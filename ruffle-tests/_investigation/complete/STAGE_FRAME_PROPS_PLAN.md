@@ -531,19 +531,17 @@ python3 ruffle-tests/verify_output.py --test=stage_object_children --diff --verb
 
 ---
 
-### Phase 9 (Deferred): Mouse input simulation
+### Phase 9 (COMPLETE): Mouse input simulation
 
-**Effort**: Large (infrastructure)
-**Impact**: `frame_size_translated_*` line 21 ("Pressed shape1")
+**Effort**: Large (infrastructure) — **Done**
+**Impact**: `frame_size_translated_*` line 21 ("Pressed shape1") — **Now passing**
 
-The `input.json` files contain simulated mouse events. Currently `verify_output.py` ignores them. To fire `onPress` on shapes, we'd need:
-1. `verify_output.py` to parse `input.json` and pass events to the runtime
-2. The runtime to simulate hit testing in trace mode
-3. The runtime to call `onPress` callbacks when a click hits an object
+Input event injection is fully implemented (see `SWFRecompDocs/plans/input-event-injection.md`):
+1. `verify_output.py` preprocesses `input.json` → line-based event file, passed as `argv[1]`
+2. C event pump in `swf_core.c` delivers events at tick boundaries
+3. Full button state machine with shape hit-testing fires `onPress`/`onRelease` callbacks
 
-This is a significant infrastructure change affecting `verify_output.py`, the runtime's main loop, and hit testing in NO_GRAPHICS mode. It is deferred until after the simpler fixes are done.
-
-Without Phase 9: `frame_size_translated_*` reach 20/21 (95%). With Phase 9: 21/21 (100%).
+Both `frame_size_translated_positive` and `frame_size_translated_negative` now pass 21/21 (100%).
 
 ---
 

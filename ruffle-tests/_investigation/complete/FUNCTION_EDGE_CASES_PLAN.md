@@ -73,7 +73,7 @@ Requires user interaction simulation (clicking on a link in a TextField). The `a
 
 ### Blocker
 
-`asfunction` (0/12) is blocked on user interaction simulation — the test requires clicking on TextField hyperlinks which triggers `asfunction:` protocol handlers. This would need the mouse event system to support clicking on text field links, which is outside the scope of this plan.
+`asfunction` (0/12) — the mouse event system is now fully implemented, but this test requires clicking on TextField hyperlinks which triggers `asfunction:` protocol handlers. This would need TextField link hit-testing (detecting which character/link is under the cursor) which is a specialized feature beyond general mouse dispatch.
 
 ### Files Modified
 

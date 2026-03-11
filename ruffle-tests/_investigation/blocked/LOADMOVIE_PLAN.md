@@ -32,7 +32,7 @@ matching our existing two-group model. See LOADMOVIE_MULTI_SWF_PLAN.md for detai
 |----------|-------|---------|
 | **getBounds on loaded clips** | movieclip_invalid_get_bounds_1-8 | getBounds returns undefined after child load; _6/_7 crash (heap_free) |
 | **RegisterClass + loadMovie** | loadmovie_registerclass (24/30) | Child class registration |
-| **Mouse events** | root_button_mode (0/10) | Needs mouse event dispatch infrastructure |
+| **Mouse events** | root_button_mode (0/10) | Mouse event dispatch now implemented; still needs loadMovie |
 | **Clip state after load** | movieclip_state_values (41/114), movieclip_library_state_values (76/78) | Image loading, URL format |
 | **Image loading methods** | movieclip_methods_with_loaded_image | MC methods on loaded image clip |
 | **loadVariables POST** | loadvariables_method | Needs log_fetch / network POST trace infra |
@@ -119,7 +119,7 @@ them into the same binary, using a dispatch mechanism to "load" them at runtime.
 | movieclip_invalid_get_bounds_6 | ❌ runtime_error | HIT_TESTING | getBounds on loaded clip |
 | movieclip_invalid_get_bounds_7 | ❌ runtime_error | HIT_TESTING | getBounds on loaded clip |
 | movieclip_invalid_get_bounds_8 | ❌ output_mismatch | HIT_TESTING | getBounds on loaded clip |
-| root_button_mode | ❌ output_mismatch | BUTTON | Needs mouse event dispatch |
+| root_button_mode | ❌ output_mismatch | BUTTON | Mouse events implemented; still needs loadMovie |
 | movieclip_state_values | ❌ output_mismatch | MOVIECLIP | Clip state after load |
 | movieclip_library_state_values | ❌ output_mismatch (77/78) | MOVIECLIP | Library state after load (segfault fixed) |
 | movieclip_methods_with_loaded_image | ❌ output_mismatch | MOVIECLIP | MC methods on loaded image |

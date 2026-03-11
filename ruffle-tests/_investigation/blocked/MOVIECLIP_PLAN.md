@@ -21,7 +21,7 @@ Last updated: 2026-02-28
 | 3 | createEmptyMovieClip + display list | **DONE** ✅ | create_empty_movie_clip PASS, place_and_lookup PASS, placeobject_occupied_depth PASS |
 | 4 | ExportAssets + attachMovie | **DONE** ✅ | attach_movie PASS, attach_movie_stop PASS, export_assets PASS, empty_movieclip_can_attach_movies PASS, movieclip_init_object PASS |
 | 5 | duplicateMovieClip + removeMovieClip | **DONE** ✅ | duplicate_movie_clip PASS, remove_movie_clip PASS, clone_sprite_types PASS, rewind_depth PASS |
-| 6 | Clip events + construction order | **MOSTLY DONE** | clip_events ✅, on_construct ✅, clip_constructors ✅, execution_order4 ✅. Blocked: clip_event_propagation_order (mouse events), do_init_action_child (recompiler) |
+| 6 | Clip events + construction order | **MOSTLY DONE** | clip_events ✅, on_construct ✅, clip_constructors ✅, execution_order4 ✅. clip_event_propagation_order needs re-evaluation (mouse events now implemented). Blocked: do_init_action_child (recompiler) |
 | 7 | getBounds / getRect | **DONE** ✅ | movieclip_getbounds 190/192 (2 lines in ACCEPTED_DIFFS: morph bounds rounding) |
 | 8 | hitTest | **DONE** ✅ | movieclip_hittest PASS, movieclip_hittest_shapeflag 266/339 (remaining needs pixel-level hit testing) |
 | 9 | localToGlobal / globalToLocal + others | **DONE** ✅ | local_to_global PASS |
@@ -68,7 +68,7 @@ Last updated: 2026-02-28
 |------|-------|---------|
 | movieclip_lockroot | 16/29 | Blocked: child clips need multi-SWF script execution (loadMovie semantics) |
 | default_names | ~12/52 | Blocked: instance counter off-by-1 + missing child sprite init ordering |
-| clip_event_propagation_order | 1/17 | Blocked: needs onMouseMove/Down/Up dispatch through clip hierarchy (MOUSE_EVENTS) |
+| clip_event_propagation_order | 1/17 | Mouse events now implemented — needs re-evaluation |
 | custom_clip_methods | 0/4 | Blocked: needs global→MC method dispatch + multi-frame child sprite execution |
 | movieclip_getbounds | 190/192 | 2 lines in ACCEPTED_DIFFS (morph bounds rounding) |
 | movieclip_invalid_get_bounds_1-5,8 | various | Blocked: need loadMovie for multi-SWF child bounds tests |

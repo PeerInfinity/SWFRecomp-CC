@@ -48,10 +48,12 @@ Buttons contain child clips placed in their state frames. In trace mode, these c
 to initialize (run their frame scripts) even without user interaction. Currently `tagDefineButton`
 discards all state_funcs and the children never execute.
 
-**Problem B — Input Event Simulation (9 tests with input.json)**
+**Problem B — Input Event Simulation (9 tests with input.json) — SOLVED**
 Tests with `input.json` files expect simulated mouse and keyboard events to trigger AS2 event
 handlers (`onRollOver`, `onPress`, `onKeyDown`, etc.) and SWF4-style button conditions
-(DoAction with condition bitmask). Currently `verify_output.py` ignores `input.json` entirely.
+(DoAction with condition bitmask). Input event injection is now fully implemented — `verify_output.py`
+preprocesses `input.json` and the C event pump in `swf_core.c` delivers all event types at tick
+boundaries with full button state machine, hit testing, and key dispatch.
 
 Both problems are independent — Phase 1 can be done without Phase 2 infrastructure.
 
@@ -239,26 +241,16 @@ python3 ruffle-tests/verify_output.py --test=movieclip_in_removed_button --diff 
 
 ## Phase 2: Input Event Simulation Infrastructure
 
-> **SUPERSEDED** — This phase is now fully covered by `SWFRecompDocs/plans/input-event-injection.md`
-> (Phases 0–4 of that plan). See that document for the authoritative design. Summary of what
-> it provides for phases 3–5 of this plan:
+> **SUPERSEDED AND COMPLETE** — This phase is fully implemented via
+> `SWFRecompDocs/plans/input-event-injection.md` (all phases done). The infrastructure includes:
 >
-> - **Phase 0**: `tag_stubs.c` deleted; `tag.c` unified; `Character`/`DisplayObject`/
->   `MouseState` unconditional in `swf.h`; `shape_data`/`transform_data` + `hit_test.c`
->   included in trace builds. Button `Character` variant and display list fully available.
-> - **Phase 1**: `verify_output.py` reads `input.json`, pre-processes to a line-based text
->   file (one event per line), passes as `argv[1]` to the test binary. Key mapping:
->   Ruffle key names → Flash key codes.
-> - **Phase 2**: Event file format (`WAIT`, `MOUSE_MOVE x y`, `MOUSE_DOWN_LEFT x y`,
->   `KEY_DOWN code`, etc.). Coordinates are Ruffle viewport pixels ÷ `scale_factor` from
->   `test.toml` → logical Flash stage pixels. C multiplies by 20 for twips.
-> - **Phase 3**: `input_events_load(argv[1])` in `swf_core.c`; per-tick pump delivers
->   events before `ng_advanceSprites`; `Wait` tokens map to tick boundaries.
-> - **Phase 4**: `KeyState keys` in `SWFAppContext` (`uint8_t down[256]`,
->   `last_key_down`); per-tick edge-flag reset; `_xmouse`/`_ymouse` read from
->   `mouse.stage_x / 20.0f`.
->
-> No tests pass from infrastructure alone — it unlocks Phases 3–5 of this plan.
+> - `verify_output.py` preprocesses `input.json` → line-based event file, passed as `argv[1]`
+> - C event pump in `swf_core.c` (`input_events_load`/`pump_tick`/`deliver`) at tick boundaries
+> - Full mouse events (move/down/up for left/middle/right, wheel), keyboard (down/up),
+>   text input, text control, focus, clipboard
+> - Button state machine with shape hit-testing, AS2 roll/drag dispatch
+> - Key dispatch with button keyPress conditions, tab focus, focused MC dispatch
+> - 13/14 button tests now pass.
 
 ---
 

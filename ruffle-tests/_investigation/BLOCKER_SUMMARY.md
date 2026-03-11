@@ -20,9 +20,9 @@ Our pipeline compiles SWF→C at build time. `loadMovie` loads external SWFs at 
 | ~~Failed load state~~ | ~~`_framesloaded`/`getBytesTotal` return `-1`~~ | ~~movieclip_state_values~~ | **DONE** |
 | ~~Child RegisterClass~~ | ~~Classes registered in child SWF's DoInitAction~~ | ~~register_class, register_class_swf6~~ | **DONE** (export-versioned lookup) |
 | MCL cross-version root replace | Closure clearing, _name reset | mcl_replace_root_swf7_to_swf5/swf6 | **ACTIONABLE** |
-| Mouse events | root_button_mode needs mouse dispatch | root_button_mode | **BLOCKED** |
+| Mouse events | Mouse dispatch now implemented | root_button_mode | **RESOLVED** (still needs loadMovie) |
 
-**Plans blocked (reduced)**: BUTTON_PLAN (root_button_mode, mouse events), HIT_TESTING_PLAN (invalid_get_bounds 1-8, display list after load)
+**Plans blocked (reduced)**: BUTTON_PLAN (root_button_mode needs loadMovie), HIT_TESTING_PLAN (invalid_get_bounds 1-8, display list after load)
 
 ---
 

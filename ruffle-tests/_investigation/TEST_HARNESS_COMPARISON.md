@@ -173,11 +173,15 @@ The entire test suite runs in NO_GRAPHICS mode:
 
 ### Input Events
 
-`input.json` support exists in `verify_output.py`:
-- Mouse events: `MouseMove`, `MouseDown`, `MouseUp`
-- Keyboard events: `KeyDown`, `KeyUp`
-- Events injected at specific frames via `SET_MOUSE_*`/`SET_KEY_*` runtime functions
-- Currently limited to tests already in `ignored_tests.txt` (interactive tests)
+Full `input.json` support implemented in `verify_output.py` + `swf_core.c`:
+- Mouse events: `MouseMove`, `MouseDown`/`MouseUp` (left, middle, right), `MouseWheel`
+- Keyboard events: `KeyDown`, `KeyUp`, `TextInput`, `TextControl` (Paste/Copy/Cut/SelectAll/Backspace/Enter/MoveLeft/MoveRight)
+- Focus events: `FocusGained`, `FocusLost`
+- Clipboard: `SetClipboardText`
+- Pipeline: `verify_output.py` preprocesses `input.json` → line-based `input_events.txt`, passed as `argv[1]` to the test binary
+- C event pump (`input_events_load`/`input_events_pump_tick`/`input_events_deliver`) in `swf_core.c` delivers events at tick boundaries via `WAIT` tokens
+- Full button state machine with shape hit-testing, AS2 roll/drag dispatch, focus acquisition, tab ordering
+- 40+ input-dependent tests now pass (buttons, mouse events, tab ordering, focus, drag/drop, text input)
 
 ---
 
@@ -193,7 +197,7 @@ The entire test suite runs in NO_GRAPHICS mode:
 | **Trace + image combined** | Yes (both in one test) | No | Major gap |
 | **Trace in graphics mode** | N/A (always has trace) | **No** (NO_GRAPHICS only) | **Major gap** |
 | **Frame count config** | `num_frames` / `num_ticks` | `num_frames` only | Minor |
-| **Input event injection** | Full (mouse, keyboard, per-frame) | Partial (exists but limited) | Minor |
+| **Input event injection** | Full (mouse, keyboard, per-frame) | Full (mouse, keyboard, text, focus, clipboard, per-frame) | Parity |
 | **FSCommand quit** | Yes | Yes | Parity |
 | **FSCommand captureImage** | Yes | No | Major gap |
 | **Known failure marking** | Yes | No | Minor |

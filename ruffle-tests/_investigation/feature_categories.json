@@ -127,7 +127,7 @@
         "mouse_events", "mouse_events_visible_enabled", "mouse_hover_events_while_dragging",
         "mouse_listeners", "mouse_pos", "mouse_pos_with_scale_factor", "mouse_wheel_enabled"
       ],
-      "description": "Needs simulated mouse/keyboard event dispatch for trace-only testing. Tests expect synthetic input events (mouse click, move, key press) to trigger onPress, onRelease, onRollOver, onRollOut, onMouseDown, onMouseUp, etc. callbacks. Also needs focus management (Selection.setFocus, moveFocus, focus rectangle drawing), and Mouse.addListener()/Mouse.removeListener() for global mouse events."
+      "description": "Mouse/keyboard event dispatch for trace-only testing. Input event injection is fully implemented — tests receive synthetic input events (mouse click, move, key press) that trigger onPress, onRelease, onRollOver, onRollOut, onMouseDown, onMouseUp, etc. callbacks. Focus management (Selection.setFocus, moveFocus, focus rectangle), Mouse.addListener()/Mouse.removeListener() for global mouse events, and button state machine with shape hit-testing are all working."
     },
     {
       "name": "Button Behavior and Events",
@@ -137,7 +137,7 @@
         "button_keypress_vs_textinput", "button_order", "button_properties_special_cases",
         "button_v5", "button_v6", "movieclip_in_removed_button", "root_button_mode"
       ],
-      "description": "Needs button event handling in trace mode. Tests need: button key events (onKeyDown/onKeyUp on buttons), button_goto (gotoAndStop from button actions), button display ordering, button property access (special cases for _name, _target, etc.), SWF5/SWF6 version-specific button behavior, and handling of buttons after their parent clip is removed."
+      "description": "Button event handling in trace mode is fully implemented. Button key events (onKeyDown/onKeyUp), button_goto (gotoAndStop from button actions), button display ordering, button property access (special cases for _name, _target, etc.), SWF5/SWF6 version-specific button behavior, and handling of buttons after their parent clip is removed — all working via input event injection and button state machine."
     },
     {
       "name": "Tab Ordering and Focus Navigation",
@@ -150,7 +150,7 @@
         "tab_ordering_movieclip_enabled_default", "tab_ordering_properties",
         "tab_ordering_reverse", "tab_ordering_tabbable"
       ],
-      "description": "Needs tab/focus navigation system. Automatic tab ordering sorts by position (top-to-bottom, left-to-right). Custom tab ordering uses tabIndex property. Tests check tabEnabled, tabIndex, tabChildren properties on MovieClips and Buttons. Requires synthetic Tab key press simulation."
+      "description": "Tab/focus navigation system is fully implemented. Automatic tab ordering sorts by position (top-to-bottom, left-to-right). Custom tab ordering uses tabIndex property. Tests check tabEnabled, tabIndex, tabChildren properties on MovieClips and Buttons. Synthetic Tab key press simulation works via input event injection."
     },
     {
       "name": "String Methods and String Paths",
@@ -317,7 +317,7 @@
       "tests": [
         "drag_drop", "drag_over_from_outside", "drag_over_without_startdrag"
       ],
-      "description": "Needs startDrag()/stopDrag() implementation with simulated mouse movement for trace testing."
+      "description": "startDrag()/stopDrag() implementation with simulated mouse movement is fully implemented. Drag tracking and virtual drag position update on mouse move events work via input event injection."
     },
     {
       "name": "Enumeration (for-in)",
@@ -396,7 +396,7 @@
       "tests": [
         "input_dead_keys_windows", "key_isToggled"
       ],
-      "description": "Needs Key object with isToggled() for checking Caps Lock/Num Lock state, and dead key input handling for international keyboards. Requires keyboard event simulation."
+      "description": "Key object with isToggled() for checking Caps Lock/Num Lock state, and dead key input handling for international keyboards. Keyboard event simulation is fully implemented via input event injection."
     },
     {
       "name": "LocalConnection",

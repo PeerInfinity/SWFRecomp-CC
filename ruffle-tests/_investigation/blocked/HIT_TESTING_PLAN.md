@@ -3,7 +3,7 @@
 
 Last updated: 2026-02-25
 
-## Status: BLOCKED (remaining tests need loadMovie, mouse events, or morph interpolation)
+## Status: BLOCKED (remaining tests need loadMovie or morph interpolation; mouse events now implemented)
 
 ---
 
@@ -19,8 +19,8 @@ Last updated: 2026-02-25
 | hittest_morph | 70 | **PASS** (70/70) ✅ | Now passing in CI |
 | movieclip_hittest_shapeflag | 338 | 266/338 (72 diff) | Was compile_fail, now output_mismatch — edge cases in triangulation approach |
 | movieclip_invalid_get_bounds_1-8 | varies | BLOCKED | Needs loadMovie infrastructure |
-| hittest_morph_input | 1 | BLOCKED | Needs mouse event dispatch |
-| text_blocks_clicks | 4 | BLOCKED | Needs mouse event dispatch |
+| hittest_morph_input | 1 | Needs re-evaluation | Mouse event dispatch now implemented |
+| text_blocks_clicks | 4 | Needs re-evaluation | Mouse event dispatch now implemented |
 
 ---
 
@@ -76,8 +76,8 @@ Fundamental fix would require vector-path-based hit testing (line segment inters
 ### movieclip_invalid_get_bounds_1-8 — BLOCKED on loadMovie
 These tests use `loadMovie`/`loadClip` to load external SWFs, which requires multi-SWF infrastructure not yet implemented.
 
-### hittest_morph_input, text_blocks_clicks — BLOCKED on Mouse Events
-Both require mouse event dispatch infrastructure (onMouseMove, onMouseDown, onPress). See MOUSE_EVENTS_PLAN.md.
+### hittest_morph_input, text_blocks_clicks — Mouse Events Now Implemented
+Both require mouse event dispatch infrastructure (onMouseMove, onMouseDown, onPress) which is now fully implemented via input event injection. These tests need re-evaluation — they were previously in `ignored_tests.txt` and have been un-ignored.
 
 ---
 

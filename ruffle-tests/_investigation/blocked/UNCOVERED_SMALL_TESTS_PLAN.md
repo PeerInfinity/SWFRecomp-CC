@@ -85,11 +85,11 @@ These tests involve multi-SWF loading (`loadMovie`), display list bounds from sh
 
 ---
 
-### Group C: Blocked by Input Simulation / Other Infrastructure
+### Group C: Other Infrastructure Blockers
 
 | Test | Lines | Current | Blocker |
 |------|-------|---------|---------|
-| string_paths_keyevents | 0 | 0/0 (empty) | 0 expected output lines — likely needs keyboard input.json simulation |
+| string_paths_keyevents | 0 | 0/0 (empty) | 0 expected output lines — test produces no trace output even with input events |
 | string_paths_timer | ? | segfault | Timer + string path interaction causes crash; needs debugging |
 | localconnection | 579 | ~74/579 (13%) | Full LocalConnection protocol (send/receive/domain management) |
 | displacementmapfilter_mappoint_throw_error | 13 | 0/13 | Error/throw from DisplacementMapFilter constructor |
@@ -97,7 +97,7 @@ These tests involve multi-SWF loading (`loadMovie`), display list bounds from sh
 
 #### string_paths_keyevents (0 lines expected)
 
-Empty expected output — test likely needs keyboard input simulation to produce output. Effectively a no-op test.
+Empty expected output — keyboard input simulation is now implemented, but this test has 0 expected lines so it produces no trace output regardless. Effectively a no-op test.
 
 #### string_paths_timer (segfault)
 

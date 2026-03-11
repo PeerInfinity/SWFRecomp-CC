@@ -291,8 +291,8 @@ Everything fits in `action.c` alongside the existing Selection stub. The impleme
 
 | Test | Expected Lines | Estimated Pass Rate | Notes |
 |------|---------------|-------------------|-------|
-| `selection` | 456 | ~85-90% after Phase 1, ~95% after Phase 2 | Lines 20-28 of selection_handlers need onRollOver/onRollOut (mouse simulation, deferred). The `selection` test should mostly pass since it's all setFocus/getFocus/setSelection. |
-| `selection_handlers` | 28 | ~64% (18/28) after Phase 1 | Lines 1-19 should pass (focus handler ordering). Lines 20-28 are onRollOver/onRollOut requiring mouse simulation — won't pass without interactive input. |
+| `selection` | 456 | ~85-90% after Phase 1, ~95% after Phase 2 | selection 454/454 PASS ✅. Mouse simulation now fully implemented. |
+| `selection_handlers` | 28 | ~64% (18/28) after Phase 1 | Lines 1-19 = focus handler ordering. Lines 20-28 = onRollOver/onRollOut — mouse simulation now implemented, needs re-evaluation. |
 
 ### Indirect test improvements
 
