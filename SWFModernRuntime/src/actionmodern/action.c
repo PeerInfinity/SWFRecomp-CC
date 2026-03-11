@@ -19896,7 +19896,6 @@ void actionFirePendingLoadInits(SWFAppContext* app_context)
         }
 
         // onLoadProgress(target_mc, bytesLoaded, bytesTotal)
-        // Flash/Ruffle fires onLoadProgress twice for fully-loaded content
         {
             ActionVar progress_args[3];
             progress_args[0] = mc_var;
@@ -19907,7 +19906,10 @@ void actionFirePendingLoadInits(SWFAppContext* app_context)
             VAL(double, &progress_args[2].data.numeric_value) = (double)loads[i].file_size;
             progress_args[2].str_size = 0;
             fireMCLEvent(app_context, loads[i].mcl, "onLoadProgress", progress_args, 3);
-            fireMCLEvent(app_context, loads[i].mcl, "onLoadProgress", progress_args, 3);
+            // Root replacement fires onLoadProgress twice (Ruffle behavior)
+            if (_phase1_switched) {
+                fireMCLEvent(app_context, loads[i].mcl, "onLoadProgress", progress_args, 3);
+            }
         }
 
         // onLoadComplete(target_mc, httpStatus=0)

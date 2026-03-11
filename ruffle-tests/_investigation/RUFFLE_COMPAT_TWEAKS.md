@@ -37,3 +37,32 @@ If future tests reveal that the +1 is wrong for other scenarios, this tweak may 
 to be conditioned on specific cases.
 
 **File**: `SWFModernRuntime/src/libswf/tag.c` — `textfield_render_cb()`
+
+---
+
+## Double onLoadProgress for Root Replacement Loads
+
+**Affected tests**: `mcl_replace_root_swf7_to_swf5`, `mcl_replace_root_swf7_to_swf6`
+
+**What we did**: When MovieClipLoader replaces the root movie, we fire `onLoadProgress` twice
+(with identical bytesLoaded/bytesTotal). Normal (non-root) loads fire it only once.
+
+```c
+fireMCLEvent(app_context, loads[i].mcl, "onLoadProgress", progress_args, 3);
+// Root replacement fires onLoadProgress twice (Ruffle behavior)
+if (_phase1_switched) {
+    fireMCLEvent(app_context, loads[i].mcl, "onLoadProgress", progress_args, 3);
+}
+```
+
+**Why**: Ruffle's `loader.rs` line 759 in `on_success_root_movie()` explicitly fires
+`movie_loader_progress()` twice with the comment "For some reason, progress event is
+dispatched twice here." This is empirically-observed Flash behavior that the Ruffle devs
+replicated without understanding the underlying reason. Normal loads in Ruffle fire progress
+only once per preload tick.
+
+**Evidence**: Both mcl_replace_root expected outputs contain two consecutive identical
+`onLoadProgress` blocks. Without the double fire, output shifts by 12 lines. Added in
+Ruffle commit 3891fb824 (Feb 2026) by Kamil Jarosz.
+
+**File**: `SWFModernRuntime/src/actionmodern/action.c` — `actionFirePendingLoadInits()`
