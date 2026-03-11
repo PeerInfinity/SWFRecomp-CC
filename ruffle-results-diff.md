@@ -1,23 +1,27 @@
 # Ruffle Test Results Diff
 
-**Previous:** `6856edc7e86f` (2026-03-10T20:42:48.671230+00:00)
-**Current:** `a5bc34f5f337` (2026-03-10T21:26:50.290749+00:00)
+**Previous:** `a5bc34f5f337` (2026-03-10T21:26:50.290749+00:00)
+**Current:** `7fcfb1185907` (2026-03-11T01:11:13.407435+00:00)
 
 ## Summary
 
 | Metric | Previous | Current | Delta |
 |--------|----------|---------|-------|
-| Passing | 509 | 509 | 0 |
+| Passing | 509 | 511 | +2 |
 | Total | 618 | 618 | 0 |
-| Pass rate | 82.4% | 82.4% | 0% |
-| Mismatched lines | 19156 | 19194 | +38 |
-|   Decreased | | | -14 |
-|   Increased | | | +52 |
+| Pass rate | 82.4% | 82.7% | +0.3% |
+| Mismatched lines | 19194 | 19177 | -17 |
+|   Decreased | | | -17 |
 
-## Status Changed (3)
+## Newly Passing (2)
 
-| Test | Previous | Current | Lines (prev) | Lines (now) |
-|------|----------|---------|--------------|-------------|
-| `movieclip_hittest_shapeflag` | compile_fail | output_mismatch | - | 286/338 |
-| `movieclip_invalid_get_bounds_6` | runtime_error | output_mismatch | 1/10 | 8/10 |
-| `movieclip_invalid_get_bounds_7` | runtime_error | output_mismatch | 1/10 | 8/10 |
+| Test | Previous Status | Lines (prev) | Lines (now) |
+|------|----------------|--------------|-------------|
+| `edittext_newlines` | output_mismatch | 23/30 | 30/30 |
+| `edittext_scroll` | output_mismatch | 52/54 | 54/54 |
+
+## Line Count Changed (1)
+
+| Test | Status | Lines (prev) | Lines (now) | Diff |
+|------|--------|--------------|-------------|------|
+| `edittext_bullet` | output_mismatch | 18/30 | 26/30 | -8 |
