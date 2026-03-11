@@ -1,26 +1,33 @@
 # Ruffle Test Results Diff
 
-**Previous:** `e946183199f9` (2026-03-11T06:19:22.169057+00:00)
-**Current:** `987ae6742549` (2026-03-11T07:10:32.888646+00:00)
+**Previous:** `987ae6742549` (2026-03-11T07:10:32.888646+00:00)
+**Current:** `77ae51d72a36` (2026-03-11T18:03:10.389685+00:00)
 
 ## Summary
 
 | Metric | Previous | Current | Delta |
 |--------|----------|---------|-------|
-| Passing | 505 | 512 | +7 |
+| Passing | 512 | 512 | 0 |
 | Total | 618 | 618 | 0 |
-| Pass rate | 81.7% | 82.8% | +1.1% |
-| Mismatched lines | 19205 | 19094 | -111 |
-|   Decreased | | | -111 |
+| Pass rate | 82.8% | 82.8% | 0% |
+| Mismatched lines | 19094 | 19093 | -1 |
+|   Decreased | | | -6 |
+|   Increased | | | +5 |
 
-## Newly Passing (7)
+## Newly Passing (1)
 
 | Test | Previous Status | Lines (prev) | Lines (now) |
 |------|----------------|--------------|-------------|
-| `mcl_loadclip` | output_mismatch | 61/149 | 149/149 |
-| `mcl_mislabeled_target` | output_mismatch | 2/6 | 6/6 |
-| `mcl_target_gif87a` | output_mismatch | 2/6 | 6/6 |
-| `mcl_target_gif89a` | output_mismatch | 2/6 | 6/6 |
-| `mcl_target_jpg` | output_mismatch | 2/6 | 6/6 |
-| `mcl_target_png` | output_mismatch | 2/6 | 6/6 |
-| `mcl_unloadclip` | output_mismatch | 2/5 | 5/5 |
+| `loadmovie_registerclass` | output_mismatch | 24/30 | 30/30 |
+
+## Newly Failing (1)
+
+| Test | New Status | Lines (prev) | Lines (now) |
+|------|-----------|--------------|-------------|
+| `loadmovie_replace_root` | output_mismatch | 5/5 | 0/5 |
+
+## Line Count Changed (1)
+
+| Test | Status | Lines (prev) | Lines (now) | Diff |
+|------|--------|--------------|-------------|------|
+| `swf5_xml_event_handler_context` | output_mismatch | 0/2 | 0/2 | 0 |
