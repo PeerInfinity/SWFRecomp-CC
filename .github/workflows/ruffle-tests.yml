@@ -142,7 +142,7 @@ jobs:
 
       - name: Upload results
         if: always()
-        uses: actions/upload-artifact@v6
+        uses: actions/upload-artifact@v7
         with:
           name: ruffle-test-results
           path: |
@@ -248,14 +248,14 @@ jobs:
         run: python3 ruffle-tests/run_tests.py
 
       - name: Upload SWFRecomp binary
-        uses: actions/upload-artifact@v6
+        uses: actions/upload-artifact@v7
         with:
           name: setup-binary
           path: SWFRecomp/build/SWFRecomp
           retention-days: 1
 
       - name: Upload recompiled test data
-        uses: actions/upload-artifact@v6
+        uses: actions/upload-artifact@v7
         with:
           name: setup-tests
           path: ruffle-tests/
@@ -285,7 +285,7 @@ jobs:
         run: sudo apt-get update && sudo apt-get install -y build-essential
 
       - name: Download SWFRecomp binary
-        uses: actions/download-artifact@v6
+        uses: actions/download-artifact@v7
         with:
           name: setup-binary
           path: SWFRecomp/build/
@@ -294,7 +294,7 @@ jobs:
         run: chmod +x SWFRecomp/build/SWFRecomp
 
       - name: Download recompiled test data
-        uses: actions/download-artifact@v6
+        uses: actions/download-artifact@v7
         with:
           name: setup-tests
           path: ruffle-tests/
@@ -311,7 +311,7 @@ jobs:
 
       - name: Upload shard results
         if: always()
-        uses: actions/upload-artifact@v6
+        uses: actions/upload-artifact@v7
         with:
           name: results-shard-${{ matrix.shard }}
           path: ruffle-tests/results-shard-${{ matrix.shard }}.json
@@ -335,7 +335,7 @@ jobs:
           fi
 
       - name: Download all shard artifacts
-        uses: actions/download-artifact@v6
+        uses: actions/download-artifact@v7
         with:
           pattern: results-shard-*
           path: artifacts
@@ -452,7 +452,7 @@ jobs:
 
       - name: Upload results
         if: always()
-        uses: actions/upload-artifact@v6
+        uses: actions/upload-artifact@v7
         with:
           name: ruffle-test-results
           path: |
