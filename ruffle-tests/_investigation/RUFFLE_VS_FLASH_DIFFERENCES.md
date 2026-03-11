@@ -75,3 +75,23 @@ However, Ruffle's expected output includes `display = block;` in each `printText
 The SWF bytecode literally does not contain the string "display" or any GetMember call for it.
 
 **Decision:** Accept 5-line permanent diff. The SWF code doesn't access `display`; the expected output reflects Ruffle's own behavior, not the SWF's intent.
+
+## MCL Callback Unset Parameter Concatenation in SWF7
+
+**Tests:** `mcl_replace_root_swf7_to_swf5`, `mcl_replace_root_swf7_to_swf6`
+
+The test defines MCL callbacks with extra parameters beyond what broadcastMessage passes. For example, `onLoadStart = function(mc, rest) { trace("rest=" + rest); }` where `rest` is not passed by the MCL (only `mc` is). In SWF7, unset function parameters are `undefined`, and Flash's string concatenation rule is `"" + undefined` = `"undefined"`.
+
+Our output correctly produces `rest=undefined` (SWF7 concatenation of undefined). Ruffle's expected output shows `rest=` (empty), suggesting either Ruffle treats unset parameters differently or Ruffle's string concatenation of undefined in this context produces an empty string.
+
+```diff
+  onLoadStart
+    d=closure var
+-   rest=
++   rest=undefined
+    _target=/
+```
+
+This affects only the `onLoadStart` callback (1 line per test). All other callbacks fire after the SWF version switch to the child's version (SWF5/6), where undefined concatenates as `""` — those lines already match.
+
+**Decision:** Accept 1-line diff per test. Our SWF7 `"" + undefined` = `"undefined"` behavior is correct per Flash spec.

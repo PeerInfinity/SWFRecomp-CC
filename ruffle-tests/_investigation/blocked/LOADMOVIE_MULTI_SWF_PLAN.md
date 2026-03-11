@@ -118,7 +118,7 @@ static ASObject* g_array_proto_legacy/modern = NULL;
 | 8 | Failed load state (`-1` values) | movieclip_state_values | ~100+ | LOW | **DONE** (load_failed flag, DeferredFailedLoad queue, getter checks) |
 | 9 | Child URL / version properties | movieclip_library_state_values (1 _url line) | ~1 | LOW | **BLOCKED** (URL format inconsistent across tests — changing risks regressions; _xmouse now works via mouse events) |
 | 10 | Sequential MCL dispatch (one-per-frame) | mcl_events_swf_version | ~50 | MEDIUM | **DONE** — mcl_events_swf_version 232/232 PASS |
-| 11 | Child RegisterClass in child scope | register_class (2 lines), register_class_swf6 (~8 lines) | ~10 | MEDIUM | **UNBLOCKED** — no longer depends on Phase 6. Actual issue: child class constructor timing/typeof |
+| 11 | Child RegisterClass in child scope | register_class ✅ (67/67), register_class_swf6 ✅ (38/38), loadmovie_registerclass (27/31) | ~4 | LOW | **MOSTLY DONE** — register_class and register_class_swf6 fully PASS. loadmovie_registerclass has 4 lines off (cross-movie attachMovie scope) |
 | 12 | Root button mode / mouse events | root_button_mode (10 lines) | ~10 | MEDIUM | Mouse events now implemented — needs re-evaluation (still requires loadMovie) |
 | 13 | `_root` scope in loaded SWFs | resolve_different_root (2 lines) | ~2 | LOW | **DONE** — resolve_different_root PASS |
 | 14 | MCL loadClip replace root (MTASC) | mcl_loadclip_replace_root (1 line) | ~1 | MEDIUM | **DONE** — mcl_loadclip_replace_root PASS |
@@ -649,8 +649,8 @@ Phase 15 (MCL Root Replace Cross-Version) ──► mcl_replace_root_swf7_to_swf
 | loadmovie_var_persistence | — | **PASS** | — | **DONE** (was undocumented) |
 | movieclip_state_values | 41/114 | 41/114 | Phase 8 DONE; remaining blocked on image loading | PARTIAL |
 | movieclip_library_state_values | 76/78 | 76/78 | Phase 9 | BLOCKED (ignored) |
-| register_class | 48/67 | 64/66 | Phase 11 (UNBLOCKED) | **ACTIONABLE** |
-| register_class_swf6 | 4/38 | ~30/38 | Phase 11 (UNBLOCKED) | **ACTIONABLE** |
+| register_class | 48/67 | **67/67** ✅ | Phase 11 | **PASS** |
+| register_class_swf6 | 4/38 | **38/38** ✅ | Phase 11 | **PASS** |
 | loadmovie_registerclass | — | 24/30 | Phase 11 | **ACTIONABLE** |
 | mcl_replace_root_swf7_to_swf5 | — | ~37/57 | Phase 15 | **ACTIONABLE** |
 | mcl_replace_root_swf7_to_swf6 | — | ~37/57 | Phase 15 | **ACTIONABLE** |

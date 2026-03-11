@@ -555,7 +555,7 @@ def _sanitize_prefix(filename):
     return name
 
 
-def generate_child_movie_file(child_swf_name, child_recomp_dir, build_dir):
+def generate_child_movie_file(child_swf_name, child_recomp_dir, build_dir, swf_file_size=0):
     """Generate a self-contained C file for a child SWF movie.
 
     Reads the recompiled C files from child_recomp_dir and generates a single
@@ -779,6 +779,7 @@ def generate_child_movie_file(child_swf_name, child_recomp_dir, build_dir):
     lines.append(f"    .frame_count = {frame_count_val},")
     lines.append(f"    .stage_width = {frame_width},")
     lines.append(f"    .stage_height = {frame_height},")
+    lines.append(f"    .file_size = {swf_file_size},")
     lines.append(f"}};")
     lines.append("")
 
@@ -915,6 +916,17 @@ def get_mock_date_time(test_dir):
     return None
 
 
+def get_self_load(test_dir):
+    """Parse self_load from test.toml if present."""
+    toml_path = test_dir / "test.toml"
+    if toml_path.exists():
+        text = toml_path.read_text()
+        m = re.search(r"self_load\s*=\s*true", text)
+        if m:
+            return True
+    return False
+
+
 def compile_native(test_dir, num_frames, build_dir, headless=False, has_image_comparisons=False):
     """Compile generated C code with runtime into native binary."""
     mem_dir = build_dir / "memory"
@@ -963,10 +975,55 @@ def compile_native(test_dir, num_frames, build_dir, headless=False, has_image_co
         child_recomp_dir = build_dir / f"_child_{_sanitize_prefix(child_swf.name)}"
         child_recomp_dir.mkdir(exist_ok=True)
         if recompile_child_swf(child_swf, child_recomp_dir):
+            child_file_size = child_swf.stat().st_size if child_swf.exists() else 0
             prefix = generate_child_movie_file(
-                child_swf.name, child_recomp_dir, build_dir)
+                child_swf.name, child_recomp_dir, build_dir, swf_file_size=child_file_size)
             if prefix:
                 child_prefixes.append(prefix)
+
+    # Handle self-loading SWFs (test.swf loads itself into a child MC)
+    self_load = get_self_load(test_dir)
+    if self_load:
+        has_children = True
+        # Parse SWF version and dimensions from constants.h
+        constants_h = build_dir / "constants.h"
+        sl_version = 8
+        sl_width = 550
+        sl_height = 400
+        sl_frame_count = 1
+        if constants_h.exists():
+            ctext = constants_h.read_text()
+            m = re.search(r"#define\s+SWF_VERSION\s+(\d+)", ctext)
+            if m: sl_version = int(m.group(1))
+            m = re.search(r"#define\s+FRAME_WIDTH\s+(\d+)", ctext)
+            if m: sl_width = int(m.group(1))
+            m = re.search(r"#define\s+FRAME_HEIGHT\s+(\d+)", ctext)
+            if m: sl_height = int(m.group(1))
+            m = re.search(r"#define\s+SWF_FRAME_COUNT\s+(\d+)", ctext)
+            if m: sl_frame_count = int(m.group(1))
+        # Get file size
+        test_swf_path = test_dir / "test.swf"
+        sl_file_size = test_swf_path.stat().st_size if test_swf_path.exists() else 0
+        # Generate a MovieEntry for test.swf that references the main movie's functions
+        lines = []
+        lines.append("// Auto-generated self-load MovieEntry for test.swf")
+        lines.append("#include <libswf/swf.h>")
+        lines.append("")
+        lines.append("extern void tagInit(SWFAppContext* app_context);")
+        lines.append("extern frame_func frame_funcs[];")
+        lines.append("")
+        lines.append("MovieEntry self_movie_entry = {")
+        lines.append('    .filename = "test.swf",')
+        lines.append("    .frame_funcs = frame_funcs,")
+        lines.append("    .init_func = tagInit,")
+        lines.append(f"    .swf_version = {sl_version},")
+        lines.append(f"    .frame_count = {sl_frame_count},")
+        lines.append(f"    .stage_width = {sl_width},")
+        lines.append(f"    .stage_height = {sl_height},")
+        lines.append(f"    .file_size = {sl_file_size},")
+        lines.append("};")
+        (build_dir / "movie_self.c").write_text("\n".join(lines))
+        child_prefixes.append("self")
 
     if has_children:
         generate_movie_registry(child_prefixes, build_dir)

@@ -23,16 +23,16 @@ matching our existing two-group model. See LOADMOVIE_MULTI_SWF_PLAN.md for detai
 
 | Category | Tests | Blocker |
 |----------|-------|---------|
-| **RegisterClass in child SWF** | register_class (64/66), register_class_swf6 (~30/38) | Child class constructor typeof/prototype — **ACTIONABLE** |
-| **MCL root replace cross-version** | mcl_replace_root_swf7_to_swf5 (~37/57), mcl_replace_root_swf7_to_swf6 (~37/57) | Closure var clearing, _name reset, onLoadProgress count — **ACTIONABLE** |
+| **RegisterClass in child SWF** | register_class ✅ (67/67), register_class_swf6 ✅ (38/38), loadmovie_registerclass (27/31) | register_class and register_class_swf6 now PASS. loadmovie_registerclass has 4 lines off (cross-movie export table isolation) |
+| **MCL root replace cross-version** | mcl_replace_root_swf7_to_swf5 (56/57), mcl_replace_root_swf7_to_swf6 (56/57) | Fixed: _name clearing, file_size from actual SWF, double onLoadProgress, SWF version switch between onLoadStart and onLoadProgress, closure scope gating. Remaining 1 line: `rest=undefined` vs `rest=` in onLoadStart (Ruffle-specific) |
 
 ### Additional loadMovie-adjacent tests (not in core 35)
 
 | Category | Tests | Blocker |
 |----------|-------|---------|
 | **getBounds on loaded clips** | movieclip_invalid_get_bounds_1-8 | getBounds returns undefined after child load; _6/_7 crash (heap_free) |
-| **RegisterClass + loadMovie** | loadmovie_registerclass (24/30) | Child class registration |
-| **Mouse events** | root_button_mode (0/10) | Mouse event dispatch now implemented; still needs loadMovie |
+| **RegisterClass + loadMovie** | loadmovie_registerclass (27/31) | Cross-movie export table isolation |
+| **Self-loading SWF** | root_button_mode ✅ (10/10) | Fixed: self_load MovieEntry + quit_swf restore + root onMouse* dispatch + child MC bounds propagation |
 | **Clip state after load** | movieclip_state_values (41/114), movieclip_library_state_values (76/78) | Image loading, URL format |
 | **Image loading methods** | movieclip_methods_with_loaded_image | MC methods on loaded image clip |
 | **loadVariables POST** | loadvariables_method | Needs log_fetch / network POST trace infra |

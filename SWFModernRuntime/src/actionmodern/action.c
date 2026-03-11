@@ -19409,7 +19409,8 @@ static ActionVar builtin_broadcaster_broadcastMessage(SWFAppContext* app_context
             ActionVar* regs = NULL;
             if (func->register_count > 0)
                 regs = (ActionVar*) HCALLOC(func->register_count, sizeof(ActionVar));
-            u8 bm_captured = func->captured_scope_count;
+            // Only restore captured scopes for SWF6+ (SWF5 has no closure semantics)
+            u8 bm_captured = (g_swf_version >= 6) ? func->captured_scope_count : 0;
             for (u8 ci = 0; ci < bm_captured; ci++) {
                 if (scope_depth < MAX_SCOPE_DEPTH) {
                     scope_is_with[scope_depth] = func->captured_scope_is_with[ci];
@@ -19423,7 +19424,8 @@ static ActionVar builtin_broadcaster_broadcastMessage(SWFAppContext* app_context
             }
             if (regs) FREE(regs);
         } else if (func->function_type == 1 && func->simple_func != NULL) {
-            u8 bm_captured_t1 = func->captured_scope_count;
+            // Only restore captured scopes for SWF6+ (SWF5 has no closure semantics)
+            u8 bm_captured_t1 = (g_swf_version >= 6) ? func->captured_scope_count : 0;
             for (u8 ci = 0; ci < bm_captured_t1; ci++) {
                 if (scope_depth < MAX_SCOPE_DEPTH) {
                     scope_is_with[scope_depth] = func->captured_scope_is_with[ci];
@@ -19499,7 +19501,9 @@ static void fireMCLEvent(SWFAppContext* app_context, ASObject* mcl,
                          const char* event_name, ActionVar* extra_args, int extra_count)
 {
     // Build args: [event_name_string, extra_args...]
+    // Zero-initialize to prevent UB when listener function reads beyond passed arg count
     ActionVar args[8];
+    memset(args, 0, sizeof(args));
     args[0] = makeStringVar(app_context, event_name);
     for (int i = 0; i < extra_count && i < 7; i++)
         args[i + 1] = extra_args[i];
@@ -19657,7 +19661,7 @@ static ActionVar builtin_mcl_loadClip(SWFAppContext* app_context, ActionVar* arg
     // Determine file size for onLoadProgress/getProgress
     int file_size = 0;
     if (entry != NULL) {
-        file_size = 68;  // default small SWF size for child SWFs
+        file_size = (entry->file_size > 0) ? (int)entry->file_size : 68;
     }
 
     // Store file size on target MC for getProgress
@@ -19845,6 +19849,11 @@ void actionFirePendingLoadInits(SWFAppContext* app_context)
                 // Note: dynamic_props clearing already happened in actionLoadClip before FlashVars were set
                 constructChildURL(loads[i].target->url, sizeof(loads[i].target->url), loads[i].entry->filename);
                 loads[i].target->swf_version = (u16)loads[i].entry->swf_version;
+                // Clear _name on root replacement (Flash clears it before callbacks fire)
+                extern MovieClip root_movieclip;
+                if (loads[i].target == &root_movieclip) {
+                    loads[i].target->name[0] = '\0';
+                }
             } else if (loads[i].is_swf_url) {
                 // Failed .swf load: still update the URL on the target MC
                 constructChildURL(loads[i].target->url, sizeof(loads[i].target->url), loads[i].url);
@@ -19855,6 +19864,9 @@ void actionFirePendingLoadInits(SWFAppContext* app_context)
     // Phase 1: Fire onLoadStart, onLoadProgress, onLoadComplete for each load (FIFO)
     // For failed .swf loads (entry==NULL && is_swf_url), skip all Phase 1 events —
     // Flash only fires onLoadError for these (handled in Phase 3).
+    // For root replacement: Ruffle replaces root BETWEEN onLoadStart and onLoadProgress,
+    // so onLoadStart fires in old movie's context, then SWF version switches to child's,
+    // then onLoadProgress/onLoadComplete fire in child's context.
     for (int i = 0; i < count; i++) {
         if (g_execution_halted) break;
         if (loads[i].entry == NULL && loads[i].is_swf_url) continue;
@@ -19863,10 +19875,28 @@ void actionFirePendingLoadInits(SWFAppContext* app_context)
         mc_var.type = ACTION_STACK_VALUE_MOVIECLIP;
         mc_var.data.numeric_value = (u64)loads[i].target;
 
-        // onLoadStart(target_mc)
+        // onLoadStart(target_mc) — fires in OLD movie context
         fireMCLEvent(app_context, loads[i].mcl, "onLoadStart", &mc_var, 1);
 
+        // For root replacement: switch SWF version to child's AFTER onLoadStart
+        // This means onLoadProgress/Complete execute under child SWF version rules:
+        // - SWF5: no closure semantics, undefined concatenates as ""
+        extern MovieClip root_movieclip;
+        int _phase1_saved_ver = 0;
+        ASObject* _phase1_saved_global = NULL;
+        int _phase1_switched = 0;
+        if (loads[i].entry != NULL && loads[i].target == &root_movieclip) {
+            _phase1_saved_ver = g_swf_version;
+            _phase1_saved_global = global_object;
+            g_swf_version = loads[i].entry->swf_version;
+            ensureSecondaryGlobalInit(app_context, loads[i].entry->swf_version);
+            if (versionGroup(g_swf_version) == 0 && g_global_legacy) global_object = g_global_legacy;
+            else if (versionGroup(g_swf_version) == 1 && g_global_modern) global_object = g_global_modern;
+            _phase1_switched = 1;
+        }
+
         // onLoadProgress(target_mc, bytesLoaded, bytesTotal)
+        // Flash/Ruffle fires onLoadProgress twice for fully-loaded content
         {
             ActionVar progress_args[3];
             progress_args[0] = mc_var;
@@ -19876,6 +19906,7 @@ void actionFirePendingLoadInits(SWFAppContext* app_context)
             progress_args[2].type = ACTION_STACK_VALUE_F64;
             VAL(double, &progress_args[2].data.numeric_value) = (double)loads[i].file_size;
             progress_args[2].str_size = 0;
+            fireMCLEvent(app_context, loads[i].mcl, "onLoadProgress", progress_args, 3);
             fireMCLEvent(app_context, loads[i].mcl, "onLoadProgress", progress_args, 3);
         }
 
@@ -19887,6 +19918,12 @@ void actionFirePendingLoadInits(SWFAppContext* app_context)
             VAL(double, &complete_args[1].data.numeric_value) = 0.0;
             complete_args[1].str_size = 0;
             fireMCLEvent(app_context, loads[i].mcl, "onLoadComplete", complete_args, 2);
+        }
+
+        // Restore SWF version if we switched (Phase 2 will switch again properly)
+        if (_phase1_switched) {
+            g_swf_version = _phase1_saved_ver;
+            global_object = _phase1_saved_global;
         }
     }
 
@@ -19913,6 +19950,8 @@ void actionFirePendingLoadInits(SWFAppContext* app_context)
             int _saved_ver = g_swf_version;
             ASObject* _saved_global = global_object;
             int _saved_child_init = g_child_swf_init;
+            extern int quit_swf;
+            int _saved_quit = quit_swf;
             g_swf_version = loads[i].entry->swf_version;
             g_child_swf_init = 1;
             ensureSecondaryGlobalInit(app_context, loads[i].entry->swf_version);
@@ -19928,18 +19967,31 @@ void actionFirePendingLoadInits(SWFAppContext* app_context)
             g_swf_version = _saved_ver;
             global_object = _saved_global;
             g_child_swf_init = _saved_child_init;
+            quit_swf = _saved_quit;  // Restore: child's quit_swf must not terminate parent
         }
     }
 
     // Phase 3: Fire onLoadInit (success) or onLoadError (failure) for each load (LIFO order)
+    // For root replacement, onLoadInit fires in child's SWF version context
     for (int i = count - 1; i >= 0; i--) {
         if (g_execution_halted) break;
         ActionVar mc_var = {0};
         mc_var.type = ACTION_STACK_VALUE_MOVIECLIP;
         mc_var.data.numeric_value = (u64)loads[i].target;
         if (loads[i].entry != NULL) {
-            // SWF loaded successfully
+            // SWF loaded successfully — fire in child's SWF version context for root loads
+            extern MovieClip root_movieclip;
+            int _p3_saved_ver = g_swf_version;
+            ASObject* _p3_saved_global = global_object;
+            if (loads[i].target == &root_movieclip) {
+                g_swf_version = loads[i].entry->swf_version;
+                ensureSecondaryGlobalInit(app_context, loads[i].entry->swf_version);
+                if (versionGroup(g_swf_version) == 0 && g_global_legacy) global_object = g_global_legacy;
+                else if (versionGroup(g_swf_version) == 1 && g_global_modern) global_object = g_global_modern;
+            }
             fireMCLEvent(app_context, loads[i].mcl, "onLoadInit", &mc_var, 1);
+            g_swf_version = _p3_saved_ver;
+            global_object = _p3_saved_global;
         } else if (loads[i].is_swf_url) {
             // .swf URL not found in registry — fire onLoadError
             ActionVar error_args[3];
@@ -44900,15 +44952,6 @@ static int mc_get_pixel_aabb_ng(MovieClip* mc, float* x1, float* y1, float* x2, 
 			float child_xmax = (float)cxmax / 20.0f;
 			float child_ymin = (float)cymin / 20.0f;
 			float child_ymax = (float)cymax / 20.0f;
-			// Apply the child's local transform if it has one
-			if (sdl[d].transform_id > 0) {
-				float a, b, c, dd, tx, ty;
-				int32_t ttx, tty;
-				// For simplicity, just expand bounds by the child's translation
-				// (Full transform would require rotating the AABB corners)
-				// For now, use the entry index (depth index in the sprite display list)
-				// The transform is typically identity+translation for simple placements
-			}
 			if (!has_bounds) {
 				bxmin = child_xmin; bxmax = child_xmax;
 				bymin = child_ymin; bymax = child_ymax;
@@ -44918,6 +44961,30 @@ static int mc_get_pixel_aabb_ng(MovieClip* mc, float* x1, float* y1, float* x2, 
 				if (child_xmax > bxmax) bxmax = child_xmax;
 				if (child_ymin < bymin) bymin = child_ymin;
 				if (child_ymax > bymax) bymax = child_ymax;
+			}
+		}
+	}
+
+	// Include bounds of dynamically-created child MCs (from child_mc_cache).
+	// This handles children created via createEmptyMovieClip + Drawing API.
+	for (int ci = 0; ci < child_mc_count; ci++) {
+		MovieClip* child = child_mc_cache[ci];
+		if (child == NULL || child->parent != mc) continue;
+		if (child->draw_has_bounds) {
+			// Child's draw bounds are in child-local coords; offset by child's position
+			float cx1 = child->x + child->draw_xmin;
+			float cx2 = child->x + child->draw_xmax;
+			float cy1 = child->y + child->draw_ymin;
+			float cy2 = child->y + child->draw_ymax;
+			if (!has_bounds) {
+				bxmin = cx1; bxmax = cx2;
+				bymin = cy1; bymax = cy2;
+				has_bounds = 1;
+			} else {
+				if (cx1 < bxmin) bxmin = cx1;
+				if (cx2 > bxmax) bxmax = cx2;
+				if (cy1 < bymin) bymin = cy1;
+				if (cy2 > bymax) bymax = cy2;
 			}
 		}
 	}
@@ -45183,6 +45250,10 @@ void actionDispatchMCMouseDown(SWFAppContext* app_context)
 		if (mc->is_button_mc || mc->ng_textfield_idx >= 0) continue;
 		mc_call_as2_handler_ng(app_context, mc, "onMouseDown", 11, NULL, 0);
 	}
+	// Also dispatch on root MovieClip (it's not in child_mc_cache, fires after children)
+	extern MovieClip root_movieclip;
+	if (root_movieclip.dynamic_props != NULL)
+		mc_call_as2_handler_ng(app_context, &root_movieclip, "onMouseDown", 11, NULL, 0);
 }
 
 // Global AS2 onMouseUp dispatch — fires on all sprite MCs that have onMouseUp handler.
@@ -45194,6 +45265,10 @@ void actionDispatchMCMouseUp(SWFAppContext* app_context)
 		if (mc->is_button_mc || mc->ng_textfield_idx >= 0) continue;
 		mc_call_as2_handler_ng(app_context, mc, "onMouseUp", 9, NULL, 0);
 	}
+	// Also dispatch on root MovieClip (it's not in child_mc_cache, fires after children)
+	extern MovieClip root_movieclip;
+	if (root_movieclip.dynamic_props != NULL)
+		mc_call_as2_handler_ng(app_context, &root_movieclip, "onMouseUp", 9, NULL, 0);
 }
 
 // ====== Focus and Tab Navigation System ======

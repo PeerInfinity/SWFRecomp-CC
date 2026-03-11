@@ -151,7 +151,7 @@ Last updated: 2026-03-10
 | INPUT_EVENTS_PLAN | **ALL PHASES COMPLETE** → `complete/` | 40+ input tests pass (buttons, mouse, tab, focus, drag, text input) | — |
 | SELECTION_PLAN | **FULLY COMPLETE** → `complete/` | selection 454/454 ✅ | — |
 | OOP_SUPER_EXTENDS_PLAN | **8/8 PASS** → `complete/` | 8/8 pass (as2_oop ✅, extends_native_type ✅, as2_super_and_this_v6 ✅, as2_super_and_this_v8 ✅, as2_super_via_manual_prototype ✅, extends_chain ✅, super_edge_cases ✅, interface_implements_op 47/47 ✅) | — |
-| REGISTERCLASS_PLAN | **ALL PHASES DONE** → `blocked/` | **15/15 pass** (+ register_class 66/66 ✅, register_class_swf6 38/38 ✅ via export-versioned lookup) | register_and_init_order 36/231 (sprite init ordering regression) |
+| REGISTERCLASS_PLAN | **ALL PHASES DONE** → `blocked/` | **15/15 pass** (+ register_class 67/67 ✅, register_class_swf6 38/38 ✅) | register_and_init_order 36/231 (sprite init ordering regression) |
 | PROTOTYPE_OBJECT_PLAN | **COMPLETE** → `complete/` | 11/12 pass | Remaining blocked on recompiler MTASC nested function bug |
 | NATIVE_INTROSPECTION_PLAN | **ALL PHASES COMPLETE** → `complete/` | 4/5 pass (native_objects_swf7/8 ✅, native_double_construct ✅, native_subclasses 190/191 ✅) | native_objects_swf6 83/84 (1 line Ruffle vs Flash diff, ignored); native_subclasses 1 line timezone diff (ignored) |
 | TELLTARGET_PLAN | **Phases 1-2 COMPLETE** → `blocked/` | 16/22 pass (14 prior + string_paths_other ✅ 36/36, string_paths_unload ✅ 1/1 via MC_REMOVAL_LIFECYCLE) | Remaining 6 tests blocked on: input.json mouse events now supported (string_paths_eval needs re-evaluation), loadMovie (string_paths_eval2), onEnterFrame per-tick (string_paths_variable_scopes), call() early-termination (removed_target_clip_scope 34/35), Ruffle trace msg (removed_base_clip_tell_target), Ruffle known_failure (string_paths_reference_launder) |
@@ -159,7 +159,7 @@ Last updated: 2026-03-10
 | FOCUS_SYSTEM_PLAN | **6/7 PASS** → `blocked/` | focus_root_movie ✅, focusrect_focuslost ✅, movieclip_focusenabled ✅, focus_mouse ✅, focus_keyboard_press ✅ (60/60), focus_mouse_rollout ✅ (4/4) | Remaining 1: focus_mouse_focusable blocked by dynamic object creation |
 | TAB_ORDERING_PLAN | **16/16 PASS** → `complete/` | All 16 tests PASS including edittext_tab_focus ✅ (13/13), tab_ordering_events_mouse ✅ (65/65), tab_ordering_automatic_order_same_position ✅ (12/12) | — |
 | DRAG_DROP_PLAN | **COMPLETE** | 4/4 pass ✅ | All tests already passing |
-| LOADMOVIE_PLAN | **31/35 core tests PASS** → `blocked/` | Phase 6 CANCELLED. Child RegisterClass ✅ DONE. | Remaining: MCL cross-version root replace (mouse events now implemented) |
+| LOADMOVIE_PLAN | **31/35 core tests PASS** → `blocked/` | Phase 6 CANCELLED. Child RegisterClass ✅ DONE. mcl_replace_root 56/57 each. root_button_mode ✅. | Remaining: loadmovie_registerclass (cross-movie export table isolation) |
 | LOADVARIABLES_PLAN | **COMPLETE** → `complete/` | 3/4 pass | loadvariables_method needs log_fetch infra (not worth it) |
 | ROOT_REPLACEMENT_PLAN | **Phases 1-4 DONE** → `blocked/` | 1/4 pass | Remaining blocked on MTASC class support + cross-version scope |
 | ASNATIVE_ASNEW_PLAN | **COMPLETE** → `complete/` | asnative 34/34 ✅, asnew 34/34 ✅ | — |

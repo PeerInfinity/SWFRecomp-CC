@@ -298,6 +298,7 @@ typedef struct MovieEntry {
 	u16 frame_count;
 	u16 stage_width;
 	u16 stage_height;
+	u32 file_size;                     // SWF file size in bytes (for onLoadProgress)
 } MovieEntry;
 
 // Find a pre-compiled movie entry by filename (defined in movie_registry.c when HAS_CHILD_MOVIES)
