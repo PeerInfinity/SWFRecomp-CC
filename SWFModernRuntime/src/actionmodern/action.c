@@ -611,6 +611,7 @@ u32 g_max_call_depth = 256;  // Default; overridden by tagScriptLimits()
 u8 g_execution_halted = 0;   // Set when recursion limit is hit; halts all further script execution
 static u32 g_call_depth = 0;
 static int g_child_swf_init = 0;  // >0 during child SWF init (MCL/loadMovie); scopes funcs to MC
+extern u8 g_current_movie_id;    // Defined in tag_stubs.c — tracks which movie is currently initializing
 
 // ==================================================================
 // Effective SWF Version (accounts for function context)
@@ -19075,13 +19076,16 @@ void actionGetURL(SWFAppContext* app_context, const char* url, const char* targe
 			// Set child SWF URL and version on target MC
 			constructChildURL(mc->url, sizeof(mc->url), entry->filename);
 			mc->swf_version = (u16)entry->swf_version;
+			mc->movie_id = entry->movie_id;
 			mc->load_failed = 0;
 			// Switch to child's SWF version during init (with per-movie global)
 			int _saved_ver = g_swf_version;
 			ASObject* _saved_global = global_object;
 			int _saved_child_init = g_child_swf_init;
+			u8 _saved_movie_id = g_current_movie_id;
 			g_swf_version = entry->swf_version;
 			g_child_swf_init = 1;
+			g_current_movie_id = entry->movie_id;
 			ensureSecondaryGlobalInit(app_context, entry->swf_version);
 			if (versionGroup(g_swf_version) == 0 && g_global_legacy) global_object = g_global_legacy;
 			else if (versionGroup(g_swf_version) == 1 && g_global_modern) global_object = g_global_modern;
@@ -19119,6 +19123,7 @@ void actionGetURL(SWFAppContext* app_context, const char* url, const char* targe
 			g_swf_version = _saved_ver;
 			global_object = _saved_global;
 			g_child_swf_init = _saved_child_init;
+			g_current_movie_id = _saved_movie_id;
 		} else if (mc != NULL) {
 			// Failed load: defer state change to next frame (async load simulation)
 			if (g_deferred_failed_load_count < MAX_DEFERRED_FAILED_LOADS) {
@@ -19175,13 +19180,16 @@ void actionGetURL(SWFAppContext* app_context, const char* url, const char* targe
 			// Set child SWF URL and version on target MC
 			constructChildURL(mc->url, sizeof(mc->url), entry->filename);
 			mc->swf_version = (u16)entry->swf_version;
+			mc->movie_id = entry->movie_id;
 			mc->load_failed = 0;
 			// Switch to child's SWF version during init (with per-movie global)
 			int _saved_ver = g_swf_version;
 			ASObject* _saved_global = global_object;
 			int _saved_child_init2 = g_child_swf_init;
+			u8 _saved_movie_id2 = g_current_movie_id;
 			g_swf_version = entry->swf_version;
 			g_child_swf_init = 1;
+			g_current_movie_id = entry->movie_id;
 			ensureSecondaryGlobalInit(app_context, entry->swf_version);
 			if (versionGroup(g_swf_version) == 0 && g_global_legacy) global_object = g_global_legacy;
 			else if (versionGroup(g_swf_version) == 1 && g_global_modern) global_object = g_global_modern;
@@ -19195,6 +19203,7 @@ void actionGetURL(SWFAppContext* app_context, const char* url, const char* targe
 			g_swf_version = _saved_ver;
 			global_object = _saved_global;
 			g_child_swf_init = _saved_child_init2;
+			g_current_movie_id = _saved_movie_id2;
 		} else if (mc != NULL) {
 			// Failed load: defer state change to next frame (async load simulation)
 			if (g_deferred_failed_load_count < MAX_DEFERRED_FAILED_LOADS) {
@@ -19816,10 +19825,12 @@ void actionImportAssets(SWFAppContext* app_context, const char* url)
 	MovieEntry* entry = findMovieEntry(url);
 	if (entry == NULL) return;
 
-	// Save/restore SWF version around imported SWF init (with per-movie global)
+	// Save/restore SWF version and movie_id around imported SWF init (with per-movie global)
 	int _saved_ver = g_swf_version;
 	ASObject* _saved_global = global_object;
+	u8 _saved_movie_id = g_current_movie_id;
 	g_swf_version = entry->swf_version;
+	g_current_movie_id = entry->movie_id;
 	ensureSecondaryGlobalInit(app_context, entry->swf_version);
 	if (versionGroup(g_swf_version) == 0 && g_global_legacy) global_object = g_global_legacy;
 	else if (versionGroup(g_swf_version) == 1 && g_global_modern) global_object = g_global_modern;
@@ -19828,6 +19839,7 @@ void actionImportAssets(SWFAppContext* app_context, const char* url)
 
 	g_swf_version = _saved_ver;
 	global_object = _saved_global;
+	g_current_movie_id = _saved_movie_id;
 }
 
 // 1. For each load (FIFO): fire onLoadStart, onLoadProgress, onLoadComplete
@@ -19952,10 +19964,13 @@ void actionFirePendingLoadInits(SWFAppContext* app_context)
             int _saved_ver = g_swf_version;
             ASObject* _saved_global = global_object;
             int _saved_child_init = g_child_swf_init;
+            u8 _saved_movie_id = g_current_movie_id;
             extern int quit_swf;
             int _saved_quit = quit_swf;
             g_swf_version = loads[i].entry->swf_version;
             g_child_swf_init = 1;
+            g_current_movie_id = loads[i].entry->movie_id;
+            if (loads[i].target != NULL) loads[i].target->movie_id = loads[i].entry->movie_id;
             ensureSecondaryGlobalInit(app_context, loads[i].entry->swf_version);
             if (versionGroup(g_swf_version) == 0 && g_global_legacy) global_object = g_global_legacy;
             else if (versionGroup(g_swf_version) == 1 && g_global_modern) global_object = g_global_modern;
@@ -19969,6 +19984,7 @@ void actionFirePendingLoadInits(SWFAppContext* app_context)
             g_swf_version = _saved_ver;
             global_object = _saved_global;
             g_child_swf_init = _saved_child_init;
+            g_current_movie_id = _saved_movie_id;
             quit_swf = _saved_quit;  // Restore: child's quit_swf must not terminate parent
         }
     }
@@ -27424,14 +27440,17 @@ void actionGetURL2(SWFAppContext* app_context, u8 send_vars_method, u8 load_targ
 			if (_gu2_mc != NULL) {
 				constructChildURL(_gu2_mc->url, sizeof(_gu2_mc->url), entry->filename);
 				_gu2_mc->swf_version = (u16)entry->swf_version;
+				_gu2_mc->movie_id = entry->movie_id;
 			}
 			// Run child in target MC context with child's SWF version (with per-movie global)
 			MovieClip* _saved_ctx = g_current_context;
 			int _saved_ver = g_swf_version;
 			ASObject* _saved_global = global_object;
 			int _saved_child_init3 = g_child_swf_init;
+			u8 _saved_movie_id3 = g_current_movie_id;
 			g_swf_version = entry->swf_version;
 			g_child_swf_init = 1;
+			g_current_movie_id = entry->movie_id;
 			ensureSecondaryGlobalInit(app_context, entry->swf_version);
 			if (versionGroup(g_swf_version) == 0 && g_global_legacy) global_object = g_global_legacy;
 			else if (versionGroup(g_swf_version) == 1 && g_global_modern) global_object = g_global_modern;
@@ -27444,6 +27463,7 @@ void actionGetURL2(SWFAppContext* app_context, u8 send_vars_method, u8 load_targ
 			g_swf_version = _saved_ver;
 			global_object = _saved_global;
 			g_child_swf_init = _saved_child_init3;
+			g_current_movie_id = _saved_movie_id3;
 		} else if (_gu2_mc != NULL) {
 			// Failed load: defer state change to next frame (async load simulation)
 			if (g_deferred_failed_load_count < MAX_DEFERRED_FAILED_LOADS) {
@@ -36193,7 +36213,8 @@ void actionCallFunction(SWFAppContext* app_context, char* str_buffer)
 				varToStringBuf(app_context, &args[1], _am_buf2, sizeof(_am_buf2));
 			}
 			int depth_val = (int)varToDouble(&args[2]);
-			size_t char_id = ng_lookupExport(_am_buf1);
+			// Per-movie export isolation: look up in the calling MC's movie's exports
+			size_t char_id = ng_lookupExportForMovie(_am_buf1, mc->movie_id);
 			if (char_id != (size_t)-1) {
 				MovieClip* attached = ng_attachMovie(app_context, char_id, _am_buf2, depth_val, mc);
 				if (attached != NULL) {
@@ -36217,7 +36238,7 @@ void actionCallFunction(SWFAppContext* app_context, char* str_buffer)
 						} else {
 							// Use the export's defining SWF version for registerClass registry lookup
 							// (Ruffle: self.movie().version() — the SWF that defines the symbol)
-							int _am_exp_ver = ng_lookupExportVersion(_am_buf1);
+							int _am_exp_ver = ng_lookupExportVersionForMovie(_am_buf1, mc->movie_id);
 							int _am_ver = _am_exp_ver ? _am_exp_ver : ((mc && mc->swf_version) ? mc->swf_version : g_swf_version);
 							void* reg_ctor = lookupRegisteredClassVersion(_am_buf1, _am_ver);
 							if (reg_ctor != NULL) {
@@ -41461,8 +41482,8 @@ void actionCallMethod(SWFAppContext* app_context, char* str_buffer)
 				}
 				int depth_val = ecmaToInt32(varToDouble(&args[2]));
 
-				// Lookup exported symbol
-				size_t char_id = ng_lookupExport(linkage_id);
+				// Lookup exported symbol (per-movie isolation)
+				size_t char_id = ng_lookupExportForMovie(linkage_id, mc->movie_id);
 				if (char_id != (size_t)-1 && new_name[0] != '\0') {
 					// Attach the movie
 					MovieClip* attached = ng_attachMovie(app_context, char_id, new_name, depth_val, mc);
@@ -41491,7 +41512,7 @@ void actionCallMethod(SWFAppContext* app_context, char* str_buffer)
 								}
 							} else {
 								// Use the export's defining SWF version for registerClass registry lookup
-								int _am_exp_ver3 = ng_lookupExportVersion(linkage_id);
+								int _am_exp_ver3 = ng_lookupExportVersionForMovie(linkage_id, mc->movie_id);
 								int _am_ver3 = _am_exp_ver3 ? _am_exp_ver3 : ((mc && mc->swf_version) ? mc->swf_version : g_swf_version);
 								void* reg_ctor = lookupRegisteredClassVersion(linkage_id, _am_ver3);
 								if (reg_ctor != NULL) {
@@ -44134,13 +44155,16 @@ void actionCallMethod(SWFAppContext* app_context, char* str_buffer)
 						// Set child SWF URL and version on target MC
 						constructChildURL(mc->url, sizeof(mc->url), entry->filename);
 						mc->swf_version = (u16)entry->swf_version;
+						mc->movie_id = entry->movie_id;
 						mc->load_failed = 0;
 						// Run the child movie's init and frame 0 with child's SWF version
 						int _saved_ver = g_swf_version;
 						ASObject* _saved_global = global_object;
 						int _saved_child_init4 = g_child_swf_init;
+						u8 _saved_movie_id4 = g_current_movie_id;
 						g_swf_version = entry->swf_version;
 						g_child_swf_init = 1;
+						g_current_movie_id = entry->movie_id;
 						ensureSecondaryGlobalInit(app_context, entry->swf_version);
 						if (versionGroup(g_swf_version) == 0 && g_global_legacy) global_object = g_global_legacy;
 						else if (versionGroup(g_swf_version) == 1 && g_global_modern) global_object = g_global_modern;
@@ -44154,6 +44178,7 @@ void actionCallMethod(SWFAppContext* app_context, char* str_buffer)
 						g_swf_version = _saved_ver;
 						global_object = _saved_global;
 						g_child_swf_init = _saved_child_init4;
+						g_current_movie_id = _saved_movie_id4;
 					} else if (mc != NULL) {
 						// Failed load: defer state change to next frame
 						if (g_deferred_failed_load_count < MAX_DEFERRED_FAILED_LOADS) {

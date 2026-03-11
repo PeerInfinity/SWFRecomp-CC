@@ -192,8 +192,12 @@ static struct {
 	char name[128];
 	size_t char_id;
 	u8 swf_version; // SWF version of the movie that defined this export
+	u8 movie_id;    // Which movie registered this export (0=main, 1+=child)
 } ng_exported_symbols[MAX_EXPORTED_SYMBOLS];
 static size_t ng_exported_symbol_count = 0;
+
+// Current movie ID — set during child movie init, used by tagRegisterExport
+u8 g_current_movie_id = 0;
 
 size_t ng_lookupExport(const char* name)
 {
@@ -206,6 +210,18 @@ size_t ng_lookupExport(const char* name)
 	return result;
 }
 
+// Look up export by name within a specific movie's export table.
+// Returns char_id or (size_t)-1 if not found. Does NOT fall back to other movies.
+size_t ng_lookupExportForMovie(const char* name, u8 movie_id)
+{
+	size_t result = (size_t)-1;
+	for (size_t i = 0; i < ng_exported_symbol_count; i++)
+		if (ng_exported_symbols[i].movie_id == movie_id
+			&& strcasecmp(ng_exported_symbols[i].name, name) == 0)
+			result = ng_exported_symbols[i].char_id;
+	return result;
+}
+
 // Returns the SWF version of the movie that exported the given symbol name.
 // Used by registerClass lookup to determine which registry (case-sensitive vs insensitive).
 int ng_lookupExportVersion(const char* name)
@@ -213,6 +229,17 @@ int ng_lookupExportVersion(const char* name)
 	int result = 0;
 	for (size_t i = 0; i < ng_exported_symbol_count; i++)
 		if (strcasecmp(ng_exported_symbols[i].name, name) == 0)
+			result = ng_exported_symbols[i].swf_version;
+	return result;
+}
+
+// Version of ng_lookupExportVersion that is scoped to a specific movie_id
+int ng_lookupExportVersionForMovie(const char* name, u8 movie_id)
+{
+	int result = 0;
+	for (size_t i = 0; i < ng_exported_symbol_count; i++)
+		if (ng_exported_symbols[i].movie_id == movie_id
+			&& strcasecmp(ng_exported_symbols[i].name, name) == 0)
 			result = ng_exported_symbols[i].swf_version;
 	return result;
 }
@@ -1495,6 +1522,7 @@ void tagRegisterExport(SWFAppContext* app_context, const char* name, size_t char
 		ng_exported_symbols[ng_exported_symbol_count].name[127] = '\0';
 		ng_exported_symbols[ng_exported_symbol_count].char_id = char_id;
 		ng_exported_symbols[ng_exported_symbol_count].swf_version = (u8)g_swf_version;
+		ng_exported_symbols[ng_exported_symbol_count].movie_id = g_current_movie_id;
 		ng_exported_symbol_count++;
 	}
 }
@@ -1631,6 +1659,7 @@ MovieClip* ng_attachMovie(SWFAppContext* app_context, size_t char_id, const char
 	MovieClip* new_mc = actionFindOrCreateMovieClip(app_context, new_name, parent);
 	if (new_mc == NULL) return NULL;
 	new_mc->is_button_mc = _am_is_button ? 1 : 0;
+	new_mc->movie_id = parent->movie_id;  // Attached clips belong to same movie as parent
 
 	// Remove any existing clone at this SWF depth BEFORE setting depth/props.
 	// clone_depth_evict may set depth=INT_MIN on the old MC at this depth,

@@ -37,7 +37,7 @@ typedef enum
 	CHAR_TYPE_BUTTON,
 } CharacterType;
 
-#define INITIAL_DICTIONARY_CAPACITY 1024
+#define INITIAL_DICTIONARY_CAPACITY 8192  // Increased to support per-movie char_id offsetting (1000 per child SWF)
 #define INITIAL_DISPLAYLIST_CAPACITY 1024
 
 // Clip event flag bits (SWF spec)
@@ -299,6 +299,7 @@ typedef struct MovieEntry {
 	u16 stage_width;
 	u16 stage_height;
 	u32 file_size;                     // SWF file size in bytes (for onLoadProgress)
+	u8 movie_id;                       // 0 = main SWF, 1+ = child SWFs (for per-movie export isolation)
 } MovieEntry;
 
 // Find a pre-compiled movie entry by filename (defined in movie_registry.c when HAS_CHILD_MOVIES)

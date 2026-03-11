@@ -1,7 +1,29 @@
 # Cross-Movie Export Table Isolation Plan
 <!-- TESTS: loadmovie_registerclass -->
 
-Last updated: 2026-03-10
+Last updated: 2026-03-11
+
+## Status: **COMPLETE** — loadmovie_registerclass 31/31 PASS
+
+### Implementation Summary (2026-03-11)
+
+Two-part fix: compile-time char_id offsetting + runtime per-movie export isolation.
+
+**Part A — Char_id Offsetting** (`verify_output.py`):
+- Each child SWF gets char_ids offset by `movie_id * 1000` (child 1 → +1000, child 2 → +2000, etc.)
+- Applied to all tag definition/placement calls in generated tagMain.c via regex
+- `INITIAL_DICTIONARY_CAPACITY` increased from 1024 to 8192 to accommodate offsets
+
+**Part B — Per-Movie Export Table** (runtime):
+- Added `movie_id` field to `ng_exported_symbols[]` entries, `MovieEntry`, and `MovieClip` structs
+- `tagRegisterExport` stores `g_current_movie_id` with each export
+- `ng_lookupExportForMovie(name, movie_id)` searches only within that movie's exports
+- Both `attachMovie` call sites (CallFunction + CallMethod) use `mc->movie_id` for scoped lookup
+- All 6 child loading paths save/restore `g_current_movie_id` and set `mc->movie_id = entry->movie_id`
+
+**Files changed**: `swf.h` (MovieEntry.movie_id, INITIAL_DICTIONARY_CAPACITY), `action.h` (MovieClip.movie_id), `tag.h` (new function decls), `tag_stubs.c` (export registry + movie_id), `action.c` (6 child load paths + 2 attachMovie paths), `verify_output.py` (char_id offsetting + movie_id in MovieEntry)
+
+**Regression tests**: 20+ tests verified passing including all multi-SWF tests.
 
 ## Problem Statement
 

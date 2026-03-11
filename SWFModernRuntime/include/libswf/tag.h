@@ -136,8 +136,11 @@ void ng_getTextExtent(u16 font_id, double font_size_px, const char* text, size_t
     double width_px, double* out_ascent, double* out_descent,
     double* out_width, double* out_height, double* out_tf_height, double* out_tf_width);
 size_t ng_lookupExport(const char* name);
+size_t ng_lookupExportForMovie(const char* name, u8 movie_id);
 int ng_lookupExportVersion(const char* name);
+int ng_lookupExportVersionForMovie(const char* name, u8 movie_id);
 int32_t ng_getSoundDuration(u16 char_id);
+extern u8 g_current_movie_id;
 void ng_on_place_object2(SWFAppContext* app_context, size_t depth, size_t char_id);
 void ng_on_remove_object(SWFAppContext* app_context, size_t depth);
 size_t ng_findDisplayEntryByName(const char* name);

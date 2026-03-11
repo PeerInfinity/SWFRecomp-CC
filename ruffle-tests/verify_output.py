@@ -555,12 +555,16 @@ def _sanitize_prefix(filename):
     return name
 
 
-def generate_child_movie_file(child_swf_name, child_recomp_dir, build_dir, swf_file_size=0):
+def generate_child_movie_file(child_swf_name, child_recomp_dir, build_dir, swf_file_size=0, movie_id=1):
     """Generate a self-contained C file for a child SWF movie.
 
     Reads the recompiled C files from child_recomp_dir and generates a single
     movie_<prefix>.c file in build_dir that wraps all symbols with a unique prefix.
     Returns the prefix used, or None on failure.
+
+    movie_id: unique ID for this child movie (1, 2, 3, ...). Used for per-movie
+    export table isolation. Char IDs are offset by movie_id * 1000 to avoid
+    dictionary collisions with the parent movie.
     """
     prefix = _sanitize_prefix(child_swf_name)
 
@@ -740,6 +744,63 @@ def generate_child_movie_file(child_swf_name, child_recomp_dir, build_dir, swf_f
         lines.append(modified)
         lines.append("")
 
+    # Apply char_id offsetting to avoid dictionary collisions with parent movie.
+    # Each child gets a fixed offset of movie_id * 1000 added to all char_ids.
+    char_id_offset = movie_id * 1000
+    if tag_main_text and char_id_offset > 0:
+        def _offset_char_id(m):
+            """Add char_id_offset to the integer char_id argument in tag calls."""
+            prefix_part = m.group(1)
+            char_id_val = int(m.group(2))
+            suffix_part = m.group(3)
+            return f"{prefix_part}{char_id_val + char_id_offset}{suffix_part}"
+
+        # tagDefineSprite(app_context, CHAR_ID, ...) — 2nd arg
+        tag_main_text = re.sub(
+            r'(tagDefineSprite\(app_context,\s*)(\d+)(\s*,)',
+            _offset_char_id, tag_main_text)
+        # tagDefineShape(app_context, CHAR_TYPE_*, CHAR_ID, ...) — 3rd arg
+        tag_main_text = re.sub(
+            r'(tagDefineShape\(app_context,\s*\w+,\s*)(\d+)(\s*,)',
+            _offset_char_id, tag_main_text)
+        # tagDefineMorphShape(app_context, CHAR_ID, ...) — 2nd arg
+        tag_main_text = re.sub(
+            r'(tagDefineMorphShape\(app_context,\s*)(\d+)(\s*,)',
+            _offset_char_id, tag_main_text)
+        # tagDefineEditText(app_context, CHAR_ID, ...) — 2nd arg
+        tag_main_text = re.sub(
+            r'(tagDefineEditText\(app_context,\s*)(\d+)(\s*,)',
+            _offset_char_id, tag_main_text)
+        # tagDefineButton(app_context, CHAR_ID, ...) — 2nd arg
+        tag_main_text = re.sub(
+            r'(tagDefineButton\(app_context,\s*)(\d+)(\s*,)',
+            _offset_char_id, tag_main_text)
+        # tagRegisterExport(app_context, "name", CHAR_ID) — 3rd arg (last, before ')')
+        tag_main_text = re.sub(
+            r'(tagRegisterExport\(app_context,\s*"[^"]*",\s*)(\d+)(\s*\))',
+            _offset_char_id, tag_main_text)
+        # tagPlaceObject2 and variants — CHAR_ID is 3rd arg (after app_context, depth)
+        # Match: tagPlaceObject2*(app_context, DEPTH, CHAR_ID, ...)
+        tag_main_text = re.sub(
+            r'(tagPlaceObject2\w*\(app_context,\s*\d+,\s*)(\d+)(\s*,)',
+            _offset_char_id, tag_main_text)
+        # tagDefineFont(app_context, CHAR_ID, ...) — 2nd arg
+        tag_main_text = re.sub(
+            r'(tagDefineFont\(app_context,\s*)(\d+)(\s*,)',
+            _offset_char_id, tag_main_text)
+        # tagDefineSoundMeta(app_context, CHAR_ID, ...) — 2nd arg
+        tag_main_text = re.sub(
+            r'(tagDefineSoundMeta\(app_context,\s*)(\d+)(\s*,)',
+            _offset_char_id, tag_main_text)
+        # tagDefineVideoMeta(app_context, CHAR_ID, ...) — 2nd arg
+        tag_main_text = re.sub(
+            r'(tagDefineVideoMeta\(app_context,\s*)(\d+)(\s*,)',
+            _offset_char_id, tag_main_text)
+        # button_N_hit_char_id references (in tagDefineButton calls)
+        # These are embedded as a bare integer argument for hit char_id.
+        # Also offset char_id references in sprite_frame_funcs arrays via
+        # tagPlaceObject2 calls inside sprite frame functions (already handled above).
+
     # Frame functions from tagMain.c
     if tag_main_text:
         modified = tag_main_text
@@ -780,6 +841,7 @@ def generate_child_movie_file(child_swf_name, child_recomp_dir, build_dir, swf_f
     lines.append(f"    .stage_width = {frame_width},")
     lines.append(f"    .stage_height = {frame_height},")
     lines.append(f"    .file_size = {swf_file_size},")
+    lines.append(f"    .movie_id = {movie_id},")
     lines.append(f"}};")
     lines.append("")
 
@@ -971,13 +1033,15 @@ def compile_native(test_dir, num_frames, build_dir, headless=False, has_image_co
     child_prefixes = []
     has_children = len(child_swfs) > 0
 
-    for child_swf in child_swfs:
+    for child_idx, child_swf in enumerate(child_swfs):
         child_recomp_dir = build_dir / f"_child_{_sanitize_prefix(child_swf.name)}"
         child_recomp_dir.mkdir(exist_ok=True)
         if recompile_child_swf(child_swf, child_recomp_dir):
             child_file_size = child_swf.stat().st_size if child_swf.exists() else 0
+            child_movie_id = child_idx + 1  # 0 = main SWF, 1+ = children
             prefix = generate_child_movie_file(
-                child_swf.name, child_recomp_dir, build_dir, swf_file_size=child_file_size)
+                child_swf.name, child_recomp_dir, build_dir,
+                swf_file_size=child_file_size, movie_id=child_movie_id)
             if prefix:
                 child_prefixes.append(prefix)
 
@@ -1021,6 +1085,7 @@ def compile_native(test_dir, num_frames, build_dir, headless=False, has_image_co
         lines.append(f"    .stage_width = {sl_width},")
         lines.append(f"    .stage_height = {sl_height},")
         lines.append(f"    .file_size = {sl_file_size},")
+        lines.append("    .movie_id = 0,")  # Self-load: same movie as parent
         lines.append("};")
         (build_dir / "movie_self.c").write_text("\n".join(lines))
         child_prefixes.append("self")
