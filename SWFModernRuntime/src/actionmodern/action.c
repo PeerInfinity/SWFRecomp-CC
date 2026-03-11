@@ -33651,10 +33651,22 @@ void actionRemoveSprite(SWFAppContext* app_context)
 			// Mark as removed — keep dynamic_props intact until pending unload fires
 			_rs_mc->avm1_removed = 1;
 			_rs_mc->depth = INT_MIN;
+			// Also mark all descendant MCs as removed (children, grandchildren, etc.)
 			for (int _rs_j = 0; _rs_j < child_mc_count; _rs_j++) {
 				if (child_mc_cache[_rs_j] == _rs_mc) {
 					child_mc_cache[_rs_j] = NULL;
-					break;
+				} else if (child_mc_cache[_rs_j] != NULL) {
+					// Check if this MC is a descendant of the removed MC
+					MovieClip* _rs_anc = child_mc_cache[_rs_j]->parent;
+					while (_rs_anc != NULL) {
+						if (_rs_anc == _rs_mc) {
+							child_mc_cache[_rs_j]->avm1_removed = 1;
+							child_mc_cache[_rs_j]->depth = INT_MIN;
+							child_mc_cache[_rs_j] = NULL;
+							break;
+						}
+						_rs_anc = _rs_anc->parent;
+					}
 				}
 			}
 			// Clear display list entry so GetVariable doesn't re-find it

@@ -1635,8 +1635,11 @@ MovieClip* ng_attachMovie(SWFAppContext* app_context, size_t char_id, const char
 	// Remove any existing clone at this SWF depth BEFORE setting depth/props.
 	// clone_depth_evict may set depth=INT_MIN on the old MC at this depth,
 	// which could be the same struct if actionFindOrCreateMovieClip reused it.
+	// Only use global clone depth system for root-level attachments; non-root
+	// children have independent depth spaces and must not collide.
 	int swf_depth = as_depth + 16384;
-	clone_depth_register(swf_depth, new_name);
+	if (parent == &root_movieclip)
+		clone_depth_register(swf_depth, new_name);
 
 	new_mc->depth = as_depth;
 	new_mc->x = 0.0f;
@@ -1787,6 +1790,35 @@ MovieClip* ng_attachMovie(SWFAppContext* app_context, size_t char_id, const char
 				else g_pending_attach_inits[g_pending_attach_init_count].export_name[0] = '\0';
 				g_pending_attach_init_count++;
 			}
+		}
+	}
+
+	// Register the new child in the parent's sprite display list so that
+	// resolveSlashPathToMC can find it (e.g., GetVariable("target2") inside base2)
+	if (parent != &root_movieclip && parent->display_obj != NULL) {
+		DisplayObject* pdobj = (DisplayObject*)parent->display_obj;
+		if (pdobj->sprite_display_list != NULL) {
+			size_t target_d = (size_t)swf_depth;
+			// Grow if needed
+			if (target_d >= pdobj->sprite_dl_capacity) {
+				size_t new_cap = target_d + 16;
+				pdobj->sprite_display_list = realloc(pdobj->sprite_display_list, new_cap * sizeof(DisplayObject));
+				memset(&pdobj->sprite_display_list[pdobj->sprite_dl_capacity], 0, (new_cap - pdobj->sprite_dl_capacity) * sizeof(DisplayObject));
+				pdobj->sprite_dl_capacity = new_cap;
+			}
+			pdobj->sprite_display_list[target_d].char_id = char_id;
+			if (pdobj->sprite_display_list[target_d].instance_name)
+				free(pdobj->sprite_display_list[target_d].instance_name);
+			pdobj->sprite_display_list[target_d].instance_name = strdup(new_name);
+			// Copy child's display list pointers if it has a display_obj
+			if (new_mc->display_obj != NULL) {
+				DisplayObject* cdobj = (DisplayObject*)new_mc->display_obj;
+				pdobj->sprite_display_list[target_d].sprite_display_list = cdobj->sprite_display_list;
+				pdobj->sprite_display_list[target_d].sprite_max_depth = cdobj->sprite_max_depth;
+				pdobj->sprite_display_list[target_d].sprite_dl_capacity = cdobj->sprite_dl_capacity;
+			}
+			if (target_d > pdobj->sprite_max_depth)
+				pdobj->sprite_max_depth = target_d;
 		}
 	}
 

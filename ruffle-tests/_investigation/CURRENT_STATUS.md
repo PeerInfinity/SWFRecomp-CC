@@ -103,6 +103,7 @@ Last updated: 2026-03-10
 | `register_class_swf6` | 38/38 ✅ | Same fix — SWF6 parent + SWF17 child cross-version registry isolation |
 | `edittext_scroll` | 54/54 ✅ | Per-run mixed-font measurement via `ng_measure_substr_mixed_twips()` |
 | `edittext_newlines` | 30/30 ✅ | Mixed-font textHeight path via `ng_computeScrollMixedFont()` |
+| `removed_target_clip_scope` | 35/35 ✅ | Scoped clone_depth_register to root-only + recursive child removal in removeMovieClip |
 
 ### Near-passing (>=90%)
 | Test | Match | Issue |
@@ -118,7 +119,7 @@ Last updated: 2026-03-10
 | Test | Before | After | Cause |
 |------|--------|-------|-------|
 | `register_and_init_order` | 146/231 | 36/231 | Constructor ordering — script halting changes |
-| `removed_target_clip_scope` | 11/35 | **34/35** | ~~7/35~~ Recovered via "this" fix + context reset. 1 remaining: child MC resolution via GetVariable in non-root sprite |
+| ~~`removed_target_clip_scope`~~ | ~~11/35~~ | **35/35 PASS** ✅ | Fixed: scope clone_depth_register to root-only (non-root children have independent depth spaces) + recursive child MC removal in removeMovieClip |
 
 ### FrameLabelEntry compile_fail (FIXED)
 202 tests had stale `FrameLabelEntry` typedef in generated tagMain.c conflicting with tag.h. Fixed by removing the stale typedefs from all generated files. The recompiler was already updated to not emit the typedef, but pre-existing generated files needed cleanup. Many tests that were compile_fail now compile and run (some pass, some have output_mismatch).

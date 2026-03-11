@@ -1610,6 +1610,9 @@ def main():
             test_results.append(entry)
             if args.verbose:
                 print("MISMATCH")
+                if run_stderr.strip():
+                    for line in run_stderr.strip().splitlines()[:200]:
+                        print(f"  stderr: {line}")
         save_incremental()
 
     # Print results
