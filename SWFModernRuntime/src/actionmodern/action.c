@@ -612,6 +612,7 @@ u8 g_execution_halted = 0;   // Set when recursion limit is hit; halts all furth
 static u32 g_call_depth = 0;
 static int g_child_swf_init = 0;  // >0 during child SWF init (MCL/loadMovie); scopes funcs to MC
 extern u8 g_current_movie_id;    // Defined in tag_stubs.c — tracks which movie is currently initializing
+static int g_use_new_invalid_bounds = 0;  // Ruffle: one-way flag, flips to 1 when getBounds/getRect called from SWF>=8
 
 // ==================================================================
 // Effective SWF Version (accounts for function context)
@@ -19427,7 +19428,16 @@ static ActionVar builtin_broadcaster_broadcastMessage(SWFAppContext* app_context
                     scope_chain[scope_depth++] = func->captured_scope[ci];
                 }
             }
+            // When listener is a MovieClip, pass 'this' as MOVIECLIP type via g_override_this
+            // so preload_this in the function sees the correct type (not OBJECT from dynamic_props)
+            if (listener_mc != NULL) {
+                g_override_this.type = ACTION_STACK_VALUE_MOVIECLIP;
+                g_override_this.data.numeric_value = (u64)listener_mc;
+                g_override_this.str_size = 0;
+                g_override_this_set = 1;
+            }
             func->advanced_func(app_context, extra_args, extra_count, regs, listener_obj);
+            if (listener_mc != NULL && g_override_this_set) g_override_this_set = 0; // clear if unconsumed
             for (u8 ci = 0; ci < bm_captured; ci++) {
                 if (scope_depth > 0) scope_depth--;
             }
@@ -19444,8 +19454,14 @@ static ActionVar builtin_broadcaster_broadcastMessage(SWFAppContext* app_context
             }
             u32 saved_this_depth_bm_t1 = g_this_depth;
             if (g_this_depth < MAX_THIS_DEPTH) {
-                g_this_stack[g_this_depth].type = ACTION_STACK_VALUE_OBJECT;
-                g_this_stack[g_this_depth].data.numeric_value = (u64)listener_obj;
+                // When listener is a MovieClip, push 'this' as MOVIECLIP type
+                if (listener_mc != NULL) {
+                    g_this_stack[g_this_depth].type = ACTION_STACK_VALUE_MOVIECLIP;
+                    g_this_stack[g_this_depth].data.numeric_value = (u64)listener_mc;
+                } else {
+                    g_this_stack[g_this_depth].type = ACTION_STACK_VALUE_OBJECT;
+                    g_this_stack[g_this_depth].data.numeric_value = (u64)listener_obj;
+                }
                 g_this_depth++;
             }
             for (u32 j = 0; j < extra_count; j++)
@@ -20256,6 +20272,10 @@ void actionDispatchEnterFrameHandlers(SWFAppContext* app_context)
 		actionSetCurrentContext(mc);
 		g_event_this_mc = mc;
 
+		// Switch to the function's SWF version context
+		int _ef_saved_ver = 0; ASObject* _ef_saved_global = NULL; int _ef_saved_midx = 0;
+		switchToFunctionVersion(func, &_ef_saved_ver, &_ef_saved_global, &_ef_saved_midx);
+
 		// Pass NULL as this_obj; the generated code's else branch uses
 		// g_event_this_mc to preload 'this' as MOVIECLIP.
 		if (func->function_type == 2 && func->advanced_func != NULL)
@@ -20300,6 +20320,7 @@ void actionDispatchEnterFrameHandlers(SWFAppContext* app_context)
 		}
 		g_event_this_mc = NULL;
 
+		restoreFunctionVersion(_ef_saved_ver, _ef_saved_global, _ef_saved_midx);
 		actionSetCurrentContext(saved_ctx);
 	}
 
@@ -42890,6 +42911,12 @@ void actionCallMethod(SWFAppContext* app_context, char* str_buffer)
 			int target_is_self = (target_mc == mc);
 			if (args != NULL) FREE(args);
 
+			// Ruffle: one-way flag flips when getBounds/getRect called from SWF>=8 activation
+			// context OR when root SWF version >= 8
+			if (!g_use_new_invalid_bounds &&
+				(g_swf_version >= 8 || root_movieclip.swf_version >= 8))
+				g_use_new_invalid_bounds = 1;
+
 			// If a target argument was provided but couldn't be resolved, return undefined
 			if (!target_resolved) {
 				pushUndefined(app_context);
@@ -43026,8 +43053,14 @@ void actionCallMethod(SWFAppContext* app_context, char* str_buffer)
 
 				if (!has_bounds) {
 					// Empty clip: return sentinel values
-					// Self-target: (2^27-1)/20 = 6710886.35, cross-target (SWF>=8): 2^27/20 = 6710886.4
-					double sentinel = target_is_self ? (134217727.0 / 20.0) : (134217728.0 / 20.0);
+					// Flag already checked/flipped above based on g_swf_version >= 8
+					int use_new = g_use_new_invalid_bounds;
+					double sentinel;
+					if (target_is_self) {
+						sentinel = 134217727.0 / 20.0;  // always 6710886.35
+					} else {
+						sentinel = use_new ? (134217728.0 / 20.0) : (134217727.0 / 20.0);
+					}
 					ASObject* bounds = allocObject(app_context, 8);
 					ActionVar v = {0}; v.type = ACTION_STACK_VALUE_F64;
 					VAL(double, &v.data.numeric_value) = sentinel;
@@ -43146,7 +43179,14 @@ void actionCallMethod(SWFAppContext* app_context, char* str_buffer)
 			}
 #endif
 			// Fallback: sentinel values
-			double sentinel = target_is_self ? (134217727.0 / 20.0) : (134217728.0 / 20.0);
+			// Flag already checked/flipped above based on g_swf_version >= 8
+			int use_new_fb = g_use_new_invalid_bounds;
+			double sentinel;
+			if (target_is_self) {
+				sentinel = 134217727.0 / 20.0;
+			} else {
+				sentinel = use_new_fb ? (134217728.0 / 20.0) : (134217727.0 / 20.0);
+			}
 			ASObject* bounds = allocObject(app_context, 8);
 			ActionVar v = {0}; v.type = ACTION_STACK_VALUE_F64;
 			VAL(double, &v.data.numeric_value) = sentinel;
