@@ -111,9 +111,9 @@ The original plan below is preserved for architectural documentation purposes. A
 | `xml_socket_on_data` | Needs `XMLSocket` | Yes |
 | `xml_socket_segmented` | Needs `XMLSocket` | Yes |
 | `xml_getbytes` | Needs `XML.load()` for `getBytesLoaded`/`getBytesTotal` | **No — should be added** |
-| `swf5_xml_event_handler_context` | Needs `loadMovie` (not actually XML) | **No — should be added** |
+| `swf5_xml_event_handler_context` | Needs `loadMovie` + XML.load() callback in child context | No (multi-SWF tests now visible in filtered results) |
 
-**Action item**: Add `xml_getbytes` and `swf5_xml_event_handler_context` to `ignored_tests.txt`.
+**Action item**: Add `xml_getbytes` to `ignored_tests.txt` (needs XML.load()). `swf5_xml_event_handler_context` left visible — loadMovie infra works, remaining issue is XML.load() callback context in child SWF.
 
 ---
 

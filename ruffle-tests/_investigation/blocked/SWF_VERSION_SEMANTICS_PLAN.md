@@ -12,8 +12,8 @@ Last updated: 2026-02-24
 | swf6_case_insensitive | 6 | 43/43 | 43 | **PASS** (Phase 1 complete) |
 | swf6_string_as_bool | 6 | 15/15 | 15 | **PASS** (Phase 2 complete) |
 | swf4_actions_coercion_order | 8 | 158/158 | 158 | **PASS** (Phase 3 complete) |
-| swf5_to_6_cross_call | 5 | 8/29 | 29 | Phase 4 — blocked on loadMovie |
-| swf6_to_5_cross_call | 6 | 10/29 | 29 | Phase 4 — blocked on loadMovie |
+| swf5_to_6_cross_call | 5 | ~10/29 | 29 | Phase 4 — blocked on per-function SWF version tracking |
+| swf6_to_5_cross_call | 6 | ~10/29 | 29 | Phase 4 — blocked on per-function SWF version tracking |
 
 ### Already passing
 - `divide_swf4` — PASS
@@ -74,7 +74,7 @@ Implemented across multiple changes. Key fixes:
 
 ---
 
-## Phase 4: Cross-Version Function Calls (BLOCKED on loadMovie)
+## Phase 4: Cross-Version Function Calls (BLOCKED on per-function version tracking)
 
 ### The Problem
 
@@ -82,16 +82,18 @@ Implemented across multiple changes. Key fixes:
 
 ### Current State
 
-Both tests have `child.swf` files that need to be loaded via loadMovie. The child's functions should execute with the child's `g_swf_version`, not the parent's.
+Both tests have `child.swf` files that are loaded via loadMovie. The multi-SWF loading infrastructure is fully implemented and working (31/35 core loadMovie tests pass). The child's functions should execute with the child's `g_swf_version`, not the parent's.
+
+Current test results (2026-03-10): swf5_to_6_cross_call ~10/29, swf6_to_5_cross_call ~10/29. The `this` binding and `_target` resolution are wrong — functions from the child execute with the parent's version semantics.
 
 ### Blocker
 
 This requires:
-1. **loadMovie child SWF support** — loading `child.swf` into a clip
+1. ~~**loadMovie child SWF support**~~ — **DONE** (multi-SWF infrastructure fully working)
 2. **Per-function SWF version tracking** — each ASFunction needs to remember which SWF version it was defined in
 3. **Version switching on call** — when calling a function from a different version, temporarily switch `g_swf_version`
 
-The loadMovie infrastructure for child SWFs exists (verify_output.py handles multi-SWF compilation), but per-function version tracking is not implemented.
+Per-function version tracking is not implemented. The `ASFunction` struct needs a `swf_version` field set at definition time, and `actionCallFunction`/`actionCallMethod` need to save/restore `g_swf_version` around the call.
 
 ### Estimated Impact
 - swf5_to_6_cross_call: requires loadMovie + version tracking

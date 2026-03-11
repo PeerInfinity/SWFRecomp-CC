@@ -43,13 +43,13 @@ Investigation docs: [XML_PLAN.md](ruffle-tests/_investigation/complete/XML_PLAN.
 
 ---
 
-## 3. LoadMovie/LoadVariables/MovieClipLoader (6 failing / 29 total)
+## 3. LoadMovie/LoadVariables/MovieClipLoader (4 failing / 35 total)
 
-Failing tests: loading_avm2 (NOT IN RESULTS), loadmovie_registerclass, loadmovienum_cross_version_prototype, loadvariables_method, mcl_replace_root_swf7_to_swf5, mcl_replace_root_swf7_to_swf6
+Failing tests: loadmovie_registerclass (27/31), mcl_replace_root_swf7_to_swf5 (56/57, accepted diff), mcl_replace_root_swf7_to_swf6 (56/57, accepted diff), loadvariables_method (needs network POST)
 
-Description: Needs runtime SWF/image loading capability. loadMovie() loads external SWF files into movie clip targets. loadMovieNum() loads into _levels. loadVariables()/loadVariablesNum() loads URL-encoded variable data. MovieClipLoader is the AS2 event-based loader with onLoadStart/onLoadComplete/onLoadInit/onLoadError callbacks and getProgress(). These all fundamentally require network/file loading which may not be feasible in the recompiler's trace-only mode.
+31/35 core loadMovie tests now PASS. Multi-SWF infrastructure fully implemented (compile-time child SWF discovery, symbol prefix isolation, MovieEntry registry). Remaining failures: cross-movie export table isolation (loadmovie_registerclass), accepted Ruffle vs Flash diffs (mcl_replace_root), network POST (loadvariables_method). loading_avm2 and mixed_avm_load_into_root are AVM2 (out of scope, in ignored_tests.txt).
 
-Investigation docs: [LOADVARIABLES_PLAN.md](ruffle-tests/_investigation/complete/LOADVARIABLES_PLAN.md), [MOVIECLIPLOADER_PLAN.md](ruffle-tests/_investigation/complete/MOVIECLIPLOADER_PLAN.md)
+Investigation docs: [LOADMOVIE_PLAN.md](ruffle-tests/_investigation/blocked/LOADMOVIE_PLAN.md), [LOADMOVIE_MULTI_SWF_PLAN.md](ruffle-tests/_investigation/blocked/LOADMOVIE_MULTI_SWF_PLAN.md), [CROSS_MOVIE_EXPORT_ISOLATION_PLAN.md](ruffle-tests/_investigation/incomplete/CROSS_MOVIE_EXPORT_ISOLATION_PLAN.md)
 
 ---
 
@@ -144,9 +144,9 @@ Description: Needs Object.registerClass() implementation for linking AS2 classes
 
 ## 16. SWF Version-Specific Behavior (2 failing / 9 total)
 
-Failing tests: swf5_to_6_cross_call, swf6_to_5_cross_call
+Failing tests: swf5_to_6_cross_call (~10/29), swf6_to_5_cross_call (~10/29)
 
-Description: Tests that verify version-dependent behavior differences: case sensitivity (SWF6 insensitive, SWF7+ sensitive), cross-version function calls between loaded movies, SWF5 closure behavior, string-as-boolean coercion, and SWF4 type coercion.
+Description: Tests that verify version-dependent behavior differences: case sensitivity (SWF6 insensitive, SWF7+ sensitive), cross-version function calls between loaded movies, SWF5 closure behavior, string-as-boolean coercion, and SWF4 type coercion. The cross_call tests now compile and run (multi-SWF loadMovie infra works), but fail due to missing per-function SWF version tracking — functions from child SWFs execute with the parent's version semantics instead of their own.
 
 ---
 
@@ -290,9 +290,9 @@ Investigation docs: [CALL_SEMANTICS_PLAN.md](ruffle-tests/_investigation/complet
 
 ## 48. Path Resolution (1 failing / 5 total)
 
-Failing tests: cross_movie_root
+Failing tests: cross_movie_root (~6/10)
 
-Description: Tests for variable path resolution via slash syntax (/clip1/clip2:var), named shape access, property access with invalid base clips, and cross-movie _root resolution.
+Description: Tests for variable path resolution via slash syntax (/clip1/clip2:var), named shape access, property access with invalid base clips, and cross-movie _root resolution. cross_movie_root loads a child SWF into _level1 and tests _root vs _level0/_level1 resolution — multi-SWF infra works, remaining issue is _lockRoot interaction with _level targets.
 
 ---
 

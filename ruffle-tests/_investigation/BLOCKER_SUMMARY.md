@@ -19,10 +19,11 @@ Our pipeline compiles SWF→C at build time. `loadMovie` loads external SWFs at 
 | ~~Per-movie `_global`~~ | ~~SWF7+ need separate `_global`~~ | ~~global_swf5_6_7_8_9, loadmovienum_cross_version_prototype~~ | **CANCELLED** (Ruffle shares `_global`) |
 | ~~Failed load state~~ | ~~`_framesloaded`/`getBytesTotal` return `-1`~~ | ~~movieclip_state_values~~ | **DONE** |
 | ~~Child RegisterClass~~ | ~~Classes registered in child SWF's DoInitAction~~ | ~~register_class, register_class_swf6~~ | **DONE** (export-versioned lookup) |
-| MCL cross-version root replace | Closure clearing, _name reset | mcl_replace_root_swf7_to_swf5/swf6 | **ACTIONABLE** |
-| Mouse events | Mouse dispatch now implemented | root_button_mode | **RESOLVED** (still needs loadMovie) |
+| ~~MCL cross-version root replace~~ | ~~Closure clearing, _name reset~~ | mcl_replace_root_swf7_to_swf5/swf6 (56/57 each) | **DONE** (1 line accepted diff per test) |
+| ~~Mouse events~~ | ~~Mouse dispatch now implemented~~ | ~~root_button_mode~~ | **RESOLVED** — root_button_mode **10/10 PASS** |
+| Cross-movie export isolation | Per-movie char_id and export table scoping | loadmovie_registerclass (27/31) | **ACTIONABLE** (see CROSS_MOVIE_EXPORT_ISOLATION_PLAN.md) |
 
-**Plans blocked (reduced)**: BUTTON_PLAN (root_button_mode needs loadMovie), HIT_TESTING_PLAN (invalid_get_bounds 1-8, display list after load)
+**Plans blocked (reduced)**: HIT_TESTING_PLAN (invalid_get_bounds 1-8, display list after load). Multi-SWF tests now visible in filtered results (removed from ignored_tests.txt).
 
 ---
 

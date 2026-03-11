@@ -165,8 +165,8 @@ Last updated: 2026-03-10
 | ASNATIVE_ASNEW_PLAN | **COMPLETE** → `complete/` | asnative 34/34 ✅, asnew 34/34 ✅ | — |
 | LOADMOVIE_REMAINING_PLAN | **Partially blocked** | 0/5 | dynamic_props clearing done; var_persistence needs setTimeout; others need cross-version/__proto__ |
 | UNLOAD_PLAN | **MOSTLY DONE** | 5/6 pass (unload 52/52 ✅, unload_clip_event, unloadmovie, unloadmovie_method, unloadmovienum ✅) | unload_nested_child (0/5) |
-| BUTTON_PLAN | **13/14 PASS** → `blocked/` | + button_keypress_vs_tab ✅, button_keypress_vs_textinput ✅ (TF onChanged, commit c6722fa5) | Remaining 1: root_button_mode (loadMovie) |
-| SWF_VERSION_SEMANTICS_PLAN | **Phases 1-3 COMPLETE** → `blocked/` | 3/5 pass | Phase 4 blocked on loadMovie + per-function version tracking |
+| BUTTON_PLAN | **14/14 PASS** → `complete/` | + root_button_mode ✅ (self-load + root onMouse dispatch + child MC bounds) | — |
+| SWF_VERSION_SEMANTICS_PLAN | **Phases 1-3 COMPLETE** → `blocked/` | 3/5 pass | Phase 4: loadMovie infra done, blocked on per-function SWF version tracking |
 | THIS_BINDING_PLAN | **FULLY COMPLETE** → `complete/` | 5/5 pass (this_swf5/6 ✅, mutable_this ✅, swf5_no_closure ✅, this_scoping ✅) | — |
 | HIT_TESTING_PLAN | **Phases 1-6 DONE** → `blocked/` | 5 PASS (hittest_morph now ✅) + movieclip_hittest_shapeflag 266/338 | Remaining blocked by loadMovie (mouse events now implemented) |
 | EXTERNAL_INTERFACE_PLAN | **Phases 1-3 COMPLETE** → `complete/` | 6/7 pass (645 lines): escapexml ✅, unescapexml ✅, jsquotestring ✅, toxml_basic ✅, toxml_array ✅, toas_basic ✅ | Phase 4 (JS bridge) blocked — no JS environment |
@@ -185,13 +185,14 @@ Last updated: 2026-03-10
 2. ~~**Font metrics accuracy**~~ — ✅ MOSTLY FIXED: edittext_scroll 54/54 PASS, edittext_newlines 30/30 PASS, edittext_bullet 26/30 (4 textHeight lines: bounding box model mismatch, 3px diff).
 3. **removed_target_clip_scope** (34/35) — child MC resolution via GetVariable in non-root sprite context.
 4. **register_and_init_order** (36/231) — constructor ordering regression from script halting changes.
-5. **MCL cross-version root replace** (Phase 15) — mcl_replace_root_swf7_to_swf5/swf6 (14/57, 17/57). Far from passing.
+5. ~~**MCL cross-version root replace**~~ — mcl_replace_root_swf7_to_swf5/swf6 now **56/57 each**. Remaining 1 line: `rest=undefined` vs `rest=` (accepted Ruffle vs Flash diff).
 
 ### Quick wins exhausted
 All simple fixes have been applied. Remaining failing tests require:
 - ~~Font metrics improvements (mixed-font line height)~~ — **MOSTLY RESOLVED** (edittext_scroll + edittext_newlines now PASS)
 - Mouse event dispatch (rollover/rollout, shape-flag hitTest)
-- LoadMovie infrastructure improvements (parent getBounds after child load)
+- Cross-movie export table isolation (loadmovie_registerclass, see CROSS_MOVIE_EXPORT_ISOLATION_PLAN.md)
+- Per-function SWF version tracking (swf5_to_6_cross_call, swf6_to_5_cross_call)
 - Deep architectural changes (constructor ordering, call() termination, closure capture)
 
 ### Remaining blocked work (from blocked/ plans)
@@ -202,7 +203,7 @@ All simple fixes have been applied. Remaining failing tests require:
 - **TYPE_COERCION_ADVANCED_PLAN** — coerce_to_object_monkeypatch blocked by closure variable capture (not feasible).
 
 ### Dependency Blockers (plans blocking other plans)
-- **LOADMOVIE_PLAN** (reduced blocker): Phase 6 cancelled. Remaining loadMovie issues block: BUTTON_PLAN (root_button_mode, mouse events), some getBounds tests.
+- **LOADMOVIE_PLAN** (reduced blocker): 31/35 core tests PASS. root_button_mode ✅. Remaining: loadmovie_registerclass (cross-movie export isolation), mcl_replace_root accepted diffs, some getBounds tests. Multi-SWF tests now visible in filtered results (removed from ignored_tests.txt).
 - **FOCUS_SYSTEM_PLAN** — 7/7 pass (focus_remove ✅ newly fixed). TAB_ORDERING_PLAN fully complete (16/16). Only focus_mouse_focusable (0/8) blocked by dynamic object creation.
 
 ### Session notes (2026-03-10 font metrics)

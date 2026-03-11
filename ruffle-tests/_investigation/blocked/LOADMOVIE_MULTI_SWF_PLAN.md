@@ -119,10 +119,10 @@ static ASObject* g_array_proto_legacy/modern = NULL;
 | 9 | Child URL / version properties | movieclip_library_state_values (1 _url line) | ~1 | LOW | **BLOCKED** (URL format inconsistent across tests — changing risks regressions; _xmouse now works via mouse events) |
 | 10 | Sequential MCL dispatch (one-per-frame) | mcl_events_swf_version | ~50 | MEDIUM | **DONE** — mcl_events_swf_version 232/232 PASS |
 | 11 | Child RegisterClass in child scope | register_class ✅ (67/67), register_class_swf6 ✅ (38/38), loadmovie_registerclass (27/31) | ~4 | LOW | **MOSTLY DONE** — register_class and register_class_swf6 fully PASS. loadmovie_registerclass has 4 lines off (cross-movie attachMovie scope) |
-| 12 | Root button mode / mouse events | root_button_mode (10 lines) | ~10 | MEDIUM | Mouse events now implemented — needs re-evaluation (still requires loadMovie) |
+| 12 | Root button mode / mouse events | root_button_mode ✅ (10/10) | 0 | LOW | **DONE** — self-load MovieEntry + root onMouse dispatch + child MC bounds |
 | 13 | `_root` scope in loaded SWFs | resolve_different_root (2 lines) | ~2 | LOW | **DONE** — resolve_different_root PASS |
 | 14 | MCL loadClip replace root (MTASC) | mcl_loadclip_replace_root (1 line) | ~1 | MEDIUM | **DONE** — mcl_loadclip_replace_root PASS |
-| 15 | MCL root replace cross-version | mcl_replace_root_swf7_to_swf5/swf6 (~10 lines each) | ~20 | MEDIUM | **NEW** — closure var clearing, _name reset, onLoadProgress event count |
+| 15 | MCL root replace cross-version | mcl_replace_root_swf7_to_swf5/swf6 (56/57 each) | 1 each | LOW | **DONE** — 1 accepted diff per test (`rest=undefined` vs `rest=`, Ruffle vs Flash) |
 
 ---
 
@@ -651,13 +651,13 @@ Phase 15 (MCL Root Replace Cross-Version) ──► mcl_replace_root_swf7_to_swf
 | movieclip_library_state_values | 76/78 | 76/78 | Phase 9 | BLOCKED (ignored) |
 | register_class | 48/67 | **67/67** ✅ | Phase 11 | **PASS** |
 | register_class_swf6 | 4/38 | **38/38** ✅ | Phase 11 | **PASS** |
-| loadmovie_registerclass | — | 24/30 | Phase 11 | **ACTIONABLE** |
-| mcl_replace_root_swf7_to_swf5 | — | ~37/57 | Phase 15 | **ACTIONABLE** |
-| mcl_replace_root_swf7_to_swf6 | — | ~37/57 | Phase 15 | **ACTIONABLE** |
+| loadmovie_registerclass | — | 27/31 | Phase 11 | **ACTIONABLE** (cross-movie export isolation, see CROSS_MOVIE_EXPORT_ISOLATION_PLAN.md) |
+| mcl_replace_root_swf7_to_swf5 | — | **56/57** | Phase 15 | **DONE** (1 accepted diff: `rest=undefined` vs `rest=`) |
+| mcl_replace_root_swf7_to_swf6 | — | **56/57** | Phase 15 | **DONE** (1 accepted diff: `rest=undefined` vs `rest=`) |
 | sandbox_type_remote | 1/3 | 1/3 | Needs network loading | BLOCKED |
-| root_button_mode | 0/10 | 0/10 | Phase 12 (mouse done; needs loadMovie) | BLOCKED |
+| root_button_mode | 0/10 | **10/10** ✅ | Phase 12 | **PASS** (self-load + root onMouse + child MC bounds) |
 
-**Remaining actionable**: Phase 11 (child RegisterClass) is now unblocked — ~10 lines across register_class + register_class_swf6. Phase 15 (MCL cross-version root replace) has ~20 lines of closure/name clearing fixes.
+**Remaining actionable**: loadmovie_registerclass (27/31) needs cross-movie export table isolation (char_id offsetting + per-movie export scoping). See `CROSS_MOVIE_EXPORT_ISOLATION_PLAN.md`.
 
 **Key insight**: Phase 6 was cancelled. The "biggest blocker" turned out to be unnecessary — Ruffle shares `_global` across movies, matching our existing model.
 
