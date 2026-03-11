@@ -28762,11 +28762,11 @@ void actionSetMember(SWFAppContext* app_context)
 							VAL(double, &fid_val.data.numeric_value) = (double)found_fid;
 							setProperty(app_context, props, "_tf_fontId", 10, &fid_val);
 						}
-						// Sync leading
+						// Sync leading (htmlText replaces all text formatting; convert pixels → twips)
 						{
 							ActionVar ld_val = {0};
 							ld_val.type = ACTION_STACK_VALUE_F64;
-							VAL(double, &ld_val.data.numeric_value) = (double)first_run->leading;
+							VAL(double, &ld_val.data.numeric_value) = (double)(first_run->leading * 20);
 							setProperty(app_context, props, "_tf_leading", 11, &ld_val);
 						}
 					}
@@ -29729,6 +29729,11 @@ static __attribute__((noinline)) int computeTextFieldDimension(
 			block_indent_twips = (int)(bi * 20.0);
 		}
 		left_margin_twips += block_indent_twips;
+
+		// Bullet indent: 36 pixels (720 twips) added to left margin when bullet=true
+		ActionVar* bul_prop = getProperty((ASObject*)mc->dynamic_props, "_tf_bullet", 10);
+		if (bul_prop != NULL && bul_prop->type == ACTION_STACK_VALUE_BOOLEAN && bul_prop->data.numeric_value)
+			left_margin_twips += 720;
 	}
 
 	if (is_width) {
@@ -29742,15 +29747,50 @@ static __attribute__((noinline)) int computeTextFieldDimension(
 		}
 		int ls_twips = getLetterSpacingTwips(mc);
 		setDeviceFontModeForMC(mc);
-		*out_result = (double)(ng_computeTextWidth(font_id, font_height, utf8, utf8_len,
+		int tw_twips = ng_computeTextWidth(font_id, font_height, utf8, utf8_len,
 		    word_wrap, field_width_twips, g_swf_version,
-		    left_margin_twips, right_margin_twips, indent_twips, align, ls_twips) / 20);
+		    left_margin_twips, right_margin_twips, indent_twips, align, ls_twips);
+		*out_result = (double)(tw_twips / 20);
 	} else {
 		int ls_twips = getLetterSpacingTwips(mc);
 		setDeviceFontModeForMC(mc);
-		*out_result = (double)(ng_computeTextHeight(font_id, font_height, leading, utf8, utf8_len,
+		// Check for mixed font runs (HTML text with different font sizes)
+		TFRunTable* run_table = tf_find_table(mc);
+		int has_mixed = 0;
+		if (run_table && run_table->run_count > 1) {
+			u16 first_fh = (u16)run_table->runs[0].font_height;
+			for (size_t ri = 1; ri < run_table->run_count; ri++) {
+				if ((u16)run_table->runs[ri].font_height != first_fh) { has_mixed = 1; break; }
+			}
+		}
+		if (has_mixed) {
+			u32 run_starts[512], run_lengths[512];
+			u16 run_font_heights[512];
+			int rc = (int)run_table->run_count;
+			if (rc > 512) rc = 512;
+			for (int r = 0; r < rc; r++) {
+				run_starts[r] = run_table->runs[r].start;
+				run_lengths[r] = run_table->runs[r].length;
+				run_font_heights[r] = (u16)run_table->runs[r].font_height;
+			}
+			int th_twips = 0;
+			ng_computeScrollMixedFont(font_id, font_height, leading,
+				utf8, utf8_len,
+				word_wrap, field_width_twips, g_swf_version,
+				left_margin_twips, right_margin_twips, indent_twips, ls_twips,
+				0.0f, 1,
+				run_starts, run_lengths, run_font_heights, rc,
+				NULL, NULL, &th_twips);
+			*out_result = (double)(th_twips / 20);
+		} else {
+			int th_twips = ng_computeTextHeight(font_id, font_height, leading, utf8, utf8_len,
+			    word_wrap, field_width_twips, g_swf_version,
+			    left_margin_twips, right_margin_twips, indent_twips, ls_twips);
+			*out_result = (double)(th_twips / 20);
+		}
+		int lc = ng_computeTextLineCount(font_id, font_height, utf8, utf8_len,
 		    word_wrap, field_width_twips, g_swf_version,
-		    left_margin_twips, right_margin_twips, indent_twips, ls_twips) / 20);
+		    left_margin_twips, right_margin_twips, indent_twips, ls_twips);
 	}
 	return 1;
 }
@@ -29882,6 +29922,11 @@ static size_t extractTextFieldParams(SWFAppContext* app_context, MovieClip* mc,
 			block_indent_twips = (int)(bi * 20.0);
 		}
 		left_margin_twips += block_indent_twips;
+
+		// Bullet indent: 36 pixels (720 twips) added to left margin when bullet=true
+		ActionVar* bul_prop = getProperty((ASObject*)mc->dynamic_props, "_tf_bullet", 10);
+		if (bul_prop != NULL && bul_prop->type == ACTION_STACK_VALUE_BOOLEAN && bul_prop->data.numeric_value)
+			left_margin_twips += 720;
 	}
 
 	*out_font_id = font_id;
@@ -30015,30 +30060,73 @@ static __attribute__((noinline)) int computeScrollProperty(
 		return 1;
 	}
 
-	int total_lines = ng_computeTextLineCount(font_id, font_height, utf8, utf8_len,
-		word_wrap, field_width_twips, g_swf_version,
-		left_margin_twips, right_margin_twips, indent_twips, ls_twips);
-	int visible_lines = ng_computeVisibleLines(font_id, font_height, leading, mc->height);
-
-	int maxscroll = total_lines - visible_lines + 1;
-	if (maxscroll < 1) maxscroll = 1;
-
-	if (is_maxscroll) {
-		*out_result = (double)maxscroll;
-	} else {
-		// bottomScroll = scroll + visible_lines - 1, clamped to total_lines
-		ASObject* props = (ASObject*)mc->dynamic_props;
-		ActionVar* scroll_var = getProperty(props, "scroll", 6);
-		int scroll = 1;
-		if (scroll_var && (scroll_var->type == ACTION_STACK_VALUE_F64 || scroll_var->type == ACTION_STACK_VALUE_F32)) {
-			scroll = (int)varToDoubleSimple(scroll_var);
-			if (scroll < 1) scroll = 1;
-			if (scroll > maxscroll) scroll = maxscroll;
+	// Check if we have mixed-font TFRun data
+	TFRunTable* run_table = tf_find_table(mc);
+	int has_mixed_fonts = 0;
+	if (run_table && run_table->run_count > 1) {
+		// Check if any run has a different font_height
+		for (u32 r = 1; r < run_table->run_count; r++) {
+			if (run_table->runs[r].font_height != run_table->runs[0].font_height) {
+				has_mixed_fonts = 1;
+				break;
+			}
 		}
-		int bottom = scroll + visible_lines - 1;
-		if (bottom > total_lines) bottom = total_lines;
-		if (bottom < 1) bottom = 1;
-		*out_result = (double)bottom;
+	}
+
+	// Get current scroll value (needed for both paths)
+	ASObject* props = (ASObject*)mc->dynamic_props;
+	ActionVar* scroll_var = getProperty(props, "scroll", 6);
+	int scroll = 1;
+	if (scroll_var && (scroll_var->type == ACTION_STACK_VALUE_F64 || scroll_var->type == ACTION_STACK_VALUE_F32)) {
+		scroll = (int)varToDoubleSimple(scroll_var);
+		if (scroll < 1) scroll = 1;
+	}
+
+	if (has_mixed_fonts) {
+		// Mixed-font path: use per-line heights
+		u32 run_starts[512], run_lengths[512];
+		u16 run_font_heights[512];
+		int rc = (int)run_table->run_count;
+		if (rc > 512) rc = 512;
+		for (int r = 0; r < rc; r++) {
+			run_starts[r] = run_table->runs[r].start;
+			run_lengths[r] = run_table->runs[r].length;
+			run_font_heights[r] = (u16)run_table->runs[r].font_height;
+		}
+		int maxscroll, bottomscroll;
+		ng_computeScrollMixedFont(font_id, font_height, leading,
+			utf8, utf8_len,
+			word_wrap, field_width_twips, g_swf_version,
+			left_margin_twips, right_margin_twips, indent_twips, ls_twips,
+			mc->height, scroll,
+			run_starts, run_lengths, run_font_heights, rc,
+			&maxscroll, &bottomscroll, NULL);
+		if (scroll > maxscroll) scroll = maxscroll;
+		if (is_maxscroll) {
+			*out_result = (double)maxscroll;
+		} else {
+			*out_result = (double)bottomscroll;
+		}
+	} else {
+		// Uniform font path: original algorithm
+		int total_lines = ng_computeTextLineCount(font_id, font_height, utf8, utf8_len,
+			word_wrap, field_width_twips, g_swf_version,
+			left_margin_twips, right_margin_twips, indent_twips, ls_twips);
+		int visible_lines = ng_computeVisibleLines(font_id, font_height, leading, mc->height);
+
+		int maxscroll = total_lines - visible_lines + 1;
+		if (maxscroll < 1) maxscroll = 1;
+
+		if (is_maxscroll) {
+			*out_result = (double)maxscroll;
+		} else {
+			// bottomScroll = scroll + visible_lines - 1, clamped to total_lines
+			if (scroll > maxscroll) scroll = maxscroll;
+			int bottom = scroll + visible_lines - 1;
+			if (bottom > total_lines) bottom = total_lines;
+			if (bottom < 1) bottom = 1;
+			*out_result = (double)bottom;
+		}
 	}
 	return 1;
 }
@@ -41655,6 +41743,14 @@ void actionCallMethod(SWFAppContext* app_context, char* str_buffer)
 						margin_val.data.numeric_value = ls_prop->data.numeric_value;
 						if (mc->dynamic_props) setProperty(app_context, (ASObject*)mc->dynamic_props, "_tf_letterSpacing", 17, &margin_val);
 					}
+					// Store bullet property for text width/height computation
+					ActionVar* bul_prop = getProperty(fmt_obj, "bullet", 6);
+					if (bul_prop != NULL && bul_prop->type == ACTION_STACK_VALUE_BOOLEAN) {
+						ActionVar bul_val = {0};
+						bul_val.type = ACTION_STACK_VALUE_BOOLEAN;
+						bul_val.data.numeric_value = bul_prop->data.numeric_value;
+						if (mc->dynamic_props) setProperty(app_context, (ASObject*)mc->dynamic_props, "_tf_bullet", 10, &bul_val);
+					}
 				}
 			}
 			// Modify format runs for HTML text field
@@ -41928,6 +42024,14 @@ void actionCallMethod(SWFAppContext* app_context, char* str_buffer)
 				if (ls_prop != NULL && ls_prop->type == ACTION_STACK_VALUE_F64) {
 					margin_val.data.numeric_value = ls_prop->data.numeric_value;
 					if (mc->dynamic_props) setProperty(app_context, (ASObject*)mc->dynamic_props, "_tf_letterSpacing", 17, &margin_val);
+				}
+				// Store bullet property for text width/height computation
+				ActionVar* bul_prop = getProperty(fmt_obj, "bullet", 6);
+				if (bul_prop != NULL && bul_prop->type == ACTION_STACK_VALUE_BOOLEAN) {
+					ActionVar bul_val = {0};
+					bul_val.type = ACTION_STACK_VALUE_BOOLEAN;
+					bul_val.data.numeric_value = bul_prop->data.numeric_value;
+					if (mc->dynamic_props) setProperty(app_context, (ASObject*)mc->dynamic_props, "_tf_bullet", 10, &bul_val);
 				}
 				// Store text alignment from TextFormat
 				ActionVar* al_prop = getProperty(fmt_obj, "align", 5);

@@ -815,13 +815,16 @@ static int ng_wrap_count_lines(int font_idx, int em, u16 font_height,
 				} else if (ng_device_font_mode ? (_wr_ls > 0) : (letter_spacing_twips > 0)) {
 					gw = ng_device_font_mode ? _wr_ls : letter_spacing_twips;
 				}
-				if (char_w + gw > cur_avail && last_fitting_pos > seg_start)
+				if (char_w + gw > cur_avail && last_fitting_pos > seg_start) {
 					break;
+				}
 				char_w += gw;
 				last_fitting_pos = next_pos;
 				last_fitting_w = char_w;
-				if (is_swf8 && last_fitting_pos > seg_start && char_w > cur_avail)
+				if (is_swf8 && last_fitting_pos > seg_start && char_w > cur_avail) {
 					break;
+				}
+				char_pos = next_pos;
 			}
 			if (last_fitting_pos == seg_start) {
 				size_t tmp = seg_start;
@@ -830,6 +833,7 @@ static int ng_wrap_count_lines(int font_idx, int em, u16 font_height,
 				last_fitting_w = ng_measure_substr_twips(font_idx, em, font_height, text, seg_start, last_fitting_pos, letter_spacing_twips);
 			}
 			if (last_fitting_w > max_line_w) max_line_w = last_fitting_w;
+			if (last_fitting_w > max_line_w_full) max_line_w_full = last_fitting_w;
 			// Start new line with remainder (subsequent lines don't have indent)
 			line_count++;
 			cur_line_w = 0;
@@ -890,7 +894,7 @@ int ng_computeTextWidth(u16 font_id, u16 font_height, const char* text, size_t t
 				if (cur_width_twips > max_width_twips) max_width_twips = cur_width_twips;
 				cur_width_twips = 0;
 				cur_trimmed_twips = 0;
-				if (c == '\r' && i + 1 < text_len && text[i + 1] == '\n') i += 2; else i++;
+				i++;
 				continue;
 			}
 			u16 code_point = ng_decode_utf8_char(text, text_len, &i);
@@ -943,9 +947,6 @@ int ng_computeTextWidth(u16 font_id, u16 font_height, const char* text, size_t t
 			    &line_max_w, &line_max_w_full, letter_spacing_twips);
 			int w = use_full ? line_max_w_full : line_max_w;
 			if (w > max_width_twips) max_width_twips = w;
-			if (is_newline) {
-				if (text[i] == '\r' && i + 1 < text_len && text[i + 1] == '\n') i++;
-			}
 			line_start = i + 1;
 		}
 	}
@@ -978,12 +979,9 @@ int ng_computeTextHeight(u16 font_id, u16 font_height, s16 leading_twips, const 
 	int line_count = 1;
 	{
 		if (!word_wrap || field_width_twips <= 0) {
-			// No wrap: count hard lines only
+			// No wrap: count hard lines only (\r and \n are independent breaks, like Ruffle)
 			for (size_t i = 0; i < text_len; i++) {
-				if (text[i] == '\r') {
-					line_count++;
-					if (i + 1 < text_len && text[i + 1] == '\n') i++;
-				} else if (text[i] == '\n') {
+				if (text[i] == '\r' || text[i] == '\n') {
 					line_count++;
 				}
 			}
@@ -1001,9 +999,6 @@ int ng_computeTextHeight(u16 font_id, u16 font_height, s16 leading_twips, const 
 					    field_width_twips, swf_version,
 					    left_margin_twips, right_margin_twips, indent_twips, &dummy_w, NULL,
 					    letter_spacing_twips);
-					if (is_newline) {
-						if (text[i] == '\r' && i + 1 < text_len && text[i + 1] == '\n') i++;
-					}
 					line_start = i + 1;
 				}
 			}
@@ -1037,11 +1032,9 @@ int ng_computeTextLineCount(u16 font_id, u16 font_height, const char* text, size
 	int line_count = 1;
 	if (text != NULL && text_len > 0) {
 		if (!word_wrap || field_width_twips <= 0) {
+			// \r and \n are independent line breaks (matching Ruffle's split behavior)
 			for (size_t i = 0; i < text_len; i++) {
-				if (text[i] == '\r') {
-					line_count++;
-					if (i + 1 < text_len && text[i + 1] == '\n') i++;
-				} else if (text[i] == '\n') {
+				if (text[i] == '\r' || text[i] == '\n') {
 					line_count++;
 				}
 			}
@@ -1058,9 +1051,6 @@ int ng_computeTextLineCount(u16 font_id, u16 font_height, const char* text, size
 					    field_width_twips, swf_version,
 					    left_margin_twips, right_margin_twips, indent_twips, &dummy_w, NULL,
 					    letter_spacing_twips);
-					if (is_newline) {
-						if (text[i] == '\r' && i + 1 < text_len && text[i + 1] == '\n') i++;
-					}
 					line_start = i + 1;
 				}
 			}
@@ -1097,6 +1087,336 @@ int ng_computeVisibleLines(u16 font_id, u16 font_height, s16 leading_twips, floa
 	int remaining = avail_twips - first_line_twips;
 	int extra_lines = remaining / line_height_twips;
 	return 1 + extra_lines;
+}
+
+// Measure substring width with per-run font heights.
+// Positions are absolute (into full text buffer), matching run_starts[] offsets.
+static int ng_measure_substr_mixed_twips(int font_idx, int em,
+    const char* text, size_t start, size_t end, int letter_spacing_twips,
+    const u32* run_starts, const u32* run_lengths, const u16* run_font_heights,
+    int run_count, u16 base_font_height)
+{
+	int w = 0;
+	int ls_rounded = ng_device_font_mode ? ng_round_ls_to_pixel(letter_spacing_twips) : 0;
+	size_t i = start;
+	while (i < end) {
+		size_t prev_i = i;
+		u16 cp = ng_decode_utf8_char(text, end, &i);
+		// Look up font height for this character position
+		u16 fh = base_font_height;
+		for (int r = 0; r < run_count; r++) {
+			if (prev_i >= run_starts[r] && prev_i < run_starts[r] + run_lengths[r]) {
+				fh = run_font_heights[r]; break;
+			}
+		}
+		s16 adv = ng_font_glyph_advance(font_idx, cp);
+		int glyph_twips = 0;
+		if (adv >= 0) {
+			int raw = (int)((float)adv * (float)fh / (float)em);
+			if (ng_device_font_mode) {
+				int unspaced = ng_round_to_pixel(raw);
+				if (ls_rounded != 0) {
+					int spaced = unspaced + ls_rounded;
+					glyph_twips = (spaced > 0) ? spaced : unspaced;
+				} else {
+					glyph_twips = unspaced;
+				}
+			} else {
+				glyph_twips = raw + letter_spacing_twips;
+				if (glyph_twips <= 0 && letter_spacing_twips < 0)
+					glyph_twips = raw;
+			}
+		} else if (ng_device_font_mode ? (ls_rounded > 0) : (letter_spacing_twips > 0)) {
+			glyph_twips = ng_device_font_mode ? ls_rounded : letter_spacing_twips;
+		}
+		w += glyph_twips;
+	}
+	return w;
+}
+
+// Compute maxscroll and bottomScroll for mixed-font text using per-line heights.
+// This implements Ruffle's algorithm: per-line offset_y/extent_y from actual layout.
+// font_runs: array of {start, length, font_height_twips} for each span.
+// run_count: number of font runs. If 0, falls back to uniform font_height.
+// Returns maxscroll via *out_maxscroll and bottomScroll via *out_bottomscroll.
+void ng_computeScrollMixedFont(u16 font_id, u16 base_font_height, s16 leading_twips,
+    const char* text, size_t text_len,
+    int word_wrap, int field_width_twips, int swf_version,
+    int left_margin_twips, int right_margin_twips, int indent_twips,
+    int letter_spacing_twips,
+    float field_height_pixels, int scroll,
+    const u32* run_starts, const u32* run_lengths, const u16* run_font_heights, int run_count,
+    int* out_maxscroll, int* out_bottomscroll, int* out_text_height_twips)
+{
+	int fi = ng_find_font_with_metrics(font_id);
+	if (fi < 0) { if (out_maxscroll) *out_maxscroll = 1; if (out_bottomscroll) *out_bottomscroll = 1; if (out_text_height_twips) *out_text_height_twips = 0; return; }
+
+	int em = ng_fonts[fi].em_square;
+	if (em <= 0) em = 1024;
+	// Compute per-line heights by doing word-wrap with font run awareness
+	// Each visual line's height = max(ascent+descent across overlapping runs) on that line
+	// We track line offsets (offset_y) and extents (extent_y = offset_y + line_height)
+
+	#define MAX_LAYOUT_LINES 256
+	int line_offsets[MAX_LAYOUT_LINES]; // offset_y in twips for each line
+	int line_extents[MAX_LAYOUT_LINES]; // extent_y in twips for each line
+	int total_visual_lines = 0;
+
+	// Helper: get font_height for a character position in the text
+	// If no runs, use base_font_height
+	#define GET_FONT_HEIGHT_AT(pos) ({ \
+		u16 _fh = base_font_height; \
+		for (int _r = 0; _r < run_count; _r++) { \
+			if ((pos) >= run_starts[_r] && (pos) < run_starts[_r] + run_lengths[_r]) { \
+				_fh = run_font_heights[_r]; break; \
+			} \
+		} \
+		_fh; \
+	})
+
+	// Process text: split on hard line breaks, word-wrap each
+	int cursor_y = 0;
+	size_t line_start = 0;
+
+	for (size_t i = 0; i <= text_len; i++) {
+		int is_end = (i == text_len);
+		int is_newline = (!is_end && (text[i] == '\r' || text[i] == '\n'));
+		if (!is_end && !is_newline) continue;
+
+		// Process hard line [line_start, i)
+		const char* hline = text + line_start;
+		size_t hline_len = i - line_start;
+
+		if (!word_wrap || field_width_twips <= 0 || hline_len == 0) {
+			// No wrap or empty line: single visual line
+			// Find max font height in this hard line (0 = no runs found, fall back to base)
+			u16 max_fh = 0;
+			if (run_count > 0) {
+				for (int r = 0; r < run_count; r++) {
+					u32 rs = run_starts[r], rl = run_lengths[r];
+					// Check if run overlaps [line_start, i)
+					if (rs < (u32)i && rs + rl > (u32)line_start) {
+						if (run_font_heights[r] > max_fh) max_fh = run_font_heights[r];
+					}
+				}
+			}
+			if (max_fh == 0) max_fh = base_font_height;
+			int asc = (int)((float)ng_fonts[fi].ascent * (float)max_fh / (float)em);
+			int desc = (int)((float)ng_fonts[fi].descent * (float)max_fh / (float)em);
+			int lh = asc + desc;
+
+			if (total_visual_lines == 0) {
+				// First line includes leading
+				lh += (int)leading_twips;
+			}
+
+			if (total_visual_lines < MAX_LAYOUT_LINES) {
+				line_offsets[total_visual_lines] = cursor_y;
+				line_extents[total_visual_lines] = cursor_y + lh;
+			}
+			total_visual_lines++;
+			cursor_y += asc + desc + (int)leading_twips;
+		} else {
+			// Word-wrap: need to split into visual lines and track font height per line
+			// Simplified: use the word-wrap segmenter from ng_wrap_count_lines logic
+			int base_avail = field_width_twips - left_margin_twips - right_margin_twips;
+			if (base_avail < 0) base_avail = 0;
+			int first_line_offset = indent_twips > 0 ? indent_twips : 0;
+			int cur_avail = (total_visual_lines == 0) ? (base_avail - first_line_offset) : base_avail;
+			int is_swf8 = (swf_version >= 8);
+
+			size_t seg_start = 0;
+			int cur_line_w = 0;
+			u16 cur_line_max_fh = 0; // max font height on current visual line
+			int is_first_visual_line_in_para = 1;
+
+			while (seg_start < hline_len) {
+				// Find next segment boundary
+				size_t seg_end = seg_start;
+				if (is_swf8) {
+					int in_space = (hline[seg_end] == ' ');
+					while (seg_end < hline_len) {
+						if (hline[seg_end] == '-' && seg_end > seg_start) { seg_end++; break; }
+						int cur_space = (hline[seg_end] == ' ');
+						if (in_space && !cur_space && seg_end > seg_start) break;
+						in_space = cur_space;
+						seg_end++;
+					}
+				} else {
+					while (seg_end < hline_len && hline[seg_end] != ' ' && hline[seg_end] != '-') seg_end++;
+					if (seg_end < hline_len) {
+						if (hline[seg_end] == '-') seg_end++;
+						else seg_end++;
+					}
+				}
+
+				// Find max font height for this segment (0 = no runs, fall back to base)
+				u16 seg_max_fh = 0;
+				if (run_count > 0) {
+					size_t abs_seg_start = line_start + seg_start;
+					size_t abs_seg_end = line_start + seg_end;
+					for (int r = 0; r < run_count; r++) {
+						u32 rs = run_starts[r], rl = run_lengths[r];
+						if (rs < (u32)abs_seg_end && rs + rl > (u32)abs_seg_start) {
+							if (run_font_heights[r] > seg_max_fh) seg_max_fh = run_font_heights[r];
+						}
+					}
+				}
+				if (seg_max_fh == 0) seg_max_fh = base_font_height;
+
+				// Measure segment width (using per-run font heights)
+				int seg_w = ng_measure_substr_mixed_twips(fi, em,
+					text, line_start + seg_start, line_start + seg_end, letter_spacing_twips,
+					run_starts, run_lengths, run_font_heights, run_count, base_font_height);
+
+				// Trimmed width for SWF8
+				size_t trim_end = seg_end;
+				if (is_swf8) { while (trim_end > seg_start && hline[trim_end-1] == ' ') trim_end--; }
+				int seg_trimmed_w = (trim_end < seg_end) ?
+					ng_measure_substr_mixed_twips(fi, em,
+						text, line_start + seg_start, line_start + trim_end, letter_spacing_twips,
+						run_starts, run_lengths, run_font_heights, run_count, base_font_height) : seg_w;
+
+				int test_w = cur_line_w + (is_swf8 ? seg_trimmed_w : seg_w);
+
+				if (test_w <= cur_avail) {
+					cur_line_w += seg_w;
+					if (seg_max_fh > cur_line_max_fh) cur_line_max_fh = seg_max_fh;
+					seg_start = seg_end;
+				} else if (cur_line_w == 0) {
+					// Force-break
+					if (seg_max_fh > cur_line_max_fh) cur_line_max_fh = seg_max_fh;
+					// Just advance at least one character
+					size_t char_pos = seg_start;
+					int char_w = 0;
+					size_t last_fitting_pos = seg_start;
+					while (char_pos < seg_end) {
+						size_t next_pos = char_pos;
+						u16 cp = ng_decode_utf8_char(hline, seg_end, &next_pos);
+						s16 adv = ng_font_glyph_advance(fi, cp);
+						int gw = 0;
+						if (adv >= 0) {
+							u16 cfh = GET_FONT_HEIGHT_AT(line_start + char_pos);
+							gw = (int)((float)adv * (float)cfh / (float)em);
+						}
+						if (char_w + gw > cur_avail && last_fitting_pos > seg_start) break;
+						char_w += gw;
+						last_fitting_pos = next_pos;
+						if (is_swf8 && last_fitting_pos > seg_start && char_w > cur_avail) break;
+						char_pos = next_pos;
+					}
+					if (last_fitting_pos == seg_start) {
+						size_t tmp = seg_start;
+						ng_decode_utf8_char(hline, seg_end, &tmp);
+						last_fitting_pos = tmp;
+					}
+
+					// Emit this line
+					u16 fh = cur_line_max_fh > 0 ? cur_line_max_fh : base_font_height;
+					int asc = (int)((float)ng_fonts[fi].ascent * (float)fh / (float)em);
+					int desc = (int)((float)ng_fonts[fi].descent * (float)fh / (float)em);
+					int lh = asc + desc;
+					if (total_visual_lines == 0) lh += (int)leading_twips;
+					if (total_visual_lines < MAX_LAYOUT_LINES) {
+						line_offsets[total_visual_lines] = cursor_y;
+						line_extents[total_visual_lines] = cursor_y + lh;
+					}
+					total_visual_lines++;
+					cursor_y += asc + desc + (int)leading_twips;
+
+					cur_line_w = 0;
+					cur_line_max_fh = 0;
+					cur_avail = base_avail;
+					seg_start = last_fitting_pos;
+				} else {
+					// Wrap to new line: emit current line
+					u16 fh = cur_line_max_fh > 0 ? cur_line_max_fh : base_font_height;
+					int asc = (int)((float)ng_fonts[fi].ascent * (float)fh / (float)em);
+					int desc = (int)((float)ng_fonts[fi].descent * (float)fh / (float)em);
+					int lh = asc + desc;
+					if (total_visual_lines == 0) lh += (int)leading_twips;
+					if (total_visual_lines < MAX_LAYOUT_LINES) {
+						line_offsets[total_visual_lines] = cursor_y;
+						line_extents[total_visual_lines] = cursor_y + lh;
+					}
+					total_visual_lines++;
+					cursor_y += asc + desc + (int)leading_twips;
+
+					cur_line_w = 0;
+					cur_line_max_fh = 0;
+					cur_avail = base_avail;
+					// Don't advance seg_start — retry
+				}
+			}
+
+			// Emit final visual line for this hard line
+			u16 fh = cur_line_max_fh > 0 ? cur_line_max_fh : base_font_height;
+			int asc = (int)((float)ng_fonts[fi].ascent * (float)fh / (float)em);
+			int desc = (int)((float)ng_fonts[fi].descent * (float)fh / (float)em);
+			int lh = asc + desc;
+			if (total_visual_lines == 0) lh += (int)leading_twips;
+			if (total_visual_lines < MAX_LAYOUT_LINES) {
+				line_offsets[total_visual_lines] = cursor_y;
+				line_extents[total_visual_lines] = cursor_y + lh;
+			}
+			total_visual_lines++;
+			cursor_y += asc + desc + (int)leading_twips;
+		}
+
+		line_start = i + 1;
+	}
+
+	if (total_visual_lines == 0) {
+		if (out_maxscroll) *out_maxscroll = 1;
+		if (out_bottomscroll) *out_bottomscroll = 1;
+		if (out_text_height_twips) *out_text_height_twips = 0;
+		return;
+	}
+
+	// Compute text_height = last line's extent_y - first line's offset_y
+	int last_idx = (total_visual_lines - 1 < MAX_LAYOUT_LINES) ? total_visual_lines - 1 : MAX_LAYOUT_LINES - 1;
+	int text_height = line_extents[last_idx] - line_offsets[0];
+
+	if (out_text_height_twips) *out_text_height_twips = text_height;
+
+	// Window height in twips (field height minus 2*GUTTER of 40 twips)
+	int window_height = (int)(field_height_pixels * 20.0f) - 80;
+	if (window_height <= 0) window_height = 1;
+
+	// maxscroll: first line where offset_y >= (text_height - window_height)
+	int target = text_height - window_height;
+	int maxscroll = 1;
+	if (target > 0) {
+		for (int i = 0; i < total_visual_lines && i < MAX_LAYOUT_LINES; i++) {
+			if (line_offsets[i] >= target) {
+				maxscroll = i + 1; // 1-based
+				break;
+			}
+			maxscroll = i + 1; // fallback to last line
+		}
+	}
+	if (maxscroll < 1) maxscroll = 1;
+	if (out_maxscroll) *out_maxscroll = maxscroll;
+
+	// bottomScroll: first line whose extent_y > (window_height + scroll_offset)
+	if (out_bottomscroll) {
+		int scroll_idx = scroll - 1;
+		if (scroll_idx < 0) scroll_idx = 0;
+		if (scroll_idx >= total_visual_lines) scroll_idx = total_visual_lines - 1;
+		int scroll_offset = (scroll_idx < MAX_LAYOUT_LINES) ? line_offsets[scroll_idx] : 0;
+		int bottom_target = window_height + scroll_offset;
+
+		int bottomscroll = total_visual_lines; // default: all visible
+		for (int i = 0; i < total_visual_lines && i < MAX_LAYOUT_LINES; i++) {
+			if (line_extents[i] > bottom_target) {
+				bottomscroll = i;
+				if (bottomscroll < 1) bottomscroll = 1;
+				break;
+			}
+		}
+		if (bottomscroll < 1) bottomscroll = 1;
+		*out_bottomscroll = bottomscroll;
+	}
 }
 
 // Compute TextFormat.getTextExtent() metrics.

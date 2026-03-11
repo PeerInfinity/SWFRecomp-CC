@@ -281,6 +281,14 @@ int ng_computeTextLineCount(u16 font_id, u16 font_height, const char* text, size
     int left_margin_twips, int right_margin_twips, int indent_twips,
     int letter_spacing_twips);
 int ng_computeVisibleLines(u16 font_id, u16 font_height, s16 leading_twips, float field_height_pixels);
+void ng_computeScrollMixedFont(u16 font_id, u16 base_font_height, s16 leading_twips,
+    const char* text, size_t text_len,
+    int word_wrap, int field_width_twips, int swf_version,
+    int left_margin_twips, int right_margin_twips, int indent_twips,
+    int letter_spacing_twips,
+    float field_height_pixels, int scroll,
+    const u32* run_starts, const u32* run_lengths, const u16* run_font_heights, int run_count,
+    int* out_maxscroll, int* out_bottomscroll, int* out_text_height_twips);
 // ng_findFontIdByName, ng_getTextExtent, ng_lookupExport, ng_getSoundDuration
 // are declared above (outside #ifdef NO_GRAPHICS) since action.c needs them in all modes.
 void ng_record_video(SWFAppContext* app_context, u16 char_id);

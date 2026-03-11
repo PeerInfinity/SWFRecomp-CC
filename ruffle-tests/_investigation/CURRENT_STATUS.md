@@ -101,6 +101,8 @@ Last updated: 2026-03-10
 | `device_font_spacing` | 91/91 ✅ | Conditional pixel rounding based on embedFonts property |
 | `register_class` | 66/66 ✅ | Export-versioned registerClass lookup for cross-version attachMovie |
 | `register_class_swf6` | 38/38 ✅ | Same fix — SWF6 parent + SWF17 child cross-version registry isolation |
+| `edittext_scroll` | 54/54 ✅ | Per-run mixed-font measurement via `ng_measure_substr_mixed_twips()` |
+| `edittext_newlines` | 30/30 ✅ | Mixed-font textHeight path via `ng_computeScrollMixedFont()` |
 
 ### Near-passing (>=90%)
 | Test | Match | Issue |
@@ -109,7 +111,7 @@ Last updated: 2026-03-10
 | ~~`movieclip_getbounds`~~ | ~~189/191~~ **191/191 ✅** | Fixed: round transformed AABB to integer twips (Ruffle Twips model) |
 | ~~`text_format_get_text_extent_undefined_width`~~ | ~~8/10~~ **10/10 ✅** | Fixed: valueOf coercion on getTextExtent width argument |
 | `edittext_default_format_empty` | ~95/100 (95%) | 5 missing `display = block;` lines — permanent diff (see RUFFLE_VS_FLASH_DIFFERENCES.md) |
-| `edittext_scroll` | 52/54 (96%) | Mixed-font maxscroll/bottomScroll (font metrics — needs per-line height for mixed fonts) |
+| ~~`edittext_scroll`~~ | **54/54 PASS** ✅ | Fixed: per-run mixed-font measurement via `ng_measure_substr_mixed_twips()` |
 | ~~`global_swf5_6_7_8_9`~~ | ~~1073/1145~~ **1145/1145 ✅** | Fixed: per-version-group Function.prototype + SWF5 _global restriction + function valueOf/toString display |
 
 ### Regressions to investigate
@@ -135,7 +137,7 @@ Last updated: 2026-03-10
 | OBJECT_WATCH_PLAN | **Phase 2 DONE** | 4/4 pass (watch_textfield ✅) | `watch_virtual_property` known_failure in Ruffle |
 | GLOBALS_PLAN | **Phases 1-7 COMPLETE** → `blocked/` | 23/30 pass (18 original + native_objects_swf6/7/8 ✅, as_set_prop_flags ✅, global_swf6_7_8 ✅) | Phase 8 blocked: enumeration order + 20 missing globals |
 | STRING_PLAN | **Phases 1-4 COMPLETE** | 4/4 method tests + string_ops_swf6 pass | String paths blocked by MC infra |
-| TEXTFIELD_PLAN | **Phases 1-6 DONE, Phase 7 MOSTLY DONE** → `blocked/` | 57/62 pass (TextSnapshot DONE via separate plan) | Remaining blocked: font metrics (scroll/newlines/bullet), SWF6 HTML paragraph semantics |
+| TEXTFIELD_PLAN | **Phases 1-6 DONE, Phase 7 MOSTLY DONE** → `blocked/` | 59/62 pass (TextSnapshot DONE via separate plan, edittext_scroll ✅, edittext_newlines ✅) | Remaining blocked: edittext_bullet (4 lines, bounding box model), SWF6 HTML paragraph semantics |
 | MOVIECLIP_PLAN | **ALL PHASES DONE** → `blocked/` | 27 tests pass ✅ (incl. do_init_action_child ✅, unload ✅) | Remaining blocked: mouse events, loadMovie, pixel hitTest |
 | SOUND_CLASS_PLAN | **Phase 0 COMPLETE** → `complete/` | register_class_with_sound PASS, sound 622/628 | Blocked on attachSound/shared transform model |
 | CLONE_DUPLICATE_PLAN | **Phase 1 COMPLETE** → `blocked/` | 4/8 pass (duplicate_movie_clip ✅, clone_sprite_types ✅, clip_events ✅, on_construct ✅) | Blocked on TEXTFIELD, MOUSE_EVENTS |
@@ -179,20 +181,20 @@ Last updated: 2026-03-10
 
 ### Actionable — Quick wins
 1. ~~**Child RegisterClass**~~ — ✅ FIXED: register_class 66/66, register_class_swf6 38/38. Export-versioned registerClass lookup.
-2. **Font metrics accuracy** — edittext_scroll (52/54), edittext_newlines (23/30), edittext_bullet (18/30). Needs per-line height for mixed-font text.
+2. ~~**Font metrics accuracy**~~ — ✅ MOSTLY FIXED: edittext_scroll 54/54 PASS, edittext_newlines 30/30 PASS, edittext_bullet 26/30 (4 textHeight lines: bounding box model mismatch, 3px diff).
 3. **removed_target_clip_scope** (34/35) — child MC resolution via GetVariable in non-root sprite context.
 4. **register_and_init_order** (36/231) — constructor ordering regression from script halting changes.
 5. **MCL cross-version root replace** (Phase 15) — mcl_replace_root_swf7_to_swf5/swf6 (14/57, 17/57). Far from passing.
 
 ### Quick wins exhausted
 All simple fixes have been applied. Remaining failing tests require:
-- Font metrics improvements (mixed-font line height)
+- ~~Font metrics improvements (mixed-font line height)~~ — **MOSTLY RESOLVED** (edittext_scroll + edittext_newlines now PASS)
 - Mouse event dispatch (rollover/rollout, shape-flag hitTest)
 - LoadMovie infrastructure improvements (parent getBounds after child load)
 - Deep architectural changes (constructor ordering, call() termination, closure capture)
 
 ### Remaining blocked work (from blocked/ plans)
-- **TEXTFIELD_PLAN remaining** — scroll, newlines, bullet (font metrics), SWF6 HTML. 57/62 pass.
+- **TEXTFIELD_PLAN remaining** — ~~scroll~~ ✅, ~~newlines~~ ✅, bullet (4 lines, bounding box model), SWF6 HTML. 59/62 pass.
 - **GLOBALS_PLAN Phase 8** — BLOCKED by enumeration order + 20 missing globals.
 - ~~**LOADMOVIE_PLAN Phase 6**~~ — **CANCELLED**: Ruffle shares `_global` across movies. Was never needed.
 - **MC_REMOVAL_LIFECYCLE_PLAN** — call() early termination, SetTarget on removed base_clip.
@@ -201,6 +203,13 @@ All simple fixes have been applied. Remaining failing tests require:
 ### Dependency Blockers (plans blocking other plans)
 - **LOADMOVIE_PLAN** (reduced blocker): Phase 6 cancelled. Remaining loadMovie issues block: BUTTON_PLAN (root_button_mode, mouse events), some getBounds tests.
 - **FOCUS_SYSTEM_PLAN** — 7/7 pass (focus_remove ✅ newly fixed). TAB_ORDERING_PLAN fully complete (16/16). Only focus_mouse_focusable (0/8) blocked by dynamic object creation.
+
+### Session notes (2026-03-10 font metrics)
+- **Font metrics improvements**: edittext_scroll 52/54 → **54/54 PASS**, edittext_newlines 23/30 → **30/30 PASS**, edittext_bullet 18/30 → **26/30**
+- **Mixed-font per-run measurement**: `ng_measure_substr_mixed_twips()` uses per-run font height for width measurement in word wrap. `ng_computeScrollMixedFont()` uses per-line max font height for height computation.
+- **Bullet indent**: 720 twips (36px) added to left margin for `<li>` tags, matching Ruffle's `append_bullet()`.
+- **edittext_bullet remaining 4 failures**: textHeight off by 3px (176 vs 179/197). Root cause: Ruffle uses baseline-aligned bounding box union where each line's text box is positioned relative to max_ascent. Our simpler offset/extent model doesn't account for this. Additionally, \r paragraph separator's font span (size 12) contaminates the preceding line's metrics in Ruffle. Not feasible to fix without full layout engine rewrite.
+- **verify_output.py**: Reverted `delete=False` on TemporaryDirectory (was left from debugging).
 
 ### Session notes (2026-03-10 continued)
 - **Pass rate: 507→509/618 (82.4%)**: +2 from register_class (66/66 PASS) and register_class_swf6 (38/38 PASS)

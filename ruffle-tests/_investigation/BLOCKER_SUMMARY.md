@@ -54,23 +54,23 @@ All MTASC-specific issues have been resolved except `mcl_loadclip_replace_root` 
 
 ## Blocker 4: Font Metrics / Text Layout Accuracy
 
-**Impact**: 3 tests, ~21 lines
+**Impact**: 1 test, ~4 lines (down from 3 tests, ~21 lines)
 
-TextField textWidth/textHeight computations are close but off by a few pixels. The root causes are interconnected:
+TextField textWidth/textHeight computations are close but off by a few pixels. Major improvements via mixed-font per-run measurement and bullet indent support:
 
-- **Word wrap algorithm**: Doesn't perfectly match Flash's line-breaking decisions for mixed-font text
-- **Line height calculation**: Mixed-font lines compute height differently (max ascent + max descent vs per-glyph)
-- **Bullet/tab indent**: Bullet point indent width and tab stop positions slightly wrong
+- ~~**Word wrap algorithm**~~: **RESOLVED** — `ng_measure_substr_mixed_twips()` for per-run font height measurement
+- ~~**Line height calculation**~~: **MOSTLY RESOLVED** — `ng_computeScrollMixedFont()` with per-line max font height
+- **Bounding box union model**: Ruffle uses baseline-aligned bounding box union for textHeight; we use simpler offset/extent tracking. 3-pixel discrepancy on mixed-font bullet lists.
 
 | Test | Match | Lines Off | Issue |
 |------|-------|-----------|-------|
-| edittext_scroll | 52/54 | 2 | maxscroll/bottomScroll with mixed fonts |
-| edittext_newlines | 23/30 | 7 | textWidth/textHeight accuracy |
-| edittext_bullet | 18/30 | 12 | Bullet indent width |
+| ~~edittext_scroll~~ | **54/54 PASS** | 0 | **RESOLVED** — per-run mixed-font measurement |
+| ~~edittext_newlines~~ | **30/30 PASS** | 0 | **RESOLVED** — mixed-font textHeight path |
+| edittext_bullet | 26/30 | 4 | textHeight off by 3px (176 vs 179/197) — Ruffle bounding box union model |
 | ~~edittext_tab_stops~~ | 45/60 | 15 | Tab stop computation (ignored — in ignored_tests.txt) |
 | ~~device_font_spacing~~ | **91/91 PASS** | 0 | **RESOLVED** |
 
-**Plans blocked**: TEXTFIELD_PLAN (3 tests)
+**Plans blocked**: TEXTFIELD_PLAN (1 test — edittext_bullet 4 remaining lines)
 
 ---
 
@@ -206,7 +206,7 @@ LOADMOVIE_REMAINING ──────► REGISTERCLASS (child SWFs)
 MTASC class infra ─────────► ROOT_REPLACEMENT (mcl_loadclip_replace_root)
                              (interface_implements_op: RESOLVED, object_resolve: RESOLVED)
 
-Font metrics accuracy ─────► TEXTFIELD (scroll, newlines, bullet)
+Font metrics accuracy ─────► TEXTFIELD (~~scroll~~, ~~newlines~~, bullet 4 lines)
 
 SWF6 HTML model ───────────► TEXTFIELD (edittext_html_swf6)
                              HTML_TEXT_REMAINING_WORK
@@ -227,7 +227,7 @@ Closure capture ───────────► TYPE_COERCION_ADVANCED (NOT
 3. ~~**Default instance naming**~~ — **RESOLVED**. default_names **52/52 PASS**. See DEFAULT_NAMES_PLAN (complete/).
 4. ~~**Script halting on clip removal**~~ — **RESOLVED**. removed_clip_halts_script **15/15 PASS**, target_clip_removed **5/5 PASS**, remove_movie_clip **29/29 PASS**, removed_target_clip_scope **34/35**. All script halting regressions recovered except register_and_init_order (36/231, constructor ordering issue).
 5. **register_and_init_order regression** — 146→36/231 from script halting changes. Deep constructor ordering issue, partially overlaps with Blocker 11.
-6. **Font metrics accuracy** — Incremental improvements to word wrap and line height
+6. ~~**Font metrics accuracy**~~ — **MOSTLY RESOLVED**. edittext_scroll **54/54 PASS**, edittext_newlines **30/30 PASS**, edittext_bullet 26/30 (4 lines: bounding box model mismatch)
 7. **Failed load state values** — Return `-1` for specific MC properties on failed load
 8. **Global stubs** — Add 20 missing globals (tedious but straightforward)
 9. ~~**interface_implements_op regression**~~ — **RESOLVED** (47/47 PASS)
@@ -249,7 +249,7 @@ Closure capture ───────────► TYPE_COERCION_ADVANCED (NOT
 | LoadMovie / multi-SWF | 25+ | 2000+ | Moderate (incremental) |
 | ~~Per-movie `_global`~~ | ~~4-6~~ | ~~400+~~ | **RESOLVED** |
 | ~~MTASC class infra~~ | ~~1~~ | ~~50~~ | **MOSTLY RESOLVED** (1 test left, blocked by LoadMovie) |
-| Font metrics | 3 | ~21 | Moderate |
+| Font metrics | 1 | ~4 | Low (bounding box model mismatch, 3px diff) |
 | SWF6 HTML model | 1 | 1480 | Low (complex refactor) |
 | ~~condenseWhite~~ | ~~2~~ | ~~17~~ | **RESOLVED** |
 | ~~StyleSheet CSS~~ | ~~1~~ | ~~121~~ | **RESOLVED** |
