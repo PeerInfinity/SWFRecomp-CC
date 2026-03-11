@@ -27435,6 +27435,18 @@ void actionGetURL2(SWFAppContext* app_context, u8 send_vars_method, u8 load_targ
 				root_movieclip.totalframes = entry->frame_count;
 				root_movieclip.framesloaded = entry->frame_count;
 				root_movieclip.currentframe = 1;
+				// Clear root display list so child movie's placements don't conflict
+				// with stale entries from parent movie (char_ids differ after offset)
+				{
+					extern DisplayObject* display_list;
+					extern size_t max_depth;
+					extern size_t display_list_capacity;
+					for (size_t _di = 0; _di <= max_depth && _di < display_list_capacity; _di++) {
+						display_list[_di].char_id = 0;
+						display_list[_di].place_gen = 0;
+					}
+					max_depth = 0;
+				}
 			}
 			// Set child SWF URL and version on target MC
 			if (_gu2_mc != NULL) {
