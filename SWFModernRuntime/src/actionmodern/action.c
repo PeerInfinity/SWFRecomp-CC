@@ -29846,6 +29846,22 @@ static __attribute__((noinline)) int computeTextFieldDimension(
 			left_margin_twips += 720;
 	}
 
+	// Set up tab stops for text measurement
+	{
+		int ts_arr[64];
+		int ts_count = 0;
+		ActionVar* ts_prop = mc->dynamic_props ? getProperty((ASObject*)mc->dynamic_props, "_tf_tabStops", 12) : NULL;
+		if (ts_prop != NULL && ts_prop->type == ACTION_STACK_VALUE_ARRAY && ts_prop->data.numeric_value != 0) {
+			ASArray* ts_array = (ASArray*)ts_prop->data.numeric_value;
+			for (u32 ti = 0; ti < ts_array->length && ts_count < 64; ti++) {
+				double v = varToDouble(&ts_array->elements[ti]);
+				if (!isnan(v) && !isinf(v))
+					ts_arr[ts_count++] = (int)(v * 20.0); // pixels to twips
+			}
+		}
+		ng_setTabStops(ts_arr, ts_count, font_height);
+	}
+
 	if (is_width) {
 		// Determine text alignment: 0=left (default), 1=center, 2=right
 		int align = 0;
@@ -29902,6 +29918,7 @@ static __attribute__((noinline)) int computeTextFieldDimension(
 		    word_wrap, field_width_twips, g_swf_version,
 		    left_margin_twips, right_margin_twips, indent_twips, ls_twips);
 	}
+	ng_clearTabStops();
 	return 1;
 }
 
@@ -41885,6 +41902,11 @@ void actionCallMethod(SWFAppContext* app_context, char* str_buffer)
 						bul_val.data.numeric_value = bul_prop->data.numeric_value;
 						if (mc->dynamic_props) setProperty(app_context, (ASObject*)mc->dynamic_props, "_tf_bullet", 10, &bul_val);
 					}
+					// Store tabStops array for text width/height computation
+					ActionVar* ts_prop = getProperty(fmt_obj, "tabStops", 8);
+					if (ts_prop != NULL && mc->dynamic_props) {
+						setProperty(app_context, (ASObject*)mc->dynamic_props, "_tf_tabStops", 12, ts_prop);
+					}
 				}
 			}
 			// Modify format runs for HTML text field
@@ -42166,6 +42188,11 @@ void actionCallMethod(SWFAppContext* app_context, char* str_buffer)
 					bul_val.type = ACTION_STACK_VALUE_BOOLEAN;
 					bul_val.data.numeric_value = bul_prop->data.numeric_value;
 					if (mc->dynamic_props) setProperty(app_context, (ASObject*)mc->dynamic_props, "_tf_bullet", 10, &bul_val);
+				}
+				// Store tabStops array for text width/height computation
+				ActionVar* ts_prop = getProperty(fmt_obj, "tabStops", 8);
+				if (ts_prop != NULL && mc->dynamic_props) {
+					setProperty(app_context, (ASObject*)mc->dynamic_props, "_tf_tabStops", 12, ts_prop);
 				}
 				// Store text alignment from TextFormat
 				ActionVar* al_prop = getProperty(fmt_obj, "align", 5);

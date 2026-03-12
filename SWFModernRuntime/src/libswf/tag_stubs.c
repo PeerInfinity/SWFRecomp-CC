@@ -657,6 +657,39 @@ static int ng_round_ls_to_pixel(int ls_twips) {
 	return rounded_px * 20;
 }
 
+// Tab stop state for text measurement (set before calling measurement functions).
+// Using file-scope globals since measurement is single-threaded and synchronous.
+static int g_tab_stops_twips[64];
+static int g_tab_stop_count = 0;
+static u16 g_tab_font_height = 0;  // font height in twips, for default tab modulo
+
+void ng_setTabStops(const int* stops_twips, int count, u16 font_height)
+{
+	g_tab_stop_count = count > 64 ? 64 : count;
+	for (int i = 0; i < g_tab_stop_count; i++) g_tab_stops_twips[i] = stops_twips[i];
+	g_tab_font_height = font_height;
+}
+
+void ng_clearTabStops(void) { g_tab_stop_count = 0; g_tab_font_height = 0; }
+
+// Compute next tab stop position (in twips) given current cursor position.
+// With explicit stops: first stop > cursor; if none, cursor unchanged.
+// Without explicit stops: advance to next multiple of (font_height * 2.7).
+static int ng_next_tab_stop(int cursor_twips)
+{
+	if (g_tab_stop_count > 0) {
+		for (int i = 0; i < g_tab_stop_count; i++) {
+			if (g_tab_stops_twips[i] > cursor_twips)
+				return g_tab_stops_twips[i];
+		}
+		return cursor_twips; // past all stops: no-op
+	}
+	// Default: font_height * 2.7 (font_height is already in twips)
+	int modulo = (int)(g_tab_font_height * 2.7f);
+	if (modulo <= 0) return cursor_twips;
+	return ((cursor_twips / modulo) + 1) * modulo;
+}
+
 // Measure width of a UTF-8 substring in twips using font glyph advances.
 // When letter spacing is non-zero, per-glyph advance is rounded to pixel
 // boundaries and letter spacing is rounded/clamped per glyph.
@@ -731,6 +764,19 @@ static int ng_wrap_count_lines(int font_idx, int em, u16 font_height,
 	size_t seg_start = 0;  // byte offset of current segment start
 
 	while (seg_start < text_len) {
+		// Handle tab characters: advance cursor to next tab stop
+		if ((unsigned char)text[seg_start] == '\t') {
+			int next_tab = ng_next_tab_stop(cur_line_w);
+			if (next_tab > cur_line_w) {
+				cur_line_w = next_tab;
+				trimmed_line_w = cur_line_w;
+				if (trimmed_line_w > max_line_w) max_line_w = trimmed_line_w;
+				if (cur_line_w > max_line_w_full) max_line_w_full = cur_line_w;
+			}
+			seg_start++;
+			continue;
+		}
+
 		// Find next break point starting from seg_start
 		size_t seg_end = text_len;  // default: rest of line
 		size_t i = seg_start;
@@ -740,7 +786,11 @@ static int ng_wrap_count_lines(int font_idx, int em, u16 font_height,
 			int in_spaces = 0;
 			while (i < text_len) {
 				unsigned char c = (unsigned char)text[i];
-				if (c == ' ') {
+				if (c == '\t') {
+					// Tab: end segment before it
+					seg_end = i;
+					break;
+				} else if (c == ' ') {
 					in_spaces = 1;
 					i++;
 				} else if (in_spaces) {
@@ -766,7 +816,11 @@ static int ng_wrap_count_lines(int font_idx, int em, u16 font_height,
 			// SWF<=7: break after every space, before and after hyphens
 			while (i < text_len) {
 				unsigned char c = (unsigned char)text[i];
-				if (c == ' ') {
+				if (c == '\t') {
+					// Tab: end segment before it
+					seg_end = i;
+					break;
+				} else if (c == ' ') {
 					i++;
 					seg_end = i;
 					break;
@@ -921,6 +975,14 @@ int ng_computeTextWidth(u16 font_id, u16 font_height, const char* text, size_t t
 				if (cur_width_twips > max_width_twips) max_width_twips = cur_width_twips;
 				cur_width_twips = 0;
 				cur_trimmed_twips = 0;
+				i++;
+				continue;
+			}
+			if (c == '\t') {
+				int next_tab = ng_next_tab_stop(cur_width_twips);
+				if (next_tab > cur_width_twips)
+					cur_width_twips = next_tab;
+				cur_trimmed_twips = cur_width_twips;
 				i++;
 				continue;
 			}
@@ -2917,18 +2979,47 @@ static int ng_hitTestShapeChar(size_t char_id, u16 ratio,
     double ma, double mb, double mc_m, double md, double mtx, double mty,
     double test_x, double test_y)
 {
+	// EditText (text field): hit test against bounds rectangle
+	int tf_idx = ng_find_textfield(char_id);
+	if (tf_idx >= 0) {
+		double det = ma * md - mb * mc_m;
+		if (det == 0.0) return 0;
+		double inv_det = 1.0 / det;
+		double sx = test_x - mtx;
+		double sy = test_y - mty;
+		double local_x = ( md * sx - mc_m * sy) * inv_det;
+		double local_y = (-mb * sx + ma  * sy) * inv_det;
+		double xmin = (double)ng_textfields[tf_idx].bounds_xmin;
+		double xmax = (double)ng_textfields[tf_idx].bounds_xmax;
+		double ymin = (double)ng_textfields[tf_idx].bounds_ymin;
+		double ymax = (double)ng_textfields[tf_idx].bounds_ymax;
+		return (local_x >= xmin && local_x <= xmax && local_y >= ymin && local_y <= ymax);
+	}
+
 	Character* ch = &dictionary[char_id];
 	int is_morph = (ch->type == CHAR_TYPE_MORPH_SHAPE);
 	if (ch->type != CHAR_TYPE_SHAPE && !is_morph) return 0;
 
-	size_t offset, count;
+	// Morph shapes: use interpolated bounds-based hit testing
+	// (morph end vertex data may not be emitted by recompiler for line-only morphs)
 	if (is_morph) {
-		offset = ch->morph_start_offset;
-		count = ch->morph_start_size;
-	} else {
-		offset = ch->shape_offset;
-		count = ch->size;
+		s32 bxmin, bxmax, bymin, bymax;
+		if (ng_getCharBoundsForRatio(char_id, ratio, &bxmin, &bxmax, &bymin, &bymax)) {
+			double det = ma * md - mb * mc_m;
+			if (det == 0.0) return 0;
+			double inv_det = 1.0 / det;
+			double bsx = test_x - mtx;
+			double bsy = test_y - mty;
+			double local_x = ( md * bsx - mc_m * bsy) * inv_det;
+			double local_y = (-mb * bsx + ma  * bsy) * inv_det;
+			return (local_x >= (double)bxmin && local_x <= (double)bxmax &&
+			        local_y >= (double)bymin && local_y <= (double)bymax);
+		}
+		return 0;
 	}
+
+	size_t offset = ch->shape_offset;
+	size_t count = ch->size;
 	if (count < 3) return 0;
 
 	// Inverse-transform test point into shape's local space
@@ -2940,14 +3031,7 @@ static int ng_hitTestShapeChar(size_t char_id, u16 ratio,
 	double local_x = ( md * sx - mc_m * sy) * inv_det;
 	double local_y = (-mb * sx + ma  * sy) * inv_det;
 
-	double interp_t = 0.0;
-	size_t morph_end_off = 0;
-	if (is_morph && ratio > 0) {
-		interp_t = (double)ratio / 65535.0;
-		morph_end_off = ch->morph_end_offset;
-	}
-
-	// Count triangle hits
+	// Count triangle hits (non-morph shapes only — morphs handled above via bounds)
 	int hits = 0;
 	size_t num_tris = count / 3;
 	for (size_t t = 0; t < num_tris; t++) {
@@ -2960,23 +3044,6 @@ static int ng_hitTestShapeChar(size_t char_id, u16 ratio,
 		double by = (double)*(const float*)&v1[1];
 		double cx = (double)*(const float*)&v2[0];
 		double cy = (double)*(const float*)&v2[1];
-
-		if (is_morph && ratio > 0) {
-			// Interpolate with end shape vertices
-			size_t vi = morph_end_off + t * 3;
-			double eax = (double)morph_end_shape_data[vi + 0][0];
-			double eay = (double)morph_end_shape_data[vi + 0][1];
-			double ebx = (double)morph_end_shape_data[vi + 1][0];
-			double eby = (double)morph_end_shape_data[vi + 1][1];
-			double ecx = (double)morph_end_shape_data[vi + 2][0];
-			double ecy = (double)morph_end_shape_data[vi + 2][1];
-			ax += (eax - ax) * interp_t;
-			ay += (eay - ay) * interp_t;
-			bx += (ebx - bx) * interp_t;
-			by += (eby - by) * interp_t;
-			cx += (ecx - cx) * interp_t;
-			cy += (ecy - cy) * interp_t;
-		}
 
 		if (pit(local_x, local_y, ax, ay, bx, by, cx, cy))
 			hits++;
@@ -3009,6 +3076,11 @@ int ng_hitTestShapeFromDL(DisplayObject* dl, size_t dl_max,
 		if (child->sprite_display_list != NULL && child->sprite_max_depth > 0) {
 			if (ng_hitTestShapeFromDL(child->sprite_display_list, child->sprite_max_depth,
 				na, nb, nc, nd, ntx, nty, test_x, test_y))
+				return 1;
+			// Sprites that are also textfields (EditText with MC association):
+			// if recursive display list test fails, test textfield bounds
+			if (ng_hitTestShapeChar(child->char_id, child->ratio, na, nb, nc, nd, ntx, nty,
+				test_x, test_y))
 				return 1;
 		} else {
 			if (ng_hitTestShapeChar(child->char_id, child->ratio, na, nb, nc, nd, ntx, nty,

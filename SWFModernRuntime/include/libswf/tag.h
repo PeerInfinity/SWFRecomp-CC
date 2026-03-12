@@ -271,6 +271,8 @@ void ng_record_font(SWFAppContext* app_context, u16 font_id, const char* name, i
 void ng_record_font_metrics(SWFAppContext* app_context, u16 font_id,
     s16 ascent, s16 descent, s16 leading, int em_square,
     const u16* code_table, const s16* advance_table, size_t glyph_count);
+void ng_setTabStops(const int* stops_twips, int count, u16 font_height);
+void ng_clearTabStops(void);
 int ng_computeTextWidth(u16 font_id, u16 font_height, const char* text, size_t text_len,
     int word_wrap, int field_width_twips, int swf_version,
     int left_margin_twips, int right_margin_twips, int indent_twips, int align,

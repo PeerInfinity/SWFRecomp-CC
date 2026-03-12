@@ -169,7 +169,7 @@ Last updated: 2026-03-12
 | BUTTON_PLAN | **14/14 PASS** → `complete/` | + root_button_mode ✅ (self-load + root onMouse dispatch + child MC bounds) | — |
 | SWF_VERSION_SEMANTICS_PLAN | **Phases 1-3 COMPLETE** → `blocked/` | 3/5 pass | Phase 4: caller-version closure decision done (swf5_to_6 23→25/29). Remaining: version-gated MC props, child SWF init context, objectCallToString context |
 | THIS_BINDING_PLAN | **FULLY COMPLETE** → `complete/` | 5/5 pass (this_swf5/6 ✅, mutable_this ✅, swf5_no_closure ✅, this_scoping ✅) | — |
-| HIT_TESTING_PLAN | **Phases 1-6 DONE** → `blocked/` | 5 PASS (hittest_morph now ✅) + movieclip_hittest_shapeflag 266/338 + getBounds 1-5,8 ✅ | getBounds_6/7 each 9/10 (shape bounds in NO_GRAPHICS). Mouse event tests need re-evaluation |
+| HIT_TESTING_PLAN | **Phases 1-6 DONE** → `blocked/` | 5 PASS (hittest_morph now ✅) + movieclip_hittest_shapeflag 306/338 (90.5%) + getBounds 1-5,8 ✅ | getBounds_6/7 each 9/10 (shape bounds in NO_GRAPHICS). Remaining 32: shape accuracy (curves/strokes), masking, morph BB overshoot |
 | EXTERNAL_INTERFACE_PLAN | **Phases 1-3 COMPLETE** → `complete/` | 6/7 pass (645 lines): escapexml ✅, unescapexml ✅, jsquotestring ✅, toxml_basic ✅, toxml_array ✅, toas_basic ✅ | Phase 4 (JS bridge) blocked — no JS environment |
 | MOUSE_EVENTS_ADVANCED_PLAN | **ALL PHASES COMPLETE** → `complete/` | 7 tests PASS: focus_mouse ✅, frame_size_translated_pos/neg ✅, button_keypress_vs_textinput ✅, focus_keyboard_press ✅ (60/60), tab_ordering_events_mouse ✅ (65/65), tab_ordering_automatic_order_same_position ✅ (12/12) | — |
 | LOCKROOT_PLAN | **COMPLETE** → `complete/` | movieclip_lockroot 29/29 ✅ | — |
