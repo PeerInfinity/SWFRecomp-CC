@@ -3,7 +3,7 @@
 
 Last updated: 2026-03-12
 
-## Status: IN PROGRESS — 4/5 tests passing (Phases 1+2+3 complete, Phase 4 partial)
+## Status: ALL PHASES COMPLETE — 5/5 tests passing
 
 ### Target Tests
 
@@ -13,7 +13,7 @@ Last updated: 2026-03-12
 | swf6_string_as_bool | 6 | 15/15 | 15 | **PASS** (Phase 2 complete) |
 | swf4_actions_coercion_order | 8 | 158/158 | 158 | **PASS** (Phase 3 complete) |
 | swf5_to_6_cross_call | 5 | **29/29** | 29 | **PASS** ✅ (Phase 4 — SWF5 non-closure version isolation + this OBJECT type + objectCallToString context + getDepth version gate) |
-| swf6_to_5_cross_call | 6 | 20/29 | 29 | Phase 4 partial — improved from 16/29 via objectCallToString context fix. Remaining: child SWF init context, reverse-direction version issues |
+| swf6_to_5_cross_call | 6 | **29/29** | 29 | **PASS** ✅ (Phase 4 — cross-movie this binding + CallMethod closure support + objectCallToString unconditional base_clip) |
 
 ### Already passing
 - `divide_swf4` — PASS
@@ -74,7 +74,7 @@ Implemented across multiple changes. Key fixes:
 
 ---
 
-## Phase 4: Cross-Version Function Calls (PARTIALLY COMPLETE)
+## Phase 4: Cross-Version Function Calls (COMPLETE ✅)
 
 ### The Problem
 
@@ -90,10 +90,12 @@ Both tests have `child.swf` files that are loaded via loadMovie. The multi-SWF l
 3. `objectCallToString` closure context: Added `switchToFunctionVersion` + `actionSetCurrentContext(func->base_clip)` in the toString invocation path.
 4. `getDepth` version gate: Added `g_swf_version < 6` check in MovieClip.prototype "last resort" lookup in `actionGetVariable`.
 
-**swf6_to_5_cross_call: 20/29** (improved from 16/29 via objectCallToString fix). Remaining 9 diffs are the reverse direction (SWF6 calling SWF5 function). Issues:
-- Child SWF init context: child defines function `f` with `g_current_context = root` instead of target clip, so `base_clip` points to root instead of clip MC.
-- `this` binding: SWF6 closure call to SWF5-defined function — unclear whether to use SWF5 or SWF6 semantics for `this`.
-- `_target`/`foo`/`getDepth`: flow from incorrect `base_clip`.
+**swf6_to_5_cross_call: 29/29 PASS** ✅ (commit d61239f5). Five fixes:
+1. `actionCallFunction` default this: use `g_current_context` instead of `root_movieclip`, so child SWF functions get the correct MC as `this` when called standalone.
+2. `actionCallMethod` empty-method-name path: added full closure support (version switching, scope chain save/restore, base_clip context switch, `this` binding).
+3. `objectCallToString` type 1 path: push `this=obj` onto `g_this_stack` before calling type 1 functions (previously type 1 toString calls inherited caller's `this`).
+4. `objectCallToString` base_clip: changed from `g_swf_version >= 6` to unconditional `func->base_clip != NULL` (after switchToFunctionVersion, g_swf_version reflected function's version, not caller's).
+5. Key insight: `CallFunction` always uses MovieClip type for `this`; `CallMethod` with undefined method name uses Object type for SWF6+ callers; internal toString calls always use function's base_clip.
 
 ### Implementation Checklist
 
@@ -101,14 +103,14 @@ Both tests have `child.swf` files that are loaded via loadMovie. The multi-SWF l
 2. ~~**Per-function SWF version tracking**~~ — **DONE**
 3. ~~**Version switching on call**~~ — **DONE**
 4. ~~**Version-gated MC prototype properties**~~ — **DONE** (getDepth gated in GetVariable last-resort path)
-5. **Child SWF init context** — **BLOCKED**. Child SWF init scripts run with `g_current_context = root` instead of the loaded-into clip MC. Affects `base_clip` of functions defined in child SWF.
+5. ~~**Child SWF init context**~~ — **DONE**. `actionCallFunction` now uses `g_current_context` (set correctly during child SWF loading) instead of hardcoded `root_movieclip`.
 6. ~~**objectCallToString context switch**~~ — **DONE**. `switchToFunctionVersion` + `actionSetCurrentContext(func->base_clip)` in objectCallToString.
 7. ~~**SWF5 non-closure version isolation**~~ — **DONE**. `actionCallFunction` only calls `switchToFunctionVersion` when `_cf_caller_ver >= 6`.
 8. ~~**SWF5 non-closure this type**~~ — **DONE**. Pass `global_object` as `this_obj` for SWF5 callers calling SWF6+ DefineFunction2 standalone.
 
 ### Estimated Impact
 - swf5_to_6_cross_call: **29/29 PASS** ✅
-- swf6_to_5_cross_call: 20/29. Remaining 9 lines blocked on item 5 (child SWF init context)
+- swf6_to_5_cross_call: **29/29 PASS** ✅
 
 ---
 

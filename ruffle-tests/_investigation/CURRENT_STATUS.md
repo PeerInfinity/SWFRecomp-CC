@@ -4,10 +4,10 @@ Last updated: 2026-03-12
 
 ## Quick Summary
 
-- **Pass rate (CI, last run)**: 522/618 (84.5%) total (CI run on 3724101d, 0 regressions)
+- **Pass rate (CI, last run)**: 524/618 (84.8%) total (CI run on d61239f5, 0 regressions)
 - **Image test baseline**: **7/31 strict image match** (run_image_tests.py, 0-outlier AND 0-max-diff). **9/31 tolerance pass** (within test.toml limits). Strict passes: focusrect_focuslost, focusrect_mouse_swf8/swf9, focusrect_swf6, frame_size_translated_neg/pos, mask_with_drawing. Tolerance-only: display_object_properties (max_diff=79), mask_reapply (max_diff=1).
 - **Main failure types**: output_mismatch (46), segfault (2, ignored), timeout (1, ignored)
-- **Recent gains**: swf5_to_6_cross_call 25→29/29 ✅ (SWF5 non-closure version isolation + this type + objectCallToString context + getDepth gate). swf6_to_5_cross_call 16→20/29 (side-effect of toString fix). selection_handlers 27/27 ✅, edittext_html_swf6 3900→5289/5377 (+1389 lines). register_class 66/66 ✅, register_class_swf6 38/38 ✅. getBounds on loaded clips: 6/8 PASS.
+- **Recent gains**: swf5_to_6_cross_call 29/29 ✅, swf6_to_5_cross_call 29/29 ✅ (cross-movie this binding + closure context + toString dispatch). selection_handlers 27/27 ✅, edittext_html_swf6 3900→5289/5377 (+1389 lines). register_class 66/66 ✅, register_class_swf6 38/38 ✅. getBounds on loaded clips: 6/8 PASS.
 - **Known regressions**: None. Previous regressions all recovered.
 
 ## Crashes and Errors (8 tests)
@@ -167,7 +167,7 @@ Last updated: 2026-03-12
 | LOADMOVIE_REMAINING_PLAN | **Partially blocked** | 0/5 | dynamic_props clearing done; var_persistence needs setTimeout; others need cross-version/__proto__ |
 | UNLOAD_PLAN | **MOSTLY DONE** | 5/6 pass (unload 52/52 ✅, unload_clip_event, unloadmovie, unloadmovie_method, unloadmovienum ✅) | unload_nested_child (0/5) |
 | BUTTON_PLAN | **14/14 PASS** → `complete/` | + root_button_mode ✅ (self-load + root onMouse dispatch + child MC bounds) | — |
-| SWF_VERSION_SEMANTICS_PLAN | **Phases 1-3 COMPLETE, Phase 4 partial** → `blocked/` | 4/5 pass (swf5_to_6_cross_call ✅) | Phase 4: SWF5→SWF6 PASS (version isolation + this type + toString context + getDepth gate). swf6_to_5 20/29. Remaining: child SWF init context (base_clip wrong for child-defined functions) |
+| SWF_VERSION_SEMANTICS_PLAN | **ALL PHASES COMPLETE** → `complete/` | 5/5 pass (swf5_to_6_cross_call ✅, swf6_to_5_cross_call ✅) | Phase 4 COMPLETE: cross-movie this binding (g_current_context), CallMethod closure support, objectCallToString unconditional base_clip |
 | THIS_BINDING_PLAN | **FULLY COMPLETE** → `complete/` | 5/5 pass (this_swf5/6 ✅, mutable_this ✅, swf5_no_closure ✅, this_scoping ✅) | — |
 | HIT_TESTING_PLAN | **Phases 1-6 DONE** → `blocked/` | 5 PASS (hittest_morph now ✅) + movieclip_hittest_shapeflag 306/338 (90.5%) + getBounds 1-5,8 ✅ | getBounds_6/7 each 9/10 (shape bounds in NO_GRAPHICS). Remaining 32: shape accuracy (curves/strokes), masking, morph BB overshoot |
 | EXTERNAL_INTERFACE_PLAN | **Phases 1-3 COMPLETE** → `complete/` | 6/7 pass (645 lines): escapexml ✅, unescapexml ✅, jsquotestring ✅, toxml_basic ✅, toxml_array ✅, toas_basic ✅ | Phase 4 (JS bridge) blocked — no JS environment |
@@ -193,7 +193,7 @@ All simple fixes have been applied. Remaining failing tests require:
 - ~~Font metrics improvements (mixed-font line height)~~ — **MOSTLY RESOLVED** (edittext_scroll + edittext_newlines now PASS)
 - Mouse event dispatch (rollover/rollout, shape-flag hitTest)
 - Cross-movie export table isolation (loadmovie_registerclass, see CROSS_MOVIE_EXPORT_ISOLATION_PLAN.md)
-- Per-function SWF version tracking: swf5_to_6_cross_call 29/29 ✅ PASS, swf6_to_5_cross_call 20/29. Remaining for swf6_to_5: child SWF init context (base_clip wrong for child-defined functions)
+- ~~Per-function SWF version tracking~~: swf5_to_6_cross_call 29/29 ✅, swf6_to_5_cross_call 29/29 ✅. Both PASS.
 - Deep architectural changes (~~constructor ordering~~ ✅, call() termination, closure capture)
 
 ### Remaining blocked work (from blocked/ plans)
@@ -207,8 +207,18 @@ All simple fixes have been applied. Remaining failing tests require:
 - **LOADMOVIE_PLAN** (reduced blocker): 31/35 core tests PASS. root_button_mode ✅. getBounds 6/8 PASS (1-5, 8 ✅; 6, 7 at 9/10). Remaining: loadmovie_registerclass (cross-movie export isolation), mcl_replace_root accepted diffs. Multi-SWF tests now visible in filtered results (removed from ignored_tests.txt).
 - **FOCUS_SYSTEM_PLAN** — 7/7 pass (focus_remove ✅ newly fixed). TAB_ORDERING_PLAN fully complete (16/16). Only focus_mouse_focusable (0/8) blocked by dynamic object creation.
 
+### Session notes (2026-03-12 swf6_to_5_cross_call fix)
+- **Pass rate: 524/618 (84.8%)**: +1 newly passing (swf6_to_5_cross_call). -9 mismatched lines.
+- **swf6_to_5_cross_call 20→29/29 PASS** ✅ (commit d61239f5): Five fixes:
+  1. `actionCallFunction` default this: use `g_current_context` instead of `root_movieclip`, so child SWF functions get the correct MC as `this`.
+  2. `actionCallMethod` empty-method-name path: added full closure support (version switching, scope chain save/restore, base_clip context switch, `this` binding with Object type for SWF6+ callers).
+  3. `objectCallToString` type 1 path: push `this=obj` onto `g_this_stack` before calling type 1 functions (previously inherited caller's `this`).
+  4. `objectCallToString` base_clip: changed from `g_swf_version >= 6` to unconditional `func->base_clip != NULL` (post-switchToFunctionVersion, `g_swf_version` reflected function's version, not caller's).
+  5. Key insight: `CallFunction` always uses MovieClip type for `this`; `CallMethod` with undefined method name uses Object type for SWF6+ callers; internal toString calls always use function's base_clip.
+- **No regressions**: Verified 27+ related tests still pass.
+
 ### Session notes (2026-03-12 SWF5↔SWF6 cross-call fixes)
-- **Pass rate: 522/618 (84.5%)**: +1 newly passing (swf5_to_6_cross_call). swf6_to_5_cross_call improved 16→20/29. -6 mismatched lines net.
+- **Pass rate: 523/618 (84.6%)**: +1 newly passing (swf5_to_6_cross_call). swf6_to_5_cross_call improved 16→20/29. -6 mismatched lines net.
 - **swf5_to_6_cross_call 25→29/29 PASS** ✅ (commits 2f40f9f9 + 3724101d): Four fixes:
   1. SWF5 non-closure version isolation: `actionCallFunction` gates `switchToFunctionVersion` on `_cf_caller_ver >= 6`. SWF5 callers don't switch to called function's version, so getDepth version gate kicks in.
   2. SWF5 non-closure `this` type: For SWF5 callers calling SWF6+ DefineFunction2 standalone, pass `global_object` as `this_obj` so preload_this stores as OBJECT type (typeof="object"), not MOVIECLIP. Gated on `func->swf_version >= 6` to avoid SWF5→SWF5 regression (this_swf5 test).

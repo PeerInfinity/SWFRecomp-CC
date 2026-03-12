@@ -142,11 +142,11 @@ Description: Needs Object.registerClass() implementation for linking AS2 classes
 
 ---
 
-## 16. SWF Version-Specific Behavior (2 failing / 9 total)
+## 16. SWF Version-Specific Behavior (0 failing / 9 total) ✅
 
-Failing tests: swf5_to_6_cross_call (~10/29), swf6_to_5_cross_call (~10/29)
+All tests now pass: swf5_to_6_cross_call 29/29 ✅, swf6_to_5_cross_call 29/29 ✅.
 
-Description: Tests that verify version-dependent behavior differences: case sensitivity (SWF6 insensitive, SWF7+ sensitive), cross-version function calls between loaded movies, SWF5 closure behavior, string-as-boolean coercion, and SWF4 type coercion. The cross_call tests now compile and run (multi-SWF loadMovie infra works), but fail due to missing per-function SWF version tracking — functions from child SWFs execute with the parent's version semantics instead of their own.
+Description: Tests that verify version-dependent behavior differences: case sensitivity (SWF6 insensitive, SWF7+ sensitive), cross-version function calls between loaded movies, SWF5 closure behavior, string-as-boolean coercion, and SWF4 type coercion. Fixed via per-function SWF version tracking, cross-movie this binding (g_current_context), CallMethod closure support, and objectCallToString unconditional base_clip.
 
 ---
 
@@ -384,7 +384,7 @@ These tests are >60% passing and likely need bug fixes rather than new features:
 | edittext_scroll | 52/54 (96%) | EditText scroll properties |
 | global_swf5_6_7_8_9 | 1057/1145 (92%) |  |
 | movieclip_hittest_shapeflag | 286/338 (85%) |  |
-| swf5_to_6_cross_call | 23/29 (79%) |  |
+| swf5_to_6_cross_call | **29/29 PASS** ✅ |  |
 | selection_handlers | 21/27 (78%) |  |
 | edittext_newlines | 23/30 (77%) |  |
 | edittext_tab_stops | 45/60 (75%) |  |
