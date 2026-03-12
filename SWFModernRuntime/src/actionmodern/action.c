@@ -14207,8 +14207,9 @@ static char* tf_serialize_html(TFRunTable* table, int is_multiline) {
 			int is_tag_break = (ti < table->text_len && (table->text[ti] == SENTINEL_TAG_BREAK || table->text[ti] == SENTINEL_BR_BREAK));
 			int is_content_nl = (ti < table->text_len && table->text[ti] == '\n');
 
-			if (!is_multiline && is_tag_break) {
-				// Single-line: tag breaks merge paragraphs. Don't create a break.
+			if (!is_multiline && is_tag_break && table->swf_version >= 7) {
+				// Single-line SWF7+: tag breaks merge paragraphs. Don't create a break.
+				// In SWF<=6, non-multiline preserves paragraph breaks like multiline.
 				// Track para_type from the first break marker that has content before it.
 				if (!sl_found_content) {
 					// Check if there's non-break content between pstart and ti
@@ -14312,9 +14313,10 @@ static char* tf_serialize_html(TFRunTable* table, int is_multiline) {
 			}
 		}
 
-		// In single-line mode, skip empty paragraphs (no content runs)
+		// In single-line SWF7+ mode, skip empty paragraphs (no content runs)
 		// These arise from <p></p> tag pairs where the tag break was skipped
-		if (!is_multiline && prcnt == 0 && p_break_kind[pi] != 1) {
+		// In SWF<=6, non-multiline preserves all paragraphs like multiline
+		if (!is_multiline && table->swf_version >= 7 && prcnt == 0 && p_break_kind[pi] != 1) {
 			// Only skip if not a content-NL-created paragraph
 			// Check if there's actually any non-marker text in this range
 			int has_real_text = 0;
@@ -14749,8 +14751,9 @@ static void tf_get_plain_text(TFRunTable* table, char* out_buf, u32 out_buf_size
 			// Content newline: always produces \r
 			out_buf[oi++] = '\r';
 		} else if (c == SENTINEL_TAG_BREAK || c == SENTINEL_BR_BREAK) {
-			// Tag paragraph break: \r in multiline, space in single-line condenseWhite SWF8
-			if (is_multiline) out_buf[oi++] = '\r';
+			// Tag paragraph break: \r in multiline (or SWF<=6 non-multiline),
+			// space in single-line condenseWhite SWF8
+			if (is_multiline || table->swf_version <= 6) out_buf[oi++] = '\r';
 			else if (cw8_space && oi > 0 && out_buf[oi - 1] != ' ') out_buf[oi++] = ' ';
 		} else {
 			out_buf[oi++] = c;
@@ -36666,7 +36669,10 @@ void actionCallFunction(SWFAppContext* app_context, char* str_buffer)
 			// Phase 3: switch to function's SWF version for correct version-dependent behavior
 			int _cf_saved_ver = 0; ASObject* _cf_saved_global = NULL; int _cf_saved_midx = 0;
 			switchToFunctionVersion(func, &_cf_saved_ver, &_cf_saved_global, &_cf_saved_midx);
-			// Save scope chain: SWF6+ functions start with a fresh scope chain
+			// Use CALLER's version for closure decision (not function's version).
+			// In Ruffle, is_closure = activation.swf_version() >= 6 (caller's version).
+			int _cf_caller_ver = _cf_saved_ver;
+			// Save scope chain: SWF6+ callers start with a fresh scope chain
 			// (only captured scopes + local scope), not inheriting the caller's scopes.
 			// We save the entire scope chain state because the function will overwrite
 			// the global scope_chain array positions during its execution.
@@ -36674,7 +36680,7 @@ void actionCallFunction(SWFAppContext* app_context, char* str_buffer)
 			ASObject* saved_scope_chain_cf[MAX_SCOPE_DEPTH];
 			u8 saved_scope_is_with_cf[MAX_SCOPE_DEPTH];
 			MovieClip* saved_scope_mc_cf[MAX_SCOPE_DEPTH];
-			if (g_swf_version >= 6)
+			if (_cf_caller_ver >= 6)
 			{
 				for (u32 si = 0; si < scope_depth; si++) {
 					saved_scope_chain_cf[si] = scope_chain[si];
@@ -36683,7 +36689,7 @@ void actionCallFunction(SWFAppContext* app_context, char* str_buffer)
 				}
 				scope_depth = 0;
 			}
-			if (g_swf_version >= 6 && func->base_clip != NULL)
+			if (_cf_caller_ver >= 6 && func->base_clip != NULL)
 			{
 				MovieClip* _bc = reResolveDeadBaseClip(app_context, (MovieClip*)func->base_clip);
 				actionSetCurrentContext(_bc);
@@ -36980,7 +36986,7 @@ void actionCallFunction(SWFAppContext* app_context, char* str_buffer)
 			g_call_depth--;
 
 			// Restore caller's scope chain and context
-			if (g_swf_version >= 6)
+			if (_cf_caller_ver >= 6)
 			{
 				for (u32 si = 0; si < saved_scope_depth_cf; si++) {
 					scope_chain[si] = saved_scope_chain_cf[si];
@@ -39837,10 +39843,11 @@ void actionCallMethod(SWFAppContext* app_context, char* str_buffer)
 				// Phase 3: switch to function's SWF version
 				int _om2_saved_ver = 0; ASObject* _om2_saved_global = NULL; int _om2_saved_midx = 0;
 				switchToFunctionVersion(func, &_om2_saved_ver, &_om2_saved_global, &_om2_saved_midx);
+				int _om2_caller_ver = _om2_saved_ver; // caller's version for closure decision
 
-				// Switch base_clip context for SWF6+ closures
+				// Switch base_clip context for SWF6+ closures (uses caller's version)
 				MovieClip* saved_ctx_om2 = g_current_context;
-				if (g_swf_version >= 6 && func->base_clip != NULL) {
+				if (_om2_caller_ver >= 6 && func->base_clip != NULL) {
 					MovieClip* bc_raw = (MovieClip*)func->base_clip;
 					MovieClip* bc = reResolveDeadBaseClip(app_context, bc_raw);
 					if (bc->depth != INT_MIN)
@@ -39948,10 +39955,11 @@ void actionCallMethod(SWFAppContext* app_context, char* str_buffer)
 				// Phase 3: switch to function's SWF version
 				int _om1_saved_ver = 0; ASObject* _om1_saved_global = NULL; int _om1_saved_midx = 0;
 				switchToFunctionVersion(func, &_om1_saved_ver, &_om1_saved_global, &_om1_saved_midx);
+				int _om1_caller_ver = _om1_saved_ver; // caller's version for closure decision
 
-				// Switch base_clip context for SWF6+ closures
+				// Switch base_clip context for SWF6+ closures (uses caller's version)
 				MovieClip* saved_ctx_om1 = g_current_context;
-				if (g_swf_version >= 6 && func->base_clip != NULL) {
+				if (_om1_caller_ver >= 6 && func->base_clip != NULL) {
 					MovieClip* bc = reResolveDeadBaseClip(app_context, (MovieClip*)func->base_clip);
 					if (bc->depth != INT_MIN)
 						g_current_context = bc;
@@ -45666,6 +45674,8 @@ static ActionVar builtin_selection_setFocus(SWFAppContext* app_context, ActionVa
 	if (arg->type == ACTION_STACK_VALUE_NULL || arg->type == ACTION_STACK_VALUE_UNDEFINED) {
 		if (g_focused_mc != NULL) {
 			queue_deferred_roll(g_focused_mc, NULL);
+			g_tab_hovered_mc = NULL;
+			g_mouse_hovered_mc = NULL;
 			selection_do_focus_change(app_context, g_focused_mc, NULL);
 		}
 		ret.data.numeric_value = 1;
@@ -45686,7 +45696,12 @@ static ActionVar builtin_selection_setFocus(SWFAppContext* app_context, ActionVa
 	if (new_mc == NULL) return ret;
 	if (!mc_is_focusable_by_setfocus(new_mc)) return ret;
 	if (new_mc == g_focused_mc) {
-		// Re-focusing the same text field re-selects all text
+		// Re-focusing the same MC: no focus events, but roll events still fire
+		// (Ruffle fires rollOut+rollOver unconditionally on each setFocus call)
+		MovieClip* old_hover = g_tab_hovered_mc ? g_tab_hovered_mc : g_focused_mc;
+		queue_deferred_roll(old_hover, new_mc);
+		g_tab_hovered_mc = new_mc;
+		g_mouse_hovered_mc = NULL;
 		if (MC_IS_TEXTFIELD(new_mc)) {
 			g_tf_select_all = 1;
 			g_selection_begin = -1;
@@ -45696,6 +45711,10 @@ static ActionVar builtin_selection_setFocus(SWFAppContext* app_context, ActionVa
 		ret.data.numeric_value = 1; return ret;
 	}
 	queue_deferred_roll(g_focused_mc, new_mc);
+	// Eagerly track hover target so subsequent same-frame setFocus calls
+	// see the correct old hover (flush hasn't happened yet)
+	g_tab_hovered_mc = new_mc;
+	g_mouse_hovered_mc = NULL;
 	selection_do_focus_change(app_context, g_focused_mc, new_mc);
 	// Programmatic setFocus selects all text (mouse click does not)
 	if (MC_IS_TEXTFIELD(new_mc))
