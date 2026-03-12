@@ -2817,17 +2817,21 @@ static void fire_eager_constructors(SWFAppContext* app_context, DisplayObject* d
 		if (obj->instance_name == NULL) continue;
 
 		const char* exp = ng_lookupExportName(obj->char_id);
-		MovieClip* mc = actionFindOrCreateMovieClip(app_context, obj->instance_name, parent_mc);
+		MovieClip* mc = NULL;
 
-		// Link MC to display entry so child property lookups work
-		if (mc != NULL)
-			mc->display_obj = (void*)obj;
-
-		if (exp != NULL && mc != NULL)
+		// Only create the MC when there's a registered class — premature creation
+		// causes zombie MCs with wrong depth/parent (regressions in
+		// function_base_clip_readded, movieclip_in_removed_button)
+		if (exp != NULL)
 		{
-			actionSetupRegisteredClassPrototype(app_context, exp, mc);
-			actionInvokeRegisteredClassConstructor(app_context, exp, mc);
-			obj->constructor_invoked = 1;
+			mc = actionFindOrCreateMovieClip(app_context, obj->instance_name, parent_mc);
+			if (mc != NULL)
+			{
+				mc->display_obj = (void*)obj;
+				actionSetupRegisteredClassPrototype(app_context, exp, mc);
+				actionInvokeRegisteredClassConstructor(app_context, exp, mc);
+				obj->constructor_invoked = 1;
+			}
 		}
 
 		// Recurse into children regardless of whether this sprite had a class
@@ -3163,18 +3167,21 @@ void tagPlaceObject2(SWFAppContext* app_context, size_t depth, size_t char_id, u
 		extern void actionSetupRegisteredClassPrototype(SWFAppContext*, const char*, MovieClip*);
 		extern MovieClip root_movieclip;
 		MovieClip* _ctor_parent = g_current_context ? g_current_context : &root_movieclip;
-		MovieClip* _ctor_mc = actionFindOrCreateMovieClip(app_context, display_list[depth].instance_name, _ctor_parent);
+		MovieClip* _ctor_mc = NULL;
 
-		// Link MC to display entry so child property lookups work via sprite_display_list
-		if (_ctor_mc != NULL)
-			_ctor_mc->display_obj = (void*)&display_list[depth];
-
+		// Only create MC when there's a registered class — premature creation
+		// causes zombie MCs with wrong depth/parent
 		const char* _ctor_exp = ng_lookupExportName(char_id);
-		if (_ctor_exp != NULL && _ctor_mc != NULL)
+		if (_ctor_exp != NULL)
 		{
-			actionSetupRegisteredClassPrototype(app_context, _ctor_exp, _ctor_mc);
-			actionInvokeRegisteredClassConstructor(app_context, _ctor_exp, _ctor_mc);
-			display_list[depth].constructor_invoked = 1;
+			_ctor_mc = actionFindOrCreateMovieClip(app_context, display_list[depth].instance_name, _ctor_parent);
+			if (_ctor_mc != NULL)
+			{
+				_ctor_mc->display_obj = (void*)&display_list[depth];
+				actionSetupRegisteredClassPrototype(app_context, _ctor_exp, _ctor_mc);
+				actionInvokeRegisteredClassConstructor(app_context, _ctor_exp, _ctor_mc);
+				display_list[depth].constructor_invoked = 1;
+			}
 		}
 
 		// Recursively fire constructors for child sprites placed during eager init
