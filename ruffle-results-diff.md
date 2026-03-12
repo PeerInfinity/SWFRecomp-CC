@@ -1,26 +1,33 @@
 # Ruffle Test Results Diff
 
-**Previous:** `9239d9dd082d` (2026-03-12T05:14:43.074210+00:00)
-**Current:** `06817b9539c6` (2026-03-12T05:46:30.694068+00:00)
+**Previous:** `06817b9539c6` (2026-03-12T05:46:30.694068+00:00)
+**Current:** `2f40f9f9d0d6` (2026-03-12T18:54:42.149235+00:00)
 
 ## Summary
 
 | Metric | Previous | Current | Delta |
 |--------|----------|---------|-------|
-| Passing | 521 | 522 | +1 |
+| Passing | 522 | 522 | 0 |
 | Total | 618 | 618 | 0 |
-| Pass rate | 84.3% | 84.5% | +0.2% |
-| Mismatched lines | 17446 | 17411 | -35 |
-|   Decreased | | | -35 |
+| Pass rate | 84.5% | 84.5% | 0% |
+| Mismatched lines | 17411 | 17405 | -6 |
+|   Decreased | | | -8 |
+|   Increased | | | +2 |
 
 ## Newly Passing (1)
 
 | Test | Previous Status | Lines (prev) | Lines (now) |
 |------|----------------|--------------|-------------|
-| `edittext_tab_stops` | output_mismatch | 45/60 | 60/60 |
+| `swf5_to_6_cross_call` | output_mismatch | 25/29 | 29/29 |
+
+## Newly Failing (1)
+
+| Test | New Status | Lines (prev) | Lines (now) |
+|------|-----------|--------------|-------------|
+| `this_swf5` | output_mismatch | 41/41 | 39/41 |
 
 ## Line Count Changed (1)
 
 | Test | Status | Lines (prev) | Lines (now) | Diff |
 |------|--------|--------------|-------------|------|
-| `movieclip_hittest_shapeflag` | output_mismatch | 286/338 | 306/338 | -20 |
+| `swf6_to_5_cross_call` | output_mismatch | 16/29 | 20/29 | -4 |
