@@ -7663,6 +7663,10 @@ static ActionVar objectCallValueOf(SWFAppContext* app_context, ActionVar* obj_va
 	return *obj_var;  // No valueOf found, return original
 }
 
+// Forward declarations for version switching helpers (defined later in file)
+static inline void switchToFunctionVersion(ASFunction* func, int* saved_ver, ASObject** saved_global, int* saved_movie_idx);
+static inline void restoreFunctionVersion(int saved_ver, ASObject* saved_global, int saved_movie_idx);
+
 // Call just toString on an object. Returns the raw result.
 // If found is non-NULL, sets *found = 1 if toString existed and was called, 0 otherwise.
 static ActionVar objectCallToString(SWFAppContext* app_context, ActionVar* obj_var, int* found)
@@ -7761,6 +7765,12 @@ static ActionVar objectCallToString(SWFAppContext* app_context, ActionVar* obj_v
 		{
 			if (found) *found = 1;
 			ActionVar result;
+			// Switch to function's base_clip and SWF version (closure context)
+			MovieClip* _ts_saved_ctx = g_current_context;
+			int _ts_saved_ver; ASObject* _ts_saved_global; int _ts_saved_midx;
+			switchToFunctionVersion(func, &_ts_saved_ver, &_ts_saved_global, &_ts_saved_midx);
+			if (func->base_clip != NULL && g_swf_version >= 6)
+				actionSetCurrentContext(func->base_clip);
 			// Save and restore captured scopes for proper closure support
 			u32 saved_scope_depth = scope_depth;
 			u8 captured = func->captured_scope_count;
@@ -7789,6 +7799,8 @@ static ActionVar objectCallToString(SWFAppContext* app_context, ActionVar* obj_v
 				result.data.numeric_value = 0;
 			}
 			scope_depth = saved_scope_depth;
+			actionSetCurrentContext(_ts_saved_ctx);
+			restoreFunctionVersion(_ts_saved_ver, _ts_saved_global, _ts_saved_midx);
 			return result;
 		}
 	}
@@ -23802,8 +23814,19 @@ check_special_vars:
 			ActionVar* proto_prop = getPropertyWithPrototype(g_movieclip_constructor.prototype_obj, var_name, var_name_len);
 			if (proto_prop != NULL)
 			{
-				PUSH_VAR(proto_prop);
-				return;
+				// Version-gate SWF6+ MC methods: getDepth, getSWFVersion, getInstanceAtDepth,
+				// getNextHighestDepth, attachMovie, createEmptyMovieClip, createTextField
+				// are not accessible via GetVariable in SWF5
+				if (g_swf_version < 6 && proto_prop->type == ACTION_STACK_VALUE_FUNCTION &&
+				    (var_name_len == 8 && strncmp(var_name, "getDepth", 8) == 0))
+				{
+					// Skip: getDepth not visible in SWF5 via GetVariable
+				}
+				else
+				{
+					PUSH_VAR(proto_prop);
+					return;
+				}
 			}
 		}
 
@@ -36683,12 +36706,14 @@ void actionCallFunction(SWFAppContext* app_context, char* str_buffer)
 			// SWF5 does NOT have closures — functions execute in the caller's context.
 			MovieClip* saved_cf_context = g_current_context;
 			DisplayObject* saved_cf_sprite = g_current_sprite_obj;
-			// Phase 3: switch to function's SWF version for correct version-dependent behavior
-			int _cf_saved_ver = 0; ASObject* _cf_saved_global = NULL; int _cf_saved_midx = 0;
-			switchToFunctionVersion(func, &_cf_saved_ver, &_cf_saved_global, &_cf_saved_midx);
 			// Use CALLER's version for closure decision (not function's version).
 			// In Ruffle, is_closure = activation.swf_version() >= 6 (caller's version).
-			int _cf_caller_ver = _cf_saved_ver;
+			int _cf_caller_ver = g_swf_version;
+			// Phase 3: switch to function's SWF version for correct version-dependent behavior
+			// Only for SWF6+ closure calls — SWF5 non-closures execute in caller's version
+			int _cf_saved_ver = 0; ASObject* _cf_saved_global = NULL; int _cf_saved_midx = 0;
+			if (_cf_caller_ver >= 6)
+				switchToFunctionVersion(func, &_cf_saved_ver, &_cf_saved_global, &_cf_saved_midx);
 			// Save scope chain: SWF6+ callers start with a fresh scope chain
 			// (only captured scopes + local scope), not inheriting the caller's scopes.
 			// We save the entire scope chain state because the function will overwrite
@@ -36803,12 +36828,20 @@ void actionCallFunction(SWFAppContext* app_context, char* str_buffer)
 
 				g_prev_executing_func = prev_executing_func;
 				g_current_executing_func = func;
+				// SWF5 non-closure standalone call: 'this' should be OBJECT type (not MOVIECLIP).
+				// In Ruffle, SWF5 non-closure calls pass target_clip_or_root() as a Value::Object,
+				// yielding typeof="object". Pass global_object as this_obj so generated preload_this
+				// stores as OBJECT type instead of falling back to MOVIECLIP.
+				void* _cf_this_obj = NULL;
+				if (_cf_caller_ver < 6 && !has_callable_this) {
+					_cf_this_obj = (void*)global_object;
+				}
 				// Only push constructor context for bytecode functions (register_count > 0).
 				// Native Function2Ptr wrappers (register_count == 0) should see through
 				// to the enclosing bytecode frame's constructor context.
 				int is_bytecode_func = (func->register_count > 0);
 				if (is_bytecode_func) pushCtorContext(0);
-				ActionVar result = func->advanced_func(app_context, args, num_args, registers, NULL);
+				ActionVar result = func->advanced_func(app_context, args, num_args, registers, _cf_this_obj);
 				if (is_bytecode_func) popCtorContext();
 				g_current_executing_func = prev_executing_func;
 
@@ -37014,8 +37047,9 @@ void actionCallFunction(SWFAppContext* app_context, char* str_buffer)
 			scope_depth = saved_scope_depth_cf;
 			actionSetCurrentContext(saved_cf_context);
 			g_current_sprite_obj = saved_cf_sprite;
-			// Phase 3: restore caller's SWF version
-			restoreFunctionVersion(_cf_saved_ver, _cf_saved_global, _cf_saved_midx);
+			// Phase 3: restore caller's SWF version (only if we switched)
+			if (_cf_caller_ver >= 6)
+				restoreFunctionVersion(_cf_saved_ver, _cf_saved_global, _cf_saved_midx);
 		}
 		else
 		{
