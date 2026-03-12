@@ -2,16 +2,16 @@
 
 <!-- TESTS: register_class_return_value, register_class, register_class_swf6, register_class_with_sound, register_and_init_order, register_globals_across_frames, register_underflow, attach_movie, attach_movie_stop, export_assets, clip_constructors, on_construct, movieclip_init_object, empty_movieclip_can_attach_movies, do_init_action_child -->
 
-Last updated: 2026-03-03
+Last updated: 2026-03-11
 Status: **BLOCKED** — moved to blocked/
 
 ## Summary
 
-This plan covered implementing `Object.registerClass()`, ExportAssets (tag 56), `attachMovie()`, and the constructor invocation pipeline. All implementable phases are complete. Remaining failures are blocked on infrastructure that doesn't exist yet (child SWF loading, Sound class, button MC typeof, sprite init ordering).
+This plan covered implementing `Object.registerClass()`, ExportAssets (tag 56), `attachMovie()`, and the constructor invocation pipeline. All implementable phases are complete. register_and_init_order now fully passes (233/233). Remaining failures are blocked on infrastructure that doesn't exist yet (child SWF loading, button MC typeof).
 
 ## Final Test Results (15 tests)
 
-### Passing (13/15)
+### Passing (14/15)
 
 | Test | Lines | Result |
 |------|-------|--------|
@@ -27,13 +27,13 @@ This plan covered implementing `Object.registerClass()`, ExportAssets (tag 56), 
 | empty_movieclip_can_attach_movies | 11 | **PASS** |
 | do_init_action_child | 12 | **12/12 PASS** ✅ (cross-version Phase 1+4 + ImportAssets2) |
 | register_class_with_sound | 11 | **11/11 PASS** ✅ (fixed by Sound Phase 0) |
+| register_and_init_order | 233 | **233/233 PASS** ✅ (fixed 2026-03-11: child constructor ordering + Phase 0 deferred constructors + script_only_mode in attach inits) |
 
-### Failing (2/15)
+### Failing (1/15)
 
 | Test | Lines | Match | Blocker |
 |------|-------|-------|---------|
 | register_class | 67 | 26/67 | Lines 27-29: button MC typeof. Lines 31+: child SWF loading (loadMovie) |
-| register_and_init_order | 233 | ~76/233 | Line 35: deep child access during constructor. Lines 133+: child sprite constructor ordering |
 
 ## What Was Implemented
 
@@ -78,17 +78,16 @@ This plan covered implementing `Object.registerClass()`, ExportAssets (tag 56), 
 **Plan**: LOADMOVIE_PLAN (already in blocked/)
 **Note**: do_init_action_child is now PASS (12/12) via cross-version Phase 1+4 + ImportAssets2
 
-### 2. Sprite Initialization Ordering
-**Blocks**: register_and_init_order (lines 133+)
-**What's needed**: When sprite_6 ("a") contains child sprite_5 ("aa", export "aa"), the registered class constructor for "aa" should fire BETWEEN the parent "a" constructor end and parent first frame script. Currently "aa"'s constructor fires too late (after parent frame script).
-**Root cause**: Constructor invocation happens at `tagSetInstanceName` during eager init, but child sprites' constructors are deferred to `process_sprite_needs_init`. The ordering needs to be: parent constructor → child constructors (recursive) → parent frame script.
-**Difficulty**: HIGH — requires rearchitecting the sprite initialization pipeline to control when child constructors fire relative to parent frame scripts.
+### 2. Sprite Initialization Ordering — RESOLVED
+**Was blocking**: register_and_init_order (lines 133+) — now **233/233 PASS** ✅
+**Fixed by**: Three-part fix (commit fe35db71, 2026-03-11):
+1. `ng_fire_child_constructors`: Recursively fires child sprite constructors during attachMovie, immediately after the parent's constructor. Ensures children like "box" get constructors before goto catch-up.
+2. Phase 0 deferred constructor pass (`ng_fire_deferred_constructors`): In swf_core.c goto processing, fires ALL pending constructors via `g_constructor_only_mode` before Phase 2 scripts.
+3. `g_script_only_mode` in `ng_fire_pending_attach_inits`: Prevents tagPlaceObject2's loop-back preservation from clearing `sprite_needs_init` on child sprites during frame function re-run.
 
-### 3. Deep Child Access During Constructor
-**Blocks**: register_and_init_order (line 35)
-**What's needed**: `this.box.box` should resolve during constructor execution (grandchild display lists need to be initialized when constructor fires at tagSetInstanceName time).
-**Root cause**: When constructor fires at tagSetInstanceName, only the immediate children's display list is populated. Grandchildren haven't been placed yet because their parent sprite hasn't executed its tags.
-**Difficulty**: HIGH — would require recursive tag execution for child sprites before constructor invocation.
+### 3. Deep Child Access During Constructor — RESOLVED
+**Was blocking**: register_and_init_order (line 35) — now passing ✅
+**Fixed by**: `mc->display_obj` linking in `fire_eager_constructors` and tagPlaceObject2's constructor block. Child MCs get their `display_obj` pointer set before constructors fire, enabling `this.box.box` resolution via `sprite_display_list`.
 
 ### 4. Sound Class Implementation — RESOLVED
 **Was blocking**: register_class_with_sound (6 lines) — now PASS (11/11)
@@ -105,3 +104,5 @@ This plan covered implementing `Object.registerClass()`, ExportAssets (tag 56), 
 2. **Object.registerClass undefined unregister** (same commit): `Object.registerClass(sym, undefined)` now correctly unregisters (previously only NULL was handled, not UNDEFINED).
 
 3. Earlier commits (from previous sessions): Phase 0-5 implementation including ExportAssets parsing, attachMovie, registerClass registry, constructor invocation at tagSetInstanceName, initVarArray ordering, on(construct) event, clip_constructors fixes, etc.
+
+4. **register_and_init_order constructor ordering fix** (commit fe35db71, 2026-03-11): Three-part fix: (1) `ng_fire_child_constructors` fires child sprite constructors during attachMovie after parent constructor. (2) Phase 0 `ng_fire_deferred_constructors` in goto processing fires all pending constructors before Phase 2 scripts. (3) `g_script_only_mode` in `ng_fire_pending_attach_inits` prevents tagPlaceObject2 loop-back preservation from clearing child `sprite_needs_init`. Also: `g_eager_init_depth` tracking, `g_constructor_only_mode` flag, `display_obj` linking for child MCs.
