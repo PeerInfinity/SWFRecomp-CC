@@ -292,7 +292,7 @@ Everything fits in `action.c` alongside the existing Selection stub. The impleme
 | Test | Expected Lines | Estimated Pass Rate | Notes |
 |------|---------------|-------------------|-------|
 | `selection` | 456 | ~85-90% after Phase 1, ~95% after Phase 2 | selection 454/454 PASS ✅. Mouse simulation now fully implemented. |
-| `selection_handlers` | 28 | ~64% (18/28) after Phase 1 | Lines 1-19 = focus handler ordering. Lines 20-28 = onRollOver/onRollOut — mouse simulation now implemented, needs re-evaluation. |
+| `selection_handlers` | 27 | **27/27 PASS** ✅ | Fixed (commit 19e968ed): setFocus re-focus roll events + eager g_tab_hovered_mc tracking |
 
 ### Indirect test improvements
 

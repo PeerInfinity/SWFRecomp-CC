@@ -87,7 +87,7 @@ Last updated: 2026-03-07
 
 | Test | Match | Blocker |
 |------|-------|---------|
-| edittext_html_swf6 | 3900/5377 | SWF6-specific paragraph semantics: `\r` preserved in text getter, different `<P>` splitting in htmlText, empty text produces `<P>` wrapper (~1500 differing lines vs SWF7+) |
+| edittext_html_swf6 | **5289/5377** | ~~SWF6 paragraph semantics~~ mostly fixed (swf_version >= 7 gates). Remaining 88 lines: trailing empty styled runs, empty paragraph font/color defaults |
 | edittext_scroll | 52/54 | Mixed-font maxscroll/bottomScroll computation — `ng_computeVisibleLines` uses single font; multi-font text boxes need per-line height tracking |
 | edittext_newlines | 23/30 | textWidth/textHeight computation accuracy (word wrap, mixed-font line height) |
 | edittext_bullet | 18/30 | textWidth/textHeight with bullet indent (font metrics / layout) |

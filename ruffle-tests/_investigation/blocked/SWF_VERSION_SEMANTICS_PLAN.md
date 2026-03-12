@@ -12,8 +12,8 @@ Last updated: 2026-03-11
 | swf6_case_insensitive | 6 | 43/43 | 43 | **PASS** (Phase 1 complete) |
 | swf6_string_as_bool | 6 | 15/15 | 15 | **PASS** (Phase 2 complete) |
 | swf4_actions_coercion_order | 8 | 158/158 | 158 | **PASS** (Phase 3 complete) |
-| swf5_to_6_cross_call | 5 | ~9/30 | 30 | Phase 4 — partially unblocked (onEnterFrame version switching done, direct calls still need it) |
-| swf6_to_5_cross_call | 6 | ~19/30 | 30 | Phase 4 — improved from ~10 via onEnterFrame per-function version switching |
+| swf5_to_6_cross_call | 5 | 25/29 | 29 | Phase 4 — caller-version closure decision done (23→25/29). Remaining: version-gated MC props, objectCallToString context |
+| swf6_to_5_cross_call | 6 | 16/29 | 29 | Phase 4 — unchanged. Remaining: child SWF init context, version-gated MC props, objectCallToString |
 
 ### Already passing
 - `divide_swf4` — PASS
@@ -84,20 +84,21 @@ Implemented across multiple changes. Key fixes:
 
 Both tests have `child.swf` files that are loaded via loadMovie. The multi-SWF loading infrastructure is fully implemented and working (31/35 core loadMovie tests pass). The child's functions should execute with the child's `g_swf_version`, not the parent's.
 
-Current test results (2026-03-10): swf5_to_6_cross_call ~10/29, swf6_to_5_cross_call ~10/29. The `this` binding and `_target` resolution are wrong — functions from the child execute with the parent's version semantics.
+Current test results (2026-03-12): swf5_to_6_cross_call 25/29, swf6_to_5_cross_call 16/29. Caller-version closure decision fixed (commit 19e968ed). Remaining failures: version-gated MC prototype properties (getDepth invisible in SWF5), child SWF init context (g_current_context = root instead of clip), objectCallToString missing context switch.
 
 ### Blocker (Partially Resolved)
 
 This requires:
 1. ~~**loadMovie child SWF support**~~ — **DONE** (multi-SWF infrastructure fully working)
-2. **Per-function SWF version tracking** — **PARTIALLY DONE**. `ASFunction.swf_version` field exists, set at definition time. `switchToFunctionVersion()`/`restoreFunctionVersion()` helpers save/restore `g_swf_version`, `g_active_global`, and `g_active_movie_idx` around calls.
-3. **Version switching on call** — **DONE for onEnterFrame dispatch** (b5df5477). Still needed for `actionCallFunction`/`actionCallMethod` direct call paths.
-
-The `swf6_to_5_cross_call` test improved from ~10 to ~19/30 after onEnterFrame version switching was added. The remaining failures need version switching in the direct function/method call paths.
+2. ~~**Per-function SWF version tracking**~~ — **DONE**. `ASFunction.swf_version` field exists, set at definition time. `switchToFunctionVersion()`/`restoreFunctionVersion()` helpers save/restore `g_swf_version`, `g_active_global`, and `g_active_movie_idx` around calls.
+3. ~~**Version switching on call**~~ — **DONE** for onEnterFrame dispatch (b5df5477) AND direct call paths (19e968ed). Caller-version closure decision: `_cf_caller_ver`/`_om2_caller_ver`/`_om1_caller_ver` saved before `switchToFunctionVersion`, used for scope chain save/restore and base_clip context switch.
+4. **Version-gated MC prototype properties** — **BLOCKED**. `getDepth` (and other SWF6+ methods) should be invisible when executing in SWF5 context. Requires per-property version tags on MC prototype.
+5. **Child SWF init context** — **BLOCKED**. Child SWF init scripts run with `g_current_context = root` instead of the loaded-into clip MC. Affects `this` binding and `_target` in child-defined functions.
+6. **objectCallToString context switch** — **BLOCKED**. Implicit toString/valueOf calls don't call `switchToFunctionVersion` or switch `g_current_context` to `func->base_clip`.
 
 ### Estimated Impact
-- swf5_to_6_cross_call: requires loadMovie + version tracking
-- swf6_to_5_cross_call: same
+- swf5_to_6_cross_call: 25/29. Remaining 4 lines blocked on items 4+6 above
+- swf6_to_5_cross_call: 16/29. Remaining 13 lines blocked on items 4+5+6 above
 
 ---
 

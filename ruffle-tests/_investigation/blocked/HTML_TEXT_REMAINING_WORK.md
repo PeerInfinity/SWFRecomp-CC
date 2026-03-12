@@ -11,7 +11,7 @@
 | `edittext_html_entity` | — | 0 | PASS |
 | `edittext_html_swf7` | 5377 | 0 | **PASS** ✅ (font size 0 clamping fix) |
 | `edittext_html_swf8` | 5377 | 0 | **PASS** ✅ (font size 0 clamping fix) |
-| `edittext_html_swf6` | 5377 | ~1478 | ~72% match |
+| `edittext_html_swf6` | 5377 | ~88 | **98.4% match** (was ~72%, fixed SWF6 paragraph breaks) |
 | `edittext_html_condensewhite_swf7` | 311 | 4 | 98.7% match |
 | `edittext_html_condensewhite_swf8` | 311 | 24 | 92.3% match |
 
@@ -35,11 +35,14 @@ All diffs fixed (font size 0 clamping + SWF8 whitespace fixes).
 
 ---
 
-## Part C: edittext_html_swf6 (~1478 diff lines) — BLOCKED
+## Part C: edittext_html_swf6 (~88 diff lines remaining) — MOSTLY FIXED
 
-SWF6 is fundamentally different — it needs single-paragraph singleline-like behavior even for multiline fields in many contexts. ~72% match.
+**Fixed (2026-03-12, commit 19e968ed):** SWF<=6 non-multiline text fields preserve tag-based paragraph breaks like multiline. Three `swf_version >= 7` gates added to `tf_serialize_html` and `tf_get_plain_text`. Improved from 3900/5377 (72%) to **5289/5377 (98.4%)** (+1389 lines).
 
-**Blocker:** Requires a complete SWF6-specific paragraph splitting model. Largest effort, lowest priority.
+**Remaining 88 lines:** Pre-existing HTML serialization issues unrelated to paragraph breaks:
+- Trailing empty styled runs (e.g. `<B></B>`, `<FONT COLOR="#121212"></FONT>`) — expected output has them, our serializer omits empty runs
+- Empty paragraph font/color defaults differ (expected: original font from tag, actual: text field's default font)
+- `<!-- the same -->` lines that fail because the HTML get line itself is wrong (ml output differs from the wrong non-ml output)
 
 ---
 

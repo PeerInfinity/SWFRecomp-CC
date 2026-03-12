@@ -76,19 +76,19 @@ TextField textWidth/textHeight computations are close but off by a few pixels. M
 
 ---
 
-## Blocker 5: SWF6 HTML Paragraph Semantics
+## ~~Blocker 5: SWF6 HTML Paragraph Semantics~~ MOSTLY RESOLVED
 
-**Impact**: 1 test, ~1480 lines
+**Impact**: 1 test, ~~1480~~ **88 lines remaining** (was 1480)
 
-SWF6 treats `\n` in HTML text differently from SWF7+. In SWF7+, `\n` inside `<P>` tags creates separate paragraph elements. In SWF6, `\n` is treated as a line break within the same paragraph — no `<P>` splitting occurs. Also different `\r` handling in text storage.
+~~SWF6 treats paragraph breaks differently from SWF7+.~~ **Fixed (commit 19e968ed):** Added `swf_version >= 7` gates to 3 sites in `tf_serialize_html`/`tf_get_plain_text` so SWF<=6 non-multiline fields preserve tag-based paragraph breaks like multiline. Improved from 3900/5377 (72%) to **5289/5377 (98.4%)**.
 
-This requires a version-specific HTML parser path — a major refactor of the existing HTML text pipeline.
+Remaining 88 lines are pre-existing HTML serialization issues (trailing empty styled runs, empty paragraph font/color defaults).
 
 | Test | Match | Lines Off |
 |------|-------|-----------|
-| edittext_html_swf6 | 3897/5377 | 1480 |
+| edittext_html_swf6 | **5289/5377** | 88 |
 
-**Plans blocked**: TEXTFIELD_PLAN, HTML_TEXT_REMAINING_WORK
+**Plans blocked**: ~~TEXTFIELD_PLAN~~ mostly unblocked, HTML_TEXT_REMAINING_WORK (88 remaining lines)
 
 ---
 

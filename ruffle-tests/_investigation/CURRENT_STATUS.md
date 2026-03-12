@@ -1,14 +1,14 @@
 # Current Ruffle Test Status
 
-Last updated: 2026-03-11
+Last updated: 2026-03-12
 
 ## Quick Summary
 
-- **Pass rate (CI, last run)**: 509/618 (82.4%) total (CI run on a5bc34f5)
+- **Pass rate (CI, last run)**: ~521/618 (84.3%) total (CI run on 19e968ed, partial — 41 tests missing from shard failures, 0 regressions)
 - **Image test baseline**: **7/31 strict image match** (run_image_tests.py, 0-outlier AND 0-max-diff). **9/31 tolerance pass** (within test.toml limits). Strict passes: focusrect_focuslost, focusrect_mouse_swf8/swf9, focusrect_swf6, frame_size_translated_neg/pos, mask_with_drawing. Tolerance-only: display_object_properties (max_diff=79), mask_reapply (max_diff=1).
 - **Main failure types**: output_mismatch (46), segfault (2, ignored), timeout (1, ignored)
-- **Recent gains**: register_class 66/66 ✅, register_class_swf6 38/38 ✅ (export-versioned registerClass lookup). getBounds on loaded clips: 6/8 PASS (movieclip_invalid_get_bounds_1-5, 8), _6/_7 improved to 9/10. 4 textsnapshot tests pass locally (not yet in CI).
-- **Known regressions**: ~~register_and_init_order~~ **233/233 PASS** ✅ (was ~16/233 — fixed constructor ordering for attachMovie'd clips + deferred goto).
+- **Recent gains**: selection_handlers 27/27 ✅, edittext_html_swf6 3900→5289/5377 (+1389 lines), swf5_to_6_cross_call 23→25/29 (+2). register_class 66/66 ✅, register_class_swf6 38/38 ✅. getBounds on loaded clips: 6/8 PASS.
+- **Known regressions**: None. Previous regressions all recovered.
 
 ## Crashes and Errors (8 tests)
 
@@ -104,6 +104,7 @@ Last updated: 2026-03-11
 | `edittext_scroll` | 54/54 ✅ | Per-run mixed-font measurement via `ng_measure_substr_mixed_twips()` |
 | `edittext_newlines` | 30/30 ✅ | Mixed-font textHeight path via `ng_computeScrollMixedFont()` |
 | `removed_target_clip_scope` | 35/35 ✅ | Scoped clone_depth_register to root-only + recursive child removal in removeMovieClip |
+| `selection_handlers` | 27/27 ✅ | setFocus re-focus roll events + eager g_tab_hovered_mc tracking |
 
 ### Near-passing (>=90%)
 | Test | Match | Issue |
@@ -166,7 +167,7 @@ Last updated: 2026-03-11
 | LOADMOVIE_REMAINING_PLAN | **Partially blocked** | 0/5 | dynamic_props clearing done; var_persistence needs setTimeout; others need cross-version/__proto__ |
 | UNLOAD_PLAN | **MOSTLY DONE** | 5/6 pass (unload 52/52 ✅, unload_clip_event, unloadmovie, unloadmovie_method, unloadmovienum ✅) | unload_nested_child (0/5) |
 | BUTTON_PLAN | **14/14 PASS** → `complete/` | + root_button_mode ✅ (self-load + root onMouse dispatch + child MC bounds) | — |
-| SWF_VERSION_SEMANTICS_PLAN | **Phases 1-3 COMPLETE** → `blocked/` | 3/5 pass | Phase 4: per-function version tracking partially done (onEnterFrame). swf6_to_5_cross_call ~19/30. Still needs version switching in direct call/method paths |
+| SWF_VERSION_SEMANTICS_PLAN | **Phases 1-3 COMPLETE** → `blocked/` | 3/5 pass | Phase 4: caller-version closure decision done (swf5_to_6 23→25/29). Remaining: version-gated MC props, child SWF init context, objectCallToString context |
 | THIS_BINDING_PLAN | **FULLY COMPLETE** → `complete/` | 5/5 pass (this_swf5/6 ✅, mutable_this ✅, swf5_no_closure ✅, this_scoping ✅) | — |
 | HIT_TESTING_PLAN | **Phases 1-6 DONE** → `blocked/` | 5 PASS (hittest_morph now ✅) + movieclip_hittest_shapeflag 266/338 + getBounds 1-5,8 ✅ | getBounds_6/7 each 9/10 (shape bounds in NO_GRAPHICS). Mouse event tests need re-evaluation |
 | EXTERNAL_INTERFACE_PLAN | **Phases 1-3 COMPLETE** → `complete/` | 6/7 pass (645 lines): escapexml ✅, unescapexml ✅, jsquotestring ✅, toxml_basic ✅, toxml_array ✅, toas_basic ✅ | Phase 4 (JS bridge) blocked — no JS environment |
@@ -192,11 +193,11 @@ All simple fixes have been applied. Remaining failing tests require:
 - ~~Font metrics improvements (mixed-font line height)~~ — **MOSTLY RESOLVED** (edittext_scroll + edittext_newlines now PASS)
 - Mouse event dispatch (rollover/rollout, shape-flag hitTest)
 - Cross-movie export table isolation (loadmovie_registerclass, see CROSS_MOVIE_EXPORT_ISOLATION_PLAN.md)
-- Per-function SWF version tracking in direct calls (swf5_to_6_cross_call ~9/30, swf6_to_5_cross_call ~19/30 — onEnterFrame done, call/method paths needed)
+- Per-function SWF version tracking: closure decision fixed (swf5_to_6_cross_call 25/29, swf6_to_5_cross_call 16/29). Remaining: version-gated MC prototype props (getDepth etc.), child SWF init context, objectCallToString context switch
 - Deep architectural changes (~~constructor ordering~~ ✅, call() termination, closure capture)
 
 ### Remaining blocked work (from blocked/ plans)
-- **TEXTFIELD_PLAN remaining** — ~~scroll~~ ✅, ~~newlines~~ ✅, bullet (4 lines, bounding box model), SWF6 HTML. 59/62 pass.
+- **TEXTFIELD_PLAN remaining** — ~~scroll~~ ✅, ~~newlines~~ ✅, bullet (4 lines, bounding box model), ~~SWF6 HTML~~ mostly fixed (5289/5377, 88 remaining lines = font/color defaults + trailing empty tags). 59/62 pass.
 - **GLOBALS_PLAN Phase 8** — BLOCKED by enumeration order + 20 missing globals.
 - ~~**LOADMOVIE_PLAN Phase 6**~~ — **CANCELLED**: Ruffle shares `_global` across movies. Was never needed.
 - **MC_REMOVAL_LIFECYCLE_PLAN** — call() early termination, SetTarget on removed base_clip.
@@ -205,6 +206,16 @@ All simple fixes have been applied. Remaining failing tests require:
 ### Dependency Blockers (plans blocking other plans)
 - **LOADMOVIE_PLAN** (reduced blocker): 31/35 core tests PASS. root_button_mode ✅. getBounds 6/8 PASS (1-5, 8 ✅; 6, 7 at 9/10). Remaining: loadmovie_registerclass (cross-movie export isolation), mcl_replace_root accepted diffs. Multi-SWF tests now visible in filtered results (removed from ignored_tests.txt).
 - **FOCUS_SYSTEM_PLAN** — 7/7 pass (focus_remove ✅ newly fixed). TAB_ORDERING_PLAN fully complete (16/16). Only focus_mouse_focusable (0/8) blocked by dynamic object creation.
+
+### Session notes (2026-03-12 batch improvements)
+- **Pass rate: ~521/618 (84.3%)**: +1 newly passing (selection_handlers), +1389 mismatched lines reduced (edittext_html_swf6), +2 cross-call lines (swf5_to_6_cross_call).
+- **edittext_html_swf6 3900→5289/5377** (+1389 lines): In SWF<=6, non-multiline text fields preserve tag-based paragraph breaks (`<p>`, `<li>`, `<br>`) like multiline. Added `swf_version >= 7` gates to 3 sites in `tf_serialize_html`/`tf_get_plain_text`: (1) single-line tag break merge, (2) empty paragraph skip, (3) plain text `\r` emission. Remaining 88 lines: pre-existing font/color default issues + trailing empty tag runs.
+- **selection_handlers 21→27/27 PASS**: `setFocus` re-focusing the same MC now fires rollOut+rollOver events. Eagerly track `g_tab_hovered_mc` in `builtin_selection_setFocus` so subsequent same-frame calls see the correct old hover target before deferred flush.
+- **swf5_to_6_cross_call 23→25/29** (+2): Use caller's SWF version (saved before `switchToFunctionVersion`) for the closure decision, not the function's version. Fixed in `actionCallFunction` and both `actionCallMethod` type 1/2 paths. Matches Ruffle's `is_closure = activation.swf_version() >= 6`. Remaining 4 lines: version-gated MC props (getDepth), objectCallToString context switch.
+- **swf6_to_5_cross_call**: unchanged at 16/29. Remaining failures: child SWF init context (g_current_context = root instead of clip), version-gated props, objectCallToString.
+- **Zombie MC regression fix** (commit 68b4f72b): `fire_eager_constructors` and tagPlaceObject2 constructor block were calling `actionFindOrCreateMovieClip` unconditionally, creating zombie MCs for sprites without registered classes. Moved MC creation inside `ng_lookupExportName != NULL` guard. Recovered function_base_clip_readded (11/11) and movieclip_in_removed_button (4/4).
+- **mcl_replace_root_swf7_to_swf5/swf6**: Added to ignored_tests.txt (already in ACCEPTED_DIFFS.md).
+- **No regressions**: Verified 30+ related tests still pass after all changes.
 
 ### Session notes (2026-03-11 register_and_init_order fix)
 - **register_and_init_order 233/233 PASS** (was ~16/233): Three interrelated fixes for constructor and Phase 2 script ordering:
