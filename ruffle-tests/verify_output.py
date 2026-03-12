@@ -979,12 +979,22 @@ def get_mock_date_time(test_dir):
 
 
 def get_self_load(test_dir):
-    """Parse self_load from test.toml if present."""
+    """Detect if the test loads itself (test.swf loads test.swf into a child MC).
+
+    Auto-detects by scanning recompiled scripts for a "test.swf" string literal.
+    Falls back to explicit self_load = true in test.toml for backward compatibility.
+    """
+    # Auto-detect: scan recompiled scripts for "test.swf" string reference
+    recomp_dir = test_dir / "RecompiledScripts"
+    if recomp_dir.exists():
+        for f in recomp_dir.iterdir():
+            if f.suffix == '.c' and '"test.swf"' in f.read_text():
+                return True
+    # Fallback: explicit flag in test.toml
     toml_path = test_dir / "test.toml"
     if toml_path.exists():
         text = toml_path.read_text()
-        m = re.search(r"self_load\s*=\s*true", text)
-        if m:
+        if re.search(r"self_load\s*=\s*true", text):
             return True
     return False
 
