@@ -7766,10 +7766,11 @@ static ActionVar objectCallToString(SWFAppContext* app_context, ActionVar* obj_v
 			if (found) *found = 1;
 			ActionVar result;
 			// Switch to function's base_clip and SWF version (closure context)
+			// toString is an internal call — always use function's base_clip
 			MovieClip* _ts_saved_ctx = g_current_context;
 			int _ts_saved_ver; ASObject* _ts_saved_global; int _ts_saved_midx;
 			switchToFunctionVersion(func, &_ts_saved_ver, &_ts_saved_global, &_ts_saved_midx);
-			if (func->base_clip != NULL && g_swf_version >= 6)
+			if (func->base_clip != NULL)
 				actionSetCurrentContext(func->base_clip);
 			// Save and restore captured scopes for proper closure support
 			u32 saved_scope_depth = scope_depth;
@@ -7791,7 +7792,15 @@ static ActionVar objectCallToString(SWFAppContext* app_context, ActionVar* obj_v
 			}
 			else if (func->function_type == 1 && func->simple_func != NULL)
 			{
+				// Push this=obj for type 1 functions (they access this via getVariable("this"))
+				u32 _ts_saved_this_depth = g_this_depth;
+				if (g_this_depth < MAX_THIS_DEPTH) {
+					g_this_stack[g_this_depth].type = ACTION_STACK_VALUE_OBJECT;
+					g_this_stack[g_this_depth].data.numeric_value = (u64)obj;
+					g_this_depth++;
+				}
 				result = ((ActionVar(*)(SWFAppContext*))func->simple_func)(app_context);
+				g_this_depth = _ts_saved_this_depth;
 			}
 			else
 			{
@@ -36790,9 +36799,11 @@ void actionCallFunction(SWFAppContext* app_context, char* str_buffer)
 							// Function found on WITH scope — use scope object as this
 							this_var = callable_this;
 						} else {
-							extern MovieClip root_movieclip;
+							// Default this = current context MC (not root_movieclip)
+							// For child SWF contexts, g_current_context is the loaded clip
+							MovieClip* _ctx = g_current_context ? g_current_context : &root_movieclip;
 							this_var.type = ACTION_STACK_VALUE_MOVIECLIP;
-							this_var.data.numeric_value = (u64)&root_movieclip;
+							this_var.data.numeric_value = (u64)_ctx;
 						}
 						setProperty(app_context, local_scope, "this", 4, &this_var);
 						if (g_this_depth < MAX_THIS_DEPTH) {
@@ -36871,16 +36882,17 @@ void actionCallFunction(SWFAppContext* app_context, char* str_buffer)
 				ASObject* local_scope = allocObject(app_context, 8);
 
 				// Push 'this' binding for type 1 functions (DefineFunction)
-				// In Flash, 'this' defaults to _level0 (root movieclip) for plain calls,
+				// In Flash, 'this' defaults to current context MC for plain calls,
 				// unless the function was found on a WITH scope object (then this = that object)
 				u32 saved_this_depth_t1 = g_this_depth;
 				if (g_this_depth < MAX_THIS_DEPTH) {
 					if (has_callable_this) {
 						g_this_stack[g_this_depth] = callable_this;
 					} else {
-						extern MovieClip root_movieclip;
+						// Default this = current context MC (not root_movieclip)
+						MovieClip* _ctx = g_current_context ? g_current_context : &root_movieclip;
 						g_this_stack[g_this_depth].type = ACTION_STACK_VALUE_MOVIECLIP;
-						g_this_stack[g_this_depth].data.numeric_value = (u64)&root_movieclip;
+						g_this_stack[g_this_depth].data.numeric_value = (u64)_ctx;
 					}
 					g_this_depth++;
 				}
@@ -39583,7 +39595,32 @@ void actionCallMethod(SWFAppContext* app_context, char* str_buffer)
 				pushUndefined(app_context);
 				return;
 			}
-			else if (func != NULL && func->function_type == 2)
+
+			// Closure context: SWF6+ callers switch to function's context
+			int _cme_caller_ver = g_swf_version;
+			MovieClip* _cme_saved_ctx = g_current_context;
+			DisplayObject* _cme_saved_sprite = g_current_sprite_obj;
+			int _cme_saved_ver = 0; ASObject* _cme_saved_global = NULL; int _cme_saved_midx = 0;
+			u32 _cme_saved_scope = scope_depth;
+			ASObject* _cme_saved_sc[MAX_SCOPE_DEPTH];
+			u8 _cme_saved_sw[MAX_SCOPE_DEPTH];
+			MovieClip* _cme_saved_sm[MAX_SCOPE_DEPTH];
+			if (_cme_caller_ver >= 6 && func != NULL) {
+				switchToFunctionVersion(func, &_cme_saved_ver, &_cme_saved_global, &_cme_saved_midx);
+				for (u32 si = 0; si < scope_depth; si++) {
+					_cme_saved_sc[si] = scope_chain[si];
+					_cme_saved_sw[si] = scope_is_with[si];
+					_cme_saved_sm[si] = scope_mc[si];
+				}
+				scope_depth = 0;
+				if (func->base_clip != NULL) {
+					MovieClip* _bc = reResolveDeadBaseClip(app_context, (MovieClip*)func->base_clip);
+					actionSetCurrentContext(_bc);
+					g_current_sprite_obj = NULL;
+				}
+			}
+
+			if (func != NULL && func->function_type == 2)
 			{
 				// Invoke DefineFunction2
 				ActionVar* registers = NULL;
@@ -39609,12 +39646,40 @@ void actionCallMethod(SWFAppContext* app_context, char* str_buffer)
 				if (registers != NULL) FREE(registers);
 				if (args != NULL) FREE(args);
 
+				// Restore closure context
+				if (_cme_caller_ver >= 6) {
+					scope_depth = _cme_saved_scope;
+					for (u32 si = 0; si < _cme_saved_scope; si++) {
+						scope_chain[si] = _cme_saved_sc[si];
+						scope_is_with[si] = _cme_saved_sw[si];
+						scope_mc[si] = _cme_saved_sm[si];
+					}
+					actionSetCurrentContext(_cme_saved_ctx);
+					g_current_sprite_obj = _cme_saved_sprite;
+					restoreFunctionVersion(_cme_saved_ver, _cme_saved_global, _cme_saved_midx);
+				}
+
 				pushVar(app_context, &result);
 				return;
 			}
 			else if (func != NULL && func->function_type == 1 && func->simple_func != NULL)
 			{
 				// Invoke simple function (DefineFunction type 1)
+				// Push 'this' binding
+				u32 _cme_saved_this = g_this_depth;
+				if (g_this_depth < MAX_THIS_DEPTH) {
+					if (_cme_caller_ver >= 6) {
+						MovieClip* _ctx = g_current_context ? g_current_context : &root_movieclip;
+						g_this_stack[g_this_depth].type = ACTION_STACK_VALUE_OBJECT;
+						g_this_stack[g_this_depth].data.numeric_value = (u64)_ctx->dynamic_props;
+					} else {
+						MovieClip* _ctx = g_current_context ? g_current_context : &root_movieclip;
+						g_this_stack[g_this_depth].type = ACTION_STACK_VALUE_MOVIECLIP;
+						g_this_stack[g_this_depth].data.numeric_value = (u64)_ctx;
+					}
+					g_this_depth++;
+				}
+
 				// Push arguments onto stack for parameter binding
 				for (u32 i = 0; i < num_args; i++)
 				{
@@ -39628,6 +39693,20 @@ void actionCallMethod(SWFAppContext* app_context, char* str_buffer)
 				result = ((ActionVar(*)(SWFAppContext*))func->simple_func)(app_context);
 				popCtorContext();
 				g_call_depth--;
+				g_this_depth = _cme_saved_this;
+
+				// Restore closure context
+				if (_cme_caller_ver >= 6) {
+					scope_depth = _cme_saved_scope;
+					for (u32 si = 0; si < _cme_saved_scope; si++) {
+						scope_chain[si] = _cme_saved_sc[si];
+						scope_is_with[si] = _cme_saved_sw[si];
+						scope_mc[si] = _cme_saved_sm[si];
+					}
+					actionSetCurrentContext(_cme_saved_ctx);
+					g_current_sprite_obj = _cme_saved_sprite;
+					restoreFunctionVersion(_cme_saved_ver, _cme_saved_global, _cme_saved_midx);
+				}
 
 				pushVar(app_context, &result);
 				return;
@@ -39636,6 +39715,18 @@ void actionCallMethod(SWFAppContext* app_context, char* str_buffer)
 			{
 				// Unknown function type or NULL - push undefined
 				if (args != NULL) FREE(args);
+				// Restore closure context
+				if (_cme_caller_ver >= 6) {
+					scope_depth = _cme_saved_scope;
+					for (u32 si = 0; si < _cme_saved_scope; si++) {
+						scope_chain[si] = _cme_saved_sc[si];
+						scope_is_with[si] = _cme_saved_sw[si];
+						scope_mc[si] = _cme_saved_sm[si];
+					}
+					actionSetCurrentContext(_cme_saved_ctx);
+					g_current_sprite_obj = _cme_saved_sprite;
+					restoreFunctionVersion(_cme_saved_ver, _cme_saved_global, _cme_saved_midx);
+				}
 				pushUndefined(app_context);
 				return;
 			}
