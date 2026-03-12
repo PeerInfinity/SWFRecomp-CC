@@ -36833,7 +36833,7 @@ void actionCallFunction(SWFAppContext* app_context, char* str_buffer)
 				// yielding typeof="object". Pass global_object as this_obj so generated preload_this
 				// stores as OBJECT type instead of falling back to MOVIECLIP.
 				void* _cf_this_obj = NULL;
-				if (_cf_caller_ver < 6 && !has_callable_this) {
+				if (_cf_caller_ver < 6 && !has_callable_this && func->swf_version >= 6) {
 					_cf_this_obj = (void*)global_object;
 				}
 				// Only push constructor context for bytecode functions (register_count > 0).
