@@ -90,6 +90,16 @@ static int g_script_only_mode = 0;
 // parent-frame DoAction (matching Ruffle's execution order).
 int g_defer_sprite_init = 0;
 
+// Tracks nesting depth of eager init in tagPlaceObject2.
+// Used to determine whether constructor invocation is at the top level
+// (g_eager_init_depth==0) or inside a nested sprite's eager init.
+static int g_eager_init_depth = 0;
+
+// When 1, process_sprite_init_at_depth only fires constructors (no Phase 2 scripts).
+// Used by ng_fire_deferred_constructors to separate constructor invocation
+// from Phase 2 script execution.
+static int g_constructor_only_mode = 0;
+
 // Frame filter for process_sprite_needs_init during deferred init.
 // When g_sprite_init_filter_active=1, only process sprites matching the filter:
 //   g_sprite_init_before_target=1: only placed_at_frame < g_sprite_init_target_frame
@@ -199,7 +209,9 @@ static void process_sprite_needs_init(SWFAppContext* app_context, MovieClip* par
 static void process_sprite_init_at_depth(SWFAppContext* app_context, MovieClip* parent_mc, size_t i)
 {
 		DisplayObject* obj = &display_list[i];
-		if (obj->char_id == 0 || !obj->sprite_needs_init) return;
+		if (obj->char_id == 0 || !obj->sprite_needs_init) {
+			return;
+		}
 
 		Character* ch = &dictionary[obj->char_id];
 
@@ -219,6 +231,44 @@ static void process_sprite_init_at_depth(SWFAppContext* app_context, MovieClip* 
 				child_mc = actionFindOrCreateMovieClip(app_context, anon_name, parent_mc);
 			}
 			if (child_mc) child_mc->display_obj = (void*)obj;
+
+			// In constructor_only mode, only fire constructors (no Phase 2 scripts).
+			// Keep sprite_needs_init set so the later script pass can find this sprite.
+			if (g_constructor_only_mode)
+			{
+				if (!obj->constructor_invoked)
+				{
+					extern const char* ng_lookupExportName(size_t char_id);
+					extern void actionInvokeRegisteredClassConstructor(SWFAppContext* app_context, const char* export_name, MovieClip* mc);
+					extern void actionSetupRegisteredClassPrototype(SWFAppContext*, const char*, MovieClip*);
+					const char* export_name = ng_lookupExportName(obj->char_id);
+					if (export_name != NULL && child_mc != NULL)
+					{
+						child_mc->display_obj = (void*)obj;
+						actionSetupRegisteredClassPrototype(app_context, export_name, child_mc);
+						actionInvokeRegisteredClassConstructor(app_context, export_name, child_mc);
+						obj->constructor_invoked = 1;
+					}
+				}
+				// Recurse into children to fire their constructors
+				if (obj->sprite_display_list != NULL && obj->sprite_max_depth > 0)
+				{
+					DisplayObject* saved_dl = display_list;
+					size_t saved_max = max_depth;
+					size_t saved_cap = display_list_capacity;
+					display_list = obj->sprite_display_list;
+					max_depth = obj->sprite_max_depth;
+					display_list_capacity = obj->sprite_dl_capacity;
+					process_sprite_needs_init(app_context, child_mc);
+					obj->sprite_display_list = display_list;
+					obj->sprite_max_depth = max_depth;
+					obj->sprite_dl_capacity = display_list_capacity;
+					display_list = saved_dl;
+					max_depth = saved_max;
+					display_list_capacity = saved_cap;
+				}
+				return;
+			}
 
 			// sprite_needs_init == 2: Phase 1 (placement) ran eagerly; run Phase 2
 			// (scripts only) now. sprite_needs_init == 1: normal deferred path.
@@ -388,6 +438,12 @@ static void process_sprite_init_at_depth(SWFAppContext* app_context, MovieClip* 
 void process_sprite_needs_init_public(SWFAppContext* app_context, MovieClip* parent_mc)
 {
 	process_sprite_needs_init(app_context, parent_mc);
+}
+
+// Public setter for g_script_only_mode (called from tag_stubs.c).
+void ng_set_script_only_mode(int mode)
+{
+	g_script_only_mode = mode;
 }
 #endif
 
@@ -2743,6 +2799,44 @@ static void fire_deferred_construct(SWFAppContext* app_context, DisplayObject* d
 #endif
 }
 
+// Helper: recursively fire registered class constructors for child sprites
+// placed during eager init. Called after the parent's constructor fires
+// to match Flash's DFS parent-first constructor ordering.
+#ifdef NO_GRAPHICS
+static void fire_eager_constructors(SWFAppContext* app_context, DisplayObject* dl, size_t dl_max, MovieClip* parent_mc)
+{
+	extern const char* ng_lookupExportName(size_t char_id);
+	extern void actionInvokeRegisteredClassConstructor(SWFAppContext*, const char*, MovieClip*);
+	extern void actionSetupRegisteredClassPrototype(SWFAppContext*, const char*, MovieClip*);
+
+	for (size_t i = 1; i <= dl_max; i++)
+	{
+		DisplayObject* obj = &dl[i];
+		if (obj->char_id == 0 || obj->constructor_invoked) continue;
+		if (dictionary[obj->char_id].type != CHAR_TYPE_SPRITE) continue;
+		if (obj->instance_name == NULL) continue;
+
+		const char* exp = ng_lookupExportName(obj->char_id);
+		MovieClip* mc = actionFindOrCreateMovieClip(app_context, obj->instance_name, parent_mc);
+
+		// Link MC to display entry so child property lookups work
+		if (mc != NULL)
+			mc->display_obj = (void*)obj;
+
+		if (exp != NULL && mc != NULL)
+		{
+			actionSetupRegisteredClassPrototype(app_context, exp, mc);
+			actionInvokeRegisteredClassConstructor(app_context, exp, mc);
+			obj->constructor_invoked = 1;
+		}
+
+		// Recurse into children regardless of whether this sprite had a class
+		if (obj->sprite_display_list != NULL && obj->sprite_max_depth > 0)
+			fire_eager_constructors(app_context, obj->sprite_display_list, obj->sprite_max_depth, mc ? mc : parent_mc);
+	}
+}
+#endif
+
 void tagPlaceObject2(SWFAppContext* app_context, size_t depth, size_t char_id, u32 transform_id, u32 cxform_id, u16 clip_depth)
 {
 #ifdef NO_GRAPHICS
@@ -3010,7 +3104,9 @@ void tagPlaceObject2(SWFAppContext* app_context, size_t depth, size_t char_id, u
 				// DoAction scripts are deferred to tagShowFrame Phase 2.
 				int saved_catch_up = catch_up_mode;
 				catch_up_mode = 1;
+				g_eager_init_depth++;
 				CALL_FRAME(app_context, &saved_dl[depth], sp_ch->sprite_frame_funcs[0]);
+				g_eager_init_depth--;
 				catch_up_mode = saved_catch_up;
 				saved_dl[depth].sprite_display_list = display_list;
 				saved_dl[depth].sprite_max_depth = max_depth;
@@ -3050,6 +3146,41 @@ void tagPlaceObject2(SWFAppContext* app_context, size_t depth, size_t char_id, u
 			fire_deferred_construct(app_context, display_list[depth].sprite_display_list,
 				display_list[depth].sprite_max_depth, _mc ? _mc : _parent_mc);
 		}
+	}
+
+	// Fire registered class constructor at placement time (before DoAction).
+	// In Flash, timeline-placed sprites get their constructors invoked immediately
+	// after PlaceObject2, BEFORE the parent frame's DoAction runs.
+	// Only at top level — during catch_up_mode (nested eager init), constructors
+	// are deferred to the parent's fire_eager_constructors recursion.
+	if (!catch_up_mode && display_list[depth].sprite_needs_init
+	    && !display_list[depth].constructor_invoked
+	    && display_list[depth].instance_name != NULL
+	    && dictionary[char_id].type == CHAR_TYPE_SPRITE)
+	{
+		extern const char* ng_lookupExportName(size_t char_id);
+		extern void actionInvokeRegisteredClassConstructor(SWFAppContext*, const char*, MovieClip*);
+		extern void actionSetupRegisteredClassPrototype(SWFAppContext*, const char*, MovieClip*);
+		extern MovieClip root_movieclip;
+		MovieClip* _ctor_parent = g_current_context ? g_current_context : &root_movieclip;
+		MovieClip* _ctor_mc = actionFindOrCreateMovieClip(app_context, display_list[depth].instance_name, _ctor_parent);
+
+		// Link MC to display entry so child property lookups work via sprite_display_list
+		if (_ctor_mc != NULL)
+			_ctor_mc->display_obj = (void*)&display_list[depth];
+
+		const char* _ctor_exp = ng_lookupExportName(char_id);
+		if (_ctor_exp != NULL && _ctor_mc != NULL)
+		{
+			actionSetupRegisteredClassPrototype(app_context, _ctor_exp, _ctor_mc);
+			actionInvokeRegisteredClassConstructor(app_context, _ctor_exp, _ctor_mc);
+			display_list[depth].constructor_invoked = 1;
+		}
+
+		// Recursively fire constructors for child sprites placed during eager init
+		if (display_list[depth].sprite_display_list != NULL && display_list[depth].sprite_max_depth > 0)
+			fire_eager_constructors(app_context, display_list[depth].sprite_display_list,
+				display_list[depth].sprite_max_depth, _ctor_mc ? _ctor_mc : _ctor_parent);
 	}
 
 #else
@@ -3232,7 +3363,9 @@ void tagPlaceObject2Ratio(SWFAppContext* app_context, size_t depth, size_t char_
 				// DoAction scripts are deferred to tagShowFrame Phase 2.
 				int saved_catch_up = catch_up_mode;
 				catch_up_mode = 1;
+				g_eager_init_depth++;
 				CALL_FRAME(app_context, &saved_dl[depth], sp_ch->sprite_frame_funcs[0]);
+				g_eager_init_depth--;
 				catch_up_mode = saved_catch_up;
 				saved_dl[depth].sprite_display_list = display_list;
 				saved_dl[depth].sprite_max_depth = max_depth;
@@ -3998,6 +4131,34 @@ static void ng_run_deferred_sprite_init_impl(SWFAppContext* app_context, int fil
 	g_enterframe_new_mc_start = mc_count_before;
 	actionDispatchEnterFrameHandlers(app_context);
 	g_enterframe_new_mc_start = -1;
+}
+
+// Fire registered class constructors for child sprites of a specific MC.
+// Called after attachMovie fires the parent's constructor so that child
+// constructors (e.g. "box" inside an attached "a" clip) fire immediately
+// during the attachMovie call, before any goto catch-up places new sprites.
+#ifdef NO_GRAPHICS
+void ng_fire_child_constructors(SWFAppContext* app_context, MovieClip* mc)
+{
+	if (mc == NULL || mc->display_obj == NULL) return;
+	DisplayObject* dobj = (DisplayObject*)mc->display_obj;
+	if (dobj->sprite_display_list == NULL || dobj->sprite_max_depth == 0) return;
+	fire_eager_constructors(app_context, dobj->sprite_display_list, dobj->sprite_max_depth, mc);
+}
+#endif
+
+// Fire registered class constructors for ALL pending sprites (root + children),
+// without running Phase 2 scripts. Uses process_sprite_needs_init in constructor_only
+// mode so it naturally handles both root-level and nested sprites.
+void ng_fire_deferred_constructors(SWFAppContext* app_context)
+{
+	extern void ng_sync_root_display_obj(void);
+	ng_sync_root_display_obj();
+
+	g_constructor_only_mode = 1;
+	catch_up_mode = 0;
+	process_sprite_needs_init(app_context, &root_movieclip);
+	g_constructor_only_mode = 0;
 }
 
 // Run ALL deferred sprite inits (used when no target frame distinction needed).

@@ -1599,8 +1599,16 @@ void ng_fire_pending_attach_inits(SWFAppContext* app_context)
 		g_settarget_none = 0;
 		g_current_sprite_obj = NULL;
 
-		// Run the frame function (scripts will run this time since catch_up_mode = 0)
-		local_inits[i].func(app_context);
+		// Run the frame function in script-only mode: placement tags already ran during
+		// ng_attachMovie with catch_up_mode=1, so only scripts need to execute now.
+		// Without script_only_mode, tagPlaceObject2's loop-back preservation check
+		// would clear sprite_needs_init on children (e.g. "box"), preventing Phase 2.
+		{
+			extern void ng_set_script_only_mode(int mode);
+			ng_set_script_only_mode(1);
+			local_inits[i].func(app_context);
+			ng_set_script_only_mode(0);
+		}
 
 		// Recursively initialize any child sprites placed by the frame function.
 		// Without this, children of attachMovie'd sprites (e.g. sprite_2's child

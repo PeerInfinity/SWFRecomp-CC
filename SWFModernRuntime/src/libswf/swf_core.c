@@ -846,13 +846,19 @@ void swfStart(SWFAppContext* app_context)
 			extern int g_defer_sprite_init;
 			extern void ng_run_deferred_sprite_init_before(SWFAppContext* app_context, size_t target_frame);
 			extern void ng_run_deferred_sprite_init_on_or_after(SWFAppContext* app_context, size_t target_frame);
+			extern void ng_fire_deferred_constructors(SWFAppContext* app_context);
 
 			for (int qi = 0; qi < local_count; qi++)
 			{
 				size_t target = local_queue[qi];
 
-				// Phase 1: Init sprites placed in intermediate frames (before target)
+				// Phase 0: Fire registered class constructors for ALL pending sprites
+				// before any Phase 2 scripts run. Flash fires all constructors first,
+				// then processes frame scripts in a separate pass.
 				g_defer_sprite_init = 0;
+				ng_fire_deferred_constructors(app_context);
+
+				// Phase 1: Init sprites placed in intermediate frames (before target)
 				ng_run_deferred_sprite_init_before(app_context, target);
 
 				// Phase 2: Run the target frame's script

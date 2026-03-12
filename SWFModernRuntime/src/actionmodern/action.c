@@ -36336,6 +36336,9 @@ void actionCallFunction(SWFAppContext* app_context, char* str_buffer)
 						if (_am_reg_ctor != NULL) {
 							actionInvokeRegisteredClassConstructor(app_context, _am_buf1, attached);
 						}
+						// Fire constructors for child sprites placed during eager init
+						extern void ng_fire_child_constructors(SWFAppContext*, MovieClip*);
+						ng_fire_child_constructors(app_context, attached);
 					}
 					if (args != NULL) FREE(args);
 					PUSH(ACTION_STACK_VALUE_MOVIECLIP, (u64)attached);
@@ -41621,6 +41624,9 @@ void actionCallMethod(SWFAppContext* app_context, char* str_buffer)
 							if (_am_reg_ctor2 != NULL) {
 								actionInvokeRegisteredClassConstructor(app_context, linkage_id, attached);
 							}
+							// Fire constructors for child sprites placed during eager init
+							extern void ng_fire_child_constructors(SWFAppContext*, MovieClip*);
+							ng_fire_child_constructors(app_context, attached);
 						}
 						if (args != NULL) FREE(args);
 						PUSH(ACTION_STACK_VALUE_MOVIECLIP, (u64)attached);
