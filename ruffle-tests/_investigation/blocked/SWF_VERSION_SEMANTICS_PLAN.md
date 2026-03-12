@@ -1,9 +1,9 @@
 # SWF Version-Specific Semantics Plan
 <!-- TESTS: swf6_case_insensitive, swf6_string_as_bool, swf4_actions_coercion_order, swf5_to_6_cross_call, swf6_to_5_cross_call -->
 
-Last updated: 2026-03-11
+Last updated: 2026-03-12
 
-## Status: IN PROGRESS — 3/5 tests passing (Phases 1+2+3 complete)
+## Status: IN PROGRESS — 4/5 tests passing (Phases 1+2+3 complete, Phase 4 partial)
 
 ### Target Tests
 
@@ -12,8 +12,8 @@ Last updated: 2026-03-11
 | swf6_case_insensitive | 6 | 43/43 | 43 | **PASS** (Phase 1 complete) |
 | swf6_string_as_bool | 6 | 15/15 | 15 | **PASS** (Phase 2 complete) |
 | swf4_actions_coercion_order | 8 | 158/158 | 158 | **PASS** (Phase 3 complete) |
-| swf5_to_6_cross_call | 5 | 25/29 | 29 | Phase 4 — caller-version closure decision done (23→25/29). Remaining: version-gated MC props, objectCallToString context |
-| swf6_to_5_cross_call | 6 | 16/29 | 29 | Phase 4 — unchanged. Remaining: child SWF init context, version-gated MC props, objectCallToString |
+| swf5_to_6_cross_call | 5 | **29/29** | 29 | **PASS** ✅ (Phase 4 — SWF5 non-closure version isolation + this OBJECT type + objectCallToString context + getDepth version gate) |
+| swf6_to_5_cross_call | 6 | 20/29 | 29 | Phase 4 partial — improved from 16/29 via objectCallToString context fix. Remaining: child SWF init context, reverse-direction version issues |
 
 ### Already passing
 - `divide_swf4` — PASS
@@ -74,7 +74,7 @@ Implemented across multiple changes. Key fixes:
 
 ---
 
-## Phase 4: Cross-Version Function Calls (BLOCKED on per-function version tracking)
+## Phase 4: Cross-Version Function Calls (PARTIALLY COMPLETE)
 
 ### The Problem
 
@@ -82,23 +82,33 @@ Implemented across multiple changes. Key fixes:
 
 ### Current State
 
-Both tests have `child.swf` files that are loaded via loadMovie. The multi-SWF loading infrastructure is fully implemented and working (31/35 core loadMovie tests pass). The child's functions should execute with the child's `g_swf_version`, not the parent's.
+Both tests have `child.swf` files that are loaded via loadMovie. The multi-SWF loading infrastructure is fully implemented and working (31/35 core loadMovie tests pass).
 
-Current test results (2026-03-12): swf5_to_6_cross_call 25/29, swf6_to_5_cross_call 16/29. Caller-version closure decision fixed (commit 19e968ed). Remaining failures: version-gated MC prototype properties (getDepth invisible in SWF5), child SWF init context (g_current_context = root instead of clip), objectCallToString missing context switch.
+**swf5_to_6_cross_call: 29/29 PASS** ✅ (commit 2f40f9f9 + 3724101d). Four fixes:
+1. SWF5 non-closure version isolation: `actionCallFunction` gates `switchToFunctionVersion` on `_cf_caller_ver >= 6`. SWF5 callers don't switch to called function's version.
+2. SWF5 non-closure `this` type: For standalone DefineFunction2 calls from SWF5 calling SWF6+ functions, pass `global_object` as `this_obj` so preload_this stores as OBJECT type (typeof="object"), not MOVIECLIP.
+3. `objectCallToString` closure context: Added `switchToFunctionVersion` + `actionSetCurrentContext(func->base_clip)` in the toString invocation path.
+4. `getDepth` version gate: Added `g_swf_version < 6` check in MovieClip.prototype "last resort" lookup in `actionGetVariable`.
 
-### Blocker (Partially Resolved)
+**swf6_to_5_cross_call: 20/29** (improved from 16/29 via objectCallToString fix). Remaining 9 diffs are the reverse direction (SWF6 calling SWF5 function). Issues:
+- Child SWF init context: child defines function `f` with `g_current_context = root` instead of target clip, so `base_clip` points to root instead of clip MC.
+- `this` binding: SWF6 closure call to SWF5-defined function — unclear whether to use SWF5 or SWF6 semantics for `this`.
+- `_target`/`foo`/`getDepth`: flow from incorrect `base_clip`.
 
-This requires:
-1. ~~**loadMovie child SWF support**~~ — **DONE** (multi-SWF infrastructure fully working)
-2. ~~**Per-function SWF version tracking**~~ — **DONE**. `ASFunction.swf_version` field exists, set at definition time. `switchToFunctionVersion()`/`restoreFunctionVersion()` helpers save/restore `g_swf_version`, `g_active_global`, and `g_active_movie_idx` around calls.
-3. ~~**Version switching on call**~~ — **DONE** for onEnterFrame dispatch (b5df5477) AND direct call paths (19e968ed). Caller-version closure decision: `_cf_caller_ver`/`_om2_caller_ver`/`_om1_caller_ver` saved before `switchToFunctionVersion`, used for scope chain save/restore and base_clip context switch.
-4. **Version-gated MC prototype properties** — **BLOCKED**. `getDepth` (and other SWF6+ methods) should be invisible when executing in SWF5 context. Requires per-property version tags on MC prototype.
-5. **Child SWF init context** — **BLOCKED**. Child SWF init scripts run with `g_current_context = root` instead of the loaded-into clip MC. Affects `this` binding and `_target` in child-defined functions.
-6. **objectCallToString context switch** — **BLOCKED**. Implicit toString/valueOf calls don't call `switchToFunctionVersion` or switch `g_current_context` to `func->base_clip`.
+### Implementation Checklist
+
+1. ~~**loadMovie child SWF support**~~ — **DONE**
+2. ~~**Per-function SWF version tracking**~~ — **DONE**
+3. ~~**Version switching on call**~~ — **DONE**
+4. ~~**Version-gated MC prototype properties**~~ — **DONE** (getDepth gated in GetVariable last-resort path)
+5. **Child SWF init context** — **BLOCKED**. Child SWF init scripts run with `g_current_context = root` instead of the loaded-into clip MC. Affects `base_clip` of functions defined in child SWF.
+6. ~~**objectCallToString context switch**~~ — **DONE**. `switchToFunctionVersion` + `actionSetCurrentContext(func->base_clip)` in objectCallToString.
+7. ~~**SWF5 non-closure version isolation**~~ — **DONE**. `actionCallFunction` only calls `switchToFunctionVersion` when `_cf_caller_ver >= 6`.
+8. ~~**SWF5 non-closure this type**~~ — **DONE**. Pass `global_object` as `this_obj` for SWF5 callers calling SWF6+ DefineFunction2 standalone.
 
 ### Estimated Impact
-- swf5_to_6_cross_call: 25/29. Remaining 4 lines blocked on items 4+6 above
-- swf6_to_5_cross_call: 16/29. Remaining 13 lines blocked on items 4+5+6 above
+- swf5_to_6_cross_call: **29/29 PASS** ✅
+- swf6_to_5_cross_call: 20/29. Remaining 9 lines blocked on item 5 (child SWF init context)
 
 ---
 
