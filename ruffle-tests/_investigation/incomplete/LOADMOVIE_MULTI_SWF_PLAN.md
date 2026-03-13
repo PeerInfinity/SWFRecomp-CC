@@ -1,6 +1,7 @@
 # LoadMovie / Multi-SWF Infrastructure — Implementation Plan
+<!-- TESTS: issue_2870, cross_movie_root -->
 
-Last updated: 2026-03-10
+Last updated: 2026-03-12
 
 **Goal**: Close the remaining gaps in multi-SWF support.
 

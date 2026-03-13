@@ -571,6 +571,9 @@ void swfStart(SWFAppContext* app_context)
 	// MCL pending load dispatch (used after processTimers and in exit conditions)
 	extern void actionFirePendingLoadInits(SWFAppContext* app_context);
 	extern int g_pending_mcl_load_count;
+	// Direct loadMovie pending load dispatch
+	extern void actionFirePendingDirectLoads(SWFAppContext* app_context);
+	extern int g_pending_direct_load_count;
 
 	initTime(app_context);
 	initMap();
@@ -891,6 +894,13 @@ void swfStart(SWFAppContext* app_context)
 			actionProcessDeferredFailedLoads();
 		}
 
+		// Fire deferred direct loadMovie inits (non-MCL loads queued during frame scripts)
+		{
+			int dl_guard = 0;
+			while (g_pending_direct_load_count > 0 && dl_guard++ < 32)
+				actionFirePendingDirectLoads(app_context);
+		}
+
 		// Flush pending onLoads queued during frame scripts (before timers)
 		actionFlushPendingOnLoads(app_context);
 
@@ -931,6 +941,7 @@ void swfStart(SWFAppContext* app_context)
 			if (g_events && g_event_pos < g_event_count) continue;
 			if (actionHasEnterFrameHandlers() || hasPlayingSprites() || hasClipEnterFrameHandlers()) continue;
 			if (g_pending_mcl_load_count > 0) continue;
+			if (g_pending_direct_load_count > 0) continue;
 			break;
 		}
 		else if (manual_next_frame)

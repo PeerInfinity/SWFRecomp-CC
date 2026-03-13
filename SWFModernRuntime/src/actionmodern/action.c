@@ -13062,13 +13062,16 @@ void actionProcessDeferredUnloads(void)
 		if (g_deferred_unload_mcs[i] != NULL) {
 			MovieClip* umc = g_deferred_unload_mcs[i];
 			umc->unloaded = 1;
-			// Clear failed-load state and restore root properties
-			if (umc->load_failed) {
-				umc->load_failed = 0;
-				strncpy(umc->url, root_movieclip.url, sizeof(umc->url) - 1);
-				umc->url[sizeof(umc->url) - 1] = '\0';
-				umc->swf_version = (u16)g_swf_version;
-			}
+			// Reset MC properties to pre-load state
+			umc->currentframe = 0;
+			umc->framesloaded = 0;
+			umc->totalframes = 0;
+			umc->byte_size = 0;
+			umc->load_failed = 0;
+			// Restore parent's URL and SWF version
+			strncpy(umc->url, root_movieclip.url, sizeof(umc->url) - 1);
+			umc->url[sizeof(umc->url) - 1] = '\0';
+			umc->swf_version = (u16)root_movieclip.swf_version;
 		}
 	}
 	g_deferred_unload_mc_count = 0;
@@ -13117,6 +13120,103 @@ void actionProcessDeferredFailedLoads(void)
 		}
 	}
 	g_deferred_failed_load_count = 0;
+}
+
+// --- Deferred direct loadMovie queue ---
+// When loadMovie (non-MCL) finds a valid MovieEntry, we defer the child init+scripts
+// to the next frame, matching Flash/Ruffle async loading behavior. Without deferral,
+// child scripts fire synchronously during the loadMovie opcode, which is wrong.
+typedef struct {
+	MovieClip* target;
+	MovieEntry* entry;
+	int is_level;  // 1 if target is a _levelN MC (needs display_list swap)
+} PendingDirectLoad;
+#define MAX_PENDING_DIRECT_LOADS 16
+static PendingDirectLoad g_pending_direct_loads[MAX_PENDING_DIRECT_LOADS];
+int g_pending_direct_load_count = 0;
+
+void actionFirePendingDirectLoads(SWFAppContext* app_context)
+{
+	int count = g_pending_direct_load_count;
+	if (count == 0) return;
+	// Copy and reset (child scripts may queue more loads)
+	PendingDirectLoad loads[MAX_PENDING_DIRECT_LOADS];
+	for (int i = 0; i < count; i++) loads[i] = g_pending_direct_loads[i];
+	g_pending_direct_load_count = 0;
+
+	for (int i = 0; i < count; i++) {
+		MovieClip* mc = loads[i].target;
+		MovieEntry* entry = loads[i].entry;
+		if (mc == NULL || entry == NULL) continue;
+
+		// Set child SWF URL, version, movie_id, frame counts, byte_size on target MC
+		constructChildURL(mc->url, sizeof(mc->url), entry->filename);
+		mc->swf_version = (u16)entry->swf_version;
+		mc->movie_id = entry->movie_id;
+		mc->load_failed = 0;
+		mc->totalframes = entry->frame_count;
+		mc->framesloaded = entry->frame_count;
+		mc->currentframe = 1;
+		mc->byte_size = entry->file_size;
+
+		// Switch to child's SWF version during init
+		int _saved_ver = g_swf_version;
+		ASObject* _saved_global = global_object;
+		int _saved_child_init = g_child_swf_init;
+		u8 _saved_movie_id = g_current_movie_id;
+		g_swf_version = entry->swf_version;
+		g_child_swf_init = 1;
+		g_current_movie_id = entry->movie_id;
+		ensureSecondaryGlobalInit(app_context, entry->swf_version);
+		if (versionGroup(g_swf_version) == 0 && g_global_legacy) global_object = g_global_legacy;
+		else if (versionGroup(g_swf_version) == 1 && g_global_modern) global_object = g_global_modern;
+		MovieClip* _saved_ctx = g_current_context;
+		actionSetCurrentContext(mc);
+
+		// For _level loads: swap display_list to target MC's sprite display list
+		extern DisplayObject* display_list;
+		extern size_t max_depth;
+		extern size_t display_list_capacity;
+		DisplayObject* _saved_dl = NULL;
+		size_t _saved_max = 0, _saved_cap = 0;
+		int _did_swap = 0;
+		if (loads[i].is_level) {
+			DisplayObject* dobj = mc->display_obj ? (DisplayObject*)mc->display_obj : NULL;
+			if (dobj != NULL && dobj->sprite_display_list != NULL) {
+				_saved_dl = display_list;
+				_saved_max = max_depth;
+				_saved_cap = display_list_capacity;
+				display_list = dobj->sprite_display_list;
+				max_depth = dobj->sprite_max_depth;
+				display_list_capacity = dobj->sprite_dl_capacity;
+				_did_swap = 1;
+			}
+		}
+
+		entry->init_func(app_context);
+		if (entry->frame_count > 0 && entry->frame_funcs != NULL && entry->frame_funcs[0] != NULL) {
+			entry->frame_funcs[0](app_context);
+		}
+
+		// Restore display_list if swapped
+		if (_did_swap) {
+			DisplayObject* dobj = mc->display_obj ? (DisplayObject*)mc->display_obj : NULL;
+			if (dobj != NULL) {
+				dobj->sprite_display_list = display_list;
+				dobj->sprite_max_depth = max_depth;
+				dobj->sprite_dl_capacity = display_list_capacity;
+			}
+			display_list = _saved_dl;
+			max_depth = _saved_max;
+			display_list_capacity = _saved_cap;
+		}
+
+		actionSetCurrentContext(_saved_ctx);
+		g_swf_version = _saved_ver;
+		global_object = _saved_global;
+		g_child_swf_init = _saved_child_init;
+		g_current_movie_id = _saved_movie_id;
+	}
 }
 
 // --- Deferred onUnload queue ---
@@ -19099,57 +19199,13 @@ void actionGetURL(SWFAppContext* app_context, const char* url, const char* targe
 		parseAndSetFlashVars(app_context, url_mut, mc);
 		MovieEntry* entry = findMovieEntry(url_mut);
 		if (entry != NULL && mc != NULL) {
-			// Set child SWF URL and version on target MC
-			constructChildURL(mc->url, sizeof(mc->url), entry->filename);
-			mc->swf_version = (u16)entry->swf_version;
-			mc->movie_id = entry->movie_id;
-			mc->load_failed = 0;
-			// Switch to child's SWF version during init (with per-movie global)
-			int _saved_ver = g_swf_version;
-			ASObject* _saved_global = global_object;
-			int _saved_child_init = g_child_swf_init;
-			u8 _saved_movie_id = g_current_movie_id;
-			g_swf_version = entry->swf_version;
-			g_child_swf_init = 1;
-			g_current_movie_id = entry->movie_id;
-			ensureSecondaryGlobalInit(app_context, entry->swf_version);
-			if (versionGroup(g_swf_version) == 0 && g_global_legacy) global_object = g_global_legacy;
-			else if (versionGroup(g_swf_version) == 1 && g_global_modern) global_object = g_global_modern;
-			MovieClip* _saved_ctx = g_current_context;
-			actionSetCurrentContext(mc);
-			// Swap display_list to the container MC's sprite display list so that
-			// the loaded SWF's frame functions place objects inside the container MC
-			// (not on the root display list).
-			extern DisplayObject* display_list;
-			extern size_t max_depth;
-			extern size_t display_list_capacity;
-			DisplayObject* _saved_dl = display_list;
-			size_t _saved_max = max_depth;
-			size_t _saved_cap = display_list_capacity;
-			DisplayObject* dobj_lm = mc->display_obj ? (DisplayObject*)mc->display_obj : NULL;
-			if (dobj_lm != NULL && dobj_lm->sprite_display_list != NULL) {
-				display_list = dobj_lm->sprite_display_list;
-				max_depth = dobj_lm->sprite_max_depth;
-				display_list_capacity = dobj_lm->sprite_dl_capacity;
+			// Defer child init to next frame (async load simulation)
+			if (g_pending_direct_load_count < MAX_PENDING_DIRECT_LOADS) {
+				PendingDirectLoad* pdl = &g_pending_direct_loads[g_pending_direct_load_count++];
+				pdl->target = mc;
+				pdl->entry = entry;
+				pdl->is_level = 1;
 			}
-			entry->init_func(app_context);
-			if (entry->frame_count > 0 && entry->frame_funcs != NULL && entry->frame_funcs[0] != NULL) {
-				entry->frame_funcs[0](app_context);
-			}
-			// Save back any display list changes (realloc may have grown it)
-			if (dobj_lm != NULL) {
-				dobj_lm->sprite_display_list = display_list;
-				dobj_lm->sprite_max_depth = max_depth;
-				dobj_lm->sprite_dl_capacity = display_list_capacity;
-			}
-			display_list = _saved_dl;
-			max_depth = _saved_max;
-			display_list_capacity = _saved_cap;
-			actionSetCurrentContext(_saved_ctx);
-			g_swf_version = _saved_ver;
-			global_object = _saved_global;
-			g_child_swf_init = _saved_child_init;
-			g_current_movie_id = _saved_movie_id;
 		} else if (mc != NULL) {
 			// Failed load: defer state change to next frame (async load simulation)
 			if (g_deferred_failed_load_count < MAX_DEFERRED_FAILED_LOADS) {
@@ -19203,33 +19259,13 @@ void actionGetURL(SWFAppContext* app_context, const char* url, const char* targe
 		parseAndSetFlashVars(app_context, url_mut2, mc);
 		MovieEntry* entry = findMovieEntry(url_mut2);
 		if (entry != NULL && mc != NULL) {
-			// Set child SWF URL and version on target MC
-			constructChildURL(mc->url, sizeof(mc->url), entry->filename);
-			mc->swf_version = (u16)entry->swf_version;
-			mc->movie_id = entry->movie_id;
-			mc->load_failed = 0;
-			// Switch to child's SWF version during init (with per-movie global)
-			int _saved_ver = g_swf_version;
-			ASObject* _saved_global = global_object;
-			int _saved_child_init2 = g_child_swf_init;
-			u8 _saved_movie_id2 = g_current_movie_id;
-			g_swf_version = entry->swf_version;
-			g_child_swf_init = 1;
-			g_current_movie_id = entry->movie_id;
-			ensureSecondaryGlobalInit(app_context, entry->swf_version);
-			if (versionGroup(g_swf_version) == 0 && g_global_legacy) global_object = g_global_legacy;
-			else if (versionGroup(g_swf_version) == 1 && g_global_modern) global_object = g_global_modern;
-			MovieClip* _saved_ctx = g_current_context;
-			actionSetCurrentContext(mc);
-			entry->init_func(app_context);
-			if (entry->frame_count > 0 && entry->frame_funcs != NULL && entry->frame_funcs[0] != NULL) {
-				entry->frame_funcs[0](app_context);
+			// Defer child init to next frame (async load simulation)
+			if (g_pending_direct_load_count < MAX_PENDING_DIRECT_LOADS) {
+				PendingDirectLoad* pdl = &g_pending_direct_loads[g_pending_direct_load_count++];
+				pdl->target = mc;
+				pdl->entry = entry;
+				pdl->is_level = 0;
 			}
-			actionSetCurrentContext(_saved_ctx);
-			g_swf_version = _saved_ver;
-			global_object = _saved_global;
-			g_child_swf_init = _saved_child_init2;
-			g_current_movie_id = _saved_movie_id2;
 		} else if (mc != NULL) {
 			// Failed load: defer state change to next frame (async load simulation)
 			if (g_deferred_failed_load_count < MAX_DEFERRED_FAILED_LOADS) {
@@ -27509,11 +27545,9 @@ void actionGetURL2(SWFAppContext* app_context, u8 send_vars_method, u8 load_targ
 			if (_gu2_query != NULL && *_gu2_query != '\0') {
 				parseURLEncodedVars(app_context, _gu2_query, _gu2_mc);
 			}
-			// Root replacement: clear state when loading into _root/_level0
+			// Root replacement: keep synchronous (complex state clearing)
 			if (_gu2_mc == &root_movieclip) {
 				// Clear global variable table (parent's root-level variables)
-				// _root.foo = 2 also writes to var_map via setVariableByName;
-				// we must clear it so the child doesn't inherit parent variables.
 				freeMap();
 				initMap();
 				for (size_t _vi = 0; _vi < var_array_size; _vi++) {
@@ -27531,8 +27565,7 @@ void actionGetURL2(SWFAppContext* app_context, u8 send_vars_method, u8 load_targ
 				root_movieclip.totalframes = entry->frame_count;
 				root_movieclip.framesloaded = entry->frame_count;
 				root_movieclip.currentframe = 1;
-				// Clear root display list so child movie's placements don't conflict
-				// with stale entries from parent movie (char_ids differ after offset)
+				// Clear root display list
 				{
 					extern DisplayObject* display_list;
 					extern size_t max_depth;
@@ -27543,35 +27576,41 @@ void actionGetURL2(SWFAppContext* app_context, u8 send_vars_method, u8 load_targ
 					}
 					max_depth = 0;
 				}
-			}
-			// Set child SWF URL and version on target MC
-			if (_gu2_mc != NULL) {
+				// Set child SWF URL and version on target MC
 				constructChildURL(_gu2_mc->url, sizeof(_gu2_mc->url), entry->filename);
 				_gu2_mc->swf_version = (u16)entry->swf_version;
 				_gu2_mc->movie_id = entry->movie_id;
+				// Run child synchronously for root replacement
+				MovieClip* _saved_ctx = g_current_context;
+				int _saved_ver = g_swf_version;
+				ASObject* _saved_global = global_object;
+				int _saved_child_init3 = g_child_swf_init;
+				u8 _saved_movie_id3 = g_current_movie_id;
+				g_swf_version = entry->swf_version;
+				g_child_swf_init = 1;
+				g_current_movie_id = entry->movie_id;
+				ensureSecondaryGlobalInit(app_context, entry->swf_version);
+				if (versionGroup(g_swf_version) == 0 && g_global_legacy) global_object = g_global_legacy;
+				else if (versionGroup(g_swf_version) == 1 && g_global_modern) global_object = g_global_modern;
+				actionSetCurrentContext(_gu2_mc);
+				entry->init_func(app_context);
+				if (entry->frame_count > 0 && entry->frame_funcs != NULL && entry->frame_funcs[0] != NULL) {
+					entry->frame_funcs[0](app_context);
+				}
+				actionSetCurrentContext(_saved_ctx);
+				g_swf_version = _saved_ver;
+				global_object = _saved_global;
+				g_child_swf_init = _saved_child_init3;
+				g_current_movie_id = _saved_movie_id3;
+			} else if (_gu2_mc != NULL) {
+				// Non-root: defer child init to next frame (async load simulation)
+				if (g_pending_direct_load_count < MAX_PENDING_DIRECT_LOADS) {
+					PendingDirectLoad* pdl = &g_pending_direct_loads[g_pending_direct_load_count++];
+					pdl->target = _gu2_mc;
+					pdl->entry = entry;
+					pdl->is_level = 0;
+				}
 			}
-			// Run child in target MC context with child's SWF version (with per-movie global)
-			MovieClip* _saved_ctx = g_current_context;
-			int _saved_ver = g_swf_version;
-			ASObject* _saved_global = global_object;
-			int _saved_child_init3 = g_child_swf_init;
-			u8 _saved_movie_id3 = g_current_movie_id;
-			g_swf_version = entry->swf_version;
-			g_child_swf_init = 1;
-			g_current_movie_id = entry->movie_id;
-			ensureSecondaryGlobalInit(app_context, entry->swf_version);
-			if (versionGroup(g_swf_version) == 0 && g_global_legacy) global_object = g_global_legacy;
-			else if (versionGroup(g_swf_version) == 1 && g_global_modern) global_object = g_global_modern;
-			if (_gu2_mc != NULL) actionSetCurrentContext(_gu2_mc);
-			entry->init_func(app_context);
-			if (entry->frame_count > 0 && entry->frame_funcs != NULL && entry->frame_funcs[0] != NULL) {
-				entry->frame_funcs[0](app_context);
-			}
-			actionSetCurrentContext(_saved_ctx);
-			g_swf_version = _saved_ver;
-			global_object = _saved_global;
-			g_child_swf_init = _saved_child_init3;
-			g_current_movie_id = _saved_movie_id3;
 		} else if (_gu2_mc != NULL) {
 			// Failed load: defer state change to next frame (async load simulation)
 			if (g_deferred_failed_load_count < MAX_DEFERRED_FAILED_LOADS) {
