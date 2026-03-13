@@ -19116,10 +19116,17 @@ void actionEndDrag(SWFAppContext* app_context)
 		ng_compute_droptarget(g_drag_virt_x, g_drag_virt_y,
 		    g_drag_target_name[0] ? g_drag_target_name : dragged_target,
 		    path, sizeof(path));
-
-		// Set droptarget on the current context MC (the dragged clip's MC,
-		// set by dispatch_clip_event_release before calling this action).
-		if (g_current_context)
+		// Set droptarget on the dragged MC (looked up by instance name).
+		const char* drag_name = g_drag_target_name[0] ? g_drag_target_name : dragged_target;
+		// Extract instance name from full path (e.g. "_level0.dragger" -> "dragger")
+		if (drag_name) {
+			const char* dot = strrchr(drag_name, '.');
+			if (dot) drag_name = dot + 1;
+		}
+		MovieClip* drag_mc = drag_name ? actionFindMovieClipByName(drag_name) : NULL;
+		if (drag_mc)
+			snprintf(drag_mc->droptarget, sizeof(drag_mc->droptarget), "%s", path);
+		else if (g_current_context)
 			snprintf(g_current_context->droptarget, sizeof(g_current_context->droptarget),
 			    "%s", path);
 #endif
@@ -22177,12 +22184,14 @@ static void ensureGlobalInit(SWFAppContext* app_context)
 			}
 
 			// Set constructor → Function constructor (if not already set)
+			// Must use setPropertyWithFlags to override the auto-DONT_ENUM rule
+			// in setProperty (which forces __proto__ and constructor to DONT_ENUM)
 			if (getProperty(ctor->own_props, "constructor", 11) == NULL)
-				setProperty(app_context, ctor->own_props, "constructor", 11, &fn_ctor_val);
+				setPropertyWithFlags(app_context, ctor->own_props, "constructor", 11, &fn_ctor_val, PROPERTY_FLAGS_DEFAULT);
 
 			// Set __proto__ → Function.prototype (if not already set)
 			if (getProperty(ctor->own_props, "__proto__", 9) == NULL)
-				setProperty(app_context, ctor->own_props, "__proto__", 9, &fn_proto_val);
+				setPropertyWithFlags(app_context, ctor->own_props, "__proto__", 9, &fn_proto_val, PROPERTY_FLAGS_DEFAULT);
 		}
 	}
 }
@@ -26522,9 +26531,7 @@ void actionEnumerate2(SWFAppContext* app_context, char* str_buffer)
 			for (u32 i = 0; i < obj->num_used; i++)
 			{
 				if (!(obj->properties[i].flags & PROPERTY_FLAG_ENUMERABLE))
-				{
 					continue;
-				}
 				PUSH_STR((char*)obj->properties[i].name, obj->properties[i].name_length);
 			}
 		}
