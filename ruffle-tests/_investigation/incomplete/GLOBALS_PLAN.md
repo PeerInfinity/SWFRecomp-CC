@@ -3,16 +3,16 @@
 
 Last updated: 2026-03-13
 
-## Status: INCOMPLETE — Phases 1-8b DONE, Phase 8c in progress
+## Status: INCOMPLETE — Phases 1-8c-2 DONE, Phase 8c-3+ in progress
 
-**28 of 31 tests PASSING.** 3 tests remain with output mismatches. Unblocking plan below.
+**28 of 31 plan tests PASSING.** 3 tests remain with output mismatches. Session gained +6 overall tests (531→537).
 
-### Current Pass Rates (2026-03-13, CI run on 530c6389)
+### Current Pass Rates (2026-03-13, CI run on 7714e908)
 
 | Test | Lines | Pass Rate | Status | Notes |
 |------|-------|-----------|--------|-------|
-| globals_swf5 | 304/304 | 100% | **PASS** | Newly passing (was 296/304) |
-| globals_swf6 | 304/304 | 100% | **PASS** | Newly passing (was 301/304) |
+| globals_swf5 | 304/304 | 100% | **PASS** | |
+| globals_swf6 | 304/304 | 100% | **PASS** | |
 | globals_swf7 | 304/304 | 100% | **PASS** | |
 | globals_swf8 | 304/304 | 100% | **PASS** | |
 | math_min_max | 101/101 | 100% | **PASS** | |
@@ -37,10 +37,10 @@ Last updated: 2026-03-13
 | swf5_global_funcs | 232/232 | 100% | **PASS** | |
 | swf6_global_funcs | 232/232 | 100% | **PASS** | |
 | swf7_global_funcs | 232/232 | 100% | **PASS** | |
-| global_swf5_6_7_8_9 | 1145/1145 | 100% | **PASS** | Newly passing (was 1115/1145) |
-| native_subclasses | PASS | 100% | **PASS** | Timezone issue resolved in CI |
-| global_proto_decls | 20/4497 | ~0% | **FAIL** | Phase 8c |
-| global_proto_decls_delete | 0/4158 | 0% | **FAIL** | Phase 8c |
+| global_swf5_6_7_8_9 | 1145/1145 | 100% | **PASS** | |
+| native_subclasses | PASS | 100% | **PASS** | |
+| global_proto_decls | 24/4497 | ~1% | **FAIL** | Phase 8c |
+| global_proto_decls_delete | 22/4158 | ~1% | **FAIL** | Phase 8c |
 | global_instance_decls | 12/758 | ~2% | **FAIL** | Phase 8d |
 
 ---
@@ -55,6 +55,17 @@ Our `actionEnumerate2` (the for-in implementation) has separate code paths for O
 
 1. Constructor own properties (`__proto__`, `constructor`, `prototype`) are not visible
 2. Inherited methods from Object.prototype (watch, valueOf, toString, etc.) are not visible
+
+### Open Investigation: `constructor` shows DONT_ENUM incorrectly
+
+After Phase 8c-2, constructor own_props are enumerated but `constructor` is labeled DONT_ENUM when it shouldn't be. The test's logic:
+1. First for-in (before ASSetPropFlags) builds `enumerated` dict
+2. ASSetPropFlags clears DONT_ENUM on all properties
+3. Second for-in checks each key against `enumerated` — if missing, labels DONT_ENUM
+
+`constructor` is set with PROPERTY_FLAGS_DEFAULT (ENUMERABLE), so the first for-in should see it and add it to `enumerated`. Yet the output shows DONT_ENUM, meaning the first for-in did NOT enumerate it.
+
+**Hypothesis:** The first for-in might not be reaching the function enumeration path at all, or there's an interaction with how the test stores `enumerated[key] = true` via SetMember on an InitObject that causes the check to fail. Needs further debugging — possibly by adding trace output to a custom test or stepping through the recompiled code.
 
 ### Phase 8c-1: Fix actionEnumerate2 prototype chain walking for functions
 
@@ -187,8 +198,8 @@ Deferred until 8c is further along. Requires:
 | 7 | Prototype methods for stub classes | **DONE** |
 | 8a | Match global registration order | **DONE** |
 | 8b | Add ~20 missing global stubs | **DONE** |
-| 8c-1 | Fix actionEnumerate2 prototype chain walking for functions | TODO |
-| 8c-2 | Populate own_props on every constructor | TODO |
+| 8c-1 | Fix actionEnumerate2 prototype chain walking for functions | **NOT NEEDED** — Flash doesn't walk chain for functions |
+| 8c-2 | Populate own_props on every constructor | **DONE** (7714e908) — but `constructor` shows DONT_ENUM incorrectly (see below) |
 | 8c-3 | Register System + flash on _global | TODO |
 | 8c-4 | Add missing properties on existing objects | TODO |
 | 8c-5 | Property flags cleanup | TODO |
