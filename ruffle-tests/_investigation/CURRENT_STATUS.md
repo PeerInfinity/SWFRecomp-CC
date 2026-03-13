@@ -4,10 +4,10 @@ Last updated: 2026-03-12
 
 ## Quick Summary
 
-- **Pass rate (CI, last run)**: 524/618 (84.8%) total (CI run on d61239f5, 0 regressions)
+- **Pass rate (CI, last run)**: 530/618 (85.8%) total (CI run on 94c64bbe, 0 regressions)
 - **Image test baseline**: **7/31 strict image match** (run_image_tests.py, 0-outlier AND 0-max-diff). **9/31 tolerance pass** (within test.toml limits). Strict passes: focusrect_focuslost, focusrect_mouse_swf8/swf9, focusrect_swf6, frame_size_translated_neg/pos, mask_with_drawing. Tolerance-only: display_object_properties (max_diff=79), mask_reapply (max_diff=1).
 - **Main failure types**: output_mismatch (46), segfault (2, ignored), timeout (1, ignored)
-- **Recent gains**: swf5_to_6_cross_call 29/29 ✅, swf6_to_5_cross_call 29/29 ✅ (cross-movie this binding + closure context + toString dispatch). selection_handlers 27/27 ✅, edittext_html_swf6 3900→5289/5377 (+1389 lines). register_class 66/66 ✅, register_class_swf6 38/38 ✅. getBounds on loaded clips: 6/8 PASS.
+- **Recent gains**: timer_run_actions 18/18 ✅ (onLoad dispatch for attached MCs). textsnapshot_available_text/findtext/gettext/text_order ✅ (text_char_codes CI fix). swf5_to_6_cross_call 29/29 ✅, swf6_to_5_cross_call 29/29 ✅. selection_handlers 27/27 ✅, edittext_html_swf6 3900→5289/5377 (+1389 lines). register_class 66/66 ✅, register_class_swf6 38/38 ✅. getBounds on loaded clips: 6/8 PASS.
 - **Known regressions**: None. Previous regressions all recovered.
 
 ## Crashes and Errors (8 tests)
@@ -98,6 +98,11 @@ Last updated: 2026-03-12
 | `tab_ordering_movieclip_enabled_default` | 462/462 ✅ | MC tabIndex + mouse handler implicit tabbability |
 | `root_onload` | PASS ✅ | Root MC onLoad dispatch (was compile_fail, now fixed) |
 | `root_global_parent` | 6/6 ✅ | mc._global member access in GetMember |
+| `timer_run_actions` | 18/18 ✅ | onLoad dispatch for dynamically-attached MCs (deferred queue) |
+| `textsnapshot_available_text` | 20/20 ✅ | text_char_codes CI fix (glyph index → Unicode code point) |
+| `textsnapshot_findtext` | 44/44 ✅ | Same text_char_codes fix |
+| `textsnapshot_gettext` | 55/55 ✅ | Same text_char_codes fix |
+| `textsnapshot_text_order` | 1/1 ✅ | Same text_char_codes fix |
 | `device_font_spacing` | 91/91 ✅ | Conditional pixel rounding based on embedFonts property |
 | `register_class` | 66/66 ✅ | Export-versioned registerClass lookup for cross-version attachMovie |
 | `register_class_swf6` | 38/38 ✅ | Same fix — SWF6 parent + SWF17 child cross-version registry isolation |
@@ -156,7 +161,7 @@ Last updated: 2026-03-12
 | PROTOTYPE_OBJECT_PLAN | **COMPLETE** → `complete/` | 11/12 pass | Remaining blocked on recompiler MTASC nested function bug |
 | NATIVE_INTROSPECTION_PLAN | **ALL PHASES COMPLETE** → `complete/` | 4/5 pass (native_objects_swf7/8 ✅, native_double_construct ✅, native_subclasses 190/191 ✅) | native_objects_swf6 83/84 (1 line Ruffle vs Flash diff, ignored); native_subclasses 1 line timezone diff (ignored) |
 | TELLTARGET_PLAN | **Phases 1-2 COMPLETE** → `blocked/` | 16/22 pass (14 prior + string_paths_other ✅ 36/36, string_paths_unload ✅ 1/1 via MC_REMOVAL_LIFECYCLE) | Remaining 6 tests blocked on: input.json mouse events now supported (string_paths_eval needs re-evaluation), loadMovie (string_paths_eval2), onEnterFrame per-tick (string_paths_variable_scopes), call() early-termination (removed_target_clip_scope 34/35), Ruffle trace msg (removed_base_clip_tell_target), Ruffle known_failure (string_paths_reference_launder) |
-| TIMER_PLAN | **COMPLETE** → `complete/` | 1/3 pass (set_interval ✅) | Core done; timer_run_actions blocked on REGISTERCLASS; timeout deferred |
+| TIMER_PLAN | **COMPLETE** → `complete/` | 2/3 pass (set_interval ✅, timer_run_actions ✅) | Core done; timeout deferred (needs script execution timeout mechanism) |
 | FOCUS_SYSTEM_PLAN | **6/7 PASS** → `blocked/` | focus_root_movie ✅, focusrect_focuslost ✅, movieclip_focusenabled ✅, focus_mouse ✅, focus_keyboard_press ✅ (60/60), focus_mouse_rollout ✅ (4/4) | Remaining 1: focus_mouse_focusable blocked by dynamic object creation |
 | TAB_ORDERING_PLAN | **16/16 PASS** → `complete/` | All 16 tests PASS including edittext_tab_focus ✅ (13/13), tab_ordering_events_mouse ✅ (65/65), tab_ordering_automatic_order_same_position ✅ (12/12) | — |
 | DRAG_DROP_PLAN | **COMPLETE** | 4/4 pass ✅ | All tests already passing |
@@ -206,6 +211,15 @@ All simple fixes have been applied. Remaining failing tests require:
 ### Dependency Blockers (plans blocking other plans)
 - **LOADMOVIE_PLAN** (reduced blocker): 31/35 core tests PASS. root_button_mode ✅. getBounds 6/8 PASS (1-5, 8 ✅; 6, 7 at 9/10). Remaining: loadmovie_registerclass (cross-movie export isolation), mcl_replace_root accepted diffs. Multi-SWF tests now visible in filtered results (removed from ignored_tests.txt).
 - **FOCUS_SYSTEM_PLAN** — 7/7 pass (focus_remove ✅ newly fixed). TAB_ORDERING_PLAN fully complete (16/16). Only focus_mouse_focusable (0/8) blocked by dynamic object creation.
+
+### Session notes (2026-03-12 onLoad + TextSnapshot CI fix)
+- **Pass rate: 525→530/618 (85.0%→85.8%)**: +5 newly passing tests across two commits.
+- **timer_run_actions 0→18/18 PASS** ✅ (commit 27ce21c2): Three fixes:
+  1. `\r` in HTML content: `tf_parse_html` was silently skipping `\r` characters. Now treats `\r` same as `\n` (paragraph break).
+  2. `actionDispatchMCOnLoad`: New function dispatches onLoad for any MC, walking `__proto__` chain via `getPropertyWithPrototype` (root onLoad was using `getProperty` — own props only).
+  3. Deferred onLoad queue: `actionQueueMCOnLoad`/`actionFlushPendingOnLoads` — attachMovie queues onLoad, which fires after the current script/timer callback returns. Flush points: after each `fireTimerCallback`, after frame scripts, after timer processing.
+- **textsnapshot_available_text/findtext/gettext/text_order PASS** ✅ (commit 94c64bbe): `textSnapshotCapture` was using `text_data[]` (glyph indices) as character codes — worked locally but failed in CI. Fixed by emitting `text_char_codes[]` from the recompiler (Unicode code points via `font_code_tables`). Weak symbol fallback for backward compatibility.
+- **No regressions**: Verified related tests still pass.
 
 ### Session notes (2026-03-12 swf6_to_5_cross_call fix)
 - **Pass rate: 524/618 (84.8%)**: +1 newly passing (swf6_to_5_cross_call). -9 mismatched lines.
@@ -263,7 +277,7 @@ All simple fixes have been applied. Remaining failing tests require:
 - **Pass rate: 507→509/618 (82.4%)**: +2 from register_class (66/66 PASS) and register_class_swf6 (38/38 PASS)
 - **register_class + register_class_swf6 FIXED**: Export-versioned registerClass lookup. `ng_lookupExportVersion()` returns the SWF version of the movie that DEFINED the exported symbol. All 6 registerClass lookup sites in action.c updated to use export version for registry selection (case-sensitive vs case-insensitive). Matches Ruffle's `self.movie().version()` behavior in `get_registered_avm1_constructor()`.
 - **HCALLOC fix**: `actionNewMethod` DefineFunction2 constructor path used `calloc()` but freed with `FREE()` (heap_free). Fixed to `HCALLOC()`. Resolved runtime_error crash in movieclip_invalid_get_bounds_6/7 (0/10 → 8/10 each).
-- **4 textsnapshot tests pass locally** (not yet in CI): textsnapshot_available_text, textsnapshot_findtext, textsnapshot_gettext, textsnapshot_text_order. CI still shows output_mismatch — needs investigation.
+- **4 textsnapshot tests now PASS in CI** ✅ (commit 94c64bbe): textsnapshot_available_text, textsnapshot_findtext, textsnapshot_gettext, textsnapshot_text_order. CI failure was caused by `textSnapshotCapture` using `text_data[]` (glyph indices) as character codes — worked locally (indices happened to match ASCII) but failed in CI (fresh recompilation). Fixed by emitting `text_char_codes[]` (Unicode code points via `font_code_tables`) from the recompiler, with weak symbol fallback for backward compatibility.
 - **Near-passing test investigation**: Exhaustive sweep of all 46 remaining output_mismatch tests. No more quick wins found. Remaining failures require font metrics (edittext_scroll 52/54), mouse events, loadMovie infrastructure, or architectural changes.
 
 ### Session notes (2026-03-10)

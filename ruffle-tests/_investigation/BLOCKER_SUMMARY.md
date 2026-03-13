@@ -4,7 +4,7 @@ Last updated: 2026-03-12
 
 This document catalogs the root-cause blockers preventing further progress on the Ruffle AVM1 test suite. Each blocker is a missing infrastructure feature or architectural limitation that blocks one or more plans in `blocked/`.
 
-Current pass rate: **524/618 (84.8%)** total (CI run on d61239f5). Image tests: **7/31 strict** (exact pixel match) / **9/31 tolerance pass** (within test.toml limits).
+Current pass rate: **530/618 (85.8%)** total (CI run on 94c64bbe). Image tests: **7/31 strict** (exact pixel match) / **9/31 tolerance pass** (within test.toml limits).
 
 ---
 

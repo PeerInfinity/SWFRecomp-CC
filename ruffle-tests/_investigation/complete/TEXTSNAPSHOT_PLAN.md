@@ -3,7 +3,7 @@
 
 Last updated: 2026-03-04
 
-## Status: COMPLETE — All 4 tests PASS
+## Status: COMPLETE — All 4 tests PASS (CI confirmed, commit 94c64bbe)
 
 | Test | Result |
 |------|--------|
@@ -30,3 +30,5 @@ Last updated: 2026-03-04
 - `ng_cloneSprite` and `ng_duplicateMovieClip` in tag_stubs.c: Run frame 0 to populate clone's sprite_display_list (display list context switching)
 - `tagDefineText` in tag.c: Accumulate text ranges for same char_id across multiple calls
 - Flash behavior: after cloning, source MC's display_obj cleared (TextSnapshot returns empty for source, clone gets text)
+
+**CI Fix (commit 94c64bbe)**: `textSnapshotCapture()` was using `text_data[]` (global glyph indices for rendering) as character codes. This worked locally (pre-compiled glyph indices happened to match ASCII) but failed in CI (fresh recompilation produced different indices). Fixed by having the recompiler emit `text_char_codes[]` (a parallel `u16` array of Unicode code points, resolved via `font_code_tables[font_id][glyph_index]`). Runtime uses `__attribute__((weak))` on `text_char_codes` for backward compatibility — falls back to `text_data` if the symbol isn't defined (older recompiler builds).

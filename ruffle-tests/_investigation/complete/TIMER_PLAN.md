@@ -3,7 +3,7 @@
 
 Last updated: 2026-02-25
 
-## Status: PHASES 1-2 COMPLETE — set_interval PASSING (27/27)
+## Status: PHASES 1-2 COMPLETE — set_interval PASSING (27/27), timer_run_actions PASSING (18/18)
 
 ### Implementation Summary (2026-02-25)
 
@@ -27,12 +27,12 @@ Last updated: 2026-02-25
 | Test | Before | After | Notes |
 |------|--------|-------|-------|
 | set_interval | 0/27 | **27/27 PASS** ✅ | All timer types working: function-form, method-form, extra args, valueOf coercion, null delay, validation |
-| timer_run_actions | SEGFAULT | SEGFAULT (0/18) | Timer fires but callback calls `attachMovie` → segfaults (blocked on REGISTERCLASS_PLAN) |
+| timer_run_actions | SEGFAULT | **18/18 PASS** ✅ | Fixed (commit 27ce21c2): onLoad dispatch for dynamically-attached MCs via deferred queue (`actionQueueMCOnLoad`/`actionFlushPendingOnLoads`) |
 | timeout | TIMEOUT | TIMEOUT | Needs script execution timeout mechanism (Phase 4, deferred) |
 
 ## Overview
 
-Three Ruffle tests need timer support: `set_interval` (27/27 ✅), `timer_run_actions` (0/18, blocked), and `timeout` (TIMEOUT, deferred). Timer registration and execution are fully implemented. Remaining tests blocked on external dependencies.
+Three Ruffle tests need timer support: `set_interval` (27/27 ✅), `timer_run_actions` (18/18 ✅), and `timeout` (TIMEOUT, deferred). Timer registration and execution are fully implemented. Only `timeout` remains (needs script execution timeout mechanism).
 
 ## Test Analysis
 
