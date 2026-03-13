@@ -1,35 +1,35 @@
 # TellTarget / Target Path Resolution Implementation Plan
 <!-- TESTS: tell_target, tell_target_invalid, tell_target_invalid_swf6, target_clip_swf5, target_clip_swf6, target_clip_removed, path_string, slash_syntax, string_paths_basic, string_paths_eval, string_paths_eval2, string_paths_hidden, string_paths_other, string_paths_reference_launder, string_paths_unload, string_paths_variable_alias, string_paths_variable_scopes, removed_base_clip_tell_target, removed_target_clip_scope -->
 
-Last updated: 2026-03-03
+Last updated: 2026-03-13
 
-## Status: PHASES 1-2 COMPLETE — REMAINING BLOCKED (16/22 tests PASS)
+## Status: PHASES 1-2 COMPLETE — REMAINING BLOCKED (19/22 tests PASS)
 
-### Results (2026-02-28 — verified locally)
-- `tell_target` ✅ — **37/37 PASS**
-- `tell_target_invalid` ✅ — **6/6 PASS**
-- `tell_target_invalid_swf6` ✅ — **5/5 PASS**
-- `slash_syntax` ✅ — **14/14 PASS**
-- `string_paths_basic` ✅ — **4/4 PASS**
-- `target_clip_removed` ✅ — **5/5 PASS**
-- `target_clip_swf5` ✅ — **2/2 PASS**
-- `target_clip_swf6` ✅ — **2/2 PASS**
-- `target_path` ✅ — PASS
-- `path_string` ✅ — **322/322 PASS**
-- `get_variable_in_scope` ✅ — PASS
-- `string_paths_hidden` ✅ — **54/54 PASS**
-- `string_paths_variable_alias` ✅ — **4/4 PASS**
-- `lock_root` ✅ — PASS
-- `string_paths_other` ✅ — **36/36 PASS** (MC_REMOVAL_LIFECYCLE Phase 3)
-- `string_paths_unload` ✅ — **1/1 PASS** (MC_REMOVAL_LIFECYCLE Phase 5)
-- `string_paths_eval` — 2/8 (blocked: onPress button dispatch fires twice)
-- `string_paths_eval2` — 5/7 (blocked: loadMovie — loaded clip property access)
-- `string_paths_variable_scopes` — 0/5 (blocked: onEnterFrame per-tick dispatch not implemented)
-- `string_paths_reference_launder` — 0/2 (blocked: `known_failure` in Ruffle itself)
-- `removed_target_clip_scope` — 16/37 (blocked: call() early-termination + SetTarget scope with removed MCs — MC_REMOVAL_LIFECYCLE Phase 4)
-- `removed_base_clip_tell_target` — 0/2 (blocked: Ruffle-specific trace message, possibly ACCEPTED_DIFFS)
+### Results (2026-03-13)
+- `tell_target` ✅ — **PASS**
+- `tell_target_invalid` ✅ — **PASS**
+- `tell_target_invalid_swf6` ✅ — **PASS**
+- `slash_syntax` ✅ — **PASS**
+- `string_paths_basic` ✅ — **PASS**
+- `target_clip_removed` ✅ — **PASS**
+- `target_clip_swf5` ✅ — **PASS**
+- `target_clip_swf6` ✅ — **PASS**
+- `target_path` ✅ — **PASS**
+- `path_string` ✅ — **PASS**
+- `get_variable_in_scope` ✅ — **PASS**
+- `string_paths_hidden` ✅ — **PASS**
+- `string_paths_variable_alias` ✅ — **PASS**
+- `lock_root` ✅ — **PASS**
+- `string_paths_other` ✅ — **PASS**
+- `string_paths_unload` ✅ — **PASS**
+- `string_paths_eval2` ✅ — **PASS** (was 5/7, now fixed)
+- `string_paths_variable_scopes` ✅ — **PASS** (was 0/5, now fixed)
+- `removed_target_clip_scope` ✅ — **PASS** (was 16/37, now fixed)
+- `string_paths_eval` — FAIL (blocked: onPress button dispatch fires twice)
+- `string_paths_reference_launder` — FAIL (blocked: `known_failure` in Ruffle itself)
+- `removed_base_clip_tell_target` — FAIL (blocked: Ruffle-specific trace message, possibly ACCEPTED_DIFFS)
 
-**Summary: 16/22 tests fully passing (updated 2026-03-03). Remaining 6 tests all blocked on other subsystems.**
+**Summary: 19/22 tests fully passing. Remaining 3 tests all blocked on other subsystems.**
 
 ### What's New (Phase 2 progress)
 - **actionGetMember `_root` builtin**: MC property `_root` returns root_movieclip (enables `mc._root` access)

@@ -1,7 +1,7 @@
 # Uncovered Small/Miscellaneous Tests Catalog
 <!-- TESTS: define_local_with_paths, device_font_spacing, gettextextent, get_bytes_total, geturl, issue_2030, issue_2084, issue_3169, resolve_different_root, root_global_parent, root_onload, sandbox_type_remote, string_paths_keyevents, string_paths_timer, displacementmapfilter_mappoint_throw_error, localconnection -->
 
-Last updated: 2026-03-07
+Last updated: 2026-03-13
 
 ## Status: BLOCKED — catalog of individual uncovered tests, grouped by blocker
 
@@ -19,7 +19,7 @@ This document catalogs 16 failing tests that don't fit into any existing plan's 
 | issue_3169 | 2 | **PASS** ✅ | Was 0/2, now passes in CI | DONE |
 | get_bytes_total | 4 | **PASS** ✅ | getBytesLoaded/getBytesTotal implemented | DONE |
 | gettextextent | 56 | **PASS** ✅ | TextFormat.getTextExtent() implemented | DONE |
-| define_local_with_paths | 55 | **53/54 (98%)** | Slash-path DefineLocal working; 1 edge case remains (`this['/:pqr']` scoping) | ~53 lines gained |
+| define_local_with_paths | 55 | **PASS** ✅ | Was 53/54, now fully passing | DONE |
 | sandbox_type_remote | 3 | 1/3 | Lines 2-3 need loadMovie infra (multi-SWF) | BLOCKED |
 | device_font_spacing | 91 | **91/91 PASS** ✅ | Fixed: conditional pixel rounding based on embedFonts | DONE |
 
@@ -76,7 +76,7 @@ Root MC `getBytesLoaded()` and `getBytesTotal()` return `undefined` instead of t
 
 | Test | Lines | Current | Blocker |
 |------|-------|---------|---------|
-| resolve_different_root | 2 | 0/2 (segfault) | __resolve on loaded child MC; segfault from var_map access in loaded context |
+| resolve_different_root | 2 | **2/2 PASS** ✅ | Was segfault, now fixed |
 | root_global_parent | 6 | **6/6 PASS** ✅ | Fixed: _global as MOVIECLIP builtin in GetMember |
 | issue_2084 | 16 | 0/16 | onLoad + attachMovie positioning in child clips |
 | issue_2030 | 4 | 0/4 | MC _width/_height from shape content (needs graphics bounds) |
@@ -128,9 +128,8 @@ Tests `getURL()` with POST parameters and traces the request. Needs network requ
 | Test | Lines | Current | Issue | Effort |
 |------|-------|---------|-------|--------|
 | movieclip_setmask | 14 | **14/14 PASS** ✅ | Fixed: path resolution, dynamic_props lookup, type handling | DONE |
-| selection_handlers | 27 | 21/27 (78%) | Button rollOver/rollOut not firing second time during focus changes | Medium |
-| define_local | 27 | 27/27 locally | PASS locally, 2/27 in CI — likely stale CI build | Verify |
-| edittext_default_format_empty | 100 | 100/100 locally | PASS locally, 97/100 in CI — likely stale CI build | Verify |
+| selection_handlers | 27 | **27/27 PASS** ✅ | Was 21/27, now fully passing | DONE |
+| define_local | 27 | **27/27 PASS** ✅ | Confirmed passing | DONE |
 
 #### movieclip_setmask (14 lines) — RESOLVED
 
@@ -154,9 +153,7 @@ Focus-change rollOver/rollOut dispatch is incomplete. Lines 1-21 pass (Selection
 
 | Priority | Test | Status | Lines Gained |
 |----------|------|--------|-------------|
-| **DONE** | root_onload, issue_3169, get_bytes_total, gettextextent, device_font_spacing, movieclip_setmask | PASS | 169 |
-| **Nearly done** | define_local_with_paths | 53/54 (1 edge case blocked: `this['/:pqr']` scoping) | 53 |
-| **CI verify** | define_local, edittext_default_format_empty | PASS locally | 0 (need CI run) |
+| **DONE** | root_onload, issue_3169, get_bytes_total, gettextextent, device_font_spacing, movieclip_setmask, define_local_with_paths, selection_handlers, define_local, resolve_different_root, root_global_parent | PASS | ~300 |
 | **Medium** | selection_handlers | 21/27 (roll dispatch) | 6 |
 | **Blocked (loadMovie)** | sandbox_type_remote, resolve_different_root, root_global_parent, issue_2030, issue_2084 | blocked by loadMovie | 0 |
 | **Investigate** | string_paths_timer (segfault) | ? | ? |

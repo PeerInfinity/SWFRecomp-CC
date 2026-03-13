@@ -1,9 +1,9 @@
 # Hit Testing Implementation Plan
 <!-- TESTS: hittest_lockroot, hittest_morph, hittest_morph_input, hittest_winding_rule, text_blocks_clicks, movieclip_hittest, movieclip_hittest_shapeflag, local_to_global, movieclip_getbounds, movieclip_invalid_get_bounds_1, movieclip_invalid_get_bounds_2, movieclip_invalid_get_bounds_3, movieclip_invalid_get_bounds_4, movieclip_invalid_get_bounds_5, movieclip_invalid_get_bounds_6, movieclip_invalid_get_bounds_7, movieclip_invalid_get_bounds_8 -->
 
-Last updated: 2026-03-11
+Last updated: 2026-03-13
 
-## Status: BLOCKED (remaining tests need loadMovie or morph interpolation; mouse events now implemented)
+## Status: BLOCKED — 12/17 PASS (remaining need pixel-level shape testing, loadMovie, or morph interpolation)
 
 ---
 
@@ -15,7 +15,7 @@ Last updated: 2026-03-11
 | movieclip_hittest | 92 | **PASS** (92/92) | Phases 4-5 complete |
 | hittest_lockroot | 15 | **PASS** (15/15) | Phase 4 + drawing bounds |
 | hittest_winding_rule | 12 | **PASS** (12/12) | Phase 6 (shape-accurate + winding rules) |
-| movieclip_getbounds | 191 | 186/191 (5 diff) | Rounding precision (-99.9 vs -100) |
+| movieclip_getbounds | 191 | **PASS** (191/191) | Was 186/191, now fully passing |
 | hittest_morph | 70 | **PASS** (70/70) ✅ | Now passing in CI |
 | movieclip_hittest_shapeflag | 338 | 266/338 (72 diff) | Was compile_fail, now output_mismatch — edge cases in triangulation approach |
 | movieclip_invalid_get_bounds_1 | 75 | **PASS** (75/75) ✅ | Fixed: broadcastMessage MC `this` type + `g_use_new_invalid_bounds` flag |
@@ -62,14 +62,11 @@ Implementation details:
 
 ## Remaining Failures
 
-### movieclip_getbounds (5 diff lines) — Rounding
-Lines 159-160: `-99.9` vs `-100` — sub-pixel rounding precision difference. Not actionable without changing rounding strategy.
+### ~~movieclip_getbounds (5 diff lines) — Rounding~~ RESOLVED
+Now fully **PASS** (191/191).
 
-### hittest_morph (3 diff lines) — Morph Interpolation
-- Lines 61, 66: `xMax: 87.25` vs `32.8` — morph shape bounds need runtime interpolation between start/end bounds based on morph ratio
-- Line 68: `hitTest:true` vs `false` — shape-accurate hitTest on fully morphed shape needs interpolated triangle data
-
-Both require morph ratio interpolation infrastructure (runtime lerp of start/end shape bounds and vertex positions).
+### ~~hittest_morph (3 diff lines) — Morph Interpolation~~ RESOLVED
+Now fully **PASS** (70/70).
 
 ### movieclip_hittest_shapeflag (145 diff lines) — Triangulation Limitations
 Remaining failures come from:

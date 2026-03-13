@@ -1,23 +1,18 @@
 # Focus System Implementation Plan
 <!-- TESTS: focus_mouse, focus_mouse_focusable, focus_mouse_rollout, focus_root_movie, focus_keyboard_press, focusrect_focuslost, movieclip_focusenabled -->
 
-Last updated: 2026-03-07
+Last updated: 2026-03-13
 
-## Status: BLOCKED — 6/7 tests passing
+## Status: COMPLETE — 7/7 tests passing
 
-### Passing tests (6)
+### Passing tests (7)
 - `focus_root_movie` — Root MC rejection in `mc_is_focusable_by_setfocus`
 - `focusrect_focuslost` — Tab-triggered onRollOut/onRollOver + window focus lost handling
 - `movieclip_focusenabled` — Dot-path resolution in `getMovieClipByTarget` + string focusEnabled + button-handler focusability
 - `focus_mouse` — **45/45 PASS** ✅ (text field hit-testing via mc_get_pixel_aabb_ng, commit e7974be4)
 - `focus_keyboard_press` — **60/60 PASS** ✅ (fixed by MOUSE_EVENTS_ADVANCED Phase 3: key simulation)
 - `focus_mouse_rollout` — **4/4 PASS** ✅ (fixed by MOUSE_EVENTS_ADVANCED Phase 2: roll dispatch)
-
-### Blocked tests (1)
-
-| Test | Match | Issue | Blocker |
-|------|-------|-------|---------|
-| `focus_mouse_focusable` | 0/8 | Needs dynamic createEmptyMovieClip/createTextField + "Focus changed" listener | **Dynamic object creation** |
+- `focus_mouse_focusable` — **8/8 PASS** ✅ (fixed: `mc_get_pixel_aabb_ng` now uses MC struct `width`/`height` for dynamic text fields)
 
 ### Resolved issues (2026-02-25, commit d9138260)
 

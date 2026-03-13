@@ -12,8 +12,8 @@
 | `edittext_html_swf7` | 5377 | 0 | **PASS** ✅ (font size 0 clamping fix) |
 | `edittext_html_swf8` | 5377 | 0 | **PASS** ✅ (font size 0 clamping fix) |
 | `edittext_html_swf6` | 5377 | ~88 | **98.4% match** (was ~72%, fixed SWF6 paragraph breaks) |
-| `edittext_html_condensewhite_swf7` | 311 | 4 | 98.7% match |
-| `edittext_html_condensewhite_swf8` | 311 | 24 | 92.3% match |
+| `edittext_html_condensewhite_swf7` | 311 | 0 | **PASS** (was 4 diff) |
+| `edittext_html_condensewhite_swf8` | 311 | 0 | **PASS** (was 24 diff) |
 
 **History:**
 - Initial broad `</font>` revert markers caused 55→133 regression (reverted). Surgical approach in `afb3880d` fixed 36 lines (55→19 for swf7, 125→107 for swf8) with no regressions.

@@ -2421,8 +2421,15 @@ static ActionVar actionASSetPropFlags_func2(SWFAppContext* app_context, ActionVa
 {
 	ActionVar result = {0};
 	result.type = ACTION_STACK_VALUE_UNDEFINED;
-	if (num_args < 3 || args[0].type != ACTION_STACK_VALUE_OBJECT) return result;
-	ASObject* obj = (ASObject*)(u64)args[0].data.numeric_value;
+	if (num_args < 3) return result;
+	ASObject* obj = NULL;
+	if (args[0].type == ACTION_STACK_VALUE_OBJECT)
+		obj = (ASObject*)(u64)args[0].data.numeric_value;
+	else if (args[0].type == ACTION_STACK_VALUE_FUNCTION) {
+		// For functions, ASSetPropFlags operates on own_props
+		ASFunction* func = (ASFunction*)(u64)args[0].data.numeric_value;
+		if (func != NULL) obj = func->own_props;
+	}
 	if (obj == NULL) return result;
 	// Coerce set_flags (args[2]) via valueOf if it's an object
 	if (args[2].type == ACTION_STACK_VALUE_OBJECT || args[2].type == ACTION_STACK_VALUE_ARRAY) {
@@ -22079,8 +22086,9 @@ static void ensureGlobalInit(SWFAppContext* app_context)
 	}
 
 	// Create Function.prototype for the primary version group
+	ASObject* fn_proto;
 	{
-		ASObject* fn_proto = allocObject(app_context, 4);
+		fn_proto = allocObject(app_context, 4);
 		retainObject(fn_proto);
 		ActionVar op_val; op_val.type = ACTION_STACK_VALUE_OBJECT; op_val.str_size = 0;
 		op_val.data.numeric_value = (u64) g_object_prototype;
@@ -22089,13 +22097,101 @@ static void ensureGlobalInit(SWFAppContext* app_context)
 			g_function_proto_legacy = fn_proto;
 		else
 			g_function_proto_modern = fn_proto;
+	}
 
-		for (int ci = 0; ci < 18; ci++) {
-			if (g_ctors[ci].own_props != NULL) {
-				ActionVar fp; fp.type = ACTION_STACK_VALUE_OBJECT; fp.str_size = 0;
-				fp.data.numeric_value = (u64) fn_proto;
-				setProperty(app_context, g_ctors[ci].own_props, "__proto__", 9, &fp);
+	// ---- Phase 8c-2: Populate own_props on every constructor ----
+	// In Flash, functions are objects. for-in on a constructor enumerates:
+	//   __proto__ (→ Function.prototype), constructor (→ Function), prototype (DONT_ENUM)
+	// plus inherited methods from Function.prototype → Object.prototype via chain walking.
+	{
+		// Function constructor reference (g_ctors[5] for SWF6+, NULL for SWF5)
+		ASFunction* fn_ctor = (g_swf_version >= 6) ? &g_ctors[5] : &g_ctors[0];
+
+		// Collect ALL constructor functions that should have own_props populated
+		ASFunction* all_ctors[] = {
+			&g_ctors[0], // Object
+			&g_ctors[1], // Array
+			&g_ctors[2], // String
+			&g_ctors[3], // Number
+			&g_ctors[4], // Boolean
+			(g_swf_version >= 6) ? &g_ctors[5] : NULL, // Function (SWF6+)
+			&g_movieclip_constructor,
+			&g_textfield_constructor,
+			&g_textformat_constructor,
+			&g_xml_constructor,
+			&g_xmlnode_constructor,
+			&g_date_constructor,
+			&g_error_ctor,
+			&g_stub_ctors[0],  // AsBroadcaster
+			&g_stub_ctors[1],  // Button
+			&g_stub_ctors[2],  // Camera
+			&g_stub_ctors[3],  // Color
+			&g_stub_ctors[4],  // ContextMenu
+			&g_stub_ctors[5],  // ContextMenuItem
+			&g_stub_ctors[6],  // LoadVars
+			&g_stub_ctors[7],  // LocalConnection
+			&g_stub_ctors[8],  // Microphone
+			&g_stub_ctors[9],  // MovieClipLoader
+			&g_stub_ctors[10], // NetConnection
+			&g_stub_ctors[11], // NetStream
+			&g_stub_ctors[12], // PrintJob
+			&g_stub_ctors[13], // SharedObject
+			&g_stub_ctors[14], // Sound
+			&g_stub_ctors[15], // TextSnapshot
+			&g_stub_ctors[16], // Video
+			&g_stub_ctors[17], // XMLSocket
+			&g_remoteLSOUsage_ctor,
+			&g_assetCache_ctor,
+			&g_asSetupError_ctor,
+		};
+		int num_all_ctors = sizeof(all_ctors) / sizeof(all_ctors[0]);
+
+		ActionVar fn_proto_val; fn_proto_val.type = ACTION_STACK_VALUE_OBJECT; fn_proto_val.str_size = 0;
+		fn_proto_val.data.numeric_value = (u64) fn_proto;
+		ActionVar fn_ctor_val; fn_ctor_val.type = ACTION_STACK_VALUE_FUNCTION; fn_ctor_val.str_size = 0;
+		fn_ctor_val.data.numeric_value = (u64) fn_ctor;
+
+		for (int ci = 0; ci < num_all_ctors; ci++)
+		{
+			ASFunction* ctor = all_ctors[ci];
+			if (ctor == NULL) continue;
+			if (ctor->name[0] == '\0') continue; // uninitialized
+
+			// Ensure own_props exists
+			if (ctor->own_props == NULL) {
+				ctor->own_props = allocObject(app_context, 8);
+				retainObject(ctor->own_props);
 			}
+
+			// Ensure prototype_obj exists (lazily create like GetMember does)
+			if (ctor->prototype_obj == NULL) {
+				ctor->prototype_obj = allocObject(app_context, 4);
+				retainObject(ctor->prototype_obj);
+				setObjectProto(app_context, ctor->prototype_obj);
+				ActionVar ctor_var = {0};
+				ctor_var.type = ACTION_STACK_VALUE_FUNCTION;
+				ctor_var.data.numeric_value = (u64) ctor;
+				setPropertyWithFlags(app_context, ctor->prototype_obj, "constructor", 11, &ctor_var, PROPERTY_FLAGS_DONTENUM);
+			}
+
+			// Registration order: prototype, constructor, __proto__
+			// (LIFO enumeration means last registered = first in for-in,
+			// and expected order is: __proto__, constructor, prototype)
+
+			// Set prototype → prototype_obj (DONT_ENUM, if not already set)
+			if (getProperty(ctor->own_props, "prototype", 9) == NULL) {
+				ActionVar proto_val; proto_val.type = ACTION_STACK_VALUE_OBJECT; proto_val.str_size = 0;
+				proto_val.data.numeric_value = (u64) ctor->prototype_obj;
+				setPropertyWithFlags(app_context, ctor->own_props, "prototype", 9, &proto_val, PROPERTY_FLAGS_DONTENUM);
+			}
+
+			// Set constructor → Function constructor (if not already set)
+			if (getProperty(ctor->own_props, "constructor", 11) == NULL)
+				setProperty(app_context, ctor->own_props, "constructor", 11, &fn_ctor_val);
+
+			// Set __proto__ → Function.prototype (if not already set)
+			if (getProperty(ctor->own_props, "__proto__", 9) == NULL)
+				setProperty(app_context, ctor->own_props, "__proto__", 9, &fn_proto_val);
 		}
 	}
 }
@@ -26425,7 +26521,9 @@ void actionEnumerate2(SWFAppContext* app_context, char* str_buffer)
 	}
 	else if (obj_var.type == ACTION_STACK_VALUE_FUNCTION)
 	{
-		// Function enumeration — enumerate own_props
+		// Function enumeration — enumerate own_props only (no prototype chain walking).
+		// In Flash, for-in on a function only shows own properties, not inherited ones.
+		// (Unlike objects which walk __proto__ chain.)
 		ASFunction* func = (ASFunction*) obj_var.data.numeric_value;
 		if (func != NULL && func->own_props != NULL)
 		{
@@ -26433,7 +26531,9 @@ void actionEnumerate2(SWFAppContext* app_context, char* str_buffer)
 			for (u32 i = 0; i < obj->num_used; i++)
 			{
 				if (!(obj->properties[i].flags & PROPERTY_FLAG_ENUMERABLE))
+				{
 					continue;
+				}
 				PUSH_STR((char*)obj->properties[i].name, obj->properties[i].name_length);
 			}
 		}
@@ -45545,14 +45645,19 @@ static int mc_get_pixel_aabb_ng(MovieClip* mc, float* x1, float* y1, float* x2, 
 		bymax = (float)tf_ymax / 20.0f;
 		has_bounds = 1;
 	}
-	// Dynamic text field bounds from _width/_height properties
-	if (!has_bounds && mc->ng_textfield_idx == -2 && mc->dynamic_props != NULL) {
-		ActionVar* wp = getProperty((ASObject*)mc->dynamic_props, "_width", 6);
-		ActionVar* hp = getProperty((ASObject*)mc->dynamic_props, "_height", 7);
-		if (wp != NULL && hp != NULL) {
+	// Dynamic text field bounds from struct width/height or _width/_height properties
+	if (!has_bounds && mc->ng_textfield_idx == -2) {
+		float w = mc->width, h = mc->height;
+		if (mc->dynamic_props != NULL) {
+			ActionVar* wp = getProperty((ASObject*)mc->dynamic_props, "_width", 6);
+			ActionVar* hp = getProperty((ASObject*)mc->dynamic_props, "_height", 7);
+			if (wp != NULL) w = (float)varToDouble(wp);
+			if (hp != NULL) h = (float)varToDouble(hp);
+		}
+		if (w > 0 || h > 0) {
 			bxmin = 0; bymin = 0;
-			bxmax = (float)varToDouble(wp);
-			bymax = (float)varToDouble(hp);
+			bxmax = w;
+			bymax = h;
 			has_bounds = 1;
 		}
 	}

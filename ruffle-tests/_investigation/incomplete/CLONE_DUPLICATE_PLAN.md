@@ -1,23 +1,23 @@
 # Clone/Duplicate MovieClip Implementation Plan
 <!-- TESTS: duplicate_movie_clip, clone_sprite_types, clone_sprite_edittext, clone_sprite_edittext_dynamic, duplicate_movie_clip_drawing, clip_events, clip_event_propagation_order, on_construct -->
 
-Last updated: 2026-02-27
+Last updated: 2026-03-13
 
 ## Overview
 
-Clone/Duplicate MovieClip covers 5 failing Ruffle tests. The core feature is `ActionCloneSprite` (opcode 0x24), which duplicates an existing display list object, giving the copy a new name and depth. The AS2 method wrapper is `MovieClip.duplicateMovieClip(name, depth, initObj)`.
+Clone/Duplicate MovieClip covers 8 Ruffle tests. The core feature is `ActionCloneSprite` (opcode 0x24), which duplicates an existing display list object, giving the copy a new name and depth. The AS2 method wrapper is `MovieClip.duplicateMovieClip(name, depth, initObj)`.
 
-**Current state (as of 2026-03-07)**:
-- `duplicate_movie_clip` (21/21) ✅ — DONE
-- `clone_sprite_types` (25/25) ✅ — DONE
-- `clone_sprite_edittext` (26/94) — BLOCKED: TextField clone init + position reading (improved from ~0)
-- `clone_sprite_edittext_dynamic` (52/86) — BLOCKED: same (improved from ~0)
-- `duplicate_movie_clip_drawing` (2 lines off) — DEFERRED: needs Drawing API _width/_height from drawn content
-- `clip_events` ✅ — PASS (fixed by prior commits)
-- `clip_event_propagation_order` (0/17) — BLOCKED: needs recursive clip event dispatch (parent→child propagation order)
-- `on_construct` (25/25) ✅ — DONE (RegisterClass prototype setup + on(construct) event dispatch)
+**Current state (2026-03-13)**:
+- `duplicate_movie_clip` ✅ — **PASS**
+- `clone_sprite_types` ✅ — **PASS**
+- `duplicate_movie_clip_drawing` ✅ — **PASS** (was deferred, now fixed)
+- `clip_events` ✅ — **PASS**
+- `on_construct` ✅ — **PASS**
+- `clone_sprite_edittext` (~26/94) — BLOCKED: TextField clone property accessors
+- `clone_sprite_edittext_dynamic` (~52/86) — BLOCKED: same
+- `clip_event_propagation_order` (0/17) — Covered by MOVIECLIP_PLAN Phase 10
 
-**4/8 PASS.** Phase 1 is fully complete. Phase 2 is blocked on TextField clone infrastructure (clone_sprite_edittext/dynamic have improved significantly but still failing). `clip_event_propagation_order` blocked on clip event parent→child propagation ordering.
+**5/8 PASS.** Phase 1 is fully complete. Phase 2 is blocked on TextField property accessors for cloned instances.
 
 **Key implementation notes discovered during Phase 1**:
 - `duplicateMovieClip` registers clones via `setVariableByName` so `GetVariable("clip")` works

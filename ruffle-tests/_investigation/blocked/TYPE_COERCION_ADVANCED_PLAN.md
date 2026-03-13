@@ -1,9 +1,9 @@
 # Advanced Type Coercion / instanceof Plan
 <!-- TESTS: coerce_to_object_monkeypatch, instanceof_coercions -->
 
-Last updated: 2026-03-05
+Last updated: 2026-03-13
 
-## Status: PARTIALLY BLOCKED — closure variable capture prevents full coerce_to_object_monkeypatch pass
+## Status: BLOCKED — 1/2 PASS, remaining test blocked on heap-allocated activation scopes
 
 ### Overview
 
@@ -13,7 +13,7 @@ Two tests exercise advanced type system edge cases: primitive-to-object automati
 
 | Test | Lines | Before | After | Status |
 |------|-------|--------|-------|--------|
-| instanceof_coercions | 88 | ~12/88 (14%) | 86/88 (97.7%) | Near-pass (2 edge cases) |
+| instanceof_coercions | 88 | ~12/88 (14%) | **88/88 PASS** | Fixed (was 86/88) |
 | coerce_to_object_monkeypatch | 129 | ~7/129 (5%) | Blocked | Closure capture blocker |
 
 ### What Was Implemented
