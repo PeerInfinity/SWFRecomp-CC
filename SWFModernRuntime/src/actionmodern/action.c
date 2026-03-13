@@ -2322,6 +2322,100 @@ static void init_isNaN_isFinite(void)
 	g_isNaN_isFinite_init = 1;
 }
 
+// --- Global function stubs for _global registration ---
+// These are stub ASFunction objects so that for-in on _global can enumerate them.
+// Many of these functions are actually handled inline in actionCallFunction,
+// but we need ASFunction objects for property enumeration tests.
+
+static ActionVar builtin_noop_func(SWFAppContext* app_context, ActionVar* args, u32 arg_count, ActionVar* registers, void* this_obj)
+{
+	(void)app_context; (void)args; (void)arg_count; (void)registers; (void)this_obj;
+	ActionVar r = {0}; r.type = ACTION_STACK_VALUE_UNDEFINED; return r;
+}
+
+// Wrapper for trace — prints first arg
+static ActionVar builtin_trace_func2(SWFAppContext* app_context, ActionVar* args, u32 arg_count, ActionVar* registers, void* this_obj)
+{
+	(void)registers; (void)this_obj;
+	if (arg_count > 0) {
+		char buf[4096];
+		int len = varToStringBuf(app_context, &args[0], buf, sizeof(buf));
+		if (len > 0) printf("%.*s\n", len, buf);
+		else printf("undefined\n");
+	} else {
+		printf("undefined\n");
+	}
+	ActionVar r = {0}; r.type = ACTION_STACK_VALUE_UNDEFINED; return r;
+}
+
+// All missing global function stubs
+static ASFunction g_escape_func;
+static ASFunction g_unescape_func;
+static ASFunction g_parseInt_func;
+static ASFunction g_parseFloat_func;
+static ASFunction g_trace_func;
+static ASFunction g_updateAfterEvent_func;
+static ASFunction g_showRedrawRegions_func;
+static ASFunction g_addRequestHeader_func;
+static ASFunction g_clearRequestHeaders_func;
+static ASFunction g_setInterval_func;
+static ASFunction g_clearInterval_func;
+static ASFunction g_setTimeout_func;
+static ASFunction g_clearTimeout_func;
+static ASFunction g_asconstructor_func;
+static ASFunction g_enableDebugConsole_func;
+static ASFunction g_ASSetNative_func;
+static ASFunction g_ASSetNativeAccessor_func;
+// Stub constructors for missing globals
+static ASFunction g_remoteLSOUsage_ctor;
+static ASFunction g_assetCache_ctor;
+static ASFunction g_asSetupError_ctor;
+static int g_global_funcs_init = 0;
+
+static void init_global_funcs(void)
+{
+	if (g_global_funcs_init) return;
+	struct { ASFunction* func; const char* name; Function2Ptr impl; } entries[] = {
+		{&g_escape_func, "escape", (Function2Ptr)builtin_noop_func},
+		{&g_unescape_func, "unescape", (Function2Ptr)builtin_noop_func},
+		{&g_parseInt_func, "parseInt", (Function2Ptr)builtin_noop_func},
+		{&g_parseFloat_func, "parseFloat", (Function2Ptr)builtin_noop_func},
+		{&g_trace_func, "trace", (Function2Ptr)builtin_trace_func2},
+		{&g_updateAfterEvent_func, "updateAfterEvent", (Function2Ptr)builtin_noop_func},
+		{&g_showRedrawRegions_func, "showRedrawRegions", (Function2Ptr)builtin_noop_func},
+		{&g_addRequestHeader_func, "addRequestHeader", (Function2Ptr)builtin_noop_func},
+		{&g_clearRequestHeaders_func, "clearRequestHeaders", (Function2Ptr)builtin_noop_func},
+		{&g_setInterval_func, "setInterval", (Function2Ptr)builtin_noop_func},
+		{&g_clearInterval_func, "clearInterval", (Function2Ptr)builtin_noop_func},
+		{&g_setTimeout_func, "setTimeout", (Function2Ptr)builtin_noop_func},
+		{&g_clearTimeout_func, "clearTimeout", (Function2Ptr)builtin_noop_func},
+		{&g_asconstructor_func, "ASconstructor", (Function2Ptr)builtin_noop_func},
+		{&g_enableDebugConsole_func, "enableDebugConsole", (Function2Ptr)builtin_noop_func},
+		{&g_ASSetNative_func, "ASSetNative", (Function2Ptr)builtin_noop_func},
+		{&g_ASSetNativeAccessor_func, "ASSetNativeAccessor", (Function2Ptr)builtin_noop_func},
+		{&g_remoteLSOUsage_ctor, "RemoteLSOUsage", (Function2Ptr)builtin_noop_func},
+		{&g_assetCache_ctor, "AssetCache", (Function2Ptr)builtin_noop_func},
+		{&g_asSetupError_ctor, "AsSetupError", (Function2Ptr)builtin_noop_func},
+	};
+	for (int i = 0; i < (int)(sizeof(entries)/sizeof(entries[0])); i++) {
+		memset(entries[i].func, 0, sizeof(ASFunction));
+		strncpy(entries[i].func->name, entries[i].name, 255);
+		entries[i].func->function_type = 2;
+		entries[i].func->advanced_func = entries[i].impl;
+	}
+	// RemoteLSOUsage, AssetCache, AsSetupError are constructors (type 1)
+	g_remoteLSOUsage_ctor.function_type = 1;
+	g_assetCache_ctor.function_type = 1;
+	g_asSetupError_ctor.function_type = 1;
+	g_global_funcs_init = 1;
+}
+
+// File-scope statics for System and flash objects (moved from actionGetVariable lazy init)
+static ASObject* g_system_object = NULL;
+static ASObject* g_flash_object = NULL;
+static ASObject* g_soundcodec_obj = NULL;
+static ASObject* g_textrenderer_obj = NULL;
+
 // --- ASSetPropFlags (Function2Ptr callable via both CallFunction and CallMethod) ---
 static ActionVar actionASSetPropFlags_func2(SWFAppContext* app_context, ActionVar* args, u32 num_args, ActionVar* registers, void* this_obj)
 {
@@ -4513,6 +4607,9 @@ static ASObject* getObjectPrototype(SWFAppContext* app_context)
 		vo_var.data.numeric_value = (u64) &g_object_valueOf_func;
 		setProperty(app_context, g_object_prototype, "valueOf", 7, &vo_var);
 
+		// SWF6+ methods on Object.prototype (VERSION_6 in Ruffle):
+		// hasOwnProperty, isPropertyEnumerable, isPrototypeOf, watch, unwatch, addProperty
+		if (g_swf_version >= 6) {
 		// Set up the built-in hasOwnProperty function (type-2: needs this_obj + args)
 		memset(&g_object_hasOwnProperty_func, 0, sizeof(ASFunction));
 		strncpy(g_object_hasOwnProperty_func.name, "hasOwnProperty", 255);
@@ -4609,6 +4706,7 @@ static ASObject* getObjectPrototype(SWFAppContext* app_context)
 		addprop_var.str_size = 0;
 		addprop_var.data.numeric_value = (u64) &g_object_addProperty_func;
 		setProperty(app_context, g_object_prototype, "addProperty", 11, &addprop_var);
+		} // end if (g_swf_version >= 6)
 
 		// Mark all built-in Object.prototype properties as non-enumerable (DontEnum)
 		for (u32 i = 0; i < g_object_prototype->num_used; i++)
@@ -21529,38 +21627,33 @@ static void ensureGlobalInit(SWFAppContext* app_context)
 
 	if (global_object == NULL)
 	{
-		global_object = allocObject(app_context, 64);
+		global_object = allocObject(app_context, 128);
 	}
 
-	// ---- Existing built-in constructors (Object, Array, String, Number, Boolean, Function) ----
-	// Function constructor is SWF6+ only
+	// ========== PHASE A: Initialize all constructors, prototypes, objects ==========
+	// (no setProperty on global_object here — registration order is in Phase B)
+
+	// ---- Core constructors (Object, Array, String, Number, Boolean, Function) ----
 	static ASFunction g_ctors[6];
 	static ASFunction g_registerClass_func_global;
 	memset(g_ctors, 0, sizeof(g_ctors));
 	const char* ctor_names[] = {"Object", "Array", "String", "Number", "Boolean", "Function"};
-	int ctor_name_lens[] = {6, 5, 6, 6, 7, 8};
 	int num_ctors = (g_swf_version >= 6) ? 6 : 5;
 	for (int ci = 0; ci < num_ctors; ci++)
 	{
 		strncpy(g_ctors[ci].name, ctor_names[ci], 255);
 		g_ctors[ci].function_type = 1;
-		ActionVar cv = {0};
-		cv.type = ACTION_STACK_VALUE_FUNCTION;
-		cv.data.numeric_value = (u64)&g_ctors[ci];
-		setProperty(app_context, global_object, ctor_names[ci], ctor_name_lens[ci], &cv);
 	}
-	// Set up Object constructor's own_props with registerClass and prototype
 	g_ctors[0].prototype_obj = getObjectPrototype(app_context);
 	g_ctors[0].own_props = allocObject(app_context, 4);
 	retainObject(g_ctors[0].own_props);
-	// __proto__ set to Function.prototype at end of ensureGlobalInit
 	registerGeomMethod(&g_registerClass_func_global, "registerClass",
 		(Function2Ptr)actionObjectRegisterClass, app_context,
 		g_ctors[0].own_props);
 
 	// ---- MovieClip ----
 	initMovieClipPrototype(app_context);
-	if (g_swf_version >= 6) {
+	{
 		ActionVar mc_cv = {0};
 		mc_cv.type = ACTION_STACK_VALUE_FUNCTION;
 		mc_cv.data.numeric_value = (u64)&g_movieclip_constructor;
@@ -21569,7 +21662,7 @@ static void ensureGlobalInit(SWFAppContext* app_context)
 
 	// ---- TextField ----
 	initTextFieldPrototype(app_context);
-	if (g_swf_version >= 6) {
+	{
 		ActionVar tf_cv = {0};
 		tf_cv.type = ACTION_STACK_VALUE_FUNCTION;
 		tf_cv.data.numeric_value = (u64)&g_textfield_constructor;
@@ -21578,103 +21671,49 @@ static void ensureGlobalInit(SWFAppContext* app_context)
 
 	// ---- TextFormat ----
 	initTextFormatPrototype(app_context);
-	{
-		ActionVar tfmt_cv = {0};
-		tfmt_cv.type = ACTION_STACK_VALUE_FUNCTION;
-		tfmt_cv.data.numeric_value = (u64)&g_textformat_constructor;
-		setProperty(app_context, global_object, "TextFormat", 10, &tfmt_cv);
-	}
-
-	// ---- XML and XMLNode ----
 	initXMLPrototype(app_context);
-	{
-		ActionVar xml_cv = {0};
-		xml_cv.type = ACTION_STACK_VALUE_FUNCTION;
-		xml_cv.data.numeric_value = (u64)&g_xml_constructor;
-		setProperty(app_context, global_object, "XML", 3, &xml_cv);
-	}
-	{
-		ActionVar xmln_cv = {0};
-		xmln_cv.type = ACTION_STACK_VALUE_FUNCTION;
-		xmln_cv.data.numeric_value = (u64)&g_xmlnode_constructor;
-		setProperty(app_context, global_object, "XMLNode", 7, &xmln_cv);
-	}
-
-	// ---- Math ----
 	initMathObject(app_context);
 	setObjectProto(app_context, g_math_object);
-	{
-		ActionVar math_cv = {0};
-		math_cv.type = ACTION_STACK_VALUE_OBJECT;
-		math_cv.data.numeric_value = (u64)g_math_object;
-		setProperty(app_context, global_object, "Math", 4, &math_cv);
-	}
-
-	// ---- Date ----
 	initDatePrototype(app_context);
+
+	// ---- Error constructor ----
+	static ASFunction g_error_ctor;
+	static int g_error_init = 0;
+	if (!g_error_init)
 	{
-		ActionVar date_cv = {0};
-		date_cv.type = ACTION_STACK_VALUE_FUNCTION;
-		date_cv.data.numeric_value = (u64)&g_date_constructor;
-		setProperty(app_context, global_object, "Date", 4, &date_cv);
+		memset(&g_error_ctor, 0, sizeof(ASFunction));
+		strncpy(g_error_ctor.name, "Error", 255);
+		g_error_ctor.function_type = 1;
+		g_error_init = 1;
 	}
 
-	// ---- Error ----
+	// ---- ASSetPropFlags ----
+	static ASFunction g_aspf_func;
+	static int g_aspf_init = 0;
+	if (!g_aspf_init)
 	{
-		static ASFunction g_error_ctor;
-		static int g_error_init = 0;
-		if (!g_error_init)
-		{
-			memset(&g_error_ctor, 0, sizeof(ASFunction));
-			strncpy(g_error_ctor.name, "Error", 255);
-			g_error_ctor.function_type = 1;
-			g_error_init = 1;
-		}
-		ActionVar ev = {0};
-		ev.type = ACTION_STACK_VALUE_FUNCTION;
-		ev.data.numeric_value = (u64)&g_error_ctor;
-		setProperty(app_context, global_object, "Error", 5, &ev);
+		memset(&g_aspf_func, 0, sizeof(ASFunction));
+		strncpy(g_aspf_func.name, "ASSetPropFlags", 255);
+		g_aspf_func.function_type = 2;
+		g_aspf_func.advanced_func = actionASSetPropFlags_func2;
+		g_aspf_init = 1;
 	}
 
-	// ---- ASSetPropFlags (global function — callable via both CallFunction and CallMethod) ----
+	// ---- ASnative ----
+	static ASFunction g_asnative_func;
+	static int g_asnative_init = 0;
+	if (!g_asnative_init)
 	{
-		static ASFunction g_aspf_func;
-		static int g_aspf_init = 0;
-		if (!g_aspf_init)
-		{
-			memset(&g_aspf_func, 0, sizeof(ASFunction));
-			strncpy(g_aspf_func.name, "ASSetPropFlags", 255);
-			g_aspf_func.function_type = 2;
-			g_aspf_func.advanced_func = actionASSetPropFlags_func2;
-			g_aspf_init = 1;
-		}
-		ActionVar aspf_var = {0};
-		aspf_var.type = ACTION_STACK_VALUE_FUNCTION;
-		aspf_var.data.numeric_value = (u64)&g_aspf_func;
-		setProperty(app_context, global_object, "ASSetPropFlags", 14, &aspf_var);
+		memset(&g_asnative_func, 0, sizeof(ASFunction));
+		strncpy(g_asnative_func.name, "ASnative", 255);
+		g_asnative_func.function_type = 2;
+		g_asnative_func.advanced_func = (Function2Ptr)builtin_asnative;
+		if (function_count < MAX_FUNCTIONS)
+			function_registry[function_count++] = &g_asnative_func;
+		g_asnative_init = 1;
 	}
 
-	// ---- ASnative (global function) ----
-	{
-		static ASFunction g_asnative_func;
-		static int g_asnative_init = 0;
-		if (!g_asnative_init)
-		{
-			memset(&g_asnative_func, 0, sizeof(ASFunction));
-			strncpy(g_asnative_func.name, "ASnative", 255);
-			g_asnative_func.function_type = 2;
-			g_asnative_func.advanced_func = (Function2Ptr)builtin_asnative;
-			if (function_count < MAX_FUNCTIONS)
-				function_registry[function_count++] = &g_asnative_func;
-			g_asnative_init = 1;
-		}
-		ActionVar an_var = {0};
-		an_var.type = ACTION_STACK_VALUE_FUNCTION;
-		VAL(u64, &an_var.data.numeric_value) = (u64)&g_asnative_func;
-		setProperty(app_context, global_object, "ASnative", 8, &an_var);
-	}
-
-	// ---- Stub constructors (function type with prototype) ----
+	// ---- Initialize stub constructors (don't register on _global yet) ----
 	{
 		static const char* stub_names[NUM_STUB_CTORS] = {
 			"AsBroadcaster", "Button", "Camera", "Color",
@@ -21683,212 +21722,175 @@ static void ensureGlobalInit(SWFAppContext* app_context)
 			"NetConnection", "NetStream", "PrintJob", "SharedObject",
 			"Sound", "TextSnapshot", "Video", "XMLSocket"
 		};
-		static const int stub_name_lens[NUM_STUB_CTORS] = {
-			13, 6, 6, 5,
-			11, 15, 8,
-			15, 10, 15,
-			13, 9, 8, 12,
-			5, 12, 5, 9
-		};
 		for (int i = 0; i < NUM_STUB_CTORS; i++)
 		{
-			// Button constructor is SWF7+ only (SWF5/6 don't expose it)
-			if (strcmp(stub_names[i], "Button") == 0 && g_swf_version < 7)
-				continue;
 			memset(&g_stub_ctors[i], 0, sizeof(ASFunction));
 			strncpy(g_stub_ctors[i].name, stub_names[i], 255);
 			g_stub_ctors[i].function_type = 1;
-			// prototype_obj is lazily created on first .prototype access
-			ActionVar sv = {0};
-			sv.type = ACTION_STACK_VALUE_FUNCTION;
-			sv.data.numeric_value = (u64)&g_stub_ctors[i];
-			setProperty(app_context, global_object, stub_names[i], stub_name_lens[i], &sv);
 		}
 	}
 
-	// ---- Static global objects (typeof = "object", inherit Object.prototype) ----
+	// ---- Static global objects (Accessibility, Key, Mouse, Selection, Stage) ----
+	g_accessibility_obj = allocObject(app_context, 8);
+	g_key_obj = allocObject(app_context, 32);
+	g_mouse_obj = allocObject(app_context, 16);
+	g_selection_obj = allocObject(app_context, 16);
+	g_stage_obj = allocObject(app_context, 24);
+	setObjectProto(app_context, g_accessibility_obj);
+	setObjectProto(app_context, g_key_obj);
+	setObjectProto(app_context, g_mouse_obj);
+	setObjectProto(app_context, g_selection_obj);
+	setObjectProto(app_context, g_stage_obj);
+
+	// Native static objects always trace as "[object Object]" regardless of SWF version
+	installNativeToString(app_context, g_accessibility_obj);
+	installNativeToString(app_context, g_key_obj);
+	installNativeToString(app_context, g_mouse_obj);
+	installNativeToString(app_context, g_selection_obj);
+	installNativeToString(app_context, g_stage_obj);
+
+	// Install AsBroadcaster methods on Mouse, Key, Stage, Selection
+	installAsBroadcaster(app_context, g_mouse_obj);
+	installAsBroadcaster(app_context, g_key_obj);
+	installKeyMethods(app_context, g_key_obj);
+	installAsBroadcaster(app_context, g_stage_obj);
+	// Stage default properties (READ_ONLY)
 	{
-		g_accessibility_obj = allocObject(app_context, 4);
-		g_key_obj = allocObject(app_context, 16);
-		g_mouse_obj = allocObject(app_context, 16);
-		g_selection_obj = allocObject(app_context, 16);
-		g_stage_obj = allocObject(app_context, 16);
+		ActionVar sv;
+		#define STAGE_RO (PROPERTY_FLAG_ENUMERABLE | PROPERTY_FLAG_CONFIGURABLE)
+		sv = makeStringActionVar(app_context, "", 0);
+		setPropertyWithFlags(app_context, g_stage_obj, "align", 5, &sv, STAGE_RO);
+		sv = makeStringActionVar(app_context, "showAll", 7);
+		setPropertyWithFlags(app_context, g_stage_obj, "scaleMode", 9, &sv, STAGE_RO);
+		sv = makeF64(0.0); // height
+		setPropertyWithFlags(app_context, g_stage_obj, "height", 6, &sv, STAGE_RO);
+		sv = makeF64(0.0); // width
+		setPropertyWithFlags(app_context, g_stage_obj, "width", 5, &sv, STAGE_RO);
+		sv = makeStringActionVar(app_context, "normal", 6);
+		setPropertyWithFlags(app_context, g_stage_obj, "displayState", 12, &sv, STAGE_RO);
+		ActionVar bv = {0};
+		bv.type = ACTION_STACK_VALUE_BOOLEAN;
+		bv.data.numeric_value = 1;
+		setPropertyWithFlags(app_context, g_stage_obj, "showMenu", 8, &bv, STAGE_RO);
+		// Additional Stage properties
+		sv = makeF64(0.0);
+		setPropertyWithFlags(app_context, g_stage_obj, "fullScreenHeight", 16, &sv, STAGE_RO);
+		sv = makeF64(0.0);
+		setPropertyWithFlags(app_context, g_stage_obj, "fullScreenWidth", 15, &sv, STAGE_RO);
+		bv.data.numeric_value = 0;
+		setPropertyWithFlags(app_context, g_stage_obj, "wmodeGPU", 8, &bv, STAGE_RO);
+		ActionVar nv = {0};
+		nv.type = ACTION_STACK_VALUE_NULL;
+		setPropertyWithFlags(app_context, g_stage_obj, "fullScreenSourceRect", 20, &nv, STAGE_RO);
+		#undef STAGE_RO
+	}
+	installAsBroadcaster(app_context, g_selection_obj);
 
-		struct { const char* name; int len; ASObject* obj; } objs[] = {
-			{"Accessibility", 13, g_accessibility_obj},
-			{"Key", 3, g_key_obj},
-			{"Mouse", 5, g_mouse_obj},
-			{"Selection", 9, g_selection_obj},
-			{"Stage", 5, g_stage_obj},
-		};
-		for (int i = 0; i < 5; i++)
-		{
-			setObjectProto(app_context, objs[i].obj);
-			ActionVar ov = {0};
-			ov.type = ACTION_STACK_VALUE_OBJECT;
-			ov.data.numeric_value = (u64)objs[i].obj;
-			setProperty(app_context, global_object, objs[i].name, objs[i].len, &ov);
-		}
-
-		// Native static objects always trace as "[object Object]" regardless of SWF version
-		installNativeToString(app_context, g_accessibility_obj);
-		installNativeToString(app_context, g_key_obj);
-		installNativeToString(app_context, g_mouse_obj);
-		installNativeToString(app_context, g_selection_obj);
-		installNativeToString(app_context, g_stage_obj);
-
-		// Install AsBroadcaster methods on Mouse, Key, Stage, Selection
-		installAsBroadcaster(app_context, g_mouse_obj);
-		installAsBroadcaster(app_context, g_key_obj);
-		installKeyMethods(app_context, g_key_obj);
-		installAsBroadcaster(app_context, g_stage_obj);
-		// Stage default properties
-		{
-			ActionVar sv;
-			sv = makeStringActionVar(app_context, "", 0);
-			setProperty(app_context, g_stage_obj, "align", 5, &sv);
-			sv = makeStringActionVar(app_context, "showAll", 7);
-			setProperty(app_context, g_stage_obj, "scaleMode", 9, &sv);
-			sv = makeStringActionVar(app_context, "normal", 6);
-			setProperty(app_context, g_stage_obj, "displayState", 12, &sv);
-#ifdef FRAME_WIDTH
-			sv = makeF64((double)FRAME_WIDTH);
-			setProperty(app_context, g_stage_obj, "width", 5, &sv);
-#endif
-#ifdef FRAME_HEIGHT
-			sv = makeF64((double)FRAME_HEIGHT);
-			setProperty(app_context, g_stage_obj, "height", 6, &sv);
-#endif
-			sv = makeStringActionVar(app_context, "HIGH", 4);
-			setProperty(app_context, g_stage_obj, "quality", 7, &sv);
-			ActionVar bv = {0};
-			bv.type = ACTION_STACK_VALUE_BOOLEAN;
-			bv.data.numeric_value = 1;
-			setProperty(app_context, g_stage_obj, "showMenu", 8, &bv);
-		}
-		installAsBroadcaster(app_context, g_selection_obj);
-
-		// Install Selection methods
+	// Install Selection methods
 #ifdef NO_GRAPHICS
-		{
-			static int sel_funcs_init = 0;
-			if (!sel_funcs_init) {
-				memset(&g_selection_setFocus_func, 0, sizeof(ASFunction));
-				strncpy(g_selection_setFocus_func.name, "setFocus", 255);
-				g_selection_setFocus_func.function_type = 2;
-				g_selection_setFocus_func.advanced_func = (Function2Ptr)builtin_selection_setFocus;
-				memset(&g_selection_getFocus_func, 0, sizeof(ASFunction));
-				strncpy(g_selection_getFocus_func.name, "getFocus", 255);
-				g_selection_getFocus_func.function_type = 2;
-				g_selection_getFocus_func.advanced_func = (Function2Ptr)builtin_selection_getFocus;
-				memset(&g_selection_getBeginIndex_func, 0, sizeof(ASFunction));
-				strncpy(g_selection_getBeginIndex_func.name, "getBeginIndex", 255);
-				g_selection_getBeginIndex_func.function_type = 2;
-				g_selection_getBeginIndex_func.advanced_func = (Function2Ptr)builtin_selection_getBeginIndex;
-				memset(&g_selection_getCaretIndex_func, 0, sizeof(ASFunction));
-				strncpy(g_selection_getCaretIndex_func.name, "getCaretIndex", 255);
-				g_selection_getCaretIndex_func.function_type = 2;
-				g_selection_getCaretIndex_func.advanced_func = (Function2Ptr)builtin_selection_getCaretIndex;
-				memset(&g_selection_getEndIndex_func, 0, sizeof(ASFunction));
-				strncpy(g_selection_getEndIndex_func.name, "getEndIndex", 255);
-				g_selection_getEndIndex_func.function_type = 2;
-				g_selection_getEndIndex_func.advanced_func = (Function2Ptr)builtin_selection_getEndIndex;
-				memset(&g_selection_setSelection_func, 0, sizeof(ASFunction));
-				strncpy(g_selection_setSelection_func.name, "setSelection", 255);
-				g_selection_setSelection_func.function_type = 2;
-				g_selection_setSelection_func.advanced_func = (Function2Ptr)builtin_selection_setSelection;
-				sel_funcs_init = 1;
-			}
-			ActionVar fv = {0};
-			fv.type = ACTION_STACK_VALUE_FUNCTION;
-			fv.data.numeric_value = (u64)&g_selection_setFocus_func;
-			setProperty(app_context, g_selection_obj, "setFocus", 8, &fv);
-			fv.data.numeric_value = (u64)&g_selection_getFocus_func;
-			setProperty(app_context, g_selection_obj, "getFocus", 8, &fv);
-			fv.data.numeric_value = (u64)&g_selection_getBeginIndex_func;
-			setProperty(app_context, g_selection_obj, "getBeginIndex", 13, &fv);
-			fv.data.numeric_value = (u64)&g_selection_getCaretIndex_func;
-			setProperty(app_context, g_selection_obj, "getCaretIndex", 13, &fv);
-			fv.data.numeric_value = (u64)&g_selection_getEndIndex_func;
-			setProperty(app_context, g_selection_obj, "getEndIndex", 11, &fv);
-			fv.data.numeric_value = (u64)&g_selection_setSelection_func;
-			setProperty(app_context, g_selection_obj, "setSelection", 12, &fv);
+	{
+		static int sel_funcs_init = 0;
+		if (!sel_funcs_init) {
+			memset(&g_selection_setFocus_func, 0, sizeof(ASFunction));
+			strncpy(g_selection_setFocus_func.name, "setFocus", 255);
+			g_selection_setFocus_func.function_type = 2;
+			g_selection_setFocus_func.advanced_func = (Function2Ptr)builtin_selection_setFocus;
+			memset(&g_selection_getFocus_func, 0, sizeof(ASFunction));
+			strncpy(g_selection_getFocus_func.name, "getFocus", 255);
+			g_selection_getFocus_func.function_type = 2;
+			g_selection_getFocus_func.advanced_func = (Function2Ptr)builtin_selection_getFocus;
+			memset(&g_selection_getBeginIndex_func, 0, sizeof(ASFunction));
+			strncpy(g_selection_getBeginIndex_func.name, "getBeginIndex", 255);
+			g_selection_getBeginIndex_func.function_type = 2;
+			g_selection_getBeginIndex_func.advanced_func = (Function2Ptr)builtin_selection_getBeginIndex;
+			memset(&g_selection_getCaretIndex_func, 0, sizeof(ASFunction));
+			strncpy(g_selection_getCaretIndex_func.name, "getCaretIndex", 255);
+			g_selection_getCaretIndex_func.function_type = 2;
+			g_selection_getCaretIndex_func.advanced_func = (Function2Ptr)builtin_selection_getCaretIndex;
+			memset(&g_selection_getEndIndex_func, 0, sizeof(ASFunction));
+			strncpy(g_selection_getEndIndex_func.name, "getEndIndex", 255);
+			g_selection_getEndIndex_func.function_type = 2;
+			g_selection_getEndIndex_func.advanced_func = (Function2Ptr)builtin_selection_getEndIndex;
+			memset(&g_selection_setSelection_func, 0, sizeof(ASFunction));
+			strncpy(g_selection_setSelection_func.name, "setSelection", 255);
+			g_selection_setSelection_func.function_type = 2;
+			g_selection_setSelection_func.advanced_func = (Function2Ptr)builtin_selection_setSelection;
+			sel_funcs_init = 1;
 		}
+		ActionVar fv = {0};
+		fv.type = ACTION_STACK_VALUE_FUNCTION;
+		fv.data.numeric_value = (u64)&g_selection_setFocus_func;
+		setProperty(app_context, g_selection_obj, "setFocus", 8, &fv);
+		fv.data.numeric_value = (u64)&g_selection_getFocus_func;
+		setProperty(app_context, g_selection_obj, "getFocus", 8, &fv);
+		fv.data.numeric_value = (u64)&g_selection_getBeginIndex_func;
+		setProperty(app_context, g_selection_obj, "getBeginIndex", 13, &fv);
+		fv.data.numeric_value = (u64)&g_selection_getCaretIndex_func;
+		setProperty(app_context, g_selection_obj, "getCaretIndex", 13, &fv);
+		fv.data.numeric_value = (u64)&g_selection_getEndIndex_func;
+		setProperty(app_context, g_selection_obj, "getEndIndex", 11, &fv);
+		fv.data.numeric_value = (u64)&g_selection_setSelection_func;
+		setProperty(app_context, g_selection_obj, "setSelection", 12, &fv);
+	}
 #endif
 
-		// Also install addListener/removeListener/broadcastMessage on AsBroadcaster itself
-		// and on MovieClipLoader.prototype (both are AsBroadcaster-initialized in Flash).
-		// This ensures AsBroadcaster.addListener === Mouse.addListener (same func pointer).
-		// Note: the test compares mcl.addListener (instance) vs ab.addListener (AsBroadcaster
-		// constructor), so MCL methods go on prototype_obj while AB methods go on own_props.
-		initAsBroadcasterFuncs(app_context);
-		{
-			ActionVar fv = {0};
-			fv.type = ACTION_STACK_VALUE_FUNCTION;
+	// AsBroadcaster own_props and MovieClipLoader prototype
+	initAsBroadcasterFuncs(app_context);
+	{
+		ActionVar fv = {0};
+		fv.type = ACTION_STACK_VALUE_FUNCTION;
 
-			// AsBroadcaster (stub_ctors[0]) — install on own_props so AsBroadcaster.addListener works
-			// All methods DONT_ENUM
-			if (g_stub_ctors[0].own_props == NULL) {
-				g_stub_ctors[0].own_props = allocObject(app_context, 6);
-				retainObject(g_stub_ctors[0].own_props);
-			}
-			fv.data.numeric_value = (u64)&g_ab_broadcastMessage_func;
-			setPropertyWithFlags(app_context, g_stub_ctors[0].own_props, "broadcastMessage", 16, &fv, PROPERTY_FLAG_WRITABLE);
-			fv.data.numeric_value = (u64)&g_ab_addListener_func;
-			setPropertyWithFlags(app_context, g_stub_ctors[0].own_props, "addListener", 11, &fv, PROPERTY_FLAG_WRITABLE);
-			fv.data.numeric_value = (u64)&g_ab_removeListener_func;
-			setPropertyWithFlags(app_context, g_stub_ctors[0].own_props, "removeListener", 14, &fv, PROPERTY_FLAG_WRITABLE);
-			// initialize
-			static ASFunction g_ab_initialize_func;
-			memset(&g_ab_initialize_func, 0, sizeof(ASFunction));
-			strncpy(g_ab_initialize_func.name, "initialize", 255);
-			g_ab_initialize_func.function_type = 2;
-			g_ab_initialize_func.advanced_func = (Function2Ptr) builtin_asbroadcaster_initialize;
-			if (function_count < MAX_FUNCTIONS) function_registry[function_count++] = &g_ab_initialize_func;
-			fv.data.numeric_value = (u64)&g_ab_initialize_func;
-			setPropertyWithFlags(app_context, g_stub_ctors[0].own_props, "initialize", 10, &fv, PROPERTY_FLAG_WRITABLE);
-
-			// MovieClipLoader (stub_ctors[9]) — pre-create prototype and install methods there
-			// so that MCL instances (var mcl = new MovieClipLoader()) inherit them.
-			// All methods DONT_ENUM
-			if (g_stub_ctors[9].prototype_obj == NULL) {
-				g_stub_ctors[9].prototype_obj = allocObject(app_context, 12);
-				retainObject(g_stub_ctors[9].prototype_obj);
-				setObjectProto(app_context, g_stub_ctors[9].prototype_obj);
-				ActionVar ctor_var = {0};
-				ctor_var.type = ACTION_STACK_VALUE_FUNCTION;
-				ctor_var.data.numeric_value = (u64)&g_stub_ctors[9];
-				setPropertyWithFlags(app_context, g_stub_ctors[9].prototype_obj, "constructor", 11, &ctor_var, PROPERTY_FLAGS_DONTENUM);
-			}
-			// MCL-specific methods: loadClip, unloadClip, getProgress (DONT_ENUM)
-			initMCLFuncs();
-			fv.data.numeric_value = (u64)&g_mcl_loadClip_func;
-			setPropertyWithFlags(app_context, g_stub_ctors[9].prototype_obj, "loadClip", 8, &fv, PROPERTY_FLAG_WRITABLE);
-			fv.data.numeric_value = (u64)&g_mcl_unloadClip_func;
-			setPropertyWithFlags(app_context, g_stub_ctors[9].prototype_obj, "unloadClip", 10, &fv, PROPERTY_FLAG_WRITABLE);
-			fv.data.numeric_value = (u64)&g_mcl_getProgress_func;
-			setPropertyWithFlags(app_context, g_stub_ctors[9].prototype_obj, "getProgress", 11, &fv, PROPERTY_FLAG_WRITABLE);
-			// AsBroadcaster methods on MCL prototype (DONT_ENUM)
-			fv.data.numeric_value = (u64)&g_ab_broadcastMessage_func;
-			setPropertyWithFlags(app_context, g_stub_ctors[9].prototype_obj, "broadcastMessage", 16, &fv, PROPERTY_FLAG_WRITABLE);
-			fv.data.numeric_value = (u64)&g_ab_addListener_func;
-			setPropertyWithFlags(app_context, g_stub_ctors[9].prototype_obj, "addListener", 11, &fv, PROPERTY_FLAG_WRITABLE);
-			fv.data.numeric_value = (u64)&g_ab_removeListener_func;
-			setPropertyWithFlags(app_context, g_stub_ctors[9].prototype_obj, "removeListener", 14, &fv, PROPERTY_FLAG_WRITABLE);
-			// _listeners array (DONT_ENUM)
-			ASObject* mcl_listeners = allocObject(app_context, 4);
-			retainObject(mcl_listeners);
-			ActionVar listeners_val = {0};
-			listeners_val.type = ACTION_STACK_VALUE_OBJECT;
-			listeners_val.data.numeric_value = (u64) mcl_listeners;
-			setPropertyWithFlags(app_context, g_stub_ctors[9].prototype_obj, "_listeners", 10, &listeners_val, PROPERTY_FLAG_WRITABLE);
+		if (g_stub_ctors[0].own_props == NULL) {
+			g_stub_ctors[0].own_props = allocObject(app_context, 6);
+			retainObject(g_stub_ctors[0].own_props);
 		}
+		fv.data.numeric_value = (u64)&g_ab_broadcastMessage_func;
+		setPropertyWithFlags(app_context, g_stub_ctors[0].own_props, "broadcastMessage", 16, &fv, PROPERTY_FLAG_WRITABLE);
+		fv.data.numeric_value = (u64)&g_ab_addListener_func;
+		setPropertyWithFlags(app_context, g_stub_ctors[0].own_props, "addListener", 11, &fv, PROPERTY_FLAG_WRITABLE);
+		fv.data.numeric_value = (u64)&g_ab_removeListener_func;
+		setPropertyWithFlags(app_context, g_stub_ctors[0].own_props, "removeListener", 14, &fv, PROPERTY_FLAG_WRITABLE);
+		static ASFunction g_ab_initialize_func;
+		memset(&g_ab_initialize_func, 0, sizeof(ASFunction));
+		strncpy(g_ab_initialize_func.name, "initialize", 255);
+		g_ab_initialize_func.function_type = 2;
+		g_ab_initialize_func.advanced_func = (Function2Ptr) builtin_asbroadcaster_initialize;
+		if (function_count < MAX_FUNCTIONS) function_registry[function_count++] = &g_ab_initialize_func;
+		fv.data.numeric_value = (u64)&g_ab_initialize_func;
+		setPropertyWithFlags(app_context, g_stub_ctors[0].own_props, "initialize", 10, &fv, PROPERTY_FLAG_WRITABLE);
+
+		// MovieClipLoader prototype
+		if (g_stub_ctors[9].prototype_obj == NULL) {
+			g_stub_ctors[9].prototype_obj = allocObject(app_context, 12);
+			retainObject(g_stub_ctors[9].prototype_obj);
+			setObjectProto(app_context, g_stub_ctors[9].prototype_obj);
+			ActionVar ctor_var = {0};
+			ctor_var.type = ACTION_STACK_VALUE_FUNCTION;
+			ctor_var.data.numeric_value = (u64)&g_stub_ctors[9];
+			setPropertyWithFlags(app_context, g_stub_ctors[9].prototype_obj, "constructor", 11, &ctor_var, PROPERTY_FLAGS_DONTENUM);
+		}
+		initMCLFuncs();
+		fv.data.numeric_value = (u64)&g_mcl_loadClip_func;
+		setPropertyWithFlags(app_context, g_stub_ctors[9].prototype_obj, "loadClip", 8, &fv, PROPERTY_FLAG_WRITABLE);
+		fv.data.numeric_value = (u64)&g_mcl_unloadClip_func;
+		setPropertyWithFlags(app_context, g_stub_ctors[9].prototype_obj, "unloadClip", 10, &fv, PROPERTY_FLAG_WRITABLE);
+		fv.data.numeric_value = (u64)&g_mcl_getProgress_func;
+		setPropertyWithFlags(app_context, g_stub_ctors[9].prototype_obj, "getProgress", 11, &fv, PROPERTY_FLAG_WRITABLE);
+		fv.data.numeric_value = (u64)&g_ab_broadcastMessage_func;
+		setPropertyWithFlags(app_context, g_stub_ctors[9].prototype_obj, "broadcastMessage", 16, &fv, PROPERTY_FLAG_WRITABLE);
+		fv.data.numeric_value = (u64)&g_ab_addListener_func;
+		setPropertyWithFlags(app_context, g_stub_ctors[9].prototype_obj, "addListener", 11, &fv, PROPERTY_FLAG_WRITABLE);
+		fv.data.numeric_value = (u64)&g_ab_removeListener_func;
+		setPropertyWithFlags(app_context, g_stub_ctors[9].prototype_obj, "removeListener", 14, &fv, PROPERTY_FLAG_WRITABLE);
+		ASObject* mcl_listeners = allocObject(app_context, 4);
+		retainObject(mcl_listeners);
+		ActionVar listeners_val = {0};
+		listeners_val.type = ACTION_STACK_VALUE_OBJECT;
+		listeners_val.data.numeric_value = (u64) mcl_listeners;
+		setPropertyWithFlags(app_context, g_stub_ctors[9].prototype_obj, "_listeners", 10, &listeners_val, PROPERTY_FLAG_WRITABLE);
 	}
 
 	// ---- Prototype setup for stub classes ----
-	// Index: 0=AsBroadcaster, 1=Button, 2=Camera, 3=Color, 4=ContextMenu, 5=ContextMenuItem,
-	// 6=LoadVars, 7=LocalConnection, 8=Microphone, 9=MovieClipLoader, 10=NetConnection,
-	// 11=NetStream, 12=PrintJob, 13=SharedObject, 14=Sound, 15=TextSnapshot, 16=Video, 17=XMLSocket
 	initAsBroadcasterPrototype(app_context, &g_stub_ctors[0]);
 	initButtonPrototype(app_context, &g_stub_ctors[1]);
 	initCameraPrototype(app_context, &g_stub_ctors[2]);
@@ -21898,7 +21900,6 @@ static void ensureGlobalInit(SWFAppContext* app_context)
 	initLoadVarsPrototype(app_context, &g_stub_ctors[6]);
 	initLocalConnectionPrototype(app_context, &g_stub_ctors[7]);
 	initMicrophonePrototype(app_context, &g_stub_ctors[8]);
-	// MovieClipLoader (stub_ctors[9]) — already initialized above with AsBroadcaster methods
 	initNetConnectionPrototype(app_context, &g_stub_ctors[10]);
 	initNetStreamPrototype(app_context, &g_stub_ctors[11]);
 	initPrintJobPrototype(app_context, &g_stub_ctors[12]);
@@ -21908,26 +21909,156 @@ static void ensureGlobalInit(SWFAppContext* app_context)
 	initVideoPrototype(app_context, &g_stub_ctors[16]);
 	initXMLSocketPrototype(app_context, &g_stub_ctors[17]);
 
-	// ---- isNaN / isFinite on _global ----
+	// ---- Initialize missing global function stubs ----
 	init_isNaN_isFinite();
-	{
-		ActionVar isnan_val = {0};
-		isnan_val.type = ACTION_STACK_VALUE_FUNCTION;
-		isnan_val.data.numeric_value = (u64)&g_isNaN_func;
-		setProperty(app_context, global_object, "isNaN", 5, &isnan_val);
+	init_global_funcs();
 
-		ActionVar isfin_val = {0};
-		isfin_val.type = ACTION_STACK_VALUE_FUNCTION;
-		isfin_val.data.numeric_value = (u64)&g_isFinite_func;
-		setProperty(app_context, global_object, "isFinite", 8, &isfin_val);
+	// ---- SoundCodec object ----
+	g_soundcodec_obj = allocObject(app_context, 4);
+	setObjectProto(app_context, g_soundcodec_obj);
+	{
+		ActionVar sv = makeStringActionVar(app_context, "Speex", 5);
+		setProperty(app_context, g_soundcodec_obj, "SPEEX", 5, &sv);
+		sv = makeStringActionVar(app_context, "NellyMoser", 10);
+		setProperty(app_context, g_soundcodec_obj, "NELLYMOSER", 10, &sv);
 	}
 
-	// ---- valueOf on _global ----
+	// ---- textRenderer (function with own_props) ----
 	{
-		ActionVar undef_val = {0};
-		undef_val.type = ACTION_STACK_VALUE_UNDEFINED;
-		setProperty(app_context, global_object, "valueOf", 7, &undef_val);
+		static ASFunction g_textrenderer_ctor;
+		static int g_tr_init = 0;
+		if (!g_tr_init) {
+			memset(&g_textrenderer_ctor, 0, sizeof(ASFunction));
+			strncpy(g_textrenderer_ctor.name, "textRenderer", 255);
+			g_textrenderer_ctor.function_type = 1;
+			g_textrenderer_ctor.own_props = NULL; // will be created below
+			g_tr_init = 1;
+		}
+		if (g_textrenderer_ctor.own_props == NULL) {
+			g_textrenderer_ctor.own_props = allocObject(app_context, 8);
+			retainObject(g_textrenderer_ctor.own_props);
+			setObjectProto(app_context, g_textrenderer_ctor.own_props);
+			ActionVar sv;
+			#define TR_RO (PROPERTY_FLAG_ENUMERABLE | PROPERTY_FLAG_CONFIGURABLE)
+			sv = makeStringActionVar(app_context, "normal", 6);
+			setPropertyWithFlags(app_context, g_textrenderer_ctor.own_props, "displayMode", 11, &sv, TR_RO);
+			sv = makeF64(0.0);
+			setPropertyWithFlags(app_context, g_textrenderer_ctor.own_props, "maxLevel", 8, &sv, TR_RO);
+			// setAdvancedAntialiasingTable method (writable)
+			static ASFunction g_tr_setAATable_func;
+			memset(&g_tr_setAATable_func, 0, sizeof(ASFunction));
+			strncpy(g_tr_setAATable_func.name, "setAdvancedAntialiasingTable", 255);
+			g_tr_setAATable_func.function_type = 2;
+			g_tr_setAATable_func.advanced_func = (Function2Ptr)builtin_noop_func;
+			ActionVar fv = {0};
+			fv.type = ACTION_STACK_VALUE_FUNCTION;
+			fv.data.numeric_value = (u64)&g_tr_setAATable_func;
+			setProperty(app_context, g_textrenderer_ctor.own_props, "setAdvancedAntialiasingTable", 28, &fv);
+			#undef TR_RO
+		}
+		g_textrenderer_obj = (ASObject*)&g_textrenderer_ctor; // used for registration
 	}
+
+	// ========== PHASE B: Register on global_object in correct LIFO order ==========
+	// First registered = last in for-in. Last registered = first in for-in.
+	// Target for-in order (first enumerated): TextSnapshot, PrintJob, MovieClipLoader,
+	// LocalConnection, textRenderer, flash, System, SoundCodec, Accessibility, Video,
+	// Stage, TextFormat, TextField, Button, Key, Mouse, Selection, LoadVars, XML, XMLNode,
+	// Sound, Math, Array, String, Date, Boolean, Number, (o=test var),
+	// clearRequestHeaders, addRequestHeader, showRedrawRegions, setTimeout, clearInterval,
+	// clearTimeout, setInterval, isFinite, isNaN, updateAfterEvent, trace, parseFloat,
+	// parseInt, unescape, escape, ASSetNativeAccessor, ASSetNative, ASSetPropFlags,
+	// RemoteLSOUsage, AssetCache, AsSetupError, Error, ContextMenu, ContextMenuItem,
+	// SharedObject, Microphone, Camera, NetStream, NetConnection, Color, AsBroadcaster,
+	// XMLSocket, MovieClip, Infinity, NaN, enableDebugConsole, Function, Object,
+	// ASconstructor, ASnative
+
+	#define REG_FUNC(name, namelen, funcptr) { \
+		ActionVar _v = {0}; _v.type = ACTION_STACK_VALUE_FUNCTION; \
+		_v.data.numeric_value = (u64)(funcptr); \
+		setProperty(app_context, global_object, name, namelen, &_v); }
+	#define REG_OBJ(name, namelen, objptr) { \
+		ActionVar _v = {0}; _v.type = ACTION_STACK_VALUE_OBJECT; \
+		_v.data.numeric_value = (u64)(objptr); \
+		setProperty(app_context, global_object, name, namelen, &_v); }
+
+	// Registration order: first registered → last in for-in
+	REG_FUNC("ASnative", 8, &g_asnative_func);
+	REG_FUNC("ASconstructor", 13, &g_asconstructor_func);
+	REG_FUNC("Object", 6, &g_ctors[0]);
+	if (g_swf_version >= 6) REG_FUNC("Function", 8, &g_ctors[5]);
+	REG_FUNC("enableDebugConsole", 18, &g_enableDebugConsole_func);
+	{ ActionVar _v = {0}; _v.type = ACTION_STACK_VALUE_F64;
+	  double nan_val = NAN; memcpy(&_v.data.numeric_value, &nan_val, sizeof(double));
+	  setProperty(app_context, global_object, "NaN", 3, &_v); }
+	{ ActionVar _v = {0}; _v.type = ACTION_STACK_VALUE_F64;
+	  double inf_val = INFINITY; memcpy(&_v.data.numeric_value, &inf_val, sizeof(double));
+	  setProperty(app_context, global_object, "Infinity", 8, &_v); }
+	REG_FUNC("MovieClip", 9, &g_movieclip_constructor);
+	REG_FUNC("XMLSocket", 9, &g_stub_ctors[17]);
+	REG_FUNC("AsBroadcaster", 13, &g_stub_ctors[0]);
+	REG_FUNC("Color", 5, &g_stub_ctors[3]);
+	REG_FUNC("NetConnection", 13, &g_stub_ctors[10]);
+	REG_FUNC("NetStream", 9, &g_stub_ctors[11]);
+	REG_FUNC("Camera", 6, &g_stub_ctors[2]);
+	REG_FUNC("Microphone", 10, &g_stub_ctors[8]);
+	REG_FUNC("SharedObject", 12, &g_stub_ctors[13]);
+	REG_FUNC("ContextMenuItem", 15, &g_stub_ctors[5]);
+	REG_FUNC("ContextMenu", 11, &g_stub_ctors[4]);
+	REG_FUNC("Error", 5, &g_error_ctor);
+	REG_FUNC("AsSetupError", 12, &g_asSetupError_ctor);
+	REG_FUNC("AssetCache", 10, &g_assetCache_ctor);
+	REG_FUNC("RemoteLSOUsage", 14, &g_remoteLSOUsage_ctor);
+	REG_FUNC("ASSetPropFlags", 14, &g_aspf_func);
+	REG_FUNC("ASSetNative", 11, &g_ASSetNative_func);
+	REG_FUNC("ASSetNativeAccessor", 19, &g_ASSetNativeAccessor_func);
+	REG_FUNC("escape", 6, &g_escape_func);
+	REG_FUNC("unescape", 8, &g_unescape_func);
+	REG_FUNC("parseInt", 8, &g_parseInt_func);
+	REG_FUNC("parseFloat", 10, &g_parseFloat_func);
+	REG_FUNC("trace", 5, &g_trace_func);
+	REG_FUNC("updateAfterEvent", 16, &g_updateAfterEvent_func);
+	REG_FUNC("isNaN", 5, &g_isNaN_func);
+	REG_FUNC("isFinite", 8, &g_isFinite_func);
+	REG_FUNC("setInterval", 11, &g_setInterval_func);
+	REG_FUNC("clearTimeout", 12, &g_clearTimeout_func);
+	REG_FUNC("clearInterval", 13, &g_clearInterval_func);
+	REG_FUNC("setTimeout", 10, &g_setTimeout_func);
+	REG_FUNC("showRedrawRegions", 17, &g_showRedrawRegions_func);
+	REG_FUNC("addRequestHeader", 16, &g_addRequestHeader_func);
+	REG_FUNC("clearRequestHeaders", 19, &g_clearRequestHeaders_func);
+	// (o is set by test code, not our registration)
+	REG_FUNC("Number", 6, &g_ctors[3]);
+	REG_FUNC("Boolean", 7, &g_ctors[4]);
+	REG_FUNC("Date", 4, &g_date_constructor);
+	REG_FUNC("String", 6, &g_ctors[2]);
+	REG_FUNC("Array", 5, &g_ctors[1]);
+	REG_OBJ("Math", 4, g_math_object);
+	REG_FUNC("Sound", 5, &g_stub_ctors[14]);
+	REG_FUNC("XMLNode", 7, &g_xmlnode_constructor);
+	REG_FUNC("XML", 3, &g_xml_constructor);
+	REG_FUNC("LoadVars", 8, &g_stub_ctors[6]);
+	REG_OBJ("Selection", 9, g_selection_obj);
+	REG_OBJ("Mouse", 5, g_mouse_obj);
+	REG_OBJ("Key", 3, g_key_obj);
+	REG_FUNC("Button", 6, &g_stub_ctors[1]);
+	REG_FUNC("TextField", 9, &g_textfield_constructor);
+	REG_FUNC("TextFormat", 10, &g_textformat_constructor);
+	REG_OBJ("Stage", 5, g_stage_obj);
+	REG_FUNC("Video", 5, &g_stub_ctors[16]);
+	REG_OBJ("Accessibility", 13, g_accessibility_obj);
+	REG_OBJ("SoundCodec", 10, g_soundcodec_obj);
+	// System and flash are registered here but fully initialized lazily on first access
+	// (their lazy init code in actionGetVariable will use these same static pointers)
+	REG_FUNC("LocalConnection", 15, &g_stub_ctors[7]);
+	REG_FUNC("MovieClipLoader", 15, &g_stub_ctors[9]);
+	REG_FUNC("PrintJob", 8, &g_stub_ctors[12]);
+	REG_FUNC("TextSnapshot", 12, &g_stub_ctors[15]);
+
+	// No valueOf on _global (Flash Player doesn't expose it as an own property)
+
+	#undef REG_FUNC
+	#undef REG_OBJ
 
 	g_global_init_done = 1;
 
@@ -21943,13 +22074,10 @@ static void ensureGlobalInit(SWFAppContext* app_context)
 		g_array_proto_modern = g_array_prototype;
 	}
 
-	// Create Function.prototype for the primary version group.
-	// Each version group has a distinct Function.prototype so that
-	// cross-group func.__proto__ === comparisons return false.
+	// Create Function.prototype for the primary version group
 	{
 		ASObject* fn_proto = allocObject(app_context, 4);
 		retainObject(fn_proto);
-		// Function.prototype.__proto__ = Object.prototype
 		ActionVar op_val; op_val.type = ACTION_STACK_VALUE_OBJECT; op_val.str_size = 0;
 		op_val.data.numeric_value = (u64) g_object_prototype;
 		setProperty(app_context, fn_proto, "__proto__", 9, &op_val);
@@ -21958,8 +22086,6 @@ static void ensureGlobalInit(SWFAppContext* app_context)
 		else
 			g_function_proto_modern = fn_proto;
 
-		// Set __proto__ on all constructors that have own_props to Function.prototype
-		// (replaces previous setObjectProto which pointed to Object.prototype)
 		for (int ci = 0; ci < 18; ci++) {
 			if (g_ctors[ci].own_props != NULL) {
 				ActionVar fp; fp.type = ACTION_STACK_VALUE_OBJECT; fp.str_size = 0;
@@ -22236,13 +22362,11 @@ static void ensureSecondaryGlobalInit(SWFAppContext* app_context, int target_ver
 			fv.data.numeric_value = (u64)sec_extra_ctors[i];
 			setProperty(app_context, sec_global, ctor_names[i], ctor_name_lens[i], &fv);
 		}
-		// MovieClip, TextField, TextFormat (SWF6+)
-		if (g_swf_version >= 6) {
-			fv.data.numeric_value = (u64)sec_mc_ctor;
-			setProperty(app_context, sec_global, "MovieClip", 9, &fv);
-			fv.data.numeric_value = (u64)sec_tf_ctor;
-			setProperty(app_context, sec_global, "TextField", 9, &fv);
-		}
+		// MovieClip, TextField, TextFormat
+		fv.data.numeric_value = (u64)sec_mc_ctor;
+		setProperty(app_context, sec_global, "MovieClip", 9, &fv);
+		fv.data.numeric_value = (u64)sec_tf_ctor;
+		setProperty(app_context, sec_global, "TextField", 9, &fv);
 		fv.data.numeric_value = (u64)sec_tfmt_ctor;
 		setProperty(app_context, sec_global, "TextFormat", 10, &fv);
 		// XML, XMLNode, Date, Error
@@ -22256,8 +22380,6 @@ static void ensureSecondaryGlobalInit(SWFAppContext* app_context, int target_ver
 		setProperty(app_context, sec_global, "Error", 5, &fv);
 		// Stub constructors
 		for (int i = 0; i < 18; i++) {
-			if (strcmp(stub_names[i], "Button") == 0 && g_swf_version < 7)
-				continue;
 			fv.data.numeric_value = (u64)sec_stub_ctors[i];
 			setProperty(app_context, sec_global, stub_names[i], stub_name_lens[i], &fv);
 		}
@@ -23240,17 +23362,17 @@ check_special_vars:
 			PUSH(ACTION_STACK_VALUE_FUNCTION, (u64)&g_object_constructor);
 			return;
 		}
-		else if (var_name_len == 9 && strncmp(var_name, "MovieClip", 9) == 0 && g_swf_version >= 6)
+		else if (var_name_len == 9 && strncmp(var_name, "MovieClip", 9) == 0)
 		{
-			// Return the version-appropriate MovieClip constructor (SWF6+)
+			// Return the version-appropriate MovieClip constructor
 			initMovieClipPrototype(app_context);
 			ASFunction* mc_ctor = getMovieClipCtor(g_swf_version);
 			PUSH(ACTION_STACK_VALUE_FUNCTION, (u64)mc_ctor);
 			return;
 		}
-		else if (var_name_len == 9 && strncmp(var_name, "TextField", 9) == 0 && g_swf_version >= 6)
+		else if (var_name_len == 9 && strncmp(var_name, "TextField", 9) == 0)
 		{
-			// Return the built-in TextField constructor as a function (SWF6+)
+			// Return the built-in TextField constructor as a function
 			initTextFieldPrototype(app_context);
 			PUSH(ACTION_STACK_VALUE_FUNCTION, (u64)&g_textfield_constructor);
 			return;
@@ -23421,12 +23543,11 @@ check_special_vars:
 		}
 				else if (var_name_len == 6 && strncmp(var_name, "System", 6) == 0)
 		{
-			// Lazily create System built-in object
-			static ASObject* system_object = NULL;
-			if (system_object == NULL)
+			// Lazily create System built-in object (uses file-scope g_system_object)
+			if (g_system_object == NULL)
 			{
-				system_object = allocObject(app_context, 4);
-				setObjectProto(app_context, system_object);
+				g_system_object = allocObject(app_context, 4);
+				setObjectProto(app_context, g_system_object);
 				ASObject* security_obj = allocObject(app_context, 4);
 				setObjectProto(app_context, security_obj);
 				ActionVar sandbox_val = {0};
@@ -23442,98 +23563,83 @@ check_special_vars:
 				ActionVar security_var = {0};
 				security_var.type = ACTION_STACK_VALUE_OBJECT;
 				VAL(u64, &security_var.data.numeric_value) = (u64)security_obj;
-				setProperty(app_context, system_object, "security", 8, &security_var);
+				setProperty(app_context, g_system_object, "security", 8, &security_var);
 
 				// System.capabilities object
 				ASObject* caps_obj = allocObject(app_context, 16);
 				setObjectProto(app_context, caps_obj);
 				ActionVar cap_val = {0};
-				// screenResolutionX (default 1536 to match Ruffle test defaults)
 				cap_val.type = ACTION_STACK_VALUE_F64;
 				VAL(double, &cap_val.data.numeric_value) = 1536.0;
 				setProperty(app_context, caps_obj, "screenResolutionX", 17, &cap_val);
-				// screenResolutionY
 				VAL(double, &cap_val.data.numeric_value) = 864.0;
 				setProperty(app_context, caps_obj, "screenResolutionY", 17, &cap_val);
-				// pixelAspectRatio
 				VAL(double, &cap_val.data.numeric_value) = 1.0;
 				setProperty(app_context, caps_obj, "pixelAspectRatio", 16, &cap_val);
-				// screenDPI
 				VAL(double, &cap_val.data.numeric_value) = 72.0;
 				setProperty(app_context, caps_obj, "screenDPI", 9, &cap_val);
-				// playerType (StandAlone)
 				ActionVar pt_val = {0};
 				pt_val.type = ACTION_STACK_VALUE_STRING;
 				pt_val.str_size = 10;
 				VAL(u64, &pt_val.data.numeric_value) = (u64)u16_StandAlone;
 				setProperty(app_context, caps_obj, "playerType", 10, &pt_val);
-				// version
 				ActionVar ver_val = {0};
 				ver_val.type = ACTION_STACK_VALUE_STRING;
 				ver_val.str_size = 13;
 				VAL(u64, &ver_val.data.numeric_value) = (u64)u16_WIN_ver;
 				setProperty(app_context, caps_obj, "version", 7, &ver_val);
-				// os
 				ActionVar os_val = {0};
 				os_val.type = ACTION_STACK_VALUE_STRING;
 				os_val.str_size = 10;
 				VAL(u64, &os_val.data.numeric_value) = (u64)u16_Windows_XP;
 				setProperty(app_context, caps_obj, "os", 2, &os_val);
-				// manufacturer
 				ActionVar mfr_val = {0};
 				mfr_val.type = ACTION_STACK_VALUE_STRING;
 				mfr_val.str_size = 18;
 				VAL(u64, &mfr_val.data.numeric_value) = (u64)u16_Macromedia_Windows;
 				setProperty(app_context, caps_obj, "manufacturer", 12, &mfr_val);
-				// language
 				ActionVar lang_val = {0};
 				lang_val.type = ACTION_STACK_VALUE_STRING;
 				lang_val.str_size = 2;
 				VAL(u64, &lang_val.data.numeric_value) = (u64)u16_en;
 				setProperty(app_context, caps_obj, "language", 8, &lang_val);
-				// isDebugger
 				cap_val.type = ACTION_STACK_VALUE_BOOLEAN;
 				VAL(u32, &cap_val.data.numeric_value) = 0;
 				setProperty(app_context, caps_obj, "isDebugger", 10, &cap_val);
-				// hasAudio
 				cap_val.type = ACTION_STACK_VALUE_BOOLEAN;
 				VAL(u32, &cap_val.data.numeric_value) = 1;
 				setProperty(app_context, caps_obj, "hasAudio", 8, &cap_val);
-				// hasVideoEncoder
 				cap_val.type = ACTION_STACK_VALUE_BOOLEAN;
 				VAL(u32, &cap_val.data.numeric_value) = 1;
 				setProperty(app_context, caps_obj, "hasVideoEncoder", 15, &cap_val);
 				ActionVar caps_var = {0};
 				caps_var.type = ACTION_STACK_VALUE_OBJECT;
 				VAL(u64, &caps_var.data.numeric_value) = (u64)caps_obj;
-				setProperty(app_context, system_object, "capabilities", 12, &caps_var);
+				setProperty(app_context, g_system_object, "capabilities", 12, &caps_var);
 
-				// System.IME (AsBroadcaster-initialized object)
 				ASObject* ime_obj = allocObject(app_context, 4);
 				setObjectProto(app_context, ime_obj);
 				installAsBroadcaster(app_context, ime_obj);
 				ActionVar ime_var = {0};
 				ime_var.type = ACTION_STACK_VALUE_OBJECT;
 				VAL(u64, &ime_var.data.numeric_value) = (u64)ime_obj;
-				setProperty(app_context, system_object, "IME", 3, &ime_var);
+				setProperty(app_context, g_system_object, "IME", 3, &ime_var);
 
-				// All System sub-objects are native — always trace as "[object Object]"
-				installNativeToString(app_context, system_object);
+				installNativeToString(app_context, g_system_object);
 				installNativeToString(app_context, security_obj);
 				installNativeToString(app_context, caps_obj);
 				installNativeToString(app_context, ime_obj);
 			}
-			PUSH(ACTION_STACK_VALUE_OBJECT, (u64)system_object);
+			PUSH(ACTION_STACK_VALUE_OBJECT, (u64)g_system_object);
 			return;
 		}
 		// flash package (flash.display, flash.geom, etc.) - SWF8+ only
 		else if (EFFECTIVE_SWF_VERSION() >= 8 && var_name_len == 5 && strncmp(var_name, "flash", 5) == 0)
 		{
-			static ASObject* flash_object = NULL;
-			if (flash_object == NULL)
+			if (g_flash_object == NULL)
 			{
-				flash_object = allocObject(app_context, 8);
-				setObjectProto(app_context, flash_object);
+				g_flash_object = allocObject(app_context, 8);
+				setObjectProto(app_context, g_flash_object);
 
 				// Helper: create a stub constructor ASFunction
 				#define MAKE_STUB_CTOR(varname, namestr) \
@@ -23553,12 +23659,12 @@ check_special_vars:
 					  setProperty(app_context, parent, propname, proplen, &_pv); }
 
 				// flash.display
-				MAKE_PKG(display_obj, flash_object, "display", 7, 4);
+				MAKE_PKG(display_obj, g_flash_object, "display", 7, 4);
 				MAKE_STUB_CTOR(fc_BitmapData, "BitmapData");
 				SET_CTOR_PROP(display_obj, "BitmapData", 10, fc_BitmapData);
 
 				// flash.external
-				MAKE_PKG(external_obj, flash_object, "external", 8, 4);
+				MAKE_PKG(external_obj, g_flash_object, "external", 8, 4);
 				MAKE_STUB_CTOR(fc_ExternalInterface, "ExternalInterface");
 				// Add static methods on ExternalInterface
 				fc_ExternalInterface.own_props = allocObject(app_context, 16);
@@ -23683,7 +23789,7 @@ check_special_vars:
 				SET_CTOR_PROP(external_obj, "ExternalInterface", 17, fc_ExternalInterface);
 
 				// flash.filters (10 filter classes)
-				MAKE_PKG(filters_obj, flash_object, "filters", 7, 12);
+				MAKE_PKG(filters_obj, g_flash_object, "filters", 7, 12);
 				MAKE_STUB_CTOR(fc_BevelFilter, "BevelFilter");
 				SET_CTOR_PROP(filters_obj, "BevelFilter", 11, fc_BevelFilter);
 				MAKE_STUB_CTOR(fc_BitmapFilter, "BitmapFilter");
@@ -23706,7 +23812,7 @@ check_special_vars:
 				SET_CTOR_PROP(filters_obj, "GradientGlowFilter", 18, fc_GradientGlowFilter);
 
 				// flash.geom (5 classes)
-				MAKE_PKG(geom_obj, flash_object, "geom", 4, 8);
+				MAKE_PKG(geom_obj, g_flash_object, "geom", 4, 8);
 				// ColorTransform constructor with prototype
 				initColorTransformPrototype(app_context);
 				static ASFunction fc_ColorTransform;
@@ -23763,14 +23869,14 @@ check_special_vars:
 				SET_CTOR_PROP(geom_obj, "Transform", 9, fc_Transform);
 
 				// flash.net
-				MAKE_PKG(net_obj, flash_object, "net", 3, 4);
+				MAKE_PKG(net_obj, g_flash_object, "net", 3, 4);
 				MAKE_STUB_CTOR(fc_FileReference, "FileReference");
 				SET_CTOR_PROP(net_obj, "FileReference", 13, fc_FileReference);
 				MAKE_STUB_CTOR(fc_FileReferenceList, "FileReferenceList");
 				SET_CTOR_PROP(net_obj, "FileReferenceList", 17, fc_FileReferenceList);
 
 				// flash.text
-				MAKE_PKG(text_obj, flash_object, "text", 4, 4);
+				MAKE_PKG(text_obj, g_flash_object, "text", 4, 4);
 				MAKE_STUB_CTOR(fc_TextRenderer, "TextRenderer");
 				SET_CTOR_PROP(text_obj, "TextRenderer", 12, fc_TextRenderer);
 
@@ -23778,10 +23884,89 @@ check_special_vars:
 				#undef SET_CTOR_PROP
 				#undef MAKE_PKG
 			}
-			PUSH(ACTION_STACK_VALUE_OBJECT, (u64)flash_object);
+			PUSH(ACTION_STACK_VALUE_OBJECT, (u64)g_flash_object);
 			return;
 		}
 		} // end if (EFFECTIVE_SWF_VERSION() >= 5)
+
+		// Check display list children by instance name BEFORE _global
+		// (Flash resolution: target clip scope > _global)
+		{
+			char name_buf[64];
+			if (var_name_len < 64)
+			{
+				memcpy(name_buf, var_name, var_name_len);
+				name_buf[var_name_len] = '\0';
+			}
+			else
+			{
+				memcpy(name_buf, var_name, 63);
+				name_buf[63] = '\0';
+			}
+
+#ifndef NO_GRAPHICS
+			DisplayObject* dobj = findDisplayObjectByName(name_buf);
+			if (dobj != NULL)
+			{
+				extern MovieClip root_movieclip;
+				MovieClip* child_mc = findOrCreateMovieClip(app_context, name_buf, &root_movieclip);
+				if (child_mc != NULL)
+				{
+					PUSH(ACTION_STACK_VALUE_MOVIECLIP, (u64)child_mc);
+					return;
+				}
+			}
+#else
+			// Check pending_removal MCs first
+			{
+				int found_pending = 0;
+				for (int _pri = 0; _pri < child_mc_count; _pri++) {
+					if (child_mc_cache[_pri] != NULL &&
+					    child_mc_cache[_pri]->pending_removal &&
+					    swf_name_match(child_mc_cache[_pri]->name, name_buf)) {
+						PUSH(ACTION_STACK_VALUE_MOVIECLIP, (u64)child_mc_cache[_pri]);
+						found_pending = 1;
+						break;
+					}
+				}
+				if (found_pending) return;
+			}
+
+			{
+			size_t child_depth = ng_findDisplayEntryByName(name_buf);
+			if (child_depth != SIZE_MAX)
+			{
+				extern MovieClip root_movieclip;
+				if (!ng_isScriptableAtDepth(child_depth)) {
+					PUSH(ACTION_STACK_VALUE_MOVIECLIP, (u64)&root_movieclip);
+					return;
+				}
+				// SWF5: buttons are transparent — accessing button by name returns parent MC
+				if (g_swf_version < 6) {
+					extern DisplayObject* display_list;
+					extern Character* dictionary;
+					size_t _cid = display_list[child_depth].char_id;
+					if (_cid > 0 && dictionary[_cid].type == CHAR_TYPE_BUTTON) {
+						PUSH(ACTION_STACK_VALUE_MOVIECLIP, (u64)&root_movieclip);
+						return;
+					}
+				}
+				MovieClip* child_mc = findOrCreateMovieClip(app_context, name_buf, &root_movieclip);
+				if (child_mc != NULL)
+				{
+					extern DisplayObject* display_list;
+					child_mc->display_obj = (void*)&display_list[child_depth];
+					extern Character* dictionary;
+					size_t _cid = display_list[child_depth].char_id;
+					if (_cid > 0 && dictionary[_cid].type == CHAR_TYPE_BUTTON)
+						child_mc->is_button_mc = 1;
+					PUSH(ACTION_STACK_VALUE_MOVIECLIP, (u64)child_mc);
+					return;
+				}
+			}
+			}
+#endif
+		}
 
 		// Check _global object properties as fallback
 		{
@@ -23854,88 +24039,6 @@ check_special_vars:
 				float v = mc->ymouse; PUSH(ACTION_STACK_VALUE_F32, VAL(u32, &v)); return;
 #endif
 			}
-		}
-
-		// Check display list children by instance name (e.g., GetVariable("clip"))
-		// In Flash, child movie clips are accessible as variables by their instance name
-		{
-			// First, check if name needs to be null-terminated
-			char name_buf[64];
-			if (var_name_len < 64)
-			{
-				memcpy(name_buf, var_name, var_name_len);
-				name_buf[var_name_len] = '\0';
-			}
-			else
-			{
-				memcpy(name_buf, var_name, 63);
-				name_buf[63] = '\0';
-			}
-
-#ifndef NO_GRAPHICS
-			DisplayObject* dobj = findDisplayObjectByName(name_buf);
-			if (dobj != NULL)
-			{
-				extern MovieClip root_movieclip;
-				MovieClip* child_mc = findOrCreateMovieClip(app_context, name_buf, &root_movieclip);
-				if (child_mc != NULL)
-				{
-					PUSH(ACTION_STACK_VALUE_MOVIECLIP, (u64)child_mc);
-					return;
-				}
-			}
-#else
-			// Check pending_removal MCs first — in Flash/Ruffle, removed MCs at
-			// negative depths come before live MCs in the depth-sorted lookup.
-			// Pending_removal MCs persist for one frame after removal.
-			{
-				int found_pending = 0;
-				for (int _pri = 0; _pri < child_mc_count; _pri++) {
-					if (child_mc_cache[_pri] != NULL &&
-					    child_mc_cache[_pri]->pending_removal &&
-					    swf_name_match(child_mc_cache[_pri]->name, name_buf)) {
-						PUSH(ACTION_STACK_VALUE_MOVIECLIP, (u64)child_mc_cache[_pri]);
-						found_pending = 1;
-						break;
-					}
-				}
-				if (found_pending) return;
-			}
-
-			size_t child_depth = ng_findDisplayEntryByName(name_buf);
-			if (child_depth != SIZE_MAX)
-			{
-				extern MovieClip root_movieclip;
-				if (!ng_isScriptableAtDepth(child_depth)) {
-					// Non-scriptable type (shape, statictext, morphshape, image) — resolves to parent MC
-					PUSH(ACTION_STACK_VALUE_MOVIECLIP, (u64)&root_movieclip);
-					return;
-				}
-				// SWF5: buttons are transparent — accessing button by name returns parent MC
-				if (g_swf_version < 6) {
-					extern DisplayObject* display_list;
-					extern Character* dictionary;
-					size_t _cid = display_list[child_depth].char_id;
-					if (_cid > 0 && dictionary[_cid].type == CHAR_TYPE_BUTTON) {
-						PUSH(ACTION_STACK_VALUE_MOVIECLIP, (u64)&root_movieclip);
-						return;
-					}
-				}
-				MovieClip* child_mc = findOrCreateMovieClip(app_context, name_buf, &root_movieclip);
-				if (child_mc != NULL)
-				{
-					// Sync display_obj and is_button_mc from display list
-					extern DisplayObject* display_list;
-					child_mc->display_obj = (void*)&display_list[child_depth];
-					extern Character* dictionary;
-					size_t _cid = display_list[child_depth].char_id;
-					if (_cid > 0 && dictionary[_cid].type == CHAR_TYPE_BUTTON)
-						child_mc->is_button_mc = 1;
-					PUSH(ACTION_STACK_VALUE_MOVIECLIP, (u64)child_mc);
-					return;
-				}
-			}
-#endif
 		}
 
 		// Last resort: check MovieClip.prototype chain
