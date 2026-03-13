@@ -13193,6 +13193,22 @@ void actionFirePendingDirectLoads(SWFAppContext* app_context)
 			}
 		}
 
+		// Re-fire clip LOAD events on the target MC before child init
+		// (Flash re-dispatches onLoad when loadMovie replaces content)
+		{
+			DisplayObject* _dobj = mc->display_obj ? (DisplayObject*)mc->display_obj : NULL;
+			if (_dobj != NULL && _dobj->clip_action_count > 0) {
+				// Temporarily restore parent context for clip LOAD dispatch
+				MovieClip* _clip_save = g_current_context;
+				actionSetCurrentContext(mc);
+				for (size_t a = 0; a < _dobj->clip_action_count; a++) {
+					if (_dobj->clip_actions[a].event_flags & 0x1) // CLIP_EVENT_LOAD
+						_dobj->clip_actions[a].action(app_context);
+				}
+				actionSetCurrentContext(_clip_save);
+			}
+		}
+
 		entry->init_func(app_context);
 		if (entry->frame_count > 0 && entry->frame_funcs != NULL && entry->frame_funcs[0] != NULL) {
 			extern int quit_swf;
@@ -44464,33 +44480,13 @@ void actionCallMethod(SWFAppContext* app_context, char* str_buffer)
 					parseAndSetFlashVars(app_context, _lm_url, mc);
 					MovieEntry* entry = findMovieEntry(_lm_url);
 					if (entry != NULL && mc != NULL) {
-						// Set child SWF URL and version on target MC
-						constructChildURL(mc->url, sizeof(mc->url), entry->filename);
-						mc->swf_version = (u16)entry->swf_version;
-						mc->movie_id = entry->movie_id;
-						mc->load_failed = 0;
-						// Run the child movie's init and frame 0 with child's SWF version
-						int _saved_ver = g_swf_version;
-						ASObject* _saved_global = global_object;
-						int _saved_child_init4 = g_child_swf_init;
-						u8 _saved_movie_id4 = g_current_movie_id;
-						g_swf_version = entry->swf_version;
-						g_child_swf_init = 1;
-						g_current_movie_id = entry->movie_id;
-						ensureSecondaryGlobalInit(app_context, entry->swf_version);
-						if (versionGroup(g_swf_version) == 0 && g_global_legacy) global_object = g_global_legacy;
-						else if (versionGroup(g_swf_version) == 1 && g_global_modern) global_object = g_global_modern;
-						MovieClip* _saved_ctx = g_current_context;
-						actionSetCurrentContext(mc);
-						entry->init_func(app_context);
-						if (entry->frame_count > 0 && entry->frame_funcs != NULL && entry->frame_funcs[0] != NULL) {
-							entry->frame_funcs[0](app_context);
+						// Defer child init to next frame (async loading)
+						if (g_pending_direct_load_count < MAX_PENDING_DIRECT_LOADS) {
+							PendingDirectLoad* pdl = &g_pending_direct_loads[g_pending_direct_load_count++];
+							pdl->target = mc;
+							pdl->entry = entry;
+							pdl->is_level = 0;
 						}
-						actionSetCurrentContext(_saved_ctx);
-						g_swf_version = _saved_ver;
-						global_object = _saved_global;
-						g_child_swf_init = _saved_child_init4;
-						g_current_movie_id = _saved_movie_id4;
 					} else if (mc != NULL) {
 						// Failed load: defer state change to next frame
 						if (g_deferred_failed_load_count < MAX_DEFERRED_FAILED_LOADS) {
