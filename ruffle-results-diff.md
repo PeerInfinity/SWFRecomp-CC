@@ -1,7 +1,7 @@
 # Ruffle Test Results Diff
 
-**Previous:** `7714e908415f` (2026-03-13T20:29:15.413116+00:00)
-**Current:** `9fc4eda183b1` (2026-03-13T21:14:01.086784+00:00)
+**Previous:** `9fc4eda183b1` (2026-03-13T21:14:01.086784+00:00)
+**Current:** `d569af6c3557` (2026-03-13T22:09:52.904660+00:00)
 
 ## Summary
 
@@ -10,12 +10,12 @@
 | Passing | 537 | 537 | 0 |
 | Total | 618 | 618 | 0 |
 | Pass rate | 86.9% | 86.9% | 0% |
-| Mismatched lines | 15033 | 15031 | -2 |
-|   Decreased | | | -2 |
+| Mismatched lines | 15031 | 14941 | -90 |
+|   Decreased | | | -90 |
 
 ## Line Count Changed (2)
 
 | Test | Status | Lines (prev) | Lines (now) | Diff |
 |------|--------|--------------|-------------|------|
-| `global_proto_decls` | output_mismatch | 24/4497 | 26/4497 | -2 |
-| `text_blocks_clicks` | output_mismatch | 3/4 | 3/4 | 0 |
+| `clone_sprite_edittext` | output_mismatch | 26/94 | 90/94 | -64 |
+| `clone_sprite_edittext_dynamic` | output_mismatch | 52/86 | 78/86 | -26 |
