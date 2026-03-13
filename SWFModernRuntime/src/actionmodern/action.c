@@ -12674,8 +12674,8 @@ static MovieClip* findOrCreateMovieClip(SWFAppContext* app_context, const char* 
 				ActionVar true_val = {0};
 				true_val.type = ACTION_STACK_VALUE_BOOLEAN;
 				VAL(u32, &true_val.data.numeric_value) = 1;
-				// background (default false)
-				setProperty(app_context, props, "background", 10, &false_val);
+				// background (default false; Border flag enables both border AND background)
+				setProperty(app_context, props, "background", 10, (tf_flags & 0x0020) ? &true_val : &false_val);
 				// border (from DefineEditText Border flag)
 				setProperty(app_context, props, "border", 6, (tf_flags & 0x0020) ? &true_val : &false_val);
 				// type ("input" if !ReadOnly, "dynamic" otherwise)
@@ -13004,6 +13004,135 @@ static MovieClip* findOrCreateMovieClip(SWFAppContext* app_context, const char* 
 // Public wrapper for findOrCreateMovieClip (callable from tag_stubs.c and generated code)
 MovieClip* actionFindOrCreateMovieClip(SWFAppContext* app_context, const char* instance_name, MovieClip* parent) {
 	return findOrCreateMovieClip(app_context, instance_name, parent);
+}
+
+void actionInitDynTextFieldClone(SWFAppContext* app_context, MovieClip* mc) {
+	if (mc == NULL) return;
+	mc->ng_textfield_idx = -2;
+
+	if (mc->dynamic_props == NULL) {
+		mc->dynamic_props = (void*) allocObject(app_context, 32);
+		retainObject((ASObject*) mc->dynamic_props);
+	}
+	ASObject* props = (ASObject*) mc->dynamic_props;
+	props->native_type = NATIVE_TEXTFIELD;
+
+	initTextFieldPrototype(app_context);
+	if (g_textfield_constructor.prototype_obj != NULL) {
+		ActionVar proto_val = {0};
+		proto_val.type = ACTION_STACK_VALUE_OBJECT;
+		proto_val.data.numeric_value = (u64) g_textfield_constructor.prototype_obj;
+		setProperty(app_context, props, "__proto__", 9, &proto_val);
+		for (u32 pi = 0; pi < props->num_used; pi++) {
+			if (strcmp(props->properties[pi].name, "__proto__") == 0) {
+				props->properties[pi].flags &= ~PROPERTY_FLAG_ENUMERABLE;
+				break;
+			}
+		}
+	}
+
+	// Default string properties
+	ActionVar sval = {0};
+	sval.type = ACTION_STACK_VALUE_STRING;
+	sval.str_size = 0;
+	VAL(u64, &sval.data.numeric_value) = (u64)u16_empty;
+	setProperty(app_context, props, "text", 4, &sval);
+	setProperty(app_context, props, "htmlText", 8, &sval);
+	// variable defaults to null for cloned textfields (empty string for createTextField)
+	{
+		ActionVar var_null = {0};
+		var_null.type = ACTION_STACK_VALUE_NULL;
+		setProperty(app_context, props, "variable", 8, &var_null);
+	}
+
+	// Boolean defaults (false)
+	ActionVar fval = {0};
+	fval.type = ACTION_STACK_VALUE_BOOLEAN;
+	fval.data.numeric_value = 0;
+	setProperty(app_context, props, "background", 10, &fval);
+	setProperty(app_context, props, "border", 6, &fval);
+	setProperty(app_context, props, "multiline", 9, &fval);
+	setProperty(app_context, props, "wordWrap", 8, &fval);
+	setProperty(app_context, props, "password", 8, &fval);
+	setProperty(app_context, props, "html", 4, &fval);
+	setProperty(app_context, props, "embedFonts", 10, &fval);
+	setProperty(app_context, props, "condenseWhite", 13, &fval);
+
+	// Boolean defaults (true)
+	ActionVar tval = {0};
+	tval.type = ACTION_STACK_VALUE_BOOLEAN;
+	tval.data.numeric_value = 1;
+	setProperty(app_context, props, "selectable", 10, &tval);
+
+	// Type defaults to "dynamic"
+	ActionVar type_val = {0};
+	type_val.type = ACTION_STACK_VALUE_STRING;
+	type_val.str_size = 7;
+	VAL(u64, &type_val.data.numeric_value) = (u64)u16_dynamic;
+	setProperty(app_context, props, "type", 4, &type_val);
+
+	// Numeric defaults (0)
+	ActionVar dval = {0};
+	dval.type = ACTION_STACK_VALUE_F64;
+	VAL(double, &dval.data.numeric_value) = 0.0;
+	setProperty(app_context, props, "length", 6, &dval);
+	setProperty(app_context, props, "textWidth", 9, &dval);
+	setProperty(app_context, props, "textHeight", 10, &dval);
+	setProperty(app_context, props, "hscroll", 7, &dval);
+	setProperty(app_context, props, "maxhscroll", 10, &dval);
+	setProperty(app_context, props, "sharpness", 9, &dval);
+	setProperty(app_context, props, "thickness", 9, &dval);
+	setProperty(app_context, props, "textColor", 9, &dval);
+	VAL(double, &dval.data.numeric_value) = 16777215.0;
+	setProperty(app_context, props, "backgroundColor", 15, &dval);
+	VAL(double, &dval.data.numeric_value) = 0.0;
+	setProperty(app_context, props, "borderColor", 11, &dval);
+
+	// Scroll defaults (1)
+	ActionVar one_val = {0};
+	one_val.type = ACTION_STACK_VALUE_F64;
+	VAL(double, &one_val.data.numeric_value) = 1.0;
+	setProperty(app_context, props, "scroll", 6, &one_val);
+	setProperty(app_context, props, "maxscroll", 9, &one_val);
+	setProperty(app_context, props, "bottomScroll", 12, &one_val);
+
+	// Null defaults
+	ActionVar null_val = {0};
+	null_val.type = ACTION_STACK_VALUE_NULL;
+	setProperty(app_context, props, "maxChars", 8, &null_val);
+	setProperty(app_context, props, "restrict", 8, &null_val);
+
+	// Undefined defaults
+	ActionVar undef_val = {0};
+	undef_val.type = ACTION_STACK_VALUE_UNDEFINED;
+	setProperty(app_context, props, "tabIndex", 8, &undef_val);
+
+	// String defaults
+	ActionVar aat_val = {0};
+	aat_val.type = ACTION_STACK_VALUE_STRING;
+	aat_val.str_size = 6;
+	VAL(u64, &aat_val.data.numeric_value) = (u64)u16_normal;
+	setProperty(app_context, props, "antiAliasType", 13, &aat_val);
+
+	ActionVar gft_val = {0};
+	gft_val.type = ACTION_STACK_VALUE_STRING;
+	gft_val.str_size = 5;
+	VAL(u64, &gft_val.data.numeric_value) = (u64)u16_pixel;
+	setProperty(app_context, props, "gridFitType", 11, &gft_val);
+
+	ActionVar as_val = {0};
+	as_val.type = ACTION_STACK_VALUE_STRING;
+	as_val.str_size = 4;
+	VAL(u64, &as_val.data.numeric_value) = (u64)u16_none;
+	setProperty(app_context, props, "autoSize", 8, &as_val);
+
+	// Empty filters array
+	ASArray* filters_arr = allocArray(app_context, 0);
+	filters_arr->length = 0;
+	ActionVar filters_val = {0};
+	filters_val.type = ACTION_STACK_VALUE_ARRAY;
+	filters_val.data.numeric_value = (u64) filters_arr;
+	setProperty(app_context, props, "filters", 7, &filters_val);
 }
 
 // Find a cached MovieClip by name only (no parent constraint, no creation).
@@ -31292,6 +31421,12 @@ void actionGetMember(SWFAppContext* app_context)
 					if (_dep != SIZE_MAX) {
 						double _dx;
 						if (ng_getTransformXY_d(_dep, &_dx, NULL)) {
+							// Textfields: add DefineEditText bounds_xmin offset
+							if (mc->ng_textfield_idx >= 0) {
+								s32 bxmin, bxmax, bymin, bymax;
+								ng_getTextFieldBounds(mc->ng_textfield_idx, &bxmin, &bxmax, &bymin, &bymax);
+								_dx += (double)bxmin / 20.0;
+							}
 							PUSH(ACTION_STACK_VALUE_F64, VAL(u64, &_dx));
 							return;
 						}
@@ -31312,6 +31447,12 @@ void actionGetMember(SWFAppContext* app_context)
 					if (_dep != SIZE_MAX) {
 						double _dy;
 						if (ng_getTransformXY_d(_dep, NULL, &_dy)) {
+							// Textfields: add DefineEditText bounds_ymin offset
+							if (mc->ng_textfield_idx >= 0) {
+								s32 bxmin, bxmax, bymin, bymax;
+								ng_getTextFieldBounds(mc->ng_textfield_idx, &bxmin, &bxmax, &bymin, &bymax);
+								_dy += (double)bymin / 20.0;
+							}
 							PUSH(ACTION_STACK_VALUE_F64, VAL(u64, &_dy));
 							return;
 						}

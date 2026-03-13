@@ -96,6 +96,8 @@ void actionSetBaseClip(MovieClip* mc);
 MovieClip* actionGetBaseClip(void);
 // Create or find a cached MovieClip by instance name
 MovieClip* actionFindOrCreateMovieClip(SWFAppContext* app_context, const char* instance_name, MovieClip* parent);
+// Initialize default textfield properties on a clone of a dynamic textfield
+void actionInitDynTextFieldClone(SWFAppContext* app_context, MovieClip* mc);
 // Invalidate cached MovieClip when removed from display list (swf_depth for disambiguation)
 void actionInvalidateCachedMovieClip(SWFAppContext* app_context, const char* name, int swf_depth);
 // Mark MC for deferred removal: transform depth and set pending_removal flag

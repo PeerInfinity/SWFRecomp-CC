@@ -3507,6 +3507,11 @@ MovieClip* ng_cloneSprite(SWFAppContext* app_context, const char* source_name,
 	clone_mc->currentframe = 1;
 	clone_mc->depth = depth;
 
+	// For dynamic textfield clones (no DefineEditText tag), init default props
+	if (src_mc != NULL && src_mc->ng_textfield_idx == -2 && clone_mc->ng_textfield_idx != -2) {
+		actionInitDynTextFieldClone(app_context, clone_mc);
+	}
+
 	// Evict any old clone registered at this SWF depth, then register new one
 	clone_depth_register(depth, target_name);
 
@@ -3586,6 +3591,49 @@ MovieClip* ng_cloneSpriteFromMC(SWFAppContext* app_context, MovieClip* src_mc,
 	if (!src_mc || !target_name) return NULL;
 	if (src_mc->parent == NULL) return NULL;  // cannot clone root
 
+	// Look up source display entry — needed for display list copy & clip_actions
+	size_t src_depth = ng_findDisplayEntryByName(src_mc->name);
+
+	// Create display list entry for the clone (mirrors ng_cloneSprite logic).
+	// This is critical for textfield clones: actionFindOrCreateMovieClip needs
+	// the display entry to detect the textfield char_id and init properties.
+	size_t target_swf_depth = (size_t)depth;
+	if (src_depth != SIZE_MAX && target_swf_depth < INITIAL_DISPLAYLIST_CAPACITY)
+	{
+		// Pre-clear target depth if occupied
+		if (target_swf_depth >= 1 && target_swf_depth <= max_depth &&
+		    display_list[target_swf_depth].char_id != 0)
+		{
+			ng_on_remove_object(app_context, target_swf_depth);
+			if (display_list[target_swf_depth].instance_name_owned &&
+			    display_list[target_swf_depth].instance_name != NULL)
+			{
+				free(display_list[target_swf_depth].instance_name);
+				display_list[target_swf_depth].instance_name_owned = 0;
+				display_list[target_swf_depth].instance_name = NULL;
+			}
+		}
+		// Ensure capacity
+		if (target_swf_depth >= display_list_capacity)
+		{
+			size_t new_cap = target_swf_depth + 64;
+			display_list = realloc(display_list, new_cap * sizeof(DisplayObject));
+			memset(&display_list[display_list_capacity], 0,
+			       (new_cap - display_list_capacity) * sizeof(DisplayObject));
+			display_list_capacity = new_cap;
+		}
+		display_list[target_swf_depth] = display_list[src_depth];
+		display_list[target_swf_depth].instance_name = strdup(target_name);
+		display_list[target_swf_depth].instance_name_owned = 1;
+		display_list[target_swf_depth].sprite_display_list = NULL;
+		display_list[target_swf_depth].sprite_max_depth = 0;
+		display_list[target_swf_depth].sprite_dl_capacity = 0;
+		display_list[target_swf_depth].sprite_needs_init = 0;
+		display_list[target_swf_depth].clip_actions = NULL;
+		display_list[target_swf_depth].clip_action_count = 0;
+		if (target_swf_depth > max_depth) max_depth = target_swf_depth;
+	}
+
 	MovieClip* clone_mc = actionFindOrCreateMovieClip(app_context, target_name, &root_movieclip);
 	if (clone_mc == NULL) return NULL;
 
@@ -3607,23 +3655,40 @@ MovieClip* ng_cloneSpriteFromMC(SWFAppContext* app_context, MovieClip* src_mc,
 	clone_mc->currentframe = 1;
 	clone_mc->depth = depth;
 
-	// CloneSprite fires onLoad for the clone — look up source's clip_actions by name
-	if (src_mc->name && g_pending_load_count < MAX_PENDING_LOADS)
-	{
-		size_t src_depth = ng_findDisplayEntryByName(src_mc->name);
-		if (src_depth != SIZE_MAX && display_list[src_depth].clip_action_count > 0)
-		{
-			PendingLoad* pl = &g_pending_loads[g_pending_load_count++];
-			strncpy(pl->instance_name, target_name, sizeof(pl->instance_name) - 1);
-			pl->instance_name[sizeof(pl->instance_name) - 1] = '\0';
-			pl->clip_actions = display_list[src_depth].clip_actions;
-			pl->clip_action_count = display_list[src_depth].clip_action_count;
+	// For dynamic textfield clones (src has ng_textfield_idx == -2 but no DefineEditText tag),
+	// actionFindOrCreateMovieClip won't detect the textfield from the display list.
+	// Initialize default textfield properties manually.
+	if (src_mc->ng_textfield_idx == -2 && clone_mc->ng_textfield_idx != -2) {
+		actionInitDynTextFieldClone(app_context, clone_mc);
+		// Copy "type" property from source (preserved for clones)
+		if (src_mc->dynamic_props != NULL && clone_mc->dynamic_props != NULL) {
+			ASObject* src_props = (ASObject*) src_mc->dynamic_props;
+			ASObject* clone_props = (ASObject*) clone_mc->dynamic_props;
+			ActionVar* type_prop = getProperty(src_props, "type", 4);
+			if (type_prop != NULL && type_prop->type != ACTION_STACK_VALUE_UNDEFINED) {
+				setProperty(app_context, clone_props, "type", 4, type_prop);
+			}
 		}
 	}
 
-	// Evict any old clone at this SWF depth (from duplicateMovieClip, depth+16384 convention).
-	// ng_cloneSpriteFromMC is called from the duplicateMovieClip fallback path only.
-	clone_depth_register(depth + 16384, target_name);
+	// Textfield clones reset _visible to true (unlike sprite clones which preserve it)
+	if (clone_mc->ng_textfield_idx >= 0 || clone_mc->ng_textfield_idx == -2) {
+		clone_mc->visible = 1;
+	}
+
+	// CloneSprite fires onLoad for the clone — look up source's clip_actions by name
+	if (src_depth != SIZE_MAX && display_list[src_depth].clip_action_count > 0 &&
+	    g_pending_load_count < MAX_PENDING_LOADS)
+	{
+		PendingLoad* pl = &g_pending_loads[g_pending_load_count++];
+		strncpy(pl->instance_name, target_name, sizeof(pl->instance_name) - 1);
+		pl->instance_name[sizeof(pl->instance_name) - 1] = '\0';
+		pl->clip_actions = display_list[src_depth].clip_actions;
+		pl->clip_action_count = display_list[src_depth].clip_action_count;
+	}
+
+	// Evict any old clone at this SWF depth, then register new one
+	clone_depth_register(depth, target_name);
 
 	ActionVar _clone_mc_var = {0};
 	_clone_mc_var.type = ACTION_STACK_VALUE_MOVIECLIP;
