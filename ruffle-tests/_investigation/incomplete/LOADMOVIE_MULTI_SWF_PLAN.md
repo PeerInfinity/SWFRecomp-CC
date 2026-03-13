@@ -576,6 +576,47 @@ Check if `_root` resolution already respects `g_current_context` / base_clip. If
 
 ---
 
+### Phase 13 Addendum: `cross_movie_root` — RESOLVED ✅
+
+**Status**: **10/10 PASS** (2026-03-12)
+
+**Root cause**: `resolveSlashPathToMC` in the GetVariable MC-context child-name lookup path (line 22837) was handling `_root` as an instance name and hardcoding it to `&root_movieclip`. This intercepted `_root` before the `check_special_vars` handler (which correctly walks parent pointers for lockroot/level semantics). Level MCs created by `getOrCreateLevel()` have `parent == NULL`, so the special handler correctly returns the level MC itself.
+
+**Fix**: Skip `_root` and `_levelN` names in the `resolveSlashPathToMC` child-name lookup, letting them fall through to `check_special_vars`. Also save/restore `quit_swf` around child frame function calls (child SWFs set `quit_swf=1` on their last frame, which would terminate the parent).
+
+---
+
+### Phase 13 Addendum: `issue_2870` (1/3, 33%)
+
+**What it tests**: Clip event `onLoad` firing during `loadMovie`. A `loader` MC has two clip events:
+- `onLoad` (0x1): traces `"load"`
+- `onEnterFrame` (0x2): increments counter, checks loaded state
+
+The main script calls `loader.loadMovie("child.swf", 1)`. The child SWF traces `"child"` and sets `_root.loaded = true`.
+
+**Expected output**:
+```
+load       ← clip onLoad fires when loader MC is first placed
+load       ← clip onLoad fires AGAIN when child.swf finishes loading into loader
+child      ← child.swf's init script traces "child"
+```
+
+**Actual output**:
+```
+child      ← child trace appears first (wrong order)
+load       ← only one "load" (missing second onLoad)
+```
+
+**Two issues**:
+1. **Missing second onLoad**: When a child SWF loads into an MC that has a clip `onLoad` handler, the onLoad should fire again upon load completion. Currently only the initial placement fires onLoad.
+2. **Execution order**: The child's init script runs before the target MC's onLoad re-fires. Expected order: onLoad → child init.
+
+**Fix**:
+- In the deferred direct load path (`actionFirePendingDirectLoads` or equivalent), after initializing the child SWF, re-dispatch the target MC's clip `onLoad` action.
+- Ensure the onLoad fires BEFORE the child's init scripts execute.
+
+---
+
 ## 10. Phase 14: MCL loadClip Replace Root (MTASC)
 
 **Impact**: 1 line in `mcl_loadclip_replace_root`. Medium difficulty.
@@ -624,6 +665,7 @@ Phase 11 (Child RegisterClass) ──► register_class, register_class_swf6 ─
 Phase 12 (Mouse Events) ──► root_button_mode ─── Mouse infra DONE; still needs loadMovie
 
 Phase 13 (_root Scope) ──► resolve_different_root ─── DONE ✅
+                       ──► cross_movie_root ─── DONE ✅ (resolveSlashPathToMC bypass)
 
 Phase 14 (MCL Root Replace) ──► mcl_loadclip_replace_root ─── DONE ✅
 
@@ -657,6 +699,9 @@ Phase 15 (MCL Root Replace Cross-Version) ──► mcl_replace_root_swf7_to_swf
 | mcl_replace_root_swf7_to_swf6 | — | **56/57** | Phase 15 | **DONE** (1 accepted diff: `rest=undefined` vs `rest=`) |
 | sandbox_type_remote | 1/3 | 1/3 | Needs network loading | BLOCKED |
 | root_button_mode | 0/10 | **10/10** ✅ | Phase 12 | **PASS** (self-load + root onMouse + child MC bounds) |
+
+| cross_movie_root | — | **10/10** ✅ | Phase 13 (per-level _root) | **PASS** (resolveSlashPathToMC bypass + quit_swf save/restore) |
+| issue_2870 | — | 1/3 | Child load ordering / clip onLoad | **NEW** |
 
 **Remaining actionable**: loadmovie_registerclass (27/31) needs cross-movie export table isolation (char_id offsetting + per-movie export scoping). See `CROSS_MOVIE_EXPORT_ISOLATION_PLAN.md`.
 

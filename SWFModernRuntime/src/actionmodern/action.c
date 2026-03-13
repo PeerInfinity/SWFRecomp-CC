@@ -13195,7 +13195,11 @@ void actionFirePendingDirectLoads(SWFAppContext* app_context)
 
 		entry->init_func(app_context);
 		if (entry->frame_count > 0 && entry->frame_funcs != NULL && entry->frame_funcs[0] != NULL) {
+			extern int quit_swf;
+			int _saved_quit = quit_swf;
+			quit_swf = 0;
 			entry->frame_funcs[0](app_context);
+			quit_swf = _saved_quit;
 		}
 
 		// Restore display_list if swapped
@@ -22823,6 +22827,11 @@ void actionGetVariable(SWFAppContext* app_context)
 			return;
 		}
 		// Check child MovieClips by instance name (Flash resolves child names as variables)
+		// Skip _root and _levelN — these are global names handled by check_special_vars,
+		// not child instance names. resolveSlashPathToMC would hardcode them to root_movieclip
+		// which is wrong for SWFs loaded into _levelN (where _root should be the level MC).
+		if (!(var_name_len == 5 && strncmp(var_name, "_root", 5) == 0)
+		    && !(var_name_len >= 6 && strncmp(var_name, "_level", 6) == 0))
 		{
 			MovieClip* child = resolveSlashPathToMC(app_context, var_name, var_name_len, g_current_context);
 			if (child != NULL && child != g_current_context) {
