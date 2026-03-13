@@ -2415,6 +2415,9 @@ static ASObject* g_system_object = NULL;
 static ASObject* g_flash_object = NULL;
 static ASObject* g_soundcodec_obj = NULL;
 static ASObject* g_textrenderer_obj = NULL;
+static ASFunction g_textrenderer_ctor;
+static ASFunction g_tr_setAATable_func;
+static int g_tr_init = 0;
 
 // --- ASSetPropFlags (Function2Ptr callable via both CallFunction and CallMethod) ---
 static ActionVar actionASSetPropFlags_func2(SWFAppContext* app_context, ActionVar* args, u32 num_args, ActionVar* registers, void* this_obj)
@@ -4741,6 +4744,18 @@ static void setObjectProto(SWFAppContext* app_context, ASObject* obj)
 			break;
 		}
 	}
+}
+
+// Like setObjectProto but sets __proto__ as ENUMERABLE.
+// Used for built-in prototype objects where Flash exposes __proto__ in for-in.
+static void setObjectProtoEnum(SWFAppContext* app_context, ASObject* obj)
+{
+	ASObject* proto = getObjectPrototype(app_context);
+	ActionVar proto_var;
+	proto_var.type = ACTION_STACK_VALUE_OBJECT;
+	proto_var.str_size = 0;
+	proto_var.data.numeric_value = (u64) proto;
+	setPropertyWithFlags(app_context, obj, "__proto__", 9, &proto_var, PROPERTY_FLAGS_DEFAULT);
 }
 
 // Set up arguments object properties: __proto__ = Array.prototype, callee, caller.
@@ -8033,6 +8048,15 @@ static ActionVar objectToPrimitive(SWFAppContext* app_context, ActionVar* obj_va
 	else
 	{
 		obj = (ASObject*) obj_var->data.numeric_value;
+	}
+
+	// Global scope objects (_global) convert to undefined in valueOf context.
+	// Flash doesn't have valueOf on _global; Object.prototype.valueOf would return
+	// the object itself (non-primitive), but we need undefined → 0 for SWF≤6.
+	if (obj == global_object) {
+		ActionVar undef = {0};
+		undef.type = ACTION_STACK_VALUE_UNDEFINED;
+		return undef;
 	}
 
 	// Try valueOf via prototype chain (finds Object.prototype.valueOf too)
@@ -21100,22 +21124,23 @@ static int g_global_init_done = 0;
 // ---- Prototype initializers for stub classes ----
 
 // PrintJob.prototype:
-//   Numeric properties (ENUMERABLE, READ_ONLY, DONT_DELETE): orientation, pageWidth, pageHeight, paperWidth, paperHeight
 //   Method stubs (DONT_ENUM, WRITABLE, DONT_DELETE) only on SWF7+: start, addPage, send
+//   Numeric properties (orientation, etc.) are instance-only, NOT on prototype.
 //
 // Note: actionEnumerate2 uses LIFO stack, so properties are yielded in REVERSE insertion order.
-// We insert numeric props in reverse of the desired for-in order to get correct enumeration.
+// constructor is set FIRST so it appears LAST in for-in; __proto__ set second.
 static void initPrintJobPrototype(SWFAppContext* app_context, ASFunction* ctor)
 {
 	if (ctor->prototype_obj != NULL) return;
 	ctor->prototype_obj = allocObject(app_context, 8);
 	retainObject(ctor->prototype_obj);
-	setObjectProto(app_context, ctor->prototype_obj);
-	// constructor back-reference (DONT_ENUM — not enumerable in Flash)
+	// constructor first (enumerated last in LIFO)
 	ActionVar ctor_var = {0};
 	ctor_var.type = ACTION_STACK_VALUE_FUNCTION;
 	ctor_var.data.numeric_value = (u64) ctor;
 	setPropertyWithFlags(app_context, ctor->prototype_obj, "constructor", 11, &ctor_var, PROPERTY_FLAGS_DONTENUM);
+	// __proto__ second (enumerated before constructor in LIFO)
+	setObjectProto(app_context, ctor->prototype_obj);
 
 	// In SWF < 7, PrintJob instances trace as "[type Object]" (not "[object Object]").
 	// Install a toString override on the prototype to produce this behavior.
@@ -21132,18 +21157,20 @@ static void initPrintJobPrototype(SWFAppContext* app_context, ASFunction* ctor)
 		setPropertyWithFlags(app_context, ctor->prototype_obj, "toString", 8, &ts_var, PROPERTY_FLAGS_DONTENUM);
 	}
 
-	// Numeric properties: ENUMERABLE only (READ_ONLY + DONT_DELETE = no WRITABLE, no CONFIGURABLE)
+	// Numeric properties: SWF<=7 only (not present in SWF8+ per global_proto_decls test)
 	// Inserted in REVERSE of desired for-in order (LIFO enumeration reverses insertion order):
 	// Desired: orientation, pageWidth, pageHeight, paperWidth, paperHeight
 	// Insert:  paperHeight, paperWidth, pageHeight, pageWidth, orientation
-	ActionVar num_val = {0};
-	num_val.type = ACTION_STACK_VALUE_F64;
-	num_val.data.numeric_value = 0; // 0.0 as double
-	setPropertyWithFlags(app_context, ctor->prototype_obj, "paperHeight", 11, &num_val, PROPERTY_FLAG_ENUMERABLE);
-	setPropertyWithFlags(app_context, ctor->prototype_obj, "paperWidth", 10, &num_val, PROPERTY_FLAG_ENUMERABLE);
-	setPropertyWithFlags(app_context, ctor->prototype_obj, "pageHeight", 10, &num_val, PROPERTY_FLAG_ENUMERABLE);
-	setPropertyWithFlags(app_context, ctor->prototype_obj, "pageWidth", 9, &num_val, PROPERTY_FLAG_ENUMERABLE);
-	setPropertyWithFlags(app_context, ctor->prototype_obj, "orientation", 11, &num_val, PROPERTY_FLAG_ENUMERABLE);
+	if (g_swf_version < 8) {
+		ActionVar num_val = {0};
+		num_val.type = ACTION_STACK_VALUE_F64;
+		num_val.data.numeric_value = 0; // 0.0 as double
+		setPropertyWithFlags(app_context, ctor->prototype_obj, "paperHeight", 11, &num_val, PROPERTY_FLAG_ENUMERABLE);
+		setPropertyWithFlags(app_context, ctor->prototype_obj, "paperWidth", 10, &num_val, PROPERTY_FLAG_ENUMERABLE);
+		setPropertyWithFlags(app_context, ctor->prototype_obj, "pageHeight", 10, &num_val, PROPERTY_FLAG_ENUMERABLE);
+		setPropertyWithFlags(app_context, ctor->prototype_obj, "pageWidth", 9, &num_val, PROPERTY_FLAG_ENUMERABLE);
+		setPropertyWithFlags(app_context, ctor->prototype_obj, "orientation", 11, &num_val, PROPERTY_FLAG_ENUMERABLE);
+	}
 
 	// Method stubs: SWF7+ only (DONT_ENUM + DONT_DELETE = WRITABLE only)
 	if (g_swf_version >= 7) {
@@ -21163,12 +21190,13 @@ static void initSoundPrototype(SWFAppContext* app_context, ASFunction* ctor)
 	if (ctor->prototype_obj != NULL) return;
 	ctor->prototype_obj = allocObject(app_context, 24);
 	retainObject(ctor->prototype_obj);
-	setObjectProto(app_context, ctor->prototype_obj);
-	// constructor back-reference (DONT_ENUM)
+	// constructor first (enumerated last in LIFO)
 	ActionVar ctor_var = {0};
 	ctor_var.type = ACTION_STACK_VALUE_FUNCTION;
 	ctor_var.data.numeric_value = (u64) ctor;
 	setPropertyWithFlags(app_context, ctor->prototype_obj, "constructor", 11, &ctor_var, PROPERTY_FLAGS_DONTENUM);
+	// __proto__ → Object.prototype (enumerated before constructor in LIFO)
+	setObjectProto(app_context, ctor->prototype_obj);
 
 	// toString: always "[object Object]" (native object behavior)
 	installNativeToString(app_context, ctor->prototype_obj);
@@ -21298,18 +21326,25 @@ static void initLocalConnectionPrototype(SWFAppContext* app_context, ASFunction*
 	if (ctor->prototype_obj != NULL) return;
 	ctor->prototype_obj = allocObject(app_context, 8);
 	retainObject(ctor->prototype_obj);
-	setObjectProto(app_context, ctor->prototype_obj);
-	// constructor back-reference (DONT_ENUM)
+	// constructor first (enumerated last in LIFO)
 	ActionVar ctor_var = {0};
 	ctor_var.type = ACTION_STACK_VALUE_FUNCTION;
 	ctor_var.data.numeric_value = (u64) ctor;
 	setPropertyWithFlags(app_context, ctor->prototype_obj, "constructor", 11, &ctor_var, PROPERTY_FLAGS_DONTENUM);
+	// __proto__ → Object.prototype (enumerated before constructor in LIFO)
+	setObjectProto(app_context, ctor->prototype_obj);
 
 	const u8 mflags = PROPERTY_FLAG_WRITABLE; // DONT_ENUM + DONT_DELETE
-	addStubMethodToProto(app_context, ctor->prototype_obj, "domain", 6, mflags);
+	// Insertion order is reverse of desired LIFO enumeration:
+	// Expected enum: isPerUser, domain, close, send, connect
 	addStubMethodToProto(app_context, ctor->prototype_obj, "connect", 7, mflags);
-	addStubMethodToProto(app_context, ctor->prototype_obj, "close", 5, mflags);
 	addStubMethodToProto(app_context, ctor->prototype_obj, "send", 4, mflags);
+	addStubMethodToProto(app_context, ctor->prototype_obj, "close", 5, mflags);
+	addStubMethodToProto(app_context, ctor->prototype_obj, "domain", 6, mflags);
+	// isPerUser: DONT_ENUM + READ_ONLY, type undefined
+	ActionVar undef_val = {0};
+	undef_val.type = ACTION_STACK_VALUE_UNDEFINED;
+	setPropertyWithFlags(app_context, ctor->prototype_obj, "isPerUser", 9, &undef_val, 0); // no ENUMERABLE, no WRITABLE
 }
 
 // TextSnapshot.prototype: 9 methods (NOT DONT_ENUM — unusual for built-in)
@@ -21319,11 +21354,13 @@ static void initTextSnapshotPrototype(SWFAppContext* app_context, ASFunction* ct
 	if (ctor->prototype_obj != NULL) return;
 	ctor->prototype_obj = allocObject(app_context, 12);
 	retainObject(ctor->prototype_obj);
-	setObjectProto(app_context, ctor->prototype_obj);
+	// constructor first (enumerated last in LIFO)
 	ActionVar ctor_var = {0};
 	ctor_var.type = ACTION_STACK_VALUE_FUNCTION;
 	ctor_var.data.numeric_value = (u64) ctor;
 	setPropertyWithFlags(app_context, ctor->prototype_obj, "constructor", 11, &ctor_var, PROPERTY_FLAGS_DONTENUM);
+	// __proto__ → Object.prototype (enumerated before constructor in LIFO)
+	setObjectProto(app_context, ctor->prototype_obj);
 	// TextSnapshot methods are NOT DONT_ENUM (enumerable + writable + configurable)
 	const u8 mflags = PROPERTY_FLAGS_DEFAULT;
 	ASObject* proto = ctor->prototype_obj;
@@ -21376,11 +21413,13 @@ static void initCameraPrototype(SWFAppContext* app_context, ASFunction* ctor)
 	if (ctor->prototype_obj != NULL) return;
 	ctor->prototype_obj = allocObject(app_context, 8);
 	retainObject(ctor->prototype_obj);
-	setObjectProto(app_context, ctor->prototype_obj);
+	// constructor first (enumerated last in LIFO)
 	ActionVar ctor_var = {0};
 	ctor_var.type = ACTION_STACK_VALUE_FUNCTION;
 	ctor_var.data.numeric_value = (u64) ctor;
 	setPropertyWithFlags(app_context, ctor->prototype_obj, "constructor", 11, &ctor_var, PROPERTY_FLAGS_DONTENUM);
+	// __proto__ → Object.prototype (enumerated before constructor in LIFO)
+	setObjectProto(app_context, ctor->prototype_obj);
 	const u8 mflags = PROPERTY_FLAG_WRITABLE; // DONT_ENUM + DONT_DELETE
 	addStubMethodToProto(app_context, ctor->prototype_obj, "setMode", 7, mflags);
 	addStubMethodToProto(app_context, ctor->prototype_obj, "setQuality", 10, mflags);
@@ -21418,11 +21457,13 @@ static void initMicrophonePrototype(SWFAppContext* app_context, ASFunction* ctor
 	if (ctor->prototype_obj != NULL) return;
 	ctor->prototype_obj = allocObject(app_context, 10);
 	retainObject(ctor->prototype_obj);
-	setObjectProto(app_context, ctor->prototype_obj);
+	// constructor first (enumerated last in LIFO)
 	ActionVar ctor_var = {0};
 	ctor_var.type = ACTION_STACK_VALUE_FUNCTION;
 	ctor_var.data.numeric_value = (u64) ctor;
 	setPropertyWithFlags(app_context, ctor->prototype_obj, "constructor", 11, &ctor_var, PROPERTY_FLAGS_DONTENUM);
+	// __proto__ → Object.prototype (enumerated before constructor in LIFO)
+	setObjectProto(app_context, ctor->prototype_obj);
 	const u8 mflags = PROPERTY_FLAG_WRITABLE; // DONT_ENUM + DONT_DELETE
 	addStubMethodToProto(app_context, ctor->prototype_obj, "setSilenceLevel", 15, mflags);
 	addStubMethodToProto(app_context, ctor->prototype_obj, "setRate", 7, mflags);
@@ -21460,11 +21501,13 @@ static void initNetConnectionPrototype(SWFAppContext* app_context, ASFunction* c
 	if (ctor->prototype_obj != NULL) return;
 	ctor->prototype_obj = allocObject(app_context, 14);
 	retainObject(ctor->prototype_obj);
-	setObjectProto(app_context, ctor->prototype_obj);
+	// constructor first (enumerated last in LIFO)
 	ActionVar ctor_var = {0};
 	ctor_var.type = ACTION_STACK_VALUE_FUNCTION;
 	ctor_var.data.numeric_value = (u64) ctor;
 	setPropertyWithFlags(app_context, ctor->prototype_obj, "constructor", 11, &ctor_var, PROPERTY_FLAGS_DONTENUM);
+	// __proto__ → Object.prototype (enumerated before constructor in LIFO)
+	setObjectProto(app_context, ctor->prototype_obj);
 	const u8 mflags = PROPERTY_FLAG_WRITABLE; // DONT_ENUM + DONT_DELETE
 	// proxyType is a DONT_ENUM string property
 	ActionVar sv = makeStringActionVar(app_context, "none", 4);
@@ -21491,11 +21534,13 @@ static void initNetStreamPrototype(SWFAppContext* app_context, ASFunction* ctor)
 	if (ctor->prototype_obj != NULL) return;
 	ctor->prototype_obj = allocObject(app_context, 20);
 	retainObject(ctor->prototype_obj);
-	setObjectProto(app_context, ctor->prototype_obj);
+	// constructor first (enumerated last in LIFO)
 	ActionVar ctor_var = {0};
 	ctor_var.type = ACTION_STACK_VALUE_FUNCTION;
 	ctor_var.data.numeric_value = (u64) ctor;
 	setPropertyWithFlags(app_context, ctor->prototype_obj, "constructor", 11, &ctor_var, PROPERTY_FLAGS_DONTENUM);
+	// __proto__ → Object.prototype (enumerated before constructor in LIFO)
+	setObjectProto(app_context, ctor->prototype_obj);
 	const u8 mflags = PROPERTY_FLAG_WRITABLE; // DONT_ENUM + DONT_DELETE
 	addStubMethodToProto(app_context, ctor->prototype_obj, "publish", 7, mflags);
 	addStubMethodToProto(app_context, ctor->prototype_obj, "play", 4, mflags);
@@ -21525,11 +21570,13 @@ static void initSharedObjectPrototype(SWFAppContext* app_context, ASFunction* ct
 	if (ctor->prototype_obj != NULL) return;
 	ctor->prototype_obj = allocObject(app_context, 10);
 	retainObject(ctor->prototype_obj);
-	setObjectProto(app_context, ctor->prototype_obj);
+	// constructor first (enumerated last in LIFO)
 	ActionVar ctor_var = {0};
 	ctor_var.type = ACTION_STACK_VALUE_FUNCTION;
 	ctor_var.data.numeric_value = (u64) ctor;
 	setPropertyWithFlags(app_context, ctor->prototype_obj, "constructor", 11, &ctor_var, PROPERTY_FLAGS_DONTENUM);
+	// __proto__ → Object.prototype (enumerated before constructor in LIFO)
+	setObjectProto(app_context, ctor->prototype_obj);
 	const u8 mflags = PROPERTY_FLAG_WRITABLE; // DONT_ENUM + DONT_DELETE
 	addStubMethodToProto(app_context, ctor->prototype_obj, "connect", 7, mflags);
 	addStubMethodToProto(app_context, ctor->prototype_obj, "send", 4, mflags);
@@ -21589,11 +21636,13 @@ static void initVideoPrototype(SWFAppContext* app_context, ASFunction* ctor)
 	if (ctor->prototype_obj != NULL) return;
 	ctor->prototype_obj = allocObject(app_context, 4);
 	retainObject(ctor->prototype_obj);
-	setObjectProto(app_context, ctor->prototype_obj);
+	// constructor first (enumerated last in LIFO)
 	ActionVar ctor_var = {0};
 	ctor_var.type = ACTION_STACK_VALUE_FUNCTION;
 	ctor_var.data.numeric_value = (u64) ctor;
 	setPropertyWithFlags(app_context, ctor->prototype_obj, "constructor", 11, &ctor_var, PROPERTY_FLAGS_DONTENUM);
+	// __proto__ → Object.prototype (enumerated before constructor in LIFO)
+	setObjectProto(app_context, ctor->prototype_obj);
 	const u8 mflags = PROPERTY_FLAG_WRITABLE; // DONT_ENUM + DONT_DELETE
 	addStubMethodToProto(app_context, ctor->prototype_obj, "attachVideo", 11, mflags);
 	addStubMethodToProto(app_context, ctor->prototype_obj, "clear", 5, mflags);
@@ -21605,11 +21654,13 @@ static void initXMLSocketPrototype(SWFAppContext* app_context, ASFunction* ctor)
 	if (ctor->prototype_obj != NULL) return;
 	ctor->prototype_obj = allocObject(app_context, 8);
 	retainObject(ctor->prototype_obj);
-	setObjectProto(app_context, ctor->prototype_obj);
+	// constructor first (enumerated last in LIFO)
 	ActionVar ctor_var = {0};
 	ctor_var.type = ACTION_STACK_VALUE_FUNCTION;
 	ctor_var.data.numeric_value = (u64) ctor;
 	setPropertyWithFlags(app_context, ctor->prototype_obj, "constructor", 11, &ctor_var, PROPERTY_FLAGS_DONTENUM);
+	// __proto__ → Object.prototype (enumerated before constructor in LIFO)
+	setObjectProto(app_context, ctor->prototype_obj);
 	const u8 mflags = PROPERTY_FLAG_WRITABLE; // DONT_ENUM + DONT_DELETE
 	addStubMethodToProto(app_context, ctor->prototype_obj, "connect", 7, mflags);
 	addStubMethodToProto(app_context, ctor->prototype_obj, "send", 4, mflags);
@@ -21627,11 +21678,13 @@ static void initContextMenuPrototype(SWFAppContext* app_context, ASFunction* cto
 	if (ctor->prototype_obj != NULL) return;
 	ctor->prototype_obj = allocObject(app_context, 4);
 	retainObject(ctor->prototype_obj);
-	setObjectProto(app_context, ctor->prototype_obj);
+	// constructor first (enumerated last in LIFO)
 	ActionVar ctor_var = {0};
 	ctor_var.type = ACTION_STACK_VALUE_FUNCTION;
 	ctor_var.data.numeric_value = (u64) ctor;
 	setPropertyWithFlags(app_context, ctor->prototype_obj, "constructor", 11, &ctor_var, PROPERTY_FLAGS_DONTENUM);
+	// __proto__ → Object.prototype (enumerated before constructor in LIFO)
+	setObjectProto(app_context, ctor->prototype_obj);
 	const u8 mflags = PROPERTY_FLAG_WRITABLE; // DONT_ENUM + DONT_DELETE
 	// Real copy() implementation
 	memset(&g_cm_copy_func, 0, sizeof(ASFunction));
@@ -21653,11 +21706,13 @@ static void initContextMenuItemPrototype(SWFAppContext* app_context, ASFunction*
 	if (ctor->prototype_obj != NULL) return;
 	ctor->prototype_obj = allocObject(app_context, 4);
 	retainObject(ctor->prototype_obj);
-	setObjectProto(app_context, ctor->prototype_obj);
+	// constructor first (enumerated last in LIFO)
 	ActionVar ctor_var = {0};
 	ctor_var.type = ACTION_STACK_VALUE_FUNCTION;
 	ctor_var.data.numeric_value = (u64) ctor;
 	setPropertyWithFlags(app_context, ctor->prototype_obj, "constructor", 11, &ctor_var, PROPERTY_FLAGS_DONTENUM);
+	// __proto__ → Object.prototype (enumerated before constructor in LIFO)
+	setObjectProto(app_context, ctor->prototype_obj);
 	const u8 mflags = PROPERTY_FLAG_WRITABLE; // DONT_ENUM + DONT_DELETE
 	// Real copy() implementation
 	memset(&g_cmi_copy_func, 0, sizeof(ASFunction));
@@ -21678,11 +21733,13 @@ static void initLoadVarsPrototype(SWFAppContext* app_context, ASFunction* ctor)
 	if (ctor->prototype_obj != NULL) return;
 	ctor->prototype_obj = allocObject(app_context, 14);
 	retainObject(ctor->prototype_obj);
-	setObjectProto(app_context, ctor->prototype_obj);
+	// constructor first (enumerated last in LIFO)
 	ActionVar ctor_var = {0};
 	ctor_var.type = ACTION_STACK_VALUE_FUNCTION;
 	ctor_var.data.numeric_value = (u64) ctor;
 	setPropertyWithFlags(app_context, ctor->prototype_obj, "constructor", 11, &ctor_var, PROPERTY_FLAGS_DONTENUM);
+	// __proto__ → Object.prototype (enumerated before constructor in LIFO)
+	setObjectProto(app_context, ctor->prototype_obj);
 	const u8 mflags = PROPERTY_FLAG_WRITABLE; // DONT_ENUM + DONT_DELETE
 	addStubMethodToProto(app_context, ctor->prototype_obj, "load", 4, mflags);
 	addStubMethodToProto(app_context, ctor->prototype_obj, "send", 4, mflags);
@@ -21706,11 +21763,13 @@ static void initButtonPrototype(SWFAppContext* app_context, ASFunction* ctor)
 	if (ctor->prototype_obj != NULL) return;
 	ctor->prototype_obj = allocObject(app_context, 10);
 	retainObject(ctor->prototype_obj);
-	setObjectProto(app_context, ctor->prototype_obj);
+	// constructor first (enumerated last in LIFO)
 	ActionVar ctor_var = {0};
 	ctor_var.type = ACTION_STACK_VALUE_FUNCTION;
 	ctor_var.data.numeric_value = (u64) ctor;
 	setPropertyWithFlags(app_context, ctor->prototype_obj, "constructor", 11, &ctor_var, PROPERTY_FLAGS_DONTENUM);
+	// __proto__ → Object.prototype (enumerated before constructor in LIFO)
+	setObjectProto(app_context, ctor->prototype_obj);
 	// Button proto methods are NOT DONT_ENUM
 	addStubMethodToProto(app_context, ctor->prototype_obj, "getDepth", 8, PROPERTY_FLAGS_DEFAULT);
 	// Boolean properties (enumerable, writable)
@@ -21734,11 +21793,13 @@ static void initColorStubPrototype(SWFAppContext* app_context, ASFunction* ctor)
 	if (ctor->prototype_obj != NULL) return;
 	ctor->prototype_obj = allocObject(app_context, 6);
 	retainObject(ctor->prototype_obj);
-	setObjectProto(app_context, ctor->prototype_obj);
+	// constructor first (enumerated last in LIFO)
 	ActionVar ctor_var = {0};
 	ctor_var.type = ACTION_STACK_VALUE_FUNCTION;
 	ctor_var.data.numeric_value = (u64) ctor;
-	setPropertyWithFlags(app_context, ctor->prototype_obj, "constructor", 11, &ctor_var, 0); // READ_ONLY too
+	setPropertyWithFlags(app_context, ctor->prototype_obj, "constructor", 11, &ctor_var, PROPERTY_FLAGS_DONTENUM);
+	// __proto__ → Object.prototype (enumerated before constructor in LIFO)
+	setObjectProto(app_context, ctor->prototype_obj);
 	const u8 mflags = 0; // DONT_ENUM + DONT_DELETE + READ_ONLY = no flags
 	addStubMethodToProto(app_context, ctor->prototype_obj, "setRGB", 6, mflags);
 	addStubMethodToProto(app_context, ctor->prototype_obj, "setTransform", 12, mflags);
@@ -21753,11 +21814,374 @@ static void initAsBroadcasterPrototype(SWFAppContext* app_context, ASFunction* c
 	if (ctor->prototype_obj != NULL) return;
 	ctor->prototype_obj = allocObject(app_context, 4);
 	retainObject(ctor->prototype_obj);
-	setObjectProto(app_context, ctor->prototype_obj);
+	// constructor first (enumerated last in LIFO)
 	ActionVar ctor_var = {0};
 	ctor_var.type = ACTION_STACK_VALUE_FUNCTION;
 	ctor_var.data.numeric_value = (u64) ctor;
 	setPropertyWithFlags(app_context, ctor->prototype_obj, "constructor", 11, &ctor_var, PROPERTY_FLAGS_DONTENUM);
+	// __proto__ → Object.prototype (enumerated before constructor in LIFO)
+	setObjectProto(app_context, ctor->prototype_obj);
+}
+
+// ---- initSystemObject: create System built-in (idempotent) ----
+static void initSystemObject(SWFAppContext* app_context)
+{
+	if (g_system_object != NULL) return;
+
+	g_system_object = allocObject(app_context, 4);
+	setObjectProto(app_context, g_system_object);
+	ASObject* security_obj = allocObject(app_context, 4);
+	setObjectProto(app_context, security_obj);
+	ActionVar sandbox_val = {0};
+	sandbox_val.type = ACTION_STACK_VALUE_STRING;
+	if (g_use_network) {
+		sandbox_val.str_size = 16;
+		VAL(u64, &sandbox_val.data.numeric_value) = (u64)u16_localWithNetwork;
+	} else {
+		sandbox_val.str_size = 13;
+		VAL(u64, &sandbox_val.data.numeric_value) = (u64)u16_localWithFile;
+	}
+	setProperty(app_context, security_obj, "sandboxType", 11, &sandbox_val);
+	ActionVar security_var = {0};
+	security_var.type = ACTION_STACK_VALUE_OBJECT;
+	VAL(u64, &security_var.data.numeric_value) = (u64)security_obj;
+	setProperty(app_context, g_system_object, "security", 8, &security_var);
+
+	// System.capabilities object
+	ASObject* caps_obj = allocObject(app_context, 16);
+	setObjectProto(app_context, caps_obj);
+	ActionVar cap_val = {0};
+	cap_val.type = ACTION_STACK_VALUE_F64;
+	VAL(double, &cap_val.data.numeric_value) = 1536.0;
+	setProperty(app_context, caps_obj, "screenResolutionX", 17, &cap_val);
+	VAL(double, &cap_val.data.numeric_value) = 864.0;
+	setProperty(app_context, caps_obj, "screenResolutionY", 17, &cap_val);
+	VAL(double, &cap_val.data.numeric_value) = 1.0;
+	setProperty(app_context, caps_obj, "pixelAspectRatio", 16, &cap_val);
+	VAL(double, &cap_val.data.numeric_value) = 72.0;
+	setProperty(app_context, caps_obj, "screenDPI", 9, &cap_val);
+	ActionVar pt_val = {0};
+	pt_val.type = ACTION_STACK_VALUE_STRING;
+	pt_val.str_size = 10;
+	VAL(u64, &pt_val.data.numeric_value) = (u64)u16_StandAlone;
+	setProperty(app_context, caps_obj, "playerType", 10, &pt_val);
+	ActionVar ver_val = {0};
+	ver_val.type = ACTION_STACK_VALUE_STRING;
+	ver_val.str_size = 13;
+	VAL(u64, &ver_val.data.numeric_value) = (u64)u16_WIN_ver;
+	setProperty(app_context, caps_obj, "version", 7, &ver_val);
+	ActionVar os_val = {0};
+	os_val.type = ACTION_STACK_VALUE_STRING;
+	os_val.str_size = 10;
+	VAL(u64, &os_val.data.numeric_value) = (u64)u16_Windows_XP;
+	setProperty(app_context, caps_obj, "os", 2, &os_val);
+	ActionVar mfr_val = {0};
+	mfr_val.type = ACTION_STACK_VALUE_STRING;
+	mfr_val.str_size = 18;
+	VAL(u64, &mfr_val.data.numeric_value) = (u64)u16_Macromedia_Windows;
+	setProperty(app_context, caps_obj, "manufacturer", 12, &mfr_val);
+	ActionVar lang_val = {0};
+	lang_val.type = ACTION_STACK_VALUE_STRING;
+	lang_val.str_size = 2;
+	VAL(u64, &lang_val.data.numeric_value) = (u64)u16_en;
+	setProperty(app_context, caps_obj, "language", 8, &lang_val);
+	cap_val.type = ACTION_STACK_VALUE_BOOLEAN;
+	VAL(u32, &cap_val.data.numeric_value) = 0;
+	setProperty(app_context, caps_obj, "isDebugger", 10, &cap_val);
+	cap_val.type = ACTION_STACK_VALUE_BOOLEAN;
+	VAL(u32, &cap_val.data.numeric_value) = 1;
+	setProperty(app_context, caps_obj, "hasAudio", 8, &cap_val);
+	cap_val.type = ACTION_STACK_VALUE_BOOLEAN;
+	VAL(u32, &cap_val.data.numeric_value) = 1;
+	setProperty(app_context, caps_obj, "hasVideoEncoder", 15, &cap_val);
+	ActionVar caps_var = {0};
+	caps_var.type = ACTION_STACK_VALUE_OBJECT;
+	VAL(u64, &caps_var.data.numeric_value) = (u64)caps_obj;
+	setProperty(app_context, g_system_object, "capabilities", 12, &caps_var);
+
+	ASObject* ime_obj = allocObject(app_context, 4);
+	setObjectProto(app_context, ime_obj);
+	installAsBroadcaster(app_context, ime_obj);
+	ActionVar ime_var = {0};
+	ime_var.type = ACTION_STACK_VALUE_OBJECT;
+	VAL(u64, &ime_var.data.numeric_value) = (u64)ime_obj;
+	setProperty(app_context, g_system_object, "IME", 3, &ime_var);
+
+	installNativeToString(app_context, g_system_object);
+	installNativeToString(app_context, security_obj);
+	installNativeToString(app_context, caps_obj);
+	installNativeToString(app_context, ime_obj);
+}
+
+// ---- initFlashPackage: create flash.* package hierarchy (idempotent, SWF8+) ----
+static int g_flash_init_done = 0;
+static void initFlashPackage(SWFAppContext* app_context)
+{
+	if (g_flash_init_done) return;
+	g_flash_init_done = 1;
+
+	// g_flash_object may have been pre-created by ensureGlobalInit with
+	// constructor + __proto__ already set. If not, create it here.
+	if (g_flash_object == NULL) {
+		g_flash_object = allocObject(app_context, 12);
+		setObjectProto(app_context, g_flash_object);
+	}
+
+	// Helper: create a stub constructor ASFunction
+	#define MAKE_STUB_CTOR(varname, namestr) \
+		static ASFunction varname; \
+		memset(&varname, 0, sizeof(ASFunction)); \
+		strncpy(varname.name, namestr, 255); \
+		varname.function_type = 1;
+	#define SET_CTOR_PROP(parent, propname, proplen, ctorvar) \
+		{ ActionVar _cv = {0}; _cv.type = ACTION_STACK_VALUE_FUNCTION; \
+		  VAL(u64, &_cv.data.numeric_value) = (u64)&ctorvar; \
+		  setProperty(app_context, parent, propname, proplen, &_cv); }
+	#define MAKE_PKG(varname, parent, propname, proplen, capacity) \
+		ASObject* varname = allocObject(app_context, capacity); \
+		setObjectProto(app_context, varname); \
+		{ ActionVar _pv = {0}; _pv.type = ACTION_STACK_VALUE_OBJECT; \
+		  VAL(u64, &_pv.data.numeric_value) = (u64)varname; \
+		  setProperty(app_context, parent, propname, proplen, &_pv); }
+
+	// Registration order is reversed from desired enumeration order (LIFO).
+	// Desired enumeration: automation, external, net, geom, filters, display, text
+	// So insertion order: text, display, filters, geom, net, external, automation
+
+	// flash.text
+	MAKE_PKG(text_obj, g_flash_object, "text", 4, 4);
+	MAKE_STUB_CTOR(fc_TextRenderer, "TextRenderer");
+	SET_CTOR_PROP(text_obj, "TextRenderer", 12, fc_TextRenderer);
+
+	// flash.display
+	MAKE_PKG(display_obj, g_flash_object, "display", 7, 4);
+	MAKE_STUB_CTOR(fc_BitmapData, "BitmapData");
+	SET_CTOR_PROP(display_obj, "BitmapData", 10, fc_BitmapData);
+
+	// flash.filters (10 filter classes)
+	MAKE_PKG(filters_obj, g_flash_object, "filters", 7, 12);
+	MAKE_STUB_CTOR(fc_BevelFilter, "BevelFilter");
+	SET_CTOR_PROP(filters_obj, "BevelFilter", 11, fc_BevelFilter);
+	MAKE_STUB_CTOR(fc_BitmapFilter, "BitmapFilter");
+	SET_CTOR_PROP(filters_obj, "BitmapFilter", 12, fc_BitmapFilter);
+	MAKE_STUB_CTOR(fc_BlurFilter, "BlurFilter");
+	SET_CTOR_PROP(filters_obj, "BlurFilter", 10, fc_BlurFilter);
+	MAKE_STUB_CTOR(fc_ColorMatrixFilter, "ColorMatrixFilter");
+	SET_CTOR_PROP(filters_obj, "ColorMatrixFilter", 17, fc_ColorMatrixFilter);
+	MAKE_STUB_CTOR(fc_ConvolutionFilter, "ConvolutionFilter");
+	SET_CTOR_PROP(filters_obj, "ConvolutionFilter", 17, fc_ConvolutionFilter);
+	MAKE_STUB_CTOR(fc_DisplacementMapFilter, "DisplacementMapFilter");
+	SET_CTOR_PROP(filters_obj, "DisplacementMapFilter", 21, fc_DisplacementMapFilter);
+	MAKE_STUB_CTOR(fc_DropShadowFilter, "DropShadowFilter");
+	SET_CTOR_PROP(filters_obj, "DropShadowFilter", 16, fc_DropShadowFilter);
+	MAKE_STUB_CTOR(fc_GlowFilter, "GlowFilter");
+	SET_CTOR_PROP(filters_obj, "GlowFilter", 10, fc_GlowFilter);
+	MAKE_STUB_CTOR(fc_GradientBevelFilter, "GradientBevelFilter");
+	SET_CTOR_PROP(filters_obj, "GradientBevelFilter", 19, fc_GradientBevelFilter);
+	MAKE_STUB_CTOR(fc_GradientGlowFilter, "GradientGlowFilter");
+	SET_CTOR_PROP(filters_obj, "GradientGlowFilter", 18, fc_GradientGlowFilter);
+
+	// flash.geom (5 classes)
+	MAKE_PKG(geom_obj, g_flash_object, "geom", 4, 8);
+	// ColorTransform constructor with prototype
+	initColorTransformPrototype(app_context);
+	static ASFunction fc_ColorTransform;
+	memset(&fc_ColorTransform, 0, sizeof(ASFunction));
+	strncpy(fc_ColorTransform.name, "ColorTransform", 255);
+	fc_ColorTransform.function_type = 2;
+	fc_ColorTransform.advanced_func = (Function2Ptr)colorTransformConstructor;
+	fc_ColorTransform.prototype_obj = g_color_transform_prototype;
+	retainObject(g_color_transform_prototype);
+	if (function_count < MAX_FUNCTIONS) function_registry[function_count++] = &fc_ColorTransform;
+	SET_CTOR_PROP(geom_obj, "ColorTransform", 14, fc_ColorTransform);
+	// Initialize geometry prototypes (Point, Matrix, Rectangle)
+	initGeomPrototypes(app_context);
+
+	// Point constructor with prototype and static methods
+	static ASFunction fc_Point;
+	memset(&fc_Point, 0, sizeof(ASFunction));
+	strncpy(fc_Point.name, "Point", 255);
+	fc_Point.function_type = 2;
+	fc_Point.advanced_func = (Function2Ptr)pointConstructor;
+	fc_Point.prototype_obj = g_point_prototype;
+	retainObject(g_point_prototype);
+	if (function_count < MAX_FUNCTIONS) function_registry[function_count++] = &fc_Point;
+	// Static methods on Point constructor (own_props)
+	fc_Point.own_props = allocObject(app_context, 4);
+	retainObject(fc_Point.own_props);
+	registerGeomMethod(&g_point_statics[0], "distance",    (Function2Ptr)pointDistance,    app_context, fc_Point.own_props);
+	registerGeomMethod(&g_point_statics[1], "interpolate", (Function2Ptr)pointInterpolate, app_context, fc_Point.own_props);
+	registerGeomMethod(&g_point_statics[2], "polar",       (Function2Ptr)pointPolar,       app_context, fc_Point.own_props);
+	SET_CTOR_PROP(geom_obj, "Point", 5, fc_Point);
+
+	// Matrix constructor with prototype
+	static ASFunction fc_Matrix;
+	memset(&fc_Matrix, 0, sizeof(ASFunction));
+	strncpy(fc_Matrix.name, "Matrix", 255);
+	fc_Matrix.function_type = 2;
+	fc_Matrix.advanced_func = (Function2Ptr)matrixConstructor;
+	fc_Matrix.prototype_obj = g_matrix_prototype;
+	retainObject(g_matrix_prototype);
+	if (function_count < MAX_FUNCTIONS) function_registry[function_count++] = &fc_Matrix;
+	SET_CTOR_PROP(geom_obj, "Matrix", 6, fc_Matrix);
+
+	// Rectangle constructor with prototype
+	static ASFunction fc_Rectangle;
+	memset(&fc_Rectangle, 0, sizeof(ASFunction));
+	strncpy(fc_Rectangle.name, "Rectangle", 255);
+	fc_Rectangle.function_type = 2;
+	fc_Rectangle.advanced_func = (Function2Ptr)rectangleConstructor;
+	fc_Rectangle.prototype_obj = g_rect_prototype;
+	retainObject(g_rect_prototype);
+	if (function_count < MAX_FUNCTIONS) function_registry[function_count++] = &fc_Rectangle;
+	SET_CTOR_PROP(geom_obj, "Rectangle", 9, fc_Rectangle);
+	MAKE_STUB_CTOR(fc_Transform, "Transform");
+	SET_CTOR_PROP(geom_obj, "Transform", 9, fc_Transform);
+
+	// flash.net
+	MAKE_PKG(net_obj, g_flash_object, "net", 3, 4);
+	MAKE_STUB_CTOR(fc_FileReference, "FileReference");
+	SET_CTOR_PROP(net_obj, "FileReference", 13, fc_FileReference);
+	MAKE_STUB_CTOR(fc_FileReferenceList, "FileReferenceList");
+	SET_CTOR_PROP(net_obj, "FileReferenceList", 17, fc_FileReferenceList);
+
+	// flash.external
+	MAKE_PKG(external_obj, g_flash_object, "external", 8, 4);
+	MAKE_STUB_CTOR(fc_ExternalInterface, "ExternalInterface");
+	// Add static methods on ExternalInterface
+	fc_ExternalInterface.own_props = allocObject(app_context, 16);
+	retainObject(fc_ExternalInterface.own_props);
+	{
+		memset(&g_ei_escapeXML_func, 0, sizeof(ASFunction));
+		strncpy(g_ei_escapeXML_func.name, "_escapeXML", 255);
+		g_ei_escapeXML_func.function_type = 2;
+		g_ei_escapeXML_func.advanced_func = (Function2Ptr)actionEI_escapeXML;
+		ActionVar _ev = {0}; _ev.type = ACTION_STACK_VALUE_FUNCTION;
+		VAL(u64, &_ev.data.numeric_value) = (u64)&g_ei_escapeXML_func;
+		setProperty(app_context, fc_ExternalInterface.own_props, "_escapeXML", 10, &_ev);
+
+		memset(&g_ei_unescapeXML_func, 0, sizeof(ASFunction));
+		strncpy(g_ei_unescapeXML_func.name, "_unescapeXML", 255);
+		g_ei_unescapeXML_func.function_type = 2;
+		g_ei_unescapeXML_func.advanced_func = (Function2Ptr)actionEI_unescapeXML;
+		_ev.type = ACTION_STACK_VALUE_FUNCTION;
+		VAL(u64, &_ev.data.numeric_value) = (u64)&g_ei_unescapeXML_func;
+		setProperty(app_context, fc_ExternalInterface.own_props, "_unescapeXML", 12, &_ev);
+
+		memset(&g_ei_jsQuoteString_func, 0, sizeof(ASFunction));
+		strncpy(g_ei_jsQuoteString_func.name, "_jsQuoteString", 255);
+		g_ei_jsQuoteString_func.function_type = 2;
+		g_ei_jsQuoteString_func.advanced_func = (Function2Ptr)actionEI_jsQuoteString;
+		_ev.type = ACTION_STACK_VALUE_FUNCTION;
+		VAL(u64, &_ev.data.numeric_value) = (u64)&g_ei_jsQuoteString_func;
+		setProperty(app_context, fc_ExternalInterface.own_props, "_jsQuoteString", 14, &_ev);
+
+		// Phase 2: XML serialization methods
+		memset(&g_ei_toXML_func, 0, sizeof(ASFunction));
+		strncpy(g_ei_toXML_func.name, "_toXML", 255);
+		g_ei_toXML_func.function_type = 2;
+		g_ei_toXML_func.advanced_func = (Function2Ptr)actionEI_toXML;
+		_ev.type = ACTION_STACK_VALUE_FUNCTION;
+		VAL(u64, &_ev.data.numeric_value) = (u64)&g_ei_toXML_func;
+		setProperty(app_context, fc_ExternalInterface.own_props, "_toXML", 6, &_ev);
+
+		memset(&g_ei_arrayToXML_func, 0, sizeof(ASFunction));
+		strncpy(g_ei_arrayToXML_func.name, "_arrayToXML", 255);
+		g_ei_arrayToXML_func.function_type = 2;
+		g_ei_arrayToXML_func.advanced_func = (Function2Ptr)actionEI_arrayToXML;
+		_ev.type = ACTION_STACK_VALUE_FUNCTION;
+		VAL(u64, &_ev.data.numeric_value) = (u64)&g_ei_arrayToXML_func;
+		setProperty(app_context, fc_ExternalInterface.own_props, "_arrayToXML", 11, &_ev);
+
+		memset(&g_ei_argumentsToXML_func, 0, sizeof(ASFunction));
+		strncpy(g_ei_argumentsToXML_func.name, "_argumentsToXML", 255);
+		g_ei_argumentsToXML_func.function_type = 2;
+		g_ei_argumentsToXML_func.advanced_func = (Function2Ptr)actionEI_argumentsToXML;
+		_ev.type = ACTION_STACK_VALUE_FUNCTION;
+		VAL(u64, &_ev.data.numeric_value) = (u64)&g_ei_argumentsToXML_func;
+		setProperty(app_context, fc_ExternalInterface.own_props, "_argumentsToXML", 15, &_ev);
+
+		memset(&g_ei_objectToXML_func, 0, sizeof(ASFunction));
+		strncpy(g_ei_objectToXML_func.name, "_objectToXML", 255);
+		g_ei_objectToXML_func.function_type = 2;
+		g_ei_objectToXML_func.advanced_func = (Function2Ptr)actionEI_objectToXML;
+		_ev.type = ACTION_STACK_VALUE_FUNCTION;
+		VAL(u64, &_ev.data.numeric_value) = (u64)&g_ei_objectToXML_func;
+		setProperty(app_context, fc_ExternalInterface.own_props, "_objectToXML", 12, &_ev);
+
+		// Phase 3: XML-to-AS deserialization methods
+		memset(&g_ei_toAS_func, 0, sizeof(ASFunction));
+		strncpy(g_ei_toAS_func.name, "_toAS", 255);
+		g_ei_toAS_func.function_type = 2;
+		g_ei_toAS_func.advanced_func = (Function2Ptr)actionEI_toAS;
+		_ev.type = ACTION_STACK_VALUE_FUNCTION;
+		VAL(u64, &_ev.data.numeric_value) = (u64)&g_ei_toAS_func;
+		setProperty(app_context, fc_ExternalInterface.own_props, "_toAS", 5, &_ev);
+
+		memset(&g_ei_arrayToAS_func, 0, sizeof(ASFunction));
+		strncpy(g_ei_arrayToAS_func.name, "_arrayToAS", 255);
+		g_ei_arrayToAS_func.function_type = 2;
+		g_ei_arrayToAS_func.advanced_func = (Function2Ptr)actionEI_arrayToAS;
+		_ev.type = ACTION_STACK_VALUE_FUNCTION;
+		VAL(u64, &_ev.data.numeric_value) = (u64)&g_ei_arrayToAS_func;
+		setProperty(app_context, fc_ExternalInterface.own_props, "_arrayToAS", 10, &_ev);
+
+		memset(&g_ei_argumentsToAS_func, 0, sizeof(ASFunction));
+		strncpy(g_ei_argumentsToAS_func.name, "_argumentsToAS", 255);
+		g_ei_argumentsToAS_func.function_type = 2;
+		g_ei_argumentsToAS_func.advanced_func = (Function2Ptr)actionEI_argumentsToAS;
+		_ev.type = ACTION_STACK_VALUE_FUNCTION;
+		VAL(u64, &_ev.data.numeric_value) = (u64)&g_ei_argumentsToAS_func;
+		setProperty(app_context, fc_ExternalInterface.own_props, "_argumentsToAS", 14, &_ev);
+
+		memset(&g_ei_objectToAS_func, 0, sizeof(ASFunction));
+		strncpy(g_ei_objectToAS_func.name, "_objectToAS", 255);
+		g_ei_objectToAS_func.function_type = 2;
+		g_ei_objectToAS_func.advanced_func = (Function2Ptr)actionEI_objectToAS;
+		_ev.type = ACTION_STACK_VALUE_FUNCTION;
+		VAL(u64, &_ev.data.numeric_value) = (u64)&g_ei_objectToAS_func;
+		setProperty(app_context, fc_ExternalInterface.own_props, "_objectToAS", 11, &_ev);
+
+		// Phase 4: Bridge methods (available, addCallback, call)
+		memset(&g_ei_addCallback_func, 0, sizeof(ASFunction));
+		strncpy(g_ei_addCallback_func.name, "addCallback", 255);
+		g_ei_addCallback_func.function_type = 2;
+		g_ei_addCallback_func.advanced_func = (Function2Ptr)actionEI_addCallback;
+		_ev.type = ACTION_STACK_VALUE_FUNCTION;
+		VAL(u64, &_ev.data.numeric_value) = (u64)&g_ei_addCallback_func;
+		setProperty(app_context, fc_ExternalInterface.own_props, "addCallback", 11, &_ev);
+
+		memset(&g_ei_call_func, 0, sizeof(ASFunction));
+		strncpy(g_ei_call_func.name, "call", 255);
+		g_ei_call_func.function_type = 2;
+		g_ei_call_func.advanced_func = (Function2Ptr)actionEI_call;
+		_ev.type = ACTION_STACK_VALUE_FUNCTION;
+		VAL(u64, &_ev.data.numeric_value) = (u64)&g_ei_call_func;
+		setProperty(app_context, fc_ExternalInterface.own_props, "call", 4, &_ev);
+
+		// available — set as boolean based on whether external call handler is present
+		// (handler is set by test_harness_init before swfStart, so this check works)
+		{
+			ActionVar av_bool = {0};
+			av_bool.type = ACTION_STACK_VALUE_BOOLEAN;
+			av_bool.data.numeric_value = (g_external_call_handler != NULL) ? 1 : 0;
+			setProperty(app_context, fc_ExternalInterface.own_props, "available", 9, &av_bool);
+		}
+	}
+	SET_CTOR_PROP(external_obj, "ExternalInterface", 17, fc_ExternalInterface);
+
+	// flash.automation — LIFO insertion order: StageCapture, ActionGenerator, Configuration
+	MAKE_PKG(automation_obj, g_flash_object, "automation", 10, 4);
+	MAKE_STUB_CTOR(fc_StageCapture, "StageCapture");
+	SET_CTOR_PROP(automation_obj, "StageCapture", 12, fc_StageCapture);
+	MAKE_STUB_CTOR(fc_ActionGenerator, "ActionGenerator");
+	SET_CTOR_PROP(automation_obj, "ActionGenerator", 15, fc_ActionGenerator);
+	MAKE_STUB_CTOR(fc_Configuration, "Configuration");
+	SET_CTOR_PROP(automation_obj, "Configuration", 13, fc_Configuration);
+
+	#undef MAKE_STUB_CTOR
+	#undef SET_CTOR_PROP
+	#undef MAKE_PKG
 }
 
 static void ensureGlobalInit(SWFAppContext* app_context)
@@ -22006,19 +22430,21 @@ static void ensureGlobalInit(SWFAppContext* app_context)
 		if (g_stub_ctors[9].prototype_obj == NULL) {
 			g_stub_ctors[9].prototype_obj = allocObject(app_context, 12);
 			retainObject(g_stub_ctors[9].prototype_obj);
-			setObjectProto(app_context, g_stub_ctors[9].prototype_obj);
+			// constructor first (enumerated last in LIFO)
 			ActionVar ctor_var = {0};
 			ctor_var.type = ACTION_STACK_VALUE_FUNCTION;
 			ctor_var.data.numeric_value = (u64)&g_stub_ctors[9];
 			setPropertyWithFlags(app_context, g_stub_ctors[9].prototype_obj, "constructor", 11, &ctor_var, PROPERTY_FLAGS_DONTENUM);
+			// __proto__ second (enumerated before constructor in LIFO)
+			setObjectProto(app_context, g_stub_ctors[9].prototype_obj);
 		}
 		initMCLFuncs();
 		fv.data.numeric_value = (u64)&g_mcl_loadClip_func;
 		setPropertyWithFlags(app_context, g_stub_ctors[9].prototype_obj, "loadClip", 8, &fv, PROPERTY_FLAG_WRITABLE);
-		fv.data.numeric_value = (u64)&g_mcl_unloadClip_func;
-		setPropertyWithFlags(app_context, g_stub_ctors[9].prototype_obj, "unloadClip", 10, &fv, PROPERTY_FLAG_WRITABLE);
 		fv.data.numeric_value = (u64)&g_mcl_getProgress_func;
 		setPropertyWithFlags(app_context, g_stub_ctors[9].prototype_obj, "getProgress", 11, &fv, PROPERTY_FLAG_WRITABLE);
+		fv.data.numeric_value = (u64)&g_mcl_unloadClip_func;
+		setPropertyWithFlags(app_context, g_stub_ctors[9].prototype_obj, "unloadClip", 10, &fv, PROPERTY_FLAG_WRITABLE);
 		fv.data.numeric_value = (u64)&g_ab_broadcastMessage_func;
 		setPropertyWithFlags(app_context, g_stub_ctors[9].prototype_obj, "broadcastMessage", 16, &fv, PROPERTY_FLAG_WRITABLE);
 		fv.data.numeric_value = (u64)&g_ab_addListener_func;
@@ -22066,41 +22492,43 @@ static void ensureGlobalInit(SWFAppContext* app_context)
 		setProperty(app_context, g_soundcodec_obj, "NELLYMOSER", 10, &sv);
 	}
 
-	// ---- textRenderer (function with own_props) ----
+	// ---- textRenderer (function with prototype_obj, own_props populated later in Phase 8c-2) ----
 	{
-		static ASFunction g_textrenderer_ctor;
-		static int g_tr_init = 0;
 		if (!g_tr_init) {
 			memset(&g_textrenderer_ctor, 0, sizeof(ASFunction));
 			strncpy(g_textrenderer_ctor.name, "textRenderer", 255);
 			g_textrenderer_ctor.function_type = 1;
-			g_textrenderer_ctor.own_props = NULL; // will be created below
+			g_textrenderer_ctor.own_props = NULL;
+			// Create a minimal prototype_obj for textRenderer
+			g_textrenderer_ctor.prototype_obj = allocObject(app_context, 4);
+			retainObject(g_textrenderer_ctor.prototype_obj);
+			// Prototype: constructor first, __proto__ second (LIFO: __proto__, constructor)
+			{
+				ActionVar cv = {0}; cv.type = ACTION_STACK_VALUE_FUNCTION;
+				cv.data.numeric_value = (u64)&g_textrenderer_ctor;
+				setPropertyWithFlags(app_context, g_textrenderer_ctor.prototype_obj, "constructor", 11, &cv, PROPERTY_FLAGS_DONTENUM);
+			}
+			setObjectProto(app_context, g_textrenderer_ctor.prototype_obj);
 			g_tr_init = 1;
 		}
-		if (g_textrenderer_ctor.own_props == NULL) {
-			g_textrenderer_ctor.own_props = allocObject(app_context, 8);
-			retainObject(g_textrenderer_ctor.own_props);
-			setObjectProto(app_context, g_textrenderer_ctor.own_props);
-			ActionVar sv;
-			#define TR_RO (PROPERTY_FLAG_ENUMERABLE | PROPERTY_FLAG_CONFIGURABLE)
-			sv = makeStringActionVar(app_context, "normal", 6);
-			setPropertyWithFlags(app_context, g_textrenderer_ctor.own_props, "displayMode", 11, &sv, TR_RO);
-			sv = makeF64(0.0);
-			setPropertyWithFlags(app_context, g_textrenderer_ctor.own_props, "maxLevel", 8, &sv, TR_RO);
-			// setAdvancedAntialiasingTable method (writable)
-			static ASFunction g_tr_setAATable_func;
-			memset(&g_tr_setAATable_func, 0, sizeof(ASFunction));
-			strncpy(g_tr_setAATable_func.name, "setAdvancedAntialiasingTable", 255);
-			g_tr_setAATable_func.function_type = 2;
-			g_tr_setAATable_func.advanced_func = (Function2Ptr)builtin_noop_func;
-			ActionVar fv = {0};
-			fv.type = ACTION_STACK_VALUE_FUNCTION;
-			fv.data.numeric_value = (u64)&g_tr_setAATable_func;
-			setProperty(app_context, g_textrenderer_ctor.own_props, "setAdvancedAntialiasingTable", 28, &fv);
-			#undef TR_RO
-		}
-		g_textrenderer_obj = (ASObject*)&g_textrenderer_ctor; // used for registration
+		g_textrenderer_obj = (ASObject*)&g_textrenderer_ctor;
 	}
+
+	// ---- Initialize System and flash package objects ----
+	initSystemObject(app_context);
+	// Pre-create g_flash_object with constructor + __proto__ in correct LIFO order
+	// before initFlashPackage adds sub-packages. This ensures constructor and __proto__
+	// appear AFTER sub-packages in for-in (they were added first = LIFO last).
+	if (g_swf_version >= 8 && g_flash_object == NULL) {
+		g_flash_object = allocObject(app_context, 12);
+		// constructor first (enumerated last in LIFO)
+		ActionVar cv = {0}; cv.type = ACTION_STACK_VALUE_FUNCTION;
+		cv.data.numeric_value = (u64)&g_ctors[0];
+		setPropertyWithFlags(app_context, g_flash_object, "constructor", 11, &cv, PROPERTY_FLAGS_DONTENUM);
+		// __proto__ second (enumerated before constructor in LIFO)
+		setObjectProto(app_context, g_flash_object);
+	}
+	if (g_swf_version >= 8) initFlashPackage(app_context);
 
 	// ========== PHASE B: Register on global_object in correct LIFO order ==========
 	// First registered = last in for-in. Last registered = first in for-in.
@@ -22188,21 +22616,18 @@ static void ensureGlobalInit(SWFAppContext* app_context)
 	REG_FUNC("Video", 5, &g_stub_ctors[16]);
 	REG_OBJ("Accessibility", 13, g_accessibility_obj);
 	REG_OBJ("SoundCodec", 10, g_soundcodec_obj);
-	// System and flash are registered here but fully initialized lazily on first access
-	// (their lazy init code in actionGetVariable will use these same static pointers)
+	REG_OBJ("System", 6, g_system_object);
+	if (g_swf_version >= 8) REG_OBJ("flash", 5, g_flash_object);
+	REG_FUNC("textRenderer", 12, (ASFunction*)&g_textrenderer_ctor);
 	REG_FUNC("LocalConnection", 15, &g_stub_ctors[7]);
 	REG_FUNC("MovieClipLoader", 15, &g_stub_ctors[9]);
 	REG_FUNC("PrintJob", 8, &g_stub_ctors[12]);
 	REG_FUNC("TextSnapshot", 12, &g_stub_ctors[15]);
 
-	// valueOf = undefined on _global: required so that object-to-primitive
-	// conversion of _global returns undefined (→ 0 in SWF≤6 numeric context)
-	// rather than falling through to Object.prototype.valueOf (→ "[object Object]" → NaN).
-	{
-		ActionVar undef_val = {0};
-		undef_val.type = ACTION_STACK_VALUE_UNDEFINED;
-		setProperty(app_context, global_object, "valueOf", 7, &undef_val);
-	}
+	// Note: valueOf is NOT set on _global as an own property.
+	// Flash's _global doesn't have valueOf; object-to-primitive falls through to
+	// Object.prototype.valueOf which returns the global object itself.
+	// For SWF<=6 numeric context, the runtime handles _global specially in convertFloat.
 
 	#undef REG_FUNC
 	#undef REG_OBJ
@@ -22279,6 +22704,7 @@ static void ensureGlobalInit(SWFAppContext* app_context)
 			&g_remoteLSOUsage_ctor,
 			&g_assetCache_ctor,
 			&g_asSetupError_ctor,
+			&g_textrenderer_ctor, // textRenderer
 		};
 		int num_all_ctors = sizeof(all_ctors) / sizeof(all_ctors[0]);
 
@@ -22321,6 +22747,24 @@ static void ensureGlobalInit(SWFAppContext* app_context)
 			// Set __proto__ → Function.prototype (if not already set)
 			if (getProperty(ctor->own_props, "__proto__", 9) == NULL)
 				setPropertyWithFlags(app_context, ctor->own_props, "__proto__", 9, &fn_proto_val, PROPERTY_FLAGS_DEFAULT);
+		}
+
+		// ---- textRenderer own_props: add specific properties AFTER Phase 8c-2 ----
+		// Phase 8c-2 added prototype, constructor, __proto__ to textRenderer.own_props.
+		// Now add: setAdvancedAntialiasingTable, maxLevel, displayMode (in reverse LIFO order).
+		if (g_textrenderer_ctor.own_props != NULL && getProperty(g_textrenderer_ctor.own_props, "displayMode", 11) == NULL) {
+			memset(&g_tr_setAATable_func, 0, sizeof(ASFunction));
+			strncpy(g_tr_setAATable_func.name, "setAdvancedAntialiasingTable", 255);
+			g_tr_setAATable_func.function_type = 2;
+			g_tr_setAATable_func.advanced_func = (Function2Ptr)builtin_noop_func;
+			ActionVar fv = {0}; fv.type = ACTION_STACK_VALUE_FUNCTION;
+			fv.data.numeric_value = (u64)&g_tr_setAATable_func;
+			setProperty(app_context, g_textrenderer_ctor.own_props, "setAdvancedAntialiasingTable", 28, &fv);
+			ActionVar sv;
+			sv = makeF64(0.0);
+			setPropertyWithFlags(app_context, g_textrenderer_ctor.own_props, "maxLevel", 8, &sv, PROPERTY_FLAG_ENUMERABLE);
+			sv = makeStringActionVar(app_context, "normal", 6);
+			setPropertyWithFlags(app_context, g_textrenderer_ctor.own_props, "displayMode", 11, &sv, PROPERTY_FLAG_ENUMERABLE);
 		}
 	}
 }
@@ -23772,347 +24216,14 @@ check_special_vars:
 		}
 				else if (var_name_len == 6 && strncmp(var_name, "System", 6) == 0)
 		{
-			// Lazily create System built-in object (uses file-scope g_system_object)
-			if (g_system_object == NULL)
-			{
-				g_system_object = allocObject(app_context, 4);
-				setObjectProto(app_context, g_system_object);
-				ASObject* security_obj = allocObject(app_context, 4);
-				setObjectProto(app_context, security_obj);
-				ActionVar sandbox_val = {0};
-				sandbox_val.type = ACTION_STACK_VALUE_STRING;
-				if (g_use_network) {
-					sandbox_val.str_size = 16;
-					VAL(u64, &sandbox_val.data.numeric_value) = (u64)u16_localWithNetwork;
-				} else {
-					sandbox_val.str_size = 13;
-					VAL(u64, &sandbox_val.data.numeric_value) = (u64)u16_localWithFile;
-				}
-				setProperty(app_context, security_obj, "sandboxType", 11, &sandbox_val);
-				ActionVar security_var = {0};
-				security_var.type = ACTION_STACK_VALUE_OBJECT;
-				VAL(u64, &security_var.data.numeric_value) = (u64)security_obj;
-				setProperty(app_context, g_system_object, "security", 8, &security_var);
-
-				// System.capabilities object
-				ASObject* caps_obj = allocObject(app_context, 16);
-				setObjectProto(app_context, caps_obj);
-				ActionVar cap_val = {0};
-				cap_val.type = ACTION_STACK_VALUE_F64;
-				VAL(double, &cap_val.data.numeric_value) = 1536.0;
-				setProperty(app_context, caps_obj, "screenResolutionX", 17, &cap_val);
-				VAL(double, &cap_val.data.numeric_value) = 864.0;
-				setProperty(app_context, caps_obj, "screenResolutionY", 17, &cap_val);
-				VAL(double, &cap_val.data.numeric_value) = 1.0;
-				setProperty(app_context, caps_obj, "pixelAspectRatio", 16, &cap_val);
-				VAL(double, &cap_val.data.numeric_value) = 72.0;
-				setProperty(app_context, caps_obj, "screenDPI", 9, &cap_val);
-				ActionVar pt_val = {0};
-				pt_val.type = ACTION_STACK_VALUE_STRING;
-				pt_val.str_size = 10;
-				VAL(u64, &pt_val.data.numeric_value) = (u64)u16_StandAlone;
-				setProperty(app_context, caps_obj, "playerType", 10, &pt_val);
-				ActionVar ver_val = {0};
-				ver_val.type = ACTION_STACK_VALUE_STRING;
-				ver_val.str_size = 13;
-				VAL(u64, &ver_val.data.numeric_value) = (u64)u16_WIN_ver;
-				setProperty(app_context, caps_obj, "version", 7, &ver_val);
-				ActionVar os_val = {0};
-				os_val.type = ACTION_STACK_VALUE_STRING;
-				os_val.str_size = 10;
-				VAL(u64, &os_val.data.numeric_value) = (u64)u16_Windows_XP;
-				setProperty(app_context, caps_obj, "os", 2, &os_val);
-				ActionVar mfr_val = {0};
-				mfr_val.type = ACTION_STACK_VALUE_STRING;
-				mfr_val.str_size = 18;
-				VAL(u64, &mfr_val.data.numeric_value) = (u64)u16_Macromedia_Windows;
-				setProperty(app_context, caps_obj, "manufacturer", 12, &mfr_val);
-				ActionVar lang_val = {0};
-				lang_val.type = ACTION_STACK_VALUE_STRING;
-				lang_val.str_size = 2;
-				VAL(u64, &lang_val.data.numeric_value) = (u64)u16_en;
-				setProperty(app_context, caps_obj, "language", 8, &lang_val);
-				cap_val.type = ACTION_STACK_VALUE_BOOLEAN;
-				VAL(u32, &cap_val.data.numeric_value) = 0;
-				setProperty(app_context, caps_obj, "isDebugger", 10, &cap_val);
-				cap_val.type = ACTION_STACK_VALUE_BOOLEAN;
-				VAL(u32, &cap_val.data.numeric_value) = 1;
-				setProperty(app_context, caps_obj, "hasAudio", 8, &cap_val);
-				cap_val.type = ACTION_STACK_VALUE_BOOLEAN;
-				VAL(u32, &cap_val.data.numeric_value) = 1;
-				setProperty(app_context, caps_obj, "hasVideoEncoder", 15, &cap_val);
-				ActionVar caps_var = {0};
-				caps_var.type = ACTION_STACK_VALUE_OBJECT;
-				VAL(u64, &caps_var.data.numeric_value) = (u64)caps_obj;
-				setProperty(app_context, g_system_object, "capabilities", 12, &caps_var);
-
-				ASObject* ime_obj = allocObject(app_context, 4);
-				setObjectProto(app_context, ime_obj);
-				installAsBroadcaster(app_context, ime_obj);
-				ActionVar ime_var = {0};
-				ime_var.type = ACTION_STACK_VALUE_OBJECT;
-				VAL(u64, &ime_var.data.numeric_value) = (u64)ime_obj;
-				setProperty(app_context, g_system_object, "IME", 3, &ime_var);
-
-				installNativeToString(app_context, g_system_object);
-				installNativeToString(app_context, security_obj);
-				installNativeToString(app_context, caps_obj);
-				installNativeToString(app_context, ime_obj);
-			}
+			initSystemObject(app_context);
 			PUSH(ACTION_STACK_VALUE_OBJECT, (u64)g_system_object);
 			return;
 		}
 		// flash package (flash.display, flash.geom, etc.) - SWF8+ only
 		else if (EFFECTIVE_SWF_VERSION() >= 8 && var_name_len == 5 && strncmp(var_name, "flash", 5) == 0)
 		{
-			if (g_flash_object == NULL)
-			{
-				g_flash_object = allocObject(app_context, 8);
-				setObjectProto(app_context, g_flash_object);
-
-				// Helper: create a stub constructor ASFunction
-				#define MAKE_STUB_CTOR(varname, namestr) \
-					static ASFunction varname; \
-					memset(&varname, 0, sizeof(ASFunction)); \
-					strncpy(varname.name, namestr, 255); \
-					varname.function_type = 1;
-				#define SET_CTOR_PROP(parent, propname, proplen, ctorvar) \
-					{ ActionVar _cv = {0}; _cv.type = ACTION_STACK_VALUE_FUNCTION; \
-					  VAL(u64, &_cv.data.numeric_value) = (u64)&ctorvar; \
-					  setProperty(app_context, parent, propname, proplen, &_cv); }
-				#define MAKE_PKG(varname, parent, propname, proplen, capacity) \
-					ASObject* varname = allocObject(app_context, capacity); \
-					setObjectProto(app_context, varname); \
-					{ ActionVar _pv = {0}; _pv.type = ACTION_STACK_VALUE_OBJECT; \
-					  VAL(u64, &_pv.data.numeric_value) = (u64)varname; \
-					  setProperty(app_context, parent, propname, proplen, &_pv); }
-
-				// flash.display
-				MAKE_PKG(display_obj, g_flash_object, "display", 7, 4);
-				MAKE_STUB_CTOR(fc_BitmapData, "BitmapData");
-				SET_CTOR_PROP(display_obj, "BitmapData", 10, fc_BitmapData);
-
-				// flash.external
-				MAKE_PKG(external_obj, g_flash_object, "external", 8, 4);
-				MAKE_STUB_CTOR(fc_ExternalInterface, "ExternalInterface");
-				// Add static methods on ExternalInterface
-				fc_ExternalInterface.own_props = allocObject(app_context, 16);
-				retainObject(fc_ExternalInterface.own_props);
-				{
-					memset(&g_ei_escapeXML_func, 0, sizeof(ASFunction));
-					strncpy(g_ei_escapeXML_func.name, "_escapeXML", 255);
-					g_ei_escapeXML_func.function_type = 2;
-					g_ei_escapeXML_func.advanced_func = (Function2Ptr)actionEI_escapeXML;
-					ActionVar _ev = {0}; _ev.type = ACTION_STACK_VALUE_FUNCTION;
-					VAL(u64, &_ev.data.numeric_value) = (u64)&g_ei_escapeXML_func;
-					setProperty(app_context, fc_ExternalInterface.own_props, "_escapeXML", 10, &_ev);
-
-					memset(&g_ei_unescapeXML_func, 0, sizeof(ASFunction));
-					strncpy(g_ei_unescapeXML_func.name, "_unescapeXML", 255);
-					g_ei_unescapeXML_func.function_type = 2;
-					g_ei_unescapeXML_func.advanced_func = (Function2Ptr)actionEI_unescapeXML;
-					_ev.type = ACTION_STACK_VALUE_FUNCTION;
-					VAL(u64, &_ev.data.numeric_value) = (u64)&g_ei_unescapeXML_func;
-					setProperty(app_context, fc_ExternalInterface.own_props, "_unescapeXML", 12, &_ev);
-
-					memset(&g_ei_jsQuoteString_func, 0, sizeof(ASFunction));
-					strncpy(g_ei_jsQuoteString_func.name, "_jsQuoteString", 255);
-					g_ei_jsQuoteString_func.function_type = 2;
-					g_ei_jsQuoteString_func.advanced_func = (Function2Ptr)actionEI_jsQuoteString;
-					_ev.type = ACTION_STACK_VALUE_FUNCTION;
-					VAL(u64, &_ev.data.numeric_value) = (u64)&g_ei_jsQuoteString_func;
-					setProperty(app_context, fc_ExternalInterface.own_props, "_jsQuoteString", 14, &_ev);
-
-					// Phase 2: XML serialization methods
-					memset(&g_ei_toXML_func, 0, sizeof(ASFunction));
-					strncpy(g_ei_toXML_func.name, "_toXML", 255);
-					g_ei_toXML_func.function_type = 2;
-					g_ei_toXML_func.advanced_func = (Function2Ptr)actionEI_toXML;
-					_ev.type = ACTION_STACK_VALUE_FUNCTION;
-					VAL(u64, &_ev.data.numeric_value) = (u64)&g_ei_toXML_func;
-					setProperty(app_context, fc_ExternalInterface.own_props, "_toXML", 6, &_ev);
-
-					memset(&g_ei_arrayToXML_func, 0, sizeof(ASFunction));
-					strncpy(g_ei_arrayToXML_func.name, "_arrayToXML", 255);
-					g_ei_arrayToXML_func.function_type = 2;
-					g_ei_arrayToXML_func.advanced_func = (Function2Ptr)actionEI_arrayToXML;
-					_ev.type = ACTION_STACK_VALUE_FUNCTION;
-					VAL(u64, &_ev.data.numeric_value) = (u64)&g_ei_arrayToXML_func;
-					setProperty(app_context, fc_ExternalInterface.own_props, "_arrayToXML", 11, &_ev);
-
-					memset(&g_ei_argumentsToXML_func, 0, sizeof(ASFunction));
-					strncpy(g_ei_argumentsToXML_func.name, "_argumentsToXML", 255);
-					g_ei_argumentsToXML_func.function_type = 2;
-					g_ei_argumentsToXML_func.advanced_func = (Function2Ptr)actionEI_argumentsToXML;
-					_ev.type = ACTION_STACK_VALUE_FUNCTION;
-					VAL(u64, &_ev.data.numeric_value) = (u64)&g_ei_argumentsToXML_func;
-					setProperty(app_context, fc_ExternalInterface.own_props, "_argumentsToXML", 15, &_ev);
-
-					memset(&g_ei_objectToXML_func, 0, sizeof(ASFunction));
-					strncpy(g_ei_objectToXML_func.name, "_objectToXML", 255);
-					g_ei_objectToXML_func.function_type = 2;
-					g_ei_objectToXML_func.advanced_func = (Function2Ptr)actionEI_objectToXML;
-					_ev.type = ACTION_STACK_VALUE_FUNCTION;
-					VAL(u64, &_ev.data.numeric_value) = (u64)&g_ei_objectToXML_func;
-					setProperty(app_context, fc_ExternalInterface.own_props, "_objectToXML", 12, &_ev);
-
-					// Phase 3: XML-to-AS deserialization methods
-					memset(&g_ei_toAS_func, 0, sizeof(ASFunction));
-					strncpy(g_ei_toAS_func.name, "_toAS", 255);
-					g_ei_toAS_func.function_type = 2;
-					g_ei_toAS_func.advanced_func = (Function2Ptr)actionEI_toAS;
-					_ev.type = ACTION_STACK_VALUE_FUNCTION;
-					VAL(u64, &_ev.data.numeric_value) = (u64)&g_ei_toAS_func;
-					setProperty(app_context, fc_ExternalInterface.own_props, "_toAS", 5, &_ev);
-
-					memset(&g_ei_arrayToAS_func, 0, sizeof(ASFunction));
-					strncpy(g_ei_arrayToAS_func.name, "_arrayToAS", 255);
-					g_ei_arrayToAS_func.function_type = 2;
-					g_ei_arrayToAS_func.advanced_func = (Function2Ptr)actionEI_arrayToAS;
-					_ev.type = ACTION_STACK_VALUE_FUNCTION;
-					VAL(u64, &_ev.data.numeric_value) = (u64)&g_ei_arrayToAS_func;
-					setProperty(app_context, fc_ExternalInterface.own_props, "_arrayToAS", 10, &_ev);
-
-					memset(&g_ei_argumentsToAS_func, 0, sizeof(ASFunction));
-					strncpy(g_ei_argumentsToAS_func.name, "_argumentsToAS", 255);
-					g_ei_argumentsToAS_func.function_type = 2;
-					g_ei_argumentsToAS_func.advanced_func = (Function2Ptr)actionEI_argumentsToAS;
-					_ev.type = ACTION_STACK_VALUE_FUNCTION;
-					VAL(u64, &_ev.data.numeric_value) = (u64)&g_ei_argumentsToAS_func;
-					setProperty(app_context, fc_ExternalInterface.own_props, "_argumentsToAS", 14, &_ev);
-
-					memset(&g_ei_objectToAS_func, 0, sizeof(ASFunction));
-					strncpy(g_ei_objectToAS_func.name, "_objectToAS", 255);
-					g_ei_objectToAS_func.function_type = 2;
-					g_ei_objectToAS_func.advanced_func = (Function2Ptr)actionEI_objectToAS;
-					_ev.type = ACTION_STACK_VALUE_FUNCTION;
-					VAL(u64, &_ev.data.numeric_value) = (u64)&g_ei_objectToAS_func;
-					setProperty(app_context, fc_ExternalInterface.own_props, "_objectToAS", 11, &_ev);
-
-					// Phase 4: Bridge methods (available, addCallback, call)
-					memset(&g_ei_addCallback_func, 0, sizeof(ASFunction));
-					strncpy(g_ei_addCallback_func.name, "addCallback", 255);
-					g_ei_addCallback_func.function_type = 2;
-					g_ei_addCallback_func.advanced_func = (Function2Ptr)actionEI_addCallback;
-					_ev.type = ACTION_STACK_VALUE_FUNCTION;
-					VAL(u64, &_ev.data.numeric_value) = (u64)&g_ei_addCallback_func;
-					setProperty(app_context, fc_ExternalInterface.own_props, "addCallback", 11, &_ev);
-
-					memset(&g_ei_call_func, 0, sizeof(ASFunction));
-					strncpy(g_ei_call_func.name, "call", 255);
-					g_ei_call_func.function_type = 2;
-					g_ei_call_func.advanced_func = (Function2Ptr)actionEI_call;
-					_ev.type = ACTION_STACK_VALUE_FUNCTION;
-					VAL(u64, &_ev.data.numeric_value) = (u64)&g_ei_call_func;
-					setProperty(app_context, fc_ExternalInterface.own_props, "call", 4, &_ev);
-
-					// available — set as boolean based on whether external call handler is present
-					// (handler is set by test_harness_init before swfStart, so this check works)
-					{
-						ActionVar av_bool = {0};
-						av_bool.type = ACTION_STACK_VALUE_BOOLEAN;
-						av_bool.data.numeric_value = (g_external_call_handler != NULL) ? 1 : 0;
-						setProperty(app_context, fc_ExternalInterface.own_props, "available", 9, &av_bool);
-					}
-				}
-				SET_CTOR_PROP(external_obj, "ExternalInterface", 17, fc_ExternalInterface);
-
-				// flash.filters (10 filter classes)
-				MAKE_PKG(filters_obj, g_flash_object, "filters", 7, 12);
-				MAKE_STUB_CTOR(fc_BevelFilter, "BevelFilter");
-				SET_CTOR_PROP(filters_obj, "BevelFilter", 11, fc_BevelFilter);
-				MAKE_STUB_CTOR(fc_BitmapFilter, "BitmapFilter");
-				SET_CTOR_PROP(filters_obj, "BitmapFilter", 12, fc_BitmapFilter);
-				MAKE_STUB_CTOR(fc_BlurFilter, "BlurFilter");
-				SET_CTOR_PROP(filters_obj, "BlurFilter", 10, fc_BlurFilter);
-				MAKE_STUB_CTOR(fc_ColorMatrixFilter, "ColorMatrixFilter");
-				SET_CTOR_PROP(filters_obj, "ColorMatrixFilter", 17, fc_ColorMatrixFilter);
-				MAKE_STUB_CTOR(fc_ConvolutionFilter, "ConvolutionFilter");
-				SET_CTOR_PROP(filters_obj, "ConvolutionFilter", 17, fc_ConvolutionFilter);
-				MAKE_STUB_CTOR(fc_DisplacementMapFilter, "DisplacementMapFilter");
-				SET_CTOR_PROP(filters_obj, "DisplacementMapFilter", 21, fc_DisplacementMapFilter);
-				MAKE_STUB_CTOR(fc_DropShadowFilter, "DropShadowFilter");
-				SET_CTOR_PROP(filters_obj, "DropShadowFilter", 16, fc_DropShadowFilter);
-				MAKE_STUB_CTOR(fc_GlowFilter, "GlowFilter");
-				SET_CTOR_PROP(filters_obj, "GlowFilter", 10, fc_GlowFilter);
-				MAKE_STUB_CTOR(fc_GradientBevelFilter, "GradientBevelFilter");
-				SET_CTOR_PROP(filters_obj, "GradientBevelFilter", 19, fc_GradientBevelFilter);
-				MAKE_STUB_CTOR(fc_GradientGlowFilter, "GradientGlowFilter");
-				SET_CTOR_PROP(filters_obj, "GradientGlowFilter", 18, fc_GradientGlowFilter);
-
-				// flash.geom (5 classes)
-				MAKE_PKG(geom_obj, g_flash_object, "geom", 4, 8);
-				// ColorTransform constructor with prototype
-				initColorTransformPrototype(app_context);
-				static ASFunction fc_ColorTransform;
-				memset(&fc_ColorTransform, 0, sizeof(ASFunction));
-				strncpy(fc_ColorTransform.name, "ColorTransform", 255);
-				fc_ColorTransform.function_type = 2;
-				fc_ColorTransform.advanced_func = (Function2Ptr)colorTransformConstructor;
-				fc_ColorTransform.prototype_obj = g_color_transform_prototype;
-				retainObject(g_color_transform_prototype);
-				if (function_count < MAX_FUNCTIONS) function_registry[function_count++] = &fc_ColorTransform;
-				SET_CTOR_PROP(geom_obj, "ColorTransform", 14, fc_ColorTransform);
-				// Initialize geometry prototypes (Point, Matrix, Rectangle)
-				initGeomPrototypes(app_context);
-
-				// Point constructor with prototype and static methods
-				static ASFunction fc_Point;
-				memset(&fc_Point, 0, sizeof(ASFunction));
-				strncpy(fc_Point.name, "Point", 255);
-				fc_Point.function_type = 2;
-				fc_Point.advanced_func = (Function2Ptr)pointConstructor;
-				fc_Point.prototype_obj = g_point_prototype;
-				retainObject(g_point_prototype);
-				if (function_count < MAX_FUNCTIONS) function_registry[function_count++] = &fc_Point;
-				// Static methods on Point constructor (own_props)
-				fc_Point.own_props = allocObject(app_context, 4);
-				retainObject(fc_Point.own_props);
-				registerGeomMethod(&g_point_statics[0], "distance",    (Function2Ptr)pointDistance,    app_context, fc_Point.own_props);
-				registerGeomMethod(&g_point_statics[1], "interpolate", (Function2Ptr)pointInterpolate, app_context, fc_Point.own_props);
-				registerGeomMethod(&g_point_statics[2], "polar",       (Function2Ptr)pointPolar,       app_context, fc_Point.own_props);
-				SET_CTOR_PROP(geom_obj, "Point", 5, fc_Point);
-
-				// Matrix constructor with prototype
-				static ASFunction fc_Matrix;
-				memset(&fc_Matrix, 0, sizeof(ASFunction));
-				strncpy(fc_Matrix.name, "Matrix", 255);
-				fc_Matrix.function_type = 2;
-				fc_Matrix.advanced_func = (Function2Ptr)matrixConstructor;
-				fc_Matrix.prototype_obj = g_matrix_prototype;
-				retainObject(g_matrix_prototype);
-				if (function_count < MAX_FUNCTIONS) function_registry[function_count++] = &fc_Matrix;
-				SET_CTOR_PROP(geom_obj, "Matrix", 6, fc_Matrix);
-
-				// Rectangle constructor with prototype
-				static ASFunction fc_Rectangle;
-				memset(&fc_Rectangle, 0, sizeof(ASFunction));
-				strncpy(fc_Rectangle.name, "Rectangle", 255);
-				fc_Rectangle.function_type = 2;
-				fc_Rectangle.advanced_func = (Function2Ptr)rectangleConstructor;
-				fc_Rectangle.prototype_obj = g_rect_prototype;
-				retainObject(g_rect_prototype);
-				if (function_count < MAX_FUNCTIONS) function_registry[function_count++] = &fc_Rectangle;
-				SET_CTOR_PROP(geom_obj, "Rectangle", 9, fc_Rectangle);
-				MAKE_STUB_CTOR(fc_Transform, "Transform");
-				SET_CTOR_PROP(geom_obj, "Transform", 9, fc_Transform);
-
-				// flash.net
-				MAKE_PKG(net_obj, g_flash_object, "net", 3, 4);
-				MAKE_STUB_CTOR(fc_FileReference, "FileReference");
-				SET_CTOR_PROP(net_obj, "FileReference", 13, fc_FileReference);
-				MAKE_STUB_CTOR(fc_FileReferenceList, "FileReferenceList");
-				SET_CTOR_PROP(net_obj, "FileReferenceList", 17, fc_FileReferenceList);
-
-				// flash.text
-				MAKE_PKG(text_obj, g_flash_object, "text", 4, 4);
-				MAKE_STUB_CTOR(fc_TextRenderer, "TextRenderer");
-				SET_CTOR_PROP(text_obj, "TextRenderer", 12, fc_TextRenderer);
-
-				#undef MAKE_STUB_CTOR
-				#undef SET_CTOR_PROP
-				#undef MAKE_PKG
-			}
+			initFlashPackage(app_context);
 			PUSH(ACTION_STACK_VALUE_OBJECT, (u64)g_flash_object);
 			return;
 		}
