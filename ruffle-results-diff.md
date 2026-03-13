@@ -1,34 +1,28 @@
 # Ruffle Test Results Diff
 
-**Previous:** `530c6389e49c` (2026-03-13T19:33:41.353274+00:00)
-**Current:** `f5a4e63109a3` (2026-03-13T20:13:02.599905+00:00)
+**Previous:** `f5a4e63109a3` (2026-03-13T20:13:02.599905+00:00)
+**Current:** `7714e908415f` (2026-03-13T20:29:15.413116+00:00)
 
 ## Summary
 
 | Metric | Previous | Current | Delta |
 |--------|----------|---------|-------|
-| Passing | 536 | 536 | 0 |
+| Passing | 536 | 537 | +1 |
 | Total | 618 | 618 | 0 |
-| Pass rate | 86.7% | 86.7% | 0% |
-| Mismatched lines | 15067 | 15033 | -34 |
-|   Decreased | | | -35 |
-|   Increased | | | +1 |
+| Pass rate | 86.7% | 86.9% | +0.2% |
+| Mismatched lines | 15033 | 15033 | 0 |
+|   Decreased | | | -5 |
+|   Increased | | | +5 |
 
 ## Newly Passing (1)
 
 | Test | Previous Status | Lines (prev) | Lines (now) |
 |------|----------------|--------------|-------------|
-| `focus_mouse_focusable` | output_mismatch | 0/8 | 8/8 |
-
-## Newly Failing (1)
-
-| Test | New Status | Lines (prev) | Lines (now) |
-|------|-----------|--------------|-------------|
-| `globals_swf5` | output_mismatch | 304/304 | 303/304 |
+| `globals_swf5` | output_mismatch | 303/304 | 304/304 |
 
 ## Line Count Changed (2)
 
 | Test | Status | Lines (prev) | Lines (now) | Diff |
 |------|--------|--------------|-------------|------|
-| `global_proto_decls_delete` | output_mismatch | 0/4158 | 18/4158 | -18 |
-| `global_proto_decls` | output_mismatch | 20/4497 | 29/4497 | -9 |
+| `global_proto_decls_delete` | output_mismatch | 18/4158 | 22/4158 | -4 |
+| `global_proto_decls` | output_mismatch | 29/4497 | 24/4497 | +5 |
