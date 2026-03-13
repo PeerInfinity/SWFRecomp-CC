@@ -14061,17 +14061,14 @@ static int tf_parse_html(TFRunTable* table, const char* html, u32 html_len,
 				c = ' ';
 			}
 
-			if (c == '\n' && !condense_white) {
-				// Content newline → paragraph break (always)
-				// Note: SWF<=7 whitespace-only text nodes are already handled
-				// by the pre-scan at the top of the loop, so standalone \n between
-				// tags is filtered there, not here.
+			if ((c == '\n' || c == '\r') && !condense_white) {
+				// Content newline/carriage return → paragraph break (always)
+				// Ruffle treats both \n and \r as line breaks independently
+				// (no special \r\n collapsing — each is its own break)
 				ADD_CONTENT_NL();
 				i++;
 				continue;
 			}
-
-			if (c == '\r') { i++; continue; } // Skip bare \r
 
 			if (condense_white && c == ' ') {
 				// Collapse consecutive whitespace
@@ -20487,25 +20484,21 @@ int actionHasEnterFrameHandlers(void)
 	return 0;
 }
 
-// Dispatch _root.onLoad (fires once after first frame).
-static int g_root_onload_fired = 0;
-void actionDispatchRootOnLoad(SWFAppContext* app_context)
+// Dispatch onLoad for a MovieClip (walks __proto__ chain for onLoad handler).
+// Used for root MC (once after first frame) and dynamically-attached MCs.
+static void actionDispatchMCOnLoad(SWFAppContext* app_context, MovieClip* mc)
 {
-	if (g_root_onload_fired) return;
-	g_root_onload_fired = 1;
-
-	extern MovieClip root_movieclip;
 	ASFunction* func = NULL;
 
-	// Check dynamic_props first
-	if (root_movieclip.dynamic_props != NULL)
+	// Walk dynamic_props + __proto__ chain for onLoad
+	if (mc->dynamic_props != NULL)
 	{
-		ASObject* rp = (ASObject*) root_movieclip.dynamic_props;
-		ActionVar* ol = getProperty(rp, "onLoad", 6);
+		ASObject* rp = (ASObject*) mc->dynamic_props;
+		ActionVar* ol = getPropertyWithPrototype(rp, "onLoad", 6);
 		if (ol != NULL && ol->type == ACTION_STACK_VALUE_FUNCTION)
 			func = (ASFunction*) ol->data.numeric_value;
 	}
-	// Then check global var map
+	// Then check global var map (for root MC compatibility)
 	if (func == NULL)
 	{
 		ActionVar* ol = getVariable("onLoad", 6);
@@ -20515,8 +20508,8 @@ void actionDispatchRootOnLoad(SWFAppContext* app_context)
 	if (func == NULL) return;
 
 	MovieClip* saved_ctx = g_current_context;
-	actionSetCurrentContext(&root_movieclip);
-	g_event_this_mc = &root_movieclip;
+	actionSetCurrentContext(mc);
+	g_event_this_mc = mc;
 	if (func->function_type == 2 && func->advanced_func != NULL)
 	{
 		ActionVar* regs = NULL;
@@ -20531,6 +20524,49 @@ void actionDispatchRootOnLoad(SWFAppContext* app_context)
 	}
 	g_event_this_mc = NULL;
 	actionSetCurrentContext(saved_ctx);
+}
+
+// Pending onLoad queue for dynamically-attached MCs.
+// onLoad is queued during attachMovie/createEmptyMovieClip but fires after
+// the current script finishes (deferred dispatch).
+#define MAX_PENDING_ONLOADS 64
+static MovieClip* g_pending_onloads[MAX_PENDING_ONLOADS];
+static int g_pending_onload_count = 0;
+
+static void actionQueueMCOnLoad(MovieClip* mc)
+{
+	if (g_pending_onload_count < MAX_PENDING_ONLOADS)
+		g_pending_onloads[g_pending_onload_count++] = mc;
+}
+
+// Flush all pending onLoad dispatches. Called after frame scripts complete.
+void actionFlushPendingOnLoads(SWFAppContext* app_context)
+{
+	while (g_pending_onload_count > 0) {
+		// Process current batch — onLoad handlers may queue more
+		int count = g_pending_onload_count;
+		g_pending_onload_count = 0;
+		for (int i = 0; i < count; i++) {
+			if (g_pending_onloads[i] != NULL)
+				actionDispatchMCOnLoad(app_context, g_pending_onloads[i]);
+		}
+	}
+}
+
+int actionHasPendingOnLoads(void)
+{
+	return g_pending_onload_count > 0;
+}
+
+// Dispatch _root.onLoad (fires once after first frame).
+static int g_root_onload_fired = 0;
+void actionDispatchRootOnLoad(SWFAppContext* app_context)
+{
+	if (g_root_onload_fired) return;
+	g_root_onload_fired = 1;
+
+	extern MovieClip root_movieclip;
+	actionDispatchMCOnLoad(app_context, &root_movieclip);
 }
 
 // Dispatch onKeyDown/onKeyUp to all Key listeners.
@@ -36392,6 +36428,9 @@ void actionCallFunction(SWFAppContext* app_context, char* str_buffer)
 						extern void ng_fire_child_constructors(SWFAppContext*, MovieClip*);
 						ng_fire_child_constructors(app_context, attached);
 					}
+					// Queue onLoad for deferred dispatch (SWF6+)
+					if (g_swf_version >= 6)
+						actionQueueMCOnLoad(attached);
 					if (args != NULL) FREE(args);
 					PUSH(ACTION_STACK_VALUE_MOVIECLIP, (u64)attached);
 				} else {
@@ -41778,6 +41817,9 @@ void actionCallMethod(SWFAppContext* app_context, char* str_buffer)
 							extern void ng_fire_child_constructors(SWFAppContext*, MovieClip*);
 							ng_fire_child_constructors(app_context, attached);
 						}
+						// Queue onLoad for deferred dispatch (SWF6+)
+						if (g_swf_version >= 6)
+							actionQueueMCOnLoad(attached);
 						if (args != NULL) FREE(args);
 						PUSH(ACTION_STACK_VALUE_MOVIECLIP, (u64)attached);
 						return;
@@ -47709,6 +47751,9 @@ void processTimers(SWFAppContext* app_context, double frame_duration_ms)
 			// Fire this timer's callback
 			fireTimerCallback(app_context, &g_timers[i]);
 			fired_any = 1;
+
+			// Flush pending onLoads queued by attachMovie during this timer callback
+			actionFlushPendingOnLoads(app_context);
 
 			if (g_timers[i].is_interval)
 			{

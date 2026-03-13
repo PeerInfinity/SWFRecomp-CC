@@ -367,6 +367,9 @@ void actionMarkDynamicMCsEnterFrameEligible(void);
 void actionDispatchRootVarMapEnterFrame(SWFAppContext* app_context);
 // Dispatch _root.onLoad (fires once after first frame completes).
 void actionDispatchRootOnLoad(SWFAppContext* app_context);
+// Flush pending onLoad dispatches for dynamically-attached MCs.
+void actionFlushPendingOnLoads(SWFAppContext* app_context);
+int actionHasPendingOnLoads(void);
 // Check if any onEnterFrame handlers are registered.
 int actionHasEnterFrameHandlers(void);
 
