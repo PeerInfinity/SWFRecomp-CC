@@ -2316,7 +2316,27 @@ static int sprite_content_bounds_twips(DisplayObject* dl, size_t dl_max,
 		float sx = transform_data[child->transform_id][0];
 		float sy = transform_data[child->transform_id][5];
 
-		if (ch->type == CHAR_TYPE_SHAPE || ch->type == CHAR_TYPE_MORPH_SHAPE)
+		if (ch->type == CHAR_TYPE_SHAPE || ch->type == CHAR_TYPE_MORPH_SHAPE ||
+		    ch->type == CHAR_TYPE_TEXT)
+		{
+			s32 cxmin, cxmax, cymin, cymax;
+			if (ng_getCharBounds(child->char_id, &cxmin, &cxmax, &cymin, &cymax))
+			{
+				float x0 = tx + sx * (float)cxmin;
+				float x1 = tx + sx * (float)cxmax;
+				float y0 = ty + sy * (float)cymin;
+				float y1 = ty + sy * (float)cymax;
+				if (x0 > x1) { float t = x0; x0 = x1; x1 = t; }
+				if (y0 > y1) { float t = y0; y0 = y1; y1 = t; }
+				if (x0 < xmin) xmin = x0;
+				if (x1 > xmax) xmax = x1;
+				if (y0 < ymin) ymin = y0;
+				if (y1 > ymax) ymax = y1;
+				found = 1;
+			}
+		}
+		// Fallback: try ng_getCharBounds for any other type (edittext, etc.)
+		else if (ch->type != CHAR_TYPE_SPRITE && ch->type != CHAR_TYPE_BUTTON)
 		{
 			s32 cxmin, cxmax, cymin, cymax;
 			if (ng_getCharBounds(child->char_id, &cxmin, &cxmax, &cymin, &cymax))
@@ -2384,9 +2404,12 @@ static int find_drop_target_in_dl(DisplayObject* dl, size_t dl_max,
 		DisplayObject* entry = &dl[i];
 		if (entry->char_id == 0) continue;
 
-		// Skip the dragged clip itself
-		if (skip_name && entry->instance_name &&
-		    strcmp(entry->instance_name, skip_name) == 0) continue;
+		// Skip the dragged clip itself (skip_name may be full path like "_level0.dragger")
+		if (skip_name && entry->instance_name) {
+			const char* skip_base = strrchr(skip_name, '.');
+			skip_base = skip_base ? skip_base + 1 : skip_name;
+			if (strcmp(entry->instance_name, skip_base) == 0) continue;
+		}
 
 		Character* ch = &dictionary[entry->char_id];
 
@@ -2735,6 +2758,8 @@ void tagDefineEditTextProps(SWFAppContext* app_context, size_t char_id,
 		align, left_margin, right_margin, indent, leading,
 		variable_name, flags,
 		bounds_xmin, bounds_xmax, bounds_ymin, bounds_ymax);
+	// Also record char bounds so edittext participates in sprite content bounds
+	ng_record_char_bounds(char_id, bounds_xmin, bounds_xmax, bounds_ymin, bounds_ymax);
 #else
 	// Graphics mode doesn't need separate EditText properties tracking
 	(void)app_context; (void)char_id; (void)plain_text; (void)raw_html_text;
