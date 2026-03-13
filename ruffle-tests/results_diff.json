@@ -1,23 +1,23 @@
 {
   "metadata": {
-    "old_timestamp": "2026-03-13T02:57:10.391609+00:00",
-    "old_git_sha": "436d8a894964f9d39bed8492851cf1fb53581949",
-    "new_timestamp": "2026-03-13T04:05:38.666539+00:00",
-    "new_git_sha": "1f8dfd4989c0d41cae4c46da1bb3ec3e4416dd76",
+    "old_timestamp": "2026-03-13T04:05:38.666539+00:00",
+    "old_git_sha": "1f8dfd4989c0d41cae4c46da1bb3ec3e4416dd76",
+    "new_timestamp": "2026-03-13T04:22:02.777199+00:00",
+    "new_git_sha": "468281bfa9a4e0e68c5c03df7383dd703463d984",
     "partial": false,
     "same_commit": false
   },
   "summary": {
-    "old_pass": 530,
+    "old_pass": 531,
     "old_total": 618,
-    "old_pass_rate": 85.8,
-    "new_pass": 531,
+    "old_pass_rate": 85.9,
+    "new_pass": 532,
     "new_total": 618,
-    "new_pass_rate": 85.9,
-    "old_mismatched_lines": 17291,
-    "new_mismatched_lines": 17287,
+    "new_pass_rate": 86.1,
+    "old_mismatched_lines": 17287,
+    "new_mismatched_lines": 17285,
     "increased_mismatches": 0,
-    "decreased_mismatches": 4,
+    "decreased_mismatches": 2,
     "newly_passing": 1,
     "newly_failing": 0,
     "status_changed": 1,
@@ -27,19 +27,19 @@
   },
   "changes": [
     {
-      "test": "cross_movie_root",
+      "test": "issue_2870",
       "change_type": "changed",
       "old_status": "output_mismatch",
       "new_status": "pass",
       "old_lines": {
-        "actual_lines": 10,
-        "expected_lines": 10,
-        "matching_lines": 6
+        "actual_lines": 2,
+        "expected_lines": 3,
+        "matching_lines": 1
       },
       "new_lines": {
-        "actual_lines": 10,
-        "expected_lines": 10,
-        "matching_lines": 10
+        "actual_lines": 3,
+        "expected_lines": 3,
+        "matching_lines": 3
       }
     }
   ]
