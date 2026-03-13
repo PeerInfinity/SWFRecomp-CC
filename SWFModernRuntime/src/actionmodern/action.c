@@ -22163,23 +22163,14 @@ static void ensureGlobalInit(SWFAppContext* app_context)
 				retainObject(ctor->own_props);
 			}
 
-			// Ensure prototype_obj exists (lazily create like GetMember does)
-			if (ctor->prototype_obj == NULL) {
-				ctor->prototype_obj = allocObject(app_context, 4);
-				retainObject(ctor->prototype_obj);
-				setObjectProto(app_context, ctor->prototype_obj);
-				ActionVar ctor_var = {0};
-				ctor_var.type = ACTION_STACK_VALUE_FUNCTION;
-				ctor_var.data.numeric_value = (u64) ctor;
-				setPropertyWithFlags(app_context, ctor->prototype_obj, "constructor", 11, &ctor_var, PROPERTY_FLAGS_DONTENUM);
-			}
-
 			// Registration order: prototype, constructor, __proto__
 			// (LIFO enumeration means last registered = first in for-in,
 			// and expected order is: __proto__, constructor, prototype)
 
 			// Set prototype → prototype_obj (DONT_ENUM, if not already set)
-			if (getProperty(ctor->own_props, "prototype", 9) == NULL) {
+			// Only if prototype_obj exists — some constructors (e.g., AsBroadcaster in SWF5)
+			// deliberately have no prototype, and creating one would break typeof checks.
+			if (ctor->prototype_obj != NULL && getProperty(ctor->own_props, "prototype", 9) == NULL) {
 				ActionVar proto_val; proto_val.type = ACTION_STACK_VALUE_OBJECT; proto_val.str_size = 0;
 				proto_val.data.numeric_value = (u64) ctor->prototype_obj;
 				setPropertyWithFlags(app_context, ctor->own_props, "prototype", 9, &proto_val, PROPERTY_FLAGS_DONTENUM);
