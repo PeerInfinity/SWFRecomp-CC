@@ -575,6 +575,7 @@ namespace SWFRecomp
 		// Build text_data from deferred glyph entries
 		// text_data stores global glyph indices (into glyph_data), NOT character codes.
 		// The renderer does: glyph_data[2 * text_data[j]] to get shape offset/size.
+		// text_char_codes stores the Unicode code point for each glyph (for TextSnapshot).
 		for (auto& entry : text_glyph_entries) {
 			u16 fid = entry.first;
 			u32 glyph_index = entry.second;
@@ -585,6 +586,13 @@ namespace SWFRecomp
 				global_index = (u32)base_it->second + glyph_index;
 			}
 			text_data << "\t" << to_string(global_index) << "," << endl;
+			// Look up Unicode code point from font's code table
+			u16 char_code = 0;
+			auto ct_it = font_code_tables.find(fid);
+			if (ct_it != font_code_tables.end() && glyph_index < ct_it->second.size()) {
+				char_code = ct_it->second[glyph_index];
+			}
+			text_char_codes << "\t" << to_string(char_code) << "," << endl;
 		}
 
 		context.out_draws << "u32 shape_data[" << to_string(current_tri ? 3*current_tri : 1) << "][4] =" << endl
@@ -627,6 +635,11 @@ namespace SWFRecomp
 						  << (current_text ? text_data.str() : "\t0\n")
 						  << "};" << endl
 						  << endl
+						  << "u16 text_char_codes[" << to_string(current_text ? current_text : 1) << "] =" << endl
+						  << "{" << endl
+						  << (current_text ? text_char_codes.str() : "\t0\n")
+						  << "};" << endl
+						  << endl
 						  << "float cxform_data[" << to_string(current_cxform ? 20*current_cxform : 1) << "] =" << endl
 						  << "{" << endl
 						  << (current_cxform ? cxform_data.str() : "\t0\n")
@@ -656,6 +669,7 @@ namespace SWFRecomp
 								 << "extern u8 bitmap_data[" << to_string(current_bitmap_pixel ? 4*current_bitmap_pixel : 1) << "];" << endl
 								 << "extern u32 glyph_data[" << to_string(current_glyph ? 2*current_glyph : 1) << "][1];" << endl
 								 << "extern u32 text_data[" << to_string(current_text ? current_text : 1) << "];" << endl
+								 << "extern u16 text_char_codes[" << to_string(current_text ? current_text : 1) << "];" << endl
 								 << "extern float cxform_data[" << to_string(current_cxform ? 20*current_cxform : 1) << "];" << endl
 								 << "extern float morph_end_shape_data[" << to_string(current_morph_end_vertex ? current_morph_end_vertex : 1) << "][2];" << endl
 								 << "extern float morph_end_color_data[" << to_string(current_morph_end_color ? current_morph_end_color : 1) << "][4];" << endl

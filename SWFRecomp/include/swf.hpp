@@ -184,6 +184,7 @@ namespace SWFRecomp
 		std::stringstream glyph_data;
 		size_t current_glyph;
 		std::stringstream text_data;
+		std::stringstream text_char_codes;  // parallel to text_data: Unicode code point per glyph
 		size_t current_text;
 		std::vector<std::pair<u16, u32>> text_glyph_entries;  // (font_id, glyph_index) for deferred char code lookup
 		std::stringstream cxform_data;

@@ -933,6 +933,9 @@ static void textSnapshotCapture(SWFAppContext* app_context, ASObject* ts_obj, Mo
 	extern size_t max_depth;
 	extern Character* dictionary;
 	extern u32 text_data[];
+	// text_char_codes is emitted by newer recompiler builds (Unicode code points).
+	// Weak symbol: falls back to NULL if test was compiled with older recompiler.
+	extern u16 __attribute__((weak)) text_char_codes[];
 
 	DisplayObject* dl = NULL;
 	size_t dl_max = 0;
@@ -963,9 +966,10 @@ static void textSnapshotCapture(SWFAppContext* app_context, ASObject* ts_obj, Mo
 			size_t tsz = dictionary[cid].text_size;
 
 			for (size_t j = 0; j < tsz && text_len < 4090; j++) {
-				u32 code = text_data[ts + j];
+				// Use text_char_codes (Unicode) if available, else fall back to text_data (glyph indices)
+				u16 code = text_char_codes ? text_char_codes[ts + j] : (u16)text_data[ts + j];
 				nl_buf[text_len] = (j == 0 && !first_entry) ? '1' : '0';
-				text_buf[text_len] = (uint16_t)code;
+				text_buf[text_len] = code;
 				text_len++;
 			}
 			if (tsz > 0) first_entry = 0;
