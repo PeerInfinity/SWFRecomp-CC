@@ -21988,12 +21988,9 @@ static void ensureGlobalInit(SWFAppContext* app_context)
 	REG_FUNC("Object", 6, &g_ctors[0]);
 	if (g_swf_version >= 6) REG_FUNC("Function", 8, &g_ctors[5]);
 	REG_FUNC("enableDebugConsole", 18, &g_enableDebugConsole_func);
-	{ ActionVar _v = {0}; _v.type = ACTION_STACK_VALUE_F64;
-	  double nan_val = NAN; memcpy(&_v.data.numeric_value, &nan_val, sizeof(double));
-	  setProperty(app_context, global_object, "NaN", 3, &_v); }
-	{ ActionVar _v = {0}; _v.type = ACTION_STACK_VALUE_F64;
-	  double inf_val = INFINITY; memcpy(&_v.data.numeric_value, &inf_val, sizeof(double));
-	  setProperty(app_context, global_object, "Infinity", 8, &_v); }
+	// NaN and Infinity are NOT registered on global_object — they're handled by
+	// special handlers in actionGetVariable for SWF5+. Registering them on _global
+	// would break SWF4 comparison tests where NaN/Infinity should resolve as undefined.
 	REG_FUNC("MovieClip", 9, &g_movieclip_constructor);
 	REG_FUNC("XMLSocket", 9, &g_stub_ctors[17]);
 	REG_FUNC("AsBroadcaster", 13, &g_stub_ctors[0]);
@@ -22055,7 +22052,14 @@ static void ensureGlobalInit(SWFAppContext* app_context)
 	REG_FUNC("PrintJob", 8, &g_stub_ctors[12]);
 	REG_FUNC("TextSnapshot", 12, &g_stub_ctors[15]);
 
-	// No valueOf on _global (Flash Player doesn't expose it as an own property)
+	// valueOf = undefined on _global: required so that object-to-primitive
+	// conversion of _global returns undefined (→ 0 in SWF≤6 numeric context)
+	// rather than falling through to Object.prototype.valueOf (→ "[object Object]" → NaN).
+	{
+		ActionVar undef_val = {0};
+		undef_val.type = ACTION_STACK_VALUE_UNDEFINED;
+		setProperty(app_context, global_object, "valueOf", 7, &undef_val);
+	}
 
 	#undef REG_FUNC
 	#undef REG_OBJ
