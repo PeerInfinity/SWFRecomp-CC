@@ -7,7 +7,7 @@ Last updated: 2026-03-12
 - **Pass rate (CI, last run)**: 530/618 (85.8%) total (CI run on 94c64bbe, 0 regressions)
 - **Image test baseline**: **7/31 strict image match** (run_image_tests.py, 0-outlier AND 0-max-diff). **9/31 tolerance pass** (within test.toml limits). Strict passes: focusrect_focuslost, focusrect_mouse_swf8/swf9, focusrect_swf6, frame_size_translated_neg/pos, mask_with_drawing. Tolerance-only: display_object_properties (max_diff=79), mask_reapply (max_diff=1).
 - **Main failure types**: output_mismatch (46), segfault (2, ignored), timeout (1, ignored)
-- **Recent gains**: timer_run_actions 18/18 ✅ (onLoad dispatch for attached MCs). textsnapshot_available_text/findtext/gettext/text_order ✅ (text_char_codes CI fix). swf5_to_6_cross_call 29/29 ✅, swf6_to_5_cross_call 29/29 ✅. selection_handlers 27/27 ✅, edittext_html_swf6 3900→5289/5377 (+1389 lines). register_class 66/66 ✅, register_class_swf6 38/38 ✅. getBounds on loaded clips: 6/8 PASS.
+- **Recent gains**: focus_visibility_change 45/45 ✅, focusrect_property_swf5/6/7 1237/1237 each ✅ (_focusrect getter/setter semantics + focus auto-clear on _visible=false + constructor version-gating). timer_run_actions 18/18 ✅ (onLoad dispatch for attached MCs). textsnapshot_available_text/findtext/gettext/text_order ✅ (text_char_codes CI fix). swf5_to_6_cross_call 29/29 ✅, swf6_to_5_cross_call 29/29 ✅. selection_handlers 27/27 ✅, edittext_html_swf6 3900→5289/5377 (+1389 lines). register_class 66/66 ✅, register_class_swf6 38/38 ✅. getBounds on loaded clips: 6/8 PASS.
 - **Known regressions**: None. Previous regressions all recovered.
 
 ## Crashes and Errors (8 tests)
@@ -110,6 +110,10 @@ Last updated: 2026-03-12
 | `edittext_newlines` | 30/30 ✅ | Mixed-font textHeight path via `ng_computeScrollMixedFont()` |
 | `removed_target_clip_scope` | 35/35 ✅ | Scoped clone_depth_register to root-only + recursive child removal in removeMovieClip |
 | `selection_handlers` | 27/27 ✅ | setFocus re-focus roll events + eager g_tab_hovered_mc tracking |
+| `focus_visibility_change` | 45/45 ✅ | Auto-clear focus on _visible=false at all 4 setter sites |
+| `focusrect_property_swf5` | 1237/1237 ✅ | _focusrect as global stage flag (Number 1/0), constructor version-gating |
+| `focusrect_property_swf6` | 1237/1237 ✅ | _focusrect hybrid: root=stage(Boolean), children=per-object(tri-state) |
+| `focusrect_property_swf7` | 1237/1237 ✅ | _focusrect per-object, string truthiness coercion, SetProperty case 17 |
 
 ### Near-passing (>=90%)
 | Test | Match | Issue |
@@ -183,6 +187,7 @@ Last updated: 2026-03-12
 | SCRIPT_HALTING_PLAN | **COMPLETE** → `complete/` | removed_clip_halts_script 15/15 ✅, target_clip_removed 5/5 ✅, remove_movie_clip 29/29 ✅ | All regressions recovered: remove_movie_clip ✅, removed_target_clip_scope 35/35 ✅, register_and_init_order 233/233 ✅ |
 | CUSTOM_CLIP_METHODS_PLAN | **COMPLETE** → `complete/` | custom_clip_methods 4/4 ✅ | — |
 | GETTEXTSNAPSHOT_CONSTRUCTOR_PLAN | **COMPLETE** → `complete/` | movieclip_gettextsnapshot 112/112 ✅ | — |
+| FOCUS_FOCUSRECT_PLAN | **COMPLETE** → `complete/` | 4/4 pass: focus_visibility_change ✅, focusrect_property_swf5/6/7 ✅ (1237 each) | — |
 
 ## Recommended Work Order (updated 2026-03-10)
 

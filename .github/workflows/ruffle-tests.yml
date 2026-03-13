@@ -76,7 +76,7 @@ jobs:
 
       - name: Verify runtime output
         env:
-          TZ: Asia/Kathmandu
+          TZ: NPT-5:45
         run: |
           ARGS="-v --json=ruffle-tests/results.json"
           if [ "${{ inputs.limit }}" != "0" ] && [ -n "${{ inputs.limit }}" ]; then
@@ -301,7 +301,7 @@ jobs:
 
       - name: Verify runtime output (shard ${{ matrix.shard }}/${{ needs.setup-parallel.outputs.total }})
         env:
-          TZ: Asia/Kathmandu
+          TZ: NPT-5:45
         run: |
           ARGS="-v --json=ruffle-tests/results-shard-${{ matrix.shard }}.json --shard=${{ matrix.shard }}/${{ needs.setup-parallel.outputs.total }}"
           if [ "${{ inputs.limit }}" != "0" ] && [ -n "${{ inputs.limit }}" ]; then

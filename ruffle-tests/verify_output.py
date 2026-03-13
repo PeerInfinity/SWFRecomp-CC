@@ -1208,6 +1208,9 @@ def run_binary(build_dir, event_file=None, extra_env=None):
     if event_file is not None:
         cmd.append(str(event_file))
     env = os.environ.copy()
+    # Ruffle tests use a fixed UTC+5:45 (Nepal) timezone for determinism.
+    # Use POSIX fixed-offset TZ to avoid historical tz transitions.
+    env.setdefault("TZ", "NPT-5:45")
     if extra_env:
         env.update(extra_env)
     try:

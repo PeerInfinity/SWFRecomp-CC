@@ -11667,7 +11667,7 @@ MovieClip root_movieclip = {
 	.droptarget = "",  // No drag/drop in NO_GRAPHICS mode
 	.url = "file:///test.swf",  // SWF URL (matches Ruffle test expectations)
 	.highquality = 1.0f,       // Default: high quality
-	.focusrect = -1.0f,        // Default: null (sentinel: -1.0f = null)
+	.focusrect = 1.0f,         // Default: true (root/stage focusrect defaults to true)
 	.soundbuftime = 5.0f,      // Default: 5 seconds
 	.quality = "HIGH",         // Default: HIGH quality
 	.xmouse = 0.0f,  // No mouse in NO_GRAPHICS mode
@@ -21560,7 +21560,7 @@ static void ensureGlobalInit(SWFAppContext* app_context)
 
 	// ---- MovieClip ----
 	initMovieClipPrototype(app_context);
-	{
+	if (g_swf_version >= 6) {
 		ActionVar mc_cv = {0};
 		mc_cv.type = ACTION_STACK_VALUE_FUNCTION;
 		mc_cv.data.numeric_value = (u64)&g_movieclip_constructor;
@@ -21569,7 +21569,7 @@ static void ensureGlobalInit(SWFAppContext* app_context)
 
 	// ---- TextField ----
 	initTextFieldPrototype(app_context);
-	{
+	if (g_swf_version >= 6) {
 		ActionVar tf_cv = {0};
 		tf_cv.type = ACTION_STACK_VALUE_FUNCTION;
 		tf_cv.data.numeric_value = (u64)&g_textfield_constructor;
@@ -21692,6 +21692,9 @@ static void ensureGlobalInit(SWFAppContext* app_context)
 		};
 		for (int i = 0; i < NUM_STUB_CTORS; i++)
 		{
+			// Button constructor is SWF7+ only (SWF5/6 don't expose it)
+			if (strcmp(stub_names[i], "Button") == 0 && g_swf_version < 7)
+				continue;
 			memset(&g_stub_ctors[i], 0, sizeof(ASFunction));
 			strncpy(g_stub_ctors[i].name, stub_names[i], 255);
 			g_stub_ctors[i].function_type = 1;
@@ -22233,11 +22236,13 @@ static void ensureSecondaryGlobalInit(SWFAppContext* app_context, int target_ver
 			fv.data.numeric_value = (u64)sec_extra_ctors[i];
 			setProperty(app_context, sec_global, ctor_names[i], ctor_name_lens[i], &fv);
 		}
-		// MovieClip, TextField, TextFormat
-		fv.data.numeric_value = (u64)sec_mc_ctor;
-		setProperty(app_context, sec_global, "MovieClip", 9, &fv);
-		fv.data.numeric_value = (u64)sec_tf_ctor;
-		setProperty(app_context, sec_global, "TextField", 9, &fv);
+		// MovieClip, TextField, TextFormat (SWF6+)
+		if (g_swf_version >= 6) {
+			fv.data.numeric_value = (u64)sec_mc_ctor;
+			setProperty(app_context, sec_global, "MovieClip", 9, &fv);
+			fv.data.numeric_value = (u64)sec_tf_ctor;
+			setProperty(app_context, sec_global, "TextField", 9, &fv);
+		}
 		fv.data.numeric_value = (u64)sec_tfmt_ctor;
 		setProperty(app_context, sec_global, "TextFormat", 10, &fv);
 		// XML, XMLNode, Date, Error
@@ -22251,6 +22256,8 @@ static void ensureSecondaryGlobalInit(SWFAppContext* app_context, int target_ver
 		setProperty(app_context, sec_global, "Error", 5, &fv);
 		// Stub constructors
 		for (int i = 0; i < 18; i++) {
+			if (strcmp(stub_names[i], "Button") == 0 && g_swf_version < 7)
+				continue;
 			fv.data.numeric_value = (u64)sec_stub_ctors[i];
 			setProperty(app_context, sec_global, stub_names[i], stub_name_lens[i], &fv);
 		}
@@ -23233,17 +23240,17 @@ check_special_vars:
 			PUSH(ACTION_STACK_VALUE_FUNCTION, (u64)&g_object_constructor);
 			return;
 		}
-		else if (var_name_len == 9 && strncmp(var_name, "MovieClip", 9) == 0)
+		else if (var_name_len == 9 && strncmp(var_name, "MovieClip", 9) == 0 && g_swf_version >= 6)
 		{
-			// Return the version-appropriate MovieClip constructor
+			// Return the version-appropriate MovieClip constructor (SWF6+)
 			initMovieClipPrototype(app_context);
 			ASFunction* mc_ctor = getMovieClipCtor(g_swf_version);
 			PUSH(ACTION_STACK_VALUE_FUNCTION, (u64)mc_ctor);
 			return;
 		}
-		else if (var_name_len == 9 && strncmp(var_name, "TextField", 9) == 0)
+		else if (var_name_len == 9 && strncmp(var_name, "TextField", 9) == 0 && g_swf_version >= 6)
 		{
-			// Return the built-in TextField constructor as a function
+			// Return the built-in TextField constructor as a function (SWF6+)
 			initTextFieldPrototype(app_context);
 			PUSH(ACTION_STACK_VALUE_FUNCTION, (u64)&g_textfield_constructor);
 			return;
@@ -23818,6 +23825,19 @@ check_special_vars:
 			if (strcasecmp(var_name, "_url") == 0) { PUSH_STR(mc->url, strlen(mc->url)); return; }
 			if (strcasecmp(var_name, "_droptarget") == 0) { PUSH_STR(mc->droptarget, strlen(mc->droptarget)); return; }
 			if (strcasecmp(var_name, "_quality") == 0) { PUSH_STR(mc->quality, strlen(mc->quality)); return; }
+			if (strcasecmp(var_name, "_focusrect") == 0) {
+				// Bare _focusrect resolves to root MC (stage focus rect)
+				// SWF5: return Number 1/0. SWF6+: return Boolean true/false.
+				float fr = mc->focusrect;
+				int val = (fr > 0.0f) ? 1 : 0;
+				if (g_swf_version <= 5) {
+					float v = val ? 1.0f : 0.0f;
+					PUSH(ACTION_STACK_VALUE_F32, VAL(u32, &v));
+				} else {
+					PUSH(ACTION_STACK_VALUE_BOOLEAN, val);
+				}
+				return;
+			}
 			if (strcasecmp(var_name, "_xmouse") == 0) {
 #ifdef NO_GRAPHICS
 				double lx, ly; mc_get_local_mouse(app_context, mc, &lx, &ly);
@@ -24213,7 +24233,13 @@ void actionSetVariable(SWFAppContext* app_context)
 #endif
 			handled = 1; }
 		else if (strcasecmp(var_name, "_alpha") == 0) { mc->alpha = fval; handled = 1; }
-		else if (strcasecmp(var_name, "_visible") == 0) { mc->visible = (fval != 0.0f) ? 1 : 0; handled = 1; }
+		else if (strcasecmp(var_name, "_visible") == 0) {
+			int new_vis = (fval != 0.0f) ? 1 : 0;
+			if (mc->visible && !new_vis && g_focused_mc == mc)
+				selection_do_focus_change(app_context, mc, NULL);
+			mc->visible = new_vis;
+			handled = 1;
+		}
 		else if (strcasecmp(var_name, "_width") == 0) { mcSetEffectiveWidth(app_context, mc, dval); handled = 1; }
 		else if (strcasecmp(var_name, "_height") == 0) { mcSetEffectiveHeight(app_context, mc, dval); handled = 1; }
 		else if (strcasecmp(var_name, "_quality") == 0)
@@ -24225,13 +24251,25 @@ void actionSetVariable(SWFAppContext* app_context)
 		}
 		else if (strcasecmp(var_name, "_highquality") == 0) { mc->highquality = fval; handled = 1; }
 		else if (strcasecmp(var_name, "_focusrect") == 0) {
-			// Boolean coercion: varToDouble doesn't handle BOOLEAN type (raw u32 bits)
-			if (value_var.type == ACTION_STACK_VALUE_BOOLEAN)
+			// Bare _focusrect always sets stage/root focusrect
+			// Stage setter: null/undefined → no-op, object → false, NaN → no-op
+			if (value_var.type == ACTION_STACK_VALUE_NULL || value_var.type == ACTION_STACK_VALUE_UNDEFINED)
+				{ /* no-op */ }
+			else if (value_var.type == ACTION_STACK_VALUE_OBJECT || value_var.type == ACTION_STACK_VALUE_ARRAY ||
+			         value_var.type == ACTION_STACK_VALUE_FUNCTION)
+				mc->focusrect = 0.0f;
+			else if (value_var.type == ACTION_STACK_VALUE_BOOLEAN)
 				mc->focusrect = value_var.data.numeric_value ? 1.0f : 0.0f;
-			else if (value_var.type == ACTION_STACK_VALUE_NULL || value_var.type == ACTION_STACK_VALUE_UNDEFINED)
-				mc->focusrect = -1.0f; // sentinel for "inherit"
-			else
-				mc->focusrect = fval;
+			else if (value_var.type == ACTION_STACK_VALUE_STRING) {
+				const uint16_t* _u16 = varGetU16Ptr(&value_var);
+				char _fr_buf[64]; _fr_buf[0] = '\0';
+				if (_u16 && value_var.str_size > 0) u16_to_utf8(_u16, value_var.str_size, _fr_buf, sizeof(_fr_buf));
+				char* _ep; double _d = strtod(_fr_buf, &_ep);
+				if (_ep != _fr_buf && !isnan(_d)) mc->focusrect = (_d != 0.0) ? 1.0f : 0.0f;
+			} else {
+				// F32/F64 numeric
+				if (!isnan(dval)) mc->focusrect = (dval != 0.0) ? 1.0f : 0.0f;
+			}
 			handled = 1;
 		}
 		else if (strcasecmp(var_name, "_soundbuftime") == 0) { mc->soundbuftime = fval; handled = 1; }
@@ -25162,9 +25200,29 @@ void actionGetProperty(SWFAppContext* app_context)
 		case 16: // _highquality
 			value = mc ? (float)mc->highquality : 1.0f;
 			break;
-		case 17: // _focusrect
-			value = mc ? (float)mc->focusrect : 1.0f;
-			break;
+		case 17: { // _focusrect
+			extern MovieClip root_movieclip;
+			int is_stage = (g_swf_version <= 5) || (mc == &root_movieclip);
+			float fr;
+			if (is_stage || g_swf_version <= 5) {
+				fr = root_movieclip.focusrect;
+			} else {
+				fr = mc ? mc->focusrect : -1.0f;
+			}
+			if (is_stage) {
+				int val = (fr > 0.0f) ? 1 : 0;
+				if (g_swf_version <= 5) {
+					float v = val ? 1.0f : 0.0f;
+					PUSH(ACTION_STACK_VALUE_F32, VAL(u32, &v));
+				} else {
+					PUSH(ACTION_STACK_VALUE_BOOLEAN, val);
+				}
+			} else {
+				if (fr < 0.0f) { PUSH(ACTION_STACK_VALUE_NULL, 0); }
+				else { PUSH(ACTION_STACK_VALUE_BOOLEAN, (fr > 0.0f) ? 1 : 0); }
+			}
+			return;
+		}
 		case 18: // _soundbuftime
 			value = mc ? mc->soundbuftime : 5.0f;
 			break;
@@ -28595,7 +28653,12 @@ void actionSetMember(SWFAppContext* app_context)
 						ActionVar cv; popVar(app_context, &cv);
 						vis_d = VAL(double, &cv.data.numeric_value);
 					}
-					mc->visible = (vis_d != 0.0) ? 1 : 0;
+					{
+						int new_vis = (vis_d != 0.0) ? 1 : 0;
+						if (mc->visible && !new_vis && g_focused_mc == mc)
+							selection_do_focus_change(app_context, mc, NULL);
+						mc->visible = new_vis;
+					}
 					return;
 				}
 				if (strcasecmp(prop_name, "_width") == 0) { mcSetEffectiveWidth(app_context, mc, dval); return; }
@@ -28609,13 +28672,51 @@ void actionSetMember(SWFAppContext* app_context)
 				}
 				if (strcasecmp(prop_name, "_highquality") == 0) { mc->highquality = fval; return; }
 				if (strcasecmp(prop_name, "_focusrect") == 0) {
-					// Boolean coercion: varToDouble doesn't handle BOOLEAN type (raw u32 bits)
-					if (value_var.type == ACTION_STACK_VALUE_BOOLEAN)
-						mc->focusrect = value_var.data.numeric_value ? 1.0f : 0.0f;
-					else if (value_var.type == ACTION_STACK_VALUE_NULL || value_var.type == ACTION_STACK_VALUE_UNDEFINED)
-						mc->focusrect = -1.0f;
-					else
-						mc->focusrect = fval;
+					extern MovieClip root_movieclip;
+					int _is_stage = (g_swf_version <= 5) || (mc == &root_movieclip);
+					if (_is_stage) {
+						// Stage setter: null/undefined → no-op, object → false, NaN → no-op
+						MovieClip* _rmc = &root_movieclip;
+						if (value_var.type == ACTION_STACK_VALUE_NULL || value_var.type == ACTION_STACK_VALUE_UNDEFINED)
+							{ /* no-op */ }
+						else if (value_var.type == ACTION_STACK_VALUE_OBJECT || value_var.type == ACTION_STACK_VALUE_ARRAY ||
+						         value_var.type == ACTION_STACK_VALUE_FUNCTION)
+							_rmc->focusrect = 0.0f;
+						else if (value_var.type == ACTION_STACK_VALUE_BOOLEAN)
+							_rmc->focusrect = value_var.data.numeric_value ? 1.0f : 0.0f;
+						else if (value_var.type == ACTION_STACK_VALUE_STRING) {
+							const uint16_t* _u16 = varGetU16Ptr(&value_var);
+							char _fb[64]; _fb[0] = '\0';
+							if (_u16 && value_var.str_size > 0) u16_to_utf8(_u16, value_var.str_size, _fb, sizeof(_fb));
+							char* _ep; double _d = strtod(_fb, &_ep);
+							if (_ep != _fb && !isnan(_d)) _rmc->focusrect = (_d != 0.0) ? 1.0f : 0.0f;
+						} else {
+							if (!isnan(dval)) _rmc->focusrect = (dval != 0.0) ? 1.0f : 0.0f;
+						}
+					} else {
+						// Per-object setter: null/undefined → null, others → as_bool
+						if (value_var.type == ACTION_STACK_VALUE_NULL || value_var.type == ACTION_STACK_VALUE_UNDEFINED)
+							mc->focusrect = -1.0f;
+						else if (value_var.type == ACTION_STACK_VALUE_BOOLEAN)
+							mc->focusrect = value_var.data.numeric_value ? 1.0f : 0.0f;
+						else if (value_var.type == ACTION_STACK_VALUE_OBJECT || value_var.type == ACTION_STACK_VALUE_ARRAY ||
+						         value_var.type == ACTION_STACK_VALUE_FUNCTION || value_var.type == ACTION_STACK_VALUE_MOVIECLIP)
+							mc->focusrect = 1.0f; // objects are truthy
+						else if (value_var.type == ACTION_STACK_VALUE_STRING) {
+							if (g_swf_version >= 7) {
+								mc->focusrect = (value_var.str_size > 0) ? 1.0f : 0.0f;
+							} else {
+								const uint16_t* _u16 = varGetU16Ptr(&value_var);
+								char _fb[64]; _fb[0] = '\0';
+								if (_u16 && value_var.str_size > 0) u16_to_utf8(_u16, value_var.str_size, _fb, sizeof(_fb));
+								char* _ep; double _d = strtod(_fb, &_ep);
+								mc->focusrect = (_ep != _fb && !isnan(_d) && _d != 0.0) ? 1.0f : 0.0f;
+							}
+						} else {
+							// F32/F64 numeric: !isnan && != 0 → true
+							mc->focusrect = (!isnan(dval) && dval != 0.0) ? 1.0f : 0.0f;
+						}
+					}
 					return;
 				}
 				if (strcasecmp(prop_name, "_soundbuftime") == 0) { mc->soundbuftime = fval; return; }
@@ -31062,9 +31163,26 @@ void actionGetMember(SWFAppContext* app_context)
 			}
 			if (strcasecmp(prop_name, "_highquality") == 0) { float v = mc->highquality; PUSH(ACTION_STACK_VALUE_F32, VAL(u32, &v)); return; }
 			if (strcasecmp(prop_name, "_focusrect") == 0) {
-				// _focusrect defaults to null in Flash (not a number)
-				if (mc->focusrect < 0.0f) { PUSH(ACTION_STACK_VALUE_NULL, 0); }
-				else { float v = mc->focusrect; PUSH(ACTION_STACK_VALUE_F32, VAL(u32, &v)); }
+				extern MovieClip root_movieclip;
+				int _is_stage = (g_swf_version <= 5) || (mc == &root_movieclip);
+				float fr;
+				if (_is_stage || g_swf_version <= 5) {
+					fr = root_movieclip.focusrect;
+				} else {
+					fr = mc->focusrect;
+				}
+				if (_is_stage) {
+					int val = (fr > 0.0f) ? 1 : 0;
+					if (g_swf_version <= 5) {
+						float v = val ? 1.0f : 0.0f;
+						PUSH(ACTION_STACK_VALUE_F32, VAL(u32, &v));
+					} else {
+						PUSH(ACTION_STACK_VALUE_BOOLEAN, val);
+					}
+				} else {
+					if (fr < 0.0f) { PUSH(ACTION_STACK_VALUE_NULL, 0); }
+					else { PUSH(ACTION_STACK_VALUE_BOOLEAN, (fr > 0.0f) ? 1 : 0); }
+				}
 				return;
 			}
 			if (strcasecmp(prop_name, "_soundbuftime") == 0) { float v = mc->soundbuftime; PUSH(ACTION_STACK_VALUE_F32, VAL(u32, &v)); return; }
@@ -33664,9 +33782,13 @@ void actionSetProperty(SWFAppContext* app_context)
 		case 6:  // _alpha
 			mc->alpha = num_value;
 			break;
-		case 7:  // _visible
-			mc->visible = (num_value != 0.0f);
+		case 7: { // _visible
+			int new_vis = (num_value != 0.0f) ? 1 : 0;
+			if (mc->visible && !new_vis && g_focused_mc == mc)
+				selection_do_focus_change(app_context, mc, NULL);
+			mc->visible = new_vis;
 			break;
+		}
 		case 8:  // _width
 			mcSetEffectiveWidth(app_context, mc, (double)num_value);
 			break;
@@ -33691,6 +33813,57 @@ void actionSetProperty(SWFAppContext* app_context)
 				mc->name[sizeof(mc->name) - 1] = '\0';
 			}
 			break;
+		case 17: { // _focusrect
+			extern MovieClip root_movieclip;
+			int _is_stage = (g_swf_version <= 5) || (mc == &root_movieclip);
+			if (_is_stage) {
+				// Stage setter: null/undefined → no-op, object → false, NaN → no-op
+				MovieClip* _rmc = &root_movieclip;
+				if (value_var.type == ACTION_STACK_VALUE_NULL || value_var.type == ACTION_STACK_VALUE_UNDEFINED)
+					{ /* no-op */ }
+				else if (value_var.type == ACTION_STACK_VALUE_OBJECT || value_var.type == ACTION_STACK_VALUE_ARRAY ||
+				         value_var.type == ACTION_STACK_VALUE_FUNCTION)
+					_rmc->focusrect = 0.0f;
+				else if (value_var.type == ACTION_STACK_VALUE_BOOLEAN)
+					_rmc->focusrect = value_var.data.numeric_value ? 1.0f : 0.0f;
+				else if (value_var.type == ACTION_STACK_VALUE_STRING) {
+					const uint16_t* _u16 = varGetU16Ptr(&value_var);
+					char _fb[64]; _fb[0] = '\0';
+					if (_u16 && value_var.str_size > 0) u16_to_utf8(_u16, value_var.str_size, _fb, sizeof(_fb));
+					char* _ep; double _d = strtod(_fb, &_ep);
+					if (_ep != _fb && !isnan(_d)) _rmc->focusrect = (_d != 0.0) ? 1.0f : 0.0f;
+				} else {
+					double _dv = (value_var.type == ACTION_STACK_VALUE_F64) ?
+						VAL(double, &value_var.data.numeric_value) : (double)num_value;
+					if (!isnan(_dv)) _rmc->focusrect = (_dv != 0.0) ? 1.0f : 0.0f;
+				}
+			} else {
+				// Per-object setter: null/undefined → null, others → as_bool
+				if (value_var.type == ACTION_STACK_VALUE_NULL || value_var.type == ACTION_STACK_VALUE_UNDEFINED)
+					mc->focusrect = -1.0f;
+				else if (value_var.type == ACTION_STACK_VALUE_BOOLEAN)
+					mc->focusrect = value_var.data.numeric_value ? 1.0f : 0.0f;
+				else if (value_var.type == ACTION_STACK_VALUE_OBJECT || value_var.type == ACTION_STACK_VALUE_ARRAY ||
+				         value_var.type == ACTION_STACK_VALUE_FUNCTION || value_var.type == ACTION_STACK_VALUE_MOVIECLIP)
+					mc->focusrect = 1.0f;
+				else if (value_var.type == ACTION_STACK_VALUE_STRING) {
+					if (g_swf_version >= 7) {
+						mc->focusrect = (value_var.str_size > 0) ? 1.0f : 0.0f;
+					} else {
+						const uint16_t* _u16 = varGetU16Ptr(&value_var);
+						char _fb[64]; _fb[0] = '\0';
+						if (_u16 && value_var.str_size > 0) u16_to_utf8(_u16, value_var.str_size, _fb, sizeof(_fb));
+						char* _ep; double _d = strtod(_fb, &_ep);
+						mc->focusrect = (_ep != _fb && !isnan(_d) && _d != 0.0) ? 1.0f : 0.0f;
+					}
+				} else {
+					double _dv = (value_var.type == ACTION_STACK_VALUE_F64) ?
+						VAL(double, &value_var.data.numeric_value) : (double)num_value;
+					mc->focusrect = (!isnan(_dv) && _dv != 0.0) ? 1.0f : 0.0f;
+				}
+			}
+			break;
+		}
 		// Read-only properties - ignore silently
 		case 4:  // _currentframe
 		case 5:  // _totalframes
@@ -34176,7 +34349,13 @@ static int setMCBuiltinProperty(SWFAppContext* app_context, MovieClip* mc, const
 		mc->rotation = normalizeRotation(fval); return 1;
 	}
 	if (strcasecmp(name, "_alpha") == 0) { mc->alpha = fval; return 1; }
-	if (strcasecmp(name, "_visible") == 0) { mc->visible = (fval != 0.0f) ? 1 : 0; return 1; }
+	if (strcasecmp(name, "_visible") == 0) {
+		int new_vis = (fval != 0.0f) ? 1 : 0;
+		if (mc->visible && !new_vis && g_focused_mc == mc)
+			selection_do_focus_change(app_context, mc, NULL);
+		mc->visible = new_vis;
+		return 1;
+	}
 	if (strcasecmp(name, "_width") == 0) { mcSetEffectiveWidth(app_context, mc, (double)fval); return 1; }
 	if (strcasecmp(name, "_height") == 0) { mcSetEffectiveHeight(app_context, mc, (double)fval); return 1; }
 	return 0;
