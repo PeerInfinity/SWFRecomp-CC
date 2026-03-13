@@ -1,23 +1,20 @@
 # Ruffle Test Results Diff
 
-**Previous:** `27ce21c2bab9` (2026-03-13T01:01:49.305414+00:00)
-**Current:** `94c64bbea930` (2026-03-13T01:36:31.943776+00:00)
+**Previous:** `94c64bbea930` (2026-03-13T01:36:31.943776+00:00)
+**Current:** `436d8a894964` (2026-03-13T02:57:10.391609+00:00)
 
 ## Summary
 
 | Metric | Previous | Current | Delta |
 |--------|----------|---------|-------|
-| Passing | 526 | 530 | +4 |
+| Passing | 530 | 530 | 0 |
 | Total | 618 | 618 | 0 |
-| Pass rate | 85.1% | 85.8% | +0.7% |
-| Mismatched lines | 17370 | 17291 | -79 |
-|   Decreased | | | -79 |
+| Pass rate | 85.8% | 85.8% | 0% |
+| Mismatched lines | 17291 | 17291 | 0 |
 
-## Newly Passing (4)
+## Line Count Changed (2)
 
-| Test | Previous Status | Lines (prev) | Lines (now) |
-|------|----------------|--------------|-------------|
-| `textsnapshot_available_text` | output_mismatch | 10/20 | 20/20 |
-| `textsnapshot_findtext` | output_mismatch | 26/44 | 44/44 |
-| `textsnapshot_gettext` | output_mismatch | 5/55 | 55/55 |
-| `textsnapshot_text_order` | output_mismatch | 0/1 | 1/1 |
+| Test | Status | Lines (prev) | Lines (now) | Diff |
+|------|--------|--------------|-------------|------|
+| `movieclip_state_values` | output_mismatch | 39/114 | 39/114 | 0 |
+| `swf5_xml_event_handler_context` | output_mismatch | 0/2 | 0/2 | 0 |
