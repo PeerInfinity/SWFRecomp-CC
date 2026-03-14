@@ -8154,8 +8154,10 @@ static ActionVar bitmapDataCompare(SWFAppContext* app_context, ActionVar* args, 
     BitmapDataNative* bmp = getBitmapNative(obj);
     ActionVar r = {0};
     if (!bmp || bmp->disposed) { r = makeF64(-1); return r; }
-    if (arg_count < 1 || args[0].type != ACTION_STACK_VALUE_OBJECT) { r = makeF64(-1); return r; }
-    ASObject* other_obj = (ASObject*) args[0].data.numeric_value;
+    if (arg_count < 1) { r = makeF64(-1); return r; }
+    ASObject* other_obj = NULL;
+    if (args[0].type == ACTION_STACK_VALUE_OBJECT)
+        other_obj = (ASObject*) args[0].data.numeric_value;
     BitmapDataNative* other = getBitmapNative(other_obj);
     if (!other || other->disposed) { r = makeF64(-2); return r; }
     if (bmp->width != other->width) { r = makeF64(-3); return r; }
@@ -8181,20 +8183,29 @@ static ActionVar bitmapDataCompare(SWFAppContext* app_context, ActionVar* args, 
     size_t pxsize = (size_t)bmp->width * (size_t)bmp->height * sizeof(uint32_t);
     diff_bmp->pixels = (uint32_t*) malloc(pxsize);
     for (int i = 0; i < bmp->width * bmp->height; i++) {
-        if (bmp->pixels[i] == other->pixels[i]) {
+        uint32_t p1 = unpremultiplyAlpha(bmp->pixels[i]);
+        uint32_t p2 = unpremultiplyAlpha(other->pixels[i]);
+        if (p1 == p2) {
             diff_bmp->pixels[i] = 0x00000000;
         } else {
-            // Check if only alpha differs
-            if ((bmp->pixels[i] & 0x00FFFFFF) == (other->pixels[i] & 0x00FFFFFF)) {
-                // Alpha difference only: result pixel = alpha XOR with 0xFF prefix
-                uint32_t a1 = (bmp->pixels[i] >> 24) & 0xFF;
-                uint32_t a2 = (other->pixels[i] >> 24) & 0xFF;
-                uint32_t diff_a = a1 ^ a2;
-                diff_bmp->pixels[i] = (diff_a << 24) | 0x00FFFFFF;
+            // Check if only alpha differs (same RGB)
+            if ((p1 & 0x00FFFFFF) == (p2 & 0x00FFFFFF)) {
+                // Alpha difference only
+                uint8_t a1 = (p1 >> 24) & 0xFF;
+                uint8_t a2 = (p2 >> 24) & 0xFF;
+                uint8_t diff_a = a1 - a2; // wrapping subtraction
+                uint32_t result = ((uint32_t)diff_a << 24) | 0x00FFFFFF;
+                diff_bmp->pixels[i] = premultiplyAlpha(result);
             } else {
-                // RGB difference: XOR of RGB, alpha = 0xFF
-                uint32_t xor_val = bmp->pixels[i] ^ other->pixels[i];
-                diff_bmp->pixels[i] = 0xFF000000 | (xor_val & 0x00FFFFFF);
+                // RGB difference: wrapping subtraction per channel, alpha = 0xFF
+                uint8_t r1 = (p1 >> 16) & 0xFF, r2 = (p2 >> 16) & 0xFF;
+                uint8_t g1 = (p1 >> 8) & 0xFF, g2 = (p2 >> 8) & 0xFF;
+                uint8_t b1 = p1 & 0xFF, b2 = p2 & 0xFF;
+                uint32_t result = 0xFF000000 |
+                    ((uint32_t)(uint8_t)(r1 - r2) << 16) |
+                    ((uint32_t)(uint8_t)(g1 - g2) << 8) |
+                    (uint32_t)(uint8_t)(b1 - b2);
+                diff_bmp->pixels[i] = premultiplyAlpha(result);
             }
         }
     }
@@ -8317,8 +8328,8 @@ static ActionVar bitmapDataThreshold(SWFAppContext* app_context, ActionVar* args
             int dst_y = dy + sy;
             if (src_x < 0 || src_x >= src_bmp->width || src_y < 0 || src_y >= src_bmp->height) continue;
             if (dst_x < 0 || dst_x >= dest_bmp->width || dst_y < 0 || dst_y >= dest_bmp->height) continue;
-            uint32_t src_px = src_bmp->pixels[src_y * src_bmp->width + src_x];
-            uint32_t masked = src_px & mask_val;
+            uint32_t src_px_unpremul = unpremultiplyAlpha(src_bmp->pixels[src_y * src_bmp->width + src_x]);
+            uint32_t masked = src_px_unpremul & mask_val;
             uint32_t thresh_masked = threshold_val & mask_val;
             int passes = 0;
             switch (op) {
@@ -8330,10 +8341,10 @@ static ActionVar bitmapDataThreshold(SWFAppContext* app_context, ActionVar* args
                 case 6: passes = (masked != thresh_masked); break;
             }
             if (passes) {
-                dest_bmp->pixels[dst_y * dest_bmp->width + dst_x] = fill_color;
+                dest_bmp->pixels[dst_y * dest_bmp->width + dst_x] = premultiplyAlpha(fill_color);
                 count++;
             } else if (copySource) {
-                dest_bmp->pixels[dst_y * dest_bmp->width + dst_x] = src_px;
+                dest_bmp->pixels[dst_y * dest_bmp->width + dst_x] = src_bmp->pixels[src_y * src_bmp->width + src_x];
             }
         }
     }
@@ -36755,7 +36766,8 @@ static int invokeNativeSuperConstructor(SWFAppContext* app_context, ASFunction* 
 			native->disposed = 0;
 			size_t pxsize = (size_t)iw * (size_t)ih * sizeof(uint32_t);
 			native->pixels = (uint32_t*) malloc(pxsize);
-			for (int i = 0; i < iw * ih; i++) native->pixels[i] = fill_color;
+			uint32_t premul_fill2 = premultiplyAlpha(fill_color);
+			for (int i = 0; i < iw * ih; i++) native->pixels[i] = premul_fill2;
 			obj->native_data = native;
 		}
 		// Set prototype
