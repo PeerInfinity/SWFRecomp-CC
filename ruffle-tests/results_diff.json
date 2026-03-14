@@ -1,61 +1,57 @@
 {
   "metadata": {
-    "old_timestamp": "2026-03-14T19:41:14.150378+00:00",
-    "old_git_sha": "c58dbac0bcdf3901465ddb7456a80b644045146f",
-    "new_timestamp": "2026-03-14T20:27:34.210884+00:00",
-    "new_git_sha": "81898206a3334f720a6d8af00b231a3b926fb61a",
+    "old_timestamp": "2026-03-14T20:27:34.210884+00:00",
+    "old_git_sha": "81898206a3334f720a6d8af00b231a3b926fb61a",
+    "new_timestamp": "2026-03-14T20:47:54.307780+00:00",
+    "new_git_sha": "5bd1933c5fe61a686f3a164cbc843e9c491b7a9b",
     "partial": false,
     "same_commit": false
   },
   "summary": {
-    "old_pass": 543,
+    "old_pass": 545,
     "old_total": 618,
-    "old_pass_rate": 87.9,
-    "new_pass": 545,
-    "new_total": 618,
+    "old_pass_rate": 88.2,
+    "new_pass": 546,
+    "new_total": 619,
     "new_pass_rate": 88.2,
     "old_mismatched_lines": 13227,
-    "new_mismatched_lines": 13227,
+    "new_mismatched_lines": 13143,
     "increased_mismatches": 0,
-    "decreased_mismatches": 0,
-    "newly_passing": 2,
+    "decreased_mismatches": 88,
+    "newly_passing": 1,
     "newly_failing": 0,
-    "status_changed": 2,
-    "unchanged": 616,
-    "added": 0,
+    "status_changed": 1,
+    "unchanged": 617,
+    "added": 1,
     "removed": 0
   },
   "changes": [
     {
-      "test": "string_paths_keyevents",
-      "change_type": "changed",
-      "old_status": "output_mismatch",
-      "new_status": "pass",
-      "old_lines": {
-        "actual_lines": 1,
-        "expected_lines": 0,
-        "matching_lines": 0
-      },
+      "test": "bitmap_data_draw_cliprect",
+      "change_type": "added",
+      "old_status": null,
+      "new_status": "output_mismatch",
+      "old_lines": null,
       "new_lines": {
-        "actual_lines": 0,
-        "expected_lines": 0,
-        "matching_lines": 0
+        "actual_lines": 13,
+        "expected_lines": 13,
+        "matching_lines": 9
       }
     },
     {
-      "test": "string_paths_timer",
+      "test": "edittext_html_swf6",
       "change_type": "changed",
       "old_status": "output_mismatch",
       "new_status": "pass",
       "old_lines": {
-        "actual_lines": 41,
-        "expected_lines": 0,
-        "matching_lines": 0
+        "actual_lines": 5377,
+        "expected_lines": 5377,
+        "matching_lines": 5289
       },
       "new_lines": {
-        "actual_lines": 0,
-        "expected_lines": 0,
-        "matching_lines": 0
+        "actual_lines": 5377,
+        "expected_lines": 5377,
+        "matching_lines": 5377
       }
     }
   ]
