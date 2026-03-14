@@ -369,6 +369,10 @@ void actionMarkDynamicMCsEnterFrameEligible(void);
 void actionDispatchRootVarMapEnterFrame(SWFAppContext* app_context);
 // Dispatch _root.onLoad (fires once after first frame completes).
 void actionDispatchRootOnLoad(SWFAppContext* app_context);
+// Dispatch AS-level onLoad on a MovieClip (walks __proto__ chain for onLoad handler).
+void actionDispatchMCOnLoad(SWFAppContext* app_context, MovieClip* mc);
+// Queue a MovieClip for deferred onLoad dispatch.
+void actionQueueMCOnLoad(MovieClip* mc);
 // Flush pending onLoad dispatches for dynamically-attached MCs.
 void actionFlushPendingOnLoads(SWFAppContext* app_context);
 int actionHasPendingOnLoads(void);

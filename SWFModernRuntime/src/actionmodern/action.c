@@ -20810,8 +20810,9 @@ int actionHasEnterFrameHandlers(void)
 }
 
 // Dispatch onLoad for a MovieClip (walks __proto__ chain for onLoad handler).
-// Used for root MC (once after first frame) and dynamically-attached MCs.
-static void actionDispatchMCOnLoad(SWFAppContext* app_context, MovieClip* mc)
+// Used for root MC (once after first frame), dynamically-attached MCs, and
+// timeline-placed RegisterClass sprites.
+void actionDispatchMCOnLoad(SWFAppContext* app_context, MovieClip* mc)
 {
 	ASFunction* func = NULL;
 
@@ -20858,7 +20859,7 @@ static void actionDispatchMCOnLoad(SWFAppContext* app_context, MovieClip* mc)
 static MovieClip* g_pending_onloads[MAX_PENDING_ONLOADS];
 static int g_pending_onload_count = 0;
 
-static void actionQueueMCOnLoad(MovieClip* mc)
+void actionQueueMCOnLoad(MovieClip* mc)
 {
 	if (g_pending_onload_count < MAX_PENDING_ONLOADS)
 		g_pending_onloads[g_pending_onload_count++] = mc;
@@ -42498,14 +42499,20 @@ void actionCallMethod(SWFAppContext* app_context, char* str_buffer)
 						am_var.data.numeric_value = (u64)attached;
 						setProperty(app_context, (ASObject*)mc->dynamic_props, new_name, strlen(new_name), &am_var);
 
-						// Add to child_mc_cache
+						// Add to child_mc_cache (skip if already registered by actionFindOrCreateMovieClip)
 						{
-							int _sl = -1;
+							int _already = 0;
 							for (int _di = 0; _di < child_mc_count; _di++) {
-								if (child_mc_cache[_di] == NULL) { _sl = _di; break; }
+								if (child_mc_cache[_di] == attached) { _already = 1; break; }
 							}
-							if (_sl >= 0) child_mc_cache[_sl] = attached;
-							else if (child_mc_count < MAX_CHILD_MOVIECLIPS) child_mc_cache[child_mc_count++] = attached;
+							if (!_already) {
+								int _sl = -1;
+								for (int _di = 0; _di < child_mc_count; _di++) {
+									if (child_mc_cache[_di] == NULL) { _sl = _di; break; }
+								}
+								if (_sl >= 0) child_mc_cache[_sl] = attached;
+								else if (child_mc_count < MAX_CHILD_MOVIECLIPS) child_mc_cache[child_mc_count++] = attached;
+							}
 						}
 
 						// Fire registered class constructor synchronously
@@ -46004,7 +46011,8 @@ static void mc_call_as2_handler_ng(SWFAppContext* app_context, MovieClip* mc,
                                     const char* name, u32 name_len, ActionVar* handler_args, int handler_arg_count)
 {
 	if (mc == NULL || mc->dynamic_props == NULL || g_execution_halted) return;
-	ActionVar* handler_var = getProperty((ASObject*)mc->dynamic_props, name, name_len);
+	// Walk prototype chain so handlers defined on RegisterClass prototypes are found
+	ActionVar* handler_var = getPropertyWithPrototype((ASObject*)mc->dynamic_props, name, name_len);
 	if (handler_var == NULL || handler_var->type != ACTION_STACK_VALUE_FUNCTION) return;
 	ASFunction* func = (ASFunction*)(uintptr_t)handler_var->data.numeric_value;
 	if (func == NULL) return;
@@ -46205,9 +46213,10 @@ void actionDispatchMCMouseMove(SWFAppContext* app_context)
 
 // Global AS2 onMouseMove dispatch — fires on all sprite MCs that have onMouseMove handler.
 // Fires regardless of mouse position (global, not hit-test based).
+// Iterates in reverse order: highest-depth / most-recently-created clips fire first.
 void actionDispatchMCMouseMoveGlobal(SWFAppContext* app_context)
 {
-	for (int i = 0; i < child_mc_count; i++) {
+	for (int i = child_mc_count - 1; i >= 0; i--) {
 		MovieClip* mc = child_mc_cache[i];
 		if (mc == NULL || mc->dynamic_props == NULL) continue;
 		if (mc->is_button_mc || mc->ng_textfield_idx >= 0) continue;
@@ -46218,9 +46227,10 @@ void actionDispatchMCMouseMoveGlobal(SWFAppContext* app_context)
 // Global AS2 onMouseDown dispatch — fires on all sprite MCs that have onMouseDown handler.
 // Unlike onPress (hit-test), onMouseDown fires regardless of mouse position.
 // Only fires on sprite MCs, not on buttons or text fields.
+// Iterates in reverse order: highest-depth / most-recently-created clips fire first.
 void actionDispatchMCMouseDown(SWFAppContext* app_context)
 {
-	for (int i = 0; i < child_mc_count; i++) {
+	for (int i = child_mc_count - 1; i >= 0; i--) {
 		MovieClip* mc = child_mc_cache[i];
 		if (mc == NULL || mc->dynamic_props == NULL) continue;
 		if (mc->is_button_mc || mc->ng_textfield_idx >= 0) continue;
@@ -46233,9 +46243,10 @@ void actionDispatchMCMouseDown(SWFAppContext* app_context)
 }
 
 // Global AS2 onMouseUp dispatch — fires on all sprite MCs that have onMouseUp handler.
+// Iterates in reverse order: highest-depth / most-recently-created clips fire first.
 void actionDispatchMCMouseUp(SWFAppContext* app_context)
 {
-	for (int i = 0; i < child_mc_count; i++) {
+	for (int i = child_mc_count - 1; i >= 0; i--) {
 		MovieClip* mc = child_mc_cache[i];
 		if (mc == NULL || mc->dynamic_props == NULL) continue;
 		if (mc->is_button_mc || mc->ng_textfield_idx >= 0) continue;

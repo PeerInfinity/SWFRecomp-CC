@@ -1785,7 +1785,8 @@ MovieClip* ng_attachMovie(SWFAppContext* app_context, size_t char_id, const char
 			DisplayObject* dobj = calloc(1, sizeof(DisplayObject));
 			dobj->char_id = char_id;
 			dobj->sprite_dl_capacity = 64;
-			dobj->sprite_display_list = calloc(dobj->sprite_dl_capacity, sizeof(DisplayObject));
+			// Use HCALLOC so grow_ptr/ENSURE_SIZE/FREE can operate on it consistently
+			dobj->sprite_display_list = HCALLOC(dobj->sprite_dl_capacity, sizeof(DisplayObject));
 			dobj->sprite_max_depth = 0;
 			new_mc->display_obj = dobj;
 		} else {
@@ -1898,12 +1899,18 @@ MovieClip* ng_attachMovie(SWFAppContext* app_context, size_t char_id, const char
 		DisplayObject* pdobj = (DisplayObject*)parent->display_obj;
 		if (pdobj->sprite_display_list != NULL) {
 			size_t target_d = (size_t)swf_depth;
-			// Grow if needed
+			// Grow if needed — use HCALLOC/FREE (heap allocator) because the parent's
+			// sprite_display_list may have been allocated by HCALLOC (timeline sprites).
+			// Standard realloc cannot operate on custom-heap pointers.
 			if (target_d >= pdobj->sprite_dl_capacity) {
 				size_t new_cap = target_d + 16;
-				pdobj->sprite_display_list = realloc(pdobj->sprite_display_list, new_cap * sizeof(DisplayObject));
-				memset(&pdobj->sprite_display_list[pdobj->sprite_dl_capacity], 0, (new_cap - pdobj->sprite_dl_capacity) * sizeof(DisplayObject));
-				pdobj->sprite_dl_capacity = new_cap;
+				DisplayObject* new_dl = HCALLOC(new_cap, sizeof(DisplayObject));
+				if (new_dl) {
+					memcpy(new_dl, pdobj->sprite_display_list, pdobj->sprite_dl_capacity * sizeof(DisplayObject));
+					FREE(pdobj->sprite_display_list);
+					pdobj->sprite_display_list = new_dl;
+					pdobj->sprite_dl_capacity = new_cap;
+				}
 			}
 			pdobj->sprite_display_list[target_d].char_id = char_id;
 			if (pdobj->sprite_display_list[target_d].instance_name)
@@ -3445,14 +3452,18 @@ MovieClip* ng_cloneSprite(SWFAppContext* app_context, const char* source_name,
 		// Copy display entry to clone depth
 		if (target_swf_depth < INITIAL_DISPLAYLIST_CAPACITY)
 		{
-			// Ensure capacity
+			// Ensure capacity — use HCALLOC/FREE because display_list may be
+			// from the custom heap allocator (timeline sprites use HCALLOC).
 			if (target_swf_depth >= display_list_capacity)
 			{
 				size_t new_cap = target_swf_depth + 64;
-				display_list = realloc(display_list, new_cap * sizeof(DisplayObject));
-				memset(&display_list[display_list_capacity], 0,
-				       (new_cap - display_list_capacity) * sizeof(DisplayObject));
-				display_list_capacity = new_cap;
+				DisplayObject* new_dl = HCALLOC(new_cap, sizeof(DisplayObject));
+				if (new_dl) {
+					memcpy(new_dl, display_list, display_list_capacity * sizeof(DisplayObject));
+					FREE(display_list);
+					display_list = new_dl;
+					display_list_capacity = new_cap;
+				}
 			}
 			display_list[target_swf_depth] = display_list[src_depth];
 			// Give clone its own strdup'd name
@@ -3613,13 +3624,17 @@ MovieClip* ng_cloneSpriteFromMC(SWFAppContext* app_context, MovieClip* src_mc,
 				display_list[target_swf_depth].instance_name = NULL;
 			}
 		}
-		// Ensure capacity
+		// Ensure capacity — use HCALLOC/FREE because display_list may be
+		// from the custom heap allocator (timeline sprites use HCALLOC).
 		if (target_swf_depth >= display_list_capacity)
 		{
 			size_t new_cap = target_swf_depth + 64;
-			display_list = realloc(display_list, new_cap * sizeof(DisplayObject));
-			memset(&display_list[display_list_capacity], 0,
-			       (new_cap - display_list_capacity) * sizeof(DisplayObject));
+			DisplayObject* new_dl = HCALLOC(new_cap, sizeof(DisplayObject));
+			if (new_dl) {
+				memcpy(new_dl, display_list, display_list_capacity * sizeof(DisplayObject));
+				FREE(display_list);
+				display_list = new_dl;
+			}
 			display_list_capacity = new_cap;
 		}
 		display_list[target_swf_depth] = display_list[src_depth];

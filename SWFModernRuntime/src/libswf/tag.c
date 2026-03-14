@@ -173,7 +173,7 @@ static void process_sprite_needs_init(SWFAppContext* app_context, MovieClip* par
 		// Collect eligible depth indices, then sort by placed_at_frame
 		size_t eligible[256];
 		size_t eligible_count = 0;
-		for (size_t i = 1; i <= max_depth && i < 256; i++)
+		for (size_t i = 0; i <= max_depth && i < 256; i++)
 		{
 			DisplayObject* obj = &display_list[i];
 			if (obj->char_id == 0 || !obj->sprite_needs_init) continue;
@@ -201,8 +201,8 @@ static void process_sprite_needs_init(SWFAppContext* app_context, MovieClip* par
 		return;
 	}
 
-	// Normal path: iterate by depth
-	for (size_t i = 1; i <= max_depth; i++)
+	// Normal path: iterate by depth (start at 0 to handle depth-0 placements)
+	for (size_t i = 0; i <= max_depth; i++)
 		process_sprite_init_at_depth(app_context, parent_mc, i);
 }
 
@@ -369,13 +369,17 @@ static void process_sprite_init_at_depth(SWFAppContext* app_context, MovieClip* 
 
 			// Invoke registered class constructor if this sprite has an exported symbol with a registered class
 			// Skip if already invoked during eager init in tagPlaceObject2 (constructor_invoked flag)
-			if (!obj->constructor_invoked)
 			{
 				extern const char* ng_lookupExportName(size_t char_id);
 				extern void actionInvokeRegisteredClassConstructor(SWFAppContext* app_context, const char* export_name, MovieClip* mc);
-				const char* export_name = ng_lookupExportName(obj->char_id);
-				if (export_name != NULL && child_mc != NULL)
-					actionInvokeRegisteredClassConstructor(app_context, export_name, child_mc);
+				const char* _rc_export = ng_lookupExportName(obj->char_id);
+				if (!obj->constructor_invoked && _rc_export != NULL && child_mc != NULL)
+					actionInvokeRegisteredClassConstructor(app_context, _rc_export, child_mc);
+				// Queue AS-level onLoad for timeline-placed RegisterClass sprites.
+				// onLoad (prototype method) fires after constructor + process_sprite_needs_init
+				// completes, dispatched from tagShowFrame via actionFlushPendingOnLoads.
+				if (_rc_export != NULL && child_mc != NULL)
+					actionQueueMCOnLoad(child_mc);
 			}
 
 			// Mark as freshly initialized (=1); upgraded to 2 after first tagShowFrame
@@ -1893,6 +1897,12 @@ void tagShowFrame(SWFAppContext* app_context)
 
 		// Fire deferred init scripts for attachMovie clips
 		ng_fire_pending_attach_inits(app_context);
+
+		// Flush pending onLoads for timeline-placed RegisterClass sprites
+		// (queued by process_sprite_init_at_depth after constructor fires).
+		// This also flushes any onLoads queued during the onLoad handlers
+		// (e.g. children created via attachMovie inside onLoad).
+		actionFlushPendingOnLoads(app_context);
 
 		// Fire deferred onLoadInit handlers from MovieClipLoader.loadClip
 		actionFirePendingLoadInits(app_context);
