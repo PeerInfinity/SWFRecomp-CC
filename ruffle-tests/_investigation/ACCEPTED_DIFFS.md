@@ -281,6 +281,30 @@ also fails this test, there is no correct reference to match against.
 
 **Decision:** Accept; Ruffle known failure, no valid reference output.
 
+### `tab_ordering_properties_tab_index_edge_case` — Conflicting test expectations (tabIndex coercion)
+
+**Ruffle test.toml:**
+```toml
+known_failure = true
+```
+
+**Example diff:**
+```
+- asdf
++ undefined
+- asdf2
++ undefined
+```
+
+Flash stores string values in `tabIndex` as-is (no coercion). Ruffle coerces `tabIndex` to
+signed 32-bit integer on buttons/MovieClips, with NaN values (non-numeric strings, objects)
+preserving the previous numeric value. The `tab_ordering_properties` test (293 lines, not a
+known failure) expects Ruffle's coercion behavior. This edge case test expects Flash's raw
+storage behavior. The two tests have irreconcilable expectations — implementing coercion for
+the 293-line test causes this 4-line known-failure test to fail.
+
+**Decision:** Accept; Ruffle known failure, contradicts `tab_ordering_properties` expectations.
+
 ---
 
 ## Summary Table
@@ -302,3 +326,4 @@ also fails this test, there is no correct reference to match against.
 | `mcl_replace_root_swf7_to_swf6` | Ruffle vs Flash (SWF7 undefined concatenation) | 1 | Accept; same as above |
 | `movieclip_state_values` | Missing feature (image loading in Test 3) | ~75 | Accept; image decoding infeasible in NO_GRAPHICS mode |
 | `string_paths_reference_launder` | Ruffle known failure (stack_push) | 2 | Accept; Ruffle also fails this test |
+| `tab_ordering_properties_tab_index_edge_case` | Ruffle known failure (conflicting test expectations) | 4 | Accept; contradicts `tab_ordering_properties` |

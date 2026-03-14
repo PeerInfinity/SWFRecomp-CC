@@ -22807,6 +22807,8 @@ static void initButtonPrototype(SWFAppContext* app_context, ASFunction* ctor)
 	setPropertyWithFlags(app_context, ctor->prototype_obj, "filters", 7, &undef_val, PROPERTY_FLAG_ENUMERABLE);
 	setPropertyWithFlags(app_context, ctor->prototype_obj, "cacheAsBitmap", 13, &undef_val, PROPERTY_FLAG_ENUMERABLE);
 	setPropertyWithFlags(app_context, ctor->prototype_obj, "blendMode", 9, &undef_val, PROPERTY_FLAG_ENUMERABLE);
+	// tabIndex: enumerable by default on buttons (shows up in for..in even before being set)
+	setProperty(app_context, ctor->prototype_obj, "tabIndex", 8, &undef_val);
 }
 
 // Color.prototype: 4 methods (DONT_ENUM + READ_ONLY)
@@ -27749,12 +27751,41 @@ void actionEnumerate2(SWFAppContext* app_context, char* str_buffer)
 				}
 			}
 
-			// For button MCs, also walk MovieClip.prototype chain.
+			// For button MCs, also walk Button.prototype and MovieClip.prototype chains.
 			// In Flash, Button is a separate type with its own prototype where
-			// 'enabled' is enumerable. Regular MovieClip.prototype has 'enabled'
-			// as DontEnum. We only walk the prototype for button-backed MCs.
+			// 'enabled' and 'tabIndex' are enumerable. Regular MovieClip.prototype
+			// has 'enabled' as DontEnum. We only walk these prototypes for button-backed MCs.
 			if (mc->is_button_mc)
 			{
+				// Walk Button.prototype first (includes tabIndex, useHandCursor, etc.)
+				extern ASFunction g_stub_ctors[];
+				ASFunction* btn_ctor = &g_stub_ctors[1]; // Button is index 1
+				if (btn_ctor->prototype_obj != NULL)
+				{
+					ASObject* current_obj = btn_ctor->prototype_obj;
+					int chain_depth = 0;
+					const int MAX_CHAIN_DEPTH = 100;
+					while (current_obj != NULL && chain_depth < MAX_CHAIN_DEPTH)
+					{
+						chain_depth++;
+						for (u32 i = 0; i < current_obj->num_used; i++)
+						{
+							const char* prop_name = current_obj->properties[i].name;
+							u32 prop_name_len = current_obj->properties[i].name_length;
+							u8 prop_flags = current_obj->properties[i].flags;
+							if (!(prop_flags & PROPERTY_FLAG_ENUMERABLE)) continue;
+							if (isPropertyEnumerated(enumerated_head, prop_name, prop_name_len)) continue;
+							addEnumeratedName(&enumerated_head, prop_name, prop_name_len);
+							PUSH_STR((char*)prop_name, prop_name_len);
+						}
+						ActionVar* proto_var = getProperty(current_obj, "__proto__", 9);
+						if (proto_var != NULL && proto_var->type == ACTION_STACK_VALUE_OBJECT)
+							current_obj = (ASObject*) proto_var->data.numeric_value;
+						else
+							current_obj = NULL;
+					}
+				}
+				// Then walk MovieClip.prototype
 				extern ASFunction g_movieclip_constructor;
 				extern int g_movieclip_constructor_init;
 				if (g_movieclip_constructor_init && g_movieclip_constructor.prototype_obj != NULL)
@@ -31153,6 +31184,39 @@ void actionSetMember(SWFAppContext* app_context)
 						break;
 					}
 				}
+			}
+			// tabIndex coercion: text fields use u32, buttons/MCs use i32 with NaN preservation
+			if (prop_name_len == 8 && strncmp(prop_name, "tabIndex", 8) == 0)
+			{
+				if (value_var.type != ACTION_STACK_VALUE_UNDEFINED)
+				{
+					double dval = varToDoubleSimple(&value_var);
+					if (MC_IS_TEXTFIELD(mc)) {
+						// Text fields: unsigned 32-bit coercion, NaN → 0
+						value_var.type = ACTION_STACK_VALUE_F64;
+						VAL(double, &value_var.data.numeric_value) =
+							isnan(dval) ? 0.0 : (double)(uint32_t)ecmaToInt32(dval);
+					} else {
+						// Buttons / MovieClips: signed 32-bit coercion, NaN → preserve previous
+						if (isnan(dval)) return;
+						value_var.type = ACTION_STACK_VALUE_F64;
+						VAL(double, &value_var.data.numeric_value) = (double)ecmaToInt32(dval);
+					}
+				}
+				// Regular MCs (not textfield, not button): tabIndex is non-enumerable
+				if (!MC_IS_TEXTFIELD(mc) && !mc->is_button_mc)
+				{
+					if (mc->dynamic_props == NULL) {
+						mc->dynamic_props = (void*) allocObject(app_context, 4);
+						retainObject((ASObject*) mc->dynamic_props);
+					}
+					setPropertyWithFlags(app_context, (ASObject*) mc->dynamic_props,
+						"tabIndex", 8, &value_var, PROPERTY_FLAGS_DONTENUM);
+					extern MovieClip root_movieclip;
+					if (mc == &root_movieclip) setVariableByName(prop_name, &value_var);
+					return;
+				}
+				// Text fields and buttons: fall through to normal (enumerable) storage
 			}
 			// Store in dynamic_props
 			if (mc->dynamic_props == NULL)

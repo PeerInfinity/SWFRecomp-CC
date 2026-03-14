@@ -91,3 +91,4 @@ movieclip_library_state_values
 movieclip_state_values
 native_objects_swf6
 native_subclasses
+tab_ordering_properties_tab_index_edge_case
