@@ -1,26 +1,20 @@
 # Ruffle Test Results Diff
 
-**Previous:** `ca7584417f0a` (2026-03-14T17:52:46.866487+00:00)
-**Current:** `b59b387ef098` (2026-03-14T18:49:14.052793+00:00)
+**Previous:** `b59b387ef098` (2026-03-14T18:49:14.052793+00:00)
+**Current:** `c58dbac0bcdf` (2026-03-14T19:41:14.150378+00:00)
 
 ## Summary
 
 | Metric | Previous | Current | Delta |
 |--------|----------|---------|-------|
-| Passing | 542 | 542 | 0 |
+| Passing | 542 | 543 | +1 |
 | Total | 618 | 618 | 0 |
-| Pass rate | 87.7% | 87.7% | 0% |
-| Mismatched lines | 13288 | 13231 | -57 |
-|   Decreased | | | -57 |
+| Pass rate | 87.7% | 87.9% | +0.2% |
+| Mismatched lines | 13231 | 13227 | -4 |
+|   Decreased | | | -4 |
 
-## Status Changed (1)
+## Newly Passing (1)
 
-| Test | Previous | Current | Lines (prev) | Lines (now) |
-|------|----------|---------|--------------|-------------|
-| `bitmap_data_hittest` | segfault | output_mismatch | 96/132 | 96/132 |
-
-## Line Count Changed (1)
-
-| Test | Status | Lines (prev) | Lines (now) | Diff |
-|------|--------|--------------|-------------|------|
-| `bitmap_data_threshold` | output_mismatch | 112/176 | 169/176 | -57 |
+| Test | Previous Status | Lines (prev) | Lines (now) |
+|------|----------------|--------------|-------------|
+| `edittext_bullet` | output_mismatch | 26/30 | 30/30 |
