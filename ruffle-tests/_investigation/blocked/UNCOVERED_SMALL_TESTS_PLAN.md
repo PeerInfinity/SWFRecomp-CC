@@ -3,158 +3,153 @@
 
 Last updated: 2026-03-13
 
-## Status: BLOCKED — catalog of individual uncovered tests, grouped by blocker
+## Status: 11/19 PASS — 2 actionable fixes, 6 blocked
 
 ### Overview
 
-This document catalogs 16 failing tests that don't fit into any existing plan's scope. Each is small (2-91 expected lines) and either blocked by a larger feature or a quick standalone fix. Tests are grouped by the root cause/blocker.
+This document catalogs 19 tests that don't fit into any existing plan's scope. Each is small (0-579 expected lines) and either done, blocked by a larger feature, or a standalone fix.
 
 ---
 
-### Group A: Could Be Fixed Independently (best ROI)
+### Results Summary
 
-| Test | Lines | Current | Issue | Effort |
-|------|-------|---------|-------|--------|
-| root_onload | 2 | **PASS** ✅ | Was compile_fail, now passes | DONE |
-| issue_3169 | 2 | **PASS** ✅ | Was 0/2, now passes in CI | DONE |
-| get_bytes_total | 4 | **PASS** ✅ | getBytesLoaded/getBytesTotal implemented | DONE |
-| gettextextent | 56 | **PASS** ✅ | TextFormat.getTextExtent() implemented | DONE |
-| define_local_with_paths | 55 | **PASS** ✅ | Was 53/54, now fully passing | DONE |
-| sandbox_type_remote | 3 | 1/3 | Lines 2-3 need loadMovie infra (multi-SWF) | BLOCKED |
-| device_font_spacing | 91 | **91/91 PASS** ✅ | Fixed: conditional pixel rounding based on embedFonts | DONE |
-
-#### define_local_with_paths (55 lines) — 53/54 PASS
-
-DefineLocal (ActionDefineLocal, `var x`) with slash-path syntax:
-- `var /:abc = 'ABC'` → sets variable `abc` on `_root` (slash `/` = root, colon `:` = variable separator)
-- `var /ruffle/:def = 'DEF'` → sets variable `def` on `_root.ruffle` MC
-- Uses Flash's SWF4 slash-path variable convention
-
-**Fixed** (commit c4b7c440):
-- DefineLocal slash-path: converts `/ruffle/` → `_root.ruffle` dot-path for GetVariable resolution
-- Stores literal slash-path key on MC's dynamic_props for GetMember access
-- Syncs var_array changes to dynamic_props at top-level
-- GetVariable colon-path: object fallback for non-MC targets (e.g., `/ruffle/:def` where `ruffle` is an Object)
-
-**Remaining (line 54)**: `this['/:pqr']` inside a function — requires DefineLocal inside a function with slash-path key to store on root MC in a way that `GetMember(this, '/:pqr')` can find. Complex scoping interaction between function scope and slash-path MC property storage. BLOCKED.
-
-#### issue_3169 (2 lines)
-
-addProperty setter not invoked when setting `this.foo = val` inside a function where `foo` has an addProperty setter on the prototype chain.
-
-**Root cause**: `actionSetVariable` or the SetMember path doesn't check addProperty setters when setting via `this.foo` in certain scopes.
-
-**Fix**: Ensure SetMember on `this` walks the prototype chain for addProperty setters before storing as a plain property.
-
-#### get_bytes_total (4 lines)
-
-Root MC `getBytesLoaded()` and `getBytesTotal()` return `undefined` instead of the SWF file size.
-
-**Fix**: Return a plausible value (e.g., the compiled binary size or a fixed value). For child MCs, currently returns 0 which is also wrong — should return the character's data size.
-
-#### sandbox_type_remote (3 lines)
-
-`System.security.sandboxType` property needs to be registered. Expected value: `"localTrusted"` for local SWFs.
-
-**Fix**: Add `sandboxType` property to the `System.security` object (currently a stub). Return `"localTrusted"`.
-
-#### gettextextent (56 lines)
-
-`TextFormat.getTextExtent(text)` returns an object with `{ascent, descent, width, height, textFieldHeight, textFieldWidth}`. Uses font metrics to compute text dimensions without needing a TextField.
-
-**Fix**: Implement `getTextExtent` on `TextFormat.prototype` using the existing font metrics pipeline (`ng_compute_text_width`, `ng_compute_text_height`).
-
-**Related to**: TEXTFIELD_PLAN (shares font metrics infrastructure)
-
-#### device_font_spacing (91 lines) — RESOLVED
-
-~~Tests text formatting with device fonts and letter spacing.~~ **91/91 PASS.** Fixed by making pixel rounding conditional on `embedFonts` property (commit 0f010c5b).
+| Test | Lines | Status | Notes |
+|------|-------|--------|-------|
+| root_onload | 2 | **PASS** | |
+| issue_3169 | 2 | **PASS** | |
+| get_bytes_total | 4 | **PASS** | |
+| gettextextent | 56 | **PASS** | |
+| define_local_with_paths | 55 | **PASS** | |
+| device_font_spacing | 91 | **PASS** | |
+| movieclip_setmask | 14 | **PASS** | |
+| selection_handlers | 27 | **PASS** | |
+| define_local | 27 | **PASS** | |
+| resolve_different_root | 2 | **PASS** | |
+| root_global_parent | 6 | **PASS** | |
+| string_paths_keyevents | 0 | FAIL | **Actionable**: Key listener cleanup on removeMovieClip |
+| string_paths_timer | 0 | FAIL | **Actionable**: Timer cleanup on removeMovieClip |
+| issue_2030 | 4 | FAIL | Blocked: needs attachBitmap + BitmapData pixel buffer |
+| displacementmapfilter_mappoint_throw_error | 13 | FAIL | Blocked: Point.toString() + Error throw from native ctor |
+| sandbox_type_remote | 3 | FAIL | Blocked: loadMovie multi-SWF |
+| issue_2084 | 16 | FAIL | Blocked: loadMovie + onLoad positioning |
+| geturl | 7 | FAIL | Blocked: navigator/network trace infrastructure |
+| localconnection | 579 | FAIL | Blocked: full LocalConnection protocol |
 
 ---
 
-### Group B: Blocked by LoadMovie / Multi-SWF Infrastructure
+## Actionable: Removed MC Listener/Timer Cleanup
 
-| Test | Lines | Current | Blocker |
-|------|-------|---------|---------|
-| resolve_different_root | 2 | **2/2 PASS** ✅ | Was segfault, now fixed |
-| root_global_parent | 6 | **6/6 PASS** ✅ | Fixed: _global as MOVIECLIP builtin in GetMember |
-| issue_2084 | 16 | 0/16 | onLoad + attachMovie positioning in child clips |
-| issue_2030 | 4 | 0/4 | MC _width/_height from shape content (needs graphics bounds) |
+### Problem
 
-These tests involve multi-SWF loading (`loadMovie`), display list bounds from shape content, or parent chain traversal across loaded movies. All blocked by LOADMOVIE_PLAN infrastructure.
+Two tests expect that removing a MovieClip via `removeMovieClip()` also cleans up its event listeners and timers:
+
+**`string_paths_keyevents`** (0 expected lines):
+1. Creates `clip` via `createEmptyMovieClip`
+2. Sets `clip.onKeyDown = function() { trace("Keypress"); }`
+3. Calls `Key.addListener(clip)` to register clip as a key listener
+4. Immediately calls `clip.removeMovieClip()`
+5. Input sends a key event
+6. Expected: no output (removed MC shouldn't receive key events)
+7. Actual: traces "Keypress" — the Key listener array still holds the removed MC
+
+**`string_paths_timer`** (0 expected lines):
+1. Creates `clip` via `createEmptyMovieClip`
+2. Sets `clip.foo = function() { trace("Foo"); }`
+3. Calls `setInterval(clip, "foo", ...)` — method-form timer
+4. Immediately calls `clip.removeMovieClip()`
+5. Expected: no output (timer on removed MC shouldn't fire)
+6. Actual: traces "Foo" 5 times — the timer still fires its callback
+
+### Root Cause
+
+`removeMovieClip` invalidates the MC (sets `depth = INT_MIN`, clears `dynamic_props` via `actionInvalidateCachedMovieClip` or the pending removal path) but does NOT:
+1. Remove the MC from AsBroadcaster `_listeners` arrays (Key, Mouse, Stage, Selection, etc.)
+2. Deactivate timers whose `object` field references the removed MC
+
+### Fix Plan
+
+#### Fix A: Skip removed MCs in broadcastMessage dispatch
+
+In `builtin_broadcaster_broadcastMessage` (action.c ~line 19702), when iterating the `_listeners` array, check if each listener is a MovieClip with `depth == INT_MIN` (dead) or `pending_removal == 1`, and skip it:
+
+```c
+// In broadcastMessage listener dispatch loop:
+for (int i = 0; i < arr->length; i++) {
+    ActionVar* listener = &arr->elements[i];
+    // Skip removed MovieClips
+    if (listener->type == ACTION_STACK_VALUE_MOVIECLIP) {
+        MovieClip* mc = (MovieClip*)listener->data.numeric_value;
+        if (mc == NULL || mc->depth == INT_MIN) continue;
+    }
+    // ... dispatch to listener ...
+}
+```
+
+This fixes `string_paths_keyevents` because `Key.broadcastMessage("onKeyDown")` will skip the removed clip.
+
+#### Fix B: Skip removed MC timers in processTimers
+
+In `processTimers` (action.c ~line 48434), when a method-form timer fires, check if the target object is a removed MovieClip:
+
+```c
+// In processTimers, before invoking timer callback:
+if (t->is_method && t->object.type == ACTION_STACK_VALUE_MOVIECLIP) {
+    MovieClip* mc = (MovieClip*)t->object.data.numeric_value;
+    if (mc == NULL || mc->depth == INT_MIN) {
+        t->active = 0;  // Deactivate timer permanently
+        continue;
+    }
+}
+```
+
+This fixes `string_paths_timer` because the timer is deactivated when its target MC is dead.
+
+### Files to modify
+
+| File | Changes |
+|------|---------|
+| `SWFModernRuntime/src/actionmodern/action.c` | broadcastMessage: skip dead MC listeners. processTimers: deactivate timers on dead MCs. |
+
+### Verification
+
+```bash
+python3 ruffle-tests/verify_output.py --test=string_paths_keyevents --diff --verbose
+python3 ruffle-tests/verify_output.py --test=string_paths_timer --diff --verbose
+```
+
+### Potential side effects
+
+- `broadcastMessage` change: could affect any test using Key/Mouse/Stage listeners. Verify `focus_keyboard_press`, `focus_mouse`, `mouse_events`, `key_events` still pass.
+- Timer change: could affect `set_interval` test (27/27 PASS). Verify it still passes.
 
 ---
 
-### Group C: Other Infrastructure Blockers
+## Blocked Tests
 
-| Test | Lines | Current | Blocker |
-|------|-------|---------|---------|
-| string_paths_keyevents | 0 | 0/0 (empty) | 0 expected output lines — test produces no trace output even with input events |
-| string_paths_timer | ? | segfault | Timer + string path interaction causes crash; needs debugging |
-| localconnection | 579 | ~74/579 (13%) | Full LocalConnection protocol (send/receive/domain management) |
-| displacementmapfilter_mappoint_throw_error | 13 | 0/13 | Error/throw from DisplacementMapFilter constructor |
-| geturl | 7 | 0/7 | getURL with POST parameters — needs network trace infrastructure |
+### issue_2030 (4 lines) — Blocked on BITMAP_DATA_PLAN Phase 1
 
-#### string_paths_keyevents (0 lines expected)
+Creates an empty MC, creates a 10x10 BitmapData, calls `mc.attachBitmap(bitmap, 0)`, then checks `mc._width` and `mc._height`. Expects 10/10 from the attached bitmap dimensions. Requires:
+1. BitmapData pixel buffer (BITMAP_DATA_PLAN Phase 1)
+2. `MovieClip.attachBitmap()` method that sets MC dimensions from bitmap
 
-Empty expected output — keyboard input simulation is now implemented, but this test has 0 expected lines so it produces no trace output regardless. Effectively a no-op test.
+### displacementmapfilter_mappoint_throw_error (13 lines) — Partially blocked
 
-#### string_paths_timer (segfault)
+Two issues:
+1. **Point.toString()** returns `[object Object]` instead of `(x=1, y=2)`. The Point class exists but its toString is not implemented. This is fixable independently.
+2. **Error throw from native constructor** — the test expects `DisplacementMapFilter` constructor to throw an Error when `mapPoint` is invalid. Our try/catch infrastructure exists but native constructors don't throw. Requires throw-from-native support.
 
-Timer callback with string-based target paths causes a segfault. Needs investigation:
-- Could be null pointer in timer callback when target MC is removed
-- Could be string path resolution during timer dispatch
+### sandbox_type_remote (3 lines) — Blocked on loadMovie
 
-**Priority**: MEDIUM — segfaults should be investigated.
+Line 1 passes (`localTrusted` for root SWF). Lines 2-3 need a loaded child SWF with `remote` sandbox type.
 
-#### localconnection (579 lines, 13%)
+### issue_2084 (16 lines) — Blocked on loadMovie
 
-Full `LocalConnection` class implementation with domain management, send/receive across movie clips. Very complex protocol — 579 expected lines.
+Tests onLoad + attachMovie positioning in loaded child clips. Needs multi-SWF execution.
 
-**Decision**: LOW PRIORITY. Consider adding to ignored_tests.txt if effort exceeds ROI.
+### geturl (7 lines) — Blocked on navigator infrastructure
 
-#### displacementmapfilter_mappoint_throw_error (13 lines)
+Tests `getURL()` with POST parameters. Expected output traces the URL, target, method, and POST parameters. Would need a navigator/network logging hook in the test harness.
 
-Tests that `DisplacementMapFilter` throws an Error when `mapPoint` is invalid. Needs Error throw mechanism from native constructor validation.
+### localconnection (579 lines) — Low priority
 
-#### geturl (7 lines)
-
-Tests `getURL()` with POST parameters and traces the request. Needs network request tracing infrastructure (log_fetch pattern).
-
----
-
-### Group D: Small Fixes (potentially quick wins)
-
-| Test | Lines | Current | Issue | Effort |
-|------|-------|---------|-------|--------|
-| movieclip_setmask | 14 | **14/14 PASS** ✅ | Fixed: path resolution, dynamic_props lookup, type handling | DONE |
-| selection_handlers | 27 | **27/27 PASS** ✅ | Was 21/27, now fully passing | DONE |
-| define_local | 27 | **27/27 PASS** ✅ | Confirmed passing | DONE |
-
-#### movieclip_setmask (14 lines) — RESOLVED
-
-~~setMask returns false for certain arg types.~~ **14/14 PASS.** Fixed (commit c4b7c440):
-- OBJECT/FUNCTION/ARRAY args return false immediately (no valueOf coercion)
-- Non-string types converted via `convertString` for path lookup
-- Added `_root`/`_level0`/`_parent` special segment handling in `getMovieClipByTarget`
-- Added dynamic_props lookup fallback for variable-based MC references (e.g., number `1234` stored as variable pointing to MC)
-
-#### selection_handlers (27 lines)
-
-Focus-change rollOver/rollOut dispatch is incomplete. Lines 1-21 pass (Selection.setFocus, onSetFocus, onKillFocus, first pair of button rollOver/rollOut). Lines 22-27 fail: button's second rollOver/rollOut pair is missing, and clip rollOver/rollOut appears in wrong position.
-
-**Root cause**: The deferred roll event queue may not be dispatching events for buttons on the second cycle, or the roll state machine isn't tracking button hover state correctly across focus changes.
-
-**Related to**: MOUSE_EVENTS_ADVANCED_PLAN (roll dispatch). Fixing this requires understanding the roll dispatch ordering during programmatic focus changes.
-
----
-
-### Priority Summary
-
-| Priority | Test | Status | Lines Gained |
-|----------|------|--------|-------------|
-| **DONE** | root_onload, issue_3169, get_bytes_total, gettextextent, device_font_spacing, movieclip_setmask, define_local_with_paths, selection_handlers, define_local, resolve_different_root, root_global_parent | PASS | ~300 |
-| **Medium** | selection_handlers | 21/27 (roll dispatch) | 6 |
-| **Blocked (loadMovie)** | sandbox_type_remote, resolve_different_root, root_global_parent, issue_2030, issue_2084 | blocked by loadMovie | 0 |
-| **Investigate** | string_paths_timer (segfault) | ? | ? |
-| **Low priority** | localconnection, geturl, string_paths_keyevents, displacementmapfilter_mappoint_throw_error | complex/blocked | 0 |
+Full LocalConnection protocol with domain management, send/receive, connect/close. Very complex, 579 expected lines. Consider adding to ignored_tests.txt if effort exceeds ROI.
