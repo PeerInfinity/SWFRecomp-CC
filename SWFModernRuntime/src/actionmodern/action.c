@@ -4845,6 +4845,40 @@ static void setObjectProtoEnum(SWFAppContext* app_context, ASObject* obj)
 	setPropertyWithFlags(app_context, obj, "__proto__", 9, &proto_var, PROPERTY_FLAGS_DEFAULT);
 }
 
+// Fix __proto__ and constructor flags on a built-in prototype object.
+// Makes both DONT_ENUM + DONT_DELETE (= WRITABLE only).
+// Called after prototype initialization to ensure these properties survive deletion.
+static void fixBuiltinPrototypeFlags(ASObject* proto)
+{
+	if (proto == NULL) return;
+	for (u32 i = 0; i < proto->num_used; i++)
+	{
+		if ((proto->properties[i].name_length == 9 &&
+		     strncmp(proto->properties[i].name, "__proto__", 9) == 0) ||
+		    (proto->properties[i].name_length == 11 &&
+		     strncmp(proto->properties[i].name, "constructor", 11) == 0))
+		{
+			proto->properties[i].flags = PROPERTY_FLAG_WRITABLE;
+		}
+	}
+}
+
+// Ensure a built-in prototype has constructor property and both constructor/__proto__ are DONT_DELETE.
+// If constructor is missing, adds it with DONT_ENUM + DONT_DELETE flags.
+static void ensureBuiltinPrototypeProps(SWFAppContext* app_context, ASObject* proto, void* ctor_ptr)
+{
+	if (proto == NULL) return;
+	// Add constructor if missing
+	if (ctor_ptr != NULL && getProperty(proto, "constructor", 11) == NULL)
+	{
+		ActionVar ctor_val = {0};
+		ctor_val.type = ACTION_STACK_VALUE_FUNCTION;
+		ctor_val.data.numeric_value = (u64) ctor_ptr;
+		setPropertyWithFlags(app_context, proto, "constructor", 11, &ctor_val, PROPERTY_FLAG_WRITABLE);
+	}
+	fixBuiltinPrototypeFlags(proto);
+}
+
 // Set up arguments object properties: __proto__ = Array.prototype, callee, caller.
 // Called after creating the arguments ASArray for any user-defined function call.
 static void setupArgumentsProps(SWFAppContext* app_context, ASArray* arr,
@@ -22968,6 +23002,52 @@ static void initSystemObject(SWFAppContext* app_context)
 	installNativeToString(app_context, ime_obj);
 }
 
+// Create prototype_obj for a stub constructor if missing.
+// Sets constructor and __proto__ on prototype with DONT_DELETE.
+// Does NOT set up own_props (that's deferred to ensureGlobalInit Phase 8c-2.5).
+static void ensureStubCtorPrototype(SWFAppContext* app_context, ASFunction* ctor)
+{
+	if (ctor->prototype_obj == NULL) {
+		ctor->prototype_obj = allocObject(app_context, 4);
+		retainObject(ctor->prototype_obj);
+		// constructor first (enumerated last in LIFO)
+		ActionVar cv = {0}; cv.type = ACTION_STACK_VALUE_FUNCTION;
+		cv.data.numeric_value = (u64) ctor;
+		setPropertyWithFlags(app_context, ctor->prototype_obj, "constructor", 11, &cv, PROPERTY_FLAG_WRITABLE);
+		// __proto__ second
+		setObjectProto(app_context, ctor->prototype_obj);
+		fixBuiltinPrototypeFlags(ctor->prototype_obj);
+	}
+}
+
+// Ensure a constructor has own_props with prototype, constructor, __proto__ (DONT_DELETE).
+// fn_ctor = Function constructor, fn_proto = Function.prototype
+static void ensureCtorOwnProps(SWFAppContext* app_context, ASFunction* ctor,
+                               ASFunction* fn_ctor, ASObject* fn_proto)
+{
+	if (ctor->own_props == NULL) {
+		ctor->own_props = allocObject(app_context, 8);
+		retainObject(ctor->own_props);
+	}
+	// Insertion order: prototype, constructor, __proto__
+	// LIFO for-in yields: __proto__, constructor, prototype (matching most Flash constructors)
+	if (ctor->prototype_obj != NULL && getProperty(ctor->own_props, "prototype", 9) == NULL) {
+		ActionVar pv = {0}; pv.type = ACTION_STACK_VALUE_OBJECT; pv.str_size = 0;
+		pv.data.numeric_value = (u64) ctor->prototype_obj;
+		setPropertyWithFlags(app_context, ctor->own_props, "prototype", 9, &pv, PROPERTY_FLAG_WRITABLE);
+	}
+	if (fn_ctor != NULL && getProperty(ctor->own_props, "constructor", 11) == NULL) {
+		ActionVar fcv = {0}; fcv.type = ACTION_STACK_VALUE_FUNCTION;
+		fcv.data.numeric_value = (u64) fn_ctor;
+		setPropertyWithFlags(app_context, ctor->own_props, "constructor", 11, &fcv, PROPERTY_FLAG_WRITABLE);
+	}
+	if (fn_proto != NULL && getProperty(ctor->own_props, "__proto__", 9) == NULL) {
+		ActionVar fpv = {0}; fpv.type = ACTION_STACK_VALUE_OBJECT; fpv.str_size = 0;
+		fpv.data.numeric_value = (u64) fn_proto;
+		setPropertyWithFlags(app_context, ctor->own_props, "__proto__", 9, &fpv, PROPERTY_FLAG_WRITABLE);
+	}
+}
+
 // ---- initFlashPackage: create flash.* package hierarchy (idempotent, SWF8+) ----
 static int g_flash_init_done = 0;
 static void initFlashPackage(SWFAppContext* app_context)
@@ -23246,6 +23326,36 @@ static void initFlashPackage(SWFAppContext* app_context)
 	SET_CTOR_PROP(automation_obj, "ActionGenerator", 15, fc_ActionGenerator);
 	MAKE_STUB_CTOR(fc_Configuration, "Configuration");
 	SET_CTOR_PROP(automation_obj, "Configuration", 13, fc_Configuration);
+
+	// ---- Create prototypes for all flash.* constructors and fix prototype flags ----
+	// Existing prototypes — add constructor to proto + fix flags
+	ensureBuiltinPrototypeProps(app_context, g_point_prototype, &fc_Point);
+	ensureBuiltinPrototypeProps(app_context, g_matrix_prototype, &fc_Matrix);
+	ensureBuiltinPrototypeProps(app_context, g_rect_prototype, &fc_Rectangle);
+	ensureBuiltinPrototypeProps(app_context, g_color_transform_prototype, &fc_ColorTransform);
+	ensureBuiltinPrototypeProps(app_context, g_bitmapdata_prototype, &fc_BitmapData);
+
+	// Create prototype_obj for stub constructors that don't have one yet
+	ensureStubCtorPrototype(app_context, &fc_TextRenderer);
+	ensureStubCtorPrototype(app_context, &fc_BevelFilter);
+	ensureStubCtorPrototype(app_context, &fc_BitmapFilter);
+	ensureStubCtorPrototype(app_context, &fc_BlurFilter);
+	ensureStubCtorPrototype(app_context, &fc_ColorMatrixFilter);
+	ensureStubCtorPrototype(app_context, &fc_ConvolutionFilter);
+	ensureStubCtorPrototype(app_context, &fc_DisplacementMapFilter);
+	ensureStubCtorPrototype(app_context, &fc_DropShadowFilter);
+	ensureStubCtorPrototype(app_context, &fc_GlowFilter);
+	ensureStubCtorPrototype(app_context, &fc_GradientBevelFilter);
+	ensureStubCtorPrototype(app_context, &fc_GradientGlowFilter);
+	ensureStubCtorPrototype(app_context, &fc_Transform);
+	ensureStubCtorPrototype(app_context, &fc_FileReference);
+	ensureStubCtorPrototype(app_context, &fc_FileReferenceList);
+	ensureStubCtorPrototype(app_context, &fc_ExternalInterface);
+	ensureStubCtorPrototype(app_context, &fc_StageCapture);
+	ensureStubCtorPrototype(app_context, &fc_ActionGenerator);
+	ensureStubCtorPrototype(app_context, &fc_Configuration);
+	// Note: own_props (prototype, constructor, __proto__) are added in ensureGlobalInit Phase 8c-2.5
+	// because Function.prototype isn't available until then.
 
 	#undef MAKE_STUB_CTOR
 	#undef SET_CTOR_PROP
@@ -23797,24 +23907,24 @@ static void ensureGlobalInit(SWFAppContext* app_context)
 			// (LIFO enumeration means last registered = first in for-in,
 			// and expected order is: __proto__, constructor, prototype)
 
-			// Set prototype → prototype_obj (DONT_ENUM, if not already set)
+			// Set prototype → prototype_obj (DONT_ENUM + DONT_DELETE, if not already set)
 			// Only if prototype_obj exists — some constructors (e.g., AsBroadcaster in SWF5)
 			// deliberately have no prototype, and creating one would break typeof checks.
 			if (ctor->prototype_obj != NULL && getProperty(ctor->own_props, "prototype", 9) == NULL) {
 				ActionVar proto_val; proto_val.type = ACTION_STACK_VALUE_OBJECT; proto_val.str_size = 0;
 				proto_val.data.numeric_value = (u64) ctor->prototype_obj;
-				setPropertyWithFlags(app_context, ctor->own_props, "prototype", 9, &proto_val, PROPERTY_FLAGS_DONTENUM);
+				setPropertyWithFlags(app_context, ctor->own_props, "prototype", 9, &proto_val, PROPERTY_FLAG_WRITABLE);
 			}
 
-			// Set constructor → Function constructor (if not already set)
+			// Set constructor → Function constructor (DONT_ENUM + DONT_DELETE, if not already set)
 			// Must use setPropertyWithFlags to override the auto-DONT_ENUM rule
 			// in setProperty (which forces __proto__ and constructor to DONT_ENUM)
 			if (getProperty(ctor->own_props, "constructor", 11) == NULL)
-				setPropertyWithFlags(app_context, ctor->own_props, "constructor", 11, &fn_ctor_val, PROPERTY_FLAGS_DEFAULT);
+				setPropertyWithFlags(app_context, ctor->own_props, "constructor", 11, &fn_ctor_val, PROPERTY_FLAG_WRITABLE);
 
-			// Set __proto__ → Function.prototype (if not already set)
+			// Set __proto__ → Function.prototype (DONT_ENUM + DONT_DELETE, if not already set)
 			if (getProperty(ctor->own_props, "__proto__", 9) == NULL)
-				setPropertyWithFlags(app_context, ctor->own_props, "__proto__", 9, &fn_proto_val, PROPERTY_FLAGS_DEFAULT);
+				setPropertyWithFlags(app_context, ctor->own_props, "__proto__", 9, &fn_proto_val, PROPERTY_FLAG_WRITABLE);
 		}
 
 		// ---- textRenderer own_props: add specific properties AFTER Phase 8c-2 ----
@@ -23830,9 +23940,52 @@ static void ensureGlobalInit(SWFAppContext* app_context)
 			setProperty(app_context, g_textrenderer_ctor.own_props, "setAdvancedAntialiasingTable", 28, &fv);
 			ActionVar sv;
 			sv = makeF64(0.0);
-			setPropertyWithFlags(app_context, g_textrenderer_ctor.own_props, "maxLevel", 8, &sv, PROPERTY_FLAG_ENUMERABLE);
+			setPropertyWithFlags(app_context, g_textrenderer_ctor.own_props, "maxLevel", 8, &sv,
+			                     PROPERTY_FLAG_ENUMERABLE | PROPERTY_FLAG_CONFIGURABLE);
 			sv = makeStringActionVar(app_context, "normal", 6);
-			setPropertyWithFlags(app_context, g_textrenderer_ctor.own_props, "displayMode", 11, &sv, PROPERTY_FLAG_ENUMERABLE);
+			setPropertyWithFlags(app_context, g_textrenderer_ctor.own_props, "displayMode", 11, &sv,
+			                     PROPERTY_FLAG_ENUMERABLE | PROPERTY_FLAG_CONFIGURABLE);
+		}
+
+		// ---- Phase 8c-2.5: Fix prototype flags + flash.* constructor own_props ----
+		// On built-in prototypes, __proto__ and constructor should be DONT_DELETE.
+		for (int ci = 0; ci < num_all_ctors; ci++)
+		{
+			ASFunction* ctor = all_ctors[ci];
+			if (ctor == NULL) continue;
+			if (ctor->prototype_obj == NULL) continue;
+			fixBuiltinPrototypeFlags(ctor->prototype_obj);
+		}
+
+		// Set up own_props for flash.* constructors (deferred from initFlashPackage
+		// because fn_ctor/fn_proto aren't available until now).
+		if (g_flash_object != NULL) {
+			// Walk flash.* sub-packages (text, display, filters, geom, net, external, automation)
+			// Each sub-package contains constructor functions as FUNCTION-type properties.
+			// Skip g_flash_object itself (it has constructor = Function which we don't want to re-process).
+			ASObject* packages[8];
+			int num_packages = 0;
+			for (u32 i = 0; i < g_flash_object->num_used && num_packages < 8; i++) {
+				ASProperty* p = &g_flash_object->properties[i];
+				if (p->value.type == ACTION_STACK_VALUE_OBJECT &&
+				    !(p->name_length == 9 && strncmp(p->name, "__proto__", 9) == 0) &&
+				    !(p->name_length == 11 && strncmp(p->name, "constructor", 11) == 0))
+					packages[num_packages++] = (ASObject*) p->value.data.numeric_value;
+			}
+			// Process constructor functions in each sub-package
+			for (int pi = 0; pi < num_packages; pi++) {
+				ASObject* pkg = packages[pi];
+				if (pkg == NULL) continue;
+				for (u32 i = 0; i < pkg->num_used; i++) {
+					if (pkg->properties[i].value.type == ACTION_STACK_VALUE_FUNCTION) {
+						ASFunction* ctor = (ASFunction*) pkg->properties[i].value.data.numeric_value;
+						if (ctor->name[0] == '\0') continue; // skip unnamed
+						ensureCtorOwnProps(app_context, ctor, fn_ctor, fn_proto);
+						if (ctor->prototype_obj != NULL)
+							fixBuiltinPrototypeFlags(ctor->prototype_obj);
+					}
+				}
+			}
 		}
 	}
 }
@@ -31509,6 +31662,18 @@ void actionDelete(SWFAppContext* app_context)
 	if (obj_var.type == ACTION_STACK_VALUE_OBJECT)
 	{
 		obj = (ASObject*) obj_var.data.numeric_value;
+	}
+	else if (obj_var.type == ACTION_STACK_VALUE_FUNCTION)
+	{
+		// Delete from ASFunction's own_props
+		ASFunction* func = (ASFunction*) obj_var.data.numeric_value;
+		if (func != NULL && func->own_props != NULL) {
+			bool success = deleteProperty(app_context, func->own_props, prop_name, prop_name_len);
+			PUSH(ACTION_STACK_VALUE_BOOLEAN, success ? 1ULL : 0ULL);
+		} else {
+			PUSH(ACTION_STACK_VALUE_BOOLEAN, 1ULL);
+		}
+		return;
 	}
 	else if (obj_var.type == ACTION_STACK_VALUE_MOVIECLIP)
 	{
