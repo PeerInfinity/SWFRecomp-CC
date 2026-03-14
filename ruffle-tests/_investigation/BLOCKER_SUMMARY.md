@@ -58,9 +58,22 @@ Fixing requires a fundamental rewrite of the variable storage model.
 
 **Impact**: 3 tests, ~11,000+ lines (but low value — tests enumerate all globals)
 
-Tests `global_proto_decls`, `global_proto_decls_delete`, and `global_instance_decls` enumerate every global object and its properties via `for-in`. Our global registration order differs from Ruffle's, and we're missing ~15 globals (ASnative, ASconstructor, enableDebugConsole, etc.). Also need DONT_DELETE flags on `__proto__` and constructor properties.
+Tests `global_proto_decls`, `global_proto_decls_delete`, and `global_instance_decls` enumerate every global object and its properties via `for-in`. Key remaining issues:
 
-**Plans blocked**: GLOBALS_PLAN (Phases 8a-8d)
+1. **constructor DONT_ENUM conflict** — `constructor` on built-in prototypes is DONT_ENUM in our code but expected ENUMERABLE; making it ENUMERABLE breaks 7+ passing tests
+2. **flash.* constructor own_props order** — Some flash.automation constructors expect different property insertion orders, causing cascading misalignment in proto_decls_delete
+3. **Missing properties** — Key constants (20), Mouse/Accessibility methods, StageCapture.prototype methods, Object.prototype.constructor, Function.prototype apply/call
+4. **Instance construction** (global_instance_decls) — All instance properties show READ_ONLY+DONT_DELETE; root cause: SetMember on `new Constructor()` results doesn't create shadow properties
+
+**Progress (2026-03-14, 20b44c31):** Fixed `actionDelete` for ASFunction (was silently succeeding), added DONT_DELETE on built-in prototype/constructor props, created prototype_obj + own_props for all flash.* stub constructors. global_proto_decls improved 77→82 lines, global_instance_decls improved 1→4 lines.
+
+| Test | Match | Lines Off |
+|------|-------|-----------|
+| global_proto_decls | 82/4487 | ~4405 |
+| global_proto_decls_delete | 47/4115 | ~4068 |
+| global_instance_decls | 4/760 | ~756 |
+
+**Plans blocked**: GLOBALS_PLAN (Phases 8c-4 through 8d)
 
 ---
 
@@ -164,7 +177,7 @@ When a TextField is cloned via `duplicateMovieClip`, the clone's MC doesn't have
 | TEXTFIELD_PLAN | 62 | 58/62 | Font metrics (Blocker 1, resolved) + SWF6 HTML (Blocker 2, resolved) |
 | HTML_TEXT_REMAINING_WORK | 10 | 10/10 | RESOLVED — SWF6 HTML serialization (Blocker 2) |
 | TYPE_COERCION_ADVANCED_PLAN | 2 | 1/2 | Closure capture (Blocker 3) |
-| GLOBALS_PLAN | 30 | 27/30 | Enumeration order + missing globals (Blocker 4) |
+| GLOBALS_PLAN | 31 | 28/31 | Enumeration order + missing globals (Blocker 4) |
 | HIT_TESTING_PLAN | 17 | 12/17 | Pixel shape testing (Blocker 5) + loadMovie (Blocker 6) |
 | LOADMOVIE_MULTI_SWF_PLAN | 2 | 0/2 | Image loading + convertString regression (Blocker 6) |
 | LOADMOVIE_REMAINING_PLAN | 5 | 3/5 | Image loading (Blocker 6), accepted diffs |
@@ -179,5 +192,5 @@ When a TextField is cloned via `duplicateMovieClip`, the clone's MC doesn't have
 | MOVIECLIP_PLAN | 54 | 43/54 | Phase 10: AS-level event dispatch + ordering |
 | BITMAP_DATA_PLAN | 17 | 8/17 | Phase 1: Pixel buffer + properties + pixel ops |
 | UNCOVERED_SMALL_TESTS_PLAN | 19 | 11/19 | Fix A/B: Removed MC listener/timer cleanup |
-| GLOBALS_PLAN | 30 | 27/30 | Phase 8a-d: Registration order + stubs |
+| GLOBALS_PLAN | 31 | 28/31 | Phase 8c-4+: Missing properties, flags, instance construction |
 | CLONE_DUPLICATE_PLAN | 8 | 5/8 | Phase 2: TextField clone properties |

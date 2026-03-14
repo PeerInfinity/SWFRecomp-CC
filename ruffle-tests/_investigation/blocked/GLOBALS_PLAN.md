@@ -1,13 +1,13 @@
 # Global Functions/Objects Implementation Plan
 <!-- TESTS: globals_swf5, globals_swf6, globals_swf7, globals_swf8, global_swf5_6_7_8_9, global_swf6_7_8, global_instance_decls, global_proto_decls, global_proto_decls_delete, swf5_global_funcs, swf6_global_funcs, swf7_global_funcs, math_min_max, parse_int, parse_float, is_finite, is_finite_swf6, primitive_type_globals, printjob_props_swf5, printjob_props_swf6, printjob_props_swf7, context_menu, context_menu_item, localconnection_properties, sound_props_swf5, sound_props_swf6, native_objects_swf6, native_objects_swf7, native_objects_swf8, native_subclasses, as_set_prop_flags -->
 
-Last updated: 2026-03-13
+Last updated: 2026-03-14
 
-## Status: BLOCKED — Phases 1-8c-3 DONE, Phase 8c-4+ blocked
+## Status: BLOCKED — Phases 1-8c-3 DONE, Phase 8c-2.5 DONE, Phase 8c-4+ blocked
 
 **28 of 31 plan tests PASSING.** 3 tests remain with output mismatches. Remaining tests require deep property enumeration changes that risk regressions.
 
-### Current Pass Rates (2026-03-13, local run on 1649ff97)
+### Current Pass Rates (2026-03-14, local run on 20b44c31)
 
 | Test | Lines | Pass Rate | Status | Notes |
 |------|-------|-----------|--------|-------|
@@ -39,9 +39,9 @@ Last updated: 2026-03-13
 | swf7_global_funcs | 232/232 | 100% | **PASS** | |
 | global_swf5_6_7_8_9 | 1145/1145 | 100% | **PASS** | |
 | native_subclasses | PASS | 100% | **PASS** | |
-| global_proto_decls | ~77/4497 | ~2% | **FAIL** | Phase 8c — lines 1-77 match, then cascading mismatches |
-| global_proto_decls_delete | ~52/4158 | ~1% | **FAIL** | Phase 8c — similar structure to global_proto_decls |
-| global_instance_decls | ~1/758 | ~0% | **FAIL** | Phase 8d — needs DONT_DELETE, __constructor__, WRITABLE enforcement |
+| global_proto_decls | 82/4487 | ~2% | **FAIL** | Phase 8c — lines 1-82 match (+5 from 8c-2.5), then cascading mismatches |
+| global_proto_decls_delete | 47/4115 | ~1% | **FAIL** | Phase 8c — first 65 lines mostly align, cascading order mismatches in flash.* |
+| global_instance_decls | 4/760 | ~1% | **FAIL** | Phase 8d — systematic READ_ONLY/DONT_DELETE on all instance properties |
 
 ---
 
@@ -68,12 +68,13 @@ Current approach: Option 2 — constructor stays DONT_ENUM. Each prototype block
 | Key | 20 constants (ALT, ENTER, SPACE, UP, DOWN, LEFT, RIGHT, etc.), `isAccessible` method |
 | Mouse | `show`, `hide`, `setTrailer`, `setTrailerPosition`, `setTrailerMode` methods |
 | Accessibility | `isActive`, `sendEvent`, `updateProperties` methods |
-| flash sub-packages | `constructor` property on each package object (automation, external, net, etc.) |
-| flash.automation constructors | `prototype`, `__proto__`, `constructor` on own_props |
+| StageCapture.prototype | 8 methods (toString, valueOf, listenForStageCapture, setClipRect, getClipRect, setFileNameBase, getFileNameBase, cancel, capture) |
+| Object.prototype | `constructor` property (→ Object constructor, DONT_DELETE) |
+| Function.prototype | `apply`, `call` methods + `constructor` property |
 
-**Risk:** Low for adding properties. Medium for flash sub-package constructors (need to integrate with Phase 8c-2's own_props population or handle manually).
+**Risk:** Low for adding properties. Adding Object.prototype.constructor and Function.prototype methods could affect for-in on instances — needs careful DONT_ENUM flagging.
 
-**Impact:** ~200-300 lines. Would extend matching from line 77 deeper into the output.
+**Impact:** ~50-100 lines per object. StageCapture.prototype alone would recover ~8 lines in proto_decls_delete.
 
 ### Phase 8c-5: Property flags cleanup
 
@@ -84,12 +85,27 @@ Current approach: Option 2 — constructor stays DONT_ENUM. Each prototype block
 
 **Risk:** Medium. READ_ONLY enforcement requires changes to actionSetMember which could have broad effects.
 
+**Note:** textRenderer displayMode/maxLevel flags were changed to CONFIGURABLE (deletable) in 20b44c31 — the proto_decls_delete test expects them deletable. READ_ONLY enforcement (for the proto_decls test) is a separate concern.
+
+### Phase 8c-6: flash.* constructor own_props property order
+
+**What:** Some flash.* constructors have own_props property order that differs from the Phase 8c-2 standard (prototype, constructor, __proto__). Specifically:
+- flash.automation.Configuration and ActionGenerator expect: prototype, __proto__, constructor (insertion: constructor, __proto__, prototype)
+- flash.automation.StageCapture and most others expect: __proto__, constructor, prototype (insertion: prototype, constructor, __proto__)
+
+This causes cascading misalignment in proto_decls_delete starting around line 65. The variance likely reflects Ruffle's internal initialization order for these specific classes.
+
+**Risk:** Low — only affects these 3 tests. Could be fixed per-constructor with special-case insertion order.
+
+**Impact:** Would recover ~10-20 lines in proto_decls_delete by fixing cascading misalignment.
+
 ### Phase 8d: Instance construction (global_instance_decls)
 
-Deferred. The `global_instance_decls` test has deep issues:
-- `__proto__` needs DONT_DELETE flag on instances
-- `__constructor__` must be set on instances
-- Properties show READ_ONLY when our runtime doesn't enforce WRITABLE flags
+Deferred. The `global_instance_decls` test has deep systematic issues:
+- All properties on instances show READ_ONLY + DONT_DELETE — writes via `instance[key] = "TEST_VALUE"` fail
+- `hasOwnProperty` returns false for own properties like `__proto__` and `__constructor__`
+- Root cause investigation needed: when `new Constructor()` creates an instance, SetMember on the result may not be creating shadow properties correctly, or the instance object type is preventing writes
+- Missing instance-specific properties (PrintJob: paperHeight/paperWidth/etc., FileReference: name/type/size/etc.)
 - Need special construction behavior for textRenderer (→ undefined), flash.automation.Configuration (→ `[[AutomationConfiguration]]`)
 
 ---
@@ -107,6 +123,7 @@ Deferred. The `global_instance_decls` test has deep issues:
 - `d368848b` — Phase 8a+8b: Reorder _global registration + add ~20 missing global stubs
 - `530c6389` — Fix regressions: restore valueOf on _global, remove NaN/Infinity from global_object
 - `1649ff97` — Phase 8c-3: Register System/flash/textRenderer on _global, flash.automation, flash sub-package order, MCL method order, LC isPerUser, PrintJob props version-gating, valueOf removal
+- `20b44c31` — Phase 8c-2.5: Fix actionDelete for ASFunction, DONT_DELETE on built-in prototype/constructor props, flash.* stub constructor prototype + own_props setup, textRenderer flag fix
 
 ## Phase Completion Summary
 
@@ -123,7 +140,9 @@ Deferred. The `global_instance_decls` test has deep issues:
 | 8b | Add ~20 missing global stubs | **DONE** |
 | 8c-1 | Fix actionEnumerate2 prototype chain walking for functions | **NOT NEEDED** — Flash doesn't walk chain for functions |
 | 8c-2 | Populate own_props on every constructor | **DONE** (7714e908) |
+| 8c-2.5 | DONT_DELETE flags + actionDelete fix + flash.* stub setup | **DONE** (20b44c31) |
 | 8c-3 | Register System + flash + textRenderer on _global | **DONE** (1649ff97) — flash.automation added, sub-package order fixed |
-| 8c-4 | Add missing properties on existing objects | **BLOCKED** — needs Key constants, Mouse/Accessibility methods, flash sub-package constructors |
+| 8c-4 | Add missing properties on existing objects | **BLOCKED** — needs Key constants, Mouse/Accessibility methods, StageCapture prototype methods, Object/Function.prototype constructor |
 | 8c-5 | Property flags cleanup | **BLOCKED** — READ_ONLY enforcement needs actionSetMember changes |
-| 8d | Instance construction differences | **BLOCKED** — needs DONT_DELETE, __constructor__, WRITABLE enforcement |
+| 8c-6 | flash.* constructor own_props property order | **BLOCKED** — some constructors need per-constructor insertion order |
+| 8d | Instance construction differences | **BLOCKED** — systematic READ_ONLY/DONT_DELETE on instances, needs SetMember investigation |
