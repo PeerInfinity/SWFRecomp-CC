@@ -101,12 +101,16 @@ This causes cascading misalignment in proto_decls_delete starting around line 65
 
 ### Phase 8d: Instance construction (global_instance_decls)
 
-Deferred. The `global_instance_decls` test has deep systematic issues:
-- All properties on instances show READ_ONLY + DONT_DELETE — writes via `instance[key] = "TEST_VALUE"` fail
-- `hasOwnProperty` returns false for own properties like `__proto__` and `__constructor__`
-- Root cause investigation needed: when `new Constructor()` creates an instance, SetMember on the result may not be creating shadow properties correctly, or the instance object type is preventing writes
+**Root cause identified (2026-03-14):** SetMember and GetMember both work correctly on instances — properties are written and read back as STRING. The systematic "READ_ONLY" label comes from the test's `contains(modifiable, key)` helper returning false for ALL properties. Debug tracing revealed a `StrictEquals TYPE_MISMATCH: STRING vs F64` — somewhere in the array push/retrieve/compare chain, a STRING value becomes F64.
+
+**Actual blocker:** Bug in array element storage or retrieval when used with `for-in` + string-indexed GetMember + StrictEquals. This is NOT a property flag issue. The fix is likely in:
+1. `Array.prototype.push` element storage
+2. Array GetMember with string index ("0" → elements[0])
+3. String value preservation through the push→store→enumerate→retrieve cycle
+
+**Also needed** (separate from the array bug):
 - Missing instance-specific properties (PrintJob: paperHeight/paperWidth/etc., FileReference: name/type/size/etc.)
-- Need special construction behavior for textRenderer (→ undefined), flash.automation.Configuration (→ `[[AutomationConfiguration]]`)
+- Special construction behavior for textRenderer (→ undefined), flash.automation.Configuration (→ `[[AutomationConfiguration]]`)
 
 ---
 
