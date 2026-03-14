@@ -1,45 +1,77 @@
 {
   "metadata": {
-    "old_timestamp": "2026-03-14T01:03:25.938414+00:00",
-    "old_git_sha": "0f35011d0c290799905e1b61e20db2c06e6a32c2",
-    "new_timestamp": "2026-03-14T02:03:38.556143+00:00",
-    "new_git_sha": "001e0d59e26e4768c9ea79a6159b608f2bc165b1",
+    "old_timestamp": "2026-03-14T02:03:38.556143+00:00",
+    "old_git_sha": "001e0d59e26e4768c9ea79a6159b608f2bc165b1",
+    "new_timestamp": "2026-03-14T03:47:24.548961+00:00",
+    "new_git_sha": "6e238d4eaefa89a20c8a33968acb4a5c50defb34",
     "partial": false,
     "same_commit": false
   },
   "summary": {
-    "old_pass": 537,
+    "old_pass": 538,
     "old_total": 618,
-    "old_pass_rate": 86.9,
-    "new_pass": 538,
+    "old_pass_rate": 87.1,
+    "new_pass": 539,
     "new_total": 618,
-    "new_pass_rate": 87.1,
-    "old_mismatched_lines": 14867,
-    "new_mismatched_lines": 14858,
+    "new_pass_rate": 87.2,
+    "old_mismatched_lines": 14858,
+    "new_mismatched_lines": 14835,
     "increased_mismatches": 0,
-    "decreased_mismatches": 9,
+    "decreased_mismatches": 23,
     "newly_passing": 1,
     "newly_failing": 0,
     "status_changed": 1,
-    "unchanged": 617,
+    "unchanged": 615,
     "added": 0,
     "removed": 0
   },
   "changes": [
     {
-      "test": "input_dead_keys_windows",
+      "test": "clip_event_propagation_order",
       "change_type": "changed",
       "old_status": "output_mismatch",
       "new_status": "pass",
       "old_lines": {
-        "actual_lines": 15,
-        "expected_lines": 15,
-        "matching_lines": 6
+        "actual_lines": 0,
+        "expected_lines": 17,
+        "matching_lines": 0
       },
       "new_lines": {
-        "actual_lines": 15,
-        "expected_lines": 15,
-        "matching_lines": 15
+        "actual_lines": 17,
+        "expected_lines": 17,
+        "matching_lines": 17
+      }
+    },
+    {
+      "test": "issue_2084",
+      "change_type": "changed",
+      "old_status": "output_mismatch",
+      "new_status": "output_mismatch",
+      "old_lines": {
+        "actual_lines": 0,
+        "expected_lines": 16,
+        "matching_lines": 0
+      },
+      "new_lines": {
+        "actual_lines": 8,
+        "expected_lines": 16,
+        "matching_lines": 6
+      }
+    },
+    {
+      "test": "string_paths_eval",
+      "change_type": "changed",
+      "old_status": "output_mismatch",
+      "new_status": "output_mismatch",
+      "old_lines": {
+        "actual_lines": 8,
+        "expected_lines": 4,
+        "matching_lines": 3
+      },
+      "new_lines": {
+        "actual_lines": 4,
+        "expected_lines": 4,
+        "matching_lines": 3
       }
     }
   ]
