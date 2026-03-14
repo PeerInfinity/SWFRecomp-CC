@@ -1,21 +1,28 @@
 # Ruffle Test Results Diff
 
-**Previous:** `d0c846e703f1` (2026-03-14T06:02:50.397613+00:00)
-**Current:** `598e52348e3c` (2026-03-14T15:20:01.710516+00:00)
+**Previous:** `598e52348e3c` (2026-03-14T15:20:01.710516+00:00)
+**Current:** `b1bf54683b3a` (2026-03-14T16:04:42.514475+00:00)
 
 ## Summary
 
 | Metric | Previous | Current | Delta |
 |--------|----------|---------|-------|
-| Passing | 539 | 541 | +2 |
+| Passing | 541 | 540 | -1 |
 | Total | 618 | 618 | 0 |
-| Pass rate | 87.2% | 87.5% | +0.3% |
-| Mismatched lines | 14430 | 13429 | -1001 |
-|   Decreased | | | -1001 |
+| Pass rate | 87.5% | 87.4% | -0.1% |
+| Mismatched lines | 13429 | 13444 | +15 |
+|   Decreased | | | -1 |
+|   Increased | | | +16 |
 
-## Newly Passing (2)
+## Newly Passing (1)
 
 | Test | Previous Status | Lines (prev) | Lines (now) |
 |------|----------------|--------------|-------------|
-| `global_swf5_6_7_8_9` | output_mismatch | 145/1145 | 1145/1145 |
-| `native_subclasses` | output_mismatch | 190/191 | 191/191 |
+| `hittest_morph_input` | output_mismatch | 0/1 | 1/1 |
+
+## Newly Failing (2)
+
+| Test | New Status | Lines (prev) | Lines (now) |
+|------|-----------|--------------|-------------|
+| `duplicate_movie_clip` | output_mismatch | 20/20 | 6/20 |
+| `function_base_clip` | output_mismatch | 8/8 | 6/8 |
