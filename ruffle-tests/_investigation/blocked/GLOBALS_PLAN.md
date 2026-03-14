@@ -101,12 +101,17 @@ This causes cascading misalignment in proto_decls_delete starting around line 65
 
 ### Phase 8d: Instance construction (global_instance_decls)
 
-**Root cause identified (2026-03-14):** SetMember and GetMember both work correctly on instances — properties are written and read back as STRING. The systematic "READ_ONLY" label comes from the test's `contains(modifiable, key)` helper returning false for ALL properties. Debug tracing revealed a `StrictEquals TYPE_MISMATCH: STRING vs F64` — somewhere in the array push/retrieve/compare chain, a STRING value becomes F64.
+**Root cause identified (2026-03-14):** SetMember and GetMember both work correctly on instances — properties are written and read back as STRING. The systematic "READ_ONLY" label comes from the test's `contains(modifiable, key)` helper returning UNDEFINED instead of BOOLEAN for ALL calls.
 
-**Actual blocker:** Bug in array element storage or retrieval when used with `for-in` + string-indexed GetMember + StrictEquals. This is NOT a property flag issue. The fix is likely in:
-1. `Array.prototype.push` element storage
-2. Array GetMember with string index ("0" → elements[0])
-3. String value preservation through the push→store→enumerate→retrieve cycle
+**Investigation findings:**
+- `contains` IS called with correct args: array (type=12) with 11 elements, string key (type=0)
+- Array elements ARE correctly stored as STRING (verified via Enumerate2 dump: all 11 keys present, all elem_type=0)
+- Array GetMember `arr[10]` correctly returns STRING with str_size=9
+- BUT: `func2_contains_0` returns `type=3` (UNDEFINED) instead of BOOLEAN — the function body does NOT reach either explicit return statement (BOOLEAN true at label_53 drain, or BOOLEAN false at label_75)
+- Issue reproduces at BOTH -O0 and -O2 (not a GCC optimization bug)
+- The generated function code is correct: for-in loop with StrictEquals comparison, both BOOLEAN return paths present
+
+**Actual blocker:** `func2_contains_0` (a DefineFunction2-generated C function) runs but bypasses all return statements, falling through to the default `return undefined`. Root cause unknown — may be related to stack corruption, peekVar/popVar interaction with the for-in loop, or a subtle issue in how the function body's C goto-label structure interacts with the ActionScript stack. Needs deeper investigation with a manual debug build or a custom test SWF.
 
 **Also needed** (separate from the array bug):
 - Missing instance-specific properties (PrintJob: paperHeight/paperWidth/etc., FileReference: name/type/size/etc.)
