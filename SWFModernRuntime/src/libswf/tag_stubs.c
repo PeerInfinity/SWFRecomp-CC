@@ -2180,9 +2180,12 @@ int ng_gotoFrameByMC(SWFAppContext* app_context, MovieClip* mc, u16 frame, int p
 	// Clamp to last frame
 	if (frame >= (u16)fc) frame = (u16)(fc - 1);
 
-	// Execute frames synchronously (like advance_sprite_frames but immediate)
-	size_t current = obj->sprite_current_frame;
-	if (frame != current)
+	// Execute frames synchronously (like advance_sprite_frames but immediate).
+	// Always do a backward goto (replay from frame 0) to ensure the display list
+	// state is fully up-to-date. After sprite init, sprite_current_frame is bumped
+	// to 1 optimistically (ready for advance_sprite_frames), but if the sprite was
+	// stopped at frame 0, the actual frame tags may not have been executed yet.
+	// Doing a backward goto even when frame == current ensures correctness.
 	{
 		// Swap to sprite's display list context
 		DisplayObject* saved_dl = display_list;
@@ -2202,9 +2205,19 @@ int ng_gotoFrameByMC(SWFAppContext* app_context, MovieClip* mc, u16 frame, int p
 			display_list_capacity = obj->sprite_dl_capacity;
 		}
 
-		if (frame <= current)
+		size_t current = obj->sprite_current_frame;
+		if (frame > current)
 		{
-			// Backward jump: clear display list and re-execute from frame 0
+			// Forward jump: execute frames current+1..frame
+			for (size_t f = current + 1; f <= frame; f++)
+			{
+				if (f < fc && ch->sprite_frame_funcs[f] != NULL)
+					ch->sprite_frame_funcs[f](app_context);
+			}
+		}
+		else
+		{
+			// Backward or same-frame jump: clear display list and re-execute from frame 0
 			for (size_t j = 1; j <= max_depth; ++j)
 			{
 				if (display_list[j].sprite_display_list != NULL)
@@ -2217,15 +2230,6 @@ int ng_gotoFrameByMC(SWFAppContext* app_context, MovieClip* mc, u16 frame, int p
 			max_depth = 0;
 
 			for (size_t f = 0; f <= frame; f++)
-			{
-				if (f < fc && ch->sprite_frame_funcs[f] != NULL)
-					ch->sprite_frame_funcs[f](app_context);
-			}
-		}
-		else
-		{
-			// Forward jump: execute frames current+1..frame
-			for (size_t f = current + 1; f <= frame; f++)
 			{
 				if (f < fc && ch->sprite_frame_funcs[f] != NULL)
 					ch->sprite_frame_funcs[f](app_context);

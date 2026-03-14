@@ -47028,7 +47028,7 @@ static int mc_get_pixel_aabb_ng(MovieClip* mc, float* x1, float* y1, float* x2, 
 	}
 	// Also compute bounds from the MC's sprite display list children.
 	// This handles shapes placed by tagPlaceObject2 (not the Drawing API).
-	extern int ng_getCharBounds(size_t char_id, s32* out_xmin, s32* out_xmax, s32* out_ymin, s32* out_ymax);
+	extern int ng_getCharBoundsForRatio(size_t char_id, u16 ratio, s32* out_xmin, s32* out_xmax, s32* out_ymin, s32* out_ymax);
 	extern int ng_getMatrixFromEntry_render(size_t entry_idx, float* out_a, float* out_b, float* out_c, float* out_d, int32_t* out_tx_twips, int32_t* out_ty_twips);
 	DisplayObject* dobj = (DisplayObject*)mc->display_obj;
 	if (dobj != NULL && dobj->sprite_display_list != NULL) {
@@ -47037,7 +47037,7 @@ static int mc_get_pixel_aabb_ng(MovieClip* mc, float* x1, float* y1, float* x2, 
 		for (size_t d = 1; d <= sdl_max; d++) {
 			if (sdl[d].char_id == 0) continue;
 			s32 cxmin, cxmax, cymin, cymax;
-			if (!ng_getCharBounds(sdl[d].char_id, &cxmin, &cxmax, &cymin, &cymax)) continue;
+			if (!ng_getCharBoundsForRatio(sdl[d].char_id, sdl[d].ratio, &cxmin, &cxmax, &cymin, &cymax)) continue;
 			// Character bounds are in twips; convert to pixels for the local coordinate space
 			float child_xmin = (float)cxmin / 20.0f;
 			float child_xmax = (float)cxmax / 20.0f;
@@ -47289,7 +47289,9 @@ void actionDispatchMCMouseMove(SWFAppContext* app_context)
 		if (mc->ng_textfield_idx >= 0 || mc->ng_textfield_idx == -2) continue;
 
 		float x1, y1, x2, y2;
-		if (!mc_get_pixel_aabb_ng(mc, &x1, &y1, &x2, &y2)) continue;
+		if (!mc_get_pixel_aabb_ng(mc, &x1, &y1, &x2, &y2)) {
+			continue;
+		}
 
 		int was_inside = mc->mc_mouse_inside;
 		int now_inside = (mx >= x1 && mx <= x2 && my >= y1 && my <= y2);
