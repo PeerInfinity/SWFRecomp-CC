@@ -72,6 +72,25 @@ NUMPAD_CHAR_TO_FLASH = {
     '*': 106, '+': 107, '-': 109, '.': 110, '/': 111,
 }
 
+# Map shifted/punctuation Char values to their physical key codes.
+# Flash Key.getCode() returns physical key codes (like JS keyCode),
+# not ASCII values. E.g., '"' is typed via Shift+Quote, so keyCode=222.
+CHAR_TO_KEYCODE = {
+    "'": 222, '"': 222,   # Quote key
+    ';': 186, ':': 186,   # Semicolon key
+    '=': 187, '+': 187,   # Equal key (but numpad + is 107)
+    ',': 188, '<': 188,   # Comma key
+    '-': 189, '_': 189,   # Minus key (but numpad - is 109)
+    '.': 190, '>': 190,   # Period key (but numpad . is 110)
+    '/': 191, '?': 191,   # Slash key (but numpad / is 111)
+    '`': 192, '~': 192,   # Backquote key
+    '[': 219, '{': 219,   # Left bracket key
+    '\\': 220, '|': 220,  # Backslash key
+    ']': 221, '}': 221,   # Right bracket key
+    '!': 49,  '@': 50, '#': 51, '$': 52, '%': 53,  # Shift+1-5
+    '^': 54, '&': 55, '*': 56, '(': 57, ')': 48,   # Shift+6-0
+}
+
 
 def ruffle_key_to_flash_code(key):
     if isinstance(key, str):
@@ -79,6 +98,8 @@ def ruffle_key_to_flash_code(key):
     elif isinstance(key, dict):
         if "Char" in key:
             c = key["Char"]
+            if c in CHAR_TO_KEYCODE:
+                return CHAR_TO_KEYCODE[c]
             return ord(c.upper()) if c.isalpha() else ord(c)
         if "Numpad" in key:
             return NUMPAD_CHAR_TO_FLASH.get(key["Numpad"], 0)

@@ -445,7 +445,7 @@ static void input_events_deliver(SWFAppContext* app_context, InputEvent* ev)
         actionDispatchMouseUp(app_context);
         actionDispatchMCMouseUp(app_context);
         break;
-    case EV_KEY_DOWN:
+    case EV_KEY_DOWN: {
         if (ev->code >= 0 && ev->code < 256) {
             app_context->keys.down[ev->code] = 1;
             // Toggle state for all keys on key-down (isToggled tracks press count parity)
@@ -458,23 +458,86 @@ static void input_events_deliver(SWFAppContext* app_context, InputEvent* ev)
         dispatch_clip_event_flag(app_context, CLIP_EVENT_KEY_DOWN);
         // Dispatch onKeyDown to focused MC (fires before Key broadcast)
         actionDispatchKeyDownToFocused(app_context, ev->code);
-        // Broadcast onKeyDown to Key listeners, then check button key conditions
+        // Broadcast onKeyDown to Key listeners
         actionDispatchKeyDown(app_context);
-        int key_press_handled = dispatch_button_key_actions(app_context, ev->code);
-        g_key_press_consumed = key_press_handled;
-        // Fire onPress/onRelease on focused MC for Enter/Space — but ONLY if
-        // no button keyPress condition handled the event (Ruffle behavior).
-        if (!key_press_handled)
-            actionDispatchKeyPressToFocused(app_context, ev->code);
-        // Tab key: advance focus — but ONLY if no keyPress condition handled it.
-        if (!key_press_handled && ev->code == 9) {
-            int shift_held = (app_context->keys.down[16] != 0);
-            actionAdvanceTabFocus(app_context, shift_held);
+
+        // Dead key composition: peek ahead at TEXT_INPUT events before button keyPress.
+        // Only letter keys (A-Z, code 65-90) can participate in dead key composition.
+        // Non-letter keys (Enter, Space, Tab, etc.) always get normal keyPress handling
+        // even if their TextInput codepoint differs from the key code.
+        int is_letter_key = (ev->code >= 65 && ev->code <= 90);
+        int key_lower = is_letter_key ? ev->code + 32 : ev->code;
+        int has_matching_text_input = 0;
+        int has_non_matching_text_input = 0;
+        int has_any_text_input = 0;
+        if (is_letter_key) {
+            // Scan ahead for TEXT_INPUT events following this KEY_DOWN
+            for (size_t peek = g_event_pos + 1; peek < g_event_count; peek++) {
+                if (g_events[peek].type == EV_KEY_UP || g_events[peek].type == EV_KEY_DOWN
+                    || g_events[peek].type == EV_WAIT) break;
+                if (g_events[peek].type == EV_TEXT_INPUT) {
+                    has_any_text_input = 1;
+                    int cp = g_events[peek].code;
+                    if (cp == key_lower || cp == ev->code)
+                        has_matching_text_input = 1;
+                    else
+                        has_non_matching_text_input = 1;
+                }
+            }
+        }
+        if (has_any_text_input && !has_matching_text_input) {
+            // Pure composition (e.g., dead key " + a = ä): all TEXT_INPUTs are composed.
+            // Process them now and suppress button keyPress entirely.
+            for (size_t peek = g_event_pos + 1; peek < g_event_count; peek++) {
+                if (g_events[peek].type == EV_KEY_UP || g_events[peek].type == EV_KEY_DOWN
+                    || g_events[peek].type == EV_WAIT) break;
+                if (g_events[peek].type == EV_TEXT_INPUT) {
+                    actionTextFieldInput(app_context, g_events[peek].code);
+                    g_events[peek].type = -1;  // mark as consumed
+                }
+            }
+            g_key_press_consumed = 0;
+        } else if (has_non_matching_text_input) {
+            // Mixed: dead key flush + raw key (e.g., dead key " + r = " then r).
+            // Process non-matching TEXT_INPUTs now, then fire button keyPress.
+            for (size_t peek = g_event_pos + 1; peek < g_event_count; peek++) {
+                if (g_events[peek].type == EV_KEY_UP || g_events[peek].type == EV_KEY_DOWN
+                    || g_events[peek].type == EV_WAIT) break;
+                if (g_events[peek].type == EV_TEXT_INPUT) {
+                    int cp = g_events[peek].code;
+                    if (cp != key_lower && cp != ev->code) {
+                        actionTextFieldInput(app_context, cp);
+                        g_events[peek].type = -1;  // mark as consumed
+                    }
+                }
+            }
+            int key_press_handled = dispatch_button_key_actions(app_context, ev->code);
+            g_key_press_consumed = key_press_handled;
+            if (!key_press_handled)
+                actionDispatchKeyPressToFocused(app_context, ev->code);
+            if (!key_press_handled && ev->code == 9) {
+                int shift_held = (app_context->keys.down[16] != 0);
+                actionAdvanceTabFocus(app_context, shift_held);
+            }
+        } else {
+            // Normal case: no dead key composition involved.
+            int key_press_handled = dispatch_button_key_actions(app_context, ev->code);
+            g_key_press_consumed = key_press_handled;
+            if (!key_press_handled)
+                actionDispatchKeyPressToFocused(app_context, ev->code);
+            if (!key_press_handled && ev->code == 9) {
+                int shift_held = (app_context->keys.down[16] != 0);
+                actionAdvanceTabFocus(app_context, shift_held);
+            }
         }
         break;
+    }
     case EV_KEY_UP:
         if (ev->code >= 0 && ev->code < 256)
             app_context->keys.down[ev->code] = 0;
+        // Update Key.getCode()/getAscii() for the keyUp event
+        app_context->keys.last_key_down = ev->code;
+        app_context->keys.last_key_ascii = (ev->code >= 32 && ev->code <= 126) ? ev->code : 0;
         // Dispatch onClipEvent(keyUp) to all clips
         dispatch_clip_event_flag(app_context, CLIP_EVENT_KEY_UP);
         // Dispatch onKeyUp to focused MC
