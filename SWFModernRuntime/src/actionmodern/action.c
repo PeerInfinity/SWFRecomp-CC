@@ -20778,7 +20778,9 @@ static ActionVar builtin_broadcaster_broadcastMessage(SWFAppContext* app_context
             listener_obj = (ASObject*)(uintptr_t)elem->data.numeric_value;
         } else if (elem->type == ACTION_STACK_VALUE_MOVIECLIP) {
             listener_mc = (MovieClip*)(uintptr_t)elem->data.numeric_value;
-            if (listener_mc && listener_mc->dynamic_props)
+            // Skip removed/dead MovieClips (removeMovieClip sets depth = INT_MIN)
+            if (listener_mc == NULL || listener_mc->depth == INT_MIN) continue;
+            if (listener_mc->dynamic_props)
                 listener_obj = (ASObject*) listener_mc->dynamic_props;
         } else if (elem->type == ACTION_STACK_VALUE_FUNCTION) {
             listener_func = lookupFunctionFromVar(elem);
@@ -49659,6 +49661,16 @@ void processTimers(SWFAppContext* app_context, double frame_duration_ms)
 		for (int i = 0; i < MAX_TIMERS; i++)
 		{
 			if (!g_timers[i].active) continue;
+
+			// Deactivate method-form timers whose target MC has been removed
+			if (g_timers[i].is_method && g_timers[i].object.type == ACTION_STACK_VALUE_MOVIECLIP) {
+				MovieClip* tmc = (MovieClip*)(uintptr_t)g_timers[i].object.data.numeric_value;
+				if (tmc == NULL || tmc->depth == INT_MIN) {
+					g_timers[i].active = 0;
+					continue;
+				}
+			}
+
 			if (g_timers[i].elapsed_ms < g_timers[i].delay_ms) continue;
 
 			// Fire this timer's callback
