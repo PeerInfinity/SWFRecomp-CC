@@ -2068,6 +2068,69 @@ static ASFunction g_ct_rgb_getter;
 static ASFunction g_ct_rgb_setter;
 static int g_color_transform_init_done = 0;
 
+// ============================================================================
+// flash.display.BitmapData globals
+// ============================================================================
+typedef struct {
+    uint32_t* pixels;    // ARGB pixel data, row-major
+    int32_t width;
+    int32_t height;
+    uint8_t transparent; // 0 = opaque (alpha always 0xFF), 1 = transparent
+    uint8_t disposed;    // 1 = disposed (all operations return -1)
+} BitmapDataNative;
+
+static ASObject* g_bitmapdata_prototype = NULL;
+// Methods: getPixel, getPixel32, setPixel, setPixel32, fillRect, clone, dispose,
+//          copyChannel, floodFill, colorTransform, getColorBoundsRect, toString,
+//          applyFilter, copyPixels, draw, generateFilterRect, hitTest, loadBitmap,
+//          merge, noise, paletteMap, perlinNoise, pixelDissolve, scroll, setPixel,
+//          compare, threshold
+static ASFunction g_bitmapdata_methods[28];
+static int g_bitmapdata_init_done = 0;
+
+static inline BitmapDataNative* getBitmapNative(ASObject* obj)
+{
+    if (obj == NULL || obj->native_type != NATIVE_BITMAPDATA) return NULL;
+    return (BitmapDataNative*) obj->native_data;
+}
+
+// Convert double to uint32 for pixel color values (ECMA-262 ToUint32)
+static inline uint32_t doubleToUint32(double d)
+{
+    if (isnan(d) || isinf(d) || d == 0.0) return 0;
+    double posInt = (d > 0 ? 1.0 : -1.0) * floor(fabs(d));
+    double mod = fmod(posInt, 4294967296.0);
+    if (mod < 0) mod += 4294967296.0;
+    return (uint32_t)mod;
+}
+
+// Premultiply ARGB color: RGB channels scaled by alpha/255
+static inline uint32_t premultiplyAlpha(uint32_t color)
+{
+    uint32_t a = (color >> 24) & 0xFF;
+    if (a == 255) return color;
+    if (a == 0) return 0;
+    uint32_t r = ((((color >> 16) & 0xFF) * a + 127) / 255);
+    uint32_t g = ((((color >> 8) & 0xFF) * a + 127) / 255);
+    uint32_t b = (((color & 0xFF) * a + 127) / 255);
+    return (a << 24) | (r << 16) | (g << 8) | b;
+}
+
+// Un-multiply premultiplied ARGB: recover original RGB from premultiplied storage
+static inline uint32_t unpremultiplyAlpha(uint32_t color)
+{
+    uint32_t a = (color >> 24) & 0xFF;
+    if (a == 255) return color;
+    if (a == 0) return 0;
+    uint32_t r = ((color >> 16) & 0xFF);
+    uint32_t g = ((color >> 8) & 0xFF);
+    uint32_t b = (color & 0xFF);
+    uint32_t ur = (r * 255 + a / 2) / a; if (ur > 255) ur = 255;
+    uint32_t ug = (g * 255 + a / 2) / a; if (ug > 255) ug = 255;
+    uint32_t ub = (b * 255 + a / 2) / a; if (ub > 255) ub = 255;
+    return (a << 24) | (ur << 16) | (ug << 8) | ub;
+}
+
 // Coerce Math arguments to f64 via the stack (calls valueOf on objects).
 // Flash coerces min(arg_count, max_args) arguments, left to right.
 static void coerceMathArgs(SWFAppContext* app_context, ActionVar* args, u32 arg_count, u32 max_args)
@@ -5309,6 +5372,7 @@ static float normalizeRotation(float r) {
 static void setAddProperty(SWFAppContext* app_context, ASObject* obj, const char* name, u32 nlen, ASFunction* getter, ASFunction* setter);
 static void initGeomPrototypes(SWFAppContext* app_context);
 static void initColorTransformPrototype(SWFAppContext* app_context);
+static void initBitmapDataPrototype(SWFAppContext* app_context);
 
 static ActionVar matrixToString(SWFAppContext* app_context, ActionVar* args, u32 arg_count, ActionVar* registers, void* this_obj)
 {
@@ -7656,6 +7720,901 @@ static ActionVar colorTransformConstructor(SWFAppContext* app_context, ActionVar
 	v = makeF64(bOff);  setProperty(app_context, obj, "blueOffset",      10, &v);
 	v = makeF64(aOff);  setProperty(app_context, obj, "alphaOffset",     11, &v);
 	return undef;
+}
+
+// ============================================================================
+// BitmapData method implementations
+// ============================================================================
+
+static ActionVar bitmapDataGetPixel(SWFAppContext* app_context, ActionVar* args, u32 arg_count, ActionVar* registers, void* this_obj)
+{
+    (void)registers;
+    ASObject* obj = (ASObject*) this_obj;
+    BitmapDataNative* bmp = getBitmapNative(obj);
+    ActionVar r = {0};
+    if (!bmp || bmp->disposed) { r = makeF64(-1); return r; }
+    if (arg_count < 2) { r = makeF64(-1); return r; }
+    int x = (int)varToDoubleSimple(&args[0]);
+    int y = (int)varToDoubleSimple(&args[1]);
+    if (x < 0 || x >= bmp->width || y < 0 || y >= bmp->height) {
+        r = makeF64(0); return r;
+    }
+    uint32_t px = unpremultiplyAlpha(bmp->pixels[y * bmp->width + x]) & 0x00FFFFFF;
+    r = makeF64((double)px);
+    return r;
+}
+
+static ActionVar bitmapDataGetPixel32(SWFAppContext* app_context, ActionVar* args, u32 arg_count, ActionVar* registers, void* this_obj)
+{
+    (void)registers;
+    ASObject* obj = (ASObject*) this_obj;
+    BitmapDataNative* bmp = getBitmapNative(obj);
+    ActionVar r = {0};
+    if (!bmp || bmp->disposed) { r = makeF64(-1); return r; }
+    if (arg_count < 2) { r = makeF64(-1); return r; }
+    int x = (int)varToDoubleSimple(&args[0]);
+    int y = (int)varToDoubleSimple(&args[1]);
+    if (x < 0 || x >= bmp->width || y < 0 || y >= bmp->height) {
+        r = makeF64(0); return r;
+    }
+    int32_t px = (int32_t)unpremultiplyAlpha(bmp->pixels[y * bmp->width + x]);
+    r = makeF64((double)px);
+    return r;
+}
+
+static ActionVar bitmapDataSetPixel(SWFAppContext* app_context, ActionVar* args, u32 arg_count, ActionVar* registers, void* this_obj)
+{
+    (void)registers;
+    ASObject* obj = (ASObject*) this_obj;
+    BitmapDataNative* bmp = getBitmapNative(obj);
+    ActionVar r = {0}; r.type = ACTION_STACK_VALUE_UNDEFINED;
+    if (!bmp || bmp->disposed) { r = makeF64(-1); return r; }
+    if (arg_count < 3) return r;
+    int x = (int)varToDoubleSimple(&args[0]);
+    int y = (int)varToDoubleSimple(&args[1]);
+    if (x < 0 || x >= bmp->width || y < 0 || y >= bmp->height) return r;
+    uint32_t color = doubleToUint32(varToDoubleSimple(&args[2]));
+    uint32_t existing_alpha = bmp->pixels[y * bmp->width + x] & 0xFF000000;
+    uint32_t new_color = existing_alpha | (color & 0x00FFFFFF);
+    bmp->pixels[y * bmp->width + x] = premultiplyAlpha(new_color);
+    return r;
+}
+
+static ActionVar bitmapDataSetPixel32(SWFAppContext* app_context, ActionVar* args, u32 arg_count, ActionVar* registers, void* this_obj)
+{
+    (void)registers;
+    ASObject* obj = (ASObject*) this_obj;
+    BitmapDataNative* bmp = getBitmapNative(obj);
+    ActionVar r = {0}; r.type = ACTION_STACK_VALUE_UNDEFINED;
+    if (!bmp || bmp->disposed) { r = makeF64(-1); return r; }
+    if (arg_count < 3) return r;
+    int x = (int)varToDoubleSimple(&args[0]);
+    int y = (int)varToDoubleSimple(&args[1]);
+    if (x < 0 || x >= bmp->width || y < 0 || y >= bmp->height) return r;
+    uint32_t color = doubleToUint32(varToDoubleSimple(&args[2]));
+    if (!bmp->transparent) color = color | 0xFF000000;
+    bmp->pixels[y * bmp->width + x] = premultiplyAlpha(color);
+    return r;
+}
+
+static ActionVar bitmapDataFillRect(SWFAppContext* app_context, ActionVar* args, u32 arg_count, ActionVar* registers, void* this_obj)
+{
+    (void)registers;
+    ASObject* obj = (ASObject*) this_obj;
+    BitmapDataNative* bmp = getBitmapNative(obj);
+    ActionVar r = {0}; r.type = ACTION_STACK_VALUE_UNDEFINED;
+    if (!bmp || bmp->disposed) return r;
+    if (arg_count < 2) return r;
+    // First arg must be a Rectangle or object with x,y,width,height
+    if (args[0].type != ACTION_STACK_VALUE_OBJECT) return r;
+    ASObject* rect = (ASObject*) args[0].data.numeric_value;
+    if (!rect) return r;
+    ActionVar* rx = getProperty(rect, "x", 1);
+    ActionVar* ry = getProperty(rect, "y", 1);
+    ActionVar* rw = getProperty(rect, "width", 5);
+    ActionVar* rh = getProperty(rect, "height", 6);
+    int x0 = rx ? (int)varToDoubleSimple(rx) : 0;
+    int y0 = ry ? (int)varToDoubleSimple(ry) : 0;
+    int w  = rw ? (int)varToDoubleSimple(rw) : 0;
+    int h  = rh ? (int)varToDoubleSimple(rh) : 0;
+    uint32_t color = doubleToUint32(varToDoubleSimple(&args[1]));
+    if (!bmp->transparent) color = color | 0xFF000000;
+    // Clip to bitmap bounds
+    int x1 = x0 + w;
+    int y1 = y0 + h;
+    if (x0 < 0) x0 = 0;
+    if (y0 < 0) y0 = 0;
+    if (x1 > bmp->width) x1 = bmp->width;
+    if (y1 > bmp->height) y1 = bmp->height;
+    uint32_t premul_color = premultiplyAlpha(color);
+    for (int py = y0; py < y1; py++)
+        for (int px = x0; px < x1; px++)
+            bmp->pixels[py * bmp->width + px] = premul_color;
+    return r;
+}
+
+static ActionVar bitmapDataClone(SWFAppContext* app_context, ActionVar* args, u32 arg_count, ActionVar* registers, void* this_obj)
+{
+    (void)registers; (void)args; (void)arg_count;
+    ASObject* obj = (ASObject*) this_obj;
+    BitmapDataNative* bmp = getBitmapNative(obj);
+    ActionVar r = {0};
+    if (!bmp || bmp->disposed) { r = makeF64(-1); return r; }
+    // Create new BitmapData
+    ASObject* clone_obj = allocObject(app_context, 4);
+    clone_obj->native_type = NATIVE_BITMAPDATA;
+    ActionVar proto_var = {0};
+    proto_var.type = ACTION_STACK_VALUE_OBJECT;
+    proto_var.data.numeric_value = (u64) g_bitmapdata_prototype;
+    setProperty(app_context, clone_obj, "__proto__", 9, &proto_var);
+    BitmapDataNative* clone_bmp = (BitmapDataNative*) malloc(sizeof(BitmapDataNative));
+    clone_bmp->width = bmp->width;
+    clone_bmp->height = bmp->height;
+    clone_bmp->transparent = bmp->transparent;
+    clone_bmp->disposed = 0;
+    size_t pxsize = (size_t)bmp->width * (size_t)bmp->height * sizeof(uint32_t);
+    clone_bmp->pixels = (uint32_t*) malloc(pxsize);
+    memcpy(clone_bmp->pixels, bmp->pixels, pxsize);
+    clone_obj->native_data = clone_bmp;
+    r.type = ACTION_STACK_VALUE_OBJECT;
+    r.data.numeric_value = (u64) clone_obj;
+    return r;
+}
+
+static ActionVar bitmapDataDispose(SWFAppContext* app_context, ActionVar* args, u32 arg_count, ActionVar* registers, void* this_obj)
+{
+    (void)registers; (void)args; (void)arg_count; (void)app_context;
+    ASObject* obj = (ASObject*) this_obj;
+    BitmapDataNative* bmp = getBitmapNative(obj);
+    ActionVar r = {0}; r.type = ACTION_STACK_VALUE_UNDEFINED;
+    if (!bmp || bmp->disposed) { r = makeF64(-1); return r; }
+    free(bmp->pixels);
+    bmp->pixels = NULL;
+    bmp->disposed = 1;
+    return r;
+}
+
+// Helper: extract channel value from ARGB pixel
+static inline uint8_t extractChannel(uint32_t px, int channel)
+{
+    switch (channel) {
+        case 1: return (px >> 16) & 0xFF; // RED
+        case 2: return (px >> 8) & 0xFF;  // GREEN
+        case 4: return px & 0xFF;         // BLUE
+        case 8: return (px >> 24) & 0xFF; // ALPHA
+        default: return 0;
+    }
+}
+
+// Helper: inject channel value into ARGB pixel
+static inline uint32_t injectChannel(uint32_t px, int channel, uint8_t val)
+{
+    switch (channel) {
+        case 1: return (px & 0xFF00FFFF) | ((uint32_t)val << 16); // RED
+        case 2: return (px & 0xFFFF00FF) | ((uint32_t)val << 8);  // GREEN
+        case 4: return (px & 0xFFFFFF00) | (uint32_t)val;         // BLUE
+        case 8: return (px & 0x00FFFFFF) | ((uint32_t)val << 24); // ALPHA
+        default: return px;
+    }
+}
+
+static ActionVar bitmapDataCopyChannel(SWFAppContext* app_context, ActionVar* args, u32 arg_count, ActionVar* registers, void* this_obj)
+{
+    (void)registers;
+    ASObject* obj = (ASObject*) this_obj;
+    BitmapDataNative* dest_bmp = getBitmapNative(obj);
+    ActionVar r = {0}; r.type = ACTION_STACK_VALUE_UNDEFINED;
+    if (!dest_bmp || dest_bmp->disposed) { r = makeF64(-1); return r; }
+    if (arg_count < 5) return r;
+    // arg0: source BitmapData, arg1: sourceRect, arg2: destPoint, arg3: sourceChannel, arg4: destChannel
+    if (args[0].type != ACTION_STACK_VALUE_OBJECT) return r;
+    ASObject* src_obj = (ASObject*) args[0].data.numeric_value;
+    BitmapDataNative* src_bmp = getBitmapNative(src_obj);
+    if (!src_bmp || src_bmp->disposed) return r;
+    if (args[1].type != ACTION_STACK_VALUE_OBJECT) return r;
+    ASObject* src_rect = (ASObject*) args[1].data.numeric_value;
+    if (!src_rect) return r;
+    if (args[2].type != ACTION_STACK_VALUE_OBJECT) return r;
+    ASObject* dest_pt = (ASObject*) args[2].data.numeric_value;
+    if (!dest_pt) return r;
+    int src_channel = (int)varToDoubleSimple(&args[3]);
+    int dest_channel = (int)varToDoubleSimple(&args[4]);
+    // Validate channels (must be power of 2: 1, 2, 4, or 8)
+    if (src_channel != 1 && src_channel != 2 && src_channel != 4 && src_channel != 8) return r;
+    if (dest_channel != 1 && dest_channel != 2 && dest_channel != 4 && dest_channel != 8) return r;
+    // Read rect and point
+    ActionVar* srx = getProperty(src_rect, "x", 1);
+    ActionVar* sry = getProperty(src_rect, "y", 1);
+    ActionVar* srw = getProperty(src_rect, "width", 5);
+    ActionVar* srh = getProperty(src_rect, "height", 6);
+    int rx = srx ? (int)varToDoubleSimple(srx) : 0;
+    int ry = sry ? (int)varToDoubleSimple(sry) : 0;
+    int rw = srw ? (int)varToDoubleSimple(srw) : 0;
+    int rh = srh ? (int)varToDoubleSimple(srh) : 0;
+    ActionVar* dpx = getProperty(dest_pt, "x", 1);
+    ActionVar* dpy = getProperty(dest_pt, "y", 1);
+    int dx = dpx ? (int)varToDoubleSimple(dpx) : 0;
+    int dy = dpy ? (int)varToDoubleSimple(dpy) : 0;
+    // Copy channel
+    for (int sy = 0; sy < rh; sy++) {
+        for (int sx = 0; sx < rw; sx++) {
+            int src_x = rx + sx;
+            int src_y = ry + sy;
+            int dst_x = dx + sx;
+            int dst_y = dy + sy;
+            if (src_x < 0 || src_x >= src_bmp->width || src_y < 0 || src_y >= src_bmp->height) continue;
+            if (dst_x < 0 || dst_x >= dest_bmp->width || dst_y < 0 || dst_y >= dest_bmp->height) continue;
+            uint32_t src_px = src_bmp->pixels[src_y * src_bmp->width + src_x];
+            uint8_t val = extractChannel(src_px, src_channel);
+            uint32_t dst_px = dest_bmp->pixels[dst_y * dest_bmp->width + dst_x];
+            dest_bmp->pixels[dst_y * dest_bmp->width + dst_x] = injectChannel(dst_px, dest_channel, val);
+        }
+    }
+    return r;
+}
+
+static ActionVar bitmapDataFloodFill(SWFAppContext* app_context, ActionVar* args, u32 arg_count, ActionVar* registers, void* this_obj)
+{
+    (void)registers;
+    ASObject* obj = (ASObject*) this_obj;
+    BitmapDataNative* bmp = getBitmapNative(obj);
+    ActionVar r = {0}; r.type = ACTION_STACK_VALUE_UNDEFINED;
+    if (!bmp || bmp->disposed) { r = makeF64(-1); return r; }
+    if (arg_count < 3) return r;
+    int x = (int)varToDoubleSimple(&args[0]);
+    int y = (int)varToDoubleSimple(&args[1]);
+    if (x < 0 || x >= bmp->width || y < 0 || y >= bmp->height) return r;
+    uint32_t fill_color = doubleToUint32(varToDoubleSimple(&args[2]));
+    if (!bmp->transparent) fill_color = fill_color | 0xFF000000;
+    fill_color = premultiplyAlpha(fill_color);
+    uint32_t target = bmp->pixels[y * bmp->width + x];
+    if (target == fill_color) return r;
+    // Scanline flood fill (avoids stack overflow)
+    int total = bmp->width * bmp->height;
+    int* queue = (int*) malloc(total * 2 * sizeof(int));
+    if (!queue) return r;
+    int head = 0, tail = 0;
+    queue[tail++] = x; queue[tail++] = y;
+    bmp->pixels[y * bmp->width + x] = fill_color;
+    while (head < tail) {
+        int cx = queue[head++];
+        int cy = queue[head++];
+        int dirs[4][2] = {{1,0},{-1,0},{0,1},{0,-1}};
+        for (int d = 0; d < 4; d++) {
+            int nx = cx + dirs[d][0];
+            int ny = cy + dirs[d][1];
+            if (nx < 0 || nx >= bmp->width || ny < 0 || ny >= bmp->height) continue;
+            if (bmp->pixels[ny * bmp->width + nx] != target) continue;
+            bmp->pixels[ny * bmp->width + nx] = fill_color;
+            if (tail + 2 <= total * 2) {
+                queue[tail++] = nx; queue[tail++] = ny;
+            }
+        }
+    }
+    free(queue);
+    return r;
+}
+
+static ActionVar bitmapDataColorTransform(SWFAppContext* app_context, ActionVar* args, u32 arg_count, ActionVar* registers, void* this_obj)
+{
+    (void)registers;
+    ASObject* obj = (ASObject*) this_obj;
+    BitmapDataNative* bmp = getBitmapNative(obj);
+    ActionVar r = {0}; r.type = ACTION_STACK_VALUE_UNDEFINED;
+    if (!bmp || bmp->disposed) { r = makeF64(-1); return r; }
+    if (arg_count < 2) return r;
+    // arg0: rect, arg1: ColorTransform
+    if (args[0].type != ACTION_STACK_VALUE_OBJECT || args[1].type != ACTION_STACK_VALUE_OBJECT) return r;
+    ASObject* rect = (ASObject*) args[0].data.numeric_value;
+    ASObject* ct = (ASObject*) args[1].data.numeric_value;
+    if (!rect || !ct) return r;
+    // Must be a native ColorTransform object
+    if (ct->native_type != NATIVE_COLORTRANSFORM) return r;
+    ActionVar* rm = getProperty(ct, "redMultiplier", 13);
+    ActionVar* gm = getProperty(ct, "greenMultiplier", 15);
+    ActionVar* bm = getProperty(ct, "blueMultiplier", 14);
+    ActionVar* am = getProperty(ct, "alphaMultiplier", 15);
+    ActionVar* ro = getProperty(ct, "redOffset", 9);
+    ActionVar* go = getProperty(ct, "greenOffset", 11);
+    ActionVar* bo = getProperty(ct, "blueOffset", 10);
+    ActionVar* ao = getProperty(ct, "alphaOffset", 11);
+    if (!rm || !gm || !bm || !am || !ro || !go || !bo || !ao) return r;
+    double rMult = varToDoubleSimple(rm);
+    double gMult = varToDoubleSimple(gm);
+    double bMult = varToDoubleSimple(bm);
+    double aMult = varToDoubleSimple(am);
+    double rOff = varToDoubleSimple(ro);
+    double gOff = varToDoubleSimple(go);
+    double bOff = varToDoubleSimple(bo);
+    double aOff = varToDoubleSimple(ao);
+    // Get rect bounds
+    ActionVar* rx = getProperty(rect, "x", 1);
+    ActionVar* ry = getProperty(rect, "y", 1);
+    ActionVar* rw = getProperty(rect, "width", 5);
+    ActionVar* rh = getProperty(rect, "height", 6);
+    int x0 = rx ? (int)varToDoubleSimple(rx) : 0;
+    int y0 = ry ? (int)varToDoubleSimple(ry) : 0;
+    int w  = rw ? (int)varToDoubleSimple(rw) : 0;
+    int h  = rh ? (int)varToDoubleSimple(rh) : 0;
+    int x1 = x0 + w;
+    int y1 = y0 + h;
+    if (x0 < 0) x0 = 0;
+    if (y0 < 0) y0 = 0;
+    if (x1 > bmp->width) x1 = bmp->width;
+    if (y1 > bmp->height) y1 = bmp->height;
+    for (int py = y0; py < y1; py++) {
+        for (int px = x0; px < x1; px++) {
+            // Un-multiply, apply transform, re-premultiply
+            uint32_t pixel = unpremultiplyAlpha(bmp->pixels[py * bmp->width + px]);
+            int a = (pixel >> 24) & 0xFF;
+            int rv = (pixel >> 16) & 0xFF;
+            int g = (pixel >> 8) & 0xFF;
+            int b = pixel & 0xFF;
+            int na = (int)(a * aMult + aOff); if (na < 0) na = 0; if (na > 255) na = 255;
+            int nr = (int)(rv * rMult + rOff); if (nr < 0) nr = 0; if (nr > 255) nr = 255;
+            int ng = (int)(g * gMult + gOff); if (ng < 0) ng = 0; if (ng > 255) ng = 255;
+            int nb = (int)(b * bMult + bOff); if (nb < 0) nb = 0; if (nb > 255) nb = 255;
+            uint32_t result = ((uint32_t)na << 24) | ((uint32_t)nr << 16) | ((uint32_t)ng << 8) | (uint32_t)nb;
+            bmp->pixels[py * bmp->width + px] = premultiplyAlpha(result);
+        }
+    }
+    return r;
+}
+
+static ActionVar bitmapDataGetColorBoundsRect(SWFAppContext* app_context, ActionVar* args, u32 arg_count, ActionVar* registers, void* this_obj)
+{
+    (void)registers;
+    ASObject* obj = (ASObject*) this_obj;
+    BitmapDataNative* bmp = getBitmapNative(obj);
+    ActionVar r = {0};
+    if (!bmp || bmp->disposed) { r = makeF64(-1); return r; }
+    if (arg_count < 2) { r = makeF64(-1); return r; }
+    uint32_t mask = doubleToUint32(varToDoubleSimple(&args[0]));
+    uint32_t color = doubleToUint32(varToDoubleSimple(&args[1]));
+    int findColor = 1; // default true
+    if (arg_count >= 3) findColor = (int)varToDoubleSimple(&args[2]);
+    int min_x = bmp->width, min_y = bmp->height, max_x = -1, max_y = -1;
+    // Compare in premultiplied space (matching Flash's behavior)
+    if (!bmp->transparent) mask |= 0xFF000000;
+    uint32_t premul_color = premultiplyAlpha(color);
+    for (int py = 0; py < bmp->height; py++) {
+        for (int px = 0; px < bmp->width; px++) {
+            uint32_t pixel_raw = bmp->pixels[py * bmp->width + px];
+            int match = ((pixel_raw & mask) == (premul_color & mask));
+            if (findColor ? match : !match) {
+                if (px < min_x) min_x = px;
+                if (py < min_y) min_y = py;
+                if (px > max_x) max_x = px;
+                if (py > max_y) max_y = py;
+            }
+        }
+    }
+    // Create Rectangle result
+    ActionVar rx, ry, rw, rh;
+    if (max_x < 0) {
+        // No matching pixels
+        rx = makeF64(0); ry = makeF64(0); rw = makeF64(0); rh = makeF64(0);
+    } else {
+        rx = makeF64(min_x); ry = makeF64(min_y);
+        rw = makeF64(max_x - min_x + 1); rh = makeF64(max_y - min_y + 1);
+    }
+    ASObject* rect_obj = createRectObj(app_context, &rx, &ry, &rw, &rh);
+    r.type = ACTION_STACK_VALUE_OBJECT;
+    r.data.numeric_value = (u64) rect_obj;
+    return r;
+}
+
+static ActionVar bitmapDataNoise(SWFAppContext* app_context, ActionVar* args, u32 arg_count, ActionVar* registers, void* this_obj)
+{
+    (void)registers;
+    ASObject* obj = (ASObject*) this_obj;
+    BitmapDataNative* bmp = getBitmapNative(obj);
+    ActionVar r = {0}; r.type = ACTION_STACK_VALUE_UNDEFINED;
+    if (!bmp || bmp->disposed) { r = makeF64(-1); return r; }
+    if (arg_count < 1) return r;
+    int32_t seed = (int32_t)varToDoubleSimple(&args[0]);
+    uint8_t low = (arg_count >= 2) ? (uint8_t)(int)varToDoubleSimple(&args[1]) : 0;
+    uint8_t high = (arg_count >= 3) ? (uint8_t)(int)varToDoubleSimple(&args[2]) : 255;
+    int channelOptions = (arg_count >= 4) ? (int)varToDoubleSimple(&args[3]) : 7; // R|G|B
+    int grayScale = (arg_count >= 5) ? (int)varToDoubleSimple(&args[4]) : 0;
+    // Seed handling: if seed <= 0, use -seed + 1
+    uint32_t rng_state = (seed <= 0) ? (uint32_t)(-seed + 1) : (uint32_t)seed;
+    // Lehmer RNG helper macros
+    #define LEHMER_NEXT(s) (s = (uint32_t)(((uint64_t)(s) * 16807ULL) % 2147483647ULL))
+    #define LEHMER_RANGE(s, lo, hi) ((lo) + (uint8_t)(LEHMER_NEXT(s) % ((uint32_t)((hi) - (lo)) + 1)))
+    for (int py = 0; py < bmp->height; py++) {
+        for (int px = 0; px < bmp->width; px++) {
+            uint8_t rv, gv, bv, av;
+            if (grayScale) {
+                uint8_t gray = LEHMER_RANGE(rng_state, low, high);
+                rv = gray; // grayScale: all RGB channels get gray value
+                gv = gray;
+                bv = gray;
+                av = (channelOptions & 8) ? LEHMER_RANGE(rng_state, low, high) : 0xFF;
+            } else {
+                rv = (channelOptions & 1) ? LEHMER_RANGE(rng_state, low, high) : 0;
+                gv = (channelOptions & 2) ? LEHMER_RANGE(rng_state, low, high) : 0;
+                bv = (channelOptions & 4) ? LEHMER_RANGE(rng_state, low, high) : 0;
+                av = (channelOptions & 8) ? LEHMER_RANGE(rng_state, low, high) : 0xFF;
+            }
+            if (!bmp->transparent) av = 0xFF;
+            uint32_t noise_color = ((uint32_t)av << 24) | ((uint32_t)rv << 16) | ((uint32_t)gv << 8) | (uint32_t)bv;
+            bmp->pixels[py * bmp->width + px] = premultiplyAlpha(noise_color);
+        }
+    }
+    #undef LEHMER_NEXT
+    #undef LEHMER_RANGE
+    return r;
+}
+
+static ActionVar bitmapDataCompare(SWFAppContext* app_context, ActionVar* args, u32 arg_count, ActionVar* registers, void* this_obj)
+{
+    (void)registers;
+    ASObject* obj = (ASObject*) this_obj;
+    BitmapDataNative* bmp = getBitmapNative(obj);
+    ActionVar r = {0};
+    if (!bmp || bmp->disposed) { r = makeF64(-1); return r; }
+    if (arg_count < 1 || args[0].type != ACTION_STACK_VALUE_OBJECT) { r = makeF64(-1); return r; }
+    ASObject* other_obj = (ASObject*) args[0].data.numeric_value;
+    BitmapDataNative* other = getBitmapNative(other_obj);
+    if (!other || other->disposed) { r = makeF64(-2); return r; }
+    if (bmp->width != other->width) { r = makeF64(-3); return r; }
+    if (bmp->height != other->height) { r = makeF64(-4); return r; }
+    // Compare pixels
+    int differs = 0;
+    for (int i = 0; i < bmp->width * bmp->height; i++) {
+        if (bmp->pixels[i] != other->pixels[i]) { differs = 1; break; }
+    }
+    if (!differs) { r = makeF64(0); return r; }
+    // Create diff BitmapData
+    ASObject* diff_obj = allocObject(app_context, 4);
+    diff_obj->native_type = NATIVE_BITMAPDATA;
+    ActionVar proto_var = {0};
+    proto_var.type = ACTION_STACK_VALUE_OBJECT;
+    proto_var.data.numeric_value = (u64) g_bitmapdata_prototype;
+    setProperty(app_context, diff_obj, "__proto__", 9, &proto_var);
+    BitmapDataNative* diff_bmp = (BitmapDataNative*) malloc(sizeof(BitmapDataNative));
+    diff_bmp->width = bmp->width;
+    diff_bmp->height = bmp->height;
+    diff_bmp->transparent = 1;
+    diff_bmp->disposed = 0;
+    size_t pxsize = (size_t)bmp->width * (size_t)bmp->height * sizeof(uint32_t);
+    diff_bmp->pixels = (uint32_t*) malloc(pxsize);
+    for (int i = 0; i < bmp->width * bmp->height; i++) {
+        if (bmp->pixels[i] == other->pixels[i]) {
+            diff_bmp->pixels[i] = 0x00000000;
+        } else {
+            // Check if only alpha differs
+            if ((bmp->pixels[i] & 0x00FFFFFF) == (other->pixels[i] & 0x00FFFFFF)) {
+                // Alpha difference only: result pixel = alpha XOR with 0xFF prefix
+                uint32_t a1 = (bmp->pixels[i] >> 24) & 0xFF;
+                uint32_t a2 = (other->pixels[i] >> 24) & 0xFF;
+                uint32_t diff_a = a1 ^ a2;
+                diff_bmp->pixels[i] = (diff_a << 24) | 0x00FFFFFF;
+            } else {
+                // RGB difference: XOR of RGB, alpha = 0xFF
+                uint32_t xor_val = bmp->pixels[i] ^ other->pixels[i];
+                diff_bmp->pixels[i] = 0xFF000000 | (xor_val & 0x00FFFFFF);
+            }
+        }
+    }
+    diff_obj->native_data = diff_bmp;
+    r.type = ACTION_STACK_VALUE_OBJECT;
+    r.data.numeric_value = (u64) diff_obj;
+    return r;
+}
+
+static ActionVar bitmapDataCopyPixels(SWFAppContext* app_context, ActionVar* args, u32 arg_count, ActionVar* registers, void* this_obj)
+{
+    (void)registers;
+    ASObject* obj = (ASObject*) this_obj;
+    BitmapDataNative* dest_bmp = getBitmapNative(obj);
+    ActionVar r = {0}; r.type = ACTION_STACK_VALUE_UNDEFINED;
+    if (!dest_bmp || dest_bmp->disposed) { r = makeF64(-1); return r; }
+    if (arg_count < 3) return r;
+    if (args[0].type != ACTION_STACK_VALUE_OBJECT) return r;
+    ASObject* src_obj = (ASObject*) args[0].data.numeric_value;
+    BitmapDataNative* src_bmp = getBitmapNative(src_obj);
+    if (!src_bmp || src_bmp->disposed) return r;
+    if (args[1].type != ACTION_STACK_VALUE_OBJECT) return r;
+    ASObject* src_rect = (ASObject*) args[1].data.numeric_value;
+    if (!src_rect) return r;
+    if (args[2].type != ACTION_STACK_VALUE_OBJECT) return r;
+    ASObject* dest_pt = (ASObject*) args[2].data.numeric_value;
+    if (!dest_pt) return r;
+    ActionVar* srx = getProperty(src_rect, "x", 1);
+    ActionVar* sry = getProperty(src_rect, "y", 1);
+    ActionVar* srw = getProperty(src_rect, "width", 5);
+    ActionVar* srh = getProperty(src_rect, "height", 6);
+    int rx = srx ? (int)varToDoubleSimple(srx) : 0;
+    int ry = sry ? (int)varToDoubleSimple(sry) : 0;
+    int rw = srw ? (int)varToDoubleSimple(srw) : 0;
+    int rh = srh ? (int)varToDoubleSimple(srh) : 0;
+    ActionVar* dpx = getProperty(dest_pt, "x", 1);
+    ActionVar* dpy = getProperty(dest_pt, "y", 1);
+    int dx = dpx ? (int)varToDoubleSimple(dpx) : 0;
+    int dy = dpy ? (int)varToDoubleSimple(dpy) : 0;
+    int mergeAlpha = 0;
+    if (arg_count >= 6) mergeAlpha = (int)varToDoubleSimple(&args[5]);
+    for (int sy = 0; sy < rh; sy++) {
+        for (int sx = 0; sx < rw; sx++) {
+            int src_x = rx + sx;
+            int src_y = ry + sy;
+            int dst_x = dx + sx;
+            int dst_y = dy + sy;
+            if (src_x < 0 || src_x >= src_bmp->width || src_y < 0 || src_y >= src_bmp->height) continue;
+            if (dst_x < 0 || dst_x >= dest_bmp->width || dst_y < 0 || dst_y >= dest_bmp->height) continue;
+            uint32_t src_px = src_bmp->pixels[src_y * src_bmp->width + src_x];
+            if (!dest_bmp->transparent) src_px = src_px | 0xFF000000;
+            dest_bmp->pixels[dst_y * dest_bmp->width + dst_x] = src_px;
+        }
+    }
+    return r;
+}
+
+static ActionVar bitmapDataThreshold(SWFAppContext* app_context, ActionVar* args, u32 arg_count, ActionVar* registers, void* this_obj)
+{
+    (void)registers;
+    ASObject* obj = (ASObject*) this_obj;
+    BitmapDataNative* dest_bmp = getBitmapNative(obj);
+    ActionVar r = {0};
+    if (!dest_bmp || dest_bmp->disposed) { r = makeF64(-1); return r; }
+    if (arg_count < 5) { r = makeF64(0); return r; }
+    // arg0: source BitmapData, arg1: sourceRect, arg2: destPoint, arg3: operation string, arg4: threshold
+    if (args[0].type != ACTION_STACK_VALUE_OBJECT) { r = makeF64(0); return r; }
+    ASObject* src_obj = (ASObject*) args[0].data.numeric_value;
+    BitmapDataNative* src_bmp = getBitmapNative(src_obj);
+    if (!src_bmp || src_bmp->disposed) { r = makeF64(0); return r; }
+    if (args[1].type != ACTION_STACK_VALUE_OBJECT) { r = makeF64(0); return r; }
+    ASObject* src_rect = (ASObject*) args[1].data.numeric_value;
+    if (args[2].type != ACTION_STACK_VALUE_OBJECT) { r = makeF64(0); return r; }
+    ASObject* dest_pt = (ASObject*) args[2].data.numeric_value;
+    // Get operation string — coerce arg to string via stack
+    pushVar(app_context, &args[3]);
+    convertString(app_context, NULL);
+    ActionVar op_var = {0};
+    popVar(app_context, &op_var);
+    char op_buf[16] = {0};
+    int op_len = 0;
+    if (op_var.type == ACTION_STACK_VALUE_STRING) {
+        u16_to_utf8((const uint16_t*)op_var.data.numeric_value, op_var.str_size, op_buf, sizeof(op_buf));
+        op_len = (int)strlen(op_buf);
+    }
+    const char* op_str = op_buf;
+    // Parse operation
+    int op = 0; // 0=invalid, 1=<, 2=<=, 3=>, 4=>=, 5===, 6=!=
+    if (op_len == 1) {
+        if (op_str[0] == '<') op = 1;
+        else if (op_str[0] == '>') op = 3;
+    } else if (op_len == 2) {
+        if (op_str[0] == '<' && op_str[1] == '=') op = 2;
+        else if (op_str[0] == '>' && op_str[1] == '=') op = 4;
+        else if (op_str[0] == '=' && op_str[1] == '=') op = 5;
+        else if (op_str[0] == '!' && op_str[1] == '=') op = 6;
+    }
+    uint32_t threshold_val = doubleToUint32(varToDoubleSimple(&args[4]));
+    uint32_t fill_color = (arg_count >= 6) ? doubleToUint32(varToDoubleSimple(&args[5])) : 0;
+    uint32_t mask_val = (arg_count >= 7) ? doubleToUint32(varToDoubleSimple(&args[6])) : 0xFFFFFFFF;
+    int copySource = (arg_count >= 8) ? (int)varToDoubleSimple(&args[7]) : 0;
+    ActionVar* srx = getProperty(src_rect, "x", 1);
+    ActionVar* sry = getProperty(src_rect, "y", 1);
+    ActionVar* srw = getProperty(src_rect, "width", 5);
+    ActionVar* srh = getProperty(src_rect, "height", 6);
+    int rx = srx ? (int)varToDoubleSimple(srx) : 0;
+    int ry = sry ? (int)varToDoubleSimple(sry) : 0;
+    int rw = srw ? (int)varToDoubleSimple(srw) : 0;
+    int rh = srh ? (int)varToDoubleSimple(srh) : 0;
+    ActionVar* dpx = getProperty(dest_pt, "x", 1);
+    ActionVar* dpy = getProperty(dest_pt, "y", 1);
+    int dx = dpx ? (int)varToDoubleSimple(dpx) : 0;
+    int dy = dpy ? (int)varToDoubleSimple(dpy) : 0;
+    int count = 0;
+    for (int sy = 0; sy < rh; sy++) {
+        for (int sx = 0; sx < rw; sx++) {
+            int src_x = rx + sx;
+            int src_y = ry + sy;
+            int dst_x = dx + sx;
+            int dst_y = dy + sy;
+            if (src_x < 0 || src_x >= src_bmp->width || src_y < 0 || src_y >= src_bmp->height) continue;
+            if (dst_x < 0 || dst_x >= dest_bmp->width || dst_y < 0 || dst_y >= dest_bmp->height) continue;
+            uint32_t src_px = src_bmp->pixels[src_y * src_bmp->width + src_x];
+            uint32_t masked = src_px & mask_val;
+            uint32_t thresh_masked = threshold_val & mask_val;
+            int passes = 0;
+            switch (op) {
+                case 1: passes = (masked < thresh_masked); break;
+                case 2: passes = (masked <= thresh_masked); break;
+                case 3: passes = (masked > thresh_masked); break;
+                case 4: passes = (masked >= thresh_masked); break;
+                case 5: passes = (masked == thresh_masked); break;
+                case 6: passes = (masked != thresh_masked); break;
+            }
+            if (passes) {
+                dest_bmp->pixels[dst_y * dest_bmp->width + dst_x] = fill_color;
+                count++;
+            } else if (copySource) {
+                dest_bmp->pixels[dst_y * dest_bmp->width + dst_x] = src_px;
+            }
+        }
+    }
+    r = makeF64((double)count);
+    return r;
+}
+
+static ActionVar bitmapDataHitTest(SWFAppContext* app_context, ActionVar* args, u32 arg_count, ActionVar* registers, void* this_obj)
+{
+    (void)registers;
+    ASObject* obj = (ASObject*) this_obj;
+    BitmapDataNative* bmp = getBitmapNative(obj);
+    ActionVar r = {0};
+    if (!bmp || bmp->disposed) { r = makeF64(-1); return r; }
+    if (arg_count < 3) { r = makeF64(-1); return r; }
+    // arg0: firstPoint, arg1: firstAlphaThreshold, arg2: second object (Point, Rect, or BitmapData)
+    if (args[0].type != ACTION_STACK_VALUE_OBJECT) { r = makeF64(-1); return r; }
+    ASObject* first_pt = (ASObject*) args[0].data.numeric_value;
+    if (!first_pt) { r = makeF64(-1); return r; }
+    int first_alpha = (int)varToDoubleSimple(&args[1]);
+    ActionVar* fpx = getProperty(first_pt, "x", 1);
+    ActionVar* fpy = getProperty(first_pt, "y", 1);
+    int fx = fpx ? (int)varToDoubleSimple(fpx) : 0;
+    int fy = fpy ? (int)varToDoubleSimple(fpy) : 0;
+    if (args[2].type != ACTION_STACK_VALUE_OBJECT) { r.type = ACTION_STACK_VALUE_BOOLEAN; r.data.numeric_value = 0; return r; }
+    ASObject* second = (ASObject*) args[2].data.numeric_value;
+    if (!second) { r.type = ACTION_STACK_VALUE_BOOLEAN; r.data.numeric_value = 0; return r; }
+    BitmapDataNative* second_bmp = getBitmapNative(second);
+    if (second_bmp) {
+        // BitmapData vs BitmapData hit test
+        ASObject* second_pt = NULL;
+        int second_alpha = 1;
+        if (arg_count >= 4 && args[3].type == ACTION_STACK_VALUE_OBJECT)
+            second_pt = (ASObject*) args[3].data.numeric_value;
+        if (arg_count >= 5)
+            second_alpha = (int)varToDoubleSimple(&args[4]);
+        int sx = 0, sy = 0;
+        if (second_pt) {
+            ActionVar* spx = getProperty(second_pt, "x", 1);
+            ActionVar* spy = getProperty(second_pt, "y", 1);
+            sx = spx ? (int)varToDoubleSimple(spx) : 0;
+            sy = spy ? (int)varToDoubleSimple(spy) : 0;
+        }
+        // Check overlapping pixels
+        for (int py = 0; py < bmp->height; py++) {
+            for (int px = 0; px < bmp->width; px++) {
+                int bx = px + fx;
+                int by = py + fy;
+                int ox = bx - sx;
+                int oy = by - sy;
+                if (ox < 0 || ox >= second_bmp->width || oy < 0 || oy >= second_bmp->height) continue;
+                uint32_t p1 = bmp->pixels[py * bmp->width + px];
+                uint32_t p2 = second_bmp->pixels[oy * second_bmp->width + ox];
+                int a1 = (p1 >> 24) & 0xFF;
+                int a2 = (p2 >> 24) & 0xFF;
+                if (a1 >= first_alpha && a2 >= second_alpha) {
+                    r.type = ACTION_STACK_VALUE_BOOLEAN;
+                    r.data.numeric_value = 1;
+                    return r;
+                }
+            }
+        }
+        r.type = ACTION_STACK_VALUE_BOOLEAN;
+        r.data.numeric_value = 0;
+        return r;
+    }
+    // Point or Rectangle hit test
+    ActionVar* sx = getProperty(second, "x", 1);
+    ActionVar* sy = getProperty(second, "y", 1);
+    ActionVar* sw = getProperty(second, "width", 5);
+    ActionVar* sh = getProperty(second, "height", 6);
+    if (sw && sh) {
+        // Rectangle
+        int rx0 = sx ? (int)varToDoubleSimple(sx) : 0;
+        int ry0 = sy ? (int)varToDoubleSimple(sy) : 0;
+        int rw = (int)varToDoubleSimple(sw);
+        int rh = (int)varToDoubleSimple(sh);
+        for (int py = ry0; py < ry0 + rh; py++) {
+            for (int px = rx0; px < rx0 + rw; px++) {
+                int bx = px - fx;
+                int by = py - fy;
+                if (bx < 0 || bx >= bmp->width || by < 0 || by >= bmp->height) continue;
+                uint32_t p = bmp->pixels[by * bmp->width + bx];
+                int a = (p >> 24) & 0xFF;
+                if (a >= first_alpha) {
+                    r.type = ACTION_STACK_VALUE_BOOLEAN;
+                    r.data.numeric_value = 1;
+                    return r;
+                }
+            }
+        }
+        r.type = ACTION_STACK_VALUE_BOOLEAN;
+        r.data.numeric_value = 0;
+        return r;
+    }
+    // Point
+    int px = sx ? (int)varToDoubleSimple(sx) : 0;
+    int py = sy ? (int)varToDoubleSimple(sy) : 0;
+    int bx = px - fx;
+    int by = py - fy;
+    if (bx >= 0 && bx < bmp->width && by >= 0 && by < bmp->height) {
+        uint32_t p = bmp->pixels[by * bmp->width + bx];
+        int a = (p >> 24) & 0xFF;
+        if (a >= first_alpha) {
+            r.type = ACTION_STACK_VALUE_BOOLEAN;
+            r.data.numeric_value = 1;
+            return r;
+        }
+    }
+    r.type = ACTION_STACK_VALUE_BOOLEAN;
+    r.data.numeric_value = 0;
+    return r;
+}
+
+static ActionVar bitmapDataPixelDissolve(SWFAppContext* app_context, ActionVar* args, u32 arg_count, ActionVar* registers, void* this_obj)
+{
+    (void)registers;
+    ASObject* obj = (ASObject*) this_obj;
+    BitmapDataNative* dest_bmp = getBitmapNative(obj);
+    ActionVar r = {0};
+    if (!dest_bmp || dest_bmp->disposed) { r = makeF64(-1); return r; }
+    if (arg_count < 4) { r = makeF64(0); return r; }
+    if (args[0].type != ACTION_STACK_VALUE_OBJECT) { r = makeF64(0); return r; }
+    ASObject* src_obj = (ASObject*) args[0].data.numeric_value;
+    BitmapDataNative* src_bmp = getBitmapNative(src_obj);
+    if (!src_bmp || src_bmp->disposed) { r = makeF64(0); return r; }
+    if (args[1].type != ACTION_STACK_VALUE_OBJECT) { r = makeF64(0); return r; }
+    if (args[2].type != ACTION_STACK_VALUE_OBJECT) { r = makeF64(0); return r; }
+    int32_t seed = (int32_t)varToDoubleSimple(&args[3]);
+    int numPixels = (arg_count >= 5) ? (int)varToDoubleSimple(&args[4]) : 0;
+    uint32_t fill_color = (arg_count >= 6) ? doubleToUint32(varToDoubleSimple(&args[5])) : 0;
+    // Return seed for chaining
+    uint32_t rng_state = (seed <= 0) ? (uint32_t)(-seed + 1) : (uint32_t)seed;
+    int total = dest_bmp->width * dest_bmp->height;
+    int filled = 0;
+    for (int i = 0; i < numPixels && i < total; i++) {
+        rng_state = (uint32_t)(((uint64_t)rng_state * 16807ULL) % 2147483647ULL);
+        int idx = (int)(rng_state % (uint32_t)total);
+        dest_bmp->pixels[idx] = fill_color;
+        filled++;
+    }
+    r = makeF64((double)rng_state);
+    return r;
+}
+
+// Disposed stub — returns -1 for most methods
+static ActionVar bitmapDataDisposedStub(SWFAppContext* app_context, ActionVar* args, u32 arg_count, ActionVar* registers, void* this_obj)
+{
+    (void)app_context; (void)args; (void)arg_count; (void)registers; (void)this_obj;
+    return makeF64(-1);
+}
+
+static ActionVar bitmapDataToString(SWFAppContext* app_context, ActionVar* args, u32 arg_count, ActionVar* registers, void* this_obj)
+{
+    (void)app_context; (void)args; (void)arg_count; (void)registers; (void)this_obj;
+    // Return "[object Object]" — handled by default toString via prototype chain
+    ActionVar r = {0}; r.type = ACTION_STACK_VALUE_UNDEFINED;
+    return r;
+}
+
+// Scroll stub
+static ActionVar bitmapDataScroll(SWFAppContext* app_context, ActionVar* args, u32 arg_count, ActionVar* registers, void* this_obj)
+{
+    (void)registers;
+    ASObject* obj = (ASObject*) this_obj;
+    BitmapDataNative* bmp = getBitmapNative(obj);
+    ActionVar r = {0}; r.type = ACTION_STACK_VALUE_UNDEFINED;
+    if (!bmp || bmp->disposed) { r = makeF64(-1); return r; }
+    return r;
+}
+
+// Merge stub
+static ActionVar bitmapDataMerge(SWFAppContext* app_context, ActionVar* args, u32 arg_count, ActionVar* registers, void* this_obj)
+{
+    (void)registers;
+    ASObject* obj = (ASObject*) this_obj;
+    BitmapDataNative* bmp = getBitmapNative(obj);
+    ActionVar r = {0}; r.type = ACTION_STACK_VALUE_UNDEFINED;
+    if (!bmp || bmp->disposed) { r = makeF64(-1); return r; }
+    return r;
+}
+
+// PaletteMap stub
+static ActionVar bitmapDataPaletteMap(SWFAppContext* app_context, ActionVar* args, u32 arg_count, ActionVar* registers, void* this_obj)
+{
+    (void)registers;
+    ASObject* obj = (ASObject*) this_obj;
+    BitmapDataNative* bmp = getBitmapNative(obj);
+    ActionVar r = {0}; r.type = ACTION_STACK_VALUE_UNDEFINED;
+    if (!bmp || bmp->disposed) { r = makeF64(-1); return r; }
+    return r;
+}
+
+// PerlinNoise stub
+static ActionVar bitmapDataPerlinNoise(SWFAppContext* app_context, ActionVar* args, u32 arg_count, ActionVar* registers, void* this_obj)
+{
+    (void)registers;
+    ASObject* obj = (ASObject*) this_obj;
+    BitmapDataNative* bmp = getBitmapNative(obj);
+    ActionVar r = {0}; r.type = ACTION_STACK_VALUE_UNDEFINED;
+    if (!bmp || bmp->disposed) { r = makeF64(-1); return r; }
+    return r;
+}
+
+// ApplyFilter stub
+static ActionVar bitmapDataApplyFilter(SWFAppContext* app_context, ActionVar* args, u32 arg_count, ActionVar* registers, void* this_obj)
+{
+    (void)registers;
+    ASObject* obj = (ASObject*) this_obj;
+    BitmapDataNative* bmp = getBitmapNative(obj);
+    ActionVar r = {0}; r.type = ACTION_STACK_VALUE_UNDEFINED;
+    if (!bmp || bmp->disposed) { r = makeF64(-1); return r; }
+    return r;
+}
+
+// Draw stub
+static ActionVar bitmapDataDraw(SWFAppContext* app_context, ActionVar* args, u32 arg_count, ActionVar* registers, void* this_obj)
+{
+    (void)registers;
+    ASObject* obj = (ASObject*) this_obj;
+    BitmapDataNative* bmp = getBitmapNative(obj);
+    ActionVar r = {0}; r.type = ACTION_STACK_VALUE_UNDEFINED;
+    if (!bmp || bmp->disposed) { r = makeF64(-1); return r; }
+    return r;
+}
+
+// GenerateFilterRect stub
+static ActionVar bitmapDataGenerateFilterRect(SWFAppContext* app_context, ActionVar* args, u32 arg_count, ActionVar* registers, void* this_obj)
+{
+    (void)registers;
+    ASObject* obj = (ASObject*) this_obj;
+    BitmapDataNative* bmp = getBitmapNative(obj);
+    ActionVar r = {0}; r.type = ACTION_STACK_VALUE_UNDEFINED;
+    if (!bmp || bmp->disposed) { r = makeF64(-1); return r; }
+    return r;
+}
+
+// LoadBitmap stub (returns undefined even when disposed)
+static ActionVar bitmapDataLoadBitmap(SWFAppContext* app_context, ActionVar* args, u32 arg_count, ActionVar* registers, void* this_obj)
+{
+    (void)registers; (void)args; (void)arg_count; (void)this_obj; (void)app_context;
+    ActionVar r = {0}; r.type = ACTION_STACK_VALUE_UNDEFINED;
+    return r;
+}
+
+// Initialize BitmapData prototype and methods
+static void initBitmapDataPrototype(SWFAppContext* app_context)
+{
+    if (g_bitmapdata_init_done) return;
+    g_bitmapdata_init_done = 1;
+
+    g_bitmapdata_prototype = allocObject(app_context, 32);
+    retainObject(g_bitmapdata_prototype);
+    setObjectProto(app_context, g_bitmapdata_prototype);
+
+    int mi = 0;
+    registerGeomMethod(&g_bitmapdata_methods[mi++], "getPixel",            (Function2Ptr)bitmapDataGetPixel,            app_context, g_bitmapdata_prototype);
+    registerGeomMethod(&g_bitmapdata_methods[mi++], "getPixel32",          (Function2Ptr)bitmapDataGetPixel32,          app_context, g_bitmapdata_prototype);
+    registerGeomMethod(&g_bitmapdata_methods[mi++], "setPixel",            (Function2Ptr)bitmapDataSetPixel,            app_context, g_bitmapdata_prototype);
+    registerGeomMethod(&g_bitmapdata_methods[mi++], "setPixel32",          (Function2Ptr)bitmapDataSetPixel32,          app_context, g_bitmapdata_prototype);
+    registerGeomMethod(&g_bitmapdata_methods[mi++], "fillRect",            (Function2Ptr)bitmapDataFillRect,            app_context, g_bitmapdata_prototype);
+    registerGeomMethod(&g_bitmapdata_methods[mi++], "clone",               (Function2Ptr)bitmapDataClone,               app_context, g_bitmapdata_prototype);
+    registerGeomMethod(&g_bitmapdata_methods[mi++], "dispose",             (Function2Ptr)bitmapDataDispose,             app_context, g_bitmapdata_prototype);
+    registerGeomMethod(&g_bitmapdata_methods[mi++], "copyChannel",         (Function2Ptr)bitmapDataCopyChannel,         app_context, g_bitmapdata_prototype);
+    registerGeomMethod(&g_bitmapdata_methods[mi++], "floodFill",           (Function2Ptr)bitmapDataFloodFill,           app_context, g_bitmapdata_prototype);
+    registerGeomMethod(&g_bitmapdata_methods[mi++], "colorTransform",      (Function2Ptr)bitmapDataColorTransform,      app_context, g_bitmapdata_prototype);
+    registerGeomMethod(&g_bitmapdata_methods[mi++], "getColorBoundsRect",  (Function2Ptr)bitmapDataGetColorBoundsRect,  app_context, g_bitmapdata_prototype);
+    registerGeomMethod(&g_bitmapdata_methods[mi++], "noise",               (Function2Ptr)bitmapDataNoise,               app_context, g_bitmapdata_prototype);
+    registerGeomMethod(&g_bitmapdata_methods[mi++], "compare",             (Function2Ptr)bitmapDataCompare,             app_context, g_bitmapdata_prototype);
+    registerGeomMethod(&g_bitmapdata_methods[mi++], "copyPixels",          (Function2Ptr)bitmapDataCopyPixels,          app_context, g_bitmapdata_prototype);
+    registerGeomMethod(&g_bitmapdata_methods[mi++], "threshold",           (Function2Ptr)bitmapDataThreshold,           app_context, g_bitmapdata_prototype);
+    registerGeomMethod(&g_bitmapdata_methods[mi++], "hitTest",             (Function2Ptr)bitmapDataHitTest,             app_context, g_bitmapdata_prototype);
+    registerGeomMethod(&g_bitmapdata_methods[mi++], "pixelDissolve",       (Function2Ptr)bitmapDataPixelDissolve,       app_context, g_bitmapdata_prototype);
+    registerGeomMethod(&g_bitmapdata_methods[mi++], "scroll",              (Function2Ptr)bitmapDataScroll,              app_context, g_bitmapdata_prototype);
+    registerGeomMethod(&g_bitmapdata_methods[mi++], "merge",               (Function2Ptr)bitmapDataMerge,               app_context, g_bitmapdata_prototype);
+    registerGeomMethod(&g_bitmapdata_methods[mi++], "paletteMap",          (Function2Ptr)bitmapDataPaletteMap,          app_context, g_bitmapdata_prototype);
+    registerGeomMethod(&g_bitmapdata_methods[mi++], "perlinNoise",         (Function2Ptr)bitmapDataPerlinNoise,         app_context, g_bitmapdata_prototype);
+    registerGeomMethod(&g_bitmapdata_methods[mi++], "applyFilter",         (Function2Ptr)bitmapDataApplyFilter,         app_context, g_bitmapdata_prototype);
+    registerGeomMethod(&g_bitmapdata_methods[mi++], "draw",                (Function2Ptr)bitmapDataDraw,                app_context, g_bitmapdata_prototype);
+    registerGeomMethod(&g_bitmapdata_methods[mi++], "generateFilterRect",  (Function2Ptr)bitmapDataGenerateFilterRect,  app_context, g_bitmapdata_prototype);
+    registerGeomMethod(&g_bitmapdata_methods[mi++], "loadBitmap",          (Function2Ptr)bitmapDataLoadBitmap,          app_context, g_bitmapdata_prototype);
 }
 
 // Call just valueOf on an object. Returns the raw result (even if non-primitive).
@@ -21957,6 +22916,19 @@ static void initFlashPackage(SWFAppContext* app_context)
 	// flash.display
 	MAKE_PKG(display_obj, g_flash_object, "display", 7, 4);
 	MAKE_STUB_CTOR(fc_BitmapData, "BitmapData");
+	// Channel constants on BitmapData constructor
+	fc_BitmapData.own_props = allocObject(app_context, 8);
+	retainObject(fc_BitmapData.own_props);
+	{
+		ActionVar cv;
+		cv = makeF64(1); setProperty(app_context, fc_BitmapData.own_props, "RED_CHANNEL", 11, &cv);
+		cv = makeF64(2); setProperty(app_context, fc_BitmapData.own_props, "GREEN_CHANNEL", 13, &cv);
+		cv = makeF64(4); setProperty(app_context, fc_BitmapData.own_props, "BLUE_CHANNEL", 12, &cv);
+		cv = makeF64(8); setProperty(app_context, fc_BitmapData.own_props, "ALPHA_CHANNEL", 13, &cv);
+	}
+	// Set prototype_obj for BitmapData constructor
+	initBitmapDataPrototype(app_context);
+	fc_BitmapData.prototype_obj = g_bitmapdata_prototype;
 	SET_CTOR_PROP(display_obj, "BitmapData", 10, fc_BitmapData);
 
 	// flash.filters (10 filter classes)
@@ -28412,6 +29384,14 @@ void actionSetMember(SWFAppContext* app_context)
 			{
 				return;
 			}
+			// BitmapData: width, height, transparent, rectangle are read-only
+			if (obj->native_type == NATIVE_BITMAPDATA && prop_name_len >= 5) {
+				if ((prop_name_len == 5 && memcmp(prop_name, "width", 5) == 0) ||
+				    (prop_name_len == 6 && memcmp(prop_name, "height", 6) == 0) ||
+				    (prop_name_len == 11 && memcmp(prop_name, "transparent", 11) == 0) ||
+				    (prop_name_len == 9 && memcmp(prop_name, "rectangle", 9) == 0))
+					return;
+			}
 			// TextFormat instances apply per-property coercion
 			if (isTextFormatInstance(obj) && textFormatSetProperty(app_context, obj, prop_name, prop_name_len, &value_var))
 			{
@@ -30363,6 +31343,18 @@ void actionDelete(SWFAppContext* app_context)
 	{
 		obj = (ASObject*) obj_var.data.numeric_value;
 	}
+	else if (obj_var.type == ACTION_STACK_VALUE_FUNCTION)
+	{
+		// Delete from function's own_props
+		ASFunction* func = (ASFunction*) obj_var.data.numeric_value;
+		if (func != NULL && func->own_props != NULL) {
+			bool success = deleteProperty(app_context, func->own_props, prop_name, prop_name_len);
+			PUSH(ACTION_STACK_VALUE_BOOLEAN, success ? 1ULL : 0ULL);
+		} else {
+			PUSH(ACTION_STACK_VALUE_BOOLEAN, 1ULL);
+		}
+		return;
+	}
 	else if (obj_var.type == ACTION_STACK_VALUE_MOVIECLIP)
 	{
 		// Delete from MovieClip's dynamic_props
@@ -31135,6 +32127,39 @@ void actionGetMember(SWFAppContext* app_context)
 				}
 			}
 			if (!is_xml) {
+				// BitmapData computed properties (width, height, transparent, rectangle)
+				int bmp_handled = 0;
+				if (obj->native_type == NATIVE_BITMAPDATA) {
+					BitmapDataNative* bmp = getBitmapNative(obj);
+					if (prop_name_len == 5 && memcmp(prop_name, "width", 5) == 0) {
+						if (bmp && !bmp->disposed) { ActionVar v = makeF64(bmp->width); pushVar(app_context, &v); }
+						else { ActionVar v = makeF64(-1); pushVar(app_context, &v); }
+						bmp_handled = 1;
+					} else if (prop_name_len == 6 && memcmp(prop_name, "height", 6) == 0) {
+						if (bmp && !bmp->disposed) { ActionVar v = makeF64(bmp->height); pushVar(app_context, &v); }
+						else { ActionVar v = makeF64(-1); pushVar(app_context, &v); }
+						bmp_handled = 1;
+					} else if (prop_name_len == 11 && memcmp(prop_name, "transparent", 11) == 0) {
+						if (bmp && !bmp->disposed) {
+							ActionVar v = {0}; v.type = ACTION_STACK_VALUE_BOOLEAN;
+							v.data.numeric_value = bmp->transparent ? 1 : 0;
+							pushVar(app_context, &v);
+						} else { ActionVar v = makeF64(-1); pushVar(app_context, &v); }
+						bmp_handled = 1;
+					} else if (prop_name_len == 9 && memcmp(prop_name, "rectangle", 9) == 0) {
+						if (bmp && !bmp->disposed) {
+							initGeomPrototypes(app_context);
+							ActionVar rx = makeF64(0), ry = makeF64(0);
+							ActionVar rw = makeF64(bmp->width), rh = makeF64(bmp->height);
+							ASObject* rect = createRectObj(app_context, &rx, &ry, &rw, &rh);
+							ActionVar v = {0}; v.type = ACTION_STACK_VALUE_OBJECT;
+							v.data.numeric_value = (u64) rect;
+							pushVar(app_context, &v);
+						} else { ActionVar v = makeF64(-1); pushVar(app_context, &v); }
+						bmp_handled = 1;
+					}
+				}
+				if (!bmp_handled) {
 				// Geometry computed properties
 				int geom_handled = 0;
 				if (g_point_prototype != NULL || g_rect_prototype != NULL) {
@@ -31230,6 +32255,7 @@ void actionGetMember(SWFAppContext* app_context)
 						}
 					}
 				}
+				} // end if (!bmp_handled)
 			}
 		}
 	}
@@ -33951,7 +34977,8 @@ void actionNewMethod(SWFAppContext* app_context)
 	else if (ctor_name != NULL && strcmp(ctor_name, "BitmapData") == 0)
 	{
 		// Handle flash.display.BitmapData constructor
-		// BitmapData(width, height) — validates dimensions, returns object or undefined
+		// BitmapData(width, height, transparent, fillColor)
+		initBitmapDataPrototype(app_context);
 		if (num_args >= 2)
 		{
 			double w = varToDouble(&args[0]);
@@ -33963,15 +34990,31 @@ void actionNewMethod(SWFAppContext* app_context)
 				valid = (w >= 1 && w <= 2880 && h >= 1 && h <= 2880);
 			if (valid)
 			{
+				int iw = (int)w;
+				int ih = (int)h;
+				int transparent = 1; // default true
+				if (num_args >= 3) transparent = (int)varToDoubleSimple(&args[2]);
+				uint32_t fill_color = 0xFFFFFFFF; // default white opaque
+				if (num_args >= 4) fill_color = doubleToUint32(varToDoubleSimple(&args[3]));
+				if (!transparent) fill_color = fill_color | 0xFF000000;
 				ASObject* bmp = allocObject(app_context, 4);
 				bmp->native_type = NATIVE_BITMAPDATA;
-				setObjectProto(app_context, bmp);
-				// Store width/height as properties
-				ActionVar wv = {0}; wv.type = ACTION_STACK_VALUE_F64;
-				VAL(double, &wv.data.numeric_value) = w;
-				setProperty(app_context, bmp, "width", 5, &wv);
-				VAL(double, &wv.data.numeric_value) = h;
-				setProperty(app_context, bmp, "height", 6, &wv);
+				ActionVar proto_var = {0};
+				proto_var.type = ACTION_STACK_VALUE_OBJECT;
+				proto_var.data.numeric_value = (u64) g_bitmapdata_prototype;
+				setProperty(app_context, bmp, "__proto__", 9, &proto_var);
+				// Allocate pixel buffer
+				BitmapDataNative* native = (BitmapDataNative*) malloc(sizeof(BitmapDataNative));
+				native->width = iw;
+				native->height = ih;
+				native->transparent = (uint8_t)transparent;
+				native->disposed = 0;
+				size_t pxsize = (size_t)iw * (size_t)ih * sizeof(uint32_t);
+				native->pixels = (uint32_t*) malloc(pxsize);
+				// Fill with initial color (premultiplied)
+				uint32_t premul_fill = premultiplyAlpha(fill_color);
+				for (int i = 0; i < iw * ih; i++) native->pixels[i] = premul_fill;
+				bmp->native_data = native;
 				new_obj = bmp;
 				PUSH(ACTION_STACK_VALUE_OBJECT, (u64) new_obj);
 			}
@@ -35694,16 +36737,32 @@ static int invokeNativeSuperConstructor(SWFAppContext* app_context, ASFunction* 
 
 	// --- BitmapData ---
 	if (strcmp(name, "BitmapData") == 0) {
+		initBitmapDataPrototype(app_context);
 		if (obj->native_type == NATIVE_NONE)
 			obj->native_type = NATIVE_BITMAPDATA;
-		if (num_args > 0) {
-			ActionVar w = makeF64(varToDoubleSimple(&args[0]));
-			setProperty(app_context, obj, "width", 5, &w);
+		if (num_args >= 2) {
+			int iw = (int)varToDoubleSimple(&args[0]);
+			int ih = (int)varToDoubleSimple(&args[1]);
+			int transparent = 1;
+			if (num_args >= 3) transparent = (int)varToDoubleSimple(&args[2]);
+			uint32_t fill_color = 0xFFFFFFFF;
+			if (num_args >= 4) fill_color = doubleToUint32(varToDoubleSimple(&args[3]));
+			if (!transparent) fill_color = fill_color | 0xFF000000;
+			BitmapDataNative* native = (BitmapDataNative*) malloc(sizeof(BitmapDataNative));
+			native->width = iw;
+			native->height = ih;
+			native->transparent = (uint8_t)transparent;
+			native->disposed = 0;
+			size_t pxsize = (size_t)iw * (size_t)ih * sizeof(uint32_t);
+			native->pixels = (uint32_t*) malloc(pxsize);
+			for (int i = 0; i < iw * ih; i++) native->pixels[i] = fill_color;
+			obj->native_data = native;
 		}
-		if (num_args > 1) {
-			ActionVar h = makeF64(varToDoubleSimple(&args[1]));
-			setProperty(app_context, obj, "height", 6, &h);
-		}
+		// Set prototype
+		ActionVar proto_var = {0};
+		proto_var.type = ACTION_STACK_VALUE_OBJECT;
+		proto_var.data.numeric_value = (u64) g_bitmapdata_prototype;
+		setProperty(app_context, obj, "__proto__", 9, &proto_var);
 		out_result->type = ACTION_STACK_VALUE_OBJECT;
 		out_result->data.numeric_value = (u64)obj;
 		return 1;

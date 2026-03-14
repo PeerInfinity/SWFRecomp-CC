@@ -133,6 +133,7 @@ ASObject* allocObject(SWFAppContext* app_context, u32 initial_capacity)
 
 	// Initialize native type (NATIVE_NONE = pure ActionScript object)
 	obj->native_type = NATIVE_NONE;
+	obj->native_data = NULL;
 
 	// Allocate property array
 	if (initial_capacity > 0)
@@ -236,6 +237,17 @@ void releaseObject(SWFAppContext* app_context, ASObject* obj)
 		if (obj->properties != NULL)
 		{
 			free(obj->properties);
+		}
+
+		// Free native data (e.g., BitmapData pixel buffer)
+		if (obj->native_data != NULL)
+		{
+			if (obj->native_type == NATIVE_BITMAPDATA) {
+				// BitmapDataNative: first field is uint32_t* pixels
+				void** fields = (void**) obj->native_data;
+				if (fields[0] != NULL) free(fields[0]);
+			}
+			free(obj->native_data);
 		}
 
 		// Release interface objects
