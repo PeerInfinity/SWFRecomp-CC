@@ -1266,6 +1266,7 @@ void ng_computeScrollMixedFont(u16 font_id, u16 base_font_height, s16 leading_tw
 	// Process text: split on hard line breaks, word-wrap each
 	int cursor_y = 0;
 	size_t line_start = 0;
+	int last_line_was_empty = 0; // Track if last emitted line was a trailing empty line
 
 	for (size_t i = 0; i <= text_len; i++) {
 		int is_end = (i == text_len);
@@ -1275,6 +1276,20 @@ void ng_computeScrollMixedFont(u16 font_id, u16 base_font_height, s16 leading_tw
 		// Process hard line [line_start, i)
 		const char* hline = text + line_start;
 		size_t hline_len = i - line_start;
+
+		// Include the line terminator character's font height in the line's metrics.
+		// In Ruffle, the \r from </li> has the parent span's font properties, and
+		// newspan() updates max_ascent/max_descent before fixup_line is called.
+		u16 terminator_fh = 0;
+		if (is_newline && run_count > 0) {
+			for (int r = 0; r < run_count; r++) {
+				u32 rs = run_starts[r], rl = run_lengths[r];
+				if ((u32)i >= rs && (u32)i < rs + rl) {
+					terminator_fh = run_font_heights[r];
+					break;
+				}
+			}
+		}
 
 		if (!word_wrap || field_width_twips <= 0 || hline_len == 0) {
 			// No wrap or empty line: single visual line
@@ -1289,6 +1304,8 @@ void ng_computeScrollMixedFont(u16 font_id, u16 base_font_height, s16 leading_tw
 					}
 				}
 			}
+			// Include the line terminator's font height
+			if (terminator_fh > max_fh) max_fh = terminator_fh;
 			if (max_fh == 0) max_fh = base_font_height;
 			int asc = (int)((float)ng_fonts[fi].ascent * (float)max_fh / (float)em);
 			int desc = (int)((float)ng_fonts[fi].descent * (float)max_fh / (float)em);
@@ -1299,6 +1316,8 @@ void ng_computeScrollMixedFont(u16 font_id, u16 base_font_height, s16 leading_tw
 				lh += (int)leading_twips;
 			}
 
+			// Track if this is a trailing empty line (empty hard line at end of text)
+			last_line_was_empty = (hline_len == 0 && is_end);
 			if (total_visual_lines < MAX_LAYOUT_LINES) {
 				line_offsets[total_visual_lines] = cursor_y;
 				line_extents[total_visual_lines] = cursor_y + lh;
@@ -1439,6 +1458,8 @@ void ng_computeScrollMixedFont(u16 font_id, u16 base_font_height, s16 leading_tw
 			}
 
 			// Emit final visual line for this hard line
+			// Include the line terminator's font height in the last visual line
+			if (terminator_fh > cur_line_max_fh) cur_line_max_fh = terminator_fh;
 			u16 fh = cur_line_max_fh > 0 ? cur_line_max_fh : base_font_height;
 			int asc = (int)((float)ng_fonts[fi].ascent * (float)fh / (float)em);
 			int desc = (int)((float)ng_fonts[fi].descent * (float)fh / (float)em);
@@ -1462,18 +1483,26 @@ void ng_computeScrollMixedFont(u16 font_id, u16 base_font_height, s16 leading_tw
 		return;
 	}
 
-	// Compute text_height = last line's extent_y - first line's offset_y
-	int last_idx = (total_visual_lines - 1 < MAX_LAYOUT_LINES) ? total_visual_lines - 1 : MAX_LAYOUT_LINES - 1;
-	int text_height = line_extents[last_idx] - line_offsets[0];
+	// Compute full text_height (all lines) for scroll calculations
+	int full_last_idx = (total_visual_lines - 1 < MAX_LAYOUT_LINES) ? total_visual_lines - 1 : MAX_LAYOUT_LINES - 1;
+	int full_text_height = line_extents[full_last_idx] - line_offsets[0];
 
-	if (out_text_height_twips) *out_text_height_twips = text_height;
+	// For textHeight property: skip trailing empty line
+	// (Ruffle: non-input fields skip empty last line for text_size_bounds)
+	int reported_text_height = full_text_height;
+	if (last_line_was_empty && total_visual_lines > 1) {
+		int th_last_idx = (total_visual_lines - 2 < MAX_LAYOUT_LINES) ? total_visual_lines - 2 : MAX_LAYOUT_LINES - 1;
+		reported_text_height = line_extents[th_last_idx] - line_offsets[0];
+	}
+
+	if (out_text_height_twips) *out_text_height_twips = reported_text_height;
 
 	// Window height in twips (field height minus 2*GUTTER of 40 twips)
 	int window_height = (int)(field_height_pixels * 20.0f) - 80;
 	if (window_height <= 0) window_height = 1;
 
-	// maxscroll: first line where offset_y >= (text_height - window_height)
-	int target = text_height - window_height;
+	// maxscroll: use full text height (including trailing line) for scroll calculations
+	int target = full_text_height - window_height;
 	int maxscroll = 1;
 	if (target > 0) {
 		for (int i = 0; i < total_visual_lines && i < MAX_LAYOUT_LINES; i++) {

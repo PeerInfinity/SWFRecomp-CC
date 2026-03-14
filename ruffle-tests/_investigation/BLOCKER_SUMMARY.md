@@ -8,17 +8,16 @@ This document catalogs the root-cause blockers preventing further progress on th
 
 ## Active Blockers
 
-### Blocker 1: Font Metrics / Text Layout Accuracy
+### ~~Blocker 1: Font Metrics / Text Layout Accuracy~~ — RESOLVED
 
-**Impact**: 1 test, ~4 lines
-
-TextField textWidth/textHeight bounding box model differs by ~3px on mixed-font bullet lists. Ruffle uses baseline-aligned bounding box union; we use simpler offset/extent tracking.
+**Resolved 2026-03-14.** Three fixes:
+1. Preserve `_tf_leading` from `setTextFormat`/`setNewTextFormat` when `htmlText` is set (don't overwrite with HTML-parsed default)
+2. Include line terminator character's font height in per-line max (matching Ruffle's `newspan()` before `fixup_line()`)
+3. Skip trailing empty line from text height calculation (matching Ruffle's `is_line_empty && last_line` skip)
 
 | Test | Match | Lines Off |
 |------|-------|-----------|
-| edittext_bullet | 26/30 | 4 |
-
-**Plans blocked**: TEXTFIELD_PLAN
+| edittext_bullet | 30/30 | 0 |
 
 ---
 
@@ -148,6 +147,7 @@ When a TextField is cloned via `duplicateMovieClip`, the clone's MC doesn't have
 
 | Blocker | When | Key Result |
 |---------|------|------------|
+| Font metrics / text layout accuracy | 2026-03-14 | edittext_bullet 30/30 PASS |
 | Per-movie `_global` isolation | 2026-03-10 | CANCELLED — Ruffle shares `_global` |
 | MTASC class / recompiler infra | 2026-03-07 | All tests pass |
 | MC removal lifecycle / call() | 2026-03-05 | All tests pass |

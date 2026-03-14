@@ -30657,12 +30657,22 @@ void actionSetMember(SWFAppContext* app_context)
 							VAL(double, &fid_val.data.numeric_value) = (double)found_fid;
 							setProperty(app_context, props, "_tf_fontId", 10, &fid_val);
 						}
-						// Sync leading (htmlText replaces all text formatting; convert pixels → twips)
+						// Sync leading: only overwrite _tf_leading if the HTML explicitly specified
+						// a leading value (via <textformat> tag). Otherwise, preserve the existing
+						// _tf_leading from setTextFormat/setNewTextFormat. The first_run->leading
+						// comes from tf_get_defaults when no <textformat> is present, which doesn't
+						// account for dynamic _tf_leading set by setNewTextFormat.
 						{
-							ActionVar ld_val = {0};
-							ld_val.type = ACTION_STACK_VALUE_F64;
-							VAL(double, &ld_val.data.numeric_value) = (double)(first_run->leading * 20);
-							setProperty(app_context, props, "_tf_leading", 11, &ld_val);
+							ActionVar* existing_ld = getProperty(props, "_tf_leading", 11);
+							if (existing_ld == NULL || existing_ld->type != ACTION_STACK_VALUE_F64) {
+								// No existing leading set — use the parsed default
+								ActionVar ld_val = {0};
+								ld_val.type = ACTION_STACK_VALUE_F64;
+								VAL(double, &ld_val.data.numeric_value) = (double)(first_run->leading * 20);
+								setProperty(app_context, props, "_tf_leading", 11, &ld_val);
+							}
+							// If _tf_leading already exists (from setTextFormat/setNewTextFormat),
+							// keep it — it's more authoritative than the HTML-parsed default.
 						}
 					}
 
