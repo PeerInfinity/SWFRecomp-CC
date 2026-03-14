@@ -1,33 +1,21 @@
 # Ruffle Test Results Diff
 
-**Previous:** `60c48ae3a9f9` (2026-03-14T05:00:14.937376+00:00)
-**Current:** `d0c846e703f1` (2026-03-14T06:02:50.397613+00:00)
+**Previous:** `d0c846e703f1` (2026-03-14T06:02:50.397613+00:00)
+**Current:** `598e52348e3c` (2026-03-14T15:20:01.710516+00:00)
 
 ## Summary
 
 | Metric | Previous | Current | Delta |
 |--------|----------|---------|-------|
-| Passing | 539 | 539 | 0 |
+| Passing | 539 | 541 | +2 |
 | Total | 618 | 618 | 0 |
-| Pass rate | 87.2% | 87.2% | 0% |
-| Mismatched lines | 14443 | 14430 | -13 |
-|   Decreased | | | -17 |
-|   Increased | | | +4 |
+| Pass rate | 87.2% | 87.5% | +0.3% |
+| Mismatched lines | 14430 | 13429 | -1001 |
+|   Decreased | | | -1001 |
 
-## Newly Passing (1)
+## Newly Passing (2)
 
 | Test | Previous Status | Lines (prev) | Lines (now) |
 |------|----------------|--------------|-------------|
-| `bitmap_data_noise` | output_mismatch | 627/631 | 631/631 |
-
-## Newly Failing (1)
-
-| Test | New Status | Lines (prev) | Lines (now) |
-|------|-----------|--------------|-------------|
-| `bitmapdata_channels` | output_mismatch | 19/19 | 15/19 |
-
-## Line Count Changed (1)
-
-| Test | Status | Lines (prev) | Lines (now) | Diff |
-|------|--------|--------------|-------------|------|
-| `global_proto_decls_delete` | output_mismatch | 1/4158 | 14/4158 | -13 |
+| `global_swf5_6_7_8_9` | output_mismatch | 145/1145 | 1145/1145 |
+| `native_subclasses` | output_mismatch | 190/191 | 191/191 |
