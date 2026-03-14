@@ -8432,24 +8432,31 @@ static ActionVar bitmapDataHitTest(SWFAppContext* app_context, ActionVar* args, 
     if (!bmp || bmp->disposed) { r = makeF64(-1); return r; }
     if (arg_count < 3) { r = makeF64(-1); return r; }
     // arg0: firstPoint, arg1: firstAlphaThreshold, arg2: second object (Point, Rect, or BitmapData)
-    if (args[0].type != ACTION_STACK_VALUE_OBJECT) { r = makeF64(-1); return r; }
+    // Error -2: invalid firstPoint (not an object, null, or missing x/y)
+    if (args[0].type != ACTION_STACK_VALUE_OBJECT) { r = makeF64(-2); return r; }
     ASObject* first_pt = (ASObject*) args[0].data.numeric_value;
-    if (!first_pt) { r = makeF64(-1); return r; }
-    int first_alpha = (int)varToDoubleSimple(&args[1]);
+    if (!first_pt) { r = makeF64(-2); return r; }
     ActionVar* fpx = getProperty(first_pt, "x", 1);
     ActionVar* fpy = getProperty(first_pt, "y", 1);
-    int fx = fpx ? (int)varToDoubleSimple(fpx) : 0;
-    int fy = fpy ? (int)varToDoubleSimple(fpy) : 0;
-    if (args[2].type != ACTION_STACK_VALUE_OBJECT) { r.type = ACTION_STACK_VALUE_BOOLEAN; r.data.numeric_value = 0; return r; }
+    if (!fpx || !fpy) { r = makeF64(-2); return r; }
+    int first_alpha = (int)varToDoubleSimple(&args[1]);
+    int fx = (int)varToDoubleSimple(fpx);
+    int fy = (int)varToDoubleSimple(fpy);
+    // Error -3: invalid second object
+    if (args[2].type != ACTION_STACK_VALUE_OBJECT) { r = makeF64(-3); return r; }
     ASObject* second = (ASObject*) args[2].data.numeric_value;
-    if (!second) { r.type = ACTION_STACK_VALUE_BOOLEAN; r.data.numeric_value = 0; return r; }
+    if (!second) { r = makeF64(-3); return r; }
     BitmapDataNative* second_bmp = getBitmapNative(second);
-    if (second_bmp && !second_bmp->disposed) {
+    // Disposed second BitmapData → error -3
+    if (second_bmp && second_bmp->disposed) { r = makeF64(-3); return r; }
+    if (second_bmp) {
         // BitmapData vs BitmapData hit test
+        // Error -4: BitmapData vs BitmapData requires secondPoint (arg3)
         ASObject* second_pt = NULL;
         int second_alpha = 1;
         if (arg_count >= 4 && args[3].type == ACTION_STACK_VALUE_OBJECT)
             second_pt = (ASObject*) args[3].data.numeric_value;
+        if (!second_pt) { r = makeF64(-4); return r; }
         if (arg_count >= 5)
             second_alpha = (int)varToDoubleSimple(&args[4]);
         int sx = 0, sy = 0;
@@ -8483,8 +8490,10 @@ static ActionVar bitmapDataHitTest(SWFAppContext* app_context, ActionVar* args, 
         return r;
     }
     // Point or Rectangle hit test
+    // Error -3: second object must have x and y properties
     ActionVar* sx = getProperty(second, "x", 1);
     ActionVar* sy = getProperty(second, "y", 1);
+    if (!sx || !sy) { r = makeF64(-3); return r; }
     ActionVar* sw = getProperty(second, "width", 5);
     ActionVar* sh = getProperty(second, "height", 6);
     if (sw && sh) {
