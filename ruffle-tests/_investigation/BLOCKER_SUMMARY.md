@@ -1,6 +1,6 @@
 # Blocker Summary
 
-Last updated: 2026-03-13
+Last updated: 2026-03-14
 
 This document catalogs the root-cause blockers preventing further progress on the Ruffle AVM1 test suite. Each blocker maps to one or more plans in `blocked/`.
 
@@ -21,17 +21,13 @@ This document catalogs the root-cause blockers preventing further progress on th
 
 ---
 
-### Blocker 2: SWF6 HTML Paragraph Semantics
+### ~~Blocker 2: SWF6 HTML Paragraph Semantics~~ — RESOLVED
 
-**Impact**: 1 test, 88 lines
-
-SWF6 HTML serialization has remaining issues: trailing empty styled runs (`<B></B>`, `<FONT COLOR="#121212"></FONT>`) expected but omitted, and empty paragraph font/color defaults differ from Ruffle.
+**Resolved 2026-03-14.** SWF≤6 non-multiline mode already preserved paragraph breaks like multiline, but the HTML serializer's trailing marker emission (empty `<B></B>`, `<FONT COLOR="..."></FONT>` runs) and empty paragraph font attribute inheritance were gated on `is_multiline` only. Changed three conditions to `(is_multiline || swf_version < 7)`.
 
 | Test | Match | Lines Off |
 |------|-------|-----------|
-| edittext_html_swf6 | 5289/5377 | 88 |
-
-**Plans blocked**: HTML_TEXT_REMAINING_WORK
+| edittext_html_swf6 | 5377/5377 | 0 |
 
 ---
 
@@ -147,6 +143,7 @@ When a TextField is cloned via `duplicateMovieClip`, the clone's MC doesn't have
 
 | Blocker | When | Key Result |
 |---------|------|------------|
+| SWF6 HTML paragraph semantics | 2026-03-14 | edittext_html_swf6 5377/5377 PASS |
 | Font metrics / text layout accuracy | 2026-03-14 | edittext_bullet 30/30 PASS |
 | Per-movie `_global` isolation | 2026-03-10 | CANCELLED — Ruffle shares `_global` |
 | MTASC class / recompiler infra | 2026-03-07 | All tests pass |
@@ -164,8 +161,8 @@ When a TextField is cloned via `duplicateMovieClip`, the clone's MC doesn't have
 
 | Plan | Tests | Pass Rate | Primary Blocker |
 |------|-------|-----------|----------------|
-| TEXTFIELD_PLAN | 62 | 57/62 | Font metrics (Blocker 1) + SWF6 HTML (Blocker 2) |
-| HTML_TEXT_REMAINING_WORK | 10 | 9/10 | SWF6 HTML serialization (Blocker 2) |
+| TEXTFIELD_PLAN | 62 | 58/62 | Font metrics (Blocker 1, resolved) + SWF6 HTML (Blocker 2, resolved) |
+| HTML_TEXT_REMAINING_WORK | 10 | 10/10 | RESOLVED — SWF6 HTML serialization (Blocker 2) |
 | TYPE_COERCION_ADVANCED_PLAN | 2 | 1/2 | Closure capture (Blocker 3) |
 | GLOBALS_PLAN | 30 | 27/30 | Enumeration order + missing globals (Blocker 4) |
 | HIT_TESTING_PLAN | 17 | 12/17 | Pixel shape testing (Blocker 5) + loadMovie (Blocker 6) |

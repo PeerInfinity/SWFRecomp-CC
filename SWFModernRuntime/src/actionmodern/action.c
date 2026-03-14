@@ -15848,11 +15848,11 @@ static char* tf_serialize_html(TFRunTable* table, int is_multiline) {
 		else {
 			// For empty paragraphs, check for zero-length marker runs
 			// (from empty <font> tags like <font color="#111111"></font>)
-			// In singleline mode, skip the marker scan: merged tag breaks contain
-			// zero-length markers that shouldn't affect the outer font. The pfmt
-			// (from the \n break) already has the correct text field defaults.
+			// In singleline SWF7+ mode, skip the marker scan: merged tag breaks
+			// contain zero-length markers that shouldn't affect the outer font.
+			// SWF<=6 non-multiline preserves paragraph structure like multiline.
 			ofont = pfmt;
-			if (is_multiline) {
+			if (is_multiline || table->swf_version < 7) {
 				for (u32 ri = 0; ri < table->run_count; ri++) {
 					TFRun* r = &table->runs[ri];
 					if (r->length == 0 && r->start >= ps && r->start <= pe) {
@@ -16048,7 +16048,7 @@ static char* tf_serialize_html(TFRunTable* table, int is_multiline) {
 		}
 		// Emit trailing zero-length B/I/U markers (empty/break-only B/I/U tags)
 		// These appear as <B></B>, <I></I>, <U></U> after content in the paragraph.
-		if (prcnt > 0 && is_multiline) {
+		if (prcnt > 0 && (is_multiline || table->swf_version < 7)) {
 			TFRun* last_biu_marker = NULL;
 			for (u32 mi = 0; mi < table->run_count; mi++) {
 				TFRun* mr = &table->runs[mi];
@@ -16065,10 +16065,10 @@ static char* tf_serialize_html(TFRunTable* table, int is_multiline) {
 			}
 		}
 		// Emit trailing zero-length FONT marker (empty <font> tags in the paragraph)
-		// In multiline mode (all SWF versions) and singleline mode (SWF8+).
+		// In multiline mode (all SWF versions) and singleline SWF<=6 mode.
 		// Flash emits the LAST zero-length font marker in a non-empty paragraph
 		// as a trailing <FONT COLOR="..."></FONT>.
-		if (prcnt > 0 && is_multiline) {
+		if (prcnt > 0 && (is_multiline || table->swf_version < 7)) {
 			TFRun* last_marker = NULL;
 			for (u32 mi = 0; mi < table->run_count; mi++) {
 				TFRun* mr = &table->runs[mi];
