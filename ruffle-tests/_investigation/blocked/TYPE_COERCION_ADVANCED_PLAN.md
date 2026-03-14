@@ -35,16 +35,15 @@ Two tests exercise advanced type system edge cases: primitive-to-object automati
 
 ### Remaining Diffs
 
-#### instanceof_coercions (2/88 lines differ)
+#### ~~instanceof_coercions (2/88 lines differ)~~ RESOLVED
 
-1. **Line 40**: `.prototype is: super proto` vs `.prototype is: undefined` — `super.prototype` access in getter context returns undefined instead of resolving through super chain
-2. **Line 44**: `.prototype is: undefined` vs `.prototype is: SWFv9 proto` — ASSetPropFlags with flag 0x2000 should hide property at SWF8 but doesn't (FLASH_HIDE_MASK needs to include 0x2000)
+Now fully **PASS** (88/88). Both edge cases fixed since last update.
 
-Both are minor edge cases unlikely to affect real SWF content.
+#### coerce_to_object_monkeypatch (~115 diff lines, was ~244)
 
-#### coerce_to_object_monkeypatch (~244 diff lines)
+Progress from ~7/129 to ~20/129 matching lines (15%). Still **BLOCKED by closure variable capture**.
 
-**BLOCKED by closure variable capture**: The test uses `addGetter()` helper function that defines an inner getter function capturing outer function local variables (`name`, `val`). Our runtime uses stack-based variables — inner functions can't access outer function locals after the outer function returns. This is a fundamental architectural limitation requiring heap-allocated activation scopes.
+The test uses `addGetter()` helper function that defines an inner getter function capturing outer function local variables (`name`, `val`). Our runtime uses stack-based variables — inner functions can't access outer function locals after the outer function returns. This is a fundamental architectural limitation requiring heap-allocated activation scopes.
 
 The test structure:
 ```actionscript
@@ -53,13 +52,13 @@ function addGetter(obj, name, val) {
 }
 ```
 
-Our runtime returns `undefined` for `val` inside the getter because the stack frame is gone.
+Our runtime returns `undefined` for `val` inside the getter because the stack frame is gone. The `addGetter` pattern is used throughout the test to set up property getters that trace their name/value when accessed during auto-boxing. Without closure capture, these getters all return `undefined`, causing cascading mismatches.
+
+Additional minor issue at line 49: `new "callme"()` should trigger auto-boxing of the string primitive via the monkey-patched String constructor. We skip the boxing (2 lines missing), which shifts subsequent output.
 
 ### Blockers
 
-- **Closure variable capture** (FUNDAMENTAL): Would require heap-allocated activation scopes — a major architectural change to the runtime's variable storage model. This blocks ~100 lines of coerce_to_object_monkeypatch.
-- **super.prototype in getter context** (MINOR): 1 line in instanceof_coercions
-- **ASSetPropFlags 0x2000 hide mask** (MINOR): 1 line in instanceof_coercions
+- **Closure variable capture** (FUNDAMENTAL): Would require heap-allocated activation scopes — a major architectural change to the runtime's variable storage model. This blocks ~100 lines of coerce_to_object_monkeypatch. No workaround exists without this architectural change.
 
 ### Files Modified
 
