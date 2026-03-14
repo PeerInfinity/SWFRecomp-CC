@@ -6257,7 +6257,16 @@ static ActionVar pointConstructor(SWFAppContext* app_context, ActionVar* args, u
 {
 	(void)registers;
 	ASObject* obj = (ASObject*) this_obj;
-	if (obj == NULL) { ActionVar r = {0}; r.type = ACTION_STACK_VALUE_UNDEFINED; return r; }
+	if (obj == NULL) {
+		// Bare Point() call without new — act as factory function
+		initGeomPrototypes(app_context);
+		ActionVar x_val = (arg_count >= 1) ? args[0] : makeF64(0.0);
+		ActionVar y_val = (arg_count >= 2) ? args[1] : makeF64(0.0);
+		ASObject* pt = createPointObj(app_context, &x_val, &y_val);
+		ActionVar r = {0}; r.type = ACTION_STACK_VALUE_OBJECT;
+		r.data.numeric_value = (u64) pt;
+		return r;
+	}
 
 	if (arg_count == 0) {
 		ActionVar zero = makeF64(0.0);
@@ -6863,7 +6872,18 @@ static ActionVar rectangleConstructor(SWFAppContext* app_context, ActionVar* arg
 {
 	(void)registers;
 	ASObject* obj = (ASObject*) this_obj;
-	if (obj == NULL) { ActionVar r = {0}; r.type = ACTION_STACK_VALUE_UNDEFINED; return r; }
+	if (obj == NULL) {
+		// Bare Rectangle() call without new — act as factory function
+		initGeomPrototypes(app_context);
+		ActionVar x = (arg_count >= 1) ? args[0] : makeF64(0.0);
+		ActionVar y = (arg_count >= 2) ? args[1] : makeF64(0.0);
+		ActionVar w = (arg_count >= 3) ? args[2] : makeF64(0.0);
+		ActionVar h = (arg_count >= 4) ? args[3] : makeF64(0.0);
+		ASObject* rect = createRectObj(app_context, &x, &y, &w, &h);
+		ActionVar r = {0}; r.type = ACTION_STACK_VALUE_OBJECT;
+		r.data.numeric_value = (u64) rect;
+		return r;
+	}
 
 	static const char* names[] = {"x","y","width","height"};
 	static const u32 lens[] = {1,1,5,6};
@@ -8424,7 +8444,7 @@ static ActionVar bitmapDataHitTest(SWFAppContext* app_context, ActionVar* args, 
     ASObject* second = (ASObject*) args[2].data.numeric_value;
     if (!second) { r.type = ACTION_STACK_VALUE_BOOLEAN; r.data.numeric_value = 0; return r; }
     BitmapDataNative* second_bmp = getBitmapNative(second);
-    if (second_bmp) {
+    if (second_bmp && !second_bmp->disposed) {
         // BitmapData vs BitmapData hit test
         ASObject* second_pt = NULL;
         int second_alpha = 1;
