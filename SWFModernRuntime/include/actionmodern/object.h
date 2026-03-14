@@ -72,9 +72,6 @@ typedef struct ASObject
 
 	// Native backing type (0 = pure ActionScript object, >0 = native-backed)
 	u8 native_type;
-
-	// Native data pointer (used by NATIVE_BITMAPDATA etc. for backing storage)
-	void* native_data;
 } ASObject;
 
 struct ASProperty

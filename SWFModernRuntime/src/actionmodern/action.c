@@ -2088,10 +2088,34 @@ static ASObject* g_bitmapdata_prototype = NULL;
 static ASFunction g_bitmapdata_methods[28];
 static int g_bitmapdata_init_done = 0;
 
+// Side table for BitmapData native data (avoids modifying ASObject struct)
+#define MAX_BITMAP_NATIVES 256
+static struct { ASObject* obj; BitmapDataNative* native; } g_bitmap_natives[MAX_BITMAP_NATIVES];
+static int g_bitmap_native_count = 0;
+
+static void setBitmapNative(ASObject* obj, BitmapDataNative* native)
+{
+    // Check if already registered
+    for (int i = 0; i < g_bitmap_native_count; i++) {
+        if (g_bitmap_natives[i].obj == obj) {
+            g_bitmap_natives[i].native = native;
+            return;
+        }
+    }
+    if (g_bitmap_native_count < MAX_BITMAP_NATIVES) {
+        g_bitmap_natives[g_bitmap_native_count].obj = obj;
+        g_bitmap_natives[g_bitmap_native_count].native = native;
+        g_bitmap_native_count++;
+    }
+}
+
 static inline BitmapDataNative* getBitmapNative(ASObject* obj)
 {
     if (obj == NULL || obj->native_type != NATIVE_BITMAPDATA) return NULL;
-    return (BitmapDataNative*) obj->native_data;
+    for (int i = 0; i < g_bitmap_native_count; i++) {
+        if (g_bitmap_natives[i].obj == obj) return g_bitmap_natives[i].native;
+    }
+    return NULL;
 }
 
 // Convert double to uint32 for pixel color values (ECMA-262 ToUint32)
@@ -7855,7 +7879,7 @@ static ActionVar bitmapDataClone(SWFAppContext* app_context, ActionVar* args, u3
     size_t pxsize = (size_t)bmp->width * (size_t)bmp->height * sizeof(uint32_t);
     clone_bmp->pixels = (uint32_t*) malloc(pxsize);
     memcpy(clone_bmp->pixels, bmp->pixels, pxsize);
-    clone_obj->native_data = clone_bmp;
+    setBitmapNative(clone_obj, clone_bmp);
     r.type = ACTION_STACK_VALUE_OBJECT;
     r.data.numeric_value = (u64) clone_obj;
     return r;
@@ -8120,6 +8144,16 @@ static ActionVar bitmapDataNoise(SWFAppContext* app_context, ActionVar* args, u3
     // Seed handling: if seed <= 0, use -seed + 1
     uint32_t rng_state = (seed <= 0) ? (uint32_t)(-seed + 1) : (uint32_t)seed;
     // Lehmer RNG helper macros
+    if (low > high) {
+        // Flash: when low > high, fill every pixel with low value
+        for (int py = 0; py < bmp->height; py++) {
+            for (int px = 0; px < bmp->width; px++) {
+                uint32_t nc = (0xFFU << 24) | ((uint32_t)low << 16) | ((uint32_t)low << 8) | (uint32_t)low;
+                bmp->pixels[py * bmp->width + px] = premultiplyAlpha(nc);
+            }
+        }
+        return r;
+    }
     #define LEHMER_NEXT(s) (s = (uint32_t)(((uint64_t)(s) * 16807ULL) % 2147483647ULL))
     #define LEHMER_RANGE(s, lo, hi) ((lo) + (uint8_t)(LEHMER_NEXT(s) % ((uint32_t)((hi) - (lo)) + 1)))
     for (int py = 0; py < bmp->height; py++) {
@@ -8209,7 +8243,7 @@ static ActionVar bitmapDataCompare(SWFAppContext* app_context, ActionVar* args, 
             }
         }
     }
-    diff_obj->native_data = diff_bmp;
+    setBitmapNative(diff_obj, diff_bmp);
     r.type = ACTION_STACK_VALUE_OBJECT;
     r.data.numeric_value = (u64) diff_obj;
     return r;
@@ -22937,7 +22971,7 @@ static void initFlashPackage(SWFAppContext* app_context)
 		cv = makeF64(4); setProperty(app_context, fc_BitmapData.own_props, "BLUE_CHANNEL", 12, &cv);
 		cv = makeF64(8); setProperty(app_context, fc_BitmapData.own_props, "ALPHA_CHANNEL", 13, &cv);
 	}
-	// Set prototype_obj for BitmapData constructor
+	// Initialize prototype for instanceof support (methods added lazily)
 	initBitmapDataPrototype(app_context);
 	fc_BitmapData.prototype_obj = g_bitmapdata_prototype;
 	SET_CTOR_PROP(display_obj, "BitmapData", 10, fc_BitmapData);
@@ -31354,18 +31388,6 @@ void actionDelete(SWFAppContext* app_context)
 	{
 		obj = (ASObject*) obj_var.data.numeric_value;
 	}
-	else if (obj_var.type == ACTION_STACK_VALUE_FUNCTION)
-	{
-		// Delete from function's own_props
-		ASFunction* func = (ASFunction*) obj_var.data.numeric_value;
-		if (func != NULL && func->own_props != NULL) {
-			bool success = deleteProperty(app_context, func->own_props, prop_name, prop_name_len);
-			PUSH(ACTION_STACK_VALUE_BOOLEAN, success ? 1ULL : 0ULL);
-		} else {
-			PUSH(ACTION_STACK_VALUE_BOOLEAN, 1ULL);
-		}
-		return;
-	}
 	else if (obj_var.type == ACTION_STACK_VALUE_MOVIECLIP)
 	{
 		// Delete from MovieClip's dynamic_props
@@ -35025,7 +35047,7 @@ void actionNewMethod(SWFAppContext* app_context)
 				// Fill with initial color (premultiplied)
 				uint32_t premul_fill = premultiplyAlpha(fill_color);
 				for (int i = 0; i < iw * ih; i++) native->pixels[i] = premul_fill;
-				bmp->native_data = native;
+				setBitmapNative(bmp, native);
 				new_obj = bmp;
 				PUSH(ACTION_STACK_VALUE_OBJECT, (u64) new_obj);
 			}
@@ -36768,7 +36790,7 @@ static int invokeNativeSuperConstructor(SWFAppContext* app_context, ASFunction* 
 			native->pixels = (uint32_t*) malloc(pxsize);
 			uint32_t premul_fill2 = premultiplyAlpha(fill_color);
 			for (int i = 0; i < iw * ih; i++) native->pixels[i] = premul_fill2;
-			obj->native_data = native;
+			setBitmapNative(obj, native);
 		}
 		// Set prototype
 		ActionVar proto_var = {0};

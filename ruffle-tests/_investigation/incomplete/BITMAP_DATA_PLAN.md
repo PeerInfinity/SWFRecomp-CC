@@ -3,7 +3,7 @@
 
 Last updated: 2026-03-13
 
-## Status: INCOMPLETE — 8/17 tests passing, Phases 1-2 actionable
+## Status: INCOMPLETE — 10/17 tests passing, Phase 1 mostly done
 
 ### Current Results
 
@@ -17,325 +17,66 @@ Last updated: 2026-03-13
 | bitmap_data_max_size_swf9 | 10 | **PASS** | Constructor validation |
 | bitmap_data_max_size_swf10 | 12 | **PASS** | Constructor validation |
 | textfield_cache_as_bitmap | 1 | **PASS** | Property existence check |
-| bitmap_data | 1126 | FAIL (~2211 diff) | Core methods + properties |
-| bitmapdata_channels | 19 | FAIL | Channel constants |
-| bitmap_data_compare | 41 | FAIL | compare() method |
-| bitmap_data_copypixels | 17 | FAIL | copyPixels() method |
-| bitmap_data_hittest | 133 | FAIL | hitTest() method |
-| bitmap_data_noise | 631 | FAIL | noise() PRNG |
-| bitmap_data_pixeldissolve | 1075 | FAIL | pixelDissolve() PRNG |
-| bitmap_data_threshold | 176 | FAIL | threshold() method |
+| bitmapdata_channels | 19 | **PASS** | Channel constants + flags ✅ NEW |
+| bitmap_data_compare | 41 | **PASS** | compare() method ✅ NEW |
+| bitmap_data | 1126 | FAIL (1/1126 diff) | 1 getColorBoundsRect line off |
+| bitmap_data_copypixels | 17 | FAIL (5 diff) | Premultiply precision in copied pixels |
+| bitmap_data_noise | 631 | FAIL (4 diff) | noise(low>high) edge case |
+| bitmap_data_threshold | 176 | FAIL (129 diff) | copySource path not copying pixels |
+| bitmap_data_hittest | 133 | SEGFAULT | Crash in hitTest edge cases |
+| bitmap_data_pixeldissolve | 1075 | FAIL (1967 diff) | PRNG algorithm mismatch |
 | bitmap_filters | 548 | SEGFAULT | Filter .clone() crash |
 
-### What exists today
+### What was implemented
 
-The constructor validates width/height and creates an ASObject with `native_type = NATIVE_BITMAPDATA`, storing `width` and `height` as float properties. There is no pixel buffer, no pixel operations, and no prototype methods.
-
----
-
-## Phase 1: Core BitmapData Structure + Properties + Pixel Ops
-
-**Goal:** Implement the pixel buffer, read-only properties, and basic pixel methods. Fixes `bitmap_data` (~1126 lines) and `bitmapdata_channels` (19 lines).
-
-### 1a. Pixel buffer storage
-
-Add a pixel buffer to the BitmapData ASObject. Store a `uint32_t*` pointer and metadata alongside the ASObject:
-
-```c
-// Stored as native data on the ASObject (keyed by native_type == NATIVE_BITMAPDATA)
-typedef struct {
-    uint32_t* pixels;    // ARGB pixel data, row-major
-    int32_t width;
-    int32_t height;
-    uint8_t transparent; // 0 = opaque (alpha always 0xFF), 1 = transparent
-    uint8_t disposed;    // 1 = disposed (all operations return -1)
-} BitmapDataNative;
-```
-
-Store the `BitmapDataNative*` pointer in an unused field on the ASObject (e.g., a native data pointer), or use a side table indexed by a serial ID stored in a property.
-
-**Constructor changes:**
-- Allocate `width * height * sizeof(uint32_t)` pixel buffer
-- 3rd arg = transparent (bool, default `true`)
-- 4th arg = fill color (uint32, default `0xFFFFFFFF` if transparent, `0xFFFFFFFF` if not)
-- Non-transparent bitmaps: force alpha to 0xFF on all writes
-- Store width/height as integers (not floats)
-
-### 1b. Read-only properties
-
-| Property | Type | Behavior |
-|----------|------|----------|
-| `width` | int | Read-only. Returns pixel width (integer, not float). Setter is ignored. |
-| `height` | int | Read-only. Returns pixel height (integer). Setter is ignored. |
-| `transparent` | bool | Read-only. Set at construction. |
-| `rectangle` | Rectangle | Read-only. Returns `new Rectangle(0, 0, width, height)` each time. |
-
-`width` and `height` must return integers (the test expects `10`, not `10.5`). The current code stores them as float F64 properties — need to use integer storage or coerce on read.
-
-### 1c. Channel constants
-
-Register static properties on `flash.display.BitmapData`:
-
-```
-BitmapData.RED_CHANNEL = 1
-BitmapData.GREEN_CHANNEL = 2
-BitmapData.BLUE_CHANNEL = 4
-BitmapData.ALPHA_CHANNEL = 8
-```
-
-These should be non-enumerable, non-deletable properties. The `bitmapdata_channels` test checks both the values and ASSetPropFlags behavior.
-
-### 1d. Pixel read/write methods
-
-```c
-// getPixel(x, y) → int (RGB, no alpha)
-// Returns 0 for out-of-bounds. Returns -1 if disposed.
-int getPixel(BitmapDataNative* bmp, int x, int y) {
-    if (bmp->disposed) return -1;
-    if (x < 0 || x >= bmp->width || y < 0 || y >= bmp->height) return 0;
-    return bmp->pixels[y * bmp->width + x] & 0x00FFFFFF;
-}
-
-// getPixel32(x, y) → int (ARGB as signed 32-bit)
-// Flash returns as signed int: 0xFFFFFFFF → -1, 0x80FFFFFF → -2130706433
-int32_t getPixel32(BitmapDataNative* bmp, int x, int y) {
-    if (bmp->disposed) return -1;
-    if (x < 0 || x >= bmp->width || y < 0 || y >= bmp->height) return 0;
-    return (int32_t)bmp->pixels[y * bmp->width + x];
-}
-
-// setPixel(x, y, color) — sets RGB, preserves existing alpha
-void setPixel(BitmapDataNative* bmp, int x, int y, uint32_t color) {
-    if (bmp->disposed || x < 0 || x >= bmp->width || y < 0 || y >= bmp->height) return;
-    uint32_t existing = bmp->pixels[y * bmp->width + x];
-    bmp->pixels[y * bmp->width + x] = (existing & 0xFF000000) | (color & 0x00FFFFFF);
-}
-
-// setPixel32(x, y, color) — sets full ARGB
-// Non-transparent bitmaps: force alpha to 0xFF
-void setPixel32(BitmapDataNative* bmp, int x, int y, uint32_t color) {
-    if (bmp->disposed || x < 0 || x >= bmp->width || y < 0 || y >= bmp->height) return;
-    if (!bmp->transparent) color = color | 0xFF000000;
-    bmp->pixels[y * bmp->width + x] = color;
-}
-```
-
-### 1e. fillRect, clone, dispose
-
-```c
-// fillRect(rect, color) — fills rectangle with color
-// rect is a Rectangle or plain {x, y, width, height} object
-// Non-transparent: force alpha to 0xFF
-// Clips to bitmap bounds
-
-// clone() — returns new BitmapData with copied pixels
-// Preserves transparent flag
-
-// dispose() — frees pixel buffer, marks as disposed
-// All subsequent operations return -1 or undefined
-```
-
-### 1f. copyChannel
-
-```c
-// copyChannel(src, srcRect, destPoint, sourceChannel, destChannel)
-// sourceChannel/destChannel: 1=R, 2=G, 4=B, 8=A
-// Copies channel bits from source to destination channel
-// 16 possible combinations (4 source × 4 dest channels)
-```
-
-### Tests fixed by Phase 1
-
-- **bitmap_data** (1126 lines) — Core test covering all Phase 1 features
-- **bitmapdata_channels** (19 lines) — Channel constants
-
-**Estimated line gain: ~1145 lines**
+Full BitmapData pixel buffer with premultiplied alpha:
+- `BitmapDataNative` struct with `uint32_t* pixels`, width, height, transparent, disposed
+- `void* native_data` field added to ASObject for native backing storage
+- Constructor validates dimensions, allocates pixel buffer, handles transparent/fill args
+- Read-only properties: width, height, transparent, rectangle (intercepted in actionGetMember)
+- Write protection in actionSetMember for width/height/transparent/rectangle
+- Pixel read: unpremultiplyAlpha on getPixel/getPixel32
+- Pixel write: premultiplyAlpha on setPixel/setPixel32/fillRect/floodFill/noise
+- Prototype methods: getPixel, getPixel32, setPixel, setPixel32, fillRect, clone, dispose, copyChannel, floodFill, colorTransform, getColorBoundsRect, noise, compare, copyPixels, threshold, hitTest, pixelDissolve + stubs for draw/scroll/merge/etc.
+- Disposed state returns -1 for most operations
+- Channel constants (RED/GREEN/BLUE/ALPHA_CHANNEL) on BitmapData constructor's own_props
+- BitmapData prototype chain → Object.prototype
+- doubleToUint32 helper for proper ECMA-262 ToUint32 conversion
+- Fixed actionDelete to handle FUNCTION type (operate on own_props)
 
 ---
 
-## Phase 2: Comparison and Copy Operations
+## Remaining Blockers
 
-**Goal:** Implement compare, copyPixels, threshold. Fixes 3 more tests.
+### 1. bitmap_data (1/1126 diff)
+**getColorBoundsRect**: Line 883 returns `(0,0,1,1)` instead of `(0,0,0,0)`. Pixel state tracking issue — the test recreates bitmaps between getColorBoundsRect calls but the bitmap state differs by 1 pixel. Root cause unclear.
 
-### 2a. compare(otherBitmapData)
+### 2. bitmap_data_copypixels (5/17 diff)
+**Premultiply precision**: Copied pixels show different values due to premultiply→unpremultiply round-trip losses. Needs investigation into whether copyPixels should copy raw premultiplied data or un-multiply then re-premultiply.
 
-Returns:
-- `0` — identical pixels
-- `-1` — first bitmap disposed/invalid
-- `-2` — second bitmap disposed/invalid
-- `-3` — different widths
-- `-4` — different heights
-- BitmapData object — containing XOR of differing pixels (if pixels differ)
+### 3. bitmap_data_noise (4/631 diff)
+**noise(low > high)**: When `low > high`, Flash appears to fill with `low` value (or no-op). Our Lehmer PRNG generates wrapped values. Fix: handle `low >= high` edge case.
 
-For trace-only mode, we can return the integer codes and a new BitmapData for pixel diffs.
+### 4. bitmap_data_threshold (129/176 diff)
+**copySource not working**: The threshold `copySource=true` path isn't copying source pixels when threshold fails. Root cause: arg ordering or validation logic preventing the copy path from executing. Needs deeper investigation of how the prototype method receives args.
 
-### 2b. copyPixels(src, srcRect, destPoint, alphaBmp, alphaPoint, mergeAlpha)
+### 5. bitmap_data_hittest (SEGFAULT)
+**Crash in hitTest edge cases**: Likely accessing invalid memory when hitTest gets unusual arguments (valueOf objects, undefined params). Needs defensive null checks.
 
-Copies rectangular region of pixels from source to destination. Handles:
-- Source/dest clipping
-- Alpha bitmap overlay (optional)
-- Merge alpha flag
+### 6. bitmap_data_pixeldissolve (1967/1075 diff — more diff lines than expected lines)
+**PRNG mismatch**: The pixelDissolve algorithm doesn't match Flash's visited-pixel tracking. Flash uses a specific pattern for selecting unvisited pixels that our simple `rng % total` approach doesn't replicate.
 
-### 2c. threshold(src, srcRect, destPoint, operation, threshold, color, mask, copySource)
-
-Compares each pixel against threshold value using operation ("==", "!=", "<", "<=", ">", ">="). If comparison passes, writes fill color; if not and copySource is true, copies source pixel. Returns count of modified pixels.
-
-### Tests fixed by Phase 2
-
-- **bitmap_data_compare** (41 lines)
-- **bitmap_data_copypixels** (17 lines)
-- **bitmap_data_threshold** (176 lines)
-
-**Estimated line gain: ~234 lines**
+### 7. bitmap_filters (SEGFAULT)
+**Filter .clone() crash**: Not BitmapData-specific — filter objects (BevelFilter, BlurFilter etc.) don't have clone() methods, causing NULL dereference. Separate issue from BitmapData.
 
 ---
 
-## Phase 3: PRNG-Based Operations
+## Implementation Priority (remaining work)
 
-**Goal:** Implement noise and pixelDissolve with exact PRNG matching. Fixes 2 more tests.
-
-### 3a. Lehmer/Park-Miller PRNG
-
-Flash uses a Lehmer PRNG with fixed parameters. Must match exactly for deterministic output:
-
-```c
-typedef struct {
-    uint32_t x;
-} LehmerRng;
-
-void lehmer_init(LehmerRng* rng, uint32_t seed) {
-    rng->x = seed;
-}
-
-uint32_t lehmer_next(LehmerRng* rng) {
-    rng->x = (uint32_t)(((uint64_t)rng->x * 16807ULL) % 2147483647ULL);
-    return rng->x;
-}
-
-uint8_t lehmer_range(LehmerRng* rng, uint8_t low, uint8_t high) {
-    return low + (uint8_t)(lehmer_next(rng) % ((uint32_t)(high - low) + 1));
-}
-```
-
-### 3b. noise(seed, low, high, channelOptions, grayScale)
-
-```c
-// Seed handling: if seed <= 0, use -seed + 1
-// Per-pixel generation:
-//   For each pixel (row-major order):
-//     If grayScale:
-//       gray = lehmer_range(rng, low, high)
-//       R = G = B = gray (if channel in channelOptions, else 0)
-//       A = lehmer_range(rng, low, high) if ALPHA in channelOptions, else 0xFF
-//     Else:
-//       R = lehmer_range(rng, low, high) if RED in channelOptions, else 0
-//       G = lehmer_range(rng, low, high) if GREEN in channelOptions, else 0
-//       B = lehmer_range(rng, low, high) if BLUE in channelOptions, else 0
-//       A = lehmer_range(rng, low, high) if ALPHA in channelOptions, else 0xFF
-```
-
-The exact per-pixel call order must match Flash/Ruffle. The test checks specific pixel values at specific coordinates.
-
-### 3c. pixelDissolve(src, srcRect, destPoint, seed, numPixels, fillColor)
-
-Uses the same Lehmer PRNG to select random pixel positions. Each call:
-1. Randomly selects `numPixels` unvisited pixels
-2. Either copies from source or fills with fillColor
-3. Returns count of pixels actually modified
-4. Uses a visited-pixel tracking bitmask
-
-The PRNG-based position selection must match Flash's algorithm exactly. Ruffle's implementation in `bitmap_data_operations.rs` uses the Lehmer RNG to generate (x, y) coordinates.
-
-### Tests fixed by Phase 3
-
-- **bitmap_data_noise** (631 lines)
-- **bitmap_data_pixeldissolve** (1075 lines)
-
-**Estimated line gain: ~1706 lines**
-
----
-
-## Phase 4: HitTest + Filters
-
-**Goal:** Implement pixel-level hitTest and fix filter segfault. Fixes 2 more tests.
-
-### 4a. hitTest(firstPoint, firstAlphaThreshold, secondObject, secondPoint, secondAlphaThreshold)
-
-Tests pixel-level overlap between two BitmapData objects (or a BitmapData and a Point/Rectangle):
-1. For each pixel in the intersection region
-2. Check if pixel alpha >= alphaThreshold for both bitmaps
-3. Return true if any pixel passes both thresholds
-
-### 4b. Filter clone() segfault fix
-
-The `bitmap_filters` test segfaults on filter `.clone()`. This is likely a missing method on filter objects (BevelFilter, BlurFilter, etc.) — calling `.clone()` dereferences a NULL function pointer. Need to investigate and add clone methods to filter prototype objects.
-
-### Tests fixed by Phase 4
-
-- **bitmap_data_hittest** (133 lines)
-- **bitmap_filters** (548 lines) — after segfault fix + filter property implementation
-
-**Estimated line gain: ~681 lines**
-
----
-
-## Phase 5: Advanced Operations (deferred)
-
-These operations have 0 expected output lines (image comparison tests) so they already pass. Listed for completeness:
-
-- `colorTransform(rect, colorTransform)` — applies ColorTransform to pixel region
-- `applyFilter(src, srcRect, destPoint, filter)` — applies BitmapFilter
-- `perlinNoise(baseX, baseY, numOctaves, seed, stitch, fractalNoise, channelOptions, grayScale, offsets)` — Perlin noise
-- `floodFill(x, y, color)` — flood fill from point
-- `scroll(x, y)` — scrolls pixel content
-- `merge(src, srcRect, destPoint, redMult, greenMult, blueMult, alphaMult)` — per-channel merge
-- `paletteMap(src, srcRect, destPoint, redArray, greenArray, blueArray, alphaArray)` — palette lookup
-- `draw(source, matrix, colorTransform, blendMode, clipRect, smooth)` — renders display object to bitmap
-- `generateFilterRect(srcRect, filter)` — computes output rect for filter
-- `getColorBoundsRect(mask, color, findColor)` — finds bounding rect of matching pixels
-
----
-
-## Implementation Priority
-
-```
-Phase 1 (pixel buffer + properties + pixel ops)
-    │
-    ├──→ Phase 2 (compare, copyPixels, threshold)
-    │
-    ├──→ Phase 3 (noise, pixelDissolve)    [independent]
-    │
-    └──→ Phase 4 (hitTest, filters)        [independent]
-```
-
-Phase 1 is the prerequisite for all others. Phases 2-4 are independent of each other.
-
-## Estimated Test Impact
-
-| Phase | Tests Fixed | Lines Gained | Cumulative |
-|-------|-----------|-------------|------------|
-| 1 | bitmap_data, bitmapdata_channels | ~1145 | ~1145 |
-| 2 | bitmap_data_compare, bitmap_data_copypixels, bitmap_data_threshold | ~234 | ~1379 |
-| 3 | bitmap_data_noise, bitmap_data_pixeldissolve | ~1706 | ~3085 |
-| 4 | bitmap_data_hittest, bitmap_filters | ~681 | ~3766 |
-
-**Total potential: ~3766 lines gained, 9 additional tests passing (17/17 total).**
-
-## Files to Modify
-
-| File | Changes |
-|------|---------|
-| `SWFModernRuntime/src/actionmodern/action.c` | BitmapData constructor rewrite, prototype methods (getPixel, setPixel, getPixel32, setPixel32, fillRect, clone, dispose, copyChannel, compare, copyPixels, threshold, noise, pixelDissolve, hitTest), channel constants, pixel buffer management |
-| `SWFModernRuntime/include/actionmodern/action.h` | BitmapDataNative struct, function declarations |
-
-No recompiler changes needed — BitmapData is constructed entirely from ActionScript.
-
-## Design Decisions
-
-1. **Pixel buffer storage:** Use a side-allocated `BitmapDataNative*` stored via a property on the ASObject (e.g. `__native__` with a pointer cast to u64). This avoids modifying the ASObject struct. The `dispose()` method frees the pixel buffer and sets the disposed flag.
-
-2. **Memory limits:** Cap total bitmap allocation at a reasonable limit (e.g., 64MB) to prevent OOM from pathological test inputs. The SWF9 max is 2880×2880 = ~32MB per bitmap.
-
-3. **PRNG exactness:** The Lehmer PRNG must use `uint64_t` intermediate multiplication to avoid overflow. The modulus (2^31 - 1) and multiplier (16807) are fixed Flash constants. Any deviation produces cascading failures across all noise/dissolve pixel values.
-
-4. **Signed int output:** `getPixel32` returns pixels as signed 32-bit integers per Flash convention. `0xFFFF0000` = `-65536`, `0xFFFFFFFF` = `-1`. Use `(int32_t)` cast.
+1. **noise edge case** (4 lines) — Handle low >= high in noise PRNG
+2. **threshold copySource** (129 lines) — Debug arg passing to threshold method
+3. **copypixels precision** (5 lines) — Fix premultiply round-trip
+4. **getColorBoundsRect** (1 line) — Very subtle state tracking issue
+5. **hitTest segfault** (133 lines) — Add null checks, fix arg parsing
+6. **pixelDissolve PRNG** (1075 lines) — Requires exact Flash visited-pixel tracking algorithm
+7. **bitmap_filters** (548 lines) — Separate issue, needs filter .clone() implementation
