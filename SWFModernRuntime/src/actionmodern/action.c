@@ -6234,6 +6234,23 @@ static void registerGeomMethod(ASFunction* func, const char* name, Function2Ptr 
 	setProperty(app_context, proto, name, (u32)strlen(name), &fv);
 }
 
+// Like registerGeomMethod but does NOT add to global function_registry.
+// Used for BitmapData methods to avoid polluting the registry and causing
+// lookupFunctionByName collisions with user-defined functions.
+static void registerProtoMethod(ASFunction* func, const char* name, Function2Ptr impl, SWFAppContext* app_context, ASObject* proto)
+{
+	memset(func, 0, sizeof(ASFunction));
+	strncpy(func->name, name, 255);
+	func->function_type = 2;
+	func->param_count = 0;
+	func->advanced_func = impl;
+	// Intentionally NOT adding to function_registry
+	ActionVar fv = {0};
+	fv.type = ACTION_STACK_VALUE_FUNCTION;
+	VAL(u64, &fv.data.numeric_value) = (u64)func;
+	setProperty(app_context, proto, name, (u32)strlen(name), &fv);
+}
+
 // --- Point methods ---
 
 static ActionVar pointConstructor(SWFAppContext* app_context, ActionVar* args, u32 arg_count, ActionVar* registers, void* this_obj)
@@ -8635,31 +8652,31 @@ static void initBitmapDataPrototype(SWFAppContext* app_context)
     setObjectProto(app_context, g_bitmapdata_prototype);
 
     int mi = 0;
-    registerGeomMethod(&g_bitmapdata_methods[mi++], "getPixel",            (Function2Ptr)bitmapDataGetPixel,            app_context, g_bitmapdata_prototype);
-    registerGeomMethod(&g_bitmapdata_methods[mi++], "getPixel32",          (Function2Ptr)bitmapDataGetPixel32,          app_context, g_bitmapdata_prototype);
-    registerGeomMethod(&g_bitmapdata_methods[mi++], "setPixel",            (Function2Ptr)bitmapDataSetPixel,            app_context, g_bitmapdata_prototype);
-    registerGeomMethod(&g_bitmapdata_methods[mi++], "setPixel32",          (Function2Ptr)bitmapDataSetPixel32,          app_context, g_bitmapdata_prototype);
-    registerGeomMethod(&g_bitmapdata_methods[mi++], "fillRect",            (Function2Ptr)bitmapDataFillRect,            app_context, g_bitmapdata_prototype);
-    registerGeomMethod(&g_bitmapdata_methods[mi++], "clone",               (Function2Ptr)bitmapDataClone,               app_context, g_bitmapdata_prototype);
-    registerGeomMethod(&g_bitmapdata_methods[mi++], "dispose",             (Function2Ptr)bitmapDataDispose,             app_context, g_bitmapdata_prototype);
-    registerGeomMethod(&g_bitmapdata_methods[mi++], "copyChannel",         (Function2Ptr)bitmapDataCopyChannel,         app_context, g_bitmapdata_prototype);
-    registerGeomMethod(&g_bitmapdata_methods[mi++], "floodFill",           (Function2Ptr)bitmapDataFloodFill,           app_context, g_bitmapdata_prototype);
-    registerGeomMethod(&g_bitmapdata_methods[mi++], "colorTransform",      (Function2Ptr)bitmapDataColorTransform,      app_context, g_bitmapdata_prototype);
-    registerGeomMethod(&g_bitmapdata_methods[mi++], "getColorBoundsRect",  (Function2Ptr)bitmapDataGetColorBoundsRect,  app_context, g_bitmapdata_prototype);
-    registerGeomMethod(&g_bitmapdata_methods[mi++], "noise",               (Function2Ptr)bitmapDataNoise,               app_context, g_bitmapdata_prototype);
-    registerGeomMethod(&g_bitmapdata_methods[mi++], "compare",             (Function2Ptr)bitmapDataCompare,             app_context, g_bitmapdata_prototype);
-    registerGeomMethod(&g_bitmapdata_methods[mi++], "copyPixels",          (Function2Ptr)bitmapDataCopyPixels,          app_context, g_bitmapdata_prototype);
-    registerGeomMethod(&g_bitmapdata_methods[mi++], "threshold",           (Function2Ptr)bitmapDataThreshold,           app_context, g_bitmapdata_prototype);
-    registerGeomMethod(&g_bitmapdata_methods[mi++], "hitTest",             (Function2Ptr)bitmapDataHitTest,             app_context, g_bitmapdata_prototype);
-    registerGeomMethod(&g_bitmapdata_methods[mi++], "pixelDissolve",       (Function2Ptr)bitmapDataPixelDissolve,       app_context, g_bitmapdata_prototype);
-    registerGeomMethod(&g_bitmapdata_methods[mi++], "scroll",              (Function2Ptr)bitmapDataScroll,              app_context, g_bitmapdata_prototype);
-    registerGeomMethod(&g_bitmapdata_methods[mi++], "merge",               (Function2Ptr)bitmapDataMerge,               app_context, g_bitmapdata_prototype);
-    registerGeomMethod(&g_bitmapdata_methods[mi++], "paletteMap",          (Function2Ptr)bitmapDataPaletteMap,          app_context, g_bitmapdata_prototype);
-    registerGeomMethod(&g_bitmapdata_methods[mi++], "perlinNoise",         (Function2Ptr)bitmapDataPerlinNoise,         app_context, g_bitmapdata_prototype);
-    registerGeomMethod(&g_bitmapdata_methods[mi++], "applyFilter",         (Function2Ptr)bitmapDataApplyFilter,         app_context, g_bitmapdata_prototype);
-    registerGeomMethod(&g_bitmapdata_methods[mi++], "draw",                (Function2Ptr)bitmapDataDraw,                app_context, g_bitmapdata_prototype);
-    registerGeomMethod(&g_bitmapdata_methods[mi++], "generateFilterRect",  (Function2Ptr)bitmapDataGenerateFilterRect,  app_context, g_bitmapdata_prototype);
-    registerGeomMethod(&g_bitmapdata_methods[mi++], "loadBitmap",          (Function2Ptr)bitmapDataLoadBitmap,          app_context, g_bitmapdata_prototype);
+    registerProtoMethod(&g_bitmapdata_methods[mi++], "getPixel",            (Function2Ptr)bitmapDataGetPixel,            app_context, g_bitmapdata_prototype);
+    registerProtoMethod(&g_bitmapdata_methods[mi++], "getPixel32",          (Function2Ptr)bitmapDataGetPixel32,          app_context, g_bitmapdata_prototype);
+    registerProtoMethod(&g_bitmapdata_methods[mi++], "setPixel",            (Function2Ptr)bitmapDataSetPixel,            app_context, g_bitmapdata_prototype);
+    registerProtoMethod(&g_bitmapdata_methods[mi++], "setPixel32",          (Function2Ptr)bitmapDataSetPixel32,          app_context, g_bitmapdata_prototype);
+    registerProtoMethod(&g_bitmapdata_methods[mi++], "fillRect",            (Function2Ptr)bitmapDataFillRect,            app_context, g_bitmapdata_prototype);
+    registerProtoMethod(&g_bitmapdata_methods[mi++], "clone",               (Function2Ptr)bitmapDataClone,               app_context, g_bitmapdata_prototype);
+    registerProtoMethod(&g_bitmapdata_methods[mi++], "dispose",             (Function2Ptr)bitmapDataDispose,             app_context, g_bitmapdata_prototype);
+    registerProtoMethod(&g_bitmapdata_methods[mi++], "copyChannel",         (Function2Ptr)bitmapDataCopyChannel,         app_context, g_bitmapdata_prototype);
+    registerProtoMethod(&g_bitmapdata_methods[mi++], "floodFill",           (Function2Ptr)bitmapDataFloodFill,           app_context, g_bitmapdata_prototype);
+    registerProtoMethod(&g_bitmapdata_methods[mi++], "colorTransform",      (Function2Ptr)bitmapDataColorTransform,      app_context, g_bitmapdata_prototype);
+    registerProtoMethod(&g_bitmapdata_methods[mi++], "getColorBoundsRect",  (Function2Ptr)bitmapDataGetColorBoundsRect,  app_context, g_bitmapdata_prototype);
+    registerProtoMethod(&g_bitmapdata_methods[mi++], "noise",               (Function2Ptr)bitmapDataNoise,               app_context, g_bitmapdata_prototype);
+    registerProtoMethod(&g_bitmapdata_methods[mi++], "compare",             (Function2Ptr)bitmapDataCompare,             app_context, g_bitmapdata_prototype);
+    registerProtoMethod(&g_bitmapdata_methods[mi++], "copyPixels",          (Function2Ptr)bitmapDataCopyPixels,          app_context, g_bitmapdata_prototype);
+    registerProtoMethod(&g_bitmapdata_methods[mi++], "threshold",           (Function2Ptr)bitmapDataThreshold,           app_context, g_bitmapdata_prototype);
+    registerProtoMethod(&g_bitmapdata_methods[mi++], "hitTest",             (Function2Ptr)bitmapDataHitTest,             app_context, g_bitmapdata_prototype);
+    registerProtoMethod(&g_bitmapdata_methods[mi++], "pixelDissolve",       (Function2Ptr)bitmapDataPixelDissolve,       app_context, g_bitmapdata_prototype);
+    registerProtoMethod(&g_bitmapdata_methods[mi++], "scroll",              (Function2Ptr)bitmapDataScroll,              app_context, g_bitmapdata_prototype);
+    registerProtoMethod(&g_bitmapdata_methods[mi++], "merge",               (Function2Ptr)bitmapDataMerge,               app_context, g_bitmapdata_prototype);
+    registerProtoMethod(&g_bitmapdata_methods[mi++], "paletteMap",          (Function2Ptr)bitmapDataPaletteMap,          app_context, g_bitmapdata_prototype);
+    registerProtoMethod(&g_bitmapdata_methods[mi++], "perlinNoise",         (Function2Ptr)bitmapDataPerlinNoise,         app_context, g_bitmapdata_prototype);
+    registerProtoMethod(&g_bitmapdata_methods[mi++], "applyFilter",         (Function2Ptr)bitmapDataApplyFilter,         app_context, g_bitmapdata_prototype);
+    registerProtoMethod(&g_bitmapdata_methods[mi++], "draw",                (Function2Ptr)bitmapDataDraw,                app_context, g_bitmapdata_prototype);
+    registerProtoMethod(&g_bitmapdata_methods[mi++], "generateFilterRect",  (Function2Ptr)bitmapDataGenerateFilterRect,  app_context, g_bitmapdata_prototype);
+    registerProtoMethod(&g_bitmapdata_methods[mi++], "loadBitmap",          (Function2Ptr)bitmapDataLoadBitmap,          app_context, g_bitmapdata_prototype);
 }
 
 // Call just valueOf on an object. Returns the raw result (even if non-primitive).
@@ -22971,7 +22988,7 @@ static void initFlashPackage(SWFAppContext* app_context)
 		cv = makeF64(4); setProperty(app_context, fc_BitmapData.own_props, "BLUE_CHANNEL", 12, &cv);
 		cv = makeF64(8); setProperty(app_context, fc_BitmapData.own_props, "ALPHA_CHANNEL", 13, &cv);
 	}
-	// Initialize prototype for instanceof support (methods added lazily)
+	// Initialize prototype (uses registerProtoMethod to avoid function_registry pollution)
 	initBitmapDataPrototype(app_context);
 	fc_BitmapData.prototype_obj = g_bitmapdata_prototype;
 	SET_CTOR_PROP(display_obj, "BitmapData", 10, fc_BitmapData);
@@ -36792,11 +36809,9 @@ static int invokeNativeSuperConstructor(SWFAppContext* app_context, ASFunction* 
 			for (int i = 0; i < iw * ih; i++) native->pixels[i] = premul_fill2;
 			setBitmapNative(obj, native);
 		}
-		// Set prototype
-		ActionVar proto_var = {0};
-		proto_var.type = ACTION_STACK_VALUE_OBJECT;
-		proto_var.data.numeric_value = (u64) g_bitmapdata_prototype;
-		setProperty(app_context, obj, "__proto__", 9, &proto_var);
+		// Don't set __proto__ here — obj already has its prototype chain
+		// set by actionNewMethod (which preserves subclass prototypes).
+		// The actionNewObject path sets __proto__ on freshly allocated objects.
 		out_result->type = ACTION_STACK_VALUE_OBJECT;
 		out_result->data.numeric_value = (u64)obj;
 		return 1;
