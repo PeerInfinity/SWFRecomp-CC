@@ -9,7 +9,7 @@ CI run: 86ba0864 (555/619 total, 545/565 filtered = 96.5%)
 
 | Test | Match | Total | Rate | Difficulty | Category |
 |------|-------|-------|------|------------|----------|
-| unload_nested_child | 2 | 5 | 40% | Medium-Hard | nested unload handler + deferred timing |
+| unload_nested_child | 4 | 5 | 80% | Hard | deferred unload timing (nextFrame inline) |
 | clone_sprite_edittext_dynamic | 78 | 86 | 91% | Medium | TF clone bounds |
 | edittext_drag_select | 6 | 9 | 67% | Medium | selection markers |
 | issue_2084 | 4 | 16 | 25% | Medium | nested sprite init |
@@ -35,15 +35,14 @@ CI run: 86ba0864 (555/619 total, 545/565 filtered = 96.5%)
 - ~~text_blocks_clicks~~ — **FIXED** (df1f69a2): DefineText bounds now registered via `ng_record_char_bounds`, enabling sprite content bounds for `_droptarget`.
 - ~~tab_ordering_properties_tab_index_edge_case~~ — Already in `ignored_tests.txt` (Ruffle `known_failure`, contradicts `tab_ordering_properties` coercion semantics).
 
-### unload_nested_child (2/5 lines)
+### unload_nested_child (4/5 lines)
 
-**Previous**: 0/5 (button click not working). **Now**: 2/5 (click works after nested MC hit-test fix).
+**Previous**: 0/5 → 2/5 (nested MC click fix) → **4/5** (recursive child unload detection).
 
-Remaining 3 wrong lines:
+Remaining 1 wrong line:
 1. **Ordering**: "unload" fires before "go completed" — should be after. In Flash, `nextFrame()` does NOT execute the target frame inline; the unload and DoAction scripts are deferred until the frame loop processes the frame. Our `ng_executeGotoTagsOnly` runs tags inline during nextFrame.
-2. **`_level0.clip` vs `undefined`**: After removal, `getVariable("clip")` returns `undefined` instead of `_level0.clip`. The removed MC should persist as pending removal (it has a child with UNLOAD clip action) and remain findable by name for one frame.
 
-Root cause: `fire_recursive_child_unloads` fires inline during `tagRemoveObject2`, but Flash defers child unload execution to the start of the next frame. Also, `ng_on_remove_object` doesn't detect UNLOAD handlers on CHILDREN of the removed sprite, only on the removed entry itself.
+Root cause: `fire_recursive_child_unloads` fires inline during `tagRemoveObject2`, but Flash defers child unload execution to the start of the next frame. Fixing this would require changing how `nextFrame()` dispatches — using deferred frame processing instead of `ng_executeGotoTagsOnly`.
 
 ## Tier 2: Medium Effort (4 tests, +4 pass)
 
