@@ -54,11 +54,10 @@ All actionable fixes have been implemented. The remaining 6 tests are blocked on
 
 ## Blocked Tests
 
-### issue_2030 (4 lines) — Blocked on BITMAP_DATA_PLAN Phase 1
+### issue_2030 (4 lines) — Blocked on attachBitmap
 
-Creates an empty MC, creates a 10x10 BitmapData, calls `mc.attachBitmap(bitmap, 0)`, then checks `mc._width` and `mc._height`. Expects 10/10 from the attached bitmap dimensions. Requires:
-1. BitmapData pixel buffer (BITMAP_DATA_PLAN Phase 1)
-2. `MovieClip.attachBitmap()` method that sets MC dimensions from bitmap
+Creates an empty MC, creates a 10x10 BitmapData, calls `mc.attachBitmap(bitmap, 0)`, then checks `mc._width` and `mc._height`. Expects 10/10 from the attached bitmap dimensions. BitmapData pixel buffer is now implemented (BITMAP_DATA_PLAN complete), but requires:
+1. `MovieClip.attachBitmap()` method that sets MC dimensions from bitmap
 
 ### displacementmapfilter_mappoint_throw_error (13 lines) — Partially blocked
 

@@ -10,14 +10,18 @@ This document catalogs the root-cause blockers preventing further progress on th
 
 ### ~~Blocker 1: Font Metrics / Text Layout Accuracy~~ — RESOLVED
 
-**Resolved 2026-03-14.** Three fixes:
+**Resolved 2026-03-14.** All font metrics tests now pass (TEXTFIELD_PLAN complete, 62/62). Key fixes:
 1. Preserve `_tf_leading` from `setTextFormat`/`setNewTextFormat` when `htmlText` is set (don't overwrite with HTML-parsed default)
 2. Include line terminator character's font height in per-line max (matching Ruffle's `newspan()` before `fixup_line()`)
 3. Skip trailing empty line from text height calculation (matching Ruffle's `is_line_empty && last_line` skip)
+4. Per-line font height tracking, word wrap improvements, tab stop indent handling (edittext_scroll, edittext_newlines, edittext_tab_stops)
 
 | Test | Match | Lines Off |
 |------|-------|-----------|
 | edittext_bullet | 30/30 | 0 |
+| edittext_scroll | 54/54 | 0 |
+| edittext_newlines | 30/30 | 0 |
+| edittext_tab_stops | 60/60 | 0 |
 
 ---
 
@@ -184,16 +188,10 @@ Tests requiring HTTP requests, file dialogs, audio/video streaming, or browser J
 
 | Plan | Tests | Pass Rate | Resolution |
 |------|-------|-----------|------------|
+| TEXTFIELD_PLAN | 62 | **62/62** | All 7 phases done; font metrics fixed (edittext_scroll 54/54, edittext_newlines 30/30, edittext_tab_stops 60/60) |
 | HTML_TEXT_REMAINING_WORK | 10 | **10/10** | All HTML text tests PASS (SWF6 fixed 2026-03-14) |
 | CLONE_DUPLICATE_PLAN | 8 | **7/8** | Clone infrastructure complete; 7 remaining lines = textfield autoSize bugs |
 | MOVIECLIP_PLAN | 54 | **49/54** | All 10 phases done; remaining 5 tests blocked on loadMovie/image loading |
-
-### `incomplete/` — Have actionable work remaining
-
-| Plan | Tests | Pass Rate | Next Step |
-|------|-------|-----------|-----------|
-| TEXTFIELD_PLAN | 62 | 59/62 | Font metrics improvements: edittext_scroll (52/54), edittext_newlines (23/30), edittext_tab_stops (45/60) |
-| BITMAP_DATA_PLAN | 17 | 12/17 | bitmap_data 1125/1126 (1 line), bitmap_filters segfault, low-ROI items |
 
 ### `blocked/` — Genuinely blocked, no actionable steps
 
@@ -202,6 +200,7 @@ Tests requiring HTTP requests, file dialogs, audio/video streaming, or browser J
 | TYPE_COERCION_ADVANCED_PLAN | 2 | 1/2 | Closure capture (Blocker 3) |
 | GLOBALS_PLAN | 31 | 28/31 | Enumeration order + missing globals (Blocker 4) |
 | HIT_TESTING_PLAN | 17 | 13/17 | Pixel shape testing (Blocker 5) |
+| BITMAP_DATA_PLAN | 17 | 15/17 | Premultiply precision, PRNG mismatch, filter clone crash |
 | LOADMOVIE_MULTI_SWF_PLAN | 17 | 14/17 | Image loading + network (Blocker 6) |
 | LOADMOVIE_REMAINING_PLAN | 5 | 3/5 | Image loading (Blocker 6), accepted diffs |
 | IGNORED_INFRASTRUCTURE_TESTS | 23 | 0/23 | Network/external infra (Blocker 7) |
