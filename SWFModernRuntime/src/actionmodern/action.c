@@ -6260,17 +6260,18 @@ static void registerGeomMethod(ASFunction* func, const char* name, Function2Ptr 
 	func->function_type = 2;
 	func->param_count = 0;
 	func->advanced_func = impl;
-	if (function_count < MAX_FUNCTIONS)
-		function_registry[function_count++] = func;
+	// Prototype methods are NOT added to function_registry — they're accessible
+	// via the prototype chain (GetMember/CallMethod). Adding them pollutes the
+	// global namespace and shadows user-defined functions with the same name
+	// (e.g., Rectangle.contains vs a user's "contains" helper function).
 	ActionVar fv = {0};
 	fv.type = ACTION_STACK_VALUE_FUNCTION;
 	VAL(u64, &fv.data.numeric_value) = (u64)func;
 	setProperty(app_context, proto, name, (u32)strlen(name), &fv);
 }
 
-// Like registerGeomMethod but does NOT add to global function_registry.
-// Used for BitmapData methods to avoid polluting the registry and causing
-// lookupFunctionByName collisions with user-defined functions.
+// Alias for registerGeomMethod (historical name, identical behavior).
+// Used for BitmapData methods.
 static void registerProtoMethod(ASFunction* func, const char* name, Function2Ptr impl, SWFAppContext* app_context, ASObject* proto)
 {
 	memset(func, 0, sizeof(ASFunction));
