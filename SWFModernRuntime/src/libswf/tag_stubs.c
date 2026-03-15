@@ -2087,7 +2087,7 @@ void ng_on_place_object2(SWFAppContext* app_context, size_t depth, size_t char_i
 }
 
 // Recursively check a sprite's children for UNLOAD clip actions.
-static int has_child_unload_handler(DisplayObject* dl, size_t dl_max)
+int has_child_unload_handler(DisplayObject* dl, size_t dl_max)
 {
 	for (size_t d = 1; d <= dl_max; d++) {
 		if (dl[d].char_id == 0) continue;

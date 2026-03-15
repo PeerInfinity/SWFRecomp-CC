@@ -3657,6 +3657,27 @@ void tagRemoveObject(SWFAppContext* app_context, size_t depth)
 {
 	if (depth <= max_depth && display_list[depth].char_id != 0)
 	{
+#ifdef NO_GRAPHICS
+		// Defer removal during catch_up_mode for entries with UNLOAD handlers
+		// (same rationale as tagRemoveObject2 — see comment there).
+		if (catch_up_mode)
+		{
+			int has_unload_cu = 0;
+			for (size_t a = 0; a < display_list[depth].clip_action_count; a++) {
+				if (display_list[depth].clip_actions[a].event_flags & CLIP_EVENT_UNLOAD) {
+					has_unload_cu = 1; break;
+				}
+			}
+			if (!has_unload_cu) {
+				for (size_t a = 0; a < display_list[depth].accumulated_clip_action_count; a++) {
+					if (display_list[depth].accumulated_clip_actions[a].event_flags & CLIP_EVENT_UNLOAD) {
+						has_unload_cu = 1; break;
+					}
+				}
+			}
+			if (has_unload_cu) return;
+		}
+#endif
 		// Fire accumulated clip actions (from prior Remove+Replace cycle) first
 		if (display_list[depth].accumulated_clip_action_count > 0)
 		{
@@ -3701,6 +3722,35 @@ void tagRemoveObject2(SWFAppContext* app_context, size_t depth)
 		extern size_t catch_up_target;
 		if (catch_up_backward && display_list[depth].placed_at_frame <= catch_up_target)
 			return;
+
+		// During catch_up_mode (ng_executeGotoTagsOnly from nextFrame/gotoAndStop),
+		// defer removal of entries with UNLOAD handlers. The calling script hasn't
+		// finished yet, so UNLOAD must not fire inline. The main loop's catch-up
+		// will re-process the target frame with catch_up_mode=0, firing UNLOAD
+		// at the correct time (after the calling script completes).
+		if (catch_up_mode)
+		{
+			int has_unload_cu = 0;
+			for (size_t a = 0; a < display_list[depth].clip_action_count; a++) {
+				if (display_list[depth].clip_actions[a].event_flags & CLIP_EVENT_UNLOAD) {
+					has_unload_cu = 1; break;
+				}
+			}
+			if (!has_unload_cu) {
+				for (size_t a = 0; a < display_list[depth].accumulated_clip_action_count; a++) {
+					if (display_list[depth].accumulated_clip_actions[a].event_flags & CLIP_EVENT_UNLOAD) {
+						has_unload_cu = 1; break;
+					}
+				}
+			}
+			if (!has_unload_cu && display_list[depth].sprite_display_list != NULL &&
+			    display_list[depth].sprite_max_depth > 0) {
+				extern int has_child_unload_handler(DisplayObject* dl, size_t dl_max);
+				has_unload_cu = has_child_unload_handler(display_list[depth].sprite_display_list,
+				                                         display_list[depth].sprite_max_depth);
+			}
+			if (has_unload_cu) return;
+		}
 #endif
 		// Fire accumulated clip actions (from prior Remove+Replace cycle) first
 		if (display_list[depth].accumulated_clip_action_count > 0)
