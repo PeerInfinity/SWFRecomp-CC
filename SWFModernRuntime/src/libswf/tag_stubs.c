@@ -1860,28 +1860,15 @@ MovieClip* ng_attachMovie(SWFAppContext* app_context, size_t char_id, const char
 		dobj->sprite_max_depth = max_depth;
 		dobj->sprite_dl_capacity = display_list_capacity;
 
-		// Compute content bounds from children placed during frame 0
+		// Compute content bounds from children placed during frame 0.
+		// Uses sprite_content_bounds_twips which accounts for child transforms
+		// (e.g., a 1x1 twip shape placed with a 20x scale transform → 20x20 twips).
 		{
-			float bxmin = 1e30f, bxmax = -1e30f, bymin = 1e30f, bymax = -1e30f;
-			int has_bounds = 0;
-			for (size_t d = 0; d <= dobj->sprite_max_depth && d < dobj->sprite_dl_capacity; d++) {
-				if (dobj->sprite_display_list[d].char_id == 0) continue;
-				s32 cxmin, cxmax, cymin, cymax;
-				if (ng_getCharBounds(dobj->sprite_display_list[d].char_id, &cxmin, &cxmax, &cymin, &cymax)) {
-					float pxmin = (float)cxmin / 20.0f;
-					float pxmax = (float)cxmax / 20.0f;
-					float pymin = (float)cymin / 20.0f;
-					float pymax = (float)cymax / 20.0f;
-					if (pxmin < bxmin) bxmin = pxmin;
-					if (pxmax > bxmax) bxmax = pxmax;
-					if (pymin < bymin) bymin = pymin;
-					if (pymax > bymax) bymax = pymax;
-					has_bounds = 1;
-				}
-			}
-			if (has_bounds) {
-				new_mc->width = bxmax - bxmin;
-				new_mc->height = bymax - bymin;
+			float bxmin, bxmax, bymin, bymax;
+			if (sprite_content_bounds_twips(dobj->sprite_display_list, dobj->sprite_max_depth,
+			        &bxmin, &bxmax, &bymin, &bymax)) {
+				new_mc->width = (bxmax - bxmin) / 20.0f;
+				new_mc->height = (bymax - bymin) / 20.0f;
 			}
 		}
 

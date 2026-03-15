@@ -16975,6 +16975,8 @@ int actionGetMCDrawingPathsByName(const char* instance_name, DrawingRenderInfo* 
 	return fillDrawingInfos(mc, out, max_out);
 }
 
+static void mcGetEffectiveSize(MovieClip* mc, double* eff_w, double* eff_h);
+
 // Get the original (unscaled, unrotated) content bounds for an MC, in pixels.
 // Returns 1 if bounds found, 0 if not.
 static int mcGetOriginalBounds(MovieClip* mc, double* out_nat_w, double* out_nat_h)
@@ -17045,6 +17047,33 @@ static int mcGetOriginalBounds(MovieClip* mc, double* out_nat_w, double* out_nat
 		*out_nat_w = (double)mc->width;
 		*out_nat_h = (double)mc->height;
 		return 1;
+	}
+
+	// Fallback: compute bounds from dynamically-attached children (via child_mc_cache).
+	// This handles MCs whose children were added via attachMovie — not in the static
+	// display list but trackable through the parent pointer.
+	{
+		double cxmin = 1e30, cxmax = -1e30, cymin = 1e30, cymax = -1e30;
+		int found_child = 0;
+		for (int ci = 0; ci < child_mc_count; ci++) {
+			MovieClip* child = child_mc_cache[ci];
+			if (child == NULL || child->parent != mc) continue;
+			if (child->depth == INT_MIN) continue;  // dead/removed MC
+			double cw = 0.0, ch = 0.0;
+			mcGetEffectiveSize(child, &cw, &ch);
+			double cx = (double)child->x;
+			double cy = (double)child->y;
+			if (cx < cxmin) cxmin = cx;
+			if (cx + cw > cxmax) cxmax = cx + cw;
+			if (cy < cymin) cymin = cy;
+			if (cy + ch > cymax) cymax = cy + ch;
+			found_child = 1;
+		}
+		if (found_child) {
+			*out_nat_w = cxmax - cxmin;
+			*out_nat_h = cymax - cymin;
+			return 1;
+		}
 	}
 #endif
 	*out_nat_w = 0.0;
@@ -21814,7 +21843,7 @@ void actionDispatchEnterFrameHandlers(SWFAppContext* app_context)
 		}
 
 		ASObject* props = (ASObject*) mc->dynamic_props;
-		ActionVar* ef_prop = getProperty(props, "onEnterFrame", 12);
+		ActionVar* ef_prop = getPropertyWithPrototype(props, "onEnterFrame", 12);
 		if (ef_prop == NULL || ef_prop->type != ACTION_STACK_VALUE_FUNCTION) continue;
 
 		ASFunction* func = (ASFunction*) ef_prop->data.numeric_value;
@@ -22000,7 +22029,7 @@ int actionHasEnterFrameHandlers(void)
 {
 	extern MovieClip root_movieclip;
 	if (root_movieclip.dynamic_props != NULL) {
-		ActionVar* ef = getProperty((ASObject*)root_movieclip.dynamic_props, "onEnterFrame", 12);
+		ActionVar* ef = getPropertyWithPrototype((ASObject*)root_movieclip.dynamic_props, "onEnterFrame", 12);
 		if (ef != NULL && ef->type == ACTION_STACK_VALUE_FUNCTION) return 1;
 	}
 	ActionVar* ef2 = getVariable("onEnterFrame", 12);
@@ -22008,7 +22037,7 @@ int actionHasEnterFrameHandlers(void)
 	for (int i = 0; i < child_mc_count; i++) {
 		MovieClip* mc = child_mc_cache[i];
 		if (mc && mc->dynamic_props) {
-			ActionVar* ef3 = getProperty((ASObject*)mc->dynamic_props, "onEnterFrame", 12);
+			ActionVar* ef3 = getPropertyWithPrototype((ASObject*)mc->dynamic_props, "onEnterFrame", 12);
 			if (ef3 && ef3->type == ACTION_STACK_VALUE_FUNCTION) return 1;
 		}
 	}
@@ -22075,12 +22104,17 @@ void actionQueueMCOnLoad(MovieClip* mc)
 void actionFlushPendingOnLoads(SWFAppContext* app_context)
 {
 	while (g_pending_onload_count > 0) {
-		// Process current batch — onLoad handlers may queue more
+		// Copy locally: onLoad handlers may call attachMovie which queues more
+		// entries into the same g_pending_onloads array, overwriting entries
+		// we haven't dispatched yet.
+		MovieClip* local_onloads[MAX_PENDING_ONLOADS];
 		int count = g_pending_onload_count;
+		for (int i = 0; i < count; i++)
+			local_onloads[i] = g_pending_onloads[i];
 		g_pending_onload_count = 0;
 		for (int i = 0; i < count; i++) {
-			if (g_pending_onloads[i] != NULL)
-				actionDispatchMCOnLoad(app_context, g_pending_onloads[i]);
+			if (local_onloads[i] != NULL)
+				actionDispatchMCOnLoad(app_context, local_onloads[i]);
 		}
 	}
 }

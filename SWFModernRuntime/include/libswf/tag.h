@@ -215,6 +215,10 @@ int ng_getColorTransform(const char* name, double* ra, double* ga, double* ba, d
 int ng_setColorTransform(const char* name, double ra, double ga, double ba, double aa,
                           double rb, double gb, double bb, double ab);
 int ng_getCharBounds(size_t char_id, s32* out_xmin, s32* out_xmax, s32* out_ymin, s32* out_ymax);
+// Compute union of child bounds in a sprite's display list, in LOCAL twips.
+// Accounts for child transforms (scale, translation). Only available in NO_GRAPHICS builds.
+int sprite_content_bounds_twips(DisplayObject* dl, size_t dl_max,
+    float* xmin_out, float* xmax_out, float* ymin_out, float* ymax_out);
 int ng_getCharBoundsForRatio(size_t char_id, u16 ratio,
     s32* out_xmin, s32* out_xmax, s32* out_ymin, s32* out_ymax);
 // Compute content bounds (union of child bounds in pixels) for a display entry.

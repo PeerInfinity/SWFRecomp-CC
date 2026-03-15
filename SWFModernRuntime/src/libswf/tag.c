@@ -483,9 +483,9 @@ void advance_sprite_frames(SWFAppContext* app_context)
 	if (catch_up_mode) return;
 #endif
 
-	for (size_t i = max_depth; i >= 1; --i)
+	for (size_t i = max_depth + 1; i > 0; --i)
 	{
-		DisplayObject* obj = &display_list[i];
+		DisplayObject* obj = &display_list[i - 1];
 		if (obj->char_id == 0) continue;
 		Character* ch = &dictionary[obj->char_id];
 
@@ -754,9 +754,9 @@ void advance_nested_sprite_frames(SWFAppContext* app_context)
 	if (catch_up_mode) return;
 #endif
 
-	for (size_t i = max_depth; i >= 1; --i)
+	for (size_t i = max_depth + 1; i > 0; --i)
 	{
-		DisplayObject* obj = &display_list[i];
+		DisplayObject* obj = &display_list[i - 1];
 		if (obj->char_id == 0) continue;
 		Character* ch = &dictionary[obj->char_id];
 		if (ch->type != CHAR_TYPE_SPRITE) continue;
@@ -1458,7 +1458,7 @@ int ng_update_button_states(SWFAppContext* app_context)
 // Recursively upgrade sprite_initialized from 1 (this tick) to 2 (ready for per-tick dispatch).
 void upgrade_sprite_initialized(DisplayObject* dl, size_t dl_max)
 {
-	for (size_t i = 1; i <= dl_max; ++i)
+	for (size_t i = 0; i <= dl_max; ++i)
 	{
 		if (dl[i].sprite_initialized == 1)
 			dl[i].sprite_initialized = 2;
@@ -1472,7 +1472,7 @@ void upgrade_sprite_initialized(DisplayObject* dl, size_t dl_max)
 void dispatch_enterframe_clip_actions(SWFAppContext* app_context,
 	DisplayObject* dl, size_t dl_max, MovieClip* parent_mc)
 {
-	for (size_t i = 1; i <= dl_max; ++i)
+	for (size_t i = 0; i <= dl_max; ++i)
 	{
 		DisplayObject* obj = &dl[i];
 		if (obj->char_id == 0) continue;
@@ -1514,7 +1514,7 @@ void dispatch_enterframe_clip_actions(SWFAppContext* app_context,
 // When a parent is removed (char_id=0), the walk skips it → children don't get the flag.
 void set_enterframe_eligible_recursive(DisplayObject* dl, size_t dl_max)
 {
-	for (size_t i = 1; i <= dl_max; i++)
+	for (size_t i = 0; i <= dl_max; i++)
 	{
 		if (dl[i].char_id == 0) continue;
 		if (dl[i].sprite_initialized >= 2)
@@ -2324,7 +2324,7 @@ void tagShowFrame(SWFAppContext* app_context)
 // ---------------------------------------------------------------------------
 // Returns 1 if any bounds were found. Bounds are relative to the sprite's
 // registration point (i.e., the sprite's coordinate system origin).
-static int sprite_content_bounds_twips(DisplayObject* dl, size_t dl_max,
+int sprite_content_bounds_twips(DisplayObject* dl, size_t dl_max,
     float* xmin_out, float* xmax_out, float* ymin_out, float* ymax_out)
 {
 	float xmin = 1e30f, xmax = -1e30f, ymin = 1e30f, ymax = -1e30f;
@@ -4162,7 +4162,7 @@ int hasPlayingSprites(void)
 // and is initialized (sprite_initialized >= 2). Used to keep the frame loop alive.
 static int hasClipEnterFrameHandlers_impl(DisplayObject* dl, size_t dl_max)
 {
-	for (size_t i = 1; i <= dl_max; i++)
+	for (size_t i = 0; i <= dl_max; i++)
 	{
 		if (dl[i].char_id == 0) continue;
 		if (dl[i].sprite_initialized < 2) continue;
