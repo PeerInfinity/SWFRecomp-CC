@@ -33,7 +33,7 @@ This document catalogs the root-cause blockers preventing further progress on th
 
 ### Blocker 3: Heap-Allocated Activation Scopes (Closure Variable Capture)
 
-**Impact**: 1 test, ~109 lines. **NOT FEASIBLE** to fix.
+**Impact**: 1 test, ~109 lines. **NOT FEASIBLE** to fix in current architecture.
 
 Our runtime uses stack-based variables. When an inner function captures an outer function's local variable, the variable is gone after the outer function returns. Flash/Ruffle use heap-allocated activation records that persist as long as any closure references them.
 
@@ -45,6 +45,8 @@ function addGetter(obj, name, val) {
 ```
 
 Fixing requires a fundamental rewrite of the variable storage model.
+
+**Potential path via upstream merge (March 2026):** Upstream's `feature/objects-and-functions` PR ([SWFModernRuntime PR #3](https://github.com/SWFRecomp/SWFModernRuntime/pull/3)) implements activation scopes as heap-allocated `ASObject*` ([line 21](https://github.com/PeerInfinity/SWFModernRuntime/blob/96f3ac8/src/actionmodern/action.c#L21), [lines 52-55](https://github.com/PeerInfinity/SWFModernRuntime/blob/96f3ac8/src/actionmodern/action.c#L52-L55)). Currently these are pre-allocated in a static 16-slot array (reused by depth), which wouldn't support closure capture yet. But once upstream adds refcounting and per-call scope allocation, adopting their architecture would resolve this blocker. See `SWFRecompDocs/merge/upstream-downstream-merge-plan-2024-12.md` (March 2026 update) for merge strategy details.
 
 | Test | Match | Lines Off |
 |------|-------|-----------|

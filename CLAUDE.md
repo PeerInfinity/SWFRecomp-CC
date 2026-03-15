@@ -19,7 +19,7 @@ python3 ruffle-tests/verify_output.py --test=TEST_NAME --diff --verbose
 ## Project Structure
 
 - `SWFRecomp/` — Recompiler: converts SWF bytecode to C (`src/action/action.cpp` is the main bytecode→C translator)
-- `SWFModernRuntime/` — Runtime: executes the generated C (`src/actionmodern/action.c` is ~10K lines, the core runtime)
+- `SWFModernRuntime/` — Runtime: executes the generated C (`src/actionmodern/action.c` is ~50K lines, the core runtime)
 - `ruffle-tests/` — Ruffle AVM1 test suite (616 tests, each in `ruffle-tests/{test_name}/`)
 - `SWFRecomp/tests/` — Old hand-written test suite (115 trace tests + 61 graphics tests, all passing)
 - `SWFRecomp/scripts/` — Build scripts (build_test.sh, deploy_example.sh, etc.)

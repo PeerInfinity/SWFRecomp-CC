@@ -19703,10 +19703,57 @@ void actionTrace(SWFAppContext* app_context)
 		{
 			// MovieClip traces as its full dot-path ("_level0", "_level0.a", "_level0.a.b")
 			// mc->target holds slash-notation: "/", "/a", "/a/b" — convert to dot notation.
-			// For removed MCs (depth==INT_MIN), use original_target (creation-time path).
+			// For removed MCs (depth==INT_MIN), check if a live clip exists at the stored
+			// path (Ruffle's MovieClipReference behavior). If not, print empty line.
 			MovieClip* mc = (MovieClip*) STACK_TOP_VALUE;
 			extern MovieClip root_movieclip;
-			const char* trace_target = (mc != NULL && mc->depth == INT_MIN) ? mc->original_target : mc->target;
+			if (mc != NULL && mc->depth == INT_MIN) {
+				// Dead MovieClip: check if a live clip still exists at original_target
+				const char* tgt = mc->original_target;
+				int found_live = 0;
+				if (tgt[0] == '/' && tgt[1] != '\0') {
+					const char* path_start = tgt + 1;
+					u32 path_len = (u32)strlen(path_start);
+					MovieClip* resolved = resolveSlashPathToMC(app_context, path_start, path_len, &root_movieclip);
+					if (resolved != NULL && resolved != &root_movieclip && resolved->depth != INT_MIN)
+						found_live = 1;
+					if (!found_live && memchr(path_start, '/', path_len) == NULL) {
+						for (int i = 0; i < child_mc_count; i++) {
+							MovieClip* c = child_mc_cache[i];
+							if (c == NULL || c == mc || c->depth == INT_MIN) continue;
+							if (c->parent == &root_movieclip &&
+							    strncmp(c->name, path_start, path_len) == 0 &&
+							    c->name[path_len] == '\0') {
+								found_live = 1;
+								break;
+							}
+						}
+					}
+				}
+				if (found_live) {
+					// Live clip at stored path — print the cached path
+					char dot_path[512];
+					if (tgt[0] == '/' && tgt[1] == '\0') {
+						printf("_level0\n");
+					} else if (tgt[0] == '/') {
+						int pos = snprintf(dot_path, sizeof(dot_path), "_level0.");
+						const char* p = tgt + 1;
+						while (*p && pos < (int)sizeof(dot_path) - 1) {
+							dot_path[pos++] = (*p == '/') ? '.' : *p;
+							p++;
+						}
+						dot_path[pos] = '\0';
+						printf("%s\n", dot_path);
+					} else {
+						printf("_level0.%s\n", tgt);
+					}
+				} else {
+					// No live clip at stored path — print empty line
+					printf("\n");
+				}
+				break;
+			}
+			const char* trace_target = mc->target;
 			if (mc == NULL || mc == &root_movieclip || trace_target[0] == '\0' ||
 			    (trace_target[0] == '/' && trace_target[1] == '\0'))
 			{

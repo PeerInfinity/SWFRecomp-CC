@@ -55,7 +55,7 @@ Do NOT run the full suite locally. Instead:
    - Stack-based: all operations use PUSH/POP macros on a byte buffer
    - Generates: `RecompiledScripts/script_N.c` and `RecompiledTags/tagMain.c`
 
-2. **SWFModernRuntime** (`SWFModernRuntime/src/actionmodern/action.c`, ~10000 lines) — Executes the generated C
+2. **SWFModernRuntime** (`SWFModernRuntime/src/actionmodern/action.c`, ~50000 lines) — Executes the generated C
    - Implements all the `action*()` functions
    - Type system: `ActionVar` struct with 15 types (string, f32, f64, null, undefined, boolean, object, array, function, movieclip, etc.)
    - Object system: `ASObject` (property bags), `ASFunction` (with prototype), `ASArray`
