@@ -44047,6 +44047,27 @@ void actionCallMethod(SWFAppContext* app_context, char* str_buffer)
 #endif
 			return;
 		}
+		else if (method_name_len == 12 && strncmp(method_name, "attachBitmap", 12) == 0)
+		{
+			// attachBitmap(bitmapData, depth [, pixelSnapping, smoothing])
+			// Attaches a BitmapData to the MC. Sets MC width/height from bitmap dimensions.
+			if (num_args >= 1 && args[0].type == ACTION_STACK_VALUE_OBJECT) {
+				ASObject* bmp_obj = (ASObject*)(uintptr_t)args[0].data.numeric_value;
+				BitmapDataNative* bmp = getBitmapNative(bmp_obj);
+				if (bmp != NULL && !bmp->disposed) {
+					mc->width = (float)bmp->width;
+					mc->height = (float)bmp->height;
+					mc->draw_xmin = 0;
+					mc->draw_ymin = 0;
+					mc->draw_xmax = (float)bmp->width;
+					mc->draw_ymax = (float)bmp->height;
+					mc->draw_has_bounds = 1;
+				}
+			}
+			if (args != NULL) FREE(args);
+			pushUndefined(app_context);
+			return;
+		}
 		else if (method_name_len == 20 && strncmp(method_name, "createEmptyMovieClip", 20) == 0)
 		{
 			// createEmptyMovieClip(instanceName, depth)
