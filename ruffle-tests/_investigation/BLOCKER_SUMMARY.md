@@ -35,11 +35,15 @@ This document catalogs the root-cause blockers preventing further progress on th
 
 ---
 
-### Blocker 3: Heap-Allocated Activation Scopes (Closure Variable Capture)
+### ~~Blocker 3: Heap-Allocated Activation Scopes (Closure Variable Capture)~~ — RECLASSIFIED
 
-**Impact**: 1 test, ~109 lines. **NOT FEASIBLE** to fix in current architecture.
+**Reclassified 2026-03-15.** The test previously attributed to this blocker (`coerce_to_object_monkeypatch`) does NOT actually fail due to closure variable capture. The addProperty getter closures in that test **work correctly** — the failures are due to:
+1. `actionNewObject` constructor lookup skipping `__proto__` chain addProperty getters (~3 lines)
+2. Failed auto-boxing falling back to root MovieClip instead of `_global` (~55 lines, cascade)
 
-Our runtime uses stack-based variables. When an inner function captures an outer function's local variable, the variable is gone after the outer function returns. Flash/Ruffle use heap-allocated activation records that persist as long as any closure references them.
+These are fixable without architecture changes. See `incomplete/COERCE_TO_OBJECT_MONKEYPATCH.md` for details.
+
+**General blocker remains valid** for other patterns: our stack-based variable storage does mean local variables are lost after function return. Any test with closures that capture outer locals (the `addGetter` pattern below) would fail. However, no current failing test is blocked by this.
 
 ```actionscript
 function addGetter(obj, name, val) {
@@ -48,15 +52,13 @@ function addGetter(obj, name, val) {
 }
 ```
 
-Fixing requires a fundamental rewrite of the variable storage model.
+**Potential path via upstream merge:** Upstream's `feature/objects-and-functions` PR ([SWFModernRuntime PR #3](https://github.com/SWFRecomp/SWFModernRuntime/pull/3)) implements activation scopes as heap-allocated `ASObject*` ([line 21](https://github.com/PeerInfinity/SWFModernRuntime/blob/96f3ac8/src/actionmodern/action.c#L21), [lines 52-55](https://github.com/PeerInfinity/SWFModernRuntime/blob/96f3ac8/src/actionmodern/action.c#L52-L55)). Currently pre-allocated in a static 16-slot array (reused by depth). Once upstream adds refcounting and per-call scope allocation, adopting their architecture would resolve closure capture generally. See `SWFRecompDocs/merge/upstream-downstream-merge-plan-2024-12.md` (March 2026 update).
 
-**Potential path via upstream merge (March 2026):** Upstream's `feature/objects-and-functions` PR ([SWFModernRuntime PR #3](https://github.com/SWFRecomp/SWFModernRuntime/pull/3)) implements activation scopes as heap-allocated `ASObject*` ([line 21](https://github.com/PeerInfinity/SWFModernRuntime/blob/96f3ac8/src/actionmodern/action.c#L21), [lines 52-55](https://github.com/PeerInfinity/SWFModernRuntime/blob/96f3ac8/src/actionmodern/action.c#L52-L55)). Currently these are pre-allocated in a static 16-slot array (reused by depth), which wouldn't support closure capture yet. But once upstream adds refcounting and per-call scope allocation, adopting their architecture would resolve this blocker. See `SWFRecompDocs/merge/upstream-downstream-merge-plan-2024-12.md` (March 2026 update) for merge strategy details.
+| Test | Match | Lines Off | Actual Blocker |
+|------|-------|-----------|----------------|
+| coerce_to_object_monkeypatch | ~71/129 | ~58 | Constructor lookup + `this` fallback (NOT closure capture) |
 
-| Test | Match | Lines Off |
-|------|-------|-----------|
-| coerce_to_object_monkeypatch | ~20/129 | ~109 |
-
-**Plans blocked**: TYPE_COERCION_ADVANCED_PLAN
+**Plans affected**: TYPE_COERCION_ADVANCED_PLAN — should be moved from `blocked/` to `incomplete/`
 
 ---
 
@@ -197,7 +199,7 @@ Tests requiring HTTP requests, file dialogs, audio/video streaming, or browser J
 
 | Plan | Tests | Pass Rate | Primary Blocker |
 |------|-------|-----------|----------------|
-| TYPE_COERCION_ADVANCED_PLAN | 2 | 1/2 | Closure capture (Blocker 3) |
+| TYPE_COERCION_ADVANCED_PLAN | 2 | 1/2 | ~~Closure capture (Blocker 3)~~ Reclassified — constructor lookup + `this` fallback (actionable) |
 | GLOBALS_PLAN | 31 | 28/31 | Enumeration order + missing globals (Blocker 4) |
 | HIT_TESTING_PLAN | 17 | 13/17 | Pixel shape testing (Blocker 5) |
 | BITMAP_DATA_PLAN | 17 | 15/17 | Premultiply precision, PRNG mismatch, filter clone crash |
