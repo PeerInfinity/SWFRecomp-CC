@@ -3,7 +3,7 @@
 
 Last updated: 2026-03-14
 
-## Status: INCOMPLETE — 12/17 tests passing (was 8/17), remaining items blocked or low-ROI
+## Status: INCOMPLETE — 12/17 tests passing (was 8/17), remaining items blocked, low-ROI, or have small actionable fixes
 
 ### Current Results
 

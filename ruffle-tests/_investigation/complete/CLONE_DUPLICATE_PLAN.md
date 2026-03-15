@@ -1,23 +1,23 @@
 # Clone/Duplicate MovieClip Implementation Plan
 <!-- TESTS: duplicate_movie_clip, clone_sprite_types, clone_sprite_edittext, clone_sprite_edittext_dynamic, duplicate_movie_clip_drawing, clip_events, clip_event_propagation_order, on_construct -->
 
-Last updated: 2026-03-13
+Last updated: 2026-03-14
 
-## Overview
+## Status: COMPLETE — 7/8 PASS, clone infrastructure done
 
 Clone/Duplicate MovieClip covers 8 Ruffle tests. The core feature is `ActionCloneSprite` (opcode 0x24), which duplicates an existing display list object, giving the copy a new name and depth. The AS2 method wrapper is `MovieClip.duplicateMovieClip(name, depth, initObj)`.
 
-**Current state (2026-03-13)**:
+**Current state (2026-03-14)**:
 - `duplicate_movie_clip` ✅ — **PASS**
 - `clone_sprite_types` ✅ — **PASS**
 - `duplicate_movie_clip_drawing` ✅ — **PASS**
 - `clip_events` ✅ — **PASS**
 - `on_construct` ✅ — **PASS**
-- `clone_sprite_edittext` (90/94) — 4 remaining mismatches are pre-existing textfield issues
-- `clone_sprite_edittext_dynamic` (78/86) — 8 remaining mismatches are pre-existing textfield issues
-- `clip_event_propagation_order` (0/17) — Requires mouse input injection (input.json); covered by MOVIECLIP_PLAN Phase 10
+- `clone_sprite_edittext` ✅ — **94/94 PASS** (Blocker 8 resolved 2026-03-14: _alpha quantization, stylesheet scroll reset, device font name)
+- `clip_event_propagation_order` ✅ — **PASS** (fixed by MOVIECLIP_PLAN Phase 10: mouse input injection)
+- `clone_sprite_edittext_dynamic` (79/86) — 7 remaining mismatches are pre-existing textfield autoSize/dimension bugs on ORIGINAL textfield, not clone-specific
 
-**5/8 PASS. Phase 1 complete. Phase 2 substantially implemented — textfield clone infrastructure is done. Remaining mismatches are pre-existing textfield behavior issues, not clone bugs.**
+**7/8 PASS. All phases complete. Clone infrastructure is done. Remaining 7 diff lines in clone_sprite_edittext_dynamic are general textfield issues tracked under TEXTFIELD_PLAN.**
 
 ## Phase 1: Core Clone/Duplicate — COMPLETE ✅
 

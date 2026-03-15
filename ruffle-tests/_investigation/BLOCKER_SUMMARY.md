@@ -135,9 +135,7 @@ Tests requiring HTTP requests, file dialogs, audio/video streaming, or browser J
 
 ---
 
-### Blocker 8: TextField Clone Property Accessors — MOSTLY RESOLVED
-
-**Impact**: 1 test remaining, 7 lines (pre-existing textfield issues, not clone-specific)
+### Blocker 8: TextField Clone Property Accessors — RESOLVED
 
 **Resolved 2026-03-14.** Three fixes:
 1. `_alpha` quantization through 8.8 fixed-point (Flash stores alpha as int16, not raw float)
@@ -149,9 +147,7 @@ Tests requiring HTTP requests, file dialogs, audio/video streaming, or browser J
 | clone_sprite_edittext | 94/94 | 0 | **PASS** |
 | clone_sprite_edittext_dynamic | 79/86 | 7 | All 7 diffs are pre-existing textfield autoSize/dimension bugs on ORIGINAL textfield, not clone-specific |
 
-Remaining diffs in clone_sprite_edittext_dynamic: autoSize="right" dimension recalculation (5 lines), htmlText word-wrapping (1 line), height precision in rotated bounding box (1 line).
-
-**Plans blocked**: None (clone infrastructure complete; remaining diffs are general textfield issues)
+**Plans blocked**: None (CLONE_DUPLICATE_PLAN moved to `complete/`; remaining diffs tracked under TEXTFIELD_PLAN)
 
 ---
 
@@ -169,9 +165,9 @@ Remaining diffs in clone_sprite_edittext_dynamic: autoSize="right" dimension rec
 
 | Blocker | When | Key Result |
 |---------|------|------------|
-| TextField clone property accessors | 2026-03-14 | clone_sprite_edittext 94/94 PASS; dynamic 79/86 (remaining = autoSize bugs) |
-| SWF6 HTML paragraph semantics | 2026-03-14 | edittext_html_swf6 5377/5377 PASS |
-| Font metrics / text layout accuracy | 2026-03-14 | edittext_bullet 30/30 PASS |
+| TextField clone property accessors (#8) | 2026-03-14 | clone_sprite_edittext 94/94 PASS; dynamic 79/86 (remaining = autoSize bugs) |
+| SWF6 HTML paragraph semantics (#2) | 2026-03-14 | edittext_html_swf6 5377/5377 PASS |
+| Font metrics / text layout accuracy (#1) | 2026-03-14 | edittext_bullet 30/30 PASS |
 | Per-movie `_global` isolation | 2026-03-10 | CANCELLED — Ruffle shares `_global` |
 | MTASC class / recompiler infra | 2026-03-07 | All tests pass |
 | MC removal lifecycle / call() | 2026-03-05 | All tests pass |
@@ -184,27 +180,30 @@ Remaining diffs in clone_sprite_edittext_dynamic: autoSize="right" dimension rec
 
 ## Plans by Directory
 
-### `blocked/` — Genuinely blocked, no actionable steps
+### `complete/` — All planned work done
 
-| Plan | Tests | Pass Rate | Primary Blocker |
-|------|-------|-----------|----------------|
-| TEXTFIELD_PLAN | 62 | 58/62 | Font metrics (Blocker 1, resolved) + SWF6 HTML (Blocker 2, resolved) |
-| HTML_TEXT_REMAINING_WORK | 10 | 10/10 | RESOLVED — SWF6 HTML serialization (Blocker 2) |
-| TYPE_COERCION_ADVANCED_PLAN | 2 | 1/2 | Closure capture (Blocker 3) |
-| GLOBALS_PLAN | 31 | 28/31 | Enumeration order + missing globals (Blocker 4) |
-| HIT_TESTING_PLAN | 17 | 12/17 | Pixel shape testing (Blocker 5) + loadMovie (Blocker 6) |
-| LOADMOVIE_MULTI_SWF_PLAN | 2 | 0/2 | Image loading + convertString regression (Blocker 6) |
-| LOADMOVIE_REMAINING_PLAN | 5 | 3/5 | Image loading (Blocker 6), accepted diffs |
-| IGNORED_INFRASTRUCTURE_TESTS | 29 | 0/29 | Network/external infra (Blocker 7) |
-| CLONE_DUPLICATE_PLAN | 8 | 6/8 | Blocker 8 mostly resolved; remaining = autoSize bugs |
-| TELLTARGET_PLAN | 22 | 19/22 | Duplicate onPress (Blocker 9), 2 accepted/ignored |
+| Plan | Tests | Pass Rate | Resolution |
+|------|-------|-----------|------------|
+| HTML_TEXT_REMAINING_WORK | 10 | **10/10** | All HTML text tests PASS (SWF6 fixed 2026-03-14) |
+| CLONE_DUPLICATE_PLAN | 8 | **7/8** | Clone infrastructure complete; 7 remaining lines = textfield autoSize bugs |
+| MOVIECLIP_PLAN | 54 | **49/54** | All 10 phases done; remaining 5 tests blocked on loadMovie/image loading |
 
 ### `incomplete/` — Have actionable work remaining
 
 | Plan | Tests | Pass Rate | Next Step |
 |------|-------|-----------|-----------|
-| MOVIECLIP_PLAN | 54 | 43/54 | Phase 10: AS-level event dispatch + ordering |
-| BITMAP_DATA_PLAN | 17 | 8/17 | Phase 1: Pixel buffer + properties + pixel ops |
-| UNCOVERED_SMALL_TESTS_PLAN | 19 | 11/19 | Fix A/B: Removed MC listener/timer cleanup |
-| GLOBALS_PLAN | 31 | 28/31 | Phase 8c-4+: Missing properties, flags, instance construction |
-| CLONE_DUPLICATE_PLAN | 8 | 6/8 | Remaining: autoSize dimension bugs in clone_sprite_edittext_dynamic |
+| TEXTFIELD_PLAN | 62 | 59/62 | Font metrics improvements: edittext_scroll (52/54), edittext_newlines (23/30), edittext_tab_stops (45/60) |
+| BITMAP_DATA_PLAN | 17 | 12/17 | bitmap_data 1125/1126 (1 line), bitmap_filters segfault, low-ROI items |
+
+### `blocked/` — Genuinely blocked, no actionable steps
+
+| Plan | Tests | Pass Rate | Primary Blocker |
+|------|-------|-----------|----------------|
+| TYPE_COERCION_ADVANCED_PLAN | 2 | 1/2 | Closure capture (Blocker 3) |
+| GLOBALS_PLAN | 31 | 28/31 | Enumeration order + missing globals (Blocker 4) |
+| HIT_TESTING_PLAN | 17 | 13/17 | Pixel shape testing (Blocker 5) |
+| LOADMOVIE_MULTI_SWF_PLAN | 17 | 14/17 | Image loading + network (Blocker 6) |
+| LOADMOVIE_REMAINING_PLAN | 5 | 3/5 | Image loading (Blocker 6), accepted diffs |
+| IGNORED_INFRASTRUCTURE_TESTS | 23 | 0/23 | Network/external infra (Blocker 7) |
+| TELLTARGET_PLAN | 22 | 19/22 | Duplicate onPress (Blocker 9), 2 accepted/ignored |
+| UNCOVERED_SMALL_TESTS_PLAN | 19 | 13/19 | 0 actionable; 6 blocked on external features |

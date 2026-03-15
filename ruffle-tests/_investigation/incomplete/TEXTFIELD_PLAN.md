@@ -1,12 +1,14 @@
 # TextField/EditText Implementation Plan
 <!-- TESTS: text_format, text_format_rounding_swf7, text_format_rounding_swf8, edittext_default_format_font_style, edittext_antialiastype, edittext_default_format, edittext_default_format_empty, textfield_variable, textfield_properties, text_format_display, edittext_autosize_setter, textfield_background_color, textfield_border_color, textfield_text, edittext_password, textfield_maxchars, text_format_font_max_length, textfield_props_swf5, textfield_props_swf6, textfield_props_swf7, textfield_props_swf8, edittext_width_height, edittext_html_align_swf7, edittext_html_align_swf8, textfield_cache_as_bitmap, edittext_newline_stripping, edittext_newlines, edittext_programmatic_focus, edittext_autosize, edittext_font_size, edittext_text_height_leading, edittext_scroll, edittext_hscroll, edittext_html_roundtrip, edittext_html_color, edittext_html_condensewhite_swf7, edittext_html_condensewhite_swf8, edittext_html_entity, edittext_html_swf6, edittext_html_swf7, edittext_html_swf8, edittext_align, edittext_align_trailing_spaces_swf7, edittext_align_trailing_spaces_swf8, edittext_leading, edittext_margins, edittext_letter_spacing, edittext_tag_indent, edittext_bullet, edittext_underline, edittext_tab_stops, edittext_stylesheet, textsnapshot_available_text, textsnapshot_findtext, textsnapshot_gettext, textsnapshot_props_swf5, textsnapshot_props_swf6, textsnapshot_text_order, edittext_drag_select, edittext_focus_selection, edittext_ime_focus_lost, edittext_input, edittext_input_newlines, edittext_password_copy, edittext_paste_empty, edittext_place_caret, edittext_restrict, edittext_restrict_paste, edittext_tab_focus, movieclip_create_text_field -->
 
-Last updated: 2026-03-07
+Last updated: 2026-03-14
 
-## Status: ALL PHASES DONE → BLOCKED
+## Status: ALL PHASES DONE — INCOMPLETE (font metrics remaining)
 
-**57 tests passing, 5 tests failing (all blocked on deep features)**
+**59 tests passing, 3 tests failing (font metrics edge cases)**
 **13 additional interactive tests deferred (in ignored_tests.txt)**
+
+**Blockers 1 (Font Metrics) and 2 (SWF6 HTML) RESOLVED 2026-03-14.** edittext_bullet now 30/30 PASS, edittext_html_swf6 now 5377/5377 PASS. Remaining tests need incremental font metrics improvements (not blocked by external features).
 
 ### Implementation Commits
 - `8811360` — Phase 1: TextField constructor, prototype, and DefineEditText property expansion
@@ -24,7 +26,7 @@ Last updated: 2026-03-07
 - `3395c87` — Fix text field metrics: builtin Noto Sans, SWF8 trailing space trimming, align propagation
 - `0eefc289` — Fix font size clamping, htmlText non-HTML setter, trace \r→\n, Selection.setSelection, condenseWhite SWF8
 
-### Current Test Results (57 passing, 5 failing)
+### Current Test Results (59 passing, 3 failing)
 
 | Test | Lines | Status | Phase |
 |------|-------|--------|-------|
@@ -83,15 +85,20 @@ Last updated: 2026-03-07
 | textfield_cache_as_bitmap | 1/1 | **PASS** | 1 |
 | textsnapshot_text_order | 1/1 | **PASS** | 7 |
 
-### Remaining Failing Tests (5 tests — all blocked)
+### Remaining Failing Tests (3 tests — font metrics edge cases)
 
-| Test | Match | Blocker |
-|------|-------|---------|
-| edittext_html_swf6 | **5289/5377** | ~~SWF6 paragraph semantics~~ mostly fixed (swf_version >= 7 gates). Remaining 88 lines: trailing empty styled runs, empty paragraph font/color defaults |
+| Test | Match | Issue |
+|------|-------|-------|
 | edittext_scroll | 52/54 | Mixed-font maxscroll/bottomScroll computation — `ng_computeVisibleLines` uses single font; multi-font text boxes need per-line height tracking |
 | edittext_newlines | 23/30 | textWidth/textHeight computation accuracy (word wrap, mixed-font line height) |
-| edittext_bullet | 18/30 | textWidth/textHeight with bullet indent (font metrics / layout) |
 | edittext_tab_stops | 45/60 | Tab stop width computation (in ignored_tests.txt) |
+
+### Recently Resolved (2026-03-14)
+
+| Test | Old | New | Fix |
+|------|-----|-----|-----|
+| edittext_html_swf6 | 5289/5377 | **5377/5377 PASS** | SWF6 paragraph semantics (Blocker 2 resolved) |
+| edittext_bullet | 18/30 | **30/30 PASS** | Font metrics: line terminator height + trailing empty line skip (Blocker 1 resolved) |
 
 ### Phase Completion
 
@@ -105,17 +112,17 @@ Last updated: 2026-03-07
 | 6 | Text layout formatting properties | **DONE** (8 tests pass; bullet/tabstops blocked on font metrics) |
 | 7 | StyleSheet + TextSnapshot | **DONE** (all 7 tests PASS: textsnapshot_props_swf5/6, textsnapshot_gettext/findtext/available_text/text_order, edittext_stylesheet) |
 
-### Blockers
+### Remaining Work
 
-1. **Font metrics / text layout accuracy** (blocks: edittext_scroll, edittext_newlines, edittext_bullet, edittext_tab_stops): textWidth/textHeight and scroll computations are close but off for multi-font text boxes. Fixing requires per-line font height tracking, improved word wrapping, and bullet/tab stop indent handling. These are deep text layout issues that affect only a few lines per test.
+**Font metrics / text layout accuracy** (edittext_scroll, edittext_newlines, edittext_tab_stops): textWidth/textHeight and scroll computations are close but off for multi-font text boxes. Fixing requires per-line font height tracking, improved word wrapping, and tab stop indent handling. These are incremental improvements affecting only a few lines per test.
 
-2. **SWF6 HTML paragraph semantics** (blocks: edittext_html_swf6): SWF6 has fundamentally different HTML behavior from SWF7+ (~1500 differing lines): `\r` preserved in text getter, non-multiline fields split paragraphs at `\r` in htmlText output, empty text produces `<P>` wrapper. Would require version-specific HTML generation and text storage paths.
+### Resolved Blockers
 
-3. ~~**condenseWhite leading whitespace**~~ — **RESOLVED** (both condensewhite_swf7 311/311 and condensewhite_swf8 311/311 now PASS)
-
-4. ~~**TextSnapshot content extraction**~~ — **RESOLVED** (TEXTSNAPSHOT_PLAN complete → all 4 content tests PASS)
-
-5. ~~**StyleSheet CSS parser**~~ — **RESOLVED** (edittext_stylesheet 325/325 now PASS)
+1. ~~**Font metrics / text layout accuracy**~~ — **PARTIALLY RESOLVED** (edittext_bullet 30/30 PASS; remaining tests still have font metrics edge cases)
+2. ~~**SWF6 HTML paragraph semantics**~~ — **RESOLVED** (edittext_html_swf6 5377/5377 PASS)
+3. ~~**condenseWhite leading whitespace**~~ — **RESOLVED** (both condensewhite tests PASS)
+4. ~~**TextSnapshot content extraction**~~ — **RESOLVED** (TEXTSNAPSHOT_PLAN complete)
+5. ~~**StyleSheet CSS parser**~~ — **RESOLVED** (edittext_stylesheet 325/325 PASS)
 
 ---
 

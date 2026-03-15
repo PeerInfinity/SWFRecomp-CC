@@ -1,32 +1,17 @@
 # Ignored Infrastructure-Dependent Tests
-<!-- TESTS: bitmap_data, bitmap_data_compare, bitmap_data_copypixels, bitmap_data_noise, bitmap_data_threshold, bitmapdata_channels, file_reference_browse_cancel, file_reference_download_cancel, file_reference_download_httperror_dns_error, file_reference_download_httperror_status_code, file_reference_download_success, file_reference_upload_httperror_dns_error, file_reference_upload_httperror_status_code, file_reference_upload_success, form_loader_encoding_2, form_loader_encoding_3, form_loader_encoding_4, load_vars, netconnection_close, netconnection_send_remote, netstream_play_flv, netstream_play_flv_screen, netstream_seek_flv, sound_duration_position_props, sound_id3, sound_id3_prop, sound_load_start, sound_multiple_load, stylesheet_load -->
+<!-- TESTS: file_reference_browse_cancel, file_reference_download_cancel, file_reference_download_httperror_dns_error, file_reference_download_httperror_status_code, file_reference_download_success, file_reference_upload_httperror_dns_error, file_reference_upload_httperror_status_code, file_reference_upload_success, form_loader_encoding_2, form_loader_encoding_3, form_loader_encoding_4, load_vars, netconnection_close, netconnection_send_remote, netstream_play_flv, netstream_play_flv_screen, netstream_seek_flv, sound_duration_position_props, sound_id3, sound_id3_prop, sound_load_start, sound_multiple_load, stylesheet_load -->
 
-Last updated: 2026-03-12
+Last updated: 2026-03-14
 
-## Status: IGNORED — 29 tests, all in `ignored_tests.txt`
+## Status: IGNORED — 23 tests, all in `ignored_tests.txt`
 
-These 29 tests are excluded from filtered results because they require runtime infrastructure unavailable in our trace-only NO_GRAPHICS mode (network I/O, pixel-level bitmap operations, audio file loading, OS file dialogs, or video streaming). They are not actionable without major infrastructure additions.
+These 23 tests are excluded from filtered results because they require runtime infrastructure unavailable in our trace-only NO_GRAPHICS mode (network I/O, audio file loading, OS file dialogs, or video streaming). They are not actionable without major infrastructure additions.
 
----
-
-## Group 1: BitmapData Pixel Operations (6 tests)
-
-| Test | Expected | Match | Summary |
-|------|----------|-------|---------|
-| `bitmap_data` | 1126 | 69 (6%) | Comprehensive BitmapData API: width/height, rectangle, transparent, getPixel/getPixel32, setPixel, floodFill, copyChannel, clone, draw, scroll, merge, paletteMap |
-| `bitmap_data_compare` | 40 | 21 (52%) | BitmapData.compare() — pixel-level image comparison returning difference bitmap |
-| `bitmap_data_copypixels` | 17 | 3 (18%) | BitmapData.copyPixels() — block pixel copy with alpha/merge flags |
-| `bitmap_data_noise` | 631 | 334 (53%) | BitmapData.noise() — procedural noise generation, getPixel32 readback |
-| `bitmap_data_threshold` | 176 | 104 (59%) | BitmapData.threshold() — color threshold operations |
-| `bitmapdata_channels` | 19 | 11 (58%) | BitmapData channel constants (RED_CHANNEL, etc.) and copyChannel |
-
-**Why blocked**: These tests create BitmapData objects and call pixel-level methods (getPixel, setPixel, noise, threshold, copyPixels, etc.) that require an actual pixel buffer. Our BitmapData constructor creates the object but methods like `getPixel32()` return `undefined`. The constructor/property tests partially match (width, height return values), but any pixel manipulation fails.
-
-**What would be needed**: A software pixel buffer in the BitmapData constructor (e.g., malloc a width*height*4 RGBA buffer) and implementations of getPixel/setPixel/noise/threshold/etc operating on it. No GPU or graphics context needed — pure CPU pixel math. This is potentially achievable in NO_GRAPHICS mode but would be a significant implementation effort (~20+ methods).
+**Note (2026-03-14):** 6 BitmapData tests previously tracked here have been moved to BITMAP_DATA_PLAN (now in `incomplete/`). Most of those tests now pass (12/17 BitmapData tests passing) thanks to the software pixel buffer implementation.
 
 ---
 
-## Group 2: FileReference (8 tests)
+## Group 1: FileReference (8 tests)
 
 | Test | Expected | Match | Summary |
 |------|----------|-------|---------|
@@ -45,7 +30,7 @@ These 29 tests are excluded from filtered results because they require runtime i
 
 ---
 
-## Group 3: Sound Loading/Streaming (5 tests)
+## Group 2: Sound Loading/Streaming (5 tests)
 
 | Test | Expected | Match | Summary |
 |------|----------|-------|---------|
@@ -61,7 +46,7 @@ These 29 tests are excluded from filtered results because they require runtime i
 
 ---
 
-## Group 4: NetConnection/NetStream Video (5 tests)
+## Group 3: NetConnection/NetStream Video (5 tests)
 
 | Test | Expected | Match | Summary |
 |------|----------|-------|---------|
@@ -77,7 +62,7 @@ These 29 tests are excluded from filtered results because they require runtime i
 
 ---
 
-## Group 5: Network/Form Loading (5 tests)
+## Group 4: Network/Form Loading (5 tests)
 
 | Test | Expected | Match | Summary |
 |------|----------|-------|---------|
