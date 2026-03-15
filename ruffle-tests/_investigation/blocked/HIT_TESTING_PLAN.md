@@ -18,7 +18,7 @@ Last updated: 2026-03-14
 | movieclip_getbounds | 191 | **PASS** (191/191) | Was 186/191, now fully passing |
 | hittest_morph | 70 | **PASS** (70/70) | Morph interpolated bounds |
 | hittest_morph_input | 1 | **PASS** (1/1) ✅ | Fixed: ratio-aware bounds in mc_get_pixel_aabb_ng + gotoAndStop same-frame replay |
-| movieclip_hittest_shapeflag | 338 | 306/338 (32 diff) | Triangulation limitations: stroke, curves, masking, morph complex |
+| movieclip_hittest_shapeflag | 338 | 309/338 (29 diff) | Triangulation limitations: stroke, curves, device-font text, morph complex |
 | movieclip_invalid_get_bounds_1 | 75 | **PASS** (75/75) | Fixed: broadcastMessage MC `this` type + `g_use_new_invalid_bounds` flag |
 | movieclip_invalid_get_bounds_2 | 75 | **PASS** (75/75) | Fixed: root SWF version >= 8 check for sentinel flag |
 | movieclip_invalid_get_bounds_3 | 13 | **PASS** (13/13) | Fixed: onEnterFrame per-function version switching |
@@ -67,17 +67,21 @@ Fixed `hittest_morph_input` (0/1 → 1/1 PASS) with two changes:
 
 ## Remaining Failures (BLOCKED)
 
-### movieclip_hittest_shapeflag (32 diff lines) — Triangulation Limitations
-Remaining 32 failing lines fall into these categories:
-1. **Stroke inclusion** (4 lines): Flash includes stroke width in shape hit testing; we only test fill triangles
-2. **Curve approximation** (3 lines): Earcut triangulation straightens curves, so curved edges don't match Flash's vector path testing
-3. **Clip-depth masking** (3 lines): `hitTest(x,y,true)` should respect clip_depth masking; we don't check this
-4. **Drawing API false positives** (4 lines): Drawing API shapes use bounds check instead of vector path testing
-5. **Text/edittext shapes** (7 lines): Text shape bounds not included in shape-accurate hit testing
-6. **Complex shape outlines** (4 lines): BG art with complex paths not fully represented by triangulation
-7. **Morph complex shape** (4 lines): Morph shapes at interpolated ratios, bounds vs exact shape testing
+### movieclip_hittest_shapeflag (29 diff lines) — Triangulation Limitations
 
-**Blocker:** Fundamental fix requires vector-path-based hit testing (line segment intersection counting) instead of triangle-based approach. This is a significant architectural change.
+**Fixed (2026-03-14):**
+- **Clip-depth masking** (was 3 lines → 0): `ng_hitTestShapeFromDL` now tracks clip layers and filters masked children. Clip layers themselves are not hittable.
+- **setMask masking** (was 1 line → 0): hitTest now checks `mc->mask_mc` and tests point against mask shape.
+- **Glyph-level text hit testing**: Added per-glyph triangle testing for CHAR_TYPE_TEXT in `ng_hitTestShapeChar`. No visible effect on this test because fonts are device fonts (empty glyph shapes), but will help tests with embedded fonts.
+
+Remaining 29 failing lines:
+1. **Stroke edge precision** (5 lines): Stroke-to-triangle conversion in recompiler already generates stroke triangles, but triangulation approximation causes edge mismatches. Ruffle uses exact distance-to-path testing.
+2. **Curve approximation** (5 lines): Earcut triangulation straightens curves (donut/layer shapes). Points on curved edges miss or hit incorrectly.
+3. **Drawing API false positives** (4 lines): Drawing API shapes use bounds check instead of vector path testing.
+4. **Device-font text** (11 lines): Device fonts (Arial, Courier New) have empty glyph shapes in the SWF. Flash/Ruffle use system font outlines for hit testing; we have no font data.
+5. **Morph complex shape** (4 lines): Morph shapes with stroke-only paths (no fill triangles). Bounds-based testing is too coarse but no triangle data exists for interpolation.
+
+**Blocker:** Device-font text (11 lines) requires font outline data unavailable in the SWF. Curve/stroke precision (10 lines) would need vector-path-based hit testing. Drawing API (4 lines) needs path triangulation or ray-casting. Morph complex (4 lines) has no triangle data to interpolate.
 
 ### movieclip_invalid_get_bounds_6, _7 (1 diff line each) — LoadMovie Child Bounds
 Line 2 expects `550.45` (actual shape bounds from loaded child SWF) but we return the sentinel value (6710886.4 / 6710886.35). In NO_GRAPHICS mode, we don't have the child SWF's shape data available after loadMovie.

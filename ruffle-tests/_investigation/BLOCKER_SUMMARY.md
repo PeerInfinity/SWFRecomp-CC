@@ -79,13 +79,17 @@ Tests `global_proto_decls`, `global_proto_decls_delete`, and `global_instance_de
 
 ### Blocker 5: Pixel-Level Shape Hit Testing
 
-**Impact**: 1 test, ~73 lines
+**Impact**: 1 test, ~29 lines
 
-`movieclip_hittest_shapeflag` tests shape-accurate hit testing (not just bounding box). Our triangulation approach has edge cases: stroke inclusion, curve approximation, degenerate shared edges. Fundamental fix would require vector-path-based hit testing.
+`movieclip_hittest_shapeflag` tests shape-accurate hit testing (not just bounding box). Our triangulation approach has edge cases: stroke precision, curve approximation, device-font text, morph complex shapes.
+
+**Progress (2026-03-14):** Fixed clip-depth masking (2 lines), setMask masking (1 line), added glyph-level text hit testing (no visible effect — device fonts). Reduced from 32 → 29 diff lines.
+
+Remaining categories: device-font text (11 lines — no font outline data in SWF), curve/stroke precision (10 lines — triangulation approximation), drawing API bounds (4 lines), stroke-only morphs (4 lines).
 
 | Test | Match | Lines Off |
 |------|-------|-----------|
-| movieclip_hittest_shapeflag | ~266/339 | ~73 |
+| movieclip_hittest_shapeflag | ~309/338 | ~29 |
 
 **Plans blocked**: HIT_TESTING_PLAN
 
