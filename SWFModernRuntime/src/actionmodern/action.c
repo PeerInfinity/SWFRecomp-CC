@@ -17524,14 +17524,32 @@ ActionStackValueType convertString(SWFAppContext* app_context, char* var_str)
 				VAL(u64, &STACK_TOP_VALUE) = (u64) u16_type_Object;
 				STACK_TOP_N = 13;
 			} else {
-				// No toString method found (broken prototype chain or global object).
-				// Flash: objects without reachable toString stringify as "undefined"
-				if (g_swf_version >= 7) {
-					VAL(u64, &STACK_TOP_VALUE) = (u64) u16_undefined;
-					STACK_TOP_N = 9;
+				// No toString method found.
+				// Distinguish: broken proto chain (non-object __proto__) → "undefined"
+				//              missing/null proto or global_object → "undefined"
+				//              normal object without proto → "[object Object]"
+				ASObject* _cs_o = (ASObject*) _cs_obj.data.numeric_value;
+				int _cs_broken_proto = 0;
+				if (_cs_o == (ASObject*) global_object) {
+					_cs_broken_proto = 1;
+				} else if (_cs_o != NULL) {
+					ActionVar* _cs_pp = getProperty(_cs_o, "__proto__", 9);
+					if (_cs_pp != NULL && _cs_pp->type != ACTION_STACK_VALUE_OBJECT &&
+					    _cs_pp->type != ACTION_STACK_VALUE_UNDEFINED &&
+					    _cs_pp->type != ACTION_STACK_VALUE_NULL)
+						_cs_broken_proto = 1; // __proto__ is a non-object (boolean, number, etc.)
+				}
+				if (_cs_broken_proto) {
+					if (g_swf_version >= 7) {
+						VAL(u64, &STACK_TOP_VALUE) = (u64) u16_undefined;
+						STACK_TOP_N = 9;
+					} else {
+						VAL(u64, &STACK_TOP_VALUE) = (u64) u16_empty;
+						STACK_TOP_N = 0;
+					}
 				} else {
-					VAL(u64, &STACK_TOP_VALUE) = (u64) u16_empty;
-					STACK_TOP_N = 0;
+					VAL(u64, &STACK_TOP_VALUE) = (u64) u16_object_Object;
+					STACK_TOP_N = 15;
 				}
 			}
 			break;
