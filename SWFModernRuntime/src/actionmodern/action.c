@@ -45686,9 +45686,9 @@ void actionCallMethod(SWFAppContext* app_context, char* str_buffer)
 							hit = ng_hitTestShapeFromDL(_htdl, _htm,
 								_hwa, _hwb, _hwc, _hwd, _hwtx, _hwty, ptx, pty);
 						}
-						// Also check drawing bounds (for drawing-API shapes)
-						if (!hit && mc != NULL && mc->draw_has_bounds) {
-							// Inverse-transform test point to MC's local pixel space
+						// Also check drawing API shapes
+						if (!hit && mc != NULL && mc->draw_has_bounds && mc->drawing_state != NULL) {
+							// Inverse-transform test point to MC's local space (twips)
 							double _hwa=1, _hwb=0, _hwc=0, _hwd=1, _hwtx=0, _hwty=0;
 							getConcatMatrixForMC(mc, &_hwa, &_hwb, &_hwc, &_hwd, &_hwtx, &_hwty);
 							double ddet = _hwa*_hwd - _hwb*_hwc;
@@ -45698,7 +45698,46 @@ void actionCallMethod(SWFAppContext* app_context, char* str_buffer)
 								double dsx = dpx - _hwtx, dsy = dpy - _hwty;
 								double dlx = (_hwd*dsx - _hwc*dsy) * dinv;
 								double dly = (-_hwb*dsx + _hwa*dsy) * dinv;
-								// Check if in draw bounds (pixels)
+								// Bounds fast reject (pixels)
+								if (dlx >= mc->draw_xmin && dlx <= mc->draw_xmax &&
+								    dly >= mc->draw_ymin && dly <= mc->draw_ymax) {
+									// Test against actual drawing path triangles (in twips)
+									double ltx = dlx * 20.0, lty = dly * 20.0;
+									DrawingState* _hds = (DrawingState*)mc->drawing_state;
+									for (u32 _hdp = 0; _hdp < _hds->path_count && !hit; _hdp++) {
+										DrawPath* _hdpath = &_hds->paths[_hdp];
+										// Test fill triangles
+										for (u32 _hdv = 0; _hdv + 5 < _hdpath->fill_vert_count * 2 && !hit; _hdv += 6) {
+											float* fv = &_hdpath->fill_verts[_hdv];
+											double d1 = (ltx - (double)fv[2]) * ((double)fv[1] - (double)fv[3]) - ((double)fv[0] - (double)fv[2]) * (lty - (double)fv[3]);
+											double d2 = (ltx - (double)fv[4]) * ((double)fv[3] - (double)fv[5]) - ((double)fv[2] - (double)fv[4]) * (lty - (double)fv[5]);
+											double d3 = (ltx - (double)fv[0]) * ((double)fv[5] - (double)fv[1]) - ((double)fv[4] - (double)fv[0]) * (lty - (double)fv[1]);
+											if (!((d1 < 0 || d2 < 0 || d3 < 0) && (d1 > 0 || d2 > 0 || d3 > 0)))
+												hit = 1;
+										}
+										// Test line triangles
+										for (u32 _hdv = 0; _hdv + 5 < _hdpath->line_vert_count * 2 && !hit; _hdv += 6) {
+											float* lv = &_hdpath->line_verts[_hdv];
+											double d1 = (ltx - (double)lv[2]) * ((double)lv[1] - (double)lv[3]) - ((double)lv[0] - (double)lv[2]) * (lty - (double)lv[3]);
+											double d2 = (ltx - (double)lv[4]) * ((double)lv[3] - (double)lv[5]) - ((double)lv[2] - (double)lv[4]) * (lty - (double)lv[5]);
+											double d3 = (ltx - (double)lv[0]) * ((double)lv[5] - (double)lv[1]) - ((double)lv[4] - (double)lv[0]) * (lty - (double)lv[1]);
+											if (!((d1 < 0 || d2 < 0 || d3 < 0) && (d1 > 0 || d2 > 0 || d3 > 0)))
+												hit = 1;
+										}
+									}
+								}
+							}
+						} else if (!hit && mc != NULL && mc->draw_has_bounds) {
+							// Fallback: bounds check if no drawing_state (shouldn't happen normally)
+							double _hwa=1, _hwb=0, _hwc=0, _hwd=1, _hwtx=0, _hwty=0;
+							getConcatMatrixForMC(mc, &_hwa, &_hwb, &_hwc, &_hwd, &_hwtx, &_hwty);
+							double ddet = _hwa*_hwd - _hwb*_hwc;
+							if (ddet != 0.0) {
+								double dinv = 1.0 / ddet;
+								double dpx = ptx / 20.0, dpy = pty / 20.0;
+								double dsx = dpx - _hwtx, dsy = dpy - _hwty;
+								double dlx = (_hwd*dsx - _hwc*dsy) * dinv;
+								double dly = (-_hwb*dsx + _hwa*dsy) * dinv;
 								hit = (dlx >= mc->draw_xmin && dlx <= mc->draw_xmax &&
 								       dly >= mc->draw_ymin && dly <= mc->draw_ymax);
 							}
