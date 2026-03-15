@@ -3007,6 +3007,8 @@ int ng_computeBoundsFromDL(DisplayObject* dl, size_t dl_max,
 // Shape-accurate point-in-shape test (for hitTest shapeFlag=true)
 // ---------------------------------------------------------------------------
 extern u32 shape_data[][4];
+extern u32 glyph_data[][1];
+extern u32 text_data[];
 
 // Test if a point is inside a single triangle (barycentric coordinates)
 static int pit(double px, double py,
@@ -3049,6 +3051,56 @@ static int ng_hitTestShapeChar(size_t char_id, u16 ratio,
 	}
 
 	Character* ch = &dictionary[char_id];
+
+	// Static text (DefineText/DefineText2): per-glyph triangle hit testing
+	if (ch->type == CHAR_TYPE_TEXT) {
+		size_t ts = ch->text_start;
+		size_t tc = ch->text_size;
+		u32 tf_base = ch->transform_start;
+		for (size_t j = 0; j < tc; j++) {
+			size_t gi = 2 * (size_t)text_data[ts + j];
+			size_t glyph_offset = (size_t)glyph_data[gi][0];
+			size_t glyph_size = (size_t)glyph_data[gi + 1][0];
+			if (glyph_size < 3) continue;  // no triangles
+			// Compose parent matrix with glyph positioning transform
+			u32 gtid = tf_base + (u32)j;
+			double ga = (double)transform_data[gtid][0];
+			double gb = (double)transform_data[gtid][1];
+			double gc = (double)transform_data[gtid][4];
+			double gd = (double)transform_data[gtid][5];
+			double gtx_v = (double)transform_data[gtid][12];
+			double gty_v = (double)transform_data[gtid][13];
+			double na = ma*ga + mc_m*gb, nb = mb*ga + md*gb;
+			double nc = ma*gc + mc_m*gd, nd = mb*gc + md*gd;
+			double ntx = ma*gtx_v + mc_m*gty_v + mtx;
+			double nty = mb*gtx_v + md*gty_v + mty;
+			// Inverse transform test point to glyph-local space
+			double det = na * nd - nb * nc;
+			if (det == 0.0) continue;
+			double inv_det = 1.0 / det;
+			double sx = test_x - ntx;
+			double sy = test_y - nty;
+			double local_x = ( nd * sx - nc * sy) * inv_det;
+			double local_y = (-nb * sx + na * sy) * inv_det;
+			// Test against glyph triangles
+			size_t num_tris = glyph_size / 3;
+			for (size_t t = 0; t < num_tris; t++) {
+				const u32* v0 = shape_data[glyph_offset + t*3 + 0];
+				const u32* v1 = shape_data[glyph_offset + t*3 + 1];
+				const u32* v2 = shape_data[glyph_offset + t*3 + 2];
+				double ax = (double)*(const float*)&v0[0];
+				double ay = (double)*(const float*)&v0[1];
+				double bx = (double)*(const float*)&v1[0];
+				double by = (double)*(const float*)&v1[1];
+				double cx = (double)*(const float*)&v2[0];
+				double cy = (double)*(const float*)&v2[1];
+				if (pit(local_x, local_y, ax, ay, bx, by, cx, cy))
+					return 1;
+			}
+		}
+		return 0;
+	}
+
 	int is_morph = (ch->type == CHAR_TYPE_MORPH_SHAPE);
 	if (ch->type != CHAR_TYPE_SHAPE && !is_morph) return 0;
 
