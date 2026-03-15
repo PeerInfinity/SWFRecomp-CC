@@ -2947,13 +2947,15 @@ int ng_computeBoundsFromDL_matrix(DisplayObject* dl, size_t dl_max,
 	for (size_t i = 1; i <= dl_max; i++) {
 		DisplayObject* child = &dl[i];
 		if (child->char_id == 0) continue;
-		u32 tid = child->transform_id;
-		float ca = transform_data[tid][0];
-		float cb = transform_data[tid][1];
-		float cc = transform_data[tid][4];
-		float cd = transform_data[tid][5];
-		float ctxf = transform_data[tid][12];
-		float ctyf = transform_data[tid][13];
+		// Use cached transform values (stored at placement time by ng_cache_transform).
+		// This ensures correct transforms for child SWFs whose transform_data
+		// is a different array than the main SWF's.
+		float ca = child->place_a;
+		float cb = child->place_b;
+		float cc = child->place_c;
+		float cd = child->place_d;
+		float ctxf = child->place_tx;
+		float ctyf = child->place_ty;
 		// Ruffle composes matrices in f32 arithmetic
 		float fma = (float)ma, fmb = (float)mb, fmc = (float)mc, fmd = (float)md;
 		float fmtx = (float)mtx, fmty = (float)mty;

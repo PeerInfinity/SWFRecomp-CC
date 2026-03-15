@@ -24,8 +24,8 @@ Last updated: 2026-03-14
 | movieclip_invalid_get_bounds_3 | 13 | **PASS** (13/13) | Fixed: onEnterFrame per-function version switching |
 | movieclip_invalid_get_bounds_4 | 13 | **PASS** (13/13) | Same fixes as above |
 | movieclip_invalid_get_bounds_5 | 11 | **PASS** (11/11) | Same fixes as above |
-| movieclip_invalid_get_bounds_6 | 10 | 9/10 (1 diff) | Needs loaded child SWF shape data (loadMovie) |
-| movieclip_invalid_get_bounds_7 | 10 | 9/10 (1 diff) | Same issue as _6 |
+| movieclip_invalid_get_bounds_6 | 10 | **PASS** (10/10) | Fixed: child SWF transform_data + getBounds fallback |
+| movieclip_invalid_get_bounds_7 | 10 | **PASS** (10/10) | Same fix as _6 |
 | movieclip_invalid_get_bounds_8 | 11 | **PASS** (11/11) | Fixed with same sentinel flag changes |
 | text_blocks_clicks | 4 | 3/4 (1 diff) | Droptarget bounds precision — edittext bounds too narrow |
 
@@ -83,10 +83,12 @@ Remaining 29 failing lines:
 
 **Blocker:** Device-font text (11 lines) requires font outline data unavailable in the SWF. Curve/stroke precision (10 lines) would need vector-path-based hit testing. Drawing API (4 lines) needs path triangulation or ray-casting. Morph complex (4 lines) has no triangle data to interpolate.
 
-### movieclip_invalid_get_bounds_6, _7 (1 diff line each) — LoadMovie Child Bounds
-Line 2 expects `550.45` (actual shape bounds from loaded child SWF) but we return the sentinel value (6710886.4 / 6710886.35). In NO_GRAPHICS mode, we don't have the child SWF's shape data available after loadMovie.
+### ~~movieclip_invalid_get_bounds_6, _7~~ — RESOLVED
 
-**Blocker:** Would require implementing loadMovie SWF parsing in NO_GRAPHICS mode to extract child shape bounds.
+**Resolved 2026-03-14.** Three changes:
+1. Include child SWF's `transform_data` array in movie wrapper files (prefixed names, via verify_output.py)
+2. Cache transform values on `DisplayObject` at `tagPlaceObject2` time using per-movie `g_active_transform_data` pointer
+3. `getBounds` fallback: when MC has no `sprite_display_list` but has a `movie_id`, scan root display_list for child SWF entries and recurse into their sprite display lists
 
 ### text_blocks_clicks (1 diff line) — Droptarget Bounds Precision
 Line 4 expects `_droptarget = "/texts"` but gets `/click_mc`. The `texts` sprite's content bounds (from its text/edittext children) are slightly smaller than the mouse position (4612 twips < mouse 4680 twips). The edittext's DefineEditText bounds don't extend to where Flash considers the sprite clickable.

@@ -849,10 +849,30 @@ def generate_child_movie_file(child_swf_name, child_recomp_dir, build_dir, swf_f
         lines.append(modified)
         lines.append("")
 
+    # Extract and include child's transform_data from draws.c (for correct getBounds
+    # on loaded movies — ng_cache_transform needs the child SWF's transform array).
+    draws_c_path = child_recomp_dir / "RecompiledTags" / "draws.c"
+    has_child_transforms = False
+    if draws_c_path.exists():
+        draws_text = draws_c_path.read_text()
+        # Extract transform_data array definition
+        td_match = re.search(
+            r'(float\s+transform_data\[\d+\]\[16\]\s*=\s*\{.*?\};)',
+            draws_text, re.DOTALL)
+        if td_match:
+            td_def = td_match.group(1)
+            # Rename to prefixed name
+            td_def = td_def.replace('transform_data', f'{prefix}_transform_data', 1)
+            lines.append(f"// Child SWF transform data (for getBounds on loaded movies)")
+            lines.append(td_def)
+            lines.append("")
+            has_child_transforms = True
+
     # Generate the movie entry struct access function
     lines.append(f"// Movie entry for {child_swf_name}")
     lines.append(f"#include <libswf/swf.h>")
     lines.append("")
+    td_ptr = f"{prefix}_transform_data" if has_child_transforms else "NULL"
     lines.append(f"MovieEntry {prefix}_movie_entry = {{")
     lines.append(f'    .filename = "{child_swf_name}",')
     lines.append(f"    .frame_funcs = {prefix}_frame_funcs,")
@@ -863,6 +883,7 @@ def generate_child_movie_file(child_swf_name, child_recomp_dir, build_dir, swf_f
     lines.append(f"    .stage_height = {frame_height},")
     lines.append(f"    .file_size = {swf_file_size},")
     lines.append(f"    .movie_id = {movie_id},")
+    lines.append(f"    .transform_data_ptr = {td_ptr},")
     lines.append(f"}};")
     lines.append("")
 

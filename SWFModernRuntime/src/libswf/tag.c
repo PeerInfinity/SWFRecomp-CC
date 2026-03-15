@@ -29,6 +29,21 @@ extern int g_tag_skip_mode;
 // NO_GRAPHICS / HEADLESS: extern data arrays from generated code
 extern float transform_data[][16];
 extern float cxform_data[];
+
+// Active transform data pointer — defaults to main SWF's transform_data.
+// Swapped to child SWF's array during child movie init so that tagPlaceObject2
+// caches correct transform values on display objects (needed for getBounds on loaded movies).
+float (*g_active_transform_data)[16] = NULL;
+
+static inline void ng_cache_transform(DisplayObject* obj, u32 tid) {
+	float (*td)[16] = g_active_transform_data ? g_active_transform_data : transform_data;
+	obj->place_a  = td[tid][0];
+	obj->place_b  = td[tid][1];
+	obj->place_c  = td[tid][4];
+	obj->place_d  = td[tid][5];
+	obj->place_tx = td[tid][12];
+	obj->place_ty = td[tid][13];
+}
 #endif
 
 size_t dictionary_capacity = INITIAL_DICTIONARY_CAPACITY;
@@ -2908,6 +2923,7 @@ void tagPlaceObject2(SWFAppContext* app_context, size_t depth, size_t char_id, u
 		init_cx_fields(&display_list[depth]);
 		if (depth > max_depth) max_depth = depth;
 #ifdef NO_GRAPHICS
+		ng_cache_transform(&display_list[depth], transform_id);
 		// Re-init cxform via ng_on_place_object2 (handles ng_init_cxform_from_data internally).
 		// Pass actual char_id so type detection works.
 		// Preserve sprite_needs_init if already set (sprite awaiting Phase 2 init from
@@ -2939,6 +2955,7 @@ void tagPlaceObject2(SWFAppContext* app_context, size_t depth, size_t char_id, u
 			{
 				// Same character: treat as modify, preserve sprite state
 				display_list[depth].transform_id = transform_id;
+				ng_cache_transform(&display_list[depth], transform_id);
 				display_list[depth].cxform_id = cxform_id;
 				display_list[depth].has_cxform = (cxform_id != 0) ? 1 : 0;
 				if (clip_depth != 0) display_list[depth].clip_depth = clip_depth;
@@ -2970,6 +2987,7 @@ void tagPlaceObject2(SWFAppContext* app_context, size_t depth, size_t char_id, u
 					// but suppress sprite init (the MC already exists in cache).
 					display_list[depth].char_id = char_id;
 					display_list[depth].transform_id = transform_id;
+					ng_cache_transform(&display_list[depth], transform_id);
 					display_list[depth].cxform_id = cxform_id;
 					display_list[depth].has_cxform = (cxform_id != 0) ? 1 : 0;
 					display_list[depth].clip_depth = clip_depth;
@@ -3007,6 +3025,7 @@ void tagPlaceObject2(SWFAppContext* app_context, size_t depth, size_t char_id, u
 	    && display_list[depth].place_gen != g_place_gen)
 	{
 		display_list[depth].transform_id = transform_id;
+		ng_cache_transform(&display_list[depth], transform_id);
 		display_list[depth].cxform_id = cxform_id;
 		display_list[depth].has_cxform = (cxform_id != 0) ? 1 : 0;
 		if (clip_depth != 0) display_list[depth].clip_depth = clip_depth;
@@ -3030,6 +3049,9 @@ void tagPlaceObject2(SWFAppContext* app_context, size_t depth, size_t char_id, u
 		}
 		// Same character at same depth in same frame: treat as modify (don't re-init)
 		display_list[depth].transform_id = transform_id;
+#ifdef NO_GRAPHICS
+		ng_cache_transform(&display_list[depth], transform_id);
+#endif
 		display_list[depth].cxform_id = cxform_id;
 		display_list[depth].has_cxform = (cxform_id != 0) ? 1 : 0;
 		if (clip_depth != 0) display_list[depth].clip_depth = clip_depth;
@@ -3040,6 +3062,9 @@ void tagPlaceObject2(SWFAppContext* app_context, size_t depth, size_t char_id, u
 
 	display_list[depth].char_id = char_id;
 	display_list[depth].transform_id = transform_id;
+#ifdef NO_GRAPHICS
+	ng_cache_transform(&display_list[depth], transform_id);
+#endif
 	display_list[depth].cxform_id = cxform_id;
 	display_list[depth].has_cxform = (cxform_id != 0) ? 1 : 0;
 	display_list[depth].clip_depth = clip_depth;
@@ -3273,6 +3298,7 @@ void tagPlaceObject2Ratio(SWFAppContext* app_context, size_t depth, size_t char_
 			if (display_list[depth].char_id == char_id)
 			{
 				display_list[depth].transform_id = transform_id;
+				ng_cache_transform(&display_list[depth], transform_id);
 				display_list[depth].cxform_id = cxform_id;
 				display_list[depth].has_cxform = (cxform_id != 0) ? 1 : 0;
 				if (clip_depth != 0) display_list[depth].clip_depth = clip_depth;
@@ -3296,7 +3322,12 @@ void tagPlaceObject2Ratio(SWFAppContext* app_context, size_t depth, size_t char_
 	if (char_id == 0 && display_list[depth].char_id != 0)
 	{
 		// Update only the fields that PlaceObject2 can modify
-		if (transform_id != 0) display_list[depth].transform_id = transform_id;
+		if (transform_id != 0) {
+			display_list[depth].transform_id = transform_id;
+#ifdef NO_GRAPHICS
+			ng_cache_transform(&display_list[depth], transform_id);
+#endif
+		}
 		if (cxform_id != 0) {
 			display_list[depth].cxform_id = cxform_id;
 			display_list[depth].has_cxform = 1;
@@ -3308,6 +3339,9 @@ void tagPlaceObject2Ratio(SWFAppContext* app_context, size_t depth, size_t char_
 
 	display_list[depth].char_id = char_id;
 	display_list[depth].transform_id = transform_id;
+#ifdef NO_GRAPHICS
+	ng_cache_transform(&display_list[depth], transform_id);
+#endif
 	display_list[depth].cxform_id = cxform_id;
 	display_list[depth].has_cxform = (cxform_id != 0) ? 1 : 0;
 	display_list[depth].clip_depth = clip_depth;

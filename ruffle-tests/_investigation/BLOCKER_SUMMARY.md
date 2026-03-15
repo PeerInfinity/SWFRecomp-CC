@@ -97,18 +97,20 @@ Remaining categories: device-font text (11 lines — no font outline data in SWF
 
 ### Blocker 6: LoadMovie Remaining Gaps
 
-**Impact**: ~4 tests blocked on image loading, sandbox types, or shape bounds in NO_GRAPHICS mode
+**Impact**: ~2 tests blocked on image loading or sandbox types
 
-Core loadMovie infrastructure is complete (33/35 tests pass). Remaining gaps:
+Core loadMovie infrastructure is complete (35/37 tests pass). Remaining gaps:
 
 | Gap | Tests | Status |
 |-----|-------|--------|
 | Image decoding via loadMovie | movieclip_state_values (39/114) | Infeasible in NO_GRAPHICS — in ACCEPTED_DIFFS |
 | Remote sandbox type | sandbox_type_remote (1/3) | Needs multi-SWF with remote sandbox |
-| Shape bounds in NO_GRAPHICS | movieclip_invalid_get_bounds_6/7 (9/10 each) | Need child SWF shape data after load |
-| `convertString` signature regression | All multi-SWF tests | Pre-existing compile failure in multi-SWF builds |
 
-**Plans blocked**: LOADMOVIE_MULTI_SWF_PLAN, LOADMOVIE_REMAINING_PLAN, HIT_TESTING_PLAN
+**Resolved 2026-03-14:**
+- ~~Shape bounds in NO_GRAPHICS~~ — movieclip_invalid_get_bounds_6/7 now 10/10 each. Fix: include child SWF transform_data in movie wrappers, cache transforms on DisplayObject at placement time, getBounds fallback scans root display_list for child movie entries.
+- ~~`convertString` signature regression~~ — NOT A REAL BLOCKER. Multi-SWF tests pass (register_class 66/66, mcl_events_swf_version 232/232). `convertString` is purely internal to action.c.
+
+**Plans blocked**: LOADMOVIE_MULTI_SWF_PLAN (image loading), LOADMOVIE_REMAINING_PLAN (sandbox)
 
 ---
 

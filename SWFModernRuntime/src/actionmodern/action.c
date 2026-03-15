@@ -14523,6 +14523,7 @@ void actionFirePendingDirectLoads(SWFAppContext* app_context)
 		DisplayObject* _saved_dl = NULL;
 		size_t _saved_max = 0, _saved_cap = 0;
 		int _did_swap = 0;
+		float (*_saved_td)[16] = NULL;
 		if (loads[i].is_level) {
 			DisplayObject* dobj = mc->display_obj ? (DisplayObject*)mc->display_obj : NULL;
 			if (dobj != NULL && dobj->sprite_display_list != NULL) {
@@ -14533,6 +14534,14 @@ void actionFirePendingDirectLoads(SWFAppContext* app_context)
 				max_depth = dobj->sprite_max_depth;
 				display_list_capacity = dobj->sprite_dl_capacity;
 				_did_swap = 1;
+			}
+		}
+		// Swap transform_data to child's array (for correct ng_cache_transform)
+		{
+			extern float (*g_active_transform_data)[16];
+			if (entry->transform_data_ptr != NULL) {
+				_saved_td = g_active_transform_data;
+				g_active_transform_data = entry->transform_data_ptr;
 			}
 		}
 
@@ -14572,6 +14581,10 @@ void actionFirePendingDirectLoads(SWFAppContext* app_context)
 			display_list = _saved_dl;
 			max_depth = _saved_max;
 			display_list_capacity = _saved_cap;
+		}
+		if (_saved_td != NULL) {
+			extern float (*g_active_transform_data)[16];
+			g_active_transform_data = _saved_td;
 		}
 
 		actionSetCurrentContext(_saved_ctx);
@@ -21424,11 +21437,30 @@ void actionFirePendingLoadInits(SWFAppContext* app_context)
             if (versionGroup(g_swf_version) == 0 && g_global_legacy) global_object = g_global_legacy;
             else if (versionGroup(g_swf_version) == 1 && g_global_modern) global_object = g_global_modern;
             if (loads[i].target != NULL) actionSetCurrentContext(loads[i].target);
+
+            // Swap transform_data pointer so ng_cache_transform stores correct
+            // transform values for child SWF display objects (needed for getBounds).
+            float (*_p2_saved_td)[16] = NULL;
+            {
+                extern float (*g_active_transform_data)[16];
+                if (loads[i].entry->transform_data_ptr != NULL) {
+                    _p2_saved_td = g_active_transform_data;
+                    g_active_transform_data = loads[i].entry->transform_data_ptr;
+                }
+            }
+
             loads[i].entry->init_func(app_context);
             if (loads[i].entry->frame_count > 0 && loads[i].entry->frame_funcs != NULL
                 && loads[i].entry->frame_funcs[0] != NULL) {
                 loads[i].entry->frame_funcs[0](app_context);
             }
+
+            // Restore transform_data
+            if (_p2_saved_td != NULL) {
+                extern float (*g_active_transform_data)[16];
+                g_active_transform_data = _p2_saved_td;
+            }
+
             actionSetCurrentContext(_saved_ctx);
             g_swf_version = _saved_ver;
             global_object = _saved_global;
@@ -45297,6 +45329,26 @@ void actionCallMethod(SWFAppContext* app_context, char* str_buffer)
 					ng_computeBoundsFromDL_matrix(mc_dl, mc_dl_max,
 						1.0, 0.0, 0.0, 1.0, 0.0, 0.0,
 						&has_bounds, &lxmin, &lymin, &lxmax, &lymax);
+				}
+
+				// Fallback for loaded child SWFs: content is on root display_list
+				// (not in MC's sprite_display_list). Scan root DL for entries in the
+				// child's char_id range and recurse into their sprite_display_lists.
+				if (!has_bounds && mc_dl == NULL && mc != NULL && mc->movie_id > 0 && mc->framesloaded > 0) {
+					size_t cid_base = (size_t)mc->movie_id * 1000;
+					size_t cid_end = cid_base + 1000;
+					for (size_t d = 1; d <= max_depth; d++) {
+						if (display_list[d].char_id == 0) continue;
+						if (display_list[d].char_id < cid_base || display_list[d].char_id >= cid_end) continue;
+						DisplayObject* child = &display_list[d];
+						if (child->sprite_display_list != NULL && child->sprite_max_depth > 0) {
+							ng_computeBoundsFromDL_matrix(child->sprite_display_list, child->sprite_max_depth,
+								(double)child->place_a, (double)child->place_b,
+								(double)child->place_c, (double)child->place_d,
+								(double)child->place_tx, (double)child->place_ty,
+								&has_bounds, &lxmin, &lymin, &lxmax, &lymax);
+						}
+					}
 				}
 
 				// Include drawing bounds
