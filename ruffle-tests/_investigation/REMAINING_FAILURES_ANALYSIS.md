@@ -1,17 +1,15 @@
 # Remaining Filtered Failures Analysis
 
-Date: 2026-03-14
-CI run: 31f06ecb (554/619 total, 544/565 filtered = 96.3%)
+Date: 2026-03-15
+CI run: 86ba0864 (555/619 total, 545/565 filtered = 96.5%)
 
-21 filtered tests still failing. This document analyzes each one with local test output, root cause, and fix feasibility.
+20 filtered tests still failing. This document analyzes each one with local test output, root cause, and fix feasibility.
 
 ## Summary Table
 
 | Test | Match | Total | Rate | Difficulty | Category |
 |------|-------|-------|------|------------|----------|
-| text_blocks_clicks | 3 | 4 | 75% | Easy | droptarget hit-test |
-| tab_ordering_properties_tab_index_edge_case | 1 | 4 | 25% | Easy-Medium | tabIndex property |
-| unload_nested_child | 0 | 5 | 0% | Medium | nested unload handler |
+| unload_nested_child | 2 | 5 | 40% | Medium-Hard | nested unload handler + deferred timing |
 | clone_sprite_edittext_dynamic | 78 | 86 | 91% | Medium | TF clone bounds |
 | edittext_drag_select | 6 | 9 | 67% | Medium | selection markers |
 | issue_2084 | 4 | 16 | 25% | Medium | nested sprite init |
@@ -31,19 +29,21 @@ CI run: 31f06ecb (554/619 total, 544/565 filtered = 96.3%)
 | movieclip_methods_with_loaded_image | 0 | 4 | 0% | Very Hard | external PNG loading |
 | sandbox_type_remote | 0 | 3 | 0% | Very Hard | multi-SWF sandbox |
 
-## Tier 1: Quick Wins (3 tests, +3 pass)
+## Tier 1: Quick Wins (0 tests)
 
-### text_blocks_clicks (3/4 lines)
+*All quick wins resolved:*
+- ~~text_blocks_clicks~~ — **FIXED** (df1f69a2): DefineText bounds now registered via `ng_record_char_bounds`, enabling sprite content bounds for `_droptarget`.
+- ~~tab_ordering_properties_tab_index_edge_case~~ — Already in `ignored_tests.txt` (Ruffle `known_failure`, contradicts `tab_ordering_properties` coercion semantics).
 
-Single line wrong: `_droptarget` returns `/click_mc` instead of `/texts`. After `startDrag`, the drop target resolution doesn't detect text field container clips correctly. Fix is in the `_droptarget` hit-test path — needs to check text field parent MCs.
+### unload_nested_child (2/5 lines)
 
-### tab_ordering_properties_tab_index_edge_case (1/4 lines)
+**Previous**: 0/5 (button click not working). **Now**: 2/5 (click works after nested MC hit-test fix).
 
-Lines 1-2 expect `"asdf"`/`"asdf2"` but get `undefined`; line 4 expects `"asdf3"` but gets `5`. The `tabIndex` getter is returning undefined or raw numeric instead of assigned string-like values. Likely needs tabIndex property getter/setter type coercion fix.
+Remaining 3 wrong lines:
+1. **Ordering**: "unload" fires before "go completed" — should be after. In Flash, `nextFrame()` does NOT execute the target frame inline; the unload and DoAction scripts are deferred until the frame loop processes the frame. Our `ng_executeGotoTagsOnly` runs tags inline during nextFrame.
+2. **`_level0.clip` vs `undefined`**: After removal, `getVariable("clip")` returns `undefined` instead of `_level0.clip`. The removed MC should persist as pending removal (it has a child with UNLOAD clip action) and remain findable by name for one frame.
 
-### unload_nested_child (0/5 lines)
-
-Expects: `go completed`, `unload`, `frame 2`, `_level0.clip`, `frame 3`. No output at all. Involves a nested child unload handler that should fire during removal, plus continued frame execution after goto. May be close to existing unload infrastructure (the `unload` test passes 52/52).
+Root cause: `fire_recursive_child_unloads` fires inline during `tagRemoveObject2`, but Flash defers child unload execution to the start of the next frame. Also, `ng_on_remove_object` doesn't detect UNLOAD handlers on CHILDREN of the removed sprite, only on the removed entry itself.
 
 ## Tier 2: Medium Effort (4 tests, +4 pass)
 
@@ -138,12 +138,10 @@ Requires multi-SWF loading with different sandbox type configurations (`[network
 
 ## Recommended Priority Order
 
-1. **text_blocks_clicks** — 1 line to fix, targeted droptarget bug
-2. **tab_ordering_properties_tab_index_edge_case** — 3 lines to fix, tabIndex getter
-3. **unload_nested_child** — 5 lines, may leverage existing unload code
-4. **clone_sprite_edittext_dynamic** — 91% match, 8 lines of TF clone fixes
-5. **edittext_drag_select** — 3 lines, selection marker positioning
-6. **issue_2084** — nested sprite init ordering
-7. **asfunction** — focused feature (asfunction: URL protocol)
+1. **unload_nested_child** — 3 remaining lines, needs deferred unload timing + recursive child unload detection
+2. **clone_sprite_edittext_dynamic** — 91% match, 8 lines of TF clone fixes
+3. **edittext_drag_select** — 3 lines, selection marker positioning
+4. **issue_2084** — nested sprite init ordering
+5. **asfunction** — focused feature (asfunction: URL protocol)
 
-Tests 8-21 are either blocked by missing infrastructure, have diminishing returns, or require architectural changes not worth the effort at 96.3% filtered pass rate.
+Tests 6-19 are either blocked by missing infrastructure, have diminishing returns, or require architectural changes not worth the effort at 96.5% filtered pass rate.
