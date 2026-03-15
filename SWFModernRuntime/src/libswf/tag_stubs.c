@@ -99,6 +99,7 @@ static struct {
 	u16 code_table[MAX_FONT_GLYPHS];   // glyph index → Unicode code point
 	s16 advance_table[MAX_FONT_GLYPHS]; // glyph index → advance width (EM units)
 	size_t glyph_count;
+	int is_builtin; // 1 = lazy-registered fallback (Noto Sans), not from SWF DefineFont
 } ng_fonts[MAX_FONTS_NG];
 static size_t ng_font_count = 0;
 
@@ -560,6 +561,7 @@ static void ng_ensure_builtin_font(void)
 	strncpy(ng_fonts[idx].name, "Noto Sans", sizeof(ng_fonts[idx].name) - 1);
 	ng_fonts[idx].bold = 0;
 	ng_fonts[idx].italic = 0;
+	ng_fonts[idx].is_builtin = 1;
 	ng_fonts[idx].has_metrics = 1;
 	ng_fonts[idx].ascent = BUILTIN_NOTO_SANS_ASCENT;
 	ng_fonts[idx].descent = BUILTIN_NOTO_SANS_DESCENT;
@@ -3514,6 +3516,15 @@ const char* ng_getFontName(u16 font_id)
 {
 	for (size_t i = 0; i < ng_font_count; i++)
 		if (ng_fonts[i].font_id == font_id) return ng_fonts[i].name;
+	return "";
+}
+
+// Like ng_getFontName but skips builtin fallback fonts (returns "" for builtins).
+// Used by tf_get_defaults to avoid overriding "Times New Roman" default with "Noto Sans".
+const char* ng_getFontNameSWFDefined(u16 font_id)
+{
+	for (size_t i = 0; i < ng_font_count; i++)
+		if (ng_fonts[i].font_id == font_id && !ng_fonts[i].is_builtin) return ng_fonts[i].name;
 	return "";
 }
 

@@ -14912,7 +14912,9 @@ static void tf_get_defaults(MovieClip* mc, TFRun* def) {
 	strcpy(def->font_name, "Times New Roman");
 	if (mc->ng_textfield_idx >= 0) {
 		u16 fid = ng_getTextFieldFontId(mc->ng_textfield_idx);
-		const char* fn = ng_getFontName(fid);
+		// Use SWF-defined font name only (skip builtin Noto Sans fallback)
+		// so device fonts keep the default "Times New Roman" name
+		const char* fn = ng_getFontNameSWFDefined(fid);
 		if (fn[0] != '\0') {
 			strncpy(def->font_name, fn, 63);
 			def->font_name[63] = '\0';
@@ -25929,7 +25931,11 @@ void actionSetVariable(SWFAppContext* app_context)
 			mc->as_set_flags |= 16;
 #endif
 			handled = 1; }
-		else if (strcasecmp(var_name, "_alpha") == 0) { mc->alpha = fval; handled = 1; }
+		else if (strcasecmp(var_name, "_alpha") == 0) {
+			// Quantize through 8.8 fixed-point like Flash's color transform
+			mc->alpha = (float)((double)(int16_t)roundf(fval * 256.0f / 100.0f) * 100.0 / 256.0);
+			handled = 1;
+		}
 		else if (strcasecmp(var_name, "_visible") == 0) {
 			int new_vis = (fval != 0.0f) ? 1 : 0;
 			if (mc->visible && !new_vis && g_focused_mc == mc)
@@ -30340,7 +30346,8 @@ void actionSetMember(SWFAppContext* app_context)
 				}
 				if (strcasecmp(prop_name, "_alpha") == 0) {
 					if (dval_invalid) return;
-					mc->alpha = fval; return;
+					// Quantize through 8.8 fixed-point like Flash's color transform
+					mc->alpha = (float)((double)(int16_t)roundf(fval * 256.0f / 100.0f) * 100.0 / 256.0); return;
 				}
 				if (strcasecmp(prop_name, "_visible") == 0) {
 					// _visible: undefined and null are no-ops (preserve current value)
@@ -31012,6 +31019,16 @@ void actionSetMember(SWFAppContext* app_context)
 			if (prop_name_len == 10 && strncmp(prop_name, "styleSheet", 10) == 0
 				&& MC_IS_TEXTFIELD(mc) && mc->dynamic_props != NULL)
 			{
+				// Setting a stylesheet resets scroll positions
+				if (value_var.type == ACTION_STACK_VALUE_OBJECT) {
+					ASObject* _ss_set_props = (ASObject*) mc->dynamic_props;
+					ActionVar _ss_zero = {0}; _ss_zero.type = ACTION_STACK_VALUE_F64;
+					VAL(double, &_ss_zero.data.numeric_value) = 0.0;
+					setProperty(app_context, _ss_set_props, "hscroll", 7, &_ss_zero);
+					ActionVar _ss_one = {0}; _ss_one.type = ACTION_STACK_VALUE_F64;
+					VAL(double, &_ss_one.data.numeric_value) = 1.0;
+					setProperty(app_context, _ss_set_props, "scroll", 6, &_ss_one);
+				}
 				// Check if we're REMOVING the stylesheet (setting to null/undefined/non-object)
 				int _ss_removing = (value_var.type != ACTION_STACK_VALUE_OBJECT);
 				// Check if there was a stylesheet before
@@ -35634,7 +35651,8 @@ void actionSetProperty(SWFAppContext* app_context)
 #endif
 			break;
 		case 6:  // _alpha
-			mc->alpha = num_value;
+			// Quantize through 8.8 fixed-point like Flash's color transform
+			mc->alpha = (float)((double)(int16_t)roundf(num_value * 256.0f / 100.0f) * 100.0 / 256.0);
 			break;
 		case 7: { // _visible
 			int new_vis = (num_value != 0.0f) ? 1 : 0;
@@ -36202,7 +36220,11 @@ static int setMCBuiltinProperty(SWFAppContext* app_context, MovieClip* mc, const
 #endif
 		mc->rotation = normalizeRotation(fval); return 1;
 	}
-	if (strcasecmp(name, "_alpha") == 0) { mc->alpha = fval; return 1; }
+	if (strcasecmp(name, "_alpha") == 0) {
+		// Quantize through 8.8 fixed-point like Flash's color transform
+		mc->alpha = (float)((double)(int16_t)roundf(fval * 256.0f / 100.0f) * 100.0 / 256.0);
+		return 1;
+	}
 	if (strcasecmp(name, "_visible") == 0) {
 		int new_vis = (fval != 0.0f) ? 1 : 0;
 		if (mc->visible && !new_vis && g_focused_mc == mc)

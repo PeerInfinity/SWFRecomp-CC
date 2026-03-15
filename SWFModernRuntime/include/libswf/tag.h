@@ -203,6 +203,7 @@ void ng_getTextFieldBounds(int tf_idx, s32* xmin, s32* xmax, s32* ymin, s32* yma
 const char* ng_getTextFieldRawHtml(int tf_idx);
 const char* ng_getTextFieldInitialTextByIdx(int tf_idx);
 const char* ng_getFontName(u16 font_id);
+const char* ng_getFontNameSWFDefined(u16 font_id);
 int ng_getFontBold(u16 font_id);
 int ng_getFontItalic(u16 font_id);
 int ng_getTransformId(size_t depth, u32* out_id);

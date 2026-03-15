@@ -133,18 +133,23 @@ Tests requiring HTTP requests, file dialogs, audio/video streaming, or browser J
 
 ---
 
-### Blocker 8: TextField Clone Property Accessors
+### Blocker 8: TextField Clone Property Accessors — MOSTLY RESOLVED
 
-**Impact**: 2 tests, ~165 lines
+**Impact**: 1 test remaining, 7 lines (pre-existing textfield issues, not clone-specific)
 
-When a TextField is cloned via `duplicateMovieClip`, the clone's MC doesn't have TextField property accessors wired up (`multiline`, `password`, `text`, `textColor`, `autoSize`, etc. all return `undefined`).
+**Resolved 2026-03-14.** Three fixes:
+1. `_alpha` quantization through 8.8 fixed-point (Flash stores alpha as int16, not raw float)
+2. StyleSheet setter resets `hscroll=0` and `scroll=1` when a stylesheet is assigned
+3. Device font name: `tf_get_defaults` now skips builtin Noto Sans fallback (font_id=0) and keeps "Times New Roman" default for device fonts
 
-| Test | Match | Lines Off |
-|------|-------|-----------|
-| clone_sprite_edittext | ~26/94 | ~137 |
-| clone_sprite_edittext_dynamic | ~52/86 | ~69 |
+| Test | Match | Lines Off | Notes |
+|------|-------|-----------|-------|
+| clone_sprite_edittext | 94/94 | 0 | **PASS** |
+| clone_sprite_edittext_dynamic | 79/86 | 7 | All 7 diffs are pre-existing textfield autoSize/dimension bugs on ORIGINAL textfield, not clone-specific |
 
-**Plans blocked**: CLONE_DUPLICATE_PLAN (Phase 2)
+Remaining diffs in clone_sprite_edittext_dynamic: autoSize="right" dimension recalculation (5 lines), htmlText word-wrapping (1 line), height precision in rotated bounding box (1 line).
+
+**Plans blocked**: None (clone infrastructure complete; remaining diffs are general textfield issues)
 
 ---
 
@@ -162,6 +167,7 @@ When a TextField is cloned via `duplicateMovieClip`, the clone's MC doesn't have
 
 | Blocker | When | Key Result |
 |---------|------|------------|
+| TextField clone property accessors | 2026-03-14 | clone_sprite_edittext 94/94 PASS; dynamic 79/86 (remaining = autoSize bugs) |
 | SWF6 HTML paragraph semantics | 2026-03-14 | edittext_html_swf6 5377/5377 PASS |
 | Font metrics / text layout accuracy | 2026-03-14 | edittext_bullet 30/30 PASS |
 | Per-movie `_global` isolation | 2026-03-10 | CANCELLED — Ruffle shares `_global` |
@@ -188,7 +194,7 @@ When a TextField is cloned via `duplicateMovieClip`, the clone's MC doesn't have
 | LOADMOVIE_MULTI_SWF_PLAN | 2 | 0/2 | Image loading + convertString regression (Blocker 6) |
 | LOADMOVIE_REMAINING_PLAN | 5 | 3/5 | Image loading (Blocker 6), accepted diffs |
 | IGNORED_INFRASTRUCTURE_TESTS | 29 | 0/29 | Network/external infra (Blocker 7) |
-| CLONE_DUPLICATE_PLAN | 8 | 5/8 | TextField clone accessors (Blocker 8) |
+| CLONE_DUPLICATE_PLAN | 8 | 6/8 | Blocker 8 mostly resolved; remaining = autoSize bugs |
 | TELLTARGET_PLAN | 22 | 19/22 | Duplicate onPress (Blocker 9), 2 accepted/ignored |
 
 ### `incomplete/` — Have actionable work remaining
@@ -199,4 +205,4 @@ When a TextField is cloned via `duplicateMovieClip`, the clone's MC doesn't have
 | BITMAP_DATA_PLAN | 17 | 8/17 | Phase 1: Pixel buffer + properties + pixel ops |
 | UNCOVERED_SMALL_TESTS_PLAN | 19 | 11/19 | Fix A/B: Removed MC listener/timer cleanup |
 | GLOBALS_PLAN | 31 | 28/31 | Phase 8c-4+: Missing properties, flags, instance construction |
-| CLONE_DUPLICATE_PLAN | 8 | 5/8 | Phase 2: TextField clone properties |
+| CLONE_DUPLICATE_PLAN | 8 | 6/8 | Remaining: autoSize dimension bugs in clone_sprite_edittext_dynamic |
