@@ -5122,6 +5122,8 @@ static ActionVar invokePropertyGetter(SWFAppContext* app_context, ASFunction* fu
 // Boolean/Number/String, creates a wrapper ASObject, sets __proto__ and __constructor__,
 // calls the constructor, and mutates obj_var from primitive to OBJECT type.
 // Returns 1 if boxing occurred, 0 if not (constructor not found or is built-in stub).
+// Returns: 1 = auto-boxed, 0 = no constructor found (use _global for Function.call/apply),
+//          -1 = built-in stub constructor found (use primitive passthrough for Function.call/apply)
 static int tryAutoBoxPrimitive(SWFAppContext* app_context, ActionVar* obj_var, ASObject* active_global)
 {
 	if (obj_var->type != ACTION_STACK_VALUE_BOOLEAN &&
@@ -5137,6 +5139,7 @@ static int tryAutoBoxPrimitive(SWFAppContext* app_context, ActionVar* obj_var, A
 	else { ctor_name = "String"; ctor_name_len = 6; }
 
 	ASFunction* box_ctor = NULL;
+	int found_builtin_stub = 0;
 	if (active_global != NULL) {
 		ASProperty* gp = findPropertyStructWithPrototype(active_global, ctor_name, ctor_name_len);
 		if (gp != NULL) {
@@ -5152,11 +5155,13 @@ static int tryAutoBoxPrimitive(SWFAppContext* app_context, ActionVar* obj_var, A
 				// Built-in stubs have advanced_func=NULL and simple_func=NULL
 				if (cf != NULL && (cf->advanced_func != NULL || cf->simple_func != NULL))
 					box_ctor = cf;
+				else if (cf != NULL && strncmp(cf->name, ctor_name, ctor_name_len) == 0 && cf->name[ctor_name_len] == '\0')
+					found_builtin_stub = 1; // Original built-in constructor for this type
 			}
 		}
 	}
 
-	if (box_ctor == NULL) return 0;
+	if (box_ctor == NULL) return found_builtin_stub ? -1 : 0;
 
 	// Create wrapper object: new Constructor(primitive_value)
 	ASObject* wrapper = allocObject(app_context, 4);
@@ -17519,19 +17524,14 @@ ActionStackValueType convertString(SWFAppContext* app_context, char* var_str)
 				VAL(u64, &STACK_TOP_VALUE) = (u64) u16_type_Object;
 				STACK_TOP_N = 13;
 			} else {
-				// No toString method found.
-				// Flash: global object stringifies as "undefined"
-				if ((void*)_cs_obj.data.numeric_value == (void*)global_object) {
-					if (g_swf_version >= 7) {
-						VAL(u64, &STACK_TOP_VALUE) = (u64) u16_undefined;
-						STACK_TOP_N = 9;
-					} else {
-						VAL(u64, &STACK_TOP_VALUE) = (u64) u16_empty;
-						STACK_TOP_N = 0;
-					}
+				// No toString method found (broken prototype chain or global object).
+				// Flash: objects without reachable toString stringify as "undefined"
+				if (g_swf_version >= 7) {
+					VAL(u64, &STACK_TOP_VALUE) = (u64) u16_undefined;
+					STACK_TOP_N = 9;
 				} else {
-					VAL(u64, &STACK_TOP_VALUE) = (u64) u16_object_Object;
-					STACK_TOP_N = 15;
+					VAL(u64, &STACK_TOP_VALUE) = (u64) u16_empty;
+					STACK_TOP_N = 0;
 				}
 			}
 			break;
@@ -35162,6 +35162,14 @@ void actionNewMethod(SWFAppContext* app_context)
 			}
 		}
 
+		// Auto-box primitives: new primitive() → side-effect only (getter/constructor traces), push undefined
+		if (obj_var.type == ACTION_STACK_VALUE_STRING ||
+		    obj_var.type == ACTION_STACK_VALUE_BOOLEAN ||
+		    obj_var.type == ACTION_STACK_VALUE_F32 ||
+		    obj_var.type == ACTION_STACK_VALUE_F64) {
+			tryAutoBoxPrimitive(app_context, &obj_var, getActiveGlobal());
+		}
+
 		// If not a function object, push undefined
 		pushUndefined(app_context);
 		return;
@@ -42866,12 +42874,16 @@ void actionCallMethod(SWFAppContext* app_context, char* str_buffer)
 						this_obj = (void*) global_object;
 					} else {
 						// Primitive thisArg — auto-box if constructor was replaced
-						if (tryAutoBoxPrimitive(app_context, &args[0], getActiveGlobal())) {
+						int box_result = tryAutoBoxPrimitive(app_context, &args[0], getActiveGlobal());
+						if (box_result == 1) {
 							this_obj = (void*)(uintptr_t) args[0].data.numeric_value;
-						} else {
-							// Primitive thisArg (F32, F64, STRING, BOOLEAN) — pass via g_override_this
+						} else if (box_result == -1) {
+							// Built-in stub constructor exists — pass primitive as-is
 							g_override_this = args[0];
 							g_override_this_set = 1;
+						} else {
+							// No constructor found — Flash falls back to _global
+							this_obj = (void*) global_object;
 						}
 					}
 				}
@@ -43060,12 +43072,16 @@ void actionCallMethod(SWFAppContext* app_context, char* str_buffer)
 						this_obj = (void*) global_object;
 					} else {
 						// Primitive thisArg — auto-box if constructor was replaced
-						if (tryAutoBoxPrimitive(app_context, &args[0], getActiveGlobal())) {
+						int box_result_ap = tryAutoBoxPrimitive(app_context, &args[0], getActiveGlobal());
+						if (box_result_ap == 1) {
 							this_obj = (void*)(uintptr_t) args[0].data.numeric_value;
-						} else {
-							// Primitive thisArg (F32, F64, STRING, BOOLEAN) — pass via g_override_this
+						} else if (box_result_ap == -1) {
+							// Built-in stub constructor exists — pass primitive as-is
 							g_override_this = args[0];
 							g_override_this_set = 1;
+						} else {
+							// No constructor found — Flash falls back to _global
+							this_obj = (void*) global_object;
 						}
 					}
 				}
