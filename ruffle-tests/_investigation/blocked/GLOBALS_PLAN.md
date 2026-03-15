@@ -41,7 +41,7 @@ Last updated: 2026-03-14
 | native_subclasses | PASS | 100% | **PASS** | |
 | global_proto_decls | 82/4487 | ~2% | **FAIL** | Phase 8c — lines 1-82 match (+5 from 8c-2.5), then cascading mismatches |
 | global_proto_decls_delete | 47/4115 | ~1% | **FAIL** | Phase 8c — first 65 lines mostly align, cascading order mismatches in flash.* |
-| global_instance_decls | 4/760 | ~1% | **FAIL** | Phase 8d — systematic READ_ONLY/DONT_DELETE on all instance properties |
+| global_instance_decls | 15/756 | ~2% | **FAIL** | Phase 8d — registerGeomMethod fix resolved contains() issue; remaining: DONT_DELETE on instance __proto__, missing instance properties |
 
 ---
 
@@ -103,15 +103,9 @@ This causes cascading misalignment in proto_decls_delete starting around line 65
 
 **Root cause identified (2026-03-14):** SetMember and GetMember both work correctly on instances — properties are written and read back as STRING. The systematic "READ_ONLY" label comes from the test's `contains(modifiable, key)` helper returning UNDEFINED instead of BOOLEAN for ALL calls.
 
-**Investigation findings:**
-- `contains` IS called with correct args: array (type=12) with 11 elements, string key (type=0)
-- Array elements ARE correctly stored as STRING (verified via Enumerate2 dump: all 11 keys present, all elem_type=0)
-- Array GetMember `arr[10]` correctly returns STRING with str_size=9
-- BUT: `func2_contains_0` returns `type=3` (UNDEFINED) instead of BOOLEAN — the function body does NOT reach either explicit return statement (BOOLEAN true at label_53 drain, or BOOLEAN false at label_75)
-- Issue reproduces at BOTH -O0 and -O2 (not a GCC optimization bug)
-- The generated function code is correct: for-in loop with StrictEquals comparison, both BOOLEAN return paths present
+**Root cause found and FIXED (2026-03-14, 79f6c1c2):** `registerGeomMethod` was adding prototype methods (e.g., `Rectangle.contains`) to the global `function_registry`. When the test defined a user function `contains`, it was registered at index 0 (before ensureGlobalInit). Then ensureGlobalInit registered `Rectangle.contains` at a higher index (~249). `lookupFunctionByName` searched in reverse (highest index first), finding `Rectangle.contains` instead of the user's `contains`. The user's `contains` helper returned UNDEFINED because it was dispatching to `rectContains` (a native Rectangle method) instead of the user-defined loop function.
 
-**Actual blocker:** `func2_contains_0` (a DefineFunction2-generated C function) runs but bypasses all return statements, falling through to the default `return undefined`. Root cause unknown — may be related to stack corruption, peekVar/popVar interaction with the for-in loop, or a subtle issue in how the function body's C goto-label structure interacts with the ActionScript stack. Needs deeper investigation with a manual debug build or a custom test SWF.
+**Fix:** Removed `function_registry` addition from `registerGeomMethod` — prototype methods are accessible via the prototype chain, not the global function name lookup. The existing `registerProtoMethod` (used for BitmapData) already had this fix; `registerGeomMethod` now matches.
 
 **Also needed** (separate from the array bug):
 - Missing instance-specific properties (PrintJob: paperHeight/paperWidth/etc., FileReference: name/type/size/etc.)

@@ -63,7 +63,7 @@ Tests `global_proto_decls`, `global_proto_decls_delete`, and `global_instance_de
 1. **constructor DONT_ENUM conflict** — `constructor` on built-in prototypes is DONT_ENUM in our code but expected ENUMERABLE; making it ENUMERABLE breaks 7+ passing tests
 2. **flash.* constructor own_props order** — Some flash.automation constructors expect different property insertion orders, causing cascading misalignment in proto_decls_delete
 3. **Missing properties** — Key constants (20), Mouse/Accessibility methods, StageCapture.prototype methods, Object.prototype.constructor, Function.prototype apply/call
-4. **Array element STRING→F64 corruption** (global_instance_decls) — SetMember/GetMember work correctly, but the test's `contains(arr, val)` helper fails because array element retrieval returns F64 instead of STRING after push+for-in+GetMember cycle
+4. ~~**registerGeomMethod function_registry pollution**~~ (global_instance_decls) — **FIXED** (79f6c1c2). Prototype methods (Rectangle.contains) were shadowing user-defined functions in lookupFunctionByName. Test's `contains` helper now works correctly. Remaining gaps: missing DONT_DELETE on instance __proto__, missing instance-specific properties
 
 **Progress (2026-03-14, 20b44c31):** Fixed `actionDelete` for ASFunction (was silently succeeding), added DONT_DELETE on built-in prototype/constructor props, created prototype_obj + own_props for all flash.* stub constructors. global_proto_decls improved 77→82 lines, global_instance_decls improved 1→4 lines.
 
