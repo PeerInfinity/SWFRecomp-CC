@@ -2099,6 +2099,29 @@ void ng_on_place_object2(SWFAppContext* app_context, size_t depth, size_t char_i
 	}
 }
 
+// Recursively check a sprite's children for UNLOAD clip actions.
+static int has_child_unload_handler(DisplayObject* dl, size_t dl_max)
+{
+	for (size_t d = 1; d <= dl_max; d++) {
+		if (dl[d].char_id == 0) continue;
+		// Check this child's clip_actions
+		for (size_t ca = 0; ca < dl[d].clip_action_count; ca++) {
+			if (dl[d].clip_actions[ca].event_flags & 0x4)
+				return 1;
+		}
+		for (size_t ca = 0; ca < dl[d].accumulated_clip_action_count; ca++) {
+			if (dl[d].accumulated_clip_actions[ca].event_flags & 0x4)
+				return 1;
+		}
+		// Recurse into child sprites
+		if (dl[d].sprite_display_list != NULL && dl[d].sprite_max_depth > 0) {
+			if (has_child_unload_handler(dl[d].sprite_display_list, dl[d].sprite_max_depth))
+				return 1;
+		}
+	}
+	return 0;
+}
+
 void ng_on_remove_object(SWFAppContext* app_context, size_t depth)
 {
 	if (depth > max_depth || display_list[depth].char_id == 0) return;
@@ -2128,6 +2151,12 @@ void ng_on_remove_object(SWFAppContext* app_context, size_t depth)
 		// Check AS-level onUnload property
 		if (!has_unload) {
 			has_unload = actionMCHasOnUnloadProperty(display_list[depth].instance_name, (int)depth);
+		}
+		// Check children of this sprite for UNLOAD handlers (recursive)
+		if (!has_unload && display_list[depth].sprite_display_list != NULL &&
+		    display_list[depth].sprite_max_depth > 0) {
+			has_unload = has_child_unload_handler(display_list[depth].sprite_display_list,
+			                                      display_list[depth].sprite_max_depth);
 		}
 		if (has_unload) {
 			actionMarkMCPendingRemoval(app_context, display_list[depth].instance_name, (int)depth);
