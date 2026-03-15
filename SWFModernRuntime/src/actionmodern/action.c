@@ -17077,8 +17077,21 @@ static void mcGetEffectiveSize(MovieClip* mc, double* eff_w, double* eff_h)
 		double s = fabs(sin(rot_rad));
 		double sw_twips = abs_sw * 20.0;
 		double sh_twips = abs_sh * 20.0;
-		*eff_w = round(sw_twips * c + sh_twips * s) / 20.0;
-		*eff_h = round(sw_twips * s + sh_twips * c) / 20.0;
+		// Compute AABB by computing exact corner coordinates from matrix
+		// multiplication, rounding each to nearest twip, then finding max-min.
+		// Corners of (0,0)-(sw,sh) rotated: P0=(0,0), P1=(sw*c, sw*s),
+		// P2=(sw*c - sh*s, sw*s + sh*c), P3=(-sh*s, sh*c)
+		double cx[4] = { 0, round(sw_twips * c), round(sw_twips * c - sh_twips * s), round(-sh_twips * s) };
+		double cy[4] = { 0, round(sw_twips * s), round(sw_twips * s + sh_twips * c), round(sh_twips * c) };
+		double max_x = cx[0], min_x = cx[0], max_y = cy[0], min_y = cy[0];
+		for (int i = 1; i < 4; i++) {
+			if (cx[i] > max_x) max_x = cx[i];
+			if (cx[i] < min_x) min_x = cx[i];
+			if (cy[i] > max_y) max_y = cy[i];
+			if (cy[i] < min_y) min_y = cy[i];
+		}
+		*eff_w = (max_x - min_x) / 20.0;
+		*eff_h = (max_y - min_y) / 20.0;
 	}
 }
 
