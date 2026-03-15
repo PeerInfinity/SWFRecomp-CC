@@ -31480,24 +31480,10 @@ void actionSetMember(SWFAppContext* app_context)
 					}
 				}
 			}
-			// tabIndex coercion: text fields use u32, buttons/MCs use i32 with NaN preservation
+			// tabIndex: store value as-is (Flash preserves the type).
+			// Numeric coercion happens only when computing tab order.
 			if (prop_name_len == 8 && strncmp(prop_name, "tabIndex", 8) == 0)
 			{
-				if (value_var.type != ACTION_STACK_VALUE_UNDEFINED)
-				{
-					double dval = varToDoubleSimple(&value_var);
-					if (MC_IS_TEXTFIELD(mc)) {
-						// Text fields: unsigned 32-bit coercion, NaN → 0
-						value_var.type = ACTION_STACK_VALUE_F64;
-						VAL(double, &value_var.data.numeric_value) =
-							isnan(dval) ? 0.0 : (double)(uint32_t)ecmaToInt32(dval);
-					} else {
-						// Buttons / MovieClips: signed 32-bit coercion, NaN → preserve previous
-						if (isnan(dval)) return;
-						value_var.type = ACTION_STACK_VALUE_F64;
-						VAL(double, &value_var.data.numeric_value) = (double)ecmaToInt32(dval);
-					}
-				}
 				// Regular MCs (not textfield, not button): tabIndex is non-enumerable
 				if (!MC_IS_TEXTFIELD(mc) && !mc->is_button_mc)
 				{
@@ -32951,8 +32937,15 @@ void actionGetMember(SWFAppContext* app_context)
 					// Sync display_obj
 					if (mc->display_obj != NULL) {
 						DisplayObject* _pdobj = (DisplayObject*)mc->display_obj;
-						if (_pdobj->sprite_display_list != NULL && _early_depth <= _pdobj->sprite_max_depth)
+						if (_pdobj->sprite_display_list != NULL && _early_depth <= _pdobj->sprite_max_depth) {
 							_early_mc->display_obj = (void*)&_pdobj->sprite_display_list[_early_depth];
+							// Sync x/y from child's display object transform
+							extern void ng_getDisplayObjTranslation(void* dobj_ptr, float* tx, float* ty);
+							float _dtx, _dty;
+							ng_getDisplayObjTranslation(_early_mc->display_obj, &_dtx, &_dty);
+							if (!(_early_mc->as_set_flags & 1)) _early_mc->x = _dtx;
+							if (!(_early_mc->as_set_flags & 2)) _early_mc->y = _dty;
+						}
 					}
 					PUSH(ACTION_STACK_VALUE_MOVIECLIP, (u64)_early_mc);
 					return;
@@ -33379,8 +33372,15 @@ void actionGetMember(SWFAppContext* app_context)
 					// Link to display list entry so nested child lookups work
 					if (mc->display_obj != NULL) {
 						DisplayObject* parent_dobj = (DisplayObject*)mc->display_obj;
-						if (parent_dobj->sprite_display_list != NULL && child_depth <= parent_dobj->sprite_max_depth)
+						if (parent_dobj->sprite_display_list != NULL && child_depth <= parent_dobj->sprite_max_depth) {
 							child_mc->display_obj = (void*)&parent_dobj->sprite_display_list[child_depth];
+							// Sync x/y from child's display object transform
+							extern void ng_getDisplayObjTranslation(void* dobj_ptr, float* tx, float* ty);
+							float _dtx, _dty;
+							ng_getDisplayObjTranslation(child_mc->display_obj, &_dtx, &_dty);
+							if (!(child_mc->as_set_flags & 1)) child_mc->x = _dtx;
+							if (!(child_mc->as_set_flags & 2)) child_mc->y = _dty;
+						}
 					}
 					PUSH(ACTION_STACK_VALUE_MOVIECLIP, (u64)child_mc);
 					return;
@@ -47537,6 +47537,15 @@ static int mc_get_pixel_aabb_ng(MovieClip* mc, float* x1, float* y1, float* x2, 
 	*y1 = mc->y + bymin * sy;
 	*x2 = mc->x + bxmax * sx;
 	*y2 = mc->y + bymax * sy;
+	// Walk parent chain to convert local bounds to stage pixel space
+	MovieClip* p = mc->parent;
+	while (p != NULL) {
+		*x1 += p->x;
+		*x2 += p->x;
+		*y1 += p->y;
+		*y2 += p->y;
+		p = p->parent;
+	}
 	if (*x1 > *x2) { float t = *x1; *x1 = *x2; *x2 = t; }
 	if (*y1 > *y2) { float t = *y1; *y1 = *y2; *y2 = t; }
 	return 1;

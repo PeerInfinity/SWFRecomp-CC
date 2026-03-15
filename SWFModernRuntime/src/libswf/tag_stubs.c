@@ -2518,6 +2518,16 @@ int ng_getTransformXY(size_t depth, float* out_x, float* out_y)
 	return 1;
 }
 
+// Get translation (in pixels) from a DisplayObject pointer (for walking parent chains).
+void ng_getDisplayObjTranslation(void* dobj_ptr, float* out_tx, float* out_ty)
+{
+	if (dobj_ptr == NULL) { *out_tx = 0; *out_ty = 0; return; }
+	DisplayObject* dobj = (DisplayObject*)dobj_ptr;
+	u32 tid = dobj->transform_id;
+	*out_tx = transform_data[tid][12] / 20.0f;
+	*out_ty = transform_data[tid][13] / 20.0f;
+}
+
 int ng_getTransformXY_d(size_t depth, double* out_x, double* out_y)
 {
 	if (depth > max_depth || display_list[depth].char_id == 0) return 0;

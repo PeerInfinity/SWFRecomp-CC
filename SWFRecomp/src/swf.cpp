@@ -1759,6 +1759,11 @@ namespace SWFRecomp
 
 				tag.parseFields(cur_pos);
 
+				s32 text_bounds_xmin = (s32) tag.fields[1].value;
+				s32 text_bounds_xmax = (s32) tag.fields[2].value;
+				s32 text_bounds_ymin = (s32) tag.fields[3].value;
+				s32 text_bounds_ymax = (s32) tag.fields[4].value;
+
 				MATRIX matrix;
 				parseMatrix(matrix);
 
@@ -1971,7 +1976,11 @@ namespace SWFRecomp
 							 << to_string(text_start) << ", "
 							 << to_string(text_size) << ", "
 							 << to_string(transform_start) << ", "
-							 << to_string(cxform_id)
+							 << to_string(cxform_id) << ", "
+							 << to_string(text_bounds_xmin) << ", "
+							 << to_string(text_bounds_xmax) << ", "
+							 << to_string(text_bounds_ymin) << ", "
+							 << to_string(text_bounds_ymax)
 							 << ");";
 				}
 
@@ -2184,7 +2193,11 @@ namespace SWFRecomp
 							 << to_string(text_start) << ", "
 							 << to_string(text_size) << ", "
 							 << to_string(transform_start) << ", "
-							 << to_string(cxform_id)
+							 << to_string(cxform_id) << ", "
+							 << to_string(bounds_xmin) << ", "
+							 << to_string(bounds_xmax) << ", "
+							 << to_string(bounds_ymin) << ", "
+							 << to_string(bounds_ymax)
 							 << ");";
 				}
 
