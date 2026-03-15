@@ -17052,13 +17052,17 @@ static int mcGetOriginalBounds(MovieClip* mc, double* out_nat_w, double* out_nat
 	// Fallback: compute bounds from dynamically-attached children (via child_mc_cache).
 	// This handles MCs whose children were added via attachMovie — not in the static
 	// display list but trackable through the parent pointer.
-	{
+	// Guard: only for MCs that actually have dynamically-attached children
+	// (parent is set during attachMovie). Skip MCs where display_obj lookup didn't find
+	// them in the static display list — those are already handled above.
+	if (mc != &root_movieclip) {
 		double cxmin = 1e30, cxmax = -1e30, cymin = 1e30, cymax = -1e30;
 		int found_child = 0;
 		for (int ci = 0; ci < child_mc_count; ci++) {
 			MovieClip* child = child_mc_cache[ci];
 			if (child == NULL || child->parent != mc) continue;
 			if (child->depth == INT_MIN) continue;  // dead/removed MC
+			if (child->pending_removal) continue;    // pending removal
 			double cw = 0.0, ch = 0.0;
 			mcGetEffectiveSize(child, &cw, &ch);
 			double cx = (double)child->x;

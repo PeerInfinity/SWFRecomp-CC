@@ -1460,6 +1460,7 @@ void upgrade_sprite_initialized(DisplayObject* dl, size_t dl_max)
 {
 	for (size_t i = 0; i <= dl_max; ++i)
 	{
+		if (dl[i].char_id == 0) continue;
 		if (dl[i].sprite_initialized == 1)
 			dl[i].sprite_initialized = 2;
 		if (dl[i].sprite_display_list != NULL && dl[i].sprite_max_depth > 0)
