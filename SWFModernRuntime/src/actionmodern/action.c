@@ -8187,8 +8187,8 @@ static ActionVar bitmapDataGetColorBoundsRect(SWFAppContext* app_context, Action
     }
     // Create Rectangle result
     ActionVar rx, ry, rw, rh;
-    if (max_x < 0) {
-        // No matching pixels
+    if (max_x < 0 || (max_x == 0 && max_y == 0)) {
+        // No matching pixels (Flash treats a match of (0,0) alone as none)
         rx = makeF64(0); ry = makeF64(0); rw = makeF64(0); rh = makeF64(0);
     } else {
         rx = makeF64(min_x); ry = makeF64(min_y);
@@ -8425,15 +8425,15 @@ static ActionVar bitmapDataThreshold(SWFAppContext* app_context, ActionVar* args
     ActionVar* dpy = getProperty(dest_pt, "y", 1);
     int dx = dpx ? (int)varToDoubleSimple(dpx) : 0;
     int dy = dpy ? (int)varToDoubleSimple(dpy) : 0;
+    // When source==dest, Flash writes at source coordinates (ignoring destPoint)
+    // and counts all matching source pixels regardless of dest bounds
+    int self_threshold = (src_bmp == dest_bmp);
     int count = 0;
     for (int sy = 0; sy < rh; sy++) {
         for (int sx = 0; sx < rw; sx++) {
             int src_x = rx + sx;
             int src_y = ry + sy;
-            int dst_x = dx + sx;
-            int dst_y = dy + sy;
             if (src_x < 0 || src_x >= src_bmp->width || src_y < 0 || src_y >= src_bmp->height) continue;
-            if (dst_x < 0 || dst_x >= dest_bmp->width || dst_y < 0 || dst_y >= dest_bmp->height) continue;
             uint32_t src_px_unpremul = unpremultiplyAlpha(src_bmp->pixels[src_y * src_bmp->width + src_x]);
             uint32_t masked = src_px_unpremul & mask_val;
             uint32_t thresh_masked = threshold_val & mask_val;
@@ -8446,11 +8446,15 @@ static ActionVar bitmapDataThreshold(SWFAppContext* app_context, ActionVar* args
                 case 5: passes = (masked == thresh_masked); break;
                 case 6: passes = (masked != thresh_masked); break;
             }
+            int write_x = self_threshold ? src_x : (dx + sx);
+            int write_y = self_threshold ? src_y : (dy + sy);
             if (passes) {
-                dest_bmp->pixels[dst_y * dest_bmp->width + dst_x] = premultiplyAlpha(fill_color);
                 count++;
-            } else if (copySource) {
-                dest_bmp->pixels[dst_y * dest_bmp->width + dst_x] = src_bmp->pixels[src_y * src_bmp->width + src_x];
+                if (write_x >= 0 && write_x < dest_bmp->width && write_y >= 0 && write_y < dest_bmp->height)
+                    dest_bmp->pixels[write_y * dest_bmp->width + write_x] = premultiplyAlpha(fill_color);
+            } else if (copySource && !self_threshold) {
+                if (write_x >= 0 && write_x < dest_bmp->width && write_y >= 0 && write_y < dest_bmp->height)
+                    dest_bmp->pixels[write_y * dest_bmp->width + write_x] = src_bmp->pixels[src_y * src_bmp->width + src_x];
             }
         }
     }
@@ -8474,9 +8478,9 @@ static ActionVar bitmapDataHitTest(SWFAppContext* app_context, ActionVar* args, 
     ActionVar* fpx = getProperty(first_pt, "x", 1);
     ActionVar* fpy = getProperty(first_pt, "y", 1);
     if (!fpx || !fpy) { r = makeF64(-2); return r; }
-    int first_alpha = (int)varToDoubleSimple(&args[1]);
-    int fx = (int)varToDoubleSimple(fpx);
-    int fy = (int)varToDoubleSimple(fpy);
+    int first_alpha = (int)tsArgToDouble_ctx(app_context, &args[1]);
+    int fx = (int)tsArgToDouble_ctx(app_context, fpx);
+    int fy = (int)tsArgToDouble_ctx(app_context, fpy);
     // Error -3: invalid second object
     if (args[2].type != ACTION_STACK_VALUE_OBJECT) { r = makeF64(-3); return r; }
     ASObject* second = (ASObject*) args[2].data.numeric_value;
@@ -8493,13 +8497,13 @@ static ActionVar bitmapDataHitTest(SWFAppContext* app_context, ActionVar* args, 
             second_pt = (ASObject*) args[3].data.numeric_value;
         if (!second_pt) { r = makeF64(-4); return r; }
         if (arg_count >= 5)
-            second_alpha = (int)varToDoubleSimple(&args[4]);
+            second_alpha = (int)tsArgToDouble_ctx(app_context, &args[4]);
         int sx = 0, sy = 0;
         if (second_pt) {
             ActionVar* spx = getProperty(second_pt, "x", 1);
             ActionVar* spy = getProperty(second_pt, "y", 1);
-            sx = spx ? (int)varToDoubleSimple(spx) : 0;
-            sy = spy ? (int)varToDoubleSimple(spy) : 0;
+            sx = spx ? (int)tsArgToDouble_ctx(app_context, spx) : 0;
+            sy = spy ? (int)tsArgToDouble_ctx(app_context, spy) : 0;
         }
         // Check overlapping pixels
         for (int py = 0; py < bmp->height; py++) {
@@ -8533,10 +8537,10 @@ static ActionVar bitmapDataHitTest(SWFAppContext* app_context, ActionVar* args, 
     ActionVar* sh = getProperty(second, "height", 6);
     if (sw && sh) {
         // Rectangle
-        int rx0 = sx ? (int)varToDoubleSimple(sx) : 0;
-        int ry0 = sy ? (int)varToDoubleSimple(sy) : 0;
-        int rw = (int)varToDoubleSimple(sw);
-        int rh = (int)varToDoubleSimple(sh);
+        int rx0 = sx ? (int)tsArgToDouble_ctx(app_context, sx) : 0;
+        int ry0 = sy ? (int)tsArgToDouble_ctx(app_context, sy) : 0;
+        int rw = (int)tsArgToDouble_ctx(app_context, sw);
+        int rh = (int)tsArgToDouble_ctx(app_context, sh);
         for (int py = ry0; py < ry0 + rh; py++) {
             for (int px = rx0; px < rx0 + rw; px++) {
                 int bx = px - fx;
@@ -8556,8 +8560,8 @@ static ActionVar bitmapDataHitTest(SWFAppContext* app_context, ActionVar* args, 
         return r;
     }
     // Point
-    int px = sx ? (int)varToDoubleSimple(sx) : 0;
-    int py = sy ? (int)varToDoubleSimple(sy) : 0;
+    int px = sx ? (int)tsArgToDouble_ctx(app_context, sx) : 0;
+    int py = sy ? (int)tsArgToDouble_ctx(app_context, sy) : 0;
     int bx = px - fx;
     int by = py - fy;
     if (bx >= 0 && bx < bmp->width && by >= 0 && by < bmp->height) {
