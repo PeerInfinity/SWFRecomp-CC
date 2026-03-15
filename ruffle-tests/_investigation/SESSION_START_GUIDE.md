@@ -17,7 +17,7 @@ For current test results, regressions, and recommended work order, see `CURRENT_
 |----------|---------|
 | `ruffle-tests/_investigation/ACCEPTED_DIFFS.md` | Tests with permanently unfixable diffs, categorised by root cause (Flash UB, platform UB, Ruffle test bugs). Check here before spending time on a diff that can never be fixed. |
 | `ruffle-tests/_investigation/RUFFLE_VS_FLASH_DIFFERENCES.md` | Tests where Ruffle's expected output disagrees with Flash Player's spec. We follow Flash. |
-| `ruffle-tests/ignored_tests.txt` | 140 tests excluded from filtered results. Sections: interactive input, networking, audio/video, ExternalInterface, bitmaps, Ruffle-vs-Flash spec divergences, permanently accepted diffs. |
+| `ruffle-tests/ignored_tests.txt` | ~56 tests excluded from filtered results. Sections: interactive input, networking, audio/video, ExternalInterface, bitmaps, Ruffle-vs-Flash spec divergences, permanently accepted diffs. |
 
 ## How to Run Tests
 
@@ -66,7 +66,7 @@ Do NOT run the full suite locally. Instead:
 
 | File | Purpose |
 |------|---------|
-| `SWFModernRuntime/src/actionmodern/action.c` | Main runtime (~10K lines) |
+| `SWFModernRuntime/src/actionmodern/action.c` | Main runtime (~50K lines) |
 | `SWFModernRuntime/include/actionmodern/action.h` | Function declarations |
 | `SWFModernRuntime/include/actionmodern/variables.h` | ActionVar struct |
 | `SWFModernRuntime/include/actionmodern/stackvalue.h` | Type enum |
@@ -85,7 +85,7 @@ The SWF file format specification (version 19) is at `SWFRecompDocs/specs/swf-sp
 | `ruffle-tests/verify_output.py` | Main test runner (single or batch) |
 | `ruffle-tests/run_tests.py` | Quick recompiler-only check (no runtime) |
 | `ruffle-tests/filter_results.py` | Removes ignored tests from results |
-| `ruffle-tests/ignored_tests.txt` | 140 tests to ignore (interactive, network, etc.) |
+| `ruffle-tests/ignored_tests.txt` | ~56 tests to ignore (interactive, network, etc.) |
 | `ruffle-tests/download_tests.sh` | Downloads Ruffle test SWFs via sparse git checkout |
 | `scripts/diff_ruffle_results.py` | Compares two result JSON files, generates diff |
 | `scripts/generate_ruffle_results_markdown.py` | Generates markdown reports from results |
@@ -95,8 +95,8 @@ The SWF file format specification (version 19) is at `SWFRecompDocs/specs/swf-sp
 
 | Path | Purpose |
 |------|---------|
-| `ruffle-tests/results.json` | Full raw results (619 tests) |
-| `ruffle-tests/results_filtered.json` | After removing ignored tests (479 tests) |
+| `ruffle-tests/results.json` | Full raw results (~619 tests) |
+| `ruffle-tests/results_filtered.json` | After removing ignored tests (~565 tests) |
 | `ruffle-tests/results_diff.json` | JSON diff between previous and current |
 | `ruffle-results.md` | Human-readable full report |
 | `ruffle-results-filtered.md` | Human-readable filtered report |
@@ -125,13 +125,13 @@ The workflow is manual dispatch only (no auto-trigger). User must go to GitHub A
 
 ## Old Test System (SWFRecomp/tests/)
 
-There is a separate, older test system in `SWFRecomp/tests/`. These are hand-written opcode-level unit tests (115 trace tests + ~61 graphics tests). All 115 trace tests pass (477/477 sub-tests).
+There is a separate, older test system in `SWFRecomp/tests/`. These are hand-written opcode-level unit tests (~158 trace tests + ~59 graphics tests). All trace tests pass.
 
 ### Key differences from Ruffle tests
 
 | Aspect | Old Tests (`SWFRecomp/tests/`) | Ruffle Tests (`ruffle-tests/`) |
 |--------|-------------------------------|-------------------------------|
-| **Count** | 115 trace + ~61 graphics | 616 tests |
+| **Count** | ~158 trace + ~59 graphics | ~619 tests |
 | **Source** | Hand-written, local SWF generation scripts | Downloaded from Ruffle project |
 | **Validation** | Per-test `validate.py` with custom logic | Shared `verify_output.py`, line-by-line diff against `output.txt` |
 | **Expected output** | Encoded in `validate.py` (sub-test assertions) | Explicit `output.txt` file |
