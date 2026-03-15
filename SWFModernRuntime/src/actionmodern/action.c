@@ -31480,10 +31480,24 @@ void actionSetMember(SWFAppContext* app_context)
 					}
 				}
 			}
-			// tabIndex: store value as-is (Flash preserves the type).
-			// Numeric coercion happens only when computing tab order.
+			// tabIndex coercion: text fields use u32, buttons/MCs use i32 with NaN preservation
 			if (prop_name_len == 8 && strncmp(prop_name, "tabIndex", 8) == 0)
 			{
+				if (value_var.type != ACTION_STACK_VALUE_UNDEFINED)
+				{
+					double dval = varToDoubleSimple(&value_var);
+					if (MC_IS_TEXTFIELD(mc)) {
+						// Text fields: unsigned 32-bit coercion, NaN → 0
+						value_var.type = ACTION_STACK_VALUE_F64;
+						VAL(double, &value_var.data.numeric_value) =
+							isnan(dval) ? 0.0 : (double)(uint32_t)ecmaToInt32(dval);
+					} else {
+						// Buttons / MovieClips: signed 32-bit coercion, NaN → preserve previous
+						if (isnan(dval)) return;
+						value_var.type = ACTION_STACK_VALUE_F64;
+						VAL(double, &value_var.data.numeric_value) = (double)ecmaToInt32(dval);
+					}
+				}
 				// Regular MCs (not textfield, not button): tabIndex is non-enumerable
 				if (!MC_IS_TEXTFIELD(mc) && !mc->is_button_mc)
 				{
