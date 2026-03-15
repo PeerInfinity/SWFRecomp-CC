@@ -1,21 +1,27 @@
 # Ruffle Test Results Diff
 
-**Previous:** `d08f9a389842` (2026-03-15T01:28:46.591341+00:00)
-**Current:** `5930cf954306` (2026-03-15T02:38:16.035748+00:00)
+**Previous:** `5930cf954306` (2026-03-15T02:38:16.035748+00:00)
+**Current:** `24394c11322c` (2026-03-15T03:23:37.790236+00:00)
 
 ## Summary
 
 | Metric | Previous | Current | Delta |
 |--------|----------|---------|-------|
-| Passing | 547 | 549 | +2 |
+| Passing | 549 | 550 | +1 |
 | Total | 619 | 619 | 0 |
-| Pass rate | 88.4% | 88.7% | +0.3% |
-| Mismatched lines | 13045 | 13043 | -2 |
-|   Decreased | | | -2 |
+| Pass rate | 88.7% | 88.9% | +0.2% |
+| Mismatched lines | 13043 | 13037 | -6 |
+|   Decreased | | | -6 |
 
-## Newly Passing (2)
+## Newly Passing (1)
 
 | Test | Previous Status | Lines (prev) | Lines (now) |
 |------|----------------|--------------|-------------|
-| `movieclip_invalid_get_bounds_6` | output_mismatch | 9/10 | 10/10 |
-| `movieclip_invalid_get_bounds_7` | output_mismatch | 9/10 | 10/10 |
+| `clone_sprite_edittext` | output_mismatch | 90/94 | 94/94 |
+
+## Line Count Changed (2)
+
+| Test | Status | Lines (prev) | Lines (now) | Diff |
+|------|--------|--------------|-------------|------|
+| `clone_sprite_edittext_dynamic` | output_mismatch | 78/86 | 79/86 | -1 |
+| `global_instance_decls` | output_mismatch | 18/758 | 19/758 | -1 |
