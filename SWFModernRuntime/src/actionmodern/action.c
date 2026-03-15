@@ -45703,6 +45703,19 @@ void actionCallMethod(SWFAppContext* app_context, char* str_buffer)
 								       dly >= mc->draw_ymin && dly <= mc->draw_ymax);
 							}
 						}
+						// setMask masking: if MC has a mask, point must also hit mask shape
+						if (hit && mc != NULL && mc->mask_mc != NULL) {
+							MovieClip* _hmask = (MovieClip*)mc->mask_mc;
+							DisplayObject* _hmdobj = _hmask->display_obj ? (DisplayObject*)_hmask->display_obj : NULL;
+							if (_hmdobj != NULL && _hmdobj->sprite_display_list != NULL && _hmdobj->sprite_max_depth > 0) {
+								double _hmwa=1, _hmwb=0, _hmwc=0, _hmwd=1, _hmwtx=0, _hmwty=0;
+								getConcatMatrixForMC(_hmask, &_hmwa, &_hmwb, &_hmwc, &_hmwd, &_hmwtx, &_hmwty);
+								_hmwtx *= 20.0; _hmwty *= 20.0;
+								if (!ng_hitTestShapeFromDL(_hmdobj->sprite_display_list, _hmdobj->sprite_max_depth,
+										_hmwa, _hmwb, _hmwc, _hmwd, _hmwtx, _hmwty, ptx, pty))
+									hit = 0;
+							}
+						}
 					}
 
 					PUSH(ACTION_STACK_VALUE_BOOLEAN, hit ? 1 : 0);
