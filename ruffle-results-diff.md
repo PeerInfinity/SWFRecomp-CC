@@ -1,34 +1,27 @@
 # Ruffle Test Results Diff
 
-**Previous:** `31f06ecb9675` (2026-03-15T04:34:50.001375+00:00)
-**Current:** `df1f69a204c6` (2026-03-15T17:09:32.615133+00:00)
+**Previous:** `df1f69a204c6` (2026-03-15T17:09:32.615133+00:00)
+**Current:** `86ba0864cb78` (2026-03-15T17:35:22.959180+00:00)
 
 ## Summary
 
 | Metric | Previous | Current | Delta |
 |--------|----------|---------|-------|
-| Passing | 554 | 555 | +1 |
+| Passing | 555 | 555 | 0 |
 | Total | 619 | 619 | 0 |
-| Pass rate | 89.5% | 89.7% | +0.2% |
-| Mismatched lines | 12993 | 13005 | +12 |
-|   Decreased | | | -6 |
-|   Increased | | | +18 |
+| Pass rate | 89.7% | 89.7% | 0% |
+| Mismatched lines | 13005 | 12990 | -15 |
+|   Decreased | | | -18 |
+|   Increased | | | +3 |
 
-## Newly Passing (2)
+## Newly Passing (1)
 
 | Test | Previous Status | Lines (prev) | Lines (now) |
 |------|----------------|--------------|-------------|
-| `tab_ordering_properties_tab_index_edge_case` | output_mismatch | 1/4 | 4/4 |
-| `text_blocks_clicks` | output_mismatch | 3/4 | 4/4 |
+| `tab_ordering_properties` | output_mismatch | 275/293 | 293/293 |
 
 ## Newly Failing (1)
 
 | Test | New Status | Lines (prev) | Lines (now) |
 |------|-----------|--------------|-------------|
-| `tab_ordering_properties` | output_mismatch | 293/293 | 275/293 |
-
-## Line Count Changed (1)
-
-| Test | Status | Lines (prev) | Lines (now) | Diff |
-|------|--------|--------------|-------------|------|
-| `unload_nested_child` | output_mismatch | 0/5 | 2/5 | -2 |
+| `tab_ordering_properties_tab_index_edge_case` | output_mismatch | 4/4 | 1/4 |
