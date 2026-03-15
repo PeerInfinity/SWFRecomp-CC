@@ -3110,9 +3110,13 @@ int ng_hitTestShapeFromDL(DisplayObject* dl, size_t dl_max,
     double ma, double mb, double mc_m, double md, double mtx, double mty,
     double test_x, double test_y)
 {
+	size_t clip_depth_end = 0;  // if >0, masking active until this depth
+	int clip_hit = 0;           // whether test point hits the current clip shape
+
 	for (size_t i = 1; i <= dl_max; i++) {
 		DisplayObject* child = &dl[i];
 		if (child->char_id == 0) continue;
+
 		u32 tid = child->transform_id;
 		double ca = (double)transform_data[tid][0];
 		double cb = (double)transform_data[tid][1];
@@ -3124,6 +3128,31 @@ int ng_hitTestShapeFromDL(DisplayObject* dl, size_t dl_max,
 		double nc = ma*cc + mc_m*cd, nd = mb*cc + md*cd;
 		double ntx = ma*ctx_v + mc_m*cty_v + mtx;
 		double nty = mb*ctx_v + md*cty_v + mty;
+
+		// Clip-depth masking: this child is a clipping layer
+		if (child->clip_depth > 0) {
+			int mask_hit = 0;
+			if (child->sprite_display_list != NULL && child->sprite_max_depth > 0) {
+				mask_hit = ng_hitTestShapeFromDL(child->sprite_display_list, child->sprite_max_depth,
+					na, nb, nc, nd, ntx, nty, test_x, test_y);
+			}
+			if (!mask_hit) {
+				mask_hit = ng_hitTestShapeChar(child->char_id, child->ratio, na, nb, nc, nd, ntx, nty,
+					test_x, test_y);
+			}
+			if (mask_hit) {
+				clip_depth_end = 0;  // point hits mask: deactivate masking
+			} else {
+				clip_depth_end = child->clip_depth;  // point misses mask: activate
+			}
+			continue;  // clip layers are never directly hittable
+		}
+
+		// If masking is active and this child is within the masked range, skip it
+		if (clip_depth_end > 0) {
+			if (i <= clip_depth_end) continue;  // masked out
+			clip_depth_end = 0;  // past the clip region
+		}
 
 		if (child->sprite_display_list != NULL && child->sprite_max_depth > 0) {
 			if (ng_hitTestShapeFromDL(child->sprite_display_list, child->sprite_max_depth,
