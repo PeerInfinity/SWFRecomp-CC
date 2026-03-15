@@ -15711,8 +15711,8 @@ static char* tf_serialize_html(TFRunTable* table, int is_multiline) {
 			int is_tag_break = (ti < table->text_len && (table->text[ti] == SENTINEL_TAG_BREAK || table->text[ti] == SENTINEL_BR_BREAK));
 			int is_content_nl = (ti < table->text_len && table->text[ti] == '\n');
 
-			if (!is_multiline && is_tag_break && table->swf_version >= 7) {
-				// Single-line SWF7+: tag breaks merge paragraphs. Don't create a break.
+			if ((is_multiline <= 0) && is_tag_break && table->swf_version >= 7) {
+				// Single-line SWF7+ or stylesheet mode: tag breaks merge paragraphs.
 				// In SWF<=6, non-multiline preserves paragraph breaks like multiline.
 				// Track para_type from the first break marker that has content before it.
 				if (!sl_found_content) {
@@ -15957,7 +15957,8 @@ static char* tf_serialize_html(TFRunTable* table, int is_multiline) {
 			if (emit_href) TF_EMIT(buf, bp, bsz, "</A>");
 		}
 		// In single-line condenseWhite SWF8, tag break sentinels become spaces
-		int cw8_space = (!is_multiline && table->condense_white && table->swf_version >= 8);
+		// (but not in stylesheet mode where breaks are fully removed)
+		int cw8_space = (is_multiline == 0 && table->condense_white && table->swf_version >= 8);
 		u32 last_emit_end = ps; // Track end of last emitted content for gap detection
 
 		// Hierarchical FONT nesting with run merging
@@ -17076,8 +17077,8 @@ static void mcGetEffectiveSize(MovieClip* mc, double* eff_w, double* eff_h)
 		double s = fabs(sin(rot_rad));
 		double sw_twips = abs_sw * 20.0;
 		double sh_twips = abs_sh * 20.0;
-		*eff_w = (round(sw_twips * c) + round(sh_twips * s)) / 20.0;
-		*eff_h = (round(sw_twips * s) + round(sh_twips * c)) / 20.0;
+		*eff_w = round(sw_twips * c + sh_twips * s) / 20.0;
+		*eff_h = round(sw_twips * s + sh_twips * c) / 20.0;
 	}
 }
 
@@ -17093,6 +17094,7 @@ static void mcSetEffectiveWidth(SWFAppContext* app_context, MovieClip* mc, doubl
 	// Flash stores in twips (1/20 pixel), truncating fractional twips.
 	if (MC_IS_TEXTFIELD(mc)) {
 		mc->width = (float)(floor(fabs(v) * 20.0) / 20.0);
+		applyAutoSize(app_context, mc);
 		return;
 	}
 	double nat_w = 0, nat_h = 0;
@@ -17145,6 +17147,7 @@ static void mcSetEffectiveHeight(SWFAppContext* app_context, MovieClip* mc, doub
 	// Flash stores in twips (1/20 pixel), truncating fractional twips.
 	if (MC_IS_TEXTFIELD(mc)) {
 		mc->height = (float)(floor(fabs(v) * 20.0) / 20.0);
+		applyAutoSize(app_context, mc);
 		return;
 	}
 	double nat_w = 0, nat_h = 0;
@@ -31070,7 +31073,8 @@ void actionSetMember(SWFAppContext* app_context)
 			if (prop_name_len == 10 && strncmp(prop_name, "styleSheet", 10) == 0
 				&& MC_IS_TEXTFIELD(mc) && mc->dynamic_props != NULL)
 			{
-				// Setting a stylesheet resets scroll positions
+				// Setting a stylesheet resets scroll positions and clears run table
+				// so htmlText getter uses the stylesheet serialization path
 				if (value_var.type == ACTION_STACK_VALUE_OBJECT) {
 					ASObject* _ss_set_props = (ASObject*) mc->dynamic_props;
 					ActionVar _ss_zero = {0}; _ss_zero.type = ACTION_STACK_VALUE_F64;
@@ -32191,25 +32195,41 @@ static void applyAutoSize(SWFAppContext* app_context, MovieClip* mc)
 	size_t _as_len = extractTextFieldParams(app_context, mc, _as_utf8,
 		&_as_fid, &_as_fh, &_as_ld, &_as_ww, &_as_fwt, &_as_lm, &_as_rm, &_as_ind);
 
-	// Compute raw text width and height in twips
-	// SWF<=7: autoSize always trims trailing spaces (pass align=1 to force trim).
-	// SWF>=8: autoSize uses actual text alignment (left keeps trailing spaces, others trim).
-	int _as_align = 1; // default: force trim (SWF<=7 behavior)
-	if (g_swf_version >= 8) {
-		_as_align = 0; // default left (no trim)
-		ActionVar* _aa_prop = getProperty((ASObject*)mc->dynamic_props, "align", 5);
-		if (_aa_prop != NULL && _aa_prop->type == ACTION_STACK_VALUE_STRING && _aa_prop->str_size > 0) {
-			const uint16_t* _aa_u16 = varGetU16Ptr(_aa_prop);
-			if (_aa_prop->str_size == 6 && _aa_u16[0] == 'c') _as_align = 1;       // center
-			else if (_aa_prop->str_size == 5 && _aa_u16[0] == 'r') _as_align = 2;   // right
+	// When embedFonts=true and font is not actually embedded in the SWF (font_id=0
+	// for dynamic textfields), Flash renders nothing and text has zero dimensions.
+	int _as_embed_no_font = 0;
+	if (mc->dynamic_props) {
+		ActionVar* ef = getProperty((ASObject*)mc->dynamic_props, "embedFonts", 10);
+		if (ef && ef->type == ACTION_STACK_VALUE_BOOLEAN && ef->data.numeric_value) {
+			// embedFonts=true: check if we actually have font data
+			// font_id=0 means no DefineFont tag, just built-in fallback
+			if (_as_fid == 0 && mc->ng_textfield_idx == -2)
+				_as_embed_no_font = 1;
 		}
 	}
-	int _as_ls = getLetterSpacingTwips(mc);
-	setDeviceFontModeForMC(mc);
-	int tw_twips = ng_computeTextWidth(_as_fid, _as_fh, _as_utf8, _as_len,
-		_as_ww, _as_fwt, g_swf_version, _as_lm, _as_rm, _as_ind, _as_align, _as_ls);
-	int th_twips = ng_computeTextHeight(_as_fid, _as_fh, _as_ld, _as_utf8, _as_len,
-		_as_ww, _as_fwt, g_swf_version, _as_lm, _as_rm, _as_ind, _as_ls);
+
+	int tw_twips = 0, th_twips = 0;
+	if (!_as_embed_no_font) {
+		// Compute raw text width and height in twips
+		// SWF<=7: autoSize always trims trailing spaces (pass align=1 to force trim).
+		// SWF>=8: autoSize uses actual text alignment (left keeps trailing spaces, others trim).
+		int _as_align = 1; // default: force trim (SWF<=7 behavior)
+		if (g_swf_version >= 8) {
+			_as_align = 0; // default left (no trim)
+			ActionVar* _aa_prop = getProperty((ASObject*)mc->dynamic_props, "align", 5);
+			if (_aa_prop != NULL && _aa_prop->type == ACTION_STACK_VALUE_STRING && _aa_prop->str_size > 0) {
+				const uint16_t* _aa_u16 = varGetU16Ptr(_aa_prop);
+				if (_aa_prop->str_size == 6 && _aa_u16[0] == 'c') _as_align = 1;       // center
+				else if (_aa_prop->str_size == 5 && _aa_u16[0] == 'r') _as_align = 2;   // right
+			}
+		}
+		int _as_ls = getLetterSpacingTwips(mc);
+		setDeviceFontModeForMC(mc);
+		tw_twips = ng_computeTextWidth(_as_fid, _as_fh, _as_utf8, _as_len,
+			_as_ww, _as_fwt, g_swf_version, _as_lm, _as_rm, _as_ind, _as_align, _as_ls);
+		th_twips = ng_computeTextHeight(_as_fid, _as_fh, _as_ld, _as_utf8, _as_len,
+			_as_ww, _as_fwt, g_swf_version, _as_lm, _as_rm, _as_ind, _as_ls);
+	}
 
 	// Compute new dimensions in twips for clean integer arithmetic
 	// Padding: 2px gutter on each side = 80 twips total
@@ -33165,6 +33185,11 @@ void actionGetMember(SWFAppContext* app_context)
 						ActionVar* _ht_ml = getProperty((ASObject*) mc->dynamic_props, "multiline", 9);
 						if (_ht_ml != NULL && _ht_ml->type == ACTION_STACK_VALUE_BOOLEAN && _ht_ml->data.numeric_value)
 							_ht_multiline = 1;
+						// When a stylesheet is active, merge all paragraph breaks
+						// into one <P> with no separator characters (-1 = stylesheet mode)
+						ActionVar* _ht_ss = getProperty((ASObject*) mc->dynamic_props, "styleSheet", 10);
+						if (_ht_ss != NULL && _ht_ss->type == ACTION_STACK_VALUE_OBJECT)
+							_ht_multiline = -1;
 						char* html_str = tf_serialize_html(_ht_table, _ht_multiline);
 						u32 _hs_u16_len;
 						uint16_t* _hs_u16 = utf8_to_u16(app_context, html_str, (u32)strlen(html_str), &_hs_u16_len);
@@ -38292,6 +38317,17 @@ void actionCallFunction(SWFAppContext* app_context, char* str_buffer)
 			}
 			ASObject* props = (ASObject*) child->dynamic_props;
 			props->native_type = NATIVE_TEXTFIELD;
+
+			// Store original createTextField position for clone recovery
+			// (autoSize may modify mc->x later, clones need the original)
+			{
+				ActionVar _cx = {0}; _cx.type = ACTION_STACK_VALUE_F64;
+				VAL(double, &_cx.data.numeric_value) = (double)xi;
+				setProperty(app_context, props, "_tf_createX", 11, &_cx);
+				ActionVar _cy = {0}; _cy.type = ACTION_STACK_VALUE_F64;
+				VAL(double, &_cy.data.numeric_value) = (double)yi;
+				setProperty(app_context, props, "_tf_createY", 11, &_cy);
+			}
 
 			initTextFieldPrototype(app_context);
 			if (g_textfield_constructor.prototype_obj != NULL) {
@@ -43743,6 +43779,16 @@ void actionCallMethod(SWFAppContext* app_context, char* str_buffer)
 					retainObject((ASObject*) child->dynamic_props);
 				}
 				ASObject* props = (ASObject*) child->dynamic_props;
+
+				// Store original createTextField position for clone recovery
+				{
+					ActionVar _cx = {0}; _cx.type = ACTION_STACK_VALUE_F64;
+					VAL(double, &_cx.data.numeric_value) = (double)xi;
+					setProperty(app_context, props, "_tf_createX", 11, &_cx);
+					ActionVar _cy = {0}; _cy.type = ACTION_STACK_VALUE_F64;
+					VAL(double, &_cy.data.numeric_value) = (double)yi;
+					setProperty(app_context, props, "_tf_createY", 11, &_cy);
+				}
 
 				// Set __proto__ to TextField.prototype
 				initTextFieldPrototype(app_context);

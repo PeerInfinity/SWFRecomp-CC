@@ -3699,6 +3699,35 @@ MovieClip* ng_cloneSprite(SWFAppContext* app_context, const char* source_name,
 	// For dynamic textfield clones (no DefineEditText tag), init default props
 	if (src_mc != NULL && src_mc->ng_textfield_idx == -2 && clone_mc->ng_textfield_idx != -2) {
 		actionInitDynTextFieldClone(app_context, clone_mc);
+		// If source has active autoSize, restore clone to original createTextField position
+		if (src_mc->dynamic_props != NULL && clone_mc->dynamic_props != NULL) {
+			ASObject* _src_p = (ASObject*) src_mc->dynamic_props;
+			ASObject* _cln_p = (ASObject*) clone_mc->dynamic_props;
+			ActionVar* cx = getProperty(_src_p, "_tf_createX", 11);
+			ActionVar* cy = getProperty(_src_p, "_tf_createY", 11);
+			if (cx) setProperty(app_context, _cln_p, "_tf_createX", 11, cx);
+			if (cy) setProperty(app_context, _cln_p, "_tf_createY", 11, cy);
+			ActionVar* as_prop = getProperty(_src_p, "autoSize", 8);
+			int has_autosize = 0;
+			if (as_prop && as_prop->type == ACTION_STACK_VALUE_STRING && as_prop->str_size > 0) {
+				// Check if autoSize != "none" by comparing UTF-16 directly
+				const uint16_t* as_u16 = (const uint16_t*)(uintptr_t)as_prop->data.numeric_value;
+				int is_none = (as_prop->str_size == 4 &&
+					as_u16[0] == 'n' && as_u16[1] == 'o' &&
+					as_u16[2] == 'n' && as_u16[3] == 'e');
+				if (!is_none) has_autosize = 1;
+			}
+			if (has_autosize) {
+				if (cx && cx->type == ACTION_STACK_VALUE_F64) {
+					double ox; memcpy(&ox, &cx->data.numeric_value, sizeof(double));
+					clone_mc->x = (float)ox;
+				}
+				if (cy && cy->type == ACTION_STACK_VALUE_F64) {
+					double oy; memcpy(&oy, &cy->data.numeric_value, sizeof(double));
+					clone_mc->y = (float)oy;
+				}
+			}
+		}
 	}
 
 	// Evict any old clone registered at this SWF depth, then register new one
@@ -3853,13 +3882,40 @@ MovieClip* ng_cloneSpriteFromMC(SWFAppContext* app_context, MovieClip* src_mc,
 	// Initialize default textfield properties manually.
 	if (src_mc->ng_textfield_idx == -2 && clone_mc->ng_textfield_idx != -2) {
 		actionInitDynTextFieldClone(app_context, clone_mc);
-		// Copy "type" property from source (preserved for clones)
 		if (src_mc->dynamic_props != NULL && clone_mc->dynamic_props != NULL) {
 			ASObject* src_props = (ASObject*) src_mc->dynamic_props;
 			ASObject* clone_props = (ASObject*) clone_mc->dynamic_props;
+			// Copy "type" property from source (preserved for clones)
 			ActionVar* type_prop = getProperty(src_props, "type", 4);
 			if (type_prop != NULL && type_prop->type != ACTION_STACK_VALUE_UNDEFINED) {
 				setProperty(app_context, clone_props, "type", 4, type_prop);
+			}
+			// Copy original createTextField position to clone's properties
+			ActionVar* cx_prop = getProperty(src_props, "_tf_createX", 11);
+			ActionVar* cy_prop = getProperty(src_props, "_tf_createY", 11);
+			if (cx_prop) setProperty(app_context, clone_props, "_tf_createX", 11, cx_prop);
+			if (cy_prop) setProperty(app_context, clone_props, "_tf_createY", 11, cy_prop);
+			// If source has active autoSize (not "none"), restore clone position
+			// to original createTextField coordinates (source mc->x was modified by autoSize)
+			ActionVar* as_prop = getProperty(src_props, "autoSize", 8);
+			int has_autosize = 0;
+			if (as_prop && as_prop->type == ACTION_STACK_VALUE_STRING && as_prop->str_size > 0) {
+				// Check if autoSize != "none" by comparing UTF-16 directly
+				const uint16_t* as_u16 = (const uint16_t*)(uintptr_t)as_prop->data.numeric_value;
+				int is_none = (as_prop->str_size == 4 &&
+					as_u16[0] == 'n' && as_u16[1] == 'o' &&
+					as_u16[2] == 'n' && as_u16[3] == 'e');
+				if (!is_none) has_autosize = 1;
+			}
+			if (has_autosize) {
+				if (cx_prop && cx_prop->type == ACTION_STACK_VALUE_F64) {
+					double ox; memcpy(&ox, &cx_prop->data.numeric_value, sizeof(double));
+					clone_mc->x = (float)ox;
+				}
+				if (cy_prop && cy_prop->type == ACTION_STACK_VALUE_F64) {
+					double oy; memcpy(&oy, &cy_prop->data.numeric_value, sizeof(double));
+					clone_mc->y = (float)oy;
+				}
 			}
 		}
 	}
