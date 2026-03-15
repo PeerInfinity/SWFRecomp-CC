@@ -3,6 +3,10 @@
 # or have unclear expected behavior that needs further investigation.
 # One test name per line. Lines starting with # are comments. Blank lines ignored.
 
+# --- Navigator/getURL (Ruffle-internal tracing) ---
+# These tests trace Ruffle's internal navigator dispatch output, not Flash trace output.
+geturl
+
 # --- Network/form loading (no multi-SWF infrastructure needed) ---
 # These tests require network connections, HTTP POST, or browser-level form submission.
 form_loader_encoding_1

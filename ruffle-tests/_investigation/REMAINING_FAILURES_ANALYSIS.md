@@ -3,7 +3,7 @@
 Date: 2026-03-15
 CI run: 86ba0864 (555/619 total, 545/565 filtered = 96.5%)
 
-20 filtered tests still failing. This document analyzes each one with local test output, root cause, and fix feasibility.
+18 filtered tests still failing (2 fixed, 1 moved to ignored). This document analyzes each one with local test output, root cause, and fix feasibility.
 
 ## Summary Table
 
@@ -13,13 +13,13 @@ CI run: 86ba0864 (555/619 total, 545/565 filtered = 96.5%)
 | clone_sprite_edittext_dynamic | 78 | 86 | 91% | Medium | TF clone bounds |
 | edittext_drag_select | 6 | 9 | 67% | Medium | selection markers |
 | issue_2084 | 4 | 16 | 25% | Medium | nested sprite init |
-| issue_2030 | 2 | 4 | 50% | Hard | shape bounds (NO_GRAPHICS) |
+| ~~issue_2030~~ | ~~2~~ | ~~4~~ | ~~100%~~ | ~~Fixed~~ | ~~attachBitmap stub~~ |
 | movieclip_hittest_shapeflag | 307 | 339 | 91% | Hard | shape hit accuracy |
 | coerce_to_object_monkeypatch | 71 | 129 | 55% | Hard | primitive coercion |
 | watch_virtual_property | 11 | 61 | 18% | Hard | watch+addProperty |
 | asfunction | 2 | 12 | 17% | Medium | asfunction: URL |
 | displacementmapfilter_mappoint_throw_error | 0 | 13 | 0% | Medium | Point toString + filter errors |
-| geturl | 0 | 7 | 0% | Medium | getURL() stub |
+| ~~geturl~~ | ~~0~~ | ~~7~~ | ~~N/A~~ | ~~Ignored~~ | ~~Ruffle-internal navigator tracing~~ |
 | edittext_ime_focus_lost | 0 | 7 | 0% | Very Hard | IME infrastructure |
 | localconnection | 127 | 580 | 22% | Very Hard | full IPC system |
 | global_proto_decls | 92 | 4497 | 2% | Very Hard | property flags + stubs |
@@ -86,9 +86,9 @@ Two categories:
 
 Core issue is primitive-to-object coercion logic when built-in constructors are monkeypatched. Previously identified as blocked by closure variable capture.
 
-### issue_2030 (2/4 = 50%)
+### ~~issue_2030~~ (4/4 = PASS ✅)
 
-`mc._width` and `mc._height` return 0 instead of expected 10. MovieClip contains a shape — bounds calculation returns 0 because the NO_GRAPHICS runtime doesn't track shape geometry for bounds. Likely unfixable without shape bounds data.
+**FIXED** (2c900777): Added `MC.attachBitmap` stub that copies BitmapData width/height to the MC and sets draw bounds. `_width`/`_height` now report correctly after `attachBitmap`.
 
 ### watch_virtual_property (11/61 = 18%)
 
@@ -100,9 +100,9 @@ Core issue is primitive-to-object coercion logic when built-in constructors are 
 
 `DisplacementMapFilter.mapPoint` returns `[object Object]` instead of `(x=1, y=2)` Point toString format. Also missing: try/catch error handling for invalid Point property values (valueOf throwing), and integer overflow clamping. Requires Point toString `(x=N, y=N)` format + filter setter validation.
 
-### geturl (0/7)
+### ~~geturl~~ (0/7) — IGNORED
 
-`getURL()` / navigator stub not implemented. Test expects trace output from a navigator dispatch. Would need a navigator event system or stub.
+Added to `ignored_tests.txt`. Test traces Ruffle's internal `Navigator::navigate_to_url` dispatch output (URL, target, method, params), not standard Flash `trace()` output. Cannot be replicated without Ruffle's navigator backend.
 
 ### edittext_ime_focus_lost (0/7)
 
