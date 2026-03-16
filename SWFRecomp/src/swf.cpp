@@ -3363,7 +3363,8 @@ namespace SWFRecomp
 			{
 				// ImportAssets / ImportAssets2: imports symbols from another SWF.
 				// At runtime, the imported SWF's init function (DoInitAction scripts)
-				// must be executed in the current context.
+				// must be executed in the current context, and the imported character
+				// definitions must be remapped to the parent's char_ids.
 				// Format: URL(string) + [reserved(2) for ImportAssets2] + Count(UI16) + entries
 				char* import_start = cur_pos;
 				std::string import_url(cur_pos);
@@ -3373,13 +3374,22 @@ namespace SWFRecomp
 				}
 				u16 import_count = (u8)cur_pos[0] | ((u8)cur_pos[1] << 8);
 				cur_pos += 2;
-				// Skip import entries (tag(UI16) + name(string) per entry)
+				// Collect import entries: (local_char_id, export_name)
+				struct ImportEntry { u16 char_id; std::string name; };
+				std::vector<ImportEntry> imports;
 				for (int i = 0; i < import_count; i++) {
-					cur_pos += 2;  // tag ID
-					cur_pos += strlen(cur_pos) + 1;  // name + null
+					u16 char_id = (u8)cur_pos[0] | ((u8)cur_pos[1] << 8);
+					cur_pos += 2;
+					std::string name(cur_pos);
+					cur_pos += name.length() + 1;
+					imports.push_back({char_id, name});
 				}
-				// Emit a runtime call to load the imported SWF's init function
+				// Emit runtime call to load and remap imported symbols
 				tag_init_scripts << endl << "\tactionImportAssets(app_context, \"" << import_url << "\");";
+				for (auto& imp : imports) {
+					tag_init_scripts << endl << "\ttagImportCharacter(app_context, "
+						<< imp.char_id << ", \"" << imp.name << "\");";
+				}
 				break;
 			}
 

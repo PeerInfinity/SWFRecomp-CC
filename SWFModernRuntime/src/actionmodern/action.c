@@ -685,7 +685,7 @@ typedef struct ASFunction {
 } ASFunction;
 
 // Function registry
-#define MAX_FUNCTIONS 512
+#define MAX_FUNCTIONS 2048
 static ASFunction* function_registry[MAX_FUNCTIONS];
 static u32 function_count = 0;
 

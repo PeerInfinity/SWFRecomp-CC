@@ -1621,6 +1621,28 @@ void tagRegisterExport(SWFAppContext* app_context, const char* name, size_t char
 }
 
 // ---------------------------------------------------------------------------
+// tagImportCharacter — remap a local char_id to an imported export's definition
+// Called after actionImportAssets to wire up imported character definitions.
+// ---------------------------------------------------------------------------
+void tagImportCharacter(SWFAppContext* app_context, size_t local_char_id, const char* export_name)
+{
+	(void)app_context;
+	extern Character* dictionary;
+	extern size_t dictionary_capacity;
+
+	// Look up the exported char_id by name
+	size_t exported_char_id = ng_lookupExport(export_name);
+	if (exported_char_id == 0) return;  // Export not found
+
+	// Both char_ids must be within the dictionary
+	if (local_char_id >= dictionary_capacity || exported_char_id >= dictionary_capacity)
+		return;
+
+	// Copy the character definition from the exported char_id to the local char_id
+	dictionary[local_char_id] = dictionary[exported_char_id];
+}
+
+// ---------------------------------------------------------------------------
 // Pending attach init queue — deferred frame-0 script execution for attachMovie
 // ---------------------------------------------------------------------------
 extern MovieClip* actionFindOrCreateMovieClip(SWFAppContext* app_context, const char* name, MovieClip* parent);

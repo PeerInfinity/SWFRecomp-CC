@@ -52,25 +52,44 @@ the Dejagnu test framework in various ways and don't produce correct output.
 
 ## Blockers
 
-### Blocker 1: actionscript.all — Child Movie Not Linked
+### Blocker 1: actionscript.all — ImportAssets Doesn't Import Character Definitions
 
 **Symptoms:** Test outputs "Dejagnu not initialized yet after N iterations. Will try again again" — the setInterval polling loop runs but `dejagnu_module_initialized` is never set.
 
-**Root cause (investigation needed):** `verify_output.py` correctly detects `Dejagnu.swf` as a child SWF and `recompile_child_swf()` succeeds when run manually. However, the child movie wrapper (`movie_Dejagnu.c`) is not present in the build directory, suggesting either:
-- `recompile_child_swf()` returns False due to a compilation error in the child
-- `generate_child_movie_file()` fails silently
-- The build process doesn't compile/link `movie_Dejagnu.c`
+**Root cause (confirmed 2026-03-16):** The child movie pipeline works — `movie_Dejagnu.c` compiles and links correctly. The issue is that `actionImportAssets` only runs the child's `tagInit` (which defines sprites and registers exports), but does NOT make the child's sprite definitions available to the parent.
 
-**Investigation steps:**
-1. Add debug logging to `recompile_child_swf()` and `generate_child_movie_file()` in verify_output.py to trace the failure
-2. Manually recompile Dejagnu.swf and attempt to generate the movie wrapper
-3. Check if the Dejagnu.swf recompiled code has symbols that conflict with the test SWF (e.g., duplicate function names in the global scope)
+**How ImportAssets is supposed to work in Flash:**
+1. Parent SWF's ImportAssets tag specifies a URL and a list of export names to import
+2. Flash loads the external SWF, runs its init to discover exports
+3. The imported character definitions (sprites, shapes, etc.) are mapped to char_ids in the parent's dictionary
+4. When the parent places these char_ids on the timeline, it's actually placing the imported definitions
 
-**Once child movie links correctly**, the loadMovie infrastructure should handle the rest:
-- `findMovieEntry("Dejagnu.swf")` resolves the child
-- Child's `tagInit` runs, defining check functions on `_root`
-- Child's `DoAction` sets `dejagnu_module_initialized = true`
-- Test's `setInterval` callback detects initialization and runs assertions
+**What happens in our implementation:**
+1. Parent's `tagInit` defines its own sprite 1 (a placeholder `__shared_assets` sprite)
+2. Parent's `tagInit` calls `actionImportAssets("Dejagnu.swf")`
+3. `actionImportAssets` runs the child's `tagInit`, which defines child sprite 1 (the real Dejagnu sprite with `script_0`/`script_1`) at char_id 1001 (offset by movie_id * 1000)
+4. Child's `tagInit` calls `tagRegisterExport("dejagnu", 1001)`
+5. Parent's `frame_0` places sprite 1 — which is the parent's empty placeholder, NOT the imported Dejagnu sprite
+6. The Dejagnu's `script_0`/`script_1` (which define `check_equals`, `dejagnu_module_initialized`, etc.) never run
+
+**The fix needs to:**
+1. After running the child's `tagInit`, look up the exported char_ids by name
+2. Replace the parent's char_id mappings with the imported definitions (specifically, the parent's sprite at char_id 1 should now point to the child's sprite definition)
+3. This way, when the parent places sprite 1 in `frame_0`, it actually places the Dejagnu sprite, triggering `script_0`/`script_1`
+
+**Implementation approach:**
+
+The recompiler emits `tagDefineSprite(app_context, char_id, frame_funcs, frame_count, twips)` which registers a sprite definition in the runtime's character dictionary. ImportAssets needs to:
+- After running child `tagInit`, resolve each imported export name to its child char_id
+- Copy or alias the child's character definition to the parent's expected char_id
+- The parent SWF's ImportAssets tag in the original SWF specifies which local char_ids map to which export names — the recompiler needs to emit this mapping
+
+**Key observation:** The recompiler currently doesn't emit ImportAssets tag data (which char_ids to import under which names). It only emits `actionImportAssets(url)`. The recompiler needs to also emit the char_id→export_name mapping so the runtime can remap after import.
+
+**Files to modify:**
+- `SWFRecomp/src/action/action.cpp` (or tag handling): Emit ImportAssets char_id mappings
+- `SWFModernRuntime/src/actionmodern/action.c`: `actionImportAssets` needs to remap char_ids
+- `SWFModernRuntime/src/libswf/tag.c` or `tag_stubs.c`: Character dictionary remapping support
 
 ### Blocker 2: misc-ming / misc-swfc — Inlined Dejagnu Produces No Output
 
