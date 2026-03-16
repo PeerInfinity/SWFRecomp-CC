@@ -41,7 +41,7 @@ This document catalogs the root-cause blockers preventing further progress on th
 1. `actionNewObject` constructor lookup skipping `__proto__` chain addProperty getters (~3 lines)
 2. Failed auto-boxing falling back to root MovieClip instead of `_global` (~55 lines, cascade)
 
-These are fixable without architecture changes. See `incomplete/COERCE_TO_OBJECT_MONKEYPATCH.md` for details.
+These were fixed without architecture changes. See `complete/COERCE_TO_OBJECT_MONKEYPATCH.md` for details.
 
 **General blocker remains valid** for other patterns: our stack-based variable storage does mean local variables are lost after function return. Any test with closures that capture outer locals (the `addGetter` pattern below) would fail. However, no current failing test is blocked by this.
 
@@ -56,9 +56,9 @@ function addGetter(obj, name, val) {
 
 | Test | Match | Lines Off | Actual Blocker |
 |------|-------|-----------|----------------|
-| coerce_to_object_monkeypatch | ~71/129 | ~58 | Constructor lookup + `this` fallback (NOT closure capture) |
+| coerce_to_object_monkeypatch | **129/129** | **0** | **FIXED** (eac9ba9f) — constructor lookup + `this` fallback |
 
-**Plans affected**: TYPE_COERCION_ADVANCED_PLAN — should be moved from `blocked/` to `incomplete/`
+**Plans affected**: TYPE_COERCION_ADVANCED_PLAN — completed, plan in `complete/`
 
 ---
 
@@ -87,13 +87,13 @@ Tests `global_proto_decls`, `global_proto_decls_delete`, and `global_instance_de
 
 ### Blocker 5: Pixel-Level Shape Hit Testing
 
-**Impact**: 1 test, ~29 lines
+**Impact**: 1 test, ~27 lines
 
 `movieclip_hittest_shapeflag` tests shape-accurate hit testing (not just bounding box). Our triangulation approach has edge cases: stroke precision, curve approximation, device-font text, morph complex shapes.
 
-**Progress (2026-03-14):** Fixed clip-depth masking (2 lines), setMask masking (1 line), added glyph-level text hit testing (no visible effect — device fonts). Reduced from 32 → 29 diff lines.
+**Progress (2026-03-15):** Fixed clip-depth masking (2 lines), setMask masking (1 line), added glyph-level text hit testing, DefineText bounds for sprite content bounds, rotated bounding box AABB. Reduced from 32 → ~27 diff lines.
 
-Remaining categories: device-font text (11 lines — no font outline data in SWF), curve/stroke precision (10 lines — triangulation approximation), drawing API bounds (4 lines), stroke-only morphs (4 lines).
+Remaining categories: device-font text (11 lines — no font outline data in SWF), curve/stroke precision (~10 lines — triangulation approximation), drawing API bounds (~4 lines), stroke-only morphs (~2 lines).
 
 | Test | Match | Lines Off |
 |------|-------|-----------|

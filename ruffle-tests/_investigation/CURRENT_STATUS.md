@@ -1,15 +1,22 @@
 # Current Ruffle Test Status
 
-Last updated: 2026-03-15
+Last updated: 2026-03-15 (evening)
 
 ## Quick Summary
 
-- **Pass rate (CI, last run)**: 555/619 (89.7%) total, **545/565 (96.5%) filtered** (CI run on 86ba0864, 0 regressions)
+- **Pass rate (CI, last run)**: 559/619 (90.3%) total, **549/563 (97.5%) filtered** (CI run on de8b5c0b, 0 regressions)
 - **Image test baseline**: **7/31 strict image match** (run_image_tests.py, 0-outlier AND 0-max-diff). **9/31 tolerance pass** (within test.toml limits). Strict passes: focusrect_focuslost, focusrect_mouse_swf8/swf9, focusrect_swf6, frame_size_translated_neg/pos, mask_with_drawing. Tolerance-only: display_object_properties (max_diff=79), mask_reapply (max_diff=1).
-- **Main failure types**: output_mismatch (62), segfault (2, ignored), timeout (1, ignored)
-- **Recent gains (since 2026-03-12)**: BitmapData (bitmap_data, bitmap_data_hittest, bitmap_data_threshold ✅), shape-accurate hitTest (hittest_morph ✅, movieclip_hittest_shapeflag 306→338 improved), edittext_bullet 30/30 ✅, edittext_html_swf6 PASS ✅, super_edge_cases PASS ✅, focus_mouse_focusable PASS ✅, loadmovie_registerclass PASS ✅, string_paths_eval/eval2/keyevents/timer/variable_scopes all PASS ✅, object_resolve PASS ✅, getBounds_6/7 PASS ✅, edittext_html_condensewhite_swf7 PASS ✅, globals Phase 8c (global stubs + constructor own_props + ASSetPropFlags for functions).
+- **Main failure types**: output_mismatch (60), timeout (1, ignored)
 - **Known regressions**: None. Previous regressions all recovered.
-- **Latest fixes (2026-03-15)**: text_blocks_clicks PASS ✅ (DefineText bounds for _droptarget), nested MC click hit-testing (parent chain global offset), unload_nested_child 0/5→2/5 improved.
+- **Latest fixes (2026-03-15)**:
+  - text_blocks_clicks PASS ✅ (DefineText bounds for _droptarget)
+  - issue_2030 PASS ✅ (MC.attachBitmap stub)
+  - unload_nested_child PASS ✅ (nested MC click fix, recursive child unload detection, deferred UNLOAD in catch_up_mode)
+  - target_clip_removed PASS ✅ (char_id guard in upgrade_sprite_initialized)
+  - issue_2084 PASS ✅ (nested attachMovie with registerClass — onLoad queue, initObject ordering)
+  - coerce_to_object_monkeypatch PASS ✅ (primitive auto-boxing, addProperty getter lookup, this fallback to _global)
+  - clone_sprite_edittext_dynamic PASS ✅ (TF clone property copy, rotated bounding box)
+  - movieclip_hittest_shapeflag improved (rotated AABB, text bounds)
 
 ## Crashes and Errors (8 tests)
 
