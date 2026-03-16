@@ -381,11 +381,11 @@ STB_DIR = PROJECT_ROOT / "SWFRecomp" / "lib" / "stb"
 # Ruffle upstream test assets (expected PNGs live here)
 RUFFLE_UPSTREAM = Path.home() / "CC" / "ruffle" / "tests" / "tests" / "swfs" / "avm1"
 
-# JSON result files
-RESULTS_FINAL = SCRIPT_DIR / "results.json"
-RESULTS_PREVIOUS = SCRIPT_DIR / "results_previous.json"
-RESULTS_CURRENT = SCRIPT_DIR / "results_current.json"
-RESULTS_HEADLESS = SCRIPT_DIR / "results_headless.json"
+# JSON result files (re-derived from TESTS_DIR in main() when --tests-dir is used)
+RESULTS_DIR = TESTS_DIR / "_results"
+RESULTS_FINAL = RESULTS_DIR / "results.json"
+RESULTS_PREVIOUS = RESULTS_DIR / "results_previous.json"
+RESULTS_CURRENT = RESULTS_DIR / "results_current.json"
 
 SKIP = {"__framework__"}
 
@@ -1536,7 +1536,7 @@ examples:
 
 
 def main():
-    global TESTS_DIR
+    global TESTS_DIR, RESULTS_DIR, RESULTS_FINAL, RESULTS_PREVIOUS, RESULTS_CURRENT
     args = parse_args()
 
     # Override tests directory if specified
@@ -1545,6 +1545,12 @@ def main():
         if not TESTS_DIR.is_dir():
             print(f"Error: tests directory not found: {TESTS_DIR}")
             sys.exit(1)
+
+    # Re-derive results paths from TESTS_DIR
+    RESULTS_DIR = TESTS_DIR / "_results"
+    RESULTS_FINAL = RESULTS_DIR / "results.json"
+    RESULTS_PREVIOUS = RESULTS_DIR / "results_previous.json"
+    RESULTS_CURRENT = RESULTS_DIR / "results_current.json"
 
     if not RECOMP_BIN.exists():
         print(f"Error: SWFRecomp not found at {RECOMP_BIN}")
@@ -1609,6 +1615,9 @@ def main():
         start = sum(chunk + (1 if j <= rem else 0) for j in range(1, shard_idx))
         count = chunk + (1 if shard_idx <= rem else 0)
         tests = tests[start:start + count]
+
+    # Ensure results directory exists
+    RESULTS_DIR.mkdir(parents=True, exist_ok=True)
 
     # Save previous results before starting
     if RESULTS_FINAL.exists() and not args.test:
@@ -1896,7 +1905,9 @@ def main():
     # Write final JSON results
     json_path = args.json
     if json_path is None and args.headless:
-        json_path = str(RESULTS_HEADLESS)
+        json_path = str(RESULTS_DIR / "results_headless.json")
+    if json_path is None and not args.test:
+        json_path = str(RESULTS_FINAL)
     if json_path:
         report = build_report(test_results, stats, total, total_available, run_start)
         if args.append and Path(json_path).exists():

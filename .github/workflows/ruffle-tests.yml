@@ -34,6 +34,10 @@ on:
 permissions:
   contents: write
 
+env:
+  AVM1_RESULTS: ruffle-tests/tests/swfs/avm1/_results
+  SHUMWAY_RESULTS: ruffle-tests/tests/swfs/from_shumway/avm1/_results
+
 jobs:
   # --- Single runner path ---
   ruffle-tests:
@@ -61,83 +65,100 @@ jobs:
           make -j$(nproc)
 
       - name: Download Ruffle test SWFs
-        run: |
-          bash ruffle-tests/download_tests.sh
+        run: bash ruffle-tests/download_tests.sh avm1 from_shumway
 
       - name: Run recompiler on test SWFs
-        run: python3 ruffle-tests/run_tests.py
+        run: |
+          python3 ruffle-tests/run_tests.py
+          python3 ruffle-tests/run_tests.py --tests-dir=ruffle-tests/tests/swfs/from_shumway/avm1
 
       - name: Fetch previous results
         run: |
+          mkdir -p ${{ env.AVM1_RESULTS }}
+          mkdir -p ${{ env.SHUMWAY_RESULTS }}
           if git fetch origin ruffle-test-results 2>/dev/null; then
-            git show origin/ruffle-test-results:ruffle-tests/results.json > ruffle-tests/results_previous.json 2>/dev/null || true
+            git show origin/ruffle-test-results:${{ env.AVM1_RESULTS }}/results.json \
+              > ${{ env.AVM1_RESULTS }}/results_previous.json 2>/dev/null || true
+            git show origin/ruffle-test-results:${{ env.SHUMWAY_RESULTS }}/results.json \
+              > ${{ env.SHUMWAY_RESULTS }}/results_previous.json 2>/dev/null || true
           fi
 
-      - name: Verify runtime output
+      - name: Verify runtime output (avm1)
         env:
           TZ: NPT-5:45
         run: |
-          ARGS="-v --json=ruffle-tests/results.json"
+          ARGS="-v"
           if [ "${{ inputs.limit }}" != "0" ] && [ -n "${{ inputs.limit }}" ]; then
             ARGS="$ARGS --limit=${{ inputs.limit }}"
           fi
           python3 ruffle-tests/verify_output.py $ARGS
 
+      - name: Verify runtime output (from_shumway/avm1)
+        env:
+          TZ: NPT-5:45
+        run: |
+          python3 ruffle-tests/verify_output.py -v \
+            --tests-dir=ruffle-tests/tests/swfs/from_shumway/avm1
+
       - name: Generate filtered results
         if: always()
         run: |
-          if [ -f ruffle-tests/results.json ]; then
-            python3 ruffle-tests/filter_results.py ruffle-tests/results.json ruffle-tests/results_filtered.json
-          fi
+          for dir in ${{ env.AVM1_RESULTS }} ${{ env.SHUMWAY_RESULTS }}; do
+            if [ -f "$dir/results.json" ]; then
+              python3 ruffle-tests/filter_results.py "$dir/results.json"
+            fi
+          done
 
       - name: Generate diff report
         if: always()
         run: |
-          if [ -f ruffle-tests/results.json ] && [ -f ruffle-tests/results_previous.json ]; then
-            python3 scripts/diff_ruffle_results.py ruffle-tests/results_previous.json ruffle-tests/results.json
-          fi
+          for dir in ${{ env.AVM1_RESULTS }} ${{ env.SHUMWAY_RESULTS }}; do
+            if [ -f "$dir/results.json" ] && [ -f "$dir/results_previous.json" ]; then
+              python3 scripts/diff_ruffle_results.py "$dir/results_previous.json" "$dir/results.json" \
+                --json="$dir/results_diff.json" --markdown="$dir/results_diff.md"
+            fi
+          done
 
       - name: Generate markdown reports
         if: always()
         run: |
-          if [ -f ruffle-tests/results.json ]; then
-            python3 scripts/generate_ruffle_results_markdown.py
-          fi
+          python3 scripts/generate_ruffle_results_markdown.py --scan
+          python3 scripts/generate_results_index.py
 
       - name: Generate step summary
         if: always()
         run: |
-          if [ -f ruffle-tests/results.json ]; then
-            python3 << 'EOF' >> "$GITHUB_STEP_SUMMARY"
-          import json
-          with open("ruffle-tests/results.json") as f:
-              r = json.load(f)
-          m = r.get("metadata", {})
-          print("## Ruffle AVM1 Test Results")
-          # Show filtered results prominently if available
-          try:
-              with open("ruffle-tests/results_filtered.json") as f:
-                  rf = json.load(f)
-              ignored = rf["metadata"].get("ignored_count", 0)
-              print(f"**{rf['pass']}/{rf['total']}** tests passing ({rf['pass_rate']}%) — filtered")
-              print(f"({r['pass']}/{r['total']} raw, {ignored} tests ignored)\n")
-          except FileNotFoundError:
-              print(f"**{r['pass']}/{r['total']}** tests passing ({r['pass_rate']}%)\n")
-          if m.get("git_sha"):
-              print(f"Commit: `{m['git_sha'][:12]}`")
-          if m.get("duration_seconds"):
-              print(f"Duration: {m['duration_seconds']:.0f}s")
-          if m.get("total_available") and m["total_available"] != r["total"]:
-              print(f"Ran {r['total']} of {m['total_available']} available tests")
-          print()
-          if r.get("breakdown"):
-              print("| Category | Count |")
-              print("|----------|------:|")
-              print(f"| Pass | {r['pass']} |")
-              for k, v in r["breakdown"].items():
-                  print(f"| {k} | {v} |")
-          EOF
-          fi
+          python3 << 'PYEOF' >> "$GITHUB_STEP_SUMMARY"
+          import json, glob, os
+          print("## Ruffle Test Results\n")
+          for rj in sorted(glob.glob("ruffle-tests/tests/swfs/**/_results/results.json", recursive=True)):
+              with open(rj) as f:
+                  r = json.load(f)
+              # Derive category name
+              cat = os.path.dirname(rj).replace("ruffle-tests/tests/swfs/", "").replace("/_results", "")
+              m = r.get("metadata", {})
+              # Try filtered
+              fj = os.path.join(os.path.dirname(rj), "results_filtered.json")
+              try:
+                  with open(fj) as f:
+                      rf = json.load(f)
+                  ignored = rf["metadata"].get("ignored_count", 0)
+                  print(f"### {cat}")
+                  print(f"**{rf['pass']}/{rf['total']}** passing ({rf['pass_rate']}%) — filtered")
+                  print(f"({r['pass']}/{r['total']} raw, {ignored} ignored)\n")
+              except FileNotFoundError:
+                  print(f"### {cat}")
+                  print(f"**{r['pass']}/{r['total']}** passing ({r['pass_rate']}%)\n")
+              if m.get("git_sha"):
+                  print(f"Commit: `{m['git_sha'][:12]}`")
+              if r.get("breakdown"):
+                  print("| Category | Count |")
+                  print("|----------|------:|")
+                  print(f"| Pass | {r['pass']} |")
+                  for k, v in r["breakdown"].items():
+                      print(f"| {k} | {v} |")
+              print()
+          PYEOF
 
       - name: Upload results
         if: always()
@@ -145,29 +166,27 @@ jobs:
         with:
           name: ruffle-test-results
           path: |
-            ruffle-tests/results.json
-            ruffle-tests/results_filtered.json
-            ruffle-tests/results_diff.json
-            ruffle-results.md
-            ruffle-results-filtered.md
-            ruffle-results-diff.md
+            ruffle-tests/tests/swfs/avm1/_results/
+            ruffle-tests/tests/swfs/from_shumway/avm1/_results/
+            ruffle-tests/results-index.md
           retention-days: 90
           if-no-files-found: ignore
 
       - name: Commit results to ruffle-test-results branch
         if: always()
         run: |
-          if [ ! -f ruffle-tests/results.json ]; then
-            echo "No results file to commit"
+          AVM1="${{ env.AVM1_RESULTS }}"
+          SHUMWAY="${{ env.SHUMWAY_RESULTS }}"
+          if [ ! -f "$AVM1/results.json" ] && [ ! -f "$SHUMWAY/results.json" ]; then
+            echo "No results files to commit"
             exit 0
           fi
 
-          cp ruffle-tests/results.json /tmp/results.json
-          cp ruffle-tests/results_filtered.json /tmp/results_filtered.json 2>/dev/null || true
-          cp ruffle-tests/results_diff.json /tmp/results_diff.json 2>/dev/null || true
-          cp ruffle-results.md /tmp/ruffle-results.md 2>/dev/null || true
-          cp ruffle-results-filtered.md /tmp/ruffle-results-filtered.md 2>/dev/null || true
-          cp ruffle-results-diff.md /tmp/ruffle-results-diff.md 2>/dev/null || true
+          # Save results to /tmp
+          mkdir -p /tmp/avm1_results /tmp/shumway_results
+          cp "$AVM1"/*.json "$AVM1"/*.md /tmp/avm1_results/ 2>/dev/null || true
+          cp "$SHUMWAY"/*.json "$SHUMWAY"/*.md /tmp/shumway_results/ 2>/dev/null || true
+          cp ruffle-tests/results-index.md /tmp/ 2>/dev/null || true
 
           git config user.name "github-actions[bot]"
           git config user.email "github-actions[bot]@users.noreply.github.com"
@@ -175,17 +194,15 @@ jobs:
 
           git checkout -b ruffle-test-results
 
-          mkdir -p ruffle-tests
-          cp /tmp/results.json ruffle-tests/results.json
-          cp /tmp/results_filtered.json ruffle-tests/results_filtered.json 2>/dev/null || true
-          cp /tmp/results_diff.json ruffle-tests/results_diff.json 2>/dev/null || true
-          cp /tmp/ruffle-results.md ruffle-results.md 2>/dev/null || true
-          cp /tmp/ruffle-results-filtered.md ruffle-results-filtered.md 2>/dev/null || true
-          cp /tmp/ruffle-results-diff.md ruffle-results-diff.md 2>/dev/null || true
-          git add -f ruffle-tests/results.json ruffle-tests/results_filtered.json 2>/dev/null
-          git add -f ruffle-tests/results.json
-          git add -f ruffle-tests/results_diff.json 2>/dev/null || true
-          git add -f ruffle-results.md ruffle-results-filtered.md ruffle-results-diff.md 2>/dev/null || true
+          # Restore results
+          mkdir -p "$AVM1" "$SHUMWAY"
+          cp /tmp/avm1_results/* "$AVM1/" 2>/dev/null || true
+          cp /tmp/shumway_results/* "$SHUMWAY/" 2>/dev/null || true
+          cp /tmp/results-index.md ruffle-tests/ 2>/dev/null || true
+
+          git add -f "$AVM1"/*.json "$AVM1"/*.md 2>/dev/null || true
+          git add -f "$SHUMWAY"/*.json "$SHUMWAY"/*.md 2>/dev/null || true
+          git add -f ruffle-tests/results-index.md 2>/dev/null || true
 
           if git diff --staged --quiet; then
             echo "No changes to commit"
@@ -239,11 +256,12 @@ jobs:
           make -j$(nproc)
 
       - name: Download Ruffle test SWFs
-        run: |
-          bash ruffle-tests/download_tests.sh
+        run: bash ruffle-tests/download_tests.sh avm1 from_shumway
 
       - name: Run recompiler on test SWFs
-        run: python3 ruffle-tests/run_tests.py
+        run: |
+          python3 ruffle-tests/run_tests.py
+          python3 ruffle-tests/run_tests.py --tests-dir=ruffle-tests/tests/swfs/from_shumway/avm1
 
       - name: Upload SWFRecomp binary
         uses: actions/upload-artifact@v7
@@ -259,7 +277,7 @@ jobs:
           path: ruffle-tests/
           retention-days: 1
 
-  # --- Parallel runner path: shards ---
+  # --- Parallel runner path: shards (avm1 only) ---
   ruffle-tests-shard:
     name: Shard ${{ matrix.shard }}/${{ needs.setup-parallel.outputs.total }}
     if: inputs.parallel != '1'
@@ -319,17 +337,45 @@ jobs:
   combine-results:
     name: Combine Results
     if: inputs.parallel != '1' && !cancelled()
-    needs: ruffle-tests-shard
+    needs: [setup-parallel, ruffle-tests-shard]
     runs-on: ubuntu-latest
 
     steps:
       - name: Checkout repository
         uses: actions/checkout@v5
 
+      - name: Set up Python
+        uses: actions/setup-python@v6
+        with:
+          python-version: '3.x'
+
+      - name: Install system dependencies
+        run: sudo apt-get update && sudo apt-get install -y build-essential
+
+      - name: Download SWFRecomp binary
+        uses: actions/download-artifact@v7
+        with:
+          name: setup-binary
+          path: SWFRecomp/build/
+
+      - name: Make SWFRecomp binary executable
+        run: chmod +x SWFRecomp/build/SWFRecomp
+
+      - name: Download recompiled test data
+        uses: actions/download-artifact@v7
+        with:
+          name: setup-tests
+          path: ruffle-tests/
+
       - name: Fetch previous results
         run: |
+          mkdir -p ${{ env.AVM1_RESULTS }}
+          mkdir -p ${{ env.SHUMWAY_RESULTS }}
           if git fetch origin ruffle-test-results 2>/dev/null; then
-            git show origin/ruffle-test-results:ruffle-tests/results.json > ruffle-tests/results_previous.json 2>/dev/null || true
+            git show origin/ruffle-test-results:${{ env.AVM1_RESULTS }}/results.json \
+              > ${{ env.AVM1_RESULTS }}/results_previous.json 2>/dev/null || true
+            git show origin/ruffle-test-results:${{ env.SHUMWAY_RESULTS }}/results.json \
+              > ${{ env.SHUMWAY_RESULTS }}/results_previous.json 2>/dev/null || true
           fi
 
       - name: Download all shard artifacts
@@ -338,7 +384,7 @@ jobs:
           pattern: results-shard-*
           path: artifacts
 
-      - name: Combine shard results
+      - name: Combine AVM1 shard results
         run: |
           python3 << 'EOF'
           import json, glob, os
@@ -384,69 +430,76 @@ jobs:
               "tests": sorted(combined_tests, key=lambda t: t["test"]),
           }
 
-          os.makedirs("ruffle-tests", exist_ok=True)
-          with open("ruffle-tests/results.json", "w") as fp:
+          out_dir = "ruffle-tests/tests/swfs/avm1/_results"
+          os.makedirs(out_dir, exist_ok=True)
+          with open(f"{out_dir}/results.json", "w") as fp:
               json.dump(report, fp, indent=2)
 
           print(f"Combined: {pass_count}/{total} passing ({report['pass_rate']}%)")
           EOF
 
+      - name: Run from_shumway/avm1 tests
+        env:
+          TZ: NPT-5:45
+        run: |
+          python3 ruffle-tests/verify_output.py -v \
+            --tests-dir=ruffle-tests/tests/swfs/from_shumway/avm1
+
       - name: Generate filtered results
         if: always()
         run: |
-          if [ -f ruffle-tests/results.json ]; then
-            python3 ruffle-tests/filter_results.py ruffle-tests/results.json ruffle-tests/results_filtered.json
-          fi
+          for dir in ${{ env.AVM1_RESULTS }} ${{ env.SHUMWAY_RESULTS }}; do
+            if [ -f "$dir/results.json" ]; then
+              python3 ruffle-tests/filter_results.py "$dir/results.json"
+            fi
+          done
 
       - name: Generate diff report
         if: always()
         run: |
-          if [ -f ruffle-tests/results.json ] && [ -f ruffle-tests/results_previous.json ]; then
-            python3 scripts/diff_ruffle_results.py ruffle-tests/results_previous.json ruffle-tests/results.json
-          fi
+          for dir in ${{ env.AVM1_RESULTS }} ${{ env.SHUMWAY_RESULTS }}; do
+            if [ -f "$dir/results.json" ] && [ -f "$dir/results_previous.json" ]; then
+              python3 scripts/diff_ruffle_results.py "$dir/results_previous.json" "$dir/results.json" \
+                --json="$dir/results_diff.json" --markdown="$dir/results_diff.md"
+            fi
+          done
 
       - name: Generate markdown reports
         if: always()
         run: |
-          if [ -f ruffle-tests/results.json ]; then
-            python3 scripts/generate_ruffle_results_markdown.py
-          fi
+          python3 scripts/generate_ruffle_results_markdown.py --scan
+          python3 scripts/generate_results_index.py
 
       - name: Generate step summary
         if: always()
         run: |
-          if [ -f ruffle-tests/results.json ]; then
-            python3 << 'EOF' >> "$GITHUB_STEP_SUMMARY"
-          import json
-          with open("ruffle-tests/results.json") as f:
-              r = json.load(f)
-          m = r.get("metadata", {})
-          print("## Ruffle AVM1 Test Results")
-          try:
-              with open("ruffle-tests/results_filtered.json") as f:
-                  rf = json.load(f)
-              ignored = rf["metadata"].get("ignored_count", 0)
-              print(f"**{rf['pass']}/{rf['total']}** tests passing ({rf['pass_rate']}%) — filtered")
-              print(f"({r['pass']}/{r['total']} raw, {ignored} tests ignored)\n")
-          except FileNotFoundError:
-              print(f"**{r['pass']}/{r['total']}** tests passing ({r['pass_rate']}%)\n")
-          if m.get("git_sha"):
-              print(f"Commit: `{m['git_sha'][:12]}`")
-          if m.get("duration_seconds"):
-              dur = m['duration_seconds']
-              shards = m.get('shards', 1)
-              print(f"Duration: {dur:.0f}s total across {shards} shards")
-          if m.get("total_available") and m["total_available"] != r["total"]:
-              print(f"Ran {r['total']} of {m['total_available']} available tests")
-          print()
-          if r.get("breakdown"):
-              print("| Category | Count |")
-              print("|----------|------:|")
-              print(f"| Pass | {r['pass']} |")
-              for k, v in r["breakdown"].items():
-                  print(f"| {k} | {v} |")
-          EOF
-          fi
+          python3 << 'PYEOF' >> "$GITHUB_STEP_SUMMARY"
+          import json, glob, os
+          print("## Ruffle Test Results\n")
+          for rj in sorted(glob.glob("ruffle-tests/tests/swfs/**/_results/results.json", recursive=True)):
+              with open(rj) as f:
+                  r = json.load(f)
+              cat = os.path.dirname(rj).replace("ruffle-tests/tests/swfs/", "").replace("/_results", "")
+              m = r.get("metadata", {})
+              fj = os.path.join(os.path.dirname(rj), "results_filtered.json")
+              try:
+                  with open(fj) as f:
+                      rf = json.load(f)
+                  ignored = rf["metadata"].get("ignored_count", 0)
+                  print(f"### {cat}")
+                  print(f"**{rf['pass']}/{rf['total']}** passing ({rf['pass_rate']}%) — filtered")
+                  print(f"({r['pass']}/{r['total']} raw, {ignored} ignored)\n")
+              except FileNotFoundError:
+                  print(f"### {cat}")
+                  print(f"**{r['pass']}/{r['total']}** passing ({r['pass_rate']}%)\n")
+              if m.get("git_sha"):
+                  print(f"Commit: `{m['git_sha'][:12]}`")
+              if m.get("duration_seconds"):
+                  dur = m['duration_seconds']
+                  shards = m.get('shards', 1)
+                  print(f"Duration: {dur:.0f}s total across {shards} shard(s)")
+              print()
+          PYEOF
 
       - name: Upload results
         if: always()
@@ -454,29 +507,27 @@ jobs:
         with:
           name: ruffle-test-results
           path: |
-            ruffle-tests/results.json
-            ruffle-tests/results_filtered.json
-            ruffle-tests/results_diff.json
-            ruffle-results.md
-            ruffle-results-filtered.md
-            ruffle-results-diff.md
+            ruffle-tests/tests/swfs/avm1/_results/
+            ruffle-tests/tests/swfs/from_shumway/avm1/_results/
+            ruffle-tests/results-index.md
           retention-days: 90
           if-no-files-found: ignore
 
       - name: Commit results to ruffle-test-results branch
         if: always()
         run: |
-          if [ ! -f ruffle-tests/results.json ]; then
-            echo "No results file to commit"
+          AVM1="${{ env.AVM1_RESULTS }}"
+          SHUMWAY="${{ env.SHUMWAY_RESULTS }}"
+          if [ ! -f "$AVM1/results.json" ] && [ ! -f "$SHUMWAY/results.json" ]; then
+            echo "No results files to commit"
             exit 0
           fi
 
-          cp ruffle-tests/results.json /tmp/results.json
-          cp ruffle-tests/results_filtered.json /tmp/results_filtered.json 2>/dev/null || true
-          cp ruffle-tests/results_diff.json /tmp/results_diff.json 2>/dev/null || true
-          cp ruffle-results.md /tmp/ruffle-results.md 2>/dev/null || true
-          cp ruffle-results-filtered.md /tmp/ruffle-results-filtered.md 2>/dev/null || true
-          cp ruffle-results-diff.md /tmp/ruffle-results-diff.md 2>/dev/null || true
+          # Save results to /tmp
+          mkdir -p /tmp/avm1_results /tmp/shumway_results
+          cp "$AVM1"/*.json "$AVM1"/*.md /tmp/avm1_results/ 2>/dev/null || true
+          cp "$SHUMWAY"/*.json "$SHUMWAY"/*.md /tmp/shumway_results/ 2>/dev/null || true
+          cp ruffle-tests/results-index.md /tmp/ 2>/dev/null || true
 
           git config user.name "github-actions[bot]"
           git config user.email "github-actions[bot]@users.noreply.github.com"
@@ -484,17 +535,15 @@ jobs:
 
           git checkout -b ruffle-test-results
 
-          mkdir -p ruffle-tests
-          cp /tmp/results.json ruffle-tests/results.json
-          cp /tmp/results_filtered.json ruffle-tests/results_filtered.json 2>/dev/null || true
-          cp /tmp/results_diff.json ruffle-tests/results_diff.json 2>/dev/null || true
-          cp /tmp/ruffle-results.md ruffle-results.md 2>/dev/null || true
-          cp /tmp/ruffle-results-filtered.md ruffle-results-filtered.md 2>/dev/null || true
-          cp /tmp/ruffle-results-diff.md ruffle-results-diff.md 2>/dev/null || true
-          git add -f ruffle-tests/results.json ruffle-tests/results_filtered.json 2>/dev/null
-          git add -f ruffle-tests/results.json
-          git add -f ruffle-tests/results_diff.json 2>/dev/null || true
-          git add -f ruffle-results.md ruffle-results-filtered.md ruffle-results-diff.md 2>/dev/null || true
+          # Restore results
+          mkdir -p "$AVM1" "$SHUMWAY"
+          cp /tmp/avm1_results/* "$AVM1/" 2>/dev/null || true
+          cp /tmp/shumway_results/* "$SHUMWAY/" 2>/dev/null || true
+          cp /tmp/results-index.md ruffle-tests/ 2>/dev/null || true
+
+          git add -f "$AVM1"/*.json "$AVM1"/*.md 2>/dev/null || true
+          git add -f "$SHUMWAY"/*.json "$SHUMWAY"/*.md 2>/dev/null || true
+          git add -f ruffle-tests/results-index.md 2>/dev/null || true
 
           if git diff --staged --quiet; then
             echo "No changes to commit"

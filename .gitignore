@@ -77,9 +77,10 @@ upstream/
 # Upstream reference files for merge comparison
 upstream-reference/
 
-# Ruffle tests: ignore downloaded test data, keep infrastructure
+# Ruffle tests: ignore downloaded test data, keep infrastructure and results
 ruffle-tests/tests/swfs/avm1/*/
 !ruffle-tests/tests/swfs/avm1/_investigation/
+!ruffle-tests/tests/swfs/avm1/_results/
 !ruffle-tests/tests/swfs/avm1/external_interface/
 # Ignore downloaded files within external_interface (only track test.toml + test_harness.c)
 ruffle-tests/tests/swfs/avm1/external_interface/output.txt
@@ -87,8 +88,12 @@ ruffle-tests/tests/swfs/avm1/external_interface/*.fla
 ruffle-tests/tests/swfs/avm1/external_interface/RecompiledScripts/
 ruffle-tests/tests/swfs/avm1/external_interface/RecompiledTags/
 
-# Shumway tests (downloaded)
-ruffle-tests/tests/swfs/from_shumway/
+# Shumway tests (downloaded test data, keep results)
+ruffle-tests/tests/swfs/from_shumway/avm1/*/
+!ruffle-tests/tests/swfs/from_shumway/avm1/_results/
 
-ruffle-tests/results_current.json
-ruffle-tests/results_previous.json
+# Transient result files (not committed)
+ruffle-tests/tests/swfs/*/_results/results_current.json
+ruffle-tests/tests/swfs/*/_results/results_previous.json
+ruffle-tests/tests/swfs/*/*/_results/results_current.json
+ruffle-tests/tests/swfs/*/*/_results/results_previous.json

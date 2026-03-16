@@ -40,7 +40,7 @@ def load_results(path: Path) -> dict:
         return json.load(f)
 
 
-def build_investigation_index() -> tuple[dict[str, list[tuple[int, str]]], list[tuple[str, str, list[str]]]]:
+def build_investigation_index(inv_dir: Path = None) -> tuple[dict[str, list[tuple[int, str]]], list[tuple[str, str, list[str]]]]:
     """Parse investigation docs for <!-- TESTS: ... --> comments.
 
     Scans _investigation/, _investigation/complete/, _investigation/incomplete/,
@@ -52,35 +52,31 @@ def build_investigation_index() -> tuple[dict[str, list[tuple[int, str]]], list[
         test_to_docs: mapping test_name -> list of (doc_number, doc_rel_path)
         doc_list: list of (doc_display_name, doc_rel_path, test_names) indexed by doc_number-1
     """
-    if not INVESTIGATION_DIR.is_dir():
+    inv_dir = inv_dir or INVESTIGATION_DIR
+    if not inv_dir.is_dir():
         return {}, []
+
+    # Compute relative path prefix for links
+    try:
+        inv_rel = str(inv_dir.relative_to(BASE_DIR))
+    except ValueError:
+        inv_rel = str(inv_dir)
 
     # Collect all candidate docs from both directories
     candidates = []  # list of (display_name, rel_path, abs_path)
 
-    for p in INVESTIGATION_DIR.glob("*.md"):
+    for p in inv_dir.glob("*.md"):
         if p.name in EXCLUDED_DOCS:
             continue
-        rel = f"ruffle-tests/tests/swfs/avm1/_investigation/{p.name}"
+        rel = f"{inv_rel}/{p.name}"
         candidates.append((p.name, rel, p))
 
-    complete_dir = INVESTIGATION_DIR / "complete"
-    if complete_dir.is_dir():
-        for p in complete_dir.glob("*.md"):
-            rel = f"ruffle-tests/tests/swfs/avm1/_investigation/complete/{p.name}"
-            candidates.append((p.name, rel, p))
-
-    incomplete_dir = INVESTIGATION_DIR / "incomplete"
-    if incomplete_dir.is_dir():
-        for p in incomplete_dir.glob("*.md"):
-            rel = f"ruffle-tests/tests/swfs/avm1/_investigation/incomplete/{p.name}"
-            candidates.append((p.name, rel, p))
-
-    blocked_dir = INVESTIGATION_DIR / "blocked"
-    if blocked_dir.is_dir():
-        for p in blocked_dir.glob("*.md"):
-            rel = f"ruffle-tests/tests/swfs/avm1/_investigation/blocked/{p.name}"
-            candidates.append((p.name, rel, p))
+    for subdir_name in ("complete", "incomplete", "blocked"):
+        subdir = inv_dir / subdir_name
+        if subdir.is_dir():
+            for p in subdir.glob("*.md"):
+                rel = f"{inv_rel}/{subdir_name}/{p.name}"
+                candidates.append((p.name, rel, p))
 
     # Sort alphabetically by display name (case-insensitive)
     candidates.sort(key=lambda d: d[0].lower())
@@ -479,14 +475,15 @@ def generate_investigation_legend(doc_list: list[tuple[str, str, list[str]]], da
 # Main
 # ---------------------------------------------------------------------------
 
-def generate_one(results_path: Path, output_path: Path):
+def generate_one(results_path: Path, output_path: Path, investigation_dir: Path = None):
     """Generate a single markdown report from a results JSON file."""
     print(f"Loading {results_path}...")
     data = load_results(results_path)
 
     print(f"Generating {output_path.name}...")
 
-    test_to_docs, doc_list = build_investigation_index()
+    inv_dir = investigation_dir or INVESTIGATION_DIR
+    test_to_docs, doc_list = build_investigation_index(inv_dir)
 
     sections = [
         generate_header(data),
@@ -509,18 +506,69 @@ def generate_one(results_path: Path, output_path: Path):
 
 
 def generate_markdown():
-    """Generate both filtered and unfiltered markdown reports."""
+    """Generate markdown reports from Ruffle test results JSON.
+
+    Modes:
+      --input PATH    Generate .md alongside the given results JSON file
+      --scan          Auto-discover all _results/ dirs under ruffle-tests/tests/swfs/
+      (no args)       Legacy: read from ruffle-tests/ root (for backward compat)
+    """
     import argparse
     parser = argparse.ArgumentParser(
         description="Generate Markdown report from Ruffle test results JSON.")
+    parser.add_argument(
+        "--input", metavar="PATH",
+        help="Path to a results.json file; writes .md alongside it in the same directory")
+    parser.add_argument(
+        "--scan", action="store_true",
+        help="Auto-discover all _results/ dirs under ruffle-tests/tests/swfs/")
     parser.add_argument(
         "--headless", action="store_true",
         help="Generate from results_headless.json instead of results.json")
     parser.add_argument(
         "--json", metavar="PATH",
-        help="Path to a specific results JSON file to use")
+        help="(legacy) Path to a specific results JSON file; writes .md to project root")
     args = parser.parse_args()
 
+    if args.input:
+        json_path = Path(args.input)
+        if not json_path.exists():
+            print(f"Error: {json_path} not found", file=sys.stderr)
+            sys.exit(1)
+        results_dir = json_path.parent
+        out_name = json_path.stem + ".md"
+        # Derive investigation dir: _results/ sibling _investigation/
+        inv_dir = results_dir.parent / "_investigation"
+        generate_one(json_path, results_dir / out_name,
+                      investigation_dir=inv_dir if inv_dir.is_dir() else None)
+        print("\nDone.")
+        return
+
+    if args.scan:
+        import glob as glob_mod
+        generated = False
+        for results_json in sorted(glob_mod.glob(
+                str(RUFFLE_DIR / "tests" / "swfs" / "**" / "_results" / "results.json"),
+                recursive=True)):
+            results_json = Path(results_json)
+            results_dir = results_json.parent
+            inv_dir = results_dir.parent / "_investigation"
+            generate_one(results_json, results_dir / "results.md",
+                          investigation_dir=inv_dir if inv_dir.is_dir() else None)
+            # Also generate filtered report if available
+            filtered_json = results_dir / "results_filtered.json"
+            if filtered_json.exists():
+                generate_one(filtered_json, results_dir / "results_filtered.md",
+                              investigation_dir=inv_dir if inv_dir.is_dir() else None)
+            generated = True
+        if not generated:
+            print("No _results/results.json files found under ruffle-tests/tests/swfs/",
+                  file=sys.stderr)
+            sys.exit(1)
+        print("\nDone.")
+        return
+
+    # Legacy modes (--json, --headless, or default)
     if args.json:
         json_path = Path(args.json)
         if not json_path.exists():
@@ -540,25 +588,25 @@ def generate_markdown():
         print("\nDone.")
         return
 
-    filtered_json = RUFFLE_DIR / "results_filtered.json"
-    unfiltered_json = RUFFLE_DIR / "results.json"
-
+    # Default: scan for _results dirs
+    import glob as glob_mod
     generated = False
-
-    if unfiltered_json.exists():
-        generate_one(unfiltered_json, BASE_DIR / "ruffle-results.md")
+    for results_json in sorted(glob_mod.glob(
+            str(RUFFLE_DIR / "tests" / "swfs" / "**" / "_results" / "results.json"),
+            recursive=True)):
+        results_json = Path(results_json)
+        results_dir = results_json.parent
+        inv_dir = results_dir.parent / "_investigation"
+        generate_one(results_json, results_dir / "results.md",
+                      investigation_dir=inv_dir if inv_dir.is_dir() else None)
+        filtered_json = results_dir / "results_filtered.json"
+        if filtered_json.exists():
+            generate_one(filtered_json, results_dir / "results_filtered.md",
+                          investigation_dir=inv_dir if inv_dir.is_dir() else None)
         generated = True
-    else:
-        print(f"Skipping unfiltered: {unfiltered_json} not found")
-
-    if filtered_json.exists():
-        generate_one(filtered_json, BASE_DIR / "ruffle-results-filtered.md")
-        generated = True
-    else:
-        print(f"Skipping filtered: {filtered_json} not found")
 
     if not generated:
-        print("Error: No results JSON files found in ruffle-tests/", file=sys.stderr)
+        print("Error: No results JSON files found", file=sys.stderr)
         sys.exit(1)
 
     print("\nDone.")
