@@ -89,6 +89,8 @@ ruffle-tests/tests/swfs/avm1/external_interface/RecompiledScripts/
 ruffle-tests/tests/swfs/avm1/external_interface/RecompiledTags/
 
 # Shumway tests (downloaded test data, keep results)
+ruffle-tests/tests/swfs/from_shumway/*/
+!ruffle-tests/tests/swfs/from_shumway/avm1/
 ruffle-tests/tests/swfs/from_shumway/avm1/*/
 !ruffle-tests/tests/swfs/from_shumway/avm1/_results/
 
