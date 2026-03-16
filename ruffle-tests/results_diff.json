@@ -1,74 +1,42 @@
 {
   "metadata": {
-    "old_timestamp": "2026-03-16T00:06:29.560601+00:00",
-    "old_git_sha": "d4e283cda1a58711f4f22f5d3d07322d9ddd6d98",
-    "new_timestamp": "2026-03-16T01:10:43.621249+00:00",
-    "new_git_sha": "afce4866b144d8ecda6b9bc03abd064a2f665afb",
+    "old_timestamp": "2026-03-16T01:10:43.621249+00:00",
+    "old_git_sha": "afce4866b144d8ecda6b9bc03abd064a2f665afb",
+    "new_timestamp": "2026-03-16T02:59:20.310716+00:00",
+    "new_git_sha": "c937fbdf16b766c85caf8538a882bf50a952e1e2",
     "partial": false,
     "same_commit": false
   },
   "summary": {
-    "old_pass": 560,
+    "old_pass": 562,
     "old_total": 619,
-    "old_pass_rate": 90.5,
+    "old_pass_rate": 90.8,
     "new_pass": 562,
     "new_total": 619,
     "new_pass_rate": 90.8,
-    "old_mismatched_lines": 12889,
-    "new_mismatched_lines": 12910,
-    "increased_mismatches": 27,
-    "decreased_mismatches": 6,
-    "newly_passing": 2,
+    "old_mismatched_lines": 12910,
+    "new_mismatched_lines": 12883,
+    "increased_mismatches": 0,
+    "decreased_mismatches": 27,
+    "newly_passing": 0,
     "newly_failing": 0,
-    "status_changed": 3,
-    "unchanged": 616,
+    "status_changed": 1,
+    "unchanged": 618,
     "added": 0,
     "removed": 0
   },
   "changes": [
     {
-      "test": "bitmap_data_copypixels",
-      "change_type": "changed",
-      "old_status": "output_mismatch",
-      "new_status": "pass",
-      "old_lines": {
-        "actual_lines": 17,
-        "expected_lines": 17,
-        "matching_lines": 15
-      },
-      "new_lines": {
-        "actual_lines": 17,
-        "expected_lines": 17,
-        "matching_lines": 17
-      }
-    },
-    {
-      "test": "bitmap_data_draw_cliprect",
-      "change_type": "changed",
-      "old_status": "output_mismatch",
-      "new_status": "pass",
-      "old_lines": {
-        "actual_lines": 13,
-        "expected_lines": 13,
-        "matching_lines": 9
-      },
-      "new_lines": {
-        "actual_lines": 13,
-        "expected_lines": 13,
-        "matching_lines": 13
-      }
-    },
-    {
       "test": "movieclip_hittest_shapeflag",
       "change_type": "changed",
-      "old_status": "compile_fail",
-      "new_status": "output_mismatch",
-      "old_lines": null,
-      "new_lines": {
+      "old_status": "output_mismatch",
+      "new_status": "compile_fail",
+      "old_lines": {
         "actual_lines": 338,
         "expected_lines": 338,
         "matching_lines": 311
-      }
+      },
+      "new_lines": null
     }
   ]
 }
