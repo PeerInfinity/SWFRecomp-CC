@@ -1,17 +1,18 @@
 {
   "metadata": {
-    "timestamp": "2026-03-16T04:01:51.415309+00:00",
-    "git_sha": "d5fb5371bb3ee38f358dfed7a31d8da311c16383",
-    "duration_seconds": 1660.77,
+    "timestamp": "2026-03-16T04:36:16.044702+00:00",
+    "git_sha": "7d18c66d457ad622571e09352fdb69bed3a8c8a6",
+    "duration_seconds": 1904.78,
     "total_available": 621
   },
-  "total": 100,
-  "pass": 91,
-  "fail": 9,
-  "pass_rate": 91.0,
+  "total": 200,
+  "pass": 145,
+  "fail": 55,
+  "pass_rate": 72.5,
   "breakdown": {
-    "output_mismatch": 7,
-    "runtime_segfault": 2
+    "output_mismatch": 27,
+    "runtime_segfault": 2,
+    "compile_fail": 26
   },
   "tests": [
     {
@@ -1208,6 +1209,1084 @@
       },
       "duration": 19.09,
       "status": "pass"
+    },
+    {
+      "test": "cross_movie_root",
+      "num_frames": 5,
+      "lines": {
+        "actual_lines": 7,
+        "expected_lines": 10,
+        "matching_lines": 0
+      },
+      "duration": 20.57,
+      "status": "output_mismatch",
+      "detail": "10 line(s) differ (actual=7, expected=10)",
+      "actual_output": "undefined\nundefined\n_level0\ntrue\nfalse\nundefined\nundefined",
+      "expected_output": "_level1\nfalse\ntrue\n_level1\n_level1\n_level0\ntrue\nfalse\n_level1\n_level1"
+    },
+    {
+      "test": "custom_clip_methods",
+      "num_frames": 3,
+      "lines": {
+        "actual_lines": 4,
+        "expected_lines": 4,
+        "matching_lines": 4
+      },
+      "duration": 20.29,
+      "status": "pass"
+    },
+    {
+      "test": "date",
+      "num_frames": 1,
+      "lines": {
+        "actual_lines": 6335,
+        "expected_lines": 6335,
+        "matching_lines": 6284
+      },
+      "duration": 21.01,
+      "status": "output_mismatch",
+      "detail": "51 line(s) differ (actual=6335, expected=6335)",
+      "actual_output": "// Date()\nMon Mar 16 09:50:13 GMT+0545 2026\n\n// typeof Date()\nstring\n\n// new Date()\nMon Mar 16 09:50:13 GMT+0545 2026\nFullYear = 2026, Year = 126, Month = 2, Date = 16, Day = 1, Hours = 9, Minutes = 50, Seconds = 13, Milliseconds = 136, Time = 1773633913136, TimezoneOffset = -345, UTCFullYear = 2026, UTCYear = 126, UTCMonth = 2, UTCDate = 16, UTCDay = 1, UTCHours = 4, UTCMinutes = 5, UTCSeconds = 13, UTCMilliseconds = 136\n\n// new Date(new Date())\nMon Mar 16 09:50:13 GMT+0545 2026\nFullYear = 2026, Year = 126, Month = 2, Date = 16, Day = 1, Hours = 9, Minutes = 50, Seconds = 13, Milliseconds = 136, Time = 1773633913136, TimezoneOffset = -345, UTCFullYear = 2026, UTCYear = 126, UTCMonth = 2, UTCDate = 16, UTCDay = 1, UTCHours = 4, UTCMinutes = 5, UTCSeconds = 13, UTCMilliseconds = 136\n\n// new Date(0)\nThu Jan 1 05:45:00 GMT+0545 1970\nFullYear = 1970, Year = 70, Month = 0, Date = 1, Day = 4, Hours = 5, Minutes = 45, Seconds = 0, Milliseconds = 0, Time = 0, TimezoneOffset = -345, UTCFullYear = 1970, UTCYear = 70, UTCMonth = 0, UTCDate = 1, UTCDay = 4, UTCHours = 0, UTCMinutes = 0, UTCSeconds = 0, UTCMilliseconds = 0\n\n// new Date(5.5)\nThu Jan 1 05:45:00 GMT+0545 1970\nFullYear = 1970, Year = 70, Month = 0, Date = 1, Day = 4, Hours = 5, Minutes = 45, Seconds = 0, Milliseconds = 5, Time = 5.5, TimezoneOffset = -345, UTCFullYear = 1970, UTCYear = 70, UTCMonth = 0, UTCDate = 1, UTCDay = 4, UTCHours = 0, UTCMinutes = 0, UTCSeconds = 0, UTCMilliseconds = 5\n\n// new Date(500)\nThu Jan 1 05:45:00 GMT+0545 1970\nFullYear = 1970, Year = 70, Month = 0, Date = 1, Day = 4, Hours = 5, Minutes = 45, Seconds = 0, Milliseconds = 500, Time = 500, TimezoneOffset = -345, UTCFullYear = 1970, UTCYear = 70, UTCMonth = 0, UTCDate = 1, UTCDay = 4, UTCHours = 0, UTCMinutes = 0, UTCSeconds = 0, UTCMilliseconds = 500\n\n// new Date(-500)\nThu Jan 1 05:44:59 GMT+0545 1970\nFullYear = 1970, Year = 70, Month = 0, Date = 1, Day = 4, Hours = 5, Minutes = 44, Seconds = 59, Milliseconds = 500, Time = -500, TimezoneOffset = -345, UTCFullYear = 1969, UTCYear = 69, UTCMonth = 11, UTCDate = 31, UTCDay = 3, UTCHours = 23, UTCMinutes = 59, UTCSeconds = 59, UTCMilliseconds = 500\n\n// new Date(1000)\nThu Jan 1 05:45:01 GMT+0545 1970\nFullYear = 1970, Year = 70, Month = 0, Date = 1, Day = 4, Hours = 5, Minutes = 45, Seconds = 1, Milliseconds = 0, Time = 1000, TimezoneOffset = -345, UTCFullYear = 1970, UTCYear = 70, UTCMonth = 0, UTCDate = 1, UTCDay = 4, UTCHours = 0, UTCMinutes = 0, UTCSeconds = 1, UTCMilliseconds = 0\n\n// new Date(-1000)\nThu Jan 1 05:44:59 GMT+0545 1970\nFullYear = 1970, Year = 70, Month = 0, Date = 1, Day = 4, Hours = 5, Minutes = 44, Seconds = 59, Milliseconds = 0, Time = -1000, TimezoneOffset = -345, UTCFullYear = 1969, UTCYear = 69, UTCMonth = 11, UTCDate = 31, UTCDay = 3, UTCHours = 23, UTCMinutes = 59, UTCSeconds = 59, UTCMilliseconds = 0\n\n// new Date(1594844387653)\nThu Jul 16 02:04:47 GMT+0545 2020\nFullYear = 2020, Year = 120, Month = 6, Date = 16, Day = 4, Hours = 2, Minutes = 4, Seconds = 47, Milliseconds = 653, Time = 1594844387653, TimezoneOffset = -345, UTCFullYear = 2020, UTCYear = 120, UTCMonth = 6, UTCDate = 15, UTCDay = 3, UTCHours = 20, UTCMinutes = 19, UTCSeconds = 47, UTCMilliseconds = 653\n\n// new Date(-1594844387653)\nThu Jun 19 09:25:12 GMT+0545 1919\nFullYear = 1919, Year = 19, Month = 5, Date = 19, Day = 4, Hours = 9, Minutes = 25, Seconds = 12, Milliseconds = 347, Time = -1594844387653, TimezoneOffset = -345, UTCFullYear = 1919, UTCYear = 19, UTCMonth = 5, UTCDate = 19, UTCDay = 4, UTCHours = 3, UTCMinutes = 40, UTCSeconds = 12, UTCMilliseconds = 347\n\n// new Date(8.64e+15)\nSat Sep 13 05:45:00 GMT+0545 275760\nFullYear = 275760, Year = 273860, Month = 8, Date = 13, Day = 6, Hours = 5, Minutes = 45, Seconds = 0, Milliseconds = 0, Time = 8.64e+15, TimezoneOffset = -345, UTCFullYear = 275760, UTCYear = 273860, UTCMonth = 8, UTCDate = 13, UTCDay = 6, UTCHours = 0, UTCMinutes = 0, UTCSeconds = 0, UTCMilliseconds = 0\n\n... (6285 lines after) ...",
+      "expected_output": "// Date()\nSat Feb 3 04:05:06 GMT+0545 2001\n\n// typeof Date()\nstring\n\n// new Date()\nSat Feb 3 04:05:06 GMT+0545 2001\nFullYear = 2001, Year = 101, Month = 1, Date = 3, Day = 6, Hours = 4, Minutes = 5, Seconds = 6, Milliseconds = 0, Time = 981152406000, TimezoneOffset = -345, UTCFullYear = 2001, UTCYear = 101, UTCMonth = 1, UTCDate = 2, UTCDay = 5, UTCHours = 22, UTCMinutes = 20, UTCSeconds = 6, UTCMilliseconds = 0\n\n// new Date(new Date())\nSat Feb 3 04:05:06 GMT+0545 2001\nFullYear = 2001, Year = 101, Month = 1, Date = 3, Day = 6, Hours = 4, Minutes = 5, Seconds = 6, Milliseconds = 0, Time = 981152406000, TimezoneOffset = -345, UTCFullYear = 2001, UTCYear = 101, UTCMonth = 1, UTCDate = 2, UTCDay = 5, UTCHours = 22, UTCMinutes = 20, UTCSeconds = 6, UTCMilliseconds = 0\n\n// new Date(0)\nThu Jan 1 05:45:00 GMT+0545 1970\nFullYear = 1970, Year = 70, Month = 0, Date = 1, Day = 4, Hours = 5, Minutes = 45, Seconds = 0, Milliseconds = 0, Time = 0, TimezoneOffset = -345, UTCFullYear = 1970, UTCYear = 70, UTCMonth = 0, UTCDate = 1, UTCDay = 4, UTCHours = 0, UTCMinutes = 0, UTCSeconds = 0, UTCMilliseconds = 0\n\n// new Date(5.5)\nThu Jan 1 05:45:00 GMT+0545 1970\nFullYear = 1970, Year = 70, Month = 0, Date = 1, Day = 4, Hours = 5, Minutes = 45, Seconds = 0, Milliseconds = 5, Time = 5.5, TimezoneOffset = -345, UTCFullYear = 1970, UTCYear = 70, UTCMonth = 0, UTCDate = 1, UTCDay = 4, UTCHours = 0, UTCMinutes = 0, UTCSeconds = 0, UTCMilliseconds = 5\n\n// new Date(500)\nThu Jan 1 05:45:00 GMT+0545 1970\nFullYear = 1970, Year = 70, Month = 0, Date = 1, Day = 4, Hours = 5, Minutes = 45, Seconds = 0, Milliseconds = 500, Time = 500, TimezoneOffset = -345, UTCFullYear = 1970, UTCYear = 70, UTCMonth = 0, UTCDate = 1, UTCDay = 4, UTCHours = 0, UTCMinutes = 0, UTCSeconds = 0, UTCMilliseconds = 500\n\n// new Date(-500)\nThu Jan 1 05:44:59 GMT+0545 1970\nFullYear = 1970, Year = 70, Month = 0, Date = 1, Day = 4, Hours = 5, Minutes = 44, Seconds = 59, Milliseconds = 500, Time = -500, TimezoneOffset = -345, UTCFullYear = 1969, UTCYear = 69, UTCMonth = 11, UTCDate = 31, UTCDay = 3, UTCHours = 23, UTCMinutes = 59, UTCSeconds = 59, UTCMilliseconds = 500\n\n// new Date(1000)\nThu Jan 1 05:45:01 GMT+0545 1970\nFullYear = 1970, Year = 70, Month = 0, Date = 1, Day = 4, Hours = 5, Minutes = 45, Seconds = 1, Milliseconds = 0, Time = 1000, TimezoneOffset = -345, UTCFullYear = 1970, UTCYear = 70, UTCMonth = 0, UTCDate = 1, UTCDay = 4, UTCHours = 0, UTCMinutes = 0, UTCSeconds = 1, UTCMilliseconds = 0\n\n// new Date(-1000)\nThu Jan 1 05:44:59 GMT+0545 1970\nFullYear = 1970, Year = 70, Month = 0, Date = 1, Day = 4, Hours = 5, Minutes = 44, Seconds = 59, Milliseconds = 0, Time = -1000, TimezoneOffset = -345, UTCFullYear = 1969, UTCYear = 69, UTCMonth = 11, UTCDate = 31, UTCDay = 3, UTCHours = 23, UTCMinutes = 59, UTCSeconds = 59, UTCMilliseconds = 0\n\n// new Date(1594844387653)\nThu Jul 16 02:04:47 GMT+0545 2020\nFullYear = 2020, Year = 120, Month = 6, Date = 16, Day = 4, Hours = 2, Minutes = 4, Seconds = 47, Milliseconds = 653, Time = 1594844387653, TimezoneOffset = -345, UTCFullYear = 2020, UTCYear = 120, UTCMonth = 6, UTCDate = 15, UTCDay = 3, UTCHours = 20, UTCMinutes = 19, UTCSeconds = 47, UTCMilliseconds = 653\n\n// new Date(-1594844387653)\nThu Jun 19 09:25:12 GMT+0545 1919\nFullYear = 1919, Year = 19, Month = 5, Date = 19, Day = 4, Hours = 9, Minutes = 25, Seconds = 12, Milliseconds = 347, Time = -1594844387653, TimezoneOffset = -345, UTCFullYear = 1919, UTCYear = 19, UTCMonth = 5, UTCDate = 19, UTCDay = 4, UTCHours = 3, UTCMinutes = 40, UTCSeconds = 12, UTCMilliseconds = 347\n\n// new Date(8.64e+15)\nSat Sep 13 05:45:00 GMT+0545 275760\nFullYear = 275760, Year = 273860, Month = 8, Date = 13, Day = 6, Hours = 5, Minutes = 45, Seconds = 0, Milliseconds = 0, Time = 8.64e+15, TimezoneOffset = -345, UTCFullYear = 275760, UTCYear = 273860, UTCMonth = 8, UTCDate = 13, UTCDay = 6, UTCHours = 0, UTCMinutes = 0, UTCSeconds = 0, UTCMilliseconds = 0\n\n... (6285 lines after) ..."
+    },
+    {
+      "test": "default_names",
+      "num_frames": 6,
+      "lines": {
+        "actual_lines": 52,
+        "expected_lines": 52,
+        "matching_lines": 52
+      },
+      "duration": 24.06,
+      "status": "pass"
+    },
+    {
+      "test": "define_function2",
+      "num_frames": 1,
+      "lines": {
+        "actual_lines": 8,
+        "expected_lines": 8,
+        "matching_lines": 8
+      },
+      "duration": 23.18,
+      "status": "pass"
+    },
+    {
+      "test": "define_function2_preload",
+      "num_frames": 1,
+      "lines": {
+        "actual_lines": 13,
+        "expected_lines": 13,
+        "matching_lines": 13
+      },
+      "duration": 23.09,
+      "status": "pass"
+    },
+    {
+      "test": "define_function2_preload_order",
+      "num_frames": 1,
+      "lines": {
+        "actual_lines": 4,
+        "expected_lines": 4,
+        "matching_lines": 4
+      },
+      "duration": 19.03,
+      "status": "pass"
+    },
+    {
+      "test": "define_function_case_sensitive",
+      "num_frames": 2,
+      "lines": {
+        "actual_lines": 2,
+        "expected_lines": 2,
+        "matching_lines": 2
+      },
+      "duration": 19.08,
+      "status": "pass"
+    },
+    {
+      "test": "define_local",
+      "num_frames": 1,
+      "lines": {
+        "actual_lines": 27,
+        "expected_lines": 27,
+        "matching_lines": 27
+      },
+      "duration": 20.82,
+      "status": "pass"
+    },
+    {
+      "test": "define_local_with_paths",
+      "num_frames": 1,
+      "lines": {
+        "actual_lines": 54,
+        "expected_lines": 54,
+        "matching_lines": 54
+      },
+      "duration": 19.99,
+      "status": "pass"
+    },
+    {
+      "test": "delete",
+      "num_frames": 3,
+      "lines": {
+        "actual_lines": 3,
+        "expected_lines": 3,
+        "matching_lines": 3
+      },
+      "duration": 20.77,
+      "status": "pass"
+    },
+    {
+      "test": "device_font_spacing",
+      "num_frames": 1,
+      "status": "compile_fail",
+      "detail": "/tmp/swf_verify_6fun66hw/tagMain.c:48:9: error: too few arguments to function \u2018tagDefineText\u2019",
+      "duration": 19.14
+    },
+    {
+      "test": "displacementmapfilter_mappoint_throw_error",
+      "num_frames": 1,
+      "lines": {
+        "actual_lines": 13,
+        "expected_lines": 13,
+        "matching_lines": 0
+      },
+      "duration": 22.0,
+      "status": "output_mismatch",
+      "detail": "13 line(s) differ (actual=13, expected=13)",
+      "actual_output": "Set: [object Object]\nSet: [object Object]\nSet: [object Object]\nSet: [object Object]\nSet: [object Object]\nSet: [object Object]\nSet: [object Object]\nSet: [object Object]\nSet: [object Object]\nSet: [object Object]\nSet: [object Object]\nSet: true\nSet: false",
+      "expected_output": "Set: (x=1, y=2)\nCaught: error, (x=0, y=0)\nCaught: error, (x=0, y=0)\nCaught: error, (x=-2147483648, y=8)\nSet: (x=3, y=8)\nCaught: error, (x=3, y=-2147483648)\nCaught: error, (x=-2147483648, y=-2147483648)\nCaught: error2, (x=-2147483648, y=-2147483648)\nSet: (x=1, y=2)\nSet: (x=0, y=0)\nSet: (x=1, y=0)\nSet: (x=0, y=0)\nSet: (x=0, y=0)"
+    },
+    {
+      "test": "display_object_properties",
+      "num_frames": 1,
+      "lines": {
+        "actual_lines": 2,
+        "expected_lines": 2,
+        "matching_lines": 2
+      },
+      "duration": 19.18,
+      "image_comparisons": {
+        "output": {
+          "status": "pass",
+          "message": "Image check passed: 0 outliers (limit 0), max difference 79",
+          "max_diff": 79,
+          "trigger": [
+            "last_frame"
+          ],
+          "known_failure": false
+        }
+      },
+      "status": "pass"
+    },
+    {
+      "test": "divide_swf4",
+      "num_frames": 1,
+      "lines": {
+        "actual_lines": 107,
+        "expected_lines": 107,
+        "matching_lines": 107
+      },
+      "duration": 20.69,
+      "status": "pass"
+    },
+    {
+      "test": "do_init_action",
+      "num_frames": 3,
+      "lines": {
+        "actual_lines": 3,
+        "expected_lines": 3,
+        "matching_lines": 3
+      },
+      "duration": 22.11,
+      "status": "pass"
+    },
+    {
+      "test": "do_init_action_child",
+      "num_frames": 2,
+      "lines": {
+        "actual_lines": 12,
+        "expected_lines": 12,
+        "matching_lines": 12
+      },
+      "duration": 19.7,
+      "status": "pass"
+    },
+    {
+      "test": "drag_drop",
+      "num_frames": 16,
+      "lines": {
+        "actual_lines": 10,
+        "expected_lines": 10,
+        "matching_lines": 10
+      },
+      "duration": 21.36,
+      "status": "pass"
+    },
+    {
+      "test": "drag_over_from_outside",
+      "num_frames": 60,
+      "lines": {
+        "actual_lines": 1,
+        "expected_lines": 1,
+        "matching_lines": 1
+      },
+      "duration": 19.41,
+      "status": "pass"
+    },
+    {
+      "test": "drag_over_without_startdrag",
+      "num_frames": 60,
+      "lines": {
+        "actual_lines": 1,
+        "expected_lines": 1,
+        "matching_lines": 1
+      },
+      "duration": 19.73,
+      "status": "pass"
+    },
+    {
+      "test": "duplicate_movie_clip",
+      "num_frames": 1,
+      "lines": {
+        "actual_lines": 20,
+        "expected_lines": 20,
+        "matching_lines": 20
+      },
+      "duration": 19.88,
+      "status": "pass"
+    },
+    {
+      "test": "duplicate_movie_clip_drawing",
+      "num_frames": 1,
+      "lines": {
+        "actual_lines": 2,
+        "expected_lines": 2,
+        "matching_lines": 2
+      },
+      "duration": 19.8,
+      "status": "pass"
+    },
+    {
+      "test": "edittext_align",
+      "num_frames": 1,
+      "status": "compile_fail",
+      "detail": "/tmp/swf_verify_6dp5i8ha/tagMain.c:34:9: error: too few arguments to function \u2018tagDefineText\u2019",
+      "duration": 18.65
+    },
+    {
+      "test": "edittext_align_trailing_spaces_swf7",
+      "num_frames": 1,
+      "lines": {
+        "actual_lines": 576,
+        "expected_lines": 576,
+        "matching_lines": 576
+      },
+      "duration": 19.32,
+      "status": "pass"
+    },
+    {
+      "test": "edittext_align_trailing_spaces_swf8",
+      "num_frames": 1,
+      "lines": {
+        "actual_lines": 576,
+        "expected_lines": 576,
+        "matching_lines": 576
+      },
+      "duration": 20.15,
+      "status": "pass"
+    },
+    {
+      "test": "edittext_antialiastype",
+      "num_frames": 1,
+      "status": "compile_fail",
+      "detail": "/tmp/swf_verify_4aukbgcd/tagMain.c:31:9: error: too few arguments to function \u2018tagDefineText\u2019",
+      "duration": 20.68
+    },
+    {
+      "test": "edittext_autosize",
+      "num_frames": 1,
+      "status": "compile_fail",
+      "detail": "/tmp/swf_verify_9mtuzld6/tagMain.c:34:9: error: too few arguments to function \u2018tagDefineText\u2019",
+      "duration": 19.15
+    },
+    {
+      "test": "edittext_autosize_setter",
+      "num_frames": 1,
+      "lines": {
+        "actual_lines": 20,
+        "expected_lines": 20,
+        "matching_lines": 20
+      },
+      "duration": 19.21,
+      "status": "pass"
+    },
+    {
+      "test": "edittext_bullet",
+      "num_frames": 1,
+      "status": "compile_fail",
+      "detail": "/tmp/swf_verify_campb49u/tagMain.c:36:9: error: too few arguments to function \u2018tagDefineText\u2019",
+      "duration": 19.06
+    },
+    {
+      "test": "edittext_default_format",
+      "num_frames": 1,
+      "status": "compile_fail",
+      "detail": "/tmp/swf_verify_z07wf14r/tagMain.c:34:9: error: too few arguments to function \u2018tagDefineText\u2019",
+      "duration": 18.59
+    },
+    {
+      "test": "edittext_default_format_empty",
+      "num_frames": 1,
+      "lines": {
+        "actual_lines": 95,
+        "expected_lines": 100,
+        "matching_lines": 7
+      },
+      "duration": 18.01,
+      "status": "output_mismatch",
+      "detail": "93 line(s) differ (actual=95, expected=100)",
+      "actual_output": "... (2 lines before) ...\n  align = left;\n  blockIndent = 0;\n  bold = false;\n  bullet = false;\n  color = 0;\n  font = Times New Roman;\n  indent = 0;\n  italic = false;\n  leading = 0;\n  leftMargin = 0;\n  letterSpacing = 0;\n  rightMargin = 0;\n  size = 12;\n  tabStops = ;\n  target = ;\n  underline = false;\n  url = ;\ntext.getTextFormat()\n  size = null;\n  align = null;\n  blockIndent = null;\n  bold = null;\n  bullet = null;\n  color = null;\n  font = null;\n  indent = null;\n  italic = null;\n  leading = null;\n  leftMargin = null;\n  letterSpacing = null;\n  rightMargin = null;\n  size = null;\n  tabStops = null;\n  target = null;\n  underline = null;\n  url = null;\ntext.getTextFormat()\n  size = 12;\n  align = left;\n  blockIndent = 0;\n  bold = false;\n  bullet = false;\n  color = 0;\n  font = Times New Roman;\n  indent = 0;\n  italic = false;\n  leading = 0;\n  leftMargin = 0;\n  letterSpacing = 0;\n  rightMargin = 0;\n... (43 lines after) ...",
+      "expected_output": "... (2 lines before) ...\n  align = left;\n  blockIndent = 0;\n  bold = false;\n  bullet = false;\n  color = 0;\n  display = block;\n  font = Times New Roman;\n  indent = 0;\n  italic = false;\n  leading = 0;\n  leftMargin = 0;\n  letterSpacing = 0;\n  rightMargin = 0;\n  size = 12;\n  tabStops = ;\n  target = ;\n  underline = false;\n  url = ;\ntext.getTextFormat()\n  size = null;\n  align = null;\n  blockIndent = null;\n  bold = null;\n  bullet = null;\n  color = null;\n  display = block;\n  font = null;\n  indent = null;\n  italic = null;\n  leading = null;\n  leftMargin = null;\n  letterSpacing = null;\n  rightMargin = null;\n  size = null;\n  tabStops = null;\n  target = null;\n  underline = null;\n  url = null;\ntext.getTextFormat()\n  size = 12;\n  align = left;\n  blockIndent = 0;\n  bold = false;\n  bullet = false;\n  color = 0;\n  display = block;\n  font = Times New Roman;\n  indent = 0;\n  italic = false;\n  leading = 0;\n... (48 lines after) ..."
+    },
+    {
+      "test": "edittext_default_format_font_style",
+      "num_frames": 1,
+      "status": "compile_fail",
+      "detail": "/tmp/swf_verify_htj0_8hh/tagMain.c:46:9: error: too few arguments to function \u2018tagDefineText\u2019",
+      "duration": 17.84
+    },
+    {
+      "test": "edittext_drag_select",
+      "num_frames": 2,
+      "lines": {
+        "actual_lines": 9,
+        "expected_lines": 9,
+        "matching_lines": 6
+      },
+      "duration": 18.46,
+      "status": "output_mismatch",
+      "detail": "3 line(s) differ (actual=9, expected=9)",
+      "actual_output": "Mouse down: 234,166\nMouse up: 511,189\nText: <selection>Lorem ipsum dolor sit amet, consectetur adipiscing\\nelit. Integer nec finibus odio, at tempus metus.\\n\nMouse down: 343,166\nMouse up: 764,523\nText: <selection><selection>Lorem ipsum dolor sit amet, consectetur adipiscing\\nelit. Integer nec finibus odio, at tempus metus.\\n\nMouse down: 207,163\nMouse up: 7,13\nText: <selection><selection><selection>Lorem ipsum dolor sit amet, consectetur adipiscing\\nelit. Integer nec finibus odio, at tempus metus.\\n",
+      "expected_output": "Mouse down: 234,166\nMouse up: 511,189\nText: Lore<selection>etus.\nMouse down: 343,166\nMouse up: 764,523\nText: Lore<selection>etu<selection>\nMouse down: 207,163\nMouse up: 7,13\nText: <selection>ore<selection>etu<selection>"
+    },
+    {
+      "test": "edittext_focus_selection",
+      "num_frames": 1,
+      "lines": {
+        "actual_lines": 3,
+        "expected_lines": 2,
+        "matching_lines": 2
+      },
+      "duration": 17.95,
+      "status": "output_mismatch",
+      "detail": "1 line(s) differ (actual=3, expected=2)",
+      "actual_output": "abcd; |abcd\n|abcd; |\n[FR_CHECK] fr=1 root_fr=1 focused_fr=-1 hl=2",
+      "expected_output": "abcd; |abcd\n|abcd; |"
+    },
+    {
+      "test": "edittext_font_size",
+      "num_frames": 1,
+      "status": "compile_fail",
+      "detail": "/tmp/swf_verify_w4syn_1r/tagMain.c:34:9: error: too few arguments to function \u2018tagDefineText\u2019",
+      "duration": 17.49
+    },
+    {
+      "test": "edittext_hscroll",
+      "num_frames": 1,
+      "lines": {
+        "actual_lines": 27,
+        "expected_lines": 27,
+        "matching_lines": 27
+      },
+      "duration": 18.09,
+      "status": "pass"
+    },
+    {
+      "test": "edittext_html_align_swf7",
+      "num_frames": 1,
+      "status": "compile_fail",
+      "detail": "/tmp/swf_verify_m7hioyh8/tagMain.c:37:9: error: too few arguments to function \u2018tagDefineText\u2019",
+      "duration": 17.59
+    },
+    {
+      "test": "edittext_html_align_swf8",
+      "num_frames": 1,
+      "status": "compile_fail",
+      "detail": "/tmp/swf_verify_rok4c_9n/tagMain.c:37:9: error: too few arguments to function \u2018tagDefineText\u2019",
+      "duration": 17.53
+    },
+    {
+      "test": "edittext_html_color",
+      "num_frames": 1,
+      "lines": {
+        "actual_lines": 114,
+        "expected_lines": 114,
+        "matching_lines": 114
+      },
+      "duration": 17.96,
+      "status": "pass"
+    },
+    {
+      "test": "edittext_html_condensewhite_swf7",
+      "num_frames": 1,
+      "lines": {
+        "actual_lines": 311,
+        "expected_lines": 311,
+        "matching_lines": 311
+      },
+      "duration": 18.27,
+      "status": "pass"
+    },
+    {
+      "test": "edittext_html_condensewhite_swf8",
+      "num_frames": 1,
+      "lines": {
+        "actual_lines": 311,
+        "expected_lines": 311,
+        "matching_lines": 311
+      },
+      "duration": 18.22,
+      "status": "pass"
+    },
+    {
+      "test": "edittext_html_entity",
+      "num_frames": 1,
+      "status": "compile_fail",
+      "detail": "/tmp/swf_verify_8l6n0q15/tagMain.c:34:9: error: too few arguments to function \u2018tagDefineText\u2019",
+      "duration": 17.72
+    },
+    {
+      "test": "edittext_html_roundtrip",
+      "num_frames": 1,
+      "lines": {
+        "actual_lines": 17,
+        "expected_lines": 17,
+        "matching_lines": 17
+      },
+      "duration": 18.09,
+      "status": "pass"
+    },
+    {
+      "test": "edittext_html_swf6",
+      "num_frames": 1,
+      "status": "compile_fail",
+      "detail": "/tmp/swf_verify_h11t3g4e/tagMain.c:45:9: error: too few arguments to function \u2018tagDefineText\u2019",
+      "duration": 19.38
+    },
+    {
+      "test": "edittext_html_swf7",
+      "num_frames": 1,
+      "status": "compile_fail",
+      "detail": "/tmp/swf_verify_hc57ayx2/tagMain.c:45:9: error: too few arguments to function \u2018tagDefineText\u2019",
+      "duration": 18.54
+    },
+    {
+      "test": "edittext_html_swf8",
+      "num_frames": 1,
+      "status": "compile_fail",
+      "detail": "/tmp/swf_verify_jqq65fan/tagMain.c:43:9: error: too few arguments to function \u2018tagDefineText\u2019",
+      "duration": 18.61
+    },
+    {
+      "test": "edittext_ime_focus_lost",
+      "num_frames": 8,
+      "lines": {
+        "actual_lines": 7,
+        "expected_lines": 7,
+        "matching_lines": 0
+      },
+      "duration": 17.93,
+      "status": "output_mismatch",
+      "detail": "7 line(s) differ (actual=7, expected=7)",
+      "actual_output": "[FR_CHECK] fr=1 root_fr=1 focused_fr=-1 hl=2\nBefore: \n  0\n  |\nAfter: |\n  1\n  ||",
+      "expected_output": "Before: q\n  1\n  q|\nChanged: q|\nAfter: q|\n  2\n  |q|"
+    },
+    {
+      "test": "edittext_input",
+      "num_frames": 2,
+      "lines": {
+        "actual_lines": 2,
+        "expected_lines": 1,
+        "matching_lines": 0
+      },
+      "duration": 17.9,
+      "status": "output_mismatch",
+      "detail": "2 line(s) differ (actual=2, expected=1)",
+      "actual_output": "[FR_CHECK] fr=1 root_fr=1 focused_fr=-1 hl=2\nabcABC~!@#$%^&*()`-=_+/?|\u0105\u0119\u0107\u0142\u00fe\u00f3\u2192\u2193\u00df\u00a9\u0119\u0153\u03c0\u0105\u015b\u00f0\u00e6\u014b\u2019\u0259\u2026\u0142\u017a\u0107\u017c\u201e\u201d\u0144\u00b5\u2264\u2265\u2260\u00b2\u00b3\u00a2\u20ac\u00bd\u00a7\u00b7\u00ab\u00bb\u2013\u2014\u00b0\u00b1\u00be\u2248\u2227\u2030\u00bc\u00a3\u00bf\u00a1\u0187\u018c\u01a3\u01b1\u01c8\u01cd\u01db\u01ed\u01fc\u0209\u0225\u0239\u024c\u024f\u1e10\u1e41\u1e64\u1e88\u1e9f\u1eae\u1ed1\u1ef3\u1eff\u2c67\u2c7e\ua7a6\ua780\ua7be\ua7ff\uab67\ud801\udf94\ud801\udfae\ud837\udf19\ud837\udf1e\u1005",
+      "expected_output": "abcABC~!@#$%^&*()`-=_+/?|\u0105\u0119\u0107\u0142\u00fe\u00f3\u2192\u2193\u00df\u00a9\u0119\u0153\u03c0\u0105\u015b\u00f0\u00e6\u014b\u2019\u0259\u2026\u0142\u017a\u0107\u017c\u201e\u201d\u0144\u00b5\u2264\u2265\u2260\u00b2\u00b3\u00a2\u20ac\u00bd\u00a7\u00b7\u00ab\u00bb\u2013\u2014\u00b0\u00b1\u00be\u2248\u2227\u2030\u00bc\u00a3\u00bf\u00a1\u0187\u018c\u01a3\u01b1\u01c8\u01cd\u01db\u01ed\u01fc\u0209\u0225\u0239\u024c\u024f\u1e10\u1e41\u1e64\u1e88\u1e9f\u1eae\u1ed1\u1ef3\u1eff\u2c67\u2c7e\ua7a6\ua780\ua7be\ua7ff\uab67\ud801\udf94\ud801\udfae\ud837\udf19\ud837\udf1e\u1005"
+    },
+    {
+      "test": "edittext_input_newlines",
+      "num_frames": 2,
+      "lines": {
+        "actual_lines": 10,
+        "expected_lines": 9,
+        "matching_lines": 0
+      },
+      "duration": 18.06,
+      "status": "output_mismatch",
+      "detail": "10 line(s) differ (actual=10, expected=9)",
+      "actual_output": "[FR_CHECK] fr=1 root_fr=1 focused_fr=-1 hl=2\ntext.onChanged: a\ntext.onChanged: aa\ntext: aa\ntext multiline: \ntextMultiline.onChanged: a\ntextMultiline.onChanged: a\\r\ntextMultiline.onChanged: a\\ra\ntext: aa\ntext multiline: a\\ra",
+      "expected_output": "text.onChanged: a\ntext.onChanged: aa\ntext: aa\ntext multiline: \ntextMultiline.onChanged: a\ntextMultiline.onChanged: a\\r\ntextMultiline.onChanged: a\\ra\ntext: aa\ntext multiline: a\\ra"
+    },
+    {
+      "test": "edittext_leading",
+      "num_frames": 1,
+      "status": "compile_fail",
+      "detail": "/tmp/swf_verify_srfgrzf7/tagMain.c:34:9: error: too few arguments to function \u2018tagDefineText\u2019",
+      "duration": 18.45
+    },
+    {
+      "test": "edittext_letter_spacing",
+      "num_frames": 1,
+      "status": "compile_fail",
+      "detail": "/tmp/swf_verify_0xf955mw/tagMain.c:34:9: error: too few arguments to function \u2018tagDefineText\u2019",
+      "duration": 17.84
+    },
+    {
+      "test": "edittext_margins",
+      "num_frames": 1,
+      "status": "compile_fail",
+      "detail": "/tmp/swf_verify_im86s8km/tagMain.c:34:9: error: too few arguments to function \u2018tagDefineText\u2019",
+      "duration": 17.79
+    },
+    {
+      "test": "edittext_newline_stripping",
+      "num_frames": 1,
+      "status": "compile_fail",
+      "detail": "/tmp/swf_verify_x72jqjer/tagMain.c:35:9: error: too few arguments to function \u2018tagDefineText\u2019",
+      "duration": 22.83
+    },
+    {
+      "test": "edittext_newlines",
+      "num_frames": 1,
+      "status": "compile_fail",
+      "detail": "/tmp/swf_verify_1y5e87rk/tagMain.c:36:9: error: too few arguments to function \u2018tagDefineText\u2019",
+      "duration": 17.7
+    },
+    {
+      "test": "edittext_password",
+      "num_frames": 1,
+      "status": "compile_fail",
+      "detail": "/tmp/swf_verify_757dygwe/tagMain.c:66:9: error: too few arguments to function \u2018tagDefineText\u2019",
+      "duration": 17.48
+    },
+    {
+      "test": "edittext_password_copy",
+      "num_frames": 2,
+      "lines": {
+        "actual_lines": 5,
+        "expected_lines": 4,
+        "matching_lines": 3
+      },
+      "duration": 18.07,
+      "status": "output_mismatch",
+      "detail": "2 line(s) differ (actual=5, expected=4)",
+      "actual_output": "[FR_CHECK] fr=1 root_fr=1 focused_fr=-1 hl=2\nText: 'password'\nText: 'password'\nText: 'password'\nText: 'password'",
+      "expected_output": "Text: 'password'\nText: 'password'\nText: 'password'\nText: 'password'"
+    },
+    {
+      "test": "edittext_paste_empty",
+      "num_frames": 2,
+      "lines": {
+        "actual_lines": 3,
+        "expected_lines": 2,
+        "matching_lines": 1
+      },
+      "duration": 18.02,
+      "status": "output_mismatch",
+      "detail": "2 line(s) differ (actual=3, expected=2)",
+      "actual_output": "[FR_CHECK] fr=1 root_fr=1 focused_fr=-1 hl=2\nText: 'test'\nText: 'test'",
+      "expected_output": "Text: 'test'\nText: 'test'"
+    },
+    {
+      "test": "edittext_place_caret",
+      "num_frames": 2,
+      "lines": {
+        "actual_lines": 2,
+        "expected_lines": 2,
+        "matching_lines": 2
+      },
+      "duration": 18.01,
+      "status": "pass"
+    },
+    {
+      "test": "edittext_programmatic_focus",
+      "num_frames": 1,
+      "lines": {
+        "actual_lines": 13,
+        "expected_lines": 12,
+        "matching_lines": 12
+      },
+      "duration": 18.02,
+      "status": "output_mismatch",
+      "detail": "1 line(s) differ (actual=13, expected=12)",
+      "actual_output": "... (7 lines before) ...\nSelection: text -> t|ext\nFocus: _level0.text\nSelection: text -> te|xt\nFocus: _level0.text\nSelection: text -> |\n[FR_CHECK] fr=1 root_fr=1 focused_fr=-1 hl=2",
+      "expected_output": "... (7 lines before) ...\nSelection: text -> t|ext\nFocus: _level0.text\nSelection: text -> te|xt\nFocus: _level0.text\nSelection: text -> |"
+    },
+    {
+      "test": "edittext_restrict",
+      "num_frames": 2,
+      "lines": {
+        "actual_lines": 192,
+        "expected_lines": 191,
+        "matching_lines": 0
+      },
+      "duration": 17.97,
+      "status": "output_mismatch",
+      "detail": "192 line(s) differ (actual=192, expected=191)",
+      "actual_output": "[FR_CHECK] fr=1 root_fr=1 focused_fr=-1 hl=2\nText: 'abcABC012^\\-* &\u0105\u03b4\u0142\u0104\u0394\u0141\u00df'\n====================\nRestrict set: 'undefined'\nRestrict get: 'null'\nText: 'abcABC012^\\-* &\u0105\u03b4\u0142\u0104\u0394\u0141\u00df'\n====================\nRestrict set: 'null'\nRestrict get: 'null'\nText: 'abcABC012^\\-* &\u0105\u03b4\u0142\u0104\u0394\u0141\u00df'\n====================\nRestrict set: ''\nRestrict get: 'null'\nText: 'abcABC012^\\-* &\u0105\u03b4\u0142\u0104\u0394\u0141\u00df'\n====================\nRestrict set: 'false'\nRestrict get: 'false'\nText: 'aa'\n====================\nRestrict set: '1'\nRestrict get: '1'\nText: '1'\n====================\nRestrict set: 'true'\nRestrict get: 'true'\nText: ''\n====================\nRestrict set: '0.1'\nRestrict get: '0.1'\nText: '01'\n====================\nRestrict set: 'NaN'\nRestrict get: 'NaN'\nText: 'aa'\n====================\nRestrict set: '[object Object]'\nRestrict get: '[object Object]'\nText: 'bcbc '\n====================\nRestrict set: 'aB*\u0394'\nRestrict get: 'aB*\u0394'\nText: 'aBaB*\u0394'\n====================\nRestrict set: 'aa'\nRestrict get: 'aa'\nText: 'aa'\n====================\nRestrict set: 'a-z'\nRestrict get: 'a-z'\nText: 'abcabc'\n... (142 lines after) ...",
+      "expected_output": "Text: 'abcABC012^\\-* &\u0105\u03b4\u0142\u0104\u0394\u0141\u00df'\n====================\nRestrict set: 'undefined'\nRestrict get: 'null'\nText: 'abcABC012^\\-* &\u0105\u03b4\u0142\u0104\u0394\u0141\u00df'\n====================\nRestrict set: 'null'\nRestrict get: 'null'\nText: 'abcABC012^\\-* &\u0105\u03b4\u0142\u0104\u0394\u0141\u00df'\n====================\nRestrict set: ''\nRestrict get: 'null'\nText: 'abcABC012^\\-* &\u0105\u03b4\u0142\u0104\u0394\u0141\u00df'\n====================\nRestrict set: 'false'\nRestrict get: 'false'\nText: 'aa'\n====================\nRestrict set: '1'\nRestrict get: '1'\nText: '1'\n====================\nRestrict set: 'true'\nRestrict get: 'true'\nText: ''\n====================\nRestrict set: '0.1'\nRestrict get: '0.1'\nText: '01'\n====================\nRestrict set: 'NaN'\nRestrict get: 'NaN'\nText: 'aa'\n====================\nRestrict set: '[object Object]'\nRestrict get: '[object Object]'\nText: 'bcbc '\n====================\nRestrict set: 'aB*\u0394'\nRestrict get: 'aB*\u0394'\nText: 'aBaB*\u0394'\n====================\nRestrict set: 'aa'\nRestrict get: 'aa'\nText: 'aa'\n====================\nRestrict set: 'a-z'\nRestrict get: 'a-z'\nText: 'abcabc'\n====================\n... (141 lines after) ..."
+    },
+    {
+      "test": "edittext_restrict_paste",
+      "num_frames": 2,
+      "lines": {
+        "actual_lines": 6,
+        "expected_lines": 5,
+        "matching_lines": 1
+      },
+      "duration": 18.03,
+      "status": "output_mismatch",
+      "detail": "5 line(s) differ (actual=6, expected=5)",
+      "actual_output": "[FR_CHECK] fr=1 root_fr=1 focused_fr=-1 hl=2\nText: 'bc'\nText: ''\nText: 'bbc'\nText: 'bbc'\nText: 'bcb'",
+      "expected_output": "Text: 'bc'\nText: ''\nText: 'bbc'\nText: 'bbc'\nText: 'bcb'"
+    },
+    {
+      "test": "edittext_scroll",
+      "num_frames": 1,
+      "status": "compile_fail",
+      "detail": "/tmp/swf_verify_oz4s2ci8/tagMain.c:42:9: error: too few arguments to function \u2018tagDefineText\u2019",
+      "duration": 17.94
+    },
+    {
+      "test": "edittext_stylesheet",
+      "num_frames": 1,
+      "lines": {
+        "actual_lines": 325,
+        "expected_lines": 325,
+        "matching_lines": 325
+      },
+      "duration": 19.19,
+      "image_comparisons": {
+        "output": {
+          "status": "fail",
+          "message": "Image comparison failed: 33126 outliers exceed limit of 0, max difference 255",
+          "max_diff": 255,
+          "trigger": [
+            "last_frame"
+          ],
+          "known_failure": false
+        }
+      },
+      "status": "pass"
+    },
+    {
+      "test": "edittext_tab_focus",
+      "num_frames": 2,
+      "lines": {
+        "actual_lines": 13,
+        "expected_lines": 13,
+        "matching_lines": 13
+      },
+      "duration": 17.9,
+      "status": "pass"
+    },
+    {
+      "test": "edittext_tab_stops",
+      "num_frames": 1,
+      "status": "compile_fail",
+      "detail": "/tmp/swf_verify_z6llvppo/tagMain.c:34:9: error: too few arguments to function \u2018tagDefineText\u2019",
+      "duration": 17.76
+    },
+    {
+      "test": "edittext_tag_indent",
+      "num_frames": 1,
+      "status": "compile_fail",
+      "detail": "/tmp/swf_verify_zail4ic3/tagMain.c:42:9: error: too few arguments to function \u2018tagDefineText\u2019",
+      "duration": 17.72
+    },
+    {
+      "test": "edittext_text_height_leading",
+      "num_frames": 1,
+      "lines": {
+        "actual_lines": 20,
+        "expected_lines": 20,
+        "matching_lines": 20
+      },
+      "duration": 18.22,
+      "status": "pass"
+    },
+    {
+      "test": "edittext_underline",
+      "num_frames": 1,
+      "status": "compile_fail",
+      "detail": "/tmp/swf_verify_tql_npa0/tagMain.c:34:9: error: too few arguments to function \u2018tagDefineText\u2019",
+      "duration": 18.51
+    },
+    {
+      "test": "edittext_width_height",
+      "num_frames": 1,
+      "status": "compile_fail",
+      "detail": "/tmp/swf_verify_mjix4uvo/tagMain.c:34:9: error: too few arguments to function \u2018tagDefineText\u2019",
+      "duration": 17.67
+    },
+    {
+      "test": "empty_movieclip_can_attach_movies",
+      "num_frames": 1,
+      "lines": {
+        "actual_lines": 11,
+        "expected_lines": 11,
+        "matching_lines": 11
+      },
+      "duration": 17.94,
+      "status": "pass"
+    },
+    {
+      "test": "enumerate",
+      "num_frames": 1,
+      "lines": {
+        "actual_lines": 64,
+        "expected_lines": 64,
+        "matching_lines": 64
+      },
+      "duration": 18.03,
+      "status": "pass"
+    },
+    {
+      "test": "equals",
+      "num_frames": 1,
+      "lines": {
+        "actual_lines": 32,
+        "expected_lines": 32,
+        "matching_lines": 32
+      },
+      "duration": 20.49,
+      "status": "pass"
+    },
+    {
+      "test": "equals2_swf5",
+      "num_frames": 1,
+      "lines": {
+        "actual_lines": 926,
+        "expected_lines": 926,
+        "matching_lines": 926
+      },
+      "duration": 20.93,
+      "status": "pass"
+    },
+    {
+      "test": "equals2_swf6",
+      "num_frames": 1,
+      "lines": {
+        "actual_lines": 926,
+        "expected_lines": 926,
+        "matching_lines": 926
+      },
+      "duration": 20.24,
+      "status": "pass"
+    },
+    {
+      "test": "equals2_swf7",
+      "num_frames": 1,
+      "lines": {
+        "actual_lines": 926,
+        "expected_lines": 926,
+        "matching_lines": 926
+      },
+      "duration": 20.07,
+      "status": "pass"
+    },
+    {
+      "test": "equals_swf4",
+      "num_frames": 1,
+      "lines": {
+        "actual_lines": 665,
+        "expected_lines": 665,
+        "matching_lines": 665
+      },
+      "duration": 18.97,
+      "status": "pass"
+    },
+    {
+      "test": "equals_swf4_alt",
+      "num_frames": 1,
+      "lines": {
+        "actual_lines": 32,
+        "expected_lines": 32,
+        "matching_lines": 32
+      },
+      "duration": 17.85,
+      "status": "pass"
+    },
+    {
+      "test": "equals_swf5",
+      "num_frames": 1,
+      "lines": {
+        "actual_lines": 32,
+        "expected_lines": 32,
+        "matching_lines": 32
+      },
+      "duration": 18.01,
+      "status": "pass"
+    },
+    {
+      "test": "error",
+      "num_frames": 1,
+      "lines": {
+        "actual_lines": 58,
+        "expected_lines": 58,
+        "matching_lines": 58
+      },
+      "duration": 18.28,
+      "status": "pass"
+    },
+    {
+      "test": "escape",
+      "num_frames": 1,
+      "lines": {
+        "actual_lines": 14,
+        "expected_lines": 14,
+        "matching_lines": 14
+      },
+      "duration": 18.09,
+      "status": "pass"
+    },
+    {
+      "test": "execution_order1",
+      "num_frames": 3,
+      "lines": {
+        "actual_lines": 5,
+        "expected_lines": 5,
+        "matching_lines": 5
+      },
+      "duration": 18.12,
+      "status": "pass"
+    },
+    {
+      "test": "execution_order2",
+      "num_frames": 15,
+      "lines": {
+        "actual_lines": 7,
+        "expected_lines": 7,
+        "matching_lines": 7
+      },
+      "duration": 18.3,
+      "status": "pass"
+    },
+    {
+      "test": "execution_order3",
+      "num_frames": 5,
+      "lines": {
+        "actual_lines": 4,
+        "expected_lines": 4,
+        "matching_lines": 4
+      },
+      "duration": 18.03,
+      "status": "pass"
+    },
+    {
+      "test": "execution_order4",
+      "num_frames": 4,
+      "lines": {
+        "actual_lines": 12,
+        "expected_lines": 12,
+        "matching_lines": 12
+      },
+      "duration": 18.03,
+      "status": "pass"
+    },
+    {
+      "test": "export_assets",
+      "num_frames": 1,
+      "lines": {
+        "actual_lines": 3,
+        "expected_lines": 3,
+        "matching_lines": 3
+      },
+      "duration": 18.06,
+      "status": "pass"
+    },
+    {
+      "test": "extends_chain",
+      "num_frames": 1,
+      "status": "compile_fail",
+      "detail": "/tmp/swf_verify_m_jy49s9/tagMain.c:101:9: error: too few arguments to function \u2018tagDefineText\u2019",
+      "duration": 18.0
+    },
+    {
+      "test": "extends_native_type",
+      "num_frames": 1,
+      "lines": {
+        "actual_lines": 11,
+        "expected_lines": 11,
+        "matching_lines": 11
+      },
+      "duration": 18.02,
+      "status": "pass"
+    },
+    {
+      "test": "external_interface",
+      "num_frames": 2,
+      "lines": {
+        "actual_lines": 84,
+        "expected_lines": 84,
+        "matching_lines": 84
+      },
+      "duration": 18.11,
+      "status": "pass"
+    },
+    {
+      "test": "external_interface_escapexml",
+      "num_frames": 1,
+      "lines": {
+        "actual_lines": 26,
+        "expected_lines": 26,
+        "matching_lines": 26
+      },
+      "duration": 18.1,
+      "status": "pass"
+    },
+    {
+      "test": "external_interface_jsquotestring",
+      "num_frames": 1,
+      "lines": {
+        "actual_lines": 21,
+        "expected_lines": 21,
+        "matching_lines": 21
+      },
+      "duration": 18.08,
+      "status": "pass"
+    },
+    {
+      "test": "external_interface_toas_basic",
+      "num_frames": 1,
+      "lines": {
+        "actual_lines": 354,
+        "expected_lines": 354,
+        "matching_lines": 354
+      },
+      "duration": 19.81,
+      "status": "pass"
+    },
+    {
+      "test": "external_interface_toxml_array",
+      "num_frames": 1,
+      "lines": {
+        "actual_lines": 25,
+        "expected_lines": 25,
+        "matching_lines": 25
+      },
+      "duration": 18.43,
+      "status": "pass"
+    },
+    {
+      "test": "external_interface_toxml_basic",
+      "num_frames": 1,
+      "lines": {
+        "actual_lines": 179,
+        "expected_lines": 179,
+        "matching_lines": 179
+      },
+      "duration": 18.51,
+      "status": "pass"
+    },
+    {
+      "test": "external_interface_unescapexml",
+      "num_frames": 1,
+      "lines": {
+        "actual_lines": 40,
+        "expected_lines": 40,
+        "matching_lines": 40
+      },
+      "duration": 19.21,
+      "status": "pass"
+    },
+    {
+      "test": "file_reference_browse_cancel",
+      "num_frames": 1,
+      "lines": {
+        "actual_lines": 10,
+        "expected_lines": 21,
+        "matching_lines": 10
+      },
+      "duration": 18.78,
+      "status": "output_mismatch",
+      "detail": "11 line(s) differ (actual=10, expected=21)",
+      "actual_output": "... (5 lines before) ...\nundefined\nsize = \nundefined\ntype = \nundefined",
+      "expected_output": "... (5 lines before) ...\nundefined\nsize = \nundefined\ntype = \nundefined\nUser cancelled\ncreationDate = \nundefined\nname = \nundefined\nmodificationDate = \nundefined\nsize = \nundefined\ntype = \nundefined"
+    },
+    {
+      "test": "file_reference_download_cancel",
+      "num_frames": 1,
+      "lines": {
+        "actual_lines": 2,
+        "expected_lines": 7,
+        "matching_lines": 1
+      },
+      "duration": 18.67,
+      "status": "output_mismatch",
+      "detail": "6 line(s) differ (actual=2, expected=7)",
+      "actual_output": "// fileref.download cancel\nundefined",
+      "expected_output": "// fileref.download cancel\ntrue\n// onCancel\nC:undefined\nN:undefined\nT:undefined\n-----"
+    },
+    {
+      "test": "file_reference_download_httperror_dns_error",
+      "num_frames": 1,
+      "lines": {
+        "actual_lines": 2,
+        "expected_lines": 13,
+        "matching_lines": 1
+      },
+      "duration": 19.16,
+      "status": "output_mismatch",
+      "detail": "12 line(s) differ (actual=2, expected=13)",
+      "actual_output": "// fileref.download (http error)\nundefined",
+      "expected_output": "// fileref.download (http error)\ntrue\n// onSelect\nC:undefined\nN:debug-success.txt\nT:.txt\n-----\nError opening URL 'http://invalid-domain.domain/test?debug-error-dns'\n// onIoError\nC:undefined\nN:debug-success.txt\nT:.txt\n-----"
+    },
+    {
+      "test": "file_reference_download_httperror_status_code",
+      "num_frames": 1,
+      "lines": {
+        "actual_lines": 2,
+        "expected_lines": 23,
+        "matching_lines": 1
+      },
+      "duration": 19.16,
+      "status": "output_mismatch",
+      "detail": "22 line(s) differ (actual=2, expected=23)",
+      "actual_output": "// fileref.download (http error)\nundefined",
+      "expected_output": "// fileref.download (http error)\ntrue\n// onSelect\nC:undefined\nN:debug-success.txt\nT:.txt\n-----\n// onOpen\nC:undefined\nN:debug-success.txt\nT:.txt\n-----\nError opening URL 'http://example.com/test?debug-error-statuscode'\n// onIoError\nC:undefined\nN:debug-success.txt\nT:.txt\n-----\n// onProgress\nC:undefined\nN:debug-success.txt\nT:.txt\n-----"
+    },
+    {
+      "test": "file_reference_download_success",
+      "num_frames": 1,
+      "lines": {
+        "actual_lines": 14,
+        "expected_lines": 34,
+        "matching_lines": 7
+      },
+      "duration": 20.36,
+      "status": "output_mismatch",
+      "detail": "27 line(s) differ (actual=14, expected=34)",
+      "actual_output": "// fileref.browse([])\nundefined\n// fileref.browse([{ description: '' }])\nundefined\n// fileref.browse([{ extension: '' }])\nundefined\n// fileref.download()\nundefined\n// fileref.download('@')\nundefined\n// fileref.download('baddomain')\nundefined\n// fileref.download success\nundefined",
+      "expected_output": "// fileref.browse([])\nfalse\n// fileref.browse([{ description: '' }])\nfalse\n// fileref.browse([{ extension: '' }])\nfalse\n// fileref.download()\nfalse\n// fileref.download('@')\nfalse\n// fileref.download('baddomain')\nfalse\n// fileref.download success\ntrue\n// onSelect\nC:undefined\nN:debug-success.txt\nT:.txt\n-----\n// onOpen\nC:undefined\nN:debug-success.txt\nT:.txt\n-----\n// onProgress\nC:undefined\nN:debug-success.txt\nT:.txt\n-----\n// onComplete\nC:undefined\nN:debug-success.txt\nT:.txt\n-----"
+    },
+    {
+      "test": "file_reference_upload_httperror_dns_error",
+      "num_frames": 1,
+      "lines": {
+        "actual_lines": 2,
+        "expected_lines": 18,
+        "matching_lines": 1
+      },
+      "duration": 20.19,
+      "status": "output_mismatch",
+      "detail": "17 line(s) differ (actual=2, expected=18)",
+      "actual_output": "// browse success\nundefined",
+      "expected_output": "// browse success\ntrue\n// onSelect\nC:undefined\nN:test.txt\nT:.txt\n-----\n// upload http failure (invalid url)\n// onOpen\nC:undefined\nN:test.txt\nT:.txt\n-----\n// onIoError\nC:undefined\nN:test.txt\nT:.txt\n-----"
     }
   ]
 }

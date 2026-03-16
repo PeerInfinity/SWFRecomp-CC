@@ -87,5 +87,8 @@ ruffle-tests/tests/swfs/avm1/external_interface/*.fla
 ruffle-tests/tests/swfs/avm1/external_interface/RecompiledScripts/
 ruffle-tests/tests/swfs/avm1/external_interface/RecompiledTags/
 
+# Shumway tests (downloaded)
+ruffle-tests/tests/swfs/from_shumway/
+
 ruffle-tests/results_current.json
 ruffle-tests/results_previous.json

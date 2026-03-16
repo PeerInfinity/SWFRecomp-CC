@@ -15,6 +15,13 @@ CONFIG = SCRIPT_DIR / "_shared" / "config.toml"
 SKIP = {"__framework__"}
 
 def main():
+    global TESTS_DIR
+
+    # Support --tests-dir=DIR to override test directory
+    for arg in sys.argv[1:]:
+        if arg.startswith("--tests-dir="):
+            TESTS_DIR = Path(arg.split("=", 1)[1]).resolve()
+
     if not RECOMP.exists():
         print(f"Recompiler not found at {RECOMP}")
         sys.exit(1)

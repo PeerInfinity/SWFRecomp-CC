@@ -1491,6 +1491,9 @@ examples:
 """,
     )
     parser.add_argument(
+        "--tests-dir", metavar="DIR",
+        help="Directory containing test subdirectories (default: tests/swfs/avm1)")
+    parser.add_argument(
         "--test", metavar="NAME", action="append",
         help="Run specific test(s) by name (repeatable, e.g. --test=foo --test=bar)")
     parser.add_argument(
@@ -1533,7 +1536,15 @@ examples:
 
 
 def main():
+    global TESTS_DIR
     args = parse_args()
+
+    # Override tests directory if specified
+    if args.tests_dir:
+        TESTS_DIR = Path(args.tests_dir).resolve()
+        if not TESTS_DIR.is_dir():
+            print(f"Error: tests directory not found: {TESTS_DIR}")
+            sys.exit(1)
 
     if not RECOMP_BIN.exists():
         print(f"Error: SWFRecomp not found at {RECOMP_BIN}")
