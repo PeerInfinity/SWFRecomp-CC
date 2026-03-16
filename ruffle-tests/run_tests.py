@@ -26,6 +26,11 @@ def main():
         print(f"Recompiler not found at {RECOMP}")
         sys.exit(1)
 
+    if not TESTS_DIR.is_dir():
+        print(f"Tests directory not found: {TESTS_DIR}")
+        print("Run download_tests.sh first.")
+        sys.exit(1)
+
     tests = sorted(
         d.name for d in TESTS_DIR.iterdir()
         if d.is_dir() and d.name not in SKIP and (d / "test.swf").exists()

@@ -165,50 +165,44 @@ install_category() {
 
     mkdir -p "${dest_base}"
 
-    # For categories with subcategories (like from_shumway/avm1/), recurse
-    # Check if immediate children have test.swf (flat) or are subcategory dirs
-    local has_flat_tests=false
-    for test_dir in "${src_dir}"/*/; do
-        if [[ -f "${test_dir}/test.swf" ]]; then
-            has_flat_tests=true
-            break
+    # Install tests from immediate children (flat tests like from_shumway/add/)
+    # AND recurse into subdirectories that contain tests (like from_shumway/avm1/operations/)
+    for child_dir in "${src_dir}"/*/; do
+        local child_name
+        child_name="$(basename "${child_dir}")"
+
+        if [[ -f "${child_dir}/test.swf" ]]; then
+            # Flat test: install directly
+            install_test_dir "${child_dir}" "${dest_base}/${child_name}"
+            installed=$((installed + 1))
+        else
+            # Check if this is a subcategory with nested tests
+            local has_nested=false
+            for nested_dir in "${child_dir}"/*/; do
+                if [[ -f "${nested_dir}/test.swf" ]]; then
+                    has_nested=true
+                    break
+                fi
+            done
+
+            if ${has_nested}; then
+                for nested_dir in "${child_dir}"/*/; do
+                    local nested_name
+                    nested_name="$(basename "${nested_dir}")"
+
+                    if [[ ! -f "${nested_dir}/test.swf" ]]; then
+                        skipped=$((skipped + 1))
+                        continue
+                    fi
+
+                    install_test_dir "${nested_dir}" "${dest_base}/${child_name}/${nested_name}"
+                    installed=$((installed + 1))
+                done
+            else
+                skipped=$((skipped + 1))
+            fi
         fi
     done
-
-    if ${has_flat_tests}; then
-        # Flat structure: tests are direct children
-        for test_dir in "${src_dir}"/*/; do
-            local test_name
-            test_name="$(basename "${test_dir}")"
-
-            if [[ ! -f "${test_dir}/test.swf" ]]; then
-                skipped=$((skipped + 1))
-                continue
-            fi
-
-            install_test_dir "${test_dir}" "${dest_base}/${test_name}"
-            installed=$((installed + 1))
-        done
-    else
-        # Nested structure: subcategories contain tests (e.g., from_shumway/avm1/, from_shumway/avm2/)
-        for subcat_dir in "${src_dir}"/*/; do
-            local subcat_name
-            subcat_name="$(basename "${subcat_dir}")"
-
-            for test_dir in "${subcat_dir}"/*/; do
-                local test_name
-                test_name="$(basename "${test_dir}")"
-
-                if [[ ! -f "${test_dir}/test.swf" ]]; then
-                    skipped=$((skipped + 1))
-                    continue
-                fi
-
-                install_test_dir "${test_dir}" "${dest_base}/${subcat_name}/${test_name}"
-                installed=$((installed + 1))
-            done
-        done
-    fi
 
     # Install __framework__ directory if present
     if [[ -d "${src_dir}/__framework__" ]]; then
