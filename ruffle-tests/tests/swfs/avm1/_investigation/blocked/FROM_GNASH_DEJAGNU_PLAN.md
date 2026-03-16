@@ -54,9 +54,28 @@ the Dejagnu test framework in various ways and don't produce correct output.
 
 ### Blocker 1: actionscript.all — ImportAssets Doesn't Import Character Definitions
 
-**Symptoms:** Test outputs "Dejagnu not initialized yet after N iterations. Will try again again" — the setInterval polling loop runs but `dejagnu_module_initialized` is never set.
+**Symptoms (before ImportAssets fix):** Test outputs "Dejagnu not initialized yet after N iterations. Will try again again"
 
-**Root cause (confirmed 2026-03-16):** The child movie pipeline works — `movie_Dejagnu.c` compiles and links correctly. The issue is that `actionImportAssets` only runs the child's `tagInit` (which defines sprites and registers exports), but does NOT make the child's sprite definitions available to the parent.
+**Symptoms (after ImportAssets fix, commit bc5e38eb):** Test outputs "SWF5" repeated 11,166 times in 2 ticks, then segfaults (OOM from function registry overflow). The Dejagnu sprite IS being placed and its init scripts DO run (confirmed by function registry filling up), but the test produces no PASSED/FAILED output.
+
+**ImportAssets char_id remapping (FIXED):** `tagImportCharacter` was implemented and the recompiler now emits the char_id→export_name mappings. Verified working: `dejagnu → char_id 1001 → local 2 (CHAR_TYPE_SPRITE)`.
+
+**Remaining issue: massive output loop within a single tick.** With `MAX_FRAMES=3`, only 2 ticks execute, but 22,333 stdout lines are produced. The frame_0 function places the `__shared_assets` sprite, which contains the Dejagnu sprite. The Dejagnu sprite init (`Dejagnu_script_0` + `Dejagnu_script_1`) runs and defines ~30 anonymous functions. Something in this init or the subsequent frame processing causes thousands of re-entries or traces.
+
+**Investigation needed:**
+1. The Dejagnu sprite has char_id 2 in the parent, which was imported from char_id 1001. The parent's `__shared_assets` (sprite 1) places char_id 2 at depth 1. This triggers the Dejagnu's `sprite_1_frame_0` which calls `Dejagnu_script_0` and `Dejagnu_script_1`.
+2. `Dejagnu_script_1` defines functions on `_root` (via GetVariable("_root") + SetMember) and sets `dejagnu_module_initialized = 1`.
+3. The parent's frame 1 runs `script_2` which traces "SWF5" and calls check_equals — but no PASSED/FAILED output appears, meaning check_equals is undefined or returns without tracing.
+4. The 11,166 "SWF5" lines per tick suggest either: (a) sprite frame advancement is re-running the Dejagnu init thousands of times, (b) the Dejagnu xtrace function is producing output in a loop, or (c) the frame function is being called repeatedly within a single tick due to goto/catch-up logic.
+5. Frame never advances past 0 (playing becomes false on tick 2), suggesting actionStop fires during tick 1 — possibly from the Dejagnu sprite (which has a stop-on-last-frame pattern).
+
+**Root cause hypothesis:** The Dejagnu sprite (1 frame) contains an inner sprite at depth 3000 (_xtrace_win, char_id 1002 = imported from 2, which is a text edit). When placed, `process_sprite_needs_init` may re-trigger the parent sprite's init recursively, or the nested PlaceObject2 inside the Dejagnu sprite may cause cascading re-init.
+
+**Next steps:**
+1. Add per-function printf to `Dejagnu_script_0`, `Dejagnu_script_1`, parent's `script_0`, `script_1`, `script_2` to trace execution order
+2. Check if `process_sprite_needs_init` is causing recursive re-init
+3. Check if `_root.dejagnu_module_initialized` is actually being set (trace it in the parent's script_1 checker callback)
+4. Check if the `actionStop()` in the Dejagnu sprite's frame end is stopping the ROOT instead of the sprite
 
 **How ImportAssets is supposed to work in Flash:**
 1. Parent SWF's ImportAssets tag specifies a URL and a list of export names to import
