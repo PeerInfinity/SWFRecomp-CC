@@ -52,7 +52,8 @@ def build_investigation_index(inv_dir: Path = None) -> tuple[dict[str, list[tupl
         test_to_docs: mapping test_name -> list of (doc_number, doc_rel_path)
         doc_list: list of (doc_display_name, doc_rel_path, test_names) indexed by doc_number-1
     """
-    inv_dir = inv_dir or INVESTIGATION_DIR
+    if inv_dir is None:
+        return {}, []
     if not inv_dir.is_dir():
         return {}, []
 
@@ -475,14 +476,22 @@ def generate_investigation_legend(doc_list: list[tuple[str, str, list[str]]], da
 # Main
 # ---------------------------------------------------------------------------
 
-def generate_one(results_path: Path, output_path: Path, investigation_dir: Path = None):
-    """Generate a single markdown report from a results JSON file."""
+_UNSET = object()
+
+def generate_one(results_path: Path, output_path: Path, investigation_dir = _UNSET):
+    """Generate a single markdown report from a results JSON file.
+
+    investigation_dir: Path to _investigation dir, None to skip, or _UNSET to use default.
+    """
     print(f"Loading {results_path}...")
     data = load_results(results_path)
 
     print(f"Generating {output_path.name}...")
 
-    inv_dir = investigation_dir or INVESTIGATION_DIR
+    if investigation_dir is _UNSET:
+        inv_dir = INVESTIGATION_DIR
+    else:
+        inv_dir = investigation_dir
     test_to_docs, doc_list = build_investigation_index(inv_dir)
 
     sections = [
