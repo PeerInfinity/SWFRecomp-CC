@@ -273,11 +273,7 @@ jobs:
       - name: Generate shard matrix
         id: matrix
         run: |
-          if [ "$RUN_AVM1" = "true" ]; then
-            N=${{ inputs.parallel }}
-          else
-            N=1
-          fi
+          N=${{ inputs.parallel }}
           echo "matrix=$(seq 1 $N | jq -cs '{shard: .}')" >> "$GITHUB_OUTPUT"
           echo "total=$N" >> "$GITHUB_OUTPUT"
 
@@ -325,12 +321,16 @@ jobs:
           path: ruffle-tests/
           retention-days: 1
 
-  # --- Parallel runner path: shards (avm1 only) ---
+  # --- Parallel runner path: shards ---
   ruffle-tests-shard:
     name: Shard ${{ matrix.shard }}/${{ needs.setup-parallel.outputs.total }}
     if: inputs.parallel != '1'
     needs: setup-parallel
     runs-on: ubuntu-latest
+
+    env:
+      RUN_AVM1: ${{ needs.setup-parallel.outputs.run_avm1 }}
+      RUN_SHUMWAY: ${{ needs.setup-parallel.outputs.run_shumway }}
 
     strategy:
       fail-fast: false
@@ -363,14 +363,25 @@ jobs:
           name: setup-tests
           path: ruffle-tests/
 
-      - name: Verify runtime output (shard ${{ matrix.shard }}/${{ needs.setup-parallel.outputs.total }})
+      - name: Verify runtime output — avm1 (shard ${{ matrix.shard }}/${{ needs.setup-parallel.outputs.total }})
+        if: env.RUN_AVM1 == 'true'
         env:
           TZ: NPT-5:45
         run: |
-          ARGS="-v --json=ruffle-tests/results-shard-${{ matrix.shard }}.json --shard=${{ matrix.shard }}/${{ needs.setup-parallel.outputs.total }}"
+          ARGS="-v --json=ruffle-tests/results-shard-avm1-${{ matrix.shard }}.json --shard=${{ matrix.shard }}/${{ needs.setup-parallel.outputs.total }}"
           if [ "${{ inputs.limit }}" != "0" ] && [ -n "${{ inputs.limit }}" ]; then
             ARGS="$ARGS --limit=${{ inputs.limit }}"
           fi
+          python3 ruffle-tests/verify_output.py $ARGS
+
+      - name: Verify runtime output — from_shumway (shard ${{ matrix.shard }}/${{ needs.setup-parallel.outputs.total }})
+        if: env.RUN_SHUMWAY == 'true'
+        env:
+          TZ: NPT-5:45
+        run: |
+          ARGS="-v --tests-dir=ruffle-tests/tests/swfs/from_shumway/avm1"
+          ARGS="$ARGS --json=ruffle-tests/results-shard-shumway-${{ matrix.shard }}.json"
+          ARGS="$ARGS --shard=${{ matrix.shard }}/${{ needs.setup-parallel.outputs.total }}"
           python3 ruffle-tests/verify_output.py $ARGS
 
       - name: Upload shard results
@@ -378,7 +389,7 @@ jobs:
         uses: actions/upload-artifact@v7
         with:
           name: results-shard-${{ matrix.shard }}
-          path: ruffle-tests/results-shard-${{ matrix.shard }}.json
+          path: ruffle-tests/results-shard-*-${{ matrix.shard }}.json
           retention-days: 7
 
   # --- Combine shard results ---
@@ -435,74 +446,76 @@ jobs:
           fi
 
       - name: Download all shard artifacts
-        if: env.RUN_AVM1 == 'true'
         uses: actions/download-artifact@v7
         with:
           pattern: results-shard-*
           path: artifacts
 
-      - name: Combine AVM1 shard results
-        if: env.RUN_AVM1 == 'true'
+      - name: Combine shard results
         run: |
           python3 << 'EOF'
           import json, glob, os
           from datetime import datetime, timezone
 
-          files = sorted(glob.glob("artifacts/results-shard-*/results-shard-*.json"))
-          print(f"Found {len(files)} shard result files")
-
-          combined_tests = []
-          total_duration = 0
-          total_available = 0
-          git_sha = None
-          breakdown = {}
-          pass_count = 0
-
-          for f in files:
-              with open(f) as fp:
-                  data = json.load(fp)
-              combined_tests.extend(data.get("tests", []))
-              m = data.get("metadata", {})
-              total_duration += m.get("duration_seconds", 0)
-              total_available = max(total_available, m.get("total_available", 0))
-              if not git_sha:
-                  git_sha = m.get("git_sha")
-              pass_count += data.get("pass", 0)
-              for k, v in data.get("breakdown", {}).items():
-                  breakdown[k] = breakdown.get(k, 0) + v
-
-          total = len(combined_tests)
-          report = {
-              "metadata": {
-                  "timestamp": datetime.now(timezone.utc).isoformat(),
-                  "git_sha": git_sha,
-                  "duration_seconds": round(total_duration, 2),
-                  "total_available": total_available,
-                  "shards": len(files),
-              },
-              "total": total,
-              "pass": pass_count,
-              "fail": total - pass_count,
-              "pass_rate": round(100 * pass_count / total, 1) if total else 0,
-              "breakdown": {k: v for k, v in breakdown.items() if v},
-              "tests": sorted(combined_tests, key=lambda t: t["test"]),
+          # Map of category tag -> (shard glob pattern, output dir)
+          categories = {
+              "avm1": ("artifacts/results-shard-*/results-shard-avm1-*.json",
+                       "ruffle-tests/tests/swfs/avm1/_results"),
+              "shumway": ("artifacts/results-shard-*/results-shard-shumway-*.json",
+                          "ruffle-tests/tests/swfs/from_shumway/avm1/_results"),
           }
 
-          out_dir = "ruffle-tests/tests/swfs/avm1/_results"
-          os.makedirs(out_dir, exist_ok=True)
-          with open(f"{out_dir}/results.json", "w") as fp:
-              json.dump(report, fp, indent=2)
+          for cat, (pattern, out_dir) in categories.items():
+              files = sorted(glob.glob(pattern))
+              if not files:
+                  print(f"{cat}: no shard files found, skipping")
+                  continue
 
-          print(f"Combined: {pass_count}/{total} passing ({report['pass_rate']}%)")
+              print(f"{cat}: combining {len(files)} shard files")
+
+              combined_tests = []
+              total_duration = 0
+              total_available = 0
+              git_sha = None
+              breakdown = {}
+              pass_count = 0
+
+              for f in files:
+                  with open(f) as fp:
+                      data = json.load(fp)
+                  combined_tests.extend(data.get("tests", []))
+                  m = data.get("metadata", {})
+                  total_duration += m.get("duration_seconds", 0)
+                  total_available = max(total_available, m.get("total_available", 0))
+                  if not git_sha:
+                      git_sha = m.get("git_sha")
+                  pass_count += data.get("pass", 0)
+                  for k, v in data.get("breakdown", {}).items():
+                      breakdown[k] = breakdown.get(k, 0) + v
+
+              total = len(combined_tests)
+              report = {
+                  "metadata": {
+                      "timestamp": datetime.now(timezone.utc).isoformat(),
+                      "git_sha": git_sha,
+                      "duration_seconds": round(total_duration, 2),
+                      "total_available": total_available,
+                      "shards": len(files),
+                  },
+                  "total": total,
+                  "pass": pass_count,
+                  "fail": total - pass_count,
+                  "pass_rate": round(100 * pass_count / total, 1) if total else 0,
+                  "breakdown": {k: v for k, v in breakdown.items() if v},
+                  "tests": sorted(combined_tests, key=lambda t: t["test"]),
+              }
+
+              os.makedirs(out_dir, exist_ok=True)
+              with open(f"{out_dir}/results.json", "w") as fp:
+                  json.dump(report, fp, indent=2)
+
+              print(f"  {pass_count}/{total} passing ({report['pass_rate']}%)")
           EOF
-
-      - name: Run from_shumway/avm1 tests
-        if: env.RUN_SHUMWAY == 'true'
-        env:
-          TZ: NPT-5:45
-        run: |
-          python3 ruffle-tests/verify_output.py -v \
-            --tests-dir=ruffle-tests/tests/swfs/from_shumway/avm1
 
       - name: Generate filtered results
         if: always()
