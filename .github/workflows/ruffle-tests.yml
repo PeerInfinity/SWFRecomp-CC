@@ -4,7 +4,7 @@ on:
   workflow_dispatch:
     inputs:
       categories:
-        description: 'Test categories to run (comma-separated, or "all")'
+        description: 'Test categories to run'
         required: true
         type: choice
         options:
@@ -13,12 +13,12 @@ on:
           - 'from_shumway'
         default: 'all'
       limit:
-        description: 'Max number of tests to run per category (0 = all)'
+        description: 'Max tests per category (0 = all)'
         required: false
         default: '0'
         type: string
       parallel:
-        description: 'Number of parallel runners for avm1 (1, 10, 20, or 30)'
+        description: 'Number of parallel runners'
         required: true
         type: choice
         options:
@@ -30,7 +30,7 @@ on:
   workflow_call:
     inputs:
       categories:
-        description: 'Test categories (comma-separated, or "all")'
+        description: 'Test categories to run'
         required: false
         default: 'all'
         type: string
