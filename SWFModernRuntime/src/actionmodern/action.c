@@ -20262,7 +20262,6 @@ void actionGotoFrame(SWFAppContext* app_context, u16 frame)
 
 #ifdef NO_GRAPHICS
 	extern int goto_from_action;
-	goto_from_action = 1;
 #endif
 
 	next_frame = frame;
@@ -20273,6 +20272,17 @@ void actionGotoFrame(SWFAppContext* app_context, u16 frame)
 	root_movieclip.currentframe = frame + 1;  // 1-indexed
 
 #ifdef NO_GRAPHICS
+	// When called from inside an enterFrame handler or timer callback,
+	// defer the goto to the frame loop to avoid infinite re-entry.
+	// Normal function calls (e.g., user script calling gotoAndStop) still
+	// get synchronous catch-up via goto_from_action.
+	{
+		extern int g_inside_enterframe_dispatch;
+		if (g_inside_enterframe_dispatch) {
+			return;
+		}
+	}
+	goto_from_action = 1;
 	// Execute tags-only catch-up inline (PlaceObject, etc.) so that properties
 	// like clip._x reflect the new frame's state. Scripts are deferred until
 	// after the calling script finishes.
@@ -21946,11 +21956,15 @@ static void installKeyMethods(SWFAppContext* app_context, ASObject* key_obj)
 }
 
 // Dispatch AS2 mc.onEnterFrame property handlers for all cached MovieClips.
+// Flag to indicate we're inside enterFrame dispatch — gotos should be deferred
+int g_inside_enterframe_dispatch = 0;
+
 // Called from tagShowFrame after sprite/button initialization. Iterates the
 // MC cache in reverse creation order (most recently created = highest depth = front)
 // to match Flash's front-to-back dispatch order.
 void actionDispatchEnterFrameHandlers(SWFAppContext* app_context)
 {
+	g_inside_enterframe_dispatch = 1;
 	// Dispatch children first, then root — Flash fires enterFrame in creation
 	// order (children before parents).
 	for (int i = child_mc_count - 1; i >= 0; i--)
@@ -21992,6 +22006,7 @@ void actionDispatchEnterFrameHandlers(SWFAppContext* app_context)
 
 		// Pass NULL as this_obj; the generated code's else branch uses
 		// g_event_this_mc to preload 'this' as MOVIECLIP.
+		g_call_depth++;
 		if (func->function_type == 2 && func->advanced_func != NULL)
 		{
 			// Restore captured scopes (closure context)
@@ -22032,6 +22047,7 @@ void actionDispatchEnterFrameHandlers(SWFAppContext* app_context)
 				if (scope_depth > 0) scope_depth--;
 			}
 		}
+		g_call_depth--;
 		g_event_this_mc = NULL;
 
 		restoreFunctionVersion(_ef_saved_ver, _ef_saved_global, _ef_saved_midx);
@@ -22053,6 +22069,7 @@ void actionDispatchEnterFrameHandlers(SWFAppContext* app_context)
 					MovieClip* saved_ctx = g_current_context;
 					actionSetCurrentContext(&root_movieclip);
 					g_event_this_mc = &root_movieclip;
+					g_call_depth++;
 					if (func->function_type == 2 && func->advanced_func != NULL) {
 						u8 ref_captured = func->captured_scope_count;
 						for (u8 ci = 0; ci < ref_captured; ci++) {
@@ -22088,12 +22105,15 @@ void actionDispatchEnterFrameHandlers(SWFAppContext* app_context)
 							if (scope_depth > 0) scope_depth--;
 						}
 					}
+					g_call_depth--;
 					g_event_this_mc = NULL;
 					actionSetCurrentContext(saved_ctx);
 				}
 			}
 		}
 	}
+
+	g_inside_enterframe_dispatch = 0;
 
 	// Mark all dynamic MCs (without display_obj) as eligible for next tick's enterFrame.
 	// This ensures MCs created by createEmptyMovieClip don't fire onEnterFrame on
