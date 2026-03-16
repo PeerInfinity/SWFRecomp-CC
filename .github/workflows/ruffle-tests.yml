@@ -1,15 +1,24 @@
-name: Ruffle AVM1 Tests
+name: Ruffle Tests
 
 on:
   workflow_dispatch:
     inputs:
+      categories:
+        description: 'Test categories to run (comma-separated, or "all")'
+        required: true
+        type: choice
+        options:
+          - 'all'
+          - 'avm1'
+          - 'from_shumway'
+        default: 'all'
       limit:
-        description: 'Max number of tests to run (0 = all)'
+        description: 'Max number of tests to run per category (0 = all)'
         required: false
         default: '0'
         type: string
       parallel:
-        description: 'Number of parallel runners (1, 10, 20, or 30)'
+        description: 'Number of parallel runners for avm1 (1, 10, 20, or 30)'
         required: true
         type: choice
         options:
@@ -20,13 +29,18 @@ on:
         default: '10'
   workflow_call:
     inputs:
+      categories:
+        description: 'Test categories (comma-separated, or "all")'
+        required: false
+        default: 'all'
+        type: string
       limit:
-        description: 'Max number of tests to run (0 = all)'
+        description: 'Max number of tests to run per category (0 = all)'
         required: false
         default: '0'
         type: string
       parallel:
-        description: 'Number of parallel runners'
+        description: 'Number of parallel runners for avm1'
         required: false
         default: '10'
         type: string
@@ -44,6 +58,10 @@ jobs:
     name: Run Tests
     if: inputs.parallel == '1'
     runs-on: ubuntu-latest
+
+    env:
+      RUN_AVM1: ${{ inputs.categories == 'all' || inputs.categories == 'avm1' }}
+      RUN_SHUMWAY: ${{ inputs.categories == 'all' || inputs.categories == 'from_shumway' }}
 
     steps:
       - name: Checkout repository
@@ -65,25 +83,34 @@ jobs:
           make -j$(nproc)
 
       - name: Download Ruffle test SWFs
-        run: bash ruffle-tests/download_tests.sh avm1 from_shumway
+        run: |
+          CATS=""
+          [ "$RUN_AVM1" = "true" ] && CATS="$CATS avm1"
+          [ "$RUN_SHUMWAY" = "true" ] && CATS="$CATS from_shumway"
+          bash ruffle-tests/download_tests.sh $CATS
 
       - name: Run recompiler on test SWFs
         run: |
-          python3 ruffle-tests/run_tests.py
-          python3 ruffle-tests/run_tests.py --tests-dir=ruffle-tests/tests/swfs/from_shumway/avm1
+          [ "$RUN_AVM1" = "true" ] && python3 ruffle-tests/run_tests.py || true
+          [ "$RUN_SHUMWAY" = "true" ] && python3 ruffle-tests/run_tests.py --tests-dir=ruffle-tests/tests/swfs/from_shumway/avm1 || true
 
       - name: Fetch previous results
         run: |
-          mkdir -p ${{ env.AVM1_RESULTS }}
-          mkdir -p ${{ env.SHUMWAY_RESULTS }}
           if git fetch origin ruffle-test-results 2>/dev/null; then
-            git show origin/ruffle-test-results:${{ env.AVM1_RESULTS }}/results.json \
-              > ${{ env.AVM1_RESULTS }}/results_previous.json 2>/dev/null || true
-            git show origin/ruffle-test-results:${{ env.SHUMWAY_RESULTS }}/results.json \
-              > ${{ env.SHUMWAY_RESULTS }}/results_previous.json 2>/dev/null || true
+            if [ "$RUN_AVM1" = "true" ]; then
+              mkdir -p ${{ env.AVM1_RESULTS }}
+              git show origin/ruffle-test-results:${{ env.AVM1_RESULTS }}/results.json \
+                > ${{ env.AVM1_RESULTS }}/results_previous.json 2>/dev/null || true
+            fi
+            if [ "$RUN_SHUMWAY" = "true" ]; then
+              mkdir -p ${{ env.SHUMWAY_RESULTS }}
+              git show origin/ruffle-test-results:${{ env.SHUMWAY_RESULTS }}/results.json \
+                > ${{ env.SHUMWAY_RESULTS }}/results_previous.json 2>/dev/null || true
+            fi
           fi
 
       - name: Verify runtime output (avm1)
+        if: env.RUN_AVM1 == 'true'
         env:
           TZ: NPT-5:45
         run: |
@@ -94,6 +121,7 @@ jobs:
           python3 ruffle-tests/verify_output.py $ARGS
 
       - name: Verify runtime output (from_shumway/avm1)
+        if: env.RUN_SHUMWAY == 'true'
         env:
           TZ: NPT-5:45
         run: |
@@ -228,12 +256,28 @@ jobs:
     outputs:
       matrix: ${{ steps.matrix.outputs.matrix }}
       total: ${{ steps.matrix.outputs.total }}
+      run_avm1: ${{ steps.cats.outputs.run_avm1 }}
+      run_shumway: ${{ steps.cats.outputs.run_shumway }}
+
+    env:
+      RUN_AVM1: ${{ inputs.categories == 'all' || inputs.categories == 'avm1' }}
+      RUN_SHUMWAY: ${{ inputs.categories == 'all' || inputs.categories == 'from_shumway' }}
 
     steps:
+      - name: Determine categories
+        id: cats
+        run: |
+          echo "run_avm1=$RUN_AVM1" >> "$GITHUB_OUTPUT"
+          echo "run_shumway=$RUN_SHUMWAY" >> "$GITHUB_OUTPUT"
+
       - name: Generate shard matrix
         id: matrix
         run: |
-          N=${{ inputs.parallel }}
+          if [ "$RUN_AVM1" = "true" ]; then
+            N=${{ inputs.parallel }}
+          else
+            N=1
+          fi
           echo "matrix=$(seq 1 $N | jq -cs '{shard: .}')" >> "$GITHUB_OUTPUT"
           echo "total=$N" >> "$GITHUB_OUTPUT"
 
@@ -256,12 +300,16 @@ jobs:
           make -j$(nproc)
 
       - name: Download Ruffle test SWFs
-        run: bash ruffle-tests/download_tests.sh avm1 from_shumway
+        run: |
+          CATS=""
+          [ "$RUN_AVM1" = "true" ] && CATS="$CATS avm1"
+          [ "$RUN_SHUMWAY" = "true" ] && CATS="$CATS from_shumway"
+          bash ruffle-tests/download_tests.sh $CATS
 
       - name: Run recompiler on test SWFs
         run: |
-          python3 ruffle-tests/run_tests.py
-          python3 ruffle-tests/run_tests.py --tests-dir=ruffle-tests/tests/swfs/from_shumway/avm1
+          [ "$RUN_AVM1" = "true" ] && python3 ruffle-tests/run_tests.py || true
+          [ "$RUN_SHUMWAY" = "true" ] && python3 ruffle-tests/run_tests.py --tests-dir=ruffle-tests/tests/swfs/from_shumway/avm1 || true
 
       - name: Upload SWFRecomp binary
         uses: actions/upload-artifact@v7
@@ -340,6 +388,10 @@ jobs:
     needs: [setup-parallel, ruffle-tests-shard]
     runs-on: ubuntu-latest
 
+    env:
+      RUN_AVM1: ${{ needs.setup-parallel.outputs.run_avm1 }}
+      RUN_SHUMWAY: ${{ needs.setup-parallel.outputs.run_shumway }}
+
     steps:
       - name: Checkout repository
         uses: actions/checkout@v5
@@ -369,22 +421,28 @@ jobs:
 
       - name: Fetch previous results
         run: |
-          mkdir -p ${{ env.AVM1_RESULTS }}
-          mkdir -p ${{ env.SHUMWAY_RESULTS }}
           if git fetch origin ruffle-test-results 2>/dev/null; then
-            git show origin/ruffle-test-results:${{ env.AVM1_RESULTS }}/results.json \
-              > ${{ env.AVM1_RESULTS }}/results_previous.json 2>/dev/null || true
-            git show origin/ruffle-test-results:${{ env.SHUMWAY_RESULTS }}/results.json \
-              > ${{ env.SHUMWAY_RESULTS }}/results_previous.json 2>/dev/null || true
+            if [ "$RUN_AVM1" = "true" ]; then
+              mkdir -p ${{ env.AVM1_RESULTS }}
+              git show origin/ruffle-test-results:${{ env.AVM1_RESULTS }}/results.json \
+                > ${{ env.AVM1_RESULTS }}/results_previous.json 2>/dev/null || true
+            fi
+            if [ "$RUN_SHUMWAY" = "true" ]; then
+              mkdir -p ${{ env.SHUMWAY_RESULTS }}
+              git show origin/ruffle-test-results:${{ env.SHUMWAY_RESULTS }}/results.json \
+                > ${{ env.SHUMWAY_RESULTS }}/results_previous.json 2>/dev/null || true
+            fi
           fi
 
       - name: Download all shard artifacts
+        if: env.RUN_AVM1 == 'true'
         uses: actions/download-artifact@v7
         with:
           pattern: results-shard-*
           path: artifacts
 
       - name: Combine AVM1 shard results
+        if: env.RUN_AVM1 == 'true'
         run: |
           python3 << 'EOF'
           import json, glob, os
@@ -439,6 +497,7 @@ jobs:
           EOF
 
       - name: Run from_shumway/avm1 tests
+        if: env.RUN_SHUMWAY == 'true'
         env:
           TZ: NPT-5:45
         run: |
