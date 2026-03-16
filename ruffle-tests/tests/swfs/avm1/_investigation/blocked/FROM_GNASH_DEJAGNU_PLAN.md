@@ -71,11 +71,22 @@ the Dejagnu test framework in various ways and don't produce correct output.
 
 **Root cause hypothesis:** The Dejagnu sprite (1 frame) contains an inner sprite at depth 3000 (_xtrace_win, char_id 1002 = imported from 2, which is a text edit). When placed, `process_sprite_needs_init` may re-trigger the parent sprite's init recursively, or the nested PlaceObject2 inside the Dejagnu sprite may cause cascading re-init.
 
-**Next steps:**
-1. Add per-function printf to `Dejagnu_script_0`, `Dejagnu_script_1`, parent's `script_0`, `script_1`, `script_2` to trace execution order
-2. Check if `process_sprite_needs_init` is causing recursive re-init
-3. Check if `_root.dejagnu_module_initialized` is actually being set (trace it in the parent's script_1 checker callback)
-4. Check if the `actionStop()` in the Dejagnu sprite's frame end is stopping the ROOT instead of the sprite
+**Infinite re-entry (FIXED, commit c90882fa):**
+The root MC's `onEnterFrame` callback (Dejagnu checker) calls `gotoAndPlay(0)`, which triggered synchronous `ng_executeGotoCatchUp`, re-running `frame_0`, re-dispatching enterFrame, re-firing the callback — infinite loop. Fixed by adding `g_inside_enterframe_dispatch` flag: gotos from enterFrame handlers are deferred to the frame loop.
+
+**Current issue: Dejagnu functions not defined on `_root`.**
+After the fixes, the test runs to completion (no more segfault), producing "SWF5" × 15 with zero PASSED/FAILED output. The `check_equals` function is simply not found when called in script_2.
+
+The Dejagnu sprite init (`Dejagnu_script_0` + `Dejagnu_script_1`) should define functions on `_root` via `GetVariable("_root") → SetMember(name, func)`. But either:
+1. The scripts aren't running (the `if (!catch_up_mode)` guard in `Dejagnu_sprite_1_frame_0` may be skipping them)
+2. The scripts run but `GetVariable("_root")` resolves to the wrong object in the nested sprite context
+3. The scripts run and set functions on `_root`, but the parent's script_2 looks them up differently
+
+**Next investigation steps:**
+1. Add fprintf to `Dejagnu_script_0` and `Dejagnu_script_1` to confirm they execute
+2. If they execute, add fprintf after the final `SetMember` for `dejagnu_module_initialized` to confirm the value is set
+3. In the parent's script_2, add fprintf before the first `check_equals` call to trace `GetVariable("check_equals")` — is it undefined?
+4. Check whether `catch_up_mode` is true when `Dejagnu_sprite_1_frame_0` runs during the initial placement
 
 **How ImportAssets is supposed to work in Flash:**
 1. Parent SWF's ImportAssets tag specifies a URL and a list of export names to import
