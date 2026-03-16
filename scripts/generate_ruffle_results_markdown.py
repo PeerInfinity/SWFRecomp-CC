@@ -510,6 +510,36 @@ def generate_one(results_path: Path, output_path: Path):
 
 def generate_markdown():
     """Generate both filtered and unfiltered markdown reports."""
+    import argparse
+    parser = argparse.ArgumentParser(
+        description="Generate Markdown report from Ruffle test results JSON.")
+    parser.add_argument(
+        "--headless", action="store_true",
+        help="Generate from results_headless.json instead of results.json")
+    parser.add_argument(
+        "--json", metavar="PATH",
+        help="Path to a specific results JSON file to use")
+    args = parser.parse_args()
+
+    if args.json:
+        json_path = Path(args.json)
+        if not json_path.exists():
+            print(f"Error: {json_path} not found", file=sys.stderr)
+            sys.exit(1)
+        out_name = json_path.stem.replace("results", "ruffle-results") + ".md"
+        generate_one(json_path, BASE_DIR / out_name)
+        print("\nDone.")
+        return
+
+    if args.headless:
+        headless_json = RUFFLE_DIR / "results_headless.json"
+        if not headless_json.exists():
+            print(f"Error: {headless_json} not found", file=sys.stderr)
+            sys.exit(1)
+        generate_one(headless_json, BASE_DIR / "ruffle-results-headless.md")
+        print("\nDone.")
+        return
+
     filtered_json = RUFFLE_DIR / "results_filtered.json"
     unfiltered_json = RUFFLE_DIR / "results.json"
 

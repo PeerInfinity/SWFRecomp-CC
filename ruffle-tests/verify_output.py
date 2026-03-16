@@ -384,6 +384,7 @@ RUFFLE_UPSTREAM = Path.home() / "CC" / "ruffle" / "tests" / "tests" / "swfs" / "
 RESULTS_FINAL = SCRIPT_DIR / "results.json"
 RESULTS_PREVIOUS = SCRIPT_DIR / "results_previous.json"
 RESULTS_CURRENT = SCRIPT_DIR / "results_current.json"
+RESULTS_HEADLESS = SCRIPT_DIR / "results_headless.json"
 
 SKIP = {"_shared", "__framework__", "_investigation"}
 
@@ -1399,6 +1400,52 @@ def write_json(report, path):
         json.dump(report, f, indent=2)
 
 
+def merge_results(existing_path, new_report):
+    """Merge new_report into existing JSON results, updating tests by name.
+
+    Tests from new_report replace any existing entries with the same name.
+    Tests in the existing file that aren't in new_report are preserved.
+    Summary stats are recomputed from the merged test list.
+    """
+    with open(existing_path) as f:
+        existing = json.load(f)
+
+    # Build dict of existing tests keyed by name
+    merged = {t["test"]: t for t in existing.get("tests", [])}
+
+    # Overlay new results
+    for t in new_report.get("tests", []):
+        merged[t["test"]] = t
+
+    # Rebuild test list sorted by name
+    all_tests = sorted(merged.values(), key=lambda t: t["test"])
+
+    # Recompute stats
+    pass_count = sum(1 for t in all_tests if t["status"] == "pass")
+    total = len(all_tests)
+    breakdown = Counter()
+    for t in all_tests:
+        s = t["status"]
+        if s != "pass":
+            # Map status to breakdown category
+            cat = {"fail": "output_mismatch", "output_mismatch": "output_mismatch",
+                   "segfault": "runtime_segfault", "runtime_segfault": "runtime_segfault",
+                   "compile_fail": "compile_fail", "recomp_fail": "recomp_fail",
+                   "runtime_error": "runtime_error", "timeout": "timeout"}.get(s, s)
+            breakdown[cat] += 1
+
+    result = {
+        "metadata": new_report.get("metadata", existing.get("metadata", {})),
+        "total": total,
+        "pass": pass_count,
+        "fail": total - pass_count,
+        "pass_rate": round(100 * pass_count / total, 1) if total else 0,
+        "breakdown": {k: v for k, v in breakdown.items() if v},
+        "tests": all_tests,
+    }
+    return result
+
+
 def run_diff_comparison(new_path, partial=False):
     """Run diff_ruffle_results.py comparing previous results to new_path.
 
@@ -1436,7 +1483,8 @@ examples:
   %(prog)s --test=foo --test=bar   Run multiple tests
   %(prog)s --test=this_swf7 --diff  Show diff for a single test
   %(prog)s --recompile              Force SWF recompilation for all tests
-  %(prog)s --diff --limit=50        Run first 50 tests, show diffs for failures
+  %(prog)s --diff --count=50         Run first 50 tests, show diffs for failures
+  %(prog)s --start=100 --count=50   Run 50 tests starting from index 100
   %(prog)s --json=results.json      Write JSON report
   %(prog)s --shard=1/4              Run first quarter of tests (for CI)
 """,
@@ -1460,8 +1508,14 @@ examples:
         "--recompile", action="store_true",
         help="Force SWF recompilation (delete and regenerate RecompiledScripts)")
     parser.add_argument(
+        "--start", type=int, default=0, metavar="N",
+        help="Start from test index N (0-based, into sorted test list; default: 0)")
+    parser.add_argument(
+        "--count", type=int, metavar="N",
+        help="Run N tests starting from --start index")
+    parser.add_argument(
         "--limit", type=int, metavar="N",
-        help="Only run the first N tests")
+        help="Only run the first N tests (equivalent to --count)")
     parser.add_argument(
         "--shard", metavar="I/N",
         help="Run shard I of N (1-based, for CI parallelism)")
@@ -1471,6 +1525,9 @@ examples:
     parser.add_argument(
         "--headless", action="store_true",
         help="Build with HEADLESS_GRAPHICS mode (offscreen WebGPU rendering + trace)")
+    parser.add_argument(
+        "--append", action="store_true",
+        help="Append to existing JSON results instead of overwriting (merge by test name)")
     return parser.parse_args()
 
 
@@ -1522,8 +1579,12 @@ def main():
         )
 
     total_available = len(tests)
-    if args.limit:
-        tests = tests[:args.limit]
+
+    # Slice by start index and count
+    count = args.count or args.limit
+    if args.start or count:
+        end = args.start + count if count else None
+        tests = tests[args.start:end]
 
     # Shard: divide test list into shard_total chunks, run chunk shard_idx (1-based)
     shard_idx = shard_total = None
@@ -1821,15 +1882,21 @@ def main():
             print(diff_text)
 
     # Write final JSON results
-    if args.json:
+    json_path = args.json
+    if json_path is None and args.headless:
+        json_path = str(RESULTS_HEADLESS)
+    if json_path:
         report = build_report(test_results, stats, total, total_available, run_start)
-        write_json(report, args.json)
-        print(f"\nResults written to {args.json}")
+        if args.append and Path(json_path).exists():
+            report = merge_results(json_path, report)
+            print(f"\nMerged {len(test_results)} results into {json_path} ({report['total']} total)")
+        write_json(report, json_path)
+        print(f"Results written to {json_path}")
 
         # Run final diff comparison (non-partial)
-        if not args.test:
+        if not args.test and not args.append:
             print("\nFinal diff vs previous results:")
-            run_diff_comparison(args.json, partial=False)
+            run_diff_comparison(json_path, partial=False)
 
 
 if __name__ == "__main__":
