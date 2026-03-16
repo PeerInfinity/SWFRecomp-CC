@@ -514,12 +514,14 @@ void advance_sprite_frames(SWFAppContext* app_context)
 		if (ch->type != CHAR_TYPE_SPRITE) continue;
 
 		// Allocate persistent display list on first encounter
+		int just_allocated = 0;
 		if (obj->sprite_display_list == NULL)
 		{
 			obj->sprite_dl_capacity = INITIAL_DISPLAYLIST_CAPACITY;
 			obj->sprite_display_list = HCALLOC(obj->sprite_dl_capacity, sizeof(DisplayObject));
 			obj->sprite_max_depth = 0;
 			obj->sprite_current_frame = 0;
+			just_allocated = 1;
 			// Don't override sprite_is_playing — tagPlaceObject2 already set it to 1,
 			// and a script may have already set it to 0 (e.g. gotoAndStop before first ShowFrame)
 		}
@@ -647,8 +649,10 @@ void advance_sprite_frames(SWFAppContext* app_context)
 		// Only advance if playing
 		if (!obj->sprite_is_playing) continue;
 
-		// Skip 1-frame sprites — they don't advance
-		if (ch->sprite_frame_count <= 1) continue;
+		// Skip 1-frame sprites — they don't advance.
+		// But on first encounter (just_allocated), still fall through to execute
+		// frame 0 so the child display list is populated for rendering.
+		if (ch->sprite_frame_count <= 1 && !just_allocated) continue;
 
 		// Swap to sprite's display list context
 		DisplayObject* saved_dl = display_list;
