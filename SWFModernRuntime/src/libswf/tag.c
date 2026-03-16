@@ -3031,7 +3031,9 @@ void tagPlaceObject2(SWFAppContext* app_context, size_t depth, size_t char_id, u
 	    && display_list[depth].place_gen != g_place_gen)
 	{
 		display_list[depth].transform_id = transform_id;
+#ifdef NO_GRAPHICS
 		ng_cache_transform(&display_list[depth], transform_id);
+#endif
 		display_list[depth].cxform_id = cxform_id;
 		display_list[depth].has_cxform = (cxform_id != 0) ? 1 : 0;
 		if (clip_depth != 0) display_list[depth].clip_depth = clip_depth;
