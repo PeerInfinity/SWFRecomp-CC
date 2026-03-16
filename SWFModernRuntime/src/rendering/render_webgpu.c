@@ -448,6 +448,31 @@ static EM_BOOL on_mouse_up(int type, const EmscriptenMouseEvent* evt, void* ud) 
 	}
 	return EM_TRUE;
 }
+
+static EM_BOOL on_key_down(int type, const EmscriptenKeyboardEvent* evt, void* ud) {
+	(void)type; (void)ud;
+	if (g_mouse_app_context) {
+		int code = evt->keyCode;
+		if (code >= 0 && code < 256) {
+			g_mouse_app_context->keys.down[code] = 1;
+		}
+		g_mouse_app_context->keys.last_key_down = code;
+		g_mouse_app_context->keys.last_key_ascii = evt->which;
+	}
+	// Prevent default for arrow keys / space to stop page scrolling
+	return EM_TRUE;
+}
+
+static EM_BOOL on_key_up(int type, const EmscriptenKeyboardEvent* evt, void* ud) {
+	(void)type; (void)ud;
+	if (g_mouse_app_context) {
+		int code = evt->keyCode;
+		if (code >= 0 && code < 256) {
+			g_mouse_app_context->keys.down[code] = 0;
+		}
+	}
+	return EM_TRUE;
+}
 #endif
 
 // ---------------------------------------------------------------------------
@@ -592,6 +617,18 @@ void render_webgpu_init(SWFAppContext* app_context, WebGPURenderContext* ctx)
 	emscripten_set_mousemove_callback("#canvas", NULL, 0, on_mouse_move);
 	emscripten_set_mousedown_callback("#canvas", NULL, 0, on_mouse_down);
 	emscripten_set_mouseup_callback("#canvas", NULL, 0, on_mouse_up);
+	// Make canvas focusable, auto-focus, and re-focus on click
+	EM_ASM({
+		var c = document.getElementById('canvas');
+		if (c) {
+			c.setAttribute('tabindex', '0');
+			c.style.outline = 'none';
+			c.focus();
+			c.addEventListener('mousedown', function() { c.focus(); });
+		}
+	});
+	emscripten_set_keydown_callback("#canvas", NULL, 0, on_key_down);
+	emscripten_set_keyup_callback("#canvas", NULL, 0, on_key_up);
 #endif
 
 	// Mark renderer as ready only if critical objects were created

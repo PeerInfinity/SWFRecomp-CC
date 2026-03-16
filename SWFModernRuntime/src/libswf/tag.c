@@ -887,7 +887,6 @@ static void cxform_overrides_restore(void)
 // Overlays AS-modified fields (as_set_flags bits) onto the existing base
 // transform from transform_data.
 // ---------------------------------------------------------------------------
-#ifdef NO_GRAPHICS
 static void apply_as_transform(float slot[16], const MovieClip* mc, u8 flags)
 {
 	// Overlay scale/rotation (bits 4|8|16 = xscale|yscale|rotation)
@@ -906,7 +905,6 @@ static void apply_as_transform(float slot[16], const MovieClip* mc, u8 flags)
 	if (flags & 1) slot[12] = rintf(mc->x * 20.0f);  // pixels to twips
 	if (flags & 2) slot[13] = rintf(mc->y * 20.0f);
 }
-#endif
 
 // ---------------------------------------------------------------------------
 // Helper: Build a 20-float cxform entry from DisplayObject cx_* fields.
@@ -1947,6 +1945,12 @@ void tagShowFrame(SWFAppContext* app_context)
 #else
 	// --- Advance sprite timelines (recursive) ---
 	advance_sprite_frames(app_context);
+
+	// Enable root onEnterFrame dispatch after first frame
+	{
+		extern int g_root_enterframe_eligible;
+		g_root_enterframe_eligible = 1;
+	}
 #endif
 
 	// --- Button hit testing + state machine + action dispatch ---
@@ -1985,7 +1989,6 @@ void tagShowFrame(SWFAppContext* app_context)
 		cxform_overrides_reset();
 	}
 
-#ifdef NO_GRAPHICS
 	{
 		extern MovieClip* actionFindMovieClipByName(const char* instance_name);
 
@@ -2002,7 +2005,7 @@ void tagShowFrame(SWFAppContext* app_context)
 			if (mc == NULL || mc->as_set_flags == 0) continue;
 
 			// Update CPU-side transform_data so compose_children picks it up
-			float* slot = transform_data[obj->transform_id];
+			float* slot = (float*)app_context->transform_data + obj->transform_id * 16;
 			apply_as_transform(slot, mc, mc->as_set_flags);
 
 			// Also update the GPU buffer for this slot
@@ -2037,7 +2040,6 @@ void tagShowFrame(SWFAppContext* app_context)
 		}
 		__asm__ volatile("" ::: "memory");
 	}
-#endif
 
 	// Compose transforms recursively BEFORE the render pass.
 	// For sprites/buttons: compose_children handles all nesting levels,

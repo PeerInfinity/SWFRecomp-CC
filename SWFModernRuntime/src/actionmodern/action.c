@@ -13322,8 +13322,38 @@ static MovieClip* resolveSlashPathToMC(SWFAppContext* app_context, const char* p
 				}
 				mc = child_mc;
 #else
-				(void)app_context;
-				return NULL; // graphics mode: slash-path not supported
+				// Graphics mode: search display list for child by instance name
+				{
+					extern DisplayObject* display_list;
+					extern size_t max_depth;
+					size_t child_depth = SIZE_MAX;
+
+					// Search root display list
+					if (mc == &root_movieclip) {
+						child_depth = ng_findDisplayEntryByName(seg_buf);
+					}
+					// Search parent MC's sprite display list
+					if (child_depth == SIZE_MAX && mc->display_obj != NULL) {
+						DisplayObject* pdobj = (DisplayObject*)mc->display_obj;
+						if (pdobj->sprite_display_list != NULL) {
+							for (size_t _cd = 1; _cd <= pdobj->sprite_max_depth; _cd++) {
+								DisplayObject* _ch = &pdobj->sprite_display_list[_cd];
+								if (_ch->char_id == 0) continue;
+								if (_ch->instance_name != NULL && swf_name_match(_ch->instance_name, seg_buf)) {
+									child_depth = _cd;
+									break;
+								}
+							}
+						}
+					}
+					if (child_depth == SIZE_MAX) return NULL;
+
+					MovieClip* child_mc = findOrCreateMovieClip(app_context, seg_buf,
+						mc == &root_movieclip ? &root_movieclip : mc);
+					if (child_mc == NULL) return NULL;
+					child_mc->parent = mc;
+					mc = child_mc;
+				}
 #endif
 			}
 		}
@@ -14188,6 +14218,20 @@ static MovieClip* findOrCreateMovieClip(SWFAppContext* app_context, const char* 
 					}
 				}
 			}
+		}
+	}
+#else
+	// Graphics mode: sync initial x/y from display list transform
+	if (is_new && mc != NULL) {
+		size_t depth = ng_findDisplayEntryByName(instance_name);
+		if (depth != SIZE_MAX) {
+			mc->depth = (int)depth - 16384;
+			extern DisplayObject* display_list;
+			u32 tid = display_list[depth].transform_id;
+			float* xform = (float*)app_context->transform_data + tid * 16;
+			mc->x = xform[12] / 20.0f;  // twips to pixels
+			mc->y = xform[13] / 20.0f;
+			mc->display_obj = (void*)&display_list[depth];
 		}
 	}
 #endif
@@ -30518,38 +30562,36 @@ void actionSetMember(SWFAppContext* app_context)
 				    value_var.type == ACTION_STACK_VALUE_UNDEFINED;
 				if (strcasecmp(prop_name, "_x") == 0) {
 					if (dval_invalid) return;
-#ifdef NO_GRAPHICS
 					mc->as_set_flags |= 1;
-#endif
 					// Flash stores positions in twips (1/20 pixel), truncating fractional twips
 					mc->x = (float)(floor(dval * 20.0) / 20.0); return;
 				}
 				if (strcasecmp(prop_name, "_y") == 0) {
 					if (dval_invalid) return;
-#ifdef NO_GRAPHICS
+
 					mc->as_set_flags |= 2;
-#endif
+
 					mc->y = (float)(floor(dval * 20.0) / 20.0); return;
 				}
 				if (strcasecmp(prop_name, "_xscale") == 0) {
 					if (dval_invalid) return;
-#ifdef NO_GRAPHICS
+
 					mc->as_set_flags |= 4;
-#endif
+
 					mc->xscale = fval; return;
 				}
 				if (strcasecmp(prop_name, "_yscale") == 0) {
 					if (dval_invalid) return;
-#ifdef NO_GRAPHICS
+
 					mc->as_set_flags |= 8;
-#endif
+
 					mc->yscale = fval; return;
 				}
 				if (strcasecmp(prop_name, "_rotation") == 0) {
 					if (dval_invalid) return;
-#ifdef NO_GRAPHICS
+
 					mc->as_set_flags |= 16;
-#endif
+
 					mc->rotation = normalizeRotation(fval); return;
 				}
 				if (strcasecmp(prop_name, "_alpha") == 0) {
@@ -33172,6 +33214,19 @@ void actionGetMember(SWFAppContext* app_context)
 						}
 					}
 				}
+#else
+				// Graphics mode: read from display list transform if not AS-set
+				if (!(mc->as_set_flags & 1)) {
+					size_t _dep = ng_findDisplayEntryByName(mc->name);
+					if (_dep != SIZE_MAX) {
+						extern DisplayObject* display_list;
+						u32 _tid = display_list[_dep].transform_id;
+						float* _xf = (float*)app_context->transform_data + _tid * 16;
+						double _dx = (double)_xf[12] / 20.0;
+						PUSH(ACTION_STACK_VALUE_F64, VAL(u64, &_dx));
+						return;
+					}
+				}
 #endif
 				// TextFields: return twip-snapped value as F64 for full precision
 				if (MC_IS_TEXTFIELD(mc)) {
@@ -33196,6 +33251,19 @@ void actionGetMember(SWFAppContext* app_context)
 							PUSH(ACTION_STACK_VALUE_F64, VAL(u64, &_dy));
 							return;
 						}
+					}
+				}
+#else
+				// Graphics mode: read from display list transform if not AS-set
+				if (!(mc->as_set_flags & 2)) {
+					size_t _dep = ng_findDisplayEntryByName(mc->name);
+					if (_dep != SIZE_MAX) {
+						extern DisplayObject* display_list;
+						u32 _tid = display_list[_dep].transform_id;
+						float* _xf = (float*)app_context->transform_data + _tid * 16;
+						double _dy = (double)_xf[13] / 20.0;
+						PUSH(ACTION_STACK_VALUE_F64, VAL(u64, &_dy));
+						return;
 					}
 				}
 #endif

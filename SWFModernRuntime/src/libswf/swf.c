@@ -92,9 +92,29 @@ void tagMain(SWFAppContext* app_context)
 
 	while (!renderer_poll(app_context))
 	{
+#ifdef __EMSCRIPTEN__
+		double frame_start2 = emscripten_get_now();
+#endif
+		// Set enterframe_eligible on all initialized sprites so
+		// actionDispatchEnterFrameHandlers doesn't skip them.
+		{
+			extern void set_enterframe_eligible_recursive(DisplayObject*, size_t);
+			set_enterframe_eligible_recursive(display_list, max_depth);
+		}
+
+		// Dispatch AS2 onEnterFrame handlers (child MCs + root dynamic_props)
+		actionDispatchEnterFrameHandlers(app_context);
+		// Dispatch root onEnterFrame from var_map (DefineFunction/SetVariable path)
+		actionDispatchRootVarMapEnterFrame(app_context);
+
 		tagShowFrame(app_context);
 #ifdef __EMSCRIPTEN__
-		emscripten_sleep(0);
+		double elapsed2 = emscripten_get_now() - frame_start2;
+		u32 sleep_ms2 = (frame_ms > 0) ? frame_ms : 0;
+		if (elapsed2 < (double)sleep_ms2)
+			emscripten_sleep((u32)((double)sleep_ms2 - elapsed2));
+		else
+			emscripten_sleep(0);
 #endif
 	}
 }

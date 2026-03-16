@@ -124,6 +124,19 @@ def build_do_action_body():
     """
     # Build the function body
     func_body = bytearray()
+    # Auto-move blue square: bluebox._x += 2
+    func_body += push_string("bluebox")
+    func_body += ACTION_GET_VARIABLE       # obj
+    func_body += push_string("_x")         # name
+    func_body += push_string("bluebox")
+    func_body += ACTION_GET_VARIABLE
+    func_body += push_string("_x")
+    func_body += ACTION_GET_MEMBER         # current _x
+    func_body += push_float64(2.0)
+    func_body += ACTION_ADD2               # new _x
+    func_body += ACTION_SET_MEMBER
+
+    # Key-controlled green square
     func_body += build_key_check_and_move("_x", 37, -5.0)  # LEFT
     func_body += build_key_check_and_move("_x", 39, 5.0)   # RIGHT
     func_body += build_key_check_and_move("_y", 38, -5.0)  # UP
@@ -194,7 +207,23 @@ sprite = swf.define_sprite(object_id=2, frame_count=1)
 sprite.place_object(object_id=1, depth=1)
 sprite.show_frame()
 
-# Place the sprite with instance name "square" at center of stage
+# Define a blue square shape (object 3), 30x30 pixels = 600x600 twips
+blue_shape = swf.define_shape(object_id=3, bounds=(0, SIZE, 0, SIZE))
+blue_shape.add_fill(SolidFill(60, 100, 255))  # blue
+blue_shape.add_edges([
+    ShapeSetup(x=0, y=0, fillStyle1=1),
+    LineTo(SIZE, 0),
+    LineTo(0, SIZE),
+    LineTo(-SIZE, 0),
+    LineTo(0, -SIZE),
+])
+
+# Define sprite (object 4) wrapping the blue shape
+blue_sprite = swf.define_sprite(object_id=4, frame_count=1)
+blue_sprite.place_object(object_id=3, depth=1)
+blue_sprite.show_frame()
+
+# Place the green sprite with instance name "square" at center of stage
 # 320/2 = 160 pixels, minus 15 (half of 30px square) = 145 pixels = 2900 twips
 CENTER = 2900
 place_body = build_place_object2_with_name(
@@ -203,6 +232,14 @@ place_body = build_place_object2_with_name(
     name="square",
 )
 swf.add_raw_tag(0x1A, place_body)  # PlaceObject2 = tag 26 = 0x1A
+
+# Place the blue sprite with instance name "bluebox" near top-left
+place_blue = build_place_object2_with_name(
+    char_id=4, depth=2,
+    trans_x=200, trans_y=600,   # 10px, 30px in twips
+    name="bluebox",
+)
+swf.add_raw_tag(0x1A, place_blue)  # PlaceObject2
 
 # DoAction on frame 1: set up onEnterFrame handler + stop
 do_action_bytes = build_do_action_body()
