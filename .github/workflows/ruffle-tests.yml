@@ -11,6 +11,7 @@ on:
           - 'all'
           - 'avm1'
           - 'from_shumway'
+          - 'from_gnash'
         default: 'all'
       limit:
         description: 'Max tests per category (0 = all)'
@@ -35,12 +36,12 @@ on:
         default: 'all'
         type: string
       limit:
-        description: 'Max number of tests to run per category (0 = all)'
+        description: 'Max tests per category (0 = all)'
         required: false
         default: '0'
         type: string
       parallel:
-        description: 'Number of parallel runners for avm1'
+        description: 'Number of parallel runners'
         required: false
         default: '10'
         type: string
@@ -48,9 +49,14 @@ on:
 permissions:
   contents: write
 
+# All test directories and their results locations.
+# When adding a new category, add it here, to the DIRS lists below, and to
+# the shard combine script's categories dict.
 env:
-  AVM1_RESULTS: ruffle-tests/tests/swfs/avm1/_results
-  SHUMWAY_RESULTS: ruffle-tests/tests/swfs/from_shumway/avm1/_results
+  AVM1_DIR: ruffle-tests/tests/swfs/avm1
+  SHUMWAY_AVM1_DIR: ruffle-tests/tests/swfs/from_shumway/avm1
+  SHUMWAY_FLAT_DIR: ruffle-tests/tests/swfs/from_shumway
+  GNASH_SWFMILL_DIR: ruffle-tests/tests/swfs/from_gnash/misc-swfmill.all
 
 jobs:
   # --- Single runner path ---
@@ -62,6 +68,7 @@ jobs:
     env:
       RUN_AVM1: ${{ inputs.categories == 'all' || inputs.categories == 'avm1' }}
       RUN_SHUMWAY: ${{ inputs.categories == 'all' || inputs.categories == 'from_shumway' }}
+      RUN_GNASH: ${{ inputs.categories == 'all' || inputs.categories == 'from_gnash' }}
 
     steps:
       - name: Checkout repository
@@ -87,62 +94,71 @@ jobs:
           CATS=""
           [ "$RUN_AVM1" = "true" ] && CATS="$CATS avm1"
           [ "$RUN_SHUMWAY" = "true" ] && CATS="$CATS from_shumway"
+          [ "$RUN_GNASH" = "true" ] && CATS="$CATS from_gnash"
           bash ruffle-tests/download_tests.sh $CATS
 
       - name: Run recompiler on test SWFs
         run: |
-          [ "$RUN_AVM1" = "true" ] && python3 ruffle-tests/run_tests.py || true
-          [ "$RUN_SHUMWAY" = "true" ] && python3 ruffle-tests/run_tests.py --tests-dir=ruffle-tests/tests/swfs/from_shumway/avm1 || true
+          DIRS=""
+          [ "$RUN_AVM1" = "true" ] && DIRS="$DIRS $AVM1_DIR"
+          if [ "$RUN_SHUMWAY" = "true" ]; then
+            DIRS="$DIRS $SHUMWAY_AVM1_DIR $SHUMWAY_FLAT_DIR"
+          fi
+          [ "$RUN_GNASH" = "true" ] && DIRS="$DIRS $GNASH_SWFMILL_DIR"
+          for dir in $DIRS; do
+            [ -d "$dir" ] && python3 ruffle-tests/run_tests.py --tests-dir="$dir" || true
+          done
 
       - name: Fetch previous results
         run: |
+          DIRS=""
+          [ "$RUN_AVM1" = "true" ] && DIRS="$DIRS $AVM1_DIR"
+          if [ "$RUN_SHUMWAY" = "true" ]; then
+            DIRS="$DIRS $SHUMWAY_AVM1_DIR $SHUMWAY_FLAT_DIR"
+          fi
+          [ "$RUN_GNASH" = "true" ] && DIRS="$DIRS $GNASH_SWFMILL_DIR"
           if git fetch origin ruffle-test-results 2>/dev/null; then
-            if [ "$RUN_AVM1" = "true" ]; then
-              mkdir -p ${{ env.AVM1_RESULTS }}
-              git show origin/ruffle-test-results:${{ env.AVM1_RESULTS }}/results.json \
-                > ${{ env.AVM1_RESULTS }}/results_previous.json 2>/dev/null || true
-            fi
-            if [ "$RUN_SHUMWAY" = "true" ]; then
-              mkdir -p ${{ env.SHUMWAY_RESULTS }}
-              git show origin/ruffle-test-results:${{ env.SHUMWAY_RESULTS }}/results.json \
-                > ${{ env.SHUMWAY_RESULTS }}/results_previous.json 2>/dev/null || true
-            fi
+            for dir in $DIRS; do
+              mkdir -p "$dir/_results"
+              git show "origin/ruffle-test-results:$dir/_results/results.json" \
+                > "$dir/_results/results_previous.json" 2>/dev/null || true
+            done
           fi
 
-      - name: Verify runtime output (avm1)
-        if: env.RUN_AVM1 == 'true'
+      - name: Verify runtime output
         env:
           TZ: NPT-5:45
         run: |
-          ARGS="-v"
+          DIRS=""
+          [ "$RUN_AVM1" = "true" ] && DIRS="$DIRS $AVM1_DIR"
+          if [ "$RUN_SHUMWAY" = "true" ]; then
+            DIRS="$DIRS $SHUMWAY_AVM1_DIR $SHUMWAY_FLAT_DIR"
+          fi
+          [ "$RUN_GNASH" = "true" ] && DIRS="$DIRS $GNASH_SWFMILL_DIR"
+          LIMIT_ARGS=""
           if [ "${{ inputs.limit }}" != "0" ] && [ -n "${{ inputs.limit }}" ]; then
-            ARGS="$ARGS --limit=${{ inputs.limit }}"
+            LIMIT_ARGS="--limit=${{ inputs.limit }}"
           fi
-          python3 ruffle-tests/verify_output.py $ARGS
-
-      - name: Verify runtime output (from_shumway/avm1)
-        if: env.RUN_SHUMWAY == 'true'
-        env:
-          TZ: NPT-5:45
-        run: |
-          python3 ruffle-tests/verify_output.py -v \
-            --tests-dir=ruffle-tests/tests/swfs/from_shumway/avm1
+          for dir in $DIRS; do
+            [ -d "$dir" ] || continue
+            echo "=== Running: $dir ==="
+            python3 ruffle-tests/verify_output.py -v --tests-dir="$dir" $LIMIT_ARGS || true
+          done
 
       - name: Generate filtered results
         if: always()
         run: |
-          for dir in ${{ env.AVM1_RESULTS }} ${{ env.SHUMWAY_RESULTS }}; do
-            if [ -f "$dir/results.json" ]; then
-              python3 ruffle-tests/filter_results.py "$dir/results.json"
-            fi
+          find ruffle-tests/tests/swfs -path '*/_results/results.json' | while read f; do
+            python3 ruffle-tests/filter_results.py "$f"
           done
 
       - name: Generate diff report
         if: always()
         run: |
-          for dir in ${{ env.AVM1_RESULTS }} ${{ env.SHUMWAY_RESULTS }}; do
-            if [ -f "$dir/results.json" ] && [ -f "$dir/results_previous.json" ]; then
-              python3 scripts/diff_ruffle_results.py "$dir/results_previous.json" "$dir/results.json" \
+          find ruffle-tests/tests/swfs -path '*/_results/results.json' | while read f; do
+            dir=$(dirname "$f")
+            if [ -f "$dir/results_previous.json" ]; then
+              python3 scripts/diff_ruffle_results.py "$dir/results_previous.json" "$f" \
                 --json="$dir/results_diff.json" --markdown="$dir/results_diff.md"
             fi
           done
@@ -162,10 +178,8 @@ jobs:
           for rj in sorted(glob.glob("ruffle-tests/tests/swfs/**/_results/results.json", recursive=True)):
               with open(rj) as f:
                   r = json.load(f)
-              # Derive category name
               cat = os.path.dirname(rj).replace("ruffle-tests/tests/swfs/", "").replace("/_results", "")
               m = r.get("metadata", {})
-              # Try filtered
               fj = os.path.join(os.path.dirname(rj), "results_filtered.json")
               try:
                   with open(fj) as f:
@@ -194,8 +208,7 @@ jobs:
         with:
           name: ruffle-test-results
           path: |
-            ruffle-tests/tests/swfs/avm1/_results/
-            ruffle-tests/tests/swfs/from_shumway/avm1/_results/
+            ruffle-tests/tests/swfs/**/_results/
             ruffle-tests/results-index.md
           retention-days: 90
           if-no-files-found: ignore
@@ -203,18 +216,19 @@ jobs:
       - name: Commit results to ruffle-test-results branch
         if: always()
         run: |
-          AVM1="${{ env.AVM1_RESULTS }}"
-          SHUMWAY="${{ env.SHUMWAY_RESULTS }}"
-          if [ ! -f "$AVM1/results.json" ] && [ ! -f "$SHUMWAY/results.json" ]; then
+          # Check if any results exist
+          if ! find ruffle-tests/tests/swfs -path '*/_results/results.json' | grep -q .; then
             echo "No results files to commit"
             exit 0
           fi
 
-          # Save results to /tmp
-          mkdir -p /tmp/avm1_results /tmp/shumway_results
-          cp "$AVM1"/*.json "$AVM1"/*.md /tmp/avm1_results/ 2>/dev/null || true
-          cp "$SHUMWAY"/*.json "$SHUMWAY"/*.md /tmp/shumway_results/ 2>/dev/null || true
-          cp ruffle-tests/results-index.md /tmp/ 2>/dev/null || true
+          # Save results to /tmp preserving directory structure
+          find ruffle-tests/tests/swfs -path '*/_results' -type d | while read dir; do
+            tmp_dir="/tmp/results_backup/$dir"
+            mkdir -p "$tmp_dir"
+            cp "$dir"/*.json "$dir"/*.md "$tmp_dir/" 2>/dev/null || true
+          done
+          cp ruffle-tests/results-index.md /tmp/results_backup/ 2>/dev/null || true
 
           git config user.name "github-actions[bot]"
           git config user.email "github-actions[bot]@users.noreply.github.com"
@@ -223,13 +237,14 @@ jobs:
           git checkout -b ruffle-test-results
 
           # Restore results
-          mkdir -p "$AVM1" "$SHUMWAY"
-          cp /tmp/avm1_results/* "$AVM1/" 2>/dev/null || true
-          cp /tmp/shumway_results/* "$SHUMWAY/" 2>/dev/null || true
-          cp /tmp/results-index.md ruffle-tests/ 2>/dev/null || true
+          find /tmp/results_backup/ruffle-tests/tests/swfs -path '*/_results' -type d 2>/dev/null | while read dir; do
+            real_dir="${dir#/tmp/results_backup/}"
+            mkdir -p "$real_dir"
+            cp "$dir"/* "$real_dir/" 2>/dev/null || true
+          done
+          cp /tmp/results_backup/results-index.md ruffle-tests/ 2>/dev/null || true
 
-          git add -f "$AVM1"/*.json "$AVM1"/*.md 2>/dev/null || true
-          git add -f "$SHUMWAY"/*.json "$SHUMWAY"/*.md 2>/dev/null || true
+          find ruffle-tests/tests/swfs -path '*/_results/*.json' -o -path '*/_results/*.md' | xargs git add -f 2>/dev/null || true
           git add -f ruffle-tests/results-index.md 2>/dev/null || true
 
           if git diff --staged --quiet; then
@@ -258,10 +273,12 @@ jobs:
       total: ${{ steps.matrix.outputs.total }}
       run_avm1: ${{ steps.cats.outputs.run_avm1 }}
       run_shumway: ${{ steps.cats.outputs.run_shumway }}
+      run_gnash: ${{ steps.cats.outputs.run_gnash }}
 
     env:
       RUN_AVM1: ${{ inputs.categories == 'all' || inputs.categories == 'avm1' }}
       RUN_SHUMWAY: ${{ inputs.categories == 'all' || inputs.categories == 'from_shumway' }}
+      RUN_GNASH: ${{ inputs.categories == 'all' || inputs.categories == 'from_gnash' }}
 
     steps:
       - name: Determine categories
@@ -269,6 +286,7 @@ jobs:
         run: |
           echo "run_avm1=$RUN_AVM1" >> "$GITHUB_OUTPUT"
           echo "run_shumway=$RUN_SHUMWAY" >> "$GITHUB_OUTPUT"
+          echo "run_gnash=$RUN_GNASH" >> "$GITHUB_OUTPUT"
 
       - name: Generate shard matrix
         id: matrix
@@ -300,12 +318,20 @@ jobs:
           CATS=""
           [ "$RUN_AVM1" = "true" ] && CATS="$CATS avm1"
           [ "$RUN_SHUMWAY" = "true" ] && CATS="$CATS from_shumway"
+          [ "$RUN_GNASH" = "true" ] && CATS="$CATS from_gnash"
           bash ruffle-tests/download_tests.sh $CATS
 
       - name: Run recompiler on test SWFs
         run: |
-          [ "$RUN_AVM1" = "true" ] && python3 ruffle-tests/run_tests.py || true
-          [ "$RUN_SHUMWAY" = "true" ] && python3 ruffle-tests/run_tests.py --tests-dir=ruffle-tests/tests/swfs/from_shumway/avm1 || true
+          DIRS=""
+          [ "$RUN_AVM1" = "true" ] && DIRS="$DIRS $AVM1_DIR"
+          if [ "$RUN_SHUMWAY" = "true" ]; then
+            DIRS="$DIRS $SHUMWAY_AVM1_DIR $SHUMWAY_FLAT_DIR"
+          fi
+          [ "$RUN_GNASH" = "true" ] && DIRS="$DIRS $GNASH_SWFMILL_DIR"
+          for dir in $DIRS; do
+            [ -d "$dir" ] && python3 ruffle-tests/run_tests.py --tests-dir="$dir" || true
+          done
 
       - name: Upload SWFRecomp binary
         uses: actions/upload-artifact@v7
@@ -331,6 +357,7 @@ jobs:
     env:
       RUN_AVM1: ${{ needs.setup-parallel.outputs.run_avm1 }}
       RUN_SHUMWAY: ${{ needs.setup-parallel.outputs.run_shumway }}
+      RUN_GNASH: ${{ needs.setup-parallel.outputs.run_gnash }}
 
     strategy:
       fail-fast: false
@@ -363,26 +390,38 @@ jobs:
           name: setup-tests
           path: ruffle-tests/
 
-      - name: Verify runtime output — avm1 (shard ${{ matrix.shard }}/${{ needs.setup-parallel.outputs.total }})
-        if: env.RUN_AVM1 == 'true'
+      - name: Verify runtime output (shard ${{ matrix.shard }}/${{ needs.setup-parallel.outputs.total }})
         env:
           TZ: NPT-5:45
         run: |
-          ARGS="-v --json=ruffle-tests/results-shard-avm1-${{ matrix.shard }}.json --shard=${{ matrix.shard }}/${{ needs.setup-parallel.outputs.total }}"
+          SHARD="${{ matrix.shard }}/${{ needs.setup-parallel.outputs.total }}"
+          LIMIT_ARGS=""
           if [ "${{ inputs.limit }}" != "0" ] && [ -n "${{ inputs.limit }}" ]; then
-            ARGS="$ARGS --limit=${{ inputs.limit }}"
+            LIMIT_ARGS="--limit=${{ inputs.limit }}"
           fi
-          python3 ruffle-tests/verify_output.py $ARGS
 
-      - name: Verify runtime output — from_shumway (shard ${{ matrix.shard }}/${{ needs.setup-parallel.outputs.total }})
-        if: env.RUN_SHUMWAY == 'true'
-        env:
-          TZ: NPT-5:45
-        run: |
-          ARGS="-v --tests-dir=ruffle-tests/tests/swfs/from_shumway/avm1"
-          ARGS="$ARGS --json=ruffle-tests/results-shard-shumway-${{ matrix.shard }}.json"
-          ARGS="$ARGS --shard=${{ matrix.shard }}/${{ needs.setup-parallel.outputs.total }}"
-          python3 ruffle-tests/verify_output.py $ARGS
+          # Each category gets its own shard results file
+          if [ "$RUN_AVM1" = "true" ]; then
+            python3 ruffle-tests/verify_output.py -v \
+              --json=ruffle-tests/results-shard-avm1-${{ matrix.shard }}.json \
+              --shard="$SHARD" $LIMIT_ARGS || true
+          fi
+          if [ "$RUN_SHUMWAY" = "true" ]; then
+            python3 ruffle-tests/verify_output.py -v \
+              --tests-dir="$SHUMWAY_AVM1_DIR" \
+              --json=ruffle-tests/results-shard-shumway_avm1-${{ matrix.shard }}.json \
+              --shard="$SHARD" || true
+            python3 ruffle-tests/verify_output.py -v \
+              --tests-dir="$SHUMWAY_FLAT_DIR" \
+              --json=ruffle-tests/results-shard-shumway_flat-${{ matrix.shard }}.json \
+              --shard="$SHARD" || true
+          fi
+          if [ "$RUN_GNASH" = "true" ]; then
+            python3 ruffle-tests/verify_output.py -v \
+              --tests-dir="$GNASH_SWFMILL_DIR" \
+              --json=ruffle-tests/results-shard-gnash_swfmill-${{ matrix.shard }}.json \
+              --shard="$SHARD" || true
+          fi
 
       - name: Upload shard results
         if: always()
@@ -399,10 +438,6 @@ jobs:
     needs: [setup-parallel, ruffle-tests-shard]
     runs-on: ubuntu-latest
 
-    env:
-      RUN_AVM1: ${{ needs.setup-parallel.outputs.run_avm1 }}
-      RUN_SHUMWAY: ${{ needs.setup-parallel.outputs.run_shumway }}
-
     steps:
       - name: Checkout repository
         uses: actions/checkout@v5
@@ -412,37 +447,15 @@ jobs:
         with:
           python-version: '3.x'
 
-      - name: Install system dependencies
-        run: sudo apt-get update && sudo apt-get install -y build-essential
-
-      - name: Download SWFRecomp binary
-        uses: actions/download-artifact@v7
-        with:
-          name: setup-binary
-          path: SWFRecomp/build/
-
-      - name: Make SWFRecomp binary executable
-        run: chmod +x SWFRecomp/build/SWFRecomp
-
-      - name: Download recompiled test data
-        uses: actions/download-artifact@v7
-        with:
-          name: setup-tests
-          path: ruffle-tests/
-
       - name: Fetch previous results
         run: |
+          DIRS="$AVM1_DIR $SHUMWAY_AVM1_DIR $SHUMWAY_FLAT_DIR $GNASH_SWFMILL_DIR"
           if git fetch origin ruffle-test-results 2>/dev/null; then
-            if [ "$RUN_AVM1" = "true" ]; then
-              mkdir -p ${{ env.AVM1_RESULTS }}
-              git show origin/ruffle-test-results:${{ env.AVM1_RESULTS }}/results.json \
-                > ${{ env.AVM1_RESULTS }}/results_previous.json 2>/dev/null || true
-            fi
-            if [ "$RUN_SHUMWAY" = "true" ]; then
-              mkdir -p ${{ env.SHUMWAY_RESULTS }}
-              git show origin/ruffle-test-results:${{ env.SHUMWAY_RESULTS }}/results.json \
-                > ${{ env.SHUMWAY_RESULTS }}/results_previous.json 2>/dev/null || true
-            fi
+            for dir in $DIRS; do
+              mkdir -p "$dir/_results"
+              git show "origin/ruffle-test-results:$dir/_results/results.json" \
+                > "$dir/_results/results_previous.json" 2>/dev/null || true
+            done
           fi
 
       - name: Download all shard artifacts
@@ -457,21 +470,22 @@ jobs:
           import json, glob, os
           from datetime import datetime, timezone
 
-          # Map of category tag -> (shard glob pattern, output dir)
+          # Map of shard tag -> output results dir
           categories = {
-              "avm1": ("artifacts/results-shard-*/results-shard-avm1-*.json",
-                       "ruffle-tests/tests/swfs/avm1/_results"),
-              "shumway": ("artifacts/results-shard-*/results-shard-shumway-*.json",
-                          "ruffle-tests/tests/swfs/from_shumway/avm1/_results"),
+              "avm1": "ruffle-tests/tests/swfs/avm1/_results",
+              "shumway_avm1": "ruffle-tests/tests/swfs/from_shumway/avm1/_results",
+              "shumway_flat": "ruffle-tests/tests/swfs/from_shumway/_results",
+              "gnash_swfmill": "ruffle-tests/tests/swfs/from_gnash/misc-swfmill.all/_results",
           }
 
-          for cat, (pattern, out_dir) in categories.items():
+          for tag, out_dir in categories.items():
+              pattern = f"artifacts/results-shard-*/results-shard-{tag}-*.json"
               files = sorted(glob.glob(pattern))
               if not files:
-                  print(f"{cat}: no shard files found, skipping")
+                  print(f"{tag}: no shard files found, skipping")
                   continue
 
-              print(f"{cat}: combining {len(files)} shard files")
+              print(f"{tag}: combining {len(files)} shard files")
 
               combined_tests = []
               total_duration = 0
@@ -520,18 +534,17 @@ jobs:
       - name: Generate filtered results
         if: always()
         run: |
-          for dir in ${{ env.AVM1_RESULTS }} ${{ env.SHUMWAY_RESULTS }}; do
-            if [ -f "$dir/results.json" ]; then
-              python3 ruffle-tests/filter_results.py "$dir/results.json"
-            fi
+          find ruffle-tests/tests/swfs -path '*/_results/results.json' | while read f; do
+            python3 ruffle-tests/filter_results.py "$f"
           done
 
       - name: Generate diff report
         if: always()
         run: |
-          for dir in ${{ env.AVM1_RESULTS }} ${{ env.SHUMWAY_RESULTS }}; do
-            if [ -f "$dir/results.json" ] && [ -f "$dir/results_previous.json" ]; then
-              python3 scripts/diff_ruffle_results.py "$dir/results_previous.json" "$dir/results.json" \
+          find ruffle-tests/tests/swfs -path '*/_results/results.json' | while read f; do
+            dir=$(dirname "$f")
+            if [ -f "$dir/results_previous.json" ]; then
+              python3 scripts/diff_ruffle_results.py "$dir/results_previous.json" "$f" \
                 --json="$dir/results_diff.json" --markdown="$dir/results_diff.md"
             fi
           done
@@ -579,8 +592,7 @@ jobs:
         with:
           name: ruffle-test-results
           path: |
-            ruffle-tests/tests/swfs/avm1/_results/
-            ruffle-tests/tests/swfs/from_shumway/avm1/_results/
+            ruffle-tests/tests/swfs/**/_results/
             ruffle-tests/results-index.md
           retention-days: 90
           if-no-files-found: ignore
@@ -588,18 +600,19 @@ jobs:
       - name: Commit results to ruffle-test-results branch
         if: always()
         run: |
-          AVM1="${{ env.AVM1_RESULTS }}"
-          SHUMWAY="${{ env.SHUMWAY_RESULTS }}"
-          if [ ! -f "$AVM1/results.json" ] && [ ! -f "$SHUMWAY/results.json" ]; then
+          # Check if any results exist
+          if ! find ruffle-tests/tests/swfs -path '*/_results/results.json' | grep -q .; then
             echo "No results files to commit"
             exit 0
           fi
 
-          # Save results to /tmp
-          mkdir -p /tmp/avm1_results /tmp/shumway_results
-          cp "$AVM1"/*.json "$AVM1"/*.md /tmp/avm1_results/ 2>/dev/null || true
-          cp "$SHUMWAY"/*.json "$SHUMWAY"/*.md /tmp/shumway_results/ 2>/dev/null || true
-          cp ruffle-tests/results-index.md /tmp/ 2>/dev/null || true
+          # Save results to /tmp preserving directory structure
+          find ruffle-tests/tests/swfs -path '*/_results' -type d | while read dir; do
+            tmp_dir="/tmp/results_backup/$dir"
+            mkdir -p "$tmp_dir"
+            cp "$dir"/*.json "$dir"/*.md "$tmp_dir/" 2>/dev/null || true
+          done
+          cp ruffle-tests/results-index.md /tmp/results_backup/ 2>/dev/null || true
 
           git config user.name "github-actions[bot]"
           git config user.email "github-actions[bot]@users.noreply.github.com"
@@ -608,13 +621,14 @@ jobs:
           git checkout -b ruffle-test-results
 
           # Restore results
-          mkdir -p "$AVM1" "$SHUMWAY"
-          cp /tmp/avm1_results/* "$AVM1/" 2>/dev/null || true
-          cp /tmp/shumway_results/* "$SHUMWAY/" 2>/dev/null || true
-          cp /tmp/results-index.md ruffle-tests/ 2>/dev/null || true
+          find /tmp/results_backup/ruffle-tests/tests/swfs -path '*/_results' -type d 2>/dev/null | while read dir; do
+            real_dir="${dir#/tmp/results_backup/}"
+            mkdir -p "$real_dir"
+            cp "$dir"/* "$real_dir/" 2>/dev/null || true
+          done
+          cp /tmp/results_backup/results-index.md ruffle-tests/ 2>/dev/null || true
 
-          git add -f "$AVM1"/*.json "$AVM1"/*.md 2>/dev/null || true
-          git add -f "$SHUMWAY"/*.json "$SHUMWAY"/*.md 2>/dev/null || true
+          find ruffle-tests/tests/swfs -path '*/_results/*.json' -o -path '*/_results/*.md' | xargs git add -f 2>/dev/null || true
           git add -f ruffle-tests/results-index.md 2>/dev/null || true
 
           if git diff --staged --quiet; then

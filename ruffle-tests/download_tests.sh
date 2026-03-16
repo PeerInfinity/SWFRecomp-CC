@@ -39,7 +39,10 @@ CATEGORY_LOCAL_PATH[avm1]="${SCRIPT_DIR}/tests/swfs/avm1"
 CATEGORY_REPO_PATH[from_shumway]="tests/tests/swfs/from_shumway"
 CATEGORY_LOCAL_PATH[from_shumway]="${SCRIPT_DIR}/tests/swfs/from_shumway"
 
-ALL_CATEGORIES=(avm1 from_shumway)
+CATEGORY_REPO_PATH[from_gnash]="tests/tests/swfs/from_gnash"
+CATEGORY_LOCAL_PATH[from_gnash]="${SCRIPT_DIR}/tests/swfs/from_gnash"
+
+ALL_CATEGORIES=(avm1 from_shumway from_gnash)
 
 # Parse arguments
 CLEAN=false
