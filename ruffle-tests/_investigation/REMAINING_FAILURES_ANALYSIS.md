@@ -3,7 +3,7 @@
 Date: 2026-03-15 (evening)
 CI run: de8b5c0b (559/619 total, 549/563 filtered = 97.5%)
 
-14 filtered tests still failing. This document analyzes each one with local test output, root cause, and fix feasibility.
+13 filtered tests still failing. This document analyzes each one with local test output, root cause, and fix feasibility.
 
 ## Recently Fixed (this session)
 
@@ -16,12 +16,13 @@ CI run: de8b5c0b (559/619 total, 549/563 filtered = 97.5%)
 | issue_2084 | 4/16 | PASS | Nested attachMovie + registerClass ordering |
 | coerce_to_object_monkeypatch | 71/129 | PASS | Primitive auto-boxing, addProperty getter, this fallback |
 | clone_sprite_edittext_dynamic | 78/86 | PASS | TF clone property copy, rotated bounding box |
+| bitmap_data_draw_cliprect | 9/13 | PASS | Implement `BitmapData.draw()` with matrix + clipRect |
+| bitmap_data_copypixels | 15/17 | PASS | Alpha compositing in `copyPixels` mergeAlpha=true |
 
 ## Summary Table — Remaining Failures
 
 | Test | Match | Total | Rate | Difficulty | Category |
 |------|-------|-------|------|------------|----------|
-| bitmap_data_draw_cliprect | 1 | 3 | 33% | Medium | BitmapData.draw clipRect pixel values |
 | movieclip_hittest_shapeflag | ~312 | 339 | 92% | Hard | shape hit accuracy |
 | edittext_drag_select | 6 | 9 | 67% | Not feasible | character-level selection (NO_GRAPHICS) |
 | asfunction | 2 | 12 | 17% | Not feasible | character-level text link hit-testing |
@@ -35,11 +36,7 @@ CI run: de8b5c0b (559/619 total, 549/563 filtered = 97.5%)
 | movieclip_methods_with_loaded_image | 0 | 4 | 0% | Not feasible | external PNG loading |
 | sandbox_type_remote | 0 | 3 | 0% | Not feasible | multi-SWF sandbox |
 
-## Tier 1: Potentially Actionable (2 tests)
-
-### bitmap_data_draw_cliprect (1/3)
-
-New failure (not in original analysis). `BitmapData.draw()` with clipRect returns wrong pixel values: `-ffff01` instead of `-10000`. Likely a color format or clipping issue in the BitmapData draw implementation.
+## Tier 1: Potentially Actionable (1 test)
 
 ### movieclip_hittest_shapeflag (~312/339 = 92%)
 
@@ -103,7 +100,6 @@ Detailed planning docs for completed fixes are in `_investigation/complete/`:
 
 ## Recommended Priority Order
 
-1. **bitmap_data_draw_cliprect** — 2 wrong pixel values, likely a targeted BitmapData.draw fix
-2. **movieclip_hittest_shapeflag** — incremental shape geometry improvements
+1. **movieclip_hittest_shapeflag** — incremental shape geometry improvements
 
 Remaining 12 tests are blocked by missing infrastructure (IME, IPC, XML loading, multi-SWF) or NO_GRAPHICS limitations (character-level text layout), or have diminishing returns (global stubs) at 97.5% filtered pass rate.

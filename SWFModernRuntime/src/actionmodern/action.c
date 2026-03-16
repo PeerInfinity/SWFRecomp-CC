@@ -8368,7 +8368,27 @@ static ActionVar bitmapDataCopyPixels(SWFAppContext* app_context, ActionVar* arg
             if (dst_x < 0 || dst_x >= dest_bmp->width || dst_y < 0 || dst_y >= dest_bmp->height) continue;
             uint32_t src_px = src_bmp->pixels[src_y * src_bmp->width + src_x];
             if (!dest_bmp->transparent) src_px = src_px | 0xFF000000;
-            dest_bmp->pixels[dst_y * dest_bmp->width + dst_x] = src_px;
+            if (mergeAlpha && dest_bmp->transparent) {
+                // Source-over compositing in premultiplied alpha space
+                uint32_t dst_px = dest_bmp->pixels[dst_y * dest_bmp->width + dst_x];
+                uint32_t sa = (src_px >> 24) & 0xFF;
+                uint32_t inv_sa = 255 - sa;
+                uint32_t da = (dst_px >> 24) & 0xFF;
+                uint32_t dr = (dst_px >> 16) & 0xFF;
+                uint32_t dg = (dst_px >> 8) & 0xFF;
+                uint32_t db = dst_px & 0xFF;
+                uint32_t oa = sa + da * inv_sa / 255;
+                uint32_t or_ = ((src_px >> 16) & 0xFF) + dr * inv_sa / 255;
+                uint32_t og = ((src_px >> 8) & 0xFF) + dg * inv_sa / 255;
+                uint32_t ob = (src_px & 0xFF) + db * inv_sa / 255;
+                if (oa > 255) oa = 255;
+                if (or_ > 255) or_ = 255;
+                if (og > 255) og = 255;
+                if (ob > 255) ob = 255;
+                dest_bmp->pixels[dst_y * dest_bmp->width + dst_x] = (oa << 24) | (or_ << 16) | (og << 8) | ob;
+            } else {
+                dest_bmp->pixels[dst_y * dest_bmp->width + dst_x] = src_px;
+            }
         }
     }
     return r;
@@ -8684,14 +8704,79 @@ static ActionVar bitmapDataApplyFilter(SWFAppContext* app_context, ActionVar* ar
     return r;
 }
 
-// Draw stub
+// Draw: BitmapData.draw(source, matrix, colorTransform, blendMode, clipRect, smooth)
 static ActionVar bitmapDataDraw(SWFAppContext* app_context, ActionVar* args, u32 arg_count, ActionVar* registers, void* this_obj)
 {
     (void)registers;
     ASObject* obj = (ASObject*) this_obj;
-    BitmapDataNative* bmp = getBitmapNative(obj);
+    BitmapDataNative* dest_bmp = getBitmapNative(obj);
     ActionVar r = {0}; r.type = ACTION_STACK_VALUE_UNDEFINED;
-    if (!bmp || bmp->disposed) { r = makeF64(-1); return r; }
+    if (!dest_bmp || dest_bmp->disposed) { r = makeF64(-1); return r; }
+    if (arg_count < 1) return r;
+    // Source must be a BitmapData object (MovieClip drawing not supported in NO_GRAPHICS)
+    if (args[0].type != ACTION_STACK_VALUE_OBJECT) return r;
+    ASObject* src_obj = (ASObject*) args[0].data.numeric_value;
+    BitmapDataNative* src_bmp = getBitmapNative(src_obj);
+    if (!src_bmp || src_bmp->disposed) return r;
+
+    // Extract matrix (arg1) — defaults to identity
+    double ma = 1, mb = 0, mc = 0, md = 1, mtx = 0, mty = 0;
+    if (arg_count >= 2 && args[1].type == ACTION_STACK_VALUE_OBJECT && args[1].data.numeric_value != 0) {
+        ASObject* mat = (ASObject*) args[1].data.numeric_value;
+        ActionVar* av;
+        av = getProperty(mat, "a", 1);  if (av) ma  = varToDoubleSimple(av);
+        av = getProperty(mat, "b", 1);  if (av) mb  = varToDoubleSimple(av);
+        av = getProperty(mat, "c", 1);  if (av) mc  = varToDoubleSimple(av);
+        av = getProperty(mat, "d", 1);  if (av) md  = varToDoubleSimple(av);
+        av = getProperty(mat, "tx", 2); if (av) mtx = varToDoubleSimple(av);
+        av = getProperty(mat, "ty", 2); if (av) mty = varToDoubleSimple(av);
+    }
+
+    // Compute inverse matrix for dest→source mapping
+    // Forward: dest_x = ma*sx + mc*sy + mtx, dest_y = mb*sx + md*sy + mty
+    double det = ma * md - mb * mc;
+    if (det == 0.0) return r; // Singular matrix
+    double inv_det = 1.0 / det;
+    double ia =  md * inv_det, ib = -mb * inv_det;
+    double ic = -mc * inv_det, id =  ma * inv_det;
+    double itx = -(ia * mtx + ic * mty);
+    double ity = -(ib * mtx + id * mty);
+
+    // Determine destination region to iterate
+    int dx0 = 0, dy0 = 0, dx1 = dest_bmp->width, dy1 = dest_bmp->height;
+
+    // Apply clipRect (arg4) if provided
+    if (arg_count >= 5 && args[4].type == ACTION_STACK_VALUE_OBJECT && args[4].data.numeric_value != 0) {
+        ASObject* clip = (ASObject*) args[4].data.numeric_value;
+        ActionVar* cx = getProperty(clip, "x", 1);
+        ActionVar* cy = getProperty(clip, "y", 1);
+        ActionVar* cw = getProperty(clip, "width", 5);
+        ActionVar* ch = getProperty(clip, "height", 6);
+        int cx0 = cx ? (int)varToDoubleSimple(cx) : 0;
+        int cy0 = cy ? (int)varToDoubleSimple(cy) : 0;
+        int cw0 = cw ? (int)varToDoubleSimple(cw) : 0;
+        int ch0 = ch ? (int)varToDoubleSimple(ch) : 0;
+        // Intersect clipRect with dest bounds
+        if (cx0 > dx0) dx0 = cx0;
+        if (cy0 > dy0) dy0 = cy0;
+        if (cx0 + cw0 < dx1) dx1 = cx0 + cw0;
+        if (cy0 + ch0 < dy1) dy1 = cy0 + ch0;
+    }
+
+    // Iterate destination pixels and sample from source via inverse matrix
+    for (int dy = dy0; dy < dy1; dy++) {
+        for (int dx = dx0; dx < dx1; dx++) {
+            // Map dest coord to source coord
+            double sx_f = ia * (double)dx + ic * (double)dy + itx;
+            double sy_f = ib * (double)dx + id * (double)dy + ity;
+            int sx = (int)floor(sx_f);
+            int sy = (int)floor(sy_f);
+            if (sx < 0 || sx >= src_bmp->width || sy < 0 || sy >= src_bmp->height) continue;
+            uint32_t src_px = src_bmp->pixels[sy * src_bmp->width + sx];
+            if (!dest_bmp->transparent) src_px = src_px | 0xFF000000;
+            dest_bmp->pixels[dy * dest_bmp->width + dx] = src_px;
+        }
+    }
     return r;
 }
 

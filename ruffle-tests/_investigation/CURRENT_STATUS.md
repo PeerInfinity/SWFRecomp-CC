@@ -17,6 +17,9 @@ Last updated: 2026-03-15 (evening)
   - coerce_to_object_monkeypatch PASS ✅ (primitive auto-boxing, addProperty getter lookup, this fallback to _global)
   - clone_sprite_edittext_dynamic PASS ✅ (TF clone property copy, rotated bounding box)
   - movieclip_hittest_shapeflag improved (rotated AABB, text bounds)
+  - bitmap_data_draw_cliprect PASS ✅ (implement BitmapData.draw() with inverse matrix transform + clipRect)
+  - bitmap_data_copypixels PASS ✅ (alpha compositing in copyPixels mergeAlpha=true)
+  - Cleaned up ignored_tests.txt: removed 11 tests that now pass (7 bitmap + array_sort, form_loader_encoding_1, native_subclasses, xml_attributes_read)
 
 ## Crashes and Errors (8 tests)
 
