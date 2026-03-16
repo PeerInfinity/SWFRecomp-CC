@@ -18,7 +18,7 @@
 set -euo pipefail
 
 REPO_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/../.." && pwd)"
-INCOMPLETE_DIR="$REPO_ROOT/ruffle-tests/_investigation/incomplete"
+INCOMPLETE_DIR="$REPO_ROOT/ruffle-tests/tests/swfs/avm1/_investigation/incomplete"
 WORKTREE_PARENT="$(dirname "$REPO_ROOT")"
 
 if [[ $# -lt 1 ]]; then
@@ -112,10 +112,10 @@ setup_worktree() {
     local prompt_file="$worktree_dir/PROMPT.txt"
     cat > "$prompt_file" <<EOF
 Please read these files:
-- ruffle-tests/_investigation/ENVIRONMENT_SETUP.md
-- ruffle-tests/_investigation/SESSION_START_GUIDE.md
-- ruffle-tests/_investigation/CURRENT_STATUS.md
-- ruffle-tests/_investigation/incomplete/${filename}
+- ruffle-tests/tests/swfs/avm1/_investigation/ENVIRONMENT_SETUP.md
+- ruffle-tests/tests/swfs/avm1/_investigation/SESSION_START_GUIDE.md
+- ruffle-tests/tests/swfs/avm1/_investigation/CURRENT_STATUS.md
+- ruffle-tests/tests/swfs/avm1/_investigation/incomplete/${filename}
 
 Then follow these steps in order:
 
@@ -127,7 +127,7 @@ Then follow these steps in order:
 
 4. **Implement:** Work through the remaining items one at a time. After each change, run the affected tests to verify progress. Commit working changes.
 
-5. **Stop when:** the plan is fully passing, or you hit a blocker — in which case document the blocker in the plan file before stopping. If there are remaining failures, and the plan to fix them is blocked, then move the document to ruffle-tests/_investigation/blocked/  If the plan is complete and all the tests pass, then move the document to ruffle-tests/_investigation/complete/
+5. **Stop when:** the plan is fully passing, or you hit a blocker — in which case document the blocker in the plan file before stopping. If there are remaining failures, and the plan to fix them is blocked, then move the document to ruffle-tests/tests/swfs/avm1/_investigation/blocked/  If the plan is complete and all the tests pass, then move the document to ruffle-tests/tests/swfs/avm1/_investigation/complete/
 
 EOF
 

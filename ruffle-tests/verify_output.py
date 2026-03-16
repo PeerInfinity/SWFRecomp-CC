@@ -370,6 +370,7 @@ def preprocess_input_json(src, dst, scale_factor=1.0):
 
 SCRIPT_DIR = Path(__file__).parent
 PROJECT_ROOT = SCRIPT_DIR.parent
+TESTS_DIR = SCRIPT_DIR / "tests" / "swfs" / "avm1"
 RECOMP_BIN = PROJECT_ROOT / "SWFRecomp" / "build" / "SWFRecomp"
 RECOMP_CONFIG = SCRIPT_DIR / "_shared" / "config.toml"
 SWFMODERN = PROJECT_ROOT / "SWFModernRuntime"
@@ -386,7 +387,7 @@ RESULTS_PREVIOUS = SCRIPT_DIR / "results_previous.json"
 RESULTS_CURRENT = SCRIPT_DIR / "results_current.json"
 RESULTS_HEADLESS = SCRIPT_DIR / "results_headless.json"
 
-SKIP = {"_shared", "__framework__", "_investigation"}
+SKIP = {"__framework__"}
 
 # Lines to filter from runtime output
 BOILERPLATE_PATTERNS = [
@@ -1550,7 +1551,7 @@ def main():
     if args.test:
         import fnmatch
         all_dirs = sorted(
-            d.name for d in SCRIPT_DIR.iterdir()
+            d.name for d in TESTS_DIR.iterdir()
             if d.is_dir() and d.name not in SKIP
             and (d / "test.swf").exists() and (d / "output.txt").exists()
         )
@@ -1562,7 +1563,7 @@ def main():
                     print(f"Warning: no tests match pattern '{t}'")
                 tests.extend(matched)
             else:
-                test_dir = SCRIPT_DIR / t
+                test_dir = TESTS_DIR / t
                 if not test_dir.is_dir():
                     print(f"Error: test directory not found: {test_dir}")
                     sys.exit(1)
@@ -1571,7 +1572,7 @@ def main():
     else:
         tests = sorted(
             d.name
-            for d in SCRIPT_DIR.iterdir()
+            for d in TESTS_DIR.iterdir()
             if d.is_dir()
             and d.name not in SKIP
             and (d / "test.swf").exists()
@@ -1622,7 +1623,7 @@ def main():
         run_diff_comparison(RESULTS_CURRENT, partial=True)
 
     for i, name in enumerate(tests):
-        test_dir = SCRIPT_DIR / name
+        test_dir = TESTS_DIR / name
         epsilon = get_epsilon(test_dir)
         if args.verbose:
             print(f"[{i+1}/{len(tests)}] {name}...", end=" ", flush=True)

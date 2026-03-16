@@ -25,7 +25,7 @@ Sub-categories:
 - **TextSnapshot**: 4 failing -- TextSnapshot class not implemented
 - **Layout/Formatting**: 3 failing -- Autosize, scroll, width/height, font metrics, etc.
 
-Investigation docs: [TEXTSNAPSHOT_PLAN.md](ruffle-tests/_investigation/complete/TEXTSNAPSHOT_PLAN.md)
+Investigation docs: [TEXTSNAPSHOT_PLAN.md](ruffle-tests/tests/swfs/avm1/_investigation/complete/TEXTSNAPSHOT_PLAN.md)
 
 ---
 
@@ -54,7 +54,7 @@ Description: Two sub-features: (1) String methods: String.prototype methods like
 Sub-categories:
 - **String paths**: 2 failing -- Path-based variable resolution using slash syntax
 
-Investigation docs: [STRING_PLAN.md](ruffle-tests/_investigation/complete/STRING_PLAN.md)
+Investigation docs: [STRING_PLAN.md](ruffle-tests/tests/swfs/avm1/_investigation/complete/STRING_PLAN.md)
 
 ---
 
@@ -64,7 +64,7 @@ Failing tests: global_instance_decls, global_proto_decls, global_proto_decls_del
 
 Description: Tests that enumerate all global variables and check which built-in classes/functions exist per SWF version. Many failures are because built-in classes (XML, Date, Color, Sound, etc.) are not registered as globals. Fixing these tests requires implementing all the other missing features AND registering their constructors on _global.
 
-Investigation docs: [GEOMETRY_CLASSES_PLAN.md](ruffle-tests/_investigation/complete/GEOMETRY_CLASSES_PLAN.md)
+Investigation docs: [GEOMETRY_CLASSES_PLAN.md](ruffle-tests/tests/swfs/avm1/_investigation/complete/GEOMETRY_CLASSES_PLAN.md)
 
 ---
 
@@ -82,7 +82,7 @@ Failing tests: unload_nested_child
 
 Description: Needs proper unload behavior. When a movie clip is unloaded: onUnload event fires, clip becomes inaccessible by name but retains its depth slot, nested children are recursively unloaded.
 
-Investigation docs: [UNLOAD_PLAN.md](ruffle-tests/_investigation/complete/UNLOAD_PLAN.md)
+Investigation docs: [UNLOAD_PLAN.md](ruffle-tests/tests/swfs/avm1/_investigation/complete/UNLOAD_PLAN.md)
 
 ---
 
@@ -100,7 +100,7 @@ Failing tests: watch_virtual_property
 
 Description: Needs Object.prototype.watch() and Object.prototype.unwatch() methods. watch() registers a callback that's invoked when a property is set.
 
-Investigation docs: [OBJECT_WATCH_PLAN.md](ruffle-tests/_investigation/complete/OBJECT_WATCH_PLAN.md)
+Investigation docs: [OBJECT_WATCH_PLAN.md](ruffle-tests/tests/swfs/avm1/_investigation/complete/OBJECT_WATCH_PLAN.md)
 
 ---
 
@@ -110,7 +110,7 @@ Failing tests: timer_run_actions
 
 Description: Needs setInterval()/clearInterval() and setTimeout()/clearTimeout() implementation. Requires a timer scheduling system in the runtime.
 
-Investigation docs: [TIMER_PLAN.md](ruffle-tests/_investigation/complete/TIMER_PLAN.md)
+Investigation docs: [TIMER_PLAN.md](ruffle-tests/tests/swfs/avm1/_investigation/complete/TIMER_PLAN.md)
 
 ---
 
@@ -128,7 +128,7 @@ Failing tests: clip_event_propagation_order
 
 Description: Needs proper MovieClip event dispatching: onLoad, onUnload, onEnterFrame, onClipEvent(initialize), onClipEvent(construct), and correct propagation order.
 
-Investigation docs: [UNLOAD_PLAN.md](ruffle-tests/_investigation/complete/UNLOAD_PLAN.md)
+Investigation docs: [UNLOAD_PLAN.md](ruffle-tests/tests/swfs/avm1/_investigation/complete/UNLOAD_PLAN.md)
 
 ---
 
@@ -146,7 +146,7 @@ Failing tests: selection_handlers
 
 Description: Needs Selection object with methods: getBeginIndex(), getEndIndex(), getCaretIndex(), getFocus(), setFocus(), setSelection().
 
-Investigation docs: [SELECTION_PLAN.md](ruffle-tests/_investigation/complete/SELECTION_PLAN.md)
+Investigation docs: [SELECTION_PLAN.md](ruffle-tests/tests/swfs/avm1/_investigation/complete/SELECTION_PLAN.md)
 
 ---
 
@@ -156,7 +156,7 @@ Failing tests: removed_target_clip_scope
 
 Description: Tests for removeMovieClip behavior, script halting when base clip is removed, scope resolution after clip removal, and depth management during timeline rewind.
 
-Investigation docs: [CALL_SEMANTICS_PLAN.md](ruffle-tests/_investigation/complete/CALL_SEMANTICS_PLAN.md)
+Investigation docs: [CALL_SEMANTICS_PLAN.md](ruffle-tests/tests/swfs/avm1/_investigation/complete/CALL_SEMANTICS_PLAN.md)
 
 ---
 
@@ -182,7 +182,7 @@ Failing tests: asfunction
 
 Description: AsBroadcaster (addListener/removeListener/broadcastMessage), asfunction HTML link protocol, ASnative/ASnew for native function access, arguments object, instanceof coercions, and miscellaneous built-in behaviors.
 
-Investigation docs: [FUNCTION_EDGE_CASES_PLAN.md](ruffle-tests/_investigation/complete/FUNCTION_EDGE_CASES_PLAN.md)
+Investigation docs: [FUNCTION_EDGE_CASES_PLAN.md](ruffle-tests/tests/swfs/avm1/_investigation/complete/FUNCTION_EDGE_CASES_PLAN.md)
 
 ---
 

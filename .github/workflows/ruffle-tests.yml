@@ -62,8 +62,7 @@ jobs:
 
       - name: Download Ruffle test SWFs
         run: |
-          cd ruffle-tests
-          bash download_tests.sh
+          bash ruffle-tests/download_tests.sh
 
       - name: Run recompiler on test SWFs
         run: python3 ruffle-tests/run_tests.py
@@ -241,8 +240,7 @@ jobs:
 
       - name: Download Ruffle test SWFs
         run: |
-          cd ruffle-tests
-          bash download_tests.sh
+          bash ruffle-tests/download_tests.sh
 
       - name: Run recompiler on test SWFs
         run: python3 ruffle-tests/run_tests.py

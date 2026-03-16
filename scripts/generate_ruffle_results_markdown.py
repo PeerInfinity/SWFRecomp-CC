@@ -23,7 +23,7 @@ from pathlib import Path
 
 BASE_DIR = Path(__file__).parent.parent
 RUFFLE_DIR = BASE_DIR / "ruffle-tests"
-INVESTIGATION_DIR = RUFFLE_DIR / "_investigation"
+INVESTIGATION_DIR = RUFFLE_DIR / "tests" / "swfs" / "avm1" / "_investigation"
 
 EXCLUDED_DOCS = {
     "CURRENT_STATUS.md",
@@ -61,25 +61,25 @@ def build_investigation_index() -> tuple[dict[str, list[tuple[int, str]]], list[
     for p in INVESTIGATION_DIR.glob("*.md"):
         if p.name in EXCLUDED_DOCS:
             continue
-        rel = f"ruffle-tests/_investigation/{p.name}"
+        rel = f"ruffle-tests/tests/swfs/avm1/_investigation/{p.name}"
         candidates.append((p.name, rel, p))
 
     complete_dir = INVESTIGATION_DIR / "complete"
     if complete_dir.is_dir():
         for p in complete_dir.glob("*.md"):
-            rel = f"ruffle-tests/_investigation/complete/{p.name}"
+            rel = f"ruffle-tests/tests/swfs/avm1/_investigation/complete/{p.name}"
             candidates.append((p.name, rel, p))
 
     incomplete_dir = INVESTIGATION_DIR / "incomplete"
     if incomplete_dir.is_dir():
         for p in incomplete_dir.glob("*.md"):
-            rel = f"ruffle-tests/_investigation/incomplete/{p.name}"
+            rel = f"ruffle-tests/tests/swfs/avm1/_investigation/incomplete/{p.name}"
             candidates.append((p.name, rel, p))
 
     blocked_dir = INVESTIGATION_DIR / "blocked"
     if blocked_dir.is_dir():
         for p in blocked_dir.glob("*.md"):
-            rel = f"ruffle-tests/_investigation/blocked/{p.name}"
+            rel = f"ruffle-tests/tests/swfs/avm1/_investigation/blocked/{p.name}"
             candidates.append((p.name, rel, p))
 
     # Sort alphabetically by display name (case-insensitive)

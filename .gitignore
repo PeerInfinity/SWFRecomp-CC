@@ -77,10 +77,15 @@ upstream/
 # Upstream reference files for merge comparison
 upstream-reference/
 
-# Ruffle tests: ignore test subdirectories (downloaded data), keep top-level files
-ruffle-tests/*/
-!ruffle-tests/_shared/
-!ruffle-tests/_investigation/
+# Ruffle tests: ignore downloaded test data, keep infrastructure
+ruffle-tests/tests/swfs/avm1/*/
+!ruffle-tests/tests/swfs/avm1/_investigation/
+!ruffle-tests/tests/swfs/avm1/external_interface/
+# Ignore downloaded files within external_interface (only track test.toml + test_harness.c)
+ruffle-tests/tests/swfs/avm1/external_interface/output.txt
+ruffle-tests/tests/swfs/avm1/external_interface/*.fla
+ruffle-tests/tests/swfs/avm1/external_interface/RecompiledScripts/
+ruffle-tests/tests/swfs/avm1/external_interface/RecompiledTags/
 
 ruffle-tests/results_current.json
 ruffle-tests/results_previous.json

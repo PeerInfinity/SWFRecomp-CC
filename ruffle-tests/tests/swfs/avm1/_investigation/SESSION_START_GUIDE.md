@@ -5,7 +5,7 @@ For current test results, regressions, and recommended work order, see `CURRENT_
 
 ## How to Check Current Status
 
-1. Read `ruffle-tests/_investigation/CURRENT_STATUS.md` — curated analysis of results, regressions, and priorities
+1. Read `ruffle-tests/tests/swfs/avm1/_investigation/CURRENT_STATUS.md` — curated analysis of results, regressions, and priorities
 2. Read `ruffle-tests/results.json` — full test results with per-test data
 3. Read `ruffle-results-diff.md` — what changed in the last run
 4. Read `ruffle-results-filtered.md` — comprehensive report (filtered = ignoring interactive/network/audio tests)
@@ -15,8 +15,8 @@ For current test results, regressions, and recommended work order, see `CURRENT_
 
 | Document | Purpose |
 |----------|---------|
-| `ruffle-tests/_investigation/ACCEPTED_DIFFS.md` | Tests with permanently unfixable diffs, categorised by root cause (Flash UB, platform UB, Ruffle test bugs). Check here before spending time on a diff that can never be fixed. |
-| `ruffle-tests/_investigation/RUFFLE_VS_FLASH_DIFFERENCES.md` | Tests where Ruffle's expected output disagrees with Flash Player's spec. We follow Flash. |
+| `ruffle-tests/tests/swfs/avm1/_investigation/ACCEPTED_DIFFS.md` | Tests with permanently unfixable diffs, categorised by root cause (Flash UB, platform UB, Ruffle test bugs). Check here before spending time on a diff that can never be fixed. |
+| `ruffle-tests/tests/swfs/avm1/_investigation/RUFFLE_VS_FLASH_DIFFERENCES.md` | Tests where Ruffle's expected output disagrees with Flash Player's spec. We follow Flash. |
 | `ruffle-tests/ignored_tests.txt` | ~56 tests excluded from filtered results. Sections: interactive input, networking, audio/video, ExternalInterface, bitmaps, Ruffle-vs-Flash spec divergences, permanently accepted diffs. |
 
 ## How to Run Tests
@@ -108,14 +108,14 @@ If running locally, the Ruffle source repository is available at `~/CC/ruffle`. 
 
 ### Test data location
 
-Each test lives in: `ruffle-tests/{test_name}/`
+Each test lives in: `ruffle-tests/tests/swfs/avm1/{test_name}/`
 - `test.swf` — the SWF file
 - `output.txt` — expected trace output
 - `test.toml` — metadata (num_frames, etc.)
 - `RecompiledScripts/` — generated C code (created by verify_output.py or run_tests.py)
 - `RecompiledTags/` — generated tag code (created by verify_output.py or run_tests.py)
 
-Example: `ruffle-tests/clip_constructors/output.txt`, `ruffle-tests/clip_constructors/RecompiledScripts/script_0.c`
+Example: `ruffle-tests/tests/swfs/avm1/clip_constructors/output.txt`, `ruffle-tests/tests/swfs/avm1/clip_constructors/RecompiledScripts/script_0.c`
 
 ### Running CI
 

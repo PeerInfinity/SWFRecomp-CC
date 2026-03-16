@@ -36,8 +36,8 @@ def extract_cstring(filepath, var_name):
 
 def main():
     base = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
-    output_file = os.path.join(base, 'ruffle-tests/string_methods/output.txt')
-    defs_file = os.path.join(base, 'ruffle-tests/string_methods/RecompiledScripts/script_defs.c')
+    output_file = os.path.join(base, 'ruffle-tests/tests/swfs/avm1/string_methods/output.txt')
+    defs_file = os.path.join(base, 'ruffle-tests/tests/swfs/avm1/string_methods/RecompiledScripts/script_defs.c')
 
     # Read input strings from script_defs.c
     upper_input = extract_cstring(defs_file, 'str_166')

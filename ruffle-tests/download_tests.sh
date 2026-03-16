@@ -14,6 +14,8 @@
 set -euo pipefail
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+# Tests are installed into the same subpath as in the Ruffle repo
+TESTS_DIR="${SCRIPT_DIR}/tests/swfs/avm1"
 REPO_URL="https://github.com/ruffle-rs/ruffle.git"
 BRANCH="master"
 # AVM1 test directories live under this path in the Ruffle repo
@@ -57,17 +59,18 @@ echo "Found ${NUM_TESTS} test directories."
 
 if ${CLEAN}; then
     echo "Cleaning existing test directories..."
-    # Remove all directories except _shared, __framework__, and dotfiles
-    for dir in "${SCRIPT_DIR}"/*/; do
+    # Remove all directories except __framework__ and dotfiles
+    for dir in "${TESTS_DIR}"/*/; do
         dirname="$(basename "${dir}")"
         case "${dirname}" in
-            _shared|__framework__|_investigation) ;;
+            __framework__) ;;
             *) rm -rf "${dir}" ;;
         esac
     done
 fi
 
 # Copy test directories into place
+mkdir -p "${TESTS_DIR}"
 echo "Installing test directories..."
 INSTALLED=0
 SKIPPED=0
@@ -80,7 +83,7 @@ for test_dir in "${SRC_DIR}"/*/; do
         continue
     fi
 
-    dest="${SCRIPT_DIR}/${test_name}"
+    dest="${TESTS_DIR}/${test_name}"
     mkdir -p "${dest}"
 
     # Copy the essential files: test.swf, output.txt, test.toml, input.json, and .as/.fla sources
@@ -122,8 +125,8 @@ done
 
 # Also install the __framework__ directory if present
 if [[ -d "${SRC_DIR}/__framework__" ]]; then
-    mkdir -p "${SCRIPT_DIR}/__framework__"
-    cp -r "${SRC_DIR}/__framework__/"* "${SCRIPT_DIR}/__framework__/"
+    mkdir -p "${TESTS_DIR}/__framework__"
+    cp -r "${SRC_DIR}/__framework__/"* "${TESTS_DIR}/__framework__/"
 fi
 
 echo ""

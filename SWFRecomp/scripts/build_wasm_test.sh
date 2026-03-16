@@ -18,7 +18,7 @@ PROJECT_ROOT="$(cd "${SWFRECOMP_ROOT}/.." && pwd)"
 SWFMODERN_ROOT="${PROJECT_ROOT}/SWFModernRuntime"
 SWFMODERN_SRC="${SWFMODERN_ROOT}/src"
 SWFMODERN_INC="${SWFMODERN_ROOT}/include"
-TEST_DIR="${PROJECT_ROOT}/ruffle-tests/${TEST_NAME}"
+TEST_DIR="${PROJECT_ROOT}/ruffle-tests/tests/swfs/avm1/${TEST_NAME}"
 
 # Verify test exists
 if [ ! -d "${TEST_DIR}" ]; then

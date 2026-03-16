@@ -8,10 +8,11 @@ from pathlib import Path
 from collections import Counter
 
 SCRIPT_DIR = Path(__file__).parent
+TESTS_DIR = SCRIPT_DIR / "tests" / "swfs" / "avm1"
 RECOMP = SCRIPT_DIR.parent / "SWFRecomp" / "build" / "SWFRecomp"
 CONFIG = SCRIPT_DIR / "_shared" / "config.toml"
 
-SKIP = {"_shared", "__framework__"}
+SKIP = {"__framework__"}
 
 def main():
     if not RECOMP.exists():
@@ -19,7 +20,7 @@ def main():
         sys.exit(1)
 
     tests = sorted(
-        d.name for d in SCRIPT_DIR.iterdir()
+        d.name for d in TESTS_DIR.iterdir()
         if d.is_dir() and d.name not in SKIP and (d / "test.swf").exists()
     )
 
@@ -28,7 +29,7 @@ def main():
     errors = Counter()
 
     for name in tests:
-        test_dir = SCRIPT_DIR / name
+        test_dir = TESTS_DIR / name
         try:
             result = subprocess.run(
                 ["bash", "-c", "ulimit -v 4194304; exec \"$@\"", "--",

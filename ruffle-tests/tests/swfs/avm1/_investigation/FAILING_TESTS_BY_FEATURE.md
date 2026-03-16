@@ -24,7 +24,7 @@ Sub-categories:
 - **TextSnapshot**: 4 failing -- TextSnapshot class not implemented
 - **Layout/Formatting**: 5 failing -- Autosize, scroll, width/height, font metrics, etc.
 
-Investigation docs: [TEXTSNAPSHOT_PLAN.md](ruffle-tests/_investigation/complete/TEXTSNAPSHOT_PLAN.md)
+Investigation docs: [TEXTSNAPSHOT_PLAN.md](ruffle-tests/tests/swfs/avm1/_investigation/complete/TEXTSNAPSHOT_PLAN.md)
 
 ---
 
@@ -39,7 +39,7 @@ Sub-categories:
 - **XML.load**: 1 failing -- Needs network
 - **Core XML DOM**: 2 failing -- Core XML parsing, manipulation, and serialization
 
-Investigation docs: [XML_PLAN.md](ruffle-tests/_investigation/complete/XML_PLAN.md)
+Investigation docs: [XML_PLAN.md](ruffle-tests/tests/swfs/avm1/_investigation/complete/XML_PLAN.md)
 
 ---
 
@@ -49,7 +49,7 @@ Failing tests: loadmovie_registerclass (27/31), mcl_replace_root_swf7_to_swf5 (5
 
 31/35 core loadMovie tests now PASS. Multi-SWF infrastructure fully implemented (compile-time child SWF discovery, symbol prefix isolation, MovieEntry registry). Remaining failures: cross-movie export table isolation (loadmovie_registerclass), accepted Ruffle vs Flash diffs (mcl_replace_root), network POST (loadvariables_method). loading_avm2 and mixed_avm_load_into_root are AVM2 (out of scope, in ignored_tests.txt).
 
-Investigation docs: [LOADMOVIE_PLAN.md](ruffle-tests/_investigation/blocked/LOADMOVIE_PLAN.md), [LOADMOVIE_MULTI_SWF_PLAN.md](ruffle-tests/_investigation/blocked/LOADMOVIE_MULTI_SWF_PLAN.md), [CROSS_MOVIE_EXPORT_ISOLATION_PLAN.md](ruffle-tests/_investigation/incomplete/CROSS_MOVIE_EXPORT_ISOLATION_PLAN.md)
+Investigation docs: [LOADMOVIE_PLAN.md](ruffle-tests/tests/swfs/avm1/_investigation/blocked/LOADMOVIE_PLAN.md), [LOADMOVIE_MULTI_SWF_PLAN.md](ruffle-tests/tests/swfs/avm1/_investigation/blocked/LOADMOVIE_MULTI_SWF_PLAN.md), [CROSS_MOVIE_EXPORT_ISOLATION_PLAN.md](ruffle-tests/tests/swfs/avm1/_investigation/incomplete/CROSS_MOVIE_EXPORT_ISOLATION_PLAN.md)
 
 ---
 
@@ -94,7 +94,7 @@ Description: Two sub-features: (1) String methods: String.prototype methods like
 Sub-categories:
 - **String paths**: 2 failing -- Path-based variable resolution using slash syntax
 
-Investigation docs: [STRING_PLAN.md](ruffle-tests/_investigation/complete/STRING_PLAN.md)
+Investigation docs: [STRING_PLAN.md](ruffle-tests/tests/swfs/avm1/_investigation/complete/STRING_PLAN.md)
 
 ---
 
@@ -104,7 +104,7 @@ Failing tests: global_instance_decls, global_proto_decls, global_proto_decls_del
 
 Description: Tests that enumerate all global variables and check which built-in classes/functions exist per SWF version. Many failures are because built-in classes (XML, Date, Color, Sound, etc.) are not registered as globals. Fixing these tests requires implementing all the other missing features AND registering their constructors on _global.
 
-Investigation docs: [GEOMETRY_CLASSES_PLAN.md](ruffle-tests/_investigation/complete/GEOMETRY_CLASSES_PLAN.md)
+Investigation docs: [GEOMETRY_CLASSES_PLAN.md](ruffle-tests/tests/swfs/avm1/_investigation/complete/GEOMETRY_CLASSES_PLAN.md)
 
 ---
 
@@ -122,7 +122,7 @@ Failing tests: bitmap_data, bitmap_data_compare, bitmap_data_copypixels, bitmap_
 
 Description: Needs flash.display.BitmapData class implementation. Methods needed: compare(), copyPixels(), hitTest(), threshold(), noise(). The bitmap_data test is the main constructor/property test.
 
-Investigation docs: [GEOMETRY_CLASSES_PLAN.md](ruffle-tests/_investigation/complete/GEOMETRY_CLASSES_PLAN.md)
+Investigation docs: [GEOMETRY_CLASSES_PLAN.md](ruffle-tests/tests/swfs/avm1/_investigation/complete/GEOMETRY_CLASSES_PLAN.md)
 
 ---
 
@@ -156,7 +156,7 @@ Failing tests: unload_nested_child
 
 Description: Needs proper unload behavior. When a movie clip is unloaded: onUnload event fires, clip becomes inaccessible by name but retains its depth slot, nested children are recursively unloaded.
 
-Investigation docs: [UNLOAD_PLAN.md](ruffle-tests/_investigation/complete/UNLOAD_PLAN.md)
+Investigation docs: [UNLOAD_PLAN.md](ruffle-tests/tests/swfs/avm1/_investigation/complete/UNLOAD_PLAN.md)
 
 ---
 
@@ -174,7 +174,7 @@ Failing tests: native_objects_swf6
 
 Description: Tests that check behavior of native (built-in) objects and functions. Meta-tests that effectively require all built-in classes to be implemented.
 
-Investigation docs: [NATIVE_INTROSPECTION_PLAN.md](ruffle-tests/_investigation/complete/NATIVE_INTROSPECTION_PLAN.md)
+Investigation docs: [NATIVE_INTROSPECTION_PLAN.md](ruffle-tests/tests/swfs/avm1/_investigation/complete/NATIVE_INTROSPECTION_PLAN.md)
 
 ---
 
@@ -192,7 +192,7 @@ Failing tests: watch_virtual_property
 
 Description: Needs Object.prototype.watch() and Object.prototype.unwatch() methods. watch() registers a callback that's invoked when a property is set.
 
-Investigation docs: [OBJECT_WATCH_PLAN.md](ruffle-tests/_investigation/complete/OBJECT_WATCH_PLAN.md)
+Investigation docs: [OBJECT_WATCH_PLAN.md](ruffle-tests/tests/swfs/avm1/_investigation/complete/OBJECT_WATCH_PLAN.md)
 
 ---
 
@@ -202,7 +202,7 @@ Failing tests: timeout (TIMEOUT), timer_run_actions
 
 Description: Needs setInterval()/clearInterval() and setTimeout()/clearTimeout() implementation. Requires a timer scheduling system in the runtime.
 
-Investigation docs: [TIMER_PLAN.md](ruffle-tests/_investigation/complete/TIMER_PLAN.md)
+Investigation docs: [TIMER_PLAN.md](ruffle-tests/tests/swfs/avm1/_investigation/complete/TIMER_PLAN.md)
 
 ---
 
@@ -220,7 +220,7 @@ Failing tests: bitmap_filters (SEGFAULT), displacementmapfilter_mappoint_throw_e
 
 Description: Needs flash.filters package classes: BlurFilter, DropShadowFilter, GlowFilter, BevelFilter, etc.
 
-Investigation docs: [NATIVE_INTROSPECTION_PLAN.md](ruffle-tests/_investigation/complete/NATIVE_INTROSPECTION_PLAN.md)
+Investigation docs: [NATIVE_INTROSPECTION_PLAN.md](ruffle-tests/tests/swfs/avm1/_investigation/complete/NATIVE_INTROSPECTION_PLAN.md)
 
 ---
 
@@ -230,7 +230,7 @@ Failing tests: clip_event_propagation_order
 
 Description: Needs proper MovieClip event dispatching: onLoad, onUnload, onEnterFrame, onClipEvent(initialize), onClipEvent(construct), and correct propagation order.
 
-Investigation docs: [UNLOAD_PLAN.md](ruffle-tests/_investigation/complete/UNLOAD_PLAN.md)
+Investigation docs: [UNLOAD_PLAN.md](ruffle-tests/tests/swfs/avm1/_investigation/complete/UNLOAD_PLAN.md)
 
 ---
 
@@ -264,7 +264,7 @@ Failing tests: selection_handlers
 
 Description: Needs Selection object with methods: getBeginIndex(), getEndIndex(), getCaretIndex(), getFocus(), setFocus(), setSelection().
 
-Investigation docs: [SELECTION_PLAN.md](ruffle-tests/_investigation/complete/SELECTION_PLAN.md)
+Investigation docs: [SELECTION_PLAN.md](ruffle-tests/tests/swfs/avm1/_investigation/complete/SELECTION_PLAN.md)
 
 ---
 
@@ -274,7 +274,7 @@ Failing tests: date
 
 Description: Needs Date class constructor and all methods. The single test is huge (6335 expected lines) and partially passing, suggesting a Date implementation exists but has edge case bugs.
 
-Investigation docs: [DATE_PLAN.md](ruffle-tests/_investigation/complete/DATE_PLAN.md)
+Investigation docs: [DATE_PLAN.md](ruffle-tests/tests/swfs/avm1/_investigation/complete/DATE_PLAN.md)
 
 ---
 
@@ -284,7 +284,7 @@ Failing tests: removed_base_clip_tell_target, removed_target_clip_scope
 
 Description: Tests for removeMovieClip behavior, script halting when base clip is removed, scope resolution after clip removal, and depth management during timeline rewind.
 
-Investigation docs: [CALL_SEMANTICS_PLAN.md](ruffle-tests/_investigation/complete/CALL_SEMANTICS_PLAN.md)
+Investigation docs: [CALL_SEMANTICS_PLAN.md](ruffle-tests/tests/swfs/avm1/_investigation/complete/CALL_SEMANTICS_PLAN.md)
 
 ---
 
@@ -318,7 +318,7 @@ Failing tests: asfunction
 
 Description: AsBroadcaster (addListener/removeListener/broadcastMessage), asfunction HTML link protocol, ASnative/ASnew for native function access, arguments object, instanceof coercions, and miscellaneous built-in behaviors.
 
-Investigation docs: [FUNCTION_EDGE_CASES_PLAN.md](ruffle-tests/_investigation/complete/FUNCTION_EDGE_CASES_PLAN.md)
+Investigation docs: [FUNCTION_EDGE_CASES_PLAN.md](ruffle-tests/tests/swfs/avm1/_investigation/complete/FUNCTION_EDGE_CASES_PLAN.md)
 
 ---
 

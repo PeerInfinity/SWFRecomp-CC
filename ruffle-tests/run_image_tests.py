@@ -28,6 +28,7 @@ except ImportError:
     import tomli as tomllib
 
 SCRIPT_DIR = Path(__file__).parent.resolve()
+TESTS_DIR = SCRIPT_DIR / "tests" / "swfs" / "avm1"
 VERIFY_SCRIPT = SCRIPT_DIR / "verify_output.py"
 RESULTS_JSON = SCRIPT_DIR / "image_results.json"
 RESULTS_MD = SCRIPT_DIR.parent / "ruffle-image-results.md"
@@ -36,7 +37,7 @@ RESULTS_MD = SCRIPT_DIR.parent / "ruffle-image-results.md"
 def discover_image_tests():
     """Find all test dirs with [image_comparisons] in test.toml."""
     tests = []
-    for test_dir in sorted(SCRIPT_DIR.iterdir()):
+    for test_dir in sorted(TESTS_DIR.iterdir()):
         if not test_dir.is_dir() or test_dir.name.startswith(("_", ".")):
             continue
         toml_path = test_dir / "test.toml"
@@ -531,14 +532,14 @@ def main():
 
 def collect_image_output(tests):
     """Copy all PNG files from each test directory into _image-test-output/{test}/."""
-    output_root = SCRIPT_DIR / "_image-test-output"
+    output_root = TESTS_DIR / "_image-test-output"
     if output_root.exists():
         shutil.rmtree(output_root)
     output_root.mkdir()
 
     copied = 0
     for name in tests:
-        test_dir = SCRIPT_DIR / name
+        test_dir = TESTS_DIR / name
         pngs = sorted(test_dir.glob("*.png"))
         if not pngs:
             continue

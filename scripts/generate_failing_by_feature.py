@@ -3,7 +3,7 @@
 Generate FAILING_TESTS_BY_FEATURE.md and its filtered variant from
 feature_categories.json + results.json.
 
-Produces two files in ruffle-tests/_investigation/:
+Produces two files in ruffle-tests/tests/swfs/avm1/_investigation/:
   - FAILING_TESTS_BY_FEATURE.md           (all tests)
   - FAILING_TESTS_BY_FEATURE_FILTERED.md  (ignored tests removed)
 """
@@ -16,7 +16,7 @@ from pathlib import Path
 
 BASE_DIR = Path(__file__).parent.parent
 RUFFLE_DIR = BASE_DIR / "ruffle-tests"
-INVESTIGATION_DIR = RUFFLE_DIR / "_investigation"
+INVESTIGATION_DIR = RUFFLE_DIR / "tests" / "swfs" / "avm1" / "_investigation"
 CATEGORIES_PATH = INVESTIGATION_DIR / "feature_categories.json"
 RESULTS_PATH = RUFFLE_DIR / "results.json"
 RESULTS_FILTERED_PATH = RUFFLE_DIR / "results_filtered.json"
@@ -80,19 +80,19 @@ def build_investigation_index() -> dict[str, list[tuple[str, str]]]:
     for p in INVESTIGATION_DIR.glob("*.md"):
         if p.name in _EXCLUDED_DOCS:
             continue
-        rel = f"ruffle-tests/_investigation/{p.name}"
+        rel = f"ruffle-tests/tests/swfs/avm1/_investigation/{p.name}"
         candidates.append((p.name, rel, p))
 
     complete_dir = INVESTIGATION_DIR / "complete"
     if complete_dir.is_dir():
         for p in complete_dir.glob("*.md"):
-            rel = f"ruffle-tests/_investigation/complete/{p.name}"
+            rel = f"ruffle-tests/tests/swfs/avm1/_investigation/complete/{p.name}"
             candidates.append((p.name, rel, p))
 
     incomplete_dir = INVESTIGATION_DIR / "incomplete"
     if incomplete_dir.is_dir():
         for p in incomplete_dir.glob("*.md"):
-            rel = f"ruffle-tests/_investigation/incomplete/{p.name}"
+            rel = f"ruffle-tests/tests/swfs/avm1/_investigation/incomplete/{p.name}"
             candidates.append((p.name, rel, p))
 
     for display_name, rel_path, abs_path in candidates:

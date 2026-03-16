@@ -5,8 +5,8 @@
 We are improving the pass rate on the Ruffle AVM1 test suite (ActionScript 1/2 trace tests).
 
 **Key docs to read at session start:**
-- `ruffle-tests/_investigation/SESSION_START_GUIDE.md` — stable reference (architecture, how to run tests, infrastructure)
-- `ruffle-tests/_investigation/CURRENT_STATUS.md` — current results, regressions, near-passing tests, work priorities
+- `ruffle-tests/tests/swfs/avm1/_investigation/SESSION_START_GUIDE.md` — stable reference (architecture, how to run tests, infrastructure)
+- `ruffle-tests/tests/swfs/avm1/_investigation/CURRENT_STATUS.md` — current results, regressions, near-passing tests, work priorities
 
 **Quick test commands:**
 ```bash
@@ -20,14 +20,14 @@ python3 ruffle-tests/verify_output.py --test=TEST_NAME --diff --verbose
 
 - `SWFRecomp/` — Recompiler: converts SWF bytecode to C (`src/action/action.cpp` is the main bytecode→C translator)
 - `SWFModernRuntime/` — Runtime: executes the generated C (`src/actionmodern/action.c` is ~50K lines, the core runtime)
-- `ruffle-tests/` — Ruffle AVM1 test suite (616 tests, each in `ruffle-tests/{test_name}/`)
+- `ruffle-tests/` — Ruffle AVM1 test suite (616 tests, each in `ruffle-tests/tests/swfs/avm1/{test_name}/`)
 - `SWFRecomp/tests/` — Old hand-written test suite (115 trace tests + 61 graphics tests, all passing)
 - `SWFRecomp/scripts/` — Build scripts (build_test.sh, deploy_example.sh, etc.)
 - `scripts/` — Test result processing scripts (diff, markdown generation)
 
 ## Two Test Systems
 
-1. **Ruffle tests** (`ruffle-tests/`): 616 tests from Ruffle project. Shared runner `verify_output.py`. Expected output in `output.txt` per test. Results in `results.json`. CI via GitHub Actions workflow (manual dispatch).
+1. **Ruffle tests** (`ruffle-tests/tests/swfs/avm1/`): 616 tests from Ruffle project. Shared runner `verify_output.py`. Expected output in `output.txt` per test. Results in `results.json`. CI via GitHub Actions workflow (manual dispatch).
 
 2. **Old tests** (`SWFRecomp/tests/`): 115 hand-written tests. Per-test `validate.py` validators. Runner is `all_tests.sh`. Results in `test_results.json`. Run locally only.
 
@@ -45,9 +45,9 @@ python3 ruffle-tests/verify_output.py --test=TEST_NAME --diff --verbose
 
 Three investigation docs track cases where test diffs are permanent or intentional:
 
-- `ruffle-tests/_investigation/ACCEPTED_DIFFS.md` — Tests where some output lines will **never match** due to platform UB, inconsistent expected output, Flash quirks we can't replicate, or Flash UB we intentionally don't replicate. Each entry documents the category, example diff, explanation, and decision.
-- `ruffle-tests/_investigation/RUFFLE_VS_FLASH_DIFFERENCES.md` — Tests where our implementation **matches Flash's actual behavior** but disagrees with Ruffle's expected output (i.e., the Ruffle test expectation reflects Ruffle's own behavior, not Flash's).
-- `ruffle-tests/_investigation/RUFFLE_COMPAT_TWEAKS.md` — Pragmatic implementation choices made specifically to match Ruffle's expected test output, where the "correct" behavior is unclear or unspecified (e.g., +1 pixel on text field bounds).
+- `ruffle-tests/tests/swfs/avm1/_investigation/ACCEPTED_DIFFS.md` — Tests where some output lines will **never match** due to platform UB, inconsistent expected output, Flash quirks we can't replicate, or Flash UB we intentionally don't replicate. Each entry documents the category, example diff, explanation, and decision.
+- `ruffle-tests/tests/swfs/avm1/_investigation/RUFFLE_VS_FLASH_DIFFERENCES.md` — Tests where our implementation **matches Flash's actual behavior** but disagrees with Ruffle's expected output (i.e., the Ruffle test expectation reflects Ruffle's own behavior, not Flash's).
+- `ruffle-tests/tests/swfs/avm1/_investigation/RUFFLE_COMPAT_TWEAKS.md` — Pragmatic implementation choices made specifically to match Ruffle's expected test output, where the "correct" behavior is unclear or unspecified (e.g., +1 pixel on text field bounds).
 
 **When to update these docs:**
 - If you discover a test diff that cannot be fixed because it depends on C undefined behavior, platform-specific results, or internally inconsistent expected output → add it to `ACCEPTED_DIFFS.md` under the appropriate category.
