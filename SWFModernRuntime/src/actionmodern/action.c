@@ -34737,6 +34737,23 @@ void actionNewObject(SWFAppContext* app_context)
 			}
 		}
 
+		// Check current MC's dynamic_props (for constructors set via SetVariable
+		// inside a sprite DoAction, where the variable is stored on the MC)
+		if (ctor_func == NULL && g_current_context != NULL && g_current_context->dynamic_props != NULL)
+		{
+			ASObject* mc_props = (ASObject*) g_current_context->dynamic_props;
+			ActionVar* mcvar = getPropertyWithPrototype(mc_props, ctor_name, ctor_name_len);
+			if (mcvar != NULL && mcvar->type == ACTION_STACK_VALUE_FUNCTION)
+				ctor_func = (ASFunction*) mcvar->data.numeric_value;
+		}
+		// Also check root MC's dynamic_props
+		if (ctor_func == NULL && root_movieclip.dynamic_props != NULL)
+		{
+			ASObject* root_props = (ASObject*) root_movieclip.dynamic_props;
+			ActionVar* rvar = getPropertyWithPrototype(root_props, ctor_name, ctor_name_len);
+			if (rvar != NULL && rvar->type == ACTION_STACK_VALUE_FUNCTION)
+				ctor_func = (ASFunction*) rvar->data.numeric_value;
+		}
 		if (ctor_func != NULL)
 		{
 			// User-defined constructor found

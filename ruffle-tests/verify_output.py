@@ -578,7 +578,7 @@ def _sanitize_prefix(filename):
     return name
 
 
-def generate_child_movie_file(child_swf_name, child_recomp_dir, build_dir, swf_file_size=0, movie_id=1):
+def generate_child_movie_file(child_swf_name, child_recomp_dir, build_dir, swf_file_size=0, movie_id=1, string_id_offset=0):
     """Generate a self-contained C file for a child SWF movie.
 
     Reads the recompiled C files from child_recomp_dir and generates a single
@@ -712,6 +712,21 @@ def generate_child_movie_file(child_swf_name, child_recomp_dir, build_dir, swf_f
         def apply_renames(text):
             return text
 
+    # Offset string_ids in PUSH_STR_ID calls to avoid var_array collisions
+    # between parent and child movies. The third argument is the string_id.
+    _sid_offset = string_id_offset
+    if _sid_offset > 0:
+        _push_str_id_pattern = re.compile(
+            r'PUSH_STR_ID\(([^,]+),\s*([^,]+),\s*(\d+)\)')
+        def apply_string_id_offset(text):
+            def _offset_sid(m):
+                name, length, sid = m.group(1), m.group(2), int(m.group(3))
+                return f'PUSH_STR_ID({name}, {length}, {sid + _sid_offset})'
+            return _push_str_id_pattern.sub(_offset_sid, text)
+    else:
+        def apply_string_id_offset(text):
+            return text
+
     # Generate the combined wrapper file
     lines = []
     lines.append(f"// Auto-generated movie wrapper for {child_swf_name}")
@@ -752,8 +767,9 @@ def generate_child_movie_file(child_swf_name, child_recomp_dir, build_dir, swf_f
         # Remove #include lines and #define MAX_STRING_ID
         modified = re.sub(r'#include\s+[<"].*?[>"]\s*\n', '', modified)
         modified = re.sub(r'#define\s+MAX_STRING_ID\s+\d+\s*\n?', '', modified)
-        # Apply all symbol renames
+        # Apply all symbol renames and string_id offsets
         modified = apply_renames(modified)
+        modified = apply_string_id_offset(modified)
         lines.append(modified)
     lines.append("")
 
@@ -762,8 +778,9 @@ def generate_child_movie_file(child_swf_name, child_recomp_dir, build_dir, swf_f
         modified = source
         # Remove #include lines
         modified = re.sub(r'#include\s+[<"].*?[>"]\s*\n', '', modified)
-        # Apply all symbol renames
+        # Apply all symbol renames and string_id offsets
         modified = apply_renames(modified)
+        modified = apply_string_id_offset(modified)
         lines.append(modified)
         lines.append("")
 
@@ -837,8 +854,9 @@ def generate_child_movie_file(child_swf_name, child_recomp_dir, build_dir, swf_f
         frame_funcs_in_tag = list(set(re.findall(r'\b(frame_\d+)\b', tag_main_text)))
         for ff in frame_funcs_in_tag:
             modified = re.sub(rf'\b{ff}\b', f'{prefix}_{ff}', modified)
-        # Apply all symbol renames (str_N, script_N, func_*)
+        # Apply all symbol renames and string_id offsets (str_N, script_N, func_*)
         modified = apply_renames(modified)
+        modified = apply_string_id_offset(modified)
         # Rename frame_funcs array
         modified = modified.replace('frame_func frame_funcs[]', f'frame_func {prefix}_frame_funcs[]')
         # Rename frame_label_data and frame_label_count
@@ -846,8 +864,9 @@ def generate_child_movie_file(child_swf_name, child_recomp_dir, build_dir, swf_f
         modified = re.sub(r'\bframe_label_count\b', f'{prefix}_frame_label_count', modified)
         # Rename tagInit
         modified = modified.replace('void tagInit(', f'void {prefix}_tagInit(')
-        # Rename initVarArray call's MAX_STRING_ID
-        modified = re.sub(r'initVarArray\(MAX_STRING_ID\)', f'initVarArray({max_string_id})', modified)
+        # Rename initVarArray call's MAX_STRING_ID (with string_id offset)
+        modified = re.sub(r'initVarArray\(MAX_STRING_ID\)',
+                          f'initVarArray({max_string_id + string_id_offset})', modified)
         lines.append(modified)
         lines.append("")
 
@@ -1087,6 +1106,15 @@ def compile_native(test_dir, num_frames, build_dir, headless=False, has_image_co
     child_prefixes = []
     has_children = len(child_swfs) > 0
 
+    # Read parent's MAX_STRING_ID to offset child string_ids (avoid var_array collision)
+    parent_max_string_id = 0
+    parent_script_defs = build_dir / "script_defs.c"
+    if parent_script_defs.exists():
+        for m in re.finditer(r'#define\s+MAX_STRING_ID\s+(\d+)', parent_script_defs.read_text()):
+            parent_max_string_id = max(parent_max_string_id, int(m.group(1)))
+
+    next_string_id_offset = parent_max_string_id + 1  # +1 to leave a gap
+
     for child_idx, child_swf in enumerate(child_swfs):
         child_recomp_dir = build_dir / f"_child_{_sanitize_prefix(child_swf.name)}"
         child_recomp_dir.mkdir(exist_ok=True)
@@ -1095,9 +1123,17 @@ def compile_native(test_dir, num_frames, build_dir, headless=False, has_image_co
             child_movie_id = child_idx + 1  # 0 = main SWF, 1+ = children
             prefix = generate_child_movie_file(
                 child_swf.name, child_recomp_dir, build_dir,
-                swf_file_size=child_file_size, movie_id=child_movie_id)
+                swf_file_size=child_file_size, movie_id=child_movie_id,
+                string_id_offset=next_string_id_offset)
             if prefix:
                 child_prefixes.append(prefix)
+                # Read child's MAX_STRING_ID and advance offset for next child
+                child_defs = child_recomp_dir / "RecompiledScripts" / "script_defs.c"
+                if child_defs.exists():
+                    child_max = 0
+                    for m in re.finditer(r'#define\s+MAX_STRING_ID\s+(\d+)', child_defs.read_text()):
+                        child_max = max(child_max, int(m.group(1)))
+                    next_string_id_offset += child_max + 1
 
     # Handle self-loading SWFs (test.swf loads itself into a child MC)
     self_load = get_self_load(test_dir)
