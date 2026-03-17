@@ -3,7 +3,7 @@
 
 Last updated: 2026-03-16
 
-## Status: BLOCKED — Child SWF compilation pipeline issue
+## Status: MAJOR PROGRESS — Dejagnu framework working, 82-92% pass rate on initial tests
 
 ## Overview
 
@@ -148,7 +148,7 @@ The recompiler emits `tagDefineSprite(app_context, char_id, frame_funcs, frame_c
 
 | Priority | Category | Tests | Effort | Impact |
 |---|---|---|---|---|
-| 1 | `actionscript.all` child movie fix | 243 | Medium | Highest — unblocks the largest test suite. Many tests likely pass once Dejagnu initializes. |
+| 1 | `actionscript.all` Dejagnu framework | 243 | **DONE** | Four fixes: ImportAssets char_id remapping, enterFrame goto deferral, string_id offset, MC constructor lookup. Boolean-v5: 35/38, Color-v5: 115/140. |
 | 2 | `misc-mtasc` typeof fix | 9 | Low | Quick win — `hello` is 7/8, others may be close |
 | 3 | `misc-ming` / `misc-swfc` init action ordering | 132 | High | Complex — requires understanding DoInitAction targeting for inlined library code |
 
