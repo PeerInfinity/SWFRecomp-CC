@@ -29,6 +29,10 @@ WASI_SYSROOT="${WASI_SDK}/share/wasi-sysroot"
 BUILD_DIR="${SWFRECOMP_ROOT}/build_wasm"
 mkdir -p "${BUILD_DIR}"
 
+# Create a stub constants.h for swf_core.c (the real one is generated per-SWF;
+# the only values it needs — FRAME_X_MIN_TWIPS/FRAME_Y_MIN_TWIPS — have defaults)
+echo "/* stub for library build */" > "${BUILD_DIR}/constants.h"
+
 CFLAGS=(
     --target=wasm32-wasi
     --sysroot="${WASI_SYSROOT}"
@@ -40,8 +44,9 @@ CFLAGS=(
     -I"${SWFMODERN_ROOT}/lib/c-hashmap"
     -I"${SWFMODERN_ROOT}/lib/o1heap"
     -I"${SWFMODERN_SRC}/actionmodern"
+    -I"${BUILD_DIR}"
     -mllvm -wasm-enable-sjlj
-    -std=c17
+    -std=gnu17
     -O2
     -Wall
     -Wno-unused-variable

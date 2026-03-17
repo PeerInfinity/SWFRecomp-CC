@@ -13,6 +13,15 @@ SWFMODERN_INC="${SWFMODERN_ROOT}/include"
 DEMO_DIR="${PROJECT_ROOT}/docs/recompiler"
 BUILD_DIR="${SWFRECOMP_ROOT}/build_wasm"
 
+# Find WASI-SDK (needed for pre-compiling action.o/object.o)
+WASI_SDK="${PROJECT_ROOT}/wasi-sdk"
+if [ ! -d "${WASI_SDK}" ]; then
+    echo "ERROR: WASI-SDK not found at ${WASI_SDK}"
+    exit 1
+fi
+WASI_CC="${WASI_SDK}/bin/clang"
+WASI_SYSROOT="${WASI_SDK}/share/wasi-sysroot"
+
 # Check prerequisites
 if [ ! -f "${BUILD_DIR}/SWFRecomp.js" ] || [ ! -f "${BUILD_DIR}/SWFRecomp.wasm" ]; then
     echo "ERROR: SWFRecomp.wasm not found. Run build_wasm_recompiler.sh first."
@@ -29,12 +38,19 @@ DEMO_SRC="${SWFRECOMP_ROOT}/wasm_recompiler_demo"
 echo "Deploying in-browser demo to ${DEMO_DIR}..."
 mkdir -p "${DEMO_DIR}"
 
-# Copy demo page source files
-echo "  Copying demo page files..."
-cp "${DEMO_SRC}/index.html" "${DEMO_DIR}/"
-cp "${DEMO_SRC}/pipeline.js" "${DEMO_DIR}/"
-cp "${DEMO_SRC}/wasi_shim.js" "${DEMO_DIR}/"
-cp "${DEMO_SRC}/coi-serviceworker.js" "${DEMO_DIR}/"
+# Copy demo page source files (if they exist in wasm_recompiler_demo/)
+DEMO_PAGE_FILES=(index.html pipeline.js wasi_shim.js coi-serviceworker.js serve.py)
+for f in "${DEMO_PAGE_FILES[@]}"; do
+    if [ -f "${DEMO_SRC}/${f}" ]; then
+        echo "  Copying ${f}..."
+        cp "${DEMO_SRC}/${f}" "${DEMO_DIR}/"
+    fi
+done
+
+# Copy demo SWF if present
+if [ -f "${DEMO_SRC}/add.swf" ]; then
+    cp "${DEMO_SRC}/add.swf" "${DEMO_DIR}/"
+fi
 
 # Copy Phase 1 output (SWFRecomp.wasm)
 echo "  Copying SWFRecomp.wasm..."
@@ -54,6 +70,27 @@ cp "${SWFMODERN_SRC}/actionmodern/unicode_case_tables.h" "${DEMO_DIR}/runtime_sr
 cp "${SWFMODERN_ROOT}/lib/o1heap/o1heap.h" "${DEMO_DIR}/runtime_src/"
 cp "${SWFMODERN_ROOT}/lib/c-hashmap/map.h" "${DEMO_DIR}/runtime_src/"
 cp "${SWFRECOMP_ROOT}/wasm_wrappers/main.c" "${DEMO_DIR}/runtime_src/"
+
+# Pre-compile action.o and object.o (too large for in-browser Clang)
+echo "  Pre-compiling action.o and object.o..."
+WASI_CFLAGS=(
+    --target=wasm32-wasi
+    --sysroot="${WASI_SYSROOT}"
+    -DNO_GRAPHICS
+    -I"${SWFMODERN_INC}"
+    -I"${SWFMODERN_INC}/actionmodern"
+    -I"${SWFMODERN_INC}/libswf"
+    -I"${SWFMODERN_INC}/memory"
+    -I"${SWFMODERN_ROOT}/lib/c-hashmap"
+    -I"${SWFMODERN_ROOT}/lib/o1heap"
+    -I"${SWFMODERN_SRC}/actionmodern"
+    -mllvm -wasm-enable-sjlj
+    -std=gnu17
+    -O2
+    -w
+)
+"${WASI_CC}" "${WASI_CFLAGS[@]}" -c "${SWFMODERN_SRC}/actionmodern/action.c" -o "${DEMO_DIR}/runtime_src/action.o"
+"${WASI_CC}" "${WASI_CFLAGS[@]}" -c "${SWFMODERN_SRC}/actionmodern/object.c" -o "${DEMO_DIR}/runtime_src/object.o"
 
 # Copy runtime headers for the include paths
 echo "  Copying runtime headers..."

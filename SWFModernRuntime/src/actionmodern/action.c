@@ -7,6 +7,15 @@
 #include <ctype.h>
 #include <limits.h>
 
+// WASI compatibility: isnanf/isinff are GCC extensions not in WASI libc;
+// C99 isnan/isinf are type-generic and work on floats
+#ifndef isnanf
+#define isnanf(x) isnan(x)
+#endif
+#ifndef isinff
+#define isinff(x) isinf(x)
+#endif
+
 // constants.h is generated per-test and contains SWF_FRAME_COUNT
 // It's optional - if not present, SWF_FRAME_COUNT defaults are used
 #ifdef __has_include

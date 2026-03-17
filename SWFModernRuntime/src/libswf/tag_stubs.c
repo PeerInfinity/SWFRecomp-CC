@@ -7,6 +7,7 @@
 #include <object.h>
 #include <heap.h>
 #include <string.h>
+#include <strings.h>
 #include <stdio.h>
 #include <math.h>
 #include <stdlib.h>

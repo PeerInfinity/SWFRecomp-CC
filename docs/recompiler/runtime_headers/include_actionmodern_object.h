@@ -32,6 +32,33 @@ typedef struct ASProperty ASProperty;
 // Flags for DontEnum properties (internal/built-in properties)
 #define PROPERTY_FLAGS_DONTENUM (PROPERTY_FLAG_WRITABLE | PROPERTY_FLAG_CONFIGURABLE)
 
+// Native backing type (for __initializeNative detection)
+// Objects created by native constructors cannot be re-initialized as a different native type.
+enum NativeType {
+	NATIVE_NONE = 0,
+	NATIVE_ARRAY = 1,
+	NATIVE_STRING = 2,
+	NATIVE_NUMBER = 3,
+	NATIVE_BOOLEAN = 4,
+	NATIVE_DATE = 5,
+	NATIVE_SOUND = 6,
+	NATIVE_XML = 7,
+	NATIVE_XMLNODE = 8,
+	NATIVE_TEXTFIELD = 9,
+	NATIVE_TEXTFORMAT = 10,
+	NATIVE_BITMAPDATA = 11,
+	NATIVE_LOADVARS = 12,
+	NATIVE_LOCALCONNECTION = 13,
+	NATIVE_MOVIECLIPLOADER = 14,
+	NATIVE_PRINTJOB = 15,
+	NATIVE_BUTTON = 16,
+	NATIVE_TEXTSNAPSHOT = 17,
+	NATIVE_COLORTRANSFORM = 18,
+	NATIVE_TRANSFORM = 19,
+	NATIVE_FILTER = 20,
+	NATIVE_STYLESHEET = 21,
+};
+
 typedef struct ASObject
 {
 	u32 refcount;           // Reference count (starts at 1 on allocation)
@@ -42,6 +69,9 @@ typedef struct ASObject
 	// Interface support (for ActionScript 2.0 implements keyword)
 	u32 interface_count;           // Number of interfaces this class implements
 	struct ASObject** interfaces;  // Array of interface constructors
+
+	// Native backing type (0 = pure ActionScript object, >0 = native-backed)
+	u8 native_type;
 } ASObject;
 
 struct ASProperty
@@ -118,10 +148,17 @@ void setPropertyWithFlags(SWFAppContext* app_context, ASObject* obj, const char*
 
 // Check if property exists ignoring flash_flags visibility (for hasOwnProperty)
 bool hasPropertyRaw(ASObject* obj, const char* name, u32 name_length);
+ASProperty* findPropertyRaw(ASObject* obj, const char* name, u32 name_length);
+
+// Check if a property with given flash_flags is hidden at the current SWF version
+int isPropertyHiddenAtVersion(u16 flash_flags);
 
 // Delete property by name (returns true if deleted or not found, false if protected)
 // Handles refcount management if value is an object
 bool deleteProperty(SWFAppContext* app_context, ASObject* obj, const char* name, u32 name_length);
+
+// SWF version-aware name comparison (case-insensitive for SWF <= 6 with Unicode case folding)
+int swf_name_match(const char* a, const char* b);
 
 /**
  * Interface Management (ActionScript 2.0)

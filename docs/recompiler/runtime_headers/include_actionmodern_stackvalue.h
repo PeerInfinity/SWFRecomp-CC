@@ -17,5 +17,6 @@ typedef enum
 	ACTION_STACK_VALUE_ARRAY = 12,
 	ACTION_STACK_VALUE_FUNCTION = 13,
 	ACTION_STACK_VALUE_MOVIECLIP = 14,
-	ACTION_STACK_VALUE_HOLE = 15      // Unset array slot (not enumerable, reads as undefined)
+	ACTION_STACK_VALUE_HOLE = 15,     // Unset array slot (not enumerable, reads as undefined)
+	ACTION_STACK_VALUE_SUPER = 16     // Super proxy: numeric_value = this ptr, str_size = depth
 } ActionStackValueType;

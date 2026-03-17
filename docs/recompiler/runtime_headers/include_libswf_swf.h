@@ -37,8 +37,7 @@ typedef enum
 	CHAR_TYPE_BUTTON,
 } CharacterType;
 
-#ifndef NO_GRAPHICS
-#define INITIAL_DICTIONARY_CAPACITY 1024
+#define INITIAL_DICTIONARY_CAPACITY 8192  // Increased to support per-movie char_id offsetting (1000 per child SWF)
 #define INITIAL_DISPLAYLIST_CAPACITY 1024
 
 // Clip event flag bits (SWF spec)
@@ -95,6 +94,7 @@ typedef struct Character
 		{
 			frame_func* sprite_frame_funcs;
 			size_t sprite_frame_count;
+			size_t sprite_byte_size;
 		};
 		// DefineButton
 		struct
@@ -116,8 +116,10 @@ typedef struct DisplayObject
 	u32 has_cxform;
 	u16 clip_depth;
 	u16 ratio;
-	u8 button_state;       // 0=up, 1=over, 2=down (used for CHAR_TYPE_BUTTON)
+	u8 button_state;       // 0=idle, 1=over, 2=down, 3=outDown (CHAR_TYPE_BUTTON)
 	u8 button_prev_state;  // previous frame's state (for transition detection)
+	u8 sticky_button_state; // preserved state across remove+re-place (same char)
+	size_t sticky_char_id;  // char_id that sticky_button_state belongs to
 	u8 blend_mode;         // 0=normal (default), see SWF spec blend modes
 	// Per-sprite persistent display list (for multi-frame sprites)
 	struct DisplayObject* sprite_display_list;
@@ -128,9 +130,14 @@ typedef struct DisplayObject
 	int sprite_manual_next_frame;  // pending manual frame nav
 	size_t sprite_next_frame;      // target frame
 	char* instance_name;           // from PlaceObject2 HasName (or NULL)
+	u8 instance_name_owned;        // 1 if instance_name was malloc'd (auto-assigned), 0 if pointer to static string
 	// Clip actions (PlaceObject2 HasClipActions)
 	ClipAction* clip_actions;
 	size_t clip_action_count;
+	// Accumulated clip actions from a prior Remove that was immediately followed by a Re-place
+	// at the same depth in the same frame. Fired before clip_actions on the next removal.
+	ClipAction* accumulated_clip_actions;
+	size_t accumulated_clip_action_count;
 	// Visual filter (PlaceObject3 FilterList)
 	u8 filter_type;       // 0=none, 1=blur, 2=drop_shadow, 3=glow, 4=bevel
 	u8 filter_quality;    // blur passes (1-3)
@@ -149,7 +156,30 @@ typedef struct DisplayObject
 	float filter_highlight_g;
 	float filter_highlight_b;
 	float filter_highlight_a;
+	// Scriptable color transform override (mutable at runtime by ActionScript)
+	double cx_ra, cx_ga, cx_ba, cx_aa;  // multipliers (percentage: 100.0 = normal)
+	double cx_rb, cx_gb, cx_bb, cx_ab;  // addends (0..255 range, 0 = normal)
+	int cx_overridden;                   // 1 if cx_* fields override cxform_data[]
+	// Timeline tracking
+	u8 sprite_needs_init;   // 1 if frame_0 needs to run this tick (NO_GRAPHICS)
+	u8 depth_swapped;       // 1 if moved here by swapDepths (skip timeline modifies)
+	size_t placed_at_frame; // frame index when this object was placed
+	size_t place_gen;       // monotonic generation counter for same-frame detection
+	// Clip event interaction state
+	u8 clip_mc_pressed;     // 1 if CLIP_EVENT_PRESS was fired for this clip (awaiting RELEASE/RELEASE_OUTSIDE)
+	u8 enterframe_eligible; // 1 if AS2 onEnterFrame should fire this tick (set by init/advance, cleared after dispatch)
+	u8 constructor_invoked; // 1 if registered class constructor was already invoked during eager init
+	u8 sprite_initialized;  // 0=not init, 1=init'd this tick, 2=init'd on previous tick (for per-tick EnterFrame gating)
+	// Cached transform values (populated at placement time for correct bounds on child SWFs)
+	float place_a, place_b, place_c, place_d, place_tx, place_ty;
 } DisplayObject;
+
+typedef struct KeyState {
+	uint8_t down[256];     // 1 if key currently held (indexed by ASCII/keyCode)
+	uint8_t toggled[256];  // toggle state for lock keys (CapsLock=20, NumLock=144, ScrollLock=145)
+	int last_key_down;     // keyCode of most recently pressed key (-1 if none)
+	int last_key_ascii;    // ASCII value of last key press (for Key.getAscii())
+} KeyState;
 
 typedef struct MouseState {
 	float stage_x;      // Mouse X in twips (stage coordinates)
@@ -157,8 +187,8 @@ typedef struct MouseState {
 	int button_down;    // 1 if left mouse button is held
 	int clicked;        // 1 if button was pressed this frame (edge)
 	int released;       // 1 if button was released this frame (edge)
+	int moved;          // 1 if mouse moved this frame (edge)
 } MouseState;
-#endif
 
 // Macros for stack access via app_context
 #define STACK (app_context->stack)
@@ -176,7 +206,13 @@ typedef struct SWFAppContext
 	size_t frame_count;  // Local addition - kept for compatibility
 	u16 fps;
 
-#ifndef NO_GRAPHICS
+	// Shape/transform data (available in all modes for hit testing)
+	char* shape_data;
+	size_t shape_data_size;
+	char* transform_data;
+	size_t transform_data_size;
+
+#if !defined(NO_GRAPHICS) || defined(HEADLESS_GRAPHICS)
 	int width;
 	int height;
 
@@ -186,10 +222,6 @@ typedef struct SWFAppContext
 	size_t bitmap_highest_w;
 	size_t bitmap_highest_h;
 
-	char* shape_data;
-	size_t shape_data_size;
-	char* transform_data;
-	size_t transform_data_size;
 	char* color_data;
 	size_t color_data_size;
 	char* uninv_mat_data;
@@ -211,10 +243,12 @@ typedef struct SWFAppContext
 	char* morph_end_color_data;
 	size_t morph_end_color_data_size;
 
-	MouseState mouse;
-
 	void* audio_ctx;  // AudioContext* (opaque to avoid header dependency)
 #endif
+
+	// Input state (works in both graphics and NO_GRAPHICS modes)
+	MouseState mouse;
+	KeyState keys;
 
 	// Heap management fields
 	O1HeapInstance* heap_instance;
@@ -245,12 +279,43 @@ extern size_t g_frame_count;
 // Drag state tracking (works in both graphics and NO_GRAPHICS modes)
 extern int is_dragging;         // 1 if a sprite is being dragged, 0 otherwise
 extern char* dragged_target;    // Name of the target being dragged (or NULL)
+// Virtual drag position: registration point of dragged/last-dragged clip (twips).
+// Updated on mouse move while dragging; persists after stopDrag for PRESS hit-testing.
+extern float g_drag_virt_x;
+extern float g_drag_virt_y;
+// Name of the most recently dragged clip (persists after stopDrag for PRESS hit-testing).
+extern char g_drag_target_name[256];
 
-#ifndef NO_GRAPHICS
 extern Character* dictionary;
 
 extern DisplayObject* display_list;
 extern size_t max_depth;
-#endif
+
+// Movie entry for pre-compiled child SWFs (multi-SWF / loadMovie support)
+typedef struct MovieEntry {
+	const char* filename;              // "target.swf"
+	frame_func* frame_funcs;           // child's frame function array
+	void (*init_func)(SWFAppContext*); // child's tagInit function
+	u16 swf_version;
+	u16 frame_count;
+	u16 stage_width;
+	u16 stage_height;
+	u32 file_size;                     // SWF file size in bytes (for onLoadProgress)
+	u8 movie_id;                       // 0 = main SWF, 1+ = child SWFs (for per-movie export isolation)
+	float (*transform_data_ptr)[16];   // pointer to child SWF's transform_data (NULL = use main SWF's)
+} MovieEntry;
+
+// Find a pre-compiled movie entry by filename (defined in movie_registry.c when HAS_CHILD_MOVIES)
+MovieEntry* findMovieEntry(const char* filename);
+
+// Data file entry for loadVariables pre-bundled data
+typedef struct DataFileEntry {
+	const char* filename;
+	const char* content;
+	int content_length;
+} DataFileEntry;
+
+// Find a pre-bundled data file by filename (defined in data_registry.c when HAS_DATA_FILES)
+DataFileEntry* findDataFile(const char* filename);
 
 void swfStart(SWFAppContext* app_context);
