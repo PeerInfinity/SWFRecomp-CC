@@ -1,8 +1,8 @@
 {
   "metadata": {
-    "timestamp": "2026-03-16T19:35:55.060533+00:00",
-    "git_sha": "3bb6128369c8d2c2439b3babcce39edc85eb0dda",
-    "duration_seconds": 218.45,
+    "timestamp": "2026-03-17T02:29:48.501968+00:00",
+    "git_sha": "be80957869ba54972867d424d1362bbaa6740fc0",
+    "duration_seconds": 230.81,
     "total_available": 14,
     "shards": 30
   },
@@ -23,7 +23,7 @@
         "expected_lines": 2,
         "matching_lines": 1
       },
-      "duration": 15.15,
+      "duration": 15.62,
       "status": "output_mismatch",
       "detail": "1 line(s) differ (actual=2, expected=2)",
       "actual_output": "FAILED: func used overridden dictionary \nEND OF TEST",
@@ -37,7 +37,7 @@
         "expected_lines": 0,
         "matching_lines": 0
       },
-      "duration": 15.61,
+      "duration": 16.97,
       "status": "pass"
     },
     {
@@ -48,22 +48,22 @@
         "expected_lines": 3,
         "matching_lines": 3
       },
-      "duration": 16.25,
+      "duration": 17.44,
       "status": "pass"
     },
     {
       "test": "dict_cross",
       "num_frames": 30,
       "status": "compile_fail",
-      "detail": "/tmp/swf_verify_q0bdxg9q/script_1.c:9:9: error: expected declaration or statement at end of input",
-      "duration": 15.9
+      "detail": "/tmp/swf_verify_4qwlgs6i/script_1.c:9:9: error: expected declaration or statement at end of input",
+      "duration": 15.86
     },
     {
       "test": "dict_event",
       "num_frames": 30,
       "status": "compile_fail",
-      "detail": "/tmp/swf_verify_s8qwhbl8/script_2.c:9:9: error: expected declaration or statement at end of input",
-      "duration": 16.13
+      "detail": "/tmp/swf_verify_i0piixo7/script_2.c:9:9: error: expected declaration or statement at end of input",
+      "duration": 17.61
     },
     {
       "test": "dict_override",
@@ -73,7 +73,7 @@
         "expected_lines": 2,
         "matching_lines": 1
       },
-      "duration": 16.13,
+      "duration": 15.87,
       "status": "output_mismatch",
       "detail": "1 line(s) differ (actual=2, expected=2)",
       "actual_output": "FAILED: overridden dictionary not used\nEND OF TEST",
@@ -87,7 +87,7 @@
         "expected_lines": 3,
         "matching_lines": 1
       },
-      "duration": 15.5,
+      "duration": 17.21,
       "status": "output_mismatch",
       "detail": "2 line(s) differ (actual=3, expected=3)",
       "actual_output": "aaaa\nFAILED: func used overridden dictionary \nEND OF TEST",
@@ -101,7 +101,7 @@
         "expected_lines": 2,
         "matching_lines": 0
       },
-      "duration": 15.2,
+      "duration": 16.33,
       "status": "output_mismatch",
       "detail": "2 line(s) differ (actual=0, expected=2)",
       "actual_output": "",
@@ -111,15 +111,15 @@
       "test": "jump_after_end",
       "num_frames": 30,
       "status": "compile_fail",
-      "detail": "/tmp/swf_verify_ee4psurc/script_0.c:22:9: error: label \u2018label_121\u2019 used but not defined",
-      "duration": 15.46
+      "detail": "/tmp/swf_verify_923n3p4s/script_0.c:22:9: error: label \u2018label_121\u2019 used but not defined",
+      "duration": 17.0
     },
     {
       "test": "jump_to_prev_block",
       "num_frames": 30,
       "status": "compile_fail",
-      "detail": "/tmp/swf_verify_0zdqmfv3/script_2.c:24:20: error: expected \u2018;\u2019 before \u2018-\u2019 token",
-      "duration": 15.44
+      "detail": "/tmp/swf_verify_y50wvl9d/script_2.c:24:20: error: expected \u2018;\u2019 before \u2018-\u2019 token",
+      "duration": 15.87
     },
     {
       "test": "missing_bitmap",
@@ -129,7 +129,7 @@
         "expected_lines": 0,
         "matching_lines": 0
       },
-      "duration": 15.19,
+      "duration": 15.92,
       "status": "pass"
     },
     {
@@ -140,7 +140,7 @@
         "expected_lines": 1,
         "matching_lines": 1
       },
-      "duration": 15.17,
+      "duration": 16.7,
       "status": "pass"
     },
     {
@@ -151,7 +151,7 @@
         "expected_lines": 1,
         "matching_lines": 0
       },
-      "duration": 15.52,
+      "duration": 15.47,
       "status": "output_mismatch",
       "detail": "15 line(s) differ (actual=15, expected=1)",
       "actual_output": "i1-a1-a2-a3-1\ni1-a1-a2-a3-1a1-a2-a3-1\ni1-a1-a2-a3-1a1-a2-a3-1a1-a2-a3-1\ni1-a1-a2-a3-1a1-a2-a3-1a1-a2-a3-1a1-a2-a3-1\ni1-a1-a2-a3-1a1-a2-a3-1a1-a2-a3-1a1-a2-a3-1a1-a2-a3-1\ni1-a1-a2-a3-1a1-a2-a3-1a1-a2-a3-1a1-a2-a3-1a1-a2-a3-1a1-a2-a3-1\ni1-a1-a2-a3-1a1-a2-a3-1a1-a2-a3-1a1-a2-a3-1a1-a2-a3-1a1-a2-a3-1a1-a2-a3-1\ni1-a1-a2-a3-1a1-a2-a3-1a1-a2-a3-1a1-a2-a3-1a1-a2-a3-1a1-a2-a3-1a1-a2-a3-1a1-a2-a3-1\ni1-a1-a2-a3-1a1-a2-a3-1a1-a2-a3-1a1-a2-a3-1a1-a2-a3-1a1-a2-a3-1a1-a2-a3-1a1-a2-a3-1a1-a2-a3-1\ni1-a1-a2-a3-1a1-a2-a3-1a1-a2-a3-1a1-a2-a3-1a1-a2-a3-1a1-a2-a3-1a1-a2-a3-1a1-a2-a3-1a1-a2-a3-1a1-a2-a3-1\ni1-a1-a2-a3-1a1-a2-a3-1a1-a2-a3-1a1-a2-a3-1a1-a2-a3-1a1-a2-a3-1a1-a2-a3-1a1-a2-a3-1a1-a2-a3-1a1-a2-a3-1a1-a2-a3-1\ni1-a1-a2-a3-1a1-a2-a3-1a1-a2-a3-1a1-a2-a3-1a1-a2-a3-1a1-a2-a3-1a1-a2-a3-1a1-a2-a3-1a1-a2-a3-1a1-a2-a3-1a1-a2-a3-1a1-a2-a3-1\ni1-a1-a2-a3-1a1-a2-a3-1a1-a2-a3-1a1-a2-a3-1a1-a2-a3-1a1-a2-a3-1a1-a2-a3-1a1-a2-a3-1a1-a2-a3-1a1-a2-a3-1a1-a2-a3-1a1-a2-a3-1a1-a2-a3-1\ni1-a1-a2-a3-1a1-a2-a3-1a1-a2-a3-1a1-a2-a3-1a1-a2-a3-1a1-a2-a3-1a1-a2-a3-1a1-a2-a3-1a1-a2-a3-1a1-a2-a3-1a1-a2-a3-1a1-a2-a3-1a1-a2-a3-1a1-a2-a3-1\ni1-a1-a2-a3-1a1-a2-a3-1a1-a2-a3-1a1-a2-a3-1a1-a2-a3-1a1-a2-a3-1a1-a2-a3-1a1-a2-a3-1a1-a2-a3-1a1-a2-a3-1a1-a2-a3-1a1-a2-a3-1a1-a2-a3-1a1-a2-a3-1a1-a2-a3-1",
@@ -165,7 +165,7 @@
         "expected_lines": 3,
         "matching_lines": 0
       },
-      "duration": 15.76,
+      "duration": 16.16,
       "status": "output_mismatch",
       "detail": "3 line(s) differ (actual=2, expected=3)",
       "actual_output": "FAILED: expected a00b11c22d000        \nEND OF TEST",
