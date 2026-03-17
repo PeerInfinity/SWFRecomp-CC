@@ -1,10 +1,10 @@
 # Ruffle Test Results (Filtered)
 
-**Date**: 2026-03-17 02:29 UTC
+**Date**: 2026-03-17 03:26 UTC
 
-**Git SHA**: `be80957869`
+**Git SHA**: `2fced9201c`
 
-**Run Duration**: 3m 51s
+**Run Duration**: 3m 55s
 
 **Filtered**: 0 tests ignored out of 14 available
 
@@ -32,10 +32,10 @@
 
 | # | Test | Lines | Duration | Notes |
 |---|------|-------|----------|-------|
-| 1 | `background` | 0 | 17.0s |  |
-| 2 | `dict_callframe` | 3 | 17.4s |  |
-| 3 | `missing_bitmap` | 0 | 15.9s |  |
-| 4 | `mixed-bytecode-as2` | 1 | 16.7s |  |
+| 1 | `background` | 0 | 15.7s |  |
+| 2 | `dict_callframe` | 3 | 16.0s |  |
+| 3 | `missing_bitmap` | 0 | 17.1s |  |
+| 4 | `mixed-bytecode-as2` | 1 | 17.4s |  |
 
 ## Near-Passing Tests
 
