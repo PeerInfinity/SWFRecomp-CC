@@ -34833,6 +34833,14 @@ void actionNewObject(SWFAppContext* app_context)
 					this_var.data.numeric_value = (u64) obj;
 					setVariableByName("this", &this_var);
 
+					// Also push to g_this_stack so the early "this" resolution in
+					// actionGetVariable finds the new object (not an outer MC context)
+					u32 _saved_this_depth = g_this_depth;
+					if (g_this_depth < MAX_THIS_DEPTH) {
+						g_this_stack[g_this_depth] = this_var;
+						g_this_depth++;
+					}
+
 					// Push arguments onto stack for parameter binding
 					// Arguments are already in args[] in pop order (first arg = args[0])
 					// But DefineFunction binds params by popping, so push in reverse
@@ -34847,6 +34855,7 @@ void actionNewObject(SWFAppContext* app_context)
 					return_value = ((ActionVar(*)(SWFAppContext*))ctor_func->simple_func)(app_context);
 					popCtorContext();
 					g_call_depth--;
+					g_this_depth = _saved_this_depth;
 
 					// Per ECMAScript spec: if constructor returns object, use it
 					if (return_value.type == ACTION_STACK_VALUE_OBJECT && return_value.data.numeric_value != 0)
