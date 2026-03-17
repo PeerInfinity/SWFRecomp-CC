@@ -44464,7 +44464,7 @@ void actionCallMethod(SWFAppContext* app_context, char* str_buffer)
 
 				// Copy URL from parent
 				strncpy(child->url, mc->url[0] ? mc->url : root_movieclip.url, sizeof(child->url) - 1);
-				child->url[sizeof(child->url) - 1] = ' ';
+				child->url[sizeof(child->url) - 1] = 0;   
 
 				// Register child on parent MC's dynamic_props so mc.childName works via GetMember
 				if (mc->dynamic_props == NULL) {
@@ -49991,8 +49991,11 @@ void actionTextFieldInput(SWFAppContext* app_context, int codepoint)
 	mc_call_as2_handler_ng(app_context, g_focused_mc, "onChanged", 9, NULL, 0);
 }
 
+#endif // NO_GRAPHICS (AS2 MC event dispatch, text field handling)
+
 // ==================================================================
 // Timer System Implementation (setInterval / setTimeout / clearInterval)
+// These are needed in both graphics and non-graphics modes.
 // ==================================================================
 
 // Helper: coerce an ActionVar to double using the stack (handles valueOf on objects)
@@ -50450,5 +50453,3 @@ int hasActiveTimers(void)
 	}
 	return 0;
 }
-
-#endif // NO_GRAPHICS (AS2 MC event dispatch)

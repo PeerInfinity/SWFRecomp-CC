@@ -81,8 +81,10 @@ extern MovieClip* g_event_this_mc;
 
 // Override 'this' — passes arbitrary ActionVar as 'this' to DefineFunction2.
 // Used for primitive thisArg in call/apply and undefined this in empty-method-name calls.
+#ifndef DYNAMIC_GUEST
 extern ActionVar g_override_this;
 extern int g_override_this_set;
+#endif
 
 // Check if the current execution context's base clip has been removed.
 // Used by generated code to halt script execution after function calls.

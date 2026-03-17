@@ -97,8 +97,10 @@ emcc \
     -s WASM=1 \
     -s EXPORTED_FUNCTIONS=@"${BUILD_DIR}/exports_final.json" \
     -s ALLOW_TABLE_GROWTH=1 \
-    -s EXPORTED_RUNTIME_METHODS='["ccall","cwrap","addFunction","removeFunction","HEAPF32","wasmMemory"]' \
+    -s EXPORTED_RUNTIME_METHODS='["ccall","cwrap","addFunction","removeFunction","HEAPF32","wasmMemory","wasmTable"]' \
+    -s SHARED_MEMORY=1 \
     -s ALLOW_MEMORY_GROWTH=1 \
+    -s MAXIMUM_MEMORY=2147483648 \
     -s INITIAL_MEMORY=67108864 \
     -sASYNCIFY \
     -sASYNCIFY_STACK_SIZE=65536 \

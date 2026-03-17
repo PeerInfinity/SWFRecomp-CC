@@ -266,7 +266,9 @@ typedef struct SWFAppContext
 	u32* str_cache_len;
 } SWFAppContext;
 
+#ifndef DYNAMIC_GUEST
 extern int quit_swf;
+#endif
 extern int is_playing;
 extern size_t current_frame;
 extern size_t next_frame;

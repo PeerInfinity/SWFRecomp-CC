@@ -330,9 +330,65 @@ function extractTraceOutput(stdout) {
     return trace.join("\n");
 }
 
+// --- Graphics pipeline integration ---
+
+async function processSwfGraphics(swfBytes) {
+    const { initWasmer: gfxInitWasmer, loadClang: gfxLoadClang,
+            compileGuestModule, runGraphicsGuest } = await import("./pipeline_graphics.js");
+
+    showStatus();
+    const steps = ["step-recompile", "step-compile", "step-run"];
+    steps.forEach(s => setStep(s, ""));
+
+    try {
+        // Phase 1: Recompile SWF → C (same as trace)
+        setStep("step-recompile", "active");
+        const RecompModule = await loadRecompiler();
+        const generatedFiles = recompileSWF(RecompModule, swfBytes);
+        const fileCount = Object.keys(generatedFiles).length;
+        setStep("step-recompile", "done");
+        document.getElementById("step-recompile").textContent =
+            `Recompiled SWF to ${fileCount} C files`;
+
+        // Phase 2: Compile guest WASM
+        setStep("step-compile", "active");
+        const compileStatus = document.getElementById("step-compile");
+        const setCompileStatus = (msg) => { compileStatus.textContent = msg + " ..."; };
+        setCompileStatus("Initializing Wasmer SDK");
+        await gfxInitWasmer();
+        setCompileStatus("Loading Clang compiler (~100 MB)");
+        await gfxLoadClang();
+        const guestWasm = await compileGuestModule(generatedFiles, setCompileStatus);
+        setStep("step-compile", "done");
+        document.getElementById("step-compile").textContent =
+            `Compiled guest to WASM (${(guestWasm.length / 1024).toFixed(0)} KB)`;
+
+        // Phase 3: Load host + instantiate guest + run
+        document.getElementById("step-run").style.display = "";
+        setStep("step-run", "active");
+        document.getElementById("step-run").textContent = "Loading graphics host + running...";
+        await runGraphicsGuest(guestWasm);
+        setStep("step-run", "done");
+
+    } catch (e) {
+        console.error(e);
+        const currentStep = steps.find(s =>
+            document.getElementById(s).classList.contains("active"));
+        if (currentStep) setStep(currentStep, "error");
+        showError(e.message);
+    }
+}
+
 // --- Main pipeline ---
 
+function getSelectedMode() {
+    return document.getElementById("modeSelect")?.value || "trace";
+}
+
 async function processSwf(swfBytes) {
+    if (getSelectedMode() === "graphics") {
+        return processSwfGraphics(swfBytes);
+    }
     showStatus();
     const steps = ["step-recompile", "step-compile", "step-run"];
     steps.forEach(s => setStep(s, ""));
@@ -434,8 +490,17 @@ function handleFile(file) {
 // --- Demo button ---
 
 document.getElementById("demoBtn").addEventListener("click", async () => {
-    dropZone.querySelector("p").textContent = "add.swf";
-    const resp = await fetch("./add.swf");
+    const mode = getSelectedMode();
+    const swfName = mode === "graphics" ? "keyboard_input.swf" : "add.swf";
+    dropZone.querySelector("p").textContent = swfName;
+    const resp = await fetch(`./${swfName}`);
     const bytes = await resp.arrayBuffer();
     processSwf(bytes);
+});
+
+// Update demo button text when mode changes
+document.getElementById("modeSelect")?.addEventListener("change", () => {
+    const mode = getSelectedMode();
+    document.getElementById("demoBtn").textContent =
+        mode === "graphics" ? "Try example: keyboard_input.swf" : "Try example: add.swf";
 });

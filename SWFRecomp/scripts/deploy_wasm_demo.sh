@@ -137,6 +137,27 @@ copy_header "${SWFMODERN_INC}/memory/heap.h" "include/memory/heap.h"
 MANIFEST="${MANIFEST%,}]"
 echo "${MANIFEST}" > "${DEMO_DIR}/runtime_headers/manifest.json"
 
+# --- Graphics host module ---
+GRAPHICS_HOST_DIR="${SWFRECOMP_ROOT}/build_graphics_host"
+if [ -f "${GRAPHICS_HOST_DIR}/graphics_host.js" ] && [ -f "${GRAPHICS_HOST_DIR}/graphics_host.wasm" ]; then
+    echo "  Copying graphics host module..."
+    cp "${GRAPHICS_HOST_DIR}/graphics_host.js" "${DEMO_DIR}/"
+    cp "${GRAPHICS_HOST_DIR}/graphics_host.wasm" "${DEMO_DIR}/"
+
+    # Graphics guest support files
+    echo "  Copying graphics guest support files..."
+    mkdir -p "${DEMO_DIR}/runtime_src_graphics"
+    cp "${SWFRECOMP_ROOT}/wasm_wrappers/guest_main_graphics.c" "${DEMO_DIR}/runtime_src_graphics/"
+    cp "${SWFRECOMP_ROOT}/wasm_wrappers/bridge_globals.h" "${DEMO_DIR}/runtime_src_graphics/"
+
+    # Pre-compiled bridge_globals.o
+    if [ -f "${BUILD_DIR}/bridge_globals.o" ]; then
+        cp "${BUILD_DIR}/bridge_globals.o" "${DEMO_DIR}/runtime_src_graphics/"
+    fi
+else
+    echo "  (Skipping graphics host — not built yet)"
+fi
+
 echo ""
 echo "Demo deployed. Files:"
 find "${DEMO_DIR}" -type f | sort | while read f; do

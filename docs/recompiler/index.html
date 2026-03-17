@@ -103,6 +103,14 @@
         <input type="file" id="fileInput" accept=".swf">
     </div>
 
+    <div style="margin-bottom: 1rem; display: flex; gap: 0.5rem; align-items: center;">
+        <label style="color: #888; font-size: 0.9em;">Mode:</label>
+        <select id="modeSelect" style="background: #16213e; color: #4ecca3; border: 1px solid #4ecca3; border-radius: 6px; padding: 0.3rem 0.8rem; font-size: 0.9em;">
+            <option value="trace">Trace (text output)</option>
+            <option value="graphics">Graphics (WebGPU)</option>
+        </select>
+    </div>
+
     <button class="demo-btn" id="demoBtn">Try example: add.swf</button>
 
     <div id="status">
@@ -110,6 +118,8 @@
         <div class="status-step" id="step-compile">Compiling C to WASM...</div>
         <div class="status-step" id="step-run">Running WASM...</div>
     </div>
+
+    <canvas id="canvas" width="550" height="400" tabindex="0" style="display: none; border: 1px solid #333; border-radius: 8px; margin-bottom: 1rem; outline: none;"></canvas>
 
     <div id="output-container">
         <div id="output-label">Trace Output</div>
