@@ -85,6 +85,7 @@ WASI_CFLAGS=(
     -I"${SWFMODERN_ROOT}/lib/o1heap"
     -I"${SWFMODERN_SRC}/actionmodern"
     -mllvm -wasm-enable-sjlj
+    -matomics -mbulk-memory
     -std=gnu17
     -O2
     -w
@@ -127,6 +128,7 @@ copy_header "${SWFMODERN_INC}/actionmodern/variables.h" "include/actionmodern/va
 copy_header "${SWFMODERN_INC}/libswf/recomp.h" "include/libswf/recomp.h"
 copy_header "${SWFMODERN_INC}/libswf/swf.h" "include/libswf/swf.h"
 copy_header "${SWFMODERN_INC}/libswf/tag.h" "include/libswf/tag.h"
+copy_header "${SWFMODERN_INC}/libswf/hit_test.h" "include/libswf/hit_test.h"
 
 # memory headers
 copy_header "${SWFMODERN_INC}/memory/heap.h" "include/memory/heap.h"

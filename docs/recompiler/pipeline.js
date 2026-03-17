@@ -263,9 +263,10 @@ async function compileToWasm(generatedFiles, setStatus) {
         ...Object.keys(generatedFiles).filter(f => f.endsWith(".c")),
     ];
 
-    // Use clang entrypoint (slim driver) — it can invoke cc1 as subprocess
-    // for multi-file compilation. The full clang-16 binary crashes when run
-    // standalone (exit 45, no output), but works as cc1 subprocess.
+    // The clang entrypoint (slim driver) has preset main-args that include
+    // -pthread, --shared-memory, etc. The resulting WASM binary imports
+    // shared memory and wasix_32v1 threading functions. The WASI shim
+    // handles these with appropriate stubs.
     const clangCmd = clang.entrypoint;
 
     // Helper: run a command via cmd.run(), return wait() result
@@ -281,8 +282,6 @@ async function compileToWasm(generatedFiles, setStatus) {
     console.log("[DIAG] .c files to compile:", cFiles);
 
     // Compile all generated .c files + link in a single invocation.
-    // The slim driver compiles each .c via cc1 subprocess, then links.
-    // Note: preset main-args include threading linker flags — see if they cause issues.
     setStatus(`Compiling ${cFiles.length} files and linking`);
 
     const compileResult = await runCmd(clangCmd, [

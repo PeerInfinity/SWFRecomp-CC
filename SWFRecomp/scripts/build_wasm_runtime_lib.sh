@@ -46,6 +46,7 @@ CFLAGS=(
     -I"${SWFMODERN_SRC}/actionmodern"
     -I"${BUILD_DIR}"
     -mllvm -wasm-enable-sjlj
+    -matomics -mbulk-memory
     -std=gnu17
     -O2
     -Wall
@@ -58,7 +59,9 @@ SOURCES=(
     "${SWFMODERN_SRC}/actionmodern/variables.c"
     "${SWFMODERN_SRC}/utils.c"
     "${SWFMODERN_SRC}/libswf/swf_core.c"
+    "${SWFMODERN_SRC}/libswf/tag.c"
     "${SWFMODERN_SRC}/libswf/tag_stubs.c"
+    "${SWFMODERN_SRC}/libswf/hit_test.c"
     "${SWFMODERN_SRC}/memory/heap.c"
     "${SWFMODERN_ROOT}/lib/c-hashmap/map.c"
     "${SWFMODERN_ROOT}/lib/o1heap/o1heap.c"
