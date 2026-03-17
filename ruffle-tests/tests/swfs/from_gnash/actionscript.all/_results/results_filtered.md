@@ -1,10 +1,10 @@
 # Ruffle Test Results (Filtered)
 
-**Date**: 2026-03-17 03:26 UTC
+**Date**: 2026-03-17 04:00 UTC
 
-**Git SHA**: `2fced9201c`
+**Git SHA**: `d3c03d557b`
 
-**Run Duration**: 57m 11s
+**Run Duration**: 57m 14s
 
 **Filtered**: 0 tests ignored out of 190 available
 
@@ -33,23 +33,23 @@
 
 | # | Test | Lines | Duration | Notes |
 |---|------|-------|----------|-------|
-| 1 | `BitmapData-v6` | 7 | 16.1s |  |
-| 2 | `BitmapData-v7` | 7 | 16.5s |  |
-| 3 | `ColorTransform-v6` | 7 | 16.3s |  |
-| 4 | `ColorTransform-v7` | 7 | 16.3s |  |
-| 5 | `ContextMenu-v6` | 7 | 16.5s |  |
-| 6 | `MovieClipLoader-v6` | 6 | 16.2s |  |
-| 7 | `Point-v6` | 7 | 16.4s |  |
-| 8 | `Point-v7` | 7 | 16.2s |  |
-| 9 | `Random-v6` | 30 | 16.6s |  |
-| 10 | `Random-v7` | 30 | 17.5s |  |
-| 11 | `Random-v8` | 30 | 16.8s |  |
-| 12 | `Rectangle-v6` | 7 | 16.2s |  |
-| 13 | `Rectangle-v7` | 7 | 16.2s |  |
-| 14 | `argstest-v5` | 4 | 17.0s |  |
-| 15 | `swap-v6` | 7 | 16.6s |  |
-| 16 | `swap-v7` | 7 | 16.6s |  |
-| 17 | `swap-v8` | 7 | 16.4s |  |
+| 1 | `BitmapData-v6` | 7 | 15.8s |  |
+| 2 | `BitmapData-v7` | 7 | 17.1s |  |
+| 3 | `ColorTransform-v6` | 7 | 16.2s |  |
+| 4 | `ColorTransform-v7` | 7 | 15.9s |  |
+| 5 | `ContextMenu-v6` | 7 | 16.0s |  |
+| 6 | `MovieClipLoader-v6` | 6 | 16.0s |  |
+| 7 | `Point-v6` | 7 | 16.6s |  |
+| 8 | `Point-v7` | 7 | 16.7s |  |
+| 9 | `Random-v6` | 30 | 16.5s |  |
+| 10 | `Random-v7` | 30 | 18.4s |  |
+| 11 | `Random-v8` | 30 | 17.4s |  |
+| 12 | `Rectangle-v6` | 7 | 16.9s |  |
+| 13 | `Rectangle-v7` | 7 | 17.1s |  |
+| 14 | `argstest-v5` | 4 | 16.5s |  |
+| 15 | `swap-v6` | 7 | 16.3s |  |
+| 16 | `swap-v7` | 7 | 16.4s |  |
+| 17 | `swap-v8` | 7 | 16.1s |  |
 
 ## Near-Passing Tests
 
@@ -159,19 +159,19 @@ Tests with output mismatch but >= 50% line match rate (low-hanging fruit).
 
 | # | Test | Duration | Notes |
 |---|------|----------|-------|
-| 1 | `HitTest-v6` | 20.8s |  |
-| 2 | `HitTest-v7` | 21.2s |  |
-| 3 | `HitTest-v8` | 21.7s |  |
-| 4 | `Try-v5` | 19.3s |  |
-| 5 | `Try-v6` | 19.4s |  |
-| 6 | `Try-v7` | 19.5s |  |
-| 7 | `Try-v8` | 19.7s |  |
-| 8 | `case-v5` | 19.2s |  |
-| 9 | `case-v6` | 20.5s |  |
-| 10 | `case-v7` | 20.4s |  |
+| 1 | `HitTest-v6` | 21.0s |  |
+| 2 | `HitTest-v7` | 21.1s |  |
+| 3 | `HitTest-v8` | 22.2s |  |
+| 4 | `Try-v5` | 19.5s |  |
+| 5 | `Try-v6` | 19.7s |  |
+| 6 | `Try-v7` | 19.4s |  |
+| 7 | `Try-v8` | 19.4s |  |
+| 8 | `case-v5` | 20.1s |  |
+| 9 | `case-v6` | 20.3s |  |
+| 10 | `case-v7` | 20.6s |  |
 | 11 | `case-v8` | 20.0s |  |
-| 12 | `toString_valueOf-v5` | 22.0s |  |
-| 13 | `toString_valueOf-v6` | 23.1s |  |
+| 12 | `toString_valueOf-v5` | 21.7s |  |
+| 13 | `toString_valueOf-v6` | 22.3s |  |
 
 ## Runtime Errors
 
