@@ -41993,11 +41993,19 @@ void actionCallMethod(SWFAppContext* app_context, char* str_buffer)
 				this_var.type = ACTION_STACK_VALUE_OBJECT;
 				this_var.data.numeric_value = (u64)this_obj;
 				setVariableByName("this", &this_var);
+				// Push to g_this_stack so the early "this" resolution in
+				// actionGetVariable finds the correct object
+				u32 _saved_this_depth = g_this_depth;
+				if (g_this_depth < MAX_THIS_DEPTH) {
+					g_this_stack[g_this_depth] = this_var;
+					g_this_depth++;
+				}
 				for (int i = (int)num_args - 1; i >= 0; i--)
 					pushVar(app_context, &args[i]);
 				g_call_depth++;
 				result = ((ActionVar(*)(SWFAppContext*))method_func->simple_func)(app_context);
 				g_call_depth--;
+				g_this_depth = _saved_this_depth;
 			}
 
 			popSuperContext();
@@ -42117,11 +42125,17 @@ void actionCallMethod(SWFAppContext* app_context, char* str_buffer)
 					this_var.type = ACTION_STACK_VALUE_OBJECT;
 					this_var.data.numeric_value = (u64)super_this;
 					setVariableByName("this", &this_var);
+					u32 _saved_this_depth2 = g_this_depth;
+					if (g_this_depth < MAX_THIS_DEPTH) {
+						g_this_stack[g_this_depth] = this_var;
+						g_this_depth++;
+					}
 					for (int i = (int)num_args - 1; i >= 0; i--)
 						pushVar(app_context, &args[i]);
 					g_call_depth++;
 					result = ((ActionVar(*)(SWFAppContext*))method_func->simple_func)(app_context);
 					g_call_depth--;
+					g_this_depth = _saved_this_depth2;
 				}
 
 				popSuperContext();
