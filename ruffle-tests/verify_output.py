@@ -651,9 +651,8 @@ def generate_child_movie_file(child_swf_name, child_recomp_dir, build_dir, swf_f
         for m in re.finditer(r'\b(str_\d+)\b', script_defs_source):
             if m.group(1) not in str_names:
                 str_names.append(m.group(1))
-        m = re.search(r"#define\s+MAX_STRING_ID\s+(\d+)", script_defs_source)
-        if m:
-            max_string_id = int(m.group(1))
+        for m in re.finditer(r"#define\s+MAX_STRING_ID\s+(\d+)", script_defs_source):
+            max_string_id = max(max_string_id, int(m.group(1)))
 
     # Read the child's script_N.c files (exclude script_defs.c — handled above)
     script_sources = {}
