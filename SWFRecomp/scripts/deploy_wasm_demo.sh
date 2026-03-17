@@ -137,6 +137,23 @@ copy_header "${SWFMODERN_INC}/memory/heap.h" "include/memory/heap.h"
 MANIFEST="${MANIFEST%,}]"
 echo "${MANIFEST}" > "${DEMO_DIR}/runtime_headers/manifest.json"
 
+# --- Demo manifest ---
+echo "  Generating demos.json..."
+python3 -c "
+import os, json
+examples = '${PROJECT_ROOT}/docs/examples'
+trace = sorted([d for d in os.listdir(examples)
+    if d != 'graphics' and os.path.isdir(os.path.join(examples, d))
+    and os.path.exists(os.path.join(examples, d, 'test.swf'))])
+graphics_dir = os.path.join(examples, 'graphics')
+graphics = sorted([d for d in os.listdir(graphics_dir)
+    if os.path.isdir(os.path.join(graphics_dir, d))
+    and os.path.exists(os.path.join(graphics_dir, d, 'test.swf'))]) if os.path.isdir(graphics_dir) else []
+with open('${DEMO_DIR}/demos.json', 'w') as f:
+    json.dump({'trace': trace, 'graphics': graphics}, f)
+print(f'    {len(trace)} trace, {len(graphics)} graphics demos')
+"
+
 # --- Graphics host module ---
 GRAPHICS_HOST_DIR="${SWFRECOMP_ROOT}/build_graphics_host"
 if [ -f "${GRAPHICS_HOST_DIR}/graphics_host.js" ] && [ -f "${GRAPHICS_HOST_DIR}/graphics_host.wasm" ]; then

@@ -382,12 +382,37 @@ async function processSwfGraphics(swfBytes) {
 // --- Main pipeline ---
 
 function getSelectedMode() {
-    return document.getElementById("modeSelect")?.value || "trace";
+    return document.querySelector('input[name="mode"]:checked')?.value || "trace";
 }
 
-async function processSwf(swfBytes) {
-    if (getSelectedMode() === "graphics") {
-        return processSwfGraphics(swfBytes);
+// Detect if generated files indicate graphics content
+function detectGraphicsFromFiles(generatedFiles) {
+    const draws = generatedFiles["draws.c"] || "";
+    // shape_data[1] = empty placeholder (trace), shape_data[N>1] = real shapes (graphics)
+    const match = draws.match(/shape_data\[(\d+)\]/);
+    if (match && parseInt(match[1]) > 1) return true;
+    // Also check for tagDefineShape in tagMain.c
+    const tagMain = generatedFiles["tagMain.c"] || "";
+    if (tagMain.includes("tagDefineShape")) return true;
+    return false;
+}
+
+async function processSwf(swfBytes, modeOverride) {
+    let mode = modeOverride || getSelectedMode();
+
+    if (mode === "auto" || mode === "graphics") {
+        // For auto mode on dropped files, we need to recompile first to detect.
+        // For explicit graphics or auto-detected graphics, use the graphics pipeline.
+        if (mode === "auto") {
+            // Quick recompile to detect mode
+            const Module = await loadRecompiler();
+            const files = recompileSWF(Module, swfBytes);
+            mode = detectGraphicsFromFiles(files) ? "graphics" : "trace";
+            console.log(`[AUTO] Detected mode: ${mode}`);
+        }
+        if (mode === "graphics") {
+            return processSwfGraphics(swfBytes);
+        }
     }
     showStatus();
     const steps = ["step-recompile", "step-compile", "step-run"];
@@ -480,6 +505,7 @@ function handleFile(file) {
         showError("Please select a .swf file");
         return;
     }
+    setListOpen(false);
     dropZone.querySelector("p").textContent = file.name;
 
     const reader = new FileReader();
@@ -487,20 +513,180 @@ function handleFile(file) {
     reader.readAsArrayBuffer(file);
 }
 
-// --- Demo button ---
+// --- Demo search + run ---
 
-document.getElementById("demoBtn").addEventListener("click", async () => {
-    const mode = getSelectedMode();
-    const swfName = mode === "graphics" ? "keyboard_input.swf" : "add.swf";
-    dropZone.querySelector("p").textContent = swfName;
-    const resp = await fetch(`./${swfName}`);
-    const bytes = await resp.arrayBuffer();
-    processSwf(bytes);
+let demoList = { trace: [], graphics: [] };
+let selectedDemo = null;
+
+// Load demo manifest
+fetch("./demos.json").then(r => r.json()).then(data => {
+    demoList = data;
+    updateDemoSearch();
+}).catch(() => {
+    // Fallback if demos.json doesn't exist
+    demoList = { trace: ["add_swf_4"], graphics: ["keyboard_input"] };
+    updateDemoSearch();
 });
 
-// Update demo button text when mode changes
-document.getElementById("modeSelect")?.addEventListener("change", () => {
+const demoSearch = document.getElementById("demoSearch");
+const demoResults = document.getElementById("demoResults");
+
+function getEffectiveMode() {
     const mode = getSelectedMode();
-    document.getElementById("demoBtn").textContent =
-        mode === "graphics" ? "Try example: keyboard_input.swf" : "Try example: add.swf";
+    return mode === "auto" ? "trace" : mode;  // for demo list, auto shows trace
+}
+
+function getDemosForMode() {
+    const mode = getSelectedMode();
+    if (mode === "auto") {
+        // Show both lists combined, with graphics prefixed
+        return [
+            ...demoList.trace,
+            ...demoList.graphics.map(d => `graphics/${d}`),
+        ];
+    }
+    return mode === "graphics" ? demoList.graphics : demoList.trace;
+}
+
+function updateDemoSearch() {
+    const demos = getDemosForMode();
+    const mode = getSelectedMode();
+    demoSearch.placeholder = `Search demos... (${demos.length} ${mode} tests)`;
+    if (selectedDemo && !demos.includes(selectedDemo)) {
+        selectedDemo = null;
+        demoSearch.value = "";
+    }
+    filterDemos();
+}
+
+function highlightMatch(text, query) {
+    if (!query) return text;
+    const idx = text.toLowerCase().indexOf(query.toLowerCase());
+    if (idx < 0) return text;
+    return text.slice(0, idx) +
+        `<span class="match">${text.slice(idx, idx + query.length)}</span>` +
+        text.slice(idx + query.length);
+}
+
+const browseBtn = document.getElementById("demoBrowseBtn");
+
+function setListOpen(open) {
+    if (open) {
+        filterDemos();
+        browseBtn.style.borderColor = "#4ecca3";
+        browseBtn.style.color = "#4ecca3";
+    } else {
+        demoResults.style.display = "none";
+        browseBtn.style.borderColor = "#555";
+        browseBtn.style.color = "#888";
+    }
+}
+
+function filterDemos() {
+    const query = demoSearch.value.trim();
+    const demos = getDemosForMode();
+    const filtered = query
+        ? demos.filter(d => d.toLowerCase().includes(query.toLowerCase()))
+        : demos;
+
+    if (filtered.length === 0) {
+        demoResults.innerHTML = `<div style="padding: 0.4rem 0.8rem; color: #666; font-size: 0.85em;">No matches</div>`;
+    } else {
+        demoResults.innerHTML = filtered.map(d =>
+            `<div class="demo-item${d === selectedDemo ? ' selected' : ''}" data-demo="${d}">${highlightMatch(d, query)}</div>`
+        ).join("");
+    }
+    demoResults.style.display = "block";
+    browseBtn.style.borderColor = "#4ecca3";
+    browseBtn.style.color = "#4ecca3";
+}
+
+function isListOpen() {
+    return demoResults.style.display !== "none";
+}
+
+demoSearch.addEventListener("input", () => { setListOpen(true); });
+demoSearch.addEventListener("focus", () => { setListOpen(true); });
+demoSearch.addEventListener("blur", () => {
+    setTimeout(() => { setListOpen(false); }, 200);
+});
+
+browseBtn.addEventListener("click", () => {
+    if (isListOpen()) {
+        setListOpen(false);
+    } else {
+        setListOpen(true);
+        demoSearch.focus();
+    }
+});
+demoSearch.addEventListener("keydown", (e) => {
+    if (e.key === "Enter") {
+        const demos = getDemosForMode();
+        const query = demoSearch.value.trim();
+        const match = query
+            ? demos.find(d => d.toLowerCase().includes(query.toLowerCase()))
+            : null;
+        if (match) {
+            selectedDemo = match;
+            demoSearch.value = match;
+            demoResults.style.display = "none";
+            runSelectedDemo();
+        }
+    }
+});
+
+demoResults.addEventListener("click", (e) => {
+    const item = e.target.closest(".demo-item");
+    if (item) {
+        selectedDemo = item.dataset.demo;
+        demoSearch.value = selectedDemo;
+        setListOpen(false);
+    }
+});
+
+document.querySelectorAll('input[name="mode"]').forEach(r =>
+    r.addEventListener("change", updateDemoSearch)
+);
+
+async function runSelectedDemo() {
+    if (!selectedDemo) return;
+    const mode = getSelectedMode();
+
+    // Determine if this is a graphics demo
+    let isGraphics;
+    if (mode === "auto") {
+        isGraphics = selectedDemo.startsWith("graphics/");
+    } else {
+        isGraphics = mode === "graphics";
+    }
+
+    // Build the URL — strip "graphics/" prefix for the path
+    const demoName = selectedDemo.replace(/^graphics\//, "");
+    const swfUrl = isGraphics
+        ? `../examples/graphics/${demoName}/test.swf`
+        : `../examples/${demoName}/test.swf`;
+
+    dropZone.querySelector("p").textContent = `${selectedDemo}/test.swf`;
+    const resp = await fetch(swfUrl);
+    if (!resp.ok) {
+        showError(`Could not load ${swfUrl}`);
+        return;
+    }
+    const bytes = await resp.arrayBuffer();
+    processSwf(bytes, isGraphics ? "graphics" : "trace");
+}
+
+document.getElementById("demoBtn").addEventListener("click", () => {
+    setListOpen(false);
+    if (selectedDemo) {
+        runSelectedDemo();
+    } else {
+        // Fallback: pick first demo
+        const demos = getDemosForMode();
+        if (demos.length > 0) {
+            selectedDemo = demos[0];
+            demoSearch.value = selectedDemo;
+            runSelectedDemo();
+        }
+    }
 });

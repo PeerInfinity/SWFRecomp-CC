@@ -76,6 +76,18 @@
         }
         #output-container.visible { display: block; }
         #output-label { color: #4ecca3; margin-bottom: 0.5rem; font-weight: 600; }
+        .demo-item {
+            padding: 0.4rem 0.8rem;
+            cursor: pointer;
+            font-size: 0.85em;
+            border-bottom: 1px solid #1a1a2e;
+            color: #ccc;
+        }
+        .demo-item:hover, .demo-item.selected {
+            background: rgba(78, 204, 163, 0.15);
+            color: #4ecca3;
+        }
+        .demo-item .match { color: #e94560; font-weight: 600; }
         #output {
             width: 100%;
             background: #0f0f23;
@@ -103,15 +115,28 @@
         <input type="file" id="fileInput" accept=".swf">
     </div>
 
-    <div style="margin-bottom: 1rem; display: flex; gap: 0.5rem; align-items: center;">
-        <label style="color: #888; font-size: 0.9em;">Mode:</label>
-        <select id="modeSelect" style="background: #16213e; color: #4ecca3; border: 1px solid #4ecca3; border-radius: 6px; padding: 0.3rem 0.8rem; font-size: 0.9em;">
-            <option value="trace">Trace (text output)</option>
-            <option value="graphics">Graphics (WebGPU)</option>
-        </select>
+    <div style="margin-bottom: 1rem; display: flex; gap: 1rem; align-items: center;">
+        <label style="color: #ccc; font-size: 0.9em; cursor: pointer;">
+            <input type="radio" name="mode" value="auto" checked style="accent-color: #4ecca3;"> Auto
+        </label>
+        <label style="color: #ccc; font-size: 0.9em; cursor: pointer;">
+            <input type="radio" name="mode" value="trace" style="accent-color: #4ecca3;"> Trace
+        </label>
+        <label style="color: #ccc; font-size: 0.9em; cursor: pointer;">
+            <input type="radio" name="mode" value="graphics" style="accent-color: #4ecca3;"> Graphics (WebGPU)
+        </label>
     </div>
 
-    <button class="demo-btn" id="demoBtn">Try example: add.swf</button>
+    <div style="margin-bottom: 1rem; width: 100%; max-width: 600px; position: relative;">
+        <div style="display: flex; gap: 0.5rem; align-items: center;">
+            <input id="demoSearch" type="text" placeholder="Search demos... (110 trace tests)"
+                style="flex: 1; background: #16213e; color: #e0e0e0; border: 1px solid #4ecca3; border-radius: 6px; padding: 0.4rem 0.8rem; font-size: 0.9em; outline: none;"
+                autocomplete="off">
+            <button class="demo-btn" id="demoBrowseBtn" style="margin-bottom: 0; padding: 0.4rem 0.6rem; font-size: 0.8em; border-color: #555; color: #888;">Browse</button>
+            <button class="demo-btn" id="demoBtn" style="margin-bottom: 0;">Run</button>
+        </div>
+        <div id="demoResults" style="display: none; position: absolute; top: 100%; left: 0; right: 0; max-height: 300px; overflow-y: auto; background: #16213e; border: 1px solid #4ecca3; border-top: none; border-radius: 0 0 6px 6px; z-index: 10;"></div>
+    </div>
 
     <div id="status">
         <div class="status-step" id="step-recompile">Recompiling SWF to C...</div>
