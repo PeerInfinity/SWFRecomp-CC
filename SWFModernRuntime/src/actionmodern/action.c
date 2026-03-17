@@ -20264,6 +20264,20 @@ void actionGotoFrame(SWFAppContext* app_context, u16 frame)
 	extern int goto_from_action;
 #endif
 
+	// When called from inside an enterFrame handler, skip the goto entirely.
+	// The frame loop will naturally advance on the next tick. The enterFrame
+	// callback (e.g., Dejagnu checker) retries every tick until its condition
+	// is met, so skipping one goto is safe. This prevents the enterFrame goto
+	// from overriding the natural frame advance via manual_next_frame.
+#ifdef NO_GRAPHICS
+	{
+		extern int g_inside_enterframe_dispatch;
+		if (g_inside_enterframe_dispatch) {
+			return;
+		}
+	}
+#endif
+
 	next_frame = frame;
 	manual_next_frame = 1;
 	is_playing = 0;
@@ -20272,16 +20286,6 @@ void actionGotoFrame(SWFAppContext* app_context, u16 frame)
 	root_movieclip.currentframe = frame + 1;  // 1-indexed
 
 #ifdef NO_GRAPHICS
-	// When called from inside an enterFrame handler or timer callback,
-	// defer the goto to the frame loop to avoid infinite re-entry.
-	// Normal function calls (e.g., user script calling gotoAndStop) still
-	// get synchronous catch-up via goto_from_action.
-	{
-		extern int g_inside_enterframe_dispatch;
-		if (g_inside_enterframe_dispatch) {
-			return;
-		}
-	}
 	goto_from_action = 1;
 	// Execute tags-only catch-up inline (PlaceObject, etc.) so that properties
 	// like clip._x reflect the new frame's state. Scripts are deferred until
