@@ -2777,10 +2777,16 @@ int ng_getCharBoundsForRatio(size_t char_id, u16 ratio,
 // entry_idx is a root depth: children are sprite_display_list of that entry
 // ---------------------------------------------------------------------------
 
+static int g_bounds_recursion_depth = 0;
+#define MAX_BOUNDS_RECURSION 16
+
 int ng_getDisplayEntryBounds(size_t entry_idx,
     float* out_xmin_px, float* out_xmax_px,
     float* out_ymin_px, float* out_ymax_px)
 {
+	if (g_bounds_recursion_depth >= MAX_BOUNDS_RECURSION) return 0;
+	g_bounds_recursion_depth++;
+
 	int found = 0;
 	float gxmin = 1e30f, gxmax = -1e30f;
 	float gymin = 1e30f, gymax = -1e30f;
@@ -2803,20 +2809,20 @@ int ng_getDisplayEntryBounds(size_t entry_idx,
 		if (parent_d == 0)
 		{
 			// Root-depth sprite: iterate its sprite_display_list
-			if (child_d < 1 || child_d > max_depth || display_list[child_d].char_id == 0) return 0;
-			if (display_list[child_d].sprite_display_list == NULL) return 0;
+			if (child_d < 1 || child_d > max_depth || display_list[child_d].char_id == 0) { g_bounds_recursion_depth--; return 0; }
+			if (display_list[child_d].sprite_display_list == NULL) { g_bounds_recursion_depth--; return 0; }
 			dl     = display_list[child_d].sprite_display_list;
 			dl_max = display_list[child_d].sprite_max_depth;
 		}
 		else
 		{
 			// Level-1 nested: find child in parent's sprite display list
-			if (parent_d < 1 || parent_d > max_depth || display_list[parent_d].char_id == 0) return 0;
+			if (parent_d < 1 || parent_d > max_depth || display_list[parent_d].char_id == 0) { g_bounds_recursion_depth--; return 0; }
 			DisplayObject* parent_obj = &display_list[parent_d];
-			if (parent_obj->sprite_display_list == NULL) return 0;
-			if (child_d < 1 || child_d > parent_obj->sprite_max_depth) return 0;
+			if (parent_obj->sprite_display_list == NULL) { g_bounds_recursion_depth--; return 0; }
+			if (child_d < 1 || child_d > parent_obj->sprite_max_depth) { g_bounds_recursion_depth--; return 0; }
 			DisplayObject* child_obj = &parent_obj->sprite_display_list[child_d];
-			if (child_obj->char_id == 0 || child_obj->sprite_display_list == NULL) return 0;
+			if (child_obj->char_id == 0 || child_obj->sprite_display_list == NULL) { g_bounds_recursion_depth--; return 0; }
 			dl     = child_obj->sprite_display_list;
 			dl_max = child_obj->sprite_max_depth;
 		}
@@ -2906,6 +2912,7 @@ int ng_getDisplayEntryBounds(size_t entry_idx,
 		if (out_ymin_px) *out_ymin_px = gymin;
 		if (out_ymax_px) *out_ymax_px = gymax;
 	}
+	g_bounds_recursion_depth--;
 	return found;
 }
 
