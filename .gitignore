@@ -88,15 +88,17 @@ ruffle-tests/tests/swfs/avm1/external_interface/*.fla
 ruffle-tests/tests/swfs/avm1/external_interface/RecompiledScripts/
 ruffle-tests/tests/swfs/avm1/external_interface/RecompiledTags/
 
-# Shumway tests (downloaded test data, keep results)
+# Shumway tests (downloaded test data, keep results and investigation)
 ruffle-tests/tests/swfs/from_shumway/*/
 !ruffle-tests/tests/swfs/from_shumway/_results/
+!ruffle-tests/tests/swfs/from_shumway/_investigation/
 !ruffle-tests/tests/swfs/from_shumway/avm1/
 ruffle-tests/tests/swfs/from_shumway/avm1/*/
 !ruffle-tests/tests/swfs/from_shumway/avm1/_results/
 
-# Gnash tests (downloaded test data, keep results)
+# Gnash tests (downloaded test data, keep results and investigation)
 ruffle-tests/tests/swfs/from_gnash/*/
+!ruffle-tests/tests/swfs/from_gnash/_investigation/
 !ruffle-tests/tests/swfs/from_gnash/misc-swfmill.all/
 ruffle-tests/tests/swfs/from_gnash/misc-swfmill.all/*/
 !ruffle-tests/tests/swfs/from_gnash/misc-swfmill.all/_results/

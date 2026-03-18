@@ -5,8 +5,9 @@
 We are improving the pass rate on the Ruffle AVM1 test suite (ActionScript 1/2 trace tests).
 
 **Key docs to read at session start:**
-- `ruffle-tests/tests/swfs/avm1/_investigation/SESSION_START_GUIDE.md` — stable reference (architecture, how to run tests, infrastructure)
-- `ruffle-tests/tests/swfs/avm1/_investigation/CURRENT_STATUS.md` — current results, regressions, near-passing tests, work priorities
+- `ruffle-tests/tests/swfs/_investigation/SESSION_START_GUIDE.md` — architecture, how to run tests, infrastructure (all suites)
+- `ruffle-tests/tests/swfs/_investigation/OVERVIEW.md` — cross-suite summary (avm1, gnash, shumway)
+- Per-suite status: `ruffle-tests/tests/swfs/{suite}/_investigation/CURRENT_STATUS.md`
 
 **Quick test commands:**
 ```bash
@@ -20,8 +21,11 @@ python3 ruffle-tests/verify_output.py --test=TEST_NAME --diff --verbose
 
 - `SWFRecomp/` — Recompiler: converts SWF bytecode to C (`src/action/action.cpp` is the main bytecode→C translator)
 - `SWFModernRuntime/` — Runtime: executes the generated C (`src/actionmodern/action.c` is ~50K lines, the core runtime)
-- `ruffle-tests/` — Ruffle AVM1 test suite (616 tests, each in `ruffle-tests/tests/swfs/avm1/{test_name}/`)
-- `SWFRecomp/tests/` — Old hand-written test suite (115 trace tests + 61 graphics tests, all passing)
+- `ruffle-tests/` — Ruffle test suites:
+  - `tests/swfs/avm1/` — 619 AVM1 tests from Ruffle (97.5% filtered pass rate)
+  - `tests/swfs/from_gnash/` — 204 tests from Gnash (42 passing)
+  - `tests/swfs/from_shumway/` — 47 tests from Shumway (15 passing)
+- `SWFRecomp/tests/` — Old hand-written test suite (158 trace tests + 59 graphics tests, all passing)
 - `SWFRecomp/scripts/` — Build scripts (build_test.sh, deploy_example.sh, etc.)
 - `scripts/` — Test result processing scripts (diff, markdown generation)
 
