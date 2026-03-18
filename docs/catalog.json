@@ -1,5 +1,5 @@
 {
-  "generated": "2026-02-10T00:14:28Z",
+  "generated": "2026-03-18T03:24:19Z",
   "tests": [
     {
       "id": "add2_swf_5",
@@ -2460,6 +2460,15 @@
       "opcodes_supporting": []
     },
     {
+      "id": "graphics/glaiel_reaction",
+      "name": "glaiel_reaction",
+      "type": "graphics",
+      "path": "examples/graphics/glaiel_reaction",
+      "has_swf": true,
+      "wasm_file": "glaiel_reaction.wasm",
+      "js_file": "glaiel_reaction.js"
+    },
+    {
       "id": "graphics/glow_filter",
       "name": "glow_filter",
       "type": "graphics",
@@ -2554,6 +2563,20 @@
       "description": "WebGPU rendering test with DefineBitsJPEG4 (tag 90) JPEG bitmap with zlib-compressed alpha channel and deblocking parameter",
       "swf_version": 10,
       "fully_implemented": true,
+      "opcodes_tested": [],
+      "opcodes_supporting": []
+    },
+    {
+      "id": "graphics/keyboard_input",
+      "name": "keyboard_input",
+      "type": "graphics",
+      "path": "examples/graphics/keyboard_input",
+      "has_swf": true,
+      "wasm_file": "keyboard_input.wasm",
+      "js_file": "keyboard_input.js",
+      "description": "Keyboard input demo - arrow keys move a square",
+      "swf_version": 6,
+      "fully_implemented": false,
       "opcodes_tested": [],
       "opcodes_supporting": []
     },
@@ -2736,6 +2759,20 @@
       "description": "WebGPU rendering test with semi-transparent overlapping shapes using DefineShape3 RGBA colors",
       "swf_version": 7,
       "fully_implemented": true,
+      "opcodes_tested": [],
+      "opcodes_supporting": []
+    },
+    {
+      "id": "graphics/snake",
+      "name": "snake",
+      "type": "graphics",
+      "path": "examples/graphics/snake",
+      "has_swf": true,
+      "js_file": "snake.js",
+      "wasm_file": "snake.wasm",
+      "description": "Snake game by Neave Games (SWF5)",
+      "swf_version": 5,
+      "fully_implemented": false,
       "opcodes_tested": [],
       "opcodes_supporting": []
     },
