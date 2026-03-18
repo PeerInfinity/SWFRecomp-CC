@@ -146,7 +146,9 @@ namespace SWFRecomp
 				case SWF_ACTION_IF:
 				{
 					s16 offset = VAL(s16, action_buffer);
-					labels.insert(action_buffer + length + ((s64) offset));
+					char* target = action_buffer + length + ((s64) offset);
+					if (target >= action_buffer_start)
+						labels.insert(target);
 					break;
 				}
 
@@ -306,7 +308,7 @@ namespace SWFRecomp
 					// actionTryEnd so goto from try body doesn't skip cleanup
 					if (!tb.has_finally && labels.count(tb.after_end))
 					{
-						out_script << "label_" << to_string((s16)(tb.after_end - action_buffer_start)) << ":" << endl;
+						out_script << "label_" << to_string((s32)(tb.after_end - action_buffer_start)) << ":" << endl;
 						emitted_labels.insert(tb.after_end);
 					}
 					out_script << "\t" << "actionTryEnd(app_context);" << endl;
@@ -330,7 +332,7 @@ namespace SWFRecomp
 			{
 				if (action_buffer == ptr && emitted_labels.count(const_cast<char*>(ptr)) == 0)
 				{
-					out_script << "label_" << to_string((s16) (ptr - action_buffer_start)) << ":" << endl;
+					out_script << "label_" << to_string((s32) (ptr - action_buffer_start)) << ":" << endl;
 				}
 			}
 			
@@ -647,7 +649,7 @@ namespace SWFRecomp
 					if (in_catch_with_finally && throw_finally_ptr) {
 						out_script << "\t" << "// Throw (deferred to finally)" << endl
 								   << "\t" << "actionThrowPending(app_context);" << endl
-								   << "\t" << "goto label_" << to_string((s16)(throw_finally_ptr - action_buffer_start)) << ";" << endl;
+								   << "\t" << "goto label_" << to_string((s32)(throw_finally_ptr - action_buffer_start)) << ";" << endl;
 					} else {
 						out_script << "\t" << "// Throw" << endl
 								   << "\t" << "actionThrow(app_context);" << endl;
@@ -808,7 +810,7 @@ namespace SWFRecomp
 								   << "\t\t" << "ActionVar ret_val;" << endl
 								   << "\t\t" << "popVar(app_context, &ret_val);" << endl
 								   << "\t\t" << "actionSetReturnPending(app_context, &ret_val);" << endl
-								   << "\t\t" << "goto label_" << to_string((s16)(ret_finally_ptr - action_buffer_start)) << ";" << endl
+								   << "\t\t" << "goto label_" << to_string((s32)(ret_finally_ptr - action_buffer_start)) << ";" << endl
 								   << "\t" << "}" << endl;
 					} else {
 						out_script << "\t" << "// Return" << endl
@@ -1198,7 +1200,7 @@ namespace SWFRecomp
 						}
 					}
 
-					s16 skip_label = (s16)(skip_ptr - action_buffer_start);
+					s32 skip_label = (s32)(skip_ptr - action_buffer_start);
 
 					out_script << "\t" << "// WaitForFrame: frame=" << frame
 							   << ", skip=" << (int)skip_count << " actions" << endl
@@ -1278,7 +1280,7 @@ namespace SWFRecomp
 				out_script << "\t" << "// WaitForFrame2: skip=" << (int)skip_count << endl
 						   << "\t" << "if (!actionWaitForFrame2(app_context)) {" << endl
 						   << "\t\t" << "// Frame not loaded, skip next " << (int)skip_count << " action(s)" << endl
-						   << "\t\t" << "goto label_" << to_string((s16) (skip_ptr - action_buffer_start)) << ";" << endl
+						   << "\t\t" << "goto label_" << to_string((s32) (skip_ptr - action_buffer_start)) << ";" << endl
 						   << "\t" << "}" << endl;
 
 				action_buffer += length;
@@ -1926,24 +1928,32 @@ namespace SWFRecomp
 				case SWF_ACTION_JUMP:
 				{
 					s16 offset = VAL(s16, action_buffer);
-					
-					out_script << "\t" << "// Jump" << endl
-							   << "\t" << "goto label_" << to_string((s16) (action_buffer + length - action_buffer_start + offset)) << ";" << endl;
-					
+					s32 target_offset = (s32)(action_buffer + length - action_buffer_start + offset);
+
+					out_script << "\t" << "// Jump" << endl;
+					if (target_offset < 0)
+						out_script << "\t" << "return;" << endl;
+					else
+						out_script << "\t" << "goto label_" << to_string(target_offset) << ";" << endl;
+
 					action_buffer += length;
-					
+
 					break;
 				}
-				
+
 				case SWF_ACTION_IF:
 				{
 					s16 offset = VAL(s16, action_buffer);
+					s32 target_offset = (s32)(action_buffer + length - action_buffer_start + offset);
 
 					out_script << "\t" << "// If" << endl
 							   << "\t" << "if (evaluateCondition(app_context))" << endl
-							   << "\t" << "{" << endl
-							   << "\t" << "\t" << "goto label_" << to_string((s16) (action_buffer + length - action_buffer_start + offset)) << ";" << endl
-							   << "\t" << "}" << endl;
+							   << "\t" << "{" << endl;
+					if (target_offset < 0)
+						out_script << "\t" << "\t" << "return;" << endl;
+					else
+						out_script << "\t" << "\t" << "goto label_" << to_string(target_offset) << ";" << endl;
+					out_script << "\t" << "}" << endl;
 
 					action_buffer += length;
 

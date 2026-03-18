@@ -4713,9 +4713,12 @@ static ASObject* getObjectPrototype(SWFAppContext* app_context)
 		vo_var.data.numeric_value = (u64) &g_object_valueOf_func;
 		setProperty(app_context, g_object_prototype, "valueOf", 7, &vo_var);
 
-		// SWF6+ methods on Object.prototype (VERSION_6 in Ruffle):
+		// Methods on Object.prototype (always installed regardless of SWF version):
 		// hasOwnProperty, isPropertyEnumerable, isPrototypeOf, watch, unwatch, addProperty
-		if (g_swf_version >= 6) {
+		// Note: Flash controls visibility via ASSetPropFlags, not by omitting methods.
+		// Installing unconditionally prevents the singleton poison bug where a SWF5 child
+		// movie (e.g., Dejagnu.swf) initializes Object.prototype before the SWF6+ parent.
+		{
 		// Set up the built-in hasOwnProperty function (type-2: needs this_obj + args)
 		memset(&g_object_hasOwnProperty_func, 0, sizeof(ASFunction));
 		strncpy(g_object_hasOwnProperty_func.name, "hasOwnProperty", 255);
@@ -4812,7 +4815,7 @@ static ASObject* getObjectPrototype(SWFAppContext* app_context)
 		addprop_var.str_size = 0;
 		addprop_var.data.numeric_value = (u64) &g_object_addProperty_func;
 		setProperty(app_context, g_object_prototype, "addProperty", 11, &addprop_var);
-		} // end if (g_swf_version >= 6)
+		} // end Object.prototype SWF6+ methods block
 
 		// Mark all built-in Object.prototype properties as non-enumerable (DontEnum)
 		for (u32 i = 0; i < g_object_prototype->num_used; i++)
@@ -21569,8 +21572,22 @@ void actionImportAssets(SWFAppContext* app_context, const char* url)
 	if (versionGroup(g_swf_version) == 0 && g_global_legacy) global_object = g_global_legacy;
 	else if (versionGroup(g_swf_version) == 1 && g_global_modern) global_object = g_global_modern;
 
+	// Register child movie's transform data so sprites from this child can look up
+	// the correct array during frame execution (prevents buffer overflow when child
+	// has more transforms than parent).
+	extern void ng_registerMovieTransformData(u8 movie_id, float (*td)[16]);
+	if (entry->transform_data_ptr != NULL)
+		ng_registerMovieTransformData(entry->movie_id, entry->transform_data_ptr);
+
+	// Set active transform data during init for ng_cache_transform
+	extern float (*g_active_transform_data)[16];
+	float (*_saved_td)[16] = g_active_transform_data;
+	if (entry->transform_data_ptr != NULL)
+		g_active_transform_data = entry->transform_data_ptr;
+
 	entry->init_func(app_context);
 
+	g_active_transform_data = _saved_td;
 	g_swf_version = _saved_ver;
 	global_object = _saved_global;
 	g_current_movie_id = _saved_movie_id;

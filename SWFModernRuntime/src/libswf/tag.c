@@ -35,6 +35,17 @@ extern float cxform_data[];
 // caches correct transform values on display objects (needed for getBounds on loaded movies).
 float (*g_active_transform_data)[16] = NULL;
 
+// Per-movie transform data mapping (indexed by movie_id, 0 = main SWF).
+// Set during actionImportAssets/actionFirePendingLoadInits so that sprites from
+// child movies can reference the correct transform array during frame execution.
+#define MAX_MOVIE_TRANSFORM_ENTRIES 16
+static float (*g_movie_transform_data[MAX_MOVIE_TRANSFORM_ENTRIES])[16] = {0};
+
+void ng_registerMovieTransformData(u8 movie_id, float (*td)[16]) {
+	if (movie_id < MAX_MOVIE_TRANSFORM_ENTRIES)
+		g_movie_transform_data[movie_id] = td;
+}
+
 static inline void ng_cache_transform(DisplayObject* obj, u32 tid) {
 	float (*td)[16] = g_active_transform_data ? g_active_transform_data : transform_data;
 	obj->place_a  = td[tid][0];
@@ -48,6 +59,11 @@ static inline void ng_cache_transform(DisplayObject* obj, u32 tid) {
 
 size_t dictionary_capacity = INITIAL_DICTIONARY_CAPACITY;
 size_t display_list_capacity = INITIAL_DISPLAYLIST_CAPACITY;
+
+// Per-character movie_id tracking (which movie defined each character).
+// Used to look up the correct transform_data for child movie sprites.
+u8* g_char_movie_id = NULL;
+size_t g_char_movie_id_capacity = 0;
 
 // Note: tagInit() is provided by the generated tagMain.c file
 
@@ -157,8 +173,15 @@ static void exec_sprite_frame(SWFAppContext* app_context, DisplayObject* obj, fr
 	g_settarget_invalid = 0;
 	g_settarget_none = 0;
 
+	// Set active transform data to child SWF's array if this sprite belongs to
+	// a child movie (prevents buffer overflow when child has more transforms).
+	float (*saved_td)[16] = g_active_transform_data;
+	if (obj->child_transform_data != NULL)
+		g_active_transform_data = obj->child_transform_data;
+
 	f(app_context);
 
+	g_active_transform_data = saved_td;
 	g_settarget_explicit_root = saved_settarget;
 	g_settarget_invalid = saved_invalid;
 	g_settarget_none = saved_none;
@@ -3091,6 +3114,10 @@ void tagPlaceObject2(SWFAppContext* app_context, size_t depth, size_t char_id, u
 	display_list[depth].sprite_is_playing = 1;
 	display_list[depth].sprite_manual_next_frame = 0;
 	display_list[depth].sprite_next_frame = 0;
+	// Look up child movie transform data by character's movie_id
+	display_list[depth].child_transform_data = NULL;
+	if (g_char_movie_id != NULL && char_id < g_char_movie_id_capacity && g_char_movie_id[char_id] != 0)
+		display_list[depth].child_transform_data = g_movie_transform_data[g_char_movie_id[char_id]];
 	// Free old instance name if we own it
 	if (display_list[depth].instance_name_owned && display_list[depth].instance_name != NULL)
 	{
@@ -3368,6 +3395,10 @@ void tagPlaceObject2Ratio(SWFAppContext* app_context, size_t depth, size_t char_
 	display_list[depth].sprite_is_playing = 1;
 	display_list[depth].sprite_manual_next_frame = 0;
 	display_list[depth].sprite_next_frame = 0;
+	// Look up child movie transform data by character's movie_id
+	display_list[depth].child_transform_data = NULL;
+	if (g_char_movie_id != NULL && char_id < g_char_movie_id_capacity && g_char_movie_id[char_id] != 0)
+		display_list[depth].child_transform_data = g_movie_transform_data[g_char_movie_id[char_id]];
 	// Consume pending instance name from tagSetInstanceName (called before PlaceObject)
 	if (g_pending_instance_name != NULL) {
 		display_list[depth].instance_name = (char*)g_pending_instance_name;
@@ -3818,6 +3849,22 @@ void tagDefineSpriteEx(SWFAppContext* app_context, size_t char_id, frame_func* f
 	dictionary[char_id].sprite_frame_funcs = funcs;
 	dictionary[char_id].sprite_frame_count = frame_count;
 	dictionary[char_id].sprite_byte_size = byte_size;
+
+	// Track which movie defined this character (for child movie transform data lookup)
+	extern u8 g_current_movie_id;
+	if (g_current_movie_id != 0) {
+		if (char_id >= g_char_movie_id_capacity) {
+			size_t new_cap = char_id + 64;
+			u8* new_arr = (u8*)calloc(new_cap, 1);
+			if (g_char_movie_id) {
+				memcpy(new_arr, g_char_movie_id, g_char_movie_id_capacity);
+				free(g_char_movie_id);
+			}
+			g_char_movie_id = new_arr;
+			g_char_movie_id_capacity = new_cap;
+		}
+		g_char_movie_id[char_id] = g_current_movie_id;
+	}
 }
 
 // Per-sprite frame label storage (separate from Character union)

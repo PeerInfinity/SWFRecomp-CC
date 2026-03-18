@@ -172,6 +172,8 @@ typedef struct DisplayObject
 	u8 sprite_initialized;  // 0=not init, 1=init'd this tick, 2=init'd on previous tick (for per-tick EnterFrame gating)
 	// Cached transform values (populated at placement time for correct bounds on child SWFs)
 	float place_a, place_b, place_c, place_d, place_tx, place_ty;
+	// Child movie transform data override (set during placement when g_active_transform_data != NULL)
+	float (*child_transform_data)[16];
 } DisplayObject;
 
 typedef struct KeyState {

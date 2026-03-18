@@ -255,6 +255,9 @@ MovieClip* ng_duplicateMovieClip(SWFAppContext* app_context, const char* source_
 // Defined in tag.c (NO_GRAPHICS builds only). NULL = use main SWF's transform_data.
 extern float (*g_active_transform_data)[16];
 
+// Register a child movie's transform data for sprite frame execution.
+void ng_registerMovieTransformData(u8 movie_id, float (*td)[16]);
+
 // Callbacks from tag.c → tag_stubs.c supplemental registries (NO_GRAPHICS builds)
 void ng_record_char_bounds(size_t char_id, s32 xmin, s32 xmax, s32 ymin, s32 ymax);
 void ng_record_morph_end_bounds(size_t char_id, s32 xmin, s32 xmax, s32 ymin, s32 ymax);

@@ -1641,6 +1641,24 @@ void tagImportCharacter(SWFAppContext* app_context, size_t local_char_id, const 
 
 	// Copy the character definition from the exported char_id to the local char_id
 	dictionary[local_char_id] = dictionary[exported_char_id];
+
+	// Propagate child movie_id so the local char_id uses the correct transform data
+	extern u8* g_char_movie_id;
+	extern size_t g_char_movie_id_capacity;
+	if (g_char_movie_id != NULL && exported_char_id < g_char_movie_id_capacity
+	    && g_char_movie_id[exported_char_id] != 0) {
+		if (local_char_id >= g_char_movie_id_capacity) {
+			size_t new_cap = local_char_id + 64;
+			u8* new_arr = (u8*)calloc(new_cap, 1);
+			if (g_char_movie_id) {
+				memcpy(new_arr, g_char_movie_id, g_char_movie_id_capacity);
+				free(g_char_movie_id);
+			}
+			g_char_movie_id = new_arr;
+			g_char_movie_id_capacity = new_cap;
+		}
+		g_char_movie_id[local_char_id] = g_char_movie_id[exported_char_id];
+	}
 }
 
 // ---------------------------------------------------------------------------
