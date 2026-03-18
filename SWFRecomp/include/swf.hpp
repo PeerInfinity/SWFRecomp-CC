@@ -262,7 +262,7 @@ namespace SWFRecomp
 		void addCurvedEdge(Path* path, Vertex current, Vertex control, Vertex anchor, u32 passes, s32* morph_counter = nullptr);
 		void processShape(Shape& shape, u32* fill_styles);
 		void constructEdges(std::vector<Path>& paths, std::vector<Node>& nodes);
-		void johnson(std::vector<Node>& nodes, std::vector<Path>& path_stack, std::unordered_map<Node*, bool>& blocked, std::unordered_map<Node*, std::vector<Node*>>& blocked_map, std::vector<std::vector<Path>>& closed_paths);
+		void johnson(std::vector<Node>& nodes, std::vector<Path>& path_stack, std::unordered_map<Node*, bool>& blocked, std::unordered_map<Node*, std::vector<Node*>>& blocked_map, std::vector<std::vector<Path>>& closed_paths, size_t max_iterations = 100000);
 		void fillShape(Shape& shape, std::vector<Tri>& tris);
 		void drawLines(const Path& path, u16 width, std::vector<Tri>& tris);
 	};

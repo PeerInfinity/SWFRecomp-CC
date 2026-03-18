@@ -1148,6 +1148,12 @@ namespace SWFRecomp
 				u16 h = (u16) tag.fields[2].value;
 				tag_start_remaining -= 5;
 
+				if (w > 8192 || h > 8192)
+				{
+					fprintf(stderr, "DefineBitsLossless dimensions too large (%dx%d, max 8192x8192).\n", w, h);
+					throw std::exception();
+				}
+
 				if (bitmap_format != 5)
 				{
 					EXC_ARG("DefineBitsLossless format %d not yet supported (only format 5).\n", bitmap_format);
@@ -1232,6 +1238,12 @@ namespace SWFRecomp
 				u16 w = (u16) tag.fields[1].value;
 				u16 h = (u16) tag.fields[2].value;
 				tag_start_remaining -= 5;
+
+				if (w > 8192 || h > 8192)
+				{
+					fprintf(stderr, "DefineBitsLossless2 dimensions too large (%dx%d, max 8192x8192).\n", w, h);
+					throw std::exception();
+				}
 
 				if (bitmap_format != 5)
 				{
@@ -1778,8 +1790,15 @@ namespace SWFRecomp
 				u8 glyph_bits = (u8) tag.fields[0].value;
 				u8 advance_bits = (u8) tag.fields[1].value;
 
+				size_t text_record_count = 0;
 				while (true)
 				{
+					if (++text_record_count > 10000)
+					{
+						fprintf(stderr, "Warning: text record parsing exceeded 10000 iterations, skipping rest\n");
+						break;
+					}
+
 					tag.clearFields();
 					tag.setFieldCount(1);
 
@@ -2999,8 +3018,15 @@ namespace SWFRecomp
 					std::vector<ClipActionEntry> clip_entries;
 
 					size_t clip_scripts_start = next_script_i;
+					size_t clip_action_count = 0;
 					while (true)
 					{
+						if (++clip_action_count > 1000)
+						{
+							fprintf(stderr, "Warning: clip action parsing exceeded 1000 entries, skipping rest\n");
+							break;
+						}
+
 						// EventFlags (UI16 or UI32)
 						u32 event_flags;
 						if (header.version >= 6)
@@ -4062,9 +4088,16 @@ namespace SWFRecomp
 								struct ClipActionEntry { u32 event_flags; std::string func_name; };
 								std::vector<ClipActionEntry> clip_entries;
 								size_t clip_scripts_start = next_script_i;
+								size_t sprite_clip_action_count = 0;
 
 								while (true)
 								{
+									if (++sprite_clip_action_count > 1000)
+									{
+										fprintf(stderr, "Warning: sprite clip action parsing exceeded 1000 entries, skipping rest\n");
+										break;
+									}
+
 									u32 event_flags;
 									if (header.version >= 6)
 									{
@@ -5789,20 +5822,28 @@ namespace SWFRecomp
 				u32 cur_byte_bits_left = 8;
 
 				s32 morph_vertex_counter = 0;
+				size_t edge_iterations = 0;
+				const size_t max_edge_iterations = 1000000;
 
 				while (true)
 				{
+					if (++edge_iterations > max_edge_iterations)
+					{
+						fprintf(stderr, "Warning: shape edge parsing exceeded %zu iterations, skipping rest of shape\n", max_edge_iterations);
+						break;
+					}
+
 					shape_tag.clearFields();
 					shape_tag.setFieldCount(2);
-					
+
 					shape_tag.configureNextField(SWF_FIELD_UB, 1);
 					shape_tag.configureNextField(SWF_FIELD_UB, 5);
-					
+
 					shape_tag.parseFieldsContinue(cur_pos, cur_byte_bits_left);
-					
+
 					bool is_edge_record = (u8) shape_tag.fields[0].value;
 					u8 state_flags = (u8) shape_tag.fields[1].value;
-					
+
 					if (is_edge_record)
 					{
 						// Ensure a path exists (some shapes emit edges before any StyleChangeRecord)
@@ -6153,9 +6194,16 @@ namespace SWFRecomp
 					s32 end_last_x = 0;
 					s32 end_last_y = FRAME_HEIGHT;
 					u32 end_bits_left = 8;
+					size_t end_edge_iterations = 0;
 
 					while (true)
 					{
+						if (++end_edge_iterations > max_edge_iterations)
+						{
+							fprintf(stderr, "Warning: morph end-edge parsing exceeded %zu iterations, skipping rest\n", max_edge_iterations);
+							break;
+						}
+
 						shape_tag.clearFields();
 						shape_tag.setFieldCount(2);
 						shape_tag.configureNextField(SWF_FIELD_UB, 1);
@@ -6857,96 +6905,122 @@ namespace SWFRecomp
 	
 	void blockInMap(Node* node, std::unordered_map<Node*, std::vector<Node*>>& blocked_map)
 	{
-		blocked_map[node].clear();
-		
 		for (Node* neighbor : node->neighbors)
 		{
-			blocked_map[node].push_back(neighbor);
+			auto& blist = blocked_map[neighbor];
+			if (std::find(blist.begin(), blist.end(), node) == blist.end())
+			{
+				blist.push_back(node);
+			}
 		}
 	}
 	
 	void unblock(Node* node, std::unordered_map<Node*, bool>& blocked, std::unordered_map<Node*, std::vector<Node*>>& blocked_map)
 	{
-		blocked[node] = false;
-		
-		for (Node* n : blocked_map[node])
+		std::vector<Node*> stack;
+		stack.push_back(node);
+
+		while (!stack.empty())
 		{
-			if (blocked[n])
+			Node* current = stack.back();
+			stack.pop_back();
+
+			if (!blocked[current]) continue;
+			blocked[current] = false;
+
+			for (Node* n : blocked_map[current])
 			{
-				unblock(n, blocked, blocked_map);
+				if (blocked[n])
+				{
+					stack.push_back(n);
+				}
 			}
+			blocked_map[current].clear();
 		}
-		
-		blocked_map[node].clear();
 	}
 	
-	bool traverseIteration(Node* path, std::vector<Path>& path_stack, std::unordered_map<Node*, bool>& blocked, std::unordered_map<Node*, std::vector<Node*>>& blocked_map, std::vector<std::vector<Path>>& closed_paths);
-	
-	bool detectCycle(Node* node, std::vector<Path>& path_stack, std::unordered_map<Node*, bool>& blocked, std::unordered_map<Node*, std::vector<Node*>>& blocked_map, std::vector<std::vector<Path>>& closed_paths)
+	bool traverseIteration(Node* path, std::vector<Path>& path_stack, std::unordered_map<Node*, bool>& blocked, std::unordered_map<Node*, std::vector<Node*>>& blocked_map, std::vector<std::vector<Path>>& closed_paths, size_t& iterations, size_t max_iterations);
+
+	bool detectCycle(Node* node, std::vector<Path>& path_stack, std::unordered_map<Node*, bool>& blocked, std::unordered_map<Node*, std::vector<Node*>>& blocked_map, std::vector<std::vector<Path>>& closed_paths, size_t& iterations, size_t max_iterations)
 	{
+		if (iterations >= max_iterations) return false;
+
 		if (node == path_stack[0].front || node == path_stack[0].back)
 		{
 			std::vector<Path> cycle;
-			
+
 			for (size_t i = 0; i < path_stack.size(); ++i)
 			{
 				cycle.push_back(path_stack[i]);
 			}
-			
+
 			closed_paths.push_back(cycle);
-			
+
 			return true;
 		}
-		
+
 		if (blocked[node])
 		{
 			return false;
 		}
-		
-		return traverseIteration(node, path_stack, blocked, blocked_map, closed_paths);
+
+		return traverseIteration(node, path_stack, blocked, blocked_map, closed_paths, iterations, max_iterations);
 	}
-	
-	bool traverseIteration(Node* node, std::vector<Path>& path_stack, std::unordered_map<Node*, bool>& blocked, std::unordered_map<Node*, std::vector<Node*>>& blocked_map, std::vector<std::vector<Path>>& closed_paths)
+
+	bool traverseIteration(Node* node, std::vector<Path>& path_stack, std::unordered_map<Node*, bool>& blocked, std::unordered_map<Node*, std::vector<Node*>>& blocked_map, std::vector<std::vector<Path>>& closed_paths, size_t& iterations, size_t max_iterations)
 	{
+		++iterations;
+		if (iterations >= max_iterations) return false;
+
 		path_stack.push_back(*node->path);
-		
+
 		path_stack.back().backward = node == node->path->front;
-		
+
 		blocked[node] = true;
-		
+
 		bool cycle_found = false;
-		
+
 		for (Node* neighbor : node->neighbors)
 		{
 			if (neighbor->used)
 			{
 				continue;
 			}
-			
-			cycle_found |= detectCycle(neighbor, path_stack, blocked, blocked_map, closed_paths);
+
+			cycle_found |= detectCycle(neighbor, path_stack, blocked, blocked_map, closed_paths, iterations, max_iterations);
+
+			if (iterations >= max_iterations) break;
 		}
-		
+
 		path_stack.pop_back();
-		
+
 		if (cycle_found)
 		{
 			unblock(node, blocked, blocked_map);
 			return true;
 		}
-		
+
 		blockInMap(node, blocked_map);
-		
+
 		return false;
 	}
-	
-	void SWF::johnson(std::vector<Node>& nodes, std::vector<Path>& path_stack, std::unordered_map<Node*, bool>& blocked, std::unordered_map<Node*, std::vector<Node*>>& blocked_map, std::vector<std::vector<Path>>& closed_paths)
+
+	void SWF::johnson(std::vector<Node>& nodes, std::vector<Path>& path_stack, std::unordered_map<Node*, bool>& blocked, std::unordered_map<Node*, std::vector<Node*>>& blocked_map, std::vector<std::vector<Path>>& closed_paths, size_t max_iterations)
 	{
+		size_t iterations = 0;
+
 		for (Node& n : nodes)
 		{
+			if (iterations >= max_iterations)
+			{
+				fprintf(stderr, "Warning: johnson cycle detection exceeded %zu iterations, skipping remaining nodes\n", max_iterations);
+				break;
+			}
+
 			blocked.clear();
 			blocked_map.clear();
-			
-			traverseIteration(&n, path_stack, blocked, blocked_map, closed_paths);
+
+			traverseIteration(&n, path_stack, blocked, blocked_map, closed_paths, iterations, max_iterations);
 			n.used = true;
 		}
 	}

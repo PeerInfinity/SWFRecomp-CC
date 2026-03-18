@@ -118,7 +118,8 @@ fi
 if [ ! -d "${TEST_DIR}/RecompiledScripts" ]; then
     echo "Running SWFRecomp..."
     cd "${TEST_DIR}"
-    "${SWFRECOMP_ROOT}/build/SWFRecomp" config.toml
+    # Run with memory limit (4GB) to prevent runaway recompilation from crashing WSL
+    bash -c 'ulimit -v 4194304; exec "$@"' -- "${SWFRECOMP_ROOT}/build/SWFRecomp" config.toml
 fi
 
 # Setup build directory
