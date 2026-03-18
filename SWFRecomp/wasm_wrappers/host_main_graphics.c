@@ -80,6 +80,7 @@ void configureAppContext(int frame_count, int fps, int swf_version, int width, i
     app_context.fps = fps;
     app_context.width = width;
     app_context.height = height;
+    app_context.heap_full_size = 128 * 1024 * 1024;  // 128 MB (vs 1 GB default)
 }
 
 EMSCRIPTEN_KEEPALIVE

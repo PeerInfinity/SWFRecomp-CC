@@ -129,7 +129,7 @@ async function compileGuestModule(generatedFiles, setStatus) {
                 "-Wl,--allow-undefined",
                 "-Wl,--export-all",
                 "-Wl,--no-entry",
-                "-Wl,--global-base=1610612736",
+                "-Wl,--global-base=201326592",
                 "-o", "/project/guest.wasm",
             ],
             mount: mounts,
@@ -181,15 +181,19 @@ async function loadGraphicsHost() {
 async function runGraphicsGuest(guestWasmBytes) {
     const host = await loadGraphicsHost();
 
-    // Grow host memory to at least 1.6GB so the guest's data segments
-    // (at --global-base=1.5GB) can be initialized during instantiation.
-    // The host's heap allocation (1GB) happens later during swfStart.
+    // Grow host memory so the guest's data segments (at --global-base=192MB)
+    // can be initialized during instantiation. The host's 128MB heap allocation
+    // happens later during swfStart.
     const currentPages = host.wasmMemory.buffer.byteLength / 65536;
-    const neededPages = Math.ceil(1.6 * 1024 * 1024 * 1024 / 65536);
+    const neededPages = Math.ceil(210 * 1024 * 1024 / 65536);  // 210 MB
     if (currentPages < neededPages) {
         const growBy = neededPages - currentPages;
         console.log(`[GRAPHICS] Growing memory from ${currentPages} to ${neededPages} pages (${(neededPages * 65536 / 1024 / 1024).toFixed(0)} MB)`);
-        host.wasmMemory.grow(growBy);
+        try {
+            host.wasmMemory.grow(growBy);
+        } catch (e) {
+            throw new Error(`Failed to grow memory to ${(neededPages * 65536 / 1024 / 1024).toFixed(0)} MB. Your browser may not have enough memory for graphics mode. Try trace mode instead. (${e.message})`);
+        }
     }
 
     // Build a guest→host function pointer translation map.

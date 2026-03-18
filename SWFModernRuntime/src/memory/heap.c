@@ -51,8 +51,9 @@ bool heap_init(SWFAppContext* app_context, size_t initial_size)
 		return true;
 	}
 
-	// Reserve large virtual address space (1 GB)
-	app_context->heap_full_size = DEFAULT_FULL_HEAP_SIZE;
+	// Use caller-specified heap size, or default
+	if (app_context->heap_full_size == 0)
+		app_context->heap_full_size = DEFAULT_FULL_HEAP_SIZE;
 	app_context->heap = vmem_reserve(app_context->heap_full_size);
 
 	if (app_context->heap == NULL)

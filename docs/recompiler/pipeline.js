@@ -400,19 +400,14 @@ function detectGraphicsFromFiles(generatedFiles) {
 async function processSwf(swfBytes, modeOverride) {
     let mode = modeOverride || getSelectedMode();
 
-    if (mode === "auto" || mode === "graphics") {
-        // For auto mode on dropped files, we need to recompile first to detect.
-        // For explicit graphics or auto-detected graphics, use the graphics pipeline.
-        if (mode === "auto") {
-            // Quick recompile to detect mode
-            const Module = await loadRecompiler();
-            const files = recompileSWF(Module, swfBytes);
-            mode = detectGraphicsFromFiles(files) ? "graphics" : "trace";
-            console.log(`[AUTO] Detected mode: ${mode}`);
-        }
-        if (mode === "graphics") {
-            return processSwfGraphics(swfBytes);
-        }
+    // Auto mode: use override from demo list if provided,
+    // otherwise default to graphics (any real SWF has visual content).
+    if (mode === "auto" && !modeOverride) {
+        mode = "graphics";
+    }
+
+    if (mode === "graphics") {
+        return processSwfGraphics(swfBytes);
     }
     showStatus();
     const steps = ["step-recompile", "step-compile", "step-run"];
