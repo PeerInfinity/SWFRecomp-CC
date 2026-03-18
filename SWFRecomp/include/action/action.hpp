@@ -129,6 +129,8 @@ namespace SWFRecomp
 		std::vector<size_t> constant_pool;  // Maps constant pool index to string ID
 		stringstream pending_string_defs;  // Buffer string definitions for file-scope emission
 		int parse_depth;  // Track parseActions nesting depth
+		size_t with_counter;  // Counter for unique WITH block label prefixes
+		std::string label_prefix;  // Label prefix for current parseActions scope (e.g., "W3_")
 
 		SWFAction();
 
