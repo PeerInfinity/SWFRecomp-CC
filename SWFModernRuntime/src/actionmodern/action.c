@@ -30410,6 +30410,12 @@ void actionSetMember(SWFAppContext* app_context)
 				if (nt != NULL)
 					return;
 			}
+			// Check if property is read-only (ASSetPropFlags bit 4 → WRITABLE cleared)
+			{
+				ASProperty* _existing = findPropertyRaw(obj, prop_name, prop_name_len);
+				if (_existing != NULL && !(_existing->flags & PROPERTY_FLAG_WRITABLE))
+					return;  // Property is read-only, silently ignore the assignment
+			}
 			// Set the property on the object
 			setProperty(app_context, obj, prop_name, prop_name_len, &value_var);
 		}
