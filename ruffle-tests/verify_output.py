@@ -1567,6 +1567,12 @@ examples:
     parser.add_argument(
         "--append", action="store_true",
         help="Append to existing JSON results instead of overwriting (merge by test name)")
+    parser.add_argument(
+        "--resume", action="store_true",
+        help="Skip tests already in the results file and append new results (implies --append)")
+    parser.add_argument(
+        "--auto-start", action="store_true",
+        help="Start from the first test with no results in the results file (implies --append)")
     return parser.parse_args()
 
 
@@ -1668,6 +1674,38 @@ def main():
 
     incremental = not args.test  # Write live results when running full suite
 
+    # Determine json_path early so --append can write incrementally
+    json_path = args.json
+    if json_path is None and args.headless:
+        json_path = str(RESULTS_DIR / "results_headless.json")
+    if json_path is None and not args.test:
+        json_path = str(RESULTS_FINAL)
+
+    # --auto-start: start from the first test with no results
+    if args.auto_start:
+        args.append = True
+        if json_path and Path(json_path).exists():
+            with open(json_path) as f:
+                existing = json.load(f)
+            already_done = {t["test"] for t in existing.get("tests", [])}
+            first_missing = next((i for i, t in enumerate(tests) if t not in already_done), len(tests))
+            if first_missing > 0:
+                print(f"Auto-start: skipping to index {first_missing} ({tests[first_missing] if first_missing < len(tests) else 'end'}), {len(tests) - first_missing} tests remaining")
+                tests = tests[first_missing:]
+
+    # --resume: skip tests already present in the results file
+    if args.resume:
+        args.append = True
+        if json_path and Path(json_path).exists():
+            with open(json_path) as f:
+                existing = json.load(f)
+            already_done = {t["test"] for t in existing.get("tests", [])}
+            before = len(tests)
+            tests = [t for t in tests if t not in already_done]
+            skipped = before - len(tests)
+            if skipped:
+                print(f"Resuming: skipped {skipped} already-completed tests, {len(tests)} remaining")
+
     def save_incremental():
         """Write current results to results_current.json and run diff."""
         if not incremental:
@@ -1676,6 +1714,10 @@ def main():
         report = build_report(test_results, stats, completed, total_available, run_start)
         write_json(report, RESULTS_CURRENT)
         run_diff_comparison(RESULTS_CURRENT, partial=True)
+        # In --append mode, also merge into the target file after each test
+        if args.append and json_path and Path(json_path).exists():
+            merged = merge_results(json_path, report)
+            write_json(merged, json_path)
 
     for i, name in enumerate(tests):
         test_dir = TESTS_DIR / name
@@ -1937,12 +1979,7 @@ def main():
             print(f"\n--- {name} (expected vs actual) ---")
             print(diff_text)
 
-    # Write final JSON results
-    json_path = args.json
-    if json_path is None and args.headless:
-        json_path = str(RESULTS_DIR / "results_headless.json")
-    if json_path is None and not args.test:
-        json_path = str(RESULTS_FINAL)
+    # Write final JSON results (json_path already computed above)
     if json_path:
         report = build_report(test_results, stats, total, total_available, run_start)
         if args.append and Path(json_path).exists():

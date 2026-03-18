@@ -473,6 +473,94 @@ def generate_investigation_legend(doc_list: list[tuple[str, str, list[str]]], da
 
 
 # ---------------------------------------------------------------------------
+# Headless regressions
+# ---------------------------------------------------------------------------
+
+def generate_headless_regressions(normal_path: Path, headless_path: Path, output_path: Path):
+    """Generate report of tests that pass in normal mode but fail in headless mode."""
+    print(f"Generating headless regressions report...")
+
+    normal_data = load_results(normal_path)
+    headless_data = load_results(headless_path)
+
+    normal_status = {t["test"]: t for t in normal_data["tests"]}
+    headless_status = {t["test"]: t for t in headless_data["tests"]}
+
+    # Tests that pass in normal but fail in headless
+    regressions = []
+    for name, nt in sorted(normal_status.items()):
+        if nt["status"] != "pass":
+            continue
+        ht = headless_status.get(name)
+        if ht is None or ht["status"] == "pass":
+            continue
+        regressions.append((name, ht))
+
+    # Tests that fail in normal but pass in headless
+    improvements = []
+    for name, ht in sorted(headless_status.items()):
+        if ht["status"] != "pass":
+            continue
+        nt = normal_status.get(name)
+        if nt is None or nt["status"] == "pass":
+            continue
+        improvements.append((name, nt))
+
+    md = []
+    md.append("# Headless vs Normal Mode Differences")
+    md.append("")
+    md.append(f"Normal: {normal_data['pass']}/{normal_data['total']} passing | "
+              f"Headless: {headless_data['pass']}/{headless_data['total']} passing")
+    md.append("")
+
+    # Regressions
+    md.append(f"## Headless Regressions ({len(regressions)} tests)")
+    md.append("")
+    md.append("Tests that **pass** in normal mode but **fail** in headless mode.")
+    md.append("")
+
+    if regressions:
+        md.append("| # | Test | Headless Status | Detail |")
+        md.append("|---|------|-----------------|--------|")
+        for i, (name, ht) in enumerate(regressions, 1):
+            status = ht["status"].replace("_", " ").title()
+            detail = ht.get("detail", "")
+            lines = ht.get("lines")
+            if lines:
+                detail = f"{lines['matching_lines']}/{max(lines['actual_lines'], lines['expected_lines'])} lines match"
+            md.append(f"| {i} | `{name}` | {status} | {detail} |")
+    else:
+        md.append("No regressions.")
+    md.append("")
+
+    # Improvements
+    md.append(f"## Headless Improvements ({len(improvements)} tests)")
+    md.append("")
+    md.append("Tests that **fail** in normal mode but **pass** in headless mode.")
+    md.append("")
+
+    if improvements:
+        md.append("| # | Test | Normal Status | Detail |")
+        md.append("|---|------|---------------|--------|")
+        for i, (name, nt) in enumerate(improvements, 1):
+            status = nt["status"].replace("_", " ").title()
+            detail = nt.get("detail", "")
+            lines = nt.get("lines")
+            if lines:
+                detail = f"{lines['matching_lines']}/{max(lines['actual_lines'], lines['expected_lines'])} lines match"
+            md.append(f"| {i} | `{name}` | {status} | {detail} |")
+    else:
+        md.append("No improvements.")
+    md.append("")
+
+    with open(output_path, "w") as f:
+        f.write("\n".join(md))
+
+    print(f"  Written to {output_path}")
+    print(f"  {len(regressions)} regressions, {len(improvements)} improvements")
+
+
+# ---------------------------------------------------------------------------
 # Main
 # ---------------------------------------------------------------------------
 
@@ -589,11 +677,21 @@ def generate_markdown():
         return
 
     if args.headless:
-        headless_json = RUFFLE_DIR / "results_headless.json"
+        results_dir = RUFFLE_DIR / "tests" / "swfs" / "avm1" / "_results"
+        headless_json = results_dir / "results_headless.json"
         if not headless_json.exists():
             print(f"Error: {headless_json} not found", file=sys.stderr)
             sys.exit(1)
-        generate_one(headless_json, BASE_DIR / "ruffle-results-headless.md")
+        inv_dir = results_dir.parent / "_investigation"
+        generate_one(headless_json, results_dir / "results_headless.md",
+                      investigation_dir=inv_dir if inv_dir.is_dir() else None)
+
+        # Generate headless regressions report (pass in normal, fail in headless)
+        normal_json = results_dir / "results.json"
+        if normal_json.exists():
+            generate_headless_regressions(normal_json, headless_json,
+                                          results_dir / "results_headless_regressions.md")
+
         print("\nDone.")
         return
 
