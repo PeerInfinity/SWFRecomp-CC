@@ -1,10 +1,10 @@
 # Ruffle Test Results (Unfiltered)
 
-**Date**: 2026-03-17 21:00 UTC
+**Date**: 2026-03-18 04:04 UTC
 
-**Git SHA**: `70988e2fb2`
+**Git SHA**: `ef1e80b3a4`
 
-**Run Duration**: 3m 43s
+**Run Duration**: 3m 39s
 
 ## Summary
 
@@ -14,8 +14,8 @@
 | Passing | **4** (28.6%) |
 | Failing | 10 |
 | Total expected lines | 17 |
-| Matching lines | 7 (41.2%) |
-| Mismatched lines | 10 |
+| Matching lines | 8 (47.1%) |
+| Mismatched lines | 9 |
 
 ### Failure Breakdown
 
@@ -30,10 +30,10 @@
 
 | # | Test | Lines | Duration | Notes |
 |---|------|-------|----------|-------|
-| 1 | `background` | 0 | 15.9s |  |
-| 2 | `dict_callframe` | 3 | 16.0s |  |
+| 1 | `background` | 0 | 15.5s |  |
+| 2 | `dict_callframe` | 3 | 15.9s |  |
 | 3 | `missing_bitmap` | 0 | 16.3s |  |
-| 4 | `mixed-bytecode-as2` | 1 | 16.2s |  |
+| 4 | `mixed-bytecode-as2` | 1 | 15.4s |  |
 
 ## Near-Passing Tests
 
@@ -67,6 +67,6 @@ No timeouts.
 | 1 | `afunc_dict` | 50.0% | 1/2 | 2 | 2 |  |
 | 2 | `dict_override` | 50.0% | 1/2 | 2 | 2 |  |
 | 3 | `func_dict` | 33.3% | 1/3 | 3 | 3 |  |
-| 4 | `initaction_in_definesprite` | 0.0% | 0/2 | 0 | 2 |  |
-| 5 | `tags_after_last_showframe` | 0.0% | 0/15 | 15 | 1 |  |
-| 6 | `zeroframe_definesprite` | 0.0% | 0/3 | 2 | 3 |  |
+| 4 | `zeroframe_definesprite` | 33.3% | 1/3 | 3 | 3 |  |
+| 5 | `initaction_in_definesprite` | 0.0% | 0/2 | 0 | 2 |  |
+| 6 | `tags_after_last_showframe` | 0.0% | 0/15 | 15 | 1 |  |
