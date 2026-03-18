@@ -26404,8 +26404,17 @@ void actionSetVariable(SWFAppContext* app_context)
 									free(old_hash->data.string_data.heap_ptr);
 								free(old_hash);
 							}
+							// Existing entry: reuse stable heap key
+							hashmap_set(var_map, _wf_key, var_name_len, (uintptr_t)var);
+						} else {
+							// New entry: heap-allocate key (stack buffers become stale)
+							char* hm_key = (char*) malloc(var_name_len + 1);
+							if (hm_key) {
+								memcpy(hm_key, _wf_key, var_name_len);
+								hm_key[var_name_len] = '\0';
+								hashmap_set(var_map, hm_key, var_name_len, (uintptr_t)var);
+							}
 						}
-						hashmap_set(var_map, _wf_key, var_name_len, (uintptr_t)var);
 					}
 					POP_2();
 					return;
@@ -26443,8 +26452,19 @@ void actionSetVariable(SWFAppContext* app_context)
 					free(old_hash->data.string_data.heap_ptr);
 				free(old_hash);
 			}
+			// Existing entry has a stable heap-allocated key — just update the value.
+			hashmap_set(var_map, _sv_key, var_name_len, (uintptr_t)var);
+		} else {
+			// New entry: heap-allocate a copy of the key so the hashmap key
+			// remains valid after this stack frame returns (stack-local buffers
+			// like _sv_buf/_sv_folded become stale).
+			char* hm_key = (char*) malloc(var_name_len + 1);
+			if (hm_key) {
+				memcpy(hm_key, _sv_key, var_name_len);
+				hm_key[var_name_len] = '\0';
+				hashmap_set(var_map, hm_key, var_name_len, (uintptr_t)var);
+			}
 		}
-		hashmap_set(var_map, _sv_key, var_name_len, (uintptr_t)var);
 	}
 
 	// Also propagate to root MC dynamic_props (mirrors SetMember bidirectional behavior).
