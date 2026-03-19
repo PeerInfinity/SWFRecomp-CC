@@ -1,10 +1,10 @@
 # Ruffle Test Results (Unfiltered)
 
-**Date**: 2026-03-19 01:34 UTC
+**Date**: 2026-03-19 02:28 UTC
 
-**Git SHA**: `ea87da0d59`
+**Git SHA**: `5002fe1163`
 
-**Run Duration**: 3m 40s
+**Run Duration**: 3m 39s
 
 ## Summary
 
@@ -30,14 +30,14 @@
 
 | # | Test | Lines | Duration | Notes |
 |---|------|-------|----------|-------|
-| 1 | `afunc_dict` | 2 | 15.5s |  |
-| 2 | `background` | 0 | 15.7s |  |
-| 3 | `dict_callframe` | 3 | 15.5s |  |
-| 4 | `dict_cross` | 3 | 15.4s |  |
-| 5 | `dict_override` | 2 | 15.6s |  |
-| 6 | `func_dict` | 3 | 16.7s |  |
-| 7 | `missing_bitmap` | 0 | 15.6s |  |
-| 8 | `mixed-bytecode-as2` | 1 | 15.2s |  |
+| 1 | `afunc_dict` | 2 | 15.8s |  |
+| 2 | `background` | 0 | 15.4s |  |
+| 3 | `dict_callframe` | 3 | 15.6s |  |
+| 4 | `dict_cross` | 3 | 15.8s |  |
+| 5 | `dict_override` | 2 | 15.2s |  |
+| 6 | `func_dict` | 3 | 14.8s |  |
+| 7 | `missing_bitmap` | 0 | 14.4s |  |
+| 8 | `mixed-bytecode-as2` | 1 | 15.6s |  |
 
 ## Near-Passing Tests
 
