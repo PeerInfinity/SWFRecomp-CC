@@ -249,6 +249,8 @@ namespace SWFRecomp
 		std::vector<TryBlockBoundary> try_boundaries;
 		// Labels pre-emitted by boundary handler (skip in generic label code)
 		std::set<char*> emitted_labels;
+		// Track dead code after unconditional jumps (for ConstantPool skip)
+		bool in_dead_code = false;
 		
 		while (code != SWF_ACTION_END_OF_ACTIONS)
 		{
@@ -333,6 +335,7 @@ namespace SWFRecomp
 				if (action_buffer == ptr && emitted_labels.count(const_cast<char*>(ptr)) == 0)
 				{
 					out_script << "label_" << label_prefix << to_string((s32) (ptr - action_buffer_start)) << ":" << endl;
+					in_dead_code = false;  // Label reached: code is reachable again
 				}
 			}
 			
@@ -1159,6 +1162,22 @@ namespace SWFRecomp
 
 					out_script << "\t" << "// ConstantPool (" << count << " strings)" << endl;
 
+					// Skip pool replacement if this ConstantPool is in dead code
+					// (e.g., after an unconditional Jump). Flash only processes
+					// ConstantPool when it's actually executed.
+					if (in_dead_code) {
+						// Still need to advance past the strings
+						for (u16 i = 0; i < count; i++) {
+							size_t str_len = strlen(action_buffer);
+							declareString(context, action_buffer);
+							action_buffer += str_len + 1;
+						}
+						break;
+					}
+
+					// ConstantPool REPLACES the entire pool (Flash semantics)
+					constant_pool.clear();
+
 					// Read each null-terminated string
 					for (u16 i = 0; i < count; i++)
 					{
@@ -1940,6 +1959,7 @@ namespace SWFRecomp
 						out_script << "\t" << "return;" << endl;
 					else
 						out_script << "\t" << "goto label_" << label_prefix << to_string(target_offset) << ";" << endl;
+					in_dead_code = true;  // Code after unconditional jump is dead until next label
 
 					action_buffer += length;
 
@@ -2189,9 +2209,12 @@ namespace SWFRecomp
 			                         << "#define MAX_STRING_ID " << next_str_i << endl;
 		}
 
-		// Restore parent's constant pool (so recursive calls from
-		// DefineFunction2/Try/With don't destroy the caller's pool)
-		constant_pool = saved_pool;
+		// Restore parent's constant pool for nested calls (DefineFunction2/Try/With)
+		// so they don't destroy the caller's pool. But for top-level DoAction calls
+		// (parse_depth == 0 after decrement), preserve the pool so that subsequent
+		// frames can reference constants defined in earlier frames (cross-frame pool).
+		if (parse_depth > 0)
+			constant_pool = saved_pool;
 	}
 
 	void SWFAction::declareVariable(Context& context, char* var_name)
