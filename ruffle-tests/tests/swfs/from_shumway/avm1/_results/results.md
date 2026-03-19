@@ -1,46 +1,47 @@
 # Ruffle Test Results (Unfiltered)
 
-**Date**: 2026-03-19 02:28 UTC
+**Date**: 2026-03-19 03:48 UTC
 
-**Git SHA**: `5002fe1163`
+**Git SHA**: `182a3864f7`
 
-**Run Duration**: 6m 7s
+**Run Duration**: 6m 6s
 
 ## Summary
 
 | Metric | Value |
 |--------|-------|
 | Total tests | 23 |
-| Passing | **11** (47.8%) |
-| Failing | 12 |
+| Passing | **12** (52.2%) |
+| Failing | 11 |
 | Total expected lines | 311 |
-| Matching lines | 107 (34.4%) |
-| Mismatched lines | 204 |
+| Matching lines | 115 (37.0%) |
+| Mismatched lines | 196 |
 
 ### Failure Breakdown
 
 | Category | Count | % of Failures |
 |----------|-------|---------------|
-| Output Mismatch | 11 | 91.7% |
-| Runtime Error | 1 | 8.3% |
+| Output Mismatch | 10 | 90.9% |
+| Runtime Error | 1 | 9.1% |
 
 ## Passing Tests
 
-**11 tests passing**
+**12 tests passing**
 
 | # | Test | Lines | Duration | Notes |
 |---|------|-------|----------|-------|
 | 1 | `callee` | 2 | 15.5s |  |
-| 2 | `depth` | 6 | 15.5s |  |
-| 3 | `externalinterface` | 4 | 15.7s |  |
-| 4 | `label` | 4 | 15.1s |  |
-| 5 | `levels` | 9 | 15.7s |  |
-| 6 | `lookup` | 3 | 16.1s |  |
-| 7 | `mouse-transparency` | 1 | 14.6s |  |
-| 8 | `operations` | 13 | 16.9s |  |
-| 9 | `rollover` | 4 | 16.6s |  |
-| 10 | `super` | 11 | 15.6s |  |
-| 11 | `text-bind` | 0 | 15.5s |  |
+| 2 | `depth` | 6 | 15.8s |  |
+| 3 | `externalinterface` | 4 | 15.6s |  |
+| 4 | `label` | 4 | 16.1s |  |
+| 5 | `levels` | 9 | 15.4s |  |
+| 6 | `loadevent` | 9 | 15.7s |  |
+| 7 | `lookup` | 3 | 15.3s |  |
+| 8 | `mouse-transparency` | 1 | 15.9s |  |
+| 9 | `operations` | 13 | 16.6s |  |
+| 10 | `rollover` | 4 | 15.4s |  |
+| 11 | `super` | 11 | 16.1s |  |
+| 12 | `text-bind` | 0 | 16.2s |  |
 
 ## Near-Passing Tests
 
@@ -66,7 +67,7 @@ No segfaults.
 
 | # | Test | Detail | Duration | Notes |
 |---|------|--------|----------|-------|
-| 1 | `watch` | exit code -6 | 18.4s |  |
+| 1 | `watch` | exit code -6 | 17.9s |  |
 
 ## Timeouts
 
@@ -74,7 +75,7 @@ No timeouts.
 
 ## All Output Mismatches
 
-**11 tests** with output mismatch, sorted by match rate (best first)
+**10 tests** with output mismatch, sorted by match rate (best first)
 
 | # | Test | Match Rate | Matching/Total | Actual | Expected | Notes |
 |---|------|------------|----------------|--------|----------|-------|
@@ -85,7 +86,6 @@ No timeouts.
 | 5 | `hitarea` | 50.0% | 2/4 | 3 | 4 |  |
 | 6 | `target` | 22.7% | 5/22 | 22 | 18 |  |
 | 7 | `moviecliploader` | 14.3% | 1/7 | 6 | 7 |  |
-| 8 | `loadevent` | 11.1% | 1/9 | 7 | 9 |  |
-| 9 | `array` | 0.0% | 0/7 | 7 | 7 |  |
-| 10 | `filters` | 0.0% | 0/149 | 85 | 149 |  |
-| 11 | `nested-button` | 0.0% | 0/1 | 0 | 1 |  |
+| 8 | `array` | 0.0% | 0/7 | 7 | 7 |  |
+| 9 | `filters` | 0.0% | 0/149 | 85 | 149 |  |
+| 10 | `nested-button` | 0.0% | 0/1 | 0 | 1 |  |

@@ -1,10 +1,10 @@
 # Ruffle Test Results (Filtered)
 
-**Date**: 2026-03-19 02:28 UTC
+**Date**: 2026-03-19 03:48 UTC
 
-**Git SHA**: `5002fe1163`
+**Git SHA**: `182a3864f7`
 
-**Run Duration**: 59m 41s
+**Run Duration**: 59m 52s
 
 **Filtered**: 0 tests ignored out of 190 available
 
@@ -32,49 +32,49 @@
 
 | # | Test | Lines | Duration | Notes |
 |---|------|-------|----------|-------|
-| 1 | `Accessibility-v5` | 15 | 16.5s |  |
-| 2 | `BitmapData-v5` | 7 | 16.1s |  |
-| 3 | `BitmapData-v6` | 7 | 16.3s |  |
-| 4 | `BitmapData-v7` | 7 | 16.2s |  |
-| 5 | `Boolean-v5` | 38 | 16.6s |  |
-| 6 | `Boolean-v6` | 38 | 16.6s |  |
-| 7 | `Boolean-v7` | 38 | 16.6s |  |
-| 8 | `Boolean-v8` | 38 | 16.7s |  |
-| 9 | `Camera-v5` | 7 | 16.2s |  |
-| 10 | `ColorTransform-v5` | 7 | 17.3s |  |
-| 11 | `ColorTransform-v6` | 7 | 17.2s |  |
-| 12 | `ColorTransform-v7` | 7 | 16.7s |  |
-| 13 | `ContextMenu-v5` | 7 | 16.9s |  |
-| 14 | `ContextMenu-v6` | 7 | 16.3s |  |
-| 15 | `ExternalInterface-v5` | 7 | 15.9s |  |
-| 16 | `LoadVars-v5` | 8 | 16.4s |  |
-| 17 | `Matrix-v5` | 7 | 14.9s |  |
-| 18 | `Microphone-v5` | 6 | 16.2s |  |
-| 19 | `MovieClipLoader-v5` | 6 | 16.2s |  |
+| 1 | `Accessibility-v5` | 15 | 16.2s |  |
+| 2 | `BitmapData-v5` | 7 | 16.3s |  |
+| 3 | `BitmapData-v6` | 7 | 16.4s |  |
+| 4 | `BitmapData-v7` | 7 | 16.1s |  |
+| 5 | `Boolean-v5` | 38 | 16.4s |  |
+| 6 | `Boolean-v6` | 38 | 16.5s |  |
+| 7 | `Boolean-v7` | 38 | 16.5s |  |
+| 8 | `Boolean-v8` | 38 | 16.5s |  |
+| 9 | `Camera-v5` | 7 | 16.1s |  |
+| 10 | `ColorTransform-v5` | 7 | 15.8s |  |
+| 11 | `ColorTransform-v6` | 7 | 15.9s |  |
+| 12 | `ColorTransform-v7` | 7 | 15.9s |  |
+| 13 | `ContextMenu-v5` | 7 | 15.8s |  |
+| 14 | `ContextMenu-v6` | 7 | 15.9s |  |
+| 15 | `ExternalInterface-v5` | 7 | 16.4s |  |
+| 16 | `LoadVars-v5` | 8 | 16.2s |  |
+| 17 | `Matrix-v5` | 7 | 16.4s |  |
+| 18 | `Microphone-v5` | 6 | 16.1s |  |
+| 19 | `MovieClipLoader-v5` | 6 | 16.9s |  |
 | 20 | `MovieClipLoader-v6` | 6 | 16.2s |  |
-| 21 | `NetStream-v5` | 6 | 15.9s |  |
-| 22 | `Point-v5` | 7 | 16.9s |  |
-| 23 | `Point-v6` | 7 | 17.2s |  |
-| 24 | `Point-v7` | 7 | 16.8s |  |
-| 25 | `Random-v5` | 30 | 17.3s |  |
-| 26 | `Random-v6` | 30 | 17.1s |  |
-| 27 | `Random-v7` | 30 | 17.3s |  |
-| 28 | `Random-v8` | 30 | 17.2s |  |
-| 29 | `Rectangle-v5` | 7 | 16.6s |  |
-| 30 | `Rectangle-v6` | 7 | 16.8s |  |
-| 31 | `Rectangle-v7` | 7 | 16.6s |  |
-| 32 | `TextFieldHTML-v5` | 6 | 16.6s |  |
-| 33 | `TextSnapshot-v5` | 7 | 16.1s |  |
-| 34 | `Transform-v5` | 7 | 16.0s |  |
-| 35 | `Video-v6` | 85 | 17.4s |  |
-| 36 | `Video-v7` | 85 | 17.4s |  |
-| 37 | `Video-v8` | 85 | 17.5s |  |
+| 21 | `NetStream-v5` | 6 | 16.3s |  |
+| 22 | `Point-v5` | 7 | 16.1s |  |
+| 23 | `Point-v6` | 7 | 16.0s |  |
+| 24 | `Point-v7` | 7 | 16.1s |  |
+| 25 | `Random-v5` | 30 | 16.6s |  |
+| 26 | `Random-v6` | 30 | 16.6s |  |
+| 27 | `Random-v7` | 30 | 16.8s |  |
+| 28 | `Random-v8` | 30 | 16.6s |  |
+| 29 | `Rectangle-v5` | 7 | 16.1s |  |
+| 30 | `Rectangle-v6` | 7 | 16.3s |  |
+| 31 | `Rectangle-v7` | 7 | 16.2s |  |
+| 32 | `TextFieldHTML-v5` | 6 | 16.1s |  |
+| 33 | `TextSnapshot-v5` | 7 | 16.6s |  |
+| 34 | `Transform-v5` | 7 | 16.5s |  |
+| 35 | `Video-v6` | 85 | 17.2s |  |
+| 36 | `Video-v7` | 85 | 17.5s |  |
+| 37 | `Video-v8` | 85 | 17.6s |  |
 | 38 | `argstest-v5` | 4 | 16.3s |  |
-| 39 | `enumerate-v5` | 6 | 16.1s |  |
-| 40 | `swap-v5` | 7 | 16.2s |  |
-| 41 | `swap-v6` | 7 | 16.2s |  |
-| 42 | `swap-v7` | 7 | 16.2s |  |
-| 43 | `swap-v8` | 7 | 16.1s |  |
+| 39 | `enumerate-v5` | 6 | 17.2s |  |
+| 40 | `swap-v5` | 7 | 16.6s |  |
+| 41 | `swap-v6` | 7 | 16.8s |  |
+| 42 | `swap-v7` | 7 | 16.7s |  |
+| 43 | `swap-v8` | 7 | 16.6s |  |
 | 44 | `targetPath-v5` | 12 | 16.4s |  |
 
 ## Near-Passing Tests
@@ -190,15 +190,15 @@ Tests with output mismatch but >= 50% line match rate (low-hanging fruit).
 
 | # | Test | Duration | Notes |
 |---|------|----------|-------|
-| 1 | `Inheritance-v7` | 22.9s |  |
-| 2 | `Inheritance-v8` | 22.9s |  |
-| 3 | `Try-v5` | 19.9s |  |
-| 4 | `Try-v6` | 19.8s |  |
-| 5 | `Try-v7` | 19.6s |  |
-| 6 | `Try-v8` | 19.7s |  |
+| 1 | `Inheritance-v7` | 22.4s |  |
+| 2 | `Inheritance-v8` | 22.4s |  |
+| 3 | `Try-v5` | 19.5s |  |
+| 4 | `Try-v6` | 19.6s |  |
+| 5 | `Try-v7` | 19.9s |  |
+| 6 | `Try-v8` | 19.6s |  |
 | 7 | `array-v5` | 43.3s |  |
 | 8 | `toString_valueOf-v5` | 21.2s |  |
-| 9 | `toString_valueOf-v6` | 22.0s |  |
+| 9 | `toString_valueOf-v6` | 21.8s |  |
 
 ## Runtime Errors
 
