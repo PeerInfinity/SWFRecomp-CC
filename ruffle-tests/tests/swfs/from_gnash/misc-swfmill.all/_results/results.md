@@ -1,50 +1,53 @@
 # Ruffle Test Results (Unfiltered)
 
-**Date**: 2026-03-18 04:04 UTC
+**Date**: 2026-03-19 01:34 UTC
 
-**Git SHA**: `ef1e80b3a4`
+**Git SHA**: `ea87da0d59`
 
-**Run Duration**: 3m 39s
+**Run Duration**: 3m 40s
 
 ## Summary
 
 | Metric | Value |
 |--------|-------|
 | Total tests | 14 |
-| Passing | **4** (28.6%) |
-| Failing | 10 |
-| Total expected lines | 17 |
-| Matching lines | 8 (47.1%) |
-| Mismatched lines | 9 |
+| Passing | **8** (57.1%) |
+| Failing | 6 |
+| Total expected lines | 26 |
+| Matching lines | 18 (69.2%) |
+| Mismatched lines | 8 |
 
 ### Failure Breakdown
 
 | Category | Count | % of Failures |
 |----------|-------|---------------|
-| Output Mismatch | 6 | 60.0% |
-| Compile Fail | 4 | 40.0% |
+| Output Mismatch | 5 | 83.3% |
+| Compile Fail | 1 | 16.7% |
 
 ## Passing Tests
 
-**4 tests passing**
+**8 tests passing**
 
 | # | Test | Lines | Duration | Notes |
 |---|------|-------|----------|-------|
-| 1 | `background` | 0 | 15.5s |  |
-| 2 | `dict_callframe` | 3 | 15.9s |  |
-| 3 | `missing_bitmap` | 0 | 16.3s |  |
-| 4 | `mixed-bytecode-as2` | 1 | 15.4s |  |
+| 1 | `afunc_dict` | 2 | 15.5s |  |
+| 2 | `background` | 0 | 15.7s |  |
+| 3 | `dict_callframe` | 3 | 15.5s |  |
+| 4 | `dict_cross` | 3 | 15.4s |  |
+| 5 | `dict_override` | 2 | 15.6s |  |
+| 6 | `func_dict` | 3 | 16.7s |  |
+| 7 | `missing_bitmap` | 0 | 15.6s |  |
+| 8 | `mixed-bytecode-as2` | 1 | 15.2s |  |
 
 ## Near-Passing Tests
 
 Tests with output mismatch but >= 50% line match rate (low-hanging fruit).
 
-**2 tests** within reach
+**1 tests** within reach
 
 | # | Test | Match Rate | Matching | Total | Diff Lines | Notes |
 |---|------|------------|----------|-------|------------|-------|
-| 1 | `afunc_dict` | 50.0% | 1 | 2 | 1 |  |
-| 2 | `dict_override` | 50.0% | 1 | 2 | 1 |  |
+| 1 | `dict_event` | 60.0% | 3 | 5 | 2 |  |
 
 ## Segfaults
 
@@ -60,13 +63,12 @@ No timeouts.
 
 ## All Output Mismatches
 
-**6 tests** with output mismatch, sorted by match rate (best first)
+**5 tests** with output mismatch, sorted by match rate (best first)
 
 | # | Test | Match Rate | Matching/Total | Actual | Expected | Notes |
 |---|------|------------|----------------|--------|----------|-------|
-| 1 | `afunc_dict` | 50.0% | 1/2 | 2 | 2 |  |
-| 2 | `dict_override` | 50.0% | 1/2 | 2 | 2 |  |
-| 3 | `func_dict` | 33.3% | 1/3 | 3 | 3 |  |
-| 4 | `zeroframe_definesprite` | 33.3% | 1/3 | 3 | 3 |  |
-| 5 | `initaction_in_definesprite` | 0.0% | 0/2 | 0 | 2 |  |
-| 6 | `tags_after_last_showframe` | 0.0% | 0/15 | 15 | 1 |  |
+| 1 | `dict_event` | 60.0% | 3/5 | 5 | 5 |  |
+| 2 | `zeroframe_definesprite` | 33.3% | 1/3 | 3 | 3 |  |
+| 3 | `initaction_in_definesprite` | 0.0% | 0/2 | 0 | 2 |  |
+| 4 | `jump_to_prev_block` | 0.0% | 0/1 | 1 | 1 |  |
+| 5 | `tags_after_last_showframe` | 0.0% | 0/15 | 15 | 1 |  |
