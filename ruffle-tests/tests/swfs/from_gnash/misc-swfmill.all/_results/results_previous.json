@@ -1,30 +1,26 @@
 {
   "metadata": {
-    "timestamp": "2026-03-19T03:48:19.639473+00:00",
-    "git_sha": "182a3864f7fee80629f95bc1a51c29d9c5e57994",
-    "duration_seconds": 219.08,
+    "timestamp": "2026-03-19T20:52:22.894795+00:00",
+    "git_sha": "f246282a73c1651b50ebd24f284e9d6892f90337",
+    "duration_seconds": 327.52,
     "total_available": 14,
     "shards": 30
   },
   "total": 14,
-  "pass": 8,
-  "fail": 6,
-  "pass_rate": 57.1,
+  "pass": 3,
+  "fail": 11,
+  "pass_rate": 21.4,
   "breakdown": {
-    "output_mismatch": 5,
-    "compile_fail": 1
+    "compile_fail": 8,
+    "output_mismatch": 3
   },
   "tests": [
     {
       "test": "afunc_dict",
       "num_frames": 30,
-      "lines": {
-        "actual_lines": 2,
-        "expected_lines": 2,
-        "matching_lines": 2
-      },
-      "duration": 15.52,
-      "status": "pass"
+      "status": "compile_fail",
+      "detail": "/tmp/swf_verify_ohfd25nb/script_0.c:69:1: error: duplicate label \u2018label_140\u2019",
+      "duration": 16.07
     },
     {
       "test": "background",
@@ -34,66 +30,43 @@
         "expected_lines": 0,
         "matching_lines": 0
       },
-      "duration": 15.46,
+      "duration": 15.49,
       "status": "pass"
     },
     {
       "test": "dict_callframe",
       "num_frames": 30,
-      "lines": {
-        "actual_lines": 3,
-        "expected_lines": 3,
-        "matching_lines": 3
-      },
-      "duration": 15.51,
-      "status": "pass"
+      "status": "compile_fail",
+      "detail": "/tmp/swf_verify_i30w1wjt/script_1.c:52:1: error: duplicate label \u2018label_89\u2019",
+      "duration": 15.45
     },
     {
       "test": "dict_cross",
       "num_frames": 30,
-      "lines": {
-        "actual_lines": 3,
-        "expected_lines": 3,
-        "matching_lines": 3
-      },
-      "duration": 15.6,
-      "status": "pass"
+      "status": "compile_fail",
+      "detail": "/tmp/swf_verify_z8ul79a5/script_1.c:52:1: error: duplicate label \u2018label_17\u2019",
+      "duration": 16.5
     },
     {
       "test": "dict_event",
       "num_frames": 30,
-      "lines": {
-        "actual_lines": 5,
-        "expected_lines": 5,
-        "matching_lines": 3
-      },
-      "duration": 15.3,
-      "status": "output_mismatch",
-      "detail": "2 line(s) differ (actual=5, expected=5)",
-      "actual_output": "A\nB\nAB\nXFAILED: expected 'ABB' on clip event.. \nEND OF TEST",
-      "expected_output": "A\nB\nABB\nXPASSED: dict/clip event interaction ok\nEND OF TEST"
+      "status": "compile_fail",
+      "detail": "/tmp/swf_verify_org_9sv9/script_2.c:50:1: error: duplicate label \u2018label_76\u2019",
+      "duration": 16.82
     },
     {
       "test": "dict_override",
       "num_frames": 30,
-      "lines": {
-        "actual_lines": 2,
-        "expected_lines": 2,
-        "matching_lines": 2
-      },
-      "duration": 16.12,
-      "status": "pass"
+      "status": "compile_fail",
+      "detail": "/tmp/swf_verify_7wq1xrt7/script_0.c:80:1: error: duplicate label \u2018label_150\u2019",
+      "duration": 16.17
     },
     {
       "test": "func_dict",
       "num_frames": 30,
-      "lines": {
-        "actual_lines": 3,
-        "expected_lines": 3,
-        "matching_lines": 3
-      },
-      "duration": 15.57,
-      "status": "pass"
+      "status": "compile_fail",
+      "detail": "/tmp/swf_verify_ai0_htlk/script_0.c:65:1: error: duplicate label \u2018label_140\u2019",
+      "duration": 15.44
     },
     {
       "test": "initaction_in_definesprite",
@@ -103,7 +76,7 @@
         "expected_lines": 2,
         "matching_lines": 0
       },
-      "duration": 15.34,
+      "duration": 15.56,
       "status": "output_mismatch",
       "detail": "2 line(s) differ (actual=0, expected=2)",
       "actual_output": "",
@@ -112,9 +85,16 @@
     {
       "test": "jump_after_end",
       "num_frames": 30,
-      "status": "compile_fail",
-      "detail": "/tmp/swf_verify_z2bax3yy/script_0.c:22:9: error: label \u2018label_121\u2019 used but not defined",
-      "duration": 15.51
+      "lines": {
+        "actual_lines": 1,
+        "expected_lines": 3,
+        "matching_lines": 1
+      },
+      "duration": 15.28,
+      "status": "output_mismatch",
+      "detail": "2 line(s) differ (actual=1, expected=3)",
+      "actual_output": "Check if branch after end is allowed",
+      "expected_output": "Check if branch after end is allowed\nPASSED: jump after end ALLOWED\nEND OF TEST"
     },
     {
       "test": "jump_to_prev_block",
@@ -124,7 +104,7 @@
         "expected_lines": 1,
         "matching_lines": 0
       },
-      "duration": 15.37,
+      "duration": 15.86,
       "status": "output_mismatch",
       "detail": "1 line(s) differ (actual=1, expected=1)",
       "actual_output": "AB",
@@ -138,7 +118,7 @@
         "expected_lines": 0,
         "matching_lines": 0
       },
-      "duration": 15.69,
+      "duration": 15.32,
       "status": "pass"
     },
     {
@@ -149,36 +129,22 @@
         "expected_lines": 1,
         "matching_lines": 1
       },
-      "duration": 15.38,
+      "duration": 16.34,
       "status": "pass"
     },
     {
       "test": "tags_after_last_showframe",
       "num_frames": 30,
-      "lines": {
-        "actual_lines": 15,
-        "expected_lines": 1,
-        "matching_lines": 0
-      },
-      "duration": 16.21,
-      "status": "output_mismatch",
-      "detail": "15 line(s) differ (actual=15, expected=1)",
-      "actual_output": "i1-a1-a2-a3-1\ni1-a1-a2-a3-1a1-a2-a3-1\ni1-a1-a2-a3-1a1-a2-a3-1a1-a2-a3-1\ni1-a1-a2-a3-1a1-a2-a3-1a1-a2-a3-1a1-a2-a3-1\ni1-a1-a2-a3-1a1-a2-a3-1a1-a2-a3-1a1-a2-a3-1a1-a2-a3-1\ni1-a1-a2-a3-1a1-a2-a3-1a1-a2-a3-1a1-a2-a3-1a1-a2-a3-1a1-a2-a3-1\ni1-a1-a2-a3-1a1-a2-a3-1a1-a2-a3-1a1-a2-a3-1a1-a2-a3-1a1-a2-a3-1a1-a2-a3-1\ni1-a1-a2-a3-1a1-a2-a3-1a1-a2-a3-1a1-a2-a3-1a1-a2-a3-1a1-a2-a3-1a1-a2-a3-1a1-a2-a3-1\ni1-a1-a2-a3-1a1-a2-a3-1a1-a2-a3-1a1-a2-a3-1a1-a2-a3-1a1-a2-a3-1a1-a2-a3-1a1-a2-a3-1a1-a2-a3-1\ni1-a1-a2-a3-1a1-a2-a3-1a1-a2-a3-1a1-a2-a3-1a1-a2-a3-1a1-a2-a3-1a1-a2-a3-1a1-a2-a3-1a1-a2-a3-1a1-a2-a3-1\ni1-a1-a2-a3-1a1-a2-a3-1a1-a2-a3-1a1-a2-a3-1a1-a2-a3-1a1-a2-a3-1a1-a2-a3-1a1-a2-a3-1a1-a2-a3-1a1-a2-a3-1a1-a2-a3-1\ni1-a1-a2-a3-1a1-a2-a3-1a1-a2-a3-1a1-a2-a3-1a1-a2-a3-1a1-a2-a3-1a1-a2-a3-1a1-a2-a3-1a1-a2-a3-1a1-a2-a3-1a1-a2-a3-1a1-a2-a3-1\ni1-a1-a2-a3-1a1-a2-a3-1a1-a2-a3-1a1-a2-a3-1a1-a2-a3-1a1-a2-a3-1a1-a2-a3-1a1-a2-a3-1a1-a2-a3-1a1-a2-a3-1a1-a2-a3-1a1-a2-a3-1a1-a2-a3-1\ni1-a1-a2-a3-1a1-a2-a3-1a1-a2-a3-1a1-a2-a3-1a1-a2-a3-1a1-a2-a3-1a1-a2-a3-1a1-a2-a3-1a1-a2-a3-1a1-a2-a3-1a1-a2-a3-1a1-a2-a3-1a1-a2-a3-1a1-a2-a3-1\ni1-a1-a2-a3-1a1-a2-a3-1a1-a2-a3-1a1-a2-a3-1a1-a2-a3-1a1-a2-a3-1a1-a2-a3-1a1-a2-a3-1a1-a2-a3-1a1-a2-a3-1a1-a2-a3-1a1-a2-a3-1a1-a2-a3-1a1-a2-a3-1a1-a2-a3-1",
-      "expected_output": "a1-i1-a2-a3-1"
+      "status": "compile_fail",
+      "detail": "compilation timed out",
+      "duration": 120.22
     },
     {
       "test": "zeroframe_definesprite",
       "num_frames": 30,
-      "lines": {
-        "actual_lines": 2,
-        "expected_lines": 3,
-        "matching_lines": 0
-      },
-      "duration": 15.72,
-      "status": "output_mismatch",
-      "detail": "3 line(s) differ (actual=2, expected=3)",
-      "actual_output": "FAILED: expected a00b11c22d000        \nEND OF TEST",
-      "expected_output": "a00b11c22d000\nPASSED: got a00b11c22d000      \nEND OF TEST"
+      "status": "compile_fail",
+      "detail": "/tmp/swf_verify_ig8ur_5j/script_7.c:28:1: error: duplicate label \u2018label_86\u2019",
+      "duration": 15.35
     }
   ]
 }

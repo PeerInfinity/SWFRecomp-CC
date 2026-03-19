@@ -1,34 +1,32 @@
 # Ruffle Test Results Diff
 
-**Previous:** `182a3864f7fe` (2026-03-19T03:48:19.639473+00:00)
-**Current:** `f246282a73c1` (2026-03-19T20:52:22.894795+00:00)
+**Previous:** `f246282a73c1` (2026-03-19T20:52:22.894795+00:00)
+**Current:** `ed111aed62c7` (2026-03-19T21:20:27.385693+00:00)
 
 ## Summary
 
 | Metric | Previous | Current | Delta |
 |--------|----------|---------|-------|
-| Passing | 8 | 3 | -5 |
+| Passing | 3 | 8 | +5 |
 | Total | 14 | 14 | 0 |
-| Pass rate | 57.1% | 21.4% | -35.7% |
-| Mismatched lines | 9 | 5 | -4 |
-|   Decreased | | | -6 |
-|   Increased | | | +2 |
+| Pass rate | 21.4% | 57.1% | +35.7% |
+| Mismatched lines | 5 | 11 | +6 |
+|   Increased | | | +6 |
 
-## Newly Failing (5)
+## Newly Passing (5)
 
-| Test | New Status | Lines (prev) | Lines (now) |
-|------|-----------|--------------|-------------|
-| `afunc_dict` | compile_fail | 2/2 | - |
-| `dict_callframe` | compile_fail | 3/3 | - |
-| `dict_cross` | compile_fail | 3/3 | - |
-| `dict_override` | compile_fail | 2/2 | - |
-| `func_dict` | compile_fail | 3/3 | - |
+| Test | Previous Status | Lines (prev) | Lines (now) |
+|------|----------------|--------------|-------------|
+| `afunc_dict` | compile_fail | - | 2/2 |
+| `dict_callframe` | compile_fail | - | 3/3 |
+| `dict_cross` | compile_fail | - | 3/3 |
+| `dict_override` | compile_fail | - | 2/2 |
+| `func_dict` | compile_fail | - | 3/3 |
 
-## Status Changed (4)
+## Status Changed (3)
 
 | Test | Previous | Current | Lines (prev) | Lines (now) |
 |------|----------|---------|--------------|-------------|
-| `dict_event` | output_mismatch | compile_fail | 3/5 | - |
-| `jump_after_end` | compile_fail | output_mismatch | - | 1/3 |
-| `tags_after_last_showframe` | output_mismatch | compile_fail | 0/1 | - |
-| `zeroframe_definesprite` | output_mismatch | compile_fail | 0/3 | - |
+| `dict_event` | compile_fail | output_mismatch | - | 3/5 |
+| `tags_after_last_showframe` | compile_fail | output_mismatch | - | 0/1 |
+| `zeroframe_definesprite` | compile_fail | output_mismatch | - | 0/3 |

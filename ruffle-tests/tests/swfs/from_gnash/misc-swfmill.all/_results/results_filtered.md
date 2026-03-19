@@ -1,10 +1,10 @@
 # Ruffle Test Results (Filtered)
 
-**Date**: 2026-03-19 20:52 UTC
+**Date**: 2026-03-19 21:20 UTC
 
-**Git SHA**: `f246282a73`
+**Git SHA**: `ed111aed62`
 
-**Run Duration**: 5m 28s
+**Run Duration**: 3m 43s
 
 **Filtered**: 0 tests ignored out of 14 available
 
@@ -13,36 +13,42 @@
 | Metric | Value |
 |--------|-------|
 | Total tests | 14 |
-| Passing | **3** (21.4%) |
-| Failing | 11 |
-| Total expected lines | 7 |
-| Matching lines | 2 (28.6%) |
-| Mismatched lines | 5 |
+| Passing | **8** (57.1%) |
+| Failing | 6 |
+| Total expected lines | 29 |
+| Matching lines | 18 (62.1%) |
+| Mismatched lines | 11 |
 
 ### Failure Breakdown
 
 | Category | Count | % of Failures |
 |----------|-------|---------------|
-| Compile Fail | 8 | 72.7% |
-| Output Mismatch | 3 | 27.3% |
+| Output Mismatch | 6 | 100.0% |
 
 ## Passing Tests
 
-**3 tests passing**
+**8 tests passing**
 
 | # | Test | Lines | Duration | Notes |
 |---|------|-------|----------|-------|
-| 1 | `background` | 0 | 15.5s |  |
-| 2 | `missing_bitmap` | 0 | 15.3s |  |
-| 3 | `mixed-bytecode-as2` | 1 | 16.3s |  |
+| 1 | `afunc_dict` | 2 | 15.5s |  |
+| 2 | `background` | 0 | 15.1s |  |
+| 3 | `dict_callframe` | 3 | 15.3s |  |
+| 4 | `dict_cross` | 3 | 15.9s |  |
+| 5 | `dict_override` | 2 | 15.2s |  |
+| 6 | `func_dict` | 3 | 16.1s |  |
+| 7 | `missing_bitmap` | 0 | 15.6s |  |
+| 8 | `mixed-bytecode-as2` | 1 | 16.2s |  |
 
 ## Near-Passing Tests
 
 Tests with output mismatch but >= 50% line match rate (low-hanging fruit).
 
-**0 tests** within reach
+**1 tests** within reach
 
-No tests above 50% match threshold.
+| # | Test | Match Rate | Matching | Total | Diff Lines | Notes |
+|---|------|------------|----------|-------|------------|-------|
+| 1 | `dict_event` | 60.0% | 3 | 5 | 2 |  |
 
 ## Segfaults
 
@@ -58,10 +64,13 @@ No timeouts.
 
 ## All Output Mismatches
 
-**3 tests** with output mismatch, sorted by match rate (best first)
+**6 tests** with output mismatch, sorted by match rate (best first)
 
 | # | Test | Match Rate | Matching/Total | Actual | Expected | Notes |
 |---|------|------------|----------------|--------|----------|-------|
-| 1 | `jump_after_end` | 33.3% | 1/3 | 1 | 3 |  |
-| 2 | `initaction_in_definesprite` | 0.0% | 0/2 | 0 | 2 |  |
-| 3 | `jump_to_prev_block` | 0.0% | 0/1 | 1 | 1 |  |
+| 1 | `dict_event` | 60.0% | 3/5 | 5 | 5 |  |
+| 2 | `jump_after_end` | 33.3% | 1/3 | 1 | 3 |  |
+| 3 | `initaction_in_definesprite` | 0.0% | 0/2 | 0 | 2 |  |
+| 4 | `jump_to_prev_block` | 0.0% | 0/1 | 1 | 1 |  |
+| 5 | `tags_after_last_showframe` | 0.0% | 0/15 | 15 | 1 |  |
+| 6 | `zeroframe_definesprite` | 0.0% | 0/3 | 2 | 3 |  |
