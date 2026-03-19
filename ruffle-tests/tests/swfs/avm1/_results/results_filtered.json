@@ -1,19 +1,20 @@
 {
   "metadata": {
-    "timestamp": "2026-03-19T02:28:12.989826+00:00",
-    "git_sha": "5002fe1163bd2dea39aa739c2f609982c85898b9",
-    "duration_seconds": 9958.5,
+    "timestamp": "2026-03-19T20:52:22.882574+00:00",
+    "git_sha": "f246282a73c1651b50ebd24f284e9d6892f90337",
+    "duration_seconds": 12141.18,
     "total_available": 619,
     "shards": 30,
     "ignored_count": 45,
     "filtered": true
   },
   "total": 574,
-  "pass": 553,
-  "fail": 21,
-  "pass_rate": 96.3,
+  "pass": 310,
+  "fail": 264,
+  "pass_rate": 54.0,
   "breakdown": {
-    "output_mismatch": 21
+    "compile_fail": 257,
+    "output_mismatch": 7
   },
   "tests": [
     {
@@ -24,7 +25,7 @@
         "expected_lines": 1,
         "matching_lines": 1
       },
-      "duration": 15.99,
+      "duration": 16.24,
       "status": "pass"
     },
     {
@@ -35,7 +36,7 @@
         "expected_lines": 28,
         "matching_lines": 28
       },
-      "duration": 15.67,
+      "duration": 15.98,
       "status": "pass"
     },
     {
@@ -46,19 +47,15 @@
         "expected_lines": 28,
         "matching_lines": 28
       },
-      "duration": 15.69,
+      "duration": 16.22,
       "status": "pass"
     },
     {
       "test": "add2",
       "num_frames": 1,
-      "lines": {
-        "actual_lines": 354,
-        "expected_lines": 354,
-        "matching_lines": 354
-      },
-      "duration": 15.97,
-      "status": "pass"
+      "status": "compile_fail",
+      "detail": "/tmp/swf_verify_znezsheg/script_defs.c:146:1: error: duplicate label \u2018label_30\u2019",
+      "duration": 16.86
     },
     {
       "test": "add_property",
@@ -68,7 +65,7 @@
         "expected_lines": 15,
         "matching_lines": 15
       },
-      "duration": 15.74,
+      "duration": 16.3,
       "status": "pass"
     },
     {
@@ -79,7 +76,7 @@
         "expected_lines": 28,
         "matching_lines": 28
       },
-      "duration": 15.83,
+      "duration": 15.67,
       "status": "pass"
     },
     {
@@ -90,19 +87,15 @@
         "expected_lines": 28,
         "matching_lines": 28
       },
-      "duration": 15.71,
+      "duration": 15.9,
       "status": "pass"
     },
     {
       "test": "arguments",
       "num_frames": 1,
-      "lines": {
-        "actual_lines": 127,
-        "expected_lines": 127,
-        "matching_lines": 127
-      },
-      "duration": 15.73,
-      "status": "pass"
+      "status": "compile_fail",
+      "detail": "/tmp/swf_verify_ep1qgjk7/script_defs.c:224:1: error: duplicate label \u2018label_199\u2019",
+      "duration": 16.1
     },
     {
       "test": "array_call_method",
@@ -112,7 +105,7 @@
         "expected_lines": 9,
         "matching_lines": 9
       },
-      "duration": 15.72,
+      "duration": 16.07,
       "status": "pass"
     },
     {
@@ -123,7 +116,7 @@
         "expected_lines": 98,
         "matching_lines": 98
       },
-      "duration": 15.76,
+      "duration": 16.11,
       "status": "pass"
     },
     {
@@ -134,30 +127,22 @@
         "expected_lines": 30,
         "matching_lines": 30
       },
-      "duration": 15.82,
+      "duration": 16.01,
       "status": "pass"
     },
     {
       "test": "array_enumerate",
       "num_frames": 1,
-      "lines": {
-        "actual_lines": 4,
-        "expected_lines": 4,
-        "matching_lines": 4
-      },
-      "duration": 15.71,
-      "status": "pass"
+      "status": "compile_fail",
+      "detail": "/tmp/swf_verify_iskzjaen/script_0.c:122:1: error: duplicate label \u2018label_143\u2019",
+      "duration": 16.06
     },
     {
       "test": "array_length",
       "num_frames": 1,
-      "lines": {
-        "actual_lines": 42,
-        "expected_lines": 42,
-        "matching_lines": 42
-      },
-      "duration": 15.8,
-      "status": "pass"
+      "status": "compile_fail",
+      "detail": "/tmp/swf_verify_xenaqqbs/script_defs.c:75:1: error: duplicate label \u2018label_24\u2019",
+      "duration": 16.53
     },
     {
       "test": "array_properties",
@@ -167,7 +152,7 @@
         "expected_lines": 36,
         "matching_lines": 36
       },
-      "duration": 15.72,
+      "duration": 16.53,
       "status": "pass"
     },
     {
@@ -178,7 +163,7 @@
         "expected_lines": 12,
         "matching_lines": 12
       },
-      "duration": 15.7,
+      "duration": 16.67,
       "status": "pass"
     },
     {
@@ -189,30 +174,22 @@
         "expected_lines": 34,
         "matching_lines": 34
       },
-      "duration": 15.78,
+      "duration": 16.59,
       "status": "pass"
     },
     {
       "test": "array_sort",
       "num_frames": 1,
-      "lines": {
-        "actual_lines": 161,
-        "expected_lines": 161,
-        "matching_lines": 161
-      },
-      "duration": 16.69,
-      "status": "pass"
+      "status": "compile_fail",
+      "detail": "/tmp/swf_verify_fltw3v5j/script_0.c:3459:1: error: duplicate label \u2018label_8288\u2019",
+      "duration": 16.41
     },
     {
       "test": "array_sort_random",
       "num_frames": 1,
-      "lines": {
-        "actual_lines": 443,
-        "expected_lines": 443,
-        "matching_lines": 443
-      },
-      "duration": 15.84,
-      "status": "pass"
+      "status": "compile_fail",
+      "detail": "/tmp/swf_verify_9p6nqpcd/script_0.c:87:1: error: duplicate label \u2018label_675\u2019",
+      "duration": 16.29
     },
     {
       "test": "array_splice",
@@ -222,19 +199,15 @@
         "expected_lines": 207,
         "matching_lines": 207
       },
-      "duration": 15.85,
+      "duration": 16.29,
       "status": "pass"
     },
     {
       "test": "array_trivial",
       "num_frames": 1,
-      "lines": {
-        "actual_lines": 209,
-        "expected_lines": 209,
-        "matching_lines": 209
-      },
-      "duration": 15.83,
-      "status": "pass"
+      "status": "compile_fail",
+      "detail": "/tmp/swf_verify_2p1mhtff/script_0.c:1387:1: error: duplicate label \u2018label_412\u2019",
+      "duration": 15.86
     },
     {
       "test": "as1_constructor_v6",
@@ -244,7 +217,7 @@
         "expected_lines": 35,
         "matching_lines": 35
       },
-      "duration": 15.67,
+      "duration": 15.99,
       "status": "pass"
     },
     {
@@ -255,52 +228,36 @@
         "expected_lines": 35,
         "matching_lines": 35
       },
-      "duration": 15.94,
+      "duration": 15.8,
       "status": "pass"
     },
     {
       "test": "as2_oop",
       "num_frames": 1,
-      "lines": {
-        "actual_lines": 13,
-        "expected_lines": 13,
-        "matching_lines": 13
-      },
-      "duration": 15.87,
-      "status": "pass"
+      "status": "compile_fail",
+      "detail": "/tmp/swf_verify_mmhs7sju/script_4.c:42:1: error: duplicate label \u2018label_64\u2019",
+      "duration": 15.62
     },
     {
       "test": "as2_super_and_this_v6",
       "num_frames": 1,
-      "lines": {
-        "actual_lines": 97,
-        "expected_lines": 97,
-        "matching_lines": 97
-      },
-      "duration": 15.88,
-      "status": "pass"
+      "status": "compile_fail",
+      "detail": "/tmp/swf_verify_xmbfshkw/script_1.c:124:1: error: duplicate label \u2018label_694\u2019",
+      "duration": 15.6
     },
     {
       "test": "as2_super_and_this_v8",
       "num_frames": 1,
-      "lines": {
-        "actual_lines": 85,
-        "expected_lines": 85,
-        "matching_lines": 85
-      },
-      "duration": 16.25,
-      "status": "pass"
+      "status": "compile_fail",
+      "detail": "/tmp/swf_verify_w0j2s1x1/script_1.c:124:1: error: duplicate label \u2018label_694\u2019",
+      "duration": 15.44
     },
     {
       "test": "as2_super_via_manual_prototype",
       "num_frames": 1,
-      "lines": {
-        "actual_lines": 40,
-        "expected_lines": 40,
-        "matching_lines": 40
-      },
-      "duration": 15.89,
-      "status": "pass"
+      "status": "compile_fail",
+      "detail": "/tmp/swf_verify_lsgnbdio/script_1.c:124:1: error: duplicate label \u2018label_749\u2019",
+      "duration": 15.51
     },
     {
       "test": "as_broadcaster",
@@ -310,7 +267,7 @@
         "expected_lines": 41,
         "matching_lines": 41
       },
-      "duration": 15.62,
+      "duration": 15.46,
       "status": "pass"
     },
     {
@@ -321,96 +278,64 @@
         "expected_lines": 10,
         "matching_lines": 10
       },
-      "duration": 15.5,
+      "duration": 15.37,
       "status": "pass"
     },
     {
       "test": "as_broadcaster_undef",
       "num_frames": 1,
-      "lines": {
-        "actual_lines": 89,
-        "expected_lines": 89,
-        "matching_lines": 89
-      },
-      "duration": 15.7,
-      "status": "pass"
+      "status": "compile_fail",
+      "detail": "/tmp/swf_verify_k78qvkgh/script_0.c:733:1: error: duplicate label \u2018label_1693\u2019",
+      "duration": 15.48
     },
     {
       "test": "as_set_prop_flags",
       "num_frames": 1,
-      "lines": {
-        "actual_lines": 79,
-        "expected_lines": 79,
-        "matching_lines": 79
-      },
-      "duration": 15.68,
-      "status": "pass"
+      "status": "compile_fail",
+      "detail": "/tmp/swf_verify_of2gcdbr/script_defs.c:161:1: error: duplicate label \u2018label_55\u2019",
+      "duration": 15.46
     },
     {
       "test": "as_set_prop_flags_version",
       "num_frames": 1,
-      "lines": {
-        "actual_lines": 31,
-        "expected_lines": 31,
-        "matching_lines": 31
-      },
-      "duration": 15.61,
-      "status": "pass"
+      "status": "compile_fail",
+      "detail": "/tmp/swf_verify_lnlmne6k/script_0.c:381:1: error: duplicate label \u2018label_395\u2019",
+      "duration": 15.55
     },
     {
       "test": "as_set_prop_flags_version_swf5",
       "num_frames": 1,
-      "lines": {
-        "actual_lines": 1,
-        "expected_lines": 1,
-        "matching_lines": 1
-      },
-      "duration": 15.61,
-      "status": "pass"
+      "status": "compile_fail",
+      "detail": "/tmp/swf_verify_egr59d21/script_0.c:272:1: error: duplicate label \u2018label_150\u2019",
+      "duration": 15.27
     },
     {
       "test": "as_set_prop_flags_version_swf6",
       "num_frames": 1,
-      "lines": {
-        "actual_lines": 1,
-        "expected_lines": 1,
-        "matching_lines": 1
-      },
-      "duration": 15.57,
-      "status": "pass"
+      "status": "compile_fail",
+      "detail": "/tmp/swf_verify_7pfw6p3m/script_0.c:222:1: error: duplicate label \u2018label_150\u2019",
+      "duration": 15.29
     },
     {
       "test": "as_set_prop_flags_version_swf7",
       "num_frames": 1,
-      "lines": {
-        "actual_lines": 1,
-        "expected_lines": 1,
-        "matching_lines": 1
-      },
-      "duration": 15.59,
-      "status": "pass"
+      "status": "compile_fail",
+      "detail": "/tmp/swf_verify_m11q0p93/script_0.c:222:1: error: duplicate label \u2018label_150\u2019",
+      "duration": 15.34
     },
     {
       "test": "as_set_prop_flags_version_swf8",
       "num_frames": 1,
-      "lines": {
-        "actual_lines": 1,
-        "expected_lines": 1,
-        "matching_lines": 1
-      },
-      "duration": 15.52,
-      "status": "pass"
+      "status": "compile_fail",
+      "detail": "/tmp/swf_verify_bmym0ved/script_0.c:222:1: error: duplicate label \u2018label_150\u2019",
+      "duration": 15.36
     },
     {
       "test": "as_set_prop_flags_version_swf9",
       "num_frames": 1,
-      "lines": {
-        "actual_lines": 1,
-        "expected_lines": 1,
-        "matching_lines": 1
-      },
-      "duration": 15.58,
-      "status": "pass"
+      "status": "compile_fail",
+      "detail": "/tmp/swf_verify_soq1yx_n/script_0.c:222:1: error: duplicate label \u2018label_150\u2019",
+      "duration": 15.16
     },
     {
       "test": "as_transformed_flag",
@@ -420,7 +345,7 @@
         "expected_lines": 20,
         "matching_lines": 20
       },
-      "duration": 15.52,
+      "duration": 15.3,
       "status": "pass"
     },
     {
@@ -431,7 +356,7 @@
         "expected_lines": 11,
         "matching_lines": 0
       },
-      "duration": 15.56,
+      "duration": 15.38,
       "status": "output_mismatch",
       "detail": "11 line(s) differ (actual=0, expected=11)",
       "actual_output": "",
@@ -445,19 +370,15 @@
         "expected_lines": 34,
         "matching_lines": 34
       },
-      "duration": 15.54,
+      "duration": 15.35,
       "status": "pass"
     },
     {
       "test": "asnew",
       "num_frames": 1,
-      "lines": {
-        "actual_lines": 34,
-        "expected_lines": 34,
-        "matching_lines": 34
-      },
-      "duration": 15.64,
-      "status": "pass"
+      "status": "compile_fail",
+      "detail": "/tmp/swf_verify_rusy8nwv/script_0.c:71:1: error: duplicate label \u2018label_881\u2019",
+      "duration": 15.32
     },
     {
       "test": "attach_movie",
@@ -478,22 +399,19 @@
         "expected_lines": 3,
         "matching_lines": 3
       },
-      "duration": 15.56,
+      "duration": 15.51,
       "status": "pass"
     },
     {
       "test": "bad_placeobject_clipaction",
       "num_frames": 2,
       "lines": {
-        "actual_lines": 0,
+        "actual_lines": 2,
         "expected_lines": 2,
-        "matching_lines": 0
+        "matching_lines": 2
       },
-      "duration": 15.85,
-      "status": "output_mismatch",
-      "detail": "2 line(s) differ (actual=0, expected=2)",
-      "actual_output": "",
-      "expected_output": "Load\nEnterFrame"
+      "duration": 17.07,
+      "status": "pass"
     },
     {
       "test": "bad_swf_tag_past_eof",
@@ -503,7 +421,7 @@
         "expected_lines": 0,
         "matching_lines": 0
       },
-      "duration": 15.52,
+      "duration": 15.54,
       "status": "pass"
     },
     {
@@ -514,19 +432,15 @@
         "expected_lines": 1058,
         "matching_lines": 1058
       },
-      "duration": 18.49,
+      "duration": 18.33,
       "status": "pass"
     },
     {
       "test": "bitmap_data",
       "num_frames": 1,
-      "lines": {
-        "actual_lines": 1126,
-        "expected_lines": 1126,
-        "matching_lines": 1126
-      },
-      "duration": 18.03,
-      "status": "pass"
+      "status": "compile_fail",
+      "detail": "/tmp/swf_verify_5q3w1i3q/script_0.c:8671:1: error: duplicate label \u2018label_9487\u2019",
+      "duration": 15.56
     },
     {
       "test": "bitmap_data_colortransform",
@@ -536,41 +450,29 @@
         "expected_lines": 0,
         "matching_lines": 0
       },
-      "duration": 15.92,
+      "duration": 15.9,
       "status": "pass"
     },
     {
       "test": "bitmap_data_compare",
       "num_frames": 1,
-      "lines": {
-        "actual_lines": 40,
-        "expected_lines": 40,
-        "matching_lines": 40
-      },
-      "duration": 15.82,
-      "status": "pass"
+      "status": "compile_fail",
+      "detail": "/tmp/swf_verify_v8r694k4/script_0.c:1248:1: error: duplicate label \u2018label_2246\u2019",
+      "duration": 15.35
     },
     {
       "test": "bitmap_data_copypixels",
       "num_frames": 2,
-      "lines": {
-        "actual_lines": 17,
-        "expected_lines": 17,
-        "matching_lines": 17
-      },
-      "duration": 16.56,
-      "status": "pass"
+      "status": "compile_fail",
+      "detail": "/tmp/swf_verify_32072ra7/script_1.c:93:1: error: duplicate label \u2018label_5772\u2019",
+      "duration": 15.52
     },
     {
       "test": "bitmap_data_draw_cliprect",
       "num_frames": 1,
-      "lines": {
-        "actual_lines": 13,
-        "expected_lines": 13,
-        "matching_lines": 13
-      },
-      "duration": 15.84,
-      "status": "pass"
+      "status": "compile_fail",
+      "detail": "/tmp/swf_verify_0iztr9hd/script_0.c:71:1: error: duplicate label \u2018label_1554\u2019",
+      "duration": 15.59
     },
     {
       "test": "bitmap_data_fillrect",
@@ -580,19 +482,15 @@
         "expected_lines": 0,
         "matching_lines": 0
       },
-      "duration": 15.67,
+      "duration": 15.64,
       "status": "pass"
     },
     {
       "test": "bitmap_data_hittest",
       "num_frames": 1,
-      "lines": {
-        "actual_lines": 132,
-        "expected_lines": 132,
-        "matching_lines": 132
-      },
-      "duration": 16.21,
-      "status": "pass"
+      "status": "compile_fail",
+      "detail": "/tmp/swf_verify_ywq0rl7t/script_defs.c:153:1: error: duplicate label \u2018label_62\u2019",
+      "duration": 15.98
     },
     {
       "test": "bitmap_data_max_size_swf10",
@@ -602,7 +500,7 @@
         "expected_lines": 12,
         "matching_lines": 12
       },
-      "duration": 15.52,
+      "duration": 15.51,
       "status": "pass"
     },
     {
@@ -613,52 +511,36 @@
         "expected_lines": 10,
         "matching_lines": 10
       },
-      "duration": 15.58,
+      "duration": 15.54,
       "status": "pass"
     },
     {
       "test": "bitmap_data_noise",
       "num_frames": 1,
-      "lines": {
-        "actual_lines": 631,
-        "expected_lines": 631,
-        "matching_lines": 631
-      },
-      "duration": 15.86,
-      "status": "pass"
+      "status": "compile_fail",
+      "detail": "/tmp/swf_verify_v_abx4kq/script_0.c:1189:1: error: duplicate label \u2018label_2387\u2019",
+      "duration": 15.58
     },
     {
       "test": "bitmap_data_perlinnoise",
       "num_frames": 1,
-      "lines": {
-        "actual_lines": 0,
-        "expected_lines": 0,
-        "matching_lines": 0
-      },
-      "duration": 16.56,
-      "status": "pass"
+      "status": "compile_fail",
+      "detail": "/tmp/swf_verify_s1yzdgka/script_0.c:87:1: error: duplicate label \u2018label_3244\u2019",
+      "duration": 16.53
     },
     {
       "test": "bitmap_data_pixeldissolve_image",
       "num_frames": 1,
-      "lines": {
-        "actual_lines": 0,
-        "expected_lines": 0,
-        "matching_lines": 0
-      },
-      "duration": 16.12,
-      "status": "pass"
+      "status": "compile_fail",
+      "detail": "/tmp/swf_verify_yc_73ncc/script_0.c:135:1: error: duplicate label \u2018label_2830\u2019",
+      "duration": 15.43
     },
     {
       "test": "bitmap_data_threshold",
       "num_frames": 1,
-      "lines": {
-        "actual_lines": 176,
-        "expected_lines": 176,
-        "matching_lines": 176
-      },
-      "duration": 16.03,
-      "status": "pass"
+      "status": "compile_fail",
+      "detail": "/tmp/swf_verify_2_4v7m36/script_defs.c:243:1: error: duplicate label \u2018label_18\u2019",
+      "duration": 15.9
     },
     {
       "test": "bitmapdata_applyfilter_colormatrix",
@@ -668,19 +550,15 @@
         "expected_lines": 0,
         "matching_lines": 0
       },
-      "duration": 16.08,
+      "duration": 15.58,
       "status": "pass"
     },
     {
       "test": "bitmapdata_channels",
       "num_frames": 1,
-      "lines": {
-        "actual_lines": 19,
-        "expected_lines": 19,
-        "matching_lines": 19
-      },
-      "duration": 15.45,
-      "status": "pass"
+      "status": "compile_fail",
+      "detail": "/tmp/swf_verify_qx_tn6xo/script_0.c:523:1: error: duplicate label \u2018label_529\u2019",
+      "duration": 15.44
     },
     {
       "test": "bitor",
@@ -690,7 +568,7 @@
         "expected_lines": 1058,
         "matching_lines": 1058
       },
-      "duration": 18.39,
+      "duration": 18.36,
       "status": "pass"
     },
     {
@@ -701,7 +579,7 @@
         "expected_lines": 14,
         "matching_lines": 14
       },
-      "duration": 16.16,
+      "duration": 15.75,
       "status": "pass"
     },
     {
@@ -712,7 +590,7 @@
         "expected_lines": 14,
         "matching_lines": 14
       },
-      "duration": 15.83,
+      "duration": 15.62,
       "status": "pass"
     },
     {
@@ -723,19 +601,15 @@
         "expected_lines": 1058,
         "matching_lines": 1058
       },
-      "duration": 18.63,
+      "duration": 18.56,
       "status": "pass"
     },
     {
       "test": "boxed_primitives",
       "num_frames": 1,
-      "lines": {
-        "actual_lines": 24,
-        "expected_lines": 24,
-        "matching_lines": 24
-      },
-      "duration": 15.91,
-      "status": "pass"
+      "status": "compile_fail",
+      "detail": "/tmp/swf_verify_pvv23qg0/script_0.c:87:1: error: duplicate label \u2018label_1007\u2019",
+      "duration": 15.75
     },
     {
       "test": "button_children",
@@ -745,7 +619,7 @@
         "expected_lines": 8,
         "matching_lines": 8
       },
-      "duration": 15.91,
+      "duration": 15.93,
       "status": "pass"
     },
     {
@@ -756,7 +630,7 @@
         "expected_lines": 4,
         "matching_lines": 4
       },
-      "duration": 15.82,
+      "duration": 15.61,
       "status": "pass"
     },
     {
@@ -767,7 +641,7 @@
         "expected_lines": 14,
         "matching_lines": 14
       },
-      "duration": 15.93,
+      "duration": 15.77,
       "status": "pass"
     },
     {
@@ -778,7 +652,7 @@
         "expected_lines": 45,
         "matching_lines": 45
       },
-      "duration": 16.85,
+      "duration": 16.36,
       "status": "pass"
     },
     {
@@ -789,30 +663,22 @@
         "expected_lines": 3,
         "matching_lines": 3
       },
-      "duration": 16.02,
+      "duration": 15.58,
       "status": "pass"
     },
     {
       "test": "button_keypress_vs_press",
       "num_frames": 2,
-      "lines": {
-        "actual_lines": 25,
-        "expected_lines": 25,
-        "matching_lines": 25
-      },
-      "duration": 15.9,
-      "status": "pass"
+      "status": "compile_fail",
+      "detail": "/tmp/swf_verify_p25by33r/script_defs.c:118:1: error: duplicate label \u2018label_41\u2019",
+      "duration": 15.52
     },
     {
       "test": "button_keypress_vs_tab",
       "num_frames": 2,
-      "lines": {
-        "actual_lines": 20,
-        "expected_lines": 20,
-        "matching_lines": 20
-      },
-      "duration": 15.93,
-      "status": "pass"
+      "status": "compile_fail",
+      "detail": "/tmp/swf_verify_e1pqb1b4/script_8.c:245:1: error: duplicate label \u2018label_704\u2019",
+      "duration": 15.63
     },
     {
       "test": "button_keypress_vs_textinput",
@@ -822,7 +688,7 @@
         "expected_lines": 4,
         "matching_lines": 4
       },
-      "duration": 15.93,
+      "duration": 15.43,
       "status": "pass"
     },
     {
@@ -833,19 +699,15 @@
         "expected_lines": 2,
         "matching_lines": 2
       },
-      "duration": 15.71,
+      "duration": 15.38,
       "status": "pass"
     },
     {
       "test": "button_properties_special_cases",
       "num_frames": 20,
-      "lines": {
-        "actual_lines": 22,
-        "expected_lines": 22,
-        "matching_lines": 22
-      },
-      "duration": 15.91,
-      "status": "pass"
+      "status": "compile_fail",
+      "detail": "/tmp/swf_verify_6debi5kh/script_3.c:73:1: error: duplicate label \u2018label_1244\u2019",
+      "duration": 15.53
     },
     {
       "test": "button_v5",
@@ -855,7 +717,7 @@
         "expected_lines": 18,
         "matching_lines": 18
       },
-      "duration": 15.76,
+      "duration": 15.31,
       "status": "pass"
     },
     {
@@ -866,7 +728,7 @@
         "expected_lines": 18,
         "matching_lines": 18
       },
-      "duration": 15.84,
+      "duration": 15.39,
       "status": "pass"
     },
     {
@@ -877,7 +739,7 @@
         "expected_lines": 63,
         "matching_lines": 63
       },
-      "duration": 16.06,
+      "duration": 15.76,
       "status": "pass"
     },
     {
@@ -888,7 +750,7 @@
         "expected_lines": 1,
         "matching_lines": 1
       },
-      "duration": 15.68,
+      "duration": 15.79,
       "status": "pass"
     },
     {
@@ -899,7 +761,7 @@
         "expected_lines": 8,
         "matching_lines": 8
       },
-      "duration": 15.8,
+      "duration": 16.17,
       "status": "pass"
     },
     {
@@ -910,7 +772,7 @@
         "expected_lines": 2,
         "matching_lines": 2
       },
-      "duration": 15.77,
+      "duration": 16.7,
       "status": "pass"
     },
     {
@@ -921,66 +783,47 @@
         "expected_lines": 5,
         "matching_lines": 5
       },
-      "duration": 15.7,
+      "duration": 16.76,
       "status": "pass"
     },
     {
       "test": "clip_constructors",
       "num_frames": 1,
-      "lines": {
-        "actual_lines": 8,
-        "expected_lines": 8,
-        "matching_lines": 8
-      },
-      "duration": 16.53,
-      "status": "pass"
+      "status": "compile_fail",
+      "detail": "/tmp/swf_verify_tdzjf8gk/script_1.c:91:1: error: duplicate label \u2018label_224\u2019",
+      "duration": 17.44
     },
     {
       "test": "clip_event_propagation_order",
       "num_frames": 6,
-      "lines": {
-        "actual_lines": 17,
-        "expected_lines": 17,
-        "matching_lines": 17
-      },
-      "duration": 17.08,
-      "status": "pass"
+      "status": "compile_fail",
+      "detail": "/tmp/swf_verify_820dt1cf/script_0.c:103:1: error: duplicate label \u2018label_551\u2019",
+      "duration": 16.71
     },
     {
       "test": "clip_events",
       "num_frames": 4,
       "lines": {
-        "actual_lines": 12,
+        "actual_lines": 19,
         "expected_lines": 19,
-        "matching_lines": 1
+        "matching_lines": 19
       },
-      "duration": 16.6,
-      "status": "output_mismatch",
-      "detail": "18 line(s) differ (actual=12, expected=19)",
-      "actual_output": "frame 1\nchild initialize\nframe 2\nclip frame 1\nchild load\nchild frame 1\nchild enterframe\nclip onEnterFrame\nframe 3\nchild unload\nclip onUnload\nframe 4",
-      "expected_output": "frame 1\nclip initialize1\nclip initialize2\nchild initialize\nclip construct\nchild construct\nframe 2\nclip load\nclip frame 1\nchild load\nchild frame 1\nchild enterframe\nclip enterFrame\nclip onEnterFrame\nframe 3\nchild unload\nclip unload\nclip onUnload\nframe 4"
+      "duration": 16.46,
+      "status": "pass"
     },
     {
       "test": "clone_sprite_edittext",
       "num_frames": 1,
-      "lines": {
-        "actual_lines": 94,
-        "expected_lines": 94,
-        "matching_lines": 94
-      },
-      "duration": 15.9,
-      "status": "pass"
+      "status": "compile_fail",
+      "detail": "/tmp/swf_verify_0nx350wt/script_defs.c:367:1: error: duplicate label \u2018label_95\u2019",
+      "duration": 16.68
     },
     {
       "test": "clone_sprite_edittext_dynamic",
       "num_frames": 1,
-      "lines": {
-        "actual_lines": 86,
-        "expected_lines": 86,
-        "matching_lines": 86
-      },
-      "duration": 15.76,
-      "status": "pass"
+      "status": "compile_fail",
+      "detail": "/tmp/swf_verify_jn0b1tha/script_defs.c:246:1: error: duplicate label \u2018label_95\u2019",
+      "duration": 16.2
     },
     {
       "test": "clone_sprite_types",
@@ -990,7 +833,7 @@
         "expected_lines": 24,
         "matching_lines": 24
       },
-      "duration": 15.5,
+      "duration": 17.72,
       "status": "pass"
     },
     {
@@ -1001,30 +844,22 @@
         "expected_lines": 7,
         "matching_lines": 7
       },
-      "duration": 15.5,
+      "duration": 17.29,
       "status": "pass"
     },
     {
       "test": "coerce_to_object_monkeypatch",
       "num_frames": 1,
-      "lines": {
-        "actual_lines": 129,
-        "expected_lines": 129,
-        "matching_lines": 129
-      },
-      "duration": 16.26,
-      "status": "pass"
+      "status": "compile_fail",
+      "detail": "/tmp/swf_verify_nsdx39yq/script_0.c:71:1: error: duplicate label \u2018label_228\u2019",
+      "duration": 17.52
     },
     {
       "test": "coerce_to_primitive_resolve",
       "num_frames": 1,
-      "lines": {
-        "actual_lines": 17,
-        "expected_lines": 17,
-        "matching_lines": 17
-      },
-      "duration": 15.83,
-      "status": "pass"
+      "status": "compile_fail",
+      "detail": "/tmp/swf_verify_zj5tklnm/script_0.c:79:1: error: duplicate label \u2018label_1118\u2019",
+      "duration": 16.23
     },
     {
       "test": "color",
@@ -1034,19 +869,15 @@
         "expected_lines": 57,
         "matching_lines": 57
       },
-      "duration": 15.7,
+      "duration": 16.88,
       "status": "pass"
     },
     {
       "test": "color_transform",
       "num_frames": 1,
-      "lines": {
-        "actual_lines": 48,
-        "expected_lines": 48,
-        "matching_lines": 48
-      },
-      "duration": 15.99,
-      "status": "pass"
+      "status": "compile_fail",
+      "detail": "/tmp/swf_verify_lvb36yyt/script_0.c:913:1: error: duplicate label \u2018label_1616\u2019",
+      "duration": 15.74
     },
     {
       "test": "conflicting_instance_names",
@@ -1056,7 +887,7 @@
         "expected_lines": 23,
         "matching_lines": 23
       },
-      "duration": 15.79,
+      "duration": 16.39,
       "status": "pass"
     },
     {
@@ -1067,30 +898,22 @@
         "expected_lines": 2,
         "matching_lines": 2
       },
-      "duration": 15.44,
+      "duration": 16.7,
       "status": "pass"
     },
     {
       "test": "context_menu",
       "num_frames": 1,
-      "lines": {
-        "actual_lines": 39,
-        "expected_lines": 39,
-        "matching_lines": 39
-      },
-      "duration": 16.09,
-      "status": "pass"
+      "status": "compile_fail",
+      "detail": "/tmp/swf_verify_ddhd3z5h/script_0.c:595:1: error: duplicate label \u2018label_219\u2019",
+      "duration": 16.73
     },
     {
       "test": "context_menu_item",
       "num_frames": 1,
-      "lines": {
-        "actual_lines": 41,
-        "expected_lines": 41,
-        "matching_lines": 41
-      },
-      "duration": 16.54,
-      "status": "pass"
+      "status": "compile_fail",
+      "detail": "/tmp/swf_verify_ps_tvozz/script_0.c:427:1: error: duplicate label \u2018label_1007\u2019",
+      "duration": 15.86
     },
     {
       "test": "create_empty_movie_clip",
@@ -1100,7 +923,7 @@
         "expected_lines": 3,
         "matching_lines": 3
       },
-      "duration": 16.67,
+      "duration": 16.18,
       "status": "pass"
     },
     {
@@ -1111,7 +934,7 @@
         "expected_lines": 10,
         "matching_lines": 10
       },
-      "duration": 16.3,
+      "duration": 16.06,
       "status": "pass"
     },
     {
@@ -1122,19 +945,15 @@
         "expected_lines": 4,
         "matching_lines": 4
       },
-      "duration": 17.04,
+      "duration": 16.1,
       "status": "pass"
     },
     {
       "test": "default_names",
       "num_frames": 6,
-      "lines": {
-        "actual_lines": 52,
-        "expected_lines": 52,
-        "matching_lines": 52
-      },
-      "duration": 15.67,
-      "status": "pass"
+      "status": "compile_fail",
+      "detail": "/tmp/swf_verify_mwr1ia0l/script_4.c:41:1: error: duplicate label \u2018label_58\u2019",
+      "duration": 17.01
     },
     {
       "test": "define_function2",
@@ -1144,7 +963,7 @@
         "expected_lines": 8,
         "matching_lines": 8
       },
-      "duration": 16.14,
+      "duration": 17.17,
       "status": "pass"
     },
     {
@@ -1155,7 +974,7 @@
         "expected_lines": 13,
         "matching_lines": 13
       },
-      "duration": 15.9,
+      "duration": 16.77,
       "status": "pass"
     },
     {
@@ -1166,7 +985,7 @@
         "expected_lines": 4,
         "matching_lines": 4
       },
-      "duration": 15.31,
+      "duration": 16.42,
       "status": "pass"
     },
     {
@@ -1177,7 +996,7 @@
         "expected_lines": 2,
         "matching_lines": 2
       },
-      "duration": 15.28,
+      "duration": 16.46,
       "status": "pass"
     },
     {
@@ -1188,7 +1007,7 @@
         "expected_lines": 27,
         "matching_lines": 27
       },
-      "duration": 15.19,
+      "duration": 16.4,
       "status": "pass"
     },
     {
@@ -1199,7 +1018,7 @@
         "expected_lines": 54,
         "matching_lines": 54
       },
-      "duration": 15.21,
+      "duration": 16.46,
       "status": "pass"
     },
     {
@@ -1210,19 +1029,15 @@
         "expected_lines": 3,
         "matching_lines": 3
       },
-      "duration": 15.32,
+      "duration": 16.21,
       "status": "pass"
     },
     {
       "test": "device_font_spacing",
       "num_frames": 1,
-      "lines": {
-        "actual_lines": 91,
-        "expected_lines": 91,
-        "matching_lines": 91
-      },
-      "duration": 15.35,
-      "status": "pass"
+      "status": "compile_fail",
+      "detail": "/tmp/swf_verify_olk2c8kp/script_defs.c:232:1: error: duplicate label \u2018label_39\u2019",
+      "duration": 16.44
     },
     {
       "test": "displacementmapfilter_mappoint_throw_error",
@@ -1232,7 +1047,7 @@
         "expected_lines": 13,
         "matching_lines": 0
       },
-      "duration": 15.22,
+      "duration": 16.35,
       "status": "output_mismatch",
       "detail": "13 line(s) differ (actual=13, expected=13)",
       "actual_output": "Set: [object Object]\nSet: [object Object]\nSet: [object Object]\nSet: [object Object]\nSet: [object Object]\nSet: [object Object]\nSet: [object Object]\nSet: [object Object]\nSet: [object Object]\nSet: [object Object]\nSet: [object Object]\nSet: true\nSet: false",
@@ -1246,7 +1061,7 @@
         "expected_lines": 2,
         "matching_lines": 2
       },
-      "duration": 15.2,
+      "duration": 16.27,
       "status": "pass"
     },
     {
@@ -1257,7 +1072,7 @@
         "expected_lines": 107,
         "matching_lines": 107
       },
-      "duration": 15.26,
+      "duration": 16.4,
       "status": "pass"
     },
     {
@@ -1268,7 +1083,7 @@
         "expected_lines": 3,
         "matching_lines": 3
       },
-      "duration": 15.19,
+      "duration": 16.3,
       "status": "pass"
     },
     {
@@ -1279,58 +1094,44 @@
         "expected_lines": 12,
         "matching_lines": 12
       },
-      "duration": 15.27,
+      "duration": 16.36,
       "status": "pass"
     },
     {
       "test": "drag_drop",
       "num_frames": 16,
       "lines": {
-        "actual_lines": 0,
+        "actual_lines": 10,
         "expected_lines": 10,
-        "matching_lines": 0
+        "matching_lines": 10
       },
-      "duration": 15.23,
-      "status": "output_mismatch",
-      "detail": "10 line(s) differ (actual=0, expected=10)",
-      "actual_output": "",
-      "expected_output": "dragging start\ndragging done: /drop1\ndragging start\ndragging done: \ndragging start\ndragging done: /drop2\ndragging start\ndragging done: /drop2/drop3\ndragging start\ndragging done: /drop2"
+      "duration": 16.28,
+      "status": "pass"
     },
     {
       "test": "drag_over_from_outside",
       "num_frames": 60,
-      "lines": {
-        "actual_lines": 1,
-        "expected_lines": 1,
-        "matching_lines": 1
-      },
-      "duration": 15.3,
-      "status": "pass"
+      "status": "compile_fail",
+      "detail": "/tmp/swf_verify_yo75ueip/script_0.c:71:1: error: duplicate label \u2018label_544\u2019",
+      "duration": 16.13
     },
     {
       "test": "drag_over_without_startdrag",
       "num_frames": 60,
-      "lines": {
-        "actual_lines": 1,
-        "expected_lines": 1,
-        "matching_lines": 1
-      },
-      "duration": 15.32,
-      "status": "pass"
+      "status": "compile_fail",
+      "detail": "/tmp/swf_verify_gnwt0h1c/script_0.c:71:1: error: duplicate label \u2018label_1023\u2019",
+      "duration": 16.14
     },
     {
       "test": "duplicate_movie_clip",
       "num_frames": 1,
       "lines": {
-        "actual_lines": 16,
+        "actual_lines": 20,
         "expected_lines": 20,
-        "matching_lines": 16
+        "matching_lines": 20
       },
-      "duration": 15.27,
-      "status": "output_mismatch",
-      "detail": "4 line(s) differ (actual=16, expected=20)",
-      "actual_output": "... (11 lines before) ...\nundefined\ntarget.toString() called\ndepth.valueOf() called\ndepth.valueOf() called\ntarget.toString() called",
-      "expected_output": "... (11 lines before) ...\nundefined\ntarget.toString() called\ndepth.valueOf() called\ndepth.valueOf() called\ntarget.toString() called\nload: src\nload: clip1\nload: clip2\nload: clip4"
+      "duration": 16.24,
+      "status": "pass"
     },
     {
       "test": "duplicate_movie_clip_drawing",
@@ -1340,19 +1141,15 @@
         "expected_lines": 2,
         "matching_lines": 2
       },
-      "duration": 15.2,
+      "duration": 16.22,
       "status": "pass"
     },
     {
       "test": "edittext_align",
       "num_frames": 1,
-      "lines": {
-        "actual_lines": 60,
-        "expected_lines": 60,
-        "matching_lines": 60
-      },
-      "duration": 15.29,
-      "status": "pass"
+      "status": "compile_fail",
+      "detail": "/tmp/swf_verify_py1w3sdz/script_defs.c:228:1: error: duplicate label \u2018label_130\u2019",
+      "duration": 16.35
     },
     {
       "test": "edittext_align_trailing_spaces_swf7",
@@ -1362,7 +1159,7 @@
         "expected_lines": 576,
         "matching_lines": 576
       },
-      "duration": 15.26,
+      "duration": 16.41,
       "status": "pass"
     },
     {
@@ -1373,7 +1170,7 @@
         "expected_lines": 576,
         "matching_lines": 576
       },
-      "duration": 15.26,
+      "duration": 16.39,
       "status": "pass"
     },
     {
@@ -1384,7 +1181,7 @@
         "expected_lines": 296,
         "matching_lines": 296
       },
-      "duration": 15.34,
+      "duration": 16.55,
       "status": "pass"
     },
     {
@@ -1395,41 +1192,29 @@
         "expected_lines": 71,
         "matching_lines": 71
       },
-      "duration": 15.29,
+      "duration": 15.82,
       "status": "pass"
     },
     {
       "test": "edittext_autosize_setter",
       "num_frames": 1,
-      "lines": {
-        "actual_lines": 20,
-        "expected_lines": 20,
-        "matching_lines": 20
-      },
-      "duration": 15.01,
-      "status": "pass"
+      "status": "compile_fail",
+      "detail": "/tmp/swf_verify_4gzat27a/script_0.c:184:1: error: duplicate label \u2018label_378\u2019",
+      "duration": 15.58
     },
     {
       "test": "edittext_bullet",
       "num_frames": 1,
-      "lines": {
-        "actual_lines": 30,
-        "expected_lines": 30,
-        "matching_lines": 30
-      },
-      "duration": 15.22,
-      "status": "pass"
+      "status": "compile_fail",
+      "detail": "/tmp/swf_verify__br0sxis/script_defs.c:344:1: error: duplicate label \u2018label_62\u2019",
+      "duration": 15.57
     },
     {
       "test": "edittext_default_format",
       "num_frames": 1,
-      "lines": {
-        "actual_lines": 221,
-        "expected_lines": 221,
-        "matching_lines": 221
-      },
-      "duration": 15.11,
-      "status": "pass"
+      "status": "compile_fail",
+      "detail": "/tmp/swf_verify_o_x2s8y2/script_defs.c:315:1: error: duplicate label \u2018label_62\u2019",
+      "duration": 15.57
     },
     {
       "test": "edittext_default_format_font_style",
@@ -1439,7 +1224,7 @@
         "expected_lines": 335,
         "matching_lines": 335
       },
-      "duration": 14.98,
+      "duration": 15.54,
       "status": "pass"
     },
     {
@@ -1450,7 +1235,7 @@
         "expected_lines": 9,
         "matching_lines": 6
       },
-      "duration": 15.01,
+      "duration": 15.5,
       "status": "output_mismatch",
       "detail": "3 line(s) differ (actual=9, expected=9)",
       "actual_output": "Mouse down: 234,166\nMouse up: 511,189\nText: <selection>Lorem ipsum dolor sit amet, consectetur adipiscing\\nelit. Integer nec finibus odio, at tempus metus.\\n\nMouse down: 343,166\nMouse up: 764,523\nText: <selection><selection>Lorem ipsum dolor sit amet, consectetur adipiscing\\nelit. Integer nec finibus odio, at tempus metus.\\n\nMouse down: 207,163\nMouse up: 7,13\nText: <selection><selection><selection>Lorem ipsum dolor sit amet, consectetur adipiscing\\nelit. Integer nec finibus odio, at tempus metus.\\n",
@@ -1464,19 +1249,15 @@
         "expected_lines": 2,
         "matching_lines": 2
       },
-      "duration": 14.97,
+      "duration": 15.43,
       "status": "pass"
     },
     {
       "test": "edittext_font_size",
       "num_frames": 1,
-      "lines": {
-        "actual_lines": 45,
-        "expected_lines": 45,
-        "matching_lines": 45
-      },
-      "duration": 15.16,
-      "status": "pass"
+      "status": "compile_fail",
+      "detail": "/tmp/swf_verify_5fcsz9aj/script_defs.c:228:1: error: duplicate label \u2018label_130\u2019",
+      "duration": 15.65
     },
     {
       "test": "edittext_hscroll",
@@ -1486,7 +1267,7 @@
         "expected_lines": 27,
         "matching_lines": 27
       },
-      "duration": 14.99,
+      "duration": 15.5,
       "status": "pass"
     },
     {
@@ -1497,7 +1278,7 @@
         "expected_lines": 52,
         "matching_lines": 52
       },
-      "duration": 15.15,
+      "duration": 15.62,
       "status": "pass"
     },
     {
@@ -1508,7 +1289,7 @@
         "expected_lines": 52,
         "matching_lines": 52
       },
-      "duration": 15.12,
+      "duration": 15.59,
       "status": "pass"
     },
     {
@@ -1519,41 +1300,29 @@
         "expected_lines": 114,
         "matching_lines": 114
       },
-      "duration": 15.05,
+      "duration": 15.58,
       "status": "pass"
     },
     {
       "test": "edittext_html_condensewhite_swf7",
       "num_frames": 1,
-      "lines": {
-        "actual_lines": 311,
-        "expected_lines": 311,
-        "matching_lines": 311
-      },
-      "duration": 15.19,
-      "status": "pass"
+      "status": "compile_fail",
+      "detail": "/tmp/swf_verify_z59gamkp/script_defs.c:250:1: error: duplicate label \u2018label_198\u2019",
+      "duration": 15.41
     },
     {
       "test": "edittext_html_condensewhite_swf8",
       "num_frames": 1,
-      "lines": {
-        "actual_lines": 311,
-        "expected_lines": 311,
-        "matching_lines": 311
-      },
-      "duration": 15.2,
-      "status": "pass"
+      "status": "compile_fail",
+      "detail": "/tmp/swf_verify_igyytztb/script_defs.c:250:1: error: duplicate label \u2018label_198\u2019",
+      "duration": 15.44
     },
     {
       "test": "edittext_html_entity",
       "num_frames": 1,
-      "lines": {
-        "actual_lines": 4,
-        "expected_lines": 4,
-        "matching_lines": 4
-      },
-      "duration": 15.02,
-      "status": "pass"
+      "status": "compile_fail",
+      "detail": "/tmp/swf_verify_30hncida/script_defs.c:344:1: error: duplicate label \u2018label_62\u2019",
+      "duration": 15.47
     },
     {
       "test": "edittext_html_roundtrip",
@@ -1563,41 +1332,29 @@
         "expected_lines": 17,
         "matching_lines": 17
       },
-      "duration": 15.01,
+      "duration": 15.48,
       "status": "pass"
     },
     {
       "test": "edittext_html_swf6",
       "num_frames": 1,
-      "lines": {
-        "actual_lines": 5377,
-        "expected_lines": 5377,
-        "matching_lines": 5377
-      },
-      "duration": 16.38,
-      "status": "pass"
+      "status": "compile_fail",
+      "detail": "/tmp/swf_verify_tmgt71qx/script_defs.c:250:1: error: duplicate label \u2018label_198\u2019",
+      "duration": 15.47
     },
     {
       "test": "edittext_html_swf7",
       "num_frames": 1,
-      "lines": {
-        "actual_lines": 5377,
-        "expected_lines": 5377,
-        "matching_lines": 5377
-      },
-      "duration": 16.22,
-      "status": "pass"
+      "status": "compile_fail",
+      "detail": "/tmp/swf_verify_lmz_u7ix/script_defs.c:250:1: error: duplicate label \u2018label_198\u2019",
+      "duration": 15.47
     },
     {
       "test": "edittext_html_swf8",
       "num_frames": 1,
-      "lines": {
-        "actual_lines": 5377,
-        "expected_lines": 5377,
-        "matching_lines": 5377
-      },
-      "duration": 16.22,
-      "status": "pass"
+      "status": "compile_fail",
+      "detail": "/tmp/swf_verify_ydx17g_h/script_defs.c:250:1: error: duplicate label \u2018label_198\u2019",
+      "duration": 15.42
     },
     {
       "test": "edittext_ime_focus_lost",
@@ -1607,7 +1364,7 @@
         "expected_lines": 7,
         "matching_lines": 0
       },
-      "duration": 14.93,
+      "duration": 15.48,
       "status": "output_mismatch",
       "detail": "7 line(s) differ (actual=6, expected=7)",
       "actual_output": "Before: \n  0\n  |\nAfter: |\n  1\n  ||",
@@ -1616,57 +1373,37 @@
     {
       "test": "edittext_input",
       "num_frames": 2,
-      "lines": {
-        "actual_lines": 1,
-        "expected_lines": 1,
-        "matching_lines": 1
-      },
-      "duration": 15.85,
-      "status": "pass"
+      "status": "compile_fail",
+      "detail": "/tmp/swf_verify_bde869e4/script_defs.c:45:1: error: duplicate label \u2018label_48\u2019",
+      "duration": 15.87
     },
     {
       "test": "edittext_input_newlines",
       "num_frames": 2,
-      "lines": {
-        "actual_lines": 9,
-        "expected_lines": 9,
-        "matching_lines": 9
-      },
-      "duration": 15.75,
-      "status": "pass"
+      "status": "compile_fail",
+      "detail": "/tmp/swf_verify_up7oo_5e/script_defs.c:162:1: error: duplicate label \u2018label_128\u2019",
+      "duration": 15.5
     },
     {
       "test": "edittext_leading",
       "num_frames": 1,
-      "lines": {
-        "actual_lines": 9,
-        "expected_lines": 9,
-        "matching_lines": 9
-      },
-      "duration": 15.73,
-      "status": "pass"
+      "status": "compile_fail",
+      "detail": "/tmp/swf_verify_7cznjq2z/script_defs.c:228:1: error: duplicate label \u2018label_130\u2019",
+      "duration": 15.53
     },
     {
       "test": "edittext_letter_spacing",
       "num_frames": 1,
-      "lines": {
-        "actual_lines": 15,
-        "expected_lines": 15,
-        "matching_lines": 15
-      },
-      "duration": 15.67,
-      "status": "pass"
+      "status": "compile_fail",
+      "detail": "/tmp/swf_verify_sn23cxdx/script_defs.c:228:1: error: duplicate label \u2018label_130\u2019",
+      "duration": 15.59
     },
     {
       "test": "edittext_margins",
       "num_frames": 1,
-      "lines": {
-        "actual_lines": 25,
-        "expected_lines": 25,
-        "matching_lines": 25
-      },
-      "duration": 15.75,
-      "status": "pass"
+      "status": "compile_fail",
+      "detail": "/tmp/swf_verify_nzzaiifm/script_defs.c:228:1: error: duplicate label \u2018label_130\u2019",
+      "duration": 15.49
     },
     {
       "test": "edittext_newline_stripping",
@@ -1676,63 +1413,43 @@
         "expected_lines": 64,
         "matching_lines": 64
       },
-      "duration": 20.41,
+      "duration": 20.08,
       "status": "pass"
     },
     {
       "test": "edittext_newlines",
       "num_frames": 1,
-      "lines": {
-        "actual_lines": 30,
-        "expected_lines": 30,
-        "matching_lines": 30
-      },
-      "duration": 15.78,
-      "status": "pass"
+      "status": "compile_fail",
+      "detail": "/tmp/swf_verify__i2g4jxc/script_defs.c:344:1: error: duplicate label \u2018label_62\u2019",
+      "duration": 15.47
     },
     {
       "test": "edittext_password",
       "num_frames": 1,
-      "lines": {
-        "actual_lines": 5,
-        "expected_lines": 5,
-        "matching_lines": 5
-      },
-      "duration": 15.5,
-      "status": "pass"
+      "status": "compile_fail",
+      "detail": "/tmp/swf_verify_nmiw7mlu/script_1.c:63:1: error: duplicate label \u2018label_74\u2019",
+      "duration": 15.47
     },
     {
       "test": "edittext_password_copy",
       "num_frames": 2,
-      "lines": {
-        "actual_lines": 4,
-        "expected_lines": 4,
-        "matching_lines": 4
-      },
-      "duration": 15.56,
-      "status": "pass"
+      "status": "compile_fail",
+      "detail": "/tmp/swf_verify_ioy3n7i_/script_defs.c:53:1: error: duplicate label \u2018label_60\u2019",
+      "duration": 15.36
     },
     {
       "test": "edittext_paste_empty",
       "num_frames": 2,
-      "lines": {
-        "actual_lines": 2,
-        "expected_lines": 2,
-        "matching_lines": 2
-      },
-      "duration": 15.57,
-      "status": "pass"
+      "status": "compile_fail",
+      "detail": "/tmp/swf_verify_7q8dcuco/script_defs.c:53:1: error: duplicate label \u2018label_60\u2019",
+      "duration": 15.53
     },
     {
       "test": "edittext_place_caret",
       "num_frames": 2,
-      "lines": {
-        "actual_lines": 2,
-        "expected_lines": 2,
-        "matching_lines": 2
-      },
-      "duration": 15.56,
-      "status": "pass"
+      "status": "compile_fail",
+      "detail": "/tmp/swf_verify_sveea3y1/script_defs.c:49:1: error: duplicate label \u2018label_54\u2019",
+      "duration": 15.44
     },
     {
       "test": "edittext_programmatic_focus",
@@ -1742,30 +1459,22 @@
         "expected_lines": 12,
         "matching_lines": 12
       },
-      "duration": 15.5,
+      "duration": 15.43,
       "status": "pass"
     },
     {
       "test": "edittext_restrict",
       "num_frames": 2,
-      "lines": {
-        "actual_lines": 191,
-        "expected_lines": 191,
-        "matching_lines": 191
-      },
-      "duration": 15.58,
-      "status": "pass"
+      "status": "compile_fail",
+      "detail": "/tmp/swf_verify_pj2ugvzj/script_defs.c:148:1: error: duplicate label \u2018label_106\u2019",
+      "duration": 15.45
     },
     {
       "test": "edittext_restrict_paste",
       "num_frames": 2,
-      "lines": {
-        "actual_lines": 5,
-        "expected_lines": 5,
-        "matching_lines": 5
-      },
-      "duration": 15.67,
-      "status": "pass"
+      "status": "compile_fail",
+      "detail": "/tmp/swf_verify_iygvzvzr/script_defs.c:63:1: error: duplicate label \u2018label_77\u2019",
+      "duration": 15.53
     },
     {
       "test": "edittext_scroll",
@@ -1775,41 +1484,29 @@
         "expected_lines": 54,
         "matching_lines": 54
       },
-      "duration": 15.7,
+      "duration": 15.82,
       "status": "pass"
     },
     {
       "test": "edittext_stylesheet",
       "num_frames": 1,
-      "lines": {
-        "actual_lines": 325,
-        "expected_lines": 325,
-        "matching_lines": 325
-      },
-      "duration": 16.34,
-      "status": "pass"
+      "status": "compile_fail",
+      "detail": "/tmp/swf_verify_erb79i8m/script_defs.c:398:1: error: duplicate label \u2018label_154\u2019",
+      "duration": 15.83
     },
     {
       "test": "edittext_tab_focus",
       "num_frames": 2,
-      "lines": {
-        "actual_lines": 13,
-        "expected_lines": 13,
-        "matching_lines": 13
-      },
-      "duration": 15.84,
-      "status": "pass"
+      "status": "compile_fail",
+      "detail": "/tmp/swf_verify_pmkue6uq/script_defs.c:140:1: error: duplicate label \u2018label_155\u2019",
+      "duration": 15.68
     },
     {
       "test": "edittext_tab_stops",
       "num_frames": 1,
-      "lines": {
-        "actual_lines": 60,
-        "expected_lines": 60,
-        "matching_lines": 60
-      },
-      "duration": 15.91,
-      "status": "pass"
+      "status": "compile_fail",
+      "detail": "/tmp/swf_verify_07jg1s5l/script_defs.c:228:1: error: duplicate label \u2018label_130\u2019",
+      "duration": 15.74
     },
     {
       "test": "edittext_tag_indent",
@@ -1819,30 +1516,22 @@
         "expected_lines": 31,
         "matching_lines": 31
       },
-      "duration": 15.66,
+      "duration": 15.85,
       "status": "pass"
     },
     {
       "test": "edittext_text_height_leading",
       "num_frames": 1,
-      "lines": {
-        "actual_lines": 20,
-        "expected_lines": 20,
-        "matching_lines": 20
-      },
-      "duration": 15.71,
-      "status": "pass"
+      "status": "compile_fail",
+      "detail": "/tmp/swf_verify_jg00ksye/script_defs.c:133:1: error: duplicate label \u2018label_177\u2019",
+      "duration": 15.94
     },
     {
       "test": "edittext_underline",
       "num_frames": 1,
-      "lines": {
-        "actual_lines": 40,
-        "expected_lines": 40,
-        "matching_lines": 40
-      },
-      "duration": 15.82,
-      "status": "pass"
+      "status": "compile_fail",
+      "detail": "/tmp/swf_verify_t96da_ms/script_defs.c:344:1: error: duplicate label \u2018label_62\u2019",
+      "duration": 16.1
     },
     {
       "test": "edittext_width_height",
@@ -1852,7 +1541,7 @@
         "expected_lines": 103,
         "matching_lines": 103
       },
-      "duration": 15.76,
+      "duration": 15.81,
       "status": "pass"
     },
     {
@@ -1863,19 +1552,15 @@
         "expected_lines": 11,
         "matching_lines": 11
       },
-      "duration": 15.51,
+      "duration": 15.62,
       "status": "pass"
     },
     {
       "test": "enumerate",
       "num_frames": 1,
-      "lines": {
-        "actual_lines": 64,
-        "expected_lines": 64,
-        "matching_lines": 64
-      },
-      "duration": 15.56,
-      "status": "pass"
+      "status": "compile_fail",
+      "detail": "/tmp/swf_verify_4rd35625/script_0.c:572:1: error: duplicate label \u2018label_90\u2019",
+      "duration": 15.43
     },
     {
       "test": "equals",
@@ -1885,7 +1570,7 @@
         "expected_lines": 32,
         "matching_lines": 32
       },
-      "duration": 15.47,
+      "duration": 15.38,
       "status": "pass"
     },
     {
@@ -1896,7 +1581,7 @@
         "expected_lines": 926,
         "matching_lines": 926
       },
-      "duration": 17.15,
+      "duration": 17.07,
       "status": "pass"
     },
     {
@@ -1907,7 +1592,7 @@
         "expected_lines": 926,
         "matching_lines": 926
       },
-      "duration": 17.1,
+      "duration": 17.07,
       "status": "pass"
     },
     {
@@ -1918,7 +1603,7 @@
         "expected_lines": 926,
         "matching_lines": 926
       },
-      "duration": 17.21,
+      "duration": 17.12,
       "status": "pass"
     },
     {
@@ -1929,7 +1614,7 @@
         "expected_lines": 665,
         "matching_lines": 665
       },
-      "duration": 16.57,
+      "duration": 16.15,
       "status": "pass"
     },
     {
@@ -1940,7 +1625,7 @@
         "expected_lines": 32,
         "matching_lines": 32
       },
-      "duration": 15.87,
+      "duration": 15.41,
       "status": "pass"
     },
     {
@@ -1951,7 +1636,7 @@
         "expected_lines": 32,
         "matching_lines": 32
       },
-      "duration": 15.77,
+      "duration": 15.37,
       "status": "pass"
     },
     {
@@ -1962,7 +1647,7 @@
         "expected_lines": 58,
         "matching_lines": 58
       },
-      "duration": 15.64,
+      "duration": 15.49,
       "status": "pass"
     },
     {
@@ -1973,7 +1658,7 @@
         "expected_lines": 14,
         "matching_lines": 14
       },
-      "duration": 15.64,
+      "duration": 15.34,
       "status": "pass"
     },
     {
@@ -1984,7 +1669,7 @@
         "expected_lines": 5,
         "matching_lines": 5
       },
-      "duration": 15.71,
+      "duration": 15.39,
       "status": "pass"
     },
     {
@@ -1995,7 +1680,7 @@
         "expected_lines": 7,
         "matching_lines": 7
       },
-      "duration": 15.72,
+      "duration": 15.34,
       "status": "pass"
     },
     {
@@ -2006,7 +1691,7 @@
         "expected_lines": 4,
         "matching_lines": 4
       },
-      "duration": 15.6,
+      "duration": 15.43,
       "status": "pass"
     },
     {
@@ -2017,7 +1702,7 @@
         "expected_lines": 12,
         "matching_lines": 12
       },
-      "duration": 15.6,
+      "duration": 15.61,
       "status": "pass"
     },
     {
@@ -2028,30 +1713,22 @@
         "expected_lines": 3,
         "matching_lines": 3
       },
-      "duration": 15.59,
+      "duration": 15.31,
       "status": "pass"
     },
     {
       "test": "extends_chain",
       "num_frames": 1,
-      "lines": {
-        "actual_lines": 134,
-        "expected_lines": 134,
-        "matching_lines": 134
-      },
-      "duration": 16.34,
-      "status": "pass"
+      "status": "compile_fail",
+      "detail": "/tmp/swf_verify_ue9jo9p1/script_1.c:42:1: error: duplicate label \u2018label_56\u2019",
+      "duration": 15.6
     },
     {
       "test": "extends_native_type",
       "num_frames": 1,
-      "lines": {
-        "actual_lines": 11,
-        "expected_lines": 11,
-        "matching_lines": 11
-      },
-      "duration": 15.93,
-      "status": "pass"
+      "status": "compile_fail",
+      "detail": "/tmp/swf_verify_d80aik9x/script_1.c:99:1: error: duplicate label \u2018label_392\u2019",
+      "duration": 15.36
     },
     {
       "test": "external_interface",
@@ -2061,7 +1738,7 @@
         "expected_lines": 84,
         "matching_lines": 84
       },
-      "duration": 15.77,
+      "duration": 15.6,
       "status": "pass"
     },
     {
@@ -2072,7 +1749,7 @@
         "expected_lines": 26,
         "matching_lines": 26
       },
-      "duration": 15.71,
+      "duration": 15.37,
       "status": "pass"
     },
     {
@@ -2083,19 +1760,15 @@
         "expected_lines": 21,
         "matching_lines": 21
       },
-      "duration": 17.24,
+      "duration": 16.23,
       "status": "pass"
     },
     {
       "test": "external_interface_toas_basic",
       "num_frames": 1,
-      "lines": {
-        "actual_lines": 354,
-        "expected_lines": 354,
-        "matching_lines": 354
-      },
-      "duration": 16.12,
-      "status": "pass"
+      "status": "compile_fail",
+      "detail": "/tmp/swf_verify_lde0698i/script_defs.c:155:1: error: duplicate label \u2018label_53\u2019",
+      "duration": 16.45
     },
     {
       "test": "external_interface_toxml_array",
@@ -2105,7 +1778,7 @@
         "expected_lines": 25,
         "matching_lines": 25
       },
-      "duration": 15.67,
+      "duration": 15.96,
       "status": "pass"
     },
     {
@@ -2116,7 +1789,7 @@
         "expected_lines": 179,
         "matching_lines": 179
       },
-      "duration": 15.87,
+      "duration": 16.24,
       "status": "pass"
     },
     {
@@ -2127,19 +1800,15 @@
         "expected_lines": 40,
         "matching_lines": 40
       },
-      "duration": 15.81,
+      "duration": 16.0,
       "status": "pass"
     },
     {
       "test": "focus_keyboard_press",
       "num_frames": 2,
-      "lines": {
-        "actual_lines": 60,
-        "expected_lines": 60,
-        "matching_lines": 60
-      },
-      "duration": 16.4,
-      "status": "pass"
+      "status": "compile_fail",
+      "detail": "/tmp/swf_verify_n9fpsxv_/script_defs.c:139:1: error: duplicate label \u2018label_79\u2019",
+      "duration": 16.15
     },
     {
       "test": "focus_mouse",
@@ -2149,19 +1818,15 @@
         "expected_lines": 45,
         "matching_lines": 45
       },
-      "duration": 16.24,
+      "duration": 16.07,
       "status": "pass"
     },
     {
       "test": "focus_mouse_focusable",
       "num_frames": 3,
-      "lines": {
-        "actual_lines": 8,
-        "expected_lines": 8,
-        "matching_lines": 8
-      },
-      "duration": 16.9,
-      "status": "pass"
+      "status": "compile_fail",
+      "detail": "/tmp/swf_verify_sfsyave6/script_0.c:1389:1: error: duplicate label \u2018label_3665\u2019",
+      "duration": 15.76
     },
     {
       "test": "focus_mouse_rollout",
@@ -2171,7 +1836,7 @@
         "expected_lines": 4,
         "matching_lines": 4
       },
-      "duration": 16.38,
+      "duration": 15.94,
       "status": "pass"
     },
     {
@@ -2182,19 +1847,15 @@
         "expected_lines": 33,
         "matching_lines": 33
       },
-      "duration": 16.32,
+      "duration": 15.93,
       "status": "pass"
     },
     {
       "test": "focus_root_movie",
       "num_frames": 2,
-      "lines": {
-        "actual_lines": 2,
-        "expected_lines": 2,
-        "matching_lines": 2
-      },
-      "duration": 16.08,
-      "status": "pass"
+      "status": "compile_fail",
+      "detail": "/tmp/swf_verify_tkto_n98/script_defs.c:62:1: error: duplicate label \u2018label_35\u2019",
+      "duration": 15.76
     },
     {
       "test": "focus_visibility_change",
@@ -2204,7 +1865,7 @@
         "expected_lines": 45,
         "matching_lines": 45
       },
-      "duration": 16.17,
+      "duration": 15.87,
       "status": "pass"
     },
     {
@@ -2215,7 +1876,7 @@
         "expected_lines": 4,
         "matching_lines": 4
       },
-      "duration": 16.16,
+      "duration": 16.01,
       "status": "pass"
     },
     {
@@ -2226,7 +1887,7 @@
         "expected_lines": 0,
         "matching_lines": 0
       },
-      "duration": 15.05,
+      "duration": 15.66,
       "status": "pass"
     },
     {
@@ -2237,74 +1898,50 @@
         "expected_lines": 0,
         "matching_lines": 0
       },
-      "duration": 14.46,
+      "duration": 15.33,
       "status": "pass"
     },
     {
       "test": "focusrect_property_swf5",
       "num_frames": 2,
-      "lines": {
-        "actual_lines": 1237,
-        "expected_lines": 1237,
-        "matching_lines": 1237
-      },
-      "duration": 14.59,
-      "status": "pass"
+      "status": "compile_fail",
+      "detail": "/tmp/swf_verify_so_gt_bd/script_0.c:504:1: error: duplicate label \u2018label_1182\u2019",
+      "duration": 15.31
     },
     {
       "test": "focusrect_property_swf6",
       "num_frames": 2,
-      "lines": {
-        "actual_lines": 1237,
-        "expected_lines": 1237,
-        "matching_lines": 1237
-      },
-      "duration": 15.14,
-      "status": "pass"
+      "status": "compile_fail",
+      "detail": "/tmp/swf_verify_p7r460j6/script_0.c:504:1: error: duplicate label \u2018label_1182\u2019",
+      "duration": 15.33
     },
     {
       "test": "focusrect_property_swf7",
       "num_frames": 2,
-      "lines": {
-        "actual_lines": 1237,
-        "expected_lines": 1237,
-        "matching_lines": 1237
-      },
-      "duration": 14.56,
-      "status": "pass"
+      "status": "compile_fail",
+      "detail": "/tmp/swf_verify_llrffx6_/script_0.c:504:1: error: duplicate label \u2018label_1182\u2019",
+      "duration": 15.33
     },
     {
       "test": "focusrect_swf5",
       "num_frames": 14,
-      "lines": {
-        "actual_lines": 6,
-        "expected_lines": 6,
-        "matching_lines": 6
-      },
-      "duration": 14.54,
-      "status": "pass"
+      "status": "compile_fail",
+      "detail": "/tmp/swf_verify_6p0yfi1e/script_defs.c:233:1: error: duplicate label \u2018label_71\u2019",
+      "duration": 15.42
     },
     {
       "test": "focusrect_swf6",
       "num_frames": 14,
-      "lines": {
-        "actual_lines": 42,
-        "expected_lines": 42,
-        "matching_lines": 42
-      },
-      "duration": 14.4,
-      "status": "pass"
+      "status": "compile_fail",
+      "detail": "/tmp/swf_verify_a2m7ws4f/script_defs.c:54:1: error: duplicate label \u2018label_41\u2019",
+      "duration": 15.2
     },
     {
       "test": "form_loader_encoding_1",
       "num_frames": 3,
-      "lines": {
-        "actual_lines": 1,
-        "expected_lines": 1,
-        "matching_lines": 1
-      },
-      "duration": 14.31,
-      "status": "pass"
+      "status": "compile_fail",
+      "detail": "/tmp/swf_verify_mk1kvbar/script_defs.c:73:1: error: duplicate label \u2018label_38\u2019",
+      "duration": 15.17
     },
     {
       "test": "frame_size_translated_negative",
@@ -2314,7 +1951,7 @@
         "expected_lines": 21,
         "matching_lines": 21
       },
-      "duration": 14.54,
+      "duration": 15.27,
       "status": "pass"
     },
     {
@@ -2325,7 +1962,7 @@
         "expected_lines": 21,
         "matching_lines": 21
       },
-      "duration": 14.76,
+      "duration": 15.23,
       "status": "pass"
     },
     {
@@ -2336,7 +1973,7 @@
         "expected_lines": 35,
         "matching_lines": 35
       },
-      "duration": 14.34,
+      "duration": 15.19,
       "status": "pass"
     },
     {
@@ -2347,19 +1984,15 @@
         "expected_lines": 8,
         "matching_lines": 8
       },
-      "duration": 14.33,
+      "duration": 15.24,
       "status": "pass"
     },
     {
       "test": "function_base_clip_readded",
       "num_frames": 5,
-      "lines": {
-        "actual_lines": 11,
-        "expected_lines": 11,
-        "matching_lines": 11
-      },
-      "duration": 14.44,
-      "status": "pass"
+      "status": "compile_fail",
+      "detail": "/tmp/swf_verify_45d4b8pg/script_0.c:38:1: error: duplicate label \u2018label_129\u2019",
+      "duration": 15.33
     },
     {
       "test": "function_base_clip_removed",
@@ -2369,19 +2002,15 @@
         "expected_lines": 25,
         "matching_lines": 25
       },
-      "duration": 14.49,
+      "duration": 15.35,
       "status": "pass"
     },
     {
       "test": "function_suppress_and_preload",
       "num_frames": 1,
-      "lines": {
-        "actual_lines": 28,
-        "expected_lines": 28,
-        "matching_lines": 28
-      },
-      "duration": 14.51,
-      "status": "pass"
+      "status": "compile_fail",
+      "detail": "/tmp/swf_verify_xa_grq32/script_0.c:111:1: error: duplicate label \u2018label_815\u2019",
+      "duration": 15.27
     },
     {
       "test": "funky_function_calls",
@@ -2391,7 +2020,7 @@
         "expected_lines": 56,
         "matching_lines": 56
       },
-      "duration": 14.39,
+      "duration": 15.25,
       "status": "pass"
     },
     {
@@ -2402,7 +2031,7 @@
         "expected_lines": 4,
         "matching_lines": 4
       },
-      "duration": 14.31,
+      "duration": 15.25,
       "status": "pass"
     },
     {
@@ -2413,7 +2042,7 @@
         "expected_lines": 29,
         "matching_lines": 29
       },
-      "duration": 14.36,
+      "duration": 15.26,
       "status": "pass"
     },
     {
@@ -2424,7 +2053,7 @@
         "expected_lines": 28,
         "matching_lines": 28
       },
-      "duration": 18.83,
+      "duration": 17.92,
       "status": "pass"
     },
     {
@@ -2435,7 +2064,7 @@
         "expected_lines": 28,
         "matching_lines": 28
       },
-      "duration": 15.95,
+      "duration": 16.03,
       "status": "pass"
     },
     {
@@ -2446,7 +2075,7 @@
         "expected_lines": 28,
         "matching_lines": 28
       },
-      "duration": 15.75,
+      "duration": 16.04,
       "status": "pass"
     },
     {
@@ -2457,7 +2086,7 @@
         "expected_lines": 56,
         "matching_lines": 56
       },
-      "duration": 16.01,
+      "duration": 15.82,
       "status": "pass"
     },
     {
@@ -2468,22 +2097,15 @@
         "expected_lines": 3,
         "matching_lines": 3
       },
-      "duration": 15.74,
+      "duration": 15.93,
       "status": "pass"
     },
     {
       "test": "global_instance_decls",
       "num_frames": 1,
-      "lines": {
-        "actual_lines": 695,
-        "expected_lines": 758,
-        "matching_lines": 18
-      },
-      "duration": 16.21,
-      "status": "output_mismatch",
-      "detail": "740 line(s) differ (actual=695, expected=758)",
-      "actual_output": "_global.TextSnapshot, instance=[[object Object]], type=[object]\n  __proto__, own, type=[object]\n  __constructor__, own, type=[function]\n  getCount, DONT_ENUM, type=[function]\n  setSelected, DONT_ENUM, type=[function]\n  getSelected, DONT_ENUM, type=[function]\n  getText, DONT_ENUM, type=[function]\n  getSelectedText, DONT_ENUM, type=[function]\n  hitTestTextNearPos, DONT_ENUM, type=[function]\n  findText, DONT_ENUM, type=[function]\n  setSelectColor, DONT_ENUM, type=[function]\n  getTextRunInfo, DONT_ENUM, type=[function]\n_global.PrintJob, instance=[[object Object]], type=[object]\n  __proto__, own, type=[object]\n  __constructor__, own, type=[function]\n_global.MovieClipLoader, instance=[[object Object]], type=[object]\n  __proto__, own, type=[object]\n  __constructor__, own, type=[function]\n  _listeners, own, DONT_ENUM, type=[object]\n_global.LocalConnection, instance=[[object Object]], type=[object]\n  __proto__, own, type=[object]\n  __constructor__, own, type=[function]\n_global.textRenderer, instance=[[object Object]], type=[object]\n  __proto__, own, type=[object]\n  __constructor__, own, type=[function]\n_global.flash.automation.Configuration, instance=[[object Object]], type=[object]\n  __proto__, own, type=[object]\n  __constructor__, own, type=[function]\n_global.flash.automation.ActionGenerator, instance=[[object Object]], type=[object]\n  __proto__, own, type=[object]\n  __constructor__, own, type=[function]\n_global.flash.automation.StageCapture, instance=[[object Object]], type=[object]\n  __proto__, own, type=[object]\n  __constructor__, own, type=[function]\n_global.flash.external.ExternalInterface, instance=[[object Object]], type=[object]\n  __proto__, own, type=[object]\n  __constructor__, own, type=[function]\n_global.flash.net.FileReferenceList, instance=[[object Object]], type=[object]\n  __proto__, own, type=[object]\n  __constructor__, own, type=[function]\n_global.flash.net.FileReference, instance=[[object Object]], type=[object]\n  __proto__, own, type=[object]\n  __constructor__, own, type=[function]\n_global.flash.geom.Transform, instance=[[object Object]], type=[object]\n  __proto__, own, type=[object]\n  __constructor__, own, type=[function]\n_global.flash.geom.ColorTransform, instance=[(redMultiplier=1, greenMultiplier=1, blueMultiplier=1, alphaMultiplier=1, redOffset=0, greenOffset=0, blueOffset=0, alphaOffset=0)], type=[object]\n  __proto__, own, type=[object]\n  __constructor__, own, type=[function]\n  redMultiplier, own, DONT_ENUM, type=[number]\n... (645 lines after) ...",
-      "expected_output": "_global.TextSnapshot, instance=[[object Object]], type=[object]\n  __proto__, own, DONT_DELETE, type=[object]\n  __constructor__, own, type=[function]\n  getCount, DONT_ENUM, type=[function]\n  setSelected, DONT_ENUM, type=[function]\n  getSelected, DONT_ENUM, type=[function]\n  getText, DONT_ENUM, type=[function]\n  getSelectedText, DONT_ENUM, type=[function]\n  hitTestTextNearPos, DONT_ENUM, type=[function]\n  findText, DONT_ENUM, type=[function]\n  setSelectColor, DONT_ENUM, type=[function]\n  getTextRunInfo, DONT_ENUM, type=[function]\n_global.PrintJob, instance=[[object Object]], type=[object]\n  paperHeight, DONT_ENUM, READ_ONLY, DONT_DELETE, type=[number]\n  paperWidth, DONT_ENUM, READ_ONLY, DONT_DELETE, type=[number]\n  pageHeight, DONT_ENUM, READ_ONLY, DONT_DELETE, type=[number]\n  pageWidth, DONT_ENUM, READ_ONLY, DONT_DELETE, type=[number]\n  orientation, DONT_ENUM, READ_ONLY, DONT_DELETE, type=[number]\n_global.MovieClipLoader, instance=[[object Object]], type=[object]\n_global.LocalConnection, instance=[[object Object]], type=[object]\n_global.textRenderer, instance=[undefined], type=[undefined]\n_global.flash.automation.Configuration, instance=[[AutomationConfiguration]], type=[object]\n  __proto__, own, DONT_DELETE, type=[object]\n  __constructor__, own, type=[function]\n  getTestAutomationConfiguration, DONT_ENUM, type=[function]\n  getDeviceConfiguration, DONT_ENUM, type=[function]\n  setDeviceConfiguration, DONT_ENUM, type=[function]\n  valueOf, DONT_ENUM, type=[function]\n  toString, DONT_ENUM, type=[function]\n_global.flash.automation.ActionGenerator, instance=[undefined], type=[object]\n  __proto__, own, DONT_DELETE, type=[object]\n  __constructor__, own, type=[function]\n  generateAction, DONT_ENUM, type=[function]\n  generateActions, DONT_ENUM, type=[function]\n  valueOf, DONT_ENUM, type=[function]\n  toString, DONT_ENUM, type=[function]\n_global.flash.automation.StageCapture, instance=[undefined], type=[object]\n  __proto__, own, DONT_DELETE, type=[object]\n  __constructor__, own, type=[function]\n_global.flash.external.ExternalInterface, instance=[[object Object]], type=[object]\n  __proto__, own, DONT_DELETE, type=[object]\n  __constructor__, own, type=[function]\n_global.flash.net.FileReferenceList, instance=[[object Object]], type=[object]\n  __proto__, own, DONT_DELETE, type=[object]\n  __constructor__, own, type=[function]\n  fileList, own, DONT_ENUM, type=[object]\n  _listeners, own, DONT_ENUM, type=[object]\n_global.flash.net.FileReference, instance=[[object Object]], type=[object]\n  name, own, DONT_ENUM, READ_ONLY, type=[undefined]\n  type, own, DONT_ENUM, READ_ONLY, type=[undefined]\n... (708 lines after) ..."
+      "status": "compile_fail",
+      "detail": "/tmp/swf_verify_rs46piv6/script_defs.c:95:1: error: duplicate label \u2018label_6\u2019",
+      "duration": 16.11
     },
     {
       "test": "global_is_bare",
@@ -2493,58 +2115,36 @@
         "expected_lines": 7,
         "matching_lines": 7
       },
-      "duration": 15.92,
+      "duration": 15.78,
       "status": "pass"
     },
     {
       "test": "global_proto_decls",
       "num_frames": 1,
-      "lines": {
-        "actual_lines": 1266,
-        "expected_lines": 4497,
-        "matching_lines": 93
-      },
-      "duration": 15.96,
-      "status": "output_mismatch",
-      "detail": "4404 line(s) differ (actual=1266, expected=4497)",
-      "actual_output": "Testing _global.TextSnapshot\n  __proto__, own, type=[object]\n  constructor, own, DONT_ENUM, type=[function]\n  prototype, own, DONT_ENUM, type=[object]\nTesting _global.TextSnapshot.prototype\n  getTextRunInfo, own, type=[function]\n  setSelectColor, own, type=[function]\n  findText, own, type=[function]\n  hitTestTextNearPos, own, type=[function]\n  getSelectedText, own, type=[function]\n  getText, own, type=[function]\n  getSelected, own, type=[function]\n  setSelected, own, type=[function]\n  getCount, own, type=[function]\n  __proto__, own, type=[object]\n  constructor, own, DONT_ENUM, type=[function]\nTesting _global.PrintJob\n  __proto__, own, type=[object]\n  constructor, own, DONT_ENUM, type=[function]\n  prototype, own, DONT_ENUM, type=[object]\nTesting _global.PrintJob.prototype\n  send, own, DONT_ENUM, type=[function]\n  addPage, own, DONT_ENUM, type=[function]\n  start, own, DONT_ENUM, type=[function]\n  __proto__, own, type=[object]\n  constructor, own, DONT_ENUM, type=[function]\nTesting _global.MovieClipLoader\n  __proto__, own, type=[object]\n  constructor, own, DONT_ENUM, type=[function]\n  prototype, own, DONT_ENUM, type=[object]\nTesting _global.MovieClipLoader.prototype\n  _listeners, own, DONT_ENUM, type=[object]\n  removeListener, own, DONT_ENUM, type=[function]\n  addListener, own, DONT_ENUM, type=[function]\n  broadcastMessage, own, DONT_ENUM, type=[function]\n  unloadClip, own, DONT_ENUM, type=[function]\n  getProgress, own, DONT_ENUM, type=[function]\n  loadClip, own, DONT_ENUM, type=[function]\n  __proto__, own, type=[object]\n  constructor, own, DONT_ENUM, type=[function]\nTesting _global.LocalConnection\n  __proto__, own, type=[object]\n  constructor, own, DONT_ENUM, type=[function]\n  prototype, own, DONT_ENUM, type=[object]\nTesting _global.LocalConnection.prototype\n  isPerUser, own, DONT_ENUM, READ_ONLY, type=[undefined]\n  domain, own, DONT_ENUM, type=[function]\n  close, own, DONT_ENUM, type=[function]\n  send, own, DONT_ENUM, type=[function]\n  connect, own, DONT_ENUM, type=[function]\n... (1216 lines after) ...",
-      "expected_output": "Testing _global.TextSnapshot\n  __proto__, own, type=[object]\n  constructor, own, type=[function]\n  prototype, own, DONT_ENUM, type=[object]\nTesting _global.TextSnapshot.prototype\n  getTextRunInfo, own, type=[function]\n  setSelectColor, own, type=[function]\n  findText, own, type=[function]\n  hitTestTextNearPos, own, type=[function]\n  getSelectedText, own, type=[function]\n  getText, own, type=[function]\n  getSelected, own, type=[function]\n  setSelected, own, type=[function]\n  getCount, own, type=[function]\n  __proto__, own, type=[object]\n  constructor, own, type=[function]\nTesting _global.PrintJob\n  __proto__, own, type=[object]\n  constructor, own, type=[function]\n  prototype, own, DONT_ENUM, type=[object]\nTesting _global.PrintJob.prototype\n  send, own, DONT_ENUM, type=[function]\n  addPage, own, DONT_ENUM, type=[function]\n  start, own, DONT_ENUM, type=[function]\n  __proto__, own, type=[object]\n  constructor, own, type=[function]\nTesting _global.MovieClipLoader\n  __proto__, own, type=[object]\n  constructor, own, type=[function]\n  prototype, own, DONT_ENUM, type=[object]\nTesting _global.MovieClipLoader.prototype\n  _listeners, own, DONT_ENUM, type=[object]\n  removeListener, own, DONT_ENUM, type=[function]\n  addListener, own, DONT_ENUM, type=[function]\n  broadcastMessage, own, DONT_ENUM, type=[function]\n  unloadClip, own, DONT_ENUM, type=[function]\n  getProgress, own, DONT_ENUM, type=[function]\n  loadClip, own, DONT_ENUM, type=[function]\n  __proto__, own, type=[object]\n  constructor, own, type=[function]\nTesting _global.LocalConnection\n  __proto__, own, type=[object]\n  constructor, own, type=[function]\n  prototype, own, DONT_ENUM, type=[object]\nTesting _global.LocalConnection.prototype\n  isPerUser, own, DONT_ENUM, READ_ONLY, type=[undefined]\n  domain, own, DONT_ENUM, type=[function]\n  close, own, DONT_ENUM, type=[function]\n  send, own, DONT_ENUM, type=[function]\n  connect, own, DONT_ENUM, type=[function]\n... (4447 lines after) ..."
+      "status": "compile_fail",
+      "detail": "/tmp/swf_verify_4p0ww2nk/script_0.c:99:1: error: duplicate label \u2018label_1011\u2019",
+      "duration": 15.64
     },
     {
       "test": "global_proto_decls_delete",
       "num_frames": 1,
-      "lines": {
-        "actual_lines": 705,
-        "expected_lines": 4158,
-        "matching_lines": 91
-      },
-      "duration": 16.04,
-      "status": "output_mismatch",
-      "detail": "4067 line(s) differ (actual=705, expected=4158)",
-      "actual_output": "... (46 lines before) ...\n  prototype, DONT_DELETE\nTesting _global.textRenderer.prototype\n  __proto__, DONT_DELETE\n  constructor, DONT_DELETE\nTesting _global.flash.automation.Configuration\n  __proto__, DONT_DELETE\n  constructor, DONT_DELETE\n  prototype, DONT_DELETE\nTesting _global.flash.automation.Configuration.prototype\n  __proto__, DONT_DELETE\n  constructor, DONT_DELETE\nTesting _global.flash.automation.ActionGenerator\n  __proto__, DONT_DELETE\n  constructor, DONT_DELETE\n  prototype, DONT_DELETE\nTesting _global.flash.automation.ActionGenerator.prototype\n  __proto__, DONT_DELETE\n  constructor, DONT_DELETE\nTesting _global.flash.automation.StageCapture\n  __proto__, DONT_DELETE\n  constructor, DONT_DELETE\n  prototype, DONT_DELETE\nTesting _global.flash.automation.StageCapture.prototype\n  __proto__, DONT_DELETE\n  constructor, DONT_DELETE\nTesting _global.flash.automation\nTesting _global.flash.external.ExternalInterface\n  __proto__, DONT_DELETE\n  constructor, DONT_DELETE\n  prototype, DONT_DELETE\nTesting _global.flash.external.ExternalInterface.prototype\n  __proto__, DONT_DELETE\n  constructor, DONT_DELETE\nTesting _global.flash.external\nTesting _global.flash.net.FileReferenceList\n  __proto__, DONT_DELETE\n  constructor, DONT_DELETE\n  prototype, DONT_DELETE\nTesting _global.flash.net.FileReferenceList.prototype\n  __proto__, DONT_DELETE\n  constructor, DONT_DELETE\nTesting _global.flash.net.FileReference\n  __proto__, DONT_DELETE\n  constructor, DONT_DELETE\n  prototype, DONT_DELETE\nTesting _global.flash.net.FileReference.prototype\n  __proto__, DONT_DELETE\n  constructor, DONT_DELETE\nTesting _global.flash.net\nTesting _global.flash.geom.Transform\n... (609 lines after) ...",
-      "expected_output": "... (46 lines before) ...\n  prototype, DONT_DELETE\nTesting _global.textRenderer.prototype\n  __proto__, DONT_DELETE\n  constructor, DONT_DELETE\nTesting _global.flash.automation.Configuration\n  prototype, DONT_DELETE\n  __proto__, DONT_DELETE\n  constructor, DONT_DELETE\nTesting _global.flash.automation.Configuration.prototype\n  __proto__, DONT_DELETE\n  constructor, DONT_DELETE\nTesting _global.flash.automation.ActionGenerator\n  prototype, DONT_DELETE\n  __proto__, DONT_DELETE\n  constructor, DONT_DELETE\nTesting _global.flash.automation.ActionGenerator.prototype\n  __proto__, DONT_DELETE\n  constructor, DONT_DELETE\nTesting _global.flash.automation.StageCapture\n  __proto__, DONT_DELETE\n  constructor, DONT_DELETE\n  prototype, DONT_DELETE\nTesting _global.flash.automation.StageCapture.prototype\n  toString, DONT_DELETE\n  valueOf, DONT_DELETE\n  listenForStageCapture, DONT_DELETE\n  setClipRect, DONT_DELETE\n  getClipRect, DONT_DELETE\n  setFileNameBase, DONT_DELETE\n  getFileNameBase, DONT_DELETE\n  cancel, DONT_DELETE\n  capture, DONT_DELETE\n  __proto__, DONT_DELETE\n  constructor, DONT_DELETE\nTesting _global.flash.automation\n  __proto__, DONT_DELETE\n  constructor, DONT_DELETE\nTesting _global.flash.external.ExternalInterface\n  _toJS, DONT_DELETE\n  _objectToJS, DONT_DELETE\n  _arrayToJS, DONT_DELETE\n  _argumentsToAS, DONT_DELETE\n  _toAS, DONT_DELETE\n  _arrayToAS, DONT_DELETE\n  _objectToAS, DONT_DELETE\n  _toXML, DONT_DELETE\n  _objectToXML, DONT_DELETE\n  _argumentsToXML, DONT_DELETE\n  _arrayToXML, DONT_DELETE\n  _callIn, DONT_DELETE\n... (4062 lines after) ..."
+      "status": "compile_fail",
+      "detail": "/tmp/swf_verify_srx0_fvq/script_0.c:99:1: error: duplicate label \u2018label_809\u2019",
+      "duration": 15.72
     },
     {
       "test": "global_swf5_6_7_8_9",
       "num_frames": 2,
-      "lines": {
-        "actual_lines": 1145,
-        "expected_lines": 1145,
-        "matching_lines": 1145
-      },
-      "duration": 16.42,
-      "status": "pass"
+      "status": "compile_fail",
+      "detail": "/tmp/swf_verify_dcrl7k_m/script_defs.c:2258:1: error: duplicate label \u2018label_907\u2019",
+      "duration": 16.12
     },
     {
       "test": "global_swf6_7_8",
       "num_frames": 2,
-      "lines": {
-        "actual_lines": 15,
-        "expected_lines": 15,
-        "matching_lines": 15
-      },
-      "duration": 16.03,
-      "status": "pass"
+      "status": "compile_fail",
+      "detail": "/tmp/swf_verify_odwzsxwr/movie_child6.c:239:1: error: duplicate label \u2018label_229\u2019",
+      "duration": 15.83
     },
     {
       "test": "globals_swf5",
@@ -2552,10 +2152,13 @@
       "lines": {
         "actual_lines": 304,
         "expected_lines": 304,
-        "matching_lines": 304
+        "matching_lines": 301
       },
-      "duration": 16.1,
-      "status": "pass"
+      "duration": 15.98,
+      "status": "output_mismatch",
+      "detail": "3 line(s) differ (actual=304, expected=304)",
+      "actual_output": "... (48 lines before) ...\n// Error\n[type Function]\nfunction\nobject\n// Function\n[type Function]\nfunction\nobject\n// Key\n[object Object]\nobject\nundefined\n// LoadVars\n[type Function]\nfunction\nobject\n// LocalConnection\n[type Function]\nfunction\nobject\n// Math\n[object Object]\nobject\nundefined\n// Microphone\n[type Function]\nfunction\nobject\n// Mouse\n[object Object]\nobject\nundefined\n// MovieClip\n[type Function]\nfunction\nobject\n// MovieClipLoader\n[type Function]\nfunction\nobject\n// NetConnection\n[type Function]\nfunction\nobject\n// NetStream\n[type Function]\nfunction\nobject\n// Number\n[type Function]\n... (206 lines after) ...",
+      "expected_output": "... (48 lines before) ...\n// Error\n[type Function]\nfunction\nobject\n// Function\nundefined\nundefined\nundefined\n// Key\n[object Object]\nobject\nundefined\n// LoadVars\n[type Function]\nfunction\nobject\n// LocalConnection\n[type Function]\nfunction\nobject\n// Math\n[object Object]\nobject\nundefined\n// Microphone\n[type Function]\nfunction\nobject\n// Mouse\n[object Object]\nobject\nundefined\n// MovieClip\n[type Function]\nfunction\nobject\n// MovieClipLoader\n[type Function]\nfunction\nobject\n// NetConnection\n[type Function]\nfunction\nobject\n// NetStream\n[type Function]\nfunction\nobject\n// Number\n[type Function]\n... (206 lines after) ..."
     },
     {
       "test": "globals_swf6",
@@ -2565,7 +2168,7 @@
         "expected_lines": 304,
         "matching_lines": 304
       },
-      "duration": 15.67,
+      "duration": 16.01,
       "status": "pass"
     },
     {
@@ -2576,7 +2179,7 @@
         "expected_lines": 304,
         "matching_lines": 304
       },
-      "duration": 15.8,
+      "duration": 16.0,
       "status": "pass"
     },
     {
@@ -2587,7 +2190,7 @@
         "expected_lines": 304,
         "matching_lines": 304
       },
-      "duration": 15.88,
+      "duration": 16.12,
       "status": "pass"
     },
     {
@@ -2598,7 +2201,7 @@
         "expected_lines": 6,
         "matching_lines": 6
       },
-      "duration": 15.64,
+      "duration": 16.06,
       "status": "pass"
     },
     {
@@ -2609,7 +2212,7 @@
         "expected_lines": 2,
         "matching_lines": 2
       },
-      "duration": 15.77,
+      "duration": 15.91,
       "status": "pass"
     },
     {
@@ -2620,7 +2223,7 @@
         "expected_lines": 3,
         "matching_lines": 3
       },
-      "duration": 15.8,
+      "duration": 15.9,
       "status": "pass"
     },
     {
@@ -2631,7 +2234,7 @@
         "expected_lines": 3,
         "matching_lines": 3
       },
-      "duration": 15.93,
+      "duration": 16.03,
       "status": "pass"
     },
     {
@@ -2642,239 +2245,155 @@
         "expected_lines": 2,
         "matching_lines": 2
       },
-      "duration": 16.04,
+      "duration": 16.16,
       "status": "pass"
     },
     {
       "test": "goto_execution_order2",
       "num_frames": 2,
-      "lines": {
-        "actual_lines": 2,
-        "expected_lines": 2,
-        "matching_lines": 2
-      },
-      "duration": 15.92,
-      "status": "pass"
+      "status": "compile_fail",
+      "detail": "compilation timed out",
+      "duration": 120.24
     },
     {
       "test": "goto_frame",
       "num_frames": 3,
-      "lines": {
-        "actual_lines": 12,
-        "expected_lines": 12,
-        "matching_lines": 12
-      },
-      "duration": 15.79,
-      "status": "pass"
+      "status": "compile_fail",
+      "detail": "compilation timed out",
+      "duration": 120.17
     },
     {
       "test": "goto_frame2",
       "num_frames": 5,
-      "lines": {
-        "actual_lines": 44,
-        "expected_lines": 44,
-        "matching_lines": 44
-      },
-      "duration": 16.24,
-      "status": "pass"
+      "status": "compile_fail",
+      "detail": "compilation timed out",
+      "duration": 120.22
     },
     {
       "test": "goto_frame_number",
       "num_frames": 4,
-      "lines": {
-        "actual_lines": 3,
-        "expected_lines": 3,
-        "matching_lines": 3
-      },
-      "duration": 15.68,
-      "status": "pass"
+      "status": "compile_fail",
+      "detail": "compilation timed out",
+      "duration": 120.2
     },
     {
       "test": "goto_label",
       "num_frames": 4,
-      "lines": {
-        "actual_lines": 17,
-        "expected_lines": 17,
-        "matching_lines": 17
-      },
-      "duration": 15.91,
-      "status": "pass"
+      "status": "compile_fail",
+      "detail": "compilation timed out",
+      "duration": 120.21
     },
     {
       "test": "goto_methods",
       "num_frames": 1,
-      "lines": {
-        "actual_lines": 40,
-        "expected_lines": 40,
-        "matching_lines": 40
-      },
-      "duration": 15.75,
-      "status": "pass"
+      "status": "compile_fail",
+      "detail": "compilation timed out",
+      "duration": 120.12
     },
     {
       "test": "goto_rewind1",
       "num_frames": 4,
-      "lines": {
-        "actual_lines": 1,
-        "expected_lines": 1,
-        "matching_lines": 1
-      },
-      "duration": 15.66,
-      "status": "pass"
+      "status": "compile_fail",
+      "detail": "compilation timed out",
+      "duration": 120.2
     },
     {
       "test": "goto_rewind2",
       "num_frames": 5,
-      "lines": {
-        "actual_lines": 3,
-        "expected_lines": 3,
-        "matching_lines": 3
-      },
-      "duration": 15.62,
-      "status": "pass"
+      "status": "compile_fail",
+      "detail": "compilation timed out",
+      "duration": 120.16
     },
     {
       "test": "goto_rewind3",
       "num_frames": 2,
-      "lines": {
-        "actual_lines": 2,
-        "expected_lines": 2,
-        "matching_lines": 2
-      },
-      "duration": 15.63,
-      "status": "pass"
+      "status": "compile_fail",
+      "detail": "compilation timed out",
+      "duration": 120.17
     },
     {
       "test": "greater_swf6",
       "num_frames": 1,
-      "lines": {
-        "actual_lines": 1175,
-        "expected_lines": 1175,
-        "matching_lines": 1175
-      },
-      "duration": 17.69,
-      "status": "pass"
+      "status": "compile_fail",
+      "detail": "compilation timed out",
+      "duration": 120.2
     },
     {
       "test": "greater_swf7",
       "num_frames": 1,
-      "lines": {
-        "actual_lines": 1175,
-        "expected_lines": 1175,
-        "matching_lines": 1175
-      },
-      "duration": 17.71,
-      "status": "pass"
+      "status": "compile_fail",
+      "detail": "compilation timed out",
+      "duration": 120.18
     },
     {
       "test": "greaterthan_swf5",
       "num_frames": 1,
-      "lines": {
-        "actual_lines": 1,
-        "expected_lines": 1,
-        "matching_lines": 1
-      },
-      "duration": 15.56,
-      "status": "pass"
+      "status": "compile_fail",
+      "detail": "compilation timed out",
+      "duration": 120.11
     },
     {
       "test": "greaterthan_swf8",
       "num_frames": 1,
-      "lines": {
-        "actual_lines": 1,
-        "expected_lines": 1,
-        "matching_lines": 1
-      },
-      "duration": 15.51,
-      "status": "pass"
+      "status": "compile_fail",
+      "detail": "compilation timed out",
+      "duration": 120.19
     },
     {
       "test": "has_own_property",
       "num_frames": 1,
-      "lines": {
-        "actual_lines": 32,
-        "expected_lines": 32,
-        "matching_lines": 32
-      },
-      "duration": 15.71,
-      "status": "pass"
+      "status": "compile_fail",
+      "detail": "compilation timed out",
+      "duration": 120.18
     },
     {
       "test": "hittest_lockroot",
       "num_frames": 1,
-      "lines": {
-        "actual_lines": 15,
-        "expected_lines": 15,
-        "matching_lines": 15
-      },
-      "duration": 15.83,
-      "status": "pass"
+      "status": "compile_fail",
+      "detail": "compilation timed out",
+      "duration": 120.16
     },
     {
       "test": "hittest_morph",
       "num_frames": 1,
-      "lines": {
-        "actual_lines": 70,
-        "expected_lines": 70,
-        "matching_lines": 70
-      },
-      "duration": 15.63,
-      "status": "pass"
+      "status": "compile_fail",
+      "detail": "compilation timed out",
+      "duration": 120.12
     },
     {
       "test": "hittest_morph_input",
       "num_frames": 4,
-      "lines": {
-        "actual_lines": 1,
-        "expected_lines": 1,
-        "matching_lines": 1
-      },
-      "duration": 15.54,
-      "status": "pass"
+      "status": "compile_fail",
+      "detail": "compilation timed out",
+      "duration": 120.18
     },
     {
       "test": "hittest_winding_rule",
       "num_frames": 1,
-      "lines": {
-        "actual_lines": 12,
-        "expected_lines": 12,
-        "matching_lines": 12
-      },
-      "duration": 15.74,
-      "status": "pass"
+      "status": "compile_fail",
+      "detail": "compilation timed out",
+      "duration": 120.37
     },
     {
       "test": "infinite_recursion_function",
       "num_frames": 1,
-      "lines": {
-        "actual_lines": 4,
-        "expected_lines": 4,
-        "matching_lines": 4
-      },
-      "duration": 15.55,
-      "status": "pass"
+      "status": "compile_fail",
+      "detail": "compilation timed out",
+      "duration": 120.19
     },
     {
       "test": "infinite_recursion_function_in_setter",
       "num_frames": 1,
-      "lines": {
-        "actual_lines": 131,
-        "expected_lines": 131,
-        "matching_lines": 131
-      },
-      "duration": 15.68,
-      "status": "pass"
+      "status": "compile_fail",
+      "detail": "compilation timed out",
+      "duration": 120.19
     },
     {
       "test": "infinite_recursion_virtual_property",
       "num_frames": 1,
-      "lines": {
-        "actual_lines": 67,
-        "expected_lines": 67,
-        "matching_lines": 67
-      },
-      "duration": 15.58,
-      "status": "pass"
+      "status": "compile_fail",
+      "detail": "compilation timed out",
+      "duration": 120.19
     },
     {
       "test": "init_array_invalid",
@@ -2884,7 +2403,7 @@
         "expected_lines": 4,
         "matching_lines": 4
       },
-      "duration": 15.71,
+      "duration": 16.69,
       "status": "pass"
     },
     {
@@ -2895,19 +2414,15 @@
         "expected_lines": 4,
         "matching_lines": 4
       },
-      "duration": 15.33,
+      "duration": 15.21,
       "status": "pass"
     },
     {
       "test": "init_object_order",
       "num_frames": 1,
-      "lines": {
-        "actual_lines": 15,
-        "expected_lines": 15,
-        "matching_lines": 15
-      },
-      "duration": 15.47,
-      "status": "pass"
+      "status": "compile_fail",
+      "detail": "/tmp/swf_verify_08nz7be8/script_0.c:112:1: error: duplicate label \u2018label_182\u2019",
+      "duration": 15.25
     },
     {
       "test": "input_dead_keys_windows",
@@ -2917,30 +2432,22 @@
         "expected_lines": 15,
         "matching_lines": 15
       },
-      "duration": 15.49,
+      "duration": 15.37,
       "status": "pass"
     },
     {
       "test": "instanceof_coercions",
       "num_frames": 1,
-      "lines": {
-        "actual_lines": 88,
-        "expected_lines": 88,
-        "matching_lines": 88
-      },
-      "duration": 15.68,
-      "status": "pass"
+      "status": "compile_fail",
+      "detail": "/tmp/swf_verify_jivlgilp/script_1.c:101:1: error: duplicate label \u2018label_2352\u2019",
+      "duration": 15.49
     },
     {
       "test": "interface_implements_op",
       "num_frames": 2,
-      "lines": {
-        "actual_lines": 47,
-        "expected_lines": 47,
-        "matching_lines": 47
-      },
-      "duration": 15.89,
-      "status": "pass"
+      "status": "compile_fail",
+      "detail": "/tmp/swf_verify_c0aafh_5/movie_child6.c:280:1: error: duplicate label \u2018label_219\u2019",
+      "duration": 15.24
     },
     {
       "test": "is_finite",
@@ -2950,7 +2457,7 @@
         "expected_lines": 49,
         "matching_lines": 49
       },
-      "duration": 15.25,
+      "duration": 15.01,
       "status": "pass"
     },
     {
@@ -2961,7 +2468,7 @@
         "expected_lines": 49,
         "matching_lines": 49
       },
-      "duration": 15.35,
+      "duration": 15.12,
       "status": "pass"
     },
     {
@@ -2972,7 +2479,7 @@
         "expected_lines": 89,
         "matching_lines": 89
       },
-      "duration": 15.49,
+      "duration": 15.13,
       "status": "pass"
     },
     {
@@ -2983,22 +2490,19 @@
         "expected_lines": 1,
         "matching_lines": 1
       },
-      "duration": 15.15,
+      "duration": 15.18,
       "status": "pass"
     },
     {
       "test": "issue_1104",
       "num_frames": 3,
       "lines": {
-        "actual_lines": 0,
+        "actual_lines": 2,
         "expected_lines": 2,
-        "matching_lines": 0
+        "matching_lines": 2
       },
-      "duration": 15.14,
-      "status": "output_mismatch",
-      "detail": "2 line(s) differ (actual=0, expected=2)",
-      "actual_output": "",
-      "expected_output": "// clip enterFrame\n// clip enterFrame"
+      "duration": 15.12,
+      "status": "pass"
     },
     {
       "test": "issue_1671",
@@ -3008,7 +2512,7 @@
         "expected_lines": 0,
         "matching_lines": 0
       },
-      "duration": 15.17,
+      "duration": 15.06,
       "status": "pass"
     },
     {
@@ -3019,7 +2523,7 @@
         "expected_lines": 4,
         "matching_lines": 4
       },
-      "duration": 15.29,
+      "duration": 15.21,
       "status": "pass"
     },
     {
@@ -3030,55 +2534,36 @@
         "expected_lines": 4,
         "matching_lines": 4
       },
-      "duration": 15.27,
+      "duration": 15.16,
       "status": "pass"
     },
     {
       "test": "issue_2084",
       "num_frames": 2,
-      "lines": {
-        "actual_lines": 16,
-        "expected_lines": 16,
-        "matching_lines": 16
-      },
-      "duration": 15.73,
-      "status": "pass"
+      "status": "compile_fail",
+      "detail": "/tmp/swf_verify_hpzywg1i/script_0.c:87:1: error: duplicate label \u2018label_624\u2019",
+      "duration": 15.25
     },
     {
       "test": "issue_2166",
       "num_frames": 1,
-      "lines": {
-        "actual_lines": 9,
-        "expected_lines": 9,
-        "matching_lines": 9
-      },
-      "duration": 15.35,
-      "status": "pass"
+      "status": "compile_fail",
+      "detail": "/tmp/swf_verify_v0132nss/script_0.c:110:1: error: duplicate label \u2018label_224\u2019",
+      "duration": 15.09
     },
     {
       "test": "issue_2870",
       "num_frames": 10,
-      "lines": {
-        "actual_lines": 1,
-        "expected_lines": 3,
-        "matching_lines": 0
-      },
-      "duration": 15.41,
-      "status": "output_mismatch",
-      "detail": "3 line(s) differ (actual=1, expected=3)",
-      "actual_output": "child",
-      "expected_output": "load\nload\nchild"
+      "status": "compile_fail",
+      "detail": "/tmp/swf_verify_yeevkepq/script_defs.c:52:1: error: duplicate label \u2018label_21\u2019",
+      "duration": 15.25
     },
     {
       "test": "issue_3169",
       "num_frames": 1,
-      "lines": {
-        "actual_lines": 2,
-        "expected_lines": 2,
-        "matching_lines": 2
-      },
-      "duration": 15.59,
-      "status": "pass"
+      "status": "compile_fail",
+      "detail": "/tmp/swf_verify_9a9n_hzm/script_0.c:71:1: error: duplicate label \u2018label_404\u2019",
+      "duration": 15.25
     },
     {
       "test": "issue_3446",
@@ -3088,7 +2573,7 @@
         "expected_lines": 1,
         "matching_lines": 1
       },
-      "duration": 15.57,
+      "duration": 15.12,
       "status": "pass"
     },
     {
@@ -3099,7 +2584,7 @@
         "expected_lines": 2,
         "matching_lines": 2
       },
-      "duration": 15.44,
+      "duration": 15.08,
       "status": "pass"
     },
     {
@@ -3110,7 +2595,7 @@
         "expected_lines": 2,
         "matching_lines": 2
       },
-      "duration": 15.53,
+      "duration": 15.11,
       "status": "pass"
     },
     {
@@ -3121,7 +2606,7 @@
         "expected_lines": 4,
         "matching_lines": 4
       },
-      "duration": 17.13,
+      "duration": 15.93,
       "status": "pass"
     },
     {
@@ -3132,19 +2617,15 @@
         "expected_lines": 3,
         "matching_lines": 3
       },
-      "duration": 16.78,
+      "duration": 15.64,
       "status": "pass"
     },
     {
       "test": "issue_9327",
       "num_frames": 1,
-      "lines": {
-        "actual_lines": 2,
-        "expected_lines": 2,
-        "matching_lines": 2
-      },
-      "duration": 16.86,
-      "status": "pass"
+      "status": "compile_fail",
+      "detail": "/tmp/swf_verify_iss9lycj/script_0.c:71:1: error: duplicate label \u2018label_378\u2019",
+      "duration": 15.54
     },
     {
       "test": "issue_9885",
@@ -3154,7 +2635,7 @@
         "expected_lines": 2,
         "matching_lines": 2
       },
-      "duration": 16.43,
+      "duration": 15.44,
       "status": "pass"
     },
     {
@@ -3165,7 +2646,7 @@
         "expected_lines": 9,
         "matching_lines": 9
       },
-      "duration": 16.44,
+      "duration": 15.47,
       "status": "pass"
     },
     {
@@ -3176,7 +2657,7 @@
         "expected_lines": 41,
         "matching_lines": 41
       },
-      "duration": 16.54,
+      "duration": 15.5,
       "status": "pass"
     },
     {
@@ -3187,7 +2668,7 @@
         "expected_lines": 1226,
         "matching_lines": 1226
       },
-      "duration": 18.48,
+      "duration": 17.3,
       "status": "pass"
     },
     {
@@ -3198,7 +2679,7 @@
         "expected_lines": 1226,
         "matching_lines": 1226
       },
-      "duration": 18.3,
+      "duration": 17.25,
       "status": "pass"
     },
     {
@@ -3209,7 +2690,7 @@
         "expected_lines": 1226,
         "matching_lines": 1226
       },
-      "duration": 18.65,
+      "duration": 17.19,
       "status": "pass"
     },
     {
@@ -3220,7 +2701,7 @@
         "expected_lines": 902,
         "matching_lines": 902
       },
-      "duration": 17.34,
+      "duration": 16.37,
       "status": "pass"
     },
     {
@@ -3231,7 +2712,7 @@
         "expected_lines": 41,
         "matching_lines": 41
       },
-      "duration": 16.1,
+      "duration": 15.31,
       "status": "pass"
     },
     {
@@ -3242,7 +2723,7 @@
         "expected_lines": 41,
         "matching_lines": 41
       },
-      "duration": 16.4,
+      "duration": 15.33,
       "status": "pass"
     },
     {
@@ -3253,30 +2734,22 @@
         "expected_lines": 2,
         "matching_lines": 2
       },
-      "duration": 16.44,
+      "duration": 15.51,
       "status": "pass"
     },
     {
       "test": "loadmovie_fail",
       "num_frames": 1,
-      "lines": {
-        "actual_lines": 2,
-        "expected_lines": 2,
-        "matching_lines": 2
-      },
-      "duration": 16.52,
-      "status": "pass"
+      "status": "compile_fail",
+      "detail": "/tmp/swf_verify_4z56z_4w/script_0.c:71:1: error: duplicate label \u2018label_367\u2019",
+      "duration": 15.51
     },
     {
       "test": "loadmovie_flashvars",
       "num_frames": 2,
-      "lines": {
-        "actual_lines": 4,
-        "expected_lines": 4,
-        "matching_lines": 4
-      },
-      "duration": 16.51,
-      "status": "pass"
+      "status": "compile_fail",
+      "detail": "/tmp/swf_verify_5l6qzbt7/movie_target.c:235:1: error: duplicate label \u2018label_160\u2019",
+      "duration": 15.56
     },
     {
       "test": "loadmovie_method",
@@ -3286,19 +2759,15 @@
         "expected_lines": 2,
         "matching_lines": 2
       },
-      "duration": 16.6,
+      "duration": 15.49,
       "status": "pass"
     },
     {
       "test": "loadmovie_registerclass",
       "num_frames": 2,
-      "lines": {
-        "actual_lines": 30,
-        "expected_lines": 30,
-        "matching_lines": 30
-      },
-      "duration": 16.77,
-      "status": "pass"
+      "status": "compile_fail",
+      "detail": "/tmp/swf_verify_vm3q8bva/movie_target.c:488:1: error: duplicate label \u2018label_269\u2019",
+      "duration": 15.32
     },
     {
       "test": "loadmovie_replace_root",
@@ -3308,7 +2777,7 @@
         "expected_lines": 5,
         "matching_lines": 5
       },
-      "duration": 16.66,
+      "duration": 15.38,
       "status": "pass"
     },
     {
@@ -3319,7 +2788,7 @@
         "expected_lines": 8,
         "matching_lines": 8
       },
-      "duration": 16.68,
+      "duration": 15.57,
       "status": "pass"
     },
     {
@@ -3330,52 +2799,36 @@
         "expected_lines": 3,
         "matching_lines": 3
       },
-      "duration": 16.76,
+      "duration": 15.42,
       "status": "pass"
     },
     {
       "test": "loadmovienum_cross_version_prototype",
       "num_frames": 6,
-      "lines": {
-        "actual_lines": 9,
-        "expected_lines": 9,
-        "matching_lines": 9
-      },
-      "duration": 16.72,
-      "status": "pass"
+      "status": "compile_fail",
+      "detail": "/tmp/swf_verify_yremmjv3/movie_target.c:318:1: error: duplicate label \u2018label_393\u2019",
+      "duration": 15.73
     },
     {
       "test": "loadvariables",
       "num_frames": 3,
-      "lines": {
-        "actual_lines": 2,
-        "expected_lines": 2,
-        "matching_lines": 2
-      },
-      "duration": 16.53,
-      "status": "pass"
+      "status": "compile_fail",
+      "detail": "/tmp/swf_verify_fivrjasb/script_1.c:63:1: error: duplicate label \u2018label_78\u2019",
+      "duration": 15.74
     },
     {
       "test": "loadvariables2",
       "num_frames": 16,
-      "lines": {
-        "actual_lines": 8,
-        "expected_lines": 8,
-        "matching_lines": 8
-      },
-      "duration": 16.57,
-      "status": "pass"
+      "status": "compile_fail",
+      "detail": "/tmp/swf_verify_cpgpxcwa/script_defs.c:86:1: error: duplicate label \u2018label_92\u2019",
+      "duration": 15.42
     },
     {
       "test": "loadvariablesnum",
       "num_frames": 3,
-      "lines": {
-        "actual_lines": 2,
-        "expected_lines": 2,
-        "matching_lines": 2
-      },
-      "duration": 17.08,
-      "status": "pass"
+      "status": "compile_fail",
+      "detail": "/tmp/swf_verify_cgkfil5j/script_1.c:63:1: error: duplicate label \u2018label_78\u2019",
+      "duration": 15.59
     },
     {
       "test": "local_to_global",
@@ -3385,33 +2838,22 @@
         "expected_lines": 49,
         "matching_lines": 49
       },
-      "duration": 17.4,
+      "duration": 15.64,
       "status": "pass"
     },
     {
       "test": "localconnection",
       "num_frames": 300,
-      "lines": {
-        "actual_lines": 261,
-        "expected_lines": 579,
-        "matching_lines": 74
-      },
-      "duration": 17.88,
-      "status": "output_mismatch",
-      "detail": "505 line(s) differ (actual=261, expected=579)",
-      "actual_output": "-- start test: A message to nowhere! --\n\n\n-- end frame: A message to nowhere! --\n\n\n-- end test: A message to nowhere! --\n\n\n-- start test: Both receivers try to connect to the same channel --\n\n\n-- end frame: Both receivers try to connect to the same channel --\n\n\n-- end test: Both receivers try to connect to the same channel --\n\n\n-- start test: A message to an unimplemented function --\n\n\n-- end frame: A message to an unimplemented function --\n\n\n-- end test: A message to an unimplemented function --\n\n\n-- start test: Receiver tries to connect elsewhere, but can't --\n\n\n-- end frame: Receiver tries to connect elsewhere, but can't --\n\n\n-- end test: Receiver tries to connect elsewhere, but can't --\n\n\n-- start test: Receiver actually connects elsewhere, and custom is allowed to connect to channel --\n\n\n-- end frame: Receiver actually connects elsewhere, and custom is allowed to connect to channel --\n\n\n-- end test: Receiver actually connects elsewhere, and custom is allowed to connect to channel --\n\n\n-- start test: Sender calls test() on 'channel' --\n\n\n-- end frame: Sender calls test() on 'channel' --\n\n... (211 lines after) ...",
-      "expected_output": "\n-- start test: A message to nowhere! --\n\nsender.send(\"nowhere\", \"test\", *0 []): true\n\n-- end frame: A message to nowhere! --\n\nsender.onStatus was called\n  *0 Object {\n      level = \"error\"\n    }\n\n-- end test: A message to nowhere! --\n\n\n-- start test: Both receivers try to connect to the same channel --\n\nreceiver.connect(\"channel\"): true\ncustom.connect(\"channel\"): false\n\n-- end frame: Both receivers try to connect to the same channel --\n\n\n-- end test: Both receivers try to connect to the same channel --\n\n\n-- start test: A message to an unimplemented function --\n\nsender.send(\"channel\", \"unimplemented\", *0 []): true\n\n-- end frame: A message to an unimplemented function --\n\nsender.onStatus was called\n  *0 Object {\n      level = \"status\"\n    }\n\n-- end test: A message to an unimplemented function --\n\n\n-- start test: Receiver tries to connect elsewhere, but can't --\n\nreceiver.connect(\"elsewhere\"): false\n\n-- end frame: Receiver tries to connect elsewhere, but can't --\n\n\n-- end test: Receiver tries to connect elsewhere, but can't --\n\n\n... (530 lines after) ..."
+      "status": "compile_fail",
+      "detail": "/tmp/swf_verify_2tb3mvwa/script_1.c:107:1: error: duplicate label \u2018label_457\u2019",
+      "duration": 15.68
     },
     {
       "test": "localconnection_properties",
       "num_frames": 1,
-      "lines": {
-        "actual_lines": 8,
-        "expected_lines": 8,
-        "matching_lines": 8
-      },
-      "duration": 16.82,
-      "status": "pass"
+      "status": "compile_fail",
+      "detail": "/tmp/swf_verify_oqh2_rmi/script_0.c:447:1: error: duplicate label \u2018label_279\u2019",
+      "duration": 15.4
     },
     {
       "test": "lock_root",
@@ -3421,7 +2863,7 @@
         "expected_lines": 1,
         "matching_lines": 1
       },
-      "duration": 16.51,
+      "duration": 15.57,
       "status": "pass"
     },
     {
@@ -3432,7 +2874,7 @@
         "expected_lines": 90,
         "matching_lines": 90
       },
-      "duration": 16.21,
+      "duration": 15.41,
       "status": "pass"
     },
     {
@@ -3443,7 +2885,7 @@
         "expected_lines": 108,
         "matching_lines": 108
       },
-      "duration": 16.64,
+      "duration": 15.64,
       "status": "pass"
     },
     {
@@ -3454,7 +2896,7 @@
         "expected_lines": 6,
         "matching_lines": 6
       },
-      "duration": 16.72,
+      "duration": 15.51,
       "status": "pass"
     },
     {
@@ -3465,7 +2907,7 @@
         "expected_lines": 0,
         "matching_lines": 0
       },
-      "duration": 17.2,
+      "duration": 15.76,
       "status": "pass"
     },
     {
@@ -3476,7 +2918,7 @@
         "expected_lines": 0,
         "matching_lines": 0
       },
-      "duration": 16.71,
+      "duration": 15.68,
       "status": "pass"
     },
     {
@@ -3487,41 +2929,29 @@
         "expected_lines": 101,
         "matching_lines": 101
       },
-      "duration": 17.06,
+      "duration": 15.73,
       "status": "pass"
     },
     {
       "test": "math_swf6",
       "num_frames": 1,
-      "lines": {
-        "actual_lines": 530,
-        "expected_lines": 530,
-        "matching_lines": 530
-      },
-      "duration": 17.54,
-      "status": "pass"
+      "status": "compile_fail",
+      "detail": "/tmp/swf_verify_fnl2tn5d/script_0.c:171:1: error: duplicate label \u2018label_2861\u2019",
+      "duration": 15.93
     },
     {
       "test": "math_swf7",
       "num_frames": 1,
-      "lines": {
-        "actual_lines": 530,
-        "expected_lines": 530,
-        "matching_lines": 530
-      },
-      "duration": 17.47,
-      "status": "pass"
+      "status": "compile_fail",
+      "detail": "/tmp/swf_verify_359n2bly/script_0.c:171:1: error: duplicate label \u2018label_2861\u2019",
+      "duration": 15.59
     },
     {
       "test": "math_swf8",
       "num_frames": 1,
-      "lines": {
-        "actual_lines": 530,
-        "expected_lines": 530,
-        "matching_lines": 530
-      },
-      "duration": 17.39,
-      "status": "pass"
+      "status": "compile_fail",
+      "detail": "/tmp/swf_verify_sendx4qb/script_0.c:171:1: error: duplicate label \u2018label_2861\u2019",
+      "duration": 15.95
     },
     {
       "test": "matrix",
@@ -3531,7 +2961,7 @@
         "expected_lines": 171,
         "matching_lines": 171
       },
-      "duration": 17.6,
+      "duration": 16.26,
       "status": "pass"
     },
     {
@@ -3542,30 +2972,22 @@
         "expected_lines": 12,
         "matching_lines": 12
       },
-      "duration": 16.57,
+      "duration": 16.02,
       "status": "pass"
     },
     {
       "test": "mcl_events_swf_version",
       "num_frames": 30,
-      "lines": {
-        "actual_lines": 232,
-        "expected_lines": 232,
-        "matching_lines": 232
-      },
-      "duration": 17.47,
-      "status": "pass"
+      "status": "compile_fail",
+      "detail": "/tmp/swf_verify_oxwvr8tq/movie_child10.c:231:1: error: duplicate label \u2018label_37\u2019",
+      "duration": 15.89
     },
     {
       "test": "mcl_getprogress",
       "num_frames": 6,
-      "lines": {
-        "actual_lines": 30,
-        "expected_lines": 30,
-        "matching_lines": 30
-      },
-      "duration": 16.78,
-      "status": "pass"
+      "status": "compile_fail",
+      "detail": "/tmp/swf_verify_cizpslsl/script_defs.c:81:1: error: duplicate label \u2018label_24\u2019",
+      "duration": 17.77
     },
     {
       "test": "mcl_loadclip",
@@ -3575,85 +2997,57 @@
         "expected_lines": 149,
         "matching_lines": 149
       },
-      "duration": 16.18,
+      "duration": 16.37,
       "status": "pass"
     },
     {
       "test": "mcl_loadclip_properties",
       "num_frames": 2,
-      "lines": {
-        "actual_lines": 6,
-        "expected_lines": 6,
-        "matching_lines": 6
-      },
-      "duration": 16.41,
-      "status": "pass"
+      "status": "compile_fail",
+      "detail": "/tmp/swf_verify_smvntp3f/movie_child.c:194:1: error: duplicate label \u2018label_141\u2019",
+      "duration": 16.21
     },
     {
       "test": "mcl_loadclip_replace_root",
       "num_frames": 2,
-      "lines": {
-        "actual_lines": 1,
-        "expected_lines": 1,
-        "matching_lines": 1
-      },
-      "duration": 16.35,
-      "status": "pass"
+      "status": "compile_fail",
+      "detail": "/tmp/swf_verify_iwpf14jx/movie_child.c:208:1: error: duplicate label \u2018label_168\u2019",
+      "duration": 15.95
     },
     {
       "test": "mcl_mislabeled_target",
       "num_frames": 11,
-      "lines": {
-        "actual_lines": 6,
-        "expected_lines": 6,
-        "matching_lines": 6
-      },
-      "duration": 16.31,
-      "status": "pass"
+      "status": "compile_fail",
+      "detail": "/tmp/swf_verify_7508x8fr/script_defs.c:40:1: error: duplicate label \u2018label_18\u2019",
+      "duration": 16.16
     },
     {
       "test": "mcl_target_gif87a",
       "num_frames": 11,
-      "lines": {
-        "actual_lines": 6,
-        "expected_lines": 6,
-        "matching_lines": 6
-      },
-      "duration": 16.47,
-      "status": "pass"
+      "status": "compile_fail",
+      "detail": "/tmp/swf_verify_obqzyqhy/script_defs.c:40:1: error: duplicate label \u2018label_18\u2019",
+      "duration": 16.44
     },
     {
       "test": "mcl_target_gif89a",
       "num_frames": 11,
-      "lines": {
-        "actual_lines": 6,
-        "expected_lines": 6,
-        "matching_lines": 6
-      },
-      "duration": 16.48,
-      "status": "pass"
+      "status": "compile_fail",
+      "detail": "/tmp/swf_verify_myxh0d4p/script_defs.c:40:1: error: duplicate label \u2018label_18\u2019",
+      "duration": 16.65
     },
     {
       "test": "mcl_target_jpg",
       "num_frames": 11,
-      "lines": {
-        "actual_lines": 6,
-        "expected_lines": 6,
-        "matching_lines": 6
-      },
-      "duration": 16.47,
-      "status": "pass"
+      "status": "compile_fail",
+      "detail": "/tmp/swf_verify_rpfj34o9/script_defs.c:40:1: error: duplicate label \u2018label_18\u2019",
+      "duration": 15.99
     },
     {
       "test": "mcl_target_png",
       "num_frames": 11,
-      "lines": {
-        "actual_lines": 6,
-        "expected_lines": 6,
-        "matching_lines": 6
-      },
-      "duration": 15.86,
-      "status": "pass"
+      "status": "compile_fail",
+      "detail": "/tmp/swf_verify_bwrdl2fe/script_defs.c:40:1: error: duplicate label \u2018label_18\u2019",
+      "duration": 16.17
     },
     {
       "test": "mcl_unloadclip",
@@ -3663,7 +3057,7 @@
         "expected_lines": 5,
         "matching_lines": 5
       },
-      "duration": 16.22,
+      "duration": 16.08,
       "status": "pass"
     },
     {
@@ -3674,30 +3068,22 @@
         "expected_lines": 8,
         "matching_lines": 8
       },
-      "duration": 16.33,
+      "duration": 15.62,
       "status": "pass"
     },
     {
       "test": "mouse_events_visible_enabled",
       "num_frames": 40,
-      "lines": {
-        "actual_lines": 12,
-        "expected_lines": 12,
-        "matching_lines": 12
-      },
-      "duration": 16.28,
-      "status": "pass"
+      "status": "compile_fail",
+      "detail": "/tmp/swf_verify_0zg8v4bi/script_3.c:83:1: error: duplicate label \u2018label_947\u2019",
+      "duration": 15.64
     },
     {
       "test": "mouse_hover_events_while_dragging",
       "num_frames": 3,
-      "lines": {
-        "actual_lines": 1,
-        "expected_lines": 1,
-        "matching_lines": 1
-      },
-      "duration": 16.17,
-      "status": "pass"
+      "status": "compile_fail",
+      "detail": "/tmp/swf_verify_cq5mb4v9/script_0.c:71:1: error: duplicate label \u2018label_885\u2019",
+      "duration": 15.59
     },
     {
       "test": "mouse_listeners",
@@ -3707,30 +3093,22 @@
         "expected_lines": 67,
         "matching_lines": 67
       },
-      "duration": 16.16,
+      "duration": 15.69,
       "status": "pass"
     },
     {
       "test": "mouse_pos",
       "num_frames": 76,
-      "lines": {
-        "actual_lines": 665,
-        "expected_lines": 665,
-        "matching_lines": 665
-      },
-      "duration": 16.1,
-      "status": "pass"
+      "status": "compile_fail",
+      "detail": "/tmp/swf_verify__hvyumub/script_defs.c:231:1: error: duplicate label \u2018label_44\u2019",
+      "duration": 16.04
     },
     {
       "test": "mouse_pos_with_scale_factor",
       "num_frames": 31,
-      "lines": {
-        "actual_lines": 260,
-        "expected_lines": 260,
-        "matching_lines": 260
-      },
-      "duration": 16.17,
-      "status": "pass"
+      "status": "compile_fail",
+      "detail": "/tmp/swf_verify_o0dm9x__/script_defs.c:231:1: error: duplicate label \u2018label_44\u2019",
+      "duration": 16.18
     },
     {
       "test": "mouse_wheel_enabled",
@@ -3740,7 +3118,7 @@
         "expected_lines": 2,
         "matching_lines": 2
       },
-      "duration": 16.16,
+      "duration": 15.71,
       "status": "pass"
     },
     {
@@ -3751,19 +3129,15 @@
         "expected_lines": 0,
         "matching_lines": 0
       },
-      "duration": 16.86,
+      "duration": 16.6,
       "status": "pass"
     },
     {
       "test": "movieclip_blend_mode_property",
       "num_frames": 1,
-      "lines": {
-        "actual_lines": 35,
-        "expected_lines": 35,
-        "matching_lines": 35
-      },
-      "duration": 16.51,
-      "status": "pass"
+      "status": "compile_fail",
+      "detail": "/tmp/swf_verify_z1bc71id/script_0.c:79:1: error: duplicate label \u2018label_605\u2019",
+      "duration": 15.83
     },
     {
       "test": "movieclip_create_text_field",
@@ -3773,19 +3147,15 @@
         "expected_lines": 90,
         "matching_lines": 90
       },
-      "duration": 15.96,
+      "duration": 16.22,
       "status": "pass"
     },
     {
       "test": "movieclip_default_state",
       "num_frames": 1,
-      "lines": {
-        "actual_lines": 69,
-        "expected_lines": 69,
-        "matching_lines": 69
-      },
-      "duration": 15.88,
-      "status": "pass"
+      "status": "compile_fail",
+      "detail": "/tmp/swf_verify_0x3novzi/script_defs.c:96:1: error: duplicate label \u2018label_17\u2019",
+      "duration": 15.79
     },
     {
       "test": "movieclip_depth_methods",
@@ -3795,19 +3165,15 @@
         "expected_lines": 98,
         "matching_lines": 98
       },
-      "duration": 15.74,
+      "duration": 15.86,
       "status": "pass"
     },
     {
       "test": "movieclip_focusenabled",
       "num_frames": 1,
-      "lines": {
-        "actual_lines": 99,
-        "expected_lines": 99,
-        "matching_lines": 99
-      },
-      "duration": 15.76,
-      "status": "pass"
+      "status": "compile_fail",
+      "detail": "/tmp/swf_verify_acfyg2hu/script_defs.c:371:1: error: duplicate label \u2018label_221\u2019",
+      "duration": 15.8
     },
     {
       "test": "movieclip_get_instance_at_depth",
@@ -3817,19 +3183,15 @@
         "expected_lines": 28,
         "matching_lines": 28
       },
-      "duration": 15.55,
+      "duration": 15.66,
       "status": "pass"
     },
     {
       "test": "movieclip_getbounds",
       "num_frames": 1,
-      "lines": {
-        "actual_lines": 191,
-        "expected_lines": 191,
-        "matching_lines": 191
-      },
-      "duration": 15.81,
-      "status": "pass"
+      "status": "compile_fail",
+      "detail": "/tmp/swf_verify_q94fjk12/script_defs.c:75:1: error: duplicate label \u2018label_17\u2019",
+      "duration": 15.81
     },
     {
       "test": "movieclip_gettextsnapshot",
@@ -3839,7 +3201,7 @@
         "expected_lines": 112,
         "matching_lines": 112
       },
-      "duration": 15.9,
+      "duration": 15.92,
       "status": "pass"
     },
     {
@@ -3850,22 +3212,15 @@
         "expected_lines": 92,
         "matching_lines": 92
       },
-      "duration": 15.81,
+      "duration": 15.82,
       "status": "pass"
     },
     {
       "test": "movieclip_hittest_shapeflag",
       "num_frames": 13,
-      "lines": {
-        "actual_lines": 338,
-        "expected_lines": 338,
-        "matching_lines": 312
-      },
-      "duration": 16.88,
-      "status": "output_mismatch",
-      "detail": "26 line(s) differ (actual=338, expected=338)",
-      "actual_output": "... (13 lines before) ...\n// _level0.clip.hitTest(500, 400, true)\ntrue\n// _level0.clip.hitTest(400, 300, true)\ntrue\n// _level0.clip.hitTest(300, 400, true)\nfalse\n// _level0.clip.hitTest(NaN, NaN, true)\nfalse\n\n// donut, root transformed\n// _level0.clip.hitTest(400, 400, true)\nfalse\n// _level0.clip.hitTest(250, 250, true)\nfalse\n// _level0.clip.hitTest(550, 250, true)\nfalse\n// _level0.clip.hitTest(250, 550, true)\nfalse\n// _level0.clip.hitTest(550, 550, true)\nfalse\n// _level0.clip.hitTest(400, 500, true)\ntrue\n// _level0.clip.hitTest(500, 400, true)\ntrue\n// _level0.clip.hitTest(400, 300, true)\ntrue\n// _level0.clip.hitTest(300, 400, true)\nfalse\n\n// strokes\n// _level0.clip.hitTest(400, 50, true)\ntrue\n// _level0.clip.hitTest(50, 400, true)\nfalse\n// _level0.clip.hitTest(750, 400, true)\nfalse\n// _level0.clip.hitTest(400, 750, true)\nfalse\n// _level0.clip.hitTest(575, 575, true)\ntrue\n// _level0.clip.hitTest(400, 350, true)\ntrue\n// _level0.clip.hitTest(350, 400, true)\ntrue\n// _level0.clip.hitTest(390, 200, true)\ntrue\n// _level0.clip.hitTest(400, 270, true)\nfalse\n// _level0.clip.hitTest(400, 200, true)\ntrue\n... (275 lines after) ...",
-      "expected_output": "... (13 lines before) ...\n// _level0.clip.hitTest(500, 400, true)\ntrue\n// _level0.clip.hitTest(400, 300, true)\ntrue\n// _level0.clip.hitTest(300, 400, true)\ntrue\n// _level0.clip.hitTest(NaN, NaN, true)\nfalse\n\n// donut, root transformed\n// _level0.clip.hitTest(400, 400, true)\nfalse\n// _level0.clip.hitTest(250, 250, true)\nfalse\n// _level0.clip.hitTest(550, 250, true)\nfalse\n// _level0.clip.hitTest(250, 550, true)\nfalse\n// _level0.clip.hitTest(550, 550, true)\nfalse\n// _level0.clip.hitTest(400, 500, true)\ntrue\n// _level0.clip.hitTest(500, 400, true)\ntrue\n// _level0.clip.hitTest(400, 300, true)\ntrue\n// _level0.clip.hitTest(300, 400, true)\ntrue\n\n// strokes\n// _level0.clip.hitTest(400, 50, true)\ntrue\n// _level0.clip.hitTest(50, 400, true)\ntrue\n// _level0.clip.hitTest(750, 400, true)\ntrue\n// _level0.clip.hitTest(400, 750, true)\ntrue\n// _level0.clip.hitTest(575, 575, true)\ntrue\n// _level0.clip.hitTest(400, 350, true)\ntrue\n// _level0.clip.hitTest(350, 400, true)\ntrue\n// _level0.clip.hitTest(390, 200, true)\ntrue\n// _level0.clip.hitTest(400, 270, true)\ntrue\n// _level0.clip.hitTest(400, 200, true)\nfalse\n... (275 lines after) ..."
+      "status": "compile_fail",
+      "detail": "/tmp/swf_verify_c4fdz3x8/script_16.c:115:1: error: duplicate label \u2018label_60\u2019",
+      "duration": 16.98
     },
     {
       "test": "movieclip_in_removed_button",
@@ -3881,101 +3236,65 @@
     {
       "test": "movieclip_init_object",
       "num_frames": 1,
-      "lines": {
-        "actual_lines": 5,
-        "expected_lines": 5,
-        "matching_lines": 5
-      },
-      "duration": 15.6,
-      "status": "pass"
+      "status": "compile_fail",
+      "detail": "/tmp/swf_verify_pd0mllmf/script_1.c:85:1: error: duplicate label \u2018label_213\u2019",
+      "duration": 15.53
     },
     {
       "test": "movieclip_invalid_get_bounds_1",
       "num_frames": 150,
-      "lines": {
-        "actual_lines": 75,
-        "expected_lines": 75,
-        "matching_lines": 75
-      },
-      "duration": 16.16,
-      "status": "pass"
+      "status": "compile_fail",
+      "detail": "/tmp/swf_verify_y9q7opt5/movie_Child7.c:114:1: error: duplicate label \u2018label_69\u2019",
+      "duration": 16.01
     },
     {
       "test": "movieclip_invalid_get_bounds_2",
       "num_frames": 150,
-      "lines": {
-        "actual_lines": 75,
-        "expected_lines": 75,
-        "matching_lines": 75
-      },
-      "duration": 16.16,
-      "status": "pass"
+      "status": "compile_fail",
+      "detail": "/tmp/swf_verify_bnjd935u/movie_Child7.c:114:1: error: duplicate label \u2018label_69\u2019",
+      "duration": 15.9
     },
     {
       "test": "movieclip_invalid_get_bounds_3",
       "num_frames": 30,
-      "lines": {
-        "actual_lines": 13,
-        "expected_lines": 13,
-        "matching_lines": 13
-      },
-      "duration": 15.89,
-      "status": "pass"
+      "status": "compile_fail",
+      "detail": "/tmp/swf_verify_oqpdg5ws/movie_Child7.c:114:1: error: duplicate label \u2018label_69\u2019",
+      "duration": 15.7
     },
     {
       "test": "movieclip_invalid_get_bounds_4",
       "num_frames": 30,
-      "lines": {
-        "actual_lines": 13,
-        "expected_lines": 13,
-        "matching_lines": 13
-      },
-      "duration": 15.66,
-      "status": "pass"
+      "status": "compile_fail",
+      "detail": "/tmp/swf_verify_1f289oi3/movie_Child7.c:114:1: error: duplicate label \u2018label_69\u2019",
+      "duration": 15.81
     },
     {
       "test": "movieclip_invalid_get_bounds_5",
       "num_frames": 30,
-      "lines": {
-        "actual_lines": 11,
-        "expected_lines": 11,
-        "matching_lines": 11
-      },
-      "duration": 15.75,
-      "status": "pass"
+      "status": "compile_fail",
+      "detail": "/tmp/swf_verify_jrsu89jw/movie_Child7.c:114:1: error: duplicate label \u2018label_69\u2019",
+      "duration": 15.73
     },
     {
       "test": "movieclip_invalid_get_bounds_6",
       "num_frames": 30,
-      "lines": {
-        "actual_lines": 10,
-        "expected_lines": 10,
-        "matching_lines": 10
-      },
-      "duration": 39.55,
-      "status": "pass"
+      "status": "compile_fail",
+      "detail": "/tmp/swf_verify_rbqpj8ks/movie_BoundsChild8.c:3989:1: error: duplicate label \u2018label_65\u2019",
+      "duration": 57.64
     },
     {
       "test": "movieclip_invalid_get_bounds_7",
       "num_frames": 30,
-      "lines": {
-        "actual_lines": 10,
-        "expected_lines": 10,
-        "matching_lines": 10
-      },
-      "duration": 39.75,
-      "status": "pass"
+      "status": "compile_fail",
+      "detail": "/tmp/swf_verify_u6lndy3c/movie_BoundsChild8TestingThis.c:3982:1: error: duplicate label \u2018label_65\u2019",
+      "duration": 59.3
     },
     {
       "test": "movieclip_invalid_get_bounds_8",
       "num_frames": 30,
-      "lines": {
-        "actual_lines": 11,
-        "expected_lines": 11,
-        "matching_lines": 11
-      },
-      "duration": 15.88,
-      "status": "pass"
+      "status": "compile_fail",
+      "detail": "/tmp/swf_verify_5sr2272p/movie_Child7.c:114:1: error: duplicate label \u2018label_69\u2019",
+      "duration": 15.81
     },
     {
       "test": "movieclip_line_gradient_style",
@@ -3985,33 +3304,22 @@
         "expected_lines": 0,
         "matching_lines": 0
       },
-      "duration": 16.16,
+      "duration": 16.21,
       "status": "pass"
     },
     {
       "test": "movieclip_lockroot",
       "num_frames": 10,
-      "lines": {
-        "actual_lines": 29,
-        "expected_lines": 29,
-        "matching_lines": 29
-      },
-      "duration": 16.09,
-      "status": "pass"
+      "status": "compile_fail",
+      "detail": "/tmp/swf_verify_q0f22ket/script_defs.c:203:1: error: duplicate label \u2018label_27\u2019",
+      "duration": 18.0
     },
     {
       "test": "movieclip_methods_with_loaded_image",
       "num_frames": 11,
-      "lines": {
-        "actual_lines": 0,
-        "expected_lines": 4,
-        "matching_lines": 0
-      },
-      "duration": 15.47,
-      "status": "output_mismatch",
-      "detail": "4 line(s) differ (actual=0, expected=4)",
-      "actual_output": "",
-      "expected_output": "ruffle.getBytesTotal(): 2685\nruffle.getBytesLoaded(): 2685\nruffle.getSWFVersion(): -1\nruffle._url (unescaped & split): target.png"
+      "status": "compile_fail",
+      "detail": "/tmp/swf_verify_ngv74fjl/script_defs.c:200:1: error: duplicate label \u2018label_99\u2019",
+      "duration": 16.44
     },
     {
       "test": "movieclip_name_from_timeline",
@@ -4021,7 +3329,7 @@
         "expected_lines": 13,
         "matching_lines": 13
       },
-      "duration": 15.43,
+      "duration": 16.52,
       "status": "pass"
     },
     {
@@ -4032,30 +3340,22 @@
         "expected_lines": 5,
         "matching_lines": 5
       },
-      "duration": 15.34,
+      "duration": 16.11,
       "status": "pass"
     },
     {
       "test": "movieclip_setmask",
       "num_frames": 1,
-      "lines": {
-        "actual_lines": 14,
-        "expected_lines": 14,
-        "matching_lines": 14
-      },
-      "duration": 15.52,
-      "status": "pass"
+      "status": "compile_fail",
+      "detail": "/tmp/swf_verify_nv8dpgey/script_0.c:514:1: error: duplicate label \u2018label_1563\u2019",
+      "duration": 15.84
     },
     {
       "test": "moviecliploader_flashvars",
       "num_frames": 2,
-      "lines": {
-        "actual_lines": 4,
-        "expected_lines": 4,
-        "matching_lines": 4
-      },
-      "duration": 15.49,
-      "status": "pass"
+      "status": "compile_fail",
+      "detail": "/tmp/swf_verify_pi49dr_v/movie_target.c:235:1: error: duplicate label \u2018label_160\u2019",
+      "duration": 15.61
     },
     {
       "test": "mutable_this",
@@ -4065,7 +3365,7 @@
         "expected_lines": 18,
         "matching_lines": 18
       },
-      "duration": 15.56,
+      "duration": 15.25,
       "status": "pass"
     },
     {
@@ -4076,63 +3376,43 @@
         "expected_lines": 14,
         "matching_lines": 14
       },
-      "duration": 15.62,
+      "duration": 15.48,
       "status": "pass"
     },
     {
       "test": "nan_scale",
       "num_frames": 1,
-      "lines": {
-        "actual_lines": 9,
-        "expected_lines": 9,
-        "matching_lines": 9
-      },
-      "duration": 15.65,
-      "status": "pass"
+      "status": "compile_fail",
+      "detail": "/tmp/swf_verify_l8snbi7y/script_defs.c:245:1: error: duplicate label \u2018label_38\u2019",
+      "duration": 15.71
     },
     {
       "test": "native_double_construct",
       "num_frames": 1,
-      "lines": {
-        "actual_lines": 12,
-        "expected_lines": 12,
-        "matching_lines": 12
-      },
-      "duration": 15.71,
-      "status": "pass"
+      "status": "compile_fail",
+      "detail": "/tmp/swf_verify__3uff4_o/script_0.c:95:1: error: duplicate label \u2018label_563\u2019",
+      "duration": 15.68
     },
     {
       "test": "native_objects_swf7",
       "num_frames": 1,
-      "lines": {
-        "actual_lines": 84,
-        "expected_lines": 84,
-        "matching_lines": 84
-      },
-      "duration": 16.02,
-      "status": "pass"
+      "status": "compile_fail",
+      "detail": "/tmp/swf_verify_9pen8zbe/script_defs.c:142:1: error: duplicate label \u2018label_79\u2019",
+      "duration": 15.8
     },
     {
       "test": "native_objects_swf8",
       "num_frames": 1,
-      "lines": {
-        "actual_lines": 84,
-        "expected_lines": 84,
-        "matching_lines": 84
-      },
-      "duration": 15.78,
-      "status": "pass"
+      "status": "compile_fail",
+      "detail": "/tmp/swf_verify_ocfougy_/script_defs.c:142:1: error: duplicate label \u2018label_79\u2019",
+      "duration": 15.69
     },
     {
       "test": "native_subclasses",
       "num_frames": 1,
-      "lines": {
-        "actual_lines": 191,
-        "expected_lines": 191,
-        "matching_lines": 191
-      },
-      "duration": 15.86,
-      "status": "pass"
+      "status": "compile_fail",
+      "detail": "/tmp/swf_verify_k6zx_u3g/script_0.c:87:1: error: duplicate label \u2018label_3578\u2019",
+      "duration": 15.4
     },
     {
       "test": "nested_textfields_in_buttons",
@@ -4142,7 +3422,7 @@
         "expected_lines": 0,
         "matching_lines": 0
       },
-      "duration": 15.39,
+      "duration": 15.29,
       "status": "pass"
     },
     {
@@ -4153,19 +3433,15 @@
         "expected_lines": 4,
         "matching_lines": 4
       },
-      "duration": 15.92,
+      "duration": 16.86,
       "status": "pass"
     },
     {
       "test": "new_object_enumerate",
       "num_frames": 1,
-      "lines": {
-        "actual_lines": 7,
-        "expected_lines": 7,
-        "matching_lines": 7
-      },
-      "duration": 15.7,
-      "status": "pass"
+      "status": "compile_fail",
+      "detail": "/tmp/swf_verify_zfbq_36j/script_0.c:206:1: error: duplicate label \u2018label_178\u2019",
+      "duration": 15.17
     },
     {
       "test": "new_object_wrap",
@@ -4175,7 +3451,7 @@
         "expected_lines": 4,
         "matching_lines": 4
       },
-      "duration": 15.7,
+      "duration": 15.09,
       "status": "pass"
     },
     {
@@ -4186,7 +3462,7 @@
         "expected_lines": 3,
         "matching_lines": 3
       },
-      "duration": 15.66,
+      "duration": 15.1,
       "status": "pass"
     },
     {
@@ -4197,7 +3473,7 @@
         "expected_lines": 33,
         "matching_lines": 33
       },
-      "duration": 15.72,
+      "duration": 15.17,
       "status": "pass"
     },
     {
@@ -4208,19 +3484,15 @@
         "expected_lines": 32,
         "matching_lines": 32
       },
-      "duration": 15.71,
+      "duration": 15.14,
       "status": "pass"
     },
     {
       "test": "object_properties",
       "num_frames": 1,
-      "lines": {
-        "actual_lines": 31,
-        "expected_lines": 31,
-        "matching_lines": 31
-      },
-      "duration": 15.84,
-      "status": "pass"
+      "status": "compile_fail",
+      "detail": "/tmp/swf_verify_16vip3lp/script_defs.c:760:1: error: duplicate label \u2018label_13\u2019",
+      "duration": 15.07
     },
     {
       "test": "object_prototypes",
@@ -4230,19 +3502,15 @@
         "expected_lines": 74,
         "matching_lines": 74
       },
-      "duration": 15.69,
+      "duration": 15.13,
       "status": "pass"
     },
     {
       "test": "object_resolve",
       "num_frames": 1,
-      "lines": {
-        "actual_lines": 38,
-        "expected_lines": 38,
-        "matching_lines": 38
-      },
-      "duration": 15.88,
-      "status": "pass"
+      "status": "compile_fail",
+      "detail": "/tmp/swf_verify_6n1n5f0y/script_0.c:71:1: error: duplicate label \u2018label_1503\u2019",
+      "duration": 15.21
     },
     {
       "test": "object_string_coerce_swf5",
@@ -4252,7 +3520,7 @@
         "expected_lines": 62,
         "matching_lines": 62
       },
-      "duration": 15.77,
+      "duration": 15.26,
       "status": "pass"
     },
     {
@@ -4263,22 +3531,15 @@
         "expected_lines": 68,
         "matching_lines": 68
       },
-      "duration": 15.72,
+      "duration": 15.17,
       "status": "pass"
     },
     {
       "test": "on_construct",
       "num_frames": 1,
-      "lines": {
-        "actual_lines": 12,
-        "expected_lines": 25,
-        "matching_lines": 8
-      },
-      "duration": 15.73,
-      "status": "output_mismatch",
-      "detail": "17 line(s) differ (actual=12, expected=25)",
-      "actual_output": "/// CustomClass() constructor start\n\n// this._name\ncustom_clip\n\n// this.customProperty\nCustom property from CustomClass\n\n// this.child\n_level0.custom_clip.child\n\n/// CustomClass() constructor end",
-      "expected_output": "/// on(construct) start\n\n// this._name\ncustom_clip\n\n// customProperty\nCustom property from CustomClass\n\n// child\n_level0.custom_clip.child\n\n/// on(construct) end\n\n/// CustomClass() constructor start\n\n// this._name\ncustom_clip\n\n// this.customProperty\nCustom property from on(construct)\n\n// this.child\n_level0.custom_clip.child\n\n/// CustomClass() constructor end"
+      "status": "compile_fail",
+      "detail": "/tmp/swf_verify_825rbk0o/script_2.c:85:1: error: duplicate label \u2018label_423\u2019",
+      "duration": 15.16
     },
     {
       "test": "parse_float",
@@ -4288,19 +3549,15 @@
         "expected_lines": 74,
         "matching_lines": 74
       },
-      "duration": 15.82,
+      "duration": 15.29,
       "status": "pass"
     },
     {
       "test": "parse_int",
       "num_frames": 1,
-      "lines": {
-        "actual_lines": 64,
-        "expected_lines": 64,
-        "matching_lines": 64
-      },
-      "duration": 15.88,
-      "status": "pass"
+      "status": "compile_fail",
+      "detail": "/tmp/swf_verify_w_59cd68/script_defs.c:260:1: error: duplicate label \u2018label_67\u2019",
+      "duration": 15.35
     },
     {
       "test": "path_string",
@@ -4310,19 +3567,15 @@
         "expected_lines": 322,
         "matching_lines": 322
       },
-      "duration": 15.87,
+      "duration": 15.36,
       "status": "pass"
     },
     {
       "test": "place_and_lookup",
       "num_frames": 1,
-      "lines": {
-        "actual_lines": 30,
-        "expected_lines": 30,
-        "matching_lines": 30
-      },
-      "duration": 15.77,
-      "status": "pass"
+      "status": "compile_fail",
+      "detail": "/tmp/swf_verify_0drr2r6h/script_0.c:130:1: error: duplicate label \u2018label_247\u2019",
+      "duration": 15.05
     },
     {
       "test": "placeobject_occupied_depth",
@@ -4332,7 +3585,7 @@
         "expected_lines": 6,
         "matching_lines": 6
       },
-      "duration": 15.85,
+      "duration": 15.22,
       "status": "pass"
     },
     {
@@ -4343,7 +3596,7 @@
         "expected_lines": 175,
         "matching_lines": 175
       },
-      "duration": 16.29,
+      "duration": 15.52,
       "status": "pass"
     },
     {
@@ -4354,52 +3607,36 @@
         "expected_lines": 37,
         "matching_lines": 37
       },
-      "duration": 15.64,
+      "duration": 15.14,
       "status": "pass"
     },
     {
       "test": "primitive_type_globals",
       "num_frames": 1,
-      "lines": {
-        "actual_lines": 557,
-        "expected_lines": 557,
-        "matching_lines": 557
-      },
-      "duration": 15.8,
-      "status": "pass"
+      "status": "compile_fail",
+      "detail": "/tmp/swf_verify_7022mg1z/script_0.c:1077:1: error: duplicate label \u2018label_1063\u2019",
+      "duration": 15.07
     },
     {
       "test": "printjob_props_swf5",
       "num_frames": 1,
-      "lines": {
-        "actual_lines": 45,
-        "expected_lines": 45,
-        "matching_lines": 45
-      },
-      "duration": 17.66,
-      "status": "pass"
+      "status": "compile_fail",
+      "detail": "/tmp/swf_verify_qt9ya7s5/script_0.c:563:1: error: duplicate label \u2018label_259\u2019",
+      "duration": 15.96
     },
     {
       "test": "printjob_props_swf6",
       "num_frames": 1,
-      "lines": {
-        "actual_lines": 45,
-        "expected_lines": 45,
-        "matching_lines": 45
-      },
-      "duration": 15.87,
-      "status": "pass"
+      "status": "compile_fail",
+      "detail": "/tmp/swf_verify_al585f1x/script_0.c:563:1: error: duplicate label \u2018label_259\u2019",
+      "duration": 15.51
     },
     {
       "test": "printjob_props_swf7",
       "num_frames": 1,
-      "lines": {
-        "actual_lines": 45,
-        "expected_lines": 45,
-        "matching_lines": 45
-      },
-      "duration": 15.97,
-      "status": "pass"
+      "status": "compile_fail",
+      "detail": "/tmp/swf_verify_rcs0z129/script_0.c:563:1: error: duplicate label \u2018label_259\u2019",
+      "duration": 15.46
     },
     {
       "test": "property_invalid_base_clip",
@@ -4409,30 +3646,22 @@
         "expected_lines": 36,
         "matching_lines": 36
       },
-      "duration": 15.92,
+      "duration": 15.58,
       "status": "pass"
     },
     {
       "test": "prototype_delete",
       "num_frames": 1,
-      "lines": {
-        "actual_lines": 12,
-        "expected_lines": 12,
-        "matching_lines": 12
-      },
-      "duration": 15.92,
-      "status": "pass"
+      "status": "compile_fail",
+      "detail": "/tmp/swf_verify_48mm6c6s/script_0.c:292:1: error: duplicate label \u2018label_345\u2019",
+      "duration": 15.43
     },
     {
       "test": "prototype_enumerate",
       "num_frames": 1,
-      "lines": {
-        "actual_lines": 5,
-        "expected_lines": 5,
-        "matching_lines": 5
-      },
-      "duration": 15.68,
-      "status": "pass"
+      "status": "compile_fail",
+      "detail": "/tmp/swf_verify_0fpwtg9o/script_0.c:118:1: error: duplicate label \u2018label_176\u2019",
+      "duration": 15.36
     },
     {
       "test": "prototype_properties",
@@ -4442,19 +3671,15 @@
         "expected_lines": 17,
         "matching_lines": 17
       },
-      "duration": 15.79,
+      "duration": 15.44,
       "status": "pass"
     },
     {
       "test": "rectangle",
       "num_frames": 1,
-      "lines": {
-        "actual_lines": 745,
-        "expected_lines": 745,
-        "matching_lines": 745
-      },
-      "duration": 16.43,
-      "status": "pass"
+      "status": "compile_fail",
+      "detail": "/tmp/swf_verify_f3087ye1/script_defs.c:515:1: error: duplicate label \u2018label_102\u2019",
+      "duration": 16.23
     },
     {
       "test": "recursive_prototypes",
@@ -4464,63 +3689,43 @@
         "expected_lines": 0,
         "matching_lines": 0
       },
-      "duration": 16.27,
+      "duration": 15.4,
       "status": "pass"
     },
     {
       "test": "register_and_init_order",
       "num_frames": 1,
-      "lines": {
-        "actual_lines": 231,
-        "expected_lines": 231,
-        "matching_lines": 231
-      },
-      "duration": 16.43,
-      "status": "pass"
+      "status": "compile_fail",
+      "detail": "/tmp/swf_verify_zkqsf17e/script_5.c:99:1: error: duplicate label \u2018label_607\u2019",
+      "duration": 15.86
     },
     {
       "test": "register_class",
       "num_frames": 3,
-      "lines": {
-        "actual_lines": 66,
-        "expected_lines": 66,
-        "matching_lines": 66
-      },
-      "duration": 16.14,
-      "status": "pass"
+      "status": "compile_fail",
+      "detail": "/tmp/swf_verify_kngr3zph/movie_child.c:170:1: error: duplicate label \u2018label_95\u2019",
+      "duration": 15.51
     },
     {
       "test": "register_class_return_value",
       "num_frames": 1,
-      "lines": {
-        "actual_lines": 16,
-        "expected_lines": 16,
-        "matching_lines": 16
-      },
-      "duration": 16.0,
-      "status": "pass"
+      "status": "compile_fail",
+      "detail": "/tmp/swf_verify_dj6hu284/script_0.c:71:1: error: duplicate label \u2018label_600\u2019",
+      "duration": 15.74
     },
     {
       "test": "register_class_swf6",
       "num_frames": 3,
-      "lines": {
-        "actual_lines": 37,
-        "expected_lines": 37,
-        "matching_lines": 37
-      },
-      "duration": 16.19,
-      "status": "pass"
+      "status": "compile_fail",
+      "detail": "/tmp/swf_verify_57laho7n/movie_child.c:170:1: error: duplicate label \u2018label_95\u2019",
+      "duration": 15.71
     },
     {
       "test": "register_class_with_sound",
       "num_frames": 1,
-      "lines": {
-        "actual_lines": 11,
-        "expected_lines": 11,
-        "matching_lines": 11
-      },
-      "duration": 16.14,
-      "status": "pass"
+      "status": "compile_fail",
+      "detail": "/tmp/swf_verify_n9sho0oa/script_0.c:79:1: error: duplicate label \u2018label_723\u2019",
+      "duration": 15.71
     },
     {
       "test": "register_globals_across_frames",
@@ -4530,7 +3735,7 @@
         "expected_lines": 15,
         "matching_lines": 15
       },
-      "duration": 16.02,
+      "duration": 15.54,
       "status": "pass"
     },
     {
@@ -4541,7 +3746,7 @@
         "expected_lines": 26,
         "matching_lines": 26
       },
-      "duration": 15.94,
+      "duration": 15.57,
       "status": "pass"
     },
     {
@@ -4552,7 +3757,7 @@
         "expected_lines": 29,
         "matching_lines": 29
       },
-      "duration": 16.22,
+      "duration": 15.67,
       "status": "pass"
     },
     {
@@ -4563,7 +3768,7 @@
         "expected_lines": 15,
         "matching_lines": 15
       },
-      "duration": 16.48,
+      "duration": 15.92,
       "status": "pass"
     },
     {
@@ -4574,19 +3779,15 @@
         "expected_lines": 35,
         "matching_lines": 35
       },
-      "duration": 16.08,
+      "duration": 15.78,
       "status": "pass"
     },
     {
       "test": "resolve_different_root",
       "num_frames": 3,
-      "lines": {
-        "actual_lines": 2,
-        "expected_lines": 2,
-        "matching_lines": 2
-      },
-      "duration": 15.84,
-      "status": "pass"
+      "status": "compile_fail",
+      "detail": "/tmp/swf_verify_0_36euoo/script_1.c:91:1: error: duplicate label \u2018label_299\u2019",
+      "duration": 16.25
     },
     {
       "test": "rewind_depth",
@@ -4596,19 +3797,15 @@
         "expected_lines": 30,
         "matching_lines": 30
       },
-      "duration": 15.75,
+      "duration": 16.26,
       "status": "pass"
     },
     {
       "test": "root_button_mode",
       "num_frames": 20,
-      "lines": {
-        "actual_lines": 10,
-        "expected_lines": 10,
-        "matching_lines": 10
-      },
-      "duration": 15.76,
-      "status": "pass"
+      "status": "compile_fail",
+      "detail": "/tmp/swf_verify_aexayt7f/script_0.c:143:1: error: duplicate label \u2018label_890\u2019",
+      "duration": 16.08
     },
     {
       "test": "root_global_parent",
@@ -4618,7 +3815,7 @@
         "expected_lines": 6,
         "matching_lines": 6
       },
-      "duration": 15.53,
+      "duration": 16.06,
       "status": "pass"
     },
     {
@@ -4629,7 +3826,7 @@
         "expected_lines": 1,
         "matching_lines": 1
       },
-      "duration": 15.41,
+      "duration": 15.97,
       "status": "pass"
     },
     {
@@ -4640,7 +3837,7 @@
         "expected_lines": 1,
         "matching_lines": 1
       },
-      "duration": 15.42,
+      "duration": 15.81,
       "status": "pass"
     },
     {
@@ -4651,7 +3848,7 @@
         "expected_lines": 1,
         "matching_lines": 1
       },
-      "duration": 15.43,
+      "duration": 15.9,
       "status": "pass"
     },
     {
@@ -4662,7 +3859,7 @@
         "expected_lines": 3,
         "matching_lines": 1
       },
-      "duration": 15.41,
+      "duration": 15.93,
       "status": "output_mismatch",
       "detail": "2 line(s) differ (actual=1, expected=3)",
       "actual_output": "Current sandbox type: localWithNetwork",
@@ -4676,7 +3873,7 @@
         "expected_lines": 454,
         "matching_lines": 454
       },
-      "duration": 15.63,
+      "duration": 16.18,
       "status": "pass"
     },
     {
@@ -4687,19 +3884,15 @@
         "expected_lines": 27,
         "matching_lines": 27
       },
-      "duration": 15.53,
+      "duration": 16.06,
       "status": "pass"
     },
     {
       "test": "set_interval",
       "num_frames": 40,
-      "lines": {
-        "actual_lines": 27,
-        "expected_lines": 27,
-        "matching_lines": 27
-      },
-      "duration": 15.61,
-      "status": "pass"
+      "status": "compile_fail",
+      "detail": "/tmp/swf_verify_rzna7e3_/script_defs.c:98:1: error: duplicate label \u2018label_40\u2019",
+      "duration": 16.05
     },
     {
       "test": "set_variable_scope",
@@ -4709,7 +3902,7 @@
         "expected_lines": 58,
         "matching_lines": 58
       },
-      "duration": 15.36,
+      "duration": 15.93,
       "status": "pass"
     },
     {
@@ -4720,7 +3913,7 @@
         "expected_lines": 1,
         "matching_lines": 1
       },
-      "duration": 15.39,
+      "duration": 15.93,
       "status": "pass"
     },
     {
@@ -4731,52 +3924,36 @@
         "expected_lines": 14,
         "matching_lines": 14
       },
-      "duration": 15.44,
+      "duration": 15.92,
       "status": "pass"
     },
     {
       "test": "sound",
       "num_frames": 1,
-      "lines": {
-        "actual_lines": 628,
-        "expected_lines": 628,
-        "matching_lines": 628
-      },
-      "duration": 15.82,
-      "status": "pass"
+      "status": "compile_fail",
+      "detail": "/tmp/swf_verify_y3bqwvcy/script_0.c:1511:1: error: duplicate label \u2018label_3564\u2019",
+      "duration": 15.86
     },
     {
       "test": "sound_props_swf5",
       "num_frames": 1,
-      "lines": {
-        "actual_lines": 68,
-        "expected_lines": 68,
-        "matching_lines": 68
-      },
-      "duration": 17.15,
-      "status": "pass"
+      "status": "compile_fail",
+      "detail": "/tmp/swf_verify_4fxcsot_/script_0.c:1113:1: error: duplicate label \u2018label_373\u2019",
+      "duration": 15.7
     },
     {
       "test": "sound_props_swf6",
       "num_frames": 1,
-      "lines": {
-        "actual_lines": 68,
-        "expected_lines": 68,
-        "matching_lines": 68
-      },
-      "duration": 15.89,
-      "status": "pass"
+      "status": "compile_fail",
+      "detail": "/tmp/swf_verify_fgtxcykq/script_0.c:1113:1: error: duplicate label \u2018label_373\u2019",
+      "duration": 15.71
     },
     {
       "test": "sound_start_load",
       "num_frames": 100,
-      "lines": {
-        "actual_lines": 0,
-        "expected_lines": 0,
-        "matching_lines": 0
-      },
-      "duration": 15.82,
-      "status": "pass"
+      "status": "compile_fail",
+      "detail": "/tmp/swf_verify_bm5yev7j/script_defs.c:61:1: error: duplicate label \u2018label_71\u2019",
+      "duration": 15.52
     },
     {
       "test": "stage_display_state",
@@ -4786,7 +3963,7 @@
         "expected_lines": 16,
         "matching_lines": 16
       },
-      "duration": 15.89,
+      "duration": 15.82,
       "status": "pass"
     },
     {
@@ -4797,19 +3974,15 @@
         "expected_lines": 83,
         "matching_lines": 83
       },
-      "duration": 15.84,
+      "duration": 15.77,
       "status": "pass"
     },
     {
       "test": "stage_object_enumerate",
       "num_frames": 1,
-      "lines": {
-        "actual_lines": 4,
-        "expected_lines": 4,
-        "matching_lines": 4
-      },
-      "duration": 15.71,
-      "status": "pass"
+      "status": "compile_fail",
+      "detail": "/tmp/swf_verify_l26y6mun/script_0.c:55:1: error: duplicate label \u2018label_42\u2019",
+      "duration": 15.41
     },
     {
       "test": "stage_object_properties",
@@ -4819,7 +3992,7 @@
         "expected_lines": 241,
         "matching_lines": 241
       },
-      "duration": 16.31,
+      "duration": 16.1,
       "status": "pass"
     },
     {
@@ -4830,7 +4003,7 @@
         "expected_lines": 5,
         "matching_lines": 5
       },
-      "duration": 15.87,
+      "duration": 15.85,
       "status": "pass"
     },
     {
@@ -4841,19 +4014,15 @@
         "expected_lines": 231,
         "matching_lines": 231
       },
-      "duration": 16.12,
+      "duration": 16.13,
       "status": "pass"
     },
     {
       "test": "stage_property_representation",
       "num_frames": 1,
-      "lines": {
-        "actual_lines": 586,
-        "expected_lines": 586,
-        "matching_lines": 586
-      },
-      "duration": 15.76,
-      "status": "pass"
+      "status": "compile_fail",
+      "detail": "/tmp/swf_verify_dqtlzlrv/script_0.c:255:1: error: duplicate label \u2018label_146\u2019",
+      "duration": 15.69
     },
     {
       "test": "stage_scale_mode",
@@ -4863,7 +4032,7 @@
         "expected_lines": 39,
         "matching_lines": 39
       },
-      "duration": 15.69,
+      "duration": 15.96,
       "status": "pass"
     },
     {
@@ -4874,30 +4043,22 @@
         "expected_lines": 902,
         "matching_lines": 902
       },
-      "duration": 17.32,
+      "duration": 17.71,
       "status": "pass"
     },
     {
       "test": "strictly_equals",
       "num_frames": 1,
-      "lines": {
-        "actual_lines": 7,
-        "expected_lines": 7,
-        "matching_lines": 7
-      },
-      "duration": 15.68,
-      "status": "pass"
+      "status": "compile_fail",
+      "detail": "/tmp/swf_verify_v9syn4b6/script_0.c:326:1: error: duplicate label \u2018label_345\u2019",
+      "duration": 16.44
     },
     {
       "test": "string_coercion",
       "num_frames": 1,
-      "lines": {
-        "actual_lines": 117,
-        "expected_lines": 117,
-        "matching_lines": 117
-      },
-      "duration": 16.11,
-      "status": "pass"
+      "status": "compile_fail",
+      "detail": "/tmp/swf_verify_9_wlpqo7/script_3.c:1257:1: error: duplicate label \u2018label_941\u2019",
+      "duration": 16.13
     },
     {
       "test": "string_methods",
@@ -4907,19 +4068,15 @@
         "expected_lines": 285,
         "matching_lines": 285
       },
-      "duration": 16.22,
+      "duration": 16.26,
       "status": "pass"
     },
     {
       "test": "string_methods_negative_args",
       "num_frames": 1,
-      "lines": {
-        "actual_lines": 240,
-        "expected_lines": 240,
-        "matching_lines": 240
-      },
-      "duration": 15.97,
-      "status": "pass"
+      "status": "compile_fail",
+      "detail": "/tmp/swf_verify_4da4ogl0/script_0.c:71:1: error: duplicate label \u2018label_945\u2019",
+      "duration": 15.73
     },
     {
       "test": "string_methods_swfv5",
@@ -4929,7 +4086,7 @@
         "expected_lines": 275,
         "matching_lines": 275
       },
-      "duration": 16.66,
+      "duration": 16.37,
       "status": "pass"
     },
     {
@@ -4940,7 +4097,7 @@
         "expected_lines": 95,
         "matching_lines": 95
       },
-      "duration": 16.59,
+      "duration": 15.73,
       "status": "pass"
     },
     {
@@ -4951,7 +4108,7 @@
         "expected_lines": 4,
         "matching_lines": 4
       },
-      "duration": 16.31,
+      "duration": 15.3,
       "status": "pass"
     },
     {
@@ -4962,7 +4119,7 @@
         "expected_lines": 4,
         "matching_lines": 4
       },
-      "duration": 16.55,
+      "duration": 15.32,
       "status": "pass"
     },
     {
@@ -4973,7 +4130,7 @@
         "expected_lines": 7,
         "matching_lines": 7
       },
-      "duration": 15.74,
+      "duration": 16.81,
       "status": "pass"
     },
     {
@@ -4984,7 +4141,7 @@
         "expected_lines": 54,
         "matching_lines": 54
       },
-      "duration": 15.57,
+      "duration": 16.01,
       "status": "pass"
     },
     {
@@ -4995,19 +4152,15 @@
         "expected_lines": 0,
         "matching_lines": 0
       },
-      "duration": 15.31,
+      "duration": 15.9,
       "status": "pass"
     },
     {
       "test": "string_paths_other",
       "num_frames": 1,
-      "lines": {
-        "actual_lines": 36,
-        "expected_lines": 36,
-        "matching_lines": 36
-      },
-      "duration": 15.46,
-      "status": "pass"
+      "status": "compile_fail",
+      "detail": "/tmp/swf_verify_w1_osm2b/script_1.c:774:1: error: duplicate label \u2018label_695\u2019",
+      "duration": 15.69
     },
     {
       "test": "string_paths_timer",
@@ -5017,7 +4170,7 @@
         "expected_lines": 0,
         "matching_lines": 0
       },
-      "duration": 15.32,
+      "duration": 16.14,
       "status": "pass"
     },
     {
@@ -5028,7 +4181,7 @@
         "expected_lines": 1,
         "matching_lines": 1
       },
-      "duration": 15.36,
+      "duration": 16.09,
       "status": "pass"
     },
     {
@@ -5039,7 +4192,7 @@
         "expected_lines": 4,
         "matching_lines": 4
       },
-      "duration": 15.32,
+      "duration": 16.25,
       "status": "pass"
     },
     {
@@ -5050,19 +4203,15 @@
         "expected_lines": 5,
         "matching_lines": 5
       },
-      "duration": 15.41,
+      "duration": 16.63,
       "status": "pass"
     },
     {
       "test": "stylesheet",
       "num_frames": 1,
-      "lines": {
-        "actual_lines": 283,
-        "expected_lines": 283,
-        "matching_lines": 283
-      },
-      "duration": 16.24,
-      "status": "pass"
+      "status": "compile_fail",
+      "detail": "/tmp/swf_verify_v7d18ffh/script_0.c:1456:1: error: duplicate label \u2018label_4243\u2019",
+      "duration": 16.7
     },
     {
       "test": "stylesheet_transform",
@@ -5072,19 +4221,15 @@
         "expected_lines": 750,
         "matching_lines": 750
       },
-      "duration": 16.2,
+      "duration": 17.71,
       "status": "pass"
     },
     {
       "test": "super_edge_cases",
       "num_frames": 1,
-      "lines": {
-        "actual_lines": 39,
-        "expected_lines": 39,
-        "matching_lines": 39
-      },
-      "duration": 15.61,
-      "status": "pass"
+      "status": "compile_fail",
+      "detail": "/tmp/swf_verify_m6ctyv7n/script_0.c:79:1: error: duplicate label \u2018label_1742\u2019",
+      "duration": 16.79
     },
     {
       "test": "swf4_actions_bool",
@@ -5094,19 +4239,15 @@
         "expected_lines": 96,
         "matching_lines": 96
       },
-      "duration": 15.38,
+      "duration": 16.24,
       "status": "pass"
     },
     {
       "test": "swf4_actions_coercion_order",
       "num_frames": 1,
-      "lines": {
-        "actual_lines": 158,
-        "expected_lines": 158,
-        "matching_lines": 158
-      },
-      "duration": 15.38,
-      "status": "pass"
+      "status": "compile_fail",
+      "detail": "/tmp/swf_verify_jv23hrb7/script_0.c:777:1: error: duplicate label \u2018label_339\u2019",
+      "duration": 16.37
     },
     {
       "test": "swf4_bool",
@@ -5116,7 +4257,7 @@
         "expected_lines": 4,
         "matching_lines": 4
       },
-      "duration": 15.23,
+      "duration": 16.36,
       "status": "pass"
     },
     {
@@ -5127,7 +4268,7 @@
         "expected_lines": 7,
         "matching_lines": 7
       },
-      "duration": 15.27,
+      "duration": 15.87,
       "status": "pass"
     },
     {
@@ -5138,19 +4279,15 @@
         "expected_lines": 3,
         "matching_lines": 3
       },
-      "duration": 15.25,
+      "duration": 15.86,
       "status": "pass"
     },
     {
       "test": "swf5_global_funcs",
       "num_frames": 1,
-      "lines": {
-        "actual_lines": 232,
-        "expected_lines": 232,
-        "matching_lines": 232
-      },
-      "duration": 15.33,
-      "status": "pass"
+      "status": "compile_fail",
+      "detail": "/tmp/swf_verify_l4j7y3u0/script_0.c:280:1: error: duplicate label \u2018label_715\u2019",
+      "duration": 15.9
     },
     {
       "test": "swf5_no_closure",
@@ -5160,19 +4297,15 @@
         "expected_lines": 19,
         "matching_lines": 19
       },
-      "duration": 15.38,
+      "duration": 15.64,
       "status": "pass"
     },
     {
       "test": "swf5_to_6_cross_call",
       "num_frames": 2,
-      "lines": {
-        "actual_lines": 29,
-        "expected_lines": 29,
-        "matching_lines": 29
-      },
-      "duration": 15.79,
-      "status": "pass"
+      "status": "compile_fail",
+      "detail": "/tmp/swf_verify_lh31gcg9/movie_child.c:132:1: error: duplicate label \u2018label_29\u2019",
+      "duration": 16.08
     },
     {
       "test": "swf5_xml_event_handler_context",
@@ -5182,7 +4315,7 @@
         "expected_lines": 2,
         "matching_lines": 0
       },
-      "duration": 15.65,
+      "duration": 15.74,
       "status": "output_mismatch",
       "detail": "2 line(s) differ (actual=0, expected=2)",
       "actual_output": "",
@@ -5191,222 +4324,142 @@
     {
       "test": "swf6_case_insensitive",
       "num_frames": 1,
-      "lines": {
-        "actual_lines": 42,
-        "expected_lines": 42,
-        "matching_lines": 42
-      },
-      "duration": 15.56,
-      "status": "pass"
+      "status": "compile_fail",
+      "detail": "/tmp/swf_verify_wu4x34xd/script_0.c:422:1: error: duplicate label \u2018label_855\u2019",
+      "duration": 15.7
     },
     {
       "test": "swf6_global_funcs",
       "num_frames": 1,
-      "lines": {
-        "actual_lines": 232,
-        "expected_lines": 232,
-        "matching_lines": 232
-      },
-      "duration": 15.57,
-      "status": "pass"
+      "status": "compile_fail",
+      "detail": "/tmp/swf_verify_nvd_v4ml/script_0.c:280:1: error: duplicate label \u2018label_715\u2019",
+      "duration": 15.67
     },
     {
       "test": "swf6_string_as_bool",
       "num_frames": 1,
-      "lines": {
-        "actual_lines": 15,
-        "expected_lines": 15,
-        "matching_lines": 15
-      },
-      "duration": 15.51,
-      "status": "pass"
+      "status": "compile_fail",
+      "detail": "/tmp/swf_verify_ql2aduhs/script_0.c:268:1: error: duplicate label \u2018label_36\u2019",
+      "duration": 15.66
     },
     {
       "test": "swf6_to_5_cross_call",
       "num_frames": 2,
-      "lines": {
-        "actual_lines": 29,
-        "expected_lines": 29,
-        "matching_lines": 29
-      },
-      "duration": 15.55,
-      "status": "pass"
+      "status": "compile_fail",
+      "detail": "/tmp/swf_verify_hflitpgu/movie_child.c:112:1: error: duplicate label \u2018label_30\u2019",
+      "duration": 15.86
     },
     {
       "test": "swf7_case_sensitive",
       "num_frames": 1,
-      "lines": {
-        "actual_lines": 44,
-        "expected_lines": 44,
-        "matching_lines": 44
-      },
-      "duration": 15.52,
-      "status": "pass"
+      "status": "compile_fail",
+      "detail": "/tmp/swf_verify_ykhp04t5/script_0.c:422:1: error: duplicate label \u2018label_855\u2019",
+      "duration": 15.7
     },
     {
       "test": "swf7_global_funcs",
       "num_frames": 1,
-      "lines": {
-        "actual_lines": 232,
-        "expected_lines": 232,
-        "matching_lines": 232
-      },
-      "duration": 15.49,
-      "status": "pass"
+      "status": "compile_fail",
+      "detail": "/tmp/swf_verify_qrp5cpth/script_0.c:280:1: error: duplicate label \u2018label_715\u2019",
+      "duration": 15.58
     },
     {
       "test": "tab_ordering_automatic_basic",
       "num_frames": 2,
-      "lines": {
-        "actual_lines": 92,
-        "expected_lines": 92,
-        "matching_lines": 92
-      },
-      "duration": 15.66,
-      "status": "pass"
+      "status": "compile_fail",
+      "detail": "/tmp/swf_verify_glnab6e6/script_defs.c:54:1: error: duplicate label \u2018label_41\u2019",
+      "duration": 15.7
     },
     {
       "test": "tab_ordering_automatic_order_grid",
       "num_frames": 2,
-      "lines": {
-        "actual_lines": 21,
-        "expected_lines": 21,
-        "matching_lines": 21
-      },
-      "duration": 15.6,
-      "status": "pass"
+      "status": "compile_fail",
+      "detail": "/tmp/swf_verify_s9266rtl/script_defs.c:50:1: error: duplicate label \u2018label_35\u2019",
+      "duration": 15.63
     },
     {
       "test": "tab_ordering_automatic_order_same_position",
       "num_frames": 2,
-      "lines": {
-        "actual_lines": 12,
-        "expected_lines": 12,
-        "matching_lines": 12
-      },
-      "duration": 15.48,
-      "status": "pass"
+      "status": "compile_fail",
+      "detail": "/tmp/swf_verify_osp4lgrc/script_defs.c:50:1: error: duplicate label \u2018label_35\u2019",
+      "duration": 15.82
     },
     {
       "test": "tab_ordering_children",
       "num_frames": 2,
-      "lines": {
-        "actual_lines": 208,
-        "expected_lines": 208,
-        "matching_lines": 208
-      },
-      "duration": 15.78,
-      "status": "pass"
+      "status": "compile_fail",
+      "detail": "/tmp/swf_verify_siftaoww/script_defs.c:54:1: error: duplicate label \u2018label_41\u2019",
+      "duration": 15.84
     },
     {
       "test": "tab_ordering_custom_basic",
       "num_frames": 2,
-      "lines": {
-        "actual_lines": 71,
-        "expected_lines": 71,
-        "matching_lines": 71
-      },
-      "duration": 15.51,
-      "status": "pass"
+      "status": "compile_fail",
+      "detail": "/tmp/swf_verify_pwq6k86p/script_defs.c:54:1: error: duplicate label \u2018label_41\u2019",
+      "duration": 15.88
     },
     {
       "test": "tab_ordering_custom_duplicate_index",
       "num_frames": 2,
-      "lines": {
-        "actual_lines": 22,
-        "expected_lines": 22,
-        "matching_lines": 22
-      },
-      "duration": 15.77,
-      "status": "pass"
+      "status": "compile_fail",
+      "detail": "/tmp/swf_verify_shgqej1x/script_defs.c:50:1: error: duplicate label \u2018label_35\u2019",
+      "duration": 15.94
     },
     {
       "test": "tab_ordering_custom_i32_vs_u32",
       "num_frames": 2,
-      "lines": {
-        "actual_lines": 12,
-        "expected_lines": 12,
-        "matching_lines": 12
-      },
-      "duration": 15.42,
-      "status": "pass"
+      "status": "compile_fail",
+      "detail": "/tmp/swf_verify_b_juhjt4/script_defs.c:94:1: error: duplicate label \u2018label_49\u2019",
+      "duration": 15.84
     },
     {
       "test": "tab_ordering_custom_m1",
       "num_frames": 2,
-      "lines": {
-        "actual_lines": 29,
-        "expected_lines": 29,
-        "matching_lines": 29
-      },
-      "duration": 15.55,
-      "status": "pass"
+      "status": "compile_fail",
+      "detail": "/tmp/swf_verify_5xnnygl1/script_defs.c:72:1: error: duplicate label \u2018label_20\u2019",
+      "duration": 15.77
     },
     {
       "test": "tab_ordering_events",
       "num_frames": 2,
-      "lines": {
-        "actual_lines": 150,
-        "expected_lines": 150,
-        "matching_lines": 150
-      },
-      "duration": 15.89,
-      "status": "pass"
+      "status": "compile_fail",
+      "detail": "/tmp/swf_verify_l8rmhp20/script_defs.c:242:1: error: duplicate label \u2018label_35\u2019",
+      "duration": 15.97
     },
     {
       "test": "tab_ordering_events_mouse",
       "num_frames": 26,
-      "lines": {
-        "actual_lines": 65,
-        "expected_lines": 65,
-        "matching_lines": 65
-      },
-      "duration": 15.75,
-      "status": "pass"
+      "status": "compile_fail",
+      "detail": "/tmp/swf_verify_hwj99uo3/script_defs.c:95:1: error: duplicate label \u2018label_35\u2019",
+      "duration": 16.11
     },
     {
       "test": "tab_ordering_movieclip_enabled_default",
       "num_frames": 2,
-      "lines": {
-        "actual_lines": 462,
-        "expected_lines": 462,
-        "matching_lines": 462
-      },
-      "duration": 15.7,
-      "status": "pass"
+      "status": "compile_fail",
+      "detail": "/tmp/swf_verify__nz_nbpc/script_defs.c:54:1: error: duplicate label \u2018label_41\u2019",
+      "duration": 15.88
     },
     {
       "test": "tab_ordering_properties",
       "num_frames": 1,
-      "lines": {
-        "actual_lines": 293,
-        "expected_lines": 293,
-        "matching_lines": 293
-      },
-      "duration": 15.54,
-      "status": "pass"
+      "status": "compile_fail",
+      "detail": "/tmp/swf_verify_z6vhrnjo/script_defs.c:186:1: error: duplicate label \u2018label_60\u2019",
+      "duration": 15.85
     },
     {
       "test": "tab_ordering_reverse",
       "num_frames": 2,
-      "lines": {
-        "actual_lines": 51,
-        "expected_lines": 51,
-        "matching_lines": 51
-      },
-      "duration": 15.83,
-      "status": "pass"
+      "status": "compile_fail",
+      "detail": "/tmp/swf_verify_vla5df8q/script_defs.c:54:1: error: duplicate label \u2018label_41\u2019",
+      "duration": 16.07
     },
     {
       "test": "tab_ordering_tabbable",
       "num_frames": 2,
-      "lines": {
-        "actual_lines": 47,
-        "expected_lines": 47,
-        "matching_lines": 47
-      },
-      "duration": 15.69,
-      "status": "pass"
+      "status": "compile_fail",
+      "detail": "/tmp/swf_verify_0o2ehhkh/script_defs.c:49:1: error: duplicate label \u2018label_37\u2019",
+      "duration": 15.91
     },
     {
       "test": "target_clip_removed",
@@ -5416,7 +4469,7 @@
         "expected_lines": 5,
         "matching_lines": 5
       },
-      "duration": 15.63,
+      "duration": 15.96,
       "status": "pass"
     },
     {
@@ -5427,7 +4480,7 @@
         "expected_lines": 2,
         "matching_lines": 2
       },
-      "duration": 15.6,
+      "duration": 15.94,
       "status": "pass"
     },
     {
@@ -5438,7 +4491,7 @@
         "expected_lines": 2,
         "matching_lines": 2
       },
-      "duration": 15.56,
+      "duration": 16.09,
       "status": "pass"
     },
     {
@@ -5449,7 +4502,7 @@
         "expected_lines": 14,
         "matching_lines": 14
       },
-      "duration": 15.52,
+      "duration": 15.86,
       "status": "pass"
     },
     {
@@ -5460,7 +4513,7 @@
         "expected_lines": 37,
         "matching_lines": 37
       },
-      "duration": 15.7,
+      "duration": 15.99,
       "status": "pass"
     },
     {
@@ -5471,7 +4524,7 @@
         "expected_lines": 6,
         "matching_lines": 6
       },
-      "duration": 15.66,
+      "duration": 15.91,
       "status": "pass"
     },
     {
@@ -5482,7 +4535,7 @@
         "expected_lines": 5,
         "matching_lines": 5
       },
-      "duration": 15.58,
+      "duration": 16.04,
       "status": "pass"
     },
     {
@@ -5493,19 +4546,15 @@
         "expected_lines": 4,
         "matching_lines": 4
       },
-      "duration": 15.76,
+      "duration": 16.2,
       "status": "pass"
     },
     {
       "test": "text_format",
       "num_frames": 1,
-      "lines": {
-        "actual_lines": 1146,
-        "expected_lines": 1146,
-        "matching_lines": 1146
-      },
-      "duration": 15.98,
-      "status": "pass"
+      "status": "compile_fail",
+      "detail": "/tmp/swf_verify_ka0yoepw/script_defs.c:117:1: error: duplicate label \u2018label_27\u2019",
+      "duration": 16.03
     },
     {
       "test": "text_format_display",
@@ -5515,7 +4564,7 @@
         "expected_lines": 21,
         "matching_lines": 21
       },
-      "duration": 15.63,
+      "duration": 15.98,
       "status": "pass"
     },
     {
@@ -5526,7 +4575,7 @@
         "expected_lines": 2,
         "matching_lines": 2
       },
-      "duration": 15.47,
+      "duration": 16.01,
       "status": "pass"
     },
     {
@@ -5537,7 +4586,7 @@
         "expected_lines": 10,
         "matching_lines": 10
       },
-      "duration": 15.45,
+      "duration": 15.94,
       "status": "pass"
     },
     {
@@ -5548,7 +4597,7 @@
         "expected_lines": 840,
         "matching_lines": 840
       },
-      "duration": 15.71,
+      "duration": 16.22,
       "status": "pass"
     },
     {
@@ -5559,7 +4608,7 @@
         "expected_lines": 840,
         "matching_lines": 840
       },
-      "duration": 15.76,
+      "duration": 16.17,
       "status": "pass"
     },
     {
@@ -5570,7 +4619,7 @@
         "expected_lines": 11,
         "matching_lines": 11
       },
-      "duration": 15.44,
+      "duration": 16.02,
       "status": "pass"
     },
     {
@@ -5581,7 +4630,7 @@
         "expected_lines": 11,
         "matching_lines": 11
       },
-      "duration": 15.52,
+      "duration": 16.4,
       "status": "pass"
     },
     {
@@ -5592,7 +4641,7 @@
         "expected_lines": 1,
         "matching_lines": 1
       },
-      "duration": 15.61,
+      "duration": 16.46,
       "status": "pass"
     },
     {
@@ -5603,7 +4652,7 @@
         "expected_lines": 3,
         "matching_lines": 3
       },
-      "duration": 16.6,
+      "duration": 15.08,
       "status": "pass"
     },
     {
@@ -5614,52 +4663,36 @@
         "expected_lines": 44,
         "matching_lines": 44
       },
-      "duration": 16.34,
+      "duration": 14.97,
       "status": "pass"
     },
     {
       "test": "textfield_props_swf5",
       "num_frames": 1,
-      "lines": {
-        "actual_lines": 175,
-        "expected_lines": 175,
-        "matching_lines": 175
-      },
-      "duration": 16.47,
-      "status": "pass"
+      "status": "compile_fail",
+      "detail": "/tmp/swf_verify_b_ymu0om/script_0.c:2313:1: error: duplicate label \u2018label_644\u2019",
+      "duration": 15.05
     },
     {
       "test": "textfield_props_swf6",
       "num_frames": 1,
-      "lines": {
-        "actual_lines": 210,
-        "expected_lines": 210,
-        "matching_lines": 210
-      },
-      "duration": 16.39,
-      "status": "pass"
+      "status": "compile_fail",
+      "detail": "/tmp/swf_verify_7gr_cf3g/script_0.c:2313:1: error: duplicate label \u2018label_644\u2019",
+      "duration": 15.01
     },
     {
       "test": "textfield_props_swf7",
       "num_frames": 1,
-      "lines": {
-        "actual_lines": 210,
-        "expected_lines": 210,
-        "matching_lines": 210
-      },
-      "duration": 16.12,
-      "status": "pass"
+      "status": "compile_fail",
+      "detail": "/tmp/swf_verify_koctohcp/script_0.c:2313:1: error: duplicate label \u2018label_644\u2019",
+      "duration": 15.08
     },
     {
       "test": "textfield_props_swf8",
       "num_frames": 1,
-      "lines": {
-        "actual_lines": 210,
-        "expected_lines": 210,
-        "matching_lines": 210
-      },
-      "duration": 16.02,
-      "status": "pass"
+      "status": "compile_fail",
+      "detail": "/tmp/swf_verify_b_tis_1f/script_0.c:2313:1: error: duplicate label \u2018label_644\u2019",
+      "duration": 15.0
     },
     {
       "test": "textfield_text",
@@ -5669,7 +4702,7 @@
         "expected_lines": 7,
         "matching_lines": 7
       },
-      "duration": 16.12,
+      "duration": 15.14,
       "status": "pass"
     },
     {
@@ -5680,7 +4713,7 @@
         "expected_lines": 81,
         "matching_lines": 81
       },
-      "duration": 16.25,
+      "duration": 15.22,
       "status": "pass"
     },
     {
@@ -5691,52 +4724,36 @@
         "expected_lines": 20,
         "matching_lines": 20
       },
-      "duration": 15.88,
+      "duration": 15.0,
       "status": "pass"
     },
     {
       "test": "textsnapshot_findtext",
       "num_frames": 1,
-      "lines": {
-        "actual_lines": 44,
-        "expected_lines": 44,
-        "matching_lines": 44
-      },
-      "duration": 16.27,
-      "status": "pass"
+      "status": "compile_fail",
+      "detail": "/tmp/swf_verify_8y9ier1m/script_defs.c:114:1: error: duplicate label \u2018label_114\u2019",
+      "duration": 15.16
     },
     {
       "test": "textsnapshot_gettext",
       "num_frames": 1,
-      "lines": {
-        "actual_lines": 55,
-        "expected_lines": 55,
-        "matching_lines": 55
-      },
-      "duration": 16.33,
-      "status": "pass"
+      "status": "compile_fail",
+      "detail": "/tmp/swf_verify_ve4l9shv/script_defs.c:114:1: error: duplicate label \u2018label_114\u2019",
+      "duration": 15.21
     },
     {
       "test": "textsnapshot_props_swf5",
       "num_frames": 1,
-      "lines": {
-        "actual_lines": 56,
-        "expected_lines": 56,
-        "matching_lines": 56
-      },
-      "duration": 16.02,
-      "status": "pass"
+      "status": "compile_fail",
+      "detail": "/tmp/swf_verify__drvioas/script_0.c:613:1: error: duplicate label \u2018label_303\u2019",
+      "duration": 14.81
     },
     {
       "test": "textsnapshot_props_swf6",
       "num_frames": 1,
-      "lines": {
-        "actual_lines": 56,
-        "expected_lines": 56,
-        "matching_lines": 56
-      },
-      "duration": 15.94,
-      "status": "pass"
+      "status": "compile_fail",
+      "detail": "/tmp/swf_verify_q9_gghh5/script_0.c:613:1: error: duplicate label \u2018label_303\u2019",
+      "duration": 14.91
     },
     {
       "test": "textsnapshot_text_order",
@@ -5746,7 +4763,7 @@
         "expected_lines": 1,
         "matching_lines": 1
       },
-      "duration": 16.0,
+      "duration": 14.85,
       "status": "pass"
     },
     {
@@ -5757,7 +4774,7 @@
         "expected_lines": 52,
         "matching_lines": 52
       },
-      "duration": 15.56,
+      "duration": 14.88,
       "status": "pass"
     },
     {
@@ -5768,7 +4785,7 @@
         "expected_lines": 41,
         "matching_lines": 41
       },
-      "duration": 15.7,
+      "duration": 14.73,
       "status": "pass"
     },
     {
@@ -5779,7 +4796,7 @@
         "expected_lines": 41,
         "matching_lines": 41
       },
-      "duration": 15.84,
+      "duration": 14.92,
       "status": "pass"
     },
     {
@@ -5790,7 +4807,7 @@
         "expected_lines": 41,
         "matching_lines": 41
       },
-      "duration": 15.76,
+      "duration": 14.87,
       "status": "pass"
     },
     {
@@ -5801,19 +4818,15 @@
         "expected_lines": 7,
         "matching_lines": 7
       },
-      "duration": 15.65,
+      "duration": 14.89,
       "status": "pass"
     },
     {
       "test": "timer_run_actions",
       "num_frames": 1,
-      "lines": {
-        "actual_lines": 18,
-        "expected_lines": 18,
-        "matching_lines": 18
-      },
-      "duration": 15.96,
-      "status": "pass"
+      "status": "compile_fail",
+      "detail": "/tmp/swf_verify_ctn2db_s/script_1.c:99:1: error: duplicate label \u2018label_258\u2019",
+      "duration": 15.59
     },
     {
       "test": "trace",
@@ -5823,7 +4836,7 @@
         "expected_lines": 8,
         "matching_lines": 8
       },
-      "duration": 15.68,
+      "duration": 15.44,
       "status": "pass"
     },
     {
@@ -5834,30 +4847,22 @@
         "expected_lines": 70,
         "matching_lines": 70
       },
-      "duration": 15.73,
+      "duration": 15.49,
       "status": "pass"
     },
     {
       "test": "try_catch_finally",
       "num_frames": 1,
-      "lines": {
-        "actual_lines": 118,
-        "expected_lines": 118,
-        "matching_lines": 118
-      },
-      "duration": 15.74,
-      "status": "pass"
+      "status": "compile_fail",
+      "detail": "/tmp/swf_verify_2w5tyjwg/script_defs.c:121:1: error: duplicate label \u2018label_86\u2019",
+      "duration": 15.4
     },
     {
       "test": "try_finally_simple",
       "num_frames": 1,
-      "lines": {
-        "actual_lines": 16,
-        "expected_lines": 16,
-        "matching_lines": 16
-      },
-      "duration": 15.59,
-      "status": "pass"
+      "status": "compile_fail",
+      "detail": "/tmp/swf_verify_vroo0cjp/script_0.c:114:1: error: duplicate label \u2018label_391\u2019",
+      "duration": 15.39
     },
     {
       "test": "typeof",
@@ -5867,7 +4872,7 @@
         "expected_lines": 22,
         "matching_lines": 22
       },
-      "duration": 15.57,
+      "duration": 15.32,
       "status": "pass"
     },
     {
@@ -5878,7 +4883,7 @@
         "expected_lines": 7,
         "matching_lines": 7
       },
-      "duration": 15.57,
+      "duration": 15.28,
       "status": "pass"
     },
     {
@@ -5889,7 +4894,7 @@
         "expected_lines": 1,
         "matching_lines": 1
       },
-      "duration": 15.54,
+      "duration": 15.31,
       "status": "pass"
     },
     {
@@ -5900,7 +4905,7 @@
         "expected_lines": 1,
         "matching_lines": 1
       },
-      "duration": 15.58,
+      "duration": 15.34,
       "status": "pass"
     },
     {
@@ -5911,7 +4916,7 @@
         "expected_lines": 4,
         "matching_lines": 4
       },
-      "duration": 15.61,
+      "duration": 15.23,
       "status": "pass"
     },
     {
@@ -5922,36 +4927,30 @@
         "expected_lines": 43,
         "matching_lines": 43
       },
-      "duration": 15.51,
+      "duration": 15.31,
       "status": "pass"
     },
     {
       "test": "unload",
       "num_frames": 4,
       "lines": {
-        "actual_lines": 50,
+        "actual_lines": 52,
         "expected_lines": 52,
-        "matching_lines": 25
+        "matching_lines": 52
       },
-      "duration": 15.68,
-      "status": "output_mismatch",
-      "detail": "27 line(s) differ (actual=50, expected=52)",
-      "actual_output": "... (12 lines before) ...\nEnd frame 1\nUnload clip4\nUnload clip5\nFrame 2\nclip = _level0.clip\nclip._x = 429.95\nclip2 = undefined\nclip3 = undefined\nclip4 = undefined\nclip5 = _level0.clip5\nclip.depth = -16383\nclip2.depth = undefined\nFixme(5492)\nclip5.depth = -16390\nEnd frame 2\nFrame 3\nclip = undefined\nclip._x = undefined\nclip2 = undefined\nclip3 = undefined\nclip4 = undefined\nclip5 = undefined\nclip.depth = undefined\nclip2.depth = undefined\nFixme(5492)\nclip5.depth = undefined\nEnd frame 3\nFrame 4\nclip = undefined\nclip._x = undefined\nclip2 = undefined\nFixme(5492)\nclip5 = undefined\nclip.depth = undefined\nclip2.depth = undefined\nFixme(5492)\nclip5.depth = undefined\nEnd frame 4",
-      "expected_output": "... (12 lines before) ...\nEnd frame 1\nUnload clip4\nUnload clip5\nFrame 2\nclip = _level0.clip\nclip._x = 125.5\nclip2 = undefined\nclip3 = undefined\nclip4 = undefined\nclip5 = _level0.clip5\nclip.depth = -16386\nclip2.depth = undefined\nFixme(5492)\nclip5.depth = -16390\nEnd frame 2\nunload clipEvent\nunload clipEvent 2\nFrame 3\nclip = _level0.clip\nclip._x = 429.95\nclip2 = undefined\nclip3 = undefined\nclip4 = undefined\nclip5 = undefined\nclip.depth = -16386\nclip2.depth = undefined\nFixme(5492)\nclip5.depth = undefined\nEnd frame 3\nFrame 4\nclip = undefined\nclip._x = undefined\nclip2 = undefined\nFixme(5492)\nclip5 = undefined\nclip.depth = undefined\nclip2.depth = undefined\nFixme(5492)\nclip5.depth = undefined\nEnd frame 4"
+      "duration": 15.69,
+      "status": "pass"
     },
     {
       "test": "unload_clip_event",
       "num_frames": 2,
       "lines": {
-        "actual_lines": 2,
+        "actual_lines": 4,
         "expected_lines": 4,
-        "matching_lines": 0
+        "matching_lines": 4
       },
-      "duration": 15.73,
-      "status": "output_mismatch",
-      "detail": "4 line(s) differ (actual=2, expected=4)",
-      "actual_output": "unload handler\nunload handler end",
-      "expected_output": "unload clipEvent\nunload clipEvent end\nunload handler\nunload handler end"
+      "duration": 15.44,
+      "status": "pass"
     },
     {
       "test": "unload_nested_child",
@@ -5961,7 +4960,7 @@
         "expected_lines": 5,
         "matching_lines": 5
       },
-      "duration": 15.74,
+      "duration": 15.33,
       "status": "pass"
     },
     {
@@ -5972,7 +4971,7 @@
         "expected_lines": 4,
         "matching_lines": 4
       },
-      "duration": 15.71,
+      "duration": 15.4,
       "status": "pass"
     },
     {
@@ -5983,7 +4982,7 @@
         "expected_lines": 3,
         "matching_lines": 3
       },
-      "duration": 15.69,
+      "duration": 15.45,
       "status": "pass"
     },
     {
@@ -5994,7 +4993,7 @@
         "expected_lines": 13,
         "matching_lines": 13
       },
-      "duration": 15.69,
+      "duration": 15.4,
       "status": "pass"
     },
     {
@@ -6005,52 +5004,36 @@
         "expected_lines": 8,
         "matching_lines": 8
       },
-      "duration": 15.56,
+      "duration": 15.33,
       "status": "pass"
     },
     {
       "test": "variable_args",
       "num_frames": 1,
-      "lines": {
-        "actual_lines": 5,
-        "expected_lines": 5,
-        "matching_lines": 5
-      },
-      "duration": 15.71,
-      "status": "pass"
+      "status": "compile_fail",
+      "detail": "/tmp/swf_verify_8yc7bmt8/script_defs.c:82:1: error: duplicate label \u2018label_18\u2019",
+      "duration": 15.38
     },
     {
       "test": "waitforframe",
       "num_frames": 1,
-      "lines": {
-        "actual_lines": 7,
-        "expected_lines": 7,
-        "matching_lines": 7
-      },
-      "duration": 15.51,
-      "status": "pass"
+      "status": "compile_fail",
+      "detail": "/tmp/swf_verify_00gsmmb2/script_0.c:110:1: error: duplicate label \u2018label_45\u2019",
+      "duration": 15.29
     },
     {
       "test": "waitforframe2",
       "num_frames": 1,
-      "lines": {
-        "actual_lines": 16,
-        "expected_lines": 16,
-        "matching_lines": 16
-      },
-      "duration": 17.62,
-      "status": "pass"
+      "status": "compile_fail",
+      "detail": "/tmp/swf_verify_mhyhp_l8/script_0.c:324:1: error: duplicate label \u2018label_629\u2019",
+      "duration": 15.92
     },
     {
       "test": "watch",
       "num_frames": 1,
-      "lines": {
-        "actual_lines": 117,
-        "expected_lines": 117,
-        "matching_lines": 117
-      },
-      "duration": 15.87,
-      "status": "pass"
+      "status": "compile_fail",
+      "detail": "/tmp/swf_verify_fi9js7pn/script_1.c:101:1: error: duplicate label \u2018label_604\u2019",
+      "duration": 16.04
     },
     {
       "test": "watch_textfield",
@@ -6060,19 +5043,15 @@
         "expected_lines": 12,
         "matching_lines": 12
       },
-      "duration": 15.57,
+      "duration": 15.85,
       "status": "pass"
     },
     {
       "test": "watch_virtual_property_proto",
       "num_frames": 1,
-      "lines": {
-        "actual_lines": 2,
-        "expected_lines": 2,
-        "matching_lines": 2
-      },
-      "duration": 15.64,
-      "status": "pass"
+      "status": "compile_fail",
+      "detail": "/tmp/swf_verify_7cl0lnzs/script_0.c:71:1: error: duplicate label \u2018label_383\u2019",
+      "duration": 15.69
     },
     {
       "test": "with",
@@ -6082,7 +5061,7 @@
         "expected_lines": 49,
         "matching_lines": 49
       },
-      "duration": 15.57,
+      "duration": 15.56,
       "status": "pass"
     },
     {
@@ -6093,7 +5072,7 @@
         "expected_lines": 2,
         "matching_lines": 2
       },
-      "duration": 15.57,
+      "duration": 15.79,
       "status": "pass"
     },
     {
@@ -6104,19 +5083,15 @@
         "expected_lines": 43,
         "matching_lines": 43
       },
-      "duration": 16.0,
+      "duration": 15.83,
       "status": "pass"
     },
     {
       "test": "xml",
       "num_frames": 1,
-      "lines": {
-        "actual_lines": 15,
-        "expected_lines": 15,
-        "matching_lines": 15
-      },
-      "duration": 15.57,
-      "status": "pass"
+      "status": "compile_fail",
+      "detail": "/tmp/swf_verify_uix4x42m/script_defs.c:201:1: error: duplicate label \u2018label_50\u2019",
+      "duration": 15.5
     },
     {
       "test": "xml_append_child",
@@ -6126,7 +5101,7 @@
         "expected_lines": 28,
         "matching_lines": 28
       },
-      "duration": 15.6,
+      "duration": 15.65,
       "status": "pass"
     },
     {
@@ -6137,19 +5112,15 @@
         "expected_lines": 20,
         "matching_lines": 20
       },
-      "duration": 15.57,
+      "duration": 15.75,
       "status": "pass"
     },
     {
       "test": "xml_attributes_read",
       "num_frames": 1,
-      "lines": {
-        "actual_lines": 4,
-        "expected_lines": 4,
-        "matching_lines": 4
-      },
-      "duration": 15.91,
-      "status": "pass"
+      "status": "compile_fail",
+      "detail": "/tmp/swf_verify_i2xjq1kq/script_0.c:116:1: error: duplicate label \u2018label_215\u2019",
+      "duration": 15.4
     },
     {
       "test": "xml_cdata",
@@ -6159,7 +5130,7 @@
         "expected_lines": 11,
         "matching_lines": 11
       },
-      "duration": 15.54,
+      "duration": 15.44,
       "status": "pass"
     },
     {
@@ -6170,7 +5141,7 @@
         "expected_lines": 4,
         "matching_lines": 4
       },
-      "duration": 15.56,
+      "duration": 15.36,
       "status": "pass"
     },
     {
@@ -6181,7 +5152,7 @@
         "expected_lines": 19,
         "matching_lines": 19
       },
-      "duration": 15.55,
+      "duration": 15.38,
       "status": "pass"
     },
     {
@@ -6192,7 +5163,7 @@
         "expected_lines": 8,
         "matching_lines": 8
       },
-      "duration": 15.69,
+      "duration": 15.42,
       "status": "pass"
     },
     {
@@ -6203,30 +5174,22 @@
         "expected_lines": 3,
         "matching_lines": 3
       },
-      "duration": 15.47,
+      "duration": 15.57,
       "status": "pass"
     },
     {
       "test": "xml_idmap",
       "num_frames": 1,
-      "lines": {
-        "actual_lines": 21,
-        "expected_lines": 21,
-        "matching_lines": 21
-      },
-      "duration": 15.6,
-      "status": "pass"
+      "status": "compile_fail",
+      "detail": "/tmp/swf_verify_h2gzg1y2/script_defs.c:249:1: error: duplicate label \u2018label_26\u2019",
+      "duration": 15.58
     },
     {
       "test": "xml_ignore_comments",
       "num_frames": 1,
-      "lines": {
-        "actual_lines": 21,
-        "expected_lines": 21,
-        "matching_lines": 21
-      },
-      "duration": 15.78,
-      "status": "pass"
+      "status": "compile_fail",
+      "detail": "/tmp/swf_verify_y34op2hc/script_defs.c:102:1: error: duplicate label \u2018label_26\u2019",
+      "duration": 15.42
     },
     {
       "test": "xml_ignore_white",
@@ -6236,7 +5199,7 @@
         "expected_lines": 34,
         "matching_lines": 34
       },
-      "duration": 16.52,
+      "duration": 16.25,
       "status": "pass"
     },
     {
@@ -6247,63 +5210,43 @@
         "expected_lines": 20,
         "matching_lines": 20
       },
-      "duration": 16.08,
+      "duration": 15.45,
       "status": "pass"
     },
     {
       "test": "xml_inspect_createmethods",
       "num_frames": 1,
-      "lines": {
-        "actual_lines": 15,
-        "expected_lines": 15,
-        "matching_lines": 15
-      },
-      "duration": 15.88,
-      "status": "pass"
+      "status": "compile_fail",
+      "detail": "/tmp/swf_verify_g_ln6l1b/script_defs.c:259:1: error: duplicate label \u2018label_94\u2019",
+      "duration": 15.41
     },
     {
       "test": "xml_inspect_doctype",
       "num_frames": 1,
-      "lines": {
-        "actual_lines": 7,
-        "expected_lines": 7,
-        "matching_lines": 7
-      },
-      "duration": 15.88,
-      "status": "pass"
+      "status": "compile_fail",
+      "detail": "/tmp/swf_verify_h0vgh54f/script_defs.c:259:1: error: duplicate label \u2018label_94\u2019",
+      "duration": 15.45
     },
     {
       "test": "xml_inspect_parsexml",
       "num_frames": 1,
-      "lines": {
-        "actual_lines": 62,
-        "expected_lines": 62,
-        "matching_lines": 62
-      },
-      "duration": 15.74,
-      "status": "pass"
+      "status": "compile_fail",
+      "detail": "/tmp/swf_verify_ab2ewy77/script_defs.c:259:1: error: duplicate label \u2018label_94\u2019",
+      "duration": 15.44
     },
     {
       "test": "xml_inspect_xmldecl",
       "num_frames": 1,
-      "lines": {
-        "actual_lines": 7,
-        "expected_lines": 7,
-        "matching_lines": 7
-      },
-      "duration": 15.6,
-      "status": "pass"
+      "status": "compile_fail",
+      "detail": "/tmp/swf_verify_k_ri3x18/script_defs.c:259:1: error: duplicate label \u2018label_94\u2019",
+      "duration": 15.73
     },
     {
       "test": "xml_namespaces",
       "num_frames": 1,
-      "lines": {
-        "actual_lines": 203,
-        "expected_lines": 203,
-        "matching_lines": 203
-      },
-      "duration": 15.71,
-      "status": "pass"
+      "status": "compile_fail",
+      "detail": "/tmp/swf_verify_qbp91b8_/script_defs.c:199:1: error: duplicate label \u2018label_171\u2019",
+      "duration": 15.69
     },
     {
       "test": "xml_parent_and_child",
@@ -6313,7 +5256,7 @@
         "expected_lines": 5,
         "matching_lines": 5
       },
-      "duration": 15.62,
+      "duration": 16.33,
       "status": "pass"
     },
     {
@@ -6324,19 +5267,15 @@
         "expected_lines": 22,
         "matching_lines": 22
       },
-      "duration": 15.63,
+      "duration": 15.8,
       "status": "pass"
     },
     {
       "test": "xml_reparenting",
       "num_frames": 1,
-      "lines": {
-        "actual_lines": 14,
-        "expected_lines": 14,
-        "matching_lines": 14
-      },
-      "duration": 15.71,
-      "status": "pass"
+      "status": "compile_fail",
+      "detail": "/tmp/swf_verify_mfe9o6px/script_0.c:71:1: error: duplicate label \u2018label_564\u2019",
+      "duration": 15.84
     },
     {
       "test": "xml_siblings",
@@ -6346,7 +5285,7 @@
         "expected_lines": 10,
         "matching_lines": 10
       },
-      "duration": 15.62,
+      "duration": 15.16,
       "status": "pass"
     },
     {
@@ -6357,7 +5296,7 @@
         "expected_lines": 13,
         "matching_lines": 13
       },
-      "duration": 15.59,
+      "duration": 14.91,
       "status": "pass"
     },
     {
@@ -6368,30 +5307,22 @@
         "expected_lines": 1,
         "matching_lines": 1
       },
-      "duration": 15.62,
+      "duration": 14.97,
       "status": "pass"
     },
     {
       "test": "xml_unescaping",
       "num_frames": 1,
-      "lines": {
-        "actual_lines": 23,
-        "expected_lines": 23,
-        "matching_lines": 23
-      },
-      "duration": 15.7,
-      "status": "pass"
+      "status": "compile_fail",
+      "detail": "/tmp/swf_verify_e6f59lhz/script_0.c:71:1: error: duplicate label \u2018label_1102\u2019",
+      "duration": 14.92
     },
     {
       "test": "xmlnode_proto",
       "num_frames": 1,
-      "lines": {
-        "actual_lines": 1,
-        "expected_lines": 1,
-        "matching_lines": 1
-      },
-      "duration": 15.75,
-      "status": "pass"
+      "status": "compile_fail",
+      "detail": "/tmp/swf_verify_ln8ifzyi/script_1.c:107:1: error: duplicate label \u2018label_361\u2019",
+      "duration": 14.83
     }
   ]
 }

@@ -1,9 +1,9 @@
 {
   "metadata": {
-    "old_timestamp": "2026-03-19T01:34:53.079850+00:00",
-    "old_git_sha": "ea87da0d59adb5e5274fb19a1c1607b3e04e2542",
-    "new_timestamp": "2026-03-19T02:28:13.003650+00:00",
-    "new_git_sha": "5002fe1163bd2dea39aa739c2f609982c85898b9",
+    "old_timestamp": "2026-03-19T03:48:19.639473+00:00",
+    "old_git_sha": "182a3864f7fee80629f95bc1a51c29d9c5e57994",
+    "new_timestamp": "2026-03-19T20:52:22.894795+00:00",
+    "new_git_sha": "f246282a73c1651b50ebd24f284e9d6892f90337",
     "partial": false,
     "same_commit": false
   },
@@ -11,19 +11,128 @@
     "old_pass": 8,
     "old_total": 14,
     "old_pass_rate": 57.1,
-    "new_pass": 8,
+    "new_pass": 3,
     "new_total": 14,
-    "new_pass_rate": 57.1,
-    "old_mismatched_lines": 8,
-    "new_mismatched_lines": 8,
-    "increased_mismatches": 0,
-    "decreased_mismatches": 0,
+    "new_pass_rate": 21.4,
+    "old_mismatched_lines": 9,
+    "new_mismatched_lines": 5,
+    "increased_mismatches": 2,
+    "decreased_mismatches": 6,
     "newly_passing": 0,
-    "newly_failing": 0,
-    "status_changed": 0,
-    "unchanged": 14,
+    "newly_failing": 5,
+    "status_changed": 9,
+    "unchanged": 5,
     "added": 0,
     "removed": 0
   },
-  "changes": []
+  "changes": [
+    {
+      "test": "afunc_dict",
+      "change_type": "changed",
+      "old_status": "pass",
+      "new_status": "compile_fail",
+      "old_lines": {
+        "actual_lines": 2,
+        "expected_lines": 2,
+        "matching_lines": 2
+      },
+      "new_lines": null
+    },
+    {
+      "test": "dict_callframe",
+      "change_type": "changed",
+      "old_status": "pass",
+      "new_status": "compile_fail",
+      "old_lines": {
+        "actual_lines": 3,
+        "expected_lines": 3,
+        "matching_lines": 3
+      },
+      "new_lines": null
+    },
+    {
+      "test": "dict_cross",
+      "change_type": "changed",
+      "old_status": "pass",
+      "new_status": "compile_fail",
+      "old_lines": {
+        "actual_lines": 3,
+        "expected_lines": 3,
+        "matching_lines": 3
+      },
+      "new_lines": null
+    },
+    {
+      "test": "dict_event",
+      "change_type": "changed",
+      "old_status": "output_mismatch",
+      "new_status": "compile_fail",
+      "old_lines": {
+        "actual_lines": 5,
+        "expected_lines": 5,
+        "matching_lines": 3
+      },
+      "new_lines": null
+    },
+    {
+      "test": "dict_override",
+      "change_type": "changed",
+      "old_status": "pass",
+      "new_status": "compile_fail",
+      "old_lines": {
+        "actual_lines": 2,
+        "expected_lines": 2,
+        "matching_lines": 2
+      },
+      "new_lines": null
+    },
+    {
+      "test": "func_dict",
+      "change_type": "changed",
+      "old_status": "pass",
+      "new_status": "compile_fail",
+      "old_lines": {
+        "actual_lines": 3,
+        "expected_lines": 3,
+        "matching_lines": 3
+      },
+      "new_lines": null
+    },
+    {
+      "test": "jump_after_end",
+      "change_type": "changed",
+      "old_status": "compile_fail",
+      "new_status": "output_mismatch",
+      "old_lines": null,
+      "new_lines": {
+        "actual_lines": 1,
+        "expected_lines": 3,
+        "matching_lines": 1
+      }
+    },
+    {
+      "test": "tags_after_last_showframe",
+      "change_type": "changed",
+      "old_status": "output_mismatch",
+      "new_status": "compile_fail",
+      "old_lines": {
+        "actual_lines": 15,
+        "expected_lines": 1,
+        "matching_lines": 0
+      },
+      "new_lines": null
+    },
+    {
+      "test": "zeroframe_definesprite",
+      "change_type": "changed",
+      "old_status": "output_mismatch",
+      "new_status": "compile_fail",
+      "old_lines": {
+        "actual_lines": 2,
+        "expected_lines": 3,
+        "matching_lines": 0
+      },
+      "new_lines": null
+    }
+  ]
 }
