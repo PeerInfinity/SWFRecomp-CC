@@ -3018,10 +3018,10 @@ namespace SWFRecomp
 					std::vector<ClipActionEntry> clip_entries;
 
 					size_t clip_scripts_start = next_script_i;
-					size_t clip_action_count = 0;
+					size_t clip_action_iter = 0;
 					while (true)
 					{
-						if (++clip_action_count > 1000)
+						if (++clip_action_iter > 1000)
 						{
 							fprintf(stderr, "Warning: clip action parsing exceeded 1000 entries, skipping rest\n");
 							break;
