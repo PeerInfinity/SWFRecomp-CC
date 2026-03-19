@@ -260,6 +260,12 @@ static uint16_t* u16_concat(SWFAppContext* app_context, const uint16_t* a, u32 a
 {
 	u32 total = a_len + b_len;
 	uint16_t* result = (uint16_t*) heap_alloc(app_context, (total + 1) * sizeof(uint16_t));
+	if (result == NULL) {
+		// OOM: return empty string to avoid segfault
+		static uint16_t empty_u16 = 0;
+		*out_len = 0;
+		return &empty_u16;
+	}
 	if (a_len > 0) memcpy(result, a, a_len * sizeof(uint16_t));
 	if (b_len > 0) memcpy(result + a_len, b, b_len * sizeof(uint16_t));
 	result[total] = 0;
@@ -18060,8 +18066,13 @@ ActionStackValueType convertFloat(SWFAppContext* app_context)
 		{
 			// Try to extract primitive via valueOf
 			ASObject* obj = NULL;
-			if (STACK_TOP_TYPE == ACTION_STACK_VALUE_OBJECT || STACK_TOP_TYPE == ACTION_STACK_VALUE_ARRAY)
+			if (STACK_TOP_TYPE == ACTION_STACK_VALUE_OBJECT)
 				obj = (ASObject*) STACK_TOP_VALUE;
+			else if (STACK_TOP_TYPE == ACTION_STACK_VALUE_ARRAY) {
+				// ASArray has a different struct layout — use props sub-object
+				ASArray* arr = (ASArray*) STACK_TOP_VALUE;
+				obj = arr->props;
+			}
 
 			if (obj != NULL)
 			{
@@ -23738,7 +23749,7 @@ static void ensureGlobalInit(SWFAppContext* app_context)
 	static ASFunction g_registerClass_func_global;
 	memset(g_ctors, 0, sizeof(g_ctors));
 	const char* ctor_names[] = {"Object", "Array", "String", "Number", "Boolean", "Function"};
-	int num_ctors = (g_swf_version >= 6) ? 6 : 5;
+	int num_ctors = 6;  // Always init all 6 (including Function) to prevent singleton poison
 	for (int ci = 0; ci < num_ctors; ci++)
 	{
 		strncpy(g_ctors[ci].name, ctor_names[ci], 255);
@@ -24090,7 +24101,7 @@ static void ensureGlobalInit(SWFAppContext* app_context)
 	REG_FUNC("ASnative", 8, &g_asnative_func);
 	REG_FUNC("ASconstructor", 13, &g_asconstructor_func);
 	REG_FUNC("Object", 6, &g_ctors[0]);
-	if (g_swf_version >= 6) REG_FUNC("Function", 8, &g_ctors[5]);
+	REG_FUNC("Function", 8, &g_ctors[5]);
 	REG_FUNC("enableDebugConsole", 18, &g_enableDebugConsole_func);
 	// NaN and Infinity are NOT registered on global_object — they're handled by
 	// special handlers in actionGetVariable for SWF5+. Registering them on _global
@@ -24198,8 +24209,8 @@ static void ensureGlobalInit(SWFAppContext* app_context)
 	//   __proto__ (→ Function.prototype), constructor (→ Function), prototype (DONT_ENUM)
 	// plus inherited methods from Function.prototype → Object.prototype via chain walking.
 	{
-		// Function constructor reference (g_ctors[5] for SWF6+, NULL for SWF5)
-		ASFunction* fn_ctor = (g_swf_version >= 6) ? &g_ctors[5] : &g_ctors[0];
+		// Function constructor reference (always g_ctors[5] to prevent singleton poison)
+		ASFunction* fn_ctor = &g_ctors[5];
 
 		// Collect ALL constructor functions that should have own_props populated
 		ASFunction* all_ctors[] = {
@@ -24208,7 +24219,7 @@ static void ensureGlobalInit(SWFAppContext* app_context)
 			&g_ctors[2], // String
 			&g_ctors[3], // Number
 			&g_ctors[4], // Boolean
-			(g_swf_version >= 6) ? &g_ctors[5] : NULL, // Function (SWF6+)
+			&g_ctors[5], // Function (always init to prevent singleton poison)
 			&g_movieclip_constructor,
 			&g_textfield_constructor,
 			&g_textformat_constructor,

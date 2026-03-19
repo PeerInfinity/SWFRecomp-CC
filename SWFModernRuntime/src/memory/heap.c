@@ -108,6 +108,7 @@ void* heap_alloc(SWFAppContext* app_context, size_t size)
 	if (ptr == NULL)
 	{
 		fprintf(stderr, "ERROR: heap_alloc(%zu) failed - out of memory\n", size);
+		exit(1);
 	}
 
 	return ptr;

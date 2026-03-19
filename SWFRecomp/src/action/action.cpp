@@ -2186,6 +2186,19 @@ namespace SWFRecomp
 			}
 		}
 
+		// Emit any labels that were never reached during the second pass.
+		// This handles jumps into mid-instruction positions (e.g., into Push data)
+		// or past END_OF_ACTIONS. Flash re-interprets bytes at the target position,
+		// but our compiled code just falls through to the end of the function.
+		for (const char* ptr : labels)
+		{
+			if (emitted_labels.count(const_cast<char*>(ptr)) == 0)
+			{
+				s32 off = (s32)(ptr - action_buffer_start);
+				out_script << "label_" << label_prefix << to_string(off) << ": ; // unreachable label" << endl;
+			}
+		}
+
 		parse_depth--;
 
 		// Only emit string definitions and MAX_STRING_ID at the outermost level
