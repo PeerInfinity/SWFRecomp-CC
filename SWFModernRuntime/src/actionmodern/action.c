@@ -24102,6 +24102,10 @@ static void ensureGlobalInit(SWFAppContext* app_context)
 	REG_FUNC("ASconstructor", 13, &g_asconstructor_func);
 	REG_FUNC("Object", 6, &g_ctors[0]);
 	REG_FUNC("Function", 8, &g_ctors[5]);
+	// Mark Function as SWF6+ (flash_flags 0x0080: hidden in SWF5, visible in SWF6+)
+	// Always registered to prevent singleton poison, but invisible to SWF5 lookups.
+	if (global_object->num_used > 0)
+		global_object->properties[global_object->num_used - 1].flash_flags = 0x0080;
 	REG_FUNC("enableDebugConsole", 18, &g_enableDebugConsole_func);
 	// NaN and Infinity are NOT registered on global_object — they're handled by
 	// special handlers in actionGetVariable for SWF5+. Registering them on _global

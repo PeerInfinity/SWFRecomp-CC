@@ -1,9 +1,9 @@
 {
   "metadata": {
-    "old_timestamp": "2026-03-19T02:28:13.001255+00:00",
-    "old_git_sha": "5002fe1163bd2dea39aa739c2f609982c85898b9",
-    "new_timestamp": "2026-03-19T03:48:19.634759+00:00",
-    "new_git_sha": "182a3864f7fee80629f95bc1a51c29d9c5e57994",
+    "old_timestamp": "2026-03-19T03:48:19.634759+00:00",
+    "old_git_sha": "182a3864f7fee80629f95bc1a51c29d9c5e57994",
+    "new_timestamp": "2026-03-19T20:52:22.892431+00:00",
+    "new_git_sha": "f246282a73c1651b50ebd24f284e9d6892f90337",
     "partial": false,
     "same_commit": false
   },
@@ -11,19 +11,68 @@
     "old_pass": 15,
     "old_total": 47,
     "old_pass_rate": 31.9,
-    "new_pass": 15,
+    "new_pass": 13,
     "new_total": 47,
-    "new_pass_rate": 31.9,
+    "new_pass_rate": 27.7,
     "old_mismatched_lines": 225,
-    "new_mismatched_lines": 225,
+    "new_mismatched_lines": 201,
     "increased_mismatches": 0,
-    "decreased_mismatches": 0,
+    "decreased_mismatches": 24,
     "newly_passing": 0,
-    "newly_failing": 0,
-    "status_changed": 0,
-    "unchanged": 47,
+    "newly_failing": 2,
+    "status_changed": 4,
+    "unchanged": 43,
     "added": 0,
     "removed": 0
   },
-  "changes": []
+  "changes": [
+    {
+      "test": "flash_net_classes",
+      "change_type": "changed",
+      "old_status": "output_mismatch",
+      "new_status": "compile_fail",
+      "old_lines": {
+        "actual_lines": 0,
+        "expected_lines": 22,
+        "matching_lines": 0
+      },
+      "new_lines": null
+    },
+    {
+      "test": "flash_text_TextField",
+      "change_type": "changed",
+      "old_status": "pass",
+      "new_status": "compile_fail",
+      "old_lines": {
+        "actual_lines": 0,
+        "expected_lines": 0,
+        "matching_lines": 0
+      },
+      "new_lines": null
+    },
+    {
+      "test": "movieinfo1",
+      "change_type": "changed",
+      "old_status": "pass",
+      "new_status": "compile_fail",
+      "old_lines": {
+        "actual_lines": 3,
+        "expected_lines": 3,
+        "matching_lines": 3
+      },
+      "new_lines": null
+    },
+    {
+      "test": "targetPath1",
+      "change_type": "changed",
+      "old_status": "output_mismatch",
+      "new_status": "compile_fail",
+      "old_lines": {
+        "actual_lines": 8,
+        "expected_lines": 8,
+        "matching_lines": 6
+      },
+      "new_lines": null
+    }
+  ]
 }

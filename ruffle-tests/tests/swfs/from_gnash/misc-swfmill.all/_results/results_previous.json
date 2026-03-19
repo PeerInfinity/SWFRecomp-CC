@@ -1,8 +1,8 @@
 {
   "metadata": {
-    "timestamp": "2026-03-19T02:28:13.003650+00:00",
-    "git_sha": "5002fe1163bd2dea39aa739c2f609982c85898b9",
-    "duration_seconds": 218.53,
+    "timestamp": "2026-03-19T03:48:19.639473+00:00",
+    "git_sha": "182a3864f7fee80629f95bc1a51c29d9c5e57994",
+    "duration_seconds": 219.08,
     "total_available": 14,
     "shards": 30
   },
@@ -23,7 +23,7 @@
         "expected_lines": 2,
         "matching_lines": 2
       },
-      "duration": 15.78,
+      "duration": 15.52,
       "status": "pass"
     },
     {
@@ -34,7 +34,7 @@
         "expected_lines": 0,
         "matching_lines": 0
       },
-      "duration": 15.45,
+      "duration": 15.46,
       "status": "pass"
     },
     {
@@ -45,7 +45,7 @@
         "expected_lines": 3,
         "matching_lines": 3
       },
-      "duration": 15.57,
+      "duration": 15.51,
       "status": "pass"
     },
     {
@@ -56,7 +56,7 @@
         "expected_lines": 3,
         "matching_lines": 3
       },
-      "duration": 15.78,
+      "duration": 15.6,
       "status": "pass"
     },
     {
@@ -67,7 +67,7 @@
         "expected_lines": 5,
         "matching_lines": 3
       },
-      "duration": 15.76,
+      "duration": 15.3,
       "status": "output_mismatch",
       "detail": "2 line(s) differ (actual=5, expected=5)",
       "actual_output": "A\nB\nAB\nXFAILED: expected 'ABB' on clip event.. \nEND OF TEST",
@@ -81,7 +81,7 @@
         "expected_lines": 2,
         "matching_lines": 2
       },
-      "duration": 15.16,
+      "duration": 16.12,
       "status": "pass"
     },
     {
@@ -92,7 +92,7 @@
         "expected_lines": 3,
         "matching_lines": 3
       },
-      "duration": 14.85,
+      "duration": 15.57,
       "status": "pass"
     },
     {
@@ -103,7 +103,7 @@
         "expected_lines": 2,
         "matching_lines": 0
       },
-      "duration": 15.57,
+      "duration": 15.34,
       "status": "output_mismatch",
       "detail": "2 line(s) differ (actual=0, expected=2)",
       "actual_output": "",
@@ -113,8 +113,8 @@
       "test": "jump_after_end",
       "num_frames": 30,
       "status": "compile_fail",
-      "detail": "/tmp/swf_verify_9ohmzn35/script_0.c:22:9: error: label \u2018label_121\u2019 used but not defined",
-      "duration": 15.75
+      "detail": "/tmp/swf_verify_z2bax3yy/script_0.c:22:9: error: label \u2018label_121\u2019 used but not defined",
+      "duration": 15.51
     },
     {
       "test": "jump_to_prev_block",
@@ -124,7 +124,7 @@
         "expected_lines": 1,
         "matching_lines": 0
       },
-      "duration": 16.24,
+      "duration": 15.37,
       "status": "output_mismatch",
       "detail": "1 line(s) differ (actual=1, expected=1)",
       "actual_output": "AB",
@@ -138,7 +138,7 @@
         "expected_lines": 0,
         "matching_lines": 0
       },
-      "duration": 14.39,
+      "duration": 15.69,
       "status": "pass"
     },
     {
@@ -149,7 +149,7 @@
         "expected_lines": 1,
         "matching_lines": 1
       },
-      "duration": 15.55,
+      "duration": 15.38,
       "status": "pass"
     },
     {
@@ -160,7 +160,7 @@
         "expected_lines": 1,
         "matching_lines": 0
       },
-      "duration": 15.91,
+      "duration": 16.21,
       "status": "output_mismatch",
       "detail": "15 line(s) differ (actual=15, expected=1)",
       "actual_output": "i1-a1-a2-a3-1\ni1-a1-a2-a3-1a1-a2-a3-1\ni1-a1-a2-a3-1a1-a2-a3-1a1-a2-a3-1\ni1-a1-a2-a3-1a1-a2-a3-1a1-a2-a3-1a1-a2-a3-1\ni1-a1-a2-a3-1a1-a2-a3-1a1-a2-a3-1a1-a2-a3-1a1-a2-a3-1\ni1-a1-a2-a3-1a1-a2-a3-1a1-a2-a3-1a1-a2-a3-1a1-a2-a3-1a1-a2-a3-1\ni1-a1-a2-a3-1a1-a2-a3-1a1-a2-a3-1a1-a2-a3-1a1-a2-a3-1a1-a2-a3-1a1-a2-a3-1\ni1-a1-a2-a3-1a1-a2-a3-1a1-a2-a3-1a1-a2-a3-1a1-a2-a3-1a1-a2-a3-1a1-a2-a3-1a1-a2-a3-1\ni1-a1-a2-a3-1a1-a2-a3-1a1-a2-a3-1a1-a2-a3-1a1-a2-a3-1a1-a2-a3-1a1-a2-a3-1a1-a2-a3-1a1-a2-a3-1\ni1-a1-a2-a3-1a1-a2-a3-1a1-a2-a3-1a1-a2-a3-1a1-a2-a3-1a1-a2-a3-1a1-a2-a3-1a1-a2-a3-1a1-a2-a3-1a1-a2-a3-1\ni1-a1-a2-a3-1a1-a2-a3-1a1-a2-a3-1a1-a2-a3-1a1-a2-a3-1a1-a2-a3-1a1-a2-a3-1a1-a2-a3-1a1-a2-a3-1a1-a2-a3-1a1-a2-a3-1\ni1-a1-a2-a3-1a1-a2-a3-1a1-a2-a3-1a1-a2-a3-1a1-a2-a3-1a1-a2-a3-1a1-a2-a3-1a1-a2-a3-1a1-a2-a3-1a1-a2-a3-1a1-a2-a3-1a1-a2-a3-1\ni1-a1-a2-a3-1a1-a2-a3-1a1-a2-a3-1a1-a2-a3-1a1-a2-a3-1a1-a2-a3-1a1-a2-a3-1a1-a2-a3-1a1-a2-a3-1a1-a2-a3-1a1-a2-a3-1a1-a2-a3-1a1-a2-a3-1\ni1-a1-a2-a3-1a1-a2-a3-1a1-a2-a3-1a1-a2-a3-1a1-a2-a3-1a1-a2-a3-1a1-a2-a3-1a1-a2-a3-1a1-a2-a3-1a1-a2-a3-1a1-a2-a3-1a1-a2-a3-1a1-a2-a3-1a1-a2-a3-1\ni1-a1-a2-a3-1a1-a2-a3-1a1-a2-a3-1a1-a2-a3-1a1-a2-a3-1a1-a2-a3-1a1-a2-a3-1a1-a2-a3-1a1-a2-a3-1a1-a2-a3-1a1-a2-a3-1a1-a2-a3-1a1-a2-a3-1a1-a2-a3-1a1-a2-a3-1",
@@ -170,14 +170,14 @@
       "test": "zeroframe_definesprite",
       "num_frames": 30,
       "lines": {
-        "actual_lines": 3,
+        "actual_lines": 2,
         "expected_lines": 3,
-        "matching_lines": 1
+        "matching_lines": 0
       },
-      "duration": 15.96,
+      "duration": 15.72,
       "status": "output_mismatch",
-      "detail": "2 line(s) differ (actual=3, expected=3)",
-      "actual_output": "d111\nFAILED: expected a00b11c22d000        \nEND OF TEST",
+      "detail": "3 line(s) differ (actual=2, expected=3)",
+      "actual_output": "FAILED: expected a00b11c22d000        \nEND OF TEST",
       "expected_output": "a00b11c22d000\nPASSED: got a00b11c22d000      \nEND OF TEST"
     }
   ]

@@ -1,10 +1,10 @@
 # Ruffle Test Results (Filtered)
 
-**Date**: 2026-03-19 03:48 UTC
+**Date**: 2026-03-19 20:52 UTC
 
-**Git SHA**: `182a3864f7`
+**Git SHA**: `f246282a73`
 
-**Run Duration**: 3m 39s
+**Run Duration**: 5m 28s
 
 **Filtered**: 0 tests ignored out of 14 available
 
@@ -13,43 +13,36 @@
 | Metric | Value |
 |--------|-------|
 | Total tests | 14 |
-| Passing | **8** (57.1%) |
-| Failing | 6 |
-| Total expected lines | 26 |
-| Matching lines | 17 (65.4%) |
-| Mismatched lines | 9 |
+| Passing | **3** (21.4%) |
+| Failing | 11 |
+| Total expected lines | 7 |
+| Matching lines | 2 (28.6%) |
+| Mismatched lines | 5 |
 
 ### Failure Breakdown
 
 | Category | Count | % of Failures |
 |----------|-------|---------------|
-| Output Mismatch | 5 | 83.3% |
-| Compile Fail | 1 | 16.7% |
+| Compile Fail | 8 | 72.7% |
+| Output Mismatch | 3 | 27.3% |
 
 ## Passing Tests
 
-**8 tests passing**
+**3 tests passing**
 
 | # | Test | Lines | Duration | Notes |
 |---|------|-------|----------|-------|
-| 1 | `afunc_dict` | 2 | 15.5s |  |
-| 2 | `background` | 0 | 15.5s |  |
-| 3 | `dict_callframe` | 3 | 15.5s |  |
-| 4 | `dict_cross` | 3 | 15.6s |  |
-| 5 | `dict_override` | 2 | 16.1s |  |
-| 6 | `func_dict` | 3 | 15.6s |  |
-| 7 | `missing_bitmap` | 0 | 15.7s |  |
-| 8 | `mixed-bytecode-as2` | 1 | 15.4s |  |
+| 1 | `background` | 0 | 15.5s |  |
+| 2 | `missing_bitmap` | 0 | 15.3s |  |
+| 3 | `mixed-bytecode-as2` | 1 | 16.3s |  |
 
 ## Near-Passing Tests
 
 Tests with output mismatch but >= 50% line match rate (low-hanging fruit).
 
-**1 tests** within reach
+**0 tests** within reach
 
-| # | Test | Match Rate | Matching | Total | Diff Lines | Notes |
-|---|------|------------|----------|-------|------------|-------|
-| 1 | `dict_event` | 60.0% | 3 | 5 | 2 |  |
+No tests above 50% match threshold.
 
 ## Segfaults
 
@@ -65,12 +58,10 @@ No timeouts.
 
 ## All Output Mismatches
 
-**5 tests** with output mismatch, sorted by match rate (best first)
+**3 tests** with output mismatch, sorted by match rate (best first)
 
 | # | Test | Match Rate | Matching/Total | Actual | Expected | Notes |
 |---|------|------------|----------------|--------|----------|-------|
-| 1 | `dict_event` | 60.0% | 3/5 | 5 | 5 |  |
+| 1 | `jump_after_end` | 33.3% | 1/3 | 1 | 3 |  |
 | 2 | `initaction_in_definesprite` | 0.0% | 0/2 | 0 | 2 |  |
 | 3 | `jump_to_prev_block` | 0.0% | 0/1 | 1 | 1 |  |
-| 4 | `tags_after_last_showframe` | 0.0% | 0/15 | 15 | 1 |  |
-| 5 | `zeroframe_definesprite` | 0.0% | 0/3 | 2 | 3 |  |
