@@ -25588,6 +25588,13 @@ check_special_vars:
 					(Function2Ptr)actionObjectRegisterClass, app_context,
 					g_object_constructor.own_props);
 
+				// Set Object.prototype.constructor = Object (Flash default)
+				{
+					ActionVar _cv = {0}; _cv.type = ACTION_STACK_VALUE_FUNCTION;
+					_cv.data.numeric_value = (u64)&g_object_constructor;
+					setProperty(app_context, g_object_constructor.prototype_obj, "constructor", 11, &_cv);
+				}
+
 				g_object_constructor_init = 1;
 			}
 			PUSH(ACTION_STACK_VALUE_FUNCTION, (u64)&g_object_constructor);
