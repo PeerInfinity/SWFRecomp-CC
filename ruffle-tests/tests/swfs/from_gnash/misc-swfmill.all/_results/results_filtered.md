@@ -1,8 +1,8 @@
 # Ruffle Test Results (Filtered)
 
-**Date**: 2026-03-19 02:28 UTC
+**Date**: 2026-03-19 03:48 UTC
 
-**Git SHA**: `5002fe1163`
+**Git SHA**: `182a3864f7`
 
 **Run Duration**: 3m 39s
 
@@ -16,8 +16,8 @@
 | Passing | **8** (57.1%) |
 | Failing | 6 |
 | Total expected lines | 26 |
-| Matching lines | 18 (69.2%) |
-| Mismatched lines | 8 |
+| Matching lines | 17 (65.4%) |
+| Mismatched lines | 9 |
 
 ### Failure Breakdown
 
@@ -32,14 +32,14 @@
 
 | # | Test | Lines | Duration | Notes |
 |---|------|-------|----------|-------|
-| 1 | `afunc_dict` | 2 | 15.8s |  |
-| 2 | `background` | 0 | 15.4s |  |
-| 3 | `dict_callframe` | 3 | 15.6s |  |
-| 4 | `dict_cross` | 3 | 15.8s |  |
-| 5 | `dict_override` | 2 | 15.2s |  |
-| 6 | `func_dict` | 3 | 14.8s |  |
-| 7 | `missing_bitmap` | 0 | 14.4s |  |
-| 8 | `mixed-bytecode-as2` | 1 | 15.6s |  |
+| 1 | `afunc_dict` | 2 | 15.5s |  |
+| 2 | `background` | 0 | 15.5s |  |
+| 3 | `dict_callframe` | 3 | 15.5s |  |
+| 4 | `dict_cross` | 3 | 15.6s |  |
+| 5 | `dict_override` | 2 | 16.1s |  |
+| 6 | `func_dict` | 3 | 15.6s |  |
+| 7 | `missing_bitmap` | 0 | 15.7s |  |
+| 8 | `mixed-bytecode-as2` | 1 | 15.4s |  |
 
 ## Near-Passing Tests
 
@@ -70,7 +70,7 @@ No timeouts.
 | # | Test | Match Rate | Matching/Total | Actual | Expected | Notes |
 |---|------|------------|----------------|--------|----------|-------|
 | 1 | `dict_event` | 60.0% | 3/5 | 5 | 5 |  |
-| 2 | `zeroframe_definesprite` | 33.3% | 1/3 | 3 | 3 |  |
-| 3 | `initaction_in_definesprite` | 0.0% | 0/2 | 0 | 2 |  |
-| 4 | `jump_to_prev_block` | 0.0% | 0/1 | 1 | 1 |  |
-| 5 | `tags_after_last_showframe` | 0.0% | 0/15 | 15 | 1 |  |
+| 2 | `initaction_in_definesprite` | 0.0% | 0/2 | 0 | 2 |  |
+| 3 | `jump_to_prev_block` | 0.0% | 0/1 | 1 | 1 |  |
+| 4 | `tags_after_last_showframe` | 0.0% | 0/15 | 15 | 1 |  |
+| 5 | `zeroframe_definesprite` | 0.0% | 0/3 | 2 | 3 |  |
