@@ -335,6 +335,7 @@ namespace SWFRecomp
 				if (action_buffer == ptr && emitted_labels.count(const_cast<char*>(ptr)) == 0)
 				{
 					out_script << "label_" << label_prefix << to_string((s32) (ptr - action_buffer_start)) << ":" << endl;
+					emitted_labels.insert(const_cast<char*>(ptr));
 					in_dead_code = false;  // Label reached: code is reachable again
 				}
 			}
