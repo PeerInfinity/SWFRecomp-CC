@@ -4820,6 +4820,24 @@ static ASObject* getObjectPrototype(SWFAppContext* app_context)
 		// Mark all built-in Object.prototype properties as non-enumerable (DontEnum)
 		for (u32 i = 0; i < g_object_prototype->num_used; i++)
 			g_object_prototype->properties[i].flags &= ~PROPERTY_FLAG_ENUMERABLE;
+
+		// Mark SWF6+ methods with flash_flags for version-based hiding.
+		// flash_flags 0x0080: hidden in SWF5 (mask 0x7480), visible in SWF6+ (mask 0x7500).
+		// This ensures the methods exist (preventing singleton poison) but are invisible in SWF5.
+		static const char* swf6_methods[] = {
+			"hasOwnProperty", "isPropertyEnumerable", "isPrototypeOf",
+			"watch", "unwatch", "addProperty"
+		};
+		for (int m = 0; m < 6; m++) {
+			u32 mlen = (u32)strlen(swf6_methods[m]);
+			for (u32 i = 0; i < g_object_prototype->num_used; i++) {
+				if (g_object_prototype->properties[i].name_length == mlen &&
+				    memcmp(g_object_prototype->properties[i].name, swf6_methods[m], mlen) == 0) {
+					g_object_prototype->properties[i].flash_flags = 0x0080;
+					break;
+				}
+			}
+		}
 	}
 	return g_object_prototype;
 }
