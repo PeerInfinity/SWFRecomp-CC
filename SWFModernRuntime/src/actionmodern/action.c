@@ -40918,8 +40918,11 @@ static int callArrayMethod(SWFAppContext* app_context,
 					u32 _qleft = _ql + 1;
 					u32 _qright = _qh;
 
+						u32 _qs_inner = 0;
 					for (;;)
 					{
+						// Guard against non-converging comparators (bogus/inconsistent user functions)
+						if (++_qs_inner > n * 4 + 100) break;
 						// Left scan: advance while compare(pivot, elem) > 0
 						while (_qleft < _qright)
 						{
