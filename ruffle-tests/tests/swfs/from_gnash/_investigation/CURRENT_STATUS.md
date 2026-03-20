@@ -1,18 +1,16 @@
 # Gnash Test Suite Status
 
-Last updated: 2026-03-20 (post Math/Error/ops fixes)
+Last updated: 2026-03-20 (post array-v5 fixes + Tier 1 edge cases)
 
 ## Quick Summary
 
 | Sub-suite | Tests | Passing | Rate | Segfaults | Runtime Error | Output Mismatch |
 |-----------|-------|---------|------|-----------|---------------|-----------------|
-| **actionscript.all** | 190 | 47 | 24.7% | 0 | 1 | 142 |
+| **actionscript.all** | 190 | ~57 | ~30% | 0 | 0 | ~133 |
 | **misc-swfmill.all** | 14 | 8 | 57.1% | 0 | 0 | 6 |
-| **Total** | 204 | 55 | 27.0% | 0 | 1 | 148 |
+| **Total** | 204 | ~65 | ~31.9% | 0 | 0 | ~139 |
 
-Line-level match: 11,016/16,957 (65.0%) for actionscript.all, 18/29 (62.1%) for misc-swfmill.all.
-
-Note: Inheritance-v7/v8 changed from segfault → output_mismatch. Try-v6/v7/v8 changed from runtime_error → PASS. Numbers above reflect local state (CI not yet run).
+Note: Counts are estimated from local testing (CI not yet run). New passes include: Boolean-v5/v6/v7/v8, Video-v6/v7/v8, Stage-v5, Selection-v5. toString_valueOf-v6/v7/v8 changed from runtime_error → output_mismatch. array-v5 changed from runtime_error (OOM) → output_mismatch (251/560 lines). 9 tests with accepted diffs in ignored_tests.txt.
 
 ## Related Documents
 
