@@ -1,16 +1,30 @@
 # Gnash Test Suite Status
 
-Last updated: 2026-03-18 (detailed investigation)
+Last updated: 2026-03-19 (post Inheritance segfault + Try/finally fixes)
 
 ## Quick Summary
 
-| Sub-suite | Tests | Passing | Rate | Segfaults | Compile Fail | Output Mismatch |
-|-----------|-------|---------|------|-----------|--------------|-----------------|
-| **actionscript.all** | 190 | 38 | 20.0% | 13 | 31 | 108 |
-| **misc-swfmill.all** | 14 | 4 | 28.6% | 0 | 4 | 6 |
-| **Total** | 204 | 42 | 20.6% | 13 | 35 | 114 |
+| Sub-suite | Tests | Passing | Rate | Segfaults | Runtime Error | Output Mismatch |
+|-----------|-------|---------|------|-----------|---------------|-----------------|
+| **actionscript.all** | 190 | 47 | 24.7% | 0 | 1 | 142 |
+| **misc-swfmill.all** | 14 | 8 | 57.1% | 0 | 0 | 6 |
+| **Total** | 204 | 55 | 27.0% | 0 | 1 | 148 |
 
-Line-level match: 5696/9439 (60.3%) for actionscript.all, 7/17 (41.2%) for misc-swfmill.all.
+Line-level match: 11,016/16,957 (65.0%) for actionscript.all, 18/29 (62.1%) for misc-swfmill.all.
+
+Note: Inheritance-v7/v8 changed from segfault → output_mismatch. Try-v6/v7/v8 changed from runtime_error → PASS. Numbers above reflect local state (CI not yet run).
+
+## Related Documents
+
+| Document | Purpose |
+|----------|---------|
+| `FAILING_TESTS_BY_FEATURE.md` | All failures categorized by root cause / feature area |
+| `REMAINING_FAILURES_ANALYSIS.md` | Detailed tiered analysis with estimated fix effort |
+| `INHERITANCE_SEGFAULT_PLAN.md` | Inheritance-v7/v8 segfault investigation (FIXED) |
+| `TRY_FINALLY_PLAN.md` | Try-v6/v7/v8 OOM crash investigation (FIXED) |
+| `ARRAY_V5_PLAN.md` | array-v5 OOM crash investigation (root causes identified) |
+| `MISC_SWFMILL_PLAN.md` | All 6 misc-swfmill failures (root causes identified) |
+| `BLOCKER_SUMMARY.md` | Active and resolved blockers preventing progress |
 
 ## Test Structure
 
@@ -40,13 +54,17 @@ All Gnash tests include `Dejagnu.swf` as a child movie with 24 transforms (`Deja
 
 **Impact**: case-v5/v6/v7/v8 (4 tests) and HitTest-v6/v7/v8 (3 tests) would likely become output_mismatch or pass with just this fix.
 
-### Bug 2: Try/Catch OOM via Runaway String Concatenation (Try-v5/v6/v7/v8)
+### Bug 2: Try/Catch OOM via Infinite Loop (Try-v6/v7/v8) — FIXED
 
-Nested try/catch/finally blocks cause result strings to grow to 72KB+ through repeated `actionAdd2` concatenation. `heap_alloc` fails and returns NULL, then `memcpy` writes to NULL in `u16_concat`.
+**Root cause**: Two bugs in exception handling:
 
-**Root cause**: Recompiler generates `goto` jumps across try/finally boundaries that cause finally blocks to execute repeatedly.
+1. **Runtime infinite loop**: `actionThrow` and `actionTryEnd` did not clear `has_jmp_buf` on exception handler frames before longjmp. For try-finally (no catch), where `actionCatchEnter` is never called, the handler's `has_jmp_buf` stayed set. When `actionTryEnd` in a nested try-catch inside the finally re-propagated a pending exception, it longjmp'd back to the same already-handled frame, creating an infinite loop that exhausted the heap.
 
-**Fixes needed**: (1) `u16_concat` should handle NULL allocation gracefully, (2) investigate recompiler try/finally control flow for nested cases.
+2. **Recompiler: return inside finally skipped cleanup**: `actionReturn` inside a finally block emitted a direct C `return` without calling `actionTryEnd` or clearing the pending exception, leaving stale exception state after function return.
+
+**Fix**: (1) Clear `has_jmp_buf` before longjmp in both `actionThrow` and `actionTryEnd`. (2) Recompiler emits `actionClearException` + `actionTryEnd` before return inside finally blocks.
+
+Note: Try-v5 does not exist (only v6/v7/v8).
 
 ### Bug 3: NULL Property Name — ASArray/ASObject Cast (toString_valueOf-v5/v6)
 
@@ -154,7 +172,7 @@ During `actionAdd2` on two ARRAY values, `convertFloat` calls `getPropertyWithPr
 8. **`Object.prototype.constructor` setup** — Inheritance tests.
 9. **Stage/Selection non-constructable** — `typeof(new Stage())` should be "undefined".
 10. **Color.getTransform() on invalid target** — should return undefined, not object.
-11. **Try/finally control flow** — Try-v5/v6/v7/v8 runtime errors.
+11. ~~**Try/finally control flow** — Try-v6/v7/v8 runtime errors.~~ **FIXED**
 
 ### Phase 3: Individual test fixes
 12. TextFieldHTML htmlText getter

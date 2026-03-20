@@ -817,11 +817,29 @@ namespace SWFRecomp
 								   << "\t\t" << "goto label_" << label_prefix << to_string((s32)(ret_finally_ptr - action_buffer_start)) << ";" << endl
 								   << "\t" << "}" << endl;
 					} else {
+						// Count active try boundaries that need cleanup before returning
+						// (e.g., return inside a finally block that would skip actionTryEnd)
+						int try_cleanup_count = 0;
+						for (int i = (int)try_boundaries.size() - 1; i >= 0; i--) {
+							if (try_boundaries[i].state == 2) {
+								// Inside a finally block — need to clean up this try level
+								try_cleanup_count++;
+							}
+						}
+
 						out_script << "\t" << "// Return" << endl
 								   << "\t" << "{" << endl
 								   << "\t\t" << "ActionVar ret_val;" << endl
-								   << "\t\t" << "popVar(app_context, &ret_val);" << endl
-								   << "\t\t" << "return ret_val;" << endl
+								   << "\t\t" << "popVar(app_context, &ret_val);" << endl;
+						if (try_cleanup_count > 0) {
+							// Return inside finally suppresses any pending exception
+							// and must clean up try state before returning
+							out_script << "\t\t" << "actionClearException(app_context);" << endl;
+							for (int j = 0; j < try_cleanup_count; j++) {
+								out_script << "\t\t" << "actionTryEnd(app_context);" << endl;
+							}
+						}
+						out_script << "\t\t" << "return ret_val;" << endl
 								   << "\t" << "}" << endl;
 					}
 

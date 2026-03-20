@@ -1,6 +1,6 @@
 # Shumway Test Suite Status
 
-Last updated: 2026-03-18 (detailed investigation)
+Last updated: 2026-03-19
 
 ## Quick Summary
 
@@ -15,6 +15,13 @@ Last updated: 2026-03-18 (detailed investigation)
 No crashes or compile failures. All failures are output mismatches.
 
 **Key finding**: 30 of the 32 failing tests are AVM2/AS3, which our AVM1 recompiler cannot execute. After ignoring them, only 2 AVM1 tests fail, giving an effective pass rate of 88.2%.
+
+## Related Documents
+
+| Document | Purpose |
+|----------|---------|
+| `FAILING_TESTS_BY_FEATURE.md` | All 32 failures categorized (30 AVM2 + 2 AVM1) with root cause analysis |
+| `REMAINING_FAILURES_ANALYSIS.md` | Detailed analysis of the 2 fixable AVM1 tests + AVM2 ignore list |
 
 ## Passing Tests (15)
 

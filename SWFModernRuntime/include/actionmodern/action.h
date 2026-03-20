@@ -324,6 +324,7 @@ void actionCatchToVariable(SWFAppContext* app_context, const char* var_name);
 void actionCatchToRegister(SWFAppContext* app_context, u8 reg_num);
 void actionCatchGetException(SWFAppContext* app_context, ActionVar* out);
 void actionTryEnd(SWFAppContext* app_context);
+void actionClearException(SWFAppContext* app_context);
 bool actionExceptionPending(SWFAppContext* app_context);
 void actionSetReturnPending(SWFAppContext* app_context, ActionVar* value);
 bool actionReturnPending(SWFAppContext* app_context);

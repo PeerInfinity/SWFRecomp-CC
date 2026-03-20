@@ -25105,6 +25105,20 @@ void actionGetVariable(SWFAppContext* app_context)
 		}
 	}
 
+	// Check "super" early: always use the super context stack when available.
+	// The super stack is pushed by SUPER dispatch handlers (super.method(), super())
+	// and contains the correct depth for nested super calls. Scope chain lookup
+	// would find a stale "super" from the caller's local scope with wrong depth,
+	// causing infinite recursion in multi-level super.method() chains (A→B→C).
+	if (var_name_len == 5 && strncmp(var_name, "super", 5) == 0 && hasSuperContext()) {
+		ActionVar super_var = {0};
+		super_var.type = ACTION_STACK_VALUE_SUPER;
+		super_var.data.numeric_value = (u64)getSuperThis();
+		super_var.str_size = (u32)getSuperDepth();
+		pushVar(app_context, &super_var);
+		return;
+	}
+
 	// First check scope chain (innermost to outermost)
 	for (int i = scope_depth - 1; i >= 0; i--)
 	{
@@ -37023,6 +37037,9 @@ void actionThrow(SWFAppContext* app_context)
 	// Search handler stack top-down for an active handler
 	for (int i = g_exception_state.depth - 1; i >= 0; i--) {
 		if (g_exception_state.frames[i].has_jmp_buf) {
+			// Clear handler so it won't be re-entered (important for try-finally
+			// where actionCatchEnter is never called to clear it)
+			g_exception_state.frames[i].has_jmp_buf = 0;
 			// Set depth to this frame's level (skip intermediate frames)
 			g_exception_state.depth = i + 1;
 			longjmp(g_exception_state.frames[i].handler, 1);
@@ -37124,12 +37141,21 @@ void actionTryEnd(SWFAppContext* app_context)
 		// Exception still pending after finally — re-propagate to parent handler
 		for (int i = g_exception_state.depth - 1; i >= 0; i--) {
 			if (g_exception_state.frames[i].has_jmp_buf) {
+				// Clear handler so it won't be re-entered (important for try-finally
+				// where actionCatchEnter is never called to clear it)
+				g_exception_state.frames[i].has_jmp_buf = 0;
 				longjmp(g_exception_state.frames[i].handler, 1);
 			}
 		}
 		// No parent handler — uncaught
 		uncaughtException(&g_exception_state.exception_value);
 	}
+}
+
+void actionClearException(SWFAppContext* app_context)
+{
+	// Clear pending exception — used by return inside finally to suppress the exception
+	g_exception_state.exception_thrown = false;
 }
 
 bool actionExceptionPending(SWFAppContext* app_context)
@@ -42243,6 +42269,27 @@ void actionCallMethod(SWFAppContext* app_context, char* str_buffer)
 				u8 new_depth = super_depth + found_depth + 1;
 				pushSuperContext(super_this, new_depth);
 
+				// Push a local scope with the updated "super" value so that nested
+				// super.method() calls inside this function find the correct depth.
+				// Without this, a stale "super" from the caller's scope chain
+				// would be found first, causing infinite recursion in super chains
+				// (e.g., A→B→C where B.whoami calls super.whoami and C.whoami
+				// calls super.whoami — B's super must resolve at depth+1, not
+				// the same depth as C's super).
+				ASObject* super_local_scope = allocObject(app_context, 4);
+				{
+					ActionVar super_var = {0};
+					super_var.type = ACTION_STACK_VALUE_SUPER;
+					super_var.data.numeric_value = (u64)super_this;
+					super_var.str_size = (u32)new_depth;
+					setProperty(app_context, super_local_scope, "super", 5, &super_var);
+				}
+				if (scope_depth < MAX_SCOPE_DEPTH) {
+					scope_is_with[scope_depth] = 0;
+					scope_mc[scope_depth] = NULL;
+					scope_chain[scope_depth++] = super_local_scope;
+				}
+
 				ActionVar result = {0};
 				result.type = ACTION_STACK_VALUE_UNDEFINED;
 
@@ -42269,6 +42316,8 @@ void actionCallMethod(SWFAppContext* app_context, char* str_buffer)
 					g_this_depth = _saved_this_depth2;
 				}
 
+				if (scope_depth > 0) scope_depth--;
+				releaseObject(app_context, super_local_scope);
 				popSuperContext();
 				if (args != NULL) FREE(args);
 				pushVar(app_context, &result);
