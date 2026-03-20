@@ -154,15 +154,18 @@ static uint32_t utf8_decode_one(const char* s, int byte_len, int* pos)
 	return cp;
 }
 
-// Convert UTF-8 to heap-allocated UTF-16. Returns uint16_t* (from heap_alloc).
+// Convert UTF-8 to malloc-allocated UTF-16. Returns uint16_t*.
+// Uses malloc (not heap_alloc) so that leaked strings don't exhaust the fixed heap arena.
 static uint16_t* utf8_to_u16(SWFAppContext* app_context, const char* utf8, u32 byte_len, u32* out_u16_len)
 {
+	(void)app_context;
 	if (byte_len == 0 || utf8 == NULL) {
 		*out_u16_len = 0;
 		return (uint16_t*) u16_empty;
 	}
 	int count = utf8_utf16_length(utf8, (int)byte_len);
-	uint16_t* result = (uint16_t*) heap_alloc(app_context, (count + 1) * sizeof(uint16_t));
+	uint16_t* result = (uint16_t*) malloc((count + 1) * sizeof(uint16_t));
+	if (result == NULL) { *out_u16_len = 0; return (uint16_t*) u16_empty; }
 	int u = 0, i = 0;
 	while (i < (int)byte_len) {
 		uint32_t cp = utf8_decode_one(utf8, (int)byte_len, &i);
@@ -237,9 +240,12 @@ static int u16_cmp(const uint16_t* a, u32 a_len, const uint16_t* b, u32 b_len)
 }
 
 // Fast ASCII-to-UTF-16 conversion (for number strings which are always ASCII)
+// Uses malloc (not heap_alloc) so leaked strings don't exhaust the fixed heap arena.
 static uint16_t* ascii_to_u16(SWFAppContext* app_context, const char* ascii, int len, u32* out_len)
 {
-	uint16_t* result = (uint16_t*) heap_alloc(app_context, (len + 1) * sizeof(uint16_t));
+	(void)app_context;
+	uint16_t* result = (uint16_t*) malloc((len + 1) * sizeof(uint16_t));
+	if (result == NULL) { *out_len = 0; return (uint16_t*) u16_empty; }
 	for (int i = 0; i < len; i++)
 		result[i] = (uint16_t)(unsigned char)ascii[i];
 	result[len] = 0;
@@ -255,12 +261,13 @@ static const uint16_t* varGetU16Ptr(ActionVar* v)
 		v->data.string_data.heap_ptr : (const uint16_t*) v->data.numeric_value;
 }
 
-// Concatenate two UTF-16 strings into a new heap-allocated buffer
+// Concatenate two UTF-16 strings into a new malloc-allocated buffer
 static uint16_t* u16_concat(SWFAppContext* app_context, const uint16_t* a, u32 a_len,
                              const uint16_t* b, u32 b_len, u32* out_len)
 {
+	(void)app_context;
 	u32 total = a_len + b_len;
-	uint16_t* result = (uint16_t*) heap_alloc(app_context, (total + 1) * sizeof(uint16_t));
+	uint16_t* result = (uint16_t*) malloc((total + 1) * sizeof(uint16_t));
 	if (result == NULL) {
 		// OOM: return empty string to avoid segfault
 		static uint16_t empty_u16 = 0;
@@ -998,7 +1005,7 @@ static void textSnapshotCapture(SWFAppContext* app_context, ASObject* ts_obj, Mo
 	ActionVar tv = {0};
 	tv.type = ACTION_STACK_VALUE_STRING;
 	tv.str_size = (u32)text_len;
-	tv.data.string_data.heap_ptr = (uint16_t*)heap_alloc(app_context, (text_len + 1) * sizeof(uint16_t));
+	tv.data.string_data.heap_ptr = (uint16_t*)malloc( (text_len + 1) * sizeof(uint16_t));
 	memcpy(tv.data.string_data.heap_ptr, text_buf, text_len * sizeof(uint16_t));
 	tv.data.string_data.heap_ptr[text_len] = 0;
 	tv.data.string_data.owns_memory = true;
@@ -1014,7 +1021,7 @@ static void textSnapshotCapture(SWFAppContext* app_context, ASObject* ts_obj, Mo
 	ActionVar nv = {0};
 	nv.type = ACTION_STACK_VALUE_STRING;
 	nv.str_size = (u32)text_len;
-	nv.data.string_data.heap_ptr = (uint16_t*)heap_alloc(app_context, (text_len + 1) * sizeof(uint16_t));
+	nv.data.string_data.heap_ptr = (uint16_t*)malloc( (text_len + 1) * sizeof(uint16_t));
 	memcpy(nv.data.string_data.heap_ptr, nl_buf, text_len * sizeof(uint16_t));
 	nv.data.string_data.heap_ptr[text_len] = 0;
 	nv.data.string_data.owns_memory = true;
@@ -1088,7 +1095,7 @@ static ActionVar builtin_ts_getText(SWFAppContext* app_context, ActionVar* args,
 
 	ret.type = ACTION_STACK_VALUE_STRING;
 	ret.str_size = (u32)rlen;
-	ret.data.string_data.heap_ptr = (uint16_t*)heap_alloc(app_context, (rlen + 1) * sizeof(uint16_t));
+	ret.data.string_data.heap_ptr = (uint16_t*)malloc( (rlen + 1) * sizeof(uint16_t));
 	memcpy(ret.data.string_data.heap_ptr, result, rlen * sizeof(uint16_t));
 	ret.data.string_data.heap_ptr[rlen] = 0;
 	ret.data.string_data.owns_memory = true;
@@ -2004,7 +2011,7 @@ static ActionVar builtin_string_fromCharCode(SWFAppContext* app_context, ActionV
 		return ret;
 
 	// Each arg produces one UTF-16 code unit
-	uint16_t* buf = (uint16_t*) heap_alloc(app_context, (arg_count + 1) * sizeof(uint16_t));
+	uint16_t* buf = (uint16_t*) malloc( (arg_count + 1) * sizeof(uint16_t));
 	u32 pos = 0;
 
 	for (u32 i = 0; i < arg_count; i++)
@@ -19688,7 +19695,7 @@ void actionStringExtract(SWFAppContext* app_context, char* str_buffer)
 	}
 	if (index + count > src_len) count = src_len - index;
 
-	uint16_t* result = (uint16_t*)heap_alloc(app_context, count * sizeof(uint16_t));
+	uint16_t* result = (uint16_t*)malloc( count * sizeof(uint16_t));
 	memcpy(result, src + index, count * sizeof(uint16_t));
 	PUSH_U16(result, (u32)count);
 }
@@ -19751,7 +19758,7 @@ void actionMbStringExtract(SWFAppContext* app_context, char* str_buffer)
 	if (index + count > src_len) count = src_len - index;
 
 	// Direct UTF-16 sub-array copy
-	uint16_t* result = (uint16_t*)heap_alloc(app_context, count * sizeof(uint16_t));
+	uint16_t* result = (uint16_t*)malloc( count * sizeof(uint16_t));
 	memcpy(result, src + index, count * sizeof(uint16_t));
 	PUSH_U16(result, (u32)count);
 }
@@ -27436,7 +27443,7 @@ void actionAsciiToChar(SWFAppContext* app_context, char* str_buffer)
 	// Surrogates → U+FFFD
 	if (code >= 0xD800 && code <= 0xDFFF) code = 0xFFFD;
 
-	uint16_t* result = (uint16_t*)heap_alloc(app_context, sizeof(uint16_t));
+	uint16_t* result = (uint16_t*)malloc( sizeof(uint16_t));
 	result[0] = code;
 	PUSH_U16(result, 1);
 }
@@ -27499,7 +27506,7 @@ void actionMbAsciiToChar(SWFAppContext* app_context, char* str_buffer)
 	// Surrogates → U+FFFD
 	if (code >= 0xD800 && code <= 0xDFFF) code = 0xFFFD;
 
-	uint16_t* result = (uint16_t*)heap_alloc(app_context, sizeof(uint16_t));
+	uint16_t* result = (uint16_t*)malloc( sizeof(uint16_t));
 	result[0] = code;
 	PUSH_U16(result, 1);
 }
@@ -45498,7 +45505,7 @@ void actionCallMethod(SWFAppContext* app_context, char* str_buffer)
 			u32 prefix_len = (u32)sel_begin;
 			u32 suffix_len = old_u16_len - (u32)sel_end;
 			u32 result_len = prefix_len + new_u16_len + suffix_len;
-			uint16_t* result_u16 = (uint16_t*) heap_alloc(app_context, (result_len + 1) * sizeof(uint16_t));
+			uint16_t* result_u16 = (uint16_t*) malloc( (result_len + 1) * sizeof(uint16_t));
 			if (prefix_len > 0 && old_u16 != NULL)
 				memcpy(result_u16, old_u16, prefix_len * sizeof(uint16_t));
 			if (new_u16_len > 0 && new_u16 != NULL)
@@ -49828,7 +49835,7 @@ void actionTextControlBackspace(SWFAppContext* app_context)
 	u32 prefix_len = (u32)del_start;
 	u32 suffix_len = old_len - (u32)del_end;
 	u32 result_len = prefix_len + suffix_len;
-	uint16_t* result_u16 = (uint16_t*) heap_alloc(app_context, (result_len + 1) * sizeof(uint16_t));
+	uint16_t* result_u16 = (uint16_t*) malloc( (result_len + 1) * sizeof(uint16_t));
 	if (prefix_len > 0 && old_u16 != NULL)
 		memcpy(result_u16, old_u16, prefix_len * sizeof(uint16_t));
 	if (suffix_len > 0 && old_u16 != NULL)
