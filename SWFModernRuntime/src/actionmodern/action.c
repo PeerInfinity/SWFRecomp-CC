@@ -25105,20 +25105,6 @@ void actionGetVariable(SWFAppContext* app_context)
 		}
 	}
 
-	// Check "super" early: always use the super context stack when available.
-	// The super stack is pushed by SUPER dispatch handlers (super.method(), super())
-	// and contains the correct depth for nested super calls. Scope chain lookup
-	// would find a stale "super" from the caller's local scope with wrong depth,
-	// causing infinite recursion in multi-level super.method() chains (A→B→C).
-	if (var_name_len == 5 && strncmp(var_name, "super", 5) == 0 && hasSuperContext()) {
-		ActionVar super_var = {0};
-		super_var.type = ACTION_STACK_VALUE_SUPER;
-		super_var.data.numeric_value = (u64)getSuperThis();
-		super_var.str_size = (u32)getSuperDepth();
-		pushVar(app_context, &super_var);
-		return;
-	}
-
 	// First check scope chain (innermost to outermost)
 	for (int i = scope_depth - 1; i >= 0; i--)
 	{
@@ -42269,25 +42255,28 @@ void actionCallMethod(SWFAppContext* app_context, char* str_buffer)
 				u8 new_depth = super_depth + found_depth + 1;
 				pushSuperContext(super_this, new_depth);
 
-				// Push a local scope with the updated "super" value so that nested
-				// super.method() calls inside this function find the correct depth.
-				// Without this, a stale "super" from the caller's scope chain
-				// would be found first, causing infinite recursion in super chains
-				// (e.g., A→B→C where B.whoami calls super.whoami and C.whoami
-				// calls super.whoami — B's super must resolve at depth+1, not
-				// the same depth as C's super).
-				ASObject* super_local_scope = allocObject(app_context, 4);
-				{
-					ActionVar super_var = {0};
-					super_var.type = ACTION_STACK_VALUE_SUPER;
-					super_var.data.numeric_value = (u64)super_this;
-					super_var.str_size = (u32)new_depth;
-					setProperty(app_context, super_local_scope, "super", 5, &super_var);
-				}
-				if (scope_depth < MAX_SCOPE_DEPTH) {
-					scope_is_with[scope_depth] = 0;
-					scope_mc[scope_depth] = NULL;
-					scope_chain[scope_depth++] = super_local_scope;
+				// Update the existing "super" variable on the scope chain in-place
+				// so that GetVariable("super") inside the dispatched function finds
+				// the correct depth. This avoids adding new scope entries that would
+				// leak into nested calls (which broke as2_super_and_this tests).
+				// The SUPER handler calls functions directly (not through
+				// actionCallFunction's local scope setup), so we must ensure the
+				// scope chain reflects the new depth.
+				ActionVar saved_super = {0};
+				int super_scope_idx = -1;
+				ASProperty* super_prop = NULL;
+				for (int si = scope_depth - 1; si >= 0; si--) {
+					if (scope_chain[si] != NULL) {
+						super_prop = findPropertyRaw(scope_chain[si], "super", 5);
+						if (super_prop != NULL) {
+							saved_super = super_prop->value;
+							super_prop->value.type = ACTION_STACK_VALUE_SUPER;
+							super_prop->value.data.numeric_value = (u64)super_this;
+							super_prop->value.str_size = (u32)new_depth;
+							super_scope_idx = si;
+							break;
+						}
+					}
 				}
 
 				ActionVar result = {0};
@@ -42316,8 +42305,10 @@ void actionCallMethod(SWFAppContext* app_context, char* str_buffer)
 					g_this_depth = _saved_this_depth2;
 				}
 
-				if (scope_depth > 0) scope_depth--;
-				releaseObject(app_context, super_local_scope);
+				// Restore original super value on scope chain
+				if (super_scope_idx >= 0 && super_prop != NULL) {
+					super_prop->value = saved_super;
+				}
 				popSuperContext();
 				if (args != NULL) FREE(args);
 				pushVar(app_context, &result);
