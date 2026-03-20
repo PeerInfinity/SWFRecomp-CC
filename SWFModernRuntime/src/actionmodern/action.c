@@ -40935,6 +40935,10 @@ static int callArrayMethod(SWFAppContext* app_context,
 								if (comparator->function_type == 2)
 									_qres = comparator->advanced_func(app_context, _qargs, 2, NULL, NULL);
 								else {
+									// Set this=undefined for sort comparator (Flash behavior)
+									ActionVar _undef_this = {0};
+									_undef_this.type = ACTION_STACK_VALUE_UNDEFINED;
+									setVariableByName("this", &_undef_this);
 									pushVar(app_context, &_qargs[1]);
 									pushVar(app_context, &_qargs[0]);
 									_qres = ((ActionVar(*)(SWFAppContext*))comparator->simple_func)(app_context);
@@ -40964,6 +40968,9 @@ static int callArrayMethod(SWFAppContext* app_context,
 								if (comparator->function_type == 2)
 									_qres = comparator->advanced_func(app_context, _qargs, 2, NULL, NULL);
 								else {
+									ActionVar _undef_this = {0};
+									_undef_this.type = ACTION_STACK_VALUE_UNDEFINED;
+									setVariableByName("this", &_undef_this);
 									pushVar(app_context, &_qargs[1]);
 									pushVar(app_context, &_qargs[0]);
 									_qres = ((ActionVar(*)(SWFAppContext*))comparator->simple_func)(app_context);
