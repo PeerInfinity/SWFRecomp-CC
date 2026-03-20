@@ -23909,10 +23909,13 @@ static void ensureGlobalInit(SWFAppContext* app_context)
 	installNativeToString(app_context, g_stage_obj);
 
 	// Install AsBroadcaster methods on Mouse, Key, Stage, Selection
+	// In SWF5, addListener/removeListener/broadcastMessage are not available on Stage
 	installAsBroadcaster(app_context, g_mouse_obj);
 	installAsBroadcaster(app_context, g_key_obj);
 	installKeyMethods(app_context, g_key_obj);
-	installAsBroadcaster(app_context, g_stage_obj);
+	if (g_swf_version >= 6) {
+		installAsBroadcaster(app_context, g_stage_obj);
+	}
 	// Stage default properties (READ_ONLY)
 	{
 		ActionVar sv;
@@ -34841,9 +34844,13 @@ void actionNewObject(SWFAppContext* app_context)
 		PUSH(ACTION_STACK_VALUE_OBJECT, (u64)obj);
 		return;
 	}
-	else if (strcmp(ctor_name, "Math") == 0)
+	else if (strcmp(ctor_name, "Math") == 0 ||
+	         strcmp(ctor_name, "Stage") == 0 ||
+	         strcmp(ctor_name, "Selection") == 0 ||
+	         strcmp(ctor_name, "Key") == 0 ||
+	         strcmp(ctor_name, "Mouse") == 0)
 	{
-		// Math is a static object, not a constructor — new Math() returns undefined
+		// Static singleton objects — not constructable, new X() returns undefined
 		PUSH(ACTION_STACK_VALUE_UNDEFINED, 0);
 		return;
 	}

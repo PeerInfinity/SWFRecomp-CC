@@ -1,0 +1,18 @@
+# Gnash tests with only accepted permanent diffs.
+# Our output is more correct than Gnash's expected output.
+# See from_gnash/_investigation/ACCEPTED_DIFFS.md for details.
+
+# --- Math: Gnash pow/SQRT precision bugs (IEEE 754, ECMA-262) ---
+Math-v5
+Math-v6
+Math-v7
+Math-v8
+
+# --- ops: Platform-dependent NaN bit patterns (IEEE 754) ---
+ops-v8
+
+# --- Error: Gnash auto-boxing bug (ECMA-262 §15.11.1) ---
+Error-v5
+Error-v6
+Error-v7
+Error-v8

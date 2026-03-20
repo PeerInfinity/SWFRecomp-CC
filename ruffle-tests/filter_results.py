@@ -70,12 +70,20 @@ def main():
     else:
         output_path = input_path.parent / "results_filtered.json"
 
-    ignore_path = Path(__file__).parent / "ignored_tests.txt"
+    # Load global ignore list (ruffle-tests/ignored_tests.txt)
+    global_ignore_path = Path(__file__).parent / "ignored_tests.txt"
+
+    # Also load per-suite ignore list if it exists.
+    # Results live at e.g. .../from_gnash/actionscript.all/_results/results.json
+    # Suite ignore list lives at .../from_gnash/actionscript.all/ignored_tests.txt
+    # (i.e., the parent of the _results/ directory)
+    suite_ignore_path = input_path.parent.parent / "ignored_tests.txt"
 
     with open(input_path) as f:
         results = json.load(f)
 
-    ignored = load_ignored_tests(ignore_path)
+    ignored = load_ignored_tests(global_ignore_path)
+    ignored |= load_ignored_tests(suite_ignore_path)
 
     filtered = filter_results(results, ignored)
 
