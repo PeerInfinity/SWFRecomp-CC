@@ -41287,19 +41287,13 @@ static ActionVar builtin_array_method(SWFAppContext* app_context, ActionVar* arg
 	}
 	if (method_name == NULL || method_name_len == 0) return undef;
 
-	// this_obj should be an ASArray (type ARRAY) — but it comes as void*
-	// We need to figure out if it's an array. The caller passes it as the raw pointer.
-	// For ARRAY type, this_obj IS the ASArray*. For OBJECT type, return undef.
-	ASArray* arr = (ASArray*) this_obj;
-
-	// Call the existing dispatcher
-	int handled = callArrayMethod(app_context, arr, method_name, method_name_len, args, arg_count);
-	if (handled) {
-		// callArrayMethod pushes the result onto the stack; pop and return it
-		ActionVar result;
-		popVar(app_context, &result);
-		return result;
-	}
+	// Array.prototype methods called via the prototype wrapper are only used for
+	// typeof detection. Actual array method dispatch for ASArray objects goes through
+	// callArrayMethod in actionCallMethod's ARRAY branch (which takes priority).
+	// This wrapper is only reached when calling Array.prototype.method.call(obj) on
+	// a non-array object, or via direct prototype access. Since we can't safely
+	// distinguish ASArray* from ASObject* here (different struct layouts), return
+	// undefined to prevent use-after-free / corruption from invalid casts.
 	return undef;
 }
 

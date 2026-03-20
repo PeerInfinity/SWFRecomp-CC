@@ -248,9 +248,11 @@ void setVariableWithValue(ActionVar* var, char* stack, u32 sp)
 				memcpy(heap_copy, src, u16_len * sizeof(uint16_t));
 		}
 
-		// Now free the old value
-		if (var->type == ACTION_STACK_VALUE_STRING && var->data.string_data.owns_memory)
-			free(var->data.string_data.heap_ptr);
+		// Note: old string value is intentionally NOT freed here.
+		// Without reference counting, the old pointer may still be referenced by
+		// array elements, object properties, or other variables. Freeing causes
+		// use-after-free when e.g. sort() accesses array elements whose strings
+		// were also stored in a variable that was later reassigned.
 
 		var->type = ACTION_STACK_VALUE_STRING;
 		var->string_id = VAL(u32, &stack[sp + 12]);
@@ -279,9 +281,7 @@ void setVariableWithValue(ActionVar* var, char* stack, u32 sp)
 	}
 	else
 	{
-		// Free old string if variable owns memory
-		if (var->type == ACTION_STACK_VALUE_STRING && var->data.string_data.owns_memory)
-			free(var->data.string_data.heap_ptr);
+		// Note: old string value intentionally not freed (see above comment)
 
 		// Numeric types - store directly
 		var->type = type;
