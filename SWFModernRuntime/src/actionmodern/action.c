@@ -26485,7 +26485,7 @@ void actionSetVariable(SWFAppContext* app_context)
 					if (scope_depth > 0) scope_depth--;
 					releaseObject(app_context, _wscope);
 					if (_wregs != NULL) FREE(_wregs);
-					FREE(_pname_u16);
+					free(_pname_u16);  // allocated via ascii_to_u16 which uses malloc
 					// If watcher returned non-undefined, use it; else use the intended new value
 					ActionVar _actual_new = (_wret.type != ACTION_STACK_VALUE_UNDEFINED) ? _wret : _new_val;
 					*var = _actual_new;
@@ -30428,7 +30428,7 @@ void actionSetMember(SWFAppContext* app_context)
 								releaseObject(app_context, _wscope);
 								if (_wregs != NULL) FREE(_wregs);
 								if (_pname_arg.data.string_data.owns_memory)
-									FREE(_pname_arg.data.string_data.heap_ptr);
+									free(_pname_arg.data.string_data.heap_ptr);  // malloc-allocated string
 								if (_wret.type != ACTION_STACK_VALUE_UNDEFINED)
 									value_var = _wret;
 							}
@@ -31811,7 +31811,7 @@ void actionSetMember(SWFAppContext* app_context)
 								releaseObject(app_context, _wscope);
 								if (_wregs != NULL) FREE(_wregs);
 								if (_pname_arg.data.string_data.owns_memory)
-									FREE(_pname_arg.data.string_data.heap_ptr);
+									free(_pname_arg.data.string_data.heap_ptr);  // malloc-allocated string
 								if (_wret.type != ACTION_STACK_VALUE_UNDEFINED)
 									value_var = _wret;
 							}
@@ -31851,7 +31851,7 @@ void actionSetMember(SWFAppContext* app_context)
 								if (scope_depth > 0) scope_depth--;
 								releaseObject(app_context, _wscope);
 								if (_pname_arg.data.string_data.owns_memory)
-									FREE(_pname_arg.data.string_data.heap_ptr);
+									free(_pname_arg.data.string_data.heap_ptr);  // malloc-allocated string
 								if (_wret.type != ACTION_STACK_VALUE_UNDEFINED)
 									value_var = _wret;
 							}
