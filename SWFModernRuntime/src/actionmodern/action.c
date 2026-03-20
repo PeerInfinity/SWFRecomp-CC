@@ -3613,8 +3613,10 @@ static void init_asnative_2(void)
 	g_asnative_2_init = 1;
 }
 
+static ASObject* getObjectPrototype(SWFAppContext* app_context); // forward decl for ASnative class 101
+
 // ASnative(class_id, method_index) — returns a native method by numeric address.
-// Handles class 2 (ASNew), class 100 (global functions), class 200 (Math).
+// Handles class 2 (ASNew), class 101 (Object.prototype), class 100 (global functions), class 200 (Math).
 static ActionVar builtin_asnative(SWFAppContext* app_context, ActionVar* args, u32 arg_count, ActionVar* registers, void* this_obj)
 {
 	(void)registers; (void)this_obj;
@@ -3640,6 +3642,34 @@ static ActionVar builtin_asnative(SWFAppContext* app_context, ActionVar* args, u
 			result.type = ACTION_STACK_VALUE_FUNCTION;
 			VAL(u64, &result.data.numeric_value) = (u64)&g_asnative_2_asnew;
 			return result;
+		}
+		return undef;
+	}
+
+	// Class 101: Object.prototype methods
+	// Flash ASnative(101, N): 0=watch, 1=unwatch, 2=addProperty, 3=valueOf,
+	// 4=toString, 5=hasOwnProperty, 6=isPropertyEnumerable, 7=isPrototypeOf
+	if (class_id == 101) {
+		// Ensure Object.prototype is initialized (which initializes the functions)
+		getObjectPrototype(app_context);
+		ASFunction* obj_methods[] = {
+			&g_object_watch_func,                // 0
+			&g_object_unwatch_func,              // 1
+			&g_object_addProperty_func,          // 2
+			&g_object_valueOf_func,              // 3
+			&g_object_toString_func,             // 4
+			&g_object_hasOwnProperty_func,       // 5
+			&g_object_isPropertyEnumerable_func, // 6
+			&g_object_isPrototypeOf_func,        // 7
+		};
+		if (method_index <= 7) {
+			ASFunction* fn = obj_methods[method_index];
+			if (fn->advanced_func != NULL || fn->simple_func != NULL) {
+				ActionVar result = {0};
+				result.type = ACTION_STACK_VALUE_FUNCTION;
+				VAL(u64, &result.data.numeric_value) = (u64)fn;
+				return result;
+			}
 		}
 		return undef;
 	}
@@ -7581,9 +7611,18 @@ static void initColorPrototype(SWFAppContext* app_context)
 {
 	if (g_color_init_done) return;
 	g_color_init_done = 1;
-	g_color_prototype = allocObject(app_context, 4);
-	retainObject(g_color_prototype);
-	setObjectProto(app_context, g_color_prototype);
+	// Use the stub constructor's prototype_obj if already initialized (from initColorStubPrototype).
+	// This ensures Color.prototype and new Color().__proto__ are the same object,
+	// which is required for instanceof and hasOwnProperty to work correctly.
+	extern ASFunction g_stub_ctors[];
+	if (g_stub_ctors[3].prototype_obj != NULL) {
+		g_color_prototype = g_stub_ctors[3].prototype_obj;
+	} else {
+		g_color_prototype = allocObject(app_context, 8);
+		retainObject(g_color_prototype);
+		setObjectProto(app_context, g_color_prototype);
+	}
+	// Install real method implementations (overwrite stubs if present)
 	registerGeomMethod(&g_color_methods[0], "getTransform", (Function2Ptr)colorGetTransform, app_context, g_color_prototype);
 	registerGeomMethod(&g_color_methods[1], "setTransform", (Function2Ptr)colorSetTransform, app_context, g_color_prototype);
 	registerGeomMethod(&g_color_methods[2], "getRGB",       (Function2Ptr)colorGetRGB,       app_context, g_color_prototype);

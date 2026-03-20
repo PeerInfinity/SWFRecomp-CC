@@ -141,19 +141,22 @@ During `actionAdd2` on two ARRAY values, `convertFloat` calls `getPropertyWithPr
 
 ## Recommended Work Order
 
-### Phase 1: Highest ROI fixes (est. +40-50 tests)
-1. **s16 label overflow** — change `(s16)` to `(s32)` at 8 sites in action.cpp. Fixes 28 compile failures.
-2. **Object.prototype SWF5 guard** — remove `if (g_swf_version >= 6)` in `getObjectPrototype()`. Fixes hasOwnProperty across 20+ tests.
-3. **Transform buffer overflow** — set `g_active_transform_data` in `exec_sprite_frame`. Fixes 7+ segfaults.
+### Phase 1: DONE — All compile failures, segfaults, and Object.prototype fixes applied
+1. ~~**s16 label overflow**~~ — DONE (all 28 compile failures fixed)
+2. ~~**Object.prototype SWF5 guard**~~ — DONE (hasOwnProperty always installed)
+3. ~~**Transform buffer overflow**~~ — DONE (all 13 segfaults fixed)
+4. ~~**WITH block label namespacing**~~ — DONE (4 compile failures fixed)
+5. **ASnative class 101 (Object.prototype methods)** — DONE (2026-03-19). Gnash tests install hasOwnProperty/toString/valueOf/etc. on class prototypes via ASnative(101, N). Without this, ASnative returned undefined which shadowed the prototype chain.
+6. **Color prototype unification** — DONE (2026-03-19). `new Color().__proto__` and `Color.prototype` now point to the same object, fixing `instanceof Color`.
 
-### Phase 2: Medium fixes (est. +10-15 tests)
-4. **WITH block label namespacing** — 4 compile failures.
-5. **ASArray/ASObject cast in convertFloat** — 2 segfaults.
-6. **`typeof(_global.Boolean)` type bug** — Boolean/NetStream/Video v6+ tests.
-7. **`Object.prototype.constructor` setup** — Inheritance tests.
+### Phase 2: Next fixes (est. +10-15 tests)
+7. **ASArray/ASObject cast in convertFloat** — 2 runtime errors (toString_valueOf tests).
+8. **`Object.prototype.constructor` setup** — Inheritance tests.
+9. **Stage/Selection non-constructable** — `typeof(new Stage())` should be "undefined".
+10. **Color.getTransform() on invalid target** — should return undefined, not object.
+11. **Try/finally control flow** — Try-v5/v6/v7/v8 runtime errors.
 
 ### Phase 3: Individual test fixes
-8. Stage/Selection non-constructable
-9. TextFieldHTML htmlText getter
-10. Cross-frame ConstantPool persistence
-11. Try/finally control flow in recompiler
+12. TextFieldHTML htmlText getter
+13. Cross-frame ConstantPool persistence
+14. More ASnative classes (103=Date, 106=Number, 252=String, etc.)
