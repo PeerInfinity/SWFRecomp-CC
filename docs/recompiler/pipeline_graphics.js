@@ -181,20 +181,10 @@ async function loadGraphicsHost() {
 async function runGraphicsGuest(guestWasmBytes) {
     const host = await loadGraphicsHost();
 
-    // Grow host memory so the guest's data segments (at --global-base=192MB)
-    // can be initialized during instantiation. The host's 128MB heap allocation
-    // happens later during swfStart.
-    const currentPages = host.wasmMemory.buffer.byteLength / 65536;
-    const neededPages = Math.ceil(210 * 1024 * 1024 / 65536);  // 210 MB
-    if (currentPages < neededPages) {
-        const growBy = neededPages - currentPages;
-        console.log(`[GRAPHICS] Growing memory from ${currentPages} to ${neededPages} pages (${(neededPages * 65536 / 1024 / 1024).toFixed(0)} MB)`);
-        try {
-            host.wasmMemory.grow(growBy);
-        } catch (e) {
-            throw new Error(`Failed to grow memory to ${(neededPages * 65536 / 1024 / 1024).toFixed(0)} MB. Your browser may not have enough memory for graphics mode. Try trace mode instead. (${e.message})`);
-        }
-    }
+    // Host is built with INITIAL_MEMORY=200MB, large enough for guest data
+    // segments at --global-base=192MB. No memory growth needed before instantiation.
+    const memMB = host.wasmMemory.buffer.byteLength / 1024 / 1024;
+    console.log(`[GRAPHICS] Host memory: ${memMB} MB`);
 
     // Build a guest→host function pointer translation map.
     // Will be populated after guest instantiation, used by wrappers.

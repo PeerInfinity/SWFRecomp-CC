@@ -25,6 +25,18 @@ extern RenderContext* context;
 extern int catch_up_mode;
 extern int g_tag_skip_mode;
 
+// Per-movie transform data mapping (indexed by movie_id, 0 = main SWF).
+// Set during actionImportAssets/actionFirePendingLoadInits so that sprites from
+// child movies can reference the correct transform array during frame execution.
+// Needed in all build modes (NO_GRAPHICS, HEADLESS, and graphics).
+#define MAX_MOVIE_TRANSFORM_ENTRIES 16
+static float (*g_movie_transform_data[MAX_MOVIE_TRANSFORM_ENTRIES])[16] = {0};
+
+void ng_registerMovieTransformData(u8 movie_id, float (*td)[16]) {
+	if (movie_id < MAX_MOVIE_TRANSFORM_ENTRIES)
+		g_movie_transform_data[movie_id] = td;
+}
+
 #if defined(NO_GRAPHICS) || defined(HEADLESS_GRAPHICS)
 // NO_GRAPHICS / HEADLESS: extern data arrays from generated code
 extern float transform_data[][16];
@@ -34,17 +46,6 @@ extern float cxform_data[];
 // Swapped to child SWF's array during child movie init so that tagPlaceObject2
 // caches correct transform values on display objects (needed for getBounds on loaded movies).
 float (*g_active_transform_data)[16] = NULL;
-
-// Per-movie transform data mapping (indexed by movie_id, 0 = main SWF).
-// Set during actionImportAssets/actionFirePendingLoadInits so that sprites from
-// child movies can reference the correct transform array during frame execution.
-#define MAX_MOVIE_TRANSFORM_ENTRIES 16
-static float (*g_movie_transform_data[MAX_MOVIE_TRANSFORM_ENTRIES])[16] = {0};
-
-void ng_registerMovieTransformData(u8 movie_id, float (*td)[16]) {
-	if (movie_id < MAX_MOVIE_TRANSFORM_ENTRIES)
-		g_movie_transform_data[movie_id] = td;
-}
 
 static inline void ng_cache_transform(DisplayObject* obj, u32 tid) {
 	float (*td)[16] = g_active_transform_data ? g_active_transform_data : transform_data;
