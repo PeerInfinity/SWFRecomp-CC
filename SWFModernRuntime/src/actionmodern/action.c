@@ -44,6 +44,7 @@ static inline int32_t varToInt32(ActionVar* v);
 static int callArrayMethod(SWFAppContext* app_context, ASArray* arr,
                            const char* method_name, u32 method_name_len,
                            ActionVar* args, u32 num_args);
+static void initArrayPrototypeMethods(SWFAppContext* app_context);
 
 u32 start_time;
 
@@ -709,6 +710,8 @@ static ASObject* g_object_prototype = NULL;
 
 // Global Array.prototype — shared by all arrays for instanceof and arguments.__proto__
 static ASObject* g_array_prototype = NULL;
+static int g_array_proto_methods_init = 0;  // Whether Array.prototype methods have been registered
+static ASFunction g_array_proto_funcs[13];  // push,pop,shift,unshift,reverse,join,toString,concat,slice,splice,sort,sortOn,hasOwnProperty
 
 // Currently executing user-defined function — used to set arguments.caller
 static ASFunction* g_current_executing_func = NULL;
@@ -4953,10 +4956,11 @@ static void setupArgumentsProps(SWFAppContext* app_context, ASArray* arr,
 	// Lazily create Array.prototype (shared singleton)
 	if (g_array_prototype == NULL)
 	{
-		g_array_prototype = allocObject(app_context, 4);
+		g_array_prototype = allocObject(app_context, 16);
 		retainObject(g_array_prototype);
 		setObjectProto(app_context, g_array_prototype);
 	}
+	initArrayPrototypeMethods(app_context);
 
 	// Allocate props object on the array for non-index properties
 	if (arr->props == NULL)
@@ -24764,10 +24768,11 @@ static ASObject* getVersionedArrayProto(SWFAppContext* app_context)
 	if (proto != NULL) return proto;
 	// Fallback: use the primary g_array_prototype
 	if (g_array_prototype == NULL) {
-		g_array_prototype = allocObject(app_context, 4);
+		g_array_prototype = allocObject(app_context, 16);
 		retainObject(g_array_prototype);
 		setObjectProto(app_context, g_array_prototype);
 	}
+	initArrayPrototypeMethods(app_context);
 	return g_array_prototype;
 }
 
@@ -25613,10 +25618,11 @@ check_special_vars:
 				// Initialize Array.prototype (shared singleton used by instanceof and arguments.__proto__)
 				if (g_array_prototype == NULL)
 				{
-					g_array_prototype = allocObject(app_context, 4);
+					g_array_prototype = allocObject(app_context, 16);
 					retainObject(g_array_prototype);
 					setObjectProto(app_context, g_array_prototype);
 				}
+				initArrayPrototypeMethods(app_context);
 				g_array_constructor.prototype_obj = g_array_prototype;
 				// Register Array sort-flag constants on own_props
 				g_array_constructor.own_props = allocObject(app_context, 8);
@@ -41246,6 +41252,76 @@ static int callArrayMethod(SWFAppContext* app_context,
 }
 
 // =====================================================================
+// Array.prototype method wrapper (Function2Ptr)
+// Dispatches to callArrayMethod using the function's name as the method name.
+// =====================================================================
+static ActionVar builtin_array_method(SWFAppContext* app_context, ActionVar* args, u32 arg_count, ActionVar* registers, void* this_obj)
+{
+	(void)registers;
+	ActionVar undef = {0};
+	undef.type = ACTION_STACK_VALUE_UNDEFINED;
+
+	if (this_obj == NULL) return undef;
+
+	// Determine which method we are by looking at function name in registers
+	// The function's name is stored in the ASFunction struct
+	// We'll find it from g_array_proto_funcs by matching this_obj... actually,
+	// we need the method name. We can get it from the ASFunction that called us.
+	// The caller sets g_current_executing_func before calling us.
+	extern ASFunction* g_current_executing_func;
+	const char* method_name = NULL;
+	u32 method_name_len = 0;
+	if (g_current_executing_func != NULL) {
+		method_name = g_current_executing_func->name;
+		method_name_len = (u32)strlen(method_name);
+	}
+	if (method_name == NULL || method_name_len == 0) return undef;
+
+	// this_obj should be an ASArray (type ARRAY) — but it comes as void*
+	// We need to figure out if it's an array. The caller passes it as the raw pointer.
+	// For ARRAY type, this_obj IS the ASArray*. For OBJECT type, return undef.
+	ASArray* arr = (ASArray*) this_obj;
+
+	// Call the existing dispatcher
+	int handled = callArrayMethod(app_context, arr, method_name, method_name_len, args, arg_count);
+	if (handled) {
+		// callArrayMethod pushes the result onto the stack; pop and return it
+		ActionVar result;
+		popVar(app_context, &result);
+		return result;
+	}
+	return undef;
+}
+
+static void initArrayPrototypeMethods(SWFAppContext* app_context)
+{
+	if (g_array_proto_methods_init) return;
+	if (g_array_prototype == NULL) return;
+
+	struct { const char* name; u32 name_len; } methods[] = {
+		{"push", 4}, {"pop", 3}, {"shift", 5}, {"unshift", 7},
+		{"reverse", 7}, {"join", 4}, {"toString", 8}, {"concat", 6},
+		{"slice", 5}, {"splice", 6}, {"sort", 4}, {"sortOn", 6},
+		{"hasOwnProperty", 14},
+	};
+
+	for (int i = 0; i < 13; i++) {
+		memset(&g_array_proto_funcs[i], 0, sizeof(ASFunction));
+		strncpy(g_array_proto_funcs[i].name, methods[i].name, 255);
+		g_array_proto_funcs[i].function_type = 2;
+		g_array_proto_funcs[i].param_count = 0;
+		g_array_proto_funcs[i].advanced_func = (Function2Ptr)builtin_array_method;
+
+		ActionVar fv = {0};
+		fv.type = ACTION_STACK_VALUE_FUNCTION;
+		VAL(u64, &fv.data.numeric_value) = (u64)&g_array_proto_funcs[i];
+		setPropertyWithFlags(app_context, g_array_prototype, methods[i].name, methods[i].name_len, &fv, PROPERTY_FLAGS_DONTENUM);
+	}
+
+	g_array_proto_methods_init = 1;
+}
+
+// =====================================================================
 // String method helpers
 // =====================================================================
 
@@ -43142,7 +43218,18 @@ void actionCallMethod(SWFAppContext* app_context, char* str_buffer)
 			return;
 		}
 
-		// Check arr->props (and prototype chain) for user-defined method BEFORE built-in dispatch
+		// Try built-in array methods FIRST (push, pop, sort, etc.)
+		int handled = callArrayMethod(app_context, arr,
+		                               method_name, method_name_len,
+		                               args, num_args);
+
+		if (handled)
+		{
+			if (args != NULL) FREE(args);
+			return;
+		}
+
+		// Not a built-in method — check arr->props (and prototype chain) for user-defined methods
 		ActionVar* user_method_prop = NULL;
 		if (arr->props != NULL) {
 			user_method_prop = getPropertyWithPrototype(arr->props, method_name, method_name_len);
@@ -43188,23 +43275,16 @@ void actionCallMethod(SWFAppContext* app_context, char* str_buffer)
 			return;
 		}
 
-		int handled = callArrayMethod(app_context, arr,
-		                               method_name, method_name_len,
-		                               args, num_args);
-
 		if (args != NULL) FREE(args);
 
-		if (!handled)
+		// Array.valueOf() returns the array itself
+		if (method_name_len == 7 && strncmp(method_name, "valueOf", 7) == 0)
 		{
-			// Array.valueOf() returns the array itself
-			if (method_name_len == 7 && strncmp(method_name, "valueOf", 7) == 0)
-			{
-				pushVar(app_context, &obj_var);
-			}
-			else
-			{
-				pushUndefined(app_context);
-			}
+			pushVar(app_context, &obj_var);
+		}
+		else
+		{
+			pushUndefined(app_context);
 		}
 		return;
 	}
