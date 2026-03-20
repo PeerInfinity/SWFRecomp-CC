@@ -3775,8 +3775,8 @@ static void initMathObject(SWFAppContext* app_context)
 		g_math_funcs[i].function_type = 2;
 		g_math_funcs[i].param_count = 0;
 		g_math_funcs[i].advanced_func = math_methods[i].func;
-		if (function_count < MAX_FUNCTIONS)
-			function_registry[function_count++] = &g_math_funcs[i];
+		// Note: Math methods are NOT registered in function_registry.
+		// They are only accessible via Math.method(), not as standalone globals.
 
 		ActionVar fv = {0};
 		fv.type = ACTION_STACK_VALUE_FUNCTION;
@@ -17844,6 +17844,15 @@ static inline uint32_t varToUint32(ActionVar* v)
 static inline double parseStringToNumber(const char* str)
 {
 	if (str == NULL || str[0] == '\0') return NAN;
+	// Flash doesn't parse "Infinity", "inf", or "NaN" as numbers — reject them
+	// before strtod (which does recognize them). Match convertFloat behavior.
+	const char* p = str;
+	while (*p == ' ' || *p == '\t' || *p == '\n' || *p == '\r') p++;
+	if (*p == '+' || *p == '-') p++;
+	if ((p[0] == 'I' || p[0] == 'i') && (strncasecmp(p, "Infinity", 8) == 0 || strncasecmp(p, "inf", 3) == 0))
+		return NAN;
+	if ((p[0] == 'N' || p[0] == 'n') && strncasecmp(p, "nan", 3) == 0)
+		return NAN;
 	char* end;
 	double val = strtod(str, &end);
 	if (end == str) return NAN;
@@ -18045,9 +18054,9 @@ ActionStackValueType convertFloat(SWFAppContext* app_context)
 			}
 			else
 			{
-				// Empty string -> 0.0 in all SWF versions
-				// ECMA-262 section 9.3.1: empty string converts to +0
-				double temp = 0.0;
+				// Empty string: Flash SWF5+ returns NaN (not ECMA-262's +0)
+				// SWF4 and below: 0.0
+				double temp = (EFFECTIVE_SWF_VERSION() >= 5) ? NAN : 0.0;
 				STACK_TOP_TYPE = ACTION_STACK_VALUE_F64;
 				VAL(u64, &STACK_TOP_VALUE) = VAL(u64, &temp);
 			}
@@ -34152,19 +34161,30 @@ void actionNewObject(SWFAppContext* app_context)
 		ASObject* err = allocObject(app_context, 8);
 		// Set __proto__ to Error.prototype (via the Error constructor function)
 		// Use GetVariable("Error") to find the constructor and its prototype
-		// For simplicity, just set the message property
-		if (num_args > 0 && args[0].type == ACTION_STACK_VALUE_STRING)
+		// Set message property — coerce any argument to string
+		if (num_args > 0)
 		{
-			// Copy the UTF-16 string as-is
-			setProperty(app_context, err, "message", 7, &args[0]);
-		}
-		else if (num_args > 0 && args[0].type == ACTION_STACK_VALUE_NULL)
-		{
-			ActionVar msg_val = {0};
-			msg_val.type = ACTION_STACK_VALUE_STRING;
-			msg_val.str_size = 4;
-			VAL(u64, &msg_val.data.numeric_value) = (u64) u16_null;
-			setProperty(app_context, err, "message", 7, &msg_val);
+			if (args[0].type == ACTION_STACK_VALUE_STRING)
+			{
+				setProperty(app_context, err, "message", 7, &args[0]);
+			}
+			else if (args[0].type == ACTION_STACK_VALUE_UNDEFINED)
+			{
+				// undefined arg → no message property (Flash behavior)
+			}
+			else
+			{
+				// Coerce non-string args (number, boolean, null, object) to string
+				char str_buf[256];
+				int slen = varToStringBuf(app_context, &args[0], str_buf, sizeof(str_buf));
+				u32 u16_len;
+				uint16_t* u16 = ascii_to_u16(app_context, str_buf, slen, &u16_len);
+				ActionVar msg_val = {0};
+				msg_val.type = ACTION_STACK_VALUE_STRING;
+				msg_val.str_size = u16_len;
+				VAL(u64, &msg_val.data.numeric_value) = (u64) u16;
+				setProperty(app_context, err, "message", 7, &msg_val);
+			}
 		}
 		// Set __proto__ to Error.prototype
 		// Look up Error constructor's prototype
@@ -34819,6 +34839,12 @@ void actionNewObject(SWFAppContext* app_context)
 		setProperty(app_context, obj, "isConnected", 11, &bv);
 
 		PUSH(ACTION_STACK_VALUE_OBJECT, (u64)obj);
+		return;
+	}
+	else if (strcmp(ctor_name, "Math") == 0)
+	{
+		// Math is a static object, not a constructor — new Math() returns undefined
+		PUSH(ACTION_STACK_VALUE_UNDEFINED, 0);
 		return;
 	}
 		else

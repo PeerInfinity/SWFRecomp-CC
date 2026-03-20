@@ -1,6 +1,6 @@
 # Gnash Test Suite Status
 
-Last updated: 2026-03-19 (post Inheritance segfault + Try/finally fixes)
+Last updated: 2026-03-20 (post Math/Error/ops fixes)
 
 ## Quick Summary
 
@@ -25,6 +25,7 @@ Note: Inheritance-v7/v8 changed from segfault → output_mismatch. Try-v6/v7/v8 
 | `ARRAY_V5_PLAN.md` | array-v5 OOM crash investigation (root causes identified) |
 | `MISC_SWFMILL_PLAN.md` | All 6 misc-swfmill failures (root causes identified) |
 | `BLOCKER_SUMMARY.md` | Active and resolved blockers preventing progress |
+| `ACCEPTED_DIFFS.md` | Tests where our output is more correct than Gnash's expected output |
 
 ## Test Structure
 
@@ -167,12 +168,21 @@ During `actionAdd2` on two ARRAY values, `convertFloat` calls `getPropertyWithPr
 5. **ASnative class 101 (Object.prototype methods)** — DONE (2026-03-19). Gnash tests install hasOwnProperty/toString/valueOf/etc. on class prototypes via ASnative(101, N). Without this, ASnative returned undefined which shadowed the prototype chain.
 6. **Color prototype unification** — DONE (2026-03-19). `new Color().__proto__` and `Color.prototype` now point to the same object, fixing `instanceof Color`.
 
+### Phase 1b: DONE — Math, ops, Error edge case fixes (2026-03-20)
+7. ~~**Math non-constructable**~~ — DONE. `new Math()` returns undefined (not object).
+8. ~~**Empty string → NaN in convertFloat**~~ — DONE. `Math.round('')` now returns NaN for SWF5+, matching Flash/Ruffle. Also fixes `is_finite("")` consistency.
+9. ~~**Math functions not standalone globals**~~ — DONE. Removed math builtins (acos, sin, etc.) from global function_registry — accessible only via `Math.method()`.
+10. ~~**parseStringToNumber Infinity/NaN rejection**~~ — DONE. `Infinity == 'Infinity'` now correctly returns false in equality comparisons (strtod was parsing "Infinity"/"NaN" strings).
+11. ~~**Error message coercion**~~ — DONE. `new Error(7.8898)` now coerces argument to string "7.8898".
+
+**Impact**: Math-v5/v6: 6→5 diffs, Math-v7/v8: 7→5 diffs, ops-v8: 11→7 diffs, Error-v5/v6/v7/v8: 7→4 diffs each. All remaining diffs are accepted (Gnash bugs). See `ACCEPTED_DIFFS.md`.
+
 ### Phase 2: Next fixes (est. +10-15 tests)
-7. **ASArray/ASObject cast in convertFloat** — 2 runtime errors (toString_valueOf tests).
-8. **`Object.prototype.constructor` setup** — Inheritance tests.
-9. **Stage/Selection non-constructable** — `typeof(new Stage())` should be "undefined".
-10. **Color.getTransform() on invalid target** — should return undefined, not object.
-11. ~~**Try/finally control flow** — Try-v6/v7/v8 runtime errors.~~ **FIXED**
+12. **ASArray/ASObject cast in convertFloat** — 2 runtime errors (toString_valueOf tests).
+13. **`Object.prototype.constructor` setup** — Inheritance tests.
+14. **Stage/Selection non-constructable** — `typeof(new Stage())` should be "undefined".
+15. **Color.getTransform() on invalid target** — should return undefined, not object.
+16. ~~**Try/finally control flow** — Try-v6/v7/v8 runtime errors.~~ **FIXED**
 
 ### Phase 3: Individual test fixes
 12. TextFieldHTML htmlText getter
