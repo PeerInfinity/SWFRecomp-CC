@@ -1,10 +1,10 @@
 # Ruffle Test Results (Unfiltered)
 
-**Date**: 2026-03-20 03:12 UTC
+**Date**: 2026-03-20 04:14 UTC
 
-**Git SHA**: `ea3be1be1c`
+**Git SHA**: `3b1506b047`
 
-**Run Duration**: 61m 2s
+**Run Duration**: 60m 13s
 
 ## Summary
 
@@ -30,54 +30,54 @@
 
 | # | Test | Lines | Duration | Notes |
 |---|------|-------|----------|-------|
-| 1 | `Accessibility-v5` | 15 | 16.3s |  |
-| 2 | `BitmapData-v5` | 7 | 15.9s |  |
-| 3 | `BitmapData-v6` | 7 | 15.9s |  |
-| 4 | `BitmapData-v7` | 7 | 18.2s |  |
-| 5 | `Boolean-v5` | 38 | 18.1s |  |
-| 6 | `Boolean-v6` | 38 | 18.0s |  |
-| 7 | `Boolean-v7` | 38 | 17.9s |  |
-| 8 | `Boolean-v8` | 38 | 18.0s |  |
-| 9 | `Camera-v5` | 7 | 17.3s |  |
-| 10 | `ColorTransform-v5` | 7 | 16.1s |  |
-| 11 | `ColorTransform-v6` | 7 | 16.4s |  |
-| 12 | `ColorTransform-v7` | 7 | 16.5s |  |
-| 13 | `ContextMenu-v5` | 7 | 16.5s |  |
+| 1 | `Accessibility-v5` | 15 | 16.2s |  |
+| 2 | `BitmapData-v5` | 7 | 16.1s |  |
+| 3 | `BitmapData-v6` | 7 | 16.3s |  |
+| 4 | `BitmapData-v7` | 7 | 16.7s |  |
+| 5 | `Boolean-v5` | 38 | 17.1s |  |
+| 6 | `Boolean-v6` | 38 | 17.0s |  |
+| 7 | `Boolean-v7` | 38 | 17.1s |  |
+| 8 | `Boolean-v8` | 38 | 17.1s |  |
+| 9 | `Camera-v5` | 7 | 16.6s |  |
+| 10 | `ColorTransform-v5` | 7 | 16.2s |  |
+| 11 | `ColorTransform-v6` | 7 | 16.2s |  |
+| 12 | `ColorTransform-v7` | 7 | 16.3s |  |
+| 13 | `ContextMenu-v5` | 7 | 16.2s |  |
 | 14 | `ContextMenu-v6` | 7 | 16.3s |  |
-| 15 | `ExternalInterface-v5` | 7 | 15.8s |  |
-| 16 | `LoadVars-v5` | 8 | 16.6s |  |
-| 17 | `Matrix-v5` | 7 | 17.8s |  |
-| 18 | `Microphone-v5` | 6 | 15.8s |  |
-| 19 | `MovieClipLoader-v5` | 6 | 17.5s |  |
-| 20 | `MovieClipLoader-v6` | 6 | 16.9s |  |
-| 21 | `NetStream-v5` | 6 | 16.1s |  |
-| 22 | `Point-v5` | 7 | 17.2s |  |
-| 23 | `Point-v6` | 7 | 17.3s |  |
-| 24 | `Point-v7` | 7 | 17.0s |  |
-| 25 | `Random-v5` | 30 | 17.4s |  |
-| 26 | `Random-v6` | 30 | 17.4s |  |
-| 27 | `Random-v7` | 30 | 18.6s |  |
-| 28 | `Random-v8` | 30 | 18.8s |  |
-| 29 | `Rectangle-v5` | 7 | 18.1s |  |
-| 30 | `Rectangle-v6` | 7 | 18.5s |  |
-| 31 | `Rectangle-v7` | 7 | 18.4s |  |
-| 32 | `TextFieldHTML-v5` | 6 | 16.5s |  |
-| 33 | `TextSnapshot-v5` | 7 | 16.5s |  |
-| 34 | `Transform-v5` | 7 | 16.5s |  |
-| 35 | `Try-v5` | 20 | 17.6s |  |
-| 36 | `Try-v6` | 20 | 17.8s |  |
-| 37 | `Try-v7` | 20 | 17.5s |  |
-| 38 | `Try-v8` | 20 | 17.7s |  |
+| 15 | `ExternalInterface-v5` | 7 | 16.1s |  |
+| 16 | `LoadVars-v5` | 8 | 16.2s |  |
+| 17 | `Matrix-v5` | 7 | 16.3s |  |
+| 18 | `Microphone-v5` | 6 | 16.3s |  |
+| 19 | `MovieClipLoader-v5` | 6 | 17.4s |  |
+| 20 | `MovieClipLoader-v6` | 6 | 16.8s |  |
+| 21 | `NetStream-v5` | 6 | 16.2s |  |
+| 22 | `Point-v5` | 7 | 17.7s |  |
+| 23 | `Point-v6` | 7 | 17.5s |  |
+| 24 | `Point-v7` | 7 | 17.8s |  |
+| 25 | `Random-v5` | 30 | 18.4s |  |
+| 26 | `Random-v6` | 30 | 18.7s |  |
+| 27 | `Random-v7` | 30 | 17.3s |  |
+| 28 | `Random-v8` | 30 | 17.4s |  |
+| 29 | `Rectangle-v5` | 7 | 16.7s |  |
+| 30 | `Rectangle-v6` | 7 | 16.6s |  |
+| 31 | `Rectangle-v7` | 7 | 16.9s |  |
+| 32 | `TextFieldHTML-v5` | 6 | 16.6s |  |
+| 33 | `TextSnapshot-v5` | 7 | 16.0s |  |
+| 34 | `Transform-v5` | 7 | 16.1s |  |
+| 35 | `Try-v5` | 20 | 17.4s |  |
+| 36 | `Try-v6` | 20 | 17.3s |  |
+| 37 | `Try-v7` | 20 | 17.2s |  |
+| 38 | `Try-v8` | 20 | 17.1s |  |
 | 39 | `Video-v6` | 85 | 17.4s |  |
-| 40 | `Video-v7` | 85 | 17.4s |  |
-| 41 | `Video-v8` | 85 | 17.5s |  |
-| 42 | `argstest-v5` | 4 | 16.9s |  |
-| 43 | `enumerate-v5` | 6 | 16.1s |  |
-| 44 | `swap-v5` | 7 | 16.0s |  |
-| 45 | `swap-v6` | 7 | 16.1s |  |
-| 46 | `swap-v7` | 7 | 16.0s |  |
-| 47 | `swap-v8` | 7 | 16.1s |  |
-| 48 | `targetPath-v5` | 12 | 16.8s |  |
+| 40 | `Video-v7` | 85 | 17.7s |  |
+| 41 | `Video-v8` | 85 | 17.4s |  |
+| 42 | `argstest-v5` | 4 | 16.5s |  |
+| 43 | `enumerate-v5` | 6 | 16.0s |  |
+| 44 | `swap-v5` | 7 | 16.7s |  |
+| 45 | `swap-v6` | 7 | 16.5s |  |
+| 46 | `swap-v7` | 7 | 16.5s |  |
+| 47 | `swap-v8` | 7 | 16.8s |  |
+| 48 | `targetPath-v5` | 12 | 16.3s |  |
 
 ## Near-Passing Tests
 
@@ -200,7 +200,7 @@ No segfaults.
 
 | # | Test | Detail | Duration | Notes |
 |---|------|--------|----------|-------|
-| 1 | `array-v5` | exit code 1 | 54.8s |  |
+| 1 | `array-v5` | exit code 1 | 54.6s |  |
 
 ## Timeouts
 
