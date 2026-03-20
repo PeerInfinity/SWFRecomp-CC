@@ -1,20 +1,22 @@
 # Ruffle Test Results Diff
 
-**Previous:** `ea3be1be1cc3` (2026-03-20T03:12:31.815122+00:00)
-**Current:** `3b1506b047eb` (2026-03-20T04:14:59.614167+00:00)
+**Previous:** `3b1506b047eb` (2026-03-20T04:14:59.614167+00:00)
+**Current:** `97348d219df4` (2026-03-20T22:05:20.728849+00:00)
 
 ## Summary
 
 | Metric | Previous | Current | Delta |
 |--------|----------|---------|-------|
-| Passing | 561 | 562 | +1 |
+| Passing | 562 | 559 | -3 |
 | Total | 619 | 619 | 0 |
-| Pass rate | 90.6% | 90.8% | +0.2% |
-| Mismatched lines | 12912 | 12909 | -3 |
-|   Decreased | | | -3 |
+| Pass rate | 90.8% | 90.3% | -0.5% |
+| Mismatched lines | 12909 | 13013 | +104 |
+|   Increased | | | +104 |
 
-## Newly Passing (1)
+## Newly Failing (3)
 
-| Test | Previous Status | Lines (prev) | Lines (now) |
-|------|----------------|--------------|-------------|
-| `function_suppress_and_preload` | output_mismatch | 25/28 | 28/28 |
+| Test | New Status | Lines (prev) | Lines (now) |
+|------|-----------|--------------|-------------|
+| `watch` | runtime_error | 117/117 | 14/117 |
+| `watch_textfield` | runtime_error | 12/12 | 12/12 |
+| `watch_virtual_property_proto` | runtime_error | 2/2 | 1/2 |
