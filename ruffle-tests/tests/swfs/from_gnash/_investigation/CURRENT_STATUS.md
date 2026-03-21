@@ -1,16 +1,16 @@
 # Gnash Test Suite Status
 
-Last updated: 2026-03-20 (post array-v5 fixes + Tier 1 edge cases)
+Last updated: 2026-03-21 (post misc-swfmill fixes)
 
 ## Quick Summary
 
 | Sub-suite | Tests | Passing | Rate | Segfaults | Runtime Error | Output Mismatch |
 |-----------|-------|---------|------|-----------|---------------|-----------------|
-| **actionscript.all** | 190 | ~57 | ~30% | 0 | 0 | ~133 |
-| **misc-swfmill.all** | 14 | 8 | 57.1% | 0 | 0 | 6 |
-| **Total** | 204 | ~65 | ~31.9% | 0 | 0 | ~139 |
+| **actionscript.all** | 190 | 51 | 26.8% | 0 | 0 | 139 |
+| **misc-swfmill.all** | 14 | 11 | 78.6% | 0 | 0 | 3 |
+| **Total** | 204 | 62 | 30.4% | 0 | 0 | 142 |
 
-Note: Counts are estimated from local testing (CI not yet run). New passes include: Boolean-v5/v6/v7/v8, Video-v6/v7/v8, Stage-v5, Selection-v5. toString_valueOf-v6/v7/v8 changed from runtime_error → output_mismatch. array-v5 changed from runtime_error (OOM) → output_mismatch (251/560 lines). 9 tests with accepted diffs in ignored_tests.txt.
+Note: actionscript.all counts from CI run (2026-03-21). misc-swfmill.all updated after fixing zeroframe_definesprite, initaction_in_definesprite, jump_after_end (commit 1f45d1a7). Remaining 3 misc-swfmill failures (dict_event, tags_after_last_showframe, jump_to_prev_block) are blocked on architectural limitations — see `incomplete/MISC_SWFMILL_PLAN.md`.
 
 ## Related Documents
 
