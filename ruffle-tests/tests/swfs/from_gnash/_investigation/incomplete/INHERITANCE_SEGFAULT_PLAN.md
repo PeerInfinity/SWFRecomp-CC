@@ -3,7 +3,7 @@
 
 Last updated: 2026-03-20
 
-## Status: PARTIALLY FIXED — segfaults resolved, Function.prototype chain improved, 14 diffs remain
+## Status: PARTIALLY FIXED — segfaults resolved, Function.prototype + typeof(super) fixed, 11 diffs remain (v7)
 
 ---
 
@@ -54,15 +54,20 @@ Four improvements to Function.prototype infrastructure:
 | Inheritance-v7 | **Segfault** | Output mismatch | ~18 |
 | Inheritance-v8 | **Segfault** | Output mismatch | ~18 |
 
-### After Function.prototype improvements (2026-03-20)
+### After Function.prototype + typeof(super) improvements (2026-03-20)
 
 | Test | Before | After | Improvement |
 |------|--------|-------|-------------|
-| Inheritance-v7 | 18 diffs | **14 diffs** | -4 lines |
-| Inheritance-v8 | 18 diffs | **13 diffs** | -5 lines |
+| Inheritance-v7 | 18 diffs | **11 diffs** | -7 lines |
+| Inheritance-v8 | 18 diffs | **10 diffs** | -8 lines |
+| Inheritance-v6 | 26 diffs | **20 diffs** | -6 lines |
+| Inheritance-v5 | 19 diffs | **19 diffs** | 0 (v5 has no Function.prototype / typeof super tests) |
 
 Lines fixed:
 - `Function.fake == Function.prototype.fake` (line 9, v7 only)
+- `derived.typeofSuper() == 'object'` (line 61)
+- `DerivedClass.prototype.typeofSuper() == 'object'` (line 62)
+- `typeof(s) == 'object'` (line 63, where s = super)
 - `SubObj1.prototype.constructor.__proto__.constructor == Function` (line 104)
 - `typeof(DerivedClass1.constructor) == 'function'` (line 110)
 - `DerivedClass1.constructor == Function` (line 121)
@@ -81,17 +86,14 @@ Lines fixed:
 - `define_function2_preload_order`: PASS
 - `register_and_init_order`: PASS
 
-## Remaining Diff (Inheritance-v7/v8)
-
-~14 assertion failures remain:
+## Remaining Diff (Inheritance-v7: 11 diffs, v8: 10 diffs)
 
 | Category | Lines | Issue | Blocker |
 |----------|-------|-------|---------|
 | `Function.prototype.apply` | 1 | `functionObject.apply != undefined` — apply/call not installed as properties on Function.prototype (only handled in CallMethod dispatch) | Medium: need to create apply/call as actual ASFunction objects on Function.prototype |
-| `typeof(super)` | 3 | Returns 'undefined' instead of 'object' — super keyword's typeof semantics | Medium: need special typeof handling for SUPER stack value type |
-| Constructor call count (FctorCalls) | 2 | `new F()` constructor not incrementing FctorCalls — likely `new Function(...)` creating stub object instead of calling constructor body | Deep: requires understanding how `new Function(string_body)` should work |
-| `instanceof Function/Object` | 2 | Secondary version group's Function constructor has prototype_obj set, but SubObj1 still fails instanceof — likely version group mismatch in checkInstanceOf's virtual proto comparison | Medium: need to investigate exact version group flow |
-| `SubObj1.prototype` undefined (v7) | 1 | SubObj1.prototype returns undefined despite lazy creation code — may be Gnash test specific | Unknown |
+| Constructor call count (FctorCalls) | 2 | `new F()` constructor not incrementing FctorCalls — likely `new Function(string_body)` creating stub object instead of calling constructor body | Deep: requires understanding how `new Function(string_body)` should work |
+| `instanceof Function/Object` | 2 | Virtual Function.prototype check fires, but SubObj1 still fails — possibly SubObj1 has own_props with stale __proto__ from some earlier SetMember, bypassing the virtual fallback | Medium: need to trace SubObj1 own_props state at check time |
+| `SubObj1.prototype` undefined (v7 only) | 1 | SubObj1.prototype returns undefined despite lazy creation code — may be Gnash test specific (v8 passes this check) | Unknown |
 | `hasOwnProperty('constructor')` | 2 | `DerivedClass1.hasOwnProperty('constructor')` expects true — functions would need `constructor` as own property, not just inherited via proto chain | Low priority: may be Gnash-specific behavior |
 | Count/extra line | 3 | #passed/#failed counts + egg/chicken extra output | N/A (follows from above) |
 
