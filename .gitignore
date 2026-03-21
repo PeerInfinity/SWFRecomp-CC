@@ -32,8 +32,8 @@ zlib.dll
 # Compiled files
 *.spv
 *.o
-# Allow pre-compiled .o files for in-browser recompiler demo
-!docs/recompiler/runtime_src/*.o
+# Pre-compiled .o files for the in-browser recompiler demo are built by
+# the deploy-pages CI workflow — no longer committed to the repository.
 
 # WASM build artifacts (but keep source)
 wasm/examples/*/*.wasm

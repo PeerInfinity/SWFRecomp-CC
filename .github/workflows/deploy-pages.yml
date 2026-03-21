@@ -1,0 +1,78 @@
+name: Deploy GitHub Pages
+
+on:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  pages: write
+  id-token: write
+
+concurrency:
+  group: pages
+  cancel-in-progress: true
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v5
+
+      - name: Install WASI-SDK
+        run: |
+          WASI_VERSION=30
+          wget -q "https://github.com/WebAssembly/wasi-sdk/releases/download/wasi-sdk-${WASI_VERSION}/wasi-sdk-${WASI_VERSION}.0-x86_64-linux.tar.gz" \
+            -O wasi-sdk.tar.gz
+          tar xzf wasi-sdk.tar.gz
+          mv "wasi-sdk-${WASI_VERSION}.0-x86_64-linux" wasi-sdk
+
+      - name: Build pre-compiled runtime objects
+        run: |
+          WASI_CC="wasi-sdk/bin/clang"
+          WASI_SYSROOT="wasi-sdk/share/wasi-sysroot"
+          SWFMODERN_ROOT="SWFModernRuntime"
+          SWFMODERN_SRC="${SWFMODERN_ROOT}/src"
+          SWFMODERN_INC="${SWFMODERN_ROOT}/include"
+
+          WASI_CFLAGS=(
+              --target=wasm32-wasi
+              --sysroot="${WASI_SYSROOT}"
+              -DNO_GRAPHICS
+              -I"${SWFMODERN_INC}"
+              -I"${SWFMODERN_INC}/actionmodern"
+              -I"${SWFMODERN_INC}/libswf"
+              -I"${SWFMODERN_INC}/memory"
+              -I"${SWFMODERN_ROOT}/lib/c-hashmap"
+              -I"${SWFMODERN_ROOT}/lib/o1heap"
+              -I"${SWFMODERN_SRC}/actionmodern"
+              -mllvm -wasm-enable-sjlj
+              -matomics -mbulk-memory
+              -std=gnu17
+              -O2
+              -w
+          )
+
+          echo "Compiling action.o..."
+          "${WASI_CC}" "${WASI_CFLAGS[@]}" -c "${SWFMODERN_SRC}/actionmodern/action.c" -o "docs/recompiler/runtime_src/action.o"
+          echo "  action.o: $(stat --printf='%s' docs/recompiler/runtime_src/action.o) bytes"
+
+          echo "Compiling object.o..."
+          "${WASI_CC}" "${WASI_CFLAGS[@]}" -c "${SWFMODERN_SRC}/actionmodern/object.c" -o "docs/recompiler/runtime_src/object.o"
+          echo "  object.o: $(stat --printf='%s' docs/recompiler/runtime_src/object.o) bytes"
+
+      - name: Setup Pages
+        uses: actions/configure-pages@v5
+
+      - name: Upload Pages artifact
+        uses: actions/upload-pages-artifact@v3
+        with:
+          path: docs
+
+      - name: Deploy to GitHub Pages
+        id: deployment
+        uses: actions/deploy-pages@v4
