@@ -151,6 +151,16 @@
         <pre id="output"></pre>
     </div>
 
+    <div id="build-info" style="position: fixed; bottom: 0.5rem; right: 0.75rem; font-size: 0.7em; color: #555;"></div>
+    <script>
+        fetch("build_info.json").then(r => r.ok ? r.json() : null).then(info => {
+            if (!info) return;
+            const d = new Date(info.deployed_at);
+            const date = d.toLocaleString(undefined, { year: "numeric", month: "short", day: "numeric", hour: "2-digit", minute: "2-digit" });
+            document.getElementById("build-info").textContent =
+                `Deployed ${date} (${info.commit})`;
+        }).catch(() => {});
+    </script>
     <script type="module" src="pipeline.js"></script>
 </body>
 </html>

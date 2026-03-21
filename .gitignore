@@ -35,6 +35,9 @@ zlib.dll
 # Pre-compiled .o files for the in-browser recompiler demo are built by
 # the deploy-pages CI workflow — no longer committed to the repository.
 
+# Generated deploy timestamp
+docs/recompiler/build_info.json
+
 # WASM build artifacts (but keep source)
 wasm/examples/*/*.wasm
 wasm/examples/*/*.js

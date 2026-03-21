@@ -175,6 +175,16 @@ else
     echo "  (Skipping graphics host — not built yet)"
 fi
 
+# Write build info for the deploy timestamp display
+echo "  Writing build_info.json..."
+cat > "${DEMO_DIR}/build_info.json" << ENDJSON
+{
+  "deployed_at": "$(date -u +%Y-%m-%dT%H:%M:%SZ)",
+  "commit": "$(git -C "${PROJECT_ROOT}" rev-parse --short HEAD 2>/dev/null || echo "unknown")",
+  "source": "local"
+}
+ENDJSON
+
 echo ""
 echo "Demo deployed. Files:"
 find "${DEMO_DIR}" -type f | sort | while read f; do

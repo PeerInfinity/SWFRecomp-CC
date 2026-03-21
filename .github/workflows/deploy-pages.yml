@@ -65,6 +65,13 @@ jobs:
           "${WASI_CC}" "${WASI_CFLAGS[@]}" -c "${SWFMODERN_SRC}/actionmodern/object.c" -o "docs/recompiler/runtime_src/object.o"
           echo "  object.o: $(stat --printf='%s' docs/recompiler/runtime_src/object.o) bytes"
 
+      - name: Write build info
+        run: |
+          printf '{\n  "deployed_at": "%s",\n  "commit": "%s",\n  "source": "ci"\n}\n' \
+            "$(date -u +%Y-%m-%dT%H:%M:%SZ)" \
+            "$(git rev-parse --short HEAD)" \
+            > docs/recompiler/build_info.json
+
       - name: Setup Pages
         uses: actions/configure-pages@v5
 
