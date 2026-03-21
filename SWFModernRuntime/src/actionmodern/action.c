@@ -32133,9 +32133,16 @@ void actionDelete(SWFAppContext* app_context)
 		prop_name_len = (u32)u16_to_utf8((const uint16_t*)prop_name_var.data.numeric_value, prop_name_var.str_size, _del_buf, sizeof(_del_buf));
 		prop_name = _del_buf;
 	}
+	else if (prop_name_var.type == ACTION_STACK_VALUE_F32 || prop_name_var.type == ACTION_STACK_VALUE_F64 ||
+	         prop_name_var.type == ACTION_STACK_VALUE_BOOLEAN)
+	{
+		// Numeric/boolean property name — convert to string (e.g., delete arr[1])
+		prop_name_len = varToStringBuf(app_context, &prop_name_var, _del_buf, sizeof(_del_buf));
+		prop_name = _del_buf;
+	}
 	else
 	{
-		// Property name must be a string — pop object too and return true
+		// Unsupported property name type — pop object too and return true
 		POP();
 		PUSH(ACTION_STACK_VALUE_BOOLEAN, 1ULL);
 		return;
@@ -32171,6 +32178,51 @@ void actionDelete(SWFAppContext* app_context)
 			bool success = deleteProperty(app_context, (ASObject*)mc->dynamic_props, prop_name, prop_name_len);
 			PUSH(ACTION_STACK_VALUE_BOOLEAN, success ? 1ULL : 0ULL);
 		} else {
+			PUSH(ACTION_STACK_VALUE_BOOLEAN, 1ULL);
+		}
+		return;
+	}
+	else if (obj_var.type == ACTION_STACK_VALUE_ARRAY)
+	{
+		// Delete array element by marking as HOLE
+		ASArray* arr = (ASArray*) obj_var.data.numeric_value;
+		if (arr != NULL && prop_name != NULL)
+		{
+			// Try numeric index
+			char* endptr;
+			long long index_ll = strtoll(prop_name, &endptr, 10);
+			if (*endptr == '\0' && index_ll >= 0 && index_ll < (long long)arr->length)
+			{
+				u32 idx = (u32) index_ll;
+				if (idx < arr->capacity)
+				{
+					// Check ASSetPropFlags on arr->props for this index
+					if (arr->props != NULL)
+					{
+						ASProperty* ps = findPropertyRaw(arr->props, prop_name, prop_name_len);
+						if (ps != NULL && !(ps->flags & PROPERTY_FLAG_CONFIGURABLE))
+						{
+							PUSH(ACTION_STACK_VALUE_BOOLEAN, 0ULL); // can't delete
+							return;
+						}
+					}
+					arr->elements[idx].type = ACTION_STACK_VALUE_HOLE;
+					arr->elements[idx].data.numeric_value = 0;
+					arr->elements[idx].str_size = 0;
+					PUSH(ACTION_STACK_VALUE_BOOLEAN, 1ULL);
+					return;
+				}
+			}
+			// Non-numeric property — try deleting from arr->props
+			if (arr->props != NULL) {
+				bool success = deleteProperty(app_context, arr->props, prop_name, prop_name_len);
+				PUSH(ACTION_STACK_VALUE_BOOLEAN, success ? 1ULL : 0ULL);
+			} else {
+				PUSH(ACTION_STACK_VALUE_BOOLEAN, 1ULL);
+			}
+		}
+		else
+		{
 			PUSH(ACTION_STACK_VALUE_BOOLEAN, 1ULL);
 		}
 		return;
