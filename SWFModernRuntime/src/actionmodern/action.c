@@ -30561,14 +30561,21 @@ void actionSetMember(SWFAppContext* app_context)
 				u32 new_len = (u32) ecmaToInt32(dval);
 
 				// Truncation: mark elements beyond new_len as HOLE
-				if (new_len < arr->length)
+				// Use signed comparison: negative new_len means clear ALL elements
 				{
-					u32 cap_limit = new_len < arr->capacity ? arr->capacity : new_len;
-					for (u32 i = new_len; i < cap_limit && i < arr->length; i++)
+					int32_t new_len_signed = (int32_t) new_len;
+					int32_t old_len_signed = (int32_t) arr->length;
+					u32 clear_from = (new_len_signed <= 0) ? 0 : new_len;
+					if (new_len_signed < old_len_signed)
 					{
-						arr->elements[i].type = ACTION_STACK_VALUE_HOLE;
-						arr->elements[i].data.numeric_value = 0;
-						arr->elements[i].str_size = 0;
+						u32 clear_to = (old_len_signed > 0) ? (u32)old_len_signed : 0;
+						if (clear_to > arr->capacity) clear_to = arr->capacity;
+						for (u32 i = clear_from; i < clear_to; i++)
+						{
+							arr->elements[i].type = ACTION_STACK_VALUE_HOLE;
+							arr->elements[i].data.numeric_value = 0;
+							arr->elements[i].str_size = 0;
+						}
 					}
 				}
 

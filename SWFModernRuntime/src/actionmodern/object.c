@@ -1069,6 +1069,11 @@ ActionVar* getArrayElement(ASArray* arr, u32 index)
 	{
 		return NULL;
 	}
+	// Flash: negative signed length (e.g., arr.length = -1) makes all elements inaccessible
+	if ((int32_t)arr->length < 0)
+	{
+		return NULL;
+	}
 
 	return &arr->elements[index];
 }
