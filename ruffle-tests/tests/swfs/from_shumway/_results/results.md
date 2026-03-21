@@ -1,59 +1,59 @@
 # Ruffle Test Results (Unfiltered)
 
-**Date**: 2026-03-21 18:50 UTC
+**Date**: 2026-03-21 21:02 UTC
 
-**Git SHA**: `a53c11a51e`
+**Git SHA**: `3b075cff10`
 
-**Run Duration**: 12m 33s
+**Run Duration**: 12m 28s
 
 ## Summary
 
 | Metric | Value |
 |--------|-------|
 | Total tests | 47 |
-| Passing | **15** (31.9%) |
-| Failing | 32 |
+| Passing | **17** (36.2%) |
+| Failing | 30 |
 | Total expected lines | 256 |
-| Matching lines | 31 (12.1%) |
-| Mismatched lines | 225 |
+| Matching lines | 35 (13.7%) |
+| Mismatched lines | 221 |
 
 ### Failure Breakdown
 
 | Category | Count | % of Failures |
 |----------|-------|---------------|
-| Output Mismatch | 32 | 100.0% |
+| Output Mismatch | 30 | 100.0% |
 
 ## Passing Tests
 
-**15 tests passing**
+**17 tests passing**
 
 | # | Test | Lines | Duration | Notes |
 |---|------|-------|----------|-------|
-| 1 | `MaskTest` | 0 | 16.0s |  |
-| 2 | `MaskTest-2` | 0 | 16.1s |  |
-| 3 | `add` | 11 | 16.3s |  |
-| 4 | `avm1timeline1` | 3 | 16.5s |  |
-| 5 | `avm1timeline2` | 6 | 16.4s |  |
+| 1 | `MaskTest` | 0 | 15.9s |  |
+| 2 | `MaskTest-2` | 0 | 16.0s |  |
+| 3 | `add` | 11 | 16.2s |  |
+| 4 | `avm1timeline1` | 3 | 16.1s |  |
+| 5 | `avm1timeline2` | 6 | 16.2s |  |
 | 6 | `bitmapbuttons` | 0 | 15.9s |  |
-| 7 | `button3` | 1 | 15.7s |  |
+| 7 | `button3` | 1 | 15.5s |  |
 | 8 | `clipping` | 0 | 15.7s |  |
-| 9 | `flash_geom_ColorTransform` | 0 | 16.0s |  |
-| 10 | `flash_text_TextField` | 0 | 15.7s |  |
-| 11 | `fscommand1` | 1 | 15.6s |  |
-| 12 | `gradient` | 0 | 16.1s |  |
-| 13 | `gradientTransform` | 0 | 15.9s |  |
-| 14 | `invalidClipDepth` | 0 | 16.4s |  |
-| 15 | `movieinfo1` | 3 | 16.1s |  |
+| 9 | `doubleAndRegister` | 2 | 15.6s |  |
+| 10 | `flash_geom_ColorTransform` | 0 | 16.0s |  |
+| 11 | `flash_text_TextField` | 0 | 15.7s |  |
+| 12 | `fscommand1` | 1 | 15.2s |  |
+| 13 | `gradient` | 0 | 16.7s |  |
+| 14 | `gradientTransform` | 0 | 16.8s |  |
+| 15 | `invalidClipDepth` | 0 | 17.2s |  |
+| 16 | `movieinfo1` | 3 | 15.8s |  |
+| 17 | `targetPath1` | 8 | 15.2s |  |
 
 ## Near-Passing Tests
 
 Tests with output mismatch but >= 50% line match rate (low-hanging fruit).
 
-**1 tests** within reach
+**0 tests** within reach
 
-| # | Test | Match Rate | Matching | Total | Diff Lines | Notes |
-|---|------|------------|----------|-------|------------|-------|
-| 1 | `targetPath1` | 75.0% | 6 | 8 | 2 |  |
+No tests above 50% match threshold.
 
 ## Segfaults
 
@@ -69,39 +69,37 @@ No timeouts.
 
 ## All Output Mismatches
 
-**32 tests** with output mismatch, sorted by match rate (best first)
+**30 tests** with output mismatch, sorted by match rate (best first)
 
 | # | Test | Match Rate | Matching/Total | Actual | Expected | Notes |
 |---|------|------------|----------------|--------|----------|-------|
-| 1 | `targetPath1` | 75.0% | 6/8 | 8 | 8 |  |
-| 2 | `3_joystick` | 0.0% | 0/4 | 0 | 4 |  |
-| 3 | `MaskTest-3` | 0.0% | 0/4 | 0 | 4 |  |
-| 4 | `ZeroClipboardTest` | 0.0% | 0/3 | 0 | 3 |  |
-| 5 | `as3-interfaces` | 0.0% | 0/6 | 0 | 6 |  |
-| 6 | `avm1movie` | 0.0% | 0/13 | 0 | 13 |  |
-| 7 | `button1` | 0.0% | 0/1 | 0 | 1 |  |
-| 8 | `button2` | 0.0% | 0/2 | 2 | 1 |  |
-| 9 | `captions` | 0.0% | 0/8 | 0 | 8 |  |
-| 10 | `doubleAndRegister` | 0.0% | 0/2 | 0 | 2 |  |
-| 11 | `encoding1` | 0.0% | 0/31 | 0 | 31 |  |
-| 12 | `esc` | 0.0% | 0/2 | 0 | 2 |  |
-| 13 | `flash_events_Event` | 0.0% | 0/3 | 0 | 3 |  |
-| 14 | `flash_net_SharedObject` | 0.0% | 0/4 | 0 | 4 |  |
-| 15 | `flash_net_URLLoader` | 0.0% | 0/7 | 0 | 7 |  |
-| 16 | `flash_net_URLRequest` | 0.0% | 0/6 | 0 | 6 |  |
-| 17 | `flash_net_classes` | 0.0% | 0/22 | 0 | 22 |  |
-| 18 | `flash_text_TextField2` | 0.0% | 0/18 | 0 | 18 |  |
-| 19 | `flash_utils_Timer` | 0.0% | 0/2 | 0 | 2 |  |
-| 20 | `getobjectsunderpoint` | 0.0% | 0/34 | 0 | 34 |  |
-| 21 | `hardwrap` | 0.0% | 0/1 | 0 | 1 |  |
-| 22 | `hitTestStyleChange` | 0.0% | 0/1 | 0 | 1 |  |
-| 23 | `image-loading` | 0.0% | 0/4 | 0 | 4 |  |
-| 24 | `local2global` | 0.0% | 0/1 | 0 | 1 |  |
-| 25 | `localconnection` | 0.0% | 0/12 | 0 | 12 |  |
-| 26 | `lzma` | 0.0% | 0/5 | 0 | 5 |  |
-| 27 | `lzma_bytes` | 0.0% | 0/2 | 0 | 2 |  |
-| 28 | `movieclip` | 0.0% | 0/9 | 0 | 9 |  |
-| 29 | `slider_component` | 0.0% | 0/4 | 0 | 4 |  |
-| 30 | `stream1` | 0.0% | 0/9 | 0 | 9 |  |
-| 31 | `stroke1` | 0.0% | 0/1 | 0 | 1 |  |
-| 32 | `stylesheet` | 0.0% | 0/3 | 0 | 3 |  |
+| 1 | `3_joystick` | 0.0% | 0/4 | 0 | 4 |  |
+| 2 | `MaskTest-3` | 0.0% | 0/4 | 0 | 4 |  |
+| 3 | `ZeroClipboardTest` | 0.0% | 0/3 | 0 | 3 |  |
+| 4 | `as3-interfaces` | 0.0% | 0/6 | 0 | 6 |  |
+| 5 | `avm1movie` | 0.0% | 0/13 | 0 | 13 |  |
+| 6 | `button1` | 0.0% | 0/1 | 0 | 1 |  |
+| 7 | `button2` | 0.0% | 0/2 | 2 | 1 |  |
+| 8 | `captions` | 0.0% | 0/8 | 0 | 8 |  |
+| 9 | `encoding1` | 0.0% | 0/31 | 0 | 31 |  |
+| 10 | `esc` | 0.0% | 0/2 | 0 | 2 |  |
+| 11 | `flash_events_Event` | 0.0% | 0/3 | 0 | 3 |  |
+| 12 | `flash_net_SharedObject` | 0.0% | 0/4 | 0 | 4 |  |
+| 13 | `flash_net_URLLoader` | 0.0% | 0/7 | 0 | 7 |  |
+| 14 | `flash_net_URLRequest` | 0.0% | 0/6 | 0 | 6 |  |
+| 15 | `flash_net_classes` | 0.0% | 0/22 | 0 | 22 |  |
+| 16 | `flash_text_TextField2` | 0.0% | 0/18 | 0 | 18 |  |
+| 17 | `flash_utils_Timer` | 0.0% | 0/2 | 0 | 2 |  |
+| 18 | `getobjectsunderpoint` | 0.0% | 0/34 | 0 | 34 |  |
+| 19 | `hardwrap` | 0.0% | 0/1 | 0 | 1 |  |
+| 20 | `hitTestStyleChange` | 0.0% | 0/1 | 0 | 1 |  |
+| 21 | `image-loading` | 0.0% | 0/4 | 0 | 4 |  |
+| 22 | `local2global` | 0.0% | 0/1 | 0 | 1 |  |
+| 23 | `localconnection` | 0.0% | 0/12 | 0 | 12 |  |
+| 24 | `lzma` | 0.0% | 0/5 | 0 | 5 |  |
+| 25 | `lzma_bytes` | 0.0% | 0/2 | 0 | 2 |  |
+| 26 | `movieclip` | 0.0% | 0/9 | 0 | 9 |  |
+| 27 | `slider_component` | 0.0% | 0/4 | 0 | 4 |  |
+| 28 | `stream1` | 0.0% | 0/9 | 0 | 9 |  |
+| 29 | `stroke1` | 0.0% | 0/1 | 0 | 1 |  |
+| 30 | `stylesheet` | 0.0% | 0/3 | 0 | 3 |  |
