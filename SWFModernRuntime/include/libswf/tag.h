@@ -109,6 +109,10 @@ void tagDefineVideoStream(SWFAppContext* app_context, u16 char_id);
 void tagRegisterExport(SWFAppContext* app_context, const char* name, size_t char_id);
 void tagImportCharacter(SWFAppContext* app_context, size_t local_char_id, const char* export_name);
 
+// Run a DoInitAction script, guarded by once-per-character-id.
+// Used for DoInitAction tags inside DefineSprite definitions.
+void tagDoInitActionGuarded(SWFAppContext* app_context, size_t char_id, frame_func action);
+
 // Forward declaration (defined in actionmodern/action.h)
 typedef struct MovieClip MovieClip;
 

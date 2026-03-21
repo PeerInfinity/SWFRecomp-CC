@@ -271,6 +271,15 @@ static void process_sprite_init_at_depth(SWFAppContext* app_context, MovieClip* 
 			}
 			if (child_mc) child_mc->display_obj = (void*)obj;
 
+			// Set totalframes/framesloaded from the sprite definition BEFORE
+			// clip actions fire (onLoad reads _totalframes/_framesloaded).
+			if (child_mc) {
+				child_mc->totalframes = (int)ch->sprite_frame_count;
+				child_mc->framesloaded = (int)ch->sprite_frame_count;
+				if (ch->sprite_frame_count == 0)
+					child_mc->currentframe = 0;
+			}
+
 			// In constructor_only mode, only fire constructors (no Phase 2 scripts).
 			// Keep sprite_needs_init set so the later script pass can find this sprite.
 			if (g_constructor_only_mode)
@@ -3866,6 +3875,19 @@ void tagDefineSpriteEx(SWFAppContext* app_context, size_t char_id, frame_func* f
 		}
 		g_char_movie_id[char_id] = g_current_movie_id;
 	}
+}
+
+// DoInitAction once-per-character guard (for DoInitAction inside DefineSprite)
+#define MAX_INIT_ACTION_CHARS 512
+static u8 g_init_action_done[MAX_INIT_ACTION_CHARS];
+
+void tagDoInitActionGuarded(SWFAppContext* app_context, size_t char_id, frame_func action)
+{
+	if (char_id < MAX_INIT_ACTION_CHARS && g_init_action_done[char_id])
+		return;
+	if (char_id < MAX_INIT_ACTION_CHARS)
+		g_init_action_done[char_id] = 1;
+	action(app_context);
 }
 
 // Per-sprite frame label storage (separate from Character union)

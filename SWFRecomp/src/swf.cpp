@@ -3019,7 +3019,7 @@ namespace SWFRecomp
 
 					size_t clip_scripts_start = next_script_i;
 					size_t clip_action_iter = 0;
-					while (true)
+					while (all_event_flags != 0)
 					{
 						if (++clip_action_iter > 1000)
 						{
@@ -4090,7 +4090,7 @@ namespace SWFRecomp
 								size_t clip_scripts_start = next_script_i;
 								size_t sprite_clip_action_count = 0;
 
-								while (true)
+								while (all_event_flags != 0)
 								{
 									if (++sprite_clip_action_count > 1000)
 									{
@@ -4381,6 +4381,46 @@ namespace SWFRecomp
 							sprite_frame_scripts << "\t" << "if (!catch_up_mode) " << script_name << "(app_context);" << endl;
 
 							// Mark this sprite script as non-timeline
+							non_timeline_scripts.insert(next_script_i - 1);
+
+							break;
+						}
+
+						case SWF_TAG_DO_INIT_ACTION:
+						{
+							// DoInitAction inside DefineSprite — parse SpriteId and emit guarded call
+							sub_tag.clearFields();
+							sub_tag.setFieldCount(1);
+							sub_tag.configureNextField(SWF_FIELD_UI16);
+							sub_tag.parseFields(cur_pos);
+							u16 init_sprite_id = (u16) sub_tag.fields[0].value;
+
+							std::string script_name = "script_" + to_string(next_script_i);
+							context.out_script_header << endl << "void " << script_name << "(SWFAppContext* app_context);";
+
+							ofstream sprite_init_script(context.output_scripts_folder + script_name + ".c", ios_base::out);
+							sprite_init_script << "#include <recomp.h>" << endl
+											   << "#include <setjmp.h>" << endl
+											   << "#include \"script_decls.h\"" << endl << endl
+											   << "void " << script_name << "(SWFAppContext* app_context)" << endl
+											   << "{" << endl;
+							sprite_init_script << "\t" << "char str_buffer[17];" << endl << endl;
+							sprite_init_script << "\t" << "actionResetRegisters();" << endl << endl;
+
+							next_script_i += 1;
+
+							action.parseActions(context, cur_pos, sprite_init_script);
+
+							sprite_init_script << "}";
+
+							// Emit guarded call (once-per-character-id) into sprite frame scripts buffer.
+							// DoInitAction fires before frame actions, so prepend to buffer.
+							std::string prev = sprite_frame_scripts.str();
+							sprite_frame_scripts.str("");
+							sprite_frame_scripts.clear();
+							sprite_frame_scripts << "\t" << "tagDoInitActionGuarded(app_context, " << init_sprite_id << ", " << script_name << ");" << endl;
+							sprite_frame_scripts << prev;
+
 							non_timeline_scripts.insert(next_script_i - 1);
 
 							break;

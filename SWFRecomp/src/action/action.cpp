@@ -128,18 +128,30 @@ namespace SWFRecomp
 		std::set<char*> labels;
 
 		// Parse action bytes once to mark labels
-		while (code != SWF_ACTION_END_OF_ACTIONS)
+		while (true)
 		{
 			code = (SWFActionType) (u8) action_buffer[0];
 			action_buffer += 1;
 			length = 0;
-			
+
+			if (code == SWF_ACTION_END_OF_ACTIONS)
+			{
+				// Check if any collected label points beyond current position.
+				// If so, continue parsing past END (Flash allows jumps past END).
+				bool has_beyond = false;
+				for (const char* ptr : labels) {
+					if (ptr >= action_buffer) { has_beyond = true; break; }
+				}
+				if (!has_beyond) break;
+				continue; // treat END as no-op, keep parsing
+			}
+
 			if ((code & 0b10000000) != 0)
 			{
 				length = VAL(u16, action_buffer);
 				action_buffer += 2;
 			}
-			
+
 			switch (code)
 			{
 				case SWF_ACTION_JUMP:
@@ -252,7 +264,16 @@ namespace SWFRecomp
 		// Track dead code after unconditional jumps (for ConstantPool skip)
 		bool in_dead_code = false;
 		
-		while (code != SWF_ACTION_END_OF_ACTIONS)
+		// Lambda to check if any label beyond current position hasn't been emitted yet
+		auto hasUnvisitedLabelsAhead = [&]() -> bool {
+			for (const char* ptr : labels) {
+				if (ptr >= action_buffer && emitted_labels.count(const_cast<char*>(ptr)) == 0)
+					return true;
+			}
+			return false;
+		};
+
+		while (code != SWF_ACTION_END_OF_ACTIONS || hasUnvisitedLabelsAhead())
 		{
 			// Check try/catch/finally block boundaries before processing next action
 			while (!try_boundaries.empty())
@@ -354,6 +375,14 @@ namespace SWFRecomp
 			{
 				case SWF_ACTION_END_OF_ACTIONS:
 				{
+					// If continuing past END (labels beyond), emit return to stop fall-through
+					if (hasUnvisitedLabelsAhead())
+					{
+						if (context.in_function_body)
+							out_script << "\t" << "{ ActionVar _hr = {0}; _hr.type = ACTION_STACK_VALUE_UNDEFINED; return _hr; }" << endl;
+						else
+							out_script << "\t" << "return;" << endl;
+					}
 					break;
 				}
 
