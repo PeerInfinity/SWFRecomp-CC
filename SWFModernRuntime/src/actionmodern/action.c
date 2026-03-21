@@ -39868,6 +39868,9 @@ static int varToStringBuf(SWFAppContext* app_context, ActionVar* v, char* buf, i
 			{
 				if (i > 0 && pos < buf_size - 1) buf[pos++] = ',';
 				ActionVar* elem = getArrayElement(nested, i);
+				// Flash: missing elements (HOLE) → empty string in array toString
+				if (elem == NULL || elem->type == ACTION_STACK_VALUE_HOLE)
+					continue;
 				char elem_str[64];
 				int elen = varToStringBuf(app_context, elem, elem_str, sizeof(elem_str));
 				for (int j = 0; j < elen && pos < buf_size - 1; j++)
@@ -40339,8 +40342,12 @@ static int callArrayMethod(SWFAppContext* app_context,
 				buf_len += sep_len;
 			}
 			ActionVar* elem = getArrayElement(arr, i);
+			// Flash: missing elements (HOLE) and out-of-bounds produce empty string in join
+			if (elem == NULL || elem->type == ACTION_STACK_VALUE_HOLE) {
+				// Empty string — just skip (append nothing)
+			}
 			// For STRING type, append UTF-16 data directly to avoid buffer truncation
-			if (elem != NULL && elem->type == ACTION_STACK_VALUE_STRING) {
+			else if (elem->type == ACTION_STACK_VALUE_STRING) {
 				const uint16_t* u16 = varGetU16Ptr(elem);
 				if (u16 != NULL && elem->str_size > 0) {
 					u32 needed = elem->str_size * 4 + 1;
