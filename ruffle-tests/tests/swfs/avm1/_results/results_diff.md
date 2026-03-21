@@ -1,22 +1,23 @@
 # Ruffle Test Results Diff
 
-**Previous:** `97348d219df4` (2026-03-20T22:05:20.728849+00:00)
-**Current:** `d218f871304b` (2026-03-20T22:35:40.007157+00:00)
+**Previous:** `d218f871304b` (2026-03-20T22:35:40.007157+00:00)
+**Current:** `f4f3c5d633a0` (2026-03-21T03:31:33.699069+00:00)
 
 ## Summary
 
 | Metric | Previous | Current | Delta |
 |--------|----------|---------|-------|
-| Passing | 559 | 562 | +3 |
+| Passing | 562 | 558 | -4 |
 | Total | 619 | 619 | 0 |
-| Pass rate | 90.3% | 90.8% | +0.5% |
-| Mismatched lines | 13013 | 12909 | -104 |
-|   Decreased | | | -104 |
+| Pass rate | 90.8% | 90.1% | -0.7% |
+| Mismatched lines | 12909 | 12919 | +10 |
+|   Increased | | | +10 |
 
-## Newly Passing (3)
+## Newly Failing (4)
 
-| Test | Previous Status | Lines (prev) | Lines (now) |
-|------|----------------|--------------|-------------|
-| `watch` | runtime_error | 14/117 | 117/117 |
-| `watch_textfield` | runtime_error | 12/12 | 12/12 |
-| `watch_virtual_property_proto` | runtime_error | 1/2 | 2/2 |
+| Test | New Status | Lines (prev) | Lines (now) |
+|------|-----------|--------------|-------------|
+| `array_constructor` | output_mismatch | 30/30 | 29/30 |
+| `array_properties` | output_mismatch | 36/36 | 33/36 |
+| `external_interface_toxml_basic` | output_mismatch | 179/179 | 174/179 |
+| `global_array` | output_mismatch | 3/3 | 2/3 |
