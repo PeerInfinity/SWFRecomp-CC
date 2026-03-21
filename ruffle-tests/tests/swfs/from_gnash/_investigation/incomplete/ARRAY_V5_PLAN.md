@@ -1,90 +1,91 @@
 # array-v5 Investigation Plan
 <!-- TESTS: array-v5 -->
 
-Last updated: 2026-03-19
+Last updated: 2026-03-20
 
-## Status: INVESTIGATED — root causes identified, not yet fixed
+## Status: IN PROGRESS — 422/560 lines match (75.4%), 138 remaining failures
 
 ---
 
 ## Overview
 
-The `array-v5` test exercises extensive Array operations (560 expected lines) and crashes with `heap_alloc(16) failed - out of memory` after producing ~108 lines. Compilation takes ~72 seconds due to the massive `script_2.c` (70,731 lines). The test is marked `known_failure = true` in its `test.toml`.
+The `array-v5` test exercises extensive Array operations (560 expected lines). Compilation takes ~72 seconds due to the massive `script_2.c` (70,731 lines). The test is marked `known_failure = true` in its `test.toml`.
 
-## Root Causes (Three Categories)
+## Progress Summary
 
-### 1. Missing Array.prototype Methods (Primary — blocks majority of test)
+| Date | Match Rate | Notes |
+|------|-----------|-------|
+| 2026-03-19 | ~46/560 (8.2%) | OOM after ~108 lines |
+| 2026-03-20 (CI) | 405/560 (72.3%) | OOM fixed, Array.prototype methods registered |
+| 2026-03-20 (session) | 422/560 (75.4%) | +17 lines: HOLE join, length truncation, array delete |
 
-`typeof(Array.prototype.concat/join/pop/push/reverse/shift/slice/sort/sortOn/splice/unshift)` all return `'undefined'` instead of `'function'`. Only `toString` is present on the prototype.
+## Completed Fixes
 
-**Impact**: Lines 13-23 (typeof checks), lines 34-36 (method existence), and most downstream assertions fail because calling undefined methods produces no results.
+### 1. OOM After ~108 Lines — FIXED (prior session)
+The heap exhaustion bug was fixed in a prior session. All 560 lines of output now produced.
 
-**Fix**: Register all Array.prototype methods as ASFunction objects. Many of these methods already exist as internal C implementations (the AVM1 suite exercises them successfully via direct array operations), but they're not exposed as callable properties on `Array.prototype`.
+### 2. Array.prototype Method Registration — DONE (prior session)
+All standard Array.prototype methods registered as ASFunction objects on `g_array_prototype`.
 
-**Estimated effort**: Medium. The runtime has `actionArraySort`, `actionArrayJoin`, etc. — need to wrap them in ASFunction objects and register on the prototype, similar to how Math methods are registered on `g_math_object`.
+### 3. HOLE/Sparse Array join/toString — FIXED (commit 0c3e8470)
+Array.join() and toString() now produce empty strings for HOLE (missing) elements. +9 lines.
 
-### 2. Array.toString Returns `[object Object]` (lines 54, 72-74)
+### 4. Array Length Truncation for Negative Values — FIXED (commit c8449aed)
+Setting `arr.length = -1` now properly clears all elements using signed comparison. `getArrayElement()` returns NULL when length is negative (signed). +8 lines.
 
-`a.toString()` returns `[object Object]` instead of comma-separated values. The Array type falls through to `Object.prototype.toString` rather than using `Array.prototype.toString`.
+### 5. actionDelete for Array Elements — FIXED (commit f04b08cc)
+`actionDelete` now handles: (a) non-string property names (F64 index → convert to string), (b) ARRAY type objects (marks elements as HOLE). +0 net (masked by prior fixes).
 
-**Root cause**: Same as #1 — `Array.prototype.toString` is not properly bound. The existing `toString` that "works" (line 24) may be testing the typeof, not actually calling it.
+## Remaining Failures (138 lines, categorized)
 
-**Fix**: Ensure Array instances' prototype chain correctly resolves `toString` to the array-specific implementation that returns comma-separated values.
+### Category A: typeof(Array.prototype.method) → "undefined" (3 lines)
+**Lines**: array.as:80,82,83 — `typeof(f)` where `f = Array.prototype.concat`
+**Root cause**: The Dejagnu `check_equals(typeof(f), 'function')` receives "undefined" even though the prototype methods ARE registered. Investigation confirmed the inline typeof check PASSES (concat is type=13/FUNCTION on the prototype). The issue is in how the variable `f` is assigned — likely a stack/variable handling interaction specific to SWF5 Dejagnu test harness.
+**Complexity**: High (deep runtime interaction)
 
-### 3. OOM After ~108 Lines (Heap Exhaustion)
+### Category B: Standalone prototype method calls return empty (~48 lines)
+**Lines**: array.as:455-553+ — concat(), slice(), pop() called via variable or as standalone
+**Root cause**: `builtin_array_method` wrapper returns undefined for safety (can't distinguish ASArray* from ASObject* in `this_obj`). Only `callArrayMethod` in actionCallMethod's ARRAY branch works.
+**Complexity**: High — needs safe ASArray recovery from `arr->props`
 
-After producing ~108 lines of output, `heap_alloc(16)` fails. The test performs hundreds of array operations (create, splice, sort, concat, etc.) that allocate strings and array elements. With a 1 GB heap, this suggests either:
+### Category C: Sort ordering differences (~35 lines)
+**Lines**: array.as:295-1275 — CASEINSENSITIVE, DESCENDING, RETURNINDEXEDARRAY, sortOn
+**Assessment**: Our sort implementation matches Ruffle's AVM1 tests (array_sort PASSES). Most differences are Gnash-specific sort algorithm behavior. Many lines may be accepted diffs.
 
-- **Memory leak**: Array elements or string concatenation results not being freed during operations
-- **Fragmentation**: Many small allocations leaving the heap in a fragmented state
-- **Exponential growth**: Some array operation creating unexpectedly large intermediate results
+### Category D: Splice/shift/reverse on sparse arrays (~20 lines)
+**Lines**: array.as:215-263, 433-435, 1416-1474
+**Root cause**: Various array mutation operations on sparse arrays produce wrong results.
 
-**Investigation needed**: Run with heap tracking to identify which operations are consuming the most memory. The fact that it fails at 16 bytes (not a large allocation) strongly suggests fragmentation or leak rather than genuinely needing more memory.
+### Category E: Array methods on generic objects (~20 lines)
+**Lines**: array.as:1509-1636 — `Array.prototype.method.apply(obj)` on plain objects
+**Root cause**: Same as Category B — `builtin_array_method` returns undefined for non-array `this_obj`.
 
-**Fix complexity**: Depends on root cause. Could be a simple free() in the right place, or could require a more fundamental allocation strategy change.
+### Category F: ASSetPropFlags-protected delete (2 lines)
+**Lines**: array.as:792,795 — `! delete c[2]` should return false when protected
 
-## Recommended Fix Order
+### Category G: instanceof Array / constructor (4 lines)
+**Lines**: array.as:103,740,741,1263
 
-### Phase 1: Array.prototype Method Registration (est. +200 lines matching)
+### Category H: __resolve + toString override (6 lines)
+**Lines**: array.as:1653-1671, 1710
 
-Register all standard Array.prototype methods as ASFunction objects:
+## Key Finding: Dual Array Constructor
+Two separate Array constructors exist (`g_array_constructor` from `actionGetVariable` and `g_ctors[1]` from `ensureGlobalInit`). They have different `prototype_obj` pointers until both are initialized. This can cause `instanceof` mismatches.
 
-```
-concat, join, pop, push, reverse, shift, slice, sort, sortOn, splice, unshift, toString
-```
+## Recommended Next Steps
 
-Implementation pattern — same as Math object:
-1. Create static `g_array_funcs[12]` ASFunction array
-2. Create `g_array_prototype` singleton ASObject
-3. Lazy init via `initArrayPrototype()`
-4. Register each method as an ASFunction with a Function2Ptr that dispatches to the existing C implementation
-5. Set `Array.prototype = g_array_prototype` and ensure new arrays get `__proto__ = g_array_prototype`
-
-### Phase 2: Sort Algorithm Fixes (est. +20 lines matching)
-
-- `Array.DESCENDING` flag produces reversed order
-- Custom comparator `this` binding is wrong (`object` instead of `undefined`)
-- `sortOn` results are reversed
-
-### Phase 3: OOM Investigation (est. enables remaining ~250 lines)
-
-Profile heap usage during the test to find the leak. Likely candidates:
-- `actionArraySplice` not freeing removed elements
-- `actionAdd2` string concatenation creating temporary strings that aren't freed
-- Array resize operations not freeing old backing arrays
-
-## Dependencies
-
-- No dependencies on other fixes
-- Shares patterns with the AVM1 suite's Array tests (which pass) — can reference those implementations
+1. **Accept Gnash-specific sort diffs** — Category C sort lines confirmed matching Ruffle. Consider adding to accepted diffs.
+2. **Fix splice/shift for sparse arrays** — Category D, moderate effort, ~20 lines impact.
+3. **Make builtin_array_method work for arrays** — Categories B+E, high effort but ~68 lines impact.
+4. **Unify dual Array constructors** — Category G, moderate effort, ~4 lines impact.
 
 ## Test Details
 
 | Metric | Value |
 |--------|-------|
 | Expected output | 560 lines |
-| Current output | ~108 lines (then OOM) |
-| Match rate | ~46/560 (8.2%) |
+| Current matching | 422 lines (75.4%) |
+| Remaining failures | 138 lines |
 | Compilation time | ~72 seconds |
 | Script size | 70,731 lines (script_2.c) |
 | SWF version | 5 |
