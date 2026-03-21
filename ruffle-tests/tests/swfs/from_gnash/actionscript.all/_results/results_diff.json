@@ -1,9 +1,9 @@
 {
   "metadata": {
-    "old_timestamp": "2026-03-21T05:00:50.095919+00:00",
-    "old_git_sha": "76dbb8fbda4bf507f0eaa7a30fe575fba237809d",
-    "new_timestamp": "2026-03-21T17:15:20.206552+00:00",
-    "new_git_sha": "d1246208029f425a0655dd9760aaf814c6fa9860",
+    "old_timestamp": "2026-03-21T17:15:20.206552+00:00",
+    "old_git_sha": "d1246208029f425a0655dd9760aaf814c6fa9860",
+    "new_timestamp": "2026-03-21T18:50:17.678836+00:00",
+    "new_git_sha": "a53c11a51e0e7915cc8ed67ff5941b293efece9c",
     "partial": false,
     "same_commit": false
   },
@@ -14,81 +14,16 @@
     "new_pass": 51,
     "new_total": 190,
     "new_pass_rate": 26.8,
-    "old_mismatched_lines": 5255,
+    "old_mismatched_lines": 5248,
     "new_mismatched_lines": 5248,
-    "increased_mismatches": 2,
-    "decreased_mismatches": 9,
+    "increased_mismatches": 0,
+    "decreased_mismatches": 0,
     "newly_passing": 0,
     "newly_failing": 0,
     "status_changed": 0,
-    "unchanged": 186,
+    "unchanged": 190,
     "added": 0,
     "removed": 0
   },
-  "changes": [
-    {
-      "test": "Inheritance-v6",
-      "change_type": "changed",
-      "old_status": "output_mismatch",
-      "new_status": "output_mismatch",
-      "old_lines": {
-        "actual_lines": 182,
-        "expected_lines": 181,
-        "matching_lines": 159
-      },
-      "new_lines": {
-        "actual_lines": 182,
-        "expected_lines": 181,
-        "matching_lines": 162
-      }
-    },
-    {
-      "test": "Inheritance-v7",
-      "change_type": "changed",
-      "old_status": "output_mismatch",
-      "new_status": "output_mismatch",
-      "old_lines": {
-        "actual_lines": 182,
-        "expected_lines": 181,
-        "matching_lines": 168
-      },
-      "new_lines": {
-        "actual_lines": 182,
-        "expected_lines": 181,
-        "matching_lines": 171
-      }
-    },
-    {
-      "test": "Inheritance-v8",
-      "change_type": "changed",
-      "old_status": "output_mismatch",
-      "new_status": "output_mismatch",
-      "old_lines": {
-        "actual_lines": 182,
-        "expected_lines": 181,
-        "matching_lines": 169
-      },
-      "new_lines": {
-        "actual_lines": 182,
-        "expected_lines": 181,
-        "matching_lines": 172
-      }
-    },
-    {
-      "test": "array-v5",
-      "change_type": "changed",
-      "old_status": "output_mismatch",
-      "new_status": "output_mismatch",
-      "old_lines": {
-        "actual_lines": 560,
-        "expected_lines": 560,
-        "matching_lines": 420
-      },
-      "new_lines": {
-        "actual_lines": 560,
-        "expected_lines": 560,
-        "matching_lines": 418
-      }
-    }
-  ]
+  "changes": []
 }
