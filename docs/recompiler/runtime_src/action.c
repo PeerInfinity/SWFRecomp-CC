@@ -44,6 +44,7 @@ static inline int32_t varToInt32(ActionVar* v);
 static int callArrayMethod(SWFAppContext* app_context, ASArray* arr,
                            const char* method_name, u32 method_name_len,
                            ActionVar* args, u32 num_args);
+static void initArrayPrototypeMethods(SWFAppContext* app_context);
 
 u32 start_time;
 
@@ -153,15 +154,18 @@ static uint32_t utf8_decode_one(const char* s, int byte_len, int* pos)
 	return cp;
 }
 
-// Convert UTF-8 to heap-allocated UTF-16. Returns uint16_t* (from heap_alloc).
+// Convert UTF-8 to malloc-allocated UTF-16. Returns uint16_t*.
+// Uses malloc (not heap_alloc) so that leaked strings don't exhaust the fixed heap arena.
 static uint16_t* utf8_to_u16(SWFAppContext* app_context, const char* utf8, u32 byte_len, u32* out_u16_len)
 {
+	(void)app_context;
 	if (byte_len == 0 || utf8 == NULL) {
 		*out_u16_len = 0;
 		return (uint16_t*) u16_empty;
 	}
 	int count = utf8_utf16_length(utf8, (int)byte_len);
-	uint16_t* result = (uint16_t*) heap_alloc(app_context, (count + 1) * sizeof(uint16_t));
+	uint16_t* result = (uint16_t*) malloc((count + 1) * sizeof(uint16_t));
+	if (result == NULL) { *out_u16_len = 0; return (uint16_t*) u16_empty; }
 	int u = 0, i = 0;
 	while (i < (int)byte_len) {
 		uint32_t cp = utf8_decode_one(utf8, (int)byte_len, &i);
@@ -236,9 +240,12 @@ static int u16_cmp(const uint16_t* a, u32 a_len, const uint16_t* b, u32 b_len)
 }
 
 // Fast ASCII-to-UTF-16 conversion (for number strings which are always ASCII)
+// Uses malloc (not heap_alloc) so leaked strings don't exhaust the fixed heap arena.
 static uint16_t* ascii_to_u16(SWFAppContext* app_context, const char* ascii, int len, u32* out_len)
 {
-	uint16_t* result = (uint16_t*) heap_alloc(app_context, (len + 1) * sizeof(uint16_t));
+	(void)app_context;
+	uint16_t* result = (uint16_t*) malloc((len + 1) * sizeof(uint16_t));
+	if (result == NULL) { *out_len = 0; return (uint16_t*) u16_empty; }
 	for (int i = 0; i < len; i++)
 		result[i] = (uint16_t)(unsigned char)ascii[i];
 	result[len] = 0;
@@ -254,12 +261,19 @@ static const uint16_t* varGetU16Ptr(ActionVar* v)
 		v->data.string_data.heap_ptr : (const uint16_t*) v->data.numeric_value;
 }
 
-// Concatenate two UTF-16 strings into a new heap-allocated buffer
+// Concatenate two UTF-16 strings into a new malloc-allocated buffer
 static uint16_t* u16_concat(SWFAppContext* app_context, const uint16_t* a, u32 a_len,
                              const uint16_t* b, u32 b_len, u32* out_len)
 {
+	(void)app_context;
 	u32 total = a_len + b_len;
-	uint16_t* result = (uint16_t*) heap_alloc(app_context, (total + 1) * sizeof(uint16_t));
+	uint16_t* result = (uint16_t*) malloc((total + 1) * sizeof(uint16_t));
+	if (result == NULL) {
+		// OOM: return empty string to avoid segfault
+		static uint16_t empty_u16 = 0;
+		*out_len = 0;
+		return &empty_u16;
+	}
 	if (a_len > 0) memcpy(result, a, a_len * sizeof(uint16_t));
 	if (b_len > 0) memcpy(result + a_len, b, b_len * sizeof(uint16_t));
 	result[total] = 0;
@@ -703,6 +717,8 @@ static ASObject* g_object_prototype = NULL;
 
 // Global Array.prototype — shared by all arrays for instanceof and arguments.__proto__
 static ASObject* g_array_prototype = NULL;
+static int g_array_proto_methods_init = 0;  // Whether Array.prototype methods have been registered
+static ASFunction g_array_proto_funcs[13];  // push,pop,shift,unshift,reverse,join,toString,concat,slice,splice,sort,sortOn,hasOwnProperty
 
 // Currently executing user-defined function — used to set arguments.caller
 static ASFunction* g_current_executing_func = NULL;
@@ -989,7 +1005,7 @@ static void textSnapshotCapture(SWFAppContext* app_context, ASObject* ts_obj, Mo
 	ActionVar tv = {0};
 	tv.type = ACTION_STACK_VALUE_STRING;
 	tv.str_size = (u32)text_len;
-	tv.data.string_data.heap_ptr = (uint16_t*)heap_alloc(app_context, (text_len + 1) * sizeof(uint16_t));
+	tv.data.string_data.heap_ptr = (uint16_t*)malloc( (text_len + 1) * sizeof(uint16_t));
 	memcpy(tv.data.string_data.heap_ptr, text_buf, text_len * sizeof(uint16_t));
 	tv.data.string_data.heap_ptr[text_len] = 0;
 	tv.data.string_data.owns_memory = true;
@@ -1005,7 +1021,7 @@ static void textSnapshotCapture(SWFAppContext* app_context, ASObject* ts_obj, Mo
 	ActionVar nv = {0};
 	nv.type = ACTION_STACK_VALUE_STRING;
 	nv.str_size = (u32)text_len;
-	nv.data.string_data.heap_ptr = (uint16_t*)heap_alloc(app_context, (text_len + 1) * sizeof(uint16_t));
+	nv.data.string_data.heap_ptr = (uint16_t*)malloc( (text_len + 1) * sizeof(uint16_t));
 	memcpy(nv.data.string_data.heap_ptr, nl_buf, text_len * sizeof(uint16_t));
 	nv.data.string_data.heap_ptr[text_len] = 0;
 	nv.data.string_data.owns_memory = true;
@@ -1079,7 +1095,7 @@ static ActionVar builtin_ts_getText(SWFAppContext* app_context, ActionVar* args,
 
 	ret.type = ACTION_STACK_VALUE_STRING;
 	ret.str_size = (u32)rlen;
-	ret.data.string_data.heap_ptr = (uint16_t*)heap_alloc(app_context, (rlen + 1) * sizeof(uint16_t));
+	ret.data.string_data.heap_ptr = (uint16_t*)malloc( (rlen + 1) * sizeof(uint16_t));
 	memcpy(ret.data.string_data.heap_ptr, result, rlen * sizeof(uint16_t));
 	ret.data.string_data.heap_ptr[rlen] = 0;
 	ret.data.string_data.owns_memory = true;
@@ -1995,7 +2011,7 @@ static ActionVar builtin_string_fromCharCode(SWFAppContext* app_context, ActionV
 		return ret;
 
 	// Each arg produces one UTF-16 code unit
-	uint16_t* buf = (uint16_t*) heap_alloc(app_context, (arg_count + 1) * sizeof(uint16_t));
+	uint16_t* buf = (uint16_t*) malloc( (arg_count + 1) * sizeof(uint16_t));
 	u32 pos = 0;
 
 	for (u32 i = 0; i < arg_count; i++)
@@ -3607,8 +3623,10 @@ static void init_asnative_2(void)
 	g_asnative_2_init = 1;
 }
 
+static ASObject* getObjectPrototype(SWFAppContext* app_context); // forward decl for ASnative class 101
+
 // ASnative(class_id, method_index) — returns a native method by numeric address.
-// Handles class 2 (ASNew), class 100 (global functions), class 200 (Math).
+// Handles class 2 (ASNew), class 101 (Object.prototype), class 100 (global functions), class 200 (Math).
 static ActionVar builtin_asnative(SWFAppContext* app_context, ActionVar* args, u32 arg_count, ActionVar* registers, void* this_obj)
 {
 	(void)registers; (void)this_obj;
@@ -3634,6 +3652,34 @@ static ActionVar builtin_asnative(SWFAppContext* app_context, ActionVar* args, u
 			result.type = ACTION_STACK_VALUE_FUNCTION;
 			VAL(u64, &result.data.numeric_value) = (u64)&g_asnative_2_asnew;
 			return result;
+		}
+		return undef;
+	}
+
+	// Class 101: Object.prototype methods
+	// Flash ASnative(101, N): 0=watch, 1=unwatch, 2=addProperty, 3=valueOf,
+	// 4=toString, 5=hasOwnProperty, 6=isPropertyEnumerable, 7=isPrototypeOf
+	if (class_id == 101) {
+		// Ensure Object.prototype is initialized (which initializes the functions)
+		getObjectPrototype(app_context);
+		ASFunction* obj_methods[] = {
+			&g_object_watch_func,                // 0
+			&g_object_unwatch_func,              // 1
+			&g_object_addProperty_func,          // 2
+			&g_object_valueOf_func,              // 3
+			&g_object_toString_func,             // 4
+			&g_object_hasOwnProperty_func,       // 5
+			&g_object_isPropertyEnumerable_func, // 6
+			&g_object_isPrototypeOf_func,        // 7
+		};
+		if (method_index <= 7) {
+			ASFunction* fn = obj_methods[method_index];
+			if (fn->advanced_func != NULL || fn->simple_func != NULL) {
+				ActionVar result = {0};
+				result.type = ACTION_STACK_VALUE_FUNCTION;
+				VAL(u64, &result.data.numeric_value) = (u64)fn;
+				return result;
+			}
 		}
 		return undef;
 	}
@@ -3739,8 +3785,8 @@ static void initMathObject(SWFAppContext* app_context)
 		g_math_funcs[i].function_type = 2;
 		g_math_funcs[i].param_count = 0;
 		g_math_funcs[i].advanced_func = math_methods[i].func;
-		if (function_count < MAX_FUNCTIONS)
-			function_registry[function_count++] = &g_math_funcs[i];
+		// Note: Math methods are NOT registered in function_registry.
+		// They are only accessible via Math.method(), not as standalone globals.
 
 		ActionVar fv = {0};
 		fv.type = ACTION_STACK_VALUE_FUNCTION;
@@ -4713,9 +4759,12 @@ static ASObject* getObjectPrototype(SWFAppContext* app_context)
 		vo_var.data.numeric_value = (u64) &g_object_valueOf_func;
 		setProperty(app_context, g_object_prototype, "valueOf", 7, &vo_var);
 
-		// SWF6+ methods on Object.prototype (VERSION_6 in Ruffle):
+		// Methods on Object.prototype (always installed regardless of SWF version):
 		// hasOwnProperty, isPropertyEnumerable, isPrototypeOf, watch, unwatch, addProperty
-		if (g_swf_version >= 6) {
+		// Note: Flash controls visibility via ASSetPropFlags, not by omitting methods.
+		// Installing unconditionally prevents the singleton poison bug where a SWF5 child
+		// movie (e.g., Dejagnu.swf) initializes Object.prototype before the SWF6+ parent.
+		{
 		// Set up the built-in hasOwnProperty function (type-2: needs this_obj + args)
 		memset(&g_object_hasOwnProperty_func, 0, sizeof(ASFunction));
 		strncpy(g_object_hasOwnProperty_func.name, "hasOwnProperty", 255);
@@ -4812,11 +4861,29 @@ static ASObject* getObjectPrototype(SWFAppContext* app_context)
 		addprop_var.str_size = 0;
 		addprop_var.data.numeric_value = (u64) &g_object_addProperty_func;
 		setProperty(app_context, g_object_prototype, "addProperty", 11, &addprop_var);
-		} // end if (g_swf_version >= 6)
+		} // end Object.prototype SWF6+ methods block
 
 		// Mark all built-in Object.prototype properties as non-enumerable (DontEnum)
 		for (u32 i = 0; i < g_object_prototype->num_used; i++)
 			g_object_prototype->properties[i].flags &= ~PROPERTY_FLAG_ENUMERABLE;
+
+		// Mark SWF6+ methods with flash_flags for version-based hiding.
+		// flash_flags 0x0080: hidden in SWF5 (mask 0x7480), visible in SWF6+ (mask 0x7500).
+		// This ensures the methods exist (preventing singleton poison) but are invisible in SWF5.
+		static const char* swf6_methods[] = {
+			"hasOwnProperty", "isPropertyEnumerable", "isPrototypeOf",
+			"watch", "unwatch", "addProperty"
+		};
+		for (int m = 0; m < 6; m++) {
+			u32 mlen = (u32)strlen(swf6_methods[m]);
+			for (u32 i = 0; i < g_object_prototype->num_used; i++) {
+				if (g_object_prototype->properties[i].name_length == mlen &&
+				    memcmp(g_object_prototype->properties[i].name, swf6_methods[m], mlen) == 0) {
+					g_object_prototype->properties[i].flash_flags = 0x0080;
+					break;
+				}
+			}
+		}
 	}
 	return g_object_prototype;
 }
@@ -4896,10 +4963,11 @@ static void setupArgumentsProps(SWFAppContext* app_context, ASArray* arr,
 	// Lazily create Array.prototype (shared singleton)
 	if (g_array_prototype == NULL)
 	{
-		g_array_prototype = allocObject(app_context, 4);
+		g_array_prototype = allocObject(app_context, 16);
 		retainObject(g_array_prototype);
 		setObjectProto(app_context, g_array_prototype);
 	}
+	initArrayPrototypeMethods(app_context);
 
 	// Allocate props object on the array for non-index properties
 	if (arr->props == NULL)
@@ -7554,9 +7622,18 @@ static void initColorPrototype(SWFAppContext* app_context)
 {
 	if (g_color_init_done) return;
 	g_color_init_done = 1;
-	g_color_prototype = allocObject(app_context, 4);
-	retainObject(g_color_prototype);
-	setObjectProto(app_context, g_color_prototype);
+	// Use the stub constructor's prototype_obj if already initialized (from initColorStubPrototype).
+	// This ensures Color.prototype and new Color().__proto__ are the same object,
+	// which is required for instanceof and hasOwnProperty to work correctly.
+	extern ASFunction g_stub_ctors[];
+	if (g_stub_ctors[3].prototype_obj != NULL) {
+		g_color_prototype = g_stub_ctors[3].prototype_obj;
+	} else {
+		g_color_prototype = allocObject(app_context, 8);
+		retainObject(g_color_prototype);
+		setObjectProto(app_context, g_color_prototype);
+	}
+	// Install real method implementations (overwrite stubs if present)
 	registerGeomMethod(&g_color_methods[0], "getTransform", (Function2Ptr)colorGetTransform, app_context, g_color_prototype);
 	registerGeomMethod(&g_color_methods[1], "setTransform", (Function2Ptr)colorSetTransform, app_context, g_color_prototype);
 	registerGeomMethod(&g_color_methods[2], "getRGB",       (Function2Ptr)colorGetRGB,       app_context, g_color_prototype);
@@ -17778,6 +17855,15 @@ static inline uint32_t varToUint32(ActionVar* v)
 static inline double parseStringToNumber(const char* str)
 {
 	if (str == NULL || str[0] == '\0') return NAN;
+	// Flash doesn't parse "Infinity", "inf", or "NaN" as numbers — reject them
+	// before strtod (which does recognize them). Match convertFloat behavior.
+	const char* p = str;
+	while (*p == ' ' || *p == '\t' || *p == '\n' || *p == '\r') p++;
+	if (*p == '+' || *p == '-') p++;
+	if ((p[0] == 'I' || p[0] == 'i') && (strncasecmp(p, "Infinity", 8) == 0 || strncasecmp(p, "inf", 3) == 0))
+		return NAN;
+	if ((p[0] == 'N' || p[0] == 'n') && strncasecmp(p, "nan", 3) == 0)
+		return NAN;
 	char* end;
 	double val = strtod(str, &end);
 	if (end == str) return NAN;
@@ -17979,9 +18065,9 @@ ActionStackValueType convertFloat(SWFAppContext* app_context)
 			}
 			else
 			{
-				// Empty string -> 0.0 in all SWF versions
-				// ECMA-262 section 9.3.1: empty string converts to +0
-				double temp = 0.0;
+				// Empty string: Flash SWF5+ returns NaN (not ECMA-262's +0)
+				// SWF4 and below: 0.0
+				double temp = (EFFECTIVE_SWF_VERSION() >= 5) ? NAN : 0.0;
 				STACK_TOP_TYPE = ACTION_STACK_VALUE_F64;
 				VAL(u64, &STACK_TOP_VALUE) = VAL(u64, &temp);
 			}
@@ -18039,8 +18125,13 @@ ActionStackValueType convertFloat(SWFAppContext* app_context)
 		{
 			// Try to extract primitive via valueOf
 			ASObject* obj = NULL;
-			if (STACK_TOP_TYPE == ACTION_STACK_VALUE_OBJECT || STACK_TOP_TYPE == ACTION_STACK_VALUE_ARRAY)
+			if (STACK_TOP_TYPE == ACTION_STACK_VALUE_OBJECT)
 				obj = (ASObject*) STACK_TOP_VALUE;
+			else if (STACK_TOP_TYPE == ACTION_STACK_VALUE_ARRAY) {
+				// ASArray has a different struct layout — use props sub-object
+				ASArray* arr = (ASArray*) STACK_TOP_VALUE;
+				obj = arr->props;
+			}
 
 			if (obj != NULL)
 			{
@@ -19604,7 +19695,7 @@ void actionStringExtract(SWFAppContext* app_context, char* str_buffer)
 	}
 	if (index + count > src_len) count = src_len - index;
 
-	uint16_t* result = (uint16_t*)heap_alloc(app_context, count * sizeof(uint16_t));
+	uint16_t* result = (uint16_t*)malloc( count * sizeof(uint16_t));
 	memcpy(result, src + index, count * sizeof(uint16_t));
 	PUSH_U16(result, (u32)count);
 }
@@ -19667,7 +19758,7 @@ void actionMbStringExtract(SWFAppContext* app_context, char* str_buffer)
 	if (index + count > src_len) count = src_len - index;
 
 	// Direct UTF-16 sub-array copy
-	uint16_t* result = (uint16_t*)heap_alloc(app_context, count * sizeof(uint16_t));
+	uint16_t* result = (uint16_t*)malloc( count * sizeof(uint16_t));
 	memcpy(result, src + index, count * sizeof(uint16_t));
 	PUSH_U16(result, (u32)count);
 }
@@ -21569,8 +21660,22 @@ void actionImportAssets(SWFAppContext* app_context, const char* url)
 	if (versionGroup(g_swf_version) == 0 && g_global_legacy) global_object = g_global_legacy;
 	else if (versionGroup(g_swf_version) == 1 && g_global_modern) global_object = g_global_modern;
 
+	// Register child movie's transform data so sprites from this child can look up
+	// the correct array during frame execution (prevents buffer overflow when child
+	// has more transforms than parent).
+	extern void ng_registerMovieTransformData(u8 movie_id, float (*td)[16]);
+	if (entry->transform_data_ptr != NULL)
+		ng_registerMovieTransformData(entry->movie_id, entry->transform_data_ptr);
+
+	// Set active transform data during init for ng_cache_transform
+	extern float (*g_active_transform_data)[16];
+	float (*_saved_td)[16] = g_active_transform_data;
+	if (entry->transform_data_ptr != NULL)
+		g_active_transform_data = entry->transform_data_ptr;
+
 	entry->init_func(app_context);
 
+	g_active_transform_data = _saved_td;
 	g_swf_version = _saved_ver;
 	global_object = _saved_global;
 	g_current_movie_id = _saved_movie_id;
@@ -23703,7 +23808,7 @@ static void ensureGlobalInit(SWFAppContext* app_context)
 	static ASFunction g_registerClass_func_global;
 	memset(g_ctors, 0, sizeof(g_ctors));
 	const char* ctor_names[] = {"Object", "Array", "String", "Number", "Boolean", "Function"};
-	int num_ctors = (g_swf_version >= 6) ? 6 : 5;
+	int num_ctors = 6;  // Always init all 6 (including Function) to prevent singleton poison
 	for (int ci = 0; ci < num_ctors; ci++)
 	{
 		strncpy(g_ctors[ci].name, ctor_names[ci], 255);
@@ -23815,10 +23920,13 @@ static void ensureGlobalInit(SWFAppContext* app_context)
 	installNativeToString(app_context, g_stage_obj);
 
 	// Install AsBroadcaster methods on Mouse, Key, Stage, Selection
+	// In SWF5, addListener/removeListener/broadcastMessage are not available on Stage
 	installAsBroadcaster(app_context, g_mouse_obj);
 	installAsBroadcaster(app_context, g_key_obj);
 	installKeyMethods(app_context, g_key_obj);
-	installAsBroadcaster(app_context, g_stage_obj);
+	if (g_swf_version >= 6) {
+		installAsBroadcaster(app_context, g_stage_obj);
+	}
 	// Stage default properties (READ_ONLY)
 	{
 		ActionVar sv;
@@ -24055,7 +24163,11 @@ static void ensureGlobalInit(SWFAppContext* app_context)
 	REG_FUNC("ASnative", 8, &g_asnative_func);
 	REG_FUNC("ASconstructor", 13, &g_asconstructor_func);
 	REG_FUNC("Object", 6, &g_ctors[0]);
-	if (g_swf_version >= 6) REG_FUNC("Function", 8, &g_ctors[5]);
+	REG_FUNC("Function", 8, &g_ctors[5]);
+	// Mark Function as SWF6+ (flash_flags 0x0080: hidden in SWF5, visible in SWF6+)
+	// Always registered to prevent singleton poison, but invisible to SWF5 lookups.
+	if (global_object->num_used > 0)
+		global_object->properties[global_object->num_used - 1].flash_flags = 0x0080;
 	REG_FUNC("enableDebugConsole", 18, &g_enableDebugConsole_func);
 	// NaN and Infinity are NOT registered on global_object — they're handled by
 	// special handlers in actionGetVariable for SWF5+. Registering them on _global
@@ -24163,8 +24275,8 @@ static void ensureGlobalInit(SWFAppContext* app_context)
 	//   __proto__ (→ Function.prototype), constructor (→ Function), prototype (DONT_ENUM)
 	// plus inherited methods from Function.prototype → Object.prototype via chain walking.
 	{
-		// Function constructor reference (g_ctors[5] for SWF6+, NULL for SWF5)
-		ASFunction* fn_ctor = (g_swf_version >= 6) ? &g_ctors[5] : &g_ctors[0];
+		// Function constructor reference (always g_ctors[5] to prevent singleton poison)
+		ASFunction* fn_ctor = &g_ctors[5];
 
 		// Collect ALL constructor functions that should have own_props populated
 		ASFunction* all_ctors[] = {
@@ -24173,7 +24285,7 @@ static void ensureGlobalInit(SWFAppContext* app_context)
 			&g_ctors[2], // String
 			&g_ctors[3], // Number
 			&g_ctors[4], // Boolean
-			(g_swf_version >= 6) ? &g_ctors[5] : NULL, // Function (SWF6+)
+			&g_ctors[5], // Function (always init to prevent singleton poison)
 			&g_movieclip_constructor,
 			&g_textfield_constructor,
 			&g_textformat_constructor,
@@ -24663,10 +24775,11 @@ static ASObject* getVersionedArrayProto(SWFAppContext* app_context)
 	if (proto != NULL) return proto;
 	// Fallback: use the primary g_array_prototype
 	if (g_array_prototype == NULL) {
-		g_array_prototype = allocObject(app_context, 4);
+		g_array_prototype = allocObject(app_context, 16);
 		retainObject(g_array_prototype);
 		setObjectProto(app_context, g_array_prototype);
 	}
+	initArrayPrototypeMethods(app_context);
 	return g_array_prototype;
 }
 
@@ -25512,10 +25625,11 @@ check_special_vars:
 				// Initialize Array.prototype (shared singleton used by instanceof and arguments.__proto__)
 				if (g_array_prototype == NULL)
 				{
-					g_array_prototype = allocObject(app_context, 4);
+					g_array_prototype = allocObject(app_context, 16);
 					retainObject(g_array_prototype);
 					setObjectProto(app_context, g_array_prototype);
 				}
+				initArrayPrototypeMethods(app_context);
 				g_array_constructor.prototype_obj = g_array_prototype;
 				// Register Array sort-flag constants on own_props
 				g_array_constructor.own_props = allocObject(app_context, 8);
@@ -25570,6 +25684,13 @@ check_special_vars:
 				registerGeomMethod(&g_registerClass_func, "registerClass",
 					(Function2Ptr)actionObjectRegisterClass, app_context,
 					g_object_constructor.own_props);
+
+				// Set Object.prototype.constructor = Object (Flash default)
+				{
+					ActionVar _cv = {0}; _cv.type = ACTION_STACK_VALUE_FUNCTION;
+					_cv.data.numeric_value = (u64)&g_object_constructor;
+					setProperty(app_context, g_object_constructor.prototype_obj, "constructor", 11, &_cv);
+				}
 
 				g_object_constructor_init = 1;
 			}
@@ -26364,7 +26485,7 @@ void actionSetVariable(SWFAppContext* app_context)
 					if (scope_depth > 0) scope_depth--;
 					releaseObject(app_context, _wscope);
 					if (_wregs != NULL) FREE(_wregs);
-					FREE(_pname_u16);
+					free(_pname_u16);  // allocated via ascii_to_u16 which uses malloc
 					// If watcher returned non-undefined, use it; else use the intended new value
 					ActionVar _actual_new = (_wret.type != ACTION_STACK_VALUE_UNDEFINED) ? _wret : _new_val;
 					*var = _actual_new;
@@ -26387,8 +26508,17 @@ void actionSetVariable(SWFAppContext* app_context)
 									free(old_hash->data.string_data.heap_ptr);
 								free(old_hash);
 							}
+							// Existing entry: reuse stable heap key
+							hashmap_set(var_map, _wf_key, var_name_len, (uintptr_t)var);
+						} else {
+							// New entry: heap-allocate key (stack buffers become stale)
+							char* hm_key = (char*) malloc(var_name_len + 1);
+							if (hm_key) {
+								memcpy(hm_key, _wf_key, var_name_len);
+								hm_key[var_name_len] = '\0';
+								hashmap_set(var_map, hm_key, var_name_len, (uintptr_t)var);
+							}
 						}
-						hashmap_set(var_map, _wf_key, var_name_len, (uintptr_t)var);
 					}
 					POP_2();
 					return;
@@ -26426,8 +26556,19 @@ void actionSetVariable(SWFAppContext* app_context)
 					free(old_hash->data.string_data.heap_ptr);
 				free(old_hash);
 			}
+			// Existing entry has a stable heap-allocated key — just update the value.
+			hashmap_set(var_map, _sv_key, var_name_len, (uintptr_t)var);
+		} else {
+			// New entry: heap-allocate a copy of the key so the hashmap key
+			// remains valid after this stack frame returns (stack-local buffers
+			// like _sv_buf/_sv_folded become stale).
+			char* hm_key = (char*) malloc(var_name_len + 1);
+			if (hm_key) {
+				memcpy(hm_key, _sv_key, var_name_len);
+				hm_key[var_name_len] = '\0';
+				hashmap_set(var_map, hm_key, var_name_len, (uintptr_t)var);
+			}
 		}
-		hashmap_set(var_map, _sv_key, var_name_len, (uintptr_t)var);
 	}
 
 	// Also propagate to root MC dynamic_props (mirrors SetMember bidirectional behavior).
@@ -27302,7 +27443,7 @@ void actionAsciiToChar(SWFAppContext* app_context, char* str_buffer)
 	// Surrogates → U+FFFD
 	if (code >= 0xD800 && code <= 0xDFFF) code = 0xFFFD;
 
-	uint16_t* result = (uint16_t*)heap_alloc(app_context, sizeof(uint16_t));
+	uint16_t* result = (uint16_t*)malloc( sizeof(uint16_t));
 	result[0] = code;
 	PUSH_U16(result, 1);
 }
@@ -27365,7 +27506,7 @@ void actionMbAsciiToChar(SWFAppContext* app_context, char* str_buffer)
 	// Surrogates → U+FFFD
 	if (code >= 0xD800 && code <= 0xDFFF) code = 0xFFFD;
 
-	uint16_t* result = (uint16_t*)heap_alloc(app_context, sizeof(uint16_t));
+	uint16_t* result = (uint16_t*)malloc( sizeof(uint16_t));
 	result[0] = code;
 	PUSH_U16(result, 1);
 }
@@ -30287,7 +30428,7 @@ void actionSetMember(SWFAppContext* app_context)
 								releaseObject(app_context, _wscope);
 								if (_wregs != NULL) FREE(_wregs);
 								if (_pname_arg.data.string_data.owns_memory)
-									FREE(_pname_arg.data.string_data.heap_ptr);
+									free(_pname_arg.data.string_data.heap_ptr);  // malloc-allocated string
 								if (_wret.type != ACTION_STACK_VALUE_UNDEFINED)
 									value_var = _wret;
 							}
@@ -30372,6 +30513,12 @@ void actionSetMember(SWFAppContext* app_context)
 				ActionVar* nt = getProperty(obj, "nodeType", 8);
 				if (nt != NULL)
 					return;
+			}
+			// Check if property is read-only (ASSetPropFlags bit 4 → WRITABLE cleared)
+			{
+				ASProperty* _existing = findPropertyRaw(obj, prop_name, prop_name_len);
+				if (_existing != NULL && !(_existing->flags & PROPERTY_FLAG_WRITABLE))
+					return;  // Property is read-only, silently ignore the assignment
 			}
 			// Set the property on the object
 			setProperty(app_context, obj, prop_name, prop_name_len, &value_var);
@@ -31664,7 +31811,7 @@ void actionSetMember(SWFAppContext* app_context)
 								releaseObject(app_context, _wscope);
 								if (_wregs != NULL) FREE(_wregs);
 								if (_pname_arg.data.string_data.owns_memory)
-									FREE(_pname_arg.data.string_data.heap_ptr);
+									free(_pname_arg.data.string_data.heap_ptr);  // malloc-allocated string
 								if (_wret.type != ACTION_STACK_VALUE_UNDEFINED)
 									value_var = _wret;
 							}
@@ -31704,7 +31851,7 @@ void actionSetMember(SWFAppContext* app_context)
 								if (scope_depth > 0) scope_depth--;
 								releaseObject(app_context, _wscope);
 								if (_pname_arg.data.string_data.owns_memory)
-									FREE(_pname_arg.data.string_data.heap_ptr);
+									free(_pname_arg.data.string_data.heap_ptr);  // malloc-allocated string
 								if (_wret.type != ACTION_STACK_VALUE_UNDEFINED)
 									value_var = _wret;
 							}
@@ -34030,19 +34177,30 @@ void actionNewObject(SWFAppContext* app_context)
 		ASObject* err = allocObject(app_context, 8);
 		// Set __proto__ to Error.prototype (via the Error constructor function)
 		// Use GetVariable("Error") to find the constructor and its prototype
-		// For simplicity, just set the message property
-		if (num_args > 0 && args[0].type == ACTION_STACK_VALUE_STRING)
+		// Set message property — coerce any argument to string
+		if (num_args > 0)
 		{
-			// Copy the UTF-16 string as-is
-			setProperty(app_context, err, "message", 7, &args[0]);
-		}
-		else if (num_args > 0 && args[0].type == ACTION_STACK_VALUE_NULL)
-		{
-			ActionVar msg_val = {0};
-			msg_val.type = ACTION_STACK_VALUE_STRING;
-			msg_val.str_size = 4;
-			VAL(u64, &msg_val.data.numeric_value) = (u64) u16_null;
-			setProperty(app_context, err, "message", 7, &msg_val);
+			if (args[0].type == ACTION_STACK_VALUE_STRING)
+			{
+				setProperty(app_context, err, "message", 7, &args[0]);
+			}
+			else if (args[0].type == ACTION_STACK_VALUE_UNDEFINED)
+			{
+				// undefined arg → no message property (Flash behavior)
+			}
+			else
+			{
+				// Coerce non-string args (number, boolean, null, object) to string
+				char str_buf[256];
+				int slen = varToStringBuf(app_context, &args[0], str_buf, sizeof(str_buf));
+				u32 u16_len;
+				uint16_t* u16 = ascii_to_u16(app_context, str_buf, slen, &u16_len);
+				ActionVar msg_val = {0};
+				msg_val.type = ACTION_STACK_VALUE_STRING;
+				msg_val.str_size = u16_len;
+				VAL(u64, &msg_val.data.numeric_value) = (u64) u16;
+				setProperty(app_context, err, "message", 7, &msg_val);
+			}
 		}
 		// Set __proto__ to Error.prototype
 		// Look up Error constructor's prototype
@@ -34697,6 +34855,16 @@ void actionNewObject(SWFAppContext* app_context)
 		setProperty(app_context, obj, "isConnected", 11, &bv);
 
 		PUSH(ACTION_STACK_VALUE_OBJECT, (u64)obj);
+		return;
+	}
+	else if (strcmp(ctor_name, "Math") == 0 ||
+	         strcmp(ctor_name, "Stage") == 0 ||
+	         strcmp(ctor_name, "Selection") == 0 ||
+	         strcmp(ctor_name, "Key") == 0 ||
+	         strcmp(ctor_name, "Mouse") == 0)
+	{
+		// Static singleton objects — not constructable, new X() returns undefined
+		PUSH(ACTION_STACK_VALUE_UNDEFINED, 0);
 		return;
 	}
 		else
@@ -36901,6 +37069,9 @@ void actionThrow(SWFAppContext* app_context)
 	// Search handler stack top-down for an active handler
 	for (int i = g_exception_state.depth - 1; i >= 0; i--) {
 		if (g_exception_state.frames[i].has_jmp_buf) {
+			// Clear handler so it won't be re-entered (important for try-finally
+			// where actionCatchEnter is never called to clear it)
+			g_exception_state.frames[i].has_jmp_buf = 0;
 			// Set depth to this frame's level (skip intermediate frames)
 			g_exception_state.depth = i + 1;
 			longjmp(g_exception_state.frames[i].handler, 1);
@@ -37002,12 +37173,21 @@ void actionTryEnd(SWFAppContext* app_context)
 		// Exception still pending after finally — re-propagate to parent handler
 		for (int i = g_exception_state.depth - 1; i >= 0; i--) {
 			if (g_exception_state.frames[i].has_jmp_buf) {
+				// Clear handler so it won't be re-entered (important for try-finally
+				// where actionCatchEnter is never called to clear it)
+				g_exception_state.frames[i].has_jmp_buf = 0;
 				longjmp(g_exception_state.frames[i].handler, 1);
 			}
 		}
 		// No parent handler — uncaught
 		uncaughtException(&g_exception_state.exception_value);
 	}
+}
+
+void actionClearException(SWFAppContext* app_context)
+{
+	// Clear pending exception — used by return inside finally to suppress the exception
+	g_exception_state.exception_thrown = false;
 }
 
 bool actionExceptionPending(SWFAppContext* app_context)
@@ -40738,8 +40918,11 @@ static int callArrayMethod(SWFAppContext* app_context,
 					u32 _qleft = _ql + 1;
 					u32 _qright = _qh;
 
+						u32 _qs_inner = 0;
 					for (;;)
 					{
+						// Guard against non-converging comparators (bogus/inconsistent user functions)
+						if (++_qs_inner > n * 4 + 100) break;
 						// Left scan: advance while compare(pivot, elem) > 0
 						while (_qleft < _qright)
 						{
@@ -40752,6 +40935,10 @@ static int callArrayMethod(SWFAppContext* app_context,
 								if (comparator->function_type == 2)
 									_qres = comparator->advanced_func(app_context, _qargs, 2, NULL, NULL);
 								else {
+									// Set this=undefined for sort comparator (Flash behavior)
+									ActionVar _undef_this = {0};
+									_undef_this.type = ACTION_STACK_VALUE_UNDEFINED;
+									setVariableByName("this", &_undef_this);
 									pushVar(app_context, &_qargs[1]);
 									pushVar(app_context, &_qargs[0]);
 									_qres = ((ActionVar(*)(SWFAppContext*))comparator->simple_func)(app_context);
@@ -40781,6 +40968,9 @@ static int callArrayMethod(SWFAppContext* app_context,
 								if (comparator->function_type == 2)
 									_qres = comparator->advanced_func(app_context, _qargs, 2, NULL, NULL);
 								else {
+									ActionVar _undef_this = {0};
+									_undef_this.type = ACTION_STACK_VALUE_UNDEFINED;
+									setVariableByName("this", &_undef_this);
 									pushVar(app_context, &_qargs[1]);
 									pushVar(app_context, &_qargs[0]);
 									_qres = ((ActionVar(*)(SWFAppContext*))comparator->simple_func)(app_context);
@@ -41076,6 +41266,70 @@ static int callArrayMethod(SWFAppContext* app_context,
 	#undef SORT_COMPARE_VARS
 
 	return 0;
+}
+
+// =====================================================================
+// Array.prototype method wrapper (Function2Ptr)
+// Dispatches to callArrayMethod using the function's name as the method name.
+// =====================================================================
+static ActionVar builtin_array_method(SWFAppContext* app_context, ActionVar* args, u32 arg_count, ActionVar* registers, void* this_obj)
+{
+	(void)registers;
+	ActionVar undef = {0};
+	undef.type = ACTION_STACK_VALUE_UNDEFINED;
+
+	if (this_obj == NULL) return undef;
+
+	// Determine which method we are by looking at function name in registers
+	// The function's name is stored in the ASFunction struct
+	// We'll find it from g_array_proto_funcs by matching this_obj... actually,
+	// we need the method name. We can get it from the ASFunction that called us.
+	// The caller sets g_current_executing_func before calling us.
+	extern ASFunction* g_current_executing_func;
+	const char* method_name = NULL;
+	u32 method_name_len = 0;
+	if (g_current_executing_func != NULL) {
+		method_name = g_current_executing_func->name;
+		method_name_len = (u32)strlen(method_name);
+	}
+	if (method_name == NULL || method_name_len == 0) return undef;
+
+	// Array.prototype methods called via the prototype wrapper are only used for
+	// typeof detection. Actual array method dispatch for ASArray objects goes through
+	// callArrayMethod in actionCallMethod's ARRAY branch (which takes priority).
+	// This wrapper is only reached when calling Array.prototype.method.call(obj) on
+	// a non-array object, or via direct prototype access. Since we can't safely
+	// distinguish ASArray* from ASObject* here (different struct layouts), return
+	// undefined to prevent use-after-free / corruption from invalid casts.
+	return undef;
+}
+
+static void initArrayPrototypeMethods(SWFAppContext* app_context)
+{
+	if (g_array_proto_methods_init) return;
+	if (g_array_prototype == NULL) return;
+
+	struct { const char* name; u32 name_len; } methods[] = {
+		{"push", 4}, {"pop", 3}, {"shift", 5}, {"unshift", 7},
+		{"reverse", 7}, {"join", 4}, {"toString", 8}, {"concat", 6},
+		{"slice", 5}, {"splice", 6}, {"sort", 4}, {"sortOn", 6},
+		{"hasOwnProperty", 14},
+	};
+
+	for (int i = 0; i < 13; i++) {
+		memset(&g_array_proto_funcs[i], 0, sizeof(ASFunction));
+		strncpy(g_array_proto_funcs[i].name, methods[i].name, 255);
+		g_array_proto_funcs[i].function_type = 2;
+		g_array_proto_funcs[i].param_count = 0;
+		g_array_proto_funcs[i].advanced_func = (Function2Ptr)builtin_array_method;
+
+		ActionVar fv = {0};
+		fv.type = ACTION_STACK_VALUE_FUNCTION;
+		VAL(u64, &fv.data.numeric_value) = (u64)&g_array_proto_funcs[i];
+		setPropertyWithFlags(app_context, g_array_prototype, methods[i].name, methods[i].name_len, &fv, PROPERTY_FLAGS_DONTENUM);
+	}
+
+	g_array_proto_methods_init = 1;
 }
 
 // =====================================================================
@@ -42121,6 +42375,30 @@ void actionCallMethod(SWFAppContext* app_context, char* str_buffer)
 				u8 new_depth = super_depth + found_depth + 1;
 				pushSuperContext(super_this, new_depth);
 
+				// Update the existing "super" variable on the scope chain in-place
+				// so that GetVariable("super") inside the dispatched function finds
+				// the correct depth. This avoids adding new scope entries that would
+				// leak into nested calls (which broke as2_super_and_this tests).
+				// The SUPER handler calls functions directly (not through
+				// actionCallFunction's local scope setup), so we must ensure the
+				// scope chain reflects the new depth.
+				ActionVar saved_super = {0};
+				int super_scope_idx = -1;
+				ASProperty* super_prop = NULL;
+				for (int si = scope_depth - 1; si >= 0; si--) {
+					if (scope_chain[si] != NULL) {
+						super_prop = findPropertyRaw(scope_chain[si], "super", 5);
+						if (super_prop != NULL) {
+							saved_super = super_prop->value;
+							super_prop->value.type = ACTION_STACK_VALUE_SUPER;
+							super_prop->value.data.numeric_value = (u64)super_this;
+							super_prop->value.str_size = (u32)new_depth;
+							super_scope_idx = si;
+							break;
+						}
+					}
+				}
+
 				ActionVar result = {0};
 				result.type = ACTION_STACK_VALUE_UNDEFINED;
 
@@ -42147,6 +42425,10 @@ void actionCallMethod(SWFAppContext* app_context, char* str_buffer)
 					g_this_depth = _saved_this_depth2;
 				}
 
+				// Restore original super value on scope chain
+				if (super_scope_idx >= 0 && super_prop != NULL) {
+					super_prop->value = saved_super;
+				}
 				popSuperContext();
 				if (args != NULL) FREE(args);
 				pushVar(app_context, &result);
@@ -42947,7 +43229,18 @@ void actionCallMethod(SWFAppContext* app_context, char* str_buffer)
 			return;
 		}
 
-		// Check arr->props (and prototype chain) for user-defined method BEFORE built-in dispatch
+		// Try built-in array methods FIRST (push, pop, sort, etc.)
+		int handled = callArrayMethod(app_context, arr,
+		                               method_name, method_name_len,
+		                               args, num_args);
+
+		if (handled)
+		{
+			if (args != NULL) FREE(args);
+			return;
+		}
+
+		// Not a built-in method — check arr->props (and prototype chain) for user-defined methods
 		ActionVar* user_method_prop = NULL;
 		if (arr->props != NULL) {
 			user_method_prop = getPropertyWithPrototype(arr->props, method_name, method_name_len);
@@ -42993,23 +43286,16 @@ void actionCallMethod(SWFAppContext* app_context, char* str_buffer)
 			return;
 		}
 
-		int handled = callArrayMethod(app_context, arr,
-		                               method_name, method_name_len,
-		                               args, num_args);
-
 		if (args != NULL) FREE(args);
 
-		if (!handled)
+		// Array.valueOf() returns the array itself
+		if (method_name_len == 7 && strncmp(method_name, "valueOf", 7) == 0)
 		{
-			// Array.valueOf() returns the array itself
-			if (method_name_len == 7 && strncmp(method_name, "valueOf", 7) == 0)
-			{
-				pushVar(app_context, &obj_var);
-			}
-			else
-			{
-				pushUndefined(app_context);
-			}
+			pushVar(app_context, &obj_var);
+		}
+		else
+		{
+			pushUndefined(app_context);
 		}
 		return;
 	}
@@ -45223,7 +45509,7 @@ void actionCallMethod(SWFAppContext* app_context, char* str_buffer)
 			u32 prefix_len = (u32)sel_begin;
 			u32 suffix_len = old_u16_len - (u32)sel_end;
 			u32 result_len = prefix_len + new_u16_len + suffix_len;
-			uint16_t* result_u16 = (uint16_t*) heap_alloc(app_context, (result_len + 1) * sizeof(uint16_t));
+			uint16_t* result_u16 = (uint16_t*) malloc( (result_len + 1) * sizeof(uint16_t));
 			if (prefix_len > 0 && old_u16 != NULL)
 				memcpy(result_u16, old_u16, prefix_len * sizeof(uint16_t));
 			if (new_u16_len > 0 && new_u16 != NULL)
@@ -49553,7 +49839,7 @@ void actionTextControlBackspace(SWFAppContext* app_context)
 	u32 prefix_len = (u32)del_start;
 	u32 suffix_len = old_len - (u32)del_end;
 	u32 result_len = prefix_len + suffix_len;
-	uint16_t* result_u16 = (uint16_t*) heap_alloc(app_context, (result_len + 1) * sizeof(uint16_t));
+	uint16_t* result_u16 = (uint16_t*) malloc( (result_len + 1) * sizeof(uint16_t));
 	if (prefix_len > 0 && old_u16 != NULL)
 		memcpy(result_u16, old_u16, prefix_len * sizeof(uint16_t));
 	if (suffix_len > 0 && old_u16 != NULL)
