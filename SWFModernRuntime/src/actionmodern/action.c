@@ -9569,6 +9569,7 @@ static ASObject* g_array_proto_modern = NULL;
 // Per-version-group Function.prototype for function __proto__ identity
 static ASObject* g_function_proto_legacy = NULL;  // SWF 1-6
 static ASObject* g_function_proto_modern = NULL;  // SWF 7+
+static ASFunction* g_function_constructor = NULL; // Pointer to Function constructor (g_ctors[5])
 // Per-version-group MovieClip constructor and prototype
 static ASFunction* g_mc_ctor_legacy = NULL;  // SWF 1-6
 static ASFunction* g_mc_ctor_modern = NULL;  // SWF 7+
@@ -24259,15 +24260,22 @@ static void ensureGlobalInit(SWFAppContext* app_context)
 	// Create Function.prototype for the primary version group
 	ASObject* fn_proto;
 	{
-		fn_proto = allocObject(app_context, 4);
+		fn_proto = allocObject(app_context, 6);
 		retainObject(fn_proto);
 		ActionVar op_val; op_val.type = ACTION_STACK_VALUE_OBJECT; op_val.str_size = 0;
 		op_val.data.numeric_value = (u64) g_object_prototype;
 		setProperty(app_context, fn_proto, "__proto__", 9, &op_val);
-		if (g_primary_version_group == 0)
-			g_function_proto_legacy = fn_proto;
-		else
-			g_function_proto_modern = fn_proto;
+		// Set constructor → Function (so func.constructor resolves via proto chain)
+		ActionVar fc_val; fc_val.type = ACTION_STACK_VALUE_FUNCTION; fc_val.str_size = 0;
+		fc_val.data.numeric_value = (u64) &g_ctors[5];
+		setProperty(app_context, fn_proto, "constructor", 11, &fc_val);
+		// Set for BOTH version groups — Function.prototype is a singleton shared across
+		// all SWF versions (prevents Dejagnu SWF5 init from poisoning the modern group)
+		g_function_proto_legacy = fn_proto;
+		g_function_proto_modern = fn_proto;
+		// Set Function.prototype_obj so instanceof Function works
+		g_ctors[5].prototype_obj = fn_proto;
+		g_function_constructor = &g_ctors[5];
 	}
 
 	// ---- Phase 8c-2: Populate own_props on every constructor ----
@@ -24526,11 +24534,17 @@ static void ensureSecondaryGlobalInit(SWFAppContext* app_context, int target_ver
 
 	// Create Function.prototype for the secondary version group
 	{
-		ASObject* fn_proto = allocObject(app_context, 4);
+		ASObject* fn_proto = allocObject(app_context, 6);
 		retainObject(fn_proto);
 		ActionVar op_val; op_val.type = ACTION_STACK_VALUE_OBJECT; op_val.str_size = 0;
 		op_val.data.numeric_value = (u64) sec_obj_proto;
 		setProperty(app_context, fn_proto, "__proto__", 9, &op_val);
+		// Set constructor → Function (so func.constructor resolves via proto chain)
+		if (g_function_constructor != NULL) {
+			ActionVar fc_val; fc_val.type = ACTION_STACK_VALUE_FUNCTION; fc_val.str_size = 0;
+			fc_val.data.numeric_value = (u64) g_function_constructor;
+			setProperty(app_context, fn_proto, "constructor", 11, &fc_val);
+		}
 		if (vg == 0)
 			g_function_proto_legacy = fn_proto;
 		else
@@ -24611,6 +24625,10 @@ static void ensureSecondaryGlobalInit(SWFAppContext* app_context, int target_ver
 			ActionVar fp = {0}; fp.type = ACTION_STACK_VALUE_OBJECT;
 			fp.data.numeric_value = (u64) sec_fn_proto;
 			setProperty(app_context, sec_extra_ctors[i]->own_props, "__proto__", 9, &fp);
+		}
+		// Set Function's prototype_obj to secondary Function.prototype (for instanceof Function)
+		if (i == 3 && sec_fn_proto) { // i==3 is "Function"
+			sec_extra_ctors[i]->prototype_obj = sec_fn_proto;
 		}
 	}
 
@@ -27826,11 +27844,14 @@ static int checkInstanceOf(ActionVar* obj_var, ActionVar* ctor_var)
 
 	// Get the object for __proto__ chain walk — handle ASFunction vs ASObject vs ASArray
 	ASObject* obj;
+	int obj_is_function = 0;
+	ASFunction* obj_func_ref = NULL;
 	if (obj_var->type == ACTION_STACK_VALUE_FUNCTION)
 	{
-		ASFunction* obj_func = (ASFunction*) obj_var->data.numeric_value;
-		obj = obj_func->own_props;
-		if (obj == NULL) return 0;
+		obj_func_ref = (ASFunction*) obj_var->data.numeric_value;
+		obj = obj_func_ref->own_props;
+		obj_is_function = 1;
+		// Don't return 0 for NULL own_props — functions have virtual __proto__
 	}
 	else if (obj_var->type == ACTION_STACK_VALUE_ARRAY)
 	{
@@ -27846,7 +27867,21 @@ static int checkInstanceOf(ActionVar* obj_var, ActionVar* ctor_var)
 
 	// Walk up the object's prototype chain via __proto__ property
 	// Start with the object's __proto__
-	ActionVar* current_proto_var = getProperty(obj, "__proto__", 9);
+	ActionVar* current_proto_var = (obj != NULL) ? getProperty(obj, "__proto__", 9) : NULL;
+
+	// For FUNCTION objects, if own_props doesn't have __proto__, use virtual Function.prototype
+	if (obj_is_function && (current_proto_var == NULL || current_proto_var->type == ACTION_STACK_VALUE_UNDEFINED)) {
+		int fv = (obj_func_ref->swf_version > 0) ? obj_func_ref->swf_version : g_swf_version;
+		ASObject* virt_fn_proto = getFunctionProto(fv);
+		if (virt_fn_proto != NULL) {
+			// Check against ctor_proto, but also check both version groups of Function.prototype
+			// (Dejagnu SWF5 init can cause version group mismatch between Function.prototype_obj
+			// and the actual Function.prototype used by functions of a different SWF version)
+			if (virt_fn_proto == ctor_proto) return 1;
+			if (ctor_proto == g_function_proto_legacy || ctor_proto == g_function_proto_modern) return 1;
+			current_proto_var = getProperty(virt_fn_proto, "__proto__", 9);
+		}
+	}
 
 	// Maximum chain depth to prevent infinite loops
 	int max_depth = 100;
@@ -33318,15 +33353,30 @@ void actionGetMember(SWFAppContext* app_context)
 				if (prop_name_len == 9 && strncmp(prop_name, "__proto__", 9) == 0)
 				{
 					int fv = (func->swf_version > 0) ? func->swf_version : g_swf_version;
-					ASObject* fn_proto = getFunctionProto(fv);
-					if (fn_proto) {
-						PUSH(ACTION_STACK_VALUE_OBJECT, (u64) fn_proto);
+					ASObject* vfn_proto = getFunctionProto(fv);
+					if (vfn_proto) {
+						PUSH(ACTION_STACK_VALUE_OBJECT, (u64) vfn_proto);
 					} else {
 						pushUndefined(app_context);
 					}
 				}
 				else
-					pushUndefined(app_context);
+				{
+					// Walk virtual Function.prototype chain for inherited properties
+					// (e.g., constructor from Function.prototype, hasOwnProperty from Object.prototype)
+					int fv = (func->swf_version > 0) ? func->swf_version : g_swf_version;
+					ASObject* vfn_proto = getFunctionProto(fv);
+					if (vfn_proto != NULL) {
+						ActionVar* pv2 = getPropertyWithPrototype(vfn_proto, prop_name, prop_name_len);
+						if (pv2 != NULL) {
+							pushVar(app_context, pv2);
+						} else {
+							pushUndefined(app_context);
+						}
+					} else {
+						pushUndefined(app_context);
+					}
+				}
 			}
 		}
 		else
@@ -44021,6 +44071,17 @@ void actionCallMethod(SWFAppContext* app_context, char* str_buffer)
 			ActionVar* method_prop = NULL;
 			if (func != NULL && func->own_props != NULL)
 				method_prop = getPropertyWithPrototype(func->own_props, method_name, method_name_len);
+
+			// If not found on own_props, walk virtual Function.prototype → Object.prototype chain
+			if ((method_prop == NULL || method_prop->type == ACTION_STACK_VALUE_UNDEFINED) && func != NULL) {
+				int fv = (func->swf_version > 0) ? func->swf_version : g_swf_version;
+				ASObject* vfn_proto = getFunctionProto(fv);
+				if (vfn_proto != NULL) {
+					ActionVar* fp_method = getPropertyWithPrototype(vfn_proto, method_name, method_name_len);
+					if (fp_method != NULL && fp_method->type == ACTION_STACK_VALUE_FUNCTION)
+						method_prop = fp_method;
+				}
+			}
 
 			if (method_prop != NULL && method_prop->type == ACTION_STACK_VALUE_FUNCTION)
 			{
