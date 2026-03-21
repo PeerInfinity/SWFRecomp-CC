@@ -27604,6 +27604,11 @@ void actionTypeof(SWFAppContext* app_context, char* str_buffer)
 			type_str = "undefined";
 			break;
 
+		case ACTION_STACK_VALUE_SUPER:
+			// super is a virtual (this, depth) pair — typeof returns "object"
+			type_str = "object";
+			break;
+
 		default:
 			type_str = "undefined";
 			break;
