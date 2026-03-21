@@ -572,6 +572,40 @@ void* lookupRegisteredClassVersion(const char* symbol_name, int swf_version)
 	}
 }
 
+// Callback context for lookupRegisteredClassByCharId
+typedef struct {
+	int swf_version;
+	void* found_ctor;
+	const char* found_name;
+} _CharIdClassLookupCtx;
+
+static int _charIdClassLookupCb(const char* name, void* user_data)
+{
+	_CharIdClassLookupCtx* ctx = (_CharIdClassLookupCtx*)user_data;
+	void* ctor = lookupRegisteredClassVersion(name, ctx->swf_version);
+	if (ctor != NULL) {
+		ctx->found_ctor = ctor;
+		ctx->found_name = name;
+		return 1; // stop iteration
+	}
+	return 0; // continue
+}
+
+// Look up a registered class by char_id: iterate all export names for the given
+// char_id and return the first one that has a registered class constructor.
+// This handles cases where a sprite has multiple export names (e.g., "CCC" and "DDD")
+// and registerClass was called with one name but attachMovie uses the other.
+// If out_export_name is non-NULL, the matching export name is written there.
+static void* lookupRegisteredClassByCharId(size_t char_id, int swf_version, const char** out_export_name)
+{
+	extern int ng_forEachExportName(size_t char_id, int (*callback)(const char* name, void* user_data), void* user_data);
+	_CharIdClassLookupCtx ctx = { swf_version, NULL, NULL };
+	ng_forEachExportName(char_id, _charIdClassLookupCb, &ctx);
+	if (ctx.found_ctor != NULL && out_export_name)
+		*out_export_name = ctx.found_name;
+	return ctx.found_ctor;
+}
+
 // Register or unregister a class for a symbol name.
 // swf_version determines which registry. constructor=NULL means unregister.
 static void registerClassForSymbol(const char* symbol_name, void* constructor)
@@ -39184,6 +39218,9 @@ void actionCallFunction(SWFAppContext* app_context, char* str_buffer)
 							int _am_exp_ver = ng_lookupExportVersionForMovie(_am_buf1, mc->movie_id);
 							int _am_ver = _am_exp_ver ? _am_exp_ver : ((mc && mc->swf_version) ? mc->swf_version : g_swf_version);
 							void* reg_ctor = lookupRegisteredClassVersion(_am_buf1, _am_ver);
+							// Fallback: check other export names for same char_id
+							if (reg_ctor == NULL)
+								reg_ctor = lookupRegisteredClassByCharId(char_id, _am_ver, NULL);
 							if (reg_ctor != NULL) {
 								ASFunction* ctor_func = (ASFunction*)reg_ctor;
 								if (ctor_func->prototype_obj == NULL) {
@@ -39243,8 +39280,12 @@ void actionCallFunction(SWFAppContext* app_context, char* str_buffer)
 						int _am_exp_ver2 = ng_lookupExportVersion(_am_buf1);
 						int _am_ver2 = _am_exp_ver2 ? _am_exp_ver2 : ((mc && mc->swf_version) ? mc->swf_version : g_swf_version);
 						void* _am_reg_ctor = lookupRegisteredClassVersion(_am_buf1, _am_ver2);
+						const char* _am_ctor_name2 = _am_buf1;
+						// Fallback: check other export names for same char_id
+						if (_am_reg_ctor == NULL)
+							_am_reg_ctor = lookupRegisteredClassByCharId(char_id, _am_ver2, &_am_ctor_name2);
 						if (_am_reg_ctor != NULL) {
-							actionInvokeRegisteredClassConstructor(app_context, _am_buf1, attached);
+							actionInvokeRegisteredClassConstructor(app_context, _am_ctor_name2, attached);
 						}
 						// Fire constructors for child sprites placed during eager init
 						extern void ng_fire_child_constructors(SWFAppContext*, MovieClip*);
@@ -44718,6 +44759,9 @@ void actionCallMethod(SWFAppContext* app_context, char* str_buffer)
 								int _am_exp_ver3 = ng_lookupExportVersionForMovie(linkage_id, mc->movie_id);
 								int _am_ver3 = _am_exp_ver3 ? _am_exp_ver3 : ((mc && mc->swf_version) ? mc->swf_version : g_swf_version);
 								void* reg_ctor = lookupRegisteredClassVersion(linkage_id, _am_ver3);
+								// Fallback: check other export names for same char_id
+								if (reg_ctor == NULL)
+									reg_ctor = lookupRegisteredClassByCharId(char_id, _am_ver3, NULL);
 								if (reg_ctor != NULL) {
 									ASFunction* ctor_func = (ASFunction*)reg_ctor;
 									if (ctor_func->prototype_obj == NULL) {
@@ -44794,8 +44838,12 @@ void actionCallMethod(SWFAppContext* app_context, char* str_buffer)
 							int _am_exp_ver4 = ng_lookupExportVersion(linkage_id);
 							int _am_ver4 = _am_exp_ver4 ? _am_exp_ver4 : ((mc && mc->swf_version) ? mc->swf_version : g_swf_version);
 							void* _am_reg_ctor2 = lookupRegisteredClassVersion(linkage_id, _am_ver4);
+							const char* _am_ctor_name = linkage_id;
+							// Fallback: check other export names for same char_id
+							if (_am_reg_ctor2 == NULL)
+								_am_reg_ctor2 = lookupRegisteredClassByCharId(char_id, _am_ver4, &_am_ctor_name);
 							if (_am_reg_ctor2 != NULL) {
-								actionInvokeRegisteredClassConstructor(app_context, linkage_id, attached);
+								actionInvokeRegisteredClassConstructor(app_context, _am_ctor_name, attached);
 							}
 							// Fire constructors for child sprites placed during eager init
 							extern void ng_fire_child_constructors(SWFAppContext*, MovieClip*);
@@ -47745,6 +47793,18 @@ void actionCallMethod(SWFAppContext* app_context, char* str_buffer)
 				// Also check function registry (covers child MCs and root)
 				if (_mc_user_func == NULL)
 					_mc_user_func = lookupFunctionByName(method_name, method_name_len);
+			}
+			// Fallback: check MovieClip.prototype chain (→ Object.prototype)
+			// dynamic_props may not have __proto__ linked to MovieClip.prototype,
+			// so methods like toString/valueOf from Object.prototype won't be found above.
+			if (_mc_user_func == NULL) {
+				initMovieClipPrototype(app_context);
+				ASObject* mc_proto = getMovieClipPrototype(g_swf_version);
+				if (mc_proto != NULL) {
+					ActionVar* _mp_var = getPropertyWithPrototype(mc_proto, method_name, method_name_len);
+					if (_mp_var != NULL && _mp_var->type == ACTION_STACK_VALUE_FUNCTION)
+						_mc_user_func = (ASFunction*) _mp_var->data.numeric_value;
+				}
 			}
 			if (_mc_user_func != NULL) {
 					ASFunction* func = _mc_user_func;

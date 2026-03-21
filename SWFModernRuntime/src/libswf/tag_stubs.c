@@ -254,6 +254,17 @@ const char* ng_lookupExportName(size_t char_id)
 	return NULL;
 }
 
+// Iterate all export names for a given char_id.
+// Calls callback(name, user_data) for each; stops and returns 1 if callback returns non-zero.
+int ng_forEachExportName(size_t char_id, int (*callback)(const char* name, void* user_data), void* user_data)
+{
+	for (size_t i = 0; i < ng_exported_symbol_count; i++)
+		if (ng_exported_symbols[i].char_id == char_id)
+			if (callback(ng_exported_symbols[i].name, user_data))
+				return 1;
+	return 0;
+}
+
 // ---------------------------------------------------------------------------
 // Sound metadata registry (DefineSound → attachSound/getDuration linkage)
 // ---------------------------------------------------------------------------
