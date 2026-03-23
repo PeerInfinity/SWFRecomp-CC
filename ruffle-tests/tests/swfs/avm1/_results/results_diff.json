@@ -1,9 +1,9 @@
 {
   "metadata": {
-    "old_timestamp": "2026-03-21T18:50:17.664338+00:00",
-    "old_git_sha": "a53c11a51e0e7915cc8ed67ff5941b293efece9c",
-    "new_timestamp": "2026-03-21T21:02:28.935358+00:00",
-    "new_git_sha": "3b075cff106fcd11924e46698b16487c1864a024",
+    "old_timestamp": "2026-03-21T21:02:28.935358+00:00",
+    "old_git_sha": "3b075cff106fcd11924e46698b16487c1864a024",
+    "new_timestamp": "2026-03-23T19:51:55.111107+00:00",
+    "new_git_sha": "4b8442ba351cf67de6de8a339c47f74aeb3ef59a",
     "partial": false,
     "same_commit": false
   },
@@ -11,19 +11,752 @@
     "old_pass": 558,
     "old_total": 619,
     "old_pass_rate": 90.1,
-    "new_pass": 558,
-    "new_total": 619,
-    "new_pass_rate": 90.1,
+    "new_pass": 506,
+    "new_total": 558,
+    "new_pass_rate": 90.7,
     "old_mismatched_lines": 12922,
-    "new_mismatched_lines": 12922,
+    "new_mismatched_lines": 11817,
     "increased_mismatches": 0,
     "decreased_mismatches": 0,
     "newly_passing": 0,
     "newly_failing": 0,
     "status_changed": 0,
-    "unchanged": 619,
+    "unchanged": 558,
     "added": 0,
-    "removed": 0
+    "removed": 61
   },
-  "changes": []
+  "changes": [
+    {
+      "test": "register_underflow",
+      "change_type": "removed",
+      "old_status": "pass",
+      "new_status": null,
+      "old_lines": {
+        "actual_lines": 26,
+        "expected_lines": 26,
+        "matching_lines": 26
+      },
+      "new_lines": null
+    },
+    {
+      "test": "remove_movie_clip",
+      "change_type": "removed",
+      "old_status": "pass",
+      "new_status": null,
+      "old_lines": {
+        "actual_lines": 29,
+        "expected_lines": 29,
+        "matching_lines": 29
+      },
+      "new_lines": null
+    },
+    {
+      "test": "removed_base_clip_tell_target",
+      "change_type": "removed",
+      "old_status": "output_mismatch",
+      "new_status": null,
+      "old_lines": {
+        "actual_lines": 1,
+        "expected_lines": 2,
+        "matching_lines": 0
+      },
+      "new_lines": null
+    },
+    {
+      "test": "removed_clip_halts_script",
+      "change_type": "removed",
+      "old_status": "pass",
+      "new_status": null,
+      "old_lines": {
+        "actual_lines": 15,
+        "expected_lines": 15,
+        "matching_lines": 15
+      },
+      "new_lines": null
+    },
+    {
+      "test": "removed_target_clip_scope",
+      "change_type": "removed",
+      "old_status": "pass",
+      "new_status": null,
+      "old_lines": {
+        "actual_lines": 35,
+        "expected_lines": 35,
+        "matching_lines": 35
+      },
+      "new_lines": null
+    },
+    {
+      "test": "resolve_different_root",
+      "change_type": "removed",
+      "old_status": "pass",
+      "new_status": null,
+      "old_lines": {
+        "actual_lines": 2,
+        "expected_lines": 2,
+        "matching_lines": 2
+      },
+      "new_lines": null
+    },
+    {
+      "test": "rewind_depth",
+      "change_type": "removed",
+      "old_status": "pass",
+      "new_status": null,
+      "old_lines": {
+        "actual_lines": 30,
+        "expected_lines": 30,
+        "matching_lines": 30
+      },
+      "new_lines": null
+    },
+    {
+      "test": "root_button_mode",
+      "change_type": "removed",
+      "old_status": "pass",
+      "new_status": null,
+      "old_lines": {
+        "actual_lines": 10,
+        "expected_lines": 10,
+        "matching_lines": 10
+      },
+      "new_lines": null
+    },
+    {
+      "test": "root_global_parent",
+      "change_type": "removed",
+      "old_status": "pass",
+      "new_status": null,
+      "old_lines": {
+        "actual_lines": 6,
+        "expected_lines": 6,
+        "matching_lines": 6
+      },
+      "new_lines": null
+    },
+    {
+      "test": "root_onload",
+      "change_type": "removed",
+      "old_status": "pass",
+      "new_status": null,
+      "old_lines": {
+        "actual_lines": 1,
+        "expected_lines": 1,
+        "matching_lines": 1
+      },
+      "new_lines": null
+    },
+    {
+      "test": "sandbox_type_local_file",
+      "change_type": "removed",
+      "old_status": "pass",
+      "new_status": null,
+      "old_lines": {
+        "actual_lines": 1,
+        "expected_lines": 1,
+        "matching_lines": 1
+      },
+      "new_lines": null
+    },
+    {
+      "test": "sandbox_type_local_network",
+      "change_type": "removed",
+      "old_status": "pass",
+      "new_status": null,
+      "old_lines": {
+        "actual_lines": 1,
+        "expected_lines": 1,
+        "matching_lines": 1
+      },
+      "new_lines": null
+    },
+    {
+      "test": "sandbox_type_remote",
+      "change_type": "removed",
+      "old_status": "output_mismatch",
+      "new_status": null,
+      "old_lines": {
+        "actual_lines": 1,
+        "expected_lines": 3,
+        "matching_lines": 1
+      },
+      "new_lines": null
+    },
+    {
+      "test": "selection",
+      "change_type": "removed",
+      "old_status": "pass",
+      "new_status": null,
+      "old_lines": {
+        "actual_lines": 454,
+        "expected_lines": 454,
+        "matching_lines": 454
+      },
+      "new_lines": null
+    },
+    {
+      "test": "selection_handlers",
+      "change_type": "removed",
+      "old_status": "pass",
+      "new_status": null,
+      "old_lines": {
+        "actual_lines": 27,
+        "expected_lines": 27,
+        "matching_lines": 27
+      },
+      "new_lines": null
+    },
+    {
+      "test": "set_interval",
+      "change_type": "removed",
+      "old_status": "pass",
+      "new_status": null,
+      "old_lines": {
+        "actual_lines": 27,
+        "expected_lines": 27,
+        "matching_lines": 27
+      },
+      "new_lines": null
+    },
+    {
+      "test": "set_variable_scope",
+      "change_type": "removed",
+      "old_status": "pass",
+      "new_status": null,
+      "old_lines": {
+        "actual_lines": 58,
+        "expected_lines": 58,
+        "matching_lines": 58
+      },
+      "new_lines": null
+    },
+    {
+      "test": "single_frame",
+      "change_type": "removed",
+      "old_status": "pass",
+      "new_status": null,
+      "old_lines": {
+        "actual_lines": 1,
+        "expected_lines": 1,
+        "matching_lines": 1
+      },
+      "new_lines": null
+    },
+    {
+      "test": "slash_syntax",
+      "change_type": "removed",
+      "old_status": "pass",
+      "new_status": null,
+      "old_lines": {
+        "actual_lines": 14,
+        "expected_lines": 14,
+        "matching_lines": 14
+      },
+      "new_lines": null
+    },
+    {
+      "test": "sound",
+      "change_type": "removed",
+      "old_status": "pass",
+      "new_status": null,
+      "old_lines": {
+        "actual_lines": 628,
+        "expected_lines": 628,
+        "matching_lines": 628
+      },
+      "new_lines": null
+    },
+    {
+      "test": "sound_duration_position_props",
+      "change_type": "removed",
+      "old_status": "output_mismatch",
+      "new_status": null,
+      "old_lines": {
+        "actual_lines": 2,
+        "expected_lines": 290,
+        "matching_lines": 2
+      },
+      "new_lines": null
+    },
+    {
+      "test": "sound_id3",
+      "change_type": "removed",
+      "old_status": "output_mismatch",
+      "new_status": null,
+      "old_lines": {
+        "actual_lines": 11,
+        "expected_lines": 633,
+        "matching_lines": 11
+      },
+      "new_lines": null
+    },
+    {
+      "test": "sound_id3_prop",
+      "change_type": "removed",
+      "old_status": "output_mismatch",
+      "new_status": null,
+      "old_lines": {
+        "actual_lines": 1,
+        "expected_lines": 138,
+        "matching_lines": 1
+      },
+      "new_lines": null
+    },
+    {
+      "test": "sound_load_start",
+      "change_type": "removed",
+      "old_status": "output_mismatch",
+      "new_status": null,
+      "old_lines": {
+        "actual_lines": 0,
+        "expected_lines": 3,
+        "matching_lines": 0
+      },
+      "new_lines": null
+    },
+    {
+      "test": "sound_multiple_load",
+      "change_type": "removed",
+      "old_status": "output_mismatch",
+      "new_status": null,
+      "old_lines": {
+        "actual_lines": 0,
+        "expected_lines": 1,
+        "matching_lines": 0
+      },
+      "new_lines": null
+    },
+    {
+      "test": "sound_props_swf5",
+      "change_type": "removed",
+      "old_status": "pass",
+      "new_status": null,
+      "old_lines": {
+        "actual_lines": 68,
+        "expected_lines": 68,
+        "matching_lines": 68
+      },
+      "new_lines": null
+    },
+    {
+      "test": "sound_props_swf6",
+      "change_type": "removed",
+      "old_status": "pass",
+      "new_status": null,
+      "old_lines": {
+        "actual_lines": 68,
+        "expected_lines": 68,
+        "matching_lines": 68
+      },
+      "new_lines": null
+    },
+    {
+      "test": "sound_start_load",
+      "change_type": "removed",
+      "old_status": "pass",
+      "new_status": null,
+      "old_lines": {
+        "actual_lines": 0,
+        "expected_lines": 0,
+        "matching_lines": 0
+      },
+      "new_lines": null
+    },
+    {
+      "test": "stage_display_state",
+      "change_type": "removed",
+      "old_status": "pass",
+      "new_status": null,
+      "old_lines": {
+        "actual_lines": 16,
+        "expected_lines": 16,
+        "matching_lines": 16
+      },
+      "new_lines": null
+    },
+    {
+      "test": "stage_object_children",
+      "change_type": "removed",
+      "old_status": "pass",
+      "new_status": null,
+      "old_lines": {
+        "actual_lines": 83,
+        "expected_lines": 83,
+        "matching_lines": 83
+      },
+      "new_lines": null
+    },
+    {
+      "test": "stage_object_enumerate",
+      "change_type": "removed",
+      "old_status": "pass",
+      "new_status": null,
+      "old_lines": {
+        "actual_lines": 4,
+        "expected_lines": 4,
+        "matching_lines": 4
+      },
+      "new_lines": null
+    },
+    {
+      "test": "stage_object_properties",
+      "change_type": "removed",
+      "old_status": "pass",
+      "new_status": null,
+      "old_lines": {
+        "actual_lines": 241,
+        "expected_lines": 241,
+        "matching_lines": 241
+      },
+      "new_lines": null
+    },
+    {
+      "test": "stage_object_properties_get_var",
+      "change_type": "removed",
+      "old_status": "pass",
+      "new_status": null,
+      "old_lines": {
+        "actual_lines": 5,
+        "expected_lines": 5,
+        "matching_lines": 5
+      },
+      "new_lines": null
+    },
+    {
+      "test": "stage_object_properties_swf6",
+      "change_type": "removed",
+      "old_status": "pass",
+      "new_status": null,
+      "old_lines": {
+        "actual_lines": 231,
+        "expected_lines": 231,
+        "matching_lines": 231
+      },
+      "new_lines": null
+    },
+    {
+      "test": "stage_property_representation",
+      "change_type": "removed",
+      "old_status": "pass",
+      "new_status": null,
+      "old_lines": {
+        "actual_lines": 586,
+        "expected_lines": 586,
+        "matching_lines": 586
+      },
+      "new_lines": null
+    },
+    {
+      "test": "stage_scale_mode",
+      "change_type": "removed",
+      "old_status": "pass",
+      "new_status": null,
+      "old_lines": {
+        "actual_lines": 39,
+        "expected_lines": 39,
+        "matching_lines": 39
+      },
+      "new_lines": null
+    },
+    {
+      "test": "strictequals_swf6",
+      "change_type": "removed",
+      "old_status": "pass",
+      "new_status": null,
+      "old_lines": {
+        "actual_lines": 902,
+        "expected_lines": 902,
+        "matching_lines": 902
+      },
+      "new_lines": null
+    },
+    {
+      "test": "strictly_equals",
+      "change_type": "removed",
+      "old_status": "pass",
+      "new_status": null,
+      "old_lines": {
+        "actual_lines": 7,
+        "expected_lines": 7,
+        "matching_lines": 7
+      },
+      "new_lines": null
+    },
+    {
+      "test": "string_coercion",
+      "change_type": "removed",
+      "old_status": "pass",
+      "new_status": null,
+      "old_lines": {
+        "actual_lines": 117,
+        "expected_lines": 117,
+        "matching_lines": 117
+      },
+      "new_lines": null
+    },
+    {
+      "test": "string_methods",
+      "change_type": "removed",
+      "old_status": "pass",
+      "new_status": null,
+      "old_lines": {
+        "actual_lines": 285,
+        "expected_lines": 285,
+        "matching_lines": 285
+      },
+      "new_lines": null
+    },
+    {
+      "test": "string_methods_negative_args",
+      "change_type": "removed",
+      "old_status": "pass",
+      "new_status": null,
+      "old_lines": {
+        "actual_lines": 240,
+        "expected_lines": 240,
+        "matching_lines": 240
+      },
+      "new_lines": null
+    },
+    {
+      "test": "string_methods_swfv5",
+      "change_type": "removed",
+      "old_status": "pass",
+      "new_status": null,
+      "old_lines": {
+        "actual_lines": 275,
+        "expected_lines": 275,
+        "matching_lines": 275
+      },
+      "new_lines": null
+    },
+    {
+      "test": "string_ops_swf6",
+      "change_type": "removed",
+      "old_status": "pass",
+      "new_status": null,
+      "old_lines": {
+        "actual_lines": 95,
+        "expected_lines": 95,
+        "matching_lines": 95
+      },
+      "new_lines": null
+    },
+    {
+      "test": "string_paths_basic",
+      "change_type": "removed",
+      "old_status": "pass",
+      "new_status": null,
+      "old_lines": {
+        "actual_lines": 4,
+        "expected_lines": 4,
+        "matching_lines": 4
+      },
+      "new_lines": null
+    },
+    {
+      "test": "string_paths_eval",
+      "change_type": "removed",
+      "old_status": "pass",
+      "new_status": null,
+      "old_lines": {
+        "actual_lines": 4,
+        "expected_lines": 4,
+        "matching_lines": 4
+      },
+      "new_lines": null
+    },
+    {
+      "test": "string_paths_eval2",
+      "change_type": "removed",
+      "old_status": "pass",
+      "new_status": null,
+      "old_lines": {
+        "actual_lines": 7,
+        "expected_lines": 7,
+        "matching_lines": 7
+      },
+      "new_lines": null
+    },
+    {
+      "test": "string_paths_hidden",
+      "change_type": "removed",
+      "old_status": "pass",
+      "new_status": null,
+      "old_lines": {
+        "actual_lines": 54,
+        "expected_lines": 54,
+        "matching_lines": 54
+      },
+      "new_lines": null
+    },
+    {
+      "test": "string_paths_keyevents",
+      "change_type": "removed",
+      "old_status": "pass",
+      "new_status": null,
+      "old_lines": {
+        "actual_lines": 0,
+        "expected_lines": 0,
+        "matching_lines": 0
+      },
+      "new_lines": null
+    },
+    {
+      "test": "string_paths_other",
+      "change_type": "removed",
+      "old_status": "pass",
+      "new_status": null,
+      "old_lines": {
+        "actual_lines": 36,
+        "expected_lines": 36,
+        "matching_lines": 36
+      },
+      "new_lines": null
+    },
+    {
+      "test": "string_paths_reference_launder",
+      "change_type": "removed",
+      "old_status": "output_mismatch",
+      "new_status": null,
+      "old_lines": {
+        "actual_lines": 2,
+        "expected_lines": 2,
+        "matching_lines": 0
+      },
+      "new_lines": null
+    },
+    {
+      "test": "string_paths_timer",
+      "change_type": "removed",
+      "old_status": "pass",
+      "new_status": null,
+      "old_lines": {
+        "actual_lines": 0,
+        "expected_lines": 0,
+        "matching_lines": 0
+      },
+      "new_lines": null
+    },
+    {
+      "test": "string_paths_unload",
+      "change_type": "removed",
+      "old_status": "pass",
+      "new_status": null,
+      "old_lines": {
+        "actual_lines": 1,
+        "expected_lines": 1,
+        "matching_lines": 1
+      },
+      "new_lines": null
+    },
+    {
+      "test": "string_paths_variable_alias",
+      "change_type": "removed",
+      "old_status": "pass",
+      "new_status": null,
+      "old_lines": {
+        "actual_lines": 4,
+        "expected_lines": 4,
+        "matching_lines": 4
+      },
+      "new_lines": null
+    },
+    {
+      "test": "string_paths_variable_scopes",
+      "change_type": "removed",
+      "old_status": "pass",
+      "new_status": null,
+      "old_lines": {
+        "actual_lines": 5,
+        "expected_lines": 5,
+        "matching_lines": 5
+      },
+      "new_lines": null
+    },
+    {
+      "test": "stylesheet",
+      "change_type": "removed",
+      "old_status": "pass",
+      "new_status": null,
+      "old_lines": {
+        "actual_lines": 283,
+        "expected_lines": 283,
+        "matching_lines": 283
+      },
+      "new_lines": null
+    },
+    {
+      "test": "stylesheet_load",
+      "change_type": "removed",
+      "old_status": "output_mismatch",
+      "new_status": null,
+      "old_lines": {
+        "actual_lines": 2,
+        "expected_lines": 49,
+        "matching_lines": 1
+      },
+      "new_lines": null
+    },
+    {
+      "test": "stylesheet_transform",
+      "change_type": "removed",
+      "old_status": "pass",
+      "new_status": null,
+      "old_lines": {
+        "actual_lines": 750,
+        "expected_lines": 750,
+        "matching_lines": 750
+      },
+      "new_lines": null
+    },
+    {
+      "test": "super_edge_cases",
+      "change_type": "removed",
+      "old_status": "pass",
+      "new_status": null,
+      "old_lines": {
+        "actual_lines": 39,
+        "expected_lines": 39,
+        "matching_lines": 39
+      },
+      "new_lines": null
+    },
+    {
+      "test": "swf4_actions_bool",
+      "change_type": "removed",
+      "old_status": "pass",
+      "new_status": null,
+      "old_lines": {
+        "actual_lines": 96,
+        "expected_lines": 96,
+        "matching_lines": 96
+      },
+      "new_lines": null
+    },
+    {
+      "test": "swf4_actions_coercion_order",
+      "change_type": "removed",
+      "old_status": "pass",
+      "new_status": null,
+      "old_lines": {
+        "actual_lines": 158,
+        "expected_lines": 158,
+        "matching_lines": 158
+      },
+      "new_lines": null
+    },
+    {
+      "test": "swf4_bool",
+      "change_type": "removed",
+      "old_status": "pass",
+      "new_status": null,
+      "old_lines": {
+        "actual_lines": 4,
+        "expected_lines": 4,
+        "matching_lines": 4
+      },
+      "new_lines": null
+    }
+  ]
 }
