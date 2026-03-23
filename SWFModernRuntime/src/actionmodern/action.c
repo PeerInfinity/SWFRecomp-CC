@@ -768,6 +768,8 @@ static ASFunction g_object_unwatch_func;
 static ASFunction g_object_addProperty_func;
 static ASFunction g_wrapper_toString_func;
 static int g_wrapper_toString_init = 0;
+static ASFunction g_fn_apply_func;
+static ASFunction g_fn_call_func;
 
 // --- Object.prototype.watch() / unwatch() watcher table ---
 #define MAX_WATCH_ENTRIES 64
@@ -24315,6 +24317,91 @@ static void ensureGlobalInit(SWFAppContext* app_context)
 		// Set Function.prototype_obj so instanceof Function works
 		g_ctors[5].prototype_obj = fn_proto;
 		g_function_constructor = &g_ctors[5];
+
+		// Add apply and call as own properties on Function.prototype
+		// (actual implementation is via dynamic dispatch in actionCallMethod,
+		// but property existence is needed for hasOwnProperty checks)
+		memset(&g_fn_apply_func, 0, sizeof(ASFunction));
+		strncpy(g_fn_apply_func.name, "apply", 255);
+		g_fn_apply_func.function_type = 2;
+		g_fn_apply_func.param_count = 2;
+		g_fn_apply_func.advanced_func = (Function2Ptr)builtin_noop_func;
+		if (function_count < MAX_FUNCTIONS)
+			function_registry[function_count++] = &g_fn_apply_func;
+		ActionVar apply_val = {0}; apply_val.type = ACTION_STACK_VALUE_FUNCTION;
+		apply_val.data.numeric_value = (u64)&g_fn_apply_func;
+		setPropertyWithFlags(app_context, fn_proto, "apply", 5, &apply_val, PROPERTY_FLAG_WRITABLE);
+
+		memset(&g_fn_call_func, 0, sizeof(ASFunction));
+		strncpy(g_fn_call_func.name, "call", 255);
+		g_fn_call_func.function_type = 2;
+		g_fn_call_func.param_count = 1;
+		g_fn_call_func.advanced_func = (Function2Ptr)builtin_noop_func;
+		if (function_count < MAX_FUNCTIONS)
+			function_registry[function_count++] = &g_fn_call_func;
+		ActionVar call_val = {0}; call_val.type = ACTION_STACK_VALUE_FUNCTION;
+		call_val.data.numeric_value = (u64)&g_fn_call_func;
+		setPropertyWithFlags(app_context, fn_proto, "call", 4, &call_val, PROPERTY_FLAG_WRITABLE);
+	}
+
+	// ---- Eager prototype creation for Number, String, Boolean ----
+	// Flash's Number.prototype, String.prototype, Boolean.prototype have their own
+	// toString/valueOf methods (distinct from Object.prototype's).
+	// Create these eagerly so Phase 8c-2 can register the prototype property on own_props.
+	{
+		// Initialize wrapper functions for valueOf/toString if not already done
+		if (!g_wrapper_funcs_init)
+		{
+			memset(&g_wrapper_valueOf_func, 0, sizeof(ASFunction));
+			strncpy(g_wrapper_valueOf_func.name, "valueOf", 255);
+			g_wrapper_valueOf_func.function_type = 2;
+			g_wrapper_valueOf_func.param_count = 0;
+			g_wrapper_valueOf_func.advanced_func = (Function2Ptr) builtin_wrapper_valueOf;
+			if (function_count < MAX_FUNCTIONS)
+				function_registry[function_count++] = &g_wrapper_valueOf_func;
+
+			memset(&g_prim_wrapper_toString_func, 0, sizeof(ASFunction));
+			strncpy(g_prim_wrapper_toString_func.name, "toString", 255);
+			g_prim_wrapper_toString_func.function_type = 2;
+			g_prim_wrapper_toString_func.param_count = 0;
+			g_prim_wrapper_toString_func.advanced_func = (Function2Ptr) builtin_prim_wrapper_toString;
+			if (function_count < MAX_FUNCTIONS)
+				function_registry[function_count++] = &g_prim_wrapper_toString_func;
+
+			g_wrapper_funcs_init = 1;
+		}
+
+		ActionVar vo_val = {0}; vo_val.type = ACTION_STACK_VALUE_FUNCTION;
+		vo_val.data.numeric_value = (u64)&g_wrapper_valueOf_func;
+		ActionVar ts_val = {0}; ts_val.type = ACTION_STACK_VALUE_FUNCTION;
+		ts_val.data.numeric_value = (u64)&g_prim_wrapper_toString_func;
+
+		// Number.prototype (g_ctors[3])
+		if (g_ctors[3].prototype_obj == NULL) {
+			g_ctors[3].prototype_obj = allocObject(app_context, 8);
+			retainObject(g_ctors[3].prototype_obj);
+			setObjectProto(app_context, g_ctors[3].prototype_obj);
+		}
+		setPropertyWithFlags(app_context, g_ctors[3].prototype_obj, "valueOf", 7, &vo_val, PROPERTY_FLAG_WRITABLE);
+		setPropertyWithFlags(app_context, g_ctors[3].prototype_obj, "toString", 8, &ts_val, PROPERTY_FLAG_WRITABLE);
+
+		// String.prototype (g_ctors[2])
+		if (g_ctors[2].prototype_obj == NULL) {
+			g_ctors[2].prototype_obj = allocObject(app_context, 8);
+			retainObject(g_ctors[2].prototype_obj);
+			setObjectProto(app_context, g_ctors[2].prototype_obj);
+		}
+		setPropertyWithFlags(app_context, g_ctors[2].prototype_obj, "valueOf", 7, &vo_val, PROPERTY_FLAG_WRITABLE);
+		setPropertyWithFlags(app_context, g_ctors[2].prototype_obj, "toString", 8, &ts_val, PROPERTY_FLAG_WRITABLE);
+
+		// Boolean.prototype (g_ctors[4])
+		if (g_ctors[4].prototype_obj == NULL) {
+			g_ctors[4].prototype_obj = allocObject(app_context, 8);
+			retainObject(g_ctors[4].prototype_obj);
+			setObjectProto(app_context, g_ctors[4].prototype_obj);
+		}
+		setPropertyWithFlags(app_context, g_ctors[4].prototype_obj, "valueOf", 7, &vo_val, PROPERTY_FLAG_WRITABLE);
+		setPropertyWithFlags(app_context, g_ctors[4].prototype_obj, "toString", 8, &ts_val, PROPERTY_FLAG_WRITABLE);
 	}
 
 	// ---- Phase 8c-2: Populate own_props on every constructor ----
@@ -24424,6 +24511,25 @@ static void ensureGlobalInit(SWFAppContext* app_context)
 			sv = makeStringActionVar(app_context, "normal", 6);
 			setPropertyWithFlags(app_context, g_textrenderer_ctor.own_props, "displayMode", 11, &sv,
 			                     PROPERTY_FLAG_ENUMERABLE | PROPERTY_FLAG_CONFIGURABLE);
+		}
+
+		// ---- Object.prototype.constructor = Object ----
+		// In Flash, Object.prototype.constructor points to the Object constructor.
+		// This is needed for obj.__proto__.constructor == Object checks.
+		{
+			ActionVar obj_ctor_val;
+			obj_ctor_val.type = ACTION_STACK_VALUE_FUNCTION;
+			obj_ctor_val.str_size = 0;
+			obj_ctor_val.data.numeric_value = (u64) &g_ctors[0];
+			setProperty(app_context, g_object_prototype, "constructor", 11, &obj_ctor_val);
+			// Mark as non-enumerable (like other Object.prototype methods)
+			for (u32 i = 0; i < g_object_prototype->num_used; i++) {
+				if (g_object_prototype->properties[i].name_length == 11 &&
+				    strncmp(g_object_prototype->properties[i].name, "constructor", 11) == 0) {
+					g_object_prototype->properties[i].flags &= ~PROPERTY_FLAG_ENUMERABLE;
+					break;
+				}
+			}
 		}
 
 		// ---- Phase 8c-2.5: Fix prototype flags + flash.* constructor own_props ----
@@ -24669,6 +24775,50 @@ static void ensureSecondaryGlobalInit(SWFAppContext* app_context, int target_ver
 		if (i == 3 && sec_fn_proto) { // i==3 is "Function"
 			sec_extra_ctors[i]->prototype_obj = sec_fn_proto;
 		}
+		// Create prototype_obj for String (i=0), Number (i=1), Boolean (i=2)
+		// with own toString/valueOf (distinct from Object.prototype's)
+		if (i < 3) {
+			sec_extra_ctors[i]->prototype_obj = allocObject(app_context, 8);
+			retainObject(sec_extra_ctors[i]->prototype_obj);
+			setProtoTo(app_context, sec_extra_ctors[i]->prototype_obj, sec_obj_proto);
+			// Ensure wrapper funcs are initialized
+			if (!g_wrapper_funcs_init) {
+				memset(&g_wrapper_valueOf_func, 0, sizeof(ASFunction));
+				strncpy(g_wrapper_valueOf_func.name, "valueOf", 255);
+				g_wrapper_valueOf_func.function_type = 2;
+				g_wrapper_valueOf_func.advanced_func = (Function2Ptr) builtin_wrapper_valueOf;
+				if (function_count < MAX_FUNCTIONS)
+					function_registry[function_count++] = &g_wrapper_valueOf_func;
+				memset(&g_prim_wrapper_toString_func, 0, sizeof(ASFunction));
+				strncpy(g_prim_wrapper_toString_func.name, "toString", 255);
+				g_prim_wrapper_toString_func.function_type = 2;
+				g_prim_wrapper_toString_func.advanced_func = (Function2Ptr) builtin_prim_wrapper_toString;
+				if (function_count < MAX_FUNCTIONS)
+					function_registry[function_count++] = &g_prim_wrapper_toString_func;
+				g_wrapper_funcs_init = 1;
+			}
+			ActionVar _vo = {0}; _vo.type = ACTION_STACK_VALUE_FUNCTION;
+			_vo.data.numeric_value = (u64)&g_wrapper_valueOf_func;
+			setPropertyWithFlags(app_context, sec_extra_ctors[i]->prototype_obj, "valueOf", 7, &_vo, PROPERTY_FLAG_WRITABLE);
+			ActionVar _ts = {0}; _ts.type = ACTION_STACK_VALUE_FUNCTION;
+			_ts.data.numeric_value = (u64)&g_prim_wrapper_toString_func;
+			setPropertyWithFlags(app_context, sec_extra_ctors[i]->prototype_obj, "toString", 8, &_ts, PROPERTY_FLAG_WRITABLE);
+			// Set prototype property on own_props
+			if (sec_extra_ctors[i]->own_props != NULL) {
+				ActionVar pv = {0}; pv.type = ACTION_STACK_VALUE_OBJECT;
+				pv.data.numeric_value = (u64) sec_extra_ctors[i]->prototype_obj;
+				setPropertyWithFlags(app_context, sec_extra_ctors[i]->own_props, "prototype", 9, &pv, PROPERTY_FLAG_WRITABLE);
+			}
+		}
+	}
+
+	// Add apply and call to secondary Function.prototype
+	if (sec_fn_proto) {
+		ActionVar av = {0}; av.type = ACTION_STACK_VALUE_FUNCTION;
+		av.data.numeric_value = (u64)&g_fn_apply_func;
+		setPropertyWithFlags(app_context, sec_fn_proto, "apply", 5, &av, PROPERTY_FLAG_WRITABLE);
+		av.data.numeric_value = (u64)&g_fn_call_func;
+		setPropertyWithFlags(app_context, sec_fn_proto, "call", 4, &av, PROPERTY_FLAG_WRITABLE);
 	}
 
 	// MovieClip constructor — separate instance
@@ -25802,6 +25952,32 @@ check_special_vars:
 				VAL(u64, &fcc_val.data.numeric_value) = (u64) &g_string_fromCharCode_func;
 				setProperty(app_context, g_string_constructor.own_props, "fromCharCode", 12, &fcc_val);
 
+				// Create String.prototype with own valueOf/toString
+				g_string_constructor.prototype_obj = allocObject(app_context, 8);
+				retainObject(g_string_constructor.prototype_obj);
+				setObjectProto(app_context, g_string_constructor.prototype_obj);
+				if (!g_wrapper_funcs_init) {
+					memset(&g_wrapper_valueOf_func, 0, sizeof(ASFunction));
+					strncpy(g_wrapper_valueOf_func.name, "valueOf", 255);
+					g_wrapper_valueOf_func.function_type = 2;
+					g_wrapper_valueOf_func.advanced_func = (Function2Ptr) builtin_wrapper_valueOf;
+					if (function_count < MAX_FUNCTIONS) function_registry[function_count++] = &g_wrapper_valueOf_func;
+					memset(&g_prim_wrapper_toString_func, 0, sizeof(ASFunction));
+					strncpy(g_prim_wrapper_toString_func.name, "toString", 255);
+					g_prim_wrapper_toString_func.function_type = 2;
+					g_prim_wrapper_toString_func.advanced_func = (Function2Ptr) builtin_prim_wrapper_toString;
+					if (function_count < MAX_FUNCTIONS) function_registry[function_count++] = &g_prim_wrapper_toString_func;
+					g_wrapper_funcs_init = 1;
+				}
+				{
+					ActionVar _vo = {0}; _vo.type = ACTION_STACK_VALUE_FUNCTION;
+					_vo.data.numeric_value = (u64)&g_wrapper_valueOf_func;
+					setPropertyWithFlags(app_context, g_string_constructor.prototype_obj, "valueOf", 7, &_vo, PROPERTY_FLAG_WRITABLE);
+					ActionVar _ts = {0}; _ts.type = ACTION_STACK_VALUE_FUNCTION;
+					_ts.data.numeric_value = (u64)&g_prim_wrapper_toString_func;
+					setPropertyWithFlags(app_context, g_string_constructor.prototype_obj, "toString", 8, &_ts, PROPERTY_FLAG_WRITABLE);
+				}
+
 				g_string_constructor_init = 1;
 			}
 			PUSH(ACTION_STACK_VALUE_FUNCTION, (u64)&g_string_constructor);
@@ -25837,6 +26013,32 @@ check_special_vars:
 				ActionVar _ncp_max = makeF64(1.7976931348623149e+308);
 				setProperty(app_context, g_number_constructor.own_props, "MAX_VALUE", 9, &_ncp_max);
 
+				// Create Number.prototype with own valueOf/toString
+				g_number_constructor.prototype_obj = allocObject(app_context, 8);
+				retainObject(g_number_constructor.prototype_obj);
+				setObjectProto(app_context, g_number_constructor.prototype_obj);
+				if (!g_wrapper_funcs_init) {
+					memset(&g_wrapper_valueOf_func, 0, sizeof(ASFunction));
+					strncpy(g_wrapper_valueOf_func.name, "valueOf", 255);
+					g_wrapper_valueOf_func.function_type = 2;
+					g_wrapper_valueOf_func.advanced_func = (Function2Ptr) builtin_wrapper_valueOf;
+					if (function_count < MAX_FUNCTIONS) function_registry[function_count++] = &g_wrapper_valueOf_func;
+					memset(&g_prim_wrapper_toString_func, 0, sizeof(ASFunction));
+					strncpy(g_prim_wrapper_toString_func.name, "toString", 255);
+					g_prim_wrapper_toString_func.function_type = 2;
+					g_prim_wrapper_toString_func.advanced_func = (Function2Ptr) builtin_prim_wrapper_toString;
+					if (function_count < MAX_FUNCTIONS) function_registry[function_count++] = &g_prim_wrapper_toString_func;
+					g_wrapper_funcs_init = 1;
+				}
+				{
+					ActionVar _vo = {0}; _vo.type = ACTION_STACK_VALUE_FUNCTION;
+					_vo.data.numeric_value = (u64)&g_wrapper_valueOf_func;
+					setPropertyWithFlags(app_context, g_number_constructor.prototype_obj, "valueOf", 7, &_vo, PROPERTY_FLAG_WRITABLE);
+					ActionVar _ts = {0}; _ts.type = ACTION_STACK_VALUE_FUNCTION;
+					_ts.data.numeric_value = (u64)&g_prim_wrapper_toString_func;
+					setPropertyWithFlags(app_context, g_number_constructor.prototype_obj, "toString", 8, &_ts, PROPERTY_FLAG_WRITABLE);
+				}
+
 				g_number_constructor_init = 1;
 			}
 			PUSH(ACTION_STACK_VALUE_FUNCTION, (u64)&g_number_constructor);
@@ -25853,6 +26055,33 @@ check_special_vars:
 				strncpy(g_boolean_constructor.name, "Boolean", 255);
 				g_boolean_constructor.function_type = 1;
 				g_boolean_constructor.param_count = 0;
+
+				// Create Boolean.prototype with own valueOf/toString
+				g_boolean_constructor.prototype_obj = allocObject(app_context, 8);
+				retainObject(g_boolean_constructor.prototype_obj);
+				setObjectProto(app_context, g_boolean_constructor.prototype_obj);
+				if (!g_wrapper_funcs_init) {
+					memset(&g_wrapper_valueOf_func, 0, sizeof(ASFunction));
+					strncpy(g_wrapper_valueOf_func.name, "valueOf", 255);
+					g_wrapper_valueOf_func.function_type = 2;
+					g_wrapper_valueOf_func.advanced_func = (Function2Ptr) builtin_wrapper_valueOf;
+					if (function_count < MAX_FUNCTIONS) function_registry[function_count++] = &g_wrapper_valueOf_func;
+					memset(&g_prim_wrapper_toString_func, 0, sizeof(ASFunction));
+					strncpy(g_prim_wrapper_toString_func.name, "toString", 255);
+					g_prim_wrapper_toString_func.function_type = 2;
+					g_prim_wrapper_toString_func.advanced_func = (Function2Ptr) builtin_prim_wrapper_toString;
+					if (function_count < MAX_FUNCTIONS) function_registry[function_count++] = &g_prim_wrapper_toString_func;
+					g_wrapper_funcs_init = 1;
+				}
+				{
+					ActionVar _vo = {0}; _vo.type = ACTION_STACK_VALUE_FUNCTION;
+					_vo.data.numeric_value = (u64)&g_wrapper_valueOf_func;
+					setPropertyWithFlags(app_context, g_boolean_constructor.prototype_obj, "valueOf", 7, &_vo, PROPERTY_FLAG_WRITABLE);
+					ActionVar _ts = {0}; _ts.type = ACTION_STACK_VALUE_FUNCTION;
+					_ts.data.numeric_value = (u64)&g_prim_wrapper_toString_func;
+					setPropertyWithFlags(app_context, g_boolean_constructor.prototype_obj, "toString", 8, &_ts, PROPERTY_FLAG_WRITABLE);
+				}
+
 				g_boolean_constructor_init = 1;
 			}
 			PUSH(ACTION_STACK_VALUE_FUNCTION, (u64)&g_boolean_constructor);

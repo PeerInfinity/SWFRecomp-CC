@@ -28,12 +28,15 @@ Ignore list created for 30 AVM2/AS3 tests. Suite is complete.
 
 Phase 1b fixes (Math, ops, Error edge cases) applied. 9 tests with all-accepted diffs (Gnash bugs) added to ignore list. Line-level match improved from 65.0% → 69.1% (unfiltered) / 66.3% (filtered).
 
-### Gnash: Phase 2 in progress
+### Gnash: Phase 2 in progress — 7 new passing tests (2026-03-23)
+
+Phase 2 fixes applied:
+- **Built-in prototype own toString/valueOf** — DONE. Number/String/Boolean prototypes now have own valueOf/toString distinct from Object.prototype. Fixed: Boolean-v5/v6/v7/v8 (4 tests PASS), Video-v6/v7/v8 (3 tests PASS), toString_valueOf improved 34→22 diffs.
+- **Function.prototype.apply/call** — DONE. Registered as own properties on Function.prototype.
+- **Object.prototype.constructor** — DONE. Set constructor → Object on Object.prototype.
 
 Remaining Phase 2 items:
 - **Color.getTransform() on invalid target** — should return undefined, not object (Color-v5/v6/v7/v8)
-- **ASArray/ASObject cast in convertFloat** — toString_valueOf tests
-- **Object.prototype.constructor** — Inheritance tests
 - **Stage/Selection non-constructable** — SWF5 version gating
 
 ## Per-Suite Docs

@@ -1,14 +1,16 @@
 # Gnash Test Suite Status
 
-Last updated: 2026-03-23 (CI run on 3b075cff)
+Last updated: 2026-03-23 (local testing after prototype fixes)
 
 ## Quick Summary
 
 | Sub-suite | Tests | Passing | Rate | Filtered | Filtered Rate | Ignored |
 |-----------|-------|---------|------|----------|---------------|---------|
-| **actionscript.all** | 190 | 51 | 26.8% | 51/181 | **28.2%** | 9 |
+| **actionscript.all** | 190 | ~58 | ~30.5% | ~58/181 | **~32.0%** | 9 |
 | **misc-swfmill.all** | 14 | 11 | 78.6% | — | — | — |
-| **Total** | 204 | 62 | 30.4% | — | — | — |
+| **Total** | 204 | ~69 | ~33.8% | — | — | — |
+
+Note: +7 tests newly passing (Boolean-v5/v6/v7/v8, Video-v6/v7/v8) from prototype fixes. Exact numbers pending CI run.
 
 Filtered results exclude 9 tests with all-accepted diffs (Math-v5/v6/v7/v8, ops-v8, Error-v5/v6/v7/v8) — see `ACCEPTED_DIFFS.md`. Remaining 3 misc-swfmill failures (dict_event, tags_after_last_showframe, jump_to_prev_block) are blocked on architectural limitations — see `incomplete/MISC_SWFMILL_PLAN.md`.
 
@@ -139,16 +141,16 @@ During `actionAdd2` on two ARRAY values, `convertFloat` calls `getPropertyWithPr
 
 ### Already identified root causes
 
-| Test | Match | Root Cause | Fix |
-|------|-------|------------|-----|
-| Video-v6/v7/v8 | 95.3% | `hasOwnProperty` missing (Object.prototype bug) | Object.prototype fix |
-| NetStream-v6/v7/v8 | 91.2% | `hasOwnProperty` missing (Object.prototype bug) | Object.prototype fix |
-| Boolean-v6/v7/v8 | 92.1% | `typeof(_global.Boolean)` returns "number" not "function" | Separate _global type bug |
+| Test | Match | Root Cause | Status |
+|------|-------|------------|--------|
+| Video-v6/v7/v8 | 95.3% | `hasOwnProperty` missing (Object.prototype bug) | **FIXED → PASS** |
+| Boolean-v5/v6/v7/v8 | 92.1% | `typeof(_global.Boolean)` returns "number" not "function" | **FIXED → PASS** |
+| NetStream-v6/v7/v8 | 91.2%→97.4% | 2 remaining: `currentFps` not own property on prototype | Near-pass |
 | Stage-v5 | 86.8% | Stage should be non-constructable; AsBroadcaster methods version-gated | Medium fix |
 | TextFieldHTML-v6/v7/v8 | 86.5% | htmlText getter/text clearing bugs | TextField fix |
 | Selection-v5/v6/v7/v8 | 85.6-86.4% | Selection non-constructable + `_listeners` own property + instanceof MC | Multiple small fixes |
-| Color-v5/v6/v7/v8 | 81.3-82.9% | hasOwnProperty bug + instanceof Color + getTransform on invalid | Mixed: prototype fix + instanceof |
-| Inheritance-v5/v6 | 80.9-81.3% | `Object.prototype.constructor` not set + hasOwnProperty bug + apply | Mixed fixes |
+| Color-v5/v6/v7/v8 | 81.3-82.9% | instanceof Color + getTransform on invalid | Mixed fixes |
+| Inheritance-v5/v6 | 80.9-81.3% | super() chain, Function.__proto__, instanceOf | Complex |
 
 ### v5-passes-but-v6-fails Pattern
 
@@ -175,12 +177,16 @@ During `actionAdd2` on two ARRAY values, `convertFloat` calls `getPropertyWithPr
 
 **Impact**: Math-v5/v6: 6→5 diffs, Math-v7/v8: 7→5 diffs, ops-v8: 11→7 diffs, Error-v5/v6/v7/v8: 7→4 diffs each. All remaining diffs are accepted (Gnash bugs). See `ACCEPTED_DIFFS.md`.
 
-### Phase 2: Next fixes (est. +10-15 tests)
-12. **ASArray/ASObject cast in convertFloat** — 2 runtime errors (toString_valueOf tests).
-13. **`Object.prototype.constructor` setup** — Inheritance tests.
+### Phase 2: Prototype and constructor fixes (est. +10-15 tests)
+12. ~~**ASArray/ASObject cast in convertFloat**~~ — Already fixed (arr->props sub-object used). toString_valueOf failures are from other causes.
+13. ~~**`Object.prototype.constructor` setup**~~ — DONE (2026-03-23). Set constructor → Object on Object.prototype.
 14. **Stage/Selection non-constructable** — `typeof(new Stage())` should be "undefined".
 15. **Color.getTransform() on invalid target** — should return undefined, not object.
 16. ~~**Try/finally control flow** — Try-v6/v7/v8 runtime errors.~~ **FIXED**
+17. ~~**Built-in prototype own toString/valueOf**~~ — DONE (2026-03-23). Number.prototype, String.prototype, Boolean.prototype now have their own valueOf/toString methods distinct from Object.prototype's. Fixed in three locations: primary g_ctors, secondary constructors, and actionGetVariable special handlers.
+18. ~~**Function.prototype.apply/call as properties**~~ — DONE (2026-03-23). apply and call registered as own properties on Function.prototype (both primary and secondary version groups).
+
+**Phase 2 impact**: Boolean-v5/v6/v7/v8 now PASS (4 tests), Video-v6/v7/v8 now PASS (3 tests). toString_valueOf improved from 115/149 → 127/149 per version.
 
 ### Phase 3: Individual test fixes
 12. TextFieldHTML htmlText getter
