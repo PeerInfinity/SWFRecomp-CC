@@ -1,16 +1,16 @@
 # Gnash Test Suite Status
 
-Last updated: 2026-03-21 (post misc-swfmill fixes)
+Last updated: 2026-03-23 (CI run on 3b075cff)
 
 ## Quick Summary
 
-| Sub-suite | Tests | Passing | Rate | Segfaults | Runtime Error | Output Mismatch |
-|-----------|-------|---------|------|-----------|---------------|-----------------|
-| **actionscript.all** | 190 | 51 | 26.8% | 0 | 0 | 139 |
-| **misc-swfmill.all** | 14 | 11 | 78.6% | 0 | 0 | 3 |
-| **Total** | 204 | 62 | 30.4% | 0 | 0 | 142 |
+| Sub-suite | Tests | Passing | Rate | Filtered | Filtered Rate | Ignored |
+|-----------|-------|---------|------|----------|---------------|---------|
+| **actionscript.all** | 190 | 51 | 26.8% | 51/181 | **28.2%** | 9 |
+| **misc-swfmill.all** | 14 | 11 | 78.6% | — | — | — |
+| **Total** | 204 | 62 | 30.4% | — | — | — |
 
-Note: actionscript.all counts from CI run (2026-03-21). misc-swfmill.all updated after fixing zeroframe_definesprite, initaction_in_definesprite, jump_after_end (commit 1f45d1a7). Remaining 3 misc-swfmill failures (dict_event, tags_after_last_showframe, jump_to_prev_block) are blocked on architectural limitations — see `incomplete/MISC_SWFMILL_PLAN.md`.
+Filtered results exclude 9 tests with all-accepted diffs (Math-v5/v6/v7/v8, ops-v8, Error-v5/v6/v7/v8) — see `ACCEPTED_DIFFS.md`. Remaining 3 misc-swfmill failures (dict_event, tags_after_last_showframe, jump_to_prev_block) are blocked on architectural limitations — see `incomplete/MISC_SWFMILL_PLAN.md`.
 
 ## Related Documents
 

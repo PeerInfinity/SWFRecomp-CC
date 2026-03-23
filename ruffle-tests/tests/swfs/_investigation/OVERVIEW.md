@@ -2,39 +2,39 @@
 
 Cross-suite summary of all Ruffle-derived test suites. Each suite has its own `_investigation/` directory with detailed status docs.
 
-Last updated: 2026-03-19
+Last updated: 2026-03-23 (CI run on 3b075cff)
 
 ## Suite Summary
 
 | Suite | Tests | Passing | Rate | Filtered Rate | Notes |
 |-------|-------|---------|------|---------------|-------|
-| [avm1](../avm1/_investigation/CURRENT_STATUS.md) | 619 | 559 | 90.3% | **97.5%** (549/563) | Mature. Near-ceiling. |
-| [from_gnash/actionscript.all](../from_gnash/_investigation/CURRENT_STATUS.md) | 190 | 44 | **23.2%** | TBD (no ignore list yet) | 2 segfaults, 5 runtime errors, 139 output mismatch. |
-| [from_gnash/misc-swfmill.all](../from_gnash/_investigation/CURRENT_STATUS.md) | 14 | 8 | **57.1%** | TBD | 6 output mismatch. |
-| [from_shumway](../from_shumway/_investigation/CURRENT_STATUS.md) | 47 | 15 | 31.9% | **88.2%** (15/17) | 30 of 32 failures are AVM2/AS3 (not applicable). |
+| [avm1](../avm1/_investigation/CURRENT_STATUS.md) | 619 | 558 | 90.1% | **97.2%** (558/574) | Mature. Near-ceiling. |
+| [from_gnash/actionscript.all](../from_gnash/_investigation/CURRENT_STATUS.md) | 190 | 51 | 26.8% | **28.2%** (51/181) | 9 accepted-diff tests ignored. Line match 69.1%. |
+| [from_gnash/misc-swfmill.all](../from_gnash/_investigation/CURRENT_STATUS.md) | 14 | 11 | **78.6%** | — | 3 blocked on architecture. |
+| [from_shumway](../from_shumway/_investigation/CURRENT_STATUS.md) | 47 | 17 | 36.2% | **100.0%** (17/17) | **Complete.** All AVM1 tests pass. 30 AVM2 ignored. |
 | **SWFRecomp/tests** (old suite) | 158+59 | all trace pass | **100%** | — | Hand-written opcode tests. CI only. |
 
-## Progress Since 2026-03-18
+## Progress Since 2026-03-19
 
-### Gnash: Phase 1 complete — 42 → 52 tests passing (+24%)
+### Shumway: Complete — 15/17 → 17/17 (100% AVM1)
 
-All Phase 1 fixes applied:
-1. ~~s16 label overflow~~ — DONE (28 compile failures fixed)
-2. ~~Object.prototype SWF5 guard~~ — DONE (hasOwnProperty always installed)
-3. ~~Transform buffer overflow~~ — DONE (11 segfaults fixed, 2 remaining in Inheritance)
-4. ~~WITH block duplicate labels~~ — DONE (4 compile failures fixed)
-5. ~~ASnative class 101~~ — DONE (Object.prototype methods via ASnative)
-6. ~~Color prototype unification~~ — DONE (instanceof Color works)
+Two fixes (commit 3b075cff):
+1. **targetPath1** — MC `toString()` fallback to `MovieClip.prototype` → `Object.prototype` chain
+2. **doubleAndRegister** — `registerClass` char_id-based lookup for multi-export sprites
 
-Line-level match improved from 60.3% → 65.0% for actionscript.all.
+Ignore list created for 30 AVM2/AS3 tests. Suite is complete.
 
-### Gnash: Next highest-ROI fixes identified
+### Gnash: Phase 1b complete, ignore list created
 
-8 tests are >95% match (near-passing): Math-v5/v6/v7/v8 (97.8%), ops-v8 (95.8%), NetStream-v6/v7/v8 (95.0%). These need small, targeted fixes. See `from_gnash/_investigation/FAILING_TESTS_BY_FEATURE.md` for the full prioritized list.
+Phase 1b fixes (Math, ops, Error edge cases) applied. 9 tests with all-accepted diffs (Gnash bugs) added to ignore list. Line-level match improved from 65.0% → 69.1% (unfiltered) / 66.3% (filtered).
 
-### Shumway: Status unchanged
+### Gnash: Phase 2 in progress
 
-Still 15/17 effective AVM1 pass rate. 2 fixable AVM1 tests remain: `targetPath1` (MC toString) and `doubleAndRegister` (registerClass char_id lookup). Ignore list for 30 AVM2 tests not yet created.
+Remaining Phase 2 items:
+- **Color.getTransform() on invalid target** — should return undefined, not object (Color-v5/v6/v7/v8)
+- **ASArray/ASObject cast in convertFloat** — toString_valueOf tests
+- **Object.prototype.constructor** — Inheritance tests
+- **Stage/Selection non-constructable** — SWF5 version gating
 
 ## Per-Suite Docs
 
@@ -54,13 +54,10 @@ Still 15/17 effective AVM1 pass rate. 2 fixable AVM1 tests remain: `targetPath1`
 - `from_gnash/_investigation/BLOCKER_SUMMARY.md` — Active and resolved blockers
 
 ### from_shumway
-- `from_shumway/_investigation/CURRENT_STATUS.md` — AVM1 vs AVM2 classification, pass rates
-- `from_shumway/_investigation/FAILING_TESTS_BY_FEATURE.md` — 30 AVM2 tests + 2 AVM1 failures
-- `from_shumway/_investigation/REMAINING_FAILURES_ANALYSIS.md` — Analysis of 2 fixable AVM1 tests + ignore list
+- `from_shumway/_investigation/CURRENT_STATUS.md` — **Complete** (17/17 AVM1, 30 AVM2 ignored)
 
 ## Where to Focus
 
-1. **Gnash Tier 1 fixes** (Math edge cases, equality coercion, NetStream properties) — 8 near-passing tests that need trivial fixes.
-2. **Shumway ignore list** — creating `ignored_tests.txt` for 30 AVM2 tests immediately shows 88.2% effective pass rate.
-3. **Gnash Tier 2 fixes** (Color, Selection/Stage, Inheritance, Error) — ~25 tests at 80-95% match rate.
-4. **AVM1 suite** is at 97.5% filtered and remaining failures are blocked or diminishing-returns.
+1. **Gnash Phase 2 fixes** (Color, Inheritance, toString_valueOf) — targeted fixes for near-passing tests at 80-95% match rate.
+2. **AVM1 suite** is at 97.2% filtered and remaining failures are blocked or diminishing-returns.
+3. **Shumway** is complete (100% AVM1).

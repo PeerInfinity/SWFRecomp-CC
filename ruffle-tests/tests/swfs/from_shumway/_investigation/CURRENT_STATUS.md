@@ -1,20 +1,20 @@
 # Shumway Test Suite Status
 
-Last updated: 2026-03-19
+Last updated: 2026-03-23 (CI run on 3b075cff)
 
 ## Quick Summary
 
 | Metric | Value |
 |--------|-------|
 | Total tests | 47 |
-| Passing | **15** (31.9%) |
-| AVM2/AS3 (should ignore) | **30** |
-| AVM1 failing (fixable) | **2** |
-| Effective AVM1 pass rate | **15/17** (88.2%) |
+| Passing | **17** (36.2%) |
+| AVM2/AS3 (ignored) | **30** |
+| AVM1 failing | **0** |
+| **Filtered AVM1 pass rate** | **17/17 (100.0%)** |
 
-No crashes or compile failures. All failures are output mismatches.
+No crashes or compile failures. All 30 remaining failures are AVM2/AS3 (ignored).
 
-**Key finding**: 30 of the 32 failing tests are AVM2/AS3, which our AVM1 recompiler cannot execute. After ignoring them, only 2 AVM1 tests fail, giving an effective pass rate of 88.2%.
+**Status**: All AVM1 tests pass. The suite is complete.
 
 ## Related Documents
 
@@ -23,7 +23,7 @@ No crashes or compile failures. All failures are output mismatches.
 | `FAILING_TESTS_BY_FEATURE.md` | All 32 failures categorized (30 AVM2 + 2 AVM1) with root cause analysis |
 | `REMAINING_FAILURES_ANALYSIS.md` | Detailed analysis of the 2 fixable AVM1 tests + AVM2 ignore list |
 
-## Passing Tests (15)
+## Passing Tests (17)
 
 | Test | Lines | Type | Notes |
 |------|-------|------|-------|
@@ -31,8 +31,10 @@ No crashes or compile failures. All failures are output mismatches.
 | avm1timeline1 | 3 | AVM1 | Timeline control |
 | avm1timeline2 | 6 | AVM1 | Timeline control |
 | button3 | 1 | AVM1 | Button events |
+| doubleAndRegister | 2 | AVM1 | registerClass + attachMovie with multi-export char_id |
 | fscommand1 | 1 | AVM1 | fscommand |
 | movieinfo1 | 3 | AVM1 | Movie properties |
+| targetPath1 | 8 | AVM1 | MC targetPath + toString |
 | MaskTest | 0 | AVM1 | Visual only (zero-output) |
 | MaskTest-2 | 0 | AVM1 | Visual only (zero-output) |
 | bitmapbuttons | 0 | AVM1 | Visual only (zero-output) |
@@ -43,39 +45,23 @@ No crashes or compile failures. All failures are output mismatches.
 | gradientTransform | 0 | AVM1 | Visual only (zero-output) |
 | invalidClipDepth | 0 | AVM1 | Visual only (zero-output) |
 
-6 tests produce meaningful trace output; 9 pass trivially with zero expected lines.
+8 tests produce meaningful trace output; 9 pass trivially with zero expected lines.
 
 ---
 
-## AVM1 Failing Tests (2 tests)
+## Recently Fixed AVM1 Tests (2026-03-23)
 
-### targetPath1 — Near-passing (6/8 lines, 75%)
+### targetPath1 — FIXED (8/8 lines)
 
-**Diff**:
-```
-     5  s.t: _level0.s.t
--    6  [object Object]
-+    6  undefined
--    7  [object Object]
-+    7  undefined
-     8  Done
-```
+**Root cause**: `mc.toString()` called explicitly via `CallMethod` on a MovieClip returned `undefined` instead of `[object Object]`. The MC user-method dispatch searched `dynamic_props` but couldn't reach `Object.prototype.toString` because `dynamic_props` lacks `__proto__` linkage to `MovieClip.prototype`.
 
-**Root cause**: `this.toString()` and `s.toString()` called via `CallMethod` on MovieClip references return `undefined` instead of `[object Object]`. When a MovieClip doesn't have a custom `toString`, the default should return `[object Object]` (Flash/Shumway behavior).
+**Fix**: Added fallback in `actionCallMethod` MC handler to check `MovieClip.prototype` → `Object.prototype` chain when method not found on `dynamic_props` or function registry.
 
-**Fix**: Implement default `toString()` for MovieClip objects returning `"[object Object]"` when no custom toString is defined. This may already be partially implemented for the AVM1 suite — needs investigation of whether this is a Shumway-specific path.
+### doubleAndRegister — FIXED (2/2 lines)
 
-### doubleAndRegister — 0/2 lines
+**Root cause**: `Object.registerClass("CCC", ctor)` + `attachMovie("DDD", ...)` where both "CCC" and "DDD" export the same char_id. `attachMovie` only looked up registered classes by the linkage ID "DDD", missing the "CCC" registration.
 
-**Expected output**:
-```
-Constr CCC
-bar
-```
-
-**Root cause**: The test uses `Object.registerClass("CCC", constructor)` then `attachMovie("DDD", "AAA", 2, ...)` where both "DDD" and "CCC" are exports mapping to the same sprite char_id (2). The registered class constructor for "CCC" should fire when the sprite is instantiated via `attachMovie("DDD", ...)`, but it doesn't — the constructor is never invoked and the method call fails.
-
-**Fix**: The `registerClass` / `attachMovie` path may need to look up registered classes by char_id (not just by the export name passed to `attachMovie`). When attaching "DDD", the runtime should check if char_id 2 has any registered class (whether registered via "CCC" or "DDD").
+**Fix**: Added `lookupRegisteredClassByCharId()` fallback that iterates all export names for a char_id and checks each for a registered class. Applied to both `actionCallFunction` and `actionCallMethod` attachMovie paths.
 
 ---
 
@@ -118,9 +104,11 @@ These SWFs have the AVM2 flag set and use DoABC tags for AS3 bytecode. Our AVM1 
 
 ---
 
-## Recommended Work Order
+## Status
 
-1. **Create ignored_tests.txt** for the Shumway suite with all 30 AVM2 tests. This immediately changes the effective failure count from 32 to 2.
-2. **Fix targetPath1** (near-passing, 6/8): Investigate default `toString()` for MovieClip objects.
-3. **Fix doubleAndRegister** (0/2): Investigate `registerClass` + `attachMovie` char_id-based lookup.
-4. After filtering, the effective pass rate becomes **15/17 (88.2%)** — comparable to the AVM1 suite's early stages.
+All recommended work items are complete:
+1. ~~Create ignored_tests.txt~~ — DONE (30 AVM2 tests ignored)
+2. ~~Fix targetPath1~~ — DONE (MC toString fallback to MovieClip.prototype chain)
+3. ~~Fix doubleAndRegister~~ — DONE (registerClass char_id-based lookup)
+
+**The Shumway AVM1 suite is at 100%. No further work needed.**

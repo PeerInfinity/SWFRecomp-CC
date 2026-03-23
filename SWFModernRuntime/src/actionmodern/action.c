@@ -7535,6 +7535,7 @@ static int colorGetMCName(ASObject* obj, char* out_buf, size_t buf_size)
 }
 
 // Color.getTransform() -> Object{ra,ga,ba,aa,rb,gb,bb,ab}
+// Returns undefined if the target MC is invalid (same as getRGB).
 static ActionVar colorGetTransform(SWFAppContext* app_context, ActionVar* args, u32 arg_count, ActionVar* registers, void* this_obj)
 {
 	(void)args; (void)arg_count; (void)registers;
@@ -7544,11 +7545,15 @@ static ActionVar colorGetTransform(SWFAppContext* app_context, ActionVar* args, 
 	double rb = 0.0,   gb = 0.0,   bb = 0.0,   ab = 0.0;
 
 #ifdef NO_GRAPHICS
-	if (colorGetMCName(obj, name, sizeof(name)))
-		ng_getColorTransform(name, &ra, &ga, &ba, &aa, &rb, &gb, &bb, &ab);
+	if (!colorGetMCName(obj, name, sizeof(name))) {
+		ActionVar undef = {0}; undef.type = ACTION_STACK_VALUE_UNDEFINED;
+		return undef;
+	}
+	ng_getColorTransform(name, &ra, &ga, &ba, &aa, &rb, &gb, &bb, &ab);
 #endif
 
-	ASObject* result = allocObject(app_context, 8);
+	ASObject* result = allocObject(app_context, 10);
+	setObjectProto(app_context, result);  // __proto__ = Object.prototype (for instanceof)
 	ActionVar v;
 	v = makeF64(ra); setProperty(app_context, result, "ra", 2, &v);
 	v = makeF64(ga); setProperty(app_context, result, "ga", 2, &v);
