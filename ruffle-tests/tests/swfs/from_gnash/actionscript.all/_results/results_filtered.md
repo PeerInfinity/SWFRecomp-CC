@@ -1,10 +1,10 @@
 # Ruffle Test Results (Filtered)
 
-**Date**: 2026-03-23 19:51 UTC
+**Date**: 2026-03-23 20:23 UTC
 
-**Git SHA**: `4b8442ba35`
+**Git SHA**: `12ab3b900b`
 
-**Run Duration**: 60m 26s
+**Run Duration**: 60m 15s
 
 **Filtered**: 9 tests ignored out of 190 available
 
@@ -31,57 +31,57 @@
 
 | # | Test | Lines | Duration | Notes |
 |---|------|-------|----------|-------|
-| 1 | `Accessibility-v5` | 15 | 16.4s |  |
-| 2 | `BitmapData-v5` | 7 | 16.7s |  |
-| 3 | `BitmapData-v6` | 7 | 16.6s |  |
-| 4 | `BitmapData-v7` | 7 | 16.4s |  |
-| 5 | `Boolean-v5` | 38 | 17.0s |  |
-| 6 | `Boolean-v6` | 38 | 16.8s |  |
-| 7 | `Boolean-v7` | 38 | 17.2s |  |
-| 8 | `Boolean-v8` | 38 | 17.0s |  |
-| 9 | `Camera-v5` | 7 | 16.4s |  |
-| 10 | `ColorTransform-v5` | 7 | 16.5s |  |
-| 11 | `ColorTransform-v6` | 7 | 16.9s |  |
-| 12 | `ColorTransform-v7` | 7 | 16.7s |  |
-| 13 | `ContextMenu-v5` | 7 | 16.7s |  |
-| 14 | `ContextMenu-v6` | 7 | 16.6s |  |
+| 1 | `Accessibility-v5` | 15 | 16.9s |  |
+| 2 | `BitmapData-v5` | 7 | 15.8s |  |
+| 3 | `BitmapData-v6` | 7 | 15.8s |  |
+| 4 | `BitmapData-v7` | 7 | 17.3s |  |
+| 5 | `Boolean-v5` | 38 | 18.1s |  |
+| 6 | `Boolean-v6` | 38 | 18.2s |  |
+| 7 | `Boolean-v7` | 38 | 18.0s |  |
+| 8 | `Boolean-v8` | 38 | 18.0s |  |
+| 9 | `Camera-v5` | 7 | 17.4s |  |
+| 10 | `ColorTransform-v5` | 7 | 16.1s |  |
+| 11 | `ColorTransform-v6` | 7 | 16.1s |  |
+| 12 | `ColorTransform-v7` | 7 | 16.0s |  |
+| 13 | `ContextMenu-v5` | 7 | 15.9s |  |
+| 14 | `ContextMenu-v6` | 7 | 16.0s |  |
 | 15 | `ExternalInterface-v5` | 7 | 16.2s |  |
-| 16 | `LoadVars-v5` | 8 | 16.5s |  |
-| 17 | `Matrix-v5` | 7 | 16.8s |  |
+| 16 | `LoadVars-v5` | 8 | 16.2s |  |
+| 17 | `Matrix-v5` | 7 | 15.9s |  |
 | 18 | `Microphone-v5` | 6 | 16.0s |  |
-| 19 | `MovieClipLoader-v5` | 6 | 16.4s |  |
-| 20 | `MovieClipLoader-v6` | 6 | 16.4s |  |
-| 21 | `NetStream-v5` | 6 | 16.5s |  |
-| 22 | `Point-v5` | 7 | 17.2s |  |
-| 23 | `Point-v6` | 7 | 17.1s |  |
-| 24 | `Point-v7` | 7 | 17.0s |  |
-| 25 | `Random-v5` | 30 | 18.6s |  |
-| 26 | `Random-v6` | 30 | 18.4s |  |
-| 27 | `Random-v7` | 30 | 18.2s |  |
-| 28 | `Random-v8` | 30 | 18.4s |  |
-| 29 | `Rectangle-v5` | 7 | 17.2s |  |
-| 30 | `Rectangle-v6` | 7 | 17.0s |  |
-| 31 | `Rectangle-v7` | 7 | 16.8s |  |
-| 32 | `Selection-v5` | 21 | 17.2s |  |
-| 33 | `Stage-v5` | 38 | 16.9s |  |
-| 34 | `TextFieldHTML-v5` | 6 | 16.0s |  |
-| 35 | `TextSnapshot-v5` | 7 | 16.7s |  |
-| 36 | `Transform-v5` | 7 | 16.1s |  |
-| 37 | `Try-v5` | 20 | 18.0s |  |
-| 38 | `Try-v6` | 20 | 18.2s |  |
-| 39 | `Try-v7` | 20 | 18.6s |  |
-| 40 | `Try-v8` | 20 | 18.4s |  |
-| 41 | `Video-v6` | 85 | 18.0s |  |
-| 42 | `Video-v7` | 85 | 18.1s |  |
-| 43 | `Video-v8` | 85 | 17.9s |  |
-| 44 | `argstest-v5` | 4 | 17.0s |  |
-| 45 | `case-v5` | 39 | 17.7s |  |
-| 46 | `enumerate-v5` | 6 | 16.6s |  |
-| 47 | `swap-v5` | 7 | 16.4s |  |
-| 48 | `swap-v6` | 7 | 16.4s |  |
-| 49 | `swap-v7` | 7 | 16.4s |  |
-| 50 | `swap-v8` | 7 | 16.2s |  |
-| 51 | `targetPath-v5` | 12 | 16.4s |  |
+| 19 | `MovieClipLoader-v5` | 6 | 15.9s |  |
+| 20 | `MovieClipLoader-v6` | 6 | 16.3s |  |
+| 21 | `NetStream-v5` | 6 | 16.4s |  |
+| 22 | `Point-v5` | 7 | 16.6s |  |
+| 23 | `Point-v6` | 7 | 16.9s |  |
+| 24 | `Point-v7` | 7 | 16.5s |  |
+| 25 | `Random-v5` | 30 | 17.2s |  |
+| 26 | `Random-v6` | 30 | 16.8s |  |
+| 27 | `Random-v7` | 30 | 17.1s |  |
+| 28 | `Random-v8` | 30 | 17.0s |  |
+| 29 | `Rectangle-v5` | 7 | 16.6s |  |
+| 30 | `Rectangle-v6` | 7 | 16.6s |  |
+| 31 | `Rectangle-v7` | 7 | 16.5s |  |
+| 32 | `Selection-v5` | 21 | 17.0s |  |
+| 33 | `Stage-v5` | 38 | 17.2s |  |
+| 34 | `TextFieldHTML-v5` | 6 | 16.2s |  |
+| 35 | `TextSnapshot-v5` | 7 | 16.5s |  |
+| 36 | `Transform-v5` | 7 | 16.5s |  |
+| 37 | `Try-v5` | 20 | 17.3s |  |
+| 38 | `Try-v6` | 20 | 17.3s |  |
+| 39 | `Try-v7` | 20 | 17.4s |  |
+| 40 | `Try-v8` | 20 | 17.4s |  |
+| 41 | `Video-v6` | 85 | 18.1s |  |
+| 42 | `Video-v7` | 85 | 17.9s |  |
+| 43 | `Video-v8` | 85 | 18.0s |  |
+| 44 | `argstest-v5` | 4 | 16.4s |  |
+| 45 | `case-v5` | 39 | 16.9s |  |
+| 46 | `enumerate-v5` | 6 | 16.4s |  |
+| 47 | `swap-v5` | 7 | 17.0s |  |
+| 48 | `swap-v6` | 7 | 17.1s |  |
+| 49 | `swap-v7` | 7 | 17.4s |  |
+| 50 | `swap-v8` | 7 | 17.5s |  |
+| 51 | `targetPath-v5` | 12 | 16.8s |  |
 
 ## Near-Passing Tests
 
