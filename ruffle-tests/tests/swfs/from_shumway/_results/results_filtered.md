@@ -1,10 +1,10 @@
 # Ruffle Test Results (Filtered)
 
-**Date**: 2026-03-23 20:23 UTC
+**Date**: 2026-03-23 23:43 UTC
 
-**Git SHA**: `12ab3b900b`
+**Git SHA**: `15ce3f066a`
 
-**Run Duration**: 12m 24s
+**Run Duration**: 12m 33s
 
 **Filtered**: 30 tests ignored out of 47 available
 
@@ -25,23 +25,23 @@
 
 | # | Test | Lines | Duration | Notes |
 |---|------|-------|----------|-------|
-| 1 | `MaskTest` | 0 | 16.2s |  |
-| 2 | `MaskTest-2` | 0 | 15.2s |  |
-| 3 | `add` | 11 | 17.1s |  |
-| 4 | `avm1timeline1` | 3 | 15.3s |  |
-| 5 | `avm1timeline2` | 6 | 15.3s |  |
-| 6 | `bitmapbuttons` | 0 | 16.0s |  |
-| 7 | `button3` | 1 | 15.8s |  |
-| 8 | `clipping` | 0 | 15.8s |  |
-| 9 | `doubleAndRegister` | 2 | 15.4s |  |
-| 10 | `flash_geom_ColorTransform` | 0 | 15.3s |  |
+| 1 | `MaskTest` | 0 | 16.6s |  |
+| 2 | `MaskTest-2` | 0 | 16.6s |  |
+| 3 | `add` | 11 | 15.5s |  |
+| 4 | `avm1timeline1` | 3 | 15.5s |  |
+| 5 | `avm1timeline2` | 6 | 15.5s |  |
+| 6 | `bitmapbuttons` | 0 | 15.9s |  |
+| 7 | `button3` | 1 | 15.5s |  |
+| 8 | `clipping` | 0 | 16.0s |  |
+| 9 | `doubleAndRegister` | 2 | 16.1s |  |
+| 10 | `flash_geom_ColorTransform` | 0 | 16.0s |  |
 | 11 | `flash_text_TextField` | 0 | 15.5s |  |
-| 12 | `fscommand1` | 1 | 16.1s |  |
-| 13 | `gradient` | 0 | 15.7s |  |
-| 14 | `gradientTransform` | 0 | 15.6s |  |
-| 15 | `invalidClipDepth` | 0 | 16.3s |  |
+| 12 | `fscommand1` | 1 | 15.4s |  |
+| 13 | `gradient` | 0 | 17.0s |  |
+| 14 | `gradientTransform` | 0 | 17.1s |  |
+| 15 | `invalidClipDepth` | 0 | 15.8s |  |
 | 16 | `movieinfo1` | 3 | 15.7s |  |
-| 17 | `targetPath1` | 8 | 15.3s |  |
+| 17 | `targetPath1` | 8 | 15.5s |  |
 
 ## Near-Passing Tests
 
