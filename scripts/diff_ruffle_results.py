@@ -39,9 +39,16 @@ def diff_results(old, new, partial=False):
 
     If partial=True, tests in old but not in new are treated as
     "not yet run" and excluded from the diff (instead of "removed").
+
+    If the new results have metadata.incomplete=True (missing shards),
+    tests absent from new are classified as "missing_from_incomplete_run"
+    instead of "removed".
     """
     old_map = build_test_map(old)
     new_map = build_test_map(new)
+
+    new_meta = new.get("metadata", {})
+    new_incomplete = new_meta.get("incomplete", False)
 
     if partial:
         # Only consider tests that appear in the new results
@@ -65,10 +72,12 @@ def diff_results(old, new, partial=False):
                 "new_lines": new_t.get("lines"),
             })
         elif new_t is None:
-            # Removed test (only reachable when partial=False)
+            # Test absent from new results.
+            # If shards are missing, classify as "missing" not "removed".
+            change_type = "missing_from_incomplete_run" if new_incomplete else "removed"
             changes.append({
                 "test": name,
-                "change_type": "removed",
+                "change_type": change_type,
                 "old_status": old_t["status"],
                 "new_status": None,
                 "old_lines": old_t.get("lines"),
@@ -110,6 +119,7 @@ def diff_results(old, new, partial=False):
     )
     added = sum(1 for c in changes if c["change_type"] == "added")
     removed = sum(1 for c in changes if c["change_type"] == "removed")
+    missing_shard = sum(1 for c in changes if c["change_type"] == "missing_from_incomplete_run")
     status_changed = sum(
         1 for c in changes
         if c["change_type"] == "changed"
@@ -144,33 +154,43 @@ def diff_results(old, new, partial=False):
     new_sha = new_meta.get("git_sha")
     same_commit = bool(old_sha and new_sha and old_sha == new_sha)
 
+    diff_meta = {
+        "old_timestamp": old_meta.get("timestamp"),
+        "old_git_sha": old_sha,
+        "new_timestamp": new_meta.get("timestamp"),
+        "new_git_sha": new_sha,
+        "partial": partial,
+        "same_commit": same_commit,
+    }
+    if new_incomplete:
+        diff_meta["incomplete"] = True
+        diff_meta["missing_shards"] = new_meta.get("missing_shards", 0)
+        diff_meta["expected_shards"] = new_meta.get("expected_shards", 0)
+
+    summary = {
+        "old_pass": old.get("pass", 0),
+        "old_total": old.get("total", 0),
+        "old_pass_rate": old.get("pass_rate", 0),
+        "new_pass": new.get("pass", 0),
+        "new_total": new.get("total", 0),
+        "new_pass_rate": new.get("pass_rate", 0),
+        "old_mismatched_lines": old_mismatched,
+        "new_mismatched_lines": new_mismatched,
+        "increased_mismatches": increased_mismatches,
+        "decreased_mismatches": decreased_mismatches,
+        "newly_passing": newly_passing,
+        "newly_failing": newly_failing,
+        "status_changed": status_changed,
+        "unchanged": compared_count - changed_both,
+        "added": added,
+        "removed": removed,
+    }
+    if missing_shard > 0:
+        summary["missing_from_incomplete_run"] = missing_shard
+
     report = {
-        "metadata": {
-            "old_timestamp": old_meta.get("timestamp"),
-            "old_git_sha": old_sha,
-            "new_timestamp": new_meta.get("timestamp"),
-            "new_git_sha": new_sha,
-            "partial": partial,
-            "same_commit": same_commit,
-        },
-        "summary": {
-            "old_pass": old.get("pass", 0),
-            "old_total": old.get("total", 0),
-            "old_pass_rate": old.get("pass_rate", 0),
-            "new_pass": new.get("pass", 0),
-            "new_total": new.get("total", 0),
-            "new_pass_rate": new.get("pass_rate", 0),
-            "old_mismatched_lines": old_mismatched,
-            "new_mismatched_lines": new_mismatched,
-            "increased_mismatches": increased_mismatches,
-            "decreased_mismatches": decreased_mismatches,
-            "newly_passing": newly_passing,
-            "newly_failing": newly_failing,
-            "status_changed": status_changed,
-            "unchanged": compared_count - changed_both,
-            "added": added,
-            "removed": removed,
-        },
+        "metadata": diff_meta,
+        "summary": summary,
         "changes": changes,
     }
     return report
@@ -192,6 +212,10 @@ def format_summary_line(diff):
         other = s["status_changed"] - s["newly_passing"] - s["newly_failing"]
         if other > 0:
             delta_parts.append(f"{other} other status changes")
+
+    missing = s.get("missing_from_incomplete_run", 0)
+    if missing > 0:
+        delta_parts.append(f"{missing} missing (shard failure)")
 
     if delta_parts:
         result += f"  |  vs prev: {', '.join(delta_parts)}"
@@ -235,6 +259,11 @@ def generate_markdown(diff):
         lines.append(f"*Re-run on same commit — no comparison available.*")
     if meta.get("partial"):
         lines.append(f"*Partial run: {s['new_total']} of {s['old_total']} tests completed*")
+    if meta.get("incomplete"):
+        ms = meta.get("missing_shards", 0)
+        es = meta.get("expected_shards", 0)
+        lines.append(f"**\u26a0\ufe0f Incomplete run: {es - ms}/{es} shards produced results ({ms} missing).** "
+                      f"Tests absent from results are likely from failed shards, not intentional removals.")
     lines.append("")
 
     # Summary
@@ -261,7 +290,7 @@ def generate_markdown(diff):
     if meta.get("same_commit"):
         return "\n".join(lines)
 
-    if s["newly_passing"] == 0 and s["newly_failing"] == 0 and s["status_changed"] == 0 and s["added"] == 0 and s["removed"] == 0:
+    if s["newly_passing"] == 0 and s["newly_failing"] == 0 and s["status_changed"] == 0 and s["added"] == 0 and s["removed"] == 0 and s.get("missing_from_incomplete_run", 0) == 0:
         # Check if only line count changes
         line_only = [c for c in changes if c["change_type"] == "changed" and c["old_status"] == c["new_status"]]
         if not line_only:
@@ -324,7 +353,24 @@ def generate_markdown(diff):
             lines.append(f"| `{c['test']}` | {c['new_status']} | {format_lines(c['new_lines'])} |")
         lines.append("")
 
-    # Removed tests
+    # Missing tests from incomplete run (shard failures)
+    missing_shard = [c for c in changes if c["change_type"] == "missing_from_incomplete_run"]
+    if missing_shard:
+        passing_missing = [c for c in missing_shard if c["old_status"] == "pass"]
+        failing_missing = [c for c in missing_shard if c["old_status"] != "pass"]
+        lines.append(f"## Missing Tests — Shard Failure ({len(missing_shard)})\n")
+        lines.append(f"These tests were in the previous run but absent from this run due to missing shards. "
+                      f"This is **not** a regression — the tests were not executed.\n")
+        lines.append(f"- {len(passing_missing)} were previously passing")
+        lines.append(f"- {len(failing_missing)} were previously failing\n")
+        lines.append("<details><summary>Show all missing tests</summary>\n")
+        lines.append("| Test | Previous Status | Lines |")
+        lines.append("|------|----------------|-------|")
+        for c in sorted(missing_shard, key=lambda x: x["test"]):
+            lines.append(f"| `{c['test']}` | {c['old_status']} | {format_lines(c['old_lines'])} |")
+        lines.append("\n</details>\n")
+
+    # Removed tests (only when run is complete — intentional removals)
     removed = [c for c in changes if c["change_type"] == "removed"]
     if removed:
         lines.append(f"## Removed Tests ({len(removed)})\n")
@@ -419,6 +465,8 @@ examples:
     print(f"Newly failing: {s['newly_failing']}")
     print(f"Status changed: {s['status_changed']}")
     print(f"Added: {s['added']}, Removed: {s['removed']}")
+    if s.get("missing_from_incomplete_run", 0) > 0:
+        print(f"Missing (shard failure): {s['missing_from_incomplete_run']}")
     print(f"Unchanged: {s['unchanged']}")
 
 

@@ -219,6 +219,10 @@ int ng_getColorTransform(const char* name, double* ra, double* ga, double* ba, d
                           double* rb, double* gb, double* bb, double* ab);
 int ng_setColorTransform(const char* name, double ra, double ga, double ba, double aa,
                           double rb, double gb, double bb, double ab);
+#ifdef NO_GRAPHICS
+// Set only the alpha multiplier (cx_aa) on a display list entry. Used for _alpha ↔ Color sync.
+void ng_setCTAlpha(size_t depth, double aa);
+#endif
 int ng_getCharBounds(size_t char_id, s32* out_xmin, s32* out_xmax, s32* out_ymin, s32* out_ymax);
 // Compute union of child bounds in a sprite's display list, in LOCAL twips.
 // Accounts for child transforms (scale, translation). Only available in NO_GRAPHICS builds.

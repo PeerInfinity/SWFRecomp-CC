@@ -7596,17 +7596,26 @@ static ActionVar colorSetTransform(SWFAppContext* app_context, ActionVar* args, 
 	if (!ng_getColorTransform(name, &ra, &ga, &ba, &aa, &rb, &gb, &bb, &ab)) return undef;
 
 	// Apply only own-properties from param (not inherited via __proto__)
+	// Use varToDoubleSWF (not varToDoubleSimple) so that object values like
+	// new Number(255) have valueOf() called to extract the numeric value.
 	ActionVar* pv;
-	pv = getProperty(param, "ra", 2); if (pv) ra = quantifyColorMult(varToDoubleSimple(pv));
-	pv = getProperty(param, "ga", 2); if (pv) ga = quantifyColorMult(varToDoubleSimple(pv));
-	pv = getProperty(param, "ba", 2); if (pv) ba = quantifyColorMult(varToDoubleSimple(pv));
-	pv = getProperty(param, "aa", 2); if (pv) aa = quantifyColorMult(varToDoubleSimple(pv));
-	pv = getProperty(param, "rb", 2); if (pv) rb = quantifyColorAdd(varToDoubleSimple(pv));
-	pv = getProperty(param, "gb", 2); if (pv) gb = quantifyColorAdd(varToDoubleSimple(pv));
-	pv = getProperty(param, "bb", 2); if (pv) bb = quantifyColorAdd(varToDoubleSimple(pv));
-	pv = getProperty(param, "ab", 2); if (pv) ab = quantifyColorAdd(varToDoubleSimple(pv));
+	pv = getProperty(param, "ra", 2); if (pv) ra = quantifyColorMult(varToDoubleSWF(app_context, pv, g_swf_version));
+	pv = getProperty(param, "ga", 2); if (pv) ga = quantifyColorMult(varToDoubleSWF(app_context, pv, g_swf_version));
+	pv = getProperty(param, "ba", 2); if (pv) ba = quantifyColorMult(varToDoubleSWF(app_context, pv, g_swf_version));
+	pv = getProperty(param, "aa", 2); if (pv) aa = quantifyColorMult(varToDoubleSWF(app_context, pv, g_swf_version));
+	pv = getProperty(param, "rb", 2); if (pv) rb = quantifyColorAdd(varToDoubleSWF(app_context, pv, g_swf_version));
+	pv = getProperty(param, "gb", 2); if (pv) gb = quantifyColorAdd(varToDoubleSWF(app_context, pv, g_swf_version));
+	pv = getProperty(param, "bb", 2); if (pv) bb = quantifyColorAdd(varToDoubleSWF(app_context, pv, g_swf_version));
+	pv = getProperty(param, "ab", 2); if (pv) ab = quantifyColorAdd(varToDoubleSWF(app_context, pv, g_swf_version));
 
 	ng_setColorTransform(name, ra, ga, ba, aa, rb, gb, bb, ab);
+
+	// Sync mc->alpha with cx_aa so _alpha getter reflects Color transform changes
+	{
+		extern MovieClip* actionFindMovieClipByName(const char* instance_name);
+		MovieClip* _mc = actionFindMovieClipByName(name);
+		if (_mc) _mc->alpha = (float)aa;
+	}
 #endif
 	return undef;
 }
@@ -7649,7 +7658,7 @@ static ActionVar colorSetRGB(SWFAppContext* app_context, ActionVar* args, u32 ar
 		return undef;
 
 	// Decompose n into R, G, B bytes (0-255 each); zero the multipliers ra/ga/ba
-	int32_t n = ecmaToInt32Color(varToDoubleSimple(&args[0]));
+	int32_t n = ecmaToInt32Color(varToDoubleSWF(app_context, &args[0], g_swf_version));
 	double new_rb = (double)((n >> 16) & 0xFF);
 	double new_gb = (double)((n >> 8)  & 0xFF);
 	double new_bb = (double)(n & 0xFF);
@@ -7681,7 +7690,8 @@ static void initColorPrototype(SWFAppContext* app_context)
 	registerGeomMethod(&g_color_methods[3], "setRGB",       (Function2Ptr)colorSetRGB,       app_context, g_color_prototype);
 }
 
-// Color constructor: new Color(mc) where mc is a MovieClip or button reference.
+// Color constructor: new Color(target) where target is typically a MovieClip reference.
+// Flash stores the raw constructor argument as the "target" own property regardless of type.
 static ActionVar colorConstructor(SWFAppContext* app_context, ActionVar* args, u32 arg_count, ActionVar* registers, void* this_obj)
 {
 	(void)registers;
@@ -7689,34 +7699,33 @@ static ActionVar colorConstructor(SWFAppContext* app_context, ActionVar* args, u
 	ActionVar undef = {0}; undef.type = ACTION_STACK_VALUE_UNDEFINED;
 	if (!obj) return undef;
 
-	if (arg_count >= 1 && args[0].type == ACTION_STACK_VALUE_MOVIECLIP)
+	if (arg_count >= 1)
 	{
-		MovieClip* mc = (MovieClip*) VAL(u64, &args[0].data.numeric_value);
-		if (mc && mc->name[0] != '\0')
-		{
-			// Store target as "_level0.name" string property
-			char target_str[512];
-			int tlen = snprintf(target_str, sizeof(target_str), "_level0.%s", mc->name);
-			u32 t_u16_len;
-			uint16_t* t_u16 = ascii_to_u16(app_context, target_str, tlen, &t_u16_len);
-			ActionVar tvar = {0};
-			tvar.type = ACTION_STACK_VALUE_STRING;
-			tvar.str_size = t_u16_len;
-			tvar.data.string_data.heap_ptr = t_u16;
-			tvar.data.string_data.owns_memory = true;
-			setProperty(app_context, obj, "target", 6, &tvar);
+		// Store raw argument as "target" own property (Flash behavior)
+		setProperty(app_context, obj, "target", 6, &args[0]);
 
-			// Store MC instance name as hidden __mc_name__ property (DONTENUM)
-			u32 n_u16_len;
-			int nlen = (int)strlen(mc->name);
-			uint16_t* n_u16 = ascii_to_u16(app_context, mc->name, nlen, &n_u16_len);
-			ActionVar nvar = {0};
-			nvar.type = ACTION_STACK_VALUE_STRING;
-			nvar.str_size = n_u16_len;
-			nvar.data.string_data.heap_ptr = n_u16;
-			nvar.data.string_data.owns_memory = true;
-			setPropertyWithFlags(app_context, obj, "__mc_name__", 11, &nvar, PROPERTY_FLAGS_DONTENUM);
+		// If the target is a MovieClip, also store the MC name for getRGB/setRGB/etc.
+		if (args[0].type == ACTION_STACK_VALUE_MOVIECLIP)
+		{
+			MovieClip* mc = (MovieClip*) VAL(u64, &args[0].data.numeric_value);
+			if (mc && mc->name[0] != '\0')
+			{
+				u32 n_u16_len;
+				int nlen = (int)strlen(mc->name);
+				uint16_t* n_u16 = ascii_to_u16(app_context, mc->name, nlen, &n_u16_len);
+				ActionVar nvar = {0};
+				nvar.type = ACTION_STACK_VALUE_STRING;
+				nvar.str_size = n_u16_len;
+				nvar.data.string_data.heap_ptr = n_u16;
+				nvar.data.string_data.owns_memory = true;
+				setPropertyWithFlags(app_context, obj, "__mc_name__", 11, &nvar, PROPERTY_FLAGS_DONTENUM);
+			}
 		}
+	}
+	else
+	{
+		// No argument: store undefined as "target" (still own property)
+		setProperty(app_context, obj, "target", 6, &undef);
 	}
 	return undef;
 }
@@ -26626,6 +26635,15 @@ void actionSetVariable(SWFAppContext* app_context)
 		else if (strcasecmp(var_name, "_alpha") == 0) {
 			// Quantize through 8.8 fixed-point like Flash's color transform
 			mc->alpha = (float)((double)(int16_t)roundf(fval * 256.0f / 100.0f) * 100.0 / 256.0);
+#ifdef NO_GRAPHICS
+			// Sync with display list cx_aa so Color.getTransform() reads the updated value
+			{
+				extern size_t ng_findDisplayEntryByName(const char* name);
+				size_t _dep = ng_findDisplayEntryByName(mc->name);
+				if (_dep != SIZE_MAX)
+					ng_setCTAlpha(_dep, (double)mc->alpha);
+			}
+#endif
 			handled = 1;
 		}
 		else if (strcasecmp(var_name, "_visible") == 0) {
@@ -32175,10 +32193,13 @@ void actionSetMember(SWFAppContext* app_context)
 					}
 				}
 			}
-			// tabIndex coercion: text fields use u32, buttons/MCs use i32 with NaN preservation
+			// tabIndex coercion: numeric values go through i32/u32; non-numeric stored as-is (Flash behavior)
 			if (prop_name_len == 8 && strncmp(prop_name, "tabIndex", 8) == 0)
 			{
-				if (value_var.type != ACTION_STACK_VALUE_UNDEFINED)
+				if (value_var.type != ACTION_STACK_VALUE_UNDEFINED &&
+				    (value_var.type == ACTION_STACK_VALUE_F32 ||
+				     value_var.type == ACTION_STACK_VALUE_F64 ||
+				     value_var.type == ACTION_STACK_VALUE_BOOLEAN))
 				{
 					double dval = varToDoubleSimple(&value_var);
 					if (MC_IS_TEXTFIELD(mc)) {

@@ -2724,6 +2724,14 @@ int ng_setColorTransform(const char* name, double ra, double ga, double ba, doub
 	return 0;
 }
 
+void ng_setCTAlpha(size_t depth, double aa)
+{
+	if (depth <= max_depth && display_list[depth].char_id != 0) {
+		display_list[depth].cx_aa = aa;
+		display_list[depth].cx_overridden = 1;
+	}
+}
+
 // ---------------------------------------------------------------------------
 // Character bounds lookup
 // ---------------------------------------------------------------------------

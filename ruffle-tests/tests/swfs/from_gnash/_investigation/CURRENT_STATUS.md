@@ -1,16 +1,14 @@
 # Gnash Test Suite Status
 
-Last updated: 2026-03-23 (local testing after prototype fixes)
+Last updated: 2026-03-23 (CI run on 15ce3f06)
 
 ## Quick Summary
 
 | Sub-suite | Tests | Passing | Rate | Filtered | Filtered Rate | Ignored |
 |-----------|-------|---------|------|----------|---------------|---------|
-| **actionscript.all** | 190 | ~58 | ~30.5% | ~58/181 | **~32.0%** | 9 |
+| **actionscript.all** | 190 | 51 | 26.8% | 51/181 | **28.2%** | 9 |
 | **misc-swfmill.all** | 14 | 11 | 78.6% | — | — | — |
-| **Total** | 204 | ~69 | ~33.8% | — | — | — |
-
-Note: +7 tests newly passing (Boolean-v5/v6/v7/v8, Video-v6/v7/v8) from prototype fixes. Exact numbers pending CI run.
+| **Total** | 204 | 62 | 30.4% | — | — | — |
 
 Filtered results exclude 9 tests with all-accepted diffs (Math-v5/v6/v7/v8, ops-v8, Error-v5/v6/v7/v8) — see `ACCEPTED_DIFFS.md`. Remaining 3 misc-swfmill failures (dict_event, tags_after_last_showframe, jump_to_prev_block) are blocked on architectural limitations — see `incomplete/MISC_SWFMILL_PLAN.md`.
 
@@ -141,16 +139,17 @@ During `actionAdd2` on two ARRAY values, `convertFloat` calls `getPropertyWithPr
 
 ### Already identified root causes
 
-| Test | Match | Root Cause | Status |
-|------|-------|------------|--------|
-| Video-v6/v7/v8 | 95.3% | `hasOwnProperty` missing (Object.prototype bug) | **FIXED → PASS** |
-| Boolean-v5/v6/v7/v8 | 92.1% | `typeof(_global.Boolean)` returns "number" not "function" | **FIXED → PASS** |
-| NetStream-v6/v7/v8 | 91.2%→97.4% | 2 remaining: `currentFps` not own property on prototype | Near-pass |
-| Stage-v5 | 86.8% | Stage should be non-constructable; AsBroadcaster methods version-gated | Medium fix |
-| TextFieldHTML-v6/v7/v8 | 86.5% | htmlText getter/text clearing bugs | TextField fix |
-| Selection-v5/v6/v7/v8 | 85.6-86.4% | Selection non-constructable + `_listeners` own property + instanceof MC | Multiple small fixes |
-| Color-v5/v6/v7/v8 | 81.3-82.9% | instanceof Color + getTransform on invalid | Mixed fixes |
-| Inheritance-v5/v6 | 80.9-81.3% | super() chain, Function.__proto__, instanceOf | Complex |
+| Test | Status | Notes |
+|------|--------|-------|
+| Boolean-v5/v6/v7/v8 | **PASS** (38/38) | Already passing since Phase 1 fixes |
+| Video-v6/v7/v8 | **PASS** (85/85) | Already passing since Phase 1 fixes |
+| Selection-v5 | **PASS** (21/21) | Already passing since Phase 1 fixes |
+| Stage-v5 | **PASS** (38/38) | Already passing since Phase 1 fixes |
+| NetStream-v6/v7/v8 | 72/74 (97.3%) | 2 remaining: `currentFps` not own property on prototype |
+| TextFieldHTML-v6/v7/v8 | 86.5% | htmlText getter/text clearing bugs |
+| Selection-v6/v7/v8 | ~86% | Selection non-constructable + `_listeners` own property |
+| Color-v5/v6/v7/v8 | ~82% | instanceof Color + getTransform on invalid |
+| Inheritance-v5/v6 | ~81% | super() chain, Function.__proto__, instanceOf |
 
 ### v5-passes-but-v6-fails Pattern
 
@@ -180,13 +179,13 @@ During `actionAdd2` on two ARRAY values, `convertFloat` calls `getPropertyWithPr
 ### Phase 2: Prototype and constructor fixes (est. +10-15 tests)
 12. ~~**ASArray/ASObject cast in convertFloat**~~ — Already fixed (arr->props sub-object used). toString_valueOf failures are from other causes.
 13. ~~**`Object.prototype.constructor` setup**~~ — DONE (2026-03-23). Set constructor → Object on Object.prototype.
-14. **Stage/Selection non-constructable** — `typeof(new Stage())` should be "undefined".
-15. **Color.getTransform() on invalid target** — should return undefined, not object.
+14. **Stage/Selection non-constructable** — Stage-v5 already passes. Selection-v6/v7/v8 have deeper issues (Selection indices, _listeners instanceof Array).
+15. ~~**Color valueOf in setTransform + constructor target property**~~ — DONE (2026-03-25). Three fixes: (a) Color.setTransform now uses `varToDoubleSWF` (not `varToDoubleSimple`) for param properties, fixing valueOf on Number objects. (b) Color constructor stores raw target argument as own "target" property for all types. (c) Color.setRGB also uses varToDoubleSWF. Color-v5: 14→4 failures, Color-v7/v8: 18→8 failures each.
 16. ~~**Try/finally control flow** — Try-v6/v7/v8 runtime errors.~~ **FIXED**
 17. ~~**Built-in prototype own toString/valueOf**~~ — DONE (2026-03-23). Number.prototype, String.prototype, Boolean.prototype now have their own valueOf/toString methods distinct from Object.prototype's. Fixed in three locations: primary g_ctors, secondary constructors, and actionGetVariable special handlers.
 18. ~~**Function.prototype.apply/call as properties**~~ — DONE (2026-03-23). apply and call registered as own properties on Function.prototype (both primary and secondary version groups).
 
-**Phase 2 impact**: Boolean-v5/v6/v7/v8 now PASS (4 tests), Video-v6/v7/v8 now PASS (3 tests). toString_valueOf improved from 115/149 → 127/149 per version.
+**Phase 2 impact**: Line-level improvements across 15 tests (51 fewer mismatched lines). toString_valueOf +12 lines each, Number +2 each, String +1-3 each. Note: Boolean/Video/Selection-v5/Stage-v5 were already passing from Phase 1 fixes (CURRENT_STATUS.md was stale).
 
 ### Phase 3: Individual test fixes
 12. TextFieldHTML htmlText getter

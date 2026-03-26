@@ -2,7 +2,7 @@
 
 Cross-suite summary of all Ruffle-derived test suites. Each suite has its own `_investigation/` directory with detailed status docs.
 
-Last updated: 2026-03-23 (CI run on 3b075cff)
+Last updated: 2026-03-23 (CI run on 15ce3f06)
 
 ## Suite Summary
 
@@ -28,16 +28,23 @@ Ignore list created for 30 AVM2/AS3 tests. Suite is complete.
 
 Phase 1b fixes (Math, ops, Error edge cases) applied. 9 tests with all-accepted diffs (Gnash bugs) added to ignore list. Line-level match improved from 65.0% → 69.1% (unfiltered) / 66.3% (filtered).
 
-### Gnash: Phase 2 in progress — 7 new passing tests (2026-03-23)
+### Gnash: Phase 2 in progress (2026-03-23)
 
-Phase 2 fixes applied:
-- **Built-in prototype own toString/valueOf** — DONE. Number/String/Boolean prototypes now have own valueOf/toString distinct from Object.prototype. Fixed: Boolean-v5/v6/v7/v8 (4 tests PASS), Video-v6/v7/v8 (3 tests PASS), toString_valueOf improved 34→22 diffs.
+Phase 2 fixes applied (commit 15ce3f06):
+- **Built-in prototype own toString/valueOf** — DONE. Number/String/Boolean prototypes now have own valueOf/toString distinct from Object.prototype. Line-level improvements across 15 tests: toString_valueOf +12 lines each, Number +2, String +1-3.
 - **Function.prototype.apply/call** — DONE. Registered as own properties on Function.prototype.
 - **Object.prototype.constructor** — DONE. Set constructor → Object on Object.prototype.
 
-Remaining Phase 2 items:
-- **Color.getTransform() on invalid target** — should return undefined, not object (Color-v5/v6/v7/v8)
-- **Stage/Selection non-constructable** — SWF5 version gating
+Note: Boolean-v5/v6/v7/v8, Video-v6/v7/v8, Selection-v5, Stage-v5 were already passing from Phase 1 fixes (CURRENT_STATUS.md was stale).
+
+### Gnash: Phase 2 continued (2026-03-25)
+
+- **Color valueOf + constructor target** — DONE. Color.setTransform/setRGB use `varToDoubleSWF` for valueOf on Number objects. Color constructor stores raw target argument as own property. Color-v5: 14→4 failures (-10), Color-v7/v8: 18→8 each (-10).
+- **Stage/Selection non-constructable** — Stage-v5 already passes. Selection-v6/v7/v8 have deeper issues beyond non-constructable.
+
+### AVM1: tab_ordering_properties_tab_index_edge_case (2026-03-25)
+
+- **tabIndex string storage** — DONE. tabIndex setter now stores string values as-is (Flash behavior) instead of discarding non-numeric values. New PASS: tab_ordering_properties_tab_index_edge_case.
 
 ## Per-Suite Docs
 

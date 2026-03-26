@@ -109,7 +109,7 @@ Remaining failures require:
 - **Mouse/input dispatch**: edittext_drag_select, edittext_ime_focus_lost
 - **Missing features**: localconnection, asfunction, geturl, sandbox_type_remote, displacementmapfilter_mappoint_throw_error
 - **Shape-accurate hitTest**: movieclip_hittest_shapeflag (curves/strokes accuracy)
-- **Other**: swf5_xml_event_handler_context, watch_virtual_property (Ruffle known_failure), movieclip_methods_with_loaded_image, tab_ordering_properties_tab_index_edge_case
+- **Other**: swf5_xml_event_handler_context, watch_virtual_property (Ruffle known_failure), movieclip_methods_with_loaded_image
 
 ### Remaining blocked work (from blocked/ plans)
 - **GLOBALS_PLAN Phase 8** — BLOCKED by enumeration order + missing globals.
