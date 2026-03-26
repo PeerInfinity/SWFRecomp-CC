@@ -1,27 +1,30 @@
 # Ruffle Test Results Diff
 
-**Previous:** `36b08b5c2632` (2026-03-26T03:49:28.666202+00:00)
-**Current:** `9f2ed8bb7a19` (2026-03-26T04:52:31.008662+00:00)
-**⚠️ Incomplete run: 30/30 shards produced results (0 missing).** Tests absent from results are likely from failed shards, not intentional removals.
+**Previous:** `9f2ed8bb7a19` (2026-03-26T04:52:31.008662+00:00)
+**Current:** `6f393c831738` (2026-03-26T08:03:20.727156+00:00)
 
 ## Summary
 
 | Metric | Previous | Current | Delta |
 |--------|----------|---------|-------|
-| Passing | 541 | 548 | +7 |
-| Total | 600 | 608 | +8 |
-| Pass rate | 90.2% | 90.1% | -0.1% |
-| Mismatched lines | 12852 | 12854 | +2 |
+| Passing | 548 | 558 | +10 |
+| Total | 608 | 620 | +12 |
+| Pass rate | 90.1% | 90.0% | -0.1% |
+| Mismatched lines | 12854 | 12902 | +48 |
 
-## Added Tests (8)
+## Added Tests (12)
 
 | Test | Status | Lines |
 |------|--------|-------|
-| `string_paths_hidden` | pass | 54/54 |
-| `string_paths_keyevents` | pass | 0/0 |
-| `string_paths_other` | pass | 36/36 |
-| `string_paths_reference_launder` | output_mismatch | 0/2 |
-| `string_paths_timer` | pass | 0/0 |
-| `string_paths_unload` | pass | 1/1 |
-| `string_paths_variable_alias` | pass | 4/4 |
-| `string_paths_variable_scopes` | pass | 5/5 |
+| `string_relational_compare` | runtime_error | - |
+| `stylesheet` | pass | 283/283 |
+| `stylesheet_load` | output_mismatch | 1/49 |
+| `stylesheet_transform` | pass | 750/750 |
+| `super_edge_cases` | pass | 39/39 |
+| `swf4_actions_bool` | pass | 96/96 |
+| `swf4_actions_coercion_order` | pass | 158/158 |
+| `swf4_bool` | pass | 4/4 |
+| `swf4_function_calls` | pass | 7/7 |
+| `swf5_encoding` | pass | 3/3 |
+| `swf5_global_funcs` | pass | 232/232 |
+| `swf5_no_closure` | pass | 19/19 |
