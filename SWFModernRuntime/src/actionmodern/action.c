@@ -32193,13 +32193,10 @@ void actionSetMember(SWFAppContext* app_context)
 					}
 				}
 			}
-			// tabIndex coercion: numeric values go through i32/u32; non-numeric stored as-is (Flash behavior)
+			// tabIndex coercion: all non-undefined values coerced to integer (text fields: u32, buttons/MCs: i32)
 			if (prop_name_len == 8 && strncmp(prop_name, "tabIndex", 8) == 0)
 			{
-				if (value_var.type != ACTION_STACK_VALUE_UNDEFINED &&
-				    (value_var.type == ACTION_STACK_VALUE_F32 ||
-				     value_var.type == ACTION_STACK_VALUE_F64 ||
-				     value_var.type == ACTION_STACK_VALUE_BOOLEAN))
+				if (value_var.type != ACTION_STACK_VALUE_UNDEFINED)
 				{
 					double dval = varToDoubleSimple(&value_var);
 					if (MC_IS_TEXTFIELD(mc)) {
