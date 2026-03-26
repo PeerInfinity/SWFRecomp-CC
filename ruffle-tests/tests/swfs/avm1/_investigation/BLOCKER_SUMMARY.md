@@ -52,7 +52,7 @@ function addGetter(obj, name, val) {
 }
 ```
 
-**Potential path via upstream merge:** Upstream's `feature/objects-and-functions` PR ([SWFModernRuntime PR #3](https://github.com/SWFRecomp/SWFModernRuntime/pull/3)) implements activation scopes as heap-allocated `ASObject*` ([line 21](https://github.com/PeerInfinity/SWFModernRuntime/blob/96f3ac8/src/actionmodern/action.c#L21), [lines 52-55](https://github.com/PeerInfinity/SWFModernRuntime/blob/96f3ac8/src/actionmodern/action.c#L52-L55)). Currently pre-allocated in a static 16-slot array (reused by depth). Once upstream adds refcounting and per-call scope allocation, adopting their architecture would resolve closure capture generally. See `SWFRecompDocs/merge/upstream-downstream-merge-plan-2024-12.md` (March 2026 update).
+**Potential path via upstream merge:** Upstream's `feature/objects-and-functions` PR ([SWFModernRuntime PR #3](https://github.com/SWFRecomp/SWFModernRuntime/pull/3)) implements activation scopes as heap-allocated `ASObject*` ([line 21](https://github.com/PeerInfinity/SWFModernRuntime/blob/96f3ac8/src/actionmodern/action.c#L21), [lines 52-55](https://github.com/PeerInfinity/SWFModernRuntime/blob/96f3ac8/src/actionmodern/action.c#L52-L55)). Currently pre-allocated in a static 16-slot array (reused by depth). **Update (March 17):** LittleCube added concurrent GC with cycle detection (`f02311c`) — refcounting is now integrated into stack operations (PUSH_OBJ retains, POP releases). Per-call scope allocation is still needed for closure capture, but the refcounting/freeing foundation is in place. See `SWFRecompDocs/merge/upstream-downstream-merge-plan-2024-12.md` (March 2026 updates).
 
 | Test | Match | Lines Off | Actual Blocker |
 |------|-------|-----------|----------------|

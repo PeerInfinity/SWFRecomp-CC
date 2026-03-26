@@ -13,6 +13,47 @@
 
 ---
 
+## UPDATE: March 17, 2026
+
+### Upstream Objects & Functions PRs — GC Implementation Added
+
+LittleCube has added **garbage collection** to the runtime PR (commit `f02311c`, March 26, 2026). This was the hardest remaining task before the PR could merge.
+
+#### GC Architecture (SWFModernRuntime `f02311c`)
+- **Concurrent collector**: Separate free thread checks objects with decremented refcounts
+- **Cycle detection**: If refcount > 0 after decrement, walks references to detect unreachable cycles; frees entire cycle if all members are unreachable
+- **Read-write locks**: New locking API (`LOCK_READ`/`LOCK_WRITE` macros) — both threads can read simultaneously, only one can write. Every ASObject has its own lock (`OBJ_LOCK_READ`/`OBJ_LOCK_WRITE`)
+- **ASObject struct expanded**: `reached`/`used`/`blocked`/`freed` flags, `SwapVector` for `neighbors`/`blocked_list`, temporary refcount, mutex lock
+- **Stack integration**: `PUSH_OBJ()` now calls `retainObject()`, `POP()` now calls `releaseObject()` for objects — refcounting woven into stack operations
+- **`object_free_queue`**: rbtree with u64 keys (object pointers) for pending-free set
+- **SwapVector**: New data structure (`src/apis/swap-vector/swap_vector.c`) for GC tracking
+- **ActionVar restructured**: Union now separates function data (func, args) from string data (str_size, string_id, owns_memory)
+
+#### SWFRecomp `c7348af` (March 26, 2026)
+- Removes `arg1`-`arg6` from initial strings (no longer needed)
+- Adds `ACTION_STACK_VALUE_NULL = 2` and `ACTION_STACK_VALUE_UNDEFINED = 3` to enum
+- Recompiler emits `PUSH_NULL()` and `PUSH_UNDEFINED()`
+
+#### Updated PR Status
+
+**SWFRecomp PR #4** — now 6 commits (was 5):
+- Previous 5 commits (objects and functions infrastructure)
+- `c7348af` - remove arg initial strings, add null/undefined push values
+
+**SWFModernRuntime PR #3** — now 15 commits (was 14):
+- Previous 14 commits (objects and functions infrastructure)
+- `f02311c` - **first attempt at garbage collection** (concurrent GC with cycle detection)
+
+#### LittleCube's Pre-Merge TODO (Updated)
+
+| Task | Status |
+|------|--------|
+| Remaining primitive types (Array, String, Number) | In progress |
+| Arena optimization for rbtree | Not started |
+| Refcount/free mechanism | **In progress** (`f02311c`) |
+
+---
+
 ## UPDATE: March 9, 2026
 
 ### Upstream Objects & Functions PRs (In Progress)
@@ -22,7 +63,7 @@ LittleCube and PeerInfinity have opened PRs implementing **objects and functions
 #### SWFRecomp PR #4: `feature/objects-and-functions`
 - **Status:** Open
 - **Branch:** `PeerInfinity/SWFRecomp:feature/objects-and-functions` → `master`
-- **5 commits:**
+- **5 commits** (as of March 9):
   - `98977fd` - Add minimal object and function opcode support
   - `37192d3` - Mark unsupported opcodes in minimal build
   - `4e93e6c` - Add back arithmetic, comparison, string, and variable opcodes
@@ -40,7 +81,7 @@ LittleCube and PeerInfinity have opened PRs implementing **objects and functions
 #### SWFModernRuntime PR #3: `feature/objects-and-functions`
 - **Status:** Open
 - **Branch:** `PeerInfinity/SWFModernRuntime:feature/objects-and-functions` → `master`
-- **14 commits** (iterative refinements), key ones:
+- **14 commits** (as of March 9, iterative refinements), key ones:
   - `bfdbf3c` - Add object/function opcode support and heap refactoring
   - `f409c12` - major prune/rework (LittleCube)
   - `96f3ac8` - implement the bulk of objects and functions (LittleCube)
@@ -55,8 +96,6 @@ LittleCube and PeerInfinity have opened PRs implementing **objects and functions
 - `_global` object as root scope — similar concept to ours
 - Constructor support: `actionNewObject`, `actionNewMethod`, `new_Object()` built-in
 - `initial_strings_decls.h` / `initial_strings_defs.h` for pre-defined string IDs
-
-**Still to come:** Refcount cycle detection and object freeing (per LittleCube, March 9, 2026).
 
 #### Architectural Comparison: Upstream vs Our Fork
 
