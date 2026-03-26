@@ -472,13 +472,13 @@ jobs:
 
       - name: Combine shard results
         env:
-          EXPECTED_SHARDS: ${{ steps.matrix.outputs.total }}
+          EXPECTED_SHARDS: ${{ needs.setup-parallel.outputs.total }}
         run: |
           python3 << 'EOF'
           import json, glob, os
           from datetime import datetime, timezone
 
-          expected_shards = int(os.environ.get("EXPECTED_SHARDS", "0"))
+          expected_shards = int(os.environ.get("EXPECTED_SHARDS") or "0")
 
           # Map of shard tag -> output results dir
           categories = {
