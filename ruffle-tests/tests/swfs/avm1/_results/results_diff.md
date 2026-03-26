@@ -1,32 +1,36 @@
 # Ruffle Test Results Diff
 
-**Previous:** `12ab3b900b00` (2026-03-23T20:23:49.052456+00:00)
-**Current:** `15ce3f066a16` (2026-03-23T23:43:42.526513+00:00)
+**Previous:** `15ce3f066a16` (2026-03-23T23:43:42.526513+00:00)
+**Current:** `36b08b5c2632` (2026-03-26T03:49:28.666202+00:00)
+**⚠️ Incomplete run: 29/30 shards produced results (1 missing).** Tests absent from results are likely from failed shards, not intentional removals.
 
 ## Summary
 
 | Metric | Previous | Current | Delta |
 |--------|----------|---------|-------|
-| Passing | 541 | 506 | -35 |
-| Total | 600 | 558 | -42 |
-| Pass rate | 90.2% | 90.7% | +0.5% |
-| Mismatched lines | 12871 | 11792 | -1079 |
-|   Decreased | | | -25 |
-|   Increased | | | +1 |
+| Passing | 506 | 541 | +35 |
+| Total | 558 | 600 | +42 |
+| Pass rate | 90.7% | 90.2% | -0.5% |
+| Mismatched lines | 11792 | 12852 | +1060 |
+|   Decreased | | | -3 |
+|   Increased | | | +8 |
 
-## Added Tests (4)
+## Newly Passing (1)
+
+| Test | Previous Status | Lines (prev) | Lines (now) |
+|------|----------------|--------------|-------------|
+| `tab_ordering_properties_tab_index_edge_case` | output_mismatch | 1/4 | 4/4 |
+
+## Newly Failing (1)
+
+| Test | New Status | Lines (prev) | Lines (now) |
+|------|-----------|--------------|-------------|
+| `tab_ordering_properties` | output_mismatch | 293/293 | 285/293 |
+
+## Added Tests (46)
 
 | Test | Status | Lines |
 |------|--------|-------|
-| `swf4_function_calls` | pass | 7/7 |
-| `swf5_encoding` | pass | 3/3 |
-| `swf5_global_funcs` | pass | 232/232 |
-| `swf5_no_closure` | pass | 19/19 |
-
-## Removed Tests (46)
-
-| Test | Previous Status | Lines |
-|------|----------------|-------|
 | `register_underflow` | pass | 26/26 |
 | `remove_movie_clip` | pass | 29/29 |
 | `removed_base_clip_tell_target` | output_mismatch | 0/2 |
@@ -74,10 +78,20 @@
 | `string_paths_eval` | pass | 4/4 |
 | `string_paths_eval2` | pass | 7/7 |
 
-## Line Count Changed (3)
+## Missing Tests — Shard Failure (4)
 
-| Test | Status | Lines (prev) | Lines (now) | Diff |
-|------|--------|--------------|-------------|------|
-| `global_proto_decls` | output_mismatch | 90/4497 | 113/4497 | -23 |
-| `global_proto_decls_delete` | output_mismatch | 91/4158 | 93/4158 | -2 |
-| `global_instance_decls` | output_mismatch | 19/758 | 18/758 | +1 |
+These tests were in the previous run but absent from this run due to missing shards. This is **not** a regression — the tests were not executed.
+
+- 4 were previously passing
+- 0 were previously failing
+
+<details><summary>Show all missing tests</summary>
+
+| Test | Previous Status | Lines |
+|------|----------------|-------|
+| `swf4_function_calls` | pass | 7/7 |
+| `swf5_encoding` | pass | 3/3 |
+| `swf5_global_funcs` | pass | 232/232 |
+| `swf5_no_closure` | pass | 19/19 |
+
+</details>
