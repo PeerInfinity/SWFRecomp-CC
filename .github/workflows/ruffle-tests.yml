@@ -508,6 +508,7 @@ jobs:
               git_sha = None
               breakdown = {}
               pass_count = 0
+              interrupted_shards = 0
 
               for f in files:
                   with open(f) as fp:
@@ -521,6 +522,8 @@ jobs:
                   pass_count += data.get("pass", 0)
                   for k, v in data.get("breakdown", {}).items():
                       breakdown[k] = breakdown.get(k, 0) + v
+                  if m.get("interrupted"):
+                      interrupted_shards += 1
 
               total = len(combined_tests)
               metadata = {
@@ -535,6 +538,10 @@ jobs:
               if missing_shards > 0:
                   metadata["missing_shards"] = missing_shards
                   metadata["incomplete"] = True
+              if interrupted_shards > 0:
+                  metadata["interrupted_shards"] = interrupted_shards
+                  metadata["incomplete"] = True
+                  print(f"::warning::{tag}: {interrupted_shards} shard(s) were interrupted (partial results)")
 
               report = {
                   "metadata": metadata,

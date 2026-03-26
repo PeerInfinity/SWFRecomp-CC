@@ -10,6 +10,7 @@ Pipeline for each test:
 """
 
 import argparse
+import atexit
 import json
 import os
 import re
@@ -1719,6 +1720,23 @@ def main():
             merged = merge_results(json_path, report)
             write_json(merged, json_path)
 
+    json_written = False  # Track whether final JSON was written successfully
+
+    def write_partial_on_exit():
+        """Write partial results if the test run was interrupted before final write."""
+        if json_written or not json_path or not test_results:
+            return
+        try:
+            report = build_report(test_results, stats, len(test_results), total_available, run_start)
+            report["metadata"]["partial"] = True
+            report["metadata"]["interrupted"] = True
+            write_json(report, json_path)
+            print(f"\nPartial results ({len(test_results)} tests) written to {json_path}", file=sys.stderr)
+        except Exception:
+            pass  # Best effort — don't mask the original error
+
+    atexit.register(write_partial_on_exit)
+
     for i, name in enumerate(tests):
         test_dir = TESTS_DIR / name
         epsilon = get_epsilon(test_dir)
@@ -1986,6 +2004,7 @@ def main():
             report = merge_results(json_path, report)
             print(f"\nMerged {len(test_results)} results into {json_path} ({report['total']} total)")
         write_json(report, json_path)
+        json_written = True
         print(f"Results written to {json_path}")
 
         # Run final diff comparison (non-partial)
