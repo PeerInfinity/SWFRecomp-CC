@@ -58,7 +58,8 @@ def main():
             f_rate = fdata.get("pass_rate", 0)
             filtered_link = f"[filtered]({results_rel}/results_filtered.md) ({f_pass}/{f_total}, {f_rate}%)"
 
-        rows.append((cat_name, passed, total, rate, results_link, filtered_link, breakdown))
+        meta = data.get("metadata", {})
+        rows.append((cat_name, passed, total, rate, results_link, filtered_link, breakdown, meta))
 
     # Generate markdown
     lines = [
@@ -67,14 +68,30 @@ def main():
         "|----------|-----:|------:|-----:|--------|----------|",
     ]
 
-    for cat_name, passed, total, rate, results_link, filtered_link, breakdown in rows:
+    for cat_name, passed, total, rate, results_link, filtered_link, breakdown, meta in rows:
+        note = ""
+        if meta.get("incomplete"):
+            ms = meta.get("missing_shards", 0)
+            es = meta.get("expected_shards", 0)
+            note = f" **⚠️ {es - ms}/{es} shards**"
         lines.append(
-            f"| {cat_name} | {passed} | {total} | {rate}% | {results_link} | {filtered_link} |")
+            f"| {cat_name} | {passed} | {total} | {rate}% | {results_link} | {filtered_link} |{note}")
 
     lines.append("")
 
+    # Incomplete run warnings
+    incomplete_cats = [(cat, meta) for cat, _, _, _, _, _, _, meta in rows if meta.get("incomplete")]
+    if incomplete_cats:
+        lines.append("### ⚠️ Incomplete runs\n")
+        for cat, meta in incomplete_cats:
+            ms = meta.get("missing_shards", 0)
+            es = meta.get("expected_shards", 0)
+            lines.append(f"- **{cat}**: {es - ms}/{es} shards produced results ({ms} missing). "
+                          "Some tests may be absent due to shard failure, not code changes.")
+        lines.append("")
+
     # Per-category breakdown
-    for cat_name, passed, total, rate, _, _, breakdown in rows:
+    for cat_name, passed, total, rate, _, _, breakdown, _ in rows:
         if breakdown:
             lines.append(f"### {cat_name} failures\n")
             lines.append("| Category | Count |")
@@ -89,7 +106,7 @@ def main():
         f.write(md)
 
     print(f"Written to {OUTPUT}")
-    for cat_name, passed, total, rate, _, _, _ in rows:
+    for cat_name, passed, total, rate, _, _, _, _ in rows:
         print(f"  {cat_name}: {passed}/{total} ({rate}%)")
 
 
