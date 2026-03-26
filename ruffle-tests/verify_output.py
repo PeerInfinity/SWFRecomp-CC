@@ -1738,6 +1738,7 @@ def main():
     atexit.register(write_partial_on_exit)
 
     for i, name in enumerate(tests):
+      try:
         test_dir = TESTS_DIR / name
         epsilon = get_epsilon(test_dir)
         if args.verbose:
@@ -1967,6 +1968,16 @@ def main():
                 if run_stderr.strip():
                     for line in run_stderr.strip().splitlines()[:200]:
                         print(f"  stderr: {line}")
+        save_incremental()
+      except Exception as exc:
+        # Catch unexpected errors so one bad test doesn't abort the entire shard
+        print(f"\nERROR: test '{name}' raised {type(exc).__name__}: {exc}", file=sys.stderr)
+        entry = {"test": name, "status": "runtime_error",
+                 "detail": f"runner exception: {type(exc).__name__}: {exc}"}
+        test_results.append(entry)
+        stats["runtime_error"] = stats.get("runtime_error", 0) + 1
+        fail_list.append(name)
+        fail_details[name] = f"runner exception: {exc}"
         save_incremental()
 
     # Print results
