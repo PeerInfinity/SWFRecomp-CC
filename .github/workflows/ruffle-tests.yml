@@ -471,13 +471,14 @@ jobs:
           path: artifacts
 
       - name: Combine shard results
+        env:
+          EXPECTED_SHARDS: ${{ steps.matrix.outputs.total }}
         run: |
-          EXPECTED_SHARDS=${{ steps.matrix.outputs.total }}
-          python3 << 'EOF' "$EXPECTED_SHARDS"
-          import json, glob, os, sys
+          python3 << 'EOF'
+          import json, glob, os
           from datetime import datetime, timezone
 
-          expected_shards = int(sys.argv[1]) if len(sys.argv) > 1 else 0
+          expected_shards = int(os.environ.get("EXPECTED_SHARDS", "0"))
 
           # Map of shard tag -> output results dir
           categories = {
