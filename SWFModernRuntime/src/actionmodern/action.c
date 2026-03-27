@@ -22042,6 +22042,76 @@ static ASObject* g_key_obj;
 static ASObject* g_mouse_obj;
 
 // ============================================================================
+// Accessibility object methods: isActive, updateProperties, sendEvent
+// ============================================================================
+
+static ActionVar builtin_accessibility_isActive(SWFAppContext* app_context, ActionVar* args, u32 arg_count, ActionVar* registers, void* this_obj)
+{
+    (void)app_context; (void)args; (void)arg_count; (void)registers; (void)this_obj;
+    ActionVar result = {0};
+    result.type = ACTION_STACK_VALUE_BOOLEAN;
+    VAL(u64, &result.data.numeric_value) = 0; // false — no accessibility support
+    return result;
+}
+
+static ActionVar builtin_accessibility_stub(SWFAppContext* app_context, ActionVar* args, u32 arg_count, ActionVar* registers, void* this_obj)
+{
+    (void)app_context; (void)args; (void)arg_count; (void)registers; (void)this_obj;
+    ActionVar result = {0};
+    result.type = ACTION_STACK_VALUE_UNDEFINED;
+    return result;
+}
+
+static ASFunction g_accessibility_isActive_func;
+static ASFunction g_accessibility_updateProperties_func;
+static ASFunction g_accessibility_sendEvent_func;
+static int g_accessibility_methods_init = 0;
+
+static void installAccessibilityMethods(SWFAppContext* app_context, ASObject* acc_obj)
+{
+    if (!g_accessibility_methods_init) {
+        memset(&g_accessibility_isActive_func, 0, sizeof(ASFunction));
+        strncpy(g_accessibility_isActive_func.name, "isActive", 255);
+        g_accessibility_isActive_func.function_type = 2;
+        g_accessibility_isActive_func.advanced_func = (Function2Ptr)builtin_accessibility_isActive;
+
+        memset(&g_accessibility_updateProperties_func, 0, sizeof(ASFunction));
+        strncpy(g_accessibility_updateProperties_func.name, "updateProperties", 255);
+        g_accessibility_updateProperties_func.function_type = 2;
+        g_accessibility_updateProperties_func.advanced_func = (Function2Ptr)builtin_accessibility_stub;
+
+        memset(&g_accessibility_sendEvent_func, 0, sizeof(ASFunction));
+        strncpy(g_accessibility_sendEvent_func.name, "sendEvent", 255);
+        g_accessibility_sendEvent_func.function_type = 2;
+        g_accessibility_sendEvent_func.advanced_func = (Function2Ptr)builtin_accessibility_stub;
+
+        g_accessibility_methods_init = 1;
+    }
+    ActionVar fv = {0};
+    fv.type = ACTION_STACK_VALUE_FUNCTION;
+
+    fv.data.numeric_value = (u64)&g_accessibility_isActive_func;
+    setProperty(app_context, acc_obj, "isActive", 8, &fv);
+
+    fv.data.numeric_value = (u64)&g_accessibility_updateProperties_func;
+    setProperty(app_context, acc_obj, "updateProperties", 16, &fv);
+
+    fv.data.numeric_value = (u64)&g_accessibility_sendEvent_func;
+    setProperty(app_context, acc_obj, "sendEvent", 9, &fv);
+}
+
+// Forward declaration — g_accessibility_obj is defined later as a static global
+static ASObject* g_accessibility_obj;
+static void ensureAccessibilityMethods(SWFAppContext* app_context)
+{
+	// Lazy init: install methods the first time Accessibility is accessed at SWF6+.
+	// This avoids the Gnash Dejagnu.swf SWF5 init poison where ensureGlobalInit
+	// runs during the child SWF import with g_swf_version temporarily set to 5.
+	if (g_accessibility_obj != NULL && !g_accessibility_methods_init && g_swf_version >= 6)
+		installAccessibilityMethods(app_context, g_accessibility_obj);
+}
+
+// ============================================================================
 // Key object methods: isDown, getCode, getAscii, isToggled
 // ============================================================================
 
@@ -23999,6 +24069,9 @@ static void ensureGlobalInit(SWFAppContext* app_context)
 	installAsBroadcaster(app_context, g_mouse_obj);
 	installAsBroadcaster(app_context, g_key_obj);
 	installKeyMethods(app_context, g_key_obj);
+	// Accessibility methods (isActive, updateProperties, sendEvent) are installed lazily
+	// because ensureGlobalInit may run during a SWF5 child import (Gnash Dejagnu.swf).
+	// See ensureAccessibilityMethods() — called when Accessibility is first accessed at SWF6+.
 	if (g_swf_version >= 6) {
 		installAsBroadcaster(app_context, g_stage_obj);
 	}
@@ -26200,6 +26273,14 @@ check_special_vars:
 			initSystemObject(app_context);
 			PUSH(ACTION_STACK_VALUE_OBJECT, (u64)g_system_object);
 			return;
+		}
+		else if (var_name_len == 13 && strncmp(var_name, "Accessibility", 13) == 0)
+		{
+			ensureAccessibilityMethods(app_context);
+			if (g_accessibility_obj != NULL) {
+				PUSH(ACTION_STACK_VALUE_OBJECT, (u64)g_accessibility_obj);
+				return;
+			}
 		}
 		// flash package (flash.display, flash.geom, etc.) - SWF8+ only
 		else if (EFFECTIVE_SWF_VERSION() >= 8 && var_name_len == 5 && strncmp(var_name, "flash", 5) == 0)
@@ -35285,7 +35366,8 @@ void actionNewObject(SWFAppContext* app_context)
 	         strcmp(ctor_name, "Stage") == 0 ||
 	         strcmp(ctor_name, "Selection") == 0 ||
 	         strcmp(ctor_name, "Key") == 0 ||
-	         strcmp(ctor_name, "Mouse") == 0)
+	         strcmp(ctor_name, "Mouse") == 0 ||
+	         strcmp(ctor_name, "Accessibility") == 0)
 	{
 		// Static singleton objects — not constructable, new X() returns undefined
 		PUSH(ACTION_STACK_VALUE_UNDEFINED, 0);

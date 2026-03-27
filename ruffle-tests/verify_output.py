@@ -599,7 +599,7 @@ def generate_child_movie_file(child_swf_name, child_recomp_dir, build_dir, swf_f
     frame_height = 400
     frame_count_val = 1
     if constants_h.exists():
-        text = constants_h.read_text()
+        text = constants_h.read_text(errors="replace")
         m = re.search(r"#define\s+SWF_VERSION\s+(\d+)", text)
         if m:
             swf_version = int(m.group(1))
@@ -614,7 +614,7 @@ def generate_child_movie_file(child_swf_name, child_recomp_dir, build_dir, swf_f
     out_h = child_recomp_dir / "RecompiledScripts" / "out.h"
     script_funcs = []
     if out_h.exists():
-        text = out_h.read_text()
+        text = out_h.read_text(errors="replace")
         m = re.search(r"#define\s+FRAME_COUNT\s+(\d+)", text)
         if m:
             frame_count_val = int(m.group(1))
@@ -628,7 +628,7 @@ def generate_child_movie_file(child_swf_name, child_recomp_dir, build_dir, swf_f
     user_funcs = []  # list of (name, full_declaration_line)
     script_decls = child_recomp_dir / "RecompiledScripts" / "script_decls.h"
     if script_decls.exists():
-        text = script_decls.read_text()
+        text = script_decls.read_text(errors="replace")
         # Match function declarations like:
         # ActionVar func2_getGlobal_0(SWFAppContext* ...)
         # ActionVar func_anonymous_0(SWFAppContext* ...)
@@ -645,7 +645,7 @@ def generate_child_movie_file(child_swf_name, child_recomp_dir, build_dir, swf_f
     max_string_id = 0
     script_defs_source = ""
     if script_defs_path.exists():
-        script_defs_source = script_defs_path.read_text()
+        script_defs_source = script_defs_path.read_text(encoding="latin-1")
         for m in re.finditer(r'char\*\s+(str_\d+)\s*=\s*(".*?")\s*;', script_defs_source):
             str_defs.append((m.group(1), m.group(2)))
         # Also find buffer-type strings: char str_15[17];
@@ -662,13 +662,13 @@ def generate_child_movie_file(child_swf_name, child_recomp_dir, build_dir, swf_f
         for f in sorted(scripts_dir.iterdir()):
             if (f.name.startswith("script_") and f.suffix == ".c"
                     and f.name != "script_defs.c"):
-                script_sources[f.name] = f.read_text()
+                script_sources[f.name] = f.read_text(encoding="latin-1")
 
     # Read the child's tagMain.c
     tag_main = child_recomp_dir / "RecompiledTags" / "tagMain.c"
     tag_main_text = ""
     if tag_main.exists():
-        tag_main_text = tag_main.read_text()
+        tag_main_text = tag_main.read_text(encoding="latin-1")
 
     # Build a list of all symbols that need prefixing
     all_renames = {}  # old_name -> new_name
@@ -875,7 +875,7 @@ def generate_child_movie_file(child_swf_name, child_recomp_dir, build_dir, swf_f
     draws_c_path = child_recomp_dir / "RecompiledTags" / "draws.c"
     has_child_transforms = False
     if draws_c_path.exists():
-        draws_text = draws_c_path.read_text()
+        draws_text = draws_c_path.read_text(encoding="latin-1")
         # Extract transform_data array definition
         td_match = re.search(
             r'(float\s+transform_data\[\d+\]\[16\]\s*=\s*\{.*?\};)',
@@ -910,7 +910,7 @@ def generate_child_movie_file(child_swf_name, child_recomp_dir, build_dir, swf_f
 
     # Write the file
     out_path = build_dir / f"movie_{prefix}.c"
-    out_path.write_text("\n".join(lines))
+    out_path.write_text("\n".join(lines), encoding="latin-1")
     return prefix
 
 
@@ -1051,7 +1051,7 @@ def get_self_load(test_dir):
     recomp_dir = test_dir / "RecompiledScripts"
     if recomp_dir.exists():
         for f in recomp_dir.iterdir():
-            if f.suffix == '.c' and '"test.swf"' in f.read_text():
+            if f.suffix == '.c' and '"test.swf"' in f.read_text(errors="replace"):
                 return True
     # Fallback: explicit flag in test.toml
     toml_path = test_dir / "test.toml"
@@ -1110,7 +1110,7 @@ def compile_native(test_dir, num_frames, build_dir, headless=False, has_image_co
     parent_max_string_id = 0
     parent_script_defs = build_dir / "script_defs.c"
     if parent_script_defs.exists():
-        for m in re.finditer(r'#define\s+MAX_STRING_ID\s+(\d+)', parent_script_defs.read_text()):
+        for m in re.finditer(r'#define\s+MAX_STRING_ID\s+(\d+)', parent_script_defs.read_text(errors="replace")):
             parent_max_string_id = max(parent_max_string_id, int(m.group(1)))
 
     next_string_id_offset = parent_max_string_id + 1  # +1 to leave a gap
@@ -1131,7 +1131,7 @@ def compile_native(test_dir, num_frames, build_dir, headless=False, has_image_co
                 child_defs = child_recomp_dir / "RecompiledScripts" / "script_defs.c"
                 if child_defs.exists():
                     child_max = 0
-                    for m in re.finditer(r'#define\s+MAX_STRING_ID\s+(\d+)', child_defs.read_text()):
+                    for m in re.finditer(r'#define\s+MAX_STRING_ID\s+(\d+)', child_defs.read_text(errors="replace")):
                         child_max = max(child_max, int(m.group(1)))
                     next_string_id_offset += child_max + 1
 
@@ -1146,7 +1146,7 @@ def compile_native(test_dir, num_frames, build_dir, headless=False, has_image_co
         sl_height = 400
         sl_frame_count = 1
         if constants_h.exists():
-            ctext = constants_h.read_text()
+            ctext = constants_h.read_text(errors="replace")
             m = re.search(r"#define\s+SWF_VERSION\s+(\d+)", ctext)
             if m: sl_version = int(m.group(1))
             m = re.search(r"#define\s+FRAME_WIDTH\s+(\d+)", ctext)

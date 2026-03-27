@@ -95,3 +95,21 @@ Our output correctly produces `rest=undefined` (SWF7 concatenation of undefined)
 This affects only the `onLoadStart` callback (1 line per test). All other callbacks fire after the SWF version switch to the child's version (SWF5/6), where undefined concatenates as `""` — those lines already match.
 
 **Decision:** Accept 1-line diff per test. Our SWF7 `"" + undefined` = `"undefined"` behavior is correct per Flash spec.
+
+## String Relational Comparison Uses UTF-8 Bytes vs UTF-16 Code Units
+
+**Test:** `string_relational_compare` (3/4 lines match)
+
+Flash Player compares strings using UTF-16 code unit values (matching ECMAScript spec). Ruffle compares strings using UTF-8 byte ordering (equivalent to Unicode code point comparison), as seen in `core/src/avm1/value.rs:490`: `a.bytes().lt(b.bytes())`.
+
+This difference manifests when comparing BMP characters above U+D800 with supplementary characters encoded as surrogate pairs. For `"\uFF61" < "\uD800\uDC02"`:
+- Flash (UTF-16 code units): first code units 0xFF61 vs 0xD800 → 0xFF61 > 0xD800 → `false`
+- Ruffle (UTF-8 bytes / code points): U+FF61 (65377) vs U+10002 (65538) → `true`
+
+```diff
+     "\uFF61" < "\uD800\uDC02"
+-    true
++    false
+```
+
+**Decision:** Accept 1-line diff. Our UTF-16 code unit comparison matches Flash Player and ECMAScript spec. Add to ignored_tests.txt.

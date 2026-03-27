@@ -68,6 +68,7 @@ bitmap_filters
 # We intentionally follow the Flash spec. See RUFFLE_VS_FLASH_DIFFERENCES.md for details.
 removed_base_clip_tell_target
 string_paths_reference_launder
+string_relational_compare
 
 # --- Execution timeout / image comparison tests ---
 # These tests have 0 expected trace lines and test non-trace behaviors.
