@@ -1,95 +1,31 @@
 {
   "metadata": {
-    "old_timestamp": "2026-03-26T18:12:52.927016+00:00",
-    "old_git_sha": "373e342a67c688a98152b8491703f2e037bbbcdc",
-    "new_timestamp": "2026-03-27T01:19:23.558183+00:00",
-    "new_git_sha": "47531a8e97d2faa140d93298090645a36f9b4c14",
+    "old_timestamp": "2026-03-27T01:19:23.558183+00:00",
+    "old_git_sha": "47531a8e97d2faa140d93298090645a36f9b4c14",
+    "new_timestamp": "2026-03-27T02:14:52.906163+00:00",
+    "new_git_sha": "b601d657e63073950a943e1111ea8070c3db67bb",
     "partial": false,
     "same_commit": false
   },
   "summary": {
-    "old_pass": 51,
+    "old_pass": 55,
     "old_total": 190,
-    "old_pass_rate": 26.8,
+    "old_pass_rate": 28.9,
     "new_pass": 55,
     "new_total": 190,
     "new_pass_rate": 28.9,
-    "old_mismatched_lines": 5145,
-    "new_mismatched_lines": 5136,
-    "increased_mismatches": 7,
-    "decreased_mismatches": 16,
-    "newly_passing": 4,
+    "old_mismatched_lines": 5136,
+    "new_mismatched_lines": 5131,
+    "increased_mismatches": 0,
+    "decreased_mismatches": 5,
+    "newly_passing": 0,
     "newly_failing": 0,
-    "status_changed": 4,
-    "unchanged": 185,
+    "status_changed": 0,
+    "unchanged": 189,
     "added": 0,
     "removed": 0
   },
   "changes": [
-    {
-      "test": "XMLSocket-v5",
-      "change_type": "changed",
-      "old_status": "output_mismatch",
-      "new_status": "pass",
-      "old_lines": {
-        "actual_lines": 35,
-        "expected_lines": 35,
-        "matching_lines": 31
-      },
-      "new_lines": {
-        "actual_lines": 35,
-        "expected_lines": 35,
-        "matching_lines": 35
-      }
-    },
-    {
-      "test": "XMLSocket-v6",
-      "change_type": "changed",
-      "old_status": "output_mismatch",
-      "new_status": "pass",
-      "old_lines": {
-        "actual_lines": 35,
-        "expected_lines": 35,
-        "matching_lines": 31
-      },
-      "new_lines": {
-        "actual_lines": 35,
-        "expected_lines": 35,
-        "matching_lines": 35
-      }
-    },
-    {
-      "test": "XMLSocket-v7",
-      "change_type": "changed",
-      "old_status": "output_mismatch",
-      "new_status": "pass",
-      "old_lines": {
-        "actual_lines": 35,
-        "expected_lines": 35,
-        "matching_lines": 31
-      },
-      "new_lines": {
-        "actual_lines": 35,
-        "expected_lines": 35,
-        "matching_lines": 35
-      }
-    },
-    {
-      "test": "XMLSocket-v8",
-      "change_type": "changed",
-      "old_status": "output_mismatch",
-      "new_status": "pass",
-      "old_lines": {
-        "actual_lines": 35,
-        "expected_lines": 35,
-        "matching_lines": 31
-      },
-      "new_lines": {
-        "actual_lines": 35,
-        "expected_lines": 35,
-        "matching_lines": 35
-      }
-    },
     {
       "test": "array-v5",
       "change_type": "changed",
@@ -98,12 +34,12 @@
       "old_lines": {
         "actual_lines": 560,
         "expected_lines": 560,
-        "matching_lines": 420
+        "matching_lines": 413
       },
       "new_lines": {
         "actual_lines": 560,
         "expected_lines": 560,
-        "matching_lines": 413
+        "matching_lines": 418
       }
     }
   ]
