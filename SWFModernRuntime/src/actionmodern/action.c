@@ -40299,8 +40299,10 @@ static int varToStringBuf(SWFAppContext* app_context, ActionVar* v, char* buf, i
 			{
 				if (i > 0 && pos < buf_size - 1) buf[pos++] = ',';
 				ActionVar* elem = getArrayElement(nested, i);
-				// Out-of-bounds: empty string
+				// Out-of-bounds or HOLE in SWF5/6: empty string
 				if (elem == NULL)
+					continue;
+				if (elem->type == ACTION_STACK_VALUE_HOLE && g_swf_version < 7)
 					continue;
 				char elem_str[64];
 				int elen = varToStringBuf(app_context, elem, elem_str, sizeof(elem_str));
@@ -40777,17 +40779,21 @@ static int callArrayMethod(SWFAppContext* app_context,
 			if (elem == NULL) {
 				// Empty string — just skip (append nothing)
 			}
-			// HOLE (unset slot from new Array(n) or delete): joins as "undefined"
-			// (Flash/Ruffle treat HOLE same as UNDEFINED in Array.join)
+			// HOLE (unset slot from new Array(n) or delete):
+			// SWF7+: joins as "undefined" (Flash/Ruffle behavior)
+			// SWF5/6: joins as "" (empty string, since String(undefined)="" in SWF5/6)
 			else if (elem->type == ACTION_STACK_VALUE_HOLE) {
-				char elem_str[16];
-				int elen = varToStringBuf(app_context, elem, elem_str, sizeof(elem_str));
-				while (buf_len + elen + 1 > buf_cap) {
-					buf_cap *= 2;
-					buf = (char*) realloc(buf, buf_cap);
+				if (g_swf_version >= 7) {
+					char elem_str[16];
+					int elen = varToStringBuf(app_context, elem, elem_str, sizeof(elem_str));
+					while (buf_len + elen + 1 > buf_cap) {
+						buf_cap *= 2;
+						buf = (char*) realloc(buf, buf_cap);
+					}
+					memcpy(buf + buf_len, elem_str, elen);
+					buf_len += elen;
 				}
-				memcpy(buf + buf_len, elem_str, elen);
-				buf_len += elen;
+				// SWF5/6: empty string — skip (append nothing)
 			}
 			// For STRING type, append UTF-16 data directly to avoid buffer truncation
 			else if (elem->type == ACTION_STACK_VALUE_STRING) {
