@@ -28553,19 +28553,44 @@ static int instanceOfCoercing(SWFAppContext* app_context, ActionVar* obj_var, Ac
 
 	// Get obj as ASObject
 	ASObject* obj = NULL;
+	ASObject* virtual_proto = NULL;  // Virtual __proto__ for functions without own_props
 	if (obj_var->type == ACTION_STACK_VALUE_OBJECT)
 		obj = (ASObject*) obj_var->data.numeric_value;
 	else if (obj_var->type == ACTION_STACK_VALUE_FUNCTION) {
 		ASFunction* f = (ASFunction*) obj_var->data.numeric_value;
 		obj = f ? f->own_props : NULL;
+		// Functions have a virtual __proto__ → Function.prototype even without own_props
+		if (f != NULL) {
+			int fv = (f->swf_version > 0) ? f->swf_version : g_swf_version;
+			virtual_proto = getFunctionProto(fv);
+		}
 	} else if (obj_var->type == ACTION_STACK_VALUE_ARRAY) {
 		ASArray* arr = (ASArray*) obj_var->data.numeric_value;
 		obj = arr ? arr->props : NULL;
 	}
-	if (obj == NULL) return 0;
+	if (obj == NULL && virtual_proto == NULL) return 0;
 
 	// Walk __proto__ chain
-	ActionVar* current_proto_var = getProperty(obj, "__proto__", 9);
+	ActionVar* current_proto_var = obj ? getProperty(obj, "__proto__", 9) : NULL;
+	// If own_props has no __proto__, use virtual Function.prototype
+	if (current_proto_var == NULL && virtual_proto != NULL) {
+		// Start chain walk from virtual Function.prototype
+		ASObject* current_proto = virtual_proto;
+		int depth = 0;
+		while (current_proto != NULL && depth < 100) {
+			if (current_proto == proto_target) return 1;
+			for (u32 ii = 0; ii < current_proto->interface_count; ii++) {
+				if (checkInterfaceTransitive(current_proto->interfaces[ii], proto_target, 0))
+					return 1;
+			}
+			ActionVar* next = getProperty(current_proto, "__proto__", 9);
+			if (next && next->type == ACTION_STACK_VALUE_OBJECT)
+				current_proto = (ASObject*) next->data.numeric_value;
+			else break;
+			depth++;
+		}
+		return 0;
+	}
 	int depth = 0;
 	while (current_proto_var != NULL && depth < 100) {
 		depth++;
