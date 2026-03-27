@@ -28559,10 +28559,13 @@ static int instanceOfCoercing(SWFAppContext* app_context, ActionVar* obj_var, Ac
 	else if (obj_var->type == ACTION_STACK_VALUE_FUNCTION) {
 		ASFunction* f = (ASFunction*) obj_var->data.numeric_value;
 		obj = f ? f->own_props : NULL;
-		// Functions have a virtual __proto__ → Function.prototype even without own_props
+		// Functions have a virtual __proto__ → Function.prototype even without own_props.
+		// Only for SWF6+: SWF5 functions don't participate in Function.prototype chain
+		// for instanceof checks (Flash Player behavior).
 		if (f != NULL) {
 			int fv = (f->swf_version > 0) ? f->swf_version : g_swf_version;
-			virtual_proto = getFunctionProto(fv);
+			if (fv >= 6)
+				virtual_proto = getFunctionProto(fv);
 		}
 	} else if (obj_var->type == ACTION_STACK_VALUE_ARRAY) {
 		ASArray* arr = (ASArray*) obj_var->data.numeric_value;
