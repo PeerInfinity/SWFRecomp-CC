@@ -1,10 +1,10 @@
 # Ruffle Test Results (Unfiltered)
 
-**Date**: 2026-03-27 02:14 UTC
+**Date**: 2026-03-27 04:49 UTC
 
-**Git SHA**: `b601d657e6`
+**Git SHA**: `075579c344`
 
-**Run Duration**: 12m 25s
+**Run Duration**: 12m 31s
 
 ## Summary
 
@@ -29,23 +29,23 @@
 
 | # | Test | Lines | Duration | Notes |
 |---|------|-------|----------|-------|
-| 1 | `MaskTest` | 0 | 16.2s |  |
-| 2 | `MaskTest-2` | 0 | 16.4s |  |
-| 3 | `add` | 11 | 15.3s |  |
-| 4 | `avm1timeline1` | 3 | 15.9s |  |
-| 5 | `avm1timeline2` | 6 | 15.9s |  |
-| 6 | `bitmapbuttons` | 0 | 16.7s |  |
-| 7 | `button3` | 1 | 17.2s |  |
-| 8 | `clipping` | 0 | 15.3s |  |
-| 9 | `doubleAndRegister` | 2 | 15.9s |  |
-| 10 | `flash_geom_ColorTransform` | 0 | 16.0s |  |
-| 11 | `flash_text_TextField` | 0 | 15.6s |  |
+| 1 | `MaskTest` | 0 | 16.4s |  |
+| 2 | `MaskTest-2` | 0 | 16.5s |  |
+| 3 | `add` | 11 | 15.8s |  |
+| 4 | `avm1timeline1` | 3 | 15.5s |  |
+| 5 | `avm1timeline2` | 6 | 15.7s |  |
+| 6 | `bitmapbuttons` | 0 | 15.9s |  |
+| 7 | `button3` | 1 | 16.1s |  |
+| 8 | `clipping` | 0 | 17.4s |  |
+| 9 | `doubleAndRegister` | 2 | 15.8s |  |
+| 10 | `flash_geom_ColorTransform` | 0 | 15.4s |  |
+| 11 | `flash_text_TextField` | 0 | 15.7s |  |
 | 12 | `fscommand1` | 1 | 15.7s |  |
-| 13 | `gradient` | 0 | 16.4s |  |
+| 13 | `gradient` | 0 | 16.6s |  |
 | 14 | `gradientTransform` | 0 | 16.2s |  |
-| 15 | `invalidClipDepth` | 0 | 15.9s |  |
-| 16 | `movieinfo1` | 3 | 16.6s |  |
-| 17 | `targetPath1` | 8 | 15.5s |  |
+| 15 | `invalidClipDepth` | 0 | 15.8s |  |
+| 16 | `movieinfo1` | 3 | 15.7s |  |
+| 17 | `targetPath1` | 8 | 15.7s |  |
 
 ## Near-Passing Tests
 

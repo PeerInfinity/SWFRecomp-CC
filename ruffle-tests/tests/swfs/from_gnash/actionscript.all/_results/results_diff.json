@@ -1,9 +1,9 @@
 {
   "metadata": {
-    "old_timestamp": "2026-03-27T01:19:23.558183+00:00",
-    "old_git_sha": "47531a8e97d2faa140d93298090645a36f9b4c14",
-    "new_timestamp": "2026-03-27T02:14:52.906163+00:00",
-    "new_git_sha": "b601d657e63073950a943e1111ea8070c3db67bb",
+    "old_timestamp": "2026-03-27T02:14:52.906163+00:00",
+    "old_git_sha": "b601d657e63073950a943e1111ea8070c3db67bb",
+    "new_timestamp": "2026-03-27T04:49:40.207656+00:00",
+    "new_git_sha": "075579c344cfd5066ce623dbf41f44f55372e950",
     "partial": false,
     "same_commit": false
   },
@@ -11,21 +11,69 @@
     "old_pass": 55,
     "old_total": 190,
     "old_pass_rate": 28.9,
-    "new_pass": 55,
+    "new_pass": 58,
     "new_total": 190,
-    "new_pass_rate": 28.9,
-    "old_mismatched_lines": 5136,
-    "new_mismatched_lines": 5131,
+    "new_pass_rate": 30.5,
+    "old_mismatched_lines": 5131,
+    "new_mismatched_lines": 5101,
     "increased_mismatches": 0,
-    "decreased_mismatches": 5,
-    "newly_passing": 0,
+    "decreased_mismatches": 30,
+    "newly_passing": 3,
     "newly_failing": 0,
-    "status_changed": 0,
-    "unchanged": 189,
+    "status_changed": 3,
+    "unchanged": 186,
     "added": 0,
     "removed": 0
   },
   "changes": [
+    {
+      "test": "Accessibility-v6",
+      "change_type": "changed",
+      "old_status": "output_mismatch",
+      "new_status": "pass",
+      "old_lines": {
+        "actual_lines": 19,
+        "expected_lines": 19,
+        "matching_lines": 10
+      },
+      "new_lines": {
+        "actual_lines": 19,
+        "expected_lines": 19,
+        "matching_lines": 19
+      }
+    },
+    {
+      "test": "Accessibility-v7",
+      "change_type": "changed",
+      "old_status": "output_mismatch",
+      "new_status": "pass",
+      "old_lines": {
+        "actual_lines": 19,
+        "expected_lines": 19,
+        "matching_lines": 10
+      },
+      "new_lines": {
+        "actual_lines": 19,
+        "expected_lines": 19,
+        "matching_lines": 19
+      }
+    },
+    {
+      "test": "Accessibility-v8",
+      "change_type": "changed",
+      "old_status": "output_mismatch",
+      "new_status": "pass",
+      "old_lines": {
+        "actual_lines": 19,
+        "expected_lines": 19,
+        "matching_lines": 9
+      },
+      "new_lines": {
+        "actual_lines": 19,
+        "expected_lines": 19,
+        "matching_lines": 19
+      }
+    },
     {
       "test": "array-v5",
       "change_type": "changed",
@@ -34,12 +82,12 @@
       "old_lines": {
         "actual_lines": 560,
         "expected_lines": 560,
-        "matching_lines": 413
+        "matching_lines": 418
       },
       "new_lines": {
         "actual_lines": 560,
         "expected_lines": 560,
-        "matching_lines": 418
+        "matching_lines": 420
       }
     }
   ]
