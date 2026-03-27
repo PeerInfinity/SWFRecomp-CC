@@ -7535,15 +7535,55 @@ static double quantifyColorAdd(double d)
 
 // Helper: get the MC instance name stored on a Color object (as UTF-8 in out_buf).
 // Returns 1 if found and valid, 0 otherwise.
-static int colorGetMCName(ASObject* obj, char* out_buf, size_t buf_size)
+// If __mc_name__ is set (MC target), uses that directly.
+// Otherwise, reads the "target" property and calls toString() on it to resolve the MC path.
+// This matches Flash behavior where Color methods invoke toString() on the target at each call.
+static int colorGetMCName(SWFAppContext* app_context, ASObject* obj, char* out_buf, size_t buf_size)
 {
 	if (!obj) return 0;
+	// Fast path: MC target stored at construction time
 	ActionVar* nv = getProperty(obj, "__mc_name__", 11);
-	if (!nv || nv->type != ACTION_STACK_VALUE_STRING) return 0;
-	const uint16_t* u16 = varGetU16Ptr(nv);
-	if (!u16 || nv->str_size == 0) return 0;
-	u16_to_utf8(u16, nv->str_size, out_buf, (u32)buf_size);
-	return out_buf[0] != '\0';
+	if (nv && nv->type == ACTION_STACK_VALUE_STRING) {
+		const uint16_t* u16 = varGetU16Ptr(nv);
+		if (u16 && nv->str_size > 0) {
+			u16_to_utf8(u16, nv->str_size, out_buf, (u32)buf_size);
+			if (out_buf[0] != '\0') return 1;
+		}
+	}
+	// Slow path: resolve target via toString() (for object targets with custom toString)
+	ActionVar* target = getProperty(obj, "target", 6);
+	if (!target) return 0;
+	if (target->type == ACTION_STACK_VALUE_MOVIECLIP) {
+		// MC target without __mc_name__ (shouldn't happen normally, but handle it)
+		MovieClip* mc = (MovieClip*)(uintptr_t)target->data.numeric_value;
+		if (mc && mc->name[0] != '\0') {
+			snprintf(out_buf, buf_size, "%s", mc->name);
+			return out_buf[0] != '\0';
+		}
+		return 0;
+	}
+	if (target->type == ACTION_STACK_VALUE_OBJECT && target->data.numeric_value != 0) {
+		// Object target: call toString() to resolve MC path
+		int found = 0;
+		ActionVar str_result = objectCallToString(app_context, target, &found);
+		if (found && str_result.type == ACTION_STACK_VALUE_STRING && str_result.str_size > 0) {
+			const uint16_t* u16 = varGetU16Ptr(&str_result);
+			if (u16) {
+				u16_to_utf8(u16, str_result.str_size, out_buf, (u32)buf_size);
+				return out_buf[0] != '\0';
+			}
+		}
+		return 0;
+	}
+	if (target->type == ACTION_STACK_VALUE_STRING && target->str_size > 0) {
+		// String target: use directly as MC path
+		const uint16_t* u16 = varGetU16Ptr(target);
+		if (u16) {
+			u16_to_utf8(u16, target->str_size, out_buf, (u32)buf_size);
+			return out_buf[0] != '\0';
+		}
+	}
+	return 0;
 }
 
 // Color.getTransform() -> Object{ra,ga,ba,aa,rb,gb,bb,ab}
@@ -7557,11 +7597,21 @@ static ActionVar colorGetTransform(SWFAppContext* app_context, ActionVar* args, 
 	double rb = 0.0,   gb = 0.0,   bb = 0.0,   ab = 0.0;
 
 #ifdef NO_GRAPHICS
-	if (!colorGetMCName(obj, name, sizeof(name))) {
+	if (!colorGetMCName(app_context, obj, name, sizeof(name))) {
 		ActionVar undef = {0}; undef.type = ACTION_STACK_VALUE_UNDEFINED;
 		return undef;
 	}
-	ng_getColorTransform(name, &ra, &ga, &ba, &aa, &rb, &gb, &bb, &ab);
+	if (!ng_getColorTransform(name, &ra, &ga, &ba, &aa, &rb, &gb, &bb, &ab)) {
+		// Dynamic MC not in display list — read from MC struct
+		extern MovieClip* actionFindMovieClipByName(const char* instance_name);
+		MovieClip* _mc = actionFindMovieClipByName(name);
+		if (_mc) {
+			ra = (double)_mc->cx_ra; ga = (double)_mc->cx_ga;
+			ba = (double)_mc->cx_ba; aa = (double)_mc->cx_aa;
+			rb = (double)_mc->cx_rb; gb = (double)_mc->cx_gb;
+			bb = (double)_mc->cx_bb; ab = (double)_mc->cx_ab;
+		}
+	}
 #endif
 
 	ASObject* result = allocObject(app_context, 10);
@@ -7599,11 +7649,21 @@ static ActionVar colorSetTransform(SWFAppContext* app_context, ActionVar* args, 
 
 	char name[256] = {0};
 #ifdef NO_GRAPHICS
-	if (!colorGetMCName(self, name, sizeof(name))) return undef;
+	if (!colorGetMCName(app_context, self, name, sizeof(name))) return undef;
 
 	// Read current transform
 	double ra, ga, ba, aa, rb, gb, bb, ab;
-	if (!ng_getColorTransform(name, &ra, &ga, &ba, &aa, &rb, &gb, &bb, &ab)) return undef;
+	extern MovieClip* actionFindMovieClipByName(const char* instance_name);
+	MovieClip* _mc = actionFindMovieClipByName(name);
+	int in_display_list = ng_getColorTransform(name, &ra, &ga, &ba, &aa, &rb, &gb, &bb, &ab);
+	if (!in_display_list) {
+		// Dynamic MC not in display list — read from MC struct
+		if (!_mc) return undef;
+		ra = (double)_mc->cx_ra; ga = (double)_mc->cx_ga;
+		ba = (double)_mc->cx_ba; aa = (double)_mc->cx_aa;
+		rb = (double)_mc->cx_rb; gb = (double)_mc->cx_gb;
+		bb = (double)_mc->cx_bb; ab = (double)_mc->cx_ab;
+	}
 
 	// Apply only own-properties from param (not inherited via __proto__)
 	// Use varToDoubleSWF (not varToDoubleSimple) so that object values like
@@ -7618,13 +7678,17 @@ static ActionVar colorSetTransform(SWFAppContext* app_context, ActionVar* args, 
 	pv = getProperty(param, "bb", 2); if (pv) bb = quantifyColorAdd(varToDoubleSWF(app_context, pv, g_swf_version));
 	pv = getProperty(param, "ab", 2); if (pv) ab = quantifyColorAdd(varToDoubleSWF(app_context, pv, g_swf_version));
 
-	ng_setColorTransform(name, ra, ga, ba, aa, rb, gb, bb, ab);
+	if (in_display_list) {
+		ng_setColorTransform(name, ra, ga, ba, aa, rb, gb, bb, ab);
+	}
 
-	// Sync mc->alpha with cx_aa so _alpha getter reflects Color transform changes
-	{
-		extern MovieClip* actionFindMovieClipByName(const char* instance_name);
-		MovieClip* _mc = actionFindMovieClipByName(name);
-		if (_mc) _mc->alpha = (float)aa;
+	// Sync mc->alpha and color transform fields
+	if (_mc) {
+		_mc->alpha = (float)aa;
+		_mc->cx_ra = (float)ra; _mc->cx_ga = (float)ga;
+		_mc->cx_ba = (float)ba; _mc->cx_aa = (float)aa;
+		_mc->cx_rb = (float)rb; _mc->cx_gb = (float)gb;
+		_mc->cx_bb = (float)bb; _mc->cx_ab = (float)ab;
 	}
 #endif
 	return undef;
@@ -7633,15 +7697,24 @@ static ActionVar colorSetTransform(SWFAppContext* app_context, ActionVar* args, 
 // Color.getRGB() -> int32 color value from addend components, or undefined if target invalid.
 static ActionVar colorGetRGB(SWFAppContext* app_context, ActionVar* args, u32 arg_count, ActionVar* registers, void* this_obj)
 {
-	(void)app_context; (void)args; (void)arg_count; (void)registers;
+	(void)args; (void)arg_count; (void)registers;
 	ActionVar undef = {0}; undef.type = ACTION_STACK_VALUE_UNDEFINED;
 	ASObject* obj = (ASObject*)this_obj;
 	char name[256] = {0};
 
 #ifdef NO_GRAPHICS
-	if (!colorGetMCName(obj, name, sizeof(name))) return undef;
+	if (!colorGetMCName(app_context, obj, name, sizeof(name))) return undef;
 	double ra, ga, ba, aa, rb, gb, bb, ab;
-	if (!ng_getColorTransform(name, &ra, &ga, &ba, &aa, &rb, &gb, &bb, &ab)) return undef;
+	if (!ng_getColorTransform(name, &ra, &ga, &ba, &aa, &rb, &gb, &bb, &ab)) {
+		// Dynamic MC not in display list — read from MC struct
+		extern MovieClip* actionFindMovieClipByName(const char* instance_name);
+		MovieClip* _mc = actionFindMovieClipByName(name);
+		if (!_mc) return undef;
+		ra = (double)_mc->cx_ra; ga = (double)_mc->cx_ga;
+		ba = (double)_mc->cx_ba; aa = (double)_mc->cx_aa;
+		rb = (double)_mc->cx_rb; gb = (double)_mc->cx_gb;
+		bb = (double)_mc->cx_bb; ab = (double)_mc->cx_ab;
+	}
 
 	uint32_t color_u = ((uint32_t)(int32_t)rb << 16) |
 	                   ((uint32_t)(int32_t)gb << 8) |
@@ -7655,17 +7728,25 @@ static ActionVar colorGetRGB(SWFAppContext* app_context, ActionVar* args, u32 ar
 // Color.setRGB(n) - sets ra=ga=ba=0, rb/gb/bb from n's bytes; aa and ab unchanged.
 static ActionVar colorSetRGB(SWFAppContext* app_context, ActionVar* args, u32 arg_count, ActionVar* registers, void* this_obj)
 {
-	(void)app_context; (void)registers;
+	(void)registers;
 	ActionVar undef = {0}; undef.type = ACTION_STACK_VALUE_UNDEFINED;
 	ASObject* obj = (ASObject*)this_obj;
 	if (arg_count == 0) return undef;
 	char name[256] = {0};
 
 #ifdef NO_GRAPHICS
-	if (!colorGetMCName(obj, name, sizeof(name))) return undef;
+	if (!colorGetMCName(app_context, obj, name, sizeof(name))) return undef;
 	double ra_cur, ga_cur, ba_cur, aa_cur, rb_cur, gb_cur, bb_cur, ab_cur;
-	if (!ng_getColorTransform(name, &ra_cur, &ga_cur, &ba_cur, &aa_cur, &rb_cur, &gb_cur, &bb_cur, &ab_cur))
-		return undef;
+	extern MovieClip* actionFindMovieClipByName(const char* instance_name);
+	MovieClip* _mc = actionFindMovieClipByName(name);
+	int in_display_list = ng_getColorTransform(name, &ra_cur, &ga_cur, &ba_cur, &aa_cur, &rb_cur, &gb_cur, &bb_cur, &ab_cur);
+	if (!in_display_list) {
+		if (!_mc) return undef;
+		ra_cur = (double)_mc->cx_ra; ga_cur = (double)_mc->cx_ga;
+		ba_cur = (double)_mc->cx_ba; aa_cur = (double)_mc->cx_aa;
+		rb_cur = (double)_mc->cx_rb; gb_cur = (double)_mc->cx_gb;
+		bb_cur = (double)_mc->cx_bb; ab_cur = (double)_mc->cx_ab;
+	}
 
 	// Decompose n into R, G, B bytes (0-255 each); zero the multipliers ra/ga/ba
 	int32_t n = ecmaToInt32Color(varToDoubleSWF(app_context, &args[0], g_swf_version));
@@ -7673,7 +7754,14 @@ static ActionVar colorSetRGB(SWFAppContext* app_context, ActionVar* args, u32 ar
 	double new_gb = (double)((n >> 8)  & 0xFF);
 	double new_bb = (double)(n & 0xFF);
 
-	ng_setColorTransform(name, 0.0, 0.0, 0.0, aa_cur, new_rb, new_gb, new_bb, ab_cur);
+	if (in_display_list) {
+		ng_setColorTransform(name, 0.0, 0.0, 0.0, aa_cur, new_rb, new_gb, new_bb, ab_cur);
+	}
+	if (_mc) {
+		_mc->cx_ra = 0.0f; _mc->cx_ga = 0.0f; _mc->cx_ba = 0.0f;
+		_mc->cx_rb = (float)new_rb; _mc->cx_gb = (float)new_gb; _mc->cx_bb = (float)new_bb;
+		// aa and ab unchanged
+	}
 #endif
 	return undef;
 }
@@ -13143,6 +13231,8 @@ MovieClip root_movieclip = {
 	.mc_as_pressed = 0,
 	.mc_enterframe_eligible = 1,  // Root is always eligible
 #endif
+	.cx_ra = 100.0f, .cx_ga = 100.0f, .cx_ba = 100.0f, .cx_aa = 100.0f,
+	.cx_rb = 0.0f,   .cx_gb = 0.0f,   .cx_bb = 0.0f,   .cx_ab = 0.0f,
 };
 
 // Forward declarations for child_mc_cache (defined later in the file)
@@ -13746,6 +13836,9 @@ static MovieClip* createMovieClip(const char* instance_name, MovieClip* parent) 
 	mc->mc_as_pressed = 0;
 	mc->mc_enterframe_eligible = 0;
 	mc->display_obj = NULL;
+	// Color transform defaults for dynamic MCs
+	mc->cx_ra = 100.0f; mc->cx_ga = 100.0f; mc->cx_ba = 100.0f; mc->cx_aa = 100.0f;
+	mc->cx_rb = 0.0f;   mc->cx_gb = 0.0f;   mc->cx_bb = 0.0f;   mc->cx_ab = 0.0f;
 
 	// Set instance name
 	strncpy(mc->name, instance_name, sizeof(mc->name) - 1);
@@ -26740,13 +26833,14 @@ void actionSetVariable(SWFAppContext* app_context)
 		else if (strcasecmp(var_name, "_alpha") == 0) {
 			// Quantize through 8.8 fixed-point like Flash's color transform
 			mc->alpha = (float)((double)(int16_t)roundf(fval * 256.0f / 100.0f) * 100.0 / 256.0);
+			mc->cx_aa = (float)quantifyColorMult(dval);  // Sync MC color transform (uses integer truncation like setTransform)
 #ifdef NO_GRAPHICS
 			// Sync with display list cx_aa so Color.getTransform() reads the updated value
 			{
 				extern size_t ng_findDisplayEntryByName(const char* name);
 				size_t _dep = ng_findDisplayEntryByName(mc->name);
 				if (_dep != SIZE_MAX)
-					ng_setCTAlpha(_dep, (double)mc->alpha);
+					ng_setCTAlpha(_dep, (double)mc->cx_aa);
 			}
 #endif
 			handled = 1;
@@ -31215,7 +31309,18 @@ void actionSetMember(SWFAppContext* app_context)
 				if (strcasecmp(prop_name, "_alpha") == 0) {
 					if (dval_invalid) return;
 					// Quantize through 8.8 fixed-point like Flash's color transform
-					mc->alpha = (float)((double)(int16_t)roundf(fval * 256.0f / 100.0f) * 100.0 / 256.0); return;
+					mc->alpha = (float)((double)(int16_t)roundf(fval * 256.0f / 100.0f) * 100.0 / 256.0);
+					mc->cx_aa = (float)quantifyColorMult(dval);  // Sync MC color transform (uses integer truncation like setTransform)
+#ifdef NO_GRAPHICS
+					// Sync with display list cx_aa so Color.getTransform() reads the updated value
+					{
+						extern size_t ng_findDisplayEntryByName(const char* name);
+						size_t _dep = ng_findDisplayEntryByName(mc->name);
+						if (_dep != SIZE_MAX)
+							ng_setCTAlpha(_dep, (double)mc->cx_aa);
+					}
+#endif
+					return;
 				}
 				if (strcasecmp(prop_name, "_visible") == 0) {
 					// _visible: undefined and null are no-ops (preserve current value)

@@ -1,18 +1,24 @@
 # Gnash Test Suite Status
 
-Last updated: 2026-03-26
+Last updated: 2026-03-27
 
 ## Quick Summary
 
 | Sub-suite | Tests | Passing | Rate | Filtered | Filtered Rate | Ignored |
 |-----------|-------|---------|------|----------|---------------|---------|
-| **actionscript.all** | 190 | ~56 | ~29.5% | ~56/181 | **~30.9%** | 9 |
+| **actionscript.all** | 190 | ~61 | ~32.1% | ~61/181 | **~33.7%** | 9 |
 | **misc-swfmill.all** | 14 | 11 | 78.6% | — | — | — |
-| **Total** | 204 | ~67 | ~32.8% | — | — | — |
+| **Total** | 204 | ~72 | ~35.3% | — | — | — |
 
-Note: counts estimated from local testing (pending CI run). New passes: XMLSocket-v5/v6/v7/v8, Accessibility-v5, Selection-v5.
+Note: counts estimated from local testing (pending CI run). New passes: Color-v5/v7/v8 (+3).
 
 Filtered results exclude 9 tests with all-accepted diffs (Math-v5/v6/v7/v8, ops-v8, Error-v5/v6/v7/v8) — see `ACCEPTED_DIFFS.md`. Remaining 3 misc-swfmill failures (dict_event, tags_after_last_showframe, jump_to_prev_block) are blocked on architectural limitations — see `incomplete/MISC_SWFMILL_PLAN.md`.
+
+### Latest fixes (2026-03-27)
+- **Color target toString() resolution** — Color.getRGB/getTransform/setRGB/setTransform now call toString() on object targets at each method invocation (Flash behavior). Fixes Color-v5.
+- **Dynamic MC color transform** — Added color transform storage (cx_ra..cx_ab) to MovieClip struct. Dynamic MCs (createEmptyMovieClip) now support Color.getTransform/setTransform. Fixes Color-v5/v7/v8.
+- **_alpha / Color transform dual quantization** — `_alpha` getter uses roundf quantization; `cx_aa` (Color.getTransform) uses integer truncation matching Flash's setTransform behavior. Fixes remaining Color-v7/v8 `trans2.aa` failures.
+- Color-v6 improved from 93% to 97% (4 remaining failures: `typeof(c) == 'undefined'` for non-constructable Color in SWF6+).
 
 ### Latest fixes (2026-03-26)
 - **XMLSocket.connect returns false** — All 4 XMLSocket tests now PASS (v5/v6/v7/v8). `connect()` stub changed from returning undefined to returning false.
@@ -150,10 +156,11 @@ During `actionAdd2` on two ARRAY values, `convertFloat` calls `getPropertyWithPr
 | Video-v6/v7/v8 | **PASS** (85/85) | Already passing since Phase 1 fixes |
 | Selection-v5 | **PASS** (21/21) | Already passing since Phase 1 fixes |
 | Stage-v5 | **PASS** (38/38) | Already passing since Phase 1 fixes |
+| Color-v5/v7/v8 | **PASS** (134/155/155) | Fixed: toString resolution, dynamic MC CxForm, dual quantization |
+| Color-v6 | 161/165 (97.6%) | 4 remaining: `typeof(c) == 'undefined'` for non-constructable Color |
 | NetStream-v6/v7/v8 | 72/74 (97.3%) | 2 remaining: `currentFps` not own property on prototype |
 | TextFieldHTML-v6/v7/v8 | 86.5% | htmlText getter/text clearing bugs |
 | Selection-v6/v7/v8 | ~86% | Selection non-constructable + `_listeners` own property |
-| Color-v5/v6/v7/v8 | ~82% | instanceof Color + getTransform on invalid |
 | Inheritance-v5/v6 | ~81% | super() chain, Function.__proto__, instanceOf |
 
 ### v5-passes-but-v6-fails Pattern

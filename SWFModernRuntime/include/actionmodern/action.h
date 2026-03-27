@@ -66,6 +66,11 @@ struct MovieClip {
 	u8 mc_as_pressed;      // 1 if button was pressed while mouse was inside this MC
 	u8 mc_enterframe_eligible; // 0 on creation tick, set to 1 on next tick so onEnterFrame doesn't fire on creation frame
 	u8 movie_id;               // Which SWF movie defined this MC (0=main, 1+=child). Used for per-movie export table isolation in attachMovie.
+	// Color transform for dynamic MCs (createEmptyMovieClip, etc.) not in the display list.
+	// Default: multipliers=100, offsets=0. Used by Color.getTransform/setTransform when
+	// ng_getColorTransform fails (no display_list entry).
+	float cx_ra, cx_ga, cx_ba, cx_aa;
+	float cx_rb, cx_gb, cx_bb, cx_ab;
 };
 
 // Global root MovieClip
