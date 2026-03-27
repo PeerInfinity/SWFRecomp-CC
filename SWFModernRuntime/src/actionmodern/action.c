@@ -29623,8 +29623,11 @@ void actionExtends(SWFAppContext* app_context)
 		setProperty(app_context, new_proto, "__proto__", 9, &proto_var);
 	}
 
-	// Set constructor property to superclass
-	setProperty(app_context, new_proto, "constructor", 11, &superclass);
+	// Set constructor on new prototype ONLY if the superclass prototype doesn't already have it.
+	// Flash inherits constructor via __proto__ when possible (DerivedClass1.prototype.hasOwnProperty('constructor') = false).
+	// But for native classes like MovieClip whose prototype may not have constructor, we set it.
+	if (super_proto == NULL || !hasPropertyRaw(super_proto, "constructor", 11))
+		setProperty(app_context, new_proto, "constructor", 11, &superclass);
 
 	// Set __constructor__ (DontEnum) — needed for super() to find parent constructor
 	setPropertyWithFlags(app_context, new_proto, "__constructor__", 15, &superclass, PROPERTY_FLAGS_DONTENUM);
