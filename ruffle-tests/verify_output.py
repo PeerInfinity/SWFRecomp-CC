@@ -1856,7 +1856,7 @@ def main():
                 # Still compare output even for crashing tests
                 if raw_output and raw_output.strip():
                     crash_actual = filter_output(raw_output)
-                    crash_expected = (test_dir / "output.txt").read_text().replace("\r\n", "\n").rstrip("\n")
+                    crash_expected = (test_dir / "output.txt").read_text(encoding="utf-8", errors="replace").replace("\r\n", "\n").rstrip("\n")
                     crash_match, crash_diff, crash_line_stats = compare_output(crash_actual, crash_expected, epsilon)
                     entry["lines"] = crash_line_stats
                     if crash_match:
@@ -1928,7 +1928,7 @@ def main():
 
         # Step 4: Filter and compare trace output
         actual = filter_output(raw_output)
-        expected = (test_dir / "output.txt").read_text().replace("\r\n", "\n").rstrip("\n")
+        expected = (test_dir / "output.txt").read_text(encoding="utf-8", errors="replace").replace("\r\n", "\n").rstrip("\n")
 
         match, diff_summary, line_stats = compare_output(actual, expected, epsilon)
         entry["lines"] = line_stats

@@ -930,6 +930,16 @@ static ActionVar builtin_stub_method(SWFAppContext* app_context, ActionVar* args
 	return ret;
 }
 
+// --- Stub that returns false (for methods like XMLSocket.connect) ---
+static ActionVar builtin_return_false(SWFAppContext* app_context, ActionVar* args, u32 arg_count, ActionVar* registers, void* this_obj)
+{
+	(void)app_context; (void)args; (void)arg_count; (void)registers; (void)this_obj;
+	ActionVar ret = {0};
+	ret.type = ACTION_STACK_VALUE_BOOLEAN;
+	ret.data.numeric_value = 0;
+	return ret;
+}
+
 // Forward declaration needed by builtin_sound_getTransform (defined later in file)
 static void setObjectProto(SWFAppContext* app_context, ASObject* obj);
 
@@ -23225,7 +23235,21 @@ static void initXMLSocketPrototype(SWFAppContext* app_context, ASFunction* ctor)
 	// __proto__ → Object.prototype (enumerated before constructor in LIFO)
 	setObjectProto(app_context, ctor->prototype_obj);
 	const u8 mflags = PROPERTY_FLAG_WRITABLE; // DONT_ENUM + DONT_DELETE
-	addStubMethodToProto(app_context, ctor->prototype_obj, "connect", 7, mflags);
+	// connect() returns false (connection always fails in headless mode)
+	{
+		if (g_proto_stub_func_count < MAX_PROTO_STUB_FUNCS) {
+			ASFunction* fn = &g_proto_stub_funcs[g_proto_stub_func_count++];
+			memset(fn, 0, sizeof(ASFunction));
+			strncpy(fn->name, "connect", 255);
+			fn->function_type = 2;
+			fn->advanced_func = (Function2Ptr) builtin_return_false;
+			if (function_count < MAX_FUNCTIONS) function_registry[function_count++] = fn;
+			ActionVar fv = {0};
+			fv.type = ACTION_STACK_VALUE_FUNCTION;
+			fv.data.numeric_value = (u64) fn;
+			setPropertyWithFlags(app_context, ctor->prototype_obj, "connect", 7, &fv, mflags);
+		}
+	}
 	addStubMethodToProto(app_context, ctor->prototype_obj, "send", 4, mflags);
 	addStubMethodToProto(app_context, ctor->prototype_obj, "close", 5, mflags);
 	addStubMethodToProto(app_context, ctor->prototype_obj, "onData", 6, mflags);
@@ -40275,8 +40299,8 @@ static int varToStringBuf(SWFAppContext* app_context, ActionVar* v, char* buf, i
 			{
 				if (i > 0 && pos < buf_size - 1) buf[pos++] = ',';
 				ActionVar* elem = getArrayElement(nested, i);
-				// Flash: missing elements (HOLE) → empty string in array toString
-				if (elem == NULL || elem->type == ACTION_STACK_VALUE_HOLE)
+				// Out-of-bounds: empty string
+				if (elem == NULL)
 					continue;
 				char elem_str[64];
 				int elen = varToStringBuf(app_context, elem, elem_str, sizeof(elem_str));
@@ -40749,9 +40773,21 @@ static int callArrayMethod(SWFAppContext* app_context,
 				buf_len += sep_len;
 			}
 			ActionVar* elem = getArrayElement(arr, i);
-			// Flash: missing elements (HOLE) and out-of-bounds produce empty string in join
-			if (elem == NULL || elem->type == ACTION_STACK_VALUE_HOLE) {
+			// Out-of-bounds (beyond capacity): empty string
+			if (elem == NULL) {
 				// Empty string — just skip (append nothing)
+			}
+			// HOLE (unset slot from new Array(n) or delete): joins as "undefined"
+			// (Flash/Ruffle treat HOLE same as UNDEFINED in Array.join)
+			else if (elem->type == ACTION_STACK_VALUE_HOLE) {
+				char elem_str[16];
+				int elen = varToStringBuf(app_context, elem, elem_str, sizeof(elem_str));
+				while (buf_len + elen + 1 > buf_cap) {
+					buf_cap *= 2;
+					buf = (char*) realloc(buf, buf_cap);
+				}
+				memcpy(buf + buf_len, elem_str, elen);
+				buf_len += elen;
 			}
 			// For STRING type, append UTF-16 data directly to avoid buffer truncation
 			else if (elem->type == ACTION_STACK_VALUE_STRING) {

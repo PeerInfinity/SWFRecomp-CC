@@ -1,13 +1,20 @@
 # Current Ruffle Test Status
 
-Last updated: 2026-03-15 (evening)
+Last updated: 2026-03-26
 
 ## Quick Summary
 
-- **Pass rate (CI, last run)**: 559/619 (90.3%) total, **549/563 (97.5%) filtered** (CI run on de8b5c0b, 0 regressions)
+- **Pass rate (CI, last run)**: 557/575 (96.9%) filtered (CI run on 6f393c83, 18 filtered failures)
 - **Image test baseline**: **7/31 strict image match** (run_image_tests.py, 0-outlier AND 0-max-diff). **9/31 tolerance pass** (within test.toml limits). Strict passes: focusrect_focuslost, focusrect_mouse_swf8/swf9, focusrect_swf6, frame_size_translated_neg/pos, mask_with_drawing. Tolerance-only: display_object_properties (max_diff=79), mask_reapply (max_diff=1).
-- **Main failure types**: output_mismatch (60), timeout (1, ignored)
-- **Known regressions**: None. Previous regressions all recovered.
+- **Main failure types**: output_mismatch (17), runtime_error (1)
+- **Known regressions**: None.
+- **Latest fixes (2026-03-26)**:
+  - array_constructor PASS (Array.join HOLE→"undefined" fix)
+  - array_properties PASS (same fix)
+  - external_interface_toxml_basic PASS (same fix)
+  - global_array PASS (same fix)
+  - tab_ordering_properties PASS (tabIndex coercion, previous fix now confirmed)
+  - string_relational_compare: runtime_error→output_mismatch (verify_output.py UTF-8 error handling)
 - **Latest fixes (2026-03-15)**:
   - text_blocks_clicks PASS (DefineText bounds for _droptarget)
   - issue_2030 PASS (MC.attachBitmap stub)

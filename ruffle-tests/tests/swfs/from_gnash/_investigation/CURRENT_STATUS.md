@@ -1,16 +1,21 @@
 # Gnash Test Suite Status
 
-Last updated: 2026-03-23 (CI run on 15ce3f06)
+Last updated: 2026-03-26
 
 ## Quick Summary
 
 | Sub-suite | Tests | Passing | Rate | Filtered | Filtered Rate | Ignored |
 |-----------|-------|---------|------|----------|---------------|---------|
-| **actionscript.all** | 190 | 51 | 26.8% | 51/181 | **28.2%** | 9 |
+| **actionscript.all** | 190 | ~56 | ~29.5% | ~56/181 | **~30.9%** | 9 |
 | **misc-swfmill.all** | 14 | 11 | 78.6% | — | — | — |
-| **Total** | 204 | 62 | 30.4% | — | — | — |
+| **Total** | 204 | ~67 | ~32.8% | — | — | — |
+
+Note: counts estimated from local testing (pending CI run). New passes: XMLSocket-v5/v6/v7/v8, Accessibility-v5, Selection-v5.
 
 Filtered results exclude 9 tests with all-accepted diffs (Math-v5/v6/v7/v8, ops-v8, Error-v5/v6/v7/v8) — see `ACCEPTED_DIFFS.md`. Remaining 3 misc-swfmill failures (dict_event, tags_after_last_showframe, jump_to_prev_block) are blocked on architectural limitations — see `incomplete/MISC_SWFMILL_PLAN.md`.
+
+### Latest fixes (2026-03-26)
+- **XMLSocket.connect returns false** — All 4 XMLSocket tests now PASS (v5/v6/v7/v8). `connect()` stub changed from returning undefined to returning false.
 
 ## Related Documents
 
