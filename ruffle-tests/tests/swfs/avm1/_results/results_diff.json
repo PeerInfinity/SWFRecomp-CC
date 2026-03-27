@@ -1,94 +1,29 @@
 {
   "metadata": {
-    "old_timestamp": "2026-03-26T18:12:52.909638+00:00",
-    "old_git_sha": "373e342a67c688a98152b8491703f2e037bbbcdc",
-    "new_timestamp": "2026-03-27T01:19:23.535871+00:00",
-    "new_git_sha": "47531a8e97d2faa140d93298090645a36f9b4c14",
+    "old_timestamp": "2026-03-27T01:19:23.535871+00:00",
+    "old_git_sha": "47531a8e97d2faa140d93298090645a36f9b4c14",
+    "new_timestamp": "2026-03-27T02:14:52.886172+00:00",
+    "new_git_sha": "b601d657e63073950a943e1111ea8070c3db67bb",
     "partial": false,
     "same_commit": false
   },
   "summary": {
-    "old_pass": 558,
+    "old_pass": 562,
     "old_total": 620,
-    "old_pass_rate": 90.0,
+    "old_pass_rate": 90.6,
     "new_pass": 562,
     "new_total": 620,
     "new_pass_rate": 90.6,
-    "old_mismatched_lines": 12897,
+    "old_mismatched_lines": 12887,
     "new_mismatched_lines": 12887,
     "increased_mismatches": 0,
-    "decreased_mismatches": 10,
-    "newly_passing": 4,
+    "decreased_mismatches": 0,
+    "newly_passing": 0,
     "newly_failing": 0,
-    "status_changed": 4,
-    "unchanged": 616,
+    "status_changed": 0,
+    "unchanged": 620,
     "added": 0,
     "removed": 0
   },
-  "changes": [
-    {
-      "test": "array_constructor",
-      "change_type": "changed",
-      "old_status": "output_mismatch",
-      "new_status": "pass",
-      "old_lines": {
-        "actual_lines": 30,
-        "expected_lines": 30,
-        "matching_lines": 29
-      },
-      "new_lines": {
-        "actual_lines": 30,
-        "expected_lines": 30,
-        "matching_lines": 30
-      }
-    },
-    {
-      "test": "array_properties",
-      "change_type": "changed",
-      "old_status": "output_mismatch",
-      "new_status": "pass",
-      "old_lines": {
-        "actual_lines": 36,
-        "expected_lines": 36,
-        "matching_lines": 33
-      },
-      "new_lines": {
-        "actual_lines": 36,
-        "expected_lines": 36,
-        "matching_lines": 36
-      }
-    },
-    {
-      "test": "external_interface_toxml_basic",
-      "change_type": "changed",
-      "old_status": "output_mismatch",
-      "new_status": "pass",
-      "old_lines": {
-        "actual_lines": 179,
-        "expected_lines": 179,
-        "matching_lines": 174
-      },
-      "new_lines": {
-        "actual_lines": 179,
-        "expected_lines": 179,
-        "matching_lines": 179
-      }
-    },
-    {
-      "test": "global_array",
-      "change_type": "changed",
-      "old_status": "output_mismatch",
-      "new_status": "pass",
-      "old_lines": {
-        "actual_lines": 3,
-        "expected_lines": 3,
-        "matching_lines": 2
-      },
-      "new_lines": {
-        "actual_lines": 3,
-        "expected_lines": 3,
-        "matching_lines": 3
-      }
-    }
-  ]
+  "changes": []
 }
