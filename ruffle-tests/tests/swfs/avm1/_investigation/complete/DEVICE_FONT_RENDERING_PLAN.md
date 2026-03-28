@@ -1,17 +1,17 @@
 # Device Font Rendering Plan
 <!-- TESTS: edittext_tag_indent, edittext_stylesheet, and any future test using device fonts -->
 
-Last updated: 2026-03-27
+Last updated: 2026-03-28
 
-## Status: NOT STARTED — All prerequisites in place
+## Status: IMPLEMENTED (581e91f2)
 
-### Problem
+Device font glyphs are now tessellated at recompile time using a bundled Noto Sans TTF. Glyph shapes are visible in headless rendering for both `edittext_tag_indent` and `edittext_stylesheet`. Remaining image test failures are from text layout (Phase 4), not device font rendering.
+
+### Problem (Solved)
 
 Many SWF files use "device fonts" — fonts where the SWF stores only code/advance tables but no glyph outlines. Flash Player renders these using system-installed fonts. Ruffle uses a bundled Noto Sans subset as its device font.
 
-Our Phase 3 glyph rendering (committed in 3efe326b) works correctly for embedded fonts but produces no output for device fonts because there are no tessellated glyph shapes in `glyph_data[]`.
-
-The two remaining failing image tests (`edittext_tag_indent`, `edittext_stylesheet`) both use device fonts.
+Our Phase 3 glyph rendering (committed in 3efe326b) works correctly for embedded fonts but produced no output for device fonts because there were no tessellated glyph shapes in `glyph_data[]`.
 
 ### Key Insight: Recompile-Time Tessellation
 

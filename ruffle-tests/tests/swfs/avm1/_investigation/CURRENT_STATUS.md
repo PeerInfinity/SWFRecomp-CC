@@ -5,9 +5,13 @@ Last updated: 2026-03-28
 ## Quick Summary
 
 - **Pass rate (CI, last run)**: 562/574 (97.9%) filtered (CI run on 04572868, 12 filtered failures)
-- **Image test baseline**: **7/31 strict image match** (run_image_tests.py, 0-outlier AND 0-max-diff). **9/31 tolerance pass** (within test.toml limits). Strict passes: focusrect_focuslost, focusrect_mouse_swf8/swf9, focusrect_swf6, frame_size_translated_neg/pos, mask_with_drawing. Tolerance-only: display_object_properties (max_diff=79), mask_reapply (max_diff=1).
+- **Image test baseline**: **8/31 strict image match** (0-outlier AND 0-max-diff). **10/31 tolerance pass** (within test.toml limits). Strict passes: focusrect_focuslost, focusrect_mouse_swf8/swf9, focusrect_swf6, frame_size_translated_neg/pos, mask_with_drawing, movieclip_create_text_field. Tolerance-only: display_object_properties (max_diff=79), mask_reapply (max_diff=1).
 - **Main failure types**: output_mismatch (12)
 - **Known regressions**: None.
+- **Latest fixes (2026-03-28)**:
+  - movieclip_create_text_field image PASS (0 outliers) — fixed createTextField negative dimension rendering
+  - Headless glyph rendering pipeline — device font tessellation via bundled Noto Sans TTF + stb_truetype
+  - edittext_tag_indent/edittext_stylesheet: glyphs now render (still fail on text layout/color)
 - **Latest fixes (2026-03-26)**:
   - array_constructor PASS (Array.join HOLE→"undefined" fix)
   - array_properties PASS (same fix)
