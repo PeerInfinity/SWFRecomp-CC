@@ -71,6 +71,10 @@ struct MovieClip {
 	// ng_getColorTransform fails (no display_list entry).
 	float cx_ra, cx_ga, cx_ba, cx_aa;
 	float cx_rb, cx_gb, cx_bb, cx_ab;
+	// Attached BitmapData (from attachBitmap) — raw pixel pointer for GPU rendering
+	uint32_t* attached_bitmap_pixels;   // ARGB premultiplied pixel data (NULL if none)
+	u16 attached_bitmap_width;
+	u16 attached_bitmap_height;
 };
 
 // Global root MovieClip
@@ -520,6 +524,18 @@ int actionIterateMaskedDrawings(DrawingMaskedCallback cb, void* user_data);
 // Get Drawing API paths for a specific MovieClip (by instance name).
 // Returns the number of paths filled into out[]. Used by tag.c for sprite clip masks.
 int actionGetMCDrawingPathsByName(const char* instance_name, DrawingRenderInfo* out, int max_out);
+
+// Attached bitmap iteration: callback for rendering BitmapData attached to MCs
+typedef struct AttachedBitmapInfo {
+	const uint32_t* pixels;   // ARGB premultiplied pixel data
+	u32 width;
+	u32 height;
+	float x_twips;            // position in stage coordinates (twips)
+	float y_twips;
+} AttachedBitmapInfo;
+
+typedef void (*AttachedBitmapCallback)(const AttachedBitmapInfo* info, void* user_data);
+int actionIterateAttachedBitmaps(AttachedBitmapCallback cb, void* user_data);
 
 // Text field rendering info (used by tag.c in graphics mode)
 typedef struct TextFieldRenderInfo {

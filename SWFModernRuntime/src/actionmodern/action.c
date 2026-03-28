@@ -13834,6 +13834,9 @@ static MovieClip* createMovieClip(const char* instance_name, MovieClip* parent) 
 	mc->is_mask = 0;
 	mc->mc_mouse_inside = 0;
 	mc->mc_as_pressed = 0;
+	mc->attached_bitmap_pixels = NULL;
+	mc->attached_bitmap_width = 0;
+	mc->attached_bitmap_height = 0;
 	mc->mc_enterframe_eligible = 0;
 	mc->display_obj = NULL;
 	// Color transform defaults for dynamic MCs
@@ -17423,6 +17426,28 @@ int actionGetMCDrawingPathsByName(const char* instance_name, DrawingRenderInfo* 
 	MovieClip* mc = actionFindMovieClipByName(instance_name);
 	if (mc == NULL) return 0;
 	return fillDrawingInfos(mc, out, max_out);
+}
+
+int actionIterateAttachedBitmaps(AttachedBitmapCallback cb, void* user_data)
+{
+	int count = 0;
+	for (int i = 0; i < child_mc_count; i++) {
+		MovieClip* mc = child_mc_cache[i];
+		if (mc == NULL || mc->depth == INT_MIN) continue;
+		if (!mc->visible) continue;
+		if (mc->attached_bitmap_pixels == NULL) continue;
+
+		AttachedBitmapInfo info;
+		info.pixels = mc->attached_bitmap_pixels;
+		info.width = mc->attached_bitmap_width;
+		info.height = mc->attached_bitmap_height;
+		// Position in stage coordinates (pixels → twips)
+		info.x_twips = mc->x * 20.0f;
+		info.y_twips = mc->y * 20.0f;
+		cb(&info, user_data);
+		count++;
+	}
+	return count;
 }
 
 static void mcGetEffectiveSize(MovieClip* mc, double* eff_w, double* eff_h);
@@ -45530,6 +45555,7 @@ void actionCallMethod(SWFAppContext* app_context, char* str_buffer)
 		{
 			// attachBitmap(bitmapData, depth [, pixelSnapping, smoothing])
 			// Attaches a BitmapData to the MC. Sets MC width/height from bitmap dimensions.
+			// Also stores the bitmap reference on the MC's DisplayObject for GPU rendering.
 			if (num_args >= 1 && args[0].type == ACTION_STACK_VALUE_OBJECT) {
 				ASObject* bmp_obj = (ASObject*)(uintptr_t)args[0].data.numeric_value;
 				BitmapDataNative* bmp = getBitmapNative(bmp_obj);
@@ -45541,6 +45567,10 @@ void actionCallMethod(SWFAppContext* app_context, char* str_buffer)
 					mc->draw_xmax = (float)bmp->width;
 					mc->draw_ymax = (float)bmp->height;
 					mc->draw_has_bounds = 1;
+					// Store bitmap pixels on the MC for rendering
+					mc->attached_bitmap_pixels = bmp->pixels;
+					mc->attached_bitmap_width = (u16)bmp->width;
+					mc->attached_bitmap_height = (u16)bmp->height;
 				}
 			}
 			if (args != NULL) FREE(args);

@@ -1764,6 +1764,14 @@ static void masked_drawing_render_cb(const DrawingMCInfo* masked, const DrawingM
 	// 3. End stencil clip
 	renderer_end_clip(context);
 }
+
+// Callback for actionIterateAttachedBitmaps: render BitmapData attached to dynamic MCs.
+static void attached_bitmap_render_cb(const AttachedBitmapInfo* info, void* user_data)
+{
+	(void)user_data;
+	renderer_draw_bitmap_quad(context, info->pixels, info->width, info->height,
+		info->x_twips, info->y_twips, 0, 0);
+}
 #endif
 
 // Re-render current display list state (for headless per-tick image capture).
@@ -1979,6 +1987,9 @@ void tagRerenderFrame(SWFAppContext* app_context)
 	// Drawing API fills and strokes
 	actionIterateDrawings(drawing_render_cb, NULL);
 	actionIterateMaskedDrawings(masked_drawing_render_cb, NULL);
+
+	// Attached bitmaps (from attachBitmap on dynamic MCs)
+	actionIterateAttachedBitmaps(attached_bitmap_render_cb, NULL);
 
 	// Focus rect (pre-computed before compose_children)
 	// Drawn as 3-pixel thick border INSIDE the object's world AABB.
@@ -2419,6 +2430,9 @@ void tagShowFrame(SWFAppContext* app_context)
 	// --- Render Drawing API fills and strokes ---
 	actionIterateDrawings(drawing_render_cb, NULL);
 	actionIterateMaskedDrawings(masked_drawing_render_cb, NULL);
+
+	// --- Render attached bitmaps (from attachBitmap on dynamic MCs) ---
+	actionIterateAttachedBitmaps(attached_bitmap_render_cb, NULL);
 
 	// --- Render focus rect (pre-computed before compose_children) ---
 	// Drawn as 3-pixel thick border INSIDE the object's world AABB.

@@ -91,6 +91,7 @@ typedef struct WebGPURenderContext
 	WGPURenderPipeline blend_lighten_pipeline;  // blend mode 5: lighten (max)
 	WGPURenderPipeline blend_darken_pipeline;   // blend mode 6: darken (min)
 	WGPURenderPipeline blend_subtract_pipeline; // blend mode 9: subtract
+	WGPURenderPipeline blend_premul_pipeline;   // premultiplied alpha (for attached bitmaps)
 	WGPUComputePipeline compute_pipeline;
 
 	// --- Bind group layouts ---
@@ -165,6 +166,13 @@ typedef struct WebGPURenderContext
 	u32 dynamic_gradient_capacity; // max dynamic gradient layers
 	u32 static_mat_count;        // number of static gradient matrices
 
+	// Dynamic bitmap rendering (attachBitmap)
+	u32 dynamic_bitmap_base;       // first dynamic bitmap layer index (= original bitmap_count)
+	u32 dynamic_bitmap_used;       // layers used this frame
+	u32 dynamic_bitmap_capacity;   // max dynamic layers
+	u32 dynamic_bitmap_max_w;      // max width for dynamic bitmap texture layers (pixels)
+	u32 dynamic_bitmap_max_h;      // max height for dynamic bitmap texture layers (pixels)
+
 	// Renderer initialization status (0 = not ready, 1 = fully initialized)
 	int renderer_ok;
 } WebGPURenderContext;
@@ -186,6 +194,7 @@ void render_webgpu_draw_shape(WebGPURenderContext* context, size_t offset, size_
 void render_webgpu_draw_rect(WebGPURenderContext* context, float x, float y, float w, float h, float r, float g, float b, float a, u32 transform_id, u32 cxform_id);
 void render_webgpu_draw_tris(WebGPURenderContext* context, const float* xy_pairs, u32 vertex_count, float r, float g, float b, float a, u32 transform_id, u32 cxform_id);
 void render_webgpu_draw_gradient_tris(WebGPURenderContext* context, const float* xy_pairs, u32 vertex_count, u8 gradient_type, u8 spread_mode, float focal_ratio, const u8* gradient_ramp, const float* gradient_matrix, u32 transform_id, u32 cxform_id);
+void render_webgpu_draw_bitmap_quad(WebGPURenderContext* context, const uint32_t* argb_pixels, u32 bmp_width, u32 bmp_height, float x_twips, float y_twips, u32 transform_id, u32 cxform_id);
 void render_webgpu_begin_clip_mask(WebGPURenderContext* context);
 void render_webgpu_end_clip_mask(WebGPURenderContext* context);
 void render_webgpu_end_clip(WebGPURenderContext* context);

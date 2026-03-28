@@ -693,12 +693,13 @@ static void create_buffers_and_upload(WebGPURenderContext* ctx)
 		ctx->dynamic_color_base = orig_colors;
 	}
 
-	// Over-allocate uninv_mat and inv_mat buffers for dynamic gradient matrices
+	// Over-allocate uninv_mat and inv_mat buffers for dynamic gradient + bitmap matrices
 	#define MAX_DYNAMIC_GRADIENTS 64
+	#define MAX_DYNAMIC_BITMAPS 32
 	{
 		u32 static_mats = ctx->uninv_mat_data_size > 0
 			? (u32)(ctx->uninv_mat_data_size / (16 * sizeof(float))) : 0;
-		size_t total_mat_size = (size_t)(static_mats + MAX_DYNAMIC_GRADIENTS) * 16 * sizeof(float);
+		size_t total_mat_size = (size_t)(static_mats + MAX_DYNAMIC_GRADIENTS + MAX_DYNAMIC_BITMAPS) * 16 * sizeof(float);
 		if (total_mat_size == 0) total_mat_size = 16 * sizeof(float); // minimum 1 slot
 
 		ctx->uninv_mat_buffer = create_buffer(ctx->device, ctx->queue,
@@ -716,9 +717,19 @@ static void create_buffers_and_upload(WebGPURenderContext* ctx)
 		ctx->dynamic_gradient_capacity = MAX_DYNAMIC_GRADIENTS;
 	}
 
-	ctx->bitmap_sizes_buffer = create_buffer(ctx->device, ctx->queue,
-		WGPUBufferUsage_Storage | WGPUBufferUsage_CopyDst,
-		NULL, 2 * sizeof(u32) * ctx->bitmap_count, "bitmap_sizes_buffer");
+	// Over-allocate bitmap_sizes_buffer for dynamic attached bitmaps
+	{
+		u32 total_bmp_slots = (u32)ctx->bitmap_count + MAX_DYNAMIC_BITMAPS;
+		if (total_bmp_slots == 0) total_bmp_slots = 1;
+		ctx->bitmap_sizes_buffer = create_buffer(ctx->device, ctx->queue,
+			WGPUBufferUsage_Storage | WGPUBufferUsage_CopyDst,
+			NULL, 2 * sizeof(u32) * total_bmp_slots, "bitmap_sizes_buffer");
+		ctx->dynamic_bitmap_base = (u32)ctx->bitmap_count;
+		ctx->dynamic_bitmap_capacity = MAX_DYNAMIC_BITMAPS;
+		ctx->dynamic_bitmap_used = 0;
+		ctx->dynamic_bitmap_max_w = 256;
+		ctx->dynamic_bitmap_max_h = 256;
+	}
 
 	// Over-allocate cxform buffer for dynamic runtime cxform slots
 	// (Color.setRGB/setTransform modify cx_* at runtime)
@@ -815,16 +826,25 @@ static void create_textures(WebGPURenderContext* ctx)
 		ctx->gradient_sampler = wgpuDeviceCreateSampler(ctx->device, &samp_desc);
 	}
 
-	// --- Bitmap texture array ---
-	if (ctx->bitmap_count > 0)
+	// --- Bitmap texture array (always created, over-allocated for dynamic attachBitmap) ---
 	{
-		u32 bw = (u32)(ctx->bitmap_highest_w + 1);
-		u32 bh = (u32)(ctx->bitmap_highest_h + 1);
+		u32 total_bitmap_layers = (u32)ctx->bitmap_count + MAX_DYNAMIC_BITMAPS;
+		// Padded dimensions: max of static bitmaps and dynamic bitmap max size
+		u32 bw = (u32)(ctx->bitmap_highest_w > 0 ? ctx->bitmap_highest_w + 1 : ctx->dynamic_bitmap_max_w + 1);
+		u32 bh = (u32)(ctx->bitmap_highest_h > 0 ? ctx->bitmap_highest_h + 1 : ctx->dynamic_bitmap_max_h + 1);
+		// If static bitmaps exist, ensure dynamic max fits within the texture dimensions
+		if (ctx->bitmap_count > 0) {
+			if (ctx->dynamic_bitmap_max_w + 1 > bw) bw = ctx->dynamic_bitmap_max_w + 1;
+			if (ctx->dynamic_bitmap_max_h + 1 > bh) bh = ctx->dynamic_bitmap_max_h + 1;
+		}
+		// Update highest dimensions for upload consistency
+		ctx->bitmap_highest_w = bw - 1;
+		ctx->bitmap_highest_h = bh - 1;
 
 		WGPUTextureDescriptor tex_desc = {0};
 		tex_desc.label = WGPU_LABEL("bitmap_tex");
 		tex_desc.dimension = WGPUTextureDimension_2D;
-		tex_desc.size = (WGPUExtent3D){bw, bh, (u32)ctx->bitmap_count};
+		tex_desc.size = (WGPUExtent3D){bw, bh, total_bitmap_layers};
 		tex_desc.format = WGPUTextureFormat_RGBA8Unorm;
 		tex_desc.mipLevelCount = 1;
 		tex_desc.sampleCount = 1;
@@ -833,7 +853,7 @@ static void create_textures(WebGPURenderContext* ctx)
 
 		WGPUTextureViewDescriptor view_desc = {0};
 		view_desc.dimension = WGPUTextureViewDimension_2DArray;
-		view_desc.arrayLayerCount = (u32)ctx->bitmap_count;
+		view_desc.arrayLayerCount = total_bitmap_layers;
 		view_desc.mipLevelCount = 1;
 		ctx->bitmap_tex_view = wgpuTextureCreateView(ctx->bitmap_tex, &view_desc);
 
@@ -1156,6 +1176,27 @@ static void create_pipelines(WebGPURenderContext* ctx)
 		assert(ctx->blend_subtract_pipeline != NULL);
 	}
 
+	// Premultiplied alpha (for attached BitmapData): One / OneMinusSrcAlpha
+	{
+		WGPUBlendState blend_premul = {0};
+		blend_premul.color.srcFactor = WGPUBlendFactor_One;
+		blend_premul.color.dstFactor = WGPUBlendFactor_OneMinusSrcAlpha;
+		blend_premul.color.operation = WGPUBlendOperation_Add;
+		blend_premul.alpha.srcFactor = WGPUBlendFactor_One;
+		blend_premul.alpha.dstFactor = WGPUBlendFactor_OneMinusSrcAlpha;
+		blend_premul.alpha.operation = WGPUBlendOperation_Add;
+
+		WGPUColorTargetState ct_premul = color_target;
+		ct_premul.blend = &blend_premul;
+		WGPUFragmentState fs_premul = frag_state;
+		fs_premul.targets = &ct_premul;
+
+		rp_desc.label = WGPU_LABEL("blend_premul_pipeline");
+		rp_desc.fragment = &fs_premul;
+		ctx->blend_premul_pipeline = wgpuDeviceCreateRenderPipeline(ctx->device, &rp_desc);
+		assert(ctx->blend_premul_pipeline != NULL);
+	}
+
 	wgpuShaderModuleRelease(vs_module);
 	wgpuShaderModuleRelease(fs_module);
 
@@ -1405,6 +1446,7 @@ void render_webgpu_open_pass(WebGPURenderContext* ctx)
 	ctx->dynamic_rect_count = 0;
 	ctx->dynamic_vertex_used = 0;
 	ctx->dynamic_gradient_used = 0;
+	ctx->dynamic_bitmap_used = 0;
 #ifdef HEADLESS_GRAPHICS
 	// Headless: use the persistent offscreen texture as resolve target
 	ctx->surface_view = ctx->offscreen_view;
@@ -1706,6 +1748,126 @@ void render_webgpu_draw_gradient_tris(WebGPURenderContext* ctx,
 	free(verts);
 
 	render_webgpu_draw_shape(ctx, vert_base, vertex_count, transform_id, cxform_id);
+}
+
+// ---------------------------------------------------------------------------
+// render_webgpu_draw_bitmap_quad — render an attached BitmapData as a textured quad
+// ---------------------------------------------------------------------------
+void render_webgpu_draw_bitmap_quad(WebGPURenderContext* ctx,
+	const uint32_t* argb_pixels, u32 bmp_width, u32 bmp_height,
+	float x_twips, float y_twips,
+	u32 transform_id, u32 cxform_id)
+{
+	if (!ctx->renderer_ok || argb_pixels == NULL) return;
+	if (bmp_width == 0 || bmp_height == 0) return;
+	if (ctx->dynamic_bitmap_used >= ctx->dynamic_bitmap_capacity) return;
+	if (bmp_width > ctx->dynamic_bitmap_max_w || bmp_height > ctx->dynamic_bitmap_max_h) return;
+	if (ctx->dynamic_vertex_used + 6 > MAX_DYNAMIC_VERTICES) return;
+
+	// Allocate a dynamic bitmap layer
+	u32 bmp_layer = ctx->dynamic_bitmap_base + ctx->dynamic_bitmap_used;
+	ctx->dynamic_bitmap_used++;
+
+	// Upload ARGB pixels as RGBA to the bitmap texture layer
+	{
+		u32 bw = (u32)(ctx->bitmap_highest_w + 1);
+		u32 bh = (u32)(ctx->bitmap_highest_h + 1);
+		size_t slice_bytes = bw * bh * 4;
+		u8* temp = (u8*)calloc(1, slice_bytes);
+
+		// Convert premultiplied ARGB to premultiplied RGBA with edge clamping.
+		// Keep premultiplied — renderer uses premultiplied alpha blend mode.
+		u32* dst = (u32*)temp;
+		for (u32 y = 0; y <= bmp_height; y++) {
+			u32 sy = (y < bmp_height) ? y : bmp_height - 1;
+			for (u32 x = 0; x <= bmp_width; x++) {
+				u32 sx = (x < bmp_width) ? x : bmp_width - 1;
+				u32 argb = argb_pixels[sy * bmp_width + sx];
+				// ARGB u32: A=bits31-24, R=bits23-16, G=bits15-8, B=bits7-0
+				u32 a = (argb >> 24) & 0xFF;
+				u32 r = (argb >> 16) & 0xFF;
+				u32 g = (argb >> 8) & 0xFF;
+				u32 b = argb & 0xFF;
+				// RGBA bytes on little-endian: R=byte0, G=byte1, B=byte2, A=byte3
+				dst[y * bw + x] = r | (g << 8) | (b << 16) | (a << 24);
+			}
+		}
+
+		WGPUTexelCopyTextureInfo dest = {0};
+		dest.texture = ctx->bitmap_tex;
+		dest.origin = (WGPUOrigin3D){0, 0, bmp_layer};
+		WGPUTexelCopyBufferLayout layout = {0};
+		layout.bytesPerRow = bw * 4;
+		layout.rowsPerImage = bh;
+		WGPUExtent3D extent = {bw, bh, 1};
+		wgpuQueueWriteTexture(ctx->queue, &dest, temp, slice_bytes, &layout, &extent);
+
+		// Upload bitmap_sizes for this layer — must match texture layer padded dimensions
+		// so the shader's UV mapping (inv_pos / padded) correctly addresses the data.
+		u32 sizes[2] = { bw, bh };
+		wgpuQueueWriteBuffer(ctx->queue, ctx->bitmap_sizes_buffer,
+			(uint64_t)bmp_layer * 2 * sizeof(u32), sizes, sizeof(sizes));
+
+		free(temp);
+	}
+
+	// Compute and upload inverse matrix for UV mapping (twips → pixel coordinates).
+	// Maps vertex position (x_twips, y_twips) → (0, 0) in bitmap space and
+	// (x_twips + w*20, y_twips + h*20) → (w, h) in bitmap space.
+	// Matrix: translate by (-x, -y) then scale by 1/20.
+	// Column-major 4x4: [sx, 0, 0, 0,  0, sy, 0, 0,  0, 0, 1, 0,  tx, ty, 0, 1]
+	u32 inv_mat_id = ctx->static_mat_count + MAX_DYNAMIC_GRADIENTS + (ctx->dynamic_bitmap_used - 1);
+	{
+		float sx = 1.0f / 20.0f;
+		float sy = 1.0f / 20.0f;
+		float tx = -x_twips / 20.0f;
+		float ty = -y_twips / 20.0f;
+		float inv_mat[16] = {
+			sx,   0.0f, 0.0f, 0.0f,
+			0.0f, sy,   0.0f, 0.0f,
+			0.0f, 0.0f, 1.0f, 0.0f,
+			tx,   ty,   0.0f, 1.0f
+		};
+		uint64_t mat_offset = (uint64_t)inv_mat_id * 16 * sizeof(float);
+		wgpuQueueWriteBuffer(ctx->queue, ctx->inv_mat_buffer, mat_offset,
+			inv_mat, 16 * sizeof(float));
+	}
+
+	// Generate 6 vertices (2 triangles) for the quad
+	// Vertex format: { float x, float y, u32 style_type, u32 style_id }
+	// style_type = 0x41 (clipped bitmap fill, no repeat)
+	// style_id = bitmap_layer_id (lower 16) | inv_mat_id (upper 16)
+	float w_twips = (float)bmp_width * 20.0f;
+	float h_twips = (float)bmp_height * 20.0f;
+
+	union { float f; u32 u; } x0, y0, x1, y1;
+	x0.f = x_twips;            y0.f = y_twips;
+	x1.f = x_twips + w_twips;  y1.f = y_twips + h_twips;
+
+	u32 sx = 0x41;  // clipped bitmap fill
+	u32 sy = (bmp_layer & 0xFFFF) | ((inv_mat_id & 0xFFFF) << 16);
+
+	u32 vert_base = ctx->dynamic_vertex_base + ctx->dynamic_vertex_used;
+	ctx->dynamic_vertex_used += 6;
+
+	u32 verts[6][4] = {
+		{ x0.u, y0.u, sx, sy },  // top-left
+		{ x1.u, y0.u, sx, sy },  // top-right
+		{ x0.u, y1.u, sx, sy },  // bottom-left
+		{ x1.u, y0.u, sx, sy },  // top-right
+		{ x1.u, y1.u, sx, sy },  // bottom-right
+		{ x0.u, y1.u, sx, sy },  // bottom-left
+	};
+
+	uint64_t byte_offset = (uint64_t)vert_base * 4 * sizeof(u32);
+	wgpuQueueWriteBuffer(ctx->queue, ctx->vertex_buffer,
+		byte_offset, verts, sizeof(verts));
+
+	// Switch to premultiplied alpha blending for bitmap rendering
+	wgpuRenderPassEncoderSetPipeline(ctx->render_pass, ctx->blend_premul_pipeline);
+	render_webgpu_draw_shape(ctx, vert_base, 6, transform_id, cxform_id);
+	// Restore normal blend pipeline
+	wgpuRenderPassEncoderSetPipeline(ctx->render_pass, ctx->render_pipeline);
 }
 
 // ---------------------------------------------------------------------------
@@ -2549,6 +2711,8 @@ void render_webgpu_free(SWFAppContext* app_context, WebGPURenderContext* ctx)
 		wgpuRenderPipelineRelease(ctx->stencil_write_pipeline);
 	if (ctx->stencil_test_pipeline)
 		wgpuRenderPipelineRelease(ctx->stencil_test_pipeline);
+	if (ctx->blend_premul_pipeline)
+		wgpuRenderPipelineRelease(ctx->blend_premul_pipeline);
 	if (ctx->compute_pipeline)
 		wgpuComputePipelineRelease(ctx->compute_pipeline);
 
