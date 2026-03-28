@@ -1,6 +1,29 @@
 # object_string_coerce_swf5 / object_string_coerce_swf6 Investigation
 <!-- TESTS: object_string_coerce_swf5, object_string_coerce_swf6 -->
 
+<!-- PLAN_META
+id: object_string_coerce
+status: complete
+phases:
+  - id: 1
+    name: "actionTrace calls toString on objects (fixed)"
+    status: complete
+  - id: 2
+    name: "Object.prototype.toString built-in (fixed)"
+    status: complete
+  - id: 3
+    name: "Prototype chain support (fixed)"
+    status: complete
+  - id: 4
+    name: "Add2 toString fallback when valueOf not found (fixed)"
+    status: complete
+  - id: 5
+    name: "objectCallValueOf handles valueOf=undefined (fixed)"
+    status: complete
+dependencies: []
+blockers: []
+-->
+
 ## Test Overview
 
 Both tests exercise object-to-string coercion in `trace()` and Add2 (`+` concat) with various

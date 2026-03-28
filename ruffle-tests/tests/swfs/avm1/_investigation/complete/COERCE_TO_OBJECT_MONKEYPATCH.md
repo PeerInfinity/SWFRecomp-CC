@@ -1,5 +1,12 @@
 # coerce_to_object_monkeypatch — Primitive-to-Object Coercion with Monkeypatched Constructors
 
+<!-- PLAN_META
+id: COERCE_TO_OBJECT_MONKEYPATCH
+status: complete
+dependencies: []
+blockers: []
+-->
+
 **Status**: 129/129 PASS
 **Category**: Primitive coercion / constructor lookup
 **Completed**: 2026-03-15

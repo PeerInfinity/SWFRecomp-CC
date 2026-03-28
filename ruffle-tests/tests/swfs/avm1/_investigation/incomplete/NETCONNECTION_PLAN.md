@@ -1,6 +1,28 @@
 # NetConnection Plan
 <!-- TESTS: netconnection_close, netconnection_send_remote -->
 
+<!-- PLAN_META
+id: NETCONNECTION
+status: not_started
+phases:
+  - id: 1
+    name: "NetConnection state machine (connect/close)"
+    status: not_started
+  - id: 2
+    name: "onStatus dispatch helper"
+    status: not_started
+  - id: 3
+    name: "Register real methods"
+    status: not_started
+  - id: 4
+    name: "netconnection_send_remote (AMF + HTTP)"
+    status: blocked
+dependencies: []
+blockers:
+  - blocker: 7
+    reason: "Phase 4 blocked on AMF codec + HTTP client infrastructure"
+-->
+
 Last updated: 2026-03-27
 
 ## Status: NOT STARTED — netconnection_close is actionable, netconnection_send_remote is blocked

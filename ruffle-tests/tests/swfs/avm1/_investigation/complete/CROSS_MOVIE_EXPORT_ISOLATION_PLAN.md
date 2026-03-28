@@ -1,6 +1,23 @@
 # Cross-Movie Export Table Isolation Plan
 <!-- TESTS: loadmovie_registerclass -->
 
+<!-- PLAN_META
+id: CROSS_MOVIE_EXPORT_ISOLATION
+status: complete
+phases:
+  - id: 1
+    name: "Character Dictionary (`dictionary[]` in tag.c)"
+    status: complete
+  - id: 2
+    name: "Export Symbol Registry (`ng_exported_symbols[]` in tag_stubs.c)"
+    status: complete
+dependencies:
+  - plan: LOADMOVIE
+    type: requires
+    reason: "Cross-movie export isolation requires loadMovie infrastructure"
+blockers: []
+-->
+
 Last updated: 2026-03-11
 
 ## Status: **COMPLETE** — loadmovie_registerclass 31/31 PASS

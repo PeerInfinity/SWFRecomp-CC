@@ -1,6 +1,42 @@
 # FLV Playback Plan
 <!-- TESTS: netstream_play_flv, netstream_seek_flv, netstream_play_flv_screen -->
 
+<!-- PLAN_META
+id: FLV_PLAYBACK
+status: blocked
+phases:
+  - id: 1
+    name: "FLV container demuxer"
+    status: not_started
+  - id: 2
+    name: "Video codec (Screen Video or Sorenson H.263)"
+    status: not_started
+  - id: 3
+    name: "NetStream state machine"
+    status: not_started
+  - id: 4
+    name: "onStatus/onMetaData dispatch"
+    status: not_started
+  - id: 5
+    name: "Video rendering"
+    status: not_started
+dependencies:
+  - plan: NETCONNECTION
+    phases: [2]
+    type: requires
+    reason: "onStatus dispatch infrastructure"
+  - plan: SOUND_LOADING
+    phases: [1]
+    type: requires
+    reason: "Data file embedding pattern"
+  - plan: BITMAPDATA_RENDERING
+    type: requires
+    reason: "Video frame display via bitmap textures"
+blockers:
+  - blocker: 7
+    reason: "Requires FLV demuxer and video codec implementation"
+-->
+
 Last updated: 2026-03-27
 
 ## Status: BLOCKED — Needs FLV demuxer + video codec + NetStream event infrastructure

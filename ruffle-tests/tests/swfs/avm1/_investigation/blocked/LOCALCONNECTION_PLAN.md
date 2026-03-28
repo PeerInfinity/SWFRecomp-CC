@@ -1,4 +1,27 @@
 <!-- TESTS: localconnection -->
+
+<!-- PLAN_META
+id: LOCALCONNECTION
+status: blocked
+phases:
+  - id: 1
+    name: "Core LocalConnection protocol"
+    status: not_started
+  - id: 2
+    name: "Message dispatch"
+    status: not_started
+  - id: 3
+    name: "Multi-SWF child loading"
+    status: blocked
+  - id: 4
+    name: "Advanced features (allowDomain, AMF, isPerUser)"
+    status: not_started
+dependencies: []
+blockers:
+  - blocker: 7
+    reason: "Child SWF loading, AVM2 execution, IPC protocol"
+-->
+
 # LocalConnection Plan
 
 ## Status: BLOCKED — requires full IPC protocol implementation + multi-SWF child loading

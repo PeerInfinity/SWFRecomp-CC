@@ -1,6 +1,26 @@
 # Mouse Events Implementation Plan
 <!-- TESTS: mouse_pos, mouse_pos_with_scale_factor, mouse_events, mouse_events_visible_enabled, click_block -->
 
+<!-- PLAN_META
+id: MOUSE_EVENTS
+status: complete
+phases:
+  - id: A
+    name: "_xmouse/_ymouse)"
+    status: complete
+  - id: B
+    name: "mouse_events)"
+    status: complete
+  - id: C
+    name: "_visible/_enabled)"
+    status: complete
+  - id: D
+    name: "click_block)"
+    status: complete
+dependencies: []
+blockers: []
+-->
+
 Last updated: 2026-02-25
 
 ## Status: COMPLETE — All 5 tests passing

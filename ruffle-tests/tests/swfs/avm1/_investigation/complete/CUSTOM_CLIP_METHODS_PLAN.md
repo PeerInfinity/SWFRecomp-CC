@@ -1,6 +1,13 @@
 # Custom Clip Methods Plan
 <!-- TESTS: custom_clip_methods -->
 
+<!-- PLAN_META
+id: CUSTOM_CLIP_METHODS
+status: complete
+dependencies: []
+blockers: []
+-->
+
 Last updated: 2026-03-06
 
 ## Status: COMPLETE — 4/4 (100%)

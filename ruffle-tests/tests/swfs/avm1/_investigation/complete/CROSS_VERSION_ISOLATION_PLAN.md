@@ -1,5 +1,34 @@
 # Cross-Version Isolation Plan
 
+<!-- PLAN_META
+id: CROSS_VERSION_ISOLATION
+status: complete
+phases:
+  - id: 1
+    name: "Child SWF Version Restoration —"
+    status: complete
+  - id: 2
+    name: "Per-Version Global Object —"
+    status: complete
+  - id: 3
+    name: "Per-Function SWF Version Tracking — PARTIALLY"
+    status: complete
+  - id: 4
+    name: "DoInitAction Context for Child SWFs —"
+    status: complete
+  - id: 5
+    name: "RegisterClass in Child SWFs (Small)"
+    status: complete
+  - id: 6
+    name: "Variable Clearing on Reload —"
+    status: complete
+dependencies:
+  - plan: SWF_VERSION_SEMANTICS
+    type: requires
+    reason: "Cross-version isolation extends version semantics"
+blockers: []
+-->
+
 ## Overview
 
 When multiple SWFs of different versions are loaded together (via `loadMovie`, `loadMovieNum`, `MovieClipLoader`), each SWF version should get version-appropriate behavior. This requires three interconnected features:

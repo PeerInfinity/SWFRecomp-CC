@@ -1,5 +1,20 @@
 # Math Object Implementation Plan
 <!-- TESTS: math_min_max, math_swf6, math_swf7, math_swf8 -->
+
+<!-- PLAN_META
+id: MATH
+status: complete
+phases:
+  - id: 1
+    name: "Core Math object (2026-02-15)"
+    status: complete
+  - id: 2
+    name: "ASnative(200, index) dispatch (2026-02-20)"
+    status: complete
+dependencies: []
+blockers: []
+-->
+
 <!-- NOTE: asnative test is partially improved by this plan (class 200 only) but not fully fixed -->
 
 Last updated: 2026-02-20

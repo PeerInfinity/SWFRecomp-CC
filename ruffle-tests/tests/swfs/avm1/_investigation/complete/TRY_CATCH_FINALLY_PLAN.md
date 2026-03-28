@@ -1,6 +1,13 @@
 # Try/Catch/Finally Implementation Plan
 <!-- TESTS: try_finally_simple, catch_references_registers, uncaught_exception, uncaught_exception_bubbled, try_catch_finally -->
 
+<!-- PLAN_META
+id: TRY_CATCH_FINALLY
+status: complete
+dependencies: []
+blockers: []
+-->
+
 Last updated: 2026-02-20
 
 ## Status: COMPLETE — All 5 tests PASS (120/120 lines)

@@ -1,5 +1,25 @@
 # Plan 05: BitmapData Rendering & External Media
 
+<!-- PLAN_META
+id: PLAN_05_BITMAP_AND_MEDIA
+status: complete
+phases:
+  - id: 1
+    name: "fillRect Only"
+    status: complete
+  - id: 2
+    name: "copyPixels + colorTransform"
+    status: complete
+  - id: 3
+    name: "Procedural Operations"
+    status: complete
+dependencies:
+  - plan: PLAN_03_DRAWING_API
+    type: requires
+    reason: "Bitmap rendering builds on drawing API infrastructure"
+blockers: []
+-->
+
 **Priority**: Low — large effort, specialized features
 **Tests unlocked**:
 - BitmapData (6 tests): `bitmap_data_fillrect`, `bitmap_data_copypixels`, `bitmap_data_colortransform`, `bitmap_data_perlinnoise`, `bitmap_data_pixeldissolve_image`, `bitmapdata_applyfilter_colormatrix`

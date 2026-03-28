@@ -1,6 +1,16 @@
 # EditText Drag Selection Plan
 <!-- TESTS: edittext_drag_select -->
 
+<!-- PLAN_META
+id: EDITTEXT_DRAG_SELECT
+status: complete
+dependencies:
+  - plan: SELECTION
+    type: requires
+    reason: "Drag selection depends on Selection API"
+blockers: []
+-->
+
 Last updated: 2026-03-28
 
 ## Status: NOT STARTED

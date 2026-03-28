@@ -1,6 +1,24 @@
 # Advanced Type Coercion / instanceof Plan
 <!-- TESTS: coerce_to_object_monkeypatch, instanceof_coercions -->
 
+<!-- PLAN_META
+id: TYPE_COERCION_ADVANCED
+status: blocked
+phases:
+  - id: 1
+    name: "tryAutoBoxPrimitive() primitive boxing"
+    status: complete
+  - id: 2
+    name: "instanceOfCoercing() instanceof/CastOp coercion"
+    status: complete
+  - id: 3
+    name: "Object.addProperty as built-in"
+    status: complete
+dependencies: []
+blockers:
+  - reason: "coerce_to_object_monkeypatch blocked on closure variable capture (heap-allocated activation scopes)"
+-->
+
 Last updated: 2026-03-13
 
 ## Status: BLOCKED — 1/2 PASS, remaining test blocked on heap-allocated activation scopes

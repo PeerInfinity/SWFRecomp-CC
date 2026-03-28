@@ -1,5 +1,15 @@
 # HTML Text Remaining Work
 
+<!-- PLAN_META
+id: HTML_TEXT_REMAINING_WORK
+status: complete
+dependencies:
+  - plan: TEXTFIELD
+    type: requires
+    reason: "HTML text serialization depends on TextField infrastructure"
+blockers: []
+-->
+
 ## Status: COMPLETE — All 10 tests PASS
 
 | Test | Total Lines | Diff Lines | Status |

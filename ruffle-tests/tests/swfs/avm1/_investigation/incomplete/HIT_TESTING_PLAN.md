@@ -1,6 +1,37 @@
 # Hit Testing Implementation Plan
 <!-- TESTS: hittest_lockroot, hittest_morph, hittest_morph_input, hittest_winding_rule, text_blocks_clicks, movieclip_hittest, movieclip_hittest_shapeflag, local_to_global, movieclip_getbounds, movieclip_invalid_get_bounds_1, movieclip_invalid_get_bounds_2, movieclip_invalid_get_bounds_3, movieclip_invalid_get_bounds_4, movieclip_invalid_get_bounds_5, movieclip_invalid_get_bounds_6, movieclip_invalid_get_bounds_7, movieclip_invalid_get_bounds_8 -->
 
+<!-- PLAN_META
+id: HIT_TESTING
+status: blocked
+phases:
+  - id: 1
+    name: "localToGlobal / globalToLocal"
+    status: complete
+  - id: 2
+    name: "Shape bounds in NO_GRAPHICS mode"
+    status: complete
+  - id: 3
+    name: "getBounds / getRect"
+    status: complete
+  - id: 4
+    name: "hitTest(x, y, shapeFlag=false)"
+    status: complete
+  - id: 5
+    name: "hitTest(clip) / hitTest(stringPath)"
+    status: complete
+  - id: 6
+    name: "hitTest(x, y, shapeFlag=true)"
+    status: complete
+  - id: 7
+    name: "Morph input hit testing"
+    status: complete
+dependencies: []
+blockers:
+  - blocker: 5
+    reason: "Pixel-level shape hit testing limitations (device fonts, curve/stroke precision)"
+-->
+
 Last updated: 2026-03-14
 
 ## Status: BLOCKED — 13/17 PASS (remaining need vector-path hit testing, loadMovie bounds, or droptarget precision)

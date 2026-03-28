@@ -1,6 +1,27 @@
 # From-Gnash Dejagnu Test Framework — Implementation Plan
 <!-- TESTS: -->
 
+<!-- PLAN_META
+id: FROM_GNASH_DEJAGNU
+status: incomplete
+phases:
+  - id: 1
+    name: "actionscript.all Dejagnu framework"
+    status: incomplete
+  - id: 2
+    name: "misc-mtasc typeof fix"
+    status: incomplete
+  - id: 3
+    name: "misc-ming / misc-swfc init action ordering"
+    status: blocked
+  - id: 4
+    name: "misc-swfmill.all"
+    status: incomplete
+dependencies: []
+blockers:
+  - reason: "misc-ming/misc-swfc blocked on DoInitAction ordering for inlined Dejagnu"
+-->
+
 Last updated: 2026-03-16
 
 ## Status: MAJOR PROGRESS — Dejagnu framework working, 82-92% pass rate on initial tests

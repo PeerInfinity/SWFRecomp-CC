@@ -2,6 +2,35 @@
 
 <!-- TESTS: register_class_return_value, register_class, register_class_swf6, register_class_with_sound, register_and_init_order, register_globals_across_frames, register_underflow, attach_movie, attach_movie_stop, export_assets, clip_constructors, on_construct, movieclip_init_object, empty_movieclip_can_attach_movies, do_init_action_child -->
 
+<!-- PLAN_META
+id: REGISTERCLASS
+status: complete
+phases:
+  - id: 0
+    name: "VM Register Fixes —"
+    status: complete
+  - id: 1
+    name: "ExportAssets Parsing —"
+    status: complete
+  - id: 2
+    name: "attachMovie Implementation —"
+    status: complete
+  - id: 3
+    name: "Object.registerClass —"
+    status: complete
+  - id: 4
+    name: "Constructor Invocation —"
+    status: complete
+  - id: 5
+    name: "DoInitAction Ordering + on(construct) —"
+    status: complete
+dependencies:
+  - plan: THIS_BINDING
+    type: requires
+    reason: "registerClass requires constructor call infrastructure via this binding"
+blockers: []
+-->
+
 Last updated: 2026-03-11
 Status: **BLOCKED** — moved to blocked/
 

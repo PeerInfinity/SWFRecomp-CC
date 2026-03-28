@@ -1,6 +1,26 @@
 # BitmapData.pixelDissolve() Implementation Plan
 <!-- TESTS: bitmap_data_pixeldissolve_image (image) -->
 
+<!-- PLAN_META
+id: BITMAPDATA_PIXELDISSOLVE
+status: not_started
+phases:
+  - id: 1
+    name: "Argument validation and extraction"
+    status: not_started
+  - id: 2
+    name: "Feistel PRNG"
+    status: not_started
+  - id: 3
+    name: "Pixel iteration"
+    status: not_started
+  - id: 4
+    name: "Pixel writing"
+    status: not_started
+dependencies: []
+blockers: []
+-->
+
 Last updated: 2026-03-28
 
 ## Status: NOT STARTED

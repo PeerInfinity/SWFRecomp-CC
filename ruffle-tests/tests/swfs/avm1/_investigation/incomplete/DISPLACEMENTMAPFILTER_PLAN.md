@@ -1,4 +1,23 @@
 <!-- TESTS: displacementmapfilter_mappoint_throw_error -->
+
+<!-- PLAN_META
+id: DISPLACEMENTMAPFILTER
+status: blocked
+phases:
+  - id: 1
+    name: "Native property setter for mapPoint"
+    status: not_started
+  - id: 2
+    name: "valueOf error propagation"
+    status: not_started
+  - id: 3
+    name: "toString for Point display"
+    status: not_started
+dependencies: []
+blockers:
+  - reason: "Requires native property setter with valueOf coercion and try/catch error propagation"
+-->
+
 # DisplacementMapFilter mapPoint Setter Plan
 
 ## Status: BLOCKED — requires native property setter with valueOf coercion and try/catch integration

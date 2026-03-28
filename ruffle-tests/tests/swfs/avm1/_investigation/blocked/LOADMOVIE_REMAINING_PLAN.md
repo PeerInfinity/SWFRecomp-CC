@@ -1,6 +1,31 @@
 # LoadMovie Remaining Tests Plan
 <!-- TESTS: loadmovie_var_persistence, loadmovienum_cross_version_prototype, mcl_events_swf_version, movieclip_state_values, movieclip_library_state_values -->
 
+<!-- PLAN_META
+id: LOADMOVIE_REMAINING
+status: blocked
+phases:
+  - id: 1
+    name: "Recompiler nested function ordering"
+    status: complete
+  - id: 2
+    name: "objectToPrimitive ASArray crash fix"
+    status: complete
+  - id: 3
+    name: "Deferred unloadMovie state"
+    status: complete
+  - id: 4
+    name: "Per-MC byte_size tracking"
+    status: complete
+  - id: 5
+    name: "SWF_URL test name inclusion"
+    status: complete
+dependencies: []
+blockers:
+  - blocker: 6
+    reason: "movieclip_state_values blocked on image decoding (JPEG via loadMovie)"
+-->
+
 Last updated: 2026-03-13
 
 ## Status: BLOCKED — 3/5 tests passing, 2 remaining permanently blocked

@@ -1,5 +1,12 @@
 # unload_nested_child — Deferred Unload Timing
 
+<!-- PLAN_META
+id: UNLOAD_NESTED_CHILD
+status: complete
+dependencies: []
+blockers: []
+-->
+
 **Status**: COMPLETE — 5/5 PASS
 **Fix commit**: 180bb81b (Defer UNLOAD clip actions during catch_up_mode)
 

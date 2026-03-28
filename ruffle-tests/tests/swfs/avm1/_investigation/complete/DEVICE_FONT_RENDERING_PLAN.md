@@ -1,6 +1,13 @@
 # Device Font Rendering Plan
 <!-- TESTS: edittext_tag_indent, edittext_stylesheet, and any future test using device fonts -->
 
+<!-- PLAN_META
+id: DEVICE_FONT_RENDERING
+status: complete
+dependencies: []
+blockers: []
+-->
+
 Last updated: 2026-03-28
 
 ## Status: IMPLEMENTED (581e91f2)

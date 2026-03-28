@@ -1,6 +1,32 @@
 # Script Halting on Clip Removal Plan
 <!-- TESTS: removed_clip_halts_script, target_clip_removed -->
 
+<!-- PLAN_META
+id: SCRIPT_HALTING
+status: complete
+phases:
+  - id: 1
+    name: "avm1_removed flag + actionBaseClipRemoved("
+    status: complete
+  - id: 2
+    name: "SetTarget(\"\") keeps dead base clip"
+    status: complete
+  - id: 3
+    name: "ng_executeGotoTagsOnly("
+    status: complete
+  - id: 4
+    name: "Outer retry loop for deferred-triggered gotos"
+    status: complete
+  - id: 5
+    name: "Recompiler loop-back guard"
+    status: complete
+dependencies:
+  - plan: MC_REMOVAL_LIFECYCLE
+    type: requires
+    reason: "Script halting on removed MCs requires removal tracking"
+blockers: []
+-->
+
 Last updated: 2026-03-07
 
 ## Status: COMPLETE

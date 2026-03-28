@@ -1,6 +1,47 @@
 # BitmapData Rendering Plan
 <!-- TESTS: bitmap_data_colortransform, bitmap_data_copypixels, bitmap_data_fillrect, bitmap_data_perlinnoise, bitmap_data_pixeldissolve_image, bitmapdata_applyfilter_colormatrix -->
 
+<!-- PLAN_META
+id: BITMAPDATA_RENDERING
+status: incomplete
+phases:
+  - id: 1
+    name: "Dynamic bitmap texture layer allocation"
+    status: complete
+  - id: 2
+    name: "render_webgpu_draw_bitmap_quad() function"
+    status: complete
+  - id: 3
+    name: "actionIterateAttachedBitmaps() callback system"
+    status: complete
+  - id: 4
+    name: "tag.c rendering hook"
+    status: complete
+  - id: 5
+    name: "MovieClip struct extension"
+    status: complete
+  - id: 6
+    name: "Premultiplied alpha blend pipeline"
+    status: complete
+  - id: 7
+    name: "Implement missing BitmapData methods"
+    status: blocked
+  - id: 8
+    name: "Fix precision issue for bitmap_data_fillrect"
+    status: not_started
+dependencies:
+  - plan: BITMAPDATA_PERLINNOISE
+    type: requires
+    reason: "perlinNoise stub needed for rendering tests"
+  - plan: BITMAPDATA_APPLYFILTER
+    type: requires
+    reason: "applyFilter stub needed for rendering tests"
+  - plan: BITMAPDATA_PIXELDISSOLVE
+    type: requires
+    reason: "pixelDissolve stub needed for rendering tests"
+blockers: []
+-->
+
 Last updated: 2026-03-28
 
 ## Status: IN PROGRESS — GPU pipeline implemented, blocked by unimplemented BitmapData methods

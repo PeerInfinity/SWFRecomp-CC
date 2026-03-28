@@ -1,6 +1,29 @@
 # TextSnapshot Implementation Plan
 <!-- TESTS: textsnapshot_gettext, textsnapshot_findtext, textsnapshot_available_text, textsnapshot_text_order -->
 
+<!-- PLAN_META
+id: TEXTSNAPSHOT
+status: complete
+phases:
+  - id: 0
+    name: "Recompiler — Emit Character Codes"
+    status: complete
+  - id: 1
+    name: "Runtime — TextSnapshot Content Capture"
+    status: complete
+  - id: 2
+    name: "Core Methods"
+    status: complete
+  - id: 3
+    name: "Dynamic Text (duplicateMovieClip"
+    status: complete
+dependencies:
+  - plan: TEXTFIELD
+    type: requires
+    reason: "TextSnapshot reads TextField content"
+blockers: []
+-->
+
 Last updated: 2026-03-04
 
 ## Status: COMPLETE — All 4 tests PASS (CI confirmed, commit 94c64bbe)

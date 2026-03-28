@@ -1,6 +1,38 @@
 # OOP / Super / Extends / Interfaces Implementation Plan
 <!-- TESTS: as2_oop, as2_super_and_this_v6, as2_super_and_this_v8, as2_super_via_manual_prototype, extends_chain, extends_native_type, super_edge_cases, interface_implements_op -->
 
+<!-- PLAN_META
+id: OOP_SUPER_EXTENDS
+status: complete
+phases:
+  - id: 1
+    name: "Fix ImplementsOp and InstanceOf for ASFunction Types"
+    status: complete
+  - id: 2
+    name: "Add __constructor__ in actionExtends"
+    status: complete
+  - id: 3
+    name: "Super Context Tracking Infrastructure"
+    status: complete
+  - id: 4
+    name: "Super for DefineFunction2 (Preload Super + Arguments Pattern)"
+    status: complete
+  - id: 5
+    name: "Super for DefineFunction / SWF6 (Pattern A)"
+    status: complete
+  - id: 6
+    name: "Edge Cases and Remaining Tests"
+    status: complete
+dependencies:
+  - plan: THIS_BINDING
+    type: requires
+    reason: "super/extends requires correct this binding"
+  - plan: CALL_SEMANTICS
+    type: requires
+    reason: "super calls depend on call/apply semantics"
+blockers: []
+-->
+
 Last updated: 2026-03-07
 
 ## Status: 7/8 PASS — interface_implements_op regressed (46/47, was 47/47)

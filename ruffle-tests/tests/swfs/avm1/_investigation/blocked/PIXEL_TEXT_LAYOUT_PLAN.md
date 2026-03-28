@@ -1,6 +1,30 @@
 # Pixel-Level Text Layout Plan
 <!-- TESTS: edittext_drag_select, asfunction, edittext_ime_focus_lost -->
 
+<!-- PLAN_META
+id: PIXEL_TEXT_LAYOUT
+status: not_started
+phases:
+  - id: 0
+    name: "Character layout engine (prerequisite)"
+    status: not_started
+  - id: 1
+    name: "asfunction handler"
+    status: not_started
+  - id: 2
+    name: "Drag selection"
+    status: not_started
+  - id: 3
+    name: "IME composition"
+    status: not_started
+dependencies:
+  - plan: CREATETEXTFIELD_RENDERING
+    phases: [3]
+    type: requires
+    reason: "Glyph rendering pipeline needed for character layout"
+blockers: []
+-->
+
 Last updated: 2026-03-27
 
 ## Status: NOT STARTED — Blocked on character layout engine (shared prerequisite)

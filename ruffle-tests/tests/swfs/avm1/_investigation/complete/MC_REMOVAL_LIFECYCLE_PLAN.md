@@ -1,5 +1,31 @@
 # MC Removal Lifecycle Plan
 
+<!-- PLAN_META
+id: MC_REMOVAL_LIFECYCLE
+status: complete
+phases:
+  - id: 1
+    name: "base_clip Removal Detection ("
+    status: complete
+  - id: 2
+    name: "_parent Resolution on Removed MCs (PARTIAL)"
+    status: complete
+  - id: 3
+    name: "Path Resolution with Removed MCs ("
+    status: complete
+  - id: 4
+    name: "SetTarget with Removed MCs (PARTIAL)"
+    status: complete
+  - id: 5
+    name: "Unload Handler Timing ("
+    status: complete
+dependencies:
+  - plan: MOVIECLIP
+    type: requires
+    reason: "Removal depends on MC lifecycle tracking"
+blockers: []
+-->
+
 ## Status: BLOCKED
 
 **Last updated:** 2026-03-03

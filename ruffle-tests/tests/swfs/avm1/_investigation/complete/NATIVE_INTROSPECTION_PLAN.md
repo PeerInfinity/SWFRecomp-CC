@@ -1,6 +1,35 @@
 # Native Object/Function Introspection Implementation Plan
 <!-- TESTS: native_objects_swf6, native_objects_swf7, native_objects_swf8, native_subclasses, native_double_construct, as2_oop, as2_super_and_this_v6, as2_super_and_this_v8, extends_chain, extends_native_type, super_edge_cases, as2_super_via_manual_prototype, globals_swf5, globals_swf6, globals_swf7, globals_swf8, bitmap_filters -->
 
+<!-- PLAN_META
+id: NATIVE_INTROSPECTION
+status: complete
+phases:
+  - id: 0
+    name: "Fix Zero-Output Crash in native_objects Tests —"
+    status: complete
+  - id: 1
+    name: "Register Missing Stub Constructors —"
+    status: complete
+  - id: 2
+    name: "Native Backing + __initializeNative Detection —"
+    status: complete
+  - id: 3
+    name: "super() Call Mechanism — **"
+    status: complete
+  - id: 4
+    name: "Double-Construct Protection — **"
+    status: complete
+  - id: 5
+    name: "Class-Specific Constructor Properties — **"
+    status: complete
+dependencies:
+  - plan: PROTOTYPE_OBJECT
+    type: requires
+    reason: "Native introspection requires prototype chain setup"
+blockers: []
+-->
+
 Last updated: 2026-03-05
 
 ## Overview

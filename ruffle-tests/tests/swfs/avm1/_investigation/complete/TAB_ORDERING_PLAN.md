@@ -1,6 +1,16 @@
 # Tab Ordering Implementation Plan
 <!-- TESTS: tab_ordering_automatic_basic, tab_ordering_automatic_order_grid, tab_ordering_automatic_order_same_position, tab_ordering_children, tab_ordering_custom_basic, tab_ordering_custom_duplicate_index, tab_ordering_custom_i32_vs_u32, tab_ordering_custom_m1, tab_ordering_events, tab_ordering_events_mouse, tab_ordering_movieclip_enabled_default, tab_ordering_reverse, tab_ordering_tabbable, edittext_tab_focus, focusrect_swf5, focusrect_swf6 -->
 
+<!-- PLAN_META
+id: TAB_ORDERING
+status: complete
+dependencies:
+  - plan: FOCUS_SYSTEM
+    type: requires
+    reason: "Tab ordering depends on focus management system"
+blockers: []
+-->
+
 Last updated: 2026-03-07
 
 ## Status: COMPLETE — 16/16 PASS

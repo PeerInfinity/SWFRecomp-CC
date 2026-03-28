@@ -1,6 +1,23 @@
 # Parsing Functions (parseInt/parseFloat) Implementation Plan
 <!-- TESTS: parse_int, parse_float, arguments -->
 
+<!-- PLAN_META
+id: PARSING_FUNCTIONS
+status: complete
+phases:
+  - id: 1
+    name: "Fix `arguments` Object for DefineFunction"
+    status: complete
+  - id: 2
+    name: "Fix parseInt Edge Cases"
+    status: complete
+  - id: 3
+    name: "Rewrite parseFloat"
+    status: complete
+dependencies: []
+blockers: []
+-->
+
 Last updated: 2026-02-26
 
 ## Status: COMPLETE (3/3 tests PASS)

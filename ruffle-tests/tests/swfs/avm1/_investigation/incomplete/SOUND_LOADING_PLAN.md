@@ -1,6 +1,26 @@
 # Sound Loading Plan
 <!-- TESTS: sound_load_start, sound_multiple_load -->
 
+<!-- PLAN_META
+id: SOUND_LOADING
+status: not_started
+phases:
+  - id: 1
+    name: "loadSound() with embedded data"
+    status: not_started
+  - id: 2
+    name: "onLoad callback dispatch"
+    status: not_started
+  - id: 3
+    name: "Sound playback simulation (onSoundComplete)"
+    status: not_started
+  - id: 4
+    name: "Integrate with frame loop"
+    status: not_started
+dependencies: []
+blockers: []
+-->
+
 Last updated: 2026-03-27
 
 ## Status: NOT STARTED — Actionable (MP3 decoder and data embedding exist)

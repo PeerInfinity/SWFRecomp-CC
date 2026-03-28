@@ -1,6 +1,23 @@
 # infinite_recursion_function Tests Investigation
 <!-- TESTS: infinite_recursion_function, infinite_recursion_function_in_setter, infinite_recursion_virtual_property -->
 
+<!-- PLAN_META
+id: infinite_recursion_function
+status: complete
+phases:
+  - id: 1
+    name: "infinite_recursion_function"
+    status: complete
+  - id: 2
+    name: "infinite_recursion_function_in_setter"
+    status: complete
+  - id: 3
+    name: "infinite_recursion_virtual_property"
+    status: complete
+dependencies: []
+blockers: []
+-->
+
 Three related tests exercise recursion depth limiting in different scenarios.
 
 ## 1. infinite_recursion_function

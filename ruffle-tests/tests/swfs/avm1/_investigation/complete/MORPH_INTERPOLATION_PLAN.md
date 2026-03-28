@@ -1,6 +1,26 @@
 # Morph Shape Interpolation Plan
 <!-- TESTS: hittest_morph -->
 
+<!-- PLAN_META
+id: MORPH_INTERPOLATION
+status: complete
+phases:
+  - id: 1
+    name: "End bounds extraction (recompiler)"
+    status: complete
+  - id: 2
+    name: "Interpolated bounds lookup"
+    status: complete
+  - id: 3
+    name: "Interpolated shape hit testing"
+    status: complete
+dependencies:
+  - plan: PLAN_01_RUNTIME_TRANSFORMS
+    type: requires
+    reason: "Morph rendering depends on transform pipeline"
+blockers: []
+-->
+
 Last updated: 2026-02-26
 
 ## Status: COMPLETE — 1/1 test PASS

@@ -1,6 +1,32 @@
 # With Statement Scope Implementation Plan
 <!-- TESTS: with, with_variable_scopes, define_local, this_scoping, closure_scope -->
 
+<!-- PLAN_META
+id: WITH_SCOPE
+status: complete
+phases:
+  - id: 1
+    name: "Distinguish function scopes from with scopes"
+    status: complete
+  - id: 2
+    name: "MovieClip identity in scope chain"
+    status: complete
+  - id: 3
+    name: "with(undefined/null) skip"
+    status: complete
+  - id: 4
+    name: "addProperty getters in scope chain lookup"
+    status: complete
+  - id: 5
+    name: "Primitive wrapping (string/number/boolean)"
+    status: complete
+  - id: Dependencies
+    name: "```"
+    status: complete
+dependencies: []
+blockers: []
+-->
+
 Last updated: 2026-02-22
 
 ## Status: ALL PHASES (1-5) COMPLETE

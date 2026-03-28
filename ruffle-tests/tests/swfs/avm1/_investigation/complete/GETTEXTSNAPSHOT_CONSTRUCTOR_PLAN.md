@@ -1,6 +1,23 @@
 # getTextSnapshot User Constructor Plan
 <!-- TESTS: movieclip_gettextsnapshot -->
 
+<!-- PLAN_META
+id: GETTEXTSNAPSHOT_CONSTRUCTOR
+status: complete
+phases:
+  - id: 1
+    name: "Invoke user constructor"
+    status: complete
+  - id: 2
+    name: "Dynamically created MC support"
+    status: complete
+  - id: 3
+    name: "Child MC context"
+    status: complete
+dependencies: []
+blockers: []
+-->
+
 Last updated: 2026-03-06
 
 ## Status: COMPLETE — movieclip_gettextsnapshot 112/112 PASS

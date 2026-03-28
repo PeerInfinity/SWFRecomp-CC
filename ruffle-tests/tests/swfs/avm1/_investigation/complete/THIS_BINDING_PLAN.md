@@ -1,6 +1,32 @@
 # This Binding Implementation Plan
 <!-- TESTS: this_swf5, this_swf6, this_scoping, mutable_this, swf5_no_closure -->
 
+<!-- PLAN_META
+id: THIS_BINDING
+status: complete
+phases:
+  - id: 1
+    name: "Set `this` on type 1 function local scope in `actionCallFunction`"
+    status: complete
+  - id: 2
+    name: "Set `this` on type 1 function local scope in `actionCallMethod`"
+    status: complete
+  - id: 3
+    name: "Fix `this` resolution in `actionGetVariable` for root context"
+    status: complete
+  - id: 4
+    name: "Fix MC dynamic_props method call path"
+    status: complete
+  - id: 5
+    name: "Fix `this` scoping in WITH blocks (this_scoping)"
+    status: complete
+  - id: 6
+    name: "Fix gotoAndStop via string path (this_scoping)"
+    status: complete
+dependencies: []
+blockers: []
+-->
+
 Last updated: 2026-02-27
 
 ## Status: FULLY COMPLETE — 5/5 tests passing ✅

@@ -1,6 +1,38 @@
 # Object.watch / Object.unwatch Implementation Plan
 <!-- TESTS: watch, watch_textfield, watch_virtual_property, watch_virtual_property_proto -->
 
+<!-- PLAN_META
+id: OBJECT_WATCH
+status: complete
+phases:
+  - id: 1
+    name: "Recursive watch prevention"
+    status: complete
+  - id: 2
+    name: "Exception handling in callback"
+    status: complete
+  - id: 3
+    name: "`this` context for watch callbacks"
+    status: complete
+  - id: 4
+    name: "Boolean return encoding"
+    status: complete
+  - id: 5
+    name: "Watch survives `delete`"
+    status: complete
+  - id: 6
+    name: "Property name case sensitivity"
+    status: complete
+  - id: 7
+    name: "Virtual property interaction (low priority)"
+    status: complete
+dependencies:
+  - plan: CALL_SEMANTICS
+    type: requires
+    reason: "Object.watch callbacks depend on call semantics"
+blockers: []
+-->
+
 Last updated: 2026-02-27
 
 ## Status: PHASE 2 COMPLETE (4/4 tests passing)

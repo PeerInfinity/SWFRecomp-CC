@@ -1,6 +1,58 @@
 # LoadMovie / Multi-SWF Infrastructure — Implementation Plan
 <!-- TESTS: issue_2870, cross_movie_root -->
 
+<!-- PLAN_META
+id: LOADMOVIE_MULTI_SWF
+status: blocked
+phases:
+  - id: 0
+    name: "Child SWF discovery and compilation"
+    status: complete
+  - id: 1
+    name: "_level management"
+    status: complete
+  - id: 2
+    name: "Core loadMovie"
+    status: complete
+  - id: 3
+    name: "actionGetURL2 routing"
+    status: complete
+  - id: 4
+    name: "MovieClipLoader class"
+    status: complete
+  - id: 5
+    name: "unloadMovie"
+    status: complete
+  - id: 7
+    name: "loadVariables"
+    status: complete
+  - id: 8
+    name: "Failed load state"
+    status: complete
+  - id: 10
+    name: "Sequential MCL dispatch"
+    status: complete
+  - id: 11
+    name: "Child RegisterClass"
+    status: complete
+  - id: 12
+    name: "Root button mode / mouse events"
+    status: complete
+  - id: 13
+    name: "_root scope in loaded SWFs"
+    status: complete
+  - id: 14
+    name: "MCL loadClip replace root"
+    status: complete
+  - id: 15
+    name: "MCL root replace cross-version"
+    status: complete
+dependencies: []
+blockers:
+  - blocker: 6
+    reason: "Remaining tests blocked on image loading via loadMovie"
+-->
+
 Last updated: 2026-03-13
 
 **Goal**: Close the remaining gaps in multi-SWF support.

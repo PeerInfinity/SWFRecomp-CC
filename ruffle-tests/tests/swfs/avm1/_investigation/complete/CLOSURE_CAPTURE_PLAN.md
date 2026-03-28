@@ -1,6 +1,13 @@
 # Closure Variable Capture Plan
 <!-- TESTS: focus_keyboard_press, focus_mouse, focus_mouse_rollout, swf5_no_closure -->
 
+<!-- PLAN_META
+id: CLOSURE_CAPTURE
+status: complete
+dependencies: []
+blockers: []
+-->
+
 Last updated: 2026-02-24
 
 ## Status: CLOSURE FIX COMPLETE — remaining test failures blocked on other systems

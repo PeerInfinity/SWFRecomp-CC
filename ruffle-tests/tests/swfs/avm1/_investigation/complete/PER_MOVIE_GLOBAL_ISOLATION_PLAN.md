@@ -1,5 +1,12 @@
 # Per-Movie `_global` Isolation Plan
 
+<!-- PLAN_META
+id: PER_MOVIE_GLOBAL_ISOLATION
+status: complete
+dependencies: []
+blockers: []
+-->
+
 ## Status: COMPLETE
 
 **Score**: `global_swf5_6_7_8_9` — **1145/1145 PASS**

@@ -1,6 +1,16 @@
 # TextField.StyleSheet Implementation Plan
 <!-- TESTS: edittext_stylesheet -->
 
+<!-- PLAN_META
+id: STYLESHEET
+status: complete
+dependencies:
+  - plan: TEXTFIELD
+    type: requires
+    reason: "StyleSheet applies to TextFields"
+blockers: []
+-->
+
 Last updated: 2026-03-04
 
 ## Status: COMPLETE — edittext_stylesheet 326/326 PASS

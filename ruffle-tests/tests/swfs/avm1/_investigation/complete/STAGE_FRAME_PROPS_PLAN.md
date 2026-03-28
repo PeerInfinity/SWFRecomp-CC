@@ -2,6 +2,38 @@
 
 <!-- TESTS: stage_property_representation, frame_size_translated_positive, frame_size_translated_negative, stage_scale_mode, stage_display_state, stage_object_properties, stage_object_properties_swf6, stage_object_enumerate, stage_object_children -->
 
+<!-- PLAN_META
+id: STAGE_FRAME_PROPS
+status: complete
+phases:
+  - id: Plan
+    name: "### Phase 1: Fix actionSetProperty F64 bug (Priority: HIGHEST)"
+    status: complete
+  - id: 2
+    name: "Shape bounds in trace mode"
+    status: complete
+  - id: 3
+    name: "Content bounds for `_root._width`/`_height` and sprites"
+    status: complete
+  - id: 4
+    name: "Extract rotation/scale from PlaceObject transform matrix"
+    status: complete
+  - id: 5
+    name: "Stage object properties initialization and normalization"
+    status: complete
+  - id: 6
+    name: "Sprite context tracking for GetProperty/SetProperty"
+    status: complete
+  - id: 7
+    name: "`_visible` returns boolean not float"
+    status: complete
+  - id: 8
+    name: "Stage children enumeration"
+    status: complete
+dependencies: []
+blockers: []
+-->
+
 Last updated: 2026-02-28
 
 ## Status: ALL PHASES COMPLETE — 9/9 tests PASS

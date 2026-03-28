@@ -1,6 +1,32 @@
 # Root Replacement Plan (loadMovie into _root/_level0)
 <!-- TESTS: loadmovie_replace_root, mcl_loadclip_replace_root, mcl_replace_root_swf7_to_swf5, mcl_replace_root_swf7_to_swf6 -->
 
+<!-- PLAN_META
+id: ROOT_REPLACEMENT
+status: complete
+phases:
+  - id: 1
+    name: "Root State Clearing"
+    status: complete
+  - id: 2
+    name: "Stage Dimensions Update"
+    status: complete
+  - id: 3
+    name: "Metadata Update"
+    status: complete
+  - id: 4
+    name: "_global Persistence"
+    status: complete
+  - id: 5
+    name: "MCL Root Replacement Timing"
+    status: complete
+dependencies:
+  - plan: LOADMOVIE
+    type: requires
+    reason: "Root replacement depends on loadMovie infrastructure"
+blockers: []
+-->
+
 Last updated: 2026-02-25
 
 ## Status: PARTIAL — 1/4 tests passing (loadmovie_replace_root)

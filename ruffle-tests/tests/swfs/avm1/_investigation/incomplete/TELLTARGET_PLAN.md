@@ -1,6 +1,22 @@
 # TellTarget / Target Path Resolution Implementation Plan
 <!-- TESTS: tell_target, tell_target_invalid, tell_target_invalid_swf6, target_clip_swf5, target_clip_swf6, target_clip_removed, path_string, slash_syntax, string_paths_basic, string_paths_eval, string_paths_eval2, string_paths_hidden, string_paths_other, string_paths_reference_launder, string_paths_unload, string_paths_variable_alias, string_paths_variable_scopes, removed_base_clip_tell_target, removed_target_clip_scope -->
 
+<!-- PLAN_META
+id: TELLTARGET
+status: incomplete
+phases:
+  - id: 1
+    name: "g_base_clip tracking + actionSetTarget rewrite"
+    status: complete
+  - id: 2
+    name: "ActionSetTarget2 UNDEFINED handling + slash-path walk"
+    status: complete
+dependencies: []
+blockers:
+  - blocker: 9
+    reason: "string_paths_eval blocked on duplicate onPress dispatch"
+-->
+
 Last updated: 2026-03-13
 
 ## Status: PHASES 1-2 COMPLETE — 19/22 PASS, 2 accepted/ignored, 1 blocked

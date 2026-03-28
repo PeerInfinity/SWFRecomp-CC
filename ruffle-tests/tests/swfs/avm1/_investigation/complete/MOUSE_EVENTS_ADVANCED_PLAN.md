@@ -1,5 +1,34 @@
 # Mouse Events Advanced Plan
 
+<!-- PLAN_META
+id: MOUSE_EVENTS_ADVANCED
+status: complete
+phases:
+  - id: 1
+    name: "Text Field Hit Testing (focus_mouse)"
+    status: complete
+  - id: 2
+    name: "Dynamic MC Roll Dispatch + Focus Events (focus_mouse_rollout, focus_keyboard_press partial)"
+    status: complete
+  - id: 3
+    name: "Button Key Simulation + Tab Roll Events (focus_keyboard_press, tab_ordering_events_mouse)"
+    status: complete
+  - id: 4
+    name: "Named Shape Scriptability (frame_size_translated_positive/negative)"
+    status: complete
+  - id: 5
+    name: "Highlight Bounds for Tab Sort (tab_ordering_automatic_order_same_position)"
+    status: complete
+  - id: 6
+    name: "TextField onChanged Callback (button_keypress_vs_textinput)"
+    status: complete
+dependencies:
+  - plan: MOUSE_EVENTS
+    type: requires
+    reason: "Advanced mouse events build on basic mouse event infrastructure"
+blockers: []
+-->
+
 ## Overview
 
 Advanced mouse event infrastructure needed to unblock focus, tab ordering, hit testing, and stage property tests. The core mouse event system works (5/5 basic tests pass), but advanced features are missing.

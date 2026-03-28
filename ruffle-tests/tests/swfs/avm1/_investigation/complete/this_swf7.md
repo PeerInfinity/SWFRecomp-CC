@@ -1,6 +1,32 @@
 # this_swf7 Test Investigation
 <!-- TESTS: this_swf7 -->
 
+<!-- PLAN_META
+id: this_swf7
+status: complete
+phases:
+  - id: 1
+    name: "actionTrace MovieClip → _level0 (fixed)"
+    status: complete
+  - id: 2
+    name: "actionTypeOf MovieClip → \"movieclip\" (fixed)"
+    status: complete
+  - id: 3
+    name: "Object.prototype.toString → \"[object Object]\" (fixed)"
+    status: complete
+  - id: 4
+    name: "Extra output lines: with block scoping (fixed)"
+    status: complete
+  - id: 5
+    name: "trace(this) in `new f()` context (fixed)"
+    status: complete
+  - id: 6
+    name: "trace(this) in `f()` call context (fixed)"
+    status: complete
+dependencies: []
+blockers: []
+-->
+
 ## Test Overview
 
 Tests `this` keyword behavior in SWF7 (case-sensitive mode). Checks `this` value, typeof, and

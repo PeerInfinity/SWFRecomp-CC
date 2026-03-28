@@ -1,6 +1,27 @@
 # Sound Duration/Position Properties Plan
 <!-- TESTS: sound_duration_position_props -->
 
+<!-- PLAN_META
+id: SOUND_DURATION_POSITION
+status: not_started
+phases:
+  - id: 1
+    name: "getPosition() implementation"
+    status: not_started
+  - id: 2
+    name: "duration/position property getters"
+    status: not_started
+  - id: 3
+    name: "Playback lifecycle integration"
+    status: not_started
+dependencies:
+  - plan: SOUND_LOADING
+    phases: [1, 2, 3]
+    type: requires
+    reason: "loadSound() and playback infrastructure"
+blockers: []
+-->
+
 Last updated: 2026-03-27
 
 ## Status: NOT STARTED — Depends on SOUND_LOADING_PLAN Phase 1-3

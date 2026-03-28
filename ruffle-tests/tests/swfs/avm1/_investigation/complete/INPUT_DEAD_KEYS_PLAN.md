@@ -1,6 +1,13 @@
 # Input Dead Keys (Windows) Plan
 <!-- TESTS: input_dead_keys_windows -->
 
+<!-- PLAN_META
+id: INPUT_DEAD_KEYS
+status: complete
+dependencies: []
+blockers: []
+-->
+
 Last updated: 2026-03-13
 
 ## Status: COMPLETE — 1/1 tests passing (15/15 lines)

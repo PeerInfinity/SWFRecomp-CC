@@ -1,5 +1,28 @@
 # clone_sprite_edittext_dynamic — Text Field Clone Properties
 
+<!-- PLAN_META
+id: CLONE_SPRITE_EDITTEXT_DYNAMIC
+status: complete
+phases:
+  - id: 1
+    name: "embedFonts=true with missing font → zero text dimensions (lines 13, 15, 16, 28, 38)"
+    status: complete
+  - id: 2
+    name: "_width setter not triggering autoSize (lines 13, 15, 38)"
+    status: complete
+  - id: 3
+    name: "Clone position from autoSize-adjusted source (line 13)"
+    status: complete
+  - id: 4
+    name: "htmlText with stylesheet showing split paragraphs (line 32)"
+    status: complete
+  - id: 5
+    name: "_height rounding (line 73)"
+    status: complete
+dependencies: []
+blockers: []
+-->
+
 **Status**: 86/86 PASS (100%) ✅
 **Category**: duplicateMovieClip text field cloning
 **Completed**: 2026-03-15

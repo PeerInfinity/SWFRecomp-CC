@@ -1,6 +1,20 @@
 # ActionCall (0x9E) Semantics Plan
 <!-- TESTS: call, removed_target_clip_scope -->
 
+<!-- PLAN_META
+id: CALL_SEMANTICS
+status: complete
+phases:
+  - id: 2
+    name: "Frame label lookup"
+    status: complete
+  - id: 3
+    name: "Target path resolution"
+    status: complete
+dependencies: []
+blockers: []
+-->
+
 Last updated: 2026-03-07
 
 ## Status: COMPLETE — call 63/63 PASS. removed_target_clip_scope failures belong to MC_REMOVAL_LIFECYCLE_PLAN (SetTarget scope semantics)

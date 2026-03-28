@@ -1,6 +1,29 @@
 # Tab Ordering Properties Plan
 <!-- TESTS: tab_ordering_properties -->
 
+<!-- PLAN_META
+id: TAB_ORDERING_PROPERTIES
+status: complete
+phases:
+  - id: 1
+    name: "TextField `tabIndex` u32 coercion (Issue 1) —"
+    status: complete
+  - id: 2
+    name: "Button/MC `tabIndex` i32 coercion with NaN preservation (Issue 2) —"
+    status: complete
+  - id: 3
+    name: "MC `tabIndex` non-enumerable (Issue 3) —"
+    status: complete
+  - id: 4
+    name: "Button `tabIndex` default enumeration —"
+    status: complete
+dependencies:
+  - plan: TAB_ORDERING
+    type: requires
+    reason: "Tab ordering properties extend tab ordering system"
+blockers: []
+-->
+
 Last updated: 2026-03-14
 
 ## Status: COMPLETE — 1/1 tests passing

@@ -1,6 +1,35 @@
 # MovieClipLoader Class Plan
 <!-- TESTS: mcl_as_broadcaster, mcl_events_swf_version, mcl_getprogress, mcl_loadclip, mcl_unloadclip, moviecliploader_flashvars, mcl_loadclip_properties, mcl_loadclip_replace_root, mcl_mislabeled_target, mcl_replace_root_swf7_to_swf5, mcl_replace_root_swf7_to_swf6, mcl_target_gif87a, mcl_target_gif89a, mcl_target_jpg, mcl_target_png, loadmovie_fail -->
 
+<!-- PLAN_META
+id: MOVIECLIPLOADER
+status: complete
+phases:
+  - id: 1
+    name: "MCL constructor — auto-add self as listener"
+    status: complete
+  - id: 2
+    name: "Register MCL methods on prototype"
+    status: complete
+  - id: 3
+    name: "Implement getProgress()"
+    status: complete
+  - id: 4
+    name: "Implement loadClip()"
+    status: complete
+  - id: 5
+    name: "Deferred onLoadInit firing"
+    status: complete
+  - id: 6
+    name: "Implement unloadClip()"
+    status: complete
+dependencies:
+  - plan: LOADMOVIE
+    type: requires
+    reason: "MCL class wraps core loadMovie functionality"
+blockers: []
+-->
+
 Last updated: 2026-02-23
 
 ## Status: NOT STARTED — 0/16 tests passing

@@ -1,6 +1,26 @@
 # Runtime Transform GPU Updates Plan
 <!-- TESTS: display_object_properties, color -->
 
+<!-- PLAN_META
+id: RUNTIME_TRANSFORM_GPU
+status: not_started
+phases:
+  - id: 1
+    name: "Build transform matrix from MovieClip properties"
+    status: not_started
+  - id: 2
+    name: "Detect runtime-modified transforms in compose_children"
+    status: not_started
+  - id: 3
+    name: "Handle non-sprite display objects"
+    status: not_started
+  - id: 4
+    name: "Test with display_object_properties"
+    status: not_started
+dependencies: []
+blockers: []
+-->
+
 Last updated: 2026-03-27
 
 ## Status: NOT STARTED — Tier 1 (closest to passing, bug fix only)

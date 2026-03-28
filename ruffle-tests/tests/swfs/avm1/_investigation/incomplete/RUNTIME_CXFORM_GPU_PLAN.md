@@ -1,6 +1,26 @@
 # Runtime Color Transform (cxform) GPU Updates Plan
 <!-- TESTS: color, display_object_properties -->
 
+<!-- PLAN_META
+id: RUNTIME_CXFORM_GPU
+status: incomplete
+phases:
+  - id: 1
+    name: "Verify existing per-frame upload works"
+    status: not_started
+  - id: 2
+    name: "Fix parent-child cxform composition"
+    status: not_started
+  - id: 3
+    name: "Extend child_mc_cache scanning"
+    status: not_started
+dependencies:
+  - plan: RUNTIME_TRANSFORM_GPU
+    type: complements
+    reason: "Both needed for color and display_object_properties tests"
+blockers: []
+-->
+
 Last updated: 2026-03-27
 
 ## Status: PARTIALLY WORKING — Per-frame upload exists, but gaps remain

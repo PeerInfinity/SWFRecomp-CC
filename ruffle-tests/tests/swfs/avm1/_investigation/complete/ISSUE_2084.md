@@ -1,5 +1,12 @@
 # issue_2084 — Nested attachMovie with registerClass
 
+<!-- PLAN_META
+id: ISSUE_2084
+status: complete
+dependencies: []
+blockers: []
+-->
+
 **Status**: COMPLETE — 16/16 (100%) ✅
 **Completed**: 2026-03-15
 

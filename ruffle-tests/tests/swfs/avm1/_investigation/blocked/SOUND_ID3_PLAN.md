@@ -1,6 +1,33 @@
 # Sound ID3 Tag Parsing Plan
 <!-- TESTS: sound_id3, sound_id3_prop -->
 
+<!-- PLAN_META
+id: SOUND_ID3
+status: not_started
+phases:
+  - id: 1
+    name: "ID3v1 parser"
+    status: not_started
+  - id: 2
+    name: "ID3v2 parser"
+    status: not_started
+  - id: 3
+    name: "ID3 object construction"
+    status: not_started
+  - id: 4
+    name: "onID3 callback dispatch"
+    status: not_started
+  - id: 5
+    name: "Integration with loadSound"
+    status: not_started
+dependencies:
+  - plan: SOUND_LOADING
+    phases: [1]
+    type: requires
+    reason: "loadSound implementation needed for ID3 parsing"
+blockers: []
+-->
+
 Last updated: 2026-03-27
 
 ## Status: NOT STARTED — Blocked on ID3 parser implementation

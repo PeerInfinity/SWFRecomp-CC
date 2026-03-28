@@ -1,6 +1,26 @@
 # BitmapData.perlinNoise() Implementation Plan
 <!-- TESTS: bitmap_data_perlinnoise (image) -->
 
+<!-- PLAN_META
+id: BITMAPDATA_PERLINNOISE
+status: not_started
+phases:
+  - id: 1
+    name: "Port LCG and initialization"
+    status: not_started
+  - id: 2
+    name: "Port noise2 function"
+    status: not_started
+  - id: 3
+    name: "Port turbulence function"
+    status: not_started
+  - id: 4
+    name: "Implement bitmapDataPerlinNoise"
+    status: not_started
+dependencies: []
+blockers: []
+-->
+
 Last updated: 2026-03-28
 
 ## Status: NOT STARTED

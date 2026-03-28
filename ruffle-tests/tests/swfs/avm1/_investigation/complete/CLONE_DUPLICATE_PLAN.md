@@ -1,6 +1,26 @@
 # Clone/Duplicate MovieClip Implementation Plan
 <!-- TESTS: duplicate_movie_clip, clone_sprite_types, clone_sprite_edittext, clone_sprite_edittext_dynamic, duplicate_movie_clip_drawing, clip_events, clip_event_propagation_order, on_construct -->
 
+<!-- PLAN_META
+id: CLONE_DUPLICATE
+status: complete
+phases:
+  - id: 1
+    name: "Core Clone/Duplicate —"
+    status: complete
+  - id: 2
+    name: "EditText Clones — SUBSTANTIALLY"
+    status: complete
+dependencies:
+  - plan: MOVIECLIP
+    type: requires
+    reason: "Clone/duplicate depends on MC creation infrastructure"
+  - plan: TEXTFIELD
+    type: complements
+    reason: "TextField cloning requires TextField property infrastructure"
+blockers: []
+-->
+
 Last updated: 2026-03-14
 
 ## Status: COMPLETE — 7/8 PASS, clone infrastructure done

@@ -1,6 +1,38 @@
 # Enumeration (for-in) Implementation Plan
 <!-- TESTS: enumerate, array_enumerate, new_object_enumerate, prototype_enumerate, stage_object_enumerate, globals_swf5, globals_swf6, globals_swf7, globals_swf8, stage_object_properties, as_set_prop_flags, prototype_properties, object_prototypes, is_prototype_of -->
 
+<!-- PLAN_META
+id: ENUMERATION
+status: complete
+phases:
+  - id: 1
+    name: "Fix actionEnumerate Segfault + Type Safety"
+    status: complete
+  - id: 2
+    name: "Fix Enumeration Order"
+    status: complete
+  - id: 3
+    name: "Fix Array Enumeration Order"
+    status: complete
+  - id: 4
+    name: "Fix `__proto__` and `constructor` DontEnum"
+    status: complete
+  - id: 5
+    name: "Enumerate `addProperty` Virtual Properties"
+    status: complete
+  - id: 6
+    name: "Enumerate MovieClip Child Instance Names"
+    status: complete
+  - id: 7
+    name: "Null Terminator (Minor)"
+    status: complete
+dependencies:
+  - plan: PROTOTYPE_OBJECT
+    type: requires
+    reason: "for-in enumeration walks prototype chain"
+blockers: []
+-->
+
 Last updated: 2026-02-18 — **COMPLETE** (all 5 direct tests passing, commit b899e90)
 
 ## Status: COMPLETE

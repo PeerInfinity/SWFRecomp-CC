@@ -1,6 +1,38 @@
 # XML/XMLNode Implementation Plan
 <!-- TESTS: xml, xml_append_child, xml_append_child_with_parent, xml_attributes_read, xml_cdata, xml_child_nodes_edge_cases, xml_clone_expandos, xml_first_last_child, xml_has_child_nodes, xml_idmap, xml_ignore_comments, xml_ignore_white, xml_insert_before, xml_inspect_createmethods, xml_inspect_doctype, xml_inspect_parsexml, xml_inspect_xmldecl, xml_namespaces, xml_parent_and_child, xml_remove_node, xml_reparenting, xml_siblings, xml_to_string, xml_to_string_comment, xml_unescaping, xmlnode_proto, xml_load, xml_socket, xml_socket_close_in_handler, xml_socket_on_data, xml_socket_segmented, xml_getbytes, swf5_xml_event_handler_context -->
 
+<!-- PLAN_META
+id: XML
+status: complete
+phases:
+  - id: 1
+    name: "XML/XMLNode Constructors + Core Properties + Parser"
+    status: complete
+  - id: 2
+    name: "Tree Manipulation — appendChild, removeNode, insertBefore"
+    status: complete
+  - id: 3
+    name: "toString Serialization"
+    status: complete
+  - id: 4
+    name: "Parser Features — CDATA, Comments, DOCTYPE, xmlDecl, ignoreWhite"
+    status: complete
+  - id: 5
+    name: "Attributes + cloneNode"
+    status: complete
+  - id: 6
+    name: "idMap + XMLNode Prototype Chain"
+    status: complete
+  - id: 7
+    name: "Namespace Support"
+    status: complete
+dependencies:
+  - plan: PARSING_FUNCTIONS
+    type: complements
+    reason: "XML parsing shares infrastructure with string parsing"
+blockers: []
+-->
+
 Last updated: 2026-02-20
 
 ## Status: FULLY COMPLETE — ALL 26 ACTIVE TESTS PASS

@@ -1,6 +1,29 @@
 # SWF Version-Specific Semantics Plan
 <!-- TESTS: swf6_case_insensitive, swf6_string_as_bool, swf4_actions_coercion_order, swf5_to_6_cross_call, swf6_to_5_cross_call -->
 
+<!-- PLAN_META
+id: SWF_VERSION_SEMANTICS
+status: complete
+phases:
+  - id: 1
+    name: "SWF6 Case-Insensitive Property Lookup (swf6_case_insensitive) —"
+    status: complete
+  - id: 2
+    name: "SWF6 String-to-Boolean Coercion (swf6_string_as_bool) —"
+    status: complete
+  - id: 3
+    name: "SWF4 Operator Coercion Order (swf4_actions_coercion_order) —"
+    status: complete
+  - id: 4
+    name: "Cross-Version Function Calls ("
+    status: complete
+dependencies:
+  - plan: PER_MOVIE_GLOBAL_ISOLATION
+    type: requires
+    reason: "Cross-version calls require per-movie global understanding"
+blockers: []
+-->
+
 Last updated: 2026-03-12
 
 ## Status: ALL PHASES COMPLETE — 5/5 tests passing

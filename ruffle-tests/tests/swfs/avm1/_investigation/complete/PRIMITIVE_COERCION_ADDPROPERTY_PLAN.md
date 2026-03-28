@@ -1,6 +1,13 @@
 # Primitive Coercion addProperty Plan
 <!-- TESTS: coerce_to_primitive_resolve -->
 
+<!-- PLAN_META
+id: PRIMITIVE_COERCION_ADDPROPERTY
+status: complete
+dependencies: []
+blockers: []
+-->
+
 Last updated: 2026-03-07
 
 ## Status: COMPLETE — coerce_to_primitive_resolve 17/17 PASS

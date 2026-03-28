@@ -1,6 +1,29 @@
 # String Features Implementation Plan
 <!-- TESTS: string_methods_negative_args, string_methods_swfv5, string_methods, string_ops_swf6, string_paths_basic, string_paths_eval, string_paths_eval2, string_paths_hidden, string_paths_other, string_paths_reference_launder, string_paths_unload, string_paths_variable_alias, string_paths_variable_scopes -->
 
+<!-- PLAN_META
+id: STRING
+status: complete
+phases:
+  - id: 1
+    name: "Fix Buffer Limits + Argument Coercion + Missing Methods ✅"
+    status: complete
+  - id: 2
+    name: "Switch to UTF-16 Internal String Storage ✅"
+    status: complete
+  - id: 3
+    name: "SWF4/6 String Operations (string_ops_swf6) ✅"
+    status: complete
+  - id: 4
+    name: "Unicode Case Mapping (toUpperCase/toLowerCase) ✅"
+    status: complete
+  - id: 5
+    name: "String Paths (Deferred)"
+    status: complete
+dependencies: []
+blockers: []
+-->
+
 Last updated: 2026-02-15 (Phases 1-4 complete)
 
 ## Overview

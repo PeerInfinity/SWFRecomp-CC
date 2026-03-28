@@ -1,6 +1,27 @@
 # createTextField / DefineEditText Rendering Plan
 <!-- TESTS: frame_size_translated_negative, frame_size_translated_positive, edittext_stylesheet, edittext_tag_indent, movieclip_create_text_field -->
 
+<!-- PLAN_META
+id: CREATETEXTFIELD_RENDERING
+status: blocked
+phases:
+  - id: 1
+    name: "Background/border rendering"
+    status: complete
+  - id: 2
+    name: "Negative dimension positioning"
+    status: complete
+  - id: 3
+    name: "Glyph rendering pipeline"
+    status: complete
+  - id: 4
+    name: "Text layout (HTML colors, word wrap, alignment)"
+    status: blocked
+dependencies: []
+blockers:
+  - reason: "Anti-aliasing rendering difference: headless tessellated polygons vs rasterized text"
+-->
+
 Last updated: 2026-03-28
 
 ## Status: BLOCKED — Image tests blocked by anti-aliasing rendering difference

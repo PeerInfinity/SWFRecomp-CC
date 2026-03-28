@@ -1,6 +1,13 @@
 # Default Instance Names Plan
 <!-- TESTS: default_names -->
 
+<!-- PLAN_META
+id: DEFAULT_NAMES
+status: complete
+dependencies: []
+blockers: []
+-->
+
 Last updated: 2026-03-06
 
 ## Status: COMPLETE — 52/52 PASS

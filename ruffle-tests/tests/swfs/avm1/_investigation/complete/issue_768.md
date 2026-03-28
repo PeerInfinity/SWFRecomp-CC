@@ -1,6 +1,13 @@
 # issue_768 Test Investigation
 <!-- TESTS: issue_768 -->
 
+<!-- PLAN_META
+id: issue_768
+status: complete
+dependencies: []
+blockers: []
+-->
+
 ## Test Overview
 
 Tests that `_root` traces as `"_level0"` (not as a generic object), verifying that MovieClip

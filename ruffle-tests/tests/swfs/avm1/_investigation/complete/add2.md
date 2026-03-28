@@ -1,6 +1,13 @@
 # add2 Test Investigation
 <!-- TESTS: add2 -->
 
+<!-- PLAN_META
+id: add2
+status: complete
+dependencies: []
+blockers: []
+-->
+
 ## Test Overview
 
 The `add2` test exercises `actionAdd2` (SWF5+ type-aware `+` operator) across a comprehensive

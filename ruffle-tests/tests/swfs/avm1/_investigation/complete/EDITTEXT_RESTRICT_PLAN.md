@@ -1,5 +1,31 @@
 # EditText Restrict Plan — COMPLETE
 
+<!-- PLAN_META
+id: EDITTEXT_RESTRICT
+status: complete
+phases:
+  - id: 1
+    name: "Pattern Tokenizer"
+    status: complete
+  - id: 2
+    name: "Pattern Parser"
+    status: complete
+  - id: 3
+    name: "Character Filter"
+    status: complete
+  - id: 4
+    name: "Integration"
+    status: complete
+  - id: 5
+    name: "Edge Cases"
+    status: complete
+dependencies:
+  - plan: TEXTFIELD
+    type: requires
+    reason: "restrict property depends on TextField infrastructure"
+blockers: []
+-->
+
 ## Status: COMPLETE (2026-03-03)
 
 **Test:** `edittext_restrict` — **191/191 PASS** (was 145/191)

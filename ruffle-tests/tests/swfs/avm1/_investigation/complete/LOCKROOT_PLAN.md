@@ -1,6 +1,20 @@
 # _lockroot / _root Resolution Plan
 <!-- TESTS: movieclip_lockroot -->
 
+<!-- PLAN_META
+id: LOCKROOT
+status: complete
+phases:
+  - id: 2
+    name: "Path resolution — NOT NEEDED for this test"
+    status: complete
+dependencies:
+  - plan: LOADMOVIE
+    type: requires
+    reason: "_lockroot behavior depends on loadMovie infrastructure"
+blockers: []
+-->
+
 Last updated: 2026-03-06
 
 ## Status: COMPLETE — movieclip_lockroot 29/29 PASS

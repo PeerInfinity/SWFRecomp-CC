@@ -1,5 +1,15 @@
 # Plan 04: Focus Rect Rendering — COMPLETE
 
+<!-- PLAN_META
+id: PLAN_04_FOCUS_RECT
+status: complete
+dependencies:
+  - plan: FOCUS_SYSTEM
+    type: requires
+    reason: "Focus rect rendering depends on focus management"
+blockers: []
+-->
+
 **Status**: DONE — all 5 tests passing (41/41 image comparisons)
 **Tests unlocked**: `focusrect_focuslost` (1/1), `focusrect_mouse_swf8` (8/8), `focusrect_mouse_swf9` (8/8), `focusrect_swf5` (12/12), `focusrect_swf6` (12/12)
 

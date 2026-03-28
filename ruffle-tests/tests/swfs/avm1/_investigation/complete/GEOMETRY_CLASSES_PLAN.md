@@ -1,6 +1,16 @@
 # Geometry Classes Implementation: Point, Rectangle, Matrix
 <!-- TESTS: point, matrix, rectangle, arguments, bitmap_data_pixeldissolve, bitmap_data_hittest, global_instance_decls -->
 
+<!-- PLAN_META
+id: GEOMETRY_CLASSES
+status: complete
+dependencies:
+  - plan: OOP_SUPER_EXTENDS
+    type: requires
+    reason: "Geometry classes use extends/super infrastructure"
+blockers: []
+-->
+
 Last updated: 2026-02-15
 
 ## Status: COMPLETE

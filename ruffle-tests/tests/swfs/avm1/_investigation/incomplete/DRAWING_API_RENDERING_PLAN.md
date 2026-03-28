@@ -1,6 +1,26 @@
 # Drawing API Rendering Plan
 <!-- TESTS: movieclip_begin_gradient_fill, movieclip_line_gradient_style, mask_with_drawing, movieclip_setmask -->
 
+<!-- PLAN_META
+id: DRAWING_API_RENDERING
+status: not_started
+phases:
+  - id: 1
+    name: "Test existing infrastructure in headless mode"
+    status: not_started
+  - id: 2
+    name: "Fix headless mode guards"
+    status: not_started
+  - id: 3
+    name: "Verify gradient rendering"
+    status: not_started
+  - id: 4
+    name: "Test all affected tests"
+    status: not_started
+dependencies: []
+blockers: []
+-->
+
 Last updated: 2026-03-27
 
 ## Status: NOT STARTED — Tier 3 (infrastructure largely exists, needs headless integration)

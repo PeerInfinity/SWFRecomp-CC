@@ -1,6 +1,16 @@
 # Focus Visibility & FocusRect Property Plan
 <!-- TESTS: focus_visibility_change, focusrect_property_swf5, focusrect_property_swf6, focusrect_property_swf7 -->
 
+<!-- PLAN_META
+id: FOCUS_FOCUSRECT
+status: complete
+dependencies:
+  - plan: FOCUS_SYSTEM
+    type: requires
+    reason: "Focus rect rendering depends on focus management"
+blockers: []
+-->
+
 Last updated: 2026-03-13
 
 ## Status: COMPLETE — 4/4 tests passing

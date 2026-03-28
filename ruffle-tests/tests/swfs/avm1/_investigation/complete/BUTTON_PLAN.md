@@ -1,6 +1,32 @@
 # Button Behavior and Events Implementation Plan
 <!-- TESTS: button_children, button_goto, button_key_events, button_key_events_special, button_keypress, button_keypress_vs_press, button_keypress_vs_tab, button_keypress_vs_textinput, button_order, button_properties_special_cases, button_v5, button_v6, movieclip_in_removed_button, root_button_mode -->
 
+<!-- PLAN_META
+id: BUTTON
+status: complete
+phases:
+  - id: 1
+    name: "Button Children Initialization (no input.json)"
+    status: complete
+  - id: 2
+    name: "Input Event Infrastructure (foundation for all 9 below)"
+    status: complete
+  - id: 3
+    name: "Mouse Events + Button State Machine"
+    status: complete
+  - id: 4
+    name: "Key Events"
+    status: complete
+  - id: 5
+    name: "Focus + Tab Navigation"
+    status: complete
+dependencies:
+  - plan: MOUSE_EVENTS
+    type: requires
+    reason: "Button behavior depends on mouse event infrastructure"
+blockers: []
+-->
+
 Last updated: 2026-02-25
 
 ## Status: 13/14 PASSING — remaining 1 blocked on loadMovie infrastructure

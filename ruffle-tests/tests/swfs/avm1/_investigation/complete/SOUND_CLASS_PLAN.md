@@ -1,6 +1,16 @@
 # Sound Class Implementation Plan
 <!-- TESTS: register_class_with_sound, sound -->
 
+<!-- PLAN_META
+id: SOUND_CLASS
+status: complete
+dependencies:
+  - plan: MOVIECLIP
+    type: complements
+    reason: "Sound class attaches to MovieClips"
+blockers: []
+-->
+
 Last updated: 2026-03-05
 
 ## Status: COMPLETE — All 4 tests PASS (628/628 for sound)

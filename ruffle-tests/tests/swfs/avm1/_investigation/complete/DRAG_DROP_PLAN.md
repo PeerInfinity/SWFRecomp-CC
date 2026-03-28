@@ -1,6 +1,29 @@
 # Drag and Drop Implementation Plan
 <!-- TESTS: drag_drop, drag_over_from_outside, drag_over_without_startdrag, mouse_hover_events_while_dragging -->
 
+<!-- PLAN_META
+id: DRAG_DROP
+status: complete
+phases:
+  - id: A
+    name: "`startDrag` / `stopDrag` Methods"
+    status: complete
+  - id: B
+    name: "Hit Test for Drop Target"
+    status: complete
+  - id: C
+    name: "`mouse_hover_events_while_dragging`"
+    status: complete
+  - id: D
+    name: "`drag_over_from_outside` and `drag_over_without_startdrag`"
+    status: complete
+dependencies:
+  - plan: MOUSE_EVENTS
+    type: requires
+    reason: "Drag/drop depends on mouse event tracking"
+blockers: []
+-->
+
 Last updated: 2026-02-26
 
 ## Status: COMPLETE — All 4/4 tests PASS

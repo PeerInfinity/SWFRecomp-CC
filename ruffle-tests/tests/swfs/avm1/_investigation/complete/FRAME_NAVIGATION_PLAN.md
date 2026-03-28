@@ -1,6 +1,13 @@
 # Frame Navigation Implementation Plan
 <!-- TESTS: goto_frame, goto_frame2, goto_label, goto_methods -->
 
+<!-- PLAN_META
+id: FRAME_NAVIGATION
+status: complete
+dependencies: []
+blockers: []
+-->
+
 Last updated: 2026-02-25
 
 ## Status: COMPLETE (4/4 tests PASS)

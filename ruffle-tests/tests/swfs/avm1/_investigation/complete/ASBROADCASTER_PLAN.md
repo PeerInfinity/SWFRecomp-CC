@@ -1,6 +1,16 @@
 # AsBroadcaster Implementation Plan
 <!-- TESTS: as_broadcaster, as_broadcaster_undef -->
 
+<!-- PLAN_META
+id: ASBROADCASTER
+status: complete
+dependencies:
+  - plan: ARRAY_METHODS
+    type: complements
+    reason: "ASBroadcaster uses array-based listener management"
+blockers: []
+-->
+
 Last updated: 2026-03-04
 
 ## Status: COMPLETE — both tests PASS (41/41 + 90/90)

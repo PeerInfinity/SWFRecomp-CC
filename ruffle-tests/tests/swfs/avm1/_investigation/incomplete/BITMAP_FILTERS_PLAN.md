@@ -1,6 +1,26 @@
 # Bitmap Filters Plan
 <!-- TESTS: bitmap_filters -->
 
+<!-- PLAN_META
+id: BITMAP_FILTERS
+status: not_started
+phases:
+  - id: 1
+    name: "Implement filter.clone()"
+    status: not_started
+  - id: 2
+    name: "Fix mc.filters round-trip storage/retrieval"
+    status: not_started
+  - id: 3
+    name: "Property coercion native getters/setters"
+    status: not_started
+  - id: 4
+    name: "Gradient array synchronization"
+    status: not_started
+dependencies: []
+blockers: []
+-->
+
 Last updated: 2026-03-27
 
 ## Status: NOT STARTED — SEGFAULT at ~line 116/548, multiple gaps

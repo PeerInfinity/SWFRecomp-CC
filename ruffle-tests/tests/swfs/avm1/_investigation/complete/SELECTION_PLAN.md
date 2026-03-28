@@ -1,6 +1,26 @@
 # Selection Object Implementation Plan
 <!-- TESTS: selection, selection_handlers, edittext_focus_selection, edittext_programmatic_focus -->
 
+<!-- PLAN_META
+id: SELECTION
+status: complete
+phases:
+  - id: 1
+    name: "Core Focus Tracking + setFocus/getFocus + Listener Pattern"
+    status: complete
+  - id: 2
+    name: "replaceSel on TextField"
+    status: complete
+dependencies:
+  - plan: TEXTFIELD
+    type: requires
+    reason: "Selection API depends on TextField infrastructure"
+  - plan: FOCUS_SYSTEM
+    type: requires
+    reason: "Selection tracking depends on focus management"
+blockers: []
+-->
+
 Last updated: 2026-02-15
 
 ## Overview

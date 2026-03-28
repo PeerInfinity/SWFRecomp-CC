@@ -1,6 +1,16 @@
 # Focus System Implementation Plan
 <!-- TESTS: focus_mouse, focus_mouse_focusable, focus_mouse_rollout, focus_root_movie, focus_keyboard_press, focusrect_focuslost, movieclip_focusenabled -->
 
+<!-- PLAN_META
+id: FOCUS_SYSTEM
+status: complete
+dependencies:
+  - plan: TEXTFIELD
+    type: complements
+    reason: "Focus management interacts with TextField focus behavior"
+blockers: []
+-->
+
 Last updated: 2026-03-13
 
 ## Status: COMPLETE — 7/7 tests passing

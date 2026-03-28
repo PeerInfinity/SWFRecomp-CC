@@ -1,6 +1,26 @@
 # Focus Rect Rendering Plan
 <!-- TESTS: focusrect_focuslost, focusrect_mouse_swf8, focusrect_mouse_swf9, focusrect_swf5, focusrect_swf6 -->
 
+<!-- PLAN_META
+id: FOCUS_RECT_RENDERING
+status: not_started
+phases:
+  - id: 1
+    name: "Investigate expected appearance from test images"
+    status: not_started
+  - id: 2
+    name: "Implement focus rect drawing function"
+    status: not_started
+  - id: 3
+    name: "Integrate into render pass"
+    status: not_started
+  - id: 4
+    name: "Handle SWF version differences"
+    status: not_started
+dependencies: []
+blockers: []
+-->
+
 Last updated: 2026-03-27
 
 ## Status: NOT STARTED — Tier 4 (minimal infrastructure exists)

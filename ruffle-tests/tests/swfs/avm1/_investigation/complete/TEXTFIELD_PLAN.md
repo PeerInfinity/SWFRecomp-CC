@@ -1,6 +1,35 @@
 # TextField/EditText Implementation Plan
 <!-- TESTS: text_format, text_format_rounding_swf7, text_format_rounding_swf8, edittext_default_format_font_style, edittext_antialiastype, edittext_default_format, edittext_default_format_empty, textfield_variable, textfield_properties, text_format_display, edittext_autosize_setter, textfield_background_color, textfield_border_color, textfield_text, edittext_password, textfield_maxchars, text_format_font_max_length, textfield_props_swf5, textfield_props_swf6, textfield_props_swf7, textfield_props_swf8, edittext_width_height, edittext_html_align_swf7, edittext_html_align_swf8, textfield_cache_as_bitmap, edittext_newline_stripping, edittext_newlines, edittext_programmatic_focus, edittext_autosize, edittext_font_size, edittext_text_height_leading, edittext_scroll, edittext_hscroll, edittext_html_roundtrip, edittext_html_color, edittext_html_condensewhite_swf7, edittext_html_condensewhite_swf8, edittext_html_entity, edittext_html_swf6, edittext_html_swf7, edittext_html_swf8, edittext_align, edittext_align_trailing_spaces_swf7, edittext_align_trailing_spaces_swf8, edittext_leading, edittext_margins, edittext_letter_spacing, edittext_tag_indent, edittext_bullet, edittext_underline, edittext_tab_stops, edittext_stylesheet, textsnapshot_available_text, textsnapshot_findtext, textsnapshot_gettext, textsnapshot_props_swf5, textsnapshot_props_swf6, textsnapshot_text_order, edittext_drag_select, edittext_focus_selection, edittext_ime_focus_lost, edittext_input, edittext_input_newlines, edittext_password_copy, edittext_paste_empty, edittext_place_caret, edittext_restrict, edittext_restrict_paste, edittext_tab_focus, movieclip_create_text_field -->
 
+<!-- PLAN_META
+id: TEXTFIELD
+status: complete
+phases:
+  - id: 1
+    name: "Tests — TextField Prototype + Core Properties (~15 tests)"
+    status: complete
+  - id: 2
+    name: "Tests — TextFormat Class (~8 tests)"
+    status: complete
+  - id: 3
+    name: "Tests — Variable Binding + Geometry (~8 tests)"
+    status: complete
+  - id: 4
+    name: "Tests — Scroll Properties (~3 tests)"
+    status: complete
+  - id: 5
+    name: "Tests — HTML Text (~11 tests)"
+    status: complete
+  - id: 6
+    name: "Tests — Text Layout Properties (~10 tests)"
+    status: complete
+  - id: 7
+    name: "Tests — StyleSheet + TextSnapshot (~9 tests)"
+    status: complete
+dependencies: []
+blockers: []
+-->
+
 Last updated: 2026-03-14
 
 ## Status: COMPLETE

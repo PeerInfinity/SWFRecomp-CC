@@ -1,5 +1,12 @@
 # Plan 01: Runtime Transform & CxForm GPU Updates
 
+<!-- PLAN_META
+id: PLAN_01_RUNTIME_TRANSFORMS
+status: complete
+dependencies: []
+blockers: []
+-->
+
 **Priority**: Highest — pure bug fix, no new features
 **Tests unlocked**: `display_object_properties` (tolerance=90), `color` (tolerance=1)
 **Estimated complexity**: Medium

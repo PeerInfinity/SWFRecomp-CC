@@ -1,6 +1,13 @@
 # ASnative / ASNew Implementation Plan
 <!-- TESTS: asnative, asnew -->
 
+<!-- PLAN_META
+id: ASNATIVE_ASNEW
+status: complete
+dependencies: []
+blockers: []
+-->
+
 Last updated: 2026-03-04
 
 ## Status: COMPLETE

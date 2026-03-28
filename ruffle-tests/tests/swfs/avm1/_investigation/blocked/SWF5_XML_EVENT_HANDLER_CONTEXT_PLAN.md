@@ -1,4 +1,27 @@
 <!-- TESTS: swf5_xml_event_handler_context -->
+
+<!-- PLAN_META
+id: SWF5_XML_EVENT_HANDLER_CONTEXT
+status: blocked
+phases:
+  - id: 1
+    name: "XML.load() implementation"
+    status: not_started
+  - id: 2
+    name: "Child SWF recompilation"
+    status: not_started
+  - id: 3
+    name: "Async callback dispatch"
+    status: not_started
+  - id: 4
+    name: "SWF5 context handling"
+    status: not_started
+dependencies: []
+blockers:
+  - blocker: 7
+    reason: "XML.load() not implemented, child SWF execution blocked"
+-->
+
 # SWF5 XML Event Handler Context Plan
 
 ## Status: BLOCKED — requires XML.load() with HTTP/file loading + multi-SWF child execution

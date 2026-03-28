@@ -1,6 +1,25 @@
 # BitmapData Implementation Plan
 <!-- TESTS: bitmap_data, bitmap_data_colortransform, bitmap_data_compare, bitmap_data_copypixels, bitmap_data_fillrect, bitmap_data_hittest, bitmap_data_max_size_swf9, bitmap_data_max_size_swf10, bitmap_data_noise, bitmap_data_perlinnoise, bitmap_data_pixeldissolve, bitmap_data_pixeldissolve_image, bitmap_data_threshold, bitmap_filters, bitmapdata_applyfilter_colormatrix, bitmapdata_channels, textfield_cache_as_bitmap -->
 
+<!-- PLAN_META
+id: BITMAP_DATA
+status: incomplete
+phases:
+  - id: 1
+    name: "Core pixel buffer implementation"
+    status: complete
+  - id: 2
+    name: "Pixel operations (get/setPixel)"
+    status: complete
+  - id: 3
+    name: "Methods (fillRect, clone, dispose, etc.)"
+    status: complete
+dependencies: []
+blockers:
+  - reason: "bitmap_data_copypixels blocked on premultiply round-trip precision"
+  - reason: "bitmap_data_pixeldissolve blocked on PRNG algorithm mismatch"
+-->
+
 Last updated: 2026-03-14
 
 ## Status: INCOMPLETE — 15/17 tests passing (was 12/17), remaining items blocked or low-ROI

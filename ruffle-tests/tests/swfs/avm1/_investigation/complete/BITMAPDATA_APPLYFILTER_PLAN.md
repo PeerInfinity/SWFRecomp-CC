@@ -1,9 +1,18 @@
 # BitmapData.applyFilter() Implementation Plan
 <!-- TESTS: bitmapdata_applyfilter_colormatrix (image) -->
 
+<!-- PLAN_META
+id: BITMAPDATA_APPLYFILTER
+status: complete
+dependencies: []
+blockers: []
+-->
+
 Last updated: 2026-03-28
 
-## Status: NOT STARTED
+## Status: COMPLETE
+
+All phases implemented. `bitmapDataApplyFilter()` now supports ColorMatrixFilter with correct un-premultiply/re-premultiply roundtrip, 4x5 matrix multiplication, source/dest rect clipping, and proper return codes. Trace test passes. Image verification requires CI headless pipeline.
 
 ### Problem
 

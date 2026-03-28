@@ -1,6 +1,29 @@
 # ExternalInterface Helper Methods Plan
 <!-- TESTS: external_interface_escapexml, external_interface_unescapexml, external_interface_toxml_basic, external_interface_toxml_array, external_interface_jsquotestring, external_interface_toas_basic, external_interface -->
 
+<!-- PLAN_META
+id: EXTERNAL_INTERFACE
+status: complete
+phases:
+  - id: 1
+    name: "String Escaping/Quoting (3 tests, 87 lines)"
+    status: complete
+  - id: 2
+    name: "Value-to-XML Serialization (2 tests, 204 lines)"
+    status: complete
+  - id: 3
+    name: "XML-to-Value Deserialization (1 test, 354 lines)"
+    status: complete
+  - id: 4
+    name: "Bridge Methods (1 test, 84 lines) —"
+    status: complete
+dependencies:
+  - plan: XML
+    type: requires
+    reason: "ExternalInterface uses XML serialization"
+blockers: []
+-->
+
 Last updated: 2026-03-06
 
 ## Status: COMPLETE — All 7/7 tests passing (729 lines).

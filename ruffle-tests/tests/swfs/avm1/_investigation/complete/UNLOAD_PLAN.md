@@ -1,6 +1,32 @@
 # Unload / UnloadMovie Implementation Plan
 <!-- TESTS: unload_clip_event, unload_nested_child, unload, unloadmovie, unloadmovie_method, unloadmovienum, clip_events, clip_event_propagation_order, movieclip_depth_methods, remove_movie_clip, attach_movie, empty_movieclip_can_attach_movies -->
 
+<!-- PLAN_META
+id: UNLOAD
+status: complete
+phases:
+  - id: 1
+    name: "Fix PlaceObject2WithClipActions + Store Clip Actions"
+    status: complete
+  - id: 2
+    name: "Fire Unload Events on Removal"
+    status: complete
+  - id: 3
+    name: "Depth Tracking (getDepth / getNextHighestDepth)"
+    status: complete
+  - id: 4
+    name: "removeMovieClip Implementation"
+    status: complete
+  - id: 5
+    name: "Investigate Recompiler Issue (clip_actions not attached)"
+    status: complete
+dependencies:
+  - plan: MC_REMOVAL_LIFECYCLE
+    type: requires
+    reason: "Unload depends on MC removal infrastructure"
+blockers: []
+-->
+
 Last updated: 2026-02-22
 
 ## Status: MOSTLY COMPLETE (4/6 tests passing)

@@ -1,6 +1,20 @@
 # Array Methods Implementation Plan
 <!-- TESTS: array_call_method, array_prototyping, array_sort, array_sort_random -->
 
+<!-- PLAN_META
+id: ARRAY_METHODS
+status: complete
+phases:
+  - id: 4
+    name: "array_prototyping — addProperty Numeric Keys + Array-like Proto"
+    status: complete
+dependencies:
+  - plan: CALL_SEMANTICS
+    type: requires
+    reason: "Array sort comparator depends on call semantics"
+blockers: []
+-->
+
 Last updated: 2026-02-18
 
 ## Status: ALL PHASES COMPLETE

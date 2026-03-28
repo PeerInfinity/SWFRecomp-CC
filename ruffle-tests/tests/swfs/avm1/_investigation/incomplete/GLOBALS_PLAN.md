@@ -1,6 +1,64 @@
 # Global Functions/Objects Implementation Plan
 <!-- TESTS: globals_swf5, globals_swf6, globals_swf7, globals_swf8, global_swf5_6_7_8_9, global_swf6_7_8, global_instance_decls, global_proto_decls, global_proto_decls_delete, swf5_global_funcs, swf6_global_funcs, swf7_global_funcs, math_min_max, parse_int, parse_float, is_finite, is_finite_swf6, primitive_type_globals, printjob_props_swf5, printjob_props_swf6, printjob_props_swf7, context_menu, context_menu_item, localconnection_properties, sound_props_swf5, sound_props_swf6, native_objects_swf6, native_objects_swf7, native_objects_swf8, native_subclasses, as_set_prop_flags -->
 
+<!-- PLAN_META
+id: GLOBALS
+status: blocked
+phases:
+  - id: 1
+    name: "Register missing global constructors (stubs)"
+    status: complete
+  - id: 2
+    name: "Math object methods"
+    status: complete
+  - id: 3
+    name: "Fix parseInt"
+    status: complete
+  - id: 4
+    name: "Fix parseFloat and isFinite"
+    status: complete
+  - id: 5
+    name: "flash.* namespace (SWF8+)"
+    status: complete
+  - id: 6
+    name: "Primitive type improvements"
+    status: complete
+  - id: 7
+    name: "Prototype methods for stub classes"
+    status: complete
+  - id: 8a
+    name: "Match global registration order"
+    status: complete
+  - id: 8b
+    name: "Add missing global stubs"
+    status: complete
+  - id: 8c-2
+    name: "Populate own_props on every constructor"
+    status: complete
+  - id: 8c-2.5
+    name: "DONT_DELETE flags and actionDelete fix"
+    status: complete
+  - id: 8c-3
+    name: "Register System + flash + textRenderer on _global"
+    status: complete
+  - id: 8c-4
+    name: "Add missing properties on existing objects"
+    status: blocked
+  - id: 8c-5
+    name: "Property flags cleanup"
+    status: blocked
+  - id: 8c-6
+    name: "flash.* constructor own_props property order"
+    status: blocked
+  - id: 8d
+    name: "Instance construction differences"
+    status: blocked
+dependencies: []
+blockers:
+  - blocker: 4
+    reason: "Constructor/__proto__ DONT_ENUM vs ENUMERABLE conflict"
+-->
+
 Last updated: 2026-03-14
 
 ## Status: BLOCKED — Phases 1-8c-3 DONE, Phase 8c-2.5 DONE, Phase 8c-4+ blocked

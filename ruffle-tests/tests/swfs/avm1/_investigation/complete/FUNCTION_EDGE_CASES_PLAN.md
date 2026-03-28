@@ -1,6 +1,13 @@
 # Function Edge Cases Plan
 <!-- TESTS: function_as_function, funky_function_calls, asfunction -->
 
+<!-- PLAN_META
+id: FUNCTION_EDGE_CASES
+status: complete
+dependencies: []
+blockers: []
+-->
+
 Last updated: 2026-03-07
 
 ## Status: COMPLETE — 2/3 PASS, asfunction permanently deferred (requires user interaction simulation)

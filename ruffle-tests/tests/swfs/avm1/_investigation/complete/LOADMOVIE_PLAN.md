@@ -1,6 +1,38 @@
 # LoadMovie / Multi-SWF Infrastructure Plan
 <!-- TESTS: loadmovie, loadmovie_fail, loadmovie_flashvars, loadmovie_method, loadmovie_registerclass, loadmovie_replace_root, loadmovie_var_persistence, loadmovienum, loadmovienum_cross_version_prototype, loadvariables, loadvariables2, loadvariables_method, loadvariablesnum, mcl_as_broadcaster, mcl_events_swf_version, mcl_getprogress, mcl_loadclip, mcl_unloadclip, moviecliploader_flashvars, mcl_loadclip_properties, mcl_loadclip_replace_root, mcl_mislabeled_target, mcl_replace_root_swf7_to_swf5, mcl_replace_root_swf7_to_swf6, mcl_target_gif87a, mcl_target_gif89a, mcl_target_jpg, mcl_target_png, loading_avm2, unloadmovie, unloadmovie_method, unloadmovienum, movieclip_invalid_get_bounds_1, movieclip_invalid_get_bounds_2, movieclip_invalid_get_bounds_3, movieclip_invalid_get_bounds_4, movieclip_invalid_get_bounds_5, movieclip_invalid_get_bounds_6, movieclip_invalid_get_bounds_7, movieclip_invalid_get_bounds_8, root_button_mode, movieclip_state_values, movieclip_library_state_values, movieclip_methods_with_loaded_image, do_init_action_child, register_class, register_class_swf6, global_swf5_6_7_8_9, global_swf6_7_8 -->
 
+<!-- PLAN_META
+id: LOADMOVIE
+status: complete
+phases:
+  - id: 0
+    name: "Child SWF compilation (verify_output.py) —"
+    status: complete
+  - id: 1
+    name: "_level management (runtime) —"
+    status: complete
+  - id: 2
+    name: "Core loadMovie (runtime) — PARTIAL ✅"
+    status: complete
+  - id: 3
+    name: "actionGetURL2 routing —"
+    status: complete
+  - id: 4
+    name: "MovieClipLoader class —"
+    status: complete
+  - id: 5
+    name: "unloadMovie —"
+    status: complete
+  - id: 6
+    name: "Cross-version global isolation"
+    status: complete
+  - id: 7
+    name: "loadVariables —"
+    status: complete
+dependencies: []
+blockers: []
+-->
+
 Last updated: 2026-03-10
 
 ## Status: MOSTLY COMPLETE — 31/35 core loadMovie tests passing locally

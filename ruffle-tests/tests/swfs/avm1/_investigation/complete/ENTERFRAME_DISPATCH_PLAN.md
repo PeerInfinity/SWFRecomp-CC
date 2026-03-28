@@ -1,6 +1,16 @@
 # onEnterFrame Per-Tick Dispatch Plan
 <!-- TESTS: issue_1104, string_paths_variable_scopes -->
 
+<!-- PLAN_META
+id: ENTERFRAME_DISPATCH
+status: complete
+dependencies:
+  - plan: FRAME_NAVIGATION
+    type: requires
+    reason: "onEnterFrame dispatch is part of frame loop"
+blockers: []
+-->
+
 Last updated: 2026-03-03
 
 ## Status: COMPLETE

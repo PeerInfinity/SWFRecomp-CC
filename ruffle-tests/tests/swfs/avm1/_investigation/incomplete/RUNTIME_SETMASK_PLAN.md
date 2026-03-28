@@ -1,6 +1,29 @@
 # Runtime setMask() Rendering Plan
 <!-- TESTS: mask_reapply, mask_with_drawing, movieclip_setmask -->
 
+<!-- PLAN_META
+id: RUNTIME_SETMASK
+status: not_started
+phases:
+  - id: 1
+    name: "Implement masked_drawing_render_cb"
+    status: not_started
+  - id: 2
+    name: "Handle stencil clear"
+    status: not_started
+  - id: 3
+    name: "Extend to tag-placed display objects"
+    status: not_started
+  - id: 4
+    name: "Test and debug"
+    status: not_started
+dependencies:
+  - plan: DRAWING_API_RENDERING
+    type: complements
+    reason: "mask_with_drawing and movieclip_setmask tests need both plans"
+blockers: []
+-->
+
 Last updated: 2026-03-27
 
 ## Status: NOT STARTED — Tier 3/7 (stencil infrastructure exists, needs host-level integration)
