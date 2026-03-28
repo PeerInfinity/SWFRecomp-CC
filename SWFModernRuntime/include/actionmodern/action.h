@@ -535,6 +535,19 @@ typedef struct TextFieldRenderInfo {
 typedef void (*TextFieldRenderCallback)(const TextFieldRenderInfo* info, void* user_data);
 int actionIterateTextFields(TextFieldRenderCallback cb, void* user_data);
 
+// Text field glyph rendering info (used by tag.c for headless glyph rendering)
+typedef struct TextFieldGlyphInfo {
+    u16 font_id;          // SWF font ID
+    u16 font_height;      // font size in twips
+    u32 text_color;       // 24-bit RGB
+    float x, y, w, h;    // field bounds in pixels
+    const char* text_utf8; // text content (UTF-8, null-terminated)
+    size_t text_len;      // text length in bytes
+} TextFieldGlyphInfo;
+
+typedef void (*TextFieldGlyphCallback)(const TextFieldGlyphInfo* info, void* user_data);
+int actionIterateTextFieldGlyphs(TextFieldGlyphCallback cb, void* user_data);
+
 // Focus rect rendering info (used by tag.c in graphics mode)
 typedef struct FocusRectInfo {
 	float x, y, w, h;  // world-space bounds in twips

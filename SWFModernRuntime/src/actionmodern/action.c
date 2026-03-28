@@ -16959,6 +16959,76 @@ int actionIterateTextFields(TextFieldRenderCallback cb, void* user_data)
 	return count;
 }
 
+// Iterate text fields and provide glyph rendering info (text content, font, color).
+int actionIterateTextFieldGlyphs(TextFieldGlyphCallback cb, void* user_data)
+{
+	int count = 0;
+	static char _tfg_utf8[4096]; // shared buffer for UTF-8 conversion
+	for (int i = 0; i < child_mc_count; i++) {
+		MovieClip* mc = child_mc_cache[i];
+		if (mc == NULL || mc->depth == INT_MIN) continue;
+		if (!MC_IS_TEXTFIELD(mc)) continue;
+		if (mc->dynamic_props == NULL) continue;
+		if (!mc->visible) continue;
+
+		ASObject* props = (ASObject*)mc->dynamic_props;
+
+		// Get text content
+		ActionVar* text_var = getProperty(props, "text", 4);
+		if (!text_var || text_var->type != ACTION_STACK_VALUE_STRING) continue;
+		if (text_var->str_size == 0) continue;
+
+		const uint16_t* u16ptr = varGetU16Ptr(text_var);
+		if (!u16ptr) continue;
+		u16_to_utf8(u16ptr, text_var->str_size, _tfg_utf8, sizeof(_tfg_utf8));
+		size_t utf8_len = strlen(_tfg_utf8);
+		if (utf8_len == 0) continue;
+
+		// Get font info: _tf_fontId/_tf_fontHeight from TextFormat, or static metadata
+		u16 font_id = 0;
+		u16 font_height = 240; // 12px default
+		{
+			ActionVar* fid_prop = getProperty(props, "_tf_fontId", 10);
+			ActionVar* fh_prop = getProperty(props, "_tf_fontHeight", 14);
+			if (fid_prop) font_id = (u16)varToDoubleSimple(fid_prop);
+			else if (mc->ng_textfield_idx >= 0) font_id = ng_getTextFieldFontId(mc->ng_textfield_idx);
+			if (fh_prop) font_height = (u16)varToDoubleSimple(fh_prop);
+			else if (mc->ng_textfield_idx >= 0) font_height = ng_getTextFieldFontHeight(mc->ng_textfield_idx);
+		}
+
+		// Get text color
+		u32 text_color = 0x000000;
+		{
+			ActionVar* tc = getProperty(props, "textColor", 9);
+			if (tc) text_color = (u32)varToDoubleSimple(tc);
+		}
+
+		// Get visual offset (negative createTextField dimensions)
+		float vis_off_x = 0.0f, vis_off_y = 0.0f;
+		{
+			ActionVar* vox = getProperty(props, "_tf_visualOffX", 14);
+			if (vox) vis_off_x = (float)varToDoubleSimple(vox);
+			ActionVar* voy = getProperty(props, "_tf_visualOffY", 14);
+			if (voy) vis_off_y = (float)varToDoubleSimple(voy);
+		}
+
+		TextFieldGlyphInfo info;
+		info.font_id = font_id;
+		info.font_height = font_height;
+		info.text_color = text_color;
+		info.x = mc->x + vis_off_x;
+		info.y = mc->y + vis_off_y;
+		info.w = mc->width;
+		info.h = mc->height;
+		info.text_utf8 = _tfg_utf8;
+		info.text_len = utf8_len;
+
+		cb(&info, user_data);
+		count++;
+	}
+	return count;
+}
+
 // ---------------------------------------------------------------------------
 // Drawing API — Path recording, tessellation, and iterator
 // ---------------------------------------------------------------------------

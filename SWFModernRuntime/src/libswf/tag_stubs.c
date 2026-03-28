@@ -100,6 +100,7 @@ static struct {
 	u16 code_table[MAX_FONT_GLYPHS];   // glyph index → Unicode code point
 	s16 advance_table[MAX_FONT_GLYPHS]; // glyph index → advance width (EM units)
 	size_t glyph_count;
+	size_t glyph_base; // starting index in global glyph_data[] for this font's glyphs
 	int is_builtin; // 1 = lazy-registered fallback (Noto Sans), not from SWF DefineFont
 } ng_fonts[MAX_FONTS_NG];
 static size_t ng_font_count = 0;
@@ -560,6 +561,16 @@ void ng_record_font_metrics(SWFAppContext* app_context, u16 font_id,
 	}
 }
 
+void ng_record_font_glyph_base(u16 font_id, size_t glyph_base)
+{
+	for (size_t i = 0; i < ng_font_count; i++) {
+		if (ng_fonts[i].font_id == font_id) {
+			ng_fonts[i].glyph_base = glyph_base;
+			return;
+		}
+	}
+}
+
 // Ensure the built-in Noto Sans fallback is registered.
 // Called lazily when font_id=0 is requested and no font with id 0 exists.
 static int ng_builtin_font_registered = 0;
@@ -603,7 +614,7 @@ static int ng_find_font(u16 font_id)
 
 // Find a font with metrics. If the given font_id has no metrics, fall back to
 // the built-in Noto Sans font (device font substitute). Returns -1 if none found.
-static int ng_find_font_with_metrics(u16 font_id)
+int ng_find_font_with_metrics(u16 font_id)
 {
 	int fi = ng_find_font(font_id);
 	if (fi >= 0 && ng_fonts[fi].has_metrics) return fi;
@@ -623,6 +634,44 @@ static s16 ng_font_glyph_advance(int font_idx, u16 code_point)
 			return ng_fonts[font_idx].advance_table[j];
 	}
 	return -1;
+}
+
+// Find glyph index within a font for a Unicode code point.
+// Returns the glyph index (for use with glyph_base), or -1 if not found.
+int ng_font_find_glyph(int font_idx, u16 code_point)
+{
+	if (font_idx < 0 || (size_t)font_idx >= ng_font_count) return -1;
+	for (size_t j = 0; j < ng_fonts[font_idx].glyph_count; j++) {
+		if (ng_fonts[font_idx].code_table[j] == code_point)
+			return (int)j;
+	}
+	return -1;
+}
+
+// Get the glyph_base for a font (starting index in global glyph_data[]).
+size_t ng_font_get_glyph_base(int font_idx)
+{
+	if (font_idx < 0 || (size_t)font_idx >= ng_font_count) return 0;
+	return ng_fonts[font_idx].glyph_base;
+}
+
+// Get font metrics for rendering (ascent, em_square, advance).
+int ng_font_get_metrics(int font_idx, s16* ascent, s16* descent, int* em_square)
+{
+	if (font_idx < 0 || (size_t)font_idx >= ng_font_count) return 0;
+	if (!ng_fonts[font_idx].has_metrics) return 0;
+	if (ascent) *ascent = ng_fonts[font_idx].ascent;
+	if (descent) *descent = ng_fonts[font_idx].descent;
+	if (em_square) *em_square = ng_fonts[font_idx].em_square;
+	return 1;
+}
+
+// Get glyph advance width by glyph index (not codepoint). Returns EM units or -1.
+s16 ng_font_glyph_advance_by_idx(int font_idx, int glyph_idx)
+{
+	if (font_idx < 0 || (size_t)font_idx >= ng_font_count) return -1;
+	if (glyph_idx < 0 || (size_t)glyph_idx >= ng_fonts[font_idx].glyph_count) return -1;
+	return ng_fonts[font_idx].advance_table[glyph_idx];
 }
 
 // Decode one UTF-8 character from text[*pos], advance *pos past it.

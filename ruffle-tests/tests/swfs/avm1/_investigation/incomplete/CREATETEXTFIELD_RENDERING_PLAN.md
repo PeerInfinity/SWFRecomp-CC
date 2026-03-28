@@ -3,17 +3,17 @@
 
 Last updated: 2026-03-27
 
-## Status: PHASE 1+2 COMPLETE — Phase 3 (glyph rendering) planned below
+## Status: PHASE 1-3 COMPLETE — Remaining tests blocked on device fonts
 
 ### Image Test Status
 
 | Test | Tolerance | Status | Notes |
 |------|-----------|--------|-------|
-| frame_size_translated_negative | max_outliers=1 | **PASS** (0 outliers) | Background/border already worked |
-| frame_size_translated_positive | max_outliers=1 | **PASS** (0 outliers) | Background/border already worked |
+| frame_size_translated_negative | max_outliers=1 | **PASS** (0 outliers) | Background/border rendering |
+| frame_size_translated_positive | max_outliers=1 | **PASS** (0 outliers) | Background/border rendering |
 | movieclip_create_text_field | trigger-based | **PASS** (0 outliers) | Fixed negative dimension positioning |
-| edittext_tag_indent | 128, known_failure | FAIL (6336 outliers) | Needs glyph rendering |
-| edittext_stylesheet | 64 | FAIL (33126 outliers) | Needs glyph rendering |
+| edittext_tag_indent | 128, known_failure | FAIL (6336 outliers) | **Device font** — no embedded glyph shapes |
+| edittext_stylesheet | 64 | FAIL (33126 outliers) | **Device font** — no embedded glyph shapes |
 
 ### Changes Already Made (Phase 1+2)
 

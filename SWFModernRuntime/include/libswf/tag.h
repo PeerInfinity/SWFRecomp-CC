@@ -105,6 +105,7 @@ void tagDefineFontInfo(SWFAppContext* app_context, u16 font_id, const char* name
 void tagDefineFontMetrics(SWFAppContext* app_context, u16 font_id,
     s16 ascent, s16 descent, s16 leading, int em_square,
     const u16* code_table, const s16* advance_table, size_t glyph_count);
+void tagDefineFontGlyphBase(u16 font_id, size_t glyph_base);
 void tagDefineVideoStream(SWFAppContext* app_context, u16 char_id);
 void tagRegisterExport(SWFAppContext* app_context, const char* name, size_t char_id);
 void tagImportCharacter(SWFAppContext* app_context, size_t local_char_id, const char* export_name);
@@ -292,6 +293,12 @@ void ng_record_font(SWFAppContext* app_context, u16 font_id, const char* name, i
 void ng_record_font_metrics(SWFAppContext* app_context, u16 font_id,
     s16 ascent, s16 descent, s16 leading, int em_square,
     const u16* code_table, const s16* advance_table, size_t glyph_count);
+void ng_record_font_glyph_base(u16 font_id, size_t glyph_base);
+int ng_find_font_with_metrics(u16 font_id);
+int ng_font_find_glyph(int font_idx, u16 code_point);
+size_t ng_font_get_glyph_base(int font_idx);
+int ng_font_get_metrics(int font_idx, s16* ascent, s16* descent, int* em_square);
+s16 ng_font_glyph_advance_by_idx(int font_idx, int glyph_idx);
 void ng_setTabStops(const int* stops_twips, int count, u16 font_height);
 void ng_clearTabStops(void);
 int ng_computeTextWidth(u16 font_id, u16 font_height, const char* text, size_t text_len,

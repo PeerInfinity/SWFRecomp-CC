@@ -1618,6 +1618,92 @@ static void textfield_render_cb(const TextFieldRenderInfo* info, void* user_data
 	}
 }
 
+// Callback for actionIterateTextFieldGlyphs: render text field glyph shapes.
+// Reads glyph vertices from shape_data, applies CPU-side transform, renders via draw_tris.
+static void textfield_glyph_render_cb(const TextFieldGlyphInfo* info, void* user_data)
+{
+	(void)user_data;
+	extern u32 shape_data[][4];
+	extern u32 glyph_data[][1];
+
+	int font_idx = ng_find_font_with_metrics(info->font_id);
+	if (font_idx < 0) return;
+
+	s16 ascent = 0;
+	int em_square = 1024;
+	if (!ng_font_get_metrics(font_idx, &ascent, NULL, &em_square)) return;
+	if (em_square == 0) return;
+
+	size_t glyph_base = ng_font_get_glyph_base(font_idx);
+	float scale = (float)info->font_height / (float)em_square;
+
+	float r = ((info->text_color >> 16) & 0xFF) / 255.0f;
+	float g = ((info->text_color >> 8) & 0xFF) / 255.0f;
+	float b = (info->text_color & 0xFF) / 255.0f;
+
+	// 2px gutter on each side (Flash text field internal padding)
+	float gutter_twips = 40.0f;
+	float x_pos = info->x * 20.0f + gutter_twips;
+	float y_pos = info->y * 20.0f + (float)ascent * scale + gutter_twips;
+
+	// Max 512 triangle vertices per draw_tris call (batch by glyph)
+	static float xy_buf[1024];
+
+	const char* text = info->text_utf8;
+	size_t text_len = info->text_len;
+	size_t pos = 0;
+
+	while (pos < text_len) {
+		// Decode one UTF-8 character
+		unsigned char c0 = (unsigned char)text[pos];
+		u16 cp;
+		if (c0 >= 0xC0 && c0 < 0xE0 && pos + 1 < text_len) {
+			cp = ((c0 & 0x1F) << 6) | ((unsigned char)text[pos + 1] & 0x3F);
+			pos += 2;
+		} else if (c0 >= 0xE0 && c0 < 0xF0 && pos + 2 < text_len) {
+			cp = ((c0 & 0x0F) << 12) | (((unsigned char)text[pos + 1] & 0x3F) << 6) |
+			     ((unsigned char)text[pos + 2] & 0x3F);
+			pos += 3;
+		} else {
+			cp = c0;
+			pos += 1;
+		}
+
+		// Newline: advance y, reset x
+		if (cp == '\n' || cp == '\r') {
+			x_pos = info->x * 20.0f + gutter_twips;
+			y_pos += (float)info->font_height;
+			continue;
+		}
+
+		int glyph_idx = ng_font_find_glyph(font_idx, cp);
+		if (glyph_idx < 0) continue; // missing glyph — skip
+
+		// Global glyph index
+		size_t global_idx = glyph_base + (size_t)glyph_idx;
+		size_t g_offset = (size_t)glyph_data[2 * global_idx][0];
+		size_t g_size = (size_t)glyph_data[2 * global_idx + 1][0];
+
+		if (g_size > 0 && g_size <= 512) {
+			// Transform glyph vertices: scale from EM space + translate to position
+			for (size_t v = 0; v < g_size; v++) {
+				union { u32 u; float f; } vx, vy;
+				vx.u = shape_data[g_offset + v][0];
+				vy.u = shape_data[g_offset + v][1];
+				xy_buf[2 * v]     = vx.f * scale + x_pos;
+				xy_buf[2 * v + 1] = vy.f * scale + y_pos;
+			}
+			renderer_draw_tris(context, xy_buf, (u32)g_size, r, g, b, 1.0f, 0, 0);
+		}
+
+		// Advance x by glyph advance width
+		s16 adv = ng_font_glyph_advance_by_idx(font_idx, glyph_idx);
+		if (adv >= 0) {
+			x_pos += (float)adv * scale;
+		}
+	}
+}
+
 // Helper: render a single drawing path (fill + stroke), handling gradients
 static void render_drawing_path(const DrawingRenderInfo* info)
 {
@@ -1886,8 +1972,9 @@ void tagRerenderFrame(SWFAppContext* app_context)
 	if (active_clip_depth > 0)
 		renderer_end_clip(context);
 
-	// Text field backgrounds/borders
+	// Text field backgrounds/borders and glyph rendering
 	actionIterateTextFields(textfield_render_cb, NULL);
+	actionIterateTextFieldGlyphs(textfield_glyph_render_cb, NULL);
 
 	// Drawing API fills and strokes
 	actionIterateDrawings(drawing_render_cb, NULL);
@@ -2323,10 +2410,11 @@ void tagShowFrame(SWFAppContext* app_context)
 		renderer_end_clip(context);
 	}
 
-	// --- Render text field backgrounds and borders ---
+	// --- Render text field backgrounds, borders, and glyphs ---
 	// Dynamic text fields (createTextField) are tracked in child_mc_cache but not
 	// on the tag display list. Render their background/border rectangles here.
 	actionIterateTextFields(textfield_render_cb, NULL);
+	actionIterateTextFieldGlyphs(textfield_glyph_render_cb, NULL);
 
 	// --- Render Drawing API fills and strokes ---
 	actionIterateDrawings(drawing_render_cb, NULL);
@@ -4247,6 +4335,15 @@ void tagDefineFontMetrics(SWFAppContext* app_context, u16 font_id,
 #else
 	(void)app_context; (void)font_id; (void)ascent; (void)descent; (void)leading;
 	(void)em_square; (void)code_table; (void)advance_table; (void)glyph_count;
+#endif
+}
+
+void tagDefineFontGlyphBase(u16 font_id, size_t glyph_base)
+{
+#ifdef NO_GRAPHICS
+	ng_record_font_glyph_base(font_id, glyph_base);
+#else
+	(void)font_id; (void)glyph_base;
 #endif
 }
 

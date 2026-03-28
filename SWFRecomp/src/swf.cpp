@@ -1739,7 +1739,14 @@ namespace SWFRecomp
 								 << "font_" << font_id << "_advances, "
 								 << to_string(codes.size())
 								 << ");" << endl
-								 << "\t" << "}";
+								 << "\t" << "}" << endl;
+						// Emit glyph base index for runtime glyph rendering
+						auto gb_it = font_glyph_bases.find(font_id);
+						if (gb_it != font_glyph_bases.end()) {
+							context.tag_main << "\t" << "tagDefineFontGlyphBase("
+								 << to_string(font_id) << ", "
+								 << to_string(gb_it->second) << ");";
+						}
 					}
 				}
 
