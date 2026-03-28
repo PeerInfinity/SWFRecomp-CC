@@ -11,6 +11,9 @@
 #define STB_IMAGE_IMPLEMENTATION
 #include <stb_image.h>
 
+#define STB_TRUETYPE_IMPLEMENTATION
+#include <stb_truetype.h>
+
 #include <swf.hpp>
 
 #define MIN(x, y) ((x < y) ? x : y)
@@ -19,6 +22,66 @@
 #define VAL(type, x) (*((type*) x))
 
 #define CROSS(v1, v2) (v1.x*v2.y - v2.x*v1.y)
+
+// ---------------------------------------------------------------------------
+// Device font (Noto Sans) for headless glyph rendering
+// ---------------------------------------------------------------------------
+static stbtt_fontinfo g_device_font;
+static bool g_device_font_loaded = false;
+static bool g_device_font_ok = false;
+static unsigned char* g_device_font_data = NULL;
+
+static std::string g_device_font_path; // set from argv[0] or explicit path
+
+static bool loadDeviceFont()
+{
+	if (g_device_font_loaded) return g_device_font_ok;
+	g_device_font_loaded = true;
+
+	// Try explicit path first, then paths relative to the binary
+	std::vector<std::string> paths;
+	if (!g_device_font_path.empty()) paths.push_back(g_device_font_path);
+	paths.push_back("assets/NotoSans.ttf");
+	paths.push_back("../assets/NotoSans.ttf");
+	paths.push_back("SWFRecomp/assets/NotoSans.ttf");
+	paths.push_back("../SWFRecomp/assets/NotoSans.ttf");
+	// Also try relative to /proc/self/exe on Linux
+	{
+		char exe_path[4096];
+		ssize_t len = readlink("/proc/self/exe", exe_path, sizeof(exe_path) - 1);
+		if (len > 0) {
+			exe_path[len] = '\0';
+			std::string exe_dir(exe_path);
+			size_t slash = exe_dir.rfind('/');
+			if (slash != std::string::npos) {
+				exe_dir = exe_dir.substr(0, slash);
+				paths.push_back(exe_dir + "/../assets/NotoSans.ttf");
+				paths.push_back(exe_dir + "/assets/NotoSans.ttf");
+			}
+		}
+	}
+
+	FILE* f = NULL;
+	for (auto& p : paths) {
+		f = fopen(p.c_str(), "rb");
+		if (f) break;
+	}
+	if (!f) return false;
+	fseek(f, 0, SEEK_END);
+	long sz = ftell(f);
+	fseek(f, 0, SEEK_SET);
+	g_device_font_data = (unsigned char*)malloc(sz);
+	if (fread(g_device_font_data, 1, sz, f) != (size_t)sz) {
+		free(g_device_font_data);
+		g_device_font_data = NULL;
+		fclose(f);
+		return false;
+	}
+	fclose(f);
+	g_device_font_ok = stbtt_InitFont(&g_device_font, g_device_font_data,
+		stbtt_GetFontOffsetForIndex(g_device_font_data, 0)) != 0;
+	return g_device_font_ok;
+}
 
 #define NOT_SHARED_LINKS(path1, path2) (std::find(path1.next_neighbors_forward.begin(), path1.next_neighbors_forward.end(), &path2) == path1.next_neighbors_forward.end() && \
 										std::find(path2.next_neighbors_forward.begin(), path2.next_neighbors_forward.end(), &path1) == path2.next_neighbors_forward.end() && \
@@ -1608,6 +1671,8 @@ namespace SWFRecomp
 				// Record this font's base index in global glyph_data
 				font_glyph_bases[font_id] = current_glyph;
 
+				// Collect glyph entries — device font fallback may patch empty ones later
+				std::vector<std::pair<size_t, size_t>> font_glyph_entries;
 				for (u16 i = 0; i < num_entries; ++i)
 				{
 					size_t glyph_start = 3*current_tri;
@@ -1616,11 +1681,7 @@ namespace SWFRecomp
 					interpretShape(context, tag);
 
 					size_t glyph_size = 3*current_tri - glyph_start;
-
-					glyph_data << "\t" << to_string(glyph_start) << "," << endl
-							   << "\t" << to_string(glyph_size) << "," << endl;
-
-					current_glyph += 1;
+					font_glyph_entries.push_back({glyph_start, glyph_size});
 				}
 
 				// Read code table for DefineFont2/3
@@ -1672,6 +1733,118 @@ namespace SWFRecomp
 
 					// Skip any remaining data (bounds table, kerning, etc.)
 					cur_pos = font_tag_start + font_tag_length;
+				}
+
+				// Device font fallback: if glyph shapes are empty, tessellate from Noto Sans TTF
+				if (font_code_tables.count(font_id) && loadDeviceFont())
+				{
+					float swf_em = font_em_square.count(font_id) ? font_em_square[font_id] : 1024.0f;
+					float ttf_scale = swf_em / 1000.0f; // Noto Sans EM = 1000
+
+					for (u16 i = 0; i < num_entries; i++) {
+						if (font_glyph_entries[i].second != 0) continue; // already has shapes
+						if (i >= font_code_tables[font_id].size()) continue;
+
+						u16 codepoint = font_code_tables[font_id][i];
+						int ttf_glyph = stbtt_FindGlyphIndex(&g_device_font, codepoint);
+						if (ttf_glyph <= 0) continue;
+
+						stbtt_vertex* verts = NULL;
+						int num_verts = stbtt_GetGlyphShape(&g_device_font, ttf_glyph, &verts);
+						if (num_verts <= 0) continue;
+
+						// Build polygon contours from TTF outline
+						std::vector<std::vector<std::array<Coord, 2>>> polygon;
+						std::vector<std::array<Coord, 2>> contour;
+
+						for (int v = 0; v < num_verts; v++) {
+							if (verts[v].type == STBTT_vmove) {
+								if (!contour.empty()) {
+									polygon.push_back(contour);
+									contour.clear();
+								}
+							} else if (verts[v].type == STBTT_vline) {
+								contour.push_back({
+									(Coord)(verts[v].x * ttf_scale),
+									(Coord)(-verts[v].y * ttf_scale)
+								});
+							} else if (verts[v].type == STBTT_vcurve) {
+								// Quadratic bezier subdivision
+								float x0, y0;
+								if (!contour.empty()) {
+									x0 = (float)contour.back()[0];
+									y0 = (float)contour.back()[1];
+								} else { x0 = 0; y0 = 0; }
+								float cx = verts[v].cx * ttf_scale;
+								float cy = -verts[v].cy * ttf_scale;
+								float x1 = verts[v].x * ttf_scale;
+								float y1 = -verts[v].y * ttf_scale;
+								for (int s = 1; s <= 6; s++) {
+									float t = (float)s / 6.0f;
+									float it = 1.0f - t;
+									contour.push_back({
+										(Coord)(it*it*x0 + 2*it*t*cx + t*t*x1),
+										(Coord)(it*it*y0 + 2*it*t*cy + t*t*y1)
+									});
+								}
+							} else if (verts[v].type == STBTT_vcubic) {
+								// Cubic bezier subdivision
+								float x0, y0;
+								if (!contour.empty()) {
+									x0 = (float)contour.back()[0];
+									y0 = (float)contour.back()[1];
+								} else { x0 = 0; y0 = 0; }
+								float cx1 = verts[v].cx * ttf_scale;
+								float cy1 = -verts[v].cy * ttf_scale;
+								float cx2 = verts[v].cx1 * ttf_scale;
+								float cy2 = -verts[v].cy1 * ttf_scale;
+								float x1 = verts[v].x * ttf_scale;
+								float y1 = -verts[v].y * ttf_scale;
+								for (int s = 1; s <= 8; s++) {
+									float t = (float)s / 8.0f;
+									float it = 1.0f - t;
+									contour.push_back({
+										(Coord)(it*it*it*x0 + 3*it*it*t*cx1 + 3*it*t*t*cx2 + t*t*t*x1),
+										(Coord)(it*it*it*y0 + 3*it*it*t*cy1 + 3*it*t*t*cy2 + t*t*t*y1)
+									});
+								}
+							}
+						}
+						if (!contour.empty()) polygon.push_back(contour);
+						stbtt_FreeShape(&g_device_font, verts);
+
+						if (polygon.empty() || polygon[0].size() < 3) continue;
+
+						std::vector<N> indices = mapbox::earcut<N>(polygon);
+						if (indices.size() < 3) continue;
+
+						// Flatten polygon for index lookup
+						std::vector<std::array<Coord, 2>> all_pts;
+						for (auto& ring : polygon)
+							for (auto& pt : ring)
+								all_pts.push_back(pt);
+
+						font_glyph_entries[i].first = 3 * current_tri;
+						font_glyph_entries[i].second = indices.size();
+
+						for (size_t idx = 0; idx < indices.size(); idx++) {
+							float x_f = (float)all_pts[indices[idx]][0];
+							float y_f = (float)all_pts[indices[idx]][1];
+							shape_data << "\t{ "
+								<< std::hex << std::uppercase
+								<< "0x" << VAL(u32, &x_f) << ", "
+								<< "0x" << VAL(u32, &y_f) << ", "
+								<< "0x00, 0x00 }," << std::dec << endl;
+						}
+						current_tri += indices.size() / 3;
+					}
+				}
+
+				// Write glyph_data entries for this font
+				for (u16 i = 0; i < num_entries; i++) {
+					glyph_data << "\t" << to_string(font_glyph_entries[i].first) << "," << endl
+							   << "\t" << to_string(font_glyph_entries[i].second) << "," << endl;
+					current_glyph += 1;
 				}
 
 				// Always skip to end of font tag data (handles 0-glyph fonts,
