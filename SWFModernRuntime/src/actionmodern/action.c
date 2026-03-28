@@ -14076,10 +14076,11 @@ static MovieClip* findOrCreateMovieClip(SWFAppContext* app_context, const char* 
 				const char* init_text = ng_getTextFieldInitialText(depth);
 				char* init_text_ml = NULL;
 				if ((tf_flags & 0x0002) && ng_getTextFieldVariableName(tf_idx)[0] == '\0'
-			    && (tf_flags & 0x0040) /* HTML only: paragraph structure produces trailing newline */
-			    && (init_text[0] != '\0')) {
+			    && (tf_flags & 0x0040)) {
 					// Multiline HTML with no variable binding: append trailing newline
-					// (HTML paragraph structure <p></p> produces a trailing newline)
+					// (HTML paragraph structure <p></p> produces a trailing newline,
+					//  even for empty text fields. Non-HTML multiline fields do NOT
+					//  get a trailing newline — their text content is literal.)
 					size_t _ml_len = strlen(init_text);
 					init_text_ml = (char*) malloc(_ml_len + 2);
 					memcpy(init_text_ml, init_text, _ml_len);
