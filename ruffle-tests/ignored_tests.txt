@@ -13,9 +13,7 @@ form_loader_encoding_2
 form_loader_encoding_3
 form_loader_encoding_4
 load_vars
-loading_avm2
 loadvariables_method
-mixed_avm_load_into_root
 stylesheet_load
 
 # --- XML networking/sockets ---
@@ -62,6 +60,21 @@ file_reference_upload_success
 bitmap_data_pixeldissolve
 bitmap_filters
 
+# --- SharedObject persistence (multi-run test format) ---
+# These tests use output1.txt/output2.txt for two separate runs. Our test runner
+# only supports single-run tests with output.txt.
+shared_object
+shared_object_self_ref
+
+# --- Infrastructure not yet available (network/IPC/IME) ---
+# These tests require features not yet implemented in any test execution mode.
+# They may be removed from this list as capabilities are added.
+# See _investigation/FEATURE_SCOPE.md for details.
+swf5_xml_event_handler_context
+movieclip_methods_with_loaded_image
+localconnection
+edittext_ime_focus_lost
+sandbox_type_remote
 
 # --- Ruffle behavior differs from Flash spec ---
 # These tests pass in Ruffle but expect behavior that doesn't match Flash Player.

@@ -25,6 +25,12 @@ Each suite stores results in its own `_results/` directory:
 
 Each `_results/` directory contains: `results.json`, `results.md`, `results_filtered.json` (if ignore list exists), `results_filtered.md`, `results_diff.json`, `results_diff.md`.
 
+### Cross-suite reference documents
+
+| Document | Purpose |
+|----------|---------|
+| `_investigation/FEATURE_SCOPE.md` | Which features are implemented vs. not, and why |
+
 ### AVM1-specific reference documents
 
 | Document | Purpose |

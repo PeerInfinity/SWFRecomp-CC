@@ -1,14 +1,20 @@
 # Remaining Filtered Failures Analysis
 
-Date: 2026-03-15 (evening)
-CI run: de8b5c0b (559/619 total, 549/563 filtered = 97.5%)
+Date: 2026-03-28
+CI run: 04572868 (562/574 filtered = 97.9%, 620 total, 46 ignored)
 
-13 filtered tests still failing. This document analyzes each one with local test output, root cause, and fix feasibility.
+12 filtered tests still failing. This document analyzes each one with local test output, root cause, and fix feasibility.
 
-## Recently Fixed (this session)
+## Recently Fixed
 
 | Test | Before | After | Fix |
 |------|--------|-------|-----|
+| array_constructor | fail | PASS | Array.join HOLE→"undefined" fix |
+| array_properties | fail | PASS | Array.join HOLE→"undefined" fix |
+| external_interface_toxml_basic | fail | PASS | Array.join HOLE→"undefined" fix |
+| global_array | fail | PASS | Array.join HOLE→"undefined" fix |
+| tab_ordering_properties | fail | PASS | tabIndex coercion fix |
+| string_relational_compare | runtime_error | ignored | UTF-8 error handling fix; moved to ignored (Ruffle behavior diff) |
 | text_blocks_clicks | 3/4 | PASS | DefineText bounds for `_droptarget` |
 | issue_2030 | 2/4 | PASS | `MC.attachBitmap` stub |
 | unload_nested_child | 0/5 | PASS | Nested MC click, recursive child unload, deferred UNLOAD |
@@ -23,24 +29,24 @@ CI run: de8b5c0b (559/619 total, 549/563 filtered = 97.5%)
 
 | Test | Match | Total | Rate | Difficulty | Category |
 |------|-------|-------|------|------------|----------|
-| movieclip_hittest_shapeflag | ~312 | 339 | 92% | Hard | shape hit accuracy |
+| movieclip_hittest_shapeflag | 312 | 338 | 92% | Hard | shape hit accuracy |
 | edittext_drag_select | 6 | 9 | 67% | Not feasible | character-level selection (NO_GRAPHICS) |
-| asfunction | 2 | 12 | 17% | Not feasible | character-level text link hit-testing |
+| asfunction | 0 | 11 | 0% | Not feasible | character-level text link hit-testing |
 | displacementmapfilter_mappoint_throw_error | 0 | 13 | 0% | Hard | filter setter validation + valueOf errors |
 | edittext_ime_focus_lost | 0 | 7 | 0% | Not feasible | IME infrastructure |
-| localconnection | 127 | 580 | 22% | Not feasible | full IPC system |
-| global_proto_decls | ~82 | 4497 | 2% | Very Hard | property flags + stubs |
-| global_instance_decls | ~4 | 758 | 1% | Very Hard | property flags + stubs |
-| global_proto_decls_delete | ~47 | 4158 | 1% | Very Hard | property flags + stubs |
+| localconnection | 74 | 579 | 13% | Not feasible | full IPC system |
+| global_proto_decls | 113 | 4497 | 3% | Very Hard | property flags + stubs |
+| global_instance_decls | 18 | 758 | 2% | Very Hard | property flags + stubs |
+| global_proto_decls_delete | 93 | 4158 | 2% | Very Hard | property flags + stubs |
 | swf5_xml_event_handler_context | 0 | 2 | 0% | Not feasible | XML.load() |
 | movieclip_methods_with_loaded_image | 0 | 4 | 0% | Not feasible | external PNG loading |
-| sandbox_type_remote | 0 | 3 | 0% | Not feasible | multi-SWF sandbox |
+| sandbox_type_remote | 1 | 3 | 33% | Not feasible | multi-SWF sandbox |
 
 ## Tier 1: Potentially Actionable (1 test)
 
-### movieclip_hittest_shapeflag (~312/339 = 92%)
+### movieclip_hittest_shapeflag (312/338 = 92%)
 
-~27 lines wrong (improved from 32). Shape-flag hitTest (`hitTest(x, y, true)`) returns wrong results for various coordinates. Remaining categories: device-font text (11 lines — no font outline data in SWF), curve/stroke precision (10 lines), drawing API bounds (4 lines), stroke-only morphs (4 lines). Incremental improvements possible but full accuracy needs shape rasterization.
+26 lines wrong. Shape-flag hitTest (`hitTest(x, y, true)`) returns wrong results for various coordinates. Remaining categories: device-font text (11 lines — no font outline data in SWF), curve/stroke precision (10 lines), drawing API bounds (4 lines), stroke-only morphs (4 lines). Incremental improvements possible but full accuracy needs shape rasterization.
 
 ## Tier 2: Not Feasible in NO_GRAPHICS Mode (3 tests)
 
@@ -48,7 +54,7 @@ CI run: de8b5c0b (559/619 total, 549/563 filtered = 97.5%)
 
 Requires character-level text layout to map mouse pixel positions to character indices for `<selection>` markers. Not feasible without a text layout engine.
 
-### asfunction (2/12 = 17%)
+### asfunction (0/11 = 0%)
 
 Requires character-level text link hit-testing to determine which `<a href="asfunction:...">` link was clicked at a given pixel position. Same fundamental limitation as edittext_drag_select.
 
@@ -62,21 +68,21 @@ Requires IME (Input Method Editor) infrastructure — text input via IME composi
 
 `DisplacementMapFilter.mapPoint` setter needs to coerce input object's x/y to int32 (creating a proper Point), and handle valueOf errors via try/catch. Also needs integer overflow clamping. Complex setter validation.
 
-### localconnection (127/580 = 22%)
+### localconnection (74/579 = 13%)
 
 Full `LocalConnection` IPC system not implemented. Requires connect/send/close methods, onStatus callbacks, receiver method dispatch. Massive standalone feature.
 
-### global_proto_decls (~82/4497 = 2%)
+### global_proto_decls (113/4497 = 3%)
 
-`constructor` DONT_ENUM conflict, missing class stubs, output truncates early. Enormous surface area. See BLOCKER_SUMMARY.md Blocker 4.
+`constructor` DONT_ENUM conflict, missing class stubs, output truncates early. Enormous surface area. See BLOCKER_SUMMARY.md Blocker 4. Improved from ~82 matching due to Array.join hole fix and other recent changes.
 
-### global_instance_decls (~4/758 = 1%)
+### global_instance_decls (18/758 = 2%)
 
-Same class of problem as global_proto_decls.
+Same class of problem as global_proto_decls. Improved from ~4 matching.
 
-### global_proto_decls_delete (~47/4158 = 1%)
+### global_proto_decls_delete (93/4158 = 2%)
 
-Same root cause as global_proto_decls.
+Same root cause as global_proto_decls. Improved from ~47 matching.
 
 ### swf5_xml_event_handler_context (0/2)
 

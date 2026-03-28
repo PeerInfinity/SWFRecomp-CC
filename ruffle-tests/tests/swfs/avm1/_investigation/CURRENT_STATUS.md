@@ -1,12 +1,12 @@
 # Current Ruffle Test Status
 
-Last updated: 2026-03-26
+Last updated: 2026-03-28
 
 ## Quick Summary
 
-- **Pass rate (CI, last run)**: 557/575 (96.9%) filtered (CI run on 6f393c83, 18 filtered failures)
+- **Pass rate (CI, last run)**: 562/574 (97.9%) filtered (CI run on 04572868, 12 filtered failures)
 - **Image test baseline**: **7/31 strict image match** (run_image_tests.py, 0-outlier AND 0-max-diff). **9/31 tolerance pass** (within test.toml limits). Strict passes: focusrect_focuslost, focusrect_mouse_swf8/swf9, focusrect_swf6, frame_size_translated_neg/pos, mask_with_drawing. Tolerance-only: display_object_properties (max_diff=79), mask_reapply (max_diff=1).
-- **Main failure types**: output_mismatch (17), runtime_error (1)
+- **Main failure types**: output_mismatch (12)
 - **Known regressions**: None.
 - **Latest fixes (2026-03-26)**:
   - array_constructor PASS (Array.join HOLE→"undefined" fix)
@@ -110,13 +110,13 @@ All other previously near-passing tests have been fixed. 146 tests were tracked 
 ### Actionable — Quick wins (all exhausted)
 All previous quick wins have been fixed. See `SESSION_NOTES.md` for details.
 
-### Remaining failing tests (filtered: ~14 tests)
+### Remaining failing tests (filtered: 12 tests)
 Remaining failures require:
 - **Global enumeration order**: global_proto_decls, global_instance_decls, global_proto_decls_delete (GLOBALS_PLAN Phase 8 blocked)
 - **Mouse/input dispatch**: edittext_drag_select, edittext_ime_focus_lost
-- **Missing features**: localconnection, asfunction, geturl, sandbox_type_remote, displacementmapfilter_mappoint_throw_error
+- **Missing features**: localconnection, asfunction, sandbox_type_remote, displacementmapfilter_mappoint_throw_error
 - **Shape-accurate hitTest**: movieclip_hittest_shapeflag (curves/strokes accuracy)
-- **Other**: swf5_xml_event_handler_context, watch_virtual_property (Ruffle known_failure), movieclip_methods_with_loaded_image
+- **Other**: swf5_xml_event_handler_context, movieclip_methods_with_loaded_image
 
 ### Remaining blocked work (from blocked/ plans)
 - **GLOBALS_PLAN Phase 8** — BLOCKED by enumeration order + missing globals.
