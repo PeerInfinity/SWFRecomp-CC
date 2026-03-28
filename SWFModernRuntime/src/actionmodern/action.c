@@ -8927,14 +8927,111 @@ static ActionVar bitmapDataPerlinNoise(SWFAppContext* app_context, ActionVar* ar
     return r;
 }
 
-// ApplyFilter stub
+// Apply a 4x5 ColorMatrixFilter to a single premultiplied ARGB pixel
+static uint32_t applyColorMatrixPixel(uint32_t argb_premul, const float matrix[20], int transparent)
+{
+    uint32_t a = (argb_premul >> 24) & 0xFF;
+    float fa, fr, fg, fb;
+    if (a == 0) {
+        fa = fr = fg = fb = 0.0f;
+    } else if (a == 255) {
+        fa = 1.0f;
+        fr = ((argb_premul >> 16) & 0xFF) / 255.0f;
+        fg = ((argb_premul >> 8) & 0xFF) / 255.0f;
+        fb = (argb_premul & 0xFF) / 255.0f;
+    } else {
+        fa = a / 255.0f;
+        fr = ((argb_premul >> 16) & 0xFF) / (float)a;
+        fg = ((argb_premul >> 8) & 0xFF) / (float)a;
+        fb = (argb_premul & 0xFF) / (float)a;
+    }
+    float nr = matrix[0]*fr + matrix[1]*fg + matrix[2]*fb  + matrix[3]*fa  + matrix[4]/255.0f;
+    float ng = matrix[5]*fr + matrix[6]*fg + matrix[7]*fb  + matrix[8]*fa  + matrix[9]/255.0f;
+    float nb = matrix[10]*fr + matrix[11]*fg + matrix[12]*fb + matrix[13]*fa + matrix[14]/255.0f;
+    float na = matrix[15]*fr + matrix[16]*fg + matrix[17]*fb + matrix[18]*fa + matrix[19]/255.0f;
+    if (nr < 0) nr = 0; if (nr > 1) nr = 1;
+    if (ng < 0) ng = 0; if (ng > 1) ng = 1;
+    if (nb < 0) nb = 0; if (nb > 1) nb = 1;
+    if (na < 0) na = 0; if (na > 1) na = 1;
+    if (!transparent) na = 1.0f;
+    uint32_t oa = (uint32_t)(na * 255.0f + 0.5f);
+    uint32_t or_ = (uint32_t)(nr * na * 255.0f + 0.5f);
+    uint32_t og = (uint32_t)(ng * na * 255.0f + 0.5f);
+    uint32_t ob = (uint32_t)(nb * na * 255.0f + 0.5f);
+    if (or_ > 255) or_ = 255;
+    if (og > 255) og = 255;
+    if (ob > 255) ob = 255;
+    return (oa << 24) | (or_ << 16) | (og << 8) | ob;
+}
+
+// BitmapData.applyFilter(sourceBitmap, sourceRect, destPoint, filter)
 static ActionVar bitmapDataApplyFilter(SWFAppContext* app_context, ActionVar* args, u32 arg_count, ActionVar* registers, void* this_obj)
 {
     (void)registers;
     ASObject* obj = (ASObject*) this_obj;
-    BitmapDataNative* bmp = getBitmapNative(obj);
-    ActionVar r = {0}; r.type = ACTION_STACK_VALUE_UNDEFINED;
-    if (!bmp || bmp->disposed) { r = makeF64(-1); return r; }
+    BitmapDataNative* dest_bmp = getBitmapNative(obj);
+    ActionVar r = {0};
+    if (!dest_bmp || dest_bmp->disposed) { r = makeF64(-1); return r; }
+    if (arg_count < 4) { r = makeF64(0); return r; }
+
+    // arg0: source BitmapData
+    if (args[0].type != ACTION_STACK_VALUE_OBJECT) { r = makeF64(-2); return r; }
+    ASObject* src_obj = (ASObject*) args[0].data.numeric_value;
+    BitmapDataNative* src_bmp = getBitmapNative(src_obj);
+    if (!src_bmp) { r = makeF64(-2); return r; }
+    if (src_bmp->disposed) { r = makeF64(-3); return r; }
+
+    // arg1: sourceRect (Rectangle with x, y, width, height)
+    if (args[1].type != ACTION_STACK_VALUE_OBJECT) { r = makeF64(0); return r; }
+    ASObject* src_rect = (ASObject*) args[1].data.numeric_value;
+    if (!src_rect) { r = makeF64(0); return r; }
+    ActionVar* srx = getProperty(src_rect, "x", 1);
+    ActionVar* sry = getProperty(src_rect, "y", 1);
+    ActionVar* srw = getProperty(src_rect, "width", 5);
+    ActionVar* srh = getProperty(src_rect, "height", 6);
+    int rx = srx ? (int)varToDoubleSimple(srx) : 0;
+    int ry = sry ? (int)varToDoubleSimple(sry) : 0;
+    int rw = srw ? (int)varToDoubleSimple(srw) : 0;
+    int rh = srh ? (int)varToDoubleSimple(srh) : 0;
+
+    // arg2: destPoint (Point with x, y)
+    if (args[2].type != ACTION_STACK_VALUE_OBJECT) { r = makeF64(0); return r; }
+    ASObject* dest_pt = (ASObject*) args[2].data.numeric_value;
+    if (!dest_pt) { r = makeF64(0); return r; }
+    ActionVar* dpx = getProperty(dest_pt, "x", 1);
+    ActionVar* dpy = getProperty(dest_pt, "y", 1);
+    int dx = dpx ? (int)varToDoubleSimple(dpx) : 0;
+    int dy = dpy ? (int)varToDoubleSimple(dpy) : 0;
+
+    // arg3: filter object — detect ColorMatrixFilter via "matrix" property
+    if (args[3].type != ACTION_STACK_VALUE_OBJECT) { r = makeF64(0); return r; }
+    ASObject* filter_obj = (ASObject*) args[3].data.numeric_value;
+    if (!filter_obj) { r = makeF64(0); return r; }
+    ActionVar* matrix_var = getProperty(filter_obj, "matrix", 6);
+    if (!matrix_var || matrix_var->type != ACTION_STACK_VALUE_ARRAY) { r = makeF64(0); return r; }
+    ASArray* matrix_arr = (ASArray*)(u64)matrix_var->data.numeric_value;
+    if (!matrix_arr || matrix_arr->length < 20) { r = makeF64(0); return r; }
+    float matrix[20];
+    for (int i = 0; i < 20; i++) {
+        matrix[i] = (float)varToDoubleSimple(&matrix_arr->elements[i]);
+    }
+
+    // Apply filter: iterate sourceRect, map to dest via destPoint offset
+    for (int sy = 0; sy < rh; sy++) {
+        for (int sx = 0; sx < rw; sx++) {
+            int src_x = rx + sx;
+            int src_y = ry + sy;
+            int dst_x = dx + sx;
+            int dst_y = dy + sy;
+            if (src_x < 0 || src_x >= src_bmp->width || src_y < 0 || src_y >= src_bmp->height) continue;
+            if (dst_x < 0 || dst_x >= dest_bmp->width || dst_y < 0 || dst_y >= dest_bmp->height) continue;
+            uint32_t src_px = src_bmp->pixels[src_y * src_bmp->width + src_x];
+            uint32_t result = applyColorMatrixPixel(src_px, matrix, dest_bmp->transparent);
+            dest_bmp->pixels[dst_y * dest_bmp->width + dst_x] = result;
+        }
+    }
+
+    r = makeF64(0);
     return r;
 }
 
