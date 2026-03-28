@@ -16932,15 +16932,26 @@ int actionIterateTextFields(TextFieldRenderCallback cb, void* user_data)
 
 		if (!has_bg && !has_border) continue;
 
+		// Check for visual offset (negative createTextField dimensions)
+		float vis_off_x = 0.0f, vis_off_y = 0.0f;
+		{
+			ActionVar* vox = getProperty(props, "_tf_visualOffX", 14);
+			if (vox) vis_off_x = (float)varToDoubleSimple(vox);
+			ActionVar* voy = getProperty(props, "_tf_visualOffY", 14);
+			if (voy) vis_off_y = (float)varToDoubleSimple(voy);
+		}
+
 		TextFieldRenderInfo info;
 		info.has_background = has_bg;
 		info.background_color = bg_color;
 		info.has_border = has_border;
 		info.border_color = bd_color;
-		info.x = mc->x;
-		info.y = mc->y;
-		info.w = mc->width;
-		info.h = mc->height;
+		info.x = mc->x + vis_off_x;
+		info.y = mc->y + vis_off_y;
+		// Flash includes the right/bottom edge pixel (+1) for positive-dimension text fields,
+		// but not for negative-dimension ones (where the visual offset adjusts the origin).
+		info.w = mc->width + (vis_off_x == 0.0f ? 1.0f : 0.0f);
+		info.h = mc->height + (vis_off_y == 0.0f ? 1.0f : 0.0f);
 
 		cb(&info, user_data);
 		count++;
@@ -39442,6 +39453,17 @@ void actionCallFunction(SWFAppContext* app_context, char* str_buffer)
 				setProperty(app_context, props, "_tf_createY", 11, &_cy);
 			}
 
+			// Store visual origin offset for negative dimensions.
+			// Flash reports _x/_y as-is but renders from (x+w, y+h) when w/h are negative.
+			{
+				ActionVar _vox = {0}; _vox.type = ACTION_STACK_VALUE_F64;
+				VAL(double, &_vox.data.numeric_value) = (wi < 0) ? (double)wi : 0.0;
+				setProperty(app_context, props, "_tf_visualOffX", 14, &_vox);
+				ActionVar _voy = {0}; _voy.type = ACTION_STACK_VALUE_F64;
+				VAL(double, &_voy.data.numeric_value) = (hi < 0) ? (double)hi : 0.0;
+				setProperty(app_context, props, "_tf_visualOffY", 14, &_voy);
+			}
+
 			initTextFieldPrototype(app_context);
 			if (g_textfield_constructor.prototype_obj != NULL) {
 				ActionVar proto_val = {0};
@@ -45111,6 +45133,17 @@ void actionCallMethod(SWFAppContext* app_context, char* str_buffer)
 					ActionVar _cy = {0}; _cy.type = ACTION_STACK_VALUE_F64;
 					VAL(double, &_cy.data.numeric_value) = (double)yi;
 					setProperty(app_context, props, "_tf_createY", 11, &_cy);
+				}
+
+				// Store visual origin offset for negative dimensions.
+				// Flash reports _x/_y as-is but renders from (x+w, y+h) when w/h are negative.
+				{
+					ActionVar _vox = {0}; _vox.type = ACTION_STACK_VALUE_F64;
+					VAL(double, &_vox.data.numeric_value) = (wi < 0) ? (double)wi : 0.0;
+					setProperty(app_context, props, "_tf_visualOffX", 14, &_vox);
+					ActionVar _voy = {0}; _voy.type = ACTION_STACK_VALUE_F64;
+					VAL(double, &_voy.data.numeric_value) = (hi < 0) ? (double)hi : 0.0;
+					setProperty(app_context, props, "_tf_visualOffY", 14, &_voy);
 				}
 
 				// Set __proto__ to TextField.prototype

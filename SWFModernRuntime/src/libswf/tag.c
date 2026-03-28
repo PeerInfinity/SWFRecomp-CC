@@ -1594,11 +1594,10 @@ static void textfield_render_cb(const TextFieldRenderInfo* info, void* user_data
 	(void)user_data;
 
 	// Convert pixel coordinates to twips.
-	// Flash text field background includes the right/bottom edge pixel (+1 pixel).
 	float x = info->x * 20.0f;
 	float y = info->y * 20.0f;
-	float w = (info->w + 1.0f) * 20.0f;
-	float h = (info->h + 1.0f) * 20.0f;
+	float w = info->w * 20.0f;
+	float h = info->h * 20.0f;
 
 	if (info->has_background) {
 		float r = ((info->background_color >> 16) & 0xFF) / 255.0f;
