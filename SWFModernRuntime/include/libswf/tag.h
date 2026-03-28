@@ -301,6 +301,8 @@ int ng_font_get_metrics(int font_idx, s16* ascent, s16* descent, int* em_square)
 s16 ng_font_glyph_advance_by_idx(int font_idx, int glyph_idx);
 void ng_setTabStops(const int* stops_twips, int count, u16 font_height);
 void ng_clearTabStops(void);
+int ng_getCharIndexAtPoint(int tf_idx, float local_x_px, float local_y_px,
+                           const char* text, size_t text_len);
 int ng_computeTextWidth(u16 font_id, u16 font_height, const char* text, size_t text_len,
     int word_wrap, int field_width_twips, int swf_version,
     int left_margin_twips, int right_margin_twips, int indent_twips, int align,

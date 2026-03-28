@@ -346,6 +346,11 @@ static void input_events_deliver(SWFAppContext* app_context, InputEvent* ev)
             g_drag_virt_x = ms->stage_x;
             g_drag_virt_y = ms->stage_y;
         }
+        // Update text field drag selection
+        if (ms->button_down) {
+            extern void actionTextFieldDragSelect(SWFAppContext* app_context);
+            actionTextFieldDragSelect(app_context);
+        }
         // Dispatch onClipEvent(mouseMove) to all clips
         dispatch_clip_event_flag(app_context, CLIP_EVENT_MOUSE_MOVE);
         // Broadcast Mouse.onMouseMove to Mouse listeners
@@ -404,6 +409,7 @@ static void input_events_deliver(SWFAppContext* app_context, InputEvent* ev)
         ms->stage_y = ev->y * 20.0f + FRAME_Y_MIN_TWIPS;
         ms->button_down = 0;
         ms->released = 1;
+        { extern void actionTextFieldDragEnd(void); actionTextFieldDragEnd(); }
         root_movieclip.xmouse = ev->x + (float)FRAME_X_MIN_TWIPS / 20.0f;
         root_movieclip.ymouse = ev->y + (float)FRAME_Y_MIN_TWIPS / 20.0f;
         // Dispatch onClipEvent(mouseUp) to all clips

@@ -1657,6 +1657,128 @@ void ng_getTextExtent(u16 font_id, double font_size_px, const char* text, size_t
 	}
 }
 
+// ---------------------------------------------------------------------------
+// ng_getCharIndexAtPoint — convert pixel coordinates to character index
+// ---------------------------------------------------------------------------
+// Given a text field index and a point in field-local pixel coordinates,
+// return the character index (UTF-16 code unit offset) at that point.
+// Returns -1 if point is outside text bounds.
+int ng_getCharIndexAtPoint(int tf_idx, float local_x_px, float local_y_px,
+                           const char* text, size_t text_len)
+{
+	if (tf_idx < 0 || (size_t)tf_idx >= ng_textfield_count) return 0;
+
+	u16 font_id = ng_textfields[tf_idx].font_id;
+	u16 font_height = ng_textfields[tf_idx].font_height;
+	// Fall back to initial text if caller provides NULL
+	if (text == NULL) {
+		text = ng_textfields[tf_idx].plain_text;
+		text_len = strlen(text);
+	}
+	s16 leading = ng_textfields[tf_idx].leading;
+	u16 left_margin = ng_textfields[tf_idx].left_margin;
+
+	int fi = ng_find_font_with_metrics(font_id);
+	if (fi < 0 || text_len == 0) return 0;
+
+	int em = ng_fonts[fi].em_square;
+	if (em <= 0) em = 1024;
+
+	// Flash text field internal gutter: 2 pixels on each side
+	float gutter_px = 2.0f;
+	float left_margin_px = (float)left_margin / 20.0f;
+
+	// Line height: (ascent + descent) / em * font_height + leading
+	s16 ascent = 0, descent = 0;
+	int em_sq = 0;
+	ng_font_get_metrics(fi, &ascent, &descent, &em_sq);
+	if (em_sq <= 0) em_sq = em;
+	float line_height_twips = (float)(ascent + descent) / (float)em_sq * (float)font_height + (float)leading;
+	float line_height_px = line_height_twips / 20.0f;
+	if (line_height_px <= 0) line_height_px = (float)font_height / 20.0f;
+
+	// Determine which line the y coordinate is on
+	float text_y = local_y_px - gutter_px;
+	int target_line = 0;
+	if (text_y > 0 && line_height_px > 0)
+		target_line = (int)(text_y / line_height_px);
+	if (target_line < 0) target_line = 0;
+
+	// Walk through text to find the start of the target line
+	int current_line = 0;
+	size_t line_start_byte = 0;
+	int line_start_u16 = 0;
+	int char_u16_idx = 0;  // UTF-16 index counter
+
+	// First pass: find the byte offset and UTF-16 offset of the target line
+	for (size_t i = 0; i < text_len && current_line < target_line; ) {
+		unsigned char c = (unsigned char)text[i];
+		if (c == '\r' || c == '\n') {
+			current_line++;
+			i++;
+			char_u16_idx++;
+			if (current_line == target_line) {
+				line_start_byte = i;
+				line_start_u16 = char_u16_idx;
+			}
+			continue;
+		}
+		// Advance UTF-8 position and UTF-16 counter
+		size_t old_i = i;
+		ng_decode_utf8_char(text, text_len, &i);
+		(void)old_i;
+		char_u16_idx++;
+	}
+
+	// If target line is beyond text, clamp to end
+	if (current_line < target_line)
+		return char_u16_idx;
+
+	// Second pass: walk characters on the target line, accumulating x positions
+	float text_x = local_x_px - gutter_px - left_margin_px;
+	float cum_x_px = 0.0f;
+	int idx_on_line = 0;
+
+	for (size_t i = line_start_byte; i < text_len; ) {
+		unsigned char c = (unsigned char)text[i];
+		if (c == '\r' || c == '\n') break;  // End of line
+
+		size_t old_i = i;
+		u16 cp = ng_decode_utf8_char(text, text_len, &i);
+
+		s16 adv = ng_font_glyph_advance(fi, cp);
+		float glyph_px = 0;
+		if (adv >= 0) {
+			int raw_twips = (int)((float)adv * (float)font_height / (float)em);
+			if (ng_device_font_mode)
+				raw_twips = ng_round_to_pixel(raw_twips);
+			glyph_px = (float)raw_twips / 20.0f;
+		}
+
+		// Check if click is before the midpoint of this character
+		if (text_x < cum_x_px + glyph_px * 0.5f)
+			return line_start_u16 + idx_on_line;
+
+		cum_x_px += glyph_px;
+		idx_on_line++;
+	}
+
+	// Past end of line: check if there are more lines after this one.
+	// If not (last line or only line), include any trailing newline in the position
+	// so that drag-select past end-of-text covers the implicit trailing newline.
+	int end_idx = line_start_u16 + idx_on_line;
+	// Check if the character at end_idx is a newline and there's nothing after it
+	size_t end_byte = line_start_byte;
+	for (int ci = 0; ci < idx_on_line && end_byte < text_len; ci++)
+		ng_decode_utf8_char(text, text_len, &end_byte);
+	if (end_byte < text_len) {
+		unsigned char c = (unsigned char)text[end_byte];
+		if ((c == '\r' || c == '\n') && end_byte + 1 >= text_len)
+			end_idx++;  // Include trailing newline
+	}
+	return end_idx;
+}
+
 void ng_record_video(SWFAppContext* app_context, u16 char_id)
 {
 	(void)app_context;

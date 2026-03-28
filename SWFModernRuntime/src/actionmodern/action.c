@@ -14076,10 +14076,10 @@ static MovieClip* findOrCreateMovieClip(SWFAppContext* app_context, const char* 
 				const char* init_text = ng_getTextFieldInitialText(depth);
 				char* init_text_ml = NULL;
 				if ((tf_flags & 0x0002) && ng_getTextFieldVariableName(tf_idx)[0] == '\0'
-			    && (init_text[0] != '\0' || (tf_flags & 0x0040))) {
-					// Multiline with no variable binding: append trailing newline
-					// (empty non-HTML fields get no trailing newline; HTML fields always get one
-					//  because the paragraph structure <p></p> produces a trailing newline)
+			    && (tf_flags & 0x0040) /* HTML only: paragraph structure produces trailing newline */
+			    && (init_text[0] != '\0')) {
+					// Multiline HTML with no variable binding: append trailing newline
+					// (HTML paragraph structure <p></p> produces a trailing newline)
 					size_t _ml_len = strlen(init_text);
 					init_text_ml = (char*) malloc(_ml_len + 2);
 					memcpy(init_text_ml, init_text, _ml_len);
@@ -22938,6 +22938,10 @@ static int g_deferred_roll_count = 0;
 static char g_clipboard_text[1024] = {0};
 static size_t g_clipboard_len = 0;
 static int g_tf_select_all = 0;  // 1 = entire text field is selected
+
+// Mouse drag selection state for text fields
+static int g_tf_drag_anchor = 0;  // Character index at mouse-down position
+static int g_tf_drag_active = 0;  // 1 if dragging to select text
 
 // Selection index tracking (for getBeginIndex/getCaretIndex/getEndIndex)
 static int g_selection_begin = -1;
@@ -50460,6 +50464,34 @@ void actionMouseClickFocus(SWFAppContext* app_context)
 		break;
 	}
 
+	// Fallback: check SWF-defined text fields on the display list that
+	// haven't been accessed by script yet (not in child_mc_cache).
+	if (hit_mc == NULL) {
+		extern DisplayObject* display_list;
+		extern size_t max_depth;
+		extern MovieClip root_movieclip;
+		for (size_t di = 1; di <= max_depth; di++) {
+			if (display_list[di].char_id == 0) continue;
+			if (display_list[di].instance_name == NULL) continue;
+			int tf_idx = ng_getTextFieldIdx(di);
+			if (tf_idx < 0) continue;
+			// Check bounds (text field bounds + placement transform)
+			s32 bxmin, bxmax, bymin, bymax;
+			ng_getTextFieldBounds(tf_idx, &bxmin, &bxmax, &bymin, &bymax);
+			float tx = display_list[di].place_tx;
+			float ty = display_list[di].place_ty;
+			float fx1 = tx / 20.0f + (float)bxmin / 20.0f;
+			float fy1 = ty / 20.0f + (float)bymin / 20.0f;
+			float fx2 = tx / 20.0f + (float)bxmax / 20.0f;
+			float fy2 = ty / 20.0f + (float)bymax / 20.0f;
+			if (mx < fx1 || mx > fx2 || my < fy1 || my > fy2) continue;
+			// Force-create the MC so it enters child_mc_cache
+			hit_mc = actionFindOrCreateMovieClip(app_context,
+				display_list[di].instance_name, &root_movieclip);
+			break;
+		}
+	}
+
 	MovieClip* old_focused = g_focused_mc;
 	if (hit_mc != NULL && mc_is_focusable_by_click(hit_mc)) {
 		if (hit_mc != g_focused_mc)
@@ -50476,6 +50508,111 @@ void actionMouseClickFocus(SWFAppContext* app_context)
 	// previously-hovered MC.  Matches Ruffle's roll_over() in focus_tracker.
 	if (g_focused_mc != old_focused)
 		queue_hover_rollout_on_focus_change();
+
+	// Position caret at click location within text field
+	if (g_focused_mc != NULL && g_focused_mc->ng_textfield_idx >= 0) {
+		float x1, y1, x2, y2;
+		if (mc_get_pixel_aabb_ng(g_focused_mc, &x1, &y1, &x2, &y2)) {
+			float local_x = mx - x1;
+			float local_y = my - y1;
+			// Get current text from MC properties
+			const char* text_utf8 = NULL;
+			size_t text_byte_len = 0;
+			if (g_focused_mc->dynamic_props != NULL) {
+				ActionVar* tp = getProperty(
+					(ASObject*)g_focused_mc->dynamic_props, "text", 4);
+				if (tp != NULL && tp->type == ACTION_STACK_VALUE_STRING) {
+					// Convert UTF-16 to UTF-8 for the char index function
+					static char _click_text_buf[4096];
+					const uint16_t* _u16p = varGetU16Ptr(tp);
+					int _u16_len = (int)tp->str_size;
+					int out_pos = 0;
+					for (int ci = 0; ci < _u16_len && out_pos < (int)sizeof(_click_text_buf) - 4; ci++) {
+						uint16_t cpt = _u16p[ci];
+						if (cpt < 0x80) { _click_text_buf[out_pos++] = (char)cpt; }
+						else if (cpt < 0x800) { _click_text_buf[out_pos++] = 0xC0 | (cpt >> 6); _click_text_buf[out_pos++] = 0x80 | (cpt & 0x3F); }
+						else { _click_text_buf[out_pos++] = 0xE0 | (cpt >> 12); _click_text_buf[out_pos++] = 0x80 | ((cpt >> 6) & 0x3F); _click_text_buf[out_pos++] = 0x80 | (cpt & 0x3F); }
+					}
+					_click_text_buf[out_pos] = '\0';
+					text_utf8 = _click_text_buf;
+					text_byte_len = (size_t)out_pos;
+				}
+			}
+			int char_idx = ng_getCharIndexAtPoint(
+				g_focused_mc->ng_textfield_idx, local_x, local_y,
+				text_utf8, text_byte_len);
+			g_selection_begin = char_idx;
+			g_selection_end = char_idx;
+			g_selection_caret = char_idx;
+			g_tf_select_all = 0;
+			// Store anchor for drag selection
+			g_tf_drag_anchor = char_idx;
+			g_tf_drag_active = 1;
+		}
+	}
+}
+
+// ---------------------------------------------------------------------------
+// Text field drag selection
+// ---------------------------------------------------------------------------
+
+// Helper: convert focused MC's text to UTF-8 and compute char index at mouse pos.
+static int tf_char_index_at_mouse(SWFAppContext* app_context)
+{
+	if (g_focused_mc == NULL || g_focused_mc->ng_textfield_idx < 0) return -1;
+	float mx = app_context->mouse.stage_x / 20.0f;
+	float my = app_context->mouse.stage_y / 20.0f;
+	float x1, y1, x2, y2;
+	if (!mc_get_pixel_aabb_ng(g_focused_mc, &x1, &y1, &x2, &y2)) return -1;
+	float local_x = mx - x1;
+	float local_y = my - y1;
+
+	// Get current text
+	static char _drag_text_buf[4096];
+	const char* text_utf8 = NULL;
+	size_t text_byte_len = 0;
+	if (g_focused_mc->dynamic_props != NULL) {
+		ActionVar* tp = getProperty(
+			(ASObject*)g_focused_mc->dynamic_props, "text", 4);
+		if (tp != NULL && tp->type == ACTION_STACK_VALUE_STRING) {
+			const uint16_t* u16p = varGetU16Ptr(tp);
+			int u16_len = (int)tp->str_size;
+			int out_pos = 0;
+			for (int ci = 0; ci < u16_len && out_pos < (int)sizeof(_drag_text_buf) - 4; ci++) {
+				uint16_t cp = u16p[ci];
+				if (cp < 0x80) { _drag_text_buf[out_pos++] = (char)cp; }
+				else if (cp < 0x800) { _drag_text_buf[out_pos++] = 0xC0 | (cp >> 6); _drag_text_buf[out_pos++] = 0x80 | (cp & 0x3F); }
+				else { _drag_text_buf[out_pos++] = 0xE0 | (cp >> 12); _drag_text_buf[out_pos++] = 0x80 | ((cp >> 6) & 0x3F); _drag_text_buf[out_pos++] = 0x80 | (cp & 0x3F); }
+			}
+			_drag_text_buf[out_pos] = '\0';
+			text_utf8 = _drag_text_buf;
+			text_byte_len = (size_t)out_pos;
+		}
+	}
+	return ng_getCharIndexAtPoint(g_focused_mc->ng_textfield_idx,
+		local_x, local_y, text_utf8, text_byte_len);
+}
+
+// Called from swf_core.c on EV_MOUSE_MOVE while button is down.
+void actionTextFieldDragSelect(SWFAppContext* app_context)
+{
+	if (!g_tf_drag_active || g_focused_mc == NULL) return;
+	int drag_idx = tf_char_index_at_mouse(app_context);
+	if (drag_idx < 0) return;
+
+	// Anchor stays at mouse-down position; selection extends to current pos
+	int lo = g_tf_drag_anchor < drag_idx ? g_tf_drag_anchor : drag_idx;
+	int hi = g_tf_drag_anchor < drag_idx ? drag_idx : g_tf_drag_anchor;
+	g_selection_begin = lo;
+	g_selection_end = hi;
+	g_selection_caret = drag_idx;
+	g_tf_select_all = 0;
+}
+
+// Called from swf_core.c on EV_MOUSE_UP_LEFT.
+void actionTextFieldDragEnd(void)
+{
+	g_tf_drag_active = 0;
 }
 
 // ---------------------------------------------------------------------------
