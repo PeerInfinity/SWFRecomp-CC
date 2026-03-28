@@ -752,7 +752,7 @@ static ASObject* g_object_prototype = NULL;
 // Global Array.prototype — shared by all arrays for instanceof and arguments.__proto__
 static ASObject* g_array_prototype = NULL;
 static int g_array_proto_methods_init = 0;  // Whether Array.prototype methods have been registered
-static ASFunction g_array_proto_funcs[13];  // push,pop,shift,unshift,reverse,join,toString,concat,slice,splice,sort,sortOn,hasOwnProperty
+static ASFunction g_array_proto_funcs[12];  // push,pop,shift,unshift,reverse,join,toString,concat,slice,splice,sort,sortOn
 
 // Currently executing user-defined function — used to set arguments.caller
 static ASFunction* g_current_executing_func = NULL;
@@ -24835,6 +24835,8 @@ static ASObject* createSecondaryArrayPrototype(SWFAppContext* app_context, ASObj
 	pv.type = ACTION_STACK_VALUE_OBJECT;
 	pv.data.numeric_value = (u64)sec_obj_proto;
 	setPropertyWithFlags(app_context, proto, "__proto__", 9, &pv, PROPERTY_FLAGS_DONTENUM);
+	// Ensure Array.prototype methods are initialized before copying
+	initArrayPrototypeMethods(app_context);
 	// Copy methods from primary Array.prototype
 	if (g_array_prototype != NULL)
 		copyObjectProperties(app_context, proto, g_array_prototype);
@@ -41987,10 +41989,9 @@ static void initArrayPrototypeMethods(SWFAppContext* app_context)
 		{"push", 4}, {"pop", 3}, {"shift", 5}, {"unshift", 7},
 		{"reverse", 7}, {"join", 4}, {"toString", 8}, {"concat", 6},
 		{"slice", 5}, {"splice", 6}, {"sort", 4}, {"sortOn", 6},
-		{"hasOwnProperty", 14},
 	};
 
-	for (int i = 0; i < 13; i++) {
+	for (int i = 0; i < 12; i++) {
 		memset(&g_array_proto_funcs[i], 0, sizeof(ASFunction));
 		strncpy(g_array_proto_funcs[i].name, methods[i].name, 255);
 		g_array_proto_funcs[i].function_type = 2;
@@ -44579,6 +44580,46 @@ void actionCallMethod(SWFAppContext* app_context, char* str_buffer)
 				if (args != NULL) FREE(args);
 				pushUndefined(app_context);
 			}
+			return;
+		}
+
+		if (method_name_len == 14 && strncmp(method_name, "hasOwnProperty", 14) == 0)
+		{
+			// Functions have virtual own properties: constructor, prototype, __proto__
+			// These are not stored in own_props but hasOwnProperty should return true for them.
+			int hop_result = 0;
+			if (func != NULL && num_args >= 1)
+			{
+				char hop_buf[256];
+				const char* hop_name = NULL;
+				u32 hop_name_len = 0;
+				if (args[0].type == ACTION_STACK_VALUE_STRING)
+				{
+					const uint16_t* _u16 = varGetU16Ptr(&args[0]);
+					hop_name_len = (u32)u16_to_utf8(_u16, args[0].str_size, hop_buf, sizeof(hop_buf));
+					hop_name = hop_buf;
+				}
+				else
+				{
+					hop_name_len = (u32)varToStringBuf(app_context, &args[0], hop_buf, sizeof(hop_buf));
+					hop_name = hop_buf;
+				}
+				if (hop_name != NULL)
+				{
+					// Check own_props first
+					if (func->own_props != NULL && hasPropertyRaw(func->own_props, hop_name, hop_name_len))
+						hop_result = 1;
+					// Virtual function own properties: constructor, prototype, __proto__
+					else if (hop_name_len == 11 && strncmp(hop_name, "constructor", 11) == 0)
+						hop_result = 1;
+					else if (hop_name_len == 9 && strncmp(hop_name, "prototype", 9) == 0)
+						hop_result = 1;
+					else if (hop_name_len == 9 && strncmp(hop_name, "__proto__", 9) == 0)
+						hop_result = 1;
+				}
+			}
+			if (args != NULL) FREE(args);
+			PUSH(ACTION_STACK_VALUE_BOOLEAN, hop_result ? 1ULL : 0ULL);
 			return;
 		}
 
