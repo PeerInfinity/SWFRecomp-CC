@@ -8920,7 +8920,183 @@ static ActionVar bitmapDataPaletteMap(SWFAppContext* app_context, ActionVar* arg
     return r;
 }
 
-// PerlinNoise stub
+// ============================================================================
+// Perlin Noise — port of W3C SVG feTurbulence reference implementation
+// See: https://www.w3.org/TR/SVG11/filters.html#feTurbulenceElement
+// ============================================================================
+
+#define PERLIN_B_SIZE 0x100
+#define PERLIN_BM     0xFF
+#define PERLIN_N_VAL  0x1000
+
+typedef struct {
+    int lattice_selector[PERLIN_B_SIZE + PERLIN_B_SIZE + 2];
+    double gradient[4][PERLIN_B_SIZE + PERLIN_B_SIZE + 2][2];
+} PerlinState;
+
+typedef struct {
+    int width;
+    int height;
+    int wrap_x;
+    int wrap_y;
+} PerlinStitchInfo;
+
+static int64_t perlin_setup_seed(int64_t seed)
+{
+    if (seed <= 0) seed = -(seed % (2147483647LL - 1)) + 1;
+    if (seed > 2147483647LL - 1) seed = 2147483647LL - 1;
+    return seed;
+}
+
+static int64_t perlin_random(int64_t seed)
+{
+    int64_t result = 16807LL * (seed % 127773LL) - 2836LL * (seed / 127773LL);
+    if (result <= 0) result += 2147483647LL;
+    return result;
+}
+
+static void perlin_init(PerlinState* state, int64_t seed)
+{
+    seed = perlin_setup_seed(seed);
+    for (int k = 0; k < 4; k++) {
+        for (int i = 0; i < PERLIN_B_SIZE; i++) {
+            state->lattice_selector[i] = i;
+            for (int j = 0; j < 2; j++) {
+                seed = perlin_random(seed);
+                state->gradient[k][i][j] =
+                    (double)((seed % (PERLIN_B_SIZE + PERLIN_B_SIZE)) - PERLIN_B_SIZE) / (double)PERLIN_B_SIZE;
+            }
+            double s = sqrt(state->gradient[k][i][0] * state->gradient[k][i][0] +
+                            state->gradient[k][i][1] * state->gradient[k][i][1]);
+            state->gradient[k][i][0] /= s;
+            state->gradient[k][i][1] /= s;
+        }
+    }
+    for (int i = PERLIN_B_SIZE - 1; i >= 1; i--) {
+        int kv = state->lattice_selector[i];
+        seed = perlin_random(seed);
+        int j = (int)(seed % PERLIN_B_SIZE);
+        state->lattice_selector[i] = state->lattice_selector[j];
+        state->lattice_selector[j] = kv;
+    }
+    for (int i = 0; i < PERLIN_B_SIZE + 2; i++) {
+        state->lattice_selector[PERLIN_B_SIZE + i] = state->lattice_selector[i];
+        for (int k = 0; k < 4; k++) {
+            state->gradient[k][PERLIN_B_SIZE + i][0] = state->gradient[k][i][0];
+            state->gradient[k][PERLIN_B_SIZE + i][1] = state->gradient[k][i][1];
+        }
+    }
+}
+
+static double perlin_noise2(const PerlinState* state, int channel, double vx, double vy,
+                            int do_stitch, const PerlinStitchInfo* si)
+{
+    double t;
+    int bx0, bx1, by0, by1;
+    double rx0, rx1, ry0, ry1;
+
+    t = vx + (double)PERLIN_N_VAL;
+    bx0 = (int)t;
+    bx1 = bx0 + 1;
+    rx0 = t - (double)((int)t);
+    rx1 = rx0 - 1.0;
+
+    t = vy + (double)PERLIN_N_VAL;
+    by0 = (int)t;
+    by1 = by0 + 1;
+    ry0 = t - (double)((int)t);
+    ry1 = ry0 - 1.0;
+
+    if (do_stitch && si) {
+        if (bx0 >= si->wrap_x) bx0 -= si->width;
+        if (bx1 >= si->wrap_x) bx1 -= si->width;
+        if (by0 >= si->wrap_y) by0 -= si->height;
+        if (by1 >= si->wrap_y) by1 -= si->height;
+    }
+
+    bx0 &= PERLIN_BM;
+    bx1 &= PERLIN_BM;
+    by0 &= PERLIN_BM;
+    by1 &= PERLIN_BM;
+
+    int i = state->lattice_selector[bx0];
+    int j = state->lattice_selector[bx1];
+    int b00 = state->lattice_selector[i + by0];
+    int b10 = state->lattice_selector[j + by0];
+    int b01 = state->lattice_selector[i + by1];
+    int b11 = state->lattice_selector[j + by1];
+
+    double sx = rx0 * rx0 * (3.0 - 2.0 * rx0);  // s_curve
+    double sy = ry0 * ry0 * (3.0 - 2.0 * ry0);
+
+    const double* q;
+    double u, v, a, b;
+
+    q = state->gradient[channel][b00];
+    u = rx0 * q[0] + ry0 * q[1];
+    q = state->gradient[channel][b10];
+    v = rx1 * q[0] + ry0 * q[1];
+    a = u + sx * (v - u);  // lerp
+
+    q = state->gradient[channel][b01];
+    u = rx0 * q[0] + ry1 * q[1];
+    q = state->gradient[channel][b11];
+    v = rx1 * q[0] + ry1 * q[1];
+    b = u + sx * (v - u);  // lerp
+
+    return a + sy * (b - a);  // lerp
+}
+
+static double perlin_turbulence(const PerlinState* state, int color_channel,
+                                double px, double py,
+                                double base_freq_x, double base_freq_y,
+                                int num_octaves, int fractal_sum, int do_stitch,
+                                double tile_w, double tile_h,
+                                const double* offsets_x, const double* offsets_y)
+{
+    PerlinStitchInfo si = {0};
+    double bf_x = base_freq_x, bf_y = base_freq_y;
+
+    if (do_stitch) {
+        if (bf_x != 0.0) {
+            double lo = floor(tile_w * bf_x) / tile_w;
+            double hi = ceil(tile_w * bf_x) / tile_w;
+            bf_x = (bf_x / lo < hi / bf_x) ? lo : hi;
+        }
+        if (bf_y != 0.0) {
+            double lo = floor(tile_h * bf_x) / tile_h;  // Note: Ruffle uses bf_x here (matches SVG spec bug)
+            double hi = ceil(tile_h * bf_y) / tile_h;
+            bf_y = (bf_y / lo < hi / bf_y) ? lo : hi;
+        }
+        si.width  = (int)(tile_w * bf_x + 0.5);
+        si.height = (int)(tile_h * bf_y + 0.5);
+        si.wrap_x = (int)(0.0 * bf_x) + PERLIN_N_VAL + si.width;  // tile_pos = (0, 0)
+        si.wrap_y = (int)(0.0 * bf_y) + PERLIN_N_VAL + si.height;
+    }
+
+    double sum = 0.0;
+    double ratio = 1.0;
+    for (int octave = 0; octave < num_octaves; octave++) {
+        double ox = offsets_x ? offsets_x[octave] : 0.0;
+        double oy = offsets_y ? offsets_y[octave] : 0.0;
+        double vx = (px + ox) * bf_x * ratio;
+        double vy = (py + oy) * bf_y * ratio;
+        double noise = perlin_noise2(state, color_channel, vx, vy, do_stitch, &si);
+        if (fractal_sum)
+            sum += noise / ratio;
+        else
+            sum += fabs(noise) / ratio;
+        ratio *= 2.0;
+        if (do_stitch) {
+            si.width *= 2;
+            si.wrap_x = 2 * si.wrap_x - PERLIN_N_VAL;
+            si.height *= 2;
+            si.wrap_y = 2 * si.wrap_y - PERLIN_N_VAL;
+        }
+    }
+    return sum;
+}
+
 static ActionVar bitmapDataPerlinNoise(SWFAppContext* app_context, ActionVar* args, u32 arg_count, ActionVar* registers, void* this_obj)
 {
     (void)registers;
@@ -8928,6 +9104,112 @@ static ActionVar bitmapDataPerlinNoise(SWFAppContext* app_context, ActionVar* ar
     BitmapDataNative* bmp = getBitmapNative(obj);
     ActionVar r = {0}; r.type = ACTION_STACK_VALUE_UNDEFINED;
     if (!bmp || bmp->disposed) { r = makeF64(-1); return r; }
+    if (arg_count < 6) return r;
+
+    double base_x = varToDoubleSimple(&args[0]);
+    double base_y = varToDoubleSimple(&args[1]);
+    int num_octaves = (int)varToDoubleSimple(&args[2]);
+    int64_t random_seed = (int64_t)(int32_t)varToDoubleSimple(&args[3]);
+    int stitch = (int)varToDoubleSimple(&args[4]);
+    int fractal_noise = (int)varToDoubleSimple(&args[5]);
+    int channel_options = (arg_count >= 7) ? (int)varToDoubleSimple(&args[6]) : 7;
+    int grayscale = 0;
+    if (arg_count >= 8) {
+        double gs_val = varToDoubleSimple(&args[7]);
+        grayscale = (!isnan(gs_val) && gs_val != 0.0) ? 1 : 0;
+    }
+
+    if (num_octaves < 0) num_octaves = 0;
+
+    double base_freq_x = (base_x == 0.0) ? 0.0 : 1.0 / base_x;
+    double base_freq_y = (base_y == 0.0) ? 0.0 : 1.0 / base_y;
+
+    // Parse offsets array (array of Point objects)
+    double offsets_x_buf[32] = {0};
+    double offsets_y_buf[32] = {0};
+    double* offsets_x = NULL;
+    double* offsets_y = NULL;
+    if (arg_count >= 9 && args[8].type == ACTION_STACK_VALUE_ARRAY) {
+        ASArray* arr = (ASArray*)(uintptr_t)args[8].data.numeric_value;
+        if (arr && arr->length > 0) {
+            int count = (int)arr->length;
+            if (count > 32) count = 32;
+            // Ensure we have at least num_octaves entries (pad with 0)
+            for (int i = 0; i < count && i < num_octaves; i++) {
+                if (arr->elements[i].type == ACTION_STACK_VALUE_OBJECT) {
+                    ASObject* pt = (ASObject*)(uintptr_t)arr->elements[i].data.numeric_value;
+                    if (pt) {
+                        ActionVar* xv = getPropertyWithPrototype(pt, "x", 1);
+                        ActionVar* yv = getPropertyWithPrototype(pt, "y", 1);
+                        if (xv) offsets_x_buf[i] = varToDoubleSimple(xv);
+                        if (yv) offsets_y_buf[i] = varToDoubleSimple(yv);
+                    }
+                }
+            }
+            offsets_x = offsets_x_buf;
+            offsets_y = offsets_y_buf;
+        }
+    }
+
+    PerlinState state;
+    perlin_init(&state, random_seed);
+
+    double tile_w = (double)bmp->width;
+    double tile_h = (double)bmp->height;
+
+    for (int py = 0; py < bmp->height; py++) {
+        for (int px = 0; px < bmp->width; px++) {
+            double noise[4] = {0};
+
+            if (grayscale) {
+                noise[0] = perlin_turbulence(&state, 0, (double)px, (double)py,
+                    base_freq_x, base_freq_y, num_octaves, fractal_noise, stitch,
+                    tile_w, tile_h, offsets_x, offsets_y);
+                noise[1] = noise[0];
+                noise[2] = noise[0];
+                noise[3] = (channel_options & 8)
+                    ? perlin_turbulence(&state, 1, (double)px, (double)py,
+                        base_freq_x, base_freq_y, num_octaves, fractal_noise, stitch,
+                        tile_w, tile_h, offsets_x, offsets_y)
+                    : 1.0;
+            } else {
+                int channel = 0;
+                for (int c = 0; c < 4; c++) {
+                    noise[c] = (c == 3) ? 1.0 : -1.0;
+                    if (channel_options & (1 << c)) {
+                        noise[c] = perlin_turbulence(&state, channel, (double)px, (double)py,
+                            base_freq_x, base_freq_y, num_octaves, fractal_noise, stitch,
+                            tile_w, tile_h, offsets_x, offsets_y);
+                        channel++;
+                    }
+                }
+            }
+
+            uint8_t color[4];
+            for (int c = 0; c < 4; c++) {
+                double val;
+                if (fractal_noise) {
+                    val = ((noise[c] * 255.0 + 255.0) + 0.5) / 2.0;
+                } else {
+                    val = (noise[c] * 255.0) + 0.5;
+                }
+                if (val < 0.0) val = 0.0;
+                if (val > 255.0) val = 255.0;
+                color[c] = (uint8_t)val;
+            }
+
+            if (!bmp->transparent) {
+                color[3] = 255;
+            }
+
+            // Store without premultiplication — matches Ruffle's set_pixel32_raw behavior.
+            // The renderer treats these as premultiplied, which is how Flash behaves.
+            uint32_t argb = ((uint32_t)color[3] << 24) | ((uint32_t)color[0] << 16) |
+                            ((uint32_t)color[1] << 8) | (uint32_t)color[2];
+            bmp->pixels[py * bmp->width + px] = argb;
+        }
+    }
+
     return r;
 }
 

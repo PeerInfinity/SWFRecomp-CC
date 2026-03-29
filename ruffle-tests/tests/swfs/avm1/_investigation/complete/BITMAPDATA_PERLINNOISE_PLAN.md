@@ -3,31 +3,46 @@
 
 <!-- PLAN_META
 id: BITMAPDATA_PERLINNOISE
-status: not_started
+status: complete
 phases:
   - id: 1
     name: "Port LCG and initialization"
-    status: not_started
+    status: complete
   - id: 2
     name: "Port noise2 function"
-    status: not_started
+    status: complete
   - id: 3
     name: "Port turbulence function"
-    status: not_started
+    status: complete
   - id: 4
     name: "Implement bitmapDataPerlinNoise"
-    status: not_started
+    status: complete
 dependencies: []
 blockers: []
 -->
 
-Last updated: 2026-03-28
+Last updated: 2026-03-29
 
-## Status: NOT STARTED
+## Status: COMPLETE
 
-### Problem
+All 4 phases implemented in `action.c`. The implementation is a direct port of the W3C SVG feTurbulence reference (matching Ruffle's `turbulence.rs`). **Headless image test: PASS — 0 outliers, 0 max difference (pixel-perfect match).**
 
-`bitmapDataPerlinNoise()` in `action.c:8919-8928` is a stub that returns immediately without modifying any pixel data. The `bitmap_data_perlinnoise` image test creates 100x100 BitmapData objects, calls `perlinNoise()` with various parameters, and displays them via `attachBitmap()`. The GPU rendering pipeline works (implemented in the BITMAPDATA_RENDERING_PLAN), but all bitmaps are blank because `perlinNoise()` never writes pixels.
+Two bugs fixed during development:
+1. `(int)NaN` UB for undefined `grayscale` arg — forced all bitmaps into grayscale path
+2. `premultiplyAlpha()` on output pixels — Ruffle uses `set_pixel32_raw` (straight alpha), must skip premultiplication to match
+
+### Implementation Summary
+
+~230 lines of C added to `action.c` replacing the stub:
+- `PerlinState` struct with lattice_selector[514] and gradient[4][514][2]
+- `perlin_init()`: LCG seed setup, gradient generation, Fisher-Yates shuffle, boundary duplication
+- `perlin_noise2()`: standard lattice Perlin noise with smoothstep interpolation and stitch wrapping
+- `perlin_turbulence()`: octave accumulation with stitch frequency adjustment (matches Ruffle's `bf_x` bug in lo_freq calculation for Y axis)
+- `bitmapDataPerlinNoise()`: full 9-argument parsing including offsets array of Point objects, grayscale mode, channel options with skip-increment, fractal/turbulence float-to-byte conversion, premultiplied alpha output
+
+### Problem (original)
+
+`bitmapDataPerlinNoise()` was a stub that returned immediately without modifying any pixel data. The `bitmap_data_perlinnoise` image test creates 100x100 BitmapData objects, calls `perlinNoise()` with various parameters, and displays them via `attachBitmap()`. The GPU rendering pipeline works (implemented in the BITMAPDATA_RENDERING_PLAN), but all bitmaps were blank because `perlinNoise()` never wrote pixels.
 
 ### API Signature
 
