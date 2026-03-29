@@ -37,14 +37,14 @@ Last updated: 2026-03-29
 
 The test exercises `.clone()` on all 9 filter types (BevelFilter, BlurFilter, ColorMatrixFilter, ConvolutionFilter, DisplacementMapFilter, DropShadowFilter, GlowFilter, GradientBevelFilter, GradientGlowFilter), followed by property access on the cloned objects.
 
-**Current trace:** SEGFAULT at line ~122 (87/122 output lines match, crash in ColorMatrixFilter matrix setter)
+**Current trace:** SEGFAULT at line ~118 (output through `new ColorMatrixFilter(null)` trace, crash during `traceAllProps` for-in enumeration on filter with array matrix property)
 
 ### Progress (2026-03-29)
 
 **Phase 1-3 DONE:** Clone implemented + filter constructors now initialize all default properties via `invokeNativeSuperConstructor` from the new() path. BevelFilter expanded to all 12 properties.
 
 **Remaining issues:**
-1. **SEGFAULT at line ~122:** Crash during `f.matrix = []` on ColorMatrixFilter — the matrix setter stores the array directly, but Flash validates/pads to 20 elements with NaN
+1. **SEGFAULT at line ~118:** Crash during `traceAllProps(new fClass(null))` — the for-in enumeration on a ColorMatrixFilter object with an array "matrix" property crashes. The constructor creates a valid 20-element matrix array, but iterating the object's properties (which include the array) causes a SEGFAULT. Root cause likely in for-in enumeration of ARRAY-type property values or `instanceof Array` check on the array
 2. **Property order:** Filter properties enumerate in different order than Flash (e.g., `blurX,blurY` before `strength,quality` in ours, after in Flash)
 3. **No property validation:** angle wrapping (360→0), color masking (0xFFFFFF), alpha clamping (0-1 with 8-bit quantization), quality (0-15), strength (0-255), blur (0-255)
 4. **mc.filters getter/setter:** Reading/writing the filters array on MovieClips
