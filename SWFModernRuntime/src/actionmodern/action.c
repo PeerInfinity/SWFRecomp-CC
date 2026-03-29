@@ -31362,6 +31362,11 @@ void actionSetMember(SWFAppContext* app_context)
 			{
 				return;
 			}
+			// DEBUG: track filter property sets
+			if (obj->native_type == NATIVE_FILTER && prop_name_len == 6 && memcmp(prop_name, "matrix", 6) == 0) {
+				printf("FILTER_SET matrix type=%d num_val=%llu\n", value_var.type, (unsigned long long)value_var.data.numeric_value);
+				fflush(stdout);
+			}
 			// BitmapData: width, height, transparent, rectangle are read-only
 			if (obj->native_type == NATIVE_BITMAPDATA && prop_name_len >= 5) {
 				if ((prop_name_len == 5 && memcmp(prop_name, "width", 5) == 0) ||
@@ -39199,10 +39204,30 @@ static int invokeNativeSuperConstructor(SWFAppContext* app_context, ASFunction* 
 	}
 	if (strcmp(name, "ColorMatrixFilter") == 0) {
 		if (obj->native_type == NATIVE_NONE) obj->native_type = NATIVE_FILTER;
-		// First arg is the matrix array
+		// Create matrix: from array arg, or default identity [1,0,0,0,0, 0,1,0,0,0, 0,0,1,0,0, 0,0,0,1,0]
+		ASArray* matrix_arr = NULL;
 		if (num_args > 0 && args[0].type == ACTION_STACK_VALUE_ARRAY) {
-			setProperty(app_context, obj, "matrix", 6, &args[0]);
+			matrix_arr = (ASArray*)(uintptr_t)args[0].data.numeric_value;
 		}
+		// Always create a 20-element matrix
+		ASArray* result_matrix = allocArray(app_context, 20);
+		result_matrix->length = 20;
+		double identity[20] = {1,0,0,0,0, 0,1,0,0,0, 0,0,1,0,0, 0,0,0,1,0};
+		for (int i = 0; i < 20; i++) {
+			if (matrix_arr && i < (int)matrix_arr->length) {
+				result_matrix->elements[i] = matrix_arr->elements[i];
+			} else if (num_args > 0 && args[0].type != ACTION_STACK_VALUE_NULL &&
+			           args[0].type != ACTION_STACK_VALUE_UNDEFINED &&
+			           args[0].type != ACTION_STACK_VALUE_ARRAY) {
+				// Non-array non-null arg (like -1): fill with NaN
+				result_matrix->elements[i] = makeF64(NAN);
+			} else {
+				result_matrix->elements[i] = makeF64(identity[i]);
+			}
+		}
+		ActionVar mv = {0}; mv.type = ACTION_STACK_VALUE_ARRAY;
+		mv.data.numeric_value = (u64)result_matrix;
+		setProperty(app_context, obj, "matrix", 6, &mv);
 		out_result->type = ACTION_STACK_VALUE_OBJECT;
 		out_result->data.numeric_value = (u64)obj;
 		return 1;
