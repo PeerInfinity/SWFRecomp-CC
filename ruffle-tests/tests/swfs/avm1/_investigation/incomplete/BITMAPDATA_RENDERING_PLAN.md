@@ -82,9 +82,9 @@ The remaining 5 tests are blocked by **unimplemented BitmapData methods** (stubs
 
 ### What Remains
 
-1. **Implement missing BitmapData methods** (perlinNoise, applyFilter, pixelDissolve, merge) — these are complex algorithms unrelated to the GPU pipeline
-2. **Fix 545 outlier precision issue** for bitmap_data_fillrect — likely MSAA anti-aliasing at quad boundaries; may need sub-pixel positioning or MSAA-aware rendering
-3. **Test bitmap_data_copypixels and bitmap_data_colortransform** with headless mode once their pixel operations are verified
+1. **bitmap_data_fillrect** (545 outliers / 218 pixels): Not edge precision — specific bitmap has wrong color (red instead of blue at x=[147,209], y=[20,29]). Likely a fillRect color interpretation issue with semi-transparent or specific ARGB values.
+2. **bitmap_data_colortransform** (78K outliers): All bitmaps render as black despite colorTransform producing correct trace output. Likely an issue with how the test creates/attaches its bitmaps (rendering pipeline doesn't pick them up). Stage background is black so the colored bitmaps should show but don't.
+3. **bitmap_data_copypixels** (190K outliers): merge() is a stub — needs ~40 lines of per-pixel weighted blend implementation.
 
 ### Affected Image Tests
 
