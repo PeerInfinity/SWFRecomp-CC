@@ -438,6 +438,10 @@ static SWFAppContext* g_scope_app_context = NULL;
 // identify which object they are operating on.
 static ASObject* g_c_function_this_obj = NULL;
 
+// Tracks the ActionVar type tag of the current `this` object when calling
+// advanced_func. Used by builtin_array_method to know if this_obj is an ASArray*.
+static int g_current_this_type = 0;
+
 // Expose local scope for parameter binding (used by setVariableByName)
 // Skips 'with' scopes to find the nearest function scope.
 ASObject* getCurrentLocalScope(void)
@@ -41060,9 +41064,17 @@ static int _sort_compare_vars(SWFAppContext* app_context, ActionVar* a, ActionVa
 
 	/* String comparison: convert to UTF-8 then compare */
 	{
+		extern int g_swf_version;
 		char buf_a[1024], buf_b[1024];
-		varToStringBuf(app_context, a, buf_a, sizeof(buf_a));
-		varToStringBuf(app_context, b, buf_b, sizeof(buf_b));
+		/* SWF < 7: HOLE elements compare as "" (empty string), not "undefined" */
+		if (g_swf_version < 7 && a->type == ACTION_STACK_VALUE_HOLE)
+			buf_a[0] = '\0';
+		else
+			varToStringBuf(app_context, a, buf_a, sizeof(buf_a));
+		if (g_swf_version < 7 && b->type == ACTION_STACK_VALUE_HOLE)
+			buf_b[0] = '\0';
+		else
+			varToStringBuf(app_context, b, buf_b, sizeof(buf_b));
 		if (flags & 1) /* CASEINSENSITIVE */
 			result = _utf8_strcasecmp(buf_a, buf_b);
 		else
@@ -41316,10 +41328,14 @@ static int callArrayMethod(SWFAppContext* app_context,
 		}
 
 		ASArray* result = allocArray(app_context, total > 0 ? total : 4);
-		// Copy this array's elements
+		// Copy this array's elements (HOLE → UNDEFINED: concat densifies)
+		ActionVar _undef_concat = {0};
+		_undef_concat.type = ACTION_STACK_VALUE_UNDEFINED;
 		for (u32 i = 0; i < arr->length; i++)
 		{
-			setArrayElement(app_context, result, result->length, &arr->elements[i]);
+			ActionVar* elem = &arr->elements[i];
+			if (elem->type == ACTION_STACK_VALUE_HOLE) elem = &_undef_concat;
+			setArrayElement(app_context, result, result->length, elem);
 		}
 		// Append each argument
 		for (u32 i = 0; i < num_args; i++)
@@ -41331,7 +41347,9 @@ static int callArrayMethod(SWFAppContext* app_context,
 				{
 					for (u32 j = 0; j < other->length; j++)
 					{
-						setArrayElement(app_context, result, result->length, &other->elements[j]);
+						ActionVar* oelem = &other->elements[j];
+						if (oelem->type == ACTION_STACK_VALUE_HOLE) oelem = &_undef_concat;
+						setArrayElement(app_context, result, result->length, oelem);
 					}
 				}
 			}
@@ -41456,6 +41474,21 @@ static int callArrayMethod(SWFAppContext* app_context,
 		for (u32 i = 0; i < insert_count; i++)
 		{
 			arr->elements[start + i] = args[2 + i];
+		}
+
+		// Flash: splice densifies the array — convert all remaining HOLEs to UNDEFINED
+		for (u32 i = 0; i < arr->length; i++)
+		{
+			if (arr->elements[i].type == ACTION_STACK_VALUE_HOLE)
+			{
+				arr->elements[i].type = ACTION_STACK_VALUE_UNDEFINED;
+				arr->elements[i].data.numeric_value = 0;
+				arr->elements[i].str_size = 0;
+				// Track the key for enumeration
+				char _idx_buf[12];
+				int _idx_len = snprintf(_idx_buf, sizeof(_idx_buf), "%u", i);
+				arrayTrackKey(arr, _idx_buf, (u32)_idx_len);
+			}
 		}
 
 		PUSH(ACTION_STACK_VALUE_ARRAY, (u64) deleted);
@@ -42091,9 +42124,9 @@ static int callArrayMethod(SWFAppContext* app_context,
 		if (_sidx == NULL) { PUSH(ACTION_STACK_VALUE_ARRAY, (u64) arr); return 1; }
 		for (u32 _ii = 0; _ii < n; _ii++) _sidx[_ii] = _ii;
 
-		if (_so_any_retidx || _so_any_unique)
+		if (_so_any_retidx)
 		{
-			// Stable insertion sort (preserve equal-element order for index arrays)
+			// RETURNINDEXEDARRAY: stable insertion sort on indices, return index array
 			for (u32 _ii = 1; _ii < n; _ii++)
 			{
 				u32 _key_sidx = _sidx[_ii];
@@ -42189,13 +42222,6 @@ static ActionVar builtin_array_method(SWFAppContext* app_context, ActionVar* arg
 	}
 	if (method_name == NULL || method_name_len == 0) return undef;
 
-	// Array.prototype methods called via the prototype wrapper are only used for
-	// typeof detection. Actual array method dispatch for ASArray objects goes through
-	// callArrayMethod in actionCallMethod's ARRAY branch (which takes priority).
-	// This wrapper is only reached when calling Array.prototype.method.call(obj) on
-	// a non-array object, or via direct prototype access. Since we can't safely
-	// distinguish ASArray* from ASObject* here (different struct layouts), return
-	// undefined to prevent use-after-free / corruption from invalid casts.
 	return undef;
 }
 

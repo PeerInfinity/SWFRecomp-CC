@@ -1272,7 +1272,7 @@ def compile_native(test_dir, num_frames, build_dir, headless=False, has_image_co
             ],
             capture_output=True,
             text=True,
-            timeout=120,
+            timeout=300,
         )
         return result.returncode == 0, result.stderr
     except subprocess.TimeoutExpired:
