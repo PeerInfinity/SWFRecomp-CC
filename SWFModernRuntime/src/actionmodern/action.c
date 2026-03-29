@@ -745,6 +745,10 @@ typedef struct ASFunction {
 	u16 movie_global_idx;
 } ASFunction;
 
+// Forward declaration for filter constructor init
+static int invokeNativeSuperConstructor(SWFAppContext* app_context, ASFunction* ctor,
+    void* this_obj, ActionVar* args, u32 num_args, ActionVar* out_result);
+
 // Function registry
 #define MAX_FUNCTIONS 2048
 static ASFunction* function_registry[MAX_FUNCTIONS];
@@ -24289,6 +24293,38 @@ static void initSystemObject(SWFAppContext* app_context)
 	installNativeToString(app_context, ime_obj);
 }
 
+// Filter clone method: shallow-copies all own properties to a new filter object
+static ASFunction g_filter_clone_funcs[10]; // one per filter type
+static ActionVar filterClone(SWFAppContext* app_context, ActionVar* args, u32 arg_count, ActionVar* registers, void* this_obj)
+{
+    (void)args; (void)arg_count; (void)registers;
+    ASObject* obj = (ASObject*) this_obj;
+    ActionVar r = {0}; r.type = ACTION_STACK_VALUE_UNDEFINED;
+    if (!obj) return r;
+
+    ASObject* clone = allocObject(app_context, obj->num_used + 4);
+    clone->native_type = NATIVE_FILTER;
+
+    // Copy __proto__ and __constructor__ from original
+    ActionVar* proto = getProperty(obj, "__proto__", 9);
+    if (proto) setProperty(app_context, clone, "__proto__", 9, proto);
+    ActionVar* ctor = getProperty(obj, "__constructor__", 15);
+    if (ctor) setProperty(app_context, clone, "__constructor__", 15, ctor);
+
+    // Copy all own properties (skip __proto__, __constructor__)
+    for (u32 i = 0; i < obj->num_used; i++) {
+        const char* name = obj->properties[i].name;
+        u32 nlen = obj->properties[i].name_length;
+        if (nlen == 9 && memcmp(name, "__proto__", 9) == 0) continue;
+        if (nlen == 15 && memcmp(name, "__constructor__", 15) == 0) continue;
+        setProperty(app_context, clone, name, nlen, &obj->properties[i].value);
+    }
+
+    r.type = ACTION_STACK_VALUE_OBJECT;
+    r.data.numeric_value = (u64)clone;
+    return r;
+}
+
 // Create prototype_obj for a stub constructor if missing.
 // Sets constructor and __proto__ on prototype with DONT_DELETE.
 // Does NOT set up own_props (that's deferred to ensureGlobalInit Phase 8c-2.5).
@@ -24634,6 +24670,24 @@ static void initFlashPackage(SWFAppContext* app_context)
 	ensureStubCtorPrototype(app_context, &fc_GlowFilter);
 	ensureStubCtorPrototype(app_context, &fc_GradientBevelFilter);
 	ensureStubCtorPrototype(app_context, &fc_GradientGlowFilter);
+
+	// Register clone() on all filter prototypes (NOT BitmapFilter base — its clone returns undefined)
+	{
+		ASFunction* filter_ctors[] = {
+			&fc_BevelFilter,
+			&fc_BlurFilter, &fc_ColorMatrixFilter,
+			&fc_ConvolutionFilter, &fc_DisplacementMapFilter,
+			&fc_DropShadowFilter, &fc_GlowFilter,
+			&fc_GradientBevelFilter, &fc_GradientGlowFilter
+		};
+		for (int i = 0; i < 9; i++) {
+			if (filter_ctors[i]->prototype_obj) {
+				registerGeomMethod(&g_filter_clone_funcs[i], "clone",
+					(Function2Ptr)filterClone, app_context, filter_ctors[i]->prototype_obj);
+			}
+		}
+	}
+
 	ensureStubCtorPrototype(app_context, &fc_Transform);
 	ensureStubCtorPrototype(app_context, &fc_FileReference);
 	ensureStubCtorPrototype(app_context, &fc_FileReferenceList);
@@ -37252,10 +37306,11 @@ void actionNewMethod(SWFAppContext* app_context)
 				(strcmp(ctor_name, "GradientBevelFilter") == 0) ||
 				(strcmp(ctor_name, "GradientGlowFilter") == 0)) {
 				new_obj_inst->native_type = NATIVE_FILTER;
-				// ColorMatrixFilter: store matrix array from first arg
-				if (strcmp(ctor_name, "ColorMatrixFilter") == 0 &&
-				    num_args > 0 && args[0].type == ACTION_STACK_VALUE_ARRAY) {
-					setProperty(app_context, new_obj_inst, "matrix", 6, &args[0]);
+				// Initialize filter properties via the super constructor handler
+				{
+					ActionVar _nsc_result = {0};
+					invokeNativeSuperConstructor(app_context, user_ctor_func,
+						new_obj_inst, args, num_args, &_nsc_result);
 				}
 			}
 			// Global stub constructors with native backing
@@ -39076,11 +39131,35 @@ static int invokeNativeSuperConstructor(SWFAppContext* app_context, ASFunction* 
 	}
 	if (strcmp(name, "BevelFilter") == 0) {
 		if (obj->native_type == NATIVE_NONE) obj->native_type = NATIVE_FILTER;
-		double dist = (num_args > 0) ? varToDoubleSimple(&args[0]) : 4.0;
-		double angle = (num_args > 1) ? varToDoubleSimple(&args[1]) : 45.0;
 		ActionVar v;
-		v = makeF64(dist); setProperty(app_context, obj, "distance", 8, &v);
-		v = makeF64(angle); setProperty(app_context, obj, "angle", 5, &v);
+		double d;
+		d = (num_args > 0) ? varToDoubleSimple(&args[0]) : 4.0;
+		v = makeF64(d); setProperty(app_context, obj, "distance", 8, &v);
+		d = (num_args > 1) ? varToDoubleSimple(&args[1]) : 45.0;
+		v = makeF64(d); setProperty(app_context, obj, "angle", 5, &v);
+		d = (num_args > 2) ? varToDoubleSimple(&args[2]) : 16777215.0;
+		v = makeF64(d); setProperty(app_context, obj, "highlightColor", 14, &v);
+		d = (num_args > 3) ? varToDoubleSimple(&args[3]) : 1.0;
+		v = makeF64(d); setProperty(app_context, obj, "highlightAlpha", 14, &v);
+		d = (num_args > 4) ? varToDoubleSimple(&args[4]) : 0.0;
+		v = makeF64(d); setProperty(app_context, obj, "shadowColor", 11, &v);
+		d = (num_args > 5) ? varToDoubleSimple(&args[5]) : 1.0;
+		v = makeF64(d); setProperty(app_context, obj, "shadowAlpha", 11, &v);
+		d = (num_args > 6) ? varToDoubleSimple(&args[6]) : 4.0;
+		v = makeF64(d); setProperty(app_context, obj, "blurX", 5, &v);
+		d = (num_args > 7) ? varToDoubleSimple(&args[7]) : 4.0;
+		v = makeF64(d); setProperty(app_context, obj, "blurY", 5, &v);
+		d = (num_args > 8) ? varToDoubleSimple(&args[8]) : 1.0;
+		v = makeF64(d); setProperty(app_context, obj, "strength", 8, &v);
+		d = (num_args > 9) ? varToDoubleSimple(&args[9]) : 1.0;
+		v = makeF64(d); setProperty(app_context, obj, "quality", 7, &v);
+		{ ActionVar sv = {0}; sv.type = ACTION_STACK_VALUE_STRING;
+		  u32 u16len; uint16_t* u16 = utf8_to_u16(app_context, "inner", 5, &u16len);
+		  sv.str_size = u16len; sv.data.string_data.heap_ptr = u16;
+		  setProperty(app_context, obj, "type", 4, &sv); }
+		d = (num_args > 11) ? varToDoubleSimple(&args[11]) : 0.0;
+		v.type = ACTION_STACK_VALUE_BOOLEAN; v.data.numeric_value = (d != 0.0) ? 1 : 0;
+		setProperty(app_context, obj, "knockout", 8, &v);
 		out_result->type = ACTION_STACK_VALUE_OBJECT;
 		out_result->data.numeric_value = (u64)obj;
 		return 1;
