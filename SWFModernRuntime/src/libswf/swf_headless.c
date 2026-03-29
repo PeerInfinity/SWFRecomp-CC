@@ -1117,11 +1117,27 @@ void swfStart(SWFAppContext* app_context)
 			actionProcessDeferredFailedLoads();
 		}
 
+		// Fire deferred direct loadMovie inits (non-MCL loads queued during frame scripts)
+		{
+			extern void actionFirePendingDirectLoads(SWFAppContext* app_context);
+			extern int g_pending_direct_load_count;
+			int dl_guard = 0;
+			while (g_pending_direct_load_count > 0 && dl_guard++ < 32)
+				actionFirePendingDirectLoads(app_context);
+		}
+
+		// Flush pending onLoads queued during frame scripts (before timers)
+		actionFlushPendingOnLoads(app_context);
+
 		// Process timers after frame actions + deferred scripts
 		{
 			double frame_duration_ms = (app_context->fps > 0) ? (1000.0 / app_context->fps) : 83.33;
 			processTimers(app_context, frame_duration_ms);
 		}
+
+		// Flush pending onLoad dispatches for dynamically-attached MCs
+		// (queued during attachMovie, fires after current script/timer completes)
+		actionFlushPendingOnLoads(app_context);
 
 		// Dispatch any MCL loads queued by timer callbacks or chained from
 		// onLoadInit handlers.  Loop because each dispatch may queue more loads.
