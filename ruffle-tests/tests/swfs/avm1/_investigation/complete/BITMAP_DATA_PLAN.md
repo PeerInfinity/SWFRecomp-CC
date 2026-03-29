@@ -3,7 +3,7 @@
 
 <!-- PLAN_META
 id: BITMAP_DATA
-status: incomplete
+status: complete
 phases:
   - id: 1
     name: "Core pixel buffer implementation"
@@ -15,14 +15,12 @@ phases:
     name: "Methods (fillRect, clone, dispose, etc.)"
     status: complete
 dependencies: []
-blockers:
-  - reason: "bitmap_data_copypixels blocked on premultiply round-trip precision"
-  - reason: "bitmap_data_pixeldissolve blocked on PRNG algorithm mismatch"
+blockers: []
 -->
 
-Last updated: 2026-03-14
+Last updated: 2026-03-29
 
-## Status: INCOMPLETE — 15/17 tests passing (was 12/17), remaining items blocked or low-ROI
+## Status: COMPLETE — 16/17 trace tests passing; bitmap_filters SEGFAULT is a separate filter issue
 
 ### Current Results
 
@@ -43,9 +41,9 @@ Last updated: 2026-03-14
 | bitmap_data | 1126 | **PASS** | getColorBoundsRect (0,0)-alone quirk fixed ✅ |
 | bitmap_data_hittest | 132 | **PASS** | valueOf coercion via tsArgToDouble_ctx ✅ |
 | bitmap_data_threshold | 176 | **PASS** | Self-threshold writes at source coords ✅ |
-| bitmap_data_copypixels | 17 | FAIL (2/17 diff) | Premultiply precision |
-| bitmap_data_pixeldissolve | 1075 | FAIL (~993 diff) | PRNG algorithm mismatch |
-| bitmap_filters | 548 | SEGFAULT | Filter .clone() crash (separate issue) |
+| bitmap_data_copypixels | 17 | **PASS** | Fixed — premultiply precision resolved |
+| bitmap_data_pixeldissolve | 1075 | **PASS** | Fixed — Feistel network PRNG implemented (2026-03-29) |
+| bitmap_filters | 548 | SEGFAULT | Filter .clone() crash (separate filter issue, not BitmapData) |
 
 ### What was implemented
 
@@ -70,15 +68,11 @@ Full BitmapData native pixel buffer with premultiplied alpha:
 
 ---
 
-## Remaining Items — All Blocked or Low-ROI
+## Previously Blocked Items — Now Resolved
 
-### Blocked
+- **bitmap_data_copypixels**: Was 2/17 diff from premultiply precision. Now 17/17 PASS.
+- **bitmap_data_pixeldissolve**: Was ~993 diff from PRNG mismatch. Fixed with Feistel network implementation (2026-03-29). Now 1075/1075 PASS.
 
-#### bitmap_data_copypixels (2/17 diff)
-Premultiply→unpremultiply round-trip precision causes pixel value differences. Expected `5d243147` vs actual `22445369` for semi-transparent pixels. This is a fundamental limitation of premultiplied alpha integer math — the round-trip `premultiply(unpremultiply(x))` is lossy for non-opaque alpha values. Would require changing the premultiply/unpremultiply rounding strategy, which could affect many other tests.
+## Out of Scope
 
-#### bitmap_data_pixeldissolve (~993 diff)
-PRNG-based visited-pixel tracking doesn't match Flash's algorithm. Would require reverse-engineering Flash's exact dissolution pattern (Lehmer RNG position selection with visited-pixel bitmask).
-
-#### bitmap_filters (SEGFAULT, 548 lines)
-Filter `.clone()` not implemented. This is NOT a BitmapData issue — it's a missing method on filter objects (BevelFilter, BlurFilter, etc.). Should be tracked separately.
+- **bitmap_filters** (SEGFAULT): Filter `.clone()` not implemented. This is NOT a BitmapData issue — it's a missing method on filter objects. Should be tracked in a BITMAP_FILTERS plan.
