@@ -7,9 +7,21 @@ status: not_started
 phases:
   - id: 1
     name: "Generic filter clone function"
-    status: not_started
+    status: complete
   - id: 2
     name: "Register clone on filter prototypes"
+    status: complete
+  - id: 3
+    name: "Filter constructor default properties"
+    status: complete
+  - id: 4
+    name: "Property validation (angle, color, alpha, quality, strength, blur)"
+    status: not_started
+  - id: 5
+    name: "mc.filters getter/setter"
+    status: not_started
+  - id: 6
+    name: "ColorMatrixFilter matrix setter validation"
     status: not_started
 dependencies: []
 blockers: []
@@ -17,7 +29,7 @@ blockers: []
 
 Last updated: 2026-03-29
 
-## Status: NOT STARTED
+## Status: IN PROGRESS — clone implemented, property validation needed
 
 ### Problem
 
@@ -25,7 +37,18 @@ Last updated: 2026-03-29
 
 The test exercises `.clone()` on all 9 filter types (BevelFilter, BlurFilter, ColorMatrixFilter, ConvolutionFilter, DisplacementMapFilter, DropShadowFilter, GlowFilter, GradientBevelFilter, GradientGlowFilter), followed by property access on the cloned objects.
 
-**Current trace:** 9/548 lines match (crashes at line 10)
+**Current trace:** SEGFAULT at line ~122 (87/122 output lines match, crash in ColorMatrixFilter matrix setter)
+
+### Progress (2026-03-29)
+
+**Phase 1-3 DONE:** Clone implemented + filter constructors now initialize all default properties via `invokeNativeSuperConstructor` from the new() path. BevelFilter expanded to all 12 properties.
+
+**Remaining issues:**
+1. **SEGFAULT at line ~122:** Crash during `f.matrix = []` on ColorMatrixFilter — the matrix setter stores the array directly, but Flash validates/pads to 20 elements with NaN
+2. **Property order:** Filter properties enumerate in different order than Flash (e.g., `blurX,blurY` before `strength,quality` in ours, after in Flash)
+3. **No property validation:** angle wrapping (360→0), color masking (0xFFFFFF), alpha clamping (0-1 with 8-bit quantization), quality (0-15), strength (0-255), blur (0-255)
+4. **mc.filters getter/setter:** Reading/writing the filters array on MovieClips
+5. **String type property:** "type" should only accept "inner"/"outer"/"full"
 
 ### Root Cause
 
@@ -105,8 +128,13 @@ registerGeomMethod(&g_filter_clone_methods[0], "clone", (Function2Ptr)filterClon
 
 ### Estimated Complexity
 
-Low — ~40 lines of C. One generic clone function + registration on 9 prototypes.
+**Done:** ~87 lines (clone + filter init)
+**Remaining:** High — ~300+ lines needed for:
+- ColorMatrixFilter matrix setter with NaN padding (~40 lines)
+- Property validation per filter type via addProperty-style getters/setters (~150 lines)
+- mc.filters getter/setter (~50 lines)
+- Property enumeration order fix (~30 lines)
 
 ### Expected Impact
 
-Should fix ~540 of the 548 expected lines in `bitmap_filters`. The test exercises clone + property access for all 9 filter types. Remaining failures might be from filter-specific property defaults or type coercion.
+With all phases complete: ~500+ of 548 lines should pass. Current: 87/122 match before crash.
