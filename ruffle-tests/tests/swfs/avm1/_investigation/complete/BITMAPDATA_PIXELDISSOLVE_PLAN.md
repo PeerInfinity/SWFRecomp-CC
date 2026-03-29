@@ -3,31 +3,37 @@
 
 <!-- PLAN_META
 id: BITMAPDATA_PIXELDISSOLVE
-status: not_started
+status: complete
 phases:
   - id: 1
     name: "Argument validation and extraction"
-    status: not_started
+    status: complete
   - id: 2
     name: "Feistel PRNG"
-    status: not_started
+    status: complete
   - id: 3
     name: "Pixel iteration"
-    status: not_started
+    status: complete
   - id: 4
     name: "Pixel writing"
-    status: not_started
+    status: complete
 dependencies: []
 blockers: []
 -->
 
-Last updated: 2026-03-28
+Last updated: 2026-03-29
 
-## Status: NOT STARTED
+## Status: COMPLETE
 
-### Problem
+Both tests pass:
+- **bitmap_data_pixeldissolve** (trace): 1075/1075 lines match
+- **bitmap_data_pixeldissolve_image** (image): 0 outliers, 0 max difference (pixel-perfect)
 
-`bitmapDataPixelDissolve()` in `action.c` is a stub that returns immediately. The `bitmap_data_pixeldissolve_image` image test creates BitmapData objects, uses `pixelDissolve()` to pseudo-randomly copy/fill pixels, and displays the results.
+Implementation: ~120 lines of C replacing the stub. Feistel network PRNG for bijective pixel permutation, source rect clipping via shared coordinate system, self-referential fill and cross-bitmap copy modes, proper error codes (-1/-2/-3/-4).
+
+### Problem (original)
+
+`bitmapDataPixelDissolve()` in `action.c` was a stub using simple LCG. The `bitmap_data_pixeldissolve_image` image test creates BitmapData objects, uses `pixelDissolve()` to pseudo-randomly copy/fill pixels, and displays the results.
 
 ### API Signature
 

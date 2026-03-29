@@ -8841,6 +8841,25 @@ static ActionVar bitmapDataHitTest(SWFAppContext* app_context, ActionVar* args, 
     return r;
 }
 
+// Feistel block size: minimum even number of bits to represent sequence_length-1
+static u32 feistel_block_size(u32 sequence_length) {
+    if (sequence_length < 2) sequence_length = 2;
+    u32 bits = 0;
+    u32 v = sequence_length - 1;
+    while (v > 0) { v /= 2; bits++; }
+    return bits + (bits % 2);  // Round up to even
+}
+
+// 1-round Feistel network: bijective mapping on [0, 2^block_size)
+static u32 feistel_index(u32 raw_idx, u32 block_size) {
+    u32 half = block_size / 2;
+    u32 mask = (1u << half) - 1;
+    u32 h1 = raw_idx >> half;
+    u32 h2 = raw_idx & mask;
+    u32 f = (h2 * h2 + 1) & mask;
+    return ((h1 ^ f) << half) | h2;
+}
+
 static ActionVar bitmapDataPixelDissolve(SWFAppContext* app_context, ActionVar* args, u32 arg_count, ActionVar* registers, void* this_obj)
 {
     (void)registers;
@@ -8848,27 +8867,125 @@ static ActionVar bitmapDataPixelDissolve(SWFAppContext* app_context, ActionVar* 
     BitmapDataNative* dest_bmp = getBitmapNative(obj);
     ActionVar r = {0};
     if (!dest_bmp || dest_bmp->disposed) { r = makeF64(-1); return r; }
-    if (arg_count < 4) { r = makeF64(0); return r; }
-    if (args[0].type != ACTION_STACK_VALUE_OBJECT) { r = makeF64(0); return r; }
-    ASObject* src_obj = (ASObject*) args[0].data.numeric_value;
-    BitmapDataNative* src_bmp = getBitmapNative(src_obj);
-    if (!src_bmp || src_bmp->disposed) { r = makeF64(0); return r; }
-    if (args[1].type != ACTION_STACK_VALUE_OBJECT) { r = makeF64(0); return r; }
+    if (arg_count < 4) { r = makeF64(-1); return r; }
+    // Source bitmap validation
+    if (args[0].type != ACTION_STACK_VALUE_OBJECT) { r = makeF64(-2); return r; }
+    ASObject* src_obj = (ASObject*)(uintptr_t)args[0].data.numeric_value;
+    BitmapDataNative* src_bmp = src_obj ? getBitmapNative(src_obj) : NULL;
+    if (!src_bmp) { r = makeF64(-2); return r; }
+    if (src_bmp->disposed) { r = makeF64(-3); return r; }
+    // Source rect validation
+    if (args[1].type != ACTION_STACK_VALUE_OBJECT) { r = makeF64(-4); return r; }
+    ASObject* rect_obj = (ASObject*)(uintptr_t)args[1].data.numeric_value;
+    if (!rect_obj) { r = makeF64(-4); return r; }
+    // Dest point validation
     if (args[2].type != ACTION_STACK_VALUE_OBJECT) { r = makeF64(0); return r; }
-    int32_t seed = (int32_t)varToDoubleSimple(&args[3]);
-    int numPixels = (arg_count >= 5) ? (int)varToDoubleSimple(&args[4]) : 0;
+    ASObject* pt_obj = (ASObject*)(uintptr_t)args[2].data.numeric_value;
+    if (!pt_obj) { r = makeF64(0); return r; }
+
+    // Parse sourceRect
+    ActionVar* srx = getProperty(rect_obj, "x", 1);
+    ActionVar* sry = getProperty(rect_obj, "y", 1);
+    ActionVar* srw = getProperty(rect_obj, "width", 5);
+    ActionVar* srh = getProperty(rect_obj, "height", 6);
+    int src_x = srx ? (int)varToDoubleSimple(srx) : 0;
+    int src_y = sry ? (int)varToDoubleSimple(sry) : 0;
+    int src_w = srw ? (int)varToDoubleSimple(srw) : 0;
+    int src_h = srh ? (int)varToDoubleSimple(srh) : 0;
+
+    // Parse destPoint
+    ActionVar* dpx = getProperty(pt_obj, "x", 1);
+    ActionVar* dpy = getProperty(pt_obj, "y", 1);
+    int dest_x = dpx ? (int)varToDoubleSimple(dpx) : 0;
+    int dest_y = dpy ? (int)varToDoubleSimple(dpy) : 0;
+
+    int32_t random_seed = (arg_count >= 4) ? (int32_t)varToDoubleSimple(&args[3]) : 0;
+    int num_pixels = (arg_count >= 5) ? (int)varToDoubleSimple(&args[4]) : 0;
     uint32_t fill_color = (arg_count >= 6) ? doubleToUint32(varToDoubleSimple(&args[5])) : 0;
-    // Return seed for chaining
-    uint32_t rng_state = (seed <= 0) ? (uint32_t)(-seed + 1) : (uint32_t)seed;
-    int total = dest_bmp->width * dest_bmp->height;
-    int filled = 0;
-    for (int i = 0; i < numPixels && i < total; i++) {
-        rng_state = (uint32_t)(((uint64_t)rng_state * 16807ULL) % 2147483647ULL);
-        int idx = (int)(rng_state % (uint32_t)total);
-        dest_bmp->pixels[idx] = fill_color;
-        filled++;
+
+    if (src_w < 0) src_w = 0;
+    if (src_h < 0) src_h = 0;
+    if (src_w == 0 || src_h == 0) { r = makeF64(0); return r; }
+
+    // Compute effective region via shared coordinate system (relative to src rect origin)
+    int cx_min = 0, cy_min = 0;
+    if (-src_x > cx_min) cx_min = -src_x;
+    if (-dest_x > cx_min) cx_min = -dest_x;
+    if (-src_y > cy_min) cy_min = -src_y;
+    if (-dest_y > cy_min) cy_min = -dest_y;
+
+    int cx_max = src_w;
+    if (src_bmp->width - src_x < cx_max) cx_max = src_bmp->width - src_x;
+    if (dest_bmp->width - dest_x < cx_max) cx_max = dest_bmp->width - dest_x;
+
+    int cy_max = src_h;
+    if (src_bmp->height - src_y < cy_max) cy_max = src_bmp->height - src_y;
+    if (dest_bmp->height - dest_y < cy_max) cy_max = dest_bmp->height - dest_y;
+
+    int eff_w = cx_max - cx_min;
+    int eff_h = cy_max - cy_min;
+    if (eff_w <= 0 || eff_h <= 0) { r = makeF64(0); return r; }
+
+    int read_off_x = src_x + cx_min;
+    int read_off_y = src_y + cy_min;
+    int write_off_x = dest_x + cx_min;
+    int write_off_y = dest_y + cy_min;
+
+    int is_self = (src_bmp == dest_bmp);
+    uint32_t premul_fill = dest_bmp->transparent ? premultiplyAlpha(fill_color) : (fill_color | 0xFF000000);
+
+    u32 seq_len = (u32)(eff_w * eff_h);
+    if (num_pixels > (int)seq_len) num_pixels = (int)seq_len;
+
+    // Write pixel (0,0) unconditionally
+    {
+        int wx = write_off_x, wy = write_off_y;
+        if (wx >= 0 && wx < dest_bmp->width && wy >= 0 && wy < dest_bmp->height) {
+            if (is_self) {
+                dest_bmp->pixels[wy * dest_bmp->width + wx] = premul_fill;
+            } else {
+                int rx = read_off_x, ry = read_off_y;
+                if (rx >= 0 && rx < src_bmp->width && ry >= 0 && ry < src_bmp->height) {
+                    dest_bmp->pixels[wy * dest_bmp->width + wx] = src_bmp->pixels[ry * src_bmp->width + rx];
+                }
+            }
+        }
     }
-    r = makeF64((double)rng_state);
+
+    u32 block_size = feistel_block_size(seq_len);
+    u32 perm_len = 1u << block_size;
+    u32 raw_idx = ((u32)random_seed) % perm_len;
+
+    for (int i = 0; i < num_pixels; i++) {
+        u32 feistel_idx = 0;
+        u32 loop_guard = 0;
+        while ((feistel_idx == 0 || feistel_idx >= seq_len) && seq_len != 1) {
+            raw_idx = (raw_idx + 1) % perm_len;
+            feistel_idx = feistel_index(raw_idx, block_size);
+            loop_guard++;
+            if (loop_guard > perm_len + 2) break;
+        }
+
+        int bx = (int)(feistel_idx % (u32)eff_w);
+        int by = (int)(feistel_idx / (u32)eff_w);
+        int wx = write_off_x + bx;
+        int wy = write_off_y + by;
+
+
+        if (wx >= 0 && wx < dest_bmp->width && wy >= 0 && wy < dest_bmp->height) {
+            if (is_self) {
+                dest_bmp->pixels[wy * dest_bmp->width + wx] = premul_fill;
+            } else {
+                int rx = read_off_x + bx;
+                int ry = read_off_y + by;
+                if (rx >= 0 && rx < src_bmp->width && ry >= 0 && ry < src_bmp->height) {
+                    dest_bmp->pixels[wy * dest_bmp->width + wx] = src_bmp->pixels[ry * src_bmp->width + rx];
+                }
+            }
+        }
+    }
+
+    r = makeF64((double)(int32_t)raw_idx);
     return r;
 }
 
