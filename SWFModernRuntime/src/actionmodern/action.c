@@ -50346,11 +50346,6 @@ int actionGetFocusRectInfo(FocusRectInfo* out)
 		fr = root_movieclip.focusrect;
 	}
 	// Default (null/-1) = true; 0 = false; > 0 = true
-	{
-		extern MovieClip root_movieclip;
-		printf("[FR_CHECK] fr=%g root_fr=%g focused_fr=%g hl=%d\n",
-			fr, root_movieclip.focusrect, g_focused_mc->focusrect, g_highlight_state);
-	}
 	if (fr == 0.0f) return 0;
 
 	// Get local content bounds (in pixels) for the focused MC
