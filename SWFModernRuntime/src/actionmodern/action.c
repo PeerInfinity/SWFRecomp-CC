@@ -36836,6 +36836,25 @@ void actionNewMethod(SWFAppContext* app_context)
 				// Create new object for 'this' context
 				ASObject* new_obj = allocObject(app_context, 8);
 
+				// Set native_type for filter constructors and initialize properties
+				if (func->name[0] != '\0') {
+					const char* fn = func->name;
+					if ((strcmp(fn, "BevelFilter") == 0) ||
+					    (strcmp(fn, "BlurFilter") == 0) ||
+					    (strcmp(fn, "ColorMatrixFilter") == 0) ||
+					    (strcmp(fn, "ConvolutionFilter") == 0) ||
+					    (strcmp(fn, "DisplacementMapFilter") == 0) ||
+					    (strcmp(fn, "DropShadowFilter") == 0) ||
+					    (strcmp(fn, "GlowFilter") == 0) ||
+					    (strcmp(fn, "GradientBevelFilter") == 0) ||
+					    (strcmp(fn, "GradientGlowFilter") == 0)) {
+						new_obj->native_type = NATIVE_FILTER;
+						ActionVar _nsc_result = {0};
+						invokeNativeSuperConstructor(app_context, func,
+							new_obj, args, num_args, &_nsc_result);
+					}
+				}
+
 				// Set up prototype chain (new_obj.__proto__ = func.prototype)
 				if (func->prototype_obj == NULL)
 				{
