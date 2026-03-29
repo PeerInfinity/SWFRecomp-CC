@@ -36930,9 +36930,14 @@ void actionNewMethod(SWFAppContext* app_context)
 					}
 
 					// Call simple function (cast to correct return type — generated functions return ActionVar)
-					pushCtorContext(1);
-					return_value = ((ActionVar(*)(SWFAppContext*))func->simple_func)(app_context);
-					popCtorContext();
+					if (func->simple_func != NULL) {
+						pushCtorContext(1);
+						return_value = ((ActionVar(*)(SWFAppContext*))func->simple_func)(app_context);
+						popCtorContext();
+					} else {
+						return_value.type = ACTION_STACK_VALUE_UNDEFINED;
+						return_value.data.numeric_value = 0;
+					}
 				}
 
 				// According to SWF spec: constructor return value should be discarded

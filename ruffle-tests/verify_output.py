@@ -1062,7 +1062,7 @@ def get_self_load(test_dir):
     return False
 
 
-def compile_native(test_dir, num_frames, build_dir, headless=False, has_image_comparisons=False):
+def compile_native(test_dir, num_frames, build_dir, headless=False, has_image_comparisons=False, asan=False):
     """Compile generated C code with runtime into native binary."""
     mem_dir = build_dir / "memory"
     mem_dir.mkdir(exist_ok=True)
@@ -1246,6 +1246,13 @@ def compile_native(test_dir, num_frames, build_dir, headless=False, has_image_co
     else:
         mode_defines = ["-DNO_GRAPHICS"]
 
+    # Sanitizer flags for crash debugging
+    sanitizer_flags = []
+    opt_level = "-O2"
+    if asan:
+        sanitizer_flags = ["-fsanitize=address", "-fno-omit-frame-pointer", "-g"]
+        opt_level = "-O1"  # ASan needs at least -O1 but -O2 can hide issues
+
     try:
         result = subprocess.run(
             [
@@ -1264,7 +1271,8 @@ def compile_native(test_dir, num_frames, build_dir, headless=False, has_image_co
                 *mode_includes,
                 "-w",
                 "-std=c17",
-                "-O2",
+                opt_level,
+                *sanitizer_flags,
                 "-o",
                 str(build_dir / "test_run"),
                 "-lm",
@@ -1574,6 +1582,9 @@ examples:
     parser.add_argument(
         "--auto-start", action="store_true",
         help="Start from the first test with no results in the results file (implies --append)")
+    parser.add_argument(
+        "--asan", action="store_true",
+        help="Compile with AddressSanitizer (-fsanitize=address -g -O1) for crash debugging")
     return parser.parse_args()
 
 
@@ -1784,7 +1795,8 @@ def main():
             has_image_cmps = bool(image_comparisons) and HAS_PIL
             ok, err = compile_native(test_dir, num_frames, build_dir,
                                      headless=args.headless,
-                                     has_image_comparisons=has_image_cmps)
+                                     has_image_comparisons=has_image_cmps,
+                                     asan=args.asan)
             if not ok:
                 stats["compile_fail"] += 1
                 fail_list.append(name)
@@ -1871,7 +1883,8 @@ def main():
                         line_info = f" [{ls.get('matched',0)}/{ls.get('expected',0)} lines]"
                     print(f"{crash_status.upper()}{line_info}")
                     if run_stderr.strip():
-                        for line in run_stderr.strip().splitlines()[:20]:
+                        max_stderr = 100 if args.asan else 20
+                        for line in run_stderr.strip().splitlines()[:max_stderr]:
                             print(f"  stderr: {line}")
                 save_incremental()
                 continue
