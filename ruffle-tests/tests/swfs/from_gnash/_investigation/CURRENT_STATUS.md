@@ -1,6 +1,6 @@
 # Gnash Test Suite Status
 
-Last updated: 2026-03-27
+Last updated: 2026-03-29
 
 ## Quick Summary
 
@@ -13,6 +13,13 @@ Last updated: 2026-03-27
 Note: counts estimated from local testing (pending CI run). New passes: Color-v5/v7/v8 (+3).
 
 Filtered results exclude 9 tests with all-accepted diffs (Math-v5/v6/v7/v8, ops-v8, Error-v5/v6/v7/v8) — see `ACCEPTED_DIFFS.md`. Remaining 3 misc-swfmill failures (dict_event, tags_after_last_showframe, jump_to_prev_block) are blocked on architectural limitations — see `incomplete/MISC_SWFMILL_PLAN.md`.
+
+### Latest fixes (2026-03-29)
+- **Sort HOLE comparison (SWF < 7)** — HOLE elements now compare as empty string during sort for SWF5/6, matching Flash behavior where sparse array holes sort to the beginning.
+- **Array.concat densification** — HOLE elements converted to UNDEFINED in concat results, matching Flash behavior.
+- **Array.splice densification** — Remaining HOLE elements converted to UNDEFINED after splice, with proper enumeration key tracking.
+- **sortOn UNIQUESORT fix** — UNIQUESORT without RETURNINDEXEDARRAY now correctly sorts in-place (was incorrectly returning index array). Fixes ~17 `tostr(r)` failures in array-v5.
+- array-v5 improved from ~418/560 (74.6%) to ~440/560 (78.6%)
 
 ### Latest fixes (2026-03-27)
 - **Color target toString() resolution** — Color.getRGB/getTransform/setRGB/setTransform now call toString() on object targets at each method invocation (Flash behavior). Fixes Color-v5.
