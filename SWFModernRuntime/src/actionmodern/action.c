@@ -9419,6 +9419,19 @@ static ActionVar bitmapDataApplyFilter(SWFAppContext* app_context, ActionVar* ar
         matrix[i] = (float)varToDoubleSimple(&matrix_arr->elements[i]);
     }
 
+    // DEBUG: dump matrix
+    static int _af_debug = 0;
+    if (!_af_debug) {
+        _af_debug = 1;
+        fprintf(stderr, "APPLYFILTER matrix: ");
+        for (int i = 0; i < 20; i++) fprintf(stderr, "%.1f ", matrix[i]);
+        fprintf(stderr, "\n");
+        // Dump first pixel
+        uint32_t px0 = src_bmp->pixels[0];
+        fprintf(stderr, "APPLYFILTER src_px0: A=%d R=%d G=%d B=%d\n",
+            (px0>>24)&0xFF, (px0>>16)&0xFF, (px0>>8)&0xFF, px0&0xFF);
+    }
+
     // Apply filter: iterate sourceRect, map to dest via destPoint offset
     for (int sy = 0; sy < rh; sy++) {
         for (int sx = 0; sx < rw; sx++) {
@@ -37239,6 +37252,11 @@ void actionNewMethod(SWFAppContext* app_context)
 				(strcmp(ctor_name, "GradientBevelFilter") == 0) ||
 				(strcmp(ctor_name, "GradientGlowFilter") == 0)) {
 				new_obj_inst->native_type = NATIVE_FILTER;
+				// ColorMatrixFilter: store matrix array from first arg
+				if (strcmp(ctor_name, "ColorMatrixFilter") == 0 &&
+				    num_args > 0 && args[0].type == ACTION_STACK_VALUE_ARRAY) {
+					setProperty(app_context, new_obj_inst, "matrix", 6, &args[0]);
+				}
 			}
 			// Global stub constructors with native backing
 			else if (strcmp(ctor_name, "Sound") == 0) {

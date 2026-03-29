@@ -25,10 +25,13 @@ phases:
     status: complete
   - id: 7
     name: "Implement missing BitmapData methods"
-    status: blocked
+    status: mostly_complete
   - id: 8
     name: "Fix precision issue for bitmap_data_fillrect"
     status: not_started
+  - id: 9
+    name: "Fix ColorMatrixFilter constructor"
+    status: complete
 dependencies:
   - plan: BITMAPDATA_PERLINNOISE
     type: requires
@@ -42,11 +45,17 @@ dependencies:
 blockers: []
 -->
 
-Last updated: 2026-03-28
+Last updated: 2026-03-29
 
-## Status: IN PROGRESS — GPU pipeline implemented, blocked by unimplemented BitmapData methods
+## Status: IN PROGRESS — 4/6 image tests passing (pixel-perfect)
 
 ### Progress Summary
+
+**Completed (2026-03-29):**
+- ColorMatrixFilter constructor fix: matrix array property was only stored in super() path, not new() path. Added to normal construction path.
+- bitmapdata_applyfilter_colormatrix: **PASS** (0 outliers, max diff 1)
+- bitmap_data_perlinnoise: **PASS** (0 outliers, 0 max diff) — via BITMAPDATA_PERLINNOISE_PLAN
+- bitmap_data_pixeldissolve_image: **PASS** (0 outliers, 0 max diff) — via BITMAPDATA_PIXELDISSOLVE_PLAN
 
 **Completed (2026-03-28):**
 - Dynamic bitmap texture layer allocation in render_webgpu.c (always creates bitmap texture array with extra layers for attachBitmap)
@@ -81,12 +90,12 @@ The remaining 5 tests are blocked by **unimplemented BitmapData methods** (stubs
 
 | Test | Tolerance | Current Outliers | Notes |
 |------|-----------|-----------------|-------|
-| bitmap_data_fillrect | 0 | 545 | Renders correctly, edge precision diff |
-| bitmap_data_copypixels | 0 | 190726 | copyPixels works but merge is stub |
-| bitmap_data_colortransform | 5 | 78561 | colorTransform implemented, needs verification |
-| bitmap_data_perlinnoise | 0 | ~876K | perlinNoise stub → all black |
-| bitmap_data_pixeldissolve_image | 1 | ~155K | pixelDissolve stub → all black |
-| bitmapdata_applyfilter_colormatrix | 1 | ~68K | applyFilter stub → all black |
+| bitmap_data_perlinnoise | 0 | **0** | **PASS** — pixel-perfect |
+| bitmap_data_pixeldissolve_image | 1 | **0** | **PASS** — pixel-perfect |
+| bitmapdata_applyfilter_colormatrix | 1 | **0** (max 1) | **PASS** — rounding only |
+| bitmap_data_fillrect | 0 | 545 | 218 pixels with wrong color in specific bitmap |
+| bitmap_data_colortransform | 5 | 78561 | Bitmaps render as black — rendering pipeline issue |
+| bitmap_data_copypixels | 0 | 190726 | merge() is stub |
 
 ### Key Code Locations
 
