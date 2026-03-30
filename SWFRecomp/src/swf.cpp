@@ -2681,13 +2681,21 @@ namespace SWFRecomp
 					tag.parseFields(cur_pos);
 					u8 flags2 = (u8) tag.fields[0].value;
 
-					has_opaque_background = (flags2 & 0b10000000) != 0;
-					has_visible = (flags2 & 0b01000000) != 0;
-					has_image = (flags2 & 0b00100000) != 0;
-					has_class_name = (flags2 & 0b00010000) != 0;
-					has_cache_as_bitmap = (flags2 & 0b00001000) != 0;
-					has_blend_mode = (flags2 & 0b00000100) != 0;
-					has_filter_list = (flags2 & 0b00000010) != 0;
+					// PlaceObject3 flags2 bit layout (per SWF spec / Ruffle):
+					// bit 0: HasFilterList
+					// bit 1: HasBlendMode
+					// bit 2: HasCacheAsBitmap
+					// bit 3: HasClassName
+					// bit 4: HasImage
+					// bit 5: HasVisible
+					// bit 6: OpaqueBackground
+					has_filter_list = (flags2 & 0b00000001) != 0;
+					has_blend_mode = (flags2 & 0b00000010) != 0;
+					has_cache_as_bitmap = (flags2 & 0b00000100) != 0;
+					has_class_name = (flags2 & 0b00001000) != 0;
+					has_image = (flags2 & 0b00010000) != 0;
+					has_visible = (flags2 & 0b00100000) != 0;
+					has_opaque_background = (flags2 & 0b01000000) != 0;
 				}
 
 				tag.clearFields();
@@ -3888,13 +3896,14 @@ namespace SWFRecomp
 								sub_tag.parseFields(cur_pos);
 								u8 flags2 = (u8) sub_tag.fields[0].value;
 
-								sp_has_opaque_background = (flags2 & 0b10000000) != 0;
-								sp_has_visible = (flags2 & 0b01000000) != 0;
-								sp_has_image = (flags2 & 0b00100000) != 0;
-								sp_has_class_name = (flags2 & 0b00010000) != 0;
-								sp_has_cache_as_bitmap = (flags2 & 0b00001000) != 0;
-								sp_has_blend_mode = (flags2 & 0b00000100) != 0;
-								sp_has_filter_list = (flags2 & 0b00000010) != 0;
+								// PlaceObject3 flags2 bit layout (per SWF spec / Ruffle)
+								sp_has_filter_list = (flags2 & 0b00000001) != 0;
+								sp_has_blend_mode = (flags2 & 0b00000010) != 0;
+								sp_has_cache_as_bitmap = (flags2 & 0b00000100) != 0;
+								sp_has_class_name = (flags2 & 0b00001000) != 0;
+								sp_has_image = (flags2 & 0b00010000) != 0;
+								sp_has_visible = (flags2 & 0b00100000) != 0;
+								sp_has_opaque_background = (flags2 & 0b01000000) != 0;
 							}
 
 							// Now read depth

@@ -2970,6 +2970,37 @@ int ng_getCharBoundsForRatio(size_t char_id, u16 ratio,
 static int g_bounds_recursion_depth = 0;
 #define MAX_BOUNDS_RECURSION 16
 
+int ng_getDisplayEntryFilterData(size_t entry_idx, u8* type, float* blur_x, float* blur_y,
+    u8* quality, u8* flags, float* r, float* g, float* b, float* a,
+    float* strength, float* angle, float* distance,
+    float* hr, float* hg, float* hb, float* ha)
+{
+	size_t root_depth = entry_idx & 0xFFFFF;
+	if (root_depth > max_depth) return 0;
+	DisplayObject* obj = &display_list[root_depth];
+	size_t nested = entry_idx >> 20;
+	if (nested > 0 && obj->sprite_display_list)
+		obj = &obj->sprite_display_list[nested];
+	if (obj->filter_type == 0) return 0;
+	*type = obj->filter_type;
+	*blur_x = obj->filter_blur_x;
+	*blur_y = obj->filter_blur_y;
+	*quality = obj->filter_quality;
+	*flags = obj->filter_flags;
+	*r = obj->filter_color_r;
+	*g = obj->filter_color_g;
+	*b = obj->filter_color_b;
+	*a = obj->filter_color_a;
+	*strength = obj->filter_strength;
+	*angle = obj->filter_angle;
+	*distance = obj->filter_distance;
+	*hr = obj->filter_highlight_r;
+	*hg = obj->filter_highlight_g;
+	*hb = obj->filter_highlight_b;
+	*ha = obj->filter_highlight_a;
+	return 1;
+}
+
 int ng_getDisplayEntryBounds(size_t entry_idx,
     float* out_xmin_px, float* out_xmax_px,
     float* out_ymin_px, float* out_ymax_px)

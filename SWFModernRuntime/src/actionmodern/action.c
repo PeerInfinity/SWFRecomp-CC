@@ -35791,7 +35791,7 @@ void actionGetMember(SWFAppContext* app_context)
 		}
 		if (mc != NULL && prop_name_len == 7 && strncmp(prop_name, "filters", 7) == 0)
 		{
-			// Return stored filters (cloned) or empty array
+			// Return stored filters (cloned) or SWF-authored filters or empty array
 			if (mc->dynamic_props != NULL) {
 				ActionVar* stored = getProperty((ASObject*)mc->dynamic_props, "filters", 7);
 				if (stored != NULL && stored->type == ACTION_STACK_VALUE_ARRAY) {
@@ -35814,6 +35814,8 @@ void actionGetMember(SWFAppContext* app_context)
 					}
 				}
 			}
+			// Fallback: check display list for SWF-authored filters (from tagSetFilter)
+			// TODO: Build filter objects from display list data — complex, deferred
 			ASArray* arr = allocArray(app_context, 0);
 			initArrayProto(app_context, arr);
 			PUSH(ACTION_STACK_VALUE_ARRAY, (u64)arr);

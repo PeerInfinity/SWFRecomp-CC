@@ -151,6 +151,10 @@ extern u8 g_current_movie_id;
 void ng_on_place_object2(SWFAppContext* app_context, size_t depth, size_t char_id);
 void ng_on_remove_object(SWFAppContext* app_context, size_t depth);
 size_t ng_findDisplayEntryByName(const char* name);
+int ng_getDisplayEntryFilterData(size_t idx, u8* type, float* blur_x, float* blur_y,
+    u8* quality, u8* flags, float* r, float* g, float* b, float* a,
+    float* strength, float* angle, float* distance,
+    float* hr, float* hg, float* hb, float* ha);
 
 // Currently-executing sprite DisplayObject (set by advance_sprite_frames in NO_GRAPHICS,
 // or defined as dummy in swf.c for GRAPHICS mode). Used by action.c in all modes.
