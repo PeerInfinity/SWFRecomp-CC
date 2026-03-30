@@ -31779,6 +31779,104 @@ void actionSetMember(SWFAppContext* app_context)
 					}
 					handled = 1;
 				}
+				// colors, alphas, ratios: gradient filter array sync (GradientBevel/GradientGlow)
+				// Ruffle semantics: colors changes num_colors; alphas doesn't; ratios only reduces
+				else if ((prop_name_len == 6 && (memcmp(prop_name, "colors", 6) == 0 ||
+				          memcmp(prop_name, "alphas", 6) == 0 ||
+				          memcmp(prop_name, "ratios", 6) == 0))) {
+					ActionVar* existing_c = getProperty(obj, "colors", 6);
+					ActionVar* existing_a = getProperty(obj, "alphas", 6);
+					ActionVar* existing_r = getProperty(obj, "ratios", 6);
+					if (existing_c && existing_a && existing_r) {
+						int is_colors = (memcmp(prop_name, "colors", 6) == 0);
+						int is_alphas = (memcmp(prop_name, "alphas", 6) == 0);
+						int is_ratios = (memcmp(prop_name, "ratios", 6) == 0);
+						// Non-OBJECT values: only colors accepts non-objects (via coerce_to_object_or_bare)
+						// alphas and ratios require Object, else no-op
+						ASArray* src_arr = NULL;
+						int src_len = 0;
+						if (value_var.type == ACTION_STACK_VALUE_ARRAY) {
+							src_arr = (ASArray*)(uintptr_t)value_var.data.numeric_value;
+							src_len = src_arr ? (int)src_arr->length : 0;
+						} else if (value_var.type == ACTION_STACK_VALUE_OBJECT) {
+							// Object with length — treat as array-like
+							src_len = 0; // TODO: read .length from object
+						} else if (is_colors) {
+							// colors accepts non-objects: coerce to object, use length
+							char sbuf[17];
+							PUSH_VAR(&value_var);
+							convertString(app_context, sbuf);
+							ActionVar sv;
+							popVar(app_context, &sv);
+							src_len = (sv.type == ACTION_STACK_VALUE_STRING) ? (int)sv.str_size : 0;
+						} else {
+							return; // alphas/ratios non-object: no-op
+						}
+						if (src_len > 16) src_len = 16;
+						// Get current num_colors (= current colors array length)
+						ASArray* cur_c = (existing_c->type == ACTION_STACK_VALUE_ARRAY) ?
+							(ASArray*)(uintptr_t)existing_c->data.numeric_value : NULL;
+						ASArray* cur_a = (existing_a->type == ACTION_STACK_VALUE_ARRAY) ?
+							(ASArray*)(uintptr_t)existing_a->data.numeric_value : NULL;
+						ASArray* cur_r = (existing_r->type == ACTION_STACK_VALUE_ARRAY) ?
+							(ASArray*)(uintptr_t)existing_r->data.numeric_value : NULL;
+						int num_colors = cur_c ? (int)cur_c->length : 0;
+						if (is_colors) {
+							// colors: changes num_colors to new length
+							num_colors = src_len;
+						} else if (is_ratios) {
+							// ratios: can only REDUCE num_colors
+							num_colors = (src_len < num_colors) ? src_len : num_colors;
+						}
+						// else alphas: num_colors stays the same
+						// Rebuild all three arrays at num_colors length
+						ASArray* new_c = allocArray(app_context, num_colors > 0 ? num_colors : 1);
+						new_c->length = num_colors; initArrayProto(app_context, new_c);
+						ASArray* new_a = allocArray(app_context, num_colors > 0 ? num_colors : 1);
+						new_a->length = num_colors; initArrayProto(app_context, new_a);
+						ASArray* new_r = allocArray(app_context, num_colors > 0 ? num_colors : 1);
+						new_r->length = num_colors; initArrayProto(app_context, new_r);
+						for (int i = 0; i < num_colors; i++) {
+							// Colors
+							ASArray* cs = is_colors ? src_arr : cur_c;
+							if (cs && i < (int)cs->length) {
+								uint32_t uv = (uint32_t)(int32_t)varToDoubleSimple(&cs->elements[i]);
+								new_c->elements[i] = makeF64((double)(uv & 0x00FFFFFF));
+							} else {
+								new_c->elements[i] = makeF64(0.0);
+							}
+							// Alphas
+							if (is_alphas && src_arr && i < (int)src_arr->length) {
+								double av_d = varToDoubleSimple(&src_arr->elements[i]);
+								if (av_d < 0) av_d = 0; if (av_d > 1) av_d = 1;
+								av_d = (double)((int)(av_d * 255.0 + 0.5)) / 255.0;
+								new_a->elements[i] = makeF64(av_d);
+							} else if (cur_a && i < (int)cur_a->length) {
+								new_a->elements[i] = cur_a->elements[i];
+							} else {
+								new_a->elements[i] = makeF64(0.0);
+							}
+							// Ratios
+							if (is_ratios && src_arr && i < (int)src_arr->length) {
+								int rv = (int)varToDoubleSimple(&src_arr->elements[i]);
+								if (rv < 0) rv = 0; if (rv > 255) rv = 255;
+								new_r->elements[i] = makeF64((double)rv);
+							} else if (cur_r && i < (int)cur_r->length) {
+								new_r->elements[i] = cur_r->elements[i];
+							} else {
+								new_r->elements[i] = makeF64(0.0);
+							}
+						}
+						ActionVar cv = {0}; cv.type = ACTION_STACK_VALUE_ARRAY; cv.data.numeric_value = (u64)new_c;
+						setProperty(app_context, obj, "colors", 6, &cv);
+						ActionVar av = {0}; av.type = ACTION_STACK_VALUE_ARRAY; av.data.numeric_value = (u64)new_a;
+						setProperty(app_context, obj, "alphas", 6, &av);
+						ActionVar rv = {0}; rv.type = ACTION_STACK_VALUE_ARRAY; rv.data.numeric_value = (u64)new_r;
+						setProperty(app_context, obj, "ratios", 6, &rv);
+						return;
+					}
+					handled = 1;
+				}
 				// distance, bias, divisor: no validation, pass through
 				(void)handled;
 			}
