@@ -36559,11 +36559,7 @@ void actionNewObject(SWFAppContext* app_context)
 	}
 	else if (strcmp(ctor_name, "TextField") == 0)
 	{
-		// SWF6: new TextField() is not constructable (returns undefined)
-		if (g_swf_version < 7) {
-			PUSH(ACTION_STACK_VALUE_UNDEFINED, 0);
-			return;
-		}
+		// Handle TextField constructor — new TextField()
 		// SWF7+: Handle TextField constructor — new TextField()
 		// Creates an empty object with __proto__ set to TextField.prototype
 		ASObject* tf_obj = allocObject(app_context, 4);
