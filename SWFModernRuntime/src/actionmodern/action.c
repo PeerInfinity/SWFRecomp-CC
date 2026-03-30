@@ -31802,13 +31802,12 @@ void actionSetMember(SWFAppContext* app_context)
 							// Object with length — treat as array-like
 							src_len = 0; // TODO: read .length from object
 						} else if (is_colors) {
-							// colors accepts non-objects: coerce to object, use length
-							char sbuf[17];
-							PUSH_VAR(&value_var);
-							convertString(app_context, sbuf);
-							ActionVar sv;
-							popVar(app_context, &sv);
-							src_len = (sv.type == ACTION_STACK_VALUE_STRING) ? (int)sv.str_size : 0;
+							// colors: strings use string.length (fill with 0); numbers/null → empty
+							if (value_var.type == ACTION_STACK_VALUE_STRING) {
+								src_len = (int)value_var.str_size;
+							} else {
+								src_len = 0;
+							}
 						} else {
 							return; // alphas/ratios non-object: no-op
 						}
@@ -31848,9 +31847,13 @@ void actionSetMember(SWFAppContext* app_context)
 							// Alphas
 							if (is_alphas && src_arr && i < (int)src_arr->length) {
 								double av_d = varToDoubleSimple(&src_arr->elements[i]);
+								if (!isfinite(av_d)) av_d = 1.0; // NaN/Inf → 1.0 (u8::MAX/255)
 								if (av_d < 0) av_d = 0; if (av_d > 1) av_d = 1;
 								av_d = (double)((int)(av_d * 255.0 + 0.5)) / 255.0;
 								new_a->elements[i] = makeF64(av_d);
+							} else if (is_alphas) {
+								// Beyond source: default to 1.0 (u8::MAX/255) per Ruffle
+								new_a->elements[i] = makeF64(1.0);
 							} else if (cur_a && i < (int)cur_a->length) {
 								new_a->elements[i] = cur_a->elements[i];
 							} else {
