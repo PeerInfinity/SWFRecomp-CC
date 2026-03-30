@@ -31672,14 +31672,25 @@ void actionSetMember(SWFAppContext* app_context)
 					initArrayProto(app_context, new_matrix);
 					for (int mi = 0; mi < alloc_len; mi++) {
 						if (src_arr && mi < (int)src_arr->length) {
-							// Array elements: strings → NaN, null/undefined → NaN, numbers → value
+							// Array elements: null/undefined → NaN; strings → parseFloat (NaN if invalid)
 							ActionVar* el = &src_arr->elements[mi];
 							double ev;
-							if (el->type == ACTION_STACK_VALUE_NULL || el->type == ACTION_STACK_VALUE_UNDEFINED ||
-							    el->type == ACTION_STACK_VALUE_STRING)
+							if (el->type == ACTION_STACK_VALUE_NULL || el->type == ACTION_STACK_VALUE_UNDEFINED)
 								ev = NAN;
-							else
+							else {
 								ev = varToDoubleSimple(el);
+								// String elements that can't fully parse → NaN (Flash rejects partial parses like "1aaa")
+								if (el->type == ACTION_STACK_VALUE_STRING && !isnan(ev)) {
+									// Check if entire string is a valid number
+									char nbuf[64];
+									u32 nlen = (u32)u16_to_utf8((const uint16_t*)el->data.numeric_value,
+										el->str_size, nbuf, sizeof(nbuf));
+									char* endp;
+									strtod(nbuf, &endp);
+									// If not all chars consumed, it's a partial parse → NaN
+									if (endp != nbuf + nlen) ev = NAN;
+								}
+							}
 							new_matrix->elements[mi] = makeF64(ev);
 						} else if (!src_arr && mi < src_len) {
 							// Non-array source: NaN for string-length elements, 0 for number-reset
