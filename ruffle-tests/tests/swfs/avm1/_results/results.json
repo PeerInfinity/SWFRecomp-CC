@@ -1,8 +1,8 @@
 {
   "metadata": {
-    "timestamp": "2026-03-30T15:09:37.903571+00:00",
-    "git_sha": "378c75067b48d702dd45650f455d45c88e729183",
-    "duration_seconds": 10649.22,
+    "timestamp": "2026-03-30T17:28:52.313482+00:00",
+    "git_sha": "06e503cb4426970946fb8d1f426afb29652d2382",
+    "duration_seconds": 10609.57,
     "total_available": 620,
     "shards": 30,
     "expected_shards": 30
@@ -25,7 +25,7 @@
         "expected_lines": 1,
         "matching_lines": 1
       },
-      "duration": 17.31,
+      "duration": 16.21,
       "status": "pass"
     },
     {
@@ -36,7 +36,7 @@
         "expected_lines": 28,
         "matching_lines": 28
       },
-      "duration": 17.15,
+      "duration": 16.2,
       "status": "pass"
     },
     {
@@ -47,7 +47,7 @@
         "expected_lines": 28,
         "matching_lines": 28
       },
-      "duration": 17.11,
+      "duration": 16.19,
       "status": "pass"
     },
     {
@@ -58,7 +58,7 @@
         "expected_lines": 354,
         "matching_lines": 354
       },
-      "duration": 17.33,
+      "duration": 16.38,
       "status": "pass"
     },
     {
@@ -69,7 +69,7 @@
         "expected_lines": 15,
         "matching_lines": 15
       },
-      "duration": 16.91,
+      "duration": 16.15,
       "status": "pass"
     },
     {
@@ -80,7 +80,7 @@
         "expected_lines": 28,
         "matching_lines": 28
       },
-      "duration": 17.61,
+      "duration": 16.16,
       "status": "pass"
     },
     {
@@ -91,7 +91,7 @@
         "expected_lines": 28,
         "matching_lines": 28
       },
-      "duration": 17.17,
+      "duration": 16.13,
       "status": "pass"
     },
     {
@@ -102,7 +102,7 @@
         "expected_lines": 127,
         "matching_lines": 127
       },
-      "duration": 17.3,
+      "duration": 16.23,
       "status": "pass"
     },
     {
@@ -113,7 +113,7 @@
         "expected_lines": 9,
         "matching_lines": 9
       },
-      "duration": 17.52,
+      "duration": 16.24,
       "status": "pass"
     },
     {
@@ -124,7 +124,7 @@
         "expected_lines": 98,
         "matching_lines": 98
       },
-      "duration": 17.25,
+      "duration": 16.27,
       "status": "pass"
     },
     {
@@ -135,7 +135,7 @@
         "expected_lines": 30,
         "matching_lines": 30
       },
-      "duration": 17.24,
+      "duration": 16.23,
       "status": "pass"
     },
     {
@@ -146,7 +146,7 @@
         "expected_lines": 4,
         "matching_lines": 4
       },
-      "duration": 17.08,
+      "duration": 16.13,
       "status": "pass"
     },
     {
@@ -157,7 +157,7 @@
         "expected_lines": 42,
         "matching_lines": 42
       },
-      "duration": 17.24,
+      "duration": 16.22,
       "status": "pass"
     },
     {
@@ -168,7 +168,7 @@
         "expected_lines": 36,
         "matching_lines": 36
       },
-      "duration": 17.54,
+      "duration": 16.2,
       "status": "pass"
     },
     {
@@ -179,7 +179,7 @@
         "expected_lines": 12,
         "matching_lines": 12
       },
-      "duration": 17.19,
+      "duration": 16.15,
       "status": "pass"
     },
     {
@@ -190,7 +190,7 @@
         "expected_lines": 34,
         "matching_lines": 34
       },
-      "duration": 17.59,
+      "duration": 16.21,
       "status": "pass"
     },
     {
@@ -201,7 +201,7 @@
         "expected_lines": 161,
         "matching_lines": 161
       },
-      "duration": 18.54,
+      "duration": 16.82,
       "status": "pass"
     },
     {
@@ -212,7 +212,7 @@
         "expected_lines": 443,
         "matching_lines": 443
       },
-      "duration": 17.59,
+      "duration": 16.18,
       "status": "pass"
     },
     {
@@ -223,7 +223,7 @@
         "expected_lines": 207,
         "matching_lines": 207
       },
-      "duration": 17.68,
+      "duration": 16.23,
       "status": "pass"
     },
     {
@@ -234,7 +234,7 @@
         "expected_lines": 209,
         "matching_lines": 209
       },
-      "duration": 17.49,
+      "duration": 16.23,
       "status": "pass"
     },
     {
@@ -245,7 +245,7 @@
         "expected_lines": 35,
         "matching_lines": 35
       },
-      "duration": 17.19,
+      "duration": 16.15,
       "status": "pass"
     },
     {
@@ -256,7 +256,7 @@
         "expected_lines": 35,
         "matching_lines": 35
       },
-      "duration": 16.33,
+      "duration": 16.71,
       "status": "pass"
     },
     {
@@ -267,7 +267,7 @@
         "expected_lines": 13,
         "matching_lines": 13
       },
-      "duration": 16.4,
+      "duration": 16.75,
       "status": "pass"
     },
     {
@@ -278,7 +278,7 @@
         "expected_lines": 97,
         "matching_lines": 97
       },
-      "duration": 16.44,
+      "duration": 16.68,
       "status": "pass"
     },
     {
@@ -289,7 +289,7 @@
         "expected_lines": 85,
         "matching_lines": 85
       },
-      "duration": 16.33,
+      "duration": 16.79,
       "status": "pass"
     },
     {
@@ -300,7 +300,7 @@
         "expected_lines": 40,
         "matching_lines": 40
       },
-      "duration": 16.51,
+      "duration": 16.7,
       "status": "pass"
     },
     {
@@ -311,7 +311,7 @@
         "expected_lines": 41,
         "matching_lines": 41
       },
-      "duration": 16.3,
+      "duration": 16.39,
       "status": "pass"
     },
     {
@@ -322,7 +322,7 @@
         "expected_lines": 10,
         "matching_lines": 10
       },
-      "duration": 16.14,
+      "duration": 16.27,
       "status": "pass"
     },
     {
@@ -333,7 +333,7 @@
         "expected_lines": 89,
         "matching_lines": 89
       },
-      "duration": 16.29,
+      "duration": 16.37,
       "status": "pass"
     },
     {
@@ -344,7 +344,7 @@
         "expected_lines": 79,
         "matching_lines": 79
       },
-      "duration": 16.26,
+      "duration": 16.45,
       "status": "pass"
     },
     {
@@ -355,7 +355,7 @@
         "expected_lines": 31,
         "matching_lines": 31
       },
-      "duration": 16.61,
+      "duration": 16.48,
       "status": "pass"
     },
     {
@@ -366,7 +366,7 @@
         "expected_lines": 1,
         "matching_lines": 1
       },
-      "duration": 16.41,
+      "duration": 16.44,
       "status": "pass"
     },
     {
@@ -377,7 +377,7 @@
         "expected_lines": 1,
         "matching_lines": 1
       },
-      "duration": 17.11,
+      "duration": 16.64,
       "status": "pass"
     },
     {
@@ -388,7 +388,7 @@
         "expected_lines": 1,
         "matching_lines": 1
       },
-      "duration": 16.55,
+      "duration": 16.82,
       "status": "pass"
     },
     {
@@ -399,7 +399,7 @@
         "expected_lines": 1,
         "matching_lines": 1
       },
-      "duration": 16.81,
+      "duration": 16.89,
       "status": "pass"
     },
     {
@@ -410,7 +410,7 @@
         "expected_lines": 1,
         "matching_lines": 1
       },
-      "duration": 16.62,
+      "duration": 16.82,
       "status": "pass"
     },
     {
@@ -421,7 +421,7 @@
         "expected_lines": 20,
         "matching_lines": 20
       },
-      "duration": 16.85,
+      "duration": 16.91,
       "status": "pass"
     },
     {
@@ -432,7 +432,7 @@
         "expected_lines": 11,
         "matching_lines": 0
       },
-      "duration": 16.93,
+      "duration": 16.85,
       "status": "output_mismatch",
       "detail": "11 line(s) differ (actual=0, expected=11)",
       "actual_output": "",
@@ -446,7 +446,7 @@
         "expected_lines": 34,
         "matching_lines": 34
       },
-      "duration": 16.57,
+      "duration": 17.09,
       "status": "pass"
     },
     {
@@ -457,7 +457,7 @@
         "expected_lines": 34,
         "matching_lines": 34
       },
-      "duration": 16.68,
+      "duration": 17.26,
       "status": "pass"
     },
     {
@@ -468,7 +468,7 @@
         "expected_lines": 59,
         "matching_lines": 59
       },
-      "duration": 16.42,
+      "duration": 16.92,
       "status": "pass"
     },
     {
@@ -479,7 +479,7 @@
         "expected_lines": 3,
         "matching_lines": 3
       },
-      "duration": 16.4,
+      "duration": 17.49,
       "status": "pass"
     },
     {
@@ -490,7 +490,7 @@
         "expected_lines": 2,
         "matching_lines": 2
       },
-      "duration": 16.32,
+      "duration": 17.47,
       "status": "pass"
     },
     {
@@ -501,7 +501,7 @@
         "expected_lines": 0,
         "matching_lines": 0
       },
-      "duration": 16.27,
+      "duration": 17.04,
       "status": "pass"
     },
     {
@@ -512,7 +512,7 @@
         "expected_lines": 1058,
         "matching_lines": 1058
       },
-      "duration": 19.03,
+      "duration": 19.96,
       "status": "pass"
     },
     {
@@ -523,7 +523,7 @@
         "expected_lines": 1126,
         "matching_lines": 1126
       },
-      "duration": 18.7,
+      "duration": 19.77,
       "status": "pass"
     },
     {
@@ -534,7 +534,7 @@
         "expected_lines": 0,
         "matching_lines": 0
       },
-      "duration": 16.44,
+      "duration": 16.81,
       "status": "pass"
     },
     {
@@ -545,7 +545,7 @@
         "expected_lines": 40,
         "matching_lines": 40
       },
-      "duration": 16.55,
+      "duration": 16.79,
       "status": "pass"
     },
     {
@@ -556,7 +556,7 @@
         "expected_lines": 17,
         "matching_lines": 17
       },
-      "duration": 17.07,
+      "duration": 17.28,
       "status": "pass"
     },
     {
@@ -567,7 +567,7 @@
         "expected_lines": 13,
         "matching_lines": 13
       },
-      "duration": 16.38,
+      "duration": 16.8,
       "status": "pass"
     },
     {
@@ -578,7 +578,7 @@
         "expected_lines": 0,
         "matching_lines": 0
       },
-      "duration": 16.38,
+      "duration": 16.69,
       "status": "pass"
     },
     {
@@ -589,7 +589,7 @@
         "expected_lines": 132,
         "matching_lines": 132
       },
-      "duration": 17.0,
+      "duration": 16.96,
       "status": "pass"
     },
     {
@@ -600,7 +600,7 @@
         "expected_lines": 12,
         "matching_lines": 12
       },
-      "duration": 16.22,
+      "duration": 16.28,
       "status": "pass"
     },
     {
@@ -611,7 +611,7 @@
         "expected_lines": 10,
         "matching_lines": 10
       },
-      "duration": 16.38,
+      "duration": 16.21,
       "status": "pass"
     },
     {
@@ -622,7 +622,7 @@
         "expected_lines": 631,
         "matching_lines": 631
       },
-      "duration": 16.66,
+      "duration": 16.64,
       "status": "pass"
     },
     {
@@ -633,7 +633,7 @@
         "expected_lines": 0,
         "matching_lines": 0
       },
-      "duration": 17.29,
+      "duration": 17.58,
       "status": "pass"
     },
     {
@@ -644,7 +644,7 @@
         "expected_lines": 1075,
         "matching_lines": 1075
       },
-      "duration": 17.44,
+      "duration": 17.51,
       "status": "pass"
     },
     {
@@ -655,7 +655,7 @@
         "expected_lines": 0,
         "matching_lines": 0
       },
-      "duration": 16.88,
+      "duration": 17.36,
       "status": "pass"
     },
     {
@@ -666,7 +666,7 @@
         "expected_lines": 176,
         "matching_lines": 176
       },
-      "duration": 16.82,
+      "duration": 17.25,
       "status": "pass"
     },
     {
@@ -675,11 +675,11 @@
       "lines": {
         "actual_lines": 548,
         "expected_lines": 548,
-        "matching_lines": 533
+        "matching_lines": 540
       },
-      "duration": 17.73,
+      "duration": 18.33,
       "status": "output_mismatch",
-      "detail": "15 line(s) differ (actual=548, expected=548)",
+      "detail": "8 line(s) differ (actual=548, expected=548)",
       "actual_output": "... (9 lines before) ...\n// f.clone()\n[object Object]\n// f == f.clone()\nfalse\n// bevelMC.filters[0]\nundefined\n// bevelMC.filters = [f]\ndistance=4, angle=44.9999999772279, highlightColor=16777215, highlightAlpha=1, shadowColor=0, shadowAlpha=1, quality=1, strength=1, knockout=false, blurX=4, blurY=4, type=inner, clone=[type Function]\n// f.angle = 360\nangle=0\n// f.angle = 361\nangle=1\n// f.angle = -1\nangle=-1\n// f.angle = 366\nangle=6\n// f.distance = 1000\ndistance=1000\n// f.distance = 2.5\ndistance=2.5\n// f.distance = -1\ndistance=-1\n// f.highlightAlpha = 0.5\nhighlightColor=16777215, highlightAlpha=0.498039215686275\n// f.highlightColor = 16777471\nhighlightColor=255, highlightAlpha=0.498039215686275\n// f.highlightAlpha = 1.5\nhighlightColor=255, highlightAlpha=1\n// f.highlightColor = -305419896\nhighlightColor=13347208, highlightAlpha=1\n// f.highlightAlpha = -1\nhighlightColor=13347208, highlightAlpha=0\n// f.shadowAlpha = 0.5\nshadowColor=0, shadowAlpha=0.498039215686275\n// f.shadowColor = 16777471\nshadowColor=255, shadowAlpha=0.498039215686275\n// f.shadowAlpha = 1.5\nshadowColor=255, shadowAlpha=1\n// f.shadowColor = -305419896\nshadowColor=13347208, shadowAlpha=1\n// f.shadowAlpha = -1\nshadowColor=13347208, shadowAlpha=0\n// f.quality = 2.5\nquality=2\n// f.quality = -1\nquality=0\n// f.quality = 100\nquality=15\n// f.strength = 256\nstrength=255\n... (489 lines after) ...",
       "expected_output": "... (9 lines before) ...\n// f.clone()\n[object Object]\n// f == f.clone()\nfalse\n// bevelMC.filters[0]\ndistance=10, angle=44.999253346525, highlightColor=65280, highlightAlpha=1, shadowColor=255, shadowAlpha=1, quality=2, strength=1.5, knockout=false, blurX=10, blurY=10, type=inner, clone=[type Function]\n// bevelMC.filters = [f]\ndistance=4, angle=44.9999999772279, highlightColor=16777215, highlightAlpha=1, shadowColor=0, shadowAlpha=1, quality=1, strength=1, knockout=false, blurX=4, blurY=4, type=inner, clone=[type Function]\n// f.angle = 360\nangle=0\n// f.angle = 361\nangle=1\n// f.angle = -1\nangle=-1\n// f.angle = 366\nangle=6\n// f.distance = 1000\ndistance=1000\n// f.distance = 2.5\ndistance=2.5\n// f.distance = -1\ndistance=-1\n// f.highlightAlpha = 0.5\nhighlightColor=16777215, highlightAlpha=0.498039215686275\n// f.highlightColor = 16777471\nhighlightColor=255, highlightAlpha=0.498039215686275\n// f.highlightAlpha = 1.5\nhighlightColor=255, highlightAlpha=1\n// f.highlightColor = -305419896\nhighlightColor=13347208, highlightAlpha=1\n// f.highlightAlpha = -1\nhighlightColor=13347208, highlightAlpha=0\n// f.shadowAlpha = 0.5\nshadowColor=0, shadowAlpha=0.498039215686275\n// f.shadowColor = 16777471\nshadowColor=255, shadowAlpha=0.498039215686275\n// f.shadowAlpha = 1.5\nshadowColor=255, shadowAlpha=1\n// f.shadowColor = -305419896\nshadowColor=13347208, shadowAlpha=1\n// f.shadowAlpha = -1\nshadowColor=13347208, shadowAlpha=0\n// f.quality = 2.5\nquality=2\n// f.quality = -1\nquality=0\n// f.quality = 100\nquality=15\n// f.strength = 256\nstrength=255\n... (489 lines after) ..."
     },
@@ -691,7 +691,7 @@
         "expected_lines": 0,
         "matching_lines": 0
       },
-      "duration": 16.31,
+      "duration": 16.85,
       "status": "pass"
     },
     {
@@ -702,7 +702,7 @@
         "expected_lines": 19,
         "matching_lines": 19
       },
-      "duration": 16.28,
+      "duration": 17.36,
       "status": "pass"
     },
     {
@@ -713,7 +713,7 @@
         "expected_lines": 1058,
         "matching_lines": 1058
       },
-      "duration": 19.21,
+      "duration": 20.04,
       "status": "pass"
     },
     {
@@ -724,7 +724,7 @@
         "expected_lines": 14,
         "matching_lines": 14
       },
-      "duration": 17.89,
+      "duration": 16.82,
       "status": "pass"
     },
     {
@@ -735,7 +735,7 @@
         "expected_lines": 14,
         "matching_lines": 14
       },
-      "duration": 16.8,
+      "duration": 16.68,
       "status": "pass"
     },
     {
@@ -746,7 +746,7 @@
         "expected_lines": 1058,
         "matching_lines": 1058
       },
-      "duration": 19.39,
+      "duration": 19.43,
       "status": "pass"
     },
     {
@@ -757,7 +757,7 @@
         "expected_lines": 24,
         "matching_lines": 24
       },
-      "duration": 16.63,
+      "duration": 16.84,
       "status": "pass"
     },
     {
@@ -768,7 +768,7 @@
         "expected_lines": 8,
         "matching_lines": 8
       },
-      "duration": 16.94,
+      "duration": 16.71,
       "status": "pass"
     },
     {
@@ -779,7 +779,7 @@
         "expected_lines": 4,
         "matching_lines": 4
       },
-      "duration": 16.75,
+      "duration": 16.6,
       "status": "pass"
     },
     {
@@ -790,7 +790,7 @@
         "expected_lines": 14,
         "matching_lines": 14
       },
-      "duration": 16.7,
+      "duration": 16.82,
       "status": "pass"
     },
     {
@@ -801,7 +801,7 @@
         "expected_lines": 45,
         "matching_lines": 45
       },
-      "duration": 17.7,
+      "duration": 17.39,
       "status": "pass"
     },
     {
@@ -812,7 +812,7 @@
         "expected_lines": 3,
         "matching_lines": 3
       },
-      "duration": 16.74,
+      "duration": 16.72,
       "status": "pass"
     },
     {
@@ -823,7 +823,7 @@
         "expected_lines": 25,
         "matching_lines": 25
       },
-      "duration": 16.77,
+      "duration": 16.95,
       "status": "pass"
     },
     {
@@ -834,7 +834,7 @@
         "expected_lines": 20,
         "matching_lines": 20
       },
-      "duration": 16.73,
+      "duration": 16.88,
       "status": "pass"
     },
     {
@@ -845,7 +845,7 @@
         "expected_lines": 4,
         "matching_lines": 4
       },
-      "duration": 16.54,
+      "duration": 16.83,
       "status": "pass"
     },
     {
@@ -856,7 +856,7 @@
         "expected_lines": 2,
         "matching_lines": 2
       },
-      "duration": 16.62,
+      "duration": 16.77,
       "status": "pass"
     },
     {
@@ -867,7 +867,7 @@
         "expected_lines": 22,
         "matching_lines": 22
       },
-      "duration": 16.96,
+      "duration": 17.05,
       "status": "pass"
     },
     {
@@ -878,7 +878,7 @@
         "expected_lines": 18,
         "matching_lines": 18
       },
-      "duration": 16.65,
+      "duration": 16.76,
       "status": "pass"
     },
     {
@@ -889,7 +889,7 @@
         "expected_lines": 18,
         "matching_lines": 18
       },
-      "duration": 16.65,
+      "duration": 16.82,
       "status": "pass"
     },
     {
@@ -900,7 +900,7 @@
         "expected_lines": 63,
         "matching_lines": 63
       },
-      "duration": 16.58,
+      "duration": 16.9,
       "status": "pass"
     },
     {
@@ -911,7 +911,7 @@
         "expected_lines": 1,
         "matching_lines": 1
       },
-      "duration": 16.51,
+      "duration": 16.73,
       "status": "pass"
     },
     {
@@ -922,7 +922,7 @@
         "expected_lines": 8,
         "matching_lines": 8
       },
-      "duration": 16.81,
+      "duration": 16.78,
       "status": "pass"
     },
     {
@@ -933,7 +933,7 @@
         "expected_lines": 2,
         "matching_lines": 2
       },
-      "duration": 17.23,
+      "duration": 16.61,
       "status": "pass"
     },
     {
@@ -944,7 +944,7 @@
         "expected_lines": 5,
         "matching_lines": 5
       },
-      "duration": 17.45,
+      "duration": 16.79,
       "status": "pass"
     },
     {
@@ -955,7 +955,7 @@
         "expected_lines": 8,
         "matching_lines": 8
       },
-      "duration": 18.49,
+      "duration": 17.25,
       "status": "pass"
     },
     {
@@ -966,7 +966,7 @@
         "expected_lines": 17,
         "matching_lines": 17
       },
-      "duration": 18.03,
+      "duration": 16.73,
       "status": "pass"
     },
     {
@@ -977,7 +977,7 @@
         "expected_lines": 19,
         "matching_lines": 19
       },
-      "duration": 17.61,
+      "duration": 16.9,
       "status": "pass"
     },
     {
@@ -988,7 +988,7 @@
         "expected_lines": 94,
         "matching_lines": 94
       },
-      "duration": 17.51,
+      "duration": 16.86,
       "status": "pass"
     },
     {
@@ -999,7 +999,7 @@
         "expected_lines": 86,
         "matching_lines": 86
       },
-      "duration": 17.53,
+      "duration": 17.16,
       "status": "pass"
     },
     {
@@ -1010,7 +1010,7 @@
         "expected_lines": 24,
         "matching_lines": 24
       },
-      "duration": 17.24,
+      "duration": 16.38,
       "status": "pass"
     },
     {
@@ -1021,7 +1021,7 @@
         "expected_lines": 7,
         "matching_lines": 7
       },
-      "duration": 18.02,
+      "duration": 16.66,
       "status": "pass"
     },
     {
@@ -1032,7 +1032,7 @@
         "expected_lines": 129,
         "matching_lines": 129
       },
-      "duration": 17.84,
+      "duration": 17.19,
       "status": "pass"
     },
     {
@@ -1043,7 +1043,7 @@
         "expected_lines": 17,
         "matching_lines": 17
       },
-      "duration": 17.47,
+      "duration": 16.66,
       "status": "pass"
     },
     {
@@ -1054,7 +1054,7 @@
         "expected_lines": 57,
         "matching_lines": 57
       },
-      "duration": 17.95,
+      "duration": 16.86,
       "status": "pass"
     },
     {
@@ -1065,7 +1065,7 @@
         "expected_lines": 48,
         "matching_lines": 48
       },
-      "duration": 17.31,
+      "duration": 16.78,
       "status": "pass"
     },
     {
@@ -1076,7 +1076,7 @@
         "expected_lines": 23,
         "matching_lines": 23
       },
-      "duration": 17.11,
+      "duration": 16.88,
       "status": "pass"
     },
     {
@@ -1087,7 +1087,7 @@
         "expected_lines": 2,
         "matching_lines": 2
       },
-      "duration": 17.18,
+      "duration": 16.49,
       "status": "pass"
     },
     {
@@ -1098,7 +1098,7 @@
         "expected_lines": 39,
         "matching_lines": 39
       },
-      "duration": 17.46,
+      "duration": 16.6,
       "status": "pass"
     },
     {
@@ -1109,7 +1109,7 @@
         "expected_lines": 41,
         "matching_lines": 41
       },
-      "duration": 17.2,
+      "duration": 16.6,
       "status": "pass"
     },
     {
@@ -1120,7 +1120,7 @@
         "expected_lines": 3,
         "matching_lines": 3
       },
-      "duration": 17.26,
+      "duration": 16.72,
       "status": "pass"
     },
     {
@@ -1131,7 +1131,7 @@
         "expected_lines": 10,
         "matching_lines": 10
       },
-      "duration": 17.17,
+      "duration": 16.76,
       "status": "pass"
     },
     {
@@ -1142,7 +1142,7 @@
         "expected_lines": 4,
         "matching_lines": 4
       },
-      "duration": 17.0,
+      "duration": 16.7,
       "status": "pass"
     },
     {
@@ -1153,10 +1153,10 @@
         "expected_lines": 6335,
         "matching_lines": 6284
       },
-      "duration": 18.69,
+      "duration": 18.29,
       "status": "output_mismatch",
       "detail": "51 line(s) differ (actual=6335, expected=6335)",
-      "actual_output": "// Date()\nMon Mar 30 20:48:53 GMT+0545 2026\n\n// typeof Date()\nstring\n\n// new Date()\nMon Mar 30 20:48:53 GMT+0545 2026\nFullYear = 2026, Year = 126, Month = 2, Date = 30, Day = 1, Hours = 20, Minutes = 48, Seconds = 53, Milliseconds = 33, Time = 1774883033033, TimezoneOffset = -345, UTCFullYear = 2026, UTCYear = 126, UTCMonth = 2, UTCDate = 30, UTCDay = 1, UTCHours = 15, UTCMinutes = 3, UTCSeconds = 53, UTCMilliseconds = 33\n\n// new Date(new Date())\nMon Mar 30 20:48:53 GMT+0545 2026\nFullYear = 2026, Year = 126, Month = 2, Date = 30, Day = 1, Hours = 20, Minutes = 48, Seconds = 53, Milliseconds = 33, Time = 1774883033033, TimezoneOffset = -345, UTCFullYear = 2026, UTCYear = 126, UTCMonth = 2, UTCDate = 30, UTCDay = 1, UTCHours = 15, UTCMinutes = 3, UTCSeconds = 53, UTCMilliseconds = 33\n\n// new Date(0)\nThu Jan 1 05:45:00 GMT+0545 1970\nFullYear = 1970, Year = 70, Month = 0, Date = 1, Day = 4, Hours = 5, Minutes = 45, Seconds = 0, Milliseconds = 0, Time = 0, TimezoneOffset = -345, UTCFullYear = 1970, UTCYear = 70, UTCMonth = 0, UTCDate = 1, UTCDay = 4, UTCHours = 0, UTCMinutes = 0, UTCSeconds = 0, UTCMilliseconds = 0\n\n// new Date(5.5)\nThu Jan 1 05:45:00 GMT+0545 1970\nFullYear = 1970, Year = 70, Month = 0, Date = 1, Day = 4, Hours = 5, Minutes = 45, Seconds = 0, Milliseconds = 5, Time = 5.5, TimezoneOffset = -345, UTCFullYear = 1970, UTCYear = 70, UTCMonth = 0, UTCDate = 1, UTCDay = 4, UTCHours = 0, UTCMinutes = 0, UTCSeconds = 0, UTCMilliseconds = 5\n\n// new Date(500)\nThu Jan 1 05:45:00 GMT+0545 1970\nFullYear = 1970, Year = 70, Month = 0, Date = 1, Day = 4, Hours = 5, Minutes = 45, Seconds = 0, Milliseconds = 500, Time = 500, TimezoneOffset = -345, UTCFullYear = 1970, UTCYear = 70, UTCMonth = 0, UTCDate = 1, UTCDay = 4, UTCHours = 0, UTCMinutes = 0, UTCSeconds = 0, UTCMilliseconds = 500\n\n// new Date(-500)\nThu Jan 1 05:44:59 GMT+0545 1970\nFullYear = 1970, Year = 70, Month = 0, Date = 1, Day = 4, Hours = 5, Minutes = 44, Seconds = 59, Milliseconds = 500, Time = -500, TimezoneOffset = -345, UTCFullYear = 1969, UTCYear = 69, UTCMonth = 11, UTCDate = 31, UTCDay = 3, UTCHours = 23, UTCMinutes = 59, UTCSeconds = 59, UTCMilliseconds = 500\n\n// new Date(1000)\nThu Jan 1 05:45:01 GMT+0545 1970\nFullYear = 1970, Year = 70, Month = 0, Date = 1, Day = 4, Hours = 5, Minutes = 45, Seconds = 1, Milliseconds = 0, Time = 1000, TimezoneOffset = -345, UTCFullYear = 1970, UTCYear = 70, UTCMonth = 0, UTCDate = 1, UTCDay = 4, UTCHours = 0, UTCMinutes = 0, UTCSeconds = 1, UTCMilliseconds = 0\n\n// new Date(-1000)\nThu Jan 1 05:44:59 GMT+0545 1970\nFullYear = 1970, Year = 70, Month = 0, Date = 1, Day = 4, Hours = 5, Minutes = 44, Seconds = 59, Milliseconds = 0, Time = -1000, TimezoneOffset = -345, UTCFullYear = 1969, UTCYear = 69, UTCMonth = 11, UTCDate = 31, UTCDay = 3, UTCHours = 23, UTCMinutes = 59, UTCSeconds = 59, UTCMilliseconds = 0\n\n// new Date(1594844387653)\nThu Jul 16 02:04:47 GMT+0545 2020\nFullYear = 2020, Year = 120, Month = 6, Date = 16, Day = 4, Hours = 2, Minutes = 4, Seconds = 47, Milliseconds = 653, Time = 1594844387653, TimezoneOffset = -345, UTCFullYear = 2020, UTCYear = 120, UTCMonth = 6, UTCDate = 15, UTCDay = 3, UTCHours = 20, UTCMinutes = 19, UTCSeconds = 47, UTCMilliseconds = 653\n\n// new Date(-1594844387653)\nThu Jun 19 09:25:12 GMT+0545 1919\nFullYear = 1919, Year = 19, Month = 5, Date = 19, Day = 4, Hours = 9, Minutes = 25, Seconds = 12, Milliseconds = 347, Time = -1594844387653, TimezoneOffset = -345, UTCFullYear = 1919, UTCYear = 19, UTCMonth = 5, UTCDate = 19, UTCDay = 4, UTCHours = 3, UTCMinutes = 40, UTCSeconds = 12, UTCMilliseconds = 347\n\n// new Date(8.64e+15)\nSat Sep 13 05:45:00 GMT+0545 275760\nFullYear = 275760, Year = 273860, Month = 8, Date = 13, Day = 6, Hours = 5, Minutes = 45, Seconds = 0, Milliseconds = 0, Time = 8.64e+15, TimezoneOffset = -345, UTCFullYear = 275760, UTCYear = 273860, UTCMonth = 8, UTCDate = 13, UTCDay = 6, UTCHours = 0, UTCMinutes = 0, UTCSeconds = 0, UTCMilliseconds = 0\n\n... (6285 lines after) ...",
+      "actual_output": "// Date()\nMon Mar 30 23:08:18 GMT+0545 2026\n\n// typeof Date()\nstring\n\n// new Date()\nMon Mar 30 23:08:18 GMT+0545 2026\nFullYear = 2026, Year = 126, Month = 2, Date = 30, Day = 1, Hours = 23, Minutes = 8, Seconds = 18, Milliseconds = 506, Time = 1774891398506, TimezoneOffset = -345, UTCFullYear = 2026, UTCYear = 126, UTCMonth = 2, UTCDate = 30, UTCDay = 1, UTCHours = 17, UTCMinutes = 23, UTCSeconds = 18, UTCMilliseconds = 506\n\n// new Date(new Date())\nMon Mar 30 23:08:18 GMT+0545 2026\nFullYear = 2026, Year = 126, Month = 2, Date = 30, Day = 1, Hours = 23, Minutes = 8, Seconds = 18, Milliseconds = 506, Time = 1774891398506, TimezoneOffset = -345, UTCFullYear = 2026, UTCYear = 126, UTCMonth = 2, UTCDate = 30, UTCDay = 1, UTCHours = 17, UTCMinutes = 23, UTCSeconds = 18, UTCMilliseconds = 506\n\n// new Date(0)\nThu Jan 1 05:45:00 GMT+0545 1970\nFullYear = 1970, Year = 70, Month = 0, Date = 1, Day = 4, Hours = 5, Minutes = 45, Seconds = 0, Milliseconds = 0, Time = 0, TimezoneOffset = -345, UTCFullYear = 1970, UTCYear = 70, UTCMonth = 0, UTCDate = 1, UTCDay = 4, UTCHours = 0, UTCMinutes = 0, UTCSeconds = 0, UTCMilliseconds = 0\n\n// new Date(5.5)\nThu Jan 1 05:45:00 GMT+0545 1970\nFullYear = 1970, Year = 70, Month = 0, Date = 1, Day = 4, Hours = 5, Minutes = 45, Seconds = 0, Milliseconds = 5, Time = 5.5, TimezoneOffset = -345, UTCFullYear = 1970, UTCYear = 70, UTCMonth = 0, UTCDate = 1, UTCDay = 4, UTCHours = 0, UTCMinutes = 0, UTCSeconds = 0, UTCMilliseconds = 5\n\n// new Date(500)\nThu Jan 1 05:45:00 GMT+0545 1970\nFullYear = 1970, Year = 70, Month = 0, Date = 1, Day = 4, Hours = 5, Minutes = 45, Seconds = 0, Milliseconds = 500, Time = 500, TimezoneOffset = -345, UTCFullYear = 1970, UTCYear = 70, UTCMonth = 0, UTCDate = 1, UTCDay = 4, UTCHours = 0, UTCMinutes = 0, UTCSeconds = 0, UTCMilliseconds = 500\n\n// new Date(-500)\nThu Jan 1 05:44:59 GMT+0545 1970\nFullYear = 1970, Year = 70, Month = 0, Date = 1, Day = 4, Hours = 5, Minutes = 44, Seconds = 59, Milliseconds = 500, Time = -500, TimezoneOffset = -345, UTCFullYear = 1969, UTCYear = 69, UTCMonth = 11, UTCDate = 31, UTCDay = 3, UTCHours = 23, UTCMinutes = 59, UTCSeconds = 59, UTCMilliseconds = 500\n\n// new Date(1000)\nThu Jan 1 05:45:01 GMT+0545 1970\nFullYear = 1970, Year = 70, Month = 0, Date = 1, Day = 4, Hours = 5, Minutes = 45, Seconds = 1, Milliseconds = 0, Time = 1000, TimezoneOffset = -345, UTCFullYear = 1970, UTCYear = 70, UTCMonth = 0, UTCDate = 1, UTCDay = 4, UTCHours = 0, UTCMinutes = 0, UTCSeconds = 1, UTCMilliseconds = 0\n\n// new Date(-1000)\nThu Jan 1 05:44:59 GMT+0545 1970\nFullYear = 1970, Year = 70, Month = 0, Date = 1, Day = 4, Hours = 5, Minutes = 44, Seconds = 59, Milliseconds = 0, Time = -1000, TimezoneOffset = -345, UTCFullYear = 1969, UTCYear = 69, UTCMonth = 11, UTCDate = 31, UTCDay = 3, UTCHours = 23, UTCMinutes = 59, UTCSeconds = 59, UTCMilliseconds = 0\n\n// new Date(1594844387653)\nThu Jul 16 02:04:47 GMT+0545 2020\nFullYear = 2020, Year = 120, Month = 6, Date = 16, Day = 4, Hours = 2, Minutes = 4, Seconds = 47, Milliseconds = 653, Time = 1594844387653, TimezoneOffset = -345, UTCFullYear = 2020, UTCYear = 120, UTCMonth = 6, UTCDate = 15, UTCDay = 3, UTCHours = 20, UTCMinutes = 19, UTCSeconds = 47, UTCMilliseconds = 653\n\n// new Date(-1594844387653)\nThu Jun 19 09:25:12 GMT+0545 1919\nFullYear = 1919, Year = 19, Month = 5, Date = 19, Day = 4, Hours = 9, Minutes = 25, Seconds = 12, Milliseconds = 347, Time = -1594844387653, TimezoneOffset = -345, UTCFullYear = 1919, UTCYear = 19, UTCMonth = 5, UTCDate = 19, UTCDay = 4, UTCHours = 3, UTCMinutes = 40, UTCSeconds = 12, UTCMilliseconds = 347\n\n// new Date(8.64e+15)\nSat Sep 13 05:45:00 GMT+0545 275760\nFullYear = 275760, Year = 273860, Month = 8, Date = 13, Day = 6, Hours = 5, Minutes = 45, Seconds = 0, Milliseconds = 0, Time = 8.64e+15, TimezoneOffset = -345, UTCFullYear = 275760, UTCYear = 273860, UTCMonth = 8, UTCDate = 13, UTCDay = 6, UTCHours = 0, UTCMinutes = 0, UTCSeconds = 0, UTCMilliseconds = 0\n\n... (6285 lines after) ...",
       "expected_output": "// Date()\nSat Feb 3 04:05:06 GMT+0545 2001\n\n// typeof Date()\nstring\n\n// new Date()\nSat Feb 3 04:05:06 GMT+0545 2001\nFullYear = 2001, Year = 101, Month = 1, Date = 3, Day = 6, Hours = 4, Minutes = 5, Seconds = 6, Milliseconds = 0, Time = 981152406000, TimezoneOffset = -345, UTCFullYear = 2001, UTCYear = 101, UTCMonth = 1, UTCDate = 2, UTCDay = 5, UTCHours = 22, UTCMinutes = 20, UTCSeconds = 6, UTCMilliseconds = 0\n\n// new Date(new Date())\nSat Feb 3 04:05:06 GMT+0545 2001\nFullYear = 2001, Year = 101, Month = 1, Date = 3, Day = 6, Hours = 4, Minutes = 5, Seconds = 6, Milliseconds = 0, Time = 981152406000, TimezoneOffset = -345, UTCFullYear = 2001, UTCYear = 101, UTCMonth = 1, UTCDate = 2, UTCDay = 5, UTCHours = 22, UTCMinutes = 20, UTCSeconds = 6, UTCMilliseconds = 0\n\n// new Date(0)\nThu Jan 1 05:45:00 GMT+0545 1970\nFullYear = 1970, Year = 70, Month = 0, Date = 1, Day = 4, Hours = 5, Minutes = 45, Seconds = 0, Milliseconds = 0, Time = 0, TimezoneOffset = -345, UTCFullYear = 1970, UTCYear = 70, UTCMonth = 0, UTCDate = 1, UTCDay = 4, UTCHours = 0, UTCMinutes = 0, UTCSeconds = 0, UTCMilliseconds = 0\n\n// new Date(5.5)\nThu Jan 1 05:45:00 GMT+0545 1970\nFullYear = 1970, Year = 70, Month = 0, Date = 1, Day = 4, Hours = 5, Minutes = 45, Seconds = 0, Milliseconds = 5, Time = 5.5, TimezoneOffset = -345, UTCFullYear = 1970, UTCYear = 70, UTCMonth = 0, UTCDate = 1, UTCDay = 4, UTCHours = 0, UTCMinutes = 0, UTCSeconds = 0, UTCMilliseconds = 5\n\n// new Date(500)\nThu Jan 1 05:45:00 GMT+0545 1970\nFullYear = 1970, Year = 70, Month = 0, Date = 1, Day = 4, Hours = 5, Minutes = 45, Seconds = 0, Milliseconds = 500, Time = 500, TimezoneOffset = -345, UTCFullYear = 1970, UTCYear = 70, UTCMonth = 0, UTCDate = 1, UTCDay = 4, UTCHours = 0, UTCMinutes = 0, UTCSeconds = 0, UTCMilliseconds = 500\n\n// new Date(-500)\nThu Jan 1 05:44:59 GMT+0545 1970\nFullYear = 1970, Year = 70, Month = 0, Date = 1, Day = 4, Hours = 5, Minutes = 44, Seconds = 59, Milliseconds = 500, Time = -500, TimezoneOffset = -345, UTCFullYear = 1969, UTCYear = 69, UTCMonth = 11, UTCDate = 31, UTCDay = 3, UTCHours = 23, UTCMinutes = 59, UTCSeconds = 59, UTCMilliseconds = 500\n\n// new Date(1000)\nThu Jan 1 05:45:01 GMT+0545 1970\nFullYear = 1970, Year = 70, Month = 0, Date = 1, Day = 4, Hours = 5, Minutes = 45, Seconds = 1, Milliseconds = 0, Time = 1000, TimezoneOffset = -345, UTCFullYear = 1970, UTCYear = 70, UTCMonth = 0, UTCDate = 1, UTCDay = 4, UTCHours = 0, UTCMinutes = 0, UTCSeconds = 1, UTCMilliseconds = 0\n\n// new Date(-1000)\nThu Jan 1 05:44:59 GMT+0545 1970\nFullYear = 1970, Year = 70, Month = 0, Date = 1, Day = 4, Hours = 5, Minutes = 44, Seconds = 59, Milliseconds = 0, Time = -1000, TimezoneOffset = -345, UTCFullYear = 1969, UTCYear = 69, UTCMonth = 11, UTCDate = 31, UTCDay = 3, UTCHours = 23, UTCMinutes = 59, UTCSeconds = 59, UTCMilliseconds = 0\n\n// new Date(1594844387653)\nThu Jul 16 02:04:47 GMT+0545 2020\nFullYear = 2020, Year = 120, Month = 6, Date = 16, Day = 4, Hours = 2, Minutes = 4, Seconds = 47, Milliseconds = 653, Time = 1594844387653, TimezoneOffset = -345, UTCFullYear = 2020, UTCYear = 120, UTCMonth = 6, UTCDate = 15, UTCDay = 3, UTCHours = 20, UTCMinutes = 19, UTCSeconds = 47, UTCMilliseconds = 653\n\n// new Date(-1594844387653)\nThu Jun 19 09:25:12 GMT+0545 1919\nFullYear = 1919, Year = 19, Month = 5, Date = 19, Day = 4, Hours = 9, Minutes = 25, Seconds = 12, Milliseconds = 347, Time = -1594844387653, TimezoneOffset = -345, UTCFullYear = 1919, UTCYear = 19, UTCMonth = 5, UTCDate = 19, UTCDay = 4, UTCHours = 3, UTCMinutes = 40, UTCSeconds = 12, UTCMilliseconds = 347\n\n// new Date(8.64e+15)\nSat Sep 13 05:45:00 GMT+0545 275760\nFullYear = 275760, Year = 273860, Month = 8, Date = 13, Day = 6, Hours = 5, Minutes = 45, Seconds = 0, Milliseconds = 0, Time = 8.64e+15, TimezoneOffset = -345, UTCFullYear = 275760, UTCYear = 273860, UTCMonth = 8, UTCDate = 13, UTCDay = 6, UTCHours = 0, UTCMinutes = 0, UTCSeconds = 0, UTCMilliseconds = 0\n\n... (6285 lines after) ..."
     },
     {
@@ -1167,7 +1167,7 @@
         "expected_lines": 52,
         "matching_lines": 52
       },
-      "duration": 17.45,
+      "duration": 16.62,
       "status": "pass"
     },
     {
@@ -1178,7 +1178,7 @@
         "expected_lines": 8,
         "matching_lines": 8
       },
-      "duration": 17.12,
+      "duration": 16.47,
       "status": "pass"
     },
     {
@@ -1189,7 +1189,7 @@
         "expected_lines": 13,
         "matching_lines": 13
       },
-      "duration": 16.96,
+      "duration": 18.0,
       "status": "pass"
     },
     {
@@ -1200,7 +1200,7 @@
         "expected_lines": 4,
         "matching_lines": 4
       },
-      "duration": 17.1,
+      "duration": 16.58,
       "status": "pass"
     },
     {
@@ -1211,7 +1211,7 @@
         "expected_lines": 2,
         "matching_lines": 2
       },
-      "duration": 17.04,
+      "duration": 16.49,
       "status": "pass"
     },
     {
@@ -1222,7 +1222,7 @@
         "expected_lines": 27,
         "matching_lines": 27
       },
-      "duration": 17.11,
+      "duration": 16.43,
       "status": "pass"
     },
     {
@@ -1233,7 +1233,7 @@
         "expected_lines": 54,
         "matching_lines": 54
       },
-      "duration": 17.07,
+      "duration": 16.52,
       "status": "pass"
     },
     {
@@ -1244,7 +1244,7 @@
         "expected_lines": 3,
         "matching_lines": 3
       },
-      "duration": 17.12,
+      "duration": 16.41,
       "status": "pass"
     },
     {
@@ -1255,7 +1255,7 @@
         "expected_lines": 91,
         "matching_lines": 91
       },
-      "duration": 17.35,
+      "duration": 16.98,
       "status": "pass"
     },
     {
@@ -1266,7 +1266,7 @@
         "expected_lines": 13,
         "matching_lines": 7
       },
-      "duration": 17.11,
+      "duration": 16.57,
       "status": "output_mismatch",
       "detail": "6 line(s) differ (actual=13, expected=13)",
       "actual_output": "Set: (x=1, y=2)\nSet: (x=0, y=0)\nSet: (x=0, y=0)\nSet: (x=-2147483648, y=8)\nSet: (x=3, y=8)\nSet: (x=3, y=-2147483648)\nSet: (x=-2147483648, y=-2147483648)\nSet: (x=-2147483648, y=-2147483648)\nSet: (x=1, y=2)\nSet: (x=0, y=0)\nSet: (x=1, y=0)\nSet: (x=0, y=0)\nSet: (x=0, y=0)",
@@ -1280,7 +1280,7 @@
         "expected_lines": 2,
         "matching_lines": 2
       },
-      "duration": 17.24,
+      "duration": 16.59,
       "status": "pass"
     },
     {
@@ -1291,7 +1291,7 @@
         "expected_lines": 107,
         "matching_lines": 107
       },
-      "duration": 17.08,
+      "duration": 16.56,
       "status": "pass"
     },
     {
@@ -1302,7 +1302,7 @@
         "expected_lines": 3,
         "matching_lines": 3
       },
-      "duration": 17.17,
+      "duration": 16.87,
       "status": "pass"
     },
     {
@@ -1313,7 +1313,7 @@
         "expected_lines": 12,
         "matching_lines": 12
       },
-      "duration": 17.27,
+      "duration": 16.99,
       "status": "pass"
     },
     {
@@ -1324,7 +1324,7 @@
         "expected_lines": 10,
         "matching_lines": 10
       },
-      "duration": 17.2,
+      "duration": 17.12,
       "status": "pass"
     },
     {
@@ -1335,7 +1335,7 @@
         "expected_lines": 1,
         "matching_lines": 1
       },
-      "duration": 17.14,
+      "duration": 17.64,
       "status": "pass"
     },
     {
@@ -1346,7 +1346,7 @@
         "expected_lines": 1,
         "matching_lines": 1
       },
-      "duration": 17.23,
+      "duration": 17.41,
       "status": "pass"
     },
     {
@@ -1357,7 +1357,7 @@
         "expected_lines": 20,
         "matching_lines": 20
       },
-      "duration": 17.11,
+      "duration": 17.01,
       "status": "pass"
     },
     {
@@ -1368,7 +1368,7 @@
         "expected_lines": 2,
         "matching_lines": 2
       },
-      "duration": 17.0,
+      "duration": 17.05,
       "status": "pass"
     },
     {
@@ -1379,7 +1379,7 @@
         "expected_lines": 60,
         "matching_lines": 60
       },
-      "duration": 17.24,
+      "duration": 17.15,
       "status": "pass"
     },
     {
@@ -1390,7 +1390,7 @@
         "expected_lines": 576,
         "matching_lines": 576
       },
-      "duration": 17.11,
+      "duration": 17.26,
       "status": "pass"
     },
     {
@@ -1401,7 +1401,7 @@
         "expected_lines": 576,
         "matching_lines": 576
       },
-      "duration": 17.1,
+      "duration": 17.29,
       "status": "pass"
     },
     {
@@ -1412,7 +1412,7 @@
         "expected_lines": 296,
         "matching_lines": 296
       },
-      "duration": 17.21,
+      "duration": 17.49,
       "status": "pass"
     },
     {
@@ -1423,7 +1423,7 @@
         "expected_lines": 71,
         "matching_lines": 71
       },
-      "duration": 17.41,
+      "duration": 17.75,
       "status": "pass"
     },
     {
@@ -1434,7 +1434,7 @@
         "expected_lines": 20,
         "matching_lines": 20
       },
-      "duration": 16.26,
+      "duration": 16.59,
       "status": "pass"
     },
     {
@@ -1445,7 +1445,7 @@
         "expected_lines": 30,
         "matching_lines": 30
       },
-      "duration": 16.4,
+      "duration": 16.75,
       "status": "pass"
     },
     {
@@ -1456,7 +1456,7 @@
         "expected_lines": 221,
         "matching_lines": 221
       },
-      "duration": 16.43,
+      "duration": 16.82,
       "status": "pass"
     },
     {
@@ -1467,7 +1467,7 @@
         "expected_lines": 100,
         "matching_lines": 97
       },
-      "duration": 16.11,
+      "duration": 16.45,
       "status": "output_mismatch",
       "detail": "3 line(s) differ (actual=100, expected=100)",
       "actual_output": "... (22 lines before) ...\n  align = null;\n  blockIndent = null;\n  bold = null;\n  bullet = null;\n  color = null;\n  display = null;\n  font = null;\n  indent = null;\n  italic = null;\n  leading = null;\n  leftMargin = null;\n  letterSpacing = null;\n  rightMargin = null;\n  size = null;\n  tabStops = null;\n  target = null;\n  underline = null;\n  url = null;\ntext.getTextFormat()\n  size = 12;\n  align = left;\n  blockIndent = 0;\n  bold = false;\n  bullet = false;\n  color = 0;\n  display = block;\n  font = Times New Roman;\n  indent = 0;\n  italic = false;\n  leading = 0;\n  leftMargin = 0;\n  letterSpacing = 0;\n  rightMargin = 0;\n  size = 12;\n  tabStops = ;\n  target = ;\n  underline = false;\n  url = ;\ntext.getTextFormat(0,0)\n  size = null;\n  align = null;\n  blockIndent = null;\n  bold = null;\n  bullet = null;\n  color = null;\n  display = null;\n  font = null;\n  indent = null;\n  italic = null;\n  leading = null;\n... (28 lines after) ...",
@@ -1481,7 +1481,7 @@
         "expected_lines": 335,
         "matching_lines": 335
       },
-      "duration": 16.25,
+      "duration": 16.6,
       "status": "pass"
     },
     {
@@ -1492,7 +1492,7 @@
         "expected_lines": 9,
         "matching_lines": 9
       },
-      "duration": 16.37,
+      "duration": 16.53,
       "status": "pass"
     },
     {
@@ -1503,7 +1503,7 @@
         "expected_lines": 2,
         "matching_lines": 2
       },
-      "duration": 16.11,
+      "duration": 16.5,
       "status": "pass"
     },
     {
@@ -1514,7 +1514,7 @@
         "expected_lines": 45,
         "matching_lines": 45
       },
-      "duration": 16.38,
+      "duration": 16.69,
       "status": "pass"
     },
     {
@@ -1525,7 +1525,7 @@
         "expected_lines": 27,
         "matching_lines": 27
       },
-      "duration": 16.23,
+      "duration": 16.58,
       "status": "pass"
     },
     {
@@ -1536,7 +1536,7 @@
         "expected_lines": 52,
         "matching_lines": 52
       },
-      "duration": 16.45,
+      "duration": 16.7,
       "status": "pass"
     },
     {
@@ -1547,7 +1547,7 @@
         "expected_lines": 52,
         "matching_lines": 52
       },
-      "duration": 16.44,
+      "duration": 16.71,
       "status": "pass"
     },
     {
@@ -1558,7 +1558,7 @@
         "expected_lines": 114,
         "matching_lines": 114
       },
-      "duration": 16.35,
+      "duration": 16.63,
       "status": "pass"
     },
     {
@@ -1569,7 +1569,7 @@
         "expected_lines": 311,
         "matching_lines": 311
       },
-      "duration": 16.43,
+      "duration": 16.77,
       "status": "pass"
     },
     {
@@ -1580,7 +1580,7 @@
         "expected_lines": 311,
         "matching_lines": 311
       },
-      "duration": 16.46,
+      "duration": 16.79,
       "status": "pass"
     },
     {
@@ -1591,7 +1591,7 @@
         "expected_lines": 4,
         "matching_lines": 4
       },
-      "duration": 16.49,
+      "duration": 16.64,
       "status": "pass"
     },
     {
@@ -1602,7 +1602,7 @@
         "expected_lines": 17,
         "matching_lines": 17
       },
-      "duration": 16.29,
+      "duration": 16.5,
       "status": "pass"
     },
     {
@@ -1613,7 +1613,7 @@
         "expected_lines": 5377,
         "matching_lines": 5377
       },
-      "duration": 17.84,
+      "duration": 17.97,
       "status": "pass"
     },
     {
@@ -1624,7 +1624,7 @@
         "expected_lines": 5377,
         "matching_lines": 5377
       },
-      "duration": 17.89,
+      "duration": 17.97,
       "status": "pass"
     },
     {
@@ -1635,7 +1635,7 @@
         "expected_lines": 5377,
         "matching_lines": 5377
       },
-      "duration": 17.96,
+      "duration": 17.98,
       "status": "pass"
     },
     {
@@ -1646,7 +1646,7 @@
         "expected_lines": 7,
         "matching_lines": 0
       },
-      "duration": 16.31,
+      "duration": 16.54,
       "status": "output_mismatch",
       "detail": "7 line(s) differ (actual=6, expected=7)",
       "actual_output": "Before: \n  0\n  |\nAfter: |\n  1\n  ||",
@@ -1660,7 +1660,7 @@
         "expected_lines": 1,
         "matching_lines": 1
       },
-      "duration": 20.34,
+      "duration": 19.66,
       "status": "pass"
     },
     {
@@ -1671,7 +1671,7 @@
         "expected_lines": 9,
         "matching_lines": 9
       },
-      "duration": 18.87,
+      "duration": 18.14,
       "status": "pass"
     },
     {
@@ -1682,7 +1682,7 @@
         "expected_lines": 9,
         "matching_lines": 9
       },
-      "duration": 18.97,
+      "duration": 18.13,
       "status": "pass"
     },
     {
@@ -1693,7 +1693,7 @@
         "expected_lines": 15,
         "matching_lines": 15
       },
-      "duration": 19.11,
+      "duration": 18.14,
       "status": "pass"
     },
     {
@@ -1704,7 +1704,7 @@
         "expected_lines": 25,
         "matching_lines": 25
       },
-      "duration": 18.75,
+      "duration": 18.4,
       "status": "pass"
     },
     {
@@ -1715,7 +1715,7 @@
         "expected_lines": 64,
         "matching_lines": 64
       },
-      "duration": 24.12,
+      "duration": 23.43,
       "status": "pass"
     },
     {
@@ -1726,7 +1726,7 @@
         "expected_lines": 30,
         "matching_lines": 30
       },
-      "duration": 18.98,
+      "duration": 19.08,
       "status": "pass"
     },
     {
@@ -1737,7 +1737,7 @@
         "expected_lines": 5,
         "matching_lines": 5
       },
-      "duration": 18.75,
+      "duration": 18.36,
       "status": "pass"
     },
     {
@@ -1748,7 +1748,7 @@
         "expected_lines": 4,
         "matching_lines": 4
       },
-      "duration": 18.73,
+      "duration": 17.96,
       "status": "pass"
     },
     {
@@ -1759,7 +1759,7 @@
         "expected_lines": 2,
         "matching_lines": 2
       },
-      "duration": 18.85,
+      "duration": 17.97,
       "status": "pass"
     },
     {
@@ -1770,7 +1770,7 @@
         "expected_lines": 2,
         "matching_lines": 2
       },
-      "duration": 18.75,
+      "duration": 17.74,
       "status": "pass"
     },
     {
@@ -1781,7 +1781,7 @@
         "expected_lines": 12,
         "matching_lines": 12
       },
-      "duration": 18.81,
+      "duration": 17.55,
       "status": "pass"
     },
     {
@@ -1792,7 +1792,7 @@
         "expected_lines": 191,
         "matching_lines": 191
       },
-      "duration": 18.76,
+      "duration": 17.77,
       "status": "pass"
     },
     {
@@ -1803,7 +1803,7 @@
         "expected_lines": 5,
         "matching_lines": 5
       },
-      "duration": 18.82,
+      "duration": 17.81,
       "status": "pass"
     },
     {
@@ -1814,7 +1814,7 @@
         "expected_lines": 54,
         "matching_lines": 54
       },
-      "duration": 19.02,
+      "duration": 18.03,
       "status": "pass"
     },
     {
@@ -1825,7 +1825,7 @@
         "expected_lines": 325,
         "matching_lines": 325
       },
-      "duration": 19.75,
+      "duration": 18.92,
       "status": "pass"
     },
     {
@@ -1836,7 +1836,7 @@
         "expected_lines": 13,
         "matching_lines": 13
       },
-      "duration": 18.95,
+      "duration": 18.09,
       "status": "pass"
     },
     {
@@ -1847,7 +1847,7 @@
         "expected_lines": 60,
         "matching_lines": 60
       },
-      "duration": 18.97,
+      "duration": 18.16,
       "status": "pass"
     },
     {
@@ -1858,7 +1858,7 @@
         "expected_lines": 31,
         "matching_lines": 31
       },
-      "duration": 19.07,
+      "duration": 17.82,
       "status": "pass"
     },
     {
@@ -1869,7 +1869,7 @@
         "expected_lines": 20,
         "matching_lines": 20
       },
-      "duration": 18.94,
+      "duration": 17.84,
       "status": "pass"
     },
     {
@@ -1880,7 +1880,7 @@
         "expected_lines": 40,
         "matching_lines": 40
       },
-      "duration": 19.12,
+      "duration": 17.87,
       "status": "pass"
     },
     {
@@ -1891,7 +1891,7 @@
         "expected_lines": 103,
         "matching_lines": 103
       },
-      "duration": 17.84,
+      "duration": 16.66,
       "status": "pass"
     },
     {
@@ -1902,7 +1902,7 @@
         "expected_lines": 11,
         "matching_lines": 11
       },
-      "duration": 17.72,
+      "duration": 16.48,
       "status": "pass"
     },
     {
@@ -1913,7 +1913,7 @@
         "expected_lines": 64,
         "matching_lines": 64
       },
-      "duration": 17.62,
+      "duration": 17.02,
       "status": "pass"
     },
     {
@@ -1924,7 +1924,7 @@
         "expected_lines": 32,
         "matching_lines": 32
       },
-      "duration": 17.62,
+      "duration": 17.17,
       "status": "pass"
     },
     {
@@ -1935,7 +1935,7 @@
         "expected_lines": 926,
         "matching_lines": 926
       },
-      "duration": 19.4,
+      "duration": 18.6,
       "status": "pass"
     },
     {
@@ -1946,7 +1946,7 @@
         "expected_lines": 926,
         "matching_lines": 926
       },
-      "duration": 19.7,
+      "duration": 18.75,
       "status": "pass"
     },
     {
@@ -1957,7 +1957,7 @@
         "expected_lines": 926,
         "matching_lines": 926
       },
-      "duration": 19.21,
+      "duration": 18.37,
       "status": "pass"
     },
     {
@@ -1968,7 +1968,7 @@
         "expected_lines": 665,
         "matching_lines": 665
       },
-      "duration": 18.36,
+      "duration": 17.44,
       "status": "pass"
     },
     {
@@ -1979,7 +1979,7 @@
         "expected_lines": 32,
         "matching_lines": 32
       },
-      "duration": 17.65,
+      "duration": 16.62,
       "status": "pass"
     },
     {
@@ -1990,7 +1990,7 @@
         "expected_lines": 32,
         "matching_lines": 32
       },
-      "duration": 17.65,
+      "duration": 16.6,
       "status": "pass"
     },
     {
@@ -2001,7 +2001,7 @@
         "expected_lines": 58,
         "matching_lines": 58
       },
-      "duration": 17.75,
+      "duration": 16.61,
       "status": "pass"
     },
     {
@@ -2012,7 +2012,7 @@
         "expected_lines": 14,
         "matching_lines": 14
       },
-      "duration": 17.9,
+      "duration": 16.68,
       "status": "pass"
     },
     {
@@ -2023,7 +2023,7 @@
         "expected_lines": 5,
         "matching_lines": 5
       },
-      "duration": 17.61,
+      "duration": 16.67,
       "status": "pass"
     },
     {
@@ -2034,7 +2034,7 @@
         "expected_lines": 7,
         "matching_lines": 7
       },
-      "duration": 18.0,
+      "duration": 16.82,
       "status": "pass"
     },
     {
@@ -2045,7 +2045,7 @@
         "expected_lines": 4,
         "matching_lines": 4
       },
-      "duration": 17.64,
+      "duration": 16.82,
       "status": "pass"
     },
     {
@@ -2056,7 +2056,7 @@
         "expected_lines": 12,
         "matching_lines": 12
       },
-      "duration": 17.92,
+      "duration": 16.83,
       "status": "pass"
     },
     {
@@ -2067,7 +2067,7 @@
         "expected_lines": 3,
         "matching_lines": 3
       },
-      "duration": 17.47,
+      "duration": 16.6,
       "status": "pass"
     },
     {
@@ -2078,7 +2078,7 @@
         "expected_lines": 134,
         "matching_lines": 134
       },
-      "duration": 18.25,
+      "duration": 16.92,
       "status": "pass"
     },
     {
@@ -2089,7 +2089,7 @@
         "expected_lines": 11,
         "matching_lines": 11
       },
-      "duration": 18.09,
+      "duration": 16.59,
       "status": "pass"
     },
     {
@@ -2100,7 +2100,7 @@
         "expected_lines": 84,
         "matching_lines": 84
       },
-      "duration": 17.61,
+      "duration": 16.92,
       "status": "pass"
     },
     {
@@ -2111,7 +2111,7 @@
         "expected_lines": 26,
         "matching_lines": 26
       },
-      "duration": 17.14,
+      "duration": 16.59,
       "status": "pass"
     },
     {
@@ -2122,7 +2122,7 @@
         "expected_lines": 21,
         "matching_lines": 21
       },
-      "duration": 17.18,
+      "duration": 17.02,
       "status": "pass"
     },
     {
@@ -2133,7 +2133,7 @@
         "expected_lines": 354,
         "matching_lines": 354
       },
-      "duration": 16.82,
+      "duration": 17.2,
       "status": "pass"
     },
     {
@@ -2144,7 +2144,7 @@
         "expected_lines": 25,
         "matching_lines": 25
       },
-      "duration": 16.37,
+      "duration": 17.01,
       "status": "pass"
     },
     {
@@ -2155,7 +2155,7 @@
         "expected_lines": 179,
         "matching_lines": 179
       },
-      "duration": 16.67,
+      "duration": 17.54,
       "status": "pass"
     },
     {
@@ -2166,7 +2166,7 @@
         "expected_lines": 40,
         "matching_lines": 40
       },
-      "duration": 16.64,
+      "duration": 16.86,
       "status": "pass"
     },
     {
@@ -2177,7 +2177,7 @@
         "expected_lines": 21,
         "matching_lines": 10
       },
-      "duration": 16.71,
+      "duration": 16.94,
       "status": "output_mismatch",
       "detail": "11 line(s) differ (actual=10, expected=21)",
       "actual_output": "... (5 lines before) ...\nundefined\nsize = \nundefined\ntype = \nundefined",
@@ -2191,7 +2191,7 @@
         "expected_lines": 7,
         "matching_lines": 1
       },
-      "duration": 16.93,
+      "duration": 16.79,
       "status": "output_mismatch",
       "detail": "6 line(s) differ (actual=2, expected=7)",
       "actual_output": "// fileref.download cancel\nundefined",
@@ -2205,7 +2205,7 @@
         "expected_lines": 13,
         "matching_lines": 1
       },
-      "duration": 16.95,
+      "duration": 17.07,
       "status": "output_mismatch",
       "detail": "12 line(s) differ (actual=2, expected=13)",
       "actual_output": "// fileref.download (http error)\nundefined",
@@ -2219,7 +2219,7 @@
         "expected_lines": 23,
         "matching_lines": 1
       },
-      "duration": 16.93,
+      "duration": 16.65,
       "status": "output_mismatch",
       "detail": "22 line(s) differ (actual=2, expected=23)",
       "actual_output": "// fileref.download (http error)\nundefined",
@@ -2233,7 +2233,7 @@
         "expected_lines": 34,
         "matching_lines": 7
       },
-      "duration": 17.17,
+      "duration": 16.85,
       "status": "output_mismatch",
       "detail": "27 line(s) differ (actual=14, expected=34)",
       "actual_output": "// fileref.browse([])\nundefined\n// fileref.browse([{ description: '' }])\nundefined\n// fileref.browse([{ extension: '' }])\nundefined\n// fileref.download()\nundefined\n// fileref.download('@')\nundefined\n// fileref.download('baddomain')\nundefined\n// fileref.download success\nundefined",
@@ -2247,7 +2247,7 @@
         "expected_lines": 18,
         "matching_lines": 1
       },
-      "duration": 17.01,
+      "duration": 16.8,
       "status": "output_mismatch",
       "detail": "17 line(s) differ (actual=2, expected=18)",
       "actual_output": "// browse success\nundefined",
@@ -2261,7 +2261,7 @@
         "expected_lines": 23,
         "matching_lines": 1
       },
-      "duration": 16.76,
+      "duration": 16.83,
       "status": "output_mismatch",
       "detail": "22 line(s) differ (actual=2, expected=23)",
       "actual_output": "// browse success\nundefined",
@@ -2275,7 +2275,7 @@
         "expected_lines": 23,
         "matching_lines": 1
       },
-      "duration": 16.85,
+      "duration": 16.8,
       "status": "output_mismatch",
       "detail": "22 line(s) differ (actual=2, expected=23)",
       "actual_output": "// browse success\nundefined",
@@ -2289,7 +2289,7 @@
         "expected_lines": 60,
         "matching_lines": 60
       },
-      "duration": 17.39,
+      "duration": 17.09,
       "status": "pass"
     },
     {
@@ -2300,7 +2300,7 @@
         "expected_lines": 45,
         "matching_lines": 45
       },
-      "duration": 17.0,
+      "duration": 17.09,
       "status": "pass"
     },
     {
@@ -2311,7 +2311,7 @@
         "expected_lines": 8,
         "matching_lines": 8
       },
-      "duration": 17.06,
+      "duration": 17.36,
       "status": "pass"
     },
     {
@@ -2322,7 +2322,7 @@
         "expected_lines": 4,
         "matching_lines": 4
       },
-      "duration": 16.56,
+      "duration": 16.74,
       "status": "pass"
     },
     {
@@ -2333,7 +2333,7 @@
         "expected_lines": 33,
         "matching_lines": 33
       },
-      "duration": 16.68,
+      "duration": 16.73,
       "status": "pass"
     },
     {
@@ -2344,7 +2344,7 @@
         "expected_lines": 2,
         "matching_lines": 2
       },
-      "duration": 16.91,
+      "duration": 16.73,
       "status": "pass"
     },
     {
@@ -2355,7 +2355,7 @@
         "expected_lines": 45,
         "matching_lines": 45
       },
-      "duration": 16.79,
+      "duration": 16.86,
       "status": "pass"
     },
     {
@@ -2366,7 +2366,7 @@
         "expected_lines": 4,
         "matching_lines": 4
       },
-      "duration": 16.96,
+      "duration": 16.58,
       "status": "pass"
     },
     {
@@ -2377,7 +2377,7 @@
         "expected_lines": 0,
         "matching_lines": 0
       },
-      "duration": 16.99,
+      "duration": 16.97,
       "status": "pass"
     },
     {
@@ -2388,7 +2388,7 @@
         "expected_lines": 0,
         "matching_lines": 0
       },
-      "duration": 16.81,
+      "duration": 17.02,
       "status": "pass"
     },
     {
@@ -2399,7 +2399,7 @@
         "expected_lines": 1237,
         "matching_lines": 1237
       },
-      "duration": 17.16,
+      "duration": 17.46,
       "status": "pass"
     },
     {
@@ -2410,7 +2410,7 @@
         "expected_lines": 1237,
         "matching_lines": 1237
       },
-      "duration": 17.22,
+      "duration": 17.4,
       "status": "pass"
     },
     {
@@ -2421,7 +2421,7 @@
         "expected_lines": 1237,
         "matching_lines": 1237
       },
-      "duration": 17.12,
+      "duration": 17.68,
       "status": "pass"
     },
     {
@@ -2432,7 +2432,7 @@
         "expected_lines": 6,
         "matching_lines": 6
       },
-      "duration": 17.02,
+      "duration": 17.13,
       "status": "pass"
     },
     {
@@ -2443,7 +2443,7 @@
         "expected_lines": 42,
         "matching_lines": 42
       },
-      "duration": 16.47,
+      "duration": 16.88,
       "status": "pass"
     },
     {
@@ -2454,7 +2454,7 @@
         "expected_lines": 1,
         "matching_lines": 1
       },
-      "duration": 17.07,
+      "duration": 16.73,
       "status": "pass"
     },
     {
@@ -2465,7 +2465,7 @@
         "expected_lines": 3,
         "matching_lines": 0
       },
-      "duration": 16.55,
+      "duration": 16.57,
       "status": "output_mismatch",
       "detail": "3 line(s) differ (actual=3, expected=3)",
       "actual_output": "UTF8: \u00c4\u00d6\u00dc \u00df - \u7247\u4eee\nIso Latin-1: \u0116\u0720\ufffd\nShift Jis: \u0550\u027c\u05bc",
@@ -2479,7 +2479,7 @@
         "expected_lines": 3,
         "matching_lines": 1
       },
-      "duration": 16.5,
+      "duration": 16.78,
       "status": "output_mismatch",
       "detail": "2 line(s) differ (actual=3, expected=3)",
       "actual_output": "UTF8: \u00c4\u00d6\u00dc \u00df - \u7247\u4eee\u540d\nIso Latin-1: \u0116\u0720\ufffd\nShift Jis: \u0550\u027c\u05bc",
@@ -2493,7 +2493,7 @@
         "expected_lines": 3,
         "matching_lines": 1
       },
-      "duration": 16.73,
+      "duration": 16.47,
       "status": "output_mismatch",
       "detail": "2 line(s) differ (actual=3, expected=3)",
       "actual_output": "UTF8: \u00c4\u00d6\u00dc \u00df - \u7247\u4eee\u540d\nIso Latin-1: \u0116\u0720\u07e0- Valid UTF-8 again - \u0116\u0720\u07e0- Valid again - \u0116\u0720\ufffd\nShift Jis: \u0550\u027c\u05bc - Valid UTF-8 again - \u0550\u027c\u05bc - Valid again - \u0550\u027c\u05bc",
@@ -2507,7 +2507,7 @@
         "expected_lines": 21,
         "matching_lines": 21
       },
-      "duration": 16.84,
+      "duration": 16.34,
       "status": "pass"
     },
     {
@@ -2518,7 +2518,7 @@
         "expected_lines": 21,
         "matching_lines": 21
       },
-      "duration": 17.14,
+      "duration": 16.46,
       "status": "pass"
     },
     {
@@ -2529,7 +2529,7 @@
         "expected_lines": 35,
         "matching_lines": 35
       },
-      "duration": 16.77,
+      "duration": 16.54,
       "status": "pass"
     },
     {
@@ -2540,7 +2540,7 @@
         "expected_lines": 8,
         "matching_lines": 8
       },
-      "duration": 16.57,
+      "duration": 16.98,
       "status": "pass"
     },
     {
@@ -2551,7 +2551,7 @@
         "expected_lines": 11,
         "matching_lines": 11
       },
-      "duration": 17.14,
+      "duration": 17.23,
       "status": "pass"
     },
     {
@@ -2562,7 +2562,7 @@
         "expected_lines": 25,
         "matching_lines": 25
       },
-      "duration": 16.79,
+      "duration": 17.76,
       "status": "pass"
     },
     {
@@ -2573,7 +2573,7 @@
         "expected_lines": 28,
         "matching_lines": 28
       },
-      "duration": 16.74,
+      "duration": 17.25,
       "status": "pass"
     },
     {
@@ -2584,7 +2584,7 @@
         "expected_lines": 56,
         "matching_lines": 56
       },
-      "duration": 17.04,
+      "duration": 17.37,
       "status": "pass"
     },
     {
@@ -2595,7 +2595,7 @@
         "expected_lines": 4,
         "matching_lines": 4
       },
-      "duration": 16.78,
+      "duration": 16.98,
       "status": "pass"
     },
     {
@@ -2606,7 +2606,7 @@
         "expected_lines": 29,
         "matching_lines": 29
       },
-      "duration": 16.67,
+      "duration": 16.77,
       "status": "pass"
     },
     {
@@ -2617,7 +2617,7 @@
         "expected_lines": 28,
         "matching_lines": 28
       },
-      "duration": 17.43,
+      "duration": 16.67,
       "status": "pass"
     },
     {
@@ -2628,7 +2628,7 @@
         "expected_lines": 28,
         "matching_lines": 28
       },
-      "duration": 17.5,
+      "duration": 16.33,
       "status": "pass"
     },
     {
@@ -2639,7 +2639,7 @@
         "expected_lines": 28,
         "matching_lines": 28
       },
-      "duration": 17.98,
+      "duration": 16.42,
       "status": "pass"
     },
     {
@@ -2650,7 +2650,7 @@
         "expected_lines": 56,
         "matching_lines": 56
       },
-      "duration": 17.57,
+      "duration": 16.38,
       "status": "pass"
     },
     {
@@ -2661,7 +2661,7 @@
         "expected_lines": 7,
         "matching_lines": 0
       },
-      "duration": 17.37,
+      "duration": 16.25,
       "status": "output_mismatch",
       "detail": "7 line(s) differ (actual=0, expected=7)",
       "actual_output": "",
@@ -2675,7 +2675,7 @@
         "expected_lines": 3,
         "matching_lines": 3
       },
-      "duration": 17.06,
+      "duration": 16.2,
       "status": "pass"
     },
     {
@@ -2686,7 +2686,7 @@
         "expected_lines": 758,
         "matching_lines": 17
       },
-      "duration": 18.12,
+      "duration": 16.66,
       "status": "output_mismatch",
       "detail": "741 line(s) differ (actual=704, expected=758)",
       "actual_output": "_global.TextSnapshot, instance=[[object Object]], type=[object]\n  __proto__, own, type=[object]\n  __constructor__, own, type=[function]\n  getCount, DONT_ENUM, type=[function]\n  setSelected, DONT_ENUM, type=[function]\n  getSelected, DONT_ENUM, type=[function]\n  getText, DONT_ENUM, type=[function]\n  getSelectedText, DONT_ENUM, type=[function]\n  hitTestTextNearPos, DONT_ENUM, type=[function]\n  findText, DONT_ENUM, type=[function]\n  setSelectColor, DONT_ENUM, type=[function]\n  getTextRunInfo, DONT_ENUM, type=[function]\n_global.PrintJob, instance=[[object Object]], type=[object]\n  __proto__, own, type=[object]\n  __constructor__, own, type=[function]\n_global.MovieClipLoader, instance=[[object Object]], type=[object]\n  __proto__, own, type=[object]\n  __constructor__, own, type=[function]\n  _listeners, own, DONT_ENUM, type=[object]\n_global.LocalConnection, instance=[[object Object]], type=[object]\n  __proto__, own, type=[object]\n  __constructor__, own, type=[function]\n_global.textRenderer, instance=[[object Object]], type=[object]\n  __proto__, own, type=[object]\n  __constructor__, own, type=[function]\n_global.flash.automation.Configuration, instance=[[object Object]], type=[object]\n  __proto__, own, type=[object]\n  __constructor__, own, type=[function]\n_global.flash.automation.ActionGenerator, instance=[[object Object]], type=[object]\n  __proto__, own, type=[object]\n  __constructor__, own, type=[function]\n_global.flash.automation.StageCapture, instance=[[object Object]], type=[object]\n  __proto__, own, type=[object]\n  __constructor__, own, type=[function]\n_global.flash.external.ExternalInterface, instance=[[object Object]], type=[object]\n  __proto__, own, type=[object]\n  __constructor__, own, type=[function]\n_global.flash.net.FileReferenceList, instance=[[object Object]], type=[object]\n  __proto__, own, type=[object]\n  __constructor__, own, type=[function]\n_global.flash.net.FileReference, instance=[[object Object]], type=[object]\n  __proto__, own, type=[object]\n  __constructor__, own, type=[function]\n_global.flash.geom.Transform, instance=[[object Object]], type=[object]\n  __proto__, own, type=[object]\n  __constructor__, own, type=[function]\n_global.flash.geom.ColorTransform, instance=[(redMultiplier=1, greenMultiplier=1, blueMultiplier=1, alphaMultiplier=1, redOffset=0, greenOffset=0, blueOffset=0, alphaOffset=0)], type=[object]\n  __proto__, own, type=[object]\n  __constructor__, own, type=[function]\n  redMultiplier, own, DONT_ENUM, type=[number]\n... (654 lines after) ...",
@@ -2700,7 +2700,7 @@
         "expected_lines": 7,
         "matching_lines": 7
       },
-      "duration": 17.55,
+      "duration": 16.31,
       "status": "pass"
     },
     {
@@ -2711,7 +2711,7 @@
         "expected_lines": 4497,
         "matching_lines": 116
       },
-      "duration": 17.95,
+      "duration": 16.42,
       "status": "output_mismatch",
       "detail": "4381 line(s) differ (actual=1288, expected=4497)",
       "actual_output": "... (48 lines before) ...\n  send, own, DONT_ENUM, type=[function]\n  connect, own, DONT_ENUM, type=[function]\n  __proto__, own, type=[object]\n  constructor, own, type=[function]\nTesting _global.textRenderer\n  displayMode, own, type=[string]\n  maxLevel, own, type=[number]\n  setAdvancedAntialiasingTable, own, type=[function]\n  __proto__, own, type=[object]\n  constructor, own, type=[function]\n  prototype, own, DONT_ENUM, type=[object]\nTesting _global.textRenderer.prototype\n  __proto__, own, type=[object]\n  constructor, own, type=[function]\nTesting _global.flash\n  automation, own, type=[object]\n  external, own, type=[object]\n  net, own, type=[object]\n  geom, own, type=[object]\n  filters, own, type=[object]\n  display, own, type=[object]\n  text, own, type=[object]\n  __proto__, own, type=[object]\n  constructor, own, type=[function]\nTesting _global.flash.automation\n  Configuration, own, type=[function]\n  ActionGenerator, own, type=[function]\n  StageCapture, own, type=[function]\n  __proto__, own, type=[object]\nTesting _global.flash.automation.Configuration\n  __proto__, own, type=[object]\n  constructor, own, type=[function]\n  prototype, own, DONT_ENUM, type=[object]\nTesting _global.flash.automation.Configuration.prototype\n  __proto__, own, type=[object]\n  constructor, own, type=[function]\nTesting _global.flash.automation.ActionGenerator\n  __proto__, own, type=[object]\n  constructor, own, type=[function]\n  prototype, own, DONT_ENUM, type=[object]\nTesting _global.flash.automation.ActionGenerator.prototype\n  __proto__, own, type=[object]\n  constructor, own, type=[function]\nTesting _global.flash.automation.StageCapture\n  __proto__, own, type=[object]\n  constructor, own, type=[function]\n  prototype, own, DONT_ENUM, type=[object]\nTesting _global.flash.automation.StageCapture.prototype\n  __proto__, own, type=[object]\n  constructor, own, type=[function]\n... (1190 lines after) ...",
@@ -2725,7 +2725,7 @@
         "expected_lines": 4158,
         "matching_lines": 93
       },
-      "duration": 18.3,
+      "duration": 16.44,
       "status": "output_mismatch",
       "detail": "4065 line(s) differ (actual=727, expected=4158)",
       "actual_output": "... (46 lines before) ...\n  prototype, DONT_DELETE\nTesting _global.textRenderer.prototype\n  __proto__, DONT_DELETE\n  constructor, DONT_DELETE\nTesting _global.flash.automation.Configuration\n  __proto__, DONT_DELETE\n  constructor, DONT_DELETE\n  prototype, DONT_DELETE\nTesting _global.flash.automation.Configuration.prototype\n  __proto__, DONT_DELETE\n  constructor, DONT_DELETE\nTesting _global.flash.automation.ActionGenerator\n  __proto__, DONT_DELETE\n  constructor, DONT_DELETE\n  prototype, DONT_DELETE\nTesting _global.flash.automation.ActionGenerator.prototype\n  __proto__, DONT_DELETE\n  constructor, DONT_DELETE\nTesting _global.flash.automation.StageCapture\n  __proto__, DONT_DELETE\n  constructor, DONT_DELETE\n  prototype, DONT_DELETE\nTesting _global.flash.automation.StageCapture.prototype\n  __proto__, DONT_DELETE\n  constructor, DONT_DELETE\nTesting _global.flash.automation\nTesting _global.flash.external.ExternalInterface\n  __proto__, DONT_DELETE\n  constructor, DONT_DELETE\n  prototype, DONT_DELETE\nTesting _global.flash.external.ExternalInterface.prototype\n  __proto__, DONT_DELETE\n  constructor, DONT_DELETE\nTesting _global.flash.external\nTesting _global.flash.net.FileReferenceList\n  __proto__, DONT_DELETE\n  constructor, DONT_DELETE\n  prototype, DONT_DELETE\nTesting _global.flash.net.FileReferenceList.prototype\n  __proto__, DONT_DELETE\n  constructor, DONT_DELETE\nTesting _global.flash.net.FileReference\n  __proto__, DONT_DELETE\n  constructor, DONT_DELETE\n  prototype, DONT_DELETE\nTesting _global.flash.net.FileReference.prototype\n  __proto__, DONT_DELETE\n  constructor, DONT_DELETE\nTesting _global.flash.net\nTesting _global.flash.geom.Transform\n... (631 lines after) ...",
@@ -2739,7 +2739,7 @@
         "expected_lines": 1145,
         "matching_lines": 1145
       },
-      "duration": 18.32,
+      "duration": 17.05,
       "status": "pass"
     },
     {
@@ -2750,7 +2750,7 @@
         "expected_lines": 15,
         "matching_lines": 15
       },
-      "duration": 17.26,
+      "duration": 16.65,
       "status": "pass"
     },
     {
@@ -2761,7 +2761,7 @@
         "expected_lines": 304,
         "matching_lines": 304
       },
-      "duration": 17.28,
+      "duration": 16.56,
       "status": "pass"
     },
     {
@@ -2772,7 +2772,7 @@
         "expected_lines": 304,
         "matching_lines": 304
       },
-      "duration": 17.45,
+      "duration": 16.62,
       "status": "pass"
     },
     {
@@ -2783,7 +2783,7 @@
         "expected_lines": 304,
         "matching_lines": 304
       },
-      "duration": 17.26,
+      "duration": 16.54,
       "status": "pass"
     },
     {
@@ -2794,7 +2794,7 @@
         "expected_lines": 304,
         "matching_lines": 304
       },
-      "duration": 17.16,
+      "duration": 16.6,
       "status": "pass"
     },
     {
@@ -2805,7 +2805,7 @@
         "expected_lines": 6,
         "matching_lines": 6
       },
-      "duration": 17.18,
+      "duration": 16.23,
       "status": "pass"
     },
     {
@@ -2816,7 +2816,7 @@
         "expected_lines": 2,
         "matching_lines": 2
       },
-      "duration": 17.07,
+      "duration": 16.36,
       "status": "pass"
     },
     {
@@ -2827,7 +2827,7 @@
         "expected_lines": 3,
         "matching_lines": 3
       },
-      "duration": 16.98,
+      "duration": 16.4,
       "status": "pass"
     },
     {
@@ -2838,7 +2838,7 @@
         "expected_lines": 3,
         "matching_lines": 3
       },
-      "duration": 17.39,
+      "duration": 16.35,
       "status": "pass"
     },
     {
@@ -2849,7 +2849,7 @@
         "expected_lines": 2,
         "matching_lines": 2
       },
-      "duration": 17.12,
+      "duration": 16.38,
       "status": "pass"
     },
     {
@@ -2860,7 +2860,7 @@
         "expected_lines": 2,
         "matching_lines": 2
       },
-      "duration": 16.82,
+      "duration": 16.94,
       "status": "pass"
     },
     {
@@ -2871,7 +2871,7 @@
         "expected_lines": 12,
         "matching_lines": 12
       },
-      "duration": 16.62,
+      "duration": 16.88,
       "status": "pass"
     },
     {
@@ -2882,7 +2882,7 @@
         "expected_lines": 44,
         "matching_lines": 44
       },
-      "duration": 16.78,
+      "duration": 16.8,
       "status": "pass"
     },
     {
@@ -2893,7 +2893,7 @@
         "expected_lines": 3,
         "matching_lines": 3
       },
-      "duration": 16.31,
+      "duration": 16.62,
       "status": "pass"
     },
     {
@@ -2904,7 +2904,7 @@
         "expected_lines": 17,
         "matching_lines": 17
       },
-      "duration": 16.35,
+      "duration": 16.63,
       "status": "pass"
     },
     {
@@ -2915,7 +2915,7 @@
         "expected_lines": 40,
         "matching_lines": 40
       },
-      "duration": 16.35,
+      "duration": 16.47,
       "status": "pass"
     },
     {
@@ -2926,7 +2926,7 @@
         "expected_lines": 1,
         "matching_lines": 1
       },
-      "duration": 16.27,
+      "duration": 16.47,
       "status": "pass"
     },
     {
@@ -2937,7 +2937,7 @@
         "expected_lines": 3,
         "matching_lines": 3
       },
-      "duration": 16.26,
+      "duration": 16.66,
       "status": "pass"
     },
     {
@@ -2948,7 +2948,7 @@
         "expected_lines": 2,
         "matching_lines": 2
       },
-      "duration": 16.28,
+      "duration": 16.59,
       "status": "pass"
     },
     {
@@ -2959,7 +2959,7 @@
         "expected_lines": 1175,
         "matching_lines": 1175
       },
-      "duration": 18.21,
+      "duration": 18.92,
       "status": "pass"
     },
     {
@@ -2970,7 +2970,7 @@
         "expected_lines": 1175,
         "matching_lines": 1175
       },
-      "duration": 18.23,
+      "duration": 18.86,
       "status": "pass"
     },
     {
@@ -2981,7 +2981,7 @@
         "expected_lines": 1,
         "matching_lines": 1
       },
-      "duration": 16.31,
+      "duration": 16.63,
       "status": "pass"
     },
     {
@@ -2992,7 +2992,7 @@
         "expected_lines": 1,
         "matching_lines": 1
       },
-      "duration": 16.59,
+      "duration": 16.63,
       "status": "pass"
     },
     {
@@ -3003,7 +3003,7 @@
         "expected_lines": 32,
         "matching_lines": 32
       },
-      "duration": 16.64,
+      "duration": 16.55,
       "status": "pass"
     },
     {
@@ -3014,7 +3014,7 @@
         "expected_lines": 15,
         "matching_lines": 15
       },
-      "duration": 16.99,
+      "duration": 16.7,
       "status": "pass"
     },
     {
@@ -3025,7 +3025,7 @@
         "expected_lines": 70,
         "matching_lines": 70
       },
-      "duration": 16.75,
+      "duration": 16.59,
       "status": "pass"
     },
     {
@@ -3036,7 +3036,7 @@
         "expected_lines": 1,
         "matching_lines": 1
       },
-      "duration": 16.43,
+      "duration": 16.54,
       "status": "pass"
     },
     {
@@ -3047,7 +3047,7 @@
         "expected_lines": 12,
         "matching_lines": 12
       },
-      "duration": 16.5,
+      "duration": 16.52,
       "status": "pass"
     },
     {
@@ -3058,7 +3058,7 @@
         "expected_lines": 4,
         "matching_lines": 4
       },
-      "duration": 16.54,
+      "duration": 16.63,
       "status": "pass"
     },
     {
@@ -3069,7 +3069,7 @@
         "expected_lines": 131,
         "matching_lines": 131
       },
-      "duration": 16.35,
+      "duration": 16.69,
       "status": "pass"
     },
     {
@@ -3080,7 +3080,7 @@
         "expected_lines": 67,
         "matching_lines": 67
       },
-      "duration": 16.25,
+      "duration": 16.78,
       "status": "pass"
     },
     {
@@ -3091,7 +3091,7 @@
         "expected_lines": 4,
         "matching_lines": 4
       },
-      "duration": 16.87,
+      "duration": 16.48,
       "status": "pass"
     },
     {
@@ -3102,7 +3102,7 @@
         "expected_lines": 4,
         "matching_lines": 4
       },
-      "duration": 16.34,
+      "duration": 16.62,
       "status": "pass"
     },
     {
@@ -3113,7 +3113,7 @@
         "expected_lines": 15,
         "matching_lines": 15
       },
-      "duration": 16.54,
+      "duration": 16.49,
       "status": "pass"
     },
     {
@@ -3124,7 +3124,7 @@
         "expected_lines": 15,
         "matching_lines": 15
       },
-      "duration": 16.52,
+      "duration": 16.51,
       "status": "pass"
     },
     {
@@ -3146,7 +3146,7 @@
         "expected_lines": 47,
         "matching_lines": 47
       },
-      "duration": 16.96,
+      "duration": 17.1,
       "status": "pass"
     },
     {
@@ -3157,7 +3157,7 @@
         "expected_lines": 49,
         "matching_lines": 49
       },
-      "duration": 16.51,
+      "duration": 16.53,
       "status": "pass"
     },
     {
@@ -3168,7 +3168,7 @@
         "expected_lines": 49,
         "matching_lines": 49
       },
-      "duration": 16.37,
+      "duration": 16.91,
       "status": "pass"
     },
     {
@@ -3179,7 +3179,7 @@
         "expected_lines": 89,
         "matching_lines": 89
       },
-      "duration": 16.41,
+      "duration": 17.13,
       "status": "pass"
     },
     {
@@ -3190,7 +3190,7 @@
         "expected_lines": 1,
         "matching_lines": 1
       },
-      "duration": 16.33,
+      "duration": 17.41,
       "status": "pass"
     },
     {
@@ -3201,7 +3201,7 @@
         "expected_lines": 2,
         "matching_lines": 2
       },
-      "duration": 16.35,
+      "duration": 17.47,
       "status": "pass"
     },
     {
@@ -3212,7 +3212,7 @@
         "expected_lines": 0,
         "matching_lines": 0
       },
-      "duration": 16.32,
+      "duration": 17.44,
       "status": "pass"
     },
     {
@@ -3223,7 +3223,7 @@
         "expected_lines": 4,
         "matching_lines": 4
       },
-      "duration": 16.34,
+      "duration": 17.57,
       "status": "pass"
     },
     {
@@ -3234,7 +3234,7 @@
         "expected_lines": 4,
         "matching_lines": 4
       },
-      "duration": 16.27,
+      "duration": 17.44,
       "status": "pass"
     },
     {
@@ -3245,7 +3245,7 @@
         "expected_lines": 16,
         "matching_lines": 16
       },
-      "duration": 16.58,
+      "duration": 18.0,
       "status": "pass"
     },
     {
@@ -3256,7 +3256,7 @@
         "expected_lines": 9,
         "matching_lines": 9
       },
-      "duration": 16.31,
+      "duration": 16.45,
       "status": "pass"
     },
     {
@@ -3267,7 +3267,7 @@
         "expected_lines": 3,
         "matching_lines": 3
       },
-      "duration": 16.43,
+      "duration": 16.87,
       "status": "pass"
     },
     {
@@ -3289,7 +3289,7 @@
         "expected_lines": 1,
         "matching_lines": 1
       },
-      "duration": 16.32,
+      "duration": 16.73,
       "status": "pass"
     },
     {
@@ -3300,7 +3300,7 @@
         "expected_lines": 2,
         "matching_lines": 2
       },
-      "duration": 16.29,
+      "duration": 16.94,
       "status": "pass"
     },
     {
@@ -3311,7 +3311,7 @@
         "expected_lines": 2,
         "matching_lines": 2
       },
-      "duration": 16.26,
+      "duration": 17.35,
       "status": "pass"
     },
     {
@@ -3322,7 +3322,7 @@
         "expected_lines": 4,
         "matching_lines": 4
       },
-      "duration": 17.22,
+      "duration": 16.4,
       "status": "pass"
     },
     {
@@ -3333,7 +3333,7 @@
         "expected_lines": 3,
         "matching_lines": 3
       },
-      "duration": 16.46,
+      "duration": 16.17,
       "status": "pass"
     },
     {
@@ -3344,7 +3344,7 @@
         "expected_lines": 2,
         "matching_lines": 2
       },
-      "duration": 16.48,
+      "duration": 16.33,
       "status": "pass"
     },
     {
@@ -3355,7 +3355,7 @@
         "expected_lines": 2,
         "matching_lines": 2
       },
-      "duration": 16.41,
+      "duration": 16.24,
       "status": "pass"
     },
     {
@@ -3366,7 +3366,7 @@
         "expected_lines": 9,
         "matching_lines": 9
       },
-      "duration": 16.32,
+      "duration": 16.19,
       "status": "pass"
     },
     {
@@ -3377,7 +3377,7 @@
         "expected_lines": 41,
         "matching_lines": 41
       },
-      "duration": 16.38,
+      "duration": 16.21,
       "status": "pass"
     },
     {
@@ -3388,7 +3388,7 @@
         "expected_lines": 1226,
         "matching_lines": 1226
       },
-      "duration": 18.42,
+      "duration": 18.33,
       "status": "pass"
     },
     {
@@ -3399,7 +3399,7 @@
         "expected_lines": 1226,
         "matching_lines": 1226
       },
-      "duration": 18.58,
+      "duration": 18.36,
       "status": "pass"
     },
     {
@@ -3410,7 +3410,7 @@
         "expected_lines": 1226,
         "matching_lines": 1226
       },
-      "duration": 18.44,
+      "duration": 18.13,
       "status": "pass"
     },
     {
@@ -3421,7 +3421,7 @@
         "expected_lines": 902,
         "matching_lines": 902
       },
-      "duration": 17.59,
+      "duration": 17.45,
       "status": "pass"
     },
     {
@@ -3432,7 +3432,7 @@
         "expected_lines": 41,
         "matching_lines": 41
       },
-      "duration": 16.35,
+      "duration": 16.29,
       "status": "pass"
     },
     {
@@ -3443,7 +3443,7 @@
         "expected_lines": 41,
         "matching_lines": 41
       },
-      "duration": 16.45,
+      "duration": 16.21,
       "status": "pass"
     },
     {
@@ -3454,7 +3454,7 @@
         "expected_lines": 35,
         "matching_lines": 13
       },
-      "duration": 16.54,
+      "duration": 16.2,
       "status": "output_mismatch",
       "detail": "22 line(s) differ (actual=23, expected=35)",
       "actual_output": "// loadVars.load()\nundefined\n\n// loadVars.load('test.txt')\nundefined\n\n// loadVars.sendAndLoad()\nundefined\n\n// loadVars.sendAndLoad('testvars.txt', loadVars2, 'POST')\nundefined\nloadVars2.loaded: undefined\nloadVars2.getBytesLoaded(): undefined\n\n// loadVars.sendAndLoad('bogus.txt', undefined, 'POST')\nundefined\n\n// loadVars.decode('test=foo&test2=bar')\nloadVars.test: undefined\nloadVars.test2: undefined\n\n// loadVars.load('testvars.txt') with onData\nundefined",
@@ -3468,7 +3468,7 @@
         "expected_lines": 2,
         "matching_lines": 2
       },
-      "duration": 16.43,
+      "duration": 16.15,
       "status": "pass"
     },
     {
@@ -3479,7 +3479,7 @@
         "expected_lines": 2,
         "matching_lines": 2
       },
-      "duration": 16.41,
+      "duration": 16.09,
       "status": "pass"
     },
     {
@@ -3490,7 +3490,7 @@
         "expected_lines": 4,
         "matching_lines": 4
       },
-      "duration": 16.62,
+      "duration": 16.22,
       "status": "pass"
     },
     {
@@ -3501,7 +3501,7 @@
         "expected_lines": 2,
         "matching_lines": 2
       },
-      "duration": 16.41,
+      "duration": 16.19,
       "status": "pass"
     },
     {
@@ -3512,7 +3512,7 @@
         "expected_lines": 30,
         "matching_lines": 30
       },
-      "duration": 16.73,
+      "duration": 16.31,
       "status": "pass"
     },
     {
@@ -3523,7 +3523,7 @@
         "expected_lines": 5,
         "matching_lines": 5
       },
-      "duration": 16.3,
+      "duration": 16.15,
       "status": "pass"
     },
     {
@@ -3534,7 +3534,7 @@
         "expected_lines": 8,
         "matching_lines": 8
       },
-      "duration": 16.46,
+      "duration": 16.16,
       "status": "pass"
     },
     {
@@ -3545,7 +3545,7 @@
         "expected_lines": 3,
         "matching_lines": 3
       },
-      "duration": 16.29,
+      "duration": 16.07,
       "status": "pass"
     },
     {
@@ -3556,7 +3556,7 @@
         "expected_lines": 9,
         "matching_lines": 9
       },
-      "duration": 16.68,
+      "duration": 17.04,
       "status": "pass"
     },
     {
@@ -3567,7 +3567,7 @@
         "expected_lines": 2,
         "matching_lines": 2
       },
-      "duration": 16.47,
+      "duration": 16.62,
       "status": "pass"
     },
     {
@@ -3578,7 +3578,7 @@
         "expected_lines": 8,
         "matching_lines": 8
       },
-      "duration": 16.46,
+      "duration": 16.59,
       "status": "pass"
     },
     {
@@ -3589,7 +3589,7 @@
         "expected_lines": 7,
         "matching_lines": 0
       },
-      "duration": 16.46,
+      "duration": 16.57,
       "status": "output_mismatch",
       "detail": "7 line(s) differ (actual=0, expected=7)",
       "actual_output": "",
@@ -3603,7 +3603,7 @@
         "expected_lines": 2,
         "matching_lines": 2
       },
-      "duration": 16.53,
+      "duration": 16.57,
       "status": "pass"
     },
     {
@@ -3614,7 +3614,7 @@
         "expected_lines": 49,
         "matching_lines": 49
       },
-      "duration": 16.7,
+      "duration": 16.38,
       "status": "pass"
     },
     {
@@ -3625,7 +3625,7 @@
         "expected_lines": 579,
         "matching_lines": 74
       },
-      "duration": 17.31,
+      "duration": 17.13,
       "status": "output_mismatch",
       "detail": "505 line(s) differ (actual=261, expected=579)",
       "actual_output": "-- start test: A message to nowhere! --\n\n\n-- end frame: A message to nowhere! --\n\n\n-- end test: A message to nowhere! --\n\n\n-- start test: Both receivers try to connect to the same channel --\n\n\n-- end frame: Both receivers try to connect to the same channel --\n\n\n-- end test: Both receivers try to connect to the same channel --\n\n\n-- start test: A message to an unimplemented function --\n\n\n-- end frame: A message to an unimplemented function --\n\n\n-- end test: A message to an unimplemented function --\n\n\n-- start test: Receiver tries to connect elsewhere, but can't --\n\n\n-- end frame: Receiver tries to connect elsewhere, but can't --\n\n\n-- end test: Receiver tries to connect elsewhere, but can't --\n\n\n-- start test: Receiver actually connects elsewhere, and custom is allowed to connect to channel --\n\n\n-- end frame: Receiver actually connects elsewhere, and custom is allowed to connect to channel --\n\n\n-- end test: Receiver actually connects elsewhere, and custom is allowed to connect to channel --\n\n\n-- start test: Sender calls test() on 'channel' --\n\n\n-- end frame: Sender calls test() on 'channel' --\n\n... (211 lines after) ...",
@@ -3639,7 +3639,7 @@
         "expected_lines": 8,
         "matching_lines": 8
       },
-      "duration": 16.44,
+      "duration": 16.33,
       "status": "pass"
     },
     {
@@ -3650,7 +3650,7 @@
         "expected_lines": 1,
         "matching_lines": 1
       },
-      "duration": 16.6,
+      "duration": 16.34,
       "status": "pass"
     },
     {
@@ -3661,7 +3661,7 @@
         "expected_lines": 90,
         "matching_lines": 90
       },
-      "duration": 16.45,
+      "duration": 16.37,
       "status": "pass"
     },
     {
@@ -3672,7 +3672,7 @@
         "expected_lines": 108,
         "matching_lines": 108
       },
-      "duration": 16.45,
+      "duration": 16.5,
       "status": "pass"
     },
     {
@@ -3683,7 +3683,7 @@
         "expected_lines": 6,
         "matching_lines": 6
       },
-      "duration": 16.47,
+      "duration": 16.56,
       "status": "pass"
     },
     {
@@ -3694,7 +3694,7 @@
         "expected_lines": 0,
         "matching_lines": 0
       },
-      "duration": 16.41,
+      "duration": 16.46,
       "status": "pass"
     },
     {
@@ -3705,7 +3705,7 @@
         "expected_lines": 0,
         "matching_lines": 0
       },
-      "duration": 16.43,
+      "duration": 16.83,
       "status": "pass"
     },
     {
@@ -3716,7 +3716,7 @@
         "expected_lines": 101,
         "matching_lines": 101
       },
-      "duration": 16.45,
+      "duration": 16.78,
       "status": "pass"
     },
     {
@@ -3727,7 +3727,7 @@
         "expected_lines": 530,
         "matching_lines": 530
       },
-      "duration": 16.87,
+      "duration": 17.04,
       "status": "pass"
     },
     {
@@ -3738,7 +3738,7 @@
         "expected_lines": 530,
         "matching_lines": 530
       },
-      "duration": 16.75,
+      "duration": 17.09,
       "status": "pass"
     },
     {
@@ -3749,7 +3749,7 @@
         "expected_lines": 530,
         "matching_lines": 530
       },
-      "duration": 16.76,
+      "duration": 17.12,
       "status": "pass"
     },
     {
@@ -3760,7 +3760,7 @@
         "expected_lines": 171,
         "matching_lines": 171
       },
-      "duration": 16.9,
+      "duration": 17.05,
       "status": "pass"
     },
     {
@@ -3771,7 +3771,7 @@
         "expected_lines": 12,
         "matching_lines": 12
       },
-      "duration": 16.38,
+      "duration": 16.66,
       "status": "pass"
     },
     {
@@ -3782,7 +3782,7 @@
         "expected_lines": 232,
         "matching_lines": 232
       },
-      "duration": 17.01,
+      "duration": 17.3,
       "status": "pass"
     },
     {
@@ -3793,7 +3793,7 @@
         "expected_lines": 30,
         "matching_lines": 30
       },
-      "duration": 16.52,
+      "duration": 18.0,
       "status": "pass"
     },
     {
@@ -3804,7 +3804,7 @@
         "expected_lines": 149,
         "matching_lines": 149
       },
-      "duration": 16.23,
+      "duration": 17.85,
       "status": "pass"
     },
     {
@@ -3815,7 +3815,7 @@
         "expected_lines": 6,
         "matching_lines": 6
       },
-      "duration": 16.26,
+      "duration": 17.83,
       "status": "pass"
     },
     {
@@ -3826,7 +3826,7 @@
         "expected_lines": 1,
         "matching_lines": 1
       },
-      "duration": 16.16,
+      "duration": 16.66,
       "status": "pass"
     },
     {
@@ -3848,7 +3848,7 @@
         "expected_lines": 57,
         "matching_lines": 56
       },
-      "duration": 16.11,
+      "duration": 16.2,
       "status": "output_mismatch",
       "detail": "1 line(s) differ (actual=57, expected=57)",
       "actual_output": "Loading child movie\nonLoadStart\n  d=closure var\n  rest=undefined\n  _target=/\n  _name=\n  _url=file:///child.swf\n  mc=_level0\n  mc._target=/\n  mc._name=\n  mc._url=file:///child.swf\nonLoadProgress\n  d=\n  loaded=97\n  total=97\n  rest=\n  _target=/\n  _name=\n  _url=file:///child.swf\n  mc=_level0\n  mc._target=/\n  mc._name=\n  mc._url=file:///child.swf\nonLoadProgress\n  d=\n  loaded=97\n  total=97\n  rest=\n  _target=/\n  _name=\n  _url=file:///child.swf\n  mc=_level0\n  mc._target=/\n  mc._name=\n  mc._url=file:///child.swf\nonLoadComplete\n  d=\n  status=0\n  rest=\n  _target=/\n  _name=\n  _url=file:///child.swf\n  mc=_level0\n  mc._target=/\n  mc._name=\n  mc._url=file:///child.swf\nLoaded version 5\nonLoadInit\n  d=\n  rest=\n... (7 lines after) ...",
@@ -3862,7 +3862,7 @@
         "expected_lines": 57,
         "matching_lines": 56
       },
-      "duration": 16.15,
+      "duration": 16.1,
       "status": "output_mismatch",
       "detail": "1 line(s) differ (actual=57, expected=57)",
       "actual_output": "Loading child movie\nonLoadStart\n  d=closure var\n  rest=undefined\n  _target=/\n  _name=\n  _url=file:///child.swf\n  mc=_level0\n  mc._target=/\n  mc._name=\n  mc._url=file:///child.swf\nonLoadProgress\n  d=closure var\n  loaded=97\n  total=97\n  rest=\n  _target=/\n  _name=\n  _url=file:///child.swf\n  mc=_level0\n  mc._target=/\n  mc._name=\n  mc._url=file:///child.swf\nonLoadProgress\n  d=closure var\n  loaded=97\n  total=97\n  rest=\n  _target=/\n  _name=\n  _url=file:///child.swf\n  mc=_level0\n  mc._target=/\n  mc._name=\n  mc._url=file:///child.swf\nonLoadComplete\n  d=closure var\n  status=0\n  rest=\n  _target=/\n  _name=\n  _url=file:///child.swf\n  mc=_level0\n  mc._target=/\n  mc._name=\n  mc._url=file:///child.swf\nLoaded version 6\nonLoadInit\n  d=closure var\n  rest=\n... (7 lines after) ...",
@@ -3876,7 +3876,7 @@
         "expected_lines": 6,
         "matching_lines": 6
       },
-      "duration": 16.48,
+      "duration": 16.55,
       "status": "pass"
     },
     {
@@ -3887,7 +3887,7 @@
         "expected_lines": 6,
         "matching_lines": 6
       },
-      "duration": 16.51,
+      "duration": 17.03,
       "status": "pass"
     },
     {
@@ -3898,7 +3898,7 @@
         "expected_lines": 6,
         "matching_lines": 6
       },
-      "duration": 16.21,
+      "duration": 16.28,
       "status": "pass"
     },
     {
@@ -3909,7 +3909,7 @@
         "expected_lines": 6,
         "matching_lines": 6
       },
-      "duration": 16.15,
+      "duration": 16.29,
       "status": "pass"
     },
     {
@@ -3920,7 +3920,7 @@
         "expected_lines": 5,
         "matching_lines": 5
       },
-      "duration": 16.09,
+      "duration": 16.26,
       "status": "pass"
     },
     {
@@ -3931,7 +3931,7 @@
         "expected_lines": 8,
         "matching_lines": 8
       },
-      "duration": 16.1,
+      "duration": 16.27,
       "status": "pass"
     },
     {
@@ -3942,7 +3942,7 @@
         "expected_lines": 12,
         "matching_lines": 12
       },
-      "duration": 16.27,
+      "duration": 16.28,
       "status": "pass"
     },
     {
@@ -3953,7 +3953,7 @@
         "expected_lines": 1,
         "matching_lines": 1
       },
-      "duration": 16.18,
+      "duration": 16.21,
       "status": "pass"
     },
     {
@@ -3964,7 +3964,7 @@
         "expected_lines": 67,
         "matching_lines": 67
       },
-      "duration": 16.11,
+      "duration": 16.14,
       "status": "pass"
     },
     {
@@ -3975,7 +3975,7 @@
         "expected_lines": 665,
         "matching_lines": 665
       },
-      "duration": 16.07,
+      "duration": 16.02,
       "status": "pass"
     },
     {
@@ -3986,7 +3986,7 @@
         "expected_lines": 260,
         "matching_lines": 260
       },
-      "duration": 15.98,
+      "duration": 16.62,
       "status": "pass"
     },
     {
@@ -3997,7 +3997,7 @@
         "expected_lines": 2,
         "matching_lines": 2
       },
-      "duration": 16.02,
+      "duration": 17.59,
       "status": "pass"
     },
     {
@@ -4008,7 +4008,7 @@
         "expected_lines": 0,
         "matching_lines": 0
       },
-      "duration": 16.54,
+      "duration": 18.29,
       "status": "pass"
     },
     {
@@ -4019,7 +4019,7 @@
         "expected_lines": 35,
         "matching_lines": 35
       },
-      "duration": 16.23,
+      "duration": 17.77,
       "status": "pass"
     },
     {
@@ -4030,7 +4030,7 @@
         "expected_lines": 90,
         "matching_lines": 90
       },
-      "duration": 20.78,
+      "duration": 16.46,
       "status": "pass"
     },
     {
@@ -4041,7 +4041,7 @@
         "expected_lines": 69,
         "matching_lines": 69
       },
-      "duration": 16.95,
+      "duration": 16.38,
       "status": "pass"
     },
     {
@@ -4052,7 +4052,7 @@
         "expected_lines": 98,
         "matching_lines": 98
       },
-      "duration": 16.77,
+      "duration": 16.29,
       "status": "pass"
     },
     {
@@ -4063,7 +4063,7 @@
         "expected_lines": 99,
         "matching_lines": 99
       },
-      "duration": 16.81,
+      "duration": 16.24,
       "status": "pass"
     },
     {
@@ -4074,7 +4074,7 @@
         "expected_lines": 28,
         "matching_lines": 28
       },
-      "duration": 16.7,
+      "duration": 16.18,
       "status": "pass"
     },
     {
@@ -4085,7 +4085,7 @@
         "expected_lines": 191,
         "matching_lines": 191
       },
-      "duration": 17.08,
+      "duration": 16.49,
       "status": "pass"
     },
     {
@@ -4096,7 +4096,7 @@
         "expected_lines": 112,
         "matching_lines": 112
       },
-      "duration": 17.05,
+      "duration": 16.56,
       "status": "pass"
     },
     {
@@ -4107,7 +4107,7 @@
         "expected_lines": 92,
         "matching_lines": 92
       },
-      "duration": 17.13,
+      "duration": 16.3,
       "status": "pass"
     },
     {
@@ -4118,7 +4118,7 @@
         "expected_lines": 338,
         "matching_lines": 312
       },
-      "duration": 17.89,
+      "duration": 17.57,
       "status": "output_mismatch",
       "detail": "26 line(s) differ (actual=338, expected=338)",
       "actual_output": "... (13 lines before) ...\n// _level0.clip.hitTest(500, 400, true)\ntrue\n// _level0.clip.hitTest(400, 300, true)\ntrue\n// _level0.clip.hitTest(300, 400, true)\nfalse\n// _level0.clip.hitTest(NaN, NaN, true)\nfalse\n\n// donut, root transformed\n// _level0.clip.hitTest(400, 400, true)\nfalse\n// _level0.clip.hitTest(250, 250, true)\nfalse\n// _level0.clip.hitTest(550, 250, true)\nfalse\n// _level0.clip.hitTest(250, 550, true)\nfalse\n// _level0.clip.hitTest(550, 550, true)\nfalse\n// _level0.clip.hitTest(400, 500, true)\ntrue\n// _level0.clip.hitTest(500, 400, true)\ntrue\n// _level0.clip.hitTest(400, 300, true)\ntrue\n// _level0.clip.hitTest(300, 400, true)\nfalse\n\n// strokes\n// _level0.clip.hitTest(400, 50, true)\ntrue\n// _level0.clip.hitTest(50, 400, true)\nfalse\n// _level0.clip.hitTest(750, 400, true)\nfalse\n// _level0.clip.hitTest(400, 750, true)\nfalse\n// _level0.clip.hitTest(575, 575, true)\ntrue\n// _level0.clip.hitTest(400, 350, true)\ntrue\n// _level0.clip.hitTest(350, 400, true)\ntrue\n// _level0.clip.hitTest(390, 200, true)\ntrue\n// _level0.clip.hitTest(400, 270, true)\nfalse\n// _level0.clip.hitTest(400, 200, true)\ntrue\n... (275 lines after) ...",
@@ -4132,7 +4132,7 @@
         "expected_lines": 4,
         "matching_lines": 4
       },
-      "duration": 16.73,
+      "duration": 16.11,
       "status": "pass"
     },
     {
@@ -4143,7 +4143,7 @@
         "expected_lines": 5,
         "matching_lines": 5
       },
-      "duration": 16.6,
+      "duration": 16.26,
       "status": "pass"
     },
     {
@@ -4154,7 +4154,7 @@
         "expected_lines": 75,
         "matching_lines": 75
       },
-      "duration": 17.53,
+      "duration": 16.75,
       "status": "pass"
     },
     {
@@ -4165,7 +4165,7 @@
         "expected_lines": 75,
         "matching_lines": 75
       },
-      "duration": 16.97,
+      "duration": 16.83,
       "status": "pass"
     },
     {
@@ -4176,7 +4176,7 @@
         "expected_lines": 13,
         "matching_lines": 13
       },
-      "duration": 16.82,
+      "duration": 16.79,
       "status": "pass"
     },
     {
@@ -4187,7 +4187,7 @@
         "expected_lines": 13,
         "matching_lines": 13
       },
-      "duration": 16.81,
+      "duration": 17.08,
       "status": "pass"
     },
     {
@@ -4198,7 +4198,7 @@
         "expected_lines": 11,
         "matching_lines": 11
       },
-      "duration": 16.6,
+      "duration": 16.71,
       "status": "pass"
     },
     {
@@ -4209,7 +4209,7 @@
         "expected_lines": 10,
         "matching_lines": 10
       },
-      "duration": 40.44,
+      "duration": 40.97,
       "status": "pass"
     },
     {
@@ -4220,7 +4220,7 @@
         "expected_lines": 10,
         "matching_lines": 10
       },
-      "duration": 40.26,
+      "duration": 41.15,
       "status": "pass"
     },
     {
@@ -4231,7 +4231,7 @@
         "expected_lines": 11,
         "matching_lines": 11
       },
-      "duration": 16.62,
+      "duration": 17.82,
       "status": "pass"
     },
     {
@@ -4242,7 +4242,7 @@
         "expected_lines": 78,
         "matching_lines": 76
       },
-      "duration": 16.69,
+      "duration": 17.03,
       "status": "output_mismatch",
       "detail": "2 line(s) differ (actual=78, expected=78)",
       "actual_output": "... (14 lines before) ...\n_target = /childClip\n_totalframes = 1\n_visible = true\n_width = 0\n_x = 0\n_xmouse = 0\n_xscale = 100\n_y = 0\n_ymouse = 0\n_yscale = 100\nblendMode = normal\ncacheAsBitmap = false\nenabled = true\nfilters = \nfilters.length = 0\nfocusEnabled = undefined\nforceSmoothing = undefined\nhitArea = undefined\nmenu = undefined\nopaqueBackground = undefined\nscale9Grid = undefined\nscrollRect = undefined\ntabChildren = undefined\ntabEnabled = undefined\ntabIndex = undefined\ntrackAsMenu = undefined\ntransform.colorTransform = (redMultiplier=1, greenMultiplier=1, blueMultiplier=1, alphaMultiplier=1, redOffset=0, greenOffset=0, blueOffset=0, alphaOffset=0)\ntransform.concatenatedColorTransform = (redMultiplier=1, greenMultiplier=1, blueMultiplier=1, alphaMultiplier=1, redOffset=0, greenOffset=0, blueOffset=0, alphaOffset=0)\ntransform.matrix = (a=1, b=0, c=0, d=1, tx=0, ty=0)\ntransform.concatenatedMatrix = (a=1, b=0, c=0, d=1, tx=0, ty=0)\ntransform.pixelBounds = (x=0, y=0, w=0, h=0)\nuseHandCursor = true\n_url = /test.swf\ngetBounds(this).xMin = 6710886.4\ngetBounds(this).xMax = 6710886.4\ngetBounds(this).yMin = 6710886.4\ngetBounds(this).yMax = 6710886.4\ngetBounds(mc).xMin = 6710886.35\ngetBounds(mc).xMax = 6710886.35\ngetBounds(mc).yMin = 6710886.35\ngetBounds(mc).yMax = 6710886.35\ngetBytesLoaded() = 4\ngetBytesTotal() = 4\ngetDepth() = 0\ngetInstanceAtDepth(0) = undefined\ngetNextHighestDepth() = 0\ngetRect(this).xMin = 6710886.4\ngetRect(this).xMax = 6710886.4\ngetRect(this).yMin = 6710886.4\ngetRect(this).yMax = 6710886.4\n... (14 lines after) ...",
@@ -4256,7 +4256,7 @@
         "expected_lines": 0,
         "matching_lines": 0
       },
-      "duration": 16.66,
+      "duration": 17.38,
       "status": "pass"
     },
     {
@@ -4267,7 +4267,7 @@
         "expected_lines": 29,
         "matching_lines": 29
       },
-      "duration": 17.19,
+      "duration": 16.61,
       "status": "pass"
     },
     {
@@ -4278,7 +4278,7 @@
         "expected_lines": 4,
         "matching_lines": 0
       },
-      "duration": 16.55,
+      "duration": 16.21,
       "status": "output_mismatch",
       "detail": "4 line(s) differ (actual=0, expected=4)",
       "actual_output": "",
@@ -4292,7 +4292,7 @@
         "expected_lines": 13,
         "matching_lines": 13
       },
-      "duration": 16.45,
+      "duration": 16.33,
       "status": "pass"
     },
     {
@@ -4303,7 +4303,7 @@
         "expected_lines": 5,
         "matching_lines": 5
       },
-      "duration": 16.4,
+      "duration": 16.32,
       "status": "pass"
     },
     {
@@ -4314,7 +4314,7 @@
         "expected_lines": 14,
         "matching_lines": 14
       },
-      "duration": 16.52,
+      "duration": 16.77,
       "status": "pass"
     },
     {
@@ -4325,7 +4325,7 @@
         "expected_lines": 114,
         "matching_lines": 39
       },
-      "duration": 17.57,
+      "duration": 18.41,
       "status": "output_mismatch",
       "detail": "75 line(s) differ (actual=63, expected=114)",
       "actual_output": "... (34 lines before) ...\nChange: Prop getSWFVersion() is \"-1\" on the first, but \"10\" on the second target.\n\nTest 3 (Offline; Link is an image)\nloadMovie command issued.\nBoth targets have the same props.\nError: The arrays are not equal.\nError: The MovieClip has not loaded.\n\nTest 4 (Offline; Link is a valid file)\nloadMovie command issued.\nBoth targets have the same props.\nChild movie loaded!\nFrames loaded: 1\nChange: Prop _currentframe is \"0\" on the first, but \"1\" on the second target.\nChange: Prop _url is \"test.swf\" on the first, but \"target.swf\" on the second target.\nChange: Prop getBytesLoaded() is \"0\" on the first, but \"68\" on the second target.\nChange: Prop getBytesTotal() is \"0\" on the first, but \"68\" on the second target.\nChange: Prop getSWFVersion() is \"10\" on the first, but \"8\" on the second target.\nunloadMovie command issued.\nBoth targets have the same props.\nChange: Prop _currentframe is \"1\" on the first, but \"0\" on the second target.\nChange: Prop _framesloaded is \"1\" on the first, but \"0\" on the second target.\nChange: Prop _totalframes is \"1\" on the first, but \"0\" on the second target.\nChange: Prop _url is \"target.swf\" on the first, but \"test.swf\" on the second target.\nChange: Prop getBytesLoaded() is \"68\" on the first, but \"0\" on the second target.\nChange: Prop getBytesTotal() is \"68\" on the first, but \"0\" on the second target.\nChange: Prop getSWFVersion() is \"8\" on the first, but \"10\" on the second target.\n\nFinished all tests.",
@@ -4339,7 +4339,7 @@
         "expected_lines": 4,
         "matching_lines": 4
       },
-      "duration": 16.36,
+      "duration": 16.83,
       "status": "pass"
     },
     {
@@ -4350,7 +4350,7 @@
         "expected_lines": 18,
         "matching_lines": 18
       },
-      "duration": 16.37,
+      "duration": 16.91,
       "status": "pass"
     },
     {
@@ -4361,7 +4361,7 @@
         "expected_lines": 14,
         "matching_lines": 14
       },
-      "duration": 16.4,
+      "duration": 17.41,
       "status": "pass"
     },
     {
@@ -4372,7 +4372,7 @@
         "expected_lines": 9,
         "matching_lines": 9
       },
-      "duration": 16.52,
+      "duration": 17.5,
       "status": "pass"
     },
     {
@@ -4383,7 +4383,7 @@
         "expected_lines": 12,
         "matching_lines": 12
       },
-      "duration": 16.72,
+      "duration": 17.16,
       "status": "pass"
     },
     {
@@ -4394,7 +4394,7 @@
         "expected_lines": 84,
         "matching_lines": 83
       },
-      "duration": 17.04,
+      "duration": 17.47,
       "status": "output_mismatch",
       "detail": "1 line(s) differ (actual=84, expected=84)",
       "actual_output": "... (34 lines before) ...\nnew Sound(): native\nnew Sound(2): native\nnew Sound(_root): native\nStage: non-native\nSystem: non-native\nnew TextField(): native\ntextField: native\ntimelineEditText: native\nnew TextFormat(): native\nnew TextSnapshot(): non-native\nnew TextSnapshot(3): non-native\nnew TextSnapshot(timelineButton): non-native\nnew TextSnapshot(_root): native\nnew TextSnapshot(_root, 4): non-native\nnew TextSnapshot(_root, _root): non-native\nnew Video(): non-native\ntimelineVideo: native\nnew XML(): native\nnew XML(\"\"): native\nnew XML(\"<a></a>\"): native\nnew XMLNode(): non-native\nnew XMLNode(1): non-native\nnew XMLNode(1, \"name\"): native\nnew XMLNode(1, \"name\", 1): native\nnew XMLNode(1, \"name\", true): native\nnew XMLNode(1, \"name\", 1, 2): native\nnew XMLSocket(): non-native\nnew flash.display.BitmapData(): non-object: undefined\nnew flash.display.BitmapData(1,1): non-object: undefined\nnew flash.filters.BevelFilter(): non-object: undefined\nnew flash.filters.BitmapFilter(): non-object: undefined\nnew flash.filters.BlurFilter(): non-object: undefined\nnew flash.filters.ColorMatrixFilter(): non-object: undefined\nnew flash.filters.ColorMatrixFilter([...]): non-object: undefined\nnew flash.filters.ConvolutionFilter(): non-object: undefined\nnew flash.filters.ConvolutionFilter([...]): non-object: undefined\nnew flash.filters.DisplacementMapFilter(): non-object: undefined\nnew flash.filters.DisplacementMapFilter([...]): non-object: undefined\nnew flash.filters.DropShadowFilter(): non-object: undefined\nnew flash.filters.GlowFilter(): non-object: undefined\nnew flash.filters.GradientBevelFilter(): non-object: undefined\nnew flash.filters.GradientGlowFilter(): non-object: undefined\nnew flash.geom.ColorTransform(): non-object: undefined\nnew flash.geom.Matrix(): non-object: undefined\nnew flash.geom.Point(): non-object: undefined\nnew flash.geom.Rectangle(): non-object: undefined\nnew flash.geom.Rectangle(1,2,3,4): non-object: undefined\nnew flash.geom.Transform(): non-object: undefined\nnew flash.geom.Transform(_root): non-object: undefined\nnew flash.text.TextRenderer(): non-object: undefined",
@@ -4408,7 +4408,7 @@
         "expected_lines": 84,
         "matching_lines": 84
       },
-      "duration": 16.91,
+      "duration": 18.02,
       "status": "pass"
     },
     {
@@ -4419,7 +4419,7 @@
         "expected_lines": 84,
         "matching_lines": 84
       },
-      "duration": 17.01,
+      "duration": 17.62,
       "status": "pass"
     },
     {
@@ -4430,7 +4430,7 @@
         "expected_lines": 191,
         "matching_lines": 190
       },
-      "duration": 16.86,
+      "duration": 17.06,
       "status": "output_mismatch",
       "detail": "1 line(s) differ (actual=191, expected=191)",
       "actual_output": "... (84 lines before) ...\nsuper(2,3,1,2,3,4,5,6): [object Object]\nobj.isSubclass: true\nobj instanceof flash.filters.ConvolutionFilter: true\nobj.matrixX: 2\nobj.matrixY: 3\nobj.matrix: \n\nSubclassing flash.filters.GradientBevelFilter...\nsuper(5,60): [object Object]\nobj.isSubclass: true\nobj instanceof flash.filters.GradientBevelFilter: true\nobj.distance: 5\nobj.angle: 60\n\nSubclassing flash.filters.GradientGlowFilter...\nsuper(5,60): [object Object]\nobj.isSubclass: true\nobj instanceof flash.filters.GradientGlowFilter: true\nobj.distance: 5\nobj.angle: 60\n\nSubclassing flash.geom.ColorTransform...\nsuper(): (redMultiplier=1, greenMultiplier=1, blueMultiplier=1, alphaMultiplier=1, redOffset=0, greenOffset=0, blueOffset=0, alphaOffset=0)\nobj.isSubclass: true\nobj instanceof flash.geom.ColorTransform: true\nobj.toString(): (redMultiplier=1, greenMultiplier=1, blueMultiplier=1, alphaMultiplier=1, redOffset=0, greenOffset=0, blueOffset=0, alphaOffset=0)\n\nSubclassing flash.geom.Transform...\nsuper(_level0): [object Object]\nobj.isSubclass: true\nobj instanceof flash.geom.Transform: true\n\nSubclassing TextFormat...\nsuper(Arial,12): [object Object]\nobj.isSubclass: true\nobj instanceof TextFormat: true\nobj.font: Arial\nobj.size: 12\n\nSubclassing flash.display.BitmapData...\nsuper(20,30): [object Object]\nobj.isSubclass: true\nobj instanceof flash.display.BitmapData: true\nobj.width: 20\nobj.height: 30\n\nSubclassing XML...\nsuper(<node />): <node />\nobj.isSubclass: true\nobj instanceof XML: true\n... (57 lines after) ...",
@@ -4444,7 +4444,7 @@
         "expected_lines": 0,
         "matching_lines": 0
       },
-      "duration": 16.53,
+      "duration": 16.99,
       "status": "pass"
     },
     {
@@ -4455,7 +4455,7 @@
         "expected_lines": 39,
         "matching_lines": 3
       },
-      "duration": 16.55,
+      "duration": 16.71,
       "status": "output_mismatch",
       "detail": "36 line(s) differ (actual=11, expected=39)",
       "actual_output": "/// connection.close()\n\n/// connection.connect(null)\n\n/// connection.connect(null)\n\n/// connection.close()\n\n/// connection.connect(\"http://example.org\")\n\n/// connection.close()",
@@ -4469,7 +4469,7 @@
         "expected_lines": 50,
         "matching_lines": 1
       },
-      "duration": 16.79,
+      "duration": 16.85,
       "status": "output_mismatch",
       "detail": "49 line(s) differ (actual=11, expected=50)",
       "actual_output": "# Start of Test 1\n# End of Test 1\n\n# Start of Test 2\n# End of Test 2\n\n# Start of Test 3\n# End of Test 3\n\n# Start of Test 4\n# End of Test 4",
@@ -4483,7 +4483,7 @@
         "expected_lines": 21,
         "matching_lines": 1
       },
-      "duration": 16.79,
+      "duration": 17.06,
       "status": "output_mismatch",
       "detail": "20 line(s) differ (actual=2, expected=21)",
       "actual_output": "// nc.isConnected:false\n// nc.isConnected:false",
@@ -4494,7 +4494,7 @@
       "num_frames": 60,
       "status": "segfault",
       "detail": "SIGSEGV",
-      "duration": 33.34
+      "duration": 34.38
     },
     {
       "test": "netstream_seek_flv",
@@ -4504,7 +4504,7 @@
         "expected_lines": 25,
         "matching_lines": 0
       },
-      "duration": 17.04,
+      "duration": 16.92,
       "status": "output_mismatch",
       "detail": "25 line(s) differ (actual=5, expected=25)",
       "actual_output": "//ns.seek(0.5);\n//ns.seek(1.5);\n//ns.pause();\nundefined\n//ns.seek(0.5);",
@@ -4518,7 +4518,7 @@
         "expected_lines": 4,
         "matching_lines": 4
       },
-      "duration": 16.5,
+      "duration": 16.69,
       "status": "pass"
     },
     {
@@ -4529,7 +4529,7 @@
         "expected_lines": 7,
         "matching_lines": 7
       },
-      "duration": 16.4,
+      "duration": 16.52,
       "status": "pass"
     },
     {
@@ -4540,7 +4540,7 @@
         "expected_lines": 4,
         "matching_lines": 4
       },
-      "duration": 16.45,
+      "duration": 16.26,
       "status": "pass"
     },
     {
@@ -4551,7 +4551,7 @@
         "expected_lines": 3,
         "matching_lines": 3
       },
-      "duration": 16.4,
+      "duration": 16.5,
       "status": "pass"
     },
     {
@@ -4562,7 +4562,7 @@
         "expected_lines": 33,
         "matching_lines": 33
       },
-      "duration": 16.41,
+      "duration": 16.33,
       "status": "pass"
     },
     {
@@ -4573,7 +4573,7 @@
         "expected_lines": 32,
         "matching_lines": 32
       },
-      "duration": 16.51,
+      "duration": 16.61,
       "status": "pass"
     },
     {
@@ -4584,7 +4584,7 @@
         "expected_lines": 31,
         "matching_lines": 31
       },
-      "duration": 16.86,
+      "duration": 16.84,
       "status": "pass"
     },
     {
@@ -4595,7 +4595,7 @@
         "expected_lines": 74,
         "matching_lines": 74
       },
-      "duration": 16.89,
+      "duration": 16.73,
       "status": "pass"
     },
     {
@@ -4606,7 +4606,7 @@
         "expected_lines": 38,
         "matching_lines": 38
       },
-      "duration": 17.04,
+      "duration": 16.67,
       "status": "pass"
     },
     {
@@ -4617,7 +4617,7 @@
         "expected_lines": 62,
         "matching_lines": 62
       },
-      "duration": 17.02,
+      "duration": 16.7,
       "status": "pass"
     },
     {
@@ -4628,7 +4628,7 @@
         "expected_lines": 68,
         "matching_lines": 68
       },
-      "duration": 16.64,
+      "duration": 16.74,
       "status": "pass"
     },
     {
@@ -4639,7 +4639,7 @@
         "expected_lines": 25,
         "matching_lines": 25
       },
-      "duration": 16.91,
+      "duration": 17.07,
       "status": "pass"
     },
     {
@@ -4650,7 +4650,7 @@
         "expected_lines": 74,
         "matching_lines": 74
       },
-      "duration": 16.72,
+      "duration": 16.94,
       "status": "pass"
     },
     {
@@ -4661,7 +4661,7 @@
         "expected_lines": 64,
         "matching_lines": 64
       },
-      "duration": 16.63,
+      "duration": 17.25,
       "status": "pass"
     },
     {
@@ -4672,7 +4672,7 @@
         "expected_lines": 322,
         "matching_lines": 322
       },
-      "duration": 16.54,
+      "duration": 17.06,
       "status": "pass"
     },
     {
@@ -4683,7 +4683,7 @@
         "expected_lines": 30,
         "matching_lines": 30
       },
-      "duration": 16.49,
+      "duration": 16.8,
       "status": "pass"
     },
     {
@@ -4694,7 +4694,7 @@
         "expected_lines": 6,
         "matching_lines": 6
       },
-      "duration": 16.83,
+      "duration": 16.58,
       "status": "pass"
     },
     {
@@ -4705,7 +4705,7 @@
         "expected_lines": 175,
         "matching_lines": 175
       },
-      "duration": 16.94,
+      "duration": 16.82,
       "status": "pass"
     },
     {
@@ -4716,7 +4716,7 @@
         "expected_lines": 37,
         "matching_lines": 37
       },
-      "duration": 16.73,
+      "duration": 16.46,
       "status": "pass"
     },
     {
@@ -4727,7 +4727,7 @@
         "expected_lines": 557,
         "matching_lines": 557
       },
-      "duration": 16.64,
+      "duration": 16.89,
       "status": "pass"
     },
     {
@@ -4738,7 +4738,7 @@
         "expected_lines": 45,
         "matching_lines": 45
       },
-      "duration": 16.35,
+      "duration": 16.43,
       "status": "pass"
     },
     {
@@ -4749,7 +4749,7 @@
         "expected_lines": 45,
         "matching_lines": 45
       },
-      "duration": 17.36,
+      "duration": 17.95,
       "status": "pass"
     },
     {
@@ -4760,7 +4760,7 @@
         "expected_lines": 45,
         "matching_lines": 45
       },
-      "duration": 16.55,
+      "duration": 17.07,
       "status": "pass"
     },
     {
@@ -4771,7 +4771,7 @@
         "expected_lines": 36,
         "matching_lines": 36
       },
-      "duration": 16.63,
+      "duration": 17.26,
       "status": "pass"
     },
     {
@@ -4782,7 +4782,7 @@
         "expected_lines": 12,
         "matching_lines": 12
       },
-      "duration": 16.37,
+      "duration": 17.01,
       "status": "pass"
     },
     {
@@ -4793,7 +4793,7 @@
         "expected_lines": 5,
         "matching_lines": 5
       },
-      "duration": 16.29,
+      "duration": 17.05,
       "status": "pass"
     },
     {
@@ -4804,7 +4804,7 @@
         "expected_lines": 17,
         "matching_lines": 17
       },
-      "duration": 16.61,
+      "duration": 17.14,
       "status": "pass"
     },
     {
@@ -4815,7 +4815,7 @@
         "expected_lines": 745,
         "matching_lines": 745
       },
-      "duration": 17.32,
+      "duration": 17.8,
       "status": "pass"
     },
     {
@@ -4826,7 +4826,7 @@
         "expected_lines": 0,
         "matching_lines": 0
       },
-      "duration": 16.52,
+      "duration": 17.12,
       "status": "pass"
     },
     {
@@ -4837,7 +4837,7 @@
         "expected_lines": 231,
         "matching_lines": 231
       },
-      "duration": 16.96,
+      "duration": 17.53,
       "status": "pass"
     },
     {
@@ -4848,7 +4848,7 @@
         "expected_lines": 66,
         "matching_lines": 66
       },
-      "duration": 16.85,
+      "duration": 17.61,
       "status": "pass"
     },
     {
@@ -4859,7 +4859,7 @@
         "expected_lines": 16,
         "matching_lines": 16
       },
-      "duration": 16.76,
+      "duration": 17.33,
       "status": "pass"
     },
     {
@@ -4870,7 +4870,7 @@
         "expected_lines": 37,
         "matching_lines": 37
       },
-      "duration": 16.82,
+      "duration": 17.46,
       "status": "pass"
     },
     {
@@ -4881,7 +4881,7 @@
         "expected_lines": 11,
         "matching_lines": 11
       },
-      "duration": 16.76,
+      "duration": 17.05,
       "status": "pass"
     },
     {
@@ -4892,7 +4892,7 @@
         "expected_lines": 15,
         "matching_lines": 15
       },
-      "duration": 16.45,
+      "duration": 17.02,
       "status": "pass"
     },
     {
@@ -4903,7 +4903,7 @@
         "expected_lines": 26,
         "matching_lines": 26
       },
-      "duration": 16.46,
+      "duration": 16.98,
       "status": "pass"
     },
     {
@@ -4914,7 +4914,7 @@
         "expected_lines": 29,
         "matching_lines": 29
       },
-      "duration": 16.49,
+      "duration": 17.06,
       "status": "pass"
     },
     {
@@ -4925,7 +4925,7 @@
         "expected_lines": 2,
         "matching_lines": 0
       },
-      "duration": 16.44,
+      "duration": 17.09,
       "status": "output_mismatch",
       "detail": "2 line(s) differ (actual=1, expected=2)",
       "actual_output": "BAD",
@@ -4939,7 +4939,7 @@
         "expected_lines": 15,
         "matching_lines": 15
       },
-      "duration": 16.91,
+      "duration": 17.32,
       "status": "pass"
     },
     {
@@ -4950,7 +4950,7 @@
         "expected_lines": 35,
         "matching_lines": 35
       },
-      "duration": 16.56,
+      "duration": 17.12,
       "status": "pass"
     },
     {
@@ -4961,7 +4961,7 @@
         "expected_lines": 2,
         "matching_lines": 2
       },
-      "duration": 16.53,
+      "duration": 17.09,
       "status": "pass"
     },
     {
@@ -4972,7 +4972,7 @@
         "expected_lines": 30,
         "matching_lines": 30
       },
-      "duration": 17.76,
+      "duration": 17.13,
       "status": "pass"
     },
     {
@@ -4983,7 +4983,7 @@
         "expected_lines": 10,
         "matching_lines": 10
       },
-      "duration": 17.07,
+      "duration": 16.85,
       "status": "pass"
     },
     {
@@ -4994,7 +4994,7 @@
         "expected_lines": 6,
         "matching_lines": 6
       },
-      "duration": 16.63,
+      "duration": 16.54,
       "status": "pass"
     },
     {
@@ -5005,7 +5005,7 @@
         "expected_lines": 1,
         "matching_lines": 1
       },
-      "duration": 16.6,
+      "duration": 16.29,
       "status": "pass"
     },
     {
@@ -5016,7 +5016,7 @@
         "expected_lines": 1,
         "matching_lines": 1
       },
-      "duration": 16.83,
+      "duration": 16.37,
       "status": "pass"
     },
     {
@@ -5027,7 +5027,7 @@
         "expected_lines": 1,
         "matching_lines": 1
       },
-      "duration": 16.9,
+      "duration": 16.31,
       "status": "pass"
     },
     {
@@ -5038,7 +5038,7 @@
         "expected_lines": 3,
         "matching_lines": 1
       },
-      "duration": 16.98,
+      "duration": 16.44,
       "status": "output_mismatch",
       "detail": "2 line(s) differ (actual=1, expected=3)",
       "actual_output": "Current sandbox type: localWithNetwork",
@@ -5052,7 +5052,7 @@
         "expected_lines": 454,
         "matching_lines": 454
       },
-      "duration": 17.14,
+      "duration": 16.84,
       "status": "pass"
     },
     {
@@ -5063,7 +5063,7 @@
         "expected_lines": 27,
         "matching_lines": 27
       },
-      "duration": 17.07,
+      "duration": 16.8,
       "status": "pass"
     },
     {
@@ -5074,7 +5074,7 @@
         "expected_lines": 27,
         "matching_lines": 27
       },
-      "duration": 16.98,
+      "duration": 16.68,
       "status": "pass"
     },
     {
@@ -5085,7 +5085,7 @@
         "expected_lines": 58,
         "matching_lines": 58
       },
-      "duration": 17.05,
+      "duration": 16.89,
       "status": "pass"
     },
     {
@@ -5096,7 +5096,7 @@
         "expected_lines": 1,
         "matching_lines": 1
       },
-      "duration": 16.99,
+      "duration": 16.76,
       "status": "pass"
     },
     {
@@ -5107,7 +5107,7 @@
         "expected_lines": 14,
         "matching_lines": 14
       },
-      "duration": 16.91,
+      "duration": 16.64,
       "status": "pass"
     },
     {
@@ -5118,7 +5118,7 @@
         "expected_lines": 628,
         "matching_lines": 628
       },
-      "duration": 16.98,
+      "duration": 16.87,
       "status": "pass"
     },
     {
@@ -5129,7 +5129,7 @@
         "expected_lines": 290,
         "matching_lines": 2
       },
-      "duration": 16.58,
+      "duration": 16.69,
       "status": "output_mismatch",
       "detail": "288 line(s) differ (actual=2, expected=290)",
       "actual_output": "// Place 0\n// Setting both",
@@ -5143,7 +5143,7 @@
         "expected_lines": 633,
         "matching_lines": 11
       },
-      "duration": 16.52,
+      "duration": 16.6,
       "status": "output_mismatch",
       "detail": "622 line(s) differ (actual=11, expected=633)",
       "actual_output": "... (6 lines before) ...\n      id3 == null = true\n      id3 == 0 = false\n      id3 === undefined = true\n      id3 === null = false\n      id3 === 0 = false",
@@ -5157,7 +5157,7 @@
         "expected_lines": 138,
         "matching_lines": 1
       },
-      "duration": 16.59,
+      "duration": 16.51,
       "status": "output_mismatch",
       "detail": "137 line(s) differ (actual=1, expected=138)",
       "actual_output": "// Place 0",
@@ -5171,7 +5171,7 @@
         "expected_lines": 3,
         "matching_lines": 0
       },
-      "duration": 16.57,
+      "duration": 16.55,
       "status": "output_mismatch",
       "detail": "3 line(s) differ (actual=0, expected=3)",
       "actual_output": "",
@@ -5185,7 +5185,7 @@
         "expected_lines": 1,
         "matching_lines": 0
       },
-      "duration": 16.83,
+      "duration": 16.4,
       "status": "output_mismatch",
       "detail": "1 line(s) differ (actual=0, expected=1)",
       "actual_output": "",
@@ -5199,7 +5199,7 @@
         "expected_lines": 68,
         "matching_lines": 68
       },
-      "duration": 16.66,
+      "duration": 16.43,
       "status": "pass"
     },
     {
@@ -5210,7 +5210,7 @@
         "expected_lines": 68,
         "matching_lines": 68
       },
-      "duration": 16.48,
+      "duration": 16.72,
       "status": "pass"
     },
     {
@@ -5221,7 +5221,7 @@
         "expected_lines": 0,
         "matching_lines": 0
       },
-      "duration": 16.21,
+      "duration": 16.48,
       "status": "pass"
     },
     {
@@ -5232,7 +5232,7 @@
         "expected_lines": 16,
         "matching_lines": 16
       },
-      "duration": 16.23,
+      "duration": 16.37,
       "status": "pass"
     },
     {
@@ -5243,7 +5243,7 @@
         "expected_lines": 83,
         "matching_lines": 83
       },
-      "duration": 16.24,
+      "duration": 16.68,
       "status": "pass"
     },
     {
@@ -5254,7 +5254,7 @@
         "expected_lines": 4,
         "matching_lines": 4
       },
-      "duration": 16.23,
+      "duration": 16.39,
       "status": "pass"
     },
     {
@@ -5265,7 +5265,7 @@
         "expected_lines": 241,
         "matching_lines": 241
       },
-      "duration": 16.56,
+      "duration": 16.84,
       "status": "pass"
     },
     {
@@ -5276,7 +5276,7 @@
         "expected_lines": 5,
         "matching_lines": 5
       },
-      "duration": 16.2,
+      "duration": 16.36,
       "status": "pass"
     },
     {
@@ -5287,7 +5287,7 @@
         "expected_lines": 231,
         "matching_lines": 231
       },
-      "duration": 16.45,
+      "duration": 16.94,
       "status": "pass"
     },
     {
@@ -5298,7 +5298,7 @@
         "expected_lines": 586,
         "matching_lines": 586
       },
-      "duration": 16.21,
+      "duration": 16.67,
       "status": "pass"
     },
     {
@@ -5309,7 +5309,7 @@
         "expected_lines": 39,
         "matching_lines": 39
       },
-      "duration": 16.32,
+      "duration": 17.02,
       "status": "pass"
     },
     {
@@ -5320,7 +5320,7 @@
         "expected_lines": 902,
         "matching_lines": 902
       },
-      "duration": 17.74,
+      "duration": 17.99,
       "status": "pass"
     },
     {
@@ -5331,7 +5331,7 @@
         "expected_lines": 7,
         "matching_lines": 7
       },
-      "duration": 16.38,
+      "duration": 16.61,
       "status": "pass"
     },
     {
@@ -5342,7 +5342,7 @@
         "expected_lines": 117,
         "matching_lines": 117
       },
-      "duration": 16.42,
+      "duration": 17.01,
       "status": "pass"
     },
     {
@@ -5353,7 +5353,7 @@
         "expected_lines": 285,
         "matching_lines": 285
       },
-      "duration": 16.72,
+      "duration": 17.12,
       "status": "pass"
     },
     {
@@ -5364,7 +5364,7 @@
         "expected_lines": 240,
         "matching_lines": 240
       },
-      "duration": 16.4,
+      "duration": 16.6,
       "status": "pass"
     },
     {
@@ -5375,7 +5375,7 @@
         "expected_lines": 275,
         "matching_lines": 275
       },
-      "duration": 17.0,
+      "duration": 17.18,
       "status": "pass"
     },
     {
@@ -5386,7 +5386,7 @@
         "expected_lines": 95,
         "matching_lines": 95
       },
-      "duration": 16.34,
+      "duration": 16.5,
       "status": "pass"
     },
     {
@@ -5408,7 +5408,7 @@
         "expected_lines": 4,
         "matching_lines": 4
       },
-      "duration": 16.25,
+      "duration": 16.46,
       "status": "pass"
     },
     {
@@ -5419,7 +5419,7 @@
         "expected_lines": 7,
         "matching_lines": 7
       },
-      "duration": 16.27,
+      "duration": 16.77,
       "status": "pass"
     },
     {
@@ -5430,7 +5430,7 @@
         "expected_lines": 54,
         "matching_lines": 54
       },
-      "duration": 16.98,
+      "duration": 16.63,
       "status": "pass"
     },
     {
@@ -5441,7 +5441,7 @@
         "expected_lines": 0,
         "matching_lines": 0
       },
-      "duration": 16.73,
+      "duration": 16.55,
       "status": "pass"
     },
     {
@@ -5452,7 +5452,7 @@
         "expected_lines": 36,
         "matching_lines": 36
       },
-      "duration": 16.95,
+      "duration": 16.78,
       "status": "pass"
     },
     {
@@ -5463,7 +5463,7 @@
         "expected_lines": 2,
         "matching_lines": 0
       },
-      "duration": 16.89,
+      "duration": 16.45,
       "status": "output_mismatch",
       "detail": "2 line(s) differ (actual=2, expected=2)",
       "actual_output": "0\nundefined",
@@ -5477,7 +5477,7 @@
         "expected_lines": 0,
         "matching_lines": 0
       },
-      "duration": 16.78,
+      "duration": 16.39,
       "status": "pass"
     },
     {
@@ -5499,7 +5499,7 @@
         "expected_lines": 4,
         "matching_lines": 4
       },
-      "duration": 16.96,
+      "duration": 16.83,
       "status": "pass"
     },
     {
@@ -5510,7 +5510,7 @@
         "expected_lines": 5,
         "matching_lines": 5
       },
-      "duration": 16.91,
+      "duration": 16.8,
       "status": "pass"
     },
     {
@@ -5521,7 +5521,7 @@
         "expected_lines": 4,
         "matching_lines": 3
       },
-      "duration": 16.91,
+      "duration": 16.8,
       "status": "output_mismatch",
       "detail": "1 line(s) differ (actual=4, expected=4)",
       "actual_output": "\"A\" < \"B\"\ntrue\n\"\\uFF61\" < \"\\uD800\\uDC02\"\nfalse",
@@ -5535,7 +5535,7 @@
         "expected_lines": 283,
         "matching_lines": 283
       },
-      "duration": 17.61,
+      "duration": 17.6,
       "status": "pass"
     },
     {
@@ -5546,7 +5546,7 @@
         "expected_lines": 49,
         "matching_lines": 1
       },
-      "duration": 17.19,
+      "duration": 17.11,
       "status": "output_mismatch",
       "detail": "48 line(s) differ (actual=2, expected=49)",
       "actual_output": "/// Load valid\nundefined",
@@ -5560,7 +5560,7 @@
         "expected_lines": 750,
         "matching_lines": 750
       },
-      "duration": 17.73,
+      "duration": 17.7,
       "status": "pass"
     },
     {
@@ -5571,7 +5571,7 @@
         "expected_lines": 39,
         "matching_lines": 39
       },
-      "duration": 17.05,
+      "duration": 17.01,
       "status": "pass"
     },
     {
@@ -5582,7 +5582,7 @@
         "expected_lines": 96,
         "matching_lines": 96
       },
-      "duration": 16.91,
+      "duration": 16.81,
       "status": "pass"
     },
     {
@@ -5593,7 +5593,7 @@
         "expected_lines": 158,
         "matching_lines": 158
       },
-      "duration": 16.94,
+      "duration": 16.8,
       "status": "pass"
     },
     {
@@ -5604,7 +5604,7 @@
         "expected_lines": 4,
         "matching_lines": 4
       },
-      "duration": 16.69,
+      "duration": 16.87,
       "status": "pass"
     },
     {
@@ -5615,7 +5615,7 @@
         "expected_lines": 7,
         "matching_lines": 7
       },
-      "duration": 16.72,
+      "duration": 16.88,
       "status": "pass"
     },
     {
@@ -5626,7 +5626,7 @@
         "expected_lines": 3,
         "matching_lines": 3
       },
-      "duration": 16.72,
+      "duration": 16.8,
       "status": "pass"
     },
     {
@@ -5637,7 +5637,7 @@
         "expected_lines": 232,
         "matching_lines": 232
       },
-      "duration": 16.73,
+      "duration": 16.77,
       "status": "pass"
     },
     {
@@ -5648,7 +5648,7 @@
         "expected_lines": 19,
         "matching_lines": 19
       },
-      "duration": 16.94,
+      "duration": 16.76,
       "status": "pass"
     },
     {
@@ -5659,7 +5659,7 @@
         "expected_lines": 29,
         "matching_lines": 29
       },
-      "duration": 16.32,
+      "duration": 17.03,
       "status": "pass"
     },
     {
@@ -5670,7 +5670,7 @@
         "expected_lines": 2,
         "matching_lines": 0
       },
-      "duration": 16.15,
+      "duration": 16.43,
       "status": "output_mismatch",
       "detail": "2 line(s) differ (actual=0, expected=2)",
       "actual_output": "",
@@ -5684,7 +5684,7 @@
         "expected_lines": 42,
         "matching_lines": 42
       },
-      "duration": 16.08,
+      "duration": 16.38,
       "status": "pass"
     },
     {
@@ -5695,7 +5695,7 @@
         "expected_lines": 232,
         "matching_lines": 232
       },
-      "duration": 16.06,
+      "duration": 16.38,
       "status": "pass"
     },
     {
@@ -5706,7 +5706,7 @@
         "expected_lines": 15,
         "matching_lines": 15
       },
-      "duration": 15.97,
+      "duration": 16.34,
       "status": "pass"
     },
     {
@@ -5717,7 +5717,7 @@
         "expected_lines": 29,
         "matching_lines": 29
       },
-      "duration": 16.11,
+      "duration": 16.39,
       "status": "pass"
     },
     {
@@ -5728,7 +5728,7 @@
         "expected_lines": 44,
         "matching_lines": 44
       },
-      "duration": 16.11,
+      "duration": 16.33,
       "status": "pass"
     },
     {
@@ -5739,7 +5739,7 @@
         "expected_lines": 232,
         "matching_lines": 232
       },
-      "duration": 16.13,
+      "duration": 16.33,
       "status": "pass"
     },
     {
@@ -5750,7 +5750,7 @@
         "expected_lines": 92,
         "matching_lines": 92
       },
-      "duration": 16.25,
+      "duration": 16.42,
       "status": "pass"
     },
     {
@@ -5761,7 +5761,7 @@
         "expected_lines": 21,
         "matching_lines": 21
       },
-      "duration": 16.15,
+      "duration": 16.39,
       "status": "pass"
     },
     {
@@ -5772,7 +5772,7 @@
         "expected_lines": 12,
         "matching_lines": 12
       },
-      "duration": 16.14,
+      "duration": 16.36,
       "status": "pass"
     },
     {
@@ -5783,7 +5783,7 @@
         "expected_lines": 208,
         "matching_lines": 208
       },
-      "duration": 16.29,
+      "duration": 16.65,
       "status": "pass"
     },
     {
@@ -5794,7 +5794,7 @@
         "expected_lines": 71,
         "matching_lines": 71
       },
-      "duration": 16.23,
+      "duration": 16.56,
       "status": "pass"
     },
     {
@@ -5805,7 +5805,7 @@
         "expected_lines": 22,
         "matching_lines": 22
       },
-      "duration": 16.16,
+      "duration": 16.48,
       "status": "pass"
     },
     {
@@ -5816,7 +5816,7 @@
         "expected_lines": 12,
         "matching_lines": 12
       },
-      "duration": 16.21,
+      "duration": 16.57,
       "status": "pass"
     },
     {
@@ -5827,7 +5827,7 @@
         "expected_lines": 29,
         "matching_lines": 29
       },
-      "duration": 16.21,
+      "duration": 16.66,
       "status": "pass"
     },
     {
@@ -5838,7 +5838,7 @@
         "expected_lines": 150,
         "matching_lines": 150
       },
-      "duration": 16.54,
+      "duration": 17.47,
       "status": "pass"
     },
     {
@@ -5849,7 +5849,7 @@
         "expected_lines": 65,
         "matching_lines": 65
       },
-      "duration": 16.37,
+      "duration": 16.77,
       "status": "pass"
     },
     {
@@ -5860,7 +5860,7 @@
         "expected_lines": 462,
         "matching_lines": 462
       },
-      "duration": 16.33,
+      "duration": 16.96,
       "status": "pass"
     },
     {
@@ -5871,7 +5871,7 @@
         "expected_lines": 293,
         "matching_lines": 293
       },
-      "duration": 16.26,
+      "duration": 16.94,
       "status": "pass"
     },
     {
@@ -5882,7 +5882,7 @@
         "expected_lines": 4,
         "matching_lines": 1
       },
-      "duration": 20.05,
+      "duration": 17.5,
       "status": "output_mismatch",
       "detail": "3 line(s) differ (actual=4, expected=4)",
       "actual_output": "undefined\nundefined\n5\n5",
@@ -5896,7 +5896,7 @@
         "expected_lines": 51,
         "matching_lines": 51
       },
-      "duration": 16.5,
+      "duration": 17.86,
       "status": "pass"
     },
     {
@@ -5907,7 +5907,7 @@
         "expected_lines": 47,
         "matching_lines": 47
       },
-      "duration": 16.38,
+      "duration": 17.15,
       "status": "pass"
     },
     {
@@ -5918,7 +5918,7 @@
         "expected_lines": 5,
         "matching_lines": 5
       },
-      "duration": 16.38,
+      "duration": 17.46,
       "status": "pass"
     },
     {
@@ -5929,7 +5929,7 @@
         "expected_lines": 2,
         "matching_lines": 2
       },
-      "duration": 16.68,
+      "duration": 17.4,
       "status": "pass"
     },
     {
@@ -5940,7 +5940,7 @@
         "expected_lines": 2,
         "matching_lines": 2
       },
-      "duration": 16.45,
+      "duration": 17.0,
       "status": "pass"
     },
     {
@@ -5951,7 +5951,7 @@
         "expected_lines": 14,
         "matching_lines": 14
       },
-      "duration": 16.37,
+      "duration": 17.0,
       "status": "pass"
     },
     {
@@ -5962,7 +5962,7 @@
         "expected_lines": 37,
         "matching_lines": 37
       },
-      "duration": 16.62,
+      "duration": 17.17,
       "status": "pass"
     },
     {
@@ -5973,7 +5973,7 @@
         "expected_lines": 6,
         "matching_lines": 6
       },
-      "duration": 16.77,
+      "duration": 17.24,
       "status": "pass"
     },
     {
@@ -5984,7 +5984,7 @@
         "expected_lines": 5,
         "matching_lines": 5
       },
-      "duration": 16.64,
+      "duration": 16.68,
       "status": "pass"
     },
     {
@@ -5995,7 +5995,7 @@
         "expected_lines": 4,
         "matching_lines": 4
       },
-      "duration": 16.33,
+      "duration": 16.39,
       "status": "pass"
     },
     {
@@ -6006,7 +6006,7 @@
         "expected_lines": 1146,
         "matching_lines": 1146
       },
-      "duration": 16.46,
+      "duration": 16.84,
       "status": "pass"
     },
     {
@@ -6017,7 +6017,7 @@
         "expected_lines": 21,
         "matching_lines": 21
       },
-      "duration": 16.32,
+      "duration": 16.62,
       "status": "pass"
     },
     {
@@ -6028,7 +6028,7 @@
         "expected_lines": 2,
         "matching_lines": 2
       },
-      "duration": 16.35,
+      "duration": 16.45,
       "status": "pass"
     },
     {
@@ -6039,7 +6039,7 @@
         "expected_lines": 10,
         "matching_lines": 10
       },
-      "duration": 16.46,
+      "duration": 16.48,
       "status": "pass"
     },
     {
@@ -6050,7 +6050,7 @@
         "expected_lines": 840,
         "matching_lines": 840
       },
-      "duration": 16.48,
+      "duration": 16.55,
       "status": "pass"
     },
     {
@@ -6061,7 +6061,7 @@
         "expected_lines": 840,
         "matching_lines": 840
       },
-      "duration": 16.65,
+      "duration": 16.79,
       "status": "pass"
     },
     {
@@ -6072,7 +6072,7 @@
         "expected_lines": 11,
         "matching_lines": 11
       },
-      "duration": 16.41,
+      "duration": 16.77,
       "status": "pass"
     },
     {
@@ -6083,7 +6083,7 @@
         "expected_lines": 11,
         "matching_lines": 11
       },
-      "duration": 16.35,
+      "duration": 16.53,
       "status": "pass"
     },
     {
@@ -6094,7 +6094,7 @@
         "expected_lines": 1,
         "matching_lines": 1
       },
-      "duration": 16.32,
+      "duration": 16.36,
       "status": "pass"
     },
     {
@@ -6105,7 +6105,7 @@
         "expected_lines": 3,
         "matching_lines": 3
       },
-      "duration": 17.71,
+      "duration": 16.45,
       "status": "pass"
     },
     {
@@ -6116,7 +6116,7 @@
         "expected_lines": 44,
         "matching_lines": 44
       },
-      "duration": 16.78,
+      "duration": 16.3,
       "status": "pass"
     },
     {
@@ -6127,7 +6127,7 @@
         "expected_lines": 175,
         "matching_lines": 175
       },
-      "duration": 16.9,
+      "duration": 16.42,
       "status": "pass"
     },
     {
@@ -6138,7 +6138,7 @@
         "expected_lines": 210,
         "matching_lines": 210
       },
-      "duration": 17.02,
+      "duration": 16.45,
       "status": "pass"
     },
     {
@@ -6149,7 +6149,7 @@
         "expected_lines": 210,
         "matching_lines": 210
       },
-      "duration": 17.38,
+      "duration": 16.38,
       "status": "pass"
     },
     {
@@ -6160,7 +6160,7 @@
         "expected_lines": 210,
         "matching_lines": 210
       },
-      "duration": 17.21,
+      "duration": 16.52,
       "status": "pass"
     },
     {
@@ -6171,7 +6171,7 @@
         "expected_lines": 7,
         "matching_lines": 7
       },
-      "duration": 17.03,
+      "duration": 16.79,
       "status": "pass"
     },
     {
@@ -6182,7 +6182,7 @@
         "expected_lines": 81,
         "matching_lines": 81
       },
-      "duration": 17.29,
+      "duration": 16.8,
       "status": "pass"
     },
     {
@@ -6193,7 +6193,7 @@
         "expected_lines": 20,
         "matching_lines": 20
       },
-      "duration": 17.22,
+      "duration": 16.64,
       "status": "pass"
     },
     {
@@ -6204,7 +6204,7 @@
         "expected_lines": 44,
         "matching_lines": 44
       },
-      "duration": 17.5,
+      "duration": 16.82,
       "status": "pass"
     },
     {
@@ -6215,7 +6215,7 @@
         "expected_lines": 55,
         "matching_lines": 55
       },
-      "duration": 17.46,
+      "duration": 16.87,
       "status": "pass"
     },
     {
@@ -6226,7 +6226,7 @@
         "expected_lines": 56,
         "matching_lines": 56
       },
-      "duration": 16.79,
+      "duration": 16.69,
       "status": "pass"
     },
     {
@@ -6237,7 +6237,7 @@
         "expected_lines": 56,
         "matching_lines": 56
       },
-      "duration": 16.68,
+      "duration": 16.97,
       "status": "pass"
     },
     {
@@ -6248,7 +6248,7 @@
         "expected_lines": 1,
         "matching_lines": 1
       },
-      "duration": 16.7,
+      "duration": 17.1,
       "status": "pass"
     },
     {
@@ -6259,7 +6259,7 @@
         "expected_lines": 52,
         "matching_lines": 52
       },
-      "duration": 16.8,
+      "duration": 16.37,
       "status": "pass"
     },
     {
@@ -6270,7 +6270,7 @@
         "expected_lines": 41,
         "matching_lines": 41
       },
-      "duration": 16.65,
+      "duration": 16.38,
       "status": "pass"
     },
     {
@@ -6281,7 +6281,7 @@
         "expected_lines": 41,
         "matching_lines": 41
       },
-      "duration": 16.61,
+      "duration": 16.58,
       "status": "pass"
     },
     {
@@ -6292,7 +6292,7 @@
         "expected_lines": 41,
         "matching_lines": 41
       },
-      "duration": 16.66,
+      "duration": 16.32,
       "status": "pass"
     },
     {
@@ -6303,7 +6303,7 @@
         "expected_lines": 7,
         "matching_lines": 7
       },
-      "duration": 16.72,
+      "duration": 16.46,
       "status": "pass"
     },
     {
@@ -6311,7 +6311,7 @@
       "num_frames": 1,
       "status": "timeout",
       "detail": "runtime timeout (>10s)",
-      "duration": 46.61
+      "duration": 46.39
     },
     {
       "test": "timer_run_actions",
@@ -6321,7 +6321,7 @@
         "expected_lines": 18,
         "matching_lines": 18
       },
-      "duration": 16.92,
+      "duration": 16.79,
       "status": "pass"
     },
     {
@@ -6332,7 +6332,7 @@
         "expected_lines": 8,
         "matching_lines": 8
       },
-      "duration": 16.76,
+      "duration": 17.57,
       "status": "pass"
     },
     {
@@ -6343,7 +6343,7 @@
         "expected_lines": 70,
         "matching_lines": 70
       },
-      "duration": 16.97,
+      "duration": 17.66,
       "status": "pass"
     },
     {
@@ -6354,7 +6354,7 @@
         "expected_lines": 118,
         "matching_lines": 118
       },
-      "duration": 16.68,
+      "duration": 17.14,
       "status": "pass"
     },
     {
@@ -6365,7 +6365,7 @@
         "expected_lines": 16,
         "matching_lines": 16
       },
-      "duration": 16.67,
+      "duration": 16.85,
       "status": "pass"
     },
     {
@@ -6376,7 +6376,7 @@
         "expected_lines": 22,
         "matching_lines": 22
       },
-      "duration": 16.49,
+      "duration": 17.08,
       "status": "pass"
     },
     {
@@ -6387,7 +6387,7 @@
         "expected_lines": 7,
         "matching_lines": 7
       },
-      "duration": 17.28,
+      "duration": 16.97,
       "status": "pass"
     },
     {
@@ -6398,7 +6398,7 @@
         "expected_lines": 1,
         "matching_lines": 1
       },
-      "duration": 16.7,
+      "duration": 16.78,
       "status": "pass"
     },
     {
@@ -6409,7 +6409,7 @@
         "expected_lines": 1,
         "matching_lines": 1
       },
-      "duration": 16.99,
+      "duration": 16.93,
       "status": "pass"
     },
     {
@@ -6420,7 +6420,7 @@
         "expected_lines": 4,
         "matching_lines": 4
       },
-      "duration": 16.76,
+      "duration": 16.6,
       "status": "pass"
     },
     {
@@ -6431,7 +6431,7 @@
         "expected_lines": 43,
         "matching_lines": 43
       },
-      "duration": 16.98,
+      "duration": 17.17,
       "status": "pass"
     },
     {
@@ -6442,7 +6442,7 @@
         "expected_lines": 52,
         "matching_lines": 52
       },
-      "duration": 16.83,
+      "duration": 17.64,
       "status": "pass"
     },
     {
@@ -6453,7 +6453,7 @@
         "expected_lines": 4,
         "matching_lines": 4
       },
-      "duration": 17.47,
+      "duration": 17.31,
       "status": "pass"
     },
     {
@@ -6464,7 +6464,7 @@
         "expected_lines": 5,
         "matching_lines": 5
       },
-      "duration": 17.22,
+      "duration": 17.83,
       "status": "pass"
     },
     {
@@ -6475,7 +6475,7 @@
         "expected_lines": 4,
         "matching_lines": 4
       },
-      "duration": 17.14,
+      "duration": 17.12,
       "status": "pass"
     },
     {
@@ -6486,7 +6486,7 @@
         "expected_lines": 3,
         "matching_lines": 3
       },
-      "duration": 17.53,
+      "duration": 17.46,
       "status": "pass"
     },
     {
@@ -6497,7 +6497,7 @@
         "expected_lines": 13,
         "matching_lines": 13
       },
-      "duration": 17.23,
+      "duration": 17.2,
       "status": "pass"
     },
     {
@@ -6508,7 +6508,7 @@
         "expected_lines": 8,
         "matching_lines": 8
       },
-      "duration": 16.94,
+      "duration": 17.13,
       "status": "pass"
     },
     {
@@ -6519,7 +6519,7 @@
         "expected_lines": 5,
         "matching_lines": 5
       },
-      "duration": 17.16,
+      "duration": 17.12,
       "status": "pass"
     },
     {
@@ -6530,7 +6530,7 @@
         "expected_lines": 7,
         "matching_lines": 7
       },
-      "duration": 17.04,
+      "duration": 16.7,
       "status": "pass"
     },
     {
@@ -6541,7 +6541,7 @@
         "expected_lines": 16,
         "matching_lines": 16
       },
-      "duration": 17.73,
+      "duration": 16.98,
       "status": "pass"
     },
     {
@@ -6552,7 +6552,7 @@
         "expected_lines": 117,
         "matching_lines": 117
       },
-      "duration": 17.11,
+      "duration": 17.01,
       "status": "pass"
     },
     {
@@ -6563,7 +6563,7 @@
         "expected_lines": 12,
         "matching_lines": 12
       },
-      "duration": 16.81,
+      "duration": 16.6,
       "status": "pass"
     },
     {
@@ -6574,7 +6574,7 @@
         "expected_lines": 60,
         "matching_lines": 9
       },
-      "duration": 16.97,
+      "duration": 16.9,
       "status": "output_mismatch",
       "detail": "51 line(s) differ (actual=52, expected=60)",
       "actual_output": "// watch(\"variable\", plusOne)\ntrue\n\n// addProperty(\"variable\", getter, setter)\ntrue\n\n// variable = 10\nsetter: ignoring new value of 10\n// variable\ngetter: returning 5\n5\n\n// variable = 4\nsetter: ignoring new value of 4\n// variable\ngetter: returning 5\n5\n\n// unwatch(\"variable\")\ntrue\n\n// variable = 10\nsetter: ignoring new value of 10\n// variable\ngetter: returning 5\n5\n\n// variable = 4\nsetter: ignoring new value of 4\n// variable\ngetter: returning 5\n5\n\n// watch(\"variable\", plusOne)\ntrue\n\n// variable = 10\nsetter: ignoring new value of 10\n// variable\ngetter: returning 5\n5\n\n// variable = 4\nsetter: ignoring new value of 4\n// variable\ngetter: returning 5\n5\n\n// delete(variable)\n\n... (2 lines after) ...",
@@ -6588,7 +6588,7 @@
         "expected_lines": 2,
         "matching_lines": 2
       },
-      "duration": 17.32,
+      "duration": 17.06,
       "status": "pass"
     },
     {
@@ -6599,7 +6599,7 @@
         "expected_lines": 49,
         "matching_lines": 49
       },
-      "duration": 17.03,
+      "duration": 17.7,
       "status": "pass"
     },
     {
@@ -6610,7 +6610,7 @@
         "expected_lines": 2,
         "matching_lines": 2
       },
-      "duration": 16.81,
+      "duration": 17.79,
       "status": "pass"
     },
     {
@@ -6621,7 +6621,7 @@
         "expected_lines": 43,
         "matching_lines": 43
       },
-      "duration": 16.88,
+      "duration": 18.04,
       "status": "pass"
     },
     {
@@ -6632,7 +6632,7 @@
         "expected_lines": 15,
         "matching_lines": 15
       },
-      "duration": 17.04,
+      "duration": 17.56,
       "status": "pass"
     },
     {
@@ -6643,7 +6643,7 @@
         "expected_lines": 28,
         "matching_lines": 28
       },
-      "duration": 17.06,
+      "duration": 17.36,
       "status": "pass"
     },
     {
@@ -6654,7 +6654,7 @@
         "expected_lines": 20,
         "matching_lines": 20
       },
-      "duration": 17.2,
+      "duration": 17.56,
       "status": "pass"
     },
     {
@@ -6665,7 +6665,7 @@
         "expected_lines": 4,
         "matching_lines": 4
       },
-      "duration": 17.04,
+      "duration": 18.27,
       "status": "pass"
     },
     {
@@ -6676,7 +6676,7 @@
         "expected_lines": 11,
         "matching_lines": 11
       },
-      "duration": 17.1,
+      "duration": 18.21,
       "status": "pass"
     },
     {
@@ -6687,7 +6687,7 @@
         "expected_lines": 4,
         "matching_lines": 4
       },
-      "duration": 17.4,
+      "duration": 18.07,
       "status": "pass"
     },
     {
@@ -6698,7 +6698,7 @@
         "expected_lines": 19,
         "matching_lines": 19
       },
-      "duration": 17.26,
+      "duration": 18.49,
       "status": "pass"
     },
     {
@@ -6709,7 +6709,7 @@
         "expected_lines": 8,
         "matching_lines": 8
       },
-      "duration": 17.16,
+      "duration": 18.61,
       "status": "pass"
     },
     {
@@ -6720,7 +6720,7 @@
         "expected_lines": 17,
         "matching_lines": 9
       },
-      "duration": 17.17,
+      "duration": 18.01,
       "status": "output_mismatch",
       "detail": "8 line(s) differ (actual=11, expected=17)",
       "actual_output": "... (2 lines before) ...\nxml.getBytesTotal(): undefined\nxml._bytesLoaded: undefined\nxml._bytesTotal: undefined\n\n// XML loading requested\nxml.getBytesLoaded(): undefined\nxml.getBytesTotal(): undefined\nxml._bytesLoaded: undefined\nxml._bytesTotal: undefined",
@@ -6734,7 +6734,7 @@
         "expected_lines": 3,
         "matching_lines": 3
       },
-      "duration": 17.15,
+      "duration": 18.14,
       "status": "pass"
     },
     {
@@ -6745,7 +6745,7 @@
         "expected_lines": 21,
         "matching_lines": 21
       },
-      "duration": 17.16,
+      "duration": 18.01,
       "status": "pass"
     },
     {
@@ -6756,7 +6756,7 @@
         "expected_lines": 21,
         "matching_lines": 21
       },
-      "duration": 17.48,
+      "duration": 17.85,
       "status": "pass"
     },
     {
@@ -6767,7 +6767,7 @@
         "expected_lines": 34,
         "matching_lines": 34
       },
-      "duration": 17.8,
+      "duration": 16.86,
       "status": "pass"
     },
     {
@@ -6778,7 +6778,7 @@
         "expected_lines": 20,
         "matching_lines": 20
       },
-      "duration": 16.51,
+      "duration": 16.21,
       "status": "pass"
     },
     {
@@ -6789,7 +6789,7 @@
         "expected_lines": 15,
         "matching_lines": 15
       },
-      "duration": 16.38,
+      "duration": 16.24,
       "status": "pass"
     },
     {
@@ -6800,7 +6800,7 @@
         "expected_lines": 7,
         "matching_lines": 7
       },
-      "duration": 16.54,
+      "duration": 16.08,
       "status": "pass"
     },
     {
@@ -6811,7 +6811,7 @@
         "expected_lines": 62,
         "matching_lines": 62
       },
-      "duration": 16.49,
+      "duration": 16.15,
       "status": "pass"
     },
     {
@@ -6822,7 +6822,7 @@
         "expected_lines": 7,
         "matching_lines": 7
       },
-      "duration": 16.62,
+      "duration": 16.04,
       "status": "pass"
     },
     {
@@ -6833,7 +6833,7 @@
         "expected_lines": 2,
         "matching_lines": 0
       },
-      "duration": 16.58,
+      "duration": 16.1,
       "status": "output_mismatch",
       "detail": "2 line(s) differ (actual=0, expected=2)",
       "actual_output": "",
@@ -6847,7 +6847,7 @@
         "expected_lines": 203,
         "matching_lines": 203
       },
-      "duration": 16.99,
+      "duration": 16.15,
       "status": "pass"
     },
     {
@@ -6858,7 +6858,7 @@
         "expected_lines": 5,
         "matching_lines": 5
       },
-      "duration": 17.24,
+      "duration": 16.14,
       "status": "pass"
     },
     {
@@ -6869,7 +6869,7 @@
         "expected_lines": 22,
         "matching_lines": 22
       },
-      "duration": 17.15,
+      "duration": 16.18,
       "status": "pass"
     },
     {
@@ -6880,7 +6880,7 @@
         "expected_lines": 14,
         "matching_lines": 14
       },
-      "duration": 17.36,
+      "duration": 16.23,
       "status": "pass"
     },
     {
@@ -6891,7 +6891,7 @@
         "expected_lines": 10,
         "matching_lines": 10
       },
-      "duration": 17.31,
+      "duration": 16.09,
       "status": "pass"
     },
     {
@@ -6902,7 +6902,7 @@
         "expected_lines": 8,
         "matching_lines": 1
       },
-      "duration": 17.42,
+      "duration": 16.14,
       "status": "output_mismatch",
       "detail": "7 line(s) differ (actual=1, expected=8)",
       "actual_output": "Check for socket errors",
@@ -6916,7 +6916,7 @@
         "expected_lines": 6,
         "matching_lines": 0
       },
-      "duration": 17.34,
+      "duration": 16.18,
       "status": "output_mismatch",
       "detail": "6 line(s) differ (actual=0, expected=6)",
       "actual_output": "",
@@ -6930,7 +6930,7 @@
         "expected_lines": 7,
         "matching_lines": 0
       },
-      "duration": 17.36,
+      "duration": 16.07,
       "status": "output_mismatch",
       "detail": "7 line(s) differ (actual=0, expected=7)",
       "actual_output": "",
@@ -6944,7 +6944,7 @@
         "expected_lines": 29,
         "matching_lines": 0
       },
-      "duration": 16.96,
+      "duration": 16.14,
       "status": "output_mismatch",
       "detail": "29 line(s) differ (actual=0, expected=29)",
       "actual_output": "",
@@ -6958,7 +6958,7 @@
         "expected_lines": 13,
         "matching_lines": 13
       },
-      "duration": 16.92,
+      "duration": 16.13,
       "status": "pass"
     },
     {
@@ -6969,7 +6969,7 @@
         "expected_lines": 1,
         "matching_lines": 1
       },
-      "duration": 16.71,
+      "duration": 16.0,
       "status": "pass"
     },
     {
@@ -6980,7 +6980,7 @@
         "expected_lines": 23,
         "matching_lines": 23
       },
-      "duration": 16.67,
+      "duration": 16.17,
       "status": "pass"
     },
     {
@@ -6991,7 +6991,7 @@
         "expected_lines": 1,
         "matching_lines": 1
       },
-      "duration": 17.04,
+      "duration": 16.17,
       "status": "pass"
     }
   ]

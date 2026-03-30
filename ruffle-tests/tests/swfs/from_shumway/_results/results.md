@@ -1,10 +1,10 @@
 # Ruffle Test Results (Unfiltered)
 
-**Date**: 2026-03-30 15:09 UTC
+**Date**: 2026-03-30 17:28 UTC
 
-**Git SHA**: `378c75067b`
+**Git SHA**: `06e503cb44`
 
-**Run Duration**: 13m 9s
+**Run Duration**: 13m 11s
 
 ## Summary
 
@@ -29,23 +29,23 @@
 
 | # | Test | Lines | Duration | Notes |
 |---|------|-------|----------|-------|
-| 1 | `MaskTest` | 0 | 17.5s |  |
-| 2 | `MaskTest-2` | 0 | 16.6s |  |
-| 3 | `add` | 11 | 16.3s |  |
-| 4 | `avm1timeline1` | 3 | 17.2s |  |
-| 5 | `avm1timeline2` | 6 | 17.4s |  |
-| 6 | `bitmapbuttons` | 0 | 17.6s |  |
-| 7 | `button3` | 1 | 16.3s |  |
-| 8 | `clipping` | 0 | 18.8s |  |
-| 9 | `doubleAndRegister` | 2 | 16.8s |  |
-| 10 | `flash_geom_ColorTransform` | 0 | 17.2s |  |
-| 11 | `flash_text_TextField` | 0 | 16.3s |  |
-| 12 | `fscommand1` | 1 | 16.3s |  |
-| 13 | `gradient` | 0 | 16.4s |  |
-| 14 | `gradientTransform` | 0 | 16.4s |  |
-| 15 | `invalidClipDepth` | 0 | 16.7s |  |
-| 16 | `movieinfo1` | 3 | 16.0s |  |
-| 17 | `targetPath1` | 8 | 17.2s |  |
+| 1 | `MaskTest` | 0 | 16.1s |  |
+| 2 | `MaskTest-2` | 0 | 16.8s |  |
+| 3 | `add` | 11 | 16.9s |  |
+| 4 | `avm1timeline1` | 3 | 16.9s |  |
+| 5 | `avm1timeline2` | 6 | 16.7s |  |
+| 6 | `bitmapbuttons` | 0 | 17.8s |  |
+| 7 | `button3` | 1 | 16.6s |  |
+| 8 | `clipping` | 0 | 18.0s |  |
+| 9 | `doubleAndRegister` | 2 | 16.7s |  |
+| 10 | `flash_geom_ColorTransform` | 0 | 17.0s |  |
+| 11 | `flash_text_TextField` | 0 | 16.6s |  |
+| 12 | `fscommand1` | 1 | 16.1s |  |
+| 13 | `gradient` | 0 | 16.5s |  |
+| 14 | `gradientTransform` | 0 | 16.5s |  |
+| 15 | `invalidClipDepth` | 0 | 16.9s |  |
+| 16 | `movieinfo1` | 3 | 16.6s |  |
+| 17 | `targetPath1` | 8 | 16.1s |  |
 
 ## Near-Passing Tests
 
