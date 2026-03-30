@@ -2,7 +2,7 @@
 
 | Category | Pass | Total | Rate | Report | Filtered |
 |----------|-----:|------:|-----:|--------|----------|
-| avm1 | 564 | 620 | 91.0% | [results](tests/swfs/avm1/_results/results.md) | [filtered](tests/swfs/avm1/_results/results_filtered.md) (561/569, 98.6%) |
+| avm1 | 565 | 620 | 91.1% | [results](tests/swfs/avm1/_results/results.md) | [filtered](tests/swfs/avm1/_results/results_filtered.md) (563/569, 98.9%) |
 | from_gnash/actionscript.all | 61 | 190 | 32.1% | [results](tests/swfs/from_gnash/actionscript.all/_results/results.md) | [filtered](tests/swfs/from_gnash/actionscript.all/_results/results_filtered.md) (61/181, 33.7%) |
 | from_gnash/misc-swfmill.all | 11 | 14 | 78.6% | [results](tests/swfs/from_gnash/misc-swfmill.all/_results/results.md) | [filtered](tests/swfs/from_gnash/misc-swfmill.all/_results/results_filtered.md) (11/14, 78.6%) |
 | from_shumway | 17 | 47 | 36.2% | [results](tests/swfs/from_shumway/_results/results.md) | [filtered](tests/swfs/from_shumway/_results/results_filtered.md) (17/17, 100.0%) |
@@ -12,7 +12,7 @@
 
 | Category | Count |
 |----------|------:|
-| output_mismatch | 54 |
+| output_mismatch | 53 |
 | runtime_segfault | 1 |
 | timeout | 1 |
 

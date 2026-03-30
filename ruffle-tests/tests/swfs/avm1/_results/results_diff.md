@@ -1,36 +1,28 @@
 # Ruffle Test Results Diff
 
-**Previous:** `06e503cb4426` (2026-03-30T17:28:52.313482+00:00)
-**Current:** `5ec473ecb0f5` (2026-03-30T19:31:20.974943+00:00)
+**Previous:** `5ec473ecb0f5` (2026-03-30T19:31:20.974943+00:00)
+**Current:** `56ec186a4be1` (2026-03-30T20:10:51.608936+00:00)
 
 ## Summary
 
 | Metric | Previous | Current | Delta |
 |--------|----------|---------|-------|
-| Passing | 563 | 564 | +1 |
+| Passing | 564 | 565 | +1 |
 | Total | 620 | 620 | 0 |
-| Pass rate | 90.8% | 91.0% | +0.2% |
-| Mismatched lines | 11422 | 11639 | +217 |
-|   Decreased | | | -7 |
-|   Increased | | | +224 |
+| Pass rate | 91.0% | 91.1% | +0.1% |
+| Mismatched lines | 11639 | 11416 | -223 |
+|   Decreased | | | -224 |
+|   Increased | | | +1 |
 
-## Newly Passing (3)
+## Newly Passing (2)
 
 | Test | Previous Status | Lines (prev) | Lines (now) |
 |------|----------------|--------------|-------------|
-| `native_objects_swf6` | output_mismatch | 83/84 | 84/84 |
-| `native_subclasses` | output_mismatch | 190/191 | 191/191 |
-| `string_relational_compare` | output_mismatch | 3/4 | 4/4 |
+| `textfield_props_swf5` | output_mismatch | 84/175 | 175/175 |
+| `textfield_props_swf6` | output_mismatch | 77/210 | 210/210 |
 
-## Newly Failing (2)
+## Newly Failing (1)
 
 | Test | New Status | Lines (prev) | Lines (now) |
 |------|-----------|--------------|-------------|
-| `textfield_props_swf5` | output_mismatch | 175/175 | 84/175 |
-| `textfield_props_swf6` | output_mismatch | 210/210 | 77/210 |
-
-## Line Count Changed (1)
-
-| Test | Status | Lines (prev) | Lines (now) | Diff |
-|------|--------|--------------|-------------|------|
-| `bitmap_filters` | output_mismatch | 540/548 | 544/548 | -4 |
+| `native_objects_swf6` | output_mismatch | 84/84 | 83/84 |
