@@ -31456,47 +31456,74 @@ void actionSetMember(SWFAppContext* app_context)
 					if (value_var.type == ACTION_STACK_VALUE_NULL || value_var.type == ACTION_STACK_VALUE_UNDEFINED) {
 						return; // Keep old matrix
 					}
-					// Determine target size: ColorMatrixFilter=20, ConvolutionFilter=matrixX*matrixY
+					// Matrix setter: ColorMatrixFilter always 20 + NaN pad; ConvolutionFilter stores as-is
 					ActionVar* mx_prop = getProperty(obj, "matrixX", 7);
-					int target_len;
-					if (mx_prop) {
-						// ConvolutionFilter: resize to matrixX * matrixY
-						ActionVar* my_prop = getProperty(obj, "matrixY", 7);
-						int matX = mx_prop ? (int)varToDoubleSimple(mx_prop) : 0;
-						int matY = my_prop ? (int)varToDoubleSimple(my_prop) : 0;
-						if (matX < 0) matX = 0; if (matY < 0) matY = 0;
-						target_len = matX * matY;
-					} else {
-						target_len = 20; // ColorMatrixFilter
-					}
+					int is_convolution = (mx_prop != NULL);
 					ASArray* src_arr = NULL;
 					if (value_var.type == ACTION_STACK_VALUE_ARRAY)
 						src_arr = (ASArray*)(uintptr_t)value_var.data.numeric_value;
-					int alloc_len = target_len > 0 ? target_len : (src_arr ? (int)src_arr->length : 0);
+					int alloc_len;
+					if (is_convolution) {
+						// ConvolutionFilter: store array as-is (no resize)
+						alloc_len = src_arr ? (int)src_arr->length : 0;
+					} else {
+						alloc_len = 20; // ColorMatrixFilter always 20
+					}
 					ASArray* new_matrix = allocArray(app_context, alloc_len > 0 ? alloc_len : 1);
 					new_matrix->length = alloc_len;
 					initArrayProto(app_context, new_matrix);
 					for (int mi = 0; mi < alloc_len; mi++) {
 						if (src_arr && mi < (int)src_arr->length) {
-							double ev = varToDoubleSimple(&src_arr->elements[mi]);
+							// Convert element to number — null/undefined/non-number → NaN
+							ActionVar* el = &src_arr->elements[mi];
+							double ev;
+							if (el->type == ACTION_STACK_VALUE_NULL || el->type == ACTION_STACK_VALUE_UNDEFINED)
+								ev = NAN;
+							else
+								ev = varToDoubleSimple(el);
 							new_matrix->elements[mi] = makeF64(ev);
-						} else if (target_len > 0) {
-							new_matrix->elements[mi] = makeF64(0.0); // ConvolutionFilter pads with 0
 						} else {
-							new_matrix->elements[mi] = makeF64(NAN); // ColorMatrixFilter pads with NaN
+							new_matrix->elements[mi] = makeF64(NAN); // Pad with NaN
 						}
 					}
 					value_var.type = ACTION_STACK_VALUE_ARRAY;
 					value_var.data.numeric_value = (u64)new_matrix;
 					handled = 1;
 				}
-				// matrixX, matrixY (ConvolutionFilter): int truncation, resize matrix
+				// matrixX, matrixY (ConvolutionFilter): int truncation + auto-resize matrix
 				else if ((prop_name_len == 7 && memcmp(prop_name, "matrixX", 7) == 0) ||
 				         (prop_name_len == 7 && memcmp(prop_name, "matrixY", 7) == 0)) {
 					int iv = (int)dv;
 					if (iv < 0) iv = 0; if (iv > 15) iv = 15;
 					value_var = makeF64((double)iv);
-					handled = 1;
+					// Store the new matrixX/matrixY first
+					setProperty(app_context, obj, prop_name, prop_name_len, &value_var);
+					// Auto-resize matrix to matrixX * matrixY (only if product > 0)
+					ActionVar* mxp = getProperty(obj, "matrixX", 7);
+					ActionVar* myp = getProperty(obj, "matrixY", 7);
+					int matX = mxp ? (int)varToDoubleSimple(mxp) : 0;
+					int matY = myp ? (int)varToDoubleSimple(myp) : 0;
+					if (matX < 0) matX = 0; if (matY < 0) matY = 0;
+					int new_len = matX * matY;
+					if (new_len > 0) {
+						ActionVar* old_mat = getProperty(obj, "matrix", 6);
+						ASArray* old_arr = (old_mat && old_mat->type == ACTION_STACK_VALUE_ARRAY) ?
+							(ASArray*)(uintptr_t)old_mat->data.numeric_value : NULL;
+						ASArray* resized = allocArray(app_context, new_len);
+						resized->length = new_len;
+						initArrayProto(app_context, resized);
+						for (int mi = 0; mi < new_len; mi++) {
+							if (old_arr && mi < (int)old_arr->length)
+								resized->elements[mi] = old_arr->elements[mi];
+							else
+								resized->elements[mi] = makeF64(0.0);
+						}
+						ActionVar mat_val = {0}; mat_val.type = ACTION_STACK_VALUE_ARRAY;
+						mat_val.data.numeric_value = (u64)resized;
+						setProperty(app_context, obj, "matrix", 6, &mat_val);
+					}
+					// If product == 0, keep old matrix unchanged
+					return; // Already stored via setProperty above
 				}
 				// distance, scaleX, scaleY, bias, divisor: no validation, pass through
 				(void)handled;
