@@ -5,10 +5,16 @@ Last updated: 2026-03-29
 ## Quick Summary
 
 - **Pass rate (CI, last run)**: 564/620 (91.0%) raw, 563/569 (98.9%) filtered (6 filtered failures)
-- **Image test baseline**: **11/31 strict image match** (+3: bitmap_data_perlinnoise, bitmap_data_pixeldissolve_image, bitmapdata_applyfilter_colormatrix). **10/31 tolerance pass** (within test.toml limits).
+- **Image test baseline**: **12/31 strict image match** (+4: bitmap_data_fillrect, bitmap_data_perlinnoise, bitmap_data_pixeldissolve_image, bitmapdata_applyfilter_colormatrix). **10/31 tolerance pass** (within test.toml limits).
 - **Main failure types**: output_mismatch (54), runtime_segfault (1), timeout (1)
 - **Known regressions**: None.
-- **Latest fixes (2026-03-29)**:
+- **Latest fixes (2026-03-29, session 2)**:
+  - bitmap_data_fillrect image PASS (0 outliers) — fillRect negative dimensions + removed bare Rectangle global
+  - BitmapData.loadBitmap(exportName) — full implementation with defineBitmap char_id metadata, R/B byte swap
+  - bitmap_data_colortransform image: 78561→726 outliers — loadBitmap working, remaining 2× precision issue
+  - copyPixels alpha bitmap path (6-arg form), merge() method implementation
+  - bitmap_data_copypixels: 190726→188581 outliers (partial progress)
+- **Latest fixes (2026-03-29, session 1)**:
   - bitmap_data_pixeldissolve PASS (1075/1075) — Feistel network PRNG implementation
   - bitmap_data_perlinnoise image PASS (0 outliers) — W3C SVG feTurbulence port
   - bitmap_data_pixeldissolve_image image PASS (0 outliers) — same Feistel implementation

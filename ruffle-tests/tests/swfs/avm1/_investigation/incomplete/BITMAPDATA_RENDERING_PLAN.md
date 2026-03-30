@@ -27,11 +27,17 @@ phases:
     name: "Implement missing BitmapData methods"
     status: mostly_complete
   - id: 8
-    name: "Fix precision issue for bitmap_data_fillrect"
-    status: not_started
+    name: "Fix fillRect negative dimensions + bare Rectangle"
+    status: complete
   - id: 9
     name: "Fix ColorMatrixFilter constructor"
     status: complete
+  - id: 10
+    name: "Implement BitmapData.loadBitmap"
+    status: complete
+  - id: 11
+    name: "Fix colortransform precision (726 outliers remaining)"
+    status: in_progress
 dependencies:
   - plan: BITMAPDATA_PERLINNOISE
     type: requires
@@ -47,44 +53,40 @@ blockers: []
 
 Last updated: 2026-03-29
 
-## Status: IN PROGRESS — 4/6 image tests passing (pixel-perfect)
+## Status: IN PROGRESS — 5/6 image tests passing (pixel-perfect)
 
 ### Progress Summary
 
-**Completed (2026-03-29):**
-- ColorMatrixFilter constructor fix: matrix array property was only stored in super() path, not new() path. Added to normal construction path.
+**Completed (2026-03-29, session 2):**
+- **bitmap_data_fillrect: PASS** (0 outliers) — Two fixes:
+  1. fillRect negative width/height normalization (e.g., {x:15,w:-8} → {x:7,w:8})
+  2. Removed bare `Rectangle` from function_registry — `NewObject("Rectangle")` now fails, matching Ruffle/Flash where Rectangle is only available via `flash.geom.Rectangle`
+- **BitmapData.loadBitmap(exportName)**: Full implementation:
+  - `defineBitmap()` now takes char_id, stores metadata in `g_bitmap_defs[]`
+  - `ng_getBitmapMetadata()` for runtime lookup
+  - Recompiler emits char_id in defineBitmap calls
+  - R/B channel swap from recompiler byte order (RGBA LE = ABGR u32) to ARGB u32
+  - Registered as static method on BitmapData constructor's own_props
+- **bitmap_data_colortransform: 78561 → 726 outliers** (major progress)
+  - loadBitmap working, colorTransform applying, rendering showing correct patterns
+  - Remaining: 726 outliers at tolerance=5, max diff 125 — appears to be 2× value pattern for specific colorTransform multipliers (aMult=2 path)
+- **copyPixels alpha bitmap path**: 6-argument form with alpha bitmap modulation
+- **merge()**: Per-channel weighted blend implementation
+
+**Completed (2026-03-29, session 1):**
+- ColorMatrixFilter constructor fix
 - bitmapdata_applyfilter_colormatrix: **PASS** (0 outliers, max diff 1)
-- bitmap_data_perlinnoise: **PASS** (0 outliers, 0 max diff) — via BITMAPDATA_PERLINNOISE_PLAN
-- bitmap_data_pixeldissolve_image: **PASS** (0 outliers, 0 max diff) — via BITMAPDATA_PIXELDISSOLVE_PLAN
+- bitmap_data_perlinnoise: **PASS** (0 outliers)
+- bitmap_data_pixeldissolve_image: **PASS** (0 outliers)
 
 **Completed (2026-03-28):**
-- Dynamic bitmap texture layer allocation in render_webgpu.c (always creates bitmap texture array with extra layers for attachBitmap)
-- `render_webgpu_draw_bitmap_quad()` function: uploads premultiplied ARGB pixels as RGBA, computes inverse matrix for UV mapping, generates textured quad vertices, draws with premultiplied alpha blend pipeline
-- `actionIterateAttachedBitmaps()` callback system in action.c: iterates child_mc_cache for MCs with attached bitmaps, computes stage-space position
-- tag.c rendering hook: calls attached_bitmap_render_cb during tagShowFrame render pass (alongside Drawing API and text field rendering)
-- MovieClip struct extended with `attached_bitmap_pixels`, `attached_bitmap_width`, `attached_bitmap_height`
-- Premultiplied alpha blend pipeline (`blend_premul_pipeline`) for correct compositing of premultiplied bitmap data
-
-**Result: `bitmap_data_fillrect` renders correctly** (visual match with expected output, 545 sub-pixel outliers at tolerance=0 from MSAA edge blending).
-
-### Blockers
-
-The remaining 5 tests are blocked by **unimplemented BitmapData methods** (stubs that don't modify pixel data):
-
-| Test | Required Method | Status |
-|------|----------------|--------|
-| bitmap_data_fillrect | fillRect | **IMPLEMENTED** — 545 outliers (tolerance=0) |
-| bitmap_data_copypixels | copyPixels, merge | copyPixels implemented, merge is stub |
-| bitmap_data_colortransform | colorTransform | Implemented (trace passes) — image untested |
-| bitmap_data_perlinnoise | perlinNoise | **STUB** — all pixels zero |
-| bitmap_data_pixeldissolve_image | pixelDissolve | **STUB** — all pixels zero |
-| bitmapdata_applyfilter_colormatrix | applyFilter | **STUB** — all pixels zero |
+- Dynamic bitmap texture layer allocation, render_webgpu_draw_bitmap_quad(), actionIterateAttachedBitmaps(), tag.c rendering hook, MovieClip struct extension, premultiplied alpha blend pipeline
 
 ### What Remains
 
-1. **bitmap_data_fillrect** (545 outliers / 218 pixels): Not edge precision — specific bitmap has wrong color (red instead of blue at x=[147,209], y=[20,29]). Likely a fillRect color interpretation issue with semi-transparent or specific ARGB values.
-2. **bitmap_data_colortransform** (78K outliers): All bitmaps render as black despite colorTransform producing correct trace output. Likely an issue with how the test creates/attaches its bitmaps (rendering pipeline doesn't pick them up). Stage background is black so the colored bitmaps should show but don't.
-3. **bitmap_data_copypixels** (190K outliers): merge() is a stub — needs ~40 lines of per-pixel weighted blend implementation.
+1. **bitmap_data_colortransform** (726 outliers, tol=5): Values are exactly 2× expected for pixels affected by aMult=2 colorTransform. Root cause unclear — may be related to how loadBitmap stores pixel data or how colorTransform handles the premultiply/unpremultiply cycle.
+
+2. **bitmap_data_copypixels** (188K outliers): Alpha bitmap path partially working. Missing rows 3-4 suggest some copyPixels+alpha combinations aren't rendering correctly. merge() implemented but may not be exercised by the test's visible output.
 
 ### Affected Image Tests
 
@@ -93,25 +95,17 @@ The remaining 5 tests are blocked by **unimplemented BitmapData methods** (stubs
 | bitmap_data_perlinnoise | 0 | **0** | **PASS** — pixel-perfect |
 | bitmap_data_pixeldissolve_image | 1 | **0** | **PASS** — pixel-perfect |
 | bitmapdata_applyfilter_colormatrix | 1 | **0** (max 1) | **PASS** — rounding only |
-| bitmap_data_fillrect | 0 | 545 | 218 pixels with wrong color in specific bitmap |
-| bitmap_data_colortransform | 5 | 78561 | Bitmaps render as black — rendering pipeline issue |
-| bitmap_data_copypixels | 0 | 190726 | merge() is stub |
+| bitmap_data_fillrect | 0 | **0** | **PASS** — pixel-perfect |
+| bitmap_data_colortransform | 5 | 726 | 2× value pattern, needs investigation |
+| bitmap_data_copypixels | 0 | 188581 | Alpha bitmap path + merge, large gap |
 
 ### Key Code Locations
 
 | Component | File | Description |
 |-----------|------|-------------|
-| Dynamic bitmap quad rendering | `render_webgpu.c:render_webgpu_draw_bitmap_quad()` | Uploads pixels, computes UV matrix, draws textured quad |
-| Premultiplied alpha pipeline | `render_webgpu.c:blend_premul_pipeline` | One/OneMinusSrcAlpha blend for premul data |
-| Bitmap iteration callback | `action.c:actionIterateAttachedBitmaps()` | Iterates child_mc_cache for attached bitmaps |
-| Rendering hook | `tag.c:attached_bitmap_render_cb()` | Called during tagShowFrame render pass |
-| MC bitmap storage | `action.h:MovieClip.attached_bitmap_*` | Pixel pointer, width, height |
-| Bitmap texture allocation | `render_webgpu.c:create_textures()` | Always allocates 32 extra dynamic layers |
-
-### Architecture Notes
-
-- Dynamic bitmaps use **premultiplied alpha blending** (One/OneMinusSrcAlpha) since BitmapDataNative stores premultiplied ARGB
-- Inverse matrix includes translation offset to map quad position → (0,0) in bitmap space
-- Bitmap texture array always has `bitmap_count + MAX_DYNAMIC_BITMAPS` layers (even if no static bitmaps)
-- `bitmap_sizes_buffer` and `inv_mat_buffer` over-allocated with `MAX_DYNAMIC_BITMAPS` extra slots
-- Dynamic bitmap layers reset each frame (`dynamic_bitmap_used = 0` in `render_webgpu_open_pass`)
+| fillRect negative dims | `action.c:bitmapDataFillRect` | Normalize w/h before clipping |
+| loadBitmap | `action.c:bitmapDataLoadBitmap` | Static method on BitmapData ctor |
+| Bitmap metadata registry | `tag.c:g_bitmap_defs[]` | char_id → offset/size/w/h |
+| defineBitmap with char_id | `tag.h`, `tag.c`, `tag_stubs.c`, `swf.cpp` | Full pipeline |
+| copyPixels alpha path | `action.c:bitmapDataCopyPixels` | 6-arg form with alpha bitmap |
+| merge() | `action.c:bitmapDataMerge` | Per-channel weighted blend |
