@@ -3,13 +3,13 @@
 
 <!-- PLAN_META
 id: BITMAP_FILTERS_MCFILTERS
-status: not_started
+status: in_progress
 phases:
   - id: 1
-    name: "Diagnose mc reference in testMovieClipFilterSetter"
-    status: not_started
+    name: "Fix PlaceObject3 flags2 bit positions"
+    status: complete
   - id: 2
-    name: "Fix mc.filters initial read"
+    name: "Build filter ASObjects from display list data"
     status: not_started
 dependencies:
   - plan: BITMAP_FILTERS
@@ -20,49 +20,37 @@ blockers: []
 
 Last updated: 2026-03-30
 
-## Status: NOT STARTED — 8/548 lines remaining (540 pass)
+## Status: IN PROGRESS — 540/548, infrastructure in place
 
-### Problem
+### Completed: PlaceObject3 flags2 bit fix
 
-The `bitmap_filters` test at 540/548 has 8 failing lines (15, 90, 113, 156, 289, 360, 411, 484). All are `mc.filters[0]` reads that return `undefined` instead of the expected filter object.
+The recompiler had PlaceObject3 flags2 bits **shifted by 1 position** (both main frame and sprite contexts). `HasFilterList` was at bit 1 (0x02) instead of bit 0 (0x01), causing ALL filter data to be silently ignored. Fixed in both `swf.cpp` locations.
 
-### Root Cause Analysis
+After fix, the recompiler correctly emits `tagSetFilter()` and `tagSetFilterHighlight()` calls. The display list's filter fields are populated at runtime. An `ng_getDisplayEntryFilterData()` accessor was also added.
 
-**NOT a SWF tag issue.** The test SWF has `hasFilter=0` on all PlaceObject3 tags — no SWF-authored filters. The filters are set entirely by ActionScript.
+### Remaining: Build filter ASObjects from display list
 
-The test's `testMovieClipFilterSetter(arg0, mcName, filter)` function:
-1. Gets MC reference: `mc = arg0[mcName]` (e.g., `arg0["bevelMC"]`)
-2. Reads `mc.filters[0]` and traces it (the failing line)
-3. Sets `mc.filters = [filter]`
-4. Reads `mc.filters[0]` again (this line passes)
+The mc.filters getter needs to construct filter ASObjects from the display list's filter fields when no script-set filters exist. The initial attempt segfaulted because `invokeNativeSuperConstructor` was called with a stack-allocated dummy ASFunction, which likely caused issues with global state.
 
-**The issue**: At the call site, `arg0` appears to be the integer `1` (from `main(1)`), not a MovieClip. So `1["bevelMC"]` returns `undefined`, making the MC reference `undefined`, and `undefined.filters[0]` also returns `undefined`.
+**Approach for fix**: Instead of invoking the full constructor pipeline, directly allocate an ASObject, set `native_type = NATIVE_FILTER`, set the correct `__proto__` chain, and populate properties manually. This avoids the constructor machinery and is safer.
 
-The function likely intends to use `this` (the root MC/Test instance) to access `this["bevelMC"]`, not `arg0`. This suggests either:
-- The recompiler pushes CallMethod arguments in the wrong order for this case
-- Or `arg0` is actually a different register (the root MC ref) at the call site
-
-### Investigation Needed
-
-1. **Verify argument ordering**: Parse the raw SWF bytecode for the CallMethod at the call site. Compare the bytecode push order with what the recompiler emits. The recompiler's C code may have the argument pushes in the wrong order.
-
-2. **Check register assignment**: Trace what `reg2` contains at the call to `testMovieClipFilterSetter`. In the generated code, `reg2 = args[0]` of the `main(1)` call, which is `1`. But in Flash, `reg2` might hold the Test instance or root MC.
-
-3. **Compare with Ruffle trace**: The expected output shows the filter read succeeding, meaning Ruffle resolves the MC reference correctly. Check how Ruffle's AVM1 passes arguments for MTASC-compiled class methods.
+**Specific needs per filter type**:
+- **BevelFilter** (type 4): distance, angle (radians→degrees), highlightColor/Alpha, shadowColor/Alpha, quality, strength, blurX/Y, knockout, inner, type
+- **BlurFilter** (type 1): blurX, blurY, quality
+- **DropShadowFilter** (type 2): distance, angle, color, alpha, quality, inner, knockout, blurX/Y, strength, hideObject
+- **GlowFilter** (type 3): color, alpha, quality, inner, knockout, blurX/Y, strength
+- **GradientBevel/GlowFilter** (types with gradient data): needs gradient array support — currently NOT stored in display list (tagSetFilter only supports simple filters)
 
 ### Key Code Locations
 
-| Component | File | Lines |
-|-----------|------|-------|
-| testMovieClipFilterSetter | `script_defs.c` | 2974-3092 |
-| Call site (main function) | `script_defs.c` | 132-146 |
-| mc.filters getter | `action.c` | ~35792 |
-| mc.filters setter | `action.c` | ~32789 |
+| Component | File | Description |
+|-----------|------|-------------|
+| flags2 fix | `swf.cpp:2682-2691, 3897-3905` | Both main frame and sprite PO3 |
+| tagSetFilter emission | `swf.cpp:3408-3438` | Emits filter calls |
+| ng_getDisplayEntryFilterData | `tag_stubs.c` | Reads filter fields from display list |
+| mc.filters getter | `action.c:~35792` | TODO: build filter objects |
+| Filter constructor init | `action.c:invokeNativeSuperConstructor` | For property defaults |
 
-### Estimated Complexity
+### Estimated Work
 
-Medium — likely a 1-5 line fix if it's an argument ordering issue. But requires careful bytecode analysis to confirm.
-
-### Expected Impact
-
-Fixes the last 8 lines of `bitmap_filters` (540→548, PASS). Would also fix similar patterns in other MTASC-compiled tests.
+~50 lines: create filter object, set __proto__, populate properties from display list data. Gradient filters need additional work (gradient data not in display list).
