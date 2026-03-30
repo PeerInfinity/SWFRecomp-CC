@@ -31451,27 +31451,51 @@ void actionSetMember(SWFAppContext* app_context)
 						value_var.data.string_data.heap_ptr = u16;
 					}
 				}
-				// matrix (ColorMatrixFilter): array → create 20-element array padded with NaN; null/undefined → keep old
+				// matrix: ColorMatrixFilter → always 20 elements; ConvolutionFilter → matrixX*matrixY elements
 				else if (prop_name_len == 6 && memcmp(prop_name, "matrix", 6) == 0) {
 					if (value_var.type == ACTION_STACK_VALUE_NULL || value_var.type == ACTION_STACK_VALUE_UNDEFINED) {
 						return; // Keep old matrix
 					}
+					// Determine target size: ColorMatrixFilter=20, ConvolutionFilter=matrixX*matrixY
+					ActionVar* mx_prop = getProperty(obj, "matrixX", 7);
+					int target_len;
+					if (mx_prop) {
+						// ConvolutionFilter: resize to matrixX * matrixY
+						ActionVar* my_prop = getProperty(obj, "matrixY", 7);
+						int matX = mx_prop ? (int)varToDoubleSimple(mx_prop) : 0;
+						int matY = my_prop ? (int)varToDoubleSimple(my_prop) : 0;
+						if (matX < 0) matX = 0; if (matY < 0) matY = 0;
+						target_len = matX * matY;
+					} else {
+						target_len = 20; // ColorMatrixFilter
+					}
 					ASArray* src_arr = NULL;
 					if (value_var.type == ACTION_STACK_VALUE_ARRAY)
 						src_arr = (ASArray*)(uintptr_t)value_var.data.numeric_value;
-					ASArray* new_matrix = allocArray(app_context, 20);
-					new_matrix->length = 20;
+					int alloc_len = target_len > 0 ? target_len : (src_arr ? (int)src_arr->length : 0);
+					ASArray* new_matrix = allocArray(app_context, alloc_len > 0 ? alloc_len : 1);
+					new_matrix->length = alloc_len;
 					initArrayProto(app_context, new_matrix);
-					for (int mi = 0; mi < 20; mi++) {
+					for (int mi = 0; mi < alloc_len; mi++) {
 						if (src_arr && mi < (int)src_arr->length) {
 							double ev = varToDoubleSimple(&src_arr->elements[mi]);
 							new_matrix->elements[mi] = makeF64(ev);
+						} else if (target_len > 0) {
+							new_matrix->elements[mi] = makeF64(0.0); // ConvolutionFilter pads with 0
 						} else {
-							new_matrix->elements[mi] = makeF64(NAN);
+							new_matrix->elements[mi] = makeF64(NAN); // ColorMatrixFilter pads with NaN
 						}
 					}
 					value_var.type = ACTION_STACK_VALUE_ARRAY;
 					value_var.data.numeric_value = (u64)new_matrix;
+					handled = 1;
+				}
+				// matrixX, matrixY (ConvolutionFilter): int truncation, resize matrix
+				else if ((prop_name_len == 7 && memcmp(prop_name, "matrixX", 7) == 0) ||
+				         (prop_name_len == 7 && memcmp(prop_name, "matrixY", 7) == 0)) {
+					int iv = (int)dv;
+					if (iv < 0) iv = 0; if (iv > 15) iv = 15;
+					value_var = makeF64((double)iv);
 					handled = 1;
 				}
 				// distance, scaleX, scaleY, bias, divisor: no validation, pass through
@@ -32339,33 +32363,13 @@ void actionSetMember(SWFAppContext* app_context)
 				// All other types (boolean, object, movieclip, etc.): keep previous value
 				return;
 			}
-			// filters setter: store array with cloned filter objects on dynamic_props
+			// filters setter: store array on dynamic_props (getter does the cloning)
 			if (prop_name_len == 7 && strncmp(prop_name, "filters", 7) == 0) {
 				if (value_var.type == ACTION_STACK_VALUE_ARRAY) {
-					ASArray* src = (ASArray*)(uintptr_t)value_var.data.numeric_value;
-					if (src) {
-						// Clone each filter in the array
-						ASArray* cloned = allocArray(app_context, src->length);
-						cloned->length = src->length;
-						initArrayProto(app_context, cloned);
-						for (u32 fi = 0; fi < src->length; fi++) {
-							if (src->elements[fi].type == ACTION_STACK_VALUE_OBJECT) {
-								// Call filterClone to deep-copy the filter
-								ActionVar clone_result = filterClone(app_context, NULL, 0, NULL,
-									(void*)(uintptr_t)src->elements[fi].data.numeric_value);
-								cloned->elements[fi] = clone_result;
-							} else {
-								cloned->elements[fi] = src->elements[fi];
-							}
-						}
-						ActionVar arr_val = {0};
-						arr_val.type = ACTION_STACK_VALUE_ARRAY;
-						arr_val.data.numeric_value = (u64)cloned;
-						if (mc->dynamic_props == NULL) {
-							mc->dynamic_props = allocObject(app_context, 4);
-						}
-						setProperty(app_context, (ASObject*)mc->dynamic_props, "filters", 7, &arr_val);
+					if (mc->dynamic_props == NULL) {
+						mc->dynamic_props = allocObject(app_context, 4);
 					}
+					setProperty(app_context, (ASObject*)mc->dynamic_props, "filters", 7, &value_var);
 				}
 				return;
 			}
@@ -37003,7 +37007,7 @@ void actionNewMethod(SWFAppContext* app_context)
 					    (strcmp(fn, "GlowFilter") == 0) ||
 					    (strcmp(fn, "GradientBevelFilter") == 0) ||
 					    (strcmp(fn, "GradientGlowFilter") == 0)) {
-						new_obj->native_type = NATIVE_FILTER;
+						// invokeNativeSuperConstructor sets native_type = NATIVE_FILTER
 						ActionVar _nsc_result = {0};
 						invokeNativeSuperConstructor(app_context, func,
 							new_obj, args, num_args, &_nsc_result);
@@ -37489,8 +37493,8 @@ void actionNewMethod(SWFAppContext* app_context)
 				(strcmp(ctor_name, "GlowFilter") == 0) ||
 				(strcmp(ctor_name, "GradientBevelFilter") == 0) ||
 				(strcmp(ctor_name, "GradientGlowFilter") == 0)) {
-				new_obj_inst->native_type = NATIVE_FILTER;
 				// Initialize filter properties via the super constructor handler
+				// (invokeNativeSuperConstructor sets native_type = NATIVE_FILTER)
 				{
 					ActionVar _nsc_result = {0};
 					invokeNativeSuperConstructor(app_context, user_ctor_func,
