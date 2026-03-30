@@ -25,7 +25,7 @@ phases:
     status: not_started
   - id: 7
     name: "ColorMatrixFilter matrix setter validation"
-    status: not_started
+    status: complete
   - id: 8
     name: "Property enumeration order"
     status: complete
