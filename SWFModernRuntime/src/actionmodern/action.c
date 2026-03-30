@@ -9423,19 +9423,6 @@ static ActionVar bitmapDataApplyFilter(SWFAppContext* app_context, ActionVar* ar
         matrix[i] = (float)varToDoubleSimple(&matrix_arr->elements[i]);
     }
 
-    // DEBUG: dump matrix
-    static int _af_debug = 0;
-    if (!_af_debug) {
-        _af_debug = 1;
-        fprintf(stderr, "APPLYFILTER matrix: ");
-        for (int i = 0; i < 20; i++) fprintf(stderr, "%.1f ", matrix[i]);
-        fprintf(stderr, "\n");
-        // Dump first pixel
-        uint32_t px0 = src_bmp->pixels[0];
-        fprintf(stderr, "APPLYFILTER src_px0: A=%d R=%d G=%d B=%d\n",
-            (px0>>24)&0xFF, (px0>>16)&0xFF, (px0>>8)&0xFF, px0&0xFF);
-    }
-
     // Apply filter: iterate sourceRect, map to dest via destPoint offset
     for (int sy = 0; sy < rh; sy++) {
         for (int sx = 0; sx < rw; sx++) {
@@ -24325,11 +24312,11 @@ static ActionVar filterClone(SWFAppContext* app_context, ActionVar* args, u32 ar
     ASObject* clone = allocObject(app_context, obj->num_used + 4);
     clone->native_type = NATIVE_FILTER;
 
-    // Copy __proto__ and __constructor__ from original
+    // Copy __proto__ and __constructor__ from original (both DontEnum)
     ActionVar* proto = getProperty(obj, "__proto__", 9);
-    if (proto) setProperty(app_context, clone, "__proto__", 9, proto);
+    if (proto) setPropertyWithFlags(app_context, clone, "__proto__", 9, proto, PROPERTY_FLAGS_DONTENUM);
     ActionVar* ctor = getProperty(obj, "__constructor__", 15);
-    if (ctor) setProperty(app_context, clone, "__constructor__", 15, ctor);
+    if (ctor) setPropertyWithFlags(app_context, clone, "__constructor__", 15, ctor, PROPERTY_FLAGS_DONTENUM);
 
     // Copy all own properties (skip __proto__, __constructor__)
     for (u32 i = 0; i < obj->num_used; i++) {
@@ -31382,11 +31369,6 @@ void actionSetMember(SWFAppContext* app_context)
 			{
 				return;
 			}
-			// DEBUG: track filter property sets
-			if (obj->native_type == NATIVE_FILTER && prop_name_len == 6 && memcmp(prop_name, "matrix", 6) == 0) {
-				printf("FILTER_SET matrix type=%d num_val=%llu\n", value_var.type, (unsigned long long)value_var.data.numeric_value);
-				fflush(stdout);
-			}
 			// BitmapData: width, height, transparent, rectangle are read-only
 			if (obj->native_type == NATIVE_BITMAPDATA && prop_name_len >= 5) {
 				if ((prop_name_len == 5 && memcmp(prop_name, "width", 5) == 0) ||
@@ -32355,6 +32337,36 @@ void actionSetMember(SWFAppContext* app_context)
 					// Out of range after byte truncation: keep previous value
 				}
 				// All other types (boolean, object, movieclip, etc.): keep previous value
+				return;
+			}
+			// filters setter: store array with cloned filter objects on dynamic_props
+			if (prop_name_len == 7 && strncmp(prop_name, "filters", 7) == 0) {
+				if (value_var.type == ACTION_STACK_VALUE_ARRAY) {
+					ASArray* src = (ASArray*)(uintptr_t)value_var.data.numeric_value;
+					if (src) {
+						// Clone each filter in the array
+						ASArray* cloned = allocArray(app_context, src->length);
+						cloned->length = src->length;
+						initArrayProto(app_context, cloned);
+						for (u32 fi = 0; fi < src->length; fi++) {
+							if (src->elements[fi].type == ACTION_STACK_VALUE_OBJECT) {
+								// Call filterClone to deep-copy the filter
+								ActionVar clone_result = filterClone(app_context, NULL, 0, NULL,
+									(void*)(uintptr_t)src->elements[fi].data.numeric_value);
+								cloned->elements[fi] = clone_result;
+							} else {
+								cloned->elements[fi] = src->elements[fi];
+							}
+						}
+						ActionVar arr_val = {0};
+						arr_val.type = ACTION_STACK_VALUE_ARRAY;
+						arr_val.data.numeric_value = (u64)cloned;
+						if (mc->dynamic_props == NULL) {
+							mc->dynamic_props = allocObject(app_context, 4);
+						}
+						setProperty(app_context, (ASObject*)mc->dynamic_props, "filters", 7, &arr_val);
+					}
+				}
 				return;
 			}
 			// _lockroot setter via non-underscore name (some tests use "lockroot" without underscore on dynamic_props)
@@ -35337,8 +35349,31 @@ void actionGetMember(SWFAppContext* app_context)
 		}
 		if (mc != NULL && prop_name_len == 7 && strncmp(prop_name, "filters", 7) == 0)
 		{
-			// filters defaults to empty array
+			// Return stored filters (cloned) or empty array
+			if (mc->dynamic_props != NULL) {
+				ActionVar* stored = getProperty((ASObject*)mc->dynamic_props, "filters", 7);
+				if (stored != NULL && stored->type == ACTION_STACK_VALUE_ARRAY) {
+					ASArray* src = (ASArray*)(uintptr_t)stored->data.numeric_value;
+					if (src) {
+						ASArray* cloned = allocArray(app_context, src->length);
+						cloned->length = src->length;
+						initArrayProto(app_context, cloned);
+						for (u32 fi = 0; fi < src->length; fi++) {
+							if (src->elements[fi].type == ACTION_STACK_VALUE_OBJECT) {
+								ActionVar cr = filterClone(app_context, NULL, 0, NULL,
+									(void*)(uintptr_t)src->elements[fi].data.numeric_value);
+								cloned->elements[fi] = cr;
+							} else {
+								cloned->elements[fi] = src->elements[fi];
+							}
+						}
+						PUSH(ACTION_STACK_VALUE_ARRAY, (u64)cloned);
+						return;
+					}
+				}
+			}
 			ASArray* arr = allocArray(app_context, 0);
+			initArrayProto(app_context, arr);
 			PUSH(ACTION_STACK_VALUE_ARRAY, (u64)arr);
 			return;
 		}
