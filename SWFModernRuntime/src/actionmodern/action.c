@@ -31375,6 +31375,83 @@ void actionSetMember(SWFAppContext* app_context)
 				    (prop_name_len == 9 && memcmp(prop_name, "rectangle", 9) == 0))
 					return;
 			}
+			// Filter property setters: validate and clamp values
+			if (obj->native_type == NATIVE_FILTER && prop_name_len >= 4) {
+				double dv = varToDoubleSimple(&value_var);
+				int handled = 0;
+				// angle: fmod(val, 360)
+				if (prop_name_len == 5 && memcmp(prop_name, "angle", 5) == 0) {
+					dv = fmod(dv, 360.0);
+					value_var = makeF64(dv); handled = 1;
+				}
+				// quality: int clamp 0-15
+				else if (prop_name_len == 7 && memcmp(prop_name, "quality", 7) == 0) {
+					int iv = (int)dv; if (iv < 0) iv = 0; if (iv > 15) iv = 15;
+					value_var = makeF64((double)iv); handled = 1;
+				}
+				// strength: clamp 0-255
+				else if (prop_name_len == 8 && memcmp(prop_name, "strength", 8) == 0) {
+					if (dv < 0) dv = 0; if (dv > 255) dv = 255;
+					value_var = makeF64(dv); handled = 1;
+				}
+				// blurX, blurY: clamp 0-255
+				else if (prop_name_len == 5 && (memcmp(prop_name, "blurX", 5) == 0 || memcmp(prop_name, "blurY", 5) == 0)) {
+					if (dv < 0) dv = 0; if (dv > 255) dv = 255;
+					value_var = makeF64(dv); handled = 1;
+				}
+				// alpha, highlightAlpha, shadowAlpha: clamp 0-1, quantize to 8-bit
+				else if ((prop_name_len == 5 && memcmp(prop_name, "alpha", 5) == 0) ||
+				         (prop_name_len == 14 && memcmp(prop_name, "highlightAlpha", 14) == 0) ||
+				         (prop_name_len == 11 && memcmp(prop_name, "shadowAlpha", 11) == 0)) {
+					if (dv < 0) dv = 0; if (dv > 1) dv = 1;
+					dv = (double)((int)(dv * 255.0)) / 255.0;
+					value_var = makeF64(dv); handled = 1;
+				}
+				// color, highlightColor, shadowColor: mask to 0xFFFFFF (24-bit)
+				else if ((prop_name_len == 5 && memcmp(prop_name, "color", 5) == 0) ||
+				         (prop_name_len == 14 && memcmp(prop_name, "highlightColor", 14) == 0) ||
+				         (prop_name_len == 11 && memcmp(prop_name, "shadowColor", 11) == 0)) {
+					uint32_t uv = (uint32_t)(int32_t)dv;
+					uv &= 0x00FFFFFF;
+					value_var = makeF64((double)uv); handled = 1;
+				}
+				// knockout, inner, hideObject, preserveAlpha, clamp: boolean
+				else if ((prop_name_len == 8 && memcmp(prop_name, "knockout", 8) == 0) ||
+				         (prop_name_len == 5 && memcmp(prop_name, "inner", 5) == 0) ||
+				         (prop_name_len == 10 && memcmp(prop_name, "hideObject", 10) == 0) ||
+				         (prop_name_len == 13 && memcmp(prop_name, "preserveAlpha", 13) == 0) ||
+				         (prop_name_len == 5 && memcmp(prop_name, "clamp", 5) == 0)) {
+					int bv = (value_var.type == ACTION_STACK_VALUE_NULL ||
+					          value_var.type == ACTION_STACK_VALUE_UNDEFINED) ? 0 :
+					         (value_var.type == ACTION_STACK_VALUE_BOOLEAN) ? (int)value_var.data.numeric_value :
+					         (dv != 0.0 && !isnan(dv)) ? 1 : 0;
+					value_var.type = ACTION_STACK_VALUE_BOOLEAN;
+					value_var.data.numeric_value = bv ? 1 : 0;
+					handled = 1;
+				}
+				// type: validate "inner"/"outer"/"full", invalid → "full"
+				else if (prop_name_len == 4 && memcmp(prop_name, "type", 4) == 0) {
+					int valid = 0;
+					if (value_var.type == ACTION_STACK_VALUE_STRING) {
+						char tbuf[32];
+						u32 tlen = (u32)u16_to_utf8((const uint16_t*)value_var.data.numeric_value,
+							value_var.str_size, tbuf, sizeof(tbuf));
+						if ((tlen == 5 && memcmp(tbuf, "inner", 5) == 0) ||
+						    (tlen == 5 && memcmp(tbuf, "outer", 5) == 0) ||
+						    (tlen == 4 && memcmp(tbuf, "full", 4) == 0))
+							valid = 1;
+					}
+					if (!valid) {
+						// Invalid type → set to "full"
+						u32 u16len; uint16_t* u16 = utf8_to_u16(app_context, "full", 4, &u16len);
+						value_var.type = ACTION_STACK_VALUE_STRING;
+						value_var.str_size = u16len;
+						value_var.data.string_data.heap_ptr = u16;
+					}
+				}
+				// distance, scaleX, scaleY, bias, divisor: no validation, pass through
+				(void)handled;
+			}
 			// TextFormat instances apply per-property coercion
 			if (isTextFormatInstance(obj) && textFormatSetProperty(app_context, obj, prop_name, prop_name_len, &value_var))
 			{
@@ -39174,58 +39251,117 @@ static int invokeNativeSuperConstructor(SWFAppContext* app_context, ASFunction* 
 		v = makeF64(d); setProperty(app_context, obj, "shadowColor", 11, &v);
 		d = (num_args > 5) ? varToDoubleSimple(&args[5]) : 1.0;
 		v = makeF64(d); setProperty(app_context, obj, "shadowAlpha", 11, &v);
+		// Property order must match Flash's enumeration: quality, strength, knockout, blurX, blurY, type
+		d = (num_args > 9) ? varToDoubleSimple(&args[9]) : 1.0;
+		v = makeF64(d); setProperty(app_context, obj, "quality", 7, &v);
+		d = (num_args > 8) ? varToDoubleSimple(&args[8]) : 1.0;
+		v = makeF64(d); setProperty(app_context, obj, "strength", 8, &v);
+		d = (num_args > 11) ? varToDoubleSimple(&args[11]) : 0.0;
+		v.type = ACTION_STACK_VALUE_BOOLEAN; v.data.numeric_value = (d != 0.0) ? 1 : 0;
+		setProperty(app_context, obj, "knockout", 8, &v);
 		d = (num_args > 6) ? varToDoubleSimple(&args[6]) : 4.0;
 		v = makeF64(d); setProperty(app_context, obj, "blurX", 5, &v);
 		d = (num_args > 7) ? varToDoubleSimple(&args[7]) : 4.0;
 		v = makeF64(d); setProperty(app_context, obj, "blurY", 5, &v);
-		d = (num_args > 8) ? varToDoubleSimple(&args[8]) : 1.0;
-		v = makeF64(d); setProperty(app_context, obj, "strength", 8, &v);
-		d = (num_args > 9) ? varToDoubleSimple(&args[9]) : 1.0;
-		v = makeF64(d); setProperty(app_context, obj, "quality", 7, &v);
 		{ ActionVar sv = {0}; sv.type = ACTION_STACK_VALUE_STRING;
 		  u32 u16len; uint16_t* u16 = utf8_to_u16(app_context, "inner", 5, &u16len);
 		  sv.str_size = u16len; sv.data.string_data.heap_ptr = u16;
 		  setProperty(app_context, obj, "type", 4, &sv); }
-		d = (num_args > 11) ? varToDoubleSimple(&args[11]) : 0.0;
-		v.type = ACTION_STACK_VALUE_BOOLEAN; v.data.numeric_value = (d != 0.0) ? 1 : 0;
-		setProperty(app_context, obj, "knockout", 8, &v);
+		out_result->type = ACTION_STACK_VALUE_OBJECT;
+		out_result->data.numeric_value = (u64)obj;
+		return 1;
+	}
+	// Helper macro for filter property init
+	#define FILTER_SET_F64(pname, plen, val) { ActionVar _fv = makeF64(val); setProperty(app_context, obj, pname, plen, &_fv); }
+	#define FILTER_SET_BOOL(pname, plen, val) { ActionVar _fv = {0}; _fv.type = ACTION_STACK_VALUE_BOOLEAN; _fv.data.numeric_value = (val) ? 1 : 0; setProperty(app_context, obj, pname, plen, &_fv); }
+	#define FILTER_SET_STR(pname, plen, sval, slen) { ActionVar _fv = {0}; _fv.type = ACTION_STACK_VALUE_STRING; u32 _u16l; uint16_t* _u16 = utf8_to_u16(app_context, sval, slen, &_u16l); _fv.str_size = _u16l; _fv.data.string_data.heap_ptr = _u16; setProperty(app_context, obj, pname, plen, &_fv); }
+	#define FILTER_SET_ARR(pname, plen) { ASArray* _ea = allocArray(app_context, 0); _ea->length = 0; ActionVar _fv = {0}; _fv.type = ACTION_STACK_VALUE_ARRAY; _fv.data.numeric_value = (u64)_ea; setProperty(app_context, obj, pname, plen, &_fv); }
+
+	if (strcmp(name, "BlurFilter") == 0) {
+		if (obj->native_type == NATIVE_NONE) obj->native_type = NATIVE_FILTER;
+		// Order: blurX, blurY, quality
+		double bx = (num_args > 0) ? varToDoubleSimple(&args[0]) : 4.0;
+		double by = (num_args > 1) ? varToDoubleSimple(&args[1]) : 4.0;
+		double q  = (num_args > 2) ? varToDoubleSimple(&args[2]) : 1.0;
+		FILTER_SET_F64("blurX", 5, bx);
+		FILTER_SET_F64("blurY", 5, by);
+		FILTER_SET_F64("quality", 7, q);
 		out_result->type = ACTION_STACK_VALUE_OBJECT;
 		out_result->data.numeric_value = (u64)obj;
 		return 1;
 	}
 	if (strcmp(name, "GlowFilter") == 0) {
 		if (obj->native_type == NATIVE_NONE) obj->native_type = NATIVE_FILTER;
-		double color = (num_args > 0) ? varToDoubleSimple(&args[0]) : 16711680.0;
-		double alpha = (num_args > 1) ? varToDoubleSimple(&args[1]) : 1.0;
-		ActionVar v;
-		v = makeF64(color); setProperty(app_context, obj, "color", 5, &v);
-		v = makeF64(alpha); setProperty(app_context, obj, "alpha", 5, &v);
+		// Order: color, alpha, quality, inner, knockout, blurX, blurY, strength
+		FILTER_SET_F64("color", 5, (num_args > 0) ? varToDoubleSimple(&args[0]) : 16711680.0);
+		FILTER_SET_F64("alpha", 5, (num_args > 1) ? varToDoubleSimple(&args[1]) : 1.0);
+		FILTER_SET_F64("quality", 7, (num_args > 5) ? varToDoubleSimple(&args[5]) : 1.0);
+		FILTER_SET_BOOL("inner", 5, (num_args > 6) ? (int)varToDoubleSimple(&args[6]) : 0);
+		FILTER_SET_BOOL("knockout", 8, (num_args > 7) ? (int)varToDoubleSimple(&args[7]) : 0);
+		FILTER_SET_F64("blurX", 5, (num_args > 2) ? varToDoubleSimple(&args[2]) : 6.0);
+		FILTER_SET_F64("blurY", 5, (num_args > 3) ? varToDoubleSimple(&args[3]) : 6.0);
+		FILTER_SET_F64("strength", 8, (num_args > 4) ? varToDoubleSimple(&args[4]) : 2.0);
 		out_result->type = ACTION_STACK_VALUE_OBJECT;
 		out_result->data.numeric_value = (u64)obj;
 		return 1;
 	}
 	if (strcmp(name, "DropShadowFilter") == 0) {
 		if (obj->native_type == NATIVE_NONE) obj->native_type = NATIVE_FILTER;
-		double dist = (num_args > 0) ? varToDoubleSimple(&args[0]) : 4.0;
-		double angle = (num_args > 1) ? varToDoubleSimple(&args[1]) : 45.0;
-		ActionVar v;
-		v = makeF64(dist); setProperty(app_context, obj, "distance", 8, &v);
-		v = makeF64(angle); setProperty(app_context, obj, "angle", 5, &v);
+		// Order: distance, angle, color, alpha, quality, inner, knockout, blurX, blurY, strength, hideObject
+		FILTER_SET_F64("distance", 8, (num_args > 0) ? varToDoubleSimple(&args[0]) : 4.0);
+		FILTER_SET_F64("angle", 5, (num_args > 1) ? varToDoubleSimple(&args[1]) : 45.0);
+		FILTER_SET_F64("color", 5, (num_args > 2) ? varToDoubleSimple(&args[2]) : 0.0);
+		FILTER_SET_F64("alpha", 5, (num_args > 3) ? varToDoubleSimple(&args[3]) : 1.0);
+		FILTER_SET_F64("quality", 7, (num_args > 6) ? varToDoubleSimple(&args[6]) : 1.0);
+		FILTER_SET_BOOL("inner", 5, (num_args > 7) ? (int)varToDoubleSimple(&args[7]) : 0);
+		FILTER_SET_BOOL("knockout", 8, (num_args > 8) ? (int)varToDoubleSimple(&args[8]) : 0);
+		FILTER_SET_F64("blurX", 5, (num_args > 4) ? varToDoubleSimple(&args[4]) : 4.0);
+		FILTER_SET_F64("blurY", 5, (num_args > 5) ? varToDoubleSimple(&args[5]) : 4.0);
+		FILTER_SET_F64("strength", 8, (num_args > 9) ? varToDoubleSimple(&args[9]) : 1.0);
+		FILTER_SET_BOOL("hideObject", 10, (num_args > 10) ? (int)varToDoubleSimple(&args[10]) : 0);
+		out_result->type = ACTION_STACK_VALUE_OBJECT;
+		out_result->data.numeric_value = (u64)obj;
+		return 1;
+	}
+	if (strcmp(name, "ConvolutionFilter") == 0) {
+		if (obj->native_type == NATIVE_NONE) obj->native_type = NATIVE_FILTER;
+		// Order: matrixX, matrixY, matrix, divisor, bias, preserveAlpha, clamp, color, alpha
+		FILTER_SET_F64("matrixX", 7, (num_args > 0) ? varToDoubleSimple(&args[0]) : 0.0);
+		FILTER_SET_F64("matrixY", 7, (num_args > 1) ? varToDoubleSimple(&args[1]) : 0.0);
+		FILTER_SET_ARR("matrix", 6);
+		FILTER_SET_F64("divisor", 7, (num_args > 3) ? varToDoubleSimple(&args[3]) : 1.0);
+		FILTER_SET_F64("bias", 4, (num_args > 4) ? varToDoubleSimple(&args[4]) : 0.0);
+		FILTER_SET_BOOL("preserveAlpha", 13, 1);
+		FILTER_SET_BOOL("clamp", 5, 1);
+		FILTER_SET_F64("color", 5, 0.0);
+		FILTER_SET_F64("alpha", 5, 0.0);
 		out_result->type = ACTION_STACK_VALUE_OBJECT;
 		out_result->data.numeric_value = (u64)obj;
 		return 1;
 	}
 	if (strcmp(name, "GradientBevelFilter") == 0 || strcmp(name, "GradientGlowFilter") == 0) {
 		if (obj->native_type == NATIVE_NONE) obj->native_type = NATIVE_FILTER;
-		double dist = (num_args > 0) ? varToDoubleSimple(&args[0]) : 4.0;
-		double angle = (num_args > 1) ? varToDoubleSimple(&args[1]) : 45.0;
-		ActionVar v;
-		v = makeF64(dist); setProperty(app_context, obj, "distance", 8, &v);
-		v = makeF64(angle); setProperty(app_context, obj, "angle", 5, &v);
+		// Order: distance, angle, colors, alphas, ratios, blurX, blurY, quality, strength, knockout, type
+		FILTER_SET_F64("distance", 8, (num_args > 0) ? varToDoubleSimple(&args[0]) : 4.0);
+		FILTER_SET_F64("angle", 5, (num_args > 1) ? varToDoubleSimple(&args[1]) : 45.0);
+		FILTER_SET_ARR("colors", 6);
+		FILTER_SET_ARR("alphas", 6);
+		FILTER_SET_ARR("ratios", 6);
+		FILTER_SET_F64("blurX", 5, (num_args > 5) ? varToDoubleSimple(&args[5]) : 4.0);
+		FILTER_SET_F64("blurY", 5, (num_args > 6) ? varToDoubleSimple(&args[6]) : 4.0);
+		FILTER_SET_F64("quality", 7, (num_args > 7) ? varToDoubleSimple(&args[7]) : 1.0);
+		FILTER_SET_F64("strength", 8, (num_args > 8) ? varToDoubleSimple(&args[8]) : 1.0);
+		FILTER_SET_BOOL("knockout", 8, (num_args > 9) ? (int)varToDoubleSimple(&args[9]) : 0);
+		FILTER_SET_STR("type", 4, "inner", 5);
 		out_result->type = ACTION_STACK_VALUE_OBJECT;
 		out_result->data.numeric_value = (u64)obj;
 		return 1;
 	}
+
+	#undef FILTER_SET_F64
+	#undef FILTER_SET_BOOL
+	#undef FILTER_SET_STR
+	#undef FILTER_SET_ARR
 	if (strcmp(name, "ColorMatrixFilter") == 0) {
 		if (obj->native_type == NATIVE_NONE) obj->native_type = NATIVE_FILTER;
 		// Create matrix: from array arg, or default identity [1,0,0,0,0, 0,1,0,0,0, 0,0,1,0,0, 0,0,0,1,0]
