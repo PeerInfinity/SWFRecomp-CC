@@ -43,13 +43,13 @@ phases:
     status: complete
   - id: 8c-4
     name: "Add missing properties on existing objects"
-    status: blocked
+    status: partial
   - id: 8c-5
     name: "Property flags cleanup"
-    status: blocked
+    status: partial
   - id: 8c-6
     name: "flash.* constructor own_props property order"
-    status: blocked
+    status: complete
   - id: 8d
     name: "Instance construction differences"
     status: blocked
@@ -59,13 +59,29 @@ blockers:
     reason: "Constructor/__proto__ DONT_ENUM vs ENUMERABLE conflict"
 -->
 
-Last updated: 2026-03-14
+Last updated: 2026-03-30
 
-## Status: BLOCKED — Phases 1-8c-3 DONE, Phase 8c-2.5 DONE, Phase 8c-4+ blocked
+## Status: BLOCKED — Phases 1-8c-6 DONE, Phase 8c-4/8c-5/8d partially done, remaining items blocked
 
-**28 of 31 plan tests PASSING.** 3 tests remain with output mismatches. Remaining tests require deep property enumeration changes that risk regressions.
+**29 of 31 plan tests PASSING.** `native_objects_swf6` is a pre-existing regression (83/84) from the reverted TextField SWF6 constructor gate. 3 tests remain with output mismatches but significant progress was made (2026-03-30):
+- `global_proto_decls`: lines 1-199 now match (was 116)
+- `global_proto_decls_delete`: lines 1-187 now match (was 93)
+- `global_instance_decls`: still at ~17 (changes needed are in instance construction, not addressed yet)
 
-### Current Pass Rates (2026-03-14, local run on 20b44c31)
+### Changes made (2026-03-30)
+- **WRITABLE enforcement in FUNCTION case of actionSetMember** — textRenderer displayMode/maxLevel now correctly show READ_ONLY; prototype property on ExternalInterface is also READ_ONLY
+- **flash.automation prototype methods** — Configuration.prototype (5 methods), ActionGenerator.prototype (4 methods), StageCapture.prototype (9 methods) added
+- **flash.automation own_props order** — Configuration and ActionGenerator now use reversed LIFO order (prototype, __proto__, constructor)
+- **Package object constructor** — All flash.* package objects now have `constructor` property (= Object) with DONT_DELETE flag
+- **Package object flags** — constructor and __proto__ on package objects now have ENUMERABLE | WRITABLE (DONT_DELETE) flags
+- **ExternalInterface properties** — All 28 properties added with correct DONT_ENUM + READ_ONLY flags, including 10 new stub methods (_toJS, _objectToJS, _arrayToJS, _callIn, _useSetReturnValueHack, _callOut, _evalJS, _addCallback, _objectID, _initJS)
+- **FileReferenceList prototype methods** — browse, _listeners, removeListener, addListener, broadcastMessage (DONT_ENUM + DONT_DELETE)
+- **FileReference prototype methods** — deleteConvertedPPT, convertToPPT, cancel, download, upload, browse, _listeners, removeListener, addListener, broadcastMessage (DONT_ENUM + DONT_DELETE)
+- **Geom registration order** — flash.geom children reordered to match expected enumeration (Transform, ColorTransform, Matrix, Point, Rectangle)
+- **ensureBuiltinPrototypeProps** — Fixed __proto__/constructor insertion order on prototype objects (constructor before __proto__ for correct LIFO)
+- **Geometry constructor own_props order** — Matrix, Point, Rectangle now use reversed LIFO order
+
+### Current Pass Rates (2026-03-30)
 
 | Test | Lines | Pass Rate | Status | Notes |
 |------|-------|-----------|--------|-------|
@@ -87,7 +103,7 @@ Last updated: 2026-03-14
 | localconnection_properties | PASS | 100% | **PASS** | |
 | context_menu | 40/40 | 100% | **PASS** | |
 | context_menu_item | 42/42 | 100% | **PASS** | |
-| native_objects_swf6 | 83/84 | 99% | **FAIL** | Pre-existing: `new TextField()` returns native (should be undefined in SWF6) |
+| native_objects_swf6 | 83/84 | 99% | **FAIL** | Pre-existing: `new TextField()` returns native (should be undefined in SWF6) — SWF6 gate reverted due to textfield_props_swf6 conflict |
 | native_objects_swf7 | 84/84 | 100% | **PASS** | |
 | native_objects_swf8 | 84/84 | 100% | **PASS** | |
 | as_set_prop_flags | 79/79 | 100% | **PASS** | |
@@ -97,9 +113,9 @@ Last updated: 2026-03-14
 | swf7_global_funcs | 232/232 | 100% | **PASS** | |
 | global_swf5_6_7_8_9 | 1145/1145 | 100% | **PASS** | |
 | native_subclasses | PASS | 100% | **PASS** | |
-| global_proto_decls | 82/4487 | ~2% | **FAIL** | Phase 8c — lines 1-82 match (+5 from 8c-2.5), then cascading mismatches |
-| global_proto_decls_delete | 47/4115 | ~1% | **FAIL** | Phase 8c — first 65 lines mostly align, cascading order mismatches in flash.* |
-| global_instance_decls | 15/756 | ~2% | **FAIL** | Phase 8d — registerGeomMethod fix resolved contains() issue; remaining: DONT_DELETE on instance __proto__, missing instance properties |
+| global_proto_decls | ~199/4497 | ~4.4% | **FAIL** | Lines 1-199 match. Next blocker: Transform.prototype missing READ_ONLY properties, filter enumeration order |
+| global_proto_decls_delete | ~187/4158 | ~4.5% | **FAIL** | Lines 1-187 match. Next blocker: filter registration order, missing clone method |
+| global_instance_decls | 17/758 | ~2% | **FAIL** | Phase 8d — DONT_DELETE on instance __proto__, missing instance properties, special construction behavior |
 
 ---
 
@@ -203,7 +219,7 @@ This causes cascading misalignment in proto_decls_delete starting around line 65
 | 8c-2 | Populate own_props on every constructor | **DONE** (7714e908) |
 | 8c-2.5 | DONT_DELETE flags + actionDelete fix + flash.* stub setup | **DONE** (20b44c31) |
 | 8c-3 | Register System + flash + textRenderer on _global | **DONE** (1649ff97) — flash.automation added, sub-package order fixed |
-| 8c-4 | Add missing properties on existing objects | **BLOCKED** — needs Key constants, Mouse/Accessibility methods, StageCapture prototype methods, Object/Function.prototype constructor |
-| 8c-5 | Property flags cleanup | **BLOCKED** — READ_ONLY enforcement needs actionSetMember changes |
-| 8c-6 | flash.* constructor own_props property order | **BLOCKED** — some constructors need per-constructor insertion order |
-| 8d | Instance construction differences | **BLOCKED** — systematic READ_ONLY/DONT_DELETE on instances, needs SetMember investigation |
+| 8c-4 | Add missing properties on existing objects | **PARTIAL** — EI methods done, FileRef methods done, automation methods done. Remaining: Key constants, Mouse/Accessibility methods, Transform.prototype properties, filter clone |
+| 8c-5 | Property flags cleanup | **PARTIAL** — textRenderer READ_ONLY done, EI READ_ONLY done, package DONT_DELETE done. Remaining: filter enumeration order, geometry prototype READ_ONLY properties |
+| 8c-6 | flash.* constructor own_props property order | **DONE** — Configuration, ActionGenerator, FileRef, Matrix, Point, Rectangle all use correct order |
+| 8d | Instance construction differences | **BLOCKED** — systematic DONT_DELETE on instance __proto__, special construction returns (textRenderer→undefined, Configuration→[[AutomationConfiguration]]), missing instance properties |
