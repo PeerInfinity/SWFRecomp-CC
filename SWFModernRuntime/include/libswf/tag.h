@@ -87,7 +87,7 @@ void tagDefineSpriteEx(SWFAppContext* app_context, size_t char_id, frame_func* f
 #define tagDefineSprite_GET(_1, _2, _3, _4, _5, NAME, ...) NAME
 #define tagDefineSprite(...) tagDefineSprite_GET(__VA_ARGS__, tagDefineSprite_5, tagDefineSprite_4)(__VA_ARGS__)
 void tagDefineButton(SWFAppContext* app_context, size_t char_id, frame_func* state_funcs, size_t hit_char_id, u32 hit_transform_id, ButtonAction* actions, size_t action_count);
-void defineBitmap(size_t offset, size_t size, u32 width, u32 height);
+void defineBitmap(size_t offset, size_t size, u32 width, u32 height, u16 char_id);
 void finalizeBitmaps();
 void tagDefineSound(SWFAppContext* app_context, u16 sound_id,
     u8 format, u8 rate, u8 sample_size, u8 stereo,
@@ -146,6 +146,7 @@ size_t ng_lookupExportForMovie(const char* name, u8 movie_id);
 int ng_lookupExportVersion(const char* name);
 int ng_lookupExportVersionForMovie(const char* name, u8 movie_id);
 int32_t ng_getSoundDuration(u16 char_id);
+int ng_getBitmapMetadata(u16 char_id, size_t* out_offset, size_t* out_size, u32* out_width, u32* out_height);
 extern u8 g_current_movie_id;
 void ng_on_place_object2(SWFAppContext* app_context, size_t depth, size_t char_id);
 void ng_on_remove_object(SWFAppContext* app_context, size_t depth);

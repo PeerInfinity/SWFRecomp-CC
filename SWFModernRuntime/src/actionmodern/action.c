@@ -8162,6 +8162,9 @@ static ActionVar bitmapDataFillRect(SWFAppContext* app_context, ActionVar* args,
     int h  = rh ? (int)varToDoubleSimple(rh) : 0;
     uint32_t color = doubleToUint32(varToDoubleSimple(&args[1]));
     if (!bmp->transparent) color = color | 0xFF000000;
+    // Normalize negative width/height (Flash treats {x:15,w:-8} as {x:7,w:8})
+    if (w < 0) { x0 += w; w = -w; }
+    if (h < 0) { y0 += h; h = -h; }
     // Clip to bitmap bounds
     int x1 = x0 + w;
     int y1 = y0 + h;
@@ -9529,11 +9532,94 @@ static ActionVar bitmapDataGenerateFilterRect(SWFAppContext* app_context, Action
     return r;
 }
 
-// LoadBitmap stub (returns undefined even when disposed)
+// LoadBitmap — static method: BitmapData.loadBitmap(exportName)
+// Loads an embedded bitmap from the SWF library by export name.
 static ActionVar bitmapDataLoadBitmap(SWFAppContext* app_context, ActionVar* args, u32 arg_count, ActionVar* registers, void* this_obj)
 {
-    (void)registers; (void)args; (void)arg_count; (void)this_obj; (void)app_context;
+    (void)registers; (void)this_obj;
     ActionVar r = {0}; r.type = ACTION_STACK_VALUE_UNDEFINED;
+    if (arg_count < 1) return r;
+
+    // Get export name from first argument (UTF-16 → UTF-8)
+    char name_buf[256];
+    name_buf[0] = '\0';
+    if (args[0].type == ACTION_STACK_VALUE_STRING && args[0].str_size > 0) {
+        const uint16_t* u16ptr = varGetU16Ptr(&args[0]);
+        u16_to_utf8(u16ptr, args[0].str_size, name_buf, sizeof(name_buf));
+    } else {
+        // Coerce to string via stack
+        char sbuf[17];
+        PUSH_VAR(&args[0]);
+        convertString(app_context, sbuf);
+        ActionVar sv;
+        popVar(app_context, &sv);
+        if (sv.type == ACTION_STACK_VALUE_STRING && sv.str_size > 0) {
+            const uint16_t* u16ptr = varGetU16Ptr(&sv);
+            u16_to_utf8(u16ptr, sv.str_size, name_buf, sizeof(name_buf));
+        }
+    }
+    char* name = name_buf;
+    u32 name_len = (u32)strlen(name_buf);
+    if (!name || name_len == 0) return r;
+
+    // Look up export name → char_id
+    size_t char_id = ng_lookupExport(name);
+    if (char_id == (size_t)-1) return r;
+
+    // Look up char_id → bitmap metadata
+    size_t offset, size;
+    u32 width, height;
+    if (!ng_getBitmapMetadata((u16)char_id, &offset, &size, &width, &height)) return r;
+
+    // Access raw bitmap pixel data from generated code
+    extern u8 bitmap_data[];
+    u32* src_pixels = (u32*)(bitmap_data + offset);
+    u32 num_pixels = width * height;
+    if (size < num_pixels * 4) return r;
+
+    // Create BitmapData object
+    initBitmapDataPrototype(app_context);
+    ASObject* obj = allocObject(app_context, 4);
+    obj->native_type = NATIVE_BITMAPDATA;
+    ActionVar proto_var = {0};
+    proto_var.type = ACTION_STACK_VALUE_OBJECT;
+    proto_var.data.numeric_value = (u64) g_bitmapdata_prototype;
+    setProperty(app_context, obj, "__proto__", 9, &proto_var);
+
+    BitmapDataNative* bmp = (BitmapDataNative*) malloc(sizeof(BitmapDataNative));
+    bmp->width = (int32_t)width;
+    bmp->height = (int32_t)height;
+    bmp->transparent = 1; // loadBitmap always creates transparent bitmaps
+    bmp->disposed = 0;
+    size_t pxsize = (size_t)num_pixels * sizeof(uint32_t);
+    bmp->pixels = (uint32_t*) malloc(pxsize);
+    // Raw bitmap_data stores bytes as [R, G, B, A] per pixel.
+    // On LE, u32 reads as 0xABGR (A=byte3, B=byte2, G=byte1, R=byte0).
+    // BitmapData uses ARGB u32 (0xAARRGGBB), so swap R↔B.
+    for (u32 i = 0; i < num_pixels; i++) {
+        uint32_t px = src_pixels[i];
+        uint32_t a = (px >> 24) & 0xFF;
+        uint32_t b = (px >> 16) & 0xFF; // stored in R position (byte2)
+        uint32_t g = (px >> 8) & 0xFF;
+        uint32_t r = (px >> 0) & 0xFF;  // stored in B position (byte0)
+        bmp->pixels[i] = (a << 24) | (r << 16) | (g << 8) | b;
+    }
+    setBitmapNative(obj, bmp);
+
+    // Set "rectangle" property (read-only rect matching bitmap dimensions)
+    {
+        ActionVar rx = makeF64(0), ry = makeF64(0);
+        ActionVar rw = makeF64((double)width), rh = makeF64((double)height);
+        ASObject* rect = createRectObj(app_context, &rx, &ry, &rw, &rh);
+        if (rect) {
+            ActionVar rv = {0}; rv.type = ACTION_STACK_VALUE_OBJECT;
+            rv.data.numeric_value = (u64)rect;
+            setProperty(app_context, obj, "rectangle", 9, &rv);
+        }
+    }
+
+    r.type = ACTION_STACK_VALUE_OBJECT;
+    r.data.numeric_value = (u64) obj;
     return r;
 }
 
@@ -24434,6 +24520,17 @@ static void initFlashPackage(SWFAppContext* app_context)
 	// Initialize prototype (uses registerProtoMethod to avoid function_registry pollution)
 	initBitmapDataPrototype(app_context);
 	fc_BitmapData.prototype_obj = g_bitmapdata_prototype;
+	// Static method: BitmapData.loadBitmap(exportName)
+	{
+		static ASFunction loadbmp_func;
+		memset(&loadbmp_func, 0, sizeof(ASFunction));
+		strncpy(loadbmp_func.name, "loadBitmap", 255);
+		loadbmp_func.function_type = 2;
+		loadbmp_func.advanced_func = (Function2Ptr)bitmapDataLoadBitmap;
+		ActionVar fv = {0}; fv.type = ACTION_STACK_VALUE_FUNCTION;
+		fv.data.numeric_value = (u64)&loadbmp_func;
+		setProperty(app_context, fc_BitmapData.own_props, "loadBitmap", 10, &fv);
+	}
 	SET_CTOR_PROP(display_obj, "BitmapData", 10, fc_BitmapData);
 
 	// flash.filters (10 filter classes)
@@ -24511,7 +24608,8 @@ static void initFlashPackage(SWFAppContext* app_context)
 	fc_Rectangle.advanced_func = (Function2Ptr)rectangleConstructor;
 	fc_Rectangle.prototype_obj = g_rect_prototype;
 	retainObject(g_rect_prototype);
-	if (function_count < MAX_FUNCTIONS) function_registry[function_count++] = &fc_Rectangle;
+	// Note: Rectangle is NOT registered in function_registry — bare "new Rectangle()"
+	// doesn't work in Flash/Ruffle. Only "new flash.geom.Rectangle()" via qualified path.
 	SET_CTOR_PROP(geom_obj, "Rectangle", 9, fc_Rectangle);
 	MAKE_STUB_CTOR(fc_Transform, "Transform");
 	SET_CTOR_PROP(geom_obj, "Transform", 9, fc_Transform);
@@ -45035,7 +45133,6 @@ void actionCallMethod(SWFAppContext* app_context, char* str_buffer)
 	{
 		// Function object - handle toString, valueOf, call, apply
 		ASFunction* func = (ASFunction*) obj_var.data.numeric_value;
-
 		// Check own_props first: methods stored directly on a function's own_props
 		// take priority over Function.prototype builtins (call/apply/toString/valueOf).
 		// This is needed for e.g. ExternalInterface.call vs Function.prototype.call.

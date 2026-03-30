@@ -4521,10 +4521,37 @@ void ng_display_clear_after(SWFAppContext* app_context, size_t target_frame)
 }
 #endif // NO_GRAPHICS
 
+// Bitmap metadata registry (shared across all build modes)
+#define MAX_BITMAP_DEFS 128
+static struct { u16 char_id; size_t offset; size_t size; u32 width; u32 height; } g_bitmap_defs[MAX_BITMAP_DEFS];
+static int g_bitmap_def_count = 0;
+
+int ng_getBitmapMetadata(u16 char_id, size_t* out_offset, size_t* out_size, u32* out_width, u32* out_height)
+{
+	for (int i = 0; i < g_bitmap_def_count; i++) {
+		if (g_bitmap_defs[i].char_id == char_id) {
+			if (out_offset) *out_offset = g_bitmap_defs[i].offset;
+			if (out_size) *out_size = g_bitmap_defs[i].size;
+			if (out_width) *out_width = g_bitmap_defs[i].width;
+			if (out_height) *out_height = g_bitmap_defs[i].height;
+			return 1;
+		}
+	}
+	return 0;
+}
+
 #if !defined(NO_GRAPHICS) || defined(HEADLESS_GRAPHICS)
-void defineBitmap(size_t offset, size_t size, u32 width, u32 height)
+void defineBitmap(size_t offset, size_t size, u32 width, u32 height, u16 char_id)
 {
 	renderer_upload_bitmap(context, offset, size, width, height);
+	if (g_bitmap_def_count < MAX_BITMAP_DEFS) {
+		g_bitmap_defs[g_bitmap_def_count].char_id = char_id;
+		g_bitmap_defs[g_bitmap_def_count].offset = offset;
+		g_bitmap_defs[g_bitmap_def_count].size = size;
+		g_bitmap_defs[g_bitmap_def_count].width = width;
+		g_bitmap_defs[g_bitmap_def_count].height = height;
+		g_bitmap_def_count++;
+	}
 }
 
 void finalizeBitmaps()

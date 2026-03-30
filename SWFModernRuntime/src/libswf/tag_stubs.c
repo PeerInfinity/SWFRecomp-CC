@@ -4284,9 +4284,9 @@ MovieClip* ng_duplicateMovieClip(SWFAppContext* app_context, const char* source_
 #ifndef HEADLESS_GRAPHICS
 // In HEADLESS_GRAPHICS mode, tag.c provides real implementations that call
 // the renderer. These stubs are only needed in pure NO_GRAPHICS mode.
-void defineBitmap(size_t offset, size_t size, u32 width, u32 height)
+void defineBitmap(size_t offset, size_t size, u32 width, u32 height, u16 char_id)
 {
-	(void)offset; (void)size; (void)width; (void)height;
+	(void)offset; (void)size; (void)width; (void)height; (void)char_id;
 }
 
 void finalizeBitmaps(void)

@@ -951,7 +951,8 @@ namespace SWFRecomp
 						 << to_string(4*bitmap_start) << ", "
 						 << to_string(4*(current_bitmap_pixel - bitmap_start)) << ", "
 						 << to_string(w) << ", "
-						 << to_string(h)
+						 << to_string(h) << ", "
+						 << to_string(char_id)
 						 << ");";
 				
 				current_bitmap += 1;
@@ -1022,7 +1023,8 @@ namespace SWFRecomp
 						 << to_string(4*bitmap_start) << ", "
 						 << to_string(4*(current_bitmap_pixel - bitmap_start)) << ", "
 						 << to_string(w) << ", "
-						 << to_string(h)
+						 << to_string(h) << ", "
+						 << to_string(char_id)
 						 << ");";
 
 				current_bitmap += 1;
@@ -1139,7 +1141,8 @@ namespace SWFRecomp
 						 << to_string(4*bitmap_start) << ", "
 						 << to_string(4*(current_bitmap_pixel - bitmap_start)) << ", "
 						 << to_string(w) << ", "
-						 << to_string(h)
+						 << to_string(h) << ", "
+						 << to_string(char_id)
 						 << ");";
 
 				current_bitmap += 1;
@@ -1264,7 +1267,8 @@ namespace SWFRecomp
 						 << to_string(4*bitmap_start) << ", "
 						 << to_string(4*(current_bitmap_pixel - bitmap_start)) << ", "
 						 << to_string(w) << ", "
-						 << to_string(h)
+						 << to_string(h) << ", "
+						 << to_string(char_id)
 						 << ");";
 
 				current_bitmap += 1;
@@ -1355,7 +1359,8 @@ namespace SWFRecomp
 						 << to_string(4*bitmap_start) << ", "
 						 << to_string(4*(current_bitmap_pixel - bitmap_start)) << ", "
 						 << to_string(w) << ", "
-						 << to_string(h)
+						 << to_string(h) << ", "
+						 << to_string(char_id)
 						 << ");";
 
 				current_bitmap += 1;
