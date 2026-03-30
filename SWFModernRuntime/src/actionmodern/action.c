@@ -39956,7 +39956,12 @@ static int invokeNativeSuperConstructor(SWFAppContext* app_context, ASFunction* 
 		// Order: matrixX, matrixY, matrix, divisor, bias, preserveAlpha, clamp, color, alpha
 		FILTER_SET_F64("matrixX", 7, (num_args > 0) ? varToDoubleSimple(&args[0]) : 0.0);
 		FILTER_SET_F64("matrixY", 7, (num_args > 1) ? varToDoubleSimple(&args[1]) : 0.0);
-		FILTER_SET_ARR("matrix", 6);
+		// matrix: use args[2] if it's an array, else empty
+		if (num_args > 2 && args[2].type == ACTION_STACK_VALUE_ARRAY) {
+			setProperty(app_context, obj, "matrix", 6, &args[2]);
+		} else {
+			FILTER_SET_ARR("matrix", 6);
+		}
 		FILTER_SET_F64("divisor", 7, (num_args > 3) ? varToDoubleSimple(&args[3]) : 1.0);
 		FILTER_SET_F64("bias", 4, (num_args > 4) ? varToDoubleSimple(&args[4]) : 0.0);
 		FILTER_SET_BOOL("preserveAlpha", 13, 1);
