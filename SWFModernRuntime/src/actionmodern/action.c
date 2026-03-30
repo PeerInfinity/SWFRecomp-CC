@@ -8601,6 +8601,20 @@ static ActionVar bitmapDataCopyPixels(SWFAppContext* app_context, ActionVar* arg
     ActionVar* dpy = getProperty(dest_pt, "y", 1);
     int dx = dpx ? (int)varToDoubleSimple(dpx) : 0;
     int dy = dpy ? (int)varToDoubleSimple(dpy) : 0;
+    // Parse optional alpha bitmap (arg 3) and alpha point (arg 4)
+    BitmapDataNative* alpha_bmp = NULL;
+    int alpha_pt_x = 0, alpha_pt_y = 0;
+    if (arg_count >= 4 && args[3].type == ACTION_STACK_VALUE_OBJECT && args[3].data.numeric_value != 0) {
+        ASObject* alpha_obj = (ASObject*) args[3].data.numeric_value;
+        alpha_bmp = getBitmapNative(alpha_obj);
+        if (arg_count >= 5 && args[4].type == ACTION_STACK_VALUE_OBJECT && args[4].data.numeric_value != 0) {
+            ASObject* apt = (ASObject*) args[4].data.numeric_value;
+            ActionVar* apx = getProperty(apt, "x", 1);
+            ActionVar* apy = getProperty(apt, "y", 1);
+            alpha_pt_x = apx ? (int)varToDoubleSimple(apx) : 0;
+            alpha_pt_y = apy ? (int)varToDoubleSimple(apy) : 0;
+        }
+    }
     int mergeAlpha = 0;
     if (arg_count >= 6) mergeAlpha = (int)varToDoubleSimple(&args[5]);
     for (int sy = 0; sy < rh; sy++) {
@@ -8613,6 +8627,26 @@ static ActionVar bitmapDataCopyPixels(SWFAppContext* app_context, ActionVar* arg
             if (dst_x < 0 || dst_x >= dest_bmp->width || dst_y < 0 || dst_y >= dest_bmp->height) continue;
             uint32_t src_px = src_bmp->pixels[src_y * src_bmp->width + src_x];
             if (!dest_bmp->transparent) src_px = src_px | 0xFF000000;
+            // If alpha bitmap provided, modulate source alpha by alpha bitmap's alpha
+            if (alpha_bmp && !alpha_bmp->disposed) {
+                int abx = alpha_pt_x + sx;
+                int aby = alpha_pt_y + sy;
+                uint32_t ab_alpha = 0;
+                if (abx >= 0 && abx < alpha_bmp->width && aby >= 0 && aby < alpha_bmp->height) {
+                    uint32_t ab_px = alpha_bmp->pixels[aby * alpha_bmp->width + abx];
+                    ab_alpha = (ab_px >> 24) & 0xFF;
+                }
+                // Scale source by alpha bitmap's alpha (in premultiplied space)
+                uint32_t sa = (src_px >> 24) & 0xFF;
+                uint32_t sr = (src_px >> 16) & 0xFF;
+                uint32_t sg = (src_px >> 8) & 0xFF;
+                uint32_t sb = src_px & 0xFF;
+                sa = sa * ab_alpha / 255;
+                sr = sr * ab_alpha / 255;
+                sg = sg * ab_alpha / 255;
+                sb = sb * ab_alpha / 255;
+                src_px = (sa << 24) | (sr << 16) | (sg << 8) | sb;
+            }
             if (mergeAlpha && dest_bmp->transparent) {
                 // Source-over compositing in premultiplied alpha space
                 uint32_t dst_px = dest_bmp->pixels[dst_y * dest_bmp->width + dst_x];
@@ -9022,14 +9056,58 @@ static ActionVar bitmapDataScroll(SWFAppContext* app_context, ActionVar* args, u
     return r;
 }
 
-// Merge stub
+// merge(sourceBitmap, sourceRect, destPoint, redMult, greenMult, blueMult, alphaMult)
+// Per-channel weighted blend in unpremultiplied space: new = (src * mult + dest * (256 - mult)) / 256
 static ActionVar bitmapDataMerge(SWFAppContext* app_context, ActionVar* args, u32 arg_count, ActionVar* registers, void* this_obj)
 {
     (void)registers;
     ASObject* obj = (ASObject*) this_obj;
-    BitmapDataNative* bmp = getBitmapNative(obj);
+    BitmapDataNative* dest_bmp = getBitmapNative(obj);
     ActionVar r = {0}; r.type = ACTION_STACK_VALUE_UNDEFINED;
-    if (!bmp || bmp->disposed) { r = makeF64(-1); return r; }
+    if (!dest_bmp || dest_bmp->disposed) { r = makeF64(-1); return r; }
+    if (arg_count < 7) return r;
+    if (args[0].type != ACTION_STACK_VALUE_OBJECT) return r;
+    ASObject* src_obj = (ASObject*) args[0].data.numeric_value;
+    BitmapDataNative* src_bmp = getBitmapNative(src_obj);
+    if (!src_bmp || src_bmp->disposed) return r;
+    if (args[1].type != ACTION_STACK_VALUE_OBJECT || args[2].type != ACTION_STACK_VALUE_OBJECT) return r;
+    ASObject* src_rect = (ASObject*) args[1].data.numeric_value;
+    ASObject* dest_pt = (ASObject*) args[2].data.numeric_value;
+    if (!src_rect || !dest_pt) return r;
+    ActionVar* srx = getProperty(src_rect, "x", 1);
+    ActionVar* sry = getProperty(src_rect, "y", 1);
+    ActionVar* srw = getProperty(src_rect, "width", 5);
+    ActionVar* srh = getProperty(src_rect, "height", 6);
+    int rx = srx ? (int)varToDoubleSimple(srx) : 0;
+    int ry = sry ? (int)varToDoubleSimple(sry) : 0;
+    int rw = srw ? (int)varToDoubleSimple(srw) : 0;
+    int rh = srh ? (int)varToDoubleSimple(srh) : 0;
+    ActionVar* dpx = getProperty(dest_pt, "x", 1);
+    ActionVar* dpy = getProperty(dest_pt, "y", 1);
+    int dxo = dpx ? (int)varToDoubleSimple(dpx) : 0;
+    int dyo = dpy ? (int)varToDoubleSimple(dpy) : 0;
+    int rm = (int)varToDoubleSimple(&args[3]); if (rm < 0) rm = 0; if (rm > 256) rm = 256;
+    int gm = (int)varToDoubleSimple(&args[4]); if (gm < 0) gm = 0; if (gm > 256) gm = 256;
+    int bm = (int)varToDoubleSimple(&args[5]); if (bm < 0) bm = 0; if (bm > 256) bm = 256;
+    int am = (int)varToDoubleSimple(&args[6]); if (am < 0) am = 0; if (am > 256) am = 256;
+    for (int sy = 0; sy < rh; sy++) {
+        for (int sx = 0; sx < rw; sx++) {
+            int src_x = rx + sx, src_y = ry + sy;
+            int dst_x = dxo + sx, dst_y = dyo + sy;
+            if (src_x < 0 || src_x >= src_bmp->width || src_y < 0 || src_y >= src_bmp->height) continue;
+            if (dst_x < 0 || dst_x >= dest_bmp->width || dst_y < 0 || dst_y >= dest_bmp->height) continue;
+            uint32_t sp = unpremultiplyAlpha(src_bmp->pixels[src_y * src_bmp->width + src_x]);
+            uint32_t dp = unpremultiplyAlpha(dest_bmp->pixels[dst_y * dest_bmp->width + dst_x]);
+            uint16_t sa = (sp >> 24) & 0xFF, sr = (sp >> 16) & 0xFF, sg = (sp >> 8) & 0xFF, sb = sp & 0xFF;
+            uint16_t da = (dp >> 24) & 0xFF, dr = (dp >> 16) & 0xFF, dg = (dp >> 8) & 0xFF, db = dp & 0xFF;
+            uint8_t na = (uint8_t)((sa * am + da * (256 - am)) / 256);
+            uint8_t nr = (uint8_t)((sr * rm + dr * (256 - rm)) / 256);
+            uint8_t ng = (uint8_t)((sg * gm + dg * (256 - gm)) / 256);
+            uint8_t nb = (uint8_t)((sb * bm + db * (256 - bm)) / 256);
+            uint32_t result = ((uint32_t)na << 24) | ((uint32_t)nr << 16) | ((uint32_t)ng << 8) | (uint32_t)nb;
+            dest_bmp->pixels[dst_y * dest_bmp->width + dst_x] = premultiplyAlpha(result);
+        }
+    }
     return r;
 }
 
