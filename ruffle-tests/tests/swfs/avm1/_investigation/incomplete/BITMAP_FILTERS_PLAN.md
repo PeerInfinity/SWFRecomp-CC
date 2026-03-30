@@ -18,16 +18,16 @@ phases:
     name: "Gradient array synchronization"
     status: complete
   - id: 5
-    name: "mc.filters[0] initial read from SWF tags"
-    status: blocked
+    name: "mc.filters[0] initial read from display list"
+    status: mostly_complete
 dependencies: []
 blockers:
-  - "mc.filters[0] initial read requires SWF tag filter data storage (8 lines)"
+  - "4 lines need extended filter infrastructure (ColorMatrix/Convolution/Gradient data in display list)"
 -->
 
 Last updated: 2026-03-30
 
-## Status: 540/548 matching lines (98.5%) — BLOCKED on SWF tag filters
+## Status: 544/548 matching lines (99.3%)
 
 ### Session Progress (2026-03-30)
 
@@ -43,17 +43,23 @@ Started at: 496/548 (from CI)
 | ConvMatrix string element parsing | +3 | 536 |
 | mapPoint defensive copy (clone on read) | +2 | 538 |
 | Gradient persistent backing arrays | +2 | 540 |
-| **Total** | **+44** | **540/548** |
+| PlaceObject3 flags2 bit positions fix | +0 | 540 |
+| Filter flag extraction (MSB-first per SWF spec) | +0 | 540 |
+| mc.filters display list getter (Blur/DropShadow/Glow/Bevel) | +1 | 541 |
+| Property enumeration order per filter type | +0 | 541 |
+| float→double precision chain (display list + recompiler) | +3 | 544 |
+| BevelFilter color order (highlight first) | +0 | 544 |
+| **Total** | **+48** | **544/548** |
 
-### Remaining Failures (8 lines)
+### Remaining 4 Lines
 
-**ALL BLOCKED — mc.filters[0] initial read (lines 15, 90, 113, 156, 289, 360, 411, 484)**
+All require extended display list filter data storage:
 
-These 8 lines read the initial filters from MovieClips that have SWF-authored filters set via PlaceObject3 tags with filter data. Each expects the filter's property values (e.g., distance, angle, blurX/Y, colors/alphas/ratios for gradient filters).
+1. **Line 113 (ColorMatrixFilter)**: Needs 20-float matrix stored in display list
+2. **Line 156 (ConvolutionFilter)**: Needs variable-size matrix + divisor/bias/preserveAlpha/clamp/color/alpha
+3. **Line 411 (GradientBevelFilter)**: Needs gradient colors/alphas/ratios arrays in display list
+4. **Line 484 (GradientGlowFilter)**: Same gradient array requirement
 
-**Required infrastructure:**
-1. Recompiler: parse FILTERLIST from PlaceObject3 tags and emit filter data in tagMain.c
-2. Runtime: store filter data on the DisplayObject at placement time
-3. mc.filters getter: if no script-set filters, return SWF-authored filters
+### Also Fixed
 
-This is a substantial cross-cutting feature (recompiler + runtime + tag system). Estimated ~200 lines.
+- **native_subclasses**: 190/191 → PASS (ConvolutionFilter constructor matrix from args)
