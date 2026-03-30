@@ -3,108 +3,45 @@
 
 <!-- PLAN_META
 id: COPYPIXELS_ALPHA
-status: not_started
+status: in_progress
 phases:
   - id: 1
     name: "Implement copyPixels alpha bitmap path"
-    status: not_started
+    status: complete
   - id: 2
     name: "Implement merge() method"
-    status: not_started
+    status: complete
+  - id: 3
+    name: "Fix remaining rendering issues"
+    status: in_progress
 dependencies: []
 blockers: []
 -->
 
 Last updated: 2026-03-29
 
-## Status: NOT STARTED
+## Status: IN PROGRESS — Alpha path + merge() implemented, 188K outliers remain
 
-### Problem
+### Progress (2026-03-29)
 
-The `bitmap_data_copypixels` headless image test has 190,726 outlier pixels. The trace test passes (17/17 lines), but the image fails because the test's second half uses `copyPixels` with an **alpha bitmap** argument, which is not implemented.
+**Implemented:**
+- copyPixels alpha bitmap path: 6-argument form with alpha bitmap modulation. Source pixels have their premultiplied alpha/RGB scaled by the alpha bitmap's alpha channel.
+- merge() method: Per-channel weighted blend `(src * mult + dest * (256 - mult)) / 256` in unpremultiplied space.
 
-**Current image result:** 190,726 outliers, max diff 255
+**Results:**
+- Image outliers: 190,726 → 188,581 (small improvement)
+- Expected row 3-4 bitmaps partially rendering, but still significant mismatches
 
-### Root Cause
+### Remaining Issues
 
-The test calls (from ActionScript):
-```actionscript
-dest.copyPixels(src, new Rectangle(0,0,80,20), new Point(10, 50), alpha, new Point(0,0), merge);
-```
+The small improvement suggests the main rendering gap is NOT just the alpha bitmap path. The issue may be:
+1. Missing rows in the output suggest some test flow paths aren't executing
+2. Black areas in rendered bitmaps may indicate premultiplied alpha rendering issues
+3. The test may use additional BitmapData features beyond copyPixels/merge
 
-This is the 6-argument form of `copyPixels`:
-1. `sourceBitmap` — source pixels
-2. `sourceRect` — region to copy
-3. `destPoint` — where to write
-4. `alphaBitmap` — alpha source for blending
-5. `alphaPoint` — offset into alpha bitmap
-6. `mergeAlpha` — whether to blend with existing dest pixels
+### Key Code Locations
 
-Our `bitmapDataCopyPixels` at `action.c:8567` only handles args 0-2 (source, rect, point) and arg 5 (mergeAlpha flag). **Args 3-4 (alpha bitmap + point) are completely ignored.** When an alpha bitmap is provided, the copy should use the alpha bitmap's pixel values to modulate the source before writing to dest.
-
-### Algorithm
-
-When `alphaBitmap` is provided (Ruffle reference: `copy_pixels_with_alpha_source` in `operations.rs`):
-
-For each pixel in sourceRect:
-1. Read source pixel (premultiplied ARGB)
-2. Read alpha bitmap pixel at corresponding position + alphaPoint offset
-3. Extract alpha channel from alpha bitmap pixel
-4. Multiply source pixel's alpha by the alpha bitmap's alpha: `final_alpha = src_alpha * ab_alpha / 255`
-5. Scale source RGB by the same factor
-6. If `mergeAlpha` is true: composite over destination using source-over blending
-7. If `mergeAlpha` is false: replace destination pixel directly
-
-### Also Needed: merge() Method
-
-The `bitmapDataMerge` function at `action.c:9019` is also a stub. While it's NOT the cause of the copypixels image failure, it should be implemented for completeness.
-
-**merge() algorithm** (per pixel, per channel):
-```
-new_channel = (src_channel * multiplier + dest_channel * (256 - multiplier)) / 256
-```
-
-Parameters: sourceBitmap, sourceRect, destPoint, redMult, greenMult, blueMult, alphaMult (all 0-256 range).
-
-Works in unmultiplied alpha space. Uses u16 intermediates to avoid overflow.
-
-### Implementation Steps
-
-#### Step 1: copyPixels alpha bitmap path (~60 lines)
-
-In `bitmapDataCopyPixels`, after the existing arg parsing:
-1. Check if `arg_count >= 4` and `args[3].type == ACTION_STACK_VALUE_OBJECT`
-2. Extract alpha BitmapData from args[3]
-3. Parse alpha point from args[4] (default Point(0,0))
-4. In the pixel loop, for each pixel:
-   - Read alpha bitmap pixel at `(alpha_pt_x + sx, alpha_pt_y + sy)`
-   - Extract alpha channel: `ab_alpha = (ab_pixel >> 24) & 0xFF`
-   - Modulate source: scale src_alpha and src_rgb by `ab_alpha / 255`
-   - If mergeAlpha: composite over dest (source-over in premul space)
-   - Else: write directly
-
-#### Step 2: merge() method (~50 lines)
-
-1. Parse 7 arguments (source, rect, point, rMult, gMult, bMult, aMult)
-2. Clamp multipliers to [0, 256]
-3. For each pixel in region:
-   - Unpremultiply source and dest
-   - Blend: `new = (src * mult + dest * (256 - mult)) / 256` per channel
-   - Premultiply result
-   - Write to dest
-
-### Key Ruffle Reference
-
-| File | Function | Lines |
-|------|----------|-------|
-| `~/CC/ruffle/core/src/bitmap/operations.rs` | `copy_pixels_with_alpha_source` | ~1670-1765 |
-| `~/CC/ruffle/core/src/bitmap/operations.rs` | `merge` | ~955-1039 |
-| `~/CC/ruffle/core/src/avm1/globals/bitmap_data.rs` | `copy_pixels` (AVM1 entry) | ~548-620 |
-
-### Estimated Complexity
-
-Medium — ~110 lines total (60 for alpha path + 50 for merge).
-
-### Expected Impact
-
-Fixing the alpha bitmap path should fix most of the 190,726 outliers in the copypixels image test. The merge() method would fix any tests that call merge() directly (none currently identified as failing).
+| Component | File | Description |
+|-----------|------|-------------|
+| copyPixels alpha path | `action.c:bitmapDataCopyPixels` | 6-arg form with alpha bitmap |
+| merge() | `action.c:bitmapDataMerge` | Per-channel weighted blend |
