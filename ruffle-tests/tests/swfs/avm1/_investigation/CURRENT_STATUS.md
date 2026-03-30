@@ -1,13 +1,20 @@
 # Current Ruffle Test Status
 
-Last updated: 2026-03-28
+Last updated: 2026-03-29
 
 ## Quick Summary
 
-- **Pass rate (CI, last run)**: 562/574 (97.9%) filtered (CI run on 04572868, 12 filtered failures)
-- **Image test baseline**: **8/31 strict image match** (0-outlier AND 0-max-diff). **10/31 tolerance pass** (within test.toml limits). Strict passes: focusrect_focuslost, focusrect_mouse_swf8/swf9, focusrect_swf6, frame_size_translated_neg/pos, mask_with_drawing, movieclip_create_text_field. Tolerance-only: display_object_properties (max_diff=79), mask_reapply (max_diff=1).
-- **Main failure types**: output_mismatch (12)
+- **Pass rate (CI, last run)**: 564/620 (91.0%) raw, 563/569 (98.9%) filtered (6 filtered failures)
+- **Image test baseline**: **11/31 strict image match** (+3: bitmap_data_perlinnoise, bitmap_data_pixeldissolve_image, bitmapdata_applyfilter_colormatrix). **10/31 tolerance pass** (within test.toml limits).
+- **Main failure types**: output_mismatch (54), runtime_segfault (1), timeout (1)
 - **Known regressions**: None.
+- **Latest fixes (2026-03-29)**:
+  - bitmap_data_pixeldissolve PASS (1075/1075) — Feistel network PRNG implementation
+  - bitmap_data_perlinnoise image PASS (0 outliers) — W3C SVG feTurbulence port
+  - bitmap_data_pixeldissolve_image image PASS (0 outliers) — same Feistel implementation
+  - bitmapdata_applyfilter_colormatrix image PASS (0 outliers, max diff 1) — ColorMatrixFilter constructor fix
+  - bitmap_filters SEGFAULT→MISMATCH (~496/548) — filter clone, property validation, mc.filters, NULL stub fix
+  - Added --asan flag to verify_output.py for crash debugging
 - **Latest fixes (2026-03-28)**:
   - movieclip_create_text_field image PASS (0 outliers) — fixed createTextField negative dimension rendering
   - Headless glyph rendering pipeline — device font tessellation via bundled Noto Sans TTF + stb_truetype
@@ -35,8 +42,9 @@ Last updated: 2026-03-28
 | Test | Status | Notes |
 |------|--------|-------|
 | timeout | timeout | Infinite loop — needs script execution timeout mechanism |
+| netstream_play_flv_screen | segfault | FLV playback crash |
 
-All previous crashes/segfaults/runtime_errors have been fixed (funky_function_calls, goto_methods, native_objects_swf6/7/8, movieclip_invalid_get_bounds_6/7).
+All previous crashes/segfaults/runtime_errors have been fixed (funky_function_calls, goto_methods, native_objects_swf6/7/8, movieclip_invalid_get_bounds_6/7, bitmap_filters).
 
 ## Near-Passing Tests
 

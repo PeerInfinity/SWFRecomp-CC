@@ -40,7 +40,7 @@ Last updated: 2026-03-29
 
 ## Status: IN PROGRESS — Phases 1-4 done (no crash), property validation remaining
 
-**CI result (last):** 84/548 lines match. All 548 lines produced. Expected to improve significantly with property validation + constructor defaults now implemented.
+**Local result:** 52 diff lines (down from 973). ~496/548 lines match. All 548 lines produced, no crash.
 
 ### Problem (original)
 
@@ -54,10 +54,11 @@ Last updated: 2026-03-29
 
 Diagnosed using new `--asan` flag added to `verify_output.py`.
 
-### Remaining issues (Phases 6-7)
-1. **mc.filters getter/setter (Phase 6):** Reading/writing the filters array on MovieClips — `clip.filters[0]` returns embedded filter, `clip.filters = [f]` sets filters. Affects ~20 lines.
-2. **ColorMatrixFilter matrix setter (Phase 7):** Setting matrix to partial array should pad to 20 elements with NaN; setting to non-array keeps old matrix. Affects ~30 lines.
-3. **Angle precision:** Default 45° shows as 45.0, but Ruffle's expected output has 44.9999999772279 (f64 radians round-trip). This affects every line containing an angle property. Not fixable without matching Ruffle's internal radians storage.
+### Remaining 52 diff lines (diminishing returns)
+1. **Embedded SWF filter data (~16 lines):** `mc.filters[0]` for embedded filters returns undefined — needs recompiler to emit PlaceObject3 filter data. Not fixable in runtime.
+2. **Angle precision (~20 lines):** 45.0 vs 44.9999999772279 — documented in RUFFLE_VS_FLASH_DIFFERENCES.md. Not fixable (our value matches Flash).
+3. **ConvolutionFilter duck-typed matrix (~10 lines):** Flash iterates strings/objects via `.length` + indexed access for matrix setter. Complex AS2 runtime eval needed.
+4. **Gradient array validation (~6 lines):** colors/alphas/ratios setters need sync (all three resized to max length), color masking, ratio clamping.
 
 ### Root Cause
 
@@ -137,9 +138,11 @@ registerGeomMethod(&g_filter_clone_methods[0], "clone", (Function2Ptr)filterClon
 
 ### Estimated Complexity
 
-**Done:** ~290 lines (clone + filter init + SEGFAULT fix + NewMethod path + property validation + constructor defaults + enumeration order)
-**Remaining:** Medium — ~90 lines for mc.filters and matrix setter.
+**Done:** ~450 lines of implementation across 12 commits (clone, constructor defaults, SEGFAULT fix, NewMethod path, property validation, mc.filters, matrix setter, ConvolutionFilter sizing, array instanceof)
+**Remaining:** Low priority — 52 diff lines from embedded filter data (recompiler), angle precision (Ruffle artifact), and complex AS2 duck-typing.
 
 ### Expected Impact
 
-Angle precision prevents most filter property dump lines from matching exactly (45.0 vs 44.9999999772279). The test may need to be added to ACCEPTED_DIFFS or RUFFLE_VS_FLASH_DIFFERENCES if this precision mismatch is inherent to Ruffle's f64 radians round-trip.
+The test went from SEGFAULT (78/548) to ~496/548 matching. The 52 remaining diffs are from:
+- Unfixable: embedded filter data (recompiler), angle precision (documented Ruffle difference)
+- Low priority: ConvolutionFilter duck-typed matrix, gradient array validation
