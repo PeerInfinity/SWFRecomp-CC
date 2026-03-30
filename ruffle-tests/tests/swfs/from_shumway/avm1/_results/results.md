@@ -1,10 +1,10 @@
 # Ruffle Test Results (Unfiltered)
 
-**Date**: 2026-03-30 00:01 UTC
+**Date**: 2026-03-30 02:35 UTC
 
-**Git SHA**: `35ae511427`
+**Git SHA**: `f8583a19cb`
 
-**Run Duration**: 6m 24s
+**Run Duration**: 6m 28s
 
 ## Summary
 
@@ -14,8 +14,8 @@
 | Passing | **12** (52.2%) |
 | Failing | 11 |
 | Total expected lines | 311 |
-| Matching lines | 115 (37.0%) |
-| Mismatched lines | 196 |
+| Matching lines | 118 (37.9%) |
+| Mismatched lines | 193 |
 
 ### Failure Breakdown
 
@@ -30,18 +30,18 @@
 
 | # | Test | Lines | Duration | Notes |
 |---|------|-------|----------|-------|
-| 1 | `callee` | 2 | 15.9s |  |
-| 2 | `depth` | 6 | 16.7s |  |
+| 1 | `callee` | 2 | 17.1s |  |
+| 2 | `depth` | 6 | 16.6s |  |
 | 3 | `externalinterface` | 4 | 16.3s |  |
-| 4 | `label` | 4 | 16.6s |  |
-| 5 | `levels` | 9 | 16.1s |  |
+| 4 | `label` | 4 | 18.0s |  |
+| 5 | `levels` | 9 | 16.6s |  |
 | 6 | `loadevent` | 9 | 17.3s |  |
-| 7 | `lookup` | 3 | 16.0s |  |
-| 8 | `mouse-transparency` | 1 | 16.1s |  |
-| 9 | `operations` | 13 | 16.5s |  |
-| 10 | `rollover` | 4 | 16.1s |  |
-| 11 | `super` | 11 | 16.0s |  |
-| 12 | `text-bind` | 0 | 15.9s |  |
+| 7 | `lookup` | 3 | 16.1s |  |
+| 8 | `mouse-transparency` | 1 | 16.7s |  |
+| 9 | `operations` | 13 | 16.1s |  |
+| 10 | `rollover` | 4 | 16.6s |  |
+| 11 | `super` | 11 | 16.8s |  |
+| 12 | `text-bind` | 0 | 16.1s |  |
 
 ## Near-Passing Tests
 
@@ -67,7 +67,7 @@ No segfaults.
 
 | # | Test | Detail | Duration | Notes |
 |---|------|--------|----------|-------|
-| 1 | `watch` | exit code -6 | 18.3s |  |
+| 1 | `watch` | exit code -6 | 20.4s |  |
 
 ## Timeouts
 
@@ -86,6 +86,6 @@ No timeouts.
 | 5 | `hitarea` | 50.0% | 2/4 | 3 | 4 |  |
 | 6 | `target` | 22.7% | 5/22 | 22 | 18 |  |
 | 7 | `moviecliploader` | 14.3% | 1/7 | 6 | 7 |  |
-| 8 | `array` | 0.0% | 0/7 | 7 | 7 |  |
-| 9 | `filters` | 0.0% | 0/149 | 85 | 149 |  |
+| 8 | `filters` | 2.0% | 3/149 | 85 | 149 |  |
+| 9 | `array` | 0.0% | 0/7 | 7 | 7 |  |
 | 10 | `nested-button` | 0.0% | 0/1 | 0 | 1 |  |
