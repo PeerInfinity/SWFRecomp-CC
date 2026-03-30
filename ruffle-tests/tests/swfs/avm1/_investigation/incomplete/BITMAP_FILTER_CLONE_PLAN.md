@@ -3,7 +3,7 @@
 
 <!-- PLAN_META
 id: BITMAP_FILTER_CLONE
-status: not_started
+status: incomplete
 phases:
   - id: 1
     name: "Generic filter clone function"
@@ -15,13 +15,19 @@ phases:
     name: "Filter constructor default properties"
     status: complete
   - id: 4
+    name: "Fix SEGFAULT (NULL stub constructor call)"
+    status: complete
+  - id: 5
     name: "Property validation (angle, color, alpha, quality, strength, blur)"
     status: not_started
-  - id: 5
+  - id: 6
     name: "mc.filters getter/setter"
     status: not_started
-  - id: 6
+  - id: 7
     name: "ColorMatrixFilter matrix setter validation"
+    status: not_started
+  - id: 8
+    name: "Property enumeration order"
     status: not_started
 dependencies: []
 blockers: []
@@ -29,26 +35,27 @@ blockers: []
 
 Last updated: 2026-03-29
 
-## Status: IN PROGRESS — clone implemented, property validation needed
+## Status: IN PROGRESS — Phases 1-4 done (no crash), property validation remaining
 
-### Problem
+**CI result:** 84/548 lines match (was SEGFAULT, now output_mismatch). All 548 lines produced.
 
-`bitmap_filters` test SEGFAULTs at line 10 when calling `.clone()` on a BevelFilter object. No filter classes have a `clone()` method, causing method lookup to return undefined and subsequent property access to crash.
+### Problem (original)
 
-The test exercises `.clone()` on all 9 filter types (BevelFilter, BlurFilter, ColorMatrixFilter, ConvolutionFilter, DisplacementMapFilter, DropShadowFilter, GlowFilter, GradientBevelFilter, GradientGlowFilter), followed by property access on the cloned objects.
-
-**Current trace:** SEGFAULT at line ~118 (output through `new ColorMatrixFilter(null)` trace, crash during `traceAllProps` for-in enumeration on filter with array matrix property)
+`bitmap_filters` test SEGFAULTs when calling `.clone()` on filter objects. The test exercises clone, property validation, mc.filters, and all 9 filter types.
 
 ### Progress (2026-03-29)
 
-**Phase 1-3 DONE:** Clone implemented + filter constructors now initialize all default properties via `invokeNativeSuperConstructor` from the new() path. BevelFilter expanded to all 12 properties.
+**Phase 1-3:** Clone implemented + filter constructors initialize all default properties via `invokeNativeSuperConstructor` from both NewObject and NewMethod paths. BevelFilter expanded to all 12 properties. ColorMatrixFilter creates default identity matrix.
 
-**Remaining issues:**
-1. **SEGFAULT at line ~118:** Crash during `traceAllProps(new fClass(null))` — the for-in enumeration on a ColorMatrixFilter object with an array "matrix" property crashes. The constructor creates a valid 20-element matrix array, but iterating the object's properties (which include the array) causes a SEGFAULT. Root cause likely in for-in enumeration of ARRAY-type property values or `instanceof Array` check on the array
-2. **Property order:** Filter properties enumerate in different order than Flash (e.g., `blurX,blurY` before `strength,quality` in ours, after in Flash)
-3. **No property validation:** angle wrapping (360→0), color masking (0xFFFFFF), alpha clamping (0-1 with 8-bit quantization), quality (0-15), strength (0-255), blur (0-255)
-4. **mc.filters getter/setter:** Reading/writing the filters array on MovieClips
-5. **String type property:** "type" should only accept "inner"/"outer"/"full"
+**Phase 4 (SEGFAULT fix):** Root cause was NULL function pointer call in `actionNewMethod` blank-method-name path — stub constructors (function_type=1) have `simple_func=NULL`, and the code called it without a NULL check. Fixed with a guard. Also fixed off-by-one register allocation in generated test code (`regs[7]` with only 7 elements).
+
+Diagnosed using new `--asan` flag added to `verify_output.py`.
+
+### Remaining issues (Phases 5-8)
+1. **Property validation (Phase 5):** angle wrapping (fmod 360), color masking (& 0xFFFFFF), alpha clamping (0-1 with 8-bit quantization: `round(v*255)/255`), quality (int clamp 0-15), strength (clamp 0-255), blur (clamp 0-255), knockout/inner/hideObject (boolean coercion), type string ("inner"/"outer"/"full" validation)
+2. **mc.filters getter/setter (Phase 6):** Reading/writing the filters array on MovieClips — `clip.filters[0]` returns embedded filter, `clip.filters = [f]` sets filters
+3. **ColorMatrixFilter matrix setter (Phase 7):** Setting matrix to partial array should pad to 20 elements with NaN; setting to non-array keeps old matrix
+4. **Property enumeration order (Phase 8):** Filter properties must enumerate in Flash's specific order (not insertion order)
 
 ### Root Cause
 
@@ -128,13 +135,13 @@ registerGeomMethod(&g_filter_clone_methods[0], "clone", (Function2Ptr)filterClon
 
 ### Estimated Complexity
 
-**Done:** ~87 lines (clone + filter init)
+**Done:** ~130 lines (clone + filter init + SEGFAULT fix + NewMethod filter init)
 **Remaining:** High — ~300+ lines needed for:
-- ColorMatrixFilter matrix setter with NaN padding (~40 lines)
 - Property validation per filter type via addProperty-style getters/setters (~150 lines)
 - mc.filters getter/setter (~50 lines)
+- ColorMatrixFilter matrix setter with NaN padding (~40 lines)
 - Property enumeration order fix (~30 lines)
 
 ### Expected Impact
 
-With all phases complete: ~500+ of 548 lines should pass. Current: 87/122 match before crash.
+With all phases complete: ~500+ of 548 lines should pass. Current: 84/548 match (CI), all lines produced.
