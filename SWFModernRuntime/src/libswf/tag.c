@@ -4171,9 +4171,9 @@ void tagPlaceObject3(SWFAppContext* app_context, size_t depth, size_t char_id,
 }
 
 void tagSetFilter(SWFAppContext* app_context, size_t depth,
-    u8 type, float blur_x, float blur_y, u8 quality, u8 flags,
-    float r, float g, float b, float a, float strength,
-    float angle, float distance)
+    u8 type, double blur_x, double blur_y, u8 quality, u8 flags,
+    double r, double g, double b, double a, double strength,
+    double angle, double distance)
 {
 	(void)app_context;
 	if (depth <= max_depth)
@@ -4194,7 +4194,7 @@ void tagSetFilter(SWFAppContext* app_context, size_t depth,
 }
 
 void tagSetFilterHighlight(SWFAppContext* app_context, size_t depth,
-    float r, float g, float b, float a)
+    double r, double g, double b, double a)
 {
 	(void)app_context;
 	if (depth <= max_depth)

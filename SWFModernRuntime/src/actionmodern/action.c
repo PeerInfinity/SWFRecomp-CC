@@ -35841,60 +35841,75 @@ void actionGetMember(SWFAppContext* app_context)
 						ActionVar pv = {0}; pv.type = ACTION_STACK_VALUE_OBJECT;
 						pv.data.numeric_value = (u64)proto;
 						setPropertyWithFlags(app_context, fobj, "__proto__", 9, &pv, PROPERTY_FLAGS_DONTENUM);
-						// Populate properties from display list data
+						// Populate properties in Flash enumeration order per filter type
 						ActionVar v;
 						double angle_deg = (double)fangle * 180.0 / 3.14159265358979323846;
-						if (ftype == 4 || ftype == 2) { // Bevel or DropShadow
+						// Decode flags per filter type
+						int inner_flag = 0, knockout_flag = 0, on_top = 0;
+						if (ftype == 4) { // Bevel flags: bits 4-7
+							inner_flag = (fflags >> 3) & 1;
+							knockout_flag = (fflags >> 2) & 1;
+							on_top = fflags & 1;
+						} else if (ftype == 2 || ftype == 3) { // DropShadow/Glow flags: bits 5-7
+							inner_flag = (fflags >> 2) & 1;
+							knockout_flag = (fflags >> 1) & 1;
+						}
+						if (ftype == 4) {
+							// BevelFilter order: distance, angle, highlightColor, highlightAlpha,
+							//   shadowColor, shadowAlpha, quality, strength, knockout, blurX, blurY, type
 							v = makeF64((double)fdistance); setProperty(app_context, fobj, "distance", 8, &v);
 							v = makeF64(angle_deg); setProperty(app_context, fobj, "angle", 5, &v);
-						}
-						if (ftype == 2 || ftype == 3) { // DropShadow or Glow: color (RGBA)
-							uint32_t color = ((uint32_t)(fr*255+0.5f)<<16)|((uint32_t)(fg*255+0.5f)<<8)|(uint32_t)(fb*255+0.5f);
-							v = makeF64((double)color); setProperty(app_context, fobj, "color", 5, &v);
-							v = makeF64((double)fa); setProperty(app_context, fobj, "alpha", 5, &v);
-						}
-						if (ftype == 4) { // Bevel: highlight + shadow colors
 							uint32_t hc = ((uint32_t)(fhr*255+0.5f)<<16)|((uint32_t)(fhg*255+0.5f)<<8)|(uint32_t)(fhb*255+0.5f);
 							v = makeF64((double)hc); setProperty(app_context, fobj, "highlightColor", 14, &v);
 							v = makeF64((double)fha); setProperty(app_context, fobj, "highlightAlpha", 14, &v);
 							uint32_t sc = ((uint32_t)(fr*255+0.5f)<<16)|((uint32_t)(fg*255+0.5f)<<8)|(uint32_t)(fb*255+0.5f);
 							v = makeF64((double)sc); setProperty(app_context, fobj, "shadowColor", 11, &v);
 							v = makeF64((double)fa); setProperty(app_context, fobj, "shadowAlpha", 11, &v);
-						}
-						v = makeF64((double)fblur_x); setProperty(app_context, fobj, "blurX", 5, &v);
-						v = makeF64((double)fblur_y); setProperty(app_context, fobj, "blurY", 5, &v);
-						v = makeF64((double)fquality); setProperty(app_context, fobj, "quality", 7, &v);
-						if (ftype != 1) { // BlurFilter has no strength
+							v = makeF64((double)fquality); setProperty(app_context, fobj, "quality", 7, &v);
 							v = makeF64((double)fstrength); setProperty(app_context, fobj, "strength", 8, &v);
-						}
-						// Flags decoding — fflags is the UPPER bits from the recompiler:
-						// For DropShadow/Glow (bits 5-7 of original): bit0=CompositeSource, bit1=Knockout, bit2=Inner
-						// For Bevel (bits 4-7 of original): bit0=OnTop, bit1=CompositeSource, bit2=Knockout, bit3=Inner
-						int inner_flag, knockout_flag;
-						if (ftype == 4) { // Bevel: flags are bits 4-7
-							inner_flag = (fflags >> 3) & 1;   // bit 7 of original = bit 3 of extracted
-							knockout_flag = (fflags >> 2) & 1; // bit 6 of original = bit 2 of extracted
-							int on_top = fflags & 1;           // bit 4 of original = bit 0 of extracted
+							v.type = ACTION_STACK_VALUE_BOOLEAN;
+							v.data.numeric_value = knockout_flag; setProperty(app_context, fobj, "knockout", 8, &v);
+							v = makeF64((double)fblur_x); setProperty(app_context, fobj, "blurX", 5, &v);
+							v = makeF64((double)fblur_y); setProperty(app_context, fobj, "blurY", 5, &v);
 							const char* type_str = (inner_flag && on_top) ? "full" : (inner_flag ? "inner" : "outer");
 							u32 u16len; uint16_t* u16p = utf8_to_u16(app_context, type_str, strlen(type_str), &u16len);
 							v.type = ACTION_STACK_VALUE_STRING; v.str_size = u16len;
 							v.data.string_data.heap_ptr = u16p;
 							setProperty(app_context, fobj, "type", 4, &v);
-						} else { // DropShadow/Glow: flags are bits 5-7
-							inner_flag = (fflags >> 2) & 1;   // bit 7 of original = bit 2 of extracted
-							knockout_flag = (fflags >> 1) & 1; // bit 6 of original = bit 1 of extracted
-						}
-						v.type = ACTION_STACK_VALUE_BOOLEAN;
-						if (ftype != 1) { // BlurFilter has no inner/knockout
+						} else if (ftype == 2) {
+							// DropShadowFilter order: distance, angle, color, alpha, quality, inner,
+							//   knockout, blurX, blurY, strength, hideObject
+							v = makeF64((double)fdistance); setProperty(app_context, fobj, "distance", 8, &v);
+							v = makeF64(angle_deg); setProperty(app_context, fobj, "angle", 5, &v);
+							uint32_t color = ((uint32_t)(fr*255+0.5f)<<16)|((uint32_t)(fg*255+0.5f)<<8)|(uint32_t)(fb*255+0.5f);
+							v = makeF64((double)color); setProperty(app_context, fobj, "color", 5, &v);
+							v = makeF64((double)fa); setProperty(app_context, fobj, "alpha", 5, &v);
+							v = makeF64((double)fquality); setProperty(app_context, fobj, "quality", 7, &v);
+							v.type = ACTION_STACK_VALUE_BOOLEAN;
 							v.data.numeric_value = inner_flag; setProperty(app_context, fobj, "inner", 5, &v);
 							v.data.numeric_value = knockout_flag; setProperty(app_context, fobj, "knockout", 8, &v);
-						}
-						if (ftype == 2) { // DropShadow: hideObject
-							v.data.numeric_value = (fflags >> 0) & 1; // CompositeSource = bit 5 = bit 0 extracted...
-							// Actually hideObject is NOT CompositeSource. In Flash, hideObject is separate.
-							// For now set false as default
-							v.data.numeric_value = 0;
-							setProperty(app_context, fobj, "hideObject", 10, &v);
+							v = makeF64((double)fblur_x); setProperty(app_context, fobj, "blurX", 5, &v);
+							v = makeF64((double)fblur_y); setProperty(app_context, fobj, "blurY", 5, &v);
+							v = makeF64((double)fstrength); setProperty(app_context, fobj, "strength", 8, &v);
+							v.type = ACTION_STACK_VALUE_BOOLEAN;
+							v.data.numeric_value = 0; setProperty(app_context, fobj, "hideObject", 10, &v);
+						} else if (ftype == 3) {
+							// GlowFilter order: color, alpha, quality, inner, knockout, blurX, blurY, strength
+							uint32_t color = ((uint32_t)(fr*255+0.5f)<<16)|((uint32_t)(fg*255+0.5f)<<8)|(uint32_t)(fb*255+0.5f);
+							v = makeF64((double)color); setProperty(app_context, fobj, "color", 5, &v);
+							v = makeF64((double)fa); setProperty(app_context, fobj, "alpha", 5, &v);
+							v = makeF64((double)fquality); setProperty(app_context, fobj, "quality", 7, &v);
+							v.type = ACTION_STACK_VALUE_BOOLEAN;
+							v.data.numeric_value = inner_flag; setProperty(app_context, fobj, "inner", 5, &v);
+							v.data.numeric_value = knockout_flag; setProperty(app_context, fobj, "knockout", 8, &v);
+							v = makeF64((double)fblur_x); setProperty(app_context, fobj, "blurX", 5, &v);
+							v = makeF64((double)fblur_y); setProperty(app_context, fobj, "blurY", 5, &v);
+							v = makeF64((double)fstrength); setProperty(app_context, fobj, "strength", 8, &v);
+						} else { // ftype == 1: BlurFilter
+							// BlurFilter order: blurX, blurY, quality
+							v = makeF64((double)fblur_x); setProperty(app_context, fobj, "blurX", 5, &v);
+							v = makeF64((double)fblur_y); setProperty(app_context, fobj, "blurY", 5, &v);
+							v = makeF64((double)fquality); setProperty(app_context, fobj, "quality", 7, &v);
 						}
 						// Wrap in array
 						ASArray* farr = allocArray(app_context, 1);

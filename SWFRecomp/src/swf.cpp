@@ -2882,13 +2882,13 @@ namespace SWFRecomp
 
 				// Filter data (first visual filter wins)
 				u8 parsed_filter_type = 0;
-				float parsed_blur_x = 0, parsed_blur_y = 0;
+				double parsed_blur_x = 0, parsed_blur_y = 0;
 				u8 parsed_filter_quality = 1;
 				u8 parsed_filter_flags = 0;
-				float parsed_filter_r = 0, parsed_filter_g = 0, parsed_filter_b = 0, parsed_filter_a = 0;
-				float parsed_filter_strength = 1.0f;
-				float parsed_filter_angle = 0, parsed_filter_distance = 0;
-				float parsed_highlight_r = 0, parsed_highlight_g = 0, parsed_highlight_b = 0, parsed_highlight_a = 0;
+				double parsed_filter_r = 0, parsed_filter_g = 0, parsed_filter_b = 0, parsed_filter_a = 0;
+				double parsed_filter_strength = 1.0;
+				double parsed_filter_angle = 0, parsed_filter_distance = 0;
+				double parsed_highlight_r = 0, parsed_highlight_g = 0, parsed_highlight_b = 0, parsed_highlight_a = 0;
 
 				if (is_po3 && has_filter_list)
 				{
@@ -2911,15 +2911,15 @@ namespace SWFRecomp
 								u8 ds_flags_byte = *(u8*)cur_pos; cur_pos += 1;
 								if (parsed_filter_type == 0) {
 									parsed_filter_type = 2;
-									parsed_filter_r = ds_r / 255.0f;
-									parsed_filter_g = ds_g / 255.0f;
-									parsed_filter_b = ds_b / 255.0f;
-									parsed_filter_a = ds_a / 255.0f;
-									parsed_blur_x = (float)(s32)ds_blur_x_raw / 65536.0f;
-									parsed_blur_y = (float)(s32)ds_blur_y_raw / 65536.0f;
-									parsed_filter_angle = (float)(s32)ds_angle_raw / 65536.0f;
-									parsed_filter_distance = (float)(s32)ds_dist_raw / 65536.0f;
-									parsed_filter_strength = (float)ds_strength_raw / 256.0f;
+									parsed_filter_r = ds_r / 255.0;
+									parsed_filter_g = ds_g / 255.0;
+									parsed_filter_b = ds_b / 255.0;
+									parsed_filter_a = ds_a / 255.0;
+									parsed_blur_x = (double)(s32)ds_blur_x_raw / 65536.0;
+									parsed_blur_y = (double)(s32)ds_blur_y_raw / 65536.0;
+									parsed_filter_angle = (double)(s32)ds_angle_raw / 65536.0;
+									parsed_filter_distance = (double)(s32)ds_dist_raw / 65536.0;
+									parsed_filter_strength = (double)ds_strength_raw / 256.0;
 									parsed_filter_quality = ds_flags_byte & 0x1F;  // bits 0-4
 									if (parsed_filter_quality == 0) parsed_filter_quality = 1;
 									parsed_filter_flags = (ds_flags_byte >> 5) & 0x07;  // bits 5-7
@@ -2933,8 +2933,8 @@ namespace SWFRecomp
 								u8 bl_flags = *(u8*)cur_pos; cur_pos += 1;
 								if (parsed_filter_type == 0) {
 									parsed_filter_type = 1;
-									parsed_blur_x = (float)(s32)bl_x_raw / 65536.0f;
-									parsed_blur_y = (float)(s32)bl_y_raw / 65536.0f;
+									parsed_blur_x = (double)(s32)bl_x_raw / 65536.0;
+									parsed_blur_y = (double)(s32)bl_y_raw / 65536.0;
 									parsed_filter_quality = (bl_flags >> 3) & 0x1F;  // UB[5] = bits 7-3 (MSB first)
 									if (parsed_filter_quality == 0) parsed_filter_quality = 1;
 								}
@@ -2951,13 +2951,13 @@ namespace SWFRecomp
 								u8 gl_flags = *(u8*)cur_pos; cur_pos += 1;
 								if (parsed_filter_type == 0) {
 									parsed_filter_type = 3;
-									parsed_filter_r = gl_r / 255.0f;
-									parsed_filter_g = gl_g / 255.0f;
-									parsed_filter_b = gl_b / 255.0f;
-									parsed_filter_a = gl_a / 255.0f;
-									parsed_blur_x = (float)(s32)gl_blur_x_raw / 65536.0f;
-									parsed_blur_y = (float)(s32)gl_blur_y_raw / 65536.0f;
-									parsed_filter_strength = (float)gl_strength_raw / 256.0f;
+									parsed_filter_r = gl_r / 255.0;
+									parsed_filter_g = gl_g / 255.0;
+									parsed_filter_b = gl_b / 255.0;
+									parsed_filter_a = gl_a / 255.0;
+									parsed_blur_x = (double)(s32)gl_blur_x_raw / 65536.0;
+									parsed_blur_y = (double)(s32)gl_blur_y_raw / 65536.0;
+									parsed_filter_strength = (double)gl_strength_raw / 256.0;
 									parsed_filter_quality = gl_flags & 0x1F;  // bits 0-4
 									if (parsed_filter_quality == 0) parsed_filter_quality = 1;
 									parsed_filter_flags = (gl_flags >> 5) & 0x07;  // bits 5-7
@@ -2981,19 +2981,19 @@ namespace SWFRecomp
 								u8 bv_flags_byte = *(u8*)cur_pos; cur_pos += 1;
 								if (parsed_filter_type == 0) {
 									parsed_filter_type = 4; // bevel
-									parsed_filter_r = bv_sr / 255.0f;
-									parsed_filter_g = bv_sg / 255.0f;
-									parsed_filter_b = bv_sb / 255.0f;
-									parsed_filter_a = bv_sa / 255.0f;
-									parsed_highlight_r = bv_hr / 255.0f;
-									parsed_highlight_g = bv_hg / 255.0f;
-									parsed_highlight_b = bv_hb / 255.0f;
-									parsed_highlight_a = bv_ha / 255.0f;
-									parsed_blur_x = (float)(s32)bv_blur_x_raw / 65536.0f;
-									parsed_blur_y = (float)(s32)bv_blur_y_raw / 65536.0f;
-									parsed_filter_angle = (float)(s32)bv_angle_raw / 65536.0f;
-									parsed_filter_distance = (float)(s32)bv_dist_raw / 65536.0f;
-									parsed_filter_strength = (float)bv_strength_raw / 256.0f;
+									parsed_filter_r = bv_sr / 255.0;
+									parsed_filter_g = bv_sg / 255.0;
+									parsed_filter_b = bv_sb / 255.0;
+									parsed_filter_a = bv_sa / 255.0;
+									parsed_highlight_r = bv_hr / 255.0;
+									parsed_highlight_g = bv_hg / 255.0;
+									parsed_highlight_b = bv_hb / 255.0;
+									parsed_highlight_a = bv_ha / 255.0;
+									parsed_blur_x = (double)(s32)bv_blur_x_raw / 65536.0;
+									parsed_blur_y = (double)(s32)bv_blur_y_raw / 65536.0;
+									parsed_filter_angle = (double)(s32)bv_angle_raw / 65536.0;
+									parsed_filter_distance = (double)(s32)bv_dist_raw / 65536.0;
+									parsed_filter_strength = (double)bv_strength_raw / 256.0;
 									parsed_filter_quality = bv_flags_byte & 0x0F;  // bits 0-3
 									if (parsed_filter_quality == 0) parsed_filter_quality = 1;
 									parsed_filter_flags = (bv_flags_byte >> 4) & 0x0F;  // bits 4-7
@@ -3021,10 +3021,10 @@ namespace SWFRecomp
 								u8 gg_fl = *(u8*)cur_pos; cur_pos += 1;
 								if (parsed_filter_type == 0) {
 									parsed_filter_type = 3; // approximate as glow
-									parsed_filter_r = last_r / 255.0f;
-									parsed_filter_g = last_g / 255.0f;
-									parsed_filter_b = last_b / 255.0f;
-									parsed_filter_a = last_a / 255.0f;
+									parsed_filter_r = last_r / 255.0;
+									parsed_filter_g = last_g / 255.0;
+									parsed_filter_b = last_b / 255.0;
+									parsed_filter_a = last_a / 255.0;
 									parsed_blur_x = (float)(s32)gg_bx / 65536.0f;
 									parsed_blur_y = (float)(s32)gg_by / 65536.0f;
 									parsed_filter_angle = (float)(s32)gg_ang / 65536.0f;
@@ -3127,14 +3127,14 @@ namespace SWFRecomp
 								u8 gb_fl = *(u8*)cur_pos; cur_pos += 1;
 								if (parsed_filter_type == 0) {
 									parsed_filter_type = 4; // approximate as bevel
-									parsed_filter_r = gb_sr / 255.0f;
-									parsed_filter_g = gb_sg / 255.0f;
-									parsed_filter_b = gb_sb / 255.0f;
-									parsed_filter_a = gb_sa / 255.0f;
-									parsed_highlight_r = gb_hr / 255.0f;
-									parsed_highlight_g = gb_hg / 255.0f;
-									parsed_highlight_b = gb_hb / 255.0f;
-									parsed_highlight_a = gb_ha / 255.0f;
+									parsed_filter_r = gb_sr / 255.0;
+									parsed_filter_g = gb_sg / 255.0;
+									parsed_filter_b = gb_sb / 255.0;
+									parsed_filter_a = gb_sa / 255.0;
+									parsed_highlight_r = gb_hr / 255.0;
+									parsed_highlight_g = gb_hg / 255.0;
+									parsed_highlight_b = gb_hb / 255.0;
+									parsed_highlight_a = gb_ha / 255.0;
 									parsed_blur_x = (float)(s32)gb_bx / 65536.0f;
 									parsed_blur_y = (float)(s32)gb_by / 65536.0f;
 									parsed_filter_angle = (float)(s32)gb_ang / 65536.0f;
@@ -3417,31 +3417,31 @@ namespace SWFRecomp
 				// Emit filter if parsed
 				if (parsed_filter_type != 0)
 				{
-					context.tag_main << std::fixed
+					context.tag_main << std::setprecision(15)
 						<< "\t" << "tagSetFilter(app_context, " << to_string(depth) << ", "
 						<< to_string(parsed_filter_type) << ", "
-						<< parsed_blur_x << "f, "
-						<< parsed_blur_y << "f, "
+						<< parsed_blur_x << ", "
+						<< parsed_blur_y << ", "
 						<< to_string(parsed_filter_quality) << ", "
 						<< to_string(parsed_filter_flags) << ", "
-						<< parsed_filter_r << "f, "
-						<< parsed_filter_g << "f, "
-						<< parsed_filter_b << "f, "
-						<< parsed_filter_a << "f, "
-						<< parsed_filter_strength << "f, "
-						<< parsed_filter_angle << "f, "
-						<< parsed_filter_distance << "f);"
+						<< parsed_filter_r << ", "
+						<< parsed_filter_g << ", "
+						<< parsed_filter_b << ", "
+						<< parsed_filter_a << ", "
+						<< parsed_filter_strength << ", "
+						<< parsed_filter_angle << ", "
+						<< parsed_filter_distance << ");"
 						<< std::defaultfloat << endl;
 
 					// Emit highlight color for bevel filters
 					if (parsed_filter_type == 4)
 					{
-						context.tag_main << std::fixed
+						context.tag_main << std::setprecision(15)
 							<< "\t" << "tagSetFilterHighlight(app_context, " << to_string(depth) << ", "
-							<< parsed_highlight_r << "f, "
-							<< parsed_highlight_g << "f, "
-							<< parsed_highlight_b << "f, "
-							<< parsed_highlight_a << "f);"
+							<< parsed_highlight_r << ", "
+							<< parsed_highlight_g << ", "
+							<< parsed_highlight_b << ", "
+							<< parsed_highlight_a << ");"
 							<< std::defaultfloat << endl;
 					}
 				}
@@ -5076,8 +5076,8 @@ namespace SWFRecomp
 
 	static u8 linearRgbLerp(u8 start, u8 end, float t)
 	{
-		float s = srgbToLinear(start / 255.0f);
-		float e = srgbToLinear(end / 255.0f);
+		float s = srgbToLinear(start / 255.0);
+		float e = srgbToLinear(end / 255.0);
 		float result = s + t * (e - s);
 		return (u8)(linearToSrgb(result) * 255.0f + 0.5f);
 	}

@@ -142,20 +142,20 @@ typedef struct DisplayObject
 	u8 filter_type;       // 0=none, 1=blur, 2=drop_shadow, 3=glow, 4=bevel
 	u8 filter_quality;    // blur passes (1-3)
 	u8 filter_flags;      // inner/knockout/compositeSource
-	float filter_blur_x;
-	float filter_blur_y;
-	float filter_color_r;
-	float filter_color_g;
-	float filter_color_b;
-	float filter_color_a;
-	float filter_strength;
-	float filter_angle;
-	float filter_distance;
+	double filter_blur_x;
+	double filter_blur_y;
+	double filter_color_r;
+	double filter_color_g;
+	double filter_color_b;
+	double filter_color_a;
+	double filter_strength;
+	double filter_angle;
+	double filter_distance;
 	// Bevel highlight color (shadow color uses filter_color_*)
-	float filter_highlight_r;
-	float filter_highlight_g;
-	float filter_highlight_b;
-	float filter_highlight_a;
+	double filter_highlight_r;
+	double filter_highlight_g;
+	double filter_highlight_b;
+	double filter_highlight_a;
 	// Scriptable color transform override (mutable at runtime by ActionScript)
 	double cx_ra, cx_ga, cx_ba, cx_aa;  // multipliers (percentage: 100.0 = normal)
 	double cx_rb, cx_gb, cx_bb, cx_ab;  // addends (0..255 range, 0 = normal)
