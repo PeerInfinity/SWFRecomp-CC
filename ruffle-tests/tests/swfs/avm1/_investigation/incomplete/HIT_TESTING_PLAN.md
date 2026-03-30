@@ -32,9 +32,9 @@ blockers:
     reason: "Pixel-level shape hit testing limitations (device fonts, curve/stroke precision)"
 -->
 
-Last updated: 2026-03-14
+Last updated: 2026-03-30
 
-## Status: BLOCKED — 13/17 PASS (remaining need vector-path hit testing, loadMovie bounds, or droptarget precision)
+## Status: BLOCKED — 15/17 PASS (remaining need vector-path hit testing or device font outlines)
 
 ---
 
@@ -49,7 +49,7 @@ Last updated: 2026-03-14
 | movieclip_getbounds | 191 | **PASS** (191/191) | Was 186/191, now fully passing |
 | hittest_morph | 70 | **PASS** (70/70) | Morph interpolated bounds |
 | hittest_morph_input | 1 | **PASS** (1/1) ✅ | Fixed: ratio-aware bounds in mc_get_pixel_aabb_ng + gotoAndStop same-frame replay |
-| movieclip_hittest_shapeflag | 338 | 309/338 (29 diff) | Triangulation limitations: stroke, curves, device-font text, morph complex |
+| movieclip_hittest_shapeflag | 338 | 318/338 (20 diff) | Triangulation limitations: stroke precision, device-font text, morph complex |
 | movieclip_invalid_get_bounds_1 | 75 | **PASS** (75/75) | Fixed: broadcastMessage MC `this` type + `g_use_new_invalid_bounds` flag |
 | movieclip_invalid_get_bounds_2 | 75 | **PASS** (75/75) | Fixed: root SWF version >= 8 check for sentinel flag |
 | movieclip_invalid_get_bounds_3 | 13 | **PASS** (13/13) | Fixed: onEnterFrame per-function version switching |
@@ -58,7 +58,7 @@ Last updated: 2026-03-14
 | movieclip_invalid_get_bounds_6 | 10 | **PASS** (10/10) | Fixed: child SWF transform_data + getBounds fallback |
 | movieclip_invalid_get_bounds_7 | 10 | **PASS** (10/10) | Same fix as _6 |
 | movieclip_invalid_get_bounds_8 | 11 | **PASS** (11/11) | Fixed with same sentinel flag changes |
-| text_blocks_clicks | 4 | 3/4 (1 diff) | Droptarget bounds precision — edittext bounds too narrow |
+| text_blocks_clicks | 4 | **PASS** (4/4) | Fixed in prior session |
 
 ---
 
@@ -98,21 +98,26 @@ Fixed `hittest_morph_input` (0/1 → 1/1 PASS) with two changes:
 
 ## Remaining Failures (BLOCKED)
 
-### movieclip_hittest_shapeflag (29 diff lines) — Triangulation Limitations
+### movieclip_hittest_shapeflag (20 diff lines) — Triangulation Limitations
 
 **Fixed (2026-03-14):**
 - **Clip-depth masking** (was 3 lines → 0): `ng_hitTestShapeFromDL` now tracks clip layers and filters masked children. Clip layers themselves are not hittable.
 - **setMask masking** (was 1 line → 0): hitTest now checks `mc->mask_mc` and tests point against mask shape.
 - **Glyph-level text hit testing**: Added per-glyph triangle testing for CHAR_TYPE_TEXT in `ng_hitTestShapeChar`. No visible effect on this test because fonts are device fonts (empty glyph shapes), but will help tests with embedded fonts.
 
-Remaining 29 failing lines:
-1. **Stroke edge precision** (5 lines): Stroke-to-triangle conversion in recompiler already generates stroke triangles, but triangulation approximation causes edge mismatches. Ruffle uses exact distance-to-path testing.
-2. **Curve approximation** (5 lines): Earcut triangulation straightens curves (donut/layer shapes). Points on curved edges miss or hit incorrectly.
-3. **Drawing API false positives** (4 lines): Drawing API shapes use bounds check instead of vector path testing.
-4. **Device-font text** (11 lines): Device fonts (Arial, Courier New) have empty glyph shapes in the SWF. Flash/Ruffle use system font outlines for hit testing; we have no font data.
-5. **Morph complex shape** (4 lines): Morph shapes with stroke-only paths (no fill triangles). Bounds-based testing is too coarse but no triangle data exists for interpolation.
+**Fixed (2026-03-30):**
+- **Earcut bridge-edge double-counting** (was 2 lines → 0): Donut shapes with holes had earcut bridge edges that caused shared-edge double-counting, breaking even-odd parity. Fixed by implementing a top-left fill rule in `pit()` that assigns shared edges to exactly one triangle.
+- **Stroke intersection overlap** (was 4 lines → 0): Cross-pattern stroke triangles overlapped at intersections, causing even-odd to subtract the overlap region. Fixed by marking stroke triangles with bit 31 in shape_data column 2 (recompiler) and using non-zero winding (union) for stroke hits separately from fill hits.
 
-**Blocker:** Device-font text (11 lines) requires font outline data unavailable in the SWF. Curve/stroke precision (10 lines) would need vector-path-based hit testing. Drawing API (4 lines) needs path triangulation or ray-casting. Morph complex (4 lines) has no triangle data to interpolate.
+Remaining 20 failing lines:
+1. **Stroke edge precision** (1 line): Line 63 false positive — stroke triangle extends beyond actual stroke boundary at endpoint.
+2. **Curve/scribble/layers** (3 lines): Lines 71, 85, 89 — earcut triangulation of complex curved paths misses points near polygon boundaries. Not a bridge-edge issue but fundamental polygon approximation.
+3. **Drawing API false positives** (2 lines): Lines 117, 137 — drawing API fill triangles cover areas that should be outside the drawn shape. Likely curve approximation in drawing API triangulation.
+4. **Background art** (3 lines): Lines 141, 143, 147 — large background shapes with complex paths miss points at certain coordinates. Similar polygon approximation issue.
+5. **Device-font text** (7 lines): Lines 157, 163, 165, 171-177 — device fonts (Arial, Courier New) have empty glyph shapes in the SWF. Flash/Ruffle use system font outlines for hit testing; we have no font data.
+6. **Morph complex shape** (4 lines): Lines 292, 294, 296, 304 — morph shapes with stroke-only paths (no fill triangles). Bounds-based testing is too coarse but no triangle data exists for interpolation.
+
+**Blocker:** Device-font text (7 lines) requires font outline data unavailable in the SWF. Morph complex (4 lines) has no triangle data to interpolate. Curve/polygon approximation (6 lines) is fundamental to the earcut triangulation approach. Stroke precision (1 line) is a stroke endpoint geometry issue.
 
 ### ~~movieclip_invalid_get_bounds_6, _7~~ — RESOLVED
 
@@ -121,10 +126,8 @@ Remaining 29 failing lines:
 2. Cache transform values on `DisplayObject` at `tagPlaceObject2` time using per-movie `g_active_transform_data` pointer
 3. `getBounds` fallback: when MC has no `sprite_display_list` but has a `movie_id`, scan root display_list for child SWF entries and recurse into their sprite display lists
 
-### text_blocks_clicks (1 diff line) — Droptarget Bounds Precision
-Line 4 expects `_droptarget = "/texts"` but gets `/click_mc`. The `texts` sprite's content bounds (from its text/edittext children) are slightly smaller than the mouse position (4612 twips < mouse 4680 twips). The edittext's DefineEditText bounds don't extend to where Flash considers the sprite clickable.
-
-**Blocker:** Would require understanding Flash's exact text field padding/margin rules for drop target resolution — possibly the 2px gutter or additional padding beyond the DefineEditText bounds.
+### ~~text_blocks_clicks~~ — RESOLVED
+Fixed in a prior session (now 4/4 PASS).
 
 ---
 
@@ -133,11 +136,11 @@ Line 4 expects `_droptarget = "/texts"` but gets `/click_mc`. The `texts` sprite
 ### Recompiler (SWFRecomp/)
 | File | Changes |
 |------|---------|
-| `src/swf.cpp` | Emit `ng_record_char_bounds()` and `ng_record_char_winding()` in generated code |
+| `src/swf.cpp` | Emit `ng_record_char_bounds()`, `ng_record_char_winding()`, and stroke marker (0x80000000 in shape_data column 2) in generated code |
 
 ### Runtime (SWFModernRuntime/)
 | File | Changes |
 |------|---------|
 | `src/actionmodern/action.c` | localToGlobal, globalToLocal, hitTest (all forms), getBounds, getRect, COMPUTE_GLOBAL_AABB, drawing bounds tracking, ratio-aware morph bounds in mc_get_pixel_aabb_ng |
-| `src/libswf/tag_stubs.c` | `ng_char_bounds[]`, `ng_record_char_bounds()`, `ng_record_char_winding()`, `ng_hitTestShapeChar()`, `ng_hitTestShapeFromDL()`, `pit()`, `ng_gotoFrameByMC` same-frame replay fix |
+| `src/libswf/tag_stubs.c` | `ng_char_bounds[]`, `ng_record_char_bounds()`, `ng_record_char_winding()`, `ng_hitTestShapeChar()` (fill/stroke split winding), `ng_hitTestShapeFromDL()`, `pit()` (top-left fill rule), `ng_gotoFrameByMC` same-frame replay fix |
 | `include/libswf/tag.h` | Function declarations for bounds, winding, shape hit test |

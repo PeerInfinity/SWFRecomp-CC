@@ -6884,7 +6884,7 @@ namespace SWFRecomp
 										   << std::hex << std::uppercase
 										   << "0x" << VAL(u32, &x_f) << ", "
 										   << "0x" << VAL(u32, &y_f) << ", "
-										   << "0x00, "
+										   << "0x80000000, "
 										   << "0x" << (u32) line_style.index
 										   << " }," << endl;
 							}

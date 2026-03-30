@@ -3318,7 +3318,26 @@ static int pit(double px, double py,
 	double d3 = (px - ax) * (cy - ay) - (cx - ax) * (py - ay);
 	int has_neg = (d1 < 0) || (d2 < 0) || (d3 < 0);
 	int has_pos = (d1 > 0) || (d2 > 0) || (d3 > 0);
-	return !(has_neg && has_pos);
+	if (has_neg && has_pos) return 0;
+
+	// Check for shared-edge case: if exactly one d is zero, the point is
+	// on a triangle edge. Use a fill rule to assign it to exactly one of
+	// the two triangles sharing that edge, preventing double-counting that
+	// breaks even-odd winding on earcut bridge edges.
+	int zeros = (d1 == 0.0) + (d2 == 0.0) + (d3 == 0.0);
+	if (zeros == 1) {
+		// Identify the edge: d1=0 → edge AB, d2=0 → edge BC, d3=0 → edge CA
+		double ex, ey;
+		if (d1 == 0.0) { ex = bx - ax; ey = by - ay; }
+		else if (d2 == 0.0) { ex = cx - bx; ey = cy - by; }
+		else { ex = ax - cx; ey = ay - cy; }
+		// Include if edge goes upward (ey > 0) or rightward when horizontal
+		if (ey > 0.0) return 1;
+		if (ey < 0.0) return 0;
+		return (ex > 0.0) ? 1 : 0;
+	}
+
+	return 1;  // Strictly inside or on a vertex
 }
 
 // Morph end vertex data (for interpolated shape hit testing)
@@ -3434,8 +3453,12 @@ static int ng_hitTestShapeChar(size_t char_id, u16 ratio,
 	double local_x = ( md * sx - mc_m * sy) * inv_det;
 	double local_y = (-mb * sx + ma  * sy) * inv_det;
 
-	// Count triangle hits (non-morph shapes only — morphs handled above via bounds)
-	int hits = 0;
+	// Count triangle hits separately for fills and strokes.
+	// Stroke triangles (marked with bit 31 in column 2) use non-zero winding
+	// because overlapping strokes at intersections should be unioned.
+	// Fill triangles use even-odd winding (unless DefineShape4 nonzero flag).
+	int fill_hits = 0;
+	int stroke_hits = 0;
 	size_t num_tris = count / 3;
 	for (size_t t = 0; t < num_tris; t++) {
 		const u32* v0 = shape_data[offset + t * 3 + 0];
@@ -3448,13 +3471,18 @@ static int ng_hitTestShapeChar(size_t char_id, u16 ratio,
 		double cx = (double)*(const float*)&v2[0];
 		double cy = (double)*(const float*)&v2[1];
 
-		if (pit(local_x, local_y, ax, ay, bx, by, cx, cy))
-			hits++;
+		if (pit(local_x, local_y, ax, ay, bx, by, cx, cy)) {
+			if (v0[2] & 0x80000000)
+				stroke_hits++;
+			else
+				fill_hits++;
+		}
 	}
 
+	if (stroke_hits > 0) return 1;  // strokes always use non-zero (union)
 	if (ng_uses_nonzero_winding(char_id))
-		return hits > 0;  // non-zero: any hit means inside
-	return (hits % 2) == 1;  // even-odd: odd count = inside
+		return fill_hits > 0;  // non-zero: any hit means inside
+	return (fill_hits % 2) == 1;  // even-odd: odd count = inside
 }
 
 int ng_hitTestShapeFromDL(DisplayObject* dl, size_t dl_max,
