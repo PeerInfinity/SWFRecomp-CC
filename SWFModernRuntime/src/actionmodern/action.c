@@ -31557,10 +31557,13 @@ void actionSetMember(SWFAppContext* app_context)
 			if (obj->native_type == NATIVE_FILTER && prop_name_len >= 4) {
 				double dv = varToDoubleSimple(&value_var);
 				int handled = 0;
-				// angle: fmod(val, 360)
+				// angle: fmod(val, 360), convert to radians (internal storage), then back to degrees
+				// Flash/Ruffle stores angle as radians internally; reading converts back to degrees
 				if (prop_name_len == 5 && memcmp(prop_name, "angle", 5) == 0) {
 					dv = fmod(dv, 360.0);
-					value_var = makeF64(dv); handled = 1;
+					double rad = dv * 3.14159265358979323846 / 180.0;
+					double deg_back = rad * 180.0 / 3.14159265358979323846;
+					value_var = makeF64(deg_back); handled = 1;
 				}
 				// quality: int clamp 0-15
 				else if (prop_name_len == 7 && memcmp(prop_name, "quality", 7) == 0) {
@@ -31701,7 +31704,82 @@ void actionSetMember(SWFAppContext* app_context)
 					// If product == 0, keep old matrix unchanged
 					return; // Already stored via setProperty above
 				}
-				// distance, scaleX, scaleY, bias, divisor: no validation, pass through
+				// componentX, componentY (DisplacementMapFilter): truncate to int
+				else if ((prop_name_len == 10 && memcmp(prop_name, "componentX", 10) == 0) ||
+				         (prop_name_len == 10 && memcmp(prop_name, "componentY", 10) == 0)) {
+					value_var = makeF64((double)(int)dv); handled = 1;
+				}
+				// scaleX, scaleY (DisplacementMapFilter): clamp [-65535, 65535]
+				else if ((prop_name_len == 6 && memcmp(prop_name, "scaleX", 6) == 0) ||
+				         (prop_name_len == 6 && memcmp(prop_name, "scaleY", 6) == 0)) {
+					if (dv > 65535) dv = 65535; if (dv < -65535) dv = -65535;
+					value_var = makeF64(dv); handled = 1;
+				}
+				// mode (DisplacementMapFilter): validate "wrap"/"clamp"/"ignore"/"color"
+				else if (prop_name_len == 4 && memcmp(prop_name, "mode", 4) == 0) {
+					int valid = 0;
+					if (value_var.type == ACTION_STACK_VALUE_STRING) {
+						char mbuf[32];
+						u32 mlen = (u32)u16_to_utf8((const uint16_t*)value_var.data.numeric_value,
+							value_var.str_size, mbuf, sizeof(mbuf));
+						if ((mlen == 4 && memcmp(mbuf, "wrap", 4) == 0) ||
+						    (mlen == 5 && memcmp(mbuf, "clamp", 5) == 0) ||
+						    (mlen == 6 && memcmp(mbuf, "ignore", 6) == 0) ||
+						    (mlen == 5 && memcmp(mbuf, "color", 5) == 0))
+							valid = 1;
+					}
+					if (!valid) {
+						u32 u16len; uint16_t* u16 = utf8_to_u16(app_context, "wrap", 4, &u16len);
+						value_var.type = ACTION_STACK_VALUE_STRING;
+						value_var.str_size = u16len;
+						value_var.data.string_data.heap_ptr = u16;
+					}
+					handled = 1;
+				}
+				// mapBitmap: must be OBJECT with BitmapData native, else keep old value
+				else if (prop_name_len == 9 && memcmp(prop_name, "mapBitmap", 9) == 0) {
+					if (value_var.type == ACTION_STACK_VALUE_OBJECT) {
+						ASObject* bmp_obj = (ASObject*)(uintptr_t)value_var.data.numeric_value;
+						if (bmp_obj && bmp_obj->native_type == NATIVE_BITMAPDATA) {
+							// Valid BitmapData — store it
+						} else {
+							return; // Non-BitmapData object: keep old value
+						}
+					} else {
+						return; // Non-object: keep old value
+					}
+					handled = 1;
+				}
+				// mapPoint: must be a Point object; clone it, truncate x/y to int
+				else if (prop_name_len == 8 && memcmp(prop_name, "mapPoint", 8) == 0) {
+					if (value_var.type == ACTION_STACK_VALUE_OBJECT && value_var.data.numeric_value != 0) {
+						ASObject* pt = (ASObject*)(uintptr_t)value_var.data.numeric_value;
+						ActionVar* px = getProperty(pt, "x", 1);
+						ActionVar* py = getProperty(pt, "y", 1);
+						if (px && py) {
+							int ix = (int)varToDoubleSimple(px);
+							int iy = (int)varToDoubleSimple(py);
+							ActionVar vx = makeF64((double)ix), vy = makeF64((double)iy);
+							ASObject* cloned_pt = createPointObj(app_context, &vx, &vy);
+							value_var.type = ACTION_STACK_VALUE_OBJECT;
+							value_var.data.numeric_value = (u64)cloned_pt;
+						} else {
+							// Not a valid Point: set to Point(0,0)
+							ActionVar vx = makeF64(0), vy = makeF64(0);
+							ASObject* def_pt = createPointObj(app_context, &vx, &vy);
+							value_var.type = ACTION_STACK_VALUE_OBJECT;
+							value_var.data.numeric_value = (u64)def_pt;
+						}
+					} else {
+						// null/undefined/non-object: set to Point(0,0)
+						ActionVar vx = makeF64(0), vy = makeF64(0);
+						ASObject* def_pt = createPointObj(app_context, &vx, &vy);
+						value_var.type = ACTION_STACK_VALUE_OBJECT;
+						value_var.data.numeric_value = (u64)def_pt;
+					}
+					handled = 1;
+				}
+				// distance, bias, divisor: no validation, pass through
 				(void)handled;
 			}
 			// TextFormat instances apply per-property coercion
@@ -39526,7 +39604,8 @@ static int invokeNativeSuperConstructor(SWFAppContext* app_context, ASFunction* 
 		double d;
 		d = (num_args > 0) ? varToDoubleSimple(&args[0]) : 4.0;
 		v = makeF64(d); setProperty(app_context, obj, "distance", 8, &v);
-		d = (num_args > 1) ? varToDoubleSimple(&args[1]) : 45.0;
+		// Default angle: Ruffle uses 0.785398163 radians ≈ 44.9999999772279 degrees
+		d = (num_args > 1) ? varToDoubleSimple(&args[1]) : 44.9999999772279;
 		v = makeF64(d); setProperty(app_context, obj, "angle", 5, &v);
 		d = (num_args > 2) ? varToDoubleSimple(&args[2]) : 16777215.0;
 		v = makeF64(d); setProperty(app_context, obj, "highlightColor", 14, &v);
@@ -39594,7 +39673,7 @@ static int invokeNativeSuperConstructor(SWFAppContext* app_context, ASFunction* 
 		if (obj->native_type == NATIVE_NONE) obj->native_type = NATIVE_FILTER;
 		// Order: distance, angle, color, alpha, quality, inner, knockout, blurX, blurY, strength, hideObject
 		FILTER_SET_F64("distance", 8, (num_args > 0) ? varToDoubleSimple(&args[0]) : 4.0);
-		FILTER_SET_F64("angle", 5, (num_args > 1) ? varToDoubleSimple(&args[1]) : 45.0);
+		FILTER_SET_F64("angle", 5, (num_args > 1) ? varToDoubleSimple(&args[1]) : 44.9999999772279);
 		FILTER_SET_F64("color", 5, (num_args > 2) ? varToDoubleSimple(&args[2]) : 0.0);
 		FILTER_SET_F64("alpha", 5, (num_args > 3) ? varToDoubleSimple(&args[3]) : 1.0);
 		FILTER_SET_F64("quality", 7, (num_args > 6) ? varToDoubleSimple(&args[6]) : 1.0);
@@ -39628,7 +39707,7 @@ static int invokeNativeSuperConstructor(SWFAppContext* app_context, ASFunction* 
 		if (obj->native_type == NATIVE_NONE) obj->native_type = NATIVE_FILTER;
 		// Order: distance, angle, colors, alphas, ratios, blurX, blurY, quality, strength, knockout, type
 		FILTER_SET_F64("distance", 8, (num_args > 0) ? varToDoubleSimple(&args[0]) : 4.0);
-		FILTER_SET_F64("angle", 5, (num_args > 1) ? varToDoubleSimple(&args[1]) : 45.0);
+		FILTER_SET_F64("angle", 5, (num_args > 1) ? varToDoubleSimple(&args[1]) : 44.9999999772279);
 		FILTER_SET_ARR("colors", 6);
 		FILTER_SET_ARR("alphas", 6);
 		FILTER_SET_ARR("ratios", 6);
@@ -39680,16 +39759,35 @@ static int invokeNativeSuperConstructor(SWFAppContext* app_context, ASFunction* 
 	}
 	if (strcmp(name, "DisplacementMapFilter") == 0) {
 		if (obj->native_type == NATIVE_NONE) obj->native_type = NATIVE_FILTER;
-		// mapBitmap (first arg), mapPoint (second arg — default is Point(0,0))
-		if (num_args > 0 && args[0].type != ACTION_STACK_VALUE_NULL && args[0].type != ACTION_STACK_VALUE_UNDEFINED)
-			setProperty(app_context, obj, "mapBitmap", 9, &args[0]);
-		// mapPoint defaults to Point(0,0)
+		// All properties with defaults matching Flash/Ruffle
 		{
+			// mapBitmap: undefined by default, or first arg
+			ActionVar undef = {0}; undef.type = ACTION_STACK_VALUE_UNDEFINED;
+			if (num_args > 0 && args[0].type == ACTION_STACK_VALUE_OBJECT)
+				setProperty(app_context, obj, "mapBitmap", 9, &args[0]);
+			else
+				setProperty(app_context, obj, "mapBitmap", 9, &undef);
+			// mapPoint: default Point(0,0), or second arg
 			ActionVar zero = makeF64(0.0);
 			ASObject* pt = createPointObj(app_context, &zero, &zero);
 			ActionVar pv = {0}; pv.type = ACTION_STACK_VALUE_OBJECT;
 			pv.data.numeric_value = (u64)pt;
 			setProperty(app_context, obj, "mapPoint", 8, &pv);
+			// componentX, componentY, scaleX, scaleY: default 0
+			{ ActionVar _fv = makeF64((num_args > 2) ? (double)(int)varToDoubleSimple(&args[2]) : 0.0); setProperty(app_context, obj, "componentX", 10, &_fv); }
+			{ ActionVar _fv = makeF64((num_args > 3) ? (double)(int)varToDoubleSimple(&args[3]) : 0.0); setProperty(app_context, obj, "componentY", 10, &_fv); }
+			{ ActionVar _fv = makeF64((num_args > 4) ? varToDoubleSimple(&args[4]) : 0.0); setProperty(app_context, obj, "scaleX", 6, &_fv); }
+			{ ActionVar _fv = makeF64((num_args > 5) ? varToDoubleSimple(&args[5]) : 0.0); setProperty(app_context, obj, "scaleY", 6, &_fv); }
+			// mode: default "wrap"
+			{
+				u32 u16len; uint16_t* u16 = utf8_to_u16(app_context, "wrap", 4, &u16len);
+				ActionVar sv = {0}; sv.type = ACTION_STACK_VALUE_STRING;
+				sv.str_size = u16len; sv.data.string_data.heap_ptr = u16;
+				setProperty(app_context, obj, "mode", 4, &sv);
+			}
+			// color: default 0, alpha: default 0
+			{ ActionVar _fv = makeF64(0.0); setProperty(app_context, obj, "color", 5, &_fv); }
+			{ ActionVar _fv = makeF64(0.0); setProperty(app_context, obj, "alpha", 5, &_fv); }
 		}
 		out_result->type = ACTION_STACK_VALUE_OBJECT;
 		out_result->data.numeric_value = (u64)obj;
