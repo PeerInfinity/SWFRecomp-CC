@@ -229,14 +229,34 @@ static int u16_to_utf8(const uint16_t* u16, u32 u16_len, char* out, int out_size
 	return pos;
 }
 
-// Lexicographic comparison of two UTF-16 strings (like strcmp)
+// Decode a UTF-16 code unit (possibly surrogate pair) to a code point.
+// Advances *idx past the consumed units. Returns the code point.
+static inline uint32_t u16_decode_codepoint(const uint16_t* s, u32 len, u32* idx)
+{
+	uint16_t u = s[*idx];
+	(*idx)++;
+	if (u >= 0xD800 && u <= 0xDBFF && *idx < len) {
+		uint16_t u2 = s[*idx];
+		if (u2 >= 0xDC00 && u2 <= 0xDFFF) {
+			(*idx)++;
+			return 0x10000 + ((uint32_t)(u - 0xD800) << 10) + (u2 - 0xDC00);
+		}
+	}
+	return u;
+}
+
+// Lexicographic comparison of two UTF-16 strings by Unicode code point
 static int u16_cmp(const uint16_t* a, u32 a_len, const uint16_t* b, u32 b_len)
 {
-	u32 min_len = a_len < b_len ? a_len : b_len;
-	for (u32 i = 0; i < min_len; i++) {
-		if (a[i] != b[i]) return (int)a[i] - (int)b[i];
+	u32 ai = 0, bi = 0;
+	while (ai < a_len && bi < b_len) {
+		uint32_t ca = u16_decode_codepoint(a, a_len, &ai);
+		uint32_t cb = u16_decode_codepoint(b, b_len, &bi);
+		if (ca != cb) return (ca < cb) ? -1 : 1;
 	}
-	return (int)a_len - (int)b_len;
+	if (ai < a_len) return 1;  // a is longer
+	if (bi < b_len) return -1; // b is longer
+	return 0;
 }
 
 // Fast ASCII-to-UTF-16 conversion (for number strings which are always ASCII)
@@ -36539,10 +36559,12 @@ void actionNewObject(SWFAppContext* app_context)
 	}
 	else if (strcmp(ctor_name, "TextField") == 0)
 	{
-		// Note: native_objects_swf6 (known_failure in Ruffle) expects undefined here,
-		// but textfield_props_swf6 (fully passing) expects an object. We follow the
-		// passing test — new TextField() always creates an object.
-		// Handle TextField constructor — new TextField()
+		// SWF6: new TextField() is not constructable (returns undefined)
+		if (g_swf_version < 7) {
+			PUSH(ACTION_STACK_VALUE_UNDEFINED, 0);
+			return;
+		}
+		// SWF7+: Handle TextField constructor — new TextField()
 		// Creates an empty object with __proto__ set to TextField.prototype
 		ASObject* tf_obj = allocObject(app_context, 4);
 		tf_obj->native_type = NATIVE_TEXTFIELD;
