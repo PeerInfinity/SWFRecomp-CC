@@ -24293,6 +24293,26 @@ static void initSystemObject(SWFAppContext* app_context)
 	installNativeToString(app_context, ime_obj);
 }
 
+// Forward declaration
+static ASObject* getVersionedArrayProto(SWFAppContext* app_context);
+
+// Initialize an ASArray's props/proto for instanceof Array support
+static void initArrayProto(SWFAppContext* app_context, ASArray* arr) {
+	if (arr == NULL) return;
+	if (arr->props == NULL) {
+		arr->props = allocObject(app_context, 4);
+		retainObject(arr->props);
+	}
+	arr->props->native_type = NATIVE_ARRAY;
+	ASObject* ver_arr_proto = getVersionedArrayProto(app_context);
+	if (ver_arr_proto != NULL) {
+		ActionVar pv = {0};
+		pv.type = ACTION_STACK_VALUE_OBJECT;
+		pv.data.numeric_value = (u64)ver_arr_proto;
+		setPropertyWithFlags(app_context, arr->props, "__proto__", 9, &pv, PROPERTY_FLAGS_DONTENUM);
+	}
+}
+
 // Filter clone method: shallow-copies all own properties to a new filter object
 static ASFunction g_filter_clone_funcs[10]; // one per filter type
 static ActionVar filterClone(SWFAppContext* app_context, ActionVar* args, u32 arg_count, ActionVar* registers, void* this_obj)
@@ -31448,6 +31468,29 @@ void actionSetMember(SWFAppContext* app_context)
 						value_var.str_size = u16len;
 						value_var.data.string_data.heap_ptr = u16;
 					}
+				}
+				// matrix (ColorMatrixFilter): array → create 20-element array padded with NaN; null/undefined → keep old
+				else if (prop_name_len == 6 && memcmp(prop_name, "matrix", 6) == 0) {
+					if (value_var.type == ACTION_STACK_VALUE_NULL || value_var.type == ACTION_STACK_VALUE_UNDEFINED) {
+						return; // Keep old matrix
+					}
+					ASArray* src_arr = NULL;
+					if (value_var.type == ACTION_STACK_VALUE_ARRAY)
+						src_arr = (ASArray*)(uintptr_t)value_var.data.numeric_value;
+					ASArray* new_matrix = allocArray(app_context, 20);
+					new_matrix->length = 20;
+					initArrayProto(app_context, new_matrix);
+					for (int mi = 0; mi < 20; mi++) {
+						if (src_arr && mi < (int)src_arr->length) {
+							double ev = varToDoubleSimple(&src_arr->elements[mi]);
+							new_matrix->elements[mi] = makeF64(ev);
+						} else {
+							new_matrix->elements[mi] = makeF64(NAN);
+						}
+					}
+					value_var.type = ACTION_STACK_VALUE_ARRAY;
+					value_var.data.numeric_value = (u64)new_matrix;
+					handled = 1;
 				}
 				// distance, scaleX, scaleY, bias, divisor: no validation, pass through
 				(void)handled;
@@ -39275,7 +39318,7 @@ static int invokeNativeSuperConstructor(SWFAppContext* app_context, ASFunction* 
 	#define FILTER_SET_F64(pname, plen, val) { ActionVar _fv = makeF64(val); setProperty(app_context, obj, pname, plen, &_fv); }
 	#define FILTER_SET_BOOL(pname, plen, val) { ActionVar _fv = {0}; _fv.type = ACTION_STACK_VALUE_BOOLEAN; _fv.data.numeric_value = (val) ? 1 : 0; setProperty(app_context, obj, pname, plen, &_fv); }
 	#define FILTER_SET_STR(pname, plen, sval, slen) { ActionVar _fv = {0}; _fv.type = ACTION_STACK_VALUE_STRING; u32 _u16l; uint16_t* _u16 = utf8_to_u16(app_context, sval, slen, &_u16l); _fv.str_size = _u16l; _fv.data.string_data.heap_ptr = _u16; setProperty(app_context, obj, pname, plen, &_fv); }
-	#define FILTER_SET_ARR(pname, plen) { ASArray* _ea = allocArray(app_context, 0); _ea->length = 0; ActionVar _fv = {0}; _fv.type = ACTION_STACK_VALUE_ARRAY; _fv.data.numeric_value = (u64)_ea; setProperty(app_context, obj, pname, plen, &_fv); }
+	#define FILTER_SET_ARR(pname, plen) { ASArray* _ea = allocArray(app_context, 0); _ea->length = 0; initArrayProto(app_context, _ea); ActionVar _fv = {0}; _fv.type = ACTION_STACK_VALUE_ARRAY; _fv.data.numeric_value = (u64)_ea; setProperty(app_context, obj, pname, plen, &_fv); }
 
 	if (strcmp(name, "BlurFilter") == 0) {
 		if (obj->native_type == NATIVE_NONE) obj->native_type = NATIVE_FILTER;
@@ -39372,6 +39415,7 @@ static int invokeNativeSuperConstructor(SWFAppContext* app_context, ASFunction* 
 		// Always create a 20-element matrix
 		ASArray* result_matrix = allocArray(app_context, 20);
 		result_matrix->length = 20;
+		initArrayProto(app_context, result_matrix);
 		double identity[20] = {1,0,0,0,0, 0,1,0,0,0, 0,0,1,0,0, 0,0,0,1,0};
 		for (int i = 0; i < 20; i++) {
 			if (matrix_arr && i < (int)matrix_arr->length) {
