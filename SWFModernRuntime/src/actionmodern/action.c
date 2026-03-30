@@ -24466,6 +24466,8 @@ static void initArrayProto(SWFAppContext* app_context, ASArray* arr) {
 
 // Filter clone method: shallow-copies all own properties to a new filter object
 static ASFunction g_filter_clone_funcs[10]; // one per filter type
+// Filter prototype lookup by display list filter_type (1=blur, 2=dropshadow, 3=glow, 4=bevel)
+static ASObject* g_filter_protos_by_type[5] = {NULL, NULL, NULL, NULL, NULL};
 static ActionVar filterClone(SWFAppContext* app_context, ActionVar* args, u32 arg_count, ActionVar* registers, void* this_obj)
 {
     (void)args; (void)arg_count; (void)registers;
@@ -24853,6 +24855,12 @@ static void initFlashPackage(SWFAppContext* app_context)
 	ensureStubCtorPrototype(app_context, &fc_GlowFilter);
 	ensureStubCtorPrototype(app_context, &fc_GradientBevelFilter);
 	ensureStubCtorPrototype(app_context, &fc_GradientGlowFilter);
+
+	// Store filter prototypes by display list type for mc.filters getter
+	g_filter_protos_by_type[1] = fc_BlurFilter.prototype_obj;       // type 1 = Blur
+	g_filter_protos_by_type[2] = fc_DropShadowFilter.prototype_obj; // type 2 = DropShadow
+	g_filter_protos_by_type[3] = fc_GlowFilter.prototype_obj;       // type 3 = Glow
+	g_filter_protos_by_type[4] = fc_BevelFilter.prototype_obj;       // type 4 = Bevel
 
 	// Register clone() on all filter prototypes (NOT BitmapFilter base — its clone returns undefined)
 	{
@@ -35815,7 +35823,89 @@ void actionGetMember(SWFAppContext* app_context)
 				}
 			}
 			// Fallback: check display list for SWF-authored filters (from tagSetFilter)
-			// TODO: Build filter objects from display list data — complex, deferred
+			{
+				size_t entry_idx = getDisplayEntryIdxForMC(mc);
+				u8 ftype = 0;
+				float fblur_x=0, fblur_y=0, fstrength=0, fangle=0, fdistance=0;
+				float fr=0, fg=0, fb=0, fa=0;
+				float fhr=0, fhg=0, fhb=0, fha=0;
+				u8 fquality=0, fflags=0;
+				if (entry_idx != (size_t)-1 &&
+				    ng_getDisplayEntryFilterData(entry_idx, &ftype, &fblur_x, &fblur_y,
+				        &fquality, &fflags, &fr, &fg, &fb, &fa, &fstrength, &fangle, &fdistance,
+				        &fhr, &fhg, &fhb, &fha) && ftype != 0 && ftype <= 4) {
+					ASObject* proto = g_filter_protos_by_type[ftype];
+					if (proto) {
+						ASObject* fobj = allocObject(app_context, 16);
+						fobj->native_type = NATIVE_FILTER;
+						ActionVar pv = {0}; pv.type = ACTION_STACK_VALUE_OBJECT;
+						pv.data.numeric_value = (u64)proto;
+						setPropertyWithFlags(app_context, fobj, "__proto__", 9, &pv, PROPERTY_FLAGS_DONTENUM);
+						// Populate properties from display list data
+						ActionVar v;
+						double angle_deg = (double)fangle * 180.0 / 3.14159265358979323846;
+						if (ftype == 4 || ftype == 2) { // Bevel or DropShadow
+							v = makeF64((double)fdistance); setProperty(app_context, fobj, "distance", 8, &v);
+							v = makeF64(angle_deg); setProperty(app_context, fobj, "angle", 5, &v);
+						}
+						if (ftype == 2 || ftype == 3) { // DropShadow or Glow: color (RGBA)
+							uint32_t color = ((uint32_t)(fr*255+0.5f)<<16)|((uint32_t)(fg*255+0.5f)<<8)|(uint32_t)(fb*255+0.5f);
+							v = makeF64((double)color); setProperty(app_context, fobj, "color", 5, &v);
+							v = makeF64((double)fa); setProperty(app_context, fobj, "alpha", 5, &v);
+						}
+						if (ftype == 4) { // Bevel: highlight + shadow colors
+							uint32_t hc = ((uint32_t)(fhr*255+0.5f)<<16)|((uint32_t)(fhg*255+0.5f)<<8)|(uint32_t)(fhb*255+0.5f);
+							v = makeF64((double)hc); setProperty(app_context, fobj, "highlightColor", 14, &v);
+							v = makeF64((double)fha); setProperty(app_context, fobj, "highlightAlpha", 14, &v);
+							uint32_t sc = ((uint32_t)(fr*255+0.5f)<<16)|((uint32_t)(fg*255+0.5f)<<8)|(uint32_t)(fb*255+0.5f);
+							v = makeF64((double)sc); setProperty(app_context, fobj, "shadowColor", 11, &v);
+							v = makeF64((double)fa); setProperty(app_context, fobj, "shadowAlpha", 11, &v);
+						}
+						v = makeF64((double)fblur_x); setProperty(app_context, fobj, "blurX", 5, &v);
+						v = makeF64((double)fblur_y); setProperty(app_context, fobj, "blurY", 5, &v);
+						v = makeF64((double)fquality); setProperty(app_context, fobj, "quality", 7, &v);
+						if (ftype != 1) { // BlurFilter has no strength
+							v = makeF64((double)fstrength); setProperty(app_context, fobj, "strength", 8, &v);
+						}
+						// Flags decoding — fflags is the UPPER bits from the recompiler:
+						// For DropShadow/Glow (bits 5-7 of original): bit0=CompositeSource, bit1=Knockout, bit2=Inner
+						// For Bevel (bits 4-7 of original): bit0=OnTop, bit1=CompositeSource, bit2=Knockout, bit3=Inner
+						int inner_flag, knockout_flag;
+						if (ftype == 4) { // Bevel: flags are bits 4-7
+							inner_flag = (fflags >> 3) & 1;   // bit 7 of original = bit 3 of extracted
+							knockout_flag = (fflags >> 2) & 1; // bit 6 of original = bit 2 of extracted
+							int on_top = fflags & 1;           // bit 4 of original = bit 0 of extracted
+							const char* type_str = (inner_flag && on_top) ? "full" : (inner_flag ? "inner" : "outer");
+							u32 u16len; uint16_t* u16p = utf8_to_u16(app_context, type_str, strlen(type_str), &u16len);
+							v.type = ACTION_STACK_VALUE_STRING; v.str_size = u16len;
+							v.data.string_data.heap_ptr = u16p;
+							setProperty(app_context, fobj, "type", 4, &v);
+						} else { // DropShadow/Glow: flags are bits 5-7
+							inner_flag = (fflags >> 2) & 1;   // bit 7 of original = bit 2 of extracted
+							knockout_flag = (fflags >> 1) & 1; // bit 6 of original = bit 1 of extracted
+						}
+						v.type = ACTION_STACK_VALUE_BOOLEAN;
+						if (ftype != 1) { // BlurFilter has no inner/knockout
+							v.data.numeric_value = inner_flag; setProperty(app_context, fobj, "inner", 5, &v);
+							v.data.numeric_value = knockout_flag; setProperty(app_context, fobj, "knockout", 8, &v);
+						}
+						if (ftype == 2) { // DropShadow: hideObject
+							v.data.numeric_value = (fflags >> 0) & 1; // CompositeSource = bit 5 = bit 0 extracted...
+							// Actually hideObject is NOT CompositeSource. In Flash, hideObject is separate.
+							// For now set false as default
+							v.data.numeric_value = 0;
+							setProperty(app_context, fobj, "hideObject", 10, &v);
+						}
+						// Wrap in array
+						ASArray* farr = allocArray(app_context, 1);
+						farr->length = 1; initArrayProto(app_context, farr);
+						farr->elements[0].type = ACTION_STACK_VALUE_OBJECT;
+						farr->elements[0].data.numeric_value = (u64)fobj;
+						PUSH(ACTION_STACK_VALUE_ARRAY, (u64)farr);
+						return;
+					}
+				}
+			}
 			ASArray* arr = allocArray(app_context, 0);
 			initArrayProto(app_context, arr);
 			PUSH(ACTION_STACK_VALUE_ARRAY, (u64)arr);

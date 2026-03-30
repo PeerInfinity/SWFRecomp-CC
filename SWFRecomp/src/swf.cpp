@@ -2920,9 +2920,9 @@ namespace SWFRecomp
 									parsed_filter_angle = (float)(s32)ds_angle_raw / 65536.0f;
 									parsed_filter_distance = (float)(s32)ds_dist_raw / 65536.0f;
 									parsed_filter_strength = (float)ds_strength_raw / 256.0f;
-									parsed_filter_quality = (ds_flags_byte >> 3) & 0x1F;
+									parsed_filter_quality = ds_flags_byte & 0x1F;  // bits 0-4
 									if (parsed_filter_quality == 0) parsed_filter_quality = 1;
-									parsed_filter_flags = ds_flags_byte & 0x07;
+									parsed_filter_flags = (ds_flags_byte >> 5) & 0x07;  // bits 5-7
 								}
 								break;
 							}
@@ -2935,7 +2935,7 @@ namespace SWFRecomp
 									parsed_filter_type = 1;
 									parsed_blur_x = (float)(s32)bl_x_raw / 65536.0f;
 									parsed_blur_y = (float)(s32)bl_y_raw / 65536.0f;
-									parsed_filter_quality = (bl_flags >> 3) & 0x1F;
+									parsed_filter_quality = (bl_flags >> 3) & 0x1F;  // UB[5] = bits 7-3 (MSB first)
 									if (parsed_filter_quality == 0) parsed_filter_quality = 1;
 								}
 								break;
@@ -2958,19 +2958,20 @@ namespace SWFRecomp
 									parsed_blur_x = (float)(s32)gl_blur_x_raw / 65536.0f;
 									parsed_blur_y = (float)(s32)gl_blur_y_raw / 65536.0f;
 									parsed_filter_strength = (float)gl_strength_raw / 256.0f;
-									parsed_filter_quality = (gl_flags >> 3) & 0x1F;
+									parsed_filter_quality = gl_flags & 0x1F;  // bits 0-4
 									if (parsed_filter_quality == 0) parsed_filter_quality = 1;
-									parsed_filter_flags = gl_flags & 0x07;
+									parsed_filter_flags = (gl_flags >> 5) & 0x07;  // bits 5-7
 								}
 								break;
 							}
 							case 3: // BevelFilter (27 bytes)
 							{
-								u8 bv_sr = *(u8*)cur_pos; u8 bv_sg = *(u8*)(cur_pos+1);
-								u8 bv_sb = *(u8*)(cur_pos+2); u8 bv_sa = *(u8*)(cur_pos+3);
-								cur_pos += 4;
+								// SWF stores HIGHLIGHT first, SHADOW second (spec text is wrong per Ruffle)
 								u8 bv_hr = *(u8*)cur_pos; u8 bv_hg = *(u8*)(cur_pos+1);
 								u8 bv_hb = *(u8*)(cur_pos+2); u8 bv_ha = *(u8*)(cur_pos+3);
+								cur_pos += 4;
+								u8 bv_sr = *(u8*)cur_pos; u8 bv_sg = *(u8*)(cur_pos+1);
+								u8 bv_sb = *(u8*)(cur_pos+2); u8 bv_sa = *(u8*)(cur_pos+3);
 								cur_pos += 4;
 								u32 bv_blur_x_raw; memcpy(&bv_blur_x_raw, cur_pos, 4); cur_pos += 4;
 								u32 bv_blur_y_raw; memcpy(&bv_blur_y_raw, cur_pos, 4); cur_pos += 4;
@@ -2993,9 +2994,9 @@ namespace SWFRecomp
 									parsed_filter_angle = (float)(s32)bv_angle_raw / 65536.0f;
 									parsed_filter_distance = (float)(s32)bv_dist_raw / 65536.0f;
 									parsed_filter_strength = (float)bv_strength_raw / 256.0f;
-									parsed_filter_quality = (bv_flags_byte >> 3) & 0x1F;
+									parsed_filter_quality = bv_flags_byte & 0x0F;  // bits 0-3
 									if (parsed_filter_quality == 0) parsed_filter_quality = 1;
-									parsed_filter_flags = bv_flags_byte & 0x07;
+									parsed_filter_flags = (bv_flags_byte >> 4) & 0x0F;  // bits 4-7
 								}
 								break;
 							}
@@ -3029,9 +3030,9 @@ namespace SWFRecomp
 									parsed_filter_angle = (float)(s32)gg_ang / 65536.0f;
 									parsed_filter_distance = (float)(s32)gg_dist / 65536.0f;
 									parsed_filter_strength = (float)gg_str / 256.0f;
-									parsed_filter_quality = (gg_fl >> 3) & 0x1F;
+									parsed_filter_quality = gg_fl & 0x1F;  // bits 0-4
 									if (parsed_filter_quality == 0) parsed_filter_quality = 1;
-									parsed_filter_flags = gg_fl & 0x07;
+									parsed_filter_flags = (gg_fl >> 5) & 0x07;  // bits 5-7
 								}
 								break;
 							}
@@ -3139,9 +3140,9 @@ namespace SWFRecomp
 									parsed_filter_angle = (float)(s32)gb_ang / 65536.0f;
 									parsed_filter_distance = (float)(s32)gb_dist / 65536.0f;
 									parsed_filter_strength = (float)gb_str / 256.0f;
-									parsed_filter_quality = (gb_fl >> 3) & 0x1F;
+									parsed_filter_quality = gb_fl & 0x1F;  // bits 0-4
 									if (parsed_filter_quality == 0) parsed_filter_quality = 1;
-									parsed_filter_flags = gb_fl & 0x07;
+									parsed_filter_flags = (gb_fl >> 5) & 0x07;  // bits 5-7
 								}
 								break;
 							}
@@ -4098,8 +4099,8 @@ namespace SWFRecomp
 												sp_blur_x = (float)(s32)ds_bx/65536.0f; sp_blur_y = (float)(s32)ds_by/65536.0f;
 												sp_filter_angle = (float)(s32)ds_ang/65536.0f; sp_filter_distance = (float)(s32)ds_dist/65536.0f;
 												sp_filter_strength = (float)ds_str/256.0f;
-												sp_filter_quality = (ds_fl >> 3) & 0x1F; if (!sp_filter_quality) sp_filter_quality = 1;
-												sp_filter_flags = ds_fl & 0x07;
+												sp_filter_quality = ds_fl & 0x1F; if (!sp_filter_quality) sp_filter_quality = 1;
+												sp_filter_flags = (ds_fl >> 5) & 0x07;
 											}
 											break;
 										}
@@ -4128,8 +4129,8 @@ namespace SWFRecomp
 												sp_filter_b = gl_b/255.0f; sp_filter_a = gl_a/255.0f;
 												sp_blur_x = (float)(s32)gl_bx/65536.0f; sp_blur_y = (float)(s32)gl_by/65536.0f;
 												sp_filter_strength = (float)gl_str/256.0f;
-												sp_filter_quality = (gl_fl >> 3) & 0x1F; if (!sp_filter_quality) sp_filter_quality = 1;
-												sp_filter_flags = gl_fl & 0x07;
+												sp_filter_quality = gl_fl & 0x1F; if (!sp_filter_quality) sp_filter_quality = 1;
+												sp_filter_flags = (gl_fl >> 5) & 0x07;
 											}
 											break;
 										}
@@ -4156,8 +4157,8 @@ namespace SWFRecomp
 												sp_blur_x = (float)(s32)bv_bx/65536.0f; sp_blur_y = (float)(s32)bv_by/65536.0f;
 												sp_filter_angle = (float)(s32)bv_ang/65536.0f; sp_filter_distance = (float)(s32)bv_dist/65536.0f;
 												sp_filter_strength = (float)bv_str/256.0f;
-												sp_filter_quality = (bv_fl >> 3) & 0x1F; if (!sp_filter_quality) sp_filter_quality = 1;
-												sp_filter_flags = bv_fl & 0x07;
+												sp_filter_quality = bv_fl & 0x0F; if (!sp_filter_quality) sp_filter_quality = 1;
+												sp_filter_flags = (bv_fl >> 4) & 0x0F;
 											}
 											break;
 										}
@@ -4183,8 +4184,8 @@ namespace SWFRecomp
 												sp_blur_x = (float)(s32)gg_bx/65536.0f; sp_blur_y = (float)(s32)gg_by/65536.0f;
 												sp_filter_angle = (float)(s32)gg_ang/65536.0f; sp_filter_distance = (float)(s32)gg_dist/65536.0f;
 												sp_filter_strength = (float)gg_str/256.0f;
-												sp_filter_quality = (gg_fl >> 3) & 0x1F; if (!sp_filter_quality) sp_filter_quality = 1;
-												sp_filter_flags = gg_fl & 0x07;
+												sp_filter_quality = gg_fl & 0x1F; if (!sp_filter_quality) sp_filter_quality = 1;
+												sp_filter_flags = (gg_fl >> 5) & 0x07;
 											}
 											break;
 										}
@@ -4232,8 +4233,8 @@ namespace SWFRecomp
 												sp_blur_x = (float)(s32)gb_bx/65536.0f; sp_blur_y = (float)(s32)gb_by/65536.0f;
 												sp_filter_angle = (float)(s32)gb_ang/65536.0f; sp_filter_distance = (float)(s32)gb_dist/65536.0f;
 												sp_filter_strength = (float)gb_str/256.0f;
-												sp_filter_quality = (gb_fl >> 3) & 0x1F; if (!sp_filter_quality) sp_filter_quality = 1;
-												sp_filter_flags = gb_fl & 0x07;
+												sp_filter_quality = gb_fl & 0x1F; if (!sp_filter_quality) sp_filter_quality = 1;
+												sp_filter_flags = (gb_fl >> 5) & 0x07;
 											}
 											break;
 										}
