@@ -31635,16 +31635,35 @@ void actionSetMember(SWFAppContext* app_context)
 					if (value_var.type == ACTION_STACK_VALUE_NULL || value_var.type == ACTION_STACK_VALUE_UNDEFINED) {
 						return; // Keep old matrix
 					}
-					// Matrix setter: ColorMatrixFilter always 20 + NaN pad; ConvolutionFilter stores as-is
 					ActionVar* mx_prop = getProperty(obj, "matrixX", 7);
 					int is_convolution = (mx_prop != NULL);
+					// Get matrixX*matrixY for ConvolutionFilter target size
+					int target_sz = 0;
+					if (is_convolution) {
+						ActionVar* myp = getProperty(obj, "matrixY", 7);
+						int mx = mx_prop ? (int)varToDoubleSimple(mx_prop) : 0;
+						int my = myp ? (int)varToDoubleSimple(myp) : 0;
+						if (mx < 0) mx = 0; if (my < 0) my = 0;
+						target_sz = mx * my;
+					}
 					ASArray* src_arr = NULL;
-					if (value_var.type == ACTION_STACK_VALUE_ARRAY)
+					int src_len = 0;
+					if (value_var.type == ACTION_STACK_VALUE_ARRAY) {
 						src_arr = (ASArray*)(uintptr_t)value_var.data.numeric_value;
+						src_len = src_arr ? (int)src_arr->length : 0;
+					} else if (is_convolution) {
+						// Non-array: string → NaN-filled of string length; number → zeros of matrixX*matrixY
+						if (value_var.type == ACTION_STACK_VALUE_STRING) {
+							src_len = (int)value_var.str_size;
+						} else {
+							// Number/other: reset to zeros with matrixX*matrixY length
+							src_len = target_sz;
+						}
+					}
 					int alloc_len;
 					if (is_convolution) {
-						// ConvolutionFilter: store array as-is (no resize)
-						alloc_len = src_arr ? (int)src_arr->length : 0;
+						// ConvolutionFilter: max of src_len and target_sz (pad to matrixX*matrixY)
+						alloc_len = (src_len > target_sz) ? src_len : target_sz;
 					} else {
 						alloc_len = 20; // ColorMatrixFilter always 20
 					}
@@ -31653,16 +31672,21 @@ void actionSetMember(SWFAppContext* app_context)
 					initArrayProto(app_context, new_matrix);
 					for (int mi = 0; mi < alloc_len; mi++) {
 						if (src_arr && mi < (int)src_arr->length) {
-							// Convert element to number — null/undefined/non-number → NaN
+							// Array elements: strings → NaN, null/undefined → NaN, numbers → value
 							ActionVar* el = &src_arr->elements[mi];
 							double ev;
-							if (el->type == ACTION_STACK_VALUE_NULL || el->type == ACTION_STACK_VALUE_UNDEFINED)
+							if (el->type == ACTION_STACK_VALUE_NULL || el->type == ACTION_STACK_VALUE_UNDEFINED ||
+							    el->type == ACTION_STACK_VALUE_STRING)
 								ev = NAN;
 							else
 								ev = varToDoubleSimple(el);
 							new_matrix->elements[mi] = makeF64(ev);
+						} else if (!src_arr && mi < src_len) {
+							// Non-array source: NaN for string-length elements, 0 for number-reset
+							new_matrix->elements[mi] = (value_var.type == ACTION_STACK_VALUE_STRING) ? makeF64(NAN) : makeF64(0.0);
 						} else {
-							new_matrix->elements[mi] = makeF64(NAN); // Pad with NaN
+							// Padding: 0 for ConvolutionFilter, NaN for ColorMatrixFilter
+							new_matrix->elements[mi] = is_convolution ? makeF64(0.0) : makeF64(NAN);
 						}
 					}
 					value_var.type = ACTION_STACK_VALUE_ARRAY;
