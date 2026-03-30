@@ -31863,53 +31863,58 @@ void actionSetMember(SWFAppContext* app_context)
 							num_colors = (src_len < num_colors) ? src_len : num_colors;
 						}
 						// else alphas: num_colors stays the same
-						// Rebuild all three arrays at num_colors length
-						ASArray* new_c = allocArray(app_context, num_colors > 0 ? num_colors : 1);
-						new_c->length = num_colors; initArrayProto(app_context, new_c);
-						ASArray* new_a = allocArray(app_context, num_colors > 0 ? num_colors : 1);
-						new_a->length = num_colors; initArrayProto(app_context, new_a);
-						ASArray* new_r = allocArray(app_context, num_colors > 0 ? num_colors : 1);
-						new_r->length = num_colors; initArrayProto(app_context, new_r);
-						for (int i = 0; i < num_colors; i++) {
-							// Colors
-							ASArray* cs = is_colors ? src_arr : cur_c;
-							if (cs && i < (int)cs->length) {
-								uint32_t uv = (uint32_t)(int32_t)varToDoubleSimple(&cs->elements[i]);
-								new_c->elements[i] = makeF64((double)(uv & 0x00FFFFFF));
-							} else {
-								new_c->elements[i] = makeF64(0.0);
+						// Use persistent 16-element backing arrays; only change visible length.
+						// This preserves old values when num_colors expands.
+						// Reuse existing arrays if possible (mutate in place).
+						if (!cur_c) { cur_c = allocArray(app_context, 16); initArrayProto(app_context, cur_c); for (int j=0;j<16;j++) cur_c->elements[j]=makeF64(0.0); }
+						if (!cur_a) { cur_a = allocArray(app_context, 16); initArrayProto(app_context, cur_a); for (int j=0;j<16;j++) cur_a->elements[j]=makeF64(0.0); }
+						if (!cur_r) { cur_r = allocArray(app_context, 16); initArrayProto(app_context, cur_r); for (int j=0;j<16;j++) cur_r->elements[j]=makeF64(0.0); }
+						// Ensure capacity is at least 16
+						if (cur_c->capacity < 16) { ASArray* tmp = allocArray(app_context, 16); initArrayProto(app_context, tmp); for (int j=0;j<16;j++) tmp->elements[j]=makeF64(0.0); for (u32 j = 0; j < cur_c->length && j < 16; j++) tmp->elements[j] = cur_c->elements[j]; cur_c = tmp; }
+						if (cur_a->capacity < 16) { ASArray* tmp = allocArray(app_context, 16); initArrayProto(app_context, tmp); for (int j=0;j<16;j++) tmp->elements[j]=makeF64(0.0); for (u32 j = 0; j < cur_a->length && j < 16; j++) tmp->elements[j] = cur_a->elements[j]; cur_a = tmp; }
+						if (cur_r->capacity < 16) { ASArray* tmp = allocArray(app_context, 16); initArrayProto(app_context, tmp); for (int j=0;j<16;j++) tmp->elements[j]=makeF64(0.0); for (u32 j = 0; j < cur_r->length && j < 16; j++) tmp->elements[j] = cur_r->elements[j]; cur_r = tmp; }
+						// Apply source values to the target array
+						for (int i = 0; i < 16; i++) {
+							if (is_colors && i < src_len) {
+								if (src_arr && i < (int)src_arr->length) {
+									uint32_t uv = (uint32_t)(int32_t)varToDoubleSimple(&src_arr->elements[i]);
+									cur_c->elements[i] = makeF64((double)(uv & 0x00FFFFFF));
+								} else {
+									cur_c->elements[i] = makeF64(0.0);
+								}
+							} else if (is_colors && i >= src_len && i >= (int)cur_c->length) {
+								// New position beyond old: default 0
+								cur_c->elements[i] = makeF64(0.0);
 							}
-							// Alphas
-							if (is_alphas && src_arr && i < (int)src_arr->length) {
-								double av_d = varToDoubleSimple(&src_arr->elements[i]);
-								if (!isfinite(av_d)) av_d = 1.0; // NaN/Inf → 1.0 (u8::MAX/255)
-								if (av_d < 0) av_d = 0; if (av_d > 1) av_d = 1;
-								av_d = (double)((int)(av_d * 255.0 + 0.5)) / 255.0;
-								new_a->elements[i] = makeF64(av_d);
-							} else if (is_alphas) {
-								// Beyond source: default to 1.0 (u8::MAX/255) per Ruffle
-								new_a->elements[i] = makeF64(1.0);
-							} else if (cur_a && i < (int)cur_a->length) {
-								new_a->elements[i] = cur_a->elements[i];
-							} else {
-								new_a->elements[i] = makeF64(0.0);
+							if (is_alphas && i < num_colors) {
+								if (src_arr && i < (int)src_arr->length) {
+									double av_d = varToDoubleSimple(&src_arr->elements[i]);
+									if (!isfinite(av_d)) av_d = 1.0;
+									if (av_d < 0) av_d = 0; if (av_d > 1) av_d = 1;
+									av_d = (double)((int)(av_d * 255.0 + 0.5)) / 255.0;
+									cur_a->elements[i] = makeF64(av_d);
+								} else {
+									cur_a->elements[i] = makeF64(1.0);
+								}
 							}
-							// Ratios
-							if (is_ratios && src_arr && i < (int)src_arr->length) {
-								int rv = (int)varToDoubleSimple(&src_arr->elements[i]);
-								if (rv < 0) rv = 0; if (rv > 255) rv = 255;
-								new_r->elements[i] = makeF64((double)rv);
-							} else if (cur_r && i < (int)cur_r->length) {
-								new_r->elements[i] = cur_r->elements[i];
-							} else {
-								new_r->elements[i] = makeF64(0.0);
+							if (is_ratios && i < num_colors) {
+								if (src_arr && i < (int)src_arr->length) {
+									int rv_i = (int)varToDoubleSimple(&src_arr->elements[i]);
+									if (rv_i < 0) rv_i = 0; if (rv_i > 255) rv_i = 255;
+									cur_r->elements[i] = makeF64((double)rv_i);
+								}
+								// Beyond source for ratios: keep old value
 							}
+							// Alphas and ratios persist in backing array across all operations
 						}
-						ActionVar cv = {0}; cv.type = ACTION_STACK_VALUE_ARRAY; cv.data.numeric_value = (u64)new_c;
+						cur_c->length = num_colors;
+						cur_a->length = num_colors;
+						cur_r->length = num_colors;
+						ActionVar cv = {0}; cv.type = ACTION_STACK_VALUE_ARRAY; cv.data.numeric_value = (u64)cur_c;
 						setProperty(app_context, obj, "colors", 6, &cv);
-						ActionVar av = {0}; av.type = ACTION_STACK_VALUE_ARRAY; av.data.numeric_value = (u64)new_a;
+						ActionVar av = {0}; av.type = ACTION_STACK_VALUE_ARRAY; av.data.numeric_value = (u64)cur_a;
 						setProperty(app_context, obj, "alphas", 6, &av);
-						ActionVar rv = {0}; rv.type = ACTION_STACK_VALUE_ARRAY; rv.data.numeric_value = (u64)new_r;
+						ActionVar rv = {0}; rv.type = ACTION_STACK_VALUE_ARRAY; rv.data.numeric_value = (u64)cur_r;
 						setProperty(app_context, obj, "ratios", 6, &rv);
 						return;
 					}
@@ -34783,8 +34788,24 @@ void actionGetMember(SWFAppContext* app_context)
 			}
 			else
 			{
-				// Regular property — push its value
-				pushVar(app_context, &prop_struct->value);
+				// Filter mapPoint getter: return a defensive copy (new Point each time)
+				if (obj->native_type == NATIVE_FILTER &&
+				    prop_name_len == 8 && memcmp(prop_name, "mapPoint", 8) == 0 &&
+				    prop_struct->value.type == ACTION_STACK_VALUE_OBJECT &&
+				    prop_struct->value.data.numeric_value != 0) {
+					ASObject* pt = (ASObject*)(uintptr_t)prop_struct->value.data.numeric_value;
+					ActionVar* px = getProperty(pt, "x", 1);
+					ActionVar* py = getProperty(pt, "y", 1);
+					ActionVar vx = px ? *px : makeF64(0.0);
+					ActionVar vy = py ? *py : makeF64(0.0);
+					ASObject* clone_pt = createPointObj(app_context, &vx, &vy);
+					ActionVar cv = {0}; cv.type = ACTION_STACK_VALUE_OBJECT;
+					cv.data.numeric_value = (u64)clone_pt;
+					pushVar(app_context, &cv);
+				} else {
+					// Regular property — push its value
+					pushVar(app_context, &prop_struct->value);
+				}
 			}
 		}
 		else
