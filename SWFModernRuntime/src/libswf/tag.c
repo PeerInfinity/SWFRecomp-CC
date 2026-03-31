@@ -1138,7 +1138,7 @@ static void render_single_object(SWFAppContext* app_context, DisplayObject* obj)
 		case CHAR_TYPE_TEXT:
 			for (size_t j = 0; j < ch->text_size; ++j)
 			{
-				size_t glyph_index = 2*app_context->text_data[ch->text_start + j];
+				size_t glyph_index = 4*app_context->text_data[ch->text_start + j];
 				renderer_draw_shape(context,
 					app_context->glyph_data[glyph_index],
 					app_context->glyph_data[glyph_index + 1],
@@ -1179,7 +1179,7 @@ static void render_display_list(SWFAppContext* app_context, DisplayObject* dl, s
 			case CHAR_TYPE_TEXT:
 				for (size_t j = 0; j < ch->text_size; ++j)
 				{
-					size_t glyph_index = 2*app_context->text_data[ch->text_start + j];
+					size_t glyph_index = 4*app_context->text_data[ch->text_start + j];
 					renderer_draw_shape(context,
 						app_context->glyph_data[glyph_index],
 						app_context->glyph_data[glyph_index + 1],
@@ -1681,8 +1681,8 @@ static void textfield_glyph_render_cb(const TextFieldGlyphInfo* info, void* user
 
 		// Global glyph index
 		size_t global_idx = glyph_base + (size_t)glyph_idx;
-		size_t g_offset = (size_t)glyph_data[2 * global_idx][0];
-		size_t g_size = (size_t)glyph_data[2 * global_idx + 1][0];
+		size_t g_offset = (size_t)glyph_data[4 * global_idx][0];
+		size_t g_size = (size_t)glyph_data[4 * global_idx + 1][0];
 
 		if (g_size > 0 && g_size <= 512) {
 			// Transform glyph vertices: scale from EM space + translate to position

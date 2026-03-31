@@ -3599,16 +3599,19 @@ static int ng_hitTestShapeChar(size_t char_id, u16 ratio,
 
 	Character* ch = &dictionary[char_id];
 
-	// Static text (DefineText/DefineText2): per-glyph triangle hit testing
+	// Static text (DefineText/DefineText2): per-glyph hit testing
 	if (ch->type == CHAR_TYPE_TEXT) {
 		size_t ts = ch->text_start;
 		size_t tc = ch->text_size;
 		u32 tf_base = ch->transform_start;
 		for (size_t j = 0; j < tc; j++) {
-			size_t gi = 2 * (size_t)text_data[ts + j];
+			// glyph_data: 4 values per glyph (tri_offset, tri_size, path_offset, path_size)
+			size_t gi = 4 * (size_t)text_data[ts + j];
 			size_t glyph_offset = (size_t)glyph_data[gi][0];
 			size_t glyph_size = (size_t)glyph_data[gi + 1][0];
-			if (glyph_size < 3) continue;  // no triangles
+			size_t glyph_path_offset = (size_t)glyph_data[gi + 2][0];
+			size_t glyph_path_size = (size_t)glyph_data[gi + 3][0];
+			if (glyph_size < 3 && glyph_path_size < 3) continue;  // no data
 			// Compose parent matrix with glyph positioning transform
 			u32 gtid = tf_base + (u32)j;
 			double ga = (double)transform_data[gtid][0];
@@ -3629,7 +3632,34 @@ static int ng_hitTestShapeChar(size_t char_id, u16 ratio,
 			double sy = test_y - nty;
 			double local_x = ( nd * sx - nc * sy) * inv_det;
 			double local_y = (-nb * sx + na * sy) * inv_det;
-			// Test against glyph triangles
+			// Try path-based glyph hit test first (exact curves)
+			if (glyph_path_size >= 3) {
+				// Font glyphs use non-zero winding (TTF convention)
+				int glyph_winding = 0;
+				double g_cursor_x = 0, g_cursor_y = 0;
+				int g_fill1 = 0;
+				for (size_t pi = glyph_path_offset; pi < glyph_path_offset + glyph_path_size; pi++) {
+					float pcmd = path_data[pi][0];
+					if (pcmd == 1.0f) { g_fill1 = (int)path_data[pi][2]; if (pi+1 < glyph_path_offset+glyph_path_size && path_data[pi+1][0]==1.5f) pi++; }
+					else if (pcmd == 5.0f) { g_cursor_x = (double)path_data[pi][1]; g_cursor_y = (double)path_data[pi][2]; }
+					else if (pcmd == 2.0f && g_fill1) {
+						double gnx = (double)path_data[pi][1], gny = (double)path_data[pi][2];
+						glyph_winding += winding_number_line(local_x, local_y, g_cursor_x, g_cursor_y, gnx, gny);
+						g_cursor_x = gnx; g_cursor_y = gny;
+					}
+					else if (pcmd == 3.0f && pi+1 < glyph_path_offset+glyph_path_size && g_fill1) {
+						double gcx = (double)path_data[pi][1], gcy = (double)path_data[pi][2];
+						pi++;
+						double gnx = (double)path_data[pi][1], gny = (double)path_data[pi][2];
+						glyph_winding += winding_number_curve(local_x, local_y, g_cursor_x, g_cursor_y, gcx, gcy, gnx, gny);
+						g_cursor_x = gnx; g_cursor_y = gny;
+					}
+					else if (pcmd == 0.0f) break;
+				}
+				if (glyph_winding != 0) return 1;  // non-zero winding = inside glyph
+				continue;  // path test is authoritative, skip triangle fallback
+			}
+			// Fallback: test against glyph triangles
 			size_t num_tris = glyph_size / 3;
 			for (size_t t = 0; t < num_tris; t++) {
 				const u32* v0 = shape_data[glyph_offset + t*3 + 0];

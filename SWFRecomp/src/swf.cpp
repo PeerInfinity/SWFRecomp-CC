@@ -689,7 +689,7 @@ namespace SWFRecomp
 						  << (current_bitmap_pixel ? bitmap_data.str() : "\t0\n")
 						  << "};" << endl
 						  << endl
-						  << "u32 glyph_data[" << to_string(current_glyph ? 2*current_glyph : 1) << "][1] =" << endl
+						  << "u32 glyph_data[" << to_string(current_glyph ? 4*current_glyph : 1) << "][1] =" << endl
 						  << "{" << endl
 						  << (current_glyph ? glyph_data.str() : "\t0\n")
 						  << "};" << endl
@@ -736,7 +736,7 @@ namespace SWFRecomp
 								 << "extern float uninv_mat_data[" << to_string(current_uninv ? 16*current_uninv : 1) << "];" << endl
 								 << "extern u8 gradient_data[" << to_string(current_gradient ? 256*current_gradient : 1) << "][4];" << endl
 								 << "extern u8 bitmap_data[" << to_string(current_bitmap_pixel ? 4*current_bitmap_pixel : 1) << "];" << endl
-								 << "extern u32 glyph_data[" << to_string(current_glyph ? 2*current_glyph : 1) << "][1];" << endl
+								 << "extern u32 glyph_data[" << to_string(current_glyph ? 4*current_glyph : 1) << "][1];" << endl
 								 << "extern u32 text_data[" << to_string(current_text ? current_text : 1) << "];" << endl
 								 << "extern u16 text_char_codes[" << to_string(current_text ? current_text : 1) << "];" << endl
 								 << "extern float cxform_data[" << to_string(current_cxform ? 20*current_cxform : 1) << "];" << endl
@@ -1685,6 +1685,7 @@ namespace SWFRecomp
 
 				// Collect glyph entries — device font fallback may patch empty ones later
 				std::vector<std::pair<size_t, size_t>> font_glyph_entries;
+				std::vector<std::pair<size_t, size_t>> font_glyph_path_entries;
 				for (u16 i = 0; i < num_entries; ++i)
 				{
 					size_t glyph_start = 3*current_tri;
@@ -1694,6 +1695,7 @@ namespace SWFRecomp
 
 					size_t glyph_size = 3*current_tri - glyph_start;
 					font_glyph_entries.push_back({glyph_start, glyph_size});
+					font_glyph_path_entries.push_back({0, 0}); // filled by device font fallback
 				}
 
 				// Read code table for DefineFont2/3
@@ -1754,8 +1756,8 @@ namespace SWFRecomp
 					float ttf_scale = swf_em / 1000.0f; // Noto Sans EM = 1000
 
 					for (u16 i = 0; i < num_entries; i++) {
-						if (font_glyph_entries[i].second != 0) continue; // already has shapes
 						if (i >= font_code_tables[font_id].size()) continue;
+						int needs_triangles = (font_glyph_entries[i].second == 0);
 
 						u16 codepoint = font_code_tables[font_id][i];
 						int ttf_glyph = stbtt_FindGlyphIndex(&g_device_font, codepoint);
@@ -1765,9 +1767,19 @@ namespace SWFRecomp
 						int num_verts = stbtt_GetGlyphShape(&g_device_font, ttf_glyph, &verts);
 						if (num_verts <= 0) continue;
 
-						// Build polygon contours from TTF outline
+						// Build polygon contours from TTF outline AND emit path commands
 						std::vector<std::vector<std::array<Coord, 2>>> polygon;
 						std::vector<std::array<Coord, 2>> contour;
+
+						// Emit glyph path header: fill1=1, non-zero winding (font glyphs)
+						size_t glyph_path_start = current_path_entry;
+						auto emitGP = [&](float cmd, float a, float b) {
+							path_data << "\t{" << std::fixed << std::setprecision(1)
+							          << cmd << "f, " << a << "f, " << b << "f},\n";
+							current_path_entry++;
+						};
+						emitGP(1.0f, 0.0f, 1.0f);  // fill0=0, fill1=1
+						emitGP(1.5f, 0.0f, 0.0f);  // no line style
 
 						for (int v = 0; v < num_verts; v++) {
 							if (verts[v].type == STBTT_vmove) {
@@ -1775,13 +1787,15 @@ namespace SWFRecomp
 									polygon.push_back(contour);
 									contour.clear();
 								}
+								// Emit MoveTo for path data
+								emitGP(5.0f, verts[v].x * ttf_scale, -verts[v].y * ttf_scale);
 							} else if (verts[v].type == STBTT_vline) {
-								contour.push_back({
-									(Coord)(verts[v].x * ttf_scale),
-									(Coord)(-verts[v].y * ttf_scale)
-								});
+								float lx = verts[v].x * ttf_scale;
+								float ly = -verts[v].y * ttf_scale;
+								contour.push_back({(Coord)lx, (Coord)ly});
+								emitGP(2.0f, lx, ly);
 							} else if (verts[v].type == STBTT_vcurve) {
-								// Quadratic bezier subdivision
+								// Quadratic bezier: emit raw curve for path, subdivide for triangles
 								float x0, y0;
 								if (!contour.empty()) {
 									x0 = (float)contour.back()[0];
@@ -1791,6 +1805,10 @@ namespace SWFRecomp
 								float cy = -verts[v].cy * ttf_scale;
 								float x1 = verts[v].x * ttf_scale;
 								float y1 = -verts[v].y * ttf_scale;
+								// Path: raw quadratic curve
+								emitGP(3.0f, cx, cy);
+								emitGP(4.0f, x1, y1);
+								// Triangulation: subdivide into 6 segments
 								for (int s = 1; s <= 6; s++) {
 									float t = (float)s / 6.0f;
 									float it = 1.0f - t;
@@ -1800,7 +1818,7 @@ namespace SWFRecomp
 									});
 								}
 							} else if (verts[v].type == STBTT_vcubic) {
-								// Cubic bezier subdivision
+								// Cubic bezier: decompose to quadratics for path, subdivide for triangles
 								float x0, y0;
 								if (!contour.empty()) {
 									x0 = (float)contour.back()[0];
@@ -1812,6 +1830,26 @@ namespace SWFRecomp
 								float cy2 = -verts[v].cy1 * ttf_scale;
 								float x1 = verts[v].x * ttf_scale;
 								float y1 = -verts[v].y * ttf_scale;
+								// Path: approximate cubic with 2 quadratics (midpoint split)
+								float mx = (cx1 + cx2) * 0.5f;
+								float my = (cy1 + cy2) * 0.5f;
+								float q1cx = (x0 + cx1) * 0.5f + (cx1 - x0) * 0.25f;
+								float q1cy = (y0 + cy1) * 0.5f + (cy1 - y0) * 0.25f;
+								// Simpler: split at t=0.5 using de Casteljau
+								float h1x = (x0 + cx1) * 0.5f, h1y = (y0 + cy1) * 0.5f;
+								float h2x = (cx1 + cx2) * 0.5f, h2y = (cy1 + cy2) * 0.5f;
+								float h3x = (cx2 + x1) * 0.5f, h3y = (cy2 + y1) * 0.5f;
+								float h12x = (h1x + h2x) * 0.5f, h12y = (h1y + h2y) * 0.5f;
+								float h23x = (h2x + h3x) * 0.5f, h23y = (h2y + h3y) * 0.5f;
+								float midx = (h12x + h23x) * 0.5f, midy = (h12y + h23y) * 0.5f;
+								// First half: quadratic (x0,y0) ctrl(h1x,h1y) anchor(midx,midy)
+								// — but quadratic can't exactly represent cubic half; use ctrl≈h12
+								emitGP(3.0f, h12x, h12y);
+								emitGP(4.0f, midx, midy);
+								// Second half: quadratic (midx,midy) ctrl(h23x,h23y) anchor(x1,y1)
+								emitGP(3.0f, h23x, h23y);
+								emitGP(4.0f, x1, y1);
+								// Triangulation: subdivide cubic into 8 segments
 								for (int s = 1; s <= 8; s++) {
 									float t = (float)s / 8.0f;
 									float it = 1.0f - t;
@@ -1825,6 +1863,11 @@ namespace SWFRecomp
 						if (!contour.empty()) polygon.push_back(contour);
 						stbtt_FreeShape(&g_device_font, verts);
 
+						// Always emit glyph path end marker (path data for hit testing)
+						emitGP(0.0f, 0.0f, 0.0f);
+						if (current_path_entry > glyph_path_start + 3)  // has actual commands beyond header
+							font_glyph_path_entries[i] = {glyph_path_start, current_path_entry - glyph_path_start};
+
 						if (polygon.empty() || polygon[0].size() < 3) continue;
 
 						std::vector<N> indices = mapbox::earcut<N>(polygon);
@@ -1836,26 +1879,32 @@ namespace SWFRecomp
 							for (auto& pt : ring)
 								all_pts.push_back(pt);
 
-						font_glyph_entries[i].first = 3 * current_tri;
-						font_glyph_entries[i].second = indices.size();
+						// Only emit triangles if the SWF didn't already provide glyph shapes
+						if (needs_triangles) {
+							font_glyph_entries[i].first = 3 * current_tri;
+							font_glyph_entries[i].second = indices.size();
 
-						for (size_t idx = 0; idx < indices.size(); idx++) {
-							float x_f = (float)all_pts[indices[idx]][0];
-							float y_f = (float)all_pts[indices[idx]][1];
-							shape_data << "\t{ "
-								<< std::hex << std::uppercase
-								<< "0x" << VAL(u32, &x_f) << ", "
-								<< "0x" << VAL(u32, &y_f) << ", "
-								<< "0x00, 0x00 }," << std::dec << endl;
+							for (size_t idx = 0; idx < indices.size(); idx++) {
+								float x_f = (float)all_pts[indices[idx]][0];
+								float y_f = (float)all_pts[indices[idx]][1];
+								shape_data << "\t{ "
+									<< std::hex << std::uppercase
+									<< "0x" << VAL(u32, &x_f) << ", "
+									<< "0x" << VAL(u32, &y_f) << ", "
+									<< "0x00, 0x00 }," << std::dec << endl;
+							}
+							current_tri += indices.size() / 3;
 						}
-						current_tri += indices.size() / 3;
 					}
 				}
 
-				// Write glyph_data entries for this font
+				// Write glyph_data entries for this font (4 values per glyph:
+				// tri_offset, tri_size, path_offset, path_size)
 				for (u16 i = 0; i < num_entries; i++) {
 					glyph_data << "\t" << to_string(font_glyph_entries[i].first) << "," << endl
-							   << "\t" << to_string(font_glyph_entries[i].second) << "," << endl;
+							   << "\t" << to_string(font_glyph_entries[i].second) << "," << endl
+							   << "\t" << to_string(font_glyph_path_entries.size() > i ? font_glyph_path_entries[i].first : 0) << "," << endl
+							   << "\t" << to_string(font_glyph_path_entries.size() > i ? font_glyph_path_entries[i].second : 0) << "," << endl;
 					current_glyph += 1;
 				}
 
