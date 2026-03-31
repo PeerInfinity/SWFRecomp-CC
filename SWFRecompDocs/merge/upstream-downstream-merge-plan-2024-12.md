@@ -40,10 +40,13 @@ LittleCube has added **garbage collection** to the runtime PR (commit `f02311c`,
 - Previous 5 commits (objects and functions infrastructure)
 - `c7348af` - remove arg initial strings, add null/undefined push values
 
-**SWFModernRuntime PR #3** — now 16 commits (was 14):
+**SWFModernRuntime PR #3** — now 19 commits (was 14):
 - Previous 14 commits (objects and functions infrastructure)
 - `f02311c` - **first attempt at garbage collection** (concurrent GC with cycle detection)
 - `f1d2da9` - move free thread functions to separate file (`free_thread.c`/`free_thread.h`)
+- `e2db29b` - cleanup
+- `6f256b2` - **fix free mechanism bug** — edge case with aliased objects in dense cycles (e.g. `a = b; a.bb = b; b.a = a;` with cross-references)
+- `aa3fa7f` - cleanup
 
 #### LittleCube's Pre-Merge TODO (Updated)
 
