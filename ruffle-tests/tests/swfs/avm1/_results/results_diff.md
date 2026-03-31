@@ -1,7 +1,7 @@
 # Ruffle Test Results Diff
 
-**Previous:** `44c591653858` (2026-03-31T03:00:21.643692+00:00)
-**Current:** `f7b350abb276` (2026-03-31T03:54:30.398218+00:00)
+**Previous:** `f7b350abb276` (2026-03-31T03:54:30.398218+00:00)
+**Current:** `aa4c108d6a4c` (2026-03-31T04:48:25.717834+00:00)
 
 ## Summary
 
@@ -10,11 +10,11 @@
 | Passing | 565 | 565 | 0 |
 | Total | 620 | 620 | 0 |
 | Pass rate | 91.1% | 91.1% | 0% |
-| Mismatched lines | 11099 | 11098 | -1 |
+| Mismatched lines | 11098 | 11097 | -1 |
 |   Decreased | | | -1 |
 
 ## Line Count Changed (1)
 
 | Test | Status | Lines (prev) | Lines (now) | Diff |
 |------|--------|--------------|-------------|------|
-| `movieclip_hittest_shapeflag` | output_mismatch | 323/338 | 324/338 | -1 |
+| `movieclip_hittest_shapeflag` | output_mismatch | 324/338 | 325/338 | -1 |
