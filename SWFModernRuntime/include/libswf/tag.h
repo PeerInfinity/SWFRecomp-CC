@@ -277,6 +277,8 @@ void ng_record_char_bounds(size_t char_id, s32 xmin, s32 xmax, s32 ymin, s32 yma
 void ng_record_morph_end_bounds(size_t char_id, s32 xmin, s32 xmax, s32 ymin, s32 ymax);
 // Record that a shape uses non-zero winding rule (DefineShape4 UsesFillWindingRule flag)
 void ng_record_char_winding(size_t char_id);
+// Record vector path data for a shape (for path-based hit testing)
+void ng_record_char_path(size_t char_id, size_t path_offset, size_t path_size);
 // Shape-accurate point-in-shape test for a display list.
 // Walks the display list recursively; for leaf shapes, tests the test point against triangles.
 // ma..mty is the accumulated parent matrix (twips space).

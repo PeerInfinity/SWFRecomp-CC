@@ -190,6 +190,9 @@ namespace SWFRecomp
 		std::stringstream cxform_data;
 		size_t current_cxform;
 
+		std::stringstream path_data;  // vector path data for hit testing (fills + strokes)
+		size_t current_path_entry;
+
 		std::stringstream morph_end_shape_data;
 		size_t current_morph_end_vertex;
 		std::stringstream morph_end_color_data;

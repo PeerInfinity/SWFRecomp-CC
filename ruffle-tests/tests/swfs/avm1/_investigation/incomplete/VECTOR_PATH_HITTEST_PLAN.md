@@ -7,10 +7,10 @@ status: incomplete
 phases:
   - id: 1
     name: "Path data emission (recompiler)"
-    status: not_started
+    status: complete
   - id: 2
     name: "Fill winding number algorithm (runtime)"
-    status: not_started
+    status: incomplete
   - id: 3
     name: "Stroke distance testing (runtime)"
     status: not_started

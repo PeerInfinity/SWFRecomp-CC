@@ -187,6 +187,7 @@ namespace SWFRecomp
 								 current_glyph(0),
 								 current_text(0),
 								 current_cxform(0),
+								 current_path_entry(0),
 								 current_morph_end_vertex(0),
 								 current_morph_end_color(0),
 								 jpeg_tables(nullptr),
@@ -721,6 +722,11 @@ namespace SWFRecomp
 						  << "u8 sound_data[" << to_string(current_sound_byte ? current_sound_byte : 1) << "] =" << endl
 						  << "{" << endl
 						  << (current_sound_byte ? sound_data.str() : "\t0\n")
+						  << "};" << endl
+						  << endl
+						  << "float path_data[" << to_string(current_path_entry ? current_path_entry : 1) << "][3] =" << endl
+						  << "{" << endl
+						  << (current_path_entry ? path_data.str() : "\t{0}\n")
 						  << "};" << endl;
 
 		context.out_draws_header << endl
@@ -736,7 +742,8 @@ namespace SWFRecomp
 								 << "extern float cxform_data[" << to_string(current_cxform ? 20*current_cxform : 1) << "];" << endl
 								 << "extern float morph_end_shape_data[" << to_string(current_morph_end_vertex ? current_morph_end_vertex : 1) << "][2];" << endl
 								 << "extern float morph_end_color_data[" << to_string(current_morph_end_color ? current_morph_end_color : 1) << "][4];" << endl
-								 << "extern u8 sound_data[" << to_string(current_sound_byte ? current_sound_byte : 1) << "];" << endl;
+								 << "extern u8 sound_data[" << to_string(current_sound_byte ? current_sound_byte : 1) << "];" << endl
+								 << "extern float path_data[" << to_string(current_path_entry ? current_path_entry : 1) << "][3];" << endl;
 
 		// Emit sprite forward declarations (frame_func arrays)
 		if (!sprite_forward_decls.str().empty())
@@ -6040,21 +6047,41 @@ namespace SWFRecomp
 				
 				u32 current_fill_style_list = 0;
 				u32 current_line_style_list = 0;
-				
+
 				u32 last_fill_style_0 = 0;
 				u32 last_fill_style_1 = 0;
-				
+
 				u32 last_line_style = 0;
-				
+
 				std::vector<Path> paths;
 				paths.reserve(512);
-				
+
 				Path* current_path = nullptr;
-				
+
 				s32 last_x = 0;
 				s32 last_y = FRAME_HEIGHT;
-				
+
 				u32 cur_byte_bits_left = 8;
+
+				// Path data recording: capture raw edge commands for vector-path hit testing.
+				// Format: float path_data[][3] = {cmd, param1, param2}
+				// Commands:
+				//   {1, fill0_idx, fill1_idx}  — StyleChange (fill styles)
+				//   {1.5, line_idx, line_width} — StyleChange (line style, width in local twips)
+				//   {2, x, y}                   — LineTo
+				//   {3, ctrl_x, ctrl_y}         — CurveTo control (followed by anchor)
+				//   {4, anchor_x, anchor_y}     — CurveTo anchor
+				//   {5, x, y}                   — MoveTo
+				//   {0, 0, 0}                   — End of paths for this character
+				bool path_recording = !is_font && !is_morph;
+				size_t path_start = current_path_entry;
+
+				auto emitPath = [&](float cmd, float a, float b) {
+					if (!path_recording) return;
+					path_data << "\t{" << std::fixed << std::setprecision(1)
+					          << cmd << "f, " << a << "f, " << b << "f},\n";
+					current_path_entry++;
+				};
 
 				s32 morph_vertex_counter = 0;
 				size_t edge_iterations = 0;
@@ -6137,15 +6164,18 @@ namespace SWFRecomp
 
 								current_path->verts.push_back(v);
 
+								// Emit LineTo path command
+								emitPath(2.0f, (float)v.x, (float)(FRAME_HEIGHT - v.y));
+
 								last_x = v.x;
 								last_y = v.y;
 
 								continue;
 							}
-							
+
 							shape_tag.clearFields();
 							shape_tag.setFieldCount(2);
-							
+
 							shape_tag.configureNextField(SWF_FIELD_UB, 1);
 							shape_tag.configureNextField(SWF_FIELD_SB, num_bits + 2);
 							
@@ -6173,12 +6203,15 @@ namespace SWFRecomp
 
 							current_path->verts.push_back(v);
 
+							// Emit LineTo path command
+							emitPath(2.0f, (float)v.x, (float)(FRAME_HEIGHT - v.y));
+
 							last_x = v.x;
 							last_y = v.y;
 
 							continue;
 						}
-						
+
 						// CurvedEdgeRecord
 						
 						shape_tag.clearFields();
@@ -6210,6 +6243,10 @@ namespace SWFRecomp
 						
 						u32 num_passes = 6;
 
+						// Emit CurveTo path command (control + anchor, before subdivision)
+						emitPath(3.0f, (float)control.x, (float)(FRAME_HEIGHT - control.y));
+						emitPath(4.0f, (float)anchor.x, (float)(FRAME_HEIGHT - anchor.y));
+
 						addCurvedEdge(current_path, current, control, anchor, num_passes, is_morph ? &morph_vertex_counter : nullptr);
 
 						last_x = anchor.x;
@@ -6221,6 +6258,7 @@ namespace SWFRecomp
 					if (state_flags == 0)
 					{
 						// EndShapeRecord
+						emitPath(0.0f, 0.0f, 0.0f);  // End marker for path data
 						break;
 					}
 					
@@ -6402,11 +6440,29 @@ namespace SWFRecomp
 						if (is_morph) v.morph_index = morph_vertex_counter++;
 
 						current_path->verts.push_back(v);
+
+						// Emit path style change + moveto
+						if (path_recording && (fill_style_0_change || fill_style_1_change || state_new_styles || state_move_to))
+						{
+							emitPath(1.0f, (float)fill_style_0, (float)fill_style_1);
+							// Line style with width
+							float line_width = 0.0f;
+							if (line_style != 0 && current_line_style_list < all_line_styles.size()) {
+								LineStyle* ls = all_line_styles[current_line_style_list];
+								if (line_style - 1 < line_style_count)
+									line_width = (float)ls[line_style - 1].width;
+							}
+							emitPath(1.5f, (float)line_style, line_width);
+							// MoveTo
+							float mx = (float)last_x;
+							float my = (float)(FRAME_HEIGHT - last_y);
+							emitPath(5.0f, mx, my);
+						}
 					}
-					
+
 					last_fill_style_0 = fill_style_0;
 					last_fill_style_1 = fill_style_1;
-					
+
 					last_line_style = line_style;
 				}
 				
@@ -6917,6 +6973,14 @@ namespace SWFRecomp
 					else
 					{
 						context.tag_main << "\t" << "tagDefineShape(app_context, CHAR_TYPE_SHAPE, " << to_string(shape_id) << ", " << to_string(3*current_tri) << ", " << to_string(3*tris_size) << ", " << std::dec << to_string(shape_bounds_xmin) << ", " << to_string(shape_bounds_xmax) << ", " << to_string(shape_bounds_ymin) << ", " << to_string(shape_bounds_ymax) << ");" << endl;
+					}
+
+					// Record path data offset/size for vector-path hit testing
+					if (path_recording && current_path_entry > path_start) {
+						context.tag_main << "\t" << "ng_record_char_path("
+						                 << to_string(shape_id) << ", "
+						                 << to_string(path_start) << ", "
+						                 << to_string(current_path_entry - path_start) << ");" << endl;
 					}
 				}
 

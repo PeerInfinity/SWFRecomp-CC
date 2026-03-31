@@ -54,6 +54,15 @@ static struct {
 } ng_morph_end_bounds[MAX_MORPH_END_BOUNDS_NG];
 static size_t ng_morph_end_bounds_count = 0;
 
+// Path data for vector-path hit testing (offset, size per character)
+#define MAX_CHAR_PATHS_NG 256
+static struct {
+	size_t char_id;
+	size_t path_offset;
+	size_t path_size;
+} ng_char_paths[MAX_CHAR_PATHS_NG];
+static size_t ng_char_paths_count = 0;
+
 // Non-zero winding rule char_ids (DefineShape4 UsesFillWindingRule)
 #define MAX_WINDING_NG 64
 static size_t ng_winding_ids[MAX_WINDING_NG];
@@ -429,10 +438,31 @@ void ng_record_morph_end_bounds(size_t char_id, s32 xmin, s32 xmax, s32 ymin, s3
 	ng_morph_end_bounds_count++;
 }
 
+void ng_record_char_path(size_t char_id, size_t path_offset, size_t path_size)
+{
+	if (ng_char_paths_count >= MAX_CHAR_PATHS_NG) return;
+	ng_char_paths[ng_char_paths_count].char_id = char_id;
+	ng_char_paths[ng_char_paths_count].path_offset = path_offset;
+	ng_char_paths[ng_char_paths_count].path_size = path_size;
+	ng_char_paths_count++;
+}
+
 void ng_record_char_winding(size_t char_id)
 {
 	if (ng_winding_count < MAX_WINDING_NG)
 		ng_winding_ids[ng_winding_count++] = char_id;
+}
+
+static int ng_find_char_path(size_t char_id, size_t* out_offset, size_t* out_size)
+{
+	for (size_t i = 0; i < ng_char_paths_count; i++) {
+		if (ng_char_paths[i].char_id == char_id) {
+			*out_offset = ng_char_paths[i].path_offset;
+			*out_size = ng_char_paths[i].path_size;
+			return 1;
+		}
+	}
+	return 0;
 }
 
 static int ng_uses_nonzero_winding(size_t char_id)
@@ -3310,6 +3340,177 @@ extern u32 glyph_data[][1];
 extern u32 text_data[];
 
 // Test if a point is inside a single triangle (barycentric coordinates)
+// ---------------------------------------------------------------------------
+// Vector-path hit testing: winding number algorithm
+// ---------------------------------------------------------------------------
+
+extern float path_data[][3];
+
+// Winding number contribution from a line segment (ray-cast along +x axis).
+// Returns +1 (downward crossing), -1 (upward crossing), or 0 (no crossing).
+static int winding_number_line(double px, double py,
+    double ax, double ay, double bx, double by)
+{
+	// Check if horizontal ray from (px, py) to +inf crosses segment (a → b)
+	if (ay == by) return 0;  // horizontal segment — no crossing
+	int downward = (by > ay) ? 1 : 0;
+	double y_min = downward ? ay : by;
+	double y_max = downward ? by : ay;
+	// Point must be in [y_min, y_max) range (half-open for consistent endpoints)
+	if (py < y_min || py >= y_max) return 0;
+	// Check if point is to the left of the segment (ray crosses it)
+	double t = (py - ay) / (by - ay);
+	double x_at_t = ax + t * (bx - ax);
+	if (px < x_at_t) return downward ? 1 : -1;
+	return 0;
+}
+
+// Winding number contribution from a quadratic bezier curve.
+// P0=(ax,ay), P1=(cx,cy) control, P2=(bx,by) anchor.
+static int winding_number_curve(double px, double py,
+    double ax, double ay, double cx, double cy, double bx, double by)
+{
+	// Quick reject: point outside control point bounding box
+	double y_min = ay < cy ? (ay < by ? ay : by) : (cy < by ? cy : by);
+	double y_max = ay > cy ? (ay > by ? ay : by) : (cy > by ? cy : by);
+	if (py < y_min || py >= y_max) return 0;
+	double x_max = ax > cx ? (ax > bx ? ax : bx) : (cx > bx ? cx : bx);
+	if (px >= x_max) return 0;
+
+	// Quadratic bezier: B(t) = (1-t)²P0 + 2t(1-t)P1 + t²P2
+	// Solve B_y(t) = py: (ay-2cy+by)t² + 2(cy-ay)t + (ay-py) = 0
+	double qa = ay - 2.0*cy + by;
+	double qb = 2.0*(cy - ay);
+	double qc = ay - py;
+
+	int winding = 0;
+
+	if (fabs(qa) < 1e-7) {
+		// Near-linear: solve qb*t + qc = 0
+		if (fabs(qb) < 1e-7) return 0;
+		double t = -qc / qb;
+		if (t >= 0.0 && t < 1.0) {
+			double it = 1.0 - t;
+			double xt = it*it*ax + 2.0*it*t*cx + t*t*bx;
+			if (px < xt) {
+				double dyt = 2.0*qa*t + qb;
+				winding += (dyt > 0) ? 1 : -1;
+			}
+		}
+	} else {
+		double disc = qb*qb - 4.0*qa*qc;
+		if (disc < 0.0) return 0;
+		// Skip near-tangent intersections (disc ≈ 0) to avoid precision issues
+		// at curve extrema (wonderputt #7684 edge case)
+		if (disc < 1e-4 * (qb*qb + fabs(4.0*qa*qc) + 1.0)) return 0;
+		double sq = sqrt(disc);
+		double t1 = (-qb - sq) / (2.0*qa);
+		double t2 = (-qb + sq) / (2.0*qa);
+
+		for (int i = 0; i < 2; i++) {
+			double t = (i == 0) ? t1 : t2;
+			if (t >= 0.0 && t < 1.0) {
+				double it = 1.0 - t;
+				double xt = it*it*ax + 2.0*it*t*cx + t*t*bx;
+				if (px < xt) {
+					double dyt = 2.0*qa*t + qb;
+					if (fabs(dyt) < 1e-3) continue;  // skip near-horizontal tangent
+					winding += (dyt > 0) ? 1 : -1;
+				}
+			}
+		}
+	}
+
+	return winding;
+}
+
+// Path-based fill hit test: test if point is inside the shape's fill paths.
+// Uses winding number accumulation from path_data edges.
+// Returns 1 if hit, 0 if miss.
+static int ng_hitTestPathFill(size_t char_id, size_t path_offset, size_t path_size,
+    double local_x, double local_y)
+{
+	// Accumulate winding numbers per fill style
+	// (SWF shapes have few fill styles, typically < 10)
+	int fill_winding[64] = {0};
+	int max_fill = 0;
+
+	int cur_fill0 = 0, cur_fill1 = 0;
+	double cursor_x = 0.0, cursor_y = 0.0;
+
+	size_t end = path_offset + path_size;
+	for (size_t i = path_offset; i < end; i++) {
+		float cmd = path_data[i][0];
+
+		if (cmd == 1.0f) {
+			// StyleChange: {1, fill0, fill1}
+			cur_fill0 = (int)path_data[i][1];
+			cur_fill1 = (int)path_data[i][2];
+			if (cur_fill0 > max_fill) max_fill = cur_fill0;
+			if (cur_fill1 > max_fill) max_fill = cur_fill1;
+			// Skip line style entry (1.5)
+			if (i + 1 < end && path_data[i+1][0] == 1.5f) i++;
+		}
+		else if (cmd == 5.0f) {
+			// MoveTo: {5, x, y}
+			cursor_x = (double)path_data[i][1];
+			cursor_y = (double)path_data[i][2];
+		}
+		else if (cmd == 2.0f) {
+			// LineTo: {2, x, y}
+			double nx = (double)path_data[i][1];
+			double ny = (double)path_data[i][2];
+
+			// fill1 (left fill): forward direction
+			if (cur_fill1 > 0 && cur_fill1 < 64) {
+				fill_winding[cur_fill1] += winding_number_line(local_x, local_y,
+					cursor_x, cursor_y, nx, ny);
+			}
+			// fill0 (right fill): negate forward winding (NOT reverse arguments,
+			// because reversing shifts endpoints between t=0/t=1, breaking half-open interval)
+			if (cur_fill0 > 0 && cur_fill0 < 64) {
+				fill_winding[cur_fill0] -= winding_number_line(local_x, local_y,
+					cursor_x, cursor_y, nx, ny);
+			}
+			cursor_x = nx;
+			cursor_y = ny;
+		}
+		else if (cmd == 3.0f && i + 1 < end) {
+			// CurveTo: {3, ctrl_x, ctrl_y} + {4, anchor_x, anchor_y}
+			double cx = (double)path_data[i][1];
+			double cy = (double)path_data[i][2];
+			i++;
+			double nx = (double)path_data[i][1];
+			double ny = (double)path_data[i][2];
+
+			if (cur_fill1 > 0 && cur_fill1 < 64) {
+				fill_winding[cur_fill1] += winding_number_curve(local_x, local_y,
+					cursor_x, cursor_y, cx, cy, nx, ny);
+			}
+			if (cur_fill0 > 0 && cur_fill0 < 64) {
+				fill_winding[cur_fill0] -= winding_number_curve(local_x, local_y,
+					cursor_x, cursor_y, cx, cy, nx, ny);
+			}
+			cursor_x = nx;
+			cursor_y = ny;
+		}
+		else if (cmd == 0.0f) {
+			break;  // End
+		}
+	}
+
+	// Check if point is inside any fill
+	int nonzero = ng_uses_nonzero_winding(char_id);
+	for (int f = 1; f <= max_fill && f < 64; f++) {
+		if (nonzero) {
+			if (fill_winding[f] != 0) return 1;
+		} else {
+			if ((fill_winding[f] & 1) != 0) return 1;
+		}
+	}
+	return 0;
+}
+
 static int pit(double px, double py,
                double ax, double ay, double bx, double by, double cx, double cy)
 {
@@ -3439,6 +3640,12 @@ static int ng_hitTestShapeChar(size_t char_id, u16 ratio,
 		}
 		return 0;
 	}
+
+	// Vector-path hit testing infrastructure is in place (path_data emitted by
+	// recompiler, ng_hitTestPathFill implemented) but disabled pending proper
+	// y-monotonic curve splitting in winding_number_curve to avoid precision
+	// issues at curve extrema. See VECTOR_PATH_HITTEST_PLAN.md Phase 2.
+	// TODO: Enable once winding_number_curve handles y-extrema correctly.
 
 	size_t offset = ch->shape_offset;
 	size_t count = ch->size;
