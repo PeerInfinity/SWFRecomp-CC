@@ -3455,6 +3455,187 @@ static int winding_number_curve(double px, double py,
 // Path-based fill hit test: test if point is inside the shape's fill paths.
 // Uses winding number accumulation from path_data edges.
 // Returns 1 if hit, 0 if miss.
+// ---------------------------------------------------------------------------
+// Stroke distance testing: closest-point-to-path for stroke hit detection
+// ---------------------------------------------------------------------------
+
+// Squared distance from point P to line segment A→B.
+static double dist_sq_point_to_segment(double px, double py,
+    double ax, double ay, double bx, double by)
+{
+	double dx = bx - ax, dy = by - ay;
+	double len_sq = dx*dx + dy*dy;
+	if (len_sq < 1e-10) {
+		// Degenerate segment (zero length)
+		double ex = px - ax, ey = py - ay;
+		return ex*ex + ey*ey;
+	}
+	// Project P onto line AB, clamped to [0,1]
+	double t = ((px - ax)*dx + (py - ay)*dy) / len_sq;
+	if (t < 0.0) t = 0.0;
+	if (t > 1.0) t = 1.0;
+	double cx = ax + t*dx - px;
+	double cy = ay + t*dy - py;
+	return cx*cx + cy*cy;
+}
+
+// Squared distance from point P to quadratic bezier curve P0→P1(ctrl)→P2(anchor).
+// Finds t where (P - C(t)) · C'(t) = 0 by solving a cubic, then tests endpoints.
+static double dist_sq_point_to_curve(double px, double py,
+    double x0, double y0, double x1, double y1, double x2, double y2)
+{
+	// Coefficients for C(t) = (1-t)²P0 + 2t(1-t)P1 + t²P2
+	// C(t) = P0 + 2t(P1-P0) + t²(P0-2P1+P2) = P0 + t*B + t²*A
+	double ax = x0 - 2.0*x1 + x2, ay_c = y0 - 2.0*y1 + y2;
+	double bxc = 2.0*(x1 - x0), byc = 2.0*(y1 - y0);
+	double mx = x0 - px, my = y0 - py;
+
+	// (P - C(t)) · C'(t) = 0, where C'(t) = B + 2tA
+	// Expanding: cubic in t: a3*t³ + a2*t² + a1*t + a0 = 0
+	double a3 = 2.0*(ax*ax + ay_c*ay_c);
+	double a2 = 3.0*(ax*bxc + ay_c*byc);
+	double a1 = bxc*bxc + byc*byc + 2.0*(ax*mx + ay_c*my);
+	double a0 = bxc*mx + byc*my;
+
+	// Find minimum distance: check endpoints and all cubic roots in [0,1]
+	double min_d = mx*mx + my*my;  // dist at t=0
+	double e2x = x2 - px, e2y = y2 - py;
+	double d_end = e2x*e2x + e2y*e2y;
+	if (d_end < min_d) min_d = d_end;
+
+	// Solve cubic a3*t³ + a2*t² + a1*t + a0 = 0
+	if (fabs(a3) > 1e-10) {
+		// Reduce to depressed cubic: t³ + pt + q = 0
+		double inv_a3 = 1.0 / a3;
+		double p = (3.0*a3*a1 - a2*a2) / (3.0*a3*a3);
+		double q = (2.0*a2*a2*a2 - 9.0*a3*a2*a1 + 27.0*a3*a3*a0) / (27.0*a3*a3*a3);
+		double disc = q*q/4.0 + p*p*p/27.0;
+		double shift = -a2 / (3.0*a3);
+
+		double roots[3];
+		int n_roots = 0;
+
+		if (disc > 1e-10) {
+			// One real root
+			double sq = sqrt(disc);
+			double u = cbrt(-q/2.0 + sq);
+			double v = cbrt(-q/2.0 - sq);
+			roots[n_roots++] = u + v + shift;
+		} else if (disc < -1e-10) {
+			// Three real roots (trigonometric solution)
+			double r = sqrt(-p*p*p / 27.0);
+			double theta = acos(-q / (2.0*r));
+			double cr = cbrt(r);
+			roots[n_roots++] = 2.0*cr*cos(theta/3.0) + shift;
+			roots[n_roots++] = 2.0*cr*cos((theta + 2.0*3.14159265358979323846)/3.0) + shift;
+			roots[n_roots++] = 2.0*cr*cos((theta + 4.0*3.14159265358979323846)/3.0) + shift;
+		} else {
+			// Double or triple root
+			if (fabs(q) > 1e-10) {
+				double u = cbrt(-q/2.0);
+				roots[n_roots++] = 2.0*u + shift;
+				roots[n_roots++] = -u + shift;
+			} else {
+				roots[n_roots++] = shift;
+			}
+		}
+
+		for (int i = 0; i < n_roots; i++) {
+			double t = roots[i];
+			if (t > 0.0 && t < 1.0) {
+				double it = 1.0 - t;
+				double cx = it*it*x0 + 2.0*it*t*x1 + t*t*x2 - px;
+				double cy = it*it*y0 + 2.0*it*t*y1 + t*t*y2 - py;
+				double d = cx*cx + cy*cy;
+				if (d < min_d) min_d = d;
+			}
+		}
+	} else if (fabs(a2) > 1e-10) {
+		// Quadratic: a2*t² + a1*t + a0 = 0
+		double disc = a1*a1 - 4.0*a2*a0;
+		if (disc >= 0.0) {
+			double sq = sqrt(disc);
+			double r1 = (-a1 - sq) / (2.0*a2);
+			double r2 = (-a1 + sq) / (2.0*a2);
+			for (int i = 0; i < 2; i++) {
+				double t = (i == 0) ? r1 : r2;
+				if (t > 0.0 && t < 1.0) {
+					double it = 1.0 - t;
+					double cx = it*it*x0 + 2.0*it*t*x1 + t*t*x2 - px;
+					double cy = it*it*y0 + 2.0*it*t*y1 + t*t*y2 - py;
+					double d = cx*cx + cy*cy;
+					if (d < min_d) min_d = d;
+				}
+			}
+		}
+	} else if (fabs(a1) > 1e-10) {
+		// Linear: a1*t + a0 = 0
+		double t = -a0 / a1;
+		if (t > 0.0 && t < 1.0) {
+			double it = 1.0 - t;
+			double cx = it*it*x0 + 2.0*it*t*x1 + t*t*x2 - px;
+			double cy = it*it*y0 + 2.0*it*t*y1 + t*t*y2 - py;
+			double d = cx*cx + cy*cy;
+			if (d < min_d) min_d = d;
+		}
+	}
+
+	return min_d;
+}
+
+// Path-based stroke hit test: test if point is within stroke width of any edge.
+// Returns 1 if hit, 0 if miss.
+static int ng_hitTestPathStroke(size_t path_offset, size_t path_size,
+    double local_x, double local_y)
+{
+	double cursor_x = 0.0, cursor_y = 0.0;
+	double line_width = 0.0;  // full width in local coords
+	int has_line = 0;
+
+	size_t end = path_offset + path_size;
+	for (size_t i = path_offset; i < end; i++) {
+		float cmd = path_data[i][0];
+		if (cmd == 1.0f) {
+			// StyleChange fills — skip
+			if (i + 1 < end && path_data[i+1][0] == 1.5f) {
+				i++;
+				int line_style = (int)path_data[i][1];
+				line_width = (double)path_data[i][2];
+				has_line = (line_style > 0 && line_width > 0.0);
+				// Minimum stroke width: 1 pixel = 20 twips
+				if (has_line && line_width < 20.0) line_width = 20.0;
+			}
+		}
+		else if (cmd == 5.0f) {
+			cursor_x = (double)path_data[i][1];
+			cursor_y = (double)path_data[i][2];
+		}
+		else if (cmd == 2.0f && has_line) {
+			double nx = (double)path_data[i][1], ny = (double)path_data[i][2];
+			double half_w = line_width * 0.5;
+			if (dist_sq_point_to_segment(local_x, local_y, cursor_x, cursor_y, nx, ny) <= half_w * half_w)
+				return 1;
+			cursor_x = nx; cursor_y = ny;
+		}
+		else if (cmd == 2.0f) {
+			cursor_x = (double)path_data[i][1]; cursor_y = (double)path_data[i][2];
+		}
+		else if (cmd == 3.0f && i + 1 < end) {
+			double cx = (double)path_data[i][1], cy = (double)path_data[i][2];
+			i++;
+			double nx = (double)path_data[i][1], ny = (double)path_data[i][2];
+			if (has_line) {
+				double half_w = line_width * 0.5;
+				if (dist_sq_point_to_curve(local_x, local_y, cursor_x, cursor_y, cx, cy, nx, ny) <= half_w * half_w)
+					return 1;
+			}
+			cursor_x = nx; cursor_y = ny;
+		}
+		else if (cmd == 0.0f) break;
+	}
+	return 0;
+}
+
 static int ng_hitTestPathFill(size_t char_id, size_t path_offset, size_t path_size,
     double local_x, double local_y)
 {
@@ -3699,7 +3880,7 @@ static int ng_hitTestShapeChar(size_t char_id, u16 ratio,
 		return 0;
 	}
 
-	// Vector-path hit testing for fills (more accurate than triangles for curves)
+	// Vector-path hit testing for fills and strokes
 	{
 		size_t p_offset, p_size;
 		if (ng_find_char_path(char_id, &p_offset, &p_size)) {
@@ -3712,7 +3893,10 @@ static int ng_hitTestShapeChar(size_t char_id, u16 ratio,
 			double local_y = (-mb * sx + ma  * sy) * inv_det;
 			if (ng_hitTestPathFill(char_id, p_offset, p_size, local_x, local_y))
 				return 1;
-			// Fill miss — still check stroke triangles below
+			if (ng_hitTestPathStroke(p_offset, p_size, local_x, local_y))
+				return 1;
+			// Path test is authoritative when available — skip triangle fallback
+			return 0;
 		}
 	}
 
