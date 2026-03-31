@@ -3367,57 +3367,85 @@ static int winding_number_line(double px, double py,
 
 // Winding number contribution from a quadratic bezier curve.
 // P0=(ax,ay), P1=(cx,cy) control, P2=(bx,by) anchor.
+// Uses y-monotonic curve splitting for numerical stability at extrema.
+// Port of Ruffle's shape_utils.rs winding_number_curve + solve_quadratic.
 static int winding_number_curve(double px, double py,
     double ax, double ay, double cx, double cy, double bx, double by)
 {
-	// Quick reject: point outside control point bounding box
-	double y_min = ay < cy ? (ay < by ? ay : by) : (cy < by ? cy : by);
-	double y_max = ay > cy ? (ay > by ? ay : by) : (cy > by ? cy : by);
-	if (py < y_min || py >= y_max) return 0;
-	double x_max = ax > cx ? (ax > bx ? ax : bx) : (cx > bx ? cx : bx);
-	if (px >= x_max) return 0;
+	// Translate so test point is at origin; ray goes along +x at y=0
+	double x0 = ax - px, y0 = ay - py;
+	double x1 = cx - px, y1 = cy - py;
+	double x2 = bx - px, y2 = by - py;
 
-	// Quadratic bezier: B(t) = (1-t)²P0 + 2t(1-t)P1 + t²P2
-	// Solve B_y(t) = py: (ay-2cy+by)t² + 2(cy-ay)t + (ay-py) = 0
-	double qa = ay - 2.0*cy + by;
-	double qb = 2.0*(cy - ay);
-	double qc = ay - py;
+	// Quick reject: all control points on same side of ray, or all to the left
+	if ((y0 < 0.0 && y1 < 0.0 && y2 < 0.0) ||
+	    (y0 > 0.0 && y1 > 0.0 && y2 > 0.0) ||
+	    (x0 <= 0.0 && x1 <= 0.0 && x2 <= 0.0))
+		return 0;
 
+	// Quadratic y(t) = a*t² + b*t + c, solve y(t) = 0
+	double a = y0 - 2.0*y1 + y2;
+	double b = 2.0*(y1 - y0);
+	double c_v = y0;
+
+	// Solve with Citardauq root ordering: t0=ascending, t1=descending
+	double t0 = 0.0/0.0, t1 = 0.0/0.0;  // NaN = invalid
+	if (fabs(a) <= 1e-7) {
+		// Near-linear
+		if (fabs(b) < 1e-10) return 0;
+		double r = -c_v / b;
+		if (b >= 0.0) t1 = r; else t0 = r;
+	} else {
+		double disc = b*b - 4.0*a*c_v;
+		if (disc < 0.0) return 0;
+		disc = sqrt(disc);
+		if (b >= 0.0) {
+			t0 = (-b - disc) / (2.0*a);
+			t1 = (-b + disc) / (2.0*a);
+		} else {
+			t0 = (-b - disc) / (2.0*a);
+			t1 = (-b + disc) / (2.0*a);
+		}
+	}
+
+	int t0_ok = isfinite(t0);
+	int t1_ok = isfinite(t1);
+	if (!t0_ok && !t1_ok) return 0;
+
+	// Y-monotonic splitting: split at y-extremum t_ext = -b/(2a)
 	int winding = 0;
+	double qax = x0 - 2.0*x1 + x2;
+	double qbx = 2.0*(x1 - x0);
+	double t_ext = (fabs(a) > 1e-10) ? (-0.5 * b / a) : -1.0;
+	int is_mono = (t_ext <= 0.0 || t_ext >= 1.0);
 
-	if (fabs(qa) < 1e-7) {
-		// Near-linear: solve qb*t + qc = 0
-		if (fabs(qb) < 1e-7) return 0;
-		double t = -qc / qb;
-		if (t >= 0.0 && t < 1.0) {
-			double it = 1.0 - t;
-			double xt = it*it*ax + 2.0*it*t*cx + t*t*bx;
-			if (px < xt) {
-				double dyt = 2.0*qa*t + qb;
-				winding += (dyt > 0) ? 1 : -1;
-			}
+	if (a >= 0.0) {
+		// Downward-opening parabola: y has a MINIMUM at t_ext
+		double y_min = is_mono ? fmin(y0, y2) : (a*t_ext*t_ext + b*t_ext + c_v);
+
+		// First subcurve: upward (ascending root t0). Ray must be in [y_min, y0)
+		if (t0_ok && 0.0 >= y_min && 0.0 < y0) {
+			double x = x0 + qbx*t0 + qax*t0*t0;
+			if (x > 0.0) winding += 1;
+		}
+		// Second subcurve: downward (descending root t1). Ray must be in [y_min, y2)
+		if (t1_ok && 0.0 >= y_min && 0.0 < y2) {
+			double x = x0 + qbx*t1 + qax*t1*t1;
+			if (x > 0.0) winding -= 1;
 		}
 	} else {
-		double disc = qb*qb - 4.0*qa*qc;
-		if (disc < 0.0) return 0;
-		// Skip near-tangent intersections (disc ≈ 0) to avoid precision issues
-		// at curve extrema (wonderputt #7684 edge case)
-		if (disc < 1e-4 * (qb*qb + fabs(4.0*qa*qc) + 1.0)) return 0;
-		double sq = sqrt(disc);
-		double t1 = (-qb - sq) / (2.0*qa);
-		double t2 = (-qb + sq) / (2.0*qa);
+		// Upward-opening parabola: y has a MAXIMUM at t_ext
+		double y_max = is_mono ? fmax(y0, y2) : (a*t_ext*t_ext + b*t_ext + c_v);
 
-		for (int i = 0; i < 2; i++) {
-			double t = (i == 0) ? t1 : t2;
-			if (t >= 0.0 && t < 1.0) {
-				double it = 1.0 - t;
-				double xt = it*it*ax + 2.0*it*t*cx + t*t*bx;
-				if (px < xt) {
-					double dyt = 2.0*qa*t + qb;
-					if (fabs(dyt) < 1e-3) continue;  // skip near-horizontal tangent
-					winding += (dyt > 0) ? 1 : -1;
-				}
-			}
+		// First subcurve: downward (descending root t1). Ray must be in [y0, y_max)
+		if (t1_ok && 0.0 >= y0 && 0.0 < y_max) {
+			double x = x0 + qbx*t1 + qax*t1*t1;
+			if (x > 0.0) winding -= 1;
+		}
+		// Second subcurve: upward (ascending root t0). Ray must be in [y2, y_max)
+		if (t0_ok && 0.0 >= y2 && 0.0 < y_max) {
+			double x = x0 + qbx*t0 + qax*t0*t0;
+			if (x > 0.0) winding += 1;
 		}
 	}
 
@@ -3641,11 +3669,22 @@ static int ng_hitTestShapeChar(size_t char_id, u16 ratio,
 		return 0;
 	}
 
-	// Vector-path hit testing infrastructure is in place (path_data emitted by
-	// recompiler, ng_hitTestPathFill implemented) but disabled pending proper
-	// y-monotonic curve splitting in winding_number_curve to avoid precision
-	// issues at curve extrema. See VECTOR_PATH_HITTEST_PLAN.md Phase 2.
-	// TODO: Enable once winding_number_curve handles y-extrema correctly.
+	// Vector-path hit testing for fills (more accurate than triangles for curves)
+	{
+		size_t p_offset, p_size;
+		if (ng_find_char_path(char_id, &p_offset, &p_size)) {
+			double det = ma * md - mb * mc_m;
+			if (det == 0.0) return 0;
+			double inv_det = 1.0 / det;
+			double sx = test_x - mtx;
+			double sy = test_y - mty;
+			double local_x = ( md * sx - mc_m * sy) * inv_det;
+			double local_y = (-mb * sx + ma  * sy) * inv_det;
+			if (ng_hitTestPathFill(char_id, p_offset, p_size, local_x, local_y))
+				return 1;
+			// Fill miss — still check stroke triangles below
+		}
+	}
 
 	size_t offset = ch->shape_offset;
 	size_t count = ch->size;
