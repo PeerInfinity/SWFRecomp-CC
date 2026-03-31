@@ -25263,8 +25263,8 @@ static void initFlashPackage(SWFAppContext* app_context)
 		// LIFO order: matrix, concatenatedMatrix, colorTransform, concatenatedColorTransform, pixelBounds
 		// Enumerated as: pixelBounds, concatenatedColorTransform, colorTransform, concatenatedMatrix, matrix
 		// Flags = 0 means READ_ONLY + DONT_DELETE + DONT_ENUM? No — flags=0 means ENUMERABLE + READ_ONLY (no WRITABLE, no CONFIGURABLE)
-		// flags = ENUMERABLE only (READ_ONLY, not DONT_ENUM)
-		const u8 ro = PROPERTY_FLAG_ENUMERABLE;
+		// flags = ENUMERABLE + CONFIGURABLE (READ_ONLY but deletable)
+		const u8 ro = PROPERTY_FLAG_ENUMERABLE | PROPERTY_FLAG_CONFIGURABLE;
 		setPropertyWithFlags(app_context, tp, "matrix", 6, &uv, ro);
 		setPropertyWithFlags(app_context, tp, "concatenatedMatrix", 18, &uv, ro);
 		setPropertyWithFlags(app_context, tp, "colorTransform", 14, &uv, ro);
