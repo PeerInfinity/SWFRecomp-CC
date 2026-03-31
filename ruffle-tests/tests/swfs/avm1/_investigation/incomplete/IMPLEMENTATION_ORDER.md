@@ -170,14 +170,14 @@ All other plans are independent.
 
 | Order | Plan | Current State | Effort | Lines Gained | Category |
 |-------|------|--------------|--------|-------------|----------|
-| 1 | BITMAP_FILTERS_MCFILTERS | 540/548 | ~50 lines | ~8 | Close out |
-| 2 | BITMAP_FILTERS | 544/548 | Low | ~4 | Close out |
-| 3 | BITMAP_FILTER_CLONE | 496/548 | Done (shared w/ #1) | — | Close out |
-| 4 | GLOBALS | 29/31 pass | Low-med | ~300 lines in proto_decls | Close out |
-| 5 | NETCONNECTION (close) | 3/39 | ~80 lines | ~36 | Quick win |
-| 6 | SOUND_LOADING | 0/4 | ~200 lines | ~4 + unlocks #7 | Foundation |
-| 7 | SOUND_DURATION_POSITION | 2/290 | ~100 lines | ~200+ | Dependent |
-| 8 | LOADBITMAP | Likely done | ~50 lines | 1 image test | Check status |
+| 1 | BITMAP_FILTERS_MCFILTERS | 544/548 | ~240 lines (recompiler+runtime) | ~4 | ~~Close out~~ Low ROI |
+| 2 | BITMAP_FILTERS | 544/548 | Same as #1 | ~4 | ~~Close out~~ Low ROI |
+| 3 | BITMAP_FILTER_CLONE | 496/548 | Done (shared w/ #1) | — | ~~Close out~~ Done |
+| 4 | GLOBALS | 29/31 pass | Low-med | +13 done, rest blocked | Partial |
+| 5 | NETCONNECTION (close) | **39/39 PASS** | ~~80 lines~~ | ~~36~~ | **DONE** |
+| 6 | SOUND_LOADING | **4/4 PASS** | ~~200 lines~~ | ~~4~~ | **DONE** |
+| 7 | SOUND_DURATION_POSITION | **290/290 PASS** | ~~100 lines~~ | ~~288~~ | **DONE** |
+| 8 | LOADBITMAP | Already done | — | — | **DONE** |
 | 9 | RUNTIME_TRANSFORM_GPU | Not started | ~45 lines | 2 image tests | Graphics |
 | 10 | RUNTIME_CXFORM_GPU | Partial | ~30 lines | w/ #9: 1 image test | Graphics |
 | 11 | DRAWING_API_RENDERING | Not started | Low-med | 2 image tests | Graphics |
@@ -191,11 +191,18 @@ All other plans are independent.
 
 ---
 
-## Recommended Session Batching
+## Progress (2026-03-31)
 
-**Session A** (Tier 1 close-outs): #1 + #2 (bitmap_filters mc.filters getter + remaining 4 lines)
-**Session B** (Quick wins): #5 (NetConnection close) + #4 (Globals remaining properties)
-**Session C** (Sound): #6 + #7 (Sound loading + duration/position — natural chain)
+Items #5, #6, #7 completed in one session. Item #4 partially done (Transform.prototype +13 lines).
+Items #1-2 assessed as low ROI (~240 lines cross-codebase for 4 test lines). Item #8 already done.
+
+**Next actionable items**: #9-12 (graphics rendering batch), #13 (Gnash Dejagnu framework).
+
+## Recommended Session Batching (updated)
+
+**~~Session A~~** ~~(Tier 1 close-outs)~~: Assessed as low ROI, skipped
+**~~Session B~~** ~~(Quick wins)~~: #5 DONE, #4 partial
+**~~Session C~~** ~~(Sound)~~: #6 + #7 DONE
 **Session D** (Graphics batch): #9 + #10 (transforms + cxform — same pipeline, same tests)
 **Session E** (Graphics batch): #11 + #12 (Drawing API + setMask — dependent chain)
 **Session F** (Framework): #13 misc-mtasc typeof fix (quick), then assess actionscript.all feasibility

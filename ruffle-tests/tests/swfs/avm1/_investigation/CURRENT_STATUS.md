@@ -1,13 +1,22 @@
 # Current Ruffle Test Status
 
-Last updated: 2026-03-29
+Last updated: 2026-03-31
 
 ## Quick Summary
 
-- **Pass rate (CI, last run)**: 564/620 (91.0%) raw, 563/569 (98.9%) filtered (6 filtered failures)
+- **Pass rate (CI, last run)**: 569/620 (91.8%) raw, 563/569 (98.9%) filtered (6 filtered failures)
 - **Image test baseline**: **12/31 strict image match** (+4: bitmap_data_fillrect, bitmap_data_perlinnoise, bitmap_data_pixeldissolve_image, bitmapdata_applyfilter_colormatrix). **10/31 tolerance pass** (within test.toml limits).
-- **Main failure types**: output_mismatch (54), runtime_segfault (1), timeout (1)
-- **Known regressions**: None.
+- **Main failure types**: output_mismatch (51), runtime_segfault (1), timeout (1)
+- **Known regressions**: `global_instance_decls` 40→23 (unclear root cause, test at 3% pass rate).
+- **Latest fixes (2026-03-31)**:
+  - netconnection_close PASS (39/39) — NetConnection connect/close state machine + onStatus dispatch
+  - sound_load_start PASS (3/3) — loadSound with embedded MP3 data registry lookup
+  - sound_multiple_load PASS (1/1) — loadSound replaces previous load
+  - sound_duration_position_props PASS (290/290) — getPosition, duration/position native getters, onID3/onLoad/onSoundComplete lifecycle
+  - global_proto_decls improved (237→250) — Transform.prototype 5 READ_ONLY properties
+  - global_proto_decls_delete (255→255) — Transform.prototype CONFIGURABLE flag fix
+  - sound_id3_prop improved (1→8), sound_id3 improved (11→17) — bonus from onID3 dispatch
+  - Sound playback simulation: processSoundPlayback in frame loop, hasPlayingSounds exit condition
 - **Latest fixes (2026-03-29, session 2)**:
   - bitmap_data_fillrect image PASS (0 outliers) — fillRect negative dimensions + removed bare Rectangle global
   - BitmapData.loadBitmap(exportName) — full implementation with defineBitmap char_id metadata, R/B byte swap

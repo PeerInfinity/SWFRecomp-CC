@@ -3,17 +3,17 @@
 
 <!-- PLAN_META
 id: NETCONNECTION
-status: not_started
+status: incomplete
 phases:
   - id: 1
     name: "NetConnection state machine (connect/close)"
-    status: not_started
+    status: complete
   - id: 2
     name: "onStatus dispatch helper"
-    status: not_started
+    status: complete
   - id: 3
     name: "Register real methods"
-    status: not_started
+    status: complete
   - id: 4
     name: "netconnection_send_remote (AMF + HTTP)"
     status: blocked
@@ -23,9 +23,21 @@ blockers:
     reason: "Phase 4 blocked on AMF codec + HTTP client infrastructure"
 -->
 
-Last updated: 2026-03-27
+Last updated: 2026-03-31
 
-## Status: NOT STARTED — netconnection_close is actionable, netconnection_send_remote is blocked
+## Status: PHASES 1-3 COMPLETE — netconnection_close 39/39 PASS, netconnection_send_remote blocked
+
+### Implementation (2026-03-31)
+
+Commit `a6a3e688`: Implemented `builtin_nc_connect`, `builtin_nc_close`, `nc_dispatch_onStatus`, and `nc_dispatch_onStatus_undefined` in action.c. Replaced stub method registrations on NetConnection.prototype with real implementations.
+
+Key behaviors:
+- `connect(null)`: sets isConnected=true, fires onStatus with `NetConnection.Connect.Success`
+- `connect(null)` when already connected: fires `Connect.Closed` then `Connect.Success`
+- `close()` when connected: fires `Connect.Closed`, sets isConnected=false
+- `close()` when not connected: no-op
+- `connect("http://...")`: sets isConnected=true, stores URI, no onStatus
+- `close()` after remote connect: fires `Connect.Closed` then a second onStatus with undefined event
 
 ### Test Summary
 

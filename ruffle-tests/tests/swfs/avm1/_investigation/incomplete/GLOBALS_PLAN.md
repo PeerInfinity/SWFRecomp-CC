@@ -63,10 +63,10 @@ Last updated: 2026-03-30
 
 ## Status: BLOCKED — Phases 1-8c-6 DONE, Phase 8c-4/8c-5/8d partially done, remaining items blocked
 
-**29 of 31 plan tests PASSING.** `native_objects_swf6` is a pre-existing regression (83/84) from the reverted TextField SWF6 constructor gate. 3 tests remain with output mismatches but significant progress was made (2026-03-30):
-- `global_proto_decls`: lines 1-199 now match (was 116)
-- `global_proto_decls_delete`: lines 1-187 now match (was 93)
-- `global_instance_decls`: still at ~17 (changes needed are in instance construction, not addressed yet)
+**29 of 31 plan tests PASSING.** `native_objects_swf6` is a pre-existing regression (83/84) from the reverted TextField SWF6 constructor gate. 3 tests remain with output mismatches but significant progress was made:
+- `global_proto_decls`: 250/4497 (was 237, +13 from Transform.prototype 5 READ_ONLY properties, 2026-03-31)
+- `global_proto_decls_delete`: 255/4158 (was 255, recovered from -79 regression via CONFIGURABLE flag fix, 2026-03-31)
+- `global_instance_decls`: 23/758 (was 40, -17 regression of unclear origin — may be from initialization order changes, 2026-03-31)
 
 ### Changes made (2026-03-30)
 - **WRITABLE enforcement in FUNCTION case of actionSetMember** — textRenderer displayMode/maxLevel now correctly show READ_ONLY; prototype property on ExternalInterface is also READ_ONLY

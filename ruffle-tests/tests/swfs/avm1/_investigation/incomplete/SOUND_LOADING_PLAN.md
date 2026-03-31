@@ -3,27 +3,36 @@
 
 <!-- PLAN_META
 id: SOUND_LOADING
-status: not_started
+status: complete
 phases:
   - id: 1
     name: "loadSound() with embedded data"
-    status: not_started
+    status: complete
   - id: 2
     name: "onLoad callback dispatch"
-    status: not_started
+    status: complete
   - id: 3
     name: "Sound playback simulation (onSoundComplete)"
-    status: not_started
+    status: complete
   - id: 4
     name: "Integrate with frame loop"
-    status: not_started
+    status: complete
 dependencies: []
 blockers: []
 -->
 
-Last updated: 2026-03-27
+Last updated: 2026-03-31
 
-## Status: NOT STARTED — Actionable (MP3 decoder and data embedding exist)
+## Status: COMPLETE — sound_load_start 3/3 PASS, sound_multiple_load 1/1 PASS
+
+### Implementation (2026-03-31)
+
+Commit `a6a3e688`: All 4 phases implemented.
+
+- **Phase 1**: `builtin_sound_loadSound` looks up embedded MP3 data via `findDataFile()`, parses MPEG audio frame header for bitrate-based duration calculation (handles ID3v2 header skipping). Stores duration as `__duration__` on Sound instance.
+- **Phase 2**: `soundFireCallback` generic dispatcher handles both type-1 and type-2 AS functions with scope chain, captured scopes, and base_clip context switching. Dispatches `onID3` (duration=0) then `onLoad` (with computed duration) during loadSound.
+- **Phase 3**: `PlayingSoundEntry` tracking array (16 slots). `soundStartPlayback` adds entries, `soundFireOnComplete` dispatches onSoundComplete + sets `__completed__` flag. `soundStopForObject` clears entries. Second `loadSound` clears previous duration and stops active playback.
+- **Phase 4**: `processSoundPlayback` called from swf_core.c frame loop after `processTimers`. `hasPlayingSounds` added to both exit conditions (past-last-frame branch and frame-advance branch) to keep loop alive during playback.
 
 ### Test Summary
 

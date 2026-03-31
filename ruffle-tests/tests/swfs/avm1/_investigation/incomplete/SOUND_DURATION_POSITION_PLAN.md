@@ -3,17 +3,17 @@
 
 <!-- PLAN_META
 id: SOUND_DURATION_POSITION
-status: not_started
+status: complete
 phases:
   - id: 1
     name: "getPosition() implementation"
-    status: not_started
+    status: complete
   - id: 2
     name: "duration/position property getters"
-    status: not_started
+    status: complete
   - id: 3
     name: "Playback lifecycle integration"
-    status: not_started
+    status: complete
 dependencies:
   - plan: SOUND_LOADING
     phases: [1, 2, 3]
@@ -22,9 +22,24 @@ dependencies:
 blockers: []
 -->
 
-Last updated: 2026-03-27
+Last updated: 2026-03-31
 
-## Status: NOT STARTED — Depends on SOUND_LOADING_PLAN Phase 1-3
+## Status: COMPLETE — sound_duration_position_props 290/290 PASS
+
+### Implementation (2026-03-31)
+
+Commit `a6a3e688`: All 3 phases implemented.
+
+- **Phase 1**: `builtin_sound_getPosition` returns elapsed ms from `soundGetElapsedForObject` during playback, or duration when `__completed__` flag is set. Returns undefined when not loaded.
+- **Phase 2**: Native `duration`/`position` property getters intercepted in `actionGetMember` for `NATIVE_SOUND` objects. Key behavior: after `__loaded__` flag is set, computed values always returned (user writes silently ignored). Before loading, own property values are respected. Pre-loadSound string overrides persist only when BOTH `duration` AND `position` are set (Place 0 SWF5 pattern) — stored as `__dur_override__`/`__pos_override__`.
+- **Phase 3**: `onID3` fires with `__duration__=0` (temporarily cleared during callback). `onLoad` fires with full duration. `onSoundComplete` fires from frame loop via `processSoundPlayback`. `builtin_sound_stop` registered as real method. Streaming mode (`isStreaming=true`) auto-starts playback after load.
+
+### Discovered Behaviors
+- Flash's `Sound.duration`/`Sound.position` are effectively native getters that ignore user writes after loadSound
+- Exception: setting both to strings BEFORE loadSound persists (Place 0 pattern)
+- Setting only one (Place -1, -2) does NOT persist
+- `onID3` callback fires synchronously during loadSound with duration=0
+- `onLoad` fires synchronously after onID3 with full duration
 
 ### Test Summary
 

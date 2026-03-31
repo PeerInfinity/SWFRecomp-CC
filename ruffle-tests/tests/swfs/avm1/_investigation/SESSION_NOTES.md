@@ -3,6 +3,17 @@
 Historical session-by-session notes documenting changes, fixes, and investigations.
 For current test status, see `CURRENT_STATUS.md`.
 
+## Session notes (2026-03-31 — 565→569 pass rate, -338 mismatched lines)
+- **Pass rate: 565→569/620 (91.1%→91.8%)**: +4 newly passing tests, -338 net mismatched lines.
+- **NetConnection close (39/39 PASS)**: Implemented connect/close state machine with onStatus dispatch. Remote connections (non-null URL) fire additional undefined event on close. ~120 lines in action.c.
+- **Sound loading (3/3 + 1/1 PASS)**: `loadSound()` with embedded MP3 data registry lookup, ID3v2 header skipping, bitrate-based duration calculation. `start()`/`stop()` control playback simulation. `processSoundPlayback()` in frame loop fires `onSoundComplete`. `hasPlayingSounds()` added to both frame loop exit conditions.
+- **Sound duration/position (290/290 PASS)**: `getPosition()` returns elapsed ms. Native `duration`/`position` property getters intercepted in `actionGetMember` for NATIVE_SOUND objects — always return computed values after loading, with exception for pre-loadSound string overrides (Place 0 pattern: both must be set). `onID3` fires with duration=0, `onLoad` fires with full duration. Streaming mode auto-starts playback.
+- **Transform.prototype (+13 lines in global_proto_decls)**: Added 5 READ_ONLY CONFIGURABLE properties (pixelBounds, concatenatedColorTransform, colorTransform, concatenatedMatrix, matrix).
+- **Bonus improvements**: sound_id3_prop +7 (1→8), sound_id3 +6 (11→17), netstream_play_flv +1 (1→2) — all from onID3/onLoad/NetConnection dispatch infrastructure.
+- **Regression**: global_instance_decls -17 (40→23) — unclear root cause, test at 3% pass rate. May be from initialization order changes.
+- **Plans completed**: SOUND_LOADING_PLAN, SOUND_DURATION_POSITION_PLAN, NETCONNECTION_PLAN (phases 1-3).
+- **Assessment**: bitmap_filters remaining 4 lines need ~240 lines cross-codebase (recompiler+runtime extended filter storage) — low ROI, deferred.
+
 ## Session notes (2026-03-15 — 554→559 pass rate)
 - **Pass rate: 554→559/619 (89.5%→90.3%)**: +5 newly passing tests, +10 lines improved.
 - **Latest fixes**:

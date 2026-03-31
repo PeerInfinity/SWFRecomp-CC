@@ -2,13 +2,13 @@
 
 Cross-suite summary of all Ruffle-derived test suites. Each suite has its own `_investigation/` directory with detailed status docs.
 
-Last updated: 2026-03-23 (CI run on 15ce3f06)
+Last updated: 2026-03-31 (CI run on 0ea7c296)
 
 ## Suite Summary
 
 | Suite | Tests | Passing | Rate | Filtered Rate | Notes |
 |-------|-------|---------|------|---------------|-------|
-| [avm1](../avm1/_investigation/CURRENT_STATUS.md) | 619 | 558 | 90.1% | **97.2%** (558/574) | Mature. Near-ceiling. |
+| [avm1](../avm1/_investigation/CURRENT_STATUS.md) | 620 | 569 | 91.8% | **98.9%** (563/569) | Mature. Near-ceiling. |
 | [from_gnash/actionscript.all](../from_gnash/_investigation/CURRENT_STATUS.md) | 190 | ~61 | ~32.1% | **~33.7%** (~61/181) | 9 accepted-diff tests ignored. +3 from Color fixes. |
 | [from_gnash/misc-swfmill.all](../from_gnash/_investigation/CURRENT_STATUS.md) | 14 | 11 | **78.6%** | — | 3 blocked on architecture. |
 | [from_shumway](../from_shumway/_investigation/CURRENT_STATUS.md) | 47 | 17 | 36.2% | **100.0%** (17/17) | **Complete.** All AVM1 tests pass. 30 AVM2 ignored. |
