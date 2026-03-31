@@ -770,11 +770,15 @@ void swfStart(SWFAppContext* app_context)
 			// Past the last frame: keep dispatching per-tick AS handlers
 			// (onEnterFrame, sprite timelines, clip ENTER_FRAME events).
 			// Break if quit_swf and no remaining input events, handlers, or playing sprites.
-			if (quit_swf && !(g_events && g_event_pos < g_event_count)
-			    && !actionHasEnterFrameHandlers()
-			    && !hasPlayingSprites()
-			    && !hasActiveTimers()
-			    && !hasClipEnterFrameHandlers()) break;
+			{
+				extern int hasPlayingSounds(void);
+				if (quit_swf && !(g_events && g_event_pos < g_event_count)
+				    && !actionHasEnterFrameHandlers()
+				    && !hasPlayingSprites()
+				    && !hasActiveTimers()
+				    && !hasPlayingSounds()
+				    && !hasClipEnterFrameHandlers()) break;
+			}
 			{
 				extern int g_advance_defer_nested;
 				g_advance_defer_nested = 1;
@@ -977,6 +981,11 @@ void swfStart(SWFAppContext* app_context)
 		{
 			double frame_duration_ms = (app_context->fps > 0) ? (1000.0 / app_context->fps) : 83.33;
 			processTimers(app_context, frame_duration_ms);
+			// Process sound playback (fire onSoundComplete callbacks)
+			{
+				extern void processSoundPlayback(SWFAppContext*, double);
+				processSoundPlayback(app_context, frame_duration_ms);
+			}
 		}
 
 		// Flush pending onLoad dispatches for dynamically-attached MCs
@@ -1011,6 +1020,7 @@ void swfStart(SWFAppContext* app_context)
 			if (actionHasEnterFrameHandlers() || hasPlayingSprites() || hasClipEnterFrameHandlers()) continue;
 			if (g_pending_mcl_load_count > 0) continue;
 			if (g_pending_direct_load_count > 0) continue;
+			{ extern int hasPlayingSounds(void); if (hasPlayingSounds()) continue; }
 			break;
 		}
 		else if (manual_next_frame)

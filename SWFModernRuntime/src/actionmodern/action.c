@@ -1577,6 +1577,237 @@ static ActionVar builtin_sound_getDuration(SWFAppContext* app_context, ActionVar
 	return ret;
 }
 
+// Forward declarations for sound playback
+static void soundStartPlayback(ASObject* sound_obj, double duration_ms);
+static void soundStopForObject(ASObject* sound_obj);
+static void soundFireCallback(SWFAppContext* app_context, ASObject* sound_obj, const char* name, u32 name_len);
+static double soundGetElapsedForObject(ASObject* sound_obj);
+
+static ActionVar builtin_sound_loadSound(SWFAppContext* app_context, ActionVar* args, u32 arg_count, ActionVar* registers, void* this_obj)
+{
+	(void)registers;
+	ActionVar ret = {0}; ret.type = ACTION_STACK_VALUE_UNDEFINED;
+	ASObject* sound_obj = resolveSoundThis(this_obj);
+	if (sound_obj == NULL || arg_count < 1) return ret;
+
+	// Get URL string
+	if (args[0].type != ACTION_STACK_VALUE_STRING) return ret;
+	const uint16_t* u16 = varGetU16Ptr(&args[0]);
+	if (!u16) return ret;
+	char url[256];
+	u16_to_utf8(u16, args[0].str_size, url, sizeof(url));
+
+	// Stop any currently playing instances of this sound
+	soundStopForObject(sound_obj);
+
+	// Snapshot pre-loadSound string own properties (Place 0 pattern)
+	ASProperty* pre_dur_p = findPropertyRaw(sound_obj, "duration", 8);
+	int pre_had_str_dur = (pre_dur_p != NULL && pre_dur_p->value.type == ACTION_STACK_VALUE_STRING);
+	ActionVar pre_str_dur = {0}; if (pre_had_str_dur) pre_str_dur = pre_dur_p->value;
+
+	ASProperty* pre_pos_p = findPropertyRaw(sound_obj, "position", 8);
+	int pre_had_str_pos = (pre_pos_p != NULL && pre_pos_p->value.type == ACTION_STACK_VALUE_STRING);
+	ActionVar pre_str_pos = {0}; if (pre_had_str_pos) pre_str_pos = pre_pos_p->value;
+
+	// Clear previous duration (in case new load fails)
+	{
+		ActionVar zero_dur = {0}; zero_dur.type = ACTION_STACK_VALUE_F64;
+		VAL(double, &zero_dur.data.numeric_value) = 0;
+		setProperty(app_context, sound_obj, "__duration__", 12, &zero_dur);
+	}
+
+	// Look up in data registry
+#ifdef HAS_DATA_FILES
+	// Strip path, match basename
+	const char* basename = url;
+	for (const char* p = url; *p; p++)
+		if (*p == '/' || *p == '\\') basename = p + 1;
+
+	DataFileEntry* entry = findDataFile(basename);
+	if (entry == NULL) return ret;
+
+	// Estimate MP3 duration from file size
+	// Simple heuristic for CBR MP3: parse first frame header for bitrate
+	const unsigned char* mp3 = (const unsigned char*)entry->content;
+	int mp3_len = entry->content_length;
+	double duration_ms = 0;
+
+	// Skip ID3v2 header if present
+	int audio_offset = 0;
+	if (mp3_len >= 10 && mp3[0] == 'I' && mp3[1] == 'D' && mp3[2] == '3')
+	{
+		int id3_size = ((mp3[6] & 0x7F) << 21) | ((mp3[7] & 0x7F) << 14) |
+		               ((mp3[8] & 0x7F) << 7) | (mp3[9] & 0x7F);
+		audio_offset = id3_size + 10;
+		mp3 += audio_offset;
+		mp3_len -= audio_offset;
+	}
+
+	if (mp3_len >= 4 && mp3[0] == 0xFF && (mp3[1] & 0xE0) == 0xE0)
+	{
+		// MPEG audio frame header
+		int version = (mp3[1] >> 3) & 3; // 0=2.5, 2=2, 3=1
+		int layer = (mp3[1] >> 1) & 3;   // 1=III, 2=II, 3=I
+		int br_idx = (mp3[2] >> 4) & 0xF;
+		int sr_idx = (mp3[2] >> 2) & 3;
+
+		// Bitrate table for MPEG1 Layer III
+		static const int bitrates_v1_l3[] = {0,32,40,48,56,64,80,96,112,128,160,192,224,256,320,0};
+		// Sample rate table for MPEG1
+		static const int samplerates_v1[] = {44100, 48000, 32000, 0};
+
+		int bitrate = 0;
+		if (version == 3 && layer == 1) // MPEG1 Layer III
+			bitrate = bitrates_v1_l3[br_idx] * 1000;
+		else if (version == 3 && layer == 2) { // MPEG1 Layer II
+			static const int bitrates_v1_l2[] = {0,32,48,56,64,80,96,112,128,160,192,224,256,320,384,0};
+			bitrate = bitrates_v1_l2[br_idx] * 1000;
+		}
+
+		if (bitrate > 0)
+			duration_ms = (double)mp3_len * 8.0 / (double)bitrate * 1000.0;
+		else
+			duration_ms = 1000.0; // fallback
+	}
+	else
+	{
+		duration_ms = 1000.0; // fallback for non-standard MP3
+	}
+
+	// Store duration on the Sound instance
+	ActionVar dur_val = {0};
+	dur_val.type = ACTION_STACK_VALUE_F64;
+	VAL(double, &dur_val.data.numeric_value) = duration_ms;
+	setProperty(app_context, sound_obj, "__duration__", 12, &dur_val);
+
+	// Set position to 0 (not playing yet)
+	{
+		ActionVar pos = {0}; pos.type = ACTION_STACK_VALUE_F64;
+		setProperty(app_context, sound_obj, "__position__", 12, &pos);
+	}
+
+	// Mark as loaded (activates native getters for duration/position)
+	// If pre-loadSound string overrides exist, set __dur_override__ / __pos_override__
+	{
+		ActionVar loaded = {0}; loaded.type = ACTION_STACK_VALUE_BOOLEAN; loaded.data.numeric_value = 1;
+		setProperty(app_context, sound_obj, "__loaded__", 10, &loaded);
+
+		// Pre-loadSound overrides only persist if BOTH duration AND position were set
+		if (pre_had_str_dur && pre_had_str_pos) {
+			setProperty(app_context, sound_obj, "__dur_override__", 16, &pre_str_dur);
+			setProperty(app_context, sound_obj, "__pos_override__", 16, &pre_str_pos);
+		}
+	}
+
+	// Dispatch onID3 callback (before onLoad, duration not yet visible)
+	{
+		// Temporarily clear __duration__ so getDuration() returns 0 during onID3
+		ActionVar save_int_dur = dur_val;
+		ActionVar zero = {0}; zero.type = ACTION_STACK_VALUE_F64;
+		VAL(double, &zero.data.numeric_value) = 0;
+		setProperty(app_context, sound_obj, "__duration__", 12, &zero);
+
+		soundFireCallback(app_context, sound_obj, "onID3", 5);
+
+		// Clear string own props set during onID3 callback, restore pre-loadSound ones
+		{
+			ASProperty* pd = findPropertyRaw(sound_obj, "duration", 8);
+			if (pd != NULL && pd->value.type == ACTION_STACK_VALUE_STRING) {
+				if (pre_had_str_dur) pd->value = pre_str_dur;
+				else pd->value.type = ACTION_STACK_VALUE_UNDEFINED;
+			}
+			ASProperty* pp = findPropertyRaw(sound_obj, "position", 8);
+			if (pp != NULL && pp->value.type == ACTION_STACK_VALUE_STRING) {
+				if (pre_had_str_pos) pp->value = pre_str_pos;
+				else pp->value.type = ACTION_STACK_VALUE_UNDEFINED;
+			}
+		}
+
+		// Restore __duration__ for onLoad
+		setProperty(app_context, sound_obj, "__duration__", 12, &save_int_dur);
+	}
+
+	// Dispatch onLoad callback (with success=true)
+	soundFireCallback(app_context, sound_obj, "onLoad", 6);
+
+	// Clear any string duration/position own properties set during callbacks
+	// Then restore only the ones that existed before loadSound
+	{
+		ASProperty* pd = findPropertyRaw(sound_obj, "duration", 8);
+		if (pd != NULL && pd->value.type == ACTION_STACK_VALUE_STRING) {
+			if (pre_had_str_dur) pd->value = pre_str_dur;
+			else pd->value.type = ACTION_STACK_VALUE_UNDEFINED;
+		}
+		ASProperty* pp = findPropertyRaw(sound_obj, "position", 8);
+		if (pp != NULL && pp->value.type == ACTION_STACK_VALUE_STRING) {
+			if (pre_had_str_pos) pp->value = pre_str_pos;
+			else pp->value.type = ACTION_STACK_VALUE_UNDEFINED;
+		}
+	}
+
+	// If streaming mode, auto-start playback
+	int is_streaming = 0;
+	if (arg_count >= 2 && args[1].type == ACTION_STACK_VALUE_BOOLEAN)
+		is_streaming = (int)args[1].data.numeric_value;
+	if (is_streaming)
+		soundStartPlayback(sound_obj, duration_ms);
+#endif
+
+	return ret;
+}
+
+static ActionVar builtin_sound_getPosition(SWFAppContext* app_context, ActionVar* args, u32 arg_count, ActionVar* registers, void* this_obj)
+{
+	(void)app_context; (void)args; (void)arg_count; (void)registers;
+	ActionVar ret = {0}; ret.type = ACTION_STACK_VALUE_F64;
+	ASObject* sound_obj = resolveSoundThis(this_obj);
+	if (sound_obj == NULL) return ret;
+
+	// Check if sound has completed (position = duration)
+	ActionVar* completed = getProperty(sound_obj, "__completed__", 13);
+	if (completed != NULL && completed->type == ACTION_STACK_VALUE_BOOLEAN && completed->data.numeric_value)
+	{
+		ActionVar* dur = getProperty(sound_obj, "__duration__", 12);
+		if (dur != NULL && dur->type == ACTION_STACK_VALUE_F64)
+			VAL(double, &ret.data.numeric_value) = VAL(double, &dur->data.numeric_value);
+		return ret;
+	}
+
+	// Check if currently playing — return elapsed
+	double elapsed = soundGetElapsedForObject(sound_obj);
+	VAL(double, &ret.data.numeric_value) = elapsed;
+	return ret;
+}
+
+static ActionVar builtin_sound_stop(SWFAppContext* app_context, ActionVar* args, u32 arg_count, ActionVar* registers, void* this_obj)
+{
+	(void)app_context; (void)args; (void)arg_count; (void)registers;
+	ActionVar ret = {0}; ret.type = ACTION_STACK_VALUE_UNDEFINED;
+	ASObject* sound_obj = resolveSoundThis(this_obj);
+	if (sound_obj == NULL) return ret;
+	soundStopForObject(sound_obj);
+	return ret;
+}
+
+static ActionVar builtin_sound_start(SWFAppContext* app_context, ActionVar* args, u32 arg_count, ActionVar* registers, void* this_obj)
+{
+	(void)registers;
+	ActionVar ret = {0}; ret.type = ACTION_STACK_VALUE_UNDEFINED;
+	ASObject* sound_obj = resolveSoundThis(this_obj);
+	if (sound_obj == NULL) return ret;
+
+	// Get duration
+	ActionVar* dur = getProperty(sound_obj, "__duration__", 12);
+	if (dur == NULL || dur->type != ACTION_STACK_VALUE_F64) return ret;
+	double duration_ms = VAL(double, &dur->data.numeric_value);
+	if (duration_ms <= 0) return ret;
+
+	// Start playback simulation
+	soundStartPlayback(sound_obj, duration_ms);
+
+	return ret;
+}
+
 // Forward declarations for copy functions
 static void setObjectProto(SWFAppContext* app_context, ASObject* obj);
 
@@ -1681,6 +1912,233 @@ static ActionVar builtin_return_zero(SWFAppContext* app_context, ActionVar* args
 	(void)app_context; (void)args; (void)arg_count; (void)registers; (void)this_obj;
 	ActionVar ret = {0};
 	ret.type = ACTION_STACK_VALUE_F64;
+	return ret;
+}
+
+// --- NetConnection connect/close implementation ---
+
+static ActionVar makeStringActionVar(SWFAppContext* app_context, const char* str, u32 len);
+static ASFunction g_nc_connect_func;
+static ASFunction g_nc_close_func;
+
+static void nc_dispatch_onStatus(SWFAppContext* app_context, ASObject* nc,
+                                  const char* code, const char* level)
+{
+	extern MovieClip* g_current_context;
+	ActionVar* handler = getPropertyWithPrototype(nc, "onStatus", 8);
+	if (handler == NULL || handler->type != ACTION_STACK_VALUE_FUNCTION) return;
+	ASFunction* func = (ASFunction*)(uintptr_t)handler->data.numeric_value;
+	if (func == NULL) return;
+
+	// Create event object: { code: "...", level: "..." }
+	ASObject* event_obj = allocObject(app_context, 4);
+	ActionVar cv = makeStringActionVar(app_context, code, strlen(code));
+	setProperty(app_context, event_obj, "code", 4, &cv);
+	ActionVar lv = makeStringActionVar(app_context, level, strlen(level));
+	setProperty(app_context, event_obj, "level", 5, &lv);
+
+	ActionVar event_arg = {0};
+	event_arg.type = ACTION_STACK_VALUE_OBJECT;
+	event_arg.data.numeric_value = (u64)event_obj;
+
+	g_special_depth++;
+	if (g_special_depth >= MAX_SPECIAL_DEPTH) { g_special_depth--; return; }
+
+	if (func->function_type == 2)
+	{
+		ActionVar* regs = NULL;
+		if (func->register_count > 0)
+			regs = (ActionVar*) HCALLOC(func->register_count, sizeof(ActionVar));
+
+		u32 captured_count = func->captured_scope_count;
+		for (u32 ci = 0; ci < captured_count; ci++)
+		{
+			if (scope_depth < MAX_SCOPE_DEPTH) {
+				scope_is_with[scope_depth] = func->captured_scope_is_with[ci];
+				scope_mc[scope_depth] = (MovieClip*)func->captured_scope_mc[ci];
+				scope_chain[scope_depth++] = (ASObject*)func->captured_scope[ci];
+			}
+		}
+
+		ASObject* local_scope = allocObject(app_context, 8);
+		if (scope_depth < MAX_SCOPE_DEPTH) {
+			scope_is_with[scope_depth] = 0;
+			scope_mc[scope_depth] = NULL;
+			scope_chain[scope_depth++] = local_scope;
+		}
+
+		MovieClip* saved_context = g_current_context;
+		if (g_swf_version >= 6 && func->base_clip != NULL)
+			g_current_context = (MovieClip*)func->base_clip;
+
+		g_call_depth++;
+		func->advanced_func(app_context, &event_arg, 1, regs, (void*)nc);
+		g_call_depth--;
+
+		g_current_context = saved_context;
+		for (u32 ci = 0; ci < captured_count + 1; ci++)
+			if (scope_depth > 0) scope_depth--;
+		releaseObject(app_context, local_scope);
+		if (regs != NULL) FREE(regs);
+	}
+	else
+	{
+		// Type 1 function: push event arg on stack
+		pushVar(app_context, &event_arg);
+
+		u32 captured_count = func->captured_scope_count;
+		for (u32 ci = 0; ci < captured_count; ci++)
+		{
+			if (scope_depth < MAX_SCOPE_DEPTH) {
+				scope_is_with[scope_depth] = func->captured_scope_is_with[ci];
+				scope_mc[scope_depth] = (MovieClip*)func->captured_scope_mc[ci];
+				scope_chain[scope_depth++] = (ASObject*)func->captured_scope[ci];
+			}
+		}
+
+		g_call_depth++;
+		((ActionVar(*)(SWFAppContext*))func->simple_func)(app_context);
+		g_call_depth--;
+
+		for (u32 ci = 0; ci < captured_count; ci++)
+			if (scope_depth > 0) scope_depth--;
+	}
+
+	g_special_depth--;
+}
+
+static ActionVar builtin_nc_connect(SWFAppContext* app_context, ActionVar* args, u32 arg_count, ActionVar* registers, void* this_obj)
+{
+	(void)registers;
+	ASObject* nc = (ASObject*)this_obj;
+	ActionVar ret = {0}; ret.type = ACTION_STACK_VALUE_UNDEFINED;
+	if (nc == NULL) return ret;
+
+	// If already connected, fire Close first
+	ActionVar* is_conn = getProperty(nc, "isConnected", 11);
+	if (is_conn != NULL && is_conn->type == ACTION_STACK_VALUE_BOOLEAN && is_conn->data.numeric_value != 0)
+	{
+		nc_dispatch_onStatus(app_context, nc, "NetConnection.Connect.Closed", "status");
+	}
+
+	// Set isConnected = true
+	ActionVar bv = {0}; bv.type = ACTION_STACK_VALUE_BOOLEAN; bv.data.numeric_value = 1;
+	setProperty(app_context, nc, "isConnected", 11, &bv);
+
+	// connect(null) = local connection: fire Success
+	// connect(non-null string) = remote: no onStatus, but store URI for close()
+	int is_null_connect = (arg_count == 0);
+	if (!is_null_connect && arg_count > 0)
+	{
+		is_null_connect = (args[0].type == ACTION_STACK_VALUE_NULL ||
+		                   args[0].type == ACTION_STACK_VALUE_UNDEFINED);
+	}
+
+	if (is_null_connect)
+	{
+		// Clear uri for local connections
+		ActionVar empty_uri = {0}; empty_uri.type = ACTION_STACK_VALUE_NULL;
+		setProperty(app_context, nc, "uri", 3, &empty_uri);
+		nc_dispatch_onStatus(app_context, nc, "NetConnection.Connect.Success", "status");
+	}
+	else
+	{
+		// Store the URI for remote connections (used by close to detect remote)
+		if (arg_count > 0)
+			setProperty(app_context, nc, "uri", 3, &args[0]);
+	}
+
+	return ret;
+}
+
+static void nc_dispatch_onStatus_undefined(SWFAppContext* app_context, ASObject* nc)
+{
+	extern MovieClip* g_current_context;
+	ActionVar* handler = getPropertyWithPrototype(nc, "onStatus", 8);
+	if (handler == NULL || handler->type != ACTION_STACK_VALUE_FUNCTION) return;
+	ASFunction* func = (ASFunction*)(uintptr_t)handler->data.numeric_value;
+	if (func == NULL) return;
+
+	ActionVar undef_arg = {0};
+	undef_arg.type = ACTION_STACK_VALUE_UNDEFINED;
+
+	g_special_depth++;
+	if (g_special_depth >= MAX_SPECIAL_DEPTH) { g_special_depth--; return; }
+
+	if (func->function_type == 2)
+	{
+		ActionVar* regs = NULL;
+		if (func->register_count > 0)
+			regs = (ActionVar*) HCALLOC(func->register_count, sizeof(ActionVar));
+
+		u32 captured_count = func->captured_scope_count;
+		for (u32 ci = 0; ci < captured_count; ci++)
+		{
+			if (scope_depth < MAX_SCOPE_DEPTH) {
+				scope_is_with[scope_depth] = func->captured_scope_is_with[ci];
+				scope_mc[scope_depth] = (MovieClip*)func->captured_scope_mc[ci];
+				scope_chain[scope_depth++] = (ASObject*)func->captured_scope[ci];
+			}
+		}
+
+		ASObject* local_scope = allocObject(app_context, 8);
+		if (scope_depth < MAX_SCOPE_DEPTH) {
+			scope_is_with[scope_depth] = 0;
+			scope_mc[scope_depth] = NULL;
+			scope_chain[scope_depth++] = local_scope;
+		}
+
+		MovieClip* saved_context = g_current_context;
+		if (g_swf_version >= 6 && func->base_clip != NULL)
+			g_current_context = (MovieClip*)func->base_clip;
+
+		g_call_depth++;
+		func->advanced_func(app_context, &undef_arg, 1, regs, (void*)nc);
+		g_call_depth--;
+
+		g_current_context = saved_context;
+		for (u32 ci = 0; ci < captured_count + 1; ci++)
+			if (scope_depth > 0) scope_depth--;
+		releaseObject(app_context, local_scope);
+		if (regs != NULL) FREE(regs);
+	}
+	else
+	{
+		pushVar(app_context, &undef_arg);
+		g_call_depth++;
+		((ActionVar(*)(SWFAppContext*))func->simple_func)(app_context);
+		g_call_depth--;
+	}
+
+	g_special_depth--;
+}
+
+static ActionVar builtin_nc_close(SWFAppContext* app_context, ActionVar* args, u32 arg_count, ActionVar* registers, void* this_obj)
+{
+	(void)args; (void)arg_count; (void)registers;
+	ASObject* nc = (ASObject*)this_obj;
+	ActionVar ret = {0}; ret.type = ACTION_STACK_VALUE_UNDEFINED;
+	if (nc == NULL) return ret;
+
+	// Only fire onStatus if currently connected
+	ActionVar* is_conn = getProperty(nc, "isConnected", 11);
+	if (is_conn != NULL && is_conn->type == ACTION_STACK_VALUE_BOOLEAN && is_conn->data.numeric_value != 0)
+	{
+		// Check if it was a remote connection (has uri property)
+		ActionVar* uri = getProperty(nc, "uri", 3);
+		int was_remote = (uri != NULL && uri->type == ACTION_STACK_VALUE_STRING && uri->str_size > 0);
+
+		ActionVar bv = {0}; bv.type = ACTION_STACK_VALUE_BOOLEAN; bv.data.numeric_value = 0;
+		setProperty(app_context, nc, "isConnected", 11, &bv);
+		nc_dispatch_onStatus(app_context, nc, "NetConnection.Connect.Closed", "status");
+
+		// Remote connections also fire a second onStatus with undefined event
+		if (was_remote)
+		{
+			nc_dispatch_onStatus_undefined(app_context, nc);
+		}
+	}
+
 	return ret;
 }
 
@@ -23838,7 +24296,17 @@ static void initSoundPrototype(SWFAppContext* app_context, ASFunction* ctor)
 			setPropertyWithFlags(app_context, ctor->prototype_obj, "setVolume", 9, &fv, mflags);
 		}
 	}
-	addStubMethodToProto(app_context, ctor->prototype_obj, "stop", 4, mflags);
+	// Sound.stop — real implementation
+	{
+		ASFunction* fn = &g_proto_stub_funcs[g_proto_stub_func_count++];
+		memset(fn, 0, sizeof(ASFunction));
+		strncpy(fn->name, "stop", 255);
+		fn->function_type = 2;
+		fn->advanced_func = (Function2Ptr) builtin_sound_stop;
+		if (function_count < MAX_FUNCTIONS) function_registry[function_count++] = fn;
+		ActionVar fv = {0}; fv.type = ACTION_STACK_VALUE_FUNCTION; fv.data.numeric_value = (u64) fn;
+		setPropertyWithFlags(app_context, ctor->prototype_obj, "stop", 4, &fv, mflags);
+	}
 	// Sound.attachSound — real implementation
 	{
 		ASFunction* fn = &g_proto_stub_funcs[g_proto_stub_func_count++];
@@ -23851,7 +24319,17 @@ static void initSoundPrototype(SWFAppContext* app_context, ASFunction* ctor)
 		ActionVar fv = {0}; fv.type = ACTION_STACK_VALUE_FUNCTION; fv.data.numeric_value = (u64) fn;
 		setPropertyWithFlags(app_context, ctor->prototype_obj, "attachSound", 11, &fv, mflags);
 	}
-	addStubMethodToProto(app_context, ctor->prototype_obj, "start", 5, mflags);
+	// Sound.start — real implementation
+	{
+		ASFunction* fn = &g_proto_stub_funcs[g_proto_stub_func_count++];
+		memset(fn, 0, sizeof(ASFunction));
+		strncpy(fn->name, "start", 255);
+		fn->function_type = 2;
+		fn->advanced_func = (Function2Ptr) builtin_sound_start;
+		if (function_count < MAX_FUNCTIONS) function_registry[function_count++] = fn;
+		ActionVar fv = {0}; fv.type = ACTION_STACK_VALUE_FUNCTION; fv.data.numeric_value = (u64) fn;
+		setPropertyWithFlags(app_context, ctor->prototype_obj, "start", 5, &fv, mflags);
+	}
 
 	// Extended methods (SWF6+)
 	if (g_swf_version >= 6) {
@@ -23868,9 +24346,29 @@ static void initSoundPrototype(SWFAppContext* app_context, ASFunction* ctor)
 			setPropertyWithFlags(app_context, ctor->prototype_obj, "getDuration", 11, &fv, mflags);
 		}
 		addStubMethodToProto(app_context, ctor->prototype_obj, "setDuration", 11, mflags);
-		addStubMethodToProto(app_context, ctor->prototype_obj, "getPosition", 11, mflags);
+		// Sound.getPosition — real implementation
+		{
+			ASFunction* fn = &g_proto_stub_funcs[g_proto_stub_func_count++];
+			memset(fn, 0, sizeof(ASFunction));
+			strncpy(fn->name, "getPosition", 255);
+			fn->function_type = 2;
+			fn->advanced_func = (Function2Ptr) builtin_sound_getPosition;
+			if (function_count < MAX_FUNCTIONS) function_registry[function_count++] = fn;
+			ActionVar fv = {0}; fv.type = ACTION_STACK_VALUE_FUNCTION; fv.data.numeric_value = (u64) fn;
+			setPropertyWithFlags(app_context, ctor->prototype_obj, "getPosition", 11, &fv, mflags);
+		}
 		addStubMethodToProto(app_context, ctor->prototype_obj, "setPosition", 11, mflags);
-		addStubMethodToProto(app_context, ctor->prototype_obj, "loadSound", 9, mflags);
+		// Sound.loadSound — real implementation
+		{
+			ASFunction* fn = &g_proto_stub_funcs[g_proto_stub_func_count++];
+			memset(fn, 0, sizeof(ASFunction));
+			strncpy(fn->name, "loadSound", 255);
+			fn->function_type = 2;
+			fn->advanced_func = (Function2Ptr) builtin_sound_loadSound;
+			if (function_count < MAX_FUNCTIONS) function_registry[function_count++] = fn;
+			ActionVar fv = {0}; fv.type = ACTION_STACK_VALUE_FUNCTION; fv.data.numeric_value = (u64) fn;
+			setPropertyWithFlags(app_context, ctor->prototype_obj, "loadSound", 9, &fv, mflags);
+		}
 		addStubMethodToProto(app_context, ctor->prototype_obj, "getBytesLoaded", 14, mflags);
 		addStubMethodToProto(app_context, ctor->prototype_obj, "getBytesTotal", 13, mflags);
 	}
@@ -24075,9 +24573,23 @@ static void initNetConnectionPrototype(SWFAppContext* app_context, ASFunction* c
 	setPropertyWithFlags(app_context, ctor->prototype_obj, "connectedProxyType", 18, &undef_val, 0);
 	setPropertyWithFlags(app_context, ctor->prototype_obj, "usingTLS", 8, &undef_val, 0);
 	setPropertyWithFlags(app_context, ctor->prototype_obj, "protocol", 8, &undef_val, 0);
-	// Methods
-	addStubMethodToProto(app_context, ctor->prototype_obj, "connect", 7, mflags);
-	addStubMethodToProto(app_context, ctor->prototype_obj, "close", 5, mflags);
+	// Methods — connect and close are real implementations, call and addHeader are stubs
+	{
+		memset(&g_nc_connect_func, 0, sizeof(ASFunction));
+		strncpy(g_nc_connect_func.name, "connect", 255);
+		g_nc_connect_func.function_type = 2;
+		g_nc_connect_func.advanced_func = (Function2Ptr) builtin_nc_connect;
+		ActionVar fv = {0}; fv.type = ACTION_STACK_VALUE_FUNCTION;
+		fv.data.numeric_value = (u64)&g_nc_connect_func;
+		setPropertyWithFlags(app_context, ctor->prototype_obj, "connect", 7, &fv, mflags);
+
+		memset(&g_nc_close_func, 0, sizeof(ASFunction));
+		strncpy(g_nc_close_func.name, "close", 255);
+		g_nc_close_func.function_type = 2;
+		g_nc_close_func.advanced_func = (Function2Ptr) builtin_nc_close;
+		fv.data.numeric_value = (u64)&g_nc_close_func;
+		setPropertyWithFlags(app_context, ctor->prototype_obj, "close", 5, &fv, mflags);
+	}
 	addStubMethodToProto(app_context, ctor->prototype_obj, "call", 4, mflags);
 	addStubMethodToProto(app_context, ctor->prototype_obj, "addHeader", 9, mflags);
 	// READ_ONLY undefined at front
@@ -24743,6 +25255,22 @@ static void initFlashPackage(SWFAppContext* app_context)
 	// doesn't work in Flash/Ruffle. Only "new flash.geom.Rectangle()" via qualified path.
 
 	MAKE_STUB_CTOR(fc_Transform, "Transform");
+	// Transform.prototype: 5 READ_ONLY undefined properties
+	{
+		ensureStubCtorPrototype(app_context, &fc_Transform);
+		ASObject* tp = fc_Transform.prototype_obj;
+		ActionVar uv = {0}; uv.type = ACTION_STACK_VALUE_UNDEFINED;
+		// LIFO order: matrix, concatenatedMatrix, colorTransform, concatenatedColorTransform, pixelBounds
+		// Enumerated as: pixelBounds, concatenatedColorTransform, colorTransform, concatenatedMatrix, matrix
+		// Flags = 0 means READ_ONLY + DONT_DELETE + DONT_ENUM? No — flags=0 means ENUMERABLE + READ_ONLY (no WRITABLE, no CONFIGURABLE)
+		// flags = ENUMERABLE only (READ_ONLY, not DONT_ENUM)
+		const u8 ro = PROPERTY_FLAG_ENUMERABLE;
+		setPropertyWithFlags(app_context, tp, "matrix", 6, &uv, ro);
+		setPropertyWithFlags(app_context, tp, "concatenatedMatrix", 18, &uv, ro);
+		setPropertyWithFlags(app_context, tp, "colorTransform", 14, &uv, ro);
+		setPropertyWithFlags(app_context, tp, "concatenatedColorTransform", 26, &uv, ro);
+		setPropertyWithFlags(app_context, tp, "pixelBounds", 11, &uv, ro);
+	}
 
 	// Register geom children in LIFO order for correct enumeration:
 	// Expected: Transform, ColorTransform, Matrix, Point, Rectangle
@@ -34931,6 +35459,73 @@ void actionGetMember(SWFAppContext* app_context)
 				}
 			}
 			return;
+		}
+
+		// Sound native properties: duration and position are always computed
+		// (unless the user set them to a string, which sticks for SWF5 Place 0 pattern)
+		if (obj->native_type == NATIVE_SOUND) {
+			// Sound native properties: duration and position
+			// Before loadSound (__loaded__ not set): own property is returned if exists.
+			// After loadSound (__loaded__ set): always return computed value.
+			ActionVar* _snd_loaded = getProperty(obj, "__loaded__", 10);
+			int _snd_is_loaded = (_snd_loaded && _snd_loaded->type == ACTION_STACK_VALUE_BOOLEAN && _snd_loaded->data.numeric_value);
+
+			if (prop_name_len == 8 && memcmp(prop_name, "duration", 8) == 0) {
+				if (!_snd_is_loaded) {
+					// Not loaded: return own property if exists
+					ASProperty* own = findPropertyRaw(obj, "duration", 8);
+					if (own != NULL && own->value.type != ACTION_STACK_VALUE_UNDEFINED) {
+						pushVar(app_context, &own->value);
+						return;
+					}
+				} else {
+					// Loaded: check for pre-loadSound override
+					ActionVar* ovr = getProperty(obj, "__dur_override__", 16);
+					if (ovr != NULL && ovr->type == ACTION_STACK_VALUE_STRING) {
+						pushVar(app_context, ovr);
+						return;
+					}
+				}
+				// Computed: return __duration__
+				ActionVar* dur = getProperty(obj, "__duration__", 12);
+				if (dur != NULL && dur->type == ACTION_STACK_VALUE_F64) {
+					pushVar(app_context, dur);
+				} else {
+					pushUndefined(app_context);
+				}
+				return;
+			}
+			if (prop_name_len == 8 && memcmp(prop_name, "position", 8) == 0) {
+				if (!_snd_is_loaded) {
+					ASProperty* own = findPropertyRaw(obj, "position", 8);
+					if (own != NULL && own->value.type != ACTION_STACK_VALUE_UNDEFINED) {
+						pushVar(app_context, &own->value);
+						return;
+					}
+				} else {
+					ActionVar* ovr = getProperty(obj, "__pos_override__", 16);
+					if (ovr != NULL && ovr->type == ACTION_STACK_VALUE_STRING) {
+						pushVar(app_context, ovr);
+						return;
+					}
+				}
+				// Computed: check if loaded, completed, or playing
+				if (!_snd_is_loaded) {
+					pushUndefined(app_context);
+					return;
+				}
+				ActionVar* completed = getProperty(obj, "__completed__", 13);
+				if (completed != NULL && completed->type == ACTION_STACK_VALUE_BOOLEAN && completed->data.numeric_value) {
+					ActionVar* dur = getProperty(obj, "__duration__", 12);
+					if (dur != NULL) pushVar(app_context, dur);
+					else { ActionVar z = makeF64(0); pushVar(app_context, &z); }
+				} else {
+					double elapsed = soundGetElapsedForObject(obj);
+					ActionVar ev = makeF64(elapsed);
+					pushVar(app_context, &ev);
+				}
+				return;
+			}
 		}
 
 		// Look up property with prototype chain support (returns ASProperty* for getter check)
@@ -53379,4 +53974,178 @@ int hasActiveTimers(void)
 		if (g_timers[i].active) return 1;
 	}
 	return 0;
+}
+
+// ===========================================================================
+// Sound playback simulation (for trace-only mode)
+// ===========================================================================
+
+#define MAX_PLAYING_SOUNDS 16
+
+typedef struct {
+	int active;
+	ASObject* sound_obj;     // The Sound instance
+	double duration_ms;      // Duration of the loaded sound
+	double elapsed_ms;       // Elapsed playback time
+} PlayingSoundEntry;
+
+static PlayingSoundEntry g_playing_sounds[MAX_PLAYING_SOUNDS];
+static int g_has_playing_sounds = 0;
+
+static void soundStopForObject(ASObject* sound_obj)
+{
+	for (int i = 0; i < MAX_PLAYING_SOUNDS; i++)
+	{
+		if (g_playing_sounds[i].active && g_playing_sounds[i].sound_obj == sound_obj)
+			g_playing_sounds[i].active = 0;
+	}
+}
+
+static double soundGetElapsedForObject(ASObject* sound_obj)
+{
+	for (int i = 0; i < MAX_PLAYING_SOUNDS; i++)
+	{
+		if (g_playing_sounds[i].active && g_playing_sounds[i].sound_obj == sound_obj)
+		{
+			double elapsed = g_playing_sounds[i].elapsed_ms;
+			double dur = g_playing_sounds[i].duration_ms;
+			return elapsed < dur ? elapsed : dur;
+		}
+	}
+	return 0;
+}
+
+// Generic callback dispatcher for Sound events (onID3, onLoad, etc.)
+static void soundFireCallback(SWFAppContext* app_context, ASObject* sound_obj, const char* name, u32 name_len)
+{
+	extern MovieClip* g_current_context;
+	ActionVar* handler = getPropertyWithPrototype(sound_obj, name, name_len);
+	if (handler == NULL || handler->type != ACTION_STACK_VALUE_FUNCTION) return;
+	ASFunction* func = (ASFunction*)(uintptr_t)handler->data.numeric_value;
+	if (func == NULL) return;
+
+	g_special_depth++;
+	if (g_special_depth >= MAX_SPECIAL_DEPTH) { g_special_depth--; return; }
+
+	if (func->function_type == 2)
+	{
+		ActionVar* regs = NULL;
+		if (func->register_count > 0)
+			regs = (ActionVar*) HCALLOC(func->register_count, sizeof(ActionVar));
+
+		u32 captured_count = func->captured_scope_count;
+		for (u32 ci = 0; ci < captured_count; ci++)
+		{
+			if (scope_depth < MAX_SCOPE_DEPTH) {
+				scope_is_with[scope_depth] = func->captured_scope_is_with[ci];
+				scope_mc[scope_depth] = (MovieClip*)func->captured_scope_mc[ci];
+				scope_chain[scope_depth++] = (ASObject*)func->captured_scope[ci];
+			}
+		}
+
+		ASObject* local_scope = allocObject(app_context, 8);
+		if (scope_depth < MAX_SCOPE_DEPTH) {
+			scope_is_with[scope_depth] = 0;
+			scope_mc[scope_depth] = NULL;
+			scope_chain[scope_depth++] = local_scope;
+		}
+
+		MovieClip* saved_context = g_current_context;
+		if (g_swf_version >= 6 && func->base_clip != NULL)
+			g_current_context = (MovieClip*)func->base_clip;
+
+		g_call_depth++;
+		func->advanced_func(app_context, NULL, 0, regs, (void*)sound_obj);
+		g_call_depth--;
+
+		g_current_context = saved_context;
+		for (u32 ci = 0; ci < captured_count + 1; ci++)
+			if (scope_depth > 0) scope_depth--;
+		releaseObject(app_context, local_scope);
+		if (regs != NULL) FREE(regs);
+	}
+	else
+	{
+		u32 captured_count = func->captured_scope_count;
+		for (u32 ci = 0; ci < captured_count; ci++)
+		{
+			if (scope_depth < MAX_SCOPE_DEPTH) {
+				scope_is_with[scope_depth] = func->captured_scope_is_with[ci];
+				scope_mc[scope_depth] = (MovieClip*)func->captured_scope_mc[ci];
+				scope_chain[scope_depth++] = (ASObject*)func->captured_scope[ci];
+			}
+		}
+
+		g_call_depth++;
+		((ActionVar(*)(SWFAppContext*))func->simple_func)(app_context);
+		g_call_depth--;
+
+		for (u32 ci = 0; ci < captured_count; ci++)
+			if (scope_depth > 0) scope_depth--;
+	}
+
+	g_special_depth--;
+}
+
+static void soundStartPlayback(ASObject* sound_obj, double duration_ms)
+{
+	for (int i = 0; i < MAX_PLAYING_SOUNDS; i++)
+	{
+		if (!g_playing_sounds[i].active)
+		{
+			g_playing_sounds[i].active = 1;
+			g_playing_sounds[i].sound_obj = sound_obj;
+			g_playing_sounds[i].duration_ms = duration_ms;
+			g_playing_sounds[i].elapsed_ms = 0;
+			g_has_playing_sounds = 1;
+			return;
+		}
+	}
+}
+
+static void soundFireOnComplete(SWFAppContext* app_context, ASObject* sound_obj)
+{
+	// Set completed flag so getPosition() returns duration
+	ActionVar cv = {0}; cv.type = ACTION_STACK_VALUE_BOOLEAN; cv.data.numeric_value = 1;
+	setProperty(app_context, sound_obj, "__completed__", 13, &cv);
+
+	soundFireCallback(app_context, sound_obj, "onSoundComplete", 15);
+}
+
+void processSoundPlayback(SWFAppContext* app_context, double frame_duration_ms)
+{
+	if (!g_has_playing_sounds) return;
+
+	int any_active = 0;
+	for (int i = 0; i < MAX_PLAYING_SOUNDS; i++)
+	{
+		if (!g_playing_sounds[i].active) continue;
+
+		g_playing_sounds[i].elapsed_ms += frame_duration_ms;
+		if (g_playing_sounds[i].elapsed_ms >= g_playing_sounds[i].duration_ms)
+		{
+			// Sound completed
+			g_playing_sounds[i].active = 0;
+			ASObject* sobj = g_playing_sounds[i].sound_obj;
+			soundFireOnComplete(app_context, sobj);
+			// Re-check: the callback may have started new sounds
+		}
+		else
+		{
+			any_active = 1;
+		}
+	}
+
+	// Recheck after callbacks
+	if (!any_active)
+	{
+		g_has_playing_sounds = 0;
+		for (int i = 0; i < MAX_PLAYING_SOUNDS; i++)
+			if (g_playing_sounds[i].active) { g_has_playing_sounds = 1; break; }
+	}
+}
+
+int hasPlayingSounds(void)
+{
+	return g_has_playing_sounds;
 }
