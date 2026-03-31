@@ -40,9 +40,10 @@ LittleCube has added **garbage collection** to the runtime PR (commit `f02311c`,
 - Previous 5 commits (objects and functions infrastructure)
 - `c7348af` - remove arg initial strings, add null/undefined push values
 
-**SWFModernRuntime PR #3** — now 15 commits (was 14):
+**SWFModernRuntime PR #3** — now 16 commits (was 14):
 - Previous 14 commits (objects and functions infrastructure)
 - `f02311c` - **first attempt at garbage collection** (concurrent GC with cycle detection)
+- `f1d2da9` - move free thread functions to separate file (`free_thread.c`/`free_thread.h`)
 
 #### LittleCube's Pre-Merge TODO (Updated)
 
@@ -50,7 +51,7 @@ LittleCube has added **garbage collection** to the runtime PR (commit `f02311c`,
 |------|--------|
 | Remaining primitive types (Array, String, Number) | In progress |
 | Arena optimization for rbtree | Not started |
-| Refcount/free mechanism | **In progress** (`f02311c`) |
+| Refcount/free mechanism | **In progress** (`f02311c`, `f1d2da9`) |
 
 ---
 

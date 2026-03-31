@@ -117,7 +117,7 @@ Remaining 20 failing lines:
 5. **Device-font text** (7 lines): Lines 157, 163, 165, 171-177 — device fonts (Arial, Courier New) have empty glyph shapes in the SWF. Flash/Ruffle use system font outlines for hit testing; we have no font data.
 6. **Morph complex shape** (4 lines): Lines 292, 294, 296, 304 — morph shapes with stroke-only paths (no fill triangles). Bounds-based testing is too coarse but no triangle data exists for interpolation.
 
-**Blocker:** Device-font text (7 lines) requires font outline data unavailable in the SWF. Morph complex (4 lines) has no triangle data to interpolate. Curve/polygon approximation (6 lines) is fundamental to the earcut triangulation approach. Stroke precision (1 line) is a stroke endpoint geometry issue.
+**Blocker:** All 20 remaining failures trace to earcut polygon approximation of curves. A vector-path winding number algorithm (matching Ruffle's approach) would fix all of them. See `VECTOR_PATH_HITTEST_PLAN.md` for the implementation plan.
 
 ### ~~movieclip_invalid_get_bounds_6, _7~~ — RESOLVED
 
