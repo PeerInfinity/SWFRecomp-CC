@@ -9,7 +9,7 @@ Last updated: 2026-03-31
 - **Main failure types**: output_mismatch (51), runtime_segfault (1), timeout (1)
 - **Known regressions**: `global_instance_decls` 40→23 (unclear root cause, test at 3% pass rate).
 - **Latest fixes (2026-03-31, session 2)**:
-  - global_proto_decls improved (250→259) — Point.prototype enumeration order fix, geometry constructor own_props UNDEFINED placeholder fix
+  - global_proto_decls improved (250→276) — Point/Matrix/Rectangle/ColorTransform prototype enumeration order, geometry constructor own_props UNDEFINED placeholder fix
   - ensureBuiltinPrototypeProps + ensureCtorOwnProps now handle UNDEFINED placeholders correctly
   - Investigated near-miss tests: native_objects_swf6 (Flash vs Ruffle difference), tab_ordering_properties_tab_index_edge_case (conflicting expectations), movieclip_library_state_values (already accepted diffs)
 - **Latest fixes (2026-03-31)**:

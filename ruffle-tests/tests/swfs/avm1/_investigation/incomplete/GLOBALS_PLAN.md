@@ -64,7 +64,7 @@ Last updated: 2026-03-30
 ## Status: BLOCKED — Phases 1-8c-6 DONE, Phase 8c-4/8c-5/8d partially done, remaining items blocked
 
 **29 of 31 plan tests PASSING.** `native_objects_swf6` is a pre-existing regression (83/84) from the reverted TextField SWF6 constructor gate. 3 tests remain with output mismatches but significant progress was made:
-- `global_proto_decls`: 259/4497 (was 250, +9 from Point.prototype ordering + constructor own_props fix, 2026-03-31)
+- `global_proto_decls`: 276/4497 (was 250, +26 from Point/Matrix/Rectangle/ColorTransform prototype ordering + constructor own_props fix, 2026-03-31)
 - `global_proto_decls_delete`: 255/4158 (was 255, recovered from -79 regression via CONFIGURABLE flag fix, 2026-03-31)
 - `global_instance_decls`: 23/758 (was 40, -17 regression of unclear origin — may be from initialization order changes, 2026-03-31)
 
