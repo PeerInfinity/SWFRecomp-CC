@@ -64,7 +64,7 @@ Last updated: 2026-04-01
 ## Status: BLOCKED — Phases 1-8c-6 DONE, Phase 8c-4/8c-5/8d partially done, remaining items blocked
 
 **29 of 31 plan tests PASSING.** `native_objects_swf6` is a pre-existing regression (83/84) from the reverted TextField SWF6 constructor gate. 3 tests remain with output mismatches but significant progress was made:
-- `global_proto_decls`: ~512/4497 (was 276, +236 from geom/filter/BitmapData/TextRenderer virtual props + ordering fixes, 2026-04-01)
+- `global_proto_decls`: ~551/4497 (was 276, +275 from geom/filter/BitmapData/TextRenderer/System fixes, 2026-04-01)
 - `global_proto_decls_delete`: ~283/4158 (was 255, +28 from filter order + clone BitmapFilter.prototype + constructor removal, 2026-04-01)
 - `global_instance_decls`: 23/758 (was 40, -17 regression of unclear origin — may be from initialization order changes, 2026-03-31)
 
@@ -82,6 +82,9 @@ Last updated: 2026-04-01
 - **BitmapData constructor own_props order** — Pre-added prototype/constructor/__proto__ placeholders before channel constants and loadBitmap. Removed loadBitmap from prototype (static method only).
 - **BitmapData.prototype method reorder** — All 23 methods reordered to match expected LIFO enumeration. Added 4 virtual READ_ONLY properties (width, height, rectangle, transparent) returning -1.
 - **TextRenderer own_props** — Added displayMode (READ_ONLY, string), maxLevel (READ_ONLY, number), setAdvancedAntialiasingTable (function) to flash.text.TextRenderer constructor.
+- **System object rewrite** — Added privateBytes (READ_ONLY number), setClipboard/showSettings/Product (stub functions), useCodepage/exactSettings (READ_ONLY booleans). Proper LIFO insertion order. Removed own toString (inherited from Object.prototype).
+- **System.IME rewrite** — Added 6 IME-specific methods (doConversion, setCompositionString, setConversionMode, getConversionMode, setEnabled, getEnabled) + 8 string constants (ALPHANUMERIC_FULL/HALF, CHINESE, etc.) All with DONT_ENUM + READ_ONLY flags. AsBroadcaster methods also DONT_ENUM + READ_ONLY. __proto__ and constructor READ_ONLY.
+- **System/IME constructor fixup** — Deferred constructor value fill-in to ensureGlobalInit (after Object constructor available).
 
 ### Changes made (2026-03-31 session 2)
 - **Geometry constructor own_props UNDEFINED placeholder fix** — `ensureCtorOwnProps` and flash.* constructor loop now check for UNDEFINED type (not just NULL) when filling in constructor/__proto__/prototype placeholders. Fixes Point/Matrix/Rectangle constructor own_props.
@@ -133,7 +136,7 @@ Last updated: 2026-04-01
 | swf7_global_funcs | 232/232 | 100% | **PASS** | |
 | global_swf5_6_7_8_9 | 1145/1145 | 100% | **PASS** | |
 | native_subclasses | PASS | 100% | **PASS** | |
-| global_proto_decls | ~512/4497 | ~11.4% | **FAIL** | Lines 1-512 match. Next blocker: System.* property ordering (privateBytes, setClipboard, useCodepage) |
+| global_proto_decls | ~551/4497 | ~12.3% | **FAIL** | Lines 1-551 match. Next blocker: IME method sub-object own_props (prototype/constructor/__proto__) |
 | global_proto_decls_delete | ~283/4158 | ~6.8% | **FAIL** | Lines 1-283 match. Next blocker: System.privateBytes/IME property ordering |
 | global_instance_decls | 17/758 | ~2% | **FAIL** | Phase 8d — DONT_DELETE on instance __proto__, missing instance properties, special construction behavior |
 

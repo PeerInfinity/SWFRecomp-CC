@@ -25150,89 +25150,224 @@ static void initSystemObject(SWFAppContext* app_context)
 {
 	if (g_system_object != NULL) return;
 
-	g_system_object = allocObject(app_context, 4);
-	setObjectProto(app_context, g_system_object);
-	ASObject* security_obj = allocObject(app_context, 4);
-	setObjectProto(app_context, security_obj);
-	ActionVar sandbox_val = {0};
-	sandbox_val.type = ACTION_STACK_VALUE_STRING;
-	if (g_use_network) {
-		sandbox_val.str_size = 16;
-		VAL(u64, &sandbox_val.data.numeric_value) = (u64)u16_localWithNetwork;
-	} else {
-		sandbox_val.str_size = 13;
-		VAL(u64, &sandbox_val.data.numeric_value) = (u64)u16_localWithFile;
-	}
-	setProperty(app_context, security_obj, "sandboxType", 11, &sandbox_val);
-	ActionVar security_var = {0};
-	security_var.type = ACTION_STACK_VALUE_OBJECT;
-	VAL(u64, &security_var.data.numeric_value) = (u64)security_obj;
-	setProperty(app_context, g_system_object, "security", 8, &security_var);
+	// System object — LIFO insertion order (reverse of expected enumeration):
+	// Enum: privateBytes, IME, setClipboard, security, useCodepage, exactSettings,
+	//       showSettings, Product, capabilities, __proto__, constructor
+	g_system_object = allocObject(app_context, 14);
 
-	// System.capabilities object
+	// constructor placeholder — DONT_ENUM, inserted first so it enumerates last (LIFO)
+	// Value filled in by ensureGlobalInit when Object constructor is available
+	{
+		ActionVar _u = {0}; _u.type = ACTION_STACK_VALUE_UNDEFINED;
+		setPropertyWithFlags(app_context, g_system_object, "constructor", 11, &_u, PROPERTY_FLAGS_DONTENUM);
+	}
+	setObjectProto(app_context, g_system_object);
+
+	// capabilities
 	ASObject* caps_obj = allocObject(app_context, 16);
 	setObjectProto(app_context, caps_obj);
-	ActionVar cap_val = {0};
-	cap_val.type = ACTION_STACK_VALUE_F64;
-	VAL(double, &cap_val.data.numeric_value) = 1536.0;
-	setProperty(app_context, caps_obj, "screenResolutionX", 17, &cap_val);
-	VAL(double, &cap_val.data.numeric_value) = 864.0;
-	setProperty(app_context, caps_obj, "screenResolutionY", 17, &cap_val);
-	VAL(double, &cap_val.data.numeric_value) = 1.0;
-	setProperty(app_context, caps_obj, "pixelAspectRatio", 16, &cap_val);
-	VAL(double, &cap_val.data.numeric_value) = 72.0;
-	setProperty(app_context, caps_obj, "screenDPI", 9, &cap_val);
-	ActionVar pt_val = {0};
-	pt_val.type = ACTION_STACK_VALUE_STRING;
-	pt_val.str_size = 10;
-	VAL(u64, &pt_val.data.numeric_value) = (u64)u16_StandAlone;
-	setProperty(app_context, caps_obj, "playerType", 10, &pt_val);
-	ActionVar ver_val = {0};
-	ver_val.type = ACTION_STACK_VALUE_STRING;
-	ver_val.str_size = 13;
-	VAL(u64, &ver_val.data.numeric_value) = (u64)u16_WIN_ver;
-	setProperty(app_context, caps_obj, "version", 7, &ver_val);
-	ActionVar os_val = {0};
-	os_val.type = ACTION_STACK_VALUE_STRING;
-	os_val.str_size = 10;
-	VAL(u64, &os_val.data.numeric_value) = (u64)u16_Windows_XP;
-	setProperty(app_context, caps_obj, "os", 2, &os_val);
-	ActionVar mfr_val = {0};
-	mfr_val.type = ACTION_STACK_VALUE_STRING;
-	mfr_val.str_size = 18;
-	VAL(u64, &mfr_val.data.numeric_value) = (u64)u16_Macromedia_Windows;
-	setProperty(app_context, caps_obj, "manufacturer", 12, &mfr_val);
-	ActionVar lang_val = {0};
-	lang_val.type = ACTION_STACK_VALUE_STRING;
-	lang_val.str_size = 2;
-	VAL(u64, &lang_val.data.numeric_value) = (u64)u16_en;
-	setProperty(app_context, caps_obj, "language", 8, &lang_val);
-	cap_val.type = ACTION_STACK_VALUE_BOOLEAN;
-	VAL(u32, &cap_val.data.numeric_value) = 0;
-	setProperty(app_context, caps_obj, "isDebugger", 10, &cap_val);
-	cap_val.type = ACTION_STACK_VALUE_BOOLEAN;
-	VAL(u32, &cap_val.data.numeric_value) = 1;
-	setProperty(app_context, caps_obj, "hasAudio", 8, &cap_val);
-	cap_val.type = ACTION_STACK_VALUE_BOOLEAN;
-	VAL(u32, &cap_val.data.numeric_value) = 1;
-	setProperty(app_context, caps_obj, "hasVideoEncoder", 15, &cap_val);
-	ActionVar caps_var = {0};
-	caps_var.type = ACTION_STACK_VALUE_OBJECT;
-	VAL(u64, &caps_var.data.numeric_value) = (u64)caps_obj;
-	setProperty(app_context, g_system_object, "capabilities", 12, &caps_var);
+	{
+		ActionVar cap_val = {0};
+		cap_val.type = ACTION_STACK_VALUE_F64;
+		VAL(double, &cap_val.data.numeric_value) = 1536.0;
+		setProperty(app_context, caps_obj, "screenResolutionX", 17, &cap_val);
+		VAL(double, &cap_val.data.numeric_value) = 864.0;
+		setProperty(app_context, caps_obj, "screenResolutionY", 17, &cap_val);
+		VAL(double, &cap_val.data.numeric_value) = 1.0;
+		setProperty(app_context, caps_obj, "pixelAspectRatio", 16, &cap_val);
+		VAL(double, &cap_val.data.numeric_value) = 72.0;
+		setProperty(app_context, caps_obj, "screenDPI", 9, &cap_val);
+		ActionVar pt_val = {0};
+		pt_val.type = ACTION_STACK_VALUE_STRING;
+		pt_val.str_size = 10;
+		VAL(u64, &pt_val.data.numeric_value) = (u64)u16_StandAlone;
+		setProperty(app_context, caps_obj, "playerType", 10, &pt_val);
+		ActionVar ver_val = {0};
+		ver_val.type = ACTION_STACK_VALUE_STRING;
+		ver_val.str_size = 13;
+		VAL(u64, &ver_val.data.numeric_value) = (u64)u16_WIN_ver;
+		setProperty(app_context, caps_obj, "version", 7, &ver_val);
+		ActionVar os_val = {0};
+		os_val.type = ACTION_STACK_VALUE_STRING;
+		os_val.str_size = 10;
+		VAL(u64, &os_val.data.numeric_value) = (u64)u16_Windows_XP;
+		setProperty(app_context, caps_obj, "os", 2, &os_val);
+		ActionVar mfr_val = {0};
+		mfr_val.type = ACTION_STACK_VALUE_STRING;
+		mfr_val.str_size = 18;
+		VAL(u64, &mfr_val.data.numeric_value) = (u64)u16_Macromedia_Windows;
+		setProperty(app_context, caps_obj, "manufacturer", 12, &mfr_val);
+		ActionVar lang_val = {0};
+		lang_val.type = ACTION_STACK_VALUE_STRING;
+		lang_val.str_size = 2;
+		VAL(u64, &lang_val.data.numeric_value) = (u64)u16_en;
+		setProperty(app_context, caps_obj, "language", 8, &lang_val);
+		cap_val.type = ACTION_STACK_VALUE_BOOLEAN;
+		VAL(u32, &cap_val.data.numeric_value) = 0;
+		setProperty(app_context, caps_obj, "isDebugger", 10, &cap_val);
+		cap_val.type = ACTION_STACK_VALUE_BOOLEAN;
+		VAL(u32, &cap_val.data.numeric_value) = 1;
+		setProperty(app_context, caps_obj, "hasAudio", 8, &cap_val);
+		cap_val.type = ACTION_STACK_VALUE_BOOLEAN;
+		VAL(u32, &cap_val.data.numeric_value) = 1;
+		setProperty(app_context, caps_obj, "hasVideoEncoder", 15, &cap_val);
+	}
+	{
+		ActionVar cv = {0}; cv.type = ACTION_STACK_VALUE_OBJECT;
+		cv.data.numeric_value = (u64)caps_obj;
+		setProperty(app_context, g_system_object, "capabilities", 12, &cv);
+	}
 
-	ASObject* ime_obj = allocObject(app_context, 4);
+	// Product (stub constructor function)
+	{
+		static ASFunction sys_product_func;
+		memset(&sys_product_func, 0, sizeof(ASFunction));
+		strncpy(sys_product_func.name, "Product", 255);
+		sys_product_func.function_type = 2;
+		sys_product_func.advanced_func = (Function2Ptr)builtin_noop_func;
+		ActionVar fv = {0}; fv.type = ACTION_STACK_VALUE_FUNCTION;
+		fv.data.numeric_value = (u64)&sys_product_func;
+		setProperty(app_context, g_system_object, "Product", 7, &fv);
+	}
+
+	// showSettings (stub function)
+	{
+		static ASFunction sys_showSettings_func;
+		memset(&sys_showSettings_func, 0, sizeof(ASFunction));
+		strncpy(sys_showSettings_func.name, "showSettings", 255);
+		sys_showSettings_func.function_type = 2;
+		sys_showSettings_func.advanced_func = (Function2Ptr)builtin_noop_func;
+		ActionVar fv = {0}; fv.type = ACTION_STACK_VALUE_FUNCTION;
+		fv.data.numeric_value = (u64)&sys_showSettings_func;
+		setProperty(app_context, g_system_object, "showSettings", 12, &fv);
+	}
+
+	// exactSettings (READ_ONLY boolean, default false)
+	{
+		ActionVar bv = {0}; bv.type = ACTION_STACK_VALUE_BOOLEAN; bv.data.numeric_value = 0;
+		setPropertyWithFlags(app_context, g_system_object, "exactSettings", 13, &bv,
+			PROPERTY_FLAG_ENUMERABLE | PROPERTY_FLAG_CONFIGURABLE);
+	}
+
+	// useCodepage (READ_ONLY boolean, default false)
+	{
+		ActionVar bv = {0}; bv.type = ACTION_STACK_VALUE_BOOLEAN; bv.data.numeric_value = 0;
+		setPropertyWithFlags(app_context, g_system_object, "useCodepage", 11, &bv,
+			PROPERTY_FLAG_ENUMERABLE | PROPERTY_FLAG_CONFIGURABLE);
+	}
+
+	// security
+	ASObject* security_obj = allocObject(app_context, 4);
+	setObjectProto(app_context, security_obj);
+	{
+		ActionVar sandbox_val = {0};
+		sandbox_val.type = ACTION_STACK_VALUE_STRING;
+		if (g_use_network) {
+			sandbox_val.str_size = 16;
+			VAL(u64, &sandbox_val.data.numeric_value) = (u64)u16_localWithNetwork;
+		} else {
+			sandbox_val.str_size = 13;
+			VAL(u64, &sandbox_val.data.numeric_value) = (u64)u16_localWithFile;
+		}
+		setProperty(app_context, security_obj, "sandboxType", 11, &sandbox_val);
+		ActionVar sv = {0}; sv.type = ACTION_STACK_VALUE_OBJECT;
+		sv.data.numeric_value = (u64)security_obj;
+		setProperty(app_context, g_system_object, "security", 8, &sv);
+	}
+
+	// setClipboard (stub function)
+	{
+		static ASFunction sys_setClipboard_func;
+		memset(&sys_setClipboard_func, 0, sizeof(ASFunction));
+		strncpy(sys_setClipboard_func.name, "setClipboard", 255);
+		sys_setClipboard_func.function_type = 2;
+		sys_setClipboard_func.advanced_func = (Function2Ptr)builtin_noop_func;
+		ActionVar fv = {0}; fv.type = ACTION_STACK_VALUE_FUNCTION;
+		fv.data.numeric_value = (u64)&sys_setClipboard_func;
+		setProperty(app_context, g_system_object, "setClipboard", 12, &fv);
+	}
+
+	// IME
+	ASObject* ime_obj = allocObject(app_context, 24);
+	// IME has __proto__ and constructor as READ_ONLY
+	{
+		ActionVar _u = {0}; _u.type = ACTION_STACK_VALUE_UNDEFINED;
+		setPropertyWithFlags(app_context, ime_obj, "constructor", 11, &_u, 0); // READ_ONLY + DONT_ENUM + DONT_DELETE
+	}
 	setObjectProto(app_context, ime_obj);
-	installAsBroadcaster(app_context, ime_obj);
-	ActionVar ime_var = {0};
-	ime_var.type = ACTION_STACK_VALUE_OBJECT;
-	VAL(u64, &ime_var.data.numeric_value) = (u64)ime_obj;
-	setProperty(app_context, g_system_object, "IME", 3, &ime_var);
+	// Make __proto__ READ_ONLY on IME
+	for (u32 i = 0; i < ime_obj->num_used; i++) {
+		if (ime_obj->properties[i].name_length == 9 && strncmp(ime_obj->properties[i].name, "__proto__", 9) == 0) {
+			ime_obj->properties[i].flags = 0; // no ENUMERABLE, no WRITABLE, no CONFIGURABLE
+			break;
+		}
+	}
 
-	installNativeToString(app_context, g_system_object);
-	installNativeToString(app_context, security_obj);
-	installNativeToString(app_context, caps_obj);
-	installNativeToString(app_context, ime_obj);
+	// IME string constants (DONT_ENUM + READ_ONLY) — inserted first = enumerated last
+	{
+		const u8 de_ro = 0; // DONT_ENUM + READ_ONLY + DONT_DELETE
+		ActionVar sv;
+		sv = makeStringActionVar(app_context, "UNKNOWN", 7);
+		setPropertyWithFlags(app_context, ime_obj, "UNKNOWN", 7, &sv, de_ro);
+		sv = makeStringActionVar(app_context, "KOREAN", 6);
+		setPropertyWithFlags(app_context, ime_obj, "KOREAN", 6, &sv, de_ro);
+		sv = makeStringActionVar(app_context, "JAPANESE_KATAKANA_HALF", 22);
+		setPropertyWithFlags(app_context, ime_obj, "JAPANESE_KATAKANA_HALF", 22, &sv, de_ro);
+		sv = makeStringActionVar(app_context, "JAPANESE_KATAKANA_FULL", 22);
+		setPropertyWithFlags(app_context, ime_obj, "JAPANESE_KATAKANA_FULL", 22, &sv, de_ro);
+		sv = makeStringActionVar(app_context, "JAPANESE_HIRAGANA", 17);
+		setPropertyWithFlags(app_context, ime_obj, "JAPANESE_HIRAGANA", 17, &sv, de_ro);
+		sv = makeStringActionVar(app_context, "CHINESE", 7);
+		setPropertyWithFlags(app_context, ime_obj, "CHINESE", 7, &sv, de_ro);
+		sv = makeStringActionVar(app_context, "ALPHANUMERIC_HALF", 17);
+		setPropertyWithFlags(app_context, ime_obj, "ALPHANUMERIC_HALF", 17, &sv, de_ro);
+		sv = makeStringActionVar(app_context, "ALPHANUMERIC_FULL", 17);
+		setPropertyWithFlags(app_context, ime_obj, "ALPHANUMERIC_FULL", 17, &sv, de_ro);
+	}
+
+	// IME methods (DONT_ENUM + READ_ONLY) — 6 IME-specific + 4 from AsBroadcaster
+	{
+		const u8 de_ro = 0; // DONT_ENUM + READ_ONLY + DONT_DELETE
+		static ASFunction ime_methods[6];
+		const char* ime_names[] = {"getEnabled", "setEnabled", "getConversionMode", "setConversionMode", "setCompositionString", "doConversion"};
+		for (int i = 0; i < 6; i++) {
+			memset(&ime_methods[i], 0, sizeof(ASFunction));
+			strncpy(ime_methods[i].name, ime_names[i], 255);
+			ime_methods[i].function_type = 2;
+			ime_methods[i].advanced_func = (Function2Ptr)builtin_noop_func;
+			ActionVar fv = {0}; fv.type = ACTION_STACK_VALUE_FUNCTION;
+			fv.data.numeric_value = (u64)&ime_methods[i];
+			setPropertyWithFlags(app_context, ime_obj, ime_names[i], (u32)strlen(ime_names[i]), &fv, de_ro);
+		}
+
+		// AsBroadcaster methods (with DONT_ENUM + READ_ONLY flags instead of default)
+		initAsBroadcasterFuncs(app_context);
+		ActionVar fv = {0}; fv.type = ACTION_STACK_VALUE_FUNCTION;
+		fv.data.numeric_value = (u64)&g_ab_broadcastMessage_func;
+		setPropertyWithFlags(app_context, ime_obj, "broadcastMessage", 16, &fv, de_ro);
+		fv.data.numeric_value = (u64)&g_ab_addListener_func;
+		setPropertyWithFlags(app_context, ime_obj, "addListener", 11, &fv, de_ro);
+		fv.data.numeric_value = (u64)&g_ab_removeListener_func;
+		setPropertyWithFlags(app_context, ime_obj, "removeListener", 14, &fv, de_ro);
+
+		// _listeners array (DONT_ENUM + READ_ONLY)
+		ASArray* listeners = allocArray(app_context, 4);
+		ActionVar lv = {0}; lv.type = ACTION_STACK_VALUE_ARRAY;
+		lv.data.numeric_value = (u64)listeners;
+		setPropertyWithFlags(app_context, ime_obj, "_listeners", 10, &lv, de_ro);
+	}
+	{
+		ActionVar iv = {0}; iv.type = ACTION_STACK_VALUE_OBJECT;
+		iv.data.numeric_value = (u64)ime_obj;
+		setProperty(app_context, g_system_object, "IME", 3, &iv);
+	}
+
+	// privateBytes (READ_ONLY number, default 0)
+	{
+		ActionVar pv = makeF64(0);
+		setPropertyWithFlags(app_context, g_system_object, "privateBytes", 12, &pv,
+			PROPERTY_FLAG_ENUMERABLE | PROPERTY_FLAG_CONFIGURABLE);
+	}
 }
 
 // Forward declaration
@@ -26623,6 +26758,23 @@ static void ensureGlobalInit(SWFAppContext* app_context)
 					g_object_prototype->properties[i].flags &= ~PROPERTY_FLAG_ENUMERABLE;
 					break;
 				}
+			}
+		}
+
+		// Fill in constructor placeholders on System + IME (were UNDEFINED, now Object ctor available)
+		if (g_system_object != NULL) {
+			ActionVar obj_ctor = {0}; obj_ctor.type = ACTION_STACK_VALUE_FUNCTION;
+			obj_ctor.data.numeric_value = (u64)&g_ctors[0];
+			ActionVar* existing = getProperty(g_system_object, "constructor", 11);
+			if (existing && existing->type == ACTION_STACK_VALUE_UNDEFINED)
+				*existing = obj_ctor;
+			// IME constructor
+			ActionVar* ime_v = getProperty(g_system_object, "IME", 3);
+			if (ime_v && ime_v->type == ACTION_STACK_VALUE_OBJECT) {
+				ASObject* ime = (ASObject*)ime_v->data.numeric_value;
+				ActionVar* ime_ctor = getProperty(ime, "constructor", 11);
+				if (ime_ctor && ime_ctor->type == ACTION_STACK_VALUE_UNDEFINED)
+					*ime_ctor = obj_ctor;
 			}
 		}
 
