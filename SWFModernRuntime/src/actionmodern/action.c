@@ -25710,9 +25710,19 @@ static void ensureGlobalInit(SWFAppContext* app_context)
 		setPropertyWithFlags(app_context, g_stage_obj, "align", 5, &sv, STAGE_RO);
 		sv = makeStringActionVar(app_context, "showAll", 7);
 		setPropertyWithFlags(app_context, g_stage_obj, "scaleMode", 9, &sv, STAGE_RO);
-		sv = makeF64(0.0); // height
+		// Default Stage dimensions: FRAME_WIDTH/HEIGHT in "showAll" mode.
+		// FRAME_WIDTH/HEIGHT are defined per-test in generated constants.h.
+#ifdef FRAME_HEIGHT
+		sv = makeF64((double)FRAME_HEIGHT);
+#else
+		sv = makeF64(400.0);
+#endif
 		setPropertyWithFlags(app_context, g_stage_obj, "height", 6, &sv, STAGE_RO);
-		sv = makeF64(0.0); // width
+#ifdef FRAME_WIDTH
+		sv = makeF64((double)FRAME_WIDTH);
+#else
+		sv = makeF64(550.0);
+#endif
 		setPropertyWithFlags(app_context, g_stage_obj, "width", 5, &sv, STAGE_RO);
 		sv = makeStringActionVar(app_context, "normal", 6);
 		setPropertyWithFlags(app_context, g_stage_obj, "displayState", 12, &sv, STAGE_RO);
