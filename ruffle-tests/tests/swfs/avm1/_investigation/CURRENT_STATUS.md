@@ -8,6 +8,12 @@ Last updated: 2026-03-31
 - **Image test baseline**: **12/31 strict image match** (+4: bitmap_data_fillrect, bitmap_data_perlinnoise, bitmap_data_pixeldissolve_image, bitmapdata_applyfilter_colormatrix). **10/31 tolerance pass** (within test.toml limits).
 - **Main failure types**: output_mismatch (51), runtime_segfault (1), timeout (1)
 - **Known regressions**: `global_instance_decls` 40→23 (unclear root cause, test at 3% pass rate).
+- **Latest fixes (2026-04-01)**:
+  - **color image test PASS** — alpha blend state fix (SrcAlpha→One for alpha channel), max diff 48→1
+  - **Stage.width/height initialized to FRAME_WIDTH/FRAME_HEIGHT** — was 0, causing Drawing API layout bugs (movieclip_setmask 202400→10096 outliers)
+  - **_global plain property resolution** — actionGetVariable now finds plain properties on _global in root context (enables Gnash misc-mtasc AS2 class resolution)
+  - display_object_properties, mask_reapply, frame_size_*, movieclip_create_text_field image tests confirmed passing
+  - focusrect_swf5: 9/12 captures pass (3 fail due to focus rect rendering as solid fill instead of outline)
 - **Latest fixes (2026-03-31, session 2)**:
   - global_proto_decls improved (250→276) — Point/Matrix/Rectangle/ColorTransform prototype enumeration order, geometry constructor own_props UNDEFINED placeholder fix
   - ensureBuiltinPrototypeProps + ensureCtorOwnProps now handle UNDEFINED placeholders correctly
