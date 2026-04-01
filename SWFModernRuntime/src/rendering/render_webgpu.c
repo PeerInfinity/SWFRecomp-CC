@@ -1004,7 +1004,9 @@ static void create_pipelines(WebGPURenderContext* ctx)
 	blend.color.srcFactor = WGPUBlendFactor_SrcAlpha;
 	blend.color.dstFactor = WGPUBlendFactor_OneMinusSrcAlpha;
 	blend.color.operation = WGPUBlendOperation_Add;
-	blend.alpha.srcFactor = WGPUBlendFactor_SrcAlpha;
+	// Alpha: standard Porter-Duff "source over" — src_alpha + dst_alpha * (1 - src_alpha)
+	// Using SrcAlpha here would square the alpha: src_alpha² + dst_alpha * (1 - src_alpha)
+	blend.alpha.srcFactor = WGPUBlendFactor_One;
 	blend.alpha.dstFactor = WGPUBlendFactor_OneMinusSrcAlpha;
 	blend.alpha.operation = WGPUBlendOperation_Add;
 
@@ -1098,7 +1100,7 @@ static void create_pipelines(WebGPURenderContext* ctx)
 		blend_add.color.srcFactor = WGPUBlendFactor_SrcAlpha;
 		blend_add.color.dstFactor = WGPUBlendFactor_One;
 		blend_add.color.operation = WGPUBlendOperation_Add;
-		blend_add.alpha.srcFactor = WGPUBlendFactor_SrcAlpha;
+		blend_add.alpha.srcFactor = WGPUBlendFactor_One;
 		blend_add.alpha.dstFactor = WGPUBlendFactor_One;
 		blend_add.alpha.operation = WGPUBlendOperation_Add;
 
