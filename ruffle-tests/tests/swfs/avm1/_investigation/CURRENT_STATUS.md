@@ -8,6 +8,10 @@ Last updated: 2026-03-31
 - **Image test baseline**: **12/31 strict image match** (+4: bitmap_data_fillrect, bitmap_data_perlinnoise, bitmap_data_pixeldissolve_image, bitmapdata_applyfilter_colormatrix). **10/31 tolerance pass** (within test.toml limits).
 - **Main failure types**: output_mismatch (51), runtime_segfault (1), timeout (1)
 - **Known regressions**: `global_instance_decls` 40→23 (unclear root cause, test at 3% pass rate).
+- **Latest fixes (2026-03-31, session 2)**:
+  - global_proto_decls improved (250→259) — Point.prototype enumeration order fix, geometry constructor own_props UNDEFINED placeholder fix
+  - ensureBuiltinPrototypeProps + ensureCtorOwnProps now handle UNDEFINED placeholders correctly
+  - Investigated near-miss tests: native_objects_swf6 (Flash vs Ruffle difference), tab_ordering_properties_tab_index_edge_case (conflicting expectations), movieclip_library_state_values (already accepted diffs)
 - **Latest fixes (2026-03-31)**:
   - netconnection_close PASS (39/39) — NetConnection connect/close state machine + onStatus dispatch
   - sound_load_start PASS (3/3) — loadSound with embedded MP3 data registry lookup

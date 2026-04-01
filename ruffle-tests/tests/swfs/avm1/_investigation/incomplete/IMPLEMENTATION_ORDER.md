@@ -193,10 +193,12 @@ All other plans are independent.
 
 ## Progress (2026-03-31)
 
-Items #5, #6, #7 completed in one session. Item #4 partially done (Transform.prototype +13 lines).
+Items #5, #6, #7 completed in one session. Item #4 partially done (Transform.prototype +13 lines, then +9 more from Point.prototype ordering fix → global_proto_decls now at 259/4497).
 Items #1-2 assessed as low ROI (~240 lines cross-codebase for 4 test lines). Item #8 already done.
 
-**Next actionable items**: #9-12 (graphics rendering batch), #13 (Gnash Dejagnu framework).
+**Blocker**: #9-12 (graphics rendering batch) require Dawn headless library (`libwebgpu_dawn.a`) which is not installed locally. These are image tests only.
+
+**Next actionable items**: #13 (Gnash Dejagnu framework — misc-mtasc typeof fix), or continue #4 (GLOBALS — ColorTransform.prototype ordering, more geometry prototype fixups).
 
 ## Recommended Session Batching (updated)
 

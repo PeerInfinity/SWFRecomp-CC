@@ -5477,34 +5477,41 @@ static void fixBuiltinPrototypeFlags(ASObject* proto)
 static void ensureBuiltinPrototypeProps(SWFAppContext* app_context, ASObject* proto, void* ctor_ptr)
 {
 	if (proto == NULL) return;
-	// Add constructor if missing — insert before __proto__ for correct LIFO order
-	if (ctor_ptr != NULL && getProperty(proto, "constructor", 11) == NULL)
+	// Check if constructor exists as a real value (not just an UNDEFINED placeholder)
+	ActionVar* existing_ctor = getProperty(proto, "constructor", 11);
+	int ctor_missing = (existing_ctor == NULL);
+	int ctor_placeholder = (existing_ctor != NULL && existing_ctor->type == ACTION_STACK_VALUE_UNDEFINED);
+
+	if (ctor_ptr != NULL && (ctor_missing || ctor_placeholder))
 	{
-		// If __proto__ exists, temporarily remove it, add constructor, re-add __proto__
-		// so constructor is before __proto__ in the properties array (constructor enumerates last in LIFO)
-		int proto_idx = -1;
-		ActionVar saved_proto = {0};
-		u8 saved_flags = 0;
-		for (u32 i = 0; i < proto->num_used; i++) {
-			if (proto->properties[i].name_length == 9 &&
-			    strncmp(proto->properties[i].name, "__proto__", 9) == 0) {
-				proto_idx = (int)i;
-				saved_proto = proto->properties[i].value;
-				saved_flags = proto->properties[i].flags;
-				// Remove __proto__ by shifting remaining properties
-				for (u32 j = i; j + 1 < proto->num_used; j++)
-					proto->properties[j] = proto->properties[j + 1];
-				proto->num_used--;
-				break;
-			}
-		}
 		ActionVar ctor_val = {0};
 		ctor_val.type = ACTION_STACK_VALUE_FUNCTION;
 		ctor_val.data.numeric_value = (u64) ctor_ptr;
-		setPropertyWithFlags(app_context, proto, "constructor", 11, &ctor_val, PROPERTY_FLAG_WRITABLE);
-		// Re-add __proto__ (now comes after constructor in insertion order)
-		if (proto_idx >= 0)
-			setPropertyWithFlags(app_context, proto, "__proto__", 9, &saved_proto, saved_flags);
+
+		if (ctor_placeholder) {
+			// Placeholder exists at correct position — just fill in the value
+			setPropertyWithFlags(app_context, proto, "constructor", 11, &ctor_val, PROPERTY_FLAG_WRITABLE);
+		} else {
+			// Constructor missing — insert before __proto__ for correct LIFO order
+			int proto_idx = -1;
+			ActionVar saved_proto = {0};
+			u8 saved_flags = 0;
+			for (u32 i = 0; i < proto->num_used; i++) {
+				if (proto->properties[i].name_length == 9 &&
+				    strncmp(proto->properties[i].name, "__proto__", 9) == 0) {
+					proto_idx = (int)i;
+					saved_proto = proto->properties[i].value;
+					saved_flags = proto->properties[i].flags;
+					for (u32 j = i; j + 1 < proto->num_used; j++)
+						proto->properties[j] = proto->properties[j + 1];
+					proto->num_used--;
+					break;
+				}
+			}
+			setPropertyWithFlags(app_context, proto, "constructor", 11, &ctor_val, PROPERTY_FLAG_WRITABLE);
+			if (proto_idx >= 0)
+				setPropertyWithFlags(app_context, proto, "__proto__", 9, &saved_proto, saved_flags);
+		}
 	}
 	fixBuiltinPrototypeFlags(proto);
 }
@@ -7958,17 +7965,23 @@ static void initGeomPrototypes(SWFAppContext* app_context)
 	if (g_geom_init_done) return;
 	g_geom_init_done = 1;
 
-	// Point prototype
-	g_point_prototype = allocObject(app_context, 12);
+	// Point prototype — insertion order is reverse of expected LIFO enumeration:
+	// Expected enum: toString, normalize, add, subtract, equals, offset, clone, length, __proto__, constructor
+	// Insertion:     constructor(placeholder), __proto__, length, clone, offset, equals, subtract, add, normalize, toString
+	g_point_prototype = allocObject(app_context, 14);
 	retainObject(g_point_prototype);
+	{
+		ActionVar _u = {0}; _u.type = ACTION_STACK_VALUE_UNDEFINED;
+		setPropertyWithFlags(app_context, g_point_prototype, "constructor", 11, &_u, PROPERTY_FLAG_WRITABLE);
+	}
 	setObjectProto(app_context, g_point_prototype);
-	registerGeomMethod(&g_point_methods[0], "toString",  (Function2Ptr)pointToString,  app_context, g_point_prototype);
-	registerGeomMethod(&g_point_methods[1], "add",       (Function2Ptr)pointAdd,       app_context, g_point_prototype);
-	registerGeomMethod(&g_point_methods[2], "subtract",  (Function2Ptr)pointSubtract,  app_context, g_point_prototype);
-	registerGeomMethod(&g_point_methods[3], "equals",    (Function2Ptr)pointEquals,     app_context, g_point_prototype);
 	registerGeomMethod(&g_point_methods[4], "clone",     (Function2Ptr)pointClone,      app_context, g_point_prototype);
 	registerGeomMethod(&g_point_methods[5], "offset",    (Function2Ptr)pointOffset,     app_context, g_point_prototype);
+	registerGeomMethod(&g_point_methods[3], "equals",    (Function2Ptr)pointEquals,     app_context, g_point_prototype);
+	registerGeomMethod(&g_point_methods[2], "subtract",  (Function2Ptr)pointSubtract,  app_context, g_point_prototype);
+	registerGeomMethod(&g_point_methods[1], "add",       (Function2Ptr)pointAdd,       app_context, g_point_prototype);
 	registerGeomMethod(&g_point_methods[6], "normalize", (Function2Ptr)pointNormalize,  app_context, g_point_prototype);
+	registerGeomMethod(&g_point_methods[0], "toString",  (Function2Ptr)pointToString,  app_context, g_point_prototype);
 
 	// Matrix prototype
 	g_matrix_prototype = allocObject(app_context, 16);
@@ -25081,20 +25094,33 @@ static void ensureCtorOwnProps(SWFAppContext* app_context, ASFunction* ctor,
 	}
 	// Insertion order: prototype, constructor, __proto__
 	// LIFO for-in yields: __proto__, constructor, prototype (matching most Flash constructors)
-	if (ctor->prototype_obj != NULL && getProperty(ctor->own_props, "prototype", 9) == NULL) {
-		ActionVar pv = {0}; pv.type = ACTION_STACK_VALUE_OBJECT; pv.str_size = 0;
-		pv.data.numeric_value = (u64) ctor->prototype_obj;
-		setPropertyWithFlags(app_context, ctor->own_props, "prototype", 9, &pv, PROPERTY_FLAG_WRITABLE);
-	}
-	if (fn_ctor != NULL && getProperty(ctor->own_props, "constructor", 11) == NULL) {
-		ActionVar fcv = {0}; fcv.type = ACTION_STACK_VALUE_FUNCTION;
-		fcv.data.numeric_value = (u64) fn_ctor;
-		setPropertyWithFlags(app_context, ctor->own_props, "constructor", 11, &fcv, PROPERTY_FLAG_WRITABLE);
-	}
-	if (fn_proto != NULL && getProperty(ctor->own_props, "__proto__", 9) == NULL) {
-		ActionVar fpv = {0}; fpv.type = ACTION_STACK_VALUE_OBJECT; fpv.str_size = 0;
-		fpv.data.numeric_value = (u64) fn_proto;
-		setPropertyWithFlags(app_context, ctor->own_props, "__proto__", 9, &fpv, PROPERTY_FLAG_WRITABLE);
+	// Note: getProperty returns non-NULL even for UNDEFINED placeholders, so also check type
+	{
+		ActionVar* existing;
+		if (ctor->prototype_obj != NULL) {
+			existing = getProperty(ctor->own_props, "prototype", 9);
+			if (existing == NULL || existing->type == ACTION_STACK_VALUE_UNDEFINED) {
+				ActionVar pv = {0}; pv.type = ACTION_STACK_VALUE_OBJECT; pv.str_size = 0;
+				pv.data.numeric_value = (u64) ctor->prototype_obj;
+				setPropertyWithFlags(app_context, ctor->own_props, "prototype", 9, &pv, PROPERTY_FLAG_WRITABLE);
+			}
+		}
+		if (fn_ctor != NULL) {
+			existing = getProperty(ctor->own_props, "constructor", 11);
+			if (existing == NULL || existing->type == ACTION_STACK_VALUE_UNDEFINED) {
+				ActionVar fcv = {0}; fcv.type = ACTION_STACK_VALUE_FUNCTION;
+				fcv.data.numeric_value = (u64) fn_ctor;
+				setPropertyWithFlags(app_context, ctor->own_props, "constructor", 11, &fcv, PROPERTY_FLAG_WRITABLE);
+			}
+		}
+		if (fn_proto != NULL) {
+			existing = getProperty(ctor->own_props, "__proto__", 9);
+			if (existing == NULL || existing->type == ACTION_STACK_VALUE_UNDEFINED) {
+				ActionVar fpv = {0}; fpv.type = ACTION_STACK_VALUE_OBJECT; fpv.str_size = 0;
+				fpv.data.numeric_value = (u64) fn_proto;
+				setPropertyWithFlags(app_context, ctor->own_props, "__proto__", 9, &fpv, PROPERTY_FLAG_WRITABLE);
+			}
+		}
 	}
 }
 
@@ -26308,20 +26334,33 @@ static void ensureGlobalInit(SWFAppContext* app_context)
 								ctor->own_props = allocObject(app_context, 8);
 								retainObject(ctor->own_props);
 							}
-							if (fn_ctor && getProperty(ctor->own_props, "constructor", 11) == NULL) {
-								ActionVar fcv = {0}; fcv.type = ACTION_STACK_VALUE_FUNCTION;
-								fcv.data.numeric_value = (u64)fn_ctor;
-								setPropertyWithFlags(app_context, ctor->own_props, "constructor", 11, &fcv, PROPERTY_FLAG_WRITABLE);
-							}
-							if (fn_proto && getProperty(ctor->own_props, "__proto__", 9) == NULL) {
-								ActionVar fpv = {0}; fpv.type = ACTION_STACK_VALUE_OBJECT; fpv.str_size = 0;
-								fpv.data.numeric_value = (u64)fn_proto;
-								setPropertyWithFlags(app_context, ctor->own_props, "__proto__", 9, &fpv, PROPERTY_FLAG_WRITABLE);
-							}
-							if (ctor->prototype_obj && getProperty(ctor->own_props, "prototype", 9) == NULL) {
-								ActionVar pv = {0}; pv.type = ACTION_STACK_VALUE_OBJECT; pv.str_size = 0;
-								pv.data.numeric_value = (u64)ctor->prototype_obj;
-								setPropertyWithFlags(app_context, ctor->own_props, "prototype", 9, &pv, PROPERTY_FLAG_WRITABLE);
+							// Check for NULL or UNDEFINED (geometry ctors pre-add UNDEFINED placeholders)
+							{
+								ActionVar* _ex;
+								if (fn_ctor) {
+									_ex = getProperty(ctor->own_props, "constructor", 11);
+									if (_ex == NULL || _ex->type == ACTION_STACK_VALUE_UNDEFINED) {
+										ActionVar fcv = {0}; fcv.type = ACTION_STACK_VALUE_FUNCTION;
+										fcv.data.numeric_value = (u64)fn_ctor;
+										setPropertyWithFlags(app_context, ctor->own_props, "constructor", 11, &fcv, PROPERTY_FLAG_WRITABLE);
+									}
+								}
+								if (fn_proto) {
+									_ex = getProperty(ctor->own_props, "__proto__", 9);
+									if (_ex == NULL || _ex->type == ACTION_STACK_VALUE_UNDEFINED) {
+										ActionVar fpv = {0}; fpv.type = ACTION_STACK_VALUE_OBJECT; fpv.str_size = 0;
+										fpv.data.numeric_value = (u64)fn_proto;
+										setPropertyWithFlags(app_context, ctor->own_props, "__proto__", 9, &fpv, PROPERTY_FLAG_WRITABLE);
+									}
+								}
+								if (ctor->prototype_obj) {
+									_ex = getProperty(ctor->own_props, "prototype", 9);
+									if (_ex == NULL || _ex->type == ACTION_STACK_VALUE_UNDEFINED) {
+										ActionVar pv = {0}; pv.type = ACTION_STACK_VALUE_OBJECT; pv.str_size = 0;
+										pv.data.numeric_value = (u64)ctor->prototype_obj;
+										setPropertyWithFlags(app_context, ctor->own_props, "prototype", 9, &pv, PROPERTY_FLAG_WRITABLE);
+									}
+								}
 							}
 						} else {
 							ensureCtorOwnProps(app_context, ctor, fn_ctor, fn_proto);
