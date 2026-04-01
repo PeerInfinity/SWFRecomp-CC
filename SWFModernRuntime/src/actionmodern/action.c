@@ -27374,7 +27374,9 @@ void actionGetVariable(SWFAppContext* app_context)
 
 	if (var == NULL)
 	{
-		// Check global_object for addProperty getter before var table
+		// Check global_object (_global) for properties before var table.
+		// This handles both addProperty getters and plain properties (e.g., AS2 classes
+		// stored at _global.ClassName via DoInitAction).
 		{
 			extern ASObject* global_object;
 			if (global_object != NULL)
@@ -27384,6 +27386,11 @@ void actionGetVariable(SWFAppContext* app_context)
 				{
 					ActionVar result = invokePropertyGetter(app_context, (ASFunction*)gp->getter, (void*)global_object);
 					pushVar(app_context, &result);
+					return;
+				}
+				if (gp != NULL && gp->value.type != ACTION_STACK_VALUE_UNDEFINED)
+				{
+					pushVar(app_context, &gp->value);
 					return;
 				}
 			}
