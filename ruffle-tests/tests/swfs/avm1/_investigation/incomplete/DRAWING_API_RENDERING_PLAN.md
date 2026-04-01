@@ -21,9 +21,9 @@ dependencies: []
 blockers: []
 -->
 
-Last updated: 2026-03-27
+Last updated: 2026-04-01
 
-## Status: NOT STARTED — Tier 3 (infrastructure largely exists, needs headless integration)
+## Status: INFRASTRUCTURE WORKS — Remaining issues are anti-aliasing precision, not missing features
 
 ### Problem
 
@@ -144,22 +144,26 @@ These calls are already in `tagShowFrame()`.
 | Render pass integration | `tag.c` | 1893-1895, 2333-2334 |
 | Iteration functions | `action.c` | ~17290-17336 |
 
-### What's Missing / To Investigate
+### Investigation Results (2026-04-01)
 
-#### Issue 1: Headless Mode Guards
+**All headless infrastructure is working.** Drawing API shapes render correctly in headless mode — gradients, solid fills, and line strokes are all visible. No missing features.
 
-The drawing iteration and rendering callbacks are in `tag.c`, which compiles for both graphics and headless modes. However, some paths may be behind `#ifndef NO_GRAPHICS` or similar guards. Need to verify that:
-- `actionIterateDrawings()` is called in headless render pass
-- `renderer_draw_tris()` and `renderer_draw_gradient_tris()` work in headless mode
-- The dynamic vertex/color/gradient GPU resources are initialized in headless mode
+**Remaining issue: anti-aliasing / edge rendering precision.** The rendered output differs from Ruffle's expected PNGs by ~20% of pixels, concentrated at shape edges and line boundaries. Specific findings:
 
-#### Issue 2: Per-Frame Dynamic Resource Reset
+- `movieclip_begin_gradient_fill`: 90474 outlier channels at tolerance 6, max diff 255. Gradient interiors look correct; edges/borders differ.
+- `movieclip_line_gradient_style`: 36756 outlier channels at tolerance 6.
+- `movieclip_setmask`: 10096 outliers at tolerance 0 (layout fixed by Stage.width fix, remaining diffs are edge anti-aliasing).
+- Max diff of 255 occurs at shape borders where our rendering is white (background) but expected is black (outline), suggesting line stroke positioning or width differs slightly.
 
-Dynamic vertex/color/gradient counters (`dynamic_vertex_used`, `dynamic_rect_count`, `dynamic_gradient_used`) need to be reset each frame. Verify this happens in the headless frame loop.
+**Root cause hypothesis:** The fan triangulation (first vertex common to all triangles) and quad stroke expansion in `drawingFinalizePath()` may produce slightly different geometry than Ruffle's tessellator, leading to sub-pixel edge differences that are amplified at strict tolerance levels.
 
-#### Issue 3: Vertex Capacity
+### Original Issues (all resolved)
 
-MAX_DYNAMIC_VERTICES = 8192 may be tight for complex drawings. The gradient fill tests likely have moderate vertex counts, but `mask_with_drawing` could be more complex.
+~~Issue 1: Headless Mode Guards~~ — **Not an issue.** All drawing iteration and GPU upload functions work in headless mode without changes.
+
+~~Issue 2: Per-Frame Dynamic Resource Reset~~ — **Working correctly.**
+
+~~Issue 3: Vertex Capacity~~ — **Not an issue** for these tests.
 
 ### Implementation Plan
 

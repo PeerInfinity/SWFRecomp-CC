@@ -24,9 +24,9 @@ dependencies:
 blockers: []
 -->
 
-Last updated: 2026-03-27
+Last updated: 2026-04-01
 
-## Status: NOT STARTED — Tier 3/7 (stencil infrastructure exists, needs host-level integration)
+## Status: PARTIALLY WORKING — mask_reapply PASSES, remaining tests blocked on Drawing API anti-aliasing
 
 ### Problem
 
@@ -129,9 +129,17 @@ setMask masking is already respected in hit testing — point must hit both the 
 | Depth-stencil texture | `render_webgpu.c` | 868-884 |
 | Masked drawing callback (tag.c) | `tag.c` | ~2333-2334 |
 
-### What's Missing
+### Investigation Results (2026-04-01)
 
-#### Gap 1: Host-Level Masked Drawing Callback
+- **mask_reapply: PASS** (0 outliers, max diff 1, tolerance 1). Static clip masks via PlaceObject2.clip_depth AND runtime setMask() both work correctly for timeline-placed shapes.
+- **movieclip_setmask: 10096 outliers** (tolerance 0). Layout fixed by Stage.width init fix. Remaining diffs are Drawing API line/edge anti-aliasing (same issue as DRAWING_API_RENDERING_PLAN).
+- **mask_with_drawing: not tested** (depends on Drawing API rendering precision).
+
+The stencil-based masking pipeline is fully functional. The remaining failures are NOT masking issues — they're Drawing API tessellation/anti-aliasing precision issues shared with the gradient fill tests.
+
+### Original Gaps (status updated)
+
+#### ~~Gap 1~~: Host-Level Masked Drawing Callback — **Already implemented and working**
 
 The `masked_drawing_render_cb` in `tag.c` needs to:
 1. Clear stencil buffer (or relevant region)

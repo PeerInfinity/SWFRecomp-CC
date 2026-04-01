@@ -178,10 +178,10 @@ All other plans are independent.
 | 6 | SOUND_LOADING | **4/4 PASS** | ~~200 lines~~ | ~~4~~ | **DONE** |
 | 7 | SOUND_DURATION_POSITION | **290/290 PASS** | ~~100 lines~~ | ~~288~~ | **DONE** |
 | 8 | LOADBITMAP | Already done | — | — | **DONE** |
-| 9 | RUNTIME_TRANSFORM_GPU | Not started | ~45 lines | 2 image tests | Graphics |
-| 10 | RUNTIME_CXFORM_GPU | Partial | ~30 lines | w/ #9: 1 image test | Graphics |
-| 11 | DRAWING_API_RENDERING | Not started | Low-med | 2 image tests | Graphics |
-| 12 | RUNTIME_SETMASK | Not started | ~110 lines | 3 image tests | Graphics |
+| 9 | RUNTIME_TRANSFORM_GPU | **Already passing** | — | — | **DONE** |
+| 10 | RUNTIME_CXFORM_GPU | **color PASS** (alpha blend fix) | 1 line | 1 image test | **DONE** |
+| 11 | DRAWING_API_RENDERING | Infrastructure works | Anti-aliasing | 2 image tests | Blocked (precision) |
+| 12 | RUNTIME_SETMASK | mask_reapply PASS | Anti-aliasing | 1 of 3 image tests | Partially done |
 | 13 | FROM_GNASH_DEJAGNU | Partial | High | 243+ tests (potential) | Framework |
 | 14 | BITMAPDATA_RENDERING | 5/6 pass | Investigation | 2 image tests | Debug |
 | 15 | COPYPIXELS_ALPHA | In progress | Investigation | 1 image test | Debug |
@@ -191,21 +191,22 @@ All other plans are independent.
 
 ---
 
-## Progress (2026-03-31)
+## Progress (2026-04-01)
 
-Items #5, #6, #7 completed in one session. Item #4 partially done (Transform.prototype +13 lines, then +9 more from Point.prototype ordering fix → global_proto_decls now at 259/4497).
-Items #1-2 assessed as low ROI (~240 lines cross-codebase for 4 test lines). Item #8 already done.
+Items #5-#10 all completed. Item #4 partially done (global_proto_decls now at 276/4497).
+Items #1-2 assessed as low ROI. Item #8 already done.
+Items #9-10: Both already working — display_object_properties image test was passing, color image test fixed by alpha blend state correction (SrcAlpha→One). Plans moved to complete/.
+Items #11-12: Drawing API rendering infrastructure works (gradients render correctly), but anti-aliasing/edge differences cause ~20% pixel mismatch. mask_reapply passes. Stage.width fix resolved layout bug in movieclip_setmask.
+Item #13: _global plain property resolution added. Gnash misc-mtasc hello test typeof still fails (MTASC `this` binding issue, not typeof-specific).
 
-**Blocker**: #9-12 (graphics rendering batch) require Dawn headless library (`libwebgpu_dawn.a`) which is not installed locally. These are image tests only.
-
-**Next actionable items**: #13 (Gnash Dejagnu framework — misc-mtasc typeof fix), or continue #4 (GLOBALS — ColorTransform.prototype ordering, more geometry prototype fixups).
+**Next actionable items**: #4 continued (ColorTransform.prototype virtual properties), #13 continued (MTASC `this` binding for AS2 class methods), or #14-15 (BitmapData precision debugging).
 
 ## Recommended Session Batching (updated)
 
 **~~Session A~~** ~~(Tier 1 close-outs)~~: Assessed as low ROI, skipped
 **~~Session B~~** ~~(Quick wins)~~: #5 DONE, #4 partial
 **~~Session C~~** ~~(Sound)~~: #6 + #7 DONE
-**Session D** (Graphics batch): #9 + #10 (transforms + cxform — same pipeline, same tests)
-**Session E** (Graphics batch): #11 + #12 (Drawing API + setMask — dependent chain)
-**Session F** (Framework): #13 misc-mtasc typeof fix (quick), then assess actionscript.all feasibility
+**~~Session D~~** ~~(Graphics batch)~~: #9 + #10 DONE (already working + alpha blend fix)
+**Session E** (Graphics precision): #11 + #12 anti-aliasing investigation — remaining image test diffs are edge rendering, not missing features
+**Session F** (Framework): #13 MTASC `this` binding fix, then assess actionscript.all feasibility
 **Session G** (Debug): #14 + #15 (BitmapData precision issues — investigation session)

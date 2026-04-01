@@ -22,7 +22,7 @@ blockers:
   - reason: "misc-ming/misc-swfc blocked on DoInitAction ordering for inlined Dejagnu"
 -->
 
-Last updated: 2026-03-16
+Last updated: 2026-04-01
 
 ## Status: MAJOR PROGRESS — Dejagnu framework working, 82-92% pass rate on initial tests
 
@@ -155,13 +155,22 @@ The recompiler emits `tagDefineSprite(app_context, char_id, frame_funcs, frame_c
 
 ### Blocker 3: misc-mtasc — `typeof(Dejagnu)` Returns "undefined"
 
-**Symptoms:** `hello` test: `typeof(Dejagnu)` returns "undefined" instead of "function". All other assertions pass.
+**Symptoms:** `hello` test: line 8 assertion fails — `typeof(X)` returns "undefined" instead of "function". All other assertions pass (lines 2-4).
 
-**Root cause (hypothesis):** The `Dejagnu` class is defined via `__Packages.Dejagnu` (AS2 class mechanism). Our runtime may not resolve `typeof(ClassName)` correctly for AS2 classes — the class constructor function exists but isn't accessible by the simple name `Dejagnu` in the global scope.
+**Root cause (investigated 2026-04-01):**
 
-**Investigation steps:**
-1. Check how `__Packages` classes are registered — the recompiler should emit code that makes the class constructor accessible as a global variable
-2. This may be a simpler fix than the other blockers
+1. **_global property resolution: FIXED.** `actionGetVariable` now finds plain properties on `_global` in root context. `GetVariable("Dejagnu")` correctly resolves `_global.Dejagnu` (confirmed via debug tracing — type=13/FUNCTION).
+
+2. **Remaining issue: MTASC `this` binding in AS2 class methods.** The hello.as line 8 assertion is NOT `typeof(Dejagnu)` as initially assumed. MTASC compiles it as `typeof(this.loadMovie)` inside the `Test.prototype.test_all` method (`func2_anonymous_20`). The test expects `typeof(this.loadMovie) == "function"`, which requires `this` to be the root MovieClip (which has `loadMovie` as a built-in method).
+
+   In our runtime, `this` inside `test_all` is a plain ASObject (the Test instance), not the root MC. So `this.loadMovie` is undefined → `typeof(undefined)` = "undefined".
+
+   **Fix needed:** When Test.main calls `test_all()`, `this` should be bound to the root MovieClip (or a MovieClip scope), not to the Test instance. This is an AS2 class method `this` binding issue — MTASC assumes class methods execute with the MovieClip as `this` (similar to Ruffle's scope chain behavior for class methods).
+
+**Investigation steps (next):**
+1. Check how `Test.main` calls `test_all` — is it via `this.test_all()` or `Dejagnu.check_equals()`?
+2. Determine if the issue is in CallMethod `this` resolution or in how the Test constructor sets up the prototype chain
+3. May require ensuring `this` in AS2 class methods bound to MCs resolves to the MC, not the class instance
 
 ---
 
