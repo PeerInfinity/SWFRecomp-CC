@@ -1,10 +1,10 @@
 # Ruffle Test Results (Filtered)
 
-**Date**: 2026-04-01 05:43 UTC
+**Date**: 2026-04-01 20:15 UTC
 
-**Git SHA**: `7a13fd77e2`
+**Git SHA**: `8d0f9c63c0`
 
-**Run Duration**: 6m 37s
+**Run Duration**: 6m 36s
 
 **Filtered**: 0 tests ignored out of 23 available
 
@@ -16,8 +16,8 @@
 | Passing | **12** (52.2%) |
 | Failing | 11 |
 | Total expected lines | 311 |
-| Matching lines | 118 (37.9%) |
-| Mismatched lines | 193 |
+| Matching lines | 119 (38.3%) |
+| Mismatched lines | 192 |
 
 ### Failure Breakdown
 
@@ -32,18 +32,18 @@
 
 | # | Test | Lines | Duration | Notes |
 |---|------|-------|----------|-------|
-| 1 | `callee` | 2 | 17.6s |  |
-| 2 | `depth` | 6 | 16.6s |  |
-| 3 | `externalinterface` | 4 | 16.8s |  |
-| 4 | `label` | 4 | 18.5s |  |
-| 5 | `levels` | 9 | 16.6s |  |
-| 6 | `loadevent` | 9 | 17.8s |  |
-| 7 | `lookup` | 3 | 17.8s |  |
-| 8 | `mouse-transparency` | 1 | 17.0s |  |
-| 9 | `operations` | 13 | 17.2s |  |
-| 10 | `rollover` | 4 | 16.4s |  |
-| 11 | `super` | 11 | 17.3s |  |
-| 12 | `text-bind` | 0 | 16.8s |  |
+| 1 | `callee` | 2 | 16.8s |  |
+| 2 | `depth` | 6 | 16.7s |  |
+| 3 | `externalinterface` | 4 | 17.0s |  |
+| 4 | `label` | 4 | 16.9s |  |
+| 5 | `levels` | 9 | 16.9s |  |
+| 6 | `loadevent` | 9 | 17.4s |  |
+| 7 | `lookup` | 3 | 16.9s |  |
+| 8 | `mouse-transparency` | 1 | 17.3s |  |
+| 9 | `operations` | 13 | 17.1s |  |
+| 10 | `rollover` | 4 | 17.0s |  |
+| 11 | `super` | 11 | 17.9s |  |
+| 12 | `text-bind` | 0 | 16.5s |  |
 
 ## Near-Passing Tests
 
@@ -69,7 +69,7 @@ No segfaults.
 
 | # | Test | Detail | Duration | Notes |
 |---|------|--------|----------|-------|
-| 1 | `watch` | exit code -6 | 18.6s |  |
+| 1 | `watch` | exit code -6 | 18.5s |  |
 
 ## Timeouts
 
@@ -86,7 +86,7 @@ No timeouts.
 | 3 | `settimeout` | 64.7% | 11/17 | 12 | 17 |  |
 | 4 | `setinterval` | 55.0% | 11/20 | 12 | 20 |  |
 | 5 | `hitarea` | 50.0% | 2/4 | 3 | 4 |  |
-| 6 | `target` | 22.7% | 5/22 | 22 | 18 |  |
+| 6 | `target` | 27.3% | 6/22 | 22 | 18 |  |
 | 7 | `moviecliploader` | 14.3% | 1/7 | 6 | 7 |  |
 | 8 | `filters` | 2.0% | 3/149 | 85 | 149 |  |
 | 9 | `array` | 0.0% | 0/7 | 7 | 7 |  |
