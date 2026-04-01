@@ -10403,6 +10403,13 @@ static ActionVar bitmapDataLoadBitmap(SWFAppContext* app_context, ActionVar* arg
     return r;
 }
 
+// BitmapData virtual property getter — returns -1 for disposed/uninitialized BitmapData
+static ActionVar bdVirtualPropGetter(SWFAppContext* app_context, ActionVar* args, u32 arg_count, ActionVar* registers, void* this_obj)
+{
+    (void)app_context; (void)args; (void)arg_count; (void)registers;
+    return makeF64(-1);
+}
+
 // Initialize BitmapData prototype and methods
 static void initBitmapDataPrototype(SWFAppContext* app_context)
 {
@@ -10411,34 +10418,59 @@ static void initBitmapDataPrototype(SWFAppContext* app_context)
 
     g_bitmapdata_prototype = allocObject(app_context, 32);
     retainObject(g_bitmapdata_prototype);
+    // Pre-add constructor placeholder (LIFO: first inserted = last enumerated)
+    {
+        ActionVar _u = {0}; _u.type = ACTION_STACK_VALUE_UNDEFINED;
+        setPropertyWithFlags(app_context, g_bitmapdata_prototype, "constructor", 11, &_u, PROPERTY_FLAG_WRITABLE);
+    }
     setObjectProto(app_context, g_bitmapdata_prototype);
 
+    // Virtual READ_ONLY properties: width, height, rectangle, transparent
+    // LIFO insertion: width, height, rectangle, transparent → enum: transparent, rectangle, height, width
+    // Returns -1 (number) for uninitialized/disposed BitmapData (including prototype)
+    {
+        static ASFunction bd_virt_getter;
+        memset(&bd_virt_getter, 0, sizeof(ASFunction));
+        bd_virt_getter.function_type = 2;
+        bd_virt_getter.advanced_func = (Function2Ptr)bdVirtualPropGetter; // returns -1
+        const u8 ro = PROPERTY_FLAG_ENUMERABLE | PROPERTY_FLAG_CONFIGURABLE;
+        setAddPropertyWithFlags(app_context, g_bitmapdata_prototype, "width",       5, &bd_virt_getter, NULL, ro);
+        setAddPropertyWithFlags(app_context, g_bitmapdata_prototype, "height",      6, &bd_virt_getter, NULL, ro);
+        setAddPropertyWithFlags(app_context, g_bitmapdata_prototype, "rectangle",   9, &bd_virt_getter, NULL, ro);
+        setAddPropertyWithFlags(app_context, g_bitmapdata_prototype, "transparent", 11, &bd_virt_getter, NULL, ro);
+    }
+
+    // Methods in LIFO insertion order (reverse of expected enumeration).
+    // Expected enum: compare, generateFilterRect, dispose, clone, copyChannel, noise, merge,
+    //   paletteMap, hitTest, colorTransform, perlinNoise, getColorBoundsRect, floodFill,
+    //   setPixel32, getPixel32, pixelDissolve, draw, threshold, scroll, applyFilter,
+    //   copyPixels, fillRect, setPixel, getPixel
     int mi = 0;
     registerProtoMethod(&g_bitmapdata_methods[mi++], "getPixel",            (Function2Ptr)bitmapDataGetPixel,            app_context, g_bitmapdata_prototype);
-    registerProtoMethod(&g_bitmapdata_methods[mi++], "getPixel32",          (Function2Ptr)bitmapDataGetPixel32,          app_context, g_bitmapdata_prototype);
     registerProtoMethod(&g_bitmapdata_methods[mi++], "setPixel",            (Function2Ptr)bitmapDataSetPixel,            app_context, g_bitmapdata_prototype);
-    registerProtoMethod(&g_bitmapdata_methods[mi++], "setPixel32",          (Function2Ptr)bitmapDataSetPixel32,          app_context, g_bitmapdata_prototype);
     registerProtoMethod(&g_bitmapdata_methods[mi++], "fillRect",            (Function2Ptr)bitmapDataFillRect,            app_context, g_bitmapdata_prototype);
+    registerProtoMethod(&g_bitmapdata_methods[mi++], "copyPixels",          (Function2Ptr)bitmapDataCopyPixels,          app_context, g_bitmapdata_prototype);
+    registerProtoMethod(&g_bitmapdata_methods[mi++], "applyFilter",         (Function2Ptr)bitmapDataApplyFilter,         app_context, g_bitmapdata_prototype);
+    registerProtoMethod(&g_bitmapdata_methods[mi++], "scroll",              (Function2Ptr)bitmapDataScroll,              app_context, g_bitmapdata_prototype);
+    registerProtoMethod(&g_bitmapdata_methods[mi++], "threshold",           (Function2Ptr)bitmapDataThreshold,           app_context, g_bitmapdata_prototype);
+    registerProtoMethod(&g_bitmapdata_methods[mi++], "draw",                (Function2Ptr)bitmapDataDraw,                app_context, g_bitmapdata_prototype);
+    registerProtoMethod(&g_bitmapdata_methods[mi++], "pixelDissolve",       (Function2Ptr)bitmapDataPixelDissolve,       app_context, g_bitmapdata_prototype);
+    registerProtoMethod(&g_bitmapdata_methods[mi++], "getPixel32",          (Function2Ptr)bitmapDataGetPixel32,          app_context, g_bitmapdata_prototype);
+    registerProtoMethod(&g_bitmapdata_methods[mi++], "setPixel32",          (Function2Ptr)bitmapDataSetPixel32,          app_context, g_bitmapdata_prototype);
+    registerProtoMethod(&g_bitmapdata_methods[mi++], "floodFill",           (Function2Ptr)bitmapDataFloodFill,           app_context, g_bitmapdata_prototype);
+    registerProtoMethod(&g_bitmapdata_methods[mi++], "getColorBoundsRect",  (Function2Ptr)bitmapDataGetColorBoundsRect,  app_context, g_bitmapdata_prototype);
+    registerProtoMethod(&g_bitmapdata_methods[mi++], "perlinNoise",         (Function2Ptr)bitmapDataPerlinNoise,         app_context, g_bitmapdata_prototype);
+    registerProtoMethod(&g_bitmapdata_methods[mi++], "colorTransform",      (Function2Ptr)bitmapDataColorTransform,      app_context, g_bitmapdata_prototype);
+    registerProtoMethod(&g_bitmapdata_methods[mi++], "hitTest",             (Function2Ptr)bitmapDataHitTest,             app_context, g_bitmapdata_prototype);
+    registerProtoMethod(&g_bitmapdata_methods[mi++], "paletteMap",          (Function2Ptr)bitmapDataPaletteMap,          app_context, g_bitmapdata_prototype);
+    registerProtoMethod(&g_bitmapdata_methods[mi++], "merge",               (Function2Ptr)bitmapDataMerge,              app_context, g_bitmapdata_prototype);
+    registerProtoMethod(&g_bitmapdata_methods[mi++], "noise",               (Function2Ptr)bitmapDataNoise,               app_context, g_bitmapdata_prototype);
+    registerProtoMethod(&g_bitmapdata_methods[mi++], "copyChannel",         (Function2Ptr)bitmapDataCopyChannel,         app_context, g_bitmapdata_prototype);
     registerProtoMethod(&g_bitmapdata_methods[mi++], "clone",               (Function2Ptr)bitmapDataClone,               app_context, g_bitmapdata_prototype);
     registerProtoMethod(&g_bitmapdata_methods[mi++], "dispose",             (Function2Ptr)bitmapDataDispose,             app_context, g_bitmapdata_prototype);
-    registerProtoMethod(&g_bitmapdata_methods[mi++], "copyChannel",         (Function2Ptr)bitmapDataCopyChannel,         app_context, g_bitmapdata_prototype);
-    registerProtoMethod(&g_bitmapdata_methods[mi++], "floodFill",           (Function2Ptr)bitmapDataFloodFill,           app_context, g_bitmapdata_prototype);
-    registerProtoMethod(&g_bitmapdata_methods[mi++], "colorTransform",      (Function2Ptr)bitmapDataColorTransform,      app_context, g_bitmapdata_prototype);
-    registerProtoMethod(&g_bitmapdata_methods[mi++], "getColorBoundsRect",  (Function2Ptr)bitmapDataGetColorBoundsRect,  app_context, g_bitmapdata_prototype);
-    registerProtoMethod(&g_bitmapdata_methods[mi++], "noise",               (Function2Ptr)bitmapDataNoise,               app_context, g_bitmapdata_prototype);
-    registerProtoMethod(&g_bitmapdata_methods[mi++], "compare",             (Function2Ptr)bitmapDataCompare,             app_context, g_bitmapdata_prototype);
-    registerProtoMethod(&g_bitmapdata_methods[mi++], "copyPixels",          (Function2Ptr)bitmapDataCopyPixels,          app_context, g_bitmapdata_prototype);
-    registerProtoMethod(&g_bitmapdata_methods[mi++], "threshold",           (Function2Ptr)bitmapDataThreshold,           app_context, g_bitmapdata_prototype);
-    registerProtoMethod(&g_bitmapdata_methods[mi++], "hitTest",             (Function2Ptr)bitmapDataHitTest,             app_context, g_bitmapdata_prototype);
-    registerProtoMethod(&g_bitmapdata_methods[mi++], "pixelDissolve",       (Function2Ptr)bitmapDataPixelDissolve,       app_context, g_bitmapdata_prototype);
-    registerProtoMethod(&g_bitmapdata_methods[mi++], "scroll",              (Function2Ptr)bitmapDataScroll,              app_context, g_bitmapdata_prototype);
-    registerProtoMethod(&g_bitmapdata_methods[mi++], "merge",               (Function2Ptr)bitmapDataMerge,               app_context, g_bitmapdata_prototype);
-    registerProtoMethod(&g_bitmapdata_methods[mi++], "paletteMap",          (Function2Ptr)bitmapDataPaletteMap,          app_context, g_bitmapdata_prototype);
-    registerProtoMethod(&g_bitmapdata_methods[mi++], "perlinNoise",         (Function2Ptr)bitmapDataPerlinNoise,         app_context, g_bitmapdata_prototype);
-    registerProtoMethod(&g_bitmapdata_methods[mi++], "applyFilter",         (Function2Ptr)bitmapDataApplyFilter,         app_context, g_bitmapdata_prototype);
-    registerProtoMethod(&g_bitmapdata_methods[mi++], "draw",                (Function2Ptr)bitmapDataDraw,                app_context, g_bitmapdata_prototype);
     registerProtoMethod(&g_bitmapdata_methods[mi++], "generateFilterRect",  (Function2Ptr)bitmapDataGenerateFilterRect,  app_context, g_bitmapdata_prototype);
-    registerProtoMethod(&g_bitmapdata_methods[mi++], "loadBitmap",          (Function2Ptr)bitmapDataLoadBitmap,          app_context, g_bitmapdata_prototype);
+    registerProtoMethod(&g_bitmapdata_methods[mi++], "compare",             (Function2Ptr)bitmapDataCompare,             app_context, g_bitmapdata_prototype);
+    // NOTE: loadBitmap is a static method on BitmapData constructor, NOT on prototype
 }
 
 // Call just valueOf on an object. Returns the raw result (even if non-primitive).
@@ -25360,15 +25392,52 @@ static void initFlashPackage(SWFAppContext* app_context)
 	// flash.text
 	MAKE_PKG(text_obj, g_flash_object, "text", 4, 4);
 	MAKE_STUB_CTOR(fc_TextRenderer, "TextRenderer");
+	// TextRenderer own_props: prototype, constructor, __proto__ (placeholders), then
+	// setAdvancedAntialiasingTable, maxLevel (READ_ONLY), displayMode (READ_ONLY)
+	fc_TextRenderer.own_props = allocObject(app_context, 8);
+	retainObject(fc_TextRenderer.own_props);
+	{
+		ActionVar _u = {0}; _u.type = ACTION_STACK_VALUE_UNDEFINED;
+		// LIFO: expected enum = displayMode, maxLevel, setAATable, __proto__, constructor, prototype
+		// Insert: prototype, constructor, __proto__, setAATable, maxLevel, displayMode
+		setPropertyWithFlags(app_context, fc_TextRenderer.own_props, "prototype", 9, &_u, PROPERTY_FLAG_WRITABLE);
+		setPropertyWithFlags(app_context, fc_TextRenderer.own_props, "constructor", 11, &_u, PROPERTY_FLAG_WRITABLE);
+		setPropertyWithFlags(app_context, fc_TextRenderer.own_props, "__proto__", 9, &_u, PROPERTY_FLAG_WRITABLE);
+		// setAdvancedAntialiasingTable (function stub)
+		static ASFunction tr_setAATable;
+		memset(&tr_setAATable, 0, sizeof(ASFunction));
+		strncpy(tr_setAATable.name, "setAdvancedAntialiasingTable", 255);
+		tr_setAATable.function_type = 2;
+		tr_setAATable.advanced_func = (Function2Ptr)builtin_noop_func;
+		ActionVar fv = {0}; fv.type = ACTION_STACK_VALUE_FUNCTION;
+		fv.data.numeric_value = (u64)&tr_setAATable;
+		setProperty(app_context, fc_TextRenderer.own_props, "setAdvancedAntialiasingTable", 28, &fv);
+		// maxLevel (READ_ONLY)
+		ActionVar sv = makeF64(0.0);
+		setPropertyWithFlags(app_context, fc_TextRenderer.own_props, "maxLevel", 8, &sv,
+		                     PROPERTY_FLAG_ENUMERABLE | PROPERTY_FLAG_CONFIGURABLE);
+		// displayMode (READ_ONLY)
+		sv = makeStringActionVar(app_context, "normal", 6);
+		setPropertyWithFlags(app_context, fc_TextRenderer.own_props, "displayMode", 11, &sv,
+		                     PROPERTY_FLAG_ENUMERABLE | PROPERTY_FLAG_CONFIGURABLE);
+	}
 	SET_CTOR_PROP(text_obj, "TextRenderer", 12, fc_TextRenderer);
 
 	// flash.display
 	MAKE_PKG(display_obj, g_flash_object, "display", 7, 4);
 	MAKE_STUB_CTOR(fc_BitmapData, "BitmapData");
 	// Channel constants on BitmapData constructor
-	fc_BitmapData.own_props = allocObject(app_context, 8);
+	fc_BitmapData.own_props = allocObject(app_context, 10);
 	retainObject(fc_BitmapData.own_props);
 	{
+		// Pre-add placeholders (LIFO: first inserted = last enumerated)
+		// Expected enum: ..., __proto__, constructor, prototype
+		// So insert: prototype, constructor, __proto__ (reverse)
+		ActionVar _u = {0}; _u.type = ACTION_STACK_VALUE_UNDEFINED;
+		setPropertyWithFlags(app_context, fc_BitmapData.own_props, "prototype", 9, &_u, PROPERTY_FLAG_WRITABLE);
+		setPropertyWithFlags(app_context, fc_BitmapData.own_props, "constructor", 11, &_u, PROPERTY_FLAG_WRITABLE);
+		setPropertyWithFlags(app_context, fc_BitmapData.own_props, "__proto__", 9, &_u, PROPERTY_FLAG_WRITABLE);
+		// Then add channel constants and loadBitmap (enumerated first in LIFO)
 		ActionVar cv;
 		cv = makeF64(1); setProperty(app_context, fc_BitmapData.own_props, "RED_CHANNEL", 11, &cv);
 		cv = makeF64(2); setProperty(app_context, fc_BitmapData.own_props, "GREEN_CHANNEL", 13, &cv);

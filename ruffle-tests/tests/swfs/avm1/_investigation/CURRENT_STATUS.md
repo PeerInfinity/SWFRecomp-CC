@@ -9,7 +9,7 @@ Last updated: 2026-04-01
 - **Main failure types**: output_mismatch (51), runtime_segfault (1), timeout (1)
 - **Known regressions**: `global_instance_decls` 40→23 (unclear root cause, test at 3% pass rate).
 - **Latest fixes (2026-04-01, session 2)**:
-  - **global_proto_decls improved (276→462)** — ColorTransform/Point/Rectangle virtual properties, flash.filters registration order, 75 filter virtual properties, filter __proto__→BitmapFilter.prototype chain, clone inheritance, __constructor__
+  - **global_proto_decls improved (276→512)** — ColorTransform/Point/Rectangle virtual properties, flash.filters (order + 75 virtual props + clone inheritance + __constructor__), BitmapData (own_props order + prototype methods reorder + 4 virtual props), TextRenderer own_props
   - **global_proto_decls_delete improved (255→283)** — filter order alignment, clone on BitmapFilter.prototype (CONFIGURABLE), constructor deleted from subclass prototypes
   - **Gnash misc-mtasc: 4/9 passing** — hello, enum, exception, implementsOpTest all PASS
 - **Latest fixes (2026-04-01)**:
