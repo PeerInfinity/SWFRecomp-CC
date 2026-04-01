@@ -1,6 +1,6 @@
 # Current Ruffle Test Status
 
-Last updated: 2026-03-31
+Last updated: 2026-04-01
 
 ## Quick Summary
 
@@ -8,6 +8,10 @@ Last updated: 2026-03-31
 - **Image test baseline**: **12/31 strict image match** (+4: bitmap_data_fillrect, bitmap_data_perlinnoise, bitmap_data_pixeldissolve_image, bitmapdata_applyfilter_colormatrix). **10/31 tolerance pass** (within test.toml limits).
 - **Main failure types**: output_mismatch (51), runtime_segfault (1), timeout (1)
 - **Known regressions**: `global_instance_decls` 40→23 (unclear root cause, test at 3% pass rate).
+- **Latest fixes (2026-04-01, session 2)**:
+  - **global_proto_decls improved (276→462)** — ColorTransform/Point/Rectangle virtual properties, flash.filters registration order, 75 filter virtual properties, filter __proto__→BitmapFilter.prototype chain, clone inheritance, __constructor__
+  - **global_proto_decls_delete improved (255→283)** — filter order alignment, clone on BitmapFilter.prototype (CONFIGURABLE), constructor deleted from subclass prototypes
+  - **Gnash misc-mtasc: 4/9 passing** — hello, enum, exception, implementsOpTest all PASS
 - **Latest fixes (2026-04-01)**:
   - **color image test PASS** — alpha blend state fix (SrcAlpha→One for alpha channel), max diff 48→1
   - **Stage.width/height initialized to FRAME_WIDTH/FRAME_HEIGHT** — was 0, causing Drawing API layout bugs (movieclip_setmask 202400→10096 outliers)

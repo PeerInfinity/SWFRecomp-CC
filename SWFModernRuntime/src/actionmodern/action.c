@@ -2605,8 +2605,11 @@ static ASObject* g_matrix_prototype = NULL;
 static ASObject* g_rect_prototype = NULL;
 static ASFunction g_point_methods[7];   // toString, add, subtract, equals, clone, offset, normalize
 static ASFunction g_point_statics[3];   // distance, interpolate, polar
+static ASFunction g_point_length_getter; // length virtual property
 static ASFunction g_matrix_methods[12]; // toString, clone, identity, scale, rotate, translate, concat, invert, createBox, createGradientBox, transformPoint, deltaTransformPoint
 static ASFunction g_rect_methods[15];   // toString, clone, equals, isEmpty, setEmpty, contains, containsPoint, containsRectangle, inflate, inflatePoint, intersection, intersects, offset, offsetPoint, union
+static ASFunction g_rect_virt_getters[7]; // left, right, top, bottom, topLeft, bottomRight, size
+static ASFunction g_rect_virt_setters[2]; // left, top
 static int g_geom_init_done = 0;
 
 // ============================================================================
@@ -2623,6 +2626,7 @@ static ASObject* g_color_transform_prototype = NULL;
 static ASFunction g_ct_methods[2];    // concat, toString
 static ASFunction g_ct_rgb_getter;
 static ASFunction g_ct_rgb_setter;
+static ASFunction g_ct_virtual_getter;  // shared getter for 8 virtual props (returns undefined)
 static int g_color_transform_init_done = 0;
 
 // ============================================================================
@@ -6071,6 +6075,7 @@ static float normalizeRotation(float r) {
 	return r;
 }
 static void setAddProperty(SWFAppContext* app_context, ASObject* obj, const char* name, u32 nlen, ASFunction* getter, ASFunction* setter);
+static void setAddPropertyWithFlags(SWFAppContext* app_context, ASObject* obj, const char* name, u32 nlen, ASFunction* getter, ASFunction* setter, u8 flags);
 static void initGeomPrototypes(SWFAppContext* app_context);
 static void initColorTransformPrototype(SWFAppContext* app_context);
 static void initBitmapDataPrototype(SWFAppContext* app_context);
@@ -7053,6 +7058,18 @@ static ActionVar pointEquals(SWFAppContext* app_context, ActionVar* args, u32 ar
 	return r;
 }
 
+// Point.prototype.length getter — sqrt(x*x + y*y)
+static ActionVar pointLengthGetter(SWFAppContext* app_context, ActionVar* args, u32 arg_count, ActionVar* registers, void* this_obj)
+{
+	(void)app_context; (void)args; (void)arg_count; (void)registers;
+	ASObject* obj = (ASObject*)this_obj;
+	ActionVar* xv = obj ? getProperty(obj, "x", 1) : NULL;
+	ActionVar* yv = obj ? getProperty(obj, "y", 1) : NULL;
+	double x = xv ? varToDoubleSimple(xv) : NAN;
+	double y = yv ? varToDoubleSimple(yv) : NAN;
+	return makeF64(sqrt(x * x + y * y));
+}
+
 static ActionVar pointClone(SWFAppContext* app_context, ActionVar* args, u32 arg_count, ActionVar* registers, void* this_obj)
 {
 	(void)args; (void)arg_count; (void)registers;
@@ -7583,6 +7600,96 @@ static ActionVar rectangleConstructor(SWFAppContext* app_context, ActionVar* arg
 	ActionVar r = {0}; r.type = ACTION_STACK_VALUE_UNDEFINED; return r;
 }
 
+// Rectangle.prototype virtual property getters/setters
+static ActionVar rectLeftGetter(SWFAppContext* app_context, ActionVar* args, u32 arg_count, ActionVar* registers, void* this_obj)
+{
+	(void)app_context; (void)args; (void)arg_count; (void)registers;
+	ASObject* obj = (ASObject*)this_obj;
+	ActionVar* xv = obj ? getProperty(obj, "x", 1) : NULL;
+	if (xv) return *xv;
+	ActionVar undef = {0}; undef.type = ACTION_STACK_VALUE_UNDEFINED; return undef;
+}
+
+static ActionVar rectLeftSetter(SWFAppContext* app_context, ActionVar* args, u32 arg_count, ActionVar* registers, void* this_obj)
+{
+	(void)registers;
+	ASObject* obj = (ASObject*)this_obj;
+	if (obj && arg_count > 0) setProperty(app_context, obj, "x", 1, &args[0]);
+	ActionVar undef = {0}; undef.type = ACTION_STACK_VALUE_UNDEFINED; return undef;
+}
+
+static ActionVar rectRightGetter(SWFAppContext* app_context, ActionVar* args, u32 arg_count, ActionVar* registers, void* this_obj)
+{
+	(void)app_context; (void)args; (void)arg_count; (void)registers;
+	ASObject* obj = (ASObject*)this_obj;
+	double x = obj ? varToDoubleSimple(getProperty(obj, "x", 1)) : NAN;
+	double w = obj ? varToDoubleSimple(getProperty(obj, "width", 5)) : NAN;
+	return makeF64(x + w);
+}
+
+static ActionVar rectTopGetter(SWFAppContext* app_context, ActionVar* args, u32 arg_count, ActionVar* registers, void* this_obj)
+{
+	(void)app_context; (void)args; (void)arg_count; (void)registers;
+	ASObject* obj = (ASObject*)this_obj;
+	ActionVar* yv = obj ? getProperty(obj, "y", 1) : NULL;
+	if (yv) return *yv;
+	ActionVar undef = {0}; undef.type = ACTION_STACK_VALUE_UNDEFINED; return undef;
+}
+
+static ActionVar rectTopSetter(SWFAppContext* app_context, ActionVar* args, u32 arg_count, ActionVar* registers, void* this_obj)
+{
+	(void)registers;
+	ASObject* obj = (ASObject*)this_obj;
+	if (obj && arg_count > 0) setProperty(app_context, obj, "y", 1, &args[0]);
+	ActionVar undef = {0}; undef.type = ACTION_STACK_VALUE_UNDEFINED; return undef;
+}
+
+static ActionVar rectBottomGetter(SWFAppContext* app_context, ActionVar* args, u32 arg_count, ActionVar* registers, void* this_obj)
+{
+	(void)app_context; (void)args; (void)arg_count; (void)registers;
+	ASObject* obj = (ASObject*)this_obj;
+	double y = obj ? varToDoubleSimple(getProperty(obj, "y", 1)) : NAN;
+	double h = obj ? varToDoubleSimple(getProperty(obj, "height", 6)) : NAN;
+	return makeF64(y + h);
+}
+
+static ActionVar rectTopLeftGetter(SWFAppContext* app_context, ActionVar* args, u32 arg_count, ActionVar* registers, void* this_obj)
+{
+	(void)args; (void)arg_count; (void)registers;
+	ASObject* obj = (ASObject*)this_obj;
+	ActionVar* xv = obj ? getProperty(obj, "x", 1) : NULL;
+	ActionVar* yv = obj ? getProperty(obj, "y", 1) : NULL;
+	ASObject* pt = createPointObj(app_context, xv, yv);
+	ActionVar r = {0}; r.type = ACTION_STACK_VALUE_OBJECT; r.data.numeric_value = (u64)pt;
+	return r;
+}
+
+static ActionVar rectBottomRightGetter(SWFAppContext* app_context, ActionVar* args, u32 arg_count, ActionVar* registers, void* this_obj)
+{
+	(void)args; (void)arg_count; (void)registers;
+	ASObject* obj = (ASObject*)this_obj;
+	double x = obj ? varToDoubleSimple(getProperty(obj, "x", 1)) : NAN;
+	double y = obj ? varToDoubleSimple(getProperty(obj, "y", 1)) : NAN;
+	double w = obj ? varToDoubleSimple(getProperty(obj, "width", 5)) : NAN;
+	double h = obj ? varToDoubleSimple(getProperty(obj, "height", 6)) : NAN;
+	ActionVar brx = makeF64(x + w);
+	ActionVar bry = makeF64(y + h);
+	ASObject* pt = createPointObj(app_context, &brx, &bry);
+	ActionVar r = {0}; r.type = ACTION_STACK_VALUE_OBJECT; r.data.numeric_value = (u64)pt;
+	return r;
+}
+
+static ActionVar rectSizeGetter(SWFAppContext* app_context, ActionVar* args, u32 arg_count, ActionVar* registers, void* this_obj)
+{
+	(void)args; (void)arg_count; (void)registers;
+	ASObject* obj = (ASObject*)this_obj;
+	ActionVar* wv = obj ? getProperty(obj, "width", 5) : NULL;
+	ActionVar* hv = obj ? getProperty(obj, "height", 6) : NULL;
+	ASObject* pt = createPointObj(app_context, wv, hv);
+	ActionVar r = {0}; r.type = ACTION_STACK_VALUE_OBJECT; r.data.numeric_value = (u64)pt;
+	return r;
+}
+
 static ActionVar rectToStringDynamic(SWFAppContext* app_context, ActionVar* args, u32 arg_count, ActionVar* registers, void* this_obj)
 {
 	(void)args; (void)arg_count; (void)registers;
@@ -7975,6 +8082,12 @@ static void initGeomPrototypes(SWFAppContext* app_context)
 		setPropertyWithFlags(app_context, g_point_prototype, "constructor", 11, &_u, PROPERTY_FLAG_WRITABLE);
 	}
 	setObjectProto(app_context, g_point_prototype);
+	// length virtual property — READ_ONLY, inserted between __proto__ and clone for correct LIFO order
+	memset(&g_point_length_getter, 0, sizeof(ASFunction));
+	g_point_length_getter.function_type = 2;
+	g_point_length_getter.advanced_func = (Function2Ptr)pointLengthGetter;
+	setAddPropertyWithFlags(app_context, g_point_prototype, "length", 6, &g_point_length_getter, NULL,
+	                        PROPERTY_FLAG_ENUMERABLE | PROPERTY_FLAG_CONFIGURABLE);
 	registerGeomMethod(&g_point_methods[4], "clone",     (Function2Ptr)pointClone,      app_context, g_point_prototype);
 	registerGeomMethod(&g_point_methods[5], "offset",    (Function2Ptr)pointOffset,     app_context, g_point_prototype);
 	registerGeomMethod(&g_point_methods[3], "equals",    (Function2Ptr)pointEquals,     app_context, g_point_prototype);
@@ -8019,6 +8132,29 @@ static void initGeomPrototypes(SWFAppContext* app_context)
 	registerGeomMethod(&g_rect_methods[1],  "clone",              (Function2Ptr)rectClone,              app_context, g_rect_prototype);
 	registerGeomMethod(&g_rect_methods[4],  "setEmpty",           (Function2Ptr)rectSetEmpty,           app_context, g_rect_prototype);
 	registerGeomMethod(&g_rect_methods[3],  "isEmpty",            (Function2Ptr)rectIsEmpty,            app_context, g_rect_prototype);
+	// Virtual computed properties: left, right, top, bottom, topLeft, bottomRight, size
+	// Insertion order (LIFO): left, right, top, bottom, topLeft, bottomRight, size → enumerates as size, bottomRight, topLeft, bottom, top, right, left
+	{
+		const u8 ro = PROPERTY_FLAG_ENUMERABLE | PROPERTY_FLAG_CONFIGURABLE; // READ_ONLY
+		for (int i = 0; i < 7; i++) { memset(&g_rect_virt_getters[i], 0, sizeof(ASFunction)); g_rect_virt_getters[i].function_type = 2; }
+		for (int i = 0; i < 2; i++) { memset(&g_rect_virt_setters[i], 0, sizeof(ASFunction)); g_rect_virt_setters[i].function_type = 2; }
+		g_rect_virt_getters[0].advanced_func = (Function2Ptr)rectLeftGetter;
+		g_rect_virt_getters[1].advanced_func = (Function2Ptr)rectRightGetter;
+		g_rect_virt_getters[2].advanced_func = (Function2Ptr)rectTopGetter;
+		g_rect_virt_getters[3].advanced_func = (Function2Ptr)rectBottomGetter;
+		g_rect_virt_getters[4].advanced_func = (Function2Ptr)rectTopLeftGetter;
+		g_rect_virt_getters[5].advanced_func = (Function2Ptr)rectBottomRightGetter;
+		g_rect_virt_getters[6].advanced_func = (Function2Ptr)rectSizeGetter;
+		g_rect_virt_setters[0].advanced_func = (Function2Ptr)rectLeftSetter;
+		g_rect_virt_setters[1].advanced_func = (Function2Ptr)rectTopSetter;
+		setAddPropertyWithFlags(app_context, g_rect_prototype, "left",        4,  &g_rect_virt_getters[0], &g_rect_virt_setters[0], PROPERTY_FLAGS_DEFAULT);
+		setAddPropertyWithFlags(app_context, g_rect_prototype, "right",       5,  &g_rect_virt_getters[1], NULL, ro);
+		setAddPropertyWithFlags(app_context, g_rect_prototype, "top",         3,  &g_rect_virt_getters[2], &g_rect_virt_setters[1], PROPERTY_FLAGS_DEFAULT);
+		setAddPropertyWithFlags(app_context, g_rect_prototype, "bottom",      6,  &g_rect_virt_getters[3], NULL, ro);
+		setAddPropertyWithFlags(app_context, g_rect_prototype, "topLeft",     7,  &g_rect_virt_getters[4], NULL, ro);
+		setAddPropertyWithFlags(app_context, g_rect_prototype, "bottomRight", 11, &g_rect_virt_getters[5], NULL, ro);
+		setAddPropertyWithFlags(app_context, g_rect_prototype, "size",        4,  &g_rect_virt_getters[6], NULL, ro);
+	}
 	registerGeomMethod(&g_rect_methods[8],  "inflate",            (Function2Ptr)rectInflate,            app_context, g_rect_prototype);
 	registerGeomMethod(&g_rect_methods[9],  "inflatePoint",       (Function2Ptr)rectInflatePoint,       app_context, g_rect_prototype);
 	registerGeomMethod(&g_rect_methods[12], "offset",             (Function2Ptr)rectOffset,             app_context, g_rect_prototype);
@@ -8459,14 +8595,27 @@ static ActionVar ctConcat(SWFAppContext* app_context, ActionVar* args, u32 arg_c
 	return undef;
 }
 
+// Virtual property getter for ColorTransform prototype — returns undefined
+// (instances have own properties set by constructor that shadow these)
+static ActionVar ctVirtualPropGetter(SWFAppContext* app_context, ActionVar* args, u32 arg_count, ActionVar* registers, void* this_obj)
+{
+	(void)app_context; (void)args; (void)arg_count; (void)registers;
+	ActionVar undef = {0}; undef.type = ACTION_STACK_VALUE_UNDEFINED;
+	return undef;
+}
+
 // ColorTransform rgb getter: returns (rOff & 0xFF)<<16 | (gOff & 0xFF)<<8 | (bOff & 0xFF)
 static ActionVar ctRgbGetter(SWFAppContext* app_context, ActionVar* args, u32 arg_count, ActionVar* registers, void* this_obj)
 {
 	(void)app_context; (void)args; (void)arg_count; (void)registers;
 	ASObject* obj = (ASObject*)this_obj;
-	ActionVar* rv = obj ? getPropertyWithPrototype(obj, "redOffset",    9) : NULL;
-	ActionVar* gv = obj ? getPropertyWithPrototype(obj, "greenOffset", 11) : NULL;
-	ActionVar* bv = obj ? getPropertyWithPrototype(obj, "blueOffset",  10) : NULL;
+	if (!obj || obj->native_type != NATIVE_COLORTRANSFORM) {
+		ActionVar undef = {0}; undef.type = ACTION_STACK_VALUE_UNDEFINED;
+		return undef;
+	}
+	ActionVar* rv = getPropertyWithPrototype(obj, "redOffset",    9);
+	ActionVar* gv = getPropertyWithPrototype(obj, "greenOffset", 11);
+	ActionVar* bv = getPropertyWithPrototype(obj, "blueOffset",  10);
 	int32_t r = rv ? (int32_t)varToDoubleSimple(rv) : 0;
 	int32_t g = gv ? (int32_t)varToDoubleSimple(gv) : 0;
 	int32_t b = bv ? (int32_t)varToDoubleSimple(bv) : 0;
@@ -8516,6 +8665,25 @@ static void setAddProperty(SWFAppContext* app_context, ASObject* obj, const char
 	}
 }
 
+// Helper: set up an addProperty virtual getter/setter with specific flags.
+static void setAddPropertyWithFlags(SWFAppContext* app_context, ASObject* obj, const char* name, u32 nlen,
+                                    ASFunction* getter, ASFunction* setter, u8 flags)
+{
+	ActionVar marker = {0};
+	marker.type = ACTION_STACK_VALUE_UNDEFINED;
+	setPropertyWithFlags(app_context, obj, name, nlen, &marker, flags);
+	for (u32 i = 0; i < obj->num_used; i++)
+	{
+		if (obj->properties[i].name_length == nlen &&
+		    strncmp(obj->properties[i].name, name, nlen) == 0)
+		{
+			obj->properties[i].getter = (void*)getter;
+			obj->properties[i].setter = (void*)setter;
+			break;
+		}
+	}
+}
+
 static void initColorTransformPrototype(SWFAppContext* app_context)
 {
 	if (g_color_transform_init_done) return;
@@ -8533,28 +8701,32 @@ static void initColorTransformPrototype(SWFAppContext* app_context)
 	// Insert properties in REVERSE of desired enumeration order (Enumerate2 uses LIFO).
 	// Desired enum order: toString, concat, rgb, blueOffset, greenOffset, redOffset,
 	//   alphaOffset, blueMultiplier, greenMultiplier, redMultiplier, alphaMultiplier, __proto__, constructor
-	// Insert order (first = last enumerated):
-	//   constructor(placeholder), __proto__, alphaMultiplier, redMultiplier, greenMultiplier, blueMultiplier,
-	//   alphaOffset, redOffset, greenOffset, blueOffset, rgb, concat, toString
-	ActionVar one  = makeF64(1.0);
-	ActionVar zero = makeF64(0.0);
-	setProperty(app_context, g_color_transform_prototype, "alphaMultiplier", 15, &one);
-	setProperty(app_context, g_color_transform_prototype, "redMultiplier",   13, &one);
-	setProperty(app_context, g_color_transform_prototype, "greenMultiplier", 15, &one);
-	setProperty(app_context, g_color_transform_prototype, "blueMultiplier",  14, &one);
-	setProperty(app_context, g_color_transform_prototype, "alphaOffset",     11, &zero);
-	setProperty(app_context, g_color_transform_prototype, "redOffset",        9, &zero);
-	setProperty(app_context, g_color_transform_prototype, "greenOffset",     11, &zero);
-	setProperty(app_context, g_color_transform_prototype, "blueOffset",      10, &zero);
+	// All 8 multiplier/offset properties + rgb are virtual (addProperty) with READ_ONLY on prototype.
+	// Instances get own plain properties from constructor that shadow these.
+	const u8 ro_flags = PROPERTY_FLAG_ENUMERABLE | PROPERTY_FLAG_CONFIGURABLE; // READ_ONLY
 
-	// rgb virtual property (addProperty getter/setter)
+	// Shared virtual getter for the 8 multiplier/offset properties (returns undefined on prototype)
+	memset(&g_ct_virtual_getter, 0, sizeof(ASFunction));
+	g_ct_virtual_getter.function_type = 2;
+	g_ct_virtual_getter.advanced_func = (Function2Ptr)ctVirtualPropGetter;
+
+	setAddPropertyWithFlags(app_context, g_color_transform_prototype, "alphaMultiplier", 15, &g_ct_virtual_getter, NULL, ro_flags);
+	setAddPropertyWithFlags(app_context, g_color_transform_prototype, "redMultiplier",   13, &g_ct_virtual_getter, NULL, ro_flags);
+	setAddPropertyWithFlags(app_context, g_color_transform_prototype, "greenMultiplier", 15, &g_ct_virtual_getter, NULL, ro_flags);
+	setAddPropertyWithFlags(app_context, g_color_transform_prototype, "blueMultiplier",  14, &g_ct_virtual_getter, NULL, ro_flags);
+	setAddPropertyWithFlags(app_context, g_color_transform_prototype, "alphaOffset",     11, &g_ct_virtual_getter, NULL, ro_flags);
+	setAddPropertyWithFlags(app_context, g_color_transform_prototype, "redOffset",        9, &g_ct_virtual_getter, NULL, ro_flags);
+	setAddPropertyWithFlags(app_context, g_color_transform_prototype, "greenOffset",     11, &g_ct_virtual_getter, NULL, ro_flags);
+	setAddPropertyWithFlags(app_context, g_color_transform_prototype, "blueOffset",      10, &g_ct_virtual_getter, NULL, ro_flags);
+
+	// rgb virtual property (addProperty getter/setter) — also READ_ONLY on prototype
 	memset(&g_ct_rgb_getter, 0, sizeof(ASFunction));
 	g_ct_rgb_getter.function_type = 2;
 	g_ct_rgb_getter.advanced_func = (Function2Ptr)ctRgbGetter;
 	memset(&g_ct_rgb_setter, 0, sizeof(ASFunction));
 	g_ct_rgb_setter.function_type = 2;
 	g_ct_rgb_setter.advanced_func = (Function2Ptr)ctRgbSetter;
-	setAddProperty(app_context, g_color_transform_prototype, "rgb", 3, &g_ct_rgb_getter, &g_ct_rgb_setter);
+	setAddPropertyWithFlags(app_context, g_color_transform_prototype, "rgb", 3, &g_ct_rgb_getter, &g_ct_rgb_setter, ro_flags);
 
 	// concat method (before toString so toString is last-inserted = first-enumerated)
 	registerGeomMethod(&g_ct_methods[0], "concat",   (Function2Ptr)ctConcat,   app_context, g_color_transform_prototype);
@@ -25055,6 +25227,8 @@ static void initArrayProto(SWFAppContext* app_context, ASArray* arr) {
 static ASFunction g_filter_clone_funcs[10]; // one per filter type
 // Filter prototype lookup by display list filter_type (1=blur, 2=dropshadow, 3=glow, 4=bevel)
 static ASObject* g_filter_protos_by_type[5] = {NULL, NULL, NULL, NULL, NULL};
+static ASObject* g_filter_subclass_protos[9] = {0}; // All 9 filter subclass prototypes (for flag fixup)
+static ASFunction g_filter_virtual_getter; // Shared getter for all filter virtual properties (returns undefined)
 static ActionVar filterClone(SWFAppContext* app_context, ActionVar* args, u32 arg_count, ActionVar* registers, void* this_obj)
 {
     (void)args; (void)arg_count; (void)registers;
@@ -25218,27 +25392,31 @@ static void initFlashPackage(SWFAppContext* app_context)
 	SET_CTOR_PROP(display_obj, "BitmapData", 10, fc_BitmapData);
 
 	// flash.filters (10 filter classes)
+	// Insertion order (LIFO): BitmapFilter, DropShadowFilter, BlurFilter, GlowFilter, BevelFilter,
+	//   GradientGlowFilter, GradientBevelFilter, ConvolutionFilter, ColorMatrixFilter, DisplacementMapFilter
+	// Enum order: DisplacementMapFilter, ColorMatrixFilter, ConvolutionFilter, GradientBevelFilter,
+	//   GradientGlowFilter, BevelFilter, GlowFilter, BlurFilter, DropShadowFilter, BitmapFilter
 	MAKE_PKG(filters_obj, g_flash_object, "filters", 7, 12);
-	MAKE_STUB_CTOR(fc_BevelFilter, "BevelFilter");
-	SET_CTOR_PROP(filters_obj, "BevelFilter", 11, fc_BevelFilter);
 	MAKE_STUB_CTOR(fc_BitmapFilter, "BitmapFilter");
 	SET_CTOR_PROP(filters_obj, "BitmapFilter", 12, fc_BitmapFilter);
-	MAKE_STUB_CTOR(fc_BlurFilter, "BlurFilter");
-	SET_CTOR_PROP(filters_obj, "BlurFilter", 10, fc_BlurFilter);
-	MAKE_STUB_CTOR(fc_ColorMatrixFilter, "ColorMatrixFilter");
-	SET_CTOR_PROP(filters_obj, "ColorMatrixFilter", 17, fc_ColorMatrixFilter);
-	MAKE_STUB_CTOR(fc_ConvolutionFilter, "ConvolutionFilter");
-	SET_CTOR_PROP(filters_obj, "ConvolutionFilter", 17, fc_ConvolutionFilter);
-	MAKE_STUB_CTOR(fc_DisplacementMapFilter, "DisplacementMapFilter");
-	SET_CTOR_PROP(filters_obj, "DisplacementMapFilter", 21, fc_DisplacementMapFilter);
 	MAKE_STUB_CTOR(fc_DropShadowFilter, "DropShadowFilter");
 	SET_CTOR_PROP(filters_obj, "DropShadowFilter", 16, fc_DropShadowFilter);
+	MAKE_STUB_CTOR(fc_BlurFilter, "BlurFilter");
+	SET_CTOR_PROP(filters_obj, "BlurFilter", 10, fc_BlurFilter);
 	MAKE_STUB_CTOR(fc_GlowFilter, "GlowFilter");
 	SET_CTOR_PROP(filters_obj, "GlowFilter", 10, fc_GlowFilter);
-	MAKE_STUB_CTOR(fc_GradientBevelFilter, "GradientBevelFilter");
-	SET_CTOR_PROP(filters_obj, "GradientBevelFilter", 19, fc_GradientBevelFilter);
+	MAKE_STUB_CTOR(fc_BevelFilter, "BevelFilter");
+	SET_CTOR_PROP(filters_obj, "BevelFilter", 11, fc_BevelFilter);
 	MAKE_STUB_CTOR(fc_GradientGlowFilter, "GradientGlowFilter");
 	SET_CTOR_PROP(filters_obj, "GradientGlowFilter", 18, fc_GradientGlowFilter);
+	MAKE_STUB_CTOR(fc_GradientBevelFilter, "GradientBevelFilter");
+	SET_CTOR_PROP(filters_obj, "GradientBevelFilter", 19, fc_GradientBevelFilter);
+	MAKE_STUB_CTOR(fc_ConvolutionFilter, "ConvolutionFilter");
+	SET_CTOR_PROP(filters_obj, "ConvolutionFilter", 17, fc_ConvolutionFilter);
+	MAKE_STUB_CTOR(fc_ColorMatrixFilter, "ColorMatrixFilter");
+	SET_CTOR_PROP(filters_obj, "ColorMatrixFilter", 17, fc_ColorMatrixFilter);
+	MAKE_STUB_CTOR(fc_DisplacementMapFilter, "DisplacementMapFilter");
+	SET_CTOR_PROP(filters_obj, "DisplacementMapFilter", 21, fc_DisplacementMapFilter);
 
 	// flash.geom (5 classes)
 	MAKE_PKG(geom_obj, g_flash_object, "geom", 4, 8);
@@ -25276,8 +25454,8 @@ static void initFlashPackage(SWFAppContext* app_context)
 		setPropertyWithFlags(app_context, fc_Point.own_props, "prototype", 9, &_u, PROPERTY_FLAG_WRITABLE);
 	}
 	registerGeomMethod(&g_point_statics[0], "distance",    (Function2Ptr)pointDistance,    app_context, fc_Point.own_props);
-	registerGeomMethod(&g_point_statics[1], "interpolate", (Function2Ptr)pointInterpolate, app_context, fc_Point.own_props);
 	registerGeomMethod(&g_point_statics[2], "polar",       (Function2Ptr)pointPolar,       app_context, fc_Point.own_props);
+	registerGeomMethod(&g_point_statics[1], "interpolate", (Function2Ptr)pointInterpolate, app_context, fc_Point.own_props);
 
 	// Matrix constructor with prototype
 	static ASFunction fc_Matrix;
@@ -25451,7 +25629,7 @@ static void initFlashPackage(SWFAppContext* app_context)
 	g_filter_protos_by_type[3] = fc_GlowFilter.prototype_obj;       // type 3 = Glow
 	g_filter_protos_by_type[4] = fc_BevelFilter.prototype_obj;       // type 4 = Bevel
 
-	// Register clone() on all filter prototypes (NOT BitmapFilter base — its clone returns undefined)
+	// Register clone() and virtual properties on filter prototypes
 	{
 		ASFunction* filter_ctors[] = {
 			&fc_BevelFilter,
@@ -25460,11 +25638,105 @@ static void initFlashPackage(SWFAppContext* app_context)
 			&fc_DropShadowFilter, &fc_GlowFilter,
 			&fc_GradientBevelFilter, &fc_GradientGlowFilter
 		};
+
+		// Shared virtual getter for filter properties (returns undefined on prototype)
+		memset(&g_filter_virtual_getter, 0, sizeof(ASFunction));
+		g_filter_virtual_getter.function_type = 2;
+		g_filter_virtual_getter.advanced_func = (Function2Ptr)ctVirtualPropGetter; // reuse CT getter
+
+		const u8 ro = PROPERTY_FLAG_ENUMERABLE | PROPERTY_FLAG_CONFIGURABLE; // READ_ONLY
+
+		// ensureStubCtorPrototype already inserted: constructor, __proto__
+		// Now we add (in LIFO insertion order): __constructor__, virtual props, clone
+		// LIFO enumeration: clone, virtual props (reversed), __constructor__, __proto__, constructor
+
+		// Step 1: Add __constructor__ (DONT_ENUM) to all 9 filter prototypes
 		for (int i = 0; i < 9; i++) {
 			if (filter_ctors[i]->prototype_obj) {
-				registerGeomMethod(&g_filter_clone_funcs[i], "clone",
-					(Function2Ptr)filterClone, app_context, filter_ctors[i]->prototype_obj);
+				g_filter_subclass_protos[i] = filter_ctors[i]->prototype_obj;
+				ActionVar cv = {0}; cv.type = ACTION_STACK_VALUE_FUNCTION;
+				cv.data.numeric_value = (u64)filter_ctors[i];
+				setPropertyWithFlags(app_context, filter_ctors[i]->prototype_obj,
+					"__constructor__", 15, &cv,
+					PROPERTY_FLAG_WRITABLE | PROPERTY_FLAG_CONFIGURABLE); // DONT_ENUM
 			}
+		}
+
+		// Step 2: Add virtual READ_ONLY properties (inserted in reverse of desired enum order)
+
+		// Helper to add N virtual properties to a prototype
+		#define ADD_FILTER_VPROPS(ctor, ...) { \
+			ASObject* _fp = (ctor)->prototype_obj; \
+			if (_fp) { \
+				const char* _props[] = { __VA_ARGS__ }; \
+				int _n = sizeof(_props)/sizeof(_props[0]); \
+				for (int _i = 0; _i < _n; _i++) { \
+					setAddPropertyWithFlags(app_context, _fp, _props[_i], (u32)strlen(_props[_i]), \
+						&g_filter_virtual_getter, NULL, ro); \
+				} \
+			} \
+		}
+
+		// DisplacementMapFilter: mapBitmap, mapPoint, componentX, componentY, scaleX, scaleY, mode, color, alpha
+		ADD_FILTER_VPROPS(&fc_DisplacementMapFilter,
+			"mapBitmap", "mapPoint", "componentX", "componentY", "scaleX", "scaleY", "mode", "color", "alpha");
+		// ColorMatrixFilter: matrix
+		ADD_FILTER_VPROPS(&fc_ColorMatrixFilter, "matrix");
+		// ConvolutionFilter: matrixX, matrixY, matrix, divisor, bias, preserveAlpha, clamp, color, alpha
+		ADD_FILTER_VPROPS(&fc_ConvolutionFilter,
+			"matrixX", "matrixY", "matrix", "divisor", "bias", "preserveAlpha", "clamp", "color", "alpha");
+		// GradientBevelFilter: distance, angle, colors, alphas, ratios, blurX, blurY, quality, strength, knockout, type
+		ADD_FILTER_VPROPS(&fc_GradientBevelFilter,
+			"distance", "angle", "colors", "alphas", "ratios", "blurX", "blurY", "quality", "strength", "knockout", "type");
+		// GradientGlowFilter: same as GradientBevel
+		ADD_FILTER_VPROPS(&fc_GradientGlowFilter,
+			"distance", "angle", "colors", "alphas", "ratios", "blurX", "blurY", "quality", "strength", "knockout", "type");
+		// BevelFilter: distance, angle, highlightColor, highlightAlpha, shadowColor, shadowAlpha, quality, strength, knockout, blurX, blurY, type
+		ADD_FILTER_VPROPS(&fc_BevelFilter,
+			"distance", "angle", "highlightColor", "highlightAlpha", "shadowColor", "shadowAlpha",
+			"quality", "strength", "knockout", "blurX", "blurY", "type");
+		// GlowFilter: color, alpha, quality, inner, knockout, blurX, blurY, strength
+		ADD_FILTER_VPROPS(&fc_GlowFilter,
+			"color", "alpha", "quality", "inner", "knockout", "blurX", "blurY", "strength");
+		// BlurFilter: blurX, blurY, quality
+		ADD_FILTER_VPROPS(&fc_BlurFilter, "blurX", "blurY", "quality");
+		// DropShadowFilter: distance, angle, color, alpha, quality, inner, knockout, blurX, blurY, strength, hideObject
+		ADD_FILTER_VPROPS(&fc_DropShadowFilter,
+			"distance", "angle", "color", "alpha", "quality", "inner", "knockout", "blurX", "blurY", "strength", "hideObject");
+
+		#undef ADD_FILTER_VPROPS
+
+		// Step 3: Register clone() ONLY on BitmapFilter.prototype (CONFIGURABLE/deletable)
+		// Subclass prototypes inherit clone via __proto__ chain
+		memset(&g_filter_clone_funcs[0], 0, sizeof(ASFunction));
+		strncpy(g_filter_clone_funcs[0].name, "clone", 255);
+		g_filter_clone_funcs[0].function_type = 2;
+		g_filter_clone_funcs[0].advanced_func = (Function2Ptr)filterClone;
+		if (fc_BitmapFilter.prototype_obj) {
+			ActionVar fv = {0}; fv.type = ACTION_STACK_VALUE_FUNCTION;
+			fv.data.numeric_value = (u64)&g_filter_clone_funcs[0];
+			setPropertyWithFlags(app_context, fc_BitmapFilter.prototype_obj, "clone", 5, &fv,
+				PROPERTY_FLAGS_DEFAULT);
+		}
+
+		// Step 4: Set subclass prototypes' __proto__ to BitmapFilter.prototype
+		// and remove constructor own property (inherited from BitmapFilter.prototype via chain)
+		for (int i = 0; i < 9; i++) {
+			ASObject* fp = filter_ctors[i]->prototype_obj;
+			if (!fp || !fc_BitmapFilter.prototype_obj) continue;
+			// Set __proto__ to BitmapFilter.prototype (inherits clone + constructor)
+			ActionVar bp = {0}; bp.type = ACTION_STACK_VALUE_OBJECT;
+			bp.data.numeric_value = (u64)fc_BitmapFilter.prototype_obj;
+			setProperty(app_context, fp, "__proto__", 9, &bp);
+			// Remove constructor own property (now inherited from BitmapFilter.prototype)
+			for (u32 j = 0; j < fp->num_used; j++) {
+				if (fp->properties[j].name_length == 11 &&
+				    strncmp(fp->properties[j].name, "constructor", 11) == 0) {
+					fp->properties[j].flags |= PROPERTY_FLAG_CONFIGURABLE;
+					break;
+				}
+			}
+			deleteProperty(app_context, fp, "constructor", 11);
 		}
 	}
 
@@ -26402,6 +26674,7 @@ static void ensureGlobalInit(SWFAppContext* app_context)
 			}
 		}
 	}
+
 }
 
 // Copy all properties from src to dst, preserving flags

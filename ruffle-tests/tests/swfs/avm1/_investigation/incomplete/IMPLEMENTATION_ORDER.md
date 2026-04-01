@@ -199,7 +199,15 @@ Items #9-10: Both already working — display_object_properties image test was p
 Items #11-12: Drawing API rendering infrastructure works (gradients render correctly), but anti-aliasing/edge differences cause ~20% pixel mismatch. mask_reapply passes. Stage.width fix resolved layout bug in movieclip_setmask.
 Item #13: _global plain property resolution added. Gnash misc-mtasc hello test typeof still fails (MTASC `this` binding issue, not typeof-specific).
 
-**Next actionable items**: #4 continued (ColorTransform.prototype virtual properties), #13 continued (MTASC `this` binding for AS2 class methods), or #14-15 (BitmapData precision debugging).
+**Next actionable items**: #4 continued (filter prototype virtual properties, System.* property ordering), #13 continued (misc-mtasc deeper failures: levels/super/arguments), or #14-15 (BitmapData precision debugging).
+
+### 2026-04-01 session 2
+- **#4 GLOBALS_PLAN progress**: global_proto_decls 276→462 (+186), global_proto_decls_delete 255→283 (+28)
+  - ColorTransform.prototype: 8 multiplier/offset properties converted to virtual addProperty (READ_ONLY, type=undefined)
+  - Point: constructor `interpolate`/`polar` order fixed, `length` READ_ONLY virtual property added
+  - Rectangle.prototype: 7 virtual properties (left, right, top, bottom, topLeft, bottomRight, size) with correct flags
+  - flash.filters: registration order fixed, 75 filter virtual properties, clone inheritance via BitmapFilter.prototype, __constructor__ property, constructor removed from subclass prototypes
+- **#13 FROM_GNASH misc-mtasc**: hello test already passing, 4/9 total (hello, enum, exception, implementsOpTest)
 
 ## Recommended Session Batching (updated)
 
