@@ -7983,42 +7983,54 @@ static void initGeomPrototypes(SWFAppContext* app_context)
 	registerGeomMethod(&g_point_methods[6], "normalize", (Function2Ptr)pointNormalize,  app_context, g_point_prototype);
 	registerGeomMethod(&g_point_methods[0], "toString",  (Function2Ptr)pointToString,  app_context, g_point_prototype);
 
-	// Matrix prototype
+	// Matrix prototype — insertion order is reverse of expected LIFO enumeration:
+	// Expected enum: toString, transformPoint, deltaTransformPoint, scale, translate, rotate,
+	//   identity, clone, createGradientBox, createBox, invert, concat, __proto__, constructor
 	g_matrix_prototype = allocObject(app_context, 16);
 	retainObject(g_matrix_prototype);
+	{
+		ActionVar _u = {0}; _u.type = ACTION_STACK_VALUE_UNDEFINED;
+		setPropertyWithFlags(app_context, g_matrix_prototype, "constructor", 11, &_u, PROPERTY_FLAG_WRITABLE);
+	}
 	setObjectProto(app_context, g_matrix_prototype);
-	registerGeomMethod(&g_matrix_methods[0],  "toString",            (Function2Ptr)matrixToStringDynamic,     app_context, g_matrix_prototype);
-	registerGeomMethod(&g_matrix_methods[1],  "clone",               (Function2Ptr)matrixClone,               app_context, g_matrix_prototype);
-	registerGeomMethod(&g_matrix_methods[2],  "identity",            (Function2Ptr)matrixIdentity,            app_context, g_matrix_prototype);
-	registerGeomMethod(&g_matrix_methods[3],  "scale",               (Function2Ptr)matrixScale,               app_context, g_matrix_prototype);
-	registerGeomMethod(&g_matrix_methods[4],  "rotate",              (Function2Ptr)matrixRotate,              app_context, g_matrix_prototype);
-	registerGeomMethod(&g_matrix_methods[5],  "translate",           (Function2Ptr)matrixTranslate,           app_context, g_matrix_prototype);
 	registerGeomMethod(&g_matrix_methods[6],  "concat",              (Function2Ptr)matrixConcat,              app_context, g_matrix_prototype);
 	registerGeomMethod(&g_matrix_methods[7],  "invert",              (Function2Ptr)matrixInvert,              app_context, g_matrix_prototype);
 	registerGeomMethod(&g_matrix_methods[8],  "createBox",           (Function2Ptr)matrixCreateBox,           app_context, g_matrix_prototype);
 	registerGeomMethod(&g_matrix_methods[9],  "createGradientBox",   (Function2Ptr)matrixCreateGradientBox,   app_context, g_matrix_prototype);
-	registerGeomMethod(&g_matrix_methods[10], "transformPoint",      (Function2Ptr)matrixTransformPoint,      app_context, g_matrix_prototype);
+	registerGeomMethod(&g_matrix_methods[1],  "clone",               (Function2Ptr)matrixClone,               app_context, g_matrix_prototype);
+	registerGeomMethod(&g_matrix_methods[2],  "identity",            (Function2Ptr)matrixIdentity,            app_context, g_matrix_prototype);
+	registerGeomMethod(&g_matrix_methods[4],  "rotate",              (Function2Ptr)matrixRotate,              app_context, g_matrix_prototype);
+	registerGeomMethod(&g_matrix_methods[5],  "translate",           (Function2Ptr)matrixTranslate,           app_context, g_matrix_prototype);
+	registerGeomMethod(&g_matrix_methods[3],  "scale",               (Function2Ptr)matrixScale,               app_context, g_matrix_prototype);
 	registerGeomMethod(&g_matrix_methods[11], "deltaTransformPoint", (Function2Ptr)matrixDeltaTransformPoint, app_context, g_matrix_prototype);
+	registerGeomMethod(&g_matrix_methods[10], "transformPoint",      (Function2Ptr)matrixTransformPoint,      app_context, g_matrix_prototype);
+	registerGeomMethod(&g_matrix_methods[0],  "toString",            (Function2Ptr)matrixToStringDynamic,     app_context, g_matrix_prototype);
 
-	// Rectangle prototype
-	g_rect_prototype = allocObject(app_context, 20);
+	// Rectangle prototype — insertion order is reverse of expected LIFO enumeration:
+	// Expected enum: toString, equals, union, intersects, intersection, containsRectangle, containsPoint,
+	//   contains, offsetPoint, offset, inflatePoint, inflate, [computed props], isEmpty, setEmpty, clone, __proto__, constructor
+	g_rect_prototype = allocObject(app_context, 24);
 	retainObject(g_rect_prototype);
+	{
+		ActionVar _u = {0}; _u.type = ACTION_STACK_VALUE_UNDEFINED;
+		setPropertyWithFlags(app_context, g_rect_prototype, "constructor", 11, &_u, PROPERTY_FLAG_WRITABLE);
+	}
 	setObjectProto(app_context, g_rect_prototype);
-	registerGeomMethod(&g_rect_methods[0],  "toString",           (Function2Ptr)rectToStringDynamic,    app_context, g_rect_prototype);
 	registerGeomMethod(&g_rect_methods[1],  "clone",              (Function2Ptr)rectClone,              app_context, g_rect_prototype);
-	registerGeomMethod(&g_rect_methods[2],  "equals",             (Function2Ptr)rectEquals,             app_context, g_rect_prototype);
-	registerGeomMethod(&g_rect_methods[3],  "isEmpty",            (Function2Ptr)rectIsEmpty,            app_context, g_rect_prototype);
 	registerGeomMethod(&g_rect_methods[4],  "setEmpty",           (Function2Ptr)rectSetEmpty,           app_context, g_rect_prototype);
+	registerGeomMethod(&g_rect_methods[3],  "isEmpty",            (Function2Ptr)rectIsEmpty,            app_context, g_rect_prototype);
+	registerGeomMethod(&g_rect_methods[8],  "inflate",            (Function2Ptr)rectInflate,            app_context, g_rect_prototype);
+	registerGeomMethod(&g_rect_methods[9],  "inflatePoint",       (Function2Ptr)rectInflatePoint,       app_context, g_rect_prototype);
+	registerGeomMethod(&g_rect_methods[12], "offset",             (Function2Ptr)rectOffset,             app_context, g_rect_prototype);
+	registerGeomMethod(&g_rect_methods[13], "offsetPoint",        (Function2Ptr)rectOffsetPoint,        app_context, g_rect_prototype);
 	registerGeomMethod(&g_rect_methods[5],  "contains",           (Function2Ptr)rectContains,           app_context, g_rect_prototype);
 	registerGeomMethod(&g_rect_methods[6],  "containsPoint",      (Function2Ptr)rectContainsPoint,      app_context, g_rect_prototype);
 	registerGeomMethod(&g_rect_methods[7],  "containsRectangle",  (Function2Ptr)rectContainsRectangle,  app_context, g_rect_prototype);
-	registerGeomMethod(&g_rect_methods[8],  "inflate",            (Function2Ptr)rectInflate,            app_context, g_rect_prototype);
-	registerGeomMethod(&g_rect_methods[9],  "inflatePoint",       (Function2Ptr)rectInflatePoint,       app_context, g_rect_prototype);
 	registerGeomMethod(&g_rect_methods[10], "intersection",       (Function2Ptr)rectIntersection,       app_context, g_rect_prototype);
 	registerGeomMethod(&g_rect_methods[11], "intersects",         (Function2Ptr)rectIntersects,         app_context, g_rect_prototype);
-	registerGeomMethod(&g_rect_methods[12], "offset",             (Function2Ptr)rectOffset,             app_context, g_rect_prototype);
-	registerGeomMethod(&g_rect_methods[13], "offsetPoint",        (Function2Ptr)rectOffsetPoint,        app_context, g_rect_prototype);
 	registerGeomMethod(&g_rect_methods[14], "union",              (Function2Ptr)rectUnion,              app_context, g_rect_prototype);
+	registerGeomMethod(&g_rect_methods[2],  "equals",             (Function2Ptr)rectEquals,             app_context, g_rect_prototype);
+	registerGeomMethod(&g_rect_methods[0],  "toString",           (Function2Ptr)rectToStringDynamic,    app_context, g_rect_prototype);
 }
 
 // ============================================================================
@@ -8509,15 +8521,20 @@ static void initColorTransformPrototype(SWFAppContext* app_context)
 	if (g_color_transform_init_done) return;
 	g_color_transform_init_done = 1;
 
-	g_color_transform_prototype = allocObject(app_context, 14);
+	g_color_transform_prototype = allocObject(app_context, 16);
 	retainObject(g_color_transform_prototype);
+	// Pre-add constructor placeholder so it enumerates last (LIFO: first added = last enumerated)
+	{
+		ActionVar _u = {0}; _u.type = ACTION_STACK_VALUE_UNDEFINED;
+		setPropertyWithFlags(app_context, g_color_transform_prototype, "constructor", 11, &_u, PROPERTY_FLAG_WRITABLE);
+	}
 	setObjectProto(app_context, g_color_transform_prototype);
 
 	// Insert properties in REVERSE of desired enumeration order (Enumerate2 uses LIFO).
 	// Desired enum order: toString, concat, rgb, blueOffset, greenOffset, redOffset,
-	//   alphaOffset, blueMultiplier, greenMultiplier, redMultiplier, alphaMultiplier
+	//   alphaOffset, blueMultiplier, greenMultiplier, redMultiplier, alphaMultiplier, __proto__, constructor
 	// Insert order (first = last enumerated):
-	//   alphaMultiplier, redMultiplier, greenMultiplier, blueMultiplier,
+	//   constructor(placeholder), __proto__, alphaMultiplier, redMultiplier, greenMultiplier, blueMultiplier,
 	//   alphaOffset, redOffset, greenOffset, blueOffset, rgb, concat, toString
 	ActionVar one  = makeF64(1.0);
 	ActionVar zero = makeF64(0.0);
