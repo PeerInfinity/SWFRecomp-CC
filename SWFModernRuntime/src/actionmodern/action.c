@@ -10981,7 +10981,7 @@ ASFunction g_movieclip_constructor;
 int g_movieclip_constructor_init = 0;
 
 // MovieClip prototype method stubs (static storage)
-#define MC_METHOD_COUNT 26
+#define MC_METHOD_COUNT 29
 static ASFunction g_mc_method_funcs[MC_METHOD_COUNT];
 
 static void initMovieClipPrototype(SWFAppContext* app_context)
@@ -11029,6 +11029,9 @@ static void initMovieClipPrototype(SWFAppContext* app_context)
 		{"play", 4},
 		{"prevFrame", 9},
 		{"nextFrame", 9},
+		{"loadMovie", 9},
+		{"loadVariables", 13},
+		{"unloadMovie", 11},
 	};
 
 	memset(g_mc_method_funcs, 0, sizeof(g_mc_method_funcs));
