@@ -286,9 +286,11 @@ Testing _global.System.IME._listeners
 Testing _global.System.IME.removeListener
   prototype, DONT_DELETE
 Testing _global.System.IME.removeListener.prototype
+  __proto__, DONT_DELETE
 Testing _global.System.IME.addListener
   prototype, DONT_DELETE
 Testing _global.System.IME.addListener.prototype
+  __proto__, DONT_DELETE
 Testing _global.System.IME.broadcastMessage
 Testing _global.System.IME.doConversion
 Testing _global.System.IME.setCompositionString
@@ -338,6 +340,7 @@ Testing _global.System.security.__constructor__
 Testing _global.System.security.__constructor__.prototype
   constructor, DONT_DELETE
 Testing _global.System.security
+  __proto__, DONT_DELETE
 Testing _global.System.useCodepage
 Testing _global.System.exactSettings
 Testing _global.System.showSettings
@@ -379,13 +382,18 @@ Testing _global.System.capabilities.screenColor
 Testing _global.System.capabilities.pixelAspectRatio
 Testing _global.System.capabilities.hasAccessibility
 Testing _global.System.capabilities
+  __proto__, DONT_DELETE
 Testing _global.System
+  __proto__, DONT_DELETE
 Testing _global.SoundCodec.NELLYMOSER
 Testing _global.SoundCodec.SPEEX
 Testing _global.SoundCodec
+  __proto__, DONT_DELETE
 Testing _global.Accessibility.toString
 Testing _global.Accessibility.toString.prototype
+  __proto__, DONT_DELETE
 Testing _global.Accessibility
+  __proto__, DONT_DELETE
 Testing _global.Video
   __proto__, DONT_DELETE
   constructor, DONT_DELETE
@@ -409,13 +417,17 @@ Testing _global.Stage.broadcastMessage
 Testing _global.Stage.removeListener
   prototype, DONT_DELETE
 Testing _global.Stage.removeListener.prototype
+  __proto__, DONT_DELETE
 Testing _global.Stage.addListener
   prototype, DONT_DELETE
 Testing _global.Stage.addListener.prototype
+  __proto__, DONT_DELETE
 Testing _global.Stage._listeners
 Testing _global.Stage.toString
 Testing _global.Stage.toString.prototype
+  __proto__, DONT_DELETE
 Testing _global.Stage
+  __proto__, DONT_DELETE
 Testing _global.TextFormat
   __proto__, DONT_DELETE
   constructor, DONT_DELETE
@@ -461,13 +473,17 @@ Testing _global.Key.broadcastMessage
 Testing _global.Key.removeListener
   prototype, DONT_DELETE
 Testing _global.Key.removeListener.prototype
+  __proto__, DONT_DELETE
 Testing _global.Key.addListener
   prototype, DONT_DELETE
 Testing _global.Key.addListener.prototype
+  __proto__, DONT_DELETE
 Testing _global.Key._listeners
 Testing _global.Key.toString
 Testing _global.Key.toString.prototype
+  __proto__, DONT_DELETE
 Testing _global.Key
+  __proto__, DONT_DELETE
 Testing _global.Mouse.setTrailerMode
 Testing _global.Mouse.setTrailerPosition
 Testing _global.Mouse.setTrailer
@@ -477,13 +493,17 @@ Testing _global.Mouse.broadcastMessage
 Testing _global.Mouse.removeListener
   prototype, DONT_DELETE
 Testing _global.Mouse.removeListener.prototype
+  __proto__, DONT_DELETE
 Testing _global.Mouse.addListener
   prototype, DONT_DELETE
 Testing _global.Mouse.addListener.prototype
+  __proto__, DONT_DELETE
 Testing _global.Mouse._listeners
 Testing _global.Mouse.toString
 Testing _global.Mouse.toString.prototype
+  __proto__, DONT_DELETE
 Testing _global.Mouse
+  __proto__, DONT_DELETE
 Testing _global.Selection.setSelection
 Testing _global.Selection.getEndIndex
 Testing _global.Selection.getCaretIndex
@@ -494,13 +514,17 @@ Testing _global.Selection.broadcastMessage
 Testing _global.Selection.removeListener
   prototype, DONT_DELETE
 Testing _global.Selection.removeListener.prototype
+  __proto__, DONT_DELETE
 Testing _global.Selection.addListener
   prototype, DONT_DELETE
 Testing _global.Selection.addListener.prototype
+  __proto__, DONT_DELETE
 Testing _global.Selection._listeners
 Testing _global.Selection.toString
 Testing _global.Selection.toString.prototype
+  __proto__, DONT_DELETE
 Testing _global.Selection
+  __proto__, DONT_DELETE
 Testing _global.LoadVars
   __proto__, DONT_DELETE
   constructor, DONT_DELETE
@@ -568,6 +592,7 @@ Testing _global.Sound.prototype
   constructor, DONT_DELETE
 Testing _global.Math.toString
 Testing _global.Math.toString.prototype
+  __proto__, DONT_DELETE
 Testing _global.Math.random
 Testing _global.Math.max
 Testing _global.Math.min
@@ -595,10 +620,12 @@ Testing _global.Math.LN2
 Testing _global.Math.E
 Testing _global.Math.PI
 Testing _global.Math
+  __proto__, DONT_DELETE
 Testing _global.Array
   __proto__, DONT_DELETE
   constructor, DONT_DELETE
 Testing _global.Array.prototype
+  __proto__, DONT_DELETE
 Testing _global.String
   __proto__, DONT_DELETE
   constructor, DONT_DELETE
@@ -646,25 +673,31 @@ Testing _global.unescape
 Testing _global.escape
 Testing _global.ASSetNativeAccessor
 Testing _global.ASSetNativeAccessor.prototype
+  __proto__, DONT_DELETE
 Testing _global.ASSetNative
 Testing _global.ASSetNative.prototype
+  __proto__, DONT_DELETE
 Testing _global.ASSetPropFlags
 Testing _global.RemoteLSOUsage
   __proto__, DONT_DELETE
   constructor, DONT_DELETE
 Testing _global.RemoteLSOUsage.prototype
+  __proto__, DONT_DELETE
 Testing _global.AssetCache
   __proto__, DONT_DELETE
   constructor, DONT_DELETE
 Testing _global.AssetCache.prototype
+  __proto__, DONT_DELETE
 Testing _global.AsSetupError
   __proto__, DONT_DELETE
   constructor, DONT_DELETE
 Testing _global.AsSetupError.prototype
+  __proto__, DONT_DELETE
 Testing _global.Error
   __proto__, DONT_DELETE
   constructor, DONT_DELETE
 Testing _global.Error.prototype
+  __proto__, DONT_DELETE
 Testing _global.ContextMenu
   __proto__, DONT_DELETE
   constructor, DONT_DELETE
@@ -805,6 +838,7 @@ Testing _global.XMLSocket.prototype
   constructor, DONT_DELETE
 Testing _global.enableDebugConsole
 Testing _global.enableDebugConsole.prototype
+  __proto__, DONT_DELETE
 Testing _global.Function
   __proto__, DONT_DELETE
   constructor, DONT_DELETE
@@ -819,6 +853,7 @@ Testing _global.Object.prototype
   constructor, DONT_DELETE
 Testing _global.ASconstructor
 Testing _global.ASconstructor.prototype
+  __proto__, DONT_DELETE
 Testing _global.ASnative
 Testing _global.TextField
   call, DONT_DELETE

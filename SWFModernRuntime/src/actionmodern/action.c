@@ -5450,17 +5450,7 @@ static void setObjectProto(SWFAppContext* app_context, ASObject* obj)
 	proto_var.type = ACTION_STACK_VALUE_OBJECT;
 	proto_var.str_size = 0;
 	proto_var.data.numeric_value = (u64) proto;
-	setProperty(app_context, obj, "__proto__", 9, &proto_var);
-	// Mark __proto__ as non-enumerable
-	for (u32 i = 0; i < obj->num_used; i++)
-	{
-		if (obj->properties[i].name_length == 9 &&
-		    strncmp(obj->properties[i].name, "__proto__", 9) == 0)
-		{
-			obj->properties[i].flags &= ~PROPERTY_FLAG_ENUMERABLE;
-			break;
-		}
-	}
+	setPropertyWithFlags(app_context, obj, "__proto__", 9, &proto_var, PROPERTY_FLAG_WRITABLE);
 }
 
 // Like setObjectProto but sets __proto__ as ENUMERABLE.
