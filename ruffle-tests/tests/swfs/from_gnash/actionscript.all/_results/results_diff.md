@@ -1,20 +1,20 @@
 # Ruffle Test Results Diff
 
 **Previous:** `868900bbb1a2` (2026-04-02T15:39:42.077685+00:00)
-**Current:** `2fd884d606d4` (2026-04-02T22:23:07.293281+00:00)
+**Current:** `f73e7ea7414d` (2026-04-02T23:43:50.055094+00:00)
 
 ## Summary
 
 | Metric | Previous | Current | Delta |
 |--------|----------|---------|-------|
-| Passing | 5 | 62 | +57 |
+| Passing | 5 | 68 | +63 |
 | Total | 190 | 190 | 0 |
-| Pass rate | 2.6% | 32.6% | +30.0% |
-| Mismatched lines | 14320 | 4661 | -9659 |
-|   Decreased | | | -9660 |
+| Pass rate | 2.6% | 35.8% | +33.2% |
+| Mismatched lines | 14320 | 4633 | -9687 |
+|   Decreased | | | -9688 |
 |   Increased | | | +1 |
 
-## Newly Passing (57)
+## Newly Passing (63)
 
 | Test | Previous Status | Lines (prev) | Lines (now) |
 |------|----------------|--------------|-------------|
@@ -39,10 +39,16 @@
 | `ContextMenu-v5` | output_mismatch | 3/7 | 7/7 |
 | `ContextMenu-v6` | output_mismatch | 3/7 | 7/7 |
 | `ExternalInterface-v5` | output_mismatch | 3/7 | 7/7 |
+| `Key-v6` | output_mismatch | 3/55 | 55/55 |
+| `Key-v7` | output_mismatch | 3/55 | 55/55 |
+| `Key-v8` | output_mismatch | 3/55 | 55/55 |
 | `LoadVars-v5` | output_mismatch | 3/8 | 8/8 |
 | `Matrix-v5` | output_mismatch | 3/7 | 7/7 |
 | `Microphone-v5` | output_mismatch | 3/6 | 6/6 |
 | `Mouse-v5` | output_mismatch | 3/13 | 13/13 |
+| `Mouse-v6` | output_mismatch | 3/21 | 21/21 |
+| `Mouse-v7` | output_mismatch | 3/21 | 21/21 |
+| `Mouse-v8` | output_mismatch | 3/21 | 21/21 |
 | `MovieClipLoader-v5` | output_mismatch | 3/6 | 6/6 |
 | `MovieClipLoader-v6` | output_mismatch | 3/6 | 6/6 |
 | `NetStream-v5` | output_mismatch | 3/6 | 6/6 |
@@ -76,11 +82,11 @@
 | `swap-v8` | output_mismatch | 3/7 | 7/7 |
 | `targetPath-v5` | output_mismatch | 3/12 | 12/12 |
 
-## Line Count Changed (99)
+## Line Count Changed (98)
 
 | Test | Status | Lines (prev) | Lines (now) | Diff |
 |------|--------|--------------|-------------|------|
-| `array-v5` | output_mismatch | 3/560 | 446/560 | -443 |
+| `array-v5` | output_mismatch | 3/560 | 448/560 | -445 |
 | `Math-v7` | output_mismatch | 3/287 | 282/287 | -279 |
 | `Math-v8` | output_mismatch | 3/287 | 282/287 | -279 |
 | `Math-v5` | output_mismatch | 3/278 | 273/278 | -270 |
@@ -113,10 +119,10 @@
 | `TextFormat-v7` | output_mismatch | 3/174 | 113/174 | -110 |
 | `TextFormat-v5` | output_mismatch | 3/128 | 101/128 | -98 |
 | `TextFormat-v6` | output_mismatch | 3/128 | 101/128 | -98 |
-| `AsBroadcaster-v6` | output_mismatch | 3/121 | 97/121 | -94 |
+| `AsBroadcaster-v6` | output_mismatch | 3/121 | 98/121 | -95 |
+| `ContextMenu-v7` | output_mismatch | 3/131 | 96/131 | -93 |
+| `ContextMenu-v8` | output_mismatch | 3/131 | 96/131 | -93 |
 | `Inheritance-v5` | output_mismatch | 3/114 | 96/114 | -93 |
-| `ContextMenu-v7` | output_mismatch | 3/131 | 95/131 | -92 |
-| `ContextMenu-v8` | output_mismatch | 3/131 | 95/131 | -92 |
 | `toString_valueOf-v5` | output_mismatch | 3/137 | 82/137 | -79 |
 | `Sound-v5` | output_mismatch | 3/100 | 77/100 | -74 |
 | `NetStream-v6` | output_mismatch | 3/80 | 76/80 | -73 |
@@ -126,9 +132,6 @@
 | `LoadVars-v6` | output_mismatch | 3/152 | 67/152 | -64 |
 | `LoadVars-v7` | output_mismatch | 3/152 | 67/152 | -64 |
 | `LoadVars-v8` | output_mismatch | 3/152 | 67/152 | -64 |
-| `Key-v6` | output_mismatch | 3/55 | 52/55 | -49 |
-| `Key-v7` | output_mismatch | 3/55 | 52/55 | -49 |
-| `Key-v8` | output_mismatch | 3/55 | 52/55 | -49 |
 | `System-v5` | output_mismatch | 3/67 | 50/67 | -47 |
 | `Microphone-v7` | output_mismatch | 3/79 | 48/79 | -45 |
 | `Microphone-v8` | output_mismatch | 3/79 | 48/79 | -45 |
@@ -160,9 +163,6 @@
 | `with-v8` | output_mismatch | 3/107 | 23/107 | -20 |
 | `enumerate-v7` | output_mismatch | 3/49 | 22/49 | -19 |
 | `enumerate-v8` | output_mismatch | 3/49 | 22/49 | -19 |
-| `Mouse-v6` | output_mismatch | 3/21 | 18/21 | -15 |
-| `Mouse-v7` | output_mismatch | 3/21 | 18/21 | -15 |
-| `Mouse-v8` | output_mismatch | 3/21 | 18/21 | -15 |
 | `case-v7` | output_mismatch | 3/67 | 13/67 | -10 |
 | `case-v8` | output_mismatch | 3/67 | 13/67 | -10 |
 | `targetPath-v6` | output_mismatch | 3/23 | 9/23 | -6 |
@@ -173,8 +173,13 @@
 | `flash-v6` | output_mismatch | 3/10 | 7/10 | -4 |
 | `flash-v7` | output_mismatch | 3/10 | 7/10 | -4 |
 | `AsBroadcaster-v5` | output_mismatch | 5/11 | 8/11 | -3 |
+| `AsBroadcaster-v7` | output_mismatch | 86/121 | 87/121 | -1 |
+| `AsBroadcaster-v8` | output_mismatch | 86/121 | 87/121 | -1 |
 | `LocalConnection-v5` | output_mismatch | 3/7 | 4/7 | -1 |
 | `NetConnection-v5` | output_mismatch | 3/7 | 4/7 | -1 |
+| `Selection-v6` | output_mismatch | 109/125 | 110/125 | -1 |
+| `Selection-v7` | output_mismatch | 110/125 | 111/125 | -1 |
+| `Selection-v8` | output_mismatch | 110/125 | 111/125 | -1 |
 | `Transform-v6` | output_mismatch | 3/7 | 4/7 | -1 |
 | `Transform-v7` | output_mismatch | 3/7 | 4/7 | -1 |
 | `Video-v5` | output_mismatch | 3/7 | 4/7 | -1 |
