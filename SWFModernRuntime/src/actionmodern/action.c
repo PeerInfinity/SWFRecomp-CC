@@ -5255,6 +5255,8 @@ static ASFunction g_wrapper_valueOf_func;
 static ASFunction g_prim_wrapper_toString_func;
 static int g_wrapper_funcs_init = 0;
 
+static void setupNativeFuncOwnProps(SWFAppContext* app_context, ASFunction* func);
+
 // Get or create the global Object.prototype
 static ASObject* getObjectPrototype(SWFAppContext* app_context)
 {
@@ -5401,6 +5403,20 @@ static ASObject* getObjectPrototype(SWFAppContext* app_context)
 			ActionVar fv = {0}; fv.type = ACTION_STACK_VALUE_FUNCTION;
 			fv.data.numeric_value = (u64) &g_object_toLocaleString_func;
 			setProperty(app_context, g_object_prototype, "toLocaleString", 14, &fv);
+
+			// Set up own_props (constructor + __proto__) and no_lazy_prototype on all
+			// Object.prototype method functions. This prevents lazy prototype creation
+			// (so `func.prototype` returns undefined) and gives each function its own
+			// __proto__ + constructor for proper enumeration in global_proto_decls.
+			setupNativeFuncOwnProps(app_context, &g_object_watch_func);
+			setupNativeFuncOwnProps(app_context, &g_object_unwatch_func);
+			setupNativeFuncOwnProps(app_context, &g_object_addProperty_func);
+			setupNativeFuncOwnProps(app_context, &g_object_valueOf_func);
+			setupNativeFuncOwnProps(app_context, &g_object_toString_func);
+			setupNativeFuncOwnProps(app_context, &g_object_hasOwnProperty_func);
+			setupNativeFuncOwnProps(app_context, &g_object_isPrototypeOf_func);
+			setupNativeFuncOwnProps(app_context, &g_object_isPropertyEnumerable_func);
+			setupNativeFuncOwnProps(app_context, &g_object_toLocaleString_func);
 		}
 
 		// Mark all built-in Object.prototype properties as non-enumerable (DontEnum)
