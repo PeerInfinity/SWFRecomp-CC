@@ -30914,8 +30914,8 @@ static int checkInstanceOf(ActionVar* obj_var, ActionVar* ctor_var)
 	{
 		// ASArray has a different memory layout from ASObject — use arr->props
 		ASArray* arr = (ASArray*) obj_var->data.numeric_value;
-		if (arr == NULL || arr->props == NULL) return 0;
-		obj = arr->props;
+		if (arr == NULL) return 0;
+		obj = arr->props;  // May be NULL — handled below with virtual Array.prototype
 	}
 	else
 	{
@@ -30925,6 +30925,27 @@ static int checkInstanceOf(ActionVar* obj_var, ActionVar* ctor_var)
 	// Walk up the object's prototype chain via __proto__ property
 	// Start with the object's __proto__
 	ActionVar* current_proto_var = (obj != NULL) ? getProperty(obj, "__proto__", 9) : NULL;
+
+	// For ARRAY objects with no props (or props without __proto__), use virtual Array.prototype
+	if (obj_var->type == ACTION_STACK_VALUE_ARRAY &&
+	    (current_proto_var == NULL || current_proto_var->type != ACTION_STACK_VALUE_OBJECT))
+	{
+		if (g_array_prototype != NULL) {
+			if (ctor_proto == g_array_prototype) return 1;
+			// Walk Array.prototype chain for parent constructors (e.g. Object)
+			ActionVar* _ap = getProperty(g_array_prototype, "__proto__", 9);
+			ASObject* _walk = (_ap && _ap->type == ACTION_STACK_VALUE_OBJECT) ? (ASObject*)_ap->data.numeric_value : NULL;
+			int _d = 0;
+			while (_walk && _d < 100) {
+				if (_walk == ctor_proto) return 1;
+				ActionVar* _next = getProperty(_walk, "__proto__", 9);
+				if (!_next || _next->type != ACTION_STACK_VALUE_OBJECT) break;
+				_walk = (ASObject*)_next->data.numeric_value;
+				_d++;
+			}
+		}
+		return 0;
+	}
 
 	// For FUNCTION objects, if own_props doesn't have __proto__, use virtual Function.prototype
 	if (obj_is_function && (current_proto_var == NULL || current_proto_var->type == ACTION_STACK_VALUE_UNDEFINED)) {
@@ -31137,6 +31158,9 @@ static int instanceOfCoercing(SWFAppContext* app_context, ActionVar* obj_var, Ac
 	} else if (obj_var->type == ACTION_STACK_VALUE_ARRAY) {
 		ASArray* arr = (ASArray*) obj_var->data.numeric_value;
 		obj = arr ? arr->props : NULL;
+		// Arrays with no props have a virtual Array.prototype chain
+		if (obj == NULL && g_array_prototype != NULL)
+			virtual_proto = g_array_prototype;
 	}
 	if (obj == NULL && virtual_proto == NULL) return 0;
 
