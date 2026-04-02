@@ -219,7 +219,8 @@ jobs:
           name: ruffle-test-results
           path: |
             ruffle-tests/tests/swfs/**/_results/
-            ruffle-tests/results-index.md
+            RUFFLE_RESULTS.md
+            RUFFLE_RESULTS_FILTERED.md
           retention-days: 90
           if-no-files-found: ignore
 
@@ -238,7 +239,7 @@ jobs:
             mkdir -p "$tmp_dir"
             cp "$dir"/*.json "$dir"/*.md "$tmp_dir/" 2>/dev/null || true
           done
-          cp ruffle-tests/results-index.md /tmp/results_backup/ 2>/dev/null || true
+          cp RUFFLE_RESULTS.md RUFFLE_RESULTS_FILTERED.md /tmp/results_backup/ 2>/dev/null || true
 
           git config user.name "github-actions[bot]"
           git config user.email "github-actions[bot]@users.noreply.github.com"
@@ -246,16 +247,25 @@ jobs:
 
           git checkout -b ruffle-test-results
 
+          # Remove stale files from old workflow layout
+          for f in ruffle-results.md ruffle-results-diff.md ruffle-results-filtered.md \
+                   ruffle-results-headless.md ruffle-image-results.md \
+                   ruffle-tests/results.json ruffle-tests/results_diff.json \
+                   ruffle-tests/results_filtered.json ruffle-tests/image_results.json \
+                   ruffle-tests/results-index.md test_results.json; do
+            git rm -f "$f" 2>/dev/null || true
+          done
+
           # Restore results
           find /tmp/results_backup/ruffle-tests/tests/swfs -path '*/_results' -type d 2>/dev/null | while read dir; do
             real_dir="${dir#/tmp/results_backup/}"
             mkdir -p "$real_dir"
             cp "$dir"/* "$real_dir/" 2>/dev/null || true
           done
-          cp /tmp/results_backup/results-index.md ruffle-tests/ 2>/dev/null || true
+          cp /tmp/results_backup/RUFFLE_RESULTS.md /tmp/results_backup/RUFFLE_RESULTS_FILTERED.md . 2>/dev/null || true
 
           find ruffle-tests/tests/swfs -path '*/_results/*.json' -o -path '*/_results/*.md' | xargs git add -f 2>/dev/null || true
-          git add -f ruffle-tests/results-index.md 2>/dev/null || true
+          git add -f RUFFLE_RESULTS.md RUFFLE_RESULTS_FILTERED.md 2>/dev/null || true
 
           if git diff --staged --quiet; then
             echo "No changes to commit"
@@ -663,7 +673,8 @@ jobs:
           name: ruffle-test-results
           path: |
             ruffle-tests/tests/swfs/**/_results/
-            ruffle-tests/results-index.md
+            RUFFLE_RESULTS.md
+            RUFFLE_RESULTS_FILTERED.md
           retention-days: 90
           if-no-files-found: ignore
 
@@ -682,7 +693,7 @@ jobs:
             mkdir -p "$tmp_dir"
             cp "$dir"/*.json "$dir"/*.md "$tmp_dir/" 2>/dev/null || true
           done
-          cp ruffle-tests/results-index.md /tmp/results_backup/ 2>/dev/null || true
+          cp RUFFLE_RESULTS.md RUFFLE_RESULTS_FILTERED.md /tmp/results_backup/ 2>/dev/null || true
 
           git config user.name "github-actions[bot]"
           git config user.email "github-actions[bot]@users.noreply.github.com"
@@ -690,16 +701,25 @@ jobs:
 
           git checkout -b ruffle-test-results
 
+          # Remove stale files from old workflow layout
+          for f in ruffle-results.md ruffle-results-diff.md ruffle-results-filtered.md \
+                   ruffle-results-headless.md ruffle-image-results.md \
+                   ruffle-tests/results.json ruffle-tests/results_diff.json \
+                   ruffle-tests/results_filtered.json ruffle-tests/image_results.json \
+                   ruffle-tests/results-index.md test_results.json; do
+            git rm -f "$f" 2>/dev/null || true
+          done
+
           # Restore results
           find /tmp/results_backup/ruffle-tests/tests/swfs -path '*/_results' -type d 2>/dev/null | while read dir; do
             real_dir="${dir#/tmp/results_backup/}"
             mkdir -p "$real_dir"
             cp "$dir"/* "$real_dir/" 2>/dev/null || true
           done
-          cp /tmp/results_backup/results-index.md ruffle-tests/ 2>/dev/null || true
+          cp /tmp/results_backup/RUFFLE_RESULTS.md /tmp/results_backup/RUFFLE_RESULTS_FILTERED.md . 2>/dev/null || true
 
           find ruffle-tests/tests/swfs -path '*/_results/*.json' -o -path '*/_results/*.md' | xargs git add -f 2>/dev/null || true
-          git add -f ruffle-tests/results-index.md 2>/dev/null || true
+          git add -f RUFFLE_RESULTS.md RUFFLE_RESULTS_FILTERED.md 2>/dev/null || true
 
           if git diff --staged --quiet; then
             echo "No changes to commit"
