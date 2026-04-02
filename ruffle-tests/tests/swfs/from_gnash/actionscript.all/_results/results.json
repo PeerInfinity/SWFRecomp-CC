@@ -1,8 +1,8 @@
 {
   "metadata": {
-    "timestamp": "2026-04-02T18:29:55.921800+00:00",
-    "git_sha": "4cfa1f44f15f0d9f73241e70e732bf66981a9ccc",
-    "duration_seconds": 3903.66,
+    "timestamp": "2026-04-02T18:56:08.123713+00:00",
+    "git_sha": "4521f069f0696b80e38641a3fb42f5a118d82f8b",
+    "duration_seconds": 3936.54,
     "total_available": 190,
     "shards": 30,
     "expected_shards": 30
@@ -23,7 +23,7 @@
         "expected_lines": 107,
         "matching_lines": 3
       },
-      "duration": 21.1,
+      "duration": 21.45,
       "status": "output_mismatch",
       "detail": "104 line(s) differ (actual=3, expected=107)",
       "actual_output": "SWF5\n\n[ASnative.as debug-22403-05c7ba106]",
@@ -37,7 +37,7 @@
         "expected_lines": 110,
         "matching_lines": 3
       },
-      "duration": 21.06,
+      "duration": 21.65,
       "status": "output_mismatch",
       "detail": "107 line(s) differ (actual=3, expected=110)",
       "actual_output": "SWF6\n\n[ASnative.as debug-22403-05c7ba106]",
@@ -51,7 +51,7 @@
         "expected_lines": 110,
         "matching_lines": 3
       },
-      "duration": 21.22,
+      "duration": 21.82,
       "status": "output_mismatch",
       "detail": "107 line(s) differ (actual=3, expected=110)",
       "actual_output": "SWF7\n\n[ASnative.as debug-22403-05c7ba106]",
@@ -65,7 +65,7 @@
         "expected_lines": 110,
         "matching_lines": 3
       },
-      "duration": 21.14,
+      "duration": 21.51,
       "status": "output_mismatch",
       "detail": "107 line(s) differ (actual=3, expected=110)",
       "actual_output": "SWF8\n\n[ASnative.as debug-22403-05c7ba106]",
@@ -79,7 +79,7 @@
         "expected_lines": 15,
         "matching_lines": 3
       },
-      "duration": 17.74,
+      "duration": 18.41,
       "status": "output_mismatch",
       "detail": "12 line(s) differ (actual=3, expected=15)",
       "actual_output": "SWF5\n\n[Accessibility.as debug-22403-05c7ba106]",
@@ -93,7 +93,7 @@
         "expected_lines": 19,
         "matching_lines": 3
       },
-      "duration": 17.84,
+      "duration": 18.97,
       "status": "output_mismatch",
       "detail": "16 line(s) differ (actual=3, expected=19)",
       "actual_output": "SWF6\n\n[Accessibility.as debug-22403-05c7ba106]",
@@ -107,7 +107,7 @@
         "expected_lines": 19,
         "matching_lines": 3
       },
-      "duration": 17.82,
+      "duration": 18.43,
       "status": "output_mismatch",
       "detail": "16 line(s) differ (actual=3, expected=19)",
       "actual_output": "SWF7\n\n[Accessibility.as debug-22403-05c7ba106]",
@@ -121,7 +121,7 @@
         "expected_lines": 19,
         "matching_lines": 3
       },
-      "duration": 18.03,
+      "duration": 18.59,
       "status": "output_mismatch",
       "detail": "16 line(s) differ (actual=3, expected=19)",
       "actual_output": "SWF8\n\n[Accessibility.as debug-22403-05c7ba106]",
@@ -135,7 +135,7 @@
         "expected_lines": 11,
         "matching_lines": 5
       },
-      "duration": 17.69,
+      "duration": 18.71,
       "status": "output_mismatch",
       "detail": "6 line(s) differ (actual=5, expected=11)",
       "actual_output": "SWF5\n\n[AsBroadcaster.as debug-22403-05c7ba106]\nundefined\nAsBroadcaster exists but doesn't provide any 'prototype' or 'initialize' for SWF < 6",
@@ -149,7 +149,7 @@
         "expected_lines": 121,
         "matching_lines": 3
       },
-      "duration": 20.94,
+      "duration": 21.57,
       "status": "output_mismatch",
       "detail": "118 line(s) differ (actual=3, expected=121)",
       "actual_output": "SWF6\n\n[AsBroadcaster.as debug-22403-05c7ba106]",
@@ -163,7 +163,7 @@
         "expected_lines": 121,
         "matching_lines": 86
       },
-      "duration": 20.7,
+      "duration": 21.55,
       "status": "output_mismatch",
       "detail": "35 line(s) differ (actual=121, expected=121)",
       "actual_output": "... (22 lines before) ...\nPASSED: typeof(bcast._listeners) == 'undefined' [./AsBroadcaster.as:68]\nPASSED: typeof(bcast.addListener) == 'undefined' [./AsBroadcaster.as:69]\nPASSED: typeof(bcast.removeListener) == 'undefined' [./AsBroadcaster.as:70]\nPASSED: typeof(bcast.broadcastMessage) == 'undefined' [./AsBroadcaster.as:71]\nPASSED: typeof(bcast._listeners) == 'object' [./AsBroadcaster.as:75]\nFAILED: bcast._listeners instanceof Array [./AsBroadcaster.as:76]\nPASSED: bcast._listeners.length == 0 [./AsBroadcaster.as:77]\nPASSED: typeof(bcast.addListener) == 'function' [./AsBroadcaster.as:78]\nPASSED: typeof(bcast.removeListener) == 'function' [./AsBroadcaster.as:79]\nPASSED: typeof(bcast.broadcastMessage) == 'function' [./AsBroadcaster.as:80]\nPASSED: bob._listeners == 5 [./AsBroadcaster.as:83]\nPASSED: bob.addListener == \"string\" [./AsBroadcaster.as:84]\nPASSED: typeof(bob._listeners) == \"object\" [./AsBroadcaster.as:86]\nPASSED: typeof(bob.addListener) == \"function\" [./AsBroadcaster.as:87]\nPASSED: typeof(ret) == 'boolean' [./AsBroadcaster.as:94]\nPASSED: ret == true [./AsBroadcaster.as:95]\nPASSED: bcast._listeners.length == 1 [./AsBroadcaster.as:96]\nPASSED: bcast._listeners.length == 1 [./AsBroadcaster.as:99]\nPASSED: typeof(ret) == 'boolean' [./AsBroadcaster.as:102]\nPASSED: ret == true [./AsBroadcaster.as:103]\nPASSED: bcast._listeners.length == 2 [./AsBroadcaster.as:104]\nPASSED: bcast._listeners.length == 2 [./AsBroadcaster.as:107]\nPASSED: bcast._listeners.length == 3 [./AsBroadcaster.as:109]\nPASSED: typeof(ret) == 'boolean' [./AsBroadcaster.as:112]\nPASSED: ret == true [./AsBroadcaster.as:113]\nPASSED: bcast._listeners.length == 2 [./AsBroadcaster.as:114]\nPASSED: typeof(ret) == 'boolean' [./AsBroadcaster.as:117]\nPASSED: ret == true [./AsBroadcaster.as:118]\nPASSED: bcast._listeners.length == 1 [./AsBroadcaster.as:119]\nPASSED: typeof(ret) == 'boolean' [./AsBroadcaster.as:122]\nPASSED: ret == true [./AsBroadcaster.as:123]\nPASSED: bcast._listeners.length == 0 [./AsBroadcaster.as:124]\nPASSED: typeof(ret) == 'boolean' [./AsBroadcaster.as:127]\nPASSED: ret == false [./AsBroadcaster.as:128]\nPASSED: bcast._listeners.length == 1 [./AsBroadcaster.as:132]\nPASSED: typeof(ret) == 'boolean' [./AsBroadcaster.as:134]\nFAILED: expected: true obtained: false [./AsBroadcaster.as:135]\nFAILED: expected: 0 obtained: 1 [./AsBroadcaster.as:136]\nPASSED: typeof(o._listeners) == 'undefined' [./AsBroadcaster.as:139]\nPASSED: typeof(o.removeListenerCalled) == 'undefined' [./AsBroadcaster.as:140]\nPASSED: typeof(ret) == 'boolean' [./AsBroadcaster.as:142]\nPASSED: ret == true [./AsBroadcaster.as:143]\nFAILED: expected: 'undefined' obtained: object [./AsBroadcaster.as:144]\nPASSED: typeof(ret) == 'boolean' [./AsBroadcaster.as:148]\nPASSED: ret == true [./AsBroadcaster.as:149]\nFAILED: expected: 'undefined' obtained: object [./AsBroadcaster.as:150]\nFAILED: expected: 'boolean' obtained: undefined [./AsBroadcaster.as:151]\nFAILED: expected: true obtained: undefined [./AsBroadcaster.as:152]\nFAILED: expected: true obtained: undefined [./AsBroadcaster.as:162]\nFAILED: expected: 2 obtained: 1 [./AsBroadcaster.as:163]\n... (49 lines after) ...",
@@ -177,7 +177,7 @@
         "expected_lines": 121,
         "matching_lines": 86
       },
-      "duration": 20.75,
+      "duration": 21.52,
       "status": "output_mismatch",
       "detail": "35 line(s) differ (actual=121, expected=121)",
       "actual_output": "... (22 lines before) ...\nPASSED: typeof(bcast._listeners) == 'undefined' [./AsBroadcaster.as:68]\nPASSED: typeof(bcast.addListener) == 'undefined' [./AsBroadcaster.as:69]\nPASSED: typeof(bcast.removeListener) == 'undefined' [./AsBroadcaster.as:70]\nPASSED: typeof(bcast.broadcastMessage) == 'undefined' [./AsBroadcaster.as:71]\nPASSED: typeof(bcast._listeners) == 'object' [./AsBroadcaster.as:75]\nFAILED: bcast._listeners instanceof Array [./AsBroadcaster.as:76]\nPASSED: bcast._listeners.length == 0 [./AsBroadcaster.as:77]\nPASSED: typeof(bcast.addListener) == 'function' [./AsBroadcaster.as:78]\nPASSED: typeof(bcast.removeListener) == 'function' [./AsBroadcaster.as:79]\nPASSED: typeof(bcast.broadcastMessage) == 'function' [./AsBroadcaster.as:80]\nPASSED: bob._listeners == 5 [./AsBroadcaster.as:83]\nPASSED: bob.addListener == \"string\" [./AsBroadcaster.as:84]\nPASSED: typeof(bob._listeners) == \"object\" [./AsBroadcaster.as:86]\nPASSED: typeof(bob.addListener) == \"function\" [./AsBroadcaster.as:87]\nPASSED: typeof(ret) == 'boolean' [./AsBroadcaster.as:94]\nPASSED: ret == true [./AsBroadcaster.as:95]\nPASSED: bcast._listeners.length == 1 [./AsBroadcaster.as:96]\nPASSED: bcast._listeners.length == 1 [./AsBroadcaster.as:99]\nPASSED: typeof(ret) == 'boolean' [./AsBroadcaster.as:102]\nPASSED: ret == true [./AsBroadcaster.as:103]\nPASSED: bcast._listeners.length == 2 [./AsBroadcaster.as:104]\nPASSED: bcast._listeners.length == 2 [./AsBroadcaster.as:107]\nPASSED: bcast._listeners.length == 3 [./AsBroadcaster.as:109]\nPASSED: typeof(ret) == 'boolean' [./AsBroadcaster.as:112]\nPASSED: ret == true [./AsBroadcaster.as:113]\nPASSED: bcast._listeners.length == 2 [./AsBroadcaster.as:114]\nPASSED: typeof(ret) == 'boolean' [./AsBroadcaster.as:117]\nPASSED: ret == true [./AsBroadcaster.as:118]\nPASSED: bcast._listeners.length == 1 [./AsBroadcaster.as:119]\nPASSED: typeof(ret) == 'boolean' [./AsBroadcaster.as:122]\nPASSED: ret == true [./AsBroadcaster.as:123]\nPASSED: bcast._listeners.length == 0 [./AsBroadcaster.as:124]\nPASSED: typeof(ret) == 'boolean' [./AsBroadcaster.as:127]\nPASSED: ret == false [./AsBroadcaster.as:128]\nPASSED: bcast._listeners.length == 1 [./AsBroadcaster.as:132]\nPASSED: typeof(ret) == 'boolean' [./AsBroadcaster.as:134]\nFAILED: expected: true obtained: false [./AsBroadcaster.as:135]\nFAILED: expected: 0 obtained: 1 [./AsBroadcaster.as:136]\nPASSED: typeof(o._listeners) == 'undefined' [./AsBroadcaster.as:139]\nPASSED: typeof(o.removeListenerCalled) == 'undefined' [./AsBroadcaster.as:140]\nPASSED: typeof(ret) == 'boolean' [./AsBroadcaster.as:142]\nPASSED: ret == true [./AsBroadcaster.as:143]\nFAILED: expected: 'undefined' obtained: object [./AsBroadcaster.as:144]\nPASSED: typeof(ret) == 'boolean' [./AsBroadcaster.as:148]\nPASSED: ret == true [./AsBroadcaster.as:149]\nFAILED: expected: 'undefined' obtained: object [./AsBroadcaster.as:150]\nFAILED: expected: 'boolean' obtained: undefined [./AsBroadcaster.as:151]\nFAILED: expected: true obtained: undefined [./AsBroadcaster.as:152]\nFAILED: expected: true obtained: undefined [./AsBroadcaster.as:162]\nFAILED: expected: 2 obtained: 1 [./AsBroadcaster.as:163]\n... (49 lines after) ...",
@@ -191,7 +191,7 @@
         "expected_lines": 7,
         "matching_lines": 3
       },
-      "duration": 17.92,
+      "duration": 18.77,
       "status": "output_mismatch",
       "detail": "4 line(s) differ (actual=3, expected=7)",
       "actual_output": "SWF5\n\n[BitmapData.as debug-22403-05c7ba106]",
@@ -205,7 +205,7 @@
         "expected_lines": 7,
         "matching_lines": 3
       },
-      "duration": 17.76,
+      "duration": 18.68,
       "status": "output_mismatch",
       "detail": "4 line(s) differ (actual=3, expected=7)",
       "actual_output": "SWF6\n\n[BitmapData.as debug-22403-05c7ba106]",
@@ -219,7 +219,7 @@
         "expected_lines": 7,
         "matching_lines": 3
       },
-      "duration": 19.17,
+      "duration": 20.07,
       "status": "output_mismatch",
       "detail": "4 line(s) differ (actual=3, expected=7)",
       "actual_output": "SWF7\n\n[BitmapData.as debug-22403-05c7ba106]",
@@ -233,7 +233,7 @@
         "expected_lines": 417,
         "matching_lines": 3
       },
-      "duration": 41.53,
+      "duration": 43.43,
       "status": "output_mismatch",
       "detail": "414 line(s) differ (actual=4, expected=417)",
       "actual_output": "SWF8\n\n[BitmapData.as debug-22403-05c7ba106]\n0 170",
@@ -247,7 +247,7 @@
         "expected_lines": 38,
         "matching_lines": 3
       },
-      "duration": 19.72,
+      "duration": 21.94,
       "status": "output_mismatch",
       "detail": "35 line(s) differ (actual=3, expected=38)",
       "actual_output": "SWF5\n\n[Boolean.as debug-22403-05c7ba106]",
@@ -261,7 +261,7 @@
         "expected_lines": 38,
         "matching_lines": 3
       },
-      "duration": 19.69,
+      "duration": 19.72,
       "status": "output_mismatch",
       "detail": "35 line(s) differ (actual=3, expected=38)",
       "actual_output": "SWF6\n\n[Boolean.as debug-22403-05c7ba106]",
@@ -275,7 +275,7 @@
         "expected_lines": 38,
         "matching_lines": 3
       },
-      "duration": 19.49,
+      "duration": 22.23,
       "status": "output_mismatch",
       "detail": "35 line(s) differ (actual=3, expected=38)",
       "actual_output": "SWF7\n\n[Boolean.as debug-22403-05c7ba106]",
@@ -289,7 +289,7 @@
         "expected_lines": 38,
         "matching_lines": 3
       },
-      "duration": 19.62,
+      "duration": 18.82,
       "status": "output_mismatch",
       "detail": "35 line(s) differ (actual=3, expected=38)",
       "actual_output": "SWF8\n\n[Boolean.as debug-22403-05c7ba106]",
@@ -303,7 +303,7 @@
         "expected_lines": 7,
         "matching_lines": 3
       },
-      "duration": 19.09,
+      "duration": 21.65,
       "status": "output_mismatch",
       "detail": "4 line(s) differ (actual=3, expected=7)",
       "actual_output": "SWF5\n\n[Camera.as debug-22403-05c7ba106]",
@@ -317,7 +317,7 @@
         "expected_lines": 90,
         "matching_lines": 33
       },
-      "duration": 19.47,
+      "duration": 19.78,
       "status": "output_mismatch",
       "detail": "57 line(s) differ (actual=90, expected=90)",
       "actual_output": "... (20 lines before) ...\nPASSED: !Camera.prototype.hasOwnProperty(\"muted\") [./Camera.as:63]\nPASSED: !Camera.prototype.hasOwnProperty(\"name\") [./Camera.as:64]\nPASSED: !Camera.prototype.hasOwnProperty(\"quality\") [./Camera.as:65]\nPASSED: Camera.get [./Camera.as:70]\nPASSED: cameraObj.get == undefined [./Camera.as:71]\nCamera.get() returns: \nPASSED: !Camera.prototype.hasOwnProperty(\"names\") [./Camera.as:78]\nPASSED: !Camera.prototype.hasOwnProperty(\"get\") [./Camera.as:79]\nPASSED: !Camera.prototype.hasOwnProperty(\"activityLevel\") [./Camera.as:98]\nPASSED: !Camera.prototype.hasOwnProperty(\"bandwidth\") [./Camera.as:99]\nPASSED: !Camera.prototype.hasOwnProperty(\"currentFps\") [./Camera.as:100]\nPASSED: !Camera.prototype.hasOwnProperty(\"fps\") [./Camera.as:101]\nPASSED: !Camera.prototype.hasOwnProperty(\"height\") [./Camera.as:102]\nPASSED: !Camera.prototype.hasOwnProperty(\"index\") [./Camera.as:103]\nPASSED: !Camera.prototype.hasOwnProperty(\"width\") [./Camera.as:104]\nPASSED: !Camera.prototype.hasOwnProperty(\"motionLevel\") [./Camera.as:105]\nPASSED: !Camera.prototype.hasOwnProperty(\"motionTimeout\") [./Camera.as:106]\nPASSED: !Camera.prototype.hasOwnProperty(\"muted\") [./Camera.as:107]\nPASSED: !Camera.prototype.hasOwnProperty(\"name\") [./Camera.as:108]\nPASSED: !Camera.prototype.hasOwnProperty(\"quality\") [./Camera.as:109]\nPASSED: Camera.setMode == undefined [./Camera.as:113]\nPASSED: Camera.setMotionLevel == undefined [./Camera.as:114]\nPASSED: Camera.setQuality == undefined [./Camera.as:115]\nPASSED: Camera.setCursor == undefined [./Camera.as:116]\nFAILED: expected: 'function' obtained: undefined [./Camera.as:118]\nFAILED: expected: 'function' obtained: undefined [./Camera.as:119]\nFAILED: expected: 'function' obtained: undefined [./Camera.as:120]\nFAILED: expected: 'function' obtained: undefined [./Camera.as:121]\nFAILED: expected: 'function' obtained: undefined [./Camera.as:122]\nFAILED: expected: 'function' obtained: undefined [./Camera.as:123]\nFAILED: expected: 'number' obtained: undefined [./Camera.as:126]\nFAILED: expected: 'number' obtained: undefined [./Camera.as:127]\nFAILED: expected: 'number' obtained: undefined [./Camera.as:128]\nFAILED: expected: 'number' obtained: undefined [./Camera.as:129]\nFAILED: expected: 'number' obtained: undefined [./Camera.as:130]\nFAILED: expected: 'string' obtained: undefined [./Camera.as:131]\nFAILED: expected: 'number' obtained: undefined [./Camera.as:132]\nFAILED: expected: 'number' obtained: undefined [./Camera.as:133]\nFAILED: expected: 'boolean' obtained: undefined [./Camera.as:134]\nFAILED: expected: 'string' obtained: undefined [./Camera.as:135]\nPASSED: typeof(cam.names) == 'undefined' [./Camera.as:136]\nFAILED: expected: 'number' obtained: undefined [./Camera.as:137]\nFAILED: expected: 'number' obtained: undefined [./Camera.as:138]\nFAILED: expected: -1 obtained:  [./Camera.as:141]\nFAILED: expected: 16384 obtained:  [./Camera.as:142]\nFAILED: expected: 120 obtained:  [./Camera.as:143]\nFAILED: expected: 50 obtained:  [./Camera.as:144]\nFAILED: expected: 2000 obtained:  [./Camera.as:145]\nFAILED: expected: true obtained:  [./Camera.as:146]\nFAILED: expected: 160 obtained:  [./Camera.as:147]\n... (20 lines after) ...",
@@ -331,7 +331,7 @@
         "expected_lines": 90,
         "matching_lines": 3
       },
-      "duration": 19.39,
+      "duration": 19.73,
       "status": "output_mismatch",
       "detail": "87 line(s) differ (actual=4, expected=90)",
       "actual_output": "SWF7\n\n[Camera.as debug-22403-05c7ba106]\nCamera.get() returns: undefined",
@@ -345,7 +345,7 @@
         "expected_lines": 90,
         "matching_lines": 3
       },
-      "duration": 19.37,
+      "duration": 19.88,
       "status": "output_mismatch",
       "detail": "87 line(s) differ (actual=4, expected=90)",
       "actual_output": "SWF8\n\n[Camera.as debug-22403-05c7ba106]\nCamera.get() returns: undefined",
@@ -359,7 +359,7 @@
         "expected_lines": 140,
         "matching_lines": 3
       },
-      "duration": 20.65,
+      "duration": 21.13,
       "status": "output_mismatch",
       "detail": "137 line(s) differ (actual=3, expected=140)",
       "actual_output": "SWF5\n\n[Color.as debug-22403-05c7ba106]",
@@ -373,7 +373,7 @@
         "expected_lines": 171,
         "matching_lines": 3
       },
-      "duration": 21.82,
+      "duration": 22.45,
       "status": "output_mismatch",
       "detail": "168 line(s) differ (actual=3, expected=171)",
       "actual_output": "SWF6\n\n[Color.as debug-22403-05c7ba106]",
@@ -387,7 +387,7 @@
         "expected_lines": 161,
         "matching_lines": 3
       },
-      "duration": 21.63,
+      "duration": 22.04,
       "status": "output_mismatch",
       "detail": "158 line(s) differ (actual=3, expected=161)",
       "actual_output": "SWF7\n\n[Color.as debug-22403-05c7ba106]",
@@ -401,7 +401,7 @@
         "expected_lines": 161,
         "matching_lines": 3
       },
-      "duration": 21.35,
+      "duration": 22.0,
       "status": "output_mismatch",
       "detail": "158 line(s) differ (actual=3, expected=161)",
       "actual_output": "SWF8\n\n[Color.as debug-22403-05c7ba106]",
@@ -415,7 +415,7 @@
         "expected_lines": 7,
         "matching_lines": 3
       },
-      "duration": 18.33,
+      "duration": 18.63,
       "status": "output_mismatch",
       "detail": "4 line(s) differ (actual=3, expected=7)",
       "actual_output": "SWF5\n\n[ColorTransform.as debug-22403-05c7ba106]",
@@ -429,7 +429,7 @@
         "expected_lines": 7,
         "matching_lines": 3
       },
-      "duration": 18.26,
+      "duration": 18.7,
       "status": "output_mismatch",
       "detail": "4 line(s) differ (actual=3, expected=7)",
       "actual_output": "SWF6\n\n[ColorTransform.as debug-22403-05c7ba106]",
@@ -443,7 +443,7 @@
         "expected_lines": 7,
         "matching_lines": 3
       },
-      "duration": 18.38,
+      "duration": 18.66,
       "status": "output_mismatch",
       "detail": "4 line(s) differ (actual=3, expected=7)",
       "actual_output": "SWF7\n\n[ColorTransform.as debug-22403-05c7ba106]",
@@ -457,7 +457,7 @@
         "expected_lines": 55,
         "matching_lines": 3
       },
-      "duration": 19.52,
+      "duration": 19.89,
       "status": "output_mismatch",
       "detail": "52 line(s) differ (actual=3, expected=55)",
       "actual_output": "SWF8\n\n[ColorTransform.as debug-22403-05c7ba106]",
@@ -471,7 +471,7 @@
         "expected_lines": 7,
         "matching_lines": 3
       },
-      "duration": 18.17,
+      "duration": 18.71,
       "status": "output_mismatch",
       "detail": "4 line(s) differ (actual=3, expected=7)",
       "actual_output": "SWF5\n\n[ContextMenu.as debug-22403-05c7ba106]",
@@ -485,7 +485,7 @@
         "expected_lines": 7,
         "matching_lines": 3
       },
-      "duration": 18.13,
+      "duration": 18.5,
       "status": "output_mismatch",
       "detail": "4 line(s) differ (actual=3, expected=7)",
       "actual_output": "SWF6\n\n[ContextMenu.as debug-22403-05c7ba106]",
@@ -499,7 +499,7 @@
         "expected_lines": 131,
         "matching_lines": 3
       },
-      "duration": 21.04,
+      "duration": 21.16,
       "status": "output_mismatch",
       "detail": "128 line(s) differ (actual=4, expected=131)",
       "actual_output": "SWF7\n\n[ContextMenu.as debug-22403-05c7ba106]\nf",
@@ -513,7 +513,7 @@
         "expected_lines": 131,
         "matching_lines": 3
       },
-      "duration": 20.74,
+      "duration": 20.46,
       "status": "output_mismatch",
       "detail": "128 line(s) differ (actual=4, expected=131)",
       "actual_output": "SWF8\n\n[ContextMenu.as debug-22403-05c7ba106]\nf",
@@ -527,7 +527,7 @@
         "expected_lines": 28,
         "matching_lines": 3
       },
-      "duration": 18.45,
+      "duration": 18.17,
       "status": "output_mismatch",
       "detail": "25 line(s) differ (actual=3, expected=28)",
       "actual_output": "SWF5\n\n[Error.as debug-22403-05c7ba106]",
@@ -541,7 +541,7 @@
         "expected_lines": 31,
         "matching_lines": 3
       },
-      "duration": 18.24,
+      "duration": 18.3,
       "status": "output_mismatch",
       "detail": "28 line(s) differ (actual=3, expected=31)",
       "actual_output": "SWF6\n\n[Error.as debug-22403-05c7ba106]",
@@ -555,7 +555,7 @@
         "expected_lines": 31,
         "matching_lines": 3
       },
-      "duration": 18.38,
+      "duration": 18.29,
       "status": "output_mismatch",
       "detail": "28 line(s) differ (actual=3, expected=31)",
       "actual_output": "SWF7\n\n[Error.as debug-22403-05c7ba106]",
@@ -569,7 +569,7 @@
         "expected_lines": 31,
         "matching_lines": 3
       },
-      "duration": 18.87,
+      "duration": 18.27,
       "status": "output_mismatch",
       "detail": "28 line(s) differ (actual=3, expected=31)",
       "actual_output": "SWF8\n\n[Error.as debug-22403-05c7ba106]",
@@ -583,7 +583,7 @@
         "expected_lines": 7,
         "matching_lines": 3
       },
-      "duration": 18.36,
+      "duration": 18.11,
       "status": "output_mismatch",
       "detail": "4 line(s) differ (actual=3, expected=7)",
       "actual_output": "SWF5\n\n[ debug-22403-05c7ba106]",
@@ -597,7 +597,7 @@
         "expected_lines": 55,
         "matching_lines": 3
       },
-      "duration": 19.21,
+      "duration": 18.69,
       "status": "output_mismatch",
       "detail": "52 line(s) differ (actual=3, expected=55)",
       "actual_output": "SWF6\n\n[ debug-22403-05c7ba106]",
@@ -611,7 +611,7 @@
         "expected_lines": 55,
         "matching_lines": 3
       },
-      "duration": 18.6,
+      "duration": 18.34,
       "status": "output_mismatch",
       "detail": "52 line(s) differ (actual=3, expected=55)",
       "actual_output": "SWF7\n\n[undefined debug-22403-05c7ba106]",
@@ -625,7 +625,7 @@
         "expected_lines": 118,
         "matching_lines": 113
       },
-      "duration": 21.1,
+      "duration": 20.07,
       "status": "output_mismatch",
       "detail": "5 line(s) differ (actual=118, expected=118)",
       "actual_output": "... (74 lines before) ...\nPASSED: typeof(r._objectToXML) == 'undefined' [./ExternalInterface.as:172]\nPASSED: typeof(r._toAS) == 'undefined' [./ExternalInterface.as:173]\nPASSED: typeof(r._toJS) == 'undefined' [./ExternalInterface.as:174]\nPASSED: typeof(r._toXML) == 'undefined' [./ExternalInterface.as:175]\nPASSED: typeof(r._unescapeXML) == 'undefined' [./ExternalInterface.as:176]\nFAILED: expected: '<object></object>' obtained: <object><property id=\"setTrailerMode\"><null/></property><property id=\"setTrailerPosition\"><null/></property><property id=\"setTrailer\"><null/></property><property id=\"hide\"><null/></property><property id=\"show\"><null/></property><property id=\"broadcastMessage\"><null/></property><property id=\"removeListener\"><null/></property><property id=\"addListener\"><null/></property><property id=\"_listeners\"><array></array></property></object> [./ExternalInterface.as:179]\nPASSED: xml == '<object><property id=\"a\"><number>1</number></property><property id=\"b\"><string>string</string></property></object>' [./ExternalInterface.as:185]\nPASSED: xml == '<object><property id=\"a\"><number>1</number></property><property id=\"b\"><string>string</string></property></object>' [./ExternalInterface.as:188]\nPASSED: xml == '<object><property id=\"o\"><object><property id=\"a\"><number>1</number></property><property id=\"b\"><string>string</string></property></object></property></object>' [./ExternalInterface.as:194]\nPASSED: xml == '<object></object>' [./ExternalInterface.as:206]\nPASSED: xml == '<object></object>' [./ExternalInterface.as:209]\nPASSED: xml == '<object></object>' [./ExternalInterface.as:212]\nPASSED: xml == '<object></object>' [./ExternalInterface.as:215]\nPASSED: xml == '<array><property id=\"0\"><number>12</number></property><property id=\"1\"><string>tr</string></property><property id=\"2\"><number>1</number></property><property id=\"3\"><undefined/></property></array>' [./ExternalInterface.as:224]\nPASSED: xml == '<arguments><string>tr</string><number>1</number><undefined/></arguments>' [./ExternalInterface.as:229]\nPASSED: xml == '<arguments></arguments>' [./ExternalInterface.as:231]\nPASSED: xml == '<arguments></arguments>' [./ExternalInterface.as:233]\nPASSED: xml == '<arguments><undefined/><undefined/></arguments>' [./ExternalInterface.as:235]\nPASSED: xml == '<arguments></arguments>' [./ExternalInterface.as:237]\nPASSED: ret == '<array><property id=\"0\"><undefined/></property><property id=\"1\"><undefined/></property></array>' [./ExternalInterface.as:242]\nPASSED: xml == \"<number>123.456</number>\" [./ExternalInterface.as:259]\nFAILED: expected: '<object><property id=\"namespaceURI\"><null/></property><property id=\"localName\"><null/></property><property id=\"prefix\"><null/></property><property id=\"previousSibling\"><null/></property><property id=\"parentNode\"><null/></property><property id=\"nodeValue\"><null/></property><property id=\"nodeType\"><number>1</number></property><property id=\"nodeName\"><null/></property><property id=\"nextSibling\"><null/></property><property id=\"lastChild\"><null/></property><property id=\"firstChild\"><null/></property><property id=\"childNodes\"><array></array></property><property id=\"attributes\"><null/></property><property id=\"getPrefixForNamespace\"><null/></property><property id=\"getNamespaceForPrefix\"><null/></property><property id=\"toString\"><null/></property><property id=\"hasChildNodes\"><null/></property><property id=\"appendChild\"><null/></property><property id=\"insertBefore\"><null/></property><property id=\"removeNode\"><null/></property><property id=\"cloneNode\"><null/></property><property id=\"xmlDecl\"><undefined/></property><property id=\"status\"><number>0</number></property><property id=\"loaded\"><undefined/></property><property id=\"ignoreWhite\"><false/></property><property id=\"docTypeDecl\"><undefined/></property><property id=\"contentType\"><string>application/x-www-form-urlencoded</string></property><property id=\"addRequestHeader\"><null/></property><property id=\"getBytesTotal\"><null/></property><property id=\"getBytesLoaded\"><null/></property><property id=\"onData\"><null/></property><property id=\"onLoad\"><null/></property><property id=\"sendAndLoad\"><null/></property><property id=\"send\"><null/></property><property id=\"load\"><null/></property><property id=\"parseXML\"><null/></property><property id=\"createTextNode\"><null/></property><property id=\"createElement\"><null/></property></object>' obtained: <object><property id=\"status\"><number>0</number></property><property id=\"contentType\"><string>application/x-www-form-urlencoded</string></property><property id=\"idMap\"><object></object></property><property id=\"namespaceURI\"><null/></property><property id=\"localName\"><null/></property><property id=\"prefix\"><null/></property><property id=\"attributes\"><object></object></property><property id=\"childNodes\"><array></array></property><property id=\"nextSibling\"><null/></property><property id=\"previousSibling\"><null/></property><property id=\"lastChild\"><null/></property><property id=\"firstChild\"><null/></property><property id=\"parentNode\"><null/></property><property id=\"nodeValue\"><null/></property><property id=\"nodeName\"><null/></property><property id=\"nodeType\"><number>1</number></property></object> [./ExternalInterface.as:265]\nPASSED: ret == rout [./ExternalInterface.as:277]\nPASSED: ret == \"& \u00df+\u00fc &nbsp; < << <>''\\\"\" [./ExternalInterface.as:286]\nPASSED: typeof(val) == 'undefined' [./ExternalInterface.as:290]\nPASSED: typeof(val) == 'undefined' [./ExternalInterface.as:293]\nPASSED: typeof(val) == 'undefined' [./ExternalInterface.as:296]\nPASSED: typeof(val) == 'undefined' [./ExternalInterface.as:299]\nPASSED: typeof(val) == 'undefined' [./ExternalInterface.as:302]\nPASSED: EI._toAS(o) == false [./ExternalInterface.as:310]\nPASSED: EI._toAS(o) == true [./ExternalInterface.as:314]\nPASSED: EI._toAS(o).toString() == \"NaN\" [./ExternalInterface.as:318]\nPASSED: EI._toAS(o) == 45 [./ExternalInterface.as:320]\nPASSED: EI._toAS(o) == 23 [./ExternalInterface.as:325]\nPASSED: EI._toAS(o) == undefined [./ExternalInterface.as:330]\nPASSED: EI._toAS(o) == undefined [./ExternalInterface.as:332]\nPASSED: EI._toAS(o) == null [./ExternalInterface.as:336]\nPASSED: EI._toAS(o) == undefined [./ExternalInterface.as:341]\nFAILED: expected: \"function\" obtained: undefined [./ExternalInterface.as:344]\nPASSED: typeOf(val) == 'object' [./ExternalInterface.as:347]\nPASSED: EI.func1 == undefined [./ExternalInterface.as:354]\n#passed: 109\n#failed: 3\n#total tests run: 112",
@@ -639,7 +639,7 @@
         "expected_lines": 210,
         "matching_lines": 3
       },
-      "duration": 24.54,
+      "duration": 23.35,
       "status": "output_mismatch",
       "detail": "207 line(s) differ (actual=3, expected=210)",
       "actual_output": "SWF6\n\n[Global.as debug-22403-05c7ba106]",
@@ -653,7 +653,7 @@
         "expected_lines": 182,
         "matching_lines": 3
       },
-      "duration": 22.78,
+      "duration": 22.2,
       "status": "output_mismatch",
       "detail": "179 line(s) differ (actual=3, expected=182)",
       "actual_output": "SWF7\n\n[Global.as debug-22403-05c7ba106]",
@@ -667,7 +667,7 @@
         "expected_lines": 169,
         "matching_lines": 3
       },
-      "duration": 23.1,
+      "duration": 21.92,
       "status": "output_mismatch",
       "detail": "166 line(s) differ (actual=3, expected=169)",
       "actual_output": "SWF8\n\n[Global.as debug-22403-05c7ba106]",
@@ -681,7 +681,7 @@
         "expected_lines": 88,
         "matching_lines": 3
       },
-      "duration": 20.59,
+      "duration": 20.93,
       "status": "output_mismatch",
       "detail": "85 line(s) differ (actual=3, expected=88)",
       "actual_output": "SWF6\n\n[HitTest.as debug-22403-05c7ba106]",
@@ -695,7 +695,7 @@
         "expected_lines": 88,
         "matching_lines": 70
       },
-      "duration": 20.81,
+      "duration": 20.56,
       "status": "output_mismatch",
       "detail": "18 line(s) differ (actual=88, expected=88)",
       "actual_output": "... (6 lines before) ...\nPASSED: a.hitTest(25, 25, false) == true [./HitTest.as:39]\nPASSED: a.hitTest(60, 60, false) == true [./HitTest.as:40]\nPASSED: a.hitTest(61, 61, false) == false [./HitTest.as:41]\nPASSED: a.hitTest(19, 19, true) == false [./HitTest.as:43]\nFAILED: expected: true obtained: false [./HitTest.as:45]\nFAILED: expected: true obtained: false [./HitTest.as:49]\nFAILED: expected: true obtained: false [./HitTest.as:50]\nPASSED: a.hitTest(60, 60, true) == false [./HitTest.as:51]\nPASSED: a.hitTest(61, 61, true) == false [./HitTest.as:52]\nPASSED: a.hitTest(25, 25, false) == true [./HitTest.as:55]\nPASSED: a.hitTest(85, 25, false) == false [./HitTest.as:56]\nFAILED: expected: true obtained: false [./HitTest.as:57]\nPASSED: a.hitTest(85, 25, true) == false [./HitTest.as:58]\nPASSED: a.hitTest(25, 25, false) == true [./HitTest.as:64]\nPASSED: a.hitTest(41, 25, false) == true [./HitTest.as:65]\nPASSED: a.hitTest(25, 25, true) == false [./HitTest.as:66]\nPASSED: a.hitTest(41, 25, true) == false [./HitTest.as:67]\nPASSED: a.hitTest(25, 25, false) == true [./HitTest.as:71]\nPASSED: a.hitTest(41, 25, false) == true [./HitTest.as:72]\nPASSED: a.hitTest(25, 25, true) == false [./HitTest.as:73]\nFAILED: expected: true obtained: false [./HitTest.as:75]\nPASSED: b.hitTest(99, 99, false) == false [./HitTest.as:89]\nPASSED: b.hitTest(100, 100, false) == true [./HitTest.as:90]\nPASSED: b.hitTest(101, 101, false) == true [./HitTest.as:91]\nPASSED: b.hitTest(120, 120, false) == true [./HitTest.as:92]\nPASSED: b.hitTest(110, 110, false) == true [./HitTest.as:93]\nPASSED: b.hitTest(151, 150, false) == false [./HitTest.as:94]\nPASSED: b.hitTest(151, 151, false) == false [./HitTest.as:95]\nPASSED: b.hitTest(151, 152, false) == false [./HitTest.as:96]\nPASSED: b.hitTest(99, 99, true) == false [./HitTest.as:98]\nPASSED: b.hitTest(100, 100, true) == false [./HitTest.as:99]\nFAILED: expected: true obtained: false [./HitTest.as:100]\nFAILED: expected: true obtained: false [./HitTest.as:101]\nFAILED: expected: true obtained: false [./HitTest.as:102]\nPASSED: b.hitTest(151, 150, true) == false [./HitTest.as:103]\nPASSED: b.hitTest(151, 151, true) == false [./HitTest.as:104]\nPASSED: b.hitTest(151, 152, true) == false [./HitTest.as:105]\nPASSED: b.hitTest(99, 99, false) == false [./HitTest.as:111]\nFAILED: expected: false obtained: true [./HitTest.as:112]\nFAILED: expected: false obtained: true [./HitTest.as:113]\nFAILED: expected: false obtained: true [./HitTest.as:114]\nFAILED: expected: false obtained: true [./HitTest.as:115]\nPASSED: b.hitTest(151, 150, false) == false [./HitTest.as:116]\nPASSED: b.hitTest(99, 99, true) == false [./HitTest.as:118]\nPASSED: b.hitTest(100, 100, true) == false [./HitTest.as:119]\nPASSED: b.hitTest(101, 101, true) == false [./HitTest.as:120]\nPASSED: b.hitTest(120, 120, true) == false [./HitTest.as:121]\nPASSED: b.hitTest(110, 110, true) == false [./HitTest.as:122]\nPASSED: b.hitTest(151, 150, true) == false [./HitTest.as:123]\nPASSED: b.hitTest(99, 199, false) == false [./HitTest.as:126]\n... (32 lines after) ...",
@@ -709,7 +709,7 @@
         "expected_lines": 88,
         "matching_lines": 71
       },
-      "duration": 21.17,
+      "duration": 21.2,
       "status": "output_mismatch",
       "detail": "17 line(s) differ (actual=88, expected=88)",
       "actual_output": "... (6 lines before) ...\nPASSED: a.hitTest(25, 25, false) == true [./HitTest.as:39]\nPASSED: a.hitTest(60, 60, false) == true [./HitTest.as:40]\nPASSED: a.hitTest(61, 61, false) == false [./HitTest.as:41]\nPASSED: a.hitTest(19, 19, true) == false [./HitTest.as:43]\nPASSED: a.hitTest(20, 20, true) == false [./HitTest.as:47]\nFAILED: expected: true obtained: false [./HitTest.as:49]\nFAILED: expected: true obtained: false [./HitTest.as:50]\nPASSED: a.hitTest(60, 60, true) == false [./HitTest.as:51]\nPASSED: a.hitTest(61, 61, true) == false [./HitTest.as:52]\nPASSED: a.hitTest(25, 25, false) == true [./HitTest.as:55]\nPASSED: a.hitTest(85, 25, false) == false [./HitTest.as:56]\nFAILED: expected: true obtained: false [./HitTest.as:57]\nPASSED: a.hitTest(85, 25, true) == false [./HitTest.as:58]\nPASSED: a.hitTest(25, 25, false) == true [./HitTest.as:64]\nPASSED: a.hitTest(41, 25, false) == true [./HitTest.as:65]\nPASSED: a.hitTest(25, 25, true) == false [./HitTest.as:66]\nPASSED: a.hitTest(41, 25, true) == false [./HitTest.as:67]\nPASSED: a.hitTest(25, 25, false) == true [./HitTest.as:71]\nPASSED: a.hitTest(41, 25, false) == true [./HitTest.as:72]\nPASSED: a.hitTest(25, 25, true) == false [./HitTest.as:73]\nPASSED: a.hitTest(41, 25, true) == false [./HitTest.as:77]\nPASSED: b.hitTest(99, 99, false) == false [./HitTest.as:89]\nPASSED: b.hitTest(100, 100, false) == true [./HitTest.as:90]\nPASSED: b.hitTest(101, 101, false) == true [./HitTest.as:91]\nPASSED: b.hitTest(120, 120, false) == true [./HitTest.as:92]\nPASSED: b.hitTest(110, 110, false) == true [./HitTest.as:93]\nPASSED: b.hitTest(151, 150, false) == false [./HitTest.as:94]\nPASSED: b.hitTest(151, 151, false) == false [./HitTest.as:95]\nPASSED: b.hitTest(151, 152, false) == false [./HitTest.as:96]\nPASSED: b.hitTest(99, 99, true) == false [./HitTest.as:98]\nPASSED: b.hitTest(100, 100, true) == false [./HitTest.as:99]\nFAILED: expected: true obtained: false [./HitTest.as:100]\nFAILED: expected: true obtained: false [./HitTest.as:101]\nFAILED: expected: true obtained: false [./HitTest.as:102]\nPASSED: b.hitTest(151, 150, true) == false [./HitTest.as:103]\nPASSED: b.hitTest(151, 151, true) == false [./HitTest.as:104]\nPASSED: b.hitTest(151, 152, true) == false [./HitTest.as:105]\nPASSED: b.hitTest(99, 99, false) == false [./HitTest.as:111]\nFAILED: expected: false obtained: true [./HitTest.as:112]\nFAILED: expected: false obtained: true [./HitTest.as:113]\nFAILED: expected: false obtained: true [./HitTest.as:114]\nFAILED: expected: false obtained: true [./HitTest.as:115]\nPASSED: b.hitTest(151, 150, false) == false [./HitTest.as:116]\nPASSED: b.hitTest(99, 99, true) == false [./HitTest.as:118]\nPASSED: b.hitTest(100, 100, true) == false [./HitTest.as:119]\nPASSED: b.hitTest(101, 101, true) == false [./HitTest.as:120]\nPASSED: b.hitTest(120, 120, true) == false [./HitTest.as:121]\nPASSED: b.hitTest(110, 110, true) == false [./HitTest.as:122]\nPASSED: b.hitTest(151, 150, true) == false [./HitTest.as:123]\nPASSED: b.hitTest(99, 199, false) == false [./HitTest.as:126]\n... (32 lines after) ...",
@@ -723,7 +723,7 @@
         "expected_lines": 114,
         "matching_lines": 3
       },
-      "duration": 21.21,
+      "duration": 20.98,
       "status": "output_mismatch",
       "detail": "111 line(s) differ (actual=5, expected=114)",
       "actual_output": "SWF5\n\n[Inheritance.as debug-22403-05c7ba106]\n\nNow your flash player will try to answer the egg/chicken question. Kill it if it hangs your machine",
@@ -751,7 +751,7 @@
         "expected_lines": 181,
         "matching_lines": 3
       },
-      "duration": 23.09,
+      "duration": 23.06,
       "status": "output_mismatch",
       "detail": "178 line(s) differ (actual=5, expected=181)",
       "actual_output": "SWF7\n\n[Inheritance.as debug-22403-05c7ba106]\n\nNow your flash player will try to answer the egg/chicken question. Kill it if it hangs your machine",
@@ -765,7 +765,7 @@
         "expected_lines": 181,
         "matching_lines": 3
       },
-      "duration": 23.56,
+      "duration": 23.36,
       "status": "output_mismatch",
       "detail": "178 line(s) differ (actual=5, expected=181)",
       "actual_output": "SWF8\n\n[Inheritance.as debug-22403-05c7ba106]\n\nNow your flash player will try to answer the egg/chicken question. Kill it if it hangs your machine",
@@ -779,7 +779,7 @@
         "expected_lines": 52,
         "matching_lines": 31
       },
-      "duration": 19.62,
+      "duration": 19.33,
       "status": "output_mismatch",
       "detail": "21 line(s) differ (actual=52, expected=52)",
       "actual_output": "... (1 lines before) ...\n\n[Boolean.as debug-22403-05c7ba106]\nPASSED: o == undefined [./Instance.as:31]\nPASSED: o == undefined [./Instance.as:41]\nPASSED: typeof(o) == \"object\" [./Instance.as:44]\nFAILED: expected: \"undefined\" obtained: object [./Instance.as:45]\nPASSED: typeof(o.constructor) == \"function\" [./Instance.as:48]\nFAILED: expected: \"undefined\" obtained: function [./Instance.as:55]\nFAILED: expected: undefined obtained: [object Object] [./Instance.as:57]\nPASSED: o.valueOf() == undefined [./Instance.as:58]\nFAILED: !o instanceOf Object [./Instance.as:59]\nPASSED: !o instanceOf Number [./Instance.as:60]\nPASSED: !o instanceOf String [./Instance.as:61]\nPASSED: typeof(o) == \"object\" [./Instance.as:64]\nFAILED: expected: \"undefined\" obtained: object [./Instance.as:65]\nPASSED: typeof(o.constructor) == \"function\" [./Instance.as:67]\nFAILED: expected: undefined obtained: [object Object] [./Instance.as:71]\nPASSED: o.valueOf() == undefined [./Instance.as:72]\nFAILED: !o instanceOf Object [./Instance.as:73]\nPASSED: !o instanceOf Number [./Instance.as:74]\nPASSED: !o instanceOf String [./Instance.as:75]\nPASSED: typeof(o) == \"object\" [./Instance.as:78]\nFAILED: expected: \"undefined\" obtained: object [./Instance.as:79]\nPASSED: typeof(o.constructor) == \"function\" [./Instance.as:81]\nFAILED: expected: undefined obtained: [object Object] [./Instance.as:85]\nPASSED: o.valueOf() == undefined [./Instance.as:86]\nFAILED: !o instanceOf Object [./Instance.as:87]\nPASSED: !o instanceOf Number [./Instance.as:88]\nPASSED: !o instanceOf String [./Instance.as:89]\nPASSED: typeof(o) == \"undefined\" [./Instance.as:92]\nPASSED: typeof(o) == \"object\" [./Instance.as:95]\nFAILED: expected: undefined obtained: [object Object] [./Instance.as:96]\nPASSED: o.valueOf() == undefined [./Instance.as:97]\nFAILED: !o instanceOf Object [./Instance.as:98]\nPASSED: typeof(o) == \"undefined\" [./Instance.as:104]\nPASSED: o == undefined [./Instance.as:105]\nPASSED: typeof(Object.prototype) == \"object\" [./Instance.as:110]\nFAILED: expected: \"object\" obtained: number [./Instance.as:112]\nFAILED: expected: \"[object Object]\" obtained: 6 [./Instance.as:113]\nPASSED: typeof(Object.prototype) == \"object\" [./Instance.as:116]\nPASSED: typeof(String.prototype) == \"number\" [./Instance.as:120]\nPASSED: String.prototype == 8 [./Instance.as:121]\nFAILED: expected: undefined obtained: hello [./Instance.as:124]\nFAILED: expected: 8 obtained: [object Object] [./Instance.as:128]\nPASSED: typeof(s) == \"object\" [./Instance.as:129]\nFAILED: !s instanceOf String [./Instance.as:130]\nFAILED: expected: undefined obtained: hello [./Instance.as:134]\nFAILED: expected: 8 obtained: [object Object] [./Instance.as:142]\n#passed: 27\n#failed: 19\n... (1 lines after) ...",
@@ -793,7 +793,7 @@
         "expected_lines": 52,
         "matching_lines": 3
       },
-      "duration": 19.86,
+      "duration": 19.02,
       "status": "output_mismatch",
       "detail": "49 line(s) differ (actual=3, expected=52)",
       "actual_output": "SWF6\n\n[Boolean.as debug-22403-05c7ba106]",
@@ -807,7 +807,7 @@
         "expected_lines": 52,
         "matching_lines": 3
       },
-      "duration": 18.58,
+      "duration": 19.61,
       "status": "output_mismatch",
       "detail": "49 line(s) differ (actual=3, expected=52)",
       "actual_output": "SWF7\n\n[Boolean.as debug-22403-05c7ba106]",
@@ -821,7 +821,7 @@
         "expected_lines": 52,
         "matching_lines": 3
       },
-      "duration": 18.57,
+      "duration": 19.45,
       "status": "output_mismatch",
       "detail": "49 line(s) differ (actual=3, expected=52)",
       "actual_output": "SWF8\n\n[Boolean.as debug-22403-05c7ba106]",
@@ -835,7 +835,7 @@
         "expected_lines": 51,
         "matching_lines": 47
       },
-      "duration": 18.5,
+      "duration": 20.23,
       "status": "output_mismatch",
       "detail": "4 line(s) differ (actual=51, expected=51)",
       "actual_output": "... (1 lines before) ...\n\n[Key.as debug-22403-05c7ba106]\nPASSED: typeof(Key) == 'object' [./Key.as:28]\nPASSED: typeof(keyObj) == 'undefined' [./Key.as:31]\nPASSED: Key.__proto__ == Object.prototype [./Key.as:33]\nFAILED: expected: 'undefined' obtained: function [./Key.as:49]\nFAILED: expected: 'undefined' obtained: function [./Key.as:50]\nPASSED: typeof(Key.getAscii) == 'function' [./Key.as:54]\nPASSED: typeof(Key.getCode) == 'function' [./Key.as:55]\nPASSED: typeof(Key.isDown) == 'function' [./Key.as:56]\nPASSED: typeof(Key.isToggled) == 'function' [./Key.as:57]\nPASSED: typeof(Key.CAPSLOCK) == 'number' [./Key.as:60]\nPASSED: Key.CAPSLOCK == 20 [./Key.as:61]\nPASSED: typeof(Key.TAB) == 'number' [./Key.as:62]\nPASSED: Key.TAB == 9 [./Key.as:63]\nPASSED: typeof(Key.CONTROL) == 'number' [./Key.as:64]\nPASSED: Key.CONTROL == 17 [./Key.as:65]\nPASSED: typeof(Key.SHIFT) == 'number' [./Key.as:66]\nPASSED: Key.SHIFT == 16 [./Key.as:67]\nPASSED: typeof(Key.DELETEKEY) == 'number' [./Key.as:68]\nPASSED: Key.DELETEKEY == 46 [./Key.as:69]\nPASSED: typeof(Key.INSERT) == 'number' [./Key.as:70]\nPASSED: Key.INSERT == 45 [./Key.as:71]\nPASSED: typeof(Key.BACKSPACE) == 'number' [./Key.as:72]\nPASSED: Key.BACKSPACE == 8 [./Key.as:73]\nPASSED: typeof(Key.LEFT) == 'number' [./Key.as:74]\nPASSED: Key.LEFT == 37 [./Key.as:75]\nPASSED: typeof(Key.UP) == 'number' [./Key.as:76]\nPASSED: Key.UP == 38 [./Key.as:77]\nPASSED: typeof(Key.RIGHT) == 'number' [./Key.as:78]\nPASSED: Key.RIGHT == 39 [./Key.as:79]\nPASSED: typeof(Key.DOWN) == 'number' [./Key.as:80]\nPASSED: Key.DOWN == 40 [./Key.as:81]\nPASSED: typeof(Key.HOME) == 'number' [./Key.as:82]\nPASSED: Key.HOME == 36 [./Key.as:83]\nPASSED: typeof(Key.END) == 'number' [./Key.as:84]\nPASSED: Key.END == 35 [./Key.as:85]\nPASSED: typeof(Key.ENTER) == 'number' [./Key.as:86]\nPASSED: Key.ENTER == 13 [./Key.as:87]\nPASSED: typeof(Key.ESCAPE) == 'number' [./Key.as:88]\nPASSED: Key.ESCAPE == 27 [./Key.as:89]\nPASSED: typeof(Key.PGDN) == 'number' [./Key.as:90]\nPASSED: Key.PGDN == 34 [./Key.as:91]\nPASSED: typeof(Key.PGUP) == 'number' [./Key.as:92]\nPASSED: Key.PGUP == 33 [./Key.as:93]\nPASSED: typeof(Key.SPACE) == 'number' [./Key.as:94]\nPASSED: Key.SPACE == 32 [./Key.as:95]\n#passed: 43\n#failed: 2\n#total tests run: 45",
@@ -849,7 +849,7 @@
         "expected_lines": 55,
         "matching_lines": 3
       },
-      "duration": 18.61,
+      "duration": 19.62,
       "status": "output_mismatch",
       "detail": "52 line(s) differ (actual=3, expected=55)",
       "actual_output": "SWF6\n\n[Key.as debug-22403-05c7ba106]",
@@ -863,7 +863,7 @@
         "expected_lines": 55,
         "matching_lines": 3
       },
-      "duration": 18.67,
+      "duration": 19.77,
       "status": "output_mismatch",
       "detail": "52 line(s) differ (actual=3, expected=55)",
       "actual_output": "SWF7\n\n[Key.as debug-22403-05c7ba106]",
@@ -877,7 +877,7 @@
         "expected_lines": 55,
         "matching_lines": 3
       },
-      "duration": 18.58,
+      "duration": 19.94,
       "status": "output_mismatch",
       "detail": "52 line(s) differ (actual=3, expected=55)",
       "actual_output": "SWF8\n\n[Key.as debug-22403-05c7ba106]",
@@ -891,7 +891,7 @@
         "expected_lines": 8,
         "matching_lines": 3
       },
-      "duration": 17.93,
+      "duration": 18.89,
       "status": "output_mismatch",
       "detail": "5 line(s) differ (actual=3, expected=8)",
       "actual_output": "SWF5\n\n[LoadVars.as debug-22405-0e18b8076]",
@@ -905,7 +905,7 @@
         "expected_lines": 152,
         "matching_lines": 3
       },
-      "duration": 21.08,
+      "duration": 21.09,
       "status": "output_mismatch",
       "detail": "149 line(s) differ (actual=3, expected=152)",
       "actual_output": "SWF6\n\n[LoadVars.as debug-22405-0e18b8076]",
@@ -919,7 +919,7 @@
         "expected_lines": 152,
         "matching_lines": 3
       },
-      "duration": 21.12,
+      "duration": 21.62,
       "status": "output_mismatch",
       "detail": "149 line(s) differ (actual=3, expected=152)",
       "actual_output": "SWF7\n\n[LoadVars.as debug-22405-0e18b8076]",
@@ -933,7 +933,7 @@
         "expected_lines": 152,
         "matching_lines": 3
       },
-      "duration": 21.09,
+      "duration": 21.58,
       "status": "output_mismatch",
       "detail": "149 line(s) differ (actual=3, expected=152)",
       "actual_output": "SWF8\n\n[LoadVars.as debug-22405-0e18b8076]",
@@ -947,7 +947,7 @@
         "expected_lines": 7,
         "matching_lines": 3
       },
-      "duration": 17.61,
+      "duration": 17.85,
       "status": "output_mismatch",
       "detail": "4 line(s) differ (actual=3, expected=7)",
       "actual_output": "SWF5\n\n[LocalConnection.as debug-22403-05c7ba106]",
@@ -961,7 +961,7 @@
         "expected_lines": 58,
         "matching_lines": 24
       },
-      "duration": 18.59,
+      "duration": 18.98,
       "status": "output_mismatch",
       "detail": "34 line(s) differ (actual=58, expected=58)",
       "actual_output": "... (11 lines before) ...\nPASSED: rec != snd [./LocalConnection.as:55]\nPASSED: typeof(rec.close) == 'function' [./LocalConnection.as:58]\nPASSED: typeof(rec.connect) == 'function' [./LocalConnection.as:61]\nPASSED: typeof(rec.domain) == 'function' [./LocalConnection.as:64]\nPASSED: typeof(rec.send) == 'function' [./LocalConnection.as:67]\nFAILED: expected: \"localhost\" obtained:  [./LocalConnection.as:71]\nFAILED: expected: false obtained:  [./LocalConnection.as:88]\nPASSED: statuses.length == 0 [./LocalConnection.as:89]\nFAILED: expected: false obtained:  [./LocalConnection.as:92]\nPASSED: statuses.length == 0 [./LocalConnection.as:93]\nFAILED: expected: false obtained:  [./LocalConnection.as:96]\nPASSED: statuses.length == 0 [./LocalConnection.as:97]\nFAILED: expected: false obtained:  [./LocalConnection.as:100]\nPASSED: statuses.length == 0 [./LocalConnection.as:101]\nFAILED: expected: true obtained:  [./LocalConnection.as:104]\nPASSED: statuses.length == 0 [./LocalConnection.as:105]\nFAILED: expected: false obtained:  [./LocalConnection.as:108]\nPASSED: statuses.length == 0 [./LocalConnection.as:109]\nFAILED: expected: true obtained:  [./LocalConnection.as:114]\nPASSED: statuses.length == 0 [./LocalConnection.as:115]\nFAILED: expected: \"localhost\" obtained:  [./LocalConnection.as:119]\nFAILED: expected: true obtained:  [./LocalConnection.as:123]\nFAILED: expected: false obtained:  [./LocalConnection.as:128]\nFAILED: expected: false obtained:  [./LocalConnection.as:131]\nFAILED: expected: true obtained:  [./LocalConnection.as:134]\nFAILED: expected: true obtained:  [./LocalConnection.as:139]\nFAILED: expected: false obtained:  [./LocalConnection.as:143]\nFAILED: expected: false obtained:  [./LocalConnection.as:145]\nFAILED: expected: false obtained:  [./LocalConnection.as:148]\nFAILED: expected: false obtained:  [./LocalConnection.as:151]\nFAILED: expected: false obtained:  [./LocalConnection.as:154]\nFAILED: expected: false obtained:  [./LocalConnection.as:157]\nFAILED: expected: false obtained:  [./LocalConnection.as:160]\nFAILED: expected: false obtained:  [./LocalConnection.as:163]\nFAILED: expected: false obtained:  [./LocalConnection.as:166]\nFAILED: expected: false obtained:  [./LocalConnection.as:169]\nFAILED: expected: false obtained:  [./LocalConnection.as:172]\nFAILED: expected: true obtained:  [./LocalConnection.as:176]\nFAILED: expected: true obtained:  [./LocalConnection.as:179]\nFAILED: expected: true obtained:  [./LocalConnection.as:182]\nFAILED: expected: true obtained:  [./LocalConnection.as:185]\nFAILED: expected: true obtained:  [./LocalConnection.as:188]\nFAILED: expected: true obtained:  [./LocalConnection.as:191]\nFAILED: expected: true obtained:  [./LocalConnection.as:194]\n#passed: 20\n#failed: 32\n#total tests run: 52",
@@ -975,7 +975,7 @@
         "expected_lines": 58,
         "matching_lines": 24
       },
-      "duration": 18.7,
+      "duration": 19.2,
       "status": "output_mismatch",
       "detail": "34 line(s) differ (actual=58, expected=58)",
       "actual_output": "... (11 lines before) ...\nPASSED: rec != snd [./LocalConnection.as:55]\nPASSED: typeof(rec.close) == 'function' [./LocalConnection.as:58]\nPASSED: typeof(rec.connect) == 'function' [./LocalConnection.as:61]\nPASSED: typeof(rec.domain) == 'function' [./LocalConnection.as:64]\nPASSED: typeof(rec.send) == 'function' [./LocalConnection.as:67]\nFAILED: expected: \"localhost\" obtained: undefined [./LocalConnection.as:71]\nFAILED: expected: false obtained: undefined [./LocalConnection.as:88]\nPASSED: statuses.length == 0 [./LocalConnection.as:89]\nFAILED: expected: false obtained: undefined [./LocalConnection.as:92]\nPASSED: statuses.length == 0 [./LocalConnection.as:93]\nFAILED: expected: false obtained: undefined [./LocalConnection.as:96]\nPASSED: statuses.length == 0 [./LocalConnection.as:97]\nFAILED: expected: false obtained: undefined [./LocalConnection.as:100]\nPASSED: statuses.length == 0 [./LocalConnection.as:101]\nFAILED: expected: true obtained: undefined [./LocalConnection.as:104]\nPASSED: statuses.length == 0 [./LocalConnection.as:105]\nFAILED: expected: false obtained: undefined [./LocalConnection.as:108]\nPASSED: statuses.length == 0 [./LocalConnection.as:109]\nFAILED: expected: true obtained: undefined [./LocalConnection.as:114]\nPASSED: statuses.length == 0 [./LocalConnection.as:115]\nFAILED: expected: \"localhost\" obtained: undefined [./LocalConnection.as:119]\nFAILED: expected: true obtained: undefined [./LocalConnection.as:123]\nFAILED: expected: false obtained: undefined [./LocalConnection.as:128]\nFAILED: expected: false obtained: undefined [./LocalConnection.as:131]\nFAILED: expected: true obtained: undefined [./LocalConnection.as:134]\nFAILED: expected: true obtained: undefined [./LocalConnection.as:139]\nFAILED: expected: false obtained: undefined [./LocalConnection.as:143]\nFAILED: expected: false obtained: undefined [./LocalConnection.as:145]\nFAILED: expected: false obtained: undefined [./LocalConnection.as:148]\nFAILED: expected: false obtained: undefined [./LocalConnection.as:151]\nFAILED: expected: false obtained: undefined [./LocalConnection.as:154]\nFAILED: expected: false obtained: undefined [./LocalConnection.as:157]\nFAILED: expected: false obtained: undefined [./LocalConnection.as:160]\nFAILED: expected: false obtained: undefined [./LocalConnection.as:163]\nFAILED: expected: false obtained: undefined [./LocalConnection.as:166]\nFAILED: expected: false obtained: undefined [./LocalConnection.as:169]\nFAILED: expected: false obtained: undefined [./LocalConnection.as:172]\nFAILED: expected: true obtained: undefined [./LocalConnection.as:176]\nFAILED: expected: true obtained: undefined [./LocalConnection.as:179]\nFAILED: expected: true obtained: undefined [./LocalConnection.as:182]\nFAILED: expected: true obtained: undefined [./LocalConnection.as:185]\nFAILED: expected: true obtained: undefined [./LocalConnection.as:188]\nFAILED: expected: true obtained: undefined [./LocalConnection.as:191]\nFAILED: expected: true obtained: undefined [./LocalConnection.as:194]\n#passed: 20\n#failed: 32\n#total tests run: 52",
@@ -989,7 +989,7 @@
         "expected_lines": 58,
         "matching_lines": 24
       },
-      "duration": 18.71,
+      "duration": 19.06,
       "status": "output_mismatch",
       "detail": "34 line(s) differ (actual=58, expected=58)",
       "actual_output": "... (11 lines before) ...\nPASSED: rec != snd [./LocalConnection.as:55]\nPASSED: typeof(rec.close) == 'function' [./LocalConnection.as:58]\nPASSED: typeof(rec.connect) == 'function' [./LocalConnection.as:61]\nPASSED: typeof(rec.domain) == 'function' [./LocalConnection.as:64]\nPASSED: typeof(rec.send) == 'function' [./LocalConnection.as:67]\nFAILED: expected: \"localhost\" obtained: undefined [./LocalConnection.as:71]\nFAILED: expected: false obtained: undefined [./LocalConnection.as:88]\nPASSED: statuses.length == 0 [./LocalConnection.as:89]\nFAILED: expected: false obtained: undefined [./LocalConnection.as:92]\nPASSED: statuses.length == 0 [./LocalConnection.as:93]\nFAILED: expected: false obtained: undefined [./LocalConnection.as:96]\nPASSED: statuses.length == 0 [./LocalConnection.as:97]\nFAILED: expected: false obtained: undefined [./LocalConnection.as:100]\nPASSED: statuses.length == 0 [./LocalConnection.as:101]\nFAILED: expected: true obtained: undefined [./LocalConnection.as:104]\nPASSED: statuses.length == 0 [./LocalConnection.as:105]\nFAILED: expected: false obtained: undefined [./LocalConnection.as:108]\nPASSED: statuses.length == 0 [./LocalConnection.as:109]\nFAILED: expected: true obtained: undefined [./LocalConnection.as:114]\nPASSED: statuses.length == 0 [./LocalConnection.as:115]\nFAILED: expected: \"localhost\" obtained: undefined [./LocalConnection.as:119]\nFAILED: expected: true obtained: undefined [./LocalConnection.as:123]\nFAILED: expected: false obtained: undefined [./LocalConnection.as:128]\nFAILED: expected: false obtained: undefined [./LocalConnection.as:131]\nFAILED: expected: true obtained: undefined [./LocalConnection.as:134]\nFAILED: expected: true obtained: undefined [./LocalConnection.as:139]\nFAILED: expected: false obtained: undefined [./LocalConnection.as:143]\nFAILED: expected: false obtained: undefined [./LocalConnection.as:145]\nFAILED: expected: false obtained: undefined [./LocalConnection.as:148]\nFAILED: expected: false obtained: undefined [./LocalConnection.as:151]\nFAILED: expected: false obtained: undefined [./LocalConnection.as:154]\nFAILED: expected: false obtained: undefined [./LocalConnection.as:157]\nFAILED: expected: false obtained: undefined [./LocalConnection.as:160]\nFAILED: expected: false obtained: undefined [./LocalConnection.as:163]\nFAILED: expected: false obtained: undefined [./LocalConnection.as:166]\nFAILED: expected: false obtained: undefined [./LocalConnection.as:169]\nFAILED: expected: false obtained: undefined [./LocalConnection.as:172]\nFAILED: expected: true obtained: undefined [./LocalConnection.as:176]\nFAILED: expected: true obtained: undefined [./LocalConnection.as:179]\nFAILED: expected: true obtained: undefined [./LocalConnection.as:182]\nFAILED: expected: true obtained: undefined [./LocalConnection.as:185]\nFAILED: expected: true obtained: undefined [./LocalConnection.as:188]\nFAILED: expected: true obtained: undefined [./LocalConnection.as:191]\nFAILED: expected: true obtained: undefined [./LocalConnection.as:194]\n#passed: 20\n#failed: 32\n#total tests run: 52",
@@ -1003,7 +1003,7 @@
         "expected_lines": 278,
         "matching_lines": 3
       },
-      "duration": 29.88,
+      "duration": 28.48,
       "status": "output_mismatch",
       "detail": "275 line(s) differ (actual=3, expected=278)",
       "actual_output": "SWF5\n\n[Math.as debug-22403-05c7ba106]",
@@ -1017,7 +1017,7 @@
         "expected_lines": 278,
         "matching_lines": 3
       },
-      "duration": 30.01,
+      "duration": 29.25,
       "status": "output_mismatch",
       "detail": "275 line(s) differ (actual=3, expected=278)",
       "actual_output": "SWF6\n\n[Math.as debug-22403-05c7ba106]",
@@ -1031,7 +1031,7 @@
         "expected_lines": 287,
         "matching_lines": 3
       },
-      "duration": 30.17,
+      "duration": 29.57,
       "status": "output_mismatch",
       "detail": "284 line(s) differ (actual=3, expected=287)",
       "actual_output": "SWF7\n\n[Math.as debug-22403-05c7ba106]",
@@ -1045,7 +1045,7 @@
         "expected_lines": 287,
         "matching_lines": 3
       },
-      "duration": 30.37,
+      "duration": 29.45,
       "status": "output_mismatch",
       "detail": "284 line(s) differ (actual=3, expected=287)",
       "actual_output": "SWF8\n\n[Math.as debug-22403-05c7ba106]",
@@ -1059,7 +1059,7 @@
         "expected_lines": 7,
         "matching_lines": 3
       },
-      "duration": 18.33,
+      "duration": 17.72,
       "status": "output_mismatch",
       "detail": "4 line(s) differ (actual=3, expected=7)",
       "actual_output": "SWF5\n\n[Matrix.as debug-22403-05c7ba106]",
@@ -1073,7 +1073,7 @@
         "expected_lines": 168,
         "matching_lines": 3
       },
-      "duration": 23.76,
+      "duration": 22.83,
       "status": "output_mismatch",
       "detail": "165 line(s) differ (actual=3, expected=168)",
       "actual_output": "SWF6\n\n[Matrix.as debug-22403-05c7ba106]",
@@ -1087,7 +1087,7 @@
         "expected_lines": 168,
         "matching_lines": 3
       },
-      "duration": 22.67,
+      "duration": 24.17,
       "status": "output_mismatch",
       "detail": "165 line(s) differ (actual=3, expected=168)",
       "actual_output": "SWF7\n\n[Matrix.as debug-22403-05c7ba106]",
@@ -1101,7 +1101,7 @@
         "expected_lines": 168,
         "matching_lines": 3
       },
-      "duration": 22.44,
+      "duration": 24.03,
       "status": "output_mismatch",
       "detail": "165 line(s) differ (actual=3, expected=168)",
       "actual_output": "SWF8\n\n[Matrix.as debug-22403-05c7ba106]",
@@ -1115,7 +1115,7 @@
         "expected_lines": 6,
         "matching_lines": 3
       },
-      "duration": 17.51,
+      "duration": 18.27,
       "status": "output_mismatch",
       "detail": "3 line(s) differ (actual=3, expected=6)",
       "actual_output": "SWF5\n\n[Microphone.as debug-22403-05c7ba106]",
@@ -1129,7 +1129,7 @@
         "expected_lines": 79,
         "matching_lines": 48
       },
-      "duration": 18.78,
+      "duration": 20.09,
       "status": "output_mismatch",
       "detail": "31 line(s) differ (actual=79, expected=79)",
       "actual_output": "... (39 lines before) ...\nPASSED: !Microphone.prototype.hasOwnProperty(\"silenceLevel\") [./Microphone.as:77]\nPASSED: !Microphone.prototype.hasOwnProperty(\"silenceTimeOut\") [./Microphone.as:78]\nPASSED: !Microphone.prototype.hasOwnProperty(\"useEchoSuppression\") [./Microphone.as:79]\nPASSED: Microphone.hasOwnProperty(\"names\") [./Microphone.as:82]\nPASSED: typeof (Microphone.names) == 'object' [./Microphone.as:83]\nFAILED: expected: 'object' obtained: undefined [./Microphone.as:87]\nPASSED: !Microphone.prototype.hasOwnProperty(\"get\") [./Microphone.as:92]\nFAILED: Microphone.prototype.hasOwnProperty(\"activityLevel\") [./Microphone.as:93]\nFAILED: Microphone.prototype.hasOwnProperty(\"gain\") [./Microphone.as:94]\nFAILED: Microphone.prototype.hasOwnProperty(\"index\") [./Microphone.as:95]\nFAILED: Microphone.prototype.hasOwnProperty(\"muted\") [./Microphone.as:96]\nFAILED: Microphone.prototype.hasOwnProperty(\"name\") [./Microphone.as:97]\nFAILED: Microphone.prototype.hasOwnProperty(\"rate\") [./Microphone.as:98]\nFAILED: Microphone.prototype.hasOwnProperty(\"silenceLevel\") [./Microphone.as:99]\nFAILED: Microphone.prototype.hasOwnProperty(\"useEchoSuppression\") [./Microphone.as:100]\nPASSED: microphoneObj == Microphone.get() [./Microphone.as:103]\nPASSED: typeof(microphoneObj.get) == 'undefined' [./Microphone.as:106]\nFAILED: expected: 'function' obtained: undefined [./Microphone.as:109]\nFAILED: expected: 'function' obtained: undefined [./Microphone.as:112]\nFAILED: expected: 'function' obtained: undefined [./Microphone.as:115]\nFAILED: expected: 'function' obtained: undefined [./Microphone.as:118]\nFAILED: expected: 'number' obtained: undefined [./Microphone.as:122]\nFAILED: expected: 'number' obtained: undefined [./Microphone.as:123]\nFAILED: expected: 'number' obtained: undefined [./Microphone.as:124]\nFAILED: expected: 'boolean' obtained: undefined [./Microphone.as:125]\nFAILED: expected: 'string' obtained: undefined [./Microphone.as:126]\nFAILED: expected: 'number' obtained: undefined [./Microphone.as:127]\nFAILED: expected: 'number' obtained: undefined [./Microphone.as:128]\nFAILED: expected: 'number' obtained: undefined [./Microphone.as:130]\nFAILED: expected: -1 obtained:  [./Microphone.as:133]\nFAILED: expected: 50 obtained:  [./Microphone.as:134]\nFAILED: expected: true obtained:  [./Microphone.as:143]\nFAILED: expected: 8 obtained:  [./Microphone.as:144]\nFAILED: expected: 2000 obtained:  [./Microphone.as:145]\nFAILED: expected: 16 obtained:  [./Microphone.as:158]\nFAILED: expected: false obtained:  [./Microphone.as:184]\nFAILED: expected: true obtained:  [./Microphone.as:187]\n#passed: 44\n#failed: 29\n#total tests run: 73",
@@ -1143,7 +1143,7 @@
         "expected_lines": 79,
         "matching_lines": 3
       },
-      "duration": 18.91,
+      "duration": 19.97,
       "status": "output_mismatch",
       "detail": "76 line(s) differ (actual=3, expected=79)",
       "actual_output": "SWF7\n\n[Microphone.as debug-22403-05c7ba106]",
@@ -1157,7 +1157,7 @@
         "expected_lines": 79,
         "matching_lines": 3
       },
-      "duration": 18.75,
+      "duration": 19.93,
       "status": "output_mismatch",
       "detail": "76 line(s) differ (actual=3, expected=79)",
       "actual_output": "SWF8\n\n[Microphone.as debug-22403-05c7ba106]",
@@ -1171,7 +1171,7 @@
         "expected_lines": 13,
         "matching_lines": 3
       },
-      "duration": 17.79,
+      "duration": 18.88,
       "status": "output_mismatch",
       "detail": "10 line(s) differ (actual=3, expected=13)",
       "actual_output": "SWF5\n\n[Mouse.as debug-22403-05c7ba106]",
@@ -1185,7 +1185,7 @@
         "expected_lines": 21,
         "matching_lines": 3
       },
-      "duration": 18.24,
+      "duration": 18.86,
       "status": "output_mismatch",
       "detail": "18 line(s) differ (actual=3, expected=21)",
       "actual_output": "SWF6\n\n[Mouse.as debug-22403-05c7ba106]",
@@ -1199,7 +1199,7 @@
         "expected_lines": 21,
         "matching_lines": 3
       },
-      "duration": 18.14,
+      "duration": 18.92,
       "status": "output_mismatch",
       "detail": "18 line(s) differ (actual=3, expected=21)",
       "actual_output": "SWF7\n\n[Mouse.as debug-22403-05c7ba106]",
@@ -1213,7 +1213,7 @@
         "expected_lines": 21,
         "matching_lines": 3
       },
-      "duration": 17.94,
+      "duration": 18.79,
       "status": "output_mismatch",
       "detail": "18 line(s) differ (actual=3, expected=21)",
       "actual_output": "SWF8\n\n[Mouse.as debug-22403-05c7ba106]",
@@ -1227,7 +1227,7 @@
         "expected_lines": 363,
         "matching_lines": 3
       },
-      "duration": 28.7,
+      "duration": 29.78,
       "status": "output_mismatch",
       "detail": "360 line(s) differ (actual=3, expected=363)",
       "actual_output": "SWF5\n\n[MovieClip.as debug-22405-0e18b8076]",
@@ -1241,7 +1241,7 @@
         "expected_lines": 6,
         "matching_lines": 3
       },
-      "duration": 18.01,
+      "duration": 18.7,
       "status": "output_mismatch",
       "detail": "3 line(s) differ (actual=3, expected=6)",
       "actual_output": "SWF5\n\n[MovieClipLoader.as debug-22405-0e18b8076]",
@@ -1255,7 +1255,7 @@
         "expected_lines": 6,
         "matching_lines": 3
       },
-      "duration": 18.01,
+      "duration": 17.88,
       "status": "output_mismatch",
       "detail": "3 line(s) differ (actual=3, expected=6)",
       "actual_output": "SWF6\n\n[MovieClipLoader.as debug-22405-0e18b8076]",
@@ -1269,7 +1269,7 @@
         "expected_lines": 165,
         "matching_lines": 3
       },
-      "duration": 19.74,
+      "duration": 19.63,
       "status": "output_mismatch",
       "detail": "162 line(s) differ (actual=3, expected=165)",
       "actual_output": "SWF7\n\n[MovieClipLoader.as debug-22405-0e18b8076]",
@@ -1283,7 +1283,7 @@
         "expected_lines": 165,
         "matching_lines": 3
       },
-      "duration": 19.96,
+      "duration": 19.68,
       "status": "output_mismatch",
       "detail": "162 line(s) differ (actual=3, expected=165)",
       "actual_output": "SWF8\n\n[MovieClipLoader.as debug-22405-0e18b8076]",
@@ -1297,7 +1297,7 @@
         "expected_lines": 7,
         "matching_lines": 3
       },
-      "duration": 18.16,
+      "duration": 17.81,
       "status": "output_mismatch",
       "detail": "4 line(s) differ (actual=3, expected=7)",
       "actual_output": "SWF5\n\n[NetConnection.as debug-22403-05c7ba106]",
@@ -1311,7 +1311,7 @@
         "expected_lines": 6,
         "matching_lines": 3
       },
-      "duration": 18.19,
+      "duration": 17.66,
       "status": "output_mismatch",
       "detail": "3 line(s) differ (actual=3, expected=6)",
       "actual_output": "SWF5\n\n[NetStream.as debug-22403-05c7ba106]",
@@ -1325,7 +1325,7 @@
         "expected_lines": 80,
         "matching_lines": 3
       },
-      "duration": 19.67,
+      "duration": 19.2,
       "status": "output_mismatch",
       "detail": "77 line(s) differ (actual=3, expected=80)",
       "actual_output": "SWF6\n\n[NetStream.as debug-22403-05c7ba106]",
@@ -1339,7 +1339,7 @@
         "expected_lines": 80,
         "matching_lines": 76
       },
-      "duration": 18.87,
+      "duration": 20.38,
       "status": "output_mismatch",
       "detail": "4 line(s) differ (actual=80, expected=80)",
       "actual_output": "... (69 lines before) ...\nPASSED: ! NetStream.prototype.hasOwnProperty('currentFps') [./NetStream.as:212]\nPASSED: ! NetStream.prototype.hasOwnProperty('currentFps') [./NetStream.as:215]\nPASSED: ! NetStream.prototype.hasOwnProperty('currentFps') [./NetStream.as:217]\nPASSED: ! NetStream.prototype.hasOwnProperty('currentFps') [./NetStream.as:219]\nPASSED: ! NetStream.prototype.hasOwnProperty('currentFps') [./NetStream.as:221]\nFAILED: NetStream.prototype.hasOwnProperty('currentFps') [./NetStream.as:223]\nPASSED: !NetStream.prototype.hasOwnProperty('currentFps') [./NetStream.as:227]\nFAILED: NetStream.prototype.hasOwnProperty('currentFps') [./NetStream.as:229]\n#passed: 72\n#failed: 2\n#total tests run: 74",
@@ -1353,7 +1353,7 @@
         "expected_lines": 80,
         "matching_lines": 76
       },
-      "duration": 18.82,
+      "duration": 20.0,
       "status": "output_mismatch",
       "detail": "4 line(s) differ (actual=80, expected=80)",
       "actual_output": "... (69 lines before) ...\nPASSED: ! NetStream.prototype.hasOwnProperty('currentFps') [./NetStream.as:212]\nPASSED: ! NetStream.prototype.hasOwnProperty('currentFps') [./NetStream.as:215]\nPASSED: ! NetStream.prototype.hasOwnProperty('currentFps') [./NetStream.as:217]\nPASSED: ! NetStream.prototype.hasOwnProperty('currentFps') [./NetStream.as:219]\nPASSED: ! NetStream.prototype.hasOwnProperty('currentFps') [./NetStream.as:221]\nFAILED: NetStream.prototype.hasOwnProperty('currentFps') [./NetStream.as:223]\nPASSED: !NetStream.prototype.hasOwnProperty('currentFps') [./NetStream.as:227]\nFAILED: NetStream.prototype.hasOwnProperty('currentFps') [./NetStream.as:229]\n#passed: 72\n#failed: 2\n#total tests run: 74",
@@ -1367,7 +1367,7 @@
         "expected_lines": 244,
         "matching_lines": 3
       },
-      "duration": 23.92,
+      "duration": 25.43,
       "status": "output_mismatch",
       "detail": "241 line(s) differ (actual=3, expected=244)",
       "actual_output": "SWF5\n\n[Number.as debug-22403-05c7ba106]",
@@ -1381,7 +1381,7 @@
         "expected_lines": 239,
         "matching_lines": 3
       },
-      "duration": 23.74,
+      "duration": 25.54,
       "status": "output_mismatch",
       "detail": "236 line(s) differ (actual=3, expected=239)",
       "actual_output": "SWF6\n\n[Number.as debug-22403-05c7ba106]",
@@ -1395,7 +1395,7 @@
         "expected_lines": 237,
         "matching_lines": 3
       },
-      "duration": 23.61,
+      "duration": 25.46,
       "status": "output_mismatch",
       "detail": "234 line(s) differ (actual=3, expected=237)",
       "actual_output": "SWF7\n\n[Number.as debug-22403-05c7ba106]",
@@ -1409,7 +1409,7 @@
         "expected_lines": 237,
         "matching_lines": 3
       },
-      "duration": 23.56,
+      "duration": 25.46,
       "status": "output_mismatch",
       "detail": "234 line(s) differ (actual=3, expected=237)",
       "actual_output": "SWF8\n\n[Number.as debug-22403-05c7ba106]",
@@ -1423,7 +1423,7 @@
         "expected_lines": 7,
         "matching_lines": 3
       },
-      "duration": 17.43,
+      "duration": 18.24,
       "status": "output_mismatch",
       "detail": "4 line(s) differ (actual=3, expected=7)",
       "actual_output": "SWF5\n\n[Point.as debug-22403-05c7ba106]",
@@ -1437,7 +1437,7 @@
         "expected_lines": 7,
         "matching_lines": 3
       },
-      "duration": 17.43,
+      "duration": 18.34,
       "status": "output_mismatch",
       "detail": "4 line(s) differ (actual=3, expected=7)",
       "actual_output": "SWF6\n\n[Point.as debug-22403-05c7ba106]",
@@ -1451,7 +1451,7 @@
         "expected_lines": 7,
         "matching_lines": 3
       },
-      "duration": 17.43,
+      "duration": 17.65,
       "status": "output_mismatch",
       "detail": "4 line(s) differ (actual=3, expected=7)",
       "actual_output": "SWF7\n\n[Point.as debug-22403-05c7ba106]",
@@ -1465,7 +1465,7 @@
         "expected_lines": 193,
         "matching_lines": 3
       },
-      "duration": 22.88,
+      "duration": 24.1,
       "status": "output_mismatch",
       "detail": "190 line(s) differ (actual=3, expected=193)",
       "actual_output": "SWF8\n\n[Point.as debug-22403-05c7ba106]",
@@ -1479,7 +1479,7 @@
         "expected_lines": 30,
         "matching_lines": 3
       },
-      "duration": 17.88,
+      "duration": 18.35,
       "status": "output_mismatch",
       "detail": "27 line(s) differ (actual=3, expected=30)",
       "actual_output": "SWF5\n\n[Random.as debug-22405-0e18b8076]",
@@ -1493,7 +1493,7 @@
         "expected_lines": 30,
         "matching_lines": 3
       },
-      "duration": 17.96,
+      "duration": 18.44,
       "status": "output_mismatch",
       "detail": "27 line(s) differ (actual=3, expected=30)",
       "actual_output": "SWF6\n\n[Random.as debug-22405-0e18b8076]",
@@ -1507,7 +1507,7 @@
         "expected_lines": 30,
         "matching_lines": 3
       },
-      "duration": 17.93,
+      "duration": 18.85,
       "status": "output_mismatch",
       "detail": "27 line(s) differ (actual=3, expected=30)",
       "actual_output": "SWF7\n\n[Random.as debug-22405-0e18b8076]",
@@ -1521,7 +1521,7 @@
         "expected_lines": 30,
         "matching_lines": 3
       },
-      "duration": 17.89,
+      "duration": 19.08,
       "status": "output_mismatch",
       "detail": "27 line(s) differ (actual=3, expected=30)",
       "actual_output": "SWF8\n\n[Random.as debug-22405-0e18b8076]",
@@ -1535,7 +1535,7 @@
         "expected_lines": 7,
         "matching_lines": 3
       },
-      "duration": 17.44,
+      "duration": 18.57,
       "status": "output_mismatch",
       "detail": "4 line(s) differ (actual=3, expected=7)",
       "actual_output": "SWF5\n\n[Rectangle.as debug-22403-05c7ba106]",
@@ -1549,7 +1549,7 @@
         "expected_lines": 7,
         "matching_lines": 3
       },
-      "duration": 17.42,
+      "duration": 18.6,
       "status": "output_mismatch",
       "detail": "4 line(s) differ (actual=3, expected=7)",
       "actual_output": "SWF6\n\n[Rectangle.as debug-22403-05c7ba106]",
@@ -1563,7 +1563,7 @@
         "expected_lines": 7,
         "matching_lines": 3
       },
-      "duration": 17.42,
+      "duration": 18.66,
       "status": "output_mismatch",
       "detail": "4 line(s) differ (actual=3, expected=7)",
       "actual_output": "SWF7\n\n[Rectangle.as debug-22403-05c7ba106]",
@@ -1577,7 +1577,7 @@
         "expected_lines": 166,
         "matching_lines": 3
       },
-      "duration": 21.8,
+      "duration": 23.47,
       "status": "output_mismatch",
       "detail": "163 line(s) differ (actual=3, expected=166)",
       "actual_output": "SWF8\n\n[Rectangle.as debug-22403-05c7ba106]",
@@ -1591,7 +1591,7 @@
         "expected_lines": 21,
         "matching_lines": 4
       },
-      "duration": 19.21,
+      "duration": 18.25,
       "status": "output_mismatch",
       "detail": "17 line(s) differ (actual=4, expected=21)",
       "actual_output": "SWF5\n\n[Selection.as debug-22403-05c7ba106]\nIf you click on the window or change focus before or during this test, some checks may fail.",
@@ -1605,7 +1605,7 @@
         "expected_lines": 125,
         "matching_lines": 109
       },
-      "duration": 22.22,
+      "duration": 22.87,
       "status": "output_mismatch",
       "detail": "16 line(s) differ (actual=125, expected=125)",
       "actual_output": "... (18 lines before) ...\nPASSED: typeof(Selection.addListener) == 'function' [./Selection.as:81]\nPASSED: typeof(Selection.removeListener) == 'function' [./Selection.as:82]\nPASSED: typeof(Selection.broadcastMessage) == 'function' [./Selection.as:83]\nPASSED: Selection.hasOwnProperty(\"_listeners\") [./Selection.as:84]\nPASSED: typeof(Selection._listeners) == 'object' [./Selection.as:85]\nFAILED: Selection._listeners instanceof Array [./Selection.as:86]\nFAILED: mc instanceof MovieClip [./Selection.as:89]\nPASSED: ret == false [./Selection.as:91]\nPASSED: Selection.getFocus() == null [./Selection.as:92]\nPASSED: Selection.getFocus() == null [./Selection.as:96]\nPASSED: typeof(ret) == \"boolean\" [./Selection.as:98]\nPASSED: ret == true [./Selection.as:99]\nFAILED: expected: false obtained: true [./Selection.as:103]\nPASSED: Selection.getFocus() == null [./Selection.as:104]\nPASSED: Selection.getFocus() == null [./Selection.as:107]\nPASSED: ret == true [./Selection.as:109]\nPASSED: Selection.getFocus() == null [./Selection.as:110]\nPASSED: ret == false [./Selection.as:112]\nPASSED: Selection.getFocus() == null [./Selection.as:113]\nPASSED: Selection.getFocus() == null [./Selection.as:116]\nFAILED: expected: false obtained: true [./Selection.as:118]\nPASSED: Selection.getFocus() == \"_level0.mc\" [./Selection.as:119]\nPASSED: ret == false [./Selection.as:121]\nPASSED: Selection.getFocus() == \"_level0.mc\" [./Selection.as:122]\nPASSED: ret == false [./Selection.as:124]\nPASSED: Selection.getFocus() == \"_level0.mc\" [./Selection.as:125]\nPASSED: mc._visible == false [./Selection.as:130]\nPASSED: Selection.getFocus() == null [./Selection.as:131]\nFAILED: expected: false obtained: true [./Selection.as:133]\nPASSED: Selection.getFocus() == \"_level0.mc\" [./Selection.as:134]\nPASSED: Selection.getFocus() == \"_level0.mc\" [./Selection.as:136]\nPASSED: ret == true [./Selection.as:139]\nPASSED: Selection.getFocus() == null [./Selection.as:140]\nFAILED: expected: false obtained: true [./Selection.as:143]\nPASSED: Selection.getFocus() == \"_level0.mc\" [./Selection.as:145]\nPASSED: Selection.getFocus() == \"_level0.mc\" [./Selection.as:147]\nPASSED: Selection.getFocus() == null [./Selection.as:149]\nPASSED: Selection.getFocus() == \"_level0.mc\" [./Selection.as:153]\nPASSED: Selection.getFocus() == \"_level0.mc\" [./Selection.as:155]\nPASSED: Selection.getFocus() == \"_level0.mc\" [./Selection.as:157]\nPASSED: ret == -1 [./Selection.as:161]\nPASSED: ret == -1 [./Selection.as:163]\nPASSED: ret == -1 [./Selection.as:165]\nPASSED: Selection.getFocus() == null [./Selection.as:169]\nPASSED: ret == false [./Selection.as:171]\nPASSED: Selection.getFocus() == null [./Selection.as:172]\nPASSED: ret == true [./Selection.as:174]\nPASSED: Selection.getFocus() == null [./Selection.as:175]\nPASSED: ret == -1 [./Selection.as:179]\nPASSED: ret == -1 [./Selection.as:181]\n... (57 lines after) ...",
@@ -1619,7 +1619,7 @@
         "expected_lines": 125,
         "matching_lines": 110
       },
-      "duration": 22.21,
+      "duration": 21.86,
       "status": "output_mismatch",
       "detail": "15 line(s) differ (actual=125, expected=125)",
       "actual_output": "... (18 lines before) ...\nPASSED: typeof(Selection.addListener) == 'function' [./Selection.as:81]\nPASSED: typeof(Selection.removeListener) == 'function' [./Selection.as:82]\nPASSED: typeof(Selection.broadcastMessage) == 'function' [./Selection.as:83]\nPASSED: Selection.hasOwnProperty(\"_listeners\") [./Selection.as:84]\nPASSED: typeof(Selection._listeners) == 'object' [./Selection.as:85]\nFAILED: Selection._listeners instanceof Array [./Selection.as:86]\nPASSED: mc instanceof MovieClip [./Selection.as:89]\nPASSED: ret == false [./Selection.as:91]\nPASSED: Selection.getFocus() == null [./Selection.as:92]\nPASSED: Selection.getFocus() == null [./Selection.as:96]\nPASSED: typeof(ret) == \"boolean\" [./Selection.as:98]\nPASSED: ret == true [./Selection.as:99]\nFAILED: expected: false obtained: true [./Selection.as:103]\nPASSED: Selection.getFocus() == null [./Selection.as:104]\nPASSED: Selection.getFocus() == null [./Selection.as:107]\nPASSED: ret == true [./Selection.as:109]\nPASSED: Selection.getFocus() == null [./Selection.as:110]\nPASSED: ret == false [./Selection.as:112]\nPASSED: Selection.getFocus() == null [./Selection.as:113]\nPASSED: Selection.getFocus() == null [./Selection.as:116]\nFAILED: expected: false obtained: true [./Selection.as:118]\nPASSED: Selection.getFocus() == \"_level0.mc\" [./Selection.as:119]\nPASSED: ret == false [./Selection.as:121]\nPASSED: Selection.getFocus() == \"_level0.mc\" [./Selection.as:122]\nPASSED: ret == false [./Selection.as:124]\nPASSED: Selection.getFocus() == \"_level0.mc\" [./Selection.as:125]\nPASSED: mc._visible == false [./Selection.as:130]\nPASSED: Selection.getFocus() == null [./Selection.as:131]\nFAILED: expected: false obtained: true [./Selection.as:133]\nPASSED: Selection.getFocus() == \"_level0.mc\" [./Selection.as:134]\nPASSED: Selection.getFocus() == \"_level0.mc\" [./Selection.as:136]\nPASSED: ret == true [./Selection.as:139]\nPASSED: Selection.getFocus() == null [./Selection.as:140]\nFAILED: expected: false obtained: true [./Selection.as:143]\nPASSED: Selection.getFocus() == \"_level0.mc\" [./Selection.as:145]\nPASSED: Selection.getFocus() == \"_level0.mc\" [./Selection.as:147]\nPASSED: Selection.getFocus() == null [./Selection.as:149]\nPASSED: Selection.getFocus() == \"_level0.mc\" [./Selection.as:153]\nPASSED: Selection.getFocus() == \"_level0.mc\" [./Selection.as:155]\nPASSED: Selection.getFocus() == \"_level0.mc\" [./Selection.as:157]\nPASSED: ret == -1 [./Selection.as:161]\nPASSED: ret == -1 [./Selection.as:163]\nPASSED: ret == -1 [./Selection.as:165]\nPASSED: Selection.getFocus() == null [./Selection.as:169]\nPASSED: ret == false [./Selection.as:171]\nPASSED: Selection.getFocus() == null [./Selection.as:172]\nPASSED: ret == true [./Selection.as:174]\nPASSED: Selection.getFocus() == null [./Selection.as:175]\nPASSED: ret == -1 [./Selection.as:179]\nPASSED: ret == -1 [./Selection.as:181]\n... (57 lines after) ...",
@@ -1633,7 +1633,7 @@
         "expected_lines": 125,
         "matching_lines": 110
       },
-      "duration": 22.34,
+      "duration": 21.59,
       "status": "output_mismatch",
       "detail": "15 line(s) differ (actual=125, expected=125)",
       "actual_output": "... (18 lines before) ...\nPASSED: typeof(Selection.addListener) == 'function' [./Selection.as:81]\nPASSED: typeof(Selection.removeListener) == 'function' [./Selection.as:82]\nPASSED: typeof(Selection.broadcastMessage) == 'function' [./Selection.as:83]\nPASSED: Selection.hasOwnProperty(\"_listeners\") [./Selection.as:84]\nPASSED: typeof(Selection._listeners) == 'object' [./Selection.as:85]\nFAILED: Selection._listeners instanceof Array [./Selection.as:86]\nPASSED: mc instanceof MovieClip [./Selection.as:89]\nPASSED: ret == false [./Selection.as:91]\nPASSED: Selection.getFocus() == null [./Selection.as:92]\nPASSED: Selection.getFocus() == null [./Selection.as:96]\nPASSED: typeof(ret) == \"boolean\" [./Selection.as:98]\nPASSED: ret == true [./Selection.as:99]\nFAILED: expected: false obtained: true [./Selection.as:103]\nPASSED: Selection.getFocus() == null [./Selection.as:104]\nPASSED: Selection.getFocus() == null [./Selection.as:107]\nPASSED: ret == true [./Selection.as:109]\nPASSED: Selection.getFocus() == null [./Selection.as:110]\nPASSED: ret == false [./Selection.as:112]\nPASSED: Selection.getFocus() == null [./Selection.as:113]\nPASSED: Selection.getFocus() == null [./Selection.as:116]\nFAILED: expected: false obtained: true [./Selection.as:118]\nPASSED: Selection.getFocus() == \"_level0.mc\" [./Selection.as:119]\nPASSED: ret == false [./Selection.as:121]\nPASSED: Selection.getFocus() == \"_level0.mc\" [./Selection.as:122]\nPASSED: ret == false [./Selection.as:124]\nPASSED: Selection.getFocus() == \"_level0.mc\" [./Selection.as:125]\nPASSED: mc._visible == false [./Selection.as:130]\nPASSED: Selection.getFocus() == null [./Selection.as:131]\nFAILED: expected: false obtained: true [./Selection.as:133]\nPASSED: Selection.getFocus() == \"_level0.mc\" [./Selection.as:134]\nPASSED: Selection.getFocus() == \"_level0.mc\" [./Selection.as:136]\nPASSED: ret == true [./Selection.as:139]\nPASSED: Selection.getFocus() == null [./Selection.as:140]\nFAILED: expected: false obtained: true [./Selection.as:143]\nPASSED: Selection.getFocus() == \"_level0.mc\" [./Selection.as:145]\nPASSED: Selection.getFocus() == \"_level0.mc\" [./Selection.as:147]\nPASSED: Selection.getFocus() == null [./Selection.as:149]\nPASSED: Selection.getFocus() == \"_level0.mc\" [./Selection.as:153]\nPASSED: Selection.getFocus() == \"_level0.mc\" [./Selection.as:155]\nPASSED: Selection.getFocus() == \"_level0.mc\" [./Selection.as:157]\nPASSED: ret == -1 [./Selection.as:161]\nPASSED: ret == -1 [./Selection.as:163]\nPASSED: ret == -1 [./Selection.as:165]\nPASSED: Selection.getFocus() == null [./Selection.as:169]\nPASSED: ret == false [./Selection.as:171]\nPASSED: Selection.getFocus() == null [./Selection.as:172]\nPASSED: ret == true [./Selection.as:174]\nPASSED: Selection.getFocus() == null [./Selection.as:175]\nPASSED: ret == -1 [./Selection.as:179]\nPASSED: ret == -1 [./Selection.as:181]\n... (57 lines after) ...",
@@ -1647,7 +1647,7 @@
         "expected_lines": 100,
         "matching_lines": 3
       },
-      "duration": 21.98,
+      "duration": 23.33,
       "status": "output_mismatch",
       "detail": "97 line(s) differ (actual=3, expected=100)",
       "actual_output": "SWF5\n\n[Sound.as debug-22405-0e18b8076]",
@@ -1661,7 +1661,7 @@
         "expected_lines": 121,
         "matching_lines": 76
       },
-      "duration": 22.49,
+      "duration": 21.94,
       "status": "output_mismatch",
       "detail": "45 line(s) differ (actual=113, expected=121)",
       "actual_output": "... (11 lines before) ...\nPASSED: typeof(Sound.prototype.stop) == 'function' [./Sound.as:50]\nPASSED: typeof(Sound.prototype.getTransform) == 'function' [./Sound.as:51]\nPASSED: typeof(Sound.prototype.setTransform) == 'function' [./Sound.as:52]\nPASSED: typeof(Sound.prototype.getVolume) == 'function' [./Sound.as:53]\nPASSED: typeof(Sound.prototype.setVolume) == 'function' [./Sound.as:54]\nFAILED: expected: functionSinceSWF6 obtained: undefined [./Sound.as:61]\nFAILED: expected: functionSinceSWF6 obtained: undefined [./Sound.as:62]\nFAILED: expected: functionSinceSWF6 obtained: undefined [./Sound.as:63]\nFAILED: expected: functionSinceSWF6 obtained: undefined [./Sound.as:64]\nFAILED: expected: functionSinceSWF6 obtained: undefined [./Sound.as:65]\nFAILED: expected: functionSinceSWF6 obtained: undefined [./Sound.as:66]\nFAILED: expected: functionSinceSWF6 obtained: undefined [./Sound.as:67]\nPASSED: typeof(Sound.prototype.areSoundInaccessible) == 'undefined' [./Sound.as:71]\nPASSED: typeof(Sound.prototype.duration) == 'undefined' [./Sound.as:72]\nPASSED: typeof(Sound.prototype.ID3) == 'undefined' [./Sound.as:73]\nPASSED: typeof(Sound.prototype.checkPolicyFile) == 'undefined' [./Sound.as:74]\nPASSED: typeof(Sound.prototype.position) == 'undefined' [./Sound.as:75]\nPASSED: typeof(Sound.prototype.onID3) == 'undefined' [./Sound.as:76]\nPASSED: typeof(Sound.prototype.onLoad) == 'undefined' [./Sound.as:77]\nPASSED: typeof(Sound.prototype.onSoundComplete) == 'undefined' [./Sound.as:78]\nPASSED: s1 instanceof Sound [./Sound.as:95]\nPASSED: typeof(s1.getDuration()) == 'undefined' [./Sound.as:96]\nPASSED: typeof(s1.getPan()) == 'number' [./Sound.as:97]\nPASSED: s1.getPan() == 0 [./Sound.as:98]\nPASSED: typeof(s1.getPosition()) == 'undefined' [./Sound.as:99]\nPASSED: typeof(s1.getTransform()) == 'object' [./Sound.as:100]\nPASSED: typeof(s1.getVolume()) == 'number' [./Sound.as:104]\nPASSED: s1.getVolume() == 100 [./Sound.as:105]\nPASSED: s1.getVolume() == 95 [./Sound.as:107]\nPASSED: s2.getVolume() == 95 [./Sound.as:108]\nPASSED: typeof(s1.getBytesLoaded()) == 'undefined' [./Sound.as:110]\nPASSED: typeof(s1.getBytesTotal()) == 'undefined' [./Sound.as:111]\nFAILED: expected: 'boolean' obtained: undefined [./Sound.as:112]\nPASSED: typeof(s1.duration) == 'undefined' [./Sound.as:116]\nPASSED: typeof(s1.ID3) == 'undefined' [./Sound.as:117]\nPASSED: typeof(s1.position) == 'undefined' [./Sound.as:118]\nPASSED: s2 instanceof Sound [./Sound.as:169]\nPASSED: typeof(s2.getDuration()) == 'undefined' [./Sound.as:170]\nPASSED: typeof(s2.getPan()) == 'number' [./Sound.as:171]\nPASSED: s2.getPan() == 0 [./Sound.as:172]\nPASSED: typeof(s2.getPosition()) == 'undefined' [./Sound.as:173]\nPASSED: typeof(s2.getTransform()) == 'object' [./Sound.as:174]\nPASSED: typeof(s2.getVolume()) == 'number' [./Sound.as:175]\nPASSED: s2.getVolume() == 100 [./Sound.as:176]\nPASSED: typeof(s2.getBytesLoaded()) == 'undefined' [./Sound.as:177]\nPASSED: typeof(s2.getBytesTotal()) == 'undefined' [./Sound.as:178]\nFAILED: expected: 'boolean' obtained: undefined [./Sound.as:179]\nPASSED: typeof(s2.duration) == 'undefined' [./Sound.as:183]\nPASSED: typeof(s2.ID3) == 'undefined' [./Sound.as:184]\nPASSED: typeof(s2.position) == 'undefined' [./Sound.as:185]\n... (52 lines after) ...",
@@ -1675,7 +1675,7 @@
         "expected_lines": 121,
         "matching_lines": 3
       },
-      "duration": 21.6,
+      "duration": 21.18,
       "status": "output_mismatch",
       "detail": "118 line(s) differ (actual=4, expected=121)",
       "actual_output": "SWF7\n\n[Sound.as debug-22405-0e18b8076]\nWaiting 3 seconds for onSoundComplete to be called",
@@ -1689,7 +1689,7 @@
         "expected_lines": 121,
         "matching_lines": 3
       },
-      "duration": 21.6,
+      "duration": 21.34,
       "status": "output_mismatch",
       "detail": "118 line(s) differ (actual=4, expected=121)",
       "actual_output": "SWF8\n\n[Sound.as debug-22405-0e18b8076]\nWaiting 3 seconds for onSoundComplete to be called",
@@ -1703,7 +1703,7 @@
         "expected_lines": 38,
         "matching_lines": 38
       },
-      "duration": 18.87,
+      "duration": 18.29,
       "status": "pass"
     },
     {
@@ -1714,7 +1714,7 @@
         "expected_lines": 358,
         "matching_lines": 3
       },
-      "duration": 31.81,
+      "duration": 31.06,
       "status": "output_mismatch",
       "detail": "355 line(s) differ (actual=3, expected=358)",
       "actual_output": "SWF5\n\n[String.as debug-22403-05c7ba106]",
@@ -1728,7 +1728,7 @@
         "expected_lines": 377,
         "matching_lines": 3
       },
-      "duration": 32.64,
+      "duration": 31.52,
       "status": "output_mismatch",
       "detail": "374 line(s) differ (actual=3, expected=377)",
       "actual_output": "SWF6\n\n[String.as debug-22403-05c7ba106]",
@@ -1742,7 +1742,7 @@
         "expected_lines": 377,
         "matching_lines": 3
       },
-      "duration": 33.08,
+      "duration": 31.91,
       "status": "output_mismatch",
       "detail": "374 line(s) differ (actual=3, expected=377)",
       "actual_output": "SWF7\n\n[String.as debug-22403-05c7ba106]",
@@ -1756,7 +1756,7 @@
         "expected_lines": 377,
         "matching_lines": 3
       },
-      "duration": 33.51,
+      "duration": 31.84,
       "status": "output_mismatch",
       "detail": "374 line(s) differ (actual=3, expected=377)",
       "actual_output": "SWF8\n\n[String.as debug-22403-05c7ba106]",
@@ -1770,7 +1770,7 @@
         "expected_lines": 67,
         "matching_lines": 3
       },
-      "duration": 19.48,
+      "duration": 19.11,
       "status": "output_mismatch",
       "detail": "64 line(s) differ (actual=5, expected=67)",
       "actual_output": "SWF5\n\n[System.as debug-22403-05c7ba106]\n    System.capabilities.hasIME certainly fails on the pp on\n    some platforms. There's no verification that it exists at all so far.",
@@ -1784,7 +1784,7 @@
         "expected_lines": 100,
         "matching_lines": 82
       },
-      "duration": 20.45,
+      "duration": 19.9,
       "status": "output_mismatch",
       "detail": "18 line(s) differ (actual=100, expected=100)",
       "actual_output": "... (26 lines before) ...\nPASSED: System.capabilities.hasOwnProperty(\"hasAudio\") [./System.as:53]\nPASSED: System.capabilities.hasOwnProperty(\"hasAccessibility\") [./System.as:54]\nPASSED: System.capabilities.hasOwnProperty(\"avHardwareDisable\") [./System.as:55]\nPASSED: System.capabilities.hasOwnProperty(\"windowlessDisable\") [./System.as:56]\nPASSED: System.hasOwnProperty(\"exactSettings\") [./System.as:58]\nFAILED: expected: 'undefined' obtained: object [./System.as:64]\nPASSED: typeof(System.__proto__) == 'object' [./System.as:66]\nPASSED: System.__proto__ == Object.prototype [./System.as:67]\nPASSED: typeof(System.setClipboard) == 'function' [./System.as:70]\nPASSED: typeof(System.showSettings) == 'function' [./System.as:73]\nPASSED: typeof(System.security.allowDomain) == 'function' [./System.as:76]\nPASSED: typeof(System.security.loadPolicyFile) == 'function' [./System.as:79]\nPASSED: typeof(System.capabilities) == 'object' [./System.as:90]\nPASSED: typeof(System.capabilities.version) == 'string' [./System.as:93]\nFAILED: expected: 'string' obtained: undefined [./System.as:94]\nFAILED: expected: $version obtained: WIN 32,0,0,0\u0000 [./System.as:95]\nPASSED: typeof(_global.$version) == 'undefined' [./System.as:96]\nFAILED: expected: 'string' obtained: undefined [./System.as:97]\nFAILED: expected: System.capabilities.version obtained:  [./System.as:98]\nPASSED: typeof(System.capabilities.os) == 'string' [./System.as:99]\nPASSED: typeof(System.capabilities.manufacturer) == 'string' [./System.as:100]\nPASSED: typeof(System.capabilities.playerType) == 'string' [./System.as:101]\nPASSED: typeof(System.capabilities.serverString) == 'string' [./System.as:102]\nPASSED: typeof(System.capabilities.screenResolutionX) == 'number' [./System.as:103]\nPASSED: typeof(System.capabilities.screenResolutionY) == 'number' [./System.as:104]\nPASSED: typeof(System.capabilities.screenDPI) == 'number' [./System.as:105]\nPASSED: typeof(System.capabilities.screenColor) == 'string' [./System.as:106]\nFAILED: expected: 'string' obtained: number [./System.as:107]\nPASSED: typeof(System.capabilities.localFileReadDisable) == 'boolean' [./System.as:108]\nPASSED: typeof(System.capabilities.language) == 'string' [./System.as:109]\nPASSED: typeof(System.capabilities.isDebugger) == 'boolean' [./System.as:110]\nPASSED: typeof(System.capabilities.hasVideoEncoder) == 'boolean' [./System.as:111]\nPASSED: typeof(System.capabilities.hasStreamingVideo) == 'boolean' [./System.as:112]\nPASSED: typeof(System.capabilities.hasStreamingAudio) == 'boolean' [./System.as:113]\nPASSED: typeof(System.capabilities.hasScreenPlayback) == 'boolean' [./System.as:114]\nPASSED: typeof(System.capabilities.hasScreenBroadcast) == 'boolean' [./System.as:115]\nPASSED: typeof(System.capabilities.hasPrinting) == 'boolean' [./System.as:116]\nPASSED: typeof(System.capabilities.hasMP3) == 'boolean' [./System.as:117]\nPASSED: typeof(System.capabilities.hasEmbeddedVideo) == 'boolean' [./System.as:118]\nPASSED: typeof(System.capabilities.hasAudioEncoder) == 'boolean' [./System.as:119]\nPASSED: typeof(System.capabilities.hasAudio) == 'boolean' [./System.as:120]\nPASSED: typeof(System.capabilities.hasAccessibility) == 'boolean' [./System.as:121]\nPASSED: typeof(System.capabilities.avHardwareDisable) == 'boolean' [./System.as:122]\nPASSED: typeof(System.capabilities.windowlessDisable) == 'boolean' [./System.as:123]\nFAILED: expected: 'undefined' obtained: boolean [./System.as:126]\n    System.capabilities.hasIME certainly fails on the pp on\n    some platforms. There's no verification that it exists at all so far.\nPASSED: typeof(System.capabilities.hasTLS) == 'boolean' [./System.as:131]\nPASSED: typeof(System.exactSettings) == 'boolean' [./System.as:136]\nFAILED: expected: true obtained: false [./System.as:138]\n... (24 lines after) ...",
@@ -1798,7 +1798,7 @@
         "expected_lines": 101,
         "matching_lines": 83
       },
-      "duration": 20.53,
+      "duration": 19.89,
       "status": "output_mismatch",
       "detail": "18 line(s) differ (actual=101, expected=101)",
       "actual_output": "... (26 lines before) ...\nPASSED: System.capabilities.hasOwnProperty(\"hasAudio\") [./System.as:53]\nPASSED: System.capabilities.hasOwnProperty(\"hasAccessibility\") [./System.as:54]\nPASSED: System.capabilities.hasOwnProperty(\"avHardwareDisable\") [./System.as:55]\nPASSED: System.capabilities.hasOwnProperty(\"windowlessDisable\") [./System.as:56]\nPASSED: System.hasOwnProperty(\"exactSettings\") [./System.as:58]\nFAILED: expected: 'undefined' obtained: object [./System.as:64]\nPASSED: typeof(System.__proto__) == 'object' [./System.as:66]\nPASSED: System.__proto__ == Object.prototype [./System.as:67]\nPASSED: typeof(System.setClipboard) == 'function' [./System.as:70]\nPASSED: typeof(System.showSettings) == 'function' [./System.as:73]\nPASSED: typeof(System.security.allowDomain) == 'function' [./System.as:76]\nPASSED: typeof(System.security.loadPolicyFile) == 'function' [./System.as:79]\nPASSED: typeof(System.security.allowInsecureDomain) == 'function' [./System.as:85]\nPASSED: typeof(System.capabilities) == 'object' [./System.as:90]\nPASSED: typeof(System.capabilities.version) == 'string' [./System.as:93]\nFAILED: expected: 'string' obtained: undefined [./System.as:94]\nFAILED: expected: $version obtained: WIN 32,0,0,0\u0000 [./System.as:95]\nPASSED: typeof(_global.$version) == 'undefined' [./System.as:96]\nFAILED: expected: 'string' obtained: undefined [./System.as:97]\nFAILED: expected: System.capabilities.version obtained: undefined [./System.as:98]\nPASSED: typeof(System.capabilities.os) == 'string' [./System.as:99]\nPASSED: typeof(System.capabilities.manufacturer) == 'string' [./System.as:100]\nPASSED: typeof(System.capabilities.playerType) == 'string' [./System.as:101]\nPASSED: typeof(System.capabilities.serverString) == 'string' [./System.as:102]\nPASSED: typeof(System.capabilities.screenResolutionX) == 'number' [./System.as:103]\nPASSED: typeof(System.capabilities.screenResolutionY) == 'number' [./System.as:104]\nPASSED: typeof(System.capabilities.screenDPI) == 'number' [./System.as:105]\nPASSED: typeof(System.capabilities.screenColor) == 'string' [./System.as:106]\nFAILED: expected: 'string' obtained: number [./System.as:107]\nPASSED: typeof(System.capabilities.localFileReadDisable) == 'boolean' [./System.as:108]\nPASSED: typeof(System.capabilities.language) == 'string' [./System.as:109]\nPASSED: typeof(System.capabilities.isDebugger) == 'boolean' [./System.as:110]\nPASSED: typeof(System.capabilities.hasVideoEncoder) == 'boolean' [./System.as:111]\nPASSED: typeof(System.capabilities.hasStreamingVideo) == 'boolean' [./System.as:112]\nPASSED: typeof(System.capabilities.hasStreamingAudio) == 'boolean' [./System.as:113]\nPASSED: typeof(System.capabilities.hasScreenPlayback) == 'boolean' [./System.as:114]\nPASSED: typeof(System.capabilities.hasScreenBroadcast) == 'boolean' [./System.as:115]\nPASSED: typeof(System.capabilities.hasPrinting) == 'boolean' [./System.as:116]\nPASSED: typeof(System.capabilities.hasMP3) == 'boolean' [./System.as:117]\nPASSED: typeof(System.capabilities.hasEmbeddedVideo) == 'boolean' [./System.as:118]\nPASSED: typeof(System.capabilities.hasAudioEncoder) == 'boolean' [./System.as:119]\nPASSED: typeof(System.capabilities.hasAudio) == 'boolean' [./System.as:120]\nPASSED: typeof(System.capabilities.hasAccessibility) == 'boolean' [./System.as:121]\nPASSED: typeof(System.capabilities.avHardwareDisable) == 'boolean' [./System.as:122]\nPASSED: typeof(System.capabilities.windowlessDisable) == 'boolean' [./System.as:123]\nFAILED: expected: 'undefined' obtained: boolean [./System.as:126]\n    System.capabilities.hasIME certainly fails on the pp on\n    some platforms. There's no verification that it exists at all so far.\nPASSED: typeof(System.capabilities.hasTLS) == 'boolean' [./System.as:131]\nPASSED: typeof(System.exactSettings) == 'boolean' [./System.as:136]\n... (25 lines after) ...",
@@ -1812,7 +1812,7 @@
         "expected_lines": 101,
         "matching_lines": 83
       },
-      "duration": 20.31,
+      "duration": 19.9,
       "status": "output_mismatch",
       "detail": "18 line(s) differ (actual=101, expected=101)",
       "actual_output": "... (26 lines before) ...\nPASSED: System.capabilities.hasOwnProperty(\"hasAudio\") [./System.as:53]\nPASSED: System.capabilities.hasOwnProperty(\"hasAccessibility\") [./System.as:54]\nPASSED: System.capabilities.hasOwnProperty(\"avHardwareDisable\") [./System.as:55]\nPASSED: System.capabilities.hasOwnProperty(\"windowlessDisable\") [./System.as:56]\nPASSED: System.hasOwnProperty(\"exactSettings\") [./System.as:58]\nFAILED: expected: 'undefined' obtained: object [./System.as:64]\nPASSED: typeof(System.__proto__) == 'object' [./System.as:66]\nPASSED: System.__proto__ == Object.prototype [./System.as:67]\nPASSED: typeof(System.setClipboard) == 'function' [./System.as:70]\nPASSED: typeof(System.showSettings) == 'function' [./System.as:73]\nPASSED: typeof(System.security.allowDomain) == 'function' [./System.as:76]\nPASSED: typeof(System.security.loadPolicyFile) == 'function' [./System.as:79]\nPASSED: typeof(System.security.allowInsecureDomain) == 'function' [./System.as:85]\nPASSED: typeof(System.capabilities) == 'object' [./System.as:90]\nPASSED: typeof(System.capabilities.version) == 'string' [./System.as:93]\nFAILED: expected: 'string' obtained: undefined [./System.as:94]\nFAILED: expected: $version obtained: WIN 32,0,0,0\u0000 [./System.as:95]\nPASSED: typeof(_global.$version) == 'undefined' [./System.as:96]\nFAILED: expected: 'string' obtained: undefined [./System.as:97]\nFAILED: expected: System.capabilities.version obtained: undefined [./System.as:98]\nPASSED: typeof(System.capabilities.os) == 'string' [./System.as:99]\nPASSED: typeof(System.capabilities.manufacturer) == 'string' [./System.as:100]\nPASSED: typeof(System.capabilities.playerType) == 'string' [./System.as:101]\nPASSED: typeof(System.capabilities.serverString) == 'string' [./System.as:102]\nPASSED: typeof(System.capabilities.screenResolutionX) == 'number' [./System.as:103]\nPASSED: typeof(System.capabilities.screenResolutionY) == 'number' [./System.as:104]\nPASSED: typeof(System.capabilities.screenDPI) == 'number' [./System.as:105]\nPASSED: typeof(System.capabilities.screenColor) == 'string' [./System.as:106]\nFAILED: expected: 'string' obtained: number [./System.as:107]\nPASSED: typeof(System.capabilities.localFileReadDisable) == 'boolean' [./System.as:108]\nPASSED: typeof(System.capabilities.language) == 'string' [./System.as:109]\nPASSED: typeof(System.capabilities.isDebugger) == 'boolean' [./System.as:110]\nPASSED: typeof(System.capabilities.hasVideoEncoder) == 'boolean' [./System.as:111]\nPASSED: typeof(System.capabilities.hasStreamingVideo) == 'boolean' [./System.as:112]\nPASSED: typeof(System.capabilities.hasStreamingAudio) == 'boolean' [./System.as:113]\nPASSED: typeof(System.capabilities.hasScreenPlayback) == 'boolean' [./System.as:114]\nPASSED: typeof(System.capabilities.hasScreenBroadcast) == 'boolean' [./System.as:115]\nPASSED: typeof(System.capabilities.hasPrinting) == 'boolean' [./System.as:116]\nPASSED: typeof(System.capabilities.hasMP3) == 'boolean' [./System.as:117]\nPASSED: typeof(System.capabilities.hasEmbeddedVideo) == 'boolean' [./System.as:118]\nPASSED: typeof(System.capabilities.hasAudioEncoder) == 'boolean' [./System.as:119]\nPASSED: typeof(System.capabilities.hasAudio) == 'boolean' [./System.as:120]\nPASSED: typeof(System.capabilities.hasAccessibility) == 'boolean' [./System.as:121]\nPASSED: typeof(System.capabilities.avHardwareDisable) == 'boolean' [./System.as:122]\nPASSED: typeof(System.capabilities.windowlessDisable) == 'boolean' [./System.as:123]\nFAILED: expected: 'undefined' obtained: boolean [./System.as:126]\n    System.capabilities.hasIME certainly fails on the pp on\n    some platforms. There's no verification that it exists at all so far.\nPASSED: typeof(System.capabilities.hasTLS) == 'boolean' [./System.as:131]\nPASSED: typeof(System.exactSettings) == 'boolean' [./System.as:136]\n... (25 lines after) ...",
@@ -1826,7 +1826,7 @@
         "expected_lines": 12,
         "matching_lines": 3
       },
-      "duration": 18.24,
+      "duration": 17.88,
       "status": "output_mismatch",
       "detail": "9 line(s) differ (actual=3, expected=12)",
       "actual_output": "SWF5\n\n[TextField.as debug-22405-0e18b8076]",
@@ -1840,7 +1840,7 @@
         "expected_lines": 6,
         "matching_lines": 3
       },
-      "duration": 17.66,
+      "duration": 18.34,
       "status": "output_mismatch",
       "detail": "3 line(s) differ (actual=3, expected=6)",
       "actual_output": "SWF5\n\n[ debug-22403-05c7ba106]",
@@ -1854,7 +1854,7 @@
         "expected_lines": 37,
         "matching_lines": 32
       },
-      "duration": 18.34,
+      "duration": 18.97,
       "status": "output_mismatch",
       "detail": "5 line(s) differ (actual=37, expected=37)",
       "actual_output": "... (4 lines before) ...\nPASSED: tf.text == \"<i>italic</i>\" [./TextFieldHTML.as:36]\nPASSED: tf.text == \"<i>italic</i>\" [./TextFieldHTML.as:40]\nPASSED: tf.text == \"<b>bold</b>\" [./TextFieldHTML.as:44]\nPASSED: tf.text == \"italic\" [./TextFieldHTML.as:46]\nPASSED: tf.text == \"<font>font</font>\" [./TextFieldHTML.as:53]\nFAILED: expected: \"<font>font</font>\" obtained: <P ALIGN=\"LEFT\"><FONT FACE=\"Times New Roman\" SIZE=\"12\" COLOR=\"#000000\" LETTERSPACING=\"0\" KERNING=\"0\"><I>italic</I></FONT></P> [./TextFieldHTML.as:56]\nFAILED: expected: '<P ALIGN=\"LEFT\"><FONT FACE=\"Times\" SIZE=\"12\" COLOR=\"#000000\" LETTERSPACING=\"0\" KERNING=\"0\">&lt;font&gt;font&lt;/font&gt;</FONT></P>' obtained: <P ALIGN=\"LEFT\"><FONT FACE=\"Times New Roman\" SIZE=\"12\" COLOR=\"#000000\" LETTERSPACING=\"0\" KERNING=\"0\"><I>italic</I></FONT></P> [./TextFieldHTML.as:61]\nPASSED: tf.text == \"green\" [./TextFieldHTML.as:67]\nPASSED: tf.textColor == 0 [./TextFieldHTML.as:69]\nPASSED: format.color == 0x00ff00 [./TextFieldHTML.as:72]\nFAILED: expected: \"\" obtained: green2 [./TextFieldHTML.as:76]\nPASSED: tf.textColor == 0 [./TextFieldHTML.as:78]\nPASSED: tf.text == \"blue\" [./TextFieldHTML.as:82]\nPASSED: tf.textColor == 0 [./TextFieldHTML.as:84]\nPASSED: format.color == 0x0000ff [./TextFieldHTML.as:86]\nPASSED: tf.text == \"too short\" [./TextFieldHTML.as:94]\nPASSED: format.color == 0x0000ff [./TextFieldHTML.as:96]\nPASSED: tf.text == \"a bit short\" [./TextFieldHTML.as:100]\nPASSED: format.color == 0x000ff0 [./TextFieldHTML.as:102]\nPASSED: tf.text == \"no hash\" [./TextFieldHTML.as:106]\nPASSED: format.color == 0 [./TextFieldHTML.as:108]\nPASSED: tf.text == \"no hash 2\" [./TextFieldHTML.as:111]\nPASSED: format.color == 0 [./TextFieldHTML.as:113]\nPASSED: tf.text == \"empty\" [./TextFieldHTML.as:116]\nPASSED: format.color == 0 [./TextFieldHTML.as:118]\nPASSED: tf.text == \"long\" [./TextFieldHTML.as:122]\nPASSED: format.color == 0xffffee [./TextFieldHTML.as:124]\nPASSED: tf.text == \"corrupt\" [./TextFieldHTML.as:128]\nPASSED: format.color == 0x00ff00 [./TextFieldHTML.as:130]\nPASSED: tf.text == \"#32508\" [./TextFieldHTML.as:134]\n#passed: 28\n#failed: 3\n#total tests run: 31",
@@ -1868,7 +1868,7 @@
         "expected_lines": 37,
         "matching_lines": 3
       },
-      "duration": 18.15,
+      "duration": 19.24,
       "status": "output_mismatch",
       "detail": "34 line(s) differ (actual=3, expected=37)",
       "actual_output": "SWF7\n\n[undefined debug-22403-05c7ba106]",
@@ -1882,7 +1882,7 @@
         "expected_lines": 37,
         "matching_lines": 3
       },
-      "duration": 18.09,
+      "duration": 19.05,
       "status": "output_mismatch",
       "detail": "34 line(s) differ (actual=3, expected=37)",
       "actual_output": "SWF8\n\n[undefined debug-22403-05c7ba106]",
@@ -1896,7 +1896,7 @@
         "expected_lines": 128,
         "matching_lines": 3
       },
-      "duration": 20.43,
+      "duration": 21.82,
       "status": "output_mismatch",
       "detail": "125 line(s) differ (actual=3, expected=128)",
       "actual_output": "SWF5\n\n[TextFormat.as debug-22405-0e18b8076]",
@@ -1910,7 +1910,7 @@
         "expected_lines": 128,
         "matching_lines": 3
       },
-      "duration": 20.43,
+      "duration": 22.36,
       "status": "output_mismatch",
       "detail": "125 line(s) differ (actual=3, expected=128)",
       "actual_output": "SWF6\n\n[TextFormat.as debug-22405-0e18b8076]",
@@ -1924,7 +1924,7 @@
         "expected_lines": 174,
         "matching_lines": 3
       },
-      "duration": 21.95,
+      "duration": 22.32,
       "status": "output_mismatch",
       "detail": "171 line(s) differ (actual=3, expected=174)",
       "actual_output": "SWF7\n\n[TextFormat.as debug-22405-0e18b8076]",
@@ -1938,7 +1938,7 @@
         "expected_lines": 7,
         "matching_lines": 3
       },
-      "duration": 17.6,
+      "duration": 17.65,
       "status": "output_mismatch",
       "detail": "4 line(s) differ (actual=3, expected=7)",
       "actual_output": "SWF5\n\n[TextSnapshot.as debug-22403-05c7ba106]",
@@ -1952,7 +1952,7 @@
         "expected_lines": 173,
         "matching_lines": 3
       },
-      "duration": 23.33,
+      "duration": 23.13,
       "status": "output_mismatch",
       "detail": "170 line(s) differ (actual=3, expected=173)",
       "actual_output": "SWF6\n\n[TextSnapshot.as debug-22403-05c7ba106]",
@@ -1966,7 +1966,7 @@
         "expected_lines": 173,
         "matching_lines": 3
       },
-      "duration": 23.21,
+      "duration": 23.27,
       "status": "output_mismatch",
       "detail": "170 line(s) differ (actual=3, expected=173)",
       "actual_output": "SWF7\n\n[TextSnapshot.as debug-22403-05c7ba106]",
@@ -1980,7 +1980,7 @@
         "expected_lines": 173,
         "matching_lines": 3
       },
-      "duration": 23.45,
+      "duration": 23.12,
       "status": "output_mismatch",
       "detail": "170 line(s) differ (actual=3, expected=173)",
       "actual_output": "SWF8\n\n[TextSnapshot.as debug-22403-05c7ba106]",
@@ -1994,7 +1994,7 @@
         "expected_lines": 7,
         "matching_lines": 3
       },
-      "duration": 17.63,
+      "duration": 17.66,
       "status": "output_mismatch",
       "detail": "4 line(s) differ (actual=3, expected=7)",
       "actual_output": "SWF5\n\n[Transform.as debug-22403-05c7ba106]",
@@ -2008,7 +2008,7 @@
         "expected_lines": 7,
         "matching_lines": 3
       },
-      "duration": 18.47,
+      "duration": 17.85,
       "status": "output_mismatch",
       "detail": "4 line(s) differ (actual=3, expected=7)",
       "actual_output": "SWF6\n\n[Transform.as debug-22403-05c7ba106]",
@@ -2022,7 +2022,7 @@
         "expected_lines": 7,
         "matching_lines": 3
       },
-      "duration": 18.68,
+      "duration": 17.81,
       "status": "output_mismatch",
       "detail": "4 line(s) differ (actual=3, expected=7)",
       "actual_output": "SWF7\n\n[Transform.as debug-22403-05c7ba106]",
@@ -2036,7 +2036,7 @@
         "expected_lines": 20,
         "matching_lines": 3
       },
-      "duration": 19.51,
+      "duration": 18.92,
       "status": "output_mismatch",
       "detail": "17 line(s) differ (actual=4, expected=20)",
       "actual_output": "SWF5\n\n[Try.as debug-22403-05c7ba106]\nthrown",
@@ -2050,7 +2050,7 @@
         "expected_lines": 20,
         "matching_lines": 3
       },
-      "duration": 19.57,
+      "duration": 18.89,
       "status": "output_mismatch",
       "detail": "17 line(s) differ (actual=4, expected=20)",
       "actual_output": "SWF6\n\n[Try.as debug-22403-05c7ba106]\nthrown",
@@ -2064,7 +2064,7 @@
         "expected_lines": 20,
         "matching_lines": 3
       },
-      "duration": 19.64,
+      "duration": 18.97,
       "status": "output_mismatch",
       "detail": "17 line(s) differ (actual=4, expected=20)",
       "actual_output": "SWF7\n\n[Try.as debug-22403-05c7ba106]\nthrown",
@@ -2078,7 +2078,7 @@
         "expected_lines": 20,
         "matching_lines": 3
       },
-      "duration": 19.45,
+      "duration": 18.91,
       "status": "output_mismatch",
       "detail": "17 line(s) differ (actual=4, expected=20)",
       "actual_output": "SWF8\n\n[Try.as debug-22403-05c7ba106]\nthrown",
@@ -2092,7 +2092,7 @@
         "expected_lines": 7,
         "matching_lines": 3
       },
-      "duration": 18.85,
+      "duration": 17.63,
       "status": "output_mismatch",
       "detail": "4 line(s) differ (actual=3, expected=7)",
       "actual_output": "SWF5\n\n[Video.as debug-22405-0e18b8076]",
@@ -2106,7 +2106,7 @@
         "expected_lines": 85,
         "matching_lines": 85
       },
-      "duration": 20.48,
+      "duration": 19.08,
       "status": "pass"
     },
     {
@@ -2117,7 +2117,7 @@
         "expected_lines": 85,
         "matching_lines": 3
       },
-      "duration": 20.47,
+      "duration": 18.96,
       "status": "output_mismatch",
       "detail": "82 line(s) differ (actual=3, expected=85)",
       "actual_output": "SWF7\n\n[Video.as debug-22405-0e18b8076]",
@@ -2131,7 +2131,7 @@
         "expected_lines": 85,
         "matching_lines": 3
       },
-      "duration": 20.52,
+      "duration": 19.15,
       "status": "output_mismatch",
       "detail": "82 line(s) differ (actual=3, expected=85)",
       "actual_output": "SWF8\n\n[Video.as debug-22405-0e18b8076]",
@@ -2145,7 +2145,7 @@
         "expected_lines": 35,
         "matching_lines": 35
       },
-      "duration": 19.45,
+      "duration": 18.75,
       "status": "pass"
     },
     {
@@ -2156,7 +2156,7 @@
         "expected_lines": 35,
         "matching_lines": 35
       },
-      "duration": 19.32,
+      "duration": 18.07,
       "status": "pass"
     },
     {
@@ -2167,7 +2167,7 @@
         "expected_lines": 35,
         "matching_lines": 3
       },
-      "duration": 18.11,
+      "duration": 18.79,
       "status": "output_mismatch",
       "detail": "32 line(s) differ (actual=3, expected=35)",
       "actual_output": "SWF7\n\n[XMLSocket.as debug-22403-05c7ba106]",
@@ -2181,7 +2181,7 @@
         "expected_lines": 35,
         "matching_lines": 3
       },
-      "duration": 18.25,
+      "duration": 18.43,
       "status": "output_mismatch",
       "detail": "32 line(s) differ (actual=3, expected=35)",
       "actual_output": "SWF8\n\n[XMLSocket.as debug-22403-05c7ba106]",
@@ -2195,7 +2195,7 @@
         "expected_lines": 4,
         "matching_lines": 3
       },
-      "duration": 17.79,
+      "duration": 18.07,
       "status": "output_mismatch",
       "detail": "1 line(s) differ (actual=3, expected=4)",
       "actual_output": "SWF5\n\n[array.as debug-22403-05c7ba106]",
@@ -2209,7 +2209,7 @@
         "expected_lines": 560,
         "matching_lines": 3
       },
-      "duration": 42.96,
+      "duration": 40.48,
       "status": "output_mismatch",
       "detail": "557 line(s) differ (actual=5, expected=560)",
       "actual_output": "SWF5\n\n[array.as debug-22403-05c7ba106]\ncreating new object\nX ctor",
@@ -2223,7 +2223,7 @@
         "expected_lines": 39,
         "matching_lines": 39
       },
-      "duration": 18.25,
+      "duration": 18.22,
       "status": "pass"
     },
     {
@@ -2234,7 +2234,7 @@
         "expected_lines": 73,
         "matching_lines": 18
       },
-      "duration": 18.98,
+      "duration": 19.12,
       "status": "output_mismatch",
       "detail": "55 line(s) differ (actual=72, expected=73)",
       "actual_output": "... (5 lines before) ...\nPASSED: OBJ.xyz == 100 [./case.as:36]\nPASSED: _root == _ROOT [./case.as:44]\nPASSED: _level0 == _LEVEL0 [./case.as:45]\nPASSED: typeof(mc0) == 'movieclip' [./case.as:58]\nPASSED: typeof(mc0.mc1) == 'movieclip' [./case.as:60]\nFAILED: expected: 100 obtained: 0 [./case.as:70]\nFAILED: expected: 100 obtained: 0 [./case.as:71]\nPASSED: mC0._name == \"mC0\" [./case.as:76]\nPASSED: mC0._target == \"/mC0\" [./case.as:77]\nPASSED: mC0.mC1._name == \"mC1\" [./case.as:78]\nPASSED: mC0.mC1._target == \"/mC0/mC1\" [./case.as:79]\nError: A 'with' action failed because the specified object did not exist.\n\nError: A 'with' action failed because the specified object did not exist.\n\nFAILED: mcRef[0]!= mcRef[1] [./case.as:126]\nFAILED: expected: 6 obtained:  [./case.as:127]\nFAILED: expected: \"clip\" obtained:  [./case.as:128]\nFAILED: expected: \"/clip\" obtained:  [./case.as:129]\nFAILED: expected: 7 obtained:  [./case.as:142]\nFAILED: expected: \"CLIP\" obtained:  [./case.as:143]\nFAILED: expected: \"/CLIP\" obtained:  [./case.as:144]\nPASSED: clip == CLIP [./case.as:151]\nFAILED: expected: 6 obtained: 7 [./case.as:162]\nFAILED: expected: 6 obtained: 7 [./case.as:164]\nFAILED: expected: 8 obtained: 9 [./case.as:165]\nFAILED: expected: 8 obtained: 9 [./case.as:166]\nPASSED: xYz == 100 [./case.as:180]\nPASSED: xyz == 100 [./case.as:182]\nPASSED: this.testVar == 100 [./case.as:185]\nPASSED: this.testvar == 100 [./case.as:187]\nPASSED: typeof(_root['mc_XYZ']) == 'movieclip' [./case.as:196]\nPASSED: typeof(_root['mcRef']) == 'movieclip' [./case.as:197]\nPASSED: typeof(mcRef['gotoAndStop']) == 'function' [./case.as:198]\nPASSED: propRecorder.length == 2 [./case.as:210]\nPASSED: propRecorder[0] == 'A' [./case.as:212]\nPASSED: propRecorder[1] == 'b' [./case.as:216]\nPASSED: propRecorder.length == 2 [./case.as:226]\nPASSED: propRecorder[0] == 'A' [./case.as:227]\nPASSED: propRecorder[1] == 'b' [./case.as:228]\nPASSED: propRecorder.length == 2 [./case.as:244]\nPASSED: propRecorder[0] == 'A' [./case.as:245]\nPASSED: propRecorder[1] == 'b' [./case.as:246]\nPASSED: propRecorder.length == 1 [./case.as:263]\nPASSED: propRecorder[0] == 'b' [./case.as:264]\nPASSED: obj.hasOwnProperty('a') [./case.as:277]\nPASSED: obj.hasOwnProperty('A') [./case.as:279]\nPASSED: propRecorder.length == 2 [./case.as:290]\nPASSED: propRecorder[0] == 'B' [./case.as:295]\nPASSED: propRecorder[1] == 'a' [./case.as:296]\n... (17 lines after) ...",
@@ -2248,7 +2248,7 @@
         "expected_lines": 67,
         "matching_lines": 3
       },
-      "duration": 19.11,
+      "duration": 18.94,
       "status": "output_mismatch",
       "detail": "64 line(s) differ (actual=6, expected=67)",
       "actual_output": "SWF7\n\n[case.as debug-22403-05c7ba106]\nError: A 'with' action failed because the specified object did not exist.\n\nError: A 'with' action failed because the specified object did not exist.",
@@ -2262,7 +2262,7 @@
         "expected_lines": 67,
         "matching_lines": 3
       },
-      "duration": 19.11,
+      "duration": 18.9,
       "status": "output_mismatch",
       "detail": "64 line(s) differ (actual=6, expected=67)",
       "actual_output": "SWF8\n\n[case.as debug-22403-05c7ba106]\nError: A 'with' action failed because the specified object did not exist.\n\nError: A 'with' action failed because the specified object did not exist.",
@@ -2276,7 +2276,7 @@
         "expected_lines": 60,
         "matching_lines": 37
       },
-      "duration": 19.03,
+      "duration": 18.5,
       "status": "output_mismatch",
       "detail": "23 line(s) differ (actual=60, expected=60)",
       "actual_output": "SWF5\n\n[delete.as debug-22403-05c7ba106]\nFAILED: anObject != undefined [./delete.as:6]\nPASSED: delete anObject [./delete.as:9]\nFAILED: expected: 'undefined' obtained: object [./delete.as:10]\nPASSED: typeof(anObjectBackup) == 'object' [./delete.as:11]\nFAILED: !delete noObject [./delete.as:12]\nPASSED: anotherObject [./delete.as:19]\nPASSED: a == \"anotherObject.a\" [./delete.as:28]\nPASSED: b == \"anotherObject.b (protected)\" [./delete.as:29]\nPASSED: !delete b [./delete.as:30]\nPASSED: b == \"anotherObject.b (protected)\" [./delete.as:31]\nPASSED: delete a [./delete.as:32]\nPASSED: a == \"a\" [./delete.as:33]\nPASSED: delete a [./delete.as:34]\nFAILED: expected: undefined obtained: a [./delete.as:40]\nFAILED: ! delete a [./delete.as:41]\nFAILED: expected: undefined obtained: a [./delete.as:44]\nFAILED: !delete a [./delete.as:45]\nPASSED: typeof(func.prototype) == 'object' [./delete.as:54]\nPASSED: func.prototype.appended_value == 4 [./delete.as:55]\nFAILED: !delete func.prototype [./delete.as:57]\nPASSED: typeof(func.prototype) == 'object' [./delete.as:58]\nPASSED: func.prototype.appended_value == 4 [./delete.as:59]\nPASSED: obj.a == 1 [./delete.as:67]\nPASSED: delete obj.a [./delete.as:68]\nPASSED: typeof(obj.a) == 'undefined' [./delete.as:69]\nPASSED: !delete obj.a [./delete.as:70]\nFAILED: !delete unexistent.a [./delete.as:71]\nFAILED: expected: undefined obtained: 5 [./delete.as:87]\nPASSED: o.b == undefined [./delete.as:92]\nFAILED: expected: undefined obtained: 5 [./delete.as:115]\nPASSED: reto == true [./delete.as:116]\nFAILED: expected: undefined obtained: 5 [./delete.as:129]\nFAILED: expected: undefined obtained: 5 [./delete.as:140]\nFAILED: expected: undefined obtained: 5 [./delete.as:153]\nPASSED: o.b == 5 [./delete.as:167]\nFAILED: expected: undefined obtained: 5 [./delete.as:179]\nPASSED: o.b == 5 [./delete.as:192]\nFAILED: expected: undefined obtained: 5 [./delete.as:203]\nPASSED: o.b.c == 5 [./delete.as:218]\nPASSED: o.b.c == 5 [./delete.as:231]\nPASSED: o.b.c == undefined [./delete.as:246]\nPASSED: o.b.c == 5 [./delete.as:259]\nPASSED: e == \"hi\" [./delete.as:265]\nPASSED: e == \"hello\" [./delete.as:267]\nPASSED: _root.e == \"hi\" [./delete.as:268]\nFAILED: expected: false obtained: true [./delete.as:271]\nFAILED: expected: \"hello\" obtained: hi [./delete.as:272]\n... (10 lines after) ...",
@@ -2290,7 +2290,7 @@
         "expected_lines": 60,
         "matching_lines": 38
       },
-      "duration": 18.64,
+      "duration": 18.65,
       "status": "output_mismatch",
       "detail": "22 line(s) differ (actual=60, expected=60)",
       "actual_output": "SWF6\n\n[delete.as debug-22403-05c7ba106]\nFAILED: anObject != undefined [./delete.as:6]\nPASSED: delete anObject [./delete.as:9]\nFAILED: expected: 'undefined' obtained: object [./delete.as:10]\nPASSED: typeof(anObjectBackup) == 'object' [./delete.as:11]\nFAILED: !delete noObject [./delete.as:12]\nPASSED: anotherObject [./delete.as:19]\nPASSED: a == \"anotherObject.a\" [./delete.as:28]\nPASSED: b == \"anotherObject.b (protected)\" [./delete.as:29]\nPASSED: !delete b [./delete.as:30]\nPASSED: b == \"anotherObject.b (protected)\" [./delete.as:31]\nPASSED: delete a [./delete.as:32]\nPASSED: a == \"a\" [./delete.as:33]\nPASSED: delete a [./delete.as:34]\nFAILED: expected: \"_global.a\" obtained: a [./delete.as:37]\nPASSED: delete a [./delete.as:38]\nFAILED: expected: undefined obtained: a [./delete.as:44]\nFAILED: !delete a [./delete.as:45]\nPASSED: typeof(func.prototype) == 'object' [./delete.as:54]\nPASSED: func.prototype.appended_value == 4 [./delete.as:55]\nFAILED: !delete func.prototype [./delete.as:57]\nPASSED: typeof(func.prototype) == 'object' [./delete.as:58]\nPASSED: func.prototype.appended_value == 4 [./delete.as:59]\nPASSED: obj.a == 1 [./delete.as:67]\nPASSED: delete obj.a [./delete.as:68]\nPASSED: typeof(obj.a) == 'undefined' [./delete.as:69]\nPASSED: !delete obj.a [./delete.as:70]\nFAILED: !delete unexistent.a [./delete.as:71]\nFAILED: expected: undefined obtained: 5 [./delete.as:87]\nPASSED: o.b == undefined [./delete.as:92]\nFAILED: expected: undefined obtained: 5 [./delete.as:115]\nPASSED: reto == true [./delete.as:116]\nFAILED: expected: undefined obtained: 5 [./delete.as:129]\nFAILED: expected: undefined obtained: 5 [./delete.as:140]\nFAILED: expected: undefined obtained: 5 [./delete.as:153]\nPASSED: o.b == 5 [./delete.as:167]\nFAILED: expected: undefined obtained: 5 [./delete.as:179]\nPASSED: o.b == 5 [./delete.as:192]\nFAILED: expected: undefined obtained: 5 [./delete.as:203]\nPASSED: o.b.c == 5 [./delete.as:218]\nPASSED: o.b.c == 5 [./delete.as:231]\nPASSED: o.b.c == undefined [./delete.as:246]\nPASSED: o.b.c == 5 [./delete.as:259]\nPASSED: e == \"hi\" [./delete.as:265]\nPASSED: e == \"hello\" [./delete.as:267]\nPASSED: _root.e == \"hi\" [./delete.as:268]\nFAILED: expected: false obtained: true [./delete.as:271]\nFAILED: expected: \"hello\" obtained: hi [./delete.as:272]\n... (10 lines after) ...",
@@ -2304,7 +2304,7 @@
         "expected_lines": 60,
         "matching_lines": 39
       },
-      "duration": 18.76,
+      "duration": 18.69,
       "status": "output_mismatch",
       "detail": "21 line(s) differ (actual=60, expected=60)",
       "actual_output": "SWF7\n\n[delete.as debug-22403-05c7ba106]\nFAILED: anObject != undefined [./delete.as:6]\nPASSED: delete anObject [./delete.as:9]\nFAILED: expected: 'undefined' obtained: object [./delete.as:10]\nPASSED: typeof(anObjectBackup) == 'object' [./delete.as:11]\nFAILED: !delete noObject [./delete.as:12]\nPASSED: anotherObject [./delete.as:19]\nPASSED: a == \"anotherObject.a\" [./delete.as:28]\nPASSED: b == \"anotherObject.b (protected)\" [./delete.as:29]\nPASSED: !delete b [./delete.as:30]\nPASSED: b == \"anotherObject.b (protected)\" [./delete.as:31]\nPASSED: delete a [./delete.as:32]\nPASSED: a == \"a\" [./delete.as:33]\nPASSED: delete a [./delete.as:34]\nFAILED: expected: \"_global.a\" obtained: a [./delete.as:37]\nPASSED: delete a [./delete.as:38]\nFAILED: expected: undefined obtained: a [./delete.as:44]\nFAILED: !delete a [./delete.as:45]\nPASSED: typeof(func.prototype) == 'object' [./delete.as:54]\nPASSED: func.prototype.appended_value == 4 [./delete.as:55]\nFAILED: !delete func.prototype [./delete.as:57]\nPASSED: typeof(func.prototype) == 'object' [./delete.as:58]\nPASSED: func.prototype.appended_value == 4 [./delete.as:59]\nPASSED: obj.a == 1 [./delete.as:67]\nPASSED: delete obj.a [./delete.as:68]\nPASSED: typeof(obj.a) == 'undefined' [./delete.as:69]\nPASSED: !delete obj.a [./delete.as:70]\nFAILED: !delete unexistent.a [./delete.as:71]\nFAILED: expected: undefined obtained: 5 [./delete.as:87]\nPASSED: o.b == undefined [./delete.as:92]\nPASSED: o == 5 [./delete.as:118]\nFAILED: expected: false obtained: true [./delete.as:119]\nFAILED: expected: undefined obtained: 5 [./delete.as:129]\nPASSED: o.b == 5 [./delete.as:142]\nFAILED: expected: undefined obtained: 5 [./delete.as:153]\nPASSED: o.b == 5 [./delete.as:167]\nFAILED: expected: undefined obtained: 5 [./delete.as:179]\nPASSED: o.b == 5 [./delete.as:192]\nFAILED: expected: undefined obtained: 5 [./delete.as:203]\nPASSED: o.b.c == 5 [./delete.as:218]\nPASSED: o.b.c == 5 [./delete.as:231]\nPASSED: o.b.c == undefined [./delete.as:246]\nPASSED: o.b.c == 5 [./delete.as:259]\nPASSED: e == \"hi\" [./delete.as:265]\nPASSED: e == \"hello\" [./delete.as:267]\nPASSED: _root.e == \"hi\" [./delete.as:268]\nFAILED: expected: false obtained: true [./delete.as:271]\nFAILED: expected: \"hello\" obtained: hi [./delete.as:272]\n... (10 lines after) ...",
@@ -2318,7 +2318,7 @@
         "expected_lines": 60,
         "matching_lines": 40
       },
-      "duration": 18.67,
+      "duration": 18.65,
       "status": "output_mismatch",
       "detail": "20 line(s) differ (actual=60, expected=60)",
       "actual_output": "SWF8\n\n[delete.as debug-22403-05c7ba106]\nPASSED: anObject != undefined [./delete.as:6]\nPASSED: delete anObject [./delete.as:9]\nFAILED: expected: 'undefined' obtained: object [./delete.as:10]\nPASSED: typeof(anObjectBackup) == 'object' [./delete.as:11]\nFAILED: !delete noObject [./delete.as:12]\nPASSED: anotherObject [./delete.as:19]\nPASSED: a == \"anotherObject.a\" [./delete.as:28]\nPASSED: b == \"anotherObject.b (protected)\" [./delete.as:29]\nPASSED: !delete b [./delete.as:30]\nPASSED: b == \"anotherObject.b (protected)\" [./delete.as:31]\nPASSED: delete a [./delete.as:32]\nPASSED: a == \"a\" [./delete.as:33]\nPASSED: delete a [./delete.as:34]\nFAILED: expected: \"_global.a\" obtained: a [./delete.as:37]\nPASSED: delete a [./delete.as:38]\nFAILED: expected: undefined obtained: a [./delete.as:44]\nFAILED: !delete a [./delete.as:45]\nPASSED: typeof(func.prototype) == 'object' [./delete.as:54]\nPASSED: func.prototype.appended_value == 4 [./delete.as:55]\nFAILED: !delete func.prototype [./delete.as:57]\nPASSED: typeof(func.prototype) == 'object' [./delete.as:58]\nPASSED: func.prototype.appended_value == 4 [./delete.as:59]\nPASSED: obj.a == 1 [./delete.as:67]\nPASSED: delete obj.a [./delete.as:68]\nPASSED: typeof(obj.a) == 'undefined' [./delete.as:69]\nPASSED: !delete obj.a [./delete.as:70]\nFAILED: !delete unexistent.a [./delete.as:71]\nFAILED: expected: undefined obtained: 5 [./delete.as:87]\nPASSED: o.b == undefined [./delete.as:92]\nPASSED: o == 5 [./delete.as:118]\nFAILED: expected: false obtained: true [./delete.as:119]\nFAILED: expected: undefined obtained: 5 [./delete.as:129]\nPASSED: o.b == 5 [./delete.as:142]\nFAILED: expected: undefined obtained: 5 [./delete.as:153]\nPASSED: o.b == 5 [./delete.as:167]\nFAILED: expected: undefined obtained: 5 [./delete.as:179]\nPASSED: o.b == 5 [./delete.as:192]\nFAILED: expected: undefined obtained: 5 [./delete.as:203]\nPASSED: o.b.c == 5 [./delete.as:218]\nPASSED: o.b.c == 5 [./delete.as:231]\nPASSED: o.b.c == undefined [./delete.as:246]\nPASSED: o.b.c == 5 [./delete.as:259]\nPASSED: e == \"hi\" [./delete.as:265]\nPASSED: e == \"hello\" [./delete.as:267]\nPASSED: _root.e == \"hi\" [./delete.as:268]\nFAILED: expected: false obtained: true [./delete.as:271]\nFAILED: expected: \"hello\" obtained: hi [./delete.as:272]\n... (10 lines after) ...",
@@ -2332,7 +2332,7 @@
         "expected_lines": 6,
         "matching_lines": 3
       },
-      "duration": 17.88,
+      "duration": 18.04,
       "status": "output_mismatch",
       "detail": "3 line(s) differ (actual=3, expected=6)",
       "actual_output": "SWF5\n\n[enumerate.as debug-22403-05c7ba106]",
@@ -2346,7 +2346,7 @@
         "expected_lines": 49,
         "matching_lines": 22
       },
-      "duration": 18.9,
+      "duration": 18.95,
       "status": "output_mismatch",
       "detail": "27 line(s) differ (actual=49, expected=49)",
       "actual_output": "SWF6\n\n[enumerate.as debug-22403-05c7ba106]\nFAILED: expected: 'movieclip' obtained: number [./enumerate.as:54]\nFAILED: expected: 'movieclip' obtained: number [./enumerate.as:55]\nFAILED: expected: 'movieclip' obtained: number [./enumerate.as:56]\nFAILED: expected: 'movieclip' obtained: number [./enumerate.as:57]\nFAILED: expected: 'movieclip' obtained: number [./enumerate.as:58]\nFAILED: expected: 'movieclip' obtained: number [./enumerate.as:59]\nFAILED: expected: false obtained: true [./enumerate.as:60]\nFAILED: expected: false obtained: true [./enumerate.as:61]\nFAILED: expected: false obtained: true [./enumerate.as:62]\nFAILED: expected: false obtained: true [./enumerate.as:63]\nFAILED: expected: false obtained: true [./enumerate.as:64]\nFAILED: expected: false obtained: true [./enumerate.as:65]\nPASSED: typeof(recorder['x1']) == 'function' [./enumerate.as:92]\nPASSED: typeof(recorder['x2']) == 'number' [./enumerate.as:93]\nPASSED: typeof(recorder['x3']) == 'object' [./enumerate.as:94]\nPASSED: obj.hasOwnProperty('x1') == true [./enumerate.as:95]\nPASSED: obj.hasOwnProperty('x2') == true [./enumerate.as:96]\nPASSED: obj.hasOwnProperty('x3') == true [./enumerate.as:97]\nFAILED: expected: \"a,\" obtained:  [./enumerate.as:115]\nFAILED: expected: \"b,a,\" obtained:  [./enumerate.as:118]\nFAILED: expected: \"el,b,a,\" obtained:  [./enumerate.as:121]\nFAILED: expected: \"8,el,b,a,\" obtained:  [./enumerate.as:124]\nFAILED: expected: \"8,el,b,a,\" obtained:  [./enumerate.as:127]\nFAILED: expected: \"8,el,a,\" obtained:  [./enumerate.as:130]\nFAILED: expected: \"b,8,el,a,\" obtained:  [./enumerate.as:133]\nFAILED: expected: \"b,8,el,a,\" obtained:  [./enumerate.as:136]\nFAILED: expected: \"[object Object],b,8,el,a,\" obtained:  [./enumerate.as:140]\nFAILED: expected: \"[object Object],b,el,a,\" obtained:  [./enumerate.as:143]\nFAILED: expected: \"c,[object Object],b,el,a,\" obtained:  [./enumerate.as:146]\nFAILED: expected: \"9,c,[object Object],b,el,a,\" obtained:  [./enumerate.as:149]\nFAILED: expected: \"6,9,c,[object Object],b,el,a,\" obtained:  [./enumerate.as:152]\nPASSED: r0 == \"b\" [./enumerate.as:200]\nPASSED: r1 == \"a\" [./enumerate.as:201]\nPASSED: r2 == undefined [./enumerate.as:202]\nPASSED: r2 === undefined [./enumerate.as:205]\nPASSED: r3 == \"stackfirst\" [./enumerate.as:207]\nPASSED: r4 == undefined [./enumerate.as:208]\nPASSED: r0 == \"b\" [./enumerate.as:244]\nPASSED: r1 == \"a\" [./enumerate.as:245]\nPASSED: r2 == undefined [./enumerate.as:246]\nPASSED: r2 === undefined [./enumerate.as:249]\nPASSED: r3 == \"stackfirst\" [./enumerate.as:251]\nPASSED: r4 == undefined [./enumerate.as:252]\n#passed: 18\n#failed: 25\n#total tests run: 43",
@@ -2360,7 +2360,7 @@
         "expected_lines": 49,
         "matching_lines": 3
       },
-      "duration": 18.92,
+      "duration": 19.1,
       "status": "output_mismatch",
       "detail": "46 line(s) differ (actual=3, expected=49)",
       "actual_output": "SWF7\n\n[enumerate.as debug-22403-05c7ba106]",
@@ -2374,7 +2374,7 @@
         "expected_lines": 49,
         "matching_lines": 3
       },
-      "duration": 19.0,
+      "duration": 19.05,
       "status": "output_mismatch",
       "detail": "46 line(s) differ (actual=3, expected=49)",
       "actual_output": "SWF8\n\n[enumerate.as debug-22403-05c7ba106]",
@@ -2388,7 +2388,7 @@
         "expected_lines": 10,
         "matching_lines": 3
       },
-      "duration": 17.96,
+      "duration": 18.05,
       "status": "output_mismatch",
       "detail": "7 line(s) differ (actual=3, expected=10)",
       "actual_output": "SWF5\n\n[ debug-22403-05c7ba106]",
@@ -2402,7 +2402,7 @@
         "expected_lines": 10,
         "matching_lines": 3
       },
-      "duration": 17.95,
+      "duration": 18.17,
       "status": "output_mismatch",
       "detail": "7 line(s) differ (actual=3, expected=10)",
       "actual_output": "SWF6\n\n[ debug-22403-05c7ba106]",
@@ -2416,7 +2416,7 @@
         "expected_lines": 10,
         "matching_lines": 3
       },
-      "duration": 18.96,
+      "duration": 18.09,
       "status": "output_mismatch",
       "detail": "7 line(s) differ (actual=3, expected=10)",
       "actual_output": "SWF7\n\n[undefined debug-22403-05c7ba106]",
@@ -2430,7 +2430,7 @@
         "expected_lines": 262,
         "matching_lines": 3
       },
-      "duration": 26.37,
+      "duration": 24.89,
       "status": "output_mismatch",
       "detail": "259 line(s) differ (actual=3, expected=262)",
       "actual_output": "SWF8\n\n[ops.as debug-22403-05c7ba106]",
@@ -2444,7 +2444,7 @@
         "expected_lines": 7,
         "matching_lines": 3
       },
-      "duration": 19.71,
+      "duration": 17.65,
       "status": "output_mismatch",
       "detail": "4 line(s) differ (actual=3, expected=7)",
       "actual_output": "SWF5\n\n[swap.as debug-22403-05c7ba106]",
@@ -2458,7 +2458,7 @@
         "expected_lines": 7,
         "matching_lines": 3
       },
-      "duration": 19.48,
+      "duration": 17.47,
       "status": "output_mismatch",
       "detail": "4 line(s) differ (actual=3, expected=7)",
       "actual_output": "SWF6\n\n[swap.as debug-22403-05c7ba106]",
@@ -2472,7 +2472,7 @@
         "expected_lines": 7,
         "matching_lines": 3
       },
-      "duration": 19.77,
+      "duration": 17.43,
       "status": "output_mismatch",
       "detail": "4 line(s) differ (actual=3, expected=7)",
       "actual_output": "SWF7\n\n[swap.as debug-22403-05c7ba106]",
@@ -2486,7 +2486,7 @@
         "expected_lines": 7,
         "matching_lines": 3
       },
-      "duration": 19.11,
+      "duration": 17.45,
       "status": "output_mismatch",
       "detail": "4 line(s) differ (actual=3, expected=7)",
       "actual_output": "SWF8\n\n[swap.as debug-22403-05c7ba106]",
@@ -2500,7 +2500,7 @@
         "expected_lines": 12,
         "matching_lines": 3
       },
-      "duration": 17.94,
+      "duration": 18.09,
       "status": "output_mismatch",
       "detail": "9 line(s) differ (actual=3, expected=12)",
       "actual_output": "SWF5\n\n[targetPath.as debug-22403-05c7ba106]",
@@ -2514,7 +2514,7 @@
         "expected_lines": 23,
         "matching_lines": 3
       },
-      "duration": 18.1,
+      "duration": 18.33,
       "status": "output_mismatch",
       "detail": "20 line(s) differ (actual=8, expected=23)",
       "actual_output": "SWF6\n\n[targetPath.as debug-22403-05c7ba106]\nTarget not found: Target=\"null\" Base=\"_level0\"\nTarget not found: Target=\"...:mc1\" Base=\"_level0\"\nTarget not found: Target=\"...:mc\" Base=\"_level0\"\nTarget not found: Target=\"mc\" Base=\"_level0\"\nTarget not found: Target=\"/mc/mc\" Base=\"_level0\"",
@@ -2528,7 +2528,7 @@
         "expected_lines": 23,
         "matching_lines": 3
       },
-      "duration": 18.04,
+      "duration": 18.72,
       "status": "output_mismatch",
       "detail": "20 line(s) differ (actual=8, expected=23)",
       "actual_output": "SWF7\n\n[targetPath.as debug-22403-05c7ba106]\nTarget not found: Target=\"null\" Base=\"_level0\"\nTarget not found: Target=\"...:mc1\" Base=\"_level0\"\nTarget not found: Target=\"...:mc\" Base=\"_level0\"\nTarget not found: Target=\"mc\" Base=\"_level0\"\nTarget not found: Target=\"/mc/mc\" Base=\"_level0\"",
@@ -2542,7 +2542,7 @@
         "expected_lines": 23,
         "matching_lines": 3
       },
-      "duration": 17.94,
+      "duration": 19.05,
       "status": "output_mismatch",
       "detail": "20 line(s) differ (actual=8, expected=23)",
       "actual_output": "SWF8\n\n[targetPath.as debug-22403-05c7ba106]\nTarget not found: Target=\"null\" Base=\"_level0\"\nTarget not found: Target=\"...:mc1\" Base=\"_level0\"\nTarget not found: Target=\"...:mc\" Base=\"_level0\"\nTarget not found: Target=\"mc\" Base=\"_level0\"\nTarget not found: Target=\"/mc/mc\" Base=\"_level0\"",
@@ -2556,7 +2556,7 @@
         "expected_lines": 137,
         "matching_lines": 3
       },
-      "duration": 20.7,
+      "duration": 21.78,
       "status": "output_mismatch",
       "detail": "134 line(s) differ (actual=3, expected=137)",
       "actual_output": "SWF5\n\n[toString_valueOf.as debug-22403-05c7ba106]",
@@ -2570,7 +2570,7 @@
         "expected_lines": 155,
         "matching_lines": 3
       },
-      "duration": 21.55,
+      "duration": 22.14,
       "status": "output_mismatch",
       "detail": "152 line(s) differ (actual=3, expected=155)",
       "actual_output": "SWF6\n\n[toString_valueOf.as debug-22403-05c7ba106]",
@@ -2584,7 +2584,7 @@
         "expected_lines": 155,
         "matching_lines": 133
       },
-      "duration": 21.42,
+      "duration": 22.27,
       "status": "output_mismatch",
       "detail": "22 line(s) differ (actual=155, expected=155)",
       "actual_output": "... (34 lines before) ...\nPASSED: Number.prototype.valueOf != Object.prototype.valueOf [./toString_valueOf.as:120]\nPASSED: typeof(x)==\"string\" [./toString_valueOf.as:131]\nPASSED: typeof(y)==\"number\" [./toString_valueOf.as:132]\nPASSED: x==1 [./toString_valueOf.as:133]\nPASSED: y==1 [./toString_valueOf.as:134]\nFAILED: expected: \"TO_VALUETO_VALUE\" obtained: 3 [./toString_valueOf.as:142]\nPASSED: typeof(x)==\"string\" [./toString_valueOf.as:146]\nFAILED: typeof(y)==\"string\" [./toString_valueOf.as:147]\nFAILED: x==\"TO_STRING\" [./toString_valueOf.as:148]\nFAILED: y==\"TO_VALUE\" [./toString_valueOf.as:149]\nPASSED: String.prototype.hasOwnProperty('toString') [./toString_valueOf.as:156]\nPASSED: String.prototype.hasOwnProperty('valueOf') [./toString_valueOf.as:157]\nPASSED: String.prototype.toString != Object.prototype.toString [./toString_valueOf.as:159]\nPASSED: String.prototype.valueOf != Object.prototype.valueOf [./toString_valueOf.as:160]\nPASSED: typeof(x) == \"string\" [./toString_valueOf.as:170]\nPASSED: typeof(y) == \"string\" [./toString_valueOf.as:171]\nPASSED: x == 10 [./toString_valueOf.as:172]\nPASSED: y == 10 [./toString_valueOf.as:173]\nPASSED: x == \"10\" [./toString_valueOf.as:174]\nPASSED: y == \"10\" [./toString_valueOf.as:175]\nPASSED: str3 == \"102\" [./toString_valueOf.as:181]\nPASSED: str3 == 102 [./toString_valueOf.as:182]\nFAILED: expected: \"_level0\" obtained: undefined [./toString_valueOf.as:188]\nFAILED: expected: \"[type Function]\" obtained: undefined [./toString_valueOf.as:192]\nFAILED: expected: \"false\" obtained: false [./toString_valueOf.as:196]\nFAILED: expected: 10 obtained: NaN [./toString_valueOf.as:201]\nFAILED: expected: 2 obtained: NaN [./toString_valueOf.as:202]\nPASSED: typeof(str3) == \"string\" [./toString_valueOf.as:204]\nFAILED: expected: \"TO_VALUETO_VALUE\" obtained: 102 [./toString_valueOf.as:206]\nPASSED: typeof(x) == \"string\" [./toString_valueOf.as:213]\nPASSED: typeof(y) == \"string\" [./toString_valueOf.as:214]\nFAILED: x == \"TO_STRING\" [./toString_valueOf.as:215]\nFAILED: y == \"TO_VALUE\" [./toString_valueOf.as:216]\nPASSED: !MovieClip.prototype.hasOwnProperty('toString') [./toString_valueOf.as:223]\nPASSED: !MovieClip.prototype.hasOwnProperty('valueOf') [./toString_valueOf.as:224]\nPASSED: typeof(MovieClip.prototype.toString) == 'function' [./toString_valueOf.as:225]\nPASSED: typeof(MovieClip.prototype.valueOf) == 'function' [./toString_valueOf.as:226]\nPASSED: MovieClip.prototype.toString == Object.prototype.toString [./toString_valueOf.as:230]\nPASSED: MovieClip.prototype.valueOf == Object.prototype.valueOf [./toString_valueOf.as:231]\nPASSED: typeof(x) == 'string' [./toString_valueOf.as:237]\nFAILED: expected: 'movieclip' obtained: undefined [./toString_valueOf.as:238]\nPASSED: x == '[object Object]' [./toString_valueOf.as:239]\nFAILED: expected: _level0.mc1 obtained: undefined [./toString_valueOf.as:240]\nFAILED: expected: _level0.mc1 obtained: undefined [./toString_valueOf.as:248]\nPASSED: mc1 != '_level0.mc1' [./toString_valueOf.as:256]\nPASSED: mc1 == _level0.mc1 [./toString_valueOf.as:257]\nFAILED: x==\"TO_STRING\" [./toString_valueOf.as:262]\nFAILED: y==\"TO_VALUE\" [./toString_valueOf.as:263]\nPASSED: typeof(mc1) == \"movieclip\" [./toString_valueOf.as:271]\nPASSED: typeof(mc2) == \"movieclip\" [./toString_valueOf.as:272]\n... (71 lines after) ...",
@@ -2598,7 +2598,7 @@
         "expected_lines": 155,
         "matching_lines": 133
       },
-      "duration": 21.66,
+      "duration": 21.34,
       "status": "output_mismatch",
       "detail": "22 line(s) differ (actual=155, expected=155)",
       "actual_output": "... (34 lines before) ...\nPASSED: Number.prototype.valueOf != Object.prototype.valueOf [./toString_valueOf.as:120]\nPASSED: typeof(x)==\"string\" [./toString_valueOf.as:131]\nPASSED: typeof(y)==\"number\" [./toString_valueOf.as:132]\nPASSED: x==1 [./toString_valueOf.as:133]\nPASSED: y==1 [./toString_valueOf.as:134]\nFAILED: expected: \"TO_VALUETO_VALUE\" obtained: 3 [./toString_valueOf.as:142]\nPASSED: typeof(x)==\"string\" [./toString_valueOf.as:146]\nFAILED: typeof(y)==\"string\" [./toString_valueOf.as:147]\nFAILED: x==\"TO_STRING\" [./toString_valueOf.as:148]\nFAILED: y==\"TO_VALUE\" [./toString_valueOf.as:149]\nPASSED: String.prototype.hasOwnProperty('toString') [./toString_valueOf.as:156]\nPASSED: String.prototype.hasOwnProperty('valueOf') [./toString_valueOf.as:157]\nPASSED: String.prototype.toString != Object.prototype.toString [./toString_valueOf.as:159]\nPASSED: String.prototype.valueOf != Object.prototype.valueOf [./toString_valueOf.as:160]\nPASSED: typeof(x) == \"string\" [./toString_valueOf.as:170]\nPASSED: typeof(y) == \"string\" [./toString_valueOf.as:171]\nPASSED: x == 10 [./toString_valueOf.as:172]\nPASSED: y == 10 [./toString_valueOf.as:173]\nPASSED: x == \"10\" [./toString_valueOf.as:174]\nPASSED: y == \"10\" [./toString_valueOf.as:175]\nPASSED: str3 == \"102\" [./toString_valueOf.as:181]\nPASSED: str3 == 102 [./toString_valueOf.as:182]\nFAILED: expected: \"_level0\" obtained: undefined [./toString_valueOf.as:188]\nFAILED: expected: \"[type Function]\" obtained: undefined [./toString_valueOf.as:192]\nFAILED: expected: \"false\" obtained: false [./toString_valueOf.as:196]\nFAILED: expected: 10 obtained: NaN [./toString_valueOf.as:201]\nFAILED: expected: 2 obtained: NaN [./toString_valueOf.as:202]\nPASSED: typeof(str3) == \"string\" [./toString_valueOf.as:204]\nFAILED: expected: \"TO_VALUETO_VALUE\" obtained: 102 [./toString_valueOf.as:206]\nPASSED: typeof(x) == \"string\" [./toString_valueOf.as:213]\nPASSED: typeof(y) == \"string\" [./toString_valueOf.as:214]\nFAILED: x == \"TO_STRING\" [./toString_valueOf.as:215]\nFAILED: y == \"TO_VALUE\" [./toString_valueOf.as:216]\nPASSED: !MovieClip.prototype.hasOwnProperty('toString') [./toString_valueOf.as:223]\nPASSED: !MovieClip.prototype.hasOwnProperty('valueOf') [./toString_valueOf.as:224]\nPASSED: typeof(MovieClip.prototype.toString) == 'function' [./toString_valueOf.as:225]\nPASSED: typeof(MovieClip.prototype.valueOf) == 'function' [./toString_valueOf.as:226]\nPASSED: MovieClip.prototype.toString == Object.prototype.toString [./toString_valueOf.as:230]\nPASSED: MovieClip.prototype.valueOf == Object.prototype.valueOf [./toString_valueOf.as:231]\nPASSED: typeof(x) == 'string' [./toString_valueOf.as:237]\nFAILED: expected: 'movieclip' obtained: undefined [./toString_valueOf.as:238]\nPASSED: x == '[object Object]' [./toString_valueOf.as:239]\nFAILED: expected: _level0.mc1 obtained: undefined [./toString_valueOf.as:240]\nFAILED: expected: _level0.mc1 obtained: undefined [./toString_valueOf.as:248]\nPASSED: mc1 != '_level0.mc1' [./toString_valueOf.as:256]\nPASSED: mc1 == _level0.mc1 [./toString_valueOf.as:257]\nFAILED: x==\"TO_STRING\" [./toString_valueOf.as:262]\nFAILED: y==\"TO_VALUE\" [./toString_valueOf.as:263]\nPASSED: typeof(mc1) == \"movieclip\" [./toString_valueOf.as:271]\nPASSED: typeof(mc2) == \"movieclip\" [./toString_valueOf.as:272]\n... (71 lines after) ...",
@@ -2612,7 +2612,7 @@
         "expected_lines": 49,
         "matching_lines": 21
       },
-      "duration": 19.3,
+      "duration": 19.47,
       "status": "output_mismatch",
       "detail": "49 line(s) differ (actual=70, expected=49)",
       "actual_output": "... (16 lines before) ...\nPASSED: a == 1 [./with.as:64]\nPASSED: b == 2 [./with.as:65]\nPASSED: found7 == 1 [./with.as:81]\nPASSED: get_name() == \"timeline\" [./with.as:115]\nPASSED: get_name() == \"obj1\" [./with.as:118]\nError: A 'with' action failed because the specified object did not exist.\n\nPASSED: checkpoint == 1 [./with.as:135]\nError: A 'with' action failed because the specified object did not exist.\n\nPASSED: checkpoint == 1 [./with.as:138]\nPASSED: checkpoint == 3 [./with.as:141]\nPASSED: Number.prototype.checkpoint == 'three' [./with.as:142]\nPASSED: checkpoint == 4 [./with.as:145]\nPASSED: String.prototype.checkpoint == 'four' [./with.as:146]\nPASSED: a == 1 [./with.as:166]\nPASSED: a == 2 [./with.as:170]\nPASSED: a == 2 [./with.as:177]\nPASSED: b == 2 [./with.as:178]\nPASSED: x == 3 [./with.as:179]\nPASSED: y == 3 [./with.as:180]\nFAILED: expected: _root obtained: [object Object] [./with.as:186]\nFAILED: expected: _level0 obtained: [object Object] [./with.as:189]\nPASSED: a == 1 [./with.as:190]\nPASSED: b == 1 [./with.as:191]\nPASSED: x == 3 [./with.as:192]\nPASSED: y == 3 [./with.as:193]\nFAILED: expected: 100 obtained: 2 [./with.as:221]\nFAILED: expected: 100 obtained: 2 [./with.as:222]\nFAILED: expected: 'undefined' obtained: number [./with.as:223]\nFAILED: expected: 'undefined' obtained: number [./with.as:224]\nPASSED: this == objA [./with.as:234]\nPASSED: this == objA [./with.as:237]\nPASSED: a == 4 [./with.as:424]\nPASSED: b == 6 [./with.as:428]\nPASSED: typeof(checkpoint) == \"undefined\" [./with.as:437]\nPASSED: checkpoint == \"o.i.j\" [./with.as:446]\nPASSED: c == \"with o\" [./with.as:458]\nPASSED: d == \"with o\" [./with.as:459]\nPASSED: typeof(e) == \"undefined\" [./with.as:460]\nPASSED: f == \"empty\" [./with.as:461]\nPASSED: typeof(o.c) == 'undefined' [./with.as:493]\nPASSED: typeof(o.d) == 'undefined' [./with.as:494]\nPASSED: o.e == 'with o' [./with.as:495]\nPASSED: o.f == 'with o' [./with.as:496]\nPASSED: typeof(checkpoint) == \"undefined\" [./with.as:504]\nPASSED: a == 120 [./with.as:474]\nPASSED: b == 7 [./with.as:478]\nPASSED: typeof(b) == \"object\" [./with.as:570]\nFAILED: expected: \"abcdefghijklm\" obtained: abcdefghijklmnopqr [./with.as:625]\n... (4 lines after) ...",
@@ -2626,7 +2626,7 @@
         "expected_lines": 107,
         "matching_lines": 3
       },
-      "duration": 20.46,
+      "duration": 20.24,
       "status": "output_mismatch",
       "detail": "104 line(s) differ (actual=22, expected=107)",
       "actual_output": "SWF6\n\n[with.as debug-22403-05c7ba106]\nError: A 'with' action failed because the specified object did not exist.\n\nError: A 'with' action failed because the specified object did not exist.\n\nTarget not found: Target=\"/clip1\" Base=\"_level0\"\nTarget not found: Target=\"/clip1/clip2\" Base=\"_level0\"\nTarget not found: Target=\"/clip1/../clip3\" Base=\"_level0\"\nTarget not found: Target=\"/clip1\" Base=\"_level0\"\nTarget not found: Target=\"/clip1/clip2\" Base=\"_level0\"\nTarget not found: Target=\"/clip1\" Base=\"_level0\"\nTarget not found: Target=\"/clip1/clip2\" Base=\"_level0\"\nTarget not found: Target=\"o.t\" Base=\"_level0\"\nTarget not found: Target=\"o:t\" Base=\"_level0\"\nTarget not found: Target=\"../o:t\" Base=\"_level0\"\nTarget not found: Target=\"o2.o\" Base=\"_level0\"\nTarget not found: Target=\"o2.o.t\" Base=\"_level0\"\nTarget not found: Target=\"o2.o.p.t\" Base=\"_level0\"\nTarget not found: Target=\"o2.inh.t\" Base=\"_level0\"\nTarget not found: Target=\"o:t\" Base=\"_level0\"",
@@ -2640,7 +2640,7 @@
         "expected_lines": 107,
         "matching_lines": 3
       },
-      "duration": 20.54,
+      "duration": 20.44,
       "status": "output_mismatch",
       "detail": "104 line(s) differ (actual=22, expected=107)",
       "actual_output": "SWF7\n\n[with.as debug-22403-05c7ba106]\nError: A 'with' action failed because the specified object did not exist.\n\nError: A 'with' action failed because the specified object did not exist.\n\nTarget not found: Target=\"/clip1\" Base=\"_level0\"\nTarget not found: Target=\"/clip1/clip2\" Base=\"_level0\"\nTarget not found: Target=\"/clip1/../clip3\" Base=\"_level0\"\nTarget not found: Target=\"/clip1\" Base=\"_level0\"\nTarget not found: Target=\"/clip1/clip2\" Base=\"_level0\"\nTarget not found: Target=\"/clip1\" Base=\"_level0\"\nTarget not found: Target=\"/clip1/clip2\" Base=\"_level0\"\nTarget not found: Target=\"o.t\" Base=\"_level0\"\nTarget not found: Target=\"o:t\" Base=\"_level0\"\nTarget not found: Target=\"../o:t\" Base=\"_level0\"\nTarget not found: Target=\"o2.o\" Base=\"_level0\"\nTarget not found: Target=\"o2.o.t\" Base=\"_level0\"\nTarget not found: Target=\"o2.o.p.t\" Base=\"_level0\"\nTarget not found: Target=\"o2.inh.t\" Base=\"_level0\"\nTarget not found: Target=\"o:t\" Base=\"_level0\"",
@@ -2654,7 +2654,7 @@
         "expected_lines": 107,
         "matching_lines": 3
       },
-      "duration": 20.57,
+      "duration": 20.15,
       "status": "output_mismatch",
       "detail": "104 line(s) differ (actual=22, expected=107)",
       "actual_output": "SWF8\n\n[with.as debug-22403-05c7ba106]\nError: A 'with' action failed because the specified object did not exist.\n\nError: A 'with' action failed because the specified object did not exist.\n\nTarget not found: Target=\"/clip1\" Base=\"_level0\"\nTarget not found: Target=\"/clip1/clip2\" Base=\"_level0\"\nTarget not found: Target=\"/clip1/../clip3\" Base=\"_level0\"\nTarget not found: Target=\"/clip1\" Base=\"_level0\"\nTarget not found: Target=\"/clip1/clip2\" Base=\"_level0\"\nTarget not found: Target=\"/clip1\" Base=\"_level0\"\nTarget not found: Target=\"/clip1/clip2\" Base=\"_level0\"\nTarget not found: Target=\"o.t\" Base=\"_level0\"\nTarget not found: Target=\"o:t\" Base=\"_level0\"\nTarget not found: Target=\"../o:t\" Base=\"_level0\"\nTarget not found: Target=\"o2.o\" Base=\"_level0\"\nTarget not found: Target=\"o2.o.t\" Base=\"_level0\"\nTarget not found: Target=\"o2.o.p.t\" Base=\"_level0\"\nTarget not found: Target=\"o2.inh.t\" Base=\"_level0\"\nTarget not found: Target=\"o:t\" Base=\"_level0\"",

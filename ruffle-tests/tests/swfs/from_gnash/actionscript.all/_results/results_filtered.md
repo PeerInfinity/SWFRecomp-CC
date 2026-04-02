@@ -1,10 +1,10 @@
 # Ruffle Test Results (Filtered)
 
-**Date**: 2026-04-02 18:29 UTC
+**Date**: 2026-04-02 18:56 UTC
 
-**Git SHA**: `4cfa1f44f1`
+**Git SHA**: `4521f069f0`
 
-**Run Duration**: 65m 4s
+**Run Duration**: 65m 37s
 
 **Filtered**: 9 tests ignored out of 190 available
 
@@ -31,10 +31,10 @@
 
 | # | Test | Lines | Duration | Notes |
 |---|------|-------|----------|-------|
-| 1 | `Stage-v5` | 38 | 18.9s |  |
-| 2 | `Video-v6` | 85 | 20.5s |  |
-| 3 | `XMLSocket-v5` | 35 | 19.4s |  |
-| 4 | `XMLSocket-v6` | 35 | 19.3s |  |
+| 1 | `Stage-v5` | 38 | 18.3s |  |
+| 2 | `Video-v6` | 85 | 19.1s |  |
+| 3 | `XMLSocket-v5` | 35 | 18.8s |  |
+| 4 | `XMLSocket-v6` | 35 | 18.1s |  |
 | 5 | `case-v5` | 39 | 18.2s |  |
 
 ## Near-Passing Tests
