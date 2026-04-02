@@ -2150,6 +2150,8 @@ static ActionVar builtin_nc_close(SWFAppContext* app_context, ActionVar* args, u
 static ASFunction g_proto_stub_funcs[MAX_PROTO_STUB_FUNCS];
 static int g_proto_stub_func_count = 0;
 
+static void setupNativeFuncOwnProps(SWFAppContext* app_context, ASFunction* func);
+
 // Add a stub function property to a prototype object.
 // flags controls ENUMERABLE/WRITABLE/CONFIGURABLE behavior.
 static void addStubMethodToProto(SWFAppContext* app_context, ASObject* proto, const char* name, u32 name_len, u8 flags)
@@ -2160,6 +2162,7 @@ static void addStubMethodToProto(SWFAppContext* app_context, ASObject* proto, co
 	strncpy(fn->name, name, 255);
 	fn->function_type = 2;
 	fn->advanced_func = (Function2Ptr) builtin_stub_method;
+	setupNativeFuncOwnProps(app_context, fn);
 	if (function_count < MAX_FUNCTIONS)
 		function_registry[function_count++] = fn;
 	ActionVar fv = {0};
@@ -2595,7 +2598,6 @@ static ActionStackValueType convertFloat(SWFAppContext* app_context);
 static ActionVar builtin_math_random(SWFAppContext* app_context, ActionVar* args, u32 arg_count, ActionVar* registers, void* this_obj);
 // initMathObject is defined later (after all Math builtins)
 static void initMathObject(SWFAppContext* app_context);
-static void setupNativeFuncOwnProps(SWFAppContext* app_context, ASFunction* func);
 
 // Static ASFunction objects for Math methods (18 methods)
 static ASFunction g_math_funcs[18];
@@ -6916,10 +6918,7 @@ static void registerGeomMethod(ASFunction* func, const char* name, Function2Ptr 
 	func->function_type = 2;
 	func->param_count = 0;
 	func->advanced_func = impl;
-	// Prototype methods are NOT added to function_registry — they're accessible
-	// via the prototype chain (GetMember/CallMethod). Adding them pollutes the
-	// global namespace and shadows user-defined functions with the same name
-	// (e.g., Rectangle.contains vs a user's "contains" helper function).
+	setupNativeFuncOwnProps(app_context, func);
 	ActionVar fv = {0};
 	fv.type = ACTION_STACK_VALUE_FUNCTION;
 	VAL(u64, &fv.data.numeric_value) = (u64)func;
@@ -6935,7 +6934,7 @@ static void registerProtoMethod(ASFunction* func, const char* name, Function2Ptr
 	func->function_type = 2;
 	func->param_count = 0;
 	func->advanced_func = impl;
-	// Intentionally NOT adding to function_registry
+	setupNativeFuncOwnProps(app_context, func);
 	ActionVar fv = {0};
 	fv.type = ACTION_STACK_VALUE_FUNCTION;
 	VAL(u64, &fv.data.numeric_value) = (u64)func;
