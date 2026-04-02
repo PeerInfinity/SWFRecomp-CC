@@ -1199,8 +1199,11 @@ def compile_native(test_dir, num_frames, build_dir, headless=False, has_image_co
     inc = SWFMODERN / "include"
     extra_defines = []
     mock_time = get_mock_date_time(test_dir)
-    if mock_time is not None:
-        extra_defines.append(f"-DMOCK_DATE_TIME={mock_time}LL")
+    if mock_time is None:
+        # Default mock time matches Ruffle's deterministic mode:
+        # 2001-02-03 04:05:06 NPT (UTC+5:45) = 981152406000 ms since epoch
+        mock_time = 981152406000
+    extra_defines.append(f"-DMOCK_DATE_TIME={mock_time}LL")
     viewport = get_viewport_dimensions(test_dir)
     if viewport is not None:
         extra_defines.append(f"-DVIEWPORT_WIDTH={viewport[0]}")

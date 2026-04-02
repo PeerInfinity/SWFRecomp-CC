@@ -12949,11 +12949,18 @@ static ASObject* createTextFormatFromField(SWFAppContext* app_context, int tf_id
 	}
 
 	// If getTextFormat on empty field, return all-null TextFormat
+	// (except display which is always "block")
 	if (!is_new_text_format && !has_text) {
 		ActionVar null_val = {0};
 		null_val.type = ACTION_STACK_VALUE_NULL;
 		for (int i = 0; i < TF_PROP_COUNT; i++)
 			setProperty(app_context, tf_obj, tf_prop_names[i], tf_prop_lens[i], &null_val);
+		// display is always "block" even for empty text fields
+		ActionVar dv = {0};
+		dv.type = ACTION_STACK_VALUE_STRING;
+		dv.data.numeric_value = (u64) u16_block;
+		dv.str_size = 5;
+		setProperty(app_context, tf_obj, "display", 7, &dv);
 		return tf_obj;
 	}
 

@@ -3344,7 +3344,10 @@ extern u32 text_data[];
 // Vector-path hit testing: winding number algorithm
 // ---------------------------------------------------------------------------
 
-extern float path_data[][3];
+// Weak default: overridden by draws.c when shapes are present.
+// Older generated code may lack path_data; this prevents linker errors.
+__attribute__((weak)) float path_data[1][3] = {{0}};
+
 
 // Winding number contribution from a line segment (ray-cast along +x axis).
 // Returns +1 (downward crossing), -1 (upward crossing), or 0 (no crossing).
