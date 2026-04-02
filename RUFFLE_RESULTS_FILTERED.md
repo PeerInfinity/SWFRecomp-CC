@@ -3,9 +3,9 @@
 *Tests on the [ignored list](ruffle-tests/ignored_tests.txt) are excluded.*  
 *See [RUFFLE_RESULTS.md](RUFFLE_RESULTS.md) for unfiltered results.*
 
-**Commit:** `393783ad9c69`  
-**Date:** 2026-04-02 19:37 UTC  
-**Total duration:** 4h36m18s
+**Commit:** `b8938ab392b9`  
+**Date:** 2026-04-02 20:20 UTC  
+**Total duration:** 4h33m15s
 
 ## Results by Suite
 
@@ -72,36 +72,36 @@ Tests verified against Flash's actual output (`output.flash.txt`).
 
 - **Pass:** 563/566 (99.5%)
 - **Ignored:** 54 tests
-- **Duration:** 3h05m35s across 30 shards
+- **Duration:** 3h03m33s across 30 shards
 - **Lines:** 71,405/71,435 matching (99.96%)
-- **Avg test duration:** 17.8s — slowest: `movieclip_invalid_get_bounds_7` (42.5s)
+- **Avg test duration:** 17.6s — slowest: `movieclip_invalid_get_bounds_6` (40.8s)
 
 ### from_gnash/actionscript.all
 
 - **Pass:** 5/181 (2.8%)
 - **Ignored:** 9 tests
-- **Duration:** 1h05m52s across 30 shards
+- **Duration:** 1h05m15s across 30 shards
 - **Lines:** 1,699/15,444 matching (11.0%)
-- **Avg test duration:** 20.6s — slowest: `array-v5` (45.3s)
+- **Avg test duration:** 20.4s — slowest: `array-v5` (42.8s)
 
 ### from_gnash/misc-swfmill.all
 
 - **Pass:** 11/14 (78.6%)
-- **Duration:** 4m07s across 30 shards
+- **Duration:** 4m03s across 30 shards
 - **Lines:** 25/29 matching (86.2%)
-- **Avg test duration:** 17.6s — slowest: `afunc_dict` (19.2s)
+- **Avg test duration:** 17.3s — slowest: `jump_to_prev_block` (18.3s)
 
 ### from_shumway
 
 - **Pass:** 17/17 (100%)
 - **Ignored:** 30 tests
-- **Duration:** 13m51s across 30 shards
+- **Duration:** 13m39s across 30 shards
 - **Lines:** 35/35 matching (100%)
-- **Avg test duration:** 17.8s — slowest: `MaskTest` (20.4s)
+- **Avg test duration:** 17.4s — slowest: `gradient` (18.5s)
 
 ### from_shumway/avm1
 
 - **Pass:** 12/23 (52.2%)
-- **Duration:** 6m52s across 30 shards
+- **Duration:** 6m43s across 30 shards
 - **Lines:** 118/311 matching (37.9%)
-- **Avg test duration:** 17.9s — slowest: `watch` (21.5s)
+- **Avg test duration:** 17.5s — slowest: `watch` (19.9s)

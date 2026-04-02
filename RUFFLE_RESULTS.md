@@ -2,9 +2,9 @@
 
 *See [RUFFLE_RESULTS_FILTERED.md](RUFFLE_RESULTS_FILTERED.md) for results with ignored tests excluded.*
 
-**Commit:** `393783ad9c69`  
-**Date:** 2026-04-02 19:37 UTC  
-**Total duration:** 4h36m18s
+**Commit:** `b8938ab392b9`  
+**Date:** 2026-04-02 20:20 UTC  
+**Total duration:** 4h33m15s
 
 ## Results by Suite
 
@@ -68,7 +68,7 @@ Tests with `output_mismatch` status but ≥80% of expected lines matching.
 | avm1 | - | - | - | 186 |
 | from_gnash/actionscript.all | - | - | 182 | 1093 |
 
-*Comparing `868900bbb1a2` → `393783ad9c69`*
+*Comparing `868900bbb1a2` → `b8938ab392b9`*
 
 ## Flash-Spec Results
 
@@ -83,34 +83,34 @@ Tests verified against Flash's actual output (`output.flash.txt`).
 ### avm1
 
 - **Pass:** 570/620 (91.9%)
-- **Duration:** 3h05m35s across 30 shards
+- **Duration:** 3h03m33s across 30 shards
 - **Lines:** 81,332/91,501 matching (88.9%)
-- **Avg test duration:** 17.9s — slowest: `timeout` (47.4s)
+- **Avg test duration:** 17.7s — slowest: `timeout` (47.4s)
 
 ### from_gnash/actionscript.all
 
 - **Pass:** 5/190 (2.6%)
-- **Duration:** 1h05m52s across 30 shards
+- **Duration:** 1h05m15s across 30 shards
 - **Lines:** 1,726/16,957 matching (10.2%)
-- **Avg test duration:** 20.7s — slowest: `array-v5` (45.3s)
+- **Avg test duration:** 20.5s — slowest: `array-v5` (42.8s)
 
 ### from_gnash/misc-swfmill.all
 
 - **Pass:** 11/14 (78.6%)
-- **Duration:** 4m07s across 30 shards
+- **Duration:** 4m03s across 30 shards
 - **Lines:** 25/29 matching (86.2%)
-- **Avg test duration:** 17.6s — slowest: `afunc_dict` (19.2s)
+- **Avg test duration:** 17.3s — slowest: `jump_to_prev_block` (18.3s)
 
 ### from_shumway
 
 - **Pass:** 17/47 (36.2%)
-- **Duration:** 13m51s across 30 shards
+- **Duration:** 13m39s across 30 shards
 - **Lines:** 35/256 matching (13.7%)
-- **Avg test duration:** 17.6s — slowest: `MaskTest` (20.4s)
+- **Avg test duration:** 17.4s — slowest: `flash_events_Event` (18.8s)
 
 ### from_shumway/avm1
 
 - **Pass:** 12/23 (52.2%)
-- **Duration:** 6m52s across 30 shards
+- **Duration:** 6m43s across 30 shards
 - **Lines:** 118/311 matching (37.9%)
-- **Avg test duration:** 17.9s — slowest: `watch` (21.5s)
+- **Avg test duration:** 17.5s — slowest: `watch` (19.9s)

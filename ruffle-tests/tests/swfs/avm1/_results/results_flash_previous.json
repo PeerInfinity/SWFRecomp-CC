@@ -1,8 +1,8 @@
 {
   "metadata": {
-    "timestamp": "2026-04-02T18:57:01.700433+00:00",
-    "git_sha": "4521f069f0696b80e38641a3fb42f5a118d82f8b",
-    "duration_seconds": 53.31,
+    "timestamp": "2026-04-02T19:38:18.315634+00:00",
+    "git_sha": "393783ad9c690c9bd2eccf35258c668a6eb71e93",
+    "duration_seconds": 54.86,
     "total_available": 3
   },
   "total": 3,
@@ -19,7 +19,7 @@
         "expected_lines": 853,
         "matching_lines": 853
       },
-      "duration": 17.94,
+      "duration": 18.47,
       "status": "pass"
     },
     {
@@ -30,7 +30,7 @@
         "expected_lines": 3714,
         "matching_lines": 3714
       },
-      "duration": 17.71,
+      "duration": 18.2,
       "status": "pass"
     },
     {
@@ -41,7 +41,7 @@
         "expected_lines": 874,
         "matching_lines": 874
       },
-      "duration": 17.5,
+      "duration": 18.03,
       "status": "pass"
     }
   ]
