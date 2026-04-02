@@ -59,14 +59,28 @@ blockers:
     reason: "Constructor/__proto__ DONT_ENUM vs ENUMERABLE conflict"
 -->
 
-Last updated: 2026-04-01
+Last updated: 2026-04-02
 
 ## Status: BLOCKED — Phases 1-8c-6 DONE, Phase 8c-4/8c-5/8d partially done, remaining items blocked
 
 **29 of 31 plan tests PASSING.** `native_objects_swf6` is a pre-existing regression (83/84) from the reverted TextField SWF6 constructor gate. 3 tests remain with output mismatches but significant progress was made:
-- `global_proto_decls`: ~742/4497 (was 551, +191 from System/IME/security/capabilities/Object.prototype fixes, 2026-04-01 session 3)
-- `global_proto_decls_delete`: ~287/4158 (was 283, +4 from IME method own_props, 2026-04-01 session 3)
+- `global_proto_decls`: 884/4497 (CI, 2026-04-02)
+- `global_proto_decls_delete`: 296/4158 (CI, 2026-04-02)
 - `global_instance_decls`: 23/758 (was 40, -17 regression of unclear origin — may be from initialization order changes, 2026-03-31)
+
+### Fixable ceiling (Ruffle vs Flash analysis, 2026-04-02)
+
+A significant portion of the remaining diff is due to Ruffle-specific behavior that we cannot match without breaking Flash-compatible tests (see `RUFFLE_VS_FLASH_DIFFERENCES.md` — "Object.prototype Methods ENUMERABLE by Default"):
+
+| Test | Total | Matching | Ruffle-specific | Fixable ceiling | Remaining gap |
+|------|-------|----------|----------------|-----------------|---------------|
+| global_proto_decls | 4497 | 884 (20%) | ~1665 | ~2832 (63%) | ~1948 |
+| global_proto_decls_delete | 4158 | 296 (7%) | ~2477 | ~1681 (40%) | ~1385 |
+| global_instance_decls | 758 | 23 (3%) | TBD | TBD | TBD |
+
+**Ruffle-specific lines** = inherited Object.prototype methods appearing without "own" label (~9 per object/prototype, ENUMERABLE in Ruffle, DONT_ENUM in Flash) + `constructor` appearing as own property on non-prototype objects (Ruffle sets it explicitly, Flash inherits it).
+
+The ~3300 remaining fixable lines across the two main tests correspond to the work in Phases 8c-4, 8c-5, and 8d below.
 
 ### Changes made (2026-04-01 session 4)
 - **AsBroadcaster function own_props** — Shared g_ab_addListener_func, g_ab_removeListener_func, g_ab_broadcastMessage_func now have proper own_props (constructor + __proto__) via setupNativeFuncOwnProps.
