@@ -82,6 +82,12 @@ sandbox_type_remote
 removed_base_clip_tell_target
 string_paths_reference_launder
 string_relational_compare
+# Global decls tests: Ruffle's expected output has Object.prototype methods as ENUMERABLE
+# (Flash uses DONT_ENUM) and constructor as own property on all objects (Flash inherits it).
+# These tests are validated against Flash-correct output via --expected-suffix=flash instead.
+global_proto_decls
+global_proto_decls_delete
+global_instance_decls
 
 # --- Execution timeout / image comparison tests ---
 # These tests have 0 expected trace lines and test non-trace behaviors.

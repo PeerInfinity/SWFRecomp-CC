@@ -472,6 +472,24 @@ jobs:
             done
           fi
 
+      - name: Install system dependencies
+        run: sudo apt-get update && sudo apt-get install -y build-essential
+
+      - name: Download SWFRecomp binary
+        uses: actions/download-artifact@v7
+        with:
+          name: setup-binary
+          path: SWFRecomp/build/
+
+      - name: Make SWFRecomp binary executable
+        run: chmod +x SWFRecomp/build/SWFRecomp
+
+      - name: Download recompiled test data
+        uses: actions/download-artifact@v7
+        with:
+          name: setup-tests
+          path: ruffle-tests/
+
       - name: Download all shard artifacts
         uses: actions/download-artifact@v7
         with:
@@ -570,6 +588,14 @@ jobs:
               else:
                   print(f"  {pass_count}/{total} passing ({report['pass_rate']}%)")
           EOF
+
+      - name: Verify Flash-spec expected output
+        if: always()
+        env:
+          TZ: NPT-5:45
+        run: |
+          echo "=== Running Flash-spec tests (output.flash.txt) ==="
+          python3 ruffle-tests/verify_output.py -v --expected-suffix=flash || true
 
       - name: Generate filtered results
         if: always()
