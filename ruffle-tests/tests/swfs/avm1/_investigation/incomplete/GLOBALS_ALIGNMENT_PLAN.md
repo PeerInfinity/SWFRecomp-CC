@@ -1,6 +1,6 @@
 # Global Decls Tests — Flash-Spec Approach
 
-Last updated: 2026-04-02
+Last updated: 2026-04-02 (session 2)
 
 ## Background: Two Testing Strategies
 
@@ -39,8 +39,8 @@ python3 ruffle-tests/verify_output.py --expected-suffix=flash --verbose
 
 | Test | Flash Lines | Ruffle Lines | Delta | Notes |
 |------|------------|-------------|-------|-------|
-| global_proto_decls | 3643 | 4497 | -854 | Missing inherited ObjProto methods (Ruffle-specific) |
-| global_proto_decls_delete | 859 | 4158 | -3299 | Same + missing DONT_DELETE on many properties |
+| global_proto_decls | 3731 | 4497 | -766 | Missing inherited ObjProto methods (Ruffle-specific) |
+| global_proto_decls_delete | 856 | 4158 | -3302 | Same + missing DONT_DELETE on many properties |
 | global_instance_decls | 853 | 758 | +95 | Our output is longer (more instance properties?) |
 
 ## Improving the Flash-Spec Baseline
@@ -55,30 +55,32 @@ These changes would improve our globals implementation. After each change, regen
 
 **Phase 8c-4: Add missing properties**
 
-| Object | Missing Properties | Impact |
+| Object | Missing Properties | Status |
 |--------|--------------------|--------|
-| Key | 19 constants (ALT, ENTER, SPACE, UP, DOWN, LEFT, RIGHT, PGUP, PGDN, HOME, END, TAB, CONTROL, SHIFT, ESCAPE, INSERT, DELETEKEY, BACKSPACE, CAPSLOCK), `isAccessible` method | +20 lines in Flash output |
-| Mouse | `show`, `hide`, `setTrailer`, `setTrailerPosition`, `setTrailerMode` methods | +5 lines |
-| Accessibility | `isActive`, `sendEvent`, `updateProperties` methods | +3 lines |
-| Function.prototype | `apply`, `call` methods + `constructor` property | Broad functional impact |
+| ~~Key~~ | ~~19 constants + isAccessible~~ | **DONE** (f3f2a04d) |
+| ~~Mouse~~ | ~~show, hide, setTrailer, setTrailerPosition, setTrailerMode~~ | **DONE** (f3f2a04d) |
+| ~~Accessibility~~ | ~~isActive, sendEvent, updateProperties~~ | Already existed, own_props added (f3f2a04d) |
+| Function.prototype | `apply`, `call` methods + `constructor` property | TODO — broad functional impact |
 
 **Phase 8c-5: Property flags cleanup**
 
-| Issue | Details |
-|-------|---------|
-| Broadcaster methods DONT_ENUM | Stage/Key/Mouse/Selection broadcaster methods (broadcastMessage, addListener, removeListener) should have DONT_ENUM + READ_ONLY flags |
-| Native function own_props | Continue adding `setupNativeFuncOwnProps` to remaining native functions (Math methods, Key methods, Selection methods, etc.) — each prevents spurious lazy prototype creation |
+| Issue | Details | Status |
+|-------|---------|--------|
+| Broadcaster methods DONT_ENUM | Stage/Key/Mouse/Selection broadcaster methods should have DONT_ENUM + READ_ONLY flags | TODO |
+| ~~Native function own_props~~ | ~~Add setupNativeFuncOwnProps to native functions~~ | **DONE** — Math (18), Key (5), Selection (6), Accessibility (3), Mouse (5), Object.prototype (9), AsBroadcaster (3) |
 
 **Phase 8d: Instance construction (global_instance_decls)**
 
-| Issue | Details |
-|-------|---------|
-| Missing instance properties | PrintJob: paperHeight/paperWidth/etc., FileReference: name/type/size/etc. |
-| Special construction returns | textRenderer → undefined, flash.automation.Configuration → `[[AutomationConfiguration]]` |
+| Issue | Details | Status |
+|-------|---------|--------|
+| Missing instance properties | PrintJob: paperHeight/paperWidth/etc., FileReference: name/type/size/etc. | TODO |
+| Special construction returns | textRenderer → undefined, flash.automation.Configuration → `[[AutomationConfiguration]]` | TODO |
 
-### MovieClip section overflow (Ruffle-specific alignment)
+### Ruffle alignment (lower priority)
 
-Our MovieClip section produces 910 lines vs 83 expected in Ruffle. This is because MovieClip.prototype has many ENUMERABLE methods that cause deep recursion in the test. Fixing this (making MovieClip.prototype methods DONT_ENUM) would primarily help Ruffle alignment, not Flash correctness. Lower priority unless we're specifically targeting Ruffle line count improvements.
+The Ruffle `output.txt` comparison (currently ~830/4497) is limited by fundamental Ruffle vs Flash differences (~1665 unfixable lines). Further Ruffle alignment improvements are possible but secondary to Flash-spec correctness:
+- MovieClip section overflow (910 actual vs 83 expected — ENUMERABLE prototype methods cause deep recursion)
+- Inherited Object.prototype methods on every object/function (Ruffle ENUMERABLE, Flash DONT_ENUM)
 
 ## Relationship to Other Docs
 
