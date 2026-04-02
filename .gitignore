@@ -84,6 +84,17 @@ upstream-reference/
 ruffle-tests/tests/swfs/avm1/*/
 !ruffle-tests/tests/swfs/avm1/_investigation/
 !ruffle-tests/tests/swfs/avm1/_results/
+# Allow Flash-correct expected output files (not overwritten by download_tests.sh).
+# Must un-ignore the directory first, then re-ignore everything except output.flash.txt.
+!ruffle-tests/tests/swfs/avm1/global_proto_decls/
+ruffle-tests/tests/swfs/avm1/global_proto_decls/*
+!ruffle-tests/tests/swfs/avm1/global_proto_decls/output.flash.txt
+!ruffle-tests/tests/swfs/avm1/global_proto_decls_delete/
+ruffle-tests/tests/swfs/avm1/global_proto_decls_delete/*
+!ruffle-tests/tests/swfs/avm1/global_proto_decls_delete/output.flash.txt
+!ruffle-tests/tests/swfs/avm1/global_instance_decls/
+ruffle-tests/tests/swfs/avm1/global_instance_decls/*
+!ruffle-tests/tests/swfs/avm1/global_instance_decls/output.flash.txt
 !ruffle-tests/tests/swfs/avm1/external_interface/
 # Ignore downloaded files within external_interface (only track test.toml + test_harness.c)
 ruffle-tests/tests/swfs/avm1/external_interface/output.txt

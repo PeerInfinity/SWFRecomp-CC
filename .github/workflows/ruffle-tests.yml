@@ -147,6 +147,14 @@ jobs:
             python3 ruffle-tests/verify_output.py -v --tests-dir="$dir" $LIMIT_ARGS || true
           done
 
+      - name: Verify Flash-spec expected output
+        if: always() && (env.RUN_AVM1 == 'true')
+        env:
+          TZ: NPT-5:45
+        run: |
+          echo "=== Running Flash-spec tests (output.flash.txt) ==="
+          python3 ruffle-tests/verify_output.py -v --expected-suffix=flash || true
+
       - name: Generate filtered results
         if: always()
         run: |

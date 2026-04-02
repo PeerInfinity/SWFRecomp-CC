@@ -1588,12 +1588,23 @@ examples:
     parser.add_argument(
         "--asan", action="store_true",
         help="Compile with AddressSanitizer (-fsanitize=address -g -O1) for crash debugging")
+    parser.add_argument(
+        "--save-actual", metavar="PATH",
+        help="Save the actual output of the first test to PATH (for generating expected output files)")
+    parser.add_argument(
+        "--expected-suffix", metavar="SUFFIX",
+        help="Use output.SUFFIX.txt instead of output.txt for expected output "
+             "(e.g. --expected-suffix=flash uses output.flash.txt). "
+             "Only tests that have the alternate file are included.")
     return parser.parse_args()
 
 
 def main():
     global TESTS_DIR, RESULTS_DIR, RESULTS_FINAL, RESULTS_PREVIOUS, RESULTS_CURRENT
     args = parse_args()
+
+    # Determine expected output filename
+    expected_filename = f"output.{args.expected_suffix}.txt" if args.expected_suffix else "output.txt"
 
     # Override tests directory if specified
     if args.tests_dir:
@@ -1604,9 +1615,15 @@ def main():
 
     # Re-derive results paths from TESTS_DIR
     RESULTS_DIR = TESTS_DIR / "_results"
-    RESULTS_FINAL = RESULTS_DIR / "results.json"
-    RESULTS_PREVIOUS = RESULTS_DIR / "results_previous.json"
-    RESULTS_CURRENT = RESULTS_DIR / "results_current.json"
+    if args.expected_suffix:
+        # Use separate results files for alternate expected output
+        RESULTS_FINAL = RESULTS_DIR / f"results_{args.expected_suffix}.json"
+        RESULTS_PREVIOUS = RESULTS_DIR / f"results_{args.expected_suffix}_previous.json"
+        RESULTS_CURRENT = RESULTS_DIR / f"results_{args.expected_suffix}_current.json"
+    else:
+        RESULTS_FINAL = RESULTS_DIR / "results.json"
+        RESULTS_PREVIOUS = RESULTS_DIR / "results_previous.json"
+        RESULTS_CURRENT = RESULTS_DIR / "results_current.json"
 
     if not RECOMP_BIN.exists():
         print(f"Error: SWFRecomp not found at {RECOMP_BIN}")
@@ -1626,7 +1643,7 @@ def main():
         all_dirs = sorted(
             d.name for d in TESTS_DIR.iterdir()
             if d.is_dir() and d.name not in SKIP
-            and (d / "test.swf").exists() and (d / "output.txt").exists()
+            and (d / "test.swf").exists() and (d / expected_filename).exists()
         )
         tests = []
         for t in args.test:
@@ -1649,7 +1666,7 @@ def main():
             if d.is_dir()
             and d.name not in SKIP
             and (d / "test.swf").exists()
-            and (d / "output.txt").exists()
+            and (d / expected_filename).exists()
         )
 
     total_available = len(tests)
@@ -1871,7 +1888,7 @@ def main():
                 # Still compare output even for crashing tests
                 if raw_output and raw_output.strip():
                     crash_actual = filter_output(raw_output)
-                    crash_expected = (test_dir / "output.txt").read_text(encoding="utf-8", errors="replace").replace("\r\n", "\n").rstrip("\n")
+                    crash_expected = (test_dir / expected_filename).read_text(encoding="utf-8", errors="replace").replace("\r\n", "\n").rstrip("\n")
                     crash_match, crash_diff, crash_line_stats = compare_output(crash_actual, crash_expected, epsilon)
                     entry["lines"] = crash_line_stats
                     if crash_match:
@@ -1944,7 +1961,11 @@ def main():
 
         # Step 4: Filter and compare trace output
         actual = filter_output(raw_output)
-        expected = (test_dir / "output.txt").read_text(encoding="utf-8", errors="replace").replace("\r\n", "\n").rstrip("\n")
+        if args.save_actual and actual:
+            Path(args.save_actual).write_text(actual + "\n", encoding="utf-8")
+            print(f"  Saved actual output ({len(actual.splitlines())} lines) to {args.save_actual}")
+            args.save_actual = None  # only save once
+        expected = (test_dir / expected_filename).read_text(encoding="utf-8", errors="replace").replace("\r\n", "\n").rstrip("\n")
 
         match, diff_summary, line_stats = compare_output(actual, expected, epsilon)
         entry["lines"] = line_stats
