@@ -41084,8 +41084,9 @@ ActionVar actionGetPendingReturn(SWFAppContext* app_context)
 
 void actionDefineFunction(SWFAppContext* app_context, const char* name, void (*func)(SWFAppContext*), u32 param_count)
 {
-	// Create function object
-	ASFunction* as_func = (ASFunction*) malloc(sizeof(ASFunction));
+	// Create function object (calloc to zero-initialize all fields including
+	// no_lazy_prototype which must default to 0 for user-defined functions)
+	ASFunction* as_func = (ASFunction*) calloc(1, sizeof(ASFunction));
 	if (as_func == NULL) {
 		fprintf(stderr, "ERROR: Failed to allocate memory for function\n");
 		return;
@@ -41203,8 +41204,8 @@ void actionDefineFunction(SWFAppContext* app_context, const char* name, void (*f
 
 void actionDefineFunction2(SWFAppContext* app_context, const char* name, Function2Ptr func, u32 param_count, u8 register_count, u16 flags)
 {
-	// Create function object
-	ASFunction* as_func = (ASFunction*) malloc(sizeof(ASFunction));
+	// Create function object (calloc to zero-initialize all fields)
+	ASFunction* as_func = (ASFunction*) calloc(1, sizeof(ASFunction));
 	if (as_func == NULL) {
 		fprintf(stderr, "ERROR: Failed to allocate memory for function\n");
 		return;
