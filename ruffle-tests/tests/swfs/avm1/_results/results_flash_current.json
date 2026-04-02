@@ -1,8 +1,8 @@
 {
   "metadata": {
-    "timestamp": "2026-04-02T18:30:48.177109+00:00",
-    "git_sha": "4cfa1f44f15f0d9f73241e70e732bf66981a9ccc",
-    "duration_seconds": 52.11,
+    "timestamp": "2026-04-02T18:57:01.646945+00:00",
+    "git_sha": "4521f069f0696b80e38641a3fb42f5a118d82f8b",
+    "duration_seconds": 53.26,
     "total_available": 3
   },
   "total": 3,
@@ -19,7 +19,7 @@
         "expected_lines": 853,
         "matching_lines": 853
       },
-      "duration": 17.7,
+      "duration": 17.94,
       "status": "pass"
     },
     {
@@ -30,18 +30,18 @@
         "expected_lines": 3714,
         "matching_lines": 3714
       },
-      "duration": 17.26,
+      "duration": 17.71,
       "status": "pass"
     },
     {
       "test": "global_proto_decls_delete",
       "num_frames": 1,
       "lines": {
-        "actual_lines": 839,
-        "expected_lines": 839,
-        "matching_lines": 839
+        "actual_lines": 874,
+        "expected_lines": 874,
+        "matching_lines": 874
       },
-      "duration": 17.04,
+      "duration": 17.5,
       "status": "pass"
     }
   ]
