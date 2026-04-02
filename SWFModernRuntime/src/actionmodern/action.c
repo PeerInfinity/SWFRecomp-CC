@@ -10407,10 +10407,52 @@ static ActionVar bitmapDataLoadBitmap(SWFAppContext* app_context, ActionVar* arg
     return r;
 }
 
-// BitmapData virtual property getter — returns -1 for disposed/uninitialized BitmapData
-static ActionVar bdVirtualPropGetter(SWFAppContext* app_context, ActionVar* args, u32 arg_count, ActionVar* registers, void* this_obj)
+// BitmapData virtual property getters — return actual value for initialized BitmapData, -1 for disposed/uninitialized
+static ActionVar bdWidthGetter(SWFAppContext* app_context, ActionVar* args, u32 arg_count, ActionVar* registers, void* this_obj)
 {
     (void)app_context; (void)args; (void)arg_count; (void)registers;
+    ASObject* obj = (ASObject*)this_obj;
+    BitmapDataNative* bmp = obj ? getBitmapNative(obj) : NULL;
+    if (bmp && !bmp->disposed) return makeF64(bmp->width);
+    return makeF64(-1);
+}
+
+static ActionVar bdHeightGetter(SWFAppContext* app_context, ActionVar* args, u32 arg_count, ActionVar* registers, void* this_obj)
+{
+    (void)app_context; (void)args; (void)arg_count; (void)registers;
+    ASObject* obj = (ASObject*)this_obj;
+    BitmapDataNative* bmp = obj ? getBitmapNative(obj) : NULL;
+    if (bmp && !bmp->disposed) return makeF64(bmp->height);
+    return makeF64(-1);
+}
+
+static ActionVar bdRectangleGetter(SWFAppContext* app_context, ActionVar* args, u32 arg_count, ActionVar* registers, void* this_obj)
+{
+    (void)args; (void)arg_count; (void)registers;
+    ASObject* obj = (ASObject*)this_obj;
+    BitmapDataNative* bmp = obj ? getBitmapNative(obj) : NULL;
+    if (bmp && !bmp->disposed) {
+        initGeomPrototypes(app_context);
+        ActionVar rx = makeF64(0), ry = makeF64(0);
+        ActionVar rw = makeF64(bmp->width), rh = makeF64(bmp->height);
+        ASObject* rect = createRectObj(app_context, &rx, &ry, &rw, &rh);
+        ActionVar v = {0}; v.type = ACTION_STACK_VALUE_OBJECT;
+        v.data.numeric_value = (u64)rect;
+        return v;
+    }
+    return makeF64(-1);
+}
+
+static ActionVar bdTransparentGetter(SWFAppContext* app_context, ActionVar* args, u32 arg_count, ActionVar* registers, void* this_obj)
+{
+    (void)app_context; (void)args; (void)arg_count; (void)registers;
+    ASObject* obj = (ASObject*)this_obj;
+    BitmapDataNative* bmp = obj ? getBitmapNative(obj) : NULL;
+    if (bmp && !bmp->disposed) {
+        ActionVar v = {0}; v.type = ACTION_STACK_VALUE_BOOLEAN;
+        v.data.numeric_value = bmp->transparent ? 1 : 0;
+        return v;
+    }
     return makeF64(-1);
 }
 
@@ -10431,17 +10473,26 @@ static void initBitmapDataPrototype(SWFAppContext* app_context)
 
     // Virtual READ_ONLY properties: width, height, rectangle, transparent
     // LIFO insertion: width, height, rectangle, transparent → enum: transparent, rectangle, height, width
-    // Returns -1 (number) for uninitialized/disposed BitmapData (including prototype)
+    // Each getter checks native BitmapData; returns -1 for uninitialized/disposed (including prototype)
     {
-        static ASFunction bd_virt_getter;
-        memset(&bd_virt_getter, 0, sizeof(ASFunction));
-        bd_virt_getter.function_type = 2;
-        bd_virt_getter.advanced_func = (Function2Ptr)bdVirtualPropGetter; // returns -1
+        static ASFunction bd_width_getter, bd_height_getter, bd_rect_getter, bd_trans_getter;
+        memset(&bd_width_getter, 0, sizeof(ASFunction));
+        memset(&bd_height_getter, 0, sizeof(ASFunction));
+        memset(&bd_rect_getter, 0, sizeof(ASFunction));
+        memset(&bd_trans_getter, 0, sizeof(ASFunction));
+        bd_width_getter.function_type = 2;
+        bd_height_getter.function_type = 2;
+        bd_rect_getter.function_type = 2;
+        bd_trans_getter.function_type = 2;
+        bd_width_getter.advanced_func = (Function2Ptr)bdWidthGetter;
+        bd_height_getter.advanced_func = (Function2Ptr)bdHeightGetter;
+        bd_rect_getter.advanced_func = (Function2Ptr)bdRectangleGetter;
+        bd_trans_getter.advanced_func = (Function2Ptr)bdTransparentGetter;
         const u8 ro = PROPERTY_FLAG_ENUMERABLE | PROPERTY_FLAG_CONFIGURABLE;
-        setAddPropertyWithFlags(app_context, g_bitmapdata_prototype, "width",       5, &bd_virt_getter, NULL, ro);
-        setAddPropertyWithFlags(app_context, g_bitmapdata_prototype, "height",      6, &bd_virt_getter, NULL, ro);
-        setAddPropertyWithFlags(app_context, g_bitmapdata_prototype, "rectangle",   9, &bd_virt_getter, NULL, ro);
-        setAddPropertyWithFlags(app_context, g_bitmapdata_prototype, "transparent", 11, &bd_virt_getter, NULL, ro);
+        setAddPropertyWithFlags(app_context, g_bitmapdata_prototype, "width",       5, &bd_width_getter, NULL, ro);
+        setAddPropertyWithFlags(app_context, g_bitmapdata_prototype, "height",      6, &bd_height_getter, NULL, ro);
+        setAddPropertyWithFlags(app_context, g_bitmapdata_prototype, "rectangle",   9, &bd_rect_getter, NULL, ro);
+        setAddPropertyWithFlags(app_context, g_bitmapdata_prototype, "transparent", 11, &bd_trans_getter, NULL, ro);
     }
 
     // Methods in LIFO insertion order (reverse of expected enumeration).
@@ -25551,89 +25602,16 @@ static void initSystemObject(SWFAppContext* app_context)
 			setPropertyWithFlags(app_context, ime_obj, ime_names[i], (u32)strlen(ime_names[i]), &fv, de_ro);
 		}
 
-		// AsBroadcaster methods — create IME-specific copies (shared g_ab_* have different
-		// flag expectations for Stage/Key/Mouse, so IME needs its own function objects)
+		// AsBroadcaster methods — use shared g_ab_* function objects (same identity
+		// as Stage/Key/Mouse/MovieClipLoader for == comparison)
 		initAsBroadcasterFuncs(app_context);
 
-		// broadcastMessage: no prototype, own_props = {__proto__, constructor}
-		static ASFunction ime_broadcastMessage;
-		memset(&ime_broadcastMessage, 0, sizeof(ASFunction));
-		strncpy(ime_broadcastMessage.name, "broadcastMessage", 255);
-		ime_broadcastMessage.function_type = 2;
-		ime_broadcastMessage.advanced_func = g_ab_broadcastMessage_func.advanced_func;
-		setupNativeFuncOwnProps(app_context, &ime_broadcastMessage);
-
-		// addListener: has prototype, own_props = {prototype (DONT_ENUM), __proto__, constructor}
-		ASObject* _op = getObjectPrototype(app_context);
-		static ASFunction ime_addListener;
-		memset(&ime_addListener, 0, sizeof(ASFunction));
-		strncpy(ime_addListener.name, "addListener", 255);
-		ime_addListener.function_type = 2;
-		ime_addListener.advanced_func = g_ab_addListener_func.advanced_func;
-		// Create prototype_obj: insert constructor first, then __proto__ (LIFO: __proto__, constructor)
-		ime_addListener.prototype_obj = allocObject(app_context, 4);
-		retainObject(ime_addListener.prototype_obj);
-		{
-			ActionVar cv = {0}; cv.type = ACTION_STACK_VALUE_FUNCTION;
-			cv.data.numeric_value = (u64)&ime_addListener;
-			setProperty(app_context, ime_addListener.prototype_obj, "constructor", 11, &cv);
-			ActionVar pv = {0}; pv.type = ACTION_STACK_VALUE_OBJECT;
-			pv.data.numeric_value = (u64)_op;
-			setProperty(app_context, ime_addListener.prototype_obj, "__proto__", 9, &pv);
-		}
-		// own_props: insert constructor, __proto__, prototype (LIFO: prototype, __proto__, constructor)
-		ime_addListener.own_props = allocObject(app_context, 4);
-		retainObject(ime_addListener.own_props);
-		{
-			ActionVar cv = {0}; cv.type = ACTION_STACK_VALUE_FUNCTION;
-			cv.data.numeric_value = (u64)&ime_addListener;
-			setPropertyWithFlags(app_context, ime_addListener.own_props, "constructor", 11, &cv, PROPERTY_FLAGS_DEFAULT);
-			ActionVar ppv = {0}; ppv.type = ACTION_STACK_VALUE_OBJECT;
-			ppv.data.numeric_value = (u64)_op;
-			setPropertyWithFlags(app_context, ime_addListener.own_props, "__proto__", 9, &ppv, PROPERTY_FLAGS_DEFAULT);
-			ActionVar ptv = {0}; ptv.type = ACTION_STACK_VALUE_OBJECT;
-			ptv.data.numeric_value = (u64)ime_addListener.prototype_obj;
-			setPropertyWithFlags(app_context, ime_addListener.own_props, "prototype", 9, &ptv, PROPERTY_FLAGS_DONTENUM);
-		}
-
-		// removeListener: has prototype, own_props = {prototype (DONT_ENUM), __proto__, constructor}
-		static ASFunction ime_removeListener;
-		memset(&ime_removeListener, 0, sizeof(ASFunction));
-		strncpy(ime_removeListener.name, "removeListener", 255);
-		ime_removeListener.function_type = 2;
-		ime_removeListener.advanced_func = g_ab_removeListener_func.advanced_func;
-		// Create prototype_obj: insert constructor first, then __proto__
-		ime_removeListener.prototype_obj = allocObject(app_context, 4);
-		retainObject(ime_removeListener.prototype_obj);
-		{
-			ActionVar cv = {0}; cv.type = ACTION_STACK_VALUE_FUNCTION;
-			cv.data.numeric_value = (u64)&ime_removeListener;
-			setProperty(app_context, ime_removeListener.prototype_obj, "constructor", 11, &cv);
-			ActionVar pv = {0}; pv.type = ACTION_STACK_VALUE_OBJECT;
-			pv.data.numeric_value = (u64)_op;
-			setProperty(app_context, ime_removeListener.prototype_obj, "__proto__", 9, &pv);
-		}
-		// own_props: insert constructor, __proto__, prototype (LIFO: prototype, __proto__, constructor)
-		ime_removeListener.own_props = allocObject(app_context, 4);
-		retainObject(ime_removeListener.own_props);
-		{
-			ActionVar cv = {0}; cv.type = ACTION_STACK_VALUE_FUNCTION;
-			cv.data.numeric_value = (u64)&ime_removeListener;
-			setPropertyWithFlags(app_context, ime_removeListener.own_props, "constructor", 11, &cv, PROPERTY_FLAGS_DEFAULT);
-			ActionVar ppv = {0}; ppv.type = ACTION_STACK_VALUE_OBJECT;
-			ppv.data.numeric_value = (u64)_op;
-			setPropertyWithFlags(app_context, ime_removeListener.own_props, "__proto__", 9, &ppv, PROPERTY_FLAGS_DEFAULT);
-			ActionVar ptv = {0}; ptv.type = ACTION_STACK_VALUE_OBJECT;
-			ptv.data.numeric_value = (u64)ime_removeListener.prototype_obj;
-			setPropertyWithFlags(app_context, ime_removeListener.own_props, "prototype", 9, &ptv, PROPERTY_FLAGS_DONTENUM);
-		}
-
 		ActionVar fv = {0}; fv.type = ACTION_STACK_VALUE_FUNCTION;
-		fv.data.numeric_value = (u64)&ime_broadcastMessage;
+		fv.data.numeric_value = (u64)&g_ab_broadcastMessage_func;
 		setPropertyWithFlags(app_context, ime_obj, "broadcastMessage", 16, &fv, de_ro);
-		fv.data.numeric_value = (u64)&ime_addListener;
+		fv.data.numeric_value = (u64)&g_ab_addListener_func;
 		setPropertyWithFlags(app_context, ime_obj, "addListener", 11, &fv, de_ro);
-		fv.data.numeric_value = (u64)&ime_removeListener;
+		fv.data.numeric_value = (u64)&g_ab_removeListener_func;
 		setPropertyWithFlags(app_context, ime_obj, "removeListener", 14, &fv, de_ro);
 
 		// _listeners array (DONT_ENUM + READ_ONLY)
@@ -25687,7 +25665,7 @@ static ActionVar filterClone(SWFAppContext* app_context, ActionVar* args, u32 ar
     (void)args; (void)arg_count; (void)registers;
     ASObject* obj = (ASObject*) this_obj;
     ActionVar r = {0}; r.type = ACTION_STACK_VALUE_UNDEFINED;
-    if (!obj) return r;
+    if (!obj || obj->native_type != NATIVE_FILTER) return r;
 
     ASObject* clone = allocObject(app_context, obj->num_used + 4);
     clone->native_type = NATIVE_FILTER;
