@@ -763,6 +763,10 @@ typedef struct ASFunction {
 	// Per-movie global index: reserved for future per-movie _global isolation.
 	// Currently unused (always 0). Built-in functions are zero-initialized.
 	u16 movie_global_idx;
+
+	// If set, this function does not get a lazily-created .prototype object.
+	// Used for native/built-in functions that don't have prototypes in Flash.
+	u8 no_lazy_prototype;
 } ASFunction;
 
 // Forward declaration for filter constructor init
@@ -5259,145 +5263,145 @@ static ASObject* getObjectPrototype(SWFAppContext* app_context)
 		g_object_prototype = allocObject(app_context, 12);
 		retainObject(g_object_prototype);
 
-		// Set up the built-in toString function
+		// Object.prototype methods — insertion order determines LIFO enumeration.
+		// Expected LIFO enum: toLocaleString, isPropertyEnumerable, isPrototypeOf, hasOwnProperty,
+		//   toString, valueOf, addProperty, unwatch, watch, constructor
+		// So insert in reverse: constructor(placeholder), watch, unwatch, addProperty, valueOf,
+		//   toString, hasOwnProperty, isPrototypeOf, isPropertyEnumerable, toLocaleString
+
+		// constructor placeholder — filled in by ensureGlobalInit with Object constructor.
+		// Inserted first so it enumerates last in LIFO.
+		{
+			ActionVar _u = {0}; _u.type = ACTION_STACK_VALUE_UNDEFINED;
+			setProperty(app_context, g_object_prototype, "constructor", 11, &_u);
+		}
+
+		// watch
+		memset(&g_object_watch_func, 0, sizeof(ASFunction));
+		strncpy(g_object_watch_func.name, "watch", 255);
+		g_object_watch_func.function_type = 2;
+		g_object_watch_func.param_count = 2;
+		g_object_watch_func.advanced_func = (Function2Ptr) builtin_object_watch;
+		if (function_count < MAX_FUNCTIONS)
+			function_registry[function_count++] = &g_object_watch_func;
+		{
+			ActionVar fv = {0}; fv.type = ACTION_STACK_VALUE_FUNCTION;
+			fv.data.numeric_value = (u64) &g_object_watch_func;
+			setProperty(app_context, g_object_prototype, "watch", 5, &fv);
+		}
+
+		// unwatch
+		memset(&g_object_unwatch_func, 0, sizeof(ASFunction));
+		strncpy(g_object_unwatch_func.name, "unwatch", 255);
+		g_object_unwatch_func.function_type = 2;
+		g_object_unwatch_func.param_count = 1;
+		g_object_unwatch_func.advanced_func = (Function2Ptr) builtin_object_unwatch;
+		if (function_count < MAX_FUNCTIONS)
+			function_registry[function_count++] = &g_object_unwatch_func;
+		{
+			ActionVar fv = {0}; fv.type = ACTION_STACK_VALUE_FUNCTION;
+			fv.data.numeric_value = (u64) &g_object_unwatch_func;
+			setProperty(app_context, g_object_prototype, "unwatch", 7, &fv);
+		}
+
+		// addProperty
+		memset(&g_object_addProperty_func, 0, sizeof(ASFunction));
+		strncpy(g_object_addProperty_func.name, "addProperty", 255);
+		g_object_addProperty_func.function_type = 2;
+		g_object_addProperty_func.param_count = 3;
+		g_object_addProperty_func.advanced_func = (Function2Ptr) builtin_object_addProperty;
+		if (function_count < MAX_FUNCTIONS)
+			function_registry[function_count++] = &g_object_addProperty_func;
+		{
+			ActionVar fv = {0}; fv.type = ACTION_STACK_VALUE_FUNCTION;
+			fv.data.numeric_value = (u64) &g_object_addProperty_func;
+			setProperty(app_context, g_object_prototype, "addProperty", 11, &fv);
+		}
+
+		// valueOf
+		memset(&g_object_valueOf_func, 0, sizeof(ASFunction));
+		strncpy(g_object_valueOf_func.name, "valueOf", 255);
+		g_object_valueOf_func.function_type = 2;
+		g_object_valueOf_func.param_count = 0;
+		g_object_valueOf_func.advanced_func = (Function2Ptr) builtin_object_valueOf;
+		if (function_count < MAX_FUNCTIONS)
+			function_registry[function_count++] = &g_object_valueOf_func;
+		{
+			ActionVar fv = {0}; fv.type = ACTION_STACK_VALUE_FUNCTION;
+			fv.data.numeric_value = (u64) &g_object_valueOf_func;
+			setProperty(app_context, g_object_prototype, "valueOf", 7, &fv);
+		}
+
+		// toString
 		memset(&g_object_toString_func, 0, sizeof(ASFunction));
 		strncpy(g_object_toString_func.name, "toString", 255);
 		g_object_toString_func.function_type = 1;
 		g_object_toString_func.param_count = 0;
 		g_object_toString_func.simple_func = (SimpleFunctionPtr) builtin_object_toString;
-
-		// Register in function registry so lookupFunctionFromVar can find it
 		if (function_count < MAX_FUNCTIONS)
 			function_registry[function_count++] = &g_object_toString_func;
-
-		// Set toString property on Object.prototype
-		ActionVar ts_var;
-		ts_var.type = ACTION_STACK_VALUE_FUNCTION;
-		ts_var.str_size = 0;
-		ts_var.data.numeric_value = (u64) &g_object_toString_func;
-		setProperty(app_context, g_object_prototype, "toString", 8, &ts_var);
-
-		// Set up the built-in valueOf function (type-2: needs this_obj)
-		memset(&g_object_valueOf_func, 0, sizeof(ASFunction));
-		strncpy(g_object_valueOf_func.name, "valueOf", 255);
-		g_object_valueOf_func.function_type = 2;
-		g_object_valueOf_func.param_count = 0;
-		g_object_valueOf_func.register_count = 0;
-		g_object_valueOf_func.advanced_func = (Function2Ptr) builtin_object_valueOf;
-
-		if (function_count < MAX_FUNCTIONS)
-			function_registry[function_count++] = &g_object_valueOf_func;
-
-		// Set valueOf property on Object.prototype
-		ActionVar vo_var;
-		vo_var.type = ACTION_STACK_VALUE_FUNCTION;
-		vo_var.str_size = 0;
-		vo_var.data.numeric_value = (u64) &g_object_valueOf_func;
-		setProperty(app_context, g_object_prototype, "valueOf", 7, &vo_var);
-
-		// Methods on Object.prototype (always installed regardless of SWF version):
-		// hasOwnProperty, isPropertyEnumerable, isPrototypeOf, watch, unwatch, addProperty
-		// Note: Flash controls visibility via ASSetPropFlags, not by omitting methods.
-		// Installing unconditionally prevents the singleton poison bug where a SWF5 child
-		// movie (e.g., Dejagnu.swf) initializes Object.prototype before the SWF6+ parent.
 		{
-		// Set up the built-in hasOwnProperty function (type-2: needs this_obj + args)
+			ActionVar fv = {0}; fv.type = ACTION_STACK_VALUE_FUNCTION;
+			fv.data.numeric_value = (u64) &g_object_toString_func;
+			setProperty(app_context, g_object_prototype, "toString", 8, &fv);
+		}
+
+		// hasOwnProperty
 		memset(&g_object_hasOwnProperty_func, 0, sizeof(ASFunction));
 		strncpy(g_object_hasOwnProperty_func.name, "hasOwnProperty", 255);
 		g_object_hasOwnProperty_func.function_type = 2;
 		g_object_hasOwnProperty_func.param_count = 1;
-		g_object_hasOwnProperty_func.register_count = 0;
 		g_object_hasOwnProperty_func.advanced_func = (Function2Ptr) builtin_object_hasOwnProperty;
-
 		if (function_count < MAX_FUNCTIONS)
 			function_registry[function_count++] = &g_object_hasOwnProperty_func;
+		{
+			ActionVar fv = {0}; fv.type = ACTION_STACK_VALUE_FUNCTION;
+			fv.data.numeric_value = (u64) &g_object_hasOwnProperty_func;
+			setProperty(app_context, g_object_prototype, "hasOwnProperty", 14, &fv);
+		}
 
-		// Set hasOwnProperty on Object.prototype
-		ActionVar hop_var;
-		hop_var.type = ACTION_STACK_VALUE_FUNCTION;
-		hop_var.str_size = 0;
-		hop_var.data.numeric_value = (u64) &g_object_hasOwnProperty_func;
-		setProperty(app_context, g_object_prototype, "hasOwnProperty", 14, &hop_var);
-
-		// Set up isPropertyEnumerable function (type-2: needs this_obj + args)
-		memset(&g_object_isPropertyEnumerable_func, 0, sizeof(ASFunction));
-		strncpy(g_object_isPropertyEnumerable_func.name, "isPropertyEnumerable", 255);
-		g_object_isPropertyEnumerable_func.function_type = 2;
-		g_object_isPropertyEnumerable_func.param_count = 1;
-		g_object_isPropertyEnumerable_func.register_count = 0;
-		g_object_isPropertyEnumerable_func.advanced_func = (Function2Ptr) builtin_object_isPropertyEnumerable;
-
-		if (function_count < MAX_FUNCTIONS)
-			function_registry[function_count++] = &g_object_isPropertyEnumerable_func;
-
-		ActionVar ipe_var;
-		ipe_var.type = ACTION_STACK_VALUE_FUNCTION;
-		ipe_var.str_size = 0;
-		ipe_var.data.numeric_value = (u64) &g_object_isPropertyEnumerable_func;
-		setProperty(app_context, g_object_prototype, "isPropertyEnumerable", 20, &ipe_var);
-
-		// Set up isPrototypeOf function (type-2: needs this_obj + args)
+		// isPrototypeOf
 		memset(&g_object_isPrototypeOf_func, 0, sizeof(ASFunction));
 		strncpy(g_object_isPrototypeOf_func.name, "isPrototypeOf", 255);
 		g_object_isPrototypeOf_func.function_type = 2;
 		g_object_isPrototypeOf_func.param_count = 1;
-		g_object_isPrototypeOf_func.register_count = 0;
 		g_object_isPrototypeOf_func.advanced_func = (Function2Ptr) builtin_object_isPrototypeOf;
-
 		if (function_count < MAX_FUNCTIONS)
 			function_registry[function_count++] = &g_object_isPrototypeOf_func;
+		{
+			ActionVar fv = {0}; fv.type = ACTION_STACK_VALUE_FUNCTION;
+			fv.data.numeric_value = (u64) &g_object_isPrototypeOf_func;
+			setProperty(app_context, g_object_prototype, "isPrototypeOf", 13, &fv);
+		}
 
-		ActionVar ipo_var;
-		ipo_var.type = ACTION_STACK_VALUE_FUNCTION;
-		ipo_var.str_size = 0;
-		ipo_var.data.numeric_value = (u64) &g_object_isPrototypeOf_func;
-		setProperty(app_context, g_object_prototype, "isPrototypeOf", 13, &ipo_var);
-
-		// Set up watch function (type-2: needs this_obj + args)
-		memset(&g_object_watch_func, 0, sizeof(ASFunction));
-		strncpy(g_object_watch_func.name, "watch", 255);
-		g_object_watch_func.function_type = 2;
-		g_object_watch_func.param_count = 2;
-		g_object_watch_func.register_count = 0;
-		g_object_watch_func.advanced_func = (Function2Ptr) builtin_object_watch;
+		// isPropertyEnumerable
+		memset(&g_object_isPropertyEnumerable_func, 0, sizeof(ASFunction));
+		strncpy(g_object_isPropertyEnumerable_func.name, "isPropertyEnumerable", 255);
+		g_object_isPropertyEnumerable_func.function_type = 2;
+		g_object_isPropertyEnumerable_func.param_count = 1;
+		g_object_isPropertyEnumerable_func.advanced_func = (Function2Ptr) builtin_object_isPropertyEnumerable;
 		if (function_count < MAX_FUNCTIONS)
-			function_registry[function_count++] = &g_object_watch_func;
-		ActionVar watch_var;
-		watch_var.type = ACTION_STACK_VALUE_FUNCTION;
-		watch_var.str_size = 0;
-		watch_var.data.numeric_value = (u64) &g_object_watch_func;
-		setProperty(app_context, g_object_prototype, "watch", 5, &watch_var);
+			function_registry[function_count++] = &g_object_isPropertyEnumerable_func;
+		{
+			ActionVar fv = {0}; fv.type = ACTION_STACK_VALUE_FUNCTION;
+			fv.data.numeric_value = (u64) &g_object_isPropertyEnumerable_func;
+			setProperty(app_context, g_object_prototype, "isPropertyEnumerable", 20, &fv);
+		}
 
-		// Set up unwatch function (type-2: needs this_obj + args)
-		memset(&g_object_unwatch_func, 0, sizeof(ASFunction));
-		strncpy(g_object_unwatch_func.name, "unwatch", 255);
-		g_object_unwatch_func.function_type = 2;
-		g_object_unwatch_func.param_count = 1;
-		g_object_unwatch_func.register_count = 0;
-		g_object_unwatch_func.advanced_func = (Function2Ptr) builtin_object_unwatch;
-		if (function_count < MAX_FUNCTIONS)
-			function_registry[function_count++] = &g_object_unwatch_func;
-		ActionVar unwatch_var;
-		unwatch_var.type = ACTION_STACK_VALUE_FUNCTION;
-		unwatch_var.str_size = 0;
-		unwatch_var.data.numeric_value = (u64) &g_object_unwatch_func;
-		setProperty(app_context, g_object_prototype, "unwatch", 7, &unwatch_var);
-
-		// Set up addProperty function (type-2: needs this_obj + args)
-		memset(&g_object_addProperty_func, 0, sizeof(ASFunction));
-		strncpy(g_object_addProperty_func.name, "addProperty", 255);
-		g_object_addProperty_func.function_type = 2;
-		g_object_addProperty_func.param_count = 3;
-		g_object_addProperty_func.register_count = 0;
-		g_object_addProperty_func.advanced_func = (Function2Ptr) builtin_object_addProperty;
-		if (function_count < MAX_FUNCTIONS)
-			function_registry[function_count++] = &g_object_addProperty_func;
-		ActionVar addprop_var;
-		addprop_var.type = ACTION_STACK_VALUE_FUNCTION;
-		addprop_var.str_size = 0;
-		addprop_var.data.numeric_value = (u64) &g_object_addProperty_func;
-		setProperty(app_context, g_object_prototype, "addProperty", 11, &addprop_var);
-		} // end Object.prototype SWF6+ methods block
+		// toLocaleString (delegates to toString)
+		{
+			static ASFunction g_object_toLocaleString_func;
+			memset(&g_object_toLocaleString_func, 0, sizeof(ASFunction));
+			strncpy(g_object_toLocaleString_func.name, "toLocaleString", 255);
+			g_object_toLocaleString_func.function_type = 1;
+			g_object_toLocaleString_func.param_count = 0;
+			g_object_toLocaleString_func.simple_func = (SimpleFunctionPtr) builtin_object_toString;
+			if (function_count < MAX_FUNCTIONS)
+				function_registry[function_count++] = &g_object_toLocaleString_func;
+			ActionVar fv = {0}; fv.type = ACTION_STACK_VALUE_FUNCTION;
+			fv.data.numeric_value = (u64) &g_object_toLocaleString_func;
+			setProperty(app_context, g_object_prototype, "toLocaleString", 14, &fv);
+		}
 
 		// Mark all built-in Object.prototype properties as non-enumerable (DontEnum)
 		for (u32 i = 0; i < g_object_prototype->num_used; i++)
@@ -25145,6 +25149,24 @@ static void initAsBroadcasterPrototype(SWFAppContext* app_context, ASFunction* c
 	setObjectProto(app_context, ctor->prototype_obj);
 }
 
+/// Helper: set up own_props on a native function with __proto__ + constructor (no prototype).
+// Insertion: constructor, __proto__ → LIFO enum: __proto__, constructor
+static void setupNativeFuncOwnProps(SWFAppContext* app_context, ASFunction* func)
+{
+	ASObject* obj_proto = getObjectPrototype(app_context);
+	func->no_lazy_prototype = 1;
+	func->own_props = allocObject(app_context, 4);
+	retainObject(func->own_props);
+	// constructor (any function ref, test only checks type=[function])
+	ActionVar cv = {0}; cv.type = ACTION_STACK_VALUE_FUNCTION;
+	cv.data.numeric_value = (u64)func; // self-reference is fine
+	setPropertyWithFlags(app_context, func->own_props, "constructor", 11, &cv, PROPERTY_FLAGS_DEFAULT);
+	// __proto__
+	ActionVar pv = {0}; pv.type = ACTION_STACK_VALUE_OBJECT;
+	pv.data.numeric_value = (u64)obj_proto;
+	setPropertyWithFlags(app_context, func->own_props, "__proto__", 9, &pv, PROPERTY_FLAGS_DEFAULT);
+}
+
 // ---- initSystemObject: create System built-in (idempotent) ----
 static void initSystemObject(SWFAppContext* app_context)
 {
@@ -25163,54 +25185,112 @@ static void initSystemObject(SWFAppContext* app_context)
 	}
 	setObjectProto(app_context, g_system_object);
 
-	// capabilities
-	ASObject* caps_obj = allocObject(app_context, 16);
+	// capabilities — LIFO reverse of expected enumeration order
+	// Expected: _internal(DONT_ENUM,READ_ONLY), supports64BitProcesses, supports32BitProcesses,
+	//   hasIME, language, cpuAddressSize, cpuArchitecture, os, manufacturer, isEmbeddedInAcrobat,
+	//   maxLevelIDC, windowlessDisable, localFileReadDisable, avHardwareDisable, playerType,
+	//   isDebugger, hasScreenBroadcast, hasScreenPlayback, hasPrinting, hasEmbeddedVideo,
+	//   hasStreamingVideo, hasStreamingAudio, version, serverString, hasAudio, hasMP3,
+	//   hasAudioEncoder, hasVideoEncoder, hasTLS, screenResolutionX, screenResolutionY,
+	//   pixelAspectRatio, screenDPI, screenColor, __proto__
+	ASObject* caps_obj = allocObject(app_context, 48);
 	setObjectProto(app_context, caps_obj);
 	{
-		ActionVar cap_val = {0};
-		cap_val.type = ACTION_STACK_VALUE_F64;
-		VAL(double, &cap_val.data.numeric_value) = 1536.0;
-		setProperty(app_context, caps_obj, "screenResolutionX", 17, &cap_val);
-		VAL(double, &cap_val.data.numeric_value) = 864.0;
-		setProperty(app_context, caps_obj, "screenResolutionY", 17, &cap_val);
-		VAL(double, &cap_val.data.numeric_value) = 1.0;
-		setProperty(app_context, caps_obj, "pixelAspectRatio", 16, &cap_val);
-		VAL(double, &cap_val.data.numeric_value) = 72.0;
-		setProperty(app_context, caps_obj, "screenDPI", 9, &cap_val);
-		ActionVar pt_val = {0};
-		pt_val.type = ACTION_STACK_VALUE_STRING;
-		pt_val.str_size = 10;
-		VAL(u64, &pt_val.data.numeric_value) = (u64)u16_StandAlone;
-		setProperty(app_context, caps_obj, "playerType", 10, &pt_val);
-		ActionVar ver_val = {0};
-		ver_val.type = ACTION_STACK_VALUE_STRING;
-		ver_val.str_size = 13;
-		VAL(u64, &ver_val.data.numeric_value) = (u64)u16_WIN_ver;
+		ActionVar bv_true = {0}; bv_true.type = ACTION_STACK_VALUE_BOOLEAN; bv_true.data.numeric_value = 1;
+		ActionVar bv_false = {0}; bv_false.type = ACTION_STACK_VALUE_BOOLEAN; bv_false.data.numeric_value = 0;
+		ActionVar nv = {0}; nv.type = ACTION_STACK_VALUE_F64;
+
+		// Insert in REVERSE of expected order (last inserted = first enumerated in LIFO)
+		// hasAccessibility
+		setProperty(app_context, caps_obj, "hasAccessibility", 16, &bv_false);
+		// pixelAspectRatio
+		nv.type = ACTION_STACK_VALUE_F64; VAL(double, &nv.data.numeric_value) = 1.0;
+		setProperty(app_context, caps_obj, "pixelAspectRatio", 16, &nv);
+		// screenColor
+		ActionVar sc = makeStringActionVar(app_context, "color", 5);
+		setProperty(app_context, caps_obj, "screenColor", 11, &sc);
+		// screenDPI
+		VAL(double, &nv.data.numeric_value) = 72.0;
+		setProperty(app_context, caps_obj, "screenDPI", 9, &nv);
+		// screenResolutionY
+		VAL(double, &nv.data.numeric_value) = 864.0;
+		setProperty(app_context, caps_obj, "screenResolutionY", 17, &nv);
+		// screenResolutionX
+		VAL(double, &nv.data.numeric_value) = 1536.0;
+		setProperty(app_context, caps_obj, "screenResolutionX", 17, &nv);
+		// hasTLS
+		setProperty(app_context, caps_obj, "hasTLS", 6, &bv_true);
+		// hasVideoEncoder
+		setProperty(app_context, caps_obj, "hasVideoEncoder", 15, &bv_true);
+		// hasAudioEncoder
+		setProperty(app_context, caps_obj, "hasAudioEncoder", 15, &bv_true);
+		// hasMP3
+		setProperty(app_context, caps_obj, "hasMP3", 6, &bv_true);
+		// hasAudio
+		setProperty(app_context, caps_obj, "hasAudio", 8, &bv_true);
+		// serverString
+		ActionVar ss = makeStringActionVar(app_context, "", 0);
+		setProperty(app_context, caps_obj, "serverString", 12, &ss);
+		// version
+		ActionVar ver_val = {0}; ver_val.type = ACTION_STACK_VALUE_STRING;
+		ver_val.str_size = 13; VAL(u64, &ver_val.data.numeric_value) = (u64)u16_WIN_ver;
 		setProperty(app_context, caps_obj, "version", 7, &ver_val);
-		ActionVar os_val = {0};
-		os_val.type = ACTION_STACK_VALUE_STRING;
-		os_val.str_size = 10;
-		VAL(u64, &os_val.data.numeric_value) = (u64)u16_Windows_XP;
-		setProperty(app_context, caps_obj, "os", 2, &os_val);
-		ActionVar mfr_val = {0};
-		mfr_val.type = ACTION_STACK_VALUE_STRING;
-		mfr_val.str_size = 18;
-		VAL(u64, &mfr_val.data.numeric_value) = (u64)u16_Macromedia_Windows;
+		// hasStreamingAudio
+		setProperty(app_context, caps_obj, "hasStreamingAudio", 17, &bv_true);
+		// hasStreamingVideo
+		setProperty(app_context, caps_obj, "hasStreamingVideo", 17, &bv_true);
+		// hasEmbeddedVideo
+		setProperty(app_context, caps_obj, "hasEmbeddedVideo", 16, &bv_true);
+		// hasPrinting
+		setProperty(app_context, caps_obj, "hasPrinting", 11, &bv_true);
+		// hasScreenPlayback
+		setProperty(app_context, caps_obj, "hasScreenPlayback", 17, &bv_false);
+		// hasScreenBroadcast
+		setProperty(app_context, caps_obj, "hasScreenBroadcast", 18, &bv_false);
+		// isDebugger
+		setProperty(app_context, caps_obj, "isDebugger", 10, &bv_false);
+		// playerType
+		ActionVar pt_val = {0}; pt_val.type = ACTION_STACK_VALUE_STRING;
+		pt_val.str_size = 10; VAL(u64, &pt_val.data.numeric_value) = (u64)u16_StandAlone;
+		setProperty(app_context, caps_obj, "playerType", 10, &pt_val);
+		// avHardwareDisable
+		setProperty(app_context, caps_obj, "avHardwareDisable", 17, &bv_false);
+		// localFileReadDisable
+		setProperty(app_context, caps_obj, "localFileReadDisable", 20, &bv_false);
+		// windowlessDisable
+		setProperty(app_context, caps_obj, "windowlessDisable", 17, &bv_false);
+		// maxLevelIDC
+		ActionVar ml = makeStringActionVar(app_context, "", 0);
+		setProperty(app_context, caps_obj, "maxLevelIDC", 11, &ml);
+		// isEmbeddedInAcrobat
+		setProperty(app_context, caps_obj, "isEmbeddedInAcrobat", 19, &bv_false);
+		// manufacturer
+		ActionVar mfr_val = {0}; mfr_val.type = ACTION_STACK_VALUE_STRING;
+		mfr_val.str_size = 18; VAL(u64, &mfr_val.data.numeric_value) = (u64)u16_Macromedia_Windows;
 		setProperty(app_context, caps_obj, "manufacturer", 12, &mfr_val);
-		ActionVar lang_val = {0};
-		lang_val.type = ACTION_STACK_VALUE_STRING;
-		lang_val.str_size = 2;
-		VAL(u64, &lang_val.data.numeric_value) = (u64)u16_en;
+		// os
+		ActionVar os_val = {0}; os_val.type = ACTION_STACK_VALUE_STRING;
+		os_val.str_size = 10; VAL(u64, &os_val.data.numeric_value) = (u64)u16_Windows_XP;
+		setProperty(app_context, caps_obj, "os", 2, &os_val);
+		// cpuArchitecture
+		ActionVar ca = makeStringActionVar(app_context, "x86", 3);
+		setProperty(app_context, caps_obj, "cpuArchitecture", 15, &ca);
+		// cpuAddressSize
+		nv.type = ACTION_STACK_VALUE_F64; VAL(double, &nv.data.numeric_value) = 64.0;
+		setProperty(app_context, caps_obj, "cpuAddressSize", 14, &nv);
+		// language
+		ActionVar lang_val = {0}; lang_val.type = ACTION_STACK_VALUE_STRING;
+		lang_val.str_size = 2; VAL(u64, &lang_val.data.numeric_value) = (u64)u16_en;
 		setProperty(app_context, caps_obj, "language", 8, &lang_val);
-		cap_val.type = ACTION_STACK_VALUE_BOOLEAN;
-		VAL(u32, &cap_val.data.numeric_value) = 0;
-		setProperty(app_context, caps_obj, "isDebugger", 10, &cap_val);
-		cap_val.type = ACTION_STACK_VALUE_BOOLEAN;
-		VAL(u32, &cap_val.data.numeric_value) = 1;
-		setProperty(app_context, caps_obj, "hasAudio", 8, &cap_val);
-		cap_val.type = ACTION_STACK_VALUE_BOOLEAN;
-		VAL(u32, &cap_val.data.numeric_value) = 1;
-		setProperty(app_context, caps_obj, "hasVideoEncoder", 15, &cap_val);
+		// hasIME
+		setProperty(app_context, caps_obj, "hasIME", 6, &bv_false);
+		// supports32BitProcesses
+		setProperty(app_context, caps_obj, "supports32BitProcesses", 22, &bv_true);
+		// supports64BitProcesses
+		setProperty(app_context, caps_obj, "supports64BitProcesses", 22, &bv_true);
+		// _internal (DONT_ENUM + READ_ONLY, number)
+		nv.type = ACTION_STACK_VALUE_F64; VAL(double, &nv.data.numeric_value) = 0.0;
+		setPropertyWithFlags(app_context, caps_obj, "_internal", 9, &nv, PROPERTY_FLAG_CONFIGURABLE);
 	}
 	{
 		ActionVar cv = {0}; cv.type = ACTION_STACK_VALUE_OBJECT;
@@ -25218,25 +25298,65 @@ static void initSystemObject(SWFAppContext* app_context)
 		setProperty(app_context, g_system_object, "capabilities", 12, &cv);
 	}
 
-	// Product (stub constructor function)
+	// Product (stub constructor function, has prototype)
 	{
 		static ASFunction sys_product_func;
 		memset(&sys_product_func, 0, sizeof(ASFunction));
 		strncpy(sys_product_func.name, "Product", 255);
 		sys_product_func.function_type = 2;
 		sys_product_func.advanced_func = (Function2Ptr)builtin_noop_func;
+		// Product has a prototype — create it with constructor + __proto__
+		ASObject* op = getObjectPrototype(app_context);
+		sys_product_func.prototype_obj = allocObject(app_context, 12);
+		retainObject(sys_product_func.prototype_obj);
+		{
+			ASObject* pp = sys_product_func.prototype_obj;
+			ActionVar cv = {0}; cv.type = ACTION_STACK_VALUE_FUNCTION;
+			cv.data.numeric_value = (u64)&sys_product_func;
+			setProperty(app_context, pp, "constructor", 11, &cv);
+			ActionVar pv = {0}; pv.type = ACTION_STACK_VALUE_OBJECT;
+			pv.data.numeric_value = (u64)op;
+			setProperty(app_context, pp, "__proto__", 9, &pv);
+			// Product.prototype methods (DONT_ENUM) — LIFO reverse of expected
+			static ASFunction prod_methods[6];
+			const char* prod_names[] = {"isRunning", "isInstalled", "launch", "download", "validate", "installedVersion"};
+			for (int i = 0; i < 6; i++) {
+				memset(&prod_methods[i], 0, sizeof(ASFunction));
+				strncpy(prod_methods[i].name, prod_names[i], 255);
+				prod_methods[i].function_type = 2;
+				prod_methods[i].advanced_func = (Function2Ptr)builtin_noop_func;
+				ActionVar mfv = {0}; mfv.type = ACTION_STACK_VALUE_FUNCTION;
+				mfv.data.numeric_value = (u64)&prod_methods[i];
+				setPropertyWithFlags(app_context, pp, prod_names[i], (u32)strlen(prod_names[i]), &mfv, PROPERTY_FLAGS_DONTENUM);
+			}
+		}
+		// own_props: constructor, __proto__, prototype (LIFO: prototype, __proto__, constructor)
+		sys_product_func.own_props = allocObject(app_context, 4);
+		retainObject(sys_product_func.own_props);
+		{
+			ActionVar cv = {0}; cv.type = ACTION_STACK_VALUE_FUNCTION;
+			cv.data.numeric_value = (u64)&sys_product_func;
+			setPropertyWithFlags(app_context, sys_product_func.own_props, "constructor", 11, &cv, PROPERTY_FLAGS_DEFAULT);
+			ActionVar ppv = {0}; ppv.type = ACTION_STACK_VALUE_OBJECT;
+			ppv.data.numeric_value = (u64)op;
+			setPropertyWithFlags(app_context, sys_product_func.own_props, "__proto__", 9, &ppv, PROPERTY_FLAGS_DEFAULT);
+			ActionVar ptv = {0}; ptv.type = ACTION_STACK_VALUE_OBJECT;
+			ptv.data.numeric_value = (u64)sys_product_func.prototype_obj;
+			setPropertyWithFlags(app_context, sys_product_func.own_props, "prototype", 9, &ptv, PROPERTY_FLAGS_DONTENUM);
+		}
 		ActionVar fv = {0}; fv.type = ACTION_STACK_VALUE_FUNCTION;
 		fv.data.numeric_value = (u64)&sys_product_func;
 		setProperty(app_context, g_system_object, "Product", 7, &fv);
 	}
 
-	// showSettings (stub function)
+	// showSettings (stub function, no prototype)
 	{
 		static ASFunction sys_showSettings_func;
 		memset(&sys_showSettings_func, 0, sizeof(ASFunction));
 		strncpy(sys_showSettings_func.name, "showSettings", 255);
 		sys_showSettings_func.function_type = 2;
 		sys_showSettings_func.advanced_func = (Function2Ptr)builtin_noop_func;
+		setupNativeFuncOwnProps(app_context, &sys_showSettings_func);
 		ActionVar fv = {0}; fv.type = ACTION_STACK_VALUE_FUNCTION;
 		fv.data.numeric_value = (u64)&sys_showSettings_func;
 		setProperty(app_context, g_system_object, "showSettings", 12, &fv);
@@ -25256,10 +25376,34 @@ static void initSystemObject(SWFAppContext* app_context)
 			PROPERTY_FLAG_ENUMERABLE | PROPERTY_FLAG_CONFIGURABLE);
 	}
 
-	// security
-	ASObject* security_obj = allocObject(app_context, 4);
+	// security — expected LIFO enum order:
+	// PolicyFileResolver, sandboxType, escapeDomain, chooseLocalSwfPath, loadPolicyFile,
+	// allowInsecureDomain, allowDomain, __constructor__(DONT_ENUM), __proto__
+	ASObject* security_obj = allocObject(app_context, 12);
+	// Insert in reverse order (LIFO): __proto__ first, then __constructor__, then allowDomain, ...
 	setObjectProto(app_context, security_obj);
+	// __constructor__ (DONT_ENUM, points to Object constructor — will be filled in ensureGlobalInit)
 	{
+		ActionVar _u = {0}; _u.type = ACTION_STACK_VALUE_UNDEFINED;
+		setPropertyWithFlags(app_context, security_obj, "__constructor__", 15, &_u, PROPERTY_FLAGS_DONTENUM);
+	}
+	// Security method stubs (reverse of display order)
+	{
+		static ASFunction sec_methods[6];
+		const char* sec_names[] = {"allowDomain", "allowInsecureDomain", "loadPolicyFile", "chooseLocalSwfPath", "escapeDomain"};
+		const u32 sec_name_lens[] = {11, 19, 14, 18, 12};
+		for (int i = 0; i < 5; i++) {
+			memset(&sec_methods[i], 0, sizeof(ASFunction));
+			strncpy(sec_methods[i].name, sec_names[i], 255);
+			sec_methods[i].function_type = 2;
+			sec_methods[i].advanced_func = (Function2Ptr)builtin_noop_func;
+			setupNativeFuncOwnProps(app_context, &sec_methods[i]);
+			ActionVar fv = {0}; fv.type = ACTION_STACK_VALUE_FUNCTION;
+			fv.data.numeric_value = (u64)&sec_methods[i];
+			setProperty(app_context, security_obj, sec_names[i], sec_name_lens[i], &fv);
+		}
+
+		// sandboxType (READ_ONLY string)
 		ActionVar sandbox_val = {0};
 		sandbox_val.type = ACTION_STACK_VALUE_STRING;
 		if (g_use_network) {
@@ -25269,19 +25413,84 @@ static void initSystemObject(SWFAppContext* app_context)
 			sandbox_val.str_size = 13;
 			VAL(u64, &sandbox_val.data.numeric_value) = (u64)u16_localWithFile;
 		}
-		setProperty(app_context, security_obj, "sandboxType", 11, &sandbox_val);
+		setPropertyWithFlags(app_context, security_obj, "sandboxType", 11, &sandbox_val,
+			PROPERTY_FLAG_ENUMERABLE | PROPERTY_FLAG_CONFIGURABLE); // READ_ONLY (no WRITABLE)
+
+		// PolicyFileResolver (function with prototype, AsBroadcaster methods)
+		memset(&sec_methods[5], 0, sizeof(ASFunction));
+		strncpy(sec_methods[5].name, "PolicyFileResolver", 255);
+		sec_methods[5].function_type = 2;
+		sec_methods[5].advanced_func = (Function2Ptr)builtin_noop_func;
+		// Create PolicyFileResolver.prototype with AsBroadcaster + resolve method
+		sec_methods[5].prototype_obj = allocObject(app_context, 8);
+		retainObject(sec_methods[5].prototype_obj);
+		{
+			ASObject* pfr_proto = sec_methods[5].prototype_obj;
+			ASObject* op = getObjectPrototype(app_context);
+			// Insert in reverse order: constructor, __proto__, resolve, broadcastMessage, addListener, removeListener, _listeners
+			ActionVar cv = {0}; cv.type = ACTION_STACK_VALUE_FUNCTION;
+			cv.data.numeric_value = (u64)&sec_methods[5];
+			setProperty(app_context, pfr_proto, "constructor", 11, &cv);
+			ActionVar ppv = {0}; ppv.type = ACTION_STACK_VALUE_OBJECT;
+			ppv.data.numeric_value = (u64)op;
+			setProperty(app_context, pfr_proto, "__proto__", 9, &ppv);
+			// resolve (plain function)
+			static ASFunction pfr_resolve;
+			memset(&pfr_resolve, 0, sizeof(ASFunction));
+			strncpy(pfr_resolve.name, "resolve", 255);
+			pfr_resolve.function_type = 2;
+			pfr_resolve.advanced_func = (Function2Ptr)builtin_noop_func;
+			ActionVar rv = {0}; rv.type = ACTION_STACK_VALUE_FUNCTION;
+			rv.data.numeric_value = (u64)&pfr_resolve;
+			setProperty(app_context, pfr_proto, "resolve", 7, &rv);
+			// AsBroadcaster methods (DONT_ENUM)
+			initAsBroadcasterFuncs(app_context);
+			ActionVar bfv = {0}; bfv.type = ACTION_STACK_VALUE_FUNCTION;
+			bfv.data.numeric_value = (u64)&g_ab_broadcastMessage_func;
+			setPropertyWithFlags(app_context, pfr_proto, "broadcastMessage", 16, &bfv, PROPERTY_FLAGS_DONTENUM);
+			bfv.data.numeric_value = (u64)&g_ab_addListener_func;
+			setPropertyWithFlags(app_context, pfr_proto, "addListener", 11, &bfv, PROPERTY_FLAGS_DONTENUM);
+			bfv.data.numeric_value = (u64)&g_ab_removeListener_func;
+			setPropertyWithFlags(app_context, pfr_proto, "removeListener", 14, &bfv, PROPERTY_FLAGS_DONTENUM);
+			// _listeners array (DONT_ENUM)
+			ASArray* listeners = allocArray(app_context, 4);
+			ActionVar lv = {0}; lv.type = ACTION_STACK_VALUE_ARRAY;
+			lv.data.numeric_value = (u64)listeners;
+			setPropertyWithFlags(app_context, pfr_proto, "_listeners", 10, &lv, PROPERTY_FLAGS_DONTENUM);
+		}
+		// PolicyFileResolver own_props: prototype (DONT_ENUM), __proto__, constructor
+		sec_methods[5].own_props = allocObject(app_context, 4);
+		retainObject(sec_methods[5].own_props);
+		{
+			ASObject* op = getObjectPrototype(app_context);
+			ActionVar cv = {0}; cv.type = ACTION_STACK_VALUE_FUNCTION;
+			cv.data.numeric_value = (u64)&sec_methods[5]; // self as constructor ref
+			setPropertyWithFlags(app_context, sec_methods[5].own_props, "constructor", 11, &cv, PROPERTY_FLAGS_DEFAULT);
+			ActionVar ppv = {0}; ppv.type = ACTION_STACK_VALUE_OBJECT;
+			ppv.data.numeric_value = (u64)op;
+			setPropertyWithFlags(app_context, sec_methods[5].own_props, "__proto__", 9, &ppv, PROPERTY_FLAGS_DEFAULT);
+			ActionVar ptv = {0}; ptv.type = ACTION_STACK_VALUE_OBJECT;
+			ptv.data.numeric_value = (u64)sec_methods[5].prototype_obj;
+			setPropertyWithFlags(app_context, sec_methods[5].own_props, "prototype", 9, &ptv, PROPERTY_FLAGS_DONTENUM);
+		}
+		ActionVar pfv = {0}; pfv.type = ACTION_STACK_VALUE_FUNCTION;
+		pfv.data.numeric_value = (u64)&sec_methods[5];
+		setProperty(app_context, security_obj, "PolicyFileResolver", 18, &pfv);
+	}
+	{
 		ActionVar sv = {0}; sv.type = ACTION_STACK_VALUE_OBJECT;
 		sv.data.numeric_value = (u64)security_obj;
 		setProperty(app_context, g_system_object, "security", 8, &sv);
 	}
 
-	// setClipboard (stub function)
+	// setClipboard (stub function, no prototype)
 	{
 		static ASFunction sys_setClipboard_func;
 		memset(&sys_setClipboard_func, 0, sizeof(ASFunction));
 		strncpy(sys_setClipboard_func.name, "setClipboard", 255);
 		sys_setClipboard_func.function_type = 2;
 		sys_setClipboard_func.advanced_func = (Function2Ptr)builtin_noop_func;
+		setupNativeFuncOwnProps(app_context, &sys_setClipboard_func);
 		ActionVar fv = {0}; fv.type = ACTION_STACK_VALUE_FUNCTION;
 		fv.data.numeric_value = (u64)&sys_setClipboard_func;
 		setProperty(app_context, g_system_object, "setClipboard", 12, &fv);
@@ -25325,29 +25534,106 @@ static void initSystemObject(SWFAppContext* app_context)
 		setPropertyWithFlags(app_context, ime_obj, "ALPHANUMERIC_FULL", 17, &sv, de_ro);
 	}
 
-	// IME methods (DONT_ENUM + READ_ONLY) — 6 IME-specific + 4 from AsBroadcaster
+	// IME methods (DONT_ENUM + READ_ONLY) — 6 IME-specific + 3 AsBroadcaster copies
 	{
 		const u8 de_ro = 0; // DONT_ENUM + READ_ONLY + DONT_DELETE
 		static ASFunction ime_methods[6];
 		const char* ime_names[] = {"getEnabled", "setEnabled", "getConversionMode", "setConversionMode", "setCompositionString", "doConversion"};
+
 		for (int i = 0; i < 6; i++) {
 			memset(&ime_methods[i], 0, sizeof(ASFunction));
 			strncpy(ime_methods[i].name, ime_names[i], 255);
 			ime_methods[i].function_type = 2;
 			ime_methods[i].advanced_func = (Function2Ptr)builtin_noop_func;
+			setupNativeFuncOwnProps(app_context, &ime_methods[i]);
 			ActionVar fv = {0}; fv.type = ACTION_STACK_VALUE_FUNCTION;
 			fv.data.numeric_value = (u64)&ime_methods[i];
 			setPropertyWithFlags(app_context, ime_obj, ime_names[i], (u32)strlen(ime_names[i]), &fv, de_ro);
 		}
 
-		// AsBroadcaster methods (with DONT_ENUM + READ_ONLY flags instead of default)
+		// AsBroadcaster methods — create IME-specific copies (shared g_ab_* have different
+		// flag expectations for Stage/Key/Mouse, so IME needs its own function objects)
 		initAsBroadcasterFuncs(app_context);
+
+		// broadcastMessage: no prototype, own_props = {__proto__, constructor}
+		static ASFunction ime_broadcastMessage;
+		memset(&ime_broadcastMessage, 0, sizeof(ASFunction));
+		strncpy(ime_broadcastMessage.name, "broadcastMessage", 255);
+		ime_broadcastMessage.function_type = 2;
+		ime_broadcastMessage.advanced_func = g_ab_broadcastMessage_func.advanced_func;
+		setupNativeFuncOwnProps(app_context, &ime_broadcastMessage);
+
+		// addListener: has prototype, own_props = {prototype (DONT_ENUM), __proto__, constructor}
+		ASObject* _op = getObjectPrototype(app_context);
+		static ASFunction ime_addListener;
+		memset(&ime_addListener, 0, sizeof(ASFunction));
+		strncpy(ime_addListener.name, "addListener", 255);
+		ime_addListener.function_type = 2;
+		ime_addListener.advanced_func = g_ab_addListener_func.advanced_func;
+		// Create prototype_obj: insert constructor first, then __proto__ (LIFO: __proto__, constructor)
+		ime_addListener.prototype_obj = allocObject(app_context, 4);
+		retainObject(ime_addListener.prototype_obj);
+		{
+			ActionVar cv = {0}; cv.type = ACTION_STACK_VALUE_FUNCTION;
+			cv.data.numeric_value = (u64)&ime_addListener;
+			setProperty(app_context, ime_addListener.prototype_obj, "constructor", 11, &cv);
+			ActionVar pv = {0}; pv.type = ACTION_STACK_VALUE_OBJECT;
+			pv.data.numeric_value = (u64)_op;
+			setProperty(app_context, ime_addListener.prototype_obj, "__proto__", 9, &pv);
+		}
+		// own_props: insert constructor, __proto__, prototype (LIFO: prototype, __proto__, constructor)
+		ime_addListener.own_props = allocObject(app_context, 4);
+		retainObject(ime_addListener.own_props);
+		{
+			ActionVar cv = {0}; cv.type = ACTION_STACK_VALUE_FUNCTION;
+			cv.data.numeric_value = (u64)&ime_addListener;
+			setPropertyWithFlags(app_context, ime_addListener.own_props, "constructor", 11, &cv, PROPERTY_FLAGS_DEFAULT);
+			ActionVar ppv = {0}; ppv.type = ACTION_STACK_VALUE_OBJECT;
+			ppv.data.numeric_value = (u64)_op;
+			setPropertyWithFlags(app_context, ime_addListener.own_props, "__proto__", 9, &ppv, PROPERTY_FLAGS_DEFAULT);
+			ActionVar ptv = {0}; ptv.type = ACTION_STACK_VALUE_OBJECT;
+			ptv.data.numeric_value = (u64)ime_addListener.prototype_obj;
+			setPropertyWithFlags(app_context, ime_addListener.own_props, "prototype", 9, &ptv, PROPERTY_FLAGS_DONTENUM);
+		}
+
+		// removeListener: has prototype, own_props = {prototype (DONT_ENUM), __proto__, constructor}
+		static ASFunction ime_removeListener;
+		memset(&ime_removeListener, 0, sizeof(ASFunction));
+		strncpy(ime_removeListener.name, "removeListener", 255);
+		ime_removeListener.function_type = 2;
+		ime_removeListener.advanced_func = g_ab_removeListener_func.advanced_func;
+		// Create prototype_obj: insert constructor first, then __proto__
+		ime_removeListener.prototype_obj = allocObject(app_context, 4);
+		retainObject(ime_removeListener.prototype_obj);
+		{
+			ActionVar cv = {0}; cv.type = ACTION_STACK_VALUE_FUNCTION;
+			cv.data.numeric_value = (u64)&ime_removeListener;
+			setProperty(app_context, ime_removeListener.prototype_obj, "constructor", 11, &cv);
+			ActionVar pv = {0}; pv.type = ACTION_STACK_VALUE_OBJECT;
+			pv.data.numeric_value = (u64)_op;
+			setProperty(app_context, ime_removeListener.prototype_obj, "__proto__", 9, &pv);
+		}
+		// own_props: insert constructor, __proto__, prototype (LIFO: prototype, __proto__, constructor)
+		ime_removeListener.own_props = allocObject(app_context, 4);
+		retainObject(ime_removeListener.own_props);
+		{
+			ActionVar cv = {0}; cv.type = ACTION_STACK_VALUE_FUNCTION;
+			cv.data.numeric_value = (u64)&ime_removeListener;
+			setPropertyWithFlags(app_context, ime_removeListener.own_props, "constructor", 11, &cv, PROPERTY_FLAGS_DEFAULT);
+			ActionVar ppv = {0}; ppv.type = ACTION_STACK_VALUE_OBJECT;
+			ppv.data.numeric_value = (u64)_op;
+			setPropertyWithFlags(app_context, ime_removeListener.own_props, "__proto__", 9, &ppv, PROPERTY_FLAGS_DEFAULT);
+			ActionVar ptv = {0}; ptv.type = ACTION_STACK_VALUE_OBJECT;
+			ptv.data.numeric_value = (u64)ime_removeListener.prototype_obj;
+			setPropertyWithFlags(app_context, ime_removeListener.own_props, "prototype", 9, &ptv, PROPERTY_FLAGS_DONTENUM);
+		}
+
 		ActionVar fv = {0}; fv.type = ACTION_STACK_VALUE_FUNCTION;
-		fv.data.numeric_value = (u64)&g_ab_broadcastMessage_func;
+		fv.data.numeric_value = (u64)&ime_broadcastMessage;
 		setPropertyWithFlags(app_context, ime_obj, "broadcastMessage", 16, &fv, de_ro);
-		fv.data.numeric_value = (u64)&g_ab_addListener_func;
+		fv.data.numeric_value = (u64)&ime_addListener;
 		setPropertyWithFlags(app_context, ime_obj, "addListener", 11, &fv, de_ro);
-		fv.data.numeric_value = (u64)&g_ab_removeListener_func;
+		fv.data.numeric_value = (u64)&ime_removeListener;
 		setPropertyWithFlags(app_context, ime_obj, "removeListener", 14, &fv, de_ro);
 
 		// _listeners array (DONT_ENUM + READ_ONLY)
@@ -25535,7 +25821,7 @@ static void initFlashPackage(SWFAppContext* app_context)
 		ActionVar _u = {0}; _u.type = ACTION_STACK_VALUE_UNDEFINED;
 		// LIFO: expected enum = displayMode, maxLevel, setAATable, __proto__, constructor, prototype
 		// Insert: prototype, constructor, __proto__, setAATable, maxLevel, displayMode
-		setPropertyWithFlags(app_context, fc_TextRenderer.own_props, "prototype", 9, &_u, PROPERTY_FLAG_WRITABLE);
+		setPropertyWithFlags(app_context, fc_TextRenderer.own_props, "prototype", 9, &_u, PROPERTY_FLAG_ENUMERABLE | PROPERTY_FLAG_WRITABLE);
 		setPropertyWithFlags(app_context, fc_TextRenderer.own_props, "constructor", 11, &_u, PROPERTY_FLAG_WRITABLE);
 		setPropertyWithFlags(app_context, fc_TextRenderer.own_props, "__proto__", 9, &_u, PROPERTY_FLAG_WRITABLE);
 		// setAdvancedAntialiasingTable (function stub)
@@ -26066,7 +26352,7 @@ static void ensureGlobalInit(SWFAppContext* app_context)
 		g_ctors[ci].function_type = 1;
 	}
 	g_ctors[0].prototype_obj = getObjectPrototype(app_context);
-	g_ctors[0].own_props = allocObject(app_context, 4);
+	g_ctors[0].own_props = allocObject(app_context, 8);
 	retainObject(g_ctors[0].own_props);
 	registerGeomMethod(&g_registerClass_func_global, "registerClass",
 		(Function2Ptr)actionObjectRegisterClass, app_context,
@@ -26776,6 +27062,14 @@ static void ensureGlobalInit(SWFAppContext* app_context)
 				if (ime_ctor && ime_ctor->type == ACTION_STACK_VALUE_UNDEFINED)
 					*ime_ctor = obj_ctor;
 			}
+			// security.__constructor__
+			ActionVar* sec_v = getProperty(g_system_object, "security", 8);
+			if (sec_v && sec_v->type == ACTION_STACK_VALUE_OBJECT) {
+				ASObject* sec = (ASObject*)sec_v->data.numeric_value;
+				ActionVar* sec_ctor = getProperty(sec, "__constructor__", 15);
+				if (sec_ctor && sec_ctor->type == ACTION_STACK_VALUE_UNDEFINED)
+					*sec_ctor = obj_ctor;
+			}
 		}
 
 		// ---- Phase 8c-2.5: Fix prototype flags + flash.* constructor own_props ----
@@ -26894,6 +27188,43 @@ static void ensureGlobalInit(SWFAppContext* app_context)
 				}
 			}
 		}
+	}
+
+	// Fix Object constructor (g_ctors[0]) own_props: reorder + set READ_ONLY flags.
+	// Expected LIFO enum: registerClass(DONT_ENUM+READ_ONLY), __proto__(READ_ONLY), constructor(READ_ONLY), prototype(DONT_ENUM+READ_ONLY)
+	// Current insertion order: registerClass, prototype, constructor, __proto__
+	// Need to rebuild with: prototype, constructor, __proto__, registerClass (reverse of expected LIFO)
+	if (g_ctors[0].own_props != NULL) {
+		ASObject* old = g_ctors[0].own_props;
+		ASObject* new_props = allocObject(app_context, 8);
+		retainObject(new_props);
+		// Insert in reverse of expected LIFO order
+		// prototype (DONT_ENUM + READ_ONLY = CONFIGURABLE only = 0x04)
+		if (g_ctors[0].prototype_obj) {
+			ActionVar pv = {0}; pv.type = ACTION_STACK_VALUE_OBJECT;
+			pv.data.numeric_value = (u64)g_ctors[0].prototype_obj;
+			setPropertyWithFlags(app_context, new_props, "prototype", 9, &pv, PROPERTY_FLAG_CONFIGURABLE);
+		}
+		// constructor (READ_ONLY = ENUMERABLE + CONFIGURABLE = 0x05)
+		{
+			ActionVar* ex = getProperty(old, "constructor", 11);
+			if (ex) setPropertyWithFlags(app_context, new_props, "constructor", 11, ex,
+				PROPERTY_FLAG_ENUMERABLE | PROPERTY_FLAG_CONFIGURABLE);
+		}
+		// __proto__ (READ_ONLY = 0x05)
+		{
+			ActionVar* ex = getProperty(old, "__proto__", 9);
+			if (ex) setPropertyWithFlags(app_context, new_props, "__proto__", 9, ex,
+				PROPERTY_FLAG_ENUMERABLE | PROPERTY_FLAG_CONFIGURABLE);
+		}
+		// registerClass (DONT_ENUM + READ_ONLY = 0x04)
+		{
+			ActionVar* ex = getProperty(old, "registerClass", 13);
+			if (ex) setPropertyWithFlags(app_context, new_props, "registerClass", 13, ex,
+				PROPERTY_FLAG_CONFIGURABLE);
+		}
+		releaseObject(app_context, old);
+		g_ctors[0].own_props = new_props;
 	}
 
 }
@@ -30895,6 +31226,7 @@ void actionEnumerate2(SWFAppContext* app_context, char* str_buffer)
 
 			ASObject* current_obj = obj;
 			int chain_depth = 0;
+			int is_inherited = 0; // 0 for own object, 1 for __proto__ chain
 			const int MAX_CHAIN_DEPTH = 100;
 
 			while (current_obj != NULL && chain_depth < MAX_CHAIN_DEPTH)
@@ -30909,6 +31241,11 @@ void actionEnumerate2(SWFAppContext* app_context, char* str_buffer)
 
 					if (!(prop_flags & PROPERTY_FLAG_ENUMERABLE))
 						continue;
+					// Skip "constructor" from inherited prototypes — Flash's for-in
+					// doesn't propagate constructor through the __proto__ chain
+					if (is_inherited && prop_name_len == 11 &&
+					    memcmp(prop_name, "constructor", 11) == 0)
+						continue;
 					if (isPropertyEnumerated(enumerated_head, prop_name, prop_name_len))
 						continue;
 
@@ -30922,6 +31259,7 @@ void actionEnumerate2(SWFAppContext* app_context, char* str_buffer)
 					current_obj = (ASObject*) proto_var->data.numeric_value;
 				else
 					current_obj = NULL;
+				is_inherited = 1;
 			}
 
 			freeEnumeratedNames(enumerated_head);
@@ -31156,19 +31494,41 @@ void actionEnumerate2(SWFAppContext* app_context, char* str_buffer)
 	}
 	else if (obj_var.type == ACTION_STACK_VALUE_FUNCTION)
 	{
-		// Function enumeration — enumerate own_props only (no prototype chain walking).
-		// In Flash, for-in on a function only shows own properties, not inherited ones.
-		// (Unlike objects which walk __proto__ chain.)
+		// Function enumeration — enumerate own_props and walk __proto__ chain on own_props.
+		// Flash's ASSetPropFlags reveals inherited properties on function objects.
 		ASFunction* func = (ASFunction*) obj_var.data.numeric_value;
 		if (func != NULL && func->own_props != NULL)
 		{
-			ASObject* obj = func->own_props;
-			for (u32 i = 0; i < obj->num_used; i++)
+			EnumeratedName* enumerated_head = NULL;
+			ASObject* current_obj = func->own_props;
+			int chain_depth = 0;
+			int _is_inherited = 0;
+			const int MAX_CHAIN = 50;
+			while (current_obj != NULL && chain_depth < MAX_CHAIN)
 			{
-				if (!(obj->properties[i].flags & PROPERTY_FLAG_ENUMERABLE))
-					continue;
-				PUSH_STR((char*)obj->properties[i].name, obj->properties[i].name_length);
+				chain_depth++;
+				for (u32 i = 0; i < current_obj->num_used; i++)
+				{
+					if (!(current_obj->properties[i].flags & PROPERTY_FLAG_ENUMERABLE))
+						continue;
+					const char* pn = current_obj->properties[i].name;
+					u32 pnl = current_obj->properties[i].name_length;
+					// Skip inherited "constructor" (Flash doesn't propagate it in chain walk)
+					if (_is_inherited && pnl == 11 && memcmp(pn, "constructor", 11) == 0)
+						continue;
+					if (isPropertyEnumerated(enumerated_head, pn, pnl))
+						continue;
+					addEnumeratedName(&enumerated_head, pn, pnl);
+					PUSH_STR((char*)pn, pnl);
+				}
+				ActionVar* proto_var = getProperty(current_obj, "__proto__", 9);
+				if (proto_var != NULL && proto_var->type == ACTION_STACK_VALUE_OBJECT)
+					current_obj = (ASObject*) proto_var->data.numeric_value;
+				else
+					current_obj = NULL;
+				_is_inherited = 1;
 			}
+			freeEnumeratedNames(enumerated_head);
 		}
 	}
 }
@@ -36451,6 +36811,11 @@ void actionGetMember(SWFAppContext* app_context)
 						// Lazily create prototype object on first access
 						if (func->prototype_obj == NULL)
 						{
+							if (func->no_lazy_prototype)
+							{
+								pushUndefined(app_context);
+								return;
+							}
 							func->prototype_obj = allocObject(app_context, 4);
 							retainObject(func->prototype_obj);
 							// Set Object.prototype as __proto__ for prototype chain

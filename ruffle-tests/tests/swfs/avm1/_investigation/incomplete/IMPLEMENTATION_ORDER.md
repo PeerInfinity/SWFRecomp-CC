@@ -193,13 +193,22 @@ All other plans are independent.
 
 ## Progress (2026-04-01)
 
-Items #5-#10 all completed. Item #4 partially done (global_proto_decls now at 276/4497).
+Items #5-#10 all completed. Item #4 partially done (global_proto_decls now at 742/4497).
 Items #1-2 assessed as low ROI. Item #8 already done.
 Items #9-10: Both already working — display_object_properties image test was passing, color image test fixed by alpha blend state correction (SrcAlpha→One). Plans moved to complete/.
 Items #11-12: Drawing API rendering infrastructure works (gradients render correctly), but anti-aliasing/edge differences cause ~20% pixel mismatch. mask_reapply passes. Stage.width fix resolved layout bug in movieclip_setmask.
 Item #13: _global plain property resolution added. Gnash misc-mtasc hello test typeof still fails (MTASC `this` binding issue, not typeof-specific).
 
-**Next actionable items**: #4 continued (filter prototype virtual properties, System.* property ordering), #13 continued (misc-mtasc deeper failures: levels/super/arguments), or #14-15 (BitmapData precision debugging).
+**Next actionable items**: #4 continued (constructor own property on every ASObject — GLOBALS_PLAN known blocker), #13 continued (misc-mtasc deeper failures: levels/super/arguments), or #14-15 (BitmapData precision debugging).
+
+### 2026-04-01 session 3
+- **#4 GLOBALS_PLAN progress**: global_proto_decls 551→742 (+191), global_proto_decls_delete 283→287 (+4)
+  - System.IME method own_props, no_lazy_prototype flag, setupNativeFuncOwnProps helper
+  - System.security rewrite (PolicyFileResolver + methods + sandboxType READ_ONLY + __constructor__)
+  - System.capabilities expanded (27 new properties), System.Product prototype methods
+  - Object.prototype method reordering + toLocaleString, Object constructor own_props flags
+  - Function enumeration __proto__ chain walking, constructor inheritance filtering
+  - Next blocker: `constructor` own property on every ASObject instance (known GLOBALS_PLAN blocker)
 
 ### 2026-04-01 session 2
 - **#4 GLOBALS_PLAN progress**: global_proto_decls 276→462 (+186), global_proto_decls_delete 255→283 (+28)

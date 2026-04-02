@@ -64,9 +64,22 @@ Last updated: 2026-04-01
 ## Status: BLOCKED — Phases 1-8c-6 DONE, Phase 8c-4/8c-5/8d partially done, remaining items blocked
 
 **29 of 31 plan tests PASSING.** `native_objects_swf6` is a pre-existing regression (83/84) from the reverted TextField SWF6 constructor gate. 3 tests remain with output mismatches but significant progress was made:
-- `global_proto_decls`: ~551/4497 (was 276, +275 from geom/filter/BitmapData/TextRenderer/System fixes, 2026-04-01)
-- `global_proto_decls_delete`: ~283/4158 (was 255, +28 from filter order + clone BitmapFilter.prototype + constructor removal, 2026-04-01)
+- `global_proto_decls`: ~742/4497 (was 551, +191 from System/IME/security/capabilities/Object.prototype fixes, 2026-04-01 session 3)
+- `global_proto_decls_delete`: ~287/4158 (was 283, +4 from IME method own_props, 2026-04-01 session 3)
 - `global_instance_decls`: 23/758 (was 40, -17 regression of unclear origin — may be from initialization order changes, 2026-03-31)
+
+### Changes made (2026-04-01 session 3)
+- **TextRenderer prototype flag** — Removed DONT_ENUM from TextRenderer constructor's `prototype` property.
+- **System.IME method own_props** — Created IME-specific copies of AsBroadcaster functions (removeListener, addListener, broadcastMessage) with proper own_props (prototype/\_\_proto\_\_/constructor). IME-specific methods (doConversion, setEnabled, etc.) also get own_props.
+- **`no_lazy_prototype` flag on ASFunction** — New field prevents lazy `.prototype` creation for native functions that shouldn't have prototypes (broadcastMessage, IME methods, setClipboard, showSettings).
+- **`setupNativeFuncOwnProps` helper** — Reusable helper sets up own_props with \_\_proto\_\_ + constructor on native functions.
+- **System.security rewrite** — Added PolicyFileResolver (with prototype + AsBroadcaster methods + resolve), 5 security method stubs (allowDomain, allowInsecureDomain, loadPolicyFile, chooseLocalSwfPath, escapeDomain), sandboxType READ_ONLY flag, \_\_constructor\_\_ (DONT_ENUM, deferred fill-in to Object constructor).
+- **System.setClipboard, showSettings, Product** — All get proper own_props. Product gets prototype with 6 methods (installedVersion, validate, download, launch, isInstalled, isRunning).
+- **System.capabilities expansion** — Added ~27 missing properties (_internal, supports64/32BitProcesses, hasIME, cpuArchitecture, cpuAddressSize, isEmbeddedInAcrobat, maxLevelIDC, windowlessDisable, localFileReadDisable, avHardwareDisable, hasScreenBroadcast/Playback, hasPrinting, hasEmbeddedVideo, hasStreamingVideo/Audio, serverString, hasMP3, hasAudioEncoder, hasTLS, screenColor, hasAccessibility).
+- **Object.prototype method reordering** — Reordered insertion to match Flash LIFO enumeration: constructor(placeholder), watch, unwatch, addProperty, valueOf, toString, hasOwnProperty, isPrototypeOf, isPropertyEnumerable, toLocaleString. Added `toLocaleString` method (delegates to toString).
+- **Object constructor own_props rebuild** — Post-ensureCtorOwnProps rebuild with correct LIFO order (prototype, constructor, \_\_proto\_\_, registerClass) and READ_ONLY/DONT_ENUM flags.
+- **Function enumeration \_\_proto\_\_ chain walking** — actionEnumerate2 for FUNCTION now walks own_props.\_\_proto\_\_ chain (previously only enumerated own_props directly). Enables inherited Object.prototype methods to appear on function objects.
+- **Constructor inheritance filtering** — Both OBJECT and FUNCTION enumeration skip inherited "constructor" during \_\_proto\_\_ chain walk (Flash doesn't propagate constructor through for-in chain walking).
 
 ### Changes made (2026-04-01 session 2)
 - **ColorTransform.prototype virtual properties** — All 8 multiplier/offset properties converted from plain F64 values to addProperty virtual getters (return undefined on prototype). rgb getter now checks native_type. All 9 properties have READ_ONLY flag on prototype. Created `setAddPropertyWithFlags` helper.
@@ -136,8 +149,8 @@ Last updated: 2026-04-01
 | swf7_global_funcs | 232/232 | 100% | **PASS** | |
 | global_swf5_6_7_8_9 | 1145/1145 | 100% | **PASS** | |
 | native_subclasses | PASS | 100% | **PASS** | |
-| global_proto_decls | ~551/4497 | ~12.3% | **FAIL** | Lines 1-551 match. Next blocker: IME method sub-object own_props (prototype/constructor/__proto__) |
-| global_proto_decls_delete | ~283/4158 | ~6.8% | **FAIL** | Lines 1-283 match. Next blocker: System.privateBytes/IME property ordering |
+| global_proto_decls | ~742/4497 | ~16.5% | **FAIL** | Lines 1-742 match. Next blocker: constructor own property on every ASObject (GLOBALS_PLAN known blocker) |
+| global_proto_decls_delete | ~287/4158 | ~6.9% | **FAIL** | Lines 1-287 match. Next blocker: IME method own_props DONT_DELETE |
 | global_instance_decls | 17/758 | ~2% | **FAIL** | Phase 8d — DONT_DELETE on instance __proto__, missing instance properties, special construction behavior |
 
 ---
