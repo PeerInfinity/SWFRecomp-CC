@@ -1,8 +1,8 @@
 {
   "metadata": {
-    "timestamp": "2026-04-02T20:20:00.924073+00:00",
-    "git_sha": "b8938ab392b9892a0d20368ebead7f325fb5a04a",
-    "duration_seconds": 243.51,
+    "timestamp": "2026-04-02T22:23:07.289118+00:00",
+    "git_sha": "2fd884d606d4baaec3f877b8422ab80824963a70",
+    "duration_seconds": 242.5,
     "total_available": 14,
     "shards": 30,
     "expected_shards": 30
@@ -23,7 +23,7 @@
         "expected_lines": 2,
         "matching_lines": 2
       },
-      "duration": 17.04,
+      "duration": 17.11,
       "status": "pass"
     },
     {
@@ -34,7 +34,7 @@
         "expected_lines": 0,
         "matching_lines": 0
       },
-      "duration": 17.3,
+      "duration": 17.54,
       "status": "pass"
     },
     {
@@ -45,7 +45,7 @@
         "expected_lines": 3,
         "matching_lines": 3
       },
-      "duration": 17.38,
+      "duration": 17.83,
       "status": "pass"
     },
     {
@@ -56,7 +56,7 @@
         "expected_lines": 3,
         "matching_lines": 3
       },
-      "duration": 17.26,
+      "duration": 16.78,
       "status": "pass"
     },
     {
@@ -67,7 +67,7 @@
         "expected_lines": 5,
         "matching_lines": 3
       },
-      "duration": 17.65,
+      "duration": 17.09,
       "status": "output_mismatch",
       "detail": "2 line(s) differ (actual=5, expected=5)",
       "actual_output": "A\nB\nAB\nXFAILED: expected 'ABB' on clip event.. \nEND OF TEST",
@@ -81,7 +81,7 @@
         "expected_lines": 2,
         "matching_lines": 2
       },
-      "duration": 16.72,
+      "duration": 17.61,
       "status": "pass"
     },
     {
@@ -92,7 +92,7 @@
         "expected_lines": 3,
         "matching_lines": 3
       },
-      "duration": 17.07,
+      "duration": 17.39,
       "status": "pass"
     },
     {
@@ -103,7 +103,7 @@
         "expected_lines": 2,
         "matching_lines": 2
       },
-      "duration": 16.8,
+      "duration": 17.09,
       "status": "pass"
     },
     {
@@ -114,7 +114,7 @@
         "expected_lines": 3,
         "matching_lines": 3
       },
-      "duration": 17.03,
+      "duration": 17.13,
       "status": "pass"
     },
     {
@@ -125,7 +125,7 @@
         "expected_lines": 1,
         "matching_lines": 0
       },
-      "duration": 18.31,
+      "duration": 17.5,
       "status": "output_mismatch",
       "detail": "1 line(s) differ (actual=1, expected=1)",
       "actual_output": "AB",
@@ -139,7 +139,7 @@
         "expected_lines": 0,
         "matching_lines": 0
       },
-      "duration": 17.05,
+      "duration": 17.24,
       "status": "pass"
     },
     {
@@ -150,7 +150,7 @@
         "expected_lines": 1,
         "matching_lines": 1
       },
-      "duration": 17.25,
+      "duration": 16.75,
       "status": "pass"
     },
     {
@@ -161,7 +161,7 @@
         "expected_lines": 1,
         "matching_lines": 0
       },
-      "duration": 17.56,
+      "duration": 17.7,
       "status": "output_mismatch",
       "detail": "15 line(s) differ (actual=15, expected=1)",
       "actual_output": "i1-a1-a2-a3-1\ni1-a1-a2-a3-1a1-a2-a3-1\ni1-a1-a2-a3-1a1-a2-a3-1a1-a2-a3-1\ni1-a1-a2-a3-1a1-a2-a3-1a1-a2-a3-1a1-a2-a3-1\ni1-a1-a2-a3-1a1-a2-a3-1a1-a2-a3-1a1-a2-a3-1a1-a2-a3-1\ni1-a1-a2-a3-1a1-a2-a3-1a1-a2-a3-1a1-a2-a3-1a1-a2-a3-1a1-a2-a3-1\ni1-a1-a2-a3-1a1-a2-a3-1a1-a2-a3-1a1-a2-a3-1a1-a2-a3-1a1-a2-a3-1a1-a2-a3-1\ni1-a1-a2-a3-1a1-a2-a3-1a1-a2-a3-1a1-a2-a3-1a1-a2-a3-1a1-a2-a3-1a1-a2-a3-1a1-a2-a3-1\ni1-a1-a2-a3-1a1-a2-a3-1a1-a2-a3-1a1-a2-a3-1a1-a2-a3-1a1-a2-a3-1a1-a2-a3-1a1-a2-a3-1a1-a2-a3-1\ni1-a1-a2-a3-1a1-a2-a3-1a1-a2-a3-1a1-a2-a3-1a1-a2-a3-1a1-a2-a3-1a1-a2-a3-1a1-a2-a3-1a1-a2-a3-1a1-a2-a3-1\ni1-a1-a2-a3-1a1-a2-a3-1a1-a2-a3-1a1-a2-a3-1a1-a2-a3-1a1-a2-a3-1a1-a2-a3-1a1-a2-a3-1a1-a2-a3-1a1-a2-a3-1a1-a2-a3-1\ni1-a1-a2-a3-1a1-a2-a3-1a1-a2-a3-1a1-a2-a3-1a1-a2-a3-1a1-a2-a3-1a1-a2-a3-1a1-a2-a3-1a1-a2-a3-1a1-a2-a3-1a1-a2-a3-1a1-a2-a3-1\ni1-a1-a2-a3-1a1-a2-a3-1a1-a2-a3-1a1-a2-a3-1a1-a2-a3-1a1-a2-a3-1a1-a2-a3-1a1-a2-a3-1a1-a2-a3-1a1-a2-a3-1a1-a2-a3-1a1-a2-a3-1a1-a2-a3-1\ni1-a1-a2-a3-1a1-a2-a3-1a1-a2-a3-1a1-a2-a3-1a1-a2-a3-1a1-a2-a3-1a1-a2-a3-1a1-a2-a3-1a1-a2-a3-1a1-a2-a3-1a1-a2-a3-1a1-a2-a3-1a1-a2-a3-1a1-a2-a3-1\ni1-a1-a2-a3-1a1-a2-a3-1a1-a2-a3-1a1-a2-a3-1a1-a2-a3-1a1-a2-a3-1a1-a2-a3-1a1-a2-a3-1a1-a2-a3-1a1-a2-a3-1a1-a2-a3-1a1-a2-a3-1a1-a2-a3-1a1-a2-a3-1a1-a2-a3-1",
@@ -175,7 +175,7 @@
         "expected_lines": 3,
         "matching_lines": 3
       },
-      "duration": 18.26,
+      "duration": 16.92,
       "status": "pass"
     }
   ]
