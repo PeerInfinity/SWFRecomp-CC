@@ -23682,6 +23682,9 @@ static void initMCLFuncs(void)
     g_mcl_funcs_init = 1;
 }
 
+static void setupNativeFuncOwnProps(SWFAppContext* app_context, ASFunction* func);
+static void addNativeFuncPrototype(SWFAppContext* app_context, ASFunction* func);
+
 static void initAsBroadcasterFuncs(SWFAppContext* app_context)
 {
     if (g_ab_funcs_init) return;
@@ -23700,8 +23703,14 @@ static void initAsBroadcasterFuncs(SWFAppContext* app_context)
     g_ab_broadcastMessage_func.function_type = 2;
     g_ab_broadcastMessage_func.advanced_func = (Function2Ptr)builtin_broadcaster_broadcastMessage;
 
+    setupNativeFuncOwnProps(app_context, &g_ab_addListener_func);
+    setupNativeFuncOwnProps(app_context, &g_ab_removeListener_func);
+    setupNativeFuncOwnProps(app_context, &g_ab_broadcastMessage_func);
+    // addListener and removeListener have prototype (DONT_ENUM); broadcastMessage does not
+    addNativeFuncPrototype(app_context, &g_ab_addListener_func);
+    addNativeFuncPrototype(app_context, &g_ab_removeListener_func);
+
     g_ab_funcs_init = 1;
-    (void)app_context;
 }
 
 // Forward declarations (defined later in ensureGlobalInit block)
@@ -25223,6 +25232,29 @@ static void setupNativeFuncOwnProps(SWFAppContext* app_context, ASFunction* func
 	ActionVar pv = {0}; pv.type = ACTION_STACK_VALUE_OBJECT;
 	pv.data.numeric_value = (u64)obj_proto;
 	setPropertyWithFlags(app_context, func->own_props, "__proto__", 9, &pv, PROPERTY_FLAGS_DEFAULT);
+}
+
+/// Helper: add prototype (DONT_ENUM) to a native function's own_props.
+// Creates prototype_obj with constructor → func, __proto__ → Object.prototype.
+// Insertion order: constructor, __proto__ on prototype; prototype appended to own_props.
+static void addNativeFuncPrototype(SWFAppContext* app_context, ASFunction* func)
+{
+	if (func->prototype_obj != NULL) return;
+	func->no_lazy_prototype = 0;
+	func->prototype_obj = allocObject(app_context, 4);
+	retainObject(func->prototype_obj);
+	// Insert constructor before __proto__ so LIFO enum yields: __proto__, constructor
+	ActionVar ctor_var = {0};
+	ctor_var.type = ACTION_STACK_VALUE_FUNCTION;
+	ctor_var.data.numeric_value = (u64)func;
+	setProperty(app_context, func->prototype_obj, "constructor", 11, &ctor_var);
+	setObjectProto(app_context, func->prototype_obj);
+	// Add prototype to own_props (DONT_ENUM = WRITABLE only)
+	if (func->own_props != NULL) {
+		ActionVar proto_val = {0}; proto_val.type = ACTION_STACK_VALUE_OBJECT;
+		proto_val.data.numeric_value = (u64)func->prototype_obj;
+		setPropertyWithFlags(app_context, func->own_props, "prototype", 9, &proto_val, PROPERTY_FLAG_WRITABLE);
+	}
 }
 
 // ---- initSystemObject: create System built-in (idempotent) ----
