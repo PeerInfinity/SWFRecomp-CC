@@ -8,6 +8,10 @@ Last updated: 2026-04-01
 - **Image test baseline**: **12/31 strict image match** (+4: bitmap_data_fillrect, bitmap_data_perlinnoise, bitmap_data_pixeldissolve_image, bitmapdata_applyfilter_colormatrix). **10/31 tolerance pass** (within test.toml limits).
 - **Main failure types**: output_mismatch (51), runtime_segfault (1), timeout (1)
 - **Known regressions**: `global_instance_decls` 40→23 (unclear root cause, test at 3% pass rate).
+- **Latest fixes (2026-04-01, session 4)**:
+  - **global_proto_decls blocker reclassified** — "constructor/__proto__ DONT_ENUM conflict" is a Ruffle vs Flash difference: Ruffle makes Object.prototype methods ENUMERABLE by default and sets constructor as own property on all objects, while Flash uses DONT_ENUM and inherits constructor. See RUFFLE_VS_FLASH_DIFFERENCES.md.
+  - **AsBroadcaster function own_props** — g_ab_addListener/removeListener/broadcastMessage now have own_props (constructor + __proto__) + selective prototype creation (addListener/removeListener get prototypes, broadcastMessage does not)
+  - **global_proto_decls improved (742→742)** — no net line change from session 3 total, but blocker understanding clarified
 - **Latest fixes (2026-04-01, session 3)**:
   - **global_proto_decls improved (551→742)** — System.IME method own_props + no_lazy_prototype, System.security (PolicyFileResolver + 5 method stubs + sandboxType READ_ONLY + __constructor__), System.capabilities (27 new properties), Object.prototype reordering + toLocaleString, Object constructor own_props flags, function enumeration __proto__ chain walking, constructor inheritance filtering
   - **global_proto_decls_delete improved (283→287)** — IME method own_props alignment

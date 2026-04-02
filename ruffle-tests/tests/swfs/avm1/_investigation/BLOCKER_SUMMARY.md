@@ -62,24 +62,24 @@ function addGetter(obj, name, val) {
 
 ---
 
-### Blocker 4: Global Constructor Enumeration Order + Missing Globals
+### Blocker 4: Global Constructor Enumeration Order + Missing Globals — PARTIALLY RECLASSIFIED
 
 **Impact**: 3 tests, ~11,000+ lines (but low value — tests enumerate all globals)
 
 Tests `global_proto_decls`, `global_proto_decls_delete`, and `global_instance_decls` enumerate every global object and its properties via `for-in`. Key remaining issues:
 
-1. **constructor DONT_ENUM conflict** — `constructor` on built-in prototypes is DONT_ENUM in our code but expected ENUMERABLE; making it ENUMERABLE breaks 7+ passing tests
+1. ~~**constructor DONT_ENUM conflict**~~ — **RECLASSIFIED (2026-04-01)** as a Ruffle vs Flash difference, not a fixable flag issue. Ruffle makes Object.prototype methods ENUMERABLE by default (Flash uses DONT_ENUM). Ruffle also sets `constructor` as an own property on all objects (Flash inherits it). See `RUFFLE_VS_FLASH_DIFFERENCES.md`. This accounts for ~550+ lines per test of permanent Ruffle-specific mismatch.
 2. **flash.* constructor own_props order** — Some flash.automation constructors expect different property insertion orders, causing cascading misalignment in proto_decls_delete
 3. **Missing properties** — Key constants (20), Mouse/Accessibility methods, StageCapture.prototype methods, Object.prototype.constructor, Function.prototype apply/call
 4. ~~**registerGeomMethod function_registry pollution**~~ (global_instance_decls) — **FIXED** (79f6c1c2). Prototype methods (Rectangle.contains) were shadowing user-defined functions in lookupFunctionByName. Test's `contains` helper now works correctly. Remaining gaps: missing DONT_DELETE on instance __proto__, missing instance-specific properties
 
-**Progress (2026-03-14, 20b44c31):** Fixed `actionDelete` for ASFunction (was silently succeeding), added DONT_DELETE on built-in prototype/constructor props, created prototype_obj + own_props for all flash.* stub constructors. global_proto_decls improved 77→82 lines, global_instance_decls improved 1→4 lines.
+**Progress (2026-04-01, session 4):** AsBroadcaster shared functions now have own_props + selective prototype creation. global_proto_decls improved 552→742 lines.
 
 | Test | Match | Lines Off |
 |------|-------|-----------|
-| global_proto_decls | 82/4487 | ~4405 |
-| global_proto_decls_delete | 47/4115 | ~4068 |
-| global_instance_decls | 4/760 | ~756 |
+| global_proto_decls | ~742/4497 | ~3755 |
+| global_proto_decls_delete | ~287/4158 | ~3871 |
+| global_instance_decls | 23/758 | ~735 |
 
 **Plans blocked**: GLOBALS_PLAN (Phases 8c-4 through 8d)
 
