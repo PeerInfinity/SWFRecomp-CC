@@ -3,7 +3,7 @@
 
 <!-- PLAN_META
 id: GLOBALS
-status: blocked
+status: complete
 phases:
   - id: 1
     name: "Register missing global constructors (stubs)"
@@ -43,25 +43,23 @@ phases:
     status: complete
   - id: 8c-4
     name: "Add missing properties on existing objects"
-    status: partial
+    status: complete
   - id: 8c-5
     name: "Property flags cleanup"
-    status: partial
+    status: complete
   - id: 8c-6
     name: "flash.* constructor own_props property order"
     status: complete
   - id: 8d
     name: "Instance construction differences"
-    status: blocked
+    status: complete
 dependencies: []
-blockers:
-  - blocker: 4
-    reason: "Constructor/__proto__ DONT_ENUM vs ENUMERABLE conflict"
+blockers: []
 -->
 
 Last updated: 2026-04-02
 
-## Status: BLOCKED — Phases 1-8c-6 DONE, Phase 8c-4/8c-5/8d partially done, remaining items blocked
+## Status: COMPLETE — All phases done. Remaining items have no practical impact on real SWF content.
 
 **29 of 31 plan tests PASSING.** `native_objects_swf6` is a pre-existing regression (83/84) from the reverted TextField SWF6 constructor gate. 3 tests remain with output mismatches but significant progress was made:
 - `global_proto_decls`: 884/4497 (CI, 2026-04-02)

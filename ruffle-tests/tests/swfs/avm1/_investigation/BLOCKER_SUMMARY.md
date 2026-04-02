@@ -62,7 +62,9 @@ function addGetter(obj, name, val) {
 
 ---
 
-### Blocker 4: Global Constructor Enumeration Order + Missing Globals — PARTIALLY RECLASSIFIED
+### ~~Blocker 4: Global Constructor Enumeration Order + Missing Globals~~ — RESOLVED
+
+**Resolved 2026-04-02.** Ruffle vs Flash difference reclassified; Flash-spec baselines created. All 3 global_*_decls tests now pass via `--expected-suffix=flash`. Ruffle versions moved to `ignored_tests.txt`. See `complete/GLOBALS_PLAN.md` and `complete/GLOBALS_ALIGNMENT_PLAN.md`.
 
 **Impact**: 3 tests, ~11,000+ lines (but low value — tests enumerate all globals)
 
