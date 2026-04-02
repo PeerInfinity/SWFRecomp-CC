@@ -2858,7 +2858,6 @@ Testing _global.Number.prototype
   valueOf, own, type=[function]
   __proto__, own, type=[object]
 Testing _global.clearRequestHeaders
-Testing _global.clearRequestHeaders.prototype
   toLocaleString, type=[function]
   isPropertyEnumerable, type=[function]
   isPrototypeOf, type=[function]
@@ -2868,10 +2867,9 @@ Testing _global.clearRequestHeaders.prototype
   addProperty, type=[function]
   unwatch, type=[function]
   watch, type=[function]
-  constructor, own, type=[function]
   __proto__, own, type=[object]
+  constructor, own, type=[function]
 Testing _global.addRequestHeader
-Testing _global.addRequestHeader.prototype
   toLocaleString, type=[function]
   isPropertyEnumerable, type=[function]
   isPrototypeOf, type=[function]
@@ -2881,10 +2879,9 @@ Testing _global.addRequestHeader.prototype
   addProperty, type=[function]
   unwatch, type=[function]
   watch, type=[function]
-  constructor, own, type=[function]
   __proto__, own, type=[object]
+  constructor, own, type=[function]
 Testing _global.showRedrawRegions
-Testing _global.showRedrawRegions.prototype
   toLocaleString, type=[function]
   isPropertyEnumerable, type=[function]
   isPrototypeOf, type=[function]
@@ -2894,10 +2891,9 @@ Testing _global.showRedrawRegions.prototype
   addProperty, type=[function]
   unwatch, type=[function]
   watch, type=[function]
-  constructor, own, type=[function]
   __proto__, own, type=[object]
+  constructor, own, type=[function]
 Testing _global.setTimeout
-Testing _global.setTimeout.prototype
   toLocaleString, type=[function]
   isPropertyEnumerable, type=[function]
   isPrototypeOf, type=[function]
@@ -2907,10 +2903,9 @@ Testing _global.setTimeout.prototype
   addProperty, type=[function]
   unwatch, type=[function]
   watch, type=[function]
-  constructor, own, type=[function]
   __proto__, own, type=[object]
+  constructor, own, type=[function]
 Testing _global.clearInterval
-Testing _global.clearInterval.prototype
   toLocaleString, type=[function]
   isPropertyEnumerable, type=[function]
   isPrototypeOf, type=[function]
@@ -2920,10 +2915,9 @@ Testing _global.clearInterval.prototype
   addProperty, type=[function]
   unwatch, type=[function]
   watch, type=[function]
-  constructor, own, type=[function]
   __proto__, own, type=[object]
+  constructor, own, type=[function]
 Testing _global.clearTimeout
-Testing _global.clearTimeout.prototype
   toLocaleString, type=[function]
   isPropertyEnumerable, type=[function]
   isPrototypeOf, type=[function]
@@ -2933,10 +2927,9 @@ Testing _global.clearTimeout.prototype
   addProperty, type=[function]
   unwatch, type=[function]
   watch, type=[function]
-  constructor, own, type=[function]
   __proto__, own, type=[object]
+  constructor, own, type=[function]
 Testing _global.setInterval
-Testing _global.setInterval.prototype
   toLocaleString, type=[function]
   isPropertyEnumerable, type=[function]
   isPrototypeOf, type=[function]
@@ -2946,10 +2939,9 @@ Testing _global.setInterval.prototype
   addProperty, type=[function]
   unwatch, type=[function]
   watch, type=[function]
-  constructor, own, type=[function]
   __proto__, own, type=[object]
+  constructor, own, type=[function]
 Testing _global.isFinite
-Testing _global.isFinite.prototype
   toLocaleString, type=[function]
   isPropertyEnumerable, type=[function]
   isPrototypeOf, type=[function]
@@ -2959,10 +2951,9 @@ Testing _global.isFinite.prototype
   addProperty, type=[function]
   unwatch, type=[function]
   watch, type=[function]
-  constructor, own, type=[function]
   __proto__, own, type=[object]
+  constructor, own, type=[function]
 Testing _global.isNaN
-Testing _global.isNaN.prototype
   toLocaleString, type=[function]
   isPropertyEnumerable, type=[function]
   isPrototypeOf, type=[function]
@@ -2972,10 +2963,9 @@ Testing _global.isNaN.prototype
   addProperty, type=[function]
   unwatch, type=[function]
   watch, type=[function]
-  constructor, own, type=[function]
   __proto__, own, type=[object]
+  constructor, own, type=[function]
 Testing _global.updateAfterEvent
-Testing _global.updateAfterEvent.prototype
   toLocaleString, type=[function]
   isPropertyEnumerable, type=[function]
   isPrototypeOf, type=[function]
@@ -2985,10 +2975,9 @@ Testing _global.updateAfterEvent.prototype
   addProperty, type=[function]
   unwatch, type=[function]
   watch, type=[function]
-  constructor, own, type=[function]
   __proto__, own, type=[object]
+  constructor, own, type=[function]
 Testing _global.trace
-Testing _global.trace.prototype
   toLocaleString, type=[function]
   isPropertyEnumerable, type=[function]
   isPrototypeOf, type=[function]
@@ -2998,10 +2987,9 @@ Testing _global.trace.prototype
   addProperty, type=[function]
   unwatch, type=[function]
   watch, type=[function]
-  constructor, own, type=[function]
   __proto__, own, type=[object]
+  constructor, own, type=[function]
 Testing _global.parseFloat
-Testing _global.parseFloat.prototype
   toLocaleString, type=[function]
   isPropertyEnumerable, type=[function]
   isPrototypeOf, type=[function]
@@ -3011,10 +2999,9 @@ Testing _global.parseFloat.prototype
   addProperty, type=[function]
   unwatch, type=[function]
   watch, type=[function]
-  constructor, own, type=[function]
   __proto__, own, type=[object]
+  constructor, own, type=[function]
 Testing _global.parseInt
-Testing _global.parseInt.prototype
   toLocaleString, type=[function]
   isPropertyEnumerable, type=[function]
   isPrototypeOf, type=[function]
@@ -3024,10 +3011,9 @@ Testing _global.parseInt.prototype
   addProperty, type=[function]
   unwatch, type=[function]
   watch, type=[function]
-  constructor, own, type=[function]
   __proto__, own, type=[object]
+  constructor, own, type=[function]
 Testing _global.unescape
-Testing _global.unescape.prototype
   toLocaleString, type=[function]
   isPropertyEnumerable, type=[function]
   isPrototypeOf, type=[function]
@@ -3037,10 +3023,9 @@ Testing _global.unescape.prototype
   addProperty, type=[function]
   unwatch, type=[function]
   watch, type=[function]
-  constructor, own, type=[function]
   __proto__, own, type=[object]
+  constructor, own, type=[function]
 Testing _global.escape
-Testing _global.escape.prototype
   toLocaleString, type=[function]
   isPropertyEnumerable, type=[function]
   isPrototypeOf, type=[function]
@@ -3050,8 +3035,8 @@ Testing _global.escape.prototype
   addProperty, type=[function]
   unwatch, type=[function]
   watch, type=[function]
-  constructor, own, type=[function]
   __proto__, own, type=[object]
+  constructor, own, type=[function]
 Testing _global.ASSetNativeAccessor
 Testing _global.ASSetNativeAccessor.prototype
   toLocaleString, type=[function]
@@ -3079,7 +3064,6 @@ Testing _global.ASSetNative.prototype
   constructor, own, type=[function]
   __proto__, own, type=[object]
 Testing _global.ASSetPropFlags
-Testing _global.ASSetPropFlags.prototype
   toLocaleString, type=[function]
   isPropertyEnumerable, type=[function]
   isPrototypeOf, type=[function]
@@ -3089,8 +3073,8 @@ Testing _global.ASSetPropFlags.prototype
   addProperty, type=[function]
   unwatch, type=[function]
   watch, type=[function]
-  constructor, own, type=[function]
   __proto__, own, type=[object]
+  constructor, own, type=[function]
 Testing _global.RemoteLSOUsage
   toLocaleString, type=[function]
   isPropertyEnumerable, type=[function]
@@ -3590,7 +3574,6 @@ Testing _global.ASconstructor.prototype
   constructor, own, type=[function]
   __proto__, own, type=[object]
 Testing _global.ASnative
-Testing _global.ASnative.prototype
   toLocaleString, type=[function]
   isPropertyEnumerable, type=[function]
   isPrototypeOf, type=[function]
@@ -3600,8 +3583,8 @@ Testing _global.ASnative.prototype
   addProperty, type=[function]
   unwatch, type=[function]
   watch, type=[function]
-  constructor, own, type=[function]
   __proto__, own, type=[object]
+  constructor, own, type=[function]
 Testing _global.TextField
   watch, type=[function]
   unwatch, type=[function]

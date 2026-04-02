@@ -24948,6 +24948,8 @@ static void initNetConnectionPrototype(SWFAppContext* app_context, ASFunction* c
 		strncpy(g_nc_close_func.name, "close", 255);
 		g_nc_close_func.function_type = 2;
 		g_nc_close_func.advanced_func = (Function2Ptr) builtin_nc_close;
+		setupNativeFuncOwnProps(app_context, &g_nc_connect_func);
+		setupNativeFuncOwnProps(app_context, &g_nc_close_func);
 		fv.data.numeric_value = (u64)&g_nc_close_func;
 		setPropertyWithFlags(app_context, ctor->prototype_obj, "close", 5, &fv, mflags);
 	}
@@ -25135,6 +25137,7 @@ static void initContextMenuPrototype(SWFAppContext* app_context, ASFunction* cto
 	strncpy(g_cm_copy_func.name, "copy", 255);
 	g_cm_copy_func.function_type = 2;
 	g_cm_copy_func.advanced_func = (Function2Ptr) builtin_contextmenu_copy;
+	setupNativeFuncOwnProps(app_context, &g_cm_copy_func);
 	if (function_count < MAX_FUNCTIONS) function_registry[function_count++] = &g_cm_copy_func;
 	ActionVar fv = {0};
 	fv.type = ACTION_STACK_VALUE_FUNCTION;
@@ -25163,6 +25166,7 @@ static void initContextMenuItemPrototype(SWFAppContext* app_context, ASFunction*
 	strncpy(g_cmi_copy_func.name, "copy", 255);
 	g_cmi_copy_func.function_type = 2;
 	g_cmi_copy_func.advanced_func = (Function2Ptr) builtin_contextmenuitem_copy;
+	setupNativeFuncOwnProps(app_context, &g_cmi_copy_func);
 	if (function_count < MAX_FUNCTIONS) function_registry[function_count++] = &g_cmi_copy_func;
 	ActionVar fv = {0};
 	fv.type = ACTION_STACK_VALUE_FUNCTION;
@@ -26673,6 +26677,7 @@ static void ensureGlobalInit(SWFAppContext* app_context)
 		strncpy(g_ab_initialize_func.name, "initialize", 255);
 		g_ab_initialize_func.function_type = 2;
 		g_ab_initialize_func.advanced_func = (Function2Ptr) builtin_asbroadcaster_initialize;
+		setupNativeFuncOwnProps(app_context, &g_ab_initialize_func);
 		if (function_count < MAX_FUNCTIONS) function_registry[function_count++] = &g_ab_initialize_func;
 		fv.data.numeric_value = (u64)&g_ab_initialize_func;
 		setPropertyWithFlags(app_context, g_stub_ctors[0].own_props, "initialize", 10, &fv, PROPERTY_FLAG_WRITABLE);
@@ -26811,6 +26816,22 @@ static void ensureGlobalInit(SWFAppContext* app_context)
 		_v.data.numeric_value = (u64)(objptr); \
 		setProperty(app_context, global_object, name, namelen, &_v); }
 
+	// Set up own_props on global stub functions (prevents lazy prototype, adds __proto__/constructor)
+	{
+		ASFunction* global_funcs[] = {
+			&g_isNaN_func, &g_isFinite_func, &g_aspf_func, &g_asnative_func,
+			&g_escape_func, &g_unescape_func, &g_parseInt_func, &g_parseFloat_func,
+			&g_trace_func, &g_updateAfterEvent_func, &g_setInterval_func,
+			&g_clearTimeout_func, &g_clearInterval_func, &g_setTimeout_func,
+			&g_showRedrawRegions_func, &g_addRequestHeader_func, &g_clearRequestHeaders_func,
+			&g_mcl_loadClip_func, &g_mcl_unloadClip_func, &g_mcl_getProgress_func,
+		};
+		for (int i = 0; i < (int)(sizeof(global_funcs)/sizeof(global_funcs[0])); i++) {
+			if (global_funcs[i]->own_props == NULL)
+				setupNativeFuncOwnProps(app_context, global_funcs[i]);
+		}
+	}
+
 	// Registration order: first registered → last in for-in
 	REG_FUNC("ASnative", 8, &g_asnative_func);
 	REG_FUNC("ASconstructor", 13, &g_asconstructor_func);
@@ -26938,6 +26959,7 @@ static void ensureGlobalInit(SWFAppContext* app_context)
 		g_fn_apply_func.advanced_func = (Function2Ptr)builtin_noop_func;
 		if (function_count < MAX_FUNCTIONS)
 			function_registry[function_count++] = &g_fn_apply_func;
+		setupNativeFuncOwnProps(app_context, &g_fn_apply_func);
 		ActionVar apply_val = {0}; apply_val.type = ACTION_STACK_VALUE_FUNCTION;
 		apply_val.data.numeric_value = (u64)&g_fn_apply_func;
 		setPropertyWithFlags(app_context, fn_proto, "apply", 5, &apply_val, PROPERTY_FLAG_WRITABLE);
@@ -26947,6 +26969,7 @@ static void ensureGlobalInit(SWFAppContext* app_context)
 		g_fn_call_func.function_type = 2;
 		g_fn_call_func.param_count = 1;
 		g_fn_call_func.advanced_func = (Function2Ptr)builtin_noop_func;
+		setupNativeFuncOwnProps(app_context, &g_fn_call_func);
 		if (function_count < MAX_FUNCTIONS)
 			function_registry[function_count++] = &g_fn_call_func;
 		ActionVar call_val = {0}; call_val.type = ACTION_STACK_VALUE_FUNCTION;
@@ -28697,6 +28720,7 @@ check_special_vars:
 				g_string_fromCharCode_func.function_type = 2;
 				g_string_fromCharCode_func.param_count = 0;
 				g_string_fromCharCode_func.advanced_func = (Function2Ptr) builtin_string_fromCharCode;
+				setupNativeFuncOwnProps(app_context, &g_string_fromCharCode_func);
 				if (function_count < MAX_FUNCTIONS)
 					function_registry[function_count++] = &g_string_fromCharCode_func;
 				ActionVar fcc_val = {0};
@@ -28883,6 +28907,7 @@ check_special_vars:
 				g_error_toString_func.function_type = 2;
 				g_error_toString_func.param_count = 0;
 				g_error_toString_func.advanced_func = (Function2Ptr) builtin_error_toString;
+				setupNativeFuncOwnProps(app_context, &g_error_toString_func);
 				if (function_count < MAX_FUNCTIONS)
 					function_registry[function_count++] = &g_error_toString_func;
 				ActionVar ts_val = {0};
