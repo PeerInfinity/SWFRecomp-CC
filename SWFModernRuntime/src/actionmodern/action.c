@@ -2595,6 +2595,7 @@ static ActionStackValueType convertFloat(SWFAppContext* app_context);
 static ActionVar builtin_math_random(SWFAppContext* app_context, ActionVar* args, u32 arg_count, ActionVar* registers, void* this_obj);
 // initMathObject is defined later (after all Math builtins)
 static void initMathObject(SWFAppContext* app_context);
+static void setupNativeFuncOwnProps(SWFAppContext* app_context, ASFunction* func);
 
 // Static ASFunction objects for Math methods (18 methods)
 static ASFunction g_math_funcs[18];
@@ -4325,8 +4326,7 @@ static void initMathObject(SWFAppContext* app_context)
 		g_math_funcs[i].function_type = 2;
 		g_math_funcs[i].param_count = 0;
 		g_math_funcs[i].advanced_func = math_methods[i].func;
-		// Note: Math methods are NOT registered in function_registry.
-		// They are only accessible via Math.method(), not as standalone globals.
+		setupNativeFuncOwnProps(app_context, &g_math_funcs[i]);
 
 		ActionVar fv = {0};
 		fv.type = ACTION_STACK_VALUE_FUNCTION;
@@ -5254,8 +5254,6 @@ static ActionVar builtin_prim_wrapper_toString(SWFAppContext* app_context, Actio
 static ASFunction g_wrapper_valueOf_func;
 static ASFunction g_prim_wrapper_toString_func;
 static int g_wrapper_funcs_init = 0;
-
-static void setupNativeFuncOwnProps(SWFAppContext* app_context, ASFunction* func);
 
 // Get or create the global Object.prototype
 static ASObject* getObjectPrototype(SWFAppContext* app_context)
@@ -23698,7 +23696,6 @@ static void initMCLFuncs(void)
     g_mcl_funcs_init = 1;
 }
 
-static void setupNativeFuncOwnProps(SWFAppContext* app_context, ASFunction* func);
 static void addNativeFuncPrototype(SWFAppContext* app_context, ASFunction* func);
 
 static void initAsBroadcasterFuncs(SWFAppContext* app_context)
@@ -23777,6 +23774,9 @@ static void installAccessibilityMethods(SWFAppContext* app_context, ASObject* ac
         g_accessibility_sendEvent_func.function_type = 2;
         g_accessibility_sendEvent_func.advanced_func = (Function2Ptr)builtin_accessibility_stub;
 
+        setupNativeFuncOwnProps(app_context, &g_accessibility_isActive_func);
+        setupNativeFuncOwnProps(app_context, &g_accessibility_updateProperties_func);
+        setupNativeFuncOwnProps(app_context, &g_accessibility_sendEvent_func);
         g_accessibility_methods_init = 1;
     }
     ActionVar fv = {0};
@@ -23878,6 +23878,10 @@ static void installKeyMethods(SWFAppContext* app_context, ASObject* key_obj)
         g_key_isToggled_func.function_type = 2;
         g_key_isToggled_func.advanced_func = (Function2Ptr)builtin_key_isToggled;
 
+        setupNativeFuncOwnProps(app_context, &g_key_isDown_func);
+        setupNativeFuncOwnProps(app_context, &g_key_getCode_func);
+        setupNativeFuncOwnProps(app_context, &g_key_getAscii_func);
+        setupNativeFuncOwnProps(app_context, &g_key_isToggled_func);
         g_key_methods_init = 1;
     }
     ActionVar fv = {0};
@@ -23894,6 +23898,39 @@ static void installKeyMethods(SWFAppContext* app_context, ASObject* key_obj)
 
     fv.data.numeric_value = (u64)&g_key_isToggled_func;
     setProperty(app_context, key_obj, "isToggled", 9, &fv);
+
+    // isAccessible (stub, always returns false)
+    {
+        static ASFunction g_key_isAccessible_func;
+        if (!g_key_isAccessible_func.function_type) {
+            memset(&g_key_isAccessible_func, 0, sizeof(ASFunction));
+            strncpy(g_key_isAccessible_func.name, "isAccessible", 255);
+            g_key_isAccessible_func.function_type = 2;
+            g_key_isAccessible_func.advanced_func = (Function2Ptr)builtin_noop_func;
+            setupNativeFuncOwnProps(app_context, &g_key_isAccessible_func);
+        }
+        fv.data.numeric_value = (u64)&g_key_isAccessible_func;
+        setProperty(app_context, key_obj, "isAccessible", 12, &fv);
+    }
+
+    // Key constants (19 named key codes)
+    {
+        ActionVar nv = {0}; nv.type = ACTION_STACK_VALUE_F64;
+        struct { const char* name; u32 len; int value; } key_consts[] = {
+            {"CAPSLOCK", 8, 20}, {"BACKSPACE", 9, 8}, {"DELETEKEY", 9, 46},
+            {"INSERT", 6, 45}, {"ESCAPE", 6, 27}, {"SHIFT", 5, 16},
+            {"CONTROL", 7, 17}, {"TAB", 3, 9}, {"END", 3, 35},
+            {"HOME", 4, 36}, {"PGDN", 4, 34}, {"PGUP", 4, 33},
+            {"RIGHT", 5, 39}, {"LEFT", 4, 37}, {"DOWN", 4, 40},
+            {"UP", 2, 38}, {"SPACE", 5, 32}, {"ENTER", 5, 13},
+            {"ALT", 3, 18},
+        };
+        for (int i = 0; i < 19; i++) {
+            double v = (double)key_consts[i].value;
+            VAL(u64, &nv.data.numeric_value) = VAL(u64, &v);
+            setProperty(app_context, key_obj, key_consts[i].name, key_consts[i].len, &nv);
+        }
+    }
 }
 
 // Dispatch AS2 mc.onEnterFrame property handlers for all cached MovieClips.
@@ -26492,6 +26529,25 @@ static void ensureGlobalInit(SWFAppContext* app_context)
 	// Install AsBroadcaster methods on Mouse, Key, Stage, Selection
 	// In SWF5, addListener/removeListener/broadcastMessage are not available on Stage
 	installAsBroadcaster(app_context, g_mouse_obj);
+	// Mouse methods: show, hide, setTrailer, setTrailerPosition, setTrailerMode
+	{
+		static ASFunction mouse_methods[5];
+		static int mouse_methods_init = 0;
+		const char* mouse_names[] = {"show", "hide", "setTrailer", "setTrailerPosition", "setTrailerMode"};
+		ActionVar fv = {0}; fv.type = ACTION_STACK_VALUE_FUNCTION;
+		for (int i = 0; i < 5; i++) {
+			if (!mouse_methods_init) {
+				memset(&mouse_methods[i], 0, sizeof(ASFunction));
+				strncpy(mouse_methods[i].name, mouse_names[i], 255);
+				mouse_methods[i].function_type = 2;
+				mouse_methods[i].advanced_func = (Function2Ptr)builtin_noop_func;
+				setupNativeFuncOwnProps(app_context, &mouse_methods[i]);
+			}
+			fv.data.numeric_value = (u64)&mouse_methods[i];
+			setProperty(app_context, g_mouse_obj, mouse_names[i], (u32)strlen(mouse_names[i]), &fv);
+		}
+		mouse_methods_init = 1;
+	}
 	installAsBroadcaster(app_context, g_key_obj);
 	installKeyMethods(app_context, g_key_obj);
 	// Accessibility methods (isActive, updateProperties, sendEvent) are installed lazily
@@ -26571,6 +26627,12 @@ static void ensureGlobalInit(SWFAppContext* app_context)
 			strncpy(g_selection_setSelection_func.name, "setSelection", 255);
 			g_selection_setSelection_func.function_type = 2;
 			g_selection_setSelection_func.advanced_func = (Function2Ptr)builtin_selection_setSelection;
+			setupNativeFuncOwnProps(app_context, &g_selection_setFocus_func);
+			setupNativeFuncOwnProps(app_context, &g_selection_getFocus_func);
+			setupNativeFuncOwnProps(app_context, &g_selection_getBeginIndex_func);
+			setupNativeFuncOwnProps(app_context, &g_selection_getCaretIndex_func);
+			setupNativeFuncOwnProps(app_context, &g_selection_getEndIndex_func);
+			setupNativeFuncOwnProps(app_context, &g_selection_setSelection_func);
 			sel_funcs_init = 1;
 		}
 		ActionVar fv = {0};

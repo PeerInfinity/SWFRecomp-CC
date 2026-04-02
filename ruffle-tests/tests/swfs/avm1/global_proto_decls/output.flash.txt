@@ -1417,6 +1417,26 @@ Testing _global.Key
   addProperty, type=[function]
   unwatch, type=[function]
   watch, type=[function]
+  ALT, own, type=[number]
+  ENTER, own, type=[number]
+  SPACE, own, type=[number]
+  UP, own, type=[number]
+  DOWN, own, type=[number]
+  LEFT, own, type=[number]
+  RIGHT, own, type=[number]
+  PGUP, own, type=[number]
+  PGDN, own, type=[number]
+  HOME, own, type=[number]
+  END, own, type=[number]
+  TAB, own, type=[number]
+  CONTROL, own, type=[number]
+  SHIFT, own, type=[number]
+  ESCAPE, own, type=[number]
+  INSERT, own, type=[number]
+  DELETEKEY, own, type=[number]
+  BACKSPACE, own, type=[number]
+  CAPSLOCK, own, type=[number]
+  isAccessible, own, type=[function]
   isToggled, own, type=[function]
   getAscii, own, type=[function]
   getCode, own, type=[function]
@@ -1523,8 +1543,38 @@ Testing _global.Key.toLocaleString
   toLocaleString, own, type=[function]
   __proto__, own, type=[object]
   constructor, own, type=[function]
+Testing _global.Key.ALT
+Testing _global.Key.ENTER
+Testing _global.Key.SPACE
+Testing _global.Key.UP
+Testing _global.Key.DOWN
+Testing _global.Key.LEFT
+Testing _global.Key.RIGHT
+Testing _global.Key.PGUP
+Testing _global.Key.PGDN
+Testing _global.Key.HOME
+Testing _global.Key.END
+Testing _global.Key.TAB
+Testing _global.Key.CONTROL
+Testing _global.Key.SHIFT
+Testing _global.Key.ESCAPE
+Testing _global.Key.INSERT
+Testing _global.Key.DELETEKEY
+Testing _global.Key.BACKSPACE
+Testing _global.Key.CAPSLOCK
+Testing _global.Key.isAccessible
+  toLocaleString, type=[function]
+  isPropertyEnumerable, type=[function]
+  isPrototypeOf, type=[function]
+  hasOwnProperty, type=[function]
+  toString, type=[function]
+  valueOf, type=[function]
+  addProperty, type=[function]
+  unwatch, type=[function]
+  watch, type=[function]
+  __proto__, own, type=[object]
+  constructor, own, type=[function]
 Testing _global.Key.isToggled
-Testing _global.Key.isToggled.prototype
   toLocaleString, type=[function]
   isPropertyEnumerable, type=[function]
   isPrototypeOf, type=[function]
@@ -1534,10 +1584,9 @@ Testing _global.Key.isToggled.prototype
   addProperty, type=[function]
   unwatch, type=[function]
   watch, type=[function]
-  constructor, own, type=[function]
   __proto__, own, type=[object]
+  constructor, own, type=[function]
 Testing _global.Key.getAscii
-Testing _global.Key.getAscii.prototype
   toLocaleString, type=[function]
   isPropertyEnumerable, type=[function]
   isPrototypeOf, type=[function]
@@ -1547,10 +1596,9 @@ Testing _global.Key.getAscii.prototype
   addProperty, type=[function]
   unwatch, type=[function]
   watch, type=[function]
-  constructor, own, type=[function]
   __proto__, own, type=[object]
+  constructor, own, type=[function]
 Testing _global.Key.getCode
-Testing _global.Key.getCode.prototype
   toLocaleString, type=[function]
   isPropertyEnumerable, type=[function]
   isPrototypeOf, type=[function]
@@ -1560,10 +1608,9 @@ Testing _global.Key.getCode.prototype
   addProperty, type=[function]
   unwatch, type=[function]
   watch, type=[function]
-  constructor, own, type=[function]
   __proto__, own, type=[object]
+  constructor, own, type=[function]
 Testing _global.Key.isDown
-Testing _global.Key.isDown.prototype
   toLocaleString, type=[function]
   isPropertyEnumerable, type=[function]
   isPrototypeOf, type=[function]
@@ -1573,8 +1620,8 @@ Testing _global.Key.isDown.prototype
   addProperty, type=[function]
   unwatch, type=[function]
   watch, type=[function]
-  constructor, own, type=[function]
   __proto__, own, type=[object]
+  constructor, own, type=[function]
 Testing _global.Key.broadcastMessage
   watch, own, type=[function]
   unwatch, own, type=[function]
@@ -1660,6 +1707,11 @@ Testing _global.Mouse
   addProperty, type=[function]
   unwatch, type=[function]
   watch, type=[function]
+  setTrailerMode, own, type=[function]
+  setTrailerPosition, own, type=[function]
+  setTrailer, own, type=[function]
+  hide, own, type=[function]
+  show, own, type=[function]
   broadcastMessage, own, type=[function]
   removeListener, own, type=[function]
   addListener, own, type=[function]
@@ -1760,6 +1812,66 @@ Testing _global.Mouse.toLocaleString
   isPrototypeOf, own, type=[function]
   isPropertyEnumerable, own, type=[function]
   toLocaleString, own, type=[function]
+  __proto__, own, type=[object]
+  constructor, own, type=[function]
+Testing _global.Mouse.setTrailerMode
+  toLocaleString, type=[function]
+  isPropertyEnumerable, type=[function]
+  isPrototypeOf, type=[function]
+  hasOwnProperty, type=[function]
+  toString, type=[function]
+  valueOf, type=[function]
+  addProperty, type=[function]
+  unwatch, type=[function]
+  watch, type=[function]
+  __proto__, own, type=[object]
+  constructor, own, type=[function]
+Testing _global.Mouse.setTrailerPosition
+  toLocaleString, type=[function]
+  isPropertyEnumerable, type=[function]
+  isPrototypeOf, type=[function]
+  hasOwnProperty, type=[function]
+  toString, type=[function]
+  valueOf, type=[function]
+  addProperty, type=[function]
+  unwatch, type=[function]
+  watch, type=[function]
+  __proto__, own, type=[object]
+  constructor, own, type=[function]
+Testing _global.Mouse.setTrailer
+  toLocaleString, type=[function]
+  isPropertyEnumerable, type=[function]
+  isPrototypeOf, type=[function]
+  hasOwnProperty, type=[function]
+  toString, type=[function]
+  valueOf, type=[function]
+  addProperty, type=[function]
+  unwatch, type=[function]
+  watch, type=[function]
+  __proto__, own, type=[object]
+  constructor, own, type=[function]
+Testing _global.Mouse.hide
+  toLocaleString, type=[function]
+  isPropertyEnumerable, type=[function]
+  isPrototypeOf, type=[function]
+  hasOwnProperty, type=[function]
+  toString, type=[function]
+  valueOf, type=[function]
+  addProperty, type=[function]
+  unwatch, type=[function]
+  watch, type=[function]
+  __proto__, own, type=[object]
+  constructor, own, type=[function]
+Testing _global.Mouse.show
+  toLocaleString, type=[function]
+  isPropertyEnumerable, type=[function]
+  isPrototypeOf, type=[function]
+  hasOwnProperty, type=[function]
+  toString, type=[function]
+  valueOf, type=[function]
+  addProperty, type=[function]
+  unwatch, type=[function]
+  watch, type=[function]
   __proto__, own, type=[object]
   constructor, own, type=[function]
 Testing _global.Mouse.broadcastMessage
@@ -1956,7 +2068,6 @@ Testing _global.Selection.toLocaleString
   __proto__, own, type=[object]
   constructor, own, type=[function]
 Testing _global.Selection.setSelection
-Testing _global.Selection.setSelection.prototype
   toLocaleString, type=[function]
   isPropertyEnumerable, type=[function]
   isPrototypeOf, type=[function]
@@ -1966,10 +2077,9 @@ Testing _global.Selection.setSelection.prototype
   addProperty, type=[function]
   unwatch, type=[function]
   watch, type=[function]
-  constructor, own, type=[function]
   __proto__, own, type=[object]
+  constructor, own, type=[function]
 Testing _global.Selection.getEndIndex
-Testing _global.Selection.getEndIndex.prototype
   toLocaleString, type=[function]
   isPropertyEnumerable, type=[function]
   isPrototypeOf, type=[function]
@@ -1979,10 +2089,9 @@ Testing _global.Selection.getEndIndex.prototype
   addProperty, type=[function]
   unwatch, type=[function]
   watch, type=[function]
-  constructor, own, type=[function]
   __proto__, own, type=[object]
+  constructor, own, type=[function]
 Testing _global.Selection.getCaretIndex
-Testing _global.Selection.getCaretIndex.prototype
   toLocaleString, type=[function]
   isPropertyEnumerable, type=[function]
   isPrototypeOf, type=[function]
@@ -1992,10 +2101,9 @@ Testing _global.Selection.getCaretIndex.prototype
   addProperty, type=[function]
   unwatch, type=[function]
   watch, type=[function]
-  constructor, own, type=[function]
   __proto__, own, type=[object]
+  constructor, own, type=[function]
 Testing _global.Selection.getBeginIndex
-Testing _global.Selection.getBeginIndex.prototype
   toLocaleString, type=[function]
   isPropertyEnumerable, type=[function]
   isPrototypeOf, type=[function]
@@ -2005,10 +2113,9 @@ Testing _global.Selection.getBeginIndex.prototype
   addProperty, type=[function]
   unwatch, type=[function]
   watch, type=[function]
-  constructor, own, type=[function]
   __proto__, own, type=[object]
+  constructor, own, type=[function]
 Testing _global.Selection.getFocus
-Testing _global.Selection.getFocus.prototype
   toLocaleString, type=[function]
   isPropertyEnumerable, type=[function]
   isPrototypeOf, type=[function]
@@ -2018,10 +2125,9 @@ Testing _global.Selection.getFocus.prototype
   addProperty, type=[function]
   unwatch, type=[function]
   watch, type=[function]
-  constructor, own, type=[function]
   __proto__, own, type=[object]
+  constructor, own, type=[function]
 Testing _global.Selection.setFocus
-Testing _global.Selection.setFocus.prototype
   toLocaleString, type=[function]
   isPropertyEnumerable, type=[function]
   isPrototypeOf, type=[function]
@@ -2031,8 +2137,8 @@ Testing _global.Selection.setFocus.prototype
   addProperty, type=[function]
   unwatch, type=[function]
   watch, type=[function]
-  constructor, own, type=[function]
   __proto__, own, type=[object]
+  constructor, own, type=[function]
 Testing _global.Selection.broadcastMessage
   watch, own, type=[function]
   unwatch, own, type=[function]
@@ -2371,7 +2477,6 @@ Testing _global.Math.toString.prototype
   constructor, own, type=[function]
   __proto__, own, type=[object]
 Testing _global.Math.random
-Testing _global.Math.random.prototype
   toLocaleString, type=[function]
   isPropertyEnumerable, type=[function]
   isPrototypeOf, type=[function]
@@ -2381,10 +2486,9 @@ Testing _global.Math.random.prototype
   addProperty, type=[function]
   unwatch, type=[function]
   watch, type=[function]
-  constructor, own, type=[function]
   __proto__, own, type=[object]
+  constructor, own, type=[function]
 Testing _global.Math.max
-Testing _global.Math.max.prototype
   toLocaleString, type=[function]
   isPropertyEnumerable, type=[function]
   isPrototypeOf, type=[function]
@@ -2394,10 +2498,9 @@ Testing _global.Math.max.prototype
   addProperty, type=[function]
   unwatch, type=[function]
   watch, type=[function]
-  constructor, own, type=[function]
   __proto__, own, type=[object]
+  constructor, own, type=[function]
 Testing _global.Math.min
-Testing _global.Math.min.prototype
   toLocaleString, type=[function]
   isPropertyEnumerable, type=[function]
   isPrototypeOf, type=[function]
@@ -2407,10 +2510,9 @@ Testing _global.Math.min.prototype
   addProperty, type=[function]
   unwatch, type=[function]
   watch, type=[function]
-  constructor, own, type=[function]
   __proto__, own, type=[object]
+  constructor, own, type=[function]
 Testing _global.Math.pow
-Testing _global.Math.pow.prototype
   toLocaleString, type=[function]
   isPropertyEnumerable, type=[function]
   isPrototypeOf, type=[function]
@@ -2420,10 +2522,9 @@ Testing _global.Math.pow.prototype
   addProperty, type=[function]
   unwatch, type=[function]
   watch, type=[function]
-  constructor, own, type=[function]
   __proto__, own, type=[object]
+  constructor, own, type=[function]
 Testing _global.Math.atan2
-Testing _global.Math.atan2.prototype
   toLocaleString, type=[function]
   isPropertyEnumerable, type=[function]
   isPrototypeOf, type=[function]
@@ -2433,10 +2534,9 @@ Testing _global.Math.atan2.prototype
   addProperty, type=[function]
   unwatch, type=[function]
   watch, type=[function]
-  constructor, own, type=[function]
   __proto__, own, type=[object]
+  constructor, own, type=[function]
 Testing _global.Math.acos
-Testing _global.Math.acos.prototype
   toLocaleString, type=[function]
   isPropertyEnumerable, type=[function]
   isPrototypeOf, type=[function]
@@ -2446,10 +2546,9 @@ Testing _global.Math.acos.prototype
   addProperty, type=[function]
   unwatch, type=[function]
   watch, type=[function]
-  constructor, own, type=[function]
   __proto__, own, type=[object]
+  constructor, own, type=[function]
 Testing _global.Math.asin
-Testing _global.Math.asin.prototype
   toLocaleString, type=[function]
   isPropertyEnumerable, type=[function]
   isPrototypeOf, type=[function]
@@ -2459,10 +2558,9 @@ Testing _global.Math.asin.prototype
   addProperty, type=[function]
   unwatch, type=[function]
   watch, type=[function]
-  constructor, own, type=[function]
   __proto__, own, type=[object]
+  constructor, own, type=[function]
 Testing _global.Math.atan
-Testing _global.Math.atan.prototype
   toLocaleString, type=[function]
   isPropertyEnumerable, type=[function]
   isPrototypeOf, type=[function]
@@ -2472,10 +2570,9 @@ Testing _global.Math.atan.prototype
   addProperty, type=[function]
   unwatch, type=[function]
   watch, type=[function]
-  constructor, own, type=[function]
   __proto__, own, type=[object]
+  constructor, own, type=[function]
 Testing _global.Math.ceil
-Testing _global.Math.ceil.prototype
   toLocaleString, type=[function]
   isPropertyEnumerable, type=[function]
   isPrototypeOf, type=[function]
@@ -2485,10 +2582,9 @@ Testing _global.Math.ceil.prototype
   addProperty, type=[function]
   unwatch, type=[function]
   watch, type=[function]
-  constructor, own, type=[function]
   __proto__, own, type=[object]
+  constructor, own, type=[function]
 Testing _global.Math.floor
-Testing _global.Math.floor.prototype
   toLocaleString, type=[function]
   isPropertyEnumerable, type=[function]
   isPrototypeOf, type=[function]
@@ -2498,10 +2594,9 @@ Testing _global.Math.floor.prototype
   addProperty, type=[function]
   unwatch, type=[function]
   watch, type=[function]
-  constructor, own, type=[function]
   __proto__, own, type=[object]
+  constructor, own, type=[function]
 Testing _global.Math.round
-Testing _global.Math.round.prototype
   toLocaleString, type=[function]
   isPropertyEnumerable, type=[function]
   isPrototypeOf, type=[function]
@@ -2511,10 +2606,9 @@ Testing _global.Math.round.prototype
   addProperty, type=[function]
   unwatch, type=[function]
   watch, type=[function]
-  constructor, own, type=[function]
   __proto__, own, type=[object]
+  constructor, own, type=[function]
 Testing _global.Math.sqrt
-Testing _global.Math.sqrt.prototype
   toLocaleString, type=[function]
   isPropertyEnumerable, type=[function]
   isPrototypeOf, type=[function]
@@ -2524,10 +2618,9 @@ Testing _global.Math.sqrt.prototype
   addProperty, type=[function]
   unwatch, type=[function]
   watch, type=[function]
-  constructor, own, type=[function]
   __proto__, own, type=[object]
+  constructor, own, type=[function]
 Testing _global.Math.log
-Testing _global.Math.log.prototype
   toLocaleString, type=[function]
   isPropertyEnumerable, type=[function]
   isPrototypeOf, type=[function]
@@ -2537,10 +2630,9 @@ Testing _global.Math.log.prototype
   addProperty, type=[function]
   unwatch, type=[function]
   watch, type=[function]
-  constructor, own, type=[function]
   __proto__, own, type=[object]
+  constructor, own, type=[function]
 Testing _global.Math.exp
-Testing _global.Math.exp.prototype
   toLocaleString, type=[function]
   isPropertyEnumerable, type=[function]
   isPrototypeOf, type=[function]
@@ -2550,10 +2642,9 @@ Testing _global.Math.exp.prototype
   addProperty, type=[function]
   unwatch, type=[function]
   watch, type=[function]
-  constructor, own, type=[function]
   __proto__, own, type=[object]
+  constructor, own, type=[function]
 Testing _global.Math.tan
-Testing _global.Math.tan.prototype
   toLocaleString, type=[function]
   isPropertyEnumerable, type=[function]
   isPrototypeOf, type=[function]
@@ -2563,10 +2654,9 @@ Testing _global.Math.tan.prototype
   addProperty, type=[function]
   unwatch, type=[function]
   watch, type=[function]
-  constructor, own, type=[function]
   __proto__, own, type=[object]
+  constructor, own, type=[function]
 Testing _global.Math.cos
-Testing _global.Math.cos.prototype
   toLocaleString, type=[function]
   isPropertyEnumerable, type=[function]
   isPrototypeOf, type=[function]
@@ -2576,10 +2666,9 @@ Testing _global.Math.cos.prototype
   addProperty, type=[function]
   unwatch, type=[function]
   watch, type=[function]
-  constructor, own, type=[function]
   __proto__, own, type=[object]
+  constructor, own, type=[function]
 Testing _global.Math.sin
-Testing _global.Math.sin.prototype
   toLocaleString, type=[function]
   isPropertyEnumerable, type=[function]
   isPrototypeOf, type=[function]
@@ -2589,10 +2678,9 @@ Testing _global.Math.sin.prototype
   addProperty, type=[function]
   unwatch, type=[function]
   watch, type=[function]
-  constructor, own, type=[function]
   __proto__, own, type=[object]
+  constructor, own, type=[function]
 Testing _global.Math.abs
-Testing _global.Math.abs.prototype
   toLocaleString, type=[function]
   isPropertyEnumerable, type=[function]
   isPrototypeOf, type=[function]
@@ -2602,8 +2690,8 @@ Testing _global.Math.abs.prototype
   addProperty, type=[function]
   unwatch, type=[function]
   watch, type=[function]
-  constructor, own, type=[function]
   __proto__, own, type=[object]
+  constructor, own, type=[function]
 Testing _global.Math.SQRT1_2
 Testing _global.Math.SQRT2
 Testing _global.Math.LOG10E
