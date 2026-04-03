@@ -2,9 +2,9 @@
 
 *See [RUFFLE_RESULTS_FILTERED.md](RUFFLE_RESULTS_FILTERED.md) for results with ignored tests excluded.*
 
-**Commit:** `683569fa9775`  
-**Date:** 2026-04-03 01:47 UTC  
-**Total duration:** 4h33m15s
+**Commit:** `cd3784f78410`  
+**Date:** 2026-04-03 03:19 UTC  
+**Total duration:** 4h33m22s
 
 ## Results by Suite
 
@@ -22,11 +22,11 @@
 | Suite | Matching | Expected | Accuracy |
 |-------|--------:|---------:|---------:|
 | avm1 | 81,342 | 91,501 | 88.9% |
-| from_gnash/actionscript.all | 12,419 | 16,957 | 73.2% |
+| from_gnash/actionscript.all | 12,417 | 16,957 | 73.2% |
 | from_gnash/misc-swfmill.all | 25 | 29 | 86.2% |
 | from_shumway | 35 | 256 | 13.7% |
 | from_shumway/avm1 | 118 | 311 | 37.9% |
-| **Total** | **93,939** | **109,054** | **86.1%** |
+| **Total** | **93,937** | **109,054** | **86.1%** |
 
 ## Failure Breakdown
 
@@ -93,18 +93,17 @@ Tests with `output_mismatch` status but ≥80% of expected lines matching.
 | from_gnash/actionscript.all | Number-v8 | 81% |
 | from_gnash/actionscript.all | AsBroadcaster-v6 | 81% |
 | from_gnash/actionscript.all | HitTest-v8 | 81% |
-| from_gnash/actionscript.all | array-v5 | 80% |
 
 ## Changes Since Last Run
 
 | Suite | Newly Passing | Newly Failing | Lines Improved | Lines Regressed |
 |-------|-------------:|-------------:|--------------:|----------------:|
 | avm1 | - | - | 1 | 177 |
-| from_gnash/actionscript.all | 63 | - | 9783 | 1 |
+| from_gnash/actionscript.all | 63 | - | 9781 | 1 |
 
 **from_gnash/actionscript.all — newly passing:** `Accessibility-v5`, `Accessibility-v6`, `Accessibility-v7`, `Accessibility-v8`, `BitmapData-v5`, `BitmapData-v6`, `BitmapData-v7`, `Boolean-v5`, `Boolean-v6`, `Boolean-v7`, `Boolean-v8`, `Camera-v5`, `Color-v5`, `Color-v7`, `Color-v8`, `ColorTransform-v5`, `ColorTransform-v6`, `ColorTransform-v7`, `ContextMenu-v5`, `ContextMenu-v6`, `ExternalInterface-v5`, `Key-v6`, `Key-v7`, `Key-v8`, `LoadVars-v5`, `Matrix-v5`, `Microphone-v5`, `Mouse-v5`, `Mouse-v6`, `Mouse-v7`, `Mouse-v8`, `MovieClipLoader-v5`, `MovieClipLoader-v6`, `NetStream-v5`, `Point-v5`, `Point-v6`, `Point-v7`, `Random-v5`, `Random-v6`, `Random-v7`, `Random-v8`, `Rectangle-v5`, `Rectangle-v6`, `Rectangle-v7`, `Selection-v5`, `TextFieldHTML-v5`, `TextSnapshot-v5`, `Transform-v5`, `Try-v5`, `Try-v6`, `Try-v7`, `Try-v8`, `Video-v7`, `Video-v8`, `XMLSocket-v7`, `XMLSocket-v8`, `argstest-v5`, `enumerate-v5`, `swap-v5`, `swap-v6`, `swap-v7`, `swap-v8`, `targetPath-v5`
 
-*Comparing `868900bbb1a2` → `683569fa9775`*
+*Comparing `868900bbb1a2` → `cd3784f78410`*
 
 ## Flash-Spec Results
 
@@ -119,34 +118,34 @@ Tests verified against Flash's actual output (`output.flash.txt`).
 ### avm1
 
 - **Pass:** 570/620 (91.9%)
-- **Duration:** 3h03m51s across 30 shards
+- **Duration:** 3h03m58s across 30 shards
 - **Lines:** 81,342/91,501 matching (88.9%)
-- **Avg test duration:** 17.7s — slowest: `timeout` (48.4s)
+- **Avg test duration:** 17.7s — slowest: `timeout` (47.4s)
 
 ### from_gnash/actionscript.all
 
 - **Pass:** 68/190 (35.8%)
-- **Duration:** 1h04m58s across 30 shards
-- **Lines:** 12,419/16,957 matching (73.2%)
-- **Avg test duration:** 20.5s — slowest: `array-v5` (42.4s)
+- **Duration:** 1h05m02s across 30 shards
+- **Lines:** 12,417/16,957 matching (73.2%)
+- **Avg test duration:** 20.5s — slowest: `array-v5` (43.1s)
 
 ### from_gnash/misc-swfmill.all
 
 - **Pass:** 11/14 (78.6%)
-- **Duration:** 4m03s across 30 shards
+- **Duration:** 4m02s across 30 shards
 - **Lines:** 25/29 matching (86.2%)
-- **Avg test duration:** 17.3s — slowest: `missing_bitmap` (18.0s)
+- **Avg test duration:** 17.2s — slowest: `background` (17.7s)
 
 ### from_shumway
 
 - **Pass:** 17/47 (36.2%)
-- **Duration:** 13m38s across 30 shards
+- **Duration:** 13m37s across 30 shards
 - **Lines:** 35/256 matching (13.7%)
-- **Avg test duration:** 17.4s — slowest: `MaskTest-2` (18.6s)
+- **Avg test duration:** 17.3s — slowest: `captions` (18.6s)
 
 ### from_shumway/avm1
 
 - **Pass:** 12/23 (52.2%)
-- **Duration:** 6m43s across 30 shards
+- **Duration:** 6m41s across 30 shards
 - **Lines:** 118/311 matching (37.9%)
-- **Avg test duration:** 17.5s — slowest: `watch` (19.1s)
+- **Avg test duration:** 17.4s — slowest: `watch` (19.1s)
