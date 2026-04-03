@@ -2,8 +2,8 @@
   "metadata": {
     "old_timestamp": "2026-04-02T15:39:42.060874+00:00",
     "old_git_sha": "868900bbb1a21bbd47807dc1a7d7098719b03e8a",
-    "new_timestamp": "2026-04-03T04:40:26.141945+00:00",
-    "new_git_sha": "53c54f5db34c65b276ee34d4b21f35d42abaffad",
+    "new_timestamp": "2026-04-03T16:28:13.515076+00:00",
+    "new_git_sha": "82bf8b804cb6740122fff8c561a2d277dd6c271d",
     "partial": false,
     "same_commit": false
   },
@@ -11,17 +11,17 @@
     "old_pass": 570,
     "old_total": 620,
     "old_pass_rate": 91.9,
-    "new_pass": 571,
+    "new_pass": 572,
     "new_total": 620,
-    "new_pass_rate": 92.1,
+    "new_pass_rate": 92.3,
     "old_mismatched_lines": 9983,
-    "new_mismatched_lines": 10155,
+    "new_mismatched_lines": 10149,
     "increased_mismatches": 177,
-    "decreased_mismatches": 5,
-    "newly_passing": 1,
+    "decreased_mismatches": 11,
+    "newly_passing": 2,
     "newly_failing": 0,
-    "status_changed": 1,
-    "unchanged": 617,
+    "status_changed": 2,
+    "unchanged": 616,
     "added": 0,
     "removed": 0
   },
@@ -40,6 +40,22 @@
         "actual_lines": 548,
         "expected_lines": 548,
         "matching_lines": 548
+      }
+    },
+    {
+      "test": "displacementmapfilter_mappoint_throw_error",
+      "change_type": "changed",
+      "old_status": "output_mismatch",
+      "new_status": "pass",
+      "old_lines": {
+        "actual_lines": 13,
+        "expected_lines": 13,
+        "matching_lines": 7
+      },
+      "new_lines": {
+        "actual_lines": 13,
+        "expected_lines": 13,
+        "matching_lines": 13
       }
     },
     {
