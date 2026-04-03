@@ -1,0 +1,768 @@
+{
+  "metadata": {
+    "timestamp": "2026-04-03T22:44:25.141434+00:00",
+    "git_sha": "5ec711b2146b339c7a7e9712603c1f81dac0ae08",
+    "duration_seconds": 1130.11,
+    "total_available": 59,
+    "shards": 28,
+    "expected_shards": 30,
+    "missing_shards": 2,
+    "incomplete": true,
+    "ignored_count": 0,
+    "filtered": true
+  },
+  "total": 55,
+  "pass": 8,
+  "fail": 47,
+  "pass_rate": 14.5,
+  "breakdown": {
+    "output_mismatch": 46,
+    "segfault": 1
+  },
+  "tests": [
+    {
+      "test": "BeginBitmapFill",
+      "num_frames": 30,
+      "lines": {
+        "actual_lines": 1,
+        "expected_lines": 1,
+        "matching_lines": 0
+      },
+      "duration": 19.07,
+      "status": "output_mismatch",
+      "detail": "1 line(s) differ (actual=1, expected=1)",
+      "actual_output": "FAILED: expected: 150 obtained: 804 [BeginBitmapFill.c:222] ",
+      "expected_output": "PASSED: _root.mc9._width  ==  150 [BeginBitmapFill.c:222]"
+    },
+    {
+      "test": "ButtonEventsTest",
+      "num_frames": 30,
+      "lines": {
+        "actual_lines": 77,
+        "expected_lines": 679,
+        "matching_lines": 16
+      },
+      "duration": 21.58,
+      "status": "output_mismatch",
+      "detail": "663 line(s) differ (actual=77, expected=679)",
+      "actual_output": "FAILED: expected: 'object' obtained: movieclip [ButtonEventsTest.c:480] \nFAILED: square1.button instanceOf Button [ButtonEventsTest.c:481] \nPASSED: typeof(square1.button.useHandCursor)  ==  'boolean' [ButtonEventsTest.c:482]\nPASSED: square1.button.useHandCursor  ==  true [ButtonEventsTest.c:483]\ntabIndex\nblendMode\ncacheAsBitmap\nfilters\nscale9Grid\nenabled\nuseHandCursor\ngetDepth\nonKeyUp\nonKeyDown\nonSetFocus\nonReleaseOutside\nonRelease\nonPress\nonRollOut\nonRollOver\ntabIndex\nblendMode\ncacheAsBitmap\nfilters\nscale9Grid\nenabled\nuseHandCursor\ngetDepth\nonKeyUp\nonKeyDown\nonSetFocus\nonReleaseOutside\nonRelease\nonPress\nonRollOut\nonRollOver\nPASSED: typeof(_root.buttonChild)  ==  'object' [ButtonEventsTest.c:563]\nPASSED: _root.buttonChild instanceof Array [ButtonEventsTest.c:564]\nFAILED: expected: 2 obtained: 0 [ButtonEventsTest.c:565] \nFAILED: expected: 'object' obtained: undefined [ButtonEventsTest.c:568] \nFAILED: expected: '_level0.square1.button.instance5' obtained:  [ButtonEventsTest.c:569] \nFAILED: expected: 1 obtained:  [ButtonEventsTest.c:570] \nFAILED: expected: 0 obtained:  [ButtonEventsTest.c:571] \nFAILED: expected: 'object' obtained: undefined [ButtonEventsTest.c:574] \nFAILED: expected: '_level0.square1.button.instance6' obtained:  [ButtonEventsTest.c:575] \nFAILED: expected: 1 obtained:  [ButtonEventsTest.c:576] \nFAILED: expected: 0 obtained:  [ButtonEventsTest.c:577] \nPASSED: _level0.square1.button.instance6._name  ==  'instance6' [ButtonEventsTest.c:578]\nFAILED: expected: -16371 obtained: -16372 [ButtonEventsTest.c:579] \nPASSED: typeof(_root.buttonChild[11])  ==  'undefined' [ButtonEventsTest.c:582]\n... (27 lines after) ...",
+      "expected_output": "PASSED: typeof(square1.button)  ==  'object' [ButtonEventsTest.c:480]\nPASSED: square1.button instanceOf Button [ButtonEventsTest.c:481]\nPASSED: typeof(square1.button.useHandCursor)  ==  'boolean' [ButtonEventsTest.c:482]\nPASSED: square1.button.useHandCursor  ==  true [ButtonEventsTest.c:483]\ntabIndex\nblendMode\ncacheAsBitmap\nfilters\nscale9Grid\ngetDepth\nenabled\nuseHandCursor\nonKeyUp\nonKeyDown\nonSetFocus\nonReleaseOutside\nonRelease\nonPress\nonRollOut\nonRollOver\ninstance6\ninstance5\ntabIndex\nblendMode\ncacheAsBitmap\nfilters\nscale9Grid\ngetDepth\nenabled\nuseHandCursor\nonKeyUp\nonKeyDown\nonSetFocus\nonReleaseOutside\nonRelease\nonPress\nonRollOut\nonRollOver\ninstance6\ninstance5\nPASSED: typeof(_root.buttonChild)  ==  'object' [ButtonEventsTest.c:563]\nPASSED: _root.buttonChild instanceof Array [ButtonEventsTest.c:564]\nPASSED: _root.buttonChild.realLength()  ==  2 [ButtonEventsTest.c:565]\nPASSED: typeof(_root.buttonChild[10])  ==  'object' [ButtonEventsTest.c:568]\nPASSED: (_root.buttonChild[10].nam)  ==  '_level0.square1.button.instance5' [ButtonEventsTest.c:569]\nPASSED: (_root.buttonChild[10].exe)  ==  1 [ButtonEventsTest.c:570]\nPASSED: (_root.buttonChild[10].uld)  ==  0 [ButtonEventsTest.c:571]\nPASSED: typeof(_root.buttonChild[12])  ==  'object' [ButtonEventsTest.c:574]\nPASSED: (_root.buttonChild[12].nam)  ==  '_level0.square1.button.instance6' [ButtonEventsTest.c:575]\nPASSED: (_root.buttonChild[12].exe)  ==  1 [ButtonEventsTest.c:576]\n... (629 lines after) ..."
+    },
+    {
+      "test": "ButtonPropertiesTest",
+      "num_frames": 30,
+      "lines": {
+        "actual_lines": 22,
+        "expected_lines": 23,
+        "matching_lines": 2
+      },
+      "duration": 18.69,
+      "status": "output_mismatch",
+      "detail": "21 line(s) differ (actual=22, expected=23)",
+      "actual_output": "This is a very simple test. Do anything you like with the buttons and you should get no failures\nFAILED: expected: instance2 , obtained: \nPASSED: square1.button.getDepth()  ==  -16383 [ButtonPropertiesTest.c:177]\nPASSED:  == \nFAILED: expected: instance3 , obtained: \nPASSED:  == \nFAILED: expected: instance4 , obtained: \nPASSED:  == \nFAILED: expected: instance5 , obtained: \nPASSED:  == \nFAILED: expected: instance6 , obtained: \nPASSED:  == \nFAILED: expected: instance7 , obtained: \nPASSED:  == \nFAILED: expected: instance8 , obtained: \nPASSED:  == \nFAILED: expected: instance9 , obtained: \nPASSED:  == \nFAILED: expected: instance10 , obtained: \nPASSED:  == \nFAILED: expected: instance11 , obtained: \nPASSED:  == ",
+      "expected_output": "This is a very simple test. Do anything you like with the buttons and you should get no failures\nPASSED: instance2 == instance2\nPASSED: square1.button.getDepth()  ==  -16383 [ButtonPropertiesTest.c:177]\nPASSED:  ==\nPASSED: instance3 == instance3\nPASSED:  ==\nPASSED: instance4 == instance4\nPASSED:  ==\nPASSED: instance5 == instance5\nPASSED:  ==\nPASSED: instance6 == instance6\nPASSED:  ==\nPASSED: instance7 == instance7\nPASSED:  ==\nPASSED: instance8 == instance8\nPASSED:  ==\nPASSED: instance9 == instance9\nPASSED:  ==\nPASSED: instance10 == instance10\nPASSED:  ==\nPASSED: instance11 == instance11\nPASSED:  ==\nPASSED: instance12 == instance12"
+    },
+    {
+      "test": "DefineEditTextTest",
+      "num_frames": 30,
+      "lines": {
+        "actual_lines": 153,
+        "expected_lines": 153,
+        "matching_lines": 145
+      },
+      "duration": 24.08,
+      "status": "output_mismatch",
+      "detail": "8 line(s) differ (actual=153, expected=153)",
+      "actual_output": "PASSED: _root.getInstanceAtDepth(-16383)  ==  _level0.instance1 [DefineEditTextTest.c:137]\nFAILED: _level0.instance1._xtrace_win instanceof TextField [DefineEditTextTest.c:139] \nPASSED: TextField.prototype.hasOwnProperty('background') [DefineEditTextTest.c:143]\nPASSED: TextField.prototype.hasOwnProperty('backgroundColor') [DefineEditTextTest.c:144]\nPASSED: TextField.prototype.hasOwnProperty('text') [DefineEditTextTest.c:145]\nPASSED: TextField.prototype.hasOwnProperty('textColor') [DefineEditTextTest.c:146]\nPASSED: dtext1.embedFonts  ==  false [DefineEditTextTest.c:178]\nPASSED: etext1.embedFonts  ==  true [DefineEditTextTest.c:179]\nFAILED: expected: false obtained: true [DefineEditTextTest.c:180] \nFAILED: expected: false , obtained: true\nPASSED: _level0.dtext1 == _level0.dtext1\nFAILED: expected: false , obtained: true\nPASSED: _level0.etext1 == _level0.etext1\nFAILED: expected: false , obtained: true\nPASSED: _level0.dynamictext1 == _level0.dynamictext1\nPASSED: dtext1.__proto__  ==  TextField.prototype [DefineEditTextTest.c:195]\nPASSED: etext1.__proto__  ==  TextField.prototype [DefineEditTextTest.c:196]\nPASSED: etext1.__proto__  ==  dynamictext1.__proto__ [DefineEditTextTest.c:197]\nPASSED: TextField.prototype.hasOwnProperty('background') [DefineEditTextTest.c:200]\nPASSED: TextField.prototype.hasOwnProperty('backgroundColor') [DefineEditTextTest.c:201]\nPASSED: TextField.prototype.hasOwnProperty('text') [DefineEditTextTest.c:202]\nPASSED: TextField.prototype.hasOwnProperty('textColor') [DefineEditTextTest.c:203]\nPASSED: !TextField.prototype.hasOwnProperty('_parent') [DefineEditTextTest.c:204]\nPASSED: !TextField.prototype.hasOwnProperty('_xmouse') [DefineEditTextTest.c:205]\nPASSED: !TextField.prototype.hasOwnProperty('_ymouse') [DefineEditTextTest.c:206]\nPASSED: !TextField.prototype.hasOwnProperty('_xscale') [DefineEditTextTest.c:207]\nPASSED: !TextField.prototype.hasOwnProperty('_yscale') [DefineEditTextTest.c:208]\nPASSED: typeof(dtext1)  ==  'object' [DefineEditTextTest.c:210]\nPASSED: typeof(dtext1.text)  ==  'string' [DefineEditTextTest.c:211]\nPASSED: typeof(dtext1.background)  ==  'boolean' [DefineEditTextTest.c:212]\nPASSED: typeof(dtext1.backgroundColor)  ==  'number' [DefineEditTextTest.c:213]\nPASSED: typeof(dtext1.textColor)  ==  'number' [DefineEditTextTest.c:214]\nPASSED: typeof(dtext1._alpha)  ==  'number' [DefineEditTextTest.c:215]\nPASSED: typeof(dtext1.type)  ==  'string' [DefineEditTextTest.c:216]\nPASSED: dtext1.type  ==  'input' [DefineEditTextTest.c:217]\nPASSED: typeof(dtext1.__proto__.text)  ==  'undefined' [DefineEditTextTest.c:219]\nPASSED: typeof(dtext1.__proto__.background)  ==  'undefined' [DefineEditTextTest.c:220]\nPASSED: typeof(dtext1.__proto__.backgroundColor)  ==  'undefined' [DefineEditTextTest.c:221]\nPASSED: typeof(dtext1.__proto__.textColor)  ==  'undefined' [DefineEditTextTest.c:222]\nPASSED: typeof(dtext1.__proto__._alpha)  ==  'undefined' [DefineEditTextTest.c:223]\nFAILED: expected: false obtained: true [DefineEditTextTest.c:225] \nFAILED: expected: false obtained: true [DefineEditTextTest.c:226] \nFAILED: expected: false obtained: true [DefineEditTextTest.c:227] \nFAILED: expected: false obtained: true [DefineEditTextTest.c:228] \nPASSED: dtext1.hasOwnProperty('_alpha')  ==  false [DefineEditTextTest.c:229]\nPASSED: !dtext1.hasOwnProperty('_parent') [DefineEditTextTest.c:230]\nPASSED: !dtext1.hasOwnProperty('_xmouse') [DefineEditTextTest.c:231]\nPASSED: !dtext1.hasOwnProperty('_ymouse') [DefineEditTextTest.c:232]\nPASSED: !dtext1.hasOwnProperty('_xscale') [DefineEditTextTest.c:233]\nPASSED: !dtext1.hasOwnProperty('_yscale') [DefineEditTextTest.c:234]\n... (103 lines after) ...",
+      "expected_output": "PASSED: _root.getInstanceAtDepth(-16383)  ==  _level0.instance1 [DefineEditTextTest.c:137]\nPASSED: _level0.instance1._xtrace_win instanceof TextField [DefineEditTextTest.c:139]\nPASSED: TextField.prototype.hasOwnProperty('background') [DefineEditTextTest.c:143]\nPASSED: TextField.prototype.hasOwnProperty('backgroundColor') [DefineEditTextTest.c:144]\nPASSED: TextField.prototype.hasOwnProperty('text') [DefineEditTextTest.c:145]\nPASSED: TextField.prototype.hasOwnProperty('textColor') [DefineEditTextTest.c:146]\nPASSED: dtext1.embedFonts  ==  false [DefineEditTextTest.c:178]\nPASSED: etext1.embedFonts  ==  true [DefineEditTextTest.c:179]\nPASSED: etext1.hasOwnProperty('embedFonts')  ==  false [DefineEditTextTest.c:180]\nFAILED: expected: false , obtained: true\nPASSED: _level0.dtext1 == _level0.dtext1\nFAILED: expected: false , obtained: true\nPASSED: _level0.etext1 == _level0.etext1\nFAILED: expected: false , obtained: true\nPASSED: _level0.dynamictext1 == _level0.dynamictext1\nPASSED: dtext1.__proto__  ==  TextField.prototype [DefineEditTextTest.c:195]\nPASSED: etext1.__proto__  ==  TextField.prototype [DefineEditTextTest.c:196]\nPASSED: etext1.__proto__  ==  dynamictext1.__proto__ [DefineEditTextTest.c:197]\nPASSED: TextField.prototype.hasOwnProperty('background') [DefineEditTextTest.c:200]\nPASSED: TextField.prototype.hasOwnProperty('backgroundColor') [DefineEditTextTest.c:201]\nPASSED: TextField.prototype.hasOwnProperty('text') [DefineEditTextTest.c:202]\nPASSED: TextField.prototype.hasOwnProperty('textColor') [DefineEditTextTest.c:203]\nPASSED: !TextField.prototype.hasOwnProperty('_parent') [DefineEditTextTest.c:204]\nPASSED: !TextField.prototype.hasOwnProperty('_xmouse') [DefineEditTextTest.c:205]\nPASSED: !TextField.prototype.hasOwnProperty('_ymouse') [DefineEditTextTest.c:206]\nPASSED: !TextField.prototype.hasOwnProperty('_xscale') [DefineEditTextTest.c:207]\nPASSED: !TextField.prototype.hasOwnProperty('_yscale') [DefineEditTextTest.c:208]\nPASSED: typeof(dtext1)  ==  'object' [DefineEditTextTest.c:210]\nPASSED: typeof(dtext1.text)  ==  'string' [DefineEditTextTest.c:211]\nPASSED: typeof(dtext1.background)  ==  'boolean' [DefineEditTextTest.c:212]\nPASSED: typeof(dtext1.backgroundColor)  ==  'number' [DefineEditTextTest.c:213]\nPASSED: typeof(dtext1.textColor)  ==  'number' [DefineEditTextTest.c:214]\nPASSED: typeof(dtext1._alpha)  ==  'number' [DefineEditTextTest.c:215]\nPASSED: typeof(dtext1.type)  ==  'string' [DefineEditTextTest.c:216]\nPASSED: dtext1.type  ==  'input' [DefineEditTextTest.c:217]\nPASSED: typeof(dtext1.__proto__.text)  ==  'undefined' [DefineEditTextTest.c:219]\nPASSED: typeof(dtext1.__proto__.background)  ==  'undefined' [DefineEditTextTest.c:220]\nPASSED: typeof(dtext1.__proto__.backgroundColor)  ==  'undefined' [DefineEditTextTest.c:221]\nPASSED: typeof(dtext1.__proto__.textColor)  ==  'undefined' [DefineEditTextTest.c:222]\nPASSED: typeof(dtext1.__proto__._alpha)  ==  'undefined' [DefineEditTextTest.c:223]\nPASSED: dtext1.hasOwnProperty('text')  ==  false [DefineEditTextTest.c:225]\nPASSED: dtext1.hasOwnProperty('background')  ==  false [DefineEditTextTest.c:226]\nPASSED: dtext1.hasOwnProperty('backgroundColor')  ==  false [DefineEditTextTest.c:227]\nPASSED: dtext1.hasOwnProperty('textColor')  ==  false [DefineEditTextTest.c:228]\nPASSED: dtext1.hasOwnProperty('_alpha')  ==  false [DefineEditTextTest.c:229]\nPASSED: !dtext1.hasOwnProperty('_parent') [DefineEditTextTest.c:230]\nPASSED: !dtext1.hasOwnProperty('_xmouse') [DefineEditTextTest.c:231]\nPASSED: !dtext1.hasOwnProperty('_ymouse') [DefineEditTextTest.c:232]\nPASSED: !dtext1.hasOwnProperty('_xscale') [DefineEditTextTest.c:233]\nPASSED: !dtext1.hasOwnProperty('_yscale') [DefineEditTextTest.c:234]\n... (103 lines after) ..."
+    },
+    {
+      "test": "DefineEditTextVariableNameTest",
+      "num_frames": 30,
+      "lines": {
+        "actual_lines": 99,
+        "expected_lines": 72,
+        "matching_lines": 0
+      },
+      "duration": 22.42,
+      "status": "output_mismatch",
+      "detail": "99 line(s) differ (actual=99, expected=72)",
+      "actual_output": "FAILED: expected: 'Hello' obtained:  [DefineEditTextVariableNameTest.c:164] \nFAILED: expected: 'Hello' obtained:  [DefineEditTextVariableNameTest.c:164] \nPASSED: _root.testName  ==  'Hello' [DefineEditTextVariableNameTest.c:165]\nPASSED: mc1.textfield._x  ==  0 [DefineEditTextVariableNameTest.c:166]\nPASSED: mc1._height  ==  16 [DefineEditTextVariableNameTest.c:167]\nPASSED: mc1._width  ==  136 [DefineEditTextVariableNameTest.c:168]\nPASSED: mc2._height  ==  16 [DefineEditTextVariableNameTest.c:169]\nPASSED: mc2._width  ==  100 [DefineEditTextVariableNameTest.c:170]\nFAILED: expected: 'Hi' obtained:  [DefineEditTextVariableNameTest.c:174] \nFAILED: expected: 'Hi' obtained:  [DefineEditTextVariableNameTest.c:174] \nPASSED: _root.mc3.testName  ==  'Hi' [DefineEditTextVariableNameTest.c:175]\nPASSED: mc2.textfield._x  ==  150 [DefineEditTextVariableNameTest.c:176]\nFAILED: expected: '_root.mc3.testName' obtained:  [DefineEditTextVariableNameTest.c:178] \nFAILED: expected: '_root.mc3.testName' obtained:  [DefineEditTextVariableNameTest.c:178] \nFAILED: expected: 'World' obtained:  [DefineEditTextVariableNameTest.c:184] \nFAILED: expected: 'World' obtained:  [DefineEditTextVariableNameTest.c:184] \nPASSED: _root.testName  ==  'World' [DefineEditTextVariableNameTest.c:185]\nPASSED: mc1.textfield._x  ==  0 [DefineEditTextVariableNameTest.c:186]\nFAILED: expected: 'There' obtained:  [DefineEditTextVariableNameTest.c:190] \nFAILED: expected: 'There' obtained:  [DefineEditTextVariableNameTest.c:190] \nPASSED: _root.mc3.testName  ==  'There' [DefineEditTextVariableNameTest.c:191]\nPASSED: mc2.textfield._x  ==  150 [DefineEditTextVariableNameTest.c:192]\nFAILED: expected: '' obtained:  [DefineEditTextVariableNameTest.c:198] \nFAILED: expected: '' obtained:  [DefineEditTextVariableNameTest.c:198] \nPASSED: _root.testName  ==  '' [DefineEditTextVariableNameTest.c:199]\nPASSED: mc1.textfield._x  ==  0 [DefineEditTextVariableNameTest.c:200]\nFAILED: expected: '' obtained:  [DefineEditTextVariableNameTest.c:204] \nFAILED: expected: '' obtained:  [DefineEditTextVariableNameTest.c:204] \nPASSED: _root.mc3.testName  ==  '' [DefineEditTextVariableNameTest.c:205]\nPASSED: mc2.textfield._x  ==  150 [DefineEditTextVariableNameTest.c:206]\nFAILED: expected: 'Hello' obtained:  [DefineEditTextVariableNameTest.c:164] \nFAILED: expected: 'Hello' obtained:  [DefineEditTextVariableNameTest.c:164] \nPASSED: _root.varName1bis  ==  'Hello' [DefineEditTextVariableNameTest.c:165]\nPASSED: mc1.textfield._x  ==  0 [DefineEditTextVariableNameTest.c:166]\nPASSED: mc1._height  ==  16 [DefineEditTextVariableNameTest.c:167]\nPASSED: mc1._width  ==  136 [DefineEditTextVariableNameTest.c:168]\nPASSED: mc2._height  ==  16 [DefineEditTextVariableNameTest.c:169]\nPASSED: mc2._width  ==  100 [DefineEditTextVariableNameTest.c:170]\nFAILED: expected: 'Hi' obtained:  [DefineEditTextVariableNameTest.c:174] \nFAILED: expected: 'Hi' obtained:  [DefineEditTextVariableNameTest.c:174] \nPASSED: _root.varName2bis  ==  'Hi' [DefineEditTextVariableNameTest.c:175]\nPASSED: mc2.textfield._x  ==  150 [DefineEditTextVariableNameTest.c:176]\nPASSED: mc2.textfield.variable  ==  '_root.varName2bis' [DefineEditTextVariableNameTest.c:178]\nFAILED: expected: 'World' obtained:  [DefineEditTextVariableNameTest.c:184] \nFAILED: expected: 'World' obtained:  [DefineEditTextVariableNameTest.c:184] \nPASSED: _root.varName1bis  ==  'World' [DefineEditTextVariableNameTest.c:185]\nPASSED: mc1.textfield._x  ==  0 [DefineEditTextVariableNameTest.c:186]\nFAILED: expected: 'There' obtained:  [DefineEditTextVariableNameTest.c:190] \nFAILED: expected: 'There' obtained:  [DefineEditTextVariableNameTest.c:190] \nPASSED: _root.varName2bis  ==  'There' [DefineEditTextVariableNameTest.c:191]\n... (49 lines after) ...",
+      "expected_output": "PASSED: mc1.textfield.text  ==  'Hello' [DefineEditTextVariableNameTest.c:164]\nPASSED: _root.testName  ==  'Hello' [DefineEditTextVariableNameTest.c:165]\nPASSED: mc1.textfield._x  ==  0 [DefineEditTextVariableNameTest.c:166]\nPASSED: mc1._height  ==  16 [DefineEditTextVariableNameTest.c:167]\nPASSED: mc1._width  ==  136 [DefineEditTextVariableNameTest.c:168]\nPASSED: mc2._height  ==  16 [DefineEditTextVariableNameTest.c:169]\nPASSED: mc2._width  ==  100 [DefineEditTextVariableNameTest.c:170]\nPASSED: mc2.textfield.text  ==  'Hi' [DefineEditTextVariableNameTest.c:174]\nPASSED: _root.mc3.testName  ==  'Hi' [DefineEditTextVariableNameTest.c:175]\nPASSED: mc2.textfield._x  ==  150 [DefineEditTextVariableNameTest.c:176]\nPASSED: mc2.textfield.variable  ==  '_root.mc3.testName' [DefineEditTextVariableNameTest.c:178]\nPASSED: mc1.textfield.text  ==  'World' [DefineEditTextVariableNameTest.c:184]\nPASSED: _root.testName  ==  'World' [DefineEditTextVariableNameTest.c:185]\nPASSED: mc1.textfield._x  ==  0 [DefineEditTextVariableNameTest.c:186]\nPASSED: mc2.textfield.text  ==  'There' [DefineEditTextVariableNameTest.c:190]\nPASSED: _root.mc3.testName  ==  'There' [DefineEditTextVariableNameTest.c:191]\nPASSED: mc2.textfield._x  ==  150 [DefineEditTextVariableNameTest.c:192]\nPASSED: mc1.textfield.text  ==  '' [DefineEditTextVariableNameTest.c:198]\nPASSED: _root.testName  ==  '' [DefineEditTextVariableNameTest.c:199]\nPASSED: mc1.textfield._x  ==  0 [DefineEditTextVariableNameTest.c:200]\nPASSED: mc2.textfield.text  ==  '' [DefineEditTextVariableNameTest.c:204]\nPASSED: _root.mc3.testName  ==  '' [DefineEditTextVariableNameTest.c:205]\nPASSED: mc2.textfield._x  ==  150 [DefineEditTextVariableNameTest.c:206]\nPASSED: mc1.textfield.text  ==  'Hello' [DefineEditTextVariableNameTest.c:164]\nPASSED: _root.varName1bis  ==  'Hello' [DefineEditTextVariableNameTest.c:165]\nPASSED: mc1.textfield._x  ==  0 [DefineEditTextVariableNameTest.c:166]\nPASSED: mc1._height  ==  16 [DefineEditTextVariableNameTest.c:167]\nPASSED: mc1._width  ==  136 [DefineEditTextVariableNameTest.c:168]\nPASSED: mc2._height  ==  16 [DefineEditTextVariableNameTest.c:169]\nPASSED: mc2._width  ==  100 [DefineEditTextVariableNameTest.c:170]\nPASSED: mc2.textfield.text  ==  'Hi' [DefineEditTextVariableNameTest.c:174]\nPASSED: _root.varName2bis  ==  'Hi' [DefineEditTextVariableNameTest.c:175]\nPASSED: mc2.textfield._x  ==  150 [DefineEditTextVariableNameTest.c:176]\nPASSED: mc2.textfield.variable  ==  '_root.varName2bis' [DefineEditTextVariableNameTest.c:178]\nPASSED: mc1.textfield.text  ==  'World' [DefineEditTextVariableNameTest.c:184]\nPASSED: _root.varName1bis  ==  'World' [DefineEditTextVariableNameTest.c:185]\nPASSED: mc1.textfield._x  ==  0 [DefineEditTextVariableNameTest.c:186]\nPASSED: mc2.textfield.text  ==  'There' [DefineEditTextVariableNameTest.c:190]\nPASSED: _root.varName2bis  ==  'There' [DefineEditTextVariableNameTest.c:191]\nPASSED: mc2.textfield._x  ==  150 [DefineEditTextVariableNameTest.c:192]\nPASSED: mc1.textfield.text  ==  '' [DefineEditTextVariableNameTest.c:198]\nPASSED: _root.varName1bis  ==  '' [DefineEditTextVariableNameTest.c:199]\nPASSED: mc1.textfield._x  ==  0 [DefineEditTextVariableNameTest.c:200]\nPASSED: mc2.textfield.text  ==  '' [DefineEditTextVariableNameTest.c:204]\nPASSED: _root.varName2bis  ==  '' [DefineEditTextVariableNameTest.c:205]\nPASSED: mc2.textfield._x  ==  150 [DefineEditTextVariableNameTest.c:206]\nPASSED: typeof(mc4.textfield)  ==  'object' [DefineEditTextVariableNameTest.c:332]\nPASSED: typeof(mc4.uninitalized_text_var)  ==  'undefined' [DefineEditTextVariableNameTest.c:333]\nPASSED: typeof(mc4.uninitalized_text_var)  ==  'undefined' [DefineEditTextVariableNameTest.c:336]\nPASSED: typeof(mc4.uninitalized_text_var)  ==  'string' [DefineEditTextVariableNameTest.c:340]\n... (22 lines after) ..."
+    },
+    {
+      "test": "DefineEditTextVariableNameTest2",
+      "num_frames": 30,
+      "lines": {
+        "actual_lines": 39,
+        "expected_lines": 39,
+        "matching_lines": 29
+      },
+      "duration": 20.51,
+      "status": "output_mismatch",
+      "detail": "10 line(s) differ (actual=39, expected=39)",
+      "actual_output": "... (20 lines before) ...\nPASSED: edit_text_var  ==  'Hahaha' [DefineEditTextVariableNameTest2.c:180]\nPASSED: edit_text_var  ==  'Hahaha' [DefineEditTextVariableNameTest2.c:188]\nPASSED: dtext4.text  ==  'Hahaha' [DefineEditTextVariableNameTest2.c:189]\nPASSED: typeof(edit_text_var)  ==  'object' [DefineEditTextVariableNameTest2.c:195]\nPASSED: typeof(dtext4.text)  ==  'string' [DefineEditTextVariableNameTest2.c:196]\nFAILED: expected: '[object Object]' obtained: Hahaha [DefineEditTextVariableNameTest2.c:197] \nPASSED: typeof(dtext4.text)  ==  'string' [DefineEditTextVariableNameTest2.c:203]\nFAILED: expected: '[object Object]' obtained: Hahaha [DefineEditTextVariableNameTest2.c:205] \nFAILED: expected: 'TO_STRING' obtained: Hahaha [DefineEditTextVariableNameTest2.c:207] \nFAILED: expected: 'function' obtained: undefined [DefineEditTextVariableNameTest2.c:208] \nFAILED: expected: 'TO_STRING' obtained: Hahaha [DefineEditTextVariableNameTest2.c:209] \nFAILED: expected: 'TO_STRING' obtained: Hahaha [DefineEditTextVariableNameTest2.c:210] \nPASSED: edit_text_var.toString()  ==  'TO_STRING' [DefineEditTextVariableNameTest2.c:215]\nFAILED: expected: 'TO_STRING' obtained: Hahaha [DefineEditTextVariableNameTest2.c:216] \nPASSED: edit_text_var.toString()  ==  'TO_STRING' [DefineEditTextVariableNameTest2.c:222]\nFAILED: expected: 'TO_STRING' obtained: Hahaha [DefineEditTextVariableNameTest2.c:223] \n#passed: 28\n#failed: 8\n#total tests run: 36",
+      "expected_output": "... (20 lines before) ...\nPASSED: edit_text_var  ==  'Hahaha' [DefineEditTextVariableNameTest2.c:180]\nPASSED: edit_text_var  ==  'Hahaha' [DefineEditTextVariableNameTest2.c:188]\nPASSED: dtext4.text  ==  'Hahaha' [DefineEditTextVariableNameTest2.c:189]\nPASSED: typeof(edit_text_var)  ==  'object' [DefineEditTextVariableNameTest2.c:195]\nPASSED: typeof(dtext4.text)  ==  'string' [DefineEditTextVariableNameTest2.c:196]\nPASSED: dtext4.text  ==  '[object Object]' [DefineEditTextVariableNameTest2.c:197]\nPASSED: typeof(dtext4.text)  ==  'string' [DefineEditTextVariableNameTest2.c:203]\nPASSED: dtext4.text  ==  '[object Object]' [DefineEditTextVariableNameTest2.c:205]\nPASSED: dtext4.text  ==  'TO_STRING' [DefineEditTextVariableNameTest2.c:207]\nPASSED: typeof(dtext4.text.toString)  ==  'function' [DefineEditTextVariableNameTest2.c:208]\nPASSED: dtext4.text.toString()  ==  'TO_STRING' [DefineEditTextVariableNameTest2.c:209]\nPASSED: dtext4.text.valueOf()  ==  'TO_STRING' [DefineEditTextVariableNameTest2.c:210]\nPASSED: edit_text_var.toString()  ==  'TO_STRING' [DefineEditTextVariableNameTest2.c:215]\nPASSED: dtext4.text  ==  'TO_STRING' [DefineEditTextVariableNameTest2.c:216]\nPASSED: edit_text_var.toString()  ==  'TO_STRING' [DefineEditTextVariableNameTest2.c:222]\nPASSED: dtext4.text  ==  'TO_STRING' [DefineEditTextVariableNameTest2.c:223]\n#passed: 36\n#failed: 0\n#total tests run: 36"
+    },
+    {
+      "test": "DragDropTest",
+      "num_frames": 50,
+      "lines": {
+        "actual_lines": 45,
+        "expected_lines": 44,
+        "matching_lines": 18
+      },
+      "duration": 19.6,
+      "status": "output_mismatch",
+      "detail": "27 line(s) differ (actual=45, expected=44)",
+      "actual_output": "... (1 lines before) ...\n- This test is for drag&drop operations. Follow the instructions - \n1. Click OUTSIDE of any drawing.\nPASSED: _root.draggable50._droptarget == \"\" [./DragDropTest.as:203]\nPASSED: eval(_root.draggable50._droptarget) == undefined [./DragDropTest.as:204]\n2. Click on the FIRST RED circle.\nFAILED: expected: \"/target10\" obtained:  [./DragDropTest.as:214]\nFAILED: expected: _level0.target10 obtained:  [./DragDropTest.as:215]\n3. Click on the FIRST GREEN circle.\nFAILED: expected: \"/target20\" obtained:  [./DragDropTest.as:225]\nFAILED: expected: _level0.target20 obtained:  [./DragDropTest.as:226]\n4. Click on the FIRST BLUE circle.\nFAILED: expected: \"/target100\" obtained:  [./DragDropTest.as:236]\nFAILED: expected: _level0.target100 obtained:  [./DragDropTest.as:237]\n5. Click on the SECOND RED circle.\nFAILED: expected: \"_level50/target10\" obtained:  [./DragDropTest.as:247]\nPASSED: eval(_root.draggable50._droptarget) == _level50.target10 [./DragDropTest.as:248]\n6. Click on the SECOND GREEN circle.\nFAILED: expected: \"_level50/target20\" obtained:  [./DragDropTest.as:258]\nPASSED: eval(_root.draggable50._droptarget) == _level50.target20 [./DragDropTest.as:259]\n7. Click on the SECOND BLUE circle.\nFAILED: expected: \"_level50/target100\" obtained:  [./DragDropTest.as:269]\nPASSED: eval(_root.draggable50._droptarget) == _level50.target100 [./DragDropTest.as:270]\n8. Click on the THIRD RED circle.\nFAILED: expected: \"/loadedTarget/target10\" obtained:  [./DragDropTest.as:280]\nFAILED: expected: _level0.loadedTarget.target10 obtained:  [./DragDropTest.as:281]\n9. Click on the THIRD GREEN circle.\nFAILED: expected: \"/loadedTarget/target20\" obtained:  [./DragDropTest.as:291]\nFAILED: expected: _level0.loadedTarget.target20 obtained:  [./DragDropTest.as:292]\n10. Click on the THIRD BLUE circle.\nFAILED: expected: \"/loadedTarget/target100\" obtained:  [./DragDropTest.as:302]\nFAILED: expected: _level0.loadedTarget.target100 obtained:  [./DragDropTest.as:303]\n11. Click on the SECOND GREEN circle.\nTarget not found: Target=\"null\" Base=\"_level0\"\nPASSED: _root.tf._x == 0 [./DragDropTest.as:323]\nPASSED: _root.tf._y == 100 [./DragDropTest.as:324]\nFAILED: expected: \"/loadedTarget/target100\" obtained:  [./DragDropTest.as:330]\nFAILED: _root.tf._x != 0 [./DragDropTest.as:331]\nFAILED: _root.tf._y != 100 [./DragDropTest.as:332]\n12. Click ANYWHERE OUT of the THIRD BLUE circle (on another circle makes a better test)\nFAILED: expected: \"/loadedTarget/target100\" obtained:  [./DragDropTest.as:342]\nEND OF TEST\n#passed: 7\n#failed: 19\n#total tests run: 26",
+      "expected_output": "... (1 lines before) ...\n- This test is for drag&drop operations. Follow the instructions - \n1. Click OUTSIDE of any drawing.\nPASSED: _root.draggable50._droptarget == \"\" [./DragDropTest.as:203]\nPASSED: eval(_root.draggable50._droptarget) == undefined [./DragDropTest.as:204]\n2. Click on the FIRST RED circle.\nPASSED: _root.draggable50._droptarget == \"/target10\" [./DragDropTest.as:214]\nPASSED: eval(_root.draggable50._droptarget) == _level0.target10 [./DragDropTest.as:215]\n3. Click on the FIRST GREEN circle.\nPASSED: _root.draggable50._droptarget == \"/target20\" [./DragDropTest.as:225]\nPASSED: eval(_root.draggable50._droptarget) == _level0.target20 [./DragDropTest.as:226]\n4. Click on the FIRST BLUE circle.\nPASSED: _root.draggable50._droptarget == \"/target100\" [./DragDropTest.as:236]\nPASSED: eval(_root.draggable50._droptarget) == _level0.target100 [./DragDropTest.as:237]\n5. Click on the SECOND RED circle.\nPASSED: _root.draggable50._droptarget == \"_level50/target10\" [./DragDropTest.as:247]\nPASSED: eval(_root.draggable50._droptarget) == _level50.target10 [./DragDropTest.as:248]\n6. Click on the SECOND GREEN circle.\nPASSED: _root.draggable50._droptarget == \"_level50/target20\" [./DragDropTest.as:258]\nPASSED: eval(_root.draggable50._droptarget) == _level50.target20 [./DragDropTest.as:259]\n7. Click on the SECOND BLUE circle.\nPASSED: _root.draggable50._droptarget == \"_level50/target100\" [./DragDropTest.as:269]\nPASSED: eval(_root.draggable50._droptarget) == _level50.target100 [./DragDropTest.as:270]\n8. Click on the THIRD RED circle.\nPASSED: _root.draggable50._droptarget == \"/loadedTarget/target10\" [./DragDropTest.as:280]\nPASSED: eval(_root.draggable50._droptarget) == _level0.loadedTarget.target10 [./DragDropTest.as:281]\n9. Click on the THIRD GREEN circle.\nPASSED: _root.draggable50._droptarget == \"/loadedTarget/target20\" [./DragDropTest.as:291]\nPASSED: eval(_root.draggable50._droptarget) == _level0.loadedTarget.target20 [./DragDropTest.as:292]\n10. Click on the THIRD BLUE circle.\nPASSED: _root.draggable50._droptarget == \"/loadedTarget/target100\" [./DragDropTest.as:302]\nPASSED: eval(_root.draggable50._droptarget) == _level0.loadedTarget.target100 [./DragDropTest.as:303]\n11. Click on the SECOND GREEN circle.\nPASSED: _root.tf._x == 0 [./DragDropTest.as:323]\nPASSED: _root.tf._y == 100 [./DragDropTest.as:324]\nPASSED: _root.draggable50._droptarget == \"/loadedTarget/target100\" [./DragDropTest.as:330]\nPASSED: _root.tf._x != 0 [./DragDropTest.as:331]\nPASSED: _root.tf._y != 100 [./DragDropTest.as:332]\n12. Click ANYWHERE OUT of the THIRD BLUE circle (on another circle makes a better test)\nPASSED: _root.draggable50._droptarget == \"/loadedTarget/target100\" [./DragDropTest.as:342]\nEND OF TEST\n#passed: 26\n#failed: 0\n#total tests run: 26"
+    },
+    {
+      "test": "DrawingApiTest",
+      "num_frames": 30,
+      "lines": {
+        "actual_lines": 93,
+        "expected_lines": 93,
+        "matching_lines": 20
+      },
+      "duration": 22.6,
+      "status": "output_mismatch",
+      "detail": "73 line(s) differ (actual=93, expected=93)",
+      "actual_output": "[ debug-22403-05c7ba106]\nSWF\n\nPASSED: getBounds() returns 6710886.35,6710886.35 6710886.35,6710886.35 after clear\nPASSED: bnd == \"6710886.35,6710886.35 6710886.35,6710886.35\" [./DrawingApiTest.as:84]\nFAILED: expected: \"80,80 220,220\" obtained: 6710886.35,6710886.35 6710886.35,6710886.35 [./DrawingApiTest.as:89]\nFAILED: expected: \"80,80 220,220\" obtained: 6710886.35,6710886.35 6710886.35,6710886.35 [./DrawingApiTest.as:96]\nFAILED: expected: \"80,80 280,220\" obtained: 6710886.35,6710886.35 6710886.35,6710886.35 [./DrawingApiTest.as:101]\nFAILED: expected: \"80,80 280,220\" obtained: 6710886.35,6710886.35 6710886.35,6710886.35 [./DrawingApiTest.as:108]\nFAILED: expected: \"80,80 280,255\" obtained: 6710886.35,6710886.35 6710886.35,6710886.35 [./DrawingApiTest.as:113]\nFAILED: expected: \"80,80 410,260\" obtained: 6710886.35,6710886.35 6710886.35,6710886.35 [./DrawingApiTest.as:120]\nPASSED: ! hitTest(376, 180, true) [./DrawingApiTest.as:125]\nFAILED: hitTest(376, 139, true) [./DrawingApiTest.as:126]\nFAILED: expected: \"80,80 410,260\" obtained: 6710886.35,6710886.35 6710886.35,6710886.35 [./DrawingApiTest.as:129]\nFAILED: expected: \"60,80 410,260\" obtained: 6710886.35,6710886.35 6710886.35,6710886.35 [./DrawingApiTest.as:140]\nFAILED: expected: \"48,80 410,260\" obtained: 6710886.35,6710886.35 6710886.35,6710886.35 [./DrawingApiTest.as:149]\nFAILED: expected: \"18,80 410,260\" obtained: 6710886.35,6710886.35 6710886.35,6710886.35 [./DrawingApiTest.as:154]\nFAILED: expected: \"18,80 410,260\" obtained: 6710886.35,6710886.35 6710886.35,6710886.35 [./DrawingApiTest.as:172]\nFAILED: expected: \"18,80 410,260\" obtained: 6710886.35,6710886.35 6710886.35,6710886.35 [./DrawingApiTest.as:201]\nFAILED: expected: \"219,141 277,169\" obtained: 6710886.35,6710886.35 6710886.35,6710886.35 [./DrawingApiTest.as:224]\nFAILED: expected: 'function' obtained: undefined [./DrawingApiTest.as:226]\nFAILED: zshape.hitTest(223, 145, true) [./DrawingApiTest.as:227]\nFAILED: zshape.hitTest((223+10), (145+0), true) [./DrawingApiTest.as:228]\nFAILED: zshape.hitTest((223+20), (145+5), true) [./DrawingApiTest.as:229]\nFAILED: zshape.hitTest((223+25), (145+20), true) [./DrawingApiTest.as:230]\nFAILED: zshape.hitTest(273, 165, true) [./DrawingApiTest.as:231]\nFAILED: x.hitTest(126, 168, true) [./DrawingApiTest.as:256]\nFAILED: x.hitTest(112, 158, true) [./DrawingApiTest.as:257]\nFAILED: x.hitTest(122, 157, true) [./DrawingApiTest.as:261]\nPASSED: ! x.hitTest(120, 155, true) [./DrawingApiTest.as:263]\nFAILED: x.hitTest(120, 155, false) [./DrawingApiTest.as:264]\nPASSED: ! x.hitTest(116, 177, true) [./DrawingApiTest.as:265]\nFAILED: x.hitTest(116, 177, false) [./DrawingApiTest.as:266]\nFAILED: inv3.hitTest((8*4), 100 + (18*4), true) [./DrawingApiTest.as:364]\nPASSED: !inv3.hitTest((4*4), 100 + (10*4), true) [./DrawingApiTest.as:365]\nFAILED: inv3.hitTest((4*4), 100 + (10*4), false) [./DrawingApiTest.as:366]\nFAILED: inv3.hitTest((20*4), 100 + (18*4), true) [./DrawingApiTest.as:368]\nPASSED: !inv3.hitTest((24*4), 100 + (10*4), true) [./DrawingApiTest.as:369]\nFAILED: inv3.hitTest((24*4), 100 + (10*4), false) [./DrawingApiTest.as:370]\nPASSED: ! inv4.hitTest(100 + (15*4), 100 + (15*4), true) [./DrawingApiTest.as:398]\nFAILED: inv4.hitTest(100 + (11*4), 100 + (11*4), true) [./DrawingApiTest.as:401]\nFAILED: inv4.hitTest(100 + (11*4), 100 + (14*4), true) [./DrawingApiTest.as:402]\nFAILED: inv4.hitTest(100 + (11*4), 100 + (19*4), true) [./DrawingApiTest.as:403]\nFAILED: inv4.hitTest(100 + (14*4), 100 + (19*4), true) [./DrawingApiTest.as:404]\nFAILED: inv4.hitTest(100 + (19*4), 100 + (19*4), true) [./DrawingApiTest.as:405]\nFAILED: inv4.hitTest(100 + (19*4), 100 + (14*4), true) [./DrawingApiTest.as:406]\nFAILED: inv4.hitTest(100 + (19*4), 100 + (11*4), true) [./DrawingApiTest.as:407]\nFAILED: inv4.hitTest(100 + (14*4), 100 + (11*4), true) [./DrawingApiTest.as:408]\nPASSED: ! inv5.hitTest(150 + (15*4), 100 + (15*4), true) [./DrawingApiTest.as:437]\nFAILED: inv5.hitTest(150 + (11*4), 100 + (11*4), true) [./DrawingApiTest.as:440]\n... (43 lines after) ...",
+      "expected_output": "[ debug-22403-05c7ba106]\nSWF\n\nPASSED: getBounds() returns 6710886.35,6710886.35 6710886.35,6710886.35 after clear\nPASSED: bnd == \"6710886.35,6710886.35 6710886.35,6710886.35\" [./DrawingApiTest.as:84]\nPASSED: bnd == \"80,80 220,220\" [./DrawingApiTest.as:89]\nPASSED: bnd == \"80,80 220,220\" [./DrawingApiTest.as:96]\nPASSED: bnd == \"80,80 280,220\" [./DrawingApiTest.as:101]\nPASSED: bnd == \"80,80 280,220\" [./DrawingApiTest.as:108]\nPASSED: bnd == \"80,80 280,255\" [./DrawingApiTest.as:113]\nPASSED: bnd == \"80,80 410,260\" [./DrawingApiTest.as:120]\nPASSED: ! hitTest(376, 180, true) [./DrawingApiTest.as:125]\nPASSED: hitTest(376, 139, true) [./DrawingApiTest.as:126]\nPASSED: bnd == \"80,80 410,260\" [./DrawingApiTest.as:129]\nPASSED: bnd == \"60,80 410,260\" [./DrawingApiTest.as:140]\nPASSED: bnd == \"48,80 410,260\" [./DrawingApiTest.as:149]\nPASSED: bnd == \"18,80 410,260\" [./DrawingApiTest.as:154]\nPASSED: bnd == \"18,80 410,260\" [./DrawingApiTest.as:172]\nPASSED: bnd == \"18,80 410,260\" [./DrawingApiTest.as:201]\nPASSED: bnd == \"219,141 277,169\" [./DrawingApiTest.as:224]\nPASSED: typeof(zshape.hitTest) == 'function' [./DrawingApiTest.as:226]\nPASSED: zshape.hitTest(223, 145, true) [./DrawingApiTest.as:227]\nPASSED: zshape.hitTest((223+10), (145+0), true) [./DrawingApiTest.as:228]\nPASSED: zshape.hitTest((223+20), (145+5), true) [./DrawingApiTest.as:229]\nPASSED: zshape.hitTest((223+25), (145+20), true) [./DrawingApiTest.as:230]\nPASSED: zshape.hitTest(273, 165, true) [./DrawingApiTest.as:231]\nPASSED: x.hitTest(126, 168, true) [./DrawingApiTest.as:256]\nPASSED: x.hitTest(112, 158, true) [./DrawingApiTest.as:257]\nFAILED: x.hitTest(122, 157, true) [./DrawingApiTest.as:261]\nPASSED: ! x.hitTest(120, 155, true) [./DrawingApiTest.as:263]\nPASSED: x.hitTest(120, 155, false) [./DrawingApiTest.as:264]\nPASSED: ! x.hitTest(116, 177, true) [./DrawingApiTest.as:265]\nPASSED: x.hitTest(116, 177, false) [./DrawingApiTest.as:266]\nPASSED: inv3.hitTest((8*4), 100 + (18*4), true) [./DrawingApiTest.as:364]\nPASSED: !inv3.hitTest((4*4), 100 + (10*4), true) [./DrawingApiTest.as:365]\nPASSED: inv3.hitTest((4*4), 100 + (10*4), false) [./DrawingApiTest.as:366]\nPASSED: inv3.hitTest((20*4), 100 + (18*4), true) [./DrawingApiTest.as:368]\nPASSED: !inv3.hitTest((24*4), 100 + (10*4), true) [./DrawingApiTest.as:369]\nPASSED: inv3.hitTest((24*4), 100 + (10*4), false) [./DrawingApiTest.as:370]\nPASSED: ! inv4.hitTest(100 + (15*4), 100 + (15*4), true) [./DrawingApiTest.as:398]\nPASSED: inv4.hitTest(100 + (11*4), 100 + (11*4), true) [./DrawingApiTest.as:401]\nPASSED: inv4.hitTest(100 + (11*4), 100 + (14*4), true) [./DrawingApiTest.as:402]\nPASSED: inv4.hitTest(100 + (11*4), 100 + (19*4), true) [./DrawingApiTest.as:403]\nPASSED: inv4.hitTest(100 + (14*4), 100 + (19*4), true) [./DrawingApiTest.as:404]\nPASSED: inv4.hitTest(100 + (19*4), 100 + (19*4), true) [./DrawingApiTest.as:405]\nPASSED: inv4.hitTest(100 + (19*4), 100 + (14*4), true) [./DrawingApiTest.as:406]\nPASSED: inv4.hitTest(100 + (19*4), 100 + (11*4), true) [./DrawingApiTest.as:407]\nPASSED: inv4.hitTest(100 + (14*4), 100 + (11*4), true) [./DrawingApiTest.as:408]\nPASSED: ! inv5.hitTest(150 + (15*4), 100 + (15*4), true) [./DrawingApiTest.as:437]\nPASSED: inv5.hitTest(150 + (11*4), 100 + (11*4), true) [./DrawingApiTest.as:440]\n... (43 lines after) ..."
+    },
+    {
+      "test": "EmbeddedFontTest",
+      "num_frames": 30,
+      "lines": {
+        "actual_lines": 87,
+        "expected_lines": 87,
+        "matching_lines": 50
+      },
+      "duration": 21.35,
+      "status": "output_mismatch",
+      "detail": "37 line(s) differ (actual=87, expected=87)",
+      "actual_output": "PASSED: tf1._width  ==  84 [EmbeddedFontTest.c:225]\nPASSED: tf1._height  ==  20 [EmbeddedFontTest.c:226]\nPASSED: tf1._x  ==  48 [EmbeddedFontTest.c:227]\nPASSED: tf1._y  ==  28 [EmbeddedFontTest.c:228]\nPASSED: tf1.textHeight  ==  23 [EmbeddedFontTest.c:229]\n43\nFAILED: tf1.textWidth >= 44 && tf1.textWidth <= 48 [EmbeddedFontTest.c:232] \nPASSED: tf2._width  ==  84 [EmbeddedFontTest.c:234]\nPASSED: tf2._height  ==  20 [EmbeddedFontTest.c:235]\nPASSED: tf2._x  ==  48 [EmbeddedFontTest.c:236]\nPASSED: tf2._y  ==  58 [EmbeddedFontTest.c:237]\nPASSED: tf2.textHeight  ==  23 [EmbeddedFontTest.c:238]\n72\nFAILED: tf2.textWidth >= 76 && tf2.textWidth <= 80 [EmbeddedFontTest.c:241] \nPASSED: tf3._width  ==  1344 [EmbeddedFontTest.c:243]\nPASSED: tf3._height  ==  20 [EmbeddedFontTest.c:244]\nFAILED: expected: 18 obtained: 48 [EmbeddedFontTest.c:245] \nPASSED: tf3._y  ==  88 [EmbeddedFontTest.c:246]\nPASSED: tf3.textHeight  ==  23 [EmbeddedFontTest.c:247]\n214\nFAILED: tf3.textWidth >= 225 && tf3.textWidth <= 235 [EmbeddedFontTest.c:250] \nPASSED: tf4._width  ==  1344 [EmbeddedFontTest.c:252]\nPASSED: tf4._height  ==  20 [EmbeddedFontTest.c:253]\nFAILED: expected: 18 obtained: 48 [EmbeddedFontTest.c:254] \nPASSED: tf4._y  ==  118 [EmbeddedFontTest.c:255]\nPASSED: tf4.textHeight  ==  23 [EmbeddedFontTest.c:256]\n144\nFAILED: tf4.textWidth >= 153 && tf4.textWidth <= 159 [EmbeddedFontTest.c:259] \nPASSED: tf5._width  ==  1344 [EmbeddedFontTest.c:261]\nPASSED: tf5._height  ==  20 [EmbeddedFontTest.c:262]\nFAILED: expected: 18 obtained: 48 [EmbeddedFontTest.c:263] \nPASSED: tf5._y  ==  148 [EmbeddedFontTest.c:264]\nPASSED: tf5.textHeight  ==  23 [EmbeddedFontTest.c:265]\n172\nFAILED: tf5.textWidth >= 183 && tf5.textWidth <= 189 [EmbeddedFontTest.c:268] \nPASSED: tf6._width  ==  1344 [EmbeddedFontTest.c:270]\nPASSED: tf6._height  ==  20 [EmbeddedFontTest.c:271]\nFAILED: expected: 18 obtained: 48 [EmbeddedFontTest.c:272] \nPASSED: tf6._y  ==  178 [EmbeddedFontTest.c:273]\nPASSED: tf6.textHeight  ==  23 [EmbeddedFontTest.c:274]\n181\nFAILED: tf6.textWidth >= 189 && tf6.textWidth <= 199 [EmbeddedFontTest.c:277] \nPASSED: tf7._width  ==  1344 [EmbeddedFontTest.c:279]\nPASSED: tf7._height  ==  20 [EmbeddedFontTest.c:280]\nFAILED: expected: 18 obtained: 48 [EmbeddedFontTest.c:281] \nPASSED: tf7._y  ==  208 [EmbeddedFontTest.c:282]\nPASSED: tf7.textHeight  ==  23 [EmbeddedFontTest.c:283]\n229\nFAILED: tf7.textWidth >= 240 && tf7.textWidth <= 254 [EmbeddedFontTest.c:286] \nPASSED: tf8._width  ==  672 [EmbeddedFontTest.c:288]\n... (37 lines after) ...",
+      "expected_output": "PASSED: tf1._width  ==  84 [EmbeddedFontTest.c:225]\nPASSED: tf1._height  ==  20 [EmbeddedFontTest.c:226]\nPASSED: tf1._x  ==  48 [EmbeddedFontTest.c:227]\nPASSED: tf1._y  ==  28 [EmbeddedFontTest.c:228]\nPASSED: tf1.textHeight  ==  23 [EmbeddedFontTest.c:229]\n46\nPASSED: tf1.textWidth >= 44 && tf1.textWidth <= 48 [EmbeddedFontTest.c:232]\nPASSED: tf2._width  ==  84 [EmbeddedFontTest.c:234]\nPASSED: tf2._height  ==  20 [EmbeddedFontTest.c:235]\nPASSED: tf2._x  ==  48 [EmbeddedFontTest.c:236]\nPASSED: tf2._y  ==  58 [EmbeddedFontTest.c:237]\nPASSED: tf2.textHeight  ==  23 [EmbeddedFontTest.c:238]\n78\nPASSED: tf2.textWidth >= 76 && tf2.textWidth <= 80 [EmbeddedFontTest.c:241]\nPASSED: tf3._width  ==  1344 [EmbeddedFontTest.c:243]\nPASSED: tf3._height  ==  20 [EmbeddedFontTest.c:244]\nPASSED: tf3._x  ==  18 [EmbeddedFontTest.c:245]\nPASSED: tf3._y  ==  88 [EmbeddedFontTest.c:246]\nPASSED: tf3.textHeight  ==  23 [EmbeddedFontTest.c:247]\n230\nPASSED: tf3.textWidth >= 225 && tf3.textWidth <= 235 [EmbeddedFontTest.c:250]\nPASSED: tf4._width  ==  1344 [EmbeddedFontTest.c:252]\nPASSED: tf4._height  ==  20 [EmbeddedFontTest.c:253]\nPASSED: tf4._x  ==  18 [EmbeddedFontTest.c:254]\nPASSED: tf4._y  ==  118 [EmbeddedFontTest.c:255]\nPASSED: tf4.textHeight  ==  23 [EmbeddedFontTest.c:256]\n156\nPASSED: tf4.textWidth >= 153 && tf4.textWidth <= 159 [EmbeddedFontTest.c:259]\nPASSED: tf5._width  ==  1344 [EmbeddedFontTest.c:261]\nPASSED: tf5._height  ==  20 [EmbeddedFontTest.c:262]\nPASSED: tf5._x  ==  18 [EmbeddedFontTest.c:263]\nPASSED: tf5._y  ==  148 [EmbeddedFontTest.c:264]\nPASSED: tf5.textHeight  ==  23 [EmbeddedFontTest.c:265]\n186\nPASSED: tf5.textWidth >= 183 && tf5.textWidth <= 189 [EmbeddedFontTest.c:268]\nPASSED: tf6._width  ==  1344 [EmbeddedFontTest.c:270]\nPASSED: tf6._height  ==  20 [EmbeddedFontTest.c:271]\nPASSED: tf6._x  ==  18 [EmbeddedFontTest.c:272]\nPASSED: tf6._y  ==  178 [EmbeddedFontTest.c:273]\nPASSED: tf6.textHeight  ==  23 [EmbeddedFontTest.c:274]\n194\nPASSED: tf6.textWidth >= 189 && tf6.textWidth <= 199 [EmbeddedFontTest.c:277]\nPASSED: tf7._width  ==  1344 [EmbeddedFontTest.c:279]\nPASSED: tf7._height  ==  20 [EmbeddedFontTest.c:280]\nPASSED: tf7._x  ==  18 [EmbeddedFontTest.c:281]\nPASSED: tf7._y  ==  208 [EmbeddedFontTest.c:282]\nPASSED: tf7.textHeight  ==  23 [EmbeddedFontTest.c:283]\n247\nPASSED: tf7.textWidth >= 240 && tf7.textWidth <= 254 [EmbeddedFontTest.c:286]\nPASSED: tf8._width  ==  672 [EmbeddedFontTest.c:288]\n... (37 lines after) ..."
+    },
+    {
+      "test": "KeyEventOrder",
+      "num_frames": 30,
+      "lines": {
+        "actual_lines": 25,
+        "expected_lines": 26,
+        "matching_lines": 6
+      },
+      "duration": 18.81,
+      "status": "output_mismatch",
+      "detail": "20 line(s) differ (actual=25, expected=26)",
+      "actual_output": "Press \"a\" then \"b\"\nDo not press any other keys!\nmc1\nmc2\no1\nbutton1\nmc1\nmc2\no1\no2\nbutton3\nFAILED: expected: 'mc2,mc1,o1,o2,button1,mc2,mc1,o1,o2,button3,' obtained: mc1,mc2,o1,button1,mc1,mc2,o1,o2,button3, [KeyEventOrder.c:199] \nPress \"a\" then \"b\" again\nDo not press any other keys!\nmc1\nmc2\no1\no2\nbutton1\nmc1\nmc2\no1\no2\nbutton3\nFAILED: expected: 'mc2,mc1,o1,o2,button1,mc2,mc1,o1,o2,button3,' obtained: mc1,mc2,o1,o2,button1,mc1,mc2,o1,o2,button3, [KeyEventOrder.c:217] ",
+      "expected_output": "Press \"a\" then \"b\"\nDo not press any other keys!\nmc2\nmc1\no1\no2\nbutton1\nmc2\nmc1\no1\no2\nbutton3\nPASSED: _root.order  ==  'mc2,mc1,o1,o2,button1,mc2,mc1,o1,o2,button3,' [KeyEventOrder.c:199]\nPress \"a\" then \"b\" again\nDo not press any other keys!\nmc2\nmc1\no1\no2\nbutton1\nmc2\nmc1\no1\no2\nbutton3\nPASSED: _root.order  ==  'mc2,mc1,o1,o2,button1,mc2,mc1,o1,o2,button3,' [KeyEventOrder.c:217]"
+    },
+    {
+      "test": "NetStream-SquareTest",
+      "num_frames": 100,
+      "lines": {
+        "actual_lines": 131,
+        "expected_lines": 216,
+        "matching_lines": 71
+      },
+      "duration": 25.43,
+      "status": "output_mismatch",
+      "detail": "145 line(s) differ (actual=131, expected=216)",
+      "actual_output": "... (1 lines before) ...\nPASSED: newly created NetConnection is not connected\nPASSED: NetConnection is connected after .connect(null)\nPASSED: true\nPASSED: true\nPASSED: undefined == undefined\nFAILED: expected: number , obtained: undefined\nFAILED: expected: number , obtained: string\nFAILED: NetStream.prototype.hasOwnProperty('currentFps') [NetStream-SquareTest.c:223] \nFAILED: NetStream.prototype.hasOwnProperty('bufferLength') [NetStream-SquareTest.c:224] \nFAILED: NetStream.prototype.hasOwnProperty('bufferTime') [NetStream-SquareTest.c:225] \nFAILED: NetStream.prototype.hasOwnProperty('liveDelay') [NetStream-SquareTest.c:226] \nFAILED: NetStream.prototype.hasOwnProperty('time') [NetStream-SquareTest.c:227] \nFAILED: NetStream.prototype.hasOwnProperty('bytesLoaded') [NetStream-SquareTest.c:228] \nFAILED: NetStream.prototype.hasOwnProperty('bytesTotal') [NetStream-SquareTest.c:229] \nPASSED: s1.getVolume()  ==  100 [NetStream-SquareTest.c:241]\nPASSED: s1.getVolume()  ==  1000 [NetStream-SquareTest.c:245]\nPASSED: s2.getVolume()  ==  1000 [NetStream-SquareTest.c:250]\nPASSED: s2.getVolume()  ==  5 [NetStream-SquareTest.c:256]\nPASSED: s1.getVolume()  ==  5 [NetStream-SquareTest.c:257]\nPASSED: s2.getVolume()  ==  80 [NetStream-SquareTest.c:259]\nPASSED: s1.getVolume()  ==  80 [NetStream-SquareTest.c:260]\nPASSED: s2.getVolume()  ==  -20 [NetStream-SquareTest.c:263]\nPASSED: s1.getVolume()  ==  -20 [NetStream-SquareTest.c:264]\nFAILED: expected: 'undefined' obtained: number [NetStream-SquareTest.c:269] \nFAILED: expected: 'undefined' obtained: number [NetStream-SquareTest.c:270] \nFAILED: expected: 'undefined' obtained: number [NetStream-SquareTest.c:273] \nFAILED: expected: 'undefined' obtained: number [NetStream-SquareTest.c:274] \nFAILED: expected: 100 obtained: 50 [NetStream-SquareTest.c:277] \nFAILED: expected: 100 obtained: 50 [NetStream-SquareTest.c:278] \nPASSED: s2.getVolume()  ==  80 [NetStream-SquareTest.c:280]\nPASSED: s1.getVolume()  ==  80 [NetStream-SquareTest.c:281]\nPASSED: s2.getVolume()  ==  100 [NetStream-SquareTest.c:287]\nPASSED: s1.getVolume()  ==  100 [NetStream-SquareTest.c:288]\nPASSED: s2.getVolume()  ==  80 [NetStream-SquareTest.c:290]\nPASSED: s1.getVolume()  ==  80 [NetStream-SquareTest.c:291]\nPASSED: Video.prototype.hasOwnProperty('attachVideo') [NetStream-SquareTest.c:312]\nFAILED: Video.prototype.hasOwnProperty('smoothing') [NetStream-SquareTest.c:313] \nFAILED: Video.prototype.hasOwnProperty('deblocking') [NetStream-SquareTest.c:314] \nPASSED: Video.prototype.hasOwnProperty('clear') [NetStream-SquareTest.c:315]\nFAILED: Video.prototype.hasOwnProperty('height') [NetStream-SquareTest.c:316] \nFAILED: Video.prototype.hasOwnProperty('width') [NetStream-SquareTest.c:317] \nFAILED: expected: 0 obtained: undefined [NetStream-SquareTest.c:318] \nFAILED: expected: 0 obtained: undefined [NetStream-SquareTest.c:319] \nFAILED: expected: 0 obtained: undefined [NetStream-SquareTest.c:320] \nFAILED: expected: 0 obtained: undefined [NetStream-SquareTest.c:321] \nFAILED: expected: 0 obtained: undefined [NetStream-SquareTest.c:327] \nFAILED: expected: 0 obtained: undefined [NetStream-SquareTest.c:328] \nFAILED: expected: 0 obtained: undefined [NetStream-SquareTest.c:329] \nFAILED: expected: 0 obtained: undefined [NetStream-SquareTest.c:330] \nFAILED: expected: 'number' obtained: undefined [NetStream-SquareTest.c:333] \n... (80 lines after) ...",
+      "expected_output": "... (1 lines before) ...\nPASSED: newly created NetConnection is not connected\nPASSED: NetConnection is connected after .connect(null)\nPASSED: true\nPASSED: true\nPASSED: undefined == undefined\nPASSED: number == number\nPASSED: number == number\nPASSED: NetStream.prototype.hasOwnProperty('currentFps') [NetStream-SquareTest.c:223]\nPASSED: NetStream.prototype.hasOwnProperty('bufferLength') [NetStream-SquareTest.c:224]\nPASSED: NetStream.prototype.hasOwnProperty('bufferTime') [NetStream-SquareTest.c:225]\nPASSED: NetStream.prototype.hasOwnProperty('liveDelay') [NetStream-SquareTest.c:226]\nPASSED: NetStream.prototype.hasOwnProperty('time') [NetStream-SquareTest.c:227]\nPASSED: NetStream.prototype.hasOwnProperty('bytesLoaded') [NetStream-SquareTest.c:228]\nPASSED: NetStream.prototype.hasOwnProperty('bytesTotal') [NetStream-SquareTest.c:229]\nPASSED: s1.getVolume()  ==  100 [NetStream-SquareTest.c:241]\nPASSED: s1.getVolume()  ==  1000 [NetStream-SquareTest.c:245]\nPASSED: s2.getVolume()  ==  1000 [NetStream-SquareTest.c:250]\nPASSED: s2.getVolume()  ==  5 [NetStream-SquareTest.c:256]\nPASSED: s1.getVolume()  ==  5 [NetStream-SquareTest.c:257]\nPASSED: s2.getVolume()  ==  80 [NetStream-SquareTest.c:259]\nPASSED: s1.getVolume()  ==  80 [NetStream-SquareTest.c:260]\nPASSED: s2.getVolume()  ==  -20 [NetStream-SquareTest.c:263]\nPASSED: s1.getVolume()  ==  -20 [NetStream-SquareTest.c:264]\nPASSED: typeof(s2.getVolume())  ==  'undefined' [NetStream-SquareTest.c:269]\nPASSED: typeof(s1.getVolume())  ==  'undefined' [NetStream-SquareTest.c:270]\nPASSED: typeof(s2.getVolume())  ==  'undefined' [NetStream-SquareTest.c:273]\nPASSED: typeof(s1.getVolume())  ==  'undefined' [NetStream-SquareTest.c:274]\nPASSED: s2.getVolume()  ==  100 [NetStream-SquareTest.c:277]\nPASSED: s1.getVolume()  ==  100 [NetStream-SquareTest.c:278]\nPASSED: s2.getVolume()  ==  80 [NetStream-SquareTest.c:280]\nPASSED: s1.getVolume()  ==  80 [NetStream-SquareTest.c:281]\nPASSED: s2.getVolume()  ==  100 [NetStream-SquareTest.c:287]\nPASSED: s1.getVolume()  ==  100 [NetStream-SquareTest.c:288]\nPASSED: s2.getVolume()  ==  80 [NetStream-SquareTest.c:290]\nPASSED: s1.getVolume()  ==  80 [NetStream-SquareTest.c:291]\nPASSED: Video.prototype.hasOwnProperty('attachVideo') [NetStream-SquareTest.c:312]\nPASSED: Video.prototype.hasOwnProperty('smoothing') [NetStream-SquareTest.c:313]\nPASSED: Video.prototype.hasOwnProperty('deblocking') [NetStream-SquareTest.c:314]\nPASSED: Video.prototype.hasOwnProperty('clear') [NetStream-SquareTest.c:315]\nPASSED: Video.prototype.hasOwnProperty('height') [NetStream-SquareTest.c:316]\nPASSED: Video.prototype.hasOwnProperty('width') [NetStream-SquareTest.c:317]\nPASSED: video.height  ==  0 [NetStream-SquareTest.c:318]\nPASSED: video.width  ==  0 [NetStream-SquareTest.c:319]\nPASSED: video2.height  ==  0 [NetStream-SquareTest.c:320]\nPASSED: video2.width  ==  0 [NetStream-SquareTest.c:321]\nPASSED: video.height  ==  0 [NetStream-SquareTest.c:327]\nPASSED: video.width  ==  0 [NetStream-SquareTest.c:328]\nPASSED: video2.height  ==  0 [NetStream-SquareTest.c:329]\nPASSED: video2.width  ==  0 [NetStream-SquareTest.c:330]\nPASSED: typeof(stream.currentFps)  ==  'number' [NetStream-SquareTest.c:333]\n... (165 lines after) ..."
+    },
+    {
+      "test": "PlaceObject2Test",
+      "num_frames": 30,
+      "status": "segfault",
+      "detail": "SIGSEGV",
+      "duration": 20.83,
+      "lines": {
+        "actual_lines": 2,
+        "expected_lines": 9,
+        "matching_lines": 1
+      }
+    },
+    {
+      "test": "ResolveEventsTest",
+      "num_frames": 30,
+      "lines": {
+        "actual_lines": 15,
+        "expected_lines": 15,
+        "matching_lines": 8
+      },
+      "duration": 19.23,
+      "status": "output_mismatch",
+      "detail": "7 line(s) differ (actual=15, expected=15)",
+      "actual_output": "Do not touch anything!\nPASSED: events.toString()  ==  'func,onEnterFrame,onRollOver' [ResolveEventsTest.c:139]\nFAILED: expected: 'func,onEnterFrame,onRollOver' obtained:  [ResolveEventsTest.c:141] \nFAILED: expected: 'func,onEnterFrame,onRollOver,onEnterFrame' obtained: func,onEnterFrame,onRollOver [ResolveEventsTest.c:146] \nFAILED: expected: 'func,onEnterFrame,onRollOver' obtained:  [ResolveEventsTest.c:148] \nMove over square, click and release!\nFAILED: expected: 'func,onEnterFrame,onRollOver,onEnterFrame,onRollOver,onMouseDown,onPress,onMouseUp,onRelease' obtained: func,onEnterFrame,onRollOver,onMouseDown,onMouseUp [ResolveEventsTest.c:161] \nFAILED: expected: 'func,onEnterFrame,onRollOver' obtained:  [ResolveEventsTest.c:163] \nMove out of square, click and release!\nFAILED: expected: 'func,onEnterFrame,onRollOver,onEnterFrame,onRollOver,onMouseDown,onPress,onMouseUp,onRelease,onRollOut,onMouseDown,onMouseUp' obtained: func,onEnterFrame,onRollOver,onMouseDown,onMouseUp,onMouseDown,onMouseUp [ResolveEventsTest.c:172] \nFAILED: expected: 'func,onEnterFrame,onRollOver' obtained:  [ResolveEventsTest.c:174] \nMove the mouse about, then click\nPASSED: mevents[0]  ==  'onMouseMove' [ResolveEventsTest.c:187]\nPASSED: resolveevents.length  ==  ressiz [ResolveEventsTest.c:188]\nEnd of test!",
+      "expected_output": "Do not touch anything!\nPASSED: events.toString()  ==  'func,onEnterFrame,onRollOver' [ResolveEventsTest.c:139]\nPASSED: resolveevents.toString()  ==  'func,onEnterFrame,onRollOver' [ResolveEventsTest.c:141]\nPASSED: events.toString()  ==  'func,onEnterFrame,onRollOver,onEnterFrame' [ResolveEventsTest.c:146]\nPASSED: resolveevents.toString()  ==  'func,onEnterFrame,onRollOver' [ResolveEventsTest.c:148]\nMove over square, click and release!\nPASSED: events.toString()  ==  'func,onEnterFrame,onRollOver,onEnterFrame,onRollOver,onMouseDown,onPress,onMouseUp,onRelease' [ResolveEventsTest.c:161]\nPASSED: resolveevents.toString()  ==  'func,onEnterFrame,onRollOver' [ResolveEventsTest.c:163]\nMove out of square, click and release!\nPASSED: events.toString()  ==  'func,onEnterFrame,onRollOver,onEnterFrame,onRollOver,onMouseDown,onPress,onMouseUp,onRelease,onRollOut,onMouseDown,onMouseUp' [ResolveEventsTest.c:172]\nPASSED: resolveevents.toString()  ==  'func,onEnterFrame,onRollOver' [ResolveEventsTest.c:174]\nMove the mouse about, then click\nPASSED: mevents[0]  ==  'onMouseMove' [ResolveEventsTest.c:187]\nPASSED: resolveevents.length  ==  ressiz [ResolveEventsTest.c:188]\nEnd of test!"
+    },
+    {
+      "test": "RollOverOutTest",
+      "num_frames": 30,
+      "lines": {
+        "actual_lines": 5,
+        "expected_lines": 5,
+        "matching_lines": 4
+      },
+      "duration": 18.91,
+      "status": "output_mismatch",
+      "detail": "1 line(s) differ (actual=5, expected=5)",
+      "actual_output": "PASSED: visible_mc.hitTest(80, 120, true) [RollOverOutTest.c:244]\nPASSED: invisible_mc.hitTest(80, 180, true) [RollOverOutTest.c:246]\nPASSED: static_mask.hitTest(80, 240, true) [RollOverOutTest.c:248]\nPASSED: ! dynamic_mask.hitTest(80, 280, true) [RollOverOutTest.c:250]\nFAILED: maskee.hitTest(80, 280, true) [RollOverOutTest.c:252] ",
+      "expected_output": "PASSED: visible_mc.hitTest(80, 120, true) [RollOverOutTest.c:244]\nPASSED: invisible_mc.hitTest(80, 180, true) [RollOverOutTest.c:246]\nPASSED: static_mask.hitTest(80, 240, true) [RollOverOutTest.c:248]\nPASSED: ! dynamic_mask.hitTest(80, 280, true) [RollOverOutTest.c:250]\nPASSED: maskee.hitTest(80, 280, true) [RollOverOutTest.c:252]"
+    },
+    {
+      "test": "VarAndCharClashTest",
+      "num_frames": 30,
+      "lines": {
+        "actual_lines": 13,
+        "expected_lines": 13,
+        "matching_lines": 13
+      },
+      "duration": 18.51,
+      "status": "pass"
+    },
+    {
+      "test": "Version4Loader",
+      "num_frames": 30,
+      "lines": {
+        "actual_lines": 0,
+        "expected_lines": 11,
+        "matching_lines": 0
+      },
+      "duration": 18.45,
+      "status": "output_mismatch",
+      "detail": "11 line(s) differ (actual=0, expected=11)",
+      "actual_output": "",
+      "expected_output": "[ debug-22403-05c7ba106]\nSWF\n\nPASSED: typeof(unescape) == \"function\" [./Version5Loaded.as:5]\nPASSED: typeof(escape) == \"function\" [./Version5Loaded.as:6]\nPASSED: typeof(isNaN) == \"function\" [./Version5Loaded.as:7]\nPASSED: typeof(isFinite) == \"function\" [./Version5Loaded.as:8]\nPASSED: typeof(parseFloat) == \"function\" [./Version5Loaded.as:9]\nPASSED: typeof(parseInt) == \"function\" [./Version5Loaded.as:10]\nPASSED: typeof(NaN) == \"number\" [./Version5Loaded.as:11]\nPASSED: typeof(Infinity) == \"number\" [./Version5Loaded.as:12]"
+    },
+    {
+      "test": "Video-EmbedSquareTest",
+      "num_frames": 20,
+      "lines": {
+        "actual_lines": 2,
+        "expected_lines": 2,
+        "matching_lines": 2
+      },
+      "duration": 19.2,
+      "status": "pass"
+    },
+    {
+      "test": "attachExtImported",
+      "num_frames": 30,
+      "lines": {
+        "actual_lines": 2,
+        "expected_lines": 2,
+        "matching_lines": 1
+      },
+      "duration": 19.88,
+      "status": "output_mismatch",
+      "detail": "1 line(s) differ (actual=2, expected=2)",
+      "actual_output": "FAILED: expected: 60.1 , obtained: \nEND_OF_TEST",
+      "expected_output": "PASSED: 60.1 == 60.1\nEND_OF_TEST"
+    },
+    {
+      "test": "attachImported",
+      "num_frames": 30,
+      "lines": {
+        "actual_lines": 2,
+        "expected_lines": 2,
+        "matching_lines": 1
+      },
+      "duration": 18.98,
+      "status": "output_mismatch",
+      "detail": "1 line(s) differ (actual=2, expected=2)",
+      "actual_output": "FAILED: expected: 60.1 , obtained: \nEND_OF_TEST",
+      "expected_output": "PASSED: 60.1 == 60.1\nEND_OF_TEST"
+    },
+    {
+      "test": "attachMovieLoopingTest",
+      "num_frames": 30,
+      "lines": {
+        "actual_lines": 41,
+        "expected_lines": 41,
+        "matching_lines": 29
+      },
+      "duration": 18.66,
+      "status": "output_mismatch",
+      "detail": "12 line(s) differ (actual=41, expected=41)",
+      "actual_output": "hello redsquare\nPASSED: 0 == 0\nPASSED: 100 == 100\nFAILED: expected: 60.1 , obtained: 604\nPASSED: undefined == undefined\nPASSED: 0 == 0\nDepth is 0\nNext counter is 1\nhello redsquare\nPASSED: 70 == 70\nPASSED: 99 == 99\nFAILED: expected: 25 , obtained: 2\nFAILED: expected: 15 , obtained: 15.0000001716614\nPASSED: 6 == 6\nPASSED: 70 == 70\nFAILED: expected: 15 , obtained: 15.0000001716614\nDepth is 70\nNext counter is 2\nhello redsquare\nPASSED: 140 == 140\nPASSED: 99 == 99\nFAILED: expected: 42 , obtained: 4\nFAILED: expected: 25 , obtained: 25.0000002861023\nPASSED: 6 == 6\nPASSED: 140 == 140\nFAILED: expected: 25 , obtained: 25.0000002861023\nDepth is 140\nNext counter is 3\nhello redsquare\nPASSED: 210 == 210\nPASSED: 99 == 99\nFAILED: expected: 58 , obtained: 6\nFAILED: expected: 35 , obtained: 35.0000004005432\nPASSED: 6 == 6\nPASSED: 210 == 210\nFAILED: expected: 35 , obtained: 35.0000004005432\nDepth is 210\nNext counter is 4\n#passed: 16\n#failed: 10\n#total tests run: 26",
+      "expected_output": "hello redsquare\nPASSED: 0 == 0\nPASSED: 100 == 100\nPASSED: 60.1 == 60.1\nPASSED: undefined == undefined\nPASSED: 0 == 0\nDepth is 0\nNext counter is 1\nhello redsquare\nPASSED: 70 == 70\nPASSED: 99 == 99\nPASSED: 25 == 25\nPASSED: 15 == 15\nPASSED: 6 == 6\nPASSED: 70 == 70\nPASSED: 15 == 15\nDepth is 70\nNext counter is 2\nhello redsquare\nPASSED: 140 == 140\nPASSED: 99 == 99\nPASSED: 42 == 42\nPASSED: 25 == 25\nPASSED: 6 == 6\nPASSED: 140 == 140\nPASSED: 25 == 25\nDepth is 140\nNext counter is 3\nhello redsquare\nPASSED: 210 == 210\nPASSED: 99 == 99\nPASSED: 58 == 58\nPASSED: 35 == 35\nPASSED: 6 == 6\nPASSED: 210 == 210\nPASSED: 35 == 35\nDepth is 210\nNext counter is 4\n#passed: 26\n#failed: 0\n#total tests run: 26"
+    },
+    {
+      "test": "attachMovieTest",
+      "num_frames": 30,
+      "lines": {
+        "actual_lines": 12,
+        "expected_lines": 12,
+        "matching_lines": 9
+      },
+      "duration": 20.02,
+      "status": "output_mismatch",
+      "detail": "3 line(s) differ (actual=12, expected=12)",
+      "actual_output": "... (1 lines before) ...\nPASSED: square1._x  ==  70 [attachMovieTest.c:183]\nPASSED: square2._x  ==  140 [attachMovieTest.c:193]\nPASSED: square3._x  ==  210 [attachMovieTest.c:203]\n_level0.butatt\n_level0.butatt\nFAILED: expected: undefined obtained: 56 [attachMovieTest.c:222] \nPASSED: butatt.t  ==  undefined [attachMovieTest.c:223]\nPASSED: butatt.s  ==  37 [attachMovieTest.c:224]\n#passed: 6\n#failed: 1\n#total tests run: 7",
+      "expected_output": "... (1 lines before) ...\nPASSED: square1._x  ==  70 [attachMovieTest.c:183]\nPASSED: square2._x  ==  140 [attachMovieTest.c:193]\nPASSED: square3._x  ==  210 [attachMovieTest.c:203]\n_level0.butatt\n_level0.butatt\nPASSED: butatt.f  ==  undefined [attachMovieTest.c:222]\nPASSED: butatt.t  ==  undefined [attachMovieTest.c:223]\nPASSED: butatt.s  ==  37 [attachMovieTest.c:224]\n#passed: 7\n#failed: 0\n#total tests run: 7"
+    },
+    {
+      "test": "callFunction_test",
+      "num_frames": 30,
+      "lines": {
+        "actual_lines": 11,
+        "expected_lines": 11,
+        "matching_lines": 6
+      },
+      "duration": 20.96,
+      "status": "output_mismatch",
+      "detail": "5 line(s) differ (actual=11, expected=11)",
+      "actual_output": "PASSED: _root.x1  ==  1 [callFunction_test.c:148]\nPASSED: _root.x2  ==  _root.mc1.mc11 [callFunction_test.c:149]\nFAILED: expected: 1 obtained: 0 [callFunction_test.c:150] \nPASSED: _root.x4  ==  0 [callFunction_test.c:151]\nPASSED: _root.x5  ==  1 [callFunction_test.c:152]\nPASSED: _root.x6  ==  _root.mc1 [callFunction_test.c:153]\nFAILED: expected: 1 obtained: 0 [callFunction_test.c:154] \nFAILED: expected: 1 obtained: 0 [callFunction_test.c:155] \n#passed: 5\n#failed: 3\n#total tests run: 8",
+      "expected_output": "PASSED: _root.x1  ==  1 [callFunction_test.c:148]\nPASSED: _root.x2  ==  _root.mc1.mc11 [callFunction_test.c:149]\nPASSED: _root.x3  ==  1 [callFunction_test.c:150]\nPASSED: _root.x4  ==  0 [callFunction_test.c:151]\nPASSED: _root.x5  ==  1 [callFunction_test.c:152]\nPASSED: _root.x6  ==  _root.mc1 [callFunction_test.c:153]\nPASSED: _root.x7  ==  1 [callFunction_test.c:154]\nPASSED: _root.x8  ==  1 [callFunction_test.c:155]\n#passed: 8\n#failed: 0\n#total tests run: 8"
+    },
+    {
+      "test": "consecutive_goto_frame_test",
+      "num_frames": 30,
+      "lines": {
+        "actual_lines": 13,
+        "expected_lines": 12,
+        "matching_lines": 4
+      },
+      "duration": 18.5,
+      "status": "output_mismatch",
+      "detail": "9 line(s) differ (actual=13, expected=12)",
+      "actual_output": "frm2 of root - gotoAndStop(3)\nfrm1 of mc_red - gotoAndStop(2)\nPASSED: as_in_frm1_of_mc_red == as_in_frm1_of_mc_red\nfrm3 of root - gotoAndStop(4)\nFAILED: expected: as_in_frm2_of_mc_red , obtained: as_in_frm3_of_root\nfrm4 of root - gotoAndStop(5)\nFAILED: expected: 'as_in_frm3_of_mc_red' obtained: as_in_frm4_of_root [consecutive_goto_frame_test.c:114] \n#passed: 1\n#failed: 2\n#total tests run: 3\nfrm1 of mc_red - gotoAndStop(2)\nfrm2 of mc_red - gotoAndStop(3)\nfrm3 of mc_red - gotoAndStop(4)",
+      "expected_output": "frm2 of root - gotoAndStop(3)\nfrm1 of mc_red - gotoAndStop(2)\nPASSED: as_in_frm1_of_mc_red == as_in_frm1_of_mc_red\nfrm3 of root - gotoAndStop(4)\nfrm2 of mc_red - gotoAndStop(3)\nPASSED: as_in_frm2_of_mc_red == as_in_frm2_of_mc_red\nfrm4 of root - gotoAndStop(5)\nfrm3 of mc_red - gotoAndStop(4)\nPASSED: mc_red.x  ==  'as_in_frm3_of_mc_red' [consecutive_goto_frame_test.c:114]\n#passed: 3\n#failed: 0\n#total tests run: 3"
+    },
+    {
+      "test": "duplicate_movie_clip_test",
+      "num_frames": 30,
+      "lines": {
+        "actual_lines": 30,
+        "expected_lines": 33,
+        "matching_lines": 3
+      },
+      "duration": 19.28,
+      "status": "output_mismatch",
+      "detail": "30 line(s) differ (actual=30, expected=33)",
+      "actual_output": "onClipLoad triggered\nonClipLoad triggered\nonClipEnterFrame triggered\nPASSED: mc1.prop1  ==  10 [duplicate_movie_clip_test.c:105]\nPASSED: typeof(mc1.onLoad)  ==  'function' [duplicate_movie_clip_test.c:106]\nPASSED: mc1.getDepth()  ==  -16374 [duplicate_movie_clip_test.c:107]\nPASSED: dup1.prop1  ==  undefined [duplicate_movie_clip_test.c:109]\nPASSED: typeof(dup1.onLoad)  ==  'undefined' [duplicate_movie_clip_test.c:111]\nFAILED: expected: 1 obtained: 16385 [duplicate_movie_clip_test.c:112] \nPASSED: typeof(mc2.onLoad)  ==  'function' [duplicate_movie_clip_test.c:114]\nPASSED: typeof(mc2.onEnterFrame)  ==  'undefined' [duplicate_movie_clip_test.c:116]\nPASSED: typeof(dup2.onLoad)  ==  'undefined' [duplicate_movie_clip_test.c:118]\nPASSED: _root.x1  ==  2 [duplicate_movie_clip_test.c:119]\nFAILED: expected: 2 obtained: 1 [duplicate_movie_clip_test.c:120] \nonClipUnload triggered\nPASSED: typeof(button)  ==  'object' [duplicate_movie_clip_test.c:139]\n_level0.button\nFAILED: expected: 'object' obtained: undefined [duplicate_movie_clip_test.c:149] \nFAILED: expected: '_level0.buttdup' obtained:  [duplicate_movie_clip_test.c:150] \nPASSED: _root.buttdup  ==  d [duplicate_movie_clip_test.c:151]\nPASSED: _root.buttdup.x  ==  undefined [duplicate_movie_clip_test.c:154]\nundefined\nPASSED: typeof(d2)  ==  'undefined' [duplicate_movie_clip_test.c:166]\nPASSED: typeof(_root.objdup)  ==  'undefined' [duplicate_movie_clip_test.c:167]\nPASSED: _root.x1  ==  2 [duplicate_movie_clip_test.c:171]\nFAILED: expected: 3 obtained: 1 [duplicate_movie_clip_test.c:172] \nFAILED: expected: 2 obtained: 1 [duplicate_movie_clip_test.c:173] \n#passed: 15\n#failed: 6\n#total tests run: 21",
+      "expected_output": "onClipLoad triggered\nonClipLoad triggered\nonClipEnterFrame triggered\nonClipEnterFrame triggered\nPASSED: mc1.prop1  ==  10 [duplicate_movie_clip_test.c:105]\nPASSED: typeof(mc1.onLoad)  ==  'function' [duplicate_movie_clip_test.c:106]\nPASSED: mc1.getDepth()  ==  -16374 [duplicate_movie_clip_test.c:107]\nPASSED: dup1.prop1  ==  undefined [duplicate_movie_clip_test.c:109]\nPASSED: typeof(dup1.onLoad)  ==  'undefined' [duplicate_movie_clip_test.c:111]\nPASSED: dup1.getDepth()  ==  1 [duplicate_movie_clip_test.c:112]\nPASSED: typeof(mc2.onLoad)  ==  'function' [duplicate_movie_clip_test.c:114]\nPASSED: typeof(mc2.onEnterFrame)  ==  'undefined' [duplicate_movie_clip_test.c:116]\nPASSED: typeof(dup2.onLoad)  ==  'undefined' [duplicate_movie_clip_test.c:118]\nPASSED: _root.x1  ==  2 [duplicate_movie_clip_test.c:119]\nPASSED: _root.x2  ==  2 [duplicate_movie_clip_test.c:120]\nonClipEnterFrame triggered\nonClipUnload triggered\nonClipUnload triggered\nPASSED: typeof(button)  ==  'object' [duplicate_movie_clip_test.c:139]\n_level0.button\nPASSED: typeof(d)  ==  'object' [duplicate_movie_clip_test.c:149]\nPASSED: '' + _root.buttdup  ==  '_level0.buttdup' [duplicate_movie_clip_test.c:150]\nPASSED: _root.buttdup  ==  d [duplicate_movie_clip_test.c:151]\nPASSED: _root.buttdup.x  ==  undefined [duplicate_movie_clip_test.c:154]\nundefined\nPASSED: typeof(d2)  ==  'undefined' [duplicate_movie_clip_test.c:166]\nPASSED: typeof(_root.objdup)  ==  'undefined' [duplicate_movie_clip_test.c:167]\nPASSED: _root.x1  ==  2 [duplicate_movie_clip_test.c:171]\nPASSED: _root.x2  ==  3 [duplicate_movie_clip_test.c:172]\nPASSED: _root.x3  ==  2 [duplicate_movie_clip_test.c:173]\n#passed: 21\n#failed: 0\n#total tests run: 21"
+    },
+    {
+      "test": "duplicate_movie_clip_test2",
+      "num_frames": 30,
+      "lines": {
+        "actual_lines": 21,
+        "expected_lines": 21,
+        "matching_lines": 13
+      },
+      "duration": 19.46,
+      "status": "output_mismatch",
+      "detail": "8 line(s) differ (actual=21, expected=21)",
+      "actual_output": "FAILED: expected: movieclip , obtained: undefined\nFAILED: expected: movieclip , obtained: undefined\nFAILED: expected: movieclip , obtained: undefined\nPASSED: undefined == undefined\nPASSED: undefined == undefined\nPASSED: typeof(dup1)  ==  'movieclip' [duplicate_movie_clip_test2.c:116]\nPASSED: typeof(dup1)  ==  'undefined' [duplicate_movie_clip_test2.c:118]\nPASSED: typeof(dup2)  ==  'movieclip' [duplicate_movie_clip_test2.c:121]\nPASSED: typeof(dup2)  ==  'undefined' [duplicate_movie_clip_test2.c:123]\nPASSED: typeof(dup3)  ==  'movieclip' [duplicate_movie_clip_test2.c:126]\nPASSED: typeof(dup3)  ==  'undefined' [duplicate_movie_clip_test2.c:128]\nPASSED: typeof(dup4)  ==  'movieclip' [duplicate_movie_clip_test2.c:131]\nPASSED: typeof(dup4)  ==  'undefined' [duplicate_movie_clip_test2.c:133]\nPASSED: typeof(dup5)  ==  'movieclip' [duplicate_movie_clip_test2.c:136]\nPASSED: typeof(dup5)  ==  'undefined' [duplicate_movie_clip_test2.c:138]\nFAILED: expected: 'undefined' obtained: movieclip [duplicate_movie_clip_test2.c:142] \nFAILED: expected: 'undefined' obtained: movieclip [duplicate_movie_clip_test2.c:146] \nFAILED: expected: 'undefined' obtained: movieclip [duplicate_movie_clip_test2.c:150] \n#passed: 12\n#failed: 6\n#total tests run: 18",
+      "expected_output": "PASSED: movieclip == movieclip\nPASSED: movieclip == movieclip\nPASSED: movieclip == movieclip\nPASSED: undefined == undefined\nPASSED: undefined == undefined\nPASSED: typeof(dup1)  ==  'movieclip' [duplicate_movie_clip_test2.c:116]\nPASSED: typeof(dup1)  ==  'undefined' [duplicate_movie_clip_test2.c:118]\nPASSED: typeof(dup2)  ==  'movieclip' [duplicate_movie_clip_test2.c:121]\nPASSED: typeof(dup2)  ==  'undefined' [duplicate_movie_clip_test2.c:123]\nPASSED: typeof(dup3)  ==  'movieclip' [duplicate_movie_clip_test2.c:126]\nPASSED: typeof(dup3)  ==  'undefined' [duplicate_movie_clip_test2.c:128]\nPASSED: typeof(dup4)  ==  'movieclip' [duplicate_movie_clip_test2.c:131]\nPASSED: typeof(dup4)  ==  'undefined' [duplicate_movie_clip_test2.c:133]\nPASSED: typeof(dup5)  ==  'movieclip' [duplicate_movie_clip_test2.c:136]\nPASSED: typeof(dup5)  ==  'undefined' [duplicate_movie_clip_test2.c:138]\nPASSED: typeof(dup6)  ==  'undefined' [duplicate_movie_clip_test2.c:142]\nPASSED: typeof(dup7)  ==  'undefined' [duplicate_movie_clip_test2.c:146]\nPASSED: typeof(dup8)  ==  'undefined' [duplicate_movie_clip_test2.c:150]\n#passed: 18\n#failed: 0\n#total tests run: 18"
+    },
+    {
+      "test": "event_handler_scope_test",
+      "num_frames": 30,
+      "lines": {
+        "actual_lines": 16,
+        "expected_lines": 16,
+        "matching_lines": 10
+      },
+      "duration": 19.01,
+      "status": "output_mismatch",
+      "detail": "6 line(s) differ (actual=16, expected=16)",
+      "actual_output": "PASSED: _root.scope_test  ==  undefined [event_handler_scope_test.c:80]\nPASSED: _root.mc.scope_test  ==  undefined [event_handler_scope_test.c:81]\nonClipEnterFrame triggered\nuser defined onEnterFrame called\nFAILED: expected: 1 obtained: 4 [event_handler_scope_test.c:84] \nFAILED: expected: 3 obtained:  [event_handler_scope_test.c:85] \nonClipEnterFrame triggered\nuser defined onEnterFrame called\nFAILED: expected: 2 obtained: 4 [event_handler_scope_test.c:88] \nonClipEnterFrame triggered\nuser defined onEnterFrame called\nFAILED: expected: 3 obtained:  [event_handler_scope_test.c:91] \nPASSED: _root.mc.scope_test  ==  undefined [event_handler_scope_test.c:95]\n#passed: 3\n#failed: 4\n#total tests run: 7",
+      "expected_output": "PASSED: _root.scope_test  ==  undefined [event_handler_scope_test.c:80]\nPASSED: _root.mc.scope_test  ==  undefined [event_handler_scope_test.c:81]\nonClipEnterFrame triggered\nuser defined onEnterFrame called\nPASSED: _root.mc.scope_test  ==  1 [event_handler_scope_test.c:84]\nPASSED: _root.scope_test  ==  3 [event_handler_scope_test.c:85]\nonClipEnterFrame triggered\nuser defined onEnterFrame called\nPASSED: _root.mc.scope_test  ==  2 [event_handler_scope_test.c:88]\nonClipEnterFrame triggered\nuser defined onEnterFrame called\nPASSED: _root.scope_test  ==  3 [event_handler_scope_test.c:91]\nPASSED: _root.mc.scope_test  ==  undefined [event_handler_scope_test.c:95]\n#passed: 7\n#failed: 0\n#total tests run: 7"
+    },
+    {
+      "test": "frame_label_test",
+      "num_frames": 30,
+      "lines": {
+        "actual_lines": 0,
+        "expected_lines": 17,
+        "matching_lines": 0
+      },
+      "duration": 20.96,
+      "status": "output_mismatch",
+      "detail": "17 line(s) differ (actual=0, expected=17)",
+      "actual_output": "",
+      "expected_output": "PASSED: _root.x1  ==  'mc11_frame4' [frame_label_test.c:152]\nPASSED: _root.x2  ==  'mc11_frame5' [frame_label_test.c:153]\nPASSED: _root.x3  ==  'mc11_frame6' [frame_label_test.c:154]\nPASSED: _root.x7  ==  'mc1_frame7' [frame_label_test.c:155]\nPASSED: _root.x8  ==  'mc1_frame8' [frame_label_test.c:156]\nPASSED: _root.x9  ==  'small_first' [frame_label_test.c:157]\nPASSED: _root.x10  ==  'mc1_frame10' [frame_label_test.c:158]\nPASSED: _root.x11  ==  'Big_first' [frame_label_test.c:159]\nPASSED: _root.x4  ==  0 [frame_label_test.c:161]\nPASSED: _root.x5  ==  0 [frame_label_test.c:162]\nPASSED: _root.x6  ==  0 [frame_label_test.c:163]\nPASSED: _root.x1  ==  0 [frame_label_test.c:165]\nPASSED: _root.x2  ==  0 [frame_label_test.c:166]\nPASSED: _root.x3  ==  0 [frame_label_test.c:167]\n#passed: 14\n#failed: 0\n#total tests run: 14"
+    },
+    {
+      "test": "getTimer_test",
+      "num_frames": 30,
+      "lines": {
+        "actual_lines": 8,
+        "expected_lines": 8,
+        "matching_lines": 8
+      },
+      "duration": 20.46,
+      "status": "pass"
+    },
+    {
+      "test": "goto_frame_test",
+      "num_frames": 30,
+      "lines": {
+        "actual_lines": 13,
+        "expected_lines": 15,
+        "matching_lines": 2
+      },
+      "duration": 18.59,
+      "status": "output_mismatch",
+      "detail": "13 line(s) differ (actual=13, expected=15)",
+      "actual_output": "PASSED: 1 == 1\nPASSED: 3 == 3\nFAILED: expected: '0+1+2+3+4+5+6+' obtained: 0+1+3+2+4+5+6+ [goto_frame_test.c:145] \nFAILED: expected: '0+1+2+3+4+5+6+7+' obtained: 0+1+3+2+4+5+6+ [goto_frame_test.c:148] \nFAILED: expected: '/mc1' obtained:  [goto_frame_test.c:155] \nFAILED: expected: '/mc2' obtained:  [goto_frame_test.c:156] \nFAILED: expected: -16485 obtained:  [goto_frame_test.c:182] \nFAILED: expected: 'mc1' obtained:  [goto_frame_test.c:183] \nFAILED: expected: -16485 obtained:  [goto_frame_test.c:184] \nFAILED: expected: 'mc2' obtained:  [goto_frame_test.c:185] \n#passed: 2\n#failed: 8\n#total tests run: 10",
+      "expected_output": "PASSED: 1 == 1\nPASSED: 3 == 3\nPASSED: _root.asOrder  ==  '0+1+2+3+4+5+6+' [goto_frame_test.c:145]\nPASSED: _root.asOrder  ==  '0+1+2+3+4+5+6+7+' [goto_frame_test.c:148]\nPASSED: mc1._target  ==  '/mc1' [goto_frame_test.c:155]\nPASSED: mc2._target  ==  '/mc2' [goto_frame_test.c:156]\n_level0.mc1 unloaded\n_level0.mc2 unloaded\nPASSED: mc1.getDepth()  ==  -16485 [goto_frame_test.c:182]\nPASSED: mc1._name  ==  'mc1' [goto_frame_test.c:183]\nPASSED: mc2.getDepth()  ==  -16485 [goto_frame_test.c:184]\nPASSED: mc2._name  ==  'mc2' [goto_frame_test.c:185]\n#passed: 10\n#failed: 0\n#total tests run: 10"
+    },
+    {
+      "test": "instanceNameTest",
+      "num_frames": 30,
+      "lines": {
+        "actual_lines": 5,
+        "expected_lines": 5,
+        "matching_lines": 1
+      },
+      "duration": 18.27,
+      "status": "output_mismatch",
+      "detail": "4 line(s) differ (actual=5, expected=5)",
+      "actual_output": "FAILED: expected: / , obtained: /instance2\nFAILED: expected: /instance2 , obtained: /instance3\n#passed: 0\n#failed: 2\n#total tests run: 2",
+      "expected_output": "PASSED: / == /\nPASSED: /instance2 == /instance2\n#passed: 2\n#failed: 0\n#total tests run: 2"
+    },
+    {
+      "test": "key_event_test",
+      "num_frames": 100,
+      "lines": {
+        "actual_lines": 29,
+        "expected_lines": 66,
+        "matching_lines": 9
+      },
+      "duration": 20.31,
+      "status": "output_mismatch",
+      "detail": "57 line(s) differ (actual=29, expected=66)",
+      "actual_output": "... (2 lines before) ...\nPASSED: undefined == undefined\nPASSED: undefined == undefined\n1. Press a single key to continue the test\nl.onKeyDown\nl.onKeyUp\nl.onKeyDown\nl.onKeyUp\nl.onKeyDown\nl.onKeyUp\nl.onKeyDown\nl.onKeyUp\nl.onKeyDown\nl.onKeyUp\nl.onKeyDown\nl.onKeyUp\nl.onKeyDown\nl.onKeyUp\nl.onKeyDown\nl.onKeyUp\nl.onKeyDown\nl.onKeyUp\nl.onKeyDown\nl.onKeyUp\nl.onKeyDown\nl.onKeyUp\nl.onKeyDown\nl.onKeyUp",
+      "expected_output": "... (2 lines before) ...\nPASSED: undefined == undefined\nPASSED: undefined == undefined\n1. Press a single key to continue the test\nl.onKeyDown\nl.onKeyUp\nPASSED: 1 == 1\nPASSED: 1 == 1\nPASSED: number == number\n2. Press a single key to continue the test\nl.onKeyDown\nl.onKeyUp\nPASSED: 2 == 2\nPASSED: 2 == 2\nPASSED: object == object\n3. Press a single key to continue the test\nobj1.onKeyDown\nPASSED: 2 == 2\nPASSED: 2 == 2\n4. Press a single key to continue the test\nlistenerClip2.onClipKeyDown\n4. Press a single key to continue the test\nlistenerClip2.onClipKeyDown\nPASSED: _root.test2  ==  2 [key_event_test.c:162]\n5. Press a single key to continue the test\ndynamic_mc.onKeyDown triggered\nPASSED: _level0.dynamic_mc == _level0.dynamic_mc\nPASSED: 11 == 11\n5. Press a single key to continue the test\ndynamic_mc.onKeyDown triggered\nPASSED: _level0.dynamic_mc == _level0.dynamic_mc\nPASSED: 13 == 13\nPASSED: _root.test3  ==  2 [key_event_test.c:193]\n6. Press a single key to continue the test\nPASSED: _root.test4  ==  0 [key_event_test.c:214]\nobj2.onKeyDown triggered\nPASSED: objRef.x  ==  100 [key_event_test.c:217]\nPASSED: _root.test4  ==  1 [key_event_test.c:218]\n7. Press a single key to continue the test\nPASSED: object == object\nobj3.onKeyDown\nPASSED: _root.test4  ==  1 [key_event_test.c:236]\n8. Press a single key to continue the test\nls3.onClipKeyDown\nls2.onClipKeyDown\nls1.onClipKeyDown\nobj1.onKeyDown\nls1.onKeyDown\nobj2.onKeyDown\nls2.onKeyDown\nobj3.onKeyDown\n... (14 lines after) ..."
+    },
+    {
+      "test": "masks_test",
+      "num_frames": 100,
+      "lines": {
+        "actual_lines": 28,
+        "expected_lines": 175,
+        "matching_lines": 20
+      },
+      "duration": 26.39,
+      "status": "output_mismatch",
+      "detail": "155 line(s) differ (actual=28, expected=175)",
+      "actual_output": "... (9 lines before) ...\nPASSED: staticmc4.hitTest(250, 250, true) [masks_test.c:176]\nPASSED: staticmc5.getDepth()  ==  -16379 [masks_test.c:179]\nPASSED: staticmc5.hitTest(240, 210, true) [masks_test.c:180]\nPASSED: staticmc5.hitTest(280, 250, true) [masks_test.c:181]\nPASSED: dynamicmc2.getDepth()  ==  12 [masks_test.c:184]\nFAILED: dynamicmc2.hitTest(10, 310, true) [masks_test.c:185] \nFAILED: dynamicmc2.hitTest(50, 350, true) [masks_test.c:186] \nPASSED: dynamicmc3.getDepth()  ==  13 [masks_test.c:189]\nFAILED: dynamicmc3.hitTest(40, 310, true) [masks_test.c:190] \nFAILED: dynamicmc3.hitTest(80, 350, true) [masks_test.c:191] \nPASSED: dynamicmc4.getDepth()  ==  14 [masks_test.c:194]\nFAILED: dynamicmc4.hitTest(210, 310, true) [masks_test.c:195] \nFAILED: dynamicmc4.hitTest(250, 350, true) [masks_test.c:196] \nPASSED: dynamicmc5.getDepth()  ==  15 [masks_test.c:199]\nFAILED: dynamicmc5.hitTest(240, 310, true) [masks_test.c:200] \nFAILED: dynamicmc5.hitTest(280, 350, true) [masks_test.c:201] \nPlaced staticmc2 (red), staticmc3 (yellow), staticmc4 (green), staticmc5 (cyan) DisplayObjects\nPlaced dynamicmc2 (blue), dynamicmc3 (violet), dynamicmc4 (dark green), dynamicmc5 (light blue) DisplayObjects\n - Press any key to continue -",
+      "expected_output": "... (9 lines before) ...\nPASSED: staticmc4.hitTest(250, 250, true) [masks_test.c:176]\nPASSED: staticmc5.getDepth()  ==  -16379 [masks_test.c:179]\nPASSED: staticmc5.hitTest(240, 210, true) [masks_test.c:180]\nPASSED: staticmc5.hitTest(280, 250, true) [masks_test.c:181]\nPASSED: dynamicmc2.getDepth()  ==  12 [masks_test.c:184]\nPASSED: dynamicmc2.hitTest(10, 310, true) [masks_test.c:185]\nPASSED: dynamicmc2.hitTest(50, 350, true) [masks_test.c:186]\nPASSED: dynamicmc3.getDepth()  ==  13 [masks_test.c:189]\nPASSED: dynamicmc3.hitTest(40, 310, true) [masks_test.c:190]\nPASSED: dynamicmc3.hitTest(80, 350, true) [masks_test.c:191]\nPASSED: dynamicmc4.getDepth()  ==  14 [masks_test.c:194]\nPASSED: dynamicmc4.hitTest(210, 310, true) [masks_test.c:195]\nPASSED: dynamicmc4.hitTest(250, 350, true) [masks_test.c:196]\nPASSED: dynamicmc5.getDepth()  ==  15 [masks_test.c:199]\nPASSED: dynamicmc5.hitTest(240, 310, true) [masks_test.c:200]\nPASSED: dynamicmc5.hitTest(280, 350, true) [masks_test.c:201]\nPlaced staticmc2 (red), staticmc3 (yellow), staticmc4 (green), staticmc5 (cyan) DisplayObjects\nPlaced dynamicmc2 (blue), dynamicmc3 (violet), dynamicmc4 (dark green), dynamicmc5 (light blue) DisplayObjects\n - Press any key to continue -\nstaticmc2.setMask(staticmc3) [red masked by yellow]\nstaticmc5.setMask(staticmc4) [cyan masked by green]\ndynamicmc2.setMask(dynamicmc3) [blue masked by violet\ndynamicmc5.setMask(dynamicmc4) [light blue masked by dark green\nPASSED: typeof(sm23)  ==  'boolean' [masks_test.c:229]\nPASSED: sm23  ==  true [masks_test.c:230]\nPASSED: typeof(sm54)  ==  'boolean' [masks_test.c:231]\nPASSED: sm54  ==  true [masks_test.c:232]\nPASSED: typeof(dm23)  ==  'boolean' [masks_test.c:233]\nPASSED: dm23  ==  true [masks_test.c:234]\nPASSED: typeof(dm54)  ==  'boolean' [masks_test.c:235]\nPASSED: dm54  ==  true [masks_test.c:236]\nPASSED: !staticmc2.hitTest(10, 210, true) [masks_test.c:241]\nPASSED: staticmc2.hitTest(10, 210, false) [masks_test.c:242]\nPASSED: staticmc2.hitTest(50, 250, true) [masks_test.c:243]\nPASSED: staticmc3.hitTest(40, 210, false) [masks_test.c:248]\nPASSED: staticmc3.hitTest(80, 250, false) [masks_test.c:249]\nPASSED: !staticmc3.hitTest(40, 210, true) [masks_test.c:250]\nPASSED: !staticmc3.hitTest(80, 250, true) [masks_test.c:251]\nPASSED: !staticmc4.hitTest(210, 210, true) [masks_test.c:256]\nPASSED: !staticmc4.hitTest(250, 250, true) [masks_test.c:257]\nPASSED: staticmc4.hitTest(210, 210, false) [masks_test.c:258]\nPASSED: staticmc4.hitTest(250, 250, false) [masks_test.c:259]\nPASSED: staticmc5.hitTest(240, 210, true) [masks_test.c:264]\nPASSED: !staticmc5.hitTest(280, 250, true) [masks_test.c:265]\nPASSED: staticmc5.hitTest(280, 250, false) [masks_test.c:266]\nPASSED: !dynamicmc2.hitTest(10, 310, true) [masks_test.c:271]\nPASSED: dynamicmc2.hitTest(10, 310, false) [masks_test.c:272]\nPASSED: dynamicmc2.hitTest(50, 350, true) [masks_test.c:273]\nPASSED: !dynamicmc3.hitTest(40, 310, true) [masks_test.c:278]\nPASSED: !dynamicmc3.hitTest(80, 350, true) [masks_test.c:279]\n... (116 lines after) ..."
+    },
+    {
+      "test": "masks_test2",
+      "num_frames": 30,
+      "lines": {
+        "actual_lines": 10,
+        "expected_lines": 10,
+        "matching_lines": 10
+      },
+      "duration": 18.65,
+      "status": "pass"
+    },
+    {
+      "test": "matrix_test",
+      "num_frames": 100,
+      "lines": {
+        "actual_lines": 1086,
+        "expected_lines": 1086,
+        "matching_lines": 908
+      },
+      "duration": 68.23,
+      "status": "output_mismatch",
+      "detail": "178 line(s) differ (actual=1086, expected=1086)",
+      "actual_output": "... (1 lines before) ...\nPASSED: staticmc._x  ==  50 [matrix_test.c:136]\nPASSED: staticmc._y  ==  300 [matrix_test.c:137]\nPASSED: staticmc._xscale  ==  100 [matrix_test.c:138]\nPASSED: staticmc._yscale  ==  100 [matrix_test.c:139]\nPASSED: staticmc._rotation  ==  0 [matrix_test.c:140]\nFAILED: expected: 60.1 obtained: 60.0999984741211 [matrix_test.c:141] \nFAILED: expected: 60.1 obtained: 60.0999984741211 [matrix_test.c:142] \nPASSED: printBounds(staticmc.getBounds(_root))  ==  '19.95,269.95 80.05,330.05' [matrix_test.c:144]\nPASSED: staticmc.hitTest(21, 270, false) [matrix_test.c:149]\nPASSED: staticmc.hitTest(79, 270, false) [matrix_test.c:150]\nPASSED: staticmc.hitTest(21, 329, false) [matrix_test.c:151]\nPASSED: staticmc.hitTest(79, 329, false) [matrix_test.c:152]\nPASSED: !staticmc.hitTest(18, 300, false) [matrix_test.c:154]\nPASSED: !staticmc.hitTest(82, 300, false) [matrix_test.c:155]\nPASSED: !staticmc.hitTest(50, 260, false) [matrix_test.c:156]\nPASSED: !staticmc.hitTest(50, 331, false) [matrix_test.c:157]\nPASSED: staticmc._x  ==  50 [matrix_test.c:163]\nPASSED: staticmc._y  ==  300 [matrix_test.c:164]\nPASSED: Math.round(staticmc._xscale)  ==  100 [matrix_test.c:165]\nPASSED: Math.round(staticmc._yscale)  ==  100 [matrix_test.c:166]\nPASSED: staticmc._rotation  ==  45 [matrix_test.c:167]\nPASSED: printBounds(staticmc.getBounds())  ==  '-30.05,-30.05 30.05,30.05' [matrix_test.c:168]\nPASSED: printBounds(staticmc.getBounds(_root))  ==  '7.5,257.5 92.5,342.5' [matrix_test.c:169]\nPASSED: staticmc._width  ==  85 [matrix_test.c:170]\nPASSED: staticmc._height  ==  85 [matrix_test.c:171]\nPASSED: staticmc.hitTest(8, 258, false) [matrix_test.c:176]\nPASSED: staticmc.hitTest(90, 258, false) [matrix_test.c:177]\nPASSED: staticmc.hitTest(8, 340, false) [matrix_test.c:178]\nPASSED: staticmc.hitTest(90, 340, false) [matrix_test.c:179]\nPASSED: !staticmc.hitTest(6, 300, false) [matrix_test.c:181]\nPASSED: !staticmc.hitTest(95, 300, false) [matrix_test.c:182]\nPASSED: !staticmc.hitTest(50, 250, false) [matrix_test.c:183]\nPASSED: !staticmc.hitTest(50, 345, false) [matrix_test.c:184]\nPASSED: staticmc._x  ==  50 [matrix_test.c:191]\nPASSED: staticmc._y  ==  300 [matrix_test.c:192]\nPASSED: Math.round(staticmc._xscale)  ==  200 [matrix_test.c:193]\nPASSED: Math.round(staticmc._yscale)  ==  300 [matrix_test.c:194]\nPASSED: staticmc._rotation  ==  45 [matrix_test.c:195]\nPASSED: printBounds(staticmc.getBounds())  ==  '-30.05,-30.05 30.05,30.05' [matrix_test.c:196]\nPASSED: printBounds(staticmc.getBounds(_root))  ==  '-56.25,193.75 156.25,406.25' [matrix_test.c:197]\nPASSED: staticmc._width  ==  212.5 [matrix_test.c:198]\nPASSED: staticmc._height  ==  212.5 [matrix_test.c:199]\nPASSED: staticmc.hitTest(-56, 194, false) [matrix_test.c:204]\nPASSED: staticmc.hitTest(156, 194, false) [matrix_test.c:205]\nPASSED: staticmc.hitTest(-56, 406, false) [matrix_test.c:206]\nPASSED: staticmc.hitTest(156, 406, false) [matrix_test.c:207]\nPASSED: !staticmc.hitTest(-57, 300, false) [matrix_test.c:209]\nPASSED: !staticmc.hitTest(157, 300, false) [matrix_test.c:210]\nPASSED: !staticmc.hitTest(50, 193, false) [matrix_test.c:211]\nPASSED: !staticmc.hitTest(50, 407, false) [matrix_test.c:212]\n... (1035 lines after) ...",
+      "expected_output": "... (1 lines before) ...\nPASSED: staticmc._x  ==  50 [matrix_test.c:136]\nPASSED: staticmc._y  ==  300 [matrix_test.c:137]\nPASSED: staticmc._xscale  ==  100 [matrix_test.c:138]\nPASSED: staticmc._yscale  ==  100 [matrix_test.c:139]\nPASSED: staticmc._rotation  ==  0 [matrix_test.c:140]\nPASSED: staticmc._width  ==  60.1 [matrix_test.c:141]\nPASSED: staticmc._height  ==  60.1 [matrix_test.c:142]\nPASSED: printBounds(staticmc.getBounds(_root))  ==  '19.95,269.95 80.05,330.05' [matrix_test.c:144]\nPASSED: staticmc.hitTest(21, 270, false) [matrix_test.c:149]\nPASSED: staticmc.hitTest(79, 270, false) [matrix_test.c:150]\nPASSED: staticmc.hitTest(21, 329, false) [matrix_test.c:151]\nPASSED: staticmc.hitTest(79, 329, false) [matrix_test.c:152]\nPASSED: !staticmc.hitTest(18, 300, false) [matrix_test.c:154]\nPASSED: !staticmc.hitTest(82, 300, false) [matrix_test.c:155]\nPASSED: !staticmc.hitTest(50, 260, false) [matrix_test.c:156]\nPASSED: !staticmc.hitTest(50, 331, false) [matrix_test.c:157]\nPASSED: staticmc._x  ==  50 [matrix_test.c:163]\nPASSED: staticmc._y  ==  300 [matrix_test.c:164]\nPASSED: Math.round(staticmc._xscale)  ==  100 [matrix_test.c:165]\nPASSED: Math.round(staticmc._yscale)  ==  100 [matrix_test.c:166]\nPASSED: staticmc._rotation  ==  45 [matrix_test.c:167]\nPASSED: printBounds(staticmc.getBounds())  ==  '-30.05,-30.05 30.05,30.05' [matrix_test.c:168]\nPASSED: printBounds(staticmc.getBounds(_root))  ==  '7.5,257.5 92.5,342.5' [matrix_test.c:169]\nPASSED: staticmc._width  ==  85 [matrix_test.c:170]\nPASSED: staticmc._height  ==  85 [matrix_test.c:171]\nPASSED: staticmc.hitTest(8, 258, false) [matrix_test.c:176]\nPASSED: staticmc.hitTest(90, 258, false) [matrix_test.c:177]\nPASSED: staticmc.hitTest(8, 340, false) [matrix_test.c:178]\nPASSED: staticmc.hitTest(90, 340, false) [matrix_test.c:179]\nPASSED: !staticmc.hitTest(6, 300, false) [matrix_test.c:181]\nPASSED: !staticmc.hitTest(95, 300, false) [matrix_test.c:182]\nPASSED: !staticmc.hitTest(50, 250, false) [matrix_test.c:183]\nPASSED: !staticmc.hitTest(50, 345, false) [matrix_test.c:184]\nPASSED: staticmc._x  ==  50 [matrix_test.c:191]\nPASSED: staticmc._y  ==  300 [matrix_test.c:192]\nPASSED: Math.round(staticmc._xscale)  ==  200 [matrix_test.c:193]\nPASSED: Math.round(staticmc._yscale)  ==  300 [matrix_test.c:194]\nPASSED: staticmc._rotation  ==  45 [matrix_test.c:195]\nPASSED: printBounds(staticmc.getBounds())  ==  '-30.05,-30.05 30.05,30.05' [matrix_test.c:196]\nPASSED: printBounds(staticmc.getBounds(_root))  ==  '-56.25,193.75 156.25,406.25' [matrix_test.c:197]\nPASSED: staticmc._width  ==  212.5 [matrix_test.c:198]\nPASSED: staticmc._height  ==  212.5 [matrix_test.c:199]\nPASSED: staticmc.hitTest(-56, 194, false) [matrix_test.c:204]\nPASSED: staticmc.hitTest(156, 194, false) [matrix_test.c:205]\nPASSED: staticmc.hitTest(-56, 406, false) [matrix_test.c:206]\nPASSED: staticmc.hitTest(156, 406, false) [matrix_test.c:207]\nPASSED: !staticmc.hitTest(-57, 300, false) [matrix_test.c:209]\nPASSED: !staticmc.hitTest(157, 300, false) [matrix_test.c:210]\nPASSED: !staticmc.hitTest(50, 193, false) [matrix_test.c:211]\nPASSED: !staticmc.hitTest(50, 407, false) [matrix_test.c:212]\n... (1035 lines after) ..."
+    },
+    {
+      "test": "morph_test1",
+      "num_frames": 30,
+      "lines": {
+        "actual_lines": 0,
+        "expected_lines": 0,
+        "matching_lines": 0
+      },
+      "duration": 18.35,
+      "status": "pass"
+    },
+    {
+      "test": "move_object_test",
+      "num_frames": 30,
+      "lines": {
+        "actual_lines": 11,
+        "expected_lines": 11,
+        "matching_lines": 11
+      },
+      "duration": 18.65,
+      "status": "pass"
+    },
+    {
+      "test": "multi_doactions_and_goto_frame_test",
+      "num_frames": 30,
+      "lines": {
+        "actual_lines": 6,
+        "expected_lines": 6,
+        "matching_lines": 6
+      },
+      "duration": 18.15,
+      "status": "pass"
+    },
+    {
+      "test": "new_child_in_unload_test",
+      "num_frames": 30,
+      "lines": {
+        "actual_lines": 11,
+        "expected_lines": 11,
+        "matching_lines": 8
+      },
+      "duration": 18.24,
+      "status": "output_mismatch",
+      "detail": "3 line(s) differ (actual=11, expected=11)",
+      "actual_output": "... (2 lines before) ...\n_level0.static_mc1\nPASSED: 100 == 100\nPASSED: 101 == 101\nPASSED: typeof(_root.dyn1Ref)  ==  'movieclip' [new_child_in_unload_test.c:127]\nPASSED: _root.dyn1Ref.valueof()  ==  null [new_child_in_unload_test.c:128]\nFAILED: expected: 'executed' obtained:  [new_child_in_unload_test.c:130] \n#passed: 6\n#failed: 1\n#total tests run: 7",
+      "expected_output": "... (2 lines before) ...\n_level0.static_mc1\nPASSED: 100 == 100\nPASSED: 101 == 101\nPASSED: typeof(_root.dyn1Ref)  ==  'movieclip' [new_child_in_unload_test.c:127]\nPASSED: _root.dyn1Ref.valueof()  ==  null [new_child_in_unload_test.c:128]\nPASSED: _root.dyn2testvar  ==  'executed' [new_child_in_unload_test.c:130]\n#passed: 7\n#failed: 0\n#total tests run: 7"
+    },
+    {
+      "test": "opcode_guard_test",
+      "num_frames": 30,
+      "lines": {
+        "actual_lines": 142,
+        "expected_lines": 18,
+        "matching_lines": 3
+      },
+      "duration": 19.34,
+      "status": "output_mismatch",
+      "detail": "139 line(s) differ (actual=142, expected=18)",
+      "actual_output": "mc1 Construct called\nPASSED: movieclip == movieclip\nFAILED: expected: undefined , obtained: movieclip\nmc1 Load called\nFAILED: false\nmc1 EnterFrame called\nFAILED: false\nmc1 EnterFrame called\nFAILED: false\nPASSED: testvar1  ==  'executed' [opcode_guard_test.c:122]\nPASSED: testvar2  ==  'executed' [opcode_guard_test.c:123]\nFAILED: expected: 'executed' obtained: undefined [opcode_guard_test.c:124] \nmc1 EnterFrame called\nFAILED: false\nPASSED: testvar1  ==  'executed' [opcode_guard_test.c:122]\nPASSED: testvar2  ==  'executed' [opcode_guard_test.c:123]\nFAILED: expected: 'executed' obtained: undefined [opcode_guard_test.c:124] \nmc1 EnterFrame called\nFAILED: false\nPASSED: testvar1  ==  'executed' [opcode_guard_test.c:122]\nPASSED: testvar2  ==  'executed' [opcode_guard_test.c:123]\nFAILED: expected: 'executed' obtained: undefined [opcode_guard_test.c:124] \nmc1 EnterFrame called\nFAILED: false\nPASSED: testvar1  ==  'executed' [opcode_guard_test.c:122]\nPASSED: testvar2  ==  'executed' [opcode_guard_test.c:123]\nFAILED: expected: 'executed' obtained: undefined [opcode_guard_test.c:124] \nmc1 EnterFrame called\nFAILED: false\nPASSED: testvar1  ==  'executed' [opcode_guard_test.c:122]\nPASSED: testvar2  ==  'executed' [opcode_guard_test.c:123]\nFAILED: expected: 'executed' obtained: undefined [opcode_guard_test.c:124] \nmc1 EnterFrame called\nFAILED: false\nPASSED: testvar1  ==  'executed' [opcode_guard_test.c:122]\nPASSED: testvar2  ==  'executed' [opcode_guard_test.c:123]\nFAILED: expected: 'executed' obtained: undefined [opcode_guard_test.c:124] \nmc1 EnterFrame called\nFAILED: false\nPASSED: testvar1  ==  'executed' [opcode_guard_test.c:122]\nPASSED: testvar2  ==  'executed' [opcode_guard_test.c:123]\nFAILED: expected: 'executed' obtained: undefined [opcode_guard_test.c:124] \nmc1 EnterFrame called\nFAILED: false\nPASSED: testvar1  ==  'executed' [opcode_guard_test.c:122]\nPASSED: testvar2  ==  'executed' [opcode_guard_test.c:123]\nFAILED: expected: 'executed' obtained: undefined [opcode_guard_test.c:124] \nmc1 EnterFrame called\nFAILED: false\nPASSED: testvar1  ==  'executed' [opcode_guard_test.c:122]\n... (92 lines after) ...",
+      "expected_output": "mc1 Construct called\nPASSED: movieclip == movieclip\nPASSED: undefined == undefined\nmc1 Load called\nmc1 Unload called\nPASSED: undefined == undefined\nPASSED: testvar1  ==  'executed' [opcode_guard_test.c:122]\nPASSED: testvar2  ==  'executed' [opcode_guard_test.c:123]\nPASSED: testvar3  ==  'executed' [opcode_guard_test.c:124]\nmc2 EnterFrame called\nPASSED: undefined == undefined\nPASSED: / == /\nPASSED: 9 == 9\nPASSED: 9 == 9\nPASSED: 100 == 100\n#passed: 11\n#failed: 0\n#total tests run: 11"
+    },
+    {
+      "test": "path_format_test",
+      "num_frames": 30,
+      "lines": {
+        "actual_lines": 28,
+        "expected_lines": 27,
+        "matching_lines": 0
+      },
+      "duration": 20.42,
+      "status": "output_mismatch",
+      "detail": "28 line(s) differ (actual=28, expected=27)",
+      "actual_output": "Warning: Failed to place object at depth 21.\nPASSED: typeOf(_root.mc1)  ==  'movieclip' [path_format_test.c:165]\nPASSED: typeOf(_root.mc1.mc11)  ==  'movieclip' [path_format_test.c:166]\nFAILED: expected: '3' obtained: 4.1 [path_format_test.c:167] \nPASSED: _root.x9  ==  0 [path_format_test.c:168]\nPASSED: _root.x8  ==  0 [path_format_test.c:175]\nPASSED: _root.x8  ==  0 [path_format_test.c:184]\nFAILED: expected: 'movieclip' obtained: undefined [path_format_test.c:196] \nPASSED: _root.x10  ==  'undefined' [path_format_test.c:206]\nPASSED: _root.x10  ==  'undefined' [path_format_test.c:216]\nPASSED: _root.x10  ==  'undefined' [path_format_test.c:227]\nPASSED: _root.x10  ==  'undefined' [path_format_test.c:239]\nPASSED: _root.x1  ==  'mc11_frame4' [path_format_test.c:242]\nFAILED: expected: 'mc11_frame4' obtained: 0 [path_format_test.c:248] \nFAILED: expected: 'mc11_frame4' obtained: 0 [path_format_test.c:254] \nPASSED: _root.x1  ==  0 [path_format_test.c:260]\nPASSED: _root.x1  ==  0 [path_format_test.c:282]\nPASSED: _root.x2  ==  0 [path_format_test.c:283]\nFAILED: expected: 'mc11_frame6' obtained: 0 [path_format_test.c:284] \nFAILED: expected: 'mc1_frame4' obtained: 0 [path_format_test.c:285] \nFAILED: expected: 'mc1_frame5' obtained: 0 [path_format_test.c:286] \nFAILED: expected: 'mc1_frame6' obtained: 0 [path_format_test.c:287] \nPASSED: checkpoint  ==  undefined [path_format_test.c:296]\nPASSED: checkpoint  ==  0 [path_format_test.c:305]\nPASSED: checkpoint  ==  0 [path_format_test.c:314]\n#passed: 16\n#failed: 8\n#total tests run: 24",
+      "expected_output": "PASSED: typeOf(_root.mc1)  ==  'movieclip' [path_format_test.c:165]\nPASSED: typeOf(_root.mc1.mc11)  ==  'movieclip' [path_format_test.c:166]\nPASSED: _root.x7  ==  '3' [path_format_test.c:167]\nPASSED: _root.x9  ==  0 [path_format_test.c:168]\nPASSED: _root.x8  ==  0 [path_format_test.c:175]\nPASSED: _root.x8  ==  0 [path_format_test.c:184]\nPASSED: _root.x10  ==  'movieclip' [path_format_test.c:196]\nPASSED: _root.x10  ==  'undefined' [path_format_test.c:206]\nPASSED: _root.x10  ==  'undefined' [path_format_test.c:216]\nPASSED: _root.x10  ==  'undefined' [path_format_test.c:227]\nPASSED: _root.x10  ==  'undefined' [path_format_test.c:239]\nPASSED: _root.x1  ==  'mc11_frame4' [path_format_test.c:242]\nPASSED: _root.x1  ==  'mc11_frame4' [path_format_test.c:248]\nPASSED: _root.x1  ==  'mc11_frame4' [path_format_test.c:254]\nPASSED: _root.x1  ==  0 [path_format_test.c:260]\nPASSED: _root.x1  ==  0 [path_format_test.c:282]\nPASSED: _root.x2  ==  0 [path_format_test.c:283]\nPASSED: _root.x3  ==  'mc11_frame6' [path_format_test.c:284]\nPASSED: _root.x4  ==  'mc1_frame4' [path_format_test.c:285]\nPASSED: _root.x5  ==  'mc1_frame5' [path_format_test.c:286]\nPASSED: _root.x6  ==  'mc1_frame6' [path_format_test.c:287]\nPASSED: checkpoint  ==  undefined [path_format_test.c:296]\nPASSED: checkpoint  ==  0 [path_format_test.c:305]\nPASSED: checkpoint  ==  0 [path_format_test.c:314]\n#passed: 24\n#failed: 0\n#total tests run: 24"
+    },
+    {
+      "test": "place_and_remove_object_insane_test",
+      "num_frames": 30,
+      "lines": {
+        "actual_lines": 22,
+        "expected_lines": 22,
+        "matching_lines": 15
+      },
+      "duration": 18.64,
+      "status": "output_mismatch",
+      "detail": "7 line(s) differ (actual=22, expected=22)",
+      "actual_output": "... (3 lines before) ...\nPASSED: typeof(_root.mc_green)  ==  'undefined' [place_and_remove_object_insane_test.c:147]\nPASSED: typeof(_root.mc_red)  ==  'movieclip' [place_and_remove_object_insane_test.c:169]\nPASSED: typeof(_root.mc_blue)  ==  'movieclip' [place_and_remove_object_insane_test.c:170]\nPASSED: typeof(_root.mc_red)  ==  'movieclip' [place_and_remove_object_insane_test.c:118]\nPASSED: typeof(_root.mc_blue)  ==  'movieclip' [place_and_remove_object_insane_test.c:119]\nFAILED: expected: undefined obtained: _level0.mc_green [place_and_remove_object_insane_test.c:121] \nPASSED: 60 == 60\nFAILED: expected: undefined , obtained: movieclip\nFAILED: expected: movieclip , obtained: undefined\nFAILED: expected: 10 obtained: 70 [place_and_remove_object_insane_test.c:136] \nPASSED: typeof(_root.mc_red)  ==  'undefined' [place_and_remove_object_insane_test.c:144]\nPASSED: typeof(_root.mc_blue)  ==  'undefined' [place_and_remove_object_insane_test.c:145]\nPASSED: typeof(_root.mc_black)  ==  'undefined' [place_and_remove_object_insane_test.c:146]\nFAILED: expected: 'undefined' obtained: movieclip [place_and_remove_object_insane_test.c:147] \nPASSED: typeof(_root.mc_red)  ==  'movieclip' [place_and_remove_object_insane_test.c:169]\nPASSED: typeof(_root.mc_blue)  ==  'movieclip' [place_and_remove_object_insane_test.c:170]\n#passed: 14\n#failed: 5\n#total tests run: 19",
+      "expected_output": "... (3 lines before) ...\nPASSED: typeof(_root.mc_green)  ==  'undefined' [place_and_remove_object_insane_test.c:147]\nPASSED: typeof(_root.mc_red)  ==  'movieclip' [place_and_remove_object_insane_test.c:169]\nPASSED: typeof(_root.mc_blue)  ==  'movieclip' [place_and_remove_object_insane_test.c:170]\nPASSED: typeof(_root.mc_red)  ==  'movieclip' [place_and_remove_object_insane_test.c:118]\nPASSED: typeof(_root.mc_blue)  ==  'movieclip' [place_and_remove_object_insane_test.c:119]\nPASSED: _root.mc_green  ==  undefined [place_and_remove_object_insane_test.c:121]\nPASSED: 60 == 60\nPASSED: undefined == undefined\nPASSED: movieclip == movieclip\nPASSED:  _root.mc_red._x  ==  10 [place_and_remove_object_insane_test.c:136]\nPASSED: typeof(_root.mc_red)  ==  'undefined' [place_and_remove_object_insane_test.c:144]\nPASSED: typeof(_root.mc_blue)  ==  'undefined' [place_and_remove_object_insane_test.c:145]\nPASSED: typeof(_root.mc_black)  ==  'undefined' [place_and_remove_object_insane_test.c:146]\nPASSED: typeof(_root.mc_green)  ==  'undefined' [place_and_remove_object_insane_test.c:147]\nPASSED: typeof(_root.mc_red)  ==  'movieclip' [place_and_remove_object_insane_test.c:169]\nPASSED: typeof(_root.mc_blue)  ==  'movieclip' [place_and_remove_object_insane_test.c:170]\n#passed: 19\n#failed: 0\n#total tests run: 19"
+    },
+    {
+      "test": "place_and_remove_object_test",
+      "num_frames": 30,
+      "lines": {
+        "actual_lines": 13,
+        "expected_lines": 13,
+        "matching_lines": 10
+      },
+      "duration": 18.6,
+      "status": "output_mismatch",
+      "detail": "3 line(s) differ (actual=13, expected=13)",
+      "actual_output": "PASSED: _root.sh1  ==  undefined [place_and_remove_object_test.c:81]\nPASSED: _root.sh2  ==  undefined [place_and_remove_object_test.c:82]\nPASSED: _root.sh1  ==  undefined [place_and_remove_object_test.c:88]\nPASSED: _root.sh2 != undefined [place_and_remove_object_test.c:89]\nFAILED: _root.sh1 != undefined [place_and_remove_object_test.c:76] \nPASSED: _root.sh2  ==  undefined [place_and_remove_object_test.c:77]\nPASSED: _root.sh1  ==  undefined [place_and_remove_object_test.c:81]\nPASSED: _root.sh2  ==  undefined [place_and_remove_object_test.c:82]\nPASSED: _root.sh1  ==  undefined [place_and_remove_object_test.c:88]\nPASSED: _root.sh2 != undefined [place_and_remove_object_test.c:89]\n#passed: 9\n#failed: 1\n#total tests run: 10",
+      "expected_output": "PASSED: _root.sh1  ==  undefined [place_and_remove_object_test.c:81]\nPASSED: _root.sh2  ==  undefined [place_and_remove_object_test.c:82]\nPASSED: _root.sh1  ==  undefined [place_and_remove_object_test.c:88]\nPASSED: _root.sh2 != undefined [place_and_remove_object_test.c:89]\nPASSED: _root.sh1 != undefined [place_and_remove_object_test.c:76]\nPASSED: _root.sh2  ==  undefined [place_and_remove_object_test.c:77]\nPASSED: _root.sh1  ==  undefined [place_and_remove_object_test.c:81]\nPASSED: _root.sh2  ==  undefined [place_and_remove_object_test.c:82]\nPASSED: _root.sh1  ==  undefined [place_and_remove_object_test.c:88]\nPASSED: _root.sh2 != undefined [place_and_remove_object_test.c:89]\n#passed: 10\n#failed: 0\n#total tests run: 10"
+    },
+    {
+      "test": "place_object_test",
+      "num_frames": 30,
+      "lines": {
+        "actual_lines": 14,
+        "expected_lines": 12,
+        "matching_lines": 0
+      },
+      "duration": 18.25,
+      "status": "output_mismatch",
+      "detail": "14 line(s) differ (actual=14, expected=12)",
+      "actual_output": "Warning: Failed to place object at depth 3.\nPlaced red shape sh1 and black shape sh2 at the same depth 3. Should both be visible, red on top.\nFAILED: expected: sh2 obtained:  [place_object_test.c:83] \nFAILED: expected: 'movieclip' obtained: undefined [place_object_test.c:84] \nPASSED: typeof(sh2)  ==  'movieclip' [place_object_test.c:85]\nWarning: Failed to place object at depth 4.\nPlaced red sprite mc1 and black sprite mc2 at the same depth 4. Should both be visible, black on top.\nPASSED: typeof(mc1)  ==  'movieclip' [place_object_test.c:111]\nFAILED: expected: 'movieclip' obtained: undefined [place_object_test.c:112] \nPASSED: mc1._name != mc2._name [place_object_test.c:113]\nFAILED: expected: mc2.getDepth() obtained: -16380 [place_object_test.c:114] \n#passed: 3\n#failed: 4\n#total tests run: 7",
+      "expected_output": "Placed red shape sh1 and black shape sh2 at the same depth 3. Should both be visible, red on top.\nPASSED: sh1  ==  sh2 [place_object_test.c:83]\nPASSED: typeof(sh1)  ==  'movieclip' [place_object_test.c:84]\nPASSED: typeof(sh2)  ==  'movieclip' [place_object_test.c:85]\nPlaced red sprite mc1 and black sprite mc2 at the same depth 4. Should both be visible, black on top.\nPASSED: typeof(mc1)  ==  'movieclip' [place_object_test.c:111]\nPASSED: typeof(mc2)  ==  'movieclip' [place_object_test.c:112]\nPASSED: mc1._name != mc2._name [place_object_test.c:113]\nPASSED: mc1.getDepth()  ==  mc2.getDepth() [place_object_test.c:114]\n#passed: 7\n#failed: 0\n#total tests run: 7"
+    },
+    {
+      "test": "place_object_test2",
+      "num_frames": 30,
+      "lines": {
+        "actual_lines": 20,
+        "expected_lines": 19,
+        "matching_lines": 4
+      },
+      "duration": 18.32,
+      "status": "output_mismatch",
+      "detail": "16 line(s) differ (actual=20, expected=19)",
+      "actual_output": "_level0.static_mc1\n1\n_level0.static_mc1\n2\nWarning: Failed to place object at depth 3.\nFAILED: expected: 'movieclip' obtained: undefined [place_object_test2.c:99] \nFAILED: expected: 'undefined' obtained: movieclip [place_object_test2.c:103] \n_level0.static_mc2\n3\nPASSED: testvar1  ==  3 [place_object_test2.c:114]\nPASSED: testvar2  ==  0 [place_object_test2.c:115]\nFAILED: expected: 'movieclip' obtained: undefined [place_object_test2.c:132] \nPASSED: typeof(static_mc3)  ==  'undefined' [place_object_test2.c:136]\nFAILED: expected: 'movieclip' obtained: undefined [place_object_test2.c:154] \nPASSED: typeof(static_mc4)  ==  'undefined' [place_object_test2.c:158]\nFAILED: expected: 'movieclip' obtained: undefined [place_object_test2.c:176] \nPASSED: typeof(static_mc5)  ==  'undefined' [place_object_test2.c:180]\n#passed: 5\n#failed: 5\n#total tests run: 10",
+      "expected_output": "_level0.static_mc1\n1\n_level0.static_mc1\n2\nPASSED: typeof(static_mc1)  ==  'movieclip' [place_object_test2.c:99]\nPASSED: typeof(static_mc2)  ==  'undefined' [place_object_test2.c:103]\n_level0.static_mc1\n3\nPASSED: testvar1  ==  3 [place_object_test2.c:114]\nPASSED: testvar2  ==  0 [place_object_test2.c:115]\nPASSED: typeof(static_mc1)  ==  'movieclip' [place_object_test2.c:132]\nPASSED: typeof(static_mc3)  ==  'undefined' [place_object_test2.c:136]\nPASSED: typeof(static_mc1)  ==  'movieclip' [place_object_test2.c:154]\nPASSED: typeof(static_mc4)  ==  'undefined' [place_object_test2.c:158]\nPASSED: typeof(static_mc1)  ==  'movieclip' [place_object_test2.c:176]\nPASSED: typeof(static_mc5)  ==  'undefined' [place_object_test2.c:180]\n#passed: 10\n#failed: 0\n#total tests run: 10"
+    },
+    {
+      "test": "replace_buttons1test",
+      "num_frames": 30,
+      "lines": {
+        "actual_lines": 24,
+        "expected_lines": 18,
+        "matching_lines": 0
+      },
+      "duration": 18.52,
+      "status": "output_mismatch",
+      "detail": "24 line(s) differ (actual=24, expected=18)",
+      "actual_output": "_level0.static1 onClipConstruct\nPASSED: movieclip == movieclip\n_root.depth3Constructed set to 1\nPASSED: typeof(static1)  ==  'object' [replace_buttons1test.c:166]\nPASSED: static1._target  ==  '/static1' [replace_buttons1test.c:167]\nPASSED: static1.name  ==  'static1' [replace_buttons1test.c:168]\n_level0.instance2 onClipConstruct\nPASSED: movieclip == movieclip\n_root.depth3Constructed set to 2\nPASSED: typeof(static2)  ==  'undefined' [replace_buttons1test.c:192]\nFAILED: expected: 'object' obtained: undefined [replace_buttons1test.c:193] \nFAILED: expected: '/static1' obtained: undefined [replace_buttons1test.c:194] \nFAILED: expected: 'static1' obtained: undefined [replace_buttons1test.c:195] \nFAILED: expected: 130 obtained: undefined [replace_buttons1test.c:196] \nPASSED: typeof(static2)  ==  'undefined' [replace_buttons1test.c:199]\nFAILED: expected: undefined , obtained: number\nPASSED: object == object\nPASSED: undefined == undefined\n#passed: 9\n#failed: 5\n#total tests run: 14\nPASSED: typeof(static1)  ==  'object' [replace_buttons1test.c:166]\nPASSED: static1._target  ==  '/static1' [replace_buttons1test.c:167]\nPASSED: static1.name  ==  'static1' [replace_buttons1test.c:168]",
+      "expected_output": "PASSED: typeof(static1)  ==  'object' [replace_buttons1test.c:166]\nPASSED: static1._target  ==  '/static1' [replace_buttons1test.c:167]\nPASSED: static1.name  ==  'static1' [replace_buttons1test.c:168]\nPASSED: typeof(static2)  ==  'undefined' [replace_buttons1test.c:192]\nPASSED: typeof(static1)  ==  'object' [replace_buttons1test.c:193]\nPASSED: static1._target  ==  '/static1' [replace_buttons1test.c:194]\nPASSED: static1.name  ==  'static1' [replace_buttons1test.c:195]\nPASSED: static1._x  ==  130 [replace_buttons1test.c:196]\nPASSED: typeof(static2)  ==  'undefined' [replace_buttons1test.c:199]\nPASSED: undefined == undefined\nPASSED: object == object\nPASSED: undefined == undefined\n#passed: 12\n#failed: 0\n#total tests run: 12\nPASSED: typeof(static1)  ==  'object' [replace_buttons1test.c:166]\nPASSED: static1._target  ==  '/static1' [replace_buttons1test.c:167]\nPASSED: static1.name  ==  'static1' [replace_buttons1test.c:168]"
+    },
+    {
+      "test": "replace_shapes1test",
+      "num_frames": 30,
+      "lines": {
+        "actual_lines": 26,
+        "expected_lines": 23,
+        "matching_lines": 0
+      },
+      "duration": 18.51,
+      "status": "output_mismatch",
+      "detail": "26 line(s) differ (actual=26, expected=23)",
+      "actual_output": "_level0.static1 onClipConstruct\nPASSED: movieclip == movieclip\n_root.depth3Constructed set to 1\nPASSED: typeof(static1)  ==  'movieclip' [replace_shapes1test.c:153]\nPASSED: static1  ==  _root [replace_shapes1test.c:154]\nPASSED: static1.name  ==  'static1' [replace_shapes1test.c:155]\nPASSED: _root.name  ==  'static1' [replace_shapes1test.c:156]\nPASSED: static1.name  ==  'static1' [replace_shapes1test.c:160]\nPASSED: static1._target  ==  '/' [replace_shapes1test.c:162]\nFAILED: expected: 'movieclip' obtained: undefined [replace_shapes1test.c:185] \nFAILED: expected: _root obtained:  [replace_shapes1test.c:186] \nFAILED: expected: 'static1' obtained:  [replace_shapes1test.c:187] \nPASSED: _root.name  ==  'static1' [replace_shapes1test.c:188]\nPASSED: typeof(static2)  ==  'undefined' [replace_shapes1test.c:191]\nFAILED: expected: undefined , obtained: number\nPASSED: movieclip == movieclip\nPASSED: static1 == static1\n#passed: 11\n#failed: 4\n#total tests run: 15\nPASSED: typeof(static1)  ==  'movieclip' [replace_shapes1test.c:153]\nPASSED: static1  ==  _root [replace_shapes1test.c:154]\nPASSED: static1.name  ==  'static1' [replace_shapes1test.c:155]\nPASSED: _root.name  ==  'static1' [replace_shapes1test.c:156]\nPASSED: static1.name  ==  'static1' [replace_shapes1test.c:160]\nPASSED: static1._target  ==  '/' [replace_shapes1test.c:162]",
+      "expected_output": "PASSED: typeof(static1)  ==  'movieclip' [replace_shapes1test.c:153]\nPASSED: static1  ==  _root [replace_shapes1test.c:154]\nPASSED: static1.name  ==  'static1' [replace_shapes1test.c:155]\nPASSED: _root.name  ==  'static1' [replace_shapes1test.c:156]\nPASSED: static1.name  ==  'static1' [replace_shapes1test.c:160]\nPASSED: static1._target  ==  '/' [replace_shapes1test.c:162]\nPASSED: typeof(static1)  ==  'movieclip' [replace_shapes1test.c:185]\nPASSED: static1  ==  _root [replace_shapes1test.c:186]\nPASSED: static1.name  ==  'static1' [replace_shapes1test.c:187]\nPASSED: _root.name  ==  'static1' [replace_shapes1test.c:188]\nPASSED: typeof(static2)  ==  'undefined' [replace_shapes1test.c:191]\nPASSED: undefined == undefined\nPASSED: movieclip == movieclip\nPASSED: static1 == static1\n#passed: 14\n#failed: 0\n#total tests run: 14\nPASSED: typeof(static1)  ==  'movieclip' [replace_shapes1test.c:153]\nPASSED: static1  ==  _root [replace_shapes1test.c:154]\nPASSED: static1.name  ==  'static1' [replace_shapes1test.c:155]\nPASSED: _root.name  ==  'static1' [replace_shapes1test.c:156]\nPASSED: static1.name  ==  'static1' [replace_shapes1test.c:160]\nPASSED: static1._target  ==  '/' [replace_shapes1test.c:162]"
+    },
+    {
+      "test": "replace_sprites1test",
+      "num_frames": 30,
+      "lines": {
+        "actual_lines": 24,
+        "expected_lines": 21,
+        "matching_lines": 5
+      },
+      "duration": 19.69,
+      "status": "output_mismatch",
+      "detail": "19 line(s) differ (actual=24, expected=21)",
+      "actual_output": "_level0.static1 onClipConstruct (place)\n_root.depth3Constructed set to 1\nPASSED: typeof(static1)  ==  'movieclip' [replace_sprites1test.c:159]\nPASSED: static1.name  ==  'static1' [replace_sprites1test.c:162]\nPASSED: static1._target  ==  '/static1' [replace_sprites1test.c:164]\n_level0.instance2 onClipConstruct (replace)\nPASSED: movieclip == movieclip\n_root.depth3Constructed set to 2\nFAILED: expected: 'movieclip' obtained: undefined [replace_sprites1test.c:197] \nFAILED: expected: 'static1' obtained:  [replace_sprites1test.c:198] \nFAILED: expected: '/static1' obtained:  [replace_sprites1test.c:199] \nFAILED: expected: 130 obtained:  [replace_sprites1test.c:200] \nPASSED: typeof(static2)  ==  'undefined' [replace_sprites1test.c:203]\nFAILED: expected: 130 obtained:  [replace_sprites1test.c:209] \nFAILED: expected: 1 , obtained: 2\nPASSED: movieclip == movieclip\nFAILED: expected: static1 , obtained: \nPASSED: 100 == 100\n#passed: 7\n#failed: 7\n#total tests run: 14\nPASSED: typeof(static1)  ==  'movieclip' [replace_sprites1test.c:159]\nPASSED: static1.name  ==  'static1' [replace_sprites1test.c:162]\nPASSED: static1._target  ==  '/static1' [replace_sprites1test.c:164]",
+      "expected_output": "_level0.static1 onClipConstruct (place)\n_root.depth3Constructed set to 1\nPASSED: typeof(static1)  ==  'movieclip' [replace_sprites1test.c:159]\nPASSED: static1.name  ==  'static1' [replace_sprites1test.c:162]\nPASSED: static1._target  ==  '/static1' [replace_sprites1test.c:164]\nPASSED: typeof(static1)  ==  'movieclip' [replace_sprites1test.c:197]\nPASSED: static1.name  ==  'static1' [replace_sprites1test.c:198]\nPASSED: static1._target  ==  '/static1' [replace_sprites1test.c:199]\nPASSED: static1._x  ==  130 [replace_sprites1test.c:200]\nPASSED: typeof(static2)  ==  'undefined' [replace_sprites1test.c:203]\nPASSED: static1._x  ==  130 [replace_sprites1test.c:209]\nPASSED: 1 == 1\nPASSED: movieclip == movieclip\nPASSED: static1 == static1\nPASSED: 100 == 100\n#passed: 13\n#failed: 0\n#total tests run: 13\nPASSED: typeof(static1)  ==  'movieclip' [replace_sprites1test.c:159]\nPASSED: static1.name  ==  'static1' [replace_sprites1test.c:162]\nPASSED: static1._target  ==  '/static1' [replace_sprites1test.c:164]"
+    },
+    {
+      "test": "reverse_execute_PlaceObject2_test1",
+      "num_frames": 30,
+      "lines": {
+        "actual_lines": 8,
+        "expected_lines": 8,
+        "matching_lines": 4
+      },
+      "duration": 19.14,
+      "status": "output_mismatch",
+      "detail": "4 line(s) differ (actual=8, expected=8)",
+      "actual_output": "PASSED: _root.mc._x  ==  300 [reverse_execute_PlaceObject2_test1.c:80]\nPASSED: _root.mc._x  ==  300 [reverse_execute_PlaceObject2_test1.c:83]\nPASSED: _root.mc._x  ==  900 [reverse_execute_PlaceObject2_test1.c:87]\nFAILED: expected: 300 obtained:  [reverse_execute_PlaceObject2_test1.c:83] \nFAILED: expected: 900 obtained:  [reverse_execute_PlaceObject2_test1.c:87] \n#passed: 3\n#failed: 2\n#total tests run: 5",
+      "expected_output": "PASSED: _root.mc._x  ==  300 [reverse_execute_PlaceObject2_test1.c:80]\nPASSED: _root.mc._x  ==  300 [reverse_execute_PlaceObject2_test1.c:83]\nPASSED: _root.mc._x  ==  900 [reverse_execute_PlaceObject2_test1.c:87]\nPASSED: _root.mc._x  ==  300 [reverse_execute_PlaceObject2_test1.c:83]\nPASSED: _root.mc._x  ==  900 [reverse_execute_PlaceObject2_test1.c:87]\n#passed: 5\n#failed: 0\n#total tests run: 5"
+    },
+    {
+      "test": "reverse_execute_PlaceObject2_test2",
+      "num_frames": 30,
+      "lines": {
+        "actual_lines": 10,
+        "expected_lines": 10,
+        "matching_lines": 7
+      },
+      "duration": 19.28,
+      "status": "output_mismatch",
+      "detail": "3 line(s) differ (actual=10, expected=10)",
+      "actual_output": "PASSED: _root.mc._x  ==  0 [reverse_execute_PlaceObject2_test2.c:89]\nPASSED: _root.mc._x  ==  300 [reverse_execute_PlaceObject2_test2.c:92]\nPASSED: _root.mc._x  ==  900 [reverse_execute_PlaceObject2_test2.c:96]\nPASSED: _root.mc._x  ==  900 [reverse_execute_PlaceObject2_test2.c:100]\nFAILED: expected: 900 obtained:  [reverse_execute_PlaceObject2_test2.c:100] \nPASSED: _root.x1  ==  'onLoad+onLoad+' [reverse_execute_PlaceObject2_test2.c:108]\nPASSED: _root.x2  ==  'onUnload+onUnload+' [reverse_execute_PlaceObject2_test2.c:109]\n#passed: 6\n#failed: 1\n#total tests run: 7",
+      "expected_output": "PASSED: _root.mc._x  ==  0 [reverse_execute_PlaceObject2_test2.c:89]\nPASSED: _root.mc._x  ==  300 [reverse_execute_PlaceObject2_test2.c:92]\nPASSED: _root.mc._x  ==  900 [reverse_execute_PlaceObject2_test2.c:96]\nPASSED: _root.mc._x  ==  900 [reverse_execute_PlaceObject2_test2.c:100]\nPASSED: _root.mc._x  ==  900 [reverse_execute_PlaceObject2_test2.c:100]\nPASSED: _root.x1  ==  'onLoad+onLoad+' [reverse_execute_PlaceObject2_test2.c:108]\nPASSED: _root.x2  ==  'onUnload+onUnload+' [reverse_execute_PlaceObject2_test2.c:109]\n#passed: 7\n#failed: 0\n#total tests run: 7"
+    },
+    {
+      "test": "runtime_vm_stack_test",
+      "num_frames": 30,
+      "lines": {
+        "actual_lines": 9,
+        "expected_lines": 9,
+        "matching_lines": 4
+      },
+      "duration": 19.11,
+      "status": "output_mismatch",
+      "detail": "5 line(s) differ (actual=9, expected=9)",
+      "actual_output": "PASSED: testvar1  ==  1 [runtime_vm_stack_test.c:103]\nPASSED: testvar2  ==  2 [runtime_vm_stack_test.c:104]\nPASSED: testvar3  ==  3 [runtime_vm_stack_test.c:105]\nFAILED: expected: 1 obtained: 4 [runtime_vm_stack_test.c:123] \nFAILED: expected: 2 obtained: 5 [runtime_vm_stack_test.c:124] \nFAILED: expected: 3 obtained: 6 [runtime_vm_stack_test.c:125] \n#passed: 3\n#failed: 3\n#total tests run: 6",
+      "expected_output": "PASSED: testvar1  ==  1 [runtime_vm_stack_test.c:103]\nPASSED: testvar2  ==  2 [runtime_vm_stack_test.c:104]\nPASSED: testvar3  ==  3 [runtime_vm_stack_test.c:105]\nPASSED: testvar1  ==  1 [runtime_vm_stack_test.c:123]\nPASSED: testvar2  ==  2 [runtime_vm_stack_test.c:124]\nPASSED: testvar3  ==  3 [runtime_vm_stack_test.c:125]\n#passed: 6\n#failed: 0\n#total tests run: 6"
+    },
+    {
+      "test": "shape_test",
+      "num_frames": 30,
+      "lines": {
+        "actual_lines": 21,
+        "expected_lines": 21,
+        "matching_lines": 17
+      },
+      "duration": 19.29,
+      "status": "output_mismatch",
+      "detail": "4 line(s) differ (actual=21, expected=21)",
+      "actual_output": "... (9 lines before) ...\nPASSED: sh1._x  ==  0 [shape_test.c:95]\nPASSED: sh2._x  ==  0 [shape_test.c:96]\nPASSED: sh1._x  ==  400 [shape_test.c:103]\nPASSED: sh2._x  ==  400 [shape_test.c:104]\nPASSED: _root._x  ==  400 [shape_test.c:105]\nFAILED: expected: 'undefined' obtained: number [shape_test.c:110] \nFAILED: expected: 'undefined' obtained: number [shape_test.c:111] \nPASSED: typeof(getInstanceAtDepth(-16381))  ==  'undefined' [shape_test.c:114]\nPASSED: typeof(getInstanceAtDepth(-16380))  ==  'undefined' [shape_test.c:115]\n#passed: 16\n#failed: 2\n#total tests run: 18",
+      "expected_output": "... (9 lines before) ...\nPASSED: sh1._x  ==  0 [shape_test.c:95]\nPASSED: sh2._x  ==  0 [shape_test.c:96]\nPASSED: sh1._x  ==  400 [shape_test.c:103]\nPASSED: sh2._x  ==  400 [shape_test.c:104]\nPASSED: _root._x  ==  400 [shape_test.c:105]\nPASSED: typeof(sh1.getDepth())  ==  'undefined' [shape_test.c:110]\nPASSED: typeof(sh2.getDepth())  ==  'undefined' [shape_test.c:111]\nPASSED: typeof(getInstanceAtDepth(-16381))  ==  'undefined' [shape_test.c:114]\nPASSED: typeof(getInstanceAtDepth(-16380))  ==  'undefined' [shape_test.c:115]\n#passed: 18\n#failed: 0\n#total tests run: 18"
+    },
+    {
+      "test": "static_vs_dynamic1",
+      "num_frames": 30,
+      "lines": {
+        "actual_lines": 17,
+        "expected_lines": 17,
+        "matching_lines": 11
+      },
+      "duration": 18.42,
+      "status": "output_mismatch",
+      "detail": "6 line(s) differ (actual=17, expected=17)",
+      "actual_output": "... (1 lines before) ...\nPASSED: undefined == undefined\nPASSED: undefined == undefined\nPASSED: undefined == undefined\nPASSED: -16382 == -16382\nPASSED: -16381 == -16381\nFAILED: expected: 1 , obtained: 16385\nFAILED: expected: 2 , obtained: 16386\nPASSED: 10 == 10\nPASSED: -10 == -10\nFAILED: expected: movieclip , obtained: undefined\nPASSED: undefined == undefined\nPASSED: undefined == undefined\nFAILED: expected: movieclip , obtained: undefined\n#passed: 10\n#failed: 4\n#total tests run: 14",
+      "expected_output": "... (1 lines before) ...\nPASSED: undefined == undefined\nPASSED: undefined == undefined\nPASSED: undefined == undefined\nPASSED: -16382 == -16382\nPASSED: -16381 == -16381\nPASSED: 1 == 1\nPASSED: 2 == 2\nPASSED: 10 == 10\nPASSED: -10 == -10\nPASSED: movieclip == movieclip\nPASSED: undefined == undefined\nPASSED: undefined == undefined\nPASSED: movieclip == movieclip\n#passed: 14\n#failed: 0\n#total tests run: 14"
+    },
+    {
+      "test": "static_vs_dynamic2",
+      "num_frames": 30,
+      "lines": {
+        "actual_lines": 18,
+        "expected_lines": 18,
+        "matching_lines": 13
+      },
+      "duration": 18.59,
+      "status": "output_mismatch",
+      "detail": "5 line(s) differ (actual=18, expected=18)",
+      "actual_output": "PASSED: -16382 == -16382\nFAILED: expected: 1 , obtained: 16385\nFAILED: expected: 1 , obtained: 16385\nPASSED: -16382 == -16382\nPASSED: 0 == 0\nPASSED: 0 == 0\nPASSED: mc1._x  ==  0 [static_vs_dynamic2.c:87]\nPASSED: dup._x  ==  0 [static_vs_dynamic2.c:88]\nPASSED: mc1._x  ==  0 [static_vs_dynamic2.c:93]\nPASSED: dup._x  ==  0 [static_vs_dynamic2.c:94]\nPASSED: typeof(mc1)  ==  'movieclip' [static_vs_dynamic2.c:100]\nFAILED: expected: 'undefined' obtained: movieclip [static_vs_dynamic2.c:102] \nPASSED: typeof(mc2)  ==  'movieclip' [static_vs_dynamic2.c:119]\nPASSED: typeof(mc2)  ==  'movieclip' [static_vs_dynamic2.c:122]\nPASSED: typeof(mc2)  ==  'undefined' [static_vs_dynamic2.c:126]\n#passed: 12\n#failed: 3\n#total tests run: 15",
+      "expected_output": "PASSED: -16382 == -16382\nPASSED: 1 == 1\nPASSED: 1 == 1\nPASSED: -16382 == -16382\nPASSED: 0 == 0\nPASSED: 0 == 0\nPASSED: mc1._x  ==  0 [static_vs_dynamic2.c:87]\nPASSED: dup._x  ==  0 [static_vs_dynamic2.c:88]\nPASSED: mc1._x  ==  0 [static_vs_dynamic2.c:93]\nPASSED: dup._x  ==  0 [static_vs_dynamic2.c:94]\nPASSED: typeof(mc1)  ==  'movieclip' [static_vs_dynamic2.c:100]\nPASSED: typeof(dup)  ==  'undefined' [static_vs_dynamic2.c:102]\nPASSED: typeof(mc2)  ==  'movieclip' [static_vs_dynamic2.c:119]\nPASSED: typeof(mc2)  ==  'movieclip' [static_vs_dynamic2.c:122]\nPASSED: typeof(mc2)  ==  'undefined' [static_vs_dynamic2.c:126]\n#passed: 15\n#failed: 0\n#total tests run: 15"
+    },
+    {
+      "test": "timeline_var_test",
+      "num_frames": 8,
+      "lines": {
+        "actual_lines": 11,
+        "expected_lines": 11,
+        "matching_lines": 8
+      },
+      "duration": 18.34,
+      "status": "output_mismatch",
+      "detail": "3 line(s) differ (actual=11, expected=11)",
+      "actual_output": "... (2 lines before) ...\nPASSED:  == \nPASSED: true\nPASSED: 1 == 1\nPASSED: var_defined_at_frame3 == var_defined_at_frame3\nonEnterFrame\nFAILED: expected: 'moo,setTarget,moo' obtained: moo,moo,setTarget [timeline_var_test.c:146] \n#passed: 6\n#failed: 1\n#total tests run: 7",
+      "expected_output": "... (2 lines before) ...\nPASSED:  == \nPASSED: true\nPASSED: 1 == 1\nPASSED: var_defined_at_frame3 == var_defined_at_frame3\nonEnterFrame\nPASSED: ar.toString()  ==  'moo,setTarget,moo' [timeline_var_test.c:146]\n#passed: 7\n#failed: 0\n#total tests run: 7"
+    },
+    {
+      "test": "unload_movieclip_test1",
+      "num_frames": 30,
+      "lines": {
+        "actual_lines": 6,
+        "expected_lines": 6,
+        "matching_lines": 6
+      },
+      "duration": 18.27,
+      "status": "pass"
+    }
+  ]
+}

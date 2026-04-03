@@ -1,29 +1,82 @@
 {
   "metadata": {
-    "old_timestamp": "2026-04-03T16:55:51.996872+00:00",
-    "old_git_sha": "bbe171d20f4fb6250b52f5c2d735644d334e5305",
-    "new_timestamp": "2026-04-03T22:14:41.115227+00:00",
-    "new_git_sha": "dc2748b675fb30e42bbad5ecc0ffc19e22c6fb03",
+    "old_timestamp": "2026-04-03T22:14:41.115227+00:00",
+    "old_git_sha": "dc2748b675fb30e42bbad5ecc0ffc19e22c6fb03",
+    "new_timestamp": "2026-04-03T22:44:25.127152+00:00",
+    "new_git_sha": "5ec711b2146b339c7a7e9712603c1f81dac0ae08",
     "partial": false,
-    "same_commit": false
+    "same_commit": false,
+    "incomplete": true,
+    "missing_shards": 2,
+    "expected_shards": 30
   },
   "summary": {
     "old_pass": 17,
     "old_total": 47,
     "old_pass_rate": 36.2,
-    "new_pass": 17,
-    "new_total": 47,
-    "new_pass_rate": 36.2,
+    "new_pass": 15,
+    "new_total": 43,
+    "new_pass_rate": 34.9,
     "old_mismatched_lines": 221,
-    "new_mismatched_lines": 221,
+    "new_mismatched_lines": 202,
     "increased_mismatches": 0,
     "decreased_mismatches": 0,
     "newly_passing": 0,
     "newly_failing": 0,
     "status_changed": 0,
-    "unchanged": 47,
+    "unchanged": 43,
     "added": 0,
-    "removed": 0
+    "removed": 0,
+    "missing_from_incomplete_run": 4
   },
-  "changes": []
+  "changes": [
+    {
+      "test": "as3-interfaces",
+      "change_type": "missing_from_incomplete_run",
+      "old_status": "output_mismatch",
+      "new_status": null,
+      "old_lines": {
+        "actual_lines": 0,
+        "expected_lines": 6,
+        "matching_lines": 0
+      },
+      "new_lines": null
+    },
+    {
+      "test": "avm1movie",
+      "change_type": "missing_from_incomplete_run",
+      "old_status": "output_mismatch",
+      "new_status": null,
+      "old_lines": {
+        "actual_lines": 0,
+        "expected_lines": 13,
+        "matching_lines": 0
+      },
+      "new_lines": null
+    },
+    {
+      "test": "gradient",
+      "change_type": "missing_from_incomplete_run",
+      "old_status": "pass",
+      "new_status": null,
+      "old_lines": {
+        "actual_lines": 0,
+        "expected_lines": 0,
+        "matching_lines": 0
+      },
+      "new_lines": null
+    },
+    {
+      "test": "gradientTransform",
+      "change_type": "missing_from_incomplete_run",
+      "old_status": "pass",
+      "new_status": null,
+      "old_lines": {
+        "actual_lines": 0,
+        "expected_lines": 0,
+        "matching_lines": 0
+      },
+      "new_lines": null
+    }
+  ]
 }
