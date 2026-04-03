@@ -120,12 +120,13 @@ static const char* fragment_wgsl =
 "  return clamp(t, 0.0, 1.0);\n"
 "}\n"
 "\n"
-"fn linear_t(v_args: vec4f) -> f32 { return apply_spread((v_args.x + 16384.0) / 32768.0, v_args.w); }\n"
-"fn radial_t(v_args: vec4f) -> f32 { return apply_spread(distance(v_args.xy, vec2f(0.0)) / 16384.0, v_args.w); }\n"
+"// UVs are now in [0,1] range (normalization baked into inverse matrix)\n"
+"fn linear_t(v_args: vec4f) -> f32 { return apply_spread(v_args.x, v_args.w); }\n"
+"fn radial_t(v_args: vec4f) -> f32 { return apply_spread(length(v_args.xy * 2.0 - 1.0), v_args.w); }\n"
 "fn focal_radial_t(v_args: vec4f) -> f32 {\n"
-"  // Match Ruffle's focal gradient formula (gradient.wgsl)\n"
+"  // Match Ruffle's focal gradient formula exactly (gradient.wgsl)\n"
 "  let f = v_args.z;\n"
-"  let uv = v_args.xy / 16384.0;  // normalize to [-1,1]\n"
+"  let uv = v_args.xy * 2.0 - 1.0;\n"
 "  var d = vec2f(f, 0.0) - uv;\n"
 "  let l = length(d);\n"
 "  if (l < 0.00001) { return 0.0; }\n"
@@ -1724,16 +1725,31 @@ void render_webgpu_draw_gradient_tris(WebGPURenderContext* ctx,
 		                      256 * 4, &layout, &extent);
 	}
 
-	// Compute inverse of the gradient matrix on CPU and upload to inv_mat_buffer
+	// Compute inverse of the gradient matrix on CPU, then compose normalization
+	// so that the vertex shader outputs [0,1] UVs instead of [-16384, 16384].
+	// This matches Ruffle's precision characteristics (operations near 1.0 instead of 16384).
 	{
 		float inv_mat[16];
 		if (!invert_4x4_matrix(gradient_matrix, inv_mat)) {
 			// Singular matrix — use identity as fallback
 			for (int i = 0; i < 16; i++) inv_mat[i] = (i % 5 == 0) ? 1.0f : 0.0f;
 		}
+		// Compose normalization: uv = (grad_coord + 16384) / 32768
+		// In matrix form: scale by 1/32768, translate by +0.5
+		float s = 1.0f / 32768.0f;
+		float norm_inv[16];
+		for (int i = 0; i < 16; i++) norm_inv[i] = 0.0f;
+		norm_inv[0]  = inv_mat[0]  * s;
+		norm_inv[1]  = inv_mat[1]  * s;
+		norm_inv[4]  = inv_mat[4]  * s;
+		norm_inv[5]  = inv_mat[5]  * s;
+		norm_inv[10] = 1.0f;
+		norm_inv[12] = inv_mat[12] * s + 0.5f;
+		norm_inv[13] = inv_mat[13] * s + 0.5f;
+		norm_inv[15] = 1.0f;
 		uint64_t mat_offset = (uint64_t)grad_id * 16 * sizeof(float);
 		wgpuQueueWriteBuffer(ctx->queue, ctx->inv_mat_buffer, mat_offset,
-			inv_mat, 16 * sizeof(float));
+			norm_inv, 16 * sizeof(float));
 	}
 
 	// Allocate dynamic vertices (shared counter with draw_rect/draw_tris)
