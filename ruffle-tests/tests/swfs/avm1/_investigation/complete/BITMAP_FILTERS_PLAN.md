@@ -3,7 +3,7 @@
 
 <!-- PLAN_META
 id: BITMAP_FILTERS
-status: incomplete
+status: complete
 phases:
   - id: 1
     name: "Implement filter.clone()"
@@ -19,15 +19,14 @@ phases:
     status: complete
   - id: 5
     name: "mc.filters[0] initial read from display list"
-    status: mostly_complete
+    status: complete
 dependencies: []
-blockers:
-  - "4 lines need extended filter infrastructure (ColorMatrix/Convolution/Gradient data in display list)"
+blockers: []
 -->
 
-Last updated: 2026-03-30
+Last updated: 2026-04-03
 
-## Status: 544/548 matching lines (99.3%)
+## Status: 548/548 matching lines (100%) — COMPLETE
 
 ### Session Progress (2026-03-30)
 
@@ -49,16 +48,16 @@ Started at: 496/548 (from CI)
 | Property enumeration order per filter type | +0 | 541 |
 | float→double precision chain (display list + recompiler) | +3 | 544 |
 | BevelFilter color order (highlight first) | +0 | 544 |
-| **Total** | **+48** | **544/548** |
 
-### Remaining 4 Lines
+### Final 4 lines fixed (2026-04-02, commit 53c54f5d)
 
-All require extended display list filter data storage:
-
-1. **Line 113 (ColorMatrixFilter)**: Needs 20-float matrix stored in display list
-2. **Line 156 (ConvolutionFilter)**: Needs variable-size matrix + divisor/bias/preserveAlpha/clamp/color/alpha
-3. **Line 411 (GradientBevelFilter)**: Needs gradient colors/alphas/ratios arrays in display list
-4. **Line 484 (GradientGlowFilter)**: Same gradient array requirement
+| Fix | Lines Fixed | New Total |
+|-----|-----------|-----------|
+| ColorMatrixFilter mc.filters[0] — 20-float matrix in display list | +1 | 545 |
+| ConvolutionFilter mc.filters[0] — variable-size matrix + params | +1 | 546 |
+| GradientBevelFilter mc.filters[0] — gradient arrays in display list | +1 | 547 |
+| GradientGlowFilter mc.filters[0] — gradient arrays in display list | +1 | 548 |
+| **Total** | **+52** | **548/548** |
 
 ### Also Fixed
 

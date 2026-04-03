@@ -6,6 +6,7 @@
 #include <time.h>
 #include <ctype.h>
 #include <limits.h>
+#include <setjmp.h>
 
 // WASI compatibility: isnanf/isinff are GCC extensions not in WASI libc;
 // C99 isnan/isinf are type-generic and work on floats
@@ -351,6 +352,28 @@ static ASObject* scope_chain[MAX_SCOPE_DEPTH];
 static u8 scope_is_with[MAX_SCOPE_DEPTH];       // 1 = with scope, 0 = function scope
 static MovieClip* scope_mc[MAX_SCOPE_DEPTH];     // non-NULL if scope entry is a MovieClip
 static u32 scope_depth = 0;
+
+// Exception handling infrastructure (setjmp/longjmp based try/catch)
+#define MAX_EXCEPTION_DEPTH 16
+
+typedef struct {
+	jmp_buf handler;
+	int has_jmp_buf;
+	u32 saved_scope_depth;
+} ExceptionFrame;
+
+typedef struct {
+	ExceptionFrame frames[MAX_EXCEPTION_DEPTH];
+	int depth;
+
+	bool exception_thrown;
+	ActionVar exception_value;
+
+	bool return_pending;
+	ActionVar return_value;
+} ExceptionState;
+
+static ExceptionState g_exception_state = {0};
 
 // Per-call-frame `this` binding stack (mirrors Ruffle's Activation.this)
 // This is separate from the scope chain — GetVariable("this") checks this stack
@@ -33624,34 +33647,98 @@ void actionSetMember(SWFAppContext* app_context)
 					}
 					handled = 1;
 				}
-				// mapPoint: must be a Point object; clone it, truncate x/y to int
+				// mapPoint: coerce x/y via valueOf (may throw), store Point, re-throw
+				// Matches Ruffle: both x/y are coerced eagerly, point is stored even
+				// if valueOf throws, then the error is re-thrown to the caller.
 				else if (prop_name_len == 8 && memcmp(prop_name, "mapPoint", 8) == 0) {
+					int mp_x_err = 0, mp_y_err = 0;
+					ActionVar mp_first_exc = {0};
+
 					if (value_var.type == ACTION_STACK_VALUE_OBJECT && value_var.data.numeric_value != 0) {
 						ASObject* pt = (ASObject*)(uintptr_t)value_var.data.numeric_value;
 						ActionVar* px = getProperty(pt, "x", 1);
 						ActionVar* py = getProperty(pt, "y", 1);
-						if (px && py) {
-							int ix = (int)varToDoubleSimple(px);
-							int iy = (int)varToDoubleSimple(py);
+						int32_t ix = 0, iy = 0;
+
+						// Coerce x via valueOf if property exists (may throw)
+						if (px != NULL) {
+							u32 _sp0 = SP; u32 _sc0 = scope_depth;
+							int _ed0 = g_exception_state.depth;
+							if (_ed0 < MAX_EXCEPTION_DEPTH) {
+								g_exception_state.frames[_ed0].saved_scope_depth = scope_depth;
+								g_exception_state.frames[_ed0].has_jmp_buf = 1;
+								if (setjmp(g_exception_state.frames[_ed0].handler) == 0) {
+									g_exception_state.depth = _ed0 + 1;
+									double dx = tsArgToDouble_ctx(app_context, px);
+									ix = (int32_t)(int64_t)dx;
+									g_exception_state.depth = _ed0;
+								} else {
+									mp_x_err = 1;
+									mp_first_exc = g_exception_state.exception_value;
+									ix = INT32_MIN;
+									g_exception_state.depth = _ed0;
+									g_exception_state.exception_thrown = false;
+									scope_depth = _sc0; SP = _sp0;
+								}
+							} else {
+								ix = (int32_t)(int64_t)varToDoubleSimple(px);
+							}
+						}
+
+						// Coerce y via valueOf if property exists (may throw)
+						if (py != NULL) {
+							u32 _sp0 = SP; u32 _sc0 = scope_depth;
+							int _ed0 = g_exception_state.depth;
+							if (_ed0 < MAX_EXCEPTION_DEPTH) {
+								g_exception_state.frames[_ed0].saved_scope_depth = scope_depth;
+								g_exception_state.frames[_ed0].has_jmp_buf = 1;
+								if (setjmp(g_exception_state.frames[_ed0].handler) == 0) {
+									g_exception_state.depth = _ed0 + 1;
+									double dy = tsArgToDouble_ctx(app_context, py);
+									iy = (int32_t)(int64_t)dy;
+									g_exception_state.depth = _ed0;
+								} else {
+									mp_y_err = 1;
+									if (!mp_x_err) mp_first_exc = g_exception_state.exception_value;
+									iy = INT32_MIN;
+									g_exception_state.depth = _ed0;
+									g_exception_state.exception_thrown = false;
+									scope_depth = _sc0; SP = _sp0;
+								}
+							} else {
+								iy = (int32_t)(int64_t)varToDoubleSimple(py);
+							}
+						}
+
+						// Build Point: use coerced values only if BOTH properties exist
+						if (px != NULL && py != NULL) {
 							ActionVar vx = makeF64((double)ix), vy = makeF64((double)iy);
 							ASObject* cloned_pt = createPointObj(app_context, &vx, &vy);
 							value_var.type = ACTION_STACK_VALUE_OBJECT;
 							value_var.data.numeric_value = (u64)cloned_pt;
 						} else {
-							// Not a valid Point: set to Point(0,0)
 							ActionVar vx = makeF64(0), vy = makeF64(0);
 							ASObject* def_pt = createPointObj(app_context, &vx, &vy);
 							value_var.type = ACTION_STACK_VALUE_OBJECT;
 							value_var.data.numeric_value = (u64)def_pt;
 						}
 					} else {
-						// null/undefined/non-object: set to Point(0,0)
+						// Non-object: Point(0,0)
 						ActionVar vx = makeF64(0), vy = makeF64(0);
 						ASObject* def_pt = createPointObj(app_context, &vx, &vy);
 						value_var.type = ACTION_STACK_VALUE_OBJECT;
 						value_var.data.numeric_value = (u64)def_pt;
 					}
-					handled = 1;
+
+					// Store the point on the filter (Ruffle: state commits before throw)
+					setProperty(app_context, obj, "mapPoint", 8, &value_var);
+
+					// Re-throw captured valueOf error (x error takes priority over y)
+					if (mp_x_err || mp_y_err) {
+						pushVar(app_context, &mp_first_exc);
+						actionThrow(app_context);
+					}
+					return;
 				}
 				// colors, alphas, ratios: gradient filter array sync (GradientBevel/GradientGlow)
 				// Ruffle semantics: colors changes num_colors; alphas doesn't; ratios only reduces
@@ -41085,28 +41172,7 @@ void actionWithEnd(SWFAppContext* app_context)
 // Exception Handling (Try-Catch-Finally)
 // ============================================================================
 
-#include <setjmp.h>
-
-#define MAX_EXCEPTION_DEPTH 16
-
-typedef struct {
-	jmp_buf handler;
-	int has_jmp_buf;
-	u32 saved_scope_depth;
-} ExceptionFrame;
-
-typedef struct {
-	ExceptionFrame frames[MAX_EXCEPTION_DEPTH];
-	int depth;
-
-	bool exception_thrown;
-	ActionVar exception_value;
-
-	bool return_pending;
-	ActionVar return_value;
-} ExceptionState;
-
-static ExceptionState g_exception_state = {0};
+// Exception types moved to top of file (needed by filter property setters)
 
 static void uncaughtException(ActionVar* throw_value)
 {

@@ -1,6 +1,6 @@
 # Current Ruffle Test Status
 
-Last updated: 2026-04-02
+Last updated: 2026-04-03
 
 ## Quick Summary
 
@@ -8,6 +8,8 @@ Last updated: 2026-04-02
 - **Image test baseline**: **14/31 strict image match** (+2: bitmap_data_colortransform, bitmap_data_copypixels). **10/31 tolerance pass** (within test.toml limits).
 - **Main failure types**: output_mismatch (48), runtime_segfault (1), timeout (1)
 - **Known regressions**: `global_instance_decls` 40→23 (unclear root cause, test at 3% pass rate).
+- **Latest fixes (2026-04-03)**:
+  - **displacementmapfilter_mappoint_throw_error PASS (13/13)** — valueOf throw propagation in mapPoint setter. Local setjmp exception handlers around tsArgToDouble_ctx coercion; state commits before re-throw. Moved ExceptionState types earlier in action.c.
 - **Latest fixes (2026-04-02)**:
   - **bitmap_data_colortransform image PASS** (0 outliers, max diff 4) — Flash bug: colorTransform with only aMult > 1 has no effect. Added early-return check.
   - **bitmap_data_copypixels image PASS** (0 outliers, pixel-perfect) — Three fixes:
@@ -148,6 +150,7 @@ All other previously near-passing tests have been fixed. 146 tests were tracked 
 | FOCUS_FOCUSRECT_PLAN | 4/4 (1237 lines each) |
 | SOUND_CLASS_PLAN (Phase 0) | register_class_with_sound, sound |
 | UNLOAD_PLAN | 5/6 (unload_nested_child now PASS) |
+| DISPLACEMENTMAPFILTER_PLAN | 13/13 |
 
 ### Blocked plans
 | Plan | Status | Blocker |
@@ -166,11 +169,11 @@ All other previously near-passing tests have been fixed. 146 tests were tracked 
 ### Actionable — Quick wins (all exhausted)
 All previous quick wins have been fixed. See `SESSION_NOTES.md` for details.
 
-### Remaining failing tests (filtered: 12 tests)
+### Remaining failing tests (filtered: 11 tests)
 Remaining failures require:
 - **Global enumeration order**: global_proto_decls, global_instance_decls, global_proto_decls_delete (GLOBALS_PLAN Phase 8 blocked)
 - **Mouse/input dispatch**: edittext_drag_select, edittext_ime_focus_lost
-- **Missing features**: localconnection, asfunction, sandbox_type_remote, displacementmapfilter_mappoint_throw_error
+- **Missing features**: localconnection, asfunction, sandbox_type_remote
 - **Shape-accurate hitTest**: movieclip_hittest_shapeflag (curves/strokes accuracy)
 - **Other**: swf5_xml_event_handler_context, movieclip_methods_with_loaded_image
 
