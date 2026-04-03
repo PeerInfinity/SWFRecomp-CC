@@ -3,7 +3,7 @@
 
 <!-- PLAN_META
 id: NETCONNECTION
-status: incomplete
+status: blocked
 phases:
   - id: 1
     name: "NetConnection state machine (connect/close)"
@@ -23,9 +23,15 @@ blockers:
     reason: "Phase 4 blocked on AMF codec + HTTP client infrastructure"
 -->
 
-Last updated: 2026-03-31
+Last updated: 2026-04-03
 
-## Status: PHASES 1-3 COMPLETE — netconnection_close 39/39 PASS, netconnection_send_remote blocked
+## Status: BLOCKED — netconnection_close 39/39 PASS, netconnection_send_remote blocked on AMF + HTTP
+
+### Blocker (2026-04-03)
+
+`netconnection_send_remote` requires AMF serialization/deserialization, HTTP POST via Navigator::fetch,
+async response dispatch, and `log_fetch` infrastructure. None of this exists in the runtime.
+This is a full networking stack requirement — not implementable without significant new infrastructure.
 
 ### Implementation (2026-03-31)
 

@@ -3,7 +3,7 @@
 
 <!-- PLAN_META
 id: TELLTARGET
-status: incomplete
+status: complete
 phases:
   - id: 1
     name: "g_base_clip tracking + actionSetTarget rewrite"
@@ -12,40 +12,38 @@ phases:
     name: "ActionSetTarget2 UNDEFINED handling + slash-path walk"
     status: complete
 dependencies: []
-blockers:
-  - blocker: 9
-    reason: "string_paths_eval blocked on duplicate onPress dispatch"
+blockers: []
 -->
 
-Last updated: 2026-03-13
+Last updated: 2026-04-03
 
-## Status: PHASES 1-2 COMPLETE — 19/22 PASS, 2 accepted/ignored, 1 blocked
+## Status: COMPLETE — 20/22 PASS, 2 accepted/ignored
 
-### Results (2026-03-13)
-- `tell_target` ✅ — **PASS**
-- `tell_target_invalid` ✅ — **PASS**
-- `tell_target_invalid_swf6` ✅ — **PASS**
-- `slash_syntax` ✅ — **PASS**
-- `string_paths_basic` ✅ — **PASS**
-- `target_clip_removed` ✅ — **PASS**
-- `target_clip_swf5` ✅ — **PASS**
-- `target_clip_swf6` ✅ — **PASS**
-- `target_path` ✅ — **PASS**
-- `path_string` ✅ — **PASS**
-- `get_variable_in_scope` ✅ — **PASS**
-- `string_paths_hidden` ✅ — **PASS**
-- `string_paths_variable_alias` ✅ — **PASS**
-- `lock_root` ✅ — **PASS**
-- `string_paths_other` ✅ — **PASS**
-- `string_paths_unload` ✅ — **PASS**
-- `string_paths_eval2` ✅ — **PASS** (was 5/7, now fixed)
-- `string_paths_variable_scopes` ✅ — **PASS** (was 0/5, now fixed)
-- `removed_target_clip_scope` ✅ — **PASS** (was 16/37, now fixed)
-- `string_paths_eval` — FAIL (blocked: onPress handler fires twice — duplicate dispatch from both clip event and AS2 handler paths)
+### Results (2026-04-03)
+- `tell_target` ✅ — **PASS** (37/37)
+- `tell_target_invalid` ✅ — **PASS** (6/6)
+- `tell_target_invalid_swf6` ✅ — **PASS** (5/5)
+- `slash_syntax` ✅ — **PASS** (14/14)
+- `string_paths_basic` ✅ — **PASS** (4/4)
+- `target_clip_removed` ✅ — **PASS** (5/5)
+- `target_clip_swf5` ✅ — **PASS** (2/2)
+- `target_clip_swf6` ✅ — **PASS** (2/2)
+- `target_path` ✅ — **PASS** (14/14)
+- `path_string` ✅ — **PASS** (322/322)
+- `get_variable_in_scope` ✅ — **PASS** (29/29)
+- `string_paths_hidden` ✅ — **PASS** (54/54)
+- `string_paths_variable_alias` ✅ — **PASS** (4/4)
+- `lock_root` ✅ — **PASS** (1/1)
+- `string_paths_other` ✅ — **PASS** (36/36)
+- `string_paths_unload` ✅ — **PASS** (1/1)
+- `string_paths_eval2` ✅ — **PASS** (7/7)
+- `string_paths_variable_scopes` ✅ — **PASS** (5/5)
+- `removed_target_clip_scope` ✅ — **PASS** (35/35)
+- `string_paths_eval` ✅ — **PASS** (4/4) (previously blocked on duplicate onPress dispatch — now fixed)
 - `string_paths_reference_launder` — IGNORED (Ruffle `known_failure = true`; added to ACCEPTED_DIFFS.md and ignored_tests.txt)
 - `removed_base_clip_tell_target` — IGNORED (line 1 is Ruffle-internal debug message, not Flash behavior; already in ignored_tests.txt)
 
-**Summary: 19/22 tests fully passing. 2 tests accepted/ignored. 1 test blocked (string_paths_eval: duplicate onPress dispatch).**
+**Summary: 20/22 tests fully passing. 2 tests accepted/ignored. Plan complete.**
 
 ### What's New (Phase 2 progress)
 - **actionGetMember `_root` builtin**: MC property `_root` returns root_movieclip (enables `mc._root` access)

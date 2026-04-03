@@ -3,7 +3,7 @@
 
 <!-- PLAN_META
 id: DRAWING_API_RENDERING
-status: in_progress
+status: blocked
 phases:
   - id: 1
     name: "Test existing infrastructure in headless mode"
@@ -12,15 +12,19 @@ phases:
     name: "Fix gradient type and linearRGB rendering"
     status: complete
   - id: 3
+    name: "Replace fan tessellation with libtess2"
+    status: complete
+  - id: 4
+    name: "Normalize gradient coordinates and adaptive bezier"
+    status: complete
+  - id: 5
     name: "Remaining anti-aliasing / focal radial precision"
     status: blocked
-  - id: 4
-    name: "Test all affected tests"
-    status: in_progress
 dependencies: []
 blockers:
   - "Focal radial gradient precision (8689 outliers in movieclip_begin_gradient_fill)"
   - "Edge anti-aliasing differences (10096 outliers in movieclip_setmask at tolerance 0)"
+  - "Different tessellator algorithms (libtess2 vs Lyon) produce different edge coverage"
 -->
 
 Last updated: 2026-04-03

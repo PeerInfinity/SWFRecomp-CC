@@ -9,6 +9,9 @@ Last updated: 2026-04-03
 - **Main failure types**: output_mismatch (48), runtime_segfault (1), timeout (1)
 - **Known regressions**: `global_instance_decls` 40→23 (unclear root cause, test at 3% pass rate).
 - **Latest fixes (2026-04-03)**:
+  - **Drawing API gradient rendering fixes** — Three bugs fixed in beginGradientFill/lineGradientStyle: (1) focal type upgrade applied to linear gradients, (2) varToDouble garbage for string args, (3) linearRGB ramp stored in sRGB instead of linear color space. Image outliers: movieclip_begin_gradient_fill 77089→10943 (86% reduction), movieclip_line_gradient_style 32510→6053 (81% reduction). See `_investigation/RENDERING_PIPELINE_COMPARISON.md`.
+  - **libtess2 tessellation** — Replaced Drawing API fan triangulation with constrained Delaunay (libtess2 library). Added adaptive bezier flattening (1/4/8/16 segments based on curvature).
+  - **Gradient coordinate normalization** — Inverse gradient matrix now outputs [0,1] UVs matching Ruffle's conventions.
   - **displacementmapfilter_mappoint_throw_error PASS (13/13)** — valueOf throw propagation in mapPoint setter. Local setjmp exception handlers around tsArgToDouble_ctx coercion; state commits before re-throw. Moved ExceptionState types earlier in action.c.
 - **Latest fixes (2026-04-02)**:
   - **bitmap_data_colortransform image PASS** (0 outliers, max diff 4) — Flash bug: colorTransform with only aMult > 1 has no effect. Added early-return check.
@@ -151,6 +154,8 @@ All other previously near-passing tests have been fixed. 146 tests were tracked 
 | SOUND_CLASS_PLAN (Phase 0) | register_class_with_sound, sound |
 | UNLOAD_PLAN | 5/6 (unload_nested_child now PASS) |
 | DISPLACEMENTMAPFILTER_PLAN | 13/13 |
+| TELLTARGET_PLAN | 20/22 (2 accepted/ignored) |
+| DRAWING_API_RENDERING | mask_with_drawing IMAGE PASS; gradient outliers reduced 80-86% |
 
 ### Blocked plans
 | Plan | Status | Blocker |
@@ -160,9 +165,9 @@ All other previously near-passing tests have been fixed. 146 tests were tracked 
 | CLONE_DUPLICATE_PLAN | 4/8 pass | Textfield mouse events |
 | LOADMOVIE_PLAN | 32/35 pass | mcl_replace_root accepted diffs |
 | ROOT_REPLACEMENT_PLAN | 1/4 pass | MTASC class support + cross-version scope |
-| TELLTARGET_PLAN | 15/17 pass | removed_base_clip_tell_target (Ruffle trace msg), string_paths_reference_launder (Ruffle known_failure) |
 | HIT_TESTING_PLAN | 5+ pass | movieclip_hittest_shapeflag (shape accuracy) |
 | LOADMOVIE_REMAINING_PLAN | 0/5 | setTimeout, cross-version/__proto__ |
+| DRAWING_API_RENDERING | 3 tests improved | Focal radial precision, edge anti-aliasing (see RENDERING_PIPELINE_COMPARISON.md) |
 
 ## Recommended Work Order (updated 2026-03-15)
 
