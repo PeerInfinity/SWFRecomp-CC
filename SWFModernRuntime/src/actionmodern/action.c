@@ -27009,12 +27009,28 @@ static void ensureGlobalInit(SWFAppContext* app_context)
 
 		// String.prototype (g_ctors[2])
 		if (g_ctors[2].prototype_obj == NULL) {
-			g_ctors[2].prototype_obj = allocObject(app_context, 8);
+			g_ctors[2].prototype_obj = allocObject(app_context, 20);
 			retainObject(g_ctors[2].prototype_obj);
 			setObjectProto(app_context, g_ctors[2].prototype_obj);
 		}
 		setPropertyWithFlags(app_context, g_ctors[2].prototype_obj, "valueOf", 7, &vo_val, PROPERTY_FLAG_WRITABLE);
 		setPropertyWithFlags(app_context, g_ctors[2].prototype_obj, "toString", 8, &ts_val, PROPERTY_FLAG_WRITABLE);
+		// Core String methods — implemented as builtins in actionCallMethod(STRING),
+		// but need to be registered on String.prototype for typeof/hasOwnProperty checks.
+		{
+			const u8 sf = PROPERTY_FLAG_WRITABLE;
+			addStubMethodToProto(app_context, g_ctors[2].prototype_obj, "toUpperCase", 11, sf);
+			addStubMethodToProto(app_context, g_ctors[2].prototype_obj, "toLowerCase", 11, sf);
+			addStubMethodToProto(app_context, g_ctors[2].prototype_obj, "charAt", 6, sf);
+			addStubMethodToProto(app_context, g_ctors[2].prototype_obj, "charCodeAt", 10, sf);
+			addStubMethodToProto(app_context, g_ctors[2].prototype_obj, "concat", 6, sf);
+			addStubMethodToProto(app_context, g_ctors[2].prototype_obj, "indexOf", 7, sf);
+			addStubMethodToProto(app_context, g_ctors[2].prototype_obj, "lastIndexOf", 11, sf);
+			addStubMethodToProto(app_context, g_ctors[2].prototype_obj, "slice", 5, sf);
+			addStubMethodToProto(app_context, g_ctors[2].prototype_obj, "substring", 9, sf);
+			addStubMethodToProto(app_context, g_ctors[2].prototype_obj, "split", 5, sf);
+			addStubMethodToProto(app_context, g_ctors[2].prototype_obj, "substr", 6, sf);
+		}
 
 		// Boolean.prototype (g_ctors[4])
 		if (g_ctors[4].prototype_obj == NULL) {
@@ -28741,6 +28757,21 @@ check_special_vars:
 					ActionVar _ts = {0}; _ts.type = ACTION_STACK_VALUE_FUNCTION;
 					_ts.data.numeric_value = (u64)&g_prim_wrapper_toString_func;
 					setPropertyWithFlags(app_context, g_string_constructor.prototype_obj, "toString", 8, &_ts, PROPERTY_FLAG_WRITABLE);
+				}
+				// Core String methods on prototype (for typeof/hasOwnProperty checks)
+				{
+					const u8 sf = PROPERTY_FLAG_WRITABLE;
+					addStubMethodToProto(app_context, g_string_constructor.prototype_obj, "toUpperCase", 11, sf);
+					addStubMethodToProto(app_context, g_string_constructor.prototype_obj, "toLowerCase", 11, sf);
+					addStubMethodToProto(app_context, g_string_constructor.prototype_obj, "charAt", 6, sf);
+					addStubMethodToProto(app_context, g_string_constructor.prototype_obj, "charCodeAt", 10, sf);
+					addStubMethodToProto(app_context, g_string_constructor.prototype_obj, "concat", 6, sf);
+					addStubMethodToProto(app_context, g_string_constructor.prototype_obj, "indexOf", 7, sf);
+					addStubMethodToProto(app_context, g_string_constructor.prototype_obj, "lastIndexOf", 11, sf);
+					addStubMethodToProto(app_context, g_string_constructor.prototype_obj, "slice", 5, sf);
+					addStubMethodToProto(app_context, g_string_constructor.prototype_obj, "substring", 9, sf);
+					addStubMethodToProto(app_context, g_string_constructor.prototype_obj, "split", 5, sf);
+					addStubMethodToProto(app_context, g_string_constructor.prototype_obj, "substr", 6, sf);
 				}
 
 				g_string_constructor_init = 1;
