@@ -3,9 +3,9 @@
 *Tests on the [ignored list](ruffle-tests/ignored_tests.txt) are excluded.*  
 *See [RUFFLE_RESULTS.md](RUFFLE_RESULTS.md) for unfiltered results.*
 
-**Commit:** `82bf8b804cb6`  
-**Date:** 2026-04-03 16:28 UTC  
-**Total duration:** 4h37m24s
+**Commit:** `bbe171d20f4f`  
+**Date:** 2026-04-03 16:55 UTC  
+**Total duration:** 4h34m29s
 
 ## Results by Suite
 
@@ -97,36 +97,36 @@ Tests verified against Flash's actual output (`output.flash.txt`).
 
 - **Pass:** 564/566 (99.6%)
 - **Ignored:** 54 tests
-- **Duration:** 3h06m16s across 30 shards
+- **Duration:** 3h04m40s across 30 shards
 - **Lines:** 71,411/71,435 matching (99.97%)
-- **Avg test duration:** 17.9s — slowest: `movieclip_invalid_get_bounds_7` (40.5s)
+- **Avg test duration:** 17.7s — slowest: `movieclip_invalid_get_bounds_7` (44.2s)
 
 ### from_gnash/actionscript.all
 
 - **Pass:** 68/181 (37.6%)
 - **Ignored:** 9 tests
-- **Duration:** 1h06m12s across 30 shards
+- **Duration:** 1h05m14s across 30 shards
 - **Lines:** 10,949/15,444 matching (70.9%)
-- **Avg test duration:** 20.6s — slowest: `array-v5` (45.9s)
+- **Avg test duration:** 20.4s — slowest: `array-v5` (43.4s)
 
 ### from_gnash/misc-swfmill.all
 
 - **Pass:** 11/14 (78.6%)
-- **Duration:** 4m08s across 30 shards
+- **Duration:** 4m05s across 30 shards
 - **Lines:** 25/29 matching (86.2%)
-- **Avg test duration:** 17.7s — slowest: `func_dict` (18.8s)
+- **Avg test duration:** 17.5s — slowest: `initaction_in_definesprite` (18.3s)
 
 ### from_shumway
 
 - **Pass:** 17/17 (100%)
 - **Ignored:** 30 tests
-- **Duration:** 13m54s across 30 shards
+- **Duration:** 13m41s across 30 shards
 - **Lines:** 35/35 matching (100%)
-- **Avg test duration:** 17.8s — slowest: `button3` (19.0s)
+- **Avg test duration:** 17.5s — slowest: `invalidClipDepth` (18.2s)
 
 ### from_shumway/avm1
 
 - **Pass:** 12/23 (52.2%)
-- **Duration:** 6m52s across 30 shards
+- **Duration:** 6m46s across 30 shards
 - **Lines:** 118/311 matching (37.9%)
-- **Avg test duration:** 17.9s — slowest: `watch` (19.3s)
+- **Avg test duration:** 17.6s — slowest: `watch` (19.4s)
