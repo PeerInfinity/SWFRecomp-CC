@@ -58,6 +58,10 @@ The test expects 2 lines: the debug trace + "GOOD!". Our output is just "GOOD!" 
 
 **Decision:** Accept as Ruffle-specific debug output. Add to ignored_tests.txt.
 
+---
+
+*See also: `FLASH_BUGS_REPLICATED.md` for documented Flash bugs we deliberately replicate (where Flash and Ruffle agree on the buggy behavior).*
+
 ## TextFormat `display` Property in Expected Output
 
 **Test:** `edittext_default_format_empty` (97/100)

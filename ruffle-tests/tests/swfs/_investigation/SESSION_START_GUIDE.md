@@ -38,6 +38,8 @@ Each `_results/` directory contains: `results.json`, `results.md`, `results_filt
 |----------|---------|
 | `avm1/_investigation/ACCEPTED_DIFFS.md` | Tests with permanently unfixable diffs (Flash UB, platform UB, Ruffle test bugs) |
 | `avm1/_investigation/RUFFLE_VS_FLASH_DIFFERENCES.md` | Tests where Ruffle's expected output disagrees with Flash Player |
+| `avm1/_investigation/RUFFLE_COMPAT_TWEAKS.md` | Arbitrary implementation choices to match Ruffle where behavior is unclear |
+| `avm1/_investigation/FLASH_BUGS_REPLICATED.md` | Documented Flash Player bugs we deliberately replicate |
 | `ruffle-tests/ignored_tests.txt` | ~56 AVM1 tests excluded from filtered results |
 
 ## How to Run Tests

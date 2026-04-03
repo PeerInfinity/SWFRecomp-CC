@@ -8,6 +8,7 @@ and we chose the value that makes the Ruffle test pass.
 This is distinct from:
 - `ACCEPTED_DIFFS.md` — tests that can never match (UB, platform-specific, etc.)
 - `RUFFLE_VS_FLASH_DIFFERENCES.md` — cases where we match Flash but Ruffle disagrees
+- `FLASH_BUGS_REPLICATED.md` — documented Flash bugs we deliberately replicate
 
 ---
 
