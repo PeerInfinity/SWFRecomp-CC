@@ -2,13 +2,13 @@
 
 Cross-suite summary of all Ruffle-derived test suites. Each suite has its own `_investigation/` directory with detailed status docs.
 
-Last updated: 2026-04-01 (CI run on 4d81e2b9)
+Last updated: 2026-04-03 (CI run on bbe171d2)
 
 ## Suite Summary
 
 | Suite | Tests | Passing | Rate | Filtered Rate | Notes |
 |-------|-------|---------|------|---------------|-------|
-| [avm1](../avm1/_investigation/CURRENT_STATUS.md) | 620 | 569 | 91.8% | **98.9%** (563/569) | Mature. Near-ceiling. |
+| [avm1](../avm1/_investigation/CURRENT_STATUS.md) | 620 | 572 | 92.3% | **99.6%** (564/566) | Near-ceiling. Only 2 filtered failures remain. |
 | [from_gnash/actionscript.all](../from_gnash/_investigation/CURRENT_STATUS.md) | 190 | ~61 | ~32.1% | **~33.7%** (~61/181) | 9 accepted-diff tests ignored. +3 from Color fixes. |
 | [from_gnash/misc-swfmill.all](../from_gnash/_investigation/CURRENT_STATUS.md) | 14 | 11 | **78.6%** | — | 3 blocked on architecture. |
 | [from_shumway](../from_shumway/_investigation/CURRENT_STATUS.md) | 47 | 17 | 36.2% | **100.0%** (17/17) | **Complete.** All AVM1 tests pass. 30 AVM2 ignored. |
@@ -88,6 +88,7 @@ Note: Boolean-v5/v6/v7/v8, Video-v6/v7/v8, Selection-v5, Stage-v5 were already p
 
 ## Where to Focus
 
-1. **Gnash Phase 2 fixes** (Color, Inheritance, toString_valueOf) — targeted fixes for near-passing tests at 80-95% match rate.
-2. **AVM1 suite** is at 97.2% filtered and remaining failures are blocked or diminishing-returns.
-3. **Shumway** is complete (100% AVM1).
+1. **AVM1 filtered failures** — Only 2 remain: `asfunction` (needs hyperlink hit testing) and `movieclip_hittest_shapeflag` (needs curve/stroke precision).
+2. **AVM1 image tests** — 14/31 strict pass, remaining need Drawing API anti-aliasing, text layout, dynamic masks, or external media loading.
+3. **Gnash Phase 2 fixes** (Color, Inheritance, toString_valueOf) — targeted fixes for near-passing tests at 80-95% match rate.
+4. **Shumway** is complete (100% AVM1).

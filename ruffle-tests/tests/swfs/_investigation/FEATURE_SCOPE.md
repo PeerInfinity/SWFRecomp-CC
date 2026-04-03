@@ -3,7 +3,7 @@
 This document explains which Flash/AVM1 features the SWFRecomp project implements,
 which it does not yet, and the reasoning behind those decisions.
 
-Last updated: 2026-03-28
+Last updated: 2026-04-03
 
 ---
 
@@ -19,8 +19,8 @@ plus an internal hand-written test suite. Current pass rates:
 
 | Suite | Filtered Pass Rate |
 |-------|-------------------|
-| AVM1 (Ruffle) trace | 97.9% (562/574) |
-| AVM1 (Ruffle) image | 9/31 tolerance pass (7/31 strict match) |
+| AVM1 (Ruffle) trace | 99.6% (564/566) |
+| AVM1 (Ruffle) image | 14/31 strict match (10/31 tolerance pass) |
 | Shumway AVM1 | 100% (17/17) |
 | Gnash | ~34% (61/181) |
 | Internal tests | 100% (158/158 trace + 59/59 graphics) |
@@ -60,11 +60,10 @@ on CPU via software rasterization. Tests with `[image_comparisons]` in their
 `test.toml` are validated by comparing rendered PNGs against expected PNGs from
 the Ruffle test suite.
 
-Currently 9/31 image tests pass within tolerance. See
+Currently 14/31 image tests pass with strict pixel match (10/31 within tolerance). See
 `avm1/_investigation/IMAGE_COMPARISON_TESTS.md` for detailed status and tier
-breakdown of remaining work (runtime transform updates, createTextField rendering,
-drawing API rendering, BitmapData rendering, focus rect rendering, mask rendering,
-external media loading).
+breakdown of remaining work (Drawing API anti-aliasing, createTextField text layout,
+focus rect outline rendering, dynamic mask rendering, external media loading).
 
 ### 3. Graphics mode (WASM/WebGPU)
 
@@ -129,8 +128,9 @@ well-tested across hundreds of test cases.
 - **Stage**: Properties (width, height, scaleMode, align, showMenu, displayState),
   onResize callback
 - **Selection**: setFocus, getFocus, setSelection, getBeginIndex/getCaretIndex/getEndIndex
-- **Sound**: Constructor, attachSound, start, stop, setVolume/getVolume, setPan/getPan,
-  setTransform/getTransform, duration, position
+- **Sound**: Constructor, attachSound, loadSound (embedded MP3 via minimp3), start, stop,
+  setVolume/getVolume, setPan/getPan, setTransform/getTransform, getDuration/getPosition,
+  duration/position native getters, onLoad/onSoundComplete/onID3 callback lifecycle
 - **SharedObject**: getLocal with data object (in-memory only, no persistence)
 - **ExternalInterface**: available, addCallback, call (via test harness mock)
 - **AsBroadcaster**: initialize, addListener, removeListener, broadcastMessage
@@ -155,9 +155,18 @@ well-tested across hundreds of test cases.
 - **Shape rendering**: Solid-color filled shapes, correct geometry and positions
 - **Sprite rendering**: Nested sprite composition with unique composed transforms
 - **Transform pipeline**: Static timeline transforms uploaded to GPU; dynamic slot
-  allocation for composed sprite transforms
-- **Color transforms**: Static cxform from timeline via GPU buffer
+  allocation for composed sprite transforms; runtime _x/_y/_xscale/_rotation updates
+  propagated to GPU buffer each frame
+- **Color transforms**: Static cxform from timeline + runtime Color.setRGB()/setTransform()
+  updates via dynamic cxform slots
 - **Clip masking**: Static clip masks from PlaceObject2 clip_depth
+- **Text rendering**: Embedded font glyph tessellation + device font rendering via
+  bundled Noto Sans TTF (stb_truetype); text field background/border rects
+- **BitmapData rendering**: attachBitmap GPU pipeline, all BitmapData pixel operations
+  rendered to texture (fillRect, copyPixels, perlinNoise, pixelDissolve, colorTransform,
+  applyFilter ColorMatrixFilter)
+- **Drawing API rendering**: Runtime shapes tessellated via libtess2 with adaptive
+  bezier flattening; solid fills, gradient fills (linear/radial/focal radial)
 - **Stage origin**: Correct viewport for SWFs with non-zero stage origin
 - **Frame capture**: PNG output at configurable frame triggers for image comparison
 
@@ -182,12 +191,12 @@ breakdown.
 
 | Feature | Status | Tests Affected | Notes |
 |---------|--------|---------------|-------|
-| Runtime transform GPU updates | Not started | display_object_properties, color, many others | _x/_y/_xscale/_rotation changes don't reach GPU buffer |
-| Runtime cxform GPU updates | Not started | color, display_object_properties | Color.setRGB()/setTransform() changes don't reach GPU buffer |
-| createTextField rendering | Not started | frame_size_translated_*, edittext_*, movieclip_create_text_field | Background/border rects + text glyph rendering |
-| Drawing API rendering | Not started | movieclip_begin_gradient_fill, mask_with_drawing, movieclip_setmask | Runtime shapes need tessellation + GPU upload |
-| BitmapData rendering | Not started | 6 bitmap_data_* image tests | Software pixel buffer → GPU texture |
-| Focus rect rendering | Not started | 5 focusrect_* tests | Yellow/black 2px outline on focused element |
+| Runtime transform GPU updates | **Complete** | display_object_properties, color | Per-frame rebuild from MC properties when as_set_flags != 0 |
+| Runtime cxform GPU updates | **Complete** | color, display_object_properties | Dynamic cxform slots + alpha blend state fix |
+| createTextField rendering | **Partial** | frame_size_translated_*, edittext_*, movieclip_create_text_field | Background/border + glyph rendering working; text layout/anti-aliasing differences remain |
+| Drawing API rendering | **Partial** | movieclip_begin_gradient_fill, mask_with_drawing, movieclip_setmask | libtess2 tessellation + gradient rendering working; anti-aliasing precision gaps remain |
+| BitmapData rendering | **Complete** | 6 bitmap_data_* image tests | All 6 image tests pixel-perfect via attachBitmap GPU pipeline |
+| Focus rect rendering | **Partial** | 5 focusrect_* tests | 9/12 focusrect_swf5 captures pass; outline vs solid fill issue remains |
 | Runtime setMask() | Not started | mask_reapply, mask_with_drawing | Dynamic masks (vs static clip_depth) |
 
 ### Audio and Video
@@ -198,11 +207,11 @@ systematically. Video playback is not implemented in any mode.
 
 | Feature | Status | Tests Affected | Notes |
 |---------|--------|---------------|-------|
-| Sound.loadSound() | Stub only | sound_load_start, sound_multiple_load | Needs audio file loading (MP3) |
-| Sound duration/position | Stub only | sound_duration_position_props | Needs playback state tracking |
-| ID3 tag parsing | Not started | sound_id3, sound_id3_prop | Needs MP3 header + ID3v1/v2 parser |
+| Sound.loadSound() | **Implemented** | sound_load_start (PASS), sound_multiple_load (PASS) | Loads embedded MP3 via data registry + minimp3 decoder |
+| Sound duration/position | **Implemented** | sound_duration_position_props (PASS) | getPosition/getDuration, duration/position getters, onID3/onLoad/onSoundComplete lifecycle |
+| ID3 tag parsing | Not started | sound_id3, sound_id3_prop | Needs MP3 header + ID3v1/v2 parser (onID3 dispatch exists, but no tag parsing) |
 | FLV playback | Not started | netstream_play_flv, netstream_play_flv_screen, netstream_seek_flv | Needs FLV demuxer + video codec |
-| NetConnection | Stub only | netconnection_close, netconnection_send_remote | connect/close/isConnected + onStatus |
+| NetConnection | **Partial** | netconnection_close (PASS), netconnection_send_remote | connect(null)/close + onStatus dispatch implemented; remote AMF calls not implemented |
 
 ### Network and External I/O
 
@@ -229,24 +238,24 @@ implemented (62+ tests pass); what's missing is the coordinate-to-character brid
 
 | Feature | Status | Tests Affected | Notes |
 |---------|--------|---------------|-------|
-| Character-level selection from pixel coords | Not started | edittext_drag_select | Maps mouse (x,y) → character index |
-| TextField hyperlink hit testing | Not started | asfunction | Maps mouse (x,y) → which `<a>` link |
-| IME composition | Not started | edittext_ime_focus_lost | Input Method Editor infrastructure |
+| Character-level selection from pixel coords | **Implemented** | edittext_drag_select (PASS) | Mouse drag → character index via glyph advance tables |
+| TextField hyperlink hit testing | Not started | asfunction | Maps mouse (x,y) → which `<a>` link; needs asfunction: protocol handler |
+| IME composition | Not started | edittext_ime_focus_lost | Input Method Editor event injection + composition state tracking |
 
-Headless graphics mode with text rendering would provide the glyph metrics needed
-to implement these. They depend on createTextField rendering (above) as a
-prerequisite.
+Character-level selection was implemented using glyph advance tables from the font
+metrics infrastructure. The remaining two features (hyperlink hit testing and IME)
+can reuse the same character-index-from-pixel-coords infrastructure.
 
 ### Bitmap/Filter Edge Cases
 
-BitmapData is substantially implemented (15/17 trace tests pass). Remaining edge
-cases:
+BitmapData is fully implemented (17/17 trace tests pass). All bitmap/filter edge
+cases have been resolved:
 
 | Feature | Status | Tests Affected | Notes |
 |---------|--------|---------------|-------|
-| DisplacementMapFilter.mapPoint setter | Not started | displacementmapfilter_mappoint_throw_error | Native setter with valueOf coercion + throw propagation |
-| BitmapData.pixelDissolve PRNG | Not started | bitmap_data_pixeldissolve | PRNG sequence matching |
-| Filter clone/complex chains | Not started | bitmap_filters | Segfault in deep filter chains |
+| DisplacementMapFilter.mapPoint setter | **Complete** | displacementmapfilter_mappoint_throw_error (13/13 PASS) | setjmp-based valueOf throw propagation in native setter |
+| BitmapData.pixelDissolve PRNG | **Complete** | bitmap_data_pixeldissolve (1075/1075 PASS) | Feistel network PRNG matching Flash's dissolution pattern |
+| Filter clone/complex chains | **Complete** | bitmap_filters (548/548 PASS) | filter.clone(), mc.filters round-trip, property coercion/clamping, gradient array sync |
 
 ### Multi-SWF Sandbox Security
 
@@ -259,8 +268,8 @@ cases:
 
 | Feature | Status | Tests Affected | Notes |
 |---------|--------|---------------|-------|
-| constructor DONT_ENUM reconciliation | Blocked | global_proto_decls, global_instance_decls, global_proto_decls_delete | Making constructor ENUMERABLE breaks 7+ passing tests |
-| Missing flash.* stubs and constants | Partially done | Same 3 tests | ~20 missing constants, several method stubs |
+| constructor DONT_ENUM reconciliation | **Reclassified** | global_proto_decls (809/4497), global_instance_decls (14/758), global_proto_decls_delete (297/4158) | Ruffle vs Flash difference: Ruffle makes constructor ENUMERABLE, Flash uses DONT_ENUM. Tests moved to ignored list. |
+| Missing flash.* stubs and constants | **Substantially done** | Same 3 tests | Key constants, IME methods, System.security, System.capabilities added. Remaining gap is property enumeration order. |
 
 ---
 
@@ -293,7 +302,7 @@ will also enable testing of audio, video, and resource loading features.
 ### 2. How many tests does it unlock?
 
 Features that fix multiple tests or unlock large line counts are prioritized over
-features that fix a single test. The 90+ completed plans each fixed between 1 and
+features that fix a single test. The 100+ completed plans each fixed between 1 and
 5000+ lines of test output.
 
 ### 3. Is it core AVM1 behavior?
@@ -339,9 +348,7 @@ meet one or more of these criteria:
 
 Tests are **not** ignored simply because they fail. A test remains in the filtered
 results if there is any reasonable prospect of improving it through runtime fixes,
-even if it currently has a low match rate. The `global_proto_decls` family (2-3%
-match rate) remains in filtered results because the failures are due to missing
-stubs, not missing infrastructure.
+even if it currently has a low match rate.
 
 ---
 
@@ -353,6 +360,7 @@ stubs, not missing infrastructure.
 | `avm1/_investigation/ACCEPTED_DIFFS.md` | Tests with permanently unfixable diffs |
 | `avm1/_investigation/RUFFLE_VS_FLASH_DIFFERENCES.md` | Where we match Flash but not Ruffle |
 | `avm1/_investigation/RUFFLE_COMPAT_TWEAKS.md` | Arbitrary choices made to match Ruffle |
+| `avm1/_investigation/FLASH_BUGS_REPLICATED.md` | Known Flash Player bugs we deliberately replicate |
 | `avm1/_investigation/BLOCKER_SUMMARY.md` | Active and resolved blockers |
 | `avm1/_investigation/REMAINING_FAILURES_ANALYSIS.md` | Per-test failure analysis |
 | `avm1/_investigation/blocked/IGNORED_INFRASTRUCTURE_TESTS.md` | Details on ignored network/external tests |
