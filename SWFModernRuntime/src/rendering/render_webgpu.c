@@ -695,7 +695,7 @@ static void create_buffers_and_upload(WebGPURenderContext* ctx)
 
 	// Over-allocate uninv_mat and inv_mat buffers for dynamic gradient + bitmap matrices
 	#define MAX_DYNAMIC_GRADIENTS 64
-	#define MAX_DYNAMIC_BITMAPS 32
+	#define MAX_DYNAMIC_BITMAPS 64
 	{
 		u32 static_mats = ctx->uninv_mat_data_size > 0
 			? (u32)(ctx->uninv_mat_data_size / (16 * sizeof(float))) : 0;

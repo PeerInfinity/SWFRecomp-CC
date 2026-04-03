@@ -9097,6 +9097,11 @@ static ActionVar bitmapDataColorTransform(SWFAppContext* app_context, ActionVar*
     if (y0 < 0) y0 = 0;
     if (x1 > bmp->width) x1 = bmp->width;
     if (y1 > bmp->height) y1 = bmp->height;
+    // Flash bug: if ONLY aMult > 1 and everything else is default, no effect
+    if (aMult > 1.0 && rMult == 1.0 && gMult == 1.0 && bMult == 1.0 &&
+        rOff == 0.0 && gOff == 0.0 && bOff == 0.0 && aOff == 0.0) {
+        return r;
+    }
     for (int py = y0; py < y1; py++) {
         for (int px = x0; px < x1; px++) {
             // Un-multiply, apply transform, re-premultiply
@@ -9326,56 +9331,97 @@ static ActionVar bitmapDataCopyPixels(SWFAppContext* app_context, ActionVar* arg
     }
     int mergeAlpha = 0;
     if (arg_count >= 6) mergeAlpha = (int)varToDoubleSimple(&args[5]);
-    for (int sy = 0; sy < rh; sy++) {
-        for (int sx = 0; sx < rw; sx++) {
-            int src_x = rx + sx;
-            int src_y = ry + sy;
-            int dst_x = dx + sx;
-            int dst_y = dy + sy;
-            if (src_x < 0 || src_x >= src_bmp->width || src_y < 0 || src_y >= src_bmp->height) continue;
-            if (dst_x < 0 || dst_x >= dest_bmp->width || dst_y < 0 || dst_y >= dest_bmp->height) continue;
-            uint32_t src_px = src_bmp->pixels[src_y * src_bmp->width + src_x];
-            if (!dest_bmp->transparent) src_px = src_px | 0xFF000000;
-            // If alpha bitmap provided, modulate source alpha by alpha bitmap's alpha
-            if (alpha_bmp && !alpha_bmp->disposed) {
+    if (alpha_bmp && !alpha_bmp->disposed && alpha_bmp->transparent) {
+        // Transparent alpha bitmap path — blend when mergeAlpha || dest is opaque
+        int alpha_blend = mergeAlpha || !dest_bmp->transparent;
+        for (int sy = 0; sy < rh; sy++) {
+            for (int sx = 0; sx < rw; sx++) {
+                int src_x = rx + sx;
+                int src_y = ry + sy;
+                int dst_x = dx + sx;
+                int dst_y = dy + sy;
+                if (src_x < 0 || src_x >= src_bmp->width || src_y < 0 || src_y >= src_bmp->height) continue;
+                if (dst_x < 0 || dst_x >= dest_bmp->width || dst_y < 0 || dst_y >= dest_bmp->height) continue;
+                // Skip pixels where alpha bitmap is out of bounds (preserve dest)
                 int abx = alpha_pt_x + sx;
                 int aby = alpha_pt_y + sy;
-                uint32_t ab_alpha = 0;
-                if (abx >= 0 && abx < alpha_bmp->width && aby >= 0 && aby < alpha_bmp->height) {
-                    uint32_t ab_px = alpha_bmp->pixels[aby * alpha_bmp->width + abx];
-                    ab_alpha = (ab_px >> 24) & 0xFF;
+                if (abx < 0 || abx >= alpha_bmp->width || aby < 0 || aby >= alpha_bmp->height) continue;
+                uint32_t ab_px = alpha_bmp->pixels[aby * alpha_bmp->width + abx];
+                uint32_t ab_alpha = (ab_px >> 24) & 0xFF;
+                uint32_t src_px = src_bmp->pixels[src_y * src_bmp->width + src_x];
+                // Unpremultiply source, compute new alpha, re-premultiply
+                uint32_t straight = unpremultiplyAlpha(src_px);
+                uint32_t sa = (straight >> 24) & 0xFF;
+                uint32_t sr = (straight >> 16) & 0xFF;
+                uint32_t sg = (straight >> 8) & 0xFF;
+                uint32_t sb = straight & 0xFF;
+                uint32_t final_alpha;
+                if (src_bmp->transparent) {
+                    final_alpha = ((uint32_t)ab_alpha * sa) >> 8;
+                } else {
+                    final_alpha = ab_alpha;
                 }
-                // Scale source by alpha bitmap's alpha (in premultiplied space)
-                uint32_t sa = (src_px >> 24) & 0xFF;
-                uint32_t sr = (src_px >> 16) & 0xFF;
-                uint32_t sg = (src_px >> 8) & 0xFF;
-                uint32_t sb = src_px & 0xFF;
-                sa = sa * ab_alpha / 255;
-                sr = sr * ab_alpha / 255;
-                sg = sg * ab_alpha / 255;
-                sb = sb * ab_alpha / 255;
-                src_px = (sa << 24) | (sr << 16) | (sg << 8) | sb;
+                if (final_alpha > 255) final_alpha = 255;
+                src_px = premultiplyAlpha((final_alpha << 24) | (sr << 16) | (sg << 8) | sb);
+                if (alpha_blend) {
+                    uint32_t dst_px = dest_bmp->pixels[dst_y * dest_bmp->width + dst_x];
+                    uint32_t spa = (src_px >> 24) & 0xFF;
+                    uint32_t inv_sa = 255 - spa;
+                    uint32_t da = (dst_px >> 24) & 0xFF;
+                    uint32_t dr = (dst_px >> 16) & 0xFF;
+                    uint32_t dg = (dst_px >> 8) & 0xFF;
+                    uint32_t db = dst_px & 0xFF;
+                    uint32_t oa = spa + (da * inv_sa) / 255;
+                    uint32_t or_ = ((src_px >> 16) & 0xFF) + (dr * inv_sa) / 255;
+                    uint32_t og = ((src_px >> 8) & 0xFF) + (dg * inv_sa) / 255;
+                    uint32_t ob = (src_px & 0xFF) + (db * inv_sa) / 255;
+                    if (oa > 255) oa = 255;
+                    if (or_ > 255) or_ = 255;
+                    if (og > 255) og = 255;
+                    if (ob > 255) ob = 255;
+                    uint32_t result = (oa << 24) | (or_ << 16) | (og << 8) | ob;
+                    if (!dest_bmp->transparent) result |= 0xFF000000;
+                    dest_bmp->pixels[dst_y * dest_bmp->width + dst_x] = result;
+                } else {
+                    dest_bmp->pixels[dst_y * dest_bmp->width + dst_x] = src_px;
+                }
             }
-            if (mergeAlpha && dest_bmp->transparent) {
-                // Source-over compositing in premultiplied alpha space
-                uint32_t dst_px = dest_bmp->pixels[dst_y * dest_bmp->width + dst_x];
-                uint32_t sa = (src_px >> 24) & 0xFF;
-                uint32_t inv_sa = 255 - sa;
-                uint32_t da = (dst_px >> 24) & 0xFF;
-                uint32_t dr = (dst_px >> 16) & 0xFF;
-                uint32_t dg = (dst_px >> 8) & 0xFF;
-                uint32_t db = dst_px & 0xFF;
-                uint32_t oa = sa + da * inv_sa / 255;
-                uint32_t or_ = ((src_px >> 16) & 0xFF) + dr * inv_sa / 255;
-                uint32_t og = ((src_px >> 8) & 0xFF) + dg * inv_sa / 255;
-                uint32_t ob = (src_px & 0xFF) + db * inv_sa / 255;
-                if (oa > 255) oa = 255;
-                if (or_ > 255) or_ = 255;
-                if (og > 255) og = 255;
-                if (ob > 255) ob = 255;
-                dest_bmp->pixels[dst_y * dest_bmp->width + dst_x] = (oa << 24) | (or_ << 16) | (og << 8) | ob;
-            } else {
-                dest_bmp->pixels[dst_y * dest_bmp->width + dst_x] = src_px;
+        }
+    } else {
+        // No alpha bitmap — blend when (source transparent && dest opaque) || mergeAlpha
+        int blend = (src_bmp->transparent && !dest_bmp->transparent) || mergeAlpha;
+        for (int sy = 0; sy < rh; sy++) {
+            for (int sx = 0; sx < rw; sx++) {
+                int src_x = rx + sx;
+                int src_y = ry + sy;
+                int dst_x = dx + sx;
+                int dst_y = dy + sy;
+                if (src_x < 0 || src_x >= src_bmp->width || src_y < 0 || src_y >= src_bmp->height) continue;
+                if (dst_x < 0 || dst_x >= dest_bmp->width || dst_y < 0 || dst_y >= dest_bmp->height) continue;
+                uint32_t src_px = src_bmp->pixels[src_y * src_bmp->width + src_x];
+                if (blend) {
+                    uint32_t dst_px = dest_bmp->pixels[dst_y * dest_bmp->width + dst_x];
+                    uint32_t sa = (src_px >> 24) & 0xFF;
+                    uint32_t inv_sa = 255 - sa;
+                    uint32_t da = (dst_px >> 24) & 0xFF;
+                    uint32_t dr = (dst_px >> 16) & 0xFF;
+                    uint32_t dg = (dst_px >> 8) & 0xFF;
+                    uint32_t db = dst_px & 0xFF;
+                    uint32_t oa = sa + (da * inv_sa) / 255;
+                    uint32_t or_ = ((src_px >> 16) & 0xFF) + (dr * inv_sa) / 255;
+                    uint32_t og = ((src_px >> 8) & 0xFF) + (dg * inv_sa) / 255;
+                    uint32_t ob = (src_px & 0xFF) + (db * inv_sa) / 255;
+                    if (oa > 255) oa = 255;
+                    if (or_ > 255) or_ = 255;
+                    if (og > 255) og = 255;
+                    if (ob > 255) ob = 255;
+                    uint32_t result = (oa << 24) | (or_ << 16) | (og << 8) | ob;
+                    if (!dest_bmp->transparent) result |= 0xFF000000;
+                    dest_bmp->pixels[dst_y * dest_bmp->width + dst_x] = result;
+                } else {
+                    if (!dest_bmp->transparent) src_px |= 0xFF000000;
+                    dest_bmp->pixels[dst_y * dest_bmp->width + dst_x] = src_px;
+                }
             }
         }
     }

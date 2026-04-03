@@ -1,13 +1,20 @@
 # Current Ruffle Test Status
 
-Last updated: 2026-04-01
+Last updated: 2026-04-02
 
 ## Quick Summary
 
-- **Pass rate (CI, last run)**: 569/620 (91.8%) raw, 563/569 (98.9%) filtered (6 filtered failures)
-- **Image test baseline**: **12/31 strict image match** (+4: bitmap_data_fillrect, bitmap_data_perlinnoise, bitmap_data_pixeldissolve_image, bitmapdata_applyfilter_colormatrix). **10/31 tolerance pass** (within test.toml limits).
-- **Main failure types**: output_mismatch (51), runtime_segfault (1), timeout (1)
+- **Pass rate (CI, last run)**: 570/620 (91.9%) raw, 563/569 (98.9%) filtered (6 filtered failures)
+- **Image test baseline**: **14/31 strict image match** (+2: bitmap_data_colortransform, bitmap_data_copypixels). **10/31 tolerance pass** (within test.toml limits).
+- **Main failure types**: output_mismatch (48), runtime_segfault (1), timeout (1)
 - **Known regressions**: `global_instance_decls` 40→23 (unclear root cause, test at 3% pass rate).
+- **Latest fixes (2026-04-02)**:
+  - **bitmap_data_colortransform image PASS** (0 outliers, max diff 4) — Flash bug: colorTransform with only aMult > 1 has no effect. Added early-return check.
+  - **bitmap_data_copypixels image PASS** (0 outliers, pixel-perfect) — Three fixes:
+    1. MAX_DYNAMIC_BITMAPS 32→64 (test needs ~48 texture layers)
+    2. copyPixels restructured with two-path logic: transparent alpha bitmap (OOB skip, modulation, blend when mergeAlpha||!dest_transparent) vs no-alpha/opaque-alpha (blend when src_transparent&&!dest_transparent || mergeAlpha)
+    3. Non-transparent alpha bitmaps ignored for alpha computation (matching Ruffle)
+  - **BITMAPDATA_RENDERING_PLAN completed** — all 6/6 image tests now passing
 - **Latest fixes (2026-04-01, session 4)**:
   - **global_proto_decls blocker reclassified** — "constructor/__proto__ DONT_ENUM conflict" is a Ruffle vs Flash difference: Ruffle makes Object.prototype methods ENUMERABLE by default and sets constructor as own property on all objects, while Flash uses DONT_ENUM and inherits constructor. See RUFFLE_VS_FLASH_DIFFERENCES.md.
   - **AsBroadcaster function own_props** — g_ab_addListener/removeListener/broadcastMessage now have own_props (constructor + __proto__) + selective prototype creation (addListener/removeListener get prototypes, broadcastMessage does not)
@@ -99,6 +106,7 @@ All other previously near-passing tests have been fixed. 146 tests were tracked 
 | Plan | Tests Passing |
 |------|--------------|
 | IMAGE_PLAN_01 | display_object_properties, color (trace); 2/31 image tests |
+| BITMAPDATA_RENDERING | 6/6 image tests pixel-perfect (colortransform, copypixels, fillrect, perlinnoise, pixeldissolve, colormatrix) |
 | DATE_PLAN | 8+ tests; `date` at ~99.2% |
 | TRY_CATCH_PLAN | `try_catch_finally` 118/118 |
 | MATH_PLAN | 4/4 |

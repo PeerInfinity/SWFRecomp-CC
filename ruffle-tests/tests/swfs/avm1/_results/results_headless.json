@@ -1,36 +1,146 @@
 {
   "metadata": {
-    "timestamp": "2026-03-29T01:40:08.219912+00:00",
-    "git_sha": "aff0870066b3d506f32bc4e4255f457869d2de4a",
-    "duration_seconds": 90.34,
-    "total_available": 2
+    "timestamp": "2026-04-03T02:34:40.858081+00:00",
+    "git_sha": "986fd654b2e2fde13d851c7e044e74db57c9fe51",
+    "duration_seconds": 271.73,
+    "total_available": 6
   },
-  "total": 2,
-  "pass": 2,
+  "total": 6,
+  "pass": 6,
   "fail": 0,
   "pass_rate": 100.0,
   "breakdown": {},
   "tests": [
     {
-      "test": "focusrect_property_swf6",
-      "num_frames": 2,
+      "test": "bitmap_data_colortransform",
+      "num_frames": 1,
       "lines": {
-        "actual_lines": 1237,
-        "expected_lines": 1237,
-        "matching_lines": 1237
+        "actual_lines": 0,
+        "expected_lines": 0,
+        "matching_lines": 0
       },
-      "duration": 45.34,
+      "duration": 45.7,
+      "image_comparisons": {
+        "output": {
+          "status": "pass",
+          "message": "Image check passed: 0 outliers (limit 0), max difference 4",
+          "max_diff": 4,
+          "trigger": [
+            "last_frame"
+          ],
+          "known_failure": false
+        }
+      },
       "status": "pass"
     },
     {
-      "test": "focusrect_property_swf7",
+      "test": "bitmap_data_copypixels",
       "num_frames": 2,
       "lines": {
-        "actual_lines": 1237,
-        "expected_lines": 1237,
-        "matching_lines": 1237
+        "actual_lines": 17,
+        "expected_lines": 17,
+        "matching_lines": 17
       },
-      "duration": 44.99,
+      "duration": 46.14,
+      "image_comparisons": {
+        "output": {
+          "status": "pass",
+          "message": "Image check passed: 0 outliers (limit 0), max difference 0",
+          "max_diff": 0,
+          "trigger": [
+            "last_frame"
+          ],
+          "known_failure": false
+        }
+      },
+      "status": "pass"
+    },
+    {
+      "test": "bitmap_data_fillrect",
+      "num_frames": 1,
+      "lines": {
+        "actual_lines": 0,
+        "expected_lines": 0,
+        "matching_lines": 0
+      },
+      "duration": 44.31,
+      "image_comparisons": {
+        "output": {
+          "status": "pass",
+          "message": "Image check passed: 0 outliers (limit 0), max difference 0",
+          "max_diff": 0,
+          "trigger": [
+            "last_frame"
+          ],
+          "known_failure": false
+        }
+      },
+      "status": "pass"
+    },
+    {
+      "test": "bitmap_data_perlinnoise",
+      "num_frames": 1,
+      "lines": {
+        "actual_lines": 0,
+        "expected_lines": 0,
+        "matching_lines": 0
+      },
+      "duration": 48.57,
+      "image_comparisons": {
+        "output": {
+          "status": "pass",
+          "message": "Image check passed: 0 outliers (limit 0), max difference 0",
+          "max_diff": 0,
+          "trigger": [
+            "last_frame"
+          ],
+          "known_failure": false
+        }
+      },
+      "status": "pass"
+    },
+    {
+      "test": "bitmap_data_pixeldissolve_image",
+      "num_frames": 1,
+      "lines": {
+        "actual_lines": 0,
+        "expected_lines": 0,
+        "matching_lines": 0
+      },
+      "duration": 43.75,
+      "image_comparisons": {
+        "output": {
+          "status": "pass",
+          "message": "Image check passed: 0 outliers (limit 0), max difference 0",
+          "max_diff": 0,
+          "trigger": [
+            "last_frame"
+          ],
+          "known_failure": false
+        }
+      },
+      "status": "pass"
+    },
+    {
+      "test": "bitmapdata_applyfilter_colormatrix",
+      "num_frames": 1,
+      "lines": {
+        "actual_lines": 0,
+        "expected_lines": 0,
+        "matching_lines": 0
+      },
+      "duration": 43.26,
+      "image_comparisons": {
+        "output": {
+          "status": "pass",
+          "message": "Image check passed: 0 outliers (limit 0), max difference 1",
+          "max_diff": 1,
+          "trigger": [
+            "last_frame"
+          ],
+          "known_failure": false
+        }
+      },
       "status": "pass"
     }
   ]
