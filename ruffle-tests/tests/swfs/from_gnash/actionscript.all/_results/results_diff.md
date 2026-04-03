@@ -1,7 +1,7 @@
 # Ruffle Test Results Diff
 
 **Previous:** `868900bbb1a2` (2026-04-02T15:39:42.077685+00:00)
-**Current:** `f73e7ea7414d` (2026-04-02T23:43:50.055094+00:00)
+**Current:** `683569fa9775` (2026-04-03T01:47:11.886999+00:00)
 
 ## Summary
 
@@ -10,8 +10,8 @@
 | Passing | 5 | 68 | +63 |
 | Total | 190 | 190 | 0 |
 | Pass rate | 2.6% | 35.8% | +33.2% |
-| Mismatched lines | 14320 | 4633 | -9687 |
-|   Decreased | | | -9688 |
+| Mismatched lines | 14320 | 4538 | -9782 |
+|   Decreased | | | -9783 |
 |   Increased | | | +1 |
 
 ## Newly Passing (63)
@@ -92,12 +92,12 @@
 | `Math-v5` | output_mismatch | 3/278 | 273/278 | -270 |
 | `Math-v6` | output_mismatch | 3/278 | 273/278 | -270 |
 | `BitmapData-v8` | output_mismatch | 3/417 | 259/417 | -256 |
+| `String-v7` | output_mismatch | 3/377 | 259/377 | -256 |
+| `String-v8` | output_mismatch | 3/377 | 259/377 | -256 |
+| `String-v6` | output_mismatch | 3/377 | 258/377 | -255 |
 | `ops-v8` | output_mismatch | 3/262 | 255/262 | -252 |
+| `String-v5` | output_mismatch | 3/358 | 240/358 | -237 |
 | `MovieClip-v5` | output_mismatch | 3/363 | 237/363 | -234 |
-| `String-v7` | output_mismatch | 3/377 | 235/377 | -232 |
-| `String-v8` | output_mismatch | 3/377 | 235/377 | -232 |
-| `String-v6` | output_mismatch | 3/377 | 234/377 | -231 |
-| `String-v5` | output_mismatch | 3/358 | 217/358 | -214 |
 | `Number-v5` | output_mismatch | 3/244 | 193/244 | -190 |
 | `Number-v7` | output_mismatch | 3/237 | 192/237 | -189 |
 | `Number-v8` | output_mismatch | 3/237 | 192/237 | -189 |
