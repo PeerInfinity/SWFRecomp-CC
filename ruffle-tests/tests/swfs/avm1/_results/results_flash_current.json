@@ -1,8 +1,8 @@
 {
   "metadata": {
-    "timestamp": "2026-04-03T04:41:20.136349+00:00",
-    "git_sha": "53c54f5db34c65b276ee34d4b21f35d42abaffad",
-    "duration_seconds": 53.63,
+    "timestamp": "2026-04-03T16:29:07.561223+00:00",
+    "git_sha": "82bf8b804cb6740122fff8c561a2d277dd6c271d",
+    "duration_seconds": 53.89,
     "total_available": 3
   },
   "total": 3,
@@ -21,7 +21,7 @@
         "expected_lines": 853,
         "matching_lines": 853
       },
-      "duration": 18.36,
+      "duration": 18.28,
       "status": "pass"
     },
     {
@@ -32,7 +32,7 @@
         "expected_lines": 3714,
         "matching_lines": 2777
       },
-      "duration": 17.63,
+      "duration": 18.03,
       "status": "output_mismatch",
       "detail": "948 line(s) differ (actual=3725, expected=3714)",
       "actual_output": "... (2742 lines before) ...\n  isPrototypeOf, type=[function]\n  hasOwnProperty, type=[function]\n  addProperty, type=[function]\n  unwatch, type=[function]\n  watch, type=[function]\n  substr, own, DONT_ENUM, type=[function]\n  split, own, DONT_ENUM, type=[function]\n  substring, own, DONT_ENUM, type=[function]\n  slice, own, DONT_ENUM, type=[function]\n  lastIndexOf, own, DONT_ENUM, type=[function]\n  indexOf, own, DONT_ENUM, type=[function]\n  concat, own, DONT_ENUM, type=[function]\n  charCodeAt, own, DONT_ENUM, type=[function]\n  charAt, own, DONT_ENUM, type=[function]\n  toLowerCase, own, DONT_ENUM, type=[function]\n  toUpperCase, own, DONT_ENUM, type=[function]\n  toString, own, type=[function]\n  valueOf, own, type=[function]\n  __proto__, own, type=[object]\nTesting _global.Date\n  toLocaleString, type=[function]\n  isPropertyEnumerable, type=[function]\n  isPrototypeOf, type=[function]\n  hasOwnProperty, type=[function]\n  toString, type=[function]\n  valueOf, type=[function]\n  addProperty, type=[function]\n  unwatch, type=[function]\n  watch, type=[function]\n  __proto__, own, type=[object]\n  constructor, own, type=[function]\n  prototype, own, DONT_ENUM, type=[object]\n  UTC, own, type=[function]\nTesting _global.Date.prototype\n  toLocaleString, type=[function]\n  isPropertyEnumerable, type=[function]\n  isPrototypeOf, type=[function]\n  hasOwnProperty, type=[function]\n  addProperty, type=[function]\n  unwatch, type=[function]\n  watch, type=[function]\n  setUTCMilliseconds, own, type=[function]\n  setUTCSeconds, own, type=[function]\n  setUTCMinutes, own, type=[function]\n  setUTCHours, own, type=[function]\n  setUTCDate, own, type=[function]\n  setUTCMonth, own, type=[function]\n  setUTCFullYear, own, type=[function]\n  setYear, own, type=[function]\n  setTime, own, type=[function]\n... (933 lines after) ...",
@@ -46,7 +46,7 @@
         "expected_lines": 874,
         "matching_lines": 654
       },
-      "duration": 17.52,
+      "duration": 17.46,
       "status": "output_mismatch",
       "detail": "231 line(s) differ (actual=885, expected=874)",
       "actual_output": "... (628 lines before) ...\nTesting _global.String\n  __proto__, DONT_DELETE\n  constructor, DONT_DELETE\n  prototype, DONT_DELETE\nTesting _global.String.prototype\n  substr, DONT_DELETE\n  split, DONT_DELETE\n  substring, DONT_DELETE\n  slice, DONT_DELETE\n  lastIndexOf, DONT_DELETE\n  indexOf, DONT_DELETE\n  concat, DONT_DELETE\n  charCodeAt, DONT_DELETE\n  charAt, DONT_DELETE\n  toLowerCase, DONT_DELETE\n  toUpperCase, DONT_DELETE\n  toString, DONT_DELETE\n  valueOf, DONT_DELETE\n  __proto__, DONT_DELETE\nTesting _global.Date\n  __proto__, DONT_DELETE\n  constructor, DONT_DELETE\n  prototype, DONT_DELETE\nTesting _global.Date.prototype\n  __proto__, DONT_DELETE\nTesting _global.Boolean\n  __proto__, DONT_DELETE\n  constructor, DONT_DELETE\n  prototype, DONT_DELETE\nTesting _global.Boolean.prototype\n  toString, DONT_DELETE\n  valueOf, DONT_DELETE\n  __proto__, DONT_DELETE\nTesting _global.Number\n  __proto__, DONT_DELETE\n  constructor, DONT_DELETE\n  prototype, DONT_DELETE\nTesting _global.Number.prototype\n  toString, DONT_DELETE\n  valueOf, DONT_DELETE\n  __proto__, DONT_DELETE\nTesting _global.clearRequestHeaders\nTesting _global.addRequestHeader\nTesting _global.showRedrawRegions\nTesting _global.setTimeout\nTesting _global.clearInterval\nTesting _global.clearTimeout\nTesting _global.setInterval\nTesting _global.isFinite\nTesting _global.isNaN\n... (207 lines after) ...",

@@ -1,24 +1,25 @@
 # Ruffle Test Results Diff
 
 **Previous:** `868900bbb1a2` (2026-04-02T15:39:42.060874+00:00)
-**Current:** `53c54f5db34c` (2026-04-03T04:40:26.141945+00:00)
+**Current:** `82bf8b804cb6` (2026-04-03T16:28:13.515076+00:00)
 
 ## Summary
 
 | Metric | Previous | Current | Delta |
 |--------|----------|---------|-------|
-| Passing | 570 | 571 | +1 |
+| Passing | 570 | 572 | +2 |
 | Total | 620 | 620 | 0 |
-| Pass rate | 91.9% | 92.1% | +0.2% |
-| Mismatched lines | 9983 | 10155 | +172 |
-|   Decreased | | | -5 |
+| Pass rate | 91.9% | 92.3% | +0.4% |
+| Mismatched lines | 9983 | 10149 | +166 |
+|   Decreased | | | -11 |
 |   Increased | | | +177 |
 
-## Newly Passing (1)
+## Newly Passing (2)
 
 | Test | Previous Status | Lines (prev) | Lines (now) |
 |------|----------------|--------------|-------------|
 | `bitmap_filters` | output_mismatch | 544/548 | 548/548 |
+| `displacementmapfilter_mappoint_throw_error` | output_mismatch | 7/13 | 13/13 |
 
 ## Line Count Changed (2)
 
