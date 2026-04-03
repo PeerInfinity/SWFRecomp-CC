@@ -544,17 +544,19 @@ def recompile_child_swf(swf_path, output_dir):
         shutil.copy2(swf_path, tmp / "test.swf")
         shutil.copy2(RECOMP_CONFIG, tmp / "config.toml")
         try:
-            result = subprocess.run(
+            proc = subprocess.Popen(
                 ["bash", "-c", "ulimit -v 4194304; exec \"$@\"", "--",
                  str(RECOMP_BIN), str(RECOMP_CONFIG)],
                 cwd=str(tmp),
-                capture_output=True,
-                text=True,
-                timeout=30,
+                stdout=subprocess.PIPE,
+                stderr=subprocess.PIPE,
             )
-            if result.returncode != 0:
+            proc.communicate(timeout=30)
+            if proc.returncode != 0:
                 return False
         except subprocess.TimeoutExpired:
+            proc.kill()
+            proc.wait()
             return False
 
         # Copy generated files to output_dir
@@ -1017,16 +1019,18 @@ def recompile_swf(test_dir, force=False):
                 shutil.rmtree(p)
 
     try:
-        result = subprocess.run(
+        proc = subprocess.Popen(
             ["bash", "-c", "ulimit -v 4194304; exec \"$@\"", "--",
              str(RECOMP_BIN), str(RECOMP_CONFIG)],
             cwd=str(test_dir),
-            capture_output=True,
-            text=True,
-            timeout=30,
+            stdout=subprocess.PIPE,
+            stderr=subprocess.PIPE,
         )
-        return result.returncode == 0, result.stderr
+        _, stderr = proc.communicate(timeout=30)
+        return proc.returncode == 0, stderr.decode("utf-8", errors="replace")
     except subprocess.TimeoutExpired:
+        proc.kill()
+        proc.wait()
         return False, "recompiler timed out"
 
 
@@ -1263,7 +1267,7 @@ def compile_native(test_dir, num_frames, build_dir, headless=False, has_image_co
         opt_level = "-O1"  # ASan needs at least -O1 but -O2 can hide issues
 
     try:
-        result = subprocess.run(
+        proc = subprocess.Popen(
             [
                 "gcc",
                 *[str(f) for f in sorted(build_dir.glob("*.c"))],
@@ -1287,12 +1291,14 @@ def compile_native(test_dir, num_frames, build_dir, headless=False, has_image_co
                 "-lm",
                 *mode_libs,
             ],
-            capture_output=True,
-            text=True,
-            timeout=300,
+            stdout=subprocess.PIPE,
+            stderr=subprocess.PIPE,
         )
-        return result.returncode == 0, result.stderr
+        stdout, stderr = proc.communicate(timeout=300)
+        return proc.returncode == 0, stderr.decode("utf-8", errors="replace")
     except subprocess.TimeoutExpired:
+        proc.kill()
+        proc.wait()
         return False, "compilation timed out"
 
 
@@ -1311,16 +1317,19 @@ def run_binary(build_dir, event_file=None, extra_env=None):
     if extra_env:
         env.update(extra_env)
     try:
-        result = subprocess.run(
+        proc = subprocess.Popen(
             cmd,
-            capture_output=True,
-            timeout=30,
+            stdout=subprocess.PIPE,
+            stderr=subprocess.PIPE,
             env=env,
         )
-        return (result.stdout.decode("utf-8", errors="replace"),
-                result.returncode,
-                result.stderr.decode("utf-8", errors="replace"))
+        stdout, stderr = proc.communicate(timeout=30)
+        return (stdout.decode("utf-8", errors="replace"),
+                proc.returncode,
+                stderr.decode("utf-8", errors="replace"))
     except subprocess.TimeoutExpired:
+        proc.kill()
+        proc.wait()
         return None, -1, ""
 
 
