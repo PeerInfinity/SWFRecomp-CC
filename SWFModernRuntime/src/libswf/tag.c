@@ -1710,7 +1710,7 @@ static void render_drawing_path(const DrawingRenderInfo* info)
 	if (info->fill_count > 0) {
 		if (info->has_gradient && info->gradient_ramp && info->gradient_matrix) {
 			renderer_draw_gradient_tris(context, info->fill_verts, info->fill_count,
-				info->gradient_type, info->spread_mode, info->focal_ratio,
+				info->gradient_type, info->spread_mode, info->interpolation, info->focal_ratio,
 				info->gradient_ramp, info->gradient_matrix,
 				info->transform_id, info->cxform_id);
 		} else {
@@ -1722,7 +1722,7 @@ static void render_drawing_path(const DrawingRenderInfo* info)
 	if (info->line_count > 0) {
 		if (info->has_line_gradient && info->line_gradient_ramp && info->line_gradient_matrix) {
 			renderer_draw_gradient_tris(context, info->line_verts, info->line_count,
-				info->line_gradient_type, info->line_spread_mode, info->line_focal_ratio,
+				info->line_gradient_type, info->line_spread_mode, info->line_interpolation, info->line_focal_ratio,
 				info->line_gradient_ramp, info->line_gradient_matrix,
 				info->transform_id, info->cxform_id);
 		} else {

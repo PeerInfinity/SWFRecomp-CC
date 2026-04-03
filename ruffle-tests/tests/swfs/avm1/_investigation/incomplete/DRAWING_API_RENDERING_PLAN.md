@@ -3,204 +3,76 @@
 
 <!-- PLAN_META
 id: DRAWING_API_RENDERING
-status: not_started
+status: in_progress
 phases:
   - id: 1
     name: "Test existing infrastructure in headless mode"
-    status: not_started
+    status: complete
   - id: 2
-    name: "Fix headless mode guards"
-    status: not_started
+    name: "Fix gradient type and linearRGB rendering"
+    status: complete
   - id: 3
-    name: "Verify gradient rendering"
-    status: not_started
+    name: "Remaining anti-aliasing / focal radial precision"
+    status: blocked
   - id: 4
     name: "Test all affected tests"
-    status: not_started
+    status: in_progress
 dependencies: []
-blockers: []
+blockers:
+  - "Focal radial gradient precision (8689 outliers in movieclip_begin_gradient_fill)"
+  - "Edge anti-aliasing differences (10096 outliers in movieclip_setmask at tolerance 0)"
 -->
 
-Last updated: 2026-04-01
+Last updated: 2026-04-03
 
-## Status: INFRASTRUCTURE WORKS — Remaining issues are anti-aliasing precision, not missing features
+## Status: MAJOR FIXES APPLIED — Remaining issues are focal radial precision and edge anti-aliasing
 
-### Problem
+### Results Summary
 
-Shapes drawn via the MovieClip Drawing API (`beginFill`, `moveTo`, `lineTo`, `curveTo`, `endFill`, `beginGradientFill`, `lineGradientStyle`) don't render in headless graphics mode. The drawing commands are stored and tessellated at runtime, but the rendering callbacks may not be wired up in the headless path.
+| Test | Before | After | Tolerance | Status |
+|------|--------|-------|-----------|--------|
+| mask_with_drawing | 0 outliers | 0 outliers | 0 | IMAGE PASS |
+| movieclip_begin_gradient_fill | 77089 outliers | 10943 outliers | 6 | 86% improved |
+| movieclip_line_gradient_style | 32510 outliers | 6053 outliers | 6 | 81% improved |
+| movieclip_setmask | 10096 outliers | 10096 outliers | 0 | Unchanged (edge AA) |
 
-### Affected Image Tests
+### Bugs Fixed (2026-04-03)
 
-| Test | Tolerance | Notes |
-|------|-----------|-------|
-| movieclip_begin_gradient_fill | 6 | Gradient fills via drawing API |
-| movieclip_line_gradient_style | 6 | Gradient line styles |
-| mask_with_drawing | 6 | Drawing API + masking (also needs setMask) |
-| movieclip_setmask | 0 | Drawing API + setMask |
+1. **Focal type upgrade for linear gradients**: `beginGradientFill` unconditionally changed gradient_type to 0x13 (focal radial) when focal_ratio was non-zero, even for LINEAR gradients. Fixed to only upgrade radial (0x12) to focal radial (0x13).
 
-### Current Infrastructure (Surprisingly Complete)
+2. **Garbage focal values from string args**: `varToDouble("???")` reads raw memory as float instead of converting strings to numbers. Changed to `varToDoubleSimple()` which properly returns NaN for non-numeric strings, then clamp NaN/Inf to 0.
 
-The Drawing API rendering pipeline is almost fully implemented for the WASM/WebGPU graphics mode. The question is whether it works in headless mode too.
+3. **LinearRGB ramp generation mismatch**: Our code stored the gradient ramp in sRGB color space (full-precision sRGB→linear→lerp→sRGB), while Ruffle stores it in linear color space (sRGB→linear u8 truncated→lerp in linear u8→store linear). Fixed to match Ruffle's approach:
+   - Ramp generation now stores linear u8 values for linearRGB mode
+   - Added `interpolation` flag propagated through DrawPath → DrawingRenderInfo → renderer
+   - Vertex shader encodes linearRGB flag in `v_args.w` (bit 2)
+   - Fragment shader applies `linear_to_srgb` conversion when flag is set
+   - Fixed spread mode extraction to mask off linearRGB bits (`& 0x3u`)
 
-#### Drawing Command Storage (`action.h:412-506`)
+### Remaining Issues
 
-```c
-typedef struct {
-    u8 type;           // 0=MOVE_TO, 1=LINE_TO, 2=CURVE_TO
-    float x, y;        // endpoint (pixels)
-    float cx, cy;      // control point (CURVE_TO only)
-} DrawCmd;
+**Focal radial gradient precision** (8689 outliers in movieclip_begin_gradient_fill R2C5):
+- Our focal radial gradient computation (`focal_radial_t()` in fragment shader) differs slightly from Ruffle's implementation
+- The max diff is 255 at shape edges but the center pixels have diff ~7 (just over tolerance 6)
+- Ruffle uses `l / (sqrt(1 - f^2 * dy^2) + f * dx)` while our implementation uses `2A / (-B + sqrt(disc))`
+- These are algebraically equivalent but may differ numerically
 
-typedef struct {
-    // Fill state
-    float fill_r, fill_g, fill_b, fill_a;
-    int has_fill;
-    // Line state
-    float line_width;
-    float line_r, line_g, line_b, line_a;
-    int has_line;
-    // Gradient fill (256-entry RGBA8 ramp + 4x4 matrix)
-    int has_gradient;
-    u8 gradient_type;      // 0x10=linear, 0x12=radial, 0x13=focal_radial
-    u8 gradient_ramp[256 * 4];
-    float gradient_matrix[16];
-    // Gradient line style (same format)
-    int has_line_gradient;
-    // Tessellated output
-    float* fill_verts;     // x,y pairs in twips (triangle vertices)
-    u32 fill_vert_count;
-    float* line_verts;     // x,y pairs in twips (line quad triangles)
-    u32 line_vert_count;
-} DrawPath;
+**Edge anti-aliasing** (10096 outliers in movieclip_setmask):
+- All at tolerance 0 (strict pixel match required)
+- Differences at shape borders due to different tessellation and rasterization
+- Fan triangulation vs Ruffle's triangulator produce different edge pixels
 
-typedef struct {
-    DrawPath* paths;
-    u32 path_count, path_capacity;
-    float pen_x, pen_y;
-    DrawCmd* cmds;
-    u32 cmd_count, cmd_capacity;
-} DrawingState;
-```
-
-Linked via `MovieClip.drawing_state` (void*, lazily allocated).
-
-#### Tessellation (`action.c:17112-17227`)
-
-`drawingFinalizePath()` converts drawing commands to triangle vertices:
-1. **Bezier flattening**: CURVE_TO → 8 line segments (fixed subdivision)
-2. **Fill tessellation**: Fan triangulation (first vertex common to all triangles), output in twips
-3. **Line tessellation**: Quad stroke expansion (2 triangles per segment with normal offset)
-
-#### GPU Upload (`render_webgpu.c:1566-1709`)
-
-Two functions handle upload:
-
-- **`render_webgpu_draw_tris()`** (line 1566): Solid fills — allocates dynamic color slot, builds vertex array (u32[4] per vertex: x, y, style_type=0x00, color_idx), uploads to GPU vertex buffer, draws
-- **`render_webgpu_draw_gradient_tris()`** (line 1640): Gradient fills — allocates gradient layer, uploads 256-entry ramp texture, computes inverse matrix, builds vertices with gradient style encoding
-
-#### Rendering Callbacks (`tag.c:1652-1681`)
-
-```c
-static void render_drawing_path(const DrawingRenderInfo* info) {
-    if (info->fill_count > 0) {
-        if (info->has_gradient)
-            renderer_draw_gradient_tris(context, ...);
-        else
-            renderer_draw_tris(context, ...);
-    }
-    if (info->line_count > 0) { /* similar */ }
-}
-```
-
-#### Integration in Render Pass (`tag.c:1893-1895, 2333-2334`)
-
-```c
-actionIterateDrawings(drawing_render_cb, NULL);          // unmasked drawings
-actionIterateMaskedDrawings(masked_drawing_render_cb, NULL);  // masked drawings
-```
-
-These calls are already in `tagShowFrame()`.
-
-#### Pre-allocated GPU Resources
-
-| Resource | Static Size | Dynamic Overhead | Max Dynamic |
-|----------|------------|------------------|-------------|
-| vertex_buffer | shape_data_size | MAX_DYNAMIC_VERTICES × 16 bytes | 8192 vertices |
-| color_buffer | color_data_size | MAX_DYNAMIC_RECTS × 16 bytes | dynamic rects |
-| gradient_tex | num_gradients layers | MAX_DYNAMIC_GRADIENTS layers | 64 gradients |
-| inv_mat_buffer | static_mats × 64 bytes | MAX_DYNAMIC_GRADIENTS × 64 bytes | 64 matrices |
+**Line gradient style** (6053 outliers in movieclip_line_gradient_style):
+- Similar linearRGB and edge precision issues as the fill gradient test
+- Mostly anti-aliasing at line stroke edges
 
 ### Key Code Locations
 
 | Component | File | Lines |
 |-----------|------|-------|
-| DrawCmd/DrawPath/DrawingState structs | `action.h` | 412-506 |
-| Drawing API functions (moveTo, lineTo, etc.) | `action.c` | 47370-47779 |
-| Tessellation (drawingFinalizePath) | `action.c` | 17112-17227 |
-| Gradient ramp generation | `action.c` | 17015-17073 |
-| GPU upload (solid fills) | `render_webgpu.c` | 1566-1609 |
-| GPU upload (gradient fills) | `render_webgpu.c` | 1640-1709 |
-| Rendering callbacks | `tag.c` | 1652-1681 |
-| Render pass integration | `tag.c` | 1893-1895, 2333-2334 |
-| Iteration functions | `action.c` | ~17290-17336 |
-
-### Investigation Results (2026-04-01)
-
-**All headless infrastructure is working.** Drawing API shapes render correctly in headless mode — gradients, solid fills, and line strokes are all visible. No missing features.
-
-**Remaining issue: anti-aliasing / edge rendering precision.** The rendered output differs from Ruffle's expected PNGs by ~20% of pixels, concentrated at shape edges and line boundaries. Specific findings:
-
-- `movieclip_begin_gradient_fill`: 90474 outlier channels at tolerance 6, max diff 255. Gradient interiors look correct; edges/borders differ.
-- `movieclip_line_gradient_style`: 36756 outlier channels at tolerance 6.
-- `movieclip_setmask`: 10096 outliers at tolerance 0 (layout fixed by Stage.width fix, remaining diffs are edge anti-aliasing).
-- Max diff of 255 occurs at shape borders where our rendering is white (background) but expected is black (outline), suggesting line stroke positioning or width differs slightly.
-
-**Root cause hypothesis:** The fan triangulation (first vertex common to all triangles) and quad stroke expansion in `drawingFinalizePath()` may produce slightly different geometry than Ruffle's tessellator, leading to sub-pixel edge differences that are amplified at strict tolerance levels.
-
-### Original Issues (all resolved)
-
-~~Issue 1: Headless Mode Guards~~ — **Not an issue.** All drawing iteration and GPU upload functions work in headless mode without changes.
-
-~~Issue 2: Per-Frame Dynamic Resource Reset~~ — **Working correctly.**
-
-~~Issue 3: Vertex Capacity~~ — **Not an issue** for these tests.
-
-### Implementation Plan
-
-#### Step 1: Test Existing Infrastructure
-
-Run the drawing API image tests and check what happens:
-```bash
-python3 ruffle-tests/verify_output.py --test=movieclip_begin_gradient_fill --headless --diff --verbose
-```
-
-If the infrastructure is already wired up for headless, this may already produce output (or produce errors that indicate what's missing).
-
-#### Step 2: Fix Headless Guards (if needed)
-
-If drawing iteration or GPU upload functions are behind `NO_GRAPHICS` guards, add headless-compatible code paths. The headless mode uses the same WebGPU rendering pipeline as full graphics mode, so the same functions should work.
-
-#### Step 3: Verify Gradient Rendering
-
-Gradient fills require:
-1. Gradient ramp texture upload (256×1 RGBA8 per gradient)
-2. Inverse gradient matrix upload
-3. Correct style type encoding in vertex data (0x10/0x12/0x13)
-
-Verify the fragment shader handles gradient lookups correctly when the gradient comes from a dynamic layer (static_gradient_count + dynamic offset).
-
-#### Step 4: Test All 4 Affected Tests
-
-After fixes, run all 4 tests. `mask_with_drawing` and `movieclip_setmask` also need runtime setMask() support (see RUNTIME_SETMASK_PLAN.md).
-
-### Dependencies
-
-- `mask_with_drawing` and `movieclip_setmask` also depend on RUNTIME_SETMASK_PLAN.md
-- No other dependencies — the Drawing API trace functionality is fully working
-
-### Estimated Complexity
-
-Low-medium. Most infrastructure exists. Main work is:
-1. Verifying headless integration works (~2 hours investigation)
-2. Fixing any guards or missing initialization (~30 lines)
-3. Testing and debugging gradient rendering (~2 hours)
+| Gradient type + focal fix | `action.c` | ~51235-51240, ~51409-51414 |
+| LinearRGB ramp generation | `action.c` | ~18625-18695 |
+| Interpolation in DrawingRenderInfo | `action.h` | ~493, ~504 |
+| Style encoding (spread + interp) | `render_webgpu.c` | ~1758 |
+| Vertex shader (interp flag) | `render_webgpu.c` | ~66-79 |
+| Fragment shader (linear_to_srgb) | `render_webgpu.c` | ~140-155, ~193-196 |

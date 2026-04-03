@@ -493,6 +493,7 @@ typedef struct {
 	int has_gradient;
 	u8 gradient_type;         // 0x10, 0x12, 0x13
 	u8 spread_mode;
+	u8 interpolation;         // 0=RGB, 1=linearRGB
 	float focal_ratio;
 	const u8* gradient_ramp;  // 256*4 RGBA8 entries
 	const float* gradient_matrix; // 4x4 column-major
@@ -502,6 +503,7 @@ typedef struct {
 	int has_line_gradient;
 	u8 line_gradient_type;
 	u8 line_spread_mode;
+	u8 line_interpolation;
 	float line_focal_ratio;
 	const u8* line_gradient_ramp;
 	const float* line_gradient_matrix;

@@ -64,6 +64,7 @@ static const char* vertex_wgsl =
 "  let transform = transforms[transform_id];\n"
 "  let pos = vec4f(in.position, 0.0, 1.0);\n"
 "  let spread_mode = (in.style.x >> 8u) & 0x3u;\n"
+"  let is_linear_rgb = (in.style.x >> 10u) & 0x1u;\n"
 "  out.v_style_type = in.style.x & 0xFFu;\n"
 "  out.v_style_id = in.style.y & 0xFFFFu;\n"
 "  let style_upper = (in.style.y >> 16u) & 0xFFFFu;\n"
@@ -76,7 +77,7 @@ static const char* vertex_wgsl =
 "    if (out.v_style_type == 0x13u) {\n"
 "      focal_z = (f32(style_upper) - 32768.0) / 16384.0;\n"
 "    }\n"
-"    out.v_args = vec4f(inv_pos.xy, focal_z, f32(spread_mode));\n"
+"    out.v_args = vec4f(inv_pos.xy, focal_z, f32(spread_mode) + f32(is_linear_rgb) * 4.0);\n"
 "  } else if ((out.v_style_type & 0xF0u) == 0x40u) {\n"
 "    let inv_pos = inv_mats[style_upper] * pos;\n"
 "    let sizes = bitmap_sizes[out.v_style_id];\n"
@@ -106,7 +107,7 @@ static const char* fragment_wgsl =
 "};\n"
 "\n"
 "fn apply_spread(t: f32, mode: f32) -> f32 {\n"
-"  let m = u32(mode + 0.5);\n"
+"  let m = u32(mode + 0.5) & 0x3u;\n"
 "  if (m == 1u) {\n"
 "    // Reflect: triangle wave\n"
 "    let p = t - 2.0 * floor(t / 2.0);\n"
@@ -134,6 +135,17 @@ static const char* fragment_wgsl =
 "  let s_denom = -B + sqrt(max(disc, 0.0));\n"
 "  if (s_denom < 0.001) { return 0.0; }\n"
 "  return apply_spread(2.0 * A / s_denom, v_args.w);\n"
+"}\n"
+"\n"
+"fn linear_to_srgb_ch(c: f32) -> f32 {\n"
+"  if (c <= 0.0031308) { return c * 12.92; }\n"
+"  return 1.055 * pow(c, 1.0 / 2.4) - 0.055;\n"
+"}\n"
+"fn apply_linear_to_srgb(color: vec4f) -> vec4f {\n"
+"  var rgb = color.rgb;\n"
+"  if (color.a > 0.0) { rgb = rgb / color.a; }\n"
+"  let result = vec3f(linear_to_srgb_ch(rgb.r), linear_to_srgb_ch(rgb.g), linear_to_srgb_ch(rgb.b));\n"
+"  return vec4f(result * color.a, color.a);\n"
 "}\n"
 "\n"
 "fn apply_cxform(color: vec4f, cxform_id: u32) -> vec4f {\n"
@@ -174,6 +186,10 @@ static const char* fragment_wgsl =
 "    color = bitmap_sample;\n"
 "  } else {\n"
 "    color = vec4f(0.0);\n"
+"  }\n"
+"  // LinearRGB gradients: ramp stored in linear space, convert to sRGB\n"
+"  if (is_gradient && (u32(in.v_args.w + 0.5) & 4u) != 0u) {\n"
+"    color = apply_linear_to_srgb(color);\n"
 "  }\n"
 "  return apply_cxform(color, in.v_cxform_id);\n"
 "}\n";
@@ -1683,7 +1699,7 @@ static int invert_4x4_matrix(const float m[16], float inv[16])
 // ---------------------------------------------------------------------------
 void render_webgpu_draw_gradient_tris(WebGPURenderContext* ctx,
 	const float* xy_pairs, u32 vertex_count,
-	u8 gradient_type, u8 spread_mode, float focal_ratio,
+	u8 gradient_type, u8 spread_mode, u8 interpolation, float focal_ratio,
 	const u8* gradient_ramp, const float* gradient_matrix,
 	u32 transform_id, u32 cxform_id)
 {
@@ -1726,8 +1742,8 @@ void render_webgpu_draw_gradient_tris(WebGPURenderContext* ctx,
 	u32 vert_base = ctx->dynamic_vertex_base + ctx->dynamic_vertex_used;
 	ctx->dynamic_vertex_used += vertex_count;
 
-	// Style encoding: gradient_type | (spread_mode << 8)
-	u32 sx = (u32)gradient_type | ((u32)spread_mode << 8);
+	// Style encoding: gradient_type | (spread_mode << 8) | (interpolation << 10)
+	u32 sx = (u32)gradient_type | ((u32)spread_mode << 8) | ((u32)interpolation << 10);
 
 	// Style Y: gradient_id in lower 16, focal_encoded in upper 16
 	u16 focal_encoded = (u16)(focal_ratio * 16384.0f + 32768.0f);

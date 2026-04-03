@@ -193,7 +193,7 @@ void render_webgpu_upload_cxform(WebGPURenderContext* context, float* cxform);
 void render_webgpu_draw_shape(WebGPURenderContext* context, size_t offset, size_t num_verts, u32 transform_id, u32 cxform_id);
 void render_webgpu_draw_rect(WebGPURenderContext* context, float x, float y, float w, float h, float r, float g, float b, float a, u32 transform_id, u32 cxform_id);
 void render_webgpu_draw_tris(WebGPURenderContext* context, const float* xy_pairs, u32 vertex_count, float r, float g, float b, float a, u32 transform_id, u32 cxform_id);
-void render_webgpu_draw_gradient_tris(WebGPURenderContext* context, const float* xy_pairs, u32 vertex_count, u8 gradient_type, u8 spread_mode, float focal_ratio, const u8* gradient_ramp, const float* gradient_matrix, u32 transform_id, u32 cxform_id);
+void render_webgpu_draw_gradient_tris(WebGPURenderContext* context, const float* xy_pairs, u32 vertex_count, u8 gradient_type, u8 spread_mode, u8 interpolation, float focal_ratio, const u8* gradient_ramp, const float* gradient_matrix, u32 transform_id, u32 cxform_id);
 void render_webgpu_draw_bitmap_quad(WebGPURenderContext* context, const uint32_t* argb_pixels, u32 bmp_width, u32 bmp_height, float x_twips, float y_twips, u32 transform_id, u32 cxform_id);
 void render_webgpu_begin_clip_mask(WebGPURenderContext* context);
 void render_webgpu_end_clip_mask(WebGPURenderContext* context);

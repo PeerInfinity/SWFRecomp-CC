@@ -18622,12 +18622,15 @@ static float drawingLinearToSrgb(float c)
 	if (c <= 0.0031308f) return c * 12.92f;
 	return 1.055f * powf(c, 1.0f / 2.4f) - 0.055f;
 }
-static u8 drawingLinearRgbLerp(u8 start, u8 end, float t)
+// Convert sRGB u8 to linear u8 (matching Ruffle: truncate, not round)
+static u8 drawingSrgbToLinearU8(u8 c)
 {
-	float s = drawingSrgbToLinear(start / 255.0f);
-	float e = drawingSrgbToLinear(end / 255.0f);
-	float result = s + t * (e - s);
-	return (u8)(drawingLinearToSrgb(result) * 255.0f + 0.5f);
+	return (u8)(drawingSrgbToLinear(c / 255.0f) * 255.0f);
+}
+// Lerp in linear u8 space, truncate result (matching Ruffle)
+static u8 drawingLinearRgbLerp(u8 start_linear, u8 end_linear, float t)
+{
+	return (u8)(start_linear + t * (float)(end_linear - start_linear));
 }
 static u8 drawingRgbLerp(u8 a, u8 b, float t)
 {
@@ -18649,6 +18652,8 @@ static void drawingGenerateGradientRamp(
 	u8 g0 = (colors[0] >> 8) & 0xFF;
 	u8 b0 = colors[0] & 0xFF;
 	u8 a0 = (u8)(alphas[0] / 100.0f * 255.0f + 0.5f);
+	// For linearRGB, store ramp in linear color space (matching Ruffle)
+	if (use_linear_rgb) { r0 = drawingSrgbToLinearU8(r0); g0 = drawingSrgbToLinearU8(g0); b0 = drawingSrgbToLinearU8(b0); }
 	for (int i = 0; i < 256; i++) {
 		out_ramp[i*4+0] = r0;
 		out_ramp[i*4+1] = g0;
@@ -18664,6 +18669,11 @@ static void drawingGenerateGradientRamp(
 		u8 sa = (u8)(alphas[s-1] / 100.0f * 255.0f + 0.5f);
 		u8 er = (colors[s] >> 16) & 0xFF, eg = (colors[s] >> 8) & 0xFF, eb = colors[s] & 0xFF;
 		u8 ea = (u8)(alphas[s] / 100.0f * 255.0f + 0.5f);
+		// For linearRGB, convert endpoints to linear u8 space
+		if (use_linear_rgb) {
+			sr = drawingSrgbToLinearU8(sr); sg = drawingSrgbToLinearU8(sg); sb = drawingSrgbToLinearU8(sb);
+			er = drawingSrgbToLinearU8(er); eg = drawingSrgbToLinearU8(eg); eb = drawingSrgbToLinearU8(eb);
+		}
 
 		float range = (float)(ratio_end - ratio_start);
 		if (range <= 0) range = 1;
@@ -18671,6 +18681,7 @@ static void drawingGenerateGradientRamp(
 		for (u8 i = ratio_start; i <= ratio_end; i++) {
 			float t = (float)(i - ratio_start) / range;
 			if (use_linear_rgb) {
+				// Lerp in linear u8 space (matching Ruffle: truncate)
 				out_ramp[i*4+0] = drawingLinearRgbLerp(sr, er, t);
 				out_ramp[i*4+1] = drawingLinearRgbLerp(sg, eg, t);
 				out_ramp[i*4+2] = drawingLinearRgbLerp(sb, eb, t);
@@ -18890,6 +18901,7 @@ static int fillDrawingInfos(MovieClip* mc, DrawingRenderInfo* out, int max_out)
 		info->has_gradient = path->has_gradient;
 		info->gradient_type = path->gradient_type;
 		info->spread_mode = path->spread_mode;
+		info->interpolation = path->interpolation;
 		info->focal_ratio = path->focal_ratio;
 		info->gradient_ramp = path->has_gradient ? path->gradient_ramp : NULL;
 		info->gradient_matrix = path->has_gradient ? path->gradient_matrix : NULL;
@@ -18900,6 +18912,7 @@ static int fillDrawingInfos(MovieClip* mc, DrawingRenderInfo* out, int max_out)
 		info->has_line_gradient = path->has_line_gradient;
 		info->line_gradient_type = path->line_gradient_type;
 		info->line_spread_mode = path->line_spread_mode;
+		info->line_interpolation = path->line_interpolation;
 		info->line_focal_ratio = path->line_focal_ratio;
 		info->line_gradient_ramp = path->has_line_gradient ? path->line_gradient_ramp : NULL;
 		info->line_gradient_matrix = path->has_line_gradient ? path->line_gradient_matrix : NULL;
@@ -51232,11 +51245,12 @@ void actionCallMethod(SWFAppContext* app_context, char* str_buffer)
 					int ip_len = varToStringBuf(app_context, &args[6], ip_buf, sizeof(ip_buf));
 					if (ip_len == 9 && strncmp(ip_buf, "linearRGB", 9) == 0) interp = 1;
 				}
-				// Parse focal point ratio (arg 7)
+				// Parse focal point ratio (arg 7) — only applies to radial gradients
 				float focal = 0.0f;
 				if (num_args >= 8) {
-					focal = (float)varToDouble(&args[7]);
-					if (focal != 0.0f) grad_type = 0x13;  // focal radial
+					focal = (float)varToDoubleSimple(&args[7]);
+					if (isnan(focal) || isinf(focal)) focal = 0.0f;
+					if (focal != 0.0f && grad_type == 0x12) grad_type = 0x13;  // focal radial
 				}
 				// Build gradient matrix
 				DrawingState* ds = getOrCreateDrawingState(mc);
@@ -51407,8 +51421,9 @@ void actionCallMethod(SWFAppContext* app_context, char* str_buffer)
 				}
 				float focal = 0.0f;
 				if (num_args >= 8) {
-					focal = (float)varToDouble(&args[7]);
-					if (focal != 0.0f) grad_type = 0x13;
+					focal = (float)varToDoubleSimple(&args[7]);
+					if (isnan(focal) || isinf(focal)) focal = 0.0f;
+					if (focal != 0.0f && grad_type == 0x12) grad_type = 0x13;
 				}
 				DrawingState* ds = getOrCreateDrawingState(mc);
 				ActionVar* lmt_v = getProperty(matrix_obj, "matrixType", 10);
