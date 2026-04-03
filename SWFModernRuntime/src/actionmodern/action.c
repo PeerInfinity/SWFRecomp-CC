@@ -46597,6 +46597,48 @@ void actionCallMethod(SWFAppContext* app_context, char* str_buffer)
 	}
 
 	// Pattern B variant: CallMethod(arguments_array, "method") = super.method()
+	// Only trigger if the method is NOT a built-in array method — otherwise normal
+	// array calls like arguments.toString() or arguments.hasOwnProperty() get
+	// incorrectly intercepted as super.method() calls.
+	if (!method_is_empty && obj_var.type == ACTION_STACK_VALUE_ARRAY && hasSuperContext())
+	{
+		// Check if this is a built-in array or object method (not a super proxy call)
+		int is_builtin_method = 0;
+		ASArray* _check_arr = (ASArray*) obj_var.data.numeric_value;
+		if (_check_arr != NULL) {
+			// Try callArrayMethod to see if it handles this method
+			// Known built-in methods: toString, join, push, pop, shift, unshift, reverse,
+			// concat, slice, splice, sort, sortOn, hasOwnProperty, valueOf, addProperty
+			if ((method_name_len == 8 && strncmp(method_name, "toString", 8) == 0) ||
+			    (method_name_len == 4 && strncmp(method_name, "join", 4) == 0) ||
+			    (method_name_len == 4 && strncmp(method_name, "push", 4) == 0) ||
+			    (method_name_len == 3 && strncmp(method_name, "pop", 3) == 0) ||
+			    (method_name_len == 5 && strncmp(method_name, "shift", 5) == 0) ||
+			    (method_name_len == 7 && strncmp(method_name, "unshift", 7) == 0) ||
+			    (method_name_len == 7 && strncmp(method_name, "reverse", 7) == 0) ||
+			    (method_name_len == 6 && strncmp(method_name, "concat", 6) == 0) ||
+			    (method_name_len == 5 && strncmp(method_name, "slice", 5) == 0) ||
+			    (method_name_len == 6 && strncmp(method_name, "splice", 6) == 0) ||
+			    (method_name_len == 4 && strncmp(method_name, "sort", 4) == 0) ||
+			    (method_name_len == 6 && strncmp(method_name, "sortOn", 6) == 0) ||
+			    (method_name_len == 7 && strncmp(method_name, "valueOf", 7) == 0) ||
+			    (method_name_len == 11 && strncmp(method_name, "addProperty", 11) == 0) ||
+			    (method_name_len == 14 && strncmp(method_name, "hasOwnProperty", 14) == 0) ||
+			    (method_name_len == 10 && strncmp(method_name, "instanceof", 10) == 0)) {
+				is_builtin_method = 1;
+			}
+			// Also check arr->props prototype chain for user-defined methods
+			if (!is_builtin_method && _check_arr->props != NULL) {
+				ActionVar* user_m = getPropertyWithPrototype(_check_arr->props, method_name, method_name_len);
+				if (user_m != NULL && user_m->type == ACTION_STACK_VALUE_FUNCTION)
+					is_builtin_method = 1;
+			}
+		}
+		if (is_builtin_method) {
+			// Fall through to the normal ARRAY handler below (line ~47527)
+			goto array_normal_dispatch;
+		}
+	}
 	if (!method_is_empty && obj_var.type == ACTION_STACK_VALUE_ARRAY && hasSuperContext())
 	{
 		void* this_obj = getSuperThis();
@@ -47526,6 +47568,7 @@ void actionCallMethod(SWFAppContext* app_context, char* str_buffer)
 	}
 	else if (obj_var.type == ACTION_STACK_VALUE_ARRAY)
 	{
+		array_normal_dispatch:
 		// Array - call built-in array methods
 		ASArray* arr = (ASArray*) obj_var.data.numeric_value;
 

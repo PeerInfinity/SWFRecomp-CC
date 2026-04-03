@@ -1610,6 +1610,25 @@ namespace SWFRecomp
 					next_reg++;
 				}
 
+				// Create 'arguments' as named local variable when not preloaded and not suppressed
+				// (MTASC uses this pattern — accesses arguments via GetVariable("arguments"))
+				if (!preload_arguments && !suppress_arguments)
+				{
+					func_def << "\t// Create 'arguments' as local variable (not preloaded, not suppressed)" << endl;
+					func_def << "\t{" << endl;
+					func_def << "\t\tASArray* _args_arr = allocArray(app_context, arg_count);" << endl;
+					func_def << "\t\tfor (u32 _ai = 0; _ai < arg_count; _ai++) {" << endl;
+					func_def << "\t\t\tsetArrayElement(app_context, _args_arr, _ai, &args[_ai]);" << endl;
+					func_def << "\t\t}" << endl;
+					func_def << "\t\tswf_setup_arguments_props(app_context, _args_arr);" << endl;
+					func_def << "\t\tActionVar _args_var;" << endl;
+					func_def << "\t\t_args_var.type = ACTION_STACK_VALUE_ARRAY;" << endl;
+					func_def << "\t\t_args_var.data.numeric_value = (u64)_args_arr;" << endl;
+					func_def << "\t\t_args_var.str_size = 0;" << endl;
+					func_def << "\t\tsetVariableByName(\"arguments\", &_args_var);" << endl;
+					func_def << "\t}" << endl;
+				}
+
 				// Bind parameters to registers or variables
 				for (size_t i = 0; i < params.size(); i++)
 				{
