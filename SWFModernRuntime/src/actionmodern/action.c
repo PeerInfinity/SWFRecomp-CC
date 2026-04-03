@@ -25787,8 +25787,9 @@ static void initArrayProto(SWFAppContext* app_context, ASArray* arr) {
 
 // Filter clone method: shallow-copies all own properties to a new filter object
 static ASFunction g_filter_clone_funcs[10]; // one per filter type
-// Filter prototype lookup by display list filter_type (1=blur, 2=dropshadow, 3=glow, 4=bevel)
-static ASObject* g_filter_protos_by_type[5] = {NULL, NULL, NULL, NULL, NULL};
+// Filter prototype lookup by type (1=blur, 2=dropshadow, 3=glow, 4=bevel,
+//   5=convolution, 6=colormatrix, 7=gradientglow, 8=gradientbevel)
+static ASObject* g_filter_protos_by_type[9] = {NULL};
 static ASObject* g_filter_subclass_protos[9] = {0}; // All 9 filter subclass prototypes (for flag fixup)
 static ASFunction g_filter_virtual_getter; // Shared getter for all filter virtual properties (returns undefined)
 static ActionVar filterClone(SWFAppContext* app_context, ActionVar* args, u32 arg_count, ActionVar* registers, void* this_obj)
@@ -26222,11 +26223,15 @@ static void initFlashPackage(SWFAppContext* app_context)
 	ensureStubCtorPrototype(app_context, &fc_GradientBevelFilter);
 	ensureStubCtorPrototype(app_context, &fc_GradientGlowFilter);
 
-	// Store filter prototypes by display list type for mc.filters getter
-	g_filter_protos_by_type[1] = fc_BlurFilter.prototype_obj;       // type 1 = Blur
-	g_filter_protos_by_type[2] = fc_DropShadowFilter.prototype_obj; // type 2 = DropShadow
-	g_filter_protos_by_type[3] = fc_GlowFilter.prototype_obj;       // type 3 = Glow
-	g_filter_protos_by_type[4] = fc_BevelFilter.prototype_obj;       // type 4 = Bevel
+	// Store filter prototypes by type for mc.filters getter
+	g_filter_protos_by_type[1] = fc_BlurFilter.prototype_obj;           // type 1 = Blur
+	g_filter_protos_by_type[2] = fc_DropShadowFilter.prototype_obj;     // type 2 = DropShadow
+	g_filter_protos_by_type[3] = fc_GlowFilter.prototype_obj;           // type 3 = Glow
+	g_filter_protos_by_type[4] = fc_BevelFilter.prototype_obj;           // type 4 = Bevel
+	g_filter_protos_by_type[5] = fc_ConvolutionFilter.prototype_obj;     // type 5 = Convolution
+	g_filter_protos_by_type[6] = fc_ColorMatrixFilter.prototype_obj;     // type 6 = ColorMatrix
+	g_filter_protos_by_type[7] = fc_GradientGlowFilter.prototype_obj;   // type 7 = GradientGlow
+	g_filter_protos_by_type[8] = fc_GradientBevelFilter.prototype_obj;   // type 8 = GradientBevel
 
 	// Register clone() and virtual properties on filter prototypes
 	{
@@ -37740,6 +37745,107 @@ void actionGetMember(SWFAppContext* app_context)
 				float fr=0, fg=0, fb=0, fa=0;
 				float fhr=0, fhg=0, fhb=0, fha=0;
 				u8 fquality=0, fflags=0;
+
+				// Check extended filter data first (ColorMatrix, Convolution, Gradient*)
+				const ExtFilterData* efd = (entry_idx != (size_t)-1) ? ng_getExtFilterData(entry_idx) : NULL;
+				if (efd && efd->type >= 5 && efd->type <= 8) {
+					ASObject* proto = g_filter_protos_by_type[efd->type];
+					if (proto) {
+						ASObject* fobj = allocObject(app_context, 16);
+						fobj->native_type = NATIVE_FILTER;
+						ActionVar pv = {0}; pv.type = ACTION_STACK_VALUE_OBJECT;
+						pv.data.numeric_value = (u64)proto;
+						setPropertyWithFlags(app_context, fobj, "__proto__", 9, &pv, PROPERTY_FLAGS_DONTENUM);
+						ActionVar v;
+						if (efd->type == 6) {
+							// ColorMatrixFilter: matrix (ASArray of 20 floats)
+							ASArray* marr = allocArray(app_context, 20);
+							marr->length = 20; initArrayProto(app_context, marr);
+							for (int i = 0; i < 20; i++) {
+								marr->elements[i] = makeF64((double)efd->cm_matrix[i]);
+							}
+							v.type = ACTION_STACK_VALUE_ARRAY;
+							v.data.numeric_value = (u64)marr;
+							setProperty(app_context, fobj, "matrix", 6, &v);
+						} else if (efd->type == 5) {
+							// ConvolutionFilter: matrixX, matrixY, matrix, divisor, bias,
+							//   preserveAlpha, clamp, color, alpha
+							v = makeF64((double)efd->conv_mx); setProperty(app_context, fobj, "matrixX", 7, &v);
+							v = makeF64((double)efd->conv_my); setProperty(app_context, fobj, "matrixY", 7, &v);
+							int n = efd->conv_mx * efd->conv_my;
+							if (n > 25) n = 25;
+							ASArray* marr = allocArray(app_context, n);
+							marr->length = n; initArrayProto(app_context, marr);
+							for (int i = 0; i < n; i++) {
+								marr->elements[i] = makeF64((double)efd->conv_matrix[i]);
+							}
+							v.type = ACTION_STACK_VALUE_ARRAY;
+							v.data.numeric_value = (u64)marr;
+							setProperty(app_context, fobj, "matrix", 6, &v);
+							v = makeF64((double)efd->conv_divisor); setProperty(app_context, fobj, "divisor", 7, &v);
+							v = makeF64((double)efd->conv_bias); setProperty(app_context, fobj, "bias", 4, &v);
+							v.type = ACTION_STACK_VALUE_BOOLEAN;
+							v.data.numeric_value = efd->conv_preserve_alpha;
+							setProperty(app_context, fobj, "preserveAlpha", 13, &v);
+							v.type = ACTION_STACK_VALUE_BOOLEAN;
+							v.data.numeric_value = efd->conv_clamp;
+							setProperty(app_context, fobj, "clamp", 5, &v);
+							uint32_t cc = ((uint32_t)efd->conv_color_r << 16) | ((uint32_t)efd->conv_color_g << 8) | efd->conv_color_b;
+							v = makeF64((double)cc); setProperty(app_context, fobj, "color", 5, &v);
+							v = makeF64(efd->conv_color_a / 255.0); setProperty(app_context, fobj, "alpha", 5, &v);
+						} else {
+							// GradientGlow (7) / GradientBevel (8): distance, angle, colors, alphas,
+							//   ratios, blurX, blurY, quality, strength, knockout, type
+							double angle_deg = (double)efd->angle * 180.0 / 3.14159265358979323846;
+							v = makeF64((double)efd->distance); setProperty(app_context, fobj, "distance", 8, &v);
+							v = makeF64(angle_deg); setProperty(app_context, fobj, "angle", 5, &v);
+							// colors array
+							ASArray* carr = allocArray(app_context, efd->grad_count);
+							carr->length = efd->grad_count; initArrayProto(app_context, carr);
+							for (int i = 0; i < efd->grad_count; i++)
+								carr->elements[i] = makeF64((double)efd->grad_colors[i]);
+							v.type = ACTION_STACK_VALUE_ARRAY; v.data.numeric_value = (u64)carr;
+							setProperty(app_context, fobj, "colors", 6, &v);
+							// alphas array
+							ASArray* aarr = allocArray(app_context, efd->grad_count);
+							aarr->length = efd->grad_count; initArrayProto(app_context, aarr);
+							for (int i = 0; i < efd->grad_count; i++)
+								aarr->elements[i] = makeF64((double)efd->grad_alphas[i]);
+							v.type = ACTION_STACK_VALUE_ARRAY; v.data.numeric_value = (u64)aarr;
+							setProperty(app_context, fobj, "alphas", 6, &v);
+							// ratios array
+							ASArray* rarr = allocArray(app_context, efd->grad_count);
+							rarr->length = efd->grad_count; initArrayProto(app_context, rarr);
+							for (int i = 0; i < efd->grad_count; i++)
+								rarr->elements[i] = makeF64((double)efd->grad_ratios[i]);
+							v.type = ACTION_STACK_VALUE_ARRAY; v.data.numeric_value = (u64)rarr;
+							setProperty(app_context, fobj, "ratios", 6, &v);
+							v = makeF64((double)efd->blur_x); setProperty(app_context, fobj, "blurX", 5, &v);
+							v = makeF64((double)efd->blur_y); setProperty(app_context, fobj, "blurY", 5, &v);
+							v = makeF64((double)efd->quality); setProperty(app_context, fobj, "quality", 7, &v);
+							v = makeF64((double)efd->strength); setProperty(app_context, fobj, "strength", 8, &v);
+							int inner_f = (efd->flags >> 2) & 1;
+							int knockout_f = (efd->flags >> 1) & 1;
+							int on_top_f = efd->flags & 1;
+							v.type = ACTION_STACK_VALUE_BOOLEAN;
+							v.data.numeric_value = knockout_f; setProperty(app_context, fobj, "knockout", 8, &v);
+							// Ruffle type logic: ON_TOP → Full, else INNER → Inner, else Outer
+							const char* type_str = on_top_f ? "full" : (inner_f ? "inner" : "outer");
+							u32 u16len; uint16_t* u16p = utf8_to_u16(app_context, type_str, strlen(type_str), &u16len);
+							v.type = ACTION_STACK_VALUE_STRING; v.str_size = u16len;
+							v.data.string_data.heap_ptr = u16p;
+							setProperty(app_context, fobj, "type", 4, &v);
+						}
+						// Wrap in array
+						ASArray* farr = allocArray(app_context, 1);
+						farr->length = 1; initArrayProto(app_context, farr);
+						farr->elements[0].type = ACTION_STACK_VALUE_OBJECT;
+						farr->elements[0].data.numeric_value = (u64)fobj;
+						PUSH(ACTION_STACK_VALUE_ARRAY, (u64)farr);
+						return;
+					}
+				}
+
 				if (entry_idx != (size_t)-1 &&
 				    ng_getDisplayEntryFilterData(entry_idx, &ftype, &fblur_x, &fblur_y,
 				        &fquality, &fflags, &fr, &fg, &fb, &fa, &fstrength, &fangle, &fdistance,
@@ -37781,7 +37887,8 @@ void actionGetMember(SWFAppContext* app_context)
 							v.data.numeric_value = knockout_flag; setProperty(app_context, fobj, "knockout", 8, &v);
 							v = makeF64((double)fblur_x); setProperty(app_context, fobj, "blurX", 5, &v);
 							v = makeF64((double)fblur_y); setProperty(app_context, fobj, "blurY", 5, &v);
-							const char* type_str = (inner_flag && on_top) ? "full" : (inner_flag ? "inner" : "outer");
+							// Ruffle type logic: ON_TOP → Full, else INNER → Inner, else Outer
+						const char* type_str = on_top ? "full" : (inner_flag ? "inner" : "outer");
 							u32 u16len; uint16_t* u16p = utf8_to_u16(app_context, type_str, strlen(type_str), &u16len);
 							v.type = ACTION_STACK_VALUE_STRING; v.str_size = u16len;
 							v.data.string_data.heap_ptr = u16p;

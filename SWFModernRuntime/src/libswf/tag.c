@@ -4206,6 +4206,93 @@ void tagSetFilterHighlight(SWFAppContext* app_context, size_t depth,
 	}
 }
 
+// Extended filter data side table (for ColorMatrix, Convolution, Gradient filters)
+#define MAX_EXT_FILTERS 32
+static ExtFilterData g_ext_filters[MAX_EXT_FILTERS];
+static int g_ext_filter_count = 0;
+
+// Parallel depth array for the ext filter side table
+static size_t g_ext_filter_depths[MAX_EXT_FILTERS];
+
+static ExtFilterData* getOrCreateExtFilter(size_t depth)
+{
+	for (int i = 0; i < g_ext_filter_count; i++) {
+		if (g_ext_filter_depths[i] == depth) return &g_ext_filters[i];
+	}
+	if (g_ext_filter_count >= MAX_EXT_FILTERS) return NULL;
+	int idx = g_ext_filter_count++;
+	memset(&g_ext_filters[idx], 0, sizeof(ExtFilterData));
+	g_ext_filter_depths[idx] = depth;
+	return &g_ext_filters[idx];
+}
+
+void tagSetFilterColorMatrix(SWFAppContext* app_context, size_t depth, const float* matrix20)
+{
+	(void)app_context;
+	if (depth > max_depth) return;
+	ExtFilterData* ef = getOrCreateExtFilter(depth);
+	if (!ef) return;
+	ef->type = 6; // colormatrix
+	memcpy(ef->cm_matrix, matrix20, 20 * sizeof(float));
+}
+
+void tagSetFilterConvolution(SWFAppContext* app_context, size_t depth,
+    u8 matrixX, u8 matrixY, const float* matrix, float divisor, float bias,
+    u8 preserve_alpha, u8 clamp, u8 def_r, u8 def_g, u8 def_b, u8 def_a)
+{
+	(void)app_context;
+	if (depth > max_depth) return;
+	ExtFilterData* ef = getOrCreateExtFilter(depth);
+	if (!ef) return;
+	ef->type = 5; // convolution
+	ef->conv_mx = matrixX;
+	ef->conv_my = matrixY;
+	int n = matrixX * matrixY;
+	if (n > 25) n = 25;
+	memcpy(ef->conv_matrix, matrix, n * sizeof(float));
+	ef->conv_divisor = divisor;
+	ef->conv_bias = bias;
+	ef->conv_preserve_alpha = preserve_alpha;
+	ef->conv_clamp = clamp;
+	ef->conv_color_r = def_r;
+	ef->conv_color_g = def_g;
+	ef->conv_color_b = def_b;
+	ef->conv_color_a = def_a;
+}
+
+void tagSetFilterGradient(SWFAppContext* app_context, size_t depth,
+    u8 type, u8 count, const u32* colors, const float* alphas, const u8* ratios,
+    float blur_x, float blur_y, float angle, float distance, float strength,
+    u8 quality, u8 flags)
+{
+	(void)app_context;
+	if (depth > max_depth) return;
+	ExtFilterData* ef = getOrCreateExtFilter(depth);
+	if (!ef) return;
+	ef->type = type; // 7=gradientglow, 8=gradientbevel
+	if (count > 16) count = 16;
+	ef->grad_count = count;
+	memcpy(ef->grad_colors, colors, count * sizeof(u32));
+	memcpy(ef->grad_alphas, alphas, count * sizeof(float));
+	memcpy(ef->grad_ratios, ratios, count);
+	ef->blur_x = blur_x;
+	ef->blur_y = blur_y;
+	ef->angle = angle;
+	ef->distance = distance;
+	ef->strength = strength;
+	ef->quality = quality;
+	ef->flags = flags;
+}
+
+const ExtFilterData* ng_getExtFilterData(size_t entry_idx)
+{
+	size_t depth = entry_idx & 0xFFFFF;
+	for (int i = 0; i < g_ext_filter_count; i++) {
+		if (g_ext_filter_depths[i] == depth) return &g_ext_filters[i];
+	}
+	return NULL;
+}
+
 void tagSetInstanceName(SWFAppContext* app_context, size_t depth, const char* name)
 {
 	(void)app_context;

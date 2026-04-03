@@ -3,6 +3,7 @@
 #include <array>
 #include <cmath>
 #include <iomanip>
+#include <sstream>
 
 #include <zlib.h>
 #include <lzma.h>
@@ -2945,6 +2946,18 @@ namespace SWFRecomp
 				double parsed_filter_strength = 1.0;
 				double parsed_filter_angle = 0, parsed_filter_distance = 0;
 				double parsed_highlight_r = 0, parsed_highlight_g = 0, parsed_highlight_b = 0, parsed_highlight_a = 0;
+				// Extended filter data for mc.filters getter
+				u8 ext_filter_type = 0; // 5=conv, 6=cm, 7=gradglow, 8=gradbevel
+				float ext_cm_matrix[20] = {0};
+				u8 ext_conv_mx = 0, ext_conv_my = 0;
+				float ext_conv_matrix[25] = {0};
+				float ext_conv_divisor = 1, ext_conv_bias = 0;
+				u8 ext_conv_preserve_alpha = 1, ext_conv_clamp = 1;
+				u8 ext_conv_color_r = 0, ext_conv_color_g = 0, ext_conv_color_b = 0, ext_conv_color_a = 0;
+				u8 ext_grad_count = 0;
+				u32 ext_grad_colors[16] = {0};
+				float ext_grad_alphas[16] = {0};
+				u8 ext_grad_ratios[16] = {0};
 
 				if (is_po3 && has_filter_list)
 				{
@@ -3060,6 +3073,7 @@ namespace SWFRecomp
 							{
 								u8 nc = *(u8*) cur_pos; cur_pos += 1;
 								// Colors: RGBA[nc] then Ratios: UI8[nc]
+								u8* color_start = (u8*)cur_pos;
 								u8 last_r = 0, last_g = 0, last_b = 0, last_a = 255;
 								for (u8 ci = 0; ci < nc; ci++) {
 									last_r = *(u8*)(cur_pos + ci*4);
@@ -3067,8 +3081,9 @@ namespace SWFRecomp
 									last_b = *(u8*)(cur_pos + ci*4 + 2);
 									last_a = *(u8*)(cur_pos + ci*4 + 3);
 								}
-								cur_pos += nc * 4; // skip colors
-								cur_pos += nc;     // skip ratios
+								cur_pos += nc * 4; // colors
+								u8* ratio_start = (u8*)cur_pos;
+								cur_pos += nc;     // ratios
 								u32 gg_bx; memcpy(&gg_bx, cur_pos, 4); cur_pos += 4;
 								u32 gg_by; memcpy(&gg_by, cur_pos, 4); cur_pos += 4;
 								u32 gg_ang; memcpy(&gg_ang, cur_pos, 4); cur_pos += 4;
@@ -3076,7 +3091,7 @@ namespace SWFRecomp
 								u16 gg_str; memcpy(&gg_str, cur_pos, 2); cur_pos += 2;
 								u8 gg_fl = *(u8*)cur_pos; cur_pos += 1;
 								if (parsed_filter_type == 0) {
-									parsed_filter_type = 3; // approximate as glow
+									parsed_filter_type = 3; // approximate as glow for rendering
 									parsed_filter_r = last_r / 255.0;
 									parsed_filter_g = last_g / 255.0;
 									parsed_filter_b = last_b / 255.0;
@@ -3086,9 +3101,24 @@ namespace SWFRecomp
 									parsed_filter_angle = (float)(s32)gg_ang / 65536.0f;
 									parsed_filter_distance = (float)(s32)gg_dist / 65536.0f;
 									parsed_filter_strength = (float)gg_str / 256.0f;
-									parsed_filter_quality = gg_fl & 0x1F;  // bits 0-4
+									// GradientGlow/Bevel flags: InnerShadow(7) Knockout(6) CompositeSource(5) OnTop(4) Passes(3-0)
+									parsed_filter_quality = gg_fl & 0x0F;
 									if (parsed_filter_quality == 0) parsed_filter_quality = 1;
-									parsed_filter_flags = (gg_fl >> 5) & 0x07;  // bits 5-7
+									// Pack inner/knockout/onTop into 3-bit flags for ext filter data
+									u8 inner = (gg_fl >> 7) & 1;
+									u8 knockout = (gg_fl >> 6) & 1;
+									u8 on_top = (gg_fl >> 4) & 1;
+									parsed_filter_flags = (inner << 2) | (knockout << 1) | on_top;
+									// Store full gradient data for mc.filters
+									ext_filter_type = 7; // GradientGlow
+									ext_grad_count = nc < 16 ? nc : 16;
+									for (u8 ci = 0; ci < ext_grad_count; ci++) {
+										u8 cr = color_start[ci*4], cg = color_start[ci*4+1];
+										u8 cb = color_start[ci*4+2], ca = color_start[ci*4+3];
+										ext_grad_colors[ci] = ((u32)cr << 16) | ((u32)cg << 8) | cb;
+										ext_grad_alphas[ci] = ca / 255.0f;
+										ext_grad_ratios[ci] = ratio_start[ci];
+									}
 								}
 								break;
 							}
@@ -3098,15 +3128,34 @@ namespace SWFRecomp
 								u8 my = *(u8*) cur_pos; cur_pos += 1;
 								float cv_divisor; memcpy(&cv_divisor, cur_pos, 4); cur_pos += 4;
 								float cv_bias; memcpy(&cv_bias, cur_pos, 4); cur_pos += 4;
-								cur_pos += mx * my * 4; // skip matrix
-								cur_pos += 4; // skip default color RGBA
+								u8* matrix_start = (u8*)cur_pos;
+								int matrix_count = mx * my;
+								cur_pos += matrix_count * 4; // matrix FLOAT[mx*my]
+								u8 cv_def_r = *(u8*)cur_pos; u8 cv_def_g = *(u8*)(cur_pos+1);
+								u8 cv_def_b = *(u8*)(cur_pos+2); u8 cv_def_a = *(u8*)(cur_pos+3);
+								cur_pos += 4; // default color RGBA
 								u8 cv_fl = *(u8*)cur_pos; cur_pos += 1;
 								if (parsed_filter_type == 0) {
-									parsed_filter_type = 1; // approximate as blur
+									parsed_filter_type = 1; // approximate as blur for rendering
 									parsed_blur_x = (float)mx;
 									parsed_blur_y = (float)my;
 									parsed_filter_quality = 1;
 									parsed_filter_strength = 1.0f;
+									// Store full convolution data for mc.filters
+									ext_filter_type = 5; // Convolution
+									ext_conv_mx = mx;
+									ext_conv_my = my;
+									ext_conv_divisor = cv_divisor;
+									ext_conv_bias = cv_bias;
+									int n = matrix_count < 25 ? matrix_count : 25;
+									for (int ci = 0; ci < n; ci++)
+										memcpy(&ext_conv_matrix[ci], matrix_start + ci*4, 4);
+									ext_conv_clamp = (cv_fl >> 1) & 1;
+									ext_conv_preserve_alpha = cv_fl & 1;
+									ext_conv_color_r = cv_def_r;
+									ext_conv_color_g = cv_def_g;
+									ext_conv_color_b = cv_def_b;
+									ext_conv_color_a = cv_def_a;
 								}
 								break;
 							}
@@ -3116,6 +3165,12 @@ namespace SWFRecomp
 								float cm[20];
 								memcpy(cm, cur_pos, 80);
 								cur_pos += 80;
+
+								// Store raw matrix for mc.filters getter
+								if (ext_filter_type == 0) {
+									ext_filter_type = 6; // ColorMatrix
+									memcpy(ext_cm_matrix, cm, 80);
+								}
 
 								// Convert to our cxform format:
 								// 4x4 column-major multiply matrix + 4 additive values
@@ -3160,6 +3215,7 @@ namespace SWFRecomp
 							{
 								u8 nc = *(u8*) cur_pos; cur_pos += 1;
 								// Colors: RGBA[nc] then Ratios: UI8[nc]
+								u8* color_start = (u8*)cur_pos;
 								// Use first non-transparent color as shadow, last as highlight
 								u8 gb_sr = 0, gb_sg = 0, gb_sb = 0, gb_sa = 255;
 								u8 gb_hr = 255, gb_hg = 255, gb_hb = 255, gb_ha = 255;
@@ -3174,6 +3230,7 @@ namespace SWFRecomp
 									gb_sb = *(u8*)(cur_pos+2); gb_sa = *(u8*)(cur_pos+3);
 								}
 								cur_pos += nc * 4; // colors
+								u8* ratio_start = (u8*)cur_pos;
 								cur_pos += nc;     // ratios
 								u32 gb_bx; memcpy(&gb_bx, cur_pos, 4); cur_pos += 4;
 								u32 gb_by; memcpy(&gb_by, cur_pos, 4); cur_pos += 4;
@@ -3182,7 +3239,7 @@ namespace SWFRecomp
 								u16 gb_str; memcpy(&gb_str, cur_pos, 2); cur_pos += 2;
 								u8 gb_fl = *(u8*)cur_pos; cur_pos += 1;
 								if (parsed_filter_type == 0) {
-									parsed_filter_type = 4; // approximate as bevel
+									parsed_filter_type = 4; // approximate as bevel for rendering
 									parsed_filter_r = gb_sr / 255.0;
 									parsed_filter_g = gb_sg / 255.0;
 									parsed_filter_b = gb_sb / 255.0;
@@ -3196,9 +3253,23 @@ namespace SWFRecomp
 									parsed_filter_angle = (float)(s32)gb_ang / 65536.0f;
 									parsed_filter_distance = (float)(s32)gb_dist / 65536.0f;
 									parsed_filter_strength = (float)gb_str / 256.0f;
-									parsed_filter_quality = gb_fl & 0x1F;  // bits 0-4
+									// GradientBevel flags: InnerShadow(7) Knockout(6) CompositeSource(5) OnTop(4) Passes(3-0)
+									parsed_filter_quality = gb_fl & 0x0F;
 									if (parsed_filter_quality == 0) parsed_filter_quality = 1;
-									parsed_filter_flags = (gb_fl >> 5) & 0x07;  // bits 5-7
+									u8 gb_inner = (gb_fl >> 7) & 1;
+									u8 gb_knockout = (gb_fl >> 6) & 1;
+									u8 gb_on_top = (gb_fl >> 4) & 1;
+									parsed_filter_flags = (gb_inner << 2) | (gb_knockout << 1) | gb_on_top;
+									// Store full gradient data for mc.filters
+									ext_filter_type = 8; // GradientBevel
+									ext_grad_count = nc < 16 ? nc : 16;
+									for (u8 ci = 0; ci < ext_grad_count; ci++) {
+										u8 cr = color_start[ci*4], cg = color_start[ci*4+1];
+										u8 cb = color_start[ci*4+2], ca = color_start[ci*4+3];
+										ext_grad_colors[ci] = ((u32)cr << 16) | ((u32)cg << 8) | cb;
+										ext_grad_alphas[ci] = ca / 255.0f;
+										ext_grad_ratios[ci] = ratio_start[ci];
+									}
 								}
 								break;
 							}
@@ -3500,6 +3571,82 @@ namespace SWFRecomp
 							<< parsed_highlight_a << ");"
 							<< std::defaultfloat << endl;
 					}
+				}
+
+				// Emit extended filter data for mc.filters getter
+				// Helper: format float as C literal with guaranteed decimal point + "f" suffix
+				auto flit = [](float v) -> std::string {
+					std::ostringstream oss;
+					oss << std::setprecision(9) << v;
+					std::string s = oss.str();
+					if (s.find('.') == std::string::npos && s.find('e') == std::string::npos)
+						s += ".0";
+					s += "f";
+					return s;
+				};
+				auto dlit = [](double v) -> std::string {
+					std::ostringstream oss;
+					oss << std::setprecision(9) << v;
+					std::string s = oss.str();
+					if (s.find('.') == std::string::npos && s.find('e') == std::string::npos)
+						s += ".0";
+					s += "f";
+					return s;
+				};
+				if (ext_filter_type == 6) { // ColorMatrixFilter
+					context.tag_main << "\t{ float _cm[] = {";
+					for (int i = 0; i < 20; i++) {
+						if (i > 0) context.tag_main << ",";
+						context.tag_main << flit(ext_cm_matrix[i]);
+					}
+					context.tag_main << "}; tagSetFilterColorMatrix(app_context, "
+						<< to_string(depth) << ", _cm); }" << endl;
+				}
+				else if (ext_filter_type == 5) { // ConvolutionFilter
+					int n = ext_conv_mx * ext_conv_my;
+					if (n > 25) n = 25;
+					context.tag_main << "\t{ float _m[] = {";
+					for (int i = 0; i < n; i++) {
+						if (i > 0) context.tag_main << ",";
+						context.tag_main << flit(ext_conv_matrix[i]);
+					}
+					context.tag_main << "}; tagSetFilterConvolution(app_context, "
+						<< to_string(depth) << ", "
+						<< to_string(ext_conv_mx) << ", " << to_string(ext_conv_my) << ", _m, "
+						<< flit(ext_conv_divisor) << ", "
+						<< flit(ext_conv_bias) << ", "
+						<< to_string(ext_conv_preserve_alpha) << ", "
+						<< to_string(ext_conv_clamp) << ", "
+						<< to_string(ext_conv_color_r) << ", "
+						<< to_string(ext_conv_color_g) << ", "
+						<< to_string(ext_conv_color_b) << ", "
+						<< to_string(ext_conv_color_a) << "); }" << endl;
+				}
+				else if (ext_filter_type == 7 || ext_filter_type == 8) { // GradientGlow/Bevel
+					context.tag_main << "\t{ u32 _c[] = {";
+					for (int i = 0; i < ext_grad_count; i++) {
+						if (i > 0) context.tag_main << ",";
+						context.tag_main << ext_grad_colors[i];
+					}
+					context.tag_main << "}; float _a[] = {";
+					for (int i = 0; i < ext_grad_count; i++) {
+						if (i > 0) context.tag_main << ",";
+						context.tag_main << flit(ext_grad_alphas[i]);
+					}
+					context.tag_main << "}; u8 _r[] = {";
+					for (int i = 0; i < ext_grad_count; i++) {
+						if (i > 0) context.tag_main << ",";
+						context.tag_main << to_string(ext_grad_ratios[i]);
+					}
+					context.tag_main << "}; tagSetFilterGradient(app_context, "
+						<< to_string(depth) << ", "
+						<< to_string(ext_filter_type) << ", "
+						<< to_string(ext_grad_count) << ", _c, _a, _r, "
+						<< dlit(parsed_blur_x) << ", " << dlit(parsed_blur_y) << ", "
+						<< dlit(parsed_filter_angle) << ", " << dlit(parsed_filter_distance) << ", "
+						<< dlit(parsed_filter_strength) << ", "
+						<< to_string(parsed_filter_quality) << ", "
+						<< to_string(parsed_filter_flags) << "); }" << endl;
 				}
 
 				break;
