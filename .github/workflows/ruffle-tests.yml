@@ -471,17 +471,6 @@ jobs:
         with:
           python-version: '3.x'
 
-      - name: Fetch previous results
-        run: |
-          DIRS="$AVM1_DIR $SHUMWAY_AVM1_DIR $SHUMWAY_FLAT_DIR $GNASH_SWFMILL_DIR $GNASH_AS_DIR"
-          if git fetch origin ruffle-test-results 2>/dev/null; then
-            for dir in $DIRS; do
-              mkdir -p "$dir/_results"
-              git show "origin/ruffle-test-results:$dir/_results/results.json" \
-                > "$dir/_results/results_previous.json" 2>/dev/null || true
-            done
-          fi
-
       - name: Install system dependencies
         run: sudo apt-get update && sudo apt-get install -y build-essential
 
@@ -499,6 +488,20 @@ jobs:
         with:
           name: setup-tests
           path: ruffle-tests/
+
+      - name: Fetch previous results
+        # Must run AFTER artifact download — the setup-tests artifact includes
+        # stale _results/ files from the master checkout, which would overwrite
+        # the fetched previous results if we fetched first.
+        run: |
+          DIRS="$AVM1_DIR $SHUMWAY_AVM1_DIR $SHUMWAY_FLAT_DIR $GNASH_SWFMILL_DIR $GNASH_AS_DIR"
+          if git fetch origin ruffle-test-results 2>/dev/null; then
+            for dir in $DIRS; do
+              mkdir -p "$dir/_results"
+              git show "origin/ruffle-test-results:$dir/_results/results.json" \
+                > "$dir/_results/results_previous.json" 2>/dev/null || true
+            done
+          fi
 
       - name: Download all shard artifacts
         uses: actions/download-artifact@v7
