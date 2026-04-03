@@ -1,7 +1,7 @@
 # Ruffle Test Results Diff
 
 **Previous:** `868900bbb1a2` (2026-04-02T15:39:42.077685+00:00)
-**Current:** `cd3784f78410` (2026-04-03T03:19:32.134309+00:00)
+**Current:** `53c54f5db34c` (2026-04-03T04:40:26.159413+00:00)
 
 ## Summary
 
@@ -10,8 +10,8 @@
 | Passing | 5 | 68 | +63 |
 | Total | 190 | 190 | 0 |
 | Pass rate | 2.6% | 35.8% | +33.2% |
-| Mismatched lines | 14320 | 4540 | -9780 |
-|   Decreased | | | -9781 |
+| Mismatched lines | 14320 | 4538 | -9782 |
+|   Decreased | | | -9783 |
 |   Increased | | | +1 |
 
 ## Newly Passing (63)
@@ -86,7 +86,7 @@
 
 | Test | Status | Lines (prev) | Lines (now) | Diff |
 |------|--------|--------------|-------------|------|
-| `array-v5` | output_mismatch | 3/560 | 446/560 | -443 |
+| `array-v5` | output_mismatch | 3/560 | 448/560 | -445 |
 | `Math-v7` | output_mismatch | 3/287 | 282/287 | -279 |
 | `Math-v8` | output_mismatch | 3/287 | 282/287 | -279 |
 | `Math-v5` | output_mismatch | 3/278 | 273/278 | -270 |
