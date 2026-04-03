@@ -1091,6 +1091,12 @@ def compile_native(test_dir, num_frames, build_dir, headless=False, has_image_co
     shutil.copy2(SWFMODERN / "lib/o1heap/o1heap.c", build_dir)
     shutil.copy2(SWFMODERN / "lib/o1heap/o1heap.h", build_dir)
     shutil.copy2(SWFMODERN / "include/memory/heap.h", mem_dir)
+    # Copy libtess2 tessellation library
+    libtess2_dir = SWFMODERN / "third_party" / "libtess2"
+    if libtess2_dir.exists():
+        for f in libtess2_dir.iterdir():
+            if f.suffix in (".c", ".h"):
+                shutil.copy2(f, build_dir)
     shutil.copy2(MAIN_C, build_dir)
 
     # Copy generated files for main SWF

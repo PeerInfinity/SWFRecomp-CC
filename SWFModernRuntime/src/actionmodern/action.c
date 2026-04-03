@@ -7,6 +7,7 @@
 #include <ctype.h>
 #include <limits.h>
 #include <setjmp.h>
+#include "tesselator.h"
 
 // WASI compatibility: isnanf/isinff are GCC extensions not in WASI libc;
 // C99 isnan/isinf are type-generic and work on floats
@@ -18755,12 +18756,21 @@ static void drawingFinalizePath(DrawingState* ds)
 	for (u32 i = 0; i < ds->cmd_count; i++) {
 		DrawCmd* c = &ds->cmds[i];
 		if (c->type == 2) {
-			// CURVE_TO: flatten quadratic Bezier to line segments
+			// CURVE_TO: adaptive Bezier flattening based on flatness tolerance
 			float sx = (i > 0) ? ds->cmds[i-1].x : ds->pen_x;
 			float sy = (i > 0) ? ds->cmds[i-1].y : ds->pen_y;
-			// Subdivide into 8 segments (good enough for most curves)
-			for (int seg = 1; seg <= 8; seg++) {
-				float t = (float)seg / 8.0f;
+			// Flatness test: max distance of control point from midpoint of start→end
+			float mx = (sx + c->x) * 0.5f, my = (sy + c->y) * 0.5f;
+			float dx = c->cx - mx, dy = c->cy - my;
+			float flatness = dx * dx + dy * dy;
+			// Choose segment count based on deviation (tolerance ~0.5 pixels)
+			int segs;
+			if (flatness < 0.25f) segs = 1;       // < 0.5px deviation
+			else if (flatness < 4.0f) segs = 4;    // < 2px
+			else if (flatness < 25.0f) segs = 8;   // < 5px
+			else segs = 16;                         // large curves
+			for (int seg = 1; seg <= segs; seg++) {
+				float t = (float)seg / (float)segs;
 				float u = 1.0f - t;
 				float px = u*u*sx + 2*u*t*c->cx + t*t*c->x;
 				float py = u*u*sy + 2*u*t*c->cy + t*t*c->y;
@@ -18820,17 +18830,46 @@ static void drawingFinalizePath(DrawingState* ds)
 		memcpy(path->line_gradient_matrix, ds->line_gradient_matrix, 16 * sizeof(float));
 	}
 
-	// Fan tessellation for fill (convert pixels to twips)
+	// Tessellate fill using libtess2 (constrained Delaunay triangulation)
 	if (path->has_fill && poly_count >= 3) {
-		u32 tri_count = poly_count - 2;
-		path->fill_vert_count = tri_count * 3;
-		path->fill_verts = (float*)malloc(path->fill_vert_count * 2 * sizeof(float));
-		for (u32 i = 0; i < tri_count; i++) {
-			float* out = &path->fill_verts[i * 6];
-			out[0] = poly[0] * 20.0f;       out[1] = poly[1] * 20.0f;
-			out[2] = poly[(i+1)*2] * 20.0f;  out[3] = poly[(i+1)*2+1] * 20.0f;
-			out[4] = poly[(i+2)*2] * 20.0f;  out[5] = poly[(i+2)*2+1] * 20.0f;
+		// Convert polygon to twips for tessellation input
+		float* twips_poly = (float*)malloc(poly_count * 2 * sizeof(float));
+		for (u32 i = 0; i < poly_count; i++) {
+			twips_poly[i*2]   = poly[i*2] * 20.0f;
+			twips_poly[i*2+1] = poly[i*2+1] * 20.0f;
 		}
+		TESStesselator* tess = tessNewTess(NULL);
+		if (tess) {
+			tessSetOption(tess, TESS_CONSTRAINED_DELAUNAY_TRIANGULATION, 1);
+			tessAddContour(tess, 2, twips_poly, sizeof(float) * 2, (int)poly_count);
+			if (tessTesselate(tess, TESS_WINDING_NONZERO, TESS_POLYGONS, 3, 2, NULL)) {
+				const TESSreal* verts = tessGetVertices(tess);
+				const TESSindex* elems = tessGetElements(tess);
+				int ntris = tessGetElementCount(tess);
+				path->fill_vert_count = (u32)ntris * 3;
+				path->fill_verts = (float*)malloc(path->fill_vert_count * 2 * sizeof(float));
+				for (int i = 0; i < ntris; i++) {
+					for (int j = 0; j < 3; j++) {
+						TESSindex idx = elems[i * 3 + j];
+						path->fill_verts[i*6 + j*2]     = verts[idx * 2];
+						path->fill_verts[i*6 + j*2 + 1] = verts[idx * 2 + 1];
+					}
+				}
+			} else {
+				// Fallback to fan tessellation if libtess2 fails
+				u32 tri_count = poly_count - 2;
+				path->fill_vert_count = tri_count * 3;
+				path->fill_verts = (float*)malloc(path->fill_vert_count * 2 * sizeof(float));
+				for (u32 i = 0; i < tri_count; i++) {
+					float* out = &path->fill_verts[i * 6];
+					out[0] = twips_poly[0]; out[1] = twips_poly[1];
+					out[2] = twips_poly[(i+1)*2]; out[3] = twips_poly[(i+1)*2+1];
+					out[4] = twips_poly[(i+2)*2]; out[5] = twips_poly[(i+2)*2+1];
+				}
+			}
+			tessDeleteTess(tess);
+		}
+		free(twips_poly);
 	}
 
 	// Line stroke expansion: for each consecutive pair, expand to quad
