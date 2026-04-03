@@ -1,23 +1,41 @@
 # Ruffle Test Results Diff
 
-**Previous:** `bbe171d20f4f` (2026-04-03T16:55:52.002040+00:00)
-**Current:** `dc2748b675fb` (2026-04-03T22:14:41.121482+00:00)
+**Previous:** `dc2748b675fb` (2026-04-03T22:14:41.121482+00:00)
+**Current:** `5ec711b2146b` (2026-04-03T22:44:25.133485+00:00)
+**⚠️ Incomplete run: 28/30 shards produced results (2 missing).** Tests absent from results are likely from failed shards, not intentional removals.
 
 ## Summary
 
 | Metric | Previous | Current | Delta |
 |--------|----------|---------|-------|
-| Passing | 68 | 68 | 0 |
-| Total | 190 | 190 | 0 |
-| Pass rate | 35.8% | 35.8% | 0% |
-| Mismatched lines | 4538 | 4534 | -4 |
-|   Decreased | | | -6 |
-|   Increased | | | +2 |
+| Passing | 68 | 60 | -8 |
+| Total | 190 | 177 | -13 |
+| Pass rate | 35.8% | 33.9% | -1.9% |
+| Mismatched lines | 4534 | 4333 | -201 |
 
-## Line Count Changed (3)
+## Missing Tests — Shard Failure (13)
 
-| Test | Status | Lines (prev) | Lines (now) | Diff |
-|------|--------|--------------|-------------|------|
-| `AsBroadcaster-v7` | output_mismatch | 87/121 | 90/121 | -3 |
-| `AsBroadcaster-v8` | output_mismatch | 87/121 | 90/121 | -3 |
-| `array-v5` | output_mismatch | 448/560 | 446/560 | +2 |
+These tests were in the previous run but absent from this run due to missing shards. This is **not** a regression — the tests were not executed.
+
+- 8 were previously passing
+- 5 were previously failing
+
+<details><summary>Show all missing tests</summary>
+
+| Test | Previous Status | Lines |
+|------|----------------|-------|
+| `Camera-v6` | output_mismatch | 33/90 |
+| `Camera-v7` | output_mismatch | 33/90 |
+| `Camera-v8` | output_mismatch | 33/90 |
+| `Color-v5` | pass | 140/140 |
+| `Color-v6` | output_mismatch | 165/171 |
+| `Color-v7` | pass | 161/161 |
+| `Color-v8` | pass | 161/161 |
+| `Point-v5` | pass | 7/7 |
+| `Point-v6` | pass | 7/7 |
+| `Point-v7` | pass | 7/7 |
+| `Point-v8` | output_mismatch | 169/193 |
+| `Random-v5` | pass | 30/30 |
+| `Random-v6` | pass | 30/30 |
+
+</details>
