@@ -1,21 +1,20 @@
 # Ruffle Test Results Diff
 
-**Previous:** `112f7a9df78d` (2026-04-04T02:19:30.614493+00:00)
-**Current:** `4b79110d60c6` (2026-04-04T03:24:53.100191+00:00)
+**Previous:** `4b79110d60c6` (2026-04-04T03:24:53.100191+00:00)
+**Current:** `57ba121d1486` (2026-04-04T17:24:13.275732+00:00)
 
 ## Summary
 
 | Metric | Previous | Current | Delta |
 |--------|----------|---------|-------|
-| Passing | 8 | 8 | 0 |
-| Total | 55 | 58 | +3 |
-| Pass rate | 14.5% | 13.8% | -0.7% |
-| Mismatched lines | 1720 | 1742 | +22 |
+| Passing | 8 | 7 | -1 |
+| Total | 58 | 58 | 0 |
+| Pass rate | 13.8% | 12.1% | -1.7% |
+| Mismatched lines | 1742 | 1745 | +3 |
+|   Increased | | | +3 |
 
-## Added Tests (3)
+## Newly Failing (1)
 
-| Test | Status | Lines |
-|------|--------|-------|
-| `DefineTextTest` | output_mismatch | 11/16 |
-| `DepthLimitsTest` | output_mismatch | 12/20 |
-| `get_frame_number_test` | output_mismatch | 22/31 |
+| Test | New Status | Lines (prev) | Lines (now) |
+|------|-----------|--------------|-------------|
+| `getTimer_test` | output_mismatch | 8/8 | 5/8 |
