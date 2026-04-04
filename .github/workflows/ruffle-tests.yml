@@ -413,7 +413,9 @@ jobs:
           name: setup-tests
           path: ruffle-tests/
 
-      - name: Verify runtime output (shard ${{ matrix.shard }}/${{ needs.setup-parallel.outputs.total }})
+      - name: Verify AVM1 (shard ${{ matrix.shard }})
+        if: env.RUN_AVM1 == 'true'
+        timeout-minutes: 30
         env:
           TZ: NPT-5:45
         run: |
@@ -422,45 +424,53 @@ jobs:
           if [ "${{ inputs.limit }}" != "0" ] && [ -n "${{ inputs.limit }}" ]; then
             LIMIT_ARGS="--limit=${{ inputs.limit }}"
           fi
+          python3 ruffle-tests/verify_output.py -v \
+            --json=ruffle-tests/results-shard-avm1-${{ matrix.shard }}.json \
+            --shard="$SHARD" $LIMIT_ARGS || true
 
-          # Each category gets its own shard results file
-          if [ "$RUN_AVM1" = "true" ]; then
-            python3 ruffle-tests/verify_output.py -v \
-              --json=ruffle-tests/results-shard-avm1-${{ matrix.shard }}.json \
-              --shard="$SHARD" $LIMIT_ARGS || true
-          fi
-          if [ "$RUN_SHUMWAY" = "true" ]; then
-            python3 ruffle-tests/verify_output.py -v \
-              --tests-dir="$SHUMWAY_AVM1_DIR" \
-              --json=ruffle-tests/results-shard-shumway_avm1-${{ matrix.shard }}.json \
-              --shard="$SHARD" || true
-            python3 ruffle-tests/verify_output.py -v \
-              --tests-dir="$SHUMWAY_FLAT_DIR" \
-              --json=ruffle-tests/results-shard-shumway_flat-${{ matrix.shard }}.json \
-              --shard="$SHARD" || true
-          fi
-          if [ "$RUN_GNASH" = "true" ]; then
-            python3 ruffle-tests/verify_output.py -v \
-              --tests-dir="$GNASH_SWFMILL_DIR" \
-              --json=ruffle-tests/results-shard-gnash_swfmill-${{ matrix.shard }}.json \
-              --shard="$SHARD" || true
-            python3 ruffle-tests/verify_output.py -v \
-              --tests-dir="$GNASH_AS_DIR" \
-              --json=ruffle-tests/results-shard-gnash_as-${{ matrix.shard }}.json \
-              --shard="$SHARD" || true
-            python3 ruffle-tests/verify_output.py -v \
-              --tests-dir="$GNASH_MTASC_DIR" \
-              --json=ruffle-tests/results-shard-gnash_mtasc-${{ matrix.shard }}.json \
-              --shard="$SHARD" || true
-            python3 ruffle-tests/verify_output.py -v \
-              --tests-dir="$GNASH_MING_DIR" \
-              --json=ruffle-tests/results-shard-gnash_ming-${{ matrix.shard }}.json \
-              --shard="$SHARD" || true
-            python3 ruffle-tests/verify_output.py -v \
-              --tests-dir="$GNASH_SWFC_DIR" \
-              --json=ruffle-tests/results-shard-gnash_swfc-${{ matrix.shard }}.json \
-              --shard="$SHARD" || true
-          fi
+      - name: Verify Shumway (shard ${{ matrix.shard }})
+        if: "!cancelled() && env.RUN_SHUMWAY == 'true'"
+        timeout-minutes: 10
+        env:
+          TZ: NPT-5:45
+        run: |
+          SHARD="${{ matrix.shard }}/${{ needs.setup-parallel.outputs.total }}"
+          python3 ruffle-tests/verify_output.py -v \
+            --tests-dir="$SHUMWAY_AVM1_DIR" \
+            --json=ruffle-tests/results-shard-shumway_avm1-${{ matrix.shard }}.json \
+            --shard="$SHARD" || true
+          python3 ruffle-tests/verify_output.py -v \
+            --tests-dir="$SHUMWAY_FLAT_DIR" \
+            --json=ruffle-tests/results-shard-shumway_flat-${{ matrix.shard }}.json \
+            --shard="$SHARD" || true
+
+      - name: Verify Gnash (shard ${{ matrix.shard }})
+        if: "!cancelled() && env.RUN_GNASH == 'true'"
+        timeout-minutes: 60
+        env:
+          TZ: NPT-5:45
+        run: |
+          SHARD="${{ matrix.shard }}/${{ needs.setup-parallel.outputs.total }}"
+          python3 ruffle-tests/verify_output.py -v \
+            --tests-dir="$GNASH_SWFMILL_DIR" \
+            --json=ruffle-tests/results-shard-gnash_swfmill-${{ matrix.shard }}.json \
+            --shard="$SHARD" || true
+          python3 ruffle-tests/verify_output.py -v \
+            --tests-dir="$GNASH_AS_DIR" \
+            --json=ruffle-tests/results-shard-gnash_as-${{ matrix.shard }}.json \
+            --shard="$SHARD" || true
+          python3 ruffle-tests/verify_output.py -v \
+            --tests-dir="$GNASH_MTASC_DIR" \
+            --json=ruffle-tests/results-shard-gnash_mtasc-${{ matrix.shard }}.json \
+            --shard="$SHARD" || true
+          python3 ruffle-tests/verify_output.py -v \
+            --tests-dir="$GNASH_MING_DIR" \
+            --json=ruffle-tests/results-shard-gnash_ming-${{ matrix.shard }}.json \
+            --shard="$SHARD" || true
+          python3 ruffle-tests/verify_output.py -v \
+            --tests-dir="$GNASH_SWFC_DIR" \
+            --json=ruffle-tests/results-shard-gnash_swfc-${{ matrix.shard }}.json \
+            --shard="$SHARD" || true
 
       - name: Upload shard results
         if: always()
