@@ -1,10 +1,10 @@
 # Ruffle Test Results (Filtered)
 
-**Date**: 2026-04-04 02:19 UTC
+**Date**: 2026-04-04 03:24 UTC
 
-**Git SHA**: `112f7a9df7`
+**Git SHA**: `4b79110d60`
 
-**Run Duration**: 2m 34s
+**Run Duration**: 2m 52s
 
 **Filtered**: 0 tests ignored out of 9 available
 
@@ -12,18 +12,18 @@
 
 | Metric | Value |
 |--------|-------|
-| Total tests | 8 |
-| Passing | **4** (50.0%) |
-| Failing | 4 |
-| Total expected lines | 205 |
-| Matching lines | 140 (68.3%) |
-| Mismatched lines | 65 |
+| Total tests | 9 |
+| Passing | **4** (44.4%) |
+| Failing | 5 |
+| Total expected lines | 231 |
+| Matching lines | 163 (70.6%) |
+| Mismatched lines | 68 |
 
 ### Failure Breakdown
 
 | Category | Count | % of Failures |
 |----------|-------|---------------|
-| Output Mismatch | 4 | 100.0% |
+| Output Mismatch | 5 | 100.0% |
 
 ## Passing Tests
 
@@ -31,22 +31,23 @@
 
 | # | Test | Lines | Duration | Notes |
 |---|------|-------|----------|-------|
-| 1 | `enum` | 19 | 18.8s |  |
-| 2 | `exception` | 35 | 19.9s |  |
-| 3 | `hello` | 8 | 18.3s |  |
-| 4 | `implementsOpTest` | 28 | 18.7s |  |
+| 1 | `enum` | 19 | 18.4s |  |
+| 2 | `exception` | 35 | 18.8s |  |
+| 3 | `hello` | 8 | 18.4s |  |
+| 4 | `implementsOpTest` | 28 | 19.4s |  |
 
 ## Near-Passing Tests
 
 Tests with output mismatch but >= 50% line match rate (low-hanging fruit).
 
-**3 tests** within reach
+**4 tests** within reach
 
 | # | Test | Match Rate | Matching | Total | Diff Lines | Notes |
 |---|------|------------|----------|-------|------------|-------|
-| 1 | `TextFieldTest` | 87.5% | 7 | 8 | 1 |  |
-| 2 | `inheritance` | 86.4% | 19 | 22 | 3 |  |
-| 3 | `super_test1` | 76.5% | 13 | 17 | 4 |  |
+| 1 | `function_test` | 88.5% | 23 | 26 | 3 |  |
+| 2 | `TextFieldTest` | 87.5% | 7 | 8 | 1 |  |
+| 3 | `inheritance` | 86.4% | 19 | 22 | 3 |  |
+| 4 | `super_test1` | 76.5% | 13 | 17 | 4 |  |
 
 ## Segfaults
 
@@ -62,11 +63,12 @@ No timeouts.
 
 ## All Output Mismatches
 
-**4 tests** with output mismatch, sorted by match rate (best first)
+**5 tests** with output mismatch, sorted by match rate (best first)
 
 | # | Test | Match Rate | Matching/Total | Actual | Expected | Notes |
 |---|------|------------|----------------|--------|----------|-------|
-| 1 | `TextFieldTest` | 87.5% | 7/8 | 8 | 8 |  |
-| 2 | `inheritance` | 86.4% | 19/22 | 22 | 22 |  |
-| 3 | `super_test1` | 76.5% | 13/17 | 17 | 17 |  |
-| 4 | `levels` | 16.2% | 11/68 | 14 | 68 |  |
+| 1 | `function_test` | 88.5% | 23/26 | 26 | 26 |  |
+| 2 | `TextFieldTest` | 87.5% | 7/8 | 8 | 8 |  |
+| 3 | `inheritance` | 86.4% | 19/22 | 22 | 22 |  |
+| 4 | `super_test1` | 76.5% | 13/17 | 17 | 17 |  |
+| 5 | `levels` | 16.2% | 11/68 | 14 | 68 |  |
