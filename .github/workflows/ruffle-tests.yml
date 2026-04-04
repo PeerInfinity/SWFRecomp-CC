@@ -428,6 +428,15 @@ jobs:
             --json=ruffle-tests/results-shard-avm1-${{ matrix.shard }}.json \
             --shard="$SHARD" $LIMIT_ARGS || true
 
+      - name: Upload AVM1 results
+        if: always()
+        uses: actions/upload-artifact@v7
+        with:
+          name: results-shard-${{ matrix.shard }}-avm1
+          path: ruffle-tests/results-shard-avm1-${{ matrix.shard }}.json
+          retention-days: 7
+          if-no-files-found: ignore
+
       - name: Verify Shumway (shard ${{ matrix.shard }})
         if: "!cancelled() && env.RUN_SHUMWAY == 'true'"
         timeout-minutes: 10
@@ -443,6 +452,15 @@ jobs:
             --tests-dir="$SHUMWAY_FLAT_DIR" \
             --json=ruffle-tests/results-shard-shumway_flat-${{ matrix.shard }}.json \
             --shard="$SHARD" || true
+
+      - name: Upload Shumway results
+        if: always()
+        uses: actions/upload-artifact@v7
+        with:
+          name: results-shard-${{ matrix.shard }}-shumway
+          path: ruffle-tests/results-shard-shumway_*-${{ matrix.shard }}.json
+          retention-days: 7
+          if-no-files-found: ignore
 
       - name: Verify Gnash (shard ${{ matrix.shard }})
         if: "!cancelled() && env.RUN_GNASH == 'true'"
@@ -472,12 +490,12 @@ jobs:
             --json=ruffle-tests/results-shard-gnash_swfc-${{ matrix.shard }}.json \
             --shard="$SHARD" || true
 
-      - name: Upload shard results
+      - name: Upload Gnash results
         if: always()
         uses: actions/upload-artifact@v7
         with:
-          name: results-shard-${{ matrix.shard }}
-          path: ruffle-tests/results-shard-*-${{ matrix.shard }}.json
+          name: results-shard-${{ matrix.shard }}-gnash
+          path: ruffle-tests/results-shard-gnash_*-${{ matrix.shard }}.json
           retention-days: 7
 
   # --- Combine shard results ---
