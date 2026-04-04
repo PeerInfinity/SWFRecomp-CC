@@ -40,6 +40,7 @@ static int varToStringBuf(SWFAppContext* app_context, ActionVar* v, char* buf, i
 static double varToDoubleSimple(ActionVar* v);
 static int _sort_compare_vars(SWFAppContext* app_context, ActionVar* a, ActionVar* b, int flags);
 static ActionVar objectCallToString(SWFAppContext* app_context, ActionVar* obj_var, int* found);
+static ActionVar builtin_array_method(SWFAppContext* app_context, ActionVar* args, u32 arg_count, ActionVar* registers, void* this_obj);
 static ActionVar objectCallValueOf(SWFAppContext* app_context, ActionVar* obj_var, int* found);
 static double varToDoubleSWF(SWFAppContext* app_context, ActionVar* v, int swf_version);
 static inline int32_t varToInt32(ActionVar* v);
@@ -809,6 +810,9 @@ static ASObject* g_object_prototype = NULL;
 static ASObject* g_array_prototype = NULL;
 static int g_array_proto_methods_init = 0;  // Whether Array.prototype methods have been registered
 static ASFunction g_array_proto_funcs[12];  // push,pop,shift,unshift,reverse,join,toString,concat,slice,splice,sort,sortOn
+// File-scope Array constructor (shared between actionGetVariable("Array") and initArrayPrototypeMethods)
+static ASFunction g_array_constructor_static;
+static int g_array_constructor_static_init = 0;
 
 // Currently executing user-defined function — used to set arguments.caller
 static ASFunction* g_current_executing_func = NULL;
@@ -10849,6 +10853,9 @@ static ActionVar objectCallToString(SWFAppContext* app_context, ActionVar* obj_v
 					scope_chain[scope_depth++] = func->captured_scope[ci];
 				}
 			}
+			// Save and set g_current_executing_func so builtin methods can identify themselves
+			ASFunction* _ts_prev_exec_func = g_current_executing_func;
+			g_current_executing_func = func;
 			if (func->function_type == 2 && func->advanced_func != NULL)
 			{
 				ActionVar* regs = NULL;
@@ -10874,9 +10881,20 @@ static ActionVar objectCallToString(SWFAppContext* app_context, ActionVar* obj_v
 				result.type = ACTION_STACK_VALUE_UNDEFINED;
 				result.data.numeric_value = 0;
 			}
+			g_current_executing_func = _ts_prev_exec_func;
 			scope_depth = saved_scope_depth;
 			actionSetCurrentContext(_ts_saved_ctx);
 			restoreFunctionVersion(_ts_saved_ver, _ts_saved_global, _ts_saved_midx);
+			// If the toString was a builtin_array_method stub that returned undefined,
+			// return an empty string (Array.prototype.toString() = join() = "" for non-arrays).
+			// This ensures all callers see a valid STRING result.
+			if (result.type == ACTION_STACK_VALUE_UNDEFINED &&
+			    func->function_type == 2 &&
+			    func->advanced_func == (Function2Ptr)builtin_array_method) {
+				result.type = ACTION_STACK_VALUE_STRING;
+				result.str_size = 0;
+				result.data.numeric_value = (u64) u16_empty;
+			}
 			return result;
 		}
 	}
@@ -28946,16 +28964,14 @@ check_special_vars:
 		}
 		else if (var_name_len == 5 && strncmp(var_name, "Array", 5) == 0)
 		{
-			// Return the built-in Array constructor as a function
-			static ASFunction g_array_constructor;
-			static int g_array_constructor_init = 0;
-			if (!g_array_constructor_init)
+			// Return the built-in Array constructor as a function (file-scope static)
+			if (!g_array_constructor_static_init)
 			{
-				memset(&g_array_constructor, 0, sizeof(ASFunction));
-				strncpy(g_array_constructor.name, "Array", 255);
-				g_array_constructor.function_type = 1;
-				g_array_constructor.param_count = 0;
-				g_array_constructor_init = 1;
+				memset(&g_array_constructor_static, 0, sizeof(ASFunction));
+				strncpy(g_array_constructor_static.name, "Array", 255);
+				g_array_constructor_static.function_type = 1;
+				g_array_constructor_static.param_count = 0;
+				g_array_constructor_static_init = 1;
 				// Initialize Array.prototype (shared singleton used by instanceof and arguments.__proto__)
 				if (g_array_prototype == NULL)
 				{
@@ -28964,11 +28980,11 @@ check_special_vars:
 					setObjectProto(app_context, g_array_prototype);
 				}
 				initArrayPrototypeMethods(app_context);
-				g_array_constructor.prototype_obj = g_array_prototype;
+				g_array_constructor_static.prototype_obj = g_array_prototype;
 				// Register Array sort-flag constants on own_props
-				g_array_constructor.own_props = allocObject(app_context, 8);
-				if (g_array_constructor.own_props != NULL) {
-					retainObject(g_array_constructor.own_props);
+				g_array_constructor_static.own_props = allocObject(app_context, 8);
+				if (g_array_constructor_static.own_props != NULL) {
+					retainObject(g_array_constructor_static.own_props);
 					static const char* const_names[] = {
 						"CASEINSENSITIVE", "DESCENDING", "UNIQUESORT",
 						"RETURNINDEXEDARRAY", "NUMERIC"
@@ -28979,12 +28995,12 @@ check_special_vars:
 						_cv.type = ACTION_STACK_VALUE_F64;
 						double _cvd = (double) const_values[_ci];
 						VAL(double, &_cv.data.numeric_value) = _cvd;
-						setProperty(app_context, g_array_constructor.own_props,
+						setProperty(app_context, g_array_constructor_static.own_props,
 						            const_names[_ci], strlen(const_names[_ci]), &_cv);
 					}
 				}
 			}
-			PUSH(ACTION_STACK_VALUE_FUNCTION, (u64)&g_array_constructor);
+			PUSH(ACTION_STACK_VALUE_FUNCTION, (u64)&g_array_constructor_static);
 			return;
 		}
 		else if (var_name_len == 6 && strncmp(var_name, "Object", 6) == 0)
@@ -45936,6 +45952,22 @@ static void initArrayPrototypeMethods(SWFAppContext* app_context)
 		fv.type = ACTION_STACK_VALUE_FUNCTION;
 		VAL(u64, &fv.data.numeric_value) = (u64)&g_array_proto_funcs[i];
 		setPropertyWithFlags(app_context, g_array_prototype, methods[i].name, methods[i].name_len, &fv, PROPERTY_FLAGS_DONTENUM);
+	}
+
+	// Initialize Array constructor (file-scope static) and set as constructor on prototype
+	if (!g_array_constructor_static_init) {
+		memset(&g_array_constructor_static, 0, sizeof(ASFunction));
+		strncpy(g_array_constructor_static.name, "Array", 255);
+		g_array_constructor_static.function_type = 1;
+		g_array_constructor_static.param_count = 0;
+		g_array_constructor_static.prototype_obj = g_array_prototype;
+		g_array_constructor_static_init = 1;
+	}
+	{
+		ActionVar ctor_v = {0};
+		ctor_v.type = ACTION_STACK_VALUE_FUNCTION;
+		ctor_v.data.numeric_value = (u64)&g_array_constructor_static;
+		setPropertyWithFlags(app_context, g_array_prototype, "constructor", 11, &ctor_v, PROPERTY_FLAGS_DONTENUM);
 	}
 
 	g_array_proto_methods_init = 1;

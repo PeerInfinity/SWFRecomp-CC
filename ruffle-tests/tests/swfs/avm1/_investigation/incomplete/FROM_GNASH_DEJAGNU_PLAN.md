@@ -22,9 +22,9 @@ blockers:
   - reason: "misc-ming/misc-swfc blocked on DoInitAction ordering for inlined Dejagnu"
 -->
 
-Last updated: 2026-04-01
+Last updated: 2026-04-04
 
-## Status: MAJOR PROGRESS — Dejagnu framework working, 82-92% pass rate on initial tests
+## Status: MAJOR PROGRESS — Dejagnu framework working, 68/190 actionscript.all passing, 5/9 misc-mtasc passing
 
 ## Overview
 
@@ -38,7 +38,7 @@ the Dejagnu test framework in various ways and don't produce correct output.
 |---|---|---|---|---|
 | `actionscript.all` | 243 | External `loadMovie("Dejagnu.swf")` + setInterval polling | Yes (per-test, identical copies, 10KB) | BLOCKED — child movie not linked |
 | `misc-ming.all` | 111 | Inlined (functions compiled into test SWF) | No (1 exception) | BLOCKED — inlined check functions produce no trace output |
-| `misc-mtasc.all` | 9 | Inlined (`__Packages.Dejagnu` AS2 class) | No | NEAR-WORKING — `hello` test: 7/8 lines match, 1 `typeof` failure |
+| `misc-mtasc.all` | 9 | Inlined (`__Packages.Dejagnu` AS2 class) | No | **5/9 PASS** — hello, enum, exception, implementsOpTest, function_test |
 | `misc-swfc.all` | 21 | Inlined (functions compiled into test SWF) | No | BLOCKED — same as misc-ming |
 | `misc-swfmill.all` | 15 | None (standalone tests) | No | **IN CI** — 4/14 passing |
 
@@ -153,24 +153,21 @@ The recompiler emits `tagDefineSprite(app_context, char_id, frame_funcs, frame_c
 2. Check if the test SWF has a sprite with an associated DoInitAction that defines the check functions
 3. Compare the recompiled tag output (`tagMain.c`) with what Ruffle would execute
 
-### Blocker 3: misc-mtasc — `typeof(Dejagnu)` Returns "undefined"
+### Blocker 3: misc-mtasc — `typeof(Dejagnu)` Returns "undefined" — RESOLVED
 
-**Symptoms:** `hello` test: line 8 assertion fails — `typeof(X)` returns "undefined" instead of "function". All other assertions pass (lines 2-4).
+**Status:** FIXED. `hello` test now passes (4→5/9 passing since 2026-04-01). The `_global` property resolution fix resolved the typeof issue.
 
-**Root cause (investigated 2026-04-01):**
+**Additional fix (2026-04-04): function_test**
+Three bugs fixed:
+1. **Array.prototype constructor property** — `g_array_prototype` had no `constructor` property. Moved Array constructor to file-scope static, set constructor in `initArrayPrototypeMethods`.
+2. **objectCallToString g_current_executing_func** — `objectCallToString` didn't set `g_current_executing_func`, so `builtin_array_method` couldn't identify its method name.
+3. **Array.prototype.toString stub returns "" not undefined** — `objectCallToString` now detects the `builtin_array_method` stub and returns an empty string instead of UNDEFINED, matching Flash's `Array.prototype.toString() = join() = ""` behavior.
 
-1. **_global property resolution: FIXED.** `actionGetVariable` now finds plain properties on `_global` in root context. `GetVariable("Dejagnu")` correctly resolves `_global.Dejagnu` (confirmed via debug tracing — type=13/FUNCTION).
-
-2. **Remaining issue: MTASC `this` binding in AS2 class methods.** The hello.as line 8 assertion is NOT `typeof(Dejagnu)` as initially assumed. MTASC compiles it as `typeof(this.loadMovie)` inside the `Test.prototype.test_all` method (`func2_anonymous_20`). The test expects `typeof(this.loadMovie) == "function"`, which requires `this` to be the root MovieClip (which has `loadMovie` as a built-in method).
-
-   In our runtime, `this` inside `test_all` is a plain ASObject (the Test instance), not the root MC. So `this.loadMovie` is undefined → `typeof(undefined)` = "undefined".
-
-   **Fix needed:** When Test.main calls `test_all()`, `this` should be bound to the root MovieClip (or a MovieClip scope), not to the Test instance. This is an AS2 class method `this` binding issue — MTASC assumes class methods execute with the MovieClip as `this` (similar to Ruffle's scope chain behavior for class methods).
-
-**Investigation steps (next):**
-1. Check how `Test.main` calls `test_all` — is it via `this.test_all()` or `Dejagnu.check_equals()`?
-2. Determine if the issue is in CallMethod `this` resolution or in how the Test constructor sets up the prototype chain
-3. May require ensuring `this` in AS2 class methods bound to MCs resolves to the MC, not the class instance
+**Remaining 4 failures:**
+- **inheritance** (13/14): `this.constructor.prototype.constructor.prototype.test()` — user-defined class prototype constructor chain not fully set up by MTASC bytecode.
+- **super_test1** (11/13): super() via apply() — `actionGetCurrentSuperInfo` returns NULL when method invoked through apply() rather than direct call.
+- **TextFieldTest** (2/3 assertions): text field height 20.3 vs expected 17.05 — font metrics difference.
+- **levels**: requires `_level` (loadMovie to _levelN) support, not implemented.
 
 ---
 
@@ -179,7 +176,7 @@ The recompiler emits `tagDefineSprite(app_context, char_id, frame_funcs, frame_c
 | Priority | Category | Tests | Effort | Impact |
 |---|---|---|---|---|
 | 1 | `actionscript.all` Dejagnu framework | 243 | **DONE** | Four fixes: ImportAssets char_id remapping, enterFrame goto deferral, string_id offset, MC constructor lookup. Boolean-v5: 35/38, Color-v5: 115/140. |
-| 2 | `misc-mtasc` typeof fix | 9 | Low | Quick win — `hello` is 7/8, others may be close |
+| 2 | `misc-mtasc` typeof fix | 9 | Low | **5/9 PASS**. function_test fixed (Array.prototype constructor + toString). Remaining: inheritance (1 diff), super_test1 (2 diffs), TextFieldTest (height metric), levels (loadMovie) |
 | 3 | `misc-ming` / `misc-swfc` init action ordering | 132 | High | Complex — requires understanding DoInitAction targeting for inlined library code |
 
 ---
