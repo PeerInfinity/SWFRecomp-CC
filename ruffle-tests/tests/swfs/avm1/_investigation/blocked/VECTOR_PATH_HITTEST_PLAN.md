@@ -3,7 +3,7 @@
 
 <!-- PLAN_META
 id: VECTOR_PATH_HITTEST
-status: incomplete
+status: blocked
 phases:
   - id: 1
     name: "Path data emission (recompiler)"
