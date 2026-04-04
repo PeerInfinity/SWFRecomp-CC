@@ -10,7 +10,7 @@ phases:
     status: incomplete
   - id: 2
     name: "misc-mtasc typeof fix"
-    status: incomplete
+    status: complete
   - id: 3
     name: "misc-ming / misc-swfc init action ordering"
     status: blocked

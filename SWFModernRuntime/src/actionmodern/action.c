@@ -45954,14 +45954,17 @@ static void initArrayPrototypeMethods(SWFAppContext* app_context)
 		setPropertyWithFlags(app_context, g_array_prototype, methods[i].name, methods[i].name_len, &fv, PROPERTY_FLAGS_DONTENUM);
 	}
 
-	// Initialize Array constructor (file-scope static) and set as constructor on prototype
+	// Set constructor on Array.prototype pointing to the file-scope Array constructor.
+	// Don't set g_array_constructor_static_init here — full init (with own_props for
+	// sort flag constants) happens in actionGetVariable("Array"). We just do minimal
+	// setup so the constructor property resolves for prototype chain lookups.
 	if (!g_array_constructor_static_init) {
 		memset(&g_array_constructor_static, 0, sizeof(ASFunction));
 		strncpy(g_array_constructor_static.name, "Array", 255);
 		g_array_constructor_static.function_type = 1;
 		g_array_constructor_static.param_count = 0;
 		g_array_constructor_static.prototype_obj = g_array_prototype;
-		g_array_constructor_static_init = 1;
+		// NOTE: do NOT set g_array_constructor_static_init = 1 here
 	}
 	{
 		ActionVar ctor_v = {0};
