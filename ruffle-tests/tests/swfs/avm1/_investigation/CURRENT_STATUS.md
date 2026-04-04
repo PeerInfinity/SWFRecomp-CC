@@ -173,6 +173,7 @@ All other previously near-passing tests have been fixed. 146 tests were tracked 
 | HIT_TESTING_PLAN | 5+ pass | movieclip_hittest_shapeflag (shape accuracy) |
 | LOADMOVIE_REMAINING_PLAN | 0/5 | setTimeout, cross-version/__proto__ |
 | DRAWING_API_RENDERING | 3 tests improved | Focal radial precision, edge anti-aliasing (see RENDERING_PIPELINE_COMPARISON.md) |
+| RUNTIME_SETMASK | 2/3 image PASS | movieclip_setmask image blocked on Drawing API anti-aliasing |
 
 ## Recommended Work Order (updated 2026-03-15)
 

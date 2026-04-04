@@ -126,6 +126,7 @@ namespace SWFRecomp
 	struct LineStyle
 	{
 		u16 width;
+		u16 end_width = 0; // morph end width (0 for non-morph)
 		size_t index;
 		u8 r;
 		u8 g;

@@ -16,17 +16,15 @@ phases:
     status: complete
   - id: 4
     name: "Morph shape interpolated paths"
-    status: blocked
+    status: complete
 dependencies:
   - HIT_TESTING (phases 1-7 complete)
-blockers:
-  - blocker: 4
-    reason: "Morph path style state ordering: initial MOVE captures line_style=0 before first StyleChange"
+blockers: []
 -->
 
-Last updated: 2026-03-31
+Last updated: 2026-04-04
 
-## Status: 3/4 PHASES COMPLETE — 325/338 (was 312/338)
+## Status: 4/4 PHASES COMPLETE — 329/338 (was 325/338)
 
 ---
 
@@ -34,16 +32,16 @@ Last updated: 2026-03-31
 
 | Test | Lines | Status | Notes |
 |------|-------|--------|-------|
-| movieclip_hittest_shapeflag | 338 | 325/338 (13 diff) | +13 lines from start of plan |
+| movieclip_hittest_shapeflag | 338 | 329/338 (9 diff) | +4 lines from Phase 4 morph implementation |
 
-### Remaining 13 diff lines
+### Remaining 9 diff lines
 
 | Category | Lines | Status |
 |----------|-------|--------|
 | Text glyph shapes | 6 (71, 163, 165, 171, 175, 177) | Noto Sans vs Flash font metric differences at curve boundaries |
 | Text regression | 1 (167) | Noto Sans glyph outline covers different area than Flash expectation |
-| Morph stroke-only | 4 (292, 294, 296, 304) | **BLOCKED** — Phase 4 style state ordering issue |
-| Drawing API curves | 2 (117, 137) | Deferred — needs DrawingState path integration |
+| Morph fill boundary | 1 (296) | Fill winding precision at boundary point — morph 41 fill0=1 at (400,300) |
+| Drawing API curves | 1 (137) | Deferred — needs DrawingState path integration |
 
 ---
 
@@ -92,64 +90,54 @@ Per-glyph path testing also implemented: glyph_data extended to 4 values per gly
 
 ---
 
-## Phase 4: Morph Interpolated Paths — BLOCKED
+## Phase 4: Morph Interpolated Paths — COMPLETE
 
 ### Approach: Interleaved format
 
 Each geometric command stores both start and end coordinates as paired entries:
 ```
-{cmd, start_x, start_y}, {0, end_x, end_y}
+{cmd, start_x, start_y}, {9.0, end_x, end_y}
 ```
 
-Style entries also paired (end entry is placeholder). Runtime interpolates per-entry:
-```c
-x = start_x * (1 - ratio/65535) + end_x * (ratio/65535)
-```
+Style entries: STYLE_LINE is followed by `{9.0, 0, end_width}` for morph end line width.
+Runtime interpolates per-entry: `x = start_x * (1 - ratio/65535) + end_x * (ratio/65535)`
 
-This guarantees 1:1 alignment by construction — no separate start/end streams to synchronize.
+### Implementation
 
-### Implementation status
+**Recompiler (SWFRecomp/src/swf.cpp)**:
+- `path_recording = !is_font` (enabled for morphs, was `!is_font && !is_morph`)
+- `LineStyle::end_width` field captures morph end line width in `parseMorphLineStyles`
+- `morph_start_buf` buffers start path commands during edge parsing (instead of direct emission)
+- `morph_end_geo_buf` captures raw end-edge geometric commands (MOVE/LINE/CURVE) during end-edge parsing
+- `morph_end_widths_buf` captures end line widths for each STYLE_LINE
+- After both edge loops, interleaved path data is emitted to `path_data` stream
+- `ng_record_morph_path(shape_id, offset, size)` emitted instead of `ng_record_char_path`
 
-Recompiler side (partially implemented, not committed):
-- Morph command tracking via `MCM` struct during start edge parsing
-- End-edge curve capture via `MEC` struct
-- Post-processing: morph_end_positions[morph_idx] provides end coords for LINE/MOVE; mend_curves provides end coords for CURVE
-- Interleaved emission to path_data after both edge loops complete
+**Runtime (SWFModernRuntime/src/libswf/tag_stubs.c)**:
+- `ng_morph_paths[MAX_MORPH_PATHS_NG]` stores morph path offset/size per char_id
+- `ng_record_morph_path()` + `ng_find_morph_path()` for morph path storage/lookup
+- `ng_hitTestMorphPath()`: walks interleaved data, interpolates coordinates, performs combined fill winding + stroke distance test
+- Morph hit test section tries path-based test first, falls back to bounds-based
 
-Runtime side (partially implemented, not committed):
-- `ng_record_morph_path(char_id, offset, size)` stores interleaved path offset
-- Morph hit test walks interleaved pairs, interpolates coords, runs fill winding + stroke distance
+**Result**: 325→329 lines passing (+4). 3 of 4 morph diff lines fixed (292, 294, 304).
 
-### Blocker: Style state ordering
+### Remaining: Line 296 (fill boundary precision)
 
-**Problem**: The initial MOVE command for stroke-only morph shapes captures `line_style=0` because it's recorded before the first StyleChange sets the line style.
+Morph 41 at (400, 300): fill winding detects the point as inside fill 1, but expected `false`. The point is at the exact fill boundary. Ruffle uses the same even-odd winding approach, but slight differences in interpolation precision or coordinate rounding cause a different result at this specific boundary point.
 
-**Code flow**:
-1. Edge loop starts with `last_line_style = 0`
-2. First iteration may be an edge (not a StyleChange) for some morph shapes
-3. Initial MOVE is recorded at the first edge encounter with `last_line_style = 0`
-4. First StyleChange (with actual line_style) comes later
-5. All stroke distance tests fail because `line_width = 0`
+**Commits**: (see below)
 
-**Effect**: Morph 27 loses 2 correct lines (189, 195). Morph 41 loses all correct lines (300-338).
-
-**Fix needed**: Defer the initial MOVE recording until the first StyleChange with non-zero line_style has been processed. Options:
-1. Two-pass: first pass records StyleChanges, second pass records edges
-2. Record MOVE lazily: emit MOVE at the first edge AFTER the first StyleChange
-3. Post-process: update the first MOVE's style info after the edge loop completes
-
-Option 3 is simplest: after the edge loop, scan `mcmds` and patch the first MOVE's fill/line fields with the actual style values from the first StyleChange.
-
-### Files to modify
-- `SWFRecomp/src/swf.cpp`: Morph command tracking + interleaved emission + MOVE style patching
-- `SWFModernRuntime/src/libswf/tag_stubs.c`: Morph path storage + interpolated fill/stroke test
+### Files modified
+- `SWFRecomp/include/swf.hpp`: `end_width` field in LineStyle
+- `SWFRecomp/src/swf.cpp`: Morph path emission (buffered + interleaved), end line width capture
+- `SWFModernRuntime/src/libswf/tag_stubs.c`: Morph path storage, `ng_hitTestMorphPath()`
 - `SWFModernRuntime/include/libswf/tag.h`: `ng_record_morph_path` declaration
 
 ---
 
 ## Drawing API Integration (Deferred)
 
-Lines 117, 137 need DrawingState in `action.c` to record path commands. Separate effort from DefineShape path testing.
+Line 137 needs DrawingState in `action.c` to record path commands. Separate effort from DefineShape path testing. (Line 117 was fixed previously.)
 
 ---
 
@@ -162,6 +150,7 @@ Lines 117, 137 need DrawingState in `action.c` to record path commands. Separate
 | 2026-03-31 | `44c59165` | Phase 2: y-monotonic curve winding | 318→323 |
 | 2026-03-31 | `f7b350ab` | Per-glyph path-based hit testing | 323→324 |
 | 2026-03-31 | `aa4c108d` | Phase 3: stroke distance-to-path | 324→325 |
+| 2026-04-04 | — | Phase 4: morph interleaved path emission + interpolated hit test | 325→329 |
 
 ---
 
@@ -170,11 +159,12 @@ Lines 117, 137 need DrawingState in `action.c` to record path commands. Separate
 ### Recompiler (SWFRecomp/)
 | File | Changes |
 |------|---------|
-| `src/swf.cpp` | path_data emission, stroke marker (0x80000000), glyph path emission, morph deferred emission (not yet committed) |
+| `include/swf.hpp` | LineStyle::end_width field for morph end line width |
+| `src/swf.cpp` | path_data emission, stroke marker (0x80000000), glyph path emission, morph buffered interleaved emission, end line width capture |
 
 ### Runtime (SWFModernRuntime/)
 | File | Changes |
 |------|---------|
-| `src/libswf/tag_stubs.c` | pit() fill rule, fill/stroke split winding, winding_number_line/curve (y-monotonic), dist_sq_point_to_segment/curve, ng_hitTestPathFill/Stroke, per-glyph path winding, ng_record_char_path |
+| `src/libswf/tag_stubs.c` | pit() fill rule, fill/stroke split winding, winding_number_line/curve (y-monotonic), dist_sq_point_to_segment/curve, ng_hitTestPathFill/Stroke, per-glyph path winding, ng_record_char_path, ng_record_morph_path, ng_hitTestMorphPath |
 | `src/libswf/tag.c` | glyph_data 2→4 values per glyph indexing |
-| `include/libswf/tag.h` | ng_record_char_path declaration |
+| `include/libswf/tag.h` | ng_record_char_path, ng_record_morph_path declarations |

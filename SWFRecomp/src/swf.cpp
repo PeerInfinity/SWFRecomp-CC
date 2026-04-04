@@ -5882,7 +5882,7 @@ namespace SWFRecomp
 			line_data.setFieldCount(1);
 			line_data.configureNextField(SWF_FIELD_UI16, 16);
 			line_data.parseFields(cur_pos);
-			// EndWidth parsed and ignored
+			line_styles[i].end_width = (u16) line_data.fields[0].value;
 
 			if (shape_is_morph2)
 			{
@@ -6269,14 +6269,23 @@ namespace SWFRecomp
 				//   {4, anchor_x, anchor_y}     — CurveTo anchor
 				//   {5, x, y}                   — MoveTo
 				//   {0, 0, 0}                   — End of paths for this character
-				bool path_recording = !is_font && !is_morph;
+				bool path_recording = !is_font;
 				size_t path_start = current_path_entry;
+
+				// For morph shapes, buffer path commands for deferred interleaved emission
+				std::vector<std::array<float, 3>> morph_start_buf;
+				std::vector<float> morph_end_widths_buf;
+				std::vector<std::array<float, 3>> morph_end_geo_buf;
 
 				auto emitPath = [&](float cmd, float a, float b) {
 					if (!path_recording) return;
-					path_data << "\t{" << std::fixed << std::setprecision(1)
-					          << cmd << "f, " << a << "f, " << b << "f},\n";
-					current_path_entry++;
+					if (is_morph) {
+						morph_start_buf.push_back({cmd, a, b});
+					} else {
+						path_data << "\t{" << std::fixed << std::setprecision(1)
+						          << cmd << "f, " << a << "f, " << b << "f},\n";
+						current_path_entry++;
+					}
 				};
 
 				s32 morph_vertex_counter = 0;
@@ -6643,12 +6652,16 @@ namespace SWFRecomp
 							emitPath(1.0f, (float)fill_style_0, (float)fill_style_1);
 							// Line style with width
 							float line_width = 0.0f;
+							float end_line_width = 0.0f;
 							if (line_style != 0 && current_line_style_list < all_line_styles.size()) {
 								LineStyle* ls = all_line_styles[current_line_style_list];
-								if (line_style - 1 < line_style_count)
+								if (line_style - 1 < line_style_count) {
 									line_width = (float)ls[line_style - 1].width;
+									if (is_morph) end_line_width = (float)ls[line_style - 1].end_width;
+								}
 							}
 							emitPath(1.5f, (float)line_style, line_width);
+							if (is_morph) morph_end_widths_buf.push_back(end_line_width);
 							// MoveTo
 							float mx = (float)last_x;
 							float my = (float)(FRAME_HEIGHT - last_y);
@@ -6729,6 +6742,7 @@ namespace SWFRecomp
 									ev.x = end_last_x + (s32) dx;
 									ev.y = end_last_y - (s32) dy;
 									morph_end_positions.push_back(ev);
+									if (path_recording) morph_end_geo_buf.push_back({2.0f, (float)ev.x, (float)(FRAME_HEIGHT - ev.y)});
 
 									end_last_x = ev.x;
 									end_last_y = ev.y;
@@ -6752,6 +6766,7 @@ namespace SWFRecomp
 									else
 										ev.x += (s32) delta;
 									morph_end_positions.push_back(ev);
+									if (path_recording) morph_end_geo_buf.push_back({2.0f, (float)ev.x, (float)(FRAME_HEIGHT - ev.y)});
 
 									end_last_x = ev.x;
 									end_last_y = ev.y;
@@ -6784,6 +6799,12 @@ namespace SWFRecomp
 								Vertex anch;
 								anch.x = ctrl.x + adx;
 								anch.y = ctrl.y - ady;
+
+								// Capture raw curve for morph path hit testing
+								if (path_recording) {
+									morph_end_geo_buf.push_back({3.0f, (float)ctrl.x, (float)(FRAME_HEIGHT - ctrl.y)});
+									morph_end_geo_buf.push_back({4.0f, (float)anch.x, (float)(FRAME_HEIGHT - anch.y)});
+								}
 
 								u32 passes = 6;
 								for (u32 p = 1; p <= passes; ++p)
@@ -6827,6 +6848,7 @@ namespace SWFRecomp
 							ev.x = end_last_x;
 							ev.y = end_last_y;
 							morph_end_positions.push_back(ev);
+							if (path_recording) morph_end_geo_buf.push_back({5.0f, (float)end_last_x, (float)(FRAME_HEIGHT - end_last_y)});
 						}
 					}
 
@@ -7171,12 +7193,47 @@ namespace SWFRecomp
 						context.tag_main << "\t" << "tagDefineShape(app_context, CHAR_TYPE_SHAPE, " << to_string(shape_id) << ", " << to_string(3*current_tri) << ", " << to_string(3*tris_size) << ", " << std::dec << to_string(shape_bounds_xmin) << ", " << to_string(shape_bounds_xmax) << ", " << to_string(shape_bounds_ymin) << ", " << to_string(shape_bounds_ymax) << ");" << endl;
 					}
 
+					// Emit interleaved morph path data (deferred from edge parsing)
+					if (is_morph && path_recording && !morph_start_buf.empty()) {
+						size_t end_geo_idx = 0;
+						size_t end_width_idx = 0;
+						for (auto& entry : morph_start_buf) {
+							float cmd = entry[0];
+							path_data << "\t{" << std::fixed << std::setprecision(1)
+							          << cmd << "f, " << entry[1] << "f, " << entry[2] << "f},\n";
+							current_path_entry++;
+
+							// For STYLE_LINE (1.5), emit morph end line width
+							if (cmd == 1.5f) {
+								float ew = (end_width_idx < morph_end_widths_buf.size())
+								         ? morph_end_widths_buf[end_width_idx++] : entry[2];
+								path_data << "\t{9.0f, 0.0f, " << ew << "f},\n";
+								current_path_entry++;
+							}
+							// For geometric entries, emit morph end coordinates
+							if (cmd == 5.0f || cmd == 2.0f || cmd == 3.0f || cmd == 4.0f) {
+								if (end_geo_idx < morph_end_geo_buf.size()) {
+									auto& e = morph_end_geo_buf[end_geo_idx++];
+									path_data << "\t{9.0f, " << e[1] << "f, " << e[2] << "f},\n";
+									current_path_entry++;
+								}
+							}
+						}
+					}
+
 					// Record path data offset/size for vector-path hit testing
 					if (path_recording && current_path_entry > path_start) {
-						context.tag_main << "\t" << "ng_record_char_path("
-						                 << to_string(shape_id) << ", "
-						                 << to_string(path_start) << ", "
-						                 << to_string(current_path_entry - path_start) << ");" << endl;
+						if (is_morph) {
+							context.tag_main << "\t" << "ng_record_morph_path("
+							                 << to_string(shape_id) << ", "
+							                 << to_string(path_start) << ", "
+							                 << to_string(current_path_entry - path_start) << ");" << endl;
+						} else {
+							context.tag_main << "\t" << "ng_record_char_path("
+							                 << to_string(shape_id) << ", "
+							                 << to_string(path_start) << ", "
+							                 << to_string(current_path_entry - path_start) << ");" << endl;
+						}
 					}
 				}
 

@@ -63,6 +63,15 @@ static struct {
 } ng_char_paths[MAX_CHAR_PATHS_NG];
 static size_t ng_char_paths_count = 0;
 
+// Morph path data for interpolated vector-path hit testing
+#define MAX_MORPH_PATHS_NG 64
+static struct {
+	size_t char_id;
+	size_t path_offset;
+	size_t path_size;
+} ng_morph_paths[MAX_MORPH_PATHS_NG];
+static size_t ng_morph_paths_count = 0;
+
 // Non-zero winding rule char_ids (DefineShape4 UsesFillWindingRule)
 #define MAX_WINDING_NG 64
 static size_t ng_winding_ids[MAX_WINDING_NG];
@@ -445,6 +454,27 @@ void ng_record_char_path(size_t char_id, size_t path_offset, size_t path_size)
 	ng_char_paths[ng_char_paths_count].path_offset = path_offset;
 	ng_char_paths[ng_char_paths_count].path_size = path_size;
 	ng_char_paths_count++;
+}
+
+void ng_record_morph_path(size_t char_id, size_t path_offset, size_t path_size)
+{
+	if (ng_morph_paths_count >= MAX_MORPH_PATHS_NG) return;
+	ng_morph_paths[ng_morph_paths_count].char_id = char_id;
+	ng_morph_paths[ng_morph_paths_count].path_offset = path_offset;
+	ng_morph_paths[ng_morph_paths_count].path_size = path_size;
+	ng_morph_paths_count++;
+}
+
+static int ng_find_morph_path(size_t char_id, size_t* out_offset, size_t* out_size)
+{
+	for (size_t i = 0; i < ng_morph_paths_count; i++) {
+		if (ng_morph_paths[i].char_id == char_id) {
+			*out_offset = ng_morph_paths[i].path_offset;
+			*out_size = ng_morph_paths[i].path_size;
+			return 1;
+		}
+	}
+	return 0;
 }
 
 void ng_record_char_winding(size_t char_id)
@@ -3723,6 +3753,157 @@ static int ng_hitTestPathFill(size_t char_id, size_t path_offset, size_t path_si
 	return 0;
 }
 
+// Morph path hit test: walks interleaved path data, interpolates by ratio, tests fills + strokes.
+// Interleaved format: geometric/line-width entries are followed by {9.0, end_a, end_b}.
+static int ng_hitTestMorphPath(size_t char_id, size_t path_offset, size_t path_size,
+    double local_x, double local_y, u16 ratio)
+{
+	double t = (double)ratio / 65535.0;
+	double ot = 1.0 - t;
+
+	int fill_winding[64] = {0};
+	int max_fill = 0;
+	int cur_fill0 = 0, cur_fill1 = 0;
+	double line_width = 0.0;
+	int has_line = 0;
+	double cursor_x = 0.0, cursor_y = 0.0;
+	int stroke_hit = 0;
+
+	size_t i = path_offset;
+	size_t end = path_offset + path_size;
+
+	while (i < end) {
+		float cmd = path_data[i][0];
+
+		if (cmd == 0.0f) break;
+
+		if (cmd == 1.0f) {
+			// StyleChange fills (no interpolation)
+			cur_fill0 = (int)path_data[i][1];
+			cur_fill1 = (int)path_data[i][2];
+			if (cur_fill0 > max_fill) max_fill = cur_fill0;
+			if (cur_fill1 > max_fill) max_fill = cur_fill1;
+			i++;
+			continue;
+		}
+
+		if (cmd == 1.5f) {
+			// StyleChange line (start width)
+			int line_style = (int)path_data[i][1];
+			double start_w = (double)path_data[i][2];
+			i++;
+			// Read morph end width (cmd == 9.0)
+			double end_w = start_w;
+			if (i < end && path_data[i][0] == 9.0f) {
+				end_w = (double)path_data[i][2];
+				i++;
+			}
+			line_width = ot * start_w + t * end_w;
+			has_line = (line_style > 0);
+			if (has_line && line_width < 20.0) line_width = 20.0;
+			continue;
+		}
+
+		if (cmd == 5.0f) {
+			// MoveTo (start)
+			double sx = (double)path_data[i][1], sy = (double)path_data[i][2];
+			i++;
+			double ex = sx, ey = sy;
+			if (i < end && path_data[i][0] == 9.0f) {
+				ex = (double)path_data[i][1]; ey = (double)path_data[i][2];
+				i++;
+			}
+			cursor_x = ot * sx + t * ex;
+			cursor_y = ot * sy + t * ey;
+			continue;
+		}
+
+		if (cmd == 2.0f) {
+			// LineTo (start)
+			double sx = (double)path_data[i][1], sy = (double)path_data[i][2];
+			i++;
+			double ex = sx, ey = sy;
+			if (i < end && path_data[i][0] == 9.0f) {
+				ex = (double)path_data[i][1]; ey = (double)path_data[i][2];
+				i++;
+			}
+			double nx = ot * sx + t * ex;
+			double ny = ot * sy + t * ey;
+
+			// Fill winding
+			int w = winding_number_line(local_x, local_y, cursor_x, cursor_y, nx, ny);
+			if (cur_fill1 > 0 && cur_fill1 < 64) fill_winding[cur_fill1] += w;
+			if (cur_fill0 > 0 && cur_fill0 < 64) fill_winding[cur_fill0] -= w;
+
+			// Stroke
+			if (has_line && !stroke_hit) {
+				double half_w = line_width * 0.5;
+				if (dist_sq_point_to_segment(local_x, local_y, cursor_x, cursor_y, nx, ny) <= half_w * half_w)
+					stroke_hit = 1;
+			}
+
+			cursor_x = nx;
+			cursor_y = ny;
+			continue;
+		}
+
+		if (cmd == 3.0f) {
+			// CurveTo control (start)
+			double scx = (double)path_data[i][1], scy = (double)path_data[i][2];
+			i++;
+			double ecx = scx, ecy = scy;
+			if (i < end && path_data[i][0] == 9.0f) {
+				ecx = (double)path_data[i][1]; ecy = (double)path_data[i][2];
+				i++;
+			}
+			double ctrl_x = ot * scx + t * ecx;
+			double ctrl_y = ot * scy + t * ecy;
+
+			// Expect anchor (cmd == 4.0)
+			if (i >= end || path_data[i][0] != 4.0f) { continue; }
+			double sax = (double)path_data[i][1], say = (double)path_data[i][2];
+			i++;
+			double eax = sax, eay = say;
+			if (i < end && path_data[i][0] == 9.0f) {
+				eax = (double)path_data[i][1]; eay = (double)path_data[i][2];
+				i++;
+			}
+			double anchor_x = ot * sax + t * eax;
+			double anchor_y = ot * say + t * eay;
+
+			// Fill winding
+			int w = winding_number_curve(local_x, local_y, cursor_x, cursor_y, ctrl_x, ctrl_y, anchor_x, anchor_y);
+			if (cur_fill1 > 0 && cur_fill1 < 64) fill_winding[cur_fill1] += w;
+			if (cur_fill0 > 0 && cur_fill0 < 64) fill_winding[cur_fill0] -= w;
+
+			// Stroke
+			if (has_line && !stroke_hit) {
+				double half_w = line_width * 0.5;
+				if (dist_sq_point_to_curve(local_x, local_y, cursor_x, cursor_y, ctrl_x, ctrl_y, anchor_x, anchor_y) <= half_w * half_w)
+					stroke_hit = 1;
+			}
+
+			cursor_x = anchor_x;
+			cursor_y = anchor_y;
+			continue;
+		}
+
+		i++;  // skip unknown
+	}
+
+	// Check fills
+	int nonzero = ng_uses_nonzero_winding(char_id);
+	for (int f = 1; f <= max_fill && f < 64; f++) {
+		if (nonzero) {
+			if (fill_winding[f] != 0) return 1;
+		} else {
+			if ((fill_winding[f] & 1) != 0) return 1;
+		}
+	}
+
+	return stroke_hit;
+}
+
 static int pit(double px, double py,
                double ax, double ay, double bx, double by, double cx, double cy)
 {
@@ -3865,9 +4046,20 @@ static int ng_hitTestShapeChar(size_t char_id, u16 ratio,
 	int is_morph = (ch->type == CHAR_TYPE_MORPH_SHAPE);
 	if (ch->type != CHAR_TYPE_SHAPE && !is_morph) return 0;
 
-	// Morph shapes: use interpolated bounds-based hit testing
-	// (morph end vertex data may not be emitted by recompiler for line-only morphs)
+	// Morph shapes: try path-based hit testing first, fall back to bounds
 	if (is_morph) {
+		size_t mp_offset, mp_size;
+		if (ng_find_morph_path(char_id, &mp_offset, &mp_size)) {
+			double det = ma * md - mb * mc_m;
+			if (det == 0.0) return 0;
+			double inv_det = 1.0 / det;
+			double bsx = test_x - mtx;
+			double bsy = test_y - mty;
+			double local_x = ( md * bsx - mc_m * bsy) * inv_det;
+			double local_y = (-mb * bsx + ma  * bsy) * inv_det;
+			return ng_hitTestMorphPath(char_id, mp_offset, mp_size, local_x, local_y, ratio);
+		}
+		// Fallback: interpolated bounds-based hit testing
 		s32 bxmin, bxmax, bymin, bymax;
 		if (ng_getCharBoundsForRatio(char_id, ratio, &bxmin, &bxmax, &bymin, &bymax)) {
 			double det = ma * md - mb * mc_m;
