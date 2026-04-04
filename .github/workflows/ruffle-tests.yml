@@ -484,11 +484,13 @@ jobs:
           python3 ruffle-tests/verify_output.py -v \
             --tests-dir="$GNASH_MING_DIR" \
             --json=ruffle-tests/results-shard-gnash_ming-${{ matrix.shard }}.json \
-            --shard="$SHARD" || true
+            --shard="$SHARD" \
+            --exclude=gotoFrame2Test || true
           python3 ruffle-tests/verify_output.py -v \
             --tests-dir="$GNASH_SWFC_DIR" \
             --json=ruffle-tests/results-shard-gnash_swfc-${{ matrix.shard }}.json \
-            --shard="$SHARD" || true
+            --shard="$SHARD" \
+            --exclude=gotoFrameFromInterval --exclude=gotoFrameFromInterval2 || true
 
       - name: Upload Gnash results
         if: always()

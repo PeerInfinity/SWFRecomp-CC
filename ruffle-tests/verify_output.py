@@ -1568,6 +1568,9 @@ examples:
         "--test", metavar="NAME", action="append",
         help="Run specific test(s) by name (repeatable, e.g. --test=foo --test=bar)")
     parser.add_argument(
+        "--exclude", metavar="NAME", action="append",
+        help="Exclude specific test(s) by name (repeatable, e.g. --exclude=foo --exclude=bar)")
+    parser.add_argument(
         "-v", "--verbose", action="store_true",
         help="Print status for each test as it runs")
     parser.add_argument(
@@ -1692,6 +1695,11 @@ def main():
             and (d / "test.swf").exists()
             and (d / expected_filename).exists()
         )
+
+    # Apply --exclude filter
+    if args.exclude:
+        exclude_set = set(args.exclude)
+        tests = [t for t in tests if t not in exclude_set]
 
     total_available = len(tests)
 
