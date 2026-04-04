@@ -1,16 +1,16 @@
 {
   "metadata": {
-    "old_timestamp": "2026-04-04T01:50:51.880613+00:00",
-    "old_git_sha": "7a348be46a51811d52bc285d07d2b88bbc2de62b",
-    "new_timestamp": "2026-04-04T02:19:30.595034+00:00",
-    "new_git_sha": "112f7a9df78ddfc6316d70ab9fa5235bc7fcde46",
+    "old_timestamp": "2026-04-04T02:19:30.595034+00:00",
+    "old_git_sha": "112f7a9df78ddfc6316d70ab9fa5235bc7fcde46",
+    "new_timestamp": "2026-04-04T03:24:53.079122+00:00",
+    "new_git_sha": "4b79110d60c6774da7865573699a648594297f2e",
     "partial": false,
     "same_commit": false
   },
   "summary": {
-    "old_pass": 10,
-    "old_total": 21,
-    "old_pass_rate": 47.6,
+    "old_pass": 12,
+    "old_total": 23,
+    "old_pass_rate": 52.2,
     "new_pass": 12,
     "new_total": 23,
     "new_pass_rate": 52.2,
@@ -21,34 +21,9 @@
     "newly_passing": 0,
     "newly_failing": 0,
     "status_changed": 0,
-    "unchanged": 21,
-    "added": 2,
+    "unchanged": 23,
+    "added": 0,
     "removed": 0
   },
-  "changes": [
-    {
-      "test": "externalinterface",
-      "change_type": "added",
-      "old_status": null,
-      "new_status": "pass",
-      "old_lines": null,
-      "new_lines": {
-        "actual_lines": 4,
-        "expected_lines": 4,
-        "matching_lines": 4
-      }
-    },
-    {
-      "test": "rollover",
-      "change_type": "added",
-      "old_status": null,
-      "new_status": "pass",
-      "old_lines": null,
-      "new_lines": {
-        "actual_lines": 4,
-        "expected_lines": 4,
-        "matching_lines": 4
-      }
-    }
-  ]
+  "changes": []
 }

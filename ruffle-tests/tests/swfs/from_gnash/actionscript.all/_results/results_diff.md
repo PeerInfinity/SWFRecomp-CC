@@ -1,21 +1,31 @@
 # Ruffle Test Results Diff
 
-**Previous:** `7a348be46a51` (2026-04-04T01:50:51.889268+00:00)
-**Current:** `112f7a9df78d` (2026-04-04T02:19:30.605328+00:00)
-**⚠️ Incomplete run: 28/30 shards produced results (2 missing).** Tests absent from results are likely from failed shards, not intentional removals.
+**Previous:** `112f7a9df78d` (2026-04-04T02:19:30.605328+00:00)
+**Current:** `4b79110d60c6` (2026-04-04T03:24:53.090295+00:00)
 
 ## Summary
 
 | Metric | Previous | Current | Delta |
 |--------|----------|---------|-------|
-| Passing | 60 | 60 | 0 |
-| Total | 177 | 177 | 0 |
-| Pass rate | 33.9% | 33.9% | 0% |
-| Mismatched lines | 4333 | 4331 | -2 |
-|   Decreased | | | -2 |
+| Passing | 60 | 68 | +8 |
+| Total | 177 | 190 | +13 |
+| Pass rate | 33.9% | 35.8% | +1.9% |
+| Mismatched lines | 4331 | 4532 | +201 |
 
-## Line Count Changed (1)
+## Added Tests (13)
 
-| Test | Status | Lines (prev) | Lines (now) | Diff |
-|------|--------|--------------|-------------|------|
-| `array-v5` | output_mismatch | 446/560 | 448/560 | -2 |
+| Test | Status | Lines |
+|------|--------|-------|
+| `Camera-v6` | output_mismatch | 33/90 |
+| `Camera-v7` | output_mismatch | 33/90 |
+| `Camera-v8` | output_mismatch | 33/90 |
+| `Color-v5` | pass | 140/140 |
+| `Color-v6` | output_mismatch | 165/171 |
+| `Color-v7` | pass | 161/161 |
+| `Color-v8` | pass | 161/161 |
+| `Point-v5` | pass | 7/7 |
+| `Point-v6` | pass | 7/7 |
+| `Point-v7` | pass | 7/7 |
+| `Point-v8` | output_mismatch | 169/193 |
+| `Random-v5` | pass | 30/30 |
+| `Random-v6` | pass | 30/30 |
