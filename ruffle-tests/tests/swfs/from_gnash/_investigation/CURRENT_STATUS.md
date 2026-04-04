@@ -1,18 +1,22 @@
 # Gnash Test Suite Status
 
-Last updated: 2026-03-29
+Last updated: 2026-04-04
 
 ## Quick Summary
 
 | Sub-suite | Tests | Passing | Rate | Filtered | Filtered Rate | Ignored |
 |-----------|-------|---------|------|----------|---------------|---------|
-| **actionscript.all** | 190 | ~61 | ~32.1% | ~61/181 | **~33.7%** | 9 |
+| **actionscript.all** | 190 | 68 | 35.8% | 68/181 | **37.6%** | 9 |
+| **misc-mtasc.all** | 9 | 5 | 55.6% | — | — | — |
 | **misc-swfmill.all** | 14 | 11 | 78.6% | — | — | — |
-| **Total** | 204 | ~72 | ~35.3% | — | — | — |
+| **Total** | 213 | ~84 | ~39.4% | — | — | — |
 
-Note: counts estimated from local testing (pending CI run). New passes: Color-v5/v7/v8 (+3).
+Note: actionscript.all counts from CI run (2026-04-04). misc-mtasc counts from local testing.
 
 Filtered results exclude 9 tests with all-accepted diffs (Math-v5/v6/v7/v8, ops-v8, Error-v5/v6/v7/v8) — see `ACCEPTED_DIFFS.md`. Remaining 3 misc-swfmill failures (dict_event, tags_after_last_showframe, jump_to_prev_block) are blocked on architectural limitations — see `incomplete/MISC_SWFMILL_PLAN.md`.
+
+### Latest fixes (2026-04-04)
+- **Gnash misc-mtasc function_test PASS (21/21)** — Three fixes: (1) Array.prototype constructor property (file-scope g_array_constructor_static), (2) objectCallToString g_current_executing_func save/restore, (3) Array.prototype.toString stub returns "" instead of undefined. misc-mtasc now 5/9 passing.
 
 ### Latest fixes (2026-03-29)
 - **Sort HOLE comparison (SWF < 7)** — HOLE elements now compare as empty string during sort for SWF5/6, matching Flash behavior where sparse array holes sort to the beginning.
