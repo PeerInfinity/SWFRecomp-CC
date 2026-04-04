@@ -1,8 +1,8 @@
 {
   "metadata": {
-    "timestamp": "2026-04-03T22:44:25.127152+00:00",
-    "git_sha": "5ec711b2146b339c7a7e9712603c1f81dac0ae08",
-    "duration_seconds": 780.96,
+    "timestamp": "2026-04-04T00:12:59.290515+00:00",
+    "git_sha": "8fb3f39023e1c8ba38f5cb4c165694a9d0cdc4b4",
+    "duration_seconds": 782.28,
     "total_available": 47,
     "shards": 28,
     "expected_shards": 30,
@@ -25,7 +25,7 @@
         "expected_lines": 0,
         "matching_lines": 0
       },
-      "duration": 17.77,
+      "duration": 19.84,
       "status": "pass"
     },
     {
@@ -36,7 +36,7 @@
         "expected_lines": 0,
         "matching_lines": 0
       },
-      "duration": 17.94,
+      "duration": 17.84,
       "status": "pass"
     },
     {
@@ -47,7 +47,7 @@
         "expected_lines": 11,
         "matching_lines": 11
       },
-      "duration": 18.36,
+      "duration": 18.42,
       "status": "pass"
     },
     {
@@ -58,7 +58,7 @@
         "expected_lines": 3,
         "matching_lines": 3
       },
-      "duration": 17.8,
+      "duration": 17.93,
       "status": "pass"
     },
     {
@@ -69,7 +69,7 @@
         "expected_lines": 6,
         "matching_lines": 6
       },
-      "duration": 17.77,
+      "duration": 18.07,
       "status": "pass"
     },
     {
@@ -80,7 +80,7 @@
         "expected_lines": 0,
         "matching_lines": 0
       },
-      "duration": 18.73,
+      "duration": 19.2,
       "status": "pass"
     },
     {
@@ -91,7 +91,7 @@
         "expected_lines": 1,
         "matching_lines": 1
       },
-      "duration": 18.36,
+      "duration": 18.32,
       "status": "pass"
     },
     {
@@ -102,7 +102,7 @@
         "expected_lines": 0,
         "matching_lines": 0
       },
-      "duration": 17.81,
+      "duration": 18.15,
       "status": "pass"
     },
     {
@@ -113,7 +113,7 @@
         "expected_lines": 2,
         "matching_lines": 2
       },
-      "duration": 17.86,
+      "duration": 18.1,
       "status": "pass"
     },
     {
@@ -124,7 +124,7 @@
         "expected_lines": 0,
         "matching_lines": 0
       },
-      "duration": 17.79,
+      "duration": 17.87,
       "status": "pass"
     },
     {
@@ -135,7 +135,7 @@
         "expected_lines": 0,
         "matching_lines": 0
       },
-      "duration": 17.88,
+      "duration": 17.63,
       "status": "pass"
     },
     {
@@ -146,7 +146,7 @@
         "expected_lines": 1,
         "matching_lines": 1
       },
-      "duration": 19.46,
+      "duration": 19.35,
       "status": "pass"
     },
     {
@@ -157,7 +157,7 @@
         "expected_lines": 0,
         "matching_lines": 0
       },
-      "duration": 18.31,
+      "duration": 18.07,
       "status": "pass"
     },
     {
@@ -168,7 +168,7 @@
         "expected_lines": 3,
         "matching_lines": 3
       },
-      "duration": 17.7,
+      "duration": 16.31,
       "status": "pass"
     },
     {
@@ -179,7 +179,7 @@
         "expected_lines": 8,
         "matching_lines": 8
       },
-      "duration": 18.07,
+      "duration": 18.43,
       "status": "pass"
     }
   ]
