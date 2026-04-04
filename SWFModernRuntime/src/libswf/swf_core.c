@@ -866,8 +866,13 @@ void swfStart(SWFAppContext* app_context)
 		// Goto catch-up + deferred script processing.
 		// An outer loop retries because deferred scripts (from ng_executeGotoCatchUp)
 		// may trigger new gotos (via ng_executeGotoTagsOnly) that need catch-up.
+		// Safety limit: prevent infinite goto catch-up within a single tick.
+		// Tests like gotoFrame2Test can trigger GotoFrame2 inside a deferred
+		// script which re-triggers catch-up, creating an infinite cycle.
+		int goto_retry_limit = 16;
 		for (;;)
 		{
+		if (--goto_retry_limit <= 0) break;
 		// Goto catch-up: when an action (GotoFrame, GoToLabel, etc.) triggered
 		// a goto, process intermediate frame tags inline to match Flash's behavior.
 		// Flash processes PlaceObject/RemoveObject for intermediate frames within
