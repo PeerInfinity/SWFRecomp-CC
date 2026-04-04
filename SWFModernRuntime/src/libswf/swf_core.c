@@ -249,6 +249,8 @@ typedef enum {
     EV_TEXT_CONTROL,
     EV_FOCUS_GAINED, EV_FOCUS_LOST,
     EV_SET_CLIPBOARD_TEXT,
+    EV_IME_PREEDIT,
+    EV_IME_COMMIT,
 } InputEventType;
 
 typedef struct {
@@ -307,6 +309,33 @@ void input_events_load(const char* path)
             ev.type = EV_FOCUS_GAINED;
         else if (strncmp(line, "FOCUSLOST", 9) == 0)
             ev.type = EV_FOCUS_LOST;
+        else if (strncmp(line, "IME_PREEDIT ", 12) == 0) {
+            ev.type = EV_IME_PREEDIT;
+            // Format: "IME_PREEDIT cursor_from cursor_to text"
+            int cf = -1, ct = -1;
+            int n = 0;
+            sscanf(line + 12, "%d %d %n", &cf, &ct, &n);
+            ev.code = cf; // cursor_from in code field
+            ev.x = (float)ct; // cursor_to in x field
+            if (n > 0 && line[12 + n] != '\0') {
+                strncpy(ev.text, line + 12 + n, sizeof(ev.text) - 1);
+                ev.text[sizeof(ev.text) - 1] = '\0';
+                // Strip trailing newline
+                size_t tl = strlen(ev.text);
+                while (tl > 0 && (ev.text[tl-1] == '\n' || ev.text[tl-1] == '\r'))
+                    ev.text[--tl] = '\0';
+            } else {
+                ev.text[0] = '\0';
+            }
+        }
+        else if (strncmp(line, "IME_COMMIT ", 11) == 0) {
+            ev.type = EV_IME_COMMIT;
+            strncpy(ev.text, line + 11, sizeof(ev.text) - 1);
+            ev.text[sizeof(ev.text) - 1] = '\0';
+            size_t tl = strlen(ev.text);
+            while (tl > 0 && (ev.text[tl-1] == '\n' || ev.text[tl-1] == '\r'))
+                ev.text[--tl] = '\0';
+        }
         else if (strncmp(line, "SET_CLIPBOARD_TEXT", 18) == 0 && line[18] == ' ') {
             ev.type = EV_SET_CLIPBOARD_TEXT;
             // "SET_CLIPBOARD_TEXT " = 19 chars prefix; text starts at position 19
@@ -409,7 +438,7 @@ static void input_events_deliver(SWFAppContext* app_context, InputEvent* ev)
         ms->stage_y = ev->y * 20.0f + FRAME_Y_MIN_TWIPS;
         ms->button_down = 0;
         ms->released = 1;
-        { extern void actionTextFieldDragEnd(void); actionTextFieldDragEnd(); }
+        { extern void actionTextFieldDragEnd(SWFAppContext*); actionTextFieldDragEnd(app_context); }
         root_movieclip.xmouse = ev->x + (float)FRAME_X_MIN_TWIPS / 20.0f;
         root_movieclip.ymouse = ev->y + (float)FRAME_Y_MIN_TWIPS / 20.0f;
         // Dispatch onClipEvent(mouseUp) to all clips
@@ -580,6 +609,14 @@ static void input_events_deliver(SWFAppContext* app_context, InputEvent* ev)
         break;
     case EV_SET_CLIPBOARD_TEXT:
         actionSetClipboardText(ev->text);
+        break;
+    case EV_IME_PREEDIT:
+        { extern void actionTextFieldImeCompose(SWFAppContext*, const char*, int, int);
+          actionTextFieldImeCompose(app_context, ev->text, ev->code, (int)ev->x); }
+        break;
+    case EV_IME_COMMIT:
+        { extern void actionTextFieldImeCommit(SWFAppContext*, const char*);
+          actionTextFieldImeCommit(app_context, ev->text); }
         break;
     case EV_FOCUS_LOST:
         // Window/tab lost focus: clear keyboard focus

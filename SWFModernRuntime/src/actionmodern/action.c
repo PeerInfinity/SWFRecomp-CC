@@ -15496,6 +15496,48 @@ static char* tf_serialize_html(TFRunTable* table, int is_multiline);
 static void tf_get_plain_text(TFRunTable* table, char* out_buf, u32 out_buf_size, int is_multiline);
 #endif
 
+#ifdef NO_GRAPHICS
+// Find a display entry by name, first in root display list, then in parent sprite.
+// Returns the root depth or encoded depth, SIZE_MAX if not found.
+// Also fills *out_char_id with the found entry's char_id.
+static size_t findDisplayEntryInParent(const char* instance_name, MovieClip* parent, size_t* out_char_id) {
+	extern DisplayObject* display_list;
+	extern size_t max_depth;
+	if (out_char_id) *out_char_id = 0;
+
+	// Try root display list first
+	size_t depth = ng_findDisplayEntryByName(instance_name);
+	if (depth != SIZE_MAX) {
+		if (out_char_id) *out_char_id = display_list[depth].char_id;
+		return depth;
+	}
+
+	// Not found at root — try parent sprite's display list
+	if (parent == NULL) return SIZE_MAX;
+	extern MovieClip root_movieclip;
+	if (parent == &root_movieclip) return SIZE_MAX; // parent IS root, already searched
+
+	// Find parent's root depth
+	size_t parent_depth = ng_findDisplayEntryByName(parent->name);
+	if (parent_depth == SIZE_MAX || parent_depth > max_depth) return SIZE_MAX;
+	DisplayObject* parent_obj = &display_list[parent_depth];
+	if (parent_obj->sprite_display_list == NULL) return SIZE_MAX;
+
+	for (size_t d = 1; d <= parent_obj->sprite_max_depth; d++) {
+		DisplayObject* child = &parent_obj->sprite_display_list[d];
+		if (child->char_id == 0 || child->instance_name == NULL) continue;
+		if (swf_name_match(child->instance_name, instance_name)) {
+			if (out_char_id) *out_char_id = child->char_id;
+			// Return encoded depth (parent_depth << 20 | child_depth)
+			// but for our purposes just return parent_depth+1 as sentinel
+			// indicating we found it in a sprite (use ng_find_textfield(char_id) directly)
+			return (parent_depth << 20) | d;
+		}
+	}
+	return SIZE_MAX;
+}
+#endif
+
 static MovieClip* findOrCreateMovieClip(SWFAppContext* app_context, const char* instance_name, MovieClip* parent) {
 	(void)app_context;  // used only in NO_GRAPHICS for TextField init
 	MovieClip* mc = NULL;
@@ -15550,6 +15592,170 @@ static MovieClip* findOrCreateMovieClip(SWFAppContext* app_context, const char* 
 	// Init or re-init: sync x/y from transform_data
 	if (mc != NULL) {
 		size_t depth = ng_findDisplayEntryByName(instance_name);
+		// Fallback: search parent sprite's display list for nested entries
+		size_t nested_char_id = 0;
+		if (depth == SIZE_MAX && parent != NULL) {
+			size_t _nci = 0;
+			size_t encoded = findDisplayEntryInParent(instance_name, parent, &_nci);
+			if (encoded != SIZE_MAX && _nci != 0) {
+				nested_char_id = _nci;
+				// For nested entries, we don't have root depth for transform sync,
+				// but we can still init text field properties via char_id/tf_idx.
+			}
+		}
+		// Handle nested text field init (no root depth available)
+		if (depth == SIZE_MAX && nested_char_id != 0 && is_new) {
+			extern int ng_getTextFieldIdxByCharId(size_t char_id);
+			int tf_idx = ng_getTextFieldIdxByCharId(nested_char_id);
+			if (tf_idx >= 0) {
+				if (mc->dynamic_props == NULL) {
+					mc->dynamic_props = (void*) allocObject(app_context, 32);
+					retainObject((ASObject*) mc->dynamic_props);
+				}
+				ASObject* props = (ASObject*) mc->dynamic_props;
+				props->native_type = NATIVE_TEXTFIELD;
+				// Set __proto__ to TextField.prototype
+				initTextFieldPrototype(app_context);
+				if (g_textfield_constructor.prototype_obj != NULL) {
+					ActionVar proto_val = {0};
+					proto_val.type = ACTION_STACK_VALUE_OBJECT;
+					proto_val.data.numeric_value = (u64) g_textfield_constructor.prototype_obj;
+					setProperty(app_context, props, "__proto__", 9, &proto_val);
+					for (u32 pi = 0; pi < props->num_used; pi++) {
+						if (strcmp(props->properties[pi].name, "__proto__") == 0) {
+							props->properties[pi].flags &= ~PROPERTY_FLAG_ENUMERABLE;
+							break;
+						}
+					}
+				}
+				mc->ng_textfield_idx = tf_idx;
+				u16 tf_flags = ng_getTextFieldFlags(tf_idx);
+				// text (initial)
+				const char* init_text = ng_getTextFieldInitialTextByIdx(tf_idx);
+				char* init_text_ml = NULL;
+				if ((tf_flags & 0x0002) && ng_getTextFieldVariableName(tf_idx)[0] == '\0'
+				    && (tf_flags & 0x0040)) {
+					size_t _ml_len = strlen(init_text);
+					init_text_ml = (char*) malloc(_ml_len + 2);
+					memcpy(init_text_ml, init_text, _ml_len);
+					init_text_ml[_ml_len] = '\n';
+					init_text_ml[_ml_len + 1] = '\0';
+					init_text = init_text_ml;
+				}
+				ActionVar text_val = {0};
+				text_val.type = ACTION_STACK_VALUE_STRING;
+				{
+					u32 _it_u16_len;
+					uint16_t* _it_u16 = utf8_to_u16(app_context, init_text, (u32)strlen(init_text), &_it_u16_len);
+					text_val.str_size = _it_u16_len;
+					VAL(u64, &text_val.data.numeric_value) = (u64)_it_u16;
+				}
+				if (init_text_ml) free(init_text_ml);
+				setProperty(app_context, props, "text", 4, &text_val);
+				// htmlText
+				const char* raw_html = ng_getTextFieldRawHtml(tf_idx);
+				if (tf_flags & 0x0040) {
+					TFRunTable* _init_table = tf_get_table(mc);
+					_init_table->from_html_text = 1;
+					TFRun _init_def;
+					tf_get_defaults(mc, &_init_def);
+					u32 _init_raw_len = (u32)strlen(raw_html);
+					int _init_multiline = (tf_flags & 0x0002) != 0;
+					tf_parse_html(_init_table, raw_html, _init_raw_len, &_init_def, 0, g_swf_version, _init_multiline);
+					char* _init_html = tf_serialize_html(_init_table, _init_multiline);
+					ActionVar html_text_val = {0};
+					html_text_val.type = ACTION_STACK_VALUE_STRING;
+					u32 _init_u16_len;
+					uint16_t* _init_u16 = utf8_to_u16(app_context, _init_html, (u32)strlen(_init_html), &_init_u16_len);
+					free(_init_html);
+					html_text_val.str_size = _init_u16_len;
+					VAL(u64, &html_text_val.data.numeric_value) = (u64)_init_u16;
+					setProperty(app_context, props, "htmlText", 8, &html_text_val);
+				} else {
+					ActionVar html_text_val = {0};
+					html_text_val.type = ACTION_STACK_VALUE_STRING;
+					u32 _rh_u16_len;
+					uint16_t* _rh_u16 = utf8_to_u16(app_context, raw_html, (u32)strlen(raw_html), &_rh_u16_len);
+					html_text_val.str_size = _rh_u16_len;
+					VAL(u64, &html_text_val.data.numeric_value) = (u64)_rh_u16;
+					setProperty(app_context, props, "htmlText", 8, &html_text_val);
+				}
+				// textColor
+				u32 tc = ng_getTextFieldColorByIdx(tf_idx);
+				ActionVar color_val = {0};
+				color_val.type = ACTION_STACK_VALUE_F64;
+				VAL(double, &color_val.data.numeric_value) = (double)tc;
+				setProperty(app_context, props, "textColor", 9, &color_val);
+				// Boolean properties
+				ActionVar false_val = {0}; false_val.type = ACTION_STACK_VALUE_BOOLEAN;
+				ActionVar true_val = {0}; true_val.type = ACTION_STACK_VALUE_BOOLEAN;
+				VAL(u32, &true_val.data.numeric_value) = 1;
+				setProperty(app_context, props, "background", 10, (tf_flags & 0x0020) ? &true_val : &false_val);
+				setProperty(app_context, props, "border", 6, (tf_flags & 0x0020) ? &true_val : &false_val);
+				ActionVar type_val = {0}; type_val.type = ACTION_STACK_VALUE_STRING;
+				if (tf_flags & 0x0008) { type_val.str_size = 7; VAL(u64, &type_val.data.numeric_value) = (u64)u16_dynamic; }
+				else { type_val.str_size = 5; VAL(u64, &type_val.data.numeric_value) = (u64)u16_input; }
+				setProperty(app_context, props, "type", 4, &type_val);
+				ActionVar len_val = {0}; len_val.type = ACTION_STACK_VALUE_F64;
+				VAL(double, &len_val.data.numeric_value) = (double)strlen(init_text);
+				setProperty(app_context, props, "length", 6, &len_val);
+				setProperty(app_context, props, "multiline", 9, (tf_flags & 0x0002) ? &true_val : &false_val);
+				setProperty(app_context, props, "wordWrap", 8, (tf_flags & 0x0001) ? &true_val : &false_val);
+				setProperty(app_context, props, "password", 8, (tf_flags & 0x0004) ? &true_val : &false_val);
+				setProperty(app_context, props, "selectable", 10, (tf_flags & 0x0010) ? &false_val : &true_val);
+				setProperty(app_context, props, "html", 4, (tf_flags & 0x0040) ? &true_val : &false_val);
+				setProperty(app_context, props, "embedFonts", 10, (tf_flags & 0x0080) ? &true_val : &false_val);
+				setProperty(app_context, props, "condenseWhite", 13, &false_val);
+				// maxChars
+				s16 max_len = ng_getTextFieldMaxLength(tf_idx);
+				if (max_len < 0) {
+					ActionVar null_val = {0}; null_val.type = ACTION_STACK_VALUE_NULL;
+					setProperty(app_context, props, "maxChars", 8, &null_val);
+				} else {
+					ActionVar maxc_val = {0}; maxc_val.type = ACTION_STACK_VALUE_F64;
+					VAL(double, &maxc_val.data.numeric_value) = (double)max_len;
+					setProperty(app_context, props, "maxChars", 8, &maxc_val);
+				}
+				// variable
+				const char* var_name = ng_getTextFieldVariableName(tf_idx);
+				ActionVar var_val = {0}; var_val.type = ACTION_STACK_VALUE_STRING;
+				{
+					u32 _vn_u16_len;
+					uint16_t* _vn_u16 = ascii_to_u16(app_context, var_name, (int)strlen(var_name), &_vn_u16_len);
+					var_val.str_size = _vn_u16_len;
+					VAL(u64, &var_val.data.numeric_value) = (u64)_vn_u16;
+					setProperty(app_context, props, "variable", 8, &var_val);
+				}
+				// autoSize
+				ActionVar autosize_val = {0}; autosize_val.type = ACTION_STACK_VALUE_STRING;
+				if (tf_flags & 0x0100) { autosize_val.str_size = 4; VAL(u64, &autosize_val.data.numeric_value) = (u64)u16_left; }
+				else { autosize_val.str_size = 4; VAL(u64, &autosize_val.data.numeric_value) = (u64)u16_none; }
+				setProperty(app_context, props, "autoSize", 8, &autosize_val);
+				// Scroll defaults
+				ActionVar one_val = {0}; one_val.type = ACTION_STACK_VALUE_F64;
+				VAL(double, &one_val.data.numeric_value) = 1.0;
+				setProperty(app_context, props, "scroll", 6, &one_val);
+				setProperty(app_context, props, "maxscroll", 9, &one_val);
+				setProperty(app_context, props, "bottomScroll", 12, &one_val);
+				ActionVar zero_val = {0}; zero_val.type = ACTION_STACK_VALUE_F64;
+				setProperty(app_context, props, "hscroll", 7, &zero_val);
+				setProperty(app_context, props, "maxhscroll", 10, &zero_val);
+				setProperty(app_context, props, "mouseWheelEnabled", 17, &true_val);
+				ActionVar null_val2 = {0}; null_val2.type = ACTION_STACK_VALUE_NULL;
+				setProperty(app_context, props, "restrict", 8, &null_val2);
+				setProperty(app_context, props, "styleSheet", 10, &null_val2);
+				setProperty(app_context, props, "textWidth", 9, &zero_val);
+				setProperty(app_context, props, "textHeight", 10, &zero_val);
+				ActionVar undef_val = {0}; undef_val.type = ACTION_STACK_VALUE_UNDEFINED;
+				setProperty(app_context, props, "tabIndex", 8, &undef_val);
+				// backgroundColor/borderColor defaults
+				ActionVar bg_val = {0}; bg_val.type = ACTION_STACK_VALUE_F64;
+				VAL(double, &bg_val.data.numeric_value) = 16777215.0;
+				setProperty(app_context, props, "backgroundColor", 15, &bg_val);
+				ActionVar bc_val = {0}; bc_val.type = ACTION_STACK_VALUE_F64;
+				setProperty(app_context, props, "borderColor", 11, &bc_val);
+			}
+		}
 		if (depth != SIZE_MAX) {
 			// Sync ActionScript depth: SWF depth - 16384
 			mc->depth = (int)depth - 16384;
@@ -16822,6 +17028,16 @@ static TFRunTable* tf_get_table(MovieClip* mc) {
 static TFRunTable* tf_find_table(MovieClip* mc) {
 	for (int i = 0; i < TF_MAX_TABLES; i++) {
 		if (g_tf_run_tables[i].mc == mc) return &g_tf_run_tables[i];
+	}
+	return NULL;
+}
+
+// Find the TFRun whose character range covers char_idx, or NULL
+static TFRun* tf_find_run_at_index(TFRunTable* table, u32 char_idx) {
+	for (u32 i = 0; i < table->run_count; i++) {
+		TFRun* run = &table->runs[i];
+		if (char_idx >= run->start && char_idx < run->start + run->length)
+			return run;
 	}
 	return NULL;
 }
@@ -18433,6 +18649,10 @@ static void syncTransformIfNeeded(MovieClip* mc) {
 // Static textfields have ng_textfield_idx >= 0 (index into metadata table).
 // Dynamic textfields (createTextField) have ng_textfield_idx == -2.
 #define MC_IS_TEXTFIELD(mc) ((mc)->ng_textfield_idx >= 0 || (mc)->ng_textfield_idx == -2)
+
+// Forward declaration for AS2 handler dispatch (defined later in this file)
+static void mc_call_as2_handler_ng(SWFAppContext* app_context, MovieClip* mc,
+                                    const char* name, u32 name_len, ActionVar* handler_args, int handler_arg_count);
 
 // Iterate all text field MovieClips in child_mc_cache and report their render info.
 // Used by tag.c to render text field backgrounds/borders in graphics mode.
@@ -24578,6 +24798,7 @@ static int g_deferred_roll_count = 0;
 static char g_clipboard_text[1024] = {0};
 static size_t g_clipboard_len = 0;
 static int g_tf_select_all = 0;  // 1 = entire text field is selected
+static MovieClip* g_pending_onchanged_mc = NULL;  // Deferred onChanged after replaceSel
 
 // Mouse drag selection state for text fields
 static int g_tf_drag_anchor = 0;  // Character index at mouse-down position
@@ -50050,6 +50271,11 @@ void actionCallMethod(SWFAppContext* app_context, char* str_buffer)
 
 			// Sync to variable binding
 			ng_syncTextToVar(app_context, mc, &new_text);
+
+			// Defer onChanged callback (fires after current script frame)
+			// Only fire if this MC is the focused text field
+			if (mc == g_focused_mc)
+				g_pending_onchanged_mc = mc;
 #endif
 			if (args != NULL) FREE(args);
 			pushUndefined(app_context);
@@ -54240,10 +54466,286 @@ void actionTextFieldDragSelect(SWFAppContext* app_context)
 	g_tf_select_all = 0;
 }
 
-// Called from swf_core.c on EV_MOUSE_UP_LEFT.
-void actionTextFieldDragEnd(void)
+// ---------------------------------------------------------------------------
+// asfunction: hyperlink handler
+// ---------------------------------------------------------------------------
+
+// Call an ASFunction with a specific this_obj (MC* or ASObject*) and optional args.
+// this_is_mc: 1 = this_obj is MovieClip*, 0 = this_obj is ASObject*
+static void call_function_with_this(SWFAppContext* app_context, ASFunction* func,
+                                     void* this_obj, int this_is_mc,
+                                     ActionVar* args, int arg_count)
 {
+	if (func == NULL || g_execution_halted) return;
+	if (g_call_depth >= g_max_call_depth - 1) {
+		g_execution_halted = 1;
+		return;
+	}
+
+	// Build this_var
+	ActionVar this_var = {0};
+	if (this_is_mc) {
+		this_var.type = ACTION_STACK_VALUE_MOVIECLIP;
+		this_var.data.numeric_value = (u64)(uintptr_t)this_obj;
+	} else {
+		this_var.type = ACTION_STACK_VALUE_OBJECT;
+		this_var.data.numeric_value = (u64)(uintptr_t)this_obj;
+	}
+
+	// Push this on the per-call-frame stack
+	u32 saved_this_depth = g_this_depth;
+	if (g_this_depth < MAX_THIS_DEPTH) {
+		g_this_stack[g_this_depth] = this_var;
+		g_this_depth++;
+	}
+
+	if (func->function_type == 2 && func->advanced_func != NULL)
+	{
+		ActionVar* registers = NULL;
+		if (func->register_count > 0)
+			registers = (ActionVar*) HCALLOC(func->register_count, sizeof(ActionVar));
+
+		// Restore captured scope chain
+		u8 captured_count = func->captured_scope_count;
+		for (u8 ci = 0; ci < captured_count; ci++) {
+			if (scope_depth < MAX_SCOPE_DEPTH) {
+				scope_is_with[scope_depth] = func->captured_scope_is_with[ci];
+				scope_mc[scope_depth] = func->captured_scope_mc[ci];
+				scope_chain[scope_depth++] = func->captured_scope[ci];
+			}
+		}
+
+		// Push local scope with "this"
+		ASObject* local_scope = allocObject(app_context, 8);
+		setProperty(app_context, local_scope, "this", 4, &this_var);
+		if (scope_depth < MAX_SCOPE_DEPTH) {
+			scope_is_with[scope_depth] = 0;
+			scope_mc[scope_depth] = this_is_mc ? (MovieClip*)this_obj : NULL;
+			scope_chain[scope_depth++] = local_scope;
+		}
+
+		// Switch base_clip context for SWF6+
+		MovieClip* saved_context = g_current_context;
+		if (g_swf_version >= 6 && func->base_clip != NULL)
+			g_current_context = (MovieClip*)func->base_clip;
+
+		MovieClip* saved_event_this = g_event_this_mc;
+		if (this_is_mc) g_event_this_mc = (MovieClip*)this_obj;
+
+		ASFunction* prev_func = g_current_executing_func;
+		g_call_depth++;
+		g_prev_executing_func = prev_func;
+		g_current_executing_func = func;
+
+		// For MC targets, pass NULL as this_obj so preload_this uses g_event_this_mc
+		// (which produces MOVIECLIP type). For ASObject targets, pass the object directly.
+		func->advanced_func(app_context, args, arg_count, registers,
+		                    this_is_mc ? NULL : this_obj);
+
+		g_current_executing_func = prev_func;
+		g_call_depth--;
+		g_event_this_mc = saved_event_this;
+		g_current_context = saved_context;
+
+		// Pop local scope + captured scopes
+		for (u8 ci = 0; ci < captured_count + 1; ci++) {
+			if (scope_depth > 0) scope_depth--;
+		}
+		releaseObject(app_context, local_scope);
+		if (registers != NULL) FREE(registers);
+	}
+	else if (func->function_type == 1 && func->simple_func != NULL)
+	{
+		// Type 1: push args on stack
+		for (int i = 0; i < arg_count; i++)
+			pushVar(app_context, &args[i]);
+
+		u8 captured_count = func->captured_scope_count;
+		for (u8 ci = 0; ci < captured_count; ci++) {
+			if (scope_depth < MAX_SCOPE_DEPTH) {
+				scope_is_with[scope_depth] = func->captured_scope_is_with[ci];
+				scope_mc[scope_depth] = func->captured_scope_mc[ci];
+				scope_chain[scope_depth++] = func->captured_scope[ci];
+			}
+		}
+
+		MovieClip* saved_event_this = g_event_this_mc;
+		if (this_is_mc) g_event_this_mc = (MovieClip*)this_obj;
+
+		g_call_depth++;
+		((ActionVar(*)(SWFAppContext*))func->simple_func)(app_context);
+		g_call_depth--;
+
+		g_event_this_mc = saved_event_this;
+
+		for (u8 ci = 0; ci < captured_count; ci++) {
+			if (scope_depth > 0) scope_depth--;
+		}
+	}
+
+	g_this_depth = saved_this_depth;
+}
+
+// Handle asfunction: URL from a hyperlink click in a text field.
+// tf_mc = the text field MC that was clicked. Resolution scope is tf_mc->parent.
+static void handle_asfunction(SWFAppContext* app_context, const char* href, MovieClip* tf_mc)
+{
+	if (strncmp(href, "asfunction:", 11) != 0) return;
+	const char* address = href + 11;
+	if (address[0] == '\0') return;
+
+	// Split on first comma → function name and argument
+	char func_name[256];
+	const char* arg_text = NULL;
+	const char* comma = strchr(address, ',');
+	if (comma) {
+		size_t name_len = (size_t)(comma - address);
+		if (name_len >= sizeof(func_name)) name_len = sizeof(func_name) - 1;
+		memcpy(func_name, address, name_len);
+		func_name[name_len] = '\0';
+		arg_text = comma + 1; // everything after the comma (including leading spaces)
+	} else {
+		size_t alen = strlen(address);
+		if (alen >= sizeof(func_name)) alen = sizeof(func_name) - 1;
+		memcpy(func_name, address, alen);
+		func_name[alen] = '\0';
+	}
+	if (func_name[0] == '\0') return;
+
+	// Container MC = parent of the text field
+	MovieClip* container = tf_mc->parent;
+	if (container == NULL) {
+		extern MovieClip root_movieclip;
+		container = &root_movieclip;
+	}
+
+	ASFunction* func = NULL;
+	void* this_obj = NULL;
+	int this_is_mc = 0;
+
+	// Check for dotted path (split on rightmost '.')
+	const char* last_dot = strrchr(func_name, '.');
+	if (last_dot != NULL) {
+		size_t path_len = (size_t)(last_dot - func_name);
+		const char* method_name = last_dot + 1;
+		size_t method_len = strlen(method_name);
+		if (method_len == 0) return;
+
+		// Resolve target path from container MC
+		MovieClip* target_mc = resolveFlashPathToMC(app_context, func_name, (u32)path_len, container, 0);
+		if (target_mc != NULL && target_mc->dynamic_props != NULL) {
+			ActionVar* mv = getPropertyWithPrototype((ASObject*)target_mc->dynamic_props, method_name, (u32)method_len);
+			if (mv != NULL && mv->type == ACTION_STACK_VALUE_FUNCTION) {
+				func = (ASFunction*)(uintptr_t)mv->data.numeric_value;
+				this_obj = target_mc;
+				this_is_mc = 1;
+			}
+		}
+	} else {
+		// Simple name — look up on container MC first, then _global
+		size_t name_len = strlen(func_name);
+
+		if (container->dynamic_props != NULL) {
+			ActionVar* mv = getPropertyWithPrototype((ASObject*)container->dynamic_props, func_name, (u32)name_len);
+			if (mv != NULL && mv->type == ACTION_STACK_VALUE_FUNCTION) {
+				func = (ASFunction*)(uintptr_t)mv->data.numeric_value;
+				this_obj = container;
+				this_is_mc = 1;
+			}
+		}
+
+		if (func == NULL && global_object != NULL) {
+			ActionVar* mv = getPropertyWithPrototype(global_object, func_name, (u32)name_len);
+			if (mv != NULL && mv->type == ACTION_STACK_VALUE_FUNCTION) {
+				func = (ASFunction*)(uintptr_t)mv->data.numeric_value;
+				this_obj = global_object;
+				this_is_mc = 0;
+			}
+		}
+	}
+
+	if (func == NULL) return;
+
+	// Build argument (0 or 1 string)
+	ActionVar arg_var = {0};
+	int arg_count = 0;
+	if (arg_text != NULL) {
+		u32 u16_len = 0;
+		uint16_t* u16_str = utf8_to_u16(app_context, arg_text, (u32)strlen(arg_text), &u16_len);
+		arg_var.type = ACTION_STACK_VALUE_STRING;
+		arg_var.str_size = u16_len;
+		arg_var.data.numeric_value = (u64)(uintptr_t)u16_str;
+		arg_count = 1;
+	}
+
+	call_function_with_this(app_context, func, this_obj, this_is_mc,
+	                        arg_count > 0 ? &arg_var : NULL, arg_count);
+}
+
+// Called from swf_core.c on EV_MOUSE_UP_LEFT.
+void actionTextFieldDragEnd(SWFAppContext* app_context)
+{
+	int was_click = (g_tf_drag_active && g_selection_begin == g_selection_end);
 	g_tf_drag_active = 0;
+
+	// Path 1: Focused text field click (drag selection case)
+	if (was_click && g_focused_mc != NULL && g_focused_mc->ng_textfield_idx >= 0) {
+		u32 char_idx = (u32)g_selection_caret;
+		TFRunTable* table = tf_find_table(g_focused_mc);
+		if (table != NULL) {
+			TFRun* run = tf_find_run_at_index(table, char_idx);
+			if (run != NULL && run->href[0] != '\0') {
+				handle_asfunction(app_context, run->href, g_focused_mc);
+				return;
+			}
+		}
+	}
+
+	// Path 2: Non-focused text field click (hyperlink-only, no selection needed)
+	// asfunction links activate on any text field click, even if the field isn't focusable.
+	float mx = app_context->mouse.stage_x / 20.0f;
+	float my = app_context->mouse.stage_y / 20.0f;
+	for (int i = child_mc_count - 1; i >= 0; i--) {
+		MovieClip* mc = child_mc_cache[i];
+		if (mc == NULL || mc->ng_textfield_idx < 0) continue;
+		float x1, y1, x2, y2;
+		if (!mc_get_pixel_aabb_ng(mc, &x1, &y1, &x2, &y2)) continue;
+		if (mx < x1 || mx > x2 || my < y1 || my > y2) continue;
+		// Mouse hit this text field — check for href
+		TFRunTable* table = tf_find_table(mc);
+		if (table == NULL) continue;
+		float local_x = mx - x1;
+		float local_y = my - y1;
+		// Get text for char index calculation
+		const char* text_utf8 = NULL;
+		size_t text_byte_len = 0;
+		if (mc->dynamic_props != NULL) {
+			ActionVar* tp = getProperty((ASObject*)mc->dynamic_props, "text", 4);
+			if (tp != NULL && tp->type == ACTION_STACK_VALUE_STRING) {
+				static char _href_text_buf[4096];
+				const uint16_t* _u16p = varGetU16Ptr(tp);
+				int _u16_len = (int)tp->str_size;
+				int out_pos = 0;
+				for (int ci = 0; ci < _u16_len && out_pos < (int)sizeof(_href_text_buf) - 4; ci++) {
+					uint16_t cpt = _u16p[ci];
+					if (cpt < 0x80) { _href_text_buf[out_pos++] = (char)cpt; }
+					else if (cpt < 0x800) { _href_text_buf[out_pos++] = 0xC0 | (cpt >> 6); _href_text_buf[out_pos++] = 0x80 | (cpt & 0x3F); }
+					else { _href_text_buf[out_pos++] = 0xE0 | (cpt >> 12); _href_text_buf[out_pos++] = 0x80 | ((cpt >> 6) & 0x3F); _href_text_buf[out_pos++] = 0x80 | (cpt & 0x3F); }
+				}
+				_href_text_buf[out_pos] = '\0';
+				text_utf8 = _href_text_buf;
+				text_byte_len = (size_t)out_pos;
+			}
+		}
+		int char_idx = ng_getCharIndexAtPoint(mc->ng_textfield_idx, local_x, local_y,
+		                                       text_utf8, text_byte_len);
+		if (char_idx < 0) continue;
+		TFRun* run = tf_find_run_at_index(table, (u32)char_idx);
+		if (run != NULL && run->href[0] != '\0') {
+			handle_asfunction(app_context, run->href, mc);
+			return;
+		}
+	}
 }
 
 // ---------------------------------------------------------------------------
@@ -54813,6 +55315,114 @@ void actionTextControlPaste(SWFAppContext* app_context)
 	g_tf_select_all = 0;
 }
 
+// ---------------------------------------------------------------------------
+// IME Composition
+// ---------------------------------------------------------------------------
+
+static struct {
+	u32 ime_start;    // UTF-16 char position where composition began
+	u32 ime_len;      // Current composition length in UTF-16 chars
+	u8 active;        // 1 if composition is in progress
+} g_ime_data = {0};
+
+// Handle IME preedit: insert/replace composition text in focused text field.
+// text="" with cursor_from=-1: finalize composition (make permanent).
+// text=non-empty: insert or replace composition text at cursor.
+void actionTextFieldImeCompose(SWFAppContext* app_context, const char* text,
+                                int cursor_from, int cursor_to)
+{
+	(void)cursor_from; (void)cursor_to;
+	if (g_focused_mc == NULL || !MC_IS_TEXTFIELD(g_focused_mc)) return;
+	ASObject* props = (ASObject*) g_focused_mc->dynamic_props;
+	if (props == NULL) return;
+
+	if (text[0] == '\0') {
+		// Empty preedit = end composition
+		g_ime_data.active = 0;
+		return;
+	}
+
+	// Convert preedit text to UTF-16
+	u32 preedit_u16_len = 0;
+	uint16_t* preedit_u16 = utf8_to_u16(app_context, text, (u32)strlen(text), &preedit_u16_len);
+
+	// Get existing text as UTF-16
+	ActionVar* text_prop = getProperty(props, "text", 4);
+	const uint16_t* old_u16 = NULL;
+	u32 old_u16_len = 0;
+	if (text_prop != NULL && text_prop->type == ACTION_STACK_VALUE_STRING && text_prop->str_size > 0) {
+		old_u16 = varGetU16Ptr(text_prop);
+		old_u16_len = text_prop->str_size;
+	}
+
+	// Build new text
+	u32 new_len;
+	uint16_t* new_u16;
+	if (g_ime_data.active) {
+		// Replace existing composition range [ime_start, ime_start+ime_len) with preedit
+		u32 before = g_ime_data.ime_start;
+		u32 after_start = g_ime_data.ime_start + g_ime_data.ime_len;
+		u32 after_len = (old_u16_len > after_start) ? (old_u16_len - after_start) : 0;
+		new_len = before + preedit_u16_len + after_len;
+		new_u16 = (uint16_t*)malloc((new_len + 1) * sizeof(uint16_t));
+		if (old_u16 && before > 0) memcpy(new_u16, old_u16, before * sizeof(uint16_t));
+		memcpy(new_u16 + before, preedit_u16, preedit_u16_len * sizeof(uint16_t));
+		if (old_u16 && after_len > 0) memcpy(new_u16 + before + preedit_u16_len, old_u16 + after_start, after_len * sizeof(uint16_t));
+		new_u16[new_len] = 0;
+		g_ime_data.ime_len = preedit_u16_len;
+	} else {
+		// Start new composition at caret position
+		u32 caret = (g_selection_caret >= 0) ? (u32)g_selection_caret : old_u16_len;
+		if (caret > old_u16_len) caret = old_u16_len;
+		g_ime_data.ime_start = caret;
+		g_ime_data.ime_len = preedit_u16_len;
+		g_ime_data.active = 1;
+		u32 after_len = old_u16_len - caret;
+		new_len = caret + preedit_u16_len + after_len;
+		new_u16 = (uint16_t*)malloc((new_len + 1) * sizeof(uint16_t));
+		if (old_u16 && caret > 0) memcpy(new_u16, old_u16, caret * sizeof(uint16_t));
+		memcpy(new_u16 + caret, preedit_u16, preedit_u16_len * sizeof(uint16_t));
+		if (old_u16 && after_len > 0) memcpy(new_u16 + caret + preedit_u16_len, old_u16 + caret, after_len * sizeof(uint16_t));
+		new_u16[new_len] = 0;
+	}
+
+	// Set text property
+	ActionVar new_text = {0};
+	new_text.type = ACTION_STACK_VALUE_STRING;
+	new_text.data.numeric_value = (u64)(uintptr_t)new_u16;
+	new_text.str_size = new_len;
+	setProperty(app_context, props, "text", 4, &new_text);
+
+	// Update length property
+	ActionVar len_val = {0};
+	len_val.type = ACTION_STACK_VALUE_F64;
+	VAL(double, &len_val.data.numeric_value) = (double)new_len;
+	setProperty(app_context, props, "length", 6, &len_val);
+
+	// Sync to variable binding
+	ng_syncTextToVar(app_context, g_focused_mc, &new_text);
+
+	// Update selection/caret to end of composition
+	int new_caret = (int)(g_ime_data.ime_start + g_ime_data.ime_len);
+	g_selection_begin = new_caret;
+	g_selection_end = new_caret;
+	g_selection_caret = new_caret;
+	g_tf_select_all = 0;
+}
+
+// Handle IME commit: commit text directly (used for ImeCommit events).
+void actionTextFieldImeCommit(SWFAppContext* app_context, const char* text)
+{
+	g_ime_data.active = 0;
+	if (text[0] == '\0') return;
+	// Insert committed text at caret (like a TEXT_INPUT sequence)
+	u32 u16_len = 0;
+	uint16_t* u16_text = utf8_to_u16(app_context, text, (u32)strlen(text), &u16_len);
+	for (u32 i = 0; i < u16_len; i++) {
+		actionTextFieldInput(app_context, (int)u16_text[i]);
+	}
+}
+
 void actionTextFieldInput(SWFAppContext* app_context, int codepoint)
 {
 	if (g_focused_mc == NULL || !MC_IS_TEXTFIELD(g_focused_mc)) return;
@@ -55355,6 +55965,13 @@ void processTimers(SWFAppContext* app_context, double frame_duration_ms)
 			// Fire this timer's callback
 			fireTimerCallback(app_context, &g_timers[i]);
 			fired_any = 1;
+
+			// Fire deferred onChanged from replaceSel (if any)
+			if (g_pending_onchanged_mc != NULL) {
+				MovieClip* oc_mc = g_pending_onchanged_mc;
+				g_pending_onchanged_mc = NULL;
+				mc_call_as2_handler_ng(app_context, oc_mc, "onChanged", 9, NULL, 0);
+			}
 
 			// Flush pending onLoads queued by attachMovie during this timer callback
 			actionFlushPendingOnLoads(app_context);

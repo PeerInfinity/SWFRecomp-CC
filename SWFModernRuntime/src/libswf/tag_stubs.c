@@ -4210,6 +4210,11 @@ int ng_getTextFieldIdx(size_t depth)
 	return ng_find_textfield(display_list[depth].char_id);
 }
 
+int ng_getTextFieldIdxByCharId(size_t char_id)
+{
+	return ng_find_textfield(char_id);
+}
+
 u16 ng_getTextFieldFlags(int tf_idx)
 {
 	if (tf_idx < 0 || (size_t)tf_idx >= ng_textfield_count) return 0;

@@ -363,7 +363,16 @@ def preprocess_input_json(src, dst, scale_factor=1.0):
             lines.append(f"SET_CLIPBOARD_TEXT {evt.get('text', '')}")
         elif t == "FocusLost":
             lines.append("FOCUSLOST")
-        # Skip ImePreedit, ImeCommit for now
+        elif t == "ImePreedit":
+            text = evt.get("text", "")
+            cursor = evt.get("cursor")
+            cursor_from = cursor[0] if cursor else -1
+            cursor_to = cursor[1] if cursor else -1
+            lines.append(f"IME_PREEDIT {cursor_from} {cursor_to} {text}")
+        elif t == "ImeCommit":
+            text = evt.get("text", "")
+            lines.append(f"IME_COMMIT {text}")
+        # Skip unknown event types
     with open(dst, "w") as f:
         f.write("\n".join(lines) + "\n")
     return sum(1 for l in lines if l == "WAIT")

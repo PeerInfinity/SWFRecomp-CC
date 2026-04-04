@@ -8,6 +8,10 @@ Last updated: 2026-04-03
 - **Image test baseline**: **14/31 strict image match** (+2: bitmap_data_colortransform, bitmap_data_copypixels). **10/31 tolerance pass** (within test.toml limits).
 - **Main failure types**: output_mismatch (48), runtime_segfault (1), timeout (1)
 - **Known regressions**: `global_instance_decls` 40→23 (unclear root cause, test at 3% pass rate).
+- **Latest fixes (2026-04-03, session 2)**:
+  - **asfunction PASS (11/11)** — Hyperlink click handler for `<a href="asfunction:...">` in text fields. Nested sprite text field initialization fix (`findDisplayEntryInParent`). Function resolution with correct `this` binding (MC vs _global).
+  - **edittext_ime_focus_lost PASS (7/7)** — IME preedit/commit event pipeline (verify_output.py → swf_core.c → action.c). Composition state tracking. Deferred onChanged from replaceSel.
+  - **PIXEL_TEXT_LAYOUT_PLAN complete** — all 4 phases done (char layout, asfunction, drag select, IME)
 - **Latest fixes (2026-04-03)**:
   - **Drawing API gradient rendering fixes** — Three bugs fixed in beginGradientFill/lineGradientStyle: (1) focal type upgrade applied to linear gradients, (2) varToDouble garbage for string args, (3) linearRGB ramp stored in sRGB instead of linear color space. Image outliers: movieclip_begin_gradient_fill 77089→10943 (86% reduction), movieclip_line_gradient_style 32510→6053 (81% reduction). See `_investigation/RENDERING_PIPELINE_COMPARISON.md`.
   - **libtess2 tessellation** — Replaced Drawing API fan triangulation with constrained Delaunay (libtess2 library). Added adaptive bezier flattening (1/4/8/16 segments based on curvature).
@@ -156,6 +160,7 @@ All other previously near-passing tests have been fixed. 146 tests were tracked 
 | DISPLACEMENTMAPFILTER_PLAN | 13/13 |
 | TELLTARGET_PLAN | 20/22 (2 accepted/ignored) |
 | DRAWING_API_RENDERING | mask_with_drawing IMAGE PASS; gradient outliers reduced 80-86% |
+| PIXEL_TEXT_LAYOUT_PLAN | 3/3 (asfunction, edittext_drag_select, edittext_ime_focus_lost) |
 
 ### Blocked plans
 | Plan | Status | Blocker |
@@ -177,8 +182,7 @@ All previous quick wins have been fixed. See `SESSION_NOTES.md` for details.
 ### Remaining failing tests (filtered: 11 tests)
 Remaining failures require:
 - **Global enumeration order**: global_proto_decls, global_instance_decls, global_proto_decls_delete (GLOBALS_PLAN Phase 8 blocked)
-- **Mouse/input dispatch**: edittext_drag_select, edittext_ime_focus_lost
-- **Missing features**: localconnection, asfunction, sandbox_type_remote
+- **Missing features**: localconnection, sandbox_type_remote
 - **Shape-accurate hitTest**: movieclip_hittest_shapeflag (curves/strokes accuracy)
 - **Other**: swf5_xml_event_handler_context, movieclip_methods_with_loaded_image
 
