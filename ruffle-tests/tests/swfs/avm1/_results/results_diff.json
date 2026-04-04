@@ -1,9 +1,9 @@
 {
   "metadata": {
-    "old_timestamp": "2026-04-03T22:44:25.116532+00:00",
-    "old_git_sha": "5ec711b2146b339c7a7e9712603c1f81dac0ae08",
-    "new_timestamp": "2026-04-04T00:12:59.281142+00:00",
-    "new_git_sha": "8fb3f39023e1c8ba38f5cb4c165694a9d0cdc4b4",
+    "old_timestamp": "2026-04-04T00:12:59.281142+00:00",
+    "old_git_sha": "8fb3f39023e1c8ba38f5cb4c165694a9d0cdc4b4",
+    "new_timestamp": "2026-04-04T01:50:51.871950+00:00",
+    "new_git_sha": "7a348be46a51811d52bc285d07d2b88bbc2de62b",
     "partial": false,
     "same_commit": false,
     "incomplete": true,
@@ -14,19 +14,68 @@
     "old_pass": 530,
     "old_total": 578,
     "old_pass_rate": 91.7,
-    "new_pass": 530,
+    "new_pass": 532,
     "new_total": 578,
-    "new_pass_rate": 91.7,
+    "new_pass_rate": 92.0,
     "old_mismatched_lines": 9771,
-    "new_mismatched_lines": 9771,
+    "new_mismatched_lines": 9751,
     "increased_mismatches": 0,
-    "decreased_mismatches": 0,
-    "newly_passing": 0,
+    "decreased_mismatches": 20,
+    "newly_passing": 2,
     "newly_failing": 0,
-    "status_changed": 0,
-    "unchanged": 578,
+    "status_changed": 2,
+    "unchanged": 575,
     "added": 0,
     "removed": 0
   },
-  "changes": []
+  "changes": [
+    {
+      "test": "asfunction",
+      "change_type": "changed",
+      "old_status": "output_mismatch",
+      "new_status": "pass",
+      "old_lines": {
+        "actual_lines": 0,
+        "expected_lines": 11,
+        "matching_lines": 0
+      },
+      "new_lines": {
+        "actual_lines": 11,
+        "expected_lines": 11,
+        "matching_lines": 11
+      }
+    },
+    {
+      "test": "edittext_ime_focus_lost",
+      "change_type": "changed",
+      "old_status": "output_mismatch",
+      "new_status": "pass",
+      "old_lines": {
+        "actual_lines": 6,
+        "expected_lines": 7,
+        "matching_lines": 0
+      },
+      "new_lines": {
+        "actual_lines": 7,
+        "expected_lines": 7,
+        "matching_lines": 7
+      }
+    },
+    {
+      "test": "global_instance_decls",
+      "change_type": "changed",
+      "old_status": "output_mismatch",
+      "new_status": "output_mismatch",
+      "old_lines": {
+        "actual_lines": 853,
+        "expected_lines": 758,
+        "matching_lines": 14
+      },
+      "new_lines": {
+        "actual_lines": 852,
+        "expected_lines": 758,
+        "matching_lines": 16
+      }
+    }
+  ]
 }
