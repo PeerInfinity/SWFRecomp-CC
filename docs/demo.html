@@ -206,6 +206,44 @@
             height: 400px;
         }
 
+        /* Drop zone */
+        .drop-zone {
+            width: 100%;
+            max-width: 500px;
+            border: 2px dashed #555;
+            border-radius: 12px;
+            padding: 3rem;
+            text-align: center;
+            cursor: pointer;
+            transition: all 0.2s;
+            margin: 0 auto 1.5rem auto;
+        }
+        .drop-zone:hover, .drop-zone.dragover {
+            border-color: #1565C0;
+            background: rgba(21, 101, 192, 0.05);
+        }
+        .drop-zone input { display: none; }
+        .drop-zone p { color: #ccc; }
+        .drop-zone .hint { color: #666; margin-top: 0.5rem; font-size: 0.9em; }
+        .standalone-view {
+            text-align: center;
+            padding: 40px 20px;
+        }
+        .standalone-view h2 {
+            color: #1565C0;
+            margin-bottom: 10px;
+            font-size: 1.4em;
+        }
+        .standalone-view .description {
+            color: #999;
+            margin-bottom: 25px;
+        }
+        .standalone-filename {
+            color: #1565C0;
+            font-weight: 600;
+            margin-bottom: 15px;
+        }
+
         /* Footer info */
         .footer-info {
             margin-top: 20px;
@@ -235,38 +273,60 @@
         </header>
 
         <main>
-            <div id="meta-section" class="meta" style="display:none;">
-                <div class="meta-description" id="meta-desc"></div>
-                <div class="meta-row" id="meta-details"></div>
-            </div>
-
-            <div id="status" class="status loading">Loading...</div>
-
-            <div class="controls">
-                <button class="btn-run" id="btn-run" disabled onclick="runSwf()">Run SWF</button>
-                <button class="btn-secondary" onclick="clearOutput()">Clear Output</button>
-                <button class="btn-compare" id="btn-compare" onclick="toggleComparison()">Toggle Comparison</button>
-            </div>
-
-            <div class="display-area" id="display-area">
-                <!-- SWFRecomp panel -->
-                <div class="panel">
-                    <div class="panel-header swfrecomp">SWFRecomp Output</div>
-                    <div id="canvas-wrap" class="canvas-wrap" style="display:none;">
-                        <canvas id="canvas" width="550" height="400"></canvas>
+            <!-- Standalone drop zone (shown when no test is specified) -->
+            <div id="standalone-section" class="standalone-view" style="display:none;">
+                <h2>Compare with Ruffle</h2>
+                <p class="description">Drop a .swf file to play it in Ruffle</p>
+                <div class="drop-zone" id="dropZone">
+                    <p>Drop a .swf file here</p>
+                    <p class="hint">or click to select</p>
+                    <input type="file" id="fileInput" accept=".swf">
+                </div>
+                <div id="standalone-filename" class="standalone-filename" style="display:none;"></div>
+                <div id="standalone-ruffle" style="display:none;">
+                    <div class="panel">
+                        <div class="panel-header ruffle">Ruffle</div>
+                        <div id="standalone-ruffle-container" style="min-height:400px; background:#fff;"></div>
                     </div>
-                    <div class="output" id="output"></div>
-                </div>
-
-                <!-- Ruffle comparison panel -->
-                <div class="panel ruffle-panel" id="ruffle-panel">
-                    <div class="panel-header ruffle">Ruffle (Original SWF)</div>
-                    <div id="ruffle-container"></div>
-                    <div class="output" id="ruffle-output"></div>
                 </div>
             </div>
 
-            <div class="footer-info" id="footer-info"></div>
+            <!-- Test demo section (shown when ?test= is specified) -->
+            <div id="test-section" style="display:none;">
+                <div id="meta-section" class="meta" style="display:none;">
+                    <div class="meta-description" id="meta-desc"></div>
+                    <div class="meta-row" id="meta-details"></div>
+                </div>
+
+                <div id="status" class="status loading">Loading...</div>
+
+                <div class="controls">
+                    <button class="btn-run" id="btn-run" disabled onclick="runSwf()">Run SWF</button>
+                    <button class="btn-secondary" onclick="clearOutput()">Clear Output</button>
+                    <button class="btn-compare" id="btn-compare" onclick="toggleComparison()">Toggle Comparison</button>
+                    <button class="btn-secondary" onclick="location.href='demo.html'">New SWF</button>
+                </div>
+
+                <div class="display-area" id="display-area">
+                    <!-- SWFRecomp panel -->
+                    <div class="panel">
+                        <div class="panel-header swfrecomp">SWFRecomp Output</div>
+                        <div id="canvas-wrap" class="canvas-wrap" style="display:none;">
+                            <canvas id="canvas" width="550" height="400"></canvas>
+                        </div>
+                        <div class="output" id="output"></div>
+                    </div>
+
+                    <!-- Ruffle comparison panel -->
+                    <div class="panel ruffle-panel" id="ruffle-panel">
+                        <div class="panel-header ruffle">Ruffle (Original SWF)</div>
+                        <div id="ruffle-container"></div>
+                        <div class="output" id="ruffle-output"></div>
+                    </div>
+                </div>
+
+                <div class="footer-info" id="footer-info"></div>
+            </div>
         </main>
     </div>
 
@@ -278,10 +338,73 @@
         const compareParam = params.get('compare') === 'true';
 
         if (!testId) {
-            document.getElementById('status').className = 'status error';
-            document.getElementById('status').textContent = 'No test specified. Use ?test=<name>';
+            // --- Standalone mode: show drop zone for Ruffle playback ---
+            document.getElementById('standalone-section').style.display = 'block';
+            document.title = 'SWFRecomp - Compare with Ruffle';
+            document.getElementById('header-title').textContent = 'Compare with Ruffle';
+
+            var dropZone = document.getElementById('dropZone');
+            var fileInput = document.getElementById('fileInput');
+
+            dropZone.addEventListener('click', function() { fileInput.click(); });
+            dropZone.addEventListener('dragover', function(e) {
+                e.preventDefault();
+                dropZone.classList.add('dragover');
+            });
+            dropZone.addEventListener('dragleave', function() {
+                dropZone.classList.remove('dragover');
+            });
+            dropZone.addEventListener('drop', function(e) {
+                e.preventDefault();
+                dropZone.classList.remove('dragover');
+                var file = e.dataTransfer.files[0];
+                if (file) loadDroppedSwf(file);
+            });
+            fileInput.addEventListener('change', function() {
+                if (fileInput.files[0]) loadDroppedSwf(fileInput.files[0]);
+            });
+
+            function loadDroppedSwf(file) {
+                if (!file.name.toLowerCase().endsWith('.swf')) {
+                    alert('Please select a .swf file');
+                    return;
+                }
+                var reader = new FileReader();
+                reader.onload = function(e) {
+                    var swfBytes = new Uint8Array(e.target.result);
+                    document.getElementById('standalone-filename').textContent = file.name;
+                    document.getElementById('standalone-filename').style.display = 'block';
+                    document.getElementById('standalone-ruffle').style.display = 'block';
+                    dropZone.style.display = 'none';
+                    loadRuffleWithData(document.getElementById('standalone-ruffle-container'), swfBytes);
+                };
+                reader.readAsArrayBuffer(file);
+            }
+
+            function loadRuffleWithData(container, swfBytes) {
+                container.innerHTML = '<div style="padding:20px;color:#888;text-align:center;">Loading Ruffle...</div>';
+                var ruffleScript = document.createElement('script');
+                ruffleScript.src = 'https://unpkg.com/@ruffle-rs/ruffle';
+                ruffleScript.onload = function() {
+                    container.innerHTML = '';
+                    var ruffle = window.RufflePlayer.newest();
+                    var player = ruffle.createPlayer();
+                    player.style.width = '100%';
+                    player.style.height = '400px';
+                    container.appendChild(player);
+                    player.load({ data: swfBytes });
+                };
+                ruffleScript.onerror = function() {
+                    container.innerHTML = '<div style="padding:20px;color:#ff5555;text-align:center;">Failed to load Ruffle from CDN</div>';
+                };
+                document.head.appendChild(ruffleScript);
+            }
+
             return;
         }
+
+        // --- Test demo mode ---
+        document.getElementById('test-section').style.display = 'block';
 
         // Determine if graphics test
         const isGraphics = testId.startsWith('graphics/');
