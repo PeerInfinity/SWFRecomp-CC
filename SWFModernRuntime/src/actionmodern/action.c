@@ -53720,9 +53720,11 @@ static ActionVar builtin_selection_setFocus(SWFAppContext* app_context, ActionVa
 		g_mouse_hovered_mc = NULL;
 		if (MC_IS_TEXTFIELD(new_mc)) {
 			g_tf_select_all = 1;
-			g_selection_begin = -1;
-			g_selection_caret = -1;
-			g_selection_end = -1;
+			// Flash reports 0/0/0 for Selection.getBeginIndex/getCaretIndex/getEndIndex
+			// immediately after programmatic setFocus (even though visual is select-all)
+			g_selection_begin = 0;
+			g_selection_caret = 0;
+			g_selection_end = 0;
 		}
 		ret.data.numeric_value = 1; return ret;
 	}
@@ -53733,8 +53735,12 @@ static ActionVar builtin_selection_setFocus(SWFAppContext* app_context, ActionVa
 	g_mouse_hovered_mc = NULL;
 	selection_do_focus_change(app_context, g_focused_mc, new_mc);
 	// Programmatic setFocus selects all text (mouse click does not)
-	if (MC_IS_TEXTFIELD(new_mc))
+	if (MC_IS_TEXTFIELD(new_mc)) {
 		g_tf_select_all = 1;
+		g_selection_begin = 0;
+		g_selection_caret = 0;
+		g_selection_end = 0;
+	}
 	ret.data.numeric_value = 1;
 	return ret;
 }
