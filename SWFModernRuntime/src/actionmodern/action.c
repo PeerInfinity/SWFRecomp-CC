@@ -24715,6 +24715,24 @@ static void installAsBroadcaster(SWFAppContext* app_context, ASObject* obj)
     setProperty(app_context, obj, "broadcastMessage", 16, &fv);
 }
 
+// Mark AsBroadcaster methods as SWF6+ (hidden in SWF5 via flash_flags).
+// Called after installAsBroadcaster for objects like Key and Mouse where
+// addListener/removeListener should not be visible in SWF5.
+static void markAsBroadcasterSWF6(ASObject* obj)
+{
+    const char* names[] = {"addListener", "removeListener", "broadcastMessage", "_listeners"};
+    const u32 lens[] = {11, 14, 16, 10};
+    for (int i = 0; i < 4; i++) {
+        for (u32 j = 0; j < obj->num_used; j++) {
+            if (obj->properties[j].name_length == lens[i] &&
+                strncmp(obj->properties[j].name, names[i], lens[i]) == 0) {
+                obj->properties[j].flash_flags = 0x0080;
+                break;
+            }
+        }
+    }
+}
+
 // AsBroadcaster.initialize(obj) — static method callable from AS2.
 // Installs _listeners, addListener, removeListener, broadcastMessage on the target.
 static ActionVar builtin_asbroadcaster_initialize(SWFAppContext* app_context, ActionVar* args, u32 arg_count, ActionVar* registers, void* this_obj)
@@ -26890,8 +26908,10 @@ static void ensureGlobalInit(SWFAppContext* app_context)
 	installNativeToString(app_context, g_stage_obj);
 
 	// Install AsBroadcaster methods on Mouse, Key, Stage, Selection
-	// In SWF5, addListener/removeListener/broadcastMessage are not available on Stage
+	// In SWF5, addListener/removeListener/broadcastMessage are not available on Key/Mouse/Stage.
+	// Install unconditionally but mark as SWF6+ via flash_flags (hidden by version mask).
 	installAsBroadcaster(app_context, g_mouse_obj);
+	markAsBroadcasterSWF6(g_mouse_obj);
 	// Mouse methods: show, hide, setTrailer, setTrailerPosition, setTrailerMode
 	{
 		static ASFunction mouse_methods[5];
@@ -26912,13 +26932,13 @@ static void ensureGlobalInit(SWFAppContext* app_context)
 		mouse_methods_init = 1;
 	}
 	installAsBroadcaster(app_context, g_key_obj);
+	markAsBroadcasterSWF6(g_key_obj);
 	installKeyMethods(app_context, g_key_obj);
 	// Accessibility methods (isActive, updateProperties, sendEvent) are installed lazily
 	// because ensureGlobalInit may run during a SWF5 child import (Gnash Dejagnu.swf).
 	// See ensureAccessibilityMethods() — called when Accessibility is first accessed at SWF6+.
-	if (g_swf_version >= 6) {
-		installAsBroadcaster(app_context, g_stage_obj);
-	}
+	installAsBroadcaster(app_context, g_stage_obj);
+	markAsBroadcasterSWF6(g_stage_obj);
 	// Stage default properties (READ_ONLY)
 	{
 		ActionVar sv;
@@ -27040,6 +27060,11 @@ static void ensureGlobalInit(SWFAppContext* app_context)
 		if (function_count < MAX_FUNCTIONS) function_registry[function_count++] = &g_ab_initialize_func;
 		fv.data.numeric_value = (u64)&g_ab_initialize_func;
 		setPropertyWithFlags(app_context, g_stub_ctors[0].own_props, "initialize", 10, &fv, PROPERTY_FLAG_WRITABLE);
+		// AsBroadcaster.initialize is SWF6+ only (hidden in SWF5)
+		{
+			ASProperty* ip = findPropertyRaw(g_stub_ctors[0].own_props, "initialize", 10);
+			if (ip) ip->flash_flags = 0x0080;
+		}
 
 		// MovieClipLoader prototype
 		if (g_stub_ctors[9].prototype_obj == NULL) {
@@ -27273,6 +27298,22 @@ static void ensureGlobalInit(SWFAppContext* app_context)
 
 	#undef REG_FUNC
 	#undef REG_OBJ
+
+	// Mark SWF6+ constructors/objects on _global with flash_flags=0x0080
+	// (hidden in SWF5 via version mask 0x7480, visible in SWF6+).
+	// In Flash, these classes don't exist in the SWF5 global scope.
+	{
+		const char* swf6_names[] = {
+			"LocalConnection", "NetConnection", "NetStream", "Video",
+			"Camera", "Microphone", "PrintJob", "SharedObject",
+			"MovieClipLoader", "TextSnapshot",
+		};
+		for (int i = 0; i < 10; i++) {
+			u32 nlen = (u32)strlen(swf6_names[i]);
+			ASProperty* p = findPropertyRaw(global_object, swf6_names[i], nlen);
+			if (p != NULL) p->flash_flags = 0x0080;
+		}
+	}
 
 	g_global_init_done = 1;
 
