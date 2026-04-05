@@ -64,10 +64,9 @@ Added `g_call_this_type` global and dispatch logic in `builtin_array_method` so 
 **Complexity**: High (deep runtime interaction)
 
 ### Category B: Standalone prototype method calls (25 lines)
-**Lines**: 157-159, 161-163, 173, 176, 179-196 — pop(), concat(), slice() called via `.call()` in SWF5
-**Root cause**: SWF5 `.call()` uses CallFunction bytecode path, not CallMethod. The Function.prototype.call stub (`g_fn_call_func`) has `advanced_func = builtin_noop_func` which returns undefined. The CallMethod "call" handler (which properly dispatches) is not reached.
-**Complexity**: High — requires implementing Function.prototype.call dispatch in the CallFunction path or making `builtin_noop_func` non-trivial.
-**BLOCKER**: See below.
+**Lines**: 157-159, 161-163, 173, 176, 179-196 — pop(), concat(), slice() called as standalone functions
+**Root cause (CORRECTED 2026-04-05)**: These are NOT `.call()` invocations. The bytecode uses direct CallMethod (e.g., `a.pop()`) where `a` was created from a standalone function call like `a = f(...)`. The variable `a` is UNDEFINED because of Category A (the function reference `f = Array.prototype.concat` doesn't work). The pop/push tests fail because `a` doesn't exist.
+**Complexity**: Same as Category A — blocked on SWF5 Dejagnu function variable interaction.
 
 ### Category C: Sort ordering differences (~50 lines)
 **Lines**: 103, 106-109, 113-114, 334-342, 351-352, 377-380, 408-431, 450, 456, 459, 461-462
@@ -98,17 +97,15 @@ Added `g_call_this_type` global and dispatch logic in `builtin_array_method` so 
 ### Other (2 lines)
 **Line 132**: `int(-2147483649)` wrapping behavior
 
-## BLOCKER: SWF5 Function.prototype.call/apply Dispatch
+## CORRECTED: Category B is NOT a .call() issue (2026-04-05)
 
-**Problem**: When SWF5 code calls `Array.prototype.pop.call(b)`, the bytecode sequence uses GetMember to retrieve the `.call` function from Function.prototype, then invokes it directly. The `.call` function's `advanced_func` is `builtin_noop_func` which returns undefined.
+The previous blocker about Function.prototype.call/apply was a misdiagnosis. Bytecode analysis confirmed:
+- The test does NOT use `.call()` — the string "call" isn't even in the constant pool
+- Category B failures are direct method calls (`a.pop()`) where `a` is undefined due to Category A
+- Category E uses `.apply()` which DOES go through CallMethod FUNCTION handler (confirmed via debug)
+- The `.call`/`.apply` dispatch infrastructure was added anyway (commit 6a3cbcab) for future use
 
-**What's needed**: Either:
-1. Make the `g_fn_call_func` advanced_func actually implement Function.prototype.call semantics (extract thisArg, build args, invoke wrapped function), OR
-2. Detect in `actionCallFunction` when the function being called IS `g_fn_call_func` and handle it specially
-
-**Impact**: Blocks Category B (25 lines) and Category E (18 lines) = 43 lines total.
-
-**Estimated effort**: Medium-high. Requires careful handling of this-arg extraction, scope management, and multiple function type paths.
+The true blocker for Categories A+B (28 lines) is that `f = Array.prototype.concat` doesn't preserve the function reference in SWF5 Dejagnu context. This is likely a scope/variable interaction issue.
 
 ## Key Finding: Dual Array Constructor
 Two separate Array constructors exist (`g_array_constructor` from `actionGetVariable` and `g_ctors[1]` from `ensureGlobalInit`). They now share the same `prototype_obj` after the fix in commit 54f14500.
@@ -116,7 +113,7 @@ Two separate Array constructors exist (`g_array_constructor` from `actionGetVari
 ## Recommended Next Steps
 
 1. **Accept Gnash-specific sort diffs** — Category C sort lines (~50) confirmed as algorithm-dependent. Consider adding to accepted diffs.
-2. **Implement Function.prototype.call** — Category B+E blocker. Would fix 43 lines but requires significant effort.
+2. **Investigate Category A** — Why `f = Array.prototype.concat` results in `typeof(f) == 'undefined'`. This blocks 28 lines (A+B).
 3. **Accept ASSetPropFlags limitation** — Categories D (partial) and F. ASSetPropFlags on arrays is unimplemented.
 4. **Category H deeper investigation** — The `t[2] = "om"` failure on plain objects with numeric properties needs investigation separate from __resolve.
 
