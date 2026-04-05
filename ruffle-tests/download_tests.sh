@@ -8,19 +8,23 @@
 # Uses git sparse-checkout to download only the requested test subtrees instead
 # of the entire Ruffle repository (~100x smaller download).
 #
-# Usage: ./download_tests.sh [--clean] [CATEGORY...]
+# Usage: ./download_tests.sh [--clean] [--clean-cache] [CATEGORY...]
 #   --clean       Remove existing test directories before downloading
+#   --clean-cache Remove cached RecompiledScripts/RecompiledTags only (no download)
 #   CATEGORY...   One or more test categories to download (default: avm1)
 #
 # Available categories:
-#   avm1              tests/tests/swfs/avm1 (620 tests)
+#   avm1              tests/tests/swfs/avm1 (620+ tests)
 #   from_shumway      tests/tests/swfs/from_shumway (AVM1 subset: ~23 tests)
+#   from_gnash        tests/tests/swfs/from_gnash (~200 tests)
 #
 # Examples:
 #   ./download_tests.sh                          # download avm1 only
 #   ./download_tests.sh from_shumway             # download from_shumway only
 #   ./download_tests.sh avm1 from_shumway        # download both
 #   ./download_tests.sh --clean avm1             # clean and re-download avm1
+#   ./download_tests.sh --clean-cache            # remove stale recompiler caches for all categories
+#   ./download_tests.sh --clean-cache from_gnash # remove caches for from_gnash only
 
 set -euo pipefail
 
@@ -46,10 +50,12 @@ ALL_CATEGORIES=(avm1 from_shumway from_gnash)
 
 # Parse arguments
 CLEAN=false
+CLEAN_CACHE=false
 CATEGORIES=()
 for arg in "$@"; do
     case "${arg}" in
         --clean) CLEAN=true ;;
+        --clean-cache) CLEAN_CACHE=true ;;
         *)
             if [[ -v "CATEGORY_REPO_PATH[${arg}]" ]]; then
                 CATEGORIES+=("${arg}")
@@ -62,9 +68,35 @@ for arg in "$@"; do
     esac
 done
 
-# Default to avm1 if no categories specified
+# Default categories
 if [[ ${#CATEGORIES[@]} -eq 0 ]]; then
-    CATEGORIES=(avm1)
+    if ${CLEAN_CACHE}; then
+        # --clean-cache with no categories: clean all
+        CATEGORIES=("${ALL_CATEGORIES[@]}")
+    else
+        CATEGORIES=(avm1)
+    fi
+fi
+
+# Handle --clean-cache: remove RecompiledScripts/RecompiledTags and exit
+if ${CLEAN_CACHE}; then
+    total_cleaned=0
+    for cat in "${CATEGORIES[@]}"; do
+        dest_base="${CATEGORY_LOCAL_PATH[${cat}]}"
+        if [[ ! -d "${dest_base}" ]]; then
+            echo "${cat}: no test directory found, skipping"
+            continue
+        fi
+        count=0
+        while IFS= read -r -d '' dir; do
+            rm -rf "${dir}"
+            count=$((count + 1))
+        done < <(find "${dest_base}" -type d \( -name "RecompiledScripts" -o -name "RecompiledTags" \) -print0)
+        echo "${cat}: cleaned ${count} cached directories"
+        total_cleaned=$((total_cleaned + count))
+    done
+    echo "Done! Cleaned ${total_cleaned} cached directories."
+    exit 0
 fi
 
 # Check dependencies
