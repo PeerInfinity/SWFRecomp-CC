@@ -40,13 +40,15 @@ LittleCube has added **garbage collection** to the runtime PR (commit `f02311c`,
 - Previous 5 commits (objects and functions infrastructure)
 - `c7348af` - remove arg initial strings, add null/undefined push values
 
-**SWFModernRuntime PR #3** — now 19 commits (was 14):
+**SWFModernRuntime PR #3** — now 21 commits (was 14):
 - Previous 14 commits (objects and functions infrastructure)
 - `f02311c` - **first attempt at garbage collection** (concurrent GC with cycle detection)
 - `f1d2da9` - move free thread functions to separate file (`free_thread.c`/`free_thread.h`)
 - `e2db29b` - cleanup
-- `6f256b2` - **fix free mechanism bug** — edge case with aliased objects in dense cycles (e.g. `a = b; a.bb = b; b.a = a;` with cross-references)
+- `6f256b2` - **fix free mechanism bug** — edge case with aliased objects in dense cycles
 - `aa3fa7f` - cleanup
+- `18589c8` - cleanup, manage scope objects, fix Math.abs
+- `21439f1` - **implement prototype support** — `STR_ID_PROTOTYPE`/`STR_ID_PROTO` string IDs, `getPropertyWithPrototype()` returns `ASProperty*` with string_id lookup, `RuntimeFunc.constructor` flag distinguishes constructors from methods
 
 #### LittleCube's Pre-Merge TODO (Updated)
 
@@ -111,7 +113,7 @@ LittleCube and PeerInfinity have opened PRs implementing **objects and functions
 | Scope chain | `getPropertyInThisScope()` | WITH scope stack + function scope + global |
 | Object/Function relation | Unified ("functions are objects") | Separate structs (ASObject vs ASFunction) — **different structs, never cast** |
 | Memory management | Red-black tree + refcount (in progress) | Reference counting on ASObject/ASArray, manual lifecycle |
-| Prototype chains | Not yet visible in PR | Full __proto__ chain traversal, __constructor__, super depth tracking |
+| Prototype chains | `getPropertyWithPrototype()` with string_id lookup (`21439f1`) | Full __proto__ chain traversal, __constructor__, super depth tracking |
 | Closure semantics | Not yet visible in PR | Full base_clip capture, SWF5 vs SWF6+ differentiation |
 | Test coverage | Basic (included in PR) | 616 Ruffle tests + 115 hand-written tests |
 
