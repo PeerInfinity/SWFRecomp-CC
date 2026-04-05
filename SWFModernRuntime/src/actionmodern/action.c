@@ -39251,6 +39251,50 @@ void actionNewObject(SWFAppContext* app_context)
 	}
 	else if (strcmp(ctor_name, "Color") == 0)
 	{
+		// SWF6 case-insensitive check: if "Color" has been shadowed or deleted,
+		// the hardcoded constructor should NOT fire. In SWF6, `color = 8` shadows
+		// `Color` and even after `delete color`, the constructor is not recoverable.
+		if (g_swf_version >= 6 && g_swf_version < 7) {
+			extern ActionVar* getVariable(char* var_name, size_t key_size);
+			// Check if a case-insensitive variable exists that shadows this constructor
+			int shadowed = 0;
+			for (int si = scope_depth - 1; si >= 0; si--) {
+				ActionVar* sv = getPropertyWithPrototype(scope_chain[si], ctor_name, ctor_name_len);
+				if (sv != NULL) {
+					if (sv->type != ACTION_STACK_VALUE_FUNCTION) shadowed = 1;
+					break;
+				}
+			}
+			if (!shadowed) {
+				ActionVar* gv = getVariable((char*)ctor_name, ctor_name_len);
+				if (gv != NULL && gv->type != ACTION_STACK_VALUE_STRING &&
+				    !(gv->type == ACTION_STACK_VALUE_STRING && gv->str_size == 0 && gv->data.string_data.heap_ptr == NULL)) {
+					if (gv->type != ACTION_STACK_VALUE_FUNCTION) shadowed = 1;
+				}
+			}
+			// Also check if _global.Color has been overwritten with a non-function
+			if (!shadowed && global_object != NULL) {
+				ActionVar* gp = getProperty(global_object, ctor_name, ctor_name_len);
+				if (gp != NULL && gp->type != ACTION_STACK_VALUE_FUNCTION) shadowed = 1;
+				// If _global.Color was deleted (not found), that's also shadowed
+				if (gp == NULL) {
+					// Check if it EVER existed by looking for case-insensitive match
+					for (u32 gi = 0; gi < global_object->num_used; gi++) {
+						if (global_object->properties[gi].name_length == ctor_name_len &&
+						    strcasecmp(global_object->properties[gi].name, ctor_name) == 0) {
+							// Found case-insensitive match — was it deleted/overwritten?
+							if (global_object->properties[gi].value.type != ACTION_STACK_VALUE_FUNCTION)
+								shadowed = 1;
+							break;
+						}
+					}
+				}
+			}
+			if (shadowed) {
+				pushUndefined(app_context);
+				return;
+			}
+		}
 		// AVM1 Color object: new Color(mc)
 		initColorPrototype(app_context);
 		ASObject* color_obj = allocObject(app_context, 4);
@@ -39351,6 +39395,34 @@ void actionNewObject(SWFAppContext* app_context)
 	}
 		else
 	{
+		// SWF6 case-insensitive check: if a scope/variable shadows the constructor
+		// with a non-function value, `new` should return undefined.
+		if (g_swf_version >= 6 && g_swf_version < 7) {
+			extern ActionVar* getVariable(char* var_name, size_t key_size);
+			// Check scope chain first
+			int ctor_shadowed = 0;
+			for (int si = scope_depth - 1; si >= 0; si--) {
+				if (scope_chain[si] != NULL) {
+					ActionVar* sv = getProperty(scope_chain[si], ctor_name, ctor_name_len);
+					if (sv != NULL) {
+						if (sv->type != ACTION_STACK_VALUE_FUNCTION) ctor_shadowed = 1;
+						break;
+					}
+				}
+			}
+			// Check variable table (case-insensitive for SWF6)
+			if (!ctor_shadowed) {
+				ActionVar* gv = getVariable((char*)ctor_name, ctor_name_len);
+				if (gv != NULL && !(gv->type == ACTION_STACK_VALUE_STRING && gv->str_size == 0 && gv->data.string_data.heap_ptr == NULL)) {
+					if (gv->type != ACTION_STACK_VALUE_FUNCTION) ctor_shadowed = 1;
+				}
+			}
+			if (ctor_shadowed) {
+				pushUndefined(app_context);
+				return;
+			}
+		}
+
 		// Try to find user-defined constructor function
 		// First check function registry, then _global object properties, then global variable table
 		ASFunction* ctor_func = lookupFunctionByName(ctor_name, ctor_name_len);
@@ -39695,10 +39767,8 @@ void actionNewObject(SWFAppContext* app_context)
 		}
 		else
 		{
-			// Unknown constructor - create generic object
-			ASObject* obj = allocObject(app_context, 8);
-			new_obj = obj;
-			PUSH(ACTION_STACK_VALUE_OBJECT, (u64) new_obj);
+			// Unknown constructor — Flash returns undefined for uncallable constructors
+			pushUndefined(app_context);
 			return;
 		}
 	}
