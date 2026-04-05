@@ -1,19 +1,23 @@
 # Gnash Test Suite Status
 
-Last updated: 2026-04-04
+Last updated: 2026-04-05
 
 ## Quick Summary
 
 | Sub-suite | Tests | Passing | Rate | Filtered | Filtered Rate | Ignored |
 |-----------|-------|---------|------|----------|---------------|---------|
-| **actionscript.all** | 190 | 68 | 35.8% | 68/181 | **37.6%** | 9 |
+| **actionscript.all** | 190 | 76 | 40.0% | 76/181 | **42.0%** | 9 |
 | **misc-mtasc.all** | 9 | 5 | 55.6% | — | — | — |
 | **misc-swfmill.all** | 14 | 11 | 78.6% | — | — | — |
-| **Total** | 213 | ~84 | ~39.4% | — | — | — |
+| **Total** | 213 | ~92 | ~43.2% | — | — | — |
 
-Note: actionscript.all counts from CI run (2026-04-04). misc-mtasc counts from local testing.
+Note: actionscript.all count = 68 (CI 2026-04-04) + 8 locally verified new passes. misc-mtasc from CI. Pending CI confirmation.
 
 Filtered results exclude 9 tests with all-accepted diffs (Math-v5/v6/v7/v8, ops-v8, Error-v5/v6/v7/v8) — see `ACCEPTED_DIFFS.md`. Remaining 3 misc-swfmill failures (dict_event, tags_after_last_showframe, jump_to_prev_block) are blocked on architectural limitations — see `incomplete/MISC_SWFMILL_PLAN.md`.
+
+### Latest fixes (2026-04-05)
+- **SWF5 version hiding via flash_flags** — SWF6+ classes (LocalConnection, NetConnection, NetStream, Video, Camera, etc.) and AsBroadcaster methods (addListener, removeListener, broadcastMessage, _listeners) now hidden in SWF5 via `flash_flags=0x0080`. Uses the version mask system (SWF5 mask 0x7480 hides bit 0x0080). **+5 tests: Key-v5, AsBroadcaster-v5, LocalConnection-v5, NetConnection-v5, Video-v5.**
+- **MovieClip.prototype.transform** — Registered as own property (undefined) on MovieClip.prototype so `hasOwnProperty("transform")` returns true. **+3 tests: flash-v5, flash-v6, flash-v7.**
 
 ### Latest fixes (2026-04-04)
 - **Dual Array constructor prototype unification** — `g_ctors[1].prototype_obj` now set to `g_array_prototype`, matching `g_array_constructor_static`. Fixes `constructor ==` and some `instanceof Array` checks. array-v5 improved from ~440/560 to ~448/560 (80.0%).
