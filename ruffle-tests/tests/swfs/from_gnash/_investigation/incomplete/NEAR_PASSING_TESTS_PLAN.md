@@ -32,12 +32,12 @@ This plan covers tests that are very close to passing (1-15 diffs) and were inve
 **Fix**: Added arguments array creation + setupArgumentsProps() in the DefineFunction2 path of `actionNewMethod`, gated on `!(func->flags & 0x0008)` (suppress_args).
 **Impact**: inheritance now PASSES (22/22). +1 test.
 
-## Fix 4: SWF6 Case-Insensitive Constructor Shadowing — MEDIUM (Color-v6, 4 lines)
+## Fix 4: SWF6 Case-Insensitive Constructor Shadowing — PARTIAL (commit ea3683bc)
 
 **Lines**: 165-168 in Color-v6
-**Root cause**: `actionNewObject` has hardcoded `strcmp(ctor_name, "Color") == 0` that bypasses variable resolution. In SWF6, `color = 8` (lowercase) should shadow the `Color` constructor via case-insensitive matching. `new Color()` should return undefined when the variable is overwritten or deleted.
-**Fix**: Before using hardcoded constructor path, check if a variable with the same name exists in scope chain (case-insensitive for SWF6). If it's a non-function, skip to the fallback. Also fix the "unknown constructor" fallback to push UNDEFINED instead of an empty object.
-**Impact**: Fixes 4 real diffs → Color-v6 goes to 165/171 → 171/171 PASS.
+**Root cause**: `actionNewObject` hardcoded constructors bypass variable resolution. SWF6 case-insensitive `color = 8` should shadow `Color`.
+**Fix**: Added scope chain + variable table shadowing checks before both hardcoded and general constructor lookups. Also changed unknown-constructor fallback to push undefined instead of creating empty object.
+**Impact**: 2 of 4 real diffs fixed (165→167/171). Remaining 2 diffs are post-delete case where Flash considers the constructor permanently gone — needs deeper SetVariable/delete/\_global interaction work.
 
 ## Investigated but NOT Fixable
 
