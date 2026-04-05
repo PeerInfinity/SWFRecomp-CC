@@ -19582,6 +19582,11 @@ MovieClip* g_current_context = NULL;
 // DefineFunction2 with this_obj=NULL. Consumed by generated code.
 MovieClip* g_event_this_mc = NULL;
 
+// Type of 'this' argument passed to Function.prototype.call/apply.
+// Set before calling advanced_func so builtin wrappers can distinguish
+// ASArray* from ASObject*. Reset after use. 0 = not set.
+static u8 g_call_this_type = 0;
+
 // Override 'this' — for passing arbitrary ActionVar (primitive, undefined) as 'this'
 // to DefineFunction2 when void* this_obj can't represent the value.
 ActionVar g_override_this = {0};
@@ -27405,6 +27410,14 @@ static void ensureGlobalInit(SWFAppContext* app_context)
 		}
 		setPropertyWithFlags(app_context, g_ctors[4].prototype_obj, "valueOf", 7, &vo_val, PROPERTY_FLAG_WRITABLE);
 		setPropertyWithFlags(app_context, g_ctors[4].prototype_obj, "toString", 8, &ts_val, PROPERTY_FLAG_WRITABLE);
+
+		// Array.prototype (g_ctors[1]) — unify with g_array_constructor_static
+		// Both constructors must share the same prototype_obj = g_array_prototype
+		// so that `instanceof Array` works regardless of which constructor is used.
+		{
+			ASObject* arr_proto = getVersionedArrayProto(app_context);
+			g_ctors[1].prototype_obj = arr_proto;
+		}
 	}
 
 	// ---- Phase 8c-2: Populate own_props on every constructor ----
@@ -45913,11 +45926,7 @@ static ActionVar builtin_array_method(SWFAppContext* app_context, ActionVar* arg
 
 	if (this_obj == NULL) return undef;
 
-	// Determine which method we are by looking at function name in registers
-	// The function's name is stored in the ASFunction struct
-	// We'll find it from g_array_proto_funcs by matching this_obj... actually,
-	// we need the method name. We can get it from the ASFunction that called us.
-	// The caller sets g_current_executing_func before calling us.
+	// Determine which method we are from the executing function's name
 	extern ASFunction* g_current_executing_func;
 	const char* method_name = NULL;
 	u32 method_name_len = 0;
@@ -45926,6 +45935,19 @@ static ActionVar builtin_array_method(SWFAppContext* app_context, ActionVar* arg
 		method_name_len = (u32)strlen(method_name);
 	}
 	if (method_name == NULL || method_name_len == 0) return undef;
+
+	// Dispatch to callArrayMethod if this_obj is an ASArray
+	// (invoked when array methods are called via Function.prototype.call/apply)
+	if (g_call_this_type == ACTION_STACK_VALUE_ARRAY) {
+		ASArray* arr = (ASArray*) this_obj;
+		int handled = callArrayMethod(app_context, arr, method_name, method_name_len, args, arg_count);
+		if (handled) {
+			// callArrayMethod pushes result onto stack; pop and return it
+			ActionVar result;
+			popVar(app_context, &result);
+			return result;
+		}
+	}
 
 	return undef;
 }
@@ -48187,7 +48209,10 @@ void actionCallMethod(SWFAppContext* app_context, char* str_buffer)
 					if (g_swf_version >= 6 && func->base_clip != NULL)
 						g_current_context = func->base_clip;
 
+					// Pass this-type so builtin wrappers can distinguish ASArray from ASObject
+					g_call_this_type = (num_args >= 1) ? args[0].type : 0;
 					ActionVar result = func->advanced_func(app_context, call_args, call_arg_count, registers, this_obj);
+					g_call_this_type = 0;
 					g_override_this_set = 0; // clear in case function didn't consume it
 
 					g_current_context = prev_ctx_call;
