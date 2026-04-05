@@ -16,6 +16,8 @@ Note: actionscript.all counts from CI run (2026-04-04). misc-mtasc counts from l
 Filtered results exclude 9 tests with all-accepted diffs (Math-v5/v6/v7/v8, ops-v8, Error-v5/v6/v7/v8) — see `ACCEPTED_DIFFS.md`. Remaining 3 misc-swfmill failures (dict_event, tags_after_last_showframe, jump_to_prev_block) are blocked on architectural limitations — see `incomplete/MISC_SWFMILL_PLAN.md`.
 
 ### Latest fixes (2026-04-04)
+- **Dual Array constructor prototype unification** — `g_ctors[1].prototype_obj` now set to `g_array_prototype`, matching `g_array_constructor_static`. Fixes `constructor ==` and some `instanceof Array` checks. array-v5 improved from ~440/560 to ~448/560 (80.0%).
+- **builtin_array_method dispatch infrastructure** — Added `g_call_this_type` and callArrayMethod dispatch for array methods invoked via Function.prototype.call in CallMethod. Doesn't help array-v5 yet (SWF5 .call() blocker — see ARRAY_V5_PLAN.md).
 - **Gnash misc-mtasc function_test PASS (21/21)** — Three fixes: (1) Array.prototype constructor property (file-scope g_array_constructor_static), (2) objectCallToString g_current_executing_func save/restore, (3) Array.prototype.toString stub returns "" instead of undefined. misc-mtasc now 5/9 passing.
 
 ### Latest fixes (2026-03-29)
