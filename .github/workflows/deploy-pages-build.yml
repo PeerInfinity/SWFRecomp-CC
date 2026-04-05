@@ -28,10 +28,11 @@ jobs:
         with:
           python-version: '3.x'
 
-      - name: Install swfmill
+      - name: Install dependencies
         run: |
           sudo apt-get update
           sudo apt-get install -y swfmill
+          pip install fonttools Pillow
 
       - name: Generate test SWFs
         run: |
