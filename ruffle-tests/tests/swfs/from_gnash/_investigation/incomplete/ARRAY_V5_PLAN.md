@@ -1,9 +1,9 @@
 # array-v5 Investigation Plan
 <!-- TESTS: array-v5 -->
 
-Last updated: 2026-03-29
+Last updated: 2026-04-04
 
-## Status: IN PROGRESS — 440/560 lines match (78.6%), 112 remaining failures
+## Status: IN PROGRESS — 448/560 lines match (80.0%), 112 remaining failures
 
 ---
 
@@ -19,6 +19,7 @@ The `array-v5` test exercises extensive Array operations (560 expected lines). C
 | 2026-03-20 (CI) | 405/560 (72.3%) | OOM fixed, Array.prototype methods registered |
 | 2026-03-20 (session) | 422/560 (75.4%) | +17 lines: HOLE join, length truncation, array delete |
 | 2026-03-29 (session) | 440/560 (78.6%) | +18 lines: HOLE sort, concat/splice densify, sortOn UNIQUESORT fix |
+| 2026-04-04 (session) | 448/560 (80.0%) | +8 lines: dual Array constructor prototype unification, sort stability |
 
 ## Completed Fixes
 
@@ -49,6 +50,12 @@ After splice operations, remaining HOLE elements are converted to UNDEFINED with
 ### 9. sortOn UNIQUESORT Return Value — FIXED (commit a2002c9a)
 `sortOn` with UNIQUESORT (without RETURNINDEXEDARRAY) now correctly sorts in-place and returns the array reference. Previously UNIQUESORT was incorrectly combined with the RETURNINDEXEDARRAY code path, returning an index array instead. +17 lines from `tostr(r)` checks.
 
+### 10. Dual Array Constructor Prototype — FIXED (commit 54f14500)
+`g_ctors[1]` (the Array constructor registered on `_global` via `ensureGlobalInit`) now has its `prototype_obj` set to `g_array_prototype`, matching `g_array_constructor_static`. Fixes `constructor ==` checks and some `instanceof` checks. +3 lines.
+
+### 11. builtin_array_method Dispatch Infrastructure — DONE (commit 54f14500)
+Added `g_call_this_type` global and dispatch logic in `builtin_array_method` so array prototype methods can forward to `callArrayMethod` when invoked via `Function.prototype.call` in the CallMethod path. Infrastructure is in place but doesn't help array-v5 because SWF5 uses a different bytecode path (see Blocker below).
+
 ## Remaining Failures (112 lines, categorized)
 
 ### Category A: typeof(f) == "undefined" (3 lines)
@@ -58,8 +65,9 @@ After splice operations, remaining HOLE elements are converted to UNDEFINED with
 
 ### Category B: Standalone prototype method calls (25 lines)
 **Lines**: 157-159, 161-163, 173, 176, 179-196 — pop(), concat(), slice() called via `.call()` in SWF5
-**Root cause**: SWF5 doesn't support Function.prototype.call/apply. `builtin_array_method` returns undefined.
-**Complexity**: High — SWF5 limitation, would need to add SWF5 call/apply to builtin_array_method
+**Root cause**: SWF5 `.call()` uses CallFunction bytecode path, not CallMethod. The Function.prototype.call stub (`g_fn_call_func`) has `advanced_func = builtin_noop_func` which returns undefined. The CallMethod "call" handler (which properly dispatches) is not reached.
+**Complexity**: High — requires implementing Function.prototype.call dispatch in the CallFunction path or making `builtin_noop_func` non-trivial.
+**BLOCKER**: See below.
 
 ### Category C: Sort ordering differences (~50 lines)
 **Lines**: 103, 106-109, 113-114, 334-342, 351-352, 377-380, 408-431, 450, 456, 459, 461-462
@@ -80,31 +88,44 @@ After splice operations, remaining HOLE elements are converted to UNDEFINED with
 
 ### Category G: instanceof Array / constructor (4 lines)
 **Lines**: 38, 42, 253-254, 458
-**Root cause**: Dual Array constructor (`g_array_constructor` vs `g_ctors[1]`), different prototype_obj.
+**Root cause**: Mixed — lines 38/42 are undefined `a` (Category A overlap). Line 253 `c.constructor` not found. Line 458 `r instanceof Array` where `r` from sortOn has wrong sort order (Category C overlap).
+**Partially fixed**: Dual constructor unification (commit 54f14500) improved some lines but 4 remain due to other root causes.
 
 ### Category H: __resolve + toString override (7 lines)
 **Lines**: 544-550, 557
+**Investigation results (2026-04-04)**: The `t` object in the test is an OBJECT type (not ARRAY), so the existing OBJECT __resolve handler already fires for lines 544-545 (now PASS in some runs). Lines 546-550 fail because `t[2] = "om"` doesn't persist when `t` is a plain object accessed via numeric index. Line 557 (`ret == "Array data"`) is a separate toString override issue on an array subclass.
 
 ### Other (2 lines)
 **Line 132**: `int(-2147483649)` wrapping behavior
 
+## BLOCKER: SWF5 Function.prototype.call/apply Dispatch
+
+**Problem**: When SWF5 code calls `Array.prototype.pop.call(b)`, the bytecode sequence uses GetMember to retrieve the `.call` function from Function.prototype, then invokes it directly. The `.call` function's `advanced_func` is `builtin_noop_func` which returns undefined.
+
+**What's needed**: Either:
+1. Make the `g_fn_call_func` advanced_func actually implement Function.prototype.call semantics (extract thisArg, build args, invoke wrapped function), OR
+2. Detect in `actionCallFunction` when the function being called IS `g_fn_call_func` and handle it specially
+
+**Impact**: Blocks Category B (25 lines) and Category E (18 lines) = 43 lines total.
+
+**Estimated effort**: Medium-high. Requires careful handling of this-arg extraction, scope management, and multiple function type paths.
+
 ## Key Finding: Dual Array Constructor
-Two separate Array constructors exist (`g_array_constructor` from `actionGetVariable` and `g_ctors[1]` from `ensureGlobalInit`). They have different `prototype_obj` pointers until both are initialized. This can cause `instanceof` mismatches.
+Two separate Array constructors exist (`g_array_constructor` from `actionGetVariable` and `g_ctors[1]` from `ensureGlobalInit`). They now share the same `prototype_obj` after the fix in commit 54f14500.
 
 ## Recommended Next Steps
 
 1. **Accept Gnash-specific sort diffs** — Category C sort lines (~50) confirmed as algorithm-dependent. Consider adding to accepted diffs.
-2. **Fix dual Array constructors** — Category G, ~4 lines. Moderate effort.
+2. **Implement Function.prototype.call** — Category B+E blocker. Would fix 43 lines but requires significant effort.
 3. **Accept ASSetPropFlags limitation** — Categories D (partial) and F. ASSetPropFlags on arrays is unimplemented.
-4. **Categories B+E blocked on SWF5** — 43 lines. Would need SWF5-compatible array method dispatch.
-5. **Category H needs __resolve on arrays** — 7 lines.
+4. **Category H deeper investigation** — The `t[2] = "om"` failure on plain objects with numeric properties needs investigation separate from __resolve.
 
 ## Test Details
 
 | Metric | Value |
 |--------|-------|
 | Expected output | 560 lines |
-| Current matching | ~440 lines (78.6%) |
+| Current matching | ~448 lines (80.0%) |
 | Remaining failures | ~112 lines |
 | Compilation time | ~72 seconds |
 | Script size | 70,731 lines (script_2.c) |
