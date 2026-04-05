@@ -275,7 +275,7 @@
         <main>
             <!-- Standalone drop zone (shown when no test is specified) -->
             <div id="standalone-section" class="standalone-view" style="display:none;">
-                <h2>Compare with Ruffle</h2>
+                <h2>View SWF in Ruffle</h2>
                 <p class="description">Drop a .swf file to play it in Ruffle</p>
                 <div class="drop-zone" id="dropZone">
                     <p>Drop a .swf file here</p>
@@ -340,8 +340,8 @@
         if (!testId) {
             // --- Standalone mode: show drop zone for Ruffle playback ---
             document.getElementById('standalone-section').style.display = 'block';
-            document.title = 'SWFRecomp - Compare with Ruffle';
-            document.getElementById('header-title').textContent = 'Compare with Ruffle';
+            document.title = 'SWFRecomp - View SWF in Ruffle';
+            document.getElementById('header-title').textContent = 'View SWF in Ruffle';
 
             var dropZone = document.getElementById('dropZone');
             var fileInput = document.getElementById('fileInput');
