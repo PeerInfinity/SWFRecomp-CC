@@ -2,9 +2,9 @@
 
 *See [RUFFLE_RESULTS_FILTERED.md](RUFFLE_RESULTS_FILTERED.md) for results with ignored tests excluded.*
 
-**Commit:** `bb4ebc9a2da5`  
-**Date:** 2026-04-05 20:14 UTC  
-**Total duration:** 5h20m54s
+**Commit:** `4734c9abe6ef`  
+**Date:** 2026-04-05 22:40 UTC  
+**Total duration:** 5h17m21s
 
 ## Results by Suite
 
@@ -25,14 +25,14 @@
 | Suite | Matching | Expected | Accuracy |
 |-------|--------:|---------:|---------:|
 | avm1 | 81,321 | 91,594 | 88.8% |
-| from_gnash/actionscript.all | 12,458 | 16,957 | 73.5% |
+| from_gnash/actionscript.all | 12,447 | 16,957 | 73.4% |
 | from_gnash/misc-ming.all | 1,646 | 3,388 | 48.6% |
 | from_gnash/misc-mtasc.all | 170 | 231 | 73.6% |
 | from_gnash/misc-swfc.all | 223 | 499 | 44.7% |
 | from_gnash/misc-swfmill.all | 25 | 29 | 86.2% |
 | from_shumway | 35 | 256 | 13.7% |
 | from_shumway/avm1 | 118 | 311 | 37.9% |
-| **Total** | **95,996** | **113,265** | **84.8%** |
+| **Total** | **95,985** | **113,265** | **84.7%** |
 
 ## Failure Breakdown
 
@@ -62,12 +62,12 @@ Tests with `output_mismatch` status but ≥80% of expected lines matching.
 | from_gnash/actionscript.all | Math-v5 | 98% |
 | from_gnash/actionscript.all | Math-v6 | 98% |
 | from_gnash/actionscript.all | Inheritance-v8 | 98% |
+| from_gnash/actionscript.all | Color-v6 | 98% |
 | avm1 | movieclip_library_state_values | 97% |
 | avm1 | movieclip_hittest_shapeflag | 97% |
 | from_gnash/actionscript.all | ops-v8 | 97% |
 | from_gnash/actionscript.all | Inheritance-v7 | 97% |
 | avm1 | globals_swf5 | 97% |
-| from_gnash/actionscript.all | Color-v6 | 96% |
 | from_gnash/actionscript.all | ExternalInterface-v8 | 96% |
 | from_gnash/misc-ming.all | DefineEditTextTest | 95% |
 | from_gnash/actionscript.all | NetStream-v6 | 95% |
@@ -93,32 +93,30 @@ Tests with `output_mismatch` status but ≥80% of expected lines matching.
 | from_gnash/actionscript.all | toString_valueOf-v8 | 86% |
 | from_gnash/actionscript.all | Error-v5 | 86% |
 | from_gnash/actionscript.all | toString_valueOf-v6 | 85% |
+| from_gnash/actionscript.all | Inheritance-v5 | 85% |
 | from_gnash/actionscript.all | Rectangle-v8 | 84% |
-| from_gnash/actionscript.all | Inheritance-v5 | 84% |
 | from_gnash/actionscript.all | ColorTransform-v8 | 84% |
 | from_gnash/misc-ming.all | matrix_test | 84% |
 | from_shumway/avm1 | nativeinheritance | 83% |
+| from_gnash/actionscript.all | System-v7 | 83% |
+| from_gnash/actionscript.all | System-v8 | 83% |
+| from_gnash/actionscript.all | System-v6 | 83% |
 | from_gnash/actionscript.all | Matrix-v8 | 83% |
-| from_gnash/actionscript.all | System-v7 | 82% |
-| from_gnash/actionscript.all | System-v8 | 82% |
-| from_gnash/actionscript.all | System-v6 | 82% |
 | from_gnash/actionscript.all | Number-v7 | 81% |
 | from_gnash/actionscript.all | Number-v8 | 81% |
 | from_gnash/actionscript.all | AsBroadcaster-v6 | 81% |
 | from_gnash/misc-ming.all | shape_test | 81% |
 | from_gnash/actionscript.all | HitTest-v8 | 81% |
+| from_gnash/actionscript.all | array-v5 | 80% |
 | from_gnash/misc-ming.all | RollOverOutTest | 80% |
 
 ## Changes Since Last Run
 
 | Suite | Newly Passing | Newly Failing | Lines Improved | Lines Regressed |
 |-------|-------------:|-------------:|--------------:|----------------:|
-| from_gnash/actionscript.all | - | - | 9 | - |
-| from_gnash/misc-mtasc.all | 1 | - | 4 | - |
+| from_gnash/actionscript.all | - | - | 11 | 22 |
 
-**from_gnash/misc-mtasc.all — newly passing:** `super_test1`
-
-*Comparing `efe5336fbda2` → `bb4ebc9a2da5`*
+*Comparing `bb4ebc9a2da5` → `4734c9abe6ef`*
 
 ## Flash-Spec Results
 
@@ -133,55 +131,55 @@ Tests verified against Flash's actual output (`output.flash.txt`).
 ### avm1
 
 - **Pass:** 571/620 (92.1%)
-- **Duration:** 3h17m05s across 30 shards
+- **Duration:** 3h14m44s across 30 shards
 - **Lines:** 81,321/91,594 matching (88.8%)
-- **Avg test duration:** 19.0s — slowest: `timeout` (48.5s)
+- **Avg test duration:** 18.8s — slowest: `timeout` (48.4s)
 
 ### from_gnash/actionscript.all
 
 - **Pass:** 76/190 (40.0%)
-- **Duration:** 1h09m12s across 30 shards
-- **Lines:** 12,458/16,957 matching (73.5%)
-- **Avg test duration:** 21.8s — slowest: `array-v5` (44.6s)
+- **Duration:** 1h08m28s across 30 shards
+- **Lines:** 12,447/16,957 matching (73.4%)
+- **Avg test duration:** 21.6s — slowest: `array-v5` (43.4s)
 
 ### from_gnash/misc-ming.all
 
 - **Pass:** 8/58 (13.8%)
-- **Duration:** 20m22s across 30 shards
+- **Duration:** 20m12s across 30 shards
 - **Lines:** 1,646/3,388 matching (48.6%)
-- **Avg test duration:** 21.0s — slowest: `matrix_test` (70.8s)
+- **Avg test duration:** 20.8s — slowest: `matrix_test` (73.2s)
 
 ### from_gnash/misc-mtasc.all
 
 - **Pass:** 6/9 (66.7%)
-- **Duration:** 2m55s across 30 shards
+- **Duration:** 2m52s across 30 shards
 - **Lines:** 170/231 matching (73.6%)
-- **Avg test duration:** 19.4s — slowest: `levels` (22.2s)
+- **Avg test duration:** 19.1s — slowest: `levels` (22.0s)
 
 ### from_gnash/misc-swfc.all
 
 - **Pass:** 2/16 (12.5%)
 - **Duration:** 5m09s across 30 shards
 - **Lines:** 223/499 matching (44.7%)
-- **Avg test duration:** 19.3s — slowest: `movieclip_destruction_test2` (20.3s)
+- **Avg test duration:** 19.3s — slowest: `opcode_guard_test2` (21.6s)
 
 ### from_gnash/misc-swfmill.all
 
 - **Pass:** 11/14 (78.6%)
-- **Duration:** 4m20s across 30 shards
+- **Duration:** 4m17s across 30 shards
 - **Lines:** 25/29 matching (86.2%)
-- **Avg test duration:** 18.5s — slowest: `initaction_in_definesprite` (19.8s)
+- **Avg test duration:** 18.4s — slowest: `zeroframe_definesprite` (19.3s)
 
 ### from_shumway
 
 - **Pass:** 17/47 (36.2%)
-- **Duration:** 14m36s across 30 shards
+- **Duration:** 14m28s across 30 shards
 - **Lines:** 35/256 matching (13.7%)
-- **Avg test duration:** 18.6s — slowest: `lzma` (20.1s)
+- **Avg test duration:** 18.4s — slowest: `fscommand1` (20.0s)
 
 ### from_shumway/avm1
 
 - **Pass:** 12/23 (52.2%)
-- **Duration:** 7m12s across 30 shards
+- **Duration:** 7m08s across 30 shards
 - **Lines:** 118/311 matching (37.9%)
-- **Avg test duration:** 18.7s — slowest: `text-bind` (20.4s)
+- **Avg test duration:** 18.6s — slowest: `watch` (19.8s)
