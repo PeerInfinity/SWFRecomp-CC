@@ -830,6 +830,10 @@ static ASFunction g_wrapper_toString_func;
 static int g_wrapper_toString_init = 0;
 static ASFunction g_fn_apply_func;
 static ASFunction g_fn_call_func;
+// Track the function that .call/.apply was retrieved from via GetMember.
+// Set when GetMember on a FUNCTION returns call/apply; consumed by the
+// empty-method-name path in CallMethod.
+static ASFunction* g_getmember_call_target = NULL;
 
 // --- Object.prototype.watch() / unwatch() watcher table ---
 #define MAX_WATCH_ENTRIES 64
@@ -37520,6 +37524,12 @@ void actionGetMember(SWFAppContext* app_context)
 						ActionVar* pv2 = getPropertyWithPrototype(vfn_proto, prop_name, prop_name_len);
 						if (pv2 != NULL) {
 							pushVar(app_context, pv2);
+							// Track target for .call/.apply retrieved via GetMember
+							if (pv2->type == ACTION_STACK_VALUE_FUNCTION) {
+								ASFunction* retrieved = (ASFunction*)(uintptr_t)pv2->data.numeric_value;
+								if (retrieved == &g_fn_call_func || retrieved == &g_fn_apply_func)
+									g_getmember_call_target = func;
+							}
 						} else {
 							pushUndefined(app_context);
 						}
@@ -47286,6 +47296,95 @@ void actionCallMethod(SWFAppContext* app_context, char* str_buffer)
 		{
 			// Object is a function - invoke it
 			ASFunction* func = lookupFunctionFromVar(&obj_var);
+
+			// Detect .call/.apply invoked via GetMember + CallMethod(undefined)
+			// (SWF5 pattern: pop.call(b) → GetMember("call") → CallMethod(undefined))
+			if (func != NULL && g_getmember_call_target != NULL &&
+			    (func == &g_fn_call_func || func == &g_fn_apply_func))
+			{
+				int is_apply = (func == &g_fn_apply_func);
+				ASFunction* target_func = g_getmember_call_target;
+				g_getmember_call_target = NULL;
+
+				// Extract thisArg and build call_args (same logic as the "call"/"apply" handlers)
+				void* this_obj = NULL;
+				u8 this_type = 0;
+				if (num_args >= 1) {
+					this_type = args[0].type;
+					if (args[0].type == ACTION_STACK_VALUE_MOVIECLIP) {
+						MovieClip* call_mc = (MovieClip*)(uintptr_t) args[0].data.numeric_value;
+						g_event_this_mc = call_mc;
+						if (call_mc && call_mc->dynamic_props)
+							this_obj = (void*) call_mc->dynamic_props;
+					} else if (args[0].type == ACTION_STACK_VALUE_OBJECT ||
+					           args[0].type == ACTION_STACK_VALUE_ARRAY) {
+						this_obj = (void*)(uintptr_t) args[0].data.numeric_value;
+					} else if (args[0].type == ACTION_STACK_VALUE_UNDEFINED ||
+					           args[0].type == ACTION_STACK_VALUE_NULL) {
+						this_obj = (void*) global_object;
+					}
+				}
+
+				ActionVar* call_args = NULL;
+				u32 call_arg_count = 0;
+				if (is_apply && num_args >= 2 && args[1].type == ACTION_STACK_VALUE_ARRAY) {
+					ASArray* arr = (ASArray*)(uintptr_t) args[1].data.numeric_value;
+					if (arr != NULL) {
+						call_arg_count = arr->length;
+						if (call_arg_count > 0) {
+							call_args = (ActionVar*) HALLOC(sizeof(ActionVar) * call_arg_count);
+							for (u32 i = 0; i < call_arg_count; i++) {
+								ActionVar* elem = getArrayElement(arr, i);
+								call_args[i] = elem ? *elem : (ActionVar){.type = ACTION_STACK_VALUE_UNDEFINED};
+							}
+						}
+					}
+				} else if (!is_apply && num_args > 1) {
+					call_arg_count = num_args - 1;
+					call_args = (ActionVar*) HALLOC(sizeof(ActionVar) * call_arg_count);
+					for (u32 i = 0; i < call_arg_count; i++)
+						call_args[i] = args[i + 1];
+				}
+
+				// Invoke the target function
+				ActionVar result = {0};
+				result.type = ACTION_STACK_VALUE_UNDEFINED;
+				if (target_func->function_type == 2 && target_func->advanced_func != NULL) {
+					ActionVar* registers = NULL;
+					if (target_func->register_count > 0)
+						registers = (ActionVar*) HCALLOC(target_func->register_count, sizeof(ActionVar));
+					ASFunction* prev_ef = g_current_executing_func;
+					g_current_executing_func = target_func;
+					if (this_obj != NULL) pushSuperContext(this_obj, 1);
+					g_call_this_type = this_type;
+					g_call_depth++;
+					result = target_func->advanced_func(app_context, call_args, call_arg_count, registers, this_obj);
+					g_call_depth--;
+					g_call_this_type = 0;
+					if (this_obj != NULL) popSuperContext();
+					g_current_executing_func = prev_ef;
+					if (registers != NULL) FREE(registers);
+				} else if (target_func->function_type == 1 && target_func->simple_func != NULL) {
+					// Type 1: push args onto stack, set this
+					for (int i = (int)call_arg_count - 1; i >= 0; i--)
+						pushVar(app_context, &call_args[i]);
+					ActionVar this_var = {0};
+					this_var.type = ACTION_STACK_VALUE_OBJECT;
+					this_var.data.numeric_value = (u64)(uintptr_t)this_obj;
+					setVariableByName("this", &this_var);
+					if (this_obj != NULL) pushSuperContext(this_obj, 1);
+					g_call_depth++;
+					result = ((ActionVar(*)(SWFAppContext*))target_func->simple_func)(app_context);
+					g_call_depth--;
+					if (this_obj != NULL) popSuperContext();
+				}
+
+				if (call_args != NULL) FREE(call_args);
+				if (args != NULL) FREE(args);
+				pushVar(app_context, &result);
+				return;
+			}
+			g_getmember_call_target = NULL;  // Clear if not consumed
 
 			if (func != NULL && g_call_depth >= g_max_call_depth - 1)
 			{
