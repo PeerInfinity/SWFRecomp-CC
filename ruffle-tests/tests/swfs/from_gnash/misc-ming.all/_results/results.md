@@ -1,10 +1,10 @@
 # Ruffle Test Results (Unfiltered)
 
-**Date**: 2026-04-04 22:33 UTC
+**Date**: 2026-04-05 05:39 UTC
 
-**Git SHA**: `2d367db889`
+**Git SHA**: `bb3378dad6`
 
-**Run Duration**: 20m 16s
+**Run Duration**: 20m 8s
 
 ## Summary
 
@@ -30,14 +30,14 @@
 
 | # | Test | Lines | Duration | Notes |
 |---|------|-------|----------|-------|
-| 1 | `VarAndCharClashTest` | 13 | 18.9s |  |
-| 2 | `Video-EmbedSquareTest` | 2 | 19.4s |  |
-| 3 | `getTimer_test` | 8 | 19.2s |  |
-| 4 | `masks_test2` | 10 | 18.8s |  |
-| 5 | `morph_test1` | 0 | 18.5s |  |
-| 6 | `move_object_test` | 11 | 18.8s |  |
-| 7 | `multi_doactions_and_goto_frame_test` | 6 | 18.8s |  |
-| 8 | `unload_movieclip_test1` | 6 | 18.8s |  |
+| 1 | `VarAndCharClashTest` | 13 | 18.7s |  |
+| 2 | `Video-EmbedSquareTest` | 2 | 19.0s |  |
+| 3 | `getTimer_test` | 8 | 19.1s |  |
+| 4 | `masks_test2` | 10 | 18.7s |  |
+| 5 | `morph_test1` | 0 | 18.8s |  |
+| 6 | `move_object_test` | 11 | 19.1s |  |
+| 7 | `multi_doactions_and_goto_frame_test` | 6 | 19.2s |  |
+| 8 | `unload_movieclip_test1` | 6 | 18.9s |  |
 
 ## Near-Passing Tests
 
@@ -80,7 +80,7 @@ Tests with output mismatch but >= 50% line match rate (low-hanging fruit).
 
 | # | Test | Duration | Notes |
 |---|------|----------|-------|
-| 1 | `PlaceObject2Test` | 21.2s |  |
+| 1 | `PlaceObject2Test` | 20.6s |  |
 
 ## Runtime Errors
 
