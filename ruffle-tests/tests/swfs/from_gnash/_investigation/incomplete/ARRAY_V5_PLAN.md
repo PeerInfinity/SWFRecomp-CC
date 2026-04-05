@@ -19,7 +19,7 @@ The `array-v5` test exercises extensive Array operations (560 expected lines). C
 | 2026-03-20 (CI) | 405/560 (72.3%) | OOM fixed, Array.prototype methods registered |
 | 2026-03-20 (session) | 422/560 (75.4%) | +17 lines: HOLE join, length truncation, array delete |
 | 2026-03-29 (session) | 440/560 (78.6%) | +18 lines: HOLE sort, concat/splice densify, sortOn UNIQUESORT fix |
-| 2026-04-04 (session) | 448/560 (80.0%) | +8 lines: dual Array constructor prototype unification, sort stability |
+| 2026-04-04 (CI) | 448/560 (80.0%) | +8 vs prior: includes inter-session fixes; this session: dual Array constructor prototype unification (+3 local) |
 
 ## Completed Fixes
 
