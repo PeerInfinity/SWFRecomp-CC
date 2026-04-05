@@ -1,41 +1,28 @@
 # Ruffle Test Results Diff
 
-**Previous:** `bb3378dad6c9` (2026-04-05T05:39:03.070396+00:00)
-**Current:** `64854045e7ed` (2026-04-05T18:15:03.514957+00:00)
+**Previous:** `64854045e7ed` (2026-04-05T18:15:03.514957+00:00)
+**Current:** `efe5336fbda2` (2026-04-05T19:08:08.666437+00:00)
 
 ## Summary
 
 | Metric | Previous | Current | Delta |
 |--------|----------|---------|-------|
-| Passing | 68 | 74 | +6 |
+| Passing | 74 | 76 | +2 |
 | Total | 190 | 190 | 0 |
-| Pass rate | 35.8% | 38.9% | +3.1% |
-| Mismatched lines | 4532 | 4512 | -20 |
-|   Decreased | | | -26 |
-|   Increased | | | +6 |
+| Pass rate | 38.9% | 40.0% | +1.1% |
+| Mismatched lines | 4512 | 4508 | -4 |
+|   Decreased | | | -6 |
+|   Increased | | | +2 |
 
-## Newly Passing (8)
+## Newly Passing (2)
 
 | Test | Previous Status | Lines (prev) | Lines (now) |
 |------|----------------|--------------|-------------|
-| `AsBroadcaster-v5` | output_mismatch | 8/11 | 11/11 |
-| `Key-v5` | output_mismatch | 47/51 | 51/51 |
-| `LocalConnection-v5` | output_mismatch | 4/7 | 7/7 |
-| `NetConnection-v5` | output_mismatch | 4/7 | 7/7 |
-| `Video-v5` | output_mismatch | 4/7 | 7/7 |
-| `flash-v5` | output_mismatch | 7/10 | 10/10 |
-| `flash-v6` | output_mismatch | 7/10 | 10/10 |
-| `flash-v7` | output_mismatch | 7/10 | 10/10 |
-
-## Newly Failing (2)
-
-| Test | New Status | Lines (prev) | Lines (now) |
-|------|-----------|--------------|-------------|
-| `Camera-v5` | output_mismatch | 7/7 | 4/7 |
-| `TextSnapshot-v5` | output_mismatch | 7/7 | 4/7 |
+| `Camera-v5` | output_mismatch | 4/7 | 7/7 |
+| `TextSnapshot-v5` | output_mismatch | 4/7 | 7/7 |
 
 ## Line Count Changed (1)
 
 | Test | Status | Lines (prev) | Lines (now) | Diff |
 |------|--------|--------------|-------------|------|
-| `MovieClip-v5` | output_mismatch | 237/363 | 238/363 | -1 |
+| `array-v5` | output_mismatch | 448/560 | 446/560 | +2 |

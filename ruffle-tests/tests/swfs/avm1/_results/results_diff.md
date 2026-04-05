@@ -1,29 +1,27 @@
 # Ruffle Test Results Diff
 
-**Previous:** `bb3378dad6c9` (2026-04-05T05:39:03.050034+00:00)
-**Current:** `64854045e7ed` (2026-04-05T18:15:03.494341+00:00)
+**Previous:** `64854045e7ed` (2026-04-05T18:15:03.494341+00:00)
+**Current:** `efe5336fbda2` (2026-04-05T19:08:08.645722+00:00)
 
 ## Summary
 
 | Metric | Previous | Current | Delta |
 |--------|----------|---------|-------|
-| Passing | 572 | 569 | -3 |
+| Passing | 569 | 571 | +2 |
 | Total | 620 | 620 | 0 |
-| Pass rate | 92.3% | 91.8% | -0.5% |
-| Mismatched lines | 10262 | 10383 | +121 |
-|   Increased | | | +121 |
+| Pass rate | 91.8% | 92.1% | +0.3% |
+| Mismatched lines | 10383 | 10273 | -110 |
+|   Decreased | | | -110 |
 
-## Newly Failing (3)
+## Newly Passing (2)
 
-| Test | New Status | Lines (prev) | Lines (now) |
-|------|-----------|--------------|-------------|
-| `globals_swf5` | output_mismatch | 304/304 | 274/304 |
-| `printjob_props_swf5` | output_mismatch | 45/45 | 3/45 |
-| `textsnapshot_props_swf5` | output_mismatch | 56/56 | 9/56 |
+| Test | Previous Status | Lines (prev) | Lines (now) |
+|------|----------------|--------------|-------------|
+| `printjob_props_swf5` | output_mismatch | 3/45 | 45/45 |
+| `textsnapshot_props_swf5` | output_mismatch | 9/56 | 56/56 |
 
-## Line Count Changed (2)
+## Line Count Changed (1)
 
 | Test | Status | Lines (prev) | Lines (now) | Diff |
 |------|--------|--------------|-------------|------|
-| `global_proto_decls` | output_mismatch | 803/4497 | 803/4497 | 0 |
-| `global_instance_decls` | output_mismatch | 16/758 | 14/758 | +2 |
+| `globals_swf5` | output_mismatch | 274/304 | 295/304 | -21 |
