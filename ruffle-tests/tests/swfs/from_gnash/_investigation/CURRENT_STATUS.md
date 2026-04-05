@@ -11,7 +11,7 @@ Last updated: 2026-04-05
 | **misc-swfmill.all** | 14 | 11 | 78.6% | — | — | — |
 | **Total** | 213 | ~92 | ~43.2% | — | — | — |
 
-Note: actionscript.all count = 68 (CI 2026-04-04) + 8 locally verified new passes. misc-mtasc from CI. Pending CI confirmation.
+Note: All counts confirmed by CI run (2026-04-05). AVM1 suite: 571/620 (92.1%), down 1 from 572 due to globals_swf5 Ruffle-vs-Flash difference (documented in RUFFLE_VS_FLASH_DIFFERENCES.md).
 
 Filtered results exclude 9 tests with all-accepted diffs (Math-v5/v6/v7/v8, ops-v8, Error-v5/v6/v7/v8) — see `ACCEPTED_DIFFS.md`. Remaining 3 misc-swfmill failures (dict_event, tags_after_last_showframe, jump_to_prev_block) are blocked on architectural limitations — see `incomplete/MISC_SWFMILL_PLAN.md`.
 
