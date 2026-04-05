@@ -11407,6 +11407,12 @@ static void initMovieClipPrototype(SWFAppContext* app_context)
 		en_val.data.numeric_value = 1;
 		setProperty(app_context, proto, "enabled", 7, &en_val);
 	}
+	// Set MovieClip.prototype.transform = undefined (own property for hasOwnProperty checks)
+	{
+		ActionVar undef_val = {0};
+		undef_val.type = ACTION_STACK_VALUE_UNDEFINED;
+		setProperty(app_context, proto, "transform", 9, &undef_val);
+	}
 
 	// Mark all methods and __proto__ as DontEnum (but NOT enabled — it's enumerable)
 	for (u32 i = 0; i < proto->num_used; i++)
