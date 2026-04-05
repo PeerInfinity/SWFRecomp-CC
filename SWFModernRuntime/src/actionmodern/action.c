@@ -48256,11 +48256,18 @@ void actionCallMethod(SWFAppContext* app_context, char* str_buffer)
 					if (g_swf_version >= 6 && func->base_clip != NULL)
 						g_current_context = func->base_clip;
 
+					// Push super context so super keyword works inside .call()
+					if (this_obj != NULL)
+						pushSuperContext(this_obj, 1);
+
 					// Pass this-type so builtin wrappers can distinguish ASArray from ASObject
 					g_call_this_type = (num_args >= 1) ? args[0].type : 0;
 					ActionVar result = func->advanced_func(app_context, call_args, call_arg_count, registers, this_obj);
 					g_call_this_type = 0;
 					g_override_this_set = 0; // clear in case function didn't consume it
+
+					if (this_obj != NULL)
+						popSuperContext();
 
 					g_current_context = prev_ctx_call;
 					for (u32 ci = 0; ci < captured_count; ci++) {
@@ -48512,8 +48519,15 @@ void actionCallMethod(SWFAppContext* app_context, char* str_buffer)
 					if (g_swf_version >= 6 && func->base_clip != NULL)
 						g_current_context = func->base_clip;
 
+					// Push super context so super keyword works inside .apply()
+					if (this_obj != NULL)
+						pushSuperContext(this_obj, 1);
+
 					ActionVar result = func->advanced_func(app_context, apply_args, apply_arg_count, registers, this_obj);
 					g_override_this_set = 0; // clear in case function didn't consume it
+
+					if (this_obj != NULL)
+						popSuperContext();
 
 					g_current_context = prev_ctx_ap2;
 					for (u32 ci = 0; ci < captured_count_ap2; ci++) {
