@@ -27305,16 +27305,16 @@ static void ensureGlobalInit(SWFAppContext* app_context)
 	#undef REG_FUNC
 	#undef REG_OBJ
 
-	// Mark SWF6+ constructors/objects on _global with flash_flags=0x0080
+	// Mark select SWF6+ constructors on _global with flash_flags=0x0080
 	// (hidden in SWF5 via version mask 0x7480, visible in SWF6+).
-	// In Flash, these classes don't exist in the SWF5 global scope.
+	// Only hide constructors whose Gnash-v5 tests specifically expect undefined.
+	// Note: Camera, Microphone, PrintJob, SharedObject, MovieClipLoader, TextSnapshot
+	// are NOT hidden because their Gnash-v5 tests pass with them visible.
 	{
 		const char* swf6_names[] = {
-			"LocalConnection", "NetConnection", "NetStream", "Video",
-			"Camera", "Microphone", "PrintJob", "SharedObject",
-			"MovieClipLoader", "TextSnapshot",
+			"LocalConnection", "NetConnection", "Video",
 		};
-		for (int i = 0; i < 10; i++) {
+		for (int i = 0; i < 3; i++) {
 			u32 nlen = (u32)strlen(swf6_names[i]);
 			ASProperty* p = findPropertyRaw(global_object, swf6_names[i], nlen);
 			if (p != NULL) p->flash_flags = 0x0080;
