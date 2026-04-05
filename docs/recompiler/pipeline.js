@@ -513,12 +513,15 @@ function handleFile(file) {
 let demoList = { trace: [], graphics: [] };
 let selectedDemo = null;
 
-// Load demo manifest
-fetch("./demos.json").then(r => r.json()).then(data => {
-    demoList = data;
+// Load demo list from shared catalog
+fetch("../catalog.json").then(r => r.json()).then(data => {
+    var tests = data.tests || [];
+    demoList = {
+        trace: tests.filter(t => t.type === "trace").map(t => t.name),
+        graphics: tests.filter(t => t.type === "graphics").map(t => t.name),
+    };
     updateDemoSearch();
 }).catch(() => {
-    // Fallback if demos.json doesn't exist
     demoList = { trace: ["add_swf_4"], graphics: ["keyboard_input"] };
     updateDemoSearch();
 });
