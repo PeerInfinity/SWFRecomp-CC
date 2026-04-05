@@ -80,10 +80,6 @@ jobs:
             fi
           done
 
-          # Copy recompiler demo SWFs from test generators
-          cp SWFRecomp/tests/add_swf_4/test.swf docs/recompiler/add.swf
-          cp SWFRecomp/tests/graphics/keyboard_input/test.swf docs/recompiler/keyboard_input.swf
-
       - name: Install WASI-SDK
         run: |
           WASI_VERSION=30
