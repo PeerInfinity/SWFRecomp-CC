@@ -376,12 +376,68 @@
                     document.getElementById('standalone-filename').style.display = 'block';
                     document.getElementById('standalone-ruffle').style.display = 'block';
                     dropZone.style.display = 'none';
-                    loadRuffleWithData(document.getElementById('standalone-ruffle-container'), swfBytes);
+                    var container = document.getElementById('standalone-ruffle-container');
+
+                    // For CWS (zlib-compressed), decompress to get dimensions
+                    var sig = String.fromCharCode(swfBytes[0], swfBytes[1], swfBytes[2]);
+                    if (sig === 'CWS' && typeof DecompressionStream !== 'undefined') {
+                        var compressed = swfBytes.slice(8);
+                        var ds = new DecompressionStream('deflate');
+                        var writer = ds.writable.getWriter();
+                        writer.write(compressed);
+                        writer.close();
+                        new Response(ds.readable).arrayBuffer().then(function(buf) {
+                            // Build fake uncompressed header for dimension parsing
+                            var decompressed = new Uint8Array(buf);
+                            var fws = new Uint8Array(8 + decompressed.length);
+                            fws[0] = 0x46; fws[1] = 0x57; fws[2] = 0x53; // FWS
+                            fws.set(swfBytes.slice(3, 8), 3);
+                            fws.set(decompressed, 8);
+                            loadRuffleWithData(container, swfBytes, fws);
+                        }).catch(function() {
+                            loadRuffleWithData(container, swfBytes, null);
+                        });
+                    } else {
+                        loadRuffleWithData(container, swfBytes, swfBytes);
+                    }
                 };
                 reader.readAsArrayBuffer(file);
             }
 
-            function loadRuffleWithData(container, swfBytes) {
+            function parseSwfDimensions(swfBytes) {
+                // Parse SWF header RECT to get stage dimensions in pixels
+                // Header: 3-byte sig, 1-byte version, 4-byte length, then RECT
+                try {
+                    var data = swfBytes;
+                    // Handle compressed SWFs
+                    var sig = String.fromCharCode(data[0], data[1], data[2]);
+                    if (sig !== 'FWS') return null;
+                    // RECT starts at byte 8
+                    var bitPos = 0;
+                    var bytePos = 8;
+                    function readBits(n) {
+                        var val = 0;
+                        for (var i = 0; i < n; i++) {
+                            var byte = data[bytePos + (bitPos >> 3)];
+                            var bit = (byte >> (7 - (bitPos & 7))) & 1;
+                            val = (val << 1) | bit;
+                            bitPos++;
+                        }
+                        return val;
+                    }
+                    var nBits = readBits(5);
+                    var xMin = readBits(nBits); // twips
+                    var xMax = readBits(nBits);
+                    var yMin = readBits(nBits);
+                    var yMax = readBits(nBits);
+                    var width = (xMax - xMin) / 20;
+                    var height = (yMax - yMin) / 20;
+                    if (width > 0 && height > 0) return { width: width, height: height };
+                } catch (e) {}
+                return null;
+            }
+
+            function loadRuffleWithData(container, swfBytes, headerBytes) {
                 container.innerHTML = '<div style="padding:20px;color:#888;text-align:center;">Loading Ruffle...</div>';
                 var ruffleScript = document.createElement('script');
                 ruffleScript.src = 'https://unpkg.com/@ruffle-rs/ruffle';
@@ -390,7 +446,15 @@
                     var ruffle = window.RufflePlayer.newest();
                     var player = ruffle.createPlayer();
                     player.style.width = '100%';
-                    player.style.height = '400px';
+                    // Match comparison page sizing: compute height from SWF aspect ratio
+                    var dims = headerBytes ? parseSwfDimensions(headerBytes) : null;
+                    if (dims) {
+                        var ruffleWidth = container.clientWidth;
+                        var ruffleHeight = Math.round(ruffleWidth * dims.height / dims.width);
+                        player.style.height = ruffleHeight + 'px';
+                    } else {
+                        player.style.height = '400px';
+                    }
                     container.appendChild(player);
                     player.load({ data: swfBytes });
                 };
