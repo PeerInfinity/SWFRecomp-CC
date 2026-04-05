@@ -50,6 +50,7 @@ jobs:
               -I"${SWFMODERN_ROOT}/lib/c-hashmap"
               -I"${SWFMODERN_ROOT}/lib/o1heap"
               -I"${SWFMODERN_SRC}/actionmodern"
+              -I"${SWFMODERN_ROOT}/third_party/libtess2"
               -mllvm -wasm-enable-sjlj
               -matomics -mbulk-memory
               -std=gnu17
