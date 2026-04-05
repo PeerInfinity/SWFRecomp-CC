@@ -40062,6 +40062,18 @@ void actionNewMethod(SWFAppContext* app_context)
 						scope_chain[scope_depth++] = local_scope;
 					}
 
+					// Set up arguments object (with callee) if not suppressed
+					if (!(func->flags & 0x0008)) {  // 0x0008 = suppress_args
+						ASArray* arguments_arr = allocArray(app_context, num_args);
+						for (u32 i = 0; i < num_args; i++)
+							setArrayElement(app_context, arguments_arr, i, &args[i]);
+						setupArgumentsProps(app_context, arguments_arr, func, g_current_executing_func);
+						ActionVar args_var = {0};
+						args_var.type = ACTION_STACK_VALUE_ARRAY;
+						args_var.data.numeric_value = (u64)arguments_arr;
+						setProperty(app_context, local_scope, "arguments", 9, &args_var);
+					}
+
 					// Call with 'this' context set to new object
 					pushCtorContext(1);
 					return_value = func->advanced_func(app_context, args, num_args, registers, new_obj);
