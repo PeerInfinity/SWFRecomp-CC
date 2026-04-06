@@ -40154,10 +40154,17 @@ void actionNewMethod(SWFAppContext* app_context)
 						setProperty(app_context, local_scope, "arguments", 9, &args_var);
 					}
 
+					// Set g_current_executing_func so swf_setup_arguments_props
+					// (called by recompiler-generated code) uses the correct callee.
+					ASFunction* prev_executing_func_nm = g_current_executing_func;
+					g_current_executing_func = func;
+
 					// Call with 'this' context set to new object
 					pushCtorContext(1);
 					return_value = func->advanced_func(app_context, args, num_args, registers, new_obj);
 					popCtorContext();
+
+					g_current_executing_func = prev_executing_func_nm;
 
 					// Pop local scope
 					if (scope_depth > 0) {
