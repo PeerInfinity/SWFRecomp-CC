@@ -25,12 +25,12 @@ This plan covers tests that are very close to passing (1-15 diffs) and were inve
 **Fix**: Added `pushSuperContext(this_obj, 1)` / `popSuperContext()` around function invocation in both `apply` and `call` paths.
 **Impact**: super_test1 now PASSES (17/17). +1 test.
 
-## Fix 3: Missing arguments in actionNewMethod — DONE (commit d357d21c)
+## Fix 3: Missing arguments.callee in actionNewMethod — DONE (commits d357d21c + dea9d8ef)
 
 **Lines**: 10 in inheritance (misc-mtasc)
-**Root cause**: `actionNewMethod` didn't set up the `arguments` object (with callee/caller) for DefineFunction2 constructors.
-**Fix**: Added arguments array creation + setupArgumentsProps() in the DefineFunction2 path of `actionNewMethod`, gated on `!(func->flags & 0x0008)` (suppress_args).
-**Impact**: inheritance now PASSES (22/22). +1 test.
+**Root cause (corrected)**: `actionNewMethod` didn't set `g_current_executing_func = func` before calling the constructor. The recompiler-generated code calls `swf_setup_arguments_props(g_current_executing_func)` to set `arguments.callee`, but `g_current_executing_func` pointed to the calling function instead of the constructor.
+**Fix**: (1) Added arguments array + setupArgumentsProps in actionNewMethod (d357d21c). (2) Set `g_current_executing_func = func` before the advanced_func call (dea9d8ef). Fix #2 was the actual root cause; fix #1 provides redundant backup.
+**Impact**: inheritance now PASSES (22/22) with fresh recompilation. +1 test.
 
 ## Fix 4: SWF6 Case-Insensitive Constructor Shadowing — PARTIAL (commit ea3683bc)
 
