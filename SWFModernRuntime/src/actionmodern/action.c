@@ -4200,8 +4200,44 @@ static void init_asnative_2(void)
 
 static ASObject* getObjectPrototype(SWFAppContext* app_context); // forward decl for ASnative class 101
 
+// --- ASnative class 252: Array constructor + prototype methods ---
+
+static void initArrayProto(SWFAppContext* app_context, ASArray* arr); // forward decl
+
+// Callable Array constructor — creates array when called as f(args) (not just new Array())
+static ActionVar builtin_asnative_array_ctor(SWFAppContext* app_context, ActionVar* args, u32 arg_count, ActionVar* registers, void* this_obj)
+{
+	(void)registers; (void)this_obj;
+	ASArray* arr;
+	if (arg_count == 1 && (args[0].type == ACTION_STACK_VALUE_F64 || args[0].type == ACTION_STACK_VALUE_F32)) {
+		// Array(n) — creates empty array with length n
+		double d = (args[0].type == ACTION_STACK_VALUE_F64)
+			? VAL(double, &args[0].data.numeric_value)
+			: (double)VAL(float, &args[0].data.numeric_value);
+		u32 len = (u32)d;
+		arr = allocArray(app_context, len > 0 ? len : 4);
+		arr->length = len;
+	} else {
+		// Array(a, b, c) — creates [a, b, c]
+		arr = allocArray(app_context, arg_count > 0 ? arg_count : 4);
+		arr->length = arg_count;
+		for (u32 i = 0; i < arg_count; i++) {
+			arr->elements[i] = args[i];
+		}
+	}
+	// Set up prototype chain so arr.pop/push/etc. resolve via Array.prototype
+	initArrayProto(app_context, arr);
+	ActionVar result = {0};
+	result.type = ACTION_STACK_VALUE_ARRAY;
+	VAL(u64, &result.data.numeric_value) = (u64)arr;
+	return result;
+}
+
+static ASFunction g_asnative_252_ctor;
+static int g_asnative_252_init = 0;
+
 // ASnative(class_id, method_index) — returns a native method by numeric address.
-// Handles class 2 (ASNew), class 101 (Object.prototype), class 100 (global functions), class 200 (Math).
+// Handles class 2 (ASNew), class 101 (Object.prototype), class 100 (global functions), class 200 (Math), class 252 (Array).
 static ActionVar builtin_asnative(SWFAppContext* app_context, ActionVar* args, u32 arg_count, ActionVar* registers, void* this_obj)
 {
 	(void)registers; (void)this_obj;
@@ -4296,6 +4332,63 @@ static ActionVar builtin_asnative(SWFAppContext* app_context, ActionVar* args, u
 		result.type = ACTION_STACK_VALUE_FUNCTION;
 		VAL(u64, &result.data.numeric_value) = (u64)&g_nan_stub;
 		return result;
+	}
+
+	// Class 252: Array — constructor (0) and prototype methods (1-12)
+	// Flash ASnative(252, N): 0=constructor, 1=push, 2=pop, 3=concat,
+	// 4=shift, 5=unshift, 6=slice, 7=join, 8=splice, 9=sort, 10=reverse,
+	// 11=toString, 12=sortOn
+	if (class_id == 252) {
+		// Ensure Array.prototype methods are initialized
+		initArrayPrototypeMethods(app_context);
+
+		if (method_index == 0) {
+			// Array constructor
+			if (!g_asnative_252_init) {
+				memset(&g_asnative_252_ctor, 0, sizeof(ASFunction));
+				strncpy(g_asnative_252_ctor.name, "Array", 255);
+				g_asnative_252_ctor.function_type = 2;
+				g_asnative_252_ctor.advanced_func = (Function2Ptr)builtin_asnative_array_ctor;
+				if (function_count < MAX_FUNCTIONS)
+					function_registry[function_count++] = &g_asnative_252_ctor;
+				g_asnative_252_init = 1;
+			}
+			ActionVar result = {0};
+			result.type = ACTION_STACK_VALUE_FUNCTION;
+			VAL(u64, &result.data.numeric_value) = (u64)&g_asnative_252_ctor;
+			return result;
+		}
+
+		// Map ASnative index (1-12) to g_array_proto_funcs[] index
+		// ASnative: 1=push(0), 2=pop(1), 3=concat(7), 4=shift(2), 5=unshift(3),
+		//           6=slice(8), 7=join(5), 8=splice(9), 9=sort(10), 10=reverse(4),
+		//           11=toString(6), 12=sortOn(11)
+		static const int asnative_to_proto[] = {
+			-1,  // 0 = constructor (handled above)
+			 0,  // 1 = push
+			 1,  // 2 = pop
+			 7,  // 3 = concat
+			 2,  // 4 = shift
+			 3,  // 5 = unshift
+			 8,  // 6 = slice
+			 5,  // 7 = join
+			 9,  // 8 = splice
+			10,  // 9 = sort
+			 4,  // 10 = reverse
+			 6,  // 11 = toString
+			11,  // 12 = sortOn
+		};
+		if (method_index >= 1 && method_index <= 12) {
+			int proto_idx = asnative_to_proto[method_index];
+			ASFunction* fn = &g_array_proto_funcs[proto_idx];
+			if (fn->advanced_func != NULL) {
+				ActionVar result = {0};
+				result.type = ACTION_STACK_VALUE_FUNCTION;
+				VAL(u64, &result.data.numeric_value) = (u64)fn;
+				return result;
+			}
+		}
+		return undef;
 	}
 
 	return undef;
