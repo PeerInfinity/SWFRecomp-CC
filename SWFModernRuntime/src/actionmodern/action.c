@@ -25208,6 +25208,7 @@ static void initSoundPrototype(SWFAppContext* app_context, ASFunction* ctor)
 		addStubMethodToProto(app_context, ctor->prototype_obj, "getBytesLoaded", 14, mflags);
 		addStubMethodToProto(app_context, ctor->prototype_obj, "getBytesTotal", 13, mflags);
 	}
+
 }
 
 // LocalConnection.prototype:
@@ -37183,7 +37184,9 @@ void actionGetMember(SWFAppContext* app_context)
 				}
 				// Computed: check if loaded, completed, or playing
 				if (!_snd_is_loaded) {
-					pushUndefined(app_context);
+					// Not loaded: position is 0 (not undefined)
+					ActionVar z = {0}; z.type = ACTION_STACK_VALUE_F64;
+					pushVar(app_context, &z);
 					return;
 				}
 				ActionVar* completed = getProperty(obj, "__completed__", 13);
