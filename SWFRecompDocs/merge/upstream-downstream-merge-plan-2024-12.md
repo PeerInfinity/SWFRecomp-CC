@@ -49,6 +49,7 @@ LittleCube has added **garbage collection** to the runtime PR (commit `f02311c`,
 - `aa3fa7f` - cleanup
 - `18589c8` - cleanup, manage scope objects, fix Math.abs
 - `21439f1` - **implement prototype support** — `STR_ID_PROTOTYPE`/`STR_ID_PROTO` string IDs, `getPropertyWithPrototype()` returns `ASProperty*` with string_id lookup, `RuntimeFunc.constructor` flag distinguishes constructors from methods
+- `c8aec0d` - **lazy prototype instantiation** — prototypes created on first access (not at function definition), new `getOrCreateProperty()` with `bool* created` flag, `rbtree_get_or_insert()` tracks creation state
 
 #### LittleCube's Pre-Merge TODO (Updated)
 
