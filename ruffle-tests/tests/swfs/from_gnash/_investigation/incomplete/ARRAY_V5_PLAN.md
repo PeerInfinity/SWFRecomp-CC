@@ -3,7 +3,7 @@
 
 Last updated: 2026-04-04
 
-## Status: IN PROGRESS — 448/560 lines match (80.0%), 112 remaining failures
+## Status: IN PROGRESS — 450/560 lines match (80.4%), 110 remaining failures
 
 ---
 
@@ -20,6 +20,7 @@ The `array-v5` test exercises extensive Array operations (560 expected lines). C
 | 2026-03-20 (session) | 422/560 (75.4%) | +17 lines: HOLE join, length truncation, array delete |
 | 2026-03-29 (session) | 440/560 (78.6%) | +18 lines: HOLE sort, concat/splice densify, sortOn UNIQUESORT fix |
 | 2026-04-04 (CI) | 448/560 (80.0%) | +8 vs prior: includes inter-session fixes; this session: dual Array constructor prototype unification (+3 local) |
+| 2026-04-05 (session) | 450/560 (80.4%) | +2 net: ASnative class 252 implementation (constructor + prototype methods) |
 
 ## Completed Fixes
 
@@ -56,17 +57,20 @@ After splice operations, remaining HOLE elements are converted to UNDEFINED with
 ### 11. builtin_array_method Dispatch Infrastructure — DONE (commit 54f14500)
 Added `g_call_this_type` global and dispatch logic in `builtin_array_method` so array prototype methods can forward to `callArrayMethod` when invoked via `Function.prototype.call` in the CallMethod path. Infrastructure is in place but doesn't help array-v5 because SWF5 uses a different bytecode path (see Blocker below).
 
-## Remaining Failures (112 lines, categorized)
+### 12. ASnative Class 252 (Array) — FIXED (commit eddd9b98)
+Implemented ASnative(252, 0) as a callable Array constructor, plus indices 1-12 for all Array.prototype methods. The constructor creates properly initialized arrays with prototype chain set up via `initArrayProto()`. Fixes lines 34-36: `typeof(f) == 'function'`, `typeof(a) == 'object'`, `typeof(a.pop) == 'function'`.
 
-### Category A: typeof(f) == "undefined" (3 lines)
-**Lines**: 34-36 — `typeof(f)` where `f = Array.prototype.concat`
-**Root cause**: Variable `f` assigned via SWF5 Dejagnu harness interaction; the variable reference doesn't preserve the function.
-**Complexity**: High (deep runtime interaction)
+## Remaining Failures (110 lines, categorized)
+
+### Category A: typeof(f) == "undefined" — FIXED (3 lines)
+**Lines**: 34-36 — `typeof(f)` where `f = ASnative(252, 0)` (Array constructor)
+**Root cause**: ASnative class 252 was not implemented. Fixed in commit eddd9b98.
+**Status**: All 3 lines now PASS.
 
 ### Category B: Standalone prototype method calls (25 lines)
 **Lines**: 157-159, 161-163, 173, 176, 179-196 — pop(), concat(), slice() called as standalone functions
-**Root cause (CORRECTED 2026-04-05)**: These are NOT `.call()` invocations. The bytecode uses direct CallMethod (e.g., `a.pop()`) where `a` was created from a standalone function call like `a = f(...)`. The variable `a` is UNDEFINED because of Category A (the function reference `f = Array.prototype.concat` doesn't work). The pop/push tests fail because `a` doesn't exist.
-**Complexity**: Same as Category A — blocked on SWF5 Dejagnu function variable interaction.
+**Root cause (RE-ASSESSED 2026-04-05)**: NOT blocked by Category A. After fixing ASnative(252,0), these lines still fail. The `a` and `b` variables at these test lines (array.as:455-584) are reassigned through intermediate operations that produce undefined results — likely related to how standalone Array.prototype method calls (without a proper `this`) interact with the test's variable scoping.
+**Complexity**: High — requires deeper bytecode analysis of the test flow between successful and failing sections.
 
 ### Category C: Sort ordering differences (~50 lines)
 **Lines**: 103, 106-109, 113-114, 334-342, 351-352, 377-380, 408-431, 450, 456, 459, 461-462
@@ -97,33 +101,33 @@ Added `g_call_this_type` global and dispatch logic in `builtin_array_method` so 
 ### Other (2 lines)
 **Line 132**: `int(-2147483649)` wrapping behavior
 
-## CORRECTED: Category B is NOT a .call() issue (2026-04-05)
+## CORRECTED: Category A root cause identified (2026-04-05)
 
 The previous blocker about Function.prototype.call/apply was a misdiagnosis. Bytecode analysis confirmed:
 - The test does NOT use `.call()` — the string "call" isn't even in the constant pool
-- Category B failures are direct method calls (`a.pop()`) where `a` is undefined due to Category A
+- Category A was actually `f = ASnative(252, 0)` returning undefined — **FIXED** by implementing ASnative class 252
+- Category B failures persist after Category A fix — they have an independent root cause (variable reassignment through intermediate operations that fail)
 - Category E uses `.apply()` which DOES go through CallMethod FUNCTION handler (confirmed via debug)
 - The `.call`/`.apply` dispatch infrastructure was added anyway (commit 6a3cbcab) for future use
-
-The true blocker for Categories A+B (28 lines) is that `f = Array.prototype.concat` doesn't preserve the function reference in SWF5 Dejagnu context. This is likely a scope/variable interaction issue.
 
 ## Key Finding: Dual Array Constructor
 Two separate Array constructors exist (`g_array_constructor` from `actionGetVariable` and `g_ctors[1]` from `ensureGlobalInit`). They now share the same `prototype_obj` after the fix in commit 54f14500.
 
 ## Recommended Next Steps
 
-1. **Accept Gnash-specific sort diffs** — Category C sort lines (~50) confirmed as algorithm-dependent. Consider adding to accepted diffs.
-2. **Investigate Category A** — Why `f = Array.prototype.concat` results in `typeof(f) == 'undefined'`. This blocks 28 lines (A+B).
+1. ~~**Investigate Category A**~~ — DONE. ASnative(252, 0) implemented. +3 lines.
+2. **Accept Gnash-specific sort diffs** — Category C sort lines (~30) confirmed as algorithm-dependent. Consider adding to accepted diffs.
 3. **Accept ASSetPropFlags limitation** — Categories D (partial) and F. ASSetPropFlags on arrays is unimplemented.
-4. **Category H deeper investigation** — The `t[2] = "om"` failure on plain objects with numeric properties needs investigation separate from __resolve.
+4. **Investigate Category B** — Now independent of Category A. Variables `a`/`b` become undefined via intermediate operations. Requires deep bytecode analysis.
+5. **Category H deeper investigation** — The `t[2] = "om"` failure on plain objects with numeric properties needs investigation separate from __resolve.
 
 ## Test Details
 
 | Metric | Value |
 |--------|-------|
 | Expected output | 560 lines |
-| Current matching | ~448 lines (80.0%) |
-| Remaining failures | ~112 lines |
+| Current matching | ~450 lines (80.4%) |
+| Remaining failures | ~110 lines |
 | Compilation time | ~72 seconds |
 | Script size | 70,731 lines (script_2.c) |
 | SWF version | 5 |
