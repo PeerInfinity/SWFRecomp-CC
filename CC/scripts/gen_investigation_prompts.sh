@@ -32,22 +32,13 @@ emit_prompt() {
         printf '\n\n\n%s\n\n\n' "$SEPARATOR" >> "$output_file"
     fi
 
-    local blocked_note=""
-    if [ "$subdir" = "blocked" ]; then
-        blocked_note="
-> **Note:** This plan was previously blocked. Check whether the blocker (described at
-> the end of the plan) has been resolved before investing time. If it is still blocked,
-> stop early and document any new findings.
-"
-    fi
-
     cat >> "$output_file" <<EOF
 Please read these files:
 - ruffle-tests/tests/swfs/_investigation/ENVIRONMENT_SETUP.md
 - ruffle-tests/tests/swfs/_investigation/SESSION_START_GUIDE.md
 - ruffle-tests/tests/swfs/${suite}/_investigation/CURRENT_STATUS.md
 - ruffle-tests/tests/swfs/${suite}/_investigation/${subdir}/${filename}
-${blocked_note}
+
 Then follow these steps in order:
 
 1. **Environment check:** Verify \`SWFRecomp/build/SWFRecomp\` exists. If not, build it per ENVIRONMENT_SETUP.md before doing anything else.
@@ -59,6 +50,28 @@ ${results_hint}
    python3 ruffle-tests/verify_output.py --test=TEST_NAME --diff --verbose
    \`\`\`
 
+EOF
+
+    if [ "$subdir" = "blocked" ]; then
+        cat >> "$output_file" <<EOF
+> **Note:** This plan was previously blocked. The primary goals below are to bring the
+> document up to date and investigate whether the blocker can be overcome.
+
+4. **Update the document:** Based on the test results and current codebase state, check whether the planning document is still accurate. Update any stale information (e.g., tests that now pass, analysis that is outdated, status sections that no longer reflect reality).
+
+5. **Investigate unblocking:** Look into whether the blocker (described in the plan) has been resolved or can now be worked around. Consider:
+   - Has relevant code changed since the plan was blocked?
+   - Are there alternative approaches that avoid the blocker entirely?
+   - Can the blocker be partially resolved to make progress on some tests?
+
+6. **If unblockable:** If you find a way forward, implement fixes and move the plan to \`incomplete/\` (or \`complete/\` if fully passing). If the way forward requires a substantially different approach, create a new planning document in \`incomplete/\` that describes the new strategy, and note in the blocked plan that it has been superseded.
+
+7. **If still blocked:** Update the plan with any new findings and leave it in \`blocked/\`. Document what you investigated and why it remains blocked.
+
+**IMPORTANT: Do NOT run the full test suite.** Only run individual tests with \`--test=TEST_NAME\`.
+EOF
+    else
+        cat >> "$output_file" <<EOF
 4. **Assess and update:** Based on the test results (not just code reading), determine which parts of the plan are done. Update the planning document to reflect current status.
 
 5. **Implement:** Work through the remaining items one at a time. After each change, run the affected tests to verify progress. Commit working changes.
@@ -70,6 +83,7 @@ ${results_hint}
 
 **IMPORTANT: Do NOT run the full test suite.** Only run individual tests with \`--test=TEST_NAME\`.
 EOF
+    fi
 }
 
 for suite in avm1 from_gnash from_shumway; do
