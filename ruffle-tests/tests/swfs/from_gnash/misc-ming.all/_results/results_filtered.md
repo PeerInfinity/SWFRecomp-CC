@@ -1,10 +1,10 @@
 # Ruffle Test Results (Filtered)
 
-**Date**: 2026-04-06 04:47 UTC
+**Date**: 2026-04-06 20:05 UTC
 
-**Git SHA**: `cf9f894c07`
+**Git SHA**: `34f9322977`
 
-**Run Duration**: 20m 17s
+**Run Duration**: 20m 26s
 
 **Filtered**: 0 tests ignored out of 58 available
 
@@ -16,8 +16,8 @@
 | Passing | **8** (13.8%) |
 | Failing | 50 |
 | Total expected lines | 3388 |
-| Matching lines | 1646 (48.6%) |
-| Mismatched lines | 1742 |
+| Matching lines | 1657 (48.9%) |
+| Mismatched lines | 1731 |
 
 ### Failure Breakdown
 
@@ -32,14 +32,14 @@
 
 | # | Test | Lines | Duration | Notes |
 |---|------|-------|----------|-------|
-| 1 | `VarAndCharClashTest` | 13 | 19.5s |  |
-| 2 | `Video-EmbedSquareTest` | 2 | 19.0s |  |
-| 3 | `getTimer_test` | 8 | 19.1s |  |
-| 4 | `masks_test2` | 10 | 19.6s |  |
-| 5 | `morph_test1` | 0 | 18.6s |  |
-| 6 | `move_object_test` | 11 | 19.2s |  |
-| 7 | `multi_doactions_and_goto_frame_test` | 6 | 18.9s |  |
-| 8 | `unload_movieclip_test1` | 6 | 18.8s |  |
+| 1 | `VarAndCharClashTest` | 13 | 18.7s |  |
+| 2 | `Video-EmbedSquareTest` | 2 | 20.1s |  |
+| 3 | `getTimer_test` | 8 | 20.1s |  |
+| 4 | `masks_test2` | 10 | 19.5s |  |
+| 5 | `morph_test1` | 0 | 18.7s |  |
+| 6 | `move_object_test` | 11 | 19.1s |  |
+| 7 | `multi_doactions_and_goto_frame_test` | 6 | 19.3s |  |
+| 8 | `unload_movieclip_test1` | 6 | 18.9s |  |
 
 ## Near-Passing Tests
 
@@ -82,7 +82,7 @@ Tests with output mismatch but >= 50% line match rate (low-hanging fruit).
 
 | # | Test | Duration | Notes |
 |---|------|----------|-------|
-| 1 | `PlaceObject2Test` | 21.1s |  |
+| 1 | `PlaceObject2Test` | 21.4s |  |
 
 ## Runtime Errors
 
@@ -126,7 +126,7 @@ No timeouts.
 | 26 | `reverse_execute_PlaceObject2_test1` | 50.0% | 4/8 | 8 | 8 |  |
 | 27 | `runtime_vm_stack_test` | 44.4% | 4/9 | 9 | 9 |  |
 | 28 | `DragDropTest` | 40.0% | 18/45 | 45 | 44 |  |
-| 29 | `NetStream-SquareTest` | 32.9% | 71/216 | 131 | 216 |  |
+| 29 | `NetStream-SquareTest` | 38.0% | 82/216 | 201 | 216 |  |
 | 30 | `consecutive_goto_frame_test` | 30.8% | 4/13 | 13 | 12 |  |
 | 31 | `KeyEventOrder` | 23.1% | 6/26 | 25 | 26 |  |
 | 32 | `DrawingApiTest` | 21.5% | 20/93 | 93 | 93 |  |
