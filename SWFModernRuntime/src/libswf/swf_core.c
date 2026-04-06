@@ -809,11 +809,13 @@ void swfStart(SWFAppContext* app_context)
 			// Break if quit_swf and no remaining input events, handlers, or playing sprites.
 			{
 				extern int hasPlayingSounds(void);
+				extern int hasActiveNetStreams(void);
 				if (quit_swf && !(g_events && g_event_pos < g_event_count)
 				    && !actionHasEnterFrameHandlers()
 				    && !hasPlayingSprites()
 				    && !hasActiveTimers()
 				    && !hasPlayingSounds()
+				    && !hasActiveNetStreams()
 				    && !hasClipEnterFrameHandlers()) break;
 			}
 			{
@@ -1028,6 +1030,11 @@ void swfStart(SWFAppContext* app_context)
 				extern void processSoundPlayback(SWFAppContext*, double);
 				processSoundPlayback(app_context, frame_duration_ms);
 			}
+			// Process NetStream playback (fire onStatus events)
+			{
+				extern void processNetStreams(SWFAppContext*, double);
+				processNetStreams(app_context, frame_duration_ms);
+			}
 		}
 
 		// Flush pending onLoad dispatches for dynamically-attached MCs
@@ -1063,6 +1070,7 @@ void swfStart(SWFAppContext* app_context)
 			if (g_pending_mcl_load_count > 0) continue;
 			if (g_pending_direct_load_count > 0) continue;
 			{ extern int hasPlayingSounds(void); if (hasPlayingSounds()) continue; }
+			{ extern int hasActiveNetStreams(void); if (hasActiveNetStreams()) continue; }
 			break;
 		}
 		else if (manual_next_frame)

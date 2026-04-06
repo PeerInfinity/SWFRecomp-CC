@@ -27,9 +27,9 @@ blockers:
   - "Different tessellator algorithms (libtess2 vs Lyon) produce different edge coverage"
 -->
 
-Last updated: 2026-04-03
+Last updated: 2026-04-06
 
-## Status: MAJOR FIXES APPLIED — Remaining issues are focal radial precision and edge anti-aliasing
+## Status: BLOCKED — Remaining issues are focal radial precision and edge anti-aliasing (architectural limitations)
 
 ### Results Summary
 
@@ -80,3 +80,13 @@ Last updated: 2026-04-03
 | Style encoding (spread + interp) | `render_webgpu.c` | ~1758 |
 | Vertex shader (interp flag) | `render_webgpu.c` | ~66-79 |
 | Fragment shader (linear_to_srgb) | `render_webgpu.c` | ~140-155, ~193-196 |
+
+### Investigated 2026-04-06
+
+Reviewed whether the blockers can be overcome:
+- **No rendering code changes** since the plan was last updated (2026-04-03). No commits touching `SWFModernRuntime/src/render/` or gradient/tessellation code.
+- **All 4 trace tests pass** in CI (2026-04-06 run) and locally confirmed.
+- **Blockers are architectural, not bugs**: The remaining outliers stem from (1) near-singularity precision differences in the focal radial gradient formula (`l / denom` near 0), and (2) different tessellation algorithms (libtess2 vs Lyon) producing different triangle edge coverage at shape boundaries.
+- **Fixes already applied** reduced outliers by 81-88% and matched Ruffle's focal formula exactly. The remaining gap is irreducible without porting Lyon to C or separating the gradient pipeline (1-2 weeks effort for marginal gain).
+- **movieclip_setmask** requires tolerance=0 (strict pixel match), making edge AA differences unfixable without identical rasterization.
+- **Conclusion**: Blockers remain. These are inherent pipeline differences between our WebGPU renderer and Ruffle's, not correctness issues.

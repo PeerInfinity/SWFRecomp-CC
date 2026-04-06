@@ -1957,6 +1957,477 @@ static ActionVar makeStringActionVar(SWFAppContext* app_context, const char* str
 static ASFunction g_nc_connect_func;
 static ASFunction g_nc_close_func;
 
+// --- NetStream playback implementation ---
+
+static ASFunction g_ns_play_func;
+static ASFunction g_ns_seek_func;
+static ASFunction g_ns_pause_func;
+
+#define MAX_ACTIVE_NETSTREAMS 8
+typedef struct {
+	int active;
+	ASObject* ns_obj;
+	int pending_start;   // play() called, fire Play.Start/Buffer.Full on next tick
+	int playing;
+	int paused;
+	double duration_s;   // video duration from FLV metadata
+	double elapsed_ms;   // playback time elapsed
+	int completed;       // playback reached end
+	int has_metadata;    // onMetaData should be dispatched
+	double meta_width;
+	double meta_height;
+	double meta_framerate;
+} ActiveNetStream;
+
+static ActiveNetStream g_active_netstreams[MAX_ACTIVE_NETSTREAMS];
+static int g_has_active_netstreams = 0;
+
+// Parse FLV header and extract duration from onMetaData script tag.
+// Returns duration in seconds, or 0 if parsing fails.
+static double flv_parse_duration(const unsigned char* data, int len,
+                                 double* out_width, double* out_height, double* out_framerate)
+{
+	*out_width = 0; *out_height = 0; *out_framerate = 0;
+	if (len < 13 || data[0] != 'F' || data[1] != 'L' || data[2] != 'V') return 0;
+	int offset = 9; // skip FLV header
+	offset += 4;    // skip first PreviousTagSize
+
+	while (offset + 11 < len)
+	{
+		int tag_type = data[offset];
+		int tag_size = (data[offset+1] << 16) | (data[offset+2] << 8) | data[offset+3];
+		int tag_data_start = offset + 11;
+		if (tag_data_start + tag_size > len) break;
+
+		if (tag_type == 18) // Script data tag
+		{
+			// Parse AMF: expect string "onMetaData" then ECMA array
+			int p = tag_data_start;
+			int tag_end = tag_data_start + tag_size;
+			if (p >= tag_end || data[p] != 0x02) goto next_tag; // AMF string type
+			p++;
+			if (p + 2 > tag_end) goto next_tag;
+			int slen = (data[p] << 8) | data[p+1]; p += 2;
+			if (p + slen > tag_end) goto next_tag;
+			if (slen != 10 || memcmp(data + p, "onMetaData", 10) != 0) goto next_tag;
+			p += slen;
+
+			// Expect ECMA array (type 0x08)
+			if (p >= tag_end || data[p] != 0x08) goto next_tag;
+			p++;
+			if (p + 4 > tag_end) goto next_tag;
+			// int count = (data[p]<<24)|(data[p+1]<<16)|(data[p+2]<<8)|data[p+3];
+			p += 4;
+
+			double duration = 0;
+			// Parse key-value pairs until end marker
+			while (p + 3 < tag_end)
+			{
+				if (data[p] == 0x00 && data[p+1] == 0x00 && data[p+2] == 0x09) break; // end marker
+				int klen = (data[p] << 8) | data[p+1]; p += 2;
+				if (p + klen > tag_end) break;
+				const char* key = (const char*)(data + p); p += klen;
+
+				if (p >= tag_end) break;
+				int vtype = data[p]; p++;
+
+				if (vtype == 0x00) // Number (8 bytes, big-endian double)
+				{
+					if (p + 8 > tag_end) break;
+					// big-endian to host double
+					unsigned char dbuf[8];
+					for (int i = 0; i < 8; i++) dbuf[i] = data[p + 7 - i];
+					double val;
+					memcpy(&val, dbuf, 8);
+					p += 8;
+
+					if (klen == 8 && memcmp(key, "duration", 8) == 0) duration = val;
+					else if (klen == 5 && memcmp(key, "width", 5) == 0) *out_width = val;
+					else if (klen == 6 && memcmp(key, "height", 6) == 0) *out_height = val;
+					else if (klen == 9 && memcmp(key, "framerate", 9) == 0) *out_framerate = val;
+				}
+				else if (vtype == 0x01) // Boolean (1 byte)
+				{
+					if (p + 1 > tag_end) break;
+					p += 1;
+				}
+				else if (vtype == 0x02) // String
+				{
+					if (p + 2 > tag_end) break;
+					int vslen = (data[p] << 8) | data[p+1]; p += 2;
+					if (p + vslen > tag_end) break;
+					p += vslen;
+				}
+				else
+				{
+					break; // Unknown type, stop parsing
+				}
+			}
+			return duration;
+		}
+next_tag:
+		offset = tag_data_start + tag_size + 4; // +4 for PreviousTagSize
+	}
+	return 0;
+}
+
+static void ns_dispatch_onStatus(SWFAppContext* app_context, ASObject* ns,
+                                  const char* code, const char* level)
+{
+	extern MovieClip* g_current_context;
+	ActionVar* handler = getPropertyWithPrototype(ns, "onStatus", 8);
+	if (handler == NULL || handler->type != ACTION_STACK_VALUE_FUNCTION) return;
+	ASFunction* func = (ASFunction*)(uintptr_t)handler->data.numeric_value;
+	if (func == NULL) return;
+
+	// Create event object: { code: "...", level: "..." }
+	// Must have Object.prototype for hasOwnProperty to work in type-1 handlers
+	ASObject* event_obj = allocObject(app_context, 4);
+	setObjectProto(app_context, event_obj);
+	ActionVar cv = makeStringActionVar(app_context, code, strlen(code));
+	setProperty(app_context, event_obj, "code", 4, &cv);
+	ActionVar lv = makeStringActionVar(app_context, level, strlen(level));
+	setProperty(app_context, event_obj, "level", 5, &lv);
+
+	ActionVar event_arg = {0};
+	event_arg.type = ACTION_STACK_VALUE_OBJECT;
+	event_arg.data.numeric_value = (u64)event_obj;
+
+	g_special_depth++;
+	if (g_special_depth >= MAX_SPECIAL_DEPTH) { g_special_depth--; return; }
+
+	if (func->function_type == 2)
+	{
+		ActionVar* regs = NULL;
+		if (func->register_count > 0)
+			regs = (ActionVar*) HCALLOC(func->register_count, sizeof(ActionVar));
+
+		u32 captured_count = func->captured_scope_count;
+		for (u32 ci = 0; ci < captured_count; ci++)
+		{
+			if (scope_depth < MAX_SCOPE_DEPTH) {
+				scope_is_with[scope_depth] = func->captured_scope_is_with[ci];
+				scope_mc[scope_depth] = (MovieClip*)func->captured_scope_mc[ci];
+				scope_chain[scope_depth++] = (ASObject*)func->captured_scope[ci];
+			}
+		}
+
+		ASObject* local_scope = allocObject(app_context, 8);
+		if (scope_depth < MAX_SCOPE_DEPTH) {
+			scope_is_with[scope_depth] = 0;
+			scope_mc[scope_depth] = NULL;
+			scope_chain[scope_depth++] = local_scope;
+		}
+
+		MovieClip* saved_context = g_current_context;
+		if (g_swf_version >= 6 && func->base_clip != NULL)
+			g_current_context = (MovieClip*)func->base_clip;
+
+		g_call_depth++;
+		func->advanced_func(app_context, &event_arg, 1, regs, (void*)ns);
+		g_call_depth--;
+
+		g_current_context = saved_context;
+		for (u32 ci = 0; ci < captured_count + 1; ci++)
+			if (scope_depth > 0) scope_depth--;
+		releaseObject(app_context, local_scope);
+		if (regs != NULL) FREE(regs);
+	}
+	else
+	{
+		pushVar(app_context, &event_arg);
+
+		u32 captured_count = func->captured_scope_count;
+		for (u32 ci = 0; ci < captured_count; ci++)
+		{
+			if (scope_depth < MAX_SCOPE_DEPTH) {
+				scope_is_with[scope_depth] = func->captured_scope_is_with[ci];
+				scope_mc[scope_depth] = (MovieClip*)func->captured_scope_mc[ci];
+				scope_chain[scope_depth++] = (ASObject*)func->captured_scope[ci];
+			}
+		}
+
+		// Push local scope so type-1 function parameter binding works
+		ASObject* local_scope = allocObject(app_context, 8);
+		if (scope_depth < MAX_SCOPE_DEPTH) {
+			scope_is_with[scope_depth] = 0;
+			scope_mc[scope_depth] = NULL;
+			scope_chain[scope_depth++] = local_scope;
+		}
+
+		g_call_depth++;
+		((ActionVar(*)(SWFAppContext*))func->simple_func)(app_context);
+		g_call_depth--;
+
+		for (u32 ci = 0; ci < captured_count + 1; ci++)
+			if (scope_depth > 0) scope_depth--;
+		releaseObject(app_context, local_scope);
+	}
+
+	g_special_depth--;
+}
+
+static void ns_dispatch_onMetaData(SWFAppContext* app_context, ASObject* ns,
+                                    double duration, double width, double height, double framerate)
+{
+	extern MovieClip* g_current_context;
+	ActionVar* handler = getPropertyWithPrototype(ns, "onMetaData", 10);
+	if (handler == NULL || handler->type != ACTION_STACK_VALUE_FUNCTION) return;
+	ASFunction* func = (ASFunction*)(uintptr_t)handler->data.numeric_value;
+	if (func == NULL) return;
+
+	// Create metadata object
+	ASObject* meta = allocObject(app_context, 8);
+	ActionVar dv = {0}; dv.type = ACTION_STACK_VALUE_F64;
+	VAL(double, &dv.data.numeric_value) = duration;
+	setProperty(app_context, meta, "duration", 8, &dv);
+	VAL(double, &dv.data.numeric_value) = width;
+	setProperty(app_context, meta, "width", 5, &dv);
+	VAL(double, &dv.data.numeric_value) = height;
+	setProperty(app_context, meta, "height", 6, &dv);
+	VAL(double, &dv.data.numeric_value) = framerate;
+	setProperty(app_context, meta, "framerate", 9, &dv);
+
+	ActionVar meta_arg = {0};
+	meta_arg.type = ACTION_STACK_VALUE_OBJECT;
+	meta_arg.data.numeric_value = (u64)meta;
+
+	g_special_depth++;
+	if (g_special_depth >= MAX_SPECIAL_DEPTH) { g_special_depth--; return; }
+
+	if (func->function_type == 2)
+	{
+		ActionVar* regs = NULL;
+		if (func->register_count > 0)
+			regs = (ActionVar*) HCALLOC(func->register_count, sizeof(ActionVar));
+
+		u32 captured_count = func->captured_scope_count;
+		for (u32 ci = 0; ci < captured_count; ci++)
+		{
+			if (scope_depth < MAX_SCOPE_DEPTH) {
+				scope_is_with[scope_depth] = func->captured_scope_is_with[ci];
+				scope_mc[scope_depth] = (MovieClip*)func->captured_scope_mc[ci];
+				scope_chain[scope_depth++] = (ASObject*)func->captured_scope[ci];
+			}
+		}
+
+		ASObject* local_scope = allocObject(app_context, 8);
+		if (scope_depth < MAX_SCOPE_DEPTH) {
+			scope_is_with[scope_depth] = 0;
+			scope_mc[scope_depth] = NULL;
+			scope_chain[scope_depth++] = local_scope;
+		}
+
+		MovieClip* saved_context = g_current_context;
+		if (g_swf_version >= 6 && func->base_clip != NULL)
+			g_current_context = (MovieClip*)func->base_clip;
+
+		g_call_depth++;
+		func->advanced_func(app_context, &meta_arg, 1, regs, (void*)ns);
+		g_call_depth--;
+
+		g_current_context = saved_context;
+		for (u32 ci = 0; ci < captured_count + 1; ci++)
+			if (scope_depth > 0) scope_depth--;
+		releaseObject(app_context, local_scope);
+		if (regs != NULL) FREE(regs);
+	}
+	else
+	{
+		pushVar(app_context, &meta_arg);
+
+		u32 captured_count = func->captured_scope_count;
+		for (u32 ci = 0; ci < captured_count; ci++)
+		{
+			if (scope_depth < MAX_SCOPE_DEPTH) {
+				scope_is_with[scope_depth] = func->captured_scope_is_with[ci];
+				scope_mc[scope_depth] = (MovieClip*)func->captured_scope_mc[ci];
+				scope_chain[scope_depth++] = (ASObject*)func->captured_scope[ci];
+			}
+		}
+
+		// Push local scope so type-1 function parameter binding works
+		ASObject* local_scope = allocObject(app_context, 8);
+		if (scope_depth < MAX_SCOPE_DEPTH) {
+			scope_is_with[scope_depth] = 0;
+			scope_mc[scope_depth] = NULL;
+			scope_chain[scope_depth++] = local_scope;
+		}
+
+		g_call_depth++;
+		((ActionVar(*)(SWFAppContext*))func->simple_func)(app_context);
+		g_call_depth--;
+
+		for (u32 ci = 0; ci < captured_count + 1; ci++)
+			if (scope_depth > 0) scope_depth--;
+		releaseObject(app_context, local_scope);
+	}
+
+	g_special_depth--;
+}
+
+#ifdef HAS_DATA_FILES
+extern DataFileEntry* findDataFile(const char* name);
+#endif
+
+static ActionVar builtin_ns_play(SWFAppContext* app_context, ActionVar* args, u32 arg_count, ActionVar* registers, void* this_obj)
+{
+	(void)registers;
+	ASObject* ns = (ASObject*)this_obj;
+	ActionVar ret = {0}; ret.type = ACTION_STACK_VALUE_UNDEFINED;
+	if (ns == NULL || arg_count == 0) return ret;
+
+#ifdef HAS_DATA_FILES
+	// Get URL string
+	char url_buf[256] = {0};
+	if (args[0].type == ACTION_STACK_VALUE_STRING && args[0].str_size > 0)
+	{
+		uint16_t* u16 = (uint16_t*)(uintptr_t)args[0].data.numeric_value;
+		u32 i;
+		for (i = 0; i < args[0].str_size && i < 255; i++)
+			url_buf[i] = (char)(u16[i] & 0xFF);
+		url_buf[i] = 0;
+	}
+	else return ret;
+
+	// Strip path, use basename
+	const char* basename = url_buf;
+	for (const char* p = url_buf; *p; p++)
+		if (*p == '/' || *p == '\\') basename = p + 1;
+
+	DataFileEntry* entry = findDataFile(basename);
+	if (entry == NULL) return ret;
+
+	// Parse FLV to get duration
+	double width = 0, height = 0, framerate = 0;
+	double duration = flv_parse_duration((const unsigned char*)entry->content, entry->content_length,
+	                                      &width, &height, &framerate);
+	if (duration <= 0) duration = 1.0; // fallback
+
+	// Register as active NetStream
+	int slot = -1;
+	for (int i = 0; i < MAX_ACTIVE_NETSTREAMS; i++)
+	{
+		if (!g_active_netstreams[i].active) { slot = i; break; }
+		// Reuse slot if same ns_obj (re-play)
+		if (g_active_netstreams[i].ns_obj == ns) { slot = i; break; }
+	}
+	if (slot < 0) return ret;
+
+	g_active_netstreams[slot].active = 1;
+	g_active_netstreams[slot].ns_obj = ns;
+	g_active_netstreams[slot].pending_start = 1;
+	g_active_netstreams[slot].playing = 0;
+	g_active_netstreams[slot].paused = 0;
+	g_active_netstreams[slot].duration_s = duration;
+	g_active_netstreams[slot].elapsed_ms = 0;
+	g_active_netstreams[slot].completed = 0;
+	g_active_netstreams[slot].has_metadata = 1;
+	g_active_netstreams[slot].meta_width = width;
+	g_active_netstreams[slot].meta_height = height;
+	g_active_netstreams[slot].meta_framerate = framerate;
+	g_has_active_netstreams = 1;
+#endif
+
+	return ret;
+}
+
+static ActionVar builtin_ns_seek(SWFAppContext* app_context, ActionVar* args, u32 arg_count, ActionVar* registers, void* this_obj)
+{
+	(void)registers;
+	ASObject* ns = (ASObject*)this_obj;
+	ActionVar ret = {0}; ret.type = ACTION_STACK_VALUE_UNDEFINED;
+	if (ns == NULL) return ret;
+
+	// Find the active stream for this ns
+	for (int i = 0; i < MAX_ACTIVE_NETSTREAMS; i++)
+	{
+		if (g_active_netstreams[i].active && g_active_netstreams[i].ns_obj == ns)
+		{
+			// Fire Seek.Notify synchronously
+			ns_dispatch_onStatus(app_context, ns, "NetStream.Seek.Notify", "status");
+			break;
+		}
+	}
+
+	return ret;
+}
+
+static ActionVar builtin_ns_pause(SWFAppContext* app_context, ActionVar* args, u32 arg_count, ActionVar* registers, void* this_obj)
+{
+	(void)args; (void)arg_count; (void)registers;
+	// pause() returns undefined in Flash
+	ActionVar ret = {0}; ret.type = ACTION_STACK_VALUE_UNDEFINED;
+	return ret;
+}
+
+void processNetStreams(SWFAppContext* app_context, double frame_duration_ms)
+{
+	if (!g_has_active_netstreams) return;
+
+	int any_active = 0;
+	for (int i = 0; i < MAX_ACTIVE_NETSTREAMS; i++)
+	{
+		if (!g_active_netstreams[i].active) continue;
+
+		ActiveNetStream* ns = &g_active_netstreams[i];
+
+		if (ns->pending_start)
+		{
+			ns->pending_start = 0;
+			ns->playing = 1;
+			// Fire Play.Start and Buffer.Full
+			ns_dispatch_onStatus(app_context, ns->ns_obj, "NetStream.Play.Start", "status");
+			ns_dispatch_onStatus(app_context, ns->ns_obj, "NetStream.Buffer.Full", "status");
+			// Dispatch onMetaData if we parsed metadata
+			if (ns->has_metadata)
+			{
+				ns_dispatch_onMetaData(app_context, ns->ns_obj,
+				                        ns->duration_s, ns->meta_width,
+				                        ns->meta_height, ns->meta_framerate);
+				ns->has_metadata = 0;
+			}
+			any_active = 1;
+			continue;
+		}
+
+		if (ns->playing && !ns->paused && !ns->completed)
+		{
+			ns->elapsed_ms += frame_duration_ms;
+			if (ns->elapsed_ms >= ns->duration_s * 1000.0)
+			{
+				// Playback complete
+				ns->completed = 1;
+				ns->playing = 0;
+				ns_dispatch_onStatus(app_context, ns->ns_obj, "NetStream.Buffer.Flush", "status");
+				ns_dispatch_onStatus(app_context, ns->ns_obj, "NetStream.Play.Stop", "status");
+				ns_dispatch_onStatus(app_context, ns->ns_obj, "NetStream.Buffer.Empty", "status");
+				ns->active = 0;
+			}
+			else
+			{
+				any_active = 1;
+			}
+		}
+		else
+		{
+			any_active = 1; // paused or waiting — still active
+		}
+	}
+
+	if (!any_active)
+	{
+		g_has_active_netstreams = 0;
+		for (int i = 0; i < MAX_ACTIVE_NETSTREAMS; i++)
+			if (g_active_netstreams[i].active) { g_has_active_netstreams = 1; break; }
+	}
+}
+
+int hasActiveNetStreams(void)
+{
+	return g_has_active_netstreams;
+}
+
 static void nc_dispatch_onStatus(SWFAppContext* app_context, ASObject* nc,
                                   const char* code, const char* level)
 {
@@ -25451,12 +25922,42 @@ static void initNetStreamPrototype(SWFAppContext* app_context, ASFunction* ctor)
 	setObjectProto(app_context, ctor->prototype_obj);
 	const u8 mflags = PROPERTY_FLAG_WRITABLE; // DONT_ENUM + DONT_DELETE
 	addStubMethodToProto(app_context, ctor->prototype_obj, "publish", 7, mflags);
-	addStubMethodToProto(app_context, ctor->prototype_obj, "play", 4, mflags);
+	// play — real implementation (FLV playback with onStatus events)
+	{
+		memset(&g_ns_play_func, 0, sizeof(ASFunction));
+		strncpy(g_ns_play_func.name, "play", 255);
+		g_ns_play_func.function_type = 2;
+		g_ns_play_func.advanced_func = (Function2Ptr) builtin_ns_play;
+		setupNativeFuncOwnProps(app_context, &g_ns_play_func);
+		ActionVar fv = {0}; fv.type = ACTION_STACK_VALUE_FUNCTION;
+		fv.data.numeric_value = (u64)&g_ns_play_func;
+		setPropertyWithFlags(app_context, ctor->prototype_obj, "play", 4, &fv, mflags);
+	}
 	addStubMethodToProto(app_context, ctor->prototype_obj, "play2", 5, mflags);
 	addStubMethodToProto(app_context, ctor->prototype_obj, "receiveAudio", 12, mflags);
 	addStubMethodToProto(app_context, ctor->prototype_obj, "receiveVideo", 12, mflags);
-	addStubMethodToProto(app_context, ctor->prototype_obj, "pause", 5, mflags);
-	addStubMethodToProto(app_context, ctor->prototype_obj, "seek", 4, mflags);
+	// pause — real implementation (returns undefined)
+	{
+		memset(&g_ns_pause_func, 0, sizeof(ASFunction));
+		strncpy(g_ns_pause_func.name, "pause", 255);
+		g_ns_pause_func.function_type = 2;
+		g_ns_pause_func.advanced_func = (Function2Ptr) builtin_ns_pause;
+		setupNativeFuncOwnProps(app_context, &g_ns_pause_func);
+		ActionVar fv = {0}; fv.type = ACTION_STACK_VALUE_FUNCTION;
+		fv.data.numeric_value = (u64)&g_ns_pause_func;
+		setPropertyWithFlags(app_context, ctor->prototype_obj, "pause", 5, &fv, mflags);
+	}
+	// seek — real implementation (fires Seek.Notify)
+	{
+		memset(&g_ns_seek_func, 0, sizeof(ASFunction));
+		strncpy(g_ns_seek_func.name, "seek", 255);
+		g_ns_seek_func.function_type = 2;
+		g_ns_seek_func.advanced_func = (Function2Ptr) builtin_ns_seek;
+		setupNativeFuncOwnProps(app_context, &g_ns_seek_func);
+		ActionVar fv = {0}; fv.type = ACTION_STACK_VALUE_FUNCTION;
+		fv.data.numeric_value = (u64)&g_ns_seek_func;
+		setPropertyWithFlags(app_context, ctor->prototype_obj, "seek", 4, &fv, mflags);
+	}
 	addStubMethodToProto(app_context, ctor->prototype_obj, "onPeerConnect", 13, mflags);
 	addStubMethodToProto(app_context, ctor->prototype_obj, "close", 5, mflags);
 	addStubMethodToProto(app_context, ctor->prototype_obj, "attachAudio", 11, mflags);

@@ -22,7 +22,7 @@ blockers:
   - reason: "Anti-aliasing rendering difference: headless tessellated polygons vs rasterized text"
 -->
 
-Last updated: 2026-03-28
+Last updated: 2026-04-06
 
 ## Status: BLOCKED — Image tests blocked by anti-aliasing rendering difference
 
@@ -34,7 +34,16 @@ The two remaining image tests are not achievable without either:
 1. Adding anti-aliased rasterization (e.g., stb_truetype bitmap rasterization → texture quads), OR
 2. Ruffle increasing the test tolerances / max_outliers to accommodate outline rendering
 
-Both tests already **PASS** their trace output in CI (edittext_tag_indent: 31/31, edittext_stylesheet: 325/325). The image comparison is headless-only and does not affect the filtered pass rate.
+All 5 trace tests **PASS** in CI (2026-04-06 run, 569/620 overall) and locally confirmed. The image failures are headless-only and do not affect the filtered pass rate.
+
+### Investigated 2026-04-06
+
+Reviewed whether the blocker can be overcome:
+- **No rendering code changes** since the plan was blocked (2026-03-28). No commits touching `SWFModernRuntime/src/render/` or text glyph rendering in `tag.c`.
+- **stbtt_MakeGlyph bitmap rasterization NOT implemented** — stb_truetype.h is present in `SWFRecomp/lib/stb/` with bitmap functions available, but no code uses them for glyph rendering.
+- **PIXEL_TEXT_LAYOUT_PLAN completed** (2026-04-03) — addresses different tests (asfunction, edittext_drag_select, edittext_ime_focus_lost) but does not change the rendering pipeline.
+- **No alternative approaches found** — the three options (bitmap rasterization, upstream tolerance increase, SDF rendering) remain the only paths forward.
+- **Conclusion**: Blocker remains. All functional (trace) testing is complete. This plan is blocked only for headless image quality.
 
 ### Image Test Status
 

@@ -1,13 +1,17 @@
 # Current Ruffle Test Status
 
-Last updated: 2026-04-03
+Last updated: 2026-04-06
 
 ## Quick Summary
 
-- **Pass rate (CI, last run)**: 570/620 (91.9%) raw, 563/569 (98.9%) filtered (6 filtered failures)
+- **Pass rate (CI, last run)**: 569/620 (91.8%) raw, 563/569 (98.9%) filtered (6 filtered failures)
 - **Image test baseline**: **14/31 strict image match** (+2: bitmap_data_colortransform, bitmap_data_copypixels). **10/31 tolerance pass** (within test.toml limits).
-- **Main failure types**: output_mismatch (48), runtime_segfault (1), timeout (1)
-- **Known regressions**: `global_instance_decls` 40→23 (unclear root cause, test at 3% pass rate).
+- **Main failure types**: output_mismatch (48), runtime_segfault (2), timeout (1)
+- **Known regressions**: `native_objects_swf6` regressed to segfault (was output_mismatch). `global_instance_decls` 40→14 (unclear root cause, test at 2% pass rate).
+- **Latest fixes (2026-04-06)**:
+  - **netstream_play_flv PASS (21/21)** — FLV playback via onStatus event dispatch. FLV container demuxer (header + AMF script tag parsing), NetStream state machine (play/seek/pause), frame-based event scheduling. Frame loop exit condition fix (past-end-of-frames check).
+  - **netstream_seek_flv PASS (25/25)** — seek() fires Seek.Notify synchronously, pause() returns undefined, onMetaData dispatched from FLV script tag.
+  - **FLV_PLAYBACK_PLAN moved to incomplete/** — 2/3 tests pass (netstream_play_flv_screen still blocked on video codec).
 - **Latest fixes (2026-04-03, session 2)**:
   - **asfunction PASS (11/11)** — Hyperlink click handler for `<a href="asfunction:...">` in text fields. Nested sprite text field initialization fix (`findDisplayEntryInParent`). Function resolution with correct `this` binding (MC vs _global).
   - **edittext_ime_focus_lost PASS (7/7)** — IME preedit/commit event pipeline (verify_output.py → swf_core.c → action.c). Composition state tracking. Deferred onChanged from replaceSel.
@@ -95,8 +99,9 @@ Last updated: 2026-04-03
 |------|--------|-------|
 | timeout | timeout | Infinite loop — needs script execution timeout mechanism |
 | netstream_play_flv_screen | segfault | FLV playback crash |
+| native_objects_swf6 | segfault | Regression (was output_mismatch) — needs investigation |
 
-All previous crashes/segfaults/runtime_errors have been fixed (funky_function_calls, goto_methods, native_objects_swf6/7/8, movieclip_invalid_get_bounds_6/7, bitmap_filters).
+Most previous crashes/segfaults/runtime_errors have been fixed (funky_function_calls, goto_methods, native_objects_swf7/8, movieclip_invalid_get_bounds_6/7, bitmap_filters).
 
 ## Near-Passing Tests
 
