@@ -8,10 +8,14 @@ Last updated: 2026-04-06
 - **Image test baseline**: **14/31 strict image match** (+2: bitmap_data_colortransform, bitmap_data_copypixels). **10/31 tolerance pass** (within test.toml limits).
 - **Main failure types**: output_mismatch (48), runtime_segfault (2), timeout (1)
 - **Known regressions**: `native_objects_swf6` regressed to segfault (was output_mismatch). `global_instance_decls` 40→14 (unclear root cause, test at 2% pass rate).
+- **Latest fixes (2026-04-06, session 2)**:
+  - **netstream_play_flv_screen PASS (0/0)** — FLVPlayback component crash fix: safety checks in object.c `getProperty`/`getPropertyWithPrototype`/`findPropertyRaw` reject corrupt ASObjects (num_used > 16384). Root cause: FLVPlayback's `createVideoPlayer` called with NULL this, leading to corrupt pointer dereference in addProperty setter chain.
+  - **ScreenVideo decoder** — `screenvideo_decode_frame()` decodes FLV Screen Video codec (block-based zlib-compressed BGR). `flv_decode_first_frame()` extracts first video keyframe from FLV container. Decoded RGBA stored in `g_video_frames[]` for future headless rendering.
+  - **VIDEO_PLAYBACK_PLAN created** — 3/5 phases complete. Remaining: Video display object integration + headless rendering.
 - **Latest fixes (2026-04-06)**:
   - **netstream_play_flv PASS (21/21)** — FLV playback via onStatus event dispatch. FLV container demuxer (header + AMF script tag parsing), NetStream state machine (play/seek/pause), frame-based event scheduling. Frame loop exit condition fix (past-end-of-frames check).
   - **netstream_seek_flv PASS (25/25)** — seek() fires Seek.Notify synchronously, pause() returns undefined, onMetaData dispatched from FLV script tag.
-  - **FLV_PLAYBACK_PLAN moved to incomplete/** — 2/3 tests pass (netstream_play_flv_screen still blocked on video codec).
+  - **FLV_PLAYBACK_PLAN moved to incomplete/** — 2/3 tests pass (netstream_play_flv_screen now also PASS).
 - **Latest fixes (2026-04-03, session 2)**:
   - **asfunction PASS (11/11)** — Hyperlink click handler for `<a href="asfunction:...">` in text fields. Nested sprite text field initialization fix (`findDisplayEntryInParent`). Function resolution with correct `this` binding (MC vs _global).
   - **edittext_ime_focus_lost PASS (7/7)** — IME preedit/commit event pipeline (verify_output.py → swf_core.c → action.c). Composition state tracking. Deferred onChanged from replaceSel.
@@ -98,8 +102,9 @@ Last updated: 2026-04-06
 | Test | Status | Notes |
 |------|--------|-------|
 | timeout | timeout | Infinite loop — needs script execution timeout mechanism |
-| netstream_play_flv_screen | segfault | FLV playback crash |
 | native_objects_swf6 | segfault | Regression (was output_mismatch) — needs investigation |
+
+netstream_play_flv_screen crash fixed (was segfault, now PASS with 0/0 trace lines).
 
 Most previous crashes/segfaults/runtime_errors have been fixed (funky_function_calls, goto_methods, native_objects_swf7/8, movieclip_invalid_get_bounds_6/7, bitmap_filters).
 

@@ -2071,6 +2071,159 @@ next_tag:
 	return 0;
 }
 
+// Decode a ScreenVideo (codec 3) keyframe to RGBA pixel buffer.
+// Returns 1 on success, 0 on failure. Caller must free *out_pixels.
+// ScreenVideo format: blocks are bottom-to-top, BGR within block is bottom-to-top.
+static int screenvideo_decode_frame(const unsigned char* data, int data_len,
+                                     int* out_width, int* out_height,
+                                     unsigned char** out_pixels)
+{
+	if (data_len < 5) return 0;
+
+	// First byte was already consumed (frameType|codecID), data starts at the SV header
+	int b1 = data[0], b2 = data[1], b3 = data[2], b4 = data[3];
+	int block_w = ((b1 >> 4) + 1) * 16;
+	int image_w = ((b1 & 0xF) << 8) | b2;
+	int block_h = ((b3 >> 4) + 1) * 16;
+	int image_h = ((b3 & 0xF) << 8) | b4;
+
+	if (image_w == 0 || image_h == 0 || image_w > 4096 || image_h > 4096) return 0;
+
+	int cols = (image_w + block_w - 1) / block_w;
+	int rows = (image_h + block_h - 1) / block_h;
+
+	unsigned char* pixels = (unsigned char*)calloc(image_w * image_h * 4, 1);
+	if (!pixels) return 0;
+
+	int p = 4; // skip SV header
+	// Blocks are in row-major order, bottom-to-top (row 0 = bottom row of image)
+	for (int row = 0; row < rows; row++)
+	{
+		for (int col = 0; col < cols; col++)
+		{
+			if (p + 2 > data_len) { free(pixels); return 0; }
+			int block_data_size = (data[p] << 8) | data[p + 1];
+			p += 2;
+			if (block_data_size == 0) continue; // unchanged block (skip)
+			if (p + block_data_size > data_len) { free(pixels); return 0; }
+
+			// Determine actual block dimensions (edge blocks may be smaller)
+			int bx = col * block_w;
+			int by_bottom = row * block_h; // y from bottom
+			int bw = (bx + block_w > image_w) ? (image_w - bx) : block_w;
+			int bh = (by_bottom + block_h > image_h) ? (image_h - by_bottom) : block_h;
+
+			// Decompress block data (zlib)
+			unsigned char* block_bgr = (unsigned char*)malloc(bw * bh * 3);
+			if (!block_bgr) { free(pixels); return 0; }
+
+			unsigned long decomp_len = bw * bh * 3;
+#ifdef HAS_DATA_FILES
+			extern int uncompress(unsigned char* dest, unsigned long* destLen,
+			                       const unsigned char* source, unsigned long sourceLen);
+#endif
+			int zret = uncompress(block_bgr, &decomp_len, data + p, block_data_size);
+			if (zret != 0 || (int)decomp_len != bw * bh * 3)
+			{
+				free(block_bgr);
+				p += block_data_size;
+				continue; // skip corrupt block
+			}
+
+			// Copy block to pixel buffer (BGR bottom-to-top → RGBA top-to-bottom)
+			for (int yr = 0; yr < bh; yr++)
+			{
+				int src_y = bh - 1 - yr; // bottom-to-top in block data
+				int dst_y = (image_h - 1) - (by_bottom + yr); // flip to top-to-bottom
+				if (dst_y < 0 || dst_y >= image_h) continue;
+				for (int xr = 0; xr < bw; xr++)
+				{
+					int dst_x = bx + xr;
+					if (dst_x >= image_w) continue;
+					int src_idx = (src_y * bw + xr) * 3;
+					int dst_idx = (dst_y * image_w + dst_x) * 4;
+					pixels[dst_idx + 0] = block_bgr[src_idx + 2]; // R (from B)
+					pixels[dst_idx + 1] = block_bgr[src_idx + 1]; // G
+					pixels[dst_idx + 2] = block_bgr[src_idx + 0]; // B (from R)
+					pixels[dst_idx + 3] = 255;                     // A
+				}
+			}
+
+			free(block_bgr);
+			p += block_data_size;
+		}
+	}
+
+	*out_width = image_w;
+	*out_height = image_h;
+	*out_pixels = pixels;
+	return 1;
+}
+
+// Parse FLV and decode the first video frame (ScreenVideo only).
+// Returns decoded RGBA pixels, or NULL if no decodable frame found.
+static unsigned char* flv_decode_first_frame(const unsigned char* data, int len,
+                                              int* out_width, int* out_height)
+{
+	*out_width = 0; *out_height = 0;
+	if (len < 13 || data[0] != 'F' || data[1] != 'L' || data[2] != 'V') return NULL;
+	int offset = 9 + 4; // skip header + first PreviousTagSize
+
+	while (offset + 11 < len)
+	{
+		int tag_type = data[offset];
+		int tag_size = (data[offset+1] << 16) | (data[offset+2] << 8) | data[offset+3];
+		int tag_data_start = offset + 11;
+		if (tag_data_start + tag_size > len) break;
+
+		if (tag_type == 9 && tag_size > 1) // Video tag
+		{
+			int first_byte = data[tag_data_start];
+			int frame_type = (first_byte >> 4) & 0xF;
+			int codec_id = first_byte & 0xF;
+
+			if (codec_id == 3 && frame_type == 1) // ScreenVideo keyframe
+			{
+				unsigned char* pixels = NULL;
+				if (screenvideo_decode_frame(data + tag_data_start + 1, tag_size - 1,
+				                              out_width, out_height, &pixels))
+					return pixels;
+			}
+			// Other codecs not supported yet
+		}
+		offset = tag_data_start + tag_size + 4;
+	}
+	return NULL;
+}
+
+// Global video frame storage for NetStream→Video pipeline
+#define MAX_VIDEO_FRAMES 4
+static struct {
+	int active;
+	ASObject* ns_obj;
+	unsigned char* pixels;  // RGBA
+	int width;
+	int height;
+} g_video_frames[MAX_VIDEO_FRAMES];
+
+static void ns_store_decoded_frame(ASObject* ns, unsigned char* pixels, int w, int h)
+{
+	for (int i = 0; i < MAX_VIDEO_FRAMES; i++)
+	{
+		if (g_video_frames[i].ns_obj == ns || !g_video_frames[i].active)
+		{
+			if (g_video_frames[i].pixels) free(g_video_frames[i].pixels);
+			g_video_frames[i].active = 1;
+			g_video_frames[i].ns_obj = ns;
+			g_video_frames[i].pixels = pixels;
+			g_video_frames[i].width = w;
+			g_video_frames[i].height = h;
+			return;
+		}
+	}
+	free(pixels); // no slot available
+}
+
 static void ns_dispatch_onStatus(SWFAppContext* app_context, ASObject* ns,
                                   const char* code, const char* level)
 {
@@ -2327,6 +2480,14 @@ static ActionVar builtin_ns_play(SWFAppContext* app_context, ActionVar* args, u3
 	g_active_netstreams[slot].meta_height = height;
 	g_active_netstreams[slot].meta_framerate = framerate;
 	g_has_active_netstreams = 1;
+
+	// Decode first video frame (ScreenVideo only)
+	int frame_w = 0, frame_h = 0;
+	unsigned char* frame_pixels = flv_decode_first_frame(
+		(const unsigned char*)entry->content, entry->content_length,
+		&frame_w, &frame_h);
+	if (frame_pixels != NULL)
+		ns_store_decoded_frame(ns, frame_pixels, frame_w, frame_h);
 #endif
 
 	return ret;
@@ -12015,6 +12176,8 @@ static ASFunction g_tf_replaceText_func;
 // Helper: check if an ASObject is a bare TextField instance (created via new TextField())
 static int isTextFieldInstance(ASObject* obj) {
 	if (!g_textfield_constructor_init || g_textfield_constructor.prototype_obj == NULL) return 0;
+	// Safety: skip corrupt objects (NULL properties or unreasonable size)
+	if (obj->properties == NULL || obj->num_used > 4096) return 0;
 	ActionVar* proto_var = getProperty(obj, "__proto__", 9);
 	if (proto_var == NULL || proto_var->type != ACTION_STACK_VALUE_OBJECT) return 0;
 	return (ASObject*)proto_var->data.numeric_value == g_textfield_constructor.prototype_obj;
@@ -34348,7 +34511,7 @@ void actionSetMember(SWFAppContext* app_context)
 	if (obj_var.type == ACTION_STACK_VALUE_OBJECT)
 	{
 		ASObject* obj = (ASObject*) obj_var.data.numeric_value;
-		if (obj != NULL)
+		if (obj != NULL && obj->properties != NULL && obj->num_used <= 16384)
 		{
 			// Bare TextField instances (from new TextField()) reject sets on native properties
 			if (isTextFieldInstance(obj) && isNativeTextFieldProperty(prop_name, prop_name_len))

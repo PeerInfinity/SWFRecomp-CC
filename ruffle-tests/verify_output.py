@@ -1298,6 +1298,7 @@ def compile_native(test_dir, num_frames, build_dir, headless=False, has_image_co
                 "-o",
                 str(build_dir / "test_run"),
                 "-lm",
+                "-lz",
                 *mode_libs,
             ],
             stdout=subprocess.PIPE,

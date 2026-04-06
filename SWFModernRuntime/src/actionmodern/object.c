@@ -263,6 +263,7 @@ void releaseObject(SWFAppContext* app_context, ASObject* obj)
 ASProperty* findPropertyRaw(ASObject* obj, const char* name, u32 name_length)
 {
 	if (obj == NULL || name == NULL) return NULL;
+	if (obj->num_used > 16384 || (obj->num_used > 0 && obj->properties == NULL)) return NULL;
 	for (u32 i = 0; i < obj->num_used; i++)
 	{
 		if (prop_name_match(obj->properties[i].name, obj->properties[i].name_length, name, name_length))
@@ -281,6 +282,12 @@ bool hasPropertyRaw(ASObject* obj, const char* name, u32 name_length)
 ActionVar* getProperty(ASObject* obj, const char* name, u32 name_length)
 {
 	if (obj == NULL || name == NULL)
+	{
+		return NULL;
+	}
+
+	// Safety: reject obviously corrupt objects (garbage num_used or NULL properties with nonzero count)
+	if (obj->num_used > 16384 || (obj->num_used > 0 && obj->properties == NULL))
 	{
 		return NULL;
 	}
@@ -317,6 +324,10 @@ ActionVar* getPropertyWithPrototype(ASObject* obj, const char* name, u32 name_le
 	{
 		return NULL;
 	}
+
+	// Safety: reject obviously corrupt objects
+	if (obj->num_used > 16384 || (obj->num_used > 0 && obj->properties == NULL))
+		return NULL;
 
 	ASObject* current = obj;
 	int max_depth = 256;  // Prevent infinite loops in deep prototype chains
