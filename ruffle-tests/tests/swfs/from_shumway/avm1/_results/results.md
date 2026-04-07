@@ -1,10 +1,10 @@
 # Ruffle Test Results (Unfiltered)
 
-**Date**: 2026-04-07 04:49 UTC
+**Date**: 2026-04-07 17:42 UTC
 
-**Git SHA**: `4a67075693`
+**Git SHA**: `fa50429eba`
 
-**Run Duration**: 7m 12s
+**Run Duration**: 7m 18s
 
 ## Summary
 
@@ -30,18 +30,18 @@
 
 | # | Test | Lines | Duration | Notes |
 |---|------|-------|----------|-------|
-| 1 | `callee` | 2 | 18.7s |  |
-| 2 | `depth` | 6 | 18.6s |  |
-| 3 | `externalinterface` | 4 | 18.9s |  |
-| 4 | `label` | 4 | 19.0s |  |
-| 5 | `levels` | 9 | 18.4s |  |
-| 6 | `loadevent` | 9 | 18.8s |  |
-| 7 | `lookup` | 3 | 18.8s |  |
-| 8 | `mouse-transparency` | 1 | 18.6s |  |
-| 9 | `operations` | 13 | 18.9s |  |
-| 10 | `rollover` | 4 | 19.1s |  |
-| 11 | `super` | 11 | 18.6s |  |
-| 12 | `text-bind` | 0 | 17.0s |  |
+| 1 | `callee` | 2 | 18.8s |  |
+| 2 | `depth` | 6 | 19.0s |  |
+| 3 | `externalinterface` | 4 | 18.2s |  |
+| 4 | `label` | 4 | 20.2s |  |
+| 5 | `levels` | 9 | 19.1s |  |
+| 6 | `loadevent` | 9 | 18.4s |  |
+| 7 | `lookup` | 3 | 18.4s |  |
+| 8 | `mouse-transparency` | 1 | 18.4s |  |
+| 9 | `operations` | 13 | 18.4s |  |
+| 10 | `rollover` | 4 | 18.9s |  |
+| 11 | `super` | 11 | 18.9s |  |
+| 12 | `text-bind` | 0 | 18.5s |  |
 
 ## Near-Passing Tests
 
@@ -67,7 +67,7 @@ No segfaults.
 
 | # | Test | Detail | Duration | Notes |
 |---|------|--------|----------|-------|
-| 1 | `watch` | exit code -6 | 20.9s |  |
+| 1 | `watch` | exit code -6 | 20.5s |  |
 
 ## Timeouts
 

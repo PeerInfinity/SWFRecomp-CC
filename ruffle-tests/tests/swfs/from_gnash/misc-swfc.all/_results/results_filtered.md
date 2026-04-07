@@ -1,10 +1,10 @@
 # Ruffle Test Results (Filtered)
 
-**Date**: 2026-04-07 04:49 UTC
+**Date**: 2026-04-07 17:42 UTC
 
-**Git SHA**: `4a67075693`
+**Git SHA**: `fa50429eba`
 
-**Run Duration**: 5m 13s
+**Run Duration**: 5m 10s
 
 **Filtered**: 0 tests ignored out of 16 available
 
@@ -16,8 +16,8 @@
 | Passing | **2** (12.5%) |
 | Failing | 14 |
 | Total expected lines | 499 |
-| Matching lines | 225 (45.1%) |
-| Mismatched lines | 274 |
+| Matching lines | 223 (44.7%) |
+| Mismatched lines | 276 |
 
 ### Failure Breakdown
 
@@ -32,14 +32,14 @@
 
 | # | Test | Lines | Duration | Notes |
 |---|------|-------|----------|-------|
-| 1 | `gotoFrameLabelAsFunction` | 6 | 19.4s |  |
-| 2 | `hello` | 4 | 18.4s |  |
+| 1 | `gotoFrameLabelAsFunction` | 6 | 18.7s |  |
+| 2 | `hello` | 4 | 19.6s |  |
 
 ## Near-Passing Tests
 
 Tests with output mismatch but >= 50% line match rate (low-hanging fruit).
 
-**6 tests** within reach
+**5 tests** within reach
 
 | # | Test | Match Rate | Matching | Total | Diff Lines | Notes |
 |---|------|------------|----------|-------|------------|-------|
@@ -47,8 +47,7 @@ Tests with output mismatch but >= 50% line match rate (low-hanging fruit).
 | 2 | `movieclip_destruction_test2` | 73.2% | 41 | 56 | 15 |  |
 | 3 | `stackscope` | 72.7% | 8 | 11 | 3 |  |
 | 4 | `swf4opcode` | 63.2% | 74 | 117 | 43 |  |
-| 5 | `sound` | 58.3% | 7 | 12 | 5 |  |
-| 6 | `mouse_drag_test` | 50.0% | 6 | 12 | 6 |  |
+| 5 | `mouse_drag_test` | 50.0% | 6 | 12 | 6 |  |
 
 ## Segfaults
 
@@ -60,7 +59,7 @@ No segfaults.
 
 | # | Test | Detail | Duration | Notes |
 |---|------|--------|----------|-------|
-| 1 | `opcode_guard_test2` | exit code -6 | 20.6s |  |
+| 1 | `opcode_guard_test2` | exit code -6 | 20.7s |  |
 
 ## Timeouts
 
@@ -76,8 +75,8 @@ No timeouts.
 | 2 | `movieclip_destruction_test2` | 73.2% | 41/56 | 56 | 56 |  |
 | 3 | `stackscope` | 72.7% | 8/11 | 11 | 11 |  |
 | 4 | `swf4opcode` | 63.2% | 74/117 | 117 | 117 |  |
-| 5 | `sound` | 58.3% | 7/12 | 12 | 7 |  |
-| 6 | `mouse_drag_test` | 50.0% | 6/12 | 12 | 12 |  |
+| 5 | `mouse_drag_test` | 50.0% | 6/12 | 12 | 12 |  |
+| 6 | `sound` | 41.7% | 5/12 | 12 | 7 |  |
 | 7 | `soft_reference_test1` | 35.6% | 16/45 | 42 | 45 |  |
 | 8 | `registerclass_test3` | 33.3% | 9/27 | 27 | 27 |  |
 | 9 | `button_test1` | 25.8% | 8/31 | 20 | 31 |  |
