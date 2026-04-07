@@ -99,6 +99,11 @@ extern int g_override_this_set;
 // Used by generated code to halt script execution after function calls.
 int actionBaseClipRemoved(void);
 
+// Execution timeout — halts all script execution after time limit exceeded
+void actionSetMaxExecutionDuration(double ms);
+void actionResetExecutionTimer(void);
+void actionSetTimeoutJmp(void* jmp_buf_ptr);
+
 // Set the current execution context
 void actionSetCurrentContext(MovieClip* mc);
 // Set/get the base clip (the clip whose timeline code is executing).

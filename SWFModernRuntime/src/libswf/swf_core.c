@@ -3,6 +3,7 @@
 #include <stdlib.h>
 #include <string.h>
 #include <stdio.h>
+#include <setjmp.h>
 #include <swf.h>
 #include "constants.h"
 
@@ -719,6 +720,22 @@ void swfStart(SWFAppContext* app_context)
 	// Set root movieclip as default execution context (for 'this' resolution)
 	actionSetCurrentContext(&root_movieclip);
 
+	// Initialize execution timeout (set via MAX_EXECUTION_MS define)
+#ifdef MAX_EXECUTION_MS
+	actionSetMaxExecutionDuration(MAX_EXECUTION_MS);
+#endif
+	actionResetExecutionTimer();
+
+	// Set up longjmp target for execution timeout abort
+	{
+		jmp_buf timeout_jmp;
+		if (setjmp(timeout_jmp) != 0) {
+			// Returned here from timeout longjmp — execution was halted
+			goto frame_loop_exit;
+		}
+		actionSetTimeoutJmp(&timeout_jmp);
+	}
+
 	// Run frames in console mode
 	frame_func* funcs = app_context->frame_funcs;
 	current_frame = 0;
@@ -734,6 +751,12 @@ void swfStart(SWFAppContext* app_context)
 	while (tick_count < max_ticks)
 	{
 		tick_count++;
+
+		// Check execution timeout — if halted, stop all further processing
+		{
+			extern u8 g_execution_halted;
+			if (g_execution_halted) break;
+		}
 
 		// Process deferred unloadMovie state (MC properties change on next frame)
 		extern void actionProcessDeferredUnloads(void);
@@ -1102,6 +1125,10 @@ void swfStart(SWFAppContext* app_context)
 			break;
 		}
 	}
+
+frame_loop_exit:
+	// Deactivate timeout longjmp (jmp_buf is stack-local, must not be used after return)
+	actionSetTimeoutJmp(NULL);
 
 	printf("\n=== SWF Execution Completed ===\n");
 

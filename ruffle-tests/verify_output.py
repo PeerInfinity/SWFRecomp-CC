@@ -492,6 +492,24 @@ def get_num_frames(test_dir, wait_count=0, has_input=False):
     return max(declared, min_ticks)
 
 
+def get_max_execution_duration(test_dir):
+    """Parse max_execution_duration from test.toml [player_options].
+    Returns duration in milliseconds, or 0 if not set."""
+    toml_path = test_dir / "test.toml"
+    if toml_path.exists():
+        text = toml_path.read_text()
+        # Match: max_execution_duration = { secs = N, nanos = N }
+        m = re.search(
+            r"max_execution_duration\s*=\s*\{\s*secs\s*=\s*(\d+)\s*,\s*nanos\s*=\s*(\d+)\s*\}",
+            text,
+        )
+        if m:
+            secs = int(m.group(1))
+            nanos = int(m.group(2))
+            return secs * 1000 + nanos // 1_000_000
+    return 0
+
+
 def get_epsilon(test_dir):
     """Parse [approximations] epsilon from test.toml, default 0 (exact match)."""
     toml_path = test_dir / "test.toml"
@@ -1233,6 +1251,10 @@ def compile_native(test_dir, num_frames, build_dir, headless=False, has_image_co
         extra_defines.append("-DHAS_DATA_FILES")
     if has_test_harness:
         extra_defines.append("-DHAS_TEST_HARNESS")
+    # Pass max execution duration for script timeout
+    max_exec_ms = get_max_execution_duration(test_dir)
+    if max_exec_ms > 0:
+        extra_defines.append(f"-DMAX_EXECUTION_MS={max_exec_ms}")
     # Pass SWF file size for getBytesLoaded/getBytesTotal
     # Use the uncompressed size from the SWF header (bytes 4-7), not the file system size,
     # because Flash reports the uncompressed size for compressed (CWS/ZWS) SWFs.

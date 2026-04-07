@@ -715,6 +715,65 @@ int g_swf_version = 5;       // SWF version — set at startup from constants.h
 int g_use_network = 0;       // UseNetwork flag from FileAttributes tag
 u32 g_max_call_depth = 256;  // Default; overridden by tagScriptLimits()
 u8 g_execution_halted = 0;   // Set when recursion limit is hit; halts all further script execution
+
+// --- Execution timeout mechanism ---
+// Mirrors Ruffle's max_execution_duration: checks wall-clock time every N actions
+// and halts all script execution if the limit is exceeded.
+#include <time.h>
+static u32 g_actions_since_timeout_check = 0;
+static double g_max_execution_ms = 0;  // 0 = no limit
+static struct timespec g_execution_start_time;
+static int g_execution_timer_active = 0;
+
+void actionSetMaxExecutionDuration(double ms)
+{
+	g_max_execution_ms = ms;
+}
+
+void actionResetExecutionTimer(void)
+{
+	if (g_max_execution_ms > 0) {
+		clock_gettime(CLOCK_MONOTONIC, &g_execution_start_time);
+		g_execution_timer_active = 1;
+		g_actions_since_timeout_check = 0;
+	}
+}
+
+// Global longjmp target for timeout abort — set in swfStart before frame loop
+#include <setjmp.h>
+static jmp_buf g_timeout_jmp_buf;
+static int g_timeout_jmp_active = 0;
+
+static inline void actionCheckExecutionTimeout(void)
+{
+	if (!g_execution_timer_active) return;
+	g_actions_since_timeout_check++;
+	if (g_actions_since_timeout_check < 2000) return;
+	g_actions_since_timeout_check = 0;
+
+	struct timespec now;
+	clock_gettime(CLOCK_MONOTONIC, &now);
+	double elapsed_ms = (now.tv_sec - g_execution_start_time.tv_sec) * 1000.0 +
+	                     (now.tv_nsec - g_execution_start_time.tv_nsec) / 1000000.0;
+	if (elapsed_ms >= g_max_execution_ms) {
+		g_execution_halted = 1;
+		g_execution_timer_active = 0;
+		// longjmp back to the frame loop to cleanly exit all script execution
+		if (g_timeout_jmp_active) {
+			longjmp(g_timeout_jmp_buf, 1);
+		}
+	}
+}
+
+void actionSetTimeoutJmp(void* jmp_buf_ptr)
+{
+	if (jmp_buf_ptr) {
+		memcpy(g_timeout_jmp_buf, jmp_buf_ptr, sizeof(jmp_buf));
+		g_timeout_jmp_active = 1;
+	} else {
+		g_timeout_jmp_active = 0;
+	}
+}
 static u32 g_call_depth = 0;
 static int g_child_swf_init = 0;  // >0 during child SWF init (MCL/loadMovie); scopes funcs to MC
 extern u8 g_current_movie_id;    // Defined in tag_stubs.c — tracks which movie is currently initializing
@@ -22369,6 +22428,13 @@ void actionEnumerate(SWFAppContext* app_context, char* str_buffer)
 
 int evaluateCondition(SWFAppContext* app_context)
 {
+	actionCheckExecutionTimeout();
+	if (g_execution_halted) {
+		// Drain the condition value from stack and return 0 to break loops
+		POP();
+		return 0;
+	}
+
 	ActionStackValueType type = STACK_TOP_TYPE;
 	u64 val = STACK_TOP_VALUE;
 	u32 str_size = STACK_TOP_N;  // read before POP
