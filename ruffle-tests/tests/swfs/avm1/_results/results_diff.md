@@ -1,21 +1,29 @@
 # Ruffle Test Results Diff
 
-**Previous:** `81f9ea28cc82` (2026-04-07T20:00:12.560577+00:00)
-**Current:** `37a9f630eea8` (2026-04-07T21:46:07.533298+00:00)
+**Previous:** `37a9f630eea8` (2026-04-07T21:46:07.533298+00:00)
+**Current:** `1c6de3d1d31b` (2026-04-07T22:09:51.889664+00:00)
 
 ## Summary
 
 | Metric | Previous | Current | Delta |
 |--------|----------|---------|-------|
-| Passing | 577 | 579 | +2 |
+| Passing | 579 | 581 | +2 |
 | Total | 620 | 620 | 0 |
-| Pass rate | 93.1% | 93.4% | +0.3% |
-| Mismatched lines | 9689 | 8943 | -746 |
-|   Decreased | | | -746 |
+| Pass rate | 93.4% | 93.7% | +0.3% |
+| Mismatched lines | 8943 | 8945 | +2 |
+|   Decreased | | | -4 |
+|   Increased | | | +6 |
 
 ## Newly Passing (2)
 
 | Test | Previous Status | Lines (prev) | Lines (now) |
 |------|----------------|--------------|-------------|
-| `sound_id3` | output_mismatch | 17/633 | 633/633 |
-| `sound_id3_prop` | output_mismatch | 8/138 | 138/138 |
+| `swf5_xml_event_handler_context` | output_mismatch | 0/2 | 2/2 |
+| `xml_load` | output_mismatch | 0/2 | 2/2 |
+
+## Line Count Changed (2)
+
+| Test | Status | Lines (prev) | Lines (now) | Diff |
+|------|--------|--------------|-------------|------|
+| `global_instance_decls` | output_mismatch | 14/758 | 13/758 | +1 |
+| `global_proto_decls_delete` | output_mismatch | 301/4158 | 296/4158 | +5 |
