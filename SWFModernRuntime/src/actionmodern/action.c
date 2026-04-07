@@ -28661,9 +28661,20 @@ static void ensureGlobalInit(SWFAppContext* app_context)
 	#undef REG_OBJ
 
 	// Mark select SWF6+ constructors on _global with flash_flags=0x0080
-	// Note: LocalConnection, NetConnection, Video were previously hidden in SWF5
-	// to match Flash behavior (they're SWF6+ features). Removed because no tests
-	// in our suite depend on them being hidden, and globals_swf5 expects them visible.
+	// (hidden in SWF5 via version mask 0x7480, visible in SWF6+).
+	// Flash Player does not expose these in SWF5. Ruffle does, so globals_swf5
+	// expects them visible — that test is in RUFFLE_VS_FLASH_DIFFERENCES.md.
+	// Gnash tests (LocalConnection-v5, NetConnection-v5, Video-v5) confirm Flash behavior.
+	{
+		const char* swf6_names[] = {
+			"LocalConnection", "NetConnection", "Video",
+		};
+		for (int i = 0; i < 3; i++) {
+			u32 nlen = (u32)strlen(swf6_names[i]);
+			ASProperty* p = findPropertyRaw(global_object, swf6_names[i], nlen);
+			if (p != NULL) p->flash_flags = 0x0080;
+		}
+	}
 
 	g_global_init_done = 1;
 

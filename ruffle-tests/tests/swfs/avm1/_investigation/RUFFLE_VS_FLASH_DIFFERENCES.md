@@ -169,8 +169,25 @@ This pattern repeats for every prototype object in the test (~50+ prototypes × 
 
 **Decision:** Keep Flash-correct DONT_ENUM behavior. Accept as permanent Ruffle difference. Not added to ignored_tests.txt because the tests have other fixable diffs alongside this systematic difference.
 
-## ~~SWF5 Constructor Visibility: LocalConnection, NetConnection, Video~~ (RESOLVED)
+## SWF5 Constructor Visibility: LocalConnection, NetConnection, Video
 
-**Test:** `globals_swf5` — **now PASS (304/304)**
+**Test:** `globals_swf5`
 
-Previously, `LocalConnection`, `NetConnection`, and `Video` were hidden in SWF5 via `flash_flags=0x0080` to match Flash Player behavior. This was reversed because no Gnash-v5 tests in our suite actually depend on the hiding, and `globals_swf5` expects them visible. The flash_flags hiding was removed (2026-04-07).
+In Flash Player, `LocalConnection`, `NetConnection`, and `Video` are not accessible in SWF5 — `typeof(LocalConnection)` returns `"undefined"`. This is confirmed by Gnash test suite tests (`LocalConnection-v5`, `NetConnection-v5`, `Video-v5`) which specifically assert these are undefined in SWF5.
+
+Ruffle's `globals_swf5` test expects all three to be visible as `[type Function]` in SWF5. Our implementation uses `flash_flags=0x0080` (hidden by SWF5 version mask `0x7480`) to match Flash's behavior.
+
+```diff
+- [type Function]    // LocalConnection (line 66)
+- function
+- object
++ undefined
++ undefined
++ undefined
+```
+
+Same pattern for NetConnection (lines 90-92) and Video (lines 146-148).
+
+**Impact:** 9 diff lines (3 constructors × 3 lines each: value, typeof, own_props).
+
+**Decision:** Keep Flash-correct behavior (hidden in SWF5). Gnash tests `LocalConnection-v5`, `NetConnection-v5`, `Video-v5` confirm this is correct. Accept `globals_swf5` at 295/304 as a Ruffle-vs-Flash difference.
