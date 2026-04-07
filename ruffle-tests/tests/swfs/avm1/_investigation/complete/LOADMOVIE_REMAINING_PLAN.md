@@ -3,7 +3,7 @@
 
 <!-- PLAN_META
 id: LOADMOVIE_REMAINING
-status: blocked
+status: complete
 phases:
   - id: 1
     name: "Recompiler nested function ordering"
@@ -20,25 +20,31 @@ phases:
   - id: 5
     name: "SWF_URL test name inclusion"
     status: complete
+  - id: 6
+    name: "Image loading via loadMovie"
+    status: complete
 dependencies: []
-blockers:
-  - blocker: 6
-    reason: "movieclip_state_values blocked on image decoding (JPEG via loadMovie)"
+blockers: []
 -->
 
-Last updated: 2026-03-13
+Last updated: 2026-04-06
 
-## Status: BLOCKED — 3/5 tests passing, 2 remaining permanently blocked
+## Status: COMPLETE — 4/5 tests passing, 1 with accepted cosmetic diffs
 
-3 tests now pass: `loadmovie_var_persistence` ✅ (8/8), `loadmovienum_cross_version_prototype` ✅ (9/9), `mcl_events_swf_version` ✅ (232/232).
+4 tests pass: `loadmovie_var_persistence` ✅ (8/8), `loadmovienum_cross_version_prototype` ✅ (9/9), `mcl_events_swf_version` ✅ (232/232), `movieclip_state_values` ✅ (114/114).
 
-2 tests remain blocked:
-- `movieclip_library_state_values` 76/78 — cosmetic diffs (_xmouse + _url), already in ACCEPTED_DIFFS.md + ignored_tests.txt
-- `movieclip_state_values` 39/114 — Tests 1-2 pass (39 lines), Test 3 blocked on image decoding (infeasible), Test 4 correct but shifted. Added to ACCEPTED_DIFFS.md + ignored_tests.txt (2026-03-13).
+1 test has accepted cosmetic diffs:
+- `movieclip_library_state_values` 76/78 — _xmouse + _url diffs, in ACCEPTED_DIFFS.md + ignored_tests.txt
 
-**Phase 6 (per-movie `_global`) was CANCELLED** — Ruffle shares `_global` across all movies (2026-03-10 investigation).
+### Bonus: `movieclip_methods_with_loaded_image` ✅ (4/4)
 
-### Fixes completed (2026-02-27)
+This test was not in the original plan but was fixed as part of unblocking:
+- **Root cause:** `actionDelete2` didn't check the current MovieClip's `dynamic_props`, so `delete onEnterFrame` in an onEnterFrame handler was a no-op. Additionally, for root MC, `actionSetMember` stores properties in both `dynamic_props` and the global var_map, so the delete needed to clean both.
+- **Fix:** Added MC `dynamic_props` lookup to `actionDelete2`, with fall-through to global variable cleanup for root MC.
+
+---
+
+## Fixes completed (2026-02-27)
 
 1. **Recompiler nested function ordering** — Phase 1 label scanning + Phase 2
    stringstream buffering. Commit: 55fb0205.
@@ -60,35 +66,28 @@ Last updated: 2026-03-13
    `SWF_URL="file:///{test_name}/test.swf"` matching Ruffle's VFS URL format
    (was `"file:///test.swf"` which broke URL-processing tests).
 
+## Fixes completed (2026-04-06)
+
+6. **Image loading via loadMovie** — PNG/JPEG children detected by magic bytes in
+   verify_output.py, synthetic MovieEntry with swf_version=0 generated. Runtime: image
+   dims stored on MovieClip, _width/_height/getBounds/getRect/pixelBounds return image
+   dimensions, getSWFVersion returns -1. This unblocked `movieclip_state_values` (114/114 PASS).
+
+7. **actionDelete2 MC dynamic_props support** — `actionDelete2` now checks
+   `g_current_context->dynamic_props` before the global variable table, mirroring Ruffle's
+   Target scope in the scope chain. For root MC, falls through to also clean up the global
+   var_map (since `actionSetMember` on root stores in both places). This fixed
+   `movieclip_methods_with_loaded_image` (4/4 PASS).
+
 ---
 
-## Test Results (2026-03-13, CI + local verification)
+## Test Results (2026-04-06, local verification)
 
 | Test | Status | Match | Notes |
 |------|--------|-------|-------|
 | loadmovie_var_persistence | **PASS** ✅ | 8/8 | |
 | loadmovienum_cross_version_prototype | **PASS** ✅ | 9/9 | |
 | mcl_events_swf_version | **PASS** ✅ | 232/232 | |
-| movieclip_state_values | output_mismatch | 39/114 | Tests 1-2 pass; Test 3 blocked (image decoding); Test 4 correct but shifted |
+| movieclip_state_values | **PASS** ✅ | 114/114 | Image loading implemented |
 | movieclip_library_state_values | output_mismatch | 76/78 | _xmouse + _url cosmetic diffs (ACCEPTED_DIFFS) |
-
----
-
-## Remaining Blockers
-
-### movieclip_state_values — Image decoding (INFEASIBLE)
-
-Test 3 loads `"no correct file (image).swf"` (a JPEG renamed to .swf). In Flash/Ruffle,
-this creates a 1-frame MovieClip with the image dimensions (1280x985) and
-bytesTotal = 2334995. Our NO_GRAPHICS runtime has no image decoder and cannot replicate
-this behavior.
-
-**What works:** Tests 1-2 (failed load with -1 state values) produce correct output (39 lines match). Test 4 (valid SWF load) also produces correct output but is permanently shifted because Test 3 emits 3 error lines instead of 53 expected lines.
-
-**Resolution:** Added to ACCEPTED_DIFFS.md (Category 6: Missing Feature) and ignored_tests.txt.
-
-### movieclip_library_state_values — Test harness artifacts (COSMETIC)
-
-Already documented in ACCEPTED_DIFFS.md and ignored_tests.txt since 2026-02-27.
-Only 2 diff lines: `_xmouse` (Ruffle default mouse position) and `_url` (anomalous
-VFS path format in this test's expected output).
+| movieclip_methods_with_loaded_image | **PASS** ✅ | 4/4 | Bonus fix (delete onEnterFrame) |

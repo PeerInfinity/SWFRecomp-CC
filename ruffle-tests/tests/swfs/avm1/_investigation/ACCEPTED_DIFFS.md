@@ -232,34 +232,9 @@ The anomalous expected output is likely a Ruffle test-generation artifact.
 
 ## Category 6: Missing Feature (Image Loading)
 
-Tests that require loading non-SWF content (JPEG/PNG images) into a MovieClip via
-`loadMovie`. Flash/Ruffle decode the image and create a 1-frame MovieClip with the
-image dimensions. Our NO_GRAPHICS runtime has no image decoder.
-
-### `movieclip_state_values` — Image loading in Test 3 (75 diff lines)
-
-**Test structure:** 4 sequential sub-tests:
-- Test 1 (failed load, non-existent file): PASS — 17 lines match
-- Test 2 (failed load, text file): PASS — 17 lines match
-- Test 3 (image load): BLOCKED — expects image dimensions (1280x985), bytesTotal (2334995)
-- Test 4 (valid SWF load): correct output but permanently shifted due to Test 3 failure
-
-**Example diff (Test 3):**
-```
-- Frames loaded: 1
-+ Error: The arrays are not equal.
-- Change: Prop _height is "0" on the first, but "985" on the second target.
-+ Error: The MovieClip has not loaded.
-- Change: Prop _width is "0" on the first, but "1280" on the second target.
-```
-
-The test loads `"no correct file (image).swf"` (a JPEG renamed to .swf). Flash/Ruffle
-decode it as an image and create a MovieClip with pixel dimensions. Our runtime treats
-it as an invalid SWF (framesloaded = -1). Test 4 produces correct output but is shifted
-by ~50 lines because Test 3 emits 3 lines instead of 53.
-
-**Decision:** Accept 75 diff lines. Image decoding is infeasible in NO_GRAPHICS mode.
-Tests 1, 2, and 4 produce correct output; only Test 3 (image) fails.
+**(Empty)** — `movieclip_state_values` was previously here but now passes (114/114) thanks
+to image loading support via loadMovie (synthetic MovieEntry with swf_version=0, image
+dimensions stored on MovieClip). Removed 2026-04-06.
 
 ---
 
@@ -324,6 +299,6 @@ the 293-line test causes this 4-line known-failure test to fail.
 | `native_subclasses` | Platform UB (Date timezone) | 1 | Accept; timezone-dependent |
 | `mcl_replace_root_swf7_to_swf5` | Ruffle vs Flash (SWF7 undefined concatenation) | 1 | Accept; our `"" + undefined` = `"undefined"` is correct per Flash |
 | `mcl_replace_root_swf7_to_swf6` | Ruffle vs Flash (SWF7 undefined concatenation) | 1 | Accept; same as above |
-| `movieclip_state_values` | Missing feature (image loading in Test 3) | ~75 | Accept; image decoding infeasible in NO_GRAPHICS mode |
+| ~~`movieclip_state_values`~~ | ~~Missing feature~~ | ~~75~~ | **REMOVED** — now PASS (114/114) via image loading support |
 | `string_paths_reference_launder` | Ruffle known failure (stack_push) | 2 | Accept; Ruffle also fails this test |
 | `tab_ordering_properties_tab_index_edge_case` | Ruffle known failure (conflicting test expectations) | 4 | Accept; contradicts `tab_ordering_properties` |

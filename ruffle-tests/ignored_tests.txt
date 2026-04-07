@@ -71,7 +71,6 @@ shared_object_self_ref
 # They may be removed from this list as capabilities are added.
 # See _investigation/FEATURE_SCOPE.md for details.
 swf5_xml_event_handler_context
-movieclip_methods_with_loaded_image
 localconnection
 edittext_ime_focus_lost
 sandbox_type_remote
@@ -102,7 +101,6 @@ edittext_default_format_empty
 mcl_replace_root_swf7_to_swf5
 mcl_replace_root_swf7_to_swf6
 movieclip_library_state_values
-movieclip_state_values
 native_objects_swf6
 tab_ordering_properties_tab_index_edge_case
 watch_virtual_property

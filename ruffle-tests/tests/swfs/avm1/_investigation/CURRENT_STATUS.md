@@ -8,6 +8,9 @@ Last updated: 2026-04-06
 - **Image test baseline**: **14/31 strict image match** (+2: bitmap_data_colortransform, bitmap_data_copypixels). **10/31 tolerance pass** (within test.toml limits).
 - **Main failure types**: output_mismatch (48), runtime_segfault (2), timeout (1)
 - **Known regressions**: `native_objects_swf6` regressed to segfault (was output_mismatch). `global_instance_decls` 40→14 (unclear root cause, test at 2% pass rate).
+- **Latest fixes (2026-04-06, session 4)**:
+  - **movieclip_methods_with_loaded_image PASS (4/4)** — `actionDelete2` now checks current MovieClip's `dynamic_props` (mirroring Ruffle's Target scope), with fall-through to global var_map cleanup for root MC. Fixed `delete onEnterFrame` in onEnterFrame handlers. Removed from ignored_tests.txt.
+  - **movieclip_state_values removed from ACCEPTED_DIFFS** — now fully passing (114/114). Removed from ignored_tests.txt. LOADMOVIE_REMAINING_PLAN moved from blocked/ to complete/.
 - **Latest fixes (2026-04-06, session 3)**:
   - **movieclip_state_values PASS (114/114)** — Image loading via loadMovie. PNG/JPEG children detected by magic bytes in verify_output.py, synthetic MovieEntry with swf_version=0 generated. Runtime: image dims stored on MovieClip, _width/_height/getBounds/getRect/pixelBounds return image dimensions, getSWFVersion returns -1. LOADMOVIE_MULTI_SWF_PLAN moved to complete/.
 - **Latest fixes (2026-04-06, session 2)**:
@@ -183,7 +186,7 @@ All other previously near-passing tests have been fixed. 146 tests were tracked 
 | LOADMOVIE_PLAN | 32/35 pass | mcl_replace_root accepted diffs |
 | ROOT_REPLACEMENT_PLAN | 1/4 pass | MTASC class support + cross-version scope |
 | HIT_TESTING_PLAN | 5+ pass | movieclip_hittest_shapeflag (shape accuracy) |
-| LOADMOVIE_REMAINING_PLAN | 0/5 | setTimeout, cross-version/__proto__ |
+| LOADMOVIE_REMAINING_PLAN | **4/5 COMPLETE** | Moved to complete/ (1 accepted diffs) |
 | DRAWING_API_RENDERING | 3 tests improved | Focal radial precision, edge anti-aliasing (see RENDERING_PIPELINE_COMPARISON.md) |
 | RUNTIME_SETMASK | 2/3 image PASS | movieclip_setmask image blocked on Drawing API anti-aliasing |
 
@@ -197,7 +200,7 @@ Remaining failures require:
 - **Global enumeration order**: global_proto_decls, global_instance_decls, global_proto_decls_delete (GLOBALS_PLAN Phase 8 blocked)
 - **Missing features**: localconnection, sandbox_type_remote
 - **Shape-accurate hitTest**: movieclip_hittest_shapeflag (curves/strokes accuracy)
-- **Other**: swf5_xml_event_handler_context, movieclip_methods_with_loaded_image
+- **Other**: swf5_xml_event_handler_context
 
 ### Remaining blocked work (from blocked/ plans)
 - **GLOBALS_PLAN Phase 8** — BLOCKED by enumeration order + missing globals.

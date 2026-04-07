@@ -32044,7 +32044,30 @@ void actionDelete2(SWFAppContext* app_context, char* str_buffer)
 		}
 	}
 
-	// Not found in scope chain - try global variables
+	// Not found in scope chain - try current MovieClip's dynamic_props
+	// (mirrors Ruffle's Target scope in the scope chain)
+	bool deleted_from_mc = false;
+	if (g_current_context != NULL && g_current_context->dynamic_props != NULL && var_name != NULL)
+	{
+		ASObject* clip_props = (ASObject*) g_current_context->dynamic_props;
+		ActionVar* prop = getProperty(clip_props, var_name, var_name_len);
+		if (prop != NULL)
+		{
+			success = deleteProperty(app_context, clip_props, var_name, var_name_len);
+			deleted_from_mc = true;
+			// For root MC, also delete from global variable table (SetMember on root
+			// stores in both dynamic_props and var_map — delete must clean both).
+			extern MovieClip root_movieclip;
+			if (g_current_context != &root_movieclip)
+			{
+				PUSH(ACTION_STACK_VALUE_BOOLEAN, success ? 1ULL : 0ULL);
+				return;
+			}
+			// Fall through for root MC to also clean up global variable table
+		}
+	}
+
+	// Not found in scope chain or MC props - try global variables
 	// Check both var_array (by string_id) and var_map (by name)
 	{
 		bool found = false;
