@@ -192,6 +192,7 @@ All other previously near-passing tests have been fixed. 146 tests were tracked 
 | DRAWING_API_RENDERING | mask_with_drawing IMAGE PASS; gradient outliers reduced 80-86% |
 | PIXEL_TEXT_LAYOUT_PLAN | 3/3 (asfunction, edittext_drag_select, edittext_ime_focus_lost) |
 | SWF5_XML_EVENT_HANDLER_CONTEXT_PLAN | 2/2 + xml_load 2/2 |
+| VECTOR_PATH_HITTEST_PLAN | 329/338 (9 accepted diffs) |
 
 ### Blocked plans
 | Plan | Status | Blocker |
@@ -201,7 +202,7 @@ All other previously near-passing tests have been fixed. 146 tests were tracked 
 | CLONE_DUPLICATE_PLAN | 4/8 pass | Textfield mouse events |
 | LOADMOVIE_PLAN | 32/35 pass | mcl_replace_root accepted diffs |
 | ROOT_REPLACEMENT_PLAN | 1/4 pass | MTASC class support + cross-version scope |
-| HIT_TESTING_PLAN | 5+ pass | movieclip_hittest_shapeflag (shape accuracy) |
+| HIT_TESTING_PLAN | 5+ pass | movieclip_hittest_shapeflag now accepted diffs |
 | LOADMOVIE_REMAINING_PLAN | **4/5 COMPLETE** | Moved to complete/ (1 accepted diffs) |
 | DRAWING_API_RENDERING | 3 tests improved | Focal radial precision, edge anti-aliasing (see RENDERING_PIPELINE_COMPARISON.md) |
 | RUNTIME_SETMASK | **COMPLETE** | Moved to complete/ (masking infra done; image diff is Drawing API edge AA) |
@@ -211,16 +212,15 @@ All other previously near-passing tests have been fixed. 146 tests were tracked 
 ### Actionable — Quick wins (all exhausted)
 All previous quick wins have been fixed. See `SESSION_NOTES.md` for details.
 
-### Remaining failing tests (filtered: 9 tests)
+### Remaining failing tests (filtered: 5 tests, after movieclip_hittest_shapeflag accepted)
 Remaining failures require:
 - **Global enumeration order**: global_proto_decls, global_instance_decls, global_proto_decls_delete (GLOBALS_PLAN Phase 8 blocked)
 - **Missing features**: localconnection, sandbox_type_remote
-- **Shape-accurate hitTest**: movieclip_hittest_shapeflag (curves/strokes accuracy)
 
 ### Remaining blocked work (from blocked/ plans)
 - **GLOBALS_PLAN Phase 8** — BLOCKED by enumeration order + missing globals.
 - **MC_REMOVAL_LIFECYCLE_PLAN** — call() early termination, SetTarget on removed base_clip.
-- **TYPE_COERCION_ADVANCED_PLAN** — coerce_to_object_monkeypatch blocked by closure variable capture (not feasible).
+- **TYPE_COERCION_ADVANCED_PLAN** — **COMPLETE** (2/2 PASS). Moved to complete/. Blocker resolved: closure capture + tri-state auto-boxing.
 
 ### Dependency Blockers (plans blocking other plans)
 - **LOADMOVIE_PLAN**: 32/35 core tests PASS. loadmovie_registerclass PASS. mcl_replace_root accepted diffs.

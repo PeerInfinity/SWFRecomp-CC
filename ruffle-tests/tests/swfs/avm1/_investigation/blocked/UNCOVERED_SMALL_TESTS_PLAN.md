@@ -1,11 +1,11 @@
 # Uncovered Small/Miscellaneous Tests Catalog
 <!-- TESTS: define_local_with_paths, device_font_spacing, gettextextent, get_bytes_total, geturl, issue_2030, issue_2084, issue_3169, resolve_different_root, root_global_parent, root_onload, sandbox_type_remote, string_paths_keyevents, string_paths_timer, displacementmapfilter_mappoint_throw_error, localconnection -->
 
-Last updated: 2026-03-14
+Last updated: 2026-04-07
 
-## Status: 13/19 PASS — 0 actionable, 6 blocked
+## Status: 16/19 PASS — 0 actionable, 3 blocked (all in ignored_tests.txt)
 
-All actionable fixes have been implemented. The remaining 6 tests are blocked on larger features (loadMovie, BitmapData, LocalConnection, navigator infrastructure, throw-from-native).
+All actionable fixes have been implemented. The remaining 3 tests are blocked on external infrastructure (child SWF HTTP loading, navigator trace logging, child SWF cross-movie communication). All 3 are in `ignored_tests.txt` and do not affect the filtered pass rate.
 
 ---
 
@@ -26,12 +26,12 @@ All actionable fixes have been implemented. The remaining 6 tests are blocked on
 | root_global_parent | 6 | **PASS** | |
 | string_paths_keyevents | 0 | **PASS** | Fixed: skip dead MCs in broadcastMessage dispatch |
 | string_paths_timer | 0 | **PASS** | Fixed: deactivate timers on removed MCs in processTimers |
-| issue_2030 | 4 | FAIL | Blocked: needs attachBitmap + BitmapData pixel buffer |
-| displacementmapfilter_mappoint_throw_error | 13 | FAIL | Blocked: Point.toString() + Error throw from native ctor |
-| sandbox_type_remote | 3 | FAIL | Blocked: loadMovie multi-SWF |
-| issue_2084 | 16 | FAIL | Blocked: loadMovie + onLoad positioning |
-| geturl | 7 | FAIL | Blocked: navigator/network trace infrastructure |
-| localconnection | 579 | FAIL | Blocked: full LocalConnection protocol |
+| issue_2030 | 4 | **PASS** | Fixed post-plan: attachBitmap + BitmapData pixel buffer implemented |
+| displacementmapfilter_mappoint_throw_error | 13 | **PASS** | Fixed post-plan: Point.toString() + valueOf throw propagation |
+| issue_2084 | 16 | **PASS** | Fixed post-plan: loadMovie + onLoad + attachMovie positioning |
+| geturl | 7 | FAIL (0/7) | Blocked: navigator trace infrastructure + POST variable enumeration |
+| sandbox_type_remote | 3 | FAIL (1/3) | Blocked: child SWF loading from HTTP URLs |
+| localconnection | 579 | FAIL (433/579) | Blocked: child SWF communication — has own plan (LOCALCONNECTION_PLAN) |
 
 ---
 
@@ -52,31 +52,55 @@ All actionable fixes have been implemented. The remaining 6 tests are blocked on
 
 ---
 
-## Blocked Tests
+## Post-Plan Fixes (resolved since 2026-03-14)
 
-### issue_2030 (4 lines) — Blocked on attachBitmap
+### issue_2030 (4 lines) — NOW PASS
+BitmapData pixel buffer and `mc.attachBitmap()` were implemented as part of the BITMAPDATA_RENDERING_PLAN. The test now passes with 4/4 lines.
 
-Creates an empty MC, creates a 10x10 BitmapData, calls `mc.attachBitmap(bitmap, 0)`, then checks `mc._width` and `mc._height`. Expects 10/10 from the attached bitmap dimensions. BitmapData pixel buffer is now implemented (BITMAP_DATA_PLAN complete), but requires:
-1. `MovieClip.attachBitmap()` method that sets MC dimensions from bitmap
+### displacementmapfilter_mappoint_throw_error (13 lines) — NOW PASS
+Point.toString() was implemented, and valueOf throw propagation from native constructors was added (local setjmp exception handlers around tsArgToDouble_ctx coercion). Has its own completed plan (DISPLACEMENTMAPFILTER_PLAN). Now passes with 13/13 lines.
 
-### displacementmapfilter_mappoint_throw_error (13 lines) — Partially blocked
+### issue_2084 (16 lines) — NOW PASS
+loadMovie multi-SWF infrastructure, onLoad callbacks, and attachMovie positioning in loaded child clips were all implemented. Now passes with 16/16 lines.
 
-Two issues:
-1. **Point.toString()** returns `[object Object]` instead of `(x=1, y=2)`. The Point class exists but its toString is not implemented. This is fixable independently.
-2. **Error throw from native constructor** — the test expects `DisplacementMapFilter` constructor to throw an Error when `mapPoint` is invalid. Our try/catch infrastructure exists but native constructors don't throw. Requires throw-from-native support.
+---
 
-### sandbox_type_remote (3 lines) — Blocked on loadMovie
+## Remaining Blocked Tests
 
-Line 1 passes (`localTrusted` for root SWF). Lines 2-3 need a loaded child SWF with `remote` sandbox type.
+### geturl (7 lines) — Blocked on navigator trace infrastructure
 
-### issue_2084 (16 lines) — Blocked on loadMovie
+The test has `log_fetch = true` in test.toml, which tells Ruffle to log navigation events. Expected output:
+```
+Navigator::navigate_to_url:
+  URL: http://www.example.com
+  Target: _blank
+  Method: POST
+  Param: value2=2
+  Param: value1=string
+  Param: $version=LNX 32,0,0,0
+```
 
-Tests onLoad + attachMovie positioning in loaded child clips. Needs multi-SWF execution.
+Would require:
+1. `log_fetch` flag parsed from test.toml and passed to runtime (not currently supported by verify_output.py)
+2. Navigator trace logging in `actionGetURL2` for browser navigation targets
+3. POST variable enumeration — when `send_vars_method=POST`, all scope variables are sent as params
 
-### geturl (7 lines) — Blocked on navigator infrastructure
+The test is in `ignored_tests.txt`. Effort outweighs the 7-line gain.
 
-Tests `getURL()` with POST parameters. Expected output traces the URL, target, method, and POST parameters. Would need a navigator/network logging hook in the test harness.
+### sandbox_type_remote (3 lines) — Blocked on child SWF HTTP loading
 
-### localconnection (579 lines) — Low priority
+Line 1 passes (`localWithNetwork` for root SWF). Lines 2-3 require child SWFs loaded from `http://localhost:8000/` with different sandbox types. No child SWFs exist in the test directory — they would need to be served from a test HTTP server. Fundamentally blocked by same infrastructure gap as other multi-SWF-from-URL tests.
 
-Full LocalConnection protocol with domain management, send/receive, connect/close. Very complex, 579 expected lines. Consider adding to ignored_tests.txt if effort exceeds ROI.
+### localconnection (433/579 lines) — Has own dedicated plan
+
+433/579 lines match (74.8%). Remaining 146 lines blocked on child SWF cross-movie communication (avm1child/avm2child). See `incomplete/LOCALCONNECTION_PLAN.md` for full details. This test is in `ignored_tests.txt`.
+
+---
+
+## Investigation Notes (2026-04-07 update)
+
+Reviewed all 6 previously-blocked tests against current codebase state:
+- 3 of 6 blockers were resolved by work done on other plans (BITMAPDATA_RENDERING, DISPLACEMENTMAPFILTER, LOADMOVIE)
+- The remaining 3 blockers are infrastructure-level gaps (HTTP child SWF loading, navigator trace, cross-movie LC) that are unlikely to be resolved without significant new infrastructure
+- All 3 remaining failing tests are already in `ignored_tests.txt`
+- No alternative approaches were identified that could bypass the blockers

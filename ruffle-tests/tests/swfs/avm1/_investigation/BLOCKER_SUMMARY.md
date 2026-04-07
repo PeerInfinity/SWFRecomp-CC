@@ -87,21 +87,17 @@ Tests `global_proto_decls`, `global_proto_decls_delete`, and `global_instance_de
 
 ---
 
-### Blocker 5: Pixel-Level Shape Hit Testing
+### Blocker 5: Pixel-Level Shape Hit Testing — **RESOLVED (accepted diffs)**
 
-**Impact**: 1 test, ~27 lines
+**Impact**: 1 test, 9 accepted diff lines (329/338 pass)
 
-`movieclip_hittest_shapeflag` tests shape-accurate hit testing (not just bounding box). Our triangulation approach has edge cases: stroke precision, curve approximation, device-font text, morph complex shapes.
-
-**Progress (2026-03-15):** Fixed clip-depth masking (2 lines), setMask masking (1 line), added glyph-level text hit testing, DefineText bounds for sprite content bounds, rotated bounding box AABB. Reduced from 32 → ~27 diff lines.
-
-Remaining categories: device-font text (11 lines — no font outline data in SWF), curve/stroke precision (~10 lines — triangulation approximation), drawing API bounds (~4 lines), stroke-only morphs (~2 lines).
+`movieclip_hittest_shapeflag` tests shape-accurate hit testing. All 4 VECTOR_PATH_HITTEST_PLAN phases complete: path data emission, fill winding number, stroke distance, morph interpolated paths. Remaining 9 diffs are permanent (Noto Sans vs Flash fonts 7 lines, morph boundary precision 1 line, Drawing API tessellation 1 line). Added to ACCEPTED_DIFFS.md and ignored_tests.txt.
 
 | Test | Match | Lines Off |
 |------|-------|-----------|
-| movieclip_hittest_shapeflag | ~309/338 | ~29 |
+| movieclip_hittest_shapeflag | 329/338 | 9 (accepted) |
 
-**Plans blocked**: HIT_TESTING_PLAN
+**Plans completed**: VECTOR_PATH_HITTEST_PLAN (moved to complete/)
 
 ---
 

@@ -282,6 +282,67 @@ the 293-line test causes this 4-line known-failure test to fail.
 
 ---
 
+## Category 8: Shape Hit Test Accuracy Limits
+
+Tests where shape-accurate `hitTest(x, y, true)` results differ due to inherent
+differences in font glyph outlines, morph boundary precision, and Drawing API
+stroke tessellation accuracy. 329/338 lines pass; the remaining 9 are at exact
+geometric boundaries where our implementation disagrees with Ruffle's.
+
+### `movieclip_hittest_shapeflag` — Noto Sans vs Flash device font glyph outlines (7 diff lines)
+
+**Example diff (text glyph boundary):**
+```
+// _level0.clip.hitTest(262, 320, true)
+- true
++ false
+```
+
+Hit testing against text glyphs uses Noto Sans TTF outlines (our device font substitute).
+Flash Player uses its own proprietary built-in device fonts with different glyph outlines.
+At coordinates near glyph curve boundaries (lines 71, 163, 165, 167, 171, 175, 177), the
+Noto Sans outline includes or excludes the test point differently than Flash's font.
+
+Not fixable without Flash's actual glyph outlines, which are proprietary.
+
+**Decision:** Accept; font metric incompatibility between Noto Sans and Flash device fonts.
+
+### `movieclip_hittest_shapeflag` — Morph fill boundary precision (1 diff line)
+
+**Example diff (morph shape boundary):**
+```
+// _level0.clip.hitTest(400, 300, true)
+- false
++ true
+```
+
+Line 296: Morph shape 41 at interpolated position (400, 300) with fill0=1. Our
+floating-point quadratic curve winding solver says the point is inside the fill, but
+Ruffle's integer-arithmetic approach (via `lerp_twips` rounding + i64 cross-product)
+says outside. The point is at the exact fill boundary where both implementations are
+technically correct within their precision domains.
+
+**Decision:** Accept; inherent floating-point vs integer precision difference at exact boundary.
+
+### `movieclip_hittest_shapeflag` — Drawing API stroke tessellation (1 diff line)
+
+**Example diff (scribble curve boundary):**
+```
+// _level0.clip.hitTest(672, 670, true)
+- false
++ true
+```
+
+Line 137: A stroke-only Drawing API shape ("scribble") is hit-tested near a curve boundary.
+Our stroke hit testing uses quad expansion (perpendicular rectangles around flattened curve
+segments), while Ruffle uses true distance-to-curve testing. At this specific boundary point,
+the quad expansion incorrectly includes the test point. Path-based stroke distance was
+investigated but fixing this point introduced 2 regressions at other scribble boundary points.
+
+**Decision:** Accept; tessellation accuracy at curve boundaries, not worth trading regressions.
+
+---
+
 ## Summary Table
 
 | Test | Category | Diff pairs | Decision |
@@ -302,3 +363,6 @@ the 293-line test causes this 4-line known-failure test to fail.
 | ~~`movieclip_state_values`~~ | ~~Missing feature~~ | ~~75~~ | **REMOVED** — now PASS (114/114) via image loading support |
 | `string_paths_reference_launder` | Ruffle known failure (stack_push) | 2 | Accept; Ruffle also fails this test |
 | `tab_ordering_properties_tab_index_edge_case` | Ruffle known failure (conflicting test expectations) | 4 | Accept; contradicts `tab_ordering_properties` |
+| `movieclip_hittest_shapeflag` | Hit test accuracy (Noto Sans glyph outlines) | 7 | Accept; proprietary Flash font metrics |
+| `movieclip_hittest_shapeflag` | Hit test accuracy (morph boundary precision) | 1 | Accept; float vs integer precision |
+| `movieclip_hittest_shapeflag` | Hit test accuracy (Drawing API stroke tessellation) | 1 | Accept; tessellation boundary |

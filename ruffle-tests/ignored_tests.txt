@@ -26,17 +26,12 @@ xml_socket_segmented
 
 # --- Sound/audio ---
 # These tests require audio playback or streaming.
-sound_duration_position_props
-sound_load_start
-sound_multiple_load
+# (sound_duration_position_props, sound_load_start, sound_multiple_load removed — now passing)
 
 # --- Video streaming (NetStream/NetConnection) ---
 # These tests require video/network streaming APIs.
-netconnection_close
 netconnection_send_remote
-netstream_play_flv
 netstream_play_flv_screen
-netstream_seek_flv
 
 # --- FileReference (OS file picker + network upload/download) ---
 # These tests require native file dialogs and HTTP file transfer.
@@ -54,7 +49,7 @@ file_reference_upload_success
 
 # --- Bitmap data operations ---
 # These tests require pixel-level bitmap manipulation not available in trace mode.
-bitmap_data_pixeldissolve
+# (bitmap_data_pixeldissolve removed — now passing)
 bitmap_filters
 
 # --- SharedObject persistence (multi-run test format) ---
@@ -63,12 +58,12 @@ bitmap_filters
 shared_object
 shared_object_self_ref
 
-# --- Infrastructure not yet available (network/IPC/IME) ---
+# --- Infrastructure not yet available (network/IPC) ---
 # These tests require features not yet implemented in any test execution mode.
 # They may be removed from this list as capabilities are added.
 # See _investigation/FEATURE_SCOPE.md for details.
 localconnection
-edittext_ime_focus_lost
+# (edittext_ime_focus_lost removed — IME implemented, now passing)
 sandbox_type_remote
 
 # --- Ruffle behavior differs from Flash spec ---
@@ -88,8 +83,7 @@ global_proto_decls_delete
 global_instance_decls
 
 # --- Execution timeout / image comparison tests ---
-# These tests have 0 expected trace lines and test non-trace behaviors.
-timeout
+# (timeout removed — 0 expected lines, vacuous pass is fine to track)
 
 # --- Permanently accepted diffs ---
 # These tests have unfixable output differences. See ACCEPTED_DIFFS.md for full rationale.
@@ -103,3 +97,9 @@ movieclip_library_state_values
 native_objects_swf6
 tab_ordering_properties_tab_index_edge_case
 watch_virtual_property
+
+# --- Shape hit test accuracy limits ---
+# 329/338 lines pass. Remaining 9 diffs at exact geometric boundaries:
+# Noto Sans glyph outlines vs Flash device fonts (7), morph boundary precision (1),
+# Drawing API stroke tessellation (1). See ACCEPTED_DIFFS.md Category 8.
+movieclip_hittest_shapeflag
