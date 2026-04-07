@@ -266,6 +266,8 @@ ASProperty* findPropertyRaw(ASObject* obj, const char* name, u32 name_length)
 	if (obj->num_used > 16384 || (obj->num_used > 0 && obj->properties == NULL)) return NULL;
 	for (u32 i = 0; i < obj->num_used; i++)
 	{
+		if (obj->properties[i].name == NULL || (uintptr_t)obj->properties[i].name < 4096)
+			continue;
 		if (prop_name_match(obj->properties[i].name, obj->properties[i].name_length, name, name_length))
 		{
 			return &obj->properties[i];
@@ -296,6 +298,9 @@ ActionVar* getProperty(ASObject* obj, const char* name, u32 name_length)
 	// For production, consider hash table for large objects
 	for (u32 i = 0; i < obj->num_used; i++)
 	{
+		// Safety: skip corrupt property entries (NULL or very low name pointer)
+		if (obj->properties[i].name == NULL || (uintptr_t)obj->properties[i].name < 4096)
+			continue;
 		if (prop_name_match(obj->properties[i].name, obj->properties[i].name_length, name, name_length))
 		{
 			// Check version-based hiding (ASSetPropFlags)
@@ -434,6 +439,8 @@ void setProperty(SWFAppContext* app_context, ASObject* obj, const char* name, u3
 	// Check if property already exists
 	for (u32 i = 0; i < obj->num_used; i++)
 	{
+		if (obj->properties[i].name == NULL || (uintptr_t)obj->properties[i].name < 4096)
+			continue;
 		if (prop_name_match(obj->properties[i].name, obj->properties[i].name_length, name, name_length))
 		{
 			// Property exists - update value

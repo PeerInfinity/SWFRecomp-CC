@@ -32588,6 +32588,9 @@ void actionEnumerate2(SWFAppContext* app_context, char* str_buffer)
 					u32 prop_name_len = current_obj->properties[i].name_length;
 					u8 prop_flags = current_obj->properties[i].flags;
 
+					// Safety: skip corrupt property entries
+					if (prop_name == NULL || (uintptr_t)prop_name < 4096)
+						continue;
 					if (!(prop_flags & PROPERTY_FLAG_ENUMERABLE))
 						continue;
 					// Skip "constructor" from inherited prototypes — Flash's for-in
