@@ -2041,6 +2041,459 @@ typedef struct {
 static ActiveNetStream g_active_netstreams[MAX_ACTIVE_NETSTREAMS];
 static int g_has_active_netstreams = 0;
 
+// --- LocalConnection implementation ---
+
+static ASFunction g_lc_connect_func;
+static ASFunction g_lc_send_func;
+static ASFunction g_lc_close_func;
+static ASFunction g_lc_domain_func;
+
+#define MAX_LC_CHANNELS 32
+#define MAX_LC_MESSAGES 64
+#define MAX_LC_MSG_ARGS 16
+
+typedef struct {
+	char key[256];        // lowercased channel key
+	ASObject* receiver;   // the connected LC object
+} LCChannel;
+
+typedef struct {
+	char channel_key[256];
+	char method[256];
+	ActionVar args[MAX_LC_MSG_ARGS];
+	int num_args;
+	ASObject* sender;
+	int had_receiver;     // 1 if channel had listener at send time
+} LCMessage;
+
+static LCChannel g_lc_channels[MAX_LC_CHANNELS];
+static int g_lc_channel_count = 0;
+static LCMessage g_lc_messages[MAX_LC_MESSAGES];
+static int g_lc_message_count = 0;
+
+// Build channel key from connection name.
+// For connect(): name has no ':', domain is always "localhost"
+// For send(): name may contain "domain:channelname"
+static void lc_build_key(const char* connection_name, int from_send, char* key_out, int key_size)
+{
+	const char* colon = strchr(connection_name, ':');
+	if (from_send && colon != NULL)
+	{
+		// Explicit domain:name — extract domain and channel name
+		int domain_len = (int)(colon - connection_name);
+		const char* name = colon + 1;
+		// Get superdomain: rsplit on '.', take last segment, or whole domain if no dot
+		const char* dot = NULL;
+		for (int i = domain_len - 1; i >= 0; i--)
+		{
+			if (connection_name[i] == '.') { dot = &connection_name[i]; break; }
+		}
+		const char* superdomain = dot ? (dot + 1) : connection_name;
+		int superdomain_len = dot ? (int)(connection_name + domain_len - dot - 1) : domain_len;
+		// ALWAYS use superdomain:name form (even for underscore names when explicit prefix given)
+		snprintf(key_out, key_size, "%.*s:%s", superdomain_len, superdomain, name);
+	}
+	else if (connection_name[0] == '_')
+	{
+		// Global channel: no domain prefix
+		snprintf(key_out, key_size, "%s", connection_name);
+	}
+	else
+	{
+		// Default domain "localhost"
+		snprintf(key_out, key_size, "localhost:%s", connection_name);
+	}
+	// Lowercase the entire key
+	for (int i = 0; key_out[i]; i++)
+		key_out[i] = (char)tolower((unsigned char)key_out[i]);
+}
+
+static ASObject* lc_find_receiver(const char* key)
+{
+	for (int i = 0; i < g_lc_channel_count; i++)
+	{
+		if (strcmp(g_lc_channels[i].key, key) == 0)
+			return g_lc_channels[i].receiver;
+	}
+	return NULL;
+}
+
+static int lc_is_connected(ASObject* obj)
+{
+	for (int i = 0; i < g_lc_channel_count; i++)
+	{
+		if (g_lc_channels[i].receiver == obj) return 1;
+	}
+	return 0;
+}
+
+static int lc_register(const char* key, ASObject* receiver)
+{
+	if (g_lc_channel_count >= MAX_LC_CHANNELS) return 0;
+	strncpy(g_lc_channels[g_lc_channel_count].key, key, 255);
+	g_lc_channels[g_lc_channel_count].key[255] = '\0';
+	g_lc_channels[g_lc_channel_count].receiver = receiver;
+	g_lc_channel_count++;
+	return 1;
+}
+
+static void lc_unregister(ASObject* receiver)
+{
+	for (int i = 0; i < g_lc_channel_count; i++)
+	{
+		if (g_lc_channels[i].receiver == receiver)
+		{
+			// Shift remaining entries down
+			for (int j = i; j < g_lc_channel_count - 1; j++)
+				g_lc_channels[j] = g_lc_channels[j + 1];
+			g_lc_channel_count--;
+			return;
+		}
+	}
+}
+
+static int lc_is_protected_method(const char* method)
+{
+	return (strcmp(method, "send") == 0 ||
+	        strcmp(method, "connect") == 0 ||
+	        strcmp(method, "close") == 0 ||
+	        strcmp(method, "allowDomain") == 0 ||
+	        strcmp(method, "allowInsecureDomain") == 0 ||
+	        strcmp(method, "domain") == 0);
+}
+
+static ActionVar builtin_lc_connect(SWFAppContext* app_context, ActionVar* args, u32 arg_count, ActionVar* registers, void* this_obj)
+{
+	(void)registers;
+	ActionVar ret = {0};
+	ret.type = ACTION_STACK_VALUE_BOOLEAN;
+	ret.data.numeric_value = 0; // false
+
+	ASObject* lc = (ASObject*)this_obj;
+	if (lc == NULL || arg_count < 1) return ret;
+
+	// Connection name must be a non-empty string
+	if (args[0].type != ACTION_STACK_VALUE_STRING || args[0].str_size == 0) return ret;
+	const uint16_t* u16 = varGetU16Ptr(&args[0]);
+	if (u16 == NULL) return ret;
+	char name_buf[256] = {0};
+	u16_to_utf8(u16, args[0].str_size, name_buf, sizeof(name_buf));
+	if (name_buf[0] == '\0') return ret;
+
+	// Reject names containing ':'
+	if (strchr(name_buf, ':') != NULL) return ret;
+
+	// Already connected? Must close first
+	if (lc_is_connected(lc)) return ret;
+
+	// Build channel key
+	char key[256] = {0};
+	lc_build_key(name_buf, 0, key, sizeof(key));
+
+	// Check if channel is taken
+	if (lc_find_receiver(key) != NULL) return ret;
+
+	// Register
+	if (!lc_register(key, lc)) return ret;
+
+	ret.data.numeric_value = 1; // true
+	return ret;
+}
+
+static ActionVar builtin_lc_send(SWFAppContext* app_context, ActionVar* args, u32 arg_count, ActionVar* registers, void* this_obj)
+{
+	(void)registers;
+	ActionVar ret = {0};
+	ret.type = ACTION_STACK_VALUE_BOOLEAN;
+	ret.data.numeric_value = 0; // false
+
+	ASObject* lc = (ASObject*)this_obj;
+	if (lc == NULL || arg_count < 2) return ret;
+
+	// Channel name must be a non-empty string
+	if (args[0].type != ACTION_STACK_VALUE_STRING || args[0].str_size == 0) return ret;
+	const uint16_t* ch_u16 = varGetU16Ptr(&args[0]);
+	if (ch_u16 == NULL) return ret;
+	char ch_buf[256] = {0};
+	u16_to_utf8(ch_u16, args[0].str_size, ch_buf, sizeof(ch_buf));
+	if (ch_buf[0] == '\0') return ret;
+
+	// Method name must be a non-empty string
+	if (args[1].type != ACTION_STACK_VALUE_STRING || args[1].str_size == 0) return ret;
+	const uint16_t* m_u16 = varGetU16Ptr(&args[1]);
+	if (m_u16 == NULL) return ret;
+	char method_buf[256] = {0};
+	u16_to_utf8(m_u16, args[1].str_size, method_buf, sizeof(method_buf));
+	if (method_buf[0] == '\0') return ret;
+
+	// Check protected methods
+	if (lc_is_protected_method(method_buf)) return ret;
+
+	// Build channel key
+	char key[256] = {0};
+	lc_build_key(ch_buf, 1, key, sizeof(key));
+
+	// Check if channel has a receiver at send time
+	int had_receiver = (lc_find_receiver(key) != NULL) ? 1 : 0;
+
+	// Queue message
+	if (g_lc_message_count >= MAX_LC_MESSAGES) { ret.data.numeric_value = 1; return ret; }
+	LCMessage* msg = &g_lc_messages[g_lc_message_count++];
+	strncpy(msg->channel_key, key, 255); msg->channel_key[255] = '\0';
+	strncpy(msg->method, method_buf, 255); msg->method[255] = '\0';
+	msg->sender = lc;
+	msg->had_receiver = had_receiver;
+
+	// Copy extra args (args beyond channel_name and method_name)
+	msg->num_args = 0;
+	for (u32 i = 2; i < arg_count && msg->num_args < MAX_LC_MSG_ARGS; i++)
+		msg->args[msg->num_args++] = args[i];
+
+	ret.data.numeric_value = 1; // true
+	return ret;
+}
+
+static ActionVar builtin_lc_close(SWFAppContext* app_context, ActionVar* args, u32 arg_count, ActionVar* registers, void* this_obj)
+{
+	(void)app_context; (void)args; (void)arg_count; (void)registers;
+	ActionVar ret = {0};
+	ret.type = ACTION_STACK_VALUE_UNDEFINED;
+
+	ASObject* lc = (ASObject*)this_obj;
+	if (lc == NULL) return ret;
+
+	lc_unregister(lc);
+	return ret;
+}
+
+static ActionVar builtin_lc_domain(SWFAppContext* app_context, ActionVar* args, u32 arg_count, ActionVar* registers, void* this_obj)
+{
+	(void)args; (void)arg_count; (void)registers; (void)this_obj;
+	ActionVar ret = makeStringActionVar(app_context, "localhost", 9);
+	return ret;
+}
+
+// Dispatch a method call on a LocalConnection receiver object.
+// Looks up methodName on the receiver's prototype chain and calls it.
+static void lc_dispatch_method(SWFAppContext* app_context, ASObject* receiver,
+                               const char* method_name, ActionVar* args, int num_args)
+{
+	extern MovieClip* g_current_context;
+	ActionVar* mv = getPropertyWithPrototype(receiver, method_name, strlen(method_name));
+	if (mv == NULL || mv->type != ACTION_STACK_VALUE_FUNCTION) return;
+	ASFunction* func = (ASFunction*)(uintptr_t)mv->data.numeric_value;
+	if (func == NULL) return;
+
+	g_special_depth++;
+	if (g_special_depth >= MAX_SPECIAL_DEPTH) { g_special_depth--; return; }
+
+	if (func->function_type == 2)
+	{
+		ActionVar* regs = NULL;
+		if (func->register_count > 0)
+			regs = (ActionVar*) HCALLOC(func->register_count, sizeof(ActionVar));
+
+		u32 captured_count = func->captured_scope_count;
+		for (u32 ci = 0; ci < captured_count; ci++)
+		{
+			if (scope_depth < MAX_SCOPE_DEPTH) {
+				scope_is_with[scope_depth] = func->captured_scope_is_with[ci];
+				scope_mc[scope_depth] = (MovieClip*)func->captured_scope_mc[ci];
+				scope_chain[scope_depth++] = (ASObject*)func->captured_scope[ci];
+			}
+		}
+
+		ASObject* local_scope = allocObject(app_context, 8);
+		if (scope_depth < MAX_SCOPE_DEPTH) {
+			scope_is_with[scope_depth] = 0;
+			scope_mc[scope_depth] = NULL;
+			scope_chain[scope_depth++] = local_scope;
+		}
+
+		MovieClip* saved_context = g_current_context;
+		if (g_swf_version >= 6 && func->base_clip != NULL)
+			g_current_context = (MovieClip*)func->base_clip;
+
+		g_call_depth++;
+		func->advanced_func(app_context, args, num_args, regs, (void*)receiver);
+		g_call_depth--;
+
+		g_current_context = saved_context;
+		for (u32 ci = 0; ci < captured_count + 1; ci++)
+			if (scope_depth > 0) scope_depth--;
+		releaseObject(app_context, local_scope);
+		if (regs != NULL) FREE(regs);
+	}
+	else
+	{
+		// Type 1: push args on stack (reverse order)
+		for (int i = num_args - 1; i >= 0; i--)
+			pushVar(app_context, &args[i]);
+
+		u32 captured_count = func->captured_scope_count;
+		for (u32 ci = 0; ci < captured_count; ci++)
+		{
+			if (scope_depth < MAX_SCOPE_DEPTH) {
+				scope_is_with[scope_depth] = func->captured_scope_is_with[ci];
+				scope_mc[scope_depth] = (MovieClip*)func->captured_scope_mc[ci];
+				scope_chain[scope_depth++] = (ASObject*)func->captured_scope[ci];
+			}
+		}
+
+		ASObject* local_scope = allocObject(app_context, 8);
+		if (scope_depth < MAX_SCOPE_DEPTH) {
+			scope_is_with[scope_depth] = 0;
+			scope_mc[scope_depth] = NULL;
+			scope_chain[scope_depth++] = local_scope;
+		}
+
+		g_call_depth++;
+		((ActionVar(*)(SWFAppContext*))func->simple_func)(app_context);
+		g_call_depth--;
+
+		for (u32 ci = 0; ci < captured_count + 1; ci++)
+			if (scope_depth > 0) scope_depth--;
+		releaseObject(app_context, local_scope);
+	}
+
+	g_special_depth--;
+}
+
+// Dispatch onStatus callback on a LocalConnection sender.
+// Creates {level: "status"} or {level: "error"} event object.
+static void lc_dispatch_onStatus(SWFAppContext* app_context, ASObject* sender, const char* level)
+{
+	extern MovieClip* g_current_context;
+	ActionVar* handler = getPropertyWithPrototype(sender, "onStatus", 8);
+	if (handler == NULL || handler->type != ACTION_STACK_VALUE_FUNCTION) return;
+	ASFunction* func = (ASFunction*)(uintptr_t)handler->data.numeric_value;
+	if (func == NULL) return;
+
+	// Create event object: { level: "status"|"error" }
+	ASObject* event_obj = allocObject(app_context, 4);
+	setObjectProto(app_context, event_obj);
+	ActionVar lv = makeStringActionVar(app_context, level, strlen(level));
+	setProperty(app_context, event_obj, "level", 5, &lv);
+
+	ActionVar event_arg = {0};
+	event_arg.type = ACTION_STACK_VALUE_OBJECT;
+	event_arg.data.numeric_value = (u64)event_obj;
+
+	g_special_depth++;
+	if (g_special_depth >= MAX_SPECIAL_DEPTH) { g_special_depth--; return; }
+
+	if (func->function_type == 2)
+	{
+		ActionVar* regs = NULL;
+		if (func->register_count > 0)
+			regs = (ActionVar*) HCALLOC(func->register_count, sizeof(ActionVar));
+
+		u32 captured_count = func->captured_scope_count;
+		for (u32 ci = 0; ci < captured_count; ci++)
+		{
+			if (scope_depth < MAX_SCOPE_DEPTH) {
+				scope_is_with[scope_depth] = func->captured_scope_is_with[ci];
+				scope_mc[scope_depth] = (MovieClip*)func->captured_scope_mc[ci];
+				scope_chain[scope_depth++] = (ASObject*)func->captured_scope[ci];
+			}
+		}
+
+		ASObject* local_scope = allocObject(app_context, 8);
+		if (scope_depth < MAX_SCOPE_DEPTH) {
+			scope_is_with[scope_depth] = 0;
+			scope_mc[scope_depth] = NULL;
+			scope_chain[scope_depth++] = local_scope;
+		}
+
+		MovieClip* saved_context = g_current_context;
+		if (g_swf_version >= 6 && func->base_clip != NULL)
+			g_current_context = (MovieClip*)func->base_clip;
+
+		g_call_depth++;
+		func->advanced_func(app_context, &event_arg, 1, regs, (void*)sender);
+		g_call_depth--;
+
+		g_current_context = saved_context;
+		for (u32 ci = 0; ci < captured_count + 1; ci++)
+			if (scope_depth > 0) scope_depth--;
+		releaseObject(app_context, local_scope);
+		if (regs != NULL) FREE(regs);
+	}
+	else
+	{
+		pushVar(app_context, &event_arg);
+
+		u32 captured_count = func->captured_scope_count;
+		for (u32 ci = 0; ci < captured_count; ci++)
+		{
+			if (scope_depth < MAX_SCOPE_DEPTH) {
+				scope_is_with[scope_depth] = func->captured_scope_is_with[ci];
+				scope_mc[scope_depth] = (MovieClip*)func->captured_scope_mc[ci];
+				scope_chain[scope_depth++] = (ASObject*)func->captured_scope[ci];
+			}
+		}
+
+		ASObject* local_scope = allocObject(app_context, 8);
+		if (scope_depth < MAX_SCOPE_DEPTH) {
+			scope_is_with[scope_depth] = 0;
+			scope_mc[scope_depth] = NULL;
+			scope_chain[scope_depth++] = local_scope;
+		}
+
+		g_call_depth++;
+		((ActionVar(*)(SWFAppContext*))func->simple_func)(app_context);
+		g_call_depth--;
+
+		for (u32 ci = 0; ci < captured_count + 1; ci++)
+			if (scope_depth > 0) scope_depth--;
+		releaseObject(app_context, local_scope);
+	}
+
+	g_special_depth--;
+}
+
+// Process all queued LocalConnection messages. Called at end of frame.
+void processLocalConnectionMessages(SWFAppContext* app_context)
+{
+	if (g_lc_message_count == 0) return;
+
+	// Copy queue (processing may trigger new sends)
+	int count = g_lc_message_count;
+	LCMessage msgs[MAX_LC_MESSAGES];
+	memcpy(msgs, g_lc_messages, count * sizeof(LCMessage));
+	g_lc_message_count = 0;
+
+	for (int i = 0; i < count; i++)
+	{
+		LCMessage* msg = &msgs[i];
+		if (!msg->had_receiver)
+		{
+			// No receiver at send time → error
+			lc_dispatch_onStatus(app_context, msg->sender, "error");
+			continue;
+		}
+
+		// Re-check if channel has a receiver at delivery time
+		ASObject* receiver = lc_find_receiver(msg->channel_key);
+		if (receiver == NULL)
+		{
+			// Receiver gone → error
+			lc_dispatch_onStatus(app_context, msg->sender, "error");
+			continue;
+		}
+
+		// Success: fire onStatus status, then call method on receiver
+		lc_dispatch_onStatus(app_context, msg->sender, "status");
+		lc_dispatch_method(app_context, receiver, msg->method,
+		                   msg->num_args > 0 ? msg->args : NULL, msg->num_args);
+	}
+}
+
+int hasActiveLocalConnections(void)
+{
+	return g_lc_message_count > 0;
+}
+
 // Parse FLV header and extract duration from onMetaData script tag.
 // Returns duration in seconds, or 0 if parsing fails.
 static double flv_parse_duration(const unsigned char* data, int len,
@@ -25972,10 +26425,41 @@ static void initLocalConnectionPrototype(SWFAppContext* app_context, ASFunction*
 	const u8 mflags = PROPERTY_FLAG_WRITABLE; // DONT_ENUM + DONT_DELETE
 	// Insertion order is reverse of desired LIFO enumeration:
 	// Expected enum: isPerUser, domain, close, send, connect
-	addStubMethodToProto(app_context, ctor->prototype_obj, "connect", 7, mflags);
-	addStubMethodToProto(app_context, ctor->prototype_obj, "send", 4, mflags);
-	addStubMethodToProto(app_context, ctor->prototype_obj, "close", 5, mflags);
-	addStubMethodToProto(app_context, ctor->prototype_obj, "domain", 6, mflags);
+	{
+		ActionVar fv = {0}; fv.type = ACTION_STACK_VALUE_FUNCTION;
+
+		memset(&g_lc_connect_func, 0, sizeof(ASFunction));
+		strncpy(g_lc_connect_func.name, "connect", 255);
+		g_lc_connect_func.function_type = 2;
+		g_lc_connect_func.advanced_func = (Function2Ptr) builtin_lc_connect;
+		setupNativeFuncOwnProps(app_context, &g_lc_connect_func);
+		fv.data.numeric_value = (u64)&g_lc_connect_func;
+		setPropertyWithFlags(app_context, ctor->prototype_obj, "connect", 7, &fv, mflags);
+
+		memset(&g_lc_send_func, 0, sizeof(ASFunction));
+		strncpy(g_lc_send_func.name, "send", 255);
+		g_lc_send_func.function_type = 2;
+		g_lc_send_func.advanced_func = (Function2Ptr) builtin_lc_send;
+		setupNativeFuncOwnProps(app_context, &g_lc_send_func);
+		fv.data.numeric_value = (u64)&g_lc_send_func;
+		setPropertyWithFlags(app_context, ctor->prototype_obj, "send", 4, &fv, mflags);
+
+		memset(&g_lc_close_func, 0, sizeof(ASFunction));
+		strncpy(g_lc_close_func.name, "close", 255);
+		g_lc_close_func.function_type = 2;
+		g_lc_close_func.advanced_func = (Function2Ptr) builtin_lc_close;
+		setupNativeFuncOwnProps(app_context, &g_lc_close_func);
+		fv.data.numeric_value = (u64)&g_lc_close_func;
+		setPropertyWithFlags(app_context, ctor->prototype_obj, "close", 5, &fv, mflags);
+
+		memset(&g_lc_domain_func, 0, sizeof(ASFunction));
+		strncpy(g_lc_domain_func.name, "domain", 255);
+		g_lc_domain_func.function_type = 2;
+		g_lc_domain_func.advanced_func = (Function2Ptr) builtin_lc_domain;
+		setupNativeFuncOwnProps(app_context, &g_lc_domain_func);
+		fv.data.numeric_value = (u64)&g_lc_domain_func;
+		setPropertyWithFlags(app_context, ctor->prototype_obj, "domain", 6, &fv, mflags);
+	}
 	// isPerUser: DONT_ENUM + READ_ONLY, type undefined
 	ActionVar undef_val = {0};
 	undef_val.type = ACTION_STACK_VALUE_UNDEFINED;
@@ -44979,6 +45463,7 @@ void actionCallFunction(SWFAppContext* app_context, char* str_buffer)
 		if (func == NULL)
 			func = lookupFunctionByName(func_name, func_name_len);
 
+
 		// Try slash-path resolution: /:foo -> foo (Flash 4 root variable syntax)
 		if (func == NULL && func_name_len > 2 && func_name[0] == '/' && func_name[1] == ':')
 		{
@@ -49111,6 +49596,87 @@ void actionCallMethod(SWFAppContext* app_context, char* str_buffer)
 				pushUndefined(app_context);
 			}
 			return;
+		}
+
+		// Try numeric index → function call: arr[N](args)
+		// ActionScript allows calling functions stored in array elements by index.
+		{
+			char* endptr = NULL;
+			long idx = strtol(method_name, &endptr, 10);
+			if (endptr != NULL && endptr != method_name && *endptr == '\0' && idx >= 0 && (u32)idx < arr->length)
+			{
+				ActionVar* elem = getArrayElement(arr, (u32)idx);
+				if (elem != NULL && elem->type == ACTION_STACK_VALUE_FUNCTION)
+				{
+					ASFunction* func = (ASFunction*)(uintptr_t)elem->data.numeric_value;
+					if (func != NULL)
+					{
+						if (func->function_type == 2 && func->advanced_func != NULL)
+						{
+							ActionVar* registers = NULL;
+							if (func->register_count > 0)
+								registers = (ActionVar*) HCALLOC(func->register_count, sizeof(ActionVar));
+
+							u32 captured_count = func->captured_scope_count;
+							for (u32 ci = 0; ci < captured_count; ci++) {
+								if (scope_depth < MAX_SCOPE_DEPTH) {
+									scope_is_with[scope_depth] = func->captured_scope_is_with[ci];
+									scope_mc[scope_depth] = func->captured_scope_mc[ci];
+									scope_chain[scope_depth++] = func->captured_scope[ci];
+								}
+							}
+
+							ASObject* local_scope = allocObject(app_context, 8);
+							if (scope_depth < MAX_SCOPE_DEPTH) {
+								scope_is_with[scope_depth] = 0;
+								scope_mc[scope_depth] = NULL;
+								scope_chain[scope_depth++] = local_scope;
+							}
+
+							MovieClip* saved_ctx = g_current_context;
+							if (g_swf_version >= 6 && func->base_clip != NULL)
+								g_current_context = func->base_clip;
+
+							g_call_depth++;
+							ActionVar result = func->advanced_func(app_context, args, num_args, registers, NULL);
+							g_call_depth--;
+
+							g_current_context = saved_ctx;
+							for (u32 ci = 0; ci < captured_count + 1; ci++)
+								if (scope_depth > 0) scope_depth--;
+							releaseObject(app_context, local_scope);
+							if (registers != NULL) FREE(registers);
+							if (args != NULL) FREE(args);
+							pushVar(app_context, &result);
+							return;
+						}
+						else if (func->function_type == 1 && func->simple_func != NULL)
+						{
+							for (int i = (int)num_args - 1; i >= 0; i--)
+								pushVar(app_context, &args[i]);
+
+							u32 captured_count = func->captured_scope_count;
+							for (u32 ci = 0; ci < captured_count; ci++) {
+								if (scope_depth < MAX_SCOPE_DEPTH) {
+									scope_is_with[scope_depth] = func->captured_scope_is_with[ci];
+									scope_mc[scope_depth] = func->captured_scope_mc[ci];
+									scope_chain[scope_depth++] = func->captured_scope[ci];
+								}
+							}
+
+							g_call_depth++;
+							ActionVar result = ((ActionVar(*)(SWFAppContext*))func->simple_func)(app_context);
+							g_call_depth--;
+
+							for (u32 ci = 0; ci < captured_count; ci++)
+								if (scope_depth > 0) scope_depth--;
+							if (args != NULL) FREE(args);
+							pushVar(app_context, &result);
+							return;
+						}
+					}
+				}
+			}
 		}
 
 		if (args != NULL) FREE(args);

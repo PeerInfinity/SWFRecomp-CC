@@ -1058,6 +1058,11 @@ void swfStart(SWFAppContext* app_context)
 				extern void processNetStreams(SWFAppContext*, double);
 				processNetStreams(app_context, frame_duration_ms);
 			}
+			// Process LocalConnection messages (end-of-frame delivery)
+			{
+				extern void processLocalConnectionMessages(SWFAppContext*);
+				processLocalConnectionMessages(app_context);
+			}
 		}
 
 		// Flush pending onLoad dispatches for dynamically-attached MCs

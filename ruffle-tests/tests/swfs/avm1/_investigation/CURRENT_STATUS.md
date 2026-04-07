@@ -1,13 +1,16 @@
 # Current Ruffle Test Status
 
-Last updated: 2026-04-06
+Last updated: 2026-04-07
 
 ## Quick Summary
 
-- **Pass rate (CI, last run)**: 569/620 (91.8%) raw, 563/569 (98.9%) filtered (6 filtered failures)
+- **Pass rate (CI, last run)**: 575/620 (92.7%) raw, 563/569 (98.9%) filtered (6 filtered failures)
 - **Image test baseline**: **14/31 strict image match** (+2: bitmap_data_colortransform, bitmap_data_copypixels). **10/31 tolerance pass** (within test.toml limits).
-- **Main failure types**: output_mismatch (48), runtime_segfault (2), timeout (1)
+- **Main failure types**: output_mismatch (45), runtime_segfault (0), timeout (1)
 - **Known regressions**: `native_objects_swf6` regressed to segfault (was output_mismatch). `global_instance_decls` 40→14 (unclear root cause, test at 2% pass rate).
+- **Latest fixes (2026-04-07)**:
+  - **localconnection improved (74→433/579, 12.8%→74.8%)** — Full LocalConnection protocol implementation: channel registry, connect/send/close/domain with real semantics, message queue with Ruffle-compatible snapshot delivery (send-time vs delivery-time checks), onStatus callback dispatch, method invocation on receivers. Remaining 146 lines require child SWF communication (avm1child/avm2child). LOCALCONNECTION_PLAN moved from blocked/ to incomplete/.
+  - **Array index function call fix** — `actionCallMethod` on ARRAY with numeric method name (e.g., `arr[1]()`) now correctly looks up the array element and calls it as a function. Previously fell through to pushUndefined. General runtime fix affecting any test using `arr[N]()` patterns.
 - **Latest fixes (2026-04-06, session 4)**:
   - **movieclip_methods_with_loaded_image PASS (4/4)** — `actionDelete2` now checks current MovieClip's `dynamic_props` (mirroring Ruffle's Target scope), with fall-through to global var_map cleanup for root MC. Fixed `delete onEnterFrame` in onEnterFrame handlers. Removed from ignored_tests.txt.
   - **movieclip_state_values removed from ACCEPTED_DIFFS** — now fully passing (114/114). Removed from ignored_tests.txt. LOADMOVIE_REMAINING_PLAN moved from blocked/ to complete/.
