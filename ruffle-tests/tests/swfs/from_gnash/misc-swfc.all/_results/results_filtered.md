@@ -1,10 +1,10 @@
 # Ruffle Test Results (Filtered)
 
-**Date**: 2026-04-06 23:18 UTC
+**Date**: 2026-04-07 01:18 UTC
 
-**Git SHA**: `0300e5b395`
+**Git SHA**: `696b6d9770`
 
-**Run Duration**: 5m 11s
+**Run Duration**: 5m 14s
 
 **Filtered**: 0 tests ignored out of 16 available
 
@@ -32,8 +32,8 @@
 
 | # | Test | Lines | Duration | Notes |
 |---|------|-------|----------|-------|
-| 1 | `gotoFrameLabelAsFunction` | 6 | 19.0s |  |
-| 2 | `hello` | 4 | 18.4s |  |
+| 1 | `gotoFrameLabelAsFunction` | 6 | 18.8s |  |
+| 2 | `hello` | 4 | 19.1s |  |
 
 ## Near-Passing Tests
 
