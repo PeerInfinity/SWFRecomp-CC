@@ -8,10 +8,13 @@ void grow_ptr(SWFAppContext* app_context, char** ptr, size_t* capacity_ptr, size
 	char* data = *ptr;
 	size_t capacity = *capacity_ptr;
 	size_t old_data_size = capacity*elem_size;
+	size_t new_data_size = old_data_size << 1;
 
-	char* new_data = HALLOC(old_data_size << 1);
+	char* new_data = HALLOC(new_data_size);
 
 	memcpy(new_data, data, old_data_size);
+	// Zero the new region so expanded display_list/dictionary entries are clean
+	memset(new_data + old_data_size, 0, new_data_size - old_data_size);
 
 	FREE(data);
 

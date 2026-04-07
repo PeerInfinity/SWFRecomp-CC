@@ -5,7 +5,7 @@
 #include <stddef.h>
 
 #define ENSURE_SIZE(ptr, new_size, capac, elem_size) \
-	if (new_size >= capac) \
+	while (new_size >= capac) \
 	{ \
 		grow_ptr(app_context, (char**) &ptr, &capac, elem_size); \
 	}
