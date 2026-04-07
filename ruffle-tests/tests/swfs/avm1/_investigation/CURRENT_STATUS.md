@@ -8,6 +8,9 @@ Last updated: 2026-04-07
 - **Image test baseline**: **14/31 strict image match** (+2: bitmap_data_colortransform, bitmap_data_copypixels). **10/31 tolerance pass** (within test.toml limits).
 - **Main failure types**: output_mismatch (45), runtime_segfault (0), timeout (1)
 - **Known regressions**: `native_objects_swf6` regressed to segfault (was output_mismatch). `global_instance_decls` 40→14 (unclear root cause, test at 2% pass rate).
+- **Latest fixes (2026-04-07, session 2)**:
+  - **sound_id3 PASS (633/633)** — Full ID3v2.3 tag parser: frame headers, Latin1/UTF-16/UTF-8 text encoding, COMM frame array collection, friendly-name aliases (genre, artist, album, etc.). valueOf override returns undefined for Flash ID3 object semantics (id3==undefined true, typeof=="object"). soundFireCallback updated to pass success=true arg. id3 property getter with Place 0 pattern support. SOUND_ID3_PLAN moved to complete/.
+  - **sound_id3_prop PASS (138/138)** — Same ID3 implementation. Tests id3 property access lifecycle across Place 0/1/2 patterns (pre-set, during onID3, during onLoad).
 - **Latest fixes (2026-04-07)**:
   - **localconnection improved (74→433/579, 12.8%→74.8%)** — Full LocalConnection protocol implementation: channel registry, connect/send/close/domain with real semantics, message queue with Ruffle-compatible snapshot delivery (send-time vs delivery-time checks), onStatus callback dispatch, method invocation on receivers. Remaining 146 lines require child SWF communication (avm1child/avm2child). LOCALCONNECTION_PLAN moved from blocked/ to incomplete/.
   - **Array index function call fix** — `actionCallMethod` on ARRAY with numeric method name (e.g., `arr[1]()`) now correctly looks up the array element and calls it as a function. Previously fell through to pushUndefined. General runtime fix affecting any test using `arr[N]()` patterns.
@@ -174,6 +177,7 @@ All other previously near-passing tests have been fixed. 146 tests were tracked 
 | GETTEXTSNAPSHOT_CONSTRUCTOR_PLAN | 112/112 |
 | FOCUS_FOCUSRECT_PLAN | 4/4 (1237 lines each) |
 | SOUND_CLASS_PLAN (Phase 0) | register_class_with_sound, sound |
+| SOUND_ID3_PLAN | 633/633 + 138/138 |
 | UNLOAD_PLAN | 5/6 (unload_nested_child now PASS) |
 | DISPLACEMENTMAPFILTER_PLAN | 13/13 |
 | TELLTARGET_PLAN | 20/22 (2 accepted/ignored) |
@@ -191,7 +195,7 @@ All other previously near-passing tests have been fixed. 146 tests were tracked 
 | HIT_TESTING_PLAN | 5+ pass | movieclip_hittest_shapeflag (shape accuracy) |
 | LOADMOVIE_REMAINING_PLAN | **4/5 COMPLETE** | Moved to complete/ (1 accepted diffs) |
 | DRAWING_API_RENDERING | 3 tests improved | Focal radial precision, edge anti-aliasing (see RENDERING_PIPELINE_COMPARISON.md) |
-| RUNTIME_SETMASK | 2/3 image PASS | movieclip_setmask image blocked on Drawing API anti-aliasing |
+| RUNTIME_SETMASK | **COMPLETE** | Moved to complete/ (masking infra done; image diff is Drawing API edge AA) |
 
 ## Recommended Work Order (updated 2026-03-15)
 

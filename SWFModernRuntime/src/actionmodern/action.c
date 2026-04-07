@@ -1675,8 +1675,222 @@ static ActionVar builtin_sound_getDuration(SWFAppContext* app_context, ActionVar
 // Forward declarations for sound playback
 static void soundStartPlayback(ASObject* sound_obj, double duration_ms);
 static void soundStopForObject(ASObject* sound_obj);
-static void soundFireCallback(SWFAppContext* app_context, ASObject* sound_obj, const char* name, u32 name_len);
+static void soundFireCallback(SWFAppContext* app_context, ASObject* sound_obj, const char* name, u32 name_len, ActionVar* cb_args, u32 cb_arg_count);
 static double soundGetElapsedForObject(ASObject* sound_obj);
+
+// --- ID3v2 tag parser ---
+
+static ActionVar builtin_id3_valueOf(SWFAppContext* app_context, ActionVar* args, u32 arg_count, ActionVar* registers, void* this_obj)
+{
+	(void)app_context; (void)args; (void)arg_count; (void)registers; (void)this_obj;
+	ActionVar ret = {0};
+	ret.type = ACTION_STACK_VALUE_UNDEFINED;
+	return ret;
+}
+
+static ASFunction g_id3_valueof_func = {0};
+
+static const char* id3_get_alias(const char* fid)
+{
+	if (memcmp(fid, "TIT2", 4) == 0) return "songname";
+	if (memcmp(fid, "TPE1", 4) == 0) return "artist";
+	if (memcmp(fid, "TALB", 4) == 0) return "album";
+	if (memcmp(fid, "TYER", 4) == 0) return "year";
+	if (memcmp(fid, "TCON", 4) == 0) return "genre";
+	if (memcmp(fid, "TRCK", 4) == 0) return "track";
+	return NULL;
+}
+
+// Decode ID3v2 text encoding to UTF-8. Returns bytes written (excluding NUL).
+static int id3_decode_text(const unsigned char* data, int data_len, int encoding, char* out, int out_size)
+{
+	int pos = 0;
+	if (encoding == 0 || encoding == 3)
+	{
+		// Latin1 (0) or UTF-8 (3): copy bytes
+		for (int i = 0; i < data_len && pos < out_size - 1; i++)
+		{
+			if (data[i] == '\0') break;
+			out[pos++] = (char)data[i];
+		}
+	}
+	else if (encoding == 1 || encoding == 2)
+	{
+		// UTF-16 with BOM (1) or UTF-16BE (2)
+		int le = 0;
+		const unsigned char* src = data;
+		int src_len = data_len;
+		if (encoding == 1 && src_len >= 2)
+		{
+			int bom = (src[0] << 8) | src[1];
+			le = (bom == 0xFFFE);
+			src += 2; src_len -= 2;
+		}
+		for (int i = 0; i + 1 < src_len && pos < out_size - 4; i += 2)
+		{
+			uint16_t ch = le ? (src[i] | (src[i+1] << 8)) : ((src[i] << 8) | src[i+1]);
+			if (ch == 0) break;
+			if (ch < 0x80) out[pos++] = (char)ch;
+			else if (ch < 0x800) { out[pos++] = (char)(0xC0 | (ch >> 6)); out[pos++] = (char)(0x80 | (ch & 0x3F)); }
+			else { out[pos++] = (char)(0xE0 | (ch >> 12)); out[pos++] = (char)(0x80 | ((ch >> 6) & 0x3F)); out[pos++] = (char)(0x80 | (ch & 0x3F)); }
+		}
+	}
+	out[pos] = '\0';
+	return pos;
+}
+
+// Parse COMM frame text (skip language + short description)
+static int id3_decode_comm(const unsigned char* frame_data, int frame_size, char* out, int out_size)
+{
+	if (frame_size < 5) return 0;
+	int encoding = frame_data[0];
+	// Skip language (3 bytes)
+	const unsigned char* rest = frame_data + 4;
+	int rest_len = frame_size - 4;
+
+	if (encoding == 0 || encoding == 3)
+	{
+		// Latin1/UTF-8: find null terminator of short description
+		int i = 0;
+		while (i < rest_len && rest[i] != '\0') i++;
+		if (i < rest_len) i++; // skip null
+		return id3_decode_text(rest + i, rest_len - i, encoding, out, out_size);
+	}
+	else if (encoding == 1 || encoding == 2)
+	{
+		// UTF-16: skip BOM for description, find double-null, then decode text portion
+		const unsigned char* scan = rest;
+		int scan_len = rest_len;
+		int le = 0;
+		if (encoding == 1 && scan_len >= 2) {
+			le = ((scan[0] << 8) | scan[1]) == 0xFFFE;
+			scan += 2; scan_len -= 2;
+		}
+		// Find null terminator (two zero bytes aligned)
+		while (scan_len >= 2)
+		{
+			uint16_t ch = le ? (scan[0] | (scan[1] << 8)) : ((scan[0] << 8) | scan[1]);
+			scan += 2; scan_len -= 2;
+			if (ch == 0) break;
+		}
+		// scan now points to text portion (may have its own BOM)
+		return id3_decode_text(scan, scan_len, encoding, out, out_size);
+	}
+	return 0;
+}
+
+static ActionVar makeStringFromUTF8(SWFAppContext* app_context, const char* utf8, int utf8_len)
+{
+	ActionVar v = {0};
+	v.type = ACTION_STACK_VALUE_STRING;
+	u32 u16len = 0;
+	uint16_t* u16str = utf8_to_u16(app_context, utf8, (u32)utf8_len, &u16len);
+	v.str_size = u16len;
+	VAL(u64, &v.data.numeric_value) = (u64)u16str;
+	return v;
+}
+
+// Parse ID3v2 tags from MP3 data, returns ASObject* with tag properties (or NULL)
+static ASObject* parseID3v2Tags(SWFAppContext* app_context, const unsigned char* data, int data_len)
+{
+	if (data_len < 10 || data[0] != 'I' || data[1] != 'D' || data[2] != '3') return NULL;
+	if (data[3] < 3) return NULL; // only v2.3+
+
+	int tag_size = ((data[6] & 0x7F) << 21) | ((data[7] & 0x7F) << 14) |
+	               ((data[8] & 0x7F) << 7) | (data[9] & 0x7F);
+	int end = 10 + tag_size;
+	if (end > data_len) end = data_len;
+
+	// Collect text frames and COMM entries
+	#define MAX_ID3_FRAMES 64
+	#define MAX_ID3_COMM 8
+	typedef struct { char fid[5]; char text[512]; } ID3Frame;
+	ID3Frame frames[MAX_ID3_FRAMES];
+	int frame_count = 0;
+	char comm_texts[MAX_ID3_COMM][512];
+	int comm_count = 0;
+	int first_comm_slot = -1;
+
+	int pos = 10;
+	while (pos + 10 <= end && frame_count < MAX_ID3_FRAMES)
+	{
+		char fid[5] = {(char)data[pos], (char)data[pos+1], (char)data[pos+2], (char)data[pos+3], 0};
+		if (fid[0] == '\0') break; // padding
+
+		int fsize = (int)((data[pos+4] << 24) | (data[pos+5] << 16) | (data[pos+6] << 8) | data[pos+7]);
+		if (fsize <= 0 || pos + 10 + fsize > end) break;
+		const unsigned char* fdata = data + pos + 10;
+		pos += 10 + fsize;
+
+		if (fid[0] == 'T' && fsize >= 2)
+		{
+			// Text frame
+			memcpy(frames[frame_count].fid, fid, 5);
+			id3_decode_text(fdata + 1, fsize - 1, fdata[0], frames[frame_count].text, 512);
+			frame_count++;
+		}
+		else if (memcmp(fid, "COMM", 4) == 0)
+		{
+			if (first_comm_slot == -1) {
+				memcpy(frames[frame_count].fid, "COMM", 5);
+				frames[frame_count].text[0] = '\0';
+				first_comm_slot = frame_count;
+				frame_count++;
+			}
+			if (comm_count < MAX_ID3_COMM)
+				id3_decode_comm(fdata, fsize, comm_texts[comm_count++], 512);
+		}
+		// Skip URL frames (WOAR etc.) and other non-text frames
+	}
+
+	if (frame_count == 0) return NULL;
+
+	ASObject* id3 = allocObject(app_context, (u32)(frame_count * 3 + 4));
+
+	// valueOf → undefined (makes id3 == undefined true, trace(id3) = "undefined")
+	if (g_id3_valueof_func.function_type == 0) {
+		g_id3_valueof_func.function_type = 2;
+		g_id3_valueof_func.advanced_func = builtin_id3_valueOf;
+	}
+	ActionVar vof = {0}; vof.type = ACTION_STACK_VALUE_FUNCTION;
+	vof.data.numeric_value = (u64)(uintptr_t)&g_id3_valueof_func;
+	setPropertyWithFlags(app_context, id3, "valueOf", 7, &vof, PROPERTY_FLAGS_DONTENUM);
+
+	// Add properties in file order (for-in is LIFO: last-added = first-iterated).
+	// Within each pair: alias first (lower index), then frame code (higher index),
+	// so for-in returns: frame code, alias (matching Flash/Ruffle order).
+	for (int i = 0; i < frame_count; i++)
+	{
+		if (i == first_comm_slot && comm_count > 0)
+		{
+			// "comment" alias first (lower index → popped later → appears after COMM)
+			ActionVar cv = makeStringFromUTF8(app_context, comm_texts[comm_count - 1], (int)strlen(comm_texts[comm_count - 1]));
+			setProperty(app_context, id3, "comment", 7, &cv);
+			// COMM → ASArray of comment texts
+			ASArray* arr = allocArray(app_context, (u32)(comm_count > 0 ? comm_count : 1));
+			arr->length = (u32)comm_count;
+			for (int j = 0; j < comm_count; j++)
+				arr->elements[j] = makeStringFromUTF8(app_context, comm_texts[j], (int)strlen(comm_texts[j]));
+			ActionVar av = {0}; av.type = ACTION_STACK_VALUE_ARRAY;
+			av.data.numeric_value = (u64)(uintptr_t)arr;
+			setProperty(app_context, id3, "COMM", 4, &av);
+		}
+		else if (i != first_comm_slot)
+		{
+			const char* alias = id3_get_alias(frames[i].fid);
+			if (alias) {
+				ActionVar av = makeStringFromUTF8(app_context, frames[i].text, (int)strlen(frames[i].text));
+				setProperty(app_context, id3, alias, (u32)strlen(alias), &av);
+			}
+			ActionVar sv = makeStringFromUTF8(app_context, frames[i].text, (int)strlen(frames[i].text));
+			setProperty(app_context, id3, frames[i].fid, 4, &sv);
+		}
+	}
+
+	#undef MAX_ID3_FRAMES
+	#undef MAX_ID3_COMM
+	return id3;
+}
 
 static ActionVar builtin_sound_loadSound(SWFAppContext* app_context, ActionVar* args, u32 arg_count, ActionVar* registers, void* this_obj)
 {
@@ -1704,6 +1918,11 @@ static ActionVar builtin_sound_loadSound(SWFAppContext* app_context, ActionVar* 
 	int pre_had_str_pos = (pre_pos_p != NULL && pre_pos_p->value.type == ACTION_STACK_VALUE_STRING);
 	ActionVar pre_str_pos = {0}; if (pre_had_str_pos) pre_str_pos = pre_pos_p->value;
 
+	// Snapshot pre-loadSound id3 own property (Place 0 pattern)
+	ASProperty* pre_id3_p = findPropertyRaw(sound_obj, "id3", 3);
+	int pre_had_id3 = (pre_id3_p != NULL && pre_id3_p->value.type == ACTION_STACK_VALUE_STRING);
+	ActionVar pre_id3_val = {0}; if (pre_had_id3) pre_id3_val = pre_id3_p->value;
+
 	// Clear previous duration (in case new load fails)
 	{
 		ActionVar zero_dur = {0}; zero_dur.type = ACTION_STACK_VALUE_F64;
@@ -1727,7 +1946,8 @@ static ActionVar builtin_sound_loadSound(SWFAppContext* app_context, ActionVar* 
 	int mp3_len = entry->content_length;
 	double duration_ms = 0;
 
-	// Skip ID3v2 header if present
+	// Parse ID3v2 tags and skip header
+	ASObject* id3_obj = parseID3v2Tags(app_context, mp3, mp3_len);
 	int audio_offset = 0;
 	if (mp3_len >= 10 && mp3[0] == 'I' && mp3[1] == 'D' && mp3[2] == '3')
 	{
@@ -1736,6 +1956,16 @@ static ActionVar builtin_sound_loadSound(SWFAppContext* app_context, ActionVar* 
 		audio_offset = id3_size + 10;
 		mp3 += audio_offset;
 		mp3_len -= audio_offset;
+	}
+
+	// Store parsed ID3 object (or clear previous)
+	if (id3_obj != NULL) {
+		ActionVar id3_var = {0}; id3_var.type = ACTION_STACK_VALUE_OBJECT;
+		id3_var.data.numeric_value = (u64)(uintptr_t)id3_obj;
+		setPropertyWithFlags(app_context, sound_obj, "__id3__", 7, &id3_var, PROPERTY_FLAGS_DONTENUM);
+		if (pre_had_id3) {
+			setPropertyWithFlags(app_context, sound_obj, "__id3_override__", 16, &pre_id3_val, PROPERTY_FLAGS_DONTENUM);
+		}
 	}
 
 	if (mp3_len >= 4 && mp3[0] == 0xFF && (mp3[1] & 0xE0) == 0xE0)
@@ -1794,7 +2024,11 @@ static ActionVar builtin_sound_loadSound(SWFAppContext* app_context, ActionVar* 
 		}
 	}
 
-	// Dispatch onID3 callback (before onLoad, duration not yet visible)
+	// Prepare success=true argument for callbacks
+	ActionVar cb_success = {0}; cb_success.type = ACTION_STACK_VALUE_BOOLEAN; cb_success.data.numeric_value = 1;
+
+	// Dispatch onID3 callback (only if ID3 tags were found, before onLoad)
+	if (id3_obj != NULL)
 	{
 		// Temporarily clear __duration__ so getDuration() returns 0 during onID3
 		ActionVar save_int_dur = dur_val;
@@ -1802,7 +2036,7 @@ static ActionVar builtin_sound_loadSound(SWFAppContext* app_context, ActionVar* 
 		VAL(double, &zero.data.numeric_value) = 0;
 		setProperty(app_context, sound_obj, "__duration__", 12, &zero);
 
-		soundFireCallback(app_context, sound_obj, "onID3", 5);
+		soundFireCallback(app_context, sound_obj, "onID3", 5, &cb_success, 1);
 
 		// Clear string own props set during onID3 callback, restore pre-loadSound ones
 		{
@@ -1823,7 +2057,7 @@ static ActionVar builtin_sound_loadSound(SWFAppContext* app_context, ActionVar* 
 	}
 
 	// Dispatch onLoad callback (with success=true)
-	soundFireCallback(app_context, sound_obj, "onLoad", 6);
+	soundFireCallback(app_context, sound_obj, "onLoad", 6, &cb_success, 1);
 
 	// Clear any string duration/position own properties set during callbacks
 	// Then restore only the ones that existed before loadSound
@@ -38483,6 +38717,28 @@ void actionGetMember(SWFAppContext* app_context)
 				}
 				return;
 			}
+			if (prop_name_len == 3 && memcmp(prop_name, "id3", 3) == 0) {
+				// id3 property: if pre-loadSound override exists (Place 0 pattern), return it
+				ActionVar* ovr = getProperty(obj, "__id3_override__", 16);
+				if (ovr != NULL && ovr->type == ACTION_STACK_VALUE_STRING) {
+					pushVar(app_context, ovr);
+					return;
+				}
+				// Return parsed ID3 object if available
+				ActionVar* id3 = getProperty(obj, "__id3__", 7);
+				if (id3 != NULL && id3->type == ACTION_STACK_VALUE_OBJECT) {
+					pushVar(app_context, id3);
+					return;
+				}
+				// Not loaded or no ID3: return own "id3" property or undefined
+				ASProperty* own = findPropertyRaw(obj, "id3", 3);
+				if (own != NULL && own->value.type != ACTION_STACK_VALUE_UNDEFINED) {
+					pushVar(app_context, &own->value);
+				} else {
+					pushUndefined(app_context);
+				}
+				return;
+			}
 		}
 
 		// Look up property with prototype chain support (returns ASProperty* for getter check)
@@ -57826,7 +58082,7 @@ static double soundGetElapsedForObject(ASObject* sound_obj)
 }
 
 // Generic callback dispatcher for Sound events (onID3, onLoad, etc.)
-static void soundFireCallback(SWFAppContext* app_context, ASObject* sound_obj, const char* name, u32 name_len)
+static void soundFireCallback(SWFAppContext* app_context, ASObject* sound_obj, const char* name, u32 name_len, ActionVar* cb_args, u32 cb_arg_count)
 {
 	extern MovieClip* g_current_context;
 	ActionVar* handler = getPropertyWithPrototype(sound_obj, name, name_len);
@@ -57865,7 +58121,7 @@ static void soundFireCallback(SWFAppContext* app_context, ASObject* sound_obj, c
 			g_current_context = (MovieClip*)func->base_clip;
 
 		g_call_depth++;
-		func->advanced_func(app_context, NULL, 0, regs, (void*)sound_obj);
+		func->advanced_func(app_context, cb_args, cb_arg_count, regs, (void*)sound_obj);
 		g_call_depth--;
 
 		g_current_context = saved_context;
@@ -57919,7 +58175,7 @@ static void soundFireOnComplete(SWFAppContext* app_context, ASObject* sound_obj)
 	ActionVar cv = {0}; cv.type = ACTION_STACK_VALUE_BOOLEAN; cv.data.numeric_value = 1;
 	setProperty(app_context, sound_obj, "__completed__", 13, &cv);
 
-	soundFireCallback(app_context, sound_obj, "onSoundComplete", 15);
+	soundFireCallback(app_context, sound_obj, "onSoundComplete", 15, NULL, 0);
 }
 
 void processSoundPlayback(SWFAppContext* app_context, double frame_duration_ms)

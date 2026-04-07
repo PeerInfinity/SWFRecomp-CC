@@ -28,8 +28,6 @@ xml_socket_segmented
 # --- Sound/audio ---
 # These tests require audio playback or streaming.
 sound_duration_position_props
-sound_id3
-sound_id3_prop
 sound_load_start
 sound_multiple_load
 
