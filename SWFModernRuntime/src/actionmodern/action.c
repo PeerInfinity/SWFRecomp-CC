@@ -7626,6 +7626,16 @@ static ActionVar transformPixelBoundsGetter(SWFAppContext* app_context, ActionVa
 	size_t entry_idx = getDisplayEntryIdxForMC(mc);
 	float lxmin, lxmax, lymin, lymax;
 	if (!ng_getDisplayEntryBounds(entry_idx, &lxmin, &lxmax, &lymin, &lymax)) {
+		if (mc->loaded_image_width > 0) {
+			// Image-loaded MC: return image dimensions as pixelBounds
+			ActionVar rx = makeF64(0.0), ry = makeF64(0.0);
+			ActionVar rw = makeF64((double)mc->loaded_image_width);
+			ActionVar rh = makeF64((double)mc->loaded_image_height);
+			ASObject* rect = createRectObj(app_context, &rx, &ry, &rw, &rh);
+			r.type = ACTION_STACK_VALUE_OBJECT;
+			r.data.numeric_value = (u64) rect;
+			return r;
+		}
 		// Empty clip: return (x=0, y=0, w=0, h=0) rectangle
 		ActionVar zero = makeF64(0.0);
 		ASObject* rect = createRectObj(app_context, &zero, &zero, &zero, &zero);
@@ -17353,6 +17363,8 @@ void actionProcessDeferredUnloads(void)
 			umc->totalframes = 0;
 			umc->byte_size = 0;
 			umc->load_failed = 0;
+			umc->loaded_image_width = 0;
+			umc->loaded_image_height = 0;
 			// Restore parent's URL and SWF version
 			strncpy(umc->url, root_movieclip.url, sizeof(umc->url) - 1);
 			umc->url[sizeof(umc->url) - 1] = '\0';
@@ -17443,6 +17455,15 @@ void actionFirePendingDirectLoads(SWFAppContext* app_context)
 		mc->framesloaded = entry->frame_count;
 		mc->currentframe = 1;
 		mc->byte_size = entry->file_size;
+
+		// Image MovieEntry (swf_version==0): set image dimensions, skip init/frame funcs
+		if (entry->swf_version == 0) {
+			mc->loaded_image_width = entry->stage_width;
+			mc->loaded_image_height = entry->stage_height;
+			continue;
+		}
+		mc->loaded_image_width = 0;
+		mc->loaded_image_height = 0;
 
 		// Switch to child's SWF version during init
 		int _saved_ver = g_swf_version;
@@ -20085,6 +20106,13 @@ static int mcGetOriginalBounds(MovieClip* mc, double* out_nat_w, double* out_nat
 #ifdef NO_GRAPHICS
 	extern MovieClip root_movieclip;
 	float gxmin, gxmax, gymin, gymax;
+
+	// For image-loaded MCs, return image dimensions directly
+	if (mc->loaded_image_width > 0) {
+		*out_nat_w = (double)mc->loaded_image_width;
+		*out_nat_h = (double)mc->loaded_image_height;
+		return 1;
+	}
 
 	// For buttons, use hit shape bounds
 	if (mc->is_button_mc) {
@@ -24598,6 +24626,20 @@ void actionFirePendingLoadInits(SWFAppContext* app_context)
                 // Note: dynamic_props clearing already happened in actionLoadClip before FlashVars were set
                 constructChildURL(loads[i].target->url, sizeof(loads[i].target->url), loads[i].entry->filename);
                 loads[i].target->swf_version = (u16)loads[i].entry->swf_version;
+                // Image MovieEntry (swf_version==0): set image dimensions
+                if (loads[i].entry->swf_version == 0) {
+                    loads[i].target->loaded_image_width = loads[i].entry->stage_width;
+                    loads[i].target->loaded_image_height = loads[i].entry->stage_height;
+                    loads[i].target->load_failed = 0;
+                    loads[i].target->totalframes = 1;
+                    loads[i].target->framesloaded = 1;
+                    loads[i].target->currentframe = 1;
+                    loads[i].target->byte_size = loads[i].entry->file_size;
+                    loads[i].target->movie_id = loads[i].entry->movie_id;
+                } else {
+                    loads[i].target->loaded_image_width = 0;
+                    loads[i].target->loaded_image_height = 0;
+                }
                 // Clear _name on root replacement (Flash clears it before callbacks fire)
                 extern MovieClip root_movieclip;
                 if (loads[i].target == &root_movieclip) {
@@ -24681,6 +24723,7 @@ void actionFirePendingLoadInits(SWFAppContext* app_context)
     // Phase 2: Run child movie init+frame0 for each load (FIFO)
     for (int i = 0; i < count; i++) {
         if (g_execution_halted) break;
+        if (loads[i].entry != NULL && loads[i].entry->swf_version == 0) continue; // Image: no scripts
         if (loads[i].entry != NULL) {
             // Root replacement: update Stage dimensions when loading into root
             extern MovieClip root_movieclip;
@@ -51422,7 +51465,7 @@ void actionCallMethod(SWFAppContext* app_context, char* str_buffer)
 		else if (method_name_len == 13 && strncmp(method_name, "getSWFVersion", 13) == 0)
 		{
 			if (args != NULL) FREE(args);
-			double v = mc->load_failed ? -1.0 : (mc->swf_version ? (double)mc->swf_version : (double)g_swf_version);
+			double v = mc->load_failed ? -1.0 : mc->loaded_image_width > 0 ? -1.0 : (mc->swf_version ? (double)mc->swf_version : (double)g_swf_version);
 			PUSH(ACTION_STACK_VALUE_F64, VAL(u64, &v));
 			return;
 		}
@@ -52018,6 +52061,14 @@ void actionCallMethod(SWFAppContext* app_context, char* str_buffer)
 							if (cymax > lymax) lymax = cymax;
 						}
 					}
+				}
+
+				// Image-loaded MC: use image dimensions as bounds (in twips)
+				if (!has_bounds && mc != NULL && mc->loaded_image_width > 0) {
+					lxmin = 0; lymin = 0;
+					lxmax = (double)mc->loaded_image_width * 20.0;
+					lymax = (double)mc->loaded_image_height * 20.0;
+					has_bounds = 1;
 				}
 
 				if (!has_bounds) {

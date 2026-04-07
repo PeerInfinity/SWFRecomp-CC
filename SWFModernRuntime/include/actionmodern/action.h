@@ -71,6 +71,10 @@ struct MovieClip {
 	// ng_getColorTransform fails (no display_list entry).
 	float cx_ra, cx_ga, cx_ba, cx_aa;
 	float cx_rb, cx_gb, cx_bb, cx_ab;
+	// Loaded image dimensions (from loadMovie with a PNG/JPEG file, swf_version==0 in MovieEntry)
+	// Non-zero means an image is loaded into this MC (overrides _width/_height/getBounds/getSWFVersion)
+	u16 loaded_image_width;
+	u16 loaded_image_height;
 	// Attached BitmapData (from attachBitmap) — raw pixel pointer for GPU rendering
 	uint32_t* attached_bitmap_pixels;   // ARGB premultiplied pixel data (NULL if none)
 	u16 attached_bitmap_width;

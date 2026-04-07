@@ -8,6 +8,8 @@ Last updated: 2026-04-06
 - **Image test baseline**: **14/31 strict image match** (+2: bitmap_data_colortransform, bitmap_data_copypixels). **10/31 tolerance pass** (within test.toml limits).
 - **Main failure types**: output_mismatch (48), runtime_segfault (2), timeout (1)
 - **Known regressions**: `native_objects_swf6` regressed to segfault (was output_mismatch). `global_instance_decls` 40→14 (unclear root cause, test at 2% pass rate).
+- **Latest fixes (2026-04-06, session 3)**:
+  - **movieclip_state_values PASS (114/114)** — Image loading via loadMovie. PNG/JPEG children detected by magic bytes in verify_output.py, synthetic MovieEntry with swf_version=0 generated. Runtime: image dims stored on MovieClip, _width/_height/getBounds/getRect/pixelBounds return image dimensions, getSWFVersion returns -1. LOADMOVIE_MULTI_SWF_PLAN moved to complete/.
 - **Latest fixes (2026-04-06, session 2)**:
   - **netstream_play_flv_screen PASS (0/0)** — FLVPlayback component crash fix: safety checks in object.c `getProperty`/`getPropertyWithPrototype`/`findPropertyRaw` reject corrupt ASObjects (num_used > 16384). Root cause: FLVPlayback's `createVideoPlayer` called with NULL this, leading to corrupt pointer dereference in addProperty setter chain.
   - **ScreenVideo decoder** — `screenvideo_decode_frame()` decodes FLV Screen Video codec (block-based zlib-compressed BGR). `flv_decode_first_frame()` extracts first video keyframe from FLV container. Decoded RGBA stored in `g_video_frames[]` for future headless rendering.

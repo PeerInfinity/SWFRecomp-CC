@@ -3,7 +3,7 @@
 
 <!-- PLAN_META
 id: LOADMOVIE_MULTI_SWF
-status: blocked
+status: complete
 phases:
   - id: 0
     name: "Child SWF discovery and compilation"
@@ -47,23 +47,25 @@ phases:
   - id: 15
     name: "MCL root replace cross-version"
     status: complete
+  - id: 16
+    name: "Image loading via loadMovie"
+    status: complete
 dependencies: []
-blockers:
-  - blocker: 6
-    reason: "Remaining tests blocked on image loading via loadMovie"
+blockers: []
 -->
 
-Last updated: 2026-03-13
+Last updated: 2026-04-06
 
 **Goal**: Close the remaining gaps in multi-SWF support.
 
-**Current state**: All actionable phases are complete (0–5, 7, 8, 10–15). Phase 6 was CANCELLED (Ruffle shares `_global` across movies). **All loadMovie-related tests with actionable fixes now pass.**
+**Current state**: All phases are complete (0–5, 7, 8, 10–16). Phase 6 was CANCELLED (Ruffle shares `_global` across movies). Phase 16 (image loading via loadMovie) was added and completed on 2026-04-06.
 
-**Status: BLOCKED** — Remaining non-passing tests are blocked by infrastructure gaps that are outside the scope of this plan:
-- `movieclip_state_values` (39/114): blocked on image loading via loadMovie (Tests 3-4 require bitmap support)
+**Status: COMPLETE** — All actionable loadMovie tests now pass. Remaining non-passing tests have accepted diffs or are blocked by unrelated infrastructure:
+- `movieclip_state_values` (114/114): **PASS** — image loading via loadMovie implemented (Phase 16)
 - `movieclip_library_state_values` (76/78): blocked on URL path format + mouse position (already ignored)
 - `mcl_replace_root_swf7_to_swf5/swf6` (56/57 each): 1 accepted diff per test (Ruffle vs Flash `rest=undefined` vs `rest=`)
 - `sandbox_type_remote` (1/3): blocked on network/remote sandbox loading
+- `movieclip_methods_with_loaded_image` (4/4 trace lines correct, but `delete onEnterFrame` bug causes extra output)
 
 ### Critical Finding: Ruffle Has NO Per-Movie `_global` Isolation (2026-03-10)
 
@@ -682,6 +684,42 @@ The onLoadStart event should fire when the MCL loadClip begins loading the child
 
 ---
 
+## Phase 16: Image Loading via loadMovie — DONE ✅
+
+**Status**: **DONE** (2026-04-06)
+
+**Impact**: `movieclip_state_values` — 39/114 → **114/114 PASS**. Also enables `movieclip_methods_with_loaded_image` (4/4 trace lines correct).
+
+### Problem
+
+`loadMovie("file.png", mc)` loads a PNG/JPEG image into a MovieClip. The MC should behave as a 1-frame clip with the image's dimensions (_width, _height, getBounds, getRect, pixelBounds). `getSWFVersion()` returns -1 (no SWF version for images).
+
+### Implementation
+
+#### verify_output.py
+- `_detect_image_child(swf_path)`: Checks magic bytes for PNG (89 50 4E 47) and JPEG (FF D8 FF). Returns `(width, height)` tuple or `None`.
+- `generate_image_movie_file()`: Creates a synthetic MovieEntry C file with `swf_version=0` (marker for image), `stage_width/height` = image dimensions, no-op init/frame functions.
+- `find_child_swfs()`: Extended to also discover `.png`/`.jpg`/`.jpeg` files as loadable children.
+- Child processing loop: Detects image children via `_detect_image_child()` before attempting SWFRecomp recompilation. Image children skip recompilation entirely.
+
+#### action.h (MovieClip struct)
+- Added `u16 loaded_image_width`, `u16 loaded_image_height` — non-zero when an image is loaded.
+
+#### action.c (runtime)
+- `actionFirePendingDirectLoads()`: When `entry->swf_version == 0`, sets image dimensions on MC and skips init/frame func calls.
+- `actionFirePendingLoadInits()`: Pre-phase sets image dimensions; Phase 2 skips image entries.
+- `mcGetOriginalBounds()`: Returns image dimensions directly for image-loaded MCs (before display list lookup).
+- `getBounds()`/`getRect()`: Injects image bounds `(0, 0, w*20, h*20)` in twips when no display list bounds exist.
+- `transformPixelBoundsGetter()`: Returns `(0, 0, width, height)` rectangle for image-loaded MCs.
+- `getSWFVersion()`: Returns -1 for image-loaded MCs (`loaded_image_width > 0`).
+- `actionProcessDeferredUnloads()`: Clears `loaded_image_width/height` on unload.
+
+### Key Design Decision
+
+Image MovieEntries use `swf_version == 0` as a sentinel value (real SWF versions are 1-43). This is checked in the load paths to skip script execution (images have no ActionScript). The image dimensions are stored on the MovieClip struct rather than computed from display list entries.
+
+---
+
 ## 11. Dependency Graph
 
 ```
@@ -704,11 +742,13 @@ Phase 13 (_root Scope) ──► resolve_different_root ─── DONE ✅
 Phase 14 (MCL Root Replace) ──► mcl_loadclip_replace_root ─── DONE ✅
 
 Phase 15 (MCL Root Replace Cross-Version) ──► mcl_replace_root_swf7_to_swf5/6 ─── DONE ✅ (1 accepted diff each)
+
+Phase 16 (Image Loading) ──► movieclip_state_values ─── DONE ✅ (114/114 PASS)
 ```
 
-### Completion Status (2026-03-13)
+### Completion Status (2026-04-06)
 
-**Completed phases**: 6 (cancelled), 8, 10, 11, 12, 13, 14, 15
+**Completed phases**: 6 (cancelled), 8, 10, 11, 12, 13, 14, 15, 16
 **Actionable phases**: None
 **Blocked phases**: 9 (URL format risk — movieclip_library_state_values already ignored)
 
@@ -732,11 +772,12 @@ Phase 15 (MCL Root Replace Cross-Version) ──► mcl_replace_root_swf7_to_swf
 | issue_2870 | — | 3/3 PASS | Phase 13 | **DONE** ✅ |
 | mcl_replace_root_swf7_to_swf5 | — | 56/57 | Phase 15 | **DONE** (1 accepted diff) |
 | mcl_replace_root_swf7_to_swf6 | — | 56/57 | Phase 15 | **DONE** (1 accepted diff) |
-| movieclip_state_values | 41/114 | 39/114 | Phase 8 done | **BLOCKED** (Tests 3-4 require image loading via loadMovie) |
+| movieclip_state_values | 41/114 | **114/114 PASS** | Phase 16 | **DONE** ✅ (image loading via loadMovie) |
 | movieclip_library_state_values | 76/78 | 76/78 | Phase 9 | **BLOCKED** (URL format + _xmouse; already ignored) |
 | sandbox_type_remote | 1/3 | 1/3 | — | **BLOCKED** (needs network/remote sandbox loading) |
+| movieclip_methods_with_loaded_image | 0/4 | 4/4 trace correct | Phase 16 | Trace PASS but `delete onEnterFrame` bug causes extra output |
 
-**Summary**: 14/17 tests PASS. 3 tests remain blocked by infrastructure gaps outside this plan's scope (image loading, URL format, network loading).
+**Summary**: 15/18 tests PASS. 2 tests remain blocked by non-loadMovie issues (URL format, network loading). 1 test (movieclip_methods_with_loaded_image) has correct trace output but fails due to unrelated `delete onEnterFrame` bug.
 
 ---
 
@@ -744,14 +785,14 @@ Phase 15 (MCL Root Replace Cross-Version) ──► mcl_replace_root_swf7_to_swf
 
 All actionable phases are complete. No remaining risk items.
 
-### Remaining Blockers (not actionable in this plan)
+### Remaining Non-Passing Tests (not actionable in this plan)
 
-| Blocker | Tests Affected | Notes |
-|---------|---------------|-------|
-| Image loading via loadMovie | movieclip_state_values (39/114) | Test 3 loads a bitmap; requires image decoding infrastructure |
-| URL path format | movieclip_library_state_values (76/78) | Expected `test_name/test.swf`, we produce `/test.swf`; changing risks regressions |
+| Issue | Tests Affected | Notes |
+|-------|---------------|-------|
+| URL path format | movieclip_library_state_values (76/78) | Expected `test_name/test.swf`, we produce `/test.swf`; changing risks regressions. Already ignored. |
 | Network/remote sandbox | sandbox_type_remote (1/3) | Needs actual network SWF loading |
 | Ruffle vs Flash spec | mcl_replace_root_swf7_to_swf5/swf6 (56/57) | `rest=undefined` vs `rest=` — accepted diff |
+| `delete onEnterFrame` bug | movieclip_methods_with_loaded_image (4/4 trace, excess output) | Trace lines correct but handler not removed, causing repetition |
 
 ---
 

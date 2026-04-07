@@ -555,10 +555,13 @@ def filter_output(raw_output):
 
 
 def find_child_swfs(test_dir):
-    """Find child .swf files (non-test.swf) in a test directory."""
+    """Find child .swf/.png/.jpg files (non-test.swf) in a test directory."""
     children = []
+    image_exts = {".png", ".jpg", ".jpeg"}
     for f in sorted(test_dir.iterdir()):
         if f.suffix == ".swf" and f.name != "test.swf":
+            children.append(f)
+        elif f.suffix.lower() in image_exts:
             children.append(f)
     return children
 
@@ -606,6 +609,87 @@ def _sanitize_prefix(filename):
     if name and name[0].isdigit():
         name = "m_" + name
     return name
+
+
+def _detect_image_child(swf_path):
+    """Check if a .swf file is actually an image (PNG/JPEG). Returns (width, height) or None."""
+    try:
+        with open(swf_path, "rb") as f:
+            header = f.read(32)
+        if len(header) < 8:
+            return None
+        # PNG: magic bytes 89 50 4E 47 0D 0A 1A 0A, IHDR at offset 8
+        if header[:8] == b'\x89PNG\r\n\x1a\n':
+            if len(header) >= 24:
+                import struct
+                width = struct.unpack(">I", header[16:20])[0]
+                height = struct.unpack(">I", header[20:24])[0]
+                return (width, height)
+        # JPEG: magic FF D8 FF
+        if header[:3] == b'\xff\xd8\xff':
+            # Parse JPEG markers to find SOF0/SOF2 for dimensions
+            with open(swf_path, "rb") as f:
+                import struct
+                f.read(2)  # skip SOI
+                while True:
+                    marker = f.read(2)
+                    if len(marker) < 2:
+                        break
+                    if marker[0] != 0xFF:
+                        break
+                    m = marker[1]
+                    if m in (0xC0, 0xC2):  # SOF0 or SOF2
+                        seg = f.read(7)
+                        if len(seg) >= 7:
+                            height = struct.unpack(">H", seg[3:5])[0]
+                            width = struct.unpack(">H", seg[5:7])[0]
+                            return (width, height)
+                    elif m == 0xD9:  # EOI
+                        break
+                    elif m == 0xDA:  # SOS — no SOF found
+                        break
+                    else:
+                        seg_len_raw = f.read(2)
+                        if len(seg_len_raw) < 2:
+                            break
+                        seg_len = struct.unpack(">H", seg_len_raw)[0]
+                        f.seek(seg_len - 2, 1)
+    except (OSError, struct.error):
+        pass
+    return None
+
+
+def generate_image_movie_file(child_swf_name, build_dir, image_width, image_height, file_size, movie_id=1):
+    """Generate a synthetic MovieEntry C file for an image loaded via loadMovie.
+
+    Image MovieEntries have swf_version=0 to signal the runtime that this is an
+    image load (not a real SWF). The runtime uses stage_width/stage_height as the
+    image dimensions.
+    """
+    prefix = _sanitize_prefix(child_swf_name)
+    lines = []
+    lines.append(f"// Auto-generated image MovieEntry for {child_swf_name}")
+    lines.append("#include <libswf/swf.h>")
+    lines.append("")
+    lines.append(f"static void {prefix}_tagInit(SWFAppContext* app_context) {{ (void)app_context; }}")
+    lines.append(f"static void {prefix}_frame0(SWFAppContext* app_context) {{ (void)app_context; }}")
+    lines.append(f"static frame_func {prefix}_frame_funcs[] = {{ {prefix}_frame0, NULL }};")
+    lines.append("")
+    lines.append(f"MovieEntry {prefix}_movie_entry = {{")
+    lines.append(f'    .filename = "{child_swf_name}",')
+    lines.append(f"    .frame_funcs = {prefix}_frame_funcs,")
+    lines.append(f"    .init_func = {prefix}_tagInit,")
+    lines.append(f"    .swf_version = 0,")  # 0 = image (not a real SWF)
+    lines.append(f"    .frame_count = 1,")
+    lines.append(f"    .stage_width = {image_width},")
+    lines.append(f"    .stage_height = {image_height},")
+    lines.append(f"    .file_size = {file_size},")
+    lines.append(f"    .movie_id = {movie_id},")
+    lines.append(f"    .transform_data_ptr = NULL,")
+    lines.append(f"}};")
+    out_path = build_dir / f"movie_{prefix}.c"
+    out_path.write_text("\n".join(lines))
+    return prefix
 
 
 def generate_child_movie_file(child_swf_name, child_recomp_dir, build_dir, swf_file_size=0, movie_id=1, string_id_offset=0):
@@ -1153,11 +1237,23 @@ def compile_native(test_dir, num_frames, build_dir, headless=False, has_image_co
     next_string_id_offset = parent_max_string_id + 1  # +1 to leave a gap
 
     for child_idx, child_swf in enumerate(child_swfs):
+        child_movie_id = child_idx + 1  # 0 = main SWF, 1+ = children
+        child_file_size = child_swf.stat().st_size if child_swf.exists() else 0
+
+        # Check if child is an image (PNG/JPEG with .swf extension)
+        image_dims = _detect_image_child(child_swf)
+        if image_dims is not None:
+            prefix = generate_image_movie_file(
+                child_swf.name, build_dir,
+                image_width=image_dims[0], image_height=image_dims[1],
+                file_size=child_file_size, movie_id=child_movie_id)
+            if prefix:
+                child_prefixes.append(prefix)
+            continue
+
         child_recomp_dir = build_dir / f"_child_{_sanitize_prefix(child_swf.name)}"
         child_recomp_dir.mkdir(exist_ok=True)
         if recompile_child_swf(child_swf, child_recomp_dir):
-            child_file_size = child_swf.stat().st_size if child_swf.exists() else 0
-            child_movie_id = child_idx + 1  # 0 = main SWF, 1+ = children
             prefix = generate_child_movie_file(
                 child_swf.name, child_recomp_dir, build_dir,
                 swf_file_size=child_file_size, movie_id=child_movie_id,
