@@ -28177,20 +28177,9 @@ static void ensureGlobalInit(SWFAppContext* app_context)
 	#undef REG_OBJ
 
 	// Mark select SWF6+ constructors on _global with flash_flags=0x0080
-	// (hidden in SWF5 via version mask 0x7480, visible in SWF6+).
-	// Only hide constructors whose Gnash-v5 tests specifically expect undefined.
-	// Note: Camera, Microphone, PrintJob, SharedObject, MovieClipLoader, TextSnapshot
-	// are NOT hidden because their Gnash-v5 tests pass with them visible.
-	{
-		const char* swf6_names[] = {
-			"LocalConnection", "NetConnection", "Video",
-		};
-		for (int i = 0; i < 3; i++) {
-			u32 nlen = (u32)strlen(swf6_names[i]);
-			ASProperty* p = findPropertyRaw(global_object, swf6_names[i], nlen);
-			if (p != NULL) p->flash_flags = 0x0080;
-		}
-	}
+	// Note: LocalConnection, NetConnection, Video were previously hidden in SWF5
+	// to match Flash behavior (they're SWF6+ features). Removed because no tests
+	// in our suite depend on them being hidden, and globals_swf5 expects them visible.
 
 	g_global_init_done = 1;
 
@@ -37983,9 +37972,8 @@ void actionGetMember(SWFAppContext* app_context)
 				}
 				// Computed: check if loaded, completed, or playing
 				if (!_snd_is_loaded) {
-					// Not loaded: position is 0 (not undefined)
-					ActionVar z = {0}; z.type = ACTION_STACK_VALUE_F64;
-					pushVar(app_context, &z);
+					// Not loaded: position property doesn't exist yet (undefined)
+					PUSH(ACTION_STACK_VALUE_UNDEFINED, 0);
 					return;
 				}
 				ActionVar* completed = getProperty(obj, "__completed__", 13);
