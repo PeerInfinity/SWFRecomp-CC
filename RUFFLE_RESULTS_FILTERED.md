@@ -3,9 +3,9 @@
 *Tests on the [ignored list](ruffle-tests/ignored_tests.txt) are excluded.*  
 *See [RUFFLE_RESULTS.md](RUFFLE_RESULTS.md) for unfiltered results.*
 
-**Commit:** `2d5c31eb0163`  
-**Date:** 2026-04-07 02:37 UTC  
-**Total duration:** 5h21m29s
+**Commit:** `deccd9ba157f`  
+**Date:** 2026-04-07 03:33 UTC  
+**Total duration:** 5h21m27s
 
 ## Results by Suite
 
@@ -28,14 +28,14 @@
 | Suite | Matching | Expected | Accuracy |
 |-------|--------:|---------:|---------:|
 | avm1 | 71,451 | 71,497 | 99.9% |
-| from_gnash/actionscript.all | 10,970 | 15,444 | 71.0% |
+| from_gnash/actionscript.all | 10,972 | 15,444 | 71.0% |
 | from_gnash/misc-ming.all | 1,665 | 3,388 | 49.1% |
 | from_gnash/misc-mtasc.all | 173 | 231 | 74.9% |
 | from_gnash/misc-swfc.all | 225 | 499 | 45.1% |
 | from_gnash/misc-swfmill.all | 25 | 29 | 86.2% |
 | from_shumway | 35 | 35 | 100% |
 | from_shumway/avm1 | 118 | 311 | 37.9% |
-| **Total** | **84,662** | **91,434** | **92.6%** |
+| **Total** | **84,664** | **91,434** | **92.6%** |
 
 ## Failure Breakdown
 
@@ -99,7 +99,7 @@ Tests with `output_mismatch` status but ≥80% of expected lines matching.
 | from_gnash/actionscript.all | AsBroadcaster-v6 | 81% |
 | from_gnash/misc-ming.all | shape_test | 81% |
 | from_gnash/actionscript.all | HitTest-v8 | 81% |
-| from_gnash/actionscript.all | array-v5 | 80% |
+| from_gnash/actionscript.all | array-v5 | 81% |
 | from_gnash/misc-ming.all | RollOverOutTest | 80% |
 
 ## Flash-Spec Results
@@ -116,57 +116,57 @@ Tests verified against Flash's actual output (`output.flash.txt`).
 
 - **Pass:** 560/566 (98.9%)
 - **Ignored:** 54 tests
-- **Duration:** 3h17m42s across 30 shards
+- **Duration:** 3h16m52s across 30 shards
 - **Lines:** 71,451/71,497 matching (99.9%)
-- **Avg test duration:** 19.0s — slowest: `movieclip_invalid_get_bounds_6` (48.3s)
+- **Avg test duration:** 19.0s — slowest: `movieclip_invalid_get_bounds_6` (42.1s)
 
 ### from_gnash/actionscript.all
 
 - **Pass:** 76/181 (42.0%)
 - **Ignored:** 9 tests
-- **Duration:** 1h09m08s across 30 shards
-- **Lines:** 10,970/15,444 matching (71.0%)
-- **Avg test duration:** 21.6s — slowest: `array-v5` (45.3s)
+- **Duration:** 1h09m29s across 30 shards
+- **Lines:** 10,972/15,444 matching (71.0%)
+- **Avg test duration:** 21.7s — slowest: `array-v5` (46.3s)
 
 ### from_gnash/misc-ming.all
 
 - **Pass:** 9/58 (15.5%)
-- **Duration:** 20m23s across 30 shards
+- **Duration:** 20m32s across 30 shards
 - **Lines:** 1,665/3,388 matching (49.1%)
-- **Avg test duration:** 21.0s — slowest: `matrix_test` (71.3s)
+- **Avg test duration:** 21.2s — slowest: `matrix_test` (70.3s)
 
 ### from_gnash/misc-mtasc.all
 
 - **Pass:** 7/9 (77.8%)
-- **Duration:** 2m53s across 30 shards
+- **Duration:** 2m57s across 30 shards
 - **Lines:** 173/231 matching (74.9%)
-- **Avg test duration:** 19.2s — slowest: `levels` (20.6s)
+- **Avg test duration:** 19.7s — slowest: `levels` (20.9s)
 
 ### from_gnash/misc-swfc.all
 
 - **Pass:** 2/16 (12.5%)
-- **Duration:** 5m09s across 30 shards
+- **Duration:** 5m14s across 30 shards
 - **Lines:** 225/499 matching (45.1%)
-- **Avg test duration:** 19.3s — slowest: `opcode_guard_test2` (20.9s)
+- **Avg test duration:** 19.6s — slowest: `opcode_guard_test2` (21.1s)
 
 ### from_gnash/misc-swfmill.all
 
 - **Pass:** 11/14 (78.6%)
-- **Duration:** 4m20s across 30 shards
+- **Duration:** 4m23s across 30 shards
 - **Lines:** 25/29 matching (86.2%)
-- **Avg test duration:** 18.5s — slowest: `dict_callframe` (19.4s)
+- **Avg test duration:** 18.8s — slowest: `background` (20.1s)
 
 ### from_shumway
 
 - **Pass:** 17/17 (100%)
 - **Ignored:** 30 tests
-- **Duration:** 14m38s across 30 shards
+- **Duration:** 14m44s across 30 shards
 - **Lines:** 35/35 matching (100%)
-- **Avg test duration:** 18.5s — slowest: `add` (19.4s)
+- **Avg test duration:** 18.8s — slowest: `MaskTest-2` (19.9s)
 
 ### from_shumway/avm1
 
 - **Pass:** 12/23 (52.2%)
-- **Duration:** 7m13s across 30 shards
+- **Duration:** 7m12s across 30 shards
 - **Lines:** 118/311 matching (37.9%)
-- **Avg test duration:** 18.8s — slowest: `setinterval` (21.2s)
+- **Avg test duration:** 18.7s — slowest: `watch` (20.3s)

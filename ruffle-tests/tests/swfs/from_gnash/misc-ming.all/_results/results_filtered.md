@@ -1,10 +1,10 @@
 # Ruffle Test Results (Filtered)
 
-**Date**: 2026-04-07 02:37 UTC
+**Date**: 2026-04-07 03:33 UTC
 
-**Git SHA**: `2d5c31eb01`
+**Git SHA**: `deccd9ba15`
 
-**Run Duration**: 20m 24s
+**Run Duration**: 20m 33s
 
 **Filtered**: 0 tests ignored out of 58 available
 
@@ -31,15 +31,15 @@
 
 | # | Test | Lines | Duration | Notes |
 |---|------|-------|----------|-------|
-| 1 | `PlaceObject2Test` | 9 | 19.3s |  |
-| 2 | `VarAndCharClashTest` | 13 | 19.4s |  |
+| 1 | `PlaceObject2Test` | 9 | 19.1s |  |
+| 2 | `VarAndCharClashTest` | 13 | 20.7s |  |
 | 3 | `Video-EmbedSquareTest` | 2 | 19.2s |  |
-| 4 | `getTimer_test` | 8 | 18.9s |  |
-| 5 | `masks_test2` | 10 | 21.9s |  |
-| 6 | `morph_test1` | 0 | 19.4s |  |
+| 4 | `getTimer_test` | 8 | 20.6s |  |
+| 5 | `masks_test2` | 10 | 19.1s |  |
+| 6 | `morph_test1` | 0 | 19.3s |  |
 | 7 | `move_object_test` | 11 | 19.4s |  |
-| 8 | `multi_doactions_and_goto_frame_test` | 6 | 19.1s |  |
-| 9 | `unload_movieclip_test1` | 6 | 18.9s |  |
+| 8 | `multi_doactions_and_goto_frame_test` | 6 | 19.0s |  |
+| 9 | `unload_movieclip_test1` | 6 | 19.4s |  |
 
 ## Near-Passing Tests
 
