@@ -1,10 +1,10 @@
 # Ruffle Test Results (Filtered)
 
-**Date**: 2026-04-07 01:18 UTC
+**Date**: 2026-04-07 01:45 UTC
 
-**Git SHA**: `696b6d9770`
+**Git SHA**: `b737c2e02e`
 
-**Run Duration**: 20m 31s
+**Run Duration**: 20m 8s
 
 **Filtered**: 0 tests ignored out of 58 available
 
@@ -13,33 +13,33 @@
 | Metric | Value |
 |--------|-------|
 | Total tests | 58 |
-| Passing | **8** (13.8%) |
-| Failing | 50 |
+| Passing | **9** (15.5%) |
+| Failing | 49 |
 | Total expected lines | 3388 |
-| Matching lines | 1657 (48.9%) |
-| Mismatched lines | 1731 |
+| Matching lines | 1665 (49.1%) |
+| Mismatched lines | 1723 |
 
 ### Failure Breakdown
 
 | Category | Count | % of Failures |
 |----------|-------|---------------|
-| Output Mismatch | 49 | 98.0% |
-| Segfault | 1 | 2.0% |
+| Output Mismatch | 49 | 100.0% |
 
 ## Passing Tests
 
-**8 tests passing**
+**9 tests passing**
 
 | # | Test | Lines | Duration | Notes |
 |---|------|-------|----------|-------|
-| 1 | `VarAndCharClashTest` | 13 | 18.9s |  |
-| 2 | `Video-EmbedSquareTest` | 2 | 19.8s |  |
-| 3 | `getTimer_test` | 8 | 18.9s |  |
-| 4 | `masks_test2` | 10 | 19.4s |  |
-| 5 | `morph_test1` | 0 | 19.6s |  |
-| 6 | `move_object_test` | 11 | 19.2s |  |
-| 7 | `multi_doactions_and_goto_frame_test` | 6 | 19.2s |  |
-| 8 | `unload_movieclip_test1` | 6 | 19.4s |  |
+| 1 | `PlaceObject2Test` | 9 | 19.1s |  |
+| 2 | `VarAndCharClashTest` | 13 | 18.8s |  |
+| 3 | `Video-EmbedSquareTest` | 2 | 15.7s |  |
+| 4 | `getTimer_test` | 8 | 19.1s |  |
+| 5 | `masks_test2` | 10 | 19.3s |  |
+| 6 | `morph_test1` | 0 | 18.7s |  |
+| 7 | `move_object_test` | 11 | 19.3s |  |
+| 8 | `multi_doactions_and_goto_frame_test` | 6 | 19.3s |  |
+| 9 | `unload_movieclip_test1` | 6 | 19.6s |  |
 
 ## Near-Passing Tests
 
@@ -78,11 +78,7 @@ Tests with output mismatch but >= 50% line match rate (low-hanging fruit).
 
 ## Segfaults
 
-**1 tests** crash with SIGSEGV
-
-| # | Test | Duration | Notes |
-|---|------|----------|-------|
-| 1 | `PlaceObject2Test` | 23.6s |  |
+No segfaults.
 
 ## Runtime Errors
 
