@@ -1,45 +1,61 @@
 {
   "metadata": {
-    "old_timestamp": "2026-04-07T19:24:35.719255+00:00",
-    "old_git_sha": "170dea13da17de7ed09aeca83df1eb016085353f",
-    "new_timestamp": "2026-04-07T20:00:12.560577+00:00",
-    "new_git_sha": "81f9ea28cc82488b15dcff9242a4ba87f3cd59a0",
+    "old_timestamp": "2026-04-07T20:00:12.560577+00:00",
+    "old_git_sha": "81f9ea28cc82488b15dcff9242a4ba87f3cd59a0",
+    "new_timestamp": "2026-04-07T21:46:07.533298+00:00",
+    "new_git_sha": "37a9f630eea82f9aa670ce30f4e7d54e2171cf51",
     "partial": false,
     "same_commit": false
   },
   "summary": {
-    "old_pass": 578,
+    "old_pass": 577,
     "old_total": 620,
-    "old_pass_rate": 93.2,
-    "new_pass": 577,
+    "old_pass_rate": 93.1,
+    "new_pass": 579,
     "new_total": 620,
-    "new_pass_rate": 93.1,
-    "old_mismatched_lines": 9680,
-    "new_mismatched_lines": 9689,
-    "increased_mismatches": 9,
-    "decreased_mismatches": 0,
-    "newly_passing": 0,
-    "newly_failing": 1,
-    "status_changed": 1,
-    "unchanged": 619,
+    "new_pass_rate": 93.4,
+    "old_mismatched_lines": 9689,
+    "new_mismatched_lines": 8943,
+    "increased_mismatches": 0,
+    "decreased_mismatches": 746,
+    "newly_passing": 2,
+    "newly_failing": 0,
+    "status_changed": 2,
+    "unchanged": 618,
     "added": 0,
     "removed": 0
   },
   "changes": [
     {
-      "test": "globals_swf5",
+      "test": "sound_id3",
       "change_type": "changed",
-      "old_status": "pass",
-      "new_status": "output_mismatch",
+      "old_status": "output_mismatch",
+      "new_status": "pass",
       "old_lines": {
-        "actual_lines": 304,
-        "expected_lines": 304,
-        "matching_lines": 304
+        "actual_lines": 229,
+        "expected_lines": 633,
+        "matching_lines": 17
       },
       "new_lines": {
-        "actual_lines": 304,
-        "expected_lines": 304,
-        "matching_lines": 295
+        "actual_lines": 633,
+        "expected_lines": 633,
+        "matching_lines": 633
+      }
+    },
+    {
+      "test": "sound_id3_prop",
+      "change_type": "changed",
+      "old_status": "output_mismatch",
+      "new_status": "pass",
+      "old_lines": {
+        "actual_lines": 18,
+        "expected_lines": 138,
+        "matching_lines": 8
+      },
+      "new_lines": {
+        "actual_lines": 138,
+        "expected_lines": 138,
+        "matching_lines": 138
       }
     }
   ]
