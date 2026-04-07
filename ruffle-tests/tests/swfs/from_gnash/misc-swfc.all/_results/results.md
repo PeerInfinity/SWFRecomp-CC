@@ -1,10 +1,10 @@
 # Ruffle Test Results (Unfiltered)
 
-**Date**: 2026-04-07 02:37 UTC
+**Date**: 2026-04-07 03:33 UTC
 
-**Git SHA**: `2d5c31eb01`
+**Git SHA**: `deccd9ba15`
 
-**Run Duration**: 5m 9s
+**Run Duration**: 5m 15s
 
 ## Summary
 
@@ -30,8 +30,8 @@
 
 | # | Test | Lines | Duration | Notes |
 |---|------|-------|----------|-------|
-| 1 | `gotoFrameLabelAsFunction` | 6 | 18.6s |  |
-| 2 | `hello` | 4 | 18.3s |  |
+| 1 | `gotoFrameLabelAsFunction` | 6 | 18.9s |  |
+| 2 | `hello` | 4 | 19.5s |  |
 
 ## Near-Passing Tests
 
@@ -58,7 +58,7 @@ No segfaults.
 
 | # | Test | Detail | Duration | Notes |
 |---|------|--------|----------|-------|
-| 1 | `opcode_guard_test2` | exit code -6 | 20.9s |  |
+| 1 | `opcode_guard_test2` | exit code -6 | 21.1s |  |
 
 ## Timeouts
 
