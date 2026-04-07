@@ -8,6 +8,10 @@ Last updated: 2026-04-07
 - **Image test baseline**: **14/31 strict image match** (+2: bitmap_data_colortransform, bitmap_data_copypixels). **10/31 tolerance pass** (within test.toml limits).
 - **Main failure types**: output_mismatch (45), runtime_segfault (0), timeout (1)
 - **Known regressions**: `native_objects_swf6` regressed to segfault (was output_mismatch). `global_instance_decls` 40→14 (unclear root cause, test at 2% pass rate).
+- **Latest fixes (2026-04-07, session 4)**:
+  - **native_objects_swf7 PASS (115/115)** — Upstream tests expanded from 84→115 lines with new readonly proto detection and flash.* namespace classes. Fixed: makeProtoReadOnly on 8 singletons (Accessibility, Key, Math, Mouse, Selection, Color, System.Product), PROPERTY_FLAG_PERM_READONLY for NetConnection (survives ASSetPropFlags), Function() without new returns proper object, StyleSheet constructor sets NATIVE_STYLESHEET, FileReference NATIVE_FILEREF in actionNewMethod, ExternalInterface type 2 constructor.
+  - **native_objects_swf8 PASS (115/115)** — Same fixes plus ExternalInterface `new` returns object, FileReference native backing.
+  - **native_objects_swf6 114/115** — Same fixes. 1 remaining diff is pre-existing accepted (SWF6 TextField).
 - **Latest fixes (2026-04-07, session 3)**:
   - **swf5_xml_event_handler_context PASS (2/2)** — XML.load() implementation using embedded data file registry (findDataFile). Fires onLoad callback synchronously via soundFireCallback pattern. Child SWF (SWF7) loads into _level2 via existing getURL2 infrastructure. Removed from ignored_tests.txt. SWF5_XML_EVENT_HANDLER_CONTEXT_PLAN moved from blocked/ to complete/.
   - **xml_load PASS (2/2)** — Same XML.load() implementation. Loads whataload.xml from embedded data, parses XML, fires onLoad(true). Removed from ignored_tests.txt.
@@ -116,7 +120,7 @@ Last updated: 2026-04-07
 | Test | Status | Notes |
 |------|--------|-------|
 | timeout | timeout | Infinite loop — needs script execution timeout mechanism |
-| native_objects_swf6 | segfault | Regression (was output_mismatch) — needs investigation |
+| native_objects_swf6 | 114/115 | 1 accepted diff (SWF6 TextField) — was segfault, recovered |
 
 netstream_play_flv_screen crash fixed (was segfault, now PASS with 0/0 trace lines).
 
@@ -181,6 +185,7 @@ All other previously near-passing tests have been fixed. 146 tests were tracked 
 | FOCUS_FOCUSRECT_PLAN | 4/4 (1237 lines each) |
 | SOUND_CLASS_PLAN (Phase 0) | register_class_with_sound, sound |
 | SOUND_ID3_PLAN | 633/633 + 138/138 |
+| NATIVE_OBJECTS_UPDATED_PLAN | swf7 115/115, swf8 115/115 (swf6 114/115 accepted) |
 | UNLOAD_PLAN | 5/6 (unload_nested_child now PASS) |
 | DISPLACEMENTMAPFILTER_PLAN | 13/13 |
 | TELLTARGET_PLAN | 20/22 (2 accepted/ignored) |

@@ -26,6 +26,11 @@ typedef struct ASProperty ASProperty;
 #define PROPERTY_FLAG_WRITABLE    0x02  // Property can be modified (default for user properties)
 #define PROPERTY_FLAG_CONFIGURABLE 0x04 // Property can be deleted (default for user properties)
 
+// Permanently non-writable — survives ASSetPropFlags clearing READ_ONLY.
+// Used for NetConnection.__proto__ and similar deeply protected properties.
+// ASSetPropFlags only touches bits 0x01-0x04, so this bit is never cleared by script.
+#define PROPERTY_FLAG_PERM_READONLY 0x80
+
 // Default flags for user-created properties (fully mutable and enumerable)
 #define PROPERTY_FLAGS_DEFAULT (PROPERTY_FLAG_ENUMERABLE | PROPERTY_FLAG_WRITABLE | PROPERTY_FLAG_CONFIGURABLE)
 
@@ -57,6 +62,7 @@ enum NativeType {
 	NATIVE_TRANSFORM = 19,
 	NATIVE_FILTER = 20,
 	NATIVE_STYLESHEET = 21,
+	NATIVE_FILEREF = 22,
 };
 
 typedef struct ASObject

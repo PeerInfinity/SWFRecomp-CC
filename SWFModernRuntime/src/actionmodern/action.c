@@ -4398,6 +4398,19 @@ static ActionVar builtin_noop_func(SWFAppContext* app_context, ActionVar* args, 
 	ActionVar r = {0}; r.type = ACTION_STACK_VALUE_UNDEFINED; return r;
 }
 
+// Forward declaration
+static void makeProtoReadOnly(ASObject* obj);
+
+// Constructor that makes __proto__ read-only on the new instance.
+// Used for types where Flash protects __proto__ (System.Product, etc.)
+static ActionVar builtin_readonly_proto_ctor(SWFAppContext* app_context, ActionVar* args, u32 arg_count, ActionVar* registers, void* this_obj)
+{
+	(void)app_context; (void)args; (void)arg_count; (void)registers;
+	if (this_obj != NULL) makeProtoReadOnly((ASObject*)this_obj);
+	ActionVar r = {0}; r.type = ACTION_STACK_VALUE_UNDEFINED; return r;
+}
+
+
 // Wrapper for trace — prints first arg
 static ActionVar builtin_trace_func2(SWFAppContext* app_context, ActionVar* args, u32 arg_count, ActionVar* registers, void* this_obj)
 {
@@ -6956,6 +6969,18 @@ static void setObjectProto(SWFAppContext* app_context, ASObject* obj)
 	proto_var.str_size = 0;
 	proto_var.data.numeric_value = (u64) proto;
 	setPropertyWithFlags(app_context, obj, "__proto__", 9, &proto_var, PROPERTY_FLAG_WRITABLE);
+}
+
+// Make __proto__ READ_ONLY on an object (after setObjectProto established it).
+// Used for singleton globals (Accessibility, Key, Math, Mouse, Selection, etc.)
+static void makeProtoReadOnly(ASObject* obj)
+{
+	for (u32 i = 0; i < obj->num_used; i++) {
+		if (obj->properties[i].name_length == 9 && strncmp(obj->properties[i].name, "__proto__", 9) == 0) {
+			obj->properties[i].flags = 0; // no ENUMERABLE, no WRITABLE, no CONFIGURABLE
+			break;
+		}
+	}
 }
 
 // Like setObjectProto but sets __proto__ as ENUMERABLE.
@@ -13962,13 +13987,24 @@ static ActionVar stylesheetLoad(SWFAppContext* app_context, ActionVar* args, u32
 	return result;
 }
 
+static ActionVar builtin_stylesheet_constructor(SWFAppContext* app_context, ActionVar* args, u32 arg_count, ActionVar* registers, void* this_obj)
+{
+	(void)app_context; (void)args; (void)arg_count; (void)registers;
+	if (this_obj != NULL) {
+		ASObject* obj = (ASObject*)this_obj;
+		if (obj->native_type == NATIVE_NONE)
+			obj->native_type = NATIVE_STYLESHEET;
+	}
+	ActionVar r = {0}; r.type = ACTION_STACK_VALUE_UNDEFINED; return r;
+}
+
 static void initStyleSheetPrototype(SWFAppContext* app_context) {
 	if (g_stylesheet_constructor_init) return;
 
 	memset(&g_stylesheet_constructor_global, 0, sizeof(ASFunction));
 	strncpy(g_stylesheet_constructor_global.name, "StyleSheet", 255);
-	g_stylesheet_constructor_global.function_type = 1;
-	g_stylesheet_constructor_global.param_count = 0;
+	g_stylesheet_constructor_global.function_type = 2;
+	g_stylesheet_constructor_global.advanced_func = (Function2Ptr)builtin_stylesheet_constructor;
 
 	// Create prototype
 	g_stylesheet_prototype = allocObject(app_context, 16);
@@ -27489,7 +27525,7 @@ static void initSystemObject(SWFAppContext* app_context)
 		memset(&sys_product_func, 0, sizeof(ASFunction));
 		strncpy(sys_product_func.name, "Product", 255);
 		sys_product_func.function_type = 2;
-		sys_product_func.advanced_func = (Function2Ptr)builtin_noop_func;
+		sys_product_func.advanced_func = (Function2Ptr)builtin_readonly_proto_ctor;
 		// Product has a prototype — create it with constructor + __proto__
 		ASObject* op = getObjectPrototype(app_context);
 		sys_product_func.prototype_obj = allocObject(app_context, 12);
@@ -28355,6 +28391,11 @@ static void initFlashPackage(SWFAppContext* app_context)
 	ensureStubCtorPrototype(app_context, &fc_ActionGenerator);
 	ensureStubCtorPrototype(app_context, &fc_Configuration);
 
+	// FileReference: native_type set in actionNewMethod (not via super() handler)
+	// ExternalInterface needs type 2 so `new` returns an object (not undefined)
+	fc_ExternalInterface.function_type = 2;
+	fc_ExternalInterface.advanced_func = (Function2Ptr)builtin_noop_func;
+
 	// Add prototype methods for flash.automation classes (LIFO insertion for correct enumeration order)
 	// Configuration.prototype: toString, valueOf, setDeviceConfiguration, getDeviceConfiguration, getTestAutomationConfiguration
 	{
@@ -28498,6 +28539,7 @@ static void ensureGlobalInit(SWFAppContext* app_context)
 	initXMLPrototype(app_context);
 	initMathObject(app_context);
 	setObjectProto(app_context, g_math_object);
+	makeProtoReadOnly(g_math_object);
 	initDatePrototype(app_context);
 
 	// ---- Error constructor ----
@@ -28565,6 +28607,11 @@ static void ensureGlobalInit(SWFAppContext* app_context)
 	setObjectProto(app_context, g_mouse_obj);
 	setObjectProto(app_context, g_selection_obj);
 	setObjectProto(app_context, g_stage_obj);
+	// Flash singletons have read-only __proto__ (detected by native_objects tests)
+	makeProtoReadOnly(g_accessibility_obj);
+	makeProtoReadOnly(g_key_obj);
+	makeProtoReadOnly(g_mouse_obj);
+	makeProtoReadOnly(g_selection_obj);
 
 	// Native static objects always trace as "[object Object]" regardless of SWF version
 	installNativeToString(app_context, g_accessibility_obj);
@@ -36267,7 +36314,8 @@ void actionSetMember(SWFAppContext* app_context)
 			// Check if property is read-only (ASSetPropFlags bit 4 → WRITABLE cleared)
 			{
 				ASProperty* _existing = findPropertyRaw(obj, prop_name, prop_name_len);
-				if (_existing != NULL && !(_existing->flags & PROPERTY_FLAG_WRITABLE))
+				if (_existing != NULL && ((_existing->flags & PROPERTY_FLAG_PERM_READONLY) ||
+				    !(_existing->flags & PROPERTY_FLAG_WRITABLE)))
 					return;  // Property is read-only, silently ignore the assignment
 			}
 			// Set the property on the object
@@ -41018,16 +41066,8 @@ void actionNewObject(SWFAppContext* app_context)
 		proto_var.type = ACTION_STACK_VALUE_OBJECT;
 		proto_var.data.numeric_value = (u64)g_color_prototype;
 		setProperty(app_context, color_obj, "__proto__", 9, &proto_var);
-		// Mark __proto__ as non-enumerable
-		for (u32 _pi = 0; _pi < color_obj->num_used; _pi++)
-		{
-			if (color_obj->properties[_pi].name_length == 9 &&
-			    strncmp(color_obj->properties[_pi].name, "__proto__", 9) == 0)
-			{
-				color_obj->properties[_pi].flags &= ~PROPERTY_FLAG_ENUMERABLE;
-				break;
-			}
-		}
+		// Mark __proto__ as non-enumerable + read-only (Flash Color objects have readonly proto)
+		makeProtoReadOnly(color_obj);
 		retainObject(g_color_prototype);
 		// Call constructor to initialize properties
 		colorConstructor(app_context, args, num_args, NULL, color_obj);
@@ -41070,6 +41110,7 @@ void actionNewObject(SWFAppContext* app_context)
 	else if (strcmp(ctor_name, "NetConnection") == 0)
 	{
 		// NetConnection: non-native, with isConnected = false
+		// __proto__ is permanently non-writable (survives ASSetPropFlags)
 		ASObject* obj = allocObject(app_context, 4);
 
 		PUSH_STR("NetConnection", 13);
@@ -41087,6 +41128,14 @@ void actionNewObject(SWFAppContext* app_context)
 			setProperty(app_context, obj, "__proto__", 9, &pv);
 		}
 		POP();
+		// Make __proto__ permanently non-writable (persists through ASSetPropFlags)
+		for (u32 _pi = 0; _pi < obj->num_used; _pi++) {
+			if (obj->properties[_pi].name_length == 9 &&
+			    strncmp(obj->properties[_pi].name, "__proto__", 9) == 0) {
+				obj->properties[_pi].flags = PROPERTY_FLAG_PERM_READONLY;
+				break;
+			}
+		}
 
 		// Set isConnected = false
 		ActionVar bv = {0};
@@ -42314,6 +42363,7 @@ void actionNewMethod(SWFAppContext* app_context)
 			else if (strcmp(ctor_name, "MovieClipLoader") == 0) new_obj_inst->native_type = NATIVE_MOVIECLIPLOADER;
 			else if (strcmp(ctor_name, "PrintJob") == 0) new_obj_inst->native_type = NATIVE_PRINTJOB;
 			else if (strcmp(ctor_name, "Button") == 0) new_obj_inst->native_type = NATIVE_BUTTON;
+			else if (strcmp(ctor_name, "FileReference") == 0) new_obj_inst->native_type = NATIVE_FILEREF;
 		}
 
 		// Set up prototype chain (new_obj.__proto__ = func.prototype)
@@ -44074,6 +44124,11 @@ static int invokeNativeSuperConstructor(SWFAppContext* app_context, ASFunction* 
 		// NetConnection super() returns undefined
 		return 1;
 	}
+	if (strcmp(name, "FileReference") == 0) {
+		if (obj->native_type == NATIVE_NONE)
+			obj->native_type = NATIVE_FILEREF;
+		return 1;
+	}
 
 	// --- Filters: BlurFilter, BevelFilter, GlowFilter, DropShadowFilter ---
 	if (strcmp(name, "BlurFilter") == 0) {
@@ -45664,7 +45719,8 @@ void actionCallFunction(SWFAppContext* app_context, char* str_buffer)
 		if (num_args >= 1) {
 			pushVar(app_context, &args[0]);
 		} else {
-			ASObject* obj = allocObject(app_context, 0);
+			ASObject* obj = allocObject(app_context, 4);
+			setObjectProto(app_context, obj);
 			ActionVar r = {0};
 			r.type = ACTION_STACK_VALUE_OBJECT;
 			r.data.numeric_value = (u64)obj;
