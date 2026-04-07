@@ -36,9 +36,11 @@ LittleCube has added **garbage collection** to the runtime PR (commit `f02311c`,
 
 #### Updated PR Status
 
-**SWFRecomp PR #4** — now 6 commits (was 5):
+**SWFRecomp PR #4** — now 8 commits (was 5):
 - Previous 5 commits (objects and functions infrastructure)
 - `c7348af` - remove arg initial strings, add null/undefined push values
+- `3a30821` - **implement pushing f64s** — `ACTION_STACK_VALUE_F64 = 6`, reads two 32-bit values into 64-bit hex literal
+- `1a72fe5` - add `"prototype"` and `"__proto__"` to initial strings (matches runtime's `STR_ID_PROTOTYPE`/`STR_ID_PROTO`)
 
 **SWFModernRuntime PR #3** — now 21 commits (was 14):
 - Previous 14 commits (objects and functions infrastructure)
