@@ -14891,6 +14891,7 @@ static ASFunction g_xml_fn_getNamespaceForPrefix;
 static ASFunction g_xml_fn_getPrefixForNamespace;
 static ASFunction g_xml_fn_getBytesLoaded;
 static ASFunction g_xml_fn_getBytesTotal;
+static ASFunction g_xml_fn_load;
 
 // Check if obj is an XML/XMLNode instance (walks __proto__ chain)
 static int isXMLNodeInstance(ASObject* obj) {
@@ -16109,6 +16110,74 @@ static ActionVar builtin_xml_getBytesTotal(SWFAppContext* app_context, ActionVar
 	return ret;
 }
 
+// XML.load(url) — load XML from embedded data file and fire onLoad callback
+static ActionVar builtin_xml_load(SWFAppContext* app_context, ActionVar* args, u32 arg_count, ActionVar* registers, void* this_obj) {
+	ActionVar ret = {0}; ret.type = ACTION_STACK_VALUE_BOOLEAN;
+	if (this_obj == NULL) { ret.data.numeric_value = 0; return ret; }
+	ASObject* doc = (ASObject*) this_obj;
+
+	// Get URL argument
+	char url_utf8[512];
+	url_utf8[0] = '\0';
+	if (arg_count > 0 && args[0].type == ACTION_STACK_VALUE_STRING) {
+		const uint16_t* u16 = varGetU16Ptr(&args[0]);
+		u16_to_utf8(u16, args[0].str_size, url_utf8, sizeof(url_utf8));
+	}
+
+	// Set loaded = false initially
+	{
+		ActionVar lv = {0}; lv.type = ACTION_STACK_VALUE_BOOLEAN; lv.data.numeric_value = 0;
+		setProperty(app_context, doc, "loaded", 6, &lv);
+	}
+
+	// Look up URL in embedded data file registry
+	extern DataFileEntry* findDataFile(const char* name);
+	DataFileEntry* data = findDataFile(url_utf8);
+	int success = 0;
+
+	if (data != NULL && data->content != NULL && data->content_length > 0) {
+		// Orphan existing children (same as parseXML)
+		ActionVar* cn = getProperty(doc, "childNodes", 10);
+		if (cn != NULL && cn->type == ACTION_STACK_VALUE_ARRAY) {
+			ASArray* children = (ASArray*) cn->data.numeric_value;
+			if (children != NULL) {
+				for (u32 i = 0; i < children->length; i++) {
+					if (children->elements[i].type == ACTION_STACK_VALUE_OBJECT) {
+						ASObject* child = (ASObject*) children->elements[i].data.numeric_value;
+						if (child != NULL) {
+							xml_set_null(app_context, child, "parentNode", 10);
+							xml_set_null(app_context, child, "previousSibling", 15);
+							xml_set_null(app_context, child, "nextSibling", 11);
+						}
+					}
+				}
+				children->length = 0;
+			}
+		}
+		xml_set_null(app_context, doc, "firstChild", 10);
+		xml_set_null(app_context, doc, "lastChild", 9);
+
+		// Parse the XML content
+		xml_parse_into(app_context, doc, data->content, (u32)data->content_length);
+
+		// Set loaded = true, status = 0
+		ActionVar lv = {0}; lv.type = ACTION_STACK_VALUE_BOOLEAN; lv.data.numeric_value = 1;
+		setProperty(app_context, doc, "loaded", 6, &lv);
+		ActionVar sv = {0}; sv.type = ACTION_STACK_VALUE_F64; sv.data.numeric_value = 0;
+		setProperty(app_context, doc, "status", 6, &sv);
+		success = 1;
+	}
+
+	// Fire onLoad callback
+	ActionVar cb_arg;
+	cb_arg.type = ACTION_STACK_VALUE_BOOLEAN;
+	cb_arg.data.numeric_value = success ? 1 : 0;
+	soundFireCallback(app_context, doc, "onLoad", 6, &cb_arg, 1);
+
+	ret.data.numeric_value = success ? 1 : 0;
+	return ret;
+}
+
 // Helper to init a static method ASFunction
 static void xml_init_method(ASFunction* fn, const char* name, Function2Ptr func) {
 	memset(fn, 0, sizeof(ASFunction));
@@ -16135,6 +16204,7 @@ static void initXMLPrototype(SWFAppContext* app_context) {
 	xml_init_method(&g_xml_fn_getPrefixForNamespace, "getPrefixForNamespace", builtin_xml_getPrefixForNamespace);
 	xml_init_method(&g_xml_fn_getBytesLoaded, "getBytesLoaded", builtin_xml_getBytesLoaded);
 	xml_init_method(&g_xml_fn_getBytesTotal, "getBytesTotal", builtin_xml_getBytesTotal);
+	xml_init_method(&g_xml_fn_load, "load", builtin_xml_load);
 
 	// ---- XMLNode constructor ----
 	memset(&g_xmlnode_constructor, 0, sizeof(ASFunction));
@@ -16193,6 +16263,7 @@ static void initXMLPrototype(SWFAppContext* app_context) {
 	INSTALL_METHOD("parseXML", 8, &g_xml_fn_parseXML);
 	INSTALL_METHOD("createElement", 13, &g_xml_fn_createElement);
 	INSTALL_METHOD("createTextNode", 14, &g_xml_fn_createTextNode);
+	INSTALL_METHOD("load", 4, &g_xml_fn_load);
 
 	// Default ignoreWhite = false on XML.prototype (tests override via XML.prototype.ignoreWhite = true)
 	{

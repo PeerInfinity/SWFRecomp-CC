@@ -8,6 +8,9 @@ Last updated: 2026-04-07
 - **Image test baseline**: **14/31 strict image match** (+2: bitmap_data_colortransform, bitmap_data_copypixels). **10/31 tolerance pass** (within test.toml limits).
 - **Main failure types**: output_mismatch (45), runtime_segfault (0), timeout (1)
 - **Known regressions**: `native_objects_swf6` regressed to segfault (was output_mismatch). `global_instance_decls` 40→14 (unclear root cause, test at 2% pass rate).
+- **Latest fixes (2026-04-07, session 3)**:
+  - **swf5_xml_event_handler_context PASS (2/2)** — XML.load() implementation using embedded data file registry (findDataFile). Fires onLoad callback synchronously via soundFireCallback pattern. Child SWF (SWF7) loads into _level2 via existing getURL2 infrastructure. Removed from ignored_tests.txt. SWF5_XML_EVENT_HANDLER_CONTEXT_PLAN moved from blocked/ to complete/.
+  - **xml_load PASS (2/2)** — Same XML.load() implementation. Loads whataload.xml from embedded data, parses XML, fires onLoad(true). Removed from ignored_tests.txt.
 - **Latest fixes (2026-04-07, session 2)**:
   - **sound_id3 PASS (633/633)** — Full ID3v2.3 tag parser: frame headers, Latin1/UTF-16/UTF-8 text encoding, COMM frame array collection, friendly-name aliases (genre, artist, album, etc.). valueOf override returns undefined for Flash ID3 object semantics (id3==undefined true, typeof=="object"). soundFireCallback updated to pass success=true arg. id3 property getter with Place 0 pattern support. SOUND_ID3_PLAN moved to complete/.
   - **sound_id3_prop PASS (138/138)** — Same ID3 implementation. Tests id3 property access lifecycle across Place 0/1/2 patterns (pre-set, during onID3, during onLoad).
@@ -183,6 +186,7 @@ All other previously near-passing tests have been fixed. 146 tests were tracked 
 | TELLTARGET_PLAN | 20/22 (2 accepted/ignored) |
 | DRAWING_API_RENDERING | mask_with_drawing IMAGE PASS; gradient outliers reduced 80-86% |
 | PIXEL_TEXT_LAYOUT_PLAN | 3/3 (asfunction, edittext_drag_select, edittext_ime_focus_lost) |
+| SWF5_XML_EVENT_HANDLER_CONTEXT_PLAN | 2/2 + xml_load 2/2 |
 
 ### Blocked plans
 | Plan | Status | Blocker |
@@ -202,12 +206,11 @@ All other previously near-passing tests have been fixed. 146 tests were tracked 
 ### Actionable — Quick wins (all exhausted)
 All previous quick wins have been fixed. See `SESSION_NOTES.md` for details.
 
-### Remaining failing tests (filtered: 11 tests)
+### Remaining failing tests (filtered: 9 tests)
 Remaining failures require:
 - **Global enumeration order**: global_proto_decls, global_instance_decls, global_proto_decls_delete (GLOBALS_PLAN Phase 8 blocked)
 - **Missing features**: localconnection, sandbox_type_remote
 - **Shape-accurate hitTest**: movieclip_hittest_shapeflag (curves/strokes accuracy)
-- **Other**: swf5_xml_event_handler_context
 
 ### Remaining blocked work (from blocked/ plans)
 - **GLOBALS_PLAN Phase 8** — BLOCKED by enumeration order + missing globals.

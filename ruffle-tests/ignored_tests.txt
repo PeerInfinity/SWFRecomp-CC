@@ -19,7 +19,6 @@ stylesheet_load
 # --- XML networking/sockets ---
 # These tests require network connections or XML HTTP loading.
 xml_getbytes
-xml_load
 xml_socket
 xml_socket_close_in_handler
 xml_socket_on_data
@@ -68,7 +67,6 @@ shared_object_self_ref
 # These tests require features not yet implemented in any test execution mode.
 # They may be removed from this list as capabilities are added.
 # See _investigation/FEATURE_SCOPE.md for details.
-swf5_xml_event_handler_context
 localconnection
 edittext_ime_focus_lost
 sandbox_type_remote
