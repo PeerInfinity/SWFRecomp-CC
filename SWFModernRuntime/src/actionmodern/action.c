@@ -2873,9 +2873,10 @@ static int screenvideo_decode_frame(const unsigned char* data, int data_len,
 			}
 
 			// Copy block to pixel buffer (BGR bottom-to-top → RGBA top-to-bottom)
+			// Block data row 0 = bottom of block visual, dst_y maps bottom-to-top
 			for (int yr = 0; yr < bh; yr++)
 			{
-				int src_y = bh - 1 - yr; // bottom-to-top in block data
+				int src_y = yr; // row 0 = bottom of block (both data and visual)
 				int dst_y = (image_h - 1) - (by_bottom + yr); // flip to top-to-bottom
 				if (dst_y < 0 || dst_y >= image_h) continue;
 				for (int xr = 0; xr < bw; xr++)
