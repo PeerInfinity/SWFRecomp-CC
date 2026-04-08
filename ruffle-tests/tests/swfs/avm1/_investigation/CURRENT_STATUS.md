@@ -189,6 +189,7 @@ All previously near-passing tests have been fixed. 146 tests were tracked throug
 | PIXEL_TEXT_LAYOUT_PLAN | 3/3 (asfunction, edittext_drag_select, edittext_ime_focus_lost) |
 | SWF5_XML_EVENT_HANDLER_CONTEXT_PLAN | 2/2 + xml_load 2/2 |
 | VECTOR_PATH_HITTEST_PLAN | 329/338 (9 accepted diffs) |
+| FLV_PLAYBACK_PLAN | 3/3 trace + headless image pixel-perfect |
 
 ### Blocked plans
 | Plan | Status | Blocker |

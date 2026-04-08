@@ -3,7 +3,7 @@
 
 <!-- PLAN_META
 id: FLV_PLAYBACK
-status: incomplete
+status: complete
 phases:
   - id: 1
     name: "FLV container demuxer (header + script tag)"
@@ -28,7 +28,7 @@ phases:
     status: complete
   - id: 8
     name: "Video rendering (headless only)"
-    status: blocked
+    status: complete
 dependencies:
   - plan: NETCONNECTION
     phases: [2]
@@ -38,13 +38,12 @@ dependencies:
     phases: [1]
     type: requires
     reason: "Data file embedding pattern"
-blockers:
-  - "FLVPlayback component parameter ordering: clip action variables set BEFORE registerClass constructor, so contentPath setter fires when VideoPlayer is undefined"
+blockers: []
 -->
 
 Last updated: 2026-04-07
 
-## Status: INCOMPLETE — All 3 trace tests PASS, image rendering blocked by FLVPlayback component
+## Status: COMPLETE — All 3 trace tests PASS, headless image test pixel-perfect
 
 ### Test Summary
 
@@ -52,7 +51,7 @@ Last updated: 2026-04-07
 |------|-------|---------|--------|-------|
 | netstream_play_flv | 21 | 21/21 (100%) | **PASS** | FLV play + onStatus events |
 | netstream_seek_flv | 25 | 25/25 (100%) | **PASS** | FLV seek + pause + onStatus events |
-| netstream_play_flv_screen | 0 | 0/0 (100%) | **PASS** | Trace pass; image comparison needs headless rendering |
+| netstream_play_flv_screen | 0 | 0/0 (100%) | **PASS** | Trace pass + headless image pixel-perfect (0 outliers) |
 
 ### Completed Work
 
@@ -151,18 +150,16 @@ Fix: Safety checks in `object.c` — `getProperty`, `getPropertyWithPrototype`, 
 - Guarded by `#ifdef HEADLESS_GRAPHICS` — only active in headless image rendering mode
 - Verified: `ng_isVideoChar(4)` correctly finds the video char_id in the display list
 
-#### Phase 8: Video rendering — BLOCKED
-The rendering infrastructure is complete but cannot be tested end-to-end because:
+#### Phase 8: Video rendering — COMPLETE (2026-04-07)
 
-**Blocker: Component parameter execution ordering**
+Three bugs fixed to reach pixel-perfect rendering:
 
-Two `this` type mismatch bugs have been fixed:
-1. `actionSetVariable` non-root MC path — now invokes addProperty setters via `g_event_this_mc` (previous commit)
-2. `actionSetMember` MOVIECLIP type-2 setter — was passing `(void*)mc` as `this_obj` (stored as OBJECT type), now uses `g_event_this_mc` pattern (this commit)
+1. **`actionSetVariable` addProperty bypass** — SetVariable on non-root MCs now invokes addProperty setters via `g_event_this_mc` pattern
+2. **`actionSetMember` MOVIECLIP setter this-type mismatch** — type-2 setter path was passing `(void*)mc` as `this_obj` (stored as OBJECT type), now uses `g_event_this_mc` pattern
+3. **registerClass constructor vs CONSTRUCT clip action ordering** — clip action variables (component parameters) were set before the constructor ran; fixed to run constructor first
+4. **ScreenVideo decoder per-block vertical flip** — `src_y` was double-flipped (`bh-1-yr` when `dst_y` already handles bottom-to-top); fixed to direct mapping (`src_y = yr`)
 
-With both fixes, the `__set__contentPath` setter fires correctly with MOVIECLIP-type `this`. However, tracing shows component parameters (autoPlay, contentPath, etc.) are set BEFORE the constructor's `createVideoPlayer` call. The `contentPath` setter checks `_vp[_activeVP] != undefined` and bails because VideoPlayer doesn't exist yet.
-
-**Next step**: Fix clip action variable ordering — parameters should be set AFTER the registerClass constructor finishes, not before. See `FLVPLAYBACK_COMPONENT_INVESTIGATION.md` for full trace analysis.
+Result: `netstream_play_flv_screen` headless image test passes pixel-perfect (0 outliers, max difference 0).
 
 ### ScreenVideo Format Reference
 
