@@ -28968,9 +28968,18 @@ static void ensureGlobalInit(SWFAppContext* app_context)
 	if (global_object->num_used > 0)
 		global_object->properties[global_object->num_used - 1].flash_flags = 0x0080;
 	REG_FUNC("enableDebugConsole", 18, &g_enableDebugConsole_func);
-	// NaN and Infinity are NOT registered on global_object — they're handled by
-	// special handlers in actionGetVariable for SWF5+. Registering them on _global
-	// would break SWF4 comparison tests where NaN/Infinity should resolve as undefined.
+	// NaN and Infinity as properties on _global (SWF5+).
+	// getVariable("NaN"/"Infinity") still has special handlers for bare access.
+	{
+		ActionVar _nan_v = {0}; _nan_v.type = ACTION_STACK_VALUE_F64;
+		VAL(double, &_nan_v.data.numeric_value) = __builtin_nan("");
+		setProperty(app_context, global_object, "NaN", 3, &_nan_v);
+	}
+	{
+		ActionVar _inf_v = {0}; _inf_v.type = ACTION_STACK_VALUE_F64;
+		VAL(double, &_inf_v.data.numeric_value) = __builtin_inf();
+		setProperty(app_context, global_object, "Infinity", 8, &_inf_v);
+	}
 	REG_FUNC("MovieClip", 9, &g_movieclip_constructor);
 	REG_FUNC("XMLSocket", 9, &g_stub_ctors[17]);
 	REG_FUNC("AsBroadcaster", 13, &g_stub_ctors[0]);
@@ -30992,6 +31001,24 @@ check_special_vars:
 					ActionVar _ts = {0}; _ts.type = ACTION_STACK_VALUE_FUNCTION;
 					_ts.data.numeric_value = (u64)&g_prim_wrapper_toString_func;
 					setPropertyWithFlags(app_context, g_number_constructor.prototype_obj, "toString", 8, &_ts, PROPERTY_FLAG_WRITABLE);
+				}
+
+				// Register constructor, __proto__, prototype as own properties
+				// so Number.hasOwnProperty('prototype') etc. return true
+				{
+					ActionVar _cv = {0}; _cv.type = ACTION_STACK_VALUE_FUNCTION;
+					_cv.data.numeric_value = (u64)&g_number_constructor;
+					setPropertyWithFlags(app_context, g_number_constructor.own_props, "constructor", 11, &_cv, PROPERTY_FLAGS_DEFAULT);
+					// __proto__ → Function.prototype
+					ASObject* fn_proto = getFunctionProto(g_swf_version);
+					if (fn_proto != NULL) {
+						ActionVar _pv = {0}; _pv.type = ACTION_STACK_VALUE_OBJECT;
+						_pv.data.numeric_value = (u64)fn_proto;
+						setPropertyWithFlags(app_context, g_number_constructor.own_props, "__proto__", 9, &_pv, PROPERTY_FLAGS_DEFAULT);
+					}
+					ActionVar _proto = {0}; _proto.type = ACTION_STACK_VALUE_OBJECT;
+					_proto.data.numeric_value = (u64)g_number_constructor.prototype_obj;
+					setPropertyWithFlags(app_context, g_number_constructor.own_props, "prototype", 9, &_proto, PROPERTY_FLAGS_DEFAULT);
 				}
 
 				g_number_constructor_init = 1;
