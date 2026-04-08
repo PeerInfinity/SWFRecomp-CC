@@ -1,6 +1,6 @@
 # Gnash Test Suite Status
 
-Last updated: 2026-04-08
+Last updated: 2026-04-08 (Phase 3 work in progress, not yet in CI)
 
 ## Quick Summary
 
@@ -17,6 +17,12 @@ Note: All counts confirmed by CI. misc-ming.all and misc-swfc.all were
 previously undocumented — they run in CI but were missing from this status page.
 
 Filtered results exclude 9 tests with all-accepted diffs (Math-v5/v6/v7/v8, ops-v8, Error-v5/v6/v7/v8) — see `ACCEPTED_DIFFS.md`. Remaining 3 misc-swfmill failures (dict_event, tags_after_last_showframe, jump_to_prev_block) are blocked on architectural limitations — see `blocked/MISC_SWFMILL_PLAN.md`.
+
+### Latest fixes (2026-04-08)
+- **Flash-compatible number formatting** — Replaced all `%.15g` with `flash_format_double()`: no leading zeros in exponents (e-7 not e-07), decimal format for exponent -5 (Flash uses -5 threshold, C uses -4). Number-v8: 192→204/237 (+12 lines), all Number tests improved ~10 lines each.
+- **NaN/Infinity on _global** — Registered NaN and Infinity as F64 properties on global_object, fixing `typeof(_global.NaN) == 'number'` checks.
+- **Number constructor own properties** — constructor, __proto__ (→Function.prototype), prototype registered on Number constructor, fixing `Number.hasOwnProperty(...)` checks.
+- **Delete operator partial fixes** — `delete func.prototype` returns false (non-deletable), `delete undefined.prop` returns false. delete-v7 +2 lines, delete-v8 +2 lines.
 
 ### Latest fixes (2026-04-05)
 - **SWF5 version hiding via flash_flags** — SWF6+ classes (LocalConnection, NetConnection, NetStream, Video, Camera, etc.) and AsBroadcaster methods (addListener, removeListener, broadcastMessage, _listeners) now hidden in SWF5 via `flash_flags=0x0080`. Uses the version mask system (SWF5 mask 0x7480 hides bit 0x0080). **+5 tests: Key-v5, AsBroadcaster-v5, LocalConnection-v5, NetConnection-v5, Video-v5.**
