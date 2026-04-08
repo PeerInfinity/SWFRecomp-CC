@@ -1,10 +1,10 @@
 # Ruffle Test Results (Unfiltered)
 
-**Date**: 2026-04-08 17:46 UTC
+**Date**: 2026-04-08 22:58 UTC
 
-**Git SHA**: `69612f4204`
+**Git SHA**: `2a4adfc3fd`
 
-**Run Duration**: 5m 25s
+**Run Duration**: 5m 20s
 
 ## Summary
 
@@ -14,8 +14,8 @@
 | Passing | **2** (12.5%) |
 | Failing | 14 |
 | Total expected lines | 499 |
-| Matching lines | 223 (44.7%) |
-| Mismatched lines | 276 |
+| Matching lines | 220 (44.1%) |
+| Mismatched lines | 279 |
 
 ### Failure Breakdown
 
@@ -30,8 +30,8 @@
 
 | # | Test | Lines | Duration | Notes |
 |---|------|-------|----------|-------|
-| 1 | `gotoFrameLabelAsFunction` | 6 | 19.3s |  |
-| 2 | `hello` | 4 | 22.5s |  |
+| 1 | `gotoFrameLabelAsFunction` | 6 | 19.2s |  |
+| 2 | `hello` | 4 | 18.7s |  |
 
 ## Near-Passing Tests
 
@@ -44,7 +44,7 @@ Tests with output mismatch but >= 50% line match rate (low-hanging fruit).
 | 1 | `edittext_test1` | 76.6% | 36 | 47 | 11 |  |
 | 2 | `movieclip_destruction_test2` | 73.2% | 41 | 56 | 15 |  |
 | 3 | `stackscope` | 72.7% | 8 | 11 | 3 |  |
-| 4 | `swf4opcode` | 63.2% | 74 | 117 | 43 |  |
+| 4 | `swf4opcode` | 60.7% | 71 | 117 | 46 |  |
 | 5 | `mouse_drag_test` | 50.0% | 6 | 12 | 6 |  |
 
 ## Segfaults
@@ -57,7 +57,7 @@ No segfaults.
 
 | # | Test | Detail | Duration | Notes |
 |---|------|--------|----------|-------|
-| 1 | `opcode_guard_test2` | exit code -6 | 22.1s |  |
+| 1 | `opcode_guard_test2` | exit code -6 | 21.2s |  |
 
 ## Timeouts
 
@@ -72,7 +72,7 @@ No timeouts.
 | 1 | `edittext_test1` | 76.6% | 36/47 | 47 | 47 |  |
 | 2 | `movieclip_destruction_test2` | 73.2% | 41/56 | 56 | 56 |  |
 | 3 | `stackscope` | 72.7% | 8/11 | 11 | 11 |  |
-| 4 | `swf4opcode` | 63.2% | 74/117 | 117 | 117 |  |
+| 4 | `swf4opcode` | 60.7% | 71/117 | 117 | 117 |  |
 | 5 | `mouse_drag_test` | 50.0% | 6/12 | 12 | 12 |  |
 | 6 | `sound` | 41.7% | 5/12 | 12 | 7 |  |
 | 7 | `soft_reference_test1` | 35.6% | 16/45 | 42 | 45 |  |
