@@ -11,12 +11,13 @@ Last updated: 2026-04-03 (CI run on bbe171d2)
 | [avm1](../avm1/_investigation/CURRENT_STATUS.md) | 620 | 572 | 92.3% | **99.6%** (564/566) | Near-ceiling. Only 2 filtered failures remain. |
 | [from_gnash/actionscript.all](../from_gnash/_investigation/CURRENT_STATUS.md) | 190 | ~61 | ~32.1% | **~33.7%** (~61/181) | 9 accepted-diff tests ignored. +3 from Color fixes. |
 | [from_gnash/misc-swfmill.all](../from_gnash/_investigation/CURRENT_STATUS.md) | 14 | 11 | **78.6%** | — | 3 blocked on architecture. |
-| [from_shumway](../from_shumway/_investigation/CURRENT_STATUS.md) | 47 | 17 | 36.2% | **100.0%** (17/17) | **Complete.** All AVM1 tests pass. 30 AVM2 ignored. |
+| [from_shumway](../from_shumway/_investigation/CURRENT_STATUS.md) (flat) | 47 | 17 | 36.2% | **100.0%** (17/17) | Flat suite complete. 30 AVM2 ignored. |
+| [from_shumway/avm1](../from_shumway/_investigation/CURRENT_STATUS.md) | 23 | 12 | 52.2% | **52.2%** (12/23) | 11 failing — no ignore list. See SHUMWAY_AVM1_PLAN. |
 | **SWFRecomp/tests** (old suite) | 158+59 | all trace pass | **100%** | — | Hand-written opcode tests. CI only. |
 
 ## Progress Since 2026-03-19
 
-### Shumway: Complete — 15/17 → 17/17 (100% AVM1)
+### Shumway flat suite: Complete — 15/17 → 17/17 (100% AVM1)
 
 Two fixes (commit 3b075cff):
 1. **targetPath1** — MC `toString()` fallback to `MovieClip.prototype` → `Object.prototype` chain
@@ -84,11 +85,12 @@ Note: Boolean-v5/v6/v7/v8, Video-v6/v7/v8, Selection-v5, Stage-v5 were already p
 - `from_gnash/_investigation/BLOCKER_SUMMARY.md` — Active and resolved blockers
 
 ### from_shumway
-- `from_shumway/_investigation/CURRENT_STATUS.md` — **Complete** (17/17 AVM1, 30 AVM2 ignored)
+- `from_shumway/_investigation/CURRENT_STATUS.md` — Flat suite complete (17/17 AVM1, 30 AVM2 ignored)
+- `from_shumway/_investigation/incomplete/SHUMWAY_AVM1_PLAN.md` — 11 failing `avm1/` subdirectory tests (12/23 passing)
 
 ## Where to Focus
 
 1. **AVM1 filtered failures** — Only 2 remain: `asfunction` (needs hyperlink hit testing) and `movieclip_hittest_shapeflag` (needs curve/stroke precision).
 2. **AVM1 image tests** — 14/31 strict pass, remaining need Drawing API anti-aliasing, text layout, dynamic masks, or external media loading.
-3. **Gnash Phase 2 fixes** (Color, Inheritance, toString_valueOf) — targeted fixes for near-passing tests at 80-95% match rate.
-4. **Shumway** is complete (100% AVM1).
+3. **Gnash near-passing** — 22 tests with <=18 diffs. See `from_gnash/_investigation/incomplete/GNASH_NEAR_PASSING_PLAN.md`.
+4. **Shumway avm1/** — 11 failing tests (previously undocumented). See `from_shumway/_investigation/incomplete/SHUMWAY_AVM1_PLAN.md`.

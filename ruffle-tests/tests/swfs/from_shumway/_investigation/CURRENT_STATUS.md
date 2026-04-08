@@ -1,8 +1,10 @@
 # Shumway Test Suite Status
 
-Last updated: 2026-03-23 (CI run on 3b075cff)
+Last updated: 2026-04-07
 
 ## Quick Summary
+
+### Flat suite (`from_shumway/`)
 
 | Metric | Value |
 |--------|-------|
@@ -12,16 +14,26 @@ Last updated: 2026-03-23 (CI run on 3b075cff)
 | AVM1 failing | **0** |
 | **Filtered AVM1 pass rate** | **17/17 (100.0%)** |
 
-No crashes or compile failures. All 30 remaining failures are AVM2/AS3 (ignored).
+**Status**: All flat-suite AVM1 tests pass. 30 AVM2 tests ignored.
 
-**Status**: All AVM1 tests pass. The suite is complete.
+### AVM1 subdirectory (`from_shumway/avm1/`)
+
+| Metric | Value |
+|--------|-------|
+| Total tests | 23 |
+| Passing | **12** (52.2%) |
+| Failing | **11** (10 output_mismatch + 1 crash) |
+| No ignore list | — |
+
+**Status**: 11 failing AVM1 tests with no prior documentation. See `SHUMWAY_AVM1_PLAN.md` for investigation plan.
 
 ## Related Documents
 
 | Document | Purpose |
 |----------|---------|
-| `FAILING_TESTS_BY_FEATURE.md` | All 32 failures categorized (30 AVM2 + 2 AVM1) with root cause analysis |
-| `REMAINING_FAILURES_ANALYSIS.md` | Detailed analysis of the 2 fixable AVM1 tests + AVM2 ignore list |
+| `FAILING_TESTS_BY_FEATURE.md` | Flat-suite failures categorized (30 AVM2 + 2 AVM1, both fixed) |
+| `REMAINING_FAILURES_ANALYSIS.md` | Analysis of the 2 fixed flat-suite AVM1 tests + AVM2 ignore list |
+| `incomplete/SHUMWAY_AVM1_PLAN.md` | **NEW** — Plan for 11 failing `avm1/` subdirectory tests |
 
 ## Passing Tests (17)
 
@@ -104,11 +116,11 @@ These SWFs have the AVM2 flag set and use DoABC tags for AS3 bytecode. Our AVM1 
 
 ---
 
-## Status
+## Flat Suite Status
 
-All recommended work items are complete:
+All flat-suite work items are complete:
 1. ~~Create ignored_tests.txt~~ — DONE (30 AVM2 tests ignored)
 2. ~~Fix targetPath1~~ — DONE (MC toString fallback to MovieClip.prototype chain)
 3. ~~Fix doubleAndRegister~~ — DONE (registerClass char_id-based lookup)
 
-**The Shumway AVM1 suite is at 100%. No further work needed.**
+**Flat suite is at 100%. See `incomplete/SHUMWAY_AVM1_PLAN.md` for the 11 remaining avm1/ subdirectory failures.**

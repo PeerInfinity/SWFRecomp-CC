@@ -94,18 +94,32 @@ bar
 
 ---
 
-## Recommended Work Order
+## Flat Suite — Recommended Work (ALL COMPLETE)
 
-### Step 1: Create ignored_tests.txt (immediate, no code changes)
+1. ~~Create ignored_tests.txt~~ — DONE (30 AVM2 tests ignored)
+2. ~~Fix targetPath1~~ — DONE (MC toString fallback)
+3. ~~Fix doubleAndRegister~~ — DONE (registerClass char_id lookup)
 
-Create `ruffle-tests/tests/swfs/from_shumway/ignored_tests.txt` with all 30 AVM2 tests. This immediately changes the visible pass rate from 31.9% to **88.2%** (15/17).
+**Flat suite at 17/17 (100%) effective AVM1 pass rate.**
 
-### Step 2: Fix targetPath1 (Low-Medium effort)
+---
 
-Investigate why `toString()` on MovieClip returns `undefined` in this context. Likely a prototype chain gap — MC `__proto__` should reach `Object.prototype`.
+## 4. AVM1 Subdirectory Failures (11 tests, 12/23 = 52.2%)
 
-### Step 3: Fix doubleAndRegister (Medium effort)
+The `from_shumway/avm1/` subdirectory contains 23 additional AVM1 tests, 11 of
+which fail. These were not documented previously. See
+`incomplete/SHUMWAY_AVM1_PLAN.md` for the full investigation plan.
 
-Add char_id-based `registerClass` lookup to the `attachMovie` path. The `ng_lookupExportName` helper already exists — needs integration into the constructor lookup in `actionCallFunction`/`actionCallMethod` attachMovie paths.
-
-### After all fixes: 17/17 (100%) effective AVM1 pass rate
+| Test | Match | Root Cause |
+|------|-------|-----------|
+| scope | 11/12 (93%) | `this` binding — method returns root MC instead of receiver |
+| nativeinheritance | 5/6 (83%) | Missing native prototype property |
+| settimeout | 11/17 (65%) | Non-numeric delay rejected instead of coerced to 0 |
+| setinterval | 11/20 (55%) | Same as settimeout + object-method arg forwarding |
+| hitarea | 2/4 (50%) | hitArea mouse event interaction |
+| array | 0/7 (0%) | Array method return values wrong |
+| moviecliploader | 1/7 (14%) | External SWF loading not implemented |
+| target | 1/18 (6%) | SetTarget dot-path resolution fails |
+| filters | 3/149 (2%) | Filter reading from display objects not implemented |
+| nested-button | 0/1 (0%) | Nested button click handler not firing |
+| watch | crash | Double-free in Object.prototype.watch() |
