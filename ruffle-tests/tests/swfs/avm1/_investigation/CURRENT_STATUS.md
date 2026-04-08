@@ -8,6 +8,8 @@ Last updated: 2026-04-07
 - **Image test baseline**: **14/31 strict image match** (+2: bitmap_data_colortransform, bitmap_data_copypixels). **10/31 tolerance pass** (within test.toml limits).
 - **Main failure types**: output_mismatch (45), runtime_segfault (0), timeout (1)
 - **Known regressions**: `native_objects_swf6` regressed to segfault (was output_mismatch). `global_instance_decls` 40→14 (unclear root cause, test at 2% pass rate).
+- **Latest fixes (2026-04-07, session 5)**:
+  - **CONSTRUCT/constructor ordering investigation** — Investigated whether FLVPlayback component video rendering could work with correct CONSTRUCT-before-constructor ordering. Confirmed Flash/Ruffle ordering (CONSTRUCT first) via Ruffle source (`core/src/player.rs:2174-2188`). FLVPlayback's contentPath setter stores value when `_vp` doesn't exist but never triggers `play()` post-constructor. Component does NOT use V2 lifecycle (`callLater`/`invalidate`). Created `CONSTRUCT_PARAMETER_REPLAY_PLAN.md` in `incomplete/` for future fix.
 - **Latest fixes (2026-04-07, session 4)**:
   - **native_objects_swf7 PASS (115/115)** — Upstream tests expanded from 84→115 lines with new readonly proto detection and flash.* namespace classes. Fixed: makeProtoReadOnly on 8 singletons (Accessibility, Key, Math, Mouse, Selection, Color, System.Product), PROPERTY_FLAG_PERM_READONLY for NetConnection (survives ASSetPropFlags), Function() without new returns proper object, StyleSheet constructor sets NATIVE_STYLESHEET, FileReference NATIVE_FILEREF in actionNewMethod, ExternalInterface type 2 constructor.
   - **native_objects_swf8 PASS (115/115)** — Same fixes plus ExternalInterface `new` returns object, FileReference native backing.

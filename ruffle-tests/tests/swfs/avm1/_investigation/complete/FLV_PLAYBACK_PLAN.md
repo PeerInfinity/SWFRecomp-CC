@@ -158,9 +158,19 @@ Bugs fixed:
 2. **`actionSetMember` MOVIECLIP setter this-type mismatch** — type-2 setter path was passing `(void*)mc` as `this_obj` (stored as OBJECT type), now uses `g_event_this_mc` pattern
 3. **ScreenVideo decoder per-block vertical flip** — `src_y` was double-flipped (`bh-1-yr` when `dst_y` already handles bottom-to-top); fixed to direct mapping (`src_y = yr`)
 
-The rendering pipeline works end-to-end (pixel-perfect when a frame is available). However, the FLVPlayback component's `contentPath` setter fires during CONSTRUCT (before constructor), when VideoPlayer is undefined — the setter just stores the value. The constructor doesn't re-trigger contentPath processing post-creation. This matches Ruffle's behavior: the test has `with_renderer = { optional = true }` and 0 expected trace lines, meaning Ruffle doesn't verify the rendered image either.
+The rendering pipeline works end-to-end (pixel-perfect when a frame is available). However, the FLVPlayback component's `contentPath` setter fires during CONSTRUCT (before constructor), when VideoPlayer (`_vp`) is undefined — the setter stores `_contentPath` but does NOT call `play()`/`load()`. The constructor creates `_vp` via `createVideoPlayer(1, 0)` but never re-invokes the contentPath setter. This matches Ruffle's behavior: the test has `with_renderer = { optional = true }` and 0 expected trace lines, meaning Ruffle doesn't verify the rendered image either.
 
-The constructor-before-CONSTRUCT ordering "fix" (commit 923d9eb8) was reverted because it broke the `on_construct` test — Flash fires CONSTRUCT clip events BEFORE the registerClass constructor.
+The constructor-before-CONSTRUCT ordering "fix" (commit 923d9eb8) was reverted because it broke the `on_construct` test — Flash fires CONSTRUCT clip events BEFORE the registerClass constructor (confirmed by Ruffle source: `core/src/player.rs` lines 2174-2188 execute CONSTRUCT events before `constructor.construct_on_existing()`).
+
+#### Root cause analysis (2026-04-07)
+
+Detailed investigation traced the full flow:
+- The contentPath addProperty setter (`func2_anonymous_49`, line 10234 in script_defs.c) has two paths: when `_vp[_activeVP]` is undefined it just stores `_contentPath`; when it exists it calls `_vp[_activeVP].play()` or `.load()`
+- The FLVPlayback constructor (`func2_anonymous_0`) checks `_contentPath != undefined` and skips default initialization if already set, but never re-invokes the setter
+- FLVPlayback does NOT use V2 component lifecycle mechanisms (`callLater`, `invalidate`, `doLater`) — confirmed by grep of entire 93K-line component codebase
+- No `onLoad`, `onEnterFrame`, or timer-based deferred init mechanism exists in the component
+
+**Future fix**: See `CONSTRUCT_PARAMETER_REPLAY_PLAN.md` in `incomplete/` — post-constructor replay of CONSTRUCT parameters through addProperty setters.
 
 ### ScreenVideo Format Reference
 
