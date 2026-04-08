@@ -248,18 +248,14 @@ static inline uint32_t u16_decode_codepoint(const uint16_t* s, u32 len, u32* idx
 	return u;
 }
 
-// Lexicographic comparison of two UTF-16 strings by Unicode code point
+// Lexicographic comparison of two UTF-16 strings by raw code unit (Flash/ECMAScript semantics)
 static int u16_cmp(const uint16_t* a, u32 a_len, const uint16_t* b, u32 b_len)
 {
-	u32 ai = 0, bi = 0;
-	while (ai < a_len && bi < b_len) {
-		uint32_t ca = u16_decode_codepoint(a, a_len, &ai);
-		uint32_t cb = u16_decode_codepoint(b, b_len, &bi);
-		if (ca != cb) return (ca < cb) ? -1 : 1;
+	u32 min_len = a_len < b_len ? a_len : b_len;
+	for (u32 i = 0; i < min_len; i++) {
+		if (a[i] != b[i]) return (int)a[i] - (int)b[i];
 	}
-	if (ai < a_len) return 1;  // a is longer
-	if (bi < b_len) return -1; // b is longer
-	return 0;
+	return (int)a_len - (int)b_len;
 }
 
 // Fast ASCII-to-UTF-16 conversion (for number strings which are always ASCII)
@@ -35505,9 +35501,7 @@ void actionSetMember(SWFAppContext* app_context)
 				// Flash/Ruffle stores angle as radians internally; reading converts back to degrees
 				if (prop_name_len == 5 && memcmp(prop_name, "angle", 5) == 0) {
 					dv = fmod(dv, 360.0);
-					double rad = dv * 3.14159265358979323846 / 180.0;
-					double deg_back = rad * 180.0 / 3.14159265358979323846;
-					value_var = makeF64(deg_back); handled = 1;
+					value_var = makeF64(dv); handled = 1;
 				}
 				// quality: int clamp 0-15
 				else if (prop_name_len == 7 && memcmp(prop_name, "quality", 7) == 0) {
@@ -44159,7 +44153,7 @@ static int invokeNativeSuperConstructor(SWFAppContext* app_context, ASFunction* 
 		d = (num_args > 0) ? varToDoubleSimple(&args[0]) : 4.0;
 		v = makeF64(d); setProperty(app_context, obj, "distance", 8, &v);
 		// Default angle: Ruffle uses 0.785398163 radians ≈ 44.9999999772279 degrees
-		d = (num_args > 1) ? varToDoubleSimple(&args[1]) : 44.9999999772279;
+		d = (num_args > 1) ? varToDoubleSimple(&args[1]) : 45.0;
 		v = makeF64(d); setProperty(app_context, obj, "angle", 5, &v);
 		d = (num_args > 2) ? varToDoubleSimple(&args[2]) : 16777215.0;
 		v = makeF64(d); setProperty(app_context, obj, "highlightColor", 14, &v);
@@ -44227,7 +44221,7 @@ static int invokeNativeSuperConstructor(SWFAppContext* app_context, ASFunction* 
 		if (obj->native_type == NATIVE_NONE) obj->native_type = NATIVE_FILTER;
 		// Order: distance, angle, color, alpha, quality, inner, knockout, blurX, blurY, strength, hideObject
 		FILTER_SET_F64("distance", 8, (num_args > 0) ? varToDoubleSimple(&args[0]) : 4.0);
-		FILTER_SET_F64("angle", 5, (num_args > 1) ? varToDoubleSimple(&args[1]) : 44.9999999772279);
+		FILTER_SET_F64("angle", 5, (num_args > 1) ? varToDoubleSimple(&args[1]) : 45.0);
 		FILTER_SET_F64("color", 5, (num_args > 2) ? varToDoubleSimple(&args[2]) : 0.0);
 		FILTER_SET_F64("alpha", 5, (num_args > 3) ? varToDoubleSimple(&args[3]) : 1.0);
 		FILTER_SET_F64("quality", 7, (num_args > 6) ? varToDoubleSimple(&args[6]) : 1.0);
@@ -44266,7 +44260,7 @@ static int invokeNativeSuperConstructor(SWFAppContext* app_context, ASFunction* 
 		if (obj->native_type == NATIVE_NONE) obj->native_type = NATIVE_FILTER;
 		// Order: distance, angle, colors, alphas, ratios, blurX, blurY, quality, strength, knockout, type
 		FILTER_SET_F64("distance", 8, (num_args > 0) ? varToDoubleSimple(&args[0]) : 4.0);
-		FILTER_SET_F64("angle", 5, (num_args > 1) ? varToDoubleSimple(&args[1]) : 44.9999999772279);
+		FILTER_SET_F64("angle", 5, (num_args > 1) ? varToDoubleSimple(&args[1]) : 45.0);
 		FILTER_SET_ARR("colors", 6);
 		FILTER_SET_ARR("alphas", 6);
 		FILTER_SET_ARR("ratios", 6);

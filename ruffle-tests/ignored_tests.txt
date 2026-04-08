@@ -90,7 +90,6 @@ global_instance_decls
 # Root causes: Flash UB we don't replicate, platform-dependent UB in expected output,
 # or internally inconsistent expected output (Ruffle test generation bugs).
 date
-edittext_default_format_empty
 mcl_replace_root_swf7_to_swf5
 mcl_replace_root_swf7_to_swf6
 movieclip_library_state_values

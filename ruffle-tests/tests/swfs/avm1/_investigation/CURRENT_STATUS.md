@@ -128,11 +128,7 @@ Most previous crashes/segfaults/runtime_errors have been fixed (funky_function_c
 
 ## Near-Passing Tests
 
-| Test | Match | Issue |
-|------|-------|-------|
-| `edittext_default_format_empty` | ~95/100 (95%) | 5 missing `display = block;` lines — permanent diff (see RUFFLE_VS_FLASH_DIFFERENCES.md) |
-
-All other previously near-passing tests have been fixed. 146 tests were tracked through the near-passing pipeline and are now fully passing — see `SESSION_NOTES.md` and git history for details.
+All previously near-passing tests have been fixed. 146 tests were tracked through the near-passing pipeline and are now fully passing — see `SESSION_NOTES.md` and git history for details.
 
 ## FrameLabelEntry compile_fail (FIXED)
 202 tests had stale `FrameLabelEntry` typedef in generated tagMain.c conflicting with tag.h. Fixed by removing the stale typedefs from all generated files.

@@ -3,17 +3,17 @@
 
 <!-- PLAN_META
 id: FLASH_CORRECT_REGRESSIONS
-status: incomplete
+status: complete
 phases:
   - id: 1
     name: "Revert u16_cmp to raw code-unit comparison"
-    status: not_started
+    status: complete
   - id: 2
     name: "Revert filter angle defaults and setter to Flash-correct values"
-    status: not_started
+    status: complete
   - id: 3
     name: "Update documentation"
-    status: not_started
+    status: complete
 dependencies: []
 blockers: []
 -->
