@@ -31552,6 +31552,21 @@ void actionSetVariable(SWFAppContext* app_context)
 		ASObject* clip_props = (ASObject*) g_current_context->dynamic_props;
 		ActionVar value_var;
 		peekVar(app_context, &value_var);
+		// Check for addProperty setter on dynamic_props prototype chain
+		ASProperty* prop_struct = findPropertyStructWithPrototype(clip_props, var_name, var_name_len);
+		if (prop_struct != NULL && prop_struct->setter != NULL)
+		{
+			POP_2();
+			// Use g_event_this_mc so the setter's preload_this gets MOVIECLIP type
+			// (passing mc directly as this_obj would make it ACTION_STACK_VALUE_OBJECT
+			// in the generated function's preload code, but MovieClip* != ASObject*)
+			extern MovieClip* g_event_this_mc;
+			MovieClip* saved_event_this = g_event_this_mc;
+			g_event_this_mc = g_current_context;
+			invokePropertySetter(app_context, (ASFunction*)prop_struct->setter, NULL, &value_var);
+			g_event_this_mc = saved_event_this;
+			return;
+		}
 		setProperty(app_context, clip_props, var_name, var_name_len, &value_var);
 		POP_2();
 		return;

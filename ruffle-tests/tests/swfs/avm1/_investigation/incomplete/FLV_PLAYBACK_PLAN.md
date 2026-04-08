@@ -154,19 +154,11 @@ Fix: Safety checks in `object.c` — `getProperty`, `getPropertyWithPrototype`, 
 #### Phase 8: Video rendering — BLOCKED
 The rendering infrastructure is complete but cannot be tested end-to-end because:
 
-**Blocker: FLVPlayback component (93K-line AS2 class hierarchy) never calls `NetStream.play()`**
+**Blocker: FLVPlayback component's `__set__contentPath` exits early before calling load/play**
 
-The `netstream_play_flv_screen` test uses Adobe's full FLVPlayback component (`mx.video.*`), not raw NetStream API. The component's internal flow is:
-1. `contentPath = "rufflelogo.flv"` sets the URL
-2. FLVPlayback → NCManager → creates NetConnection + NetStream → VideoPlayer.play()
-3. VideoPlayer calls `ns.play(url)` internally
+Investigation found and fixed one bug: `actionSetVariable` for clip actions on non-root MCs was bypassing `addProperty` setters. The `__set__contentPath` setter now fires correctly. However, the setter still exits early — likely at the `_vpState[_activeVP].autoPlay` check (the value is undefined because property storage uses inconsistent `this` types between constructor and setter).
 
-Debugging shows `builtin_ns_play` is NEVER called — the component fails silently somewhere in its NCManager/VideoPlayer initialization chain before reaching `ns.play()`. The simple `netstream_play_flv` test (which calls `ns.play()` directly) works fine, confirming the NetStream infrastructure is correct.
-
-Unblocking requires debugging which AS2 method call fails in the 93K-line component code. Possible root causes:
-- Missing AS2 class method (the component uses many Flash 8 APIs)
-- Property getter/setter chain failure in the component's internal state machine
-- NCManager's URL validation/connection logic hitting a code path that exits early
+See `FLVPLAYBACK_COMPONENT_INVESTIGATION.md` for full analysis and recommended next steps. The core architectural issue is `this` type mismatch: the constructor uses MOVIECLIP type (via `g_event_this_mc`), but method calls via `actionCallMethod` pass `this` as OBJECT type, making properties set by the constructor invisible to later methods.
 
 ### ScreenVideo Format Reference
 
