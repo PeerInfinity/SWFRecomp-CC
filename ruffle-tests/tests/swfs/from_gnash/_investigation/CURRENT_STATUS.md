@@ -1,19 +1,22 @@
 # Gnash Test Suite Status
 
-Last updated: 2026-04-05
+Last updated: 2026-04-08
 
 ## Quick Summary
 
 | Sub-suite | Tests | Passing | Rate | Filtered | Filtered Rate | Ignored |
 |-----------|-------|---------|------|----------|---------------|---------|
 | **actionscript.all** | 190 | 76 | 40.0% | 76/181 | **42.0%** | 9 |
-| **misc-mtasc.all** | 9 | 5 | 55.6% | — | — | — |
+| **misc-mtasc.all** | 9 | 7 | 77.8% | — | — | — |
 | **misc-swfmill.all** | 14 | 11 | 78.6% | — | — | — |
-| **Total** | 213 | ~92 | ~43.2% | — | — | — |
+| **misc-ming.all** | 58 | 9 | 15.5% | — | — | — |
+| **misc-swfc.all** | 16 | 2 | 12.5% | — | — | — |
+| **Total** | 287 | ~105 | ~36.6% | — | — | — |
 
-Note: All counts confirmed by CI run (2026-04-05). AVM1 suite: 571/620 (92.1%), down 1 from 572 due to globals_swf5 Ruffle-vs-Flash difference (documented in RUFFLE_VS_FLASH_DIFFERENCES.md).
+Note: All counts confirmed by CI. misc-ming.all and misc-swfc.all were
+previously undocumented — they run in CI but were missing from this status page.
 
-Filtered results exclude 9 tests with all-accepted diffs (Math-v5/v6/v7/v8, ops-v8, Error-v5/v6/v7/v8) — see `ACCEPTED_DIFFS.md`. Remaining 3 misc-swfmill failures (dict_event, tags_after_last_showframe, jump_to_prev_block) are blocked on architectural limitations — see `incomplete/MISC_SWFMILL_PLAN.md`.
+Filtered results exclude 9 tests with all-accepted diffs (Math-v5/v6/v7/v8, ops-v8, Error-v5/v6/v7/v8) — see `ACCEPTED_DIFFS.md`. Remaining 3 misc-swfmill failures (dict_event, tags_after_last_showframe, jump_to_prev_block) are blocked on architectural limitations — see `blocked/MISC_SWFMILL_PLAN.md`.
 
 ### Latest fixes (2026-04-05)
 - **SWF5 version hiding via flash_flags** — SWF6+ classes (LocalConnection, NetConnection, NetStream, Video, Camera, etc.) and AsBroadcaster methods (addListener, removeListener, broadcastMessage, _listeners) now hidden in SWF5 via `flash_flags=0x0080`. Uses the version mask system (SWF5 mask 0x7480 hides bit 0x0080). **+5 tests: Key-v5, AsBroadcaster-v5, LocalConnection-v5, NetConnection-v5, Video-v5.**
@@ -46,12 +49,14 @@ Filtered results exclude 9 tests with all-accepted diffs (Math-v5/v6/v7/v8, ops-
 |----------|---------|
 | `FAILING_TESTS_BY_FEATURE.md` | All failures categorized by root cause / feature area |
 | `REMAINING_FAILURES_ANALYSIS.md` | Detailed tiered analysis with estimated fix effort |
-| `INHERITANCE_SEGFAULT_PLAN.md` | Inheritance-v7/v8 segfault investigation (FIXED) |
-| `TRY_FINALLY_PLAN.md` | Try-v6/v7/v8 OOM crash investigation (FIXED) |
-| `ARRAY_V5_PLAN.md` | array-v5 OOM crash investigation (root causes identified) |
-| `MISC_SWFMILL_PLAN.md` | All 6 misc-swfmill failures (root causes identified) |
-| `BLOCKER_SUMMARY.md` | Active and resolved blockers preventing progress |
-| `ACCEPTED_DIFFS.md` | Tests where our output is more correct than Gnash's expected output |
+| `incomplete/GNASH_NEAR_PASSING_PLAN.md` | 22 near-passing tests (<=18 diffs), 7 phases |
+| `incomplete/ARRAY_V5_PLAN.md` | array-v5 investigation (450/560 = 80.4%) |
+| `incomplete/INHERITANCE_SEGFAULT_PLAN.md` | Inheritance-v7/v8 (segfault fixed, 5-6 diffs remain) |
+| `blocked/MISC_SWFMILL_PLAN.md` | 3 remaining misc-swfmill failures (architectural) |
+| `complete/DEJAGNU_FRAMEWORK_PLAN.md` | Dejagnu harness setup + misc-ming/misc-swfc blocker |
+| `complete/TRY_FINALLY_PLAN.md` | Try-v6/v7/v8 OOM crash (FIXED) |
+| `BLOCKER_SUMMARY.md` | Active and resolved blockers |
+| `ACCEPTED_DIFFS.md` | Tests where our output is more correct than Gnash's expected |
 
 ## Test Structure
 
@@ -220,3 +225,26 @@ During `actionAdd2` on two ARRAY values, `convertFloat` calls `getPropertyWithPr
 12. TextFieldHTML htmlText getter
 13. Cross-frame ConstantPool persistence
 14. More ASnative classes (103=Date, 106=Number, 252=String, etc.)
+
+---
+
+## misc-ming.all and misc-swfc.all (74 tests, 11 passing)
+
+These suites run in CI but were previously undocumented. Both use the **inlined
+Dejagnu pattern** — test harness functions (`check_equals`, `pass`, `fail`,
+`printtotals`) are compiled directly into each test SWF rather than loaded from
+an external `Dejagnu.swf`.
+
+| Sub-suite | Tests | Passing | Rate | Blocker |
+|-----------|-------|---------|------|---------|
+| misc-ming.all | 58 | 9 | 15.5% | Inlined Dejagnu DoInitAction ordering |
+| misc-swfc.all | 16 | 2 | 12.5% | Same + 1 runtime error |
+
+**Blocker:** Most failing tests produce zero PASSED/FAILED output despite
+executing. The inlined Dejagnu functions are defined via DoInitAction on library
+symbols. If the symbol's sprite isn't placed on the timeline, the DoInitAction
+never fires and the check functions are never defined. This is an architectural
+limitation of our DoInitAction handling — we only run DoInitAction for sprites
+that are actually placed, while Flash runs them for all library exports.
+
+See `complete/DEJAGNU_FRAMEWORK_PLAN.md` for the original investigation.
