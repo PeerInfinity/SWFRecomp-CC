@@ -51,7 +51,7 @@ Last updated: 2026-04-07
 |------|-------|---------|--------|-------|
 | netstream_play_flv | 21 | 21/21 (100%) | **PASS** | FLV play + onStatus events |
 | netstream_seek_flv | 25 | 25/25 (100%) | **PASS** | FLV seek + pause + onStatus events |
-| netstream_play_flv_screen | 0 | 0/0 (100%) | **PASS** | Trace pass + headless image pixel-perfect (0 outliers) |
+| netstream_play_flv_screen | 0 | 0/0 (100%) | **PASS** | Trace pass; image blank (FLVPlayback component ordering — matches Ruffle) |
 
 ### Completed Work
 
@@ -150,16 +150,17 @@ Fix: Safety checks in `object.c` — `getProperty`, `getPropertyWithPrototype`, 
 - Guarded by `#ifdef HEADLESS_GRAPHICS` — only active in headless image rendering mode
 - Verified: `ng_isVideoChar(4)` correctly finds the video char_id in the display list
 
-#### Phase 8: Video rendering — COMPLETE (2026-04-07)
+#### Phase 8: Video rendering — COMPLETE (infrastructure), image limited by component ordering
 
-Three bugs fixed to reach pixel-perfect rendering:
+Bugs fixed:
 
 1. **`actionSetVariable` addProperty bypass** — SetVariable on non-root MCs now invokes addProperty setters via `g_event_this_mc` pattern
 2. **`actionSetMember` MOVIECLIP setter this-type mismatch** — type-2 setter path was passing `(void*)mc` as `this_obj` (stored as OBJECT type), now uses `g_event_this_mc` pattern
-3. **registerClass constructor vs CONSTRUCT clip action ordering** — clip action variables (component parameters) were set before the constructor ran; fixed to run constructor first
-4. **ScreenVideo decoder per-block vertical flip** — `src_y` was double-flipped (`bh-1-yr` when `dst_y` already handles bottom-to-top); fixed to direct mapping (`src_y = yr`)
+3. **ScreenVideo decoder per-block vertical flip** — `src_y` was double-flipped (`bh-1-yr` when `dst_y` already handles bottom-to-top); fixed to direct mapping (`src_y = yr`)
 
-Result: `netstream_play_flv_screen` headless image test passes pixel-perfect (0 outliers, max difference 0).
+The rendering pipeline works end-to-end (pixel-perfect when a frame is available). However, the FLVPlayback component's `contentPath` setter fires during CONSTRUCT (before constructor), when VideoPlayer is undefined — the setter just stores the value. The constructor doesn't re-trigger contentPath processing post-creation. This matches Ruffle's behavior: the test has `with_renderer = { optional = true }` and 0 expected trace lines, meaning Ruffle doesn't verify the rendered image either.
+
+The constructor-before-CONSTRUCT ordering "fix" (commit 923d9eb8) was reverted because it broke the `on_construct` test — Flash fires CONSTRUCT clip events BEFORE the registerClass constructor.
 
 ### ScreenVideo Format Reference
 
