@@ -412,3 +412,22 @@ Key, Camera, System, LoadVars (network), LocalConnection (IPC), MovieClipLoader 
 - Local `var` variables should not be deletable (DONT_DELETE flag)
 - Property deletion inside `with()` blocks doesn't propagate
 - Global scope `delete a` after `_global.a` assignment
+
+### 3c: _global.NaN and _global.Infinity registration — DONE
+
+NaN and Infinity registered as F64 properties on global_object. Fixes `typeof(_global.NaN) == 'number'` checks. +2 lines per Number test.
+
+### 3d: Number constructor own properties — DONE
+
+Registered `constructor`, `__proto__` (→ Function.prototype), and `prototype` as own properties on `g_number_constructor.own_props`. Fixes `Number.hasOwnProperty('prototype')` etc. +3 lines per Number test (v7/v8).
+
+**Combined Number impact**: Number-v5: 193→~203/244, Number-v6: 186→~196/239, Number-v7: 192→~204/237, Number-v8: 192→~204/237.
+
+### Phase 3 remaining work (not yet started):
+- **Number.prototype.toString(radix)**: wrapper toString ignores radix argument (1 line per Number test)
+- **Number wrapper valueOf override**: `new Number(10)` wrapper doesn't dispatch custom valueOf (1 line per Number test)
+- **Number(string) parsing**: hex/octal prefix parsing for Number constructor (10+ lines per test)
+- **toString_valueOf dispatch**: valueOf/toString not called during implicit coercion in some paths (22 diffs per v6/v7/v8)
+- **enumerate/for-in**: child MCs returned as numbers, enumerateObj returns empty (27 diffs per test)
+- **with auto-boxing**: `with(number)` should auto-box to Number.prototype scope (not addressed)
+- **String regex methods**: replace/match/search need regex support (~120 diffs per test)
