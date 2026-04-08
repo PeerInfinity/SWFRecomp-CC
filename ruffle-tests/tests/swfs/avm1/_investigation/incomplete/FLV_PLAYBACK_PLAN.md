@@ -39,7 +39,7 @@ dependencies:
     type: requires
     reason: "Data file embedding pattern"
 blockers:
-  - "FLVPlayback component (93K lines AS2) never reaches NetStream.play() - component's NCManager/VideoPlayer fails silently"
+  - "FLVPlayback component parameter ordering: clip action variables set BEFORE registerClass constructor, so contentPath setter fires when VideoPlayer is undefined"
 -->
 
 Last updated: 2026-04-07
@@ -154,11 +154,15 @@ Fix: Safety checks in `object.c` — `getProperty`, `getPropertyWithPrototype`, 
 #### Phase 8: Video rendering — BLOCKED
 The rendering infrastructure is complete but cannot be tested end-to-end because:
 
-**Blocker: FLVPlayback component's `__set__contentPath` exits early before calling load/play**
+**Blocker: Component parameter execution ordering**
 
-Investigation found and fixed one bug: `actionSetVariable` for clip actions on non-root MCs was bypassing `addProperty` setters. The `__set__contentPath` setter now fires correctly. However, the setter still exits early — likely at the `_vpState[_activeVP].autoPlay` check (the value is undefined because property storage uses inconsistent `this` types between constructor and setter).
+Two `this` type mismatch bugs have been fixed:
+1. `actionSetVariable` non-root MC path — now invokes addProperty setters via `g_event_this_mc` (previous commit)
+2. `actionSetMember` MOVIECLIP type-2 setter — was passing `(void*)mc` as `this_obj` (stored as OBJECT type), now uses `g_event_this_mc` pattern (this commit)
 
-See `FLVPLAYBACK_COMPONENT_INVESTIGATION.md` for full analysis and recommended next steps. The core architectural issue is `this` type mismatch: the constructor uses MOVIECLIP type (via `g_event_this_mc`), but method calls via `actionCallMethod` pass `this` as OBJECT type, making properties set by the constructor invisible to later methods.
+With both fixes, the `__set__contentPath` setter fires correctly with MOVIECLIP-type `this`. However, tracing shows component parameters (autoPlay, contentPath, etc.) are set BEFORE the constructor's `createVideoPlayer` call. The `contentPath` setter checks `_vp[_activeVP] != undefined` and bails because VideoPlayer doesn't exist yet.
+
+**Next step**: Fix clip action variable ordering — parameters should be set AFTER the registerClass constructor finishes, not before. See `FLVPLAYBACK_COMPONENT_INVESTIGATION.md` for full trace analysis.
 
 ### ScreenVideo Format Reference
 

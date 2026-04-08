@@ -69,15 +69,44 @@ This ensures the function's preload code stores `this` as `ACTION_STACK_VALUE_MO
 
 This `this` type mismatch between constructor (MOVIECLIP) and method calls (OBJECT) may cause properties set by the constructor to be invisible to later methods, leading to `undefined` results for `_vp`, `_activeVP`, etc. inside `__set__contentPath`.
 
-## Recommended Next Steps
+## Fix Applied: actionSetMember MOVIECLIP addProperty Setter Type Mismatch (2026-04-07)
 
-1. **Verify `_vpState[_activeVP].autoPlay` value**: Add targeted trace at the autoPlay check (step 7) to confirm whether it's truthy or undefined. This determines which branch the setter takes.
+The type-2 (DefineFunction2) setter invocation in `actionSetMember`'s MOVIECLIP path was passing `(void*)mc` as `this_obj`, causing the generated function's preload code to store `this` as `ACTION_STACK_VALUE_OBJECT` (wrong — mc is a MovieClip, not ASObject). Fixed to use the `g_event_this_mc` pattern (same as `actionInvokeRegisteredClassConstructor` and the `actionSetVariable` fix):
 
-2. **Check property storage consistency**: The constructor stores `_vp`, `_vpState` etc. via `actionSetMember` on a MOVIECLIP `this`. Later, the setter reads them via `actionGetMember` on a MOVIECLIP `this`. Verify these access the same `dynamic_props` object.
+```c
+// Before (broken):
+setter_func->advanced_func(app_context, value, 1, registers, (void*)mc);
 
-3. **Broader fix for MC method `this` binding**: In `actionSetMember` for MOVIECLIP addProperty setters (line 43244 in action.c), the setter is called with `(void*)mc` as `this_obj`, which gets stored as OBJECT type. This should use the `g_event_this_mc` pattern instead, matching the constructor. This would be a more invasive change but architecturally correct.
+// After (fixed):
+MovieClip* saved_event_this = g_event_this_mc;
+g_event_this_mc = mc;
+setter_func->advanced_func(app_context, value, 1, registers, NULL);
+g_event_this_mc = saved_event_this;
+```
 
-4. **Trace the `load()`/`play()` path**: If the `_vpState.autoPlay` check is confirmed working, trace what happens inside `VideoPlayer.load()` (func2_anonymous_142) to find the next failure point.
+The type-1 (DefineFunction) setter path was already correct — it manually sets `this` as `ACTION_STACK_VALUE_MOVIECLIP`.
+
+The `actionGetMember` MOVIECLIP path does NOT call `invokePropertyGetter` at all, so there's no equivalent getter bug.
+
+## Current Blocker: Component Parameter Execution Ordering
+
+With both the `actionSetVariable` and `actionSetMember` fixes, the `__set__contentPath` setter IS invoked correctly with MOVIECLIP-type `this`. However, tracing reveals the parameters are set BEFORE the constructor creates the VideoPlayer:
+
+```
+SetVariable setter: 'autoPlay'       ← parameters set first
+SetVariable setter: 'contentPath'    ← setter fires, but _vp is undefined
+...
+CallMethod: createVideoPlayer        ← constructor creates VP after setters
+CallMethod: reset
+```
+
+The `contentPath` setter checks `this._vp[this._activeVP] != undefined` and bails because the VideoPlayer hasn't been created yet. In Flash, component parameters should be set AFTER the constructor finishes.
+
+## Remaining Next Steps
+
+1. **Fix component parameter ordering**: Investigate when `PlaceObject2` clip action variables (component parameters) are set relative to the `registerClass` constructor. In Flash, the constructor runs first, THEN clip action variables are applied. Our implementation appears to set them before the constructor.
+
+2. **Trace the constructor flow**: Once ordering is fixed, if `contentPath` setter still doesn't reach `play()`, trace the `_vpState.autoPlay` check and `_firstStreamShown` logic.
 
 ## Files Modified
 

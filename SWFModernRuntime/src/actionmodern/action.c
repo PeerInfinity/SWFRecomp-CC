@@ -43218,7 +43218,9 @@ static void applyInitObjectPropToMC(SWFAppContext* app_context, MovieClip* mc,
 						// Invoke addProperty setter with this = MC (MOVIECLIP type)
 						ASFunction* setter_func = (ASFunction*)ps->setter;
 						if (setter_func->function_type == 2) {
-							// Type 2 (DefineFunction2): call advanced_func directly
+							// Type 2 (DefineFunction2): call advanced_func with MC as MOVIECLIP type
+							// Use g_event_this_mc so generated preload_this code picks up MC type correctly
+							// (passing mc as this_obj would make it ACTION_STACK_VALUE_OBJECT in generated code)
 							g_special_depth++;
 							if (g_special_depth < MAX_SPECIAL_DEPTH) {
 								ActionVar* registers = NULL;
@@ -43230,7 +43232,10 @@ static void applyInitObjectPropToMC(SWFAppContext* app_context, MovieClip* mc,
 									scope_mc[scope_depth] = NULL;
 									scope_chain[scope_depth++] = local_scope;
 								}
-								setter_func->advanced_func(app_context, value, 1, registers, (void*)mc);
+								MovieClip* saved_event_this = g_event_this_mc;
+								g_event_this_mc = mc;
+								setter_func->advanced_func(app_context, value, 1, registers, NULL);
+								g_event_this_mc = saved_event_this;
 								if (scope_depth > 0) scope_depth--;
 								releaseObject(app_context, local_scope);
 								if (registers != NULL) FREE(registers);
