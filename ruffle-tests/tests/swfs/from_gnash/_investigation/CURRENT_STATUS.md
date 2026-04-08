@@ -47,7 +47,7 @@ Filtered results exclude 9 tests with all-accepted diffs (Math-v5/v6/v7/v8, ops-
 
 | Document | Purpose |
 |----------|---------|
-| `FAILING_TESTS_BY_FEATURE.md` | All failures categorized by root cause / feature area |
+| `incomplete/FAILING_TESTS_BY_FEATURE.md` | All failures categorized by root cause / feature area |
 | `REMAINING_FAILURES_ANALYSIS.md` | Detailed tiered analysis with estimated fix effort |
 | `incomplete/GNASH_NEAR_PASSING_PLAN.md` | 22 near-passing tests (<=18 diffs), 7 phases |
 | `incomplete/ARRAY_V5_PLAN.md` | array-v5 investigation (450/560 = 80.4%) |

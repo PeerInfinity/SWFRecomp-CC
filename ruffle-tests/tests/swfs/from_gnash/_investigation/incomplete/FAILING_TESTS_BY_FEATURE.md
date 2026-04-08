@@ -1,7 +1,41 @@
 # Gnash Failing Tests by Feature Category
+<!-- TESTS: ASnative-v5, ASnative-v6, ASnative-v7, ASnative-v8, AsBroadcaster-v6, AsBroadcaster-v7, AsBroadcaster-v8, BitmapData-v8, Camera-v6, Camera-v7, Camera-v8, ContextMenu-v7, ContextMenu-v8, ExternalInterface-v6, ExternalInterface-v7, Global-v6, Global-v7, Global-v8, HitTest-v6, HitTest-v7, HitTest-v8, Instance-v5, Instance-v6, Instance-v7, Instance-v8, LoadVars-v6, LoadVars-v7, LoadVars-v8, Matrix-v6, Matrix-v7, Matrix-v8, Microphone-v6, Microphone-v7, Microphone-v8, MovieClip-v5, MovieClipLoader-v7, MovieClipLoader-v8, Number-v5, Number-v6, Number-v7, Number-v8, Point-v8, Rectangle-v8, Sound-v5, Sound-v6, Sound-v7, Sound-v8, String-v5, String-v6, String-v7, String-v8, System-v5, System-v6, System-v7, System-v8, TextFormat-v5, TextFormat-v6, TextFormat-v7, TextSnapshot-v6, TextSnapshot-v7, TextSnapshot-v8, case-v6, case-v7, case-v8, delete-v5, delete-v6, delete-v7, delete-v8, enumerate-v6, enumerate-v7, enumerate-v8, targetPath-v6, targetPath-v7, targetPath-v8, toString_valueOf-v5, toString_valueOf-v6, toString_valueOf-v7, toString_valueOf-v8, with-v5, with-v6, with-v7, with-v8 -->
 
-Last updated: 2026-03-19 (based on CI run 043094ef)
+<!-- PLAN_META
+id: GNASH_FAILING_BY_FEATURE
+status: incomplete
+phases:
+  - id: 1
+    name: "Near-passing fixes (ops, Math, NetStream, Error, Color)"
+    status: complete
+  - id: 2
+    name: "Prototype and constructor fixes"
+    status: complete
+  - id: 3
+    name: "Medium-effort feature work (delete, toString_valueOf, Number, etc.)"
+    status: not_started
+  - id: 4
+    name: "Large features (ASnative, String regex, With auto-boxing)"
+    status: not_started
+dependencies: []
+blockers: []
+-->
 
+Last updated: 2026-04-08 (stats from 2026-03-19, many categories since resolved)
+
+**NOTE:** This document was written on 2026-03-19 when the pass rate was 25.5%.
+The current pass rate is ~40% (76/190 actionscript.all). Several categories
+below have been fully resolved (marked RESOLVED). Tests covered by other plans
+are cross-referenced. The category analysis and fix complexity estimates remain
+valid for unresolved categories.
+
+**Cross-references:**
+- Categories 1, 2, 6: → `ACCEPTED_DIFFS.md` (ignored, our output is correct)
+- Categories 3, 4, 5, 7: → `incomplete/GNASH_NEAR_PASSING_PLAN.md`
+- Category 14: → `complete/TRY_FINALLY_PLAN.md` (FIXED)
+- Category 17: → `blocked/MISC_SWFMILL_PLAN.md`
+
+**Original stats (2026-03-19):**
 - **Total tests**: 204 (190 actionscript.all + 14 misc-swfmill.all)
 - **Passing**: 52 (44 + 8) = 25.5%
 - **Failing**: 152 (2 segfault, 5 runtime error, 145 output mismatch)
@@ -11,7 +45,7 @@ Tests are grouped by root cause / feature area. Within each category, tests are 
 
 ---
 
-## 1. Equality/Comparison Operator Coercion (est. ~5 tests)
+## 1. Equality/Comparison Operator Coercion (est. ~5 tests) — RESOLVED
 
 Failing tests: ops-v8 (95.8%)
 
@@ -25,7 +59,7 @@ String-to-number coercion in equality operators. `Infinity == 'Infinity'` return
 
 ---
 
-## 2. Math Object Edge Cases (est. 4 tests)
+## 2. Math Object Edge Cases (est. 4 tests) — RESOLVED
 
 Failing tests: Math-v5 (97.8%), Math-v6 (97.8%), Math-v7 (97.6%), Math-v8 (97.6%)
 
@@ -42,7 +76,7 @@ Failing tests: Math-v5 (97.8%), Math-v6 (97.8%), Math-v7 (97.6%), Math-v8 (97.6%
 
 ---
 
-## 3. NetStream/Video Prototype Properties (est. 6 tests)
+## 3. NetStream/Video Prototype Properties (est. 6 tests) — see GNASH_NEAR_PASSING_PLAN
 
 Failing tests: NetStream-v6/v7/v8 (95.0%), Video-v5 (57.1%)
 
@@ -56,7 +90,7 @@ Failing tests: NetStream-v6/v7/v8 (95.0%), Video-v5 (57.1%)
 
 ---
 
-## 4. Color Object Implementation Gaps (est. 4 tests)
+## 4. Color Object Implementation Gaps (est. 4 tests) — MOSTLY RESOLVED, v6 in GNASH_NEAR_PASSING_PLAN
 
 Failing tests: Color-v5 (88.6%), Color-v6 (86.0%), Color-v7/v8 (87.6%)
 
@@ -74,7 +108,7 @@ Issues:
 
 ---
 
-## 5. Selection/Stage Non-Constructable Globals (est. 5 tests)
+## 5. Selection/Stage Non-Constructable Globals (est. 5 tests) — PARTIALLY RESOLVED, Selection in GNASH_NEAR_PASSING_PLAN
 
 Failing tests: Selection-v5 (85.7%), Selection-v6/v7/v8 (86-87%), Stage-v5 (86.8%)
 
@@ -88,7 +122,7 @@ In SWF5, `typeof(Selection)` and `typeof(Stage)` should return `'undefined'` —
 
 ---
 
-## 6. Error Constructor & Prototype (est. 4 tests)
+## 6. Error Constructor & Prototype (est. 4 tests) — RESOLVED
 
 Failing tests: Error-v5 (75.0%), Error-v6/v7/v8 (77.4%)
 
@@ -105,7 +139,7 @@ Issues:
 
 ---
 
-## 7. Inheritance & Prototype Chain (est. 4 tests)
+## 7. Inheritance & Prototype Chain (est. 4 tests) — see GNASH_NEAR_PASSING_PLAN + INHERITANCE_SEGFAULT_PLAN
 
 Failing tests: Inheritance-v5 (82.6%), Inheritance-v6 (85.2%), Inheritance-v7 (segfault), Inheritance-v8 (segfault)
 
@@ -227,7 +261,7 @@ Failing tests: Number-v5 (79.1%), Number-v6 (76.2%), Number-v7 (78.9%), Number-v
 
 ---
 
-## 14. Try/Catch/Finally Control Flow (est. 4 tests)
+## 14. Try/Catch/Finally Control Flow (est. 4 tests) — RESOLVED (see TRY_FINALLY_PLAN)
 
 Failing tests: Try-v5/v6/v7/v8 (runtime error — exit code 1)
 
