@@ -3364,11 +3364,38 @@ void tagPlaceObject2(SWFAppContext* app_context, size_t depth, size_t char_id, u
 		}
 	}
 
+	// Fire CLIP_EVENT_CONSTRUCT after eager init (children placed, their initialize fired)
+	// But only at the top level — during catch_up_mode (inside another clip's eager init),
+	// CONSTRUCT is deferred to fire_deferred_construct below.
+	if (!catch_up_mode && display_list[depth].clip_action_count > 0 && display_list[depth].instance_name != NULL) {
+		MovieClip* _parent_mc = g_current_context ? g_current_context : &root_movieclip;
+		MovieClip* saved_ctx = g_current_context;
+		MovieClip* _mc = actionFindOrCreateMovieClip(app_context, display_list[depth].instance_name, _parent_mc);
+		if (_mc) actionSetCurrentContext(_mc);
+		// Set __proto__ to registered class prototype BEFORE on(construct) fires
+		// so prototype properties are accessible in the handler
+		{
+			extern const char* ng_lookupExportName(size_t char_id);
+			extern void actionSetupRegisteredClassPrototype(SWFAppContext*, const char*, MovieClip*);
+			const char* _exp = ng_lookupExportName(display_list[depth].char_id);
+			if (_exp != NULL && _mc != NULL)
+				actionSetupRegisteredClassPrototype(app_context, _exp, _mc);
+		}
+		for (size_t a = 0; a < display_list[depth].clip_action_count; a++) {
+			if (display_list[depth].clip_actions[a].event_flags & CLIP_EVENT_CONSTRUCT)
+				display_list[depth].clip_actions[a].action(app_context);
+		}
+		actionSetCurrentContext(saved_ctx);
+		// Fire deferred CONSTRUCT for child clips placed during eager init
+		if (display_list[depth].sprite_display_list != NULL && display_list[depth].sprite_max_depth > 0) {
+			fire_deferred_construct(app_context, display_list[depth].sprite_display_list,
+				display_list[depth].sprite_max_depth, _mc ? _mc : _parent_mc);
+		}
+	}
+
 	// Fire registered class constructor at placement time (before DoAction).
 	// In Flash, timeline-placed sprites get their constructors invoked immediately
 	// after PlaceObject2, BEFORE the parent frame's DoAction runs.
-	// Constructor must fire BEFORE CLIP_EVENT_CONSTRUCT — component parameters
-	// (set via CONSTRUCT clip actions) depend on constructor-initialized state.
 	// Only at top level — during catch_up_mode (nested eager init), constructors
 	// are deferred to the parent's fire_eager_constructors recursion.
 	if (!catch_up_mode && display_list[depth].sprite_needs_init
@@ -3402,36 +3429,6 @@ void tagPlaceObject2(SWFAppContext* app_context, size_t depth, size_t char_id, u
 		if (display_list[depth].sprite_display_list != NULL && display_list[depth].sprite_max_depth > 0)
 			fire_eager_constructors(app_context, display_list[depth].sprite_display_list,
 				display_list[depth].sprite_max_depth, _ctor_mc ? _ctor_mc : _ctor_parent);
-	}
-
-	// Fire CLIP_EVENT_CONSTRUCT after constructor (component parameters depend on
-	// constructor-initialized state like _vp, _vpState, etc.).
-	// Only at the top level — during catch_up_mode (inside another clip's eager init),
-	// CONSTRUCT is deferred to fire_deferred_construct below.
-	if (!catch_up_mode && display_list[depth].clip_action_count > 0 && display_list[depth].instance_name != NULL) {
-		MovieClip* _parent_mc = g_current_context ? g_current_context : &root_movieclip;
-		MovieClip* saved_ctx = g_current_context;
-		MovieClip* _mc = actionFindOrCreateMovieClip(app_context, display_list[depth].instance_name, _parent_mc);
-		if (_mc) actionSetCurrentContext(_mc);
-		// Set __proto__ to registered class prototype BEFORE on(construct) fires
-		// so prototype properties are accessible in the handler
-		{
-			extern const char* ng_lookupExportName(size_t char_id);
-			extern void actionSetupRegisteredClassPrototype(SWFAppContext*, const char*, MovieClip*);
-			const char* _exp = ng_lookupExportName(display_list[depth].char_id);
-			if (_exp != NULL && _mc != NULL)
-				actionSetupRegisteredClassPrototype(app_context, _exp, _mc);
-		}
-		for (size_t a = 0; a < display_list[depth].clip_action_count; a++) {
-			if (display_list[depth].clip_actions[a].event_flags & CLIP_EVENT_CONSTRUCT)
-				display_list[depth].clip_actions[a].action(app_context);
-		}
-		actionSetCurrentContext(saved_ctx);
-		// Fire deferred CONSTRUCT for child clips placed during eager init
-		if (display_list[depth].sprite_display_list != NULL && display_list[depth].sprite_max_depth > 0) {
-			fire_deferred_construct(app_context, display_list[depth].sprite_display_list,
-				display_list[depth].sprite_max_depth, _mc ? _mc : _parent_mc);
-		}
 	}
 
 #else
