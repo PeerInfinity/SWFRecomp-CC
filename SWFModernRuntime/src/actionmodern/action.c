@@ -28968,17 +28968,23 @@ static void ensureGlobalInit(SWFAppContext* app_context)
 	if (global_object->num_used > 0)
 		global_object->properties[global_object->num_used - 1].flash_flags = 0x0080;
 	REG_FUNC("enableDebugConsole", 18, &g_enableDebugConsole_func);
-	// NaN and Infinity as properties on _global (SWF5+).
-	// getVariable("NaN"/"Infinity") still has special handlers for bare access.
+	// NaN and Infinity as properties on _global.
+	// flash_flags=0x8000: hidden in SWF4 (mask 0xFFFF catches it),
+	// visible in SWF5+ (masks 0x7480/0x7500/0x7000/0x6000/0x4000 don't).
+	// SWF4 equality treats NaN/Infinity as undefined strings, not numbers.
 	{
 		ActionVar _nan_v = {0}; _nan_v.type = ACTION_STACK_VALUE_F64;
 		VAL(double, &_nan_v.data.numeric_value) = __builtin_nan("");
-		setProperty(app_context, global_object, "NaN", 3, &_nan_v);
+		setPropertyWithFlags(app_context, global_object, "NaN", 3, &_nan_v, PROPERTY_FLAGS_DEFAULT);
+		ASProperty* _np = findPropertyRaw(global_object, "NaN", 3);
+		if (_np) _np->flash_flags = 0x8000;
 	}
 	{
 		ActionVar _inf_v = {0}; _inf_v.type = ACTION_STACK_VALUE_F64;
 		VAL(double, &_inf_v.data.numeric_value) = __builtin_inf();
-		setProperty(app_context, global_object, "Infinity", 8, &_inf_v);
+		setPropertyWithFlags(app_context, global_object, "Infinity", 8, &_inf_v, PROPERTY_FLAGS_DEFAULT);
+		ASProperty* _ip = findPropertyRaw(global_object, "Infinity", 8);
+		if (_ip) _ip->flash_flags = 0x8000;
 	}
 	REG_FUNC("MovieClip", 9, &g_movieclip_constructor);
 	REG_FUNC("XMLSocket", 9, &g_stub_ctors[17]);
