@@ -1846,6 +1846,11 @@ void ng_record_video(SWFAppContext* app_context, u16 char_id)
 		ng_video_ids[ng_video_count++] = (size_t)char_id;
 }
 
+int ng_isVideoChar(size_t char_id)
+{
+	return ng_find_video(char_id);
+}
+
 // ---------------------------------------------------------------------------
 // tagRegisterExport — called from generated tagInit() for DoExportAssets
 // ---------------------------------------------------------------------------

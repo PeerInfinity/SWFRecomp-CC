@@ -310,6 +310,7 @@ void ng_computeScrollMixedFont(u16 font_id, u16 base_font_height, s16 leading_tw
 // ng_findFontIdByName, ng_getTextExtent, ng_lookupExport, ng_getSoundDuration
 // are declared above (outside #ifdef NO_GRAPHICS) since action.c needs them in all modes.
 void ng_record_video(SWFAppContext* app_context, u16 char_id);
+int ng_isVideoChar(size_t char_id);
 // Attach a library symbol by char_id. Returns created MC, or NULL if not sprite.
 MovieClip* ng_attachMovie(SWFAppContext* app_context, size_t char_id, const char* new_name, int as_depth, MovieClip* parent);
 // Called after tagPlaceObject2 places an object (handles auto-naming, MC creation, textfield init)

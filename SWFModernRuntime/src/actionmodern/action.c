@@ -2966,6 +2966,37 @@ static void ns_store_decoded_frame(ASObject* ns, unsigned char* pixels, int w, i
 	free(pixels); // no slot available
 }
 
+// Expose decoded video frame for headless rendering (tag.c calls this).
+// Converts RGBA u8 to ARGB u32 (format expected by renderer_draw_bitmap_quad).
+// Returns 1 if a frame was found, 0 otherwise. Caller must free *out_argb.
+int actionGetVideoFramePixels(uint32_t** out_argb, int* out_w, int* out_h)
+{
+	for (int i = 0; i < MAX_VIDEO_FRAMES; i++)
+	{
+		if (g_video_frames[i].active && g_video_frames[i].pixels)
+		{
+			int w = g_video_frames[i].width;
+			int h = g_video_frames[i].height;
+			int n = w * h;
+			uint32_t* argb = (uint32_t*)malloc(n * sizeof(uint32_t));
+			if (!argb) return 0;
+			unsigned char* rgba = g_video_frames[i].pixels;
+			for (int p = 0; p < n; p++)
+			{
+				argb[p] = ((uint32_t)rgba[p*4+3] << 24) |
+				           ((uint32_t)rgba[p*4+0] << 16) |
+				           ((uint32_t)rgba[p*4+1] << 8) |
+				           (uint32_t)rgba[p*4+2];
+			}
+			*out_argb = argb;
+			*out_w = w;
+			*out_h = h;
+			return 1;
+		}
+	}
+	return 0;
+}
+
 static void ns_dispatch_onStatus(SWFAppContext* app_context, ASObject* ns,
                                   const char* code, const char* level)
 {

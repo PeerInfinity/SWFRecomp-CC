@@ -24,11 +24,11 @@ phases:
     name: "ScreenVideo decoder + frame delivery"
     status: complete
   - id: 7
-    name: "Video display object"
-    status: not_started
+    name: "Video display object rendering infrastructure"
+    status: complete
   - id: 8
     name: "Video rendering (headless only)"
-    status: not_started
+    status: blocked
 dependencies:
   - plan: NETCONNECTION
     phases: [2]
@@ -38,12 +38,13 @@ dependencies:
     phases: [1]
     type: requires
     reason: "Data file embedding pattern"
-blockers: []
+blockers:
+  - "FLVPlayback component (93K lines AS2) never reaches NetStream.play() - component's NCManager/VideoPlayer fails silently"
 -->
 
 Last updated: 2026-04-07
 
-## Status: INCOMPLETE — All 3 trace tests PASS, headless image rendering not yet wired
+## Status: INCOMPLETE — All 3 trace tests PASS, image rendering blocked by FLVPlayback component
 
 ### Test Summary
 
@@ -128,6 +129,7 @@ Fix: Safety checks in `object.c` — `getProperty`, `getPropertyWithPrototype`, 
 |-----------|------|-------|
 | ActiveNetStream struct + FLV parser | `action.c` | ~1974-2070 |
 | ScreenVideo decoder | `action.c` | ~2073-2170 |
+| actionGetVideoFramePixels | `action.c` | ~2968-2997 |
 | ns_dispatch_onStatus | `action.c` | ~2230-2320 |
 | ns_dispatch_onMetaData | `action.c` | ~2320-2420 |
 | builtin_ns_play/seek/pause | `action.c` | ~2420-2500 |
@@ -135,18 +137,36 @@ Fix: Safety checks in `object.c` — `getProperty`, `getPropertyWithPrototype`, 
 | initNetStreamPrototype (real methods) | `action.c` | ~26060-26100 |
 | Corrupt object safety checks | `object.c` | getProperty, findPropertyRaw, setProperty |
 | Frame loop integration | `swf_core.c` | ~1030, ~1078, ~813, ~1077 |
+| ng_isVideoChar | `tag_stubs.c` | after ng_record_video |
+| Video rendering (render_single_object) | `tag.c` | ~1126-1141 |
+| Video rendering (render_display_list) | `tag.c` | ~1180-1192 |
 
-### Remaining Work
+### Completed Work (2026-04-07)
 
-#### Phase 7: Video display object
-- Track Video instances (Video.attachNetStream → links Video to NetStream)
-- Display list integration (Video char_id already tracked via `ng_record_video`)
-- Map Video display object to stored decoded frame
+#### Phase 7: Video display object rendering infrastructure
+- `ng_isVideoChar(char_id)` — public function in tag_stubs.c, declared in tag.h
+- `actionGetVideoFramePixels(out_argb, out_w, out_h)` — converts RGBA u8 → ARGB u32 for renderer
+- `render_single_object` and `render_display_list` in tag.c — check `ng_isVideoChar` BEFORE the switch (video char_ids have type=0=CHAR_TYPE_SHAPE in dictionary since tagDefineVideoStream doesn't set a type)
+- Calls `renderer_draw_bitmap_quad()` with decoded frame, using display object's transform_id/cxform_id
+- Guarded by `#ifdef HEADLESS_GRAPHICS` — only active in headless image rendering mode
+- Verified: `ng_isVideoChar(4)` correctly finds the video char_id in the display list
 
-#### Phase 8: Video rendering (headless only)
-- Upload decoded RGBA to GPU texture via `render_webgpu_draw_bitmap_quad()`
-- Integrate into display list rendering at Video's position/size
-- Only needed for headless image comparison (not trace tests)
+#### Phase 8: Video rendering — BLOCKED
+The rendering infrastructure is complete but cannot be tested end-to-end because:
+
+**Blocker: FLVPlayback component (93K-line AS2 class hierarchy) never calls `NetStream.play()`**
+
+The `netstream_play_flv_screen` test uses Adobe's full FLVPlayback component (`mx.video.*`), not raw NetStream API. The component's internal flow is:
+1. `contentPath = "rufflelogo.flv"` sets the URL
+2. FLVPlayback → NCManager → creates NetConnection + NetStream → VideoPlayer.play()
+3. VideoPlayer calls `ns.play(url)` internally
+
+Debugging shows `builtin_ns_play` is NEVER called — the component fails silently somewhere in its NCManager/VideoPlayer initialization chain before reaching `ns.play()`. The simple `netstream_play_flv` test (which calls `ns.play()` directly) works fine, confirming the NetStream infrastructure is correct.
+
+Unblocking requires debugging which AS2 method call fails in the 93K-line component code. Possible root causes:
+- Missing AS2 class method (the component uses many Flash 8 APIs)
+- Property getter/setter chain failure in the component's internal state machine
+- NCManager's URL validation/connection logic hitting a code path that exits early
 
 ### ScreenVideo Format Reference
 

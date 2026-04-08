@@ -1124,6 +1124,20 @@ static void render_display_list(SWFAppContext* app_context, DisplayObject* dl, s
 // Helper: render a single object into the current render pass
 static void render_single_object(SWFAppContext* app_context, DisplayObject* obj)
 {
+#ifdef HEADLESS_GRAPHICS
+	// Video display objects have type=0 (CHAR_TYPE_SHAPE) in dictionary because
+	// tagDefineVideoStream doesn't set a type. Check for video BEFORE the switch.
+	if (ng_isVideoChar(obj->char_id)) {
+		uint32_t* argb = NULL;
+		int vw = 0, vh = 0;
+		if (actionGetVideoFramePixels(&argb, &vw, &vh)) {
+			renderer_draw_bitmap_quad(context, argb, (u32)vw, (u32)vh,
+				0.0f, 0.0f, obj->transform_id, obj->cxform_id);
+			free(argb);
+		}
+		return;
+	}
+#endif
 	Character* ch = &dictionary[obj->char_id];
 	switch (ch->type)
 	{
@@ -1162,6 +1176,21 @@ static void render_display_list(SWFAppContext* app_context, DisplayObject* dl, s
 	{
 		DisplayObject* obj = &dl[i];
 		if (obj->char_id == 0) continue;
+
+#ifdef HEADLESS_GRAPHICS
+		// Video display objects have type=0 (CHAR_TYPE_SHAPE) in dictionary.
+		// Check for video BEFORE the switch to avoid rendering as empty shape.
+		if (ng_isVideoChar(obj->char_id)) {
+			uint32_t* argb = NULL;
+			int vw = 0, vh = 0;
+			if (actionGetVideoFramePixels(&argb, &vw, &vh)) {
+				renderer_draw_bitmap_quad(context, argb, (u32)vw, (u32)vh,
+					0.0f, 0.0f, obj->transform_id, obj->cxform_id);
+				free(argb);
+			}
+			continue;
+		}
+#endif
 
 		Character* ch = &dictionary[obj->char_id];
 		switch (ch->type)
