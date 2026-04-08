@@ -1,7 +1,11 @@
-# Near-Passing Tests Investigation Plan
+# Near-Passing Tests Investigation Plan (SUPERSEDED)
 <!-- TESTS: Color-v6, Selection-v6, Selection-v7, Selection-v8, super_test1, inheritance, TextFieldTest -->
 
-Last updated: 2026-04-05
+**NOTE: Superseded by GNASH_NEAR_PASSING_PLAN.md, which covers these tests plus
+17 more near-passing tests. Fixes 1-4 below are still valid and retained for
+historical reference.**
+
+Last updated: 2026-04-05 (superseded 2026-04-07)
 
 ## Status: IN PROGRESS
 
