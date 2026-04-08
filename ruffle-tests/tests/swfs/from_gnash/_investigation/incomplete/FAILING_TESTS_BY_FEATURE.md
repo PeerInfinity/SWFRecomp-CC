@@ -13,7 +13,7 @@ phases:
     status: complete
   - id: 3
     name: "Medium-effort feature work (delete, toString_valueOf, Number, etc.)"
-    status: not_started
+    status: in_progress
   - id: 4
     name: "Large features (ASnative, String regex, With auto-boxing)"
     status: not_started
@@ -21,7 +21,7 @@ dependencies: []
 blockers: []
 -->
 
-Last updated: 2026-04-08 (stats from 2026-03-19, many categories since resolved)
+Last updated: 2026-04-08 (Phase 3 in progress)
 
 **NOTE:** This document was written on 2026-03-19 when the pass rate was 25.5%.
 The current pass rate is ~40% (76/190 actionscript.all). Several categories
@@ -385,3 +385,30 @@ Failing tests from misc-swfmill.all:
 ### Tier 4: Feature-specific work (requires significant new infrastructure)
 
 Key, Camera, System, LoadVars (network), LocalConnection (IPC), MovieClipLoader (loadMovie).
+
+---
+
+## Phase 3 Progress (2026-04-08)
+
+### 3a: Flash-compatible number formatting — DONE
+
+**Change**: Replaced all `%.15g` double-to-string conversions with `flash_format_double()` helper in `action.c`.
+
+**Two fixes**:
+1. **Exponent leading zeros removed**: `1.23e-07` → `1.23e-7` (Flash never uses leading zeros in exponents)
+2. **Decimal threshold shifted**: Numbers with exponent -5 (e.g., 0.000054) now render in decimal format instead of scientific notation (`5.4e-05` → `0.000054`). Flash uses decimal when `-5 <= exponent <= 14`, vs C's `-4 <= exponent <= 14`.
+
+**Impact**: Fixes ~7-10 lines per Number-v5/v6/v7/v8 test (formatting-related failures). Also improves any other test that converts numbers to strings. Number-v8 improved from 192/237 to ~199/237 (+7 lines).
+
+### 3b: Delete operator partial fixes — DONE
+
+**Changes**:
+1. `delete func.prototype` now returns false (prototype is non-deletable on ASFunction)
+2. `delete undefined.prop` now returns false (can't delete property on non-object)
+
+**Impact**: delete-v7 improved from 41/60 to 43/60 (+2), delete-v8 from 42/60 to 44/60 (+2).
+
+**Remaining delete issues** (not yet fixed):
+- Local `var` variables should not be deletable (DONT_DELETE flag)
+- Property deletion inside `with()` blocks doesn't propagate
+- Global scope `delete a` after `_global.a` assignment

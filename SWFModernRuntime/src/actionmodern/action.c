@@ -36,6 +36,7 @@
 #include "unicode_case_tables.h"
 
 // Forward declarations for array helpers (defined later in file)
+static int flash_format_double(char* buf, int buf_size, double d);
 static int varToStringBuf(SWFAppContext* app_context, ActionVar* v, char* buf, int buf_size);
 static double varToDoubleSimple(ActionVar* v);
 static int _sort_compare_vars(SWFAppContext* app_context, ActionVar* a, ActionVar* b, int flags);
@@ -21309,7 +21310,7 @@ ActionStackValueType convertString(SWFAppContext* app_context, char* var_str)
 				STACK_TOP_TYPE = ACTION_STACK_VALUE_STRING; VAL(u64, &STACK_TOP_VALUE) = (u64) s; STACK_TOP_N = len; break;
 			}
 			char tmp[32];
-			snprintf(tmp, sizeof(tmp), "%.15g", temp_val);
+			flash_format_double(tmp, sizeof(tmp), (double)temp_val);
 			u32 u16_len;
 			uint16_t* u16 = ascii_to_u16(app_context, tmp, (int)strlen(tmp), &u16_len);
 			STACK_TOP_TYPE = ACTION_STACK_VALUE_STRING;
@@ -21327,7 +21328,7 @@ ActionStackValueType convertString(SWFAppContext* app_context, char* var_str)
 				STACK_TOP_TYPE = ACTION_STACK_VALUE_STRING; VAL(u64, &STACK_TOP_VALUE) = (u64) s; STACK_TOP_N = len; break;
 			}
 			char tmp[32];
-			snprintf(tmp, sizeof(tmp), "%.15g", temp_val);
+			flash_format_double(tmp, sizeof(tmp), temp_val);
 			u32 u16_len;
 			uint16_t* u16 = ascii_to_u16(app_context, tmp, (int)strlen(tmp), &u16_len);
 			STACK_TOP_TYPE = ACTION_STACK_VALUE_STRING;
@@ -35462,12 +35463,12 @@ void actionSetMember(SWFAppContext* app_context)
 		if (prop_name_var.type == ACTION_STACK_VALUE_F32)
 		{
 			float f = VAL(float, &prop_name_var.data.numeric_value);
-			snprintf(index_buffer, sizeof(index_buffer), "%.15g", f);
+			flash_format_double(index_buffer, sizeof(index_buffer), (double)f);
 		}
 		else
 		{
 			double d = VAL(double, &prop_name_var.data.numeric_value);
-			snprintf(index_buffer, sizeof(index_buffer), "%.15g", d);
+			flash_format_double(index_buffer, sizeof(index_buffer), d);
 		}
 		prop_name = index_buffer;
 		prop_name_len = strlen(index_buffer);
@@ -37907,12 +37908,12 @@ void actionInitObject(SWFAppContext* app_context)
 			if (name_var.type == ACTION_STACK_VALUE_F32)
 			{
 				float f = VAL(float, &name_var.data.numeric_value);
-				snprintf(_io_buf, sizeof(_io_buf), "%.15g", f);
+				flash_format_double(_io_buf, sizeof(_io_buf), (double)f);
 			}
 			else
 			{
 				double d = VAL(double, &name_var.data.numeric_value);
-				snprintf(_io_buf, sizeof(_io_buf), "%.15g", d);
+				flash_format_double(_io_buf, sizeof(_io_buf), d);
 			}
 			name = _io_buf;
 			name_length = strlen(_io_buf);
@@ -38032,6 +38033,12 @@ void actionDelete(SWFAppContext* app_context)
 	}
 	else if (obj_var.type == ACTION_STACK_VALUE_FUNCTION)
 	{
+		// "prototype" is non-deletable on functions
+		if (prop_name != NULL && prop_name_len == 9 && memcmp(prop_name, "prototype", 9) == 0)
+		{
+			PUSH(ACTION_STACK_VALUE_BOOLEAN, 0ULL); // non-deletable
+			return;
+		}
 		// Delete from ASFunction's own_props
 		ASFunction* func = (ASFunction*) obj_var.data.numeric_value;
 		if (func != NULL && func->own_props != NULL) {
@@ -38115,7 +38122,11 @@ void actionDelete(SWFAppContext* app_context)
 
 	if (obj == NULL)
 	{
-		PUSH(ACTION_STACK_VALUE_BOOLEAN, 1ULL);
+		// delete on explicitly undefined/null objects returns false,
+		// but missing string lookup returns true (Flash behavior)
+		u64 result = (obj_var.type == ACTION_STACK_VALUE_UNDEFINED ||
+		              obj_var.type == ACTION_STACK_VALUE_NULL) ? 0ULL : 1ULL;
+		PUSH(ACTION_STACK_VALUE_BOOLEAN, result);
 		return;
 	}
 
@@ -44595,13 +44606,13 @@ void actionCallFunction(SWFAppContext* app_context, char* str_buffer)
 			else if (args[0].type == ACTION_STACK_VALUE_F32)
 			{
 				float fval = VAL(float, &args[0].data.numeric_value);
-				snprintf(_pi_buf, sizeof(_pi_buf), "%.15g", fval);
+				flash_format_double(_pi_buf, sizeof(_pi_buf), (double)fval);
 				str_value = _pi_buf;
 			}
 			else if (args[0].type == ACTION_STACK_VALUE_F64)
 			{
 				double dval = VAL(double, &args[0].data.numeric_value);
-				snprintf(_pi_buf, sizeof(_pi_buf), "%.15g", dval);
+				flash_format_double(_pi_buf, sizeof(_pi_buf), dval);
 				str_value = _pi_buf;
 			}
 			else if (args[0].type == ACTION_STACK_VALUE_BOOLEAN)
@@ -46365,6 +46376,76 @@ void actionCallFunction(SWFAppContext* app_context, char* str_buffer)
 	}
 }
 
+// Flash-compatible double-to-string formatting.
+// Differs from C's %.15g in two ways:
+//   1. No leading zeros in exponents (e-7 not e-07)
+//   2. Decimal format for exponent -5 (C uses scientific)
+// Flash threshold: decimal when -5 <= exponent <= 14, scientific otherwise.
+static int flash_format_double(char* buf, int buf_size, double d)
+{
+	if (isnan(d)) return snprintf(buf, buf_size, "NaN");
+	if (isinf(d)) return snprintf(buf, buf_size, "%sInfinity", d < 0 ? "-" : "");
+	if (d == 0.0) return snprintf(buf, buf_size, "0");
+
+	double abs_d = fabs(d);
+	int exponent = (int)floor(log10(abs_d));
+
+	// Flash uses decimal format for exponent -5 through 14
+	// C's %.15g uses -4 through 14, so we need to handle exponent -5 specially
+	if (exponent >= -5 && exponent <= 14)
+	{
+		// Decimal format with 15 significant digits
+		int precision = 14 - exponent;
+		if (precision < 0) precision = 0;
+		int len = snprintf(buf, buf_size, "%.*f", precision, d);
+		if (len < 0 || len >= buf_size) return buf_size - 1;
+		// Remove trailing zeros after decimal point
+		if (precision > 0)
+		{
+			while (len > 0 && buf[len - 1] == '0') len--;
+			if (len > 0 && buf[len - 1] == '.') len--;
+			buf[len] = '\0';
+		}
+		return len;
+	}
+	else
+	{
+		// Scientific format with 15 significant digits
+		int len = snprintf(buf, buf_size, "%.14e", d);
+		if (len < 0 || len >= buf_size) return buf_size - 1;
+
+		// Find the 'e' in the output
+		char* e_pos = strchr(buf, 'e');
+		if (!e_pos) return len;
+
+		// Remove trailing zeros from mantissa (between '.' and 'e')
+		char* dot = strchr(buf, '.');
+		if (dot && dot < e_pos)
+		{
+			char* p = e_pos - 1;
+			while (p > dot && *p == '0') p--;
+			if (p == dot) p--; // remove decimal point if no fractional digits
+			p++;
+			memmove(p, e_pos, strlen(e_pos) + 1);
+			e_pos = p + (e_pos[0] == 'e' ? 0 : 0);
+			e_pos = strchr(buf, 'e'); // re-find after memmove
+		}
+
+		// Remove leading zeros from exponent
+		if (e_pos)
+		{
+			char* exp_start = e_pos + 1;
+			if (*exp_start == '+' || *exp_start == '-') exp_start++;
+			char* first_nonzero = exp_start;
+			while (*first_nonzero == '0' && *(first_nonzero + 1) != '\0') first_nonzero++;
+			if (first_nonzero > exp_start)
+				memmove(exp_start, first_nonzero, strlen(first_nonzero) + 1);
+		}
+
+		return (int)strlen(buf);
+	}
+}
+
 // Helper: convert an ActionVar to a string for array join/toString.
 // Writes into buf (max buf_size chars), returns length written.
 static int varToStringBuf(SWFAppContext* app_context, ActionVar* v, char* buf, int buf_size)
@@ -46392,16 +46473,14 @@ static int varToStringBuf(SWFAppContext* app_context, ActionVar* v, char* buf, i
 			float f = VAL(float, &v->data.numeric_value);
 			if (isnan(f)) return snprintf(buf, buf_size, "NaN");
 			if (isinf(f)) return snprintf(buf, buf_size, "%sInfinity", f < 0 ? "-" : "");
-			int len = snprintf(buf, buf_size, "%.15g", (double)f);
-			return len < buf_size ? len : buf_size - 1;
+			return flash_format_double(buf, buf_size, (double)f);
 		}
 		case ACTION_STACK_VALUE_F64:
 		{
 			double d = VAL(double, &v->data.numeric_value);
 			if (isnan(d)) return snprintf(buf, buf_size, "NaN");
 			if (isinf(d)) return snprintf(buf, buf_size, "%sInfinity", d < 0 ? "-" : "");
-			int len = snprintf(buf, buf_size, "%.15g", d);
-			return len < buf_size ? len : buf_size - 1;
+			return flash_format_double(buf, buf_size, d);
 		}
 		case ACTION_STACK_VALUE_BOOLEAN:
 			return snprintf(buf, buf_size, "%s", v->data.numeric_value ? "true" : "false");
@@ -49391,7 +49470,7 @@ void actionCallMethod(SWFAppContext* app_context, char* str_buffer)
 					if ((double)as_int == d)
 						snprintf(_addprop_buf, sizeof(_addprop_buf), "%lld", (long long)as_int);
 					else
-						snprintf(_addprop_buf, sizeof(_addprop_buf), "%.15g", d);
+						flash_format_double(_addprop_buf, sizeof(_addprop_buf), d);
 					prop_name = _addprop_buf;
 					prop_name_len = (u32)strlen(_addprop_buf);
 				}
@@ -49925,7 +50004,7 @@ void actionCallMethod(SWFAppContext* app_context, char* str_buffer)
 					if ((double)as_int == d)
 						snprintf(_addprop_buf, sizeof(_addprop_buf), "%lld", (long long)as_int);
 					else
-						snprintf(_addprop_buf, sizeof(_addprop_buf), "%.15g", d);
+						flash_format_double(_addprop_buf, sizeof(_addprop_buf), d);
 					prop_name_ap = _addprop_buf;
 					prop_name_ap_len = (u32)strlen(_addprop_buf);
 				}
@@ -54466,7 +54545,7 @@ void actionCallMethod(SWFAppContext* app_context, char* str_buffer)
 					if ((double)as_int == d)
 						snprintf(_addprop_buf, sizeof(_addprop_buf), "%lld", (long long)as_int);
 					else
-						snprintf(_addprop_buf, sizeof(_addprop_buf), "%.15g", d);
+						flash_format_double(_addprop_buf, sizeof(_addprop_buf), d);
 					_ap_name = _addprop_buf;
 					_ap_name_len = (u32)strlen(_addprop_buf);
 				}
@@ -54734,7 +54813,7 @@ void actionCallMethod(SWFAppContext* app_context, char* str_buffer)
 				}
 				else if (_nts_radix == 10)
 				{
-					int _nts_len = snprintf(_nts_buf, sizeof(_nts_buf), "%.15g", dval);
+					int _nts_len = flash_format_double(_nts_buf, sizeof(_nts_buf), dval);
 					if (_nts_len < 0) _nts_len = 0;
 					PUSH_STR(_nts_buf, (u32)_nts_len);
 				}
