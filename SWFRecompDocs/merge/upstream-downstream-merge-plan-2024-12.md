@@ -36,11 +36,13 @@ LittleCube has added **garbage collection** to the runtime PR (commit `f02311c`,
 
 #### Updated PR Status
 
-**SWFRecomp PR #4** — now 8 commits (was 5):
+**SWFRecomp PR #4** — now 10 commits (was 5):
 - Previous 5 commits (objects and functions infrastructure)
 - `c7348af` - remove arg initial strings, add null/undefined push values
 - `3a30821` - **implement pushing f64s** — `ACTION_STACK_VALUE_F64 = 6`, reads two 32-bit values into 64-bit hex literal
-- `1a72fe5` - add `"prototype"` and `"__proto__"` to initial strings (matches runtime's `STR_ID_PROTOTYPE`/`STR_ID_PROTO`)
+- `1a72fe5` - add `"prototype"` and `"__proto__"` to initial strings
+- `124933f` - **implement DefineFunction2** — `Function2Param` struct (reg + string_id), register tracking maps, `ACTION_STACK_VALUE_REGISTER = 4`, initial strings `"_root"`/`"_parent"`/`"arguments"`/`"super"`, config refactor
+- `a54734d` - remove extra tabs in script limits
 
 **SWFModernRuntime PR #3** — now 21 commits (was 14):
 - Previous 14 commits (objects and functions infrastructure)
@@ -52,6 +54,10 @@ LittleCube has added **garbage collection** to the runtime PR (commit `f02311c`,
 - `18589c8` - cleanup, manage scope objects, fix Math.abs
 - `21439f1` - **implement prototype support** — `STR_ID_PROTOTYPE`/`STR_ID_PROTO` string IDs, `getPropertyWithPrototype()` returns `ASProperty*` with string_id lookup, `RuntimeFunc.constructor` flag distinguishes constructors from methods
 - `c8aec0d` - **lazy prototype instantiation** — prototypes created on first access (not at function definition), new `getOrCreateProperty()` with `bool* created` flag, `rbtree_get_or_insert()` tracks creation state
+- `a3023dd` - fix tag.c indentation
+- `d7e8c39` - remove bad_poll check in swf.c
+- `dafe7dc` - **implement DefineFunction2** — 9 preload flags (THIS/ARGUMENTS/SUPER/ROOT/PARENT/GLOBAL + suppress variants), `Function2Param` register-to-string mapping, `FunctionType` enum (TYPE_1 vs TYPE_2), `STR_ID_ROOT`/`STR_ID_PARENT`/`STR_ID_ARGUMENTS`/`STR_ID_SUPER`
+- `9a05b00` - **fix function types, registers, and refcounts** — `PUSH_FUNC_1`/`PUSH_FUNC_2`/`PUSH_FUNC_UNKNOWN` macros, `retainObject()` on function push, OBJ_LOCK macro safety fix
 
 #### LittleCube's Pre-Merge TODO (Updated)
 
@@ -117,7 +123,7 @@ LittleCube and PeerInfinity have opened PRs implementing **objects and functions
 | Object/Function relation | Unified ("functions are objects") | Separate structs (ASObject vs ASFunction) — **different structs, never cast** |
 | Memory management | Red-black tree + refcount (in progress) | Reference counting on ASObject/ASArray, manual lifecycle |
 | Prototype chains | `getPropertyWithPrototype()` with string_id lookup (`21439f1`) | Full __proto__ chain traversal, __constructor__, super depth tracking |
-| Closure semantics | Not yet visible in PR | Full base_clip capture, SWF5 vs SWF6+ differentiation |
+| Closure semantics | DefineFunction2 with preload flags for this/super/arguments/root/parent/global (`dafe7dc`) | Full base_clip capture, SWF5 vs SWF6+ differentiation, WITH scope capture |
 | Test coverage | Basic (included in PR) | 616 Ruffle tests + 115 hand-written tests |
 
 #### Impact on Upstream Contribution Strategy (Phases 5-8)
