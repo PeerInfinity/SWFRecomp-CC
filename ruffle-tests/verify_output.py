@@ -1700,7 +1700,6 @@ button:disabled {{ background: #555; cursor: default; }}
 var output = document.getElementById('output');
 window.Module = {{
     locateFile: function(path) {{ return '{test_name}/' + path.replace('test.', '{test_name}.'); }},
-    noInitialRun: true,
     print: function(text) {{ output.textContent += text + '\\n'; }},
     printErr: function(text) {{ output.textContent += '[stderr] ' + text + '\\n'; }},
     onRuntimeInitialized: function() {{
