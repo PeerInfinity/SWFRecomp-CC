@@ -1,0 +1,194 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>SWFRecomp - Runtime SWF Injection Demos</title>
+<link rel="icon" type="image/svg+xml" href="../favicon.svg">
+<style>
+* { margin: 0; padding: 0; box-sizing: border-box; }
+body {
+    font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+    line-height: 1.6;
+    color: #e0e0e0;
+    background: #1a1a1a;
+    min-height: 100vh;
+    padding: 20px;
+}
+.container {
+    max-width: 900px;
+    margin: 0 auto;
+    background: #2a2a2a;
+    border-radius: 12px;
+    box-shadow: 0 20px 60px rgba(0,0,0,0.5);
+    overflow: hidden;
+    border: 1px solid #333;
+}
+header {
+    background: #222;
+    padding: 35px 40px;
+    border-bottom: 3px solid #e94560;
+}
+header h1 { font-size: 1.8em; color: #e94560; margin-bottom: 6px; }
+header p { color: #888; }
+.back-link {
+    color: #888; text-decoration: none; font-size: 0.9em;
+    padding: 5px 12px; border: 1px solid #555; border-radius: 6px;
+    float: right; margin-top: -30px;
+}
+.back-link:hover { color: #e0e0e0; border-color: #888; }
+main { padding: 30px 40px; }
+h2 { color: #e94560; margin: 20px 0 10px; font-size: 1.3em; border-bottom: 2px solid #e94560; padding-bottom: 6px; }
+p { margin-bottom: 10px; color: #b0b0b0; }
+.demo-grid {
+    display: grid; grid-template-columns: 1fr; gap: 15px; margin: 15px 0 25px;
+}
+.demo-card {
+    background: #1f1f1f; padding: 20px; border-radius: 8px;
+    border: 1px solid #333; border-left: 4px solid #e94560;
+    transition: border-color 0.2s;
+}
+.demo-card:hover { border-color: #e94560; }
+.demo-card h3 { color: #e94560; margin-bottom: 6px; font-size: 1.1em; }
+.demo-card .desc { color: #999; font-size: 0.9em; margin-bottom: 12px; }
+.demo-card .tag {
+    display: inline-block; background: #333; color: #ccc; padding: 2px 8px;
+    border-radius: 10px; font-size: 0.75em; margin-right: 6px;
+}
+.demo-card .tag.as { background: #1b5e20; color: #a5d6a7; }
+.demo-card .tag.c { background: #0d47a1; color: #90caf9; }
+.demo-card .tag.prelude { background: #4a148c; color: #ce93d8; }
+.btn {
+    display: inline-block; padding: 8px 18px; text-decoration: none;
+    border-radius: 5px; font-weight: 600; font-size: 0.85em;
+    background: #e94560; color: white; margin-top: 8px;
+    transition: background 0.2s;
+}
+.btn:hover { background: #d63851; }
+.summary {
+    background: #1f1f1f; padding: 18px; border-radius: 8px;
+    border: 1px solid #333; margin: 15px 0;
+}
+.summary table { width: 100%; border-collapse: collapse; font-size: 0.9em; }
+.summary th { text-align: left; color: #e94560; padding: 6px 10px; border-bottom: 1px solid #333; }
+.summary td { padding: 6px 10px; border-bottom: 1px solid #222; }
+.yes { color: #4CAF50; } .no { color: #f44336; } .partial { color: #ff9800; }
+footer {
+    text-align: center; padding: 20px; background: #1f1f1f;
+    color: #666; border-top: 1px solid #333; font-size: 0.9em;
+}
+footer a { color: #e94560; text-decoration: none; }
+</style>
+</head>
+<body>
+<div class="container">
+    <header>
+        <h1>Runtime SWF Injection Demos</h1>
+        <p>Exploring how runtime APIs can be written in ActionScript and injected into recompiled SWFs</p>
+        <a href="../" class="back-link">Back to SWFRecomp</a>
+    </header>
+    <main>
+        <p>
+            These demos explore LittleCube's proposal: implement the AS2 runtime through
+            actual ActionScript code, build a "runtime" SWF from it, and recompile it
+            alongside the game SWF. Three approaches are compared.
+        </p>
+
+        <h2>Demos</h2>
+        <div class="demo-grid">
+            <div class="demo-card">
+                <h3>Demo 1: loadMovie Inspection</h3>
+                <span class="tag as">ActionScript</span>
+                <span class="tag">loadMovie</span>
+                <p class="desc">
+                    A parent SWF loads a child via <code>loadMovie()</code>, then enumerates
+                    everything visible: timeline variables, functions, <code>_global</code>
+                    contributions, prototype modifications, and MC properties. Shows that
+                    ActionScript has full unified visibility into loaded content.
+                </p>
+                <a href="loadmovie_enumerate.html" class="btn">Run Demo</a>
+            </div>
+
+            <div class="demo-card">
+                <h3>Demo 3: C Code Injection</h3>
+                <span class="tag c">C test_harness</span>
+                <span class="tag">runtime internals</span>
+                <p class="desc">
+                    A C <code>test_harness.c</code> walks runtime internals after a child SWF
+                    loads: MovieClip structs, <code>_global</code> object, variable array,
+                    display list, and dictionary. Reveals that C code sees raw structs but
+                    misses the integrated AS variable scope.
+                </p>
+                <a href="loadmovie_c_inspect.html" class="btn">Run Demo</a>
+            </div>
+
+            <div class="demo-card">
+                <h3>Demo 4: Prelude SWF</h3>
+                <span class="tag prelude">Prelude</span>
+                <span class="tag">LittleCube's idea</span>
+                <p class="desc">
+                    A "prelude" SWF runs before the main SWF, sharing the same <code>_global</code>,
+                    variable scope, and prototype chains. It sets up <code>_global.runtimeVersion</code>,
+                    <code>MovieClip.prototype.greet</code>, and a <code>Greeter</code> constructor
+                    with prototype methods &mdash; all immediately available to the main SWF.
+                </p>
+                <a href="prelude_swf.html" class="btn">Run Demo</a>
+            </div>
+        </div>
+
+        <h2>Comparison</h2>
+        <div class="summary">
+            <table>
+                <tr>
+                    <th>Capability</th>
+                    <th>Demo 1 (AS)</th>
+                    <th>Demo 3 (C)</th>
+                    <th>Demo 4 (Prelude)</th>
+                </tr>
+                <tr>
+                    <td>Timeline variables</td>
+                    <td class="yes">Full access</td>
+                    <td class="no">Not accessible</td>
+                    <td class="yes">Shared scope</td>
+                </tr>
+                <tr>
+                    <td><code>_global</code> contributions</td>
+                    <td class="yes">Visible</td>
+                    <td class="no">Not visible</td>
+                    <td class="yes">Shared _global</td>
+                </tr>
+                <tr>
+                    <td>Prototype modifications</td>
+                    <td class="yes">Visible</td>
+                    <td class="partial">Walk manually</td>
+                    <td class="yes">Shared prototypes</td>
+                </tr>
+                <tr>
+                    <td>Custom constructors</td>
+                    <td>N/A</td>
+                    <td>N/A</td>
+                    <td class="yes">Full OOP</td>
+                </tr>
+                <tr>
+                    <td>Timing</td>
+                    <td>Deferred</td>
+                    <td>After-tick hook</td>
+                    <td class="yes">Before frame 1</td>
+                </tr>
+            </table>
+        </div>
+
+        <h2>Conclusion</h2>
+        <p>
+            <strong>Demo 4 (Prelude SWF) validates LittleCube's proposal.</strong>
+            Runtime API implementations written in ActionScript, compiled into a prelude SWF,
+            and statically linked with the game SWF provide full scope sharing and immediate
+            availability. Contributors can write AS2 instead of C for the runtime API surface.
+        </p>
+    </main>
+    <footer>
+        <a href="../">SWFRecomp</a> &mdash; Preserving Flash History Through Modern Technology
+    </footer>
+</div>
+</body>
+</html>

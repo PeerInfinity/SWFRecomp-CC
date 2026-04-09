@@ -331,6 +331,14 @@
                 </div>
             </section>
 
+            <section class="demo-section" style="border-left-color: #e94560; margin-top: 15px;">
+                <h2 style="color: #e94560; border-bottom-color: #e94560;">Runtime SWF Injection</h2>
+                <p>Experimental demos exploring how runtime APIs can be written in ActionScript and injected into recompiled SWFs at build time.</p>
+                <div style="margin-top: 15px;">
+                    <a href="injector/" class="card-link primary" style="background: #e94560; font-size: 1em; padding: 10px 24px;">View Injection Demos</a>
+                </div>
+            </section>
+
             <!-- Stats bar - populated by JS -->
             <div class="stats-bar" id="stats-bar" style="display:none;"></div>
 
@@ -387,6 +395,7 @@
             <section class="links">
                 <h2>Links</h2>
                 <a href="recompiler/">In-Browser Recompiler</a>
+                <a href="injector/">Runtime SWF Injection</a>
                 <a href="demo.html">View SWF in Ruffle</a>
                 <a href="https://github.com/SWFRecomp/SWFRecomp" target="_blank">GitHub Repository</a>
                 <a href="https://github.com/SWFRecomp/SWFRecomp/blob/master/README.md" target="_blank">Documentation</a>
@@ -542,21 +551,25 @@
 
             var gfxHtml = '';
             if (graphics.length > 0) {
-                gfxHtml += '<h2 style="color: #7B1FA2; border-bottom: 2px solid #7B1FA2;">Graphics Demos (WebGPU)</h2>';
+                gfxHtml += '<h2 class="collapsible-header" onclick="toggleSection(\'gfx\')" id="gfx-toggle" style="color: #7B1FA2; border-bottom: 2px solid #7B1FA2;">';
+                gfxHtml += '<span class="arrow">&#9654;</span> Graphics Demos (WebGPU) <span style="color:#999;font-size:0.6em;font-weight:400;margin-left:8px;">' + graphics.length + ' demos</span></h2>';
+                gfxHtml += '<div class="collapsible-body" id="gfx-body">';
                 gfxHtml += '<p style="margin-bottom: 15px; color: #b0b0b0;">Flash vector graphics rendered via WebGPU. Requires a WebGPU-capable browser.</p>';
                 gfxHtml += '<div class="demo-grid">';
                 graphics.forEach(function(t) { gfxHtml += renderCard(t); });
-                gfxHtml += '</div>';
+                gfxHtml += '</div></div>';
             }
             document.getElementById('graphics-demos').innerHTML = gfxHtml;
 
             var traceHtml = '';
             if (trace.length > 0) {
-                traceHtml += '<h2 style="margin-top: 25px;">Trace Demos</h2>';
+                traceHtml += '<h2 class="collapsible-header" onclick="toggleSection(\'trace\')" id="trace-toggle" style="margin-top: 25px;">';
+                traceHtml += '<span class="arrow">&#9654;</span> Trace Demos <span style="color:#999;font-size:0.6em;font-weight:400;margin-left:8px;">' + trace.length + ' demos</span></h2>';
+                traceHtml += '<div class="collapsible-body" id="trace-body">';
                 traceHtml += '<p style="margin-bottom: 15px; color: #b0b0b0;">Recompiled ActionScript running as WebAssembly with trace output in the browser.</p>';
                 traceHtml += '<div class="demo-grid">';
                 trace.forEach(function(t) { traceHtml += renderCard(t); });
-                traceHtml += '</div>';
+                traceHtml += '</div></div>';
             }
             document.getElementById('trace-demos').innerHTML = traceHtml;
 
@@ -626,6 +639,16 @@
             var body = document.getElementById('opcode-body');
             header.classList.toggle('open');
             body.classList.toggle('open');
+        };
+
+        // Section toggle (graphics, trace)
+        window.toggleSection = function(id) {
+            var header = document.getElementById(id + '-toggle');
+            var body = document.getElementById(id + '-body');
+            if (header && body) {
+                header.classList.toggle('open');
+                body.classList.toggle('open');
+            }
         };
     })();
     </script>
