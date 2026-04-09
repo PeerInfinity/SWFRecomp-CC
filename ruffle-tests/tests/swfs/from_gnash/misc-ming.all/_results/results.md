@@ -1,10 +1,10 @@
 # Ruffle Test Results (Unfiltered)
 
-**Date**: 2026-04-08 22:58 UTC
+**Date**: 2026-04-09 00:00 UTC
 
 **Git SHA**: `2a4adfc3fd`
 
-**Run Duration**: 20m 54s
+**Run Duration**: 20m 41s
 
 ## Summary
 
@@ -29,14 +29,14 @@
 
 | # | Test | Lines | Duration | Notes |
 |---|------|-------|----------|-------|
-| 1 | `PlaceObject2Test` | 9 | 19.7s |  |
-| 2 | `VarAndCharClashTest` | 13 | 19.1s |  |
-| 3 | `Video-EmbedSquareTest` | 2 | 19.9s |  |
+| 1 | `PlaceObject2Test` | 9 | 21.2s |  |
+| 2 | `VarAndCharClashTest` | 13 | 19.2s |  |
+| 3 | `Video-EmbedSquareTest` | 2 | 19.8s |  |
 | 4 | `masks_test2` | 10 | 19.3s |  |
-| 5 | `morph_test1` | 0 | 21.8s |  |
-| 6 | `move_object_test` | 11 | 20.2s |  |
-| 7 | `multi_doactions_and_goto_frame_test` | 6 | 20.1s |  |
-| 8 | `unload_movieclip_test1` | 6 | 19.5s |  |
+| 5 | `morph_test1` | 0 | 20.4s |  |
+| 6 | `move_object_test` | 11 | 19.7s |  |
+| 7 | `multi_doactions_and_goto_frame_test` | 6 | 19.4s |  |
+| 8 | `unload_movieclip_test1` | 6 | 19.2s |  |
 
 ## Near-Passing Tests
 

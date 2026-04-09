@@ -3,8 +3,8 @@
 *See [RUFFLE_RESULTS_FILTERED.md](RUFFLE_RESULTS_FILTERED.md) for results with ignored tests excluded.*
 
 **Commit:** `2a4adfc3fdc2`  
-**Date:** 2026-04-08 22:58 UTC  
-**Total duration:** 5h28m58s
+**Date:** 2026-04-09 00:00 UTC  
+**Total duration:** 5h25m15s
 
 ## Results by Suite
 
@@ -24,7 +24,7 @@
 
 | Suite | Matching | Expected | Accuracy |
 |-------|--------:|---------:|---------:|
-| avm1 | 82,582 | 91,594 | 90.2% |
+| avm1 | 82,579 | 91,594 | 90.2% |
 | from_gnash/actionscript.all | 12,586 | 16,957 | 74.2% |
 | from_gnash/misc-ming.all | 1,662 | 3,388 | 49.1% |
 | from_gnash/misc-mtasc.all | 173 | 231 | 74.9% |
@@ -32,7 +32,7 @@
 | from_gnash/misc-swfmill.all | 25 | 29 | 86.2% |
 | from_shumway | 35 | 256 | 13.7% |
 | from_shumway/avm1 | 118 | 311 | 37.9% |
-| **Total** | **97,401** | **113,265** | **86.0%** |
+| **Total** | **97,398** | **113,265** | **86.0%** |
 
 ## Failure Breakdown
 
@@ -121,16 +121,7 @@ Tests with `output_mismatch` status but ≥80% of expected lines matching.
 
 | Suite | Newly Passing | Newly Failing | Lines Improved | Lines Regressed |
 |-------|-------------:|-------------:|--------------:|----------------:|
-| avm1 | - | 2 | 15 | 109 |
-| from_gnash/actionscript.all | - | - | 56 | 4 |
-| from_gnash/misc-ming.all | - | 1 | - | 3 |
-| from_gnash/misc-swfc.all | - | - | - | 3 |
-
-**avm1 — newly failing:** `equals_swf4`, `lessthan_swf4`
-
-**from_gnash/misc-ming.all — newly failing:** `getTimer_test`
-
-*Comparing `69612f4204e8` → `2a4adfc3fdc2`*
+| avm1 | - | - | - | 3 |
 
 ## Flash-Spec Results
 
@@ -145,55 +136,55 @@ Tests verified against Flash's actual output (`output.flash.txt`).
 ### avm1
 
 - **Pass:** 578/620 (93.2%)
-- **Duration:** 3h21m54s across 30 shards
-- **Lines:** 82,582/91,594 matching (90.2%)
-- **Avg test duration:** 19.5s — slowest: `movieclip_invalid_get_bounds_7` (42.6s)
+- **Duration:** 3h19m27s across 30 shards
+- **Lines:** 82,579/91,594 matching (90.2%)
+- **Avg test duration:** 19.2s — slowest: `movieclip_invalid_get_bounds_7` (42.6s)
 
 ### from_gnash/actionscript.all
 
 - **Pass:** 76/190 (40.0%)
-- **Duration:** 1h10m50s across 30 shards
+- **Duration:** 1h10m02s across 30 shards
 - **Lines:** 12,586/16,957 matching (74.2%)
-- **Avg test duration:** 22.3s — slowest: `array-v5` (44.9s)
+- **Avg test duration:** 22.1s — slowest: `array-v5` (43.7s)
 
 ### from_gnash/misc-ming.all
 
 - **Pass:** 8/58 (13.8%)
-- **Duration:** 20m54s across 30 shards
+- **Duration:** 20m41s across 30 shards
 - **Lines:** 1,662/3,388 matching (49.1%)
-- **Avg test duration:** 21.6s — slowest: `matrix_test` (76.3s)
+- **Avg test duration:** 21.3s — slowest: `matrix_test` (73.5s)
 
 ### from_gnash/misc-mtasc.all
 
 - **Pass:** 7/9 (77.8%)
-- **Duration:** 2m59s across 30 shards
+- **Duration:** 2m58s across 30 shards
 - **Lines:** 173/231 matching (74.9%)
-- **Avg test duration:** 19.9s — slowest: `levels` (21.2s)
+- **Avg test duration:** 19.7s — slowest: `levels` (21.2s)
 
 ### from_gnash/misc-swfc.all
 
 - **Pass:** 2/16 (12.5%)
-- **Duration:** 5m19s across 30 shards
+- **Duration:** 5m16s across 30 shards
 - **Lines:** 220/499 matching (44.1%)
-- **Avg test duration:** 19.9s — slowest: `swf4opcode` (21.2s)
+- **Avg test duration:** 19.7s — slowest: `movieclip_destruction_test1` (21.4s)
 
 ### from_gnash/misc-swfmill.all
 
 - **Pass:** 11/14 (78.6%)
-- **Duration:** 4m30s across 30 shards
+- **Duration:** 4m29s across 30 shards
 - **Lines:** 25/29 matching (86.2%)
-- **Avg test duration:** 19.2s — slowest: `mixed-bytecode-as2` (20.5s)
+- **Avg test duration:** 19.2s — slowest: `func_dict` (21.2s)
 
 ### from_shumway
 
 - **Pass:** 17/47 (36.2%)
-- **Duration:** 15m06s across 30 shards
+- **Duration:** 14m56s across 30 shards
 - **Lines:** 35/256 matching (13.7%)
-- **Avg test duration:** 19.2s — slowest: `flash_net_URLRequest` (20.7s)
+- **Avg test duration:** 19.0s — slowest: `button2` (21.5s)
 
 ### from_shumway/avm1
 
 - **Pass:** 12/23 (52.2%)
-- **Duration:** 7m23s across 30 shards
+- **Duration:** 7m22s across 30 shards
 - **Lines:** 118/311 matching (37.9%)
-- **Avg test duration:** 19.2s — slowest: `moviecliploader` (20.5s)
+- **Avg test duration:** 19.2s — slowest: `label` (21.1s)
