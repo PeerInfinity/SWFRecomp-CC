@@ -33081,13 +33081,20 @@ void actionDelete2(SWFAppContext* app_context, char* str_buffer)
 			}
 		}
 		// If we found and deleted a variable, success=true.
-		// If no variable was found, check if a child MC exists with this name — if so, return false
-		// (child MCs are not deletable via Delete2). Otherwise return true (no-op delete).
 		if (found) {
 			success = true;
 		} else {
+			// Not found in var_map — check global_object properties (_global.name)
+			if (global_object != NULL && var_name != NULL) {
+				ActionVar* gp = getProperty(global_object, var_name, var_name_len);
+				if (gp != NULL) {
+					success = deleteProperty(app_context, global_object, var_name, var_name_len);
+					PUSH(ACTION_STACK_VALUE_BOOLEAN, success ? 1ULL : 0ULL);
+					return;
+				}
+			}
 			// Check if name matches a child display object (non-deletable)
-			success = true;  // default: deleting non-existent variable is "true" in Flash
+			success = false;  // deleting non-existent variable returns false
 #ifdef NO_GRAPHICS
 			extern size_t ng_findDisplayEntryByName(const char* name);
 			if (var_name != NULL && var_name_len > 0) {
