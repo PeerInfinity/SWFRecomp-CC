@@ -18,16 +18,23 @@ and understand what each approach can and cannot see inside a target SWF.
 3. Identify which approach best supports the "runtime SWF" architecture where AS2
    code provides runtime API implementations.
 
-## Status: Demos 1 and 3 Complete
+## Status: All Demos Complete
 
-Both demos live in `demos/runtime-swf/` and use `verify_output.py --tests-dir`:
-- `demos/runtime-swf/loadmovie_enumerate/` — Demo 1
-- `demos/runtime-swf/loadmovie_c_inspect/` — Demo 3
+All three demos live in `demos/runtime-swf/` and use `verify_output.py --tests-dir`:
+- `demos/runtime-swf/loadmovie_enumerate/` — Demo 1 (AS loadMovie inspection)
+- `demos/runtime-swf/loadmovie_c_inspect/` — Demo 3 (C test_harness inspection)
+- `demos/runtime-swf/prelude_swf/` — Demo 4 (prelude SWF, LittleCube's idea)
 
-Run with:
+Run all:
 ```bash
-python3 ruffle-tests/verify_output.py --tests-dir=demos/runtime-swf --test=loadmovie_enumerate --diff --verbose
-python3 ruffle-tests/verify_output.py --tests-dir=demos/runtime-swf --test=loadmovie_c_inspect --diff --verbose
+python3 ruffle-tests/verify_output.py --tests-dir=demos/runtime-swf --diff --verbose
+```
+
+Regression test (all 9 loadmovie + 14 MCL tests verified, no regressions from
+the prelude/stop-fix changes; 3 MCL failures are pre-existing):
+```bash
+python3 ruffle-tests/verify_output.py --test='loadmovie*' --diff --verbose
+python3 ruffle-tests/verify_output.py --test='mcl_*' --diff --verbose
 ```
 
 ## Experimental Results
@@ -74,46 +81,72 @@ scope. The ActionScript runtime functions (`actionGetVariable`, `actionGetMember
 walking, and builtin property synthesis into a unified view. Raw C struct access
 skips all of this integration.
 
+### Demo 4: Prelude SWF (LittleCube's Full Vision) — PASS
+
+**Test:** `prelude_swf`
+
+A prelude SWF's setup is fully visible to the main SWF on its first frame:
+
+| What | Visible? | Detail |
+|------|----------|--------|
+| `_global.runtimeVersion` | Yes | Returns "1.0" |
+| `_global.runtimeReady` | Yes | Returns true |
+| `MovieClip.prototype.greet` | Yes | `this.greet()` traces "hello from runtime" |
+| `_global.Greeter` constructor | Yes | `typeof Greeter` = "function" |
+| `new Greeter("World")` | Yes | Constructor sets `this.name = "World"` |
+| `greeter.sayHi()` | Yes | Traces "Hi, I'm World" via prototype method |
+
+**Key finding:** Prelude SWFs share the same `_global`, var_array, and prototype
+chains as the main SWF. Everything the prelude defines is immediately available —
+no deferred loading, no scope isolation, no version-group barriers (when versions
+match). This fully validates LittleCube's proposal.
+
 ### Comparison
 
-| Capability | Demo 1 (AS) | Demo 3 (C) |
-|-----------|-------------|------------|
-| Timeline variables | Full access | Not accessible (stored in var_array, not MC props) |
-| Timeline functions | Callable | Not accessible |
-| `_global` contributions | Visible | Not visible (version-isolated globals) |
-| Prototype modifications | Visible | Not directly (would need to walk ASObject chain) |
-| MC struct fields | Indirect (via builtins) | Direct pointer access |
-| Display list | Not directly | Direct struct iteration |
-| Dictionary | Not accessible | Direct struct iteration (but empty in NO_GRAPHICS) |
-| Execution hooks | Limited to AS timing | Full control (after-tick, before-init) |
+| Capability | Demo 1 (AS loadMovie) | Demo 3 (C harness) | Demo 4 (Prelude) |
+|-----------|----------------------|--------------------|--------------------|
+| Timeline variables | Full access | Not accessible | Shared scope |
+| Timeline functions | Callable | Not accessible | Shared scope |
+| `_global` contributions | Visible | Not visible | Shared `_global` |
+| Prototype modifications | Visible | Not directly | Shared prototypes |
+| Custom constructors | N/A (not tested) | N/A | Full OOP support |
+| Timing | Deferred (next frame) | After-tick hook | Before first frame |
+| Scope isolation | Separate var_array | Raw struct access | None (shared) |
+| MC struct fields | Indirect (builtins) | Direct pointer | Indirect (builtins) |
 
 ### Implications for the Runtime SWF Architecture
 
-1. **ActionScript approach (Demo 1 / LittleCube's idea) is more natural** for
-   runtime API implementation. AS code has full visibility into the object model
-   and can modify prototypes, _global, etc. naturally.
+1. **Demo 4 (prelude SWF) is the clear winner** for LittleCube's proposal.
+   It provides shared scope, immediate availability, and full OOP support
+   (constructors, prototypes, inheritance). Contributors can write AS2 code
+   that "just works" as if it were built into the runtime.
 
-2. **C approach (Demo 3) is better for low-level integration** — renderer
-   interface, display list manipulation, dictionary access. But it cannot easily
-   participate in the ActionScript scope chain.
+2. **Demo 1 (loadMovie) is useful for dynamic content** but the deferred loading
+   and scope isolation make it unsuitable for runtime API bootstrapping.
 
-3. **The ideal architecture is hybrid:** Runtime API implementations written in
-   AS2 (compiled into a prelude SWF) for the high-level API surface, with C
-   code providing the low-level bridge to the renderer and other native systems.
+3. **Demo 3 (C harness) is complementary** — best for low-level integration
+   (renderer bridge, display list manipulation) that AS2 can't do alone.
 
-## Bugs Discovered
+4. **The ideal architecture is hybrid:** Prelude SWFs for high-level AS2 runtime
+   APIs, with C code providing the low-level bridge to native systems (renderer,
+   audio, input). The prelude's AS2 code can call C functions exposed via
+   `ExternalInterface` or similar bridging mechanisms.
 
-1. **Child SWF `stop()` stops the root timeline.** During deferred loadMovie
-   execution (`actionFirePendingDirectLoads`), `g_current_sprite_obj` is not set,
-   so `actionStop()` falls through to `is_playing = 0` on the root MC. This is
-   because the deferred load doesn't go through `exec_sprite_frame` which normally
-   sets `g_current_sprite_obj`.
+## Bugs Discovered and Fixed
 
-2. **AVM1 SetVariable stack convention.** The runtime's `actionSetVariable()`
-   expects value at SP (top) and name at SP_SECOND_TOP (second). The standard
-   AVM1 bytecode convention is: push name first (bottom), push value second (top).
-   The code comments are correct but easily misread. For hand-authored bytecode:
-   push name first, then value.
+1. **Child SWF `stop()` stops the root timeline (FIXED).**
+   During deferred loadMovie execution (`actionFirePendingDirectLoads`),
+   `g_current_sprite_obj` was not set and dynamically created MCs have
+   `display_obj == NULL`, so `actionStop()` fell through to `is_playing = 0`
+   on the root MC. Fixed by saving/restoring `is_playing` around child frame
+   execution, and setting `g_current_sprite_obj` when `display_obj` is available.
+   Commit: `16341d93`.
+
+2. **AVM1 SetVariable stack convention (documented).**
+   The runtime's `actionSetVariable()` expects value at SP (top) and name at
+   SP_SECOND_TOP (second). The standard AVM1 bytecode convention is: push name
+   first (bottom), push value second (top). The code comments are correct but
+   easily misread. For hand-authored bytecode: push name first, then value.
 
 ## Demos
 
@@ -132,12 +165,12 @@ skips all of this integration.
 - Uses `GetURL2` with `loadTarget=1` for loadMovie (same as Flash compiler output)
 - `for..in` loop uses `Enumerate2` + `StoreRegister` + `Equals2(null)` pattern
 - Each iteration consumes one name from the stack via `Equals2` popping both operands
-- Child SWF must NOT call `stop()` (see bug #1 above)
+- Child SWF calls `stop()` (safe after bug #1 fix)
 - Parent uses `FSCommand:quit` to cleanly exit the frame loop
 
 ### Demo 2: Bytecode Injection (Skipped)
 
-Not implemented. The results from Demos 1 and 3 provide sufficient insight.
+Not implemented. The results from Demos 1, 3, and 4 provide sufficient insight.
 If needed, bytecode injection would require modifying the recompiler's bytecode
 parsing to prepend/append extra actions before the normal translation.
 
@@ -160,31 +193,53 @@ parsing to prepend/append extra actions before the normal translation.
 - `display_list` for root-level display objects
 - `dictionary` for character definitions
 
-### Demo 4: Prelude SWF (LittleCube's Full Vision) — Not Yet Implemented
+### Demo 4: Prelude SWF (LittleCube's Full Vision)
 
-**Approach:** A "runtime" SWF is recompiled to C and statically linked with the game
-SWF. The runtime SWF's init code runs *before* the game SWF's init, in the same
-scope. The game SWF sees the runtime's `_global` definitions as if they were native
-builtins.
+**Test location:** `demos/runtime-swf/prelude_swf/`
 
-**Implementation plan:**
-- Add a new execution mode in `swf_core.c`: before `tagInit` + frame 0 of the main
-  SWF, run prelude SWFs' init + frame 0
-- Prelude SWFs share the same `_global`, var_array, and scope chain as the main SWF
-- Use existing `MovieEntry`/`movie_registry.c` infrastructure with a "prelude" flag
-- The prelude SWF's `_global` modifications (prototype setups, constructor
-  definitions) would be immediately available to the game SWF
+**Files:**
+- `create_prelude_swf.py` — generates prelude SWF (sets up _global, prototypes, constructor)
+- `create_test_swf.py` — generates main SWF (verifies prelude's setup is available)
+- `test.toml` — `num_frames = 1`
+- `output.txt` — expected output (11 lines)
 
-**Key question answered by Demo 1:** ActionScript CAN modify `_global` and
-`MovieClip.prototype` from a loaded SWF, and those modifications are visible to
-the parent. This validates the core premise of LittleCube's idea.
+**Implementation:**
+- `MovieEntry.is_prelude` field marks prelude entries in the movie registry
+- `getPreludeEntry(idx)` iterates prelude entries
+- `swfStart()` runs prelude init + frame 0 after `tagInit`, before the main frame loop
+- Prelude shares the same `_global`, `var_array`, and scope chain — no isolation
+- `verify_output.py` detects prelude SWFs by `prelude_*.swf` naming convention
+- SWF version auto-detected from binary header; prelude must match main SWF version
 
-## Open Questions
+**What the prelude sets up:**
+- `_global.runtimeVersion = "1.0"`
+- `_global.runtimeReady = true`
+- `MovieClip.prototype.greet` — method callable on any MC
+- `_global.Greeter` — constructor with prototype.sayHi method
 
-- **Demo 4 scope isolation:** Should the prelude SWF run in the same var_array scope
-  as the main SWF, or a separate scope? The child in Demo 1 uses a separate scope
-  (var_array with string_id offset), but a prelude SWF should probably share scope.
-- **Version matching:** The prelude SWF should match the game's SWF version to avoid
-  version-group isolation (SWF≤6 vs SWF7+ have separate `_global` objects).
-- **Multiple prelude SWFs:** Should the architecture support chaining multiple
-  prelude SWFs? (e.g., core runtime + game-specific overrides)
+**What the main SWF verifies:**
+- All `_global` properties readable
+- `this.greet()` callable (inherited via MovieClip.prototype)
+- `typeof Greeter` = "function"
+- `new Greeter("World").sayHi()` traces "Hi, I'm World"
+
+## Open Questions (Answered)
+
+- **Prelude scope isolation:** Preludes share the main SWF's scope entirely (same
+  `_global`, same `var_array`). No isolation needed — that's the point.
+- **Version matching:** SWF version is auto-detected from the binary header. The
+  prelude SWF must be authored with the same version byte as the main SWF to
+  avoid version-group isolation (SWF≤6 vs SWF7+ have separate `_global` objects).
+- **Multiple prelude SWFs:** Supported — `getPreludeEntry(idx)` iterates all
+  prelude entries. They execute in the order they appear in the movie registry.
+
+## Future Work
+
+- **WASM deployment:** Deploy demos to `docs/injector/` as in-browser demos
+  (similar to `docs/recompiler/`).
+- **AS2 compiler integration:** Explore using MTASC or Flex SDK to compile
+  AS2 source files directly into prelude SWFs, rather than hand-authoring
+  bytecode with Python.
+- **Real runtime API migration:** Identify a C-coded runtime builtin (e.g., a
+  simple `MovieClip.prototype` method) and reimplement it as a prelude SWF to
+  validate the full workflow end-to-end with a real game SWF.
