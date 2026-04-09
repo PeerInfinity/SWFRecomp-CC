@@ -21,6 +21,8 @@ sup*.swf
 !docs/examples/**/test.swf
 # Allow demo SWFs for in-browser recompiler
 !docs/recompiler/*.swf
+# Allow demo SWFs for runtime-swf experiments
+!demos/**/*.swf
 
 # Libraries
 zlib.dll

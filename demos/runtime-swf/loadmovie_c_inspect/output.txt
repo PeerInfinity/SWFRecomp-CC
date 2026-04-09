@@ -1,0 +1,20 @@
+child frame 1 executed
+=== C HARNESS: runtime inspection ===
+=== holder MovieClip ===
+  name: holder
+  totalframes: 1
+  currentframe: 1
+=== holder.dynamic_props ===
+  props: (null)
+=== _global check ===
+  _global.childGlobal: not found
+  _global property count: 66
+=== var_array (string-id variable storage) ===
+  var_array_size: 25
+  [3] = ""
+  populated slots: 1
+=== display list ===
+  (no entries)
+=== dictionary ===
+  (no sprite entries)
+=== C HARNESS: done ===

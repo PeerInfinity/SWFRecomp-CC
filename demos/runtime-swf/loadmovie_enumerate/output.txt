@@ -1,0 +1,27 @@
+parent frame 1: loading target.swf
+child frame 1 executed
+parent frame 2: waiting for child
+=== holder properties (for..in) ===
+  myFunc = [type Function]
+  childObj = [object Object]
+  childBool = true
+  childNum = 42
+  myVar = hello from child
+=== _global.childGlobal ===
+child was here
+=== MovieClip.prototype.childMethod ===
+function
+=== holder timeline info ===
+_totalframes = 2
+_currentframe = 1
+=== typeof checks ===
+typeof holder.myVar = string
+typeof holder.myFunc = function
+typeof holder.childNum = number
+typeof holder.childBool = boolean
+typeof holder.childObj = object
+=== calling holder.myFunc() ===
+myFunc called
+=== calling holder.childMethod() ===
+childMethod called
+=== done ===
