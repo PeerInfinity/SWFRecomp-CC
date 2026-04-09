@@ -692,7 +692,7 @@ def generate_image_movie_file(child_swf_name, build_dir, image_width, image_heig
     return prefix
 
 
-def generate_child_movie_file(child_swf_name, child_recomp_dir, build_dir, swf_file_size=0, movie_id=1, string_id_offset=0):
+def generate_child_movie_file(child_swf_name, child_recomp_dir, build_dir, swf_file_size=0, movie_id=1, string_id_offset=0, is_prelude=False):
     """Generate a self-contained C file for a child SWF movie.
 
     Reads the recompiled C files from child_recomp_dir and generates a single
@@ -1017,6 +1017,7 @@ def generate_child_movie_file(child_swf_name, child_recomp_dir, build_dir, swf_f
     lines.append(f"    .stage_height = {frame_height},")
     lines.append(f"    .file_size = {swf_file_size},")
     lines.append(f"    .movie_id = {movie_id},")
+    lines.append(f"    .is_prelude = {1 if is_prelude else 0},")
     lines.append(f"    .transform_data_ptr = {td_ptr},")
     lines.append(f"}};")
     lines.append("")
@@ -1047,6 +1048,17 @@ def generate_movie_registry(prefixes, build_dir):
     lines.append("    for (int i = 0; g_movie_entries[i] != NULL; i++) {")
     lines.append("        if (strcmp(g_movie_entries[i]->filename, filename) == 0)")
     lines.append("            return g_movie_entries[i];")
+    lines.append("    }")
+    lines.append("    return NULL;")
+    lines.append("}")
+    lines.append("")
+    lines.append("MovieEntry* getPreludeEntry(int idx) {")
+    lines.append("    int count = 0;")
+    lines.append("    for (int i = 0; g_movie_entries[i] != NULL; i++) {")
+    lines.append("        if (g_movie_entries[i]->is_prelude) {")
+    lines.append("            if (count == idx) return g_movie_entries[i];")
+    lines.append("            count++;")
+    lines.append("        }")
     lines.append("    }")
     lines.append("    return NULL;")
     lines.append("}")
@@ -1254,10 +1266,13 @@ def compile_native(test_dir, num_frames, build_dir, headless=False, has_image_co
         child_recomp_dir = build_dir / f"_child_{_sanitize_prefix(child_swf.name)}"
         child_recomp_dir.mkdir(exist_ok=True)
         if recompile_child_swf(child_swf, child_recomp_dir):
+            # Detect prelude SWFs by filename convention (prelude_*.swf)
+            child_is_prelude = child_swf.name.startswith("prelude_")
             prefix = generate_child_movie_file(
                 child_swf.name, child_recomp_dir, build_dir,
                 swf_file_size=child_file_size, movie_id=child_movie_id,
-                string_id_offset=next_string_id_offset)
+                string_id_offset=next_string_id_offset,
+                is_prelude=child_is_prelude)
             if prefix:
                 child_prefixes.append(prefix)
                 # Read child's MAX_STRING_ID and advance offset for next child

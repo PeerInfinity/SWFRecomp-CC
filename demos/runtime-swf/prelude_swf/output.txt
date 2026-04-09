@@ -1,0 +1,11 @@
+prelude init complete
+=== checking prelude globals ===
+runtimeVersion = 1.0
+runtimeReady = true
+=== calling this.greet() ===
+hello from runtime
+typeof Greeter = function
+=== creating new Greeter('World') ===
+=== calling greeter.sayHi() ===
+Hi, I'm World
+=== done ===
