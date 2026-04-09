@@ -447,13 +447,23 @@ The old Enumerate opcode (SWF5 for-in) wasn't checking the scope chain for varia
 
 **Impact**: enumerate-v6/v7/v8 each +13 lines (25→12 failures). Also smaller improvements in other tests.
 
+### 3i: Delete dot-path resolution (actionDelete2 + actionDelete) — DONE (2026-04-09)
+
+**Two fixes**:
+1. `actionDelete2` with dot-path variable names (e.g., `Delete2("o.b")`) now resolves the path: splits on last dot, looks up container via `actionGetVariable`, then deletes the final property. Works for OBJECT, MOVIECLIP, FUNCTION, and ARRAY containers.
+2. `actionDelete` with dot-path property name and invalid/empty object reference (stack underflow from SWF bytecode that pushes only one value before Delete): falls back to dot-path resolution. SWF5/6 only — SWF7+ uses strict property names without path resolution.
+
+**Impact**: delete-v5: 43→47/60 (+4), delete-v6: 41→45/60 (+4), delete-v7: 46→49/60 (+3), delete-v8: 47→50/60 (+3). Total: +14 lines across 4 tests.
+
 ### Phase 3 remaining work:
 - **Number wrapper valueOf override**: `new Number(10)` wrapper doesn't dispatch custom valueOf (1 line per Number test)
 - **Number hex/octal string comparison**: `"0Xff000000" != 0xFF000000` equality check (3 lines per Number test)
 - **Number float precision**: last-digit rounding at e-308 (4 lines per Number test)
 - **toString_valueOf dispatch**: valueOf/toString not called during implicit coercion in some paths (20 diffs per v6/v7/v8)
 - **enumerate child MC type**: child MCs returned as 'number' instead of 'movieclip' (12 diffs per enumerate test)
+- **enumerate hasOwnProperty**: child MCs stored in dynamic_props → hasOwnProperty returns true (6 diffs per enumerate test)
 - **with auto-boxing**: `with(number)` should auto-box to Number.prototype scope (not addressed)
 - **String regex methods**: replace/match/search need regex support (~120 diffs per test)
-- **delete inside with blocks**: `delete b` inside `with(o)` doesn't delete from `o` (3 diffs per delete test)
 - **delete DONT_DELETE flag**: local var deletion should return false (2 diffs per delete test)
+- **delete local vars**: `delete e` on function locals doesn't check DONT_DELETE, and `_root.e` persistence after delete (9 diffs per delete test)
+- **new Object() in Dejagnu context**: `anObject != undefined` fails — `new Object()` returns undefined in Gnash test harness (1 diff per delete test)

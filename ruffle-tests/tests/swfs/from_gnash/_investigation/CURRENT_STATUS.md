@@ -13,11 +13,13 @@ Last updated: 2026-04-09 (Phase 3 work in progress, not yet in CI)
 | **misc-swfc.all** | 16 | 2 | 12.5% | — | — | — |
 | **Total** | 287 | ~109 | ~38.0% | — | — | — |
 
-Note: CI last run at 77/190 (commit 6b02c514). Local fixes since then: +3 (NetStream-v6/v7/v8).
+Note: CI last run at 80/190 (commit 302d77c6). Local fixes since then: +4 (NetStream-v6/v7/v8, Color-v6).
 
 Filtered results exclude 9 tests with all-accepted diffs (Math-v5/v6/v7/v8, ops-v8, Error-v5/v6/v7/v8) — see `ACCEPTED_DIFFS.md`. Remaining 3 misc-swfmill failures (dict_event, tags_after_last_showframe, jump_to_prev_block) are blocked on architectural limitations — see `blocked/MISC_SWFMILL_PLAN.md`.
 
 ### Latest fixes (2026-04-09, not yet in CI)
+- **Delete dot-path resolution** — `actionDelete2("o.b")` and `actionDelete` with dot-path property names now resolve the path: split on last dot, look up container, delete final property. The `actionDelete` fallback is SWF5/6 only (SWF7+ uses strict property names). **+14 lines across delete-v5/v6/v7/v8** (delete-v5: 43→47/60, delete-v6: 41→45/60, delete-v7: 46→49/60, delete-v8: 47→50/60).
+- **Color-v6 now PASS** — confirmed locally, was already 161/165 in CI; recent fixes pushed it over.
 - **NetStream connected-construction property installation** — `new NetStream(nc)` where nc is a connected NetConnection now installs `currentFps` as an own property on `NetStream.prototype`. In Flash, the NetStream constructor lazily registers native data properties when first constructed with a connected NC. Detected via `__proto__ == NetConnection.prototype` + `isConnected == true` check. **+3 tests: NetStream-v6, NetStream-v7, NetStream-v8 → PASS.**
 
 ### Latest fixes (2026-04-08, batch 2 — confirmed by CI at 77/190)

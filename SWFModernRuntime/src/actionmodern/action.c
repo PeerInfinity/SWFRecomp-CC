@@ -33123,6 +33123,55 @@ void actionDelete2(SWFAppContext* app_context, char* str_buffer)
 					}
 				}
 			}
+			// Dot-path resolution: "o.b" → look up "o", delete "b" from it
+			if (var_name != NULL && var_name_len > 0 && memchr(var_name, '.', var_name_len) != NULL)
+			{
+				// Find the last dot
+				const char* last_dot = var_name;
+				for (u32 dp = 0; dp < var_name_len; dp++) {
+					if (var_name[dp] == '.') last_dot = &var_name[dp];
+				}
+				u32 container_len = (u32)(last_dot - var_name);
+				const char* final_prop = last_dot + 1;
+				u32 final_prop_len = var_name_len - container_len - 1;
+
+				if (container_len > 0 && final_prop_len > 0) {
+					// Resolve the container via GetVariable (handles nested dots, scope chain, etc.)
+					PUSH_STR(var_name, container_len);
+					actionGetVariable(app_context);
+					ActionVar _d2_container;
+					peekVar(app_context, &_d2_container);
+					POP();
+
+					if (_d2_container.type == ACTION_STACK_VALUE_OBJECT && _d2_container.data.numeric_value != 0) {
+						success = deleteProperty(app_context, (ASObject*)_d2_container.data.numeric_value, final_prop, final_prop_len);
+						PUSH(ACTION_STACK_VALUE_BOOLEAN, success ? 1ULL : 0ULL);
+						return;
+					} else if (_d2_container.type == ACTION_STACK_VALUE_MOVIECLIP && _d2_container.data.numeric_value != 0) {
+						MovieClip* _d2_mc = (MovieClip*)_d2_container.data.numeric_value;
+						if (_d2_mc->dynamic_props != NULL) {
+							success = deleteProperty(app_context, (ASObject*)_d2_mc->dynamic_props, final_prop, final_prop_len);
+							PUSH(ACTION_STACK_VALUE_BOOLEAN, success ? 1ULL : 0ULL);
+							return;
+						}
+					} else if (_d2_container.type == ACTION_STACK_VALUE_FUNCTION && _d2_container.data.numeric_value != 0) {
+						ASFunction* _d2_func = (ASFunction*)_d2_container.data.numeric_value;
+						if (_d2_func->own_props != NULL) {
+							success = deleteProperty(app_context, _d2_func->own_props, final_prop, final_prop_len);
+							PUSH(ACTION_STACK_VALUE_BOOLEAN, success ? 1ULL : 0ULL);
+							return;
+						}
+					} else if (_d2_container.type == ACTION_STACK_VALUE_ARRAY && _d2_container.data.numeric_value != 0) {
+						ASArray* _d2_arr = (ASArray*)_d2_container.data.numeric_value;
+						if (_d2_arr->props != NULL) {
+							success = deleteProperty(app_context, _d2_arr->props, final_prop, final_prop_len);
+							PUSH(ACTION_STACK_VALUE_BOOLEAN, success ? 1ULL : 0ULL);
+							return;
+						}
+					}
+				}
+			}
+
 			// Check if name matches a child display object (non-deletable)
 			success = false;  // deleting non-existent variable returns false
 #ifdef NO_GRAPHICS
@@ -38257,6 +38306,50 @@ void actionDelete(SWFAppContext* app_context)
 
 	if (obj == NULL)
 	{
+		// Dot-path fallback: when the property name is a dot-path like "o.b" and the
+		// object slot was empty (likely stack underflow from SWF bytecode that pushes
+		// only one value before Delete), resolve via dot-path.
+		// Only do this when the obj slot was NOT a meaningful value (e.g., a real string).
+		// SWF5/6 only: Flash 7+ uses strict property names without path resolution.
+		if (g_swf_version < 7 && prop_name != NULL && prop_name_len > 0 && memchr(prop_name, '.', prop_name_len) != NULL)
+		{
+			bool obj_was_meaningful = (obj_var.type == ACTION_STACK_VALUE_STRING && obj_var.str_size > 0) ||
+			                          obj_var.type == ACTION_STACK_VALUE_OBJECT ||
+			                          obj_var.type == ACTION_STACK_VALUE_FUNCTION ||
+			                          obj_var.type == ACTION_STACK_VALUE_ARRAY ||
+			                          obj_var.type == ACTION_STACK_VALUE_MOVIECLIP;
+			if (!obj_was_meaningful) {
+				const char* _ad_last_dot = prop_name;
+				for (u32 dp = 0; dp < prop_name_len; dp++) {
+					if (prop_name[dp] == '.') _ad_last_dot = &prop_name[dp];
+				}
+				u32 _ad_clen = (u32)(_ad_last_dot - prop_name);
+				const char* _ad_fprop = _ad_last_dot + 1;
+				u32 _ad_fplen = prop_name_len - _ad_clen - 1;
+
+				if (_ad_clen > 0 && _ad_fplen > 0) {
+					PUSH_STR(prop_name, _ad_clen);
+					actionGetVariable(app_context);
+					ActionVar _ad_cvar;
+					peekVar(app_context, &_ad_cvar);
+					POP();
+
+					if (_ad_cvar.type == ACTION_STACK_VALUE_OBJECT && _ad_cvar.data.numeric_value != 0) {
+						bool s = deleteProperty(app_context, (ASObject*)_ad_cvar.data.numeric_value, _ad_fprop, _ad_fplen);
+						PUSH(ACTION_STACK_VALUE_BOOLEAN, s ? 1ULL : 0ULL);
+						return;
+					} else if (_ad_cvar.type == ACTION_STACK_VALUE_MOVIECLIP && _ad_cvar.data.numeric_value != 0) {
+						MovieClip* _ad_mc = (MovieClip*)_ad_cvar.data.numeric_value;
+						if (_ad_mc->dynamic_props != NULL) {
+							bool s = deleteProperty(app_context, (ASObject*)_ad_mc->dynamic_props, _ad_fprop, _ad_fplen);
+							PUSH(ACTION_STACK_VALUE_BOOLEAN, s ? 1ULL : 0ULL);
+							return;
+						}
+					}
+				}
+			}
+		}
+
 		// delete on explicitly undefined/null objects returns false,
 		// but missing string lookup returns true (Flash behavior)
 		u64 result = (obj_var.type == ACTION_STACK_VALUE_UNDEFINED ||
