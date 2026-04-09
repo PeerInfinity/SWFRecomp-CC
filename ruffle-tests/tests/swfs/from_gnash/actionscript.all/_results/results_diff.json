@@ -1,77 +1,157 @@
 {
   "metadata": {
-    "old_timestamp": "2026-04-09T03:55:20.739870+00:00",
-    "old_git_sha": "6b02c51497e604a21dc97cc3a0d7a8f774dcff4a",
-    "new_timestamp": "2026-04-09T16:23:06.394719+00:00",
-    "new_git_sha": "302d77c6072f6529b59fff07e13b4bf587255ee6",
+    "old_timestamp": "2026-04-09T16:23:06.394719+00:00",
+    "old_git_sha": "302d77c6072f6529b59fff07e13b4bf587255ee6",
+    "new_timestamp": "2026-04-09T20:56:32.883462+00:00",
+    "new_git_sha": "1a2464e69ad85192925a72e29e5e474dc8f4ccd3",
     "partial": false,
     "same_commit": false
   },
   "summary": {
-    "old_pass": 77,
+    "old_pass": 80,
     "old_total": 190,
-    "old_pass_rate": 40.5,
+    "old_pass_rate": 42.1,
     "new_pass": 80,
     "new_total": 190,
     "new_pass_rate": 42.1,
-    "old_mismatched_lines": 4267,
-    "new_mismatched_lines": 4255,
+    "old_mismatched_lines": 4255,
+    "new_mismatched_lines": 4224,
     "increased_mismatches": 0,
-    "decreased_mismatches": 12,
-    "newly_passing": 3,
+    "decreased_mismatches": 31,
+    "newly_passing": 0,
     "newly_failing": 0,
-    "status_changed": 3,
-    "unchanged": 187,
+    "status_changed": 0,
+    "unchanged": 182,
     "added": 0,
     "removed": 0
   },
   "changes": [
     {
-      "test": "NetStream-v6",
+      "test": "Number-v6",
       "change_type": "changed",
       "old_status": "output_mismatch",
-      "new_status": "pass",
+      "new_status": "output_mismatch",
       "old_lines": {
-        "actual_lines": 80,
-        "expected_lines": 80,
-        "matching_lines": 76
+        "actual_lines": 239,
+        "expected_lines": 239,
+        "matching_lines": 209
       },
       "new_lines": {
-        "actual_lines": 80,
-        "expected_lines": 80,
-        "matching_lines": 80
+        "actual_lines": 239,
+        "expected_lines": 239,
+        "matching_lines": 214
       }
     },
     {
-      "test": "NetStream-v7",
+      "test": "Number-v7",
       "change_type": "changed",
       "old_status": "output_mismatch",
-      "new_status": "pass",
+      "new_status": "output_mismatch",
       "old_lines": {
-        "actual_lines": 80,
-        "expected_lines": 80,
-        "matching_lines": 76
+        "actual_lines": 237,
+        "expected_lines": 237,
+        "matching_lines": 217
       },
       "new_lines": {
-        "actual_lines": 80,
-        "expected_lines": 80,
-        "matching_lines": 80
+        "actual_lines": 237,
+        "expected_lines": 237,
+        "matching_lines": 222
       }
     },
     {
-      "test": "NetStream-v8",
+      "test": "Number-v8",
       "change_type": "changed",
       "old_status": "output_mismatch",
-      "new_status": "pass",
+      "new_status": "output_mismatch",
       "old_lines": {
-        "actual_lines": 80,
-        "expected_lines": 80,
-        "matching_lines": 76
+        "actual_lines": 237,
+        "expected_lines": 237,
+        "matching_lines": 217
       },
       "new_lines": {
-        "actual_lines": 80,
-        "expected_lines": 80,
-        "matching_lines": 80
+        "actual_lines": 237,
+        "expected_lines": 237,
+        "matching_lines": 222
+      }
+    },
+    {
+      "test": "array-v5",
+      "change_type": "changed",
+      "old_status": "output_mismatch",
+      "new_status": "output_mismatch",
+      "old_lines": {
+        "actual_lines": 560,
+        "expected_lines": 560,
+        "matching_lines": 456
+      },
+      "new_lines": {
+        "actual_lines": 560,
+        "expected_lines": 560,
+        "matching_lines": 458
+      }
+    },
+    {
+      "test": "delete-v5",
+      "change_type": "changed",
+      "old_status": "output_mismatch",
+      "new_status": "output_mismatch",
+      "old_lines": {
+        "actual_lines": 60,
+        "expected_lines": 60,
+        "matching_lines": 43
+      },
+      "new_lines": {
+        "actual_lines": 60,
+        "expected_lines": 60,
+        "matching_lines": 47
+      }
+    },
+    {
+      "test": "delete-v6",
+      "change_type": "changed",
+      "old_status": "output_mismatch",
+      "new_status": "output_mismatch",
+      "old_lines": {
+        "actual_lines": 60,
+        "expected_lines": 60,
+        "matching_lines": 41
+      },
+      "new_lines": {
+        "actual_lines": 60,
+        "expected_lines": 60,
+        "matching_lines": 45
+      }
+    },
+    {
+      "test": "delete-v7",
+      "change_type": "changed",
+      "old_status": "output_mismatch",
+      "new_status": "output_mismatch",
+      "old_lines": {
+        "actual_lines": 60,
+        "expected_lines": 60,
+        "matching_lines": 46
+      },
+      "new_lines": {
+        "actual_lines": 60,
+        "expected_lines": 60,
+        "matching_lines": 49
+      }
+    },
+    {
+      "test": "delete-v8",
+      "change_type": "changed",
+      "old_status": "output_mismatch",
+      "new_status": "output_mismatch",
+      "old_lines": {
+        "actual_lines": 60,
+        "expected_lines": 60,
+        "matching_lines": 47
+      },
+      "new_lines": {
+        "actual_lines": 60,
+        "expected_lines": 60,
+        "matching_lines": 50
       }
     }
   ]
