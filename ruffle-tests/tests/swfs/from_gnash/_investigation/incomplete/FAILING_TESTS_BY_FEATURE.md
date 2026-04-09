@@ -455,9 +455,17 @@ The old Enumerate opcode (SWF5 for-in) wasn't checking the scope chain for varia
 
 **Impact**: delete-v5: 43→47/60 (+4), delete-v6: 41→45/60 (+4), delete-v7: 46→49/60 (+3), delete-v8: 47→50/60 (+3). Total: +14 lines across 4 tests.
 
+### 3j: Number hex/octal parsing fixes — DONE (2026-04-09)
+
+**Three fixes**:
+1. `parseStringToNumber` (equality coercion): explicit hex parsing with signed int32 semantics. `"0xFF000000"` → `(int32_t)-16777216`, not unsigned `4278190080`. Octal parsing for leading-zero all-octal-digit strings.
+2. `varToDoubleSWF` (Number constructor): support inner negative sign after 0x prefix. `"0x-2"` → -2, `"0x-ffffffff"` → 1 (via signed int32 negate). Outer sign (`"-0x2"`, `"+0x2"`) still returns NaN (Flash behavior).
+3. Both fixes prevent C99 `strtod` from silently parsing hex floats, which produced wrong results.
+
+**Impact**: Number-v6 +5, Number-v7 +5, Number-v8 +5 lines. Number-v5 unchanged (SWF5 doesn't have hex/octal string parsing).
+
 ### Phase 3 remaining work:
 - **Number wrapper valueOf override**: `new Number(10)` wrapper doesn't dispatch custom valueOf (1 line per Number test)
-- **Number hex/octal string comparison**: `"0Xff000000" != 0xFF000000` equality check (3 lines per Number test)
 - **Number float precision**: last-digit rounding at e-308 (4 lines per Number test)
 - **toString_valueOf dispatch**: valueOf/toString not called during implicit coercion in some paths (20 diffs per v6/v7/v8)
 - **enumerate child MC type**: child MCs returned as 'number' instead of 'movieclip' (12 diffs per enumerate test)
