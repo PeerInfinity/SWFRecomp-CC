@@ -46916,8 +46916,12 @@ static double varToDoubleSWF(SWFAppContext* app_context, ActionVar* v, int swf_v
 					sign = (*s == '-') ? -1 : 1; s++; slen--;
 				}
 				if (slen >= 2 && s[0] == '0' && (s[1] == 'x' || s[1] == 'X')) {
+					// Flash rejects "+0x..." and "-0x..." but allows "0x-N" (inner sign)
 					if (sign != 0) return NAN;
 					const char* hex = s + 2; int hlen = slen - 2;
+					// Handle sign inside hex: "0x-2" → -2
+					int inner_neg = 0;
+					if (hlen > 0 && *hex == '-') { inner_neg = 1; hex++; hlen--; }
 					if (hlen == 0) return NAN;
 					int32_t result = 0;
 					for (int i = 0; i < hlen; i++) {
@@ -46928,6 +46932,7 @@ static double varToDoubleSWF(SWFAppContext* app_context, ActionVar* v, int swf_v
 						else return NAN;
 						result = (int32_t)((uint32_t)result * 16 + (uint32_t)digit);
 					}
+					if (sign == -1 || inner_neg) result = -result;
 					return (double)result;
 				}
 				if (slen >= 1 && s[0] == '0') {
