@@ -23186,6 +23186,23 @@ void actionEnumerate(SWFAppContext* app_context, char* str_buffer)
 		}
 	}
 
+	// Check scope chain first (local function variables)
+	if (var == NULL && var_name_len > 0)
+	{
+		for (int _en_si = scope_depth - 1; _en_si >= 0; _en_si--)
+		{
+			if (scope_chain[_en_si] != NULL)
+			{
+				ActionVar* _en_sp = getProperty(scope_chain[_en_si], var_name, var_name_len);
+				if (_en_sp != NULL)
+				{
+					var = _en_sp;
+					break;
+				}
+			}
+		}
+	}
+
 	if (var == NULL)
 	{
 		if (string_id > 0)
