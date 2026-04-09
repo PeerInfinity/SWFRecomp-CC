@@ -21,20 +21,21 @@ button:disabled { background: #555; cursor: default; }
 <body>
 <h1>loadmovie_c_inspect</h1>
 <p class="info">Recompiled SWF running in WebAssembly (trace output below)</p>
-<button id="btn-run" disabled onclick="run()">Run SWF</button>
+<button id="btn-run" disabled onclick="startDemo()">Run SWF</button>
 <div id="output"></div>
 <script>
 var output = document.getElementById('output');
 window.Module = {
     locateFile: function(path) { return 'loadmovie_c_inspect/' + path.replace('test.', 'loadmovie_c_inspect.'); },
+    noInitialRun: true,
     print: function(text) { output.textContent += text + '\n'; },
     printErr: function(text) { output.textContent += '[stderr] ' + text + '\n'; },
     onRuntimeInitialized: function() {
         document.getElementById('btn-run').disabled = false;
-        output.textContent += 'WASM module loaded. Click Run SWF.\n';
+        output.textContent = 'WASM module loaded. Click Run SWF.\n';
     }
 };
-function run() {
+function startDemo() {
     document.getElementById('btn-run').disabled = true;
     output.textContent = '';
     try { Module.ccall('runSWF', null, [], []); }
