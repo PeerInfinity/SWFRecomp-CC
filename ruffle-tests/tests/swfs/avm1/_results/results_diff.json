@@ -1,45 +1,141 @@
 {
   "metadata": {
-    "old_timestamp": "2026-04-08T22:58:46.064292+00:00",
+    "old_timestamp": "2026-04-09T00:00:08.182333+00:00",
     "old_git_sha": "2a4adfc3fdc2fb6e004bd646ae41f31dc418e721",
-    "new_timestamp": "2026-04-09T00:00:08.182333+00:00",
-    "new_git_sha": "2a4adfc3fdc2fb6e004bd646ae41f31dc418e721",
+    "new_timestamp": "2026-04-09T01:53:01.641202+00:00",
+    "new_git_sha": "9d4d8742948be015515a1d02d370a856d7aa34fd",
     "partial": false,
-    "same_commit": true
+    "same_commit": false
   },
   "summary": {
     "old_pass": 578,
     "old_total": 620,
     "old_pass_rate": 93.2,
-    "new_pass": 578,
+    "new_pass": 575,
     "new_total": 620,
-    "new_pass_rate": 93.2,
-    "old_mismatched_lines": 9012,
-    "new_mismatched_lines": 9015,
-    "increased_mismatches": 3,
-    "decreased_mismatches": 0,
-    "newly_passing": 0,
-    "newly_failing": 0,
-    "status_changed": 0,
-    "unchanged": 619,
+    "new_pass_rate": 92.7,
+    "old_mismatched_lines": 9015,
+    "new_mismatched_lines": 8926,
+    "increased_mismatches": 20,
+    "decreased_mismatches": 109,
+    "newly_passing": 2,
+    "newly_failing": 5,
+    "status_changed": 7,
+    "unchanged": 613,
     "added": 0,
     "removed": 0
   },
   "changes": [
     {
-      "test": "global_instance_decls",
+      "test": "equals_swf4",
       "change_type": "changed",
       "old_status": "output_mismatch",
-      "new_status": "output_mismatch",
+      "new_status": "pass",
       "old_lines": {
-        "actual_lines": 856,
-        "expected_lines": 758,
-        "matching_lines": 16
+        "actual_lines": 665,
+        "expected_lines": 665,
+        "matching_lines": 598
       },
       "new_lines": {
-        "actual_lines": 857,
-        "expected_lines": 758,
-        "matching_lines": 13
+        "actual_lines": 665,
+        "expected_lines": 665,
+        "matching_lines": 665
+      }
+    },
+    {
+      "test": "is_finite",
+      "change_type": "changed",
+      "old_status": "pass",
+      "new_status": "output_mismatch",
+      "old_lines": {
+        "actual_lines": 49,
+        "expected_lines": 49,
+        "matching_lines": 49
+      },
+      "new_lines": {
+        "actual_lines": 49,
+        "expected_lines": 49,
+        "matching_lines": 48
+      }
+    },
+    {
+      "test": "is_finite_swf6",
+      "change_type": "changed",
+      "old_status": "pass",
+      "new_status": "output_mismatch",
+      "old_lines": {
+        "actual_lines": 49,
+        "expected_lines": 49,
+        "matching_lines": 49
+      },
+      "new_lines": {
+        "actual_lines": 49,
+        "expected_lines": 49,
+        "matching_lines": 48
+      }
+    },
+    {
+      "test": "lessthan_swf4",
+      "change_type": "changed",
+      "old_status": "output_mismatch",
+      "new_status": "pass",
+      "old_lines": {
+        "actual_lines": 902,
+        "expected_lines": 902,
+        "matching_lines": 860
+      },
+      "new_lines": {
+        "actual_lines": 902,
+        "expected_lines": 902,
+        "matching_lines": 902
+      }
+    },
+    {
+      "test": "swf5_global_funcs",
+      "change_type": "changed",
+      "old_status": "pass",
+      "new_status": "output_mismatch",
+      "old_lines": {
+        "actual_lines": 232,
+        "expected_lines": 232,
+        "matching_lines": 232
+      },
+      "new_lines": {
+        "actual_lines": 232,
+        "expected_lines": 232,
+        "matching_lines": 226
+      }
+    },
+    {
+      "test": "swf6_global_funcs",
+      "change_type": "changed",
+      "old_status": "pass",
+      "new_status": "output_mismatch",
+      "old_lines": {
+        "actual_lines": 232,
+        "expected_lines": 232,
+        "matching_lines": 232
+      },
+      "new_lines": {
+        "actual_lines": 232,
+        "expected_lines": 232,
+        "matching_lines": 226
+      }
+    },
+    {
+      "test": "swf7_global_funcs",
+      "change_type": "changed",
+      "old_status": "pass",
+      "new_status": "output_mismatch",
+      "old_lines": {
+        "actual_lines": 232,
+        "expected_lines": 232,
+        "matching_lines": 232
+      },
+      "new_lines": {
+        "actual_lines": 232,
+        "expected_lines": 232,
+        "matching_lines": 226
       }
     }
   ]
