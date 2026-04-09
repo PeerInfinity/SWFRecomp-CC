@@ -21671,6 +21671,51 @@ static inline double parseStringToNumber(const char* str)
 		return NAN;
 	if ((p[0] == 'N' || p[0] == 'n') && strncasecmp(p, "nan", 3) == 0)
 		return NAN;
+	// Flash equality coercion parses hex "0x" prefixes with signed 32-bit semantics:
+	// "0xFF0000" → 16711680, but "0xFF000000" → (int32_t)0xFF000000 = -16777216.
+	// Handle hex before strtod to avoid C99 hex float parsing differences.
+	if (p[0] == '0' && (p[1] == 'x' || p[1] == 'X'))
+	{
+		const char* hex_start = p + 2;
+		char* hex_end;
+		unsigned long long hex_val = strtoull(hex_start, &hex_end, 16);
+		if (hex_end == hex_start) return NAN;
+		while (*hex_end == ' ' || *hex_end == '\t' || *hex_end == '\n' || *hex_end == '\r') hex_end++;
+		if (*hex_end != '\0') return NAN;
+		// Signed 32-bit interpretation (Flash treats hex results as int32)
+		int32_t signed_val = (int32_t)(uint32_t) hex_val;
+		double result = (double) signed_val;
+		// Apply sign prefix if present
+		int neg = (str != (const char*)p) && (p[-1] == '-');
+		return neg ? -result : result;
+	}
+	// Flash equality coercion also parses octal (leading zero + all octal digits).
+	// "07700000000" → octal 1056964608, "077000000000" → octal 8455716864.
+	if (p[0] == '0' && p[1] >= '0' && p[1] <= '7')
+	{
+		int all_octal = 1;
+		for (const char* op = p + 1; *op; op++) {
+			if (*op < '0' || *op > '7') {
+				if (*op == ' ' || *op == '\t' || *op == '\n' || *op == '\r') {
+					// Allow trailing whitespace
+					const char* wp = op;
+					while (*wp == ' ' || *wp == '\t' || *wp == '\n' || *wp == '\r') wp++;
+					if (*wp != '\0') all_octal = 0;
+					break;
+				}
+				all_octal = 0; break;
+			}
+		}
+		if (all_octal) {
+			char* oct_end;
+			unsigned long long oct_val = strtoull(p, &oct_end, 8);
+			if (oct_end != p) {
+				double result = (double) oct_val;
+				int neg = (str != (const char*)p) && (p[-1] == '-');
+				return neg ? -result : result;
+			}
+		}
+	}
 	char* end;
 	double val = strtod(str, &end);
 	if (end == str) return NAN;
