@@ -1634,6 +1634,7 @@ def compile_wasm(test_dir, num_frames, build_dir):
         "-sALLOW_MEMORY_GROWTH=1",
         "-sINITIAL_MEMORY=16MB",
         "-sUSE_ZLIB=1",
+        "-sNO_EXIT_RUNTIME=1",
         "-o", str(build_dir / "test.js"),
     ]
     # Write args to a response file to avoid shell escaping issues
