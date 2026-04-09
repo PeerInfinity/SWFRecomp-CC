@@ -23286,6 +23286,44 @@ void actionEnumerate(SWFAppContext* app_context, char* str_buffer)
 		}
 	}
 
+	// Step 2c: Special variable resolution (mirrors actionGetVariable's special vars).
+	// "_root", "this", "_levelN" are not stored in the variable table but must still
+	// resolve to MovieClips for enumeration. Without this, for-in on _root produces nothing.
+	if (var == NULL || (var->type != ACTION_STACK_VALUE_OBJECT &&
+	                    var->type != ACTION_STACK_VALUE_MOVIECLIP &&
+	                    var->type != ACTION_STACK_VALUE_ARRAY &&
+	                    var->type != ACTION_STACK_VALUE_FUNCTION))
+	{
+		static ActionVar _en_special_var;
+		extern MovieClip root_movieclip;
+		// _root / _level0
+		if ((var_name_len == 5 && (g_swf_version <= 6 ? strncasecmp(var_name, "_root", 5) == 0 : strncmp(var_name, "_root", 5) == 0)) ||
+		    (var_name_len == 7 && strncmp(var_name, "_level0", 7) == 0))
+		{
+			MovieClip* ctx = g_current_context ? g_current_context : &root_movieclip;
+			MovieClip* root = ctx;
+			while (root->parent != NULL) {
+				if (root->lockroot) break;
+				root = root->parent;
+			}
+			_en_special_var.type = ACTION_STACK_VALUE_MOVIECLIP;
+			_en_special_var.data.numeric_value = (u64)root;
+			var = &_en_special_var;
+		}
+		// this
+		else if (var_name_len == 4 && strncmp(var_name, "this", 4) == 0)
+		{
+			if (g_this_depth > 0) {
+				var = &g_this_stack[g_this_depth - 1];
+			} else {
+				MovieClip* ctx = g_current_context ? g_current_context : &root_movieclip;
+				_en_special_var.type = ACTION_STACK_VALUE_MOVIECLIP;
+				_en_special_var.data.numeric_value = (u64)ctx;
+				var = &_en_special_var;
+			}
+		}
+	}
+
 	// Step 3: Check if variable exists and is an enumerable type
 	if (!var || (var->type != ACTION_STACK_VALUE_OBJECT &&
 	             var->type != ACTION_STACK_VALUE_MOVIECLIP &&
@@ -54709,8 +54747,12 @@ void actionCallMethod(SWFAppContext* app_context, char* str_buffer)
 					_hop_len = (u32) l;
 				}
 				// Check dynamic_props (user-set properties)
+				// Exclude MOVIECLIP-type properties — child MCs stored by createEmptyMovieClip
+				// are display-list children, not own properties. Flash's hasOwnProperty returns
+				// false for child MC names (they're resolved via the display list, not as props).
 				if (mc->dynamic_props != NULL) {
-					if (hasPropertyRaw((ASObject*)mc->dynamic_props, _hop_name, _hop_len))
+					ASProperty* _hop_prop = findPropertyRaw((ASObject*)mc->dynamic_props, _hop_name, _hop_len);
+					if (_hop_prop != NULL && _hop_prop->value.type != ACTION_STACK_VALUE_MOVIECLIP)
 						_hop_result = 1;
 				}
 			}
