@@ -1,0 +1,47 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>SWFRecomp Demo - loadmovie_c_inspect</title>
+<style>
+* { margin: 0; padding: 0; box-sizing: border-box; }
+body { font-family: monospace; background: #1a1a1a; color: #e0e0e0; padding: 20px; }
+h1 { color: #4CAF50; margin-bottom: 10px; font-size: 1.3em; }
+#output { background: #111; border: 1px solid #333; border-radius: 8px;
+           padding: 15px; white-space: pre-wrap; font-size: 14px;
+           max-height: 80vh; overflow-y: auto; margin-top: 10px; }
+button { background: #4CAF50; color: white; border: none; padding: 8px 20px;
+         border-radius: 4px; cursor: pointer; font-size: 14px; }
+button:hover { background: #45a049; }
+button:disabled { background: #555; cursor: default; }
+.info { color: #888; font-size: 0.9em; margin-bottom: 10px; }
+</style>
+</head>
+<body>
+<h1>loadmovie_c_inspect</h1>
+<p class="info">Recompiled SWF running in WebAssembly (trace output below)</p>
+<button id="btn-run" disabled onclick="run()">Run SWF</button>
+<div id="output"></div>
+<script>
+var output = document.getElementById('output');
+window.Module = {
+    locateFile: function(path) { return 'loadmovie_c_inspect/' + path.replace('test.', 'loadmovie_c_inspect.'); },
+    print: function(text) { output.textContent += text + '\n'; },
+    printErr: function(text) { output.textContent += '[stderr] ' + text + '\n'; },
+    onRuntimeInitialized: function() {
+        document.getElementById('btn-run').disabled = false;
+        output.textContent += 'WASM module loaded. Click Run SWF.\n';
+    }
+};
+function run() {
+    document.getElementById('btn-run').disabled = true;
+    output.textContent = '';
+    try { Module.ccall('runSWF', null, [], []); }
+    catch(e) { output.textContent += '\nError: ' + e.message + '\n'; }
+    output.textContent += '\n=== done ===\n';
+}
+</script>
+<script src="loadmovie_c_inspect/loadmovie_c_inspect.js"></script>
+</body>
+</html>

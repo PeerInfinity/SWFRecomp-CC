@@ -1445,6 +1445,282 @@ def compile_native(test_dir, num_frames, build_dir, headless=False, has_image_co
         return False, "compilation timed out"
 
 
+EMSDK_ENV = PROJECT_ROOT / "emsdk" / "emsdk_env.sh"
+
+
+def compile_wasm(test_dir, num_frames, build_dir):
+    """Compile generated C code with Emscripten into WASM.
+
+    Reuses compile_native's setup (runtime copy, child SWFs, etc.) then
+    compiles with emcc instead of gcc.  Output: build_dir/test.js + test.wasm.
+    """
+    # First do the full native setup (copy sources, handle children, etc.)
+    # We call compile_native's setup logic by re-running the same steps.
+    # To avoid duplicating all the setup code, we actually call compile_native
+    # but intercept at the compilation step.  Instead, let's just do the setup
+    # inline since compile_native mixes setup and compilation.
+
+    mem_dir = build_dir / "memory"
+    mem_dir.mkdir(exist_ok=True)
+
+    # Copy runtime sources (same as compile_native, NO_GRAPHICS mode)
+    core_sources = [
+        "src/actionmodern/action.c",
+        "src/actionmodern/variables.c",
+        "src/actionmodern/object.c",
+        "src/actionmodern/unicode_case_tables.h",
+        "src/utils.c",
+        "src/libswf/tag.c",
+        "src/libswf/tag_stubs.c",
+        "src/libswf/hit_test.c",
+        "src/memory/heap.c",
+        "src/libswf/swf_core.c",
+    ]
+    for src in core_sources:
+        shutil.copy2(SWFMODERN / src, build_dir)
+    shutil.copy2(SWFMODERN / "lib/c-hashmap/map.c", build_dir)
+    shutil.copy2(SWFMODERN / "lib/o1heap/o1heap.c", build_dir)
+    shutil.copy2(SWFMODERN / "lib/o1heap/o1heap.h", build_dir)
+    shutil.copy2(SWFMODERN / "include/memory/heap.h", mem_dir)
+    libtess2_dir = SWFMODERN / "third_party" / "libtess2"
+    if libtess2_dir.exists():
+        for f in libtess2_dir.iterdir():
+            if f.suffix in (".c", ".h"):
+                shutil.copy2(f, build_dir)
+    shutil.copy2(MAIN_C, build_dir)
+
+    # Copy generated files for main SWF
+    for folder in ["RecompiledScripts", "RecompiledTags"]:
+        src_dir = test_dir / folder
+        if src_dir.exists():
+            for f in src_dir.iterdir():
+                if f.suffix in (".c", ".h"):
+                    shutil.copy2(f, build_dir)
+
+    # Handle child SWFs (same logic as compile_native)
+    child_swfs = find_child_swfs(test_dir)
+    child_prefixes = []
+    has_children = len(child_swfs) > 0
+    parent_max_string_id = 0
+    parent_script_defs = build_dir / "script_defs.c"
+    if parent_script_defs.exists():
+        for m in re.finditer(r'#define\s+MAX_STRING_ID\s+(\d+)', parent_script_defs.read_text(errors="replace")):
+            parent_max_string_id = max(parent_max_string_id, int(m.group(1)))
+    next_string_id_offset = parent_max_string_id + 1
+    for child_idx, child_swf in enumerate(child_swfs):
+        child_movie_id = child_idx + 1
+        child_file_size = child_swf.stat().st_size if child_swf.exists() else 0
+        image_dims = _detect_image_child(child_swf)
+        if image_dims is not None:
+            prefix = generate_image_movie_file(
+                child_swf.name, build_dir,
+                image_width=image_dims[0], image_height=image_dims[1],
+                file_size=child_file_size, movie_id=child_movie_id)
+            if prefix:
+                child_prefixes.append(prefix)
+            continue
+        child_recomp_dir = build_dir / f"_child_{_sanitize_prefix(child_swf.name)}"
+        child_recomp_dir.mkdir(exist_ok=True)
+        if recompile_child_swf(child_swf, child_recomp_dir):
+            child_is_prelude = child_swf.name.startswith("prelude_")
+            prefix = generate_child_movie_file(
+                child_swf.name, child_recomp_dir, build_dir,
+                swf_file_size=child_file_size, movie_id=child_movie_id,
+                string_id_offset=next_string_id_offset,
+                is_prelude=child_is_prelude)
+            if prefix:
+                child_prefixes.append(prefix)
+                child_defs = child_recomp_dir / "RecompiledScripts" / "script_defs.c"
+                if child_defs.exists():
+                    child_max = 0
+                    for m in re.finditer(r'#define\s+MAX_STRING_ID\s+(\d+)', child_defs.read_text(errors="replace")):
+                        child_max = max(child_max, int(m.group(1)))
+                    next_string_id_offset += child_max + 1
+    self_load = get_self_load(test_dir)
+    if self_load:
+        has_children = True
+        constants_h = build_dir / "constants.h"
+        sl_version, sl_width, sl_height, sl_frame_count = 8, 550, 400, 1
+        if constants_h.exists():
+            ctext = constants_h.read_text(errors="replace")
+            m = re.search(r"#define\s+SWF_VERSION\s+(\d+)", ctext)
+            if m: sl_version = int(m.group(1))
+            m = re.search(r"#define\s+FRAME_WIDTH\s+(\d+)", ctext)
+            if m: sl_width = int(m.group(1))
+            m = re.search(r"#define\s+FRAME_HEIGHT\s+(\d+)", ctext)
+            if m: sl_height = int(m.group(1))
+            m = re.search(r"#define\s+SWF_FRAME_COUNT\s+(\d+)", ctext)
+            if m: sl_frame_count = int(m.group(1))
+        test_swf_path = test_dir / "test.swf"
+        sl_file_size = test_swf_path.stat().st_size if test_swf_path.exists() else 0
+        lines = []
+        lines.append("// Auto-generated self-load MovieEntry for test.swf")
+        lines.append("#include <libswf/swf.h>")
+        lines.append("")
+        lines.append("extern void tagInit(SWFAppContext* app_context);")
+        lines.append("extern frame_func frame_funcs[];")
+        lines.append("")
+        lines.append("MovieEntry self_movie_entry = {")
+        lines.append('    .filename = "test.swf",')
+        lines.append("    .frame_funcs = frame_funcs,")
+        lines.append("    .init_func = tagInit,")
+        lines.append(f"    .swf_version = {sl_version},")
+        lines.append(f"    .frame_count = {sl_frame_count},")
+        lines.append(f"    .stage_width = {sl_width},")
+        lines.append(f"    .stage_height = {sl_height},")
+        lines.append(f"    .file_size = {sl_file_size},")
+        lines.append("    .movie_id = 0,")
+        lines.append("};")
+        (build_dir / "movie_self.c").write_text("\n".join(lines))
+        child_prefixes.append("self")
+    if has_children:
+        generate_movie_registry(child_prefixes, build_dir)
+    data_files = find_data_files(test_dir)
+    has_data_files = len(data_files) > 0
+    if has_data_files:
+        generate_data_registry(data_files, build_dir)
+    test_harness = test_dir / "test_harness.c"
+    has_test_harness = test_harness.exists()
+    if has_test_harness:
+        shutil.copy2(test_harness, build_dir)
+
+    # Build defines
+    inc = SWFMODERN / "include"
+    extra_defines = ["-DNO_GRAPHICS", f"-DMAX_FRAMES={num_frames}"]
+    mock_time = get_mock_date_time(test_dir)
+    if mock_time is None:
+        mock_time = 981152406000
+    extra_defines.append(f"-DMOCK_DATE_TIME={mock_time}LL")
+    if has_children:
+        extra_defines.append("-DHAS_CHILD_MOVIES")
+    if has_data_files:
+        extra_defines.append("-DHAS_DATA_FILES")
+    if has_test_harness:
+        extra_defines.append("-DHAS_TEST_HARNESS")
+    max_exec_ms = get_max_execution_duration(test_dir)
+    if max_exec_ms > 0:
+        extra_defines.append(f"-DMAX_EXECUTION_MS={max_exec_ms}")
+    test_swf = test_dir / "test.swf"
+    if test_swf.exists():
+        import struct as struct_mod
+        with open(test_swf, "rb") as swf_f:
+            swf_header = swf_f.read(8)
+        if len(swf_header) >= 8:
+            swf_file_size = struct_mod.unpack("<I", swf_header[4:8])[0]
+        else:
+            swf_file_size = test_swf.stat().st_size
+        extra_defines.append(f"-DSWF_FILE_SIZE={swf_file_size}")
+    # Write SWF_URL to a header file instead of -D (avoids shell/response-file quoting issues)
+    (build_dir / "swf_url.h").write_text('#define SWF_URL "file:///test.swf"\n')
+    extra_defines.append("-include")
+    extra_defines.append(str(build_dir / "swf_url.h"))
+
+    # Source emsdk and compile with emcc
+    if not EMSDK_ENV.exists():
+        return False, f"emsdk not found at {EMSDK_ENV}"
+
+    c_files = sorted(str(f) for f in build_dir.glob("*.c"))
+
+    # Build emcc command as a list to avoid shell quoting issues with -D defines.
+    # We source emsdk_env.sh first, then exec emcc.
+    emcc_args = c_files + extra_defines + [
+        f"-I{build_dir}",
+        f"-I{inc}", f"-I{inc}/actionmodern", f"-I{inc}/libswf", f"-I{inc}/memory",
+        f"-I{SWFMODERN}/lib/c-hashmap",
+        "-w", "-O2", "-include", "zlib.h",
+        "-sWASM=1",
+        "-sEXPORTED_FUNCTIONS=['_main','_runSWF']",
+        "-sEXPORTED_RUNTIME_METHODS=['ccall','cwrap']",
+        "-sALLOW_MEMORY_GROWTH=1",
+        "-sINITIAL_MEMORY=16MB",
+        "-sUSE_ZLIB=1",
+        "-o", str(build_dir / "test.js"),
+    ]
+    # Write args to a response file to avoid shell escaping issues
+    resp_file = build_dir / "emcc_args.txt"
+    resp_file.write_text("\n".join(emcc_args))
+    cmd = f"source {EMSDK_ENV} 2>/dev/null && emcc @{resp_file}"
+
+    try:
+        proc = subprocess.Popen(
+            ["bash", "-c", cmd],
+            stdout=subprocess.PIPE,
+            stderr=subprocess.PIPE,
+        )
+        stdout, stderr = proc.communicate(timeout=300)
+        return proc.returncode == 0, stderr.decode("utf-8", errors="replace")
+    except subprocess.TimeoutExpired:
+        proc.kill()
+        proc.wait()
+        return False, "emcc compilation timed out"
+
+
+def deploy_wasm(test_name, build_dir, deploy_dir):
+    """Deploy WASM build to a directory with an HTML wrapper.
+
+    Creates deploy_dir/test_name/ with .js, .wasm, and index.html.
+    """
+    out_dir = deploy_dir / test_name
+    out_dir.mkdir(parents=True, exist_ok=True)
+
+    # Copy WASM artifacts
+    for ext in (".js", ".wasm"):
+        src = build_dir / f"test{ext}"
+        if src.exists():
+            shutil.copy2(src, out_dir / f"{test_name}{ext}")
+
+    # Generate standalone HTML page
+    html = f"""<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>SWFRecomp Demo - {test_name}</title>
+<style>
+* {{ margin: 0; padding: 0; box-sizing: border-box; }}
+body {{ font-family: monospace; background: #1a1a1a; color: #e0e0e0; padding: 20px; }}
+h1 {{ color: #4CAF50; margin-bottom: 10px; font-size: 1.3em; }}
+#output {{ background: #111; border: 1px solid #333; border-radius: 8px;
+           padding: 15px; white-space: pre-wrap; font-size: 14px;
+           max-height: 80vh; overflow-y: auto; margin-top: 10px; }}
+button {{ background: #4CAF50; color: white; border: none; padding: 8px 20px;
+         border-radius: 4px; cursor: pointer; font-size: 14px; }}
+button:hover {{ background: #45a049; }}
+button:disabled {{ background: #555; cursor: default; }}
+.info {{ color: #888; font-size: 0.9em; margin-bottom: 10px; }}
+</style>
+</head>
+<body>
+<h1>{test_name}</h1>
+<p class="info">Recompiled SWF running in WebAssembly (trace output below)</p>
+<button id="btn-run" disabled onclick="run()">Run SWF</button>
+<div id="output"></div>
+<script>
+var output = document.getElementById('output');
+window.Module = {{
+    locateFile: function(path) {{ return '{test_name}/' + path.replace('test.', '{test_name}.'); }},
+    print: function(text) {{ output.textContent += text + '\\n'; }},
+    printErr: function(text) {{ output.textContent += '[stderr] ' + text + '\\n'; }},
+    onRuntimeInitialized: function() {{
+        document.getElementById('btn-run').disabled = false;
+        output.textContent += 'WASM module loaded. Click Run SWF.\\n';
+    }}
+}};
+function run() {{
+    document.getElementById('btn-run').disabled = true;
+    output.textContent = '';
+    try {{ Module.ccall('runSWF', null, [], []); }}
+    catch(e) {{ output.textContent += '\\nError: ' + e.message + '\\n'; }}
+    output.textContent += '\\n=== done ===\\n';
+}}
+</script>
+<script src="{test_name}/{test_name}.js"></script>
+</body>
+</html>"""
+    (deploy_dir / f"{test_name}.html").write_text(html)
+    return True
+
+
 def run_binary(build_dir, event_file=None, extra_env=None):
     """Run the compiled binary and capture output.
 
@@ -1757,6 +2033,12 @@ examples:
         help="Use output.SUFFIX.txt instead of output.txt for expected output "
              "(e.g. --expected-suffix=flash uses output.flash.txt). "
              "Only tests that have the alternate file are included.")
+    parser.add_argument(
+        "--wasm", action="store_true",
+        help="Build WASM instead of native (requires emsdk). Implies --deploy if --deploy-dir given.")
+    parser.add_argument(
+        "--deploy-dir", metavar="DIR",
+        help="Deploy WASM builds to DIR (e.g. docs/injector). Used with --wasm.")
     return parser.parse_args()
 
 
@@ -1979,10 +2261,13 @@ def main():
             # Parse image comparisons early so we can enable rendering at compile time
             image_comparisons = parse_image_comparisons(test_dir) if args.headless else {}
             has_image_cmps = bool(image_comparisons) and HAS_PIL
-            ok, err = compile_native(test_dir, num_frames, build_dir,
-                                     headless=args.headless,
-                                     has_image_comparisons=has_image_cmps,
-                                     asan=args.asan)
+            if args.wasm:
+                ok, err = compile_wasm(test_dir, num_frames, build_dir)
+            else:
+                ok, err = compile_native(test_dir, num_frames, build_dir,
+                                         headless=args.headless,
+                                         has_image_comparisons=has_image_cmps,
+                                         asan=args.asan)
             if not ok:
                 stats["compile_fail"] += 1
                 fail_list.append(name)
@@ -2004,7 +2289,23 @@ def main():
                 save_incremental()
                 continue
 
-            # Step 3: Run binary
+            # Step 3: Run binary (skip for WASM builds — deploy only)
+            if args.wasm:
+                entry.update(status="wasm_built",
+                             duration=round(time.monotonic() - test_start, 2))
+                if args.deploy_dir:
+                    deploy_dir = Path(args.deploy_dir)
+                    deploy_wasm(name, build_dir, deploy_dir)
+                    if args.verbose:
+                        print(f"WASM_BUILT → deployed to {deploy_dir}/{name}/")
+                else:
+                    if args.verbose:
+                        print(f"WASM_BUILT ({build_dir})")
+                stats["pass"] += 1
+                test_results.append(entry)
+                save_incremental()
+                continue
+
             # Set up capture triggers for image comparison tests
             run_env = {}
             if has_image_cmps and args.headless:
