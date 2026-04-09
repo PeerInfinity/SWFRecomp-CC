@@ -8,7 +8,7 @@ Last updated: 2026-04-03 (CI run on bbe171d2)
 
 | Suite | Tests | Passing | Rate | Filtered Rate | Notes |
 |-------|-------|---------|------|---------------|-------|
-| [avm1](../avm1/_investigation/CURRENT_STATUS.md) | 620 | 572 | 92.3% | **99.6%** (564/566) | Near-ceiling. Only 2 filtered failures remain. |
+| [avm1](../avm1/_investigation/CURRENT_STATUS.md) | 620 | 580 | 93.5% | **99.8%** (579/580) | 1 filtered failure (`function_as_function`). |
 | [from_gnash/actionscript.all](../from_gnash/_investigation/CURRENT_STATUS.md) | 190 | 76 | 40.0% | **42.0%** (76/181) | 9 accepted-diff tests ignored. |
 | [from_gnash/misc-mtasc.all](../from_gnash/_investigation/CURRENT_STATUS.md) | 9 | 7 | **77.8%** | — | 2 remaining (TextFieldTest, levels). |
 | [from_gnash/misc-swfmill.all](../from_gnash/_investigation/CURRENT_STATUS.md) | 14 | 11 | **78.6%** | — | 3 blocked on architecture. |

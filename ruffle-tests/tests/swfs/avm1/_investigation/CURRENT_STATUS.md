@@ -1,13 +1,14 @@
 # Current Ruffle Test Status
 
-Last updated: 2026-04-07
+Last updated: 2026-04-08
 
 ## Quick Summary
 
-- **Pass rate (CI, last run)**: 575/620 (92.7%) raw, 563/569 (98.9%) filtered (6 filtered failures)
+- **Pass rate (CI, latest)**: 580/620 (93.5%) raw, **579/580 (99.8%) filtered** (1 filtered failure)
 - **Image test baseline**: **14/31 strict image match** (+2: bitmap_data_colortransform, bitmap_data_copypixels). **10/31 tolerance pass** (within test.toml limits).
-- **Main failure types**: output_mismatch (45), runtime_segfault (0), timeout (1)
-- **Known regressions**: `native_objects_swf6` regressed to segfault (was output_mismatch). `global_instance_decls` 40→14 (unclear root cause, test at 2% pass rate).
+- **Main failure types**: output_mismatch (40), runtime_segfault (0), timeout (0)
+- **Only filtered failure**: `function_as_function` (2 diffs — Function() return value format)
+- **Latest CI improvements (2026-04-08)**: +5 new passes (is_finite, is_finite_swf6, swf5/6/7_global_funcs). native_objects_swf7/swf8 now PASS. string_relational_compare correctly fails (1 diff, Flash-correct behavior restored). timeout now passes (0 expected lines).
 - **Latest fixes (2026-04-07, session 5)**:
   - **CONSTRUCT/constructor ordering investigation** — Investigated whether FLVPlayback component video rendering could work with correct CONSTRUCT-before-constructor ordering. Confirmed Flash/Ruffle ordering (CONSTRUCT first) via Ruffle source (`core/src/player.rs:2174-2188`). FLVPlayback's contentPath setter stores value when `_vp` doesn't exist but never triggers `play()` post-constructor. Component does NOT use V2 lifecycle (`callLater`/`invalidate`). Created `CONSTRUCT_PARAMETER_REPLAY_PLAN.md` in `incomplete/` for future fix.
 - **Latest fixes (2026-04-07, session 4)**:
@@ -119,14 +120,15 @@ Last updated: 2026-04-07
 
 ## Crashes and Errors
 
-| Test | Status | Notes |
-|------|--------|-------|
-| timeout | timeout | Infinite loop — needs script execution timeout mechanism |
-| native_objects_swf6 | 114/115 | 1 accepted diff (SWF6 TextField) — was segfault, recovered |
+No crashes or segfaults remain. All previous crashes have been fixed.
 
-netstream_play_flv_screen crash fixed (was segfault, now PASS with 0/0 trace lines).
+## Remaining Filtered Failure
 
-Most previous crashes/segfaults/runtime_errors have been fixed (funky_function_calls, goto_methods, native_objects_swf7/8, movieclip_invalid_get_bounds_6/7, bitmap_filters).
+| Test | Diffs | Issue |
+|------|-------|-------|
+| `function_as_function` | 2/35 | `Function()` called as function returns `[object Object]` vs expected `[type Object]`; `Function().__proto__` returns `[object Object]` vs expected `undefined` |
+
+This test was already covered by the completed FUNCTION_EDGE_CASES_PLAN. The 2 remaining diffs are about `Function()` invoked without `new` — the return value format and `__proto__` behavior.
 
 ## Near-Passing Tests
 
@@ -206,20 +208,17 @@ All previously near-passing tests have been fixed. 146 tests were tracked throug
 | DRAWING_API_RENDERING | 3 tests improved | Focal radial precision, edge anti-aliasing (see RENDERING_PIPELINE_COMPARISON.md) |
 | RUNTIME_SETMASK | **COMPLETE** | Moved to complete/ (masking infra done; image diff is Drawing API edge AA) |
 
-## Recommended Work Order (updated 2026-03-15)
+## Recommended Work Order (updated 2026-04-08)
 
-### Actionable — Quick wins (all exhausted)
-All previous quick wins have been fixed. See `SESSION_NOTES.md` for details.
+### Remaining filtered failure (1 test)
+- **`function_as_function`** (2 diffs) — `Function()` without `new`: return value format + `__proto__` behavior. Covered by completed FUNCTION_EDGE_CASES_PLAN.
 
-### Remaining failing tests (filtered: 5 tests, after movieclip_hittest_shapeflag accepted)
-Remaining failures require:
-- **Global enumeration order**: global_proto_decls, global_instance_decls, global_proto_decls_delete (GLOBALS_PLAN Phase 8 blocked)
-- **Missing features**: localconnection, sandbox_type_remote
+### Remaining non-filtered failures (40 tests, all in ignored_tests.txt)
+These are permanently ignored (accepted diffs, Ruffle-vs-Flash differences, infrastructure blockers). No actionable work remains.
 
 ### Remaining blocked work (from blocked/ plans)
 - **GLOBALS_PLAN Phase 8** — BLOCKED by enumeration order + missing globals.
 - **MC_REMOVAL_LIFECYCLE_PLAN** — call() early termination, SetTarget on removed base_clip.
-- **TYPE_COERCION_ADVANCED_PLAN** — **COMPLETE** (2/2 PASS). Moved to complete/. Blocker resolved: closure capture + tri-state auto-boxing.
 
 ### Dependency Blockers (plans blocking other plans)
 - **LOADMOVIE_PLAN**: 32/35 core tests PASS. loadmovie_registerclass PASS. mcl_replace_root accepted diffs.
