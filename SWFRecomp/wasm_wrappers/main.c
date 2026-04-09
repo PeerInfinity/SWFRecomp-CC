@@ -78,17 +78,18 @@ int main(int argc, char* argv[]) {
     app_context.morph_end_color_data_size = sizeof(morph_end_color_data);
 #endif
 
+#ifdef HAS_TEST_HARNESS
+    {
+        extern void test_harness_init(SWFAppContext*);
+        test_harness_init(&app_context);
+    }
+#endif
+
 #ifndef __EMSCRIPTEN__
     printf("SWF Runtime Loaded (Native Build)\n\n");
 #ifdef NO_GRAPHICS
     if (argc > 1) {
         input_events_load(argv[1]);
-    }
-#endif
-#ifdef HAS_TEST_HARNESS
-    {
-        extern void test_harness_init(SWFAppContext*);
-        test_harness_init(&app_context);
     }
 #endif
     swfStart(&app_context);
