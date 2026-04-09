@@ -32265,9 +32265,11 @@ void actionDefineLocal(SWFAppContext* app_context)
 		else
 		{
 			// Function scope: always define here
+			// Use DontDelete (no CONFIGURABLE) — local vars declared with 'var' are not deletable
 			ActionVar value_var;
 			peekVar(app_context, &value_var);
-			setProperty(app_context, scope_chain[i], var_name, var_name_len, &value_var);
+			setPropertyWithFlags(app_context, scope_chain[i], var_name, var_name_len, &value_var,
+				PROPERTY_FLAG_ENUMERABLE | PROPERTY_FLAG_WRITABLE);
 			POP_2();
 			return;
 		}
