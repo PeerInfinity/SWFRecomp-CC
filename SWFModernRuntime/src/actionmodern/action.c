@@ -46777,17 +46777,13 @@ static double varToDoubleSWF(SWFAppContext* app_context, ActionVar* v, int swf_v
 					}
 				}
 			}
-			// Trim leading and trailing whitespace for decimal parsing
+			// Trim only LEADING whitespace for decimal parsing
+			// (Flash/Ruffle reject trailing whitespace in SWF5+ strict mode)
 			const char* start = tmp;
 			const char* end_ptr = tmp + len;
 			while (start < end_ptr) {
 				char c = *start;
 				if (c == ' ' || c == '\t' || c == '\n' || c == '\r' || c == '\f') { start++; continue; }
-				break;
-			}
-			while (end_ptr > start) {
-				char c = *(end_ptr - 1);
-				if (c == ' ' || c == '\t' || c == '\n' || c == '\r' || c == '\f') { end_ptr--; continue; }
 				break;
 			}
 			int trimmed_len = (int)(end_ptr - start);
