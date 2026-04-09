@@ -1,141 +1,109 @@
 {
   "metadata": {
-    "old_timestamp": "2026-04-09T00:00:08.182333+00:00",
-    "old_git_sha": "2a4adfc3fdc2fb6e004bd646ae41f31dc418e721",
-    "new_timestamp": "2026-04-09T01:53:01.641202+00:00",
-    "new_git_sha": "9d4d8742948be015515a1d02d370a856d7aa34fd",
+    "old_timestamp": "2026-04-09T01:53:01.641202+00:00",
+    "old_git_sha": "9d4d8742948be015515a1d02d370a856d7aa34fd",
+    "new_timestamp": "2026-04-09T02:54:54.091075+00:00",
+    "new_git_sha": "390b36b1143a2b78a21a4e71fd3148f688966131",
     "partial": false,
     "same_commit": false
   },
   "summary": {
-    "old_pass": 578,
+    "old_pass": 575,
     "old_total": 620,
-    "old_pass_rate": 93.2,
-    "new_pass": 575,
+    "old_pass_rate": 92.7,
+    "new_pass": 580,
     "new_total": 620,
-    "new_pass_rate": 92.7,
-    "old_mismatched_lines": 9015,
-    "new_mismatched_lines": 8926,
-    "increased_mismatches": 20,
-    "decreased_mismatches": 109,
-    "newly_passing": 2,
-    "newly_failing": 5,
-    "status_changed": 7,
-    "unchanged": 613,
+    "new_pass_rate": 93.5,
+    "old_mismatched_lines": 8926,
+    "new_mismatched_lines": 8906,
+    "increased_mismatches": 0,
+    "decreased_mismatches": 20,
+    "newly_passing": 5,
+    "newly_failing": 0,
+    "status_changed": 5,
+    "unchanged": 615,
     "added": 0,
     "removed": 0
   },
   "changes": [
     {
-      "test": "equals_swf4",
+      "test": "is_finite",
       "change_type": "changed",
       "old_status": "output_mismatch",
       "new_status": "pass",
       "old_lines": {
-        "actual_lines": 665,
-        "expected_lines": 665,
-        "matching_lines": 598
-      },
-      "new_lines": {
-        "actual_lines": 665,
-        "expected_lines": 665,
-        "matching_lines": 665
-      }
-    },
-    {
-      "test": "is_finite",
-      "change_type": "changed",
-      "old_status": "pass",
-      "new_status": "output_mismatch",
-      "old_lines": {
-        "actual_lines": 49,
-        "expected_lines": 49,
-        "matching_lines": 49
-      },
-      "new_lines": {
         "actual_lines": 49,
         "expected_lines": 49,
         "matching_lines": 48
+      },
+      "new_lines": {
+        "actual_lines": 49,
+        "expected_lines": 49,
+        "matching_lines": 49
       }
     },
     {
       "test": "is_finite_swf6",
       "change_type": "changed",
-      "old_status": "pass",
-      "new_status": "output_mismatch",
-      "old_lines": {
-        "actual_lines": 49,
-        "expected_lines": 49,
-        "matching_lines": 49
-      },
-      "new_lines": {
-        "actual_lines": 49,
-        "expected_lines": 49,
-        "matching_lines": 48
-      }
-    },
-    {
-      "test": "lessthan_swf4",
-      "change_type": "changed",
       "old_status": "output_mismatch",
       "new_status": "pass",
       "old_lines": {
-        "actual_lines": 902,
-        "expected_lines": 902,
-        "matching_lines": 860
+        "actual_lines": 49,
+        "expected_lines": 49,
+        "matching_lines": 48
       },
       "new_lines": {
-        "actual_lines": 902,
-        "expected_lines": 902,
-        "matching_lines": 902
+        "actual_lines": 49,
+        "expected_lines": 49,
+        "matching_lines": 49
       }
     },
     {
       "test": "swf5_global_funcs",
       "change_type": "changed",
-      "old_status": "pass",
-      "new_status": "output_mismatch",
+      "old_status": "output_mismatch",
+      "new_status": "pass",
       "old_lines": {
         "actual_lines": 232,
         "expected_lines": 232,
-        "matching_lines": 232
+        "matching_lines": 226
       },
       "new_lines": {
         "actual_lines": 232,
         "expected_lines": 232,
-        "matching_lines": 226
+        "matching_lines": 232
       }
     },
     {
       "test": "swf6_global_funcs",
       "change_type": "changed",
-      "old_status": "pass",
-      "new_status": "output_mismatch",
+      "old_status": "output_mismatch",
+      "new_status": "pass",
       "old_lines": {
         "actual_lines": 232,
         "expected_lines": 232,
-        "matching_lines": 232
+        "matching_lines": 226
       },
       "new_lines": {
         "actual_lines": 232,
         "expected_lines": 232,
-        "matching_lines": 226
+        "matching_lines": 232
       }
     },
     {
       "test": "swf7_global_funcs",
       "change_type": "changed",
-      "old_status": "pass",
-      "new_status": "output_mismatch",
+      "old_status": "output_mismatch",
+      "new_status": "pass",
       "old_lines": {
         "actual_lines": 232,
         "expected_lines": 232,
-        "matching_lines": 232
+        "matching_lines": 226
       },
       "new_lines": {
         "actual_lines": 232,
         "expected_lines": 232,
-        "matching_lines": 226
+        "matching_lines": 232
       }
     }
   ]

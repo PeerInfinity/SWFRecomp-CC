@@ -1,62 +1,29 @@
 {
   "metadata": {
-    "old_timestamp": "2026-04-09T00:00:08.207491+00:00",
-    "old_git_sha": "2a4adfc3fdc2fb6e004bd646ae41f31dc418e721",
-    "new_timestamp": "2026-04-09T01:53:01.671788+00:00",
-    "new_git_sha": "9d4d8742948be015515a1d02d370a856d7aa34fd",
+    "old_timestamp": "2026-04-09T01:53:01.671788+00:00",
+    "old_git_sha": "9d4d8742948be015515a1d02d370a856d7aa34fd",
+    "new_timestamp": "2026-04-09T02:54:54.122261+00:00",
+    "new_git_sha": "390b36b1143a2b78a21a4e71fd3148f688966131",
     "partial": false,
     "same_commit": false
   },
   "summary": {
-    "old_pass": 8,
+    "old_pass": 9,
     "old_total": 58,
-    "old_pass_rate": 13.8,
+    "old_pass_rate": 15.5,
     "new_pass": 9,
     "new_total": 58,
     "new_pass_rate": 15.5,
-    "old_mismatched_lines": 1726,
+    "old_mismatched_lines": 1720,
     "new_mismatched_lines": 1720,
     "increased_mismatches": 0,
-    "decreased_mismatches": 6,
-    "newly_passing": 1,
+    "decreased_mismatches": 0,
+    "newly_passing": 0,
     "newly_failing": 0,
-    "status_changed": 1,
-    "unchanged": 56,
+    "status_changed": 0,
+    "unchanged": 58,
     "added": 0,
     "removed": 0
   },
-  "changes": [
-    {
-      "test": "NetStream-SquareTest",
-      "change_type": "changed",
-      "old_status": "output_mismatch",
-      "new_status": "output_mismatch",
-      "old_lines": {
-        "actual_lines": 201,
-        "expected_lines": 216,
-        "matching_lines": 82
-      },
-      "new_lines": {
-        "actual_lines": 201,
-        "expected_lines": 216,
-        "matching_lines": 85
-      }
-    },
-    {
-      "test": "getTimer_test",
-      "change_type": "changed",
-      "old_status": "output_mismatch",
-      "new_status": "pass",
-      "old_lines": {
-        "actual_lines": 8,
-        "expected_lines": 8,
-        "matching_lines": 5
-      },
-      "new_lines": {
-        "actual_lines": 8,
-        "expected_lines": 8,
-        "matching_lines": 8
-      }
-    }
-  ]
+  "changes": []
 }
