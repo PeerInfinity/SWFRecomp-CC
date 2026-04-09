@@ -6763,6 +6763,7 @@ static ActionVar builtin_wrapper_valueOf(SWFAppContext* app_context, ActionVar* 
 }
 
 // Built-in toString for Object(primitive) wrappers — returns primitive value as string
+// For Number wrappers, supports optional radix argument (2-36)
 static ActionVar builtin_prim_wrapper_toString(SWFAppContext* app_context, ActionVar* args, u32 arg_count, ActionVar* registers, void* this_obj)
 {
 	ActionVar ret;
@@ -6780,9 +6781,73 @@ static ActionVar builtin_prim_wrapper_toString(SWFAppContext* app_context, Actio
 			{
 				return *prim;
 			}
-			else
+			// Number wrapper with radix support
+			if (obj->native_type == NATIVE_NUMBER &&
+			    (prim->type == ACTION_STACK_VALUE_F32 || prim->type == ACTION_STACK_VALUE_F64))
 			{
-				// Convert primitive to string
+				int radix = 10;
+				if (arg_count >= 1 && args != NULL)
+				{
+					double rv = 0;
+					if (args[0].type == ACTION_STACK_VALUE_F64)
+						rv = VAL(double, &args[0].data.numeric_value);
+					else if (args[0].type == ACTION_STACK_VALUE_F32)
+						rv = (double)VAL(float, &args[0].data.numeric_value);
+					if (!isnan(rv) && rv >= 2.0 && rv <= 36.0)
+						radix = (int)rv;
+				}
+				double dval = (prim->type == ACTION_STACK_VALUE_F64)
+					? VAL(double, &prim->data.numeric_value)
+					: (double)VAL(float, &prim->data.numeric_value);
+				static char _nwt_buf[256];
+				int _nwt_len = 0;
+				if (isnan(dval)) {
+					if (radix == 10) { _nwt_len = 3; memcpy(_nwt_buf, "NaN", 3); }
+					else {
+						uint32_t _nwt_uval = 2147483648U;
+						char _nwt_tmp[128]; int _nwt_pos = 0;
+						uint32_t _nwt_n = _nwt_uval;
+						while (_nwt_n > 0 && _nwt_pos < 127) {
+							int d = (int)(_nwt_n % (uint32_t)radix);
+							char c = (char)(48 - d);
+							if (c == '\r') c = '\n';
+							_nwt_tmp[_nwt_pos++] = c;
+							_nwt_n /= (uint32_t)radix;
+						}
+						_nwt_buf[0] = '-'; _nwt_len = 1;
+						for (int j = _nwt_pos - 1; j >= 0 && _nwt_len < 255; j--)
+							_nwt_buf[_nwt_len++] = _nwt_tmp[j];
+					}
+				} else if (isinf(dval)) {
+					_nwt_len = (dval > 0) ? 8 : 9;
+					memcpy(_nwt_buf, (dval > 0) ? "Infinity" : "-Infinity", _nwt_len);
+				} else if (radix == 10) {
+					_nwt_len = flash_format_double(_nwt_buf, sizeof(_nwt_buf), dval);
+					if (_nwt_len < 0) _nwt_len = 0;
+				} else {
+					int negative = (dval < 0.0);
+					double absval = negative ? -dval : dval;
+					unsigned long long ival = (unsigned long long)absval;
+					if (ival == 0) { _nwt_buf[0] = '0'; _nwt_len = 1; }
+					else {
+						const char* digits = "0123456789abcdefghijklmnopqrstuvwxyz";
+						char tmp[128]; int pos = 0;
+						unsigned long long n = ival;
+						while (n > 0 && pos < 127) { tmp[pos++] = digits[n % radix]; n /= radix; }
+						if (negative) _nwt_buf[_nwt_len++] = '-';
+						for (int j = pos - 1; j >= 0 && _nwt_len < 255; j--)
+							_nwt_buf[_nwt_len++] = tmp[j];
+					}
+				}
+				_nwt_buf[_nwt_len] = '\0';
+				u32 u16_len;
+				uint16_t* u16_ptr = ascii_to_u16(app_context, _nwt_buf, _nwt_len, &u16_len);
+				ret.data.numeric_value = (u64) u16_ptr;
+				ret.str_size = u16_len;
+				return ret;
+			}
+			// Non-Number wrapper: convert primitive to string
+			{
 				static char buf[64];
 				int len = varToStringBuf(app_context, prim, buf, sizeof(buf));
 				u32 u16_len;
@@ -40694,32 +40759,15 @@ void actionNewObject(SWFAppContext* app_context)
 		ActionVar value_var;
 		if (num_args > 0)
 		{
-			// Convert first argument to number
-			if (args[0].type == ACTION_STACK_VALUE_F32 || args[0].type == ACTION_STACK_VALUE_F64)
-			{
-				value_var = args[0];
-			}
-			else if (args[0].type == ACTION_STACK_VALUE_STRING)
-			{
-				char tmp[256];
-				const uint16_t* u16 = varGetU16Ptr(&args[0]);
-				u16_to_utf8(u16, args[0].str_size, tmp, sizeof(tmp));
-				double num = atof(tmp);
-				value_var.type = ACTION_STACK_VALUE_F64;
-				VAL(double, &value_var.data.numeric_value) = num;
-			}
-			else
-			{
-				// Default to 0
-				value_var.type = ACTION_STACK_VALUE_F32;
-				VAL(float, &value_var.data.numeric_value) = 0.0f;
-			}
+			double result = varToDoubleSWF(app_context, &args[0], g_swf_version);
+			value_var.type = ACTION_STACK_VALUE_F64;
+			VAL(double, &value_var.data.numeric_value) = result;
 		}
 		else
 		{
 			// No arguments - default to 0
-			value_var.type = ACTION_STACK_VALUE_F32;
-			VAL(float, &value_var.data.numeric_value) = 0.0f;
+			value_var.type = ACTION_STACK_VALUE_F64;
+			VAL(double, &value_var.data.numeric_value) = 0.0;
 		}
 
 		setPropertyWithFlags(app_context, num_obj, "valueOf_value", 13, &value_var, PROPERTY_FLAGS_DONTENUM);
@@ -42243,41 +42291,20 @@ void actionNewMethod(SWFAppContext* app_context)
 
 		if (num_args > 0)
 		{
-			// Store the numeric value
-			ActionVar num_value = args[0];
-
-			// Convert to float if not already numeric
-			if (num_value.type != ACTION_STACK_VALUE_F32 &&
-			    num_value.type != ACTION_STACK_VALUE_F64)
-			{
-				// For strings, convert to number
-				if (num_value.type == ACTION_STACK_VALUE_STRING)
-				{
-					char tmp[256];
-					const uint16_t* u16 = varGetU16Ptr(&num_value);
-					u16_to_utf8(u16, num_value.str_size, tmp, sizeof(tmp));
-					float fval = (float) atof(tmp);
-					num_value.type = ACTION_STACK_VALUE_F32;
-					num_value.data.numeric_value = VAL(u64, &fval);
-				}
-				else
-				{
-					// Default to 0 for other types
-					float zero = 0.0f;
-					num_value.type = ACTION_STACK_VALUE_F32;
-					num_value.data.numeric_value = VAL(u64, &zero);
-				}
-			}
-
+			double result = varToDoubleSWF(app_context, &args[0], g_swf_version);
+			ActionVar num_value;
+			num_value.type = ACTION_STACK_VALUE_F64;
+			num_value.str_size = 0;
+			VAL(double, &num_value.data.numeric_value) = result;
 			setProperty(app_context, num_obj, "valueOf", 7, &num_value);
 		}
 		else
 		{
 			// new Number() with no arguments - store 0
 			ActionVar zero_val;
-			float zero = 0.0f;
-			zero_val.type = ACTION_STACK_VALUE_F32;
-			zero_val.data.numeric_value = VAL(u64, &zero);
+			zero_val.type = ACTION_STACK_VALUE_F64;
+			zero_val.str_size = 0;
+			VAL(double, &zero_val.data.numeric_value) = 0.0;
 			setProperty(app_context, num_obj, "valueOf", 7, &zero_val);
 		}
 
@@ -46726,12 +46753,17 @@ static double varToDoubleSWF(SWFAppContext* app_context, ActionVar* v, int swf_v
 					}
 				}
 			}
-			// Trim only LEADING whitespace for decimal parsing
+			// Trim leading and trailing whitespace for decimal parsing
 			const char* start = tmp;
 			const char* end_ptr = tmp + len;
 			while (start < end_ptr) {
 				char c = *start;
 				if (c == ' ' || c == '\t' || c == '\n' || c == '\r' || c == '\f') { start++; continue; }
+				break;
+			}
+			while (end_ptr > start) {
+				char c = *(end_ptr - 1);
+				if (c == ' ' || c == '\t' || c == '\n' || c == '\r' || c == '\f') { end_ptr--; continue; }
 				break;
 			}
 			int trimmed_len = (int)(end_ptr - start);
@@ -46754,6 +46786,14 @@ static double varToDoubleSWF(SWFAppContext* app_context, ActionVar* v, int swf_v
 				return (double)VAL(float, &vo.data.numeric_value);
 			if (vo.type == ACTION_STACK_VALUE_F64)
 				return VAL(double, &vo.data.numeric_value);
+			if (vo.type == ACTION_STACK_VALUE_BOOLEAN)
+				return vo.data.numeric_value ? 1.0 : 0.0;
+			if (vo.type == ACTION_STACK_VALUE_STRING)
+				return varToDoubleSWF(app_context, &vo, swf_version);
+			if (vo.type == ACTION_STACK_VALUE_NULL)
+				return (swf_version < 7) ? 0.0 : NAN;
+			if (vo.type == ACTION_STACK_VALUE_UNDEFINED)
+				return (swf_version < 7) ? 0.0 : NAN;
 			return NAN;
 		}
 		default: return NAN;
