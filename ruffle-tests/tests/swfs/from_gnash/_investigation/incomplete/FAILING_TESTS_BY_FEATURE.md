@@ -76,17 +76,13 @@ Failing tests: Math-v5 (97.8%), Math-v6 (97.8%), Math-v7 (97.6%), Math-v8 (97.6%
 
 ---
 
-## 3. NetStream/Video Prototype Properties (est. 6 tests) — see GNASH_NEAR_PASSING_PLAN
+## 3. NetStream/Video Prototype Properties (est. 6 tests) — RESOLVED (NetStream), Video remains
 
-Failing tests: NetStream-v6/v7/v8 (95.0%), Video-v5 (57.1%)
+Failing tests: ~~NetStream-v6/v7/v8 (95.0%)~~, Video-v5 (57.1%)
 
-4 lines wrong per NetStream test. `hasOwnProperty('currentFps')` and similar property introspection checks fail — properties not registered on NetStream.prototype.
+**NetStream-v6/v7/v8: PASS** (2026-04-09). Fix: NetStream constructor now installs `currentFps` on prototype when constructed with a connected NetConnection. See `complete/NETSTREAM_NATIVE_PROPS_PLAN.md`.
 
-**Root cause**: NetStream and Video prototypes don't have all expected builtin properties defined.
-
-**Fix complexity**: Low — register missing prototype properties.
-
-**Impact**: 3 NetStream tests go from 95% → ~100%.
+Video-v5 remains at 57.1% — deeper issues unrelated to NetStream.
 
 ---
 

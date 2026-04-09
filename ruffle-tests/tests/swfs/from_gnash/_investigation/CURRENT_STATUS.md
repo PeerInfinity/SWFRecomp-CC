@@ -1,24 +1,26 @@
 # Gnash Test Suite Status
 
-Last updated: 2026-04-08 (Phase 3 work in progress, not yet in CI)
+Last updated: 2026-04-09 (Phase 3 work in progress, not yet in CI)
 
 ## Quick Summary
 
 | Sub-suite | Tests | Passing | Rate | Filtered | Filtered Rate | Ignored |
 |-----------|-------|---------|------|----------|---------------|---------|
-| **actionscript.all** | 190 | 76 | 40.0% | 76/181 | **42.0%** | 9 |
+| **actionscript.all** | 190 | 80 | 42.1% | 80/181 | **44.2%** | 9 |
 | **misc-mtasc.all** | 9 | 7 | 77.8% | — | — | — |
 | **misc-swfmill.all** | 14 | 11 | 78.6% | — | — | — |
 | **misc-ming.all** | 58 | 9 | 15.5% | — | — | — |
 | **misc-swfc.all** | 16 | 2 | 12.5% | — | — | — |
-| **Total** | 287 | ~105 | ~36.6% | — | — | — |
+| **Total** | 287 | ~109 | ~38.0% | — | — | — |
 
-Note: All counts confirmed by CI. misc-ming.all and misc-swfc.all were
-previously undocumented — they run in CI but were missing from this status page.
+Note: CI last run at 77/190 (commit 6b02c514). Local fixes since then: +3 (NetStream-v6/v7/v8).
 
 Filtered results exclude 9 tests with all-accepted diffs (Math-v5/v6/v7/v8, ops-v8, Error-v5/v6/v7/v8) — see `ACCEPTED_DIFFS.md`. Remaining 3 misc-swfmill failures (dict_event, tags_after_last_showframe, jump_to_prev_block) are blocked on architectural limitations — see `blocked/MISC_SWFMILL_PLAN.md`.
 
-### Latest fixes (2026-04-08, batch 2 — not yet in CI)
+### Latest fixes (2026-04-09, not yet in CI)
+- **NetStream connected-construction property installation** — `new NetStream(nc)` where nc is a connected NetConnection now installs `currentFps` as an own property on `NetStream.prototype`. In Flash, the NetStream constructor lazily registers native data properties when first constructed with a connected NC. Detected via `__proto__ == NetConnection.prototype` + `isConnected == true` check. **+3 tests: NetStream-v6, NetStream-v7, NetStream-v8 → PASS.**
+
+### Latest fixes (2026-04-08, batch 2 — confirmed by CI at 77/190)
 - **Number constructor proper coercion** — `new Number(obj)` now uses `varToDoubleSWF` instead of defaulting OBJECT/BOOLEAN/etc to 0. Fixes `new Number(objWithValueOf)` returning wrong value. `varToDoubleSWF` OBJECT path now handles valueOf returning STRING/BOOLEAN/etc. Number-v5/v6/v7/v8 each +12-13 lines.
 - **Number wrapper toString radix** — `new Number(10).toString(2)` now returns "1010". Wrapper toString supports radix 2-36.
 - **Delete non-existent returns false** — `delete nonExistentVar` returns false (was true). Added global_object property check for `_global.name` deletion. delete-v5/v7/v8 +2 each.

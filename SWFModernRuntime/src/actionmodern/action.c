@@ -41686,6 +41686,32 @@ void actionNewObject(SWFAppContext* app_context)
 				setProperty(app_context, cmi_obj, "visible", 7, &vi);
 			}
 
+			// NetStream constructor: install native data properties on prototype
+			// when constructed with a connected NetConnection argument.
+			// Flash lazily registers properties like currentFps on the prototype
+			// the first time a NetStream is created with a connected NC.
+			if (ctor_func == &g_stub_ctors[11] && num_args >= 1 &&
+			    args[0].type == ACTION_STACK_VALUE_OBJECT && args[0].data.numeric_value != 0) {
+				ASObject* nc_obj = (ASObject*)(uintptr_t)args[0].data.numeric_value;
+				// Verify it's a real NetConnection (not a plain object)
+				ActionVar* nc_proto = getProperty(nc_obj, "__proto__", 9);
+				if (nc_proto != NULL && nc_proto->type == ACTION_STACK_VALUE_OBJECT &&
+				    (ASObject*)(uintptr_t)nc_proto->data.numeric_value == g_stub_ctors[10].prototype_obj) {
+					// Check if the NetConnection is connected
+					ActionVar* is_conn = getProperty(nc_obj, "isConnected", 11);
+					if (is_conn != NULL && is_conn->type == ACTION_STACK_VALUE_BOOLEAN &&
+					    is_conn->data.numeric_value != 0) {
+						// Install currentFps on prototype if not already present
+						if (ctor_func->prototype_obj != NULL &&
+						    !hasPropertyRaw(ctor_func->prototype_obj, "currentFps", 10)) {
+							ActionVar uv = {0};
+							uv.type = ACTION_STACK_VALUE_UNDEFINED;
+							setProperty(app_context, ctor_func->prototype_obj, "currentFps", 10, &uv);
+						}
+					}
+				}
+			}
+
 			PUSH(ACTION_STACK_VALUE_OBJECT, (u64) new_obj);
 			return;
 		}
