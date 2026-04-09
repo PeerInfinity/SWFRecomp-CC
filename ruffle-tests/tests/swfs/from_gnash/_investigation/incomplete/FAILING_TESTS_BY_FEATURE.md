@@ -423,11 +423,41 @@ Registered `constructor`, `__proto__` (→ Function.prototype), and `prototype` 
 
 **Combined Number impact**: Number-v5: 193→~203/244, Number-v6: 186→~196/239, Number-v7: 192→~204/237, Number-v8: 192→~204/237.
 
-### Phase 3 remaining work (not yet started):
-- **Number.prototype.toString(radix)**: wrapper toString ignores radix argument (1 line per Number test)
+### 3e: Number constructor proper type coercion — DONE (2026-04-08)
+
+**Three fixes**:
+1. `new Number(value)` constructor: Use `varToDoubleSWF` for argument coercion instead of manual type switch. Fixes `new Number(obj)` returning 0 when obj has valueOf/toString methods.
+2. `varToDoubleSWF` OBJECT path: Handle valueOf returning non-numeric primitives (STRING, BOOLEAN, NULL, UNDEFINED).
+3. Trailing whitespace trimming in `varToDoubleSWF` for decimal string parsing.
+
+**Impact**: Number-v5 +13, Number-v6 +12, Number-v7 +12, Number-v8 +13 lines. Also cascading improvements to other tests that use Number coercion.
+
+### 3f: Number wrapper toString radix support — DONE (2026-04-08)
+
+`new Number(10).toString(2)` now correctly returns "1010" instead of "10". The wrapper toString (`builtin_prim_wrapper_toString`) now handles radix 2-36 for NATIVE_NUMBER wrappers.
+
+**Impact**: +1 line per Number test.
+
+### 3g: Delete operator non-existent + global_object — DONE (2026-04-08)
+
+1. `delete nonExistentVar` now returns false (was returning true).
+2. Added global_object property check before returning false — `delete a` where `a` is on `_global` now works.
+
+**Impact**: delete-v5 +2, delete-v7 +2, delete-v8 +2 lines.
+
+### 3h: actionEnumerate scope chain lookup — DONE (2026-04-08)
+
+The old Enumerate opcode (SWF5 for-in) wasn't checking the scope chain for variable lookup. Added scope chain walk before global variable lookup. Fixes `enumerateObj(o)` inside functions where `o` is a function parameter.
+
+**Impact**: enumerate-v6/v7/v8 each +13 lines (25→12 failures). Also smaller improvements in other tests.
+
+### Phase 3 remaining work:
 - **Number wrapper valueOf override**: `new Number(10)` wrapper doesn't dispatch custom valueOf (1 line per Number test)
-- **Number(string) parsing**: hex/octal prefix parsing for Number constructor (10+ lines per test)
-- **toString_valueOf dispatch**: valueOf/toString not called during implicit coercion in some paths (22 diffs per v6/v7/v8)
-- **enumerate/for-in**: child MCs returned as numbers, enumerateObj returns empty (27 diffs per test)
+- **Number hex/octal string comparison**: `"0Xff000000" != 0xFF000000` equality check (3 lines per Number test)
+- **Number float precision**: last-digit rounding at e-308 (4 lines per Number test)
+- **toString_valueOf dispatch**: valueOf/toString not called during implicit coercion in some paths (20 diffs per v6/v7/v8)
+- **enumerate child MC type**: child MCs returned as 'number' instead of 'movieclip' (12 diffs per enumerate test)
 - **with auto-boxing**: `with(number)` should auto-box to Number.prototype scope (not addressed)
 - **String regex methods**: replace/match/search need regex support (~120 diffs per test)
+- **delete inside with blocks**: `delete b` inside `with(o)` doesn't delete from `o` (3 diffs per delete test)
+- **delete DONT_DELETE flag**: local var deletion should return false (2 diffs per delete test)

@@ -18,7 +18,14 @@ previously undocumented — they run in CI but were missing from this status pag
 
 Filtered results exclude 9 tests with all-accepted diffs (Math-v5/v6/v7/v8, ops-v8, Error-v5/v6/v7/v8) — see `ACCEPTED_DIFFS.md`. Remaining 3 misc-swfmill failures (dict_event, tags_after_last_showframe, jump_to_prev_block) are blocked on architectural limitations — see `blocked/MISC_SWFMILL_PLAN.md`.
 
-### Latest fixes (2026-04-08)
+### Latest fixes (2026-04-08, batch 2 — not yet in CI)
+- **Number constructor proper coercion** — `new Number(obj)` now uses `varToDoubleSWF` instead of defaulting OBJECT/BOOLEAN/etc to 0. Fixes `new Number(objWithValueOf)` returning wrong value. `varToDoubleSWF` OBJECT path now handles valueOf returning STRING/BOOLEAN/etc. Number-v5/v6/v7/v8 each +12-13 lines.
+- **Number wrapper toString radix** — `new Number(10).toString(2)` now returns "1010". Wrapper toString supports radix 2-36.
+- **Delete non-existent returns false** — `delete nonExistentVar` returns false (was true). Added global_object property check for `_global.name` deletion. delete-v5/v7/v8 +2 each.
+- **actionEnumerate scope chain** — Old Enumerate opcode (SWF5 for-in) now checks scope chain for variable lookup. Fixes `enumerateObj(o)` inside functions. enumerate-v6/v7/v8 each +13 lines.
+- **Total estimated impact**: ~120 lines improved across ~30 tests.
+
+### Latest fixes (2026-04-08, batch 1)
 - **Flash-compatible number formatting** — Replaced all `%.15g` with `flash_format_double()`: no leading zeros in exponents (e-7 not e-07), decimal format for exponent -5 (Flash uses -5 threshold, C uses -4). Number-v8: 192→204/237 (+12 lines), all Number tests improved ~10 lines each.
 - **NaN/Infinity on _global** — Registered NaN and Infinity as F64 properties on global_object, fixing `typeof(_global.NaN) == 'number'` checks.
 - **Number constructor own properties** — constructor, __proto__ (→Function.prototype), prototype registered on Number constructor, fixing `Number.hasOwnProperty(...)` checks.
