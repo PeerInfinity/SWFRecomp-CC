@@ -33109,6 +33109,19 @@ void actionDelete2(SWFAppContext* app_context, char* str_buffer)
 					PUSH(ACTION_STACK_VALUE_BOOLEAN, success ? 1ULL : 0ULL);
 					return;
 				}
+				// SWF6 case-insensitive: `delete color` should also find `_global.Color`
+				if (g_swf_version == 6) {
+					for (u32 gi = 0; gi < global_object->num_used; gi++) {
+						if (global_object->properties[gi].name_length == var_name_len &&
+						    strncasecmp(global_object->properties[gi].name, var_name, var_name_len) == 0) {
+							success = deleteProperty(app_context, global_object,
+								global_object->properties[gi].name,
+								global_object->properties[gi].name_length);
+							PUSH(ACTION_STACK_VALUE_BOOLEAN, success ? 1ULL : 0ULL);
+							return;
+						}
+					}
+				}
 			}
 			// Check if name matches a child display object (non-deletable)
 			success = false;  // deleting non-existent variable returns false
@@ -41192,23 +41205,13 @@ void actionNewObject(SWFAppContext* app_context)
 					if (gv->type != ACTION_STACK_VALUE_FUNCTION) shadowed = 1;
 				}
 			}
-			// Also check if _global.Color has been overwritten with a non-function
+			// Also check if _global.Color has been overwritten or deleted
 			if (!shadowed && global_object != NULL) {
 				ActionVar* gp = getProperty(global_object, ctor_name, ctor_name_len);
 				if (gp != NULL && gp->type != ACTION_STACK_VALUE_FUNCTION) shadowed = 1;
-				// If _global.Color was deleted (not found), that's also shadowed
-				if (gp == NULL) {
-					// Check if it EVER existed by looking for case-insensitive match
-					for (u32 gi = 0; gi < global_object->num_used; gi++) {
-						if (global_object->properties[gi].name_length == ctor_name_len &&
-						    strcasecmp(global_object->properties[gi].name, ctor_name) == 0) {
-							// Found case-insensitive match — was it deleted/overwritten?
-							if (global_object->properties[gi].value.type != ACTION_STACK_VALUE_FUNCTION)
-								shadowed = 1;
-							break;
-						}
-					}
-				}
+				// If _global.Color was deleted (case-insensitively by `delete color`),
+				// the constructor is no longer available
+				if (gp == NULL) shadowed = 1;
 			}
 			if (shadowed) {
 				pushUndefined(app_context);
