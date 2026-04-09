@@ -1,20 +1,15 @@
 # Ruffle Test Results Diff
 
-**Previous:** `1024372b1f94` (2026-04-08T04:31:36.779443+00:00)
-**Current:** `69612f4204e8` (2026-04-08T17:46:11.961729+00:00)
+**Previous:** `2a4adfc3fdc2` (2026-04-08T22:58:46.064292+00:00)
+**Current:** `2a4adfc3fdc2` (2026-04-09T00:00:08.182333+00:00)
+*Re-run on same commit — no comparison available.*
 
 ## Summary
 
 | Metric | Previous | Current | Delta |
 |--------|----------|---------|-------|
-| Passing | 579 | 580 | +1 |
+| Passing | 578 | 578 | 0 |
 | Total | 620 | 620 | 0 |
-| Pass rate | 93.4% | 93.5% | +0.1% |
-| Mismatched lines | 8927 | 8918 | -9 |
-|   Decreased | | | -9 |
-
-## Newly Passing (1)
-
-| Test | Previous Status | Lines (prev) | Lines (now) |
-|------|----------------|--------------|-------------|
-| `on_construct` | output_mismatch | 16/25 | 25/25 |
+| Pass rate | 93.2% | 93.2% | 0% |
+| Mismatched lines | 9012 | 9015 | +3 |
+|   Increased | | | +3 |
