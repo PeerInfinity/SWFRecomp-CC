@@ -2861,10 +2861,8 @@ static int screenvideo_decode_frame(const unsigned char* data, int data_len,
 			if (!block_bgr) { free(pixels); return 0; }
 
 			unsigned long decomp_len = bw * bh * 3;
-#ifdef HAS_DATA_FILES
 			extern int uncompress(unsigned char* dest, unsigned long* destLen,
 			                       const unsigned char* source, unsigned long sourceLen);
-#endif
 			int zret = uncompress(block_bgr, &decomp_len, data + p, block_data_size);
 			if (zret != 0 || (int)decomp_len != bw * bh * 3)
 			{
