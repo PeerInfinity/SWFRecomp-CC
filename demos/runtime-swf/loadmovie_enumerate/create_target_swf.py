@@ -192,8 +192,7 @@ frame1 += myfunc_def
 
 frame1 += push_string("child frame 1 executed")
 frame1 += TRACE
-# NOTE: no stop() here — stop() in a child loaded via deferred loadMovie
-# incorrectly stops the ROOT timeline (g_current_sprite_obj not set).
+frame1 += STOP  # stop() should only stop the holder MC, not the root
 
 # --- Frame 2 ---
 frame2 = b''

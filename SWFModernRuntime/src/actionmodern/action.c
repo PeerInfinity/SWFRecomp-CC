@@ -18412,6 +18412,19 @@ void actionFirePendingDirectLoads(SWFAppContext* app_context)
 			}
 		}
 
+		// Save/restore is_playing so that stop()/play() inside the child
+		// SWF cannot affect the root timeline.  For MCs with a display_obj,
+		// set g_current_sprite_obj so stop() targets the sprite properly.
+		// For dynamically created MCs (display_obj==NULL), the save/restore
+		// of is_playing is the only protection.
+		extern DisplayObject* g_current_sprite_obj;
+		DisplayObject* _saved_sprite_obj = g_current_sprite_obj;
+		DisplayObject* _holder_dobj = mc->display_obj ? (DisplayObject*)mc->display_obj : NULL;
+		if (_holder_dobj != NULL)
+			g_current_sprite_obj = _holder_dobj;
+		extern int is_playing;
+		int _saved_is_playing = is_playing;
+
 		entry->init_func(app_context);
 		if (entry->frame_count > 0 && entry->frame_funcs != NULL && entry->frame_funcs[0] != NULL) {
 			extern int quit_swf;
@@ -18420,6 +18433,9 @@ void actionFirePendingDirectLoads(SWFAppContext* app_context)
 			entry->frame_funcs[0](app_context);
 			quit_swf = _saved_quit;
 		}
+
+		g_current_sprite_obj = _saved_sprite_obj;
+		is_playing = _saved_is_playing;
 
 		// Restore display_list if swapped
 		if (_did_swap) {
