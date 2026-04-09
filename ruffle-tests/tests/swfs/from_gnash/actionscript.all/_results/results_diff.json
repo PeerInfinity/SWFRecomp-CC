@@ -1,45 +1,77 @@
 {
   "metadata": {
-    "old_timestamp": "2026-04-09T02:54:54.112115+00:00",
-    "old_git_sha": "390b36b1143a2b78a21a4e71fd3148f688966131",
-    "new_timestamp": "2026-04-09T03:55:20.739870+00:00",
-    "new_git_sha": "6b02c51497e604a21dc97cc3a0d7a8f774dcff4a",
+    "old_timestamp": "2026-04-09T03:55:20.739870+00:00",
+    "old_git_sha": "6b02c51497e604a21dc97cc3a0d7a8f774dcff4a",
+    "new_timestamp": "2026-04-09T16:23:06.394719+00:00",
+    "new_git_sha": "302d77c6072f6529b59fff07e13b4bf587255ee6",
     "partial": false,
     "same_commit": false
   },
   "summary": {
-    "old_pass": 76,
+    "old_pass": 77,
     "old_total": 190,
-    "old_pass_rate": 40.0,
-    "new_pass": 77,
+    "old_pass_rate": 40.5,
+    "new_pass": 80,
     "new_total": 190,
-    "new_pass_rate": 40.5,
-    "old_mismatched_lines": 4270,
-    "new_mismatched_lines": 4267,
+    "new_pass_rate": 42.1,
+    "old_mismatched_lines": 4267,
+    "new_mismatched_lines": 4255,
     "increased_mismatches": 0,
-    "decreased_mismatches": 3,
-    "newly_passing": 1,
+    "decreased_mismatches": 12,
+    "newly_passing": 3,
     "newly_failing": 0,
-    "status_changed": 1,
-    "unchanged": 189,
+    "status_changed": 3,
+    "unchanged": 187,
     "added": 0,
     "removed": 0
   },
   "changes": [
     {
-      "test": "Color-v6",
+      "test": "NetStream-v6",
       "change_type": "changed",
       "old_status": "output_mismatch",
       "new_status": "pass",
       "old_lines": {
-        "actual_lines": 171,
-        "expected_lines": 171,
-        "matching_lines": 168
+        "actual_lines": 80,
+        "expected_lines": 80,
+        "matching_lines": 76
       },
       "new_lines": {
-        "actual_lines": 171,
-        "expected_lines": 171,
-        "matching_lines": 171
+        "actual_lines": 80,
+        "expected_lines": 80,
+        "matching_lines": 80
+      }
+    },
+    {
+      "test": "NetStream-v7",
+      "change_type": "changed",
+      "old_status": "output_mismatch",
+      "new_status": "pass",
+      "old_lines": {
+        "actual_lines": 80,
+        "expected_lines": 80,
+        "matching_lines": 76
+      },
+      "new_lines": {
+        "actual_lines": 80,
+        "expected_lines": 80,
+        "matching_lines": 80
+      }
+    },
+    {
+      "test": "NetStream-v8",
+      "change_type": "changed",
+      "old_status": "output_mismatch",
+      "new_status": "pass",
+      "old_lines": {
+        "actual_lines": 80,
+        "expected_lines": 80,
+        "matching_lines": 76
+      },
+      "new_lines": {
+        "actual_lines": 80,
+        "expected_lines": 80,
+        "matching_lines": 80
       }
     }
   ]

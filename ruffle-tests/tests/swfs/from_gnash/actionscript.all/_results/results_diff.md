@@ -1,20 +1,22 @@
 # Ruffle Test Results Diff
 
-**Previous:** `390b36b1143a` (2026-04-09T02:54:54.112115+00:00)
-**Current:** `6b02c51497e6` (2026-04-09T03:55:20.739870+00:00)
+**Previous:** `6b02c51497e6` (2026-04-09T03:55:20.739870+00:00)
+**Current:** `302d77c6072f` (2026-04-09T16:23:06.394719+00:00)
 
 ## Summary
 
 | Metric | Previous | Current | Delta |
 |--------|----------|---------|-------|
-| Passing | 76 | 77 | +1 |
+| Passing | 77 | 80 | +3 |
 | Total | 190 | 190 | 0 |
-| Pass rate | 40.0% | 40.5% | +0.5% |
-| Mismatched lines | 4270 | 4267 | -3 |
-|   Decreased | | | -3 |
+| Pass rate | 40.5% | 42.1% | +1.6% |
+| Mismatched lines | 4267 | 4255 | -12 |
+|   Decreased | | | -12 |
 
-## Newly Passing (1)
+## Newly Passing (3)
 
 | Test | Previous Status | Lines (prev) | Lines (now) |
 |------|----------------|--------------|-------------|
-| `Color-v6` | output_mismatch | 168/171 | 171/171 |
+| `NetStream-v6` | output_mismatch | 76/80 | 80/80 |
+| `NetStream-v7` | output_mismatch | 76/80 | 80/80 |
+| `NetStream-v8` | output_mismatch | 76/80 | 80/80 |

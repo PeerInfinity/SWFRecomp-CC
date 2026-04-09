@@ -1,10 +1,10 @@
 # Ruffle Test Results (Filtered)
 
-**Date**: 2026-04-09 03:55 UTC
+**Date**: 2026-04-09 16:23 UTC
 
-**Git SHA**: `6b02c51497`
+**Git SHA**: `302d77c607`
 
-**Run Duration**: 20m 43s
+**Run Duration**: 21m 1s
 
 **Filtered**: 0 tests ignored out of 58 available
 
@@ -16,8 +16,8 @@
 | Passing | **9** (15.5%) |
 | Failing | 49 |
 | Total expected lines | 3388 |
-| Matching lines | 1668 (49.2%) |
-| Mismatched lines | 1720 |
+| Matching lines | 1669 (49.3%) |
+| Mismatched lines | 1719 |
 
 ### Failure Breakdown
 
@@ -31,15 +31,15 @@
 
 | # | Test | Lines | Duration | Notes |
 |---|------|-------|----------|-------|
-| 1 | `PlaceObject2Test` | 9 | 19.0s |  |
-| 2 | `VarAndCharClashTest` | 13 | 19.5s |  |
-| 3 | `Video-EmbedSquareTest` | 2 | 19.7s |  |
-| 4 | `getTimer_test` | 8 | 19.9s |  |
-| 5 | `masks_test2` | 10 | 18.8s |  |
-| 6 | `morph_test1` | 0 | 20.1s |  |
-| 7 | `move_object_test` | 11 | 19.2s |  |
-| 8 | `multi_doactions_and_goto_frame_test` | 6 | 19.2s |  |
-| 9 | `unload_movieclip_test1` | 6 | 19.8s |  |
+| 1 | `PlaceObject2Test` | 9 | 20.2s |  |
+| 2 | `VarAndCharClashTest` | 13 | 20.4s |  |
+| 3 | `Video-EmbedSquareTest` | 2 | 20.2s |  |
+| 4 | `getTimer_test` | 8 | 19.2s |  |
+| 5 | `masks_test2` | 10 | 20.0s |  |
+| 6 | `morph_test1` | 0 | 19.7s |  |
+| 7 | `move_object_test` | 11 | 21.0s |  |
+| 8 | `multi_doactions_and_goto_frame_test` | 6 | 20.8s |  |
+| 9 | `unload_movieclip_test1` | 6 | 19.6s |  |
 
 ## Near-Passing Tests
 
@@ -122,7 +122,7 @@ No timeouts.
 | 26 | `reverse_execute_PlaceObject2_test1` | 50.0% | 4/8 | 8 | 8 |  |
 | 27 | `runtime_vm_stack_test` | 44.4% | 4/9 | 9 | 9 |  |
 | 28 | `DragDropTest` | 40.0% | 18/45 | 45 | 44 |  |
-| 29 | `NetStream-SquareTest` | 39.4% | 85/216 | 201 | 216 |  |
+| 29 | `NetStream-SquareTest` | 39.8% | 86/216 | 201 | 216 |  |
 | 30 | `consecutive_goto_frame_test` | 30.8% | 4/13 | 13 | 12 |  |
 | 31 | `KeyEventOrder` | 23.1% | 6/26 | 25 | 26 |  |
 | 32 | `DrawingApiTest` | 21.5% | 20/93 | 93 | 93 |  |
