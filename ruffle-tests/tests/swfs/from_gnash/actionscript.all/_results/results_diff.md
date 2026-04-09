@@ -1,25 +1,20 @@
 # Ruffle Test Results Diff
 
-**Previous:** `9d4d8742948b` (2026-04-09T01:53:01.661960+00:00)
-**Current:** `390b36b1143a` (2026-04-09T02:54:54.112115+00:00)
+**Previous:** `390b36b1143a` (2026-04-09T02:54:54.112115+00:00)
+**Current:** `6b02c51497e6` (2026-04-09T03:55:20.739870+00:00)
 
 ## Summary
 
 | Metric | Previous | Current | Delta |
 |--------|----------|---------|-------|
-| Passing | 76 | 76 | 0 |
+| Passing | 76 | 77 | +1 |
 | Total | 190 | 190 | 0 |
-| Pass rate | 40.0% | 40.0% | 0% |
-| Mismatched lines | 4272 | 4270 | -2 |
-|   Decreased | | | -4 |
-|   Increased | | | +2 |
+| Pass rate | 40.0% | 40.5% | +0.5% |
+| Mismatched lines | 4270 | 4267 | -3 |
+|   Decreased | | | -3 |
 
-## Line Count Changed (5)
+## Newly Passing (1)
 
-| Test | Status | Lines (prev) | Lines (now) | Diff |
-|------|--------|--------------|-------------|------|
-| `Number-v5` | output_mismatch | 216/244 | 217/244 | -1 |
-| `Number-v6` | output_mismatch | 208/239 | 209/239 | -1 |
-| `Number-v7` | output_mismatch | 216/237 | 217/237 | -1 |
-| `Number-v8` | output_mismatch | 216/237 | 217/237 | -1 |
-| `array-v5` | output_mismatch | 458/560 | 456/560 | +2 |
+| Test | Previous Status | Lines (prev) | Lines (now) |
+|------|----------------|--------------|-------------|
+| `Color-v6` | output_mismatch | 168/171 | 171/171 |
