@@ -1,10 +1,10 @@
 # Ruffle Test Results (Unfiltered)
 
-**Date**: 2026-04-10 03:16 UTC
+**Date**: 2026-04-10 04:44 UTC
 
-**Git SHA**: `f2ef2ccd66`
+**Git SHA**: `961aa08a80`
 
-**Run Duration**: 4m 31s
+**Run Duration**: 4m 33s
 
 ## Summary
 
@@ -29,17 +29,17 @@
 
 | # | Test | Lines | Duration | Notes |
 |---|------|-------|----------|-------|
-| 1 | `afunc_dict` | 2 | 19.7s |  |
-| 2 | `background` | 0 | 19.6s |  |
-| 3 | `dict_callframe` | 3 | 19.1s |  |
-| 4 | `dict_cross` | 3 | 19.6s |  |
-| 5 | `dict_override` | 2 | 20.1s |  |
-| 6 | `func_dict` | 3 | 19.1s |  |
+| 1 | `afunc_dict` | 2 | 18.9s |  |
+| 2 | `background` | 0 | 19.9s |  |
+| 3 | `dict_callframe` | 3 | 20.4s |  |
+| 4 | `dict_cross` | 3 | 19.0s |  |
+| 5 | `dict_override` | 2 | 18.4s |  |
+| 6 | `func_dict` | 3 | 20.6s |  |
 | 7 | `initaction_in_definesprite` | 2 | 19.3s |  |
-| 8 | `jump_after_end` | 3 | 20.6s |  |
-| 9 | `missing_bitmap` | 0 | 19.0s |  |
-| 10 | `mixed-bytecode-as2` | 1 | 18.8s |  |
-| 11 | `zeroframe_definesprite` | 3 | 19.2s |  |
+| 8 | `jump_after_end` | 3 | 19.1s |  |
+| 9 | `missing_bitmap` | 0 | 20.1s |  |
+| 10 | `mixed-bytecode-as2` | 1 | 19.4s |  |
+| 11 | `zeroframe_definesprite` | 3 | 20.0s |  |
 
 ## Near-Passing Tests
 

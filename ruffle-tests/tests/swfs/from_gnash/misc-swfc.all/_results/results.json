@@ -1,8 +1,8 @@
 {
   "metadata": {
-    "timestamp": "2026-04-10T03:16:33.434513+00:00",
-    "git_sha": "f2ef2ccd66cc752f4fb25458e0dc2ffacd97c17b",
-    "duration_seconds": 320.13,
+    "timestamp": "2026-04-10T04:44:09.409449+00:00",
+    "git_sha": "961aa08a8074953b24d85b6a47c3ac0ba1fcf9c4",
+    "duration_seconds": 323.87,
     "total_available": 16,
     "shards": 30,
     "expected_shards": 30
@@ -24,7 +24,7 @@
         "expected_lines": 16,
         "matching_lines": 2
       },
-      "duration": 20.19,
+      "duration": 19.94,
       "status": "output_mismatch",
       "detail": "14 line(s) differ (actual=10, expected=16)",
       "actual_output": "PASSED: _root._currentframe == 1  [action_execution_order_test10.sc:63]\nFAILED: _root.as_order1: expected: \"0+1+2+3+4+5+6+7+8+9+10+\" , obtained: \"0+1+3+5+2+4+YY+YY+7+9+6+8+10+\"  [action_execution_order_test10.sc:166]\nPASSED: _root.as_order2 == 0+1+2+3+  [action_execution_order_test10.sc:167]\nFAILED: mc4_onConstruct_executed: expected: \"true\" , obtained: \"false\"  [action_execution_order_test10.sc:231]\nFAILED: mc5_onConstruct_executed: expected: \"true\" , obtained: \"false\"  [action_execution_order_test10.sc:232]\nTotal tests run: 5 typeof expected: number\nFAILED: TOTAL tests run: 5, expected: 9 [ [action_execution_order_test10.sc:237]]\n#passed: 2\n#failed: 4\n__END_OF_TEST__",
@@ -38,7 +38,7 @@
         "expected_lines": 31,
         "matching_lines": 8
       },
-      "duration": 20.8,
+      "duration": 19.97,
       "status": "output_mismatch",
       "detail": "23 line(s) differ (actual=20, expected=31)",
       "actual_output": "... (2 lines before) ...\nPASSED: button3['_root'] == _level0  [button_test1.sc:83]\nPASSED: button3['_global'] ==   [button_test1.sc:84]\nPASSED: button3['_level0'] == _level0  [button_test1.sc:85]\nPASSED: button3['_target'] == /button3  [button_test1.sc:86]\nPASSED: button3['_parent'] == _level0  [button_test1.sc:87]\nFAILED: typeof(button3.instance1): expected: \"movieclip\" , obtained: \"undefined\"  [button_test1.sc:88]\nFAILED: typeof(button3.instANce1): expected: \"movieclip\" , obtained: \"undefined\"  [button_test1.sc:89]\nFAILED: typeof(button3.instance1.button1): expected: \"object\" , obtained: \"undefined\"  [button_test1.sc:90]\nFAILED: typeof(button3.instance1.button2): expected: \"object\" , obtained: \"undefined\"  [button_test1.sc:91]\nFAILED: button3.instance1['_target']: expected: \"/button3/instance1\" , obtained: \"\"  [button_test1.sc:92]\nFAILED: button3.instance1['_parent']: expected: \"_level0.button3\" , obtained: \"\"  [button_test1.sc:93]\nFAILED: button3.instance1.button1._height: expected: \"300\" , obtained: \"\"  [button_test1.sc:94]\nFAILED: button3.instance1.button1['_target']: expected: \"/button3/instance1/button1\" , obtained: \"\"  [button_test1.sc:95]\nPASSED: button3.instance1.button1['_parent'] ==   [button_test1.sc:96]\nFAILED: button3.instance1.button2._height: expected: \"200\" , obtained: \"\"  [button_test1.sc:97]\nFAILED: button3.instance1.button2['_target']: expected: \"/button3/instance1/button2\" , obtained: \"\"  [button_test1.sc:98]\nPASSED: button3.instance1.button2['_parent'] ==   [button_test1.sc:99]\n1. Click on the visible part of the green box. [button_test1.sc:107]",
@@ -52,7 +52,7 @@
         "expected_lines": 47,
         "matching_lines": 36
       },
-      "duration": 19.93,
+      "duration": 21.4,
       "status": "output_mismatch",
       "detail": "11 line(s) differ (actual=47, expected=47)",
       "actual_output": "... (2 lines before) ...\nPASSED: edtext1._target == /edtext1  [edittext_test1.sc:43]\nPASSED: edtext1.text == Hello  [edittext_test1.sc:44]\nPASSED: edtext1.variable == textVar1  [edittext_test1.sc:45]\nPASSED: _root.textVar1 == Hello  [edittext_test1.sc:46]\nPASSED: _root.textVar1 == new-string-frame2  [edittext_test1.sc:54]\nFAILED: edtext1.text: expected: \"new-string-frame2\" , obtained: \"Hello\"  [edittext_test1.sc:56]\nPASSED: edtext1.text == new-string-frame3  [edittext_test1.sc:63]\nPASSED: edtext1.text == new-string-frame3  [edittext_test1.sc:65]\nFAILED: _root.hasOwnProperty('textVar2'): expected: \"true\" , obtained: \"false\"  [edittext_test1.sc:72]\nPASSED: edtext1.variable == textVar2  [edittext_test1.sc:73]\nPASSED: _root.textVar2 == Hello  [edittext_test1.sc:76]\nPASSED: edtext1.text == Hello  [edittext_test1.sc:77]\nFAILED: _root.textVar1: expected: \"new-string-frame3\" , obtained: \"new-string-frame2\"  [edittext_test1.sc:78]\nPASSED: edtext1.variable == textVar1  [edittext_test1.sc:86]\nPASSED: edtext1.text == new-string-frame3  [edittext_test1.sc:89]\nPASSED: edtext1.text == new-string-frame6  [edittext_test1.sc:96]\nFAILED: _root.textVar1: expected: \"new-string-frame6\" , obtained: \"new-string-frame2\"  [edittext_test1.sc:97]\nPASSED: _root.textVar3 == Hello  [edittext_test1.sc:103]\nFAILED: _root.textVar1: expected: \"new-string-frame6\" , obtained: \"new-string-frame2\"  [edittext_test1.sc:104]\nPASSED: _root.hasOwnProperty('textVar1') == true  [edittext_test1.sc:109]\nFAILED: _root.hasOwnProperty('textVar2'): expected: \"true\" , obtained: \"false\"  [edittext_test1.sc:110]\nFAILED: _root.hasOwnProperty('textVar3'): expected: \"true\" , obtained: \"false\"  [edittext_test1.sc:111]\nPASSED: _root.hasOwnProperty('textVar1') == true  [edittext_test1.sc:119]\nFAILED: _root.hasOwnProperty('textVar2'): expected: \"true\" , obtained: \"false\"  [edittext_test1.sc:120]\nFAILED: _root.hasOwnProperty('textVar3'): expected: \"true\" , obtained: \"false\"  [edittext_test1.sc:121]\nPASSED: typeof(edtext1) == undefined  [edittext_test1.sc:122]\nPASSED: edtext2.text == new_tests_begin  [edittext_test1.sc:142]\nPASSED: edtext2.text == value_changed  [edittext_test1.sc:149]\nPASSED: textVar4 == value_changed  [edittext_test1.sc:150]\nPASSED: edtext10.text == AAA  [edittext_test1.sc:179]\nPASSED: edtext11.text == BBB  [edittext_test1.sc:180]\nPASSED: edtext12.text == CCC  [edittext_test1.sc:181]\nPASSED: edtext10.text == BBB  [edittext_test1.sc:185]\nPASSED: edtext11.text == CCC  [edittext_test1.sc:186]\nPASSED: edtext12.text == AAA  [edittext_test1.sc:187]\nPASSED: textVar10 == AAA  [edittext_test1.sc:188]\nPASSED: textVar11 == BBB  [edittext_test1.sc:189]\nPASSED: textVar12 == CCC  [edittext_test1.sc:190]\nPASSED: textVar10 == AAA  [edittext_test1.sc:199]\nPASSED: textVar11 == CCC  [edittext_test1.sc:200]\nPASSED: textVar12 == BBB  [edittext_test1.sc:201]\nTotal tests run: 43 typeof expected: number\n#passed: 34\n#failed: 9\n__END_OF_TEST__",
@@ -66,7 +66,7 @@
         "expected_lines": 6,
         "matching_lines": 6
       },
-      "duration": 19.68,
+      "duration": 19.36,
       "status": "pass"
     },
     {
@@ -77,7 +77,7 @@
         "expected_lines": 4,
         "matching_lines": 4
       },
-      "duration": 19.25,
+      "duration": 20.38,
       "status": "pass"
     },
     {
@@ -88,7 +88,7 @@
         "expected_lines": 12,
         "matching_lines": 6
       },
-      "duration": 20.5,
+      "duration": 18.82,
       "status": "output_mismatch",
       "detail": "6 line(s) differ (actual=12, expected=12)",
       "actual_output": "PASSED: typeof(mc1.shape1) == movieclip  [mouse_drag_test.sc:45]\nPASSED: mc1.shape1 == _level0.mc1  [mouse_drag_test.sc:47]\nPASSED: mc1._x == 0  [mouse_drag_test.sc:49]\nPASSED: mc1._y == 0  [mouse_drag_test.sc:50]\nFAILED:  [mouse_drag_test.sc:57]\nFAILED:  [mouse_drag_test.sc:58]\nFAILED:  [mouse_drag_test.sc:66]\nFAILED:  [mouse_drag_test.sc:67]\nTotal tests run: 8 typeof expected: number\n#passed: 4\n#failed: 4\n__END_OF_TEST__",
@@ -102,7 +102,7 @@
         "expected_lines": 52,
         "matching_lines": 0
       },
-      "duration": 20.63,
+      "duration": 21.64,
       "status": "output_mismatch",
       "detail": "52 line(s) differ (actual=35, expected=52)",
       "actual_output": "undefined\nundefined\nroot.frame2 (after put mc1) [movieclip_destruction_test1.sc:89]\nPASSED: typeof(mc1) == movieclip  [movieclip_destruction_test1.sc:90]\nPASSED: mc1.getDepth() == -16383  [movieclip_destruction_test1.sc:91]\nmc1.frame1 [movieclip_destruction_test1.sc:71]\nmc1.frame2 [movieclip_destruction_test1.sc:75]\nPASSED: _root.mc1.getDepth() == -16383  [movieclip_destruction_test1.sc:76]\nIf you see this message, your player is bogus with action execution order [movieclip_destruction_test1.sc:82]\nFAILED: _root.x: expected: \"0\" , obtained: \"100\"  [movieclip_destruction_test1.sc:150]\nPASSED: typeof(_root.mc4) == movieclip  [movieclip_destruction_test1.sc:162]\nFAILED: this.valueOf(): expected: \"_level0.mc4\" , obtained: \"undefined\"  [movieclip_destruction_test1.sc:166]\nFAILED: typeof(_root.mc4): expected: \"undefined\" , obtained: \"movieclip\"  [movieclip_destruction_test1.sc:172]\nPASSED: typeof(this) == movieclip  [movieclip_destruction_test1.sc:173]\nPASSED: this.valueOf() == null  [movieclip_destruction_test1.sc:174]\nPASSED: _root.testvar1 == 100  [movieclip_destruction_test1.sc:180]\nPASSED: _root.testvar2 == 200  [movieclip_destruction_test1.sc:181]\nPASSED: typeof(_root.mc4Ref) == movieclip  [movieclip_destruction_test1.sc:182]\nPASSED: _root.mc4Ref.valueOf() == undefined  [movieclip_destruction_test1.sc:183]\nPASSED: typeof(_root.mc5) == movieclip  [movieclip_destruction_test1.sc:192]\nFAILED: this.valueOf(): expected: \"_level0.mc5\" , obtained: \"undefined\"  [movieclip_destruction_test1.sc:198]\nPASSED: typeof(_root.mc5) == movieclip  [movieclip_destruction_test1.sc:201]\nPASSED: typeof(this) == movieclip  [movieclip_destruction_test1.sc:202]\nPASSED: this ==   [movieclip_destruction_test1.sc:203]\nPASSED: _root.testvar1 == 300  [movieclip_destruction_test1.sc:209]\nPASSED: _root.testvar2 == 400  [movieclip_destruction_test1.sc:210]\nPASSED: typeof(_root.mc5) == movieclip  [movieclip_destruction_test1.sc:211]\nFAILED: mc5.getDepth(): expected: \"-32969\" , obtained: \"-2147483648\"  [movieclip_destruction_test1.sc:212]\nPASSED: this.__proto__ == [object Object]  [movieclip_destruction_test1.sc:256]\nFAILED: initActionExecuted: expected: \"mc2, mc3, mc61, mc6, mc8\" , obtained: \"mc2, mc3, mc61, mc6, mc6, mc8\"  [movieclip_destruction_test1.sc:294]\nTotal tests run: 24 typeof expected: number\nFAILED: TOTAL tests run: 24, expected: 39 [ [movieclip_destruction_test1.sc:296]]\n#passed: 18\n#failed: 7\n__END_OF_TEST__",
@@ -116,7 +116,7 @@
         "expected_lines": 56,
         "matching_lines": 41
       },
-      "duration": 20.73,
+      "duration": 20.78,
       "status": "output_mismatch",
       "detail": "15 line(s) differ (actual=56, expected=56)",
       "actual_output": "PASSED: typeof(mc1) == movieclip  [movieclip_destruction_test2.sc:81]\nPASSED: mc1.getDepth() == -16383  [movieclip_destruction_test2.sc:82]\nPASSED: mc2.getDepth() == -16382  [movieclip_destruction_test2.sc:83]\nPASSED: mc3.getDepth() == -16381  [movieclip_destruction_test2.sc:84]\nFAILED: mc2.getDepth(): expected: \"-16387\" , obtained: \"-16382\"  [movieclip_destruction_test2.sc:88]\nFAILED: this.getDepth(): expected: \"-16387\" , obtained: \"-16382\"  [movieclip_destruction_test2.sc:89]\nPASSED: mc2.testvar == 100  [movieclip_destruction_test2.sc:92]\nPASSED: mc3.testvar == 100  [movieclip_destruction_test2.sc:97]\nPASSED: mc2UnlaodedCount == 1  [movieclip_destruction_test2.sc:116]\nPASSED: mc3UnlaodedCount == 1  [movieclip_destruction_test2.sc:117]\nPASSED: mc1Ref.valueOf() == null  [movieclip_destruction_test2.sc:118]\nPASSED: mc2Ref == _level0.mc2  [movieclip_destruction_test2.sc:119]\nPASSED: mc3Ref == _level0.mc3  [movieclip_destruction_test2.sc:120]\nPASSED: typeof(mc1) == undefined  [movieclip_destruction_test2.sc:122]\nPASSED: _root.getInstanceAtDepth(-16386) == undefined  [movieclip_destruction_test2.sc:124]\nPASSED: typeof(mc2) == movieclip  [movieclip_destruction_test2.sc:125]\nPASSED: typeof(mc3) == movieclip  [movieclip_destruction_test2.sc:126]\nPASSED: mc2.getDepth() == -16387  [movieclip_destruction_test2.sc:127]\nPASSED: mc3.getDepth() == -16388  [movieclip_destruction_test2.sc:128]\nFAILED: mc2.getDepth(): expected: \"-16387\" , obtained: \"-16388\"  [movieclip_destruction_test2.sc:131]\nFAILED: mc3.getDepth(): expected: \"-16388\" , obtained: \"-16387\"  [movieclip_destruction_test2.sc:132]\nFAILED: mc2.getDepth(): expected: \"-16387\" , obtained: \"-16388\"  [movieclip_destruction_test2.sc:136]\nFAILED: mc3.getDepth(): expected: \"-16388\" , obtained: \"-16387\"  [movieclip_destruction_test2.sc:137]\nPASSED: mc2.testvar == 100  [movieclip_destruction_test2.sc:139]\nPASSED: mc3.testvar == 100  [movieclip_destruction_test2.sc:140]\nPASSED: mc2UnlaodedCount == 1  [movieclip_destruction_test2.sc:143]\nPASSED: mc2UnlaodedCount == 1  [movieclip_destruction_test2.sc:144]\nPASSED: typeof(mc2) == movieclip  [movieclip_destruction_test2.sc:145]\nPASSED: typeof(mc3) == movieclip  [movieclip_destruction_test2.sc:146]\nFAILED: mc2.getDepth(): expected: \"-16387\" , obtained: \"-16388\"  [movieclip_destruction_test2.sc:147]\nFAILED: mc3.getDepth(): expected: \"-16388\" , obtained: \"-16387\"  [movieclip_destruction_test2.sc:148]\nPASSED: mc2._x == 200  [movieclip_destruction_test2.sc:149]\nPASSED: mc3._y == 300  [movieclip_destruction_test2.sc:150]\nPASSED: mc2.testvar == 100  [movieclip_destruction_test2.sc:151]\nPASSED: mc3.testvar == 100  [movieclip_destruction_test2.sc:152]\nFAILED: mc2.getDepth(): expected: \"-16387\" , obtained: \"-16388\"  [movieclip_destruction_test2.sc:88]\nFAILED: this.getDepth(): expected: \"-16387\" , obtained: \"-16388\"  [movieclip_destruction_test2.sc:89]\nPASSED: mc2.testvar == 100  [movieclip_destruction_test2.sc:92]\nPASSED: mc3.testvar == 100  [movieclip_destruction_test2.sc:97]\nFAILED: mc2UnlaodedCount: expected: \"2\" , obtained: \"1\"  [movieclip_destruction_test2.sc:156]\nFAILED: mc2UnlaodedCount: expected: \"2\" , obtained: \"1\"  [movieclip_destruction_test2.sc:157]\nPASSED: typeof(mc1) == undefined  [movieclip_destruction_test2.sc:163]\nPASSED: typeof(mc2) == undefined  [movieclip_destruction_test2.sc:164]\nPASSED: typeof(mc3) == undefined  [movieclip_destruction_test2.sc:165]\nPASSED: mc1Ref.valueOf() == null  [movieclip_destruction_test2.sc:166]\nPASSED: mc2Ref.valueOf() == null  [movieclip_destruction_test2.sc:167]\nPASSED: mc3Ref.valueOf() == null  [movieclip_destruction_test2.sc:168]\nPASSED: mc1.getDepth() == -16380  [movieclip_destruction_test2.sc:175]\nFAILED: mc1.getDepth(): expected: \"-16380\" , obtained: \"-16384\"  [movieclip_destruction_test2.sc:177]\nPASSED: mc1.getDepth() == -16384  [movieclip_destruction_test2.sc:179]\n... (6 lines after) ...",
@@ -130,7 +130,7 @@
         "expected_lines": 40,
         "matching_lines": 8
       },
-      "duration": 20.74,
+      "duration": 20.23,
       "status": "output_mismatch",
       "detail": "32 line(s) differ (actual=24, expected=40)",
       "actual_output": "... (3 lines before) ...\nRunning frame1[1] actions of mc2[/brother2] (adding red square) [movieclip_destruction_test4.sc:76]\nRunning frame1[1] actions of mc3[/brother3] (adding blue square) [movieclip_destruction_test4.sc:101]\nRunning frame1[1] actions of mc3[/brother4] (adding blue square) [movieclip_destruction_test4.sc:101]\nRunning frame1[1] actions of mc3[/brother5] (adding blue square) [movieclip_destruction_test4.sc:101]\nRunning frame1[1] actions of mc3[/brother6] (adding blue square) [movieclip_destruction_test4.sc:101]\nRunning frame3 actions of _root (nothing new) [movieclip_destruction_test4.sc:154]\nRunning frame5 actions of _root [movieclip_destruction_test4.sc:160]\nFAILED: typeof(brother1): expected: \"undefined\" , obtained: \"movieclip\"  [movieclip_destruction_test4.sc:161]\nPASSED: typeof(brother2) == movieclip  [movieclip_destruction_test4.sc:162]\nFAILED: typeof(brother3): expected: \"undefined\" , obtained: \"movieclip\"  [movieclip_destruction_test4.sc:163]\nPASSED: typeof(brother4) == movieclip  [movieclip_destruction_test4.sc:164]\nPASSED: typeof(brother5) == movieclip  [movieclip_destruction_test4.sc:165]\nPASSED: typeof(brother6) == movieclip  [movieclip_destruction_test4.sc:166]\nFAILED: typeof(brother1): expected: \"undefined\" , obtained: \"movieclip\"  [movieclip_destruction_test4.sc:172]\nPASSED: typeof(brother2) == movieclip  [movieclip_destruction_test4.sc:173]\nFAILED: typeof(brother3): expected: \"undefined\" , obtained: \"movieclip\"  [movieclip_destruction_test4.sc:174]\nTotal tests run: 9 typeof expected: number\nFAILED: TOTAL tests run: 9, expected: 19 [ [movieclip_destruction_test4.sc:176]]\n#passed: 5\n#failed: 5\n__END_OF_TEST__",
@@ -141,7 +141,7 @@
       "num_frames": 30,
       "status": "runtime_error",
       "detail": "exit code -6",
-      "duration": 20.88,
+      "duration": 21.25,
       "lines": {
         "actual_lines": 12,
         "expected_lines": 24,
@@ -156,7 +156,7 @@
         "expected_lines": 27,
         "matching_lines": 9
       },
-      "duration": 19.45,
+      "duration": 20.64,
       "status": "output_mismatch",
       "detail": "18 line(s) differ (actual=27, expected=27)",
       "actual_output": "root first InitAction of frame1 (where we check if object placed after is visible) [registerclass_test3.sc:67]\nFAILED: typeof(player.movie): expected: \"movieclip\" , obtained: \"undefined\"  [registerclass_test3.sc:68]\nPASSED: player.movie.__proto__ == [object Object]  [registerclass_test3.sc:69]\nroot second InitAction of frame1 (where the class is defined) [registerclass_test3.sc:81]\nFAILED: typeof(player.movie): expected: \"movieclip\" , obtained: \"undefined\"  [registerclass_test3.sc:82]\nPASSED: player.movie.__proto__ == [object Object]  [registerclass_test3.sc:83]\nroot third InitAction of frame1 (where registerClass is invoked) [registerclass_test3.sc:91]\nPASSED: typeof(clip1) == movieclip  [registerclass_test3.sc:126]\nPASSED: clip1.__proto__ == [object Object]  [registerclass_test3.sc:127]\nFAILED: typeof(dup1): expected: \"movieclip\" , obtained: \"undefined\"  [registerclass_test3.sc:130]\nPASSED: dup1.__proto__ == [object Object]  [registerclass_test3.sc:131]\nFAILED: dup1.testvar: expected: \"60\" , obtained: \"\"  [registerclass_test3.sc:132]\nPASSED: typeof(libItem1) == undefined  [registerclass_test3.sc:135]\nFAILED: typeof(libItem2): expected: \"movieclip\" , obtained: \"undefined\"  [registerclass_test3.sc:143]\nPASSED: libItem2.__proto__ == [object Object]  [registerclass_test3.sc:144]\nPASSED: libItem2.__proto__ == [object Object]  [registerclass_test3.sc:145]\nFAILED: typeof(libItem2.child2): expected: \"movieclip\" , obtained: \"undefined\"  [registerclass_test3.sc:149]\nroot DoAction of frame1 [registerclass_test3.sc:54]\nPASSED: typeof(player.movie) == movieclip  [registerclass_test3.sc:55]\nPASSED: player.movie.__proto__ == [object Object]  [registerclass_test3.sc:56]\nPASSED: _root.testvar == 100  [registerclass_test3.sc:58]\nPASSED: libItem2.__proto__ == [object Object]  [registerclass_test3.sc:117]\nPASSED: libItem2.__proto__ == [object Object]  [registerclass_test3.sc:156]\nTotal tests run: 19 typeof expected: number\n#passed: 13\n#failed: 6\n__END_OF_TEST__",
@@ -168,12 +168,12 @@
       "lines": {
         "actual_lines": 42,
         "expected_lines": 45,
-        "matching_lines": 16
+        "matching_lines": 17
       },
-      "duration": 19.32,
+      "duration": 20.1,
       "status": "output_mismatch",
-      "detail": "29 line(s) differ (actual=42, expected=45)",
-      "actual_output": "PASSED:  [soft_reference_test1.sc:39]\nPASSED:  [soft_reference_test1.sc:40]\nPASSED:  [soft_reference_test1.sc:41]\nPASSED:  [soft_reference_test1.sc:42]\nFAILED:  [soft_reference_test1.sc:50]\nPASSED:  [soft_reference_test1.sc:51]\nFAILED:  [soft_reference_test1.sc:52]\nFAILED:  [soft_reference_test1.sc:53]\nFAILED:  [soft_reference_test1.sc:61]\nPASSED:  [soft_reference_test1.sc:62]\nFAILED:  [soft_reference_test1.sc:63]\nPASSED:  [soft_reference_test1.sc:64]\nPASSED:  [soft_reference_test1.sc:68]\nPASSED:  [soft_reference_test1.sc:69]\nPASSED:  [soft_reference_test1.sc:70]\nFAILED:  [soft_reference_test1.sc:74]\nFAILED:  [soft_reference_test1.sc:82]\nPASSED:  [soft_reference_test1.sc:83]\nFAILED:  [soft_reference_test1.sc:85]\nPASSED:  [soft_reference_test1.sc:86]\nPASSED:  [soft_reference_test1.sc:87]\nFAILED:  [soft_reference_test1.sc:91]\nFAILED:  [soft_reference_test1.sc:92]\nPASSED:  [soft_reference_test1.sc:94]\nPASSED:  [soft_reference_test1.sc:95]\nFAILED:  [soft_reference_test1.sc:111]\nFAILED: mcRef.getDepth(): expected: \"30\" , obtained: \"\"  [soft_reference_test1.sc:112]\nFAILED:  [soft_reference_test1.sc:113]\nFAILED:  [soft_reference_test1.sc:118]\nPASSED:  [soft_reference_test1.sc:126]\nFAILED: mcContainer[0].getDepth(): expected: \"50\" , obtained: \"\"  [soft_reference_test1.sc:145]\nFAILED: mcContainer[1].getDepth(): expected: \"51\" , obtained: \"\"  [soft_reference_test1.sc:146]\nFAILED: mc1.getDepth(): expected: \"50\" , obtained: \"51\"  [soft_reference_test1.sc:147]\nPASSED:  [soft_reference_test1.sc:152]\nFAILED: mcRef.getDepth(): expected: \"50\" , obtained: \"40\"  [soft_reference_test1.sc:153]\nPASSED:  [soft_reference_test1.sc:154]\nPASSED:  [soft_reference_test1.sc:159]\nFAILED:  [soft_reference_test1.sc:164]\nTotal tests run: 38 typeof expected: number\n#passed: 19\n#failed: 19\n__END_OF_TEST__",
+      "detail": "28 line(s) differ (actual=42, expected=45)",
+      "actual_output": "PASSED:  [soft_reference_test1.sc:39]\nPASSED:  [soft_reference_test1.sc:40]\nPASSED:  [soft_reference_test1.sc:41]\nPASSED:  [soft_reference_test1.sc:42]\nFAILED:  [soft_reference_test1.sc:50]\nPASSED:  [soft_reference_test1.sc:51]\nFAILED:  [soft_reference_test1.sc:52]\nFAILED:  [soft_reference_test1.sc:53]\nFAILED:  [soft_reference_test1.sc:61]\nPASSED:  [soft_reference_test1.sc:62]\nFAILED:  [soft_reference_test1.sc:63]\nPASSED:  [soft_reference_test1.sc:64]\nPASSED:  [soft_reference_test1.sc:68]\nPASSED:  [soft_reference_test1.sc:69]\nPASSED:  [soft_reference_test1.sc:70]\nFAILED:  [soft_reference_test1.sc:74]\nFAILED:  [soft_reference_test1.sc:82]\nPASSED:  [soft_reference_test1.sc:83]\nFAILED:  [soft_reference_test1.sc:85]\nPASSED:  [soft_reference_test1.sc:86]\nPASSED:  [soft_reference_test1.sc:87]\nFAILED:  [soft_reference_test1.sc:91]\nFAILED:  [soft_reference_test1.sc:92]\nPASSED:  [soft_reference_test1.sc:94]\nPASSED:  [soft_reference_test1.sc:95]\nFAILED:  [soft_reference_test1.sc:111]\nFAILED: mcRef.getDepth(): expected: \"30\" , obtained: \"\"  [soft_reference_test1.sc:112]\nPASSED:  [soft_reference_test1.sc:113]\nFAILED:  [soft_reference_test1.sc:118]\nPASSED:  [soft_reference_test1.sc:126]\nFAILED: mcContainer[0].getDepth(): expected: \"50\" , obtained: \"\"  [soft_reference_test1.sc:145]\nFAILED: mcContainer[1].getDepth(): expected: \"51\" , obtained: \"\"  [soft_reference_test1.sc:146]\nFAILED: mc1.getDepth(): expected: \"50\" , obtained: \"51\"  [soft_reference_test1.sc:147]\nPASSED:  [soft_reference_test1.sc:152]\nFAILED: mcRef.getDepth(): expected: \"50\" , obtained: \"40\"  [soft_reference_test1.sc:153]\nPASSED:  [soft_reference_test1.sc:154]\nPASSED:  [soft_reference_test1.sc:159]\nFAILED:  [soft_reference_test1.sc:164]\nTotal tests run: 38 typeof expected: number\n#passed: 20\n#failed: 18\n__END_OF_TEST__",
       "expected_output": "PASSED:  [soft_reference_test1.sc:39]\nPASSED:  [soft_reference_test1.sc:40]\nPASSED:  [soft_reference_test1.sc:41]\nPASSED:  [soft_reference_test1.sc:42]\nPASSED:  [soft_reference_test1.sc:50]\nPASSED:  [soft_reference_test1.sc:51]\nPASSED:  [soft_reference_test1.sc:52]\nPASSED:  [soft_reference_test1.sc:53]\nPASSED:  [soft_reference_test1.sc:61]\nPASSED:  [soft_reference_test1.sc:62]\nPASSED:  [soft_reference_test1.sc:63]\nPASSED:  [soft_reference_test1.sc:64]\nPASSED:  [soft_reference_test1.sc:68]\nPASSED:  [soft_reference_test1.sc:69]\nPASSED:  [soft_reference_test1.sc:70]\nPASSED:  [soft_reference_test1.sc:74]\nPASSED:  [soft_reference_test1.sc:82]\nPASSED:  [soft_reference_test1.sc:83]\nPASSED:  [soft_reference_test1.sc:85]\nPASSED:  [soft_reference_test1.sc:86]\nPASSED:  [soft_reference_test1.sc:87]\nPASSED:  [soft_reference_test1.sc:91]\nPASSED:  [soft_reference_test1.sc:92]\nPASSED:  [soft_reference_test1.sc:94]\nPASSED:  [soft_reference_test1.sc:95]\nPASSED:  [soft_reference_test1.sc:111]\nPASSED: mcRef.getDepth() == 30  [soft_reference_test1.sc:112]\nPASSED:  [soft_reference_test1.sc:113]\nPASSED:  [soft_reference_test1.sc:118]\nPASSED:  [soft_reference_test1.sc:126]\nConstructed _level0.mc1 in depth 50 and assigned to mcContainer[0] [soft_reference_test1.sc:141]\nConstructed _level0.mc1 in depth 51 and assigned to mcContainer[1] [soft_reference_test1.sc:141]\nPASSED: mcContainer[0].getDepth() == 50  [soft_reference_test1.sc:145]\nPASSED: mcContainer[1].getDepth() == 51  [soft_reference_test1.sc:146]\nPASSED: mc1.getDepth() == 50  [soft_reference_test1.sc:147]\nPASSED:  [soft_reference_test1.sc:152]\nPASSED: mcRef.getDepth() == 50  [soft_reference_test1.sc:153]\nPASSED:  [soft_reference_test1.sc:154]\nConstructed _level0.mc2 in depth 60 and assigned to mcContainer[2] [soft_reference_test1.sc:141]\nPASSED:  [soft_reference_test1.sc:159]\nPASSED:  [soft_reference_test1.sc:164]\nTotal tests run: 38 typeof expected: number\n#passed: 38\n#failed: 0\n__END_OF_TEST__"
     },
     {
@@ -184,7 +184,7 @@
         "expected_lines": 7,
         "matching_lines": 5
       },
-      "duration": 19.04,
+      "duration": 19.21,
       "status": "output_mismatch",
       "detail": "7 line(s) differ (actual=12, expected=7)",
       "actual_output": "Sound duration is: \n13740\nCorrect value should be 13740 or 13766 (depending on liblame version)\nNow I'll get the position before starting it\nPosition is:\nundefined\nFAILED: snd.position: expected: \"0\" , obtained: \"\"  [sound.sc:39]\nTotal tests run: 1 typeof expected: number\nFAILED: TOTAL tests run: 1, expected: 2 [ [sound.sc:61]]\n#passed: 0\n#failed: 2\n__END_OF_TEST__",
@@ -198,7 +198,7 @@
         "expected_lines": 11,
         "matching_lines": 8
       },
-      "duration": 19.45,
+      "duration": 19.82,
       "status": "output_mismatch",
       "detail": "3 line(s) differ (actual=11, expected=11)",
       "actual_output": "... (1 lines before) ...\ndoaction2 in frame1\nmc1 placed in frame1\ndoaction1 in frame2\nPASSED: var1 == val1  [stackscope.sc:83]\nPASSED: var2 == val2  [stackscope.sc:84]\nFAILED: typeof(var3): expected: \"undefined\" , obtained: \"string\"  [stackscope.sc:85]\nTotal tests run: 3 typeof expected: number\n#passed: 2\n#failed: 1\n__END_OF_TEST__",
@@ -212,7 +212,7 @@
         "expected_lines": 4,
         "matching_lines": 0
       },
-      "duration": 18.89,
+      "duration": 18.78,
       "status": "output_mismatch",
       "detail": "4 line(s) differ (actual=4, expected=4)",
       "actual_output": "PASSED:  [submoviegetvar.sc:58]\nENDOFTEST\nPASSED:  [submoviegetvar.sc:52]\nPASSED:  [submoviegetvar.sc:46]",
@@ -226,7 +226,7 @@
         "expected_lines": 117,
         "matching_lines": 74
       },
-      "duration": 19.67,
+      "duration": 20.57,
       "status": "output_mismatch",
       "detail": "43 line(s) differ (actual=117, expected=117)",
       "actual_output": "... (16 lines before) ...\nPASSED: null == undefined [swf4opcode.sc:107]\nPASSED: null == 0 [swf4opcode.sc:108]\nPASSED: NaN == 0 [swf4opcode.sc:112]\nPASSED: (x+y) == 5 [swf4opcode.sc:125]\nPASSED: y > x [swf4opcode.sc:126]\nFAILED: !neg [swf4opcode.sc:128]\nFAILED: !neg [swf4opcode.sc:130]\nPASSED: y == 0 [swf4opcode.sc:132]\nPASSED: y == 4 [swf4opcode.sc:134]\nPASSED: y == 4.5 [swf4opcode.sc:137]\nPASSED: y == 4 [swf4opcode.sc:139]\nPASSED: y == 45000 [swf4opcode.sc:142]\nPASSED: y == 45000 [swf4opcode.sc:144]\nPASSED: y == 45000 [swf4opcode.sc:146]\nPASSED: y == -45000 [swf4opcode.sc:148]\nPASSED: y == 45000 [swf4opcode.sc:150]\nPASSED: y == 0.00045 [swf4opcode.sc:152]\nPASSED: y == -0.00045 [swf4opcode.sc:154]\nPASSED: x+1 == 21 [swf4opcode.sc:156]\nPASSED: !\"\" [swf4opcode.sc:160]\nPASSED: !\"a\" [swf4opcode.sc:161]\nPASSED: !\"true\" [swf4opcode.sc:162]\nPASSED: !\"fals\"\" [swf4opcode.sc:163]\nPASSED: \"1\" [swf4opcode.sc:164]\nPASSED: !\"0000.000\" [swf4opcode.sc:165]\nPASSED: !false [swf4opcode.sc:166]\nPASSED: true [swf4opcode.sc:167]\nPASSED: !0 [swf4opcode.sc:168]\nPASSED: 4 [swf4opcode.sc:169]\nPASSED: !_root [swf4opcode.sc:170]\nPASSED: !_level0 [swf4opcode.sc:171]\nPASSED: !null [swf4opcode.sc:172]\nPASSED: !undefined [swf4opcode.sc:173]\nPASSED: ! (x < y) [swf4opcode.sc:182]\nPASSED: ! (x > y) [swf4opcode.sc:183]\nPASSED: x == y [swf4opcode.sc:184]\nPASSED: x == 0 [swf4opcode.sc:185]\nPASSED: z == 0 [swf4opcode.sc:193]\nPASSED: z == 0 [swf4opcode.sc:195]\nPASSED: z == 1 [swf4opcode.sc:197]\nPASSED: z == -1 [swf4opcode.sc:199]\nPASSED: /mc1:_x == undefined [swf4opcode.sc:222]\nFAILED: expected: 100 obtained:  [swf4opcode.sc:224]\nFAILED: expected: 100 obtained:  [swf4opcode.sc:226]\nFAILED: expected: 100 obtained:  [swf4opcode.sc:228]\nPASSED: /mc1.x == 0 [swf4opcode.sc:230]\nFAILED: expected: 100 obtained:  [swf4opcode.sc:232]\nPASSED: /mc1.x == 0 [swf4opcode.sc:235]\nFAILED: expected: 100 obtained:  [swf4opcode.sc:239]\nPASSED: /mc1:_y == undefined [swf4opcode.sc:242]\n... (51 lines after) ...",
