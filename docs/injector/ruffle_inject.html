@@ -55,9 +55,6 @@ button:disabled { background: #555; cursor: default; }
     Drop .swf or click to load
     <input type="file" id="fileInput" accept=".swf">
   </div>
-  <button onclick="loadTestSwf('ruffle_inject/test_baseline.swf')">Test: baseline trace</button>
-  <button onclick="loadTestSwf('ruffle_inject/test_two_actions.swf')">Test: two DoActions</button>
-  <button onclick="loadTestSwf('ruffle_inject/test_ei.swf')">Test: ExternalInterface</button>
   <span id="loaded-name" class="loaded-name"></span>
 </div>
 <div class="layout">
@@ -319,51 +316,6 @@ function loadIntoRuffle(swfBytes) {
             doLoad();
         };
         script.onerror = function() { log('Failed to load Ruffle from CDN.'); };
-        document.head.appendChild(script);
-    } else {
-        doLoad();
-    }
-}
-
-function loadTestSwf(url) {
-    log('Loading pre-modified SWF: ' + url);
-    document.getElementById('loaded-name').textContent = url;
-
-    function doLoad() {
-        log('Loading into Ruffle via URL...');
-        player.ruffle().load({
-            url: url,
-            autoplay: 'on',
-            allowScriptAccess: true,
-            letterbox: 'off'
-        }).then(function() {
-            log('SWF loaded.');
-            player.ruffle().traceObserver = function(msg) { log('[trace] ' + msg); };
-            setTimeout(function() {
-                try {
-                    var check = player.ruffle().callExternalInterface('wireCheck');
-                    log('wireCheck: ' + check);
-                } catch(err) {
-                    log('wireCheck error: ' + err.message);
-                }
-            }, 1000);
-        }).catch(function(err) {
-            log('Failed: ' + err.message);
-        });
-    }
-
-    if (!ruffleObj) {
-        var script = document.createElement('script');
-        script.src = 'https://unpkg.com/@ruffle-rs/ruffle';
-        script.onload = function() {
-            ruffleObj = window.RufflePlayer.newest();
-            player = ruffleObj.createPlayer();
-            player.style.width = '100%';
-            player.style.height = '100%';
-            document.getElementById('ruffle-container').appendChild(player);
-            doLoad();
-        };
-        script.onerror = function() { log('Failed to load Ruffle.'); };
         document.head.appendChild(script);
     } else {
         doLoad();
