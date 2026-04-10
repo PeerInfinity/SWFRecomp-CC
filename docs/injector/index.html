@@ -91,7 +91,8 @@ footer a { color: #e94560; text-decoration: none; }
         <p>
             These demos explore LittleCube's proposal: implement the AS2 runtime through
             actual ActionScript code, build a "runtime" SWF from it, and recompile it
-            alongside the game SWF. Three approaches are compared.
+            alongside the game SWF. Multiple approaches are compared, plus a graphics
+            demo showing display list inspection.
         </p>
 
         <h2>Demos</h2>
@@ -133,6 +134,18 @@ footer a { color: #e94560; text-decoration: none; }
                     with prototype methods &mdash; all immediately available to the main SWF.
                 </p>
                 <a href="prelude_swf.html" class="btn">Run Demo</a>
+            </div>
+
+            <div class="demo-card" style="border-left-color: #7B1FA2;">
+                <h3 style="color: #7B1FA2;">Display Editor (Graphics)</h3>
+                <span class="tag" style="background: #4a148c; color: #ce93d8;">WebGPU</span>
+                <span class="tag c">C test_harness</span>
+                <p class="desc">
+                    Three colored rectangles rendered via WebGPU. A C test harness dumps the
+                    display list after the first frame, showing each shape's depth, position,
+                    scale, rotation, and character type. Foundation for live display list editing.
+                </p>
+                <a href="display_editor.html" class="btn" style="background: #7B1FA2;">Run Demo</a>
             </div>
         </div>
 
