@@ -221,6 +221,14 @@ cp "${TEST_DIR}/RecompiledScripts"/*.h "${BUILD_DIR}/" 2>/dev/null || true
 cp "${TEST_DIR}/RecompiledTags"/*.c "${BUILD_DIR}/" 2>/dev/null || true
 cp "${TEST_DIR}/RecompiledTags"/*.h "${BUILD_DIR}/" 2>/dev/null || true
 
+# Copy test harness if present (per-test custom C code)
+EXTRA_DEFINES=""
+if [ -f "${TEST_DIR}/test_harness.c" ]; then
+    cp "${TEST_DIR}/test_harness.c" "${BUILD_DIR}/"
+    EXTRA_DEFINES="-DHAS_TEST_HARNESS"
+    echo "Found test_harness.c"
+fi
+
 # Build
 if [ "$TARGET" == "wasm" ]; then
     echo "Building WASM with SWFModernRuntime..."
@@ -239,6 +247,7 @@ if [ "$TARGET" == "wasm" ]; then
         emcc \
             *.c \
             -DUSE_WEBGPU \
+            ${EXTRA_DEFINES} \
             --use-port=emdawnwebgpu \
             -Wno-error=implicit-function-declaration \
             -I. \
@@ -262,6 +271,7 @@ if [ "$TARGET" == "wasm" ]; then
         emcc \
             *.c \
             -DNO_GRAPHICS \
+            ${EXTRA_DEFINES} \
             -I. \
             -I"${SWFMODERN_INC}" \
             -I"${SWFMODERN_INC}/actionmodern" \
