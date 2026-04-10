@@ -31,87 +31,79 @@ class DisplayBridge {
         ExternalInterface.addCallback("getDisplayList", null, function():String {
             var items:Array = [];
             var seen:Object = {};
+            var MAX_ITEMS:Number = 500;
 
-            // Enumerate clips to scan: _root and _holder
-            var roots:Array = [_root, _root._holder];
-            var ri:Number = 0;
-            while (ri < roots.length) {
-                var clip:MovieClip = roots[ri];
-                ri++;
-                if (clip == undefined) continue;
+            // BFS queue: [clip, prefix] pairs
+            var queue:Array = [];
+            queue.push({clip: _root, prefix: ""});
+            if (_root._holder != undefined) {
+                queue.push({clip: _root._holder, prefix: ""});
+            }
+
+            var qi:Number = 0;
+            while (qi < queue.length && items.length < MAX_ITEMS) {
+                var entry:Object = queue[qi];
+                qi++;
+                var clip:MovieClip = entry.clip;
+                var prefix:String = entry.prefix;
 
                 // 1. for..in enumeration (finds named MCs)
                 for (var name:String in clip) {
+                    if (items.length >= MAX_ITEMS) break;
                     var child = clip[name];
-                    if (typeof(child) == "movieclip" && name != "_holder" && !seen[name]) {
-                        seen[name] = true;
-                        items.push(
-                            '{"name":"' + name + '"'
-                            + ',"type":"movieclip"'
-                            + ',"x":' + child._x
-                            + ',"y":' + child._y
-                            + ',"xscale":' + child._xscale
-                            + ',"yscale":' + child._yscale
-                            + ',"rotation":' + child._rotation
-                            + ',"alpha":' + child._alpha
-                            + ',"visible":' + child._visible
-                            + ',"width":' + child._width
-                            + ',"height":' + child._height
-                            + '}'
-                        );
-                        // Recurse into child MC
-                        for (var cname:String in child) {
-                            var gc = child[cname];
-                            if (typeof(gc) == "movieclip") {
-                                var fullName:String = name + "." + cname;
-                                if (!seen[fullName]) {
-                                    seen[fullName] = true;
-                                    items.push(
-                                        '{"name":"' + fullName + '"'
-                                        + ',"type":"movieclip"'
-                                        + ',"x":' + gc._x
-                                        + ',"y":' + gc._y
-                                        + ',"xscale":' + gc._xscale
-                                        + ',"yscale":' + gc._yscale
-                                        + ',"rotation":' + gc._rotation
-                                        + ',"alpha":' + gc._alpha
-                                        + ',"visible":' + gc._visible
-                                        + ',"width":' + gc._width
-                                        + ',"height":' + gc._height
-                                        + '}'
-                                    );
-                                }
-                            }
-                        }
-                    }
+                    if (typeof(child) != "movieclip") continue;
+                    if (name == "_holder") continue;
+                    var path:String = (prefix.length > 0) ? prefix + "." + name : name;
+                    if (seen[path]) continue;
+                    seen[path] = true;
+                    items.push(
+                        '{"name":"' + path + '"'
+                        + ',"type":"movieclip"'
+                        + ',"x":' + child._x
+                        + ',"y":' + child._y
+                        + ',"xscale":' + child._xscale
+                        + ',"yscale":' + child._yscale
+                        + ',"rotation":' + child._rotation
+                        + ',"alpha":' + child._alpha
+                        + ',"visible":' + child._visible
+                        + ',"width":' + child._width
+                        + ',"height":' + child._height
+                        + '}'
+                    );
+                    // Queue child for recursive scan
+                    queue.push({clip: child, prefix: path});
                 }
 
-                // 2. Depth scanning (finds unnamed MCs placed on timeline)
-                var d:Number = -16384;
-                while (d <= 16384) {
-                    var inst:MovieClip = clip.getInstanceAtDepth(d);
-                    if (inst != undefined) {
-                        var iname:String = inst._name;
-                        if (iname != "_holder" && !seen[iname]) {
-                            seen[iname] = true;
-                            items.push(
-                                '{"name":"' + iname + '"'
-                                + ',"type":"movieclip"'
-                                + ',"depth":' + d
-                                + ',"x":' + inst._x
-                                + ',"y":' + inst._y
-                                + ',"xscale":' + inst._xscale
-                                + ',"yscale":' + inst._yscale
-                                + ',"rotation":' + inst._rotation
-                                + ',"alpha":' + inst._alpha
-                                + ',"visible":' + inst._visible
-                                + ',"width":' + inst._width
-                                + ',"height":' + inst._height
-                                + '}'
-                            );
+                // 2. Depth scanning (top-level only, finds unnamed MCs)
+                // Only scan roots, not recursed children — too slow otherwise
+                if (prefix.length == 0) {
+                    var d:Number = 0;
+                    while (d <= 1024 && items.length < MAX_ITEMS) {
+                        var inst:MovieClip = clip.getInstanceAtDepth(d);
+                        if (inst != undefined) {
+                            var iname:String = inst._name;
+                            if (iname != "_holder" && !seen[iname]) {
+                                seen[iname] = true;
+                                items.push(
+                                    '{"name":"' + iname + '"'
+                                    + ',"type":"movieclip"'
+                                    + ',"depth":' + d
+                                    + ',"x":' + inst._x
+                                    + ',"y":' + inst._y
+                                    + ',"xscale":' + inst._xscale
+                                    + ',"yscale":' + inst._yscale
+                                    + ',"rotation":' + inst._rotation
+                                    + ',"alpha":' + inst._alpha
+                                    + ',"visible":' + inst._visible
+                                    + ',"width":' + inst._width
+                                    + ',"height":' + inst._height
+                                    + '}'
+                                );
+                                queue.push({clip: inst, prefix: iname});
+                            }
                         }
+                        d++;
                     }
-                    d++;
                 }
             }
             return '{"displayList":[' + items.join(",") + ']}';

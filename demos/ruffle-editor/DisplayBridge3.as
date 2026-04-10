@@ -123,7 +123,10 @@ package {
             return null;
         }
 
-        private function enumContainer(container:DisplayObjectContainer, items:Array, prefix:String = "", maxDepth:int = 3):void {
+        private static var MAX_ITEMS:int = 500;
+
+        private function enumContainer(container:DisplayObjectContainer, items:Array, prefix:String = "", maxDepth:int = 8):void {
+            if (items.length >= MAX_ITEMS) return;
             for (var i:int = 0; i < container.numChildren; i++) {
                 var child:DisplayObject = container.getChildAt(i);
                 var typeName:String = "unknown";
@@ -151,7 +154,7 @@ package {
                 );
 
                 // Recurse into containers (sprites, movieclips)
-                if (maxDepth > 0 && child is DisplayObjectContainer) {
+                if (items.length < MAX_ITEMS && maxDepth > 0 && child is DisplayObjectContainer) {
                     enumContainer(child as DisplayObjectContainer, items, path, maxDepth - 1);
                 }
             }
