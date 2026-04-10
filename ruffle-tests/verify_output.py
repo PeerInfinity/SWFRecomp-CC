@@ -1647,21 +1647,25 @@ def compile_wasm(test_dir, num_frames, build_dir, graphics=False):
         "-w", "-Wno-error=implicit-function-declaration",
         "-O2", "-include", "zlib.h",
         "-sWASM=1",
-        "-sEXPORTED_FUNCTIONS=['_main','_runSWF']",
-        "-sEXPORTED_RUNTIME_METHODS=['ccall','cwrap']",
         "-sALLOW_MEMORY_GROWTH=1",
         "-sUSE_ZLIB=1",
         "-sNO_EXIT_RUNTIME=1",
     ]
     if graphics:
         emcc_args += [
+            "-sEXPORTED_FUNCTIONS=['_main','_runSWF','_audio_fill_buffer']",
+            "-sEXPORTED_RUNTIME_METHODS=['ccall','cwrap','HEAPF32']",
             "--use-port=emdawnwebgpu",
             "-sASYNCIFY",
             "-sASYNCIFY_STACK_SIZE=65536",
             "-sINITIAL_MEMORY=64MB",
         ]
     else:
-        emcc_args.append("-sINITIAL_MEMORY=16MB")
+        emcc_args += [
+            "-sEXPORTED_FUNCTIONS=['_main','_runSWF']",
+            "-sEXPORTED_RUNTIME_METHODS=['ccall','cwrap']",
+            "-sINITIAL_MEMORY=16MB",
+        ]
     emcc_args += ["-o", str(build_dir / "test.js")]
     # Write args to a response file to avoid shell escaping issues
     resp_file = build_dir / "emcc_args.txt"
