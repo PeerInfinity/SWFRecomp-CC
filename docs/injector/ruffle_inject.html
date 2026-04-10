@@ -1,0 +1,403 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Ruffle Display Editor (Inject)</title>
+<style>
+* { margin: 0; padding: 0; box-sizing: border-box; }
+body { font-family: monospace; background: #1a1a1a; color: #e0e0e0; padding: 20px; }
+h1 { color: #e94560; margin-bottom: 10px; font-size: 1.3em; }
+.layout { display: flex; gap: 15px; margin-top: 10px; flex-wrap: wrap; }
+#ruffle-container {
+    width: 400px; height: 400px; background: #fff; border: 1px solid #555;
+    border-radius: 4px; flex-shrink: 0;
+}
+#ruffle-container ruffle-player { width: 100%; height: 100%; }
+#json-editor {
+    background: #111; border: 1px solid #333; border-radius: 8px;
+    padding: 15px; font-family: monospace; font-size: 13px; color: #e0e0e0;
+    flex: 1; min-width: 300px; height: 400px; resize: vertical; tab-size: 2;
+}
+#output {
+    background: #111; border: 1px solid #333; border-radius: 8px;
+    padding: 15px; white-space: pre-wrap; font-size: 13px;
+    width: 100%; max-height: 200px; overflow-y: auto; margin-top: 10px;
+}
+button {
+    background: #e94560; color: white; border: none; padding: 8px 20px;
+    border-radius: 4px; cursor: pointer; font-size: 14px; margin-right: 8px;
+}
+button:hover { background: #d63851; }
+button:disabled { background: #555; cursor: default; }
+.info { color: #888; font-size: 0.9em; margin-bottom: 10px; }
+.controls { margin-top: 10px; }
+.drop-zone {
+    border: 2px dashed #555; border-radius: 8px; padding: 12px 20px;
+    text-align: center; cursor: pointer; transition: all 0.2s;
+    display: inline-block; margin-left: 12px; vertical-align: middle;
+    color: #888; font-size: 0.9em;
+}
+.drop-zone:hover, .drop-zone.dragover {
+    border-color: #e94560; color: #ccc; background: rgba(233, 69, 96, 0.1);
+}
+.drop-zone input { display: none; }
+.loaded-name { color: #e94560; font-size: 0.9em; margin-left: 12px; }
+</style>
+</head>
+<body>
+<h1>Ruffle Display Editor (Inject)</h1>
+<p class="info">Injects ExternalInterface bridge bytecode directly into the SWF — no wrapper needed (AS2 only)</p>
+<div class="controls">
+  <button id="btn-refresh" disabled onclick="refreshData()">Refresh</button>
+  <button id="btn-apply" disabled onclick="applyData()">Apply</button>
+  <div class="drop-zone" id="dropZone">
+    Drop .swf or click to load
+    <input type="file" id="fileInput" accept=".swf">
+  </div>
+  <button onclick="loadTestSwf('ruffle_inject/test_baseline.swf')">Test: baseline trace</button>
+  <button onclick="loadTestSwf('ruffle_inject/test_two_actions.swf')">Test: two DoActions</button>
+  <button onclick="loadTestSwf('ruffle_inject/test_ei.swf')">Test: ExternalInterface</button>
+  <span id="loaded-name" class="loaded-name"></span>
+</div>
+<div class="layout">
+  <div id="ruffle-container"></div>
+  <textarea id="json-editor" placeholder="Drop a .swf file to inject the display list bridge..."></textarea>
+</div>
+<div id="output"></div>
+<script>
+// --- Bridge bytecode (auto-generated from BridgeInject.as via MTASC) ---
+</script>
+<script src="ruffle_inject/bridge_bytecode.js"></script>
+<script>
+var output = document.getElementById('output');
+var player = null;
+var bridgeReady = false;
+var ruffleObj = null;
+
+function log(msg) {
+    output.textContent += msg + '\n';
+    output.scrollTop = output.scrollHeight;
+}
+
+// --- SWF parsing/injection ---
+
+function getSwfVersion(bytes) {
+    return bytes.length >= 4 ? bytes[3] : 0;
+}
+
+function decompressSwf(bytes) {
+    // Returns a promise that resolves to uncompressed FWS bytes
+    var sig = String.fromCharCode(bytes[0], bytes[1], bytes[2]);
+    if (sig === 'FWS') {
+        return Promise.resolve(bytes);
+    } else if (sig === 'CWS' && typeof DecompressionStream !== 'undefined') {
+        var compressed = bytes.slice(8);
+        var ds = new DecompressionStream('deflate');
+        var writer = ds.writable.getWriter();
+        writer.write(compressed);
+        writer.close();
+        return new Response(ds.readable).arrayBuffer().then(function(buf) {
+            var decompressed = new Uint8Array(buf);
+            var fws = new Uint8Array(8 + decompressed.length);
+            fws[0] = 0x46; fws[1] = 0x57; fws[2] = 0x53; // FWS
+            fws.set(bytes.slice(3, 8), 3);
+            fws.set(decompressed, 8);
+            return fws;
+        });
+    }
+    return Promise.reject(new Error('Unknown SWF signature: ' + sig));
+}
+
+function parseSwfDimensions(data) {
+    try {
+        if (String.fromCharCode(data[0], data[1], data[2]) !== 'FWS') return null;
+        var bitPos = 0, bytePos = 8;
+        function readBits(n) {
+            var val = 0;
+            for (var i = 0; i < n; i++) {
+                var b = data[bytePos + (bitPos >> 3)];
+                val = (val << 1) | ((b >> (7 - (bitPos & 7))) & 1);
+                bitPos++;
+            }
+            return val;
+        }
+        var nBits = readBits(5);
+        var xMin = readBits(nBits), xMax = readBits(nBits);
+        var yMin = readBits(nBits), yMax = readBits(nBits);
+        var w = (xMax - xMin) / 20, h = (yMax - yMin) / 20;
+        return (w > 0 && h > 0) ? {width: w, height: h} : null;
+    } catch(e) { return null; }
+}
+
+function findFirstShowFrame(data) {
+    // Skip SWF header: 8 bytes + RECT + 4 bytes (frame rate + count)
+    var pos = 8;
+    var nbits = (data[pos] >> 3) & 0x1F;
+    var totalBits = 5 + nbits * 4;
+    pos += Math.ceil(totalBits / 8);
+    pos += 4; // frame rate + frame count
+
+    // Scan tags
+    while (pos < data.length) {
+        var tagStart = pos;
+        var codeAndLength = data[pos] | (data[pos + 1] << 8);
+        pos += 2;
+        var tagType = (codeAndLength >> 6) & 0x3FF;
+        var length = codeAndLength & 0x3F;
+        if (length === 0x3F) {
+            length = data[pos] | (data[pos+1] << 8) | (data[pos+2] << 16) | (data[pos+3] << 24);
+            pos += 4;
+        }
+        pos += length;
+
+        if (tagType === 1) { // ShowFrame
+            return tagStart; // Insert point: just before first ShowFrame
+        }
+        if (tagType === 0) { // End
+            return tagStart;
+        }
+    }
+    return -1;
+}
+
+function injectBridge(fwsBytes) {
+    // Find insertion point (before first ShowFrame)
+    var insertPos = findFirstShowFrame(fwsBytes);
+    if (insertPos < 0) {
+        log('Could not find ShowFrame tag in SWF');
+        return null;
+    }
+
+    log('Injecting bridge bytecode (' + BRIDGE_BYTECODE.length + ' bytes) at offset ' + insertPos);
+
+    // Ensure SWF version >= 8 so flash.external.ExternalInterface is available
+    if (fwsBytes[3] < 8) {
+        log('Upgrading SWF version from ' + fwsBytes[3] + ' to 8 for ExternalInterface');
+        fwsBytes = new Uint8Array(fwsBytes);
+        fwsBytes[3] = 8;
+    }
+
+    // Build new SWF: [header..insertPos] + bridge + [insertPos..end]
+    var before = fwsBytes.slice(0, insertPos);
+    var after = fwsBytes.slice(insertPos);
+    var result = new Uint8Array(before.length + BRIDGE_BYTECODE.length + after.length);
+    result.set(before, 0);
+    result.set(BRIDGE_BYTECODE, before.length);
+    result.set(after, before.length + BRIDGE_BYTECODE.length);
+
+    // Update file length in header (bytes 4-7, little-endian UI32)
+    var newLength = result.length;
+    result[4] = newLength & 0xFF;
+    result[5] = (newLength >> 8) & 0xFF;
+    result[6] = (newLength >> 16) & 0xFF;
+    result[7] = (newLength >> 24) & 0xFF;
+
+    return result;
+}
+
+// --- Drop zone ---
+var dropZone = document.getElementById('dropZone');
+var fileInput = document.getElementById('fileInput');
+
+dropZone.addEventListener('click', function() { fileInput.click(); });
+dropZone.addEventListener('dragover', function(e) {
+    e.preventDefault();
+    dropZone.classList.add('dragover');
+});
+dropZone.addEventListener('dragleave', function() {
+    dropZone.classList.remove('dragover');
+});
+dropZone.addEventListener('drop', function(e) {
+    e.preventDefault();
+    dropZone.classList.remove('dragover');
+    if (e.dataTransfer.files[0]) loadDroppedSwf(e.dataTransfer.files[0]);
+});
+fileInput.addEventListener('change', function() {
+    if (fileInput.files[0]) loadDroppedSwf(fileInput.files[0]);
+});
+
+function loadDroppedSwf(file) {
+    if (!file.name.toLowerCase().endsWith('.swf')) {
+        log('Please select a .swf file');
+        return;
+    }
+    var reader = new FileReader();
+    reader.onload = function(e) {
+        var bytes = new Uint8Array(e.target.result);
+        var version = getSwfVersion(bytes);
+
+        if (version >= 9) {
+            log(file.name + ': SWF version ' + version + ' (AS3) — injection not supported yet, use the wrapper editor');
+            return;
+        }
+
+        log(file.name + ': SWF version ' + version + ' (AS2)');
+
+        decompressSwf(bytes).then(function(fwsBytes) {
+            var dims = parseSwfDimensions(fwsBytes);
+            if (dims) {
+                log('Stage: ' + dims.width + 'x' + dims.height);
+                document.getElementById('loaded-name').textContent =
+                    file.name + ' (SWF' + version + ', ' + dims.width + 'x' + dims.height + ')';
+                resizePlayer(dims);
+            } else {
+                document.getElementById('loaded-name').textContent = file.name + ' (SWF' + version + ')';
+            }
+
+            var modified = injectBridge(fwsBytes);
+            if (!modified) return;
+
+            loadIntoRuffle(modified);
+        }).catch(function(err) {
+            log('Error decompressing: ' + err.message);
+        });
+    };
+    reader.readAsArrayBuffer(file);
+}
+
+function resizePlayer(dims) {
+    var container = document.getElementById('ruffle-container');
+    var maxW = 640;
+    var scale = Math.min(1, maxW / dims.width);
+    container.style.width = Math.round(dims.width * scale) + 'px';
+    container.style.height = Math.round(dims.height * scale) + 'px';
+}
+
+// --- Ruffle ---
+function loadIntoRuffle(swfBytes) {
+    bridgeReady = false;
+    document.getElementById('btn-refresh').disabled = true;
+    document.getElementById('btn-apply').disabled = true;
+
+    function doLoad() {
+        log('Loading modified SWF into Ruffle...');
+        var blob = new Blob([swfBytes], {type: 'application/x-shockwave-flash'});
+        var blobUrl = URL.createObjectURL(blob);
+        player.ruffle().load({
+            url: blobUrl,
+            autoplay: 'on',
+            allowScriptAccess: true,
+            letterbox: 'off'
+        }).then(function() {
+            log('SWF loaded.');
+            // Set traceObserver AFTER load — traces are buffered
+            player.ruffle().traceObserver = function(msg) {
+                log('[trace] ' + msg);
+            };
+            setTimeout(function() {
+                try {
+                    var check = player.ruffle().callExternalInterface('wireCheck');
+                    log('wireCheck: ' + check);
+                    if (check === 'ok') {
+                        bridgeReady = true;
+                        document.getElementById('btn-refresh').disabled = false;
+                        document.getElementById('btn-apply').disabled = false;
+                        log('Bridge injected and working!');
+                    } else {
+                        log('wireCheck failed: ' + check);
+                    }
+                } catch(err) {
+                    log('ExternalInterface not available: ' + err.message);
+                }
+            }, 500);
+        }).catch(function(err) {
+            log('Failed to load SWF: ' + err.message);
+        });
+    }
+
+    if (!ruffleObj) {
+        log('Loading Ruffle from CDN...');
+        var script = document.createElement('script');
+        script.src = 'https://unpkg.com/@ruffle-rs/ruffle';
+        script.onload = function() {
+            ruffleObj = window.RufflePlayer.newest();
+            player = ruffleObj.createPlayer();
+            player.style.width = '100%';
+            player.style.height = '100%';
+            document.getElementById('ruffle-container').appendChild(player);
+            doLoad();
+        };
+        script.onerror = function() { log('Failed to load Ruffle from CDN.'); };
+        document.head.appendChild(script);
+    } else {
+        doLoad();
+    }
+}
+
+function loadTestSwf(url) {
+    log('Loading pre-modified SWF: ' + url);
+    document.getElementById('loaded-name').textContent = url;
+
+    function doLoad() {
+        log('Loading into Ruffle via URL...');
+        player.ruffle().load({
+            url: url,
+            autoplay: 'on',
+            allowScriptAccess: true,
+            letterbox: 'off'
+        }).then(function() {
+            log('SWF loaded.');
+            player.ruffle().traceObserver = function(msg) { log('[trace] ' + msg); };
+            setTimeout(function() {
+                try {
+                    var check = player.ruffle().callExternalInterface('wireCheck');
+                    log('wireCheck: ' + check);
+                } catch(err) {
+                    log('wireCheck error: ' + err.message);
+                }
+            }, 1000);
+        }).catch(function(err) {
+            log('Failed: ' + err.message);
+        });
+    }
+
+    if (!ruffleObj) {
+        var script = document.createElement('script');
+        script.src = 'https://unpkg.com/@ruffle-rs/ruffle';
+        script.onload = function() {
+            ruffleObj = window.RufflePlayer.newest();
+            player = ruffleObj.createPlayer();
+            player.style.width = '100%';
+            player.style.height = '100%';
+            document.getElementById('ruffle-container').appendChild(player);
+            doLoad();
+        };
+        script.onerror = function() { log('Failed to load Ruffle.'); };
+        document.head.appendChild(script);
+    } else {
+        doLoad();
+    }
+}
+
+function refreshData() {
+    if (!player || !bridgeReady) return;
+    try {
+        var json = player.ruffle().callExternalInterface('getDisplayList');
+        if (typeof json === 'string') {
+            var parsed = JSON.parse(json);
+            document.getElementById('json-editor').value = JSON.stringify(parsed, null, 2);
+            log('Refreshed: ' + parsed.displayList.length + ' objects.');
+        }
+    } catch(e) {
+        log('Error refreshing: ' + e.message);
+    }
+}
+
+function applyData() {
+    if (!player || !bridgeReady) return;
+    try {
+        var data = JSON.parse(document.getElementById('json-editor').value);
+        data.displayList.forEach(function(obj) {
+            var path = obj.path || obj.name;
+            player.ruffle().callExternalInterface('setTransform',
+                path, obj.x, obj.y, obj.xscale, obj.yscale, obj.rotation);
+        });
+        log('Applied transforms for ' + data.displayList.length + ' objects.');
+    } catch(e) {
+        log('Error applying: ' + e.message);
+    }
+}
+</script>
+</body>
+</html>
