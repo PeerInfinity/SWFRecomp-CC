@@ -23,6 +23,8 @@ sup*.swf
 !docs/recompiler/*.swf
 # Allow demo SWFs for runtime-swf experiments
 !demos/**/*.swf
+# Allow deployed wrapper SWFs for injector demos
+!docs/injector/**/*.swf
 
 # Libraries
 zlib.dll
