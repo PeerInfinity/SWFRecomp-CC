@@ -76,6 +76,7 @@ test_vars
 
 # Other
 __pycache__/
+opam-*
 test-and-doc-output.log
 test-run.log
 upstream/
