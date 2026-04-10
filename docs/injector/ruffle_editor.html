@@ -32,6 +32,17 @@ button:hover { background: #1256A0; }
 button:disabled { background: #555; cursor: default; }
 .info { color: #888; font-size: 0.9em; margin-bottom: 10px; }
 .controls { margin-top: 10px; }
+.drop-zone {
+    border: 2px dashed #555; border-radius: 8px; padding: 12px 20px;
+    text-align: center; cursor: pointer; transition: all 0.2s;
+    display: inline-block; margin-left: 12px; vertical-align: middle;
+    color: #888; font-size: 0.9em;
+}
+.drop-zone:hover, .drop-zone.dragover {
+    border-color: #1565C0; color: #ccc; background: rgba(21, 101, 192, 0.1);
+}
+.drop-zone input { display: none; }
+.loaded-name { color: #1565C0; font-size: 0.9em; margin-left: 12px; }
 </style>
 </head>
 <body>
@@ -40,6 +51,11 @@ button:disabled { background: #555; cursor: default; }
 <div class="controls">
   <button id="btn-refresh" disabled onclick="refreshData()">Refresh</button>
   <button id="btn-apply" disabled onclick="applyData()">Apply</button>
+  <div class="drop-zone" id="dropZone">
+    Drop .swf or click to load
+    <input type="file" id="fileInput" accept=".swf">
+  </div>
+  <span id="loaded-name" class="loaded-name"></span>
 </div>
 <div class="layout">
   <div id="ruffle-container"></div>
@@ -49,12 +65,61 @@ button:disabled { background: #555; cursor: default; }
 <script>
 var output = document.getElementById('output');
 var player = null;
+var bridgeReady = false;
 
 function log(msg) {
     output.textContent += msg + '\n';
     output.scrollTop = output.scrollHeight;
 }
 
+// --- Drop zone ---
+var dropZone = document.getElementById('dropZone');
+var fileInput = document.getElementById('fileInput');
+
+dropZone.addEventListener('click', function() { fileInput.click(); });
+dropZone.addEventListener('dragover', function(e) {
+    e.preventDefault();
+    dropZone.classList.add('dragover');
+});
+dropZone.addEventListener('dragleave', function() {
+    dropZone.classList.remove('dragover');
+});
+dropZone.addEventListener('drop', function(e) {
+    e.preventDefault();
+    dropZone.classList.remove('dragover');
+    if (e.dataTransfer.files[0]) loadDroppedSwf(e.dataTransfer.files[0]);
+});
+fileInput.addEventListener('change', function() {
+    if (fileInput.files[0]) loadDroppedSwf(fileInput.files[0]);
+});
+
+function loadDroppedSwf(file) {
+    if (!file.name.toLowerCase().endsWith('.swf')) {
+        log('Please select a .swf file');
+        return;
+    }
+    if (!bridgeReady) {
+        log('Bridge not ready yet, please wait...');
+        return;
+    }
+    var reader = new FileReader();
+    reader.onload = function(e) {
+        var bytes = new Uint8Array(e.target.result);
+        var blob = new Blob([bytes], {type: 'application/x-shockwave-flash'});
+        var blobUrl = URL.createObjectURL(blob);
+        log('Loading ' + file.name + ' via blob URL...');
+        document.getElementById('loaded-name').textContent = file.name;
+        try {
+            player.ruffle().callExternalInterface('loadSwf', blobUrl);
+            log('loadSwf called. Click Refresh after a moment to see the display list.');
+        } catch(err) {
+            log('Error calling loadSwf: ' + err.message);
+        }
+    };
+    reader.readAsArrayBuffer(file);
+}
+
+// --- Ruffle setup ---
 function loadRuffle() {
     log('Loading Ruffle from CDN...');
     var script = document.createElement('script');
@@ -69,28 +134,26 @@ function loadRuffle() {
         var container = document.getElementById('ruffle-container');
         container.appendChild(player);
 
-        // Capture trace output
         player.ruffle().traceObserver = function(msg) {
             log('[trace] ' + msg);
         };
 
-        // Load the wrapper SWF
         player.ruffle().load({
             url: 'ruffle_editor/wrapper_as2.swf',
             autoplay: 'on',
             allowScriptAccess: true,
             letterbox: 'off'
         }).then(function() {
-            log('SWF loaded.');
-            // Give the SWF a moment to initialize ExternalInterface callbacks
+            log('Wrapper SWF loaded.');
             setTimeout(function() {
                 try {
                     var check = player.ruffle().callExternalInterface('wireCheck');
                     log('wireCheck: ' + check);
                     if (check === 'ok') {
+                        bridgeReady = true;
                         document.getElementById('btn-refresh').disabled = false;
                         document.getElementById('btn-apply').disabled = false;
-                        log('ExternalInterface bridge ready.');
+                        log('ExternalInterface bridge ready. Drop a .swf or click Refresh for built-in demo.');
                     } else {
                         log('wireCheck returned unexpected value: ' + check);
                     }
@@ -109,13 +172,13 @@ function loadRuffle() {
 }
 
 function refreshData() {
-    if (!player) return;
+    if (!player || !bridgeReady) return;
     try {
         var json = player.ruffle().callExternalInterface('getDisplayList');
-        log('getDisplayList returned: ' + typeof(json));
         if (typeof json === 'string') {
             var parsed = JSON.parse(json);
             document.getElementById('json-editor').value = JSON.stringify(parsed, null, 2);
+            log('Refreshed: ' + parsed.displayList.length + ' objects.');
         } else {
             document.getElementById('json-editor').value = JSON.stringify(json, null, 2);
         }
@@ -125,7 +188,7 @@ function refreshData() {
 }
 
 function applyData() {
-    if (!player) return;
+    if (!player || !bridgeReady) return;
     try {
         var data = JSON.parse(document.getElementById('json-editor').value);
         data.displayList.forEach(function(obj) {
