@@ -275,11 +275,11 @@ For plain shapes (no MovieClip):
   Bridge calls are safe as long as they happen between frames (e.g., during
   `emscripten_sleep`).
 
-## Open Questions
+## Decisions
 
-- Should the bridge functions live in `main.c`, a separate `display_bridge.c`,
-  or in the test_harness? Separate file is cleanest.
-- Should `getDisplayListJSON` allocate a buffer each call (caller frees via
-  `Module._free`), or use a static buffer? Static is simpler for v1.
-- For the Archipelago module, should the WASM be loaded in an iframe or directly
-  in the page? Iframe is simpler for isolation; direct allows tighter integration.
+- **Bridge functions** live in a separate `display_bridge.c` in
+  `SWFRecomp/wasm_wrappers/`, compiled when `-DHAS_DISPLAY_BRIDGE` is defined.
+- **`getDisplayListJSON`** uses a static buffer (simpler for v1, no caller-side
+  free needed).
+- **Archipelago module** loads the WASM in an iframe, using the frontend's
+  existing iframe infrastructure.
