@@ -38338,6 +38338,19 @@ void actionDelete(SWFAppContext* app_context)
 		MovieClip* mc = (MovieClip*) obj_var.data.numeric_value;
 		if (mc != NULL && mc->dynamic_props != NULL) {
 			bool success = deleteProperty(app_context, (ASObject*)mc->dynamic_props, prop_name, prop_name_len);
+			// For root MC, also clear from variable map (SetMember on root
+			// stores in both dynamic_props and var_map — delete must clean both)
+			if (success) {
+				extern MovieClip root_movieclip;
+				if (mc == &root_movieclip && hasVariable((char*)prop_name, prop_name_len)) {
+					ActionVar* var = getVariable((char*)prop_name, prop_name_len);
+					if (var != NULL) {
+						if (var->type == ACTION_STACK_VALUE_STRING && var->data.string_data.owns_memory)
+							free(var->data.string_data.heap_ptr);
+						memset(var, 0, sizeof(ActionVar));
+					}
+				}
+			}
 			PUSH(ACTION_STACK_VALUE_BOOLEAN, success ? 1ULL : 0ULL);
 		} else {
 			PUSH(ACTION_STACK_VALUE_BOOLEAN, 1ULL);
@@ -40546,7 +40559,11 @@ void actionGetMember(SWFAppContext* app_context)
 			if (mc == &root_movieclip && hasVariable((char*)prop_name, prop_name_len))
 			{
 				ActionVar* var = getVariable((char*)prop_name, prop_name_len);
-				if (var != NULL)
+				// Skip uninitialized sentinel (type=STRING=0, str_size=0, heap_ptr=NULL)
+				// which is left after delete or auto-created by getVariable
+				if (var != NULL &&
+				    !(var->type == ACTION_STACK_VALUE_STRING && var->str_size == 0 &&
+				      var->data.string_data.heap_ptr == NULL))
 				{
 					pushVar(app_context, var);
 					return;
