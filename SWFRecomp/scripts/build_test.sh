@@ -199,6 +199,13 @@ cp "${SWFMODERN_ROOT}/lib/c-hashmap/map.c" "${BUILD_DIR}/"
 cp "${SWFMODERN_ROOT}/lib/o1heap/o1heap.c" "${BUILD_DIR}/"
 cp "${SWFMODERN_ROOT}/lib/o1heap/o1heap.h" "${BUILD_DIR}/"
 
+# Copy libtess2 tessellation library (required by action.c)
+LIBTESS2_DIR="${SWFMODERN_ROOT}/third_party/libtess2"
+if [ -d "${LIBTESS2_DIR}" ]; then
+    cp "${LIBTESS2_DIR}"/*.c "${BUILD_DIR}/" 2>/dev/null || true
+    cp "${LIBTESS2_DIR}"/*.h "${BUILD_DIR}/" 2>/dev/null || true
+fi
+
 # Copy heap memory manager
 cp "${SWFMODERN_SRC}/memory/heap.c" "${BUILD_DIR}/"
 mkdir -p "${BUILD_DIR}/memory"
@@ -230,6 +237,7 @@ if [ "$TARGET" == "wasm" ]; then
             *.c \
             -DUSE_WEBGPU \
             --use-port=emdawnwebgpu \
+            -Wno-error=implicit-function-declaration \
             -I. \
             -I"${SWFMODERN_INC}" \
             -I"${SWFMODERN_INC}/actionmodern" \
