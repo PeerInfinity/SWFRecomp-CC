@@ -1203,6 +1203,7 @@ def compile_native(test_dir, num_frames, build_dir, headless=False, has_image_co
         "src/utils.c",
         "src/libswf/tag.c",
         "src/libswf/tag_stubs.c",
+        "src/libswf/ng_shared.c",
         "src/libswf/hit_test.c",
         "src/memory/heap.c",
     ]
@@ -1467,14 +1468,14 @@ def compile_wasm(test_dir, num_frames, build_dir, graphics=False):
         "src/actionmodern/unicode_case_tables.h",
         "src/utils.c",
         "src/libswf/tag.c",
+        "src/libswf/ng_shared.c",
         "src/libswf/hit_test.c",
         "src/memory/heap.c",
     ]
     if graphics:
-        # Graphics mode: swf.c (frame loop) + render_webgpu.c + tag_stubs.c
-        # (tag_stubs.c provides ng_* functions called by action.c)
+        # Graphics mode: swf.c (frame loop) + render_webgpu.c
+        # (ng_shared.c provides shared ng_* functions called by action.c/tag.c)
         core_sources.append("src/libswf/swf.c")
-        core_sources.append("src/libswf/tag_stubs.c")
         core_sources.append("src/rendering/render_webgpu.c")
         core_sources.append("src/audio/audio.c")
         core_sources.append("src/audio/audio_output_web.c")

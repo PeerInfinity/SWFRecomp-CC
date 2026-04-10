@@ -235,34 +235,6 @@ size_t ng_findDisplayEntryByName(const char* name) {
 	return result;
 }
 
-size_t ng_lookupExport(const char* name) {
-	(void)name;
-	return (size_t)-1; // Not found
-}
-
-int32_t ng_getSoundDuration(u16 char_id) {
-	(void)char_id;
-	return -1; // Not found
-}
-
-u16 ng_findFontIdByName(const char* name) {
-	(void)name;
-	return 0; // Default font
-}
-
-void ng_getTextExtent(u16 font_id, double font_size_px, const char* text, size_t text_len,
-    double width_px, double* out_ascent, double* out_descent,
-    double* out_width, double* out_height, double* out_tf_height, double* out_tf_width) {
-	(void)font_id; (void)font_size_px; (void)text; (void)text_len; (void)width_px;
-	// Return rough estimates based on font size
-	if (out_ascent) *out_ascent = font_size_px * 0.8;
-	if (out_descent) *out_descent = font_size_px * 0.2;
-	if (out_width) *out_width = font_size_px * 0.6 * (double)text_len;
-	if (out_height) *out_height = font_size_px;
-	if (out_tf_height) *out_tf_height = font_size_px + 4.0;
-	if (out_tf_width) *out_tf_width = font_size_px * 0.6 * (double)text_len;
-}
-
 // Focus rect stub — full implementation lives in action.c under #ifdef NO_GRAPHICS
 int actionGetFocusRectInfo(FocusRectInfo* out) {
 	(void)out;

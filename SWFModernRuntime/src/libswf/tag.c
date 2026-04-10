@@ -4486,15 +4486,6 @@ void tagDefineVideoStream(SWFAppContext* app_context, u16 char_id)
 #endif
 }
 
-// tagRegisterExport: in NO_GRAPHICS/HEADLESS mode, implemented in tag_stubs.c.
-// In pure graphics mode (no tag_stubs.c), provide a no-op stub.
-#if !defined(NO_GRAPHICS) && !defined(HEADLESS_GRAPHICS)
-void tagRegisterExport(SWFAppContext* app_context, const char* name, size_t char_id)
-{
-	(void)app_context; (void)name; (void)char_id;
-}
-#endif
-
 #ifdef NO_GRAPHICS
 // Returns 1 if any multi-frame sprite at root level is playing or has pending navigation.
 // A sprite with sprite_manual_next_frame=1 has a pending gotoAndStop/gotoAndPlay that
