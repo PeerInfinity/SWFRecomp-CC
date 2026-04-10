@@ -66,10 +66,18 @@ button:disabled { background: #555; cursor: default; }
 var output = document.getElementById('output');
 var player = null;
 var bridgeReady = false;
+var wrapperMode = 'as2'; // 'as2' or 'as3'
+var ruffleObj = null; // cached RufflePlayer.newest()
 
 function log(msg) {
     output.textContent += msg + '\n';
     output.scrollTop = output.scrollHeight;
+}
+
+function getSwfVersion(bytes) {
+    // SWF header byte 3 is the version number (works for FWS, CWS, ZWS)
+    if (bytes.length >= 4) return bytes[3];
+    return 0;
 }
 
 // --- Drop zone ---
@@ -98,78 +106,103 @@ function loadDroppedSwf(file) {
         log('Please select a .swf file');
         return;
     }
-    if (!bridgeReady) {
-        log('Bridge not ready yet, please wait...');
-        return;
-    }
     var reader = new FileReader();
     reader.onload = function(e) {
         var bytes = new Uint8Array(e.target.result);
+        var version = getSwfVersion(bytes);
+        var needAS3 = version >= 9;
+        log(file.name + ': SWF version ' + version + (needAS3 ? ' (AS3)' : ' (AS2)'));
+        document.getElementById('loaded-name').textContent = file.name + ' (SWF' + version + ')';
+
         var blob = new Blob([bytes], {type: 'application/x-shockwave-flash'});
         var blobUrl = URL.createObjectURL(blob);
-        log('Loading ' + file.name + ' via blob URL...');
-        document.getElementById('loaded-name').textContent = file.name;
-        try {
-            player.ruffle().callExternalInterface('loadSwf', blobUrl);
-            log('loadSwf called. Click Refresh after a moment to see the display list.');
-        } catch(err) {
-            log('Error calling loadSwf: ' + err.message);
+
+        // Switch wrapper if needed
+        var neededMode = needAS3 ? 'as3' : 'as2';
+        if (neededMode !== wrapperMode || !bridgeReady) {
+            loadWrapper(neededMode, function() {
+                callLoadSwf(blobUrl, file.name);
+            });
+        } else {
+            callLoadSwf(blobUrl, file.name);
         }
     };
     reader.readAsArrayBuffer(file);
 }
 
+function callLoadSwf(blobUrl, filename) {
+    try {
+        player.ruffle().callExternalInterface('loadSwf', blobUrl);
+        log('loadSwf called. Click Refresh after a moment to see the display list.');
+    } catch(err) {
+        log('Error calling loadSwf: ' + err.message);
+    }
+}
+
 // --- Ruffle setup ---
-function loadRuffle() {
-    log('Loading Ruffle from CDN...');
-    var script = document.createElement('script');
-    script.src = 'https://unpkg.com/@ruffle-rs/ruffle';
-    script.onload = function() {
-        log('Ruffle loaded. Creating player...');
-        var ruffle = window.RufflePlayer.newest();
-        player = ruffle.createPlayer();
-        player.style.width = '100%';
-        player.style.height = '100%';
+function loadWrapper(mode, onReady) {
+    var wrapperUrl = 'ruffle_editor/wrapper_' + mode + '.swf';
+    wrapperMode = mode;
+    bridgeReady = false;
+    document.getElementById('btn-refresh').disabled = true;
+    document.getElementById('btn-apply').disabled = true;
 
-        var container = document.getElementById('ruffle-container');
-        container.appendChild(player);
-
-        player.ruffle().traceObserver = function(msg) {
-            log('[trace] ' + msg);
-        };
-
+    function doLoad() {
+        log('Loading ' + mode.toUpperCase() + ' wrapper...');
         player.ruffle().load({
-            url: 'ruffle_editor/wrapper_as2.swf',
+            url: wrapperUrl,
             autoplay: 'on',
             allowScriptAccess: true,
             letterbox: 'off'
         }).then(function() {
-            log('Wrapper SWF loaded.');
+            log('Wrapper SWF loaded (' + mode + ').');
             setTimeout(function() {
                 try {
                     var check = player.ruffle().callExternalInterface('wireCheck');
-                    log('wireCheck: ' + check);
                     if (check === 'ok') {
                         bridgeReady = true;
                         document.getElementById('btn-refresh').disabled = false;
                         document.getElementById('btn-apply').disabled = false;
-                        log('ExternalInterface bridge ready. Drop a .swf or click Refresh for built-in demo.');
+                        log('ExternalInterface bridge ready.');
+                        if (onReady) onReady();
                     } else {
-                        log('wireCheck returned unexpected value: ' + check);
+                        log('wireCheck returned: ' + check);
                     }
                 } catch(e) {
                     log('ExternalInterface not available: ' + e.message);
                 }
             }, 500);
         }).catch(function(e) {
-            log('Failed to load SWF: ' + e.message);
+            log('Failed to load wrapper: ' + e.message);
         });
-    };
-    script.onerror = function() {
-        log('Failed to load Ruffle from CDN.');
-    };
-    document.head.appendChild(script);
+    }
+
+    if (!ruffleObj) {
+        // First load — fetch Ruffle from CDN
+        log('Loading Ruffle from CDN...');
+        var script = document.createElement('script');
+        script.src = 'https://unpkg.com/@ruffle-rs/ruffle';
+        script.onload = function() {
+            ruffleObj = window.RufflePlayer.newest();
+            player = ruffleObj.createPlayer();
+            player.style.width = '100%';
+            player.style.height = '100%';
+            var container = document.getElementById('ruffle-container');
+            container.appendChild(player);
+            player.ruffle().traceObserver = function(msg) {
+                log('[trace] ' + msg);
+            };
+            doLoad();
+        };
+        script.onerror = function() { log('Failed to load Ruffle from CDN.'); };
+        document.head.appendChild(script);
+    } else {
+        doLoad();
+    }
 }
+
+// Start with AS2 wrapper by default
+loadWrapper('as2', null);
 
 function refreshData() {
     if (!player || !bridgeReady) return;
@@ -192,8 +225,19 @@ function applyData() {
     try {
         var data = JSON.parse(document.getElementById('json-editor').value);
         data.displayList.forEach(function(obj) {
-            player.ruffle().callExternalInterface('setTransform',
-                obj.name, obj.x, obj.y, obj.xscale, obj.yscale, obj.rotation);
+            if (wrapperMode === 'as3') {
+                // AS3 uses scaleX/scaleY (1.0 = 100%)
+                var sx = obj.scaleX !== undefined ? obj.scaleX : (obj.xscale !== undefined ? obj.xscale / 100 : 1);
+                var sy = obj.scaleY !== undefined ? obj.scaleY : (obj.yscale !== undefined ? obj.yscale / 100 : 1);
+                player.ruffle().callExternalInterface('setTransform',
+                    obj.name, obj.x, obj.y, sx, sy, obj.rotation);
+            } else {
+                // AS2 uses _xscale/_yscale (100 = 100%)
+                var xs = obj.xscale !== undefined ? obj.xscale : (obj.scaleX !== undefined ? obj.scaleX * 100 : 100);
+                var ys = obj.yscale !== undefined ? obj.yscale : (obj.scaleY !== undefined ? obj.scaleY * 100 : 100);
+                player.ruffle().callExternalInterface('setTransform',
+                    obj.name, obj.x, obj.y, xs, ys, obj.rotation);
+            }
         });
         log('Applied transforms for ' + data.displayList.length + ' objects.');
     } catch(e) {
