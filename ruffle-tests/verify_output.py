@@ -1449,18 +1449,16 @@ def compile_native(test_dir, num_frames, build_dir, headless=False, has_image_co
 EMSDK_ENV = PROJECT_ROOT / "emsdk" / "emsdk_env.sh"
 
 
-def compile_wasm(test_dir, num_frames, build_dir, graphics=False):
+def compile_wasm(test_dir, num_frames, build_dir):
     """Compile generated C code with Emscripten into WASM.
 
     Reuses compile_native's setup (runtime copy, child SWFs, etc.) then
     compiles with emcc instead of gcc.  Output: build_dir/test.js + test.wasm.
-
-    graphics: if True, build with WebGPU rendering (USE_WEBGPU, ASYNCIFY).
     """
     mem_dir = build_dir / "memory"
     mem_dir.mkdir(exist_ok=True)
 
-    # Copy runtime sources
+    # Copy runtime sources (NO_GRAPHICS mode)
     core_sources = [
         "src/actionmodern/action.c",
         "src/actionmodern/variables.c",
@@ -1471,18 +1469,9 @@ def compile_wasm(test_dir, num_frames, build_dir, graphics=False):
         "src/libswf/ng_shared.c",
         "src/libswf/hit_test.c",
         "src/memory/heap.c",
+        "src/libswf/swf_core.c",
+        "src/libswf/tag_stubs.c",
     ]
-    if graphics:
-        # Graphics mode: swf.c (frame loop) + render_webgpu.c
-        # (ng_shared.c provides shared ng_* functions called by action.c/tag.c)
-        core_sources.append("src/libswf/swf.c")
-        core_sources.append("src/rendering/render_webgpu.c")
-        core_sources.append("src/audio/audio.c")
-        core_sources.append("src/audio/audio_output_web.c")
-    else:
-        # NO_GRAPHICS mode: swf_core.c + tag_stubs.c
-        core_sources.append("src/libswf/swf_core.c")
-        core_sources.append("src/libswf/tag_stubs.c")
     for src in core_sources:
         shutil.copy2(SWFMODERN / src, build_dir)
     shutil.copy2(SWFMODERN / "lib/c-hashmap/map.c", build_dir)
@@ -1593,10 +1582,7 @@ def compile_wasm(test_dir, num_frames, build_dir, graphics=False):
 
     # Build defines
     inc = SWFMODERN / "include"
-    if graphics:
-        extra_defines = ["-DUSE_WEBGPU", f"-DMAX_FRAMES={num_frames}"]
-    else:
-        extra_defines = ["-DNO_GRAPHICS", f"-DMAX_FRAMES={num_frames}"]
+    extra_defines = ["-DNO_GRAPHICS", f"-DMAX_FRAMES={num_frames}"]
     mock_time = get_mock_date_time(test_dir)
     if mock_time is None:
         mock_time = 981152406000
@@ -1638,10 +1624,6 @@ def compile_wasm(test_dir, num_frames, build_dir, graphics=False):
         f"-I{inc}", f"-I{inc}/actionmodern", f"-I{inc}/libswf", f"-I{inc}/memory",
         f"-I{SWFMODERN}/lib/c-hashmap",
     ]
-    if graphics:
-        includes.append(f"-I{inc}/rendering")
-        includes.append(f"-I{inc}/audio")
-        includes.append(f"-I{STB_DIR}")
 
     emcc_args = c_files + extra_defines + includes + [
         "-w", "-Wno-error=implicit-function-declaration",
@@ -1651,21 +1633,11 @@ def compile_wasm(test_dir, num_frames, build_dir, graphics=False):
         "-sUSE_ZLIB=1",
         "-sNO_EXIT_RUNTIME=1",
     ]
-    if graphics:
-        emcc_args += [
-            "-sEXPORTED_FUNCTIONS=['_main','_runSWF','_audio_fill_buffer']",
-            "-sEXPORTED_RUNTIME_METHODS=['ccall','cwrap','HEAPF32']",
-            "--use-port=emdawnwebgpu",
-            "-sASYNCIFY",
-            "-sASYNCIFY_STACK_SIZE=65536",
-            "-sINITIAL_MEMORY=64MB",
-        ]
-    else:
-        emcc_args += [
-            "-sEXPORTED_FUNCTIONS=['_main','_runSWF']",
-            "-sEXPORTED_RUNTIME_METHODS=['ccall','cwrap']",
-            "-sINITIAL_MEMORY=16MB",
-        ]
+    emcc_args += [
+        "-sEXPORTED_FUNCTIONS=['_main','_runSWF']",
+        "-sEXPORTED_RUNTIME_METHODS=['ccall','cwrap']",
+        "-sINITIAL_MEMORY=16MB",
+    ]
     emcc_args += ["-o", str(build_dir / "test.js")]
     # Write args to a response file to avoid shell escaping issues
     resp_file = build_dir / "emcc_args.txt"
@@ -1686,7 +1658,7 @@ def compile_wasm(test_dir, num_frames, build_dir, graphics=False):
         return False, "emcc compilation timed out"
 
 
-def deploy_wasm(test_name, build_dir, deploy_dir, graphics=False):
+def deploy_wasm(test_name, build_dir, deploy_dir):
     """Deploy WASM build to a directory with an HTML wrapper.
 
     Creates deploy_dir/test_name/ with .js, .wasm, and index.html.
@@ -1701,67 +1673,7 @@ def deploy_wasm(test_name, build_dir, deploy_dir, graphics=False):
             shutil.copy2(src, out_dir / f"{test_name}{ext}")
 
     # Generate standalone HTML page
-    if graphics:
-        html = f"""<!DOCTYPE html>
-<html lang="en">
-<head>
-<meta charset="UTF-8">
-<meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>SWFRecomp Demo - {test_name}</title>
-<style>
-* {{ margin: 0; padding: 0; box-sizing: border-box; }}
-body {{ font-family: monospace; background: #1a1a1a; color: #e0e0e0; padding: 20px; }}
-h1 {{ color: #7B1FA2; margin-bottom: 10px; font-size: 1.3em; }}
-.layout {{ display: flex; gap: 15px; margin-top: 10px; flex-wrap: wrap; }}
-canvas {{ border: 1px solid #555; border-radius: 4px; background: #000; }}
-#output {{ background: #111; border: 1px solid #333; border-radius: 8px;
-           padding: 15px; white-space: pre-wrap; font-size: 13px;
-           flex: 1; min-width: 300px; max-height: 500px; overflow-y: auto; }}
-button {{ background: #7B1FA2; color: white; border: none; padding: 8px 20px;
-         border-radius: 4px; cursor: pointer; font-size: 14px; margin-right: 8px; }}
-button:hover {{ background: #6A1B9A; }}
-button:disabled {{ background: #555; cursor: default; }}
-.info {{ color: #888; font-size: 0.9em; margin-bottom: 10px; }}
-.controls {{ margin-top: 10px; }}
-</style>
-</head>
-<body>
-<h1>{test_name}</h1>
-<p class="info">Recompiled SWF with WebGPU rendering + trace output</p>
-<div class="controls">
-  <button id="btn-run" disabled onclick="startDemo()">Run SWF</button>
-</div>
-<div class="layout">
-  <canvas id="canvas" width="400" height="400"></canvas>
-  <div id="output"></div>
-</div>
-<script>
-var output = document.getElementById('output');
-window.Module = {{
-    locateFile: function(path) {{ return '{test_name}/' + path.replace('test.', '{test_name}.'); }},
-    canvas: document.getElementById('canvas'),
-    print: function(text) {{ output.textContent += text + '\\n'; }},
-    printErr: function(text) {{ output.textContent += '[stderr] ' + text + '\\n'; }},
-    onRuntimeInitialized: function() {{
-        document.getElementById('btn-run').disabled = false;
-        output.textContent = 'WASM module loaded. Click Run SWF.\\n';
-    }}
-}};
-function startDemo() {{
-    document.getElementById('btn-run').disabled = true;
-    output.textContent = '';
-    Module.ccall('runSWF', null, [], [], {{async: true}}).then(function() {{
-        output.textContent += '\\n=== done ===\\n';
-    }}).catch(function(e) {{
-        output.textContent += '\\nError: ' + e.message + '\\n';
-    }});
-}}
-</script>
-<script src="{test_name}/{test_name}.js"></script>
-</body>
-</html>"""
-    else:
-        html = f"""<!DOCTYPE html>
+    html = f"""<!DOCTYPE html>
 <html lang="en">
 <head>
 <meta charset="UTF-8">
@@ -2128,9 +2040,6 @@ examples:
         "--wasm", action="store_true",
         help="Build WASM instead of native (requires emsdk). Implies --deploy if --deploy-dir given.")
     parser.add_argument(
-        "--graphics", action="store_true",
-        help="Build with WebGPU graphics mode (USE_WEBGPU, ASYNCIFY). Used with --wasm.")
-    parser.add_argument(
         "--deploy-dir", metavar="DIR",
         help="Deploy WASM builds to DIR (e.g. docs/injector). Used with --wasm.")
     return parser.parse_args()
@@ -2356,8 +2265,7 @@ def main():
             image_comparisons = parse_image_comparisons(test_dir) if args.headless else {}
             has_image_cmps = bool(image_comparisons) and HAS_PIL
             if args.wasm:
-                ok, err = compile_wasm(test_dir, num_frames, build_dir,
-                                       graphics=args.graphics)
+                ok, err = compile_wasm(test_dir, num_frames, build_dir)
             else:
                 ok, err = compile_native(test_dir, num_frames, build_dir,
                                          headless=args.headless,
@@ -2390,7 +2298,7 @@ def main():
                              duration=round(time.monotonic() - test_start, 2))
                 if args.deploy_dir:
                     deploy_dir = Path(args.deploy_dir)
-                    deploy_wasm(name, build_dir, deploy_dir, graphics=args.graphics)
+                    deploy_wasm(name, build_dir, deploy_dir)
                     if args.verbose:
                         print(f"WASM_BUILT → deployed to {deploy_dir}/{name}/")
                 else:
