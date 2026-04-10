@@ -21,7 +21,7 @@ dependencies: []
 blockers: []
 -->
 
-Last updated: 2026-04-08 (Phase 3 in progress)
+Last updated: 2026-04-10 (Phase 3 in progress)
 
 **NOTE:** This document was written on 2026-03-19 when the pass rate was 25.5%.
 The current pass rate is ~40% (76/190 actionscript.all). Several categories
@@ -118,20 +118,9 @@ In SWF5, `typeof(Selection)` and `typeof(Stage)` should return `'undefined'` —
 
 ---
 
-## 6. Error Constructor & Prototype (est. 4 tests) — RESOLVED
+## 6. Error Constructor & Prototype (est. 4 tests) — RESOLVED (PASS)
 
-Failing tests: Error-v5 (75.0%), Error-v6/v7/v8 (77.4%)
-
-Issues:
-- `new Error(7.8898)` — message should be coerced to string "7.8898", we store "Error"
-- `e.toString()` format doesn't match expected output
-- Error subclasses (TypeError, ReferenceError) constructor behavior
-
-**Root cause**: Error constructor doesn't coerce non-string arguments to `.message`. toString format wrong.
-
-**Fix complexity**: Low-Medium — fix Error constructor + toString.
-
-**Impact**: 4 tests improve by 7 lines each.
+**Error-v5/v6/v7/v8: ALL PASS** (2026-04-10). Fix: Error constructor now stores raw argument value (not coerced to string). `Error.prototype.toString` returns raw message value. Two remaining diffs per test (typeof(e.message) == "object" for object args) fixed by storing raw values.
 
 ---
 
@@ -464,14 +453,28 @@ The old Enumerate opcode (SWF5 for-in) wasn't checking the scope chain for varia
 
 **Impact**: Number-v6 +5, Number-v7 +5, Number-v8 +5 lines. Number-v5 unchanged (SWF5 doesn't have hex/octal string parsing).
 
+### 3k: Error constructor raw message storage — DONE (2026-04-10)
+
+**Two fixes**:
+1. Error constructor now stores the raw argument value instead of coercing non-string args to string. `new Error(new Object())` keeps the Object reference as `.message` (Flash behavior).
+2. `Error.prototype.toString` now returns the raw message value (any type), not just strings.
+
+**Impact**: Error-v5, Error-v6, Error-v7, Error-v8 → all PASS. +4 tests.
+
+### 3l: parseInt object toString coercion — DONE (2026-04-10)
+
+`parseInt()` now calls `toString()` on object/array/function arguments instead of treating them as "undefined". Uses `varToStringBuf` for object types only (preserves existing number formatting to avoid regressions).
+
+**Impact**: toString_valueOf-v6/v7/v8 each +2 lines (parseInt lines fixed). Also improves any test using `parseInt(obj)` with custom toString.
+
 ### Phase 3 remaining work:
 - **Number wrapper valueOf override**: `new Number(10)` wrapper doesn't dispatch custom valueOf (1 line per Number test)
 - **Number float precision**: last-digit rounding at e-308 (4 lines per Number test)
-- **toString_valueOf dispatch**: valueOf/toString not called during implicit coercion in some paths (20 diffs per v6/v7/v8)
+- **toString_valueOf dispatch**: valueOf/toString not called during implicit coercion in some paths (~18 diffs per v6/v7/v8)
 - **enumerate child MC type**: child MCs returned as 'number' instead of 'movieclip' (12 diffs per enumerate test)
 - **enumerate hasOwnProperty**: child MCs stored in dynamic_props → hasOwnProperty returns true (6 diffs per enumerate test)
 - **with auto-boxing**: `with(number)` should auto-box to Number.prototype scope (not addressed)
 - **String regex methods**: replace/match/search need regex support (~120 diffs per test)
-- **delete DONT_DELETE flag**: local var deletion should return false (2 diffs per delete test)
-- **delete local vars**: `delete e` on function locals doesn't check DONT_DELETE, and `_root.e` persistence after delete (9 diffs per delete test)
-- **new Object() in Dejagnu context**: `anObject != undefined` fails — `new Object()` returns undefined in Gnash test harness (1 diff per delete test)
+- **delete DONT_DELETE flag**: local var deletion semantics differ between SWF5 and SWF7+ — SWF5 allows some local vars to be deleted but function parameters remain non-deletable (complex, investigated 2026-04-10)
+- **delete local vars**: `delete e` on function locals + `_root.e` persistence after delete (9 diffs per delete test)
+- **new Object() in Dejagnu context**: `anObject != undefined` fails — `new Object()` returns undefined in SWF7 Gnash test harness (1 diff per delete-v7, investigated but complex — requires runtime instrumentation to debug)

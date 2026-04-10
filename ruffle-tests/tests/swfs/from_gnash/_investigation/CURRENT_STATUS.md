@@ -1,21 +1,26 @@
 # Gnash Test Suite Status
 
-Last updated: 2026-04-09 (Phase 3 work in progress, not yet in CI)
+Last updated: 2026-04-10 (Phase 3 work in progress, not yet in CI)
 
 ## Quick Summary
 
 | Sub-suite | Tests | Passing | Rate | Filtered | Filtered Rate | Ignored |
 |-----------|-------|---------|------|----------|---------------|---------|
-| **actionscript.all** | 190 | 80 | 42.1% | 80/181 | **44.2%** | 9 |
+| **actionscript.all** | 190 | 84 | 44.2% | 84/181 | **46.4%** | 9 |
 | **misc-mtasc.all** | 9 | 7 | 77.8% | — | — | — |
 | **misc-swfmill.all** | 14 | 11 | 78.6% | — | — | — |
 | **misc-ming.all** | 58 | 9 | 15.5% | — | — | — |
 | **misc-swfc.all** | 16 | 2 | 12.5% | — | — | — |
-| **Total** | 287 | ~109 | ~38.0% | — | — | — |
+| **Total** | 287 | ~113 | ~39.4% | — | — | — |
 
-Note: CI last run at 80/190 (commit 302d77c6). Local fixes since then: +4 (NetStream-v6/v7/v8, Color-v6).
+Note: CI last run at 84/190 (commit 961aa08a). Local fixes since then: +5 (Error-v5/v6/v7/v8, delete-v8).
 
-Filtered results exclude 9 tests with all-accepted diffs (Math-v5/v6/v7/v8, ops-v8, Error-v5/v6/v7/v8) — see `ACCEPTED_DIFFS.md`. Remaining 3 misc-swfmill failures (dict_event, tags_after_last_showframe, jump_to_prev_block) are blocked on architectural limitations — see `blocked/MISC_SWFMILL_PLAN.md`.
+Filtered results exclude 9 tests with all-accepted diffs (Math-v5/v6/v7/v8, ops-v8, Error-v5/v6/v7/v8) — see `ACCEPTED_DIFFS.md`. Note: Error-v5/v6/v7/v8 now PASS and could be removed from the ignored list. Remaining 3 misc-swfmill failures (dict_event, tags_after_last_showframe, jump_to_prev_block) are blocked on architectural limitations — see `blocked/MISC_SWFMILL_PLAN.md`.
+
+### Latest fixes (2026-04-10, not yet in CI)
+- **Error constructor raw message storage** — `new Error(new Object())` now stores the Object reference as `.message` instead of coercing to string. `Error.prototype.toString` returns the raw message value (any type). **+4 tests: Error-v5, Error-v6, Error-v7, Error-v8 → PASS.**
+- **delete-v8 now PASS** — confirmed locally, previous fixes (dot-path resolution, non-existent returns false, global_object check) pushed it over.
+- **parseInt object toString coercion** — `parseInt(obj)` now calls `toString()` on object/array/function arguments instead of returning NaN. **+2 lines per toString_valueOf test** (v6/v7/v8).
 
 ### Latest fixes (2026-04-09, not yet in CI)
 - **Delete dot-path resolution** — `actionDelete2("o.b")` and `actionDelete` with dot-path property names now resolve the path: split on last dot, look up container, delete final property. The `actionDelete` fallback is SWF5/6 only (SWF7+ uses strict property names). **+14 lines across delete-v5/v6/v7/v8** (delete-v5: 43→47/60, delete-v6: 41→45/60, delete-v7: 46→49/60, delete-v8: 47→50/60).
