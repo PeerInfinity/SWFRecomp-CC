@@ -1,10 +1,10 @@
 # Ruffle Test Results (Filtered)
 
-**Date**: 2026-04-10 03:16 UTC
+**Date**: 2026-04-10 04:44 UTC
 
-**Git SHA**: `f2ef2ccd66`
+**Git SHA**: `961aa08a80`
 
-**Run Duration**: 5m 20s
+**Run Duration**: 5m 24s
 
 **Filtered**: 0 tests ignored out of 16 available
 
@@ -16,8 +16,8 @@
 | Passing | **2** (12.5%) |
 | Failing | 14 |
 | Total expected lines | 499 |
-| Matching lines | 223 (44.7%) |
-| Mismatched lines | 276 |
+| Matching lines | 224 (44.9%) |
+| Mismatched lines | 275 |
 
 ### Failure Breakdown
 
@@ -32,8 +32,8 @@
 
 | # | Test | Lines | Duration | Notes |
 |---|------|-------|----------|-------|
-| 1 | `gotoFrameLabelAsFunction` | 6 | 19.7s |  |
-| 2 | `hello` | 4 | 19.2s |  |
+| 1 | `gotoFrameLabelAsFunction` | 6 | 19.4s |  |
+| 2 | `hello` | 4 | 20.4s |  |
 
 ## Near-Passing Tests
 
@@ -59,7 +59,7 @@ No segfaults.
 
 | # | Test | Detail | Duration | Notes |
 |---|------|--------|----------|-------|
-| 1 | `opcode_guard_test2` | exit code -6 | 20.9s |  |
+| 1 | `opcode_guard_test2` | exit code -6 | 21.2s |  |
 
 ## Timeouts
 
@@ -77,7 +77,7 @@ No timeouts.
 | 4 | `swf4opcode` | 63.2% | 74/117 | 117 | 117 |  |
 | 5 | `mouse_drag_test` | 50.0% | 6/12 | 12 | 12 |  |
 | 6 | `sound` | 41.7% | 5/12 | 12 | 7 |  |
-| 7 | `soft_reference_test1` | 35.6% | 16/45 | 42 | 45 |  |
+| 7 | `soft_reference_test1` | 37.8% | 17/45 | 42 | 45 |  |
 | 8 | `registerclass_test3` | 33.3% | 9/27 | 27 | 27 |  |
 | 9 | `button_test1` | 25.8% | 8/31 | 20 | 31 |  |
 | 10 | `movieclip_destruction_test4` | 20.0% | 8/40 | 24 | 40 |  |

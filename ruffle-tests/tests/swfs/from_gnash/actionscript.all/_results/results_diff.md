@@ -1,33 +1,31 @@
 # Ruffle Test Results Diff
 
-**Previous:** `a68c40985707` (2026-04-09T23:24:30.912305+00:00)
-**Current:** `f2ef2ccd66cc` (2026-04-10T03:16:33.421460+00:00)
+**Previous:** `f2ef2ccd66cc` (2026-04-10T03:16:33.421460+00:00)
+**Current:** `961aa08a8074` (2026-04-10T04:44:09.396150+00:00)
 
 ## Summary
 
 | Metric | Previous | Current | Delta |
 |--------|----------|---------|-------|
-| Passing | 80 | 83 | +3 |
+| Passing | 83 | 84 | +1 |
 | Total | 190 | 190 | 0 |
-| Pass rate | 42.1% | 43.7% | +1.6% |
-| Mismatched lines | 4224 | 4158 | -66 |
-|   Decreased | | | -70 |
-|   Increased | | | +4 |
+| Pass rate | 43.7% | 44.2% | +0.5% |
+| Mismatched lines | 4158 | 4150 | -8 |
+|   Decreased | | | -10 |
+|   Increased | | | +2 |
 
-## Newly Passing (3)
+## Newly Passing (1)
 
 | Test | Previous Status | Lines (prev) | Lines (now) |
 |------|----------------|--------------|-------------|
-| `enumerate-v6` | output_mismatch | 35/49 | 49/49 |
-| `enumerate-v7` | output_mismatch | 35/49 | 49/49 |
-| `enumerate-v8` | output_mismatch | 35/49 | 49/49 |
+| `delete-v8` | output_mismatch | 57/60 | 60/60 |
 
 ## Line Count Changed (5)
 
 | Test | Status | Lines (prev) | Lines (now) | Diff |
 |------|--------|--------------|-------------|------|
-| `delete-v5` | output_mismatch | 47/60 | 54/60 | -7 |
-| `delete-v6` | output_mismatch | 45/60 | 52/60 | -7 |
-| `delete-v7` | output_mismatch | 49/60 | 56/60 | -7 |
-| `delete-v8` | output_mismatch | 50/60 | 57/60 | -7 |
-| `TextFormat-v7` | output_mismatch | 113/174 | 109/174 | +4 |
+| `MovieClip-v5` | output_mismatch | 236/363 | 240/363 | -4 |
+| `delete-v5` | output_mismatch | 54/60 | 55/60 | -1 |
+| `delete-v6` | output_mismatch | 52/60 | 53/60 | -1 |
+| `delete-v7` | output_mismatch | 56/60 | 57/60 | -1 |
+| `array-v5` | output_mismatch | 458/560 | 456/560 | +2 |
