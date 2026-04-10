@@ -2,6 +2,10 @@ import flash.external.ExternalInterface;
 
 class DisplayBridge {
     static function main(mc:MovieClip) {
+        // Let the player element control the visible area, not the SWF stage size
+        Stage.scaleMode = "noScale";
+        Stage.align = "TL";
+
         // Create test content: 3 colored boxes
         makeBox(mc, "red_box",   0xFF0000, 50,  50,  80, 80);
         makeBox(mc, "green_box", 0x00FF00, 200, 80,  60, 100);

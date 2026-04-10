@@ -80,6 +80,70 @@ function getSwfVersion(bytes) {
     return 0;
 }
 
+function parseSwfDimensions(data) {
+    // Parse uncompressed SWF header RECT to get stage dimensions in pixels
+    // data must be uncompressed (FWS) bytes
+    try {
+        var sig = String.fromCharCode(data[0], data[1], data[2]);
+        if (sig !== 'FWS') return null;
+        // RECT starts at byte 8
+        var bitPos = 0;
+        var bytePos = 8;
+        function readBits(n) {
+            var val = 0;
+            for (var i = 0; i < n; i++) {
+                var b = data[bytePos + (bitPos >> 3)];
+                var bit = (b >> (7 - (bitPos & 7))) & 1;
+                val = (val << 1) | bit;
+                bitPos++;
+            }
+            return val;
+        }
+        var nBits = readBits(5);
+        var xMin = readBits(nBits);
+        var xMax = readBits(nBits);
+        var yMin = readBits(nBits);
+        var yMax = readBits(nBits);
+        var w = (xMax - xMin) / 20;
+        var h = (yMax - yMin) / 20;
+        if (w > 0 && h > 0) return {width: w, height: h};
+    } catch(e) {}
+    return null;
+}
+
+function decompressAndGetDims(bytes, callback) {
+    var sig = String.fromCharCode(bytes[0], bytes[1], bytes[2]);
+    if (sig === 'FWS') {
+        callback(parseSwfDimensions(bytes));
+    } else if (sig === 'CWS' && typeof DecompressionStream !== 'undefined') {
+        var compressed = bytes.slice(8);
+        var ds = new DecompressionStream('deflate');
+        var writer = ds.writable.getWriter();
+        writer.write(compressed);
+        writer.close();
+        new Response(ds.readable).arrayBuffer().then(function(buf) {
+            var decompressed = new Uint8Array(buf);
+            var fws = new Uint8Array(8 + decompressed.length);
+            fws[0] = 0x46; fws[1] = 0x57; fws[2] = 0x53;
+            fws.set(bytes.slice(3, 8), 3);
+            fws.set(decompressed, 8);
+            callback(parseSwfDimensions(fws));
+        }).catch(function() { callback(null); });
+    } else {
+        callback(null);
+    }
+}
+
+function resizePlayer(dims) {
+    if (!dims) return;
+    var container = document.getElementById('ruffle-container');
+    // Scale to fit within a max width, preserving aspect ratio
+    var maxW = 640;
+    var scale = Math.min(1, maxW / dims.width);
+    container.style.width = Math.round(dims.width * scale) + 'px';
+    container.style.height = Math.round(dims.height * scale) + 'px';
+}
+
 // --- Drop zone ---
 var dropZone = document.getElementById('dropZone');
 var fileInput = document.getElementById('fileInput');
@@ -112,20 +176,30 @@ function loadDroppedSwf(file) {
         var version = getSwfVersion(bytes);
         var needAS3 = version >= 9;
         log(file.name + ': SWF version ' + version + (needAS3 ? ' (AS3)' : ' (AS2)'));
-        document.getElementById('loaded-name').textContent = file.name + ' (SWF' + version + ')';
 
-        var blob = new Blob([bytes], {type: 'application/x-shockwave-flash'});
-        var blobUrl = URL.createObjectURL(blob);
+        // Parse dimensions and resize player
+        decompressAndGetDims(bytes, function(dims) {
+            if (dims) {
+                log('Stage: ' + dims.width + 'x' + dims.height);
+                document.getElementById('loaded-name').textContent =
+                    file.name + ' (SWF' + version + ', ' + dims.width + 'x' + dims.height + ')';
+                resizePlayer(dims);
+            } else {
+                document.getElementById('loaded-name').textContent = file.name + ' (SWF' + version + ')';
+            }
 
-        // Switch wrapper if needed
-        var neededMode = needAS3 ? 'as3' : 'as2';
-        if (neededMode !== wrapperMode || !bridgeReady) {
-            loadWrapper(neededMode, function() {
+            var blob = new Blob([bytes], {type: 'application/x-shockwave-flash'});
+            var blobUrl = URL.createObjectURL(blob);
+
+            var neededMode = needAS3 ? 'as3' : 'as2';
+            if (neededMode !== wrapperMode || !bridgeReady) {
+                loadWrapper(neededMode, function() {
+                    callLoadSwf(blobUrl, file.name);
+                });
+            } else {
                 callLoadSwf(blobUrl, file.name);
-            });
-        } else {
-            callLoadSwf(blobUrl, file.name);
-        }
+            }
+        });
     };
     reader.readAsArrayBuffer(file);
 }

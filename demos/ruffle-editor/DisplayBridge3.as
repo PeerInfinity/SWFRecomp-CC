@@ -3,6 +3,8 @@ package {
     import flash.display.Loader;
     import flash.display.DisplayObject;
     import flash.display.DisplayObjectContainer;
+    import flash.display.StageScaleMode;
+    import flash.display.StageAlign;
     import flash.external.ExternalInterface;
     import flash.net.URLRequest;
     import flash.events.Event;
@@ -15,6 +17,10 @@ package {
         private var testBoxes:Sprite;
 
         public function DisplayBridge3() {
+            // Let the player element control the visible area
+            stage.scaleMode = StageScaleMode.NO_SCALE;
+            stage.align = StageAlign.TOP_LEFT;
+
             // Create test content
             testBoxes = new Sprite();
             addChild(testBoxes);
