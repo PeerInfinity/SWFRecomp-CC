@@ -11,8 +11,5 @@ Math-v8
 # --- ops: Platform-dependent NaN bit patterns (IEEE 754) ---
 ops-v8
 
-# --- Error: Gnash auto-boxing bug (ECMA-262 §15.11.1) ---
-Error-v5
-Error-v6
-Error-v7
-Error-v8
+# --- Error: Previously ignored (ECMA-262 §15.11.1 vs Flash behavior) ---
+# Error-v5/v6/v7/v8 removed: now PASS (2026-04-10, raw message storage fix)

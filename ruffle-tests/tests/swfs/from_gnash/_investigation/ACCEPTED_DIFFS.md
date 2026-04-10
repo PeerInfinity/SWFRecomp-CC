@@ -93,24 +93,9 @@ generation.
 **Decision:** Accept as platform-dependent. Cannot be fixed without injecting artificial
 NaN payload diversity, which would be fragile and non-standard.
 
-### Error-v5 / Error-v6 / Error-v7 / Error-v8 — `typeof(e.message)` returns "string", not "object" (2 diff lines each)
+### ~~Error-v5 / Error-v6 / Error-v7 / Error-v8~~ — RESOLVED (2026-04-10)
 
-**Example diff (all 4 tests):**
-```
-- PASSED: typeof(e.toString()) == "object" [./Error.as:66]
-+ FAILED: expected: "object" obtained: string [./Error.as:66]
-- PASSED: typeof(e.message) == "object" [./Error.as:69]
-+ FAILED: expected: "object" obtained: string [./Error.as:69]
-```
-
-**Spec reference:** ECMA-262 §15.11.1: The Error constructor coerces its argument to a
-string via `ToString()`. The `message` property should be a string value.
-
-Gnash appears to auto-box the Error message argument (storing the raw numeric value `7.8898`
-as a Number object), making `typeof(e.message)` return "object". Flash Player and ECMA-262
-both coerce to string, making `typeof(e.message)` return "string".
-
-**Decision:** Keep ECMA-262-correct behavior. Error message is a string.
+**Previously:** 2 diff lines per test. Error constructor coerced message to string (ECMA-262 §15.11.1), but Gnash expected raw storage. Now fixed: Error constructor stores raw argument value, matching Flash Player behavior. All 4 tests PASS. Removed from `ignored_tests.txt`.
 
 ---
 
@@ -123,7 +108,7 @@ both coerce to string, making `typeof(e.message)` return "string".
 | Math-v7 | 5 | Gnash pow/SQRT bugs | Correct | IEEE 754, ECMA-262 |
 | Math-v8 | 5 | Gnash pow/SQRT bugs | Correct | IEEE 754, ECMA-262 |
 | ops-v8 | 7 | Platform NaN bit patterns | Correct (x86-64) | IEEE 754 (platform-dependent) |
-| Error-v5 | 4 | Gnash auto-boxing bug | Correct | ECMA-262 §15.11.1 |
-| Error-v6 | 4 | Gnash auto-boxing bug | Correct | ECMA-262 §15.11.1 |
-| Error-v7 | 4 | Gnash auto-boxing bug | Correct | ECMA-262 §15.11.1 |
-| Error-v8 | 4 | Gnash auto-boxing bug | Correct | ECMA-262 §15.11.1 |
+| ~~Error-v5~~ | ~~4~~ | ~~RESOLVED~~ | NOW PASS | Fixed 2026-04-10 |
+| ~~Error-v6~~ | ~~4~~ | ~~RESOLVED~~ | NOW PASS | Fixed 2026-04-10 |
+| ~~Error-v7~~ | ~~4~~ | ~~RESOLVED~~ | NOW PASS | Fixed 2026-04-10 |
+| ~~Error-v8~~ | ~~4~~ | ~~RESOLVED~~ | NOW PASS | Fixed 2026-04-10 |
