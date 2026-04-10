@@ -1,10 +1,14 @@
 package {
     import flash.display.Sprite;
+    import flash.display.Shape;
     import flash.display.Loader;
     import flash.display.DisplayObject;
     import flash.display.DisplayObjectContainer;
     import flash.display.StageScaleMode;
     import flash.display.StageAlign;
+    import flash.text.TextField;
+    import flash.display.Bitmap;
+    import flash.media.Video;
     import flash.external.ExternalInterface;
     import flash.net.URLRequest;
     import flash.events.Event;
@@ -80,14 +84,26 @@ package {
         }
 
         private function findChild(nameOrIndex:String):DisplayObject {
-            // Try test boxes first
-            if (testBoxes.parent) {
-                var child:DisplayObject = findInContainer(testBoxes, nameOrIndex);
-                if (child) return child;
-            }
-            // Try loaded content
-            if (loader.content is DisplayObjectContainer) {
-                return findInContainer(loader.content as DisplayObjectContainer, nameOrIndex);
+            var root:DisplayObjectContainer = null;
+            if (testBoxes.parent) root = testBoxes;
+            else if (loader.content is DisplayObjectContainer) root = loader.content as DisplayObjectContainer;
+            if (!root) return null;
+
+            // Handle dotted paths (e.g., "instance3.child1")
+            var parts:Array = nameOrIndex.split(".");
+            var current:DisplayObjectContainer = root;
+            for (var i:int = 0; i < parts.length; i++) {
+                var found:DisplayObject = findInContainer(current, parts[i]);
+                if (!found) return null;
+                if (i < parts.length - 1) {
+                    if (found is DisplayObjectContainer) {
+                        current = found as DisplayObjectContainer;
+                    } else {
+                        return null;
+                    }
+                } else {
+                    return found;
+                }
             }
             return null;
         }
@@ -107,11 +123,20 @@ package {
             return null;
         }
 
-        private function enumContainer(container:DisplayObjectContainer, items:Array):void {
+        private function enumContainer(container:DisplayObjectContainer, items:Array, prefix:String = "", maxDepth:int = 3):void {
             for (var i:int = 0; i < container.numChildren; i++) {
                 var child:DisplayObject = container.getChildAt(i);
+                var typeName:String = "unknown";
+                if (child is Sprite)          typeName = "sprite";
+                else if (child is Shape)      typeName = "shape";
+                else if (child is TextField)  typeName = "textfield";
+                else if (child is Bitmap)     typeName = "bitmap";
+                else if (child is Video)      typeName = "video";
+
+                var path:String = prefix.length > 0 ? prefix + "." + child.name : child.name;
                 items.push(
-                    '{"name":"' + child.name + '"'
+                    '{"name":"' + path + '"'
+                    + ',"type":"' + typeName + '"'
                     + ',"index":' + i
                     + ',"x":' + child.x
                     + ',"y":' + child.y
@@ -124,6 +149,11 @@ package {
                     + ',"height":' + child.height
                     + '}'
                 );
+
+                // Recurse into containers (sprites, movieclips)
+                if (maxDepth > 0 && child is DisplayObjectContainer) {
+                    enumContainer(child as DisplayObjectContainer, items, path, maxDepth - 1);
+                }
             }
         }
 
