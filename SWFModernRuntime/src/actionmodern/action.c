@@ -3958,14 +3958,9 @@ static ActionVar builtin_error_toString(SWFAppContext* app_context, ActionVar* a
 	{
 		ASObject* obj = (ASObject*) this_obj;
 		ActionVar* msg = getPropertyWithPrototype(obj, "message", 7);
-		if (msg != NULL && msg->type == ACTION_STACK_VALUE_STRING)
+		if (msg != NULL && msg->type != ACTION_STACK_VALUE_UNDEFINED)
 		{
-			const uint16_t* u16 = varGetU16Ptr(msg);
-			if (u16 != NULL && msg->str_size > 0)
-			{
-				ret.data.numeric_value = (u64) u16;
-				ret.str_size = msg->str_size;
-			}
+			return *msg;
 		}
 	}
 	return ret;
@@ -40819,29 +40814,16 @@ void actionNewObject(SWFAppContext* app_context)
 		ASObject* err = allocObject(app_context, 8);
 		// Set __proto__ to Error.prototype (via the Error constructor function)
 		// Use GetVariable("Error") to find the constructor and its prototype
-		// Set message property — coerce any argument to string
+		// Set message property — store raw argument value (Flash stores the original type)
 		if (num_args > 0)
 		{
-			if (args[0].type == ACTION_STACK_VALUE_STRING)
-			{
-				setProperty(app_context, err, "message", 7, &args[0]);
-			}
-			else if (args[0].type == ACTION_STACK_VALUE_UNDEFINED)
+			if (args[0].type == ACTION_STACK_VALUE_UNDEFINED)
 			{
 				// undefined arg → no message property (Flash behavior)
 			}
 			else
 			{
-				// Coerce non-string args (number, boolean, null, object) to string
-				char str_buf[256];
-				int slen = varToStringBuf(app_context, &args[0], str_buf, sizeof(str_buf));
-				u32 u16_len;
-				uint16_t* u16 = ascii_to_u16(app_context, str_buf, slen, &u16_len);
-				ActionVar msg_val = {0};
-				msg_val.type = ACTION_STACK_VALUE_STRING;
-				msg_val.str_size = u16_len;
-				VAL(u64, &msg_val.data.numeric_value) = (u64) u16;
-				setProperty(app_context, err, "message", 7, &msg_val);
+				setProperty(app_context, err, "message", 7, &args[0]);
 			}
 		}
 		// Set __proto__ to Error.prototype
@@ -44944,6 +44926,15 @@ void actionCallFunction(SWFAppContext* app_context, char* str_buffer)
 			else if (args[0].type == ACTION_STACK_VALUE_NULL)
 			{
 				str_value = "null";
+			}
+			else if (args[0].type == ACTION_STACK_VALUE_OBJECT ||
+			         args[0].type == ACTION_STACK_VALUE_ARRAY ||
+			         args[0].type == ACTION_STACK_VALUE_FUNCTION)
+			{
+				// Call toString on objects (Flash behavior for parseInt(obj))
+				int _pi_slen = varToStringBuf(app_context, &args[0], _pi_buf, sizeof(_pi_buf) - 1);
+				_pi_buf[_pi_slen] = '\0';
+				str_value = _pi_buf;
 			}
 			else
 			{
