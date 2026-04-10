@@ -294,10 +294,13 @@ MovieClip* ng_duplicateMovieClip(SWFAppContext* app_context, const char* source_
 // Defined in tag.c (NO_GRAPHICS builds only). NULL = use main SWF's transform_data.
 extern float (*g_active_transform_data)[16];
 
+#endif // NO_GRAPHICS (temporarily close for shared declarations below)
+
+// --- Shared ng_* declarations (from ng_shared.c, always compiled) ---
 // Register a child movie's transform data for sprite frame execution.
 void ng_registerMovieTransformData(u8 movie_id, float (*td)[16]);
 
-// Callbacks from tag.c → tag_stubs.c supplemental registries (NO_GRAPHICS builds)
+// Callbacks from tag.c → ng_shared.c supplemental registries (all build modes)
 void ng_record_char_bounds(size_t char_id, s32 xmin, s32 xmax, s32 ymin, s32 ymax);
 void ng_record_morph_end_bounds(size_t char_id, s32 xmin, s32 xmax, s32 ymin, s32 ymax);
 // Record that a shape uses non-zero winding rule (DefineShape4 UsesFillWindingRule flag)
@@ -306,6 +309,8 @@ void ng_record_char_winding(size_t char_id);
 void ng_record_char_path(size_t char_id, size_t path_offset, size_t path_size);
 // Record interleaved morph path data (for interpolated hit testing)
 void ng_record_morph_path(size_t char_id, size_t path_offset, size_t path_size);
+
+#ifdef NO_GRAPHICS // reopen for remaining NO_GRAPHICS-only declarations
 // Shape-accurate point-in-shape test for a display list.
 // Walks the display list recursively; for leaf shapes, tests the test point against triangles.
 // ma..mty is the accumulated parent matrix (twips space).
