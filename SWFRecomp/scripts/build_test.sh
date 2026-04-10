@@ -229,6 +229,20 @@ if [ -f "${TEST_DIR}/test_harness.c" ]; then
     echo "Found test_harness.c"
 fi
 
+# Copy display bridge if present in test dir or wasm_wrappers
+DISPLAY_BRIDGE=false
+if [ -f "${TEST_DIR}/display_bridge.c" ]; then
+    cp "${TEST_DIR}/display_bridge.c" "${BUILD_DIR}/"
+    EXTRA_DEFINES="${EXTRA_DEFINES} -DHAS_DISPLAY_BRIDGE"
+    DISPLAY_BRIDGE=true
+    echo "Found display_bridge.c (test dir)"
+elif [ -f "${SWFRECOMP_ROOT}/wasm_wrappers/display_bridge.c" ]; then
+    cp "${SWFRECOMP_ROOT}/wasm_wrappers/display_bridge.c" "${BUILD_DIR}/"
+    EXTRA_DEFINES="${EXTRA_DEFINES} -DHAS_DISPLAY_BRIDGE"
+    DISPLAY_BRIDGE=true
+    echo "Found display_bridge.c (wasm_wrappers)"
+fi
+
 # Build
 if [ "$TARGET" == "wasm" ]; then
     echo "Building WASM with SWFModernRuntime..."
@@ -242,6 +256,12 @@ if [ "$TARGET" == "wasm" ]; then
     fi
 
     cd "${BUILD_DIR}"
+
+    # Build exported functions list
+    EXPORTED_FUNCS='["_main","_runSWF","_audio_fill_buffer"]'
+    if [ "$DISPLAY_BRIDGE" = true ]; then
+        EXPORTED_FUNCS='["_main","_runSWF","_audio_fill_buffer","_getDisplayListJSON","_setObjectTransform"]'
+    fi
 
     if [ "$GRAPHICS_FLAG" = true ]; then
         emcc \
@@ -260,7 +280,7 @@ if [ "$TARGET" == "wasm" ]; then
             -I"${SWFMODERN_ROOT}/lib/c-hashmap" \
             -o "${OUTPUT_NAME}.js" \
             -s WASM=1 \
-            -s EXPORTED_FUNCTIONS='["_main","_runSWF","_audio_fill_buffer"]' \
+            -s EXPORTED_FUNCTIONS="${EXPORTED_FUNCS}" \
             -s EXPORTED_RUNTIME_METHODS='["ccall","cwrap","HEAPF32"]' \
             -s ALLOW_MEMORY_GROWTH=1 \
             -s INITIAL_MEMORY=64MB \
