@@ -77,6 +77,17 @@ void tagMain(SWFAppContext* app_context)
 		}
 		// else: stopped — stay on current frame
 		bad_poll |= renderer_poll(app_context);
+
+		// After-tick hook (for test harness / display bridge)
+		{
+			typedef void (*AfterTickHandler)(SWFAppContext*, int);
+			extern AfterTickHandler g_after_tick_handler;
+			static int _tick_count = 0;
+			_tick_count++;
+			if (g_after_tick_handler)
+				g_after_tick_handler(app_context, _tick_count);
+		}
+
 #ifdef __EMSCRIPTEN__
 		double elapsed = emscripten_get_now() - frame_start;
 		u32 sleep_ms = (elapsed < (double)frame_ms) ? (u32)((double)frame_ms - elapsed) : 0;

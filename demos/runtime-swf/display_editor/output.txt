@@ -1,0 +1,19 @@
+display_editor: 3 shapes placed
+=== display list after tick 1 ===
+depth 1: char_id=1 type=shape
+  transform_id=1
+  x=50.0 y=50.0
+  xscale=100.0 yscale=100.0
+  rotation=0.0
+depth 2: char_id=2 type=shape
+  transform_id=2
+  x=200.0 y=100.0
+  xscale=100.0 yscale=100.0
+  rotation=0.0
+depth 3: char_id=3 type=shape
+  transform_id=3
+  x=100.0 y=250.0
+  xscale=100.0 yscale=100.0
+  rotation=0.0
+=== end display list ===
+display_editor: stopped
