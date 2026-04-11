@@ -2711,104 +2711,154 @@ int ng_compute_droptarget(float stage_x_twips, float stage_y_twips,
 // ---------------------------------------------------------------------------
 // Called from swf_core.c's input_events_deliver on EV_MOUSE_DOWN_LEFT / UP_LEFT.
 
+// Recursive helper for dispatch_clip_event_press — walks into nested sprite
+// display lists to find entries with CLIP_EVENT_PRESS clip actions.
+static void dispatch_clip_event_press_dl(SWFAppContext* app_context,
+    DisplayObject* dl, size_t dl_max_depth,
+    double ma, double mb, double mc_m, double md, double mtx, double mty,
+    float mouse_x, float mouse_y, MovieClip* parent_mc)
+{
+	extern int ng_hitTestShapeFromDL(DisplayObject* dl, size_t dl_max,
+	    double ma, double mb, double mc_m, double md, double mtx, double mty,
+	    double test_x, double test_y);
+
+	for (size_t i = 1; i <= dl_max_depth; i++)
+	{
+		DisplayObject* obj = &dl[i];
+		if (obj->char_id == 0) continue;
+
+		// Compose parent transform with this entry's transform
+		u32 tid = obj->transform_id;
+		double ca = (double)transform_data[tid][0];
+		double cb = (double)transform_data[tid][1];
+		double cc = (double)transform_data[tid][4];
+		double cd = (double)transform_data[tid][5];
+		double ctx_v = (double)transform_data[tid][12];
+		double cty_v = (double)transform_data[tid][13];
+		double na = ma*ca + mc_m*cb, nb = mb*ca + md*cb;
+		double nc = ma*cc + mc_m*cd, nd = mb*cc + md*cd;
+		double ntx = ma*ctx_v + mc_m*cty_v + mtx;
+		double nty = mb*ctx_v + md*cty_v + mty;
+
+		// Check if this entry has any mouse-related clip actions (PRESS or RELEASE).
+		// We need to mark entries with RELEASE actions as pressed too, so the
+		// release handler can fire later even if there's no PRESS handler.
+		int has_mouse_clip = 0;
+		int has_press_action = 0;
+		if (obj->clip_action_count > 0)
+		{
+			for (size_t a = 0; a < obj->clip_action_count; a++)
+			{
+				uint32_t flags = obj->clip_actions[a].event_flags;
+				if (flags & (CLIP_EVENT_PRESS | CLIP_EVENT_RELEASE)) {
+					has_mouse_clip = 1;
+					if (flags & CLIP_EVENT_PRESS) has_press_action = 1;
+				}
+			}
+		}
+
+		if (has_mouse_clip)
+		{
+			// Hit-test: check if mouse is inside this entry's visual content
+			int hit = 0;
+			if (obj->sprite_display_list != NULL && obj->sprite_max_depth > 0) {
+				hit = ng_hitTestShapeFromDL(obj->sprite_display_list, obj->sprite_max_depth,
+					na, nb, nc, nd, ntx, nty, (double)mouse_x, (double)mouse_y);
+			}
+			if (hit) {
+				obj->clip_mc_pressed = 1;
+				if (has_press_action) {
+					MovieClip* saved_ctx = g_current_context;
+					if (obj->instance_name) {
+						MovieClip* mc = actionFindOrCreateMovieClip(app_context, obj->instance_name, parent_mc);
+						if (mc) actionSetCurrentContext(mc);
+					}
+					for (size_t a = 0; a < obj->clip_action_count; a++) {
+						if (obj->clip_actions[a].event_flags & CLIP_EVENT_PRESS)
+							obj->clip_actions[a].action(app_context);
+					}
+					actionSetCurrentContext(saved_ctx);
+				}
+
+				if (is_dragging && obj->instance_name && obj->instance_name[0] != '\0')
+					snprintf(g_drag_target_name, sizeof(g_drag_target_name), "%s", obj->instance_name);
+			}
+		}
+
+		// Recurse into sprite display lists to find nested clip actions
+		if (obj->sprite_display_list != NULL && obj->sprite_max_depth > 0) {
+			MovieClip* child_mc = parent_mc;
+			if (obj->instance_name) {
+				MovieClip* mc = actionFindOrCreateMovieClip(app_context, obj->instance_name, parent_mc);
+				if (mc) child_mc = mc;
+			}
+			dispatch_clip_event_press_dl(app_context,
+				obj->sprite_display_list, obj->sprite_max_depth,
+				na, nb, nc, nd, ntx, nty,
+				mouse_x, mouse_y, child_mc);
+		}
+	}
+}
+
 void dispatch_clip_event_press(SWFAppContext* app_context)
 {
 	float mx = app_context->mouse.stage_x;  // twips
 	float my = app_context->mouse.stage_y;  // twips
 
-	for (size_t i = 1; i <= max_depth; i++)
+	// Walk root display list with identity transform
+	dispatch_clip_event_press_dl(app_context,
+		display_list, max_depth,
+		1.0, 0.0, 0.0, 1.0, 0.0, 0.0,
+		mx, my, &root_movieclip);
+}
+
+// Recursive helper for dispatch_clip_event_release — walks into nested sprite
+// display lists to find entries with clip_mc_pressed flag.
+static void dispatch_clip_event_release_dl(SWFAppContext* app_context,
+    DisplayObject* dl, size_t dl_max_depth, MovieClip* parent_mc)
+{
+	for (size_t i = 1; i <= dl_max_depth; i++)
 	{
-		DisplayObject* obj = &display_list[i];
-		if (obj->char_id == 0 || obj->clip_action_count == 0) continue;
+		DisplayObject* obj = &dl[i];
+		if (obj->char_id == 0) continue;
 
-		int has_press = 0;
-		for (size_t a = 0; a < obj->clip_action_count; a++)
+		// Fire RELEASE on entries that were pressed
+		if (obj->clip_mc_pressed && obj->clip_action_count > 0)
 		{
-			if (obj->clip_actions[a].event_flags & CLIP_EVENT_PRESS) { has_press = 1; break; }
-		}
-		if (!has_press) continue;
-
-		// Determine the stage origin for this sprite.
-		// Use the persisted virtual position if this is the most-recently dragged clip.
-		float orig_x, orig_y;
-		if (g_drag_target_name[0] != '\0' && obj->instance_name &&
-		    strcmp(obj->instance_name, g_drag_target_name) == 0)
-		{
-			orig_x = g_drag_virt_x;
-			orig_y = g_drag_virt_y;
-		}
-		else
-		{
-			orig_x = transform_data[obj->transform_id][12];
-			orig_y = transform_data[obj->transform_id][13];
-		}
-
-		// Compute sprite content AABB in stage twips
-		int hit = 0;
-		if (obj->sprite_display_list != NULL && obj->sprite_max_depth > 0)
-		{
-			float lxmin, lxmax, lymin, lymax;
-			if (sprite_content_bounds_twips(obj->sprite_display_list, obj->sprite_max_depth,
-			        &lxmin, &lxmax, &lymin, &lymax))
-			{
-				float sx = transform_data[obj->transform_id][0];
-				float sy = transform_data[obj->transform_id][5];
-				float stage_xmin = orig_x + sx * lxmin;
-				float stage_xmax = orig_x + sx * lxmax;
-				float stage_ymin = orig_y + sy * lymin;
-				float stage_ymax = orig_y + sy * lymax;
-				if (stage_xmin > stage_xmax) { float t = stage_xmin; stage_xmin = stage_xmax; stage_xmax = t; }
-				if (stage_ymin > stage_ymax) { float t = stage_ymin; stage_ymin = stage_ymax; stage_ymax = t; }
-				hit = (mx >= stage_xmin && mx <= stage_xmax &&
-				       my >= stage_ymin && my <= stage_ymax);
+			obj->clip_mc_pressed = 0;
+			MovieClip* saved_ctx = g_current_context;
+			if (obj->instance_name) {
+				MovieClip* mc = actionFindOrCreateMovieClip(app_context, obj->instance_name, parent_mc);
+				if (mc) actionSetCurrentContext(mc);
 			}
+			for (size_t a = 0; a < obj->clip_action_count; a++) {
+				if (obj->clip_actions[a].event_flags & CLIP_EVENT_RELEASE)
+					obj->clip_actions[a].action(app_context);
+			}
+			actionSetCurrentContext(saved_ctx);
 		}
-		if (!hit) continue;
-
-		obj->clip_mc_pressed = 1;
-		MovieClip* saved_ctx = g_current_context;
-		if (obj->instance_name)
+		else if (obj->clip_mc_pressed)
 		{
-			MovieClip* mc = actionFindOrCreateMovieClip(app_context, obj->instance_name, &root_movieclip);
-			if (mc) actionSetCurrentContext(mc);
+			obj->clip_mc_pressed = 0;
 		}
-		for (size_t a = 0; a < obj->clip_action_count; a++)
-		{
-			if (obj->clip_actions[a].event_flags & CLIP_EVENT_PRESS)
-				obj->clip_actions[a].action(app_context);
-		}
-		actionSetCurrentContext(saved_ctx);
 
-		// If startDrag was called by the action, ensure g_drag_target_name matches this
-		// sprite's actual instance name.  GetVariable("this") currently returns root_movieclip
-		// so the target passed to actionStartDrag may be wrong ("_level0"); we correct it here.
-		if (is_dragging && obj->instance_name && obj->instance_name[0] != '\0')
-			snprintf(g_drag_target_name, sizeof(g_drag_target_name), "%s", obj->instance_name);
+		// Recurse into sprites
+		if (obj->sprite_display_list != NULL && obj->sprite_max_depth > 0) {
+			MovieClip* child_mc = parent_mc;
+			if (obj->instance_name) {
+				MovieClip* mc = actionFindOrCreateMovieClip(app_context, obj->instance_name, parent_mc);
+				if (mc) child_mc = mc;
+			}
+			dispatch_clip_event_release_dl(app_context,
+				obj->sprite_display_list, obj->sprite_max_depth, child_mc);
+		}
 	}
 }
 
 void dispatch_clip_event_release(SWFAppContext* app_context)
 {
-	for (size_t i = 1; i <= max_depth; i++)
-	{
-		DisplayObject* obj = &display_list[i];
-		if (obj->char_id == 0 || !obj->clip_mc_pressed) continue;
-		if (obj->clip_action_count == 0) { obj->clip_mc_pressed = 0; continue; }
-
-		obj->clip_mc_pressed = 0;
-		MovieClip* saved_ctx = g_current_context;
-		if (obj->instance_name)
-		{
-			MovieClip* mc = actionFindOrCreateMovieClip(app_context, obj->instance_name, &root_movieclip);
-			if (mc) actionSetCurrentContext(mc);
-		}
-		for (size_t a = 0; a < obj->clip_action_count; a++)
-		{
-			if (obj->clip_actions[a].event_flags & CLIP_EVENT_RELEASE)
-				obj->clip_actions[a].action(app_context);
-		}
-		actionSetCurrentContext(saved_ctx);
-	}
+	dispatch_clip_event_release_dl(app_context,
+		display_list, max_depth, &root_movieclip);
 }
 // ---------------------------------------------------------------------------
 // Generic clip event flag dispatch (MOUSE_DOWN/UP/MOVE, KEY_DOWN/UP)
