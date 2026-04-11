@@ -29,10 +29,10 @@ blockers: []
 
 Last updated: 2026-04-10
 
-## Status: IN PROGRESS — 6 failing tests (17/23 passing = 73.9%)
+## Status: DONE (actionable items) — 3 remaining blocked (20/23 passing = 87.0%)
 
-5 tests fixed this session: scope, settimeout, setinterval, watch, nested-button.
-6 still failing: nativeinheritance, array, target, hitarea (Ruffle known_failure), moviecliploader, filters.
+9 tests fixed: scope, settimeout, setinterval, watch, nested-button, nativeinheritance, array, target, + drag_drop regression fix.
+3 still failing: hitarea (Ruffle known_failure), moviecliploader (blocked), filters (blocked).
 
 These tests live in `ruffle-tests/tests/swfs/from_shumway/avm1/` and were
 previously undocumented. The flat `from_shumway/` suite (47 tests, 17/17 AVM1)
@@ -42,11 +42,11 @@ is complete; this plan covers the separate `avm1/` subdirectory.
 
 | Phase | Tests | Potential Flips | Effort | Status |
 |-------|-------|-----------------|--------|--------|
-| 1 | scope, nativeinheritance | 1→2 | scope=DONE, nativeinheritance=needs investigation | Partial |
-| 2 | settimeout, setinterval | 2 | Low | **DONE** |
-| 3 | array | 1 | Medium | Not started |
-| 4 | target | 1 | Medium | Not started |
-| 5 | hitarea, nested-button | 0→1 | nested-button=DONE, hitarea=known_failure in Ruffle | Partial |
+| 1 | scope, nativeinheritance | 2 | Both DONE | **DONE** |
+| 2 | settimeout, setinterval | 2 | Both DONE | **DONE** |
+| 3 | array | 1 | DONE | **DONE** |
+| 4 | target | 1 | DONE | **DONE** |
+| 5 | hitarea, nested-button | 0→1 | nested-button=DONE, hitarea=known_failure in Ruffle | **DONE** |
 | 6 | moviecliploader, filters, watch | 0→1 | watch=DONE, others=blocked | Partial |
 | **Total** | **11** | **6-9** | | **4 done** |
 

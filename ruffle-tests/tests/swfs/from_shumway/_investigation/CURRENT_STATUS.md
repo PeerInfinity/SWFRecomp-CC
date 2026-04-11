@@ -21,11 +21,11 @@ Last updated: 2026-04-10
 | Metric | Value |
 |--------|-------|
 | Total tests | 23 |
-| Passing | **17** (73.9%) |
-| Failing | **6** (6 output_mismatch) |
+| Passing | **20** (87.0%) |
+| Failing | **3** (3 output_mismatch) |
 | No ignore list | — |
 
-**Status**: 5 tests fixed (2026-04-10): scope, settimeout, setinterval, watch, nested-button. 6 remaining failures (1 is `known_failure` in Ruffle). See `incomplete/SHUMWAY_AVM1_PLAN.md` for details.
+**Status**: 9 tests fixed (2026-04-10/11): scope, settimeout, setinterval, watch, nested-button, nativeinheritance, array, target, + drag_drop AVM1 regression fix. 3 remaining: hitarea (Ruffle known_failure), moviecliploader (blocked on multi-SWF loading), filters (blocked on mc.filters getter). See `incomplete/SHUMWAY_AVM1_PLAN.md`.
 
 ## Related Documents
 
