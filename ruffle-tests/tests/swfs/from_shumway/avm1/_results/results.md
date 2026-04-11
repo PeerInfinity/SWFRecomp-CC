@@ -1,61 +1,61 @@
 # Ruffle Test Results (Unfiltered)
 
-**Date**: 2026-04-11 00:32 UTC
+**Date**: 2026-04-11 04:46 UTC
 
-**Git SHA**: `6200b1d43f`
+**Git SHA**: `f634cd780e`
 
-**Run Duration**: 7m 18s
+**Run Duration**: 7m 21s
 
 ## Summary
 
 | Metric | Value |
 |--------|-------|
 | Total tests | 23 |
-| Passing | **12** (52.2%) |
-| Failing | 11 |
+| Passing | **16** (69.6%) |
+| Failing | 7 |
 | Total expected lines | 311 |
-| Matching lines | 119 (38.3%) |
-| Mismatched lines | 192 |
+| Matching lines | 136 (43.7%) |
+| Mismatched lines | 175 |
 
 ### Failure Breakdown
 
 | Category | Count | % of Failures |
 |----------|-------|---------------|
-| Output Mismatch | 10 | 90.9% |
-| Runtime Error | 1 | 9.1% |
+| Output Mismatch | 7 | 100.0% |
 
 ## Passing Tests
 
-**12 tests passing**
+**16 tests passing**
 
 | # | Test | Lines | Duration | Notes |
 |---|------|-------|----------|-------|
-| 1 | `callee` | 2 | 18.6s |  |
-| 2 | `depth` | 6 | 19.2s |  |
+| 1 | `callee` | 2 | 18.9s |  |
+| 2 | `depth` | 6 | 19.8s |  |
 | 3 | `externalinterface` | 4 | 19.8s |  |
-| 4 | `label` | 4 | 18.9s |  |
-| 5 | `levels` | 9 | 18.9s |  |
-| 6 | `loadevent` | 9 | 18.9s |  |
-| 7 | `lookup` | 3 | 19.4s |  |
-| 8 | `mouse-transparency` | 1 | 19.2s |  |
-| 9 | `operations` | 13 | 19.0s |  |
-| 10 | `rollover` | 4 | 19.1s |  |
-| 11 | `super` | 11 | 18.2s |  |
-| 12 | `text-bind` | 0 | 18.3s |  |
+| 4 | `label` | 4 | 19.4s |  |
+| 5 | `levels` | 9 | 19.7s |  |
+| 6 | `loadevent` | 9 | 19.6s |  |
+| 7 | `lookup` | 3 | 19.2s |  |
+| 8 | `mouse-transparency` | 1 | 19.0s |  |
+| 9 | `operations` | 13 | 18.5s |  |
+| 10 | `rollover` | 4 | 19.0s |  |
+| 11 | `scope` | 14 | 18.7s |  |
+| 12 | `setinterval` | 20 | 19.1s |  |
+| 13 | `settimeout` | 17 | 18.8s |  |
+| 14 | `super` | 11 | 18.8s |  |
+| 15 | `text-bind` | 0 | 19.4s |  |
+| 16 | `watch` | 2 | 18.4s |  |
 
 ## Near-Passing Tests
 
 Tests with output mismatch but >= 50% line match rate (low-hanging fruit).
 
-**5 tests** within reach
+**2 tests** within reach
 
 | # | Test | Match Rate | Matching | Total | Diff Lines | Notes |
 |---|------|------------|----------|-------|------------|-------|
-| 1 | `scope` | 92.9% | 13 | 14 | 1 |  |
-| 2 | `nativeinheritance` | 83.3% | 5 | 6 | 1 |  |
-| 3 | `settimeout` | 64.7% | 11 | 17 | 6 |  |
-| 4 | `setinterval` | 55.0% | 11 | 20 | 9 |  |
-| 5 | `hitarea` | 50.0% | 2 | 4 | 2 |  |
+| 1 | `nativeinheritance` | 83.3% | 5 | 6 | 1 |  |
+| 2 | `hitarea` | 50.0% | 2 | 4 | 2 |  |
 
 ## Segfaults
 
@@ -63,11 +63,7 @@ No segfaults.
 
 ## Runtime Errors
 
-**1 tests** fail with runtime errors
-
-| # | Test | Detail | Duration | Notes |
-|---|------|--------|----------|-------|
-| 1 | `watch` | exit code -6 | 21.9s |  |
+No runtime errors.
 
 ## Timeouts
 
@@ -75,17 +71,14 @@ No timeouts.
 
 ## All Output Mismatches
 
-**10 tests** with output mismatch, sorted by match rate (best first)
+**7 tests** with output mismatch, sorted by match rate (best first)
 
 | # | Test | Match Rate | Matching/Total | Actual | Expected | Notes |
 |---|------|------------|----------------|--------|----------|-------|
-| 1 | `scope` | 92.9% | 13/14 | 14 | 14 |  |
-| 2 | `nativeinheritance` | 83.3% | 5/6 | 6 | 6 |  |
-| 3 | `settimeout` | 64.7% | 11/17 | 12 | 17 |  |
-| 4 | `setinterval` | 55.0% | 11/20 | 12 | 20 |  |
-| 5 | `hitarea` | 50.0% | 2/4 | 3 | 4 |  |
-| 6 | `target` | 27.3% | 6/22 | 22 | 18 |  |
-| 7 | `moviecliploader` | 14.3% | 1/7 | 6 | 7 |  |
-| 8 | `filters` | 2.0% | 3/149 | 85 | 149 |  |
-| 9 | `array` | 0.0% | 0/7 | 7 | 7 |  |
-| 10 | `nested-button` | 0.0% | 0/1 | 0 | 1 |  |
+| 1 | `nativeinheritance` | 83.3% | 5/6 | 6 | 6 |  |
+| 2 | `hitarea` | 50.0% | 2/4 | 3 | 4 |  |
+| 3 | `target` | 27.3% | 6/22 | 22 | 18 |  |
+| 4 | `moviecliploader` | 14.3% | 1/7 | 6 | 7 |  |
+| 5 | `filters` | 2.0% | 3/149 | 85 | 149 |  |
+| 6 | `array` | 0.0% | 0/7 | 7 | 7 |  |
+| 7 | `nested-button` | 0.0% | 0/1 | 0 | 1 |  |
