@@ -19,7 +19,7 @@ phases:
     status: not_started
   - id: 5
     name: "Mouse/button event fixes"
-    status: not_started
+    status: partial
   - id: 6
     name: "Blocked / large features"
     status: partial
@@ -29,10 +29,10 @@ blockers: []
 
 Last updated: 2026-04-10
 
-## Status: IN PROGRESS — 7 failing tests (16/23 passing = 69.6%)
+## Status: IN PROGRESS — 6 failing tests (17/23 passing = 73.9%)
 
-4 tests fixed this session: scope, settimeout, setinterval, watch.
-7 still failing: nativeinheritance, array, target, hitarea, nested-button, moviecliploader, filters.
+5 tests fixed this session: scope, settimeout, setinterval, watch, nested-button.
+6 still failing: nativeinheritance, array, target, hitarea (Ruffle known_failure), moviecliploader, filters.
 
 These tests live in `ruffle-tests/tests/swfs/from_shumway/avm1/` and were
 previously undocumented. The flat `from_shumway/` suite (47 tests, 17/17 AVM1)
@@ -46,7 +46,7 @@ is complete; this plan covers the separate `avm1/` subdirectory.
 | 2 | settimeout, setinterval | 2 | Low | **DONE** |
 | 3 | array | 1 | Medium | Not started |
 | 4 | target | 1 | Medium | Not started |
-| 5 | hitarea, nested-button | 0-2 | Medium (mouse input) | Not started |
+| 5 | hitarea, nested-button | 0→1 | nested-button=DONE, hitarea=known_failure in Ruffle | Partial |
 | 6 | moviecliploader, filters, watch | 0→1 | watch=DONE, others=blocked | Partial |
 | **Total** | **11** | **6-9** | | **4 done** |
 
@@ -190,7 +190,7 @@ resolution is a separate code path.
 
 ## Phase 5: Mouse/button event fixes
 
-### 5a: `hitarea` — hitArea event interaction (2 diffs, 2/4 = 50%)
+### 5a: `hitarea` — BLOCKED (known_failure in Ruffle, 2/4 = 50%)
 
 **Diff:**
 ```
@@ -223,7 +223,7 @@ shape hit-testing, and MC mouse handlers all work (rollover test 4/4 PASS).
 **Files:** `SWFModernRuntime/src/libswf/tag.c` (hit-test lookup),
 `SWFModernRuntime/src/actionmodern/action.c` (property storage).
 
-### 5b: `nested-button` — sprite clip event RELEASE (1 diff, 0/1 = 0%)
+### 5b: `nested-button` — FIXED (1/1 = 100%) ✓
 
 **Diff:**
 ```

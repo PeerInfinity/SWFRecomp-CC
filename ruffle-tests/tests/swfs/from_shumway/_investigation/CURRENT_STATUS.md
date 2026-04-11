@@ -21,11 +21,11 @@ Last updated: 2026-04-10
 | Metric | Value |
 |--------|-------|
 | Total tests | 23 |
-| Passing | **16** (69.6%) |
-| Failing | **7** (7 output_mismatch) |
+| Passing | **17** (73.9%) |
+| Failing | **6** (6 output_mismatch) |
 | No ignore list | — |
 
-**Status**: 4 tests fixed (2026-04-10): scope, settimeout, setinterval, watch. 7 remaining failures. See `incomplete/SHUMWAY_AVM1_PLAN.md` for details.
+**Status**: 5 tests fixed (2026-04-10): scope, settimeout, setinterval, watch, nested-button. 6 remaining failures (1 is `known_failure` in Ruffle). See `incomplete/SHUMWAY_AVM1_PLAN.md` for details.
 
 ## Related Documents
 
