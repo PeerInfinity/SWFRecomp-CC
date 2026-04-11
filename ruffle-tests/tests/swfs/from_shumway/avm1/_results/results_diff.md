@@ -1,20 +1,20 @@
 # Ruffle Test Results Diff
 
-**Previous:** `6d3c6fd07155` (2026-04-11T06:39:01.797466+00:00)
-**Current:** `8d0881a2c69b` (2026-04-11T18:55:42.321155+00:00)
+**Previous:** `8d0881a2c69b` (2026-04-11T18:55:42.321155+00:00)
+**Current:** `8b070eb6ecbe` (2026-04-11T19:59:46.864517+00:00)
 
 ## Summary
 
 | Metric | Previous | Current | Delta |
 |--------|----------|---------|-------|
-| Passing | 17 | 18 | +1 |
+| Passing | 18 | 19 | +1 |
 | Total | 23 | 23 | 0 |
-| Pass rate | 73.9% | 78.3% | +4.4% |
-| Mismatched lines | 174 | 173 | -1 |
-|   Decreased | | | -1 |
+| Pass rate | 78.3% | 82.6% | +4.3% |
+| Mismatched lines | 173 | 166 | -7 |
+|   Decreased | | | -7 |
 
 ## Newly Passing (1)
 
 | Test | Previous Status | Lines (prev) | Lines (now) |
 |------|----------------|--------------|-------------|
-| `nativeinheritance` | output_mismatch | 5/6 | 6/6 |
+| `array` | output_mismatch | 0/7 | 7/7 |
