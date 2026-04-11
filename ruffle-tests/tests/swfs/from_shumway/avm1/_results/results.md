@@ -1,52 +1,53 @@
 # Ruffle Test Results (Unfiltered)
 
-**Date**: 2026-04-11 18:55 UTC
+**Date**: 2026-04-11 19:59 UTC
 
-**Git SHA**: `8d0881a2c6`
+**Git SHA**: `8b070eb6ec`
 
-**Run Duration**: 7m 25s
+**Run Duration**: 7m 26s
 
 ## Summary
 
 | Metric | Value |
 |--------|-------|
 | Total tests | 23 |
-| Passing | **18** (78.3%) |
-| Failing | 5 |
+| Passing | **19** (82.6%) |
+| Failing | 4 |
 | Total expected lines | 311 |
-| Matching lines | 138 (44.4%) |
-| Mismatched lines | 173 |
+| Matching lines | 145 (46.6%) |
+| Mismatched lines | 166 |
 
 ### Failure Breakdown
 
 | Category | Count | % of Failures |
 |----------|-------|---------------|
-| Output Mismatch | 5 | 100.0% |
+| Output Mismatch | 4 | 100.0% |
 
 ## Passing Tests
 
-**18 tests passing**
+**19 tests passing**
 
 | # | Test | Lines | Duration | Notes |
 |---|------|-------|----------|-------|
-| 1 | `callee` | 2 | 19.1s |  |
-| 2 | `depth` | 6 | 18.8s |  |
-| 3 | `externalinterface` | 4 | 19.2s |  |
-| 4 | `label` | 4 | 18.9s |  |
-| 5 | `levels` | 9 | 18.9s |  |
-| 6 | `loadevent` | 9 | 19.1s |  |
-| 7 | `lookup` | 3 | 18.8s |  |
-| 8 | `mouse-transparency` | 1 | 19.9s |  |
-| 9 | `nativeinheritance` | 6 | 19.2s |  |
-| 10 | `nested-button` | 1 | 19.7s |  |
-| 11 | `operations` | 13 | 18.8s |  |
-| 12 | `rollover` | 4 | 19.0s |  |
-| 13 | `scope` | 14 | 19.2s |  |
-| 14 | `setinterval` | 20 | 19.3s |  |
-| 15 | `settimeout` | 17 | 18.9s |  |
-| 16 | `super` | 11 | 18.5s |  |
-| 17 | `text-bind` | 0 | 20.6s |  |
-| 18 | `watch` | 2 | 19.0s |  |
+| 1 | `array` | 7 | 19.5s |  |
+| 2 | `callee` | 2 | 18.6s |  |
+| 3 | `depth` | 6 | 18.7s |  |
+| 4 | `externalinterface` | 4 | 19.5s |  |
+| 5 | `label` | 4 | 19.2s |  |
+| 6 | `levels` | 9 | 19.4s |  |
+| 7 | `loadevent` | 9 | 20.4s |  |
+| 8 | `lookup` | 3 | 19.8s |  |
+| 9 | `mouse-transparency` | 1 | 19.1s |  |
+| 10 | `nativeinheritance` | 6 | 18.8s |  |
+| 11 | `nested-button` | 1 | 19.3s |  |
+| 12 | `operations` | 13 | 19.3s |  |
+| 13 | `rollover` | 4 | 19.6s |  |
+| 14 | `scope` | 14 | 18.7s |  |
+| 15 | `setinterval` | 20 | 19.3s |  |
+| 16 | `settimeout` | 17 | 19.4s |  |
+| 17 | `super` | 11 | 19.0s |  |
+| 18 | `text-bind` | 0 | 20.0s |  |
+| 19 | `watch` | 2 | 18.8s |  |
 
 ## Near-Passing Tests
 
@@ -72,7 +73,7 @@ No timeouts.
 
 ## All Output Mismatches
 
-**5 tests** with output mismatch, sorted by match rate (best first)
+**4 tests** with output mismatch, sorted by match rate (best first)
 
 | # | Test | Match Rate | Matching/Total | Actual | Expected | Notes |
 |---|------|------------|----------------|--------|----------|-------|
@@ -80,4 +81,3 @@ No timeouts.
 | 2 | `target` | 27.3% | 6/22 | 22 | 18 |  |
 | 3 | `moviecliploader` | 14.3% | 1/7 | 6 | 7 |  |
 | 4 | `filters` | 2.0% | 3/149 | 85 | 149 |  |
-| 5 | `array` | 0.0% | 0/7 | 7 | 7 |  |
