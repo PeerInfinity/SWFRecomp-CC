@@ -16802,6 +16802,27 @@ static MovieClip* resolveSlashPathToMC(SWFAppContext* app_context, const char* p
 				if (child_depth == SIZE_MAX && mc == &root_movieclip) {
 					child_depth = ng_findDisplayEntryByName(seg_buf);
 				}
+				// Fall back to dynamic_props for dynamically created MCs
+				// (createEmptyMovieClip creates MCs in the cache/dynamic_props
+				// but does NOT add them to the display list)
+				if (child_depth == SIZE_MAX && mc->dynamic_props != NULL) {
+					ActionVar* dp_val = getProperty((ASObject*)mc->dynamic_props, seg_buf, copy_len);
+					if (dp_val != NULL && dp_val->type == ACTION_STACK_VALUE_MOVIECLIP) {
+						MovieClip* dp_mc = (MovieClip*)(uintptr_t)dp_val->data.numeric_value;
+						if (dp_mc != NULL && dp_mc->depth != INT_MIN) {
+							mc = dp_mc;
+							cur_sprite_dl = NULL; cur_sprite_max = 0;
+							if (dp_mc->display_obj != NULL) {
+								DisplayObject* dobj = (DisplayObject*)dp_mc->display_obj;
+								if (dobj->sprite_display_list) {
+									cur_sprite_dl = dobj->sprite_display_list;
+									cur_sprite_max = dobj->sprite_max_depth;
+								}
+							}
+							goto slash_path_segment_done;
+						}
+					}
+				}
 				if (child_depth == SIZE_MAX) return NULL; // child not found
 
 				// Non-scriptable display objects (shapes, text, morph shapes) resolve
@@ -16858,6 +16879,7 @@ static MovieClip* resolveSlashPathToMC(SWFAppContext* app_context, const char* p
 					cur_sprite_dl = NULL; cur_sprite_max = 0;
 				}
 				mc = child_mc;
+				slash_path_segment_done: (void)0;
 #else
 				// Graphics mode: search display list for child by instance name
 				{
@@ -30864,10 +30886,11 @@ check_special_vars:
 					return;
 				}
 				// Fallback: prefer g_base_clip (frame script's clip, unaffected by
-				// SetTarget) when set; otherwise use g_current_context.
+				// SetTarget) when set; otherwise use root_movieclip.
+				// g_current_context is affected by SetTarget and must NOT be used
+				// here — "this" in a timeline script always refers to the base clip.
 				extern MovieClip root_movieclip;
 				MovieClip* ctx = g_base_clip;
-				if (ctx == NULL) ctx = g_current_context;
 				if (ctx == NULL) ctx = &root_movieclip;
 				PUSH(ACTION_STACK_VALUE_MOVIECLIP, (u64)ctx);
 				return;
