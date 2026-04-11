@@ -1,6 +1,6 @@
 # Shumway Test Suite Status
 
-Last updated: 2026-04-07
+Last updated: 2026-04-10
 
 ## Quick Summary
 
@@ -21,11 +21,11 @@ Last updated: 2026-04-07
 | Metric | Value |
 |--------|-------|
 | Total tests | 23 |
-| Passing | **12** (52.2%) |
-| Failing | **11** (10 output_mismatch + 1 crash) |
+| Passing | **16** (69.6%) |
+| Failing | **7** (7 output_mismatch) |
 | No ignore list | — |
 
-**Status**: 11 failing AVM1 tests with no prior documentation. See `SHUMWAY_AVM1_PLAN.md` for investigation plan.
+**Status**: 4 tests fixed (2026-04-10): scope, settimeout, setinterval, watch. 7 remaining failures. See `incomplete/SHUMWAY_AVM1_PLAN.md` for details.
 
 ## Related Documents
 

@@ -7,10 +7,10 @@ status: incomplete
 phases:
   - id: 1
     name: "Quick wins (scope, nativeinheritance)"
-    status: not_started
+    status: partial
   - id: 2
     name: "Timer coercion and arg forwarding"
-    status: not_started
+    status: done
   - id: 3
     name: "Array method return values"
     status: not_started
@@ -22,14 +22,17 @@ phases:
     status: not_started
   - id: 6
     name: "Blocked / large features"
-    status: not_started
+    status: partial
 dependencies: []
 blockers: []
 -->
 
-Last updated: 2026-04-07
+Last updated: 2026-04-10
 
-## Status: NOT STARTED — 11 failing tests (12/23 passing = 52.2%)
+## Status: IN PROGRESS — 7 failing tests (16/23 passing = 69.6%)
+
+4 tests fixed this session: scope, settimeout, setinterval, watch.
+7 still failing: nativeinheritance, array, target, hitarea, nested-button, moviecliploader, filters.
 
 These tests live in `ruffle-tests/tests/swfs/from_shumway/avm1/` and were
 previously undocumented. The flat `from_shumway/` suite (47 tests, 17/17 AVM1)
@@ -37,41 +40,28 @@ is complete; this plan covers the separate `avm1/` subdirectory.
 
 ## Summary
 
-| Phase | Tests | Potential Flips | Effort |
-|-------|-------|-----------------|--------|
-| 1 | scope, nativeinheritance | 2 | Trivial |
-| 2 | settimeout, setinterval | 2 | Low |
-| 3 | array | 1 | Medium |
-| 4 | target | 1 | Medium |
-| 5 | hitarea, nested-button | 0-2 | Medium (mouse input) |
-| 6 | moviecliploader, filters, watch | 0-1 | High / blocked |
-| **Total** | **11** | **6-9** | |
+| Phase | Tests | Potential Flips | Effort | Status |
+|-------|-------|-----------------|--------|--------|
+| 1 | scope, nativeinheritance | 1→2 | scope=DONE, nativeinheritance=needs investigation | Partial |
+| 2 | settimeout, setinterval | 2 | Low | **DONE** |
+| 3 | array | 1 | Medium | Not started |
+| 4 | target | 1 | Medium | Not started |
+| 5 | hitarea, nested-button | 0-2 | Medium (mouse input) | Not started |
+| 6 | moviecliploader, filters, watch | 0→1 | watch=DONE, others=blocked | Partial |
+| **Total** | **11** | **6-9** | | **4 done** |
 
 ---
 
 ## Phase 1: Quick wins
 
-### 1a: `scope` — this binding in method call (1 diff, 11/12 = 93%)
+### 1a: `scope` — FIXED (14/14 = 100%) ✓
 
-**Diff:**
-```
--   12  [type Object]
-+   12  _level0
-```
+**Root cause:** In Ruffle, `scope.resolve()` returns `Callable(scope_obj, value)` for ALL scope levels, not just WITH scopes. When a nested function (`t5()`) is called standalone from within a method (`b.t4()`), `this` should be the local scope object (which traces as `[type Object]`), not the movieclip.
 
-`b.t4()` calls a method on an object where `this` should be the object itself.
-We return `_level0` (the root movieclip) instead. The trace format `[type Object]`
-is Shumway's representation of a plain AS object.
-
-**Root cause:** The method call is binding `this` to the base clip (root MC)
-instead of the receiver object `b`. Likely a scope resolution issue in
-`actionCallMethod` where the OBJECT method dispatch path falls through to the
-movieclip context.
-
-**Fix:** Investigate what type `b` is and which dispatch path
-`actionCallMethod` takes. If `b` is an ASObject, the OBJECT handler should set
-`this` = `b`, not the current movieclip. May be related to SWF version
-semantics (this test's SWF version should be checked).
+**Fix (2026-04-10):** Three changes in `action.c`:
+1. `actionGetVariable`: set `g_last_callable_this` for all scope chain entries (removed `scope_is_with[i]` guard)
+2. `actionCallFunction`: moved scope chain lookup before global function registry lookup
+3. `actionCallFunction`: pass `callable_this` via `g_override_this` for DefineFunction2 with preload_this
 
 ### 1b: `nativeinheritance` — missing prototype property (1 diff, 5/6 = 83%)
 
@@ -92,54 +82,20 @@ prototype has that property registered.
 
 ---
 
-## Phase 2: Timer coercion and arg forwarding
+## Phase 2: Timer coercion and arg forwarding — FIXED ✓
 
-### 2a: `settimeout` — non-numeric delay + extra args (6 diffs, 11/17 = 65%)
+### 2a: `settimeout` — FIXED (17/17 = 100%) ✓
+### 2b: `setinterval` — FIXED (20/20 = 100%) ✓
 
-**Diffs:**
-```
-# Non-numeric delay should coerce to 0, not reject:
--   12  non-numeric interval is treated as 0: 2
-+   12  non-numeric interval is treated as 0: undefined
-
-# Callback never fires (timer not created), so remaining lines missing:
--   13  non-numeric interval triggered
--   14  setTimeout forwards rest arguments: 3
--   15  function callback called
--   16  arg1: arg 1
--   17  arg2: 2
-```
-
-Two issues:
-1. `setTimeout(func, nonNumericDelay)` returns `undefined` (timer not created)
-   instead of a timer ID. Non-numeric delays should coerce to 0.
-2. Extra arguments to `setTimeout(func, delay, arg1, arg2)` are not forwarded
-   to the callback function.
-
-**Cross-reference:** The AVM1 `set_interval` test (27/27 PASS) already handles
-extra args in function-form and method-form timers. The missing piece is
-non-numeric delay coercion.
-
-### 2b: `setinterval` — same issues (9 diffs, 11/20 = 55%)
-
-**Diffs:** Same pattern as settimeout plus 3 additional lines for object-method
-callback arg forwarding:
-```
--   18  object-callback called
--   19  arg1: arg 1
--   20  arg2: 2
-```
-
-**Fix (both tests):** In `actionSetInterval`/`actionSetTimeout`:
-1. When delay argument is non-numeric (string, undefined, etc.), coerce to 0
-   instead of returning undefined. Use `varToDouble` and treat NaN as 0.
-2. Verify extra arguments are forwarded to callbacks. The AVM1 timer system
-   already stores extra args (`timer->args[]`), so this may already work for
-   function-form — check if the Shumway test uses a different calling
-   convention.
-
-**File:** `SWFModernRuntime/src/actionmodern/action.c` — `actionSetInterval` /
-`actionSetTimeout` delay validation.
+**Root cause (2026-04-10):** Two issues:
+1. Non-numeric string delays (e.g., `"foo"`) returned NaN → rejected with `undefined`.
+   Fix: coerce NaN to 0 for non-undefined types. `undefined` delay still rejects
+   (Flash behavior confirmed by AVM1 `set_interval` test).
+2. Timer stubs (`g_setTimeout_func` etc.) were `builtin_noop_func` — calling
+   `setTimeout` through an alias (`var f = setTimeout; f(...)`) bypassed the
+   builtin handler and called the noop stub. Fix: replaced stubs with real
+   `builtin_setTimeout_impl`/`builtin_setInterval_impl` that delegate to
+   `actionSetInterval`.
 
 ---
 
@@ -303,24 +259,18 @@ constructor defaults/values differ.
 the display list. The AVM1 `bitmap_filters` test (in ignore list) exercises
 similar infrastructure from the construction side.
 
-### 6c: `watch` — double-free crash (1 diff + crash, 1/2)
+### 6c: `watch` — FIXED (2/2 = 100%) ✓
 
-**Error:** `free(): double free detected in tcache 2`
+**Root cause (2026-04-10):** The watch callback mechanism passed string args
+(property name, old value, user data) with `owns_memory=true`. The callback
+stored `args[0]` via `setVariableByName`, creating an owning copy in the local
+scope. When the local scope was released, the string was freed. Then the
+explicit `free(_pname_arg.data.string_data.heap_ptr)` freed the same pointer
+again → double-free.
 
-The test calls `Object.prototype.watch()` which triggers a double-free. Only 1
-line produced before crash.
-
-**Root cause:** Memory management bug in the watch/unwatch mechanism. A string
-or ActionVar is being freed twice — likely the watched property's old value is
-freed during the watch callback invocation, then freed again in the normal
-property setter path.
-
-**Fix:** Investigate `actionWatchCallback` and `setVariableWithValue` for
-double-free paths. The watched property setter probably needs to copy or retain
-the old value before invoking the callback, then free only once afterward.
-
-**Note:** The AVM1 `watch_virtual_property` test is in accepted diffs (not
-crash). This is a different bug.
+**Fix:** Mark all string args passed to watch callbacks as non-owning
+(`owns_memory = false`). The explicit `free()` after the callback is the sole
+owner of `_pname_arg`. Applied to both ASObject and MovieClip watch handlers.
 
 ---
 
