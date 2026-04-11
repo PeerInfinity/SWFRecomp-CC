@@ -394,14 +394,28 @@ static int g_last_callable_this_is_with = 0;  // 1 if from a WITH scope entry
 // __proto__ levels to skip when resolving super properties/constructors.
 // depth=1 means "start from this.__proto__" (i.e. the first parent class).
 #define MAX_SUPER_DEPTH 64
-static void* g_super_this_stack[MAX_SUPER_DEPTH];   // this binding for each super level
+static void* g_super_this_stack[MAX_SUPER_DEPTH];   // this binding for each super level (ASObject*)
 static u8    g_super_depth_stack[MAX_SUPER_DEPTH];   // prototype chain depth
+static void* g_super_mc_stack[MAX_SUPER_DEPTH];      // companion MovieClip* (for registerClass ctors)
 static u32   g_super_stack_pos = 0;
 
 static void pushSuperContext(void* this_obj, u8 depth) {
 	if (g_super_stack_pos < MAX_SUPER_DEPTH) {
 		g_super_this_stack[g_super_stack_pos] = this_obj;
 		g_super_depth_stack[g_super_stack_pos] = depth;
+		g_super_mc_stack[g_super_stack_pos] = NULL;
+		g_super_stack_pos++;
+	}
+}
+
+// Push super context with a companion MC pointer.
+// Used by registerClass constructors where this_obj is mc->dynamic_props (for
+// proto chain walking) but the parent constructor needs the actual MovieClip.
+static void pushSuperContextWithMC(void* this_obj, u8 depth, void* mc) {
+	if (g_super_stack_pos < MAX_SUPER_DEPTH) {
+		g_super_this_stack[g_super_stack_pos] = this_obj;
+		g_super_depth_stack[g_super_stack_pos] = depth;
+		g_super_mc_stack[g_super_stack_pos] = mc;
 		g_super_stack_pos++;
 	}
 }
@@ -420,6 +434,11 @@ static void* getSuperThis(void) {
 
 static u8 getSuperDepth(void) {
 	return g_super_stack_pos > 0 ? g_super_depth_stack[g_super_stack_pos - 1] : 0;
+}
+
+// Returns the companion MC if the super context was created by a registerClass constructor.
+static void* getSuperMC(void) {
+	return g_super_stack_pos > 0 ? g_super_mc_stack[g_super_stack_pos - 1] : NULL;
 }
 
 // Forward declare resolveProtoVar (defined below walkProtoChain)
@@ -42050,8 +42069,10 @@ void actionInvokeRegisteredClassConstructor(SWFAppContext* app_context, const ch
 
 	ASObject* obj = (ASObject*)mc->dynamic_props;
 
-	// Push super context for constructor call
-	pushSuperContext((void*)obj, 1);
+	// Push super context for constructor call.
+	// Use pushSuperContextWithMC so super() in the constructor can pass
+	// the MovieClip (not just dynamic_props) to the parent constructor.
+	pushSuperContextWithMC((void*)obj, 1, (void*)mc);
 
 	// Switch to MC's context for the constructor call
 	MovieClip* saved_ctx = g_current_context;
@@ -44912,7 +44933,12 @@ void actionCallFunction(SWFAppContext* app_context, char* str_buffer)
 			if (parent_ctor != NULL)
 			{
 				// Push new super context: depth + 1 (one level deeper for nested super() calls)
-				pushSuperContext(this_obj, depth + 1);
+				// Propagate companion MC to nested super() calls
+				void* super_mc = getSuperMC();
+				if (super_mc != NULL)
+					pushSuperContextWithMC(this_obj, depth + 1, super_mc);
+				else
+					pushSuperContext(this_obj, depth + 1);
 
 				// Phase 3: switch to parent constructor's SWF version
 				int _sc_saved_ver = 0; ASObject* _sc_saved_global = NULL; int _sc_saved_midx = 0;
@@ -44921,15 +44947,30 @@ void actionCallFunction(SWFAppContext* app_context, char* str_buffer)
 				if (parent_ctor->function_type == 2 && parent_ctor->advanced_func != NULL)
 				{
 					ActionVar registers[256] = {0};
+					// If registerClass context has a companion MC, pass it via
+					// g_event_this_mc so preload_this gets MOVIECLIP type.
+					MovieClip* _saved_etm = g_event_this_mc;
+					void* _ctor_this = this_obj;
+					if (super_mc != NULL) {
+						g_event_this_mc = (MovieClip*)super_mc;
+						_ctor_this = NULL;
+					}
 					g_call_depth++;
-					parent_ctor->advanced_func(app_context, args, num_args, registers, this_obj);
+					parent_ctor->advanced_func(app_context, args, num_args, registers, _ctor_this);
 					g_call_depth--;
+					if (super_mc != NULL) g_event_this_mc = _saved_etm;
 				}
 				else if (parent_ctor->function_type == 1 && parent_ctor->simple_func != NULL)
 				{
+					// For type 1 with companion MC, use MOVIECLIP type for this
 					ActionVar this_var = {0};
-					this_var.type = ACTION_STACK_VALUE_OBJECT;
-					this_var.data.numeric_value = (u64)this_obj;
+					if (super_mc != NULL) {
+						this_var.type = ACTION_STACK_VALUE_MOVIECLIP;
+						this_var.data.numeric_value = (u64)super_mc;
+					} else {
+						this_var.type = ACTION_STACK_VALUE_OBJECT;
+						this_var.data.numeric_value = (u64)this_obj;
+					}
 					setVariableByName("this", &this_var);
 					for (int i = (int)num_args - 1; i >= 0; i--)
 						pushVar(app_context, &args[i]);
@@ -49288,14 +49329,28 @@ void actionCallMethod(SWFAppContext* app_context, char* str_buffer)
 
 		if (parent_ctor != NULL)
 		{
-			pushSuperContext(this_obj, depth + 1);
+			// Propagate companion MC to nested super() calls
+			void* super_mc = getSuperMC();
+			if (super_mc != NULL)
+				pushSuperContextWithMC(this_obj, depth + 1, super_mc);
+			else
+				pushSuperContext(this_obj, depth + 1);
 
 			if (parent_ctor->function_type == 2 && parent_ctor->advanced_func != NULL)
 			{
 				ActionVar registers[256] = {0};
+				// If registerClass context has a companion MC, pass it via
+				// g_event_this_mc so preload_this gets MOVIECLIP type.
+				MovieClip* _saved_etm = g_event_this_mc;
+				void* _ctor_this = this_obj;
+				if (super_mc != NULL) {
+					g_event_this_mc = (MovieClip*)super_mc;
+					_ctor_this = NULL;  // let preload-this use g_event_this_mc
+				}
 				g_call_depth++;
-				parent_ctor->advanced_func(app_context, args, num_args, registers, this_obj);
+				parent_ctor->advanced_func(app_context, args, num_args, registers, _ctor_this);
 				g_call_depth--;
+				if (super_mc != NULL) g_event_this_mc = _saved_etm;
 			}
 			else if (parent_ctor->function_type == 1 && parent_ctor->simple_func != NULL)
 			{
@@ -49473,16 +49528,35 @@ void actionCallMethod(SWFAppContext* app_context, char* str_buffer)
 			ActionVar ctor_result = {0};
 			ctor_result.type = ACTION_STACK_VALUE_UNDEFINED;
 			if (parent_ctor != NULL) {
-				pushSuperContext(super_this, super_depth + 1);
+				// Propagate companion MC to nested super() calls
+				void* super_mc = getSuperMC();
+				if (super_mc != NULL)
+					pushSuperContextWithMC(super_this, super_depth + 1, super_mc);
+				else
+					pushSuperContext(super_this, super_depth + 1);
 				if (parent_ctor->function_type == 2 && parent_ctor->advanced_func != NULL) {
 					ActionVar registers[256] = {0};
+					// If registerClass context has a companion MC, pass it via
+					// g_event_this_mc so preload_this gets MOVIECLIP type.
+					MovieClip* _saved_etm = g_event_this_mc;
+					void* _ctor_this = super_this;
+					if (super_mc != NULL) {
+						g_event_this_mc = (MovieClip*)super_mc;
+						_ctor_this = NULL;
+					}
 					g_call_depth++;
-					ctor_result = parent_ctor->advanced_func(app_context, args, num_args, registers, super_this);
+					ctor_result = parent_ctor->advanced_func(app_context, args, num_args, registers, _ctor_this);
 					g_call_depth--;
+					if (super_mc != NULL) g_event_this_mc = _saved_etm;
 				} else if (parent_ctor->function_type == 1 && parent_ctor->simple_func != NULL) {
 					ActionVar this_var = {0};
-					this_var.type = ACTION_STACK_VALUE_OBJECT;
-					this_var.data.numeric_value = (u64)super_this;
+					if (super_mc != NULL) {
+						this_var.type = ACTION_STACK_VALUE_MOVIECLIP;
+						this_var.data.numeric_value = (u64)super_mc;
+					} else {
+						this_var.type = ACTION_STACK_VALUE_OBJECT;
+						this_var.data.numeric_value = (u64)super_this;
+					}
 					setVariableByName("this", &this_var);
 					for (int i = (int)num_args - 1; i >= 0; i--)
 						pushVar(app_context, &args[i]);
