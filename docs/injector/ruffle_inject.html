@@ -72,6 +72,7 @@ var output = document.getElementById('output');
 var player = null;
 var bridgeReady = false;
 var ruffleObj = null;
+var currentIsAS3 = false;
 
 function log(msg) {
     output.textContent += msg + '\n';
@@ -241,6 +242,7 @@ function loadDroppedSwf(file) {
                 document.getElementById('loaded-name').textContent = file.name + ' (SWF' + version + ')';
             }
 
+            currentIsAS3 = isAS3;
             var modified = injectBridge(fwsBytes, isAS3);
             if (!modified) return;
 
@@ -341,8 +343,15 @@ function applyData() {
         var data = JSON.parse(document.getElementById('json-editor').value);
         data.displayList.forEach(function(obj) {
             var path = obj.path || obj.name;
-            player.ruffle().callExternalInterface('setTransform',
-                path, obj.x, obj.y, obj.xscale, obj.yscale, obj.rotation);
+            if (currentIsAS3) {
+                var sx = obj.scaleX !== undefined ? obj.scaleX : (obj.xscale !== undefined ? obj.xscale / 100 : 1);
+                var sy = obj.scaleY !== undefined ? obj.scaleY : (obj.yscale !== undefined ? obj.yscale / 100 : 1);
+                player.ruffle().callExternalInterface('setTransform',
+                    path, obj.x, obj.y, sx, sy, obj.rotation);
+            } else {
+                player.ruffle().callExternalInterface('setTransform',
+                    path, obj.x, obj.y, obj.xscale, obj.yscale, obj.rotation);
+            }
         });
         log('Applied transforms for ' + data.displayList.length + ' objects.');
     } catch(e) {

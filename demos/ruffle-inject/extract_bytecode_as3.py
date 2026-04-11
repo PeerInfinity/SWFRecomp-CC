@@ -80,11 +80,62 @@ def main():
         print("No DoABC tags found!", file=sys.stderr)
         sys.exit(1)
 
-    combined = b''.join(bridge_tags)
+    # Build supporting tags to get our class instantiated on stage:
+    # 1. DefineSprite (tag 39) — empty sprite, character ID 65000
+    # 2. SymbolClass (tag 76) — maps our class name to sprite ID
+    # 3. PlaceObject2 (tag 26) — places sprite at depth 65000
+    SPRITE_ID = 65000
+    DEPTH = 65000
+
+    def make_tag(tag_type, body):
+        length = len(body)
+        if length < 63:
+            header = struct.pack('<H', (tag_type << 6) | length)
+        else:
+            header = struct.pack('<H', (tag_type << 6) | 0x3F)
+            header += struct.pack('<I', length)
+        return header + body
+
+    # DefineSprite: spriteId(UI16) + frameCount(UI16) + End tag(UI16)
+    define_sprite = make_tag(39,
+        struct.pack('<HH', SPRITE_ID, 1) +  # id, frame count
+        struct.pack('<H', (1 << 6) | 0) +   # ShowFrame tag
+        struct.pack('<H', 0))                # End tag
+
+    # SymbolClass: count(UI16) + [id(UI16) + name(null-terminated string)]
+    # Find the class name from the DoABC
+    class_name = b'BridgeInjectAS3'  # default
+    for tag_type, body, full in read_tags(data, pos):
+        if tag_type == 76:  # SymbolClass in source SWF
+            count = struct.unpack_from('<H', body, 0)[0]
+            off = 2
+            for i in range(count):
+                sid = struct.unpack_from('<H', body, off)[0]
+                off += 2
+                name_end = body.index(0, off)
+                name = body[off:name_end]
+                off = name_end + 1 - 0
+                if sid != 0:  # skip document class (id=0)
+                    class_name = name
+                    break
+
+    symbol_class = make_tag(76,
+        struct.pack('<H', 1) +              # count = 1
+        struct.pack('<H', SPRITE_ID) +      # character id
+        class_name + b'\x00')               # class name (null terminated)
+
+    # PlaceObject2: flags(UI8) + depth(UI16) + characterId(UI16)
+    # flags: 0x02 = hasCharacter
+    place_object = make_tag(26,
+        struct.pack('<BHH', 0x02, DEPTH, SPRITE_ID))
+
+    # Combine: DoABC tags + DefineSprite + SymbolClass + PlaceObject2
+    combined = b''.join(bridge_tags) + define_sprite + symbol_class + place_object
 
     hex_str = ','.join(f'0x{b:02x}' for b in combined)
     print(f"// Auto-generated from {sys.argv[1]}")
-    print(f"// {len(bridge_tags)} DoABC tag(s), {len(combined)} bytes total")
+    print(f"// {len(bridge_tags)} DoABC tag(s) + DefineSprite + SymbolClass + PlaceObject2")
+    print(f"// {len(combined)} bytes total")
     print(f"var BRIDGE_BYTECODE_AS3 = new Uint8Array([{hex_str}]);")
 
 if __name__ == '__main__':
