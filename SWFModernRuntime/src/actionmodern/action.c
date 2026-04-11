@@ -36555,12 +36555,31 @@ void actionSetMember(SWFAppContext* app_context)
 								_pname_arg.data.string_data.heap_ptr = _pname_u16;
 								_pname_arg.data.string_data.owns_memory = true;
 								// Get old value via prototype chain (Flash includes inherited values)
+								// IMPORTANT: copy old value before invoking callback, because
+								// the callback or stack operations might free the original string.
+								// Mark old_val as non-owning so only the property itself frees it.
 								ActionVar _old_val = {0};
 								_old_val.type = ACTION_STACK_VALUE_UNDEFINED;
 								ActionVar* _old_ptr = getPropertyWithPrototype(obj, prop_name, prop_name_len);
-								if (_old_ptr != NULL) _old_val = *_old_ptr;
+								if (_old_ptr != NULL) {
+									_old_val = *_old_ptr;
+									if (_old_val.type == ACTION_STACK_VALUE_STRING)
+										_old_val.data.string_data.owns_memory = false;
+								}
 								// Pass 4 args: (propName, oldVal, newVal, userData)
-								ActionVar _wargs[4] = { _pname_arg, _old_val, value_var, g_watch_table[_wi].user_data };
+								// Mark all string args as non-owning to prevent double-free:
+								// the watcher cleanup frees _pname_arg; user_data is owned by
+								// the watch table; old/new values are owned by the property.
+								ActionVar _wargs[4];
+								_wargs[0] = _pname_arg;
+								_wargs[0].data.string_data.owns_memory = false;  // freed below
+								_wargs[1] = _old_val;
+								_wargs[2] = value_var;
+								if (_wargs[2].type == ACTION_STACK_VALUE_STRING)
+									_wargs[2].data.string_data.owns_memory = false;
+								_wargs[3] = g_watch_table[_wi].user_data;
+								if (_wargs[3].type == ACTION_STACK_VALUE_STRING)
+									_wargs[3].data.string_data.owns_memory = false;
 								ActionVar* _wregs = NULL;
 								if (_wf->register_count > 0)
 									_wregs = (ActionVar*) HCALLOC(_wf->register_count, sizeof(ActionVar));
@@ -37977,7 +37996,19 @@ void actionSetMember(SWFAppContext* app_context)
 								// undefined until explicitly set by ActionScript)
 								ActionVar _old_val = {0};
 								_old_val.type = ACTION_STACK_VALUE_UNDEFINED;
-								ActionVar _wargs[4] = { _pname_arg, _old_val, value_var, g_watch_table[_wi].user_data };
+								// Mark all string args as non-owning to prevent double-free:
+								// the explicit free below owns _pname_arg; user_data is owned
+								// by the watch table; value_var may be owned by caller.
+								ActionVar _wargs[4];
+								_wargs[0] = _pname_arg;
+								_wargs[0].data.string_data.owns_memory = false;  // freed below
+								_wargs[1] = _old_val;
+								_wargs[2] = value_var;
+								if (_wargs[2].type == ACTION_STACK_VALUE_STRING)
+									_wargs[2].data.string_data.owns_memory = false;
+								_wargs[3] = g_watch_table[_wi].user_data;
+								if (_wargs[3].type == ACTION_STACK_VALUE_STRING)
+									_wargs[3].data.string_data.owns_memory = false;
 								ActionVar* _wregs = NULL;
 								if (_wf->register_count > 0)
 									_wregs = (ActionVar*) HCALLOC(_wf->register_count, sizeof(ActionVar));
