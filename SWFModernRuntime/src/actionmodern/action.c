@@ -4420,6 +4420,41 @@ static ActionVar builtin_noop_func(SWFAppContext* app_context, ActionVar* args, 
 	ActionVar r = {0}; r.type = ACTION_STACK_VALUE_UNDEFINED; return r;
 }
 
+// Forward declarations for timer builtins (already declared at top, repeated here for locality)
+
+// Builtin setTimeout/setInterval that work when aliased (var f = setTimeout; f(...))
+// Must copy args since actionSetInterval frees them, but caller also frees the originals.
+static ActionVar builtin_setTimeout_impl(SWFAppContext* app_context, ActionVar* args, u32 arg_count, ActionVar* registers, void* this_obj)
+{
+	(void)registers; (void)this_obj;
+	ActionVar* args_copy = NULL;
+	if (arg_count > 0) {
+		args_copy = (ActionVar*)HALLOC(sizeof(ActionVar) * arg_count);
+		for (u32 i = 0; i < arg_count; i++) args_copy[i] = args[i];
+	}
+	actionSetInterval(app_context, args_copy, arg_count, 0);
+	ActionVar r; popVar(app_context, &r); return r;
+}
+
+static ActionVar builtin_setInterval_impl(SWFAppContext* app_context, ActionVar* args, u32 arg_count, ActionVar* registers, void* this_obj)
+{
+	(void)registers; (void)this_obj;
+	ActionVar* args_copy = NULL;
+	if (arg_count > 0) {
+		args_copy = (ActionVar*)HALLOC(sizeof(ActionVar) * arg_count);
+		for (u32 i = 0; i < arg_count; i++) args_copy[i] = args[i];
+	}
+	actionSetInterval(app_context, args_copy, arg_count, 1);
+	ActionVar r; popVar(app_context, &r); return r;
+}
+
+static ActionVar builtin_clearInterval_impl(SWFAppContext* app_context, ActionVar* args, u32 arg_count, ActionVar* registers, void* this_obj)
+{
+	(void)registers; (void)this_obj;
+	actionClearInterval(app_context, args, arg_count);
+	ActionVar r = {0}; r.type = ACTION_STACK_VALUE_UNDEFINED; return r;
+}
+
 // Forward declaration
 static void makeProtoReadOnly(ASObject* obj);
 
@@ -4485,10 +4520,10 @@ static void init_global_funcs(void)
 		{&g_showRedrawRegions_func, "showRedrawRegions", (Function2Ptr)builtin_noop_func},
 		{&g_addRequestHeader_func, "addRequestHeader", (Function2Ptr)builtin_noop_func},
 		{&g_clearRequestHeaders_func, "clearRequestHeaders", (Function2Ptr)builtin_noop_func},
-		{&g_setInterval_func, "setInterval", (Function2Ptr)builtin_noop_func},
-		{&g_clearInterval_func, "clearInterval", (Function2Ptr)builtin_noop_func},
-		{&g_setTimeout_func, "setTimeout", (Function2Ptr)builtin_noop_func},
-		{&g_clearTimeout_func, "clearTimeout", (Function2Ptr)builtin_noop_func},
+		{&g_setInterval_func, "setInterval", (Function2Ptr)builtin_setInterval_impl},
+		{&g_clearInterval_func, "clearInterval", (Function2Ptr)builtin_clearInterval_impl},
+		{&g_setTimeout_func, "setTimeout", (Function2Ptr)builtin_setTimeout_impl},
+		{&g_clearTimeout_func, "clearTimeout", (Function2Ptr)builtin_clearInterval_impl},
 		{&g_asconstructor_func, "ASconstructor", (Function2Ptr)builtin_noop_func},
 		{&g_enableDebugConsole_func, "enableDebugConsole", (Function2Ptr)builtin_noop_func},
 		{&g_ASSetNative_func, "ASSetNative", (Function2Ptr)builtin_noop_func},
@@ -30496,33 +30531,31 @@ void actionGetVariable(SWFAppContext* app_context)
 				else if (prop_struct->getter != NULL)
 				{
 					ActionVar result = invokePropertyGetter(app_context, (ASFunction*)prop_struct->getter, (void*)scope_chain[i]);
-					// Track with-scope callable this for CallFunction
-					if (scope_is_with[i]) {
-						if (scope_mc[i] != NULL) {
-							g_last_callable_this.type = ACTION_STACK_VALUE_MOVIECLIP;
-							g_last_callable_this.data.numeric_value = (u64)scope_mc[i];
-						} else {
-							g_last_callable_this.type = ACTION_STACK_VALUE_OBJECT;
-							g_last_callable_this.data.numeric_value = (u64)scope_chain[i];
-						}
-						g_last_callable_this_set = 1;
+					// Track scope callable this for CallFunction
+					// Ruffle: scope.resolve() returns Callable(scope_obj, value) for ALL scope levels
+					if (scope_mc[i] != NULL) {
+						g_last_callable_this.type = ACTION_STACK_VALUE_MOVIECLIP;
+						g_last_callable_this.data.numeric_value = (u64)scope_mc[i];
+					} else {
+						g_last_callable_this.type = ACTION_STACK_VALUE_OBJECT;
+						g_last_callable_this.data.numeric_value = (u64)scope_chain[i];
 					}
+					g_last_callable_this_set = 1;
 					pushVar(app_context, &result);
 					return;
 				}
 				else
 				{
-					// Track with-scope callable this for CallFunction
-					if (scope_is_with[i]) {
-						if (scope_mc[i] != NULL) {
-							g_last_callable_this.type = ACTION_STACK_VALUE_MOVIECLIP;
-							g_last_callable_this.data.numeric_value = (u64)scope_mc[i];
-						} else {
-							g_last_callable_this.type = ACTION_STACK_VALUE_OBJECT;
-							g_last_callable_this.data.numeric_value = (u64)scope_chain[i];
-						}
-						g_last_callable_this_set = 1;
+					// Track scope callable this for CallFunction
+					// Ruffle: scope.resolve() returns Callable(scope_obj, value) for ALL scope levels
+					if (scope_mc[i] != NULL) {
+						g_last_callable_this.type = ACTION_STACK_VALUE_MOVIECLIP;
+						g_last_callable_this.data.numeric_value = (u64)scope_mc[i];
+					} else {
+						g_last_callable_this.type = ACTION_STACK_VALUE_OBJECT;
+						g_last_callable_this.data.numeric_value = (u64)scope_chain[i];
 					}
+					g_last_callable_this_set = 1;
 					pushVar(app_context, &prop_struct->value);
 					return;
 				}
@@ -46223,18 +46256,10 @@ void actionCallFunction(SWFAppContext* app_context, char* str_buffer)
 			}
 		}
 
-		// Global function registry lookup
-		if (func == NULL)
-			func = lookupFunctionByName(func_name, func_name_len);
-
-
-		// Try slash-path resolution: /:foo -> foo (Flash 4 root variable syntax)
-		if (func == NULL && func_name_len > 2 && func_name[0] == '/' && func_name[1] == ':')
-		{
-			func = lookupFunctionByName(func_name + 2, func_name_len - 2);
-		}
-
-		// Try scope chain + global variable lookup (for functions stored via DefineLocal)
+		// Scope chain + global variable lookup FIRST (Ruffle: scope resolution before function registry)
+		// In Ruffle, get_variable() searches the scope chain, which returns Callable(scope_obj, fn).
+		// This must happen before the global function registry lookup so that local scope definitions
+		// shadow global ones, and the scope object is captured as the callable 'this'.
 		int cf_var_found_not_func = 0;  // variable found but not callable
 		if (func == NULL)
 		{
@@ -46246,7 +46271,7 @@ void actionCallFunction(SWFAppContext* app_context, char* str_buffer)
 			{
 				func = (ASFunction*) STACK_TOP_VALUE;
 				POP();
-				// If the function was found on a WITH scope, use that scope's
+				// If the function was found on a scope chain entry, use that scope's
 				// object as 'this' (Ruffle: CallableValue::Callable(scope_obj, fn))
 				if (g_last_callable_this_set) {
 					callable_this = g_last_callable_this;
@@ -46264,6 +46289,17 @@ void actionCallFunction(SWFAppContext* app_context, char* str_buffer)
 			{
 				POP();
 			}
+		}
+
+		// Global function registry lookup (fallback when not found in scope chain)
+		if (func == NULL && !cf_var_found_not_func)
+			func = lookupFunctionByName(func_name, func_name_len);
+
+
+		// Try slash-path resolution: /:foo -> foo (Flash 4 root variable syntax)
+		if (func == NULL && !cf_var_found_not_func && func_name_len > 2 && func_name[0] == '/' && func_name[1] == ':')
+		{
+			func = lookupFunctionByName(func_name + 2, func_name_len - 2);
 		}
 
 		// Try current MovieClip's dynamic_props (functions set via clip.run = func)
@@ -46461,7 +46497,14 @@ void actionCallFunction(SWFAppContext* app_context, char* str_buffer)
 				// yielding typeof="object". Pass global_object as this_obj so generated preload_this
 				// stores as OBJECT type instead of falling back to MOVIECLIP.
 				void* _cf_this_obj = NULL;
-				if (_cf_caller_ver < 6 && !has_callable_this && func->swf_version >= 6) {
+				if (has_callable_this) {
+					// Function found on a scope chain entry — pass the scope object as 'this'
+					// via g_override_this (preserves correct OBJECT/MOVIECLIP type).
+					// In Ruffle, load_this() sets the register to the passed 'this' value
+					// (the scope object), while the activation's this_cell() inherits from parent.
+					g_override_this = callable_this;
+					g_override_this_set = 1;
+				} else if (_cf_caller_ver < 6 && func->swf_version >= 6) {
 					_cf_this_obj = (void*)global_object;
 				}
 				// Only push constructor context for bytecode functions (register_count > 0).
@@ -46471,6 +46514,10 @@ void actionCallFunction(SWFAppContext* app_context, char* str_buffer)
 				if (is_bytecode_func) pushCtorContext(0);
 				ActionVar result = func->advanced_func(app_context, args, num_args, registers, _cf_this_obj);
 				if (is_bytecode_func) popCtorContext();
+				// Clear g_override_this_set in case the function didn't consume it
+				// (C-implemented stubs like builtin_setTimeout_impl don't have the
+				// generated preload-this code that normally clears this flag)
+				if (g_override_this_set) g_override_this_set = 0;
 				g_current_executing_func = prev_executing_func;
 
 				// Pop local scope + captured scopes from scope chain
@@ -58272,14 +58319,16 @@ static void actionSetInterval(SWFAppContext* app_context, ActionVar* args, u32 n
 				strcpy(method_buf, "undefined");
 		}
 
-		// Coerce delay (args[2])
-		double delay = timerCoerceToNumber(app_context, &args[2]);
-		if (isnan(delay))
-		{
+		// Coerce delay (args[2]):
+		// undefined delay → reject (return undefined), matching Flash behavior
+		// Non-numeric string/object delays → coerce to 0 (Shumway/Ruffle behavior)
+		if (args[2].type == ACTION_STACK_VALUE_UNDEFINED) {
 			if (args != NULL) FREE(args);
 			pushUndefined(app_context);
 			return;
 		}
+		double delay = timerCoerceToNumber(app_context, &args[2]);
+		if (isnan(delay)) delay = 0.0;
 
 		// Find empty slot
 		int slot = -1;
@@ -58330,14 +58379,16 @@ static void actionSetInterval(SWFAppContext* app_context, ActionVar* args, u32 n
 			return;
 		}
 
-		// Coerce delay (args[1])
-		double delay = timerCoerceToNumber(app_context, &args[1]);
-		if (isnan(delay))
-		{
+		// Coerce delay (args[1]):
+		// undefined delay → reject (return undefined), matching Flash behavior
+		// Non-numeric string/object delays → coerce to 0 (Shumway/Ruffle behavior)
+		if (args[1].type == ACTION_STACK_VALUE_UNDEFINED) {
 			if (args != NULL) FREE(args);
 			pushUndefined(app_context);
 			return;
 		}
+		double delay = timerCoerceToNumber(app_context, &args[1]);
+		if (isnan(delay)) delay = 0.0;
 
 		// Find empty slot
 		int slot = -1;
