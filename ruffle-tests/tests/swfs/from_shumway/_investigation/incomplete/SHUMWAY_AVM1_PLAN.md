@@ -192,7 +192,7 @@ resolution is a separate code path.
 
 ### 5a: `hitarea` — hitArea event interaction (2 diffs, 2/4 = 50%)
 
-**Diffs:**
+**Diff:**
 ```
 -    3  rollover
 +    3  1
@@ -200,18 +200,30 @@ resolution is a separate code path.
 +    4  <end of actual>
 ```
 
-Line 3 expects `rollover` (an event label or state string) but we output `1`.
-Line 4 expects `1` but we produce no more output.
+Actual output: `undefined / _level0.hit / 1` (3 lines). Expected: `undefined / _level0.hit / rollover / 1` (4 lines).
+Lines 1-2 match. Line 3 should be `rollover` (from an onRollOver event handler) but we skip it and output `1`.
 
-**Root cause:** The test involves a MovieClip's `hitArea` property and mouse
-rollover events. The `rollover` value likely comes from an onRollOver event
-handler. Our event dispatch may be firing the wrong handler or the hitArea
-delegation is not working.
+**Root cause:** The test sets `btn.hitArea = hit` where `hit` is a sprite. This
+makes the button use the sprite's shape for hit-testing instead of its own.
+When the mouse moves over the hit sprite's area, onRollOver should fire on the
+button. Our runtime ignores the `hitArea` property assignment — the button
+always uses its own hit shape.
 
-**Note:** Requires mouse input simulation infrastructure (already present in
-verify_output.py for other mouse tests).
+**Mouse infrastructure:** Fully operational. `input.json` → `verify_output.py` →
+event file → `input_events_deliver()` in `swf_core.c`. Button state machine,
+shape hit-testing, and MC mouse handlers all work (rollover test 4/4 PASS).
 
-### 5b: `nested-button` — nested button click (1 diff, 0/1 = 0%)
+**Fix:** Two parts:
+1. `action.c` `actionSetMember` MOVIECLIP handler: store `hitArea` MC reference
+   on the button's MovieClip (e.g., `mc->hit_area_mc` field, or on dynamic_props).
+2. `tag.c` `ng_update_button_states_in_dl()` → `resolve_hit_shape()`: when the
+   button MC has a `hitArea` property, use the referenced sprite's shape for
+   hit-testing instead of the button's own hit character.
+
+**Files:** `SWFModernRuntime/src/libswf/tag.c` (hit-test lookup),
+`SWFModernRuntime/src/actionmodern/action.c` (property storage).
+
+### 5b: `nested-button` — sprite clip event RELEASE (1 diff, 0/1 = 0%)
 
 **Diff:**
 ```
@@ -219,15 +231,28 @@ verify_output.py for other mouse tests).
 +    1
 ```
 
-A button nested inside another display object should fire a click handler
-tracing `button click`. We output an empty line.
+**Root cause:** The test has a shape (char 1) placed inside a sprite (char 3).
+The sprite has `CLIP_EVENT_RELEASE` (0x800) clip actions that trace
+`button click`. No actual button character is defined — just a sprite with
+clip actions that respond to mouse release.
 
-**Root cause:** The nested button's click event handler is not being dispatched.
-This may be a button event propagation issue for buttons inside sprites, or the
-button's event handler is not registered correctly.
+Currently, only `CHAR_TYPE_BUTTON` characters get mouse hit-tested in
+`ng_update_button_states_in_dl()`. Shapes placed in sprites don't trigger
+hit-testing, so the sprite's `CLIP_EVENT_RELEASE` never fires.
 
-**Note:** Requires mouse input simulation. The AVM1 button tests (BUTTON_PLAN,
-14/14 PASS) work for top-level buttons; this tests nesting.
+**Fix:** Generalize mouse hit-test dispatch in `tag.c` so that non-button
+display objects with mouse-related clip actions (PRESS 0x400, RELEASE 0x800,
+RELEASE_OUTSIDE 0x2000, ROLL_OVER 0x0400, etc.) also get hit-tested and
+have their clip events dispatched on state transitions.
+
+Key functions:
+- `ng_update_button_states_in_dl()` in `tag.c` — extend to track hit state
+  for display objects with mouse clip actions, not just buttons
+- `dispatch_clip_event_press()`/`dispatch_clip_event_release()` in
+  `swf_core.c` — already dispatch clip events, just need to be triggered
+  for non-button hit objects
+
+**Files:** `SWFModernRuntime/src/libswf/tag.c`, `SWFModernRuntime/src/libswf/swf_core.c`.
 
 ---
 
