@@ -1,8 +1,8 @@
 # Ruffle Test Results (Unfiltered)
 
-**Date**: 2026-04-11 20:21 UTC
+**Date**: 2026-04-11 23:14 UTC
 
-**Git SHA**: `7b73007a45`
+**Git SHA**: `e70514bf6a`
 
 **Run Duration**: 3m 1s
 
@@ -14,8 +14,8 @@
 | Passing | **7** (77.8%) |
 | Failing | 2 |
 | Total expected lines | 231 |
-| Matching lines | 172 (74.5%) |
-| Mismatched lines | 59 |
+| Matching lines | 173 (74.9%) |
+| Mismatched lines | 58 |
 
 ### Failure Breakdown
 
@@ -29,13 +29,13 @@
 
 | # | Test | Lines | Duration | Notes |
 |---|------|-------|----------|-------|
-| 1 | `enum` | 19 | 19.4s |  |
-| 2 | `exception` | 35 | 19.8s |  |
-| 3 | `function_test` | 26 | 19.3s |  |
-| 4 | `hello` | 8 | 19.2s |  |
-| 5 | `implementsOpTest` | 28 | 20.4s |  |
-| 6 | `inheritance` | 22 | 20.2s |  |
-| 7 | `super_test1` | 17 | 20.2s |  |
+| 1 | `enum` | 19 | 19.8s |  |
+| 2 | `exception` | 35 | 20.1s |  |
+| 3 | `function_test` | 26 | 20.0s |  |
+| 4 | `hello` | 8 | 19.6s |  |
+| 5 | `implementsOpTest` | 28 | 20.0s |  |
+| 6 | `inheritance` | 22 | 20.0s |  |
+| 7 | `super_test1` | 17 | 19.4s |  |
 
 ## Near-Passing Tests
 
@@ -66,4 +66,4 @@ No timeouts.
 | # | Test | Match Rate | Matching/Total | Actual | Expected | Notes |
 |---|------|------------|----------------|--------|----------|-------|
 | 1 | `TextFieldTest` | 87.5% | 7/8 | 8 | 8 |  |
-| 2 | `levels` | 14.7% | 10/68 | 14 | 68 |  |
+| 2 | `levels` | 16.2% | 11/68 | 14 | 68 |  |
