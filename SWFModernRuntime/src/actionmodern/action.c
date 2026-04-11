@@ -383,10 +383,11 @@ static u32 g_this_depth = 0;
 
 // Tracks the scope object on which the last GetVariable found a value via a WITH scope.
 // Used by CallFunction to determine the correct `this` binding when a function is
-// found on a WITH scope target (Ruffle: CallableValue::Callable(scope_obj, fn)).
+// found on a scope chain entry (Ruffle: CallableValue::Callable(scope_obj, fn)).
 // Reset to {.type = ACTION_STACK_VALUE_UNDEFINED} after each GetVariable call.
 static ActionVar g_last_callable_this = {0};
 static int g_last_callable_this_set = 0;
+static int g_last_callable_this_is_with = 0;  // 1 if from a WITH scope entry
 
 // Super context stack — tracks prototype chain depth for super() resolution.
 // Ruffle model: super is a virtual (this, depth) pair. Depth indicates how many
@@ -30158,6 +30159,7 @@ void actionGetVariable(SWFAppContext* app_context)
 {
 	// Clear callable_this tracking — will be set if value is found on a WITH scope
 	g_last_callable_this_set = 0;
+	g_last_callable_this_is_with = 0;
 
 	// If stack top is not a string, convert it first (handles double GetVariable pattern
 	// where first GetVariable returns a non-string like MOVIECLIP or OBJECT)
@@ -30541,6 +30543,7 @@ void actionGetVariable(SWFAppContext* app_context)
 						g_last_callable_this.data.numeric_value = (u64)scope_chain[i];
 					}
 					g_last_callable_this_set = 1;
+					g_last_callable_this_is_with = scope_is_with[i];
 					pushVar(app_context, &result);
 					return;
 				}
@@ -30556,6 +30559,7 @@ void actionGetVariable(SWFAppContext* app_context)
 						g_last_callable_this.data.numeric_value = (u64)scope_chain[i];
 					}
 					g_last_callable_this_set = 1;
+					g_last_callable_this_is_with = scope_is_with[i];
 					pushVar(app_context, &prop_struct->value);
 					return;
 				}
@@ -30596,6 +30600,7 @@ void actionGetVariable(SWFAppContext* app_context)
 						g_last_callable_this.type = ACTION_STACK_VALUE_MOVIECLIP;
 						g_last_callable_this.data.numeric_value = (u64)scope_mc[i];
 						g_last_callable_this_set = 1;
+						g_last_callable_this_is_with = scope_is_with[i];
 						pushVar(app_context, mc_proto_prop);
 						return;
 					}
@@ -46267,9 +46272,10 @@ void actionCallFunction(SWFAppContext* app_context, char* str_buffer)
 	if (!builtin_handled)
 	{
 		ASFunction* func = NULL;
-		// Track whether function was found on a WITH scope object (for this binding)
+		// Track whether function was found on a scope chain entry (for this binding)
 		ActionVar callable_this = {0};
 		int has_callable_this = 0;
+		int callable_this_is_with = 0;  // 1 if from a WITH scope (used by type 1 functions)
 
 		// In non-root context, check MC's dynamic_props FIRST.
 		// Functions defined during child SWF init or DoInitAction are stored on
@@ -46307,6 +46313,7 @@ void actionCallFunction(SWFAppContext* app_context, char* str_buffer)
 				if (g_last_callable_this_set) {
 					callable_this = g_last_callable_this;
 					has_callable_this = 1;
+					callable_this_is_with = g_last_callable_this_is_with;
 				}
 			}
 			else if (STACK_TOP_TYPE != ACTION_STACK_VALUE_UNDEFINED)
@@ -46578,10 +46585,12 @@ void actionCallFunction(SWFAppContext* app_context, char* str_buffer)
 
 				// Push 'this' binding for type 1 functions (DefineFunction)
 				// In Flash, 'this' defaults to current context MC for plain calls,
-				// unless the function was found on a WITH scope object (then this = that object)
+				// unless the function was found on a WITH scope object (then this = that object).
+				// Non-WITH scopes (local scopes) should NOT override 'this' for type 1 functions —
+				// only type 2 functions (DefineFunction2) get scope-object-as-this via g_override_this.
 				u32 saved_this_depth_t1 = g_this_depth;
 				if (g_this_depth < MAX_THIS_DEPTH) {
-					if (has_callable_this) {
+					if (has_callable_this && callable_this_is_with) {
 						g_this_stack[g_this_depth] = callable_this;
 					} else {
 						// Default this = current context MC (not root_movieclip)
