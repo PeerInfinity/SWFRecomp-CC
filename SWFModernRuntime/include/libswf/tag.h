@@ -102,6 +102,55 @@ typedef struct ExtFilterData {
     u8 quality, flags;
 } ExtFilterData;
 const ExtFilterData* ng_getExtFilterData(size_t entry_idx);
+
+// Multi-filter list: stores ALL SWF-authored filters per display entry
+typedef struct FilterListEntry {
+    u8 type;  // 1=blur, 2=dropshadow, 3=glow, 4=bevel, 5=conv, 6=cm, 7=gradglow, 8=gradbevel
+    // Common fields (types 1-4, 7-8)
+    double blur_x, blur_y;
+    u8 quality, flags;
+    double color_r, color_g, color_b, color_a;
+    double strength, angle, distance;
+    double highlight_r, highlight_g, highlight_b, highlight_a;
+    // ColorMatrix (type 6)
+    float cm_matrix[20];
+    // Convolution (type 5)
+    u8 conv_mx, conv_my;
+    float conv_matrix[25];
+    float conv_divisor, conv_bias;
+    u8 conv_preserve_alpha, conv_clamp;
+    u8 conv_color_r, conv_color_g, conv_color_b, conv_color_a;
+    // Gradient (types 7, 8)
+    u8 grad_count;
+    u32 grad_colors[16];
+    float grad_alphas[16];
+    u8 grad_ratios[16];
+} FilterListEntry;
+
+#define MAX_FILTER_LIST_SIZE 16
+typedef struct FilterListData {
+    size_t depth;
+    u8 count;
+    FilterListEntry entries[MAX_FILTER_LIST_SIZE];
+} FilterListData;
+
+void tagBeginFilterList(SWFAppContext* app_context, size_t depth, u8 count);
+void tagAddSimpleFilter(SWFAppContext* app_context, size_t depth,
+    u8 type, double blur_x, double blur_y, u8 quality, u8 flags,
+    double r, double g, double b, double a, double strength,
+    double angle, double distance);
+void tagAddSimpleFilterHighlight(SWFAppContext* app_context, size_t depth,
+    double hr, double hg, double hb, double ha);
+void tagAddColorMatrixFilter(SWFAppContext* app_context, size_t depth, const float* matrix20);
+void tagAddConvolutionFilter(SWFAppContext* app_context, size_t depth,
+    u8 matrixX, u8 matrixY, const float* matrix, float divisor, float bias,
+    u8 preserve_alpha, u8 clamp, u8 def_r, u8 def_g, u8 def_b, u8 def_a);
+void tagAddGradientFilter(SWFAppContext* app_context, size_t depth,
+    u8 type, u8 count, const u32* colors, const float* alphas, const u8* ratios,
+    float blur_x, float blur_y, float angle, float distance, float strength,
+    u8 quality, u8 flags);
+void tagEndFilterList(SWFAppContext* app_context, size_t depth);
+const FilterListData* ng_getFilterListData(size_t entry_idx);
 void tagSetInstanceName(SWFAppContext* app_context, size_t depth, const char* name);
 void tagRemoveObject(SWFAppContext* app_context, size_t depth);
 void tagRemoveObject2(SWFAppContext* app_context, size_t depth);

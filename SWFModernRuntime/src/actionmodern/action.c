@@ -40437,6 +40437,166 @@ void actionGetMember(SWFAppContext* app_context)
 			// Fallback: check display list for SWF-authored filters (from tagSetFilter)
 			{
 				size_t entry_idx = getDisplayEntryIdxForMC(mc);
+
+				// Check multi-filter list first (from tagBeginFilterList/tagAdd*/tagEndFilterList)
+				const FilterListData* fld = (entry_idx != (size_t)-1) ? ng_getFilterListData(entry_idx) : NULL;
+				if (fld && fld->count > 0) {
+					// Ensure filter prototypes are initialized (they live in flash.filters package
+					// which is lazily created on first access to the "flash" global)
+					if (g_filter_protos_by_type[1] == NULL) initFlashPackage(app_context);
+					ASArray* farr = allocArray(app_context, fld->count);
+					farr->length = fld->count;
+					initArrayProto(app_context, farr);
+					for (u8 fi = 0; fi < fld->count; fi++) {
+						const FilterListEntry* fe = &fld->entries[fi];
+						ASObject* proto = (fe->type >= 1 && fe->type <= 8) ? g_filter_protos_by_type[fe->type] : NULL;
+						if (!proto) continue;
+						ASObject* fobj = allocObject(app_context, 16);
+						fobj->native_type = NATIVE_FILTER;
+						ActionVar pv = {0}; pv.type = ACTION_STACK_VALUE_OBJECT;
+						pv.data.numeric_value = (u64)proto;
+						setPropertyWithFlags(app_context, fobj, "__proto__", 9, &pv, PROPERTY_FLAGS_DONTENUM);
+						ActionVar v;
+						if (fe->type == 1) {
+							// BlurFilter
+							v = makeF64(fe->blur_x); setProperty(app_context, fobj, "blurX", 5, &v);
+							v = makeF64(fe->blur_y); setProperty(app_context, fobj, "blurY", 5, &v);
+							v = makeF64((double)fe->quality); setProperty(app_context, fobj, "quality", 7, &v);
+						} else if (fe->type == 2) {
+							// DropShadowFilter
+							double angle_deg = fe->angle * 180.0 / 3.14159265358979323846;
+							int inner_f = (fe->flags >> 2) & 1;
+							int knockout_f = (fe->flags >> 1) & 1;
+							v = makeF64(fe->distance); setProperty(app_context, fobj, "distance", 8, &v);
+							v = makeF64(angle_deg); setProperty(app_context, fobj, "angle", 5, &v);
+							uint32_t color = ((uint32_t)(fe->color_r*255+0.5)<<16)|((uint32_t)(fe->color_g*255+0.5)<<8)|(uint32_t)(fe->color_b*255+0.5);
+							v = makeF64((double)color); setProperty(app_context, fobj, "color", 5, &v);
+							v = makeF64(fe->color_a); setProperty(app_context, fobj, "alpha", 5, &v);
+							v = makeF64(fe->blur_x); setProperty(app_context, fobj, "blurX", 5, &v);
+							v = makeF64(fe->blur_y); setProperty(app_context, fobj, "blurY", 5, &v);
+							v = makeF64(fe->strength); setProperty(app_context, fobj, "strength", 8, &v);
+							v = makeF64((double)fe->quality); setProperty(app_context, fobj, "quality", 7, &v);
+							v.type = ACTION_STACK_VALUE_BOOLEAN;
+							v.data.numeric_value = inner_f; setProperty(app_context, fobj, "inner", 5, &v);
+							v.data.numeric_value = knockout_f; setProperty(app_context, fobj, "knockout", 8, &v);
+							v.data.numeric_value = 0; setProperty(app_context, fobj, "hideObject", 10, &v);
+						} else if (fe->type == 3) {
+							// GlowFilter
+							int inner_f = (fe->flags >> 2) & 1;
+							int knockout_f = (fe->flags >> 1) & 1;
+							uint32_t color = ((uint32_t)(fe->color_r*255+0.5)<<16)|((uint32_t)(fe->color_g*255+0.5)<<8)|(uint32_t)(fe->color_b*255+0.5);
+							v = makeF64((double)color); setProperty(app_context, fobj, "color", 5, &v);
+							v = makeF64(fe->color_a); setProperty(app_context, fobj, "alpha", 5, &v);
+							v = makeF64(fe->blur_x); setProperty(app_context, fobj, "blurX", 5, &v);
+							v = makeF64(fe->blur_y); setProperty(app_context, fobj, "blurY", 5, &v);
+							v = makeF64(fe->strength); setProperty(app_context, fobj, "strength", 8, &v);
+							v = makeF64((double)fe->quality); setProperty(app_context, fobj, "quality", 7, &v);
+							v.type = ACTION_STACK_VALUE_BOOLEAN;
+							v.data.numeric_value = inner_f; setProperty(app_context, fobj, "inner", 5, &v);
+							v.data.numeric_value = knockout_f; setProperty(app_context, fobj, "knockout", 8, &v);
+						} else if (fe->type == 4) {
+							// BevelFilter
+							double angle_deg = fe->angle * 180.0 / 3.14159265358979323846;
+							int inner_f = (fe->flags >> 3) & 1;
+							int knockout_f = (fe->flags >> 2) & 1;
+							int on_top = fe->flags & 1;
+							v = makeF64(fe->distance); setProperty(app_context, fobj, "distance", 8, &v);
+							v = makeF64(angle_deg); setProperty(app_context, fobj, "angle", 5, &v);
+							uint32_t hc = ((uint32_t)(fe->highlight_r*255+0.5)<<16)|((uint32_t)(fe->highlight_g*255+0.5)<<8)|(uint32_t)(fe->highlight_b*255+0.5);
+							v = makeF64((double)hc); setProperty(app_context, fobj, "highlightColor", 14, &v);
+							v = makeF64(fe->highlight_a); setProperty(app_context, fobj, "highlightAlpha", 14, &v);
+							uint32_t sc = ((uint32_t)(fe->color_r*255+0.5)<<16)|((uint32_t)(fe->color_g*255+0.5)<<8)|(uint32_t)(fe->color_b*255+0.5);
+							v = makeF64((double)sc); setProperty(app_context, fobj, "shadowColor", 11, &v);
+							v = makeF64(fe->color_a); setProperty(app_context, fobj, "shadowAlpha", 11, &v);
+							v = makeF64(fe->blur_x); setProperty(app_context, fobj, "blurX", 5, &v);
+							v = makeF64(fe->blur_y); setProperty(app_context, fobj, "blurY", 5, &v);
+							v = makeF64(fe->strength); setProperty(app_context, fobj, "strength", 8, &v);
+							v = makeF64((double)fe->quality); setProperty(app_context, fobj, "quality", 7, &v);
+							const char* type_str = on_top ? "full" : (inner_f ? "inner" : "outer");
+							u32 u16len; uint16_t* u16p = utf8_to_u16(app_context, type_str, strlen(type_str), &u16len);
+							v.type = ACTION_STACK_VALUE_STRING; v.str_size = u16len;
+							v.data.string_data.heap_ptr = u16p;
+							setProperty(app_context, fobj, "type", 4, &v);
+							v.type = ACTION_STACK_VALUE_BOOLEAN;
+							v.data.numeric_value = knockout_f; setProperty(app_context, fobj, "knockout", 8, &v);
+						} else if (fe->type == 6) {
+							// ColorMatrixFilter
+							ASArray* marr = allocArray(app_context, 20);
+							marr->length = 20; initArrayProto(app_context, marr);
+							for (int i = 0; i < 20; i++)
+								marr->elements[i] = makeF64((double)fe->cm_matrix[i]);
+							v.type = ACTION_STACK_VALUE_ARRAY;
+							v.data.numeric_value = (u64)marr;
+							setProperty(app_context, fobj, "matrix", 6, &v);
+						} else if (fe->type == 5) {
+							// ConvolutionFilter
+							v = makeF64((double)fe->conv_mx); setProperty(app_context, fobj, "matrixX", 7, &v);
+							v = makeF64((double)fe->conv_my); setProperty(app_context, fobj, "matrixY", 7, &v);
+							int n = fe->conv_mx * fe->conv_my;
+							if (n > 25) n = 25;
+							ASArray* marr = allocArray(app_context, n);
+							marr->length = n; initArrayProto(app_context, marr);
+							for (int i = 0; i < n; i++)
+								marr->elements[i] = makeF64((double)fe->conv_matrix[i]);
+							v.type = ACTION_STACK_VALUE_ARRAY;
+							v.data.numeric_value = (u64)marr;
+							setProperty(app_context, fobj, "matrix", 6, &v);
+							v = makeF64((double)fe->conv_divisor); setProperty(app_context, fobj, "divisor", 7, &v);
+							v = makeF64((double)fe->conv_bias); setProperty(app_context, fobj, "bias", 4, &v);
+							v.type = ACTION_STACK_VALUE_BOOLEAN;
+							v.data.numeric_value = fe->conv_preserve_alpha;
+							setProperty(app_context, fobj, "preserveAlpha", 13, &v);
+							v.type = ACTION_STACK_VALUE_BOOLEAN;
+							v.data.numeric_value = fe->conv_clamp;
+							setProperty(app_context, fobj, "clamp", 5, &v);
+							uint32_t cc = ((uint32_t)fe->conv_color_r << 16) | ((uint32_t)fe->conv_color_g << 8) | fe->conv_color_b;
+							v = makeF64((double)cc); setProperty(app_context, fobj, "color", 5, &v);
+							v = makeF64(fe->conv_color_a / 255.0); setProperty(app_context, fobj, "alpha", 5, &v);
+						} else if (fe->type == 7 || fe->type == 8) {
+							// GradientGlow / GradientBevel
+							double angle_deg = fe->angle * 180.0 / 3.14159265358979323846;
+							v = makeF64(fe->distance); setProperty(app_context, fobj, "distance", 8, &v);
+							v = makeF64(angle_deg); setProperty(app_context, fobj, "angle", 5, &v);
+							ASArray* carr = allocArray(app_context, fe->grad_count);
+							carr->length = fe->grad_count; initArrayProto(app_context, carr);
+							for (int i = 0; i < fe->grad_count; i++)
+								carr->elements[i] = makeF64((double)fe->grad_colors[i]);
+							v.type = ACTION_STACK_VALUE_ARRAY; v.data.numeric_value = (u64)carr;
+							setProperty(app_context, fobj, "colors", 6, &v);
+							ASArray* aarr = allocArray(app_context, fe->grad_count);
+							aarr->length = fe->grad_count; initArrayProto(app_context, aarr);
+							for (int i = 0; i < fe->grad_count; i++)
+								aarr->elements[i] = makeF64((double)fe->grad_alphas[i]);
+							v.type = ACTION_STACK_VALUE_ARRAY; v.data.numeric_value = (u64)aarr;
+							setProperty(app_context, fobj, "alphas", 6, &v);
+							ASArray* rarr = allocArray(app_context, fe->grad_count);
+							rarr->length = fe->grad_count; initArrayProto(app_context, rarr);
+							for (int i = 0; i < fe->grad_count; i++)
+								rarr->elements[i] = makeF64((double)fe->grad_ratios[i]);
+							v.type = ACTION_STACK_VALUE_ARRAY; v.data.numeric_value = (u64)rarr;
+							setProperty(app_context, fobj, "ratios", 6, &v);
+							v = makeF64(fe->blur_x); setProperty(app_context, fobj, "blurX", 5, &v);
+							v = makeF64(fe->blur_y); setProperty(app_context, fobj, "blurY", 5, &v);
+							v = makeF64(fe->strength); setProperty(app_context, fobj, "strength", 8, &v);
+							v = makeF64((double)fe->quality); setProperty(app_context, fobj, "quality", 7, &v);
+							int inner_f = (fe->flags >> 2) & 1;
+							int knockout_f = (fe->flags >> 1) & 1;
+							int on_top_f = fe->flags & 1;
+							v.type = ACTION_STACK_VALUE_BOOLEAN;
+							v.data.numeric_value = knockout_f; setProperty(app_context, fobj, "knockout", 8, &v);
+							const char* type_str = on_top_f ? "full" : (inner_f ? "inner" : "outer");
+							u32 u16len; uint16_t* u16p = utf8_to_u16(app_context, type_str, strlen(type_str), &u16len);
+							v.type = ACTION_STACK_VALUE_STRING; v.str_size = u16len;
+							v.data.string_data.heap_ptr = u16p;
+							setProperty(app_context, fobj, "type", 4, &v);
+						}
+						farr->elements[fi].type = ACTION_STACK_VALUE_OBJECT;
+						farr->elements[fi].data.numeric_value = (u64)fobj;
+					}
+					PUSH(ACTION_STACK_VALUE_ARRAY, (u64)farr);
+					return;
+				}
+
 				u8 ftype = 0;
 				float fblur_x=0, fblur_y=0, fstrength=0, fangle=0, fdistance=0;
 				float fr=0, fg=0, fb=0, fa=0;
@@ -44728,28 +44888,38 @@ static int invokeNativeSuperConstructor(SWFAppContext* app_context, ASFunction* 
 		}
 		FILTER_SET_F64("divisor", 7, (num_args > 3) ? varToDoubleSimple(&args[3]) : 1.0);
 		FILTER_SET_F64("bias", 4, (num_args > 4) ? varToDoubleSimple(&args[4]) : 0.0);
-		FILTER_SET_BOOL("preserveAlpha", 13, 1);
-		FILTER_SET_BOOL("clamp", 5, 1);
-		FILTER_SET_F64("color", 5, 0.0);
-		FILTER_SET_F64("alpha", 5, 0.0);
+		FILTER_SET_BOOL("preserveAlpha", 13, (num_args > 5) ? (int)varToDoubleSimple(&args[5]) : 1);
+		FILTER_SET_BOOL("clamp", 5, (num_args > 6) ? (int)varToDoubleSimple(&args[6]) : 1);
+		FILTER_SET_F64("color", 5, (num_args > 7) ? varToDoubleSimple(&args[7]) : 0.0);
+		FILTER_SET_F64("alpha", 5, (num_args > 8) ? varToDoubleSimple(&args[8]) : 0.0);
 		out_result->type = ACTION_STACK_VALUE_OBJECT;
 		out_result->data.numeric_value = (u64)obj;
 		return 1;
 	}
 	if (strcmp(name, "GradientBevelFilter") == 0 || strcmp(name, "GradientGlowFilter") == 0) {
 		if (obj->native_type == NATIVE_NONE) obj->native_type = NATIVE_FILTER;
-		// Order: distance, angle, colors, alphas, ratios, blurX, blurY, quality, strength, knockout, type
+		// Flash API order: distance, angle, colors, alphas, ratios, blurX, blurY, strength, quality, type, knockout
+		// Property insertion order: distance, angle, colors, alphas, ratios, blurX, blurY, quality, strength, knockout, type
 		FILTER_SET_F64("distance", 8, (num_args > 0) ? varToDoubleSimple(&args[0]) : 4.0);
 		FILTER_SET_F64("angle", 5, (num_args > 1) ? varToDoubleSimple(&args[1]) : 45.0);
-		FILTER_SET_ARR("colors", 6);
-		FILTER_SET_ARR("alphas", 6);
-		FILTER_SET_ARR("ratios", 6);
+		if (num_args > 2 && args[2].type == ACTION_STACK_VALUE_ARRAY) {
+			setProperty(app_context, obj, "colors", 6, &args[2]);
+		} else { FILTER_SET_ARR("colors", 6); }
+		if (num_args > 3 && args[3].type == ACTION_STACK_VALUE_ARRAY) {
+			setProperty(app_context, obj, "alphas", 6, &args[3]);
+		} else { FILTER_SET_ARR("alphas", 6); }
+		if (num_args > 4 && args[4].type == ACTION_STACK_VALUE_ARRAY) {
+			setProperty(app_context, obj, "ratios", 6, &args[4]);
+		} else { FILTER_SET_ARR("ratios", 6); }
 		FILTER_SET_F64("blurX", 5, (num_args > 5) ? varToDoubleSimple(&args[5]) : 4.0);
 		FILTER_SET_F64("blurY", 5, (num_args > 6) ? varToDoubleSimple(&args[6]) : 4.0);
-		FILTER_SET_F64("quality", 7, (num_args > 7) ? varToDoubleSimple(&args[7]) : 1.0);
-		FILTER_SET_F64("strength", 8, (num_args > 8) ? varToDoubleSimple(&args[8]) : 1.0);
-		FILTER_SET_BOOL("knockout", 8, (num_args > 9) ? (int)varToDoubleSimple(&args[9]) : 0);
-		FILTER_SET_STR("type", 4, "inner", 5);
+		FILTER_SET_F64("quality", 7, (num_args > 8) ? varToDoubleSimple(&args[8]) : 1.0);
+		FILTER_SET_F64("strength", 8, (num_args > 7) ? varToDoubleSimple(&args[7]) : 1.0);
+		FILTER_SET_BOOL("knockout", 8, (num_args > 10) ? (int)varToDoubleSimple(&args[10]) : 0);
+		// type: args[9] if string, else "inner"
+		if (num_args > 9 && args[9].type == ACTION_STACK_VALUE_STRING) {
+			setProperty(app_context, obj, "type", 4, &args[9]);
+		} else { FILTER_SET_STR("type", 4, "inner", 5); }
 		out_result->type = ACTION_STACK_VALUE_OBJECT;
 		out_result->data.numeric_value = (u64)obj;
 		return 1;
@@ -44801,26 +44971,32 @@ static int invokeNativeSuperConstructor(SWFAppContext* app_context, ASFunction* 
 			else
 				setProperty(app_context, obj, "mapBitmap", 9, &undef);
 			// mapPoint: default Point(0,0), or second arg
-			ActionVar zero = makeF64(0.0);
-			ASObject* pt = createPointObj(app_context, &zero, &zero);
-			ActionVar pv = {0}; pv.type = ACTION_STACK_VALUE_OBJECT;
-			pv.data.numeric_value = (u64)pt;
-			setProperty(app_context, obj, "mapPoint", 8, &pv);
+			if (num_args > 1 && args[1].type == ACTION_STACK_VALUE_OBJECT) {
+				setProperty(app_context, obj, "mapPoint", 8, &args[1]);
+			} else {
+				ActionVar zero = makeF64(0.0);
+				ASObject* pt = createPointObj(app_context, &zero, &zero);
+				ActionVar pv = {0}; pv.type = ACTION_STACK_VALUE_OBJECT;
+				pv.data.numeric_value = (u64)pt;
+				setProperty(app_context, obj, "mapPoint", 8, &pv);
+			}
 			// componentX, componentY, scaleX, scaleY: default 0
 			{ ActionVar _fv = makeF64((num_args > 2) ? (double)(int)varToDoubleSimple(&args[2]) : 0.0); setProperty(app_context, obj, "componentX", 10, &_fv); }
 			{ ActionVar _fv = makeF64((num_args > 3) ? (double)(int)varToDoubleSimple(&args[3]) : 0.0); setProperty(app_context, obj, "componentY", 10, &_fv); }
 			{ ActionVar _fv = makeF64((num_args > 4) ? varToDoubleSimple(&args[4]) : 0.0); setProperty(app_context, obj, "scaleX", 6, &_fv); }
 			{ ActionVar _fv = makeF64((num_args > 5) ? varToDoubleSimple(&args[5]) : 0.0); setProperty(app_context, obj, "scaleY", 6, &_fv); }
-			// mode: default "wrap"
-			{
+			// mode: default "wrap", or args[6] if string
+			if (num_args > 6 && args[6].type == ACTION_STACK_VALUE_STRING) {
+				setProperty(app_context, obj, "mode", 4, &args[6]);
+			} else {
 				u32 u16len; uint16_t* u16 = utf8_to_u16(app_context, "wrap", 4, &u16len);
 				ActionVar sv = {0}; sv.type = ACTION_STACK_VALUE_STRING;
 				sv.str_size = u16len; sv.data.string_data.heap_ptr = u16;
 				setProperty(app_context, obj, "mode", 4, &sv);
 			}
 			// color: default 0, alpha: default 0
-			{ ActionVar _fv = makeF64(0.0); setProperty(app_context, obj, "color", 5, &_fv); }
-			{ ActionVar _fv = makeF64(0.0); setProperty(app_context, obj, "alpha", 5, &_fv); }
+			{ ActionVar _fv = makeF64((num_args > 7) ? varToDoubleSimple(&args[7]) : 0.0); setProperty(app_context, obj, "color", 5, &_fv); }
+			{ ActionVar _fv = makeF64((num_args > 8) ? varToDoubleSimple(&args[8]) : 0.0); setProperty(app_context, obj, "alpha", 5, &_fv); }
 		}
 		out_result->type = ACTION_STACK_VALUE_OBJECT;
 		out_result->data.numeric_value = (u64)obj;

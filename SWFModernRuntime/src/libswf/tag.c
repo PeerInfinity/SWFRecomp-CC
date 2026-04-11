@@ -4381,6 +4381,136 @@ const ExtFilterData* ng_getExtFilterData(size_t entry_idx)
 	return NULL;
 }
 
+// Multi-filter list storage
+#define MAX_FILTER_LISTS 32
+static FilterListData g_filter_lists[MAX_FILTER_LISTS];
+static int g_filter_list_count = 0;
+static int g_current_filter_list_idx = -1; // index of list being built
+
+static FilterListData* getOrCreateFilterList(size_t depth)
+{
+	for (int i = 0; i < g_filter_list_count; i++) {
+		if (g_filter_lists[i].depth == depth) return &g_filter_lists[i];
+	}
+	if (g_filter_list_count >= MAX_FILTER_LISTS) return NULL;
+	int idx = g_filter_list_count++;
+	memset(&g_filter_lists[idx], 0, sizeof(FilterListData));
+	g_filter_lists[idx].depth = depth;
+	return &g_filter_lists[idx];
+}
+
+void tagBeginFilterList(SWFAppContext* app_context, size_t depth, u8 count)
+{
+	(void)app_context; (void)count;
+	FilterListData* fl = getOrCreateFilterList(depth);
+	if (!fl) return;
+	fl->count = 0; // reset
+	// Find index for subsequent tagAdd* calls
+	for (int i = 0; i < g_filter_list_count; i++) {
+		if (g_filter_lists[i].depth == depth) { g_current_filter_list_idx = i; return; }
+	}
+}
+
+static FilterListEntry* filterListAppend(size_t depth)
+{
+	if (g_current_filter_list_idx < 0) return NULL;
+	FilterListData* fl = &g_filter_lists[g_current_filter_list_idx];
+	if (fl->depth != depth || fl->count >= MAX_FILTER_LIST_SIZE) return NULL;
+	FilterListEntry* e = &fl->entries[fl->count];
+	memset(e, 0, sizeof(FilterListEntry));
+	fl->count++;
+	return e;
+}
+
+void tagAddSimpleFilter(SWFAppContext* app_context, size_t depth,
+    u8 type, double blur_x, double blur_y, u8 quality, u8 flags,
+    double r, double g, double b, double a, double strength,
+    double angle, double distance)
+{
+	(void)app_context;
+	FilterListEntry* e = filterListAppend(depth);
+	if (!e) return;
+	e->type = type;
+	e->blur_x = blur_x; e->blur_y = blur_y;
+	e->quality = quality; e->flags = flags;
+	e->color_r = r; e->color_g = g; e->color_b = b; e->color_a = a;
+	e->strength = strength; e->angle = angle; e->distance = distance;
+}
+
+void tagAddSimpleFilterHighlight(SWFAppContext* app_context, size_t depth,
+    double hr, double hg, double hb, double ha)
+{
+	(void)app_context;
+	if (g_current_filter_list_idx < 0) return;
+	FilterListData* fl = &g_filter_lists[g_current_filter_list_idx];
+	if (fl->depth != depth || fl->count == 0) return;
+	FilterListEntry* e = &fl->entries[fl->count - 1]; // last added
+	e->highlight_r = hr; e->highlight_g = hg; e->highlight_b = hb; e->highlight_a = ha;
+}
+
+void tagAddColorMatrixFilter(SWFAppContext* app_context, size_t depth, const float* matrix20)
+{
+	(void)app_context;
+	FilterListEntry* e = filterListAppend(depth);
+	if (!e) return;
+	e->type = 6;
+	memcpy(e->cm_matrix, matrix20, 20 * sizeof(float));
+}
+
+void tagAddConvolutionFilter(SWFAppContext* app_context, size_t depth,
+    u8 matrixX, u8 matrixY, const float* matrix, float divisor, float bias,
+    u8 preserve_alpha, u8 clamp, u8 def_r, u8 def_g, u8 def_b, u8 def_a)
+{
+	(void)app_context;
+	FilterListEntry* e = filterListAppend(depth);
+	if (!e) return;
+	e->type = 5;
+	e->conv_mx = matrixX; e->conv_my = matrixY;
+	int n = matrixX * matrixY;
+	if (n > 25) n = 25;
+	memcpy(e->conv_matrix, matrix, n * sizeof(float));
+	e->conv_divisor = divisor; e->conv_bias = bias;
+	e->conv_preserve_alpha = preserve_alpha; e->conv_clamp = clamp;
+	e->conv_color_r = def_r; e->conv_color_g = def_g;
+	e->conv_color_b = def_b; e->conv_color_a = def_a;
+}
+
+void tagAddGradientFilter(SWFAppContext* app_context, size_t depth,
+    u8 type, u8 count, const u32* colors, const float* alphas, const u8* ratios,
+    float blur_x, float blur_y, float angle, float distance, float strength,
+    u8 quality, u8 flags)
+{
+	(void)app_context;
+	FilterListEntry* e = filterListAppend(depth);
+	if (!e) return;
+	e->type = type; // 7=gradientglow, 8=gradientbevel
+	if (count > 16) count = 16;
+	e->grad_count = count;
+	memcpy(e->grad_colors, colors, count * sizeof(u32));
+	memcpy(e->grad_alphas, alphas, count * sizeof(float));
+	memcpy(e->grad_ratios, ratios, count);
+	e->blur_x = blur_x; e->blur_y = blur_y;
+	e->angle = angle; e->distance = distance;
+	e->strength = strength;
+	e->quality = quality; e->flags = flags;
+}
+
+void tagEndFilterList(SWFAppContext* app_context, size_t depth)
+{
+	(void)app_context; (void)depth;
+	g_current_filter_list_idx = -1;
+}
+
+const FilterListData* ng_getFilterListData(size_t entry_idx)
+{
+	size_t depth = entry_idx & 0xFFFFF;
+	for (int i = 0; i < g_filter_list_count; i++) {
+		if (g_filter_lists[i].depth == depth && g_filter_lists[i].count > 0)
+			return &g_filter_lists[i];
+	}
+	return NULL;
+}
+
 void tagSetInstanceName(SWFAppContext* app_context, size_t depth, const char* name)
 {
 	(void)app_context;
