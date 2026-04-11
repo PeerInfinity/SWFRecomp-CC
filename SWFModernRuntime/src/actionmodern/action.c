@@ -35255,9 +35255,13 @@ int actionCall(SWFAppContext* app_context)
 		int _saved_ic = g_in_action_call; \
 		int _saved_ts = g_tag_skip_mode; \
 		MovieClip* _saved_ctx = g_current_context; \
+		int _saved_stcc = g_settarget_context_changed; \
+		MovieClip* _saved_stsc = g_settarget_saved_context; \
 		quit_swf = 0; \
 		g_in_action_call = 1; \
 		g_tag_skip_mode = 1; \
+		g_settarget_context_changed = 0; \
+		g_settarget_saved_context = NULL; \
 		if ((ctx_mc) != NULL) setCurrentContext((MovieClip*)(ctx_mc)); \
 		(funcs)[(idx)](app_context); \
 		quit_swf = _saved_quit; \
@@ -35268,6 +35272,8 @@ int actionCall(SWFAppContext* app_context)
 		g_in_action_call = _saved_ic; \
 		g_tag_skip_mode = _saved_ts; \
 		g_current_context = _saved_ctx; \
+		g_settarget_context_changed = _saved_stcc; \
+		g_settarget_saved_context = _saved_stsc; \
 	} while(0)
 
 	// Helper: check if base_clip was removed after call() execution
