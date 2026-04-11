@@ -1,0 +1,2 @@
+# Ruffle known_failure — test fails in Ruffle's own test suite
+hitarea
