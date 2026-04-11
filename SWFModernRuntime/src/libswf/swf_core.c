@@ -679,6 +679,7 @@ void swfStart(SWFAppContext* app_context)
 	g_frame_funcs = app_context->frame_funcs;
 	g_frame_count = app_context->frame_count;
 
+
 	// MCL pending load dispatch (used after processTimers and in exit conditions)
 	extern void actionFirePendingLoadInits(SWFAppContext* app_context);
 	extern int g_pending_mcl_load_count;

@@ -146,6 +146,8 @@ static size_t g_sprite_init_target_frame = 0;
 extern int g_settarget_explicit_root;
 extern int g_settarget_invalid;
 extern int g_settarget_none;
+extern int g_settarget_context_changed;
+extern MovieClip* g_settarget_saved_context;
 extern MovieClip* g_current_context;
 extern void actionSetCurrentContext(MovieClip* mc);
 
@@ -170,9 +172,13 @@ static void exec_sprite_frame(SWFAppContext* app_context, DisplayObject* obj, fr
 	int saved_settarget = g_settarget_explicit_root;
 	int saved_invalid = g_settarget_invalid;
 	int saved_none = g_settarget_none;
+	int saved_ctx_changed = g_settarget_context_changed;
+	MovieClip* saved_ctx_save = g_settarget_saved_context;
 	g_settarget_explicit_root = 0;
 	g_settarget_invalid = 0;
 	g_settarget_none = 0;
+	g_settarget_context_changed = 0;
+	g_settarget_saved_context = NULL;
 
 	// Set active transform data to child SWF's array if this sprite belongs to
 	// a child movie (prevents buffer overflow when child has more transforms).
@@ -186,6 +192,8 @@ static void exec_sprite_frame(SWFAppContext* app_context, DisplayObject* obj, fr
 	g_settarget_explicit_root = saved_settarget;
 	g_settarget_invalid = saved_invalid;
 	g_settarget_none = saved_none;
+	g_settarget_context_changed = saved_ctx_changed;
+	g_settarget_saved_context = saved_ctx_save;
 	actionSetCurrentContext(saved_ctx);
 	actionSetBaseClip(saved_base);
 	g_current_sprite_obj = saved;
