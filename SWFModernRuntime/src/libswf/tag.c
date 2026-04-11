@@ -2727,7 +2727,10 @@ static void dispatch_clip_event_press_dl(SWFAppContext* app_context,
 		DisplayObject* obj = &dl[i];
 		if (obj->char_id == 0) continue;
 
-		// Compose parent transform with this entry's transform
+		// Compose parent transform with this entry's transform.
+		// If this entry is the current drag target, use the virtual drag position
+		// instead of the transform position (startDrag moves the clip visually
+		// without updating transform_data).
 		u32 tid = obj->transform_id;
 		double ca = (double)transform_data[tid][0];
 		double cb = (double)transform_data[tid][1];
@@ -2735,6 +2738,12 @@ static void dispatch_clip_event_press_dl(SWFAppContext* app_context,
 		double cd = (double)transform_data[tid][5];
 		double ctx_v = (double)transform_data[tid][12];
 		double cty_v = (double)transform_data[tid][13];
+		if (g_drag_target_name[0] != '\0' && obj->instance_name &&
+		    strcmp(obj->instance_name, g_drag_target_name) == 0)
+		{
+			ctx_v = (double)g_drag_virt_x;
+			cty_v = (double)g_drag_virt_y;
+		}
 		double na = ma*ca + mc_m*cb, nb = mb*ca + md*cb;
 		double nc = ma*cc + mc_m*cd, nd = mb*cc + md*cd;
 		double ntx = ma*ctx_v + mc_m*cty_v + mtx;
