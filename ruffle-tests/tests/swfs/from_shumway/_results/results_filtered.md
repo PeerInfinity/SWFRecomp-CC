@@ -1,10 +1,10 @@
 # Ruffle Test Results (Filtered)
 
-**Date**: 2026-04-11 19:59 UTC
+**Date**: 2026-04-11 20:21 UTC
 
-**Git SHA**: `8b070eb6ec`
+**Git SHA**: `7b73007a45`
 
-**Run Duration**: 15m 10s
+**Run Duration**: 15m 9s
 
 **Filtered**: 30 tests ignored out of 47 available
 
@@ -25,23 +25,23 @@
 
 | # | Test | Lines | Duration | Notes |
 |---|------|-------|----------|-------|
-| 1 | `MaskTest` | 0 | 19.4s |  |
-| 2 | `MaskTest-2` | 0 | 18.8s |  |
-| 3 | `add` | 11 | 18.7s |  |
-| 4 | `avm1timeline1` | 3 | 21.3s |  |
-| 5 | `avm1timeline2` | 6 | 21.3s |  |
-| 6 | `bitmapbuttons` | 0 | 19.3s |  |
-| 7 | `button3` | 1 | 19.3s |  |
-| 8 | `clipping` | 0 | 19.8s |  |
-| 9 | `doubleAndRegister` | 2 | 20.7s |  |
-| 10 | `flash_geom_ColorTransform` | 0 | 19.1s |  |
-| 11 | `flash_text_TextField` | 0 | 19.0s |  |
-| 12 | `fscommand1` | 1 | 19.1s |  |
-| 13 | `gradient` | 0 | 19.9s |  |
-| 14 | `gradientTransform` | 0 | 19.8s |  |
-| 15 | `invalidClipDepth` | 0 | 19.6s |  |
-| 16 | `movieinfo1` | 3 | 18.9s |  |
-| 17 | `targetPath1` | 8 | 18.6s |  |
+| 1 | `MaskTest` | 0 | 19.5s |  |
+| 2 | `MaskTest-2` | 0 | 19.2s |  |
+| 3 | `add` | 11 | 18.6s |  |
+| 4 | `avm1timeline1` | 3 | 18.8s |  |
+| 5 | `avm1timeline2` | 6 | 18.8s |  |
+| 6 | `bitmapbuttons` | 0 | 20.0s |  |
+| 7 | `button3` | 1 | 19.9s |  |
+| 8 | `clipping` | 0 | 19.6s |  |
+| 9 | `doubleAndRegister` | 2 | 19.6s |  |
+| 10 | `flash_geom_ColorTransform` | 0 | 18.9s |  |
+| 11 | `flash_text_TextField` | 0 | 19.6s |  |
+| 12 | `fscommand1` | 1 | 19.3s |  |
+| 13 | `gradient` | 0 | 19.1s |  |
+| 14 | `gradientTransform` | 0 | 19.0s |  |
+| 15 | `invalidClipDepth` | 0 | 19.8s |  |
+| 16 | `movieinfo1` | 3 | 19.7s |  |
+| 17 | `targetPath1` | 8 | 19.0s |  |
 
 ## Near-Passing Tests
 
@@ -73,5 +73,5 @@ No output mismatches.
 
 | # | Document | Tests | Passing | Failing |
 |---|----------|-------|---------|---------|
-| 1 | [SHUMWAY_AVM1_PLAN.md](ruffle-tests/tests/swfs/from_shumway/_investigation/incomplete/SHUMWAY_AVM1_PLAN.md) | 0 | 0 | 0 |
+| 1 | [SHUMWAY_AVM1_PLAN.md](ruffle-tests/tests/swfs/from_shumway/_investigation/complete/SHUMWAY_AVM1_PLAN.md) | 0 | 0 | 0 |
 | | *(tests not in any document)* | 17 | 17 | 0 |
