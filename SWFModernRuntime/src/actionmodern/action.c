@@ -48406,6 +48406,48 @@ static int callArrayMethod(SWFAppContext* app_context,
 // Array.prototype method wrapper (Function2Ptr)
 // Dispatches to callArrayMethod using the function's name as the method name.
 // =====================================================================
+// Helper: create a temporary ASArray from an array-like ASObject (has numeric keys + length).
+static ASArray* objectToTempArray(SWFAppContext* app_context, ASObject* obj, u32* out_length)
+{
+	u32 length = 0;
+	ActionVar* len_var = getProperty(obj, "length", 6);
+	if (len_var != NULL) {
+		double d = varToDoubleSimple(len_var);
+		if (!isnan(d) && d >= 0) length = (u32)d;
+	}
+	if (length > 4096) length = 4096;  // safety cap
+	ASArray* arr = allocArray(app_context, length > 0 ? length : 1);
+	arr->length = length;
+	for (u32 i = 0; i < length; i++) {
+		char idx[16]; snprintf(idx, sizeof(idx), "%u", i);
+		ActionVar* elem = getProperty(obj, idx, (u32)strlen(idx));
+		if (elem != NULL) setArrayElement(app_context, arr, i, elem);
+	}
+	*out_length = length;
+	return arr;
+}
+
+// Helper: sync a temporary ASArray back to an array-like ASObject.
+static void syncArrayToObject(SWFAppContext* app_context, ASArray* arr, ASObject* obj, u32 old_length)
+{
+	// Write new elements
+	for (u32 i = 0; i < arr->length; i++) {
+		char idx[16]; snprintf(idx, sizeof(idx), "%u", i);
+		setProperty(app_context, obj, idx, (u32)strlen(idx), &arr->elements[i]);
+	}
+	// Delete excess elements if array shrunk
+	for (u32 i = arr->length; i < old_length; i++) {
+		char idx[16]; snprintf(idx, sizeof(idx), "%u", i);
+		deleteProperty(app_context, obj, idx, (u32)strlen(idx));
+	}
+	// Update length
+	ActionVar lv = {0};
+	lv.type = ACTION_STACK_VALUE_F64;
+	double dl = (double)arr->length;
+	VAL(u64, &lv.data.numeric_value) = VAL(u64, &dl);
+	setProperty(app_context, obj, "length", 6, &lv);
+}
+
 static ActionVar builtin_array_method(SWFAppContext* app_context, ActionVar* args, u32 arg_count, ActionVar* registers, void* this_obj)
 {
 	(void)registers;
@@ -48430,7 +48472,32 @@ static ActionVar builtin_array_method(SWFAppContext* app_context, ActionVar* arg
 		ASArray* arr = (ASArray*) this_obj;
 		int handled = callArrayMethod(app_context, arr, method_name, method_name_len, args, arg_count);
 		if (handled) {
-			// callArrayMethod pushes result onto stack; pop and return it
+			ActionVar result;
+			popVar(app_context, &result);
+			return result;
+		}
+	}
+
+	// Handle array-like ASObject this (e.g., Array.prototype.concat.call(plainObj, ...))
+	// Flash/Ruffle Array.prototype methods work on any object with numeric keys + length.
+	if (g_call_this_type == ACTION_STACK_VALUE_OBJECT) {
+		ASObject* obj = (ASObject*) this_obj;
+		u32 old_length = 0;
+		ASArray* temp = objectToTempArray(app_context, obj, &old_length);
+		int handled = callArrayMethod(app_context, temp, method_name, method_name_len, args, arg_count);
+		if (handled) {
+			// Sync mutating methods back to the object
+			// (concat/slice/join/toString return new values, don't mutate)
+			int is_mutating = (method_name_len == 3 && strncmp(method_name, "pop", 3) == 0) ||
+			                  (method_name_len == 4 && strncmp(method_name, "push", 4) == 0) ||
+			                  (method_name_len == 5 && strncmp(method_name, "shift", 5) == 0) ||
+			                  (method_name_len == 7 && strncmp(method_name, "unshift", 7) == 0) ||
+			                  (method_name_len == 6 && strncmp(method_name, "splice", 6) == 0) ||
+			                  (method_name_len == 7 && strncmp(method_name, "reverse", 7) == 0) ||
+			                  (method_name_len == 4 && strncmp(method_name, "sort", 4) == 0) ||
+			                  (method_name_len == 6 && strncmp(method_name, "sortOn", 6) == 0);
+			if (is_mutating)
+				syncArrayToObject(app_context, temp, obj, old_length);
 			ActionVar result;
 			popVar(app_context, &result);
 			return result;
