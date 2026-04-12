@@ -12709,12 +12709,11 @@ static ActionVar objectToPrimitive(SWFAppContext* app_context, ActionVar* obj_va
 				}
 
 				// valueOf returned non-primitive (e.g. Object.prototype.valueOf
-				// returning `this`) — bail without falling through to toString.
-				// Flash comparisons return false for bare objects.
+				// returning `this`). Return the original object reference so the
+				// caller can distinguish "still an object" from "UNDEFINED".
+				// Equals2 uses is-primitive check; numeric conversion uses out_success=0.
 				if (out_success) *out_success = 0;
-				ActionVar undef = {0};
-				undef.type = ACTION_STACK_VALUE_UNDEFINED;
-				return undef;
+				return *obj_var;
 			}
 		}
 		// valueOf is a stored primitive value (boxed Number/Boolean/undefined)
@@ -34451,11 +34450,17 @@ void actionEquals2(SWFAppContext* app_context)
 		if (g_swf_version < 6) {
 			// SWF5 and below: try valueOf on both; if both produce primitives, compare those.
 			// If either fails to produce a primitive, fall back to reference equality.
-			ActionVar a_prim = objectToPrimitive(app_context, &a, NULL);
-			ActionVar b_prim = objectToPrimitive(app_context, &b, NULL);
-			int a_ok = (a_prim.type != ACTION_STACK_VALUE_UNDEFINED);
-			int b_ok = (b_prim.type != ACTION_STACK_VALUE_UNDEFINED);
-			if (a_ok && b_ok)
+			int a_ok = 1, b_ok = 1;
+			ActionVar a_prim = objectToPrimitive(app_context, &a, &a_ok);
+			ActionVar b_prim = objectToPrimitive(app_context, &b, &b_ok);
+			// Primitive iff not an object/array/function
+			int a_is_prim = (a_prim.type != ACTION_STACK_VALUE_OBJECT &&
+			                 a_prim.type != ACTION_STACK_VALUE_ARRAY &&
+			                 a_prim.type != ACTION_STACK_VALUE_FUNCTION);
+			int b_is_prim = (b_prim.type != ACTION_STACK_VALUE_OBJECT &&
+			                 b_prim.type != ACTION_STACK_VALUE_ARRAY &&
+			                 b_prim.type != ACTION_STACK_VALUE_FUNCTION);
+			if (a_ok && b_ok && a_is_prim && b_is_prim)
 			{
 				a = a_prim;
 				b = b_prim;
@@ -34477,14 +34482,16 @@ void actionEquals2(SWFAppContext* app_context)
 	}
 	else if (a_is_obj)
 	{
-		// Use out_success to distinguish ToPrimitive failure (valueOf returned `this`)
-		// from success returning UNDEFINED (e.g. _global.valueOf = undefined).
-		// In SWF8+, ToPrimitive failure + null/undefined comparison → false (CastOp typed catch).
-		// In SWF5/6/7, failure falls through: UNDEFINED result → null==undefined → true.
+		// Ruffle-compatible: call valueOf, then if result is not a primitive, return false.
+		// objectToPrimitive now returns the original object reference when valueOf returns
+		// non-primitive (e.g. Object.prototype.valueOf returning `this`), which we detect here.
 		int a_ok = 1;
 		a = objectToPrimitive(app_context, &a, &a_ok);
-		if (!a_ok && g_swf_version >= 8 &&
-		    (b.type == ACTION_STACK_VALUE_NULL || b.type == ACTION_STACK_VALUE_UNDEFINED))
+		// If result is still an object (valueOf returned non-primitive), return false.
+		// This matches Ruffle's is_primitive check in abstract_eq.
+		if (a.type == ACTION_STACK_VALUE_OBJECT ||
+		    a.type == ACTION_STACK_VALUE_ARRAY ||
+		    a.type == ACTION_STACK_VALUE_FUNCTION)
 		{
 			PUSH(ACTION_STACK_VALUE_BOOLEAN, 0);
 			return;
@@ -34494,8 +34501,9 @@ void actionEquals2(SWFAppContext* app_context)
 	{
 		int b_ok = 1;
 		b = objectToPrimitive(app_context, &b, &b_ok);
-		if (!b_ok && g_swf_version >= 8 &&
-		    (a.type == ACTION_STACK_VALUE_NULL || a.type == ACTION_STACK_VALUE_UNDEFINED))
+		if (b.type == ACTION_STACK_VALUE_OBJECT ||
+		    b.type == ACTION_STACK_VALUE_ARRAY ||
+		    b.type == ACTION_STACK_VALUE_FUNCTION)
 		{
 			PUSH(ACTION_STACK_VALUE_BOOLEAN, 0);
 			return;

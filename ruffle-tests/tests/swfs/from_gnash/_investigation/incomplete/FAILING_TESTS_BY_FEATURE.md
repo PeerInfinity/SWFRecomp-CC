@@ -477,4 +477,6 @@ The old Enumerate opcode (SWF5 for-in) wasn't checking the scope chain for varia
 - **String regex methods**: replace/match/search need regex support (~120 diffs per test)
 - **delete DONT_DELETE flag**: local var deletion semantics differ between SWF5 and SWF7+ — SWF5 allows some local vars to be deleted but function parameters remain non-deletable (complex, investigated 2026-04-10)
 - **delete local vars**: `delete e` on function locals + `_root.e` persistence after delete (9 diffs per delete test)
-- **new Object() in Dejagnu context**: `anObject != undefined` fails — `new Object()` returns undefined in SWF7 Gnash test harness (1 diff per delete-v7, investigated but complex — requires runtime instrumentation to debug)
+
+### Latest fixes (2026-04-11)
+- **Equals2 Object vs primitive — Ruffle is_primitive semantics** — `actionEquals2` now matches Ruffle's `abstract_eq`: when valueOf returns a non-primitive (e.g., `Object.prototype.valueOf` returning `this`), the comparison returns false immediately. `objectToPrimitive` now returns the *original object reference* (instead of UNDEFINED) when valueOf returns non-primitive, so `actionEquals2` can distinguish "object still" from "UNDEFINED" (where `_global`/`__proto__=undefined` objects legitimately resolve to UNDEFINED and compare equal to undefined). SWF5 object-vs-object path updated to use is-primitive check. **+1 test: delete-v7 → PASS.** Also fixed `SubObj1.prototype != undefined` line in Inheritance-v7.
