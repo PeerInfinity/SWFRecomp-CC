@@ -1,8 +1,8 @@
 # Ruffle Test Results (Filtered)
 
-**Date**: 2026-04-12 18:23 UTC
+**Date**: 2026-04-12 20:05 UTC
 
-**Git SHA**: `13565deb31`
+**Git SHA**: `7cd98a820d`
 
 **Run Duration**: 7m 27s
 
@@ -25,27 +25,27 @@
 
 | # | Test | Lines | Duration | Notes |
 |---|------|-------|----------|-------|
-| 1 | `array` | 7 | 19.7s |  |
-| 2 | `callee` | 2 | 19.8s |  |
-| 3 | `depth` | 6 | 19.0s |  |
-| 4 | `externalinterface` | 4 | 18.9s |  |
+| 1 | `array` | 7 | 19.8s |  |
+| 2 | `callee` | 2 | 20.0s |  |
+| 3 | `depth` | 6 | 18.8s |  |
+| 4 | `externalinterface` | 4 | 19.2s |  |
 | 5 | `filters` | 149 | 19.7s |  |
-| 6 | `label` | 4 | 19.8s |  |
-| 7 | `levels` | 9 | 20.1s |  |
-| 8 | `loadevent` | 9 | 18.8s |  |
-| 9 | `lookup` | 3 | 18.8s |  |
-| 10 | `mouse-transparency` | 1 | 19.5s |  |
-| 11 | `nativeinheritance` | 6 | 20.5s |  |
-| 12 | `nested-button` | 1 | 19.2s |  |
-| 13 | `operations` | 13 | 19.1s |  |
-| 14 | `rollover` | 4 | 19.2s |  |
+| 6 | `label` | 4 | 19.5s |  |
+| 7 | `levels` | 9 | 19.2s |  |
+| 8 | `loadevent` | 9 | 19.1s |  |
+| 9 | `lookup` | 3 | 18.9s |  |
+| 10 | `mouse-transparency` | 1 | 19.3s |  |
+| 11 | `nativeinheritance` | 6 | 18.9s |  |
+| 12 | `nested-button` | 1 | 19.1s |  |
+| 13 | `operations` | 13 | 18.9s |  |
+| 14 | `rollover` | 4 | 19.7s |  |
 | 15 | `scope` | 14 | 19.1s |  |
-| 16 | `setinterval` | 20 | 19.2s |  |
+| 16 | `setinterval` | 20 | 18.9s |  |
 | 17 | `settimeout` | 17 | 18.7s |  |
-| 18 | `super` | 11 | 18.9s |  |
-| 19 | `target` | 18 | 19.4s |  |
-| 20 | `text-bind` | 0 | 20.1s |  |
-| 21 | `watch` | 2 | 20.0s |  |
+| 18 | `super` | 11 | 19.7s |  |
+| 19 | `target` | 18 | 19.2s |  |
+| 20 | `text-bind` | 0 | 20.8s |  |
+| 21 | `watch` | 2 | 18.9s |  |
 
 ## Near-Passing Tests
 
