@@ -10307,8 +10307,8 @@ static ActionVar ctRgbGetter(SWFAppContext* app_context, ActionVar* args, u32 ar
 	int32_t r = rv ? (int32_t)varToDoubleSimple(rv) : 0;
 	int32_t g = gv ? (int32_t)varToDoubleSimple(gv) : 0;
 	int32_t b = bv ? (int32_t)varToDoubleSimple(bv) : 0;
-	uint32_t packed = ((uint32_t)(r & 0xFF) << 16) | ((uint32_t)(g & 0xFF) << 8) | (uint32_t)(b & 0xFF);
-	return makeF64((double)(int32_t)packed);
+	int32_t packed = (r << 16) + (g << 8) + b;
+	return makeF64((double)packed);
 }
 
 // ColorTransform rgb setter: n=ToInt32(value); rOff=(n>>16)&0xFF; gOff=(n>>8)&0xFF; bOff=n&0xFF;
@@ -10434,14 +10434,23 @@ static ActionVar colorTransformConstructor(SWFAppContext* app_context, ActionVar
 
 	obj->native_type = NATIVE_COLORTRANSFORM;
 
-	double rMult = (arg_count > 0) ? varToDoubleSimple(&args[0]) : 1.0;
-	double gMult = (arg_count > 1) ? varToDoubleSimple(&args[1]) : 1.0;
-	double bMult = (arg_count > 2) ? varToDoubleSimple(&args[2]) : 1.0;
-	double aMult = (arg_count > 3) ? varToDoubleSimple(&args[3]) : 1.0;
-	double rOff  = (arg_count > 4) ? varToDoubleSimple(&args[4]) : 0.0;
-	double gOff  = (arg_count > 5) ? varToDoubleSimple(&args[5]) : 0.0;
-	double bOff  = (arg_count > 6) ? varToDoubleSimple(&args[6]) : 0.0;
-	double aOff  = (arg_count > 7) ? varToDoubleSimple(&args[7]) : 0.0;
+	// Per Flash docs, ColorTransform requires 8 or more arguments. Fewer args
+	// produce the identity transform (1,1,1,1,0,0,0,0). Object args are coerced
+	// via the SWF abstract-to-number rules so valueOf() is honored.
+	double rMult, gMult, bMult, aMult, rOff, gOff, bOff, aOff;
+	if (arg_count < 8) {
+		rMult = gMult = bMult = aMult = 1.0;
+		rOff  = gOff  = bOff  = aOff  = 0.0;
+	} else {
+		rMult = varToDoubleSWF(app_context, &args[0], g_swf_version);
+		gMult = varToDoubleSWF(app_context, &args[1], g_swf_version);
+		bMult = varToDoubleSWF(app_context, &args[2], g_swf_version);
+		aMult = varToDoubleSWF(app_context, &args[3], g_swf_version);
+		rOff  = varToDoubleSWF(app_context, &args[4], g_swf_version);
+		gOff  = varToDoubleSWF(app_context, &args[5], g_swf_version);
+		bOff  = varToDoubleSWF(app_context, &args[6], g_swf_version);
+		aOff  = varToDoubleSWF(app_context, &args[7], g_swf_version);
+	}
 
 	ActionVar v;
 	v = makeF64(rMult); setProperty(app_context, obj, "redMultiplier",   13, &v);
