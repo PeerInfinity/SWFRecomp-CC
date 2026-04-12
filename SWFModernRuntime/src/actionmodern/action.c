@@ -29882,6 +29882,14 @@ static void setProtoTo(SWFAppContext* app_context, ASObject* obj, ASObject* prot
 // Create the secondary version's _global object with all constructors
 static void ensureSecondaryGlobalInit(SWFAppContext* app_context, int target_version)
 {
+	// Ensure the primary global is initialized first so g_primary_version_group
+	// is set to a real value (not -1) before the same-group check below.
+	// Otherwise, if a child movie is imported before the primary's frame script
+	// has run, this function would create a "secondary" global for the same
+	// version group as the primary and overwrite g_global_legacy/g_global_modern,
+	// permanently desyncing them from `global_object`.
+	ensureGlobalInit(app_context);
+
 	int vg = versionGroup(target_version);
 	if (vg == g_primary_version_group) return; // same group, no secondary needed
 
