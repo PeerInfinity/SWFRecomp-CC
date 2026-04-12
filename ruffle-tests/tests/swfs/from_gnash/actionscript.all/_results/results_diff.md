@@ -1,47 +1,37 @@
 # Ruffle Test Results Diff
 
-**Previous:** `7cd98a820d18` (2026-04-12T20:05:04.702871+00:00)
-**Current:** `3e6993b0e763` (2026-04-12T20:39:30.032672+00:00)
+**Previous:** `3e6993b0e763` (2026-04-12T20:39:30.032672+00:00)
+**Current:** `c13bd8fe196e` (2026-04-12T22:11:36.183538+00:00)
 
 ## Summary
 
 | Metric | Previous | Current | Delta |
 |--------|----------|---------|-------|
-| Passing | 84 | 92 | +8 |
+| Passing | 92 | 95 | +3 |
 | Total | 190 | 190 | 0 |
-| Pass rate | 44.2% | 48.4% | +4.2% |
-| Mismatched lines | 4315 | 4090 | -225 |
-|   Decreased | | | -231 |
-|   Increased | | | +6 |
+| Pass rate | 48.4% | 50.0% | +1.6% |
+| Mismatched lines | 4090 | 4049 | -41 |
+|   Decreased | | | -41 |
 
-## Newly Passing (8)
+## Newly Passing (3)
 
 | Test | Previous Status | Lines (prev) | Lines (now) |
 |------|----------------|--------------|-------------|
-| `AsBroadcaster-v5` | output_mismatch | 8/11 | 11/11 |
-| `Color-v5` | output_mismatch | 124/140 | 140/140 |
-| `Color-v6` | output_mismatch | 156/171 | 171/171 |
-| `LocalConnection-v6` | output_mismatch | 52/58 | 58/58 |
-| `NetStream-v6` | output_mismatch | 73/80 | 80/80 |
-| `Video-v6` | output_mismatch | 79/85 | 85/85 |
-| `XMLSocket-v5` | output_mismatch | 25/35 | 35/35 |
-| `XMLSocket-v6` | output_mismatch | 25/35 | 35/35 |
+| `LocalConnection-v5` | output_mismatch | 4/7 | 7/7 |
+| `NetConnection-v5` | output_mismatch | 4/7 | 7/7 |
+| `Video-v5` | output_mismatch | 4/7 | 7/7 |
 
-## Line Count Changed (14)
+## Line Count Changed (10)
 
 | Test | Status | Lines (prev) | Lines (now) | Diff |
 |------|--------|--------------|-------------|------|
-| `AsBroadcaster-v6` | output_mismatch | 28/121 | 98/121 | -70 |
-| `TextSnapshot-v6` | output_mismatch | 97/173 | 132/173 | -35 |
-| `LoadVars-v6` | output_mismatch | 55/152 | 67/152 | -12 |
-| `Sound-v5` | output_mismatch | 65/100 | 77/100 | -12 |
-| `Sound-v6` | output_mismatch | 64/121 | 76/121 | -12 |
-| `Microphone-v6` | output_mismatch | 38/79 | 48/79 | -10 |
-| `Inheritance-v5` | output_mismatch | 96/114 | 98/114 | -2 |
-| `Inheritance-v6` | output_mismatch | 163/181 | 165/181 | -2 |
-| `toString_valueOf-v6` | output_mismatch | 132/155 | 134/155 | -2 |
-| `Camera-v6` | output_mismatch | 32/90 | 33/90 | -1 |
-| `ASnative-v5` | output_mismatch | 27/107 | 26/107 | +1 |
-| `ASnative-v6` | output_mismatch | 25/110 | 24/110 | +1 |
-| `Instance-v5` | output_mismatch | 28/52 | 26/52 | +2 |
-| `Instance-v6` | output_mismatch | 29/52 | 27/52 | +2 |
+| `Inheritance-v6` | output_mismatch | 165/181 | 173/181 | -8 |
+| `Number-v6` | output_mismatch | 214/239 | 219/239 | -5 |
+| `MovieClip-v5` | output_mismatch | 240/363 | 244/363 | -4 |
+| `String-v6` | output_mismatch | 258/377 | 262/377 | -4 |
+| `String-v5` | output_mismatch | 239/358 | 242/358 | -3 |
+| `Global-v6` | output_mismatch | 151/210 | 153/210 | -2 |
+| `Inheritance-v5` | output_mismatch | 98/114 | 100/114 | -2 |
+| `array-v5` | output_mismatch | 457/560 | 459/560 | -2 |
+| `Number-v5` | output_mismatch | 217/244 | 218/244 | -1 |
+| `Selection-v6` | output_mismatch | 113/125 | 114/125 | -1 |
