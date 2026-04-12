@@ -1,10 +1,10 @@
 # Ruffle Test Results (Filtered)
 
-**Date**: 2026-04-11 23:14 UTC
+**Date**: 2026-04-12 05:58 UTC
 
-**Git SHA**: `e70514bf6a`
+**Git SHA**: `fad47faaa3`
 
-**Run Duration**: 5m 24s
+**Run Duration**: 5m 25s
 
 **Filtered**: 0 tests ignored out of 16 available
 
@@ -16,8 +16,8 @@
 | Passing | **2** (12.5%) |
 | Failing | 14 |
 | Total expected lines | 499 |
-| Matching lines | 224 (44.9%) |
-| Mismatched lines | 275 |
+| Matching lines | 222 (44.5%) |
+| Mismatched lines | 277 |
 
 ### Failure Breakdown
 
@@ -32,7 +32,7 @@
 
 | # | Test | Lines | Duration | Notes |
 |---|------|-------|----------|-------|
-| 1 | `gotoFrameLabelAsFunction` | 6 | 19.9s |  |
+| 1 | `gotoFrameLabelAsFunction` | 6 | 20.7s |  |
 | 2 | `hello` | 4 | 19.4s |  |
 
 ## Near-Passing Tests
@@ -59,7 +59,7 @@ No segfaults.
 
 | # | Test | Detail | Duration | Notes |
 |---|------|--------|----------|-------|
-| 1 | `opcode_guard_test2` | exit code -6 | 22.2s |  |
+| 1 | `opcode_guard_test2` | exit code -6 | 21.6s |  |
 
 ## Timeouts
 
@@ -78,7 +78,7 @@ No timeouts.
 | 5 | `mouse_drag_test` | 50.0% | 6/12 | 12 | 12 |  |
 | 6 | `sound` | 41.7% | 5/12 | 12 | 7 |  |
 | 7 | `soft_reference_test1` | 37.8% | 17/45 | 42 | 45 |  |
-| 8 | `registerclass_test3` | 33.3% | 9/27 | 27 | 27 |  |
+| 8 | `registerclass_test3` | 25.9% | 7/27 | 27 | 27 |  |
 | 9 | `button_test1` | 25.8% | 8/31 | 20 | 31 |  |
 | 10 | `movieclip_destruction_test4` | 20.0% | 8/40 | 24 | 40 |  |
 | 11 | `action_execution_order_test10` | 12.5% | 2/16 | 10 | 16 |  |
