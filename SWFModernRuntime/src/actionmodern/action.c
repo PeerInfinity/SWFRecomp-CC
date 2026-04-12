@@ -31537,18 +31537,22 @@ check_special_vars:
 #endif
 		}
 
-		// Check _global object properties as fallback.
-		// Use getActiveGlobal() rather than `global_object` directly: at the top
-		// level of a frame script, global_object may still be the initial/primary
-		// object while SetMember(_global, ...) writes to the version-appropriate
-		// active global. See delete-v6 where _global.a is set on the active legacy
-		// global but GetVariable fallback checked the wrong object.
+		// Check _global object properties as fallback. Primary `global_object`
+		// is checked first (this is where built-in class registrations live,
+		// including version-hidden stubs whose visibility is gated elsewhere).
+		// Only if nothing is found there do we consult `getActiveGlobal()` as
+		// a secondary fallback — this catches the case where SetMember(_global,
+		// name, value) wrote the property to the version-appropriate active
+		// global (e.g. g_global_legacy) which differs from the primary global
+		// at top-level frame-script scope. See delete-v6.
 		{
 			ensureGlobalInit(app_context);
-			ASObject* ag = getActiveGlobal();
-			ActionVar* gprop = getPropertyWithPrototype(ag, var_name, var_name_len);
-			if (gprop == NULL && ag != global_object) {
-				gprop = getPropertyWithPrototype(global_object, var_name, var_name_len);
+			ActionVar* gprop = getPropertyWithPrototype(global_object, var_name, var_name_len);
+			if (gprop == NULL) {
+				ASObject* ag = getActiveGlobal();
+				if (ag != NULL && ag != global_object) {
+					gprop = getPropertyWithPrototype(ag, var_name, var_name_len);
+				}
 			}
 			if (gprop != NULL)
 			{
@@ -33315,13 +33319,14 @@ void actionDelete2(SWFAppContext* app_context, char* str_buffer)
 			success = true;
 		} else {
 			// Not found in var_map — check _global properties (_global.name).
-			// Use getActiveGlobal() because SetMember(_global, ...) writes to the
-			// version-appropriate active global, which may differ from the primary
-			// `global_object` at top-level frame-script scope.
+			// Primary `global_object` first (matches the original Delete2 path),
+			// then fall back to `getActiveGlobal()` because SetMember(_global, ...)
+			// writes to the version-appropriate active global which may differ
+			// from the primary global at top-level frame-script scope (delete-v6).
 			ASObject* _del_active_global = getActiveGlobal();
-			ASObject* _del_globals[2] = { _del_active_global, NULL };
-			if (global_object != NULL && global_object != _del_active_global)
-				_del_globals[1] = global_object;
+			ASObject* _del_globals[2] = { global_object, NULL };
+			if (_del_active_global != NULL && _del_active_global != global_object)
+				_del_globals[1] = _del_active_global;
 			for (int _dgi = 0; _dgi < 2; _dgi++) {
 				ASObject* _dg = _del_globals[_dgi];
 				if (_dg == NULL || var_name == NULL) continue;
