@@ -31537,10 +31537,19 @@ check_special_vars:
 #endif
 		}
 
-		// Check _global object properties as fallback
+		// Check _global object properties as fallback.
+		// Use getActiveGlobal() rather than `global_object` directly: at the top
+		// level of a frame script, global_object may still be the initial/primary
+		// object while SetMember(_global, ...) writes to the version-appropriate
+		// active global. See delete-v6 where _global.a is set on the active legacy
+		// global but GetVariable fallback checked the wrong object.
 		{
 			ensureGlobalInit(app_context);
-			ActionVar* gprop = getPropertyWithPrototype(global_object, var_name, var_name_len);
+			ASObject* ag = getActiveGlobal();
+			ActionVar* gprop = getPropertyWithPrototype(ag, var_name, var_name_len);
+			if (gprop == NULL && ag != global_object) {
+				gprop = getPropertyWithPrototype(global_object, var_name, var_name_len);
+			}
 			if (gprop != NULL)
 			{
 				PUSH_VAR(gprop);
@@ -33305,22 +33314,31 @@ void actionDelete2(SWFAppContext* app_context, char* str_buffer)
 		if (found) {
 			success = true;
 		} else {
-			// Not found in var_map — check global_object properties (_global.name)
-			if (global_object != NULL && var_name != NULL) {
-				ActionVar* gp = getProperty(global_object, var_name, var_name_len);
+			// Not found in var_map — check _global properties (_global.name).
+			// Use getActiveGlobal() because SetMember(_global, ...) writes to the
+			// version-appropriate active global, which may differ from the primary
+			// `global_object` at top-level frame-script scope.
+			ASObject* _del_active_global = getActiveGlobal();
+			ASObject* _del_globals[2] = { _del_active_global, NULL };
+			if (global_object != NULL && global_object != _del_active_global)
+				_del_globals[1] = global_object;
+			for (int _dgi = 0; _dgi < 2; _dgi++) {
+				ASObject* _dg = _del_globals[_dgi];
+				if (_dg == NULL || var_name == NULL) continue;
+				ActionVar* gp = getProperty(_dg, var_name, var_name_len);
 				if (gp != NULL) {
-					success = deleteProperty(app_context, global_object, var_name, var_name_len);
+					success = deleteProperty(app_context, _dg, var_name, var_name_len);
 					PUSH(ACTION_STACK_VALUE_BOOLEAN, success ? 1ULL : 0ULL);
 					return;
 				}
 				// SWF6 case-insensitive: `delete color` should also find `_global.Color`
 				if (g_swf_version == 6) {
-					for (u32 gi = 0; gi < global_object->num_used; gi++) {
-						if (global_object->properties[gi].name_length == var_name_len &&
-						    strncasecmp(global_object->properties[gi].name, var_name, var_name_len) == 0) {
-							success = deleteProperty(app_context, global_object,
-								global_object->properties[gi].name,
-								global_object->properties[gi].name_length);
+					for (u32 gi = 0; gi < _dg->num_used; gi++) {
+						if (_dg->properties[gi].name_length == var_name_len &&
+						    strncasecmp(_dg->properties[gi].name, var_name, var_name_len) == 0) {
+							success = deleteProperty(app_context, _dg,
+								_dg->properties[gi].name,
+								_dg->properties[gi].name_length);
 							PUSH(ACTION_STACK_VALUE_BOOLEAN, success ? 1ULL : 0ULL);
 							return;
 						}
