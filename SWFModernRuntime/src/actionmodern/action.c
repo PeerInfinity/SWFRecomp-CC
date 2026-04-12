@@ -13729,12 +13729,16 @@ static void ensureStyleSheetInternals(SWFAppContext* app_context, ASObject* ss_o
 	ActionVar* css_var = getProperty(ss_obj, "_css", 4);
 	if (css_var == NULL || css_var->type != ACTION_STACK_VALUE_OBJECT) {
 		ASObject* css_obj = allocObject(app_context, 8);
+		// Set __proto__ so valueOf/toString are accessible (matches Ruffle's
+		// ArrayBuilder::empty which creates an Array with full proto chain).
+		setObjectProto(app_context, css_obj);
 		ActionVar cv = {0}; cv.type = ACTION_STACK_VALUE_OBJECT; cv.data.numeric_value = (u64)css_obj;
 		setProperty(app_context, ss_obj, "_css", 4, &cv);
 	}
 	ActionVar* styles_var = getProperty(ss_obj, "_styles", 7);
 	if (styles_var == NULL || styles_var->type != ACTION_STACK_VALUE_OBJECT) {
 		ASObject* styles_obj = allocObject(app_context, 8);
+		setObjectProto(app_context, styles_obj);
 		ActionVar sv = {0}; sv.type = ACTION_STACK_VALUE_OBJECT; sv.data.numeric_value = (u64)styles_obj;
 		setProperty(app_context, ss_obj, "_styles", 7, &sv);
 	}
@@ -13876,9 +13880,12 @@ static ActionVar stylesheetClear(SWFAppContext* app_context, ActionVar* args, u3
 	ASObject* ss_obj = (ASObject*)this_obj;
 	if (ss_obj == NULL) return result;
 
-	// Replace _css and _styles with new empty objects
+	// Replace _css and _styles with new empty objects (with proto chain so
+	// Object.prototype.valueOf is reachable, matching Ruffle's ArrayBuilder).
 	ASObject* new_css = allocObject(app_context, 4);
+	setObjectProto(app_context, new_css);
 	ASObject* new_styles = allocObject(app_context, 4);
+	setObjectProto(app_context, new_styles);
 	ActionVar cv = {0}; cv.type = ACTION_STACK_VALUE_OBJECT; cv.data.numeric_value = (u64)new_css;
 	ActionVar sv = {0}; sv.type = ACTION_STACK_VALUE_OBJECT; sv.data.numeric_value = (u64)new_styles;
 	setProperty(app_context, ss_obj, "_css", 4, &cv);
