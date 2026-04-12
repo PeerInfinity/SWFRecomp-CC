@@ -21,7 +21,16 @@ dependencies: []
 blockers: []
 -->
 
-Last updated: 2026-04-10 (Phase 3 in progress)
+Last updated: 2026-04-12 (Phase 3 in progress)
+
+## 2026-04-12 session
+
+**TextSnapshot stubs** — `hitTestTextNearPos`, `getSelected`, `getSelectedText`
+now real builtins returning type-correct values gated on arg_count. `getCount`
+now gates on `arg_count==0` (any args → undefined) and returns 0 (not undefined)
+when the TextSnapshot has no backing text. `getText` returns `""` (not undefined)
+for 2-3 args when no backing text. **TextSnapshot-v6/v7/v8**: 128→164/167 lines
+(+108 line fixes total, all 3 tests now 3 lines shy of passing).
 
 **NOTE:** This document was written on 2026-03-19 when the pass rate was 25.5%.
 The current pass rate is ~40% (76/190 actionscript.all). Several categories

@@ -1214,18 +1214,71 @@ static void textSnapshotCapture(SWFAppContext* app_context, ASObject* ts_obj, Mo
 	setProperty(app_context, ts_obj, "__ts_nl__", 9, &nv);
 }
 
-// TextSnapshot.getCount() — returns character count
+// TextSnapshot.getCount() — returns character count.
+// Flash gates this strictly on arg_count == 0 (any args → undefined).
 static ActionVar builtin_ts_getCount(SWFAppContext* app_context, ActionVar* args, u32 arg_count, ActionVar* registers, void* this_obj)
 {
-	(void)args; (void)arg_count; (void)registers;
+	(void)args; (void)registers;
 	ActionVar ret = {0};
 	ret.type = ACTION_STACK_VALUE_UNDEFINED;
+	if (arg_count != 0) return ret;
 	ASObject* obj = (ASObject*)this_obj;
 	if (!obj) return ret;
 	ActionVar* cv = getProperty(obj, "__ts_count__", 12);
 	if (cv && cv->type == ACTION_STACK_VALUE_F64) {
 		ret.type = ACTION_STACK_VALUE_F64;
 		VAL(double, &ret.data.numeric_value) = VAL(double, &cv->data.numeric_value);
+	} else {
+		// No backing text → return 0. Flash's getCount on an empty TextSnapshot is 0, not undefined.
+		ret.type = ACTION_STACK_VALUE_F64;
+		VAL(double, &ret.data.numeric_value) = 0.0;
+	}
+	return ret;
+}
+
+// TextSnapshot.getSelected(start, end) — always returns a boolean (stub).
+// With !=2 args returns undefined.
+static ActionVar builtin_ts_getSelected_stub(SWFAppContext* app_context, ActionVar* args, u32 arg_count, ActionVar* registers, void* this_obj)
+{
+	(void)app_context; (void)args; (void)registers; (void)this_obj;
+	ActionVar ret = {0};
+	if (arg_count == 2) {
+		ret.type = ACTION_STACK_VALUE_BOOLEAN;
+		ret.data.numeric_value = 0;
+	} else {
+		ret.type = ACTION_STACK_VALUE_UNDEFINED;
+	}
+	return ret;
+}
+
+// TextSnapshot.getSelectedText([includeNewlines]) — always returns a string (stub).
+// With >1 args returns undefined.
+static ActionVar builtin_ts_getSelectedText_stub(SWFAppContext* app_context, ActionVar* args, u32 arg_count, ActionVar* registers, void* this_obj)
+{
+	(void)app_context; (void)args; (void)registers; (void)this_obj;
+	ActionVar ret = {0};
+	if (arg_count <= 1) {
+		ret.type = ACTION_STACK_VALUE_STRING;
+		ret.str_size = 0;
+		ret.data.numeric_value = (u64) u16_empty;
+	} else {
+		ret.type = ACTION_STACK_VALUE_UNDEFINED;
+	}
+	return ret;
+}
+
+// TextSnapshot.hitTestTextNearPos(x, y[, closeDist]) — always returns a number (stub).
+// Real method returns index of character closest to (x, y) within closeDist, or -1.
+// With >3 args it returns undefined (matches Flash's arg-count gate).
+static ActionVar builtin_ts_hitTestTextNearPos(SWFAppContext* app_context, ActionVar* args, u32 arg_count, ActionVar* registers, void* this_obj)
+{
+	(void)app_context; (void)args; (void)registers; (void)this_obj;
+	ActionVar ret = {0};
+	if (arg_count >= 2 && arg_count <= 3) {
+		ret.type = ACTION_STACK_VALUE_F64;
+		VAL(double, &ret.data.numeric_value) = -1.0;
+	} else {
+		ret.type = ACTION_STACK_VALUE_UNDEFINED;
 	}
 	return ret;
 }
@@ -1241,16 +1294,23 @@ static ActionVar builtin_ts_getText(SWFAppContext* app_context, ActionVar* args,
 	ASObject* obj = (ASObject*)this_obj;
 	if (!obj) return ret;
 
+	// Flash's getText always returns a string when called with 2-3 args —
+	// even when the TextSnapshot has no backing text. Fall through to "" instead of undefined.
+	ActionVar empty_str = {0};
+	empty_str.type = ACTION_STACK_VALUE_STRING;
+	empty_str.str_size = 0;
+	empty_str.data.numeric_value = (u64) u16_empty;
+
 	ActionVar* tv = getProperty(obj, "__ts_text__", 11);
 	ActionVar* cv = getProperty(obj, "__ts_count__", 12);
 	ActionVar* nv = getProperty(obj, "__ts_nl__", 9);
 	if (!tv || tv->type != ACTION_STACK_VALUE_STRING || !cv || cv->type != ACTION_STACK_VALUE_F64)
-		return ret;
+		return empty_str;
 
 	const uint16_t* text = varGetU16Ptr(tv);
 	int count = (int)VAL(double, &cv->data.numeric_value);
 	const uint16_t* nl_flags = (nv && nv->type == ACTION_STACK_VALUE_STRING) ? varGetU16Ptr(nv) : NULL;
-	if (!text || count == 0) return ret;
+	if (!text || count == 0) return empty_str;
 
 	int start = (int)tsArgToDouble_ctx(app_context, &args[0]);
 	int end = (int)tsArgToDouble_ctx(app_context, &args[1]);
@@ -27157,10 +27217,10 @@ static void initTextSnapshotPrototype(SWFAppContext* app_context, ASFunction* ct
 
 	TS_REAL_METHOD("getCount",           8, builtin_ts_getCount);
 	TS_STUB_METHOD("setSelected",       11);
-	TS_STUB_METHOD("getSelected",       11);
+	TS_REAL_METHOD("getSelected",       11, builtin_ts_getSelected_stub);
 	TS_REAL_METHOD("getText",            7, builtin_ts_getText);
-	TS_STUB_METHOD("getSelectedText",   15);
-	TS_STUB_METHOD("hitTestTextNearPos",18);
+	TS_REAL_METHOD("getSelectedText",   15, builtin_ts_getSelectedText_stub);
+	TS_REAL_METHOD("hitTestTextNearPos",18, builtin_ts_hitTestTextNearPos);
 	TS_REAL_METHOD("findText",           8, builtin_ts_findText);
 	TS_STUB_METHOD("setSelectColor",    14);
 	TS_STUB_METHOD("getTextRunInfo",    14);

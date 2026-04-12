@@ -1,21 +1,24 @@
 # Gnash Test Suite Status
 
-Last updated: 2026-04-10 (Phase 3 work in progress, not yet in CI)
+Last updated: 2026-04-12 (Phase 3 work in progress)
 
 ## Quick Summary
 
 | Sub-suite | Tests | Passing | Rate | Filtered | Filtered Rate | Ignored |
 |-----------|-------|---------|------|----------|---------------|---------|
-| **actionscript.all** | 190 | 84 | 44.2% | 84/181 | **46.4%** | 9 |
+| **actionscript.all** | 190 | 95 | 50.0% | 95/181 | **52.5%** | 9 |
 | **misc-mtasc.all** | 9 | 7 | 77.8% | — | — | — |
 | **misc-swfmill.all** | 14 | 11 | 78.6% | — | — | — |
 | **misc-ming.all** | 58 | 9 | 15.5% | — | — | — |
 | **misc-swfc.all** | 16 | 2 | 12.5% | — | — | — |
-| **Total** | 287 | ~113 | ~39.4% | — | — | — |
+| **Total** | 287 | 124 | 43.2% | — | — | — |
 
-Note: CI last run at 84/190 (commit 961aa08a). Local fixes since then: +5 (Error-v5/v6/v7/v8, delete-v8).
+Note: actionscript.all is at 95/190 in the latest CI run (up from 84 at commit 961aa08a). Recent additions since then: Error-v5/v6/v7/v8, delete-v5/v6/v7/v8, ColorTransform-v8, LocalConnection-v6/v7/v8, plus line-level improvements across TextSnapshot-v6/v7/v8.
 
 Filtered results exclude 9 tests with all-accepted diffs (Math-v5/v6/v7/v8, ops-v8, Error-v5/v6/v7/v8) — see `ACCEPTED_DIFFS.md`. Note: Error-v5/v6/v7/v8 now PASS and could be removed from the ignored list. Remaining 3 misc-swfmill failures (dict_event, tags_after_last_showframe, jump_to_prev_block) are blocked on architectural limitations — see `blocked/MISC_SWFMILL_PLAN.md`.
+
+### Latest fixes (2026-04-12, not yet in CI)
+- **TextSnapshot method stubs (arg-count gated)** — Added dedicated builtins for `hitTestTextNearPos` (2-3 args → number, else undefined), `getSelected` (2 args → boolean, else undefined), `getSelectedText` (0-1 args → string, else undefined). `getCount` now gates on arg_count==0 and returns 0 when no backing text. `getText` returns `""` (not undefined) for 2-3 args when the TextSnapshot has no backing text. **Impact:** TextSnapshot-v6/v7/v8 improved from 128/167 to 164/167 lines each (+108 lines total). 3 lines shy of passing per test — remaining failures are state-dependent `gh.getCount() == undefined` patterns that need the test source to disambiguate.
 
 ### Latest fixes (2026-04-10, not yet in CI)
 - **Error constructor raw message storage** — `new Error(new Object())` now stores the Object reference as `.message` instead of coercing to string. `Error.prototype.toString` returns the raw message value (any type). **+4 tests: Error-v5, Error-v6, Error-v7, Error-v8 → PASS.**
