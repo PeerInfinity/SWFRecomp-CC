@@ -2405,12 +2405,13 @@ static void lc_unregister(ASObject* receiver)
 
 static int lc_is_protected_method(const char* method)
 {
-	return (strcmp(method, "send") == 0 ||
-	        strcmp(method, "connect") == 0 ||
-	        strcmp(method, "close") == 0 ||
-	        strcmp(method, "allowDomain") == 0 ||
-	        strcmp(method, "allowInsecureDomain") == 0 ||
-	        strcmp(method, "domain") == 0);
+	return (strcasecmp(method, "send") == 0 ||
+	        strcasecmp(method, "connect") == 0 ||
+	        strcasecmp(method, "close") == 0 ||
+	        strcasecmp(method, "allowDomain") == 0 ||
+	        strcasecmp(method, "allowInsecureDomain") == 0 ||
+	        strcasecmp(method, "domain") == 0 ||
+	        strcasecmp(method, "onStatus") == 0);
 }
 
 static ActionVar builtin_lc_connect(SWFAppContext* app_context, ActionVar* args, u32 arg_count, ActionVar* registers, void* this_obj)
@@ -38600,6 +38601,25 @@ void actionDelete(SWFAppContext* app_context)
 						}
 					}
 				}
+			}
+		}
+
+		// SWF5/6 single-arg fallback: when only the property name was pushed before
+		// `delete` (e.g., asm { push 'o'; delete }), the obj operand comes from
+		// stack underflow and is not meaningful. Treat as a bare variable name
+		// delete (same semantics as Delete2). SWF7+ does not have this fallback.
+		if (g_swf_version < 7 && prop_name != NULL && prop_name_len > 0 &&
+		    memchr(prop_name, '.', prop_name_len) == NULL)
+		{
+			bool obj_was_meaningful = (obj_var.type == ACTION_STACK_VALUE_STRING && obj_var.str_size > 0) ||
+			                          obj_var.type == ACTION_STACK_VALUE_OBJECT ||
+			                          obj_var.type == ACTION_STACK_VALUE_FUNCTION ||
+			                          obj_var.type == ACTION_STACK_VALUE_ARRAY ||
+			                          obj_var.type == ACTION_STACK_VALUE_MOVIECLIP;
+			if (!obj_was_meaningful) {
+				PUSH_STR(prop_name, prop_name_len);
+				actionDelete2(app_context, NULL);
+				return;
 			}
 		}
 
