@@ -14,9 +14,14 @@
 #   CATEGORY...   One or more test categories to download (default: avm1)
 #
 # Available categories:
-#   avm1              tests/tests/swfs/avm1 (620+ tests)
-#   from_shumway      tests/tests/swfs/from_shumway (AVM1 subset: ~23 tests)
-#   from_gnash        tests/tests/swfs/from_gnash (~200 tests)
+#   avm1              tests/tests/swfs/avm1 (~644 AVM1 tests)
+#   from_shumway      tests/tests/swfs/from_shumway (~92 AVM1 tests, ~137 AVM2 skipped)
+#   from_gnash        tests/tests/swfs/from_gnash (~404 AVM1 tests)
+#
+# The installer walks each category tree recursively and detects AVM1 vs AVM2
+# from the SWF file header (swf_is_avm2.py). AVM2 / ActionScript 3 tests are
+# skipped because the SWFRecomp pipeline is AVM1-only; running them would
+# just produce compile_fail noise.
 #
 # Examples:
 #   ./download_tests.sh                          # download avm1 only
@@ -190,53 +195,65 @@ install_category() {
             for dir in "${dest_base}"/*/; do
                 [[ -d "${dir}" ]] || continue
                 dirname="$(basename "${dir}")"
+                # Preserve infrastructure / CI-managed directories outright.
                 case "${dirname}" in
-                    __framework__|_investigation|_image-test-output) ;;
-                    *) rm -rf "${dir}" ;;
+                    __framework__|_investigation|_image-test-output|_results) continue ;;
                 esac
+                rm -rf "${dir}"
             done
+        fi
+        # rm -rf above drops everything inside the category, including files we
+        # hand-manage in git (output.flash.txt, test_harness.c, custom test.toml).
+        # Restore any git-tracked content under ${dest_base} so the subsequent
+        # install only has to populate the .gitignored artifacts (test.swf,
+        # output.txt, output.ruffle.txt, etc.).
+        local git_top rel_path
+        git_top="$(git -C "${SCRIPT_DIR}" rev-parse --show-toplevel 2>/dev/null || echo "")"
+        if [[ -n "${git_top}" ]]; then
+            rel_path="$(realpath --relative-to="${git_top}" "${dest_base}" 2>/dev/null || echo "")"
+            if [[ -n "${rel_path}" && "${rel_path}" != /* && "${rel_path}" != ..* ]]; then
+                # Run git from the worktree root so the pathspec resolves correctly.
+                git -C "${git_top}" checkout HEAD -- "${rel_path}" 2>/dev/null || true
+            fi
         fi
     fi
 
     mkdir -p "${dest_base}"
 
-    # Install tests from immediate children (flat tests like from_shumway/add/)
-    # AND recurse into subdirectories that contain tests (like from_shumway/avm1/operations/)
-    for child_dir in "${src_dir}"/*/; do
-        local child_name
-        child_name="$(basename "${child_dir}")"
+    # Discover all test.swf files anywhere under the category, at any nesting
+    # depth (handles flat tests like from_shumway/add/, single-nested tests
+    # like from_gnash/actionscript.all/Inheritance-v7/, and triply-nested tests
+    # like from_gnash/misc-ming.all/action_order/ActionOrderTest3/).
+    local all_swfs=()
+    while IFS= read -r -d '' swf; do
+        all_swfs+=("${swf}")
+    done < <(find "${src_dir}" -mindepth 2 -name test.swf -print0)
 
-        if [[ -f "${child_dir}/test.swf" ]]; then
-            # Flat test: install directly
-            install_test_dir "${child_dir}" "${dest_base}/${child_name}"
-            installed=$((installed + 1))
-        else
-            # Check if this is a subcategory with nested tests
-            local has_nested=false
-            for nested_dir in "${child_dir}"/*/; do
-                if [[ -f "${nested_dir}/test.swf" ]]; then
-                    has_nested=true
-                    break
-                fi
-            done
-
-            if ${has_nested}; then
-                for nested_dir in "${child_dir}"/*/; do
-                    local nested_name
-                    nested_name="$(basename "${nested_dir}")"
-
-                    if [[ ! -f "${nested_dir}/test.swf" ]]; then
-                        skipped=$((skipped + 1))
-                        continue
-                    fi
-
-                    install_test_dir "${nested_dir}" "${dest_base}/${child_name}/${nested_name}"
-                    installed=$((installed + 1))
-                done
-            else
-                skipped=$((skipped + 1))
-            fi
+    # Filter to AVM1 tests only — our recompiler is AVM1 only, and running
+    # AVM2 tests would just produce compile_fail noise. Uses swf_is_avm2.py
+    # in --filter-avm1 batch mode: feeds all paths on stdin, reads back the
+    # ones whose SWF headers indicate AVM1 (no FileAttributes HasActionScript3
+    # bit and no DoABC tag).
+    local avm1_swfs=()
+    if [[ ${#all_swfs[@]} -gt 0 ]]; then
+        local filtered
+        filtered="$(printf '%s\n' "${all_swfs[@]}" | python3 "${SCRIPT_DIR}/swf_is_avm2.py" --filter-avm1)"
+        if [[ -n "${filtered}" ]]; then
+            while IFS= read -r line; do
+                [[ -n "${line}" ]] && avm1_swfs+=("${line}")
+            done <<< "${filtered}"
         fi
+    fi
+
+    local avm2_skipped=$(( ${#all_swfs[@]} - ${#avm1_swfs[@]} ))
+
+    # Install each AVM1 test, preserving its path relative to the category root.
+    for swf in "${avm1_swfs[@]}"; do
+        local test_src rel_path
+        test_src="$(dirname "${swf}")"
+        rel_path="${test_src#"${src_dir}"/}"
+        install_test_dir "${test_src}" "${dest_base}/${rel_path}"
+        installed=$((installed + 1))
     done
 
     # Install __framework__ directory if present
@@ -245,9 +262,9 @@ install_category() {
         cp -r "${src_dir}/__framework__/"* "${dest_base}/__framework__/"
     fi
 
-    echo "Installed ${installed} tests (skipped ${skipped} without test.swf)."
+    echo "Installed ${installed} tests (skipped ${avm2_skipped} AVM2/non-AVM1)."
     TOTAL_INSTALLED=$((TOTAL_INSTALLED + installed))
-    TOTAL_SKIPPED=$((TOTAL_SKIPPED + skipped))
+    TOTAL_SKIPPED=$((TOTAL_SKIPPED + avm2_skipped))
 }
 
 for cat in "${CATEGORIES[@]}"; do
