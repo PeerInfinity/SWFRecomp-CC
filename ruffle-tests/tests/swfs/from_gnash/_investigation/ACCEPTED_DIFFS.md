@@ -138,6 +138,31 @@ will never match Gnash's expected output. The remaining ~3 lines per test
 (state-dependent `gh.getCount() == undefined` patterns) are independent and
 still investigable.
 
+### Inheritance-v5 / Inheritance-v6 / Inheritance-v7 / Inheritance-v8 — circular `__proto__` survival (1 diff line each)
+
+**Example diff (all 4 tests):**
+```
+  Now your flash player will try to answer the egg/chicken question. Kill it if it hangs your machine
++ PASSED: !a instanceof b [./Inheritance.as:640]
+```
+
+**Root cause:** At the end of `testsuite/actionscript.all/Inheritance.as`, the test builds a
+circular `__proto__` chain (`a.__proto__ = b; b.__proto__ = a`) inside a `dangerousStuff`
+function dispatched via `setTimeout(dangerousStuff, 0)` and immediately runs
+`check(!a instanceof b)`. The source comment is literally `"really just tests if we
+survive :)"` — Flash Player and Gnash both hang or crash, so Gnash's recorded expected
+output simply stops after the `"Now your flash player will try..."` note with no
+`PASSED`/`FAILED` line for the check.
+
+Our `instanceof` walker detects the cycle and terminates, so we produce one additional
+`PASSED: !a instanceof b` line beyond the expected output. This is strictly more correct
+behavior — we successfully execute the check instead of hanging.
+
+**Decision:** Accept the extra line. Tests with the extra line as the *only* remaining
+diff are added to `ignored_tests.txt` so filtered results count them as passing. Tests
+with other independent diffs (Inheritance-v6/v7/v8 super-chain semantics) remain failing
+until those are fixed.
+
 ### ~~Error-v5 / Error-v6 / Error-v7 / Error-v8~~ — RESOLVED (2026-04-10)
 
 **Previously:** 2 diff lines per test. Error constructor coerced message to string (ECMA-262 §15.11.1), but Gnash expected raw storage. Now fixed: Error constructor stores raw argument value, matching Flash Player behavior. All 4 tests PASS. Removed from `ignored_tests.txt`.
@@ -156,6 +181,10 @@ still investigable.
 | TextSnapshot-v6 | ~10 | Gnash expects string from empty native TS | Correct (matches Ruffle/Flash) | Ruffle avm1 text_snapshot.rs |
 | TextSnapshot-v7 | ~10 | Gnash expects string from empty native TS | Correct (matches Ruffle/Flash) | Ruffle avm1 text_snapshot.rs |
 | TextSnapshot-v8 | ~10 | Gnash expects string from empty native TS | Correct (matches Ruffle/Flash) | Ruffle avm1 text_snapshot.rs |
+| Inheritance-v5 | 1 | Circular `__proto__` chain; Flash hangs, we survive | Correct (cycle detection) | Gnash test source comment |
+| Inheritance-v6 | 1 | Same (plus independent diffs) | Correct | Same |
+| Inheritance-v7 | 1 | Same (plus independent diffs) | Correct | Same |
+| Inheritance-v8 | 1 | Same (plus independent diffs) | Correct | Same |
 | ~~Error-v5~~ | ~~4~~ | ~~RESOLVED~~ | NOW PASS | Fixed 2026-04-10 |
 | ~~Error-v6~~ | ~~4~~ | ~~RESOLVED~~ | NOW PASS | Fixed 2026-04-10 |
 | ~~Error-v7~~ | ~~4~~ | ~~RESOLVED~~ | NOW PASS | Fixed 2026-04-10 |

@@ -11,5 +11,9 @@ Math-v8
 # --- ops: Platform-dependent NaN bit patterns (IEEE 754) ---
 ops-v8
 
+# --- Inheritance: circular __proto__ survival (Flash hangs, we don't) ---
+# Only v5 qualifies — v6/v7/v8 still have other independent diffs (super-chain).
+Inheritance-v5
+
 # --- Error: Previously ignored (ECMA-262 §15.11.1 vs Flash behavior) ---
 # Error-v5/v6/v7/v8 removed: now PASS (2026-04-10, raw message storage fix)

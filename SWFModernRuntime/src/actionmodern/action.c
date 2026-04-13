@@ -29458,6 +29458,18 @@ static void ensureGlobalInit(SWFAppContext* app_context)
 		ActionVar call_val = {0}; call_val.type = ACTION_STACK_VALUE_FUNCTION;
 		call_val.data.numeric_value = (u64)&g_fn_call_func;
 		setPropertyWithFlags(app_context, fn_proto, "call", 4, &call_val, PROPERTY_FLAG_WRITABLE);
+
+		// Mark apply/call as SWF6+ via flash_flags 0x0080 (hidden in SWF5 mask 0x7480,
+		// visible in SWF6+ mask 0x7500). Function.apply/call were introduced in SWF6 —
+		// installing them unconditionally prevents singleton poison but they must be
+		// invisible to SWF5 code (matches Gnash/Flash observed behavior).
+		for (u32 i = 0; i < fn_proto->num_used; i++) {
+			ASProperty* p = &fn_proto->properties[i];
+			if ((p->name_length == 5 && memcmp(p->name, "apply", 5) == 0) ||
+			    (p->name_length == 4 && memcmp(p->name, "call",  4) == 0)) {
+				p->flash_flags = 0x0080;
+			}
+		}
 	}
 
 	// ---- Eager prototype creation for Number, String, Boolean ----
@@ -30108,6 +30120,15 @@ static void ensureSecondaryGlobalInit(SWFAppContext* app_context, int target_ver
 		setPropertyWithFlags(app_context, sec_fn_proto, "apply", 5, &av, PROPERTY_FLAG_WRITABLE);
 		av.data.numeric_value = (u64)&g_fn_call_func;
 		setPropertyWithFlags(app_context, sec_fn_proto, "call", 4, &av, PROPERTY_FLAG_WRITABLE);
+		// Hide apply/call in SWF5 (flash_flags 0x0080 — same version-mask scheme used
+		// for SWF6+ Object.prototype methods and AsBroadcaster methods).
+		for (u32 i = 0; i < sec_fn_proto->num_used; i++) {
+			ASProperty* p = &sec_fn_proto->properties[i];
+			if ((p->name_length == 5 && memcmp(p->name, "apply", 5) == 0) ||
+			    (p->name_length == 4 && memcmp(p->name, "call",  4) == 0)) {
+				p->flash_flags = 0x0080;
+			}
+		}
 	}
 
 	// MovieClip constructor — separate instance
@@ -30735,8 +30756,10 @@ void actionGetVariable(SWFAppContext* app_context)
 
 	// Fallback: GetVariable("super") when not found in scope chain
 	// (for non-function contexts or type-1 functions without local scope setup)
+	// SWF5 has no `super` keyword — always return undefined, regardless of any
+	// pushSuperContext state from the containing method invocation.
 	if (var_name_len == 5 && strncmp(var_name, "super", 5) == 0) {
-		if (hasSuperContext()) {
+		if (g_swf_version >= 6 && hasSuperContext()) {
 			ActionVar super_var = {0};
 			super_var.type = ACTION_STACK_VALUE_SUPER;
 			super_var.data.numeric_value = (u64)getSuperThis();
@@ -34961,8 +34984,11 @@ void actionExtends(SWFAppContext* app_context)
 	if (super_proto == NULL || !hasPropertyRaw(super_proto, "constructor", 11))
 		setProperty(app_context, new_proto, "constructor", 11, &superclass);
 
-	// Set __constructor__ (DontEnum) — needed for super() to find parent constructor
-	setPropertyWithFlags(app_context, new_proto, "__constructor__", 15, &superclass, PROPERTY_FLAGS_DONTENUM);
+	// Set __constructor__ (DontEnum) — needed for super() to find parent constructor.
+	// SWF5 or earlier: Extends opcode does not set __constructor__ (Gnash-observed Flash behavior,
+	// see testsuite/actionscript.all/Inheritance.as comment "SWF5 or below don't set __constructor__").
+	if (g_swf_version >= 6)
+		setPropertyWithFlags(app_context, new_proto, "__constructor__", 15, &superclass, PROPERTY_FLAGS_DONTENUM);
 
 #ifdef DEBUG
 	printf("[DEBUG] actionExtends: Set constructor + __constructor__ property - type=%d, ptr=%p\n",
@@ -45263,7 +45289,9 @@ void actionCallFunction(SWFAppContext* app_context, char* str_buffer)
 
 	// 4. Handle CallFunction("super") — SWF6 Pattern A super() constructor call
 	// Depth-based: walk this.__proto__^depth to find base_proto, look up __constructor__ there
-	if (func_name_len == 5 && strncmp(func_name, "super", 5) == 0)
+	// SWF5 has no `super` keyword — fall through so `super()` resolves as a call to an
+	// undefined variable (no-op), matching Flash behavior.
+	if (func_name_len == 5 && strncmp(func_name, "super", 5) == 0 && g_swf_version >= 6)
 	{
 		if (hasSuperContext())
 		{
