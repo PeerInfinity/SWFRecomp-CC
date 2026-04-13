@@ -74,7 +74,36 @@ cargo build --release -p player-web
 This compiles `target/release/flash-player-host.exe`. The first build takes
 several minutes as it compiles all Rust dependencies.
 
-### Step 4: Register the native messaging host
+### Step 4: Apply patches (save data fix)
+
+The extension has two issues that need patching:
+
+1. **SharedObject persistence** — Flash generates a random directory name for
+   save data on each launch, so saves are lost between sessions.
+2. **Firefox manifest compatibility** — Firefox doesn't support
+   `background.service_worker` in Manifest V3.
+
+Apply the patch file from `SWFRecompDocs/guides/clean-flash-extension-patches.diff`:
+
+```bash
+cd clean-flash-browser-extension
+git apply /path/to/clean-flash-extension-patches.diff
+cargo build --release -p player-web
+```
+
+**What the SharedObject patch does:** Flash stores save data (Local Shared
+Objects / `.sol` files) under `#SharedObjects/<ID>/` where `<ID>` is normally a
+random 8-character string generated each time the PPAPI host starts. In real
+Chrome, Flash gets a stable profile path from the browser; this extension
+doesn't provide one, so each session creates a new random directory and can't
+find previous saves. The patch intercepts Flash's file I/O in
+`PPB_Flash_File_ModuleLocal` and rewrites the random `<ID>` to a deterministic
+hash of the page URL origin, so save data persists across sessions.
+
+Save data is stored at:
+`%APPDATA%\flash-player\PepperFlash\WritableRoot\#SharedObjects\<stable_id>\`
+
+### Step 5: Register the native messaging host
 
 Run the install script with native Windows Python (not WSL):
 
@@ -87,36 +116,14 @@ This writes manifest JSON files to `%LOCALAPPDATA%\Flash Player\NativeMessagingH
 and registers them in the Windows registry for Chrome, Chromium, Brave, and
 Firefox.
 
-### Step 5a: Load the extension in Chrome
+### Step 6a: Load the extension in Chrome
 
 1. Go to `chrome://extensions`
 2. Enable **Developer Mode** (toggle in top right)
 3. Click **Load unpacked**
 4. Select the `web-extension/` directory from the cloned repo
 
-### Step 5b: Load the extension in Firefox
-
-Firefox requires a small manifest change — it doesn't support
-`background.service_worker` and needs `background.scripts` instead.
-
-Edit `web-extension/manifest.json` and change:
-
-```json
-"background": {
-    "service_worker": "background.js"
-},
-```
-
-to:
-
-```json
-"background": {
-    "service_worker": "background.js",
-    "scripts": ["background.js"]
-},
-```
-
-Then:
+### Step 6b: Load the extension in Firefox
 
 1. Go to `about:debugging#/runtime/this-firefox`
 2. Click **Load Temporary Add-on**
@@ -126,12 +133,47 @@ Then:
 close Firefox. For permanent installation, either sign the extension through
 Mozilla or set `xpinstall.signatures.required` to `false` in `about:config`.
 
+### Step 7: Configure the extension
+
+1. Pin the Flash Player extension to Chrome's toolbar (click the puzzle piece
+   icon, then pin).
+2. Click the extension icon to open settings.
+3. Go to the **Sandboxing** tab.
+4. Under **File System Access**, uncheck **"Allow access to whitelisted files
+   and folders only"**. This is required for Flash save data (SharedObjects) to
+   work. Without this, Flash cannot write `.sol` files to disk.
+5. Reload the page.
+
 ### Performance notes
 
 - Chrome runs Flash content significantly faster than Ruffle, with only minor
   occasional jerkiness from the native messaging overhead.
 - Firefox works but may experience slowdowns after initial load. Chrome is the
   better choice for now.
+
+### Known limitations
+
+- **Save data may not flush on page reload.** When refreshing a page (F5), the
+  native host process sometimes gets killed before Flash finishes writing save
+  data to disk. This means saves triggered just before a refresh may be lost.
+  This does not happen with the NPAPI plugin in legacy browsers (Basilisk),
+  where Flash runs in-process and always gets time to flush. Saves that happen
+  well before a refresh (e.g., at a game checkpoint) are fine.
+
+- **Firefox performance.** Firefox may slow down significantly after initial
+  Flash content load. Chrome is recommended.
+
+- **Tracing kills performance.** If you set the `TRACE_FLASH` environment
+  variable for debugging, remove it when done — it logs every Flash API call
+  and causes severe slowdowns. Remove with:
+  ```powershell
+  [Environment]::SetEnvironmentVariable("TRACE_FLASH", $null, "User")
+  [Environment]::SetEnvironmentVariable("FLASH_PLAYER_LOG_DIR", $null, "User")
+  ```
+
+- **Rebuilding requires closing browsers.** The `flash-player-host.exe` binary
+  is locked while Chrome/Firefox are running. Close all browsers before
+  rebuilding.
 
 ---
 
@@ -146,6 +188,7 @@ loading doesn't need modern JavaScript features.
 - **Waterfox Classic** does not support modern JavaScript (e.g. optional
   chaining, nullish coalescing).
 - Both are unmaintained or minimally maintained legacy browsers.
+- Save data works reliably in legacy browsers (no flush timing issues).
 
 ### Browser choices
 
@@ -188,7 +231,10 @@ install directory.
 2. You should see **Shockwave Flash** listed.
    - If not, check `about:config` and ensure `plugin.state.flash` is set to
      `2` (always activate).
-3. Navigate to your Flash content and confirm it loads.
+3. If Flash shows up but content still says "Flash Player Not Enabled!", the
+   plugin may be in "Ask to Activate" mode — click the gray box or set
+   `plugin.state.flash` to `2`.
+4. Navigate to your Flash content and confirm it loads.
 
 ### Pre-bundled alternative (no longer available)
 
@@ -205,14 +251,26 @@ no longer available.
   is in the profile's `plugins/` folder, not the browser install directory.
 - **"Flash Player Not Enabled!" still showing:** Check `about:config` for
   `plugin.state.flash` — set it to `2`.
+- **Gray box instead of Flash content:** Flash is in click-to-play mode. Click
+  the box or set `plugin.state.flash` to `2` in `about:config`.
 - **Wrong architecture (legacy browser):** Basilisk needs 32-bit Flash;
   Waterfox Classic needs 64-bit Flash.
 - **Extension not working:** Make sure `FLASH_PLUGIN_PATH` is set and you
   restarted the browser after setting it.
-- **Firefox extension error about `service_worker`:** Apply the manifest.json
-  change described in Step 5b above.
+- **Firefox extension error about `service_worker`:** Apply the patch described
+  in Step 4 above.
 - **Firefox extension disappears on restart:** Temporary add-ons don't persist.
   Set `xpinstall.signatures.required` to `false` in `about:config` and install
   the extension as a regular `.xpi` file, or re-load it each session.
+- **Save data not persisting (extension):** Check that the file whitelist is
+  disabled in the extension settings (Sandboxing tab). Also ensure the
+  SharedObject patch from Step 4 is applied.
+- **Save data lost on refresh (extension):** Known limitation — see "Known
+  limitations" above. Wait a moment before refreshing, or use a legacy browser
+  for games where save reliability is critical.
+- **Severe performance degradation:** Check if `TRACE_FLASH` environment
+  variable is set — remove it if so.
+- **Build fails with "Access is denied":** Close all browsers before rebuilding,
+  as the host exe is locked while in use.
 - **Windows SmartScreen warning:** Expected for Basilisk — it's a small project
   without code signing. Verify with your antivirus before proceeding.

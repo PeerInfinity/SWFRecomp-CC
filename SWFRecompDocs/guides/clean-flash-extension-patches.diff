@@ -1,0 +1,124 @@
+diff --git a/crates/ppapi-host/src/interfaces/flash_file.rs b/crates/ppapi-host/src/interfaces/flash_file.rs
+index c250b8d..5e71da1 100644
+--- a/crates/ppapi-host/src/interfaces/flash_file.rs
++++ b/crates/ppapi-host/src/interfaces/flash_file.rs
+@@ -10,8 +10,11 @@ use crate::filesystem;
+ use crate::interface_registry::InterfaceRegistry;
+ use ppapi_sys::*;
+ use std::ffi::{c_char, CStr, CString};
++use std::hash::{Hash, Hasher};
+ use std::path::PathBuf;
+
++use super::super::HOST;
++
+ static VTABLE: PPB_Flash_File_ModuleLocal_3 = PPB_Flash_File_ModuleLocal_3 {
+     CreateThreadAdapterForInstance: Some(create_thread_adapter),
+     ClearThreadAdapterForInstance: Some(clear_thread_adapter),
+@@ -56,13 +59,92 @@ pub(crate) fn data_dir() -> PathBuf {
+     dir
+ }
+
++/// Derive a stable 8-character uppercase alphanumeric ID from a string,
++/// mimicking the format Flash uses for its random SharedObjects directory names.
++fn stable_shared_objects_id(origin: &str) -> String {
++    let mut hasher = std::collections::hash_map::DefaultHasher::new();
++    origin.hash(&mut hasher);
++    let hash = hasher.finish();
++    // Encode as base-36 (0-9A-Z) and take first 8 chars, uppercase
++    let mut id = String::new();
++    let mut val = hash;
++    const CHARS: &[u8] = b"0123456789ABCDEFGHIJKLMNOPQRSTUVWXYZ";
++    for _ in 0..8 {
++        id.push(CHARS[(val % 36) as usize] as char);
++        val /= 36;
++    }
++    id
++}
++
++/// Get the page origin from the first plugin instance, for use as a stable
++/// SharedObjects directory name. Falls back to "default" if unavailable.
++fn get_page_origin() -> String {
++    let Some(host) = HOST.get() else {
++        return "default".to_string();
++    };
++    // There's exactly one instance per host process; grab instance 1.
++    let page_url = host.instances.with_instance(1, |inst| {
++        inst.page_url.clone()
++    }).flatten();
++    match page_url {
++        Some(url) => {
++            // Extract origin (scheme + host + port) from the URL.
++            // e.g. "http://localhost:8002/path/page.html" -> "http://localhost:8002"
++            if let Some(scheme_end) = url.find("://") {
++                let after_scheme = &url[scheme_end + 3..];
++                if let Some(path_start) = after_scheme.find('/') {
++                    url[..scheme_end + 3 + path_start].to_string()
++                } else {
++                    url.clone()
++                }
++            } else {
++                url
++            }
++        }
++        None => "default".to_string(),
++    }
++}
++
++/// Rewrite a Flash-relative path to replace the random `#SharedObjects/<ID>/`
++/// directory with a stable one derived from the page origin.
++///
++/// Flash internally generates a random 8-character directory name under
++/// `#SharedObjects/` each time the PPAPI host starts. This function detects
++/// that pattern and replaces the random component with a deterministic hash
++/// of the page URL origin, so save data persists across sessions.
++fn stabilize_shared_objects_path(rel: &str) -> String {
++    const PREFIX: &str = "#SharedObjects/";
++    if let Some(after_prefix) = rel.strip_prefix(PREFIX) {
++        // Split into "<random_id>/rest/of/path" or just "<random_id>"
++        if let Some(slash_pos) = after_prefix.find('/') {
++            let rest = &after_prefix[slash_pos..]; // includes leading '/'
++            let origin = get_page_origin();
++            let stable_id = stable_shared_objects_id(&origin);
++            tracing::debug!(
++                "Stabilizing SharedObjects path: random -> {} (origin: {})",
++                stable_id, origin
++            );
++            format!("{}{}{}", PREFIX, stable_id, rest)
++        } else {
++            // Just the directory itself, e.g. "#SharedObjects/3XRELRFV"
++            let origin = get_page_origin();
++            let stable_id = stable_shared_objects_id(&origin);
++            format!("{}{}", PREFIX, stable_id)
++        }
++    } else {
++        rel.to_string()
++    }
++}
++
+ /// Resolve a Flash-relative path to an absolute path, preventing traversal.
+ fn resolve_path(rel: &str) -> Option<PathBuf> {
+     tracing::trace!("Resolving Flash file path: {:?}", rel);
+     let root = data_dir();
+     // Strip leading '/' and sanitize
+     let rel = rel.trim_start_matches('/');
+-    let full = root.join(rel);
++    // Replace random SharedObjects directory with a stable one
++    let rel = stabilize_shared_objects_path(rel);
++    let full = root.join(&rel);
+     // Canonicalize to prevent ".." traversal
+     // If the path doesn't exist yet, check the parent
+     let canonical = if full.exists() {
+diff --git a/web-extension/manifest.json b/web-extension/manifest.json
+index 51af5dd..c491b6b 100644
+--- a/web-extension/manifest.json
++++ b/web-extension/manifest.json
+@@ -22,7 +22,8 @@
+     "<all_urls>"
+   ],
+   "background": {
+-    "service_worker": "background.js"
++    "service_worker": "background.js",
++    "scripts": ["background.js"]
+   },
+   "content_scripts": [
+     {
