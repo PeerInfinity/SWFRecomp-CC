@@ -1215,7 +1215,9 @@ static void textSnapshotCapture(SWFAppContext* app_context, ASObject* ts_obj, Mo
 }
 
 // TextSnapshot.getCount() — returns character count.
-// Flash gates this strictly on arg_count == 0 (any args → undefined).
+// Matches Ruffle's AVM1 TextSnapshot.getCount: arg_count > 0 → undefined; no
+// native attached → undefined; otherwise the character count (0 for an empty
+// native snapshot).
 static ActionVar builtin_ts_getCount(SWFAppContext* app_context, ActionVar* args, u32 arg_count, ActionVar* registers, void* this_obj)
 {
 	(void)args; (void)registers;
@@ -1224,15 +1226,13 @@ static ActionVar builtin_ts_getCount(SWFAppContext* app_context, ActionVar* args
 	if (arg_count != 0) return ret;
 	ASObject* obj = (ASObject*)this_obj;
 	if (!obj) return ret;
+	if (obj->native_type != NATIVE_TEXTSNAPSHOT) return ret;
 	ActionVar* cv = getProperty(obj, "__ts_count__", 12);
-	if (cv && cv->type == ACTION_STACK_VALUE_F64) {
-		ret.type = ACTION_STACK_VALUE_F64;
+	ret.type = ACTION_STACK_VALUE_F64;
+	if (cv && cv->type == ACTION_STACK_VALUE_F64)
 		VAL(double, &ret.data.numeric_value) = VAL(double, &cv->data.numeric_value);
-	} else {
-		// No backing text → return 0. Flash's getCount on an empty TextSnapshot is 0, not undefined.
-		ret.type = ACTION_STACK_VALUE_F64;
+	else
 		VAL(double, &ret.data.numeric_value) = 0.0;
-	}
 	return ret;
 }
 
@@ -1294,23 +1294,16 @@ static ActionVar builtin_ts_getText(SWFAppContext* app_context, ActionVar* args,
 	ASObject* obj = (ASObject*)this_obj;
 	if (!obj) return ret;
 
-	// Flash's getText always returns a string when called with 2-3 args —
-	// even when the TextSnapshot has no backing text. Fall through to "" instead of undefined.
-	ActionVar empty_str = {0};
-	empty_str.type = ACTION_STACK_VALUE_STRING;
-	empty_str.str_size = 0;
-	empty_str.data.numeric_value = (u64) u16_empty;
-
 	ActionVar* tv = getProperty(obj, "__ts_text__", 11);
 	ActionVar* cv = getProperty(obj, "__ts_count__", 12);
 	ActionVar* nv = getProperty(obj, "__ts_nl__", 9);
 	if (!tv || tv->type != ACTION_STACK_VALUE_STRING || !cv || cv->type != ACTION_STACK_VALUE_F64)
-		return empty_str;
+		return ret;
 
 	const uint16_t* text = varGetU16Ptr(tv);
 	int count = (int)VAL(double, &cv->data.numeric_value);
 	const uint16_t* nl_flags = (nv && nv->type == ACTION_STACK_VALUE_STRING) ? varGetU16Ptr(nv) : NULL;
-	if (!text || count == 0) return empty_str;
+	if (!text || count == 0) return ret;
 
 	int start = (int)tsArgToDouble_ctx(app_context, &args[0]);
 	int end = (int)tsArgToDouble_ctx(app_context, &args[1]);
