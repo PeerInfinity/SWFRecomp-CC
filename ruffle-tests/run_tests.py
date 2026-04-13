@@ -14,6 +14,44 @@ CONFIG = SCRIPT_DIR / "_shared" / "config.toml"
 
 SKIP = {"__framework__"}
 
+# Directories that the recursive walker must not descend into.
+DISCOVERY_SKIP_DIRS = {
+    "__framework__",
+    "_investigation",
+    "_image-test-output",
+    "_results",
+    "RecompiledScripts",
+    "RecompiledTags",
+}
+
+
+def discover_tests(tests_dir):
+    """Walk tests_dir recursively and return a sorted list of relative test
+    names (posix-style). A directory is a test iff it contains test.swf.
+    Stops descending once a test is found (tests don't nest)."""
+    results = []
+
+    def _walk(current):
+        if (current / "test.swf").exists():
+            rel = current.relative_to(tests_dir).as_posix()
+            if rel and rel != ".":
+                results.append(rel)
+            return
+        try:
+            children = sorted(current.iterdir())
+        except (NotADirectoryError, PermissionError):
+            return
+        for child in children:
+            if not child.is_dir():
+                continue
+            if child.name in DISCOVERY_SKIP_DIRS or child.name in SKIP:
+                continue
+            _walk(child)
+
+    _walk(tests_dir)
+    return sorted(results)
+
+
 def main():
     global TESTS_DIR
 
@@ -31,10 +69,7 @@ def main():
         print("Run download_tests.sh first.")
         sys.exit(1)
 
-    tests = sorted(
-        d.name for d in TESTS_DIR.iterdir()
-        if d.is_dir() and d.name not in SKIP and (d / "test.swf").exists()
-    )
+    tests = discover_tests(TESTS_DIR)
 
     passed = []
     failed = []

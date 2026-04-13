@@ -34,20 +34,43 @@ RESULTS_JSON = SCRIPT_DIR / "image_results.json"
 RESULTS_MD = SCRIPT_DIR.parent / "ruffle-image-results.md"
 
 
+_DISCOVERY_SKIP_DIRS = {
+    "__framework__", "_investigation", "_image-test-output", "_results",
+    "RecompiledScripts", "RecompiledTags",
+}
+
+
 def discover_image_tests():
-    """Find all test dirs with [image_comparisons] in test.toml."""
+    """Find all test dirs (at any nesting depth) with [image_comparisons]
+    in their test.toml. Returns sorted relative paths (posix-style)."""
     tests = []
-    for test_dir in sorted(TESTS_DIR.iterdir()):
-        if not test_dir.is_dir() or test_dir.name.startswith(("_", ".")):
-            continue
-        toml_path = test_dir / "test.toml"
-        if not toml_path.exists():
-            continue
-        with open(toml_path, "rb") as f:
-            data = tomllib.load(f)
-        if data.get("image_comparisons"):
-            tests.append(test_dir.name)
-    return tests
+
+    def _walk(current):
+        toml_path = current / "test.toml"
+        if (current / "test.swf").exists() and toml_path.exists():
+            try:
+                with open(toml_path, "rb") as f:
+                    data = tomllib.load(f)
+            except Exception:
+                return
+            if data.get("image_comparisons"):
+                rel = current.relative_to(TESTS_DIR).as_posix()
+                if rel and rel != ".":
+                    tests.append(rel)
+            return
+        try:
+            children = sorted(current.iterdir())
+        except (NotADirectoryError, PermissionError):
+            return
+        for child in children:
+            if not child.is_dir():
+                continue
+            if child.name in _DISCOVERY_SKIP_DIRS or child.name.startswith("."):
+                continue
+            _walk(child)
+
+    _walk(TESTS_DIR)
+    return sorted(tests)
 
 
 def run_single_test(test_name):

@@ -399,6 +399,53 @@ RESULTS_CURRENT = RESULTS_DIR / "results_current.json"
 
 SKIP = {"__framework__"}
 
+# Directory names that the recursive test walker must never descend into.
+# These hold infrastructure / CI artifacts, not runnable tests.
+DISCOVERY_SKIP_DIRS = {
+    "__framework__",
+    "_investigation",
+    "_image-test-output",
+    "_results",
+    "RecompiledScripts",
+    "RecompiledTags",
+}
+
+
+def discover_tests(tests_dir, expected_filename="output.txt"):
+    """Walk `tests_dir` recursively and yield each discovered test's relative
+    path name (with forward-slashes) in sorted order.
+
+    A directory is considered a test iff it contains both `test.swf` and the
+    expected-output file (`output.txt` by default). Walks skip any directory
+    whose name is in `DISCOVERY_SKIP_DIRS` and stops descending once it has
+    found a test (tests don't nest inside each other)."""
+    results = []
+
+    def _walk(current):
+        # If this directory is itself a test, record it and don't descend.
+        if (current / "test.swf").exists() and (current / expected_filename).exists():
+            rel = current.relative_to(tests_dir)
+            rel_str = rel.as_posix()
+            if rel_str and rel_str != ".":
+                results.append(rel_str)
+            return
+        # Otherwise recurse into children.
+        try:
+            children = sorted(current.iterdir())
+        except (NotADirectoryError, PermissionError):
+            return
+        for child in children:
+            if not child.is_dir():
+                continue
+            if child.name in DISCOVERY_SKIP_DIRS:
+                continue
+            if child.name in SKIP:
+                continue
+            _walk(child)
+
+    _walk(tests_dir)
+    return sorted(results)
+
 # Lines to filter from runtime output
 BOILERPLATE_PATTERNS = [
     re.compile(r"^SWF Runtime Loaded"),
@@ -1661,16 +1708,19 @@ def compile_wasm(test_dir, num_frames, build_dir):
 def deploy_wasm(test_name, build_dir, deploy_dir):
     """Deploy WASM build to a directory with an HTML wrapper.
 
-    Creates deploy_dir/test_name/ with .js, .wasm, and index.html.
+    Creates deploy_dir/<flat>/ with .js, .wasm, and index.html, where <flat>
+    is `test_name` with any `/` separators replaced by `_` so nested test
+    names like `bitmap_data_thorough/scroll` land in a single subdirectory.
     """
-    out_dir = deploy_dir / test_name
+    flat_name = test_name.replace("/", "_")
+    out_dir = deploy_dir / flat_name
     out_dir.mkdir(parents=True, exist_ok=True)
 
     # Copy WASM artifacts
     for ext in (".js", ".wasm"):
         src = build_dir / f"test{ext}"
         if src.exists():
-            shutil.copy2(src, out_dir / f"{test_name}{ext}")
+            shutil.copy2(src, out_dir / f"{flat_name}{ext}")
 
     # Generate standalone HTML page
     html = f"""<!DOCTYPE html>
@@ -1701,7 +1751,7 @@ button:disabled {{ background: #555; cursor: default; }}
 <script>
 var output = document.getElementById('output');
 window.Module = {{
-    locateFile: function(path) {{ return '{test_name}/' + path.replace('test.', '{test_name}.'); }},
+    locateFile: function(path) {{ return '{flat_name}/' + path.replace('test.', '{flat_name}.'); }},
     print: function(text) {{ output.textContent += text + '\\n'; }},
     printErr: function(text) {{ output.textContent += '[stderr] ' + text + '\\n'; }},
     onRuntimeInitialized: function() {{
@@ -1717,10 +1767,10 @@ function startDemo() {{
     output.textContent += '\\n=== done ===\\n';
 }}
 </script>
-<script src="{test_name}/{test_name}.js"></script>
+<script src="{flat_name}/{flat_name}.js"></script>
 </body>
 </html>"""
-    (deploy_dir / f"{test_name}.html").write_text(html)
+    (deploy_dir / f"{flat_name}.html").write_text(html)
     return True
 
 
@@ -2083,18 +2133,16 @@ def main():
             print(f"Build Dawn first and install to {DAWN_INSTALL}")
             sys.exit(1)
 
-    # Determine test list
+    # Determine test list. Walks the tree recursively so nested tests like
+    # `bitmap_data_thorough/scroll` are discovered alongside flat tests; test
+    # names are forward-slashed relative paths under TESTS_DIR.
     if args.test:
         import fnmatch
-        all_dirs = sorted(
-            d.name for d in TESTS_DIR.iterdir()
-            if d.is_dir() and d.name not in SKIP
-            and (d / "test.swf").exists() and (d / expected_filename).exists()
-        )
+        all_tests = discover_tests(TESTS_DIR, expected_filename)
         tests = []
         for t in args.test:
             if '*' in t or '?' in t:
-                matched = fnmatch.filter(all_dirs, t)
+                matched = fnmatch.filter(all_tests, t)
                 if not matched:
                     print(f"Warning: no tests match pattern '{t}'")
                 tests.extend(matched)
@@ -2106,14 +2154,7 @@ def main():
                 tests.append(t)
         tests = sorted(set(tests))
     else:
-        tests = sorted(
-            d.name
-            for d in TESTS_DIR.iterdir()
-            if d.is_dir()
-            and d.name not in SKIP
-            and (d / "test.swf").exists()
-            and (d / expected_filename).exists()
-        )
+        tests = discover_tests(TESTS_DIR, expected_filename)
 
     # Apply --exclude filter
     if args.exclude:
