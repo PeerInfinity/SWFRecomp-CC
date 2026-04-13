@@ -84,7 +84,7 @@ Filtered results exclude 9 tests with all-accepted diffs: Math-v5/v6/v7/v8, ops-
 | `incomplete/GNASH_NEAR_PASSING_PLAN.md` | 22 near-passing tests (<=18 diffs), 7 phases |
 | `incomplete/ARRAY_V5_PLAN.md` | array-v5 investigation (450/560 = 80.4%) |
 | `complete/INHERITANCE_SEGFAULT_PLAN.md` | All 4 Inheritance tests pass filtered (v5 via SWF5 gates, v6/v7/v8 via Ruffle-matching acceptance) |
-| `incomplete/RUFFLE_KNOWN_FAILURE_HANDLING_PLAN.md` | Broader finding: 84 Gnash failures overlap Ruffle known_failure set; Phase 3 proposes `verify_output.py` enhancement |
+| `complete/RUFFLE_KNOWN_FAILURE_HANDLING_PLAN.md` | Phase 3 landed: `verify_output.py` auto-promotes `known_failure`+`output.ruffle.txt` tests to `ruffle_matched` when our diffs ⊆ Ruffle's diffs against Flash |
 | `blocked/MISC_SWFMILL_PLAN.md` | 3 remaining misc-swfmill failures (architectural) |
 | `complete/DEJAGNU_FRAMEWORK_PLAN.md` | Dejagnu harness setup + misc-ming/misc-swfc blocker |
 | `complete/TRY_FINALLY_PLAN.md` | Try-v6/v7/v8 OOM crash (FIXED) |

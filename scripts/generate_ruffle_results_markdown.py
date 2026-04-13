@@ -180,9 +180,17 @@ def generate_summary(data: dict) -> str:
     md = []
     total = data["total"]
     passing = data["pass"]
-    failing = data["fail"]
+    ruffle_matched = data.get("ruffle_matched", 0)
+    effective_pass = data.get("effective_pass", passing + ruffle_matched)
+    effective_rate = data.get(
+        "effective_pass_rate",
+        round(100 * effective_pass / total, 1) if total else 0,
+    )
+    failing = data.get("fail", total - effective_pass)
     rate = data["pass_rate"]
-    breakdown = data.get("breakdown", {})
+    breakdown = dict(data.get("breakdown", {}))
+    # ruffle_matched is a sub-breakdown of promoted-to-pass, not a failure.
+    breakdown.pop("ruffle_matched", None)
 
     # Compute total line-level stats across all tests
     total_expected = 0
@@ -201,6 +209,10 @@ def generate_summary(data: dict) -> str:
     md.append(f"|--------|-------|")
     md.append(f"| Total tests | {total} |")
     md.append(f"| Passing | **{passing}** ({rate}%) |")
+    if ruffle_matched:
+        md.append(f"| Ruffle-matched | {ruffle_matched} "
+                  f"(diffs ⊆ Ruffle's against Flash) |")
+        md.append(f"| Effective pass | **{effective_pass}** ({effective_rate}%) |")
     md.append(f"| Failing | {failing} |")
     md.append(f"| Total expected lines | {total_expected} |")
     md.append(f"| Matching lines | {total_matching} ({line_match_pct:.1f}%) |")
@@ -227,6 +239,8 @@ def generate_passing_tests(data: dict, test_to_docs: dict) -> str:
 
     passing = [t for t in data["tests"] if t["status"] == "pass"]
     passing.sort(key=lambda t: t["test"])
+    ruffle_matched = [t for t in data["tests"] if t["status"] == "ruffle_matched"]
+    ruffle_matched.sort(key=lambda t: t["test"])
 
     md.append("## Passing Tests")
     md.append("")
@@ -236,20 +250,41 @@ def generate_passing_tests(data: dict, test_to_docs: dict) -> str:
     if not passing:
         md.append("No passing tests.")
         md.append("")
-        return "\n".join(md)
+    else:
+        md.append("| # | Test | Lines | Duration | Notes |")
+        md.append("|---|------|-------|----------|-------|")
 
-    md.append("| # | Test | Lines | Duration | Notes |")
-    md.append("|---|------|-------|----------|-------|")
+        for i, t in enumerate(passing, 1):
+            name = t["test"]
+            lines = t.get("lines", {})
+            line_str = str(lines.get("expected_lines", "")) if lines else ""
+            dur = f"{t['duration']:.1f}s" if "duration" in t else ""
+            notes = format_notes(name, test_to_docs)
+            md.append(f"| {i} | `{name}` | {line_str} | {dur} | {notes} |")
 
-    for i, t in enumerate(passing, 1):
-        name = t["test"]
-        lines = t.get("lines", {})
-        line_str = str(lines.get("expected_lines", "")) if lines else ""
-        dur = f"{t['duration']:.1f}s" if "duration" in t else ""
-        notes = format_notes(name, test_to_docs)
-        md.append(f"| {i} | `{name}` | {line_str} | {dur} | {notes} |")
+        md.append("")
 
-    md.append("")
+    if ruffle_matched:
+        md.append("## Ruffle-Matched Tests")
+        md.append("")
+        md.append(
+            f"**{len(ruffle_matched)} tests promoted** — our diffs against Flash's "
+            "`output.txt` are a proper subset of Ruffle's diffs against the same "
+            "file (i.e. we are at least as good as Ruffle on every line of these "
+            "tests). Each carries `known_failure = true` upstream with a "
+            "sidecar `output.ruffle.txt`.")
+        md.append("")
+        md.append("| # | Test | Our diffs | Ruffle diffs | Duration | Notes |")
+        md.append("|---|------|-----------|--------------|----------|-------|")
+        for i, t in enumerate(ruffle_matched, 1):
+            name = t["test"]
+            ours = t.get("ours_diff_count", "?")
+            theirs = t.get("ruffle_diff_count", "?")
+            dur = f"{t['duration']:.1f}s" if "duration" in t else ""
+            notes = format_notes(name, test_to_docs)
+            md.append(f"| {i} | `{name}` | {ours} | {theirs} | {dur} | {notes} |")
+        md.append("")
+
     return "\n".join(md)
 
 

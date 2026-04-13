@@ -7,20 +7,20 @@ status: incomplete
 phases:
   - id: 1
     name: "Document Inheritance super-chain as Ruffle-matching"
-    status: not_started
+    status: complete
   - id: 2
     name: "Add Inheritance-v6/v7/v8 to ACCEPTED_DIFFS and ignored_tests"
-    status: not_started
+    status: complete
   - id: 3
-    name: "Broader: survey 84 known_failure overlap and decide on output.ruffle.txt support"
-    status: not_started
+    name: "Broader: survey 84 known_failure overlap and add verify_output.py subset-match"
+    status: complete
 dependencies: []
 blockers: []
 -->
 
-Last updated: 2026-04-13
+Last updated: 2026-04-13 (Phase 3 complete)
 
-## Status: IN PROGRESS — Inheritance super-chain investigation complete, accepted-diff write-up and broader known_failure survey pending
+## Status: COMPLETE — all three phases landed; awaiting next CI run to measure broader impact
 
 ## Summary
 
@@ -148,41 +148,59 @@ Move `INHERITANCE_SEGFAULT_PLAN.md` to `complete/` with a closing note.
 **Expected filtered pass rate:** 95/181 = 52.5% (removing 3 more tests from
 the denominator).
 
-## Phase 3: Broader known_failure survey (future work)
+## Phase 3: Broader known_failure survey + verify_output.py subset-match — DONE 2026-04-13
 
-Build a small report that, for each of the 84 Ruffle-known_failure tests we
-fail, computes:
+The **subset criterion** was adopted: at every line index where our actual
+output disagrees with Flash's `output.txt`, Ruffle's actual output must
+also disagree with Flash's `output.txt`. The identity and line-count
+criteria were rejected (too strict / too loose respectively).
 
-- Our diff count against `output.txt`
-- Ruffle's diff count against `output.txt` (from `output.ruffle.txt`)
-- Whether our diffs are a subset of Ruffle's diffs
+### Files touched
 
-Candidate criteria for "matches Ruffle" / "at-least-as-good" promotion to
-filtered-pass:
+| File | Change |
+|------|--------|
+| `ruffle-tests/verify_output.py` | Add `_diff_indices()`, `ruffle_subset_match()`, `_test_is_known_failure()`. In the output-comparison branch, before emitting `output_mismatch`, read the sibling `output.ruffle.txt` (when `known_failure = true` and the file exists) and compute the diff-index subset check. If `our_diffs ⊆ ruffle_diffs`, emit a new status `ruffle_matched` with `ours_diff_count` / `ruffle_diff_count` metadata. Extend the stdout summary and the `results.json` report with `ruffle_matched`, `effective_pass`, `effective_pass_rate`. `merge_results` updated to preserve the new status on incremental merges. |
+| `ruffle-tests/filter_results.py` | Count `ruffle_matched` as pass in filtered `effective_pass` / `effective_pass_rate`, while keeping raw `pass` / `pass_rate` as exact-Flash matches. Print both views in the stdout summary when either is non-zero. |
+| `scripts/generate_ruffle_results_markdown.py` | Show Ruffle-matched counts in the summary table; exclude `ruffle_matched` from the failure breakdown; add a new "Ruffle-Matched Tests" section listing each promoted test with its diff counts. |
 
-1. **Subset criterion:** every line where our output differs from
-   `output.txt`, Ruffle's output also differs. This is the criterion that
-   fits the Inheritance tests.
-2. **Identity criterion:** our filtered output byte-for-byte matches
-   `output.ruffle.txt`. Too strict — we beat Ruffle on many lines.
-3. **Line-count criterion:** our diff count is ≤ Ruffle's diff count. Cruder
-   than the subset criterion but simpler.
+### Semantics of the subset criterion
 
-Proposed implementation path:
+`_diff_indices(actual, expected, epsilon)` returns the set of line indices
+where the two outputs differ (using the same whitespace-stripping and
+approximate-equality logic as `compare_output`). The subset check is
+pure-index: if both implementations happen to disagree with Flash at the
+same line but with **different** wrong values, it still counts as a match —
+the failure mode is the same location. Inserted / deleted lines that shift
+later line indices are penalized naturally, so implementations whose
+structural output diverges from each other do not falsely qualify.
 
-- Copy `output.ruffle.txt` files from `~/CC/ruffle` into our test directories
-  (or reference them via a manifest).
-- Extend `verify_output.py` with a new status `ruffle_matched` or equivalent:
-  when a test has `known_failure = true` and ships `output.ruffle.txt`, and
-  our diffs-vs-`output.txt` ⊆ Ruffle's diffs-vs-`output.txt`, emit status
-  `ruffle_matched` instead of `output_mismatch`.
-- Update `filter_results.py` to count `ruffle_matched` as pass in filtered
-  stats.
-- Regenerate reports.
+### Verification (local runs 2026-04-13)
 
-This is a test-framework enhancement and is **not** scope-creep for the
-Inheritance investigation — it's a candidate follow-up if we want to
-systematically benefit from the 84-test overlap.
+- `Inheritance-v5/v6/v7/v8` all promoted to `ruffle_matched` (diff counts
+  `1 ⊆ 17`, `9 ⊆ 16`, `5 ⊆ 10`, `5 ⊆ 10` respectively).
+- `Math-v5`, `Math-v6`, `ops-v8` all promoted (diff counts `5 ⊆ 5` /
+  `5 ⊆ 5` / `7 ⊆ 7` — equal sets qualify).
+- `ASnative-v5`, `TextSnapshot-v6`, `BitmapData-v8`,
+  `ExternalInterface-v8` remain `output_mismatch` — our diffs are NOT a
+  subset of Ruffle's on these (e.g. TextSnapshot-v6 has 13 diff indices but
+  none overlap with Ruffle's 26, because our structural output diverges
+  from Ruffle's along different lines).
+- The 10 AVM1 super/OOP regression tests still pass unchanged.
+
+### Follow-up (not required, opportunistic)
+
+- Once CI re-runs and produces a fresh `results.json` with the new
+  `ruffle_matched` status on ~30+ gnash tests, we can sweep
+  `ignored_tests.txt` to remove entries (`Math-v5..v8`, `ops-v8`,
+  `Inheritance-v5..v8`) that are now automatically promoted. Both
+  mechanisms coexist until that sweep — the filter still correctly
+  filtered-pass those tests either way.
+- The current subset criterion only aligns outputs by line index. Some
+  tests (like `TextSnapshot-v6`) are structurally divergent enough from
+  Ruffle that index-based alignment misses genuine equivalence. A
+  future refinement could use a line-content-aware diff (Myers) and
+  promote based on a semantic subset relation, but that's a larger
+  change and not necessary for the current wins.
 
 ## Priority
 

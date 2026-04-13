@@ -28,17 +28,29 @@ def load_ignored_tests(path):
 
 
 def filter_results(results, ignored):
-    """Return a new results dict with ignored tests removed and stats recalculated."""
+    """Return a new results dict with ignored tests removed and stats recalculated.
+
+    `ruffle_matched` tests (those where our diffs against Flash's output.txt
+    are a subset of Ruffle's diffs against the same file) count as pass in
+    the filtered `effective_pass` / `effective_pass_rate` totals. The raw
+    `pass` / `pass_rate` only count exact Flash matches, so the two views
+    are both visible.
+    """
     filtered_tests = [t for t in results.get("tests", []) if t["test"] not in ignored]
 
     pass_count = sum(1 for t in filtered_tests if t["status"] == "pass")
+    ruffle_matched_count = sum(1 for t in filtered_tests if t["status"] == "ruffle_matched")
     total = len(filtered_tests)
+    effective_pass = pass_count + ruffle_matched_count
 
-    # Recalculate breakdown
+    # Recalculate breakdown (pass and ruffle_matched both count as "not a failure")
     breakdown = {}
     for t in filtered_tests:
-        if t["status"] != "pass":
-            breakdown[t["status"]] = breakdown.get(t["status"], 0) + 1
+        s = t["status"]
+        if s not in ("pass", "ruffle_matched"):
+            breakdown[s] = breakdown.get(s, 0) + 1
+    if ruffle_matched_count:
+        breakdown["ruffle_matched"] = ruffle_matched_count
 
     # Count how many tests were actually ignored (present in both the ignore list and results)
     ignored_count = sum(1 for t in results.get("tests", []) if t["test"] in ignored)
@@ -51,8 +63,11 @@ def filter_results(results, ignored):
         },
         "total": total,
         "pass": pass_count,
-        "fail": total - pass_count,
+        "ruffle_matched": ruffle_matched_count,
+        "fail": total - effective_pass,
         "pass_rate": round(100 * pass_count / total, 1) if total else 0,
+        "effective_pass": effective_pass,
+        "effective_pass_rate": round(100 * effective_pass / total, 1) if total else 0,
         "breakdown": {k: v for k, v in breakdown.items() if v},
         "tests": filtered_tests,
     }
@@ -92,9 +107,17 @@ def main():
 
     orig_total = results["total"]
     orig_pass = results["pass"]
-    print(f"Original:  {orig_pass}/{orig_total} ({results['pass_rate']}%)")
+    orig_ruffle = results.get("ruffle_matched", 0)
+    print(f"Original:  {orig_pass}/{orig_total} ({results['pass_rate']}%)"
+          + (f" [+{orig_ruffle} ruffle_matched]" if orig_ruffle else ""))
     print(f"Ignored:   {filtered['metadata']['ignored_count']} tests removed")
-    print(f"Filtered:  {filtered['pass']}/{filtered['total']} ({filtered['pass_rate']}%)")
+    if filtered.get("ruffle_matched"):
+        print(f"Filtered:  {filtered['pass']}/{filtered['total']}"
+              f" ({filtered['pass_rate']}%) raw,"
+              f" {filtered['effective_pass']}/{filtered['total']}"
+              f" ({filtered['effective_pass_rate']}%) effective")
+    else:
+        print(f"Filtered:  {filtered['pass']}/{filtered['total']} ({filtered['pass_rate']}%)")
     print(f"Written to {output_path}")
 
 

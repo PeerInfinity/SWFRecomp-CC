@@ -1805,6 +1805,54 @@ def run_binary(build_dir, event_file=None, extra_env=None):
         return None, -1, ""
 
 
+def _diff_indices(actual, expected, epsilon=0.0):
+    """Return the set of 0-based line indices where `actual` differs from
+    `expected` after the same whitespace-stripping compare_output does.
+    Used by the Ruffle-subset-match check to compare diff-sets line-wise."""
+    actual_lines = actual.split("\n")
+    expected_lines = expected.rstrip("\n").split("\n")
+    for lines in (actual_lines, expected_lines):
+        while lines and lines[0].strip() == "":
+            lines.pop(0)
+        while lines and lines[-1].strip() == "":
+            lines.pop()
+    n = max(len(actual_lines), len(expected_lines))
+    return {
+        i for i in range(n)
+        if not _lines_approx_equal(
+            actual_lines[i] if i < len(actual_lines) else "<missing>",
+            expected_lines[i] if i < len(expected_lines) else "<missing>",
+            epsilon,
+        )
+    }
+
+
+def ruffle_subset_match(our_actual, flash_expected, ruffle_actual, epsilon=0.0):
+    """Return True if our diffs against Flash's `output.txt` are a subset of
+    Ruffle's diffs against the same file. The subset is taken over line
+    indices, so at every line where we disagree with Flash, Ruffle also
+    disagrees with Flash — i.e., we are no worse than Ruffle on this test.
+    An empty our-diff set (we match Flash exactly) also qualifies."""
+    our = _diff_indices(our_actual, flash_expected, epsilon)
+    ruffle = _diff_indices(ruffle_actual, flash_expected, epsilon)
+    return our.issubset(ruffle), len(our), len(ruffle)
+
+
+def _test_is_known_failure(test_dir):
+    """Return True if test.toml sets `known_failure = true` at the top level.
+    Uses tomllib (3.11+) so parsing matches the existing toml usage."""
+    toml_path = test_dir / "test.toml"
+    if not toml_path.is_file():
+        return False
+    try:
+        import tomllib
+        with open(toml_path, "rb") as f:
+            data = tomllib.load(f)
+    except Exception:
+        return False
+    return bool(data.get("known_failure"))
+
+
 def compare_output(actual, expected, epsilon=0.0):
     """Compare filtered actual output with expected output.
     Returns (match, diff_summary, stats_dict)."""
@@ -1917,13 +1965,19 @@ def build_report(test_results, stats, total, total_available, run_start):
         },
         "total": total,
         "pass": stats["pass"],
-        "fail": total - stats["pass"],
+        "ruffle_matched": stats.get("ruffle_matched", 0),
+        "fail": total - stats["pass"] - stats.get("ruffle_matched", 0),
         "pass_rate": round(100 * stats["pass"] / total, 1) if total else 0,
+        "effective_pass": stats["pass"] + stats.get("ruffle_matched", 0),
+        "effective_pass_rate": round(
+            100 * (stats["pass"] + stats.get("ruffle_matched", 0)) / total, 1
+        ) if total else 0,
         "breakdown": {
             k: stats[k]
             for k in ["output_mismatch", "compile_fail", "recomp_fail",
-                       "runtime_segfault", "runtime_error", "timeout"]
-            if stats[k]
+                       "runtime_segfault", "runtime_error", "timeout",
+                       "ruffle_matched"]
+            if stats.get(k)
         },
         "tests": test_results,
     }
@@ -1957,24 +2011,32 @@ def merge_results(existing_path, new_report):
 
     # Recompute stats
     pass_count = sum(1 for t in all_tests if t["status"] == "pass")
+    ruffle_matched_count = sum(1 for t in all_tests if t["status"] == "ruffle_matched")
     total = len(all_tests)
     breakdown = Counter()
     for t in all_tests:
         s = t["status"]
-        if s != "pass":
+        if s not in ("pass", "ruffle_matched"):
             # Map status to breakdown category
             cat = {"fail": "output_mismatch", "output_mismatch": "output_mismatch",
                    "segfault": "runtime_segfault", "runtime_segfault": "runtime_segfault",
                    "compile_fail": "compile_fail", "recomp_fail": "recomp_fail",
                    "runtime_error": "runtime_error", "timeout": "timeout"}.get(s, s)
             breakdown[cat] += 1
+    if ruffle_matched_count:
+        breakdown["ruffle_matched"] = ruffle_matched_count
 
     result = {
         "metadata": new_report.get("metadata", existing.get("metadata", {})),
         "total": total,
         "pass": pass_count,
-        "fail": total - pass_count,
+        "ruffle_matched": ruffle_matched_count,
+        "fail": total - pass_count - ruffle_matched_count,
         "pass_rate": round(100 * pass_count / total, 1) if total else 0,
+        "effective_pass": pass_count + ruffle_matched_count,
+        "effective_pass_rate": round(
+            100 * (pass_count + ruffle_matched_count) / total, 1
+        ) if total else 0,
         "breakdown": {k: v for k, v in breakdown.items() if v},
         "tests": all_tests,
     }
@@ -2500,22 +2562,59 @@ def main():
             if args.verbose:
                 print("PASS")
         else:
-            stats["output_mismatch"] += 1
-            fail_list.append(name)
-            fail_details[name] = diff_summary
-            if args.diff:
-                fail_diffs[name] = format_diff(actual, expected, epsilon=epsilon)
-            entry["status"] = "output_mismatch"
-            entry["detail"] = diff_summary.split("\n")[0]  # first line only
-            actual_snip, expected_snip = snippet_around_mismatch(actual, expected)
-            entry["actual_output"] = actual_snip
-            entry["expected_output"] = expected_snip
-            test_results.append(entry)
-            if args.verbose:
-                print("MISMATCH")
-                if run_stderr.strip():
-                    for line in run_stderr.strip().splitlines()[:200]:
-                        print(f"  stderr: {line}")
+            # Before reporting output_mismatch, check if this is a test Ruffle
+            # itself marks as known_failure (ships output.ruffle.txt alongside
+            # the Flash-generated output.txt). If so, and our diff lines are
+            # a subset of Ruffle's diff lines against the same output.txt,
+            # promote to `ruffle_matched` — we're doing at least as well as
+            # Ruffle, which is the reference implementation for AVM1.
+            ruffle_actual_path = test_dir / "output.ruffle.txt"
+            ruffle_matched = False
+            if (ruffle_actual_path.is_file()
+                    and _test_is_known_failure(test_dir)):
+                try:
+                    ruffle_actual = (
+                        ruffle_actual_path
+                        .read_text(encoding="utf-8", errors="replace")
+                        .replace("\r\n", "\n")
+                        .rstrip("\n")
+                    )
+                    is_subset, ours, theirs = ruffle_subset_match(
+                        actual, expected, ruffle_actual, epsilon)
+                    if is_subset:
+                        ruffle_matched = True
+                        entry["ruffle_diff_count"] = theirs
+                        entry["ours_diff_count"] = ours
+                except Exception:
+                    pass  # fall through to output_mismatch
+
+            if ruffle_matched:
+                stats["ruffle_matched"] = stats.get("ruffle_matched", 0) + 1
+                pass_list.append(name)
+                entry["status"] = "ruffle_matched"
+                entry["detail"] = (
+                    f"diffs {entry['ours_diff_count']} ⊆ ruffle {entry['ruffle_diff_count']}"
+                )
+                test_results.append(entry)
+                if args.verbose:
+                    print("RUFFLE_MATCHED")
+            else:
+                stats["output_mismatch"] += 1
+                fail_list.append(name)
+                fail_details[name] = diff_summary
+                if args.diff:
+                    fail_diffs[name] = format_diff(actual, expected, epsilon=epsilon)
+                entry["status"] = "output_mismatch"
+                entry["detail"] = diff_summary.split("\n")[0]  # first line only
+                actual_snip, expected_snip = snippet_around_mismatch(actual, expected)
+                entry["actual_output"] = actual_snip
+                entry["expected_output"] = expected_snip
+                test_results.append(entry)
+                if args.verbose:
+                    print("MISMATCH")
+                    if run_stderr.strip():
+                        for line in run_stderr.strip().splitlines()[:200]:
+                            print(f"  stderr: {line}")
         save_incremental()
       except Exception as exc:
         # Catch unexpected errors so one bad test doesn't abort the entire shard
@@ -2530,10 +2629,19 @@ def main():
 
     # Print results
     total = len(tests)
+    pass_count = stats["pass"]
+    ruffle_matched_count = stats.get("ruffle_matched", 0)
+    effective_pass = pass_count + ruffle_matched_count
     print(f"\n{'='*60}")
     print(f"Total tests:     {total}")
-    print(f"Pass:            {stats['pass']} ({100*stats['pass']/total:.1f}%)" if total else "")
-    print(f"Fail:            {total - stats['pass']}")
+    if total:
+        print(f"Pass:            {pass_count} ({100*pass_count/total:.1f}%)")
+        if ruffle_matched_count:
+            print(f"Ruffle-matched:  {ruffle_matched_count}"
+                  f" ({100*ruffle_matched_count/total:.1f}%)")
+            print(f"Effective pass:  {effective_pass}"
+                  f" ({100*effective_pass/total:.1f}%)")
+    print(f"Fail:            {total - effective_pass}")
     print()
     print("Failure breakdown:")
     for key in ["output_mismatch", "compile_fail", "recomp_fail", "runtime_segfault", "runtime_error", "timeout"]:
