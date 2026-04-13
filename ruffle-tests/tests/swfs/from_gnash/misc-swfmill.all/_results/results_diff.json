@@ -1,9 +1,9 @@
 {
   "metadata": {
-    "old_timestamp": "2026-04-12T23:57:00.390091+00:00",
-    "old_git_sha": "d74b2825dc765ef2c12bdf7b2f9de38223410987",
-    "new_timestamp": "2026-04-13T19:34:06.420848+00:00",
-    "new_git_sha": "83d3748a60813ec3b76ce3c638296a5a01e68b23",
+    "old_timestamp": "2026-04-13T19:34:06.420848+00:00",
+    "old_git_sha": "83d3748a60813ec3b76ce3c638296a5a01e68b23",
+    "new_timestamp": "2026-04-13T23:00:07.776626+00:00",
+    "new_git_sha": "1d207c1674234150af881cc2dd29a321a54a0af1",
     "partial": false,
     "same_commit": false
   },
@@ -11,19 +11,68 @@
     "old_pass": 11,
     "old_total": 14,
     "old_pass_rate": 78.6,
-    "new_pass": 11,
-    "new_total": 14,
-    "new_pass_rate": 78.6,
+    "new_pass": 14,
+    "new_total": 18,
+    "new_pass_rate": 77.8,
     "old_mismatched_lines": 4,
-    "new_mismatched_lines": 4,
+    "new_mismatched_lines": 6,
     "increased_mismatches": 0,
     "decreased_mismatches": 0,
     "newly_passing": 0,
     "newly_failing": 0,
     "status_changed": 0,
     "unchanged": 14,
-    "added": 0,
+    "added": 4,
     "removed": 0
   },
-  "changes": []
+  "changes": [
+    {
+      "test": "trace-as2/root_onload",
+      "change_type": "added",
+      "old_status": null,
+      "new_status": "output_mismatch",
+      "old_lines": null,
+      "new_lines": {
+        "actual_lines": 4,
+        "expected_lines": 4,
+        "matching_lines": 2
+      }
+    },
+    {
+      "test": "trace-as2/shortstack",
+      "change_type": "added",
+      "old_status": null,
+      "new_status": "pass",
+      "old_lines": null,
+      "new_lines": {
+        "actual_lines": 2,
+        "expected_lines": 2,
+        "matching_lines": 2
+      }
+    },
+    {
+      "test": "trace-as2/super",
+      "change_type": "added",
+      "old_status": null,
+      "new_status": "pass",
+      "old_lines": null,
+      "new_lines": {
+        "actual_lines": 8,
+        "expected_lines": 8,
+        "matching_lines": 8
+      }
+    },
+    {
+      "test": "trace-as2/this",
+      "change_type": "added",
+      "old_status": null,
+      "new_status": "pass",
+      "old_lines": null,
+      "new_lines": {
+        "actual_lines": 8,
+        "expected_lines": 8,
+        "matching_lines": 8
+      }
+    }
+  ]
 }
