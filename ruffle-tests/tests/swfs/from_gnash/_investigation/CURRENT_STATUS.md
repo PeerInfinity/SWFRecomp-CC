@@ -13,9 +13,12 @@ Last updated: 2026-04-12 (Phase 3 work in progress)
 | **misc-swfc.all** | 16 | 2 | 12.5% | — | — | — |
 | **Total** | 287 | 124 | 43.2% | — | — | — |
 
-Note: actionscript.all is at 95/190 in the latest CI run (up from 84 at commit 961aa08a). Recent additions since then: Error-v5/v6/v7/v8, delete-v5/v6/v7/v8, ColorTransform-v8, LocalConnection-v6/v7/v8, plus line-level improvements across TextSnapshot-v6/v7/v8.
+Note: actionscript.all is at 95/190 in the latest CI run (up from 84 at commit 961aa08a). Recent additions since then: Error-v5/v6/v7/v8, delete-v5/v6/v7/v8, ColorTransform-v8, LocalConnection-v6/v7/v8, plus line-level improvements across TextSnapshot-v6/v7/v8. Inheritance-v5 now matches all 114 expected lines (114→114); the single remaining diff is the accepted egg/chicken survival line.
 
-Filtered results exclude 9 tests with all-accepted diffs (Math-v5/v6/v7/v8, ops-v8, Error-v5/v6/v7/v8) — see `ACCEPTED_DIFFS.md`. Note: Error-v5/v6/v7/v8 now PASS and could be removed from the ignored list. Remaining 3 misc-swfmill failures (dict_event, tags_after_last_showframe, jump_to_prev_block) are blocked on architectural limitations — see `blocked/MISC_SWFMILL_PLAN.md`.
+Filtered results exclude 6 tests with all-accepted diffs: Math-v5/v6/v7/v8, ops-v8, and **Inheritance-v5** (added 2026-04-13). Filtered pass rate 95/184 = 51.6%. See `ACCEPTED_DIFFS.md`. Remaining 3 misc-swfmill failures (dict_event, tags_after_last_showframe, jump_to_prev_block) are blocked on architectural limitations — see `blocked/MISC_SWFMILL_PLAN.md`.
+
+### Latest fixes (2026-04-13, confirmed in CI at 83d3748a)
+- **Inheritance-v5 SWF5 version gates** — Four gates applied in `action.c`: (1) `actionExtends` skips `__constructor__` in SWF5 (gnash comment: "SWF5 or below don't set __constructor__"); (2) `actionGetVariable` "super" fallback gated on SWF ≥ 6 so SWF5 function bodies see super as undefined; (3) `actionCallFunction("super")` handler gated on SWF ≥ 6 so `super()` in SWF5 becomes an undefined-variable no-op; (4) `Function.prototype.apply`/`.call` marked `flash_flags=0x0080` (hidden in SWF5 per Gnash test source comment "Function.apply was introduced in SWF6"). **Impact:** Inheritance-v5 line-match 100/114 → 114/114 (all expected lines match); only residual diff is the 1 extra egg/chicken line. Added to `ignored_tests.txt` → passing via filtered results. v6/v7/v8 unchanged (deep super-chain semantics still blocked). See `incomplete/INHERITANCE_SEGFAULT_PLAN.md` Fix 3.
 
 ### Latest fixes (2026-04-12, not yet in CI)
 - **TextSnapshot method stubs (arg-count gated)** — Added dedicated builtins for `hitTestTextNearPos` (2-3 args → number, else undefined), `getSelected` (2 args → boolean, else undefined), `getSelectedText` (0-1 args → string, else undefined). `getCount` gates on arg_count==0 and on `native_type == NATIVE_TEXTSNAPSHOT` (no native → undefined). **Impact:** TextSnapshot-v6/v7/v8 improved from 128/167 to ~156/167 lines each. Note: a prior pass also made `getText` and `getCount` fall through to empty string / 0 for empty native TextSnapshots, which matched Gnash's `getText(...)=="string"` expectations but broke the avm1 suite's `textsnapshot_available_text` test — that fall-through was reverted in d7xxxx to match Ruffle's Value::Undefined semantics.
@@ -77,7 +80,7 @@ Filtered results exclude 9 tests with all-accepted diffs (Math-v5/v6/v7/v8, ops-
 | `REMAINING_FAILURES_ANALYSIS.md` | Detailed tiered analysis with estimated fix effort |
 | `incomplete/GNASH_NEAR_PASSING_PLAN.md` | 22 near-passing tests (<=18 diffs), 7 phases |
 | `incomplete/ARRAY_V5_PLAN.md` | array-v5 investigation (450/560 = 80.4%) |
-| `incomplete/INHERITANCE_SEGFAULT_PLAN.md` | Inheritance-v7/v8 (segfault fixed, 5-6 diffs remain) |
+| `incomplete/INHERITANCE_SEGFAULT_PLAN.md` | Inheritance-v5 passes filtered; v6/v7/v8 blocked on super-chain semantics |
 | `blocked/MISC_SWFMILL_PLAN.md` | 3 remaining misc-swfmill failures (architectural) |
 | `complete/DEJAGNU_FRAMEWORK_PLAN.md` | Dejagnu harness setup + misc-ming/misc-swfc blocker |
 | `complete/TRY_FINALLY_PLAN.md` | Try-v6/v7/v8 OOM crash (FIXED) |
@@ -209,7 +212,9 @@ During `actionAdd2` on two ARRAY values, `convertFloat` calls `getPropertyWithPr
 | NetStream-v6/v7/v8 | 72/74 (97.3%) | 2 remaining: `currentFps` not own property on prototype |
 | TextFieldHTML-v6/v7/v8 | 86.5% | htmlText getter/text clearing bugs |
 | Selection-v6/v7/v8 | ~86% | Selection non-constructable + `_listeners` own property |
-| Inheritance-v5/v6 | ~81% | super() chain, Function.__proto__, instanceOf |
+| Inheritance-v5 | 114/114 expected (1 accepted diff) | Filtered-passing via egg/chicken accepted diff |
+| Inheritance-v6 | 173/181 (95.6%) | SWF6 super re-entry semantics ("A.B.B"/"FAAC"/"FFFC") |
+| Inheritance-v7/v8 | 177/181 (97.8%) | SWF7+ gap-hierarchy super ("undefinedFFC"/FctorCalls) |
 
 ### v5-passes-but-v6-fails Pattern
 

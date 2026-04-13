@@ -6,7 +6,7 @@
 - **Total tests**: 190
 - **Passing**: 95 (50.0%)
 - **Failing**: 95 (95 output mismatch)
-- **Based on**: CI run at commit `d74b2825dc`
+- **Based on**: CI run at commit `83d3748a60`
 
 Tests are sorted by category (ordered by priority). Within each category, tests are listed alphabetically.
 
@@ -354,6 +354,7 @@ These tests are >60% passing and likely need bug fixes rather than new features:
 
 | Test | Match Rate | Likely Issue |
 |------|-----------|-------------|
+| Inheritance-v5 | 114/115 (99%) |  |
 | Math-v7 | 282/287 (98%) |  |
 | Math-v8 | 282/287 (98%) |  |
 | Math-v5 | 273/278 (98%) |  |
@@ -361,13 +362,13 @@ These tests are >60% passing and likely need bug fixes rather than new features:
 | ops-v8 | 255/262 (97%) |  |
 | Inheritance-v7 | 177/182 (97%) |  |
 | Inheritance-v8 | 177/182 (97%) |  |
-| TextSnapshot-v6 | 168/173 (97%) |  |
-| TextSnapshot-v7 | 168/173 (97%) |  |
-| TextSnapshot-v8 | 168/173 (97%) |  |
 | ExternalInterface-v8 | 113/118 (96%) |  |
 | Inheritance-v6 | 173/182 (95%) |  |
 | Number-v7 | 222/237 (94%) |  |
 | Number-v8 | 222/237 (94%) |  |
+| TextSnapshot-v6 | 160/173 (92%) |  |
+| TextSnapshot-v7 | 160/173 (92%) |  |
+| TextSnapshot-v8 | 160/173 (92%) |  |
 | Number-v6 | 219/239 (92%) |  |
 | Selection-v6 | 114/125 (91%) |  |
 | Selection-v7 | 114/125 (91%) |  |
@@ -376,7 +377,6 @@ These tests are >60% passing and likely need bug fixes rather than new features:
 | Point-v8 | 169/193 (88%) |  |
 | toString_valueOf-v7 | 135/155 (87%) |  |
 | toString_valueOf-v8 | 135/155 (87%) |  |
-| Inheritance-v5 | 100/115 (87%) |  |
 | TextFieldHTML-v6 | 32/37 (86%) |  |
 | TextFieldHTML-v7 | 32/37 (86%) |  |
 | TextFieldHTML-v8 | 32/37 (86%) |  |
@@ -386,7 +386,7 @@ These tests are >60% passing and likely need bug fixes rather than new features:
 | System-v8 | 84/101 (83%) |  |
 | System-v6 | 83/100 (83%) |  |
 | Matrix-v8 | 139/168 (83%) |  |
-| array-v5 | 459/560 (82%) |  |
+| array-v5 | 461/560 (82%) |  |
 | AsBroadcaster-v6 | 98/121 (81%) |  |
 | HitTest-v8 | 71/88 (81%) |  |
 | HitTest-v6 | 70/88 (80%) |  |
@@ -429,7 +429,7 @@ None.
 | Priority | Feature | Failing | Total | Notes |
 |----------|---------|---------|-------|-------|
 | 1 | ASnative | 4 | 4 | avg 22% match |
-| 2 | Inheritance | 4 | 4 | avg 94% match |
+| 2 | Inheritance | 4 | 4 | avg 97% match |
 | 3 | Instance | 4 | 4 | avg 49% match |
 | 4 | Math | 4 | 4 | avg 98% match |
 | 5 | Number | 4 | 4 | avg 92% match |
@@ -451,7 +451,7 @@ None.
 | 21 | targetPath | 3 | 4 | avg 35% match |
 | 22 | TextFieldHTML | 3 | 4 | avg 86% match |
 | 23 | TextFormat | 3 | 3 | avg 73% match |
-| 24 | TextSnapshot | 3 | 4 | avg 97% match |
+| 24 | TextSnapshot | 3 | 4 | avg 92% match |
 | 25 | ContextMenu | 2 | 4 | avg 73% match |
 | 26 | MovieClipLoader | 2 | 4 | avg 28% match |
 | 27 | Transform | 2 | 3 | avg 57% match |
