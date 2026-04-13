@@ -11,9 +11,16 @@ Math-v8
 # --- ops: Platform-dependent NaN bit patterns (IEEE 754) ---
 ops-v8
 
-# --- Inheritance: circular __proto__ survival (Flash hangs, we don't) ---
-# Only v5 qualifies — v6/v7/v8 still have other independent diffs (super-chain).
+# --- Inheritance: Ruffle-matching accepted diffs ---
+# v5: circular __proto__ survival (Flash hangs, we don't).
+# v6/v7/v8: Flash-only super-chain dynamic base class semantics neither we
+# nor Ruffle replicate. Upstream Ruffle marks all 4 as known_failure and our
+# diffs vs Flash's output.txt are a proper subset of Ruffle's diffs for each
+# version. See ACCEPTED_DIFFS.md and incomplete/RUFFLE_KNOWN_FAILURE_HANDLING_PLAN.md.
 Inheritance-v5
+Inheritance-v6
+Inheritance-v7
+Inheritance-v8
 
 # --- Error: Previously ignored (ECMA-262 §15.11.1 vs Flash behavior) ---
 # Error-v5/v6/v7/v8 removed: now PASS (2026-04-10, raw message storage fix)

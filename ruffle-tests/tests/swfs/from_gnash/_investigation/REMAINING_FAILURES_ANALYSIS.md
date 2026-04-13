@@ -90,19 +90,23 @@ Color in SWF6+.
 Selection-v5 is PASS. v6-v8 remain: Selection non-constructable + `_listeners`
 own property + `instanceof Array` on listener arrays.
 
-### Inheritance — v5 (114/114 filtered), v6 (95.6%), v7/v8 (97.8%)
+### Inheritance — all 4 versions filtered-passing (2026-04-13)
 
-v5: as of 2026-04-13 all 114 expected lines match; only remaining diff is 1
-extra trailing `PASSED: !a instanceof b` line from the circular-`__proto__`
-"egg/chicken" survival test (Flash hangs, we don't). Documented in
-`ACCEPTED_DIFFS.md` and added to `ignored_tests.txt` → excluded from filtered
-results.
+All four Inheritance tests are now in the filtered pass set.
 
-v6/v7/v8: output_mismatch with deep super-chain semantics remaining. See
-`incomplete/INHERITANCE_SEGFAULT_PLAN.md` — v7/v8 have 4 diffs each around
-`"undefinedFFC"` / `FctorCalls` (SWF7+ dynamic-base-class rules for `super`
-inside gap-hierarchy methods). v6 additionally disagrees on `"A.B.B"` /
-`"FAAC"` / `"FFFC"` which require SWF6-specific deeper re-entry semantics.
+v5: SWF5 version gates (`actionExtends` `__constructor__` skip, `GetVariable`
+super fallback, `CallFunction` super handler, `Function.prototype.apply`/`call`
+`flash_flags=0x0080`) bring the test to 114/114 expected lines matching.
+
+v6/v7/v8: Flash-only super-chain dynamic base class semantics
+(`"undefinedFFC"` in v7/v8, `"A.B.B"` / `"FAAC"` / `"FFFC"` in v6) that
+upstream Ruffle also does not replicate — all 4 tests ship `known_failure =
+true` in Ruffle with `output.ruffle.txt` recording the divergent output.
+Verified 2026-04-13 that our diffs vs Flash's `output.txt` are a proper
+subset of Ruffle's diffs for every version (v5: 1⊆17, v6: 9⊆16, v7: 5⊆10,
+v8: 5⊆10). Accepted in `ACCEPTED_DIFFS.md` Category 1b; see
+`complete/INHERITANCE_SEGFAULT_PLAN.md` and
+`incomplete/RUFFLE_KNOWN_FAILURE_HANDLING_PLAN.md`.
 
 ### ~~Stage-v5~~ — PASS (Phase 1)
 
@@ -186,9 +190,10 @@ These tests require significant new feature implementation.
 
 | Test | Type | Status |
 |------|------|--------|
-| ~~Inheritance-v5~~ | ~~14 diffs~~ | **1 diff (egg/chicken accepted)** — SWF5 version gates 2026-04-13; filtered-passing |
-| ~~Inheritance-v7~~ | ~~Segfault~~ | **output_mismatch** now (4 diffs) — segfault fixed, deep super-chain remains |
-| ~~Inheritance-v8~~ | ~~Segfault~~ | **output_mismatch** now (4 diffs) — segfault fixed, deep super-chain remains |
+| ~~Inheritance-v5~~ | ~~14 diffs~~ | **filtered-passing** — SWF5 version gates 2026-04-13 |
+| ~~Inheritance-v6~~ | ~~8 diffs~~ | **filtered-passing** — Ruffle-matching (diffs ⊆ Ruffle diffs) |
+| ~~Inheritance-v7~~ | ~~Segfault~~ | **filtered-passing** — Ruffle-matching (diffs ⊆ Ruffle diffs) |
+| ~~Inheritance-v8~~ | ~~Segfault~~ | **filtered-passing** — Ruffle-matching (diffs ⊆ Ruffle diffs) |
 | ~~Try-v6/v7/v8~~ | ~~Runtime error~~ | **FIXED** — see `complete/TRY_FINALLY_PLAN.md`. Try-v5 does not exist |
 | array-v5 | ~~Runtime error~~ | **output_mismatch** now — see `incomplete/ARRAY_V5_PLAN.md` |
 

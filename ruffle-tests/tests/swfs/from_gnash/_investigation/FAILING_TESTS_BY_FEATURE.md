@@ -28,7 +28,7 @@ Failing tests: Inheritance-v5, Inheritance-v6, Inheritance-v7, Inheritance-v8
 
 Description: Tests named `Inheritance-v<N>` — one per SWF version.
 
-Investigation docs: [GNASH_NEAR_PASSING_PLAN.md](ruffle-tests/tests/swfs/from_gnash/_investigation/incomplete/GNASH_NEAR_PASSING_PLAN.md), [INHERITANCE_SEGFAULT_PLAN.md](ruffle-tests/tests/swfs/from_gnash/_investigation/incomplete/INHERITANCE_SEGFAULT_PLAN.md)
+Investigation docs: [GNASH_NEAR_PASSING_PLAN.md](ruffle-tests/tests/swfs/from_gnash/_investigation/incomplete/GNASH_NEAR_PASSING_PLAN.md), [INHERITANCE_SEGFAULT_PLAN.md](ruffle-tests/tests/swfs/from_gnash/_investigation/complete/INHERITANCE_SEGFAULT_PLAN.md), [RUFFLE_KNOWN_FAILURE_HANDLING_PLAN.md](ruffle-tests/tests/swfs/from_gnash/_investigation/incomplete/RUFFLE_KNOWN_FAILURE_HANDLING_PLAN.md)
 
 ---
 

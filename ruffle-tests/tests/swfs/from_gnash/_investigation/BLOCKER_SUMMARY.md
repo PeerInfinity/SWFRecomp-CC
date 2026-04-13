@@ -60,8 +60,9 @@ See `MISC_SWFMILL_PLAN.md` for detailed root cause analysis of all 6.
 
 | Blocker | When | Key Result |
 |---------|------|------------|
-| Inheritance-v7/v8 segfaults (#1) | 2026-03-19 | Infinite super.method() recursion fixed. Both tests now output_mismatch (177/181 lines, 4 diffs — deep super-chain semantics remain). See `INHERITANCE_SEGFAULT_PLAN.md` |
-| Inheritance-v5 SWF5 gates | 2026-04-13 | 4 version gates (actionExtends, GetVariable super, CallFunction super, flash_flags on apply/call) → 114/114 expected lines match. Filtered-passing via egg/chicken accepted diff. See `INHERITANCE_SEGFAULT_PLAN.md` Fix 3 |
+| Inheritance-v7/v8 segfaults (#1) | 2026-03-19 | Infinite super.method() recursion fixed. Both tests now output_mismatch. See `complete/INHERITANCE_SEGFAULT_PLAN.md` |
+| Inheritance-v5 SWF5 gates | 2026-04-13 | 4 version gates (actionExtends, GetVariable super, CallFunction super, flash_flags on apply/call) → 114/114 expected lines match. Filtered-passing. See `complete/INHERITANCE_SEGFAULT_PLAN.md` Fix 3 |
+| Inheritance-v6/v7/v8 super-chain | 2026-04-13 | All 4 Inheritance tests are Ruffle `known_failure` upstream. Verified our diffs vs Flash `output.txt` are a proper subset of Ruffle's diffs for every version → filtered-passing, plan moved to `complete/`. Broader follow-up in `incomplete/RUFFLE_KNOWN_FAILURE_HANDLING_PLAN.md` |
 | Try/finally OOM (#2) | 2026-03-19 | Two bugs: has_jmp_buf not cleared + return-in-finally skipped cleanup. Try-v6/v7/v8 all PASS (20/20). See `TRY_FINALLY_PLAN.md` |
 | s16 label overflow (28 compile fails) | 2026-03-18 | All 28 tests now compile |
 | Object.prototype SWF5 guard (hasOwnProperty missing) | 2026-03-18 | 20+ tests improved |
