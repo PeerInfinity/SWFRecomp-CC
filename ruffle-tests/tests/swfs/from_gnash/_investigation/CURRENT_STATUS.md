@@ -72,7 +72,8 @@ Filtered results exclude 9 tests with all-accepted diffs (Math-v5/v6/v7/v8, ops-
 
 | Document | Purpose |
 |----------|---------|
-| `incomplete/FAILING_TESTS_BY_FEATURE.md` | All failures categorized by root cause / feature area |
+| `incomplete/GNASH_FEATURE_PLAN.md` | Hand-written phase plan: failures grouped by root cause / feature, per-phase progress notes |
+| `FAILING_TESTS_BY_FEATURE.md` | Auto-generated (by `scripts/generate_failing_by_feature.py --suite=gnash/actionscript.all`): one category per `ClassName-vN` prefix, regenerated from latest results |
 | `REMAINING_FAILURES_ANALYSIS.md` | Detailed tiered analysis with estimated fix effort |
 | `incomplete/GNASH_NEAR_PASSING_PLAN.md` | 22 near-passing tests (<=18 diffs), 7 phases |
 | `incomplete/ARRAY_V5_PLAN.md` | array-v5 investigation (450/560 = 80.4%) |

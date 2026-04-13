@@ -4,7 +4,7 @@ Original: 2026-03-19 at 52/204 passing. **Partially refreshed 2026-04-12** — t
 bulk of Tier 1 and several Tier 2/3 groups have been resolved since the
 original analysis; current actionscript.all state is 95/190 (50.0%) and the
 full suite totals 124/287 (43.2%). See `CURRENT_STATUS.md` for authoritative
-per-group numbers and `incomplete/FAILING_TESTS_BY_FEATURE.md` for live phase
+per-group numbers and `incomplete/GNASH_FEATURE_PLAN.md` for live phase
 tracking. Tier 2/3/4 entries below that have not been refreshed should be
 treated as approximate — the overall *shape* of the remaining work (which
 classes need attention) is still useful but individual match rates may be

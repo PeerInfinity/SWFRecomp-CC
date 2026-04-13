@@ -1,13 +1,20 @@
 #!/usr/bin/env python3
 """
-Generate FAILING_TESTS_BY_FEATURE.md and its filtered variant from
-feature_categories.json + results.json.
+Generate FAILING_TESTS_BY_FEATURE.md and its filtered variant from a suite's
+results.json, either using a hand-written feature_categories.json or by
+auto-categorizing tests by `ClassName-vN` prefix.
 
-Produces two files in ruffle-tests/tests/swfs/avm1/_investigation/:
-  - FAILING_TESTS_BY_FEATURE.md           (all tests)
-  - FAILING_TESTS_BY_FEATURE_FILTERED.md  (ignored tests removed)
+Usage:
+  python3 scripts/generate_failing_by_feature.py                      # default: avm1
+  python3 scripts/generate_failing_by_feature.py --suite=avm1
+  python3 scripts/generate_failing_by_feature.py --suite=gnash/actionscript.all
+
+Auto-categorization (Gnash) strips the `-v<N>` SWF-version suffix from each
+test name and groups by the remaining prefix — one category per class, no
+hand-written feature_categories.json needed.
 """
 
+import argparse
 import json
 import re
 import subprocess
@@ -16,13 +23,40 @@ from pathlib import Path
 
 BASE_DIR = Path(__file__).parent.parent
 RUFFLE_DIR = BASE_DIR / "ruffle-tests"
-INVESTIGATION_DIR = RUFFLE_DIR / "tests" / "swfs" / "avm1" / "_investigation"
-CATEGORIES_PATH = INVESTIGATION_DIR / "feature_categories.json"
-RESULTS_PATH = RUFFLE_DIR / "results.json"
-RESULTS_FILTERED_PATH = RUFFLE_DIR / "results_filtered.json"
-IGNORED_TESTS_PATH = RUFFLE_DIR / "ignored_tests.txt"
 
 NEAR_PASSING_THRESHOLD = 60.0  # percent
+
+# Per-suite configuration. Paths are relative to RUFFLE_DIR.
+# `rel_prefix` is the markdown-relative path used when emitting investigation
+# doc links — it should be the repo-relative path to the investigation dir.
+SUITES: dict[str, dict] = {
+    "avm1": {
+        "investigation_rel": "tests/swfs/avm1/_investigation",
+        "results_rel": "tests/swfs/avm1/_results/results.json",
+        "results_filtered_rel": "tests/swfs/avm1/_results/results_filtered.json",
+        "ignored_rel": "ignored_tests.txt",
+        "rel_prefix": "ruffle-tests/tests/swfs/avm1/_investigation",
+        "auto_categorize": False,
+    },
+    "gnash/actionscript.all": {
+        "investigation_rel": "tests/swfs/from_gnash/_investigation",
+        "results_rel": "tests/swfs/from_gnash/actionscript.all/_results/results.json",
+        "results_filtered_rel": "tests/swfs/from_gnash/actionscript.all/_results/results_filtered.json",
+        "ignored_rel": "tests/swfs/from_gnash/actionscript.all/ignored_tests.txt",
+        "rel_prefix": "ruffle-tests/tests/swfs/from_gnash/_investigation",
+        "auto_categorize": True,
+    },
+}
+
+# Module-level paths — set by main() from the chosen suite config.
+SUITE_NAME: str = ""
+INVESTIGATION_DIR: Path = Path()
+CATEGORIES_PATH: Path = Path()
+RESULTS_PATH: Path = Path()
+RESULTS_FILTERED_PATH: Path = Path()
+IGNORED_TESTS_PATH: Path = Path()
+INVESTIGATION_REL_PREFIX: str = ""
+AUTO_CATEGORIZE: bool = False
 
 
 # ---------------------------------------------------------------------------
@@ -80,20 +114,15 @@ def build_investigation_index() -> dict[str, list[tuple[str, str]]]:
     for p in INVESTIGATION_DIR.glob("*.md"):
         if p.name in _EXCLUDED_DOCS:
             continue
-        rel = f"ruffle-tests/tests/swfs/avm1/_investigation/{p.name}"
+        rel = f"{INVESTIGATION_REL_PREFIX}/{p.name}"
         candidates.append((p.name, rel, p))
 
-    complete_dir = INVESTIGATION_DIR / "complete"
-    if complete_dir.is_dir():
-        for p in complete_dir.glob("*.md"):
-            rel = f"ruffle-tests/tests/swfs/avm1/_investigation/complete/{p.name}"
-            candidates.append((p.name, rel, p))
-
-    incomplete_dir = INVESTIGATION_DIR / "incomplete"
-    if incomplete_dir.is_dir():
-        for p in incomplete_dir.glob("*.md"):
-            rel = f"ruffle-tests/tests/swfs/avm1/_investigation/incomplete/{p.name}"
-            candidates.append((p.name, rel, p))
+    for sub in ("complete", "incomplete", "blocked", "stale"):
+        sub_dir = INVESTIGATION_DIR / sub
+        if sub_dir.is_dir():
+            for p in sub_dir.glob("*.md"):
+                rel = f"{INVESTIGATION_REL_PREFIX}/{sub}/{p.name}"
+                candidates.append((p.name, rel, p))
 
     for display_name, rel_path, abs_path in candidates:
         with open(abs_path) as f:
@@ -108,6 +137,47 @@ def build_investigation_index() -> dict[str, list[tuple[str, str]]]:
             test_to_docs[test_name].append((display_name, rel_path))
 
     return test_to_docs
+
+
+_VERSION_SUFFIX_RE = re.compile(r"^(.*)-v(\d+)$")
+
+
+def auto_categorize_by_prefix(results: dict) -> dict:
+    """Synthesize a feature_categories dict by stripping `-v<N>` suffixes.
+
+    Each resulting category is one class (e.g., Number, delete, with),
+    containing all of its versioned tests. Categories are sorted by failing
+    count descending, then alphabetically.
+    """
+    groups: dict[str, list[str]] = {}
+    status_by_name: dict[str, str] = {}
+    for t in results["tests"]:
+        name = t["test"]
+        status_by_name[name] = t["status"]
+        m = _VERSION_SUFFIX_RE.match(name)
+        prefix = m.group(1) if m else name
+        groups.setdefault(prefix, []).append(name)
+
+    def failing_count(tests: list[str]) -> int:
+        return sum(1 for n in tests if status_by_name.get(n) != "pass")
+
+    items = sorted(
+        groups.items(),
+        key=lambda kv: (-failing_count(kv[1]), kv[0].lower()),
+    )
+
+    categories = []
+    for prefix, tests in items:
+        categories.append({
+            "name": prefix,
+            "tests": sorted(tests),
+            "description": f"Tests named `{prefix}-v<N>` — one per SWF version.",
+        })
+    return {
+        "categories": categories,
+        "near_passing_notes": {},
+        "crash_notes": {},
+    }
 
 
 def get_git_sha() -> str:
@@ -190,7 +260,10 @@ def generate_header(data: dict, filtered: bool, ignored_count: int) -> str:
         md.append("# Failing Ruffle Tests by Feature Category")
     md.append("")
     md.append("<!-- Auto-generated by scripts/generate_failing_by_feature.py -->")
-    md.append("<!-- Do not edit manually — edit feature_categories.json instead -->")
+    if AUTO_CATEGORIZE:
+        md.append(f"<!-- Do not edit manually — regenerate with `scripts/generate_failing_by_feature.py --suite={SUITE_NAME}` -->")
+    else:
+        md.append("<!-- Do not edit manually — edit feature_categories.json instead -->")
     md.append("")
 
     meta = data.get("metadata", {})
@@ -222,9 +295,8 @@ def generate_header(data: dict, filtered: bool, ignored_count: int) -> str:
 
     if filtered:
         md.append(f"This is a filtered version with {ignored_count} ignored tests removed. "
-                   f"Ignored tests include interactive input (mouse/keyboard/focus), "
-                   f"external resource loading, sound streaming, FileReference, ExternalInterface, "
-                   f"BitmapData pixel ops, and cross-movie loading.")
+                   f"See the suite's `ignored_tests.txt` and ACCEPTED_DIFFS / "
+                   f"RUFFLE_VS_FLASH_DIFFERENCES docs for the rationale.")
         md.append("")
 
     md.append("Tests are sorted by category (ordered by priority). "
@@ -545,17 +617,55 @@ def generate_document(data: dict, categories_data: dict, ignored: set[str], filt
     return "\n".join(s for s in sections if s)
 
 
+def configure_suite(suite_name: str) -> None:
+    """Populate module-level path globals from a suite config entry."""
+    global SUITE_NAME, INVESTIGATION_DIR, CATEGORIES_PATH
+    global RESULTS_PATH, RESULTS_FILTERED_PATH, IGNORED_TESTS_PATH
+    global INVESTIGATION_REL_PREFIX, AUTO_CATEGORIZE
+
+    if suite_name not in SUITES:
+        print(
+            f"Error: unknown suite '{suite_name}'. Known suites: "
+            f"{', '.join(sorted(SUITES))}",
+            file=sys.stderr,
+        )
+        sys.exit(2)
+
+    cfg = SUITES[suite_name]
+    SUITE_NAME = suite_name
+    INVESTIGATION_DIR = RUFFLE_DIR / cfg["investigation_rel"]
+    CATEGORIES_PATH = INVESTIGATION_DIR / "feature_categories.json"
+    RESULTS_PATH = RUFFLE_DIR / cfg["results_rel"]
+    RESULTS_FILTERED_PATH = RUFFLE_DIR / cfg["results_filtered_rel"]
+    IGNORED_TESTS_PATH = RUFFLE_DIR / cfg["ignored_rel"]
+    INVESTIGATION_REL_PREFIX = cfg["rel_prefix"]
+    AUTO_CATEGORIZE = bool(cfg["auto_categorize"])
+
+
 def main():
-    if not CATEGORIES_PATH.exists():
-        print(f"Error: {CATEGORIES_PATH} not found", file=sys.stderr)
-        sys.exit(1)
+    parser = argparse.ArgumentParser(description=__doc__)
+    parser.add_argument(
+        "--suite",
+        default="avm1",
+        help=f"Suite to generate docs for. One of: {', '.join(sorted(SUITES))}",
+    )
+    args = parser.parse_args()
+    configure_suite(args.suite)
 
     if not RESULTS_PATH.exists():
         print(f"Error: {RESULTS_PATH} not found", file=sys.stderr)
         sys.exit(1)
 
-    categories_data = load_categories()
     ignored = load_ignored_tests()
+
+    if AUTO_CATEGORIZE:
+        # Build categories from test name prefixes (strip -v<N>).
+        categories_data = auto_categorize_by_prefix(load_results(RESULTS_PATH))
+    else:
+        if not CATEGORIES_PATH.exists():
+            print(f"Error: {CATEGORIES_PATH} not found", file=sys.stderr)
+            sys.exit(1)
+        categories_data = load_categories()
 
     # --- Unfiltered ---
     print("Generating unfiltered document...")
