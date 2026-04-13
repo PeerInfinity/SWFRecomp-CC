@@ -1,9 +1,16 @@
 # Gnash Remaining Failures Analysis
 
-Date: 2026-03-19
-CI run: 043094ef (52/204 total = 25.5%)
+Original: 2026-03-19 at 52/204 passing. **Partially refreshed 2026-04-12** — the
+bulk of Tier 1 and several Tier 2/3 groups have been resolved since the
+original analysis; current actionscript.all state is 95/190 (50.0%) and the
+full suite totals 124/287 (43.2%). See `CURRENT_STATUS.md` for authoritative
+per-group numbers and `incomplete/FAILING_TESTS_BY_FEATURE.md` for live phase
+tracking. Tier 2/3/4 entries below that have not been refreshed should be
+treated as approximate — the overall *shape* of the remaining work (which
+classes need attention) is still useful but individual match rates may be
+off by 10-20 percentage points.
 
-152 tests still failing across actionscript.all (146) and misc-swfmill.all (6). This document groups them by actionability and estimated effort.
+This document groups remaining failures by actionability and estimated effort.
 
 ## Summary by Tier
 
@@ -18,57 +25,79 @@ CI run: 043094ef (52/204 total = 25.5%)
 
 ---
 
-## Tier 1: Near-Passing (>95% match) — 8 tests
+## Tier 1: Near-Passing (>95% match) — mostly RESOLVED as of 2026-04-12
 
-These tests are very close to passing and likely need small, targeted fixes.
+### ~~Math-v5/v6/v7/v8~~ — RESOLVED via ACCEPTED_DIFFS
 
-### Math-v5/v6 (97.8%, 272/278) + Math-v7/v8 (97.6%, 280/287)
+Remaining diffs are Gnash bugs (`Math.pow(1)` returns NaN in Gnash, `SQRT2`
+precision mismatch). All 4 tests are in `ignored_tests.txt` as fully
+accepted diffs. See `ACCEPTED_DIFFS.md` → Category 1.
 
-6-7 lines wrong. Known issues:
-- `Math.round("")` — empty string argument handling
-- `Math.pow(x)` with 1 arg — missing second arg semantics
-- Minor constant precision issues
+### ~~ops-v8~~ — RESOLVED via ACCEPTED_DIFFS
 
-**Estimated fix**: 1-2 hours. Edge case fixes in Math method implementations.
+Remaining 5 NaN-comparison diffs are platform-dependent IEEE 754 NaN bit
+patterns. Accepted. See `ACCEPTED_DIFFS.md` → Category 1.
 
-### ops-v8 (95.8%, 251/262)
+### ~~NetStream-v6/v7/v8~~ — PASS (2026-04-09)
 
-11 lines wrong. Equality operator string coercion:
-- `Infinity == 'Infinity'` → should be true (string-to-number coercion)
-- `-Infinity == '-Infinity'` → should be true
-- NaN comparison edge cases
+NetStream constructor now installs `currentFps` on prototype when
+constructed with a connected NetConnection. See
+`complete/NETSTREAM_NATIVE_PROPS_PLAN.md`.
 
-**Estimated fix**: 1 hour. Fix abstract equality algorithm for Infinity/NaN string representations.
+### ~~Error-v5/v6/v7/v8~~ — PASS (2026-04-10)
 
-### NetStream-v6/v7/v8 (95.0%, 76/80)
+Error constructor now stores raw argument value instead of coercing non-string
+args to string. All 4 tests PASS.
 
-4 lines wrong each. `hasOwnProperty` checks on NetStream.prototype properties (`currentFps`, etc.).
+### ~~delete-v5/v6/v7/v8~~ — PASS (2026-04-09..12)
 
-**Estimated fix**: 30 minutes. Register missing properties on NetStream prototype.
+Dot-path resolution in `actionDelete2` and `actionDelete`, plus global-object
+fallback routing fixes. All 4 tests PASS.
+
+### ~~LocalConnection-v6/v7/v8~~ — PASS (2026-04-12)
+
+`lc_is_protected_method` now case-insensitive and includes `onStatus`.
+
+### ~~ColorTransform-v8~~ — PASS (2026-04-12)
+
+`rgb` getter drops `& 0xFF` masking; constructor defaults to identity and
+coerces via `varToDoubleSWF`.
+
+### ~~Color-v5/v6/v7/v8~~ — PASS except Color-v6 (97%)
+
+Dynamic MC color transform, valueOf in setTransform, target property storage
+fixes. Only Color-v6 remains (4 lines: `typeof(c) == 'undefined'` for SWF6+).
+
+### ~~Stage-v5, Selection-v5, Boolean-v5/v6/v7/v8, Video-v6/v7/v8~~ — PASS (Phase 1)
+
+Already passing since the early Phase 1 fixes.
 
 ---
 
-## Tier 2: Close (80-95% match) — ~25 tests
+## Tier 2: Close (80-95% match)
 
-### Color tests — Color-v5 (88.6%), Color-v6 (86.0%), Color-v7/v8 (87.6%)
+### ~~Color-v5/v7/v8~~ — PASS. Color-v6 ~97% (4 lines remain)
 
-16-24 diff lines. Color.getTransform() on invalid target, setTransform value storage, Color prototype property access. Recent Color prototype unification helped but gaps remain.
+Only remaining failures: `typeof(c) == 'undefined'` for non-constructable
+Color in SWF6+.
 
 ### TextFieldHTML — v6/v7/v8 (86.5%, 32/37)
 
 5 diff lines each. HTML text getter edge cases. Same issues tracked in AVM1 suite's TEXTFIELD_PLAN.
 
-### Selection — v5 (85.7%), v6 (86.4%), v7/v8 (87.2%)
+### Selection — v6/v7/v8 (~86%)
 
-3-17 diff lines. SWF5 typeof check (`typeof(Selection)` should be 'undefined'), `_listeners` own property, `instanceof` on MC.
+Selection-v5 is PASS. v6-v8 remain: Selection non-constructable + `_listeners`
+own property + `instanceof Array` on listener arrays.
 
-### Inheritance — v5 (82.6%, 95/115), v6 (85.2%, 155/182)
+### Inheritance — v5 (~82%), v6 (~85%), v7/v8 (output_mismatch, not segfault)
 
-20-27 diff lines. OOP prototype chain issues: constructor execution ordering, `instanceof`, `__constructor__` setup, `Function.prototype` visibility.
+OOP prototype chain issues: constructor execution ordering, `instanceof`,
+`__constructor__` setup, `Function.prototype` visibility. v7/v8 are now
+`output_mismatch` with ~2 diff lines + 1 extra trailing line that the test
+intentionally doesn't expect (Flash hangs on the last line; we don't).
 
-### Stage-v5 (86.8%, 33/38)
-
-5 diff lines. Non-constructable global (typeof should be 'undefined' in SWF5), listener methods version-gated.
+### ~~Stage-v5~~ — PASS (Phase 1)
 
 ### Point-v8 (84.5%, 163/193)
 
@@ -102,10 +131,10 @@ These tests require feature implementation work, not just edge case fixes.
 
 | Group | Tests | Match Range | Primary Issue |
 |-------|-------|-------------|---------------|
-| Number v5-v8 | 4 | 76-79% | toString(radix), toFixed, toPrecision |
-| Error v5-v8 | 4 | 75-77% | Constructor message coercion, toString |
+| Number v5-v8 | 4 | ~85-96% (2026-04-09) | Wrapper valueOf override, float precision last-digit at e±308, toFixed/toPrecision |
+| ~~Error v5-v8~~ | — | **PASS** (2026-04-10) | Error constructor raw message storage |
 | AsBroadcaster v5-v8 | 4 | 70-79% | Listener dispatch, broadcastMessage |
-| TextSnapshot v6-v8 | 3 | 76.3% | getText, findText methods |
+| TextSnapshot v6-v8 | 3 | ~93% (2026-04-12) | ~10 lines accepted (Gnash expects string from empty native TS — see ACCEPTED_DIFFS); ~3 state-dependent `gh.getCount() == undefined` lines still investigable |
 | toString_valueOf v5-v8 | 4 | 60-77% | valueOf/toString on arrays, ASArray cast bug |
 | Global v6-v8 | 3 | 70-76% | Missing global properties/constructors |
 | TextFormat v5-v7 | 3 | 64-78% | Constructor coercion, property getters |
@@ -114,7 +143,7 @@ These tests require feature implementation work, not just edge case fixes.
 | flash v5-v7 | 3 | 70.0% | flash.geom constructor stubs |
 | ExternalInterface v6-v8 | 3 | 51-70% | addCallback, data marshalling |
 | MovieClip-v5 | 1 | 65.0% | Many MC methods |
-| delete v5-v8 | 4 | 62-67% | Scope deletion, DONT_DELETE |
+| ~~delete v5-v8~~ | — | **PASS** (2026-04-09..12) | Dot-path resolution, global-object fallback |
 | TextField-v5 | 1 | 66.7% | TextField properties |
 | Instance v5-v8 | 4 | 52-64% | instanceof, constructor, typeof |
 | String v5-v8 | 4 | 59-61% | Missing methods (replace, match, search) |
@@ -133,7 +162,7 @@ These tests require significant new feature implementation.
 |-------|-------|-------------|---------------|
 | enumerate v6-v8 | 3 | 44.9% | for-in enumeration broken |
 | LoadVars v6-v8 | 3 | 44.1% | Network loading (load/send/decode) |
-| LocalConnection v5-v8 | 4 | 41-57% | Full IPC system |
+| ~~LocalConnection v6-v8~~ | — | **PASS** (2026-04-12). v5 still failing | lc_is_protected_method case-insensitive fix |
 | System v5-v8 | 4 | 38-40% | System.capabilities |
 | Camera v6-v8 | 3 | 36.7% | Camera prototype |
 | targetPath v6-v8 | 3 | 32.1% | targetPath for nested MCs |
@@ -146,17 +175,14 @@ These tests require significant new feature implementation.
 
 ---
 
-## Crashes — 7 tests
+## Crashes — mostly RESOLVED (2026-04-12)
 
-| Test | Type | Root Cause |
-|------|------|------------|
-| Inheritance-v7 | Segfault | Prototype chain corruption — needs investigation |
-| Inheritance-v8 | Segfault | Same as above |
-| Try-v5 | Runtime error | OOM from try/finally goto bug |
-| Try-v6 | Runtime error | Same |
-| Try-v7 | Runtime error | Same |
-| Try-v8 | Runtime error | Same |
-| array-v5 | Runtime error | OOM/infinite loop in array ops |
+| Test | Type | Status |
+|------|------|--------|
+| ~~Inheritance-v7~~ | ~~Segfault~~ | **output_mismatch** now (2 lines + 1 extra) — segfault fixed |
+| ~~Inheritance-v8~~ | ~~Segfault~~ | **output_mismatch** now — segfault fixed |
+| ~~Try-v6/v7/v8~~ | ~~Runtime error~~ | **FIXED** — see `complete/TRY_FINALLY_PLAN.md`. Try-v5 does not exist |
+| array-v5 | ~~Runtime error~~ | **output_mismatch** now — see `incomplete/ARRAY_V5_PLAN.md` |
 
 ---
 
