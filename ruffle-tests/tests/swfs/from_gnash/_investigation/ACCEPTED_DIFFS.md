@@ -93,6 +93,51 @@ generation.
 **Decision:** Accept as platform-dependent. Cannot be fixed without injecting artificial
 NaN payload diversity, which would be fragile and non-standard.
 
+### TextSnapshot-v6 / TextSnapshot-v7 / TextSnapshot-v8 — `getText` / `getSelectedText` on empty native snapshot (~10 diff lines each)
+
+**Example diffs (all 3 tests):**
+```
+- PASSED: typeof(ts.getText(0, 1)) == "string" [./TextSnapshot.as:187]
++ FAILED: expected: "string" obtained: undefined [./TextSnapshot.as:187]
+- PASSED: typeof(ts.getText(1, 0)) == "string" [./TextSnapshot.as:188]
++ FAILED: expected: "string" obtained: undefined [./TextSnapshot.as:188]
+- PASSED: typeof(ts.getText(-1, 3)) == "string" [./TextSnapshot.as:189]
++ FAILED: expected: "string" obtained: undefined [./TextSnapshot.as:189]
+... (similar for 2- and 3-arg getText calls on empty native snapshot)
+- PASSED: typeof(ts.getSelectedText()) == "string" [./TextSnapshot.as:166]
++ FAILED: expected: "string" obtained: undefined [./TextSnapshot.as:166]
+```
+
+**Root cause:** The Gnash test constructs `ts = _root.getTextSnapshot()` on a SWF
+whose `_root` has no static text, so the snapshot's internal chunk list is
+empty. The test then asserts that `typeof(ts.getText(0, N))` is `"string"` — i.e.,
+that `getText` returns an empty string rather than `undefined` in that case.
+
+Ruffle's AVM1 `TextSnapshot.get_text` (and `get_selected_text`) actually returns
+`Value::Undefined` when the object's native slot is not attached, and Flash
+Player's own behavior matches Ruffle here — the `textsnapshot_available_text`
+test in the avm1 suite (which was generated against Flash Player) specifically
+asserts `child: undefined` for `new TextSnapshot(mc).getText(0, 100)` on an MC
+that was invalidated by `duplicateMovieClip`, which requires the same
+undefined-return path.
+
+**Reference:** Ruffle `core/src/avm1/globals/text_snapshot.rs` →
+```rust
+let NativeObject::TextSnapshot(object) = this.native() else {
+    return Ok(Value::Undefined);
+};
+```
+
+We match Ruffle/Flash and therefore disagree with Gnash here. An earlier attempt
+to satisfy the Gnash expectation by returning `""` instead regressed
+`textsnapshot_available_text` (20/20 → 14/20) and was reverted (commit
+91378cce).
+
+**Decision:** Keep Ruffle/Flash-correct behavior. These ~10 lines per test
+will never match Gnash's expected output. The remaining ~3 lines per test
+(state-dependent `gh.getCount() == undefined` patterns) are independent and
+still investigable.
+
 ### ~~Error-v5 / Error-v6 / Error-v7 / Error-v8~~ — RESOLVED (2026-04-10)
 
 **Previously:** 2 diff lines per test. Error constructor coerced message to string (ECMA-262 §15.11.1), but Gnash expected raw storage. Now fixed: Error constructor stores raw argument value, matching Flash Player behavior. All 4 tests PASS. Removed from `ignored_tests.txt`.
@@ -108,6 +153,9 @@ NaN payload diversity, which would be fragile and non-standard.
 | Math-v7 | 5 | Gnash pow/SQRT bugs | Correct | IEEE 754, ECMA-262 |
 | Math-v8 | 5 | Gnash pow/SQRT bugs | Correct | IEEE 754, ECMA-262 |
 | ops-v8 | 7 | Platform NaN bit patterns | Correct (x86-64) | IEEE 754 (platform-dependent) |
+| TextSnapshot-v6 | ~10 | Gnash expects string from empty native TS | Correct (matches Ruffle/Flash) | Ruffle avm1 text_snapshot.rs |
+| TextSnapshot-v7 | ~10 | Gnash expects string from empty native TS | Correct (matches Ruffle/Flash) | Ruffle avm1 text_snapshot.rs |
+| TextSnapshot-v8 | ~10 | Gnash expects string from empty native TS | Correct (matches Ruffle/Flash) | Ruffle avm1 text_snapshot.rs |
 | ~~Error-v5~~ | ~~4~~ | ~~RESOLVED~~ | NOW PASS | Fixed 2026-04-10 |
 | ~~Error-v6~~ | ~~4~~ | ~~RESOLVED~~ | NOW PASS | Fixed 2026-04-10 |
 | ~~Error-v7~~ | ~~4~~ | ~~RESOLVED~~ | NOW PASS | Fixed 2026-04-10 |
