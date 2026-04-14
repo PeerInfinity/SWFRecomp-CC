@@ -1,18 +1,20 @@
 {
   "metadata": {
-    "timestamp": "2026-04-14T00:48:27.772324+00:00",
-    "git_sha": "c3d9506ef0b3cc172159d2cfc7edf3c3568db878",
-    "duration_seconds": 179.87,
+    "timestamp": "2026-04-14T01:19:03.844849+00:00",
+    "git_sha": "f9b8102de811819c7fd49fd2b654ea9ea9ab46d8",
+    "duration_seconds": 183.23,
     "total_available": 9,
     "shards": 30,
     "expected_shards": 30
   },
   "total": 9,
   "pass": 7,
-  "fail": 2,
+  "ruffle_matched": 1,
+  "fail": 1,
   "pass_rate": 77.8,
+  "effective_pass": 8,
+  "effective_pass_rate": 88.9,
   "breakdown": {
-    "ruffle_matched": 1,
     "output_mismatch": 1
   },
   "tests": [
@@ -24,7 +26,7 @@
         "expected_lines": 8,
         "matching_lines": 7
       },
-      "duration": 20.89,
+      "duration": 21.29,
       "ruffle_diff_count": 1,
       "ours_diff_count": 1,
       "status": "ruffle_matched",
@@ -38,7 +40,7 @@
         "expected_lines": 19,
         "matching_lines": 19
       },
-      "duration": 20.25,
+      "duration": 19.49,
       "status": "pass"
     },
     {
@@ -49,7 +51,7 @@
         "expected_lines": 35,
         "matching_lines": 35
       },
-      "duration": 20.51,
+      "duration": 20.54,
       "status": "pass"
     },
     {
@@ -60,7 +62,7 @@
         "expected_lines": 26,
         "matching_lines": 26
       },
-      "duration": 19.93,
+      "duration": 20.67,
       "status": "pass"
     },
     {
@@ -71,7 +73,7 @@
         "expected_lines": 8,
         "matching_lines": 8
       },
-      "duration": 19.35,
+      "duration": 19.84,
       "status": "pass"
     },
     {
@@ -82,7 +84,7 @@
         "expected_lines": 28,
         "matching_lines": 28
       },
-      "duration": 19.79,
+      "duration": 19.9,
       "status": "pass"
     },
     {
@@ -93,7 +95,7 @@
         "expected_lines": 22,
         "matching_lines": 22
       },
-      "duration": 19.52,
+      "duration": 19.91,
       "status": "pass"
     },
     {
@@ -104,7 +106,7 @@
         "expected_lines": 68,
         "matching_lines": 11
       },
-      "duration": 21.06,
+      "duration": 21.1,
       "status": "output_mismatch",
       "detail": "57 line(s) differ (actual=14, expected=68)",
       "actual_output": "main class running\nPASSED: -16384 == -16384  [levels.as:37]\nPASSED: _level0 == _level0  [levels.as:40]\nPASSED: 1 == 1  [level5.as:30]\nFAILED: _level0.frameno >= 1  [level5.as:32]\nFAILED: expected: \"-16379\" , obtained: \"0\"  [level5.as:35]\nFAILED: expected: \"_level5\" , obtained: \"_level0._level5\"  [level5.as:38]\nPASSED: _level0 == _level0  [level5.as:41]\nPASSED: 1239 == 1239  [level5.as:44]\nPASSED:  ==   [level5.as:47]\nPASSED: 6789 == 6789  [level5.as:49]\nPASSED:  ==   [level5.as:52]\nPASSED: true == true  [level5.as:54]\nPASSED: _level5/ch == _level5/ch  [level5.as:79]",
@@ -118,7 +120,7 @@
         "expected_lines": 17,
         "matching_lines": 17
       },
-      "duration": 18.04,
+      "duration": 19.95,
       "status": "pass"
     }
   ]

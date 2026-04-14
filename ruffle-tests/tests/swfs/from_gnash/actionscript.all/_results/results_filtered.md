@@ -1,10 +1,10 @@
 # Ruffle Test Results (Filtered)
 
-**Date**: 2026-04-14 01:19 UTC
+**Date**: 2026-04-14 03:19 UTC
 
-**Git SHA**: `f9b8102de8`
+**Git SHA**: `c7e52269f4`
 
-**Run Duration**: 71m 59s
+**Run Duration**: 71m 32s
 
 **Filtered**: 0 tests ignored out of 190 available
 
@@ -18,8 +18,8 @@
 | Effective pass | **116** (61.1%) |
 | Failing | 74 |
 | Total expected lines | 16957 |
-| Matching lines | 13008 (76.7%) |
-| Mismatched lines | 3949 |
+| Matching lines | 13006 (76.7%) |
+| Mismatched lines | 3951 |
 
 ### Failure Breakdown
 
@@ -33,101 +33,101 @@
 
 | # | Test | Lines | Duration | Notes |
 |---|------|-------|----------|-------|
-| 1 | `Accessibility-v5` | 15 | 20.6s |  |
-| 2 | `Accessibility-v6` | 19 | 20.6s |  |
-| 3 | `Accessibility-v7` | 19 | 21.7s |  |
-| 4 | `Accessibility-v8` | 19 | 19.8s |  |
-| 5 | `AsBroadcaster-v5` | 11 | 19.6s |  |
-| 6 | `BitmapData-v5` | 7 | 19.4s |  |
-| 7 | `BitmapData-v6` | 7 | 19.5s |  |
-| 8 | `BitmapData-v7` | 7 | 20.6s |  |
-| 9 | `Boolean-v5` | 38 | 21.0s |  |
-| 10 | `Boolean-v6` | 38 | 21.0s |  |
-| 11 | `Boolean-v7` | 38 | 21.1s |  |
-| 12 | `Boolean-v8` | 38 | 21.0s |  |
-| 13 | `Camera-v5` | 7 | 20.2s |  |
-| 14 | `Color-v5` | 140 | 24.2s |  |
-| 15 | `Color-v6` | 171 | 25.5s |  |
-| 16 | `Color-v7` | 161 | 25.4s |  |
-| 17 | `Color-v8` | 161 | 25.1s |  |
-| 18 | `ColorTransform-v5` | 7 | 20.1s |  |
-| 19 | `ColorTransform-v6` | 7 | 20.1s |  |
-| 20 | `ColorTransform-v7` | 7 | 20.1s |  |
-| 21 | `ColorTransform-v8` | 55 | 21.2s |  |
-| 22 | `ContextMenu-v5` | 7 | 20.0s |  |
-| 23 | `ContextMenu-v6` | 7 | 20.1s |  |
+| 1 | `Accessibility-v5` | 15 | 19.9s |  |
+| 2 | `Accessibility-v6` | 19 | 20.1s |  |
+| 3 | `Accessibility-v7` | 19 | 20.1s |  |
+| 4 | `Accessibility-v8` | 19 | 20.0s |  |
+| 5 | `AsBroadcaster-v5` | 11 | 19.5s |  |
+| 6 | `BitmapData-v5` | 7 | 19.9s |  |
+| 7 | `BitmapData-v6` | 7 | 19.6s |  |
+| 8 | `BitmapData-v7` | 7 | 20.5s |  |
+| 9 | `Boolean-v5` | 38 | 20.8s |  |
+| 10 | `Boolean-v6` | 38 | 20.6s |  |
+| 11 | `Boolean-v7` | 38 | 21.7s |  |
+| 12 | `Boolean-v8` | 38 | 20.8s |  |
+| 13 | `Camera-v5` | 7 | 20.1s |  |
+| 14 | `Color-v5` | 140 | 22.9s |  |
+| 15 | `Color-v6` | 171 | 23.8s |  |
+| 16 | `Color-v7` | 161 | 23.5s |  |
+| 17 | `Color-v8` | 161 | 23.5s |  |
+| 18 | `ColorTransform-v5` | 7 | 19.8s |  |
+| 19 | `ColorTransform-v6` | 7 | 19.5s |  |
+| 20 | `ColorTransform-v7` | 7 | 19.5s |  |
+| 21 | `ColorTransform-v8` | 55 | 20.9s |  |
+| 22 | `ContextMenu-v5` | 7 | 19.6s |  |
+| 23 | `ContextMenu-v6` | 7 | 19.5s |  |
 | 24 | `Error-v5` | 28 | 19.9s |  |
-| 25 | `Error-v6` | 31 | 20.0s |  |
-| 26 | `Error-v7` | 31 | 20.2s |  |
-| 27 | `Error-v8` | 31 | 20.2s |  |
-| 28 | `ExternalInterface-v5` | 7 | 19.7s |  |
-| 29 | `Key-v5` | 51 | 20.7s |  |
-| 30 | `Key-v6` | 55 | 20.9s |  |
-| 31 | `Key-v7` | 55 | 20.9s |  |
-| 32 | `Key-v8` | 55 | 20.9s |  |
-| 33 | `LoadVars-v5` | 8 | 20.2s |  |
-| 34 | `LocalConnection-v5` | 7 | 20.4s |  |
-| 35 | `LocalConnection-v6` | 58 | 21.6s |  |
-| 36 | `LocalConnection-v7` | 58 | 21.2s |  |
-| 37 | `LocalConnection-v8` | 58 | 21.3s |  |
-| 38 | `Matrix-v5` | 7 | 19.9s |  |
-| 39 | `Microphone-v5` | 6 | 19.8s |  |
-| 40 | `Mouse-v5` | 13 | 20.0s |  |
-| 41 | `Mouse-v6` | 21 | 20.2s |  |
-| 42 | `Mouse-v7` | 21 | 20.4s |  |
-| 43 | `Mouse-v8` | 21 | 20.2s |  |
-| 44 | `MovieClipLoader-v5` | 6 | 20.2s |  |
-| 45 | `MovieClipLoader-v6` | 6 | 22.1s |  |
-| 46 | `NetConnection-v5` | 7 | 21.7s |  |
-| 47 | `NetStream-v5` | 6 | 22.0s |  |
-| 48 | `NetStream-v6` | 80 | 22.7s |  |
-| 49 | `NetStream-v7` | 80 | 21.6s |  |
-| 50 | `NetStream-v8` | 80 | 22.0s |  |
-| 51 | `Point-v5` | 7 | 20.2s |  |
-| 52 | `Point-v6` | 7 | 20.1s |  |
+| 25 | `Error-v6` | 31 | 20.4s |  |
+| 26 | `Error-v7` | 31 | 20.5s |  |
+| 27 | `Error-v8` | 31 | 20.7s |  |
+| 28 | `ExternalInterface-v5` | 7 | 19.8s |  |
+| 29 | `Key-v5` | 51 | 20.6s |  |
+| 30 | `Key-v6` | 55 | 20.7s |  |
+| 31 | `Key-v7` | 55 | 20.7s |  |
+| 32 | `Key-v8` | 55 | 20.5s |  |
+| 33 | `LoadVars-v5` | 8 | 19.9s |  |
+| 34 | `LocalConnection-v5` | 7 | 19.5s |  |
+| 35 | `LocalConnection-v6` | 58 | 20.6s |  |
+| 36 | `LocalConnection-v7` | 58 | 20.6s |  |
+| 37 | `LocalConnection-v8` | 58 | 20.7s |  |
+| 38 | `Matrix-v5` | 7 | 19.4s |  |
+| 39 | `Microphone-v5` | 6 | 20.4s |  |
+| 40 | `Mouse-v5` | 13 | 21.9s |  |
+| 41 | `Mouse-v6` | 21 | 21.9s |  |
+| 42 | `Mouse-v7` | 21 | 20.8s |  |
+| 43 | `Mouse-v8` | 21 | 20.6s |  |
+| 44 | `MovieClipLoader-v5` | 6 | 20.5s |  |
+| 45 | `MovieClipLoader-v6` | 6 | 20.4s |  |
+| 46 | `NetConnection-v5` | 7 | 20.3s |  |
+| 47 | `NetStream-v5` | 6 | 20.1s |  |
+| 48 | `NetStream-v6` | 80 | 21.8s |  |
+| 49 | `NetStream-v7` | 80 | 21.9s |  |
+| 50 | `NetStream-v8` | 80 | 22.1s |  |
+| 51 | `Point-v5` | 7 | 20.0s |  |
+| 52 | `Point-v6` | 7 | 19.7s |  |
 | 53 | `Point-v7` | 7 | 20.2s |  |
-| 54 | `Random-v5` | 30 | 20.9s |  |
-| 55 | `Random-v6` | 30 | 21.2s |  |
-| 56 | `Random-v7` | 30 | 21.0s |  |
-| 57 | `Random-v8` | 30 | 20.9s |  |
-| 58 | `Rectangle-v5` | 7 | 20.4s |  |
-| 59 | `Rectangle-v6` | 7 | 20.3s |  |
-| 60 | `Rectangle-v7` | 7 | 20.4s |  |
-| 61 | `Selection-v5` | 21 | 19.9s |  |
-| 62 | `Stage-v5` | 38 | 20.1s |  |
-| 63 | `TextFieldHTML-v5` | 6 | 20.3s |  |
+| 54 | `Random-v5` | 30 | 20.4s |  |
+| 55 | `Random-v6` | 30 | 20.7s |  |
+| 56 | `Random-v7` | 30 | 20.3s |  |
+| 57 | `Random-v8` | 30 | 20.5s |  |
+| 58 | `Rectangle-v5` | 7 | 19.9s |  |
+| 59 | `Rectangle-v6` | 7 | 20.1s |  |
+| 60 | `Rectangle-v7` | 7 | 20.0s |  |
+| 61 | `Selection-v5` | 21 | 20.4s |  |
+| 62 | `Stage-v5` | 38 | 20.6s |  |
+| 63 | `TextFieldHTML-v5` | 6 | 19.6s |  |
 | 64 | `TextSnapshot-v5` | 7 | 20.4s |  |
-| 65 | `Transform-v5` | 7 | 21.2s |  |
-| 66 | `Try-v5` | 20 | 21.3s |  |
-| 67 | `Try-v6` | 20 | 20.8s |  |
-| 68 | `Try-v7` | 20 | 21.5s |  |
-| 69 | `Try-v8` | 20 | 20.6s |  |
-| 70 | `Video-v5` | 7 | 20.3s |  |
-| 71 | `Video-v6` | 85 | 23.1s |  |
-| 72 | `Video-v7` | 85 | 24.2s |  |
-| 73 | `Video-v8` | 85 | 23.7s |  |
-| 74 | `XMLSocket-v5` | 35 | 23.1s |  |
-| 75 | `XMLSocket-v6` | 35 | 22.8s |  |
-| 76 | `XMLSocket-v7` | 35 | 21.3s |  |
-| 77 | `XMLSocket-v8` | 35 | 21.0s |  |
-| 78 | `argstest-v5` | 4 | 20.5s |  |
-| 79 | `case-v5` | 39 | 20.9s |  |
-| 80 | `delete-v5` | 60 | 21.3s |  |
-| 81 | `delete-v6` | 60 | 21.4s |  |
-| 82 | `delete-v7` | 60 | 21.2s |  |
-| 83 | `delete-v8` | 60 | 21.3s |  |
-| 84 | `enumerate-v5` | 6 | 20.0s |  |
-| 85 | `enumerate-v6` | 49 | 21.1s |  |
-| 86 | `enumerate-v7` | 49 | 21.0s |  |
-| 87 | `enumerate-v8` | 49 | 20.9s |  |
-| 88 | `flash-v5` | 10 | 20.0s |  |
-| 89 | `flash-v6` | 10 | 20.0s |  |
-| 90 | `flash-v7` | 10 | 19.9s |  |
-| 91 | `swap-v5` | 7 | 20.4s |  |
-| 92 | `swap-v6` | 7 | 20.2s |  |
-| 93 | `swap-v7` | 7 | 20.0s |  |
-| 94 | `swap-v8` | 7 | 20.1s |  |
-| 95 | `targetPath-v5` | 12 | 20.3s |  |
+| 65 | `Transform-v5` | 7 | 20.4s |  |
+| 66 | `Try-v5` | 20 | 20.7s |  |
+| 67 | `Try-v6` | 20 | 20.9s |  |
+| 68 | `Try-v7` | 20 | 20.7s |  |
+| 69 | `Try-v8` | 20 | 20.7s |  |
+| 70 | `Video-v5` | 7 | 19.9s |  |
+| 71 | `Video-v6` | 85 | 21.4s |  |
+| 72 | `Video-v7` | 85 | 21.5s |  |
+| 73 | `Video-v8` | 85 | 21.4s |  |
+| 74 | `XMLSocket-v5` | 35 | 20.1s |  |
+| 75 | `XMLSocket-v6` | 35 | 20.2s |  |
+| 76 | `XMLSocket-v7` | 35 | 20.5s |  |
+| 77 | `XMLSocket-v8` | 35 | 20.6s |  |
+| 78 | `argstest-v5` | 4 | 20.1s |  |
+| 79 | `case-v5` | 39 | 20.5s |  |
+| 80 | `delete-v5` | 60 | 21.4s |  |
+| 81 | `delete-v6` | 60 | 21.6s |  |
+| 82 | `delete-v7` | 60 | 21.3s |  |
+| 83 | `delete-v8` | 60 | 21.2s |  |
+| 84 | `enumerate-v5` | 6 | 19.8s |  |
+| 85 | `enumerate-v6` | 49 | 20.9s |  |
+| 86 | `enumerate-v7` | 49 | 21.3s |  |
+| 87 | `enumerate-v8` | 49 | 21.1s |  |
+| 88 | `flash-v5` | 10 | 19.8s |  |
+| 89 | `flash-v6` | 10 | 19.9s |  |
+| 90 | `flash-v7` | 10 | 19.6s |  |
+| 91 | `swap-v5` | 7 | 19.5s |  |
+| 92 | `swap-v6` | 7 | 19.5s |  |
+| 93 | `swap-v7` | 7 | 19.6s |  |
+| 94 | `swap-v8` | 7 | 19.6s |  |
+| 95 | `targetPath-v5` | 12 | 19.8s |  |
 
 ## Ruffle-Matched Tests
 
@@ -135,27 +135,27 @@
 
 | # | Test | Our diffs | Ruffle diffs | Duration | Notes |
 |---|------|-----------|--------------|----------|-------|
-| 1 | `Camera-v6` | 57 | 57 | 22.4s |  |
-| 2 | `Camera-v7` | 57 | 57 | 22.8s |  |
-| 3 | `Camera-v8` | 57 | 57 | 22.1s |  |
-| 4 | `Inheritance-v5` | 1 | 17 | 22.5s |  |
-| 5 | `Inheritance-v6` | 9 | 16 | 23.9s |  |
-| 6 | `Inheritance-v7` | 5 | 10 | 24.0s |  |
-| 7 | `Inheritance-v8` | 5 | 10 | 24.1s |  |
-| 8 | `Math-v5` | 5 | 5 | 31.1s |  |
-| 9 | `Math-v6` | 5 | 5 | 31.0s |  |
-| 10 | `Math-v7` | 5 | 5 | 31.2s |  |
-| 11 | `Math-v8` | 5 | 5 | 31.3s |  |
-| 12 | `Microphone-v6` | 31 | 31 | 21.4s |  |
-| 13 | `Microphone-v7` | 31 | 31 | 21.4s |  |
-| 14 | `Microphone-v8` | 31 | 31 | 21.4s |  |
-| 15 | `Sound-v5` | 23 | 27 | 22.8s |  |
-| 16 | `case-v7` | 54 | 54 | 21.7s |  |
-| 17 | `case-v8` | 54 | 54 | 21.8s |  |
-| 18 | `ops-v8` | 7 | 11 | 27.3s |  |
-| 19 | `targetPath-v6` | 17 | 17 | 20.6s |  |
-| 20 | `targetPath-v7` | 17 | 17 | 20.6s |  |
-| 21 | `targetPath-v8` | 17 | 17 | 20.4s |  |
+| 1 | `Camera-v6` | 57 | 57 | 21.7s |  |
+| 2 | `Camera-v7` | 57 | 57 | 22.0s |  |
+| 3 | `Camera-v8` | 57 | 57 | 21.8s |  |
+| 4 | `Inheritance-v5` | 1 | 17 | 23.1s |  |
+| 5 | `Inheritance-v6` | 9 | 16 | 27.9s |  |
+| 6 | `Inheritance-v7` | 5 | 10 | 27.8s |  |
+| 7 | `Inheritance-v8` | 5 | 10 | 27.9s |  |
+| 8 | `Math-v5` | 5 | 5 | 30.4s |  |
+| 9 | `Math-v6` | 5 | 5 | 29.9s |  |
+| 10 | `Math-v7` | 5 | 5 | 30.3s |  |
+| 11 | `Math-v8` | 5 | 5 | 30.2s |  |
+| 12 | `Microphone-v6` | 31 | 31 | 22.2s |  |
+| 13 | `Microphone-v7` | 31 | 31 | 21.9s |  |
+| 14 | `Microphone-v8` | 31 | 31 | 22.1s |  |
+| 15 | `Sound-v5` | 23 | 27 | 22.9s |  |
+| 16 | `case-v7` | 54 | 54 | 21.6s |  |
+| 17 | `case-v8` | 54 | 54 | 21.7s |  |
+| 18 | `ops-v8` | 7 | 11 | 26.6s |  |
+| 19 | `targetPath-v6` | 17 | 17 | 19.9s |  |
+| 20 | `targetPath-v7` | 17 | 17 | 20.0s |  |
+| 21 | `targetPath-v8` | 17 | 17 | 20.1s |  |
 
 ## Near-Passing Tests
 
@@ -188,7 +188,7 @@ Tests with output mismatch but >= 50% line match rate (low-hanging fruit).
 | 21 | `System-v8` | 83.2% | 84 | 101 | 17 |  |
 | 22 | `System-v6` | 83.0% | 83 | 100 | 17 |  |
 | 23 | `Matrix-v8` | 82.7% | 139 | 168 | 29 |  |
-| 24 | `array-v5` | 82.3% | 461 | 560 | 99 |  |
+| 24 | `array-v5` | 82.0% | 459 | 560 | 101 |  |
 | 25 | `AsBroadcaster-v6` | 81.0% | 98 | 121 | 23 |  |
 | 26 | `HitTest-v8` | 80.7% | 71 | 88 | 17 |  |
 | 27 | `HitTest-v6` | 79.5% | 70 | 88 | 18 |  |
@@ -263,7 +263,7 @@ No timeouts.
 | 21 | `System-v8` | 83.2% | 84/101 | 101 | 101 |  |
 | 22 | `System-v6` | 83.0% | 83/100 | 100 | 100 |  |
 | 23 | `Matrix-v8` | 82.7% | 139/168 | 168 | 168 |  |
-| 24 | `array-v5` | 82.3% | 461/560 | 560 | 560 |  |
+| 24 | `array-v5` | 82.0% | 459/560 | 560 | 560 |  |
 | 25 | `AsBroadcaster-v6` | 81.0% | 98/121 | 121 | 121 |  |
 | 26 | `HitTest-v8` | 80.7% | 71/88 | 88 | 88 |  |
 | 27 | `HitTest-v6` | 79.5% | 70/88 | 88 | 88 |  |
