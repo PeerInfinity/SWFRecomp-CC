@@ -1,17 +1,21 @@
 {
   "metadata": {
-    "old_timestamp": "2026-04-13T23:00:07.787553+00:00",
-    "old_git_sha": "1d207c1674234150af881cc2dd29a321a54a0af1",
-    "new_timestamp": "2026-04-14T00:48:27.772324+00:00",
-    "new_git_sha": "c3d9506ef0b3cc172159d2cfc7edf3c3568db878",
+    "old_timestamp": "2026-04-14T00:48:27.772324+00:00",
+    "old_git_sha": "c3d9506ef0b3cc172159d2cfc7edf3c3568db878",
+    "new_timestamp": "2026-04-14T01:19:03.844849+00:00",
+    "new_git_sha": "f9b8102de811819c7fd49fd2b654ea9ea9ab46d8",
     "partial": false,
     "same_commit": false
   },
   "summary": {
     "old_pass": 7,
+    "old_ruffle_matched": 0,
+    "old_effective_pass": 7,
     "old_total": 9,
     "old_pass_rate": 77.8,
     "new_pass": 7,
+    "new_ruffle_matched": 1,
+    "new_effective_pass": 8,
     "new_total": 9,
     "new_pass_rate": 77.8,
     "old_mismatched_lines": 58,
@@ -20,27 +24,10 @@
     "decreased_mismatches": 0,
     "newly_passing": 0,
     "newly_failing": 0,
-    "status_changed": 1,
-    "unchanged": 8,
+    "status_changed": 0,
+    "unchanged": 9,
     "added": 0,
     "removed": 0
   },
-  "changes": [
-    {
-      "test": "TextFieldTest",
-      "change_type": "changed",
-      "old_status": "output_mismatch",
-      "new_status": "ruffle_matched",
-      "old_lines": {
-        "actual_lines": 8,
-        "expected_lines": 8,
-        "matching_lines": 7
-      },
-      "new_lines": {
-        "actual_lines": 8,
-        "expected_lines": 8,
-        "matching_lines": 7
-      }
-    }
-  ]
+  "changes": []
 }
