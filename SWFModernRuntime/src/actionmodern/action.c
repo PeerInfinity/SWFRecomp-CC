@@ -9029,17 +9029,22 @@ static ActionVar pointDistance(SWFAppContext* app_context, ActionVar* args, u32 
 {
 	(void)registers; (void)this_obj;
 	ActionVar r = {0};
-	// Gnash: Point.distance() with < 2 args returns undefined (not NaN).
-	if (arg_count < 2) { r.type = ACTION_STACK_VALUE_UNDEFINED; return r; }
-
-	// First arg must be Point-ish (walks __proto__ chain). Second arg only
-	// needs to be an object — Gnash allows non-Point second args.
-	if (args[0].type != ACTION_STACK_VALUE_OBJECT || args[0].data.numeric_value == 0 ||
+	// First arg must be a Point instance (walks __proto__ chain). Everything
+	// else → undefined. Covers Gnash `Point.distance()` / `Point.distance(undefined)`
+	// and `Point.distance({x,y}, ...)`.
+	if (arg_count == 0 ||
+	    args[0].type != ACTION_STACK_VALUE_OBJECT || args[0].data.numeric_value == 0 ||
 	    !objIsPointInstance((ASObject*)args[0].data.numeric_value)) {
 		r.type = ACTION_STACK_VALUE_UNDEFINED; return r;
 	}
-	if (args[1].type != ACTION_STACK_VALUE_OBJECT || args[1].data.numeric_value == 0) {
-		r.type = ACTION_STACK_VALUE_UNDEFINED; return r;
+	// Second arg missing or non-object → NaN (Ruffle avm1 `point` test:
+	// `Point.distance(new Point())` → NaN). Gnash allows non-Point objects as
+	// second arg (e.g., plain `{x,y}` literals compute normally).
+	if (arg_count < 2 ||
+	    args[1].type != ACTION_STACK_VALUE_OBJECT || args[1].data.numeric_value == 0) {
+		r.type = ACTION_STACK_VALUE_F64;
+		VAL(double, &r.data.numeric_value) = NAN;
+		return r;
 	}
 
 	ASObject* p1 = (ASObject*)args[0].data.numeric_value;
