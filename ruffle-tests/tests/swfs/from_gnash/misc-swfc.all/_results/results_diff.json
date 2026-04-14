@@ -1,16 +1,16 @@
 {
   "metadata": {
-    "old_timestamp": "2026-04-14T00:48:27.778146+00:00",
-    "old_git_sha": "c3d9506ef0b3cc172159d2cfc7edf3c3568db878",
-    "new_timestamp": "2026-04-14T01:19:03.852622+00:00",
-    "new_git_sha": "f9b8102de811819c7fd49fd2b654ea9ea9ab46d8",
+    "old_timestamp": "2026-04-14T01:19:03.852622+00:00",
+    "old_git_sha": "f9b8102de811819c7fd49fd2b654ea9ea9ab46d8",
+    "new_timestamp": "2026-04-14T03:19:57.439519+00:00",
+    "new_git_sha": "c7e52269f46d78aaa09b0498187f948a2f75e1f5",
     "partial": false,
     "same_commit": false
   },
   "summary": {
     "old_pass": 2,
-    "old_ruffle_matched": 0,
-    "old_effective_pass": 2,
+    "old_ruffle_matched": 3,
+    "old_effective_pass": 5,
     "old_total": 16,
     "old_pass_rate": 12.5,
     "new_pass": 2,
