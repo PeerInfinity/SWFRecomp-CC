@@ -1,10 +1,10 @@
 # Ruffle Test Results (Filtered)
 
-**Date**: 2026-04-14 03:19 UTC
+**Date**: 2026-04-14 19:00 UTC
 
-**Git SHA**: `c7e52269f4`
+**Git SHA**: `0eddf89639`
 
-**Run Duration**: 30m 4s
+**Run Duration**: 30m 12s
 
 **Filtered**: 0 tests ignored out of 92 available
 
@@ -33,54 +33,54 @@
 
 | # | Test | Lines | Duration | Notes |
 |---|------|-------|----------|-------|
-| 1 | `add` | 11 | 19.4s |  |
-| 2 | `avm1/array` | 7 | 19.4s |  |
-| 3 | `avm1/bitmapdata/getPixel` | 2 | 19.6s |  |
-| 4 | `avm1/callee` | 2 | 18.9s |  |
-| 5 | `avm1/depth` | 6 | 19.0s |  |
-| 6 | `avm1/doactionorder/symbolclass` | 4 | 19.1s |  |
-| 7 | `avm1/externalinterface` | 4 | 19.0s |  |
-| 8 | `avm1/filters` | 149 | 19.2s |  |
-| 9 | `avm1/haxe/flocons1` | 2 | 19.1s |  |
+| 1 | `add` | 11 | 19.7s |  |
+| 2 | `avm1/array` | 7 | 19.6s |  |
+| 3 | `avm1/bitmapdata/getPixel` | 2 | 19.4s |  |
+| 4 | `avm1/callee` | 2 | 19.4s |  |
+| 5 | `avm1/depth` | 6 | 19.3s |  |
+| 6 | `avm1/doactionorder/symbolclass` | 4 | 19.6s |  |
+| 7 | `avm1/externalinterface` | 4 | 19.9s |  |
+| 8 | `avm1/filters` | 149 | 19.9s |  |
+| 9 | `avm1/haxe/flocons1` | 2 | 19.2s |  |
 | 10 | `avm1/label` | 4 | 19.0s |  |
 | 11 | `avm1/levels` | 9 | 18.9s |  |
-| 12 | `avm1/loadevent` | 9 | 19.1s |  |
-| 13 | `avm1/loadvariables/loadvariables` | 7 | 19.3s |  |
-| 14 | `avm1/lookup` | 3 | 19.1s |  |
-| 15 | `avm1/mouse-transparency` | 1 | 19.0s |  |
-| 16 | `avm1/nativeinheritance` | 6 | 19.1s |  |
-| 17 | `avm1/nested-button` | 1 | 19.3s |  |
-| 18 | `avm1/operations` | 13 | 19.3s |  |
-| 19 | `avm1/property-paths/property-paths-7` | 7 | 18.9s |  |
-| 20 | `avm1/propertycase/propertycase` | 7 | 18.9s |  |
-| 21 | `avm1/propertycase/propertycase-preserving-7` | 5 | 19.0s |  |
-| 22 | `avm1/rollover` | 4 | 19.6s |  |
-| 23 | `avm1/scope` | 14 | 19.3s |  |
-| 24 | `avm1/setinterval` | 20 | 19.9s |  |
-| 25 | `avm1/settimeout` | 17 | 20.0s |  |
-| 26 | `avm1/super` | 11 | 19.7s |  |
-| 27 | `avm1/target` | 18 | 20.5s |  |
-| 28 | `avm1/text-bind` | 0 | 20.0s |  |
-| 29 | `avm1/undefined/undefined-swf6` | 39 | 19.5s |  |
-| 30 | `avm1/undefined/undefined-swf7` | 39 | 19.5s |  |
-| 31 | `avm1/watch` | 2 | 19.0s |  |
-| 32 | `avm1/xml/xmlbuild` | 1 | 19.1s |  |
-| 33 | `avm1/xml/xmlstring` | 9 | 19.4s |  |
-| 34 | `avm1timeline1` | 3 | 19.2s |  |
-| 35 | `avm1timeline2` | 6 | 19.1s |  |
-| 36 | `button3` | 1 | 19.9s |  |
-| 37 | `doubleAndRegister` | 2 | 19.8s |  |
-| 38 | `fscommand1` | 1 | 19.5s |  |
-| 39 | `fuzz/0db0a01a92ae6ad0d2805dcfbac2ddf9a9689e77cd007924adfac57b543b1ed2` | 0 | 19.5s |  |
-| 40 | `fuzz/6f3b6cbd618b5b816edbf27e14f631aef42da1a4bcc467fb1aa2951d6c85ee48` | 0 | 19.9s |  |
+| 12 | `avm1/loadevent` | 9 | 19.0s |  |
+| 13 | `avm1/loadvariables/loadvariables` | 7 | 21.1s |  |
+| 14 | `avm1/lookup` | 3 | 21.0s |  |
+| 15 | `avm1/mouse-transparency` | 1 | 19.1s |  |
+| 16 | `avm1/nativeinheritance` | 6 | 18.9s |  |
+| 17 | `avm1/nested-button` | 1 | 19.1s |  |
+| 18 | `avm1/operations` | 13 | 19.0s |  |
+| 19 | `avm1/property-paths/property-paths-7` | 7 | 21.5s |  |
+| 20 | `avm1/propertycase/propertycase` | 7 | 21.2s |  |
+| 21 | `avm1/propertycase/propertycase-preserving-7` | 5 | 19.1s |  |
+| 22 | `avm1/rollover` | 4 | 18.9s |  |
+| 23 | `avm1/scope` | 14 | 19.1s |  |
+| 24 | `avm1/setinterval` | 20 | 19.6s |  |
+| 25 | `avm1/settimeout` | 17 | 19.2s |  |
+| 26 | `avm1/super` | 11 | 19.8s |  |
+| 27 | `avm1/target` | 18 | 21.0s |  |
+| 28 | `avm1/text-bind` | 0 | 21.2s |  |
+| 29 | `avm1/undefined/undefined-swf6` | 39 | 19.9s |  |
+| 30 | `avm1/undefined/undefined-swf7` | 39 | 19.7s |  |
+| 31 | `avm1/watch` | 2 | 15.7s |  |
+| 32 | `avm1/xml/xmlbuild` | 1 | 15.4s |  |
+| 33 | `avm1/xml/xmlstring` | 9 | 19.8s |  |
+| 34 | `avm1timeline1` | 3 | 19.5s |  |
+| 35 | `avm1timeline2` | 6 | 19.8s |  |
+| 36 | `button3` | 1 | 19.4s |  |
+| 37 | `doubleAndRegister` | 2 | 19.4s |  |
+| 38 | `fscommand1` | 1 | 19.1s |  |
+| 39 | `fuzz/0db0a01a92ae6ad0d2805dcfbac2ddf9a9689e77cd007924adfac57b543b1ed2` | 0 | 18.9s |  |
+| 40 | `fuzz/6f3b6cbd618b5b816edbf27e14f631aef42da1a4bcc467fb1aa2951d6c85ee48` | 0 | 18.6s |  |
 | 41 | `fuzz/9cad44804736a4fbd806d349c97b81d33c3f09ed4d9278acc4ef5cfbab147f3c` | 0 | 19.0s |  |
-| 42 | `gradientTransform` | 0 | 19.0s |  |
+| 42 | `gradientTransform` | 0 | 18.9s |  |
 | 43 | `invalidClipDepth` | 0 | 19.3s |  |
 | 44 | `movieinfo1` | 3 | 18.8s |  |
-| 45 | `targetPath1` | 8 | 19.1s |  |
-| 46 | `timeline/timeline_as2_2` | 3 | 19.0s |  |
-| 47 | `timeline/timeline_as2_3` | 3 | 19.2s |  |
-| 48 | `timeline/timeline_as2_4` | 2 | 19.2s |  |
+| 45 | `targetPath1` | 8 | 19.5s |  |
+| 46 | `timeline/timeline_as2_2` | 3 | 19.2s |  |
+| 47 | `timeline/timeline_as2_3` | 3 | 19.6s |  |
+| 48 | `timeline/timeline_as2_4` | 2 | 19.4s |  |
 
 ## Ruffle-Matched Tests
 
@@ -88,7 +88,7 @@
 
 | # | Test | Our diffs | Ruffle diffs | Duration | Notes |
 |---|------|-----------|--------------|----------|-------|
-| 1 | `avm1/hitarea` | 2 | 2 | 19.0s |  |
+| 1 | `avm1/hitarea` | 2 | 2 | 19.2s |  |
 
 ## Near-Passing Tests
 
