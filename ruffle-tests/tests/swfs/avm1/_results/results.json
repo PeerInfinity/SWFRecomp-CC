@@ -9,11 +9,10 @@
   },
   "total": 641,
   "pass": 580,
-  "fail": 61,
+  "fail": 56,
   "pass_rate": 90.5,
   "breakdown": {
     "output_mismatch": 55,
-    "ruffle_matched": 5,
     "compile_fail": 1
   },
   "tests": [
@@ -7244,5 +7243,8 @@
       "duration": 19.63,
       "status": "pass"
     }
-  ]
+  ],
+  "ruffle_matched": 5,
+  "effective_pass": 585,
+  "effective_pass_rate": 91.3
 }

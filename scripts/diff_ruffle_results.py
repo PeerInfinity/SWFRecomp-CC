@@ -105,17 +105,21 @@ def diff_results(old, new, partial=False):
     old_meta = old.get("metadata", {})
     new_meta = new.get("metadata", {})
 
+    # `ruffle_matched` is promoted-from-mismatch and counts as a pass for
+    # newly_passing / newly_failing stats — a test that flips from
+    # output_mismatch to ruffle_matched is a win, not a status regression.
+    PASS_LIKE = {"pass", "ruffle_matched"}
     newly_passing = sum(
         1 for c in changes
         if c["change_type"] == "changed"
-        and c["old_status"] != "pass"
-        and c["new_status"] == "pass"
+        and c["old_status"] not in PASS_LIKE
+        and c["new_status"] in PASS_LIKE
     )
     newly_failing = sum(
         1 for c in changes
         if c["change_type"] == "changed"
-        and c["old_status"] == "pass"
-        and c["new_status"] != "pass"
+        and c["old_status"] in PASS_LIKE
+        and c["new_status"] not in PASS_LIKE
     )
     added = sum(1 for c in changes if c["change_type"] == "added")
     removed = sum(1 for c in changes if c["change_type"] == "removed")
@@ -169,9 +173,15 @@ def diff_results(old, new, partial=False):
 
     summary = {
         "old_pass": old.get("pass", 0),
+        "old_ruffle_matched": old.get("ruffle_matched", 0),
+        "old_effective_pass": old.get("effective_pass",
+                                       old.get("pass", 0) + old.get("ruffle_matched", 0)),
         "old_total": old.get("total", 0),
         "old_pass_rate": old.get("pass_rate", 0),
         "new_pass": new.get("pass", 0),
+        "new_ruffle_matched": new.get("ruffle_matched", 0),
+        "new_effective_pass": new.get("effective_pass",
+                                       new.get("pass", 0) + new.get("ruffle_matched", 0)),
         "new_total": new.get("total", 0),
         "new_pass_rate": new.get("pass_rate", 0),
         "old_mismatched_lines": old_mismatched,

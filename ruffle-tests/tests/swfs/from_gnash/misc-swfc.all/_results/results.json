@@ -9,12 +9,11 @@
   },
   "total": 16,
   "pass": 2,
-  "fail": 14,
+  "fail": 11,
   "pass_rate": 12.5,
   "breakdown": {
-    "ruffle_matched": 3,
-    "runtime_error": 1,
-    "output_mismatch": 10
+    "output_mismatch": 10,
+    "runtime_error": 1
   },
   "tests": [
     {
@@ -233,5 +232,8 @@
       "actual_output": "... (16 lines before) ...\nPASSED: null == undefined [swf4opcode.sc:107]\nPASSED: null == 0 [swf4opcode.sc:108]\nPASSED: NaN == 0 [swf4opcode.sc:112]\nPASSED: (x+y) == 5 [swf4opcode.sc:125]\nPASSED: y > x [swf4opcode.sc:126]\nFAILED: !neg [swf4opcode.sc:128]\nFAILED: !neg [swf4opcode.sc:130]\nPASSED: y == 0 [swf4opcode.sc:132]\nPASSED: y == 4 [swf4opcode.sc:134]\nPASSED: y == 4.5 [swf4opcode.sc:137]\nPASSED: y == 4 [swf4opcode.sc:139]\nPASSED: y == 45000 [swf4opcode.sc:142]\nPASSED: y == 45000 [swf4opcode.sc:144]\nPASSED: y == 45000 [swf4opcode.sc:146]\nPASSED: y == -45000 [swf4opcode.sc:148]\nPASSED: y == 45000 [swf4opcode.sc:150]\nPASSED: y == 0.00045 [swf4opcode.sc:152]\nPASSED: y == -0.00045 [swf4opcode.sc:154]\nPASSED: x+1 == 21 [swf4opcode.sc:156]\nPASSED: !\"\" [swf4opcode.sc:160]\nPASSED: !\"a\" [swf4opcode.sc:161]\nPASSED: !\"true\" [swf4opcode.sc:162]\nPASSED: !\"fals\"\" [swf4opcode.sc:163]\nPASSED: \"1\" [swf4opcode.sc:164]\nPASSED: !\"0000.000\" [swf4opcode.sc:165]\nPASSED: !false [swf4opcode.sc:166]\nPASSED: true [swf4opcode.sc:167]\nPASSED: !0 [swf4opcode.sc:168]\nPASSED: 4 [swf4opcode.sc:169]\nPASSED: !_root [swf4opcode.sc:170]\nPASSED: !_level0 [swf4opcode.sc:171]\nPASSED: !null [swf4opcode.sc:172]\nPASSED: !undefined [swf4opcode.sc:173]\nPASSED: ! (x < y) [swf4opcode.sc:182]\nPASSED: ! (x > y) [swf4opcode.sc:183]\nPASSED: x == y [swf4opcode.sc:184]\nPASSED: x == 0 [swf4opcode.sc:185]\nPASSED: z == 0 [swf4opcode.sc:193]\nPASSED: z == 0 [swf4opcode.sc:195]\nPASSED: z == 1 [swf4opcode.sc:197]\nPASSED: z == -1 [swf4opcode.sc:199]\nPASSED: /mc1:_x == undefined [swf4opcode.sc:222]\nFAILED: expected: 100 obtained:  [swf4opcode.sc:224]\nFAILED: expected: 100 obtained:  [swf4opcode.sc:226]\nFAILED: expected: 100 obtained:  [swf4opcode.sc:228]\nPASSED: /mc1.x == 0 [swf4opcode.sc:230]\nFAILED: expected: 100 obtained:  [swf4opcode.sc:232]\nPASSED: /mc1.x == 0 [swf4opcode.sc:235]\nFAILED: expected: 100 obtained:  [swf4opcode.sc:239]\nPASSED: /mc1:_y == undefined [swf4opcode.sc:242]\n... (51 lines after) ...",
       "expected_output": "... (16 lines before) ...\nPASSED: null == undefined [swf4opcode.sc:107]\nPASSED: null == 0 [swf4opcode.sc:108]\nPASSED: NaN == 0 [swf4opcode.sc:112]\nPASSED: (x+y) == 5 [swf4opcode.sc:125]\nPASSED: y > x [swf4opcode.sc:126]\nPASSED: !neg [swf4opcode.sc:128]\nPASSED: !neg [swf4opcode.sc:130]\nPASSED: y == 0 [swf4opcode.sc:132]\nPASSED: y == 4 [swf4opcode.sc:134]\nPASSED: y == 4.5 [swf4opcode.sc:137]\nPASSED: y == 4 [swf4opcode.sc:139]\nPASSED: y == 45000 [swf4opcode.sc:142]\nPASSED: y == 45000 [swf4opcode.sc:144]\nPASSED: y == 45000 [swf4opcode.sc:146]\nPASSED: y == -45000 [swf4opcode.sc:148]\nPASSED: y == 45000 [swf4opcode.sc:150]\nPASSED: y == 0.00045 [swf4opcode.sc:152]\nPASSED: y == -0.00045 [swf4opcode.sc:154]\nPASSED: x+1 == 21 [swf4opcode.sc:156]\nPASSED: !\"\" [swf4opcode.sc:160]\nPASSED: !\"a\" [swf4opcode.sc:161]\nPASSED: !\"true\" [swf4opcode.sc:162]\nPASSED: !\"fals\"\" [swf4opcode.sc:163]\nPASSED: \"1\" [swf4opcode.sc:164]\nPASSED: !\"0000.000\" [swf4opcode.sc:165]\nPASSED: !false [swf4opcode.sc:166]\nPASSED: true [swf4opcode.sc:167]\nPASSED: !0 [swf4opcode.sc:168]\nPASSED: 4 [swf4opcode.sc:169]\nPASSED: !_root [swf4opcode.sc:170]\nPASSED: !_level0 [swf4opcode.sc:171]\nPASSED: !null [swf4opcode.sc:172]\nPASSED: !undefined [swf4opcode.sc:173]\nPASSED: ! (x < y) [swf4opcode.sc:182]\nPASSED: ! (x > y) [swf4opcode.sc:183]\nPASSED: x == y [swf4opcode.sc:184]\nPASSED: x == 0 [swf4opcode.sc:185]\nPASSED: z == 0 [swf4opcode.sc:193]\nPASSED: z == 0 [swf4opcode.sc:195]\nPASSED: z == 1 [swf4opcode.sc:197]\nPASSED: z == -1 [swf4opcode.sc:199]\nPASSED: /mc1:_x == undefined [swf4opcode.sc:222]\nPASSED: /mc1.x == 100 [swf4opcode.sc:224]\nPASSED: /mc1.x == 100 [swf4opcode.sc:226]\nPASSED: /mc1.x == 100 [swf4opcode.sc:228]\nPASSED: /mc1.x == 0 [swf4opcode.sc:230]\nPASSED: /mc1.x == 100 [swf4opcode.sc:232]\nPASSED: /mc1.x == 0 [swf4opcode.sc:235]\nPASSED: /mc1.x == 100 [swf4opcode.sc:239]\nPASSED: /mc1:_y == undefined [swf4opcode.sc:242]\n... (51 lines after) ..."
     }
-  ]
+  ],
+  "ruffle_matched": 3,
+  "effective_pass": 5,
+  "effective_pass_rate": 31.2
 }

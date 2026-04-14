@@ -12,7 +12,9 @@
 |--------|-------|
 | Total tests | 16 |
 | Passing | **2** (12.5%) |
-| Failing | 14 |
+| Ruffle-matched | 3 (diffs ⊆ Ruffle's against Flash) |
+| Effective pass | **5** (31.2%) |
+| Failing | 11 |
 | Total expected lines | 499 |
 | Matching lines | 222 (44.5%) |
 | Mismatched lines | 277 |
@@ -21,8 +23,8 @@
 
 | Category | Count | % of Failures |
 |----------|-------|---------------|
-| Output Mismatch | 10 | 71.4% |
-| Runtime Error | 1 | 7.1% |
+| Output Mismatch | 10 | 90.9% |
+| Runtime Error | 1 | 9.1% |
 
 ## Passing Tests
 

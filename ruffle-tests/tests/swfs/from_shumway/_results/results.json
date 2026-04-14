@@ -9,11 +9,10 @@
   },
   "total": 92,
   "pass": 48,
-  "fail": 44,
+  "fail": 43,
   "pass_rate": 52.2,
   "breakdown": {
-    "output_mismatch": 43,
-    "ruffle_matched": 1
+    "output_mismatch": 43
   },
   "tests": [
     {
@@ -1160,5 +1159,8 @@
       "actual_output": "gotoAndPlay\nplay\nstop",
       "expected_output": "gotoAndPlay\nstop\nplay\nend"
     }
-  ]
+  ],
+  "ruffle_matched": 1,
+  "effective_pass": 49,
+  "effective_pass_rate": 53.3
 }

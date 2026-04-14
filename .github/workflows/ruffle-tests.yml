@@ -198,12 +198,30 @@ jobs:
                   with open(fj) as f:
                       rf = json.load(f)
                   ignored = rf["metadata"].get("ignored_count", 0)
+                  rf_rm = rf.get("ruffle_matched", 0)
+                  rf_eff = rf.get("effective_pass", rf["pass"])
+                  rf_eff_rate = rf.get("effective_pass_rate", rf["pass_rate"])
+                  r_rm = r.get("ruffle_matched", 0)
                   print(f"### {cat}")
-                  print(f"**{rf['pass']}/{rf['total']}** passing ({rf['pass_rate']}%) — filtered")
-                  print(f"({r['pass']}/{r['total']} raw, {ignored} ignored)\n")
+                  if rf_rm:
+                      print(f"**{rf_eff}/{rf['total']}** effective ({rf_eff_rate}%)"
+                            f" = {rf['pass']} pass + {rf_rm} ruffle_matched — filtered")
+                  else:
+                      print(f"**{rf['pass']}/{rf['total']}** passing ({rf['pass_rate']}%) — filtered")
+                  if r_rm:
+                      print(f"({r['pass']}+{r_rm} rm / {r['total']} raw, {ignored} ignored)\n")
+                  else:
+                      print(f"({r['pass']}/{r['total']} raw, {ignored} ignored)\n")
               except FileNotFoundError:
+                  r_rm = r.get("ruffle_matched", 0)
                   print(f"### {cat}")
-                  print(f"**{r['pass']}/{r['total']}** passing ({r['pass_rate']}%)\n")
+                  if r_rm:
+                      r_eff = r.get("effective_pass", r["pass"])
+                      r_eff_rate = r.get("effective_pass_rate", r["pass_rate"])
+                      print(f"**{r_eff}/{r['total']}** effective ({r_eff_rate}%)"
+                            f" = {r['pass']} pass + {r_rm} ruffle_matched\n")
+                  else:
+                      print(f"**{r['pass']}/{r['total']}** passing ({r['pass_rate']}%)\n")
               if m.get("git_sha"):
                   print(f"Commit: `{m['git_sha'][:12]}`")
               if r.get("breakdown"):
@@ -595,6 +613,7 @@ jobs:
               git_sha = None
               breakdown = {}
               pass_count = 0
+              ruffle_matched_count = 0
               interrupted_shards = 0
 
               for f in files:
@@ -607,12 +626,20 @@ jobs:
                   if not git_sha:
                       git_sha = m.get("git_sha")
                   pass_count += data.get("pass", 0)
+                  ruffle_matched_count += data.get("ruffle_matched", 0)
                   for k, v in data.get("breakdown", {}).items():
                       breakdown[k] = breakdown.get(k, 0) + v
                   if m.get("interrupted"):
                       interrupted_shards += 1
 
+              # ruffle_matched lives in the shard breakdowns as an info entry —
+              # strip it here because the combined report surfaces it as a
+              # dedicated top-level field and the "breakdown" section is
+              # reserved for genuine failure categories.
+              breakdown.pop("ruffle_matched", None)
+
               total = len(combined_tests)
+              effective_pass = pass_count + ruffle_matched_count
               metadata = {
                   "timestamp": datetime.now(timezone.utc).isoformat(),
                   "git_sha": git_sha,
@@ -634,8 +661,11 @@ jobs:
                   "metadata": metadata,
                   "total": total,
                   "pass": pass_count,
-                  "fail": total - pass_count,
+                  "ruffle_matched": ruffle_matched_count,
+                  "fail": total - effective_pass,
                   "pass_rate": round(100 * pass_count / total, 1) if total else 0,
+                  "effective_pass": effective_pass,
+                  "effective_pass_rate": round(100 * effective_pass / total, 1) if total else 0,
                   "breakdown": {k: v for k, v in breakdown.items() if v},
                   "tests": sorted(combined_tests, key=lambda t: t["test"]),
               }
@@ -644,10 +674,13 @@ jobs:
               with open(f"{out_dir}/results.json", "w") as fp:
                   json.dump(report, fp, indent=2)
 
-              if missing_shards > 0:
-                  print(f"  {pass_count}/{total} passing ({report['pass_rate']}%) — INCOMPLETE ({missing_shards} shards missing)")
+              suffix = f" — INCOMPLETE ({missing_shards} shards missing)" if missing_shards > 0 else ""
+              if ruffle_matched_count:
+                  print(f"  {pass_count}/{total} passing ({report['pass_rate']}%),"
+                        f" +{ruffle_matched_count} ruffle_matched →"
+                        f" {effective_pass}/{total} effective ({report['effective_pass_rate']}%){suffix}")
               else:
-                  print(f"  {pass_count}/{total} passing ({report['pass_rate']}%)")
+                  print(f"  {pass_count}/{total} passing ({report['pass_rate']}%){suffix}")
           EOF
 
       - name: Verify Flash-spec expected output
@@ -698,12 +731,30 @@ jobs:
                   with open(fj) as f:
                       rf = json.load(f)
                   ignored = rf["metadata"].get("ignored_count", 0)
+                  rf_rm = rf.get("ruffle_matched", 0)
+                  rf_eff = rf.get("effective_pass", rf["pass"])
+                  rf_eff_rate = rf.get("effective_pass_rate", rf["pass_rate"])
+                  r_rm = r.get("ruffle_matched", 0)
                   print(f"### {cat}")
-                  print(f"**{rf['pass']}/{rf['total']}** passing ({rf['pass_rate']}%) — filtered")
-                  print(f"({r['pass']}/{r['total']} raw, {ignored} ignored)\n")
+                  if rf_rm:
+                      print(f"**{rf_eff}/{rf['total']}** effective ({rf_eff_rate}%)"
+                            f" = {rf['pass']} pass + {rf_rm} ruffle_matched — filtered")
+                  else:
+                      print(f"**{rf['pass']}/{rf['total']}** passing ({rf['pass_rate']}%) — filtered")
+                  if r_rm:
+                      print(f"({r['pass']}+{r_rm} rm / {r['total']} raw, {ignored} ignored)\n")
+                  else:
+                      print(f"({r['pass']}/{r['total']} raw, {ignored} ignored)\n")
               except FileNotFoundError:
+                  r_rm = r.get("ruffle_matched", 0)
                   print(f"### {cat}")
-                  print(f"**{r['pass']}/{r['total']}** passing ({r['pass_rate']}%)\n")
+                  if r_rm:
+                      r_eff = r.get("effective_pass", r["pass"])
+                      r_eff_rate = r.get("effective_pass_rate", r["pass_rate"])
+                      print(f"**{r_eff}/{r['total']}** effective ({r_eff_rate}%)"
+                            f" = {r['pass']} pass + {r_rm} ruffle_matched\n")
+                  else:
+                      print(f"**{r['pass']}/{r['total']}** passing ({r['pass_rate']}%)\n")
               if m.get("incomplete"):
                   ms = m.get("missing_shards", 0)
                   es = m.get("expected_shards", 0)
