@@ -1,17 +1,21 @@
 {
   "metadata": {
-    "old_timestamp": "2026-04-13T23:00:07.795463+00:00",
-    "old_git_sha": "1d207c1674234150af881cc2dd29a321a54a0af1",
-    "new_timestamp": "2026-04-14T00:48:27.778146+00:00",
-    "new_git_sha": "c3d9506ef0b3cc172159d2cfc7edf3c3568db878",
+    "old_timestamp": "2026-04-14T00:48:27.778146+00:00",
+    "old_git_sha": "c3d9506ef0b3cc172159d2cfc7edf3c3568db878",
+    "new_timestamp": "2026-04-14T01:19:03.852622+00:00",
+    "new_git_sha": "f9b8102de811819c7fd49fd2b654ea9ea9ab46d8",
     "partial": false,
     "same_commit": false
   },
   "summary": {
     "old_pass": 2,
+    "old_ruffle_matched": 0,
+    "old_effective_pass": 2,
     "old_total": 16,
     "old_pass_rate": 12.5,
     "new_pass": 2,
+    "new_ruffle_matched": 3,
+    "new_effective_pass": 5,
     "new_total": 16,
     "new_pass_rate": 12.5,
     "old_mismatched_lines": 277,
@@ -20,59 +24,10 @@
     "decreased_mismatches": 0,
     "newly_passing": 0,
     "newly_failing": 0,
-    "status_changed": 3,
-    "unchanged": 13,
+    "status_changed": 0,
+    "unchanged": 16,
     "added": 0,
     "removed": 0
   },
-  "changes": [
-    {
-      "test": "action_execution_order_test10",
-      "change_type": "changed",
-      "old_status": "output_mismatch",
-      "new_status": "ruffle_matched",
-      "old_lines": {
-        "actual_lines": 10,
-        "expected_lines": 16,
-        "matching_lines": 2
-      },
-      "new_lines": {
-        "actual_lines": 10,
-        "expected_lines": 16,
-        "matching_lines": 2
-      }
-    },
-    {
-      "test": "movieclip_destruction_test1",
-      "change_type": "changed",
-      "old_status": "output_mismatch",
-      "new_status": "ruffle_matched",
-      "old_lines": {
-        "actual_lines": 35,
-        "expected_lines": 52,
-        "matching_lines": 0
-      },
-      "new_lines": {
-        "actual_lines": 35,
-        "expected_lines": 52,
-        "matching_lines": 0
-      }
-    },
-    {
-      "test": "registerclass_test3",
-      "change_type": "changed",
-      "old_status": "output_mismatch",
-      "new_status": "ruffle_matched",
-      "old_lines": {
-        "actual_lines": 27,
-        "expected_lines": 27,
-        "matching_lines": 7
-      },
-      "new_lines": {
-        "actual_lines": 27,
-        "expected_lines": 27,
-        "matching_lines": 7
-      }
-    }
-  ]
+  "changes": []
 }
