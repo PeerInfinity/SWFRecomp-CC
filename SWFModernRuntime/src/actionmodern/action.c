@@ -8772,6 +8772,29 @@ static void avAdditionEcma(SWFAppContext* app_context, ActionVar* a, ActionVar* 
 	*out = makeF64(av + bv);
 }
 
+extern ASObject* global_object;
+
+// Lookup the wrapper prototype (String.prototype/Number.prototype/Boolean.prototype)
+// for a primitive ActionVar type, via _global's ctor binding. Used by Point.add
+// to auto-box primitive args so `.x`/`.y` lookups dispatch through the wrapper's
+// prototype (Gnash tests `String.prototype.x = 3; p.add('1')`).
+static ASObject* getPrimitiveWrapperProto(u8 type)
+{
+	const char* name = NULL; u32 nlen = 0;
+	switch (type) {
+		case ACTION_STACK_VALUE_STRING:  name = "String";  nlen = 6; break;
+		case ACTION_STACK_VALUE_F32:
+		case ACTION_STACK_VALUE_F64:     name = "Number";  nlen = 6; break;
+		case ACTION_STACK_VALUE_BOOLEAN: name = "Boolean"; nlen = 7; break;
+		default: return NULL;
+	}
+	if (global_object == NULL) return NULL;
+	ActionVar* cv = getPropertyWithPrototype(global_object, name, nlen);
+	if (cv == NULL || cv->type != ACTION_STACK_VALUE_FUNCTION) return NULL;
+	ASFunction* cf = (ASFunction*)(uintptr_t) cv->data.numeric_value;
+	return cf ? cf->prototype_obj : NULL;
+}
+
 static ActionVar pointAdd(SWFAppContext* app_context, ActionVar* args, u32 arg_count, ActionVar* registers, void* this_obj)
 {
 	(void)registers;
@@ -8783,8 +8806,16 @@ static ActionVar pointAdd(SWFAppContext* app_context, ActionVar* args, u32 arg_c
 	ActionVar* oy = NULL;
 	if (arg_count > 0 && args[0].type == ACTION_STACK_VALUE_OBJECT && args[0].data.numeric_value != 0) {
 		ASObject* pt = (ASObject*)args[0].data.numeric_value;
-		ox = getProperty(pt, "x", 1);
-		oy = getProperty(pt, "y", 1);
+		ox = getPropertyWithPrototype(pt, "x", 1);
+		oy = getPropertyWithPrototype(pt, "y", 1);
+	} else if (arg_count > 0) {
+		// Primitive arg (string/number/boolean): look up .x/.y via the wrapper
+		// prototype. Gnash: `String.prototype.x = 3; p.add('1')` → x picks up 3.
+		ASObject* wrapper_proto = getPrimitiveWrapperProto(args[0].type);
+		if (wrapper_proto != NULL) {
+			ox = getPropertyWithPrototype(wrapper_proto, "x", 1);
+			oy = getPropertyWithPrototype(wrapper_proto, "y", 1);
+		}
 	}
 	// Missing or non-object arg → other.x/y are undefined (not missing),
 	// so `this.x + undefined` string-concats to "xundefined" per Gnash tests.
@@ -8824,6 +8855,8 @@ static ActionVar pointSubtract(SWFAppContext* app_context, ActionVar* args, u32 
 	r.data.numeric_value = (u64) result;
 	return r;
 }
+
+static int objIsPointInstance(ASObject* obj);
 
 // Strict equality between two ActionVars (same type + same value).
 // Used by Point.equals — reflexive (NaN==NaN for strict equality on same
@@ -8868,10 +8901,14 @@ static ActionVar pointEquals(SWFAppContext* app_context, ActionVar* args, u32 ar
 
 	if (args[0].type == ACTION_STACK_VALUE_OBJECT && args[0].data.numeric_value != 0) {
 		ASObject* pt = (ASObject*)args[0].data.numeric_value;
-		ActionVar* px = getProperty(pt, "x", 1);
-		ActionVar* py = getProperty(pt, "y", 1);
-		if (avStrictEquals(tx, px) && avStrictEquals(ty, py))
-			r.data.numeric_value = 1;
+		// Gnash: equals requires the arg to be a Point instance (walks __proto__
+		// chain). Non-Point objects always compare false, even if x/y match.
+		if (objIsPointInstance(pt)) {
+			ActionVar* px = getProperty(pt, "x", 1);
+			ActionVar* py = getProperty(pt, "y", 1);
+			if (avStrictEquals(tx, px) && avStrictEquals(ty, py))
+				r.data.numeric_value = 1;
+		}
 	}
 	return r;
 }
@@ -8973,23 +9010,36 @@ static ActionVar pointNormalize(SWFAppContext* app_context, ActionVar* args, u32
 	ActionVar r = {0}; r.type = ACTION_STACK_VALUE_UNDEFINED; return r;
 }
 
+// Walk the __proto__ chain of `obj` checking whether any ancestor is
+// `g_point_prototype`. Matches Gnash behavior where Point.distance accepts
+// arguments whose __proto__ was manually pointed at Point.prototype.
+static int objIsPointInstance(ASObject* obj)
+{
+	for (int depth = 0; depth < 16 && obj != NULL; depth++) {
+		if (obj == g_point_prototype) return 1;
+		ActionVar* proto = getProperty(obj, "__proto__", 9);
+		if (proto == NULL || proto->type != ACTION_STACK_VALUE_OBJECT) return 0;
+		obj = (ASObject*)proto->data.numeric_value;
+	}
+	return 0;
+}
+
 // Point static methods
 static ActionVar pointDistance(SWFAppContext* app_context, ActionVar* args, u32 arg_count, ActionVar* registers, void* this_obj)
 {
 	(void)registers; (void)this_obj;
 	ActionVar r = {0};
-	if (arg_count < 2) { r.type = ACTION_STACK_VALUE_F64; VAL(double, &r.data.numeric_value) = NAN; return r; }
+	// Gnash: Point.distance() with < 2 args returns undefined (not NaN).
+	if (arg_count < 2) { r.type = ACTION_STACK_VALUE_UNDEFINED; return r; }
 
-	// Both args must be Point instances (check __proto__)
-	for (int i = 0; i < 2; i++) {
-		if (args[i].type != ACTION_STACK_VALUE_OBJECT || args[i].data.numeric_value == 0) {
-			r.type = ACTION_STACK_VALUE_UNDEFINED; return r;
-		}
-		ActionVar* proto = getProperty((ASObject*)args[i].data.numeric_value, "__proto__", 9);
-		if (proto == NULL || proto->type != ACTION_STACK_VALUE_OBJECT ||
-		    (ASObject*)proto->data.numeric_value != g_point_prototype) {
-			r.type = ACTION_STACK_VALUE_UNDEFINED; return r;
-		}
+	// First arg must be Point-ish (walks __proto__ chain). Second arg only
+	// needs to be an object — Gnash allows non-Point second args.
+	if (args[0].type != ACTION_STACK_VALUE_OBJECT || args[0].data.numeric_value == 0 ||
+	    !objIsPointInstance((ASObject*)args[0].data.numeric_value)) {
+		r.type = ACTION_STACK_VALUE_UNDEFINED; return r;
+	}
+	if (args[1].type != ACTION_STACK_VALUE_OBJECT || args[1].data.numeric_value == 0) {
+		r.type = ACTION_STACK_VALUE_UNDEFINED; return r;
 	}
 
 	ASObject* p1 = (ASObject*)args[0].data.numeric_value;
@@ -28036,18 +28086,18 @@ static void initSystemObject(SWFAppContext* app_context)
 		setProperty(app_context, g_system_object, "showSettings", 12, &fv);
 	}
 
-	// exactSettings (READ_ONLY boolean, default false)
+	// exactSettings (writable boolean, default false)
 	{
 		ActionVar bv = {0}; bv.type = ACTION_STACK_VALUE_BOOLEAN; bv.data.numeric_value = 0;
 		setPropertyWithFlags(app_context, g_system_object, "exactSettings", 13, &bv,
-			PROPERTY_FLAG_ENUMERABLE | PROPERTY_FLAG_CONFIGURABLE);
+			PROPERTY_FLAGS_DEFAULT);
 	}
 
-	// useCodepage (READ_ONLY boolean, default false)
+	// useCodepage (writable boolean, default false)
 	{
 		ActionVar bv = {0}; bv.type = ACTION_STACK_VALUE_BOOLEAN; bv.data.numeric_value = 0;
 		setPropertyWithFlags(app_context, g_system_object, "useCodepage", 11, &bv,
-			PROPERTY_FLAG_ENUMERABLE | PROPERTY_FLAG_CONFIGURABLE);
+			PROPERTY_FLAGS_DEFAULT);
 	}
 
 	// security — expected LIFO enum order:
@@ -41558,31 +41608,10 @@ void actionNewObject(SWFAppContext* app_context)
 		setPropertyWithFlags(app_context, num_obj, "valueOf_value", 13, &value_var, PROPERTY_FLAGS_DONTENUM);
 		setPropertyWithFlags(app_context, num_obj, "value", 5, &value_var, PROPERTY_FLAGS_DONTENUM);
 
-		// Set up valueOf and toString using the wrapper infrastructure
-		if (!g_wrapper_funcs_init)
-		{
-			memset(&g_wrapper_valueOf_func, 0, sizeof(ASFunction));
-			strncpy(g_wrapper_valueOf_func.name, "valueOf", 255);
-			g_wrapper_valueOf_func.function_type = 2;
-			g_wrapper_valueOf_func.param_count = 0;
-			g_wrapper_valueOf_func.advanced_func = (Function2Ptr) builtin_wrapper_valueOf;
-			if (function_count < MAX_FUNCTIONS)
-				function_registry[function_count++] = &g_wrapper_valueOf_func;
-			memset(&g_prim_wrapper_toString_func, 0, sizeof(ASFunction));
-			strncpy(g_prim_wrapper_toString_func.name, "toString", 255);
-			g_prim_wrapper_toString_func.function_type = 2;
-			g_prim_wrapper_toString_func.param_count = 0;
-			g_prim_wrapper_toString_func.advanced_func = (Function2Ptr) builtin_prim_wrapper_toString;
-			if (function_count < MAX_FUNCTIONS)
-				function_registry[function_count++] = &g_prim_wrapper_toString_func;
-			g_wrapper_funcs_init = 1;
-		}
-		ActionVar _nvo = {0}; _nvo.type = ACTION_STACK_VALUE_FUNCTION;
-		VAL(u64, &_nvo.data.numeric_value) = (u64) &g_wrapper_valueOf_func;
-		setPropertyWithFlags(app_context, num_obj, "valueOf", 7, &_nvo, PROPERTY_FLAGS_DONTENUM);
-		ActionVar _nts = {0}; _nts.type = ACTION_STACK_VALUE_FUNCTION;
-		VAL(u64, &_nts.data.numeric_value) = (u64) &g_prim_wrapper_toString_func;
-		setPropertyWithFlags(app_context, num_obj, "toString", 8, &_nts, PROPERTY_FLAGS_DONTENUM);
+		// valueOf/toString live on Number.prototype (installed eagerly earlier),
+		// NOT as own properties on the wrapper instance. Gnash:
+		// `Number.prototype.valueOf = function(){ return "fake_value" };
+		//  n1.valueOf() == "fake_value"` requires prototype-chain dispatch.
 
 		new_obj = num_obj;
 		PUSH(ACTION_STACK_VALUE_OBJECT, (u64) new_obj);

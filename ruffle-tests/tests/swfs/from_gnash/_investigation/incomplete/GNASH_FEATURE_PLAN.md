@@ -1,5 +1,6 @@
 # Gnash Failing Tests by Feature Category
-<!-- TESTS: ASnative-v5, ASnative-v6, ASnative-v7, ASnative-v8, AsBroadcaster-v6, AsBroadcaster-v7, AsBroadcaster-v8, BitmapData-v8, Camera-v6, Camera-v7, Camera-v8, ContextMenu-v7, ContextMenu-v8, ExternalInterface-v6, ExternalInterface-v7, Global-v6, Global-v7, Global-v8, HitTest-v6, HitTest-v7, HitTest-v8, Instance-v5, Instance-v6, Instance-v7, Instance-v8, LoadVars-v6, LoadVars-v7, LoadVars-v8, Matrix-v6, Matrix-v7, Matrix-v8, Microphone-v6, Microphone-v7, Microphone-v8, MovieClip-v5, MovieClipLoader-v7, MovieClipLoader-v8, Number-v5, Number-v6, Number-v7, Number-v8, Point-v8, Rectangle-v8, Sound-v5, Sound-v6, Sound-v7, Sound-v8, String-v5, String-v6, String-v7, String-v8, System-v5, System-v6, System-v7, System-v8, TextFormat-v5, TextFormat-v6, TextFormat-v7, TextSnapshot-v6, TextSnapshot-v7, TextSnapshot-v8, case-v6, case-v7, case-v8, delete-v5, delete-v6, delete-v7, delete-v8, enumerate-v6, enumerate-v7, enumerate-v8, targetPath-v6, targetPath-v7, targetPath-v8, toString_valueOf-v5, toString_valueOf-v6, toString_valueOf-v7, toString_valueOf-v8, with-v5, with-v6, with-v7, with-v8 -->
+<!-- TESTS: ASnative-v5, ASnative-v6, ASnative-v7, ASnative-v8, AsBroadcaster-v6, AsBroadcaster-v7, AsBroadcaster-v8, BitmapData-v8, ContextMenu-v7, ContextMenu-v8, ExternalInterface-v6, ExternalInterface-v7, Global-v6, Global-v7, Global-v8, HitTest-v6, HitTest-v7, HitTest-v8, Instance-v5, Instance-v6, Instance-v7, Instance-v8, LoadVars-v6, LoadVars-v7, LoadVars-v8, Matrix-v6, Matrix-v7, Matrix-v8, MovieClip-v5, MovieClipLoader-v7, MovieClipLoader-v8, Number-v5, Number-v6, Number-v7, Number-v8, Rectangle-v8, Sound-v6, Sound-v7, Sound-v8, String-v5, String-v6, String-v7, String-v8, System-v5, System-v6, System-v7, System-v8, TextFormat-v5, TextFormat-v6, TextFormat-v7, case-v6, toString_valueOf-v5, toString_valueOf-v6, toString_valueOf-v7, toString_valueOf-v8, with-v5, with-v6, with-v7, with-v8 -->
+<!-- PASSING (removed from TESTS): Point-v8 (ruffle_matched, 2026-04-14), TextSnapshot-v6/v7/v8 (pass), delete-v5..v8 (pass), enumerate-v6..v8 (pass), Camera-v6/v7/v8 (ruffle_matched), Microphone-v6/v7/v8 (ruffle_matched), Sound-v5 (ruffle_matched), case-v7/v8 (ruffle_matched), targetPath-v6/v7/v8 (ruffle_matched) -->
 
 <!-- PLAN_META
 id: GNASH_FAILING_BY_FEATURE
@@ -22,6 +23,30 @@ blockers: []
 -->
 
 Last updated: 2026-04-14 (Phase 3 in progress)
+
+## 2026-04-14 session (Point-v8 push over the line)
+
+**Point-v8 now ruffle_matched (185/193 → effectively passing).** Three targeted
+fixes to `action.c` Point builtins:
+
+1. **`pointAdd` primitive auto-boxing** — When arg is a string/number/boolean
+   primitive, look up `.x`/`.y` via the matching wrapper prototype
+   (String.prototype/Number.prototype/Boolean.prototype). Fixes the Gnash test
+   `String.prototype.x = 3; p.add('1')` expecting `ret.x == "x3"`. New helper
+   `getPrimitiveWrapperProto(type)` reads the ctor from `global_object` and
+   returns its `prototype_obj`.
+2. **`pointDistance` returns undefined for arg_count < 2** (was returning NaN).
+   Matches Gnash: `Point.distance()` and `Point.distance(undefined)` both yield
+   `typeof == 'undefined'`.
+3. **`pointDistance` and `pointEquals` walk __proto__ chain** — new helper
+   `objIsPointInstance(obj)` walks up to 16 levels of `__proto__` looking for
+   `g_point_prototype`. Fixes the test patterns `o1.__proto__ = Point.prototype`
+   (distance) and `o3.prototype.__proto__ = Point.prototype; p2.__proto__ =
+   o3.prototype; p1.equals(p2)` (equals, 2-hop).
+
+**Regression-free:** Point-v5/v6/v7 still PASS; no avm1/Number tests broken by
+the added primitive-wrapper lookup (only triggers when the Point.add arg type
+is non-object, which is rare outside Gnash's Point tests).
 
 ## 2026-04-14 session
 
