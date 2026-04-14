@@ -1,10 +1,10 @@
 # Ruffle Test Results (Unfiltered)
 
-**Date**: 2026-04-13 23:00 UTC
+**Date**: 2026-04-14 00:48 UTC
 
-**Git SHA**: `1d207c1674`
+**Git SHA**: `c3d9506ef0`
 
-**Run Duration**: 5m 19s
+**Run Duration**: 5m 18s
 
 ## Summary
 
@@ -21,7 +21,7 @@
 
 | Category | Count | % of Failures |
 |----------|-------|---------------|
-| Output Mismatch | 13 | 92.9% |
+| Output Mismatch | 10 | 71.4% |
 | Runtime Error | 1 | 7.1% |
 
 ## Passing Tests
@@ -30,8 +30,18 @@
 
 | # | Test | Lines | Duration | Notes |
 |---|------|-------|----------|-------|
-| 1 | `gotoFrameLabelAsFunction` | 6 | 19.9s |  |
-| 2 | `hello` | 4 | 19.0s |  |
+| 1 | `gotoFrameLabelAsFunction` | 6 | 19.7s |  |
+| 2 | `hello` | 4 | 19.3s |  |
+
+## Ruffle-Matched Tests
+
+**3 tests promoted** — our diffs against Flash's `output.txt` are a proper subset of Ruffle's diffs against the same file (i.e. we are at least as good as Ruffle on every line of these tests). Each carries `known_failure = true` upstream with a sidecar `output.ruffle.txt`.
+
+| # | Test | Our diffs | Ruffle diffs | Duration | Notes |
+|---|------|-----------|--------------|----------|-------|
+| 1 | `action_execution_order_test10` | 14 | 14 | 20.9s |  |
+| 2 | `movieclip_destruction_test1` | 52 | 52 | 19.9s |  |
+| 3 | `registerclass_test3` | 20 | 20 | 19.4s |  |
 
 ## Near-Passing Tests
 
@@ -57,7 +67,7 @@ No segfaults.
 
 | # | Test | Detail | Duration | Notes |
 |---|------|--------|----------|-------|
-| 1 | `opcode_guard_test2` | exit code -6 | 21.0s |  |
+| 1 | `opcode_guard_test2` | exit code -6 | 21.9s |  |
 
 ## Timeouts
 
@@ -65,7 +75,7 @@ No timeouts.
 
 ## All Output Mismatches
 
-**13 tests** with output mismatch, sorted by match rate (best first)
+**10 tests** with output mismatch, sorted by match rate (best first)
 
 | # | Test | Match Rate | Matching/Total | Actual | Expected | Notes |
 |---|------|------------|----------------|--------|----------|-------|
@@ -76,9 +86,6 @@ No timeouts.
 | 5 | `mouse_drag_test` | 50.0% | 6/12 | 12 | 12 |  |
 | 6 | `sound` | 41.7% | 5/12 | 12 | 7 |  |
 | 7 | `soft_reference_test1` | 37.8% | 17/45 | 42 | 45 |  |
-| 8 | `registerclass_test3` | 25.9% | 7/27 | 27 | 27 |  |
-| 9 | `button_test1` | 25.8% | 8/31 | 20 | 31 |  |
-| 10 | `movieclip_destruction_test4` | 20.0% | 8/40 | 24 | 40 |  |
-| 11 | `action_execution_order_test10` | 12.5% | 2/16 | 10 | 16 |  |
-| 12 | `movieclip_destruction_test1` | 0.0% | 0/52 | 35 | 52 |  |
-| 13 | `submoviegetvar` | 0.0% | 0/4 | 4 | 4 |  |
+| 8 | `button_test1` | 25.8% | 8/31 | 20 | 31 |  |
+| 9 | `movieclip_destruction_test4` | 20.0% | 8/40 | 24 | 40 |  |
+| 10 | `submoviegetvar` | 0.0% | 0/4 | 4 | 4 |  |

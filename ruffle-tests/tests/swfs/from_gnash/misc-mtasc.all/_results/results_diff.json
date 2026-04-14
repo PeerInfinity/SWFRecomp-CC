@@ -1,9 +1,9 @@
 {
   "metadata": {
-    "old_timestamp": "2026-04-13T19:34:06.431686+00:00",
-    "old_git_sha": "83d3748a60813ec3b76ce3c638296a5a01e68b23",
-    "new_timestamp": "2026-04-13T23:00:07.787553+00:00",
-    "new_git_sha": "1d207c1674234150af881cc2dd29a321a54a0af1",
+    "old_timestamp": "2026-04-13T23:00:07.787553+00:00",
+    "old_git_sha": "1d207c1674234150af881cc2dd29a321a54a0af1",
+    "new_timestamp": "2026-04-14T00:48:27.772324+00:00",
+    "new_git_sha": "c3d9506ef0b3cc172159d2cfc7edf3c3568db878",
     "partial": false,
     "same_commit": false
   },
@@ -20,10 +20,27 @@
     "decreased_mismatches": 0,
     "newly_passing": 0,
     "newly_failing": 0,
-    "status_changed": 0,
-    "unchanged": 9,
+    "status_changed": 1,
+    "unchanged": 8,
     "added": 0,
     "removed": 0
   },
-  "changes": []
+  "changes": [
+    {
+      "test": "TextFieldTest",
+      "change_type": "changed",
+      "old_status": "output_mismatch",
+      "new_status": "ruffle_matched",
+      "old_lines": {
+        "actual_lines": 8,
+        "expected_lines": 8,
+        "matching_lines": 7
+      },
+      "new_lines": {
+        "actual_lines": 8,
+        "expected_lines": 8,
+        "matching_lines": 7
+      }
+    }
+  ]
 }
