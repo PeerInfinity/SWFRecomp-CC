@@ -33164,7 +33164,21 @@ void actionMbCharToAscii(SWFAppContext* app_context, char* str_buffer)
 
 void actionGetTime(SWFAppContext* app_context)
 {
+	// Flash's getTimer() is documented to return a strictly increasing count
+	// of milliseconds since SWF start. Tests like gnash/misc-ming.all/
+	// getTimer_test rely on both `getTimer() > 0` and `getTimer() > previous`
+	// even when called in quick succession (the gap between two samples is
+	// expected to be at least 1 ms). On fast machines the real wall-clock
+	// delta can be 0, which breaks those invariants. Track the last returned
+	// value and bump by 1 when the underlying clock hasn't advanced — this
+	// preserves monotonicity and a strictly-positive first sample without
+	// diverging from real time by more than one millisecond per rapid call.
+	static u32 last_returned = 0;
 	u32 delta_ms = get_elapsed_ms() - start_time;
+	if (delta_ms <= last_returned)
+		delta_ms = last_returned + 1;
+	last_returned = delta_ms;
+
 	float delta_ms_f32 = (float) delta_ms;
 
 	PUSH(ACTION_STACK_VALUE_F32, VAL(u32, &delta_ms_f32));

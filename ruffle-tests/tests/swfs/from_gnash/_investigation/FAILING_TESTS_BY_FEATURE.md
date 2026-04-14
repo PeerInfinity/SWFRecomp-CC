@@ -5,8 +5,8 @@
 
 - **Total tests**: 190
 - **Passing**: 95 (50.0%)
-- **Failing**: 95 (95 output mismatch)
-- **Based on**: CI run at commit `83d3748a60`
+- **Failing**: 74 (74 output mismatch)
+- **Based on**: CI run at commit `f9b8102de8`
 
 Tests are sorted by category (ordered by priority). Within each category, tests are listed alphabetically.
 
@@ -28,7 +28,7 @@ Failing tests: Inheritance-v5, Inheritance-v6, Inheritance-v7, Inheritance-v8
 
 Description: Tests named `Inheritance-v<N>` — one per SWF version.
 
-Investigation docs: [GNASH_NEAR_PASSING_PLAN.md](ruffle-tests/tests/swfs/from_gnash/_investigation/incomplete/GNASH_NEAR_PASSING_PLAN.md), [INHERITANCE_SEGFAULT_PLAN.md](ruffle-tests/tests/swfs/from_gnash/_investigation/complete/INHERITANCE_SEGFAULT_PLAN.md), [RUFFLE_KNOWN_FAILURE_HANDLING_PLAN.md](ruffle-tests/tests/swfs/from_gnash/_investigation/incomplete/RUFFLE_KNOWN_FAILURE_HANDLING_PLAN.md)
+Investigation docs: [GNASH_NEAR_PASSING_PLAN.md](ruffle-tests/tests/swfs/from_gnash/_investigation/incomplete/GNASH_NEAR_PASSING_PLAN.md), [INHERITANCE_SEGFAULT_PLAN.md](ruffle-tests/tests/swfs/from_gnash/_investigation/complete/INHERITANCE_SEGFAULT_PLAN.md), [RUFFLE_KNOWN_FAILURE_HANDLING_PLAN.md](ruffle-tests/tests/swfs/from_gnash/_investigation/complete/RUFFLE_KNOWN_FAILURE_HANDLING_PLAN.md)
 
 ---
 
@@ -354,16 +354,7 @@ These tests are >60% passing and likely need bug fixes rather than new features:
 
 | Test | Match Rate | Likely Issue |
 |------|-----------|-------------|
-| Inheritance-v5 | 114/115 (99%) |  |
-| Math-v7 | 282/287 (98%) |  |
-| Math-v8 | 282/287 (98%) |  |
-| Math-v5 | 273/278 (98%) |  |
-| Math-v6 | 273/278 (98%) |  |
-| ops-v8 | 255/262 (97%) |  |
-| Inheritance-v7 | 177/182 (97%) |  |
-| Inheritance-v8 | 177/182 (97%) |  |
 | ExternalInterface-v8 | 113/118 (96%) |  |
-| Inheritance-v6 | 173/182 (95%) |  |
 | Number-v7 | 222/237 (94%) |  |
 | Number-v8 | 222/237 (94%) |  |
 | TextSnapshot-v6 | 160/173 (92%) |  |
@@ -394,7 +385,6 @@ These tests are >60% passing and likely need bug fixes rather than new features:
 | TextFormat-v5 | 101/128 (79%) |  |
 | TextFormat-v6 | 101/128 (79%) |  |
 | Global-v8 | 133/169 (79%) |  |
-| Sound-v5 | 77/100 (77%) |  |
 | Global-v7 | 139/182 (76%) |  |
 | System-v5 | 51/67 (76%) |  |
 | AsBroadcaster-v7 | 90/121 (74%) |  |
@@ -414,9 +404,6 @@ These tests are >60% passing and likely need bug fixes rather than new features:
 | TextFormat-v7 | 109/174 (63%) |  |
 | BitmapData-v8 | 259/417 (62%) |  |
 | toString_valueOf-v5 | 84/137 (61%) |  |
-| Microphone-v6 | 48/79 (61%) |  |
-| Microphone-v7 | 48/79 (61%) |  |
-| Microphone-v8 | 48/79 (61%) |  |
 
 ## Crashes and Timeouts (0 tests)
 
@@ -429,26 +416,26 @@ None.
 | Priority | Feature | Failing | Total | Notes |
 |----------|---------|---------|-------|-------|
 | 1 | ASnative | 4 | 4 | avg 22% match |
-| 2 | Inheritance | 4 | 4 | avg 97% match |
+| 2 | Inheritance | 4 | 4 |  |
 | 3 | Instance | 4 | 4 | avg 49% match |
-| 4 | Math | 4 | 4 | avg 98% match |
+| 4 | Math | 4 | 4 |  |
 | 5 | Number | 4 | 4 | avg 92% match |
-| 6 | Sound | 4 | 4 | avg 66% match |
+| 6 | Sound | 4 | 4 | avg 63% match |
 | 7 | String | 4 | 4 | avg 69% match |
 | 8 | System | 4 | 4 | avg 81% match |
 | 9 | toString_valueOf | 4 | 4 | avg 80% match |
 | 10 | with | 4 | 4 | avg 22% match |
 | 11 | AsBroadcaster | 3 | 4 | avg 77% match |
-| 12 | Camera | 3 | 4 | avg 37% match |
-| 13 | case | 3 | 4 | avg 21% match |
+| 12 | Camera | 3 | 4 |  |
+| 13 | case | 3 | 4 | avg 25% match |
 | 14 | ExternalInterface | 3 | 4 | avg 66% match |
 | 15 | Global | 3 | 3 | avg 76% match |
 | 16 | HitTest | 3 | 3 | avg 80% match |
 | 17 | LoadVars | 3 | 4 | avg 44% match |
 | 18 | Matrix | 3 | 4 | avg 42% match |
-| 19 | Microphone | 3 | 4 | avg 61% match |
+| 19 | Microphone | 3 | 4 |  |
 | 20 | Selection | 3 | 4 | avg 91% match |
-| 21 | targetPath | 3 | 4 | avg 35% match |
+| 21 | targetPath | 3 | 4 |  |
 | 22 | TextFieldHTML | 3 | 4 | avg 86% match |
 | 23 | TextFormat | 3 | 3 | avg 73% match |
 | 24 | TextSnapshot | 3 | 4 | avg 92% match |
@@ -458,7 +445,7 @@ None.
 | 28 | array | 1 | 1 | avg 82% match |
 | 29 | BitmapData | 1 | 4 | avg 62% match |
 | 30 | MovieClip | 1 | 1 | avg 67% match |
-| 31 | ops | 1 | 1 | avg 97% match |
+| 31 | ops | 1 | 1 |  |
 | 32 | Point | 1 | 4 | avg 88% match |
 | 33 | Rectangle | 1 | 4 | avg 84% match |
 | 34 | TextField | 1 | 1 | avg 67% match |

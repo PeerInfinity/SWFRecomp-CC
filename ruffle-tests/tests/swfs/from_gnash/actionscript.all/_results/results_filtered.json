@@ -6,19 +6,19 @@
     "total_available": 190,
     "shards": 30,
     "expected_shards": 30,
-    "ignored_count": 9,
+    "ignored_count": 0,
     "filtered": true
   },
-  "total": 181,
+  "total": 190,
   "pass": 95,
-  "ruffle_matched": 12,
+  "ruffle_matched": 21,
   "fail": 74,
-  "pass_rate": 52.5,
-  "effective_pass": 107,
-  "effective_pass_rate": 59.1,
+  "pass_rate": 50.0,
+  "effective_pass": 116,
+  "effective_pass_rate": 61.1,
   "breakdown": {
     "output_mismatch": 74,
-    "ruffle_matched": 12
+    "ruffle_matched": 21
   },
   "tests": [
     {
@@ -638,6 +638,62 @@
       "expected_output": "... (6 lines before) ...\nPASSED: a.hitTest(25, 25, false) == true [./HitTest.as:39]\nPASSED: a.hitTest(60, 60, false) == true [./HitTest.as:40]\nPASSED: a.hitTest(61, 61, false) == false [./HitTest.as:41]\nPASSED: a.hitTest(19, 19, true) == false [./HitTest.as:43]\nPASSED: a.hitTest(20, 20, true) == false [./HitTest.as:47]\nPASSED: a.hitTest(21, 21, true) == true [./HitTest.as:49]\nPASSED: a.hitTest(25, 25, true) == true [./HitTest.as:50]\nPASSED: a.hitTest(60, 60, true) == false [./HitTest.as:51]\nPASSED: a.hitTest(61, 61, true) == false [./HitTest.as:52]\nPASSED: a.hitTest(25, 25, false) == true [./HitTest.as:55]\nPASSED: a.hitTest(85, 25, false) == false [./HitTest.as:56]\nPASSED: a.hitTest(25, 25, true) == true [./HitTest.as:57]\nPASSED: a.hitTest(85, 25, true) == false [./HitTest.as:58]\nPASSED: a.hitTest(25, 25, false) == true [./HitTest.as:64]\nPASSED: a.hitTest(41, 25, false) == true [./HitTest.as:65]\nPASSED: a.hitTest(25, 25, true) == false [./HitTest.as:66]\nPASSED: a.hitTest(41, 25, true) == false [./HitTest.as:67]\nPASSED: a.hitTest(25, 25, false) == true [./HitTest.as:71]\nPASSED: a.hitTest(41, 25, false) == true [./HitTest.as:72]\nPASSED: a.hitTest(25, 25, true) == false [./HitTest.as:73]\nPASSED: a.hitTest(41, 25, true) == false [./HitTest.as:77]\nPASSED: b.hitTest(99, 99, false) == false [./HitTest.as:89]\nPASSED: b.hitTest(100, 100, false) == true [./HitTest.as:90]\nPASSED: b.hitTest(101, 101, false) == true [./HitTest.as:91]\nPASSED: b.hitTest(120, 120, false) == true [./HitTest.as:92]\nPASSED: b.hitTest(110, 110, false) == true [./HitTest.as:93]\nPASSED: b.hitTest(151, 150, false) == false [./HitTest.as:94]\nPASSED: b.hitTest(151, 151, false) == false [./HitTest.as:95]\nPASSED: b.hitTest(151, 152, false) == false [./HitTest.as:96]\nPASSED: b.hitTest(99, 99, true) == false [./HitTest.as:98]\nPASSED: b.hitTest(100, 100, true) == false [./HitTest.as:99]\nPASSED: b.hitTest(101, 101, true) == true [./HitTest.as:100]\nPASSED: b.hitTest(120, 120, true) == true [./HitTest.as:101]\nPASSED: b.hitTest(110, 110, true) == true [./HitTest.as:102]\nPASSED: b.hitTest(151, 150, true) == false [./HitTest.as:103]\nPASSED: b.hitTest(151, 151, true) == false [./HitTest.as:104]\nPASSED: b.hitTest(151, 152, true) == false [./HitTest.as:105]\nPASSED: b.hitTest(99, 99, false) == false [./HitTest.as:111]\nPASSED: b.hitTest(100, 100, false) == false [./HitTest.as:112]\nPASSED: b.hitTest(101, 101, false) == false [./HitTest.as:113]\nPASSED: b.hitTest(120, 120, false) == false [./HitTest.as:114]\nPASSED: b.hitTest(110, 110, false) == false [./HitTest.as:115]\nPASSED: b.hitTest(151, 150, false) == false [./HitTest.as:116]\nPASSED: b.hitTest(99, 99, true) == false [./HitTest.as:118]\nPASSED: b.hitTest(100, 100, true) == false [./HitTest.as:119]\nPASSED: b.hitTest(101, 101, true) == false [./HitTest.as:120]\nPASSED: b.hitTest(120, 120, true) == false [./HitTest.as:121]\nPASSED: b.hitTest(110, 110, true) == false [./HitTest.as:122]\nPASSED: b.hitTest(151, 150, true) == false [./HitTest.as:123]\nPASSED: b.hitTest(99, 199, false) == false [./HitTest.as:126]\n... (32 lines after) ..."
     },
     {
+      "test": "Inheritance-v5",
+      "num_frames": 30,
+      "lines": {
+        "actual_lines": 115,
+        "expected_lines": 114,
+        "matching_lines": 114
+      },
+      "duration": 22.5,
+      "ruffle_diff_count": 17,
+      "ours_diff_count": 1,
+      "status": "ruffle_matched",
+      "detail": "diffs 1 \u2286 ruffle 17"
+    },
+    {
+      "test": "Inheritance-v6",
+      "num_frames": 30,
+      "lines": {
+        "actual_lines": 182,
+        "expected_lines": 181,
+        "matching_lines": 173
+      },
+      "duration": 23.85,
+      "ruffle_diff_count": 16,
+      "ours_diff_count": 9,
+      "status": "ruffle_matched",
+      "detail": "diffs 9 \u2286 ruffle 16"
+    },
+    {
+      "test": "Inheritance-v7",
+      "num_frames": 30,
+      "lines": {
+        "actual_lines": 182,
+        "expected_lines": 181,
+        "matching_lines": 177
+      },
+      "duration": 23.97,
+      "ruffle_diff_count": 10,
+      "ours_diff_count": 5,
+      "status": "ruffle_matched",
+      "detail": "diffs 5 \u2286 ruffle 10"
+    },
+    {
+      "test": "Inheritance-v8",
+      "num_frames": 30,
+      "lines": {
+        "actual_lines": 182,
+        "expected_lines": 181,
+        "matching_lines": 177
+      },
+      "duration": 24.11,
+      "ruffle_diff_count": 10,
+      "ours_diff_count": 5,
+      "status": "ruffle_matched",
+      "detail": "diffs 5 \u2286 ruffle 10"
+    },
+    {
       "test": "Instance-v5",
       "num_frames": 30,
       "lines": {
@@ -833,6 +889,62 @@
       },
       "duration": 21.27,
       "status": "pass"
+    },
+    {
+      "test": "Math-v5",
+      "num_frames": 30,
+      "lines": {
+        "actual_lines": 278,
+        "expected_lines": 278,
+        "matching_lines": 273
+      },
+      "duration": 31.05,
+      "ruffle_diff_count": 5,
+      "ours_diff_count": 5,
+      "status": "ruffle_matched",
+      "detail": "diffs 5 \u2286 ruffle 5"
+    },
+    {
+      "test": "Math-v6",
+      "num_frames": 30,
+      "lines": {
+        "actual_lines": 278,
+        "expected_lines": 278,
+        "matching_lines": 273
+      },
+      "duration": 30.98,
+      "ruffle_diff_count": 5,
+      "ours_diff_count": 5,
+      "status": "ruffle_matched",
+      "detail": "diffs 5 \u2286 ruffle 5"
+    },
+    {
+      "test": "Math-v7",
+      "num_frames": 30,
+      "lines": {
+        "actual_lines": 287,
+        "expected_lines": 287,
+        "matching_lines": 282
+      },
+      "duration": 31.18,
+      "ruffle_diff_count": 5,
+      "ours_diff_count": 5,
+      "status": "ruffle_matched",
+      "detail": "diffs 5 \u2286 ruffle 5"
+    },
+    {
+      "test": "Math-v8",
+      "num_frames": 30,
+      "lines": {
+        "actual_lines": 287,
+        "expected_lines": 287,
+        "matching_lines": 282
+      },
+      "duration": 31.29,
+      "ruffle_diff_count": 5,
+      "ours_diff_count": 5,
+      "status": "ruffle_matched",
+      "detail": "diffs 5 \u2286 ruffle 5"
     },
     {
       "test": "Matrix-v5",
@@ -2060,6 +2172,20 @@
       },
       "duration": 19.95,
       "status": "pass"
+    },
+    {
+      "test": "ops-v8",
+      "num_frames": 30,
+      "lines": {
+        "actual_lines": 262,
+        "expected_lines": 262,
+        "matching_lines": 255
+      },
+      "duration": 27.33,
+      "ruffle_diff_count": 11,
+      "ours_diff_count": 7,
+      "status": "ruffle_matched",
+      "detail": "diffs 7 \u2286 ruffle 11"
     },
     {
       "test": "swap-v5",

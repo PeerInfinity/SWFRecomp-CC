@@ -6,20 +6,20 @@
 
 **Run Duration**: 71m 59s
 
-**Filtered**: 9 tests ignored out of 190 available
+**Filtered**: 0 tests ignored out of 190 available
 
 ## Summary
 
 | Metric | Value |
 |--------|-------|
-| Total tests | 181 |
-| Passing | **95** (52.5%) |
-| Ruffle-matched | 12 (diffs ⊆ Ruffle's against Flash) |
-| Effective pass | **107** (59.1%) |
+| Total tests | 190 |
+| Passing | **95** (50.0%) |
+| Ruffle-matched | 21 (diffs ⊆ Ruffle's against Flash) |
+| Effective pass | **116** (61.1%) |
 | Failing | 74 |
-| Total expected lines | 14908 |
-| Matching lines | 11002 (73.8%) |
-| Mismatched lines | 3906 |
+| Total expected lines | 16957 |
+| Matching lines | 13008 (76.7%) |
+| Mismatched lines | 3949 |
 
 ### Failure Breakdown
 
@@ -131,22 +131,31 @@
 
 ## Ruffle-Matched Tests
 
-**12 tests promoted** — our diffs against Flash's `output.txt` are a proper subset of Ruffle's diffs against the same file (i.e. we are at least as good as Ruffle on every line of these tests). Each carries `known_failure = true` upstream with a sidecar `output.ruffle.txt`.
+**21 tests promoted** — our diffs against Flash's `output.txt` are a proper subset of Ruffle's diffs against the same file (i.e. we are at least as good as Ruffle on every line of these tests). Each carries `known_failure = true` upstream with a sidecar `output.ruffle.txt`.
 
 | # | Test | Our diffs | Ruffle diffs | Duration | Notes |
 |---|------|-----------|--------------|----------|-------|
 | 1 | `Camera-v6` | 57 | 57 | 22.4s |  |
 | 2 | `Camera-v7` | 57 | 57 | 22.8s |  |
 | 3 | `Camera-v8` | 57 | 57 | 22.1s |  |
-| 4 | `Microphone-v6` | 31 | 31 | 21.4s |  |
-| 5 | `Microphone-v7` | 31 | 31 | 21.4s |  |
-| 6 | `Microphone-v8` | 31 | 31 | 21.4s |  |
-| 7 | `Sound-v5` | 23 | 27 | 22.8s |  |
-| 8 | `case-v7` | 54 | 54 | 21.7s |  |
-| 9 | `case-v8` | 54 | 54 | 21.8s |  |
-| 10 | `targetPath-v6` | 17 | 17 | 20.6s |  |
-| 11 | `targetPath-v7` | 17 | 17 | 20.6s |  |
-| 12 | `targetPath-v8` | 17 | 17 | 20.4s |  |
+| 4 | `Inheritance-v5` | 1 | 17 | 22.5s |  |
+| 5 | `Inheritance-v6` | 9 | 16 | 23.9s |  |
+| 6 | `Inheritance-v7` | 5 | 10 | 24.0s |  |
+| 7 | `Inheritance-v8` | 5 | 10 | 24.1s |  |
+| 8 | `Math-v5` | 5 | 5 | 31.1s |  |
+| 9 | `Math-v6` | 5 | 5 | 31.0s |  |
+| 10 | `Math-v7` | 5 | 5 | 31.2s |  |
+| 11 | `Math-v8` | 5 | 5 | 31.3s |  |
+| 12 | `Microphone-v6` | 31 | 31 | 21.4s |  |
+| 13 | `Microphone-v7` | 31 | 31 | 21.4s |  |
+| 14 | `Microphone-v8` | 31 | 31 | 21.4s |  |
+| 15 | `Sound-v5` | 23 | 27 | 22.8s |  |
+| 16 | `case-v7` | 54 | 54 | 21.7s |  |
+| 17 | `case-v8` | 54 | 54 | 21.8s |  |
+| 18 | `ops-v8` | 7 | 11 | 27.3s |  |
+| 19 | `targetPath-v6` | 17 | 17 | 20.6s |  |
+| 20 | `targetPath-v7` | 17 | 17 | 20.6s |  |
+| 21 | `targetPath-v8` | 17 | 17 | 20.4s |  |
 
 ## Near-Passing Tests
 

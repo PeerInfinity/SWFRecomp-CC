@@ -1,26 +1,16 @@
 # Gnash tests with only accepted permanent diffs.
-# Our output is more correct than Gnash's expected output.
-# See from_gnash/_investigation/ACCEPTED_DIFFS.md for details.
-
-# --- Math: Gnash pow/SQRT precision bugs (IEEE 754, ECMA-262) ---
-Math-v5
-Math-v6
-Math-v7
-Math-v8
-
-# --- ops: Platform-dependent NaN bit patterns (IEEE 754) ---
-ops-v8
-
-# --- Inheritance: Ruffle-matching accepted diffs ---
-# v5: circular __proto__ survival (Flash hangs, we don't).
-# v6/v7/v8: Flash-only super-chain dynamic base class semantics neither we
-# nor Ruffle replicate. Upstream Ruffle marks all 4 as known_failure and our
-# diffs vs Flash's output.txt are a proper subset of Ruffle's diffs for each
-# version. See ACCEPTED_DIFFS.md and incomplete/RUFFLE_KNOWN_FAILURE_HANDLING_PLAN.md.
-Inheritance-v5
-Inheritance-v6
-Inheritance-v7
-Inheritance-v8
-
-# --- Error: Previously ignored (ECMA-262 §15.11.1 vs Flash behavior) ---
-# Error-v5/v6/v7/v8 removed: now PASS (2026-04-10, raw message storage fix)
+#
+# As of 2026-04-14 this file is empty for actionscript.all. Tests that
+# previously lived here (Math-v5/v6/v7/v8, ops-v8, Inheritance-v5/v6/v7/v8)
+# are all `known_failure = true` upstream in Ruffle with sidecar
+# output.ruffle.txt files, so verify_output.py's ruffle_matched subset-match
+# promotes them automatically — they contribute to effective_pass_rate
+# instead of being silently excluded from the denominator.
+#
+# Add tests here only if:
+#   - They have permanently unfixable diffs
+#   - AND they do NOT qualify for ruffle_matched promotion
+#     (i.e. our diffs are not a subset of Ruffle's diffs against output.txt,
+#      or the test has no known_failure/output.ruffle.txt in the Ruffle repo)
+#
+# See from_gnash/_investigation/ACCEPTED_DIFFS.md for the historical list.
