@@ -153,12 +153,10 @@ Mozilla or set `xpinstall.signatures.required` to `false` in `about:config`.
 
 ### Known limitations
 
-- **Save data may not flush on page reload.** When refreshing a page (F5), the
-  native host process sometimes gets killed before Flash finishes writing save
-  data to disk. This means saves triggered just before a refresh may be lost.
-  This does not happen with the NPAPI plugin in legacy browsers (Basilisk),
-  where Flash runs in-process and always gets time to flush. Saves that happen
-  well before a refresh (e.g., at a game checkpoint) are fine.
+- **Multiple tabs with the same Flash game cause save corruption.** Each tab
+  spawns its own `flash-player-host.exe` process. If two tabs run the same
+  game, both processes read/write the same `.sol` file, causing file contention
+  and lost saves. Only run one tab per Flash game at a time.
 
 - **Firefox performance.** Firefox may slow down significantly after initial
   Flash content load. Chrome is recommended.
