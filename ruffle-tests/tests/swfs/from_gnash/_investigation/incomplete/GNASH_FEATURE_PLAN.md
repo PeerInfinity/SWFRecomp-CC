@@ -24,6 +24,30 @@ blockers: []
 
 Last updated: 2026-04-14 (Phase 3 in progress)
 
+## 2026-04-14 session (textsnapshot_available_text regression fix)
+
+The `getText` empty-native fix from the earlier TextSnapshot work produced
+`""` for a native TS whose backing MC had no captured text. That was the
+right answer for the Gnash tests but broke `avm1/textsnapshot_available_text`
+(20/20 → 17/20). The test duplicates MCs and expects `new TextSnapshot(src)`
+on a stale source to return a non-native TS whose `getText` returns
+`undefined` — matching Ruffle's constructor, which rejects the arg when
+`as_movie_clip()` returns None.
+
+**Fix:** new `ts_stale_source` flag on `MovieClip`. `ng_cloneSprite` and
+`ng_cloneSpriteFromMC` (the two paths behind the AVM1 `CloneSprite` /
+`duplicateMovieClip` opcodes) now mark the source as stale; clones inherit
+the source's current value *before* the mark, so a clone from an
+already-stale source is born stale (matches the test's `child_clone3`
+expectation: immediately undefined because its source `child` was already
+used as a dup source). TextSnapshot constructor and the `getTextSnapshot`
+method path both skip `native_type=NATIVE_TEXTSNAPSHOT` when `arg_mc->
+ts_stale_source` — `getText` on a non-native TS returns undefined, the
+test passes, and Gnash TextSnapshot-v6/v7/v8 continue to pass.
+
+Regression check: 13/13 across `duplicate_movie_clip*`, `clone_sprite_*`,
+`textsnapshot_*`, `mutable_this`, `this_scoping`, `string_coercion`.
+
 ## 2026-04-14 session (Point-v8 push over the line)
 
 **Point-v8 now ruffle_matched (185/193 → effectively passing).** Three targeted
@@ -79,17 +103,9 @@ native TextSnapshot whose backing MC has no text previously returned
 
 **Impact:** TextSnapshot-v6/v7/v8 → **all PASS** (167/167 lines each).
 
-**Known regression:** `avm1/textsnapshot_available_text` (20/20 → 17/20) —
-the test duplicates a MovieClip then creates `new TextSnapshot(child_clone)`
-against a source whose display list gets emptied mid-sequence. Our runtime
-still flags these TS instances as native with count=0 and now returns `""`
-from getText (Ruffle-matching semantics), but the test expects `undefined`,
-which in Ruffle only happens when the constructor rejects the arg (i.e.
-when `as_movie_clip()` returns None). The proper fix is to match Ruffle's
-duplicate semantics so the stale `child_clone` reference doesn't resolve to
-a valid MC, but that's a deeper investigation into `ng_duplicateMovieClip`.
-Filed here for a later session; net test delta is still positive (+3 Gnash,
-−1 avm1).
+**Resolved:** `avm1/textsnapshot_available_text` now passes via the
+`ts_stale_source` flag on MovieClip — see the 2026-04-14 session entry
+above.
 
 **Point method string-+ semantics** — Gnash's Point tests pass string-typed
 x/y coordinates and exercise `add`, `offset`, and `Point.interpolate` through

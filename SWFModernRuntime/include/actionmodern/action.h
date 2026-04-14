@@ -64,6 +64,7 @@ struct MovieClip {
 	// AS2 event dispatch state
 	u8 mc_mouse_inside;    // 1 if mouse is currently inside this MC's hit area
 	u8 mc_as_pressed;      // 1 if button was pressed while mouse was inside this MC
+	u8 ts_stale_source;    // 1 if this MC was used as the source of a duplicateMovieClip call, or inherited the flag from such a source. Ruffle rejects `new TextSnapshot(mc)` for these in AVM1 (as_movie_clip() returns None), so we skip setting NATIVE_TEXTSNAPSHOT and getText returns undefined.
 	u8 mc_enterframe_eligible; // 0 on creation tick, set to 1 on next tick so onEnterFrame doesn't fire on creation frame
 	u8 movie_id;               // Which SWF movie defined this MC (0=main, 1+=child). Used for per-movie export table isolation in attachMovie.
 	// Color transform for dynamic MCs (createEmptyMovieClip, etc.) not in the display list.

@@ -2621,6 +2621,16 @@ MovieClip* ng_cloneSprite(SWFAppContext* app_context, const char* source_name,
 		clone_mc->draw_xmax = src_mc->draw_xmax;
 		clone_mc->draw_ymin = src_mc->draw_ymin;
 		clone_mc->draw_ymax = src_mc->draw_ymax;
+		// Inherit the source's TextSnapshot stale flag BEFORE marking the
+		// source itself. In Ruffle, clone_sprite via instantiate_by_id
+		// produces an instance whose TextSnapshot availability mirrors its
+		// source, so cloning an already-stale source yields a clone that
+		// is born stale — matches avm1/textsnapshot_available_text.
+		clone_mc->ts_stale_source = src_mc->ts_stale_source;
+		// Mark source as "used as dup source" so later `new TextSnapshot(src)`
+		// calls reject it (Ruffle's as_movie_clip() returns None for these
+		// after clone).
+		src_mc->ts_stale_source = 1;
 	}
 	clone_mc->currentframe = 1;
 	clone_mc->depth = depth;
@@ -2803,6 +2813,10 @@ MovieClip* ng_cloneSpriteFromMC(SWFAppContext* app_context, MovieClip* src_mc,
 	clone_mc->draw_xmax = src_mc->draw_xmax;
 	clone_mc->draw_ymin = src_mc->draw_ymin;
 	clone_mc->draw_ymax = src_mc->draw_ymax;
+	// Inherit the source's TextSnapshot stale flag BEFORE marking the source.
+	// See ng_cloneSprite for rationale (avm1/textsnapshot_available_text).
+	clone_mc->ts_stale_source = src_mc->ts_stale_source;
+	src_mc->ts_stale_source = 1;
 	clone_mc->currentframe = 1;
 	clone_mc->depth = depth;
 
@@ -2910,6 +2924,16 @@ MovieClip* ng_duplicateMovieClip(SWFAppContext* app_context, const char* source_
 		clone_mc->totalframes   = src_mc->totalframes;
 		clone_mc->framesloaded  = src_mc->framesloaded;
 		clone_mc->as_set_flags  = src_mc->as_set_flags;
+		// Inherit the source's TextSnapshot stale flag BEFORE marking the
+		// source itself. Ruffle's clone_sprite via instantiate_by_id
+		// produces an instance whose TextSnapshot availability tracks the
+		// same state as its source, so a clone from an already-stale
+		// source (one that has itself been used as a dup source) is born
+		// stale — matches avm1/textsnapshot_available_text expectations.
+		clone_mc->ts_stale_source = src_mc->ts_stale_source;
+		// Mark the source as "used as dup source" so subsequent
+		// `new TextSnapshot(src)` calls reject it.
+		src_mc->ts_stale_source = 1;
 	}
 	clone_mc->currentframe = 1;
 	clone_mc->depth = as_depth;

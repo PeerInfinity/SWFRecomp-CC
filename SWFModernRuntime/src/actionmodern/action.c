@@ -42019,7 +42019,11 @@ void actionNewObject(SWFAppContext* app_context)
 		if (num_args == 1 && args[0].type == ACTION_STACK_VALUE_MOVIECLIP) {
 			MovieClip* arg_mc = (MovieClip*) args[0].data.numeric_value;
 			// Only native when the arg is an actual MovieClip (not button/textfield)
-			if (arg_mc && !arg_mc->is_button_mc && !MC_IS_TEXTFIELD(arg_mc)) {
+			// and has not been invalidated by duplicateMovieClip. Ruffle rejects
+			// stale source MCs (as_movie_clip() returns None) so getText returns
+			// undefined — see avm1/textsnapshot_available_text.
+			if (arg_mc && !arg_mc->is_button_mc && !MC_IS_TEXTFIELD(arg_mc) &&
+			    !arg_mc->ts_stale_source) {
 				obj->native_type = NATIVE_TEXTSNAPSHOT;
 				textSnapshotCapture(app_context, obj, arg_mc);
 			}
@@ -53866,8 +53870,13 @@ void actionCallMethod(SWFAppContext* app_context, char* str_buffer)
 				// Built-in TextSnapshot (stub ctor or missing): create directly
 				ASObject* ts = allocObject(app_context, 8);
 				retainObject(ts);
-				ts->native_type = NATIVE_TEXTSNAPSHOT;
-				textSnapshotCapture(app_context, ts, mc);
+				// Skip native-mark when the target MC is stale (has been used
+				// as a duplicateMovieClip source); see avm1/
+				// textsnapshot_available_text.
+				if (mc != NULL && !mc->ts_stale_source) {
+					ts->native_type = NATIVE_TEXTSNAPSHOT;
+					textSnapshotCapture(app_context, ts, mc);
+				}
 				if (ts_ctor != NULL && ts_ctor->prototype_obj != NULL) {
 					ActionVar pv = {0};
 					pv.type = ACTION_STACK_VALUE_OBJECT;
