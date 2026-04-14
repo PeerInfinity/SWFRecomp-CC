@@ -1,22 +1,19 @@
 # Ruffle Test Results Diff
 
-**Previous:** `83d3748a6081` (2026-04-13T19:34:06.420848+00:00)
-**Current:** `1d207c167423` (2026-04-13T23:00:07.776626+00:00)
+**Previous:** `1d207c167423` (2026-04-13T23:00:07.776626+00:00)
+**Current:** `c3d9506ef0b3` (2026-04-14T00:48:27.764540+00:00)
 
 ## Summary
 
 | Metric | Previous | Current | Delta |
 |--------|----------|---------|-------|
-| Passing | 11 | 14 | +3 |
-| Total | 14 | 18 | +4 |
-| Pass rate | 78.6% | 77.8% | -0.8% |
-| Mismatched lines | 4 | 6 | +2 |
+| Passing | 14 | 14 | 0 |
+| Total | 18 | 18 | 0 |
+| Pass rate | 77.8% | 77.8% | 0% |
+| Mismatched lines | 6 | 6 | 0 |
 
-## Added Tests (4)
+## Status Changed (1)
 
-| Test | Status | Lines |
-|------|--------|-------|
-| `trace-as2/root_onload` | output_mismatch | 2/4 |
-| `trace-as2/shortstack` | pass | 2/2 |
-| `trace-as2/super` | pass | 8/8 |
-| `trace-as2/this` | pass | 8/8 |
+| Test | Previous | Current | Lines (prev) | Lines (now) |
+|------|----------|---------|--------------|-------------|
+| `dict_event` | output_mismatch | ruffle_matched | 3/5 | 3/5 |
