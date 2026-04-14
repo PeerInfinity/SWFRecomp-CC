@@ -1293,17 +1293,30 @@ static ActionVar builtin_ts_getText(SWFAppContext* app_context, ActionVar* args,
 
 	ASObject* obj = (ASObject*)this_obj;
 	if (!obj) return ret;
+	// Non-native TextSnapshots return undefined regardless of args.
+	if (obj->native_type != NATIVE_TEXTSNAPSHOT) return ret;
 
 	ActionVar* tv = getProperty(obj, "__ts_text__", 11);
 	ActionVar* cv = getProperty(obj, "__ts_count__", 12);
 	ActionVar* nv = getProperty(obj, "__ts_nl__", 9);
-	if (!tv || tv->type != ACTION_STACK_VALUE_STRING || !cv || cv->type != ACTION_STACK_VALUE_F64)
+
+	// Native TextSnapshot with empty/missing text: return empty string (Flash/Ruffle behavior).
+	if (!tv || tv->type != ACTION_STACK_VALUE_STRING || !cv || cv->type != ACTION_STACK_VALUE_F64) {
+		ret.type = ACTION_STACK_VALUE_STRING;
+		ret.str_size = 0;
+		ret.data.numeric_value = (u64) u16_empty;
 		return ret;
+	}
 
 	const uint16_t* text = varGetU16Ptr(tv);
 	int count = (int)VAL(double, &cv->data.numeric_value);
 	const uint16_t* nl_flags = (nv && nv->type == ACTION_STACK_VALUE_STRING) ? varGetU16Ptr(nv) : NULL;
-	if (!text || count == 0) return ret;
+	if (!text || count == 0) {
+		ret.type = ACTION_STACK_VALUE_STRING;
+		ret.str_size = 0;
+		ret.data.numeric_value = (u64) u16_empty;
+		return ret;
+	}
 
 	int start = (int)tsArgToDouble_ctx(app_context, &args[0]);
 	int end = (int)tsArgToDouble_ctx(app_context, &args[1]);
@@ -8730,23 +8743,57 @@ static ActionVar pointToString(SWFAppContext* app_context, ActionVar* args, u32 
 	return r;
 }
 
+// ECMAScript-style '+' on two ActionVars — if either operand is a STRING,
+// concatenate as strings; otherwise numeric add. Used by Point.add so tests
+// that pass non-numeric x/y see Flash-compatible string-concat behavior.
+// Caller must initialize `out` to zero.
+static void avAdditionEcma(SWFAppContext* app_context, ActionVar* a, ActionVar* b, ActionVar* out)
+{
+	int a_is_str = (a != NULL && a->type == ACTION_STACK_VALUE_STRING);
+	int b_is_str = (b != NULL && b->type == ACTION_STACK_VALUE_STRING);
+	if (a_is_str || b_is_str) {
+		char abuf[256], bbuf[256];
+		varToStringBufFull(app_context, a, abuf, sizeof(abuf));
+		varToStringBufFull(app_context, b, bbuf, sizeof(bbuf));
+		char combined[512];
+		int len = snprintf(combined, sizeof(combined), "%s%s", abuf, bbuf);
+		u32 u16_len;
+		uint16_t* u16 = ascii_to_u16(app_context, combined, len, &u16_len);
+		out->type = ACTION_STACK_VALUE_STRING;
+		out->str_size = u16_len;
+		out->data.string_data.heap_ptr = u16;
+		out->data.string_data.owns_memory = true;
+		return;
+	}
+	double av = a ? varToDoubleSimple(a) : NAN;
+	double bv = b ? varToDoubleSimple(b) : NAN;
+	*out = makeF64(av + bv);
+}
+
 static ActionVar pointAdd(SWFAppContext* app_context, ActionVar* args, u32 arg_count, ActionVar* registers, void* this_obj)
 {
 	(void)registers;
 	ASObject* obj = (ASObject*) this_obj;
 	ActionVar* tx = obj ? getProperty(obj, "x", 1) : NULL;
 	ActionVar* ty = obj ? getProperty(obj, "y", 1) : NULL;
-	double sx = varToDoubleSimple(tx), sy = varToDoubleSimple(ty);
 
-	// Read pt.x and pt.y from argument — non-object → NaN
-	double ox = NAN, oy = NAN;
+	ActionVar* ox = NULL;
+	ActionVar* oy = NULL;
 	if (arg_count > 0 && args[0].type == ACTION_STACK_VALUE_OBJECT && args[0].data.numeric_value != 0) {
 		ASObject* pt = (ASObject*)args[0].data.numeric_value;
-		ox = propToDouble(pt, "x", 1);
-		oy = propToDouble(pt, "y", 1);
+		ox = getProperty(pt, "x", 1);
+		oy = getProperty(pt, "y", 1);
 	}
+	// Missing or non-object arg → other.x/y are undefined (not missing),
+	// so `this.x + undefined` string-concats to "xundefined" per Gnash tests.
+	ActionVar undef_pa = {0}; undef_pa.type = ACTION_STACK_VALUE_UNDEFINED;
+	if (ox == NULL) ox = &undef_pa;
+	if (oy == NULL) oy = &undef_pa;
 
-	ASObject* result = createPointObjF64(app_context, sx + ox, sy + oy);
+	ActionVar nx = {0}, ny = {0};
+	avAdditionEcma(app_context, tx, ox, &nx);
+	avAdditionEcma(app_context, ty, oy, &ny);
+	ASObject* result = createPointObj(app_context, &nx, &ny);
 	ActionVar r = {0};
 	r.type = ACTION_STACK_VALUE_OBJECT;
 	r.data.numeric_value = (u64) result;
@@ -8776,6 +8823,35 @@ static ActionVar pointSubtract(SWFAppContext* app_context, ActionVar* args, u32 
 	return r;
 }
 
+// Strict equality between two ActionVars (same type + same value).
+// Used by Point.equals — reflexive (NaN==NaN for strict equality on same
+// var is true), matches Gnash's Point.prototype.equals which delegates to
+// ECMAScript strict equality.
+static int avStrictEquals(ActionVar* a, ActionVar* b)
+{
+	if (a == NULL && b == NULL) return 1;
+	if (a == NULL || b == NULL) return 0;
+	if (a->type != b->type) return 0;
+	if (a->type == ACTION_STACK_VALUE_STRING) {
+		if (a->str_size != b->str_size) return 0;
+		const uint16_t* as = varGetU16Ptr(a);
+		const uint16_t* bs = varGetU16Ptr(b);
+		if (a->str_size == 0) return 1;
+		if (as == NULL || bs == NULL) return as == bs;
+		return memcmp(as, bs, a->str_size * sizeof(uint16_t)) == 0;
+	}
+	if (a->type == ACTION_STACK_VALUE_F64 || a->type == ACTION_STACK_VALUE_F32) {
+		double av = (a->type == ACTION_STACK_VALUE_F64)
+			? VAL(double, &a->data.numeric_value)
+			: (double)VAL(float, &a->data.numeric_value);
+		double bv = (b->type == ACTION_STACK_VALUE_F64)
+			? VAL(double, &b->data.numeric_value)
+			: (double)VAL(float, &b->data.numeric_value);
+		return av == bv;
+	}
+	return a->data.numeric_value == b->data.numeric_value;
+}
+
 static ActionVar pointEquals(SWFAppContext* app_context, ActionVar* args, u32 arg_count, ActionVar* registers, void* this_obj)
 {
 	(void)app_context; (void)registers;
@@ -8787,14 +8863,13 @@ static ActionVar pointEquals(SWFAppContext* app_context, ActionVar* args, u32 ar
 
 	ActionVar* tx = getProperty(obj, "x", 1);
 	ActionVar* ty = getProperty(obj, "y", 1);
-	double sx = varToDoubleSimple(tx), sy = varToDoubleSimple(ty);
 
 	if (args[0].type == ACTION_STACK_VALUE_OBJECT && args[0].data.numeric_value != 0) {
 		ASObject* pt = (ASObject*)args[0].data.numeric_value;
 		ActionVar* px = getProperty(pt, "x", 1);
 		ActionVar* py = getProperty(pt, "y", 1);
-		double ox = varToDoubleSimple(px), oy = varToDoubleSimple(py);
-		if (sx == ox && sy == oy) r.data.numeric_value = 1;
+		if (avStrictEquals(tx, px) && avStrictEquals(ty, py))
+			r.data.numeric_value = 1;
 	}
 	return r;
 }
@@ -8832,13 +8907,16 @@ static ActionVar pointOffset(SWFAppContext* app_context, ActionVar* args, u32 ar
 
 	ActionVar* xv = getProperty(obj, "x", 1);
 	ActionVar* yv = getProperty(obj, "y", 1);
-	double sx = varToDoubleSimple(xv), sy = varToDoubleSimple(yv);
-
-	double dx = (arg_count > 0) ? varToDoubleSimple(&args[0]) : NAN;
-	double dy = (arg_count > 1) ? varToDoubleSimple(&args[1]) : NAN;
-
-	ActionVar nxv = makeF64(sx + dx);
-	ActionVar nyv = makeF64(sy + dy);
+	// Use abstract `+` semantics so non-numeric x/y get string-concatenated
+	// (matches Gnash/Flash behavior for string-typed Point coordinates).
+	// Missing args are treated as undefined; avAdditionEcma produces a string
+	// "xundefined" when x is a string and arg is undefined.
+	ActionVar undef = {0}; undef.type = ACTION_STACK_VALUE_UNDEFINED;
+	ActionVar* dx_v = (arg_count > 0) ? &args[0] : &undef;
+	ActionVar* dy_v = (arg_count > 1) ? &args[1] : &undef;
+	ActionVar nxv = {0}, nyv = {0};
+	avAdditionEcma(app_context, xv, dx_v, &nxv);
+	avAdditionEcma(app_context, yv, dy_v, &nyv);
 	setProperty(app_context, obj, "x", 1, &nxv);
 	setProperty(app_context, obj, "y", 1, &nyv);
 
@@ -8929,18 +9007,36 @@ static ActionVar pointInterpolate(SWFAppContext* app_context, ActionVar* args, u
 {
 	(void)registers; (void)this_obj;
 	// Point.interpolate(pt1, pt2, f) → Point(pt2.x + f*(pt1.x-pt2.x), pt2.y + f*(pt1.y-pt2.y))
-	double x1 = NAN, y1 = NAN, x2 = NAN, y2 = NAN;
+	// Gnash's Point.interpolate formula: pt2 + f * (pt1 - pt2). In AS1/AS2 the
+	// implementation uses the abstract `+` operator, so if either pt2.x or the
+	// product is a string, the result is a string concat (matches Flash and
+	// Gnash's test expectations for string-typed coordinates).
+	ActionVar* x1_raw = NULL;
+	ActionVar* y1_raw = NULL;
+	ActionVar* x2_raw = NULL;
+	ActionVar* y2_raw = NULL;
 	if (arg_count > 0 && args[0].type == ACTION_STACK_VALUE_OBJECT && args[0].data.numeric_value != 0) {
-		x1 = varToDoubleSimple(getProperty((ASObject*)args[0].data.numeric_value, "x", 1));
-		y1 = varToDoubleSimple(getProperty((ASObject*)args[0].data.numeric_value, "y", 1));
+		x1_raw = getProperty((ASObject*)args[0].data.numeric_value, "x", 1);
+		y1_raw = getProperty((ASObject*)args[0].data.numeric_value, "y", 1);
 	}
 	if (arg_count > 1 && args[1].type == ACTION_STACK_VALUE_OBJECT && args[1].data.numeric_value != 0) {
-		x2 = varToDoubleSimple(getProperty((ASObject*)args[1].data.numeric_value, "x", 1));
-		y2 = varToDoubleSimple(getProperty((ASObject*)args[1].data.numeric_value, "y", 1));
+		x2_raw = getProperty((ASObject*)args[1].data.numeric_value, "x", 1);
+		y2_raw = getProperty((ASObject*)args[1].data.numeric_value, "y", 1);
 	}
+	double x1 = x1_raw ? varToDoubleSimple(x1_raw) : NAN;
+	double y1 = y1_raw ? varToDoubleSimple(y1_raw) : NAN;
+	double x2 = x2_raw ? varToDoubleSimple(x2_raw) : NAN;
+	double y2 = y2_raw ? varToDoubleSimple(y2_raw) : NAN;
 	double f = (arg_count > 2) ? varToDoubleSimple(&args[2]) : NAN;
 
-	ASObject* result = createPointObjF64(app_context, x2 + f * (x1 - x2), y2 + f * (y1 - y2));
+	// Product: f * (pt1 - pt2). Always numeric (subtract/multiply in ECMA).
+	ActionVar dx_prod = makeF64(f * (x1 - x2));
+	ActionVar dy_prod = makeF64(f * (y1 - y2));
+	// Final: pt2.x + dx_prod, with string concat if pt2.x is a string.
+	ActionVar nx = {0}, ny = {0};
+	avAdditionEcma(app_context, x2_raw, &dx_prod, &nx);
+	avAdditionEcma(app_context, y2_raw, &dy_prod, &ny);
+	ASObject* result = createPointObj(app_context, &nx, &ny);
 	ActionVar r = {0};
 	r.type = ACTION_STACK_VALUE_OBJECT;
 	r.data.numeric_value = (u64) result;
@@ -42131,6 +42227,18 @@ void actionNewObject(SWFAppContext* app_context)
 				// Set 'this' variable to new object, push args, call constructor
 				if (ctor_func->simple_func != NULL)
 				{
+					// Push a local scope so setVariableByName("this") writes into
+					// it (via setVariableOnLocalScope) instead of leaking into the
+					// global variable table, which would pollute root-level `this`
+					// lookups after the constructor returns.
+					ASObject* _t1_local_scope = allocObject(app_context, 4);
+					u32 _t1_saved_scope_depth = scope_depth;
+					if (scope_depth < MAX_SCOPE_DEPTH) {
+						scope_is_with[scope_depth] = 0;
+						scope_mc[scope_depth] = NULL;
+						scope_chain[scope_depth++] = _t1_local_scope;
+					}
+
 					// Set 'this' as a local variable so GetVariable("this") finds it
 					ActionVar this_var;
 					this_var.type = ACTION_STACK_VALUE_OBJECT;
@@ -42161,6 +42269,8 @@ void actionNewObject(SWFAppContext* app_context)
 					popCtorContext();
 					g_call_depth--;
 					g_this_depth = _saved_this_depth;
+					scope_depth = _t1_saved_scope_depth;
+					releaseObject(app_context, _t1_local_scope);
 
 					// Per ECMAScript spec: if constructor returns object, use it
 					if (return_value.type == ACTION_STACK_VALUE_OBJECT && return_value.data.numeric_value != 0)

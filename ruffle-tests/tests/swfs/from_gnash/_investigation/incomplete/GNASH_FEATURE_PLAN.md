@@ -21,7 +21,43 @@ dependencies: []
 blockers: []
 -->
 
-Last updated: 2026-04-12 (Phase 3 in progress)
+Last updated: 2026-04-14 (Phase 3 in progress)
+
+## 2026-04-14 session
+
+**Type-1 constructor `this` leak fix** — `actionNewObject` user-constructor
+path (type 1) called `setVariableByName("this", ...)` without pushing a local
+scope first, so when constructors run at root level the "this" write fell
+through to the global variable table and persisted after the constructor
+returned. Later `new TextSnapshot(this)` at root-level saw args[0] as OBJECT
+(the stale leftover) instead of MOVIECLIP, preventing the constructor from
+setting `native_type=NATIVE_TEXTSNAPSHOT`. Fix: allocate a local scope around
+the type-1 constructor call at action.c:42147–42176 so `setVariableByName`
+writes there and is cleaned up on exit.
+
+**TextSnapshot.getText empty-native fix** — `getText(start, end[, nl])` on a
+native TextSnapshot whose backing MC has no text previously returned
+`undefined`; now returns the empty string (matches Flash: type must be
+"string" for 2-3 arg calls).
+
+**Impact:** TextSnapshot-v6/v7/v8 → **all PASS** (167/167 lines each).
+
+**Point method string-+ semantics** — Gnash's Point tests pass string-typed
+x/y coordinates and exercise `add`, `offset`, and `Point.interpolate` through
+the AS1/AS2 abstract `+` operator, which string-concatenates when either
+operand is a STRING. Our builtins coerced both sides to doubles. Added
+`avAdditionEcma` helper (ECMA-style abstract `+`) and rewrote:
+- `pointAdd`: treats missing/non-Object args as UNDEFINED instead of NaN
+- `pointOffset`: mutates `this.x`/`this.y` via abstract `+`
+- `pointInterpolate`: `pt2.x + f*(pt1.x - pt2.x)` uses abstract `+`
+Also rewrote `pointEquals` to use strict equality (`avStrictEquals`) so
+two points with equal string x/y compare equal (previously compared as NaN
+after double coercion).
+
+**Impact:** Point-v8 22→6 diffs (line-match 165/187 → 181/187). Still not
+passing — remaining diffs involve Point.add(number) arg coercion,
+Point.distance with NaN/non-numeric fields, and one reflexive-equals edge
+case.
 
 ## 2026-04-12 session
 
