@@ -1300,7 +1300,9 @@ static ActionVar builtin_ts_getText(SWFAppContext* app_context, ActionVar* args,
 	ActionVar* cv = getProperty(obj, "__ts_count__", 12);
 	ActionVar* nv = getProperty(obj, "__ts_nl__", 9);
 
-	// Native TextSnapshot with empty/missing text: return empty string (Flash/Ruffle behavior).
+	// Native TextSnapshot with empty/missing text: return empty string
+	// (matches Ruffle: TextSnapshot::get_text returns WString::new() for
+	// count==0).
 	if (!tv || tv->type != ACTION_STACK_VALUE_STRING || !cv || cv->type != ACTION_STACK_VALUE_F64) {
 		ret.type = ACTION_STACK_VALUE_STRING;
 		ret.str_size = 0;
@@ -42227,27 +42229,20 @@ void actionNewObject(SWFAppContext* app_context)
 				// Set 'this' variable to new object, push args, call constructor
 				if (ctor_func->simple_func != NULL)
 				{
-					// Push a local scope so setVariableByName("this") writes into
-					// it (via setVariableOnLocalScope) instead of leaking into the
-					// global variable table, which would pollute root-level `this`
-					// lookups after the constructor returns.
-					ASObject* _t1_local_scope = allocObject(app_context, 4);
-					u32 _t1_saved_scope_depth = scope_depth;
-					if (scope_depth < MAX_SCOPE_DEPTH) {
-						scope_is_with[scope_depth] = 0;
-						scope_mc[scope_depth] = NULL;
-						scope_chain[scope_depth++] = _t1_local_scope;
-					}
-
-					// Set 'this' as a local variable so GetVariable("this") finds it
+					// Push to g_this_stack so the early "this" resolution in
+					// actionGetVariable finds the new object (not an outer MC
+					// context). Do NOT use setVariableByName("this", ...) — at
+					// root scope it writes to the global variable table and
+					// leaks after the constructor returns, polluting later
+					// `this` lookups (e.g. `new TextSnapshot(this)` would see
+					// an OBJECT instead of a MOVIECLIP). Early-this resolution
+					// in actionGetVariable reads g_this_stack for SWF>=5, so
+					// the in-constructor lookup still works.
 					ActionVar this_var;
 					this_var.type = ACTION_STACK_VALUE_OBJECT;
 					this_var.str_size = 0;
 					this_var.data.numeric_value = (u64) obj;
-					setVariableByName("this", &this_var);
 
-					// Also push to g_this_stack so the early "this" resolution in
-					// actionGetVariable finds the new object (not an outer MC context)
 					u32 _saved_this_depth = g_this_depth;
 					if (g_this_depth < MAX_THIS_DEPTH) {
 						g_this_stack[g_this_depth] = this_var;
@@ -42269,8 +42264,6 @@ void actionNewObject(SWFAppContext* app_context)
 					popCtorContext();
 					g_call_depth--;
 					g_this_depth = _saved_this_depth;
-					scope_depth = _t1_saved_scope_depth;
-					releaseObject(app_context, _t1_local_scope);
 
 					// Per ECMAScript spec: if constructor returns object, use it
 					if (return_value.type == ACTION_STACK_VALUE_OBJECT && return_value.data.numeric_value != 0)

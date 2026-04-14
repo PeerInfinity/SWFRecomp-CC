@@ -25,15 +25,27 @@ Last updated: 2026-04-14 (Phase 3 in progress)
 
 ## 2026-04-14 session
 
-**Type-1 constructor `this` leak fix** — `actionNewObject` user-constructor
-path (type 1) called `setVariableByName("this", ...)` without pushing a local
-scope first, so when constructors run at root level the "this" write fell
-through to the global variable table and persisted after the constructor
-returned. Later `new TextSnapshot(this)` at root-level saw args[0] as OBJECT
-(the stale leftover) instead of MOVIECLIP, preventing the constructor from
-setting `native_type=NATIVE_TEXTSNAPSHOT`. Fix: allocate a local scope around
-the type-1 constructor call at action.c:42147–42176 so `setVariableByName`
-writes there and is cleaned up on exit.
+**Type-1 constructor `this` leak fix (v2)** — `actionNewObject`
+user-constructor path (type 1) called `setVariableByName("this", ...)` without
+pushing a local scope first, so when constructors run at root level the
+"this" write fell through to the global variable table and persisted after
+the constructor returned. Later `new TextSnapshot(this)` at root-level saw
+args[0] as OBJECT (the stale leftover) instead of MOVIECLIP, preventing the
+constructor from setting `native_type=NATIVE_TEXTSNAPSHOT`.
+
+The first attempt (commit `0eddf896`) wrapped the ctor call in a fresh local
+scope so `setVariableByName` landed there. That passed the three Gnash
+TextSnapshot tests but regressed `avm1/string_coercion` (117→108 lines): the
+extra scope held references that inner closures captured, but the scope was
+popped before those closures ran, so comparisons that called custom valueOf
+methods inside the constructed objects returned undefined instead of
+true/false.
+
+Final fix (action.c:42220–42272): drop the `setVariableByName("this", ...)`
+call from the type-1 ctor path entirely and rely on the `g_this_stack` push
+(which was already there) plus the early `this` resolution in
+`actionGetVariable` (SWF>=5 reads `g_this_stack` before scope chain / var
+table). No extra scope, no leak.
 
 **TextSnapshot.getText empty-native fix** — `getText(start, end[, nl])` on a
 native TextSnapshot whose backing MC has no text previously returned
@@ -41,6 +53,18 @@ native TextSnapshot whose backing MC has no text previously returned
 "string" for 2-3 arg calls).
 
 **Impact:** TextSnapshot-v6/v7/v8 → **all PASS** (167/167 lines each).
+
+**Known regression:** `avm1/textsnapshot_available_text` (20/20 → 17/20) —
+the test duplicates a MovieClip then creates `new TextSnapshot(child_clone)`
+against a source whose display list gets emptied mid-sequence. Our runtime
+still flags these TS instances as native with count=0 and now returns `""`
+from getText (Ruffle-matching semantics), but the test expects `undefined`,
+which in Ruffle only happens when the constructor rejects the arg (i.e.
+when `as_movie_clip()` returns None). The proper fix is to match Ruffle's
+duplicate semantics so the stale `child_clone` reference doesn't resolve to
+a valid MC, but that's a deeper investigation into `ng_duplicateMovieClip`.
+Filed here for a later session; net test delta is still positive (+3 Gnash,
+−1 avm1).
 
 **Point method string-+ semantics** — Gnash's Point tests pass string-typed
 x/y coordinates and exercise `add`, `offset`, and `Point.interpolate` through
