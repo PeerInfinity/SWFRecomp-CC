@@ -1,53 +1,269 @@
 {
   "metadata": {
-    "old_timestamp": "2026-04-12T23:57:00.375084+00:00",
-    "old_git_sha": "d74b2825dc765ef2c12bdf7b2f9de38223410987",
-    "new_timestamp": "2026-04-13T19:34:06.404963+00:00",
-    "new_git_sha": "83d3748a60813ec3b76ce3c638296a5a01e68b23",
+    "old_timestamp": "2026-04-13T19:34:06.404963+00:00",
+    "old_git_sha": "83d3748a60813ec3b76ce3c638296a5a01e68b23",
+    "new_timestamp": "2026-04-13T23:00:07.759916+00:00",
+    "new_git_sha": "1d207c1674234150af881cc2dd29a321a54a0af1",
     "partial": false,
     "same_commit": false
   },
   "summary": {
-    "old_pass": 579,
-    "old_total": 620,
+    "old_pass": 580,
+    "old_total": 621,
     "old_pass_rate": 93.4,
     "new_pass": 580,
-    "new_total": 621,
-    "new_pass_rate": 93.4,
-    "old_mismatched_lines": 8917,
-    "new_mismatched_lines": 8911,
+    "new_total": 641,
+    "new_pass_rate": 90.5,
+    "old_mismatched_lines": 8911,
+    "new_mismatched_lines": 30563,
     "increased_mismatches": 0,
-    "decreased_mismatches": 6,
-    "newly_passing": 1,
+    "decreased_mismatches": 0,
+    "newly_passing": 0,
     "newly_failing": 0,
-    "status_changed": 1,
-    "unchanged": 619,
-    "added": 1,
+    "status_changed": 0,
+    "unchanged": 621,
+    "added": 20,
     "removed": 0
   },
   "changes": [
     {
-      "test": "depth_replacement_audio_unloading",
+      "test": "bitmap_data_thorough/colorTransform",
       "change_type": "added",
       "old_status": null,
-      "new_status": "compile_fail",
+      "new_status": "output_mismatch",
       "old_lines": null,
-      "new_lines": null
+      "new_lines": {
+        "actual_lines": 123,
+        "expected_lines": 279,
+        "matching_lines": 8
+      }
     },
     {
-      "test": "textsnapshot_available_text",
-      "change_type": "changed",
-      "old_status": "output_mismatch",
-      "new_status": "pass",
-      "old_lines": {
-        "actual_lines": 20,
-        "expected_lines": 20,
-        "matching_lines": 14
-      },
+      "test": "bitmap_data_thorough/compare",
+      "change_type": "added",
+      "old_status": null,
+      "new_status": "output_mismatch",
+      "old_lines": null,
       "new_lines": {
-        "actual_lines": 20,
-        "expected_lines": 20,
-        "matching_lines": 20
+        "actual_lines": 60,
+        "expected_lines": 69,
+        "matching_lines": 29
+      }
+    },
+    {
+      "test": "bitmap_data_thorough/constructor",
+      "change_type": "added",
+      "old_status": null,
+      "new_status": "output_mismatch",
+      "old_lines": null,
+      "new_lines": {
+        "actual_lines": 163,
+        "expected_lines": 313,
+        "matching_lines": 21
+      }
+    },
+    {
+      "test": "bitmap_data_thorough/copyChannel",
+      "change_type": "added",
+      "old_status": null,
+      "new_status": "output_mismatch",
+      "old_lines": null,
+      "new_lines": {
+        "actual_lines": 1131,
+        "expected_lines": 2715,
+        "matching_lines": 49
+      }
+    },
+    {
+      "test": "bitmap_data_thorough/copyPixels",
+      "change_type": "added",
+      "old_status": null,
+      "new_status": "output_mismatch",
+      "old_lines": null,
+      "new_lines": {
+        "actual_lines": 492,
+        "expected_lines": 1203,
+        "matching_lines": 23
+      }
+    },
+    {
+      "test": "bitmap_data_thorough/fillRect",
+      "change_type": "added",
+      "old_status": null,
+      "new_status": "output_mismatch",
+      "old_lines": null,
+      "new_lines": {
+        "actual_lines": 150,
+        "expected_lines": 342,
+        "matching_lines": 9
+      }
+    },
+    {
+      "test": "bitmap_data_thorough/floodFill",
+      "change_type": "added",
+      "old_status": null,
+      "new_status": "output_mismatch",
+      "old_lines": null,
+      "new_lines": {
+        "actual_lines": 375,
+        "expected_lines": 867,
+        "matching_lines": 18
+      }
+    },
+    {
+      "test": "bitmap_data_thorough/getColorBoundsRect",
+      "change_type": "added",
+      "old_status": null,
+      "new_status": "output_mismatch",
+      "old_lines": null,
+      "new_lines": {
+        "actual_lines": 285,
+        "expected_lines": 285,
+        "matching_lines": 238
+      }
+    },
+    {
+      "test": "bitmap_data_thorough/getPixel",
+      "change_type": "added",
+      "old_status": null,
+      "new_status": "output_mismatch",
+      "old_lines": null,
+      "new_lines": {
+        "actual_lines": 141,
+        "expected_lines": 141,
+        "matching_lines": 111
+      }
+    },
+    {
+      "test": "bitmap_data_thorough/getPixel32",
+      "change_type": "added",
+      "old_status": null,
+      "new_status": "output_mismatch",
+      "old_lines": null,
+      "new_lines": {
+        "actual_lines": 141,
+        "expected_lines": 141,
+        "matching_lines": 111
+      }
+    },
+    {
+      "test": "bitmap_data_thorough/hitTest",
+      "change_type": "added",
+      "old_status": null,
+      "new_status": "output_mismatch",
+      "old_lines": null,
+      "new_lines": {
+        "actual_lines": 510,
+        "expected_lines": 519,
+        "matching_lines": 285
+      }
+    },
+    {
+      "test": "bitmap_data_thorough/merge",
+      "change_type": "added",
+      "old_status": null,
+      "new_status": "output_mismatch",
+      "old_lines": null,
+      "new_lines": {
+        "actual_lines": 510,
+        "expected_lines": 1203,
+        "matching_lines": 23
+      }
+    },
+    {
+      "test": "bitmap_data_thorough/noise",
+      "change_type": "added",
+      "old_status": null,
+      "new_status": "output_mismatch",
+      "old_lines": null,
+      "new_lines": {
+        "actual_lines": 654,
+        "expected_lines": 1518,
+        "matching_lines": 29
+      }
+    },
+    {
+      "test": "bitmap_data_thorough/paletteMap",
+      "change_type": "added",
+      "old_status": null,
+      "new_status": "output_mismatch",
+      "old_lines": null,
+      "new_lines": {
+        "actual_lines": 402,
+        "expected_lines": 951,
+        "matching_lines": 18
+      }
+    },
+    {
+      "test": "bitmap_data_thorough/perlinNoise",
+      "change_type": "added",
+      "old_status": null,
+      "new_status": "output_mismatch",
+      "old_lines": null,
+      "new_lines": {
+        "actual_lines": 5274,
+        "expected_lines": 8481,
+        "matching_lines": 435
+      }
+    },
+    {
+      "test": "bitmap_data_thorough/pixelDissolve",
+      "change_type": "added",
+      "old_status": null,
+      "new_status": "output_mismatch",
+      "old_lines": null,
+      "new_lines": {
+        "actual_lines": 573,
+        "expected_lines": 1371,
+        "matching_lines": 28
+      }
+    },
+    {
+      "test": "bitmap_data_thorough/scroll",
+      "change_type": "added",
+      "old_status": null,
+      "new_status": "output_mismatch",
+      "old_lines": null,
+      "new_lines": {
+        "actual_lines": 168,
+        "expected_lines": 384,
+        "matching_lines": 10
+      }
+    },
+    {
+      "test": "bitmap_data_thorough/setPixel",
+      "change_type": "added",
+      "old_status": null,
+      "new_status": "output_mismatch",
+      "old_lines": null,
+      "new_lines": {
+        "actual_lines": 231,
+        "expected_lines": 531,
+        "matching_lines": 12
+      }
+    },
+    {
+      "test": "bitmap_data_thorough/setPixel32",
+      "change_type": "added",
+      "old_status": null,
+      "new_status": "output_mismatch",
+      "old_lines": null,
+      "new_lines": {
+        "actual_lines": 231,
+        "expected_lines": 531,
+        "matching_lines": 12
+      }
+    },
+    {
+      "test": "bitmap_data_thorough/threshold",
+      "change_type": "added",
+      "old_status": null,
+      "new_status": "output_mismatch",
+      "old_lines": null,
+      "new_lines": {
+        "actual_lines": 555,
+        "expected_lines": 1308,
+        "matching_lines": 31
       }
     }
   ]
