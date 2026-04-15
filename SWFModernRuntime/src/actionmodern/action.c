@@ -27233,8 +27233,12 @@ static void initSoundPrototype(SWFAppContext* app_context, ASFunction* ctor)
 		setPropertyWithFlags(app_context, ctor->prototype_obj, "start", 5, &fv, mflags);
 	}
 
-	// Extended methods (SWF6+)
-	if (g_swf_version >= 6) {
+	// Extended methods (SWF6+) — always install, mark with flash_flags=0x0080
+	// so they are hidden under the SWF5 version mask (0x7480) but visible for
+	// SWF6+. This avoids the Dejagnu SWF5-init cache poison where
+	// initSoundPrototype runs once during Dejagnu.swf at swf_version=5 and
+	// then skips re-entry when the real (SWF6+) test timeline runs.
+	{
 		// Sound.getDuration — real implementation
 		{
 			ASFunction* fn = &g_proto_stub_funcs[g_proto_stub_func_count++];
@@ -27273,6 +27277,17 @@ static void initSoundPrototype(SWFAppContext* app_context, ASFunction* ctor)
 		}
 		addStubMethodToProto(app_context, ctor->prototype_obj, "getBytesLoaded", 14, mflags);
 		addStubMethodToProto(app_context, ctor->prototype_obj, "getBytesTotal", 13, mflags);
+
+		// Mark the 7 SWF6+ methods with flash_flags=0x0080 (hidden in SWF5).
+		const char* swf6_sound_methods[] = {
+			"getDuration", "setDuration", "getPosition", "setPosition",
+			"loadSound", "getBytesLoaded", "getBytesTotal"
+		};
+		for (int i = 0; i < 7; i++) {
+			ASProperty* p = findPropertyRaw(ctor->prototype_obj, swf6_sound_methods[i],
+				(u32)strlen(swf6_sound_methods[i]));
+			if (p) p->flash_flags = 0x0080;
+		}
 	}
 
 }
