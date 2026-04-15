@@ -24,6 +24,49 @@ blockers: []
 
 Last updated: 2026-04-14 (Phase 3 in progress — System-v5..v8 passing)
 
+## 2026-04-14 session 3 summary (System, Sound, Matrix, TextFormat, MC, TF)
+
+Six targeted fixes in `SWFModernRuntime/src/actionmodern/action.c`:
+
+1. **System-v5..v8 → PASS** — `$version` on root MC, `exactSettings`
+   SWF5 gate, `System.security.*` return `Bool(arg_count >= 1)`.
+   See "System-v5/v6/v7/v8 → PASS" entry below.
+2. **Sound-v5..v8 → ruffle_matched** — `initSoundPrototype` now
+   installs the 7 SWF6+ methods (getDuration, setDuration, getPosition,
+   setPosition, loadSound, getBytesLoaded, getBytesTotal) unconditionally
+   and marks them with `flash_flags=0x0080`. Previously the
+   `if (g_swf_version >= 6)` block ran once during Dejagnu.swf (SWF5)
+   and was cached, so SWF6+ test timelines never got the extensions.
+3. **Matrix-v8 → ruffle_matched** — `matrixInvert` resets to identity
+   when `det == 0` instead of propagating infinities. Matches Ruffle
+   `matrix.rs:347` (`unwrap_or_default()`).
+4. **TextFormat-v5/v6/v7 improved (+13 lines each)** —
+   `initTextFormatPrototype` installs the 17 Flash-spec own properties
+   (font, size, color, url, target, bold, italic, underline, align,
+   leftMargin, rightMargin, indent, leading, blockIndent, tabStops,
+   bullet, display) as undefined on the prototype. Tests still not
+   passing — remaining diffs involve bold/align coercion semantics and
+   getTextExtent location (own vs prototype).
+5. **MovieClip-v5 improved (+22 lines, close to ruffle_matched)** —
+   `initMovieClipPrototype` installs 13 drawing-API method stubs
+   (attachAudio, beginFill, beginGradientFill, beginBitmapFill, moveTo,
+   lineTo, curveTo, lineStyle, lineGradientStyle, endFill, clear,
+   attachBitmap, getRect) plus 9 undefined property slots (blendMode,
+   cacheAsBitmap, filters, opaqueBackground, scale9Grid, scrollRect,
+   tabIndex, useHandCursor, _lockroot). Still 4 extras vs ruffle diffs:
+   `typeof(mc.valueOf())=='movieclip'`, `mc.enabled='a string'`
+   coercion, `mc.getNextHighestDepth()==undefined` SWF5 gating, and
+   a truncated-tail delta.
+6. **TextField-v5 improved (-1 diff line)** — `actionTypeof` for
+   MOVIECLIP-with-text-field now returns `'movieclip'` in SWF5 and
+   `'object'` in SWF6+ (SWF5 predates the TextField class). Still
+   fails `tf instanceOf TextField` — test source not available locally.
+
+**Net delta:** +4 passing (System), +3 new ruffle_matched (Sound-v6/v7/v8;
+Sound-v5 was already matched), +1 new ruffle_matched (Matrix-v8). 8 tests
+that were `output_mismatch` are now counted as effective passes. Other
+tests improved but did not cross the threshold.
+
 ## 2026-04-14 session 3 (System-v5/v6/v7/v8 → PASS)
 
 All four Gnash System tests now pass. Three changes in `action.c`:
