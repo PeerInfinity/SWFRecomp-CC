@@ -1080,6 +1080,27 @@ static ActionVar builtin_return_false(SWFAppContext* app_context, ActionVar* arg
 	return ret;
 }
 
+// --- Stub that returns true ---
+static ActionVar builtin_return_true(SWFAppContext* app_context, ActionVar* args, u32 arg_count, ActionVar* registers, void* this_obj)
+{
+	(void)app_context; (void)args; (void)arg_count; (void)registers; (void)this_obj;
+	ActionVar ret = {0};
+	ret.type = ACTION_STACK_VALUE_BOOLEAN;
+	ret.data.numeric_value = 1;
+	return ret;
+}
+
+// --- Stub that returns true iff at least one argument was provided. Matches
+//     Ruffle's System.security.allowDomain: Bool(args.get(0).is_some()). ---
+static ActionVar builtin_return_has_arg(SWFAppContext* app_context, ActionVar* args, u32 arg_count, ActionVar* registers, void* this_obj)
+{
+	(void)app_context; (void)args; (void)registers; (void)this_obj;
+	ActionVar ret = {0};
+	ret.type = ACTION_STACK_VALUE_BOOLEAN;
+	ret.data.numeric_value = (arg_count >= 1) ? 1 : 0;
+	return ret;
+}
+
 // Forward declaration needed by builtin_sound_getTransform (defined later in file)
 static void setObjectProto(SWFAppContext* app_context, ASObject* obj);
 
@@ -28049,11 +28070,21 @@ static void initSystemObject(SWFAppContext* app_context)
 			// Product.prototype methods (DONT_ENUM) — LIFO reverse of expected
 			static ASFunction prod_methods[6];
 			const char* prod_names[] = {"isRunning", "isInstalled", "launch", "download", "validate", "installedVersion"};
+			// Gnash System.as expects download/launch/validate to return true (success stub),
+			// isInstalled/isRunning to return false. installedVersion returns undefined.
+			Function2Ptr prod_impls[6] = {
+				(Function2Ptr)builtin_return_false, // isRunning
+				(Function2Ptr)builtin_return_false, // isInstalled
+				(Function2Ptr)builtin_return_true,  // launch
+				(Function2Ptr)builtin_return_true,  // download
+				(Function2Ptr)builtin_return_true,  // validate
+				(Function2Ptr)builtin_noop_func,    // installedVersion
+			};
 			for (int i = 0; i < 6; i++) {
 				memset(&prod_methods[i], 0, sizeof(ASFunction));
 				strncpy(prod_methods[i].name, prod_names[i], 255);
 				prod_methods[i].function_type = 2;
-				prod_methods[i].advanced_func = (Function2Ptr)builtin_noop_func;
+				prod_methods[i].advanced_func = prod_impls[i];
 				ActionVar mfv = {0}; mfv.type = ACTION_STACK_VALUE_FUNCTION;
 				mfv.data.numeric_value = (u64)&prod_methods[i];
 				setPropertyWithFlags(app_context, pp, prod_names[i], (u32)strlen(prod_names[i]), &mfv, PROPERTY_FLAGS_DONTENUM);
@@ -28091,11 +28122,13 @@ static void initSystemObject(SWFAppContext* app_context)
 		setProperty(app_context, g_system_object, "showSettings", 12, &fv);
 	}
 
-	// exactSettings (writable boolean, default false)
+	// exactSettings (writable boolean, default false) — SWF6+ only (hidden in SWF5)
 	{
 		ActionVar bv = {0}; bv.type = ACTION_STACK_VALUE_BOOLEAN; bv.data.numeric_value = 0;
 		setPropertyWithFlags(app_context, g_system_object, "exactSettings", 13, &bv,
 			PROPERTY_FLAGS_DEFAULT);
+		ASProperty* ep = findPropertyRaw(g_system_object, "exactSettings", 13);
+		if (ep) ep->flash_flags = 0x0080;
 	}
 
 	// useCodepage (writable boolean, default false)
@@ -28121,11 +28154,22 @@ static void initSystemObject(SWFAppContext* app_context)
 		static ASFunction sec_methods[6];
 		const char* sec_names[] = {"allowDomain", "allowInsecureDomain", "loadPolicyFile", "chooseLocalSwfPath", "escapeDomain"};
 		const u32 sec_name_lens[] = {11, 19, 14, 18, 12};
+		// Gnash System tests expect allowDomain/allowInsecureDomain/loadPolicyFile/escapeDomain
+		// to return true when args are provided. Ruffle's allowDomain returns
+		// Bool(args.get(0).is_some()); the other three are stubbed as Undefined in Ruffle,
+		// but Gnash's Flash ground truth expects boolean. chooseLocalSwfPath returns undefined.
+		Function2Ptr sec_impls[5] = {
+			(Function2Ptr)builtin_return_has_arg, // allowDomain (Ruffle: arg_count >= 1)
+			(Function2Ptr)builtin_return_has_arg, // allowInsecureDomain
+			(Function2Ptr)builtin_return_has_arg, // loadPolicyFile
+			(Function2Ptr)builtin_noop_func,      // chooseLocalSwfPath
+			(Function2Ptr)builtin_return_has_arg, // escapeDomain
+		};
 		for (int i = 0; i < 5; i++) {
 			memset(&sec_methods[i], 0, sizeof(ASFunction));
 			strncpy(sec_methods[i].name, sec_names[i], 255);
 			sec_methods[i].function_type = 2;
-			sec_methods[i].advanced_func = (Function2Ptr)builtin_noop_func;
+			sec_methods[i].advanced_func = sec_impls[i];
 			setupNativeFuncOwnProps(app_context, &sec_methods[i]);
 			ActionVar fv = {0}; fv.type = ACTION_STACK_VALUE_FUNCTION;
 			fv.data.numeric_value = (u64)&sec_methods[i];
@@ -29549,6 +29593,18 @@ static void ensureGlobalInit(SWFAppContext* app_context)
 			ASProperty* p = findPropertyRaw(global_object, swf6_names[i], nlen);
 			if (p != NULL) p->flash_flags = 0x0080;
 		}
+	}
+
+	// Set $version on root MovieClip as own property (Flash magic var: player version string).
+	// Ruffle defines this on root object1 at SWF load — see context.rs:417.
+	{
+		if (root_movieclip.dynamic_props == NULL) {
+			root_movieclip.dynamic_props = (void*) allocObject(app_context, 8);
+			retainObject((ASObject*) root_movieclip.dynamic_props);
+		}
+		ActionVar ver_val = {0}; ver_val.type = ACTION_STACK_VALUE_STRING;
+		ver_val.str_size = 13; VAL(u64, &ver_val.data.numeric_value) = (u64)u16_WIN_ver;
+		setProperty(app_context, (ASObject*)root_movieclip.dynamic_props, "$version", 8, &ver_val);
 	}
 
 	g_global_init_done = 1;
