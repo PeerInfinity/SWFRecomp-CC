@@ -1,6 +1,6 @@
 # Gnash Failing Tests by Feature Category
-<!-- TESTS: ASnative-v5, ASnative-v6, ASnative-v7, ASnative-v8, AsBroadcaster-v6, AsBroadcaster-v7, AsBroadcaster-v8, BitmapData-v8, ContextMenu-v7, ContextMenu-v8, ExternalInterface-v6, ExternalInterface-v7, Global-v6, Global-v7, Global-v8, HitTest-v6, HitTest-v7, HitTest-v8, Instance-v5, Instance-v6, Instance-v7, Instance-v8, LoadVars-v6, LoadVars-v7, LoadVars-v8, Matrix-v6, Matrix-v7, Matrix-v8, MovieClip-v5, MovieClipLoader-v7, MovieClipLoader-v8, Number-v5, Number-v6, Number-v7, Number-v8, Rectangle-v8, Sound-v6, Sound-v7, Sound-v8, String-v5, String-v6, String-v7, String-v8, System-v5, System-v6, System-v7, System-v8, TextFormat-v5, TextFormat-v6, TextFormat-v7, case-v6, toString_valueOf-v5, toString_valueOf-v6, toString_valueOf-v7, toString_valueOf-v8, with-v5, with-v6, with-v7, with-v8 -->
-<!-- PASSING (removed from TESTS): Point-v8 (ruffle_matched, 2026-04-14), TextSnapshot-v6/v7/v8 (pass), delete-v5..v8 (pass), enumerate-v6..v8 (pass), Camera-v6/v7/v8 (ruffle_matched), Microphone-v6/v7/v8 (ruffle_matched), Sound-v5 (ruffle_matched), case-v7/v8 (ruffle_matched), targetPath-v6/v7/v8 (ruffle_matched) -->
+<!-- TESTS: ASnative-v5, ASnative-v6, ASnative-v7, ASnative-v8, AsBroadcaster-v6, AsBroadcaster-v7, AsBroadcaster-v8, BitmapData-v8, ContextMenu-v7, ContextMenu-v8, ExternalInterface-v6, ExternalInterface-v7, Global-v6, Global-v7, Global-v8, HitTest-v6, HitTest-v7, HitTest-v8, Instance-v5, Instance-v6, Instance-v7, Instance-v8, LoadVars-v6, LoadVars-v7, LoadVars-v8, Matrix-v6, Matrix-v7, Matrix-v8, MovieClip-v5, MovieClipLoader-v7, MovieClipLoader-v8, Number-v5, Number-v6, Number-v7, Number-v8, Rectangle-v8, Sound-v6, Sound-v7, Sound-v8, String-v5, String-v6, String-v7, String-v8, TextFormat-v5, TextFormat-v6, TextFormat-v7, case-v6, toString_valueOf-v5, toString_valueOf-v6, toString_valueOf-v7, toString_valueOf-v8, with-v5, with-v6, with-v7, with-v8 -->
+<!-- PASSING (removed from TESTS): Point-v8 (ruffle_matched, 2026-04-14), TextSnapshot-v6/v7/v8 (pass), delete-v5..v8 (pass), enumerate-v6..v8 (pass), Camera-v6/v7/v8 (ruffle_matched), Microphone-v6/v7/v8 (ruffle_matched), Sound-v5 (ruffle_matched), case-v7/v8 (ruffle_matched), targetPath-v6/v7/v8 (ruffle_matched), System-v5/v6/v7/v8 (pass, 2026-04-14 session 3) -->
 
 <!-- PLAN_META
 id: GNASH_FAILING_BY_FEATURE
@@ -22,7 +22,49 @@ dependencies: []
 blockers: []
 -->
 
-Last updated: 2026-04-14 (Phase 3 in progress)
+Last updated: 2026-04-14 (Phase 3 in progress — System-v5..v8 passing)
+
+## 2026-04-14 session 3 (System-v5/v6/v7/v8 → PASS)
+
+All four Gnash System tests now pass. Three changes in `action.c`:
+
+1. **`$version` on root MovieClip** — Flash Player sets `$version` as an own
+   property on the root timeline (Ruffle does the same via
+   `context.rs:417`, `AvmString "$version"` on `root.object1()`). Added at
+   the end of `ensureGlobalInit`: allocate `root_movieclip.dynamic_props`
+   if NULL and `setProperty(..., "$version", u16_WIN_ver)`. This fixes
+   `typeof($version)=='string'`, `typeof(this.$version)=='string'`,
+   `this.$version == System.capabilities.version`, and
+   `this.hasOwnProperty("$version")` across all four tests.
+2. **`System.exactSettings` SWF5-gated** — marked with `flash_flags=0x0080`
+   (VERSION_6 mask). Matches Ruffle's `system.rs` which declares
+   `"exactSettings" => property(..; VERSION_6)`. Fixes `typeof(System.exactSettings)=='undefined'`
+   in SWF5.
+3. **`System.security` method stubs return `Bool(arg_count >= 1)`** — new
+   helper `builtin_return_has_arg` wired to `allowDomain`,
+   `allowInsecureDomain`, `loadPolicyFile`, `escapeDomain`. Mirrors
+   Ruffle's `allow_domain: Ok(Value::Bool(args.get(0).is_some()))`. The
+   test calls allowDomain with 0-7 args; our stub returns true for the
+   7 cases with args and false for the single no-arg call at line 193.
+   `chooseLocalSwfPath` stays `builtin_noop_func`.
+
+Also added (defensive, not required for System tests but correct):
+- `builtin_return_true` helper and `System.Product.{launch,download,validate}`
+  stubs returning true. Gnash test invokes `System.security.allowDomain`
+  not `p.download`, but the Flash spec says Product methods return
+  boolean, so the change matches Flash.
+
+**Impact:** System-v5: 52/67 → 67/67 PASS. System-v6/v7/v8: 85/100 → 100/100
+and 86/101 → 101/101 PASS. No regressions on avm1 tests checked
+(`enumerate`, `global_is_bare`, `mutable_this`, `string_coercion`,
+`this_scoping`, `textsnapshot_available_text`, `array_enumerate`,
+`loadvariables`). Pre-existing `global_proto_decls` failure is unrelated
+(verified by git stash — it fails on baseline too, from a
+`useCodepage/exactSettings READ_ONLY` flag mismatch unrelated to this
+session's work).
+
+**Filtered pass rate delta:** +4 tests (from `fail` to `pass`, none of the
+four System tests were known_failure).
 
 ## 2026-04-14 session (textsnapshot_available_text regression fix)
 
