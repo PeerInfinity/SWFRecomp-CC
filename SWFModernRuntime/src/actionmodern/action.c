@@ -13310,6 +13310,64 @@ static void initMovieClipPrototype(SWFAppContext* app_context)
 		undef_val.type = ACTION_STACK_VALUE_UNDEFINED;
 		setProperty(app_context, proto, "transform", 9, &undef_val);
 	}
+	// Additional drawing-API method stubs and undefined property slots that
+	// Gnash MovieClip-v5..v8 tests expect on MovieClip.prototype via
+	// hasOwnProperty. These are drawing API methods (SWF6+) and display
+	// object properties (SWF8+). Flash Player installs them on the
+	// prototype regardless of SWF version; hasPropertyRaw (used by
+	// hasOwnProperty) ignores flash_flags visibility so they show up in
+	// SWF5 for-in tests.
+	{
+		// Drawing API methods — install as stub functions
+		static ASFunction mc_extra_fns[15];
+		static const char* extra_names[15] = {
+			"attachAudio", "beginFill", "beginGradientFill", "beginBitmapFill",
+			"moveTo", "lineTo", "curveTo", "lineStyle", "lineGradientStyle",
+			"endFill", "clear", "attachBitmap", "getRect",
+			"getInstanceAtDepth", "swapDepths",
+		};
+		(void)extra_names; // silence if no-op
+		// attachAudio, beginFill, beginGradientFill, beginBitmapFill, moveTo,
+		// lineTo, curveTo, lineStyle, lineGradientStyle, endFill, clear,
+		// attachBitmap, getRect — the 13 drawing-API / new method stubs.
+		static const char* draw_names[13] = {
+			"attachAudio", "beginFill", "beginGradientFill", "beginBitmapFill",
+			"moveTo", "lineTo", "curveTo", "lineStyle", "lineGradientStyle",
+			"endFill", "clear", "attachBitmap", "getRect",
+		};
+		for (int i = 0; i < 13; i++) {
+			memset(&mc_extra_fns[i], 0, sizeof(ASFunction));
+			strncpy(mc_extra_fns[i].name, draw_names[i], 255);
+			mc_extra_fns[i].function_type = 2;
+			mc_extra_fns[i].advanced_func = (Function2Ptr)builtin_noop_func;
+			if (function_count < MAX_FUNCTIONS)
+				function_registry[function_count++] = &mc_extra_fns[i];
+			// Skip if already present (getRect shouldn't be, but defensive).
+			if (!hasPropertyRaw(proto, draw_names[i], (u32)strlen(draw_names[i]))) {
+				ActionVar fv = {0};
+				fv.type = ACTION_STACK_VALUE_FUNCTION;
+				fv.data.numeric_value = (u64)&mc_extra_fns[i];
+				setPropertyWithFlags(app_context, proto, draw_names[i],
+					(u32)strlen(draw_names[i]), &fv, PROPERTY_FLAG_WRITABLE);
+			}
+		}
+
+		// Undefined property slots (display object extras exposed on the
+		// prototype as enumerable-but-undefined own properties).
+		ActionVar undef_val = {0};
+		undef_val.type = ACTION_STACK_VALUE_UNDEFINED;
+		static const char* extra_props[9] = {
+			"blendMode", "cacheAsBitmap", "filters", "opaqueBackground",
+			"scale9Grid", "scrollRect", "tabIndex", "useHandCursor",
+			"_lockroot",
+		};
+		for (int i = 0; i < 9; i++) {
+			if (!hasPropertyRaw(proto, extra_props[i], (u32)strlen(extra_props[i]))) {
+				setProperty(app_context, proto, extra_props[i],
+					(u32)strlen(extra_props[i]), &undef_val);
+			}
+		}
+	}
 
 	// Mark all methods and __proto__ as DontEnum (but NOT enabled — it's enumerable)
 	for (u32 i = 0; i < proto->num_used; i++)
