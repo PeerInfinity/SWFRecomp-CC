@@ -1,8 +1,8 @@
 {
   "metadata": {
-    "timestamp": "2026-04-15T03:25:52.079949+00:00",
-    "git_sha": "9d17e1098f889e68f658ee35601b3db1e977b791",
-    "duration_seconds": 917.98,
+    "timestamp": "2026-04-15T19:28:28.916361+00:00",
+    "git_sha": "49c51d169ed1b46b23db2de4dcf61e44bc90f9c9",
+    "duration_seconds": 904.19,
     "total_available": 47,
     "shards": 30,
     "expected_shards": 30
@@ -26,7 +26,7 @@
         "expected_lines": 7,
         "matching_lines": 7
       },
-      "duration": 19.2,
+      "duration": 19.18,
       "status": "pass"
     },
     {
@@ -37,7 +37,7 @@
         "expected_lines": 2,
         "matching_lines": 2
       },
-      "duration": 19.08,
+      "duration": 18.88,
       "status": "pass"
     },
     {
@@ -48,7 +48,7 @@
         "expected_lines": 3,
         "matching_lines": 0
       },
-      "duration": 20.55,
+      "duration": 19.71,
       "status": "output_mismatch",
       "detail": "3 line(s) differ (actual=3, expected=3)",
       "actual_output": "undefined\nundefined\nundefined",
@@ -62,7 +62,7 @@
         "expected_lines": 2,
         "matching_lines": 2
       },
-      "duration": 20.46,
+      "duration": 20.17,
       "status": "pass"
     },
     {
@@ -73,7 +73,7 @@
         "expected_lines": 6,
         "matching_lines": 6
       },
-      "duration": 20.75,
+      "duration": 19.79,
       "status": "pass"
     },
     {
@@ -84,7 +84,7 @@
         "expected_lines": 7,
         "matching_lines": 3
       },
-      "duration": 21.2,
+      "duration": 19.86,
       "status": "output_mismatch",
       "detail": "4 line(s) differ (actual=7, expected=7)",
       "actual_output": "root1\nsym1: _level0.sym1\ntest1: undefined\nroot2\nsym1: _level0.sym1\ntest2: undefined\nsym1",
@@ -98,7 +98,7 @@
         "expected_lines": 4,
         "matching_lines": 4
       },
-      "duration": 20.05,
+      "duration": 19.42,
       "status": "pass"
     },
     {
@@ -109,7 +109,7 @@
         "expected_lines": 6,
         "matching_lines": 3
       },
-      "duration": 20.41,
+      "duration": 19.29,
       "status": "output_mismatch",
       "detail": "3 line(s) differ (actual=6, expected=6)",
       "actual_output": "undefined\n_level0.test1\n_level0.test2\nundefined\nundefined\nundefined",
@@ -123,7 +123,7 @@
         "expected_lines": 4,
         "matching_lines": 1
       },
-      "duration": 19.5,
+      "duration": 19.46,
       "status": "output_mismatch",
       "detail": "3 line(s) differ (actual=4, expected=4)",
       "actual_output": "clone\n0\n0\n0",
@@ -137,7 +137,7 @@
         "expected_lines": 3,
         "matching_lines": 1
       },
-      "duration": 19.43,
+      "duration": 19.41,
       "status": "output_mismatch",
       "detail": "2 line(s) differ (actual=3, expected=3)",
       "actual_output": "false\nfalse\ntrue",
@@ -151,7 +151,7 @@
         "expected_lines": 6,
         "matching_lines": 4
       },
-      "duration": 18.93,
+      "duration": 19.52,
       "status": "output_mismatch",
       "detail": "2 line(s) differ (actual=6, expected=6)",
       "actual_output": "undefined\nundefined\nundefined\nundefined\nundefined\nundefined",
@@ -165,7 +165,7 @@
         "expected_lines": 4,
         "matching_lines": 4
       },
-      "duration": 18.73,
+      "duration": 19.41,
       "status": "pass"
     },
     {
@@ -176,7 +176,7 @@
         "expected_lines": 149,
         "matching_lines": 149
       },
-      "duration": 19.39,
+      "duration": 19.95,
       "status": "pass"
     },
     {
@@ -187,7 +187,7 @@
         "expected_lines": 2,
         "matching_lines": 2
       },
-      "duration": 19.23,
+      "duration": 19.73,
       "status": "pass"
     },
     {
@@ -198,7 +198,7 @@
         "expected_lines": 3,
         "matching_lines": 2
       },
-      "duration": 19.34,
+      "duration": 18.9,
       "status": "output_mismatch",
       "detail": "1 line(s) differ (actual=3, expected=3)",
       "actual_output": "Test\nundefined\nDone",
@@ -212,7 +212,7 @@
         "expected_lines": 4,
         "matching_lines": 2
       },
-      "duration": 19.38,
+      "duration": 19.05,
       "ruffle_diff_count": 2,
       "ours_diff_count": 2,
       "status": "ruffle_matched",
@@ -226,7 +226,7 @@
         "expected_lines": 4,
         "matching_lines": 4
       },
-      "duration": 19.83,
+      "duration": 16.21,
       "status": "pass"
     },
     {
@@ -237,7 +237,7 @@
         "expected_lines": 9,
         "matching_lines": 9
       },
-      "duration": 19.82,
+      "duration": 16.06,
       "status": "pass"
     },
     {
@@ -248,7 +248,7 @@
         "expected_lines": 9,
         "matching_lines": 9
       },
-      "duration": 19.08,
+      "duration": 18.98,
       "status": "pass"
     },
     {
@@ -259,7 +259,7 @@
         "expected_lines": 7,
         "matching_lines": 7
       },
-      "duration": 19.17,
+      "duration": 18.92,
       "status": "pass"
     },
     {
@@ -270,7 +270,7 @@
         "expected_lines": 2,
         "matching_lines": 0
       },
-      "duration": 19.08,
+      "duration": 22.98,
       "status": "output_mismatch",
       "detail": "2 line(s) differ (actual=0, expected=2)",
       "actual_output": "",
@@ -284,7 +284,7 @@
         "expected_lines": 3,
         "matching_lines": 3
       },
-      "duration": 18.75,
+      "duration": 21.11,
       "status": "pass"
     },
     {
@@ -295,7 +295,7 @@
         "expected_lines": 1,
         "matching_lines": 1
       },
-      "duration": 20.8,
+      "duration": 19.07,
       "status": "pass"
     },
     {
@@ -306,7 +306,7 @@
         "expected_lines": 7,
         "matching_lines": 1
       },
-      "duration": 20.34,
+      "duration": 18.8,
       "status": "output_mismatch",
       "detail": "6 line(s) differ (actual=6, expected=7)",
       "actual_output": "loading started\nonLoadStart _level0.content\nonLoadComplete _level0.content\nloadee frame 1\nonLoadInit _level0.content\nloader frame 2",
@@ -320,7 +320,7 @@
         "expected_lines": 6,
         "matching_lines": 6
       },
-      "duration": 21.79,
+      "duration": 15.35,
       "status": "pass"
     },
     {
@@ -331,7 +331,7 @@
         "expected_lines": 1,
         "matching_lines": 1
       },
-      "duration": 21.56,
+      "duration": 15.34,
       "status": "pass"
     },
     {
@@ -342,7 +342,7 @@
         "expected_lines": 13,
         "matching_lines": 13
       },
-      "duration": 19.38,
+      "duration": 18.96,
       "status": "pass"
     },
     {
@@ -353,7 +353,7 @@
         "expected_lines": 6,
         "matching_lines": 5
       },
-      "duration": 19.09,
+      "duration": 18.85,
       "status": "output_mismatch",
       "detail": "1 line(s) differ (actual=6, expected=6)",
       "actual_output": "2\nTeSt\n1\ntEst\nundefined\ntEst",
@@ -367,7 +367,7 @@
         "expected_lines": 7,
         "matching_lines": 7
       },
-      "duration": 18.38,
+      "duration": 19.47,
       "status": "pass"
     },
     {
@@ -378,7 +378,7 @@
         "expected_lines": 7,
         "matching_lines": 7
       },
-      "duration": 18.17,
+      "duration": 19.38,
       "status": "pass"
     },
     {
@@ -389,7 +389,7 @@
         "expected_lines": 2,
         "matching_lines": 0
       },
-      "duration": 19.8,
+      "duration": 18.75,
       "status": "output_mismatch",
       "detail": "4 line(s) differ (actual=4, expected=2)",
       "actual_output": "MixEdcase 4\nMIXEDcase 4\nMixEdcase 5\nmixedCase 5",
@@ -403,7 +403,7 @@
         "expected_lines": 5,
         "matching_lines": 5
       },
-      "duration": 19.59,
+      "duration": 18.72,
       "status": "pass"
     },
     {
@@ -414,7 +414,7 @@
         "expected_lines": 4,
         "matching_lines": 4
       },
-      "duration": 19.56,
+      "duration": 19.54,
       "status": "pass"
     },
     {
@@ -425,7 +425,7 @@
         "expected_lines": 14,
         "matching_lines": 14
       },
-      "duration": 19.61,
+      "duration": 19.56,
       "status": "pass"
     },
     {
@@ -436,7 +436,7 @@
         "expected_lines": 20,
         "matching_lines": 20
       },
-      "duration": 17.28,
+      "duration": 16.24,
       "status": "pass"
     },
     {
@@ -447,7 +447,7 @@
         "expected_lines": 17,
         "matching_lines": 17
       },
-      "duration": 19.47,
+      "duration": 19.15,
       "status": "pass"
     },
     {
@@ -458,7 +458,7 @@
         "expected_lines": 11,
         "matching_lines": 11
       },
-      "duration": 22.29,
+      "duration": 20.79,
       "status": "pass"
     },
     {
@@ -469,7 +469,7 @@
         "expected_lines": 18,
         "matching_lines": 18
       },
-      "duration": 19.17,
+      "duration": 20.5,
       "status": "pass"
     },
     {
@@ -480,7 +480,7 @@
         "expected_lines": 0,
         "matching_lines": 0
       },
-      "duration": 19.66,
+      "duration": 21.11,
       "status": "pass"
     },
     {
@@ -491,7 +491,7 @@
         "expected_lines": 4,
         "matching_lines": 3
       },
-      "duration": 19.55,
+      "duration": 20.04,
       "status": "output_mismatch",
       "detail": "1 line(s) differ (actual=4, expected=4)",
       "actual_output": "<a>foo</a>\n\nfoo\ntrue",
@@ -505,7 +505,7 @@
         "expected_lines": 8,
         "matching_lines": 4
       },
-      "duration": 15.21,
+      "duration": 19.35,
       "status": "output_mismatch",
       "detail": "4 line(s) differ (actual=8, expected=8)",
       "actual_output": "undefined\nundefined\n\nstring\nnull\nnull\n\nstring",
@@ -519,7 +519,7 @@
         "expected_lines": 39,
         "matching_lines": 39
       },
-      "duration": 15.8,
+      "duration": 19.67,
       "status": "pass"
     },
     {
@@ -530,7 +530,7 @@
         "expected_lines": 39,
         "matching_lines": 39
       },
-      "duration": 19.35,
+      "duration": 19.0,
       "status": "pass"
     },
     {
@@ -541,7 +541,7 @@
         "expected_lines": 2,
         "matching_lines": 2
       },
-      "duration": 19.48,
+      "duration": 19.19,
       "status": "pass"
     },
     {
@@ -552,7 +552,7 @@
         "expected_lines": 1,
         "matching_lines": 1
       },
-      "duration": 19.79,
+      "duration": 19.41,
       "status": "pass"
     },
     {
@@ -563,7 +563,7 @@
         "expected_lines": 4,
         "matching_lines": 0
       },
-      "duration": 19.0,
+      "duration": 20.1,
       "status": "output_mismatch",
       "detail": "4 line(s) differ (actual=3, expected=4)",
       "actual_output": "load: true true\nbytes: undefined/undefined\nxml: <test>data</test>",
@@ -577,7 +577,7 @@
         "expected_lines": 9,
         "matching_lines": 9
       },
-      "duration": 19.74,
+      "duration": 19.1,
       "status": "pass"
     }
   ]
