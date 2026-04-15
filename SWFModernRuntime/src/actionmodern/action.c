@@ -15281,6 +15281,24 @@ static void initTextFormatPrototype(SWFAppContext* app_context) {
 	registerGeomMethod(&g_textformat_fn_getTextExtent, "getTextExtent",
 	    (Function2Ptr)textFormatGetTextExtent, app_context, proto);
 
+	// Install the 17 TextFormat own properties on the prototype as undefined.
+	// Flash's TextFormat.prototype ships with these as own properties (Gnash
+	// TextFormat-v5..v7 checks TextFormat.prototype.hasOwnProperty(name)).
+	// Order doesn't matter for hasOwnProperty checks.
+	{
+		ActionVar undef_val = {0};
+		undef_val.type = ACTION_STACK_VALUE_UNDEFINED;
+		static const char* tfp_names[17] = {
+			"font", "size", "color", "url", "target", "bold", "italic",
+			"underline", "align", "leftMargin", "rightMargin", "indent",
+			"leading", "blockIndent", "tabStops", "bullet", "display"
+		};
+		for (int i = 0; i < 17; i++) {
+			setPropertyWithFlags(app_context, proto, tfp_names[i],
+				(u32)strlen(tfp_names[i]), &undef_val, PROPERTY_FLAGS_DEFAULT);
+		}
+	}
+
 	if (function_count < MAX_FUNCTIONS)
 		function_registry[function_count++] = &g_textformat_constructor;
 
