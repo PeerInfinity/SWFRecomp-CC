@@ -1,10 +1,10 @@
 # Ruffle Test Results (Unfiltered)
 
-**Date**: 2026-04-14 23:17 UTC
+**Date**: 2026-04-14 23:50 UTC
 
-**Git SHA**: `3431011857`
+**Git SHA**: `ed7f770a89`
 
-**Run Duration**: 5m 20s
+**Run Duration**: 5m 12s
 
 ## Summary
 
@@ -32,8 +32,8 @@
 
 | # | Test | Lines | Duration | Notes |
 |---|------|-------|----------|-------|
-| 1 | `gotoFrameLabelAsFunction` | 6 | 15.4s |  |
-| 2 | `hello` | 4 | 19.2s |  |
+| 1 | `gotoFrameLabelAsFunction` | 6 | 19.9s |  |
+| 2 | `hello` | 4 | 19.1s |  |
 
 ## Ruffle-Matched Tests
 
@@ -41,9 +41,9 @@
 
 | # | Test | Our diffs | Ruffle diffs | Duration | Notes |
 |---|------|-----------|--------------|----------|-------|
-| 1 | `action_execution_order_test10` | 14 | 14 | 21.2s |  |
-| 2 | `movieclip_destruction_test1` | 52 | 52 | 21.2s |  |
-| 3 | `registerclass_test3` | 20 | 20 | 19.9s |  |
+| 1 | `action_execution_order_test10` | 14 | 14 | 20.3s |  |
+| 2 | `movieclip_destruction_test1` | 52 | 52 | 17.1s |  |
+| 3 | `registerclass_test3` | 20 | 20 | 19.4s |  |
 
 ## Near-Passing Tests
 
@@ -69,7 +69,7 @@ No segfaults.
 
 | # | Test | Detail | Duration | Notes |
 |---|------|--------|----------|-------|
-| 1 | `opcode_guard_test2` | exit code -6 | 20.2s |  |
+| 1 | `opcode_guard_test2` | exit code -6 | 21.5s |  |
 
 ## Timeouts
 

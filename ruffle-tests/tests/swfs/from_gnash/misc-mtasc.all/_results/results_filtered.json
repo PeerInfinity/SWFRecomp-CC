@@ -1,8 +1,8 @@
 {
   "metadata": {
-    "timestamp": "2026-04-14T23:17:38.867313+00:00",
-    "git_sha": "34310118579594c21a116eb76192615220062eb6",
-    "duration_seconds": 179.53,
+    "timestamp": "2026-04-14T23:50:07.938048+00:00",
+    "git_sha": "ed7f770a89ab5ce916980d9c6f7e27d915e8ff4d",
+    "duration_seconds": 172.55,
     "total_available": 9,
     "shards": 30,
     "expected_shards": 30,
@@ -29,7 +29,7 @@
         "expected_lines": 8,
         "matching_lines": 7
       },
-      "duration": 21.08,
+      "duration": 19.98,
       "ruffle_diff_count": 1,
       "ours_diff_count": 1,
       "status": "ruffle_matched",
@@ -43,7 +43,7 @@
         "expected_lines": 19,
         "matching_lines": 19
       },
-      "duration": 20.44,
+      "duration": 19.37,
       "status": "pass"
     },
     {
@@ -54,7 +54,7 @@
         "expected_lines": 35,
         "matching_lines": 35
       },
-      "duration": 20.55,
+      "duration": 19.63,
       "status": "pass"
     },
     {
@@ -65,7 +65,7 @@
         "expected_lines": 26,
         "matching_lines": 26
       },
-      "duration": 15.73,
+      "duration": 20.18,
       "status": "pass"
     },
     {
@@ -76,7 +76,7 @@
         "expected_lines": 8,
         "matching_lines": 8
       },
-      "duration": 19.39,
+      "duration": 19.44,
       "status": "pass"
     },
     {
@@ -87,7 +87,7 @@
         "expected_lines": 28,
         "matching_lines": 28
       },
-      "duration": 20.35,
+      "duration": 19.88,
       "status": "pass"
     },
     {
@@ -98,7 +98,7 @@
         "expected_lines": 22,
         "matching_lines": 22
       },
-      "duration": 19.84,
+      "duration": 16.2,
       "status": "pass"
     },
     {
@@ -109,7 +109,7 @@
         "expected_lines": 68,
         "matching_lines": 11
       },
-      "duration": 20.85,
+      "duration": 17.25,
       "status": "output_mismatch",
       "detail": "57 line(s) differ (actual=14, expected=68)",
       "actual_output": "main class running\nPASSED: -16384 == -16384  [levels.as:37]\nPASSED: _level0 == _level0  [levels.as:40]\nPASSED: 1 == 1  [level5.as:30]\nFAILED: _level0.frameno >= 1  [level5.as:32]\nFAILED: expected: \"-16379\" , obtained: \"0\"  [level5.as:35]\nFAILED: expected: \"_level5\" , obtained: \"_level0._level5\"  [level5.as:38]\nPASSED: _level0 == _level0  [level5.as:41]\nPASSED: 1239 == 1239  [level5.as:44]\nPASSED:  ==   [level5.as:47]\nPASSED: 6789 == 6789  [level5.as:49]\nPASSED:  ==   [level5.as:52]\nPASSED: true == true  [level5.as:54]\nPASSED: _level5/ch == _level5/ch  [level5.as:79]",
@@ -123,7 +123,7 @@
         "expected_lines": 17,
         "matching_lines": 17
       },
-      "duration": 20.8,
+      "duration": 20.13,
       "status": "pass"
     }
   ]
