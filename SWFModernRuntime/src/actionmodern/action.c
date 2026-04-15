@@ -51589,9 +51589,13 @@ void actionCallMethod(SWFAppContext* app_context, char* str_buffer)
 					if (args[0].type == ACTION_STACK_VALUE_MOVIECLIP) {
 						MovieClip* call_mc = (MovieClip*)(uintptr_t) args[0].data.numeric_value;
 						g_event_this_mc = call_mc;
-						// For type-2 functions, pass dynamic_props as ASObject*
+						// See apply() above for rationale on g_override_this set.
 						if (call_mc && call_mc->dynamic_props)
 							this_obj = (void*) call_mc->dynamic_props;
+						g_override_this.type = ACTION_STACK_VALUE_MOVIECLIP;
+						g_override_this.str_size = 0;
+						g_override_this.data.numeric_value = (u64)(uintptr_t)call_mc;
+						g_override_this_set = 1;
 					} else if (args[0].type == ACTION_STACK_VALUE_OBJECT ||
 					           args[0].type == ACTION_STACK_VALUE_ARRAY) {
 						this_obj = (void*)(uintptr_t) args[0].data.numeric_value;
@@ -51807,9 +51811,21 @@ void actionCallMethod(SWFAppContext* app_context, char* str_buffer)
 					if (args[0].type == ACTION_STACK_VALUE_MOVIECLIP) {
 						apply_this_mc = (MovieClip*)(uintptr_t) args[0].data.numeric_value;
 						g_event_this_mc = apply_this_mc;
-						// For type-2 functions, pass dynamic_props as ASObject*
+						// For type-2 functions, pass dynamic_props as ASObject*.
+						// Also set g_override_this with MOVIECLIP type so the
+						// recompiler-emitted preload_this picks up the MC type via
+						// _ot_flag (higher priority than this_obj). Without this,
+						// preload_this would use this_obj (OBJECT) and the function
+						// would see typeof(this)=='object' instead of 'movieclip'.
+						// Regression surfaced 2026-04-14 when $version allocation
+						// eagerly gave root_movieclip a dynamic_props; pre-existing
+						// but hidden until then.
 						if (apply_this_mc && apply_this_mc->dynamic_props)
 							this_obj = (void*) apply_this_mc->dynamic_props;
+						g_override_this.type = ACTION_STACK_VALUE_MOVIECLIP;
+						g_override_this.str_size = 0;
+						g_override_this.data.numeric_value = (u64)(uintptr_t)apply_this_mc;
+						g_override_this_set = 1;
 					} else if (args[0].type == ACTION_STACK_VALUE_OBJECT ||
 					           args[0].type == ACTION_STACK_VALUE_ARRAY) {
 						this_obj = (void*)(uintptr_t) args[0].data.numeric_value;
