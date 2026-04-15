@@ -1,8 +1,8 @@
 {
   "metadata": {
-    "timestamp": "2026-04-15T01:22:40.577052+00:00",
-    "git_sha": "d7f3c4bb2d3b93a99c06d3dc47dd479d1ccb30dd",
-    "duration_seconds": 182.54,
+    "timestamp": "2026-04-15T03:25:52.096965+00:00",
+    "git_sha": "9d17e1098f889e68f658ee35601b3db1e977b791",
+    "duration_seconds": 185.28,
     "total_available": 9,
     "shards": 30,
     "expected_shards": 30
@@ -26,7 +26,7 @@
         "expected_lines": 8,
         "matching_lines": 7
       },
-      "duration": 21.85,
+      "duration": 19.77,
       "ruffle_diff_count": 1,
       "ours_diff_count": 1,
       "status": "ruffle_matched",
@@ -40,7 +40,7 @@
         "expected_lines": 19,
         "matching_lines": 19
       },
-      "duration": 19.36,
+      "duration": 20.91,
       "status": "pass"
     },
     {
@@ -51,7 +51,7 @@
         "expected_lines": 35,
         "matching_lines": 35
       },
-      "duration": 20.49,
+      "duration": 21.69,
       "status": "pass"
     },
     {
@@ -62,7 +62,7 @@
         "expected_lines": 26,
         "matching_lines": 26
       },
-      "duration": 19.73,
+      "duration": 20.16,
       "status": "pass"
     },
     {
@@ -73,7 +73,7 @@
         "expected_lines": 8,
         "matching_lines": 8
       },
-      "duration": 19.66,
+      "duration": 20.15,
       "status": "pass"
     },
     {
@@ -84,7 +84,7 @@
         "expected_lines": 28,
         "matching_lines": 28
       },
-      "duration": 19.7,
+      "duration": 20.17,
       "status": "pass"
     },
     {
@@ -95,7 +95,7 @@
         "expected_lines": 22,
         "matching_lines": 22
       },
-      "duration": 19.82,
+      "duration": 19.74,
       "status": "pass"
     },
     {
@@ -120,7 +120,7 @@
         "expected_lines": 17,
         "matching_lines": 17
       },
-      "duration": 19.69,
+      "duration": 20.44,
       "status": "pass"
     }
   ]
