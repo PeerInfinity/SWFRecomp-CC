@@ -1,8 +1,8 @@
 {
   "metadata": {
-    "timestamp": "2026-04-14T23:50:07.927879+00:00",
-    "git_sha": "ed7f770a89ab5ce916980d9c6f7e27d915e8ff4d",
-    "duration_seconds": 338.97,
+    "timestamp": "2026-04-15T01:22:40.566904+00:00",
+    "git_sha": "d7f3c4bb2d3b93a99c06d3dc47dd479d1ccb30dd",
+    "duration_seconds": 348.46,
     "total_available": 18,
     "shards": 30,
     "expected_shards": 30,
@@ -29,7 +29,7 @@
         "expected_lines": 2,
         "matching_lines": 2
       },
-      "duration": 19.27,
+      "duration": 20.82,
       "status": "pass"
     },
     {
@@ -40,7 +40,7 @@
         "expected_lines": 0,
         "matching_lines": 0
       },
-      "duration": 19.26,
+      "duration": 19.02,
       "status": "pass"
     },
     {
@@ -51,7 +51,7 @@
         "expected_lines": 3,
         "matching_lines": 3
       },
-      "duration": 18.8,
+      "duration": 20.07,
       "status": "pass"
     },
     {
@@ -62,7 +62,7 @@
         "expected_lines": 3,
         "matching_lines": 3
       },
-      "duration": 19.46,
+      "duration": 19.22,
       "status": "pass"
     },
     {
@@ -73,7 +73,7 @@
         "expected_lines": 5,
         "matching_lines": 3
       },
-      "duration": 19.0,
+      "duration": 19.23,
       "ruffle_diff_count": 2,
       "ours_diff_count": 2,
       "status": "ruffle_matched",
@@ -87,7 +87,7 @@
         "expected_lines": 2,
         "matching_lines": 2
       },
-      "duration": 18.92,
+      "duration": 18.96,
       "status": "pass"
     },
     {
@@ -98,7 +98,7 @@
         "expected_lines": 3,
         "matching_lines": 3
       },
-      "duration": 16.0,
+      "duration": 19.19,
       "status": "pass"
     },
     {
@@ -109,7 +109,7 @@
         "expected_lines": 2,
         "matching_lines": 2
       },
-      "duration": 15.28,
+      "duration": 19.49,
       "status": "pass"
     },
     {
@@ -120,7 +120,7 @@
         "expected_lines": 3,
         "matching_lines": 3
       },
-      "duration": 19.54,
+      "duration": 18.78,
       "status": "pass"
     },
     {
@@ -131,7 +131,7 @@
         "expected_lines": 1,
         "matching_lines": 0
       },
-      "duration": 18.94,
+      "duration": 19.0,
       "status": "output_mismatch",
       "detail": "1 line(s) differ (actual=1, expected=1)",
       "actual_output": "AB",
@@ -145,7 +145,7 @@
         "expected_lines": 0,
         "matching_lines": 0
       },
-      "duration": 19.1,
+      "duration": 19.91,
       "status": "pass"
     },
     {
@@ -156,7 +156,7 @@
         "expected_lines": 1,
         "matching_lines": 1
       },
-      "duration": 19.37,
+      "duration": 19.92,
       "status": "pass"
     },
     {
@@ -167,7 +167,7 @@
         "expected_lines": 1,
         "matching_lines": 0
       },
-      "duration": 19.68,
+      "duration": 19.56,
       "status": "output_mismatch",
       "detail": "15 line(s) differ (actual=15, expected=1)",
       "actual_output": "i1-a1-a2-a3-1\ni1-a1-a2-a3-1a1-a2-a3-1\ni1-a1-a2-a3-1a1-a2-a3-1a1-a2-a3-1\ni1-a1-a2-a3-1a1-a2-a3-1a1-a2-a3-1a1-a2-a3-1\ni1-a1-a2-a3-1a1-a2-a3-1a1-a2-a3-1a1-a2-a3-1a1-a2-a3-1\ni1-a1-a2-a3-1a1-a2-a3-1a1-a2-a3-1a1-a2-a3-1a1-a2-a3-1a1-a2-a3-1\ni1-a1-a2-a3-1a1-a2-a3-1a1-a2-a3-1a1-a2-a3-1a1-a2-a3-1a1-a2-a3-1a1-a2-a3-1\ni1-a1-a2-a3-1a1-a2-a3-1a1-a2-a3-1a1-a2-a3-1a1-a2-a3-1a1-a2-a3-1a1-a2-a3-1a1-a2-a3-1\ni1-a1-a2-a3-1a1-a2-a3-1a1-a2-a3-1a1-a2-a3-1a1-a2-a3-1a1-a2-a3-1a1-a2-a3-1a1-a2-a3-1a1-a2-a3-1\ni1-a1-a2-a3-1a1-a2-a3-1a1-a2-a3-1a1-a2-a3-1a1-a2-a3-1a1-a2-a3-1a1-a2-a3-1a1-a2-a3-1a1-a2-a3-1a1-a2-a3-1\ni1-a1-a2-a3-1a1-a2-a3-1a1-a2-a3-1a1-a2-a3-1a1-a2-a3-1a1-a2-a3-1a1-a2-a3-1a1-a2-a3-1a1-a2-a3-1a1-a2-a3-1a1-a2-a3-1\ni1-a1-a2-a3-1a1-a2-a3-1a1-a2-a3-1a1-a2-a3-1a1-a2-a3-1a1-a2-a3-1a1-a2-a3-1a1-a2-a3-1a1-a2-a3-1a1-a2-a3-1a1-a2-a3-1a1-a2-a3-1\ni1-a1-a2-a3-1a1-a2-a3-1a1-a2-a3-1a1-a2-a3-1a1-a2-a3-1a1-a2-a3-1a1-a2-a3-1a1-a2-a3-1a1-a2-a3-1a1-a2-a3-1a1-a2-a3-1a1-a2-a3-1a1-a2-a3-1\ni1-a1-a2-a3-1a1-a2-a3-1a1-a2-a3-1a1-a2-a3-1a1-a2-a3-1a1-a2-a3-1a1-a2-a3-1a1-a2-a3-1a1-a2-a3-1a1-a2-a3-1a1-a2-a3-1a1-a2-a3-1a1-a2-a3-1a1-a2-a3-1\ni1-a1-a2-a3-1a1-a2-a3-1a1-a2-a3-1a1-a2-a3-1a1-a2-a3-1a1-a2-a3-1a1-a2-a3-1a1-a2-a3-1a1-a2-a3-1a1-a2-a3-1a1-a2-a3-1a1-a2-a3-1a1-a2-a3-1a1-a2-a3-1a1-a2-a3-1",
@@ -181,7 +181,7 @@
         "expected_lines": 4,
         "matching_lines": 2
       },
-      "duration": 18.89,
+      "duration": 19.43,
       "status": "output_mismatch",
       "detail": "2 line(s) differ (actual=4, expected=4)",
       "actual_output": "R.\nC.\nCC.\nL.",
@@ -195,7 +195,7 @@
         "expected_lines": 2,
         "matching_lines": 2
       },
-      "duration": 18.66,
+      "duration": 19.75,
       "status": "pass"
     },
     {
@@ -206,7 +206,7 @@
         "expected_lines": 8,
         "matching_lines": 8
       },
-      "duration": 18.71,
+      "duration": 20.03,
       "status": "pass"
     },
     {
@@ -217,7 +217,7 @@
         "expected_lines": 8,
         "matching_lines": 8
       },
-      "duration": 18.95,
+      "duration": 19.67,
       "status": "pass"
     },
     {
@@ -228,7 +228,7 @@
         "expected_lines": 3,
         "matching_lines": 3
       },
-      "duration": 20.1,
+      "duration": 15.36,
       "status": "pass"
     }
   ]
