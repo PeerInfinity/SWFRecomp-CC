@@ -29524,7 +29524,9 @@ static void ensureGlobalInit(SWFAppContext* app_context)
 	// Pre-create g_flash_object with constructor + __proto__ in correct LIFO order
 	// before initFlashPackage adds sub-packages. This ensures constructor and __proto__
 	// appear AFTER sub-packages in for-in (they were added first = LIFO last).
-	if (g_swf_version >= 8 && g_flash_object == NULL) {
+	// Always create g_flash_object so SWF<8 can use ASSetPropFlags to unhide the
+	// flash package (Gnash Transform-v6/v7 exercises this).
+	if (g_flash_object == NULL) {
 		g_flash_object = allocObject(app_context, 12);
 		// constructor first (enumerated last in LIFO)
 		// Flags: ENUMERABLE | WRITABLE (no CONFIGURABLE = DONT_DELETE)
@@ -29540,7 +29542,7 @@ static void ensureGlobalInit(SWFAppContext* app_context)
 			if (fp) fp->flags = pkg_f;
 		}
 	}
-	if (g_swf_version >= 8) initFlashPackage(app_context);
+	initFlashPackage(app_context);
 
 	// ========== PHASE B: Register on global_object in correct LIFO order ==========
 	// First registered = last in for-in. Last registered = first in for-in.
@@ -29664,7 +29666,9 @@ static void ensureGlobalInit(SWFAppContext* app_context)
 	REG_OBJ("Accessibility", 13, g_accessibility_obj);
 	REG_OBJ("SoundCodec", 10, g_soundcodec_obj);
 	REG_OBJ("System", 6, g_system_object);
-	if (g_swf_version >= 8) REG_OBJ("flash", 5, g_flash_object);
+	// Always register flash on _global; version-hide it for SWF<8 via flash_flags.
+	// Gnash Transform-v6/v7 call ASSetPropFlags(_global, "flash", 0, 5248) to unhide it.
+	REG_OBJ("flash", 5, g_flash_object);
 	REG_FUNC("textRenderer", 12, (ASFunction*)&g_textrenderer_ctor);
 	REG_FUNC("LocalConnection", 15, &g_stub_ctors[7]);
 	REG_FUNC("MovieClipLoader", 15, &g_stub_ctors[9]);
@@ -29693,6 +29697,16 @@ static void ensureGlobalInit(SWFAppContext* app_context)
 			ASProperty* p = findPropertyRaw(global_object, swf6_names[i], nlen);
 			if (p != NULL) p->flash_flags = 0x0080;
 		}
+	}
+
+	// Version-hide `flash` in SWF<8. flash_flags 0x1480:
+	//   SWF5 mask 0x7480 → hidden; SWF6 mask 0x7500 → hidden;
+	//   SWF7 mask 0x7000 → hidden; SWF8 mask 0x6000 → visible.
+	// Gnash Transform-v6/v7 calls ASSetPropFlags(_global, "flash", 0, 5248 = 0x1480)
+	// to clear these bits and make flash visible in SWF<8.
+	{
+		ASProperty* fp = findPropertyRaw(global_object, "flash", 5);
+		if (fp != NULL) fp->flash_flags = 0x1480;
 	}
 
 	// Set $version on root MovieClip as own property (Flash magic var: player version string).

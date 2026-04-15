@@ -1,6 +1,21 @@
 # Gnash Test Suite Status
 
-Last updated: 2026-04-12 (Phase 3 work in progress)
+Last updated: 2026-04-15 (Phase 3 work in progress)
+
+### Latest fixes (2026-04-15, not yet in CI)
+- **`flash` package unhide via ASSetPropFlags (SWF6/7)** — `flash` is now always
+  registered on `global_object` with `flash_flags=0x1480` (hidden under SWF5/6/7
+  version masks, visible SWF8+). `initFlashPackage` and `g_flash_object`
+  creation are no longer gated on `SWF>=8`. Gnash's Transform-v6/v7 tests call
+  `ASSetPropFlags(_global, "flash", 0, 5248)` to clear the visibility bits,
+  after which `flash.geom.Transform` resolves to a function. **Impact:**
+  Transform-v6/v7 → **PASS** (+2 tests). Matrix-v7 → **ruffle_matched**
+  (+1 effective pass; previously output_mismatch). No regressions on
+  Point-v5..v8, Rectangle-v5..v8, Matrix-v5/v8, ColorTransform-v5..v8,
+  Inheritance-v5..v8, Try-v6/v7/v8, case-v5/v7/v8, delete-v5..v8,
+  System-v5..v8, flash-v5/v6/v7, nor on avm1 global_is_bare, enumerate,
+  mutable_this, this_scoping, register_class_return_value, string_coercion,
+  array_enumerate, textsnapshot_available_text.
 
 ## Quick Summary
 

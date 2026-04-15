@@ -22,7 +22,46 @@ dependencies: []
 blockers: []
 -->
 
-Last updated: 2026-04-14 (Phase 3 in progress — System-v5..v8 passing)
+Last updated: 2026-04-15 (Phase 3 in progress — Transform-v6/v7 passing,
+Matrix-v7 ruffle_matched)
+
+## 2026-04-15 session (flash package version-hiding)
+
+**Transform-v6/v7 → PASS (+2 tests), Matrix-v7 → ruffle_matched (+1).**
+
+The Gnash Transform-v6/v7 tests do this at startup:
+```
+ASSetPropFlags(_global, "flash", 0, 5248);  // 5248 = 0x1480
+check_equals(typeof(flash.geom.Transform), "function");
+```
+The ASSetPropFlags call clears version-hiding bits (0x1480 is the OR of the
+bits set in SWF5/6/7 hide masks but not SWF8). For the second line to resolve
+to `function`, `_global.flash` must exist as a (hidden) property that becomes
+visible after the flag clear.
+
+Our previous implementation only created `g_flash_object` and registered
+`_global.flash` for SWF≥8. Three changes in
+`SWFModernRuntime/src/actionmodern/action.c`:
+
+1. Remove `SWF>=8` gate on `g_flash_object` creation in `ensureGlobalInit`.
+2. Remove `SWF>=8` gate on `initFlashPackage` call (now unconditional).
+3. Remove `SWF>=8` gate on `REG_OBJ("flash", 5, g_flash_object)` on
+   `global_object`, and mark the resulting property with
+   `flash_flags=0x1480`. Under SWF5/6/7 hide masks (0x7480/0x7500/0x7000)
+   this evaluates to hidden, and under SWF8 mask (0x6000) it is visible.
+   `setProperty` already clears `flash_flags` when a user writes to the
+   property, matching Flash's behavior where direct writes override
+   version-hiding.
+
+This leaves `typeof(flash) == 'undefined'` passing in Point-v6/v7 (flash
+stays hidden until ASSetPropFlags unhides it) and gives Transform-v6/v7
+the unhide path they need.
+
+**Filtered pass rate delta:** +2 PASS (Transform-v6/v7 were
+output_mismatch), +1 effective pass (Matrix-v7 output_mismatch →
+ruffle_matched; Matrix-v7 carries `known_failure` upstream with
+`output.ruffle.txt`, and our diffs now fit within Ruffle's).
+
 
 ## 2026-04-14 session 3 summary (System, Sound, Matrix, TextFormat, MC, TF)
 
