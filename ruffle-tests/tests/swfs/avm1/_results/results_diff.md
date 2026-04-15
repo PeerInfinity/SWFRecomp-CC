@@ -1,20 +1,22 @@
 # Ruffle Test Results Diff
 
-**Previous:** `ed7f770a89ab` (2026-04-14T23:50:07.911259+00:00)
-**Current:** `d7f3c4bb2d3b` (2026-04-15T01:22:40.549864+00:00)
+**Previous:** `d7f3c4bb2d3b` (2026-04-15T01:22:40.549864+00:00)
+**Current:** `9d17e1098f88` (2026-04-15T03:25:52.070191+00:00)
 
 ## Summary
 
 | Metric | Previous | Current | Delta |
 |--------|----------|---------|-------|
-| Passing | 580 | 579 | -1 |
+| Passing | 579 | 579 | 0 |
 | Total | 641 | 641 | 0 |
-| Pass rate | 90.5% | 90.3% | -0.2% |
-| Mismatched lines | 30565 | 30569 | +4 |
-|   Increased | | | +4 |
+| Pass rate | 90.3% | 90.3% | 0% |
+| Mismatched lines | 30569 | 30568 | -1 |
+|   Decreased | | | -1 |
 
-## Newly Failing (1)
+## Line Count Changed (3)
 
-| Test | New Status | Lines (prev) | Lines (now) |
-|------|-----------|--------------|-------------|
-| `funky_function_calls` | output_mismatch | 56/56 | 52/56 |
+| Test | Status | Lines (prev) | Lines (now) | Diff |
+|------|--------|--------------|-------------|------|
+| `global_instance_decls` | output_mismatch | 13/758 | 14/758 | -1 |
+| `global_proto_decls` | output_mismatch | 811/4497 | 811/4497 | 0 |
+| `global_proto_decls_delete` | output_mismatch | 298/4158 | 298/4158 | 0 |
