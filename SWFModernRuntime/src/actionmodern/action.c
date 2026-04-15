@@ -9361,14 +9361,23 @@ static ActionVar matrixInvert(SWFAppContext* app_context, ActionVar* args, u32 a
 	double ty = varToDoubleSimple(getProperty(obj, "ty", 2));
 
 	double det = a * d - b * c;
-	double inv_det = 1.0 / det;
-
-	double na  =  d * inv_det;
-	double nb  = -b * inv_det;
-	double nc  = -c * inv_det;
-	double nd  =  a * inv_det;
-	double ntx = (c * ty - d * tx) * inv_det;
-	double nty = (b * tx - a * ty) * inv_det;
+	double na, nb, nc, nd, ntx, nty;
+	if (det == 0.0) {
+		// Singular matrix: Flash (and Ruffle) reset to the identity matrix
+		// rather than propagating infinities. Matches Ruffle matrix.rs:347
+		// `object_to_matrix(...).inverse().unwrap_or_default()`.
+		na  = 1.0; nb  = 0.0;
+		nc  = 0.0; nd  = 1.0;
+		ntx = 0.0; nty = 0.0;
+	} else {
+		double inv_det = 1.0 / det;
+		na  =  d * inv_det;
+		nb  = -b * inv_det;
+		nc  = -c * inv_det;
+		nd  =  a * inv_det;
+		ntx = (c * ty - d * tx) * inv_det;
+		nty = (b * tx - a * ty) * inv_det;
+	}
 
 	ActionVar va = makeF64(na); setProperty(app_context, obj, "a", 1, &va);
 	ActionVar vb = makeF64(nb); setProperty(app_context, obj, "b", 1, &vb);
