@@ -33565,7 +33565,10 @@ void actionTypeof(SWFAppContext* app_context, char* str_buffer)
 		case ACTION_STACK_VALUE_MOVIECLIP:
 #ifdef NO_GRAPHICS
 			// In Flash, text fields and buttons return "object" for typeof,
-			// only actual sprites/movieclips return "movieclip"
+			// only actual sprites/movieclips return "movieclip".
+			// Exception: in SWF5 the TextField class didn't exist yet, so
+			// text fields are reported as "movieclip" (matches Gnash
+			// TextField-v5 which expects typeof(tf)=='movieclip').
 			{
 				MovieClip* mc = (MovieClip*) typeof_val;
 				if (mc && mc->is_button_mc)
@@ -33573,7 +33576,7 @@ void actionTypeof(SWFAppContext* app_context, char* str_buffer)
 					type_str = "object";
 					break;
 				}
-				if (mc && MC_IS_TEXTFIELD(mc))
+				if (mc && MC_IS_TEXTFIELD(mc) && g_swf_version >= 6)
 				{
 					type_str = "object";
 					break;
