@@ -764,7 +764,7 @@ Fixes `toNumber(funcWithCustomValueOf)` returning NaN instead of the valueOf res
 - ~~**Number wrapper valueOf override**: `new Number(10)` wrapper doesn't dispatch custom valueOf~~ (DONE — 3m auto-boxing fix)
 - **Number float precision**: last-digit rounding at e-308 (4 lines per Number test) — platform difference in dtoa algorithm, likely unfixable
 - ~~**convertFloat SWF6 NaN threshold**~~: DONE. Changed fallback from `SWF<7→0.0` to `SWF<6→0.0` (Flash returns NaN for object-to-number starting at SWF6, not SWF7). Note: toString fallback was NOT implemented — Flash does not call toString during toNumber (unlike ECMA-262).
-- **toString_valueOf dispatch**: valueOf/toString not called during implicit coercion in some paths (~13 diffs per v6/v7/v8)
+- **toString_valueOf dispatch**: valueOf/toString not called during implicit coercion in some paths (~13 diffs per v6/v7/v8). Investigation shows `objectCallValueOf` for type 1 functions calls `simple_func` without setting `this` context. For type 2, `this_obj` is passed correctly but user-defined functions may still fail if function pointers aren't properly set. The `"" + o` test expects both valueOf (returns non-primitive → 1 call) and toString (called as fallback → 1 call) to fire, but both show 0 calls.
 - **enumerate child MC type**: child MCs returned as 'number' instead of 'movieclip' (12 diffs per enumerate test)
 - **enumerate hasOwnProperty**: child MCs stored in dynamic_props → hasOwnProperty returns true (6 diffs per enumerate test)
 - **with auto-boxing**: `with(number)` should auto-box to Number.prototype scope (not addressed)
