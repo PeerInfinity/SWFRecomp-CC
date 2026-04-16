@@ -1236,7 +1236,7 @@ def get_self_load(test_dir):
     return False
 
 
-def compile_native(test_dir, num_frames, build_dir, headless=False, has_image_comparisons=False, asan=False):
+def compile_native(test_dir, num_frames, build_dir, headless=False, has_image_comparisons=False, asan=False, use_ccache=True):
     """Compile generated C code with runtime into native binary."""
     mem_dir = build_dir / "memory"
     mem_dir.mkdir(exist_ok=True)
@@ -1456,30 +1456,78 @@ def compile_native(test_dir, num_frames, build_dir, headless=False, has_image_co
         sanitizer_flags = ["-fsanitize=address", "-fno-omit-frame-pointer", "-g"]
         opt_level = "-O1"  # ASan needs at least -O1 but -O2 can hide issues
 
+    # ccache speeds up repeat compiles massively (action.c alone is ~50s at -O2,
+    # ~0.01s on a cache hit). Auto-detect and wrap gcc unless disabled. ccache
+    # hashes preprocessed output, so hits happen whenever the preprocessed
+    # source is identical — i.e. same macros that the file actually references.
+    cc = ["gcc"]
+    cc_env = None
+    # Each test builds in a fresh tempfile.TemporaryDirectory so absolute paths
+    # differ every run. -ffile-prefix-map strips the tempdir prefix from source
+    # references in the preprocessed output so ccache sees identical content.
+    prefix_map_flags = [f"-ffile-prefix-map={build_dir}=."]
+    if use_ccache and shutil.which("ccache") and not asan:
+        cc = ["ccache", "gcc"]
+        cc_env = os.environ.copy()
+        cc_env.setdefault("CCACHE_NOHASHDIR", "1")
+        cc_env.setdefault("CCACHE_BASEDIR", "/tmp")
+        cc_env.setdefault(
+            "CCACHE_SLOPPINESS",
+            "include_file_mtime,include_file_ctime,time_macros,locale",
+        )
+
+    # Split into two passes: per-file .o compile (cacheable), then link.
+    # One-shot gcc src1.c src2.c ... -o bin bypasses ccache because ccache only
+    # caches single-file compilations. Compiling per-file also lets unchanged
+    # sources hit the cache while the changed generated scripts recompile.
+    sources = sorted(build_dir.glob("*.c"))
+    # Use "-I." for the per-test build dir and run gcc with cwd=build_dir so the
+    # command line is identical across runs (no random tmpdir name embedded in
+    # -I or source path). Combined with -ffile-prefix-map, this lets ccache
+    # see identical preprocessed output across independent test builds.
+    common_flags = [
+        *mode_defines,
+        f"-DMAX_FRAMES={num_frames}",
+        "-D_POSIX_C_SOURCE=200809L",
+        *extra_defines,
+        "-I.",
+        f"-I{inc}",
+        f"-I{inc}/actionmodern",
+        f"-I{inc}/libswf",
+        f"-I{inc}/memory",
+        f"-I{SWFMODERN}/lib/c-hashmap",
+        *mode_includes,
+        *prefix_map_flags,
+        "-w",
+        "-std=c17",
+        opt_level,
+        *sanitizer_flags,
+    ]
+
+    objects = []
     try:
+        for src in sources:
+            obj = src.with_suffix(".o")
+            objects.append(obj)
+            proc = subprocess.Popen(
+                [*cc, "-c", src.name, *common_flags, "-o", obj.name],
+                cwd=str(build_dir),
+                stdout=subprocess.PIPE,
+                stderr=subprocess.PIPE,
+                env=cc_env,
+            )
+            stdout, stderr = proc.communicate(timeout=300)
+            if proc.returncode != 0:
+                return False, stderr.decode("utf-8", errors="replace")
+
+        # Link (no ccache; linking is not the bottleneck)
         proc = subprocess.Popen(
             [
                 "gcc",
-                *[str(f) for f in sorted(build_dir.glob("*.c"))],
-                *mode_defines,
-                f"-DMAX_FRAMES={num_frames}",
-                "-D_POSIX_C_SOURCE=200809L",
-                *extra_defines,
-                f"-I{build_dir}",
-                f"-I{inc}",
-                f"-I{inc}/actionmodern",
-                f"-I{inc}/libswf",
-                f"-I{inc}/memory",
-                f"-I{SWFMODERN}/lib/c-hashmap",
-                *mode_includes,
-                "-w",
-                "-std=c17",
-                opt_level,
+                *[str(o) for o in objects],
                 *sanitizer_flags,
-                "-o",
-                str(build_dir / "test_run"),
-                "-lm",
-                "-lz",
+                "-o", str(build_dir / "test_run"),
+                "-lm", "-lz",
                 *mode_libs,
             ],
             stdout=subprocess.PIPE,
@@ -2141,6 +2189,9 @@ examples:
         "--asan", action="store_true",
         help="Compile with AddressSanitizer (-fsanitize=address -g -O1) for crash debugging")
     parser.add_argument(
+        "--no-ccache", action="store_true",
+        help="Disable ccache even if installed (forces full recompile of every source)")
+    parser.add_argument(
         "--save-actual", metavar="PATH",
         help="Save the actual output of the first test to PATH (for generating expected output files)")
     parser.add_argument(
@@ -2155,6 +2206,16 @@ examples:
         "--deploy-dir", metavar="DIR",
         help="Deploy WASM builds to DIR (e.g. docs/injector). Used with --wasm.")
     return parser.parse_args()
+
+
+def _fmt_phases(pt):
+    if not pt:
+        return ""
+    parts = []
+    for k, label in (("recomp", "r"), ("compile", "c"), ("run", "x")):
+        if k in pt:
+            parts.append(f"{label}={pt[k]:.2f}s")
+    return f" [{' '.join(parts)}]" if parts else ""
 
 
 def main():
@@ -2331,11 +2392,15 @@ def main():
 
         test_start = time.monotonic()
         entry = {"test": name}
+        phase_times = {}
+        entry["phases"] = phase_times
         image_comparisons = {}
         image_results = {}
 
         # Step 1: Recompile SWF
+        _t = time.perf_counter()
         recomp_ok, recomp_stderr = recompile_swf(test_dir, force=args.recompile)
+        phase_times["recomp"] = round(time.perf_counter() - _t, 3)
         if not recomp_ok:
             stats["recomp_fail"] += 1
             fail_list.append(name)
@@ -2344,7 +2409,7 @@ def main():
                          duration=round(time.monotonic() - test_start, 2))
             test_results.append(entry)
             if args.verbose:
-                print("RECOMP_FAIL")
+                print("RECOMP_FAIL" + _fmt_phases(phase_times))
                 if recomp_stderr.strip():
                     for line in recomp_stderr.strip().splitlines()[:10]:
                         print(f"  stderr: {line}")
@@ -2367,13 +2432,16 @@ def main():
             # Parse image comparisons early so we can enable rendering at compile time
             image_comparisons = parse_image_comparisons(test_dir) if args.headless else {}
             has_image_cmps = bool(image_comparisons) and HAS_PIL
+            _t = time.perf_counter()
             if args.wasm:
                 ok, err = compile_wasm(test_dir, num_frames, build_dir)
             else:
                 ok, err = compile_native(test_dir, num_frames, build_dir,
                                          headless=args.headless,
                                          has_image_comparisons=has_image_cmps,
-                                         asan=args.asan)
+                                         asan=args.asan,
+                                         use_ccache=not args.no_ccache)
+            phase_times["compile"] = round(time.perf_counter() - _t, 3)
             if not ok:
                 stats["compile_fail"] += 1
                 fail_list.append(name)
@@ -2390,7 +2458,7 @@ def main():
                              duration=round(time.monotonic() - test_start, 2))
                 test_results.append(entry)
                 if args.verbose:
-                    print("COMPILE_FAIL")
+                    print("COMPILE_FAIL" + _fmt_phases(phase_times))
                     print(f"  Error: {detail}")
                 save_incremental()
                 continue
@@ -2429,8 +2497,10 @@ def main():
                 # Force lavapipe software Vulkan for WSL2 compatibility
                 run_env["VK_ICD_FILENAMES"] = "/usr/share/vulkan/icd.d/lvp_icd.json"
                 run_env["VK_DRIVER_FILES"] = "/usr/share/vulkan/icd.d/lvp_icd.json"
+            _t = time.perf_counter()
             raw_output, rc, run_stderr = run_binary(build_dir, event_file=event_file,
                                                     extra_env=run_env if run_env else None)
+            phase_times["run"] = round(time.perf_counter() - _t, 3)
             if raw_output is None:
                 stats["timeout"] += 1
                 fail_list.append(name)
@@ -2439,7 +2509,7 @@ def main():
                              duration=round(time.monotonic() - test_start, 2))
                 test_results.append(entry)
                 if args.verbose:
-                    print("TIMEOUT")
+                    print("TIMEOUT" + _fmt_phases(phase_times))
                 save_incremental()
                 continue
             if rc != 0 and rc not in (-11, 139):
@@ -2474,7 +2544,7 @@ def main():
                     if "lines" in entry:
                         ls = entry["lines"]
                         line_info = f" [{ls.get('matched',0)}/{ls.get('expected',0)} lines]"
-                    print(f"{crash_status.upper()}{line_info}")
+                    print(f"{crash_status.upper()}{line_info}" + _fmt_phases(phase_times))
                     if run_stderr.strip():
                         max_stderr = 100 if args.asan else 20
                         for line in run_stderr.strip().splitlines()[:max_stderr]:
@@ -2560,7 +2630,7 @@ def main():
             entry["status"] = "pass"
             test_results.append(entry)
             if args.verbose:
-                print("PASS")
+                print("PASS" + _fmt_phases(phase_times))
         else:
             # Before reporting output_mismatch, check if this is a test Ruffle
             # itself marks as known_failure (ships output.ruffle.txt alongside
@@ -2597,7 +2667,7 @@ def main():
                 )
                 test_results.append(entry)
                 if args.verbose:
-                    print("RUFFLE_MATCHED")
+                    print("RUFFLE_MATCHED" + _fmt_phases(phase_times))
             else:
                 stats["output_mismatch"] += 1
                 fail_list.append(name)
@@ -2611,7 +2681,7 @@ def main():
                 entry["expected_output"] = expected_snip
                 test_results.append(entry)
                 if args.verbose:
-                    print("MISMATCH")
+                    print("MISMATCH" + _fmt_phases(phase_times))
                     if run_stderr.strip():
                         for line in run_stderr.strip().splitlines()[:200]:
                             print(f"  stderr: {line}")

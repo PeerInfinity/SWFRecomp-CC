@@ -85,7 +85,20 @@ jobs:
           python-version: '3.x'
 
       - name: Install system dependencies
-        run: sudo apt-get update && sudo apt-get install -y build-essential cmake
+        run: sudo apt-get update && sudo apt-get install -y build-essential cmake ccache
+
+      - name: Restore ccache
+        uses: actions/cache@v4
+        with:
+          path: ~/.ccache
+          key: ccache-ruffle-single-${{ github.run_id }}
+          restore-keys: |
+            ccache-ruffle-single-
+
+      - name: Configure ccache
+        run: |
+          ccache --max-size=1G
+          ccache -z
 
       - name: Build SWFRecomp
         run: |
@@ -157,6 +170,10 @@ jobs:
         run: |
           echo "=== Running Flash-spec tests (output.flash.txt) ==="
           python3 ruffle-tests/verify_output.py -v --expected-suffix=flash || true
+
+      - name: ccache stats
+        if: always()
+        run: ccache -s
 
       - name: Generate filtered results
         if: always()
@@ -414,7 +431,21 @@ jobs:
           python-version: '3.x'
 
       - name: Install system dependencies
-        run: sudo apt-get update && sudo apt-get install -y build-essential
+        run: sudo apt-get update && sudo apt-get install -y build-essential ccache
+
+      - name: Restore ccache
+        uses: actions/cache@v4
+        with:
+          path: ~/.ccache
+          key: ccache-ruffle-shard-${{ matrix.shard }}-${{ github.run_id }}
+          restore-keys: |
+            ccache-ruffle-shard-${{ matrix.shard }}-
+            ccache-ruffle-shard-
+
+      - name: Configure ccache
+        run: |
+          ccache --max-size=1G
+          ccache -z
 
       - name: Download SWFRecomp binary
         uses: actions/download-artifact@v7
@@ -518,6 +549,10 @@ jobs:
           path: ruffle-tests/results-shard-gnash_*-${{ matrix.shard }}.json
           retention-days: 7
 
+      - name: ccache stats (shard ${{ matrix.shard }})
+        if: always()
+        run: ccache -s
+
   # --- Combine shard results ---
   combine-results:
     name: Combine Results
@@ -535,7 +570,21 @@ jobs:
           python-version: '3.x'
 
       - name: Install system dependencies
-        run: sudo apt-get update && sudo apt-get install -y build-essential
+        run: sudo apt-get update && sudo apt-get install -y build-essential ccache
+
+      - name: Restore ccache
+        uses: actions/cache@v4
+        with:
+          path: ~/.ccache
+          key: ccache-ruffle-combine-${{ github.run_id }}
+          restore-keys: |
+            ccache-ruffle-combine-
+            ccache-ruffle-shard-
+
+      - name: Configure ccache
+        run: |
+          ccache --max-size=1G
+          ccache -z
 
       - name: Download SWFRecomp binary
         uses: actions/download-artifact@v7
@@ -690,6 +739,10 @@ jobs:
         run: |
           echo "=== Running Flash-spec tests (output.flash.txt) ==="
           python3 ruffle-tests/verify_output.py -v --expected-suffix=flash || true
+
+      - name: ccache stats
+        if: always()
+        run: ccache -s
 
       - name: Generate filtered results
         if: always()
