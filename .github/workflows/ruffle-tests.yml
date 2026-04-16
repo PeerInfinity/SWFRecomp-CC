@@ -87,10 +87,13 @@ jobs:
       - name: Install system dependencies
         run: sudo apt-get update && sudo apt-get install -y build-essential cmake ccache
 
+      - name: Pin ccache directory
+        run: echo "CCACHE_DIR=$HOME/.ccache" >> "$GITHUB_ENV"
+
       - name: Restore ccache
         uses: actions/cache@v4
         with:
-          path: ~/.ccache
+          path: ${{ env.CCACHE_DIR }}
           key: ccache-ruffle-single-${{ github.run_id }}
           restore-keys: |
             ccache-ruffle-single-
@@ -433,10 +436,13 @@ jobs:
       - name: Install system dependencies
         run: sudo apt-get update && sudo apt-get install -y build-essential ccache
 
+      - name: Pin ccache directory
+        run: echo "CCACHE_DIR=$HOME/.ccache" >> "$GITHUB_ENV"
+
       - name: Restore ccache
         uses: actions/cache@v4
         with:
-          path: ~/.ccache
+          path: ${{ env.CCACHE_DIR }}
           key: ccache-ruffle-shard-${{ matrix.shard }}-${{ github.run_id }}
           restore-keys: |
             ccache-ruffle-shard-${{ matrix.shard }}-
@@ -572,10 +578,13 @@ jobs:
       - name: Install system dependencies
         run: sudo apt-get update && sudo apt-get install -y build-essential ccache
 
+      - name: Pin ccache directory
+        run: echo "CCACHE_DIR=$HOME/.ccache" >> "$GITHUB_ENV"
+
       - name: Restore ccache
         uses: actions/cache@v4
         with:
-          path: ~/.ccache
+          path: ${{ env.CCACHE_DIR }}
           key: ccache-ruffle-combine-${{ github.run_id }}
           restore-keys: |
             ccache-ruffle-combine-
