@@ -33,6 +33,8 @@
 #include <heap.h>
 #include <map.h>
 #include <actionmodern/object.h>
+#include <actionmodern/action_internal.h>
+#include <actionmodern/actionmath.h>
 #include "unicode_case_tables.h"
 
 // Forward declarations for array helpers (defined later in file)
@@ -43,7 +45,7 @@ static int _sort_compare_vars(SWFAppContext* app_context, ActionVar* a, ActionVa
 static ActionVar objectCallToString(SWFAppContext* app_context, ActionVar* obj_var, int* found);
 static ActionVar builtin_array_method(SWFAppContext* app_context, ActionVar* args, u32 arg_count, ActionVar* registers, void* this_obj);
 static ActionVar objectCallValueOf(SWFAppContext* app_context, ActionVar* obj_var, int* found);
-static double varToDoubleSWF(SWFAppContext* app_context, ActionVar* v, int swf_version);
+// varToDoubleSWF / Function2Ptr / ASFunction / helpers are declared in action_internal.h
 static inline int32_t varToInt32(ActionVar* v);
 static int callArrayMethod(SWFAppContext* app_context, ASArray* arr,
                            const char* method_name, u32 method_name_len,
@@ -814,61 +816,12 @@ static int g_use_new_invalid_bounds = 0;  // Ruffle: one-way flag, flips to 1 wh
 #define MAX_SPECIAL_DEPTH 66
 static u32 g_special_depth = 0;
 
-// Forward declaration (ASFunction is defined below)
-typedef struct ASFunction ASFunction;
-
 // ==================================================================
 // Function Storage and Management
 // ==================================================================
-
-// Function pointer types
-typedef void (*SimpleFunctionPtr)(SWFAppContext* app_context);
-typedef ActionVar (*Function2Ptr)(SWFAppContext* app_context, ActionVar* args, u32 arg_count, ActionVar* registers, void* this_obj);
-
-// Function object structure
-typedef struct ASFunction {
-	char name[256];           // Function name (can be empty for anonymous)
-	u8 function_type;         // 1 = simple (DefineFunction), 2 = advanced (DefineFunction2)
-	u32 param_count;          // Number of parameters
-
-	// For DefineFunction (type 1)
-	SimpleFunctionPtr simple_func;
-
-	// For DefineFunction2 (type 2)
-	Function2Ptr advanced_func;
-	u8 register_count;
-	u16 flags;
-
-	// Prototype object (for constructor usage)
-	ASObject* prototype_obj;  // Created lazily on first access
-
-	// Own properties on the function object itself (e.g., toString override)
-	ASObject* own_props;  // Created lazily when SetMember is called
-
-	// Captured scope chain (scope entries at time of definition)
-	u8 captured_scope_count;
-	ASObject* captured_scope[8];   // scope objects
-	MovieClip* captured_scope_mc[8]; // associated MovieClip (if any)
-	u8 captured_scope_is_with[8]; // 1 = with scope, 0 = local scope
-
-	// Closure context: the MovieClip where this function was defined
-	// SWF6+: GotoFrame/GetProperty("") operate on base_clip, not caller's context
-	// SWF5: base_clip is not used (functions execute in caller's context)
-	MovieClip* base_clip;
-
-	// SWF version at function definition time (Phase 3: per-function version tracking)
-	// When called, g_swf_version is switched to this value so version-dependent
-	// behavior matches the SWF where the function was originally defined.
-	u16 swf_version;
-
-	// Per-movie global index: reserved for future per-movie _global isolation.
-	// Currently unused (always 0). Built-in functions are zero-initialized.
-	u16 movie_global_idx;
-
-	// If set, this function does not get a lazily-created .prototype object.
-	// Used for native/built-in functions that don't have prototypes in Flash.
-	u8 no_lazy_prototype;
-} ASFunction;
+// ASFunction, Function2Ptr, and SimpleFunctionPtr are defined in
+// actionmodern/action_internal.h so that subsystem files carved out of
+// action.c (math.c, etc.) can share the same typedefs.
 
 // Forward declaration for filter constructor init
 static int invokeNativeSuperConstructor(SWFAppContext* app_context, ASFunction* ctor,
@@ -1043,7 +996,7 @@ static int g_native_toString_init = 0;
 
 // Install a toString method that always returns "[object Object]" on a native ASObject.
 // This bypasses Object.prototype.toString's SWF version check.
-static void installNativeToString(SWFAppContext* app_context, ASObject* obj)
+void installNativeToString(SWFAppContext* app_context, ASObject* obj)
 {
 	if (!g_native_toString_init) {
 		memset(&g_native_toString_func, 0, sizeof(ASFunction));
@@ -1101,13 +1054,8 @@ static ActionVar builtin_return_has_arg(SWFAppContext* app_context, ActionVar* a
 	return ret;
 }
 
-// Forward declaration needed by builtin_sound_getTransform (defined later in file)
-static void setObjectProto(SWFAppContext* app_context, ASObject* obj);
-
 // --- TextSnapshot helpers ---
-
-// Forward declaration for convertFloat (needed by tsArgToDouble)
-static ActionStackValueType convertFloat(SWFAppContext* app_context);
+// (setObjectProto / convertFloat are declared in action_internal.h)
 
 // Coerce an ActionVar to double (for TextSnapshot arg coercion)
 // Handles objects via valueOf by pushing to stack and calling convertFloat
@@ -2243,8 +2191,7 @@ static ActionVar builtin_sound_start(SWFAppContext* app_context, ActionVar* args
 	return ret;
 }
 
-// Forward declarations for copy functions
-static void setObjectProto(SWFAppContext* app_context, ASObject* obj);
+// (setObjectProto is declared in action_internal.h)
 
 // ContextMenu.copy() — creates a new ContextMenu with copied builtInItems
 static ActionVar builtin_contextmenu_copy(SWFAppContext* app_context, ActionVar* args, u32 arg_count, ActionVar* registers, void* this_obj)
@@ -3697,7 +3644,7 @@ static ActionVar builtin_nc_close(SWFAppContext* app_context, ActionVar* args, u
 static ASFunction g_proto_stub_funcs[MAX_PROTO_STUB_FUNCS];
 static int g_proto_stub_func_count = 0;
 
-static void setupNativeFuncOwnProps(SWFAppContext* app_context, ASFunction* func);
+// (setupNativeFuncOwnProps is declared in action_internal.h)
 
 // Add a stub function property to a prototype object.
 // flags controls ENUMERABLE/WRITABLE/CONFIGURABLE behavior.
@@ -4130,21 +4077,8 @@ static ActionVar builtin_string_fromCharCode(SWFAppContext* app_context, ActionV
 }
 
 // ============================================================================
-// Math object built-in methods
+// Math object — carved out to math.c (see actionmodern/actionmath.h)
 // ============================================================================
-
-// Forward declarations for functions defined later in file
-static ActionStackValueType convertFloat(SWFAppContext* app_context);
-
-// builtin_math_random is defined later (after TRandomFast/RNG definitions)
-static ActionVar builtin_math_random(SWFAppContext* app_context, ActionVar* args, u32 arg_count, ActionVar* registers, void* this_obj);
-// initMathObject is defined later (after all Math builtins)
-static void initMathObject(SWFAppContext* app_context);
-
-// Static ASFunction objects for Math methods (18 methods)
-static ASFunction g_math_funcs[18];
-static ASObject* g_math_object = NULL;
-static int g_math_init_done = 0;
 
 // ============================================================================
 // Geometry class globals (Point, Matrix, Rectangle)
@@ -4267,7 +4201,7 @@ static inline uint32_t unpremultiplyAlpha(uint32_t color)
 
 // Coerce Math arguments to f64 via the stack (calls valueOf on objects).
 // Flash coerces min(arg_count, max_args) arguments, left to right.
-static void coerceMathArgs(SWFAppContext* app_context, ActionVar* args, u32 arg_count, u32 max_args)
+void coerceMathArgs(SWFAppContext* app_context, ActionVar* args, u32 arg_count, u32 max_args)
 {
 	u32 n = arg_count < max_args ? arg_count : max_args;
 	for (u32 i = 0; i < n; i++)
@@ -4279,7 +4213,7 @@ static void coerceMathArgs(SWFAppContext* app_context, ActionVar* args, u32 arg_
 }
 
 // Helper: extract f64 from a coerced ActionVar
-static inline double mathArgToDouble(ActionVar* v)
+double mathArgToDouble(ActionVar* v)
 {
 	if (v->type == ACTION_STACK_VALUE_F64)
 		return VAL(double, &v->data.numeric_value);
@@ -4289,7 +4223,7 @@ static inline double mathArgToDouble(ActionVar* v)
 }
 
 // Helper: return f64 ActionVar
-static inline ActionVar mathReturnDouble(double val)
+ActionVar mathReturnDouble(double val)
 {
 	ActionVar ret;
 	ret.type = ACTION_STACK_VALUE_F64;
@@ -4298,226 +4232,7 @@ static inline ActionVar mathReturnDouble(double val)
 	return ret;
 }
 
-// --- Unary Math functions (abs, sin, cos, tan, exp, log, sqrt, round, floor, ceil, atan, asin, acos) ---
-
-static ActionVar builtin_math_abs(SWFAppContext* app_context, ActionVar* args, u32 arg_count, ActionVar* registers, void* this_obj)
-{
-	(void)registers; (void)this_obj;
-	coerceMathArgs(app_context, args, arg_count, 2);
-	if (arg_count == 0) return mathReturnDouble(NAN);
-	return mathReturnDouble(fabs(mathArgToDouble(&args[0])));
-}
-
-static ActionVar builtin_math_sin(SWFAppContext* app_context, ActionVar* args, u32 arg_count, ActionVar* registers, void* this_obj)
-{
-	(void)registers; (void)this_obj;
-	coerceMathArgs(app_context, args, arg_count, 2);
-	if (arg_count == 0) return mathReturnDouble(NAN);
-	return mathReturnDouble(sin(mathArgToDouble(&args[0])));
-}
-
-static ActionVar builtin_math_cos(SWFAppContext* app_context, ActionVar* args, u32 arg_count, ActionVar* registers, void* this_obj)
-{
-	(void)registers; (void)this_obj;
-	coerceMathArgs(app_context, args, arg_count, 2);
-	if (arg_count == 0) return mathReturnDouble(NAN);
-	return mathReturnDouble(cos(mathArgToDouble(&args[0])));
-}
-
-static ActionVar builtin_math_tan(SWFAppContext* app_context, ActionVar* args, u32 arg_count, ActionVar* registers, void* this_obj)
-{
-	(void)registers; (void)this_obj;
-	coerceMathArgs(app_context, args, arg_count, 2);
-	if (arg_count == 0) return mathReturnDouble(NAN);
-	return mathReturnDouble(tan(mathArgToDouble(&args[0])));
-}
-
-static ActionVar builtin_math_exp(SWFAppContext* app_context, ActionVar* args, u32 arg_count, ActionVar* registers, void* this_obj)
-{
-	(void)registers; (void)this_obj;
-	coerceMathArgs(app_context, args, arg_count, 2);
-	if (arg_count == 0) return mathReturnDouble(NAN);
-	return mathReturnDouble(exp(mathArgToDouble(&args[0])));
-}
-
-static ActionVar builtin_math_log(SWFAppContext* app_context, ActionVar* args, u32 arg_count, ActionVar* registers, void* this_obj)
-{
-	(void)registers; (void)this_obj;
-	coerceMathArgs(app_context, args, arg_count, 2);
-	if (arg_count == 0) return mathReturnDouble(NAN);
-	return mathReturnDouble(log(mathArgToDouble(&args[0])));
-}
-
-static ActionVar builtin_math_sqrt(SWFAppContext* app_context, ActionVar* args, u32 arg_count, ActionVar* registers, void* this_obj)
-{
-	(void)registers; (void)this_obj;
-	coerceMathArgs(app_context, args, arg_count, 2);
-	if (arg_count == 0) return mathReturnDouble(NAN);
-	return mathReturnDouble(sqrt(mathArgToDouble(&args[0])));
-}
-
-static ActionVar builtin_math_round(SWFAppContext* app_context, ActionVar* args, u32 arg_count, ActionVar* registers, void* this_obj)
-{
-	(void)registers; (void)this_obj;
-	coerceMathArgs(app_context, args, arg_count, 2);
-	if (arg_count == 0) return mathReturnDouble(NAN);
-	double x = mathArgToDouble(&args[0]);
-	// Flash uses floor(x + 0.5) which gives round(-12.5) = -12
-	return mathReturnDouble(floor(x + 0.5));
-}
-
-static ActionVar builtin_math_floor(SWFAppContext* app_context, ActionVar* args, u32 arg_count, ActionVar* registers, void* this_obj)
-{
-	(void)registers; (void)this_obj;
-	coerceMathArgs(app_context, args, arg_count, 2);
-	if (arg_count == 0) return mathReturnDouble(NAN);
-	return mathReturnDouble(floor(mathArgToDouble(&args[0])));
-}
-
-static ActionVar builtin_math_ceil(SWFAppContext* app_context, ActionVar* args, u32 arg_count, ActionVar* registers, void* this_obj)
-{
-	(void)registers; (void)this_obj;
-	coerceMathArgs(app_context, args, arg_count, 2);
-	if (arg_count == 0) return mathReturnDouble(NAN);
-	return mathReturnDouble(ceil(mathArgToDouble(&args[0])));
-}
-
-static ActionVar builtin_math_atan(SWFAppContext* app_context, ActionVar* args, u32 arg_count, ActionVar* registers, void* this_obj)
-{
-	(void)registers; (void)this_obj;
-	coerceMathArgs(app_context, args, arg_count, 2);
-	if (arg_count == 0) return mathReturnDouble(NAN);
-	return mathReturnDouble(atan(mathArgToDouble(&args[0])));
-}
-
-static ActionVar builtin_math_asin(SWFAppContext* app_context, ActionVar* args, u32 arg_count, ActionVar* registers, void* this_obj)
-{
-	(void)registers; (void)this_obj;
-	coerceMathArgs(app_context, args, arg_count, 2);
-	if (arg_count == 0) return mathReturnDouble(NAN);
-	return mathReturnDouble(asin(mathArgToDouble(&args[0])));
-}
-
-static ActionVar builtin_math_acos(SWFAppContext* app_context, ActionVar* args, u32 arg_count, ActionVar* registers, void* this_obj)
-{
-	(void)registers; (void)this_obj;
-	coerceMathArgs(app_context, args, arg_count, 2);
-	if (arg_count == 0) return mathReturnDouble(NAN);
-	return mathReturnDouble(acos(mathArgToDouble(&args[0])));
-}
-
-// --- Binary Math functions (atan2, pow, min, max) ---
-
-static ActionVar builtin_math_atan2(SWFAppContext* app_context, ActionVar* args, u32 arg_count, ActionVar* registers, void* this_obj)
-{
-	(void)registers; (void)this_obj;
-	coerceMathArgs(app_context, args, arg_count, 2);
-	if (arg_count < 2) return mathReturnDouble(NAN);
-	double y = mathArgToDouble(&args[0]);
-	double x = mathArgToDouble(&args[1]);
-	return mathReturnDouble(atan2(y, x));
-}
-
-static ActionVar builtin_math_pow(SWFAppContext* app_context, ActionVar* args, u32 arg_count, ActionVar* registers, void* this_obj)
-{
-	(void)registers; (void)this_obj;
-	coerceMathArgs(app_context, args, arg_count, 2);
-	if (arg_count == 0) return mathReturnDouble(NAN);
-	double base = mathArgToDouble(&args[0]);
-	// Missing second arg → NaN; pow(1, NaN) = 1 per IEEE 754
-	double exponent = (arg_count >= 2) ? mathArgToDouble(&args[1]) : NAN;
-	return mathReturnDouble(pow(base, exponent));
-}
-
-static ActionVar builtin_math_min(SWFAppContext* app_context, ActionVar* args, u32 arg_count, ActionVar* registers, void* this_obj)
-{
-	(void)registers; (void)this_obj;
-	coerceMathArgs(app_context, args, arg_count, 2);
-	if (arg_count == 0) return mathReturnDouble(INFINITY);
-	if (arg_count == 1) return mathReturnDouble(NAN);
-	double a = mathArgToDouble(&args[0]);
-	double b = mathArgToDouble(&args[1]);
-	if (isnan(a) || isnan(b)) return mathReturnDouble(NAN);
-	// Handle -0: if a == b and one is -0, return -0
-	if (a < b) return mathReturnDouble(a);
-	if (b < a) return mathReturnDouble(b);
-	// a == b: return the one that might be -0
-	return mathReturnDouble(signbit(a) ? a : b);
-}
-
-static ActionVar builtin_math_max(SWFAppContext* app_context, ActionVar* args, u32 arg_count, ActionVar* registers, void* this_obj)
-{
-	(void)registers; (void)this_obj;
-	coerceMathArgs(app_context, args, arg_count, 2);
-	if (arg_count == 0) return mathReturnDouble(-INFINITY);
-	if (arg_count == 1) return mathReturnDouble(NAN);
-	double a = mathArgToDouble(&args[0]);
-	double b = mathArgToDouble(&args[1]);
-	if (isnan(a) || isnan(b)) return mathReturnDouble(NAN);
-	if (a > b) return mathReturnDouble(a);
-	if (b > a) return mathReturnDouble(b);
-	// a == b: return the one that is NOT -0
-	return mathReturnDouble(signbit(a) ? b : a);
-}
-
-// --- ASnative (class 200 = Math) ---
-
-// NaN stub: coerces args (calling valueOf on first two) but always returns NaN.
-// Returned by ASnative(200, invalid_index).
-static ActionVar builtin_math_nan_stub(SWFAppContext* app_context, ActionVar* args, u32 arg_count, ActionVar* registers, void* this_obj)
-{
-	(void)registers; (void)this_obj;
-	coerceMathArgs(app_context, args, arg_count, 2);
-	return mathReturnDouble(NAN);
-}
-
-// --- isNaN / isFinite as first-class function objects ---
-// These need to be accessible via GetVariable("isNaN") etc., not just inline call handlers.
-
-static ASFunction g_isNaN_func;
-static ASFunction g_isFinite_func;
-static int g_isNaN_isFinite_init = 0;
-
-static ActionVar builtin_isNaN(SWFAppContext* app_context, ActionVar* args, u32 arg_count, ActionVar* registers, void* this_obj)
-{
-	(void)registers; (void)this_obj;
-	extern int g_swf_version;
-	ActionVar result = {0};
-	result.type = ACTION_STACK_VALUE_BOOLEAN;
-	if (arg_count == 0) { result.data.numeric_value = 1; return result; }
-	double val = varToDoubleSWF(app_context, &args[0], g_swf_version);
-	result.data.numeric_value = (val != val) ? 1ULL : 0ULL;
-	return result;
-}
-
-static ActionVar builtin_isFinite(SWFAppContext* app_context, ActionVar* args, u32 arg_count, ActionVar* registers, void* this_obj)
-{
-	(void)registers; (void)this_obj;
-	extern int g_swf_version;
-	ActionVar result = {0};
-	result.type = ACTION_STACK_VALUE_BOOLEAN;
-	if (arg_count == 0) { result.data.numeric_value = 0; return result; }
-	double val = varToDoubleSWF(app_context, &args[0], g_swf_version);
-	int is_finite = (val == val && val != INFINITY && val != -INFINITY);
-	result.data.numeric_value = is_finite ? 1ULL : 0ULL;
-	return result;
-}
-
-static void init_isNaN_isFinite(void)
-{
-	if (g_isNaN_isFinite_init) return;
-	memset(&g_isNaN_func, 0, sizeof(ASFunction));
-	strncpy(g_isNaN_func.name, "isNaN", 255);
-	g_isNaN_func.function_type = 2;
-	g_isNaN_func.advanced_func = (Function2Ptr)builtin_isNaN;
-
-	memset(&g_isFinite_func, 0, sizeof(ASFunction));
-	strncpy(g_isFinite_func.name, "isFinite", 255);
-	g_isFinite_func.function_type = 2;
-	g_isFinite_func.advanced_func = (Function2Ptr)builtin_isFinite;
-
-	g_isNaN_isFinite_init = 1;
-}
+// (Math builtins, isNaN/isFinite, and the NaN stub are in math.c.)
 
 // --- Global function stubs for _global registration ---
 // These are stub ASFunction objects so that for-in on _global can enumerate them.
@@ -4565,8 +4280,7 @@ static ActionVar builtin_clearInterval_impl(SWFAppContext* app_context, ActionVa
 	ActionVar r = {0}; r.type = ACTION_STACK_VALUE_UNDEFINED; return r;
 }
 
-// Forward declaration
-static void makeProtoReadOnly(ASObject* obj);
+// (makeProtoReadOnly is declared in action_internal.h)
 
 // Constructor that makes __proto__ read-only on the new instance.
 // Used for types where Flash protects __proto__ (System.Product, etc.)
@@ -5867,28 +5581,21 @@ static ActionVar builtin_asnative(SWFAppContext* app_context, ActionVar* args, u
 	if (class_id == 200) {
 		// Math class: ensure the Math object and its function table are ready
 		initMathObject(app_context);
-		// Valid indices 0–17 map directly to g_math_funcs[]
-		if (method_index < 18) {
-			ActionVar result = {0};
-			result.type = ACTION_STACK_VALUE_FUNCTION;
-			VAL(u64, &result.data.numeric_value) = (u64)&g_math_funcs[method_index];
-			return result;
-		}
-		// Out-of-range index → NaN stub (still coerces its args via valueOf)
-		static ASFunction g_nan_stub;
-		static int g_nan_stub_init = 0;
-		if (!g_nan_stub_init) {
-			memset(&g_nan_stub, 0, sizeof(ASFunction));
-			strncpy(g_nan_stub.name, "stub", 255);
-			g_nan_stub.function_type = 2;
-			g_nan_stub.advanced_func = (Function2Ptr)builtin_math_nan_stub;
-			if (function_count < MAX_FUNCTIONS)
-				function_registry[function_count++] = &g_nan_stub;
-			g_nan_stub_init = 1;
+		ASFunction* fn = actionMathGetFunc((int)method_index);
+		if (fn == NULL) {
+			// Out-of-range index → NaN stub (still coerces its args via valueOf)
+			fn = actionMathGetNaNStub();
+			// Register the NaN stub exactly once so it appears in function_registry
+			static int g_nan_stub_registered = 0;
+			if (!g_nan_stub_registered) {
+				if (function_count < MAX_FUNCTIONS)
+					function_registry[function_count++] = fn;
+				g_nan_stub_registered = 1;
+			}
 		}
 		ActionVar result = {0};
 		result.type = ACTION_STACK_VALUE_FUNCTION;
-		VAL(u64, &result.data.numeric_value) = (u64)&g_nan_stub;
+		VAL(u64, &result.data.numeric_value) = (u64)fn;
 		return result;
 	}
 
@@ -5952,78 +5659,7 @@ static ActionVar builtin_asnative(SWFAppContext* app_context, ActionVar* args, u
 	return undef;
 }
 
-// --- Math object initialization ---
-
-static void initMathObject(SWFAppContext* app_context)
-{
-	if (g_math_init_done) return;
-
-	g_math_object = allocObject(app_context, 32);
-	retainObject(g_math_object);
-
-	// Register constants (explicit values; M_PI etc. not available with -std=c17)
-	ActionVar cv = {0};
-	cv.type = ACTION_STACK_VALUE_F64;
-
-	VAL(double, &cv.data.numeric_value) = 3.14159265358979323846;
-	setProperty(app_context, g_math_object, "PI", 2, &cv);
-	VAL(double, &cv.data.numeric_value) = 2.71828182845904523536;
-	setProperty(app_context, g_math_object, "E", 1, &cv);
-	VAL(double, &cv.data.numeric_value) = 0.69314718055994530942;
-	setProperty(app_context, g_math_object, "LN2", 3, &cv);
-	VAL(double, &cv.data.numeric_value) = 2.30258509299404568402;
-	setProperty(app_context, g_math_object, "LN10", 4, &cv);
-	VAL(double, &cv.data.numeric_value) = 1.44269504088896340736;
-	setProperty(app_context, g_math_object, "LOG2E", 5, &cv);
-	VAL(double, &cv.data.numeric_value) = 0.43429448190325182765;
-	setProperty(app_context, g_math_object, "LOG10E", 6, &cv);
-	VAL(double, &cv.data.numeric_value) = 1.41421356237309504880;
-	setProperty(app_context, g_math_object, "SQRT2", 5, &cv);
-	VAL(double, &cv.data.numeric_value) = 0.70710678118654752440;
-	setProperty(app_context, g_math_object, "SQRT1_2", 7, &cv);
-
-	// Register methods
-	struct { const char* name; u32 name_len; Function2Ptr func; } math_methods[] = {
-		{"abs",    3, (Function2Ptr)builtin_math_abs},
-		{"sin",    3, (Function2Ptr)builtin_math_sin},
-		{"cos",    3, (Function2Ptr)builtin_math_cos},
-		{"tan",    3, (Function2Ptr)builtin_math_tan},
-		{"exp",    3, (Function2Ptr)builtin_math_exp},
-		{"log",    3, (Function2Ptr)builtin_math_log},
-		{"sqrt",   4, (Function2Ptr)builtin_math_sqrt},
-		{"round",  5, (Function2Ptr)builtin_math_round},
-		{"floor",  5, (Function2Ptr)builtin_math_floor},
-		{"ceil",   4, (Function2Ptr)builtin_math_ceil},
-		{"atan",   4, (Function2Ptr)builtin_math_atan},
-		{"asin",   4, (Function2Ptr)builtin_math_asin},
-		{"acos",   4, (Function2Ptr)builtin_math_acos},
-		{"atan2",  5, (Function2Ptr)builtin_math_atan2},
-		{"pow",    3, (Function2Ptr)builtin_math_pow},
-		{"min",    3, (Function2Ptr)builtin_math_min},
-		{"max",    3, (Function2Ptr)builtin_math_max},
-		{"random", 6, (Function2Ptr)builtin_math_random},
-	};
-
-	for (int i = 0; i < 18; i++)
-	{
-		memset(&g_math_funcs[i], 0, sizeof(ASFunction));
-		strncpy(g_math_funcs[i].name, math_methods[i].name, 255);
-		g_math_funcs[i].function_type = 2;
-		g_math_funcs[i].param_count = 0;
-		g_math_funcs[i].advanced_func = math_methods[i].func;
-		setupNativeFuncOwnProps(app_context, &g_math_funcs[i]);
-
-		ActionVar fv = {0};
-		fv.type = ACTION_STACK_VALUE_FUNCTION;
-		VAL(u64, &fv.data.numeric_value) = (u64)&g_math_funcs[i];
-		setProperty(app_context, g_math_object, math_methods[i].name, math_methods[i].name_len, &fv);
-	}
-
-	// Math is a native static object — always returns "[object Object]" regardless of SWF version
-	installNativeToString(app_context, g_math_object);
-
-	g_math_init_done = 1;
-}
+// (initMathObject is in math.c, declared in actionmodern/actionmath.h)
 
 // ============================================================================
 // Date class implementation
@@ -6031,7 +5667,7 @@ static void initMathObject(SWFAppContext* app_context)
 
 // Forward declarations for functions defined later in this file
 static void initDatePrototype(SWFAppContext* app_context);
-static void setObjectProto(SWFAppContext* app_context, ASObject* obj);
+// (setObjectProto is declared in action_internal.h)
 
 static ASFunction g_date_constructor;
 static ASFunction g_date_funcs[40]; // 20 getters + 17 setters + toString + valueOf + UTC
@@ -7193,7 +6829,7 @@ static ASObject* getObjectPrototype(SWFAppContext* app_context)
 }
 
 // Set __proto__ to Object.prototype on a user-created object
-static void setObjectProto(SWFAppContext* app_context, ASObject* obj)
+void setObjectProto(SWFAppContext* app_context, ASObject* obj)
 {
 	ASObject* proto = getObjectPrototype(app_context);
 	ActionVar proto_var;
@@ -7205,7 +6841,7 @@ static void setObjectProto(SWFAppContext* app_context, ASObject* obj)
 
 // Make __proto__ READ_ONLY on an object (after setObjectProto established it).
 // Used for singleton globals (Accessibility, Key, Math, Mouse, Selection, etc.)
-static void makeProtoReadOnly(ASObject* obj)
+void makeProtoReadOnly(ASObject* obj)
 {
 	for (u32 i = 0; i < obj->num_used; i++) {
 		if (obj->properties[i].name_length == 9 && strncmp(obj->properties[i].name, "__proto__", 9) == 0) {
@@ -13047,97 +12683,8 @@ void actionToggleQuality(SWFAppContext* app_context)
 	#endif
 }
 
-// ==================================================================
-// avmplus-compatible Random Number Generator
-// Based on Adobe's ActionScript VM (avmplus) implementation
-// Source: https://github.com/adobe/avmplus/blob/master/core/MathUtils.cpp
-// ==================================================================
-
-typedef struct {
-	uint32_t uValue;           // Random result and seed for next random result
-	uint32_t uXorMask;         // XOR mask for generating the next random value
-	uint32_t uSequenceLength;  // Number of values in the sequence
-} TRandomFast;
-
-#define kRandomPureMax 0x7FFFFFFFL
-
-// XOR masks for random number generation (generates 2^n - 1 numbers)
-static const uint32_t Random_Xor_Masks[31] = {
-	0x00000003L, 0x00000006L, 0x0000000CL, 0x00000014L, 0x00000030L, 0x00000060L, 0x000000B8L, 0x00000110L,
-	0x00000240L, 0x00000500L, 0x00000CA0L, 0x00001B00L, 0x00003500L, 0x00006000L, 0x0000B400L, 0x00012000L,
-	0x00020400L, 0x00072000L, 0x00090000L, 0x00140000L, 0x00300000L, 0x00400000L, 0x00D80000L, 0x01200000L,
-	0x03880000L, 0x07200000L, 0x09000000L, 0x14000000L, 0x32800000L, 0x48000000L, 0xA3000000L
-};
-
-// Global RNG state (initialized on first use or at startup)
-static TRandomFast global_random_state = {0, 0, 0};
-
-// Initialize the random number generator with a seed
-static void RandomFastInit(TRandomFast *pRandomFast, uint32_t seed) {
-	int32_t n = 31;
-	pRandomFast->uValue = seed;
-	pRandomFast->uSequenceLength = (1L << n) - 1L;
-	pRandomFast->uXorMask = Random_Xor_Masks[n - 2];
-}
-
-// Generate next random value using XOR shift
-static int32_t RandomFastNext(TRandomFast *pRandomFast) {
-	if (pRandomFast->uValue & 1L) {
-		pRandomFast->uValue = (pRandomFast->uValue >> 1L) ^ pRandomFast->uXorMask;
-	} else {
-		pRandomFast->uValue >>= 1L;
-	}
-	return (int32_t)pRandomFast->uValue;
-}
-
-// Hash function for additional randomness
-static int32_t RandomPureHasher(int32_t iSeed) {
-	const int32_t c1 = 1376312589L;
-	const int32_t c2 = 789221L;
-	const int32_t c3 = 15731L;
-
-	iSeed = ((iSeed << 13) ^ iSeed) - (iSeed >> 21);
-	int32_t iResult = (iSeed * (iSeed * iSeed * c3 + c2) + c1) & kRandomPureMax;
-	iResult += iSeed;
-	iResult = ((iResult << 13) ^ iResult) - (iResult >> 21);
-
-	return iResult;
-}
-
-// Generate a random number (avmplus implementation)
-static int32_t GenerateRandomNumber(TRandomFast *pRandomFast) {
-	// Initialize if needed (first call or uninitialized)
-	if (pRandomFast->uValue == 0) {
-		// Use time-based seed for first initialization
-		RandomFastInit(pRandomFast, (uint32_t)time(NULL));
-	}
-
-	int32_t aNum = RandomFastNext(pRandomFast);
-	aNum = RandomPureHasher(aNum * 71L);
-	return aNum & kRandomPureMax;
-}
-
-// AS2 random(max) function - returns integer in range [0, max)
-static int32_t Random(int32_t range, TRandomFast *pRandomFast) {
-	if (range <= 0) {
-		return 0;
-	}
-
-	int32_t randomNumber = GenerateRandomNumber(pRandomFast);
-	return randomNumber % range;
-}
-
-// --- Math.random (defined here after TRandomFast/RNG are available) ---
-
-static ActionVar builtin_math_random(SWFAppContext* app_context, ActionVar* args, u32 arg_count, ActionVar* registers, void* this_obj)
-{
-	(void)registers; (void)this_obj;
-	coerceMathArgs(app_context, args, arg_count, 2);
-	// Generate [0, 1) using the avmplus-compatible RNG
-	int32_t raw = GenerateRandomNumber(&global_random_state);
-	double result = (double)(raw & 0x7FFFFFFF) / 2147483648.0;
-	return mathReturnDouble(result);
-}
+// (avmplus-compatible RNG and Math.random moved to math.c; access via
+//  actionRNGGenerateRange in actionmodern/actionmath.h.)
 
 // ==================================================================
 // MovieClip Property Support (for SET_PROPERTY / GET_PROPERTY)
@@ -28009,7 +27556,7 @@ static void initAsBroadcasterPrototype(SWFAppContext* app_context, ASFunction* c
 
 /// Helper: set up own_props on a native function with __proto__ + constructor (no prototype).
 // Insertion: constructor, __proto__ → LIFO enum: __proto__, constructor
-static void setupNativeFuncOwnProps(SWFAppContext* app_context, ASFunction* func)
+void setupNativeFuncOwnProps(SWFAppContext* app_context, ASFunction* func)
 {
 	ASObject* obj_proto = getObjectPrototype(app_context);
 	func->no_lazy_prototype = 1;
@@ -29220,9 +28767,11 @@ static void ensureGlobalInit(SWFAppContext* app_context)
 	// ---- TextFormat ----
 	initTextFormatPrototype(app_context);
 	initXMLPrototype(app_context);
-	initMathObject(app_context);
-	setObjectProto(app_context, g_math_object);
-	makeProtoReadOnly(g_math_object);
+	{
+		ASObject* math_obj = actionMathGetObject(app_context);
+		setObjectProto(app_context, math_obj);
+		makeProtoReadOnly(math_obj);
+	}
 	initDatePrototype(app_context);
 
 	// ---- Error constructor ----
@@ -29515,7 +29064,7 @@ static void ensureGlobalInit(SWFAppContext* app_context)
 	initXMLSocketPrototype(app_context, &g_stub_ctors[17]);
 
 	// ---- Initialize missing global function stubs ----
-	init_isNaN_isFinite();
+	// (isNaN/isFinite are initialized lazily via actionMathGetIsNaN/actionMathGetIsFinite)
 	init_global_funcs();
 
 	// ---- SoundCodec object ----
@@ -29601,7 +29150,7 @@ static void ensureGlobalInit(SWFAppContext* app_context)
 	// Set up own_props on global stub functions (prevents lazy prototype, adds __proto__/constructor)
 	{
 		ASFunction* global_funcs[] = {
-			&g_isNaN_func, &g_isFinite_func, &g_aspf_func, &g_asnative_func,
+			actionMathGetIsNaN(), actionMathGetIsFinite(), &g_aspf_func, &g_asnative_func,
 			&g_escape_func, &g_unescape_func, &g_parseInt_func, &g_parseFloat_func,
 			&g_trace_func, &g_updateAfterEvent_func, &g_setInterval_func,
 			&g_clearTimeout_func, &g_clearInterval_func, &g_setTimeout_func,
@@ -29666,8 +29215,8 @@ static void ensureGlobalInit(SWFAppContext* app_context)
 	REG_FUNC("parseFloat", 10, &g_parseFloat_func);
 	REG_FUNC("trace", 5, &g_trace_func);
 	REG_FUNC("updateAfterEvent", 16, &g_updateAfterEvent_func);
-	REG_FUNC("isNaN", 5, &g_isNaN_func);
-	REG_FUNC("isFinite", 8, &g_isFinite_func);
+	REG_FUNC("isNaN", 5, actionMathGetIsNaN());
+	REG_FUNC("isFinite", 8, actionMathGetIsFinite());
 	REG_FUNC("setInterval", 11, &g_setInterval_func);
 	REG_FUNC("clearTimeout", 12, &g_clearTimeout_func);
 	REG_FUNC("clearInterval", 13, &g_clearInterval_func);
@@ -29681,7 +29230,7 @@ static void ensureGlobalInit(SWFAppContext* app_context)
 	REG_FUNC("Date", 4, &g_date_constructor);
 	REG_FUNC("String", 6, &g_ctors[2]);
 	REG_FUNC("Array", 5, &g_ctors[1]);
-	REG_OBJ("Math", 4, g_math_object);
+	REG_OBJ("Math", 4, actionMathGetObject(app_context));
 	REG_FUNC("Sound", 5, &g_stub_ctors[14]);
 	REG_FUNC("XMLNode", 7, &g_xmlnode_constructor);
 	REG_FUNC("XML", 3, &g_xml_constructor);
@@ -30585,7 +30134,7 @@ static void ensureSecondaryGlobalInit(SWFAppContext* app_context, int target_ver
 	// Register shared singleton objects on secondary global (same instances)
 	{
 		struct { const char* name; int len; ASObject* obj; } singletons[] = {
-			{"Math", 4, g_math_object},
+			{"Math", 4, actionMathGetObject(app_context)},
 			{"Accessibility", 13, g_accessibility_obj},
 			{"Key", 3, g_key_obj},
 			{"Mouse", 5, g_mouse_obj},
@@ -31799,14 +31348,12 @@ check_special_vars:
 		}
 		else if (var_name_len == 5 && strncmp(var_name, "isNaN", 5) == 0)
 		{
-			init_isNaN_isFinite();
-			PUSH(ACTION_STACK_VALUE_FUNCTION, (u64)&g_isNaN_func);
+			PUSH(ACTION_STACK_VALUE_FUNCTION, (u64)actionMathGetIsNaN());
 			return;
 		}
 		else if (var_name_len == 8 && strncmp(var_name, "isFinite", 8) == 0)
 		{
-			init_isNaN_isFinite();
-			PUSH(ACTION_STACK_VALUE_FUNCTION, (u64)&g_isFinite_func);
+			PUSH(ACTION_STACK_VALUE_FUNCTION, (u64)actionMathGetIsFinite());
 			return;
 		}
 		else if (var_name_len == 5 && strncmp(var_name, "Error", 5) == 0)
@@ -31869,8 +31416,7 @@ check_special_vars:
 		else if (var_name_len == 4 && strncmp(var_name, "Math", 4) == 0)
 		{
 			// Return the built-in Math object (singleton, not a constructor)
-			initMathObject(app_context);
-			PUSH(ACTION_STACK_VALUE_OBJECT, (u64)g_math_object);
+			PUSH(ACTION_STACK_VALUE_OBJECT, (u64)actionMathGetObject(app_context));
 			return;
 		}
 				else if (var_name_len == 6 && strncmp(var_name, "System", 6) == 0)
@@ -33450,7 +32996,7 @@ void actionRandomNumber(SWFAppContext* app_context)
 
 	// Generate random number using avmplus-compatible RNG
 	// This matches Flash Player's exact behavior for speedrunners
-	int random_val = Random(max, &global_random_state);
+	int random_val = actionRNGGenerateRange(max);
 
 	// Push result as float
 	float result = (float) random_val;
@@ -47872,7 +47418,7 @@ static double swfStringToF64(const char* str, int len, int swf_version)
 
 // Convert ActionVar to double using SWF-version-aware rules.
 // Used by Number(), isNaN(), isFinite().
-static double varToDoubleSWF(SWFAppContext* app_context, ActionVar* v, int swf_version)
+double varToDoubleSWF(SWFAppContext* app_context, ActionVar* v, int swf_version)
 {
 	if (v == NULL) return NAN;
 	switch (v->type) {

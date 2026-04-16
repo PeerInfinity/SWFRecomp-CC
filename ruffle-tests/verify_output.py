@@ -1244,6 +1244,7 @@ def compile_native(test_dir, num_frames, build_dir, headless=False, has_image_co
     # Copy runtime sources
     core_sources = [
         "src/actionmodern/action.c",
+        "src/actionmodern/math.c",
         "src/actionmodern/variables.c",
         "src/actionmodern/object.c",
         "src/actionmodern/unicode_case_tables.h",
@@ -1556,6 +1557,7 @@ def compile_wasm(test_dir, num_frames, build_dir):
     # Copy runtime sources (NO_GRAPHICS mode)
     core_sources = [
         "src/actionmodern/action.c",
+        "src/actionmodern/math.c",
         "src/actionmodern/variables.c",
         "src/actionmodern/object.c",
         "src/actionmodern/unicode_case_tables.h",
