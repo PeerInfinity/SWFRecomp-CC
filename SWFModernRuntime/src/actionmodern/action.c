@@ -39764,12 +39764,13 @@ void actionGetMember(SWFAppContext* app_context)
 	}
 
 	// Auto-box primitives for property access (monkey-patched constructors)
+	int _autobox_result = 0;
 	if (obj_var.type == ACTION_STACK_VALUE_BOOLEAN ||
 	    obj_var.type == ACTION_STACK_VALUE_F32 ||
 	    obj_var.type == ACTION_STACK_VALUE_F64 ||
 	    obj_var.type == ACTION_STACK_VALUE_STRING)
 	{
-		tryAutoBoxPrimitive(app_context, &obj_var, getActiveGlobal());
+		_autobox_result = tryAutoBoxPrimitive(app_context, &obj_var, getActiveGlobal());
 		// If boxed, obj_var is now OBJECT — fall through to OBJECT handler
 		// If not boxed, fall through to the original type-specific handlers
 	}
@@ -41424,13 +41425,17 @@ void actionGetMember(SWFAppContext* app_context)
 
 		pushUndefined(app_context);
 	}
-	else if (obj_var.type == ACTION_STACK_VALUE_F32 ||
-	         obj_var.type == ACTION_STACK_VALUE_F64 ||
-	         obj_var.type == ACTION_STACK_VALUE_BOOLEAN)
+	else if ((obj_var.type == ACTION_STACK_VALUE_F32 ||
+	          obj_var.type == ACTION_STACK_VALUE_F64 ||
+	          obj_var.type == ACTION_STACK_VALUE_BOOLEAN) &&
+	         _autobox_result == -1)
 	{
 		// Primitive number/boolean property access: look up on Number/Boolean.prototype
 		// This handles cases like: var a = 1; typeof(a.toString) == 'function'
 		// Flash auto-boxes primitives for property access.
+		// Only when the original built-in constructor is still in place (_autobox_result == -1).
+		// If Number/Boolean was monkey-patched, tryAutoBoxPrimitive would have either
+		// successfully boxed (changing obj_var to OBJECT) or returned 0 (no boxing).
 		if (prop_name_len == 9 && strncmp(prop_name, "__proto__", 9) == 0) {
 			// a.__proto__ returns Number/Boolean.prototype
 			ASObject* proto = getPrimitiveWrapperProto(obj_var.type);
