@@ -3,6 +3,21 @@
 Last updated: 2026-04-15 (Phase 3 work in progress)
 
 ### Latest fixes (2026-04-15, not yet in CI)
+- **TextFormat-v5/v6 → PASS (+2).** Three fixes to TextFormat in
+  `SWFModernRuntime/src/actionmodern/action.c`: (1) `tfCoerceAlign` is now
+  case-insensitive and normalizes to canonical lowercase (`"Left"` → `"left"`,
+  `"cEnter"` → `"center"`, etc.), matching Ruffle `text_format.rs` set_align +
+  align getter. (2) `getTextExtent` is now installed as an instance-own
+  property by the TextFormat constructor, not on `TextFormat.prototype` —
+  Flash's observable behavior is `!TextFormat.prototype.hasOwnProperty('getTextExtent')`
+  + `tfObj.hasOwnProperty('getTextExtent')`. (3) `tfCoerceBoolean` now uses
+  version-gated string coercion matching Ruffle `Value::as_bool`: SWF7+ →
+  non-empty string is true, SWF5/6 → `varToDoubleSWF` then non-NaN non-zero
+  check. No regressions on avm1 `text_format`, `text_format_rounding_swf7/8`,
+  `text_format_font_max_length`, `text_format_display`,
+  `text_format_get_text_extent_undefined_width`, `textfield_*`, Color/ColorTransform,
+  flash-v5/v6/v7. TextFormat-v7 still fails — residual diffs are
+  getTextExtent metric precision, unrelated to these fixes.
 - **`flash` package unhide via ASSetPropFlags (SWF6/7)** — `flash` is now always
   registered on `global_object` with `flash_flags=0x1480` (hidden under SWF5/6/7
   version masks, visible SWF8+). `initFlashPackage` and `g_flash_object`

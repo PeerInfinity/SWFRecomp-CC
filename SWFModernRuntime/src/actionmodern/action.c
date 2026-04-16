@@ -14833,7 +14833,14 @@ static ActionVar tfCoerceBoolean(SWFAppContext* app_context, ActionVar* value) {
 		float f = VAL(float, &value->data.numeric_value);
 		b = (f != 0 && f == f) ? 1 : 0;
 	} else if (value->type == ACTION_STACK_VALUE_STRING) {
-		b = (value->str_size > 0) ? 1 : 0;
+		// Match Ruffle Value::as_bool: SWF7+ → non-empty string is true;
+		// SWF5/6 → parse as number, true iff non-NaN and non-zero.
+		if (g_swf_version >= 7) {
+			b = (value->str_size > 0) ? 1 : 0;
+		} else {
+			double d = varToDoubleSWF(app_context, value, g_swf_version);
+			b = (d == d && d != 0.0) ? 1 : 0;
+		}
 	} else if (value->type == ACTION_STACK_VALUE_OBJECT || value->type == ACTION_STACK_VALUE_ARRAY || value->type == ACTION_STACK_VALUE_FUNCTION) {
 		b = 1;
 	}
@@ -14870,14 +14877,24 @@ static ActionVar tfCoerceAlign(SWFAppContext* app_context, ActionVar* value, ASO
 		slen = _align_src.str_size;
 	}
 	if (s != NULL) {
-		// Valid values: "left", "center", "right", "justify"
-		if ((slen == 4 && strncmp(s, "left", 4) == 0) ||
-		    (slen == 6 && strncmp(s, "center", 6) == 0) ||
-		    (slen == 5 && strncmp(s, "right", 5) == 0) ||
-		    (slen == 7 && strncmp(s, "justify", 7) == 0)) {
+		// Valid values: "left", "center", "right", "justify" — case-insensitive,
+		// normalized to canonical lowercase form on storage (matches Ruffle
+		// text_format.rs set_align + align getter).
+		const uint16_t* canonical = NULL;
+		u32 canonical_len = 0;
+		if (slen == 4 && strncasecmp(s, "left", 4) == 0) {
+			canonical = u16_left; canonical_len = 4;
+		} else if (slen == 6 && strncasecmp(s, "center", 6) == 0) {
+			canonical = u16_center; canonical_len = 6;
+		} else if (slen == 5 && strncasecmp(s, "right", 5) == 0) {
+			canonical = u16_right; canonical_len = 5;
+		} else if (slen == 7 && strncasecmp(s, "justify", 7) == 0) {
+			canonical = u16_justify; canonical_len = 7;
+		}
+		if (canonical != NULL) {
 			result.type = ACTION_STACK_VALUE_STRING;
-			result.data.numeric_value = _align_src.data.numeric_value;
-			result.str_size = slen;
+			result.data.numeric_value = (u64) canonical;
+			result.str_size = canonical_len;
 			return result;
 		}
 	}
@@ -15344,9 +15361,17 @@ static void initTextFormatPrototype(SWFAppContext* app_context) {
 		setProperty(app_context, proto, "__proto__", 9, &proto_val);
 	}
 
-	// Register getTextExtent method on prototype
-	registerGeomMethod(&g_textformat_fn_getTextExtent, "getTextExtent",
-	    (Function2Ptr)textFormatGetTextExtent, app_context, proto);
+	// Initialize getTextExtent ASFunction (installed as instance-own property in
+	// the TextFormat constructor, NOT on the prototype — Flash's TextFormat places
+	// getTextExtent on each instance, which the Gnash TextFormat-v5..v7 tests
+	// verify via hasOwnProperty checks on prototype vs instance).
+	memset(&g_textformat_fn_getTextExtent, 0, sizeof(ASFunction));
+	strncpy(g_textformat_fn_getTextExtent.name, "getTextExtent", 255);
+	g_textformat_fn_getTextExtent.function_type = 2;
+	g_textformat_fn_getTextExtent.advanced_func = (Function2Ptr)textFormatGetTextExtent;
+	if (function_count < MAX_FUNCTIONS)
+		function_registry[function_count++] = &g_textformat_fn_getTextExtent;
+	setupNativeFuncOwnProps(app_context, &g_textformat_fn_getTextExtent);
 
 	// Install the 17 TextFormat own properties on the prototype as undefined.
 	// Flash's TextFormat.prototype ships with these as own properties (Gnash
@@ -41991,6 +42016,15 @@ void actionNewObject(SWFAppContext* app_context)
 			display_val.data.numeric_value = (u64) u16_block;
 			display_val.str_size = 5;
 			setProperty(app_context, tf_obj, "display", 7, &display_val);
+		}
+		// Install getTextExtent as own property on the instance (Flash behavior —
+		// Gnash TextFormat-v5..v7 verify that it's own on the instance but not
+		// on TextFormat.prototype).
+		{
+			ActionVar gte_val = {0};
+			gte_val.type = ACTION_STACK_VALUE_FUNCTION;
+			gte_val.data.numeric_value = (u64) &g_textformat_fn_getTextExtent;
+			setProperty(app_context, tf_obj, "getTextExtent", 13, &gte_val);
 		}
 		// Apply constructor arguments (0-13 args) with constructor-specific coercion:
 		// Args: font, size, color, bold, italic, underline, url, target, align, leftMargin, rightMargin, indent, leading
