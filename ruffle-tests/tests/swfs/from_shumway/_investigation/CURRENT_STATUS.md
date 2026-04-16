@@ -1,6 +1,6 @@
 # Shumway Test Suite Status
 
-Last updated: 2026-04-10
+Last updated: 2026-04-16 (CI run at 82a6ea07)
 
 ## Quick Summary
 
@@ -8,24 +8,48 @@ Last updated: 2026-04-10
 
 | Metric | Value |
 |--------|-------|
-| Total tests | 47 |
-| Passing | **17** (36.2%) |
-| AVM2/AS3 (ignored) | **30** |
-| AVM1 failing | **0** |
-| **Filtered AVM1 pass rate** | **17/17 (100.0%)** |
+| Total tests | 92 |
+| Passing | **48** (52.2%) |
+| Ruffle-matched | 1 |
+| Effective pass | **49** (53.3%) |
+| Failing | 43 |
 
-**Status**: All flat-suite AVM1 tests pass. 30 AVM2 tests ignored.
+**Breakdown by sub-tree** (flat suite now recurses into subdirs):
+
+| Sub-tree | Total | Pass | RM | Fail |
+|----------|-------|------|----|------|
+| Flat root (no subdir) | 10 | 10 | 0 | 0 |
+| `avm1/` | 47 | 32 | 1 | 14 |
+| `fuzz/` | 30 | 3 | 0 | 27 |
+| `timeline/` | 5 | 3 | 0 | 2 |
+
+The original 30 AVM2/AS3 tests (listed in `ignored_tests.txt`) are no longer in the test pool — they were removed from the checkout, not merely ignored. Current `ignored_tests.txt` is present but has 0 matches (none of its entries appear in results). Flat root dropped from 17 → 10 visible tests for the same reason (visual-only tests like MaskTest/bitmapbuttons/clipping/flash_geom_ColorTransform/flash_text_TextField/gradient are no longer present).
+
+**Flat root is still 100% passing**: all 10 remaining tests (add, avm1timeline1, avm1timeline2, button3, doubleAndRegister, fscommand1, gradientTransform, invalidClipDepth, movieinfo1, targetPath1) pass.
+
+**New failing clusters** come from `fuzz/` (27 fail — fuzzer-generated SWFs, likely useful for finding edge cases in runtime/recompiler), `avm1/` sub-tree (14 fail — see below), and `timeline/` (2 fail).
 
 ### AVM1 subdirectory (`from_shumway/avm1/`)
 
 | Metric | Value |
 |--------|-------|
-| Total tests | 23 |
-| Passing | **20** (87.0%) |
-| Failing | **3** (3 output_mismatch) |
-| No ignore list | — |
+| Total tests | 47 |
+| Passing | **32** (68.1%) |
+| Ruffle-matched | 1 |
+| Effective pass | **33** (70.2%) |
+| Ignored | 2 |
+| **Filtered pass rate** | **33/45 (73.3%)** |
+| Failing (filtered) | 12 |
 
-**Status**: 9 tests fixed (2026-04-10/11): scope, settimeout, setinterval, watch, nested-button, nativeinheritance, array, target, + drag_drop AVM1 regression fix. 3 remaining: hitarea (Ruffle known_failure), moviecliploader (blocked on multi-SWF loading), filters (blocked on mc.filters getter). See `incomplete/SHUMWAY_AVM1_PLAN.md`.
+**Growth**: avm1/ subdirectory expanded 23 → 47 tests via new category sub-trees:
+- `duplicateMovieClip/` (4 tests)
+- `propertycase/` (3 tests)
+- `xml/` (3 tests)
+- `bitmapdata/`, `doactionorder/`, `haxe/`, `loadvariables/`, `property-paths/`, `textfield/`, `undefined/` (2 tests each)
+
+**Status from earlier**: 9 original tests fixed (2026-04-10/11): scope, settimeout, setinterval, watch, nested-button, nativeinheritance, array, target, + drag_drop AVM1 regression fix. Original 3 remaining: hitarea (Ruffle known_failure), moviecliploader (blocked on multi-SWF loading), filters (blocked on mc.filters getter). See `complete/SHUMWAY_AVM1_PLAN.md`.
+
+**New work**: 12 filtered failures come from the newly-added category sub-trees. Needs fresh triage — no investigation docs yet for `duplicateMovieClip/`, `propertycase/`, `xml/`, `bitmapdata/`, `doactionorder/`, `haxe/`, `loadvariables/`, `property-paths/`, `textfield/`, `undefined/`.
 
 ## Related Documents
 
@@ -33,7 +57,7 @@ Last updated: 2026-04-10
 |----------|---------|
 | `FAILING_TESTS_BY_FEATURE.md` | Flat-suite failures categorized (30 AVM2 + 2 AVM1, both fixed) |
 | `REMAINING_FAILURES_ANALYSIS.md` | Analysis of the 2 fixed flat-suite AVM1 tests + AVM2 ignore list |
-| `incomplete/SHUMWAY_AVM1_PLAN.md` | **NEW** — Plan for 11 failing `avm1/` subdirectory tests |
+| `complete/SHUMWAY_AVM1_PLAN.md` | **NEW** — Plan for 11 failing `avm1/` subdirectory tests |
 
 ## Passing Tests (17)
 
@@ -123,4 +147,4 @@ All flat-suite work items are complete:
 2. ~~Fix targetPath1~~ — DONE (MC toString fallback to MovieClip.prototype chain)
 3. ~~Fix doubleAndRegister~~ — DONE (registerClass char_id-based lookup)
 
-**Flat suite is at 100%. See `incomplete/SHUMWAY_AVM1_PLAN.md` for the 11 remaining avm1/ subdirectory failures.**
+**Flat suite is at 100%. See `complete/SHUMWAY_AVM1_PLAN.md` for the 11 remaining avm1/ subdirectory failures.**
