@@ -3,7 +3,7 @@
 
 Last updated: 2026-04-16
 
-## Status: IN PROGRESS — 466/560 lines match (83.2%), 94 remaining failures
+## Status: IN PROGRESS — 494/560 lines match (88.2%), 66 remaining failures
 
 ---
 
@@ -24,6 +24,7 @@ The `array-v5` test exercises extensive Array operations (560 expected lines). C
 | 2026-04-11 (CI)       | 459/560 (82.0%) | +9 vs 2026-04-05: cumulative effect of unrelated fixes landing (primitive auto-boxing, convertFloat NaN threshold, etc.) |
 | 2026-04-16 (session) | 460/560 (82.1%) | +1: `actionToInteger` now wraps via `ecmaToInt32` (matches Ruffle `coerce_to_i32`) so `int(-2147483649) === 2147483647` instead of saturating to INT_MIN |
 | 2026-04-16 (session) | 466/560 (83.2%) | +6: sort custom-comparator arg-push order was inverted at 5 sites, making every `a.sort(cmpFn)` call produce the reverse-of-expected order. Fix: push `args[0]` (pivot) first then `args[1]` (elem) so the generated `pop→y; pop→x` prelude binds `x=pivot, y=elem`. |
+| 2026-04-16 (session) | 494/560 (88.2%) | +28: sort custom-comparator dispatch was invoking `simple_func` without pushing a local scope, so the callee's param/this `setVariableByName` writes fell through to globals. `randomComparator(a, b)` during an earlier sort therefore overwrote global `a` and `b`, corrupting the array under test and cascading into 25+ subsequent line failures (popped, b.length, b.toString, concatted, portion, mixed, basic, count==6). Extracted `_invoke_sort_comparator` helper that mirrors `actionCallFunction`'s type-1 setup (local scope + captured scopes + base_clip + `this`) and routed all 5 sort dispatch sites through it. |
 
 ## Completed Fixes
 
@@ -88,6 +89,26 @@ convention used by `actionCallFunction`. Impact in array-v5: +6 lines
 `array_slice`, `array_splice`, `array_properties`, `array_prototyping`,
 `array_trivial`, `array_length`, `array_enumerate`, `init_array_invalid`,
 `global_array`.
+
+### 15. sort custom-comparator local scope — FIXED (2026-04-16)
+The five inline `simple_func` invocations in the sort comparator path never
+pushed a local scope before the call, so the generated function's parameter
+and `this` bindings (which go through `setVariableByName`) fell through to
+globals. In array-v5 this meant `indexedarray.sort(randomComparator,
+Array.RETURNINDEXEDARRAY)` (line 334) overwrote global `a` and `b` on every
+iteration of QuickSort (via `randomComparator(a, b)`'s param binding).
+Because the test's top-level `b = [551, "asdf", 12]` was clobbered long
+before `popped = b.pop()` ran at line 455, every subsequent check against
+`b` failed (popped == 12 / "asdf" / 551, b.length, b.toString, the concat
+chain at 179–196, the count==6 / portion / basic / mixed / concatted
+cluster, etc.). Fix: extracted an `_invoke_sort_comparator` helper that
+mirrors `actionCallFunction`'s type-1 setup — allocs a local scope, pushes
+captured scopes, switches `base_clip` for SWF6+, binds `this=undefined`,
+forward-pushes args, invokes `simple_func`, and tears down in reverse —
+and routed all 5 call sites through it. +28 lines: popped cluster (157,
+158, 159), the 161–163 / 173 / 179–196 chain driven by global `b` /
+`concatted` / `portion` / `basic` / `mixed`, and line 176 (count==6). No
+regressions on the same avm1 Array tests plus `mutable_this`, `this_scoping`.
 
 ## Ruffle-matched assessment (2026-04-16)
 

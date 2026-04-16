@@ -46333,6 +46333,86 @@ static int _utf8_strcasecmp(const char* a, const char* b)
 	return 0;
 }
 
+// Invoke a user-provided sort/sortOn comparator with (a, b).
+// Mirrors the scope setup actionCallFunction performs for type-1 functions so
+// that the callee's setVariableByName("x"/"y"/...) writes into a fresh local
+// scope instead of polluting the globals the test under sort expects to keep
+// (e.g. `randomComparator(a, b)` would otherwise clobber global `a` and `b`).
+// Returns the comparator's raw ActionVar result; callers convert to -1/0/1.
+static ActionVar _invoke_sort_comparator(SWFAppContext* app_context,
+                                         ASFunction* comparator,
+                                         ActionVar* a, ActionVar* b)
+{
+	ActionVar undef = {0};
+	undef.type = ACTION_STACK_VALUE_UNDEFINED;
+	if (comparator == NULL) return undef;
+
+	ActionVar args[2] = { *a, *b };
+	g_call_depth++;
+
+	ActionVar result;
+	if (comparator->function_type == 2 && comparator->advanced_func != NULL)
+	{
+		result = comparator->advanced_func(app_context, args, 2, NULL, NULL);
+	}
+	else if (comparator->function_type == 1 && comparator->simple_func != NULL)
+	{
+		// Push a fresh local scope so param/"this" bindings don't leak to global.
+		ASObject* local_scope = allocObject(app_context, 8);
+		int pushed_local = 0;
+		if (local_scope != NULL && scope_depth < MAX_SCOPE_DEPTH)
+		{
+			scope_is_with[scope_depth] = 0;
+			scope_mc[scope_depth] = NULL;
+			scope_chain[scope_depth++] = local_scope;
+			pushed_local = 1;
+		}
+
+		// Restore captured scopes (closure context from definition site).
+		u32 captured_count = comparator->captured_scope_count;
+		u32 captured_pushed = 0;
+		for (u32 ci = 0; ci < captured_count && scope_depth < MAX_SCOPE_DEPTH; ci++)
+		{
+			scope_is_with[scope_depth] = comparator->captured_scope_is_with[ci];
+			scope_mc[scope_depth] = (MovieClip*)comparator->captured_scope_mc[ci];
+			scope_chain[scope_depth++] = (ASObject*)comparator->captured_scope[ci];
+			captured_pushed++;
+		}
+
+		// Switch base_clip for SWF6+ closures.
+		MovieClip* saved_context = g_current_context;
+		if (g_swf_version >= 6 && comparator->base_clip != NULL)
+			g_current_context = (MovieClip*)comparator->base_clip;
+
+		// this=undefined for sort comparator (Flash behavior).
+		ActionVar undef_this = {0};
+		undef_this.type = ACTION_STACK_VALUE_UNDEFINED;
+		setVariableByName("this", &undef_this);
+
+		// Forward-push: args[0] (bottom), args[1] (top) so the generated
+		// `pop→param_last; ...; pop→param_0` prelude binds params in order.
+		pushVar(app_context, &args[0]);
+		pushVar(app_context, &args[1]);
+
+		result = ((ActionVar(*)(SWFAppContext*))comparator->simple_func)(app_context);
+
+		g_current_context = saved_context;
+		for (u32 ci = 0; ci < captured_pushed && scope_depth > 0; ci++)
+			scope_depth--;
+		if (pushed_local && scope_depth > 0)
+			scope_depth--;
+		if (local_scope != NULL)
+			releaseObject(app_context, local_scope);
+	}
+	else
+	{
+		result = undef;
+	}
+
+	g_call_depth--;
+	return result;
+}
+
 // Helper: compare two ActionVars for sort/sortOn
 // flags: CASEINSENSITIVE=1, DESCENDING=2, NUMERIC=16
 // Returns negative if a < b, 0 if equal, positive if a > b
@@ -46945,20 +47025,8 @@ static int callArrayMethod(SWFAppContext* app_context,
 					int _ucmp = 0;
 					if (comparator != NULL)
 					{
-						ActionVar _uargs[2] = { arr->elements[_ui], arr->elements[_uj] };
-						ActionVar _ures;
-						g_call_depth++;
-						if (comparator->function_type == 2)
-							_ures = comparator->advanced_func(app_context, _uargs, 2, NULL, NULL);
-						else
-						{
-							// Push in caller-visible forward order so that the generated
-							// `pop→y; pop→x` prelude binds x=_uargs[0], y=_uargs[1].
-							pushVar(app_context, &_uargs[0]);
-							pushVar(app_context, &_uargs[1]);
-							_ures = ((ActionVar(*)(SWFAppContext*))comparator->simple_func)(app_context);
-						}
-						g_call_depth--;
+						ActionVar _ures = _invoke_sort_comparator(app_context, comparator,
+						                                          &arr->elements[_ui], &arr->elements[_uj]);
 						double _ud = varToDouble(&_ures);
 						_ucmp = (_ud < 0) ? -1 : (_ud > 0) ? 1 : 0;
 					}
@@ -47014,20 +47082,9 @@ static int callArrayMethod(SWFAppContext* app_context,
 								int _qcmp;
 								if (comparator != NULL)
 								{
-									ActionVar _qargs[2] = { arr->elements[_qpivot_idx], arr->elements[_idx[_qleft]] };
-									ActionVar _qres;
-									g_call_depth++;
-									if (comparator->function_type == 2)
-										_qres = comparator->advanced_func(app_context, _qargs, 2, NULL, NULL);
-									else {
-										// Forward-push: args[0]=pivot (bottom), args[1]=elem (top)
-										// matches caller-side order so `pop→y; pop→x` binds
-										// x=pivot, y=elem.
-										pushVar(app_context, &_qargs[0]);
-										pushVar(app_context, &_qargs[1]);
-										_qres = ((ActionVar(*)(SWFAppContext*))comparator->simple_func)(app_context);
-									}
-									g_call_depth--;
+									ActionVar _qres = _invoke_sort_comparator(app_context, comparator,
+									                                          &arr->elements[_qpivot_idx],
+									                                          &arr->elements[_idx[_qleft]]);
 									if (g_execution_halted) break;
 									double _qd = varToDouble(&_qres);
 									_qcmp = (_qd < 0) ? -1 : (_qd > 0) ? 1 : 0;
@@ -47046,17 +47103,9 @@ static int callArrayMethod(SWFAppContext* app_context,
 								int _qcmp;
 								if (comparator != NULL)
 								{
-									ActionVar _qargs[2] = { arr->elements[_qpivot_idx], arr->elements[_idx[_qright]] };
-									ActionVar _qres;
-									g_call_depth++;
-									if (comparator->function_type == 2)
-										_qres = comparator->advanced_func(app_context, _qargs, 2, NULL, NULL);
-									else {
-										pushVar(app_context, &_qargs[0]);
-										pushVar(app_context, &_qargs[1]);
-										_qres = ((ActionVar(*)(SWFAppContext*))comparator->simple_func)(app_context);
-									}
-									g_call_depth--;
+									ActionVar _qres = _invoke_sort_comparator(app_context, comparator,
+									                                          &arr->elements[_qpivot_idx],
+									                                          &arr->elements[_idx[_qright]]);
 									if (g_execution_halted) break;
 									double _qd = varToDouble(&_qres);
 									_qcmp = (_qd < 0) ? -1 : (_qd > 0) ? 1 : 0;
@@ -47160,24 +47209,8 @@ static int callArrayMethod(SWFAppContext* app_context,
 							int _qcmp;
 							if (comparator != NULL)
 							{
-								ActionVar _qargs[2] = { _qpivot, arr->elements[_qleft] };
-								ActionVar _qres;
-								g_call_depth++;
-								if (comparator->function_type == 2)
-									_qres = comparator->advanced_func(app_context, _qargs, 2, NULL, NULL);
-								else {
-									// Set this=undefined for sort comparator (Flash behavior)
-									ActionVar _undef_this = {0};
-									_undef_this.type = ACTION_STACK_VALUE_UNDEFINED;
-									setVariableByName("this", &_undef_this);
-									// Forward-push: args[0]=pivot (bottom), args[1]=elem (top)
-									// matches the caller-side order so `pop→y; pop→x`
-									// binds x=pivot, y=elem.
-									pushVar(app_context, &_qargs[0]);
-									pushVar(app_context, &_qargs[1]);
-									_qres = ((ActionVar(*)(SWFAppContext*))comparator->simple_func)(app_context);
-								}
-								g_call_depth--;
+								ActionVar _qres = _invoke_sort_comparator(app_context, comparator,
+								                                          &_qpivot, &arr->elements[_qleft]);
 								if (g_execution_halted) break;
 								double _qd = varToDouble(&_qres);
 								_qcmp = (_qd < 0) ? -1 : (_qd > 0) ? 1 : 0;
@@ -47196,20 +47229,8 @@ static int callArrayMethod(SWFAppContext* app_context,
 							int _qcmp;
 							if (comparator != NULL)
 							{
-								ActionVar _qargs[2] = { _qpivot, arr->elements[_qright] };
-								ActionVar _qres;
-								g_call_depth++;
-								if (comparator->function_type == 2)
-									_qres = comparator->advanced_func(app_context, _qargs, 2, NULL, NULL);
-								else {
-									ActionVar _undef_this = {0};
-									_undef_this.type = ACTION_STACK_VALUE_UNDEFINED;
-									setVariableByName("this", &_undef_this);
-									pushVar(app_context, &_qargs[0]);
-									pushVar(app_context, &_qargs[1]);
-									_qres = ((ActionVar(*)(SWFAppContext*))comparator->simple_func)(app_context);
-								}
-								g_call_depth--;
+								ActionVar _qres = _invoke_sort_comparator(app_context, comparator,
+								                                          &_qpivot, &arr->elements[_qright]);
 								if (g_execution_halted) break;
 								double _qd = varToDouble(&_qres);
 								_qcmp = (_qd < 0) ? -1 : (_qd > 0) ? 1 : 0;
