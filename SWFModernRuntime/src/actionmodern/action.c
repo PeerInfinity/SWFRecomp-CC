@@ -46952,8 +46952,10 @@ static int callArrayMethod(SWFAppContext* app_context,
 							_ures = comparator->advanced_func(app_context, _uargs, 2, NULL, NULL);
 						else
 						{
-							pushVar(app_context, &_uargs[1]);
+							// Push in caller-visible forward order so that the generated
+							// `pop→y; pop→x` prelude binds x=_uargs[0], y=_uargs[1].
 							pushVar(app_context, &_uargs[0]);
+							pushVar(app_context, &_uargs[1]);
 							_ures = ((ActionVar(*)(SWFAppContext*))comparator->simple_func)(app_context);
 						}
 						g_call_depth--;
@@ -47018,8 +47020,11 @@ static int callArrayMethod(SWFAppContext* app_context,
 									if (comparator->function_type == 2)
 										_qres = comparator->advanced_func(app_context, _qargs, 2, NULL, NULL);
 									else {
-										pushVar(app_context, &_qargs[1]);
+										// Forward-push: args[0]=pivot (bottom), args[1]=elem (top)
+										// matches caller-side order so `pop→y; pop→x` binds
+										// x=pivot, y=elem.
 										pushVar(app_context, &_qargs[0]);
+										pushVar(app_context, &_qargs[1]);
 										_qres = ((ActionVar(*)(SWFAppContext*))comparator->simple_func)(app_context);
 									}
 									g_call_depth--;
@@ -47047,8 +47052,8 @@ static int callArrayMethod(SWFAppContext* app_context,
 									if (comparator->function_type == 2)
 										_qres = comparator->advanced_func(app_context, _qargs, 2, NULL, NULL);
 									else {
-										pushVar(app_context, &_qargs[1]);
 										pushVar(app_context, &_qargs[0]);
+										pushVar(app_context, &_qargs[1]);
 										_qres = ((ActionVar(*)(SWFAppContext*))comparator->simple_func)(app_context);
 									}
 									g_call_depth--;
@@ -47165,8 +47170,11 @@ static int callArrayMethod(SWFAppContext* app_context,
 									ActionVar _undef_this = {0};
 									_undef_this.type = ACTION_STACK_VALUE_UNDEFINED;
 									setVariableByName("this", &_undef_this);
-									pushVar(app_context, &_qargs[1]);
+									// Forward-push: args[0]=pivot (bottom), args[1]=elem (top)
+									// matches the caller-side order so `pop→y; pop→x`
+									// binds x=pivot, y=elem.
 									pushVar(app_context, &_qargs[0]);
+									pushVar(app_context, &_qargs[1]);
 									_qres = ((ActionVar(*)(SWFAppContext*))comparator->simple_func)(app_context);
 								}
 								g_call_depth--;
@@ -47197,8 +47205,8 @@ static int callArrayMethod(SWFAppContext* app_context,
 									ActionVar _undef_this = {0};
 									_undef_this.type = ACTION_STACK_VALUE_UNDEFINED;
 									setVariableByName("this", &_undef_this);
-									pushVar(app_context, &_qargs[1]);
 									pushVar(app_context, &_qargs[0]);
+									pushVar(app_context, &_qargs[1]);
 									_qres = ((ActionVar(*)(SWFAppContext*))comparator->simple_func)(app_context);
 								}
 								g_call_depth--;

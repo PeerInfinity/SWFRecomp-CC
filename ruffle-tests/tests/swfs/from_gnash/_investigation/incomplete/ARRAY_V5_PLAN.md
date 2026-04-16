@@ -3,7 +3,7 @@
 
 Last updated: 2026-04-16
 
-## Status: IN PROGRESS — 460/560 lines match (82.1%), 100 remaining failures
+## Status: IN PROGRESS — 466/560 lines match (83.2%), 94 remaining failures
 
 ---
 
@@ -23,6 +23,7 @@ The `array-v5` test exercises extensive Array operations (560 expected lines). C
 | 2026-04-05 (session) | 450/560 (80.4%) | +2 net: ASnative class 252 implementation (constructor + prototype methods) |
 | 2026-04-11 (CI)       | 459/560 (82.0%) | +9 vs 2026-04-05: cumulative effect of unrelated fixes landing (primitive auto-boxing, convertFloat NaN threshold, etc.) |
 | 2026-04-16 (session) | 460/560 (82.1%) | +1: `actionToInteger` now wraps via `ecmaToInt32` (matches Ruffle `coerce_to_i32`) so `int(-2147483649) === 2147483647` instead of saturating to INT_MIN |
+| 2026-04-16 (session) | 466/560 (83.2%) | +6: sort custom-comparator arg-push order was inverted at 5 sites, making every `a.sort(cmpFn)` call produce the reverse-of-expected order. Fix: push `args[0]` (pivot) first then `args[1]` (elem) so the generated `pop→y; pop→x` prelude binds `x=pivot, y=elem`. |
 
 ## Completed Fixes
 
@@ -71,6 +72,22 @@ saturating for out-of-range doubles. Matches Ruffle's `coerce_to_i32` /
 previously-stored `c[-2147483648] = "lowest int"`; now it wraps to 2147483647,
 which is undefined. +1 line. No regressions on `action_to_integer`,
 `parse_int`, `typeof`.
+
+### 14. sort custom-comparator arg-push order — FIXED (2026-04-16)
+The custom-comparator dispatch inside `callArrayMethod`'s `sort` path (5 sites:
+UNIQUESORT duplicate check, RETURNINDEXEDARRAY quicksort left/right, standard
+quicksort left/right) was pushing `args[1]` (elem) before `args[0]` (pivot),
+so the generated function's `popVar→y; popVar→x` prelude bound **x=elem,
+y=pivot**. Calling `testCmp(x=elem, y=pivot)` instead of `testCmp(pivot, elem)`
+negates the comparator's return value, so every custom-comparator sort
+produced the reverse of the expected order. Fix: push `args[0]` first
+(bottom) then `args[1]` (top), matching the caller-side forward-push
+convention used by `actionCallFunction`. Impact in array-v5: +6 lines
+(103, 106, 107, 108, 114, 162). No regressions on avm1 `array_sort`,
+`array_sort_random`, `array_call_method`, `array_concat`, `array_constructor`,
+`array_slice`, `array_splice`, `array_properties`, `array_prototyping`,
+`array_trivial`, `array_length`, `array_enumerate`, `init_array_invalid`,
+`global_array`.
 
 ## Ruffle-matched assessment (2026-04-16)
 
