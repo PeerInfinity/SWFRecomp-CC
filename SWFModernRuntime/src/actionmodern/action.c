@@ -22551,10 +22551,11 @@ ActionStackValueType convertFloat(SWFAppContext* app_context)
 				}
 			}
 
-			// No valueOf or valueOf didn't return a number
-			// SWF < 7: objects convert to 0.0 (Flash 6 and earlier behavior)
-			// SWF >= 7: objects convert to NaN (ECMA-262 compliant)
-			double temp = (g_swf_version < 7) ? 0.0 : NAN;
+			// No valueOf returned a primitive value
+			// Flash does NOT call toString during toNumber — unlike ECMA-262
+			// SWF5: objects/functions convert to 0.0
+			// SWF6+: objects convert to NaN
+			double temp = (g_swf_version < 6) ? 0.0 : NAN;
 			STACK_TOP_TYPE = ACTION_STACK_VALUE_F64;
 			VAL(u64, &STACK_TOP_VALUE) = VAL(u64, &temp);
 			return ACTION_STACK_VALUE_F64;
