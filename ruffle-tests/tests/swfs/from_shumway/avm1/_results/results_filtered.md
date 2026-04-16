@@ -1,10 +1,10 @@
 # Ruffle Test Results (Filtered)
 
-**Date**: 2026-04-16 17:46 UTC
+**Date**: 2026-04-16 17:59 UTC
 
-**Git SHA**: `a218080f6e`
+**Git SHA**: `ce441be362`
 
-**Run Duration**: 2m 5s
+**Run Duration**: 2m 8s
 
 **Filtered**: 2 tests ignored out of 47 available
 
@@ -31,37 +31,37 @@
 
 | # | Test | Lines | Duration | Notes |
 |---|------|-------|----------|-------|
-| 1 | `array` | 7 | 0.9s |  |
+| 1 | `array` | 7 | 1.0s |  |
 | 2 | `bitmapdata/getPixel` | 2 | 0.8s |  |
 | 3 | `callee` | 2 | 0.8s |  |
 | 4 | `depth` | 6 | 0.8s |  |
-| 5 | `doactionorder/symbolclass` | 4 | 0.9s |  |
-| 6 | `externalinterface` | 4 | 0.9s |  |
-| 7 | `filters` | 149 | 1.3s |  |
-| 8 | `haxe/flocons1` | 2 | 0.9s |  |
-| 9 | `label` | 4 | 16.6s |  |
-| 10 | `levels` | 9 | 0.9s |  |
+| 5 | `doactionorder/symbolclass` | 4 | 1.0s |  |
+| 6 | `externalinterface` | 4 | 1.0s |  |
+| 7 | `filters` | 149 | 1.2s |  |
+| 8 | `haxe/flocons1` | 2 | 0.8s |  |
+| 9 | `label` | 4 | 18.0s |  |
+| 10 | `levels` | 9 | 1.0s |  |
 | 11 | `loadevent` | 9 | 1.1s |  |
 | 12 | `loadvariables/loadvariables` | 7 | 0.9s |  |
 | 13 | `lookup` | 3 | 0.9s |  |
 | 14 | `mouse-transparency` | 1 | 1.0s |  |
 | 15 | `nativeinheritance` | 6 | 0.9s |  |
-| 16 | `nested-button` | 1 | 16.4s |  |
+| 16 | `nested-button` | 1 | 16.7s |  |
 | 17 | `operations` | 13 | 0.9s |  |
 | 18 | `property-paths/property-paths-7` | 7 | 0.8s |  |
-| 19 | `propertycase/propertycase` | 7 | 0.9s |  |
-| 20 | `propertycase/propertycase-preserving-7` | 5 | 0.2s |  |
+| 19 | `propertycase/propertycase` | 7 | 0.8s |  |
+| 20 | `propertycase/propertycase-preserving-7` | 5 | 0.3s |  |
 | 21 | `rollover` | 4 | 1.0s |  |
 | 22 | `scope` | 14 | 0.9s |  |
-| 23 | `setinterval` | 20 | 0.9s |  |
+| 23 | `setinterval` | 20 | 1.0s |  |
 | 24 | `settimeout` | 17 | 0.9s |  |
-| 25 | `super` | 11 | 0.8s |  |
+| 25 | `super` | 11 | 0.9s |  |
 | 26 | `target` | 18 | 1.0s |  |
 | 27 | `text-bind` | 0 | 17.1s |  |
 | 28 | `undefined/undefined-swf6` | 39 | 0.9s |  |
-| 29 | `undefined/undefined-swf7` | 39 | 0.9s |  |
+| 29 | `undefined/undefined-swf7` | 39 | 0.8s |  |
 | 30 | `watch` | 2 | 0.9s |  |
-| 31 | `xml/xmlbuild` | 1 | 0.8s |  |
+| 31 | `xml/xmlbuild` | 1 | 0.9s |  |
 | 32 | `xml/xmlstring` | 9 | 0.8s |  |
 
 ## Near-Passing Tests
