@@ -1,10 +1,10 @@
 # Ruffle Test Results (Unfiltered)
 
-**Date**: 2026-04-16 19:22 UTC
+**Date**: 2026-04-16 20:33 UTC
 
-**Git SHA**: `ff1a394433`
+**Git SHA**: `4c09b6ad8e`
 
-**Run Duration**: 11m 52s
+**Run Duration**: 11m 49s
 
 ## Summary
 
@@ -40,44 +40,44 @@
 | 7 | `avm1/externalinterface` | 4 | 0.3s |  |
 | 8 | `avm1/filters` | 149 | 0.3s |  |
 | 9 | `avm1/haxe/flocons1` | 2 | 0.3s |  |
-| 10 | `avm1/label` | 4 | 16.0s |  |
+| 10 | `avm1/label` | 4 | 15.6s |  |
 | 11 | `avm1/levels` | 9 | 0.3s |  |
 | 12 | `avm1/loadevent` | 9 | 0.3s |  |
 | 13 | `avm1/loadvariables/loadvariables` | 7 | 0.3s |  |
 | 14 | `avm1/lookup` | 3 | 0.3s |  |
-| 15 | `avm1/mouse-transparency` | 1 | 16.3s |  |
-| 16 | `avm1/nativeinheritance` | 6 | 0.2s |  |
+| 15 | `avm1/mouse-transparency` | 1 | 15.5s |  |
+| 16 | `avm1/nativeinheritance` | 6 | 0.3s |  |
 | 17 | `avm1/nested-button` | 1 | 0.3s |  |
 | 18 | `avm1/operations` | 13 | 0.3s |  |
-| 19 | `avm1/property-paths/property-paths-7` | 7 | 0.2s |  |
-| 20 | `avm1/propertycase/propertycase` | 7 | 0.2s |  |
+| 19 | `avm1/property-paths/property-paths-7` | 7 | 0.3s |  |
+| 20 | `avm1/propertycase/propertycase` | 7 | 0.3s |  |
 | 21 | `avm1/propertycase/propertycase-preserving-7` | 5 | 0.3s |  |
-| 22 | `avm1/rollover` | 4 | 16.5s |  |
+| 22 | `avm1/rollover` | 4 | 16.0s |  |
 | 23 | `avm1/scope` | 14 | 0.3s |  |
 | 24 | `avm1/setinterval` | 20 | 0.3s |  |
 | 25 | `avm1/settimeout` | 17 | 0.3s |  |
 | 26 | `avm1/super` | 11 | 0.3s |  |
-| 27 | `avm1/target` | 18 | 0.2s |  |
+| 27 | `avm1/target` | 18 | 0.3s |  |
 | 28 | `avm1/text-bind` | 0 | 15.6s |  |
 | 29 | `avm1/undefined/undefined-swf6` | 39 | 0.3s |  |
-| 30 | `avm1/undefined/undefined-swf7` | 39 | 0.2s |  |
+| 30 | `avm1/undefined/undefined-swf7` | 39 | 0.3s |  |
 | 31 | `avm1/watch` | 2 | 0.3s |  |
 | 32 | `avm1/xml/xmlbuild` | 1 | 0.3s |  |
-| 33 | `avm1/xml/xmlstring` | 9 | 0.2s |  |
-| 34 | `avm1timeline1` | 3 | 13.0s |  |
-| 35 | `avm1timeline2` | 6 | 0.2s |  |
-| 36 | `button3` | 1 | 16.7s |  |
+| 33 | `avm1/xml/xmlstring` | 9 | 0.3s |  |
+| 34 | `avm1timeline1` | 3 | 15.3s |  |
+| 35 | `avm1timeline2` | 6 | 0.3s |  |
+| 36 | `button3` | 1 | 16.3s |  |
 | 37 | `doubleAndRegister` | 2 | 0.3s |  |
 | 38 | `fscommand1` | 1 | 0.3s |  |
-| 39 | `fuzz/0db0a01a92ae6ad0d2805dcfbac2ddf9a9689e77cd007924adfac57b543b1ed2` | 0 | 16.0s |  |
-| 40 | `fuzz/6f3b6cbd618b5b816edbf27e14f631aef42da1a4bcc467fb1aa2951d6c85ee48` | 0 | 15.9s |  |
-| 41 | `fuzz/9cad44804736a4fbd806d349c97b81d33c3f09ed4d9278acc4ef5cfbab147f3c` | 0 | 15.6s |  |
-| 42 | `gradientTransform` | 0 | 16.5s |  |
-| 43 | `invalidClipDepth` | 0 | 16.5s |  |
+| 39 | `fuzz/0db0a01a92ae6ad0d2805dcfbac2ddf9a9689e77cd007924adfac57b543b1ed2` | 0 | 15.1s |  |
+| 40 | `fuzz/6f3b6cbd618b5b816edbf27e14f631aef42da1a4bcc467fb1aa2951d6c85ee48` | 0 | 16.6s |  |
+| 41 | `fuzz/9cad44804736a4fbd806d349c97b81d33c3f09ed4d9278acc4ef5cfbab147f3c` | 0 | 15.2s |  |
+| 42 | `gradientTransform` | 0 | 15.7s |  |
+| 43 | `invalidClipDepth` | 0 | 15.6s |  |
 | 44 | `movieinfo1` | 3 | 0.3s |  |
-| 45 | `targetPath1` | 8 | 0.2s |  |
+| 45 | `targetPath1` | 8 | 0.3s |  |
 | 46 | `timeline/timeline_as2_2` | 3 | 0.3s |  |
-| 47 | `timeline/timeline_as2_3` | 3 | 15.8s |  |
+| 47 | `timeline/timeline_as2_3` | 3 | 15.3s |  |
 | 48 | `timeline/timeline_as2_4` | 2 | 15.7s |  |
 
 ## Ruffle-Matched Tests
@@ -86,7 +86,7 @@
 
 | # | Test | Our diffs | Ruffle diffs | Duration | Notes |
 |---|------|-----------|--------------|----------|-------|
-| 1 | `avm1/hitarea` | 2 | 2 | 16.1s |  |
+| 1 | `avm1/hitarea` | 2 | 2 | 15.0s |  |
 
 ## Near-Passing Tests
 
