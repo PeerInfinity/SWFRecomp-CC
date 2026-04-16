@@ -7,6 +7,11 @@ relevant specification.
 This is analogous to `avm1/_investigation/ACCEPTED_DIFFS.md` and
 `avm1/_investigation/RUFFLE_VS_FLASH_DIFFERENCES.md` — see those for the AVM1 pattern.
 
+For a separate category — tests whose **matched-line count jitters between
+runs** because the test consumes `Math.random()` — see `FLAKY_TESTS.md` in this
+directory. A small `matching_lines` wobble on a test listed there is noise, not
+a regression.
+
 ---
 
 ## Category 1: Gnash Implementation Bugs in Expected Output
