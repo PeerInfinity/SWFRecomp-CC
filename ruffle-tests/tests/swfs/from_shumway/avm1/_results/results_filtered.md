@@ -1,10 +1,10 @@
 # Ruffle Test Results (Filtered)
 
-**Date**: 2026-04-16 04:51 UTC
+**Date**: 2026-04-16 17:03 UTC
 
-**Git SHA**: `82a6ea07ad`
+**Git SHA**: `998e879af4`
 
-**Run Duration**: 15m 19s
+**Run Duration**: 15m 14s
 
 **Filtered**: 2 tests ignored out of 47 available
 
@@ -31,38 +31,38 @@
 
 | # | Test | Lines | Duration | Notes |
 |---|------|-------|----------|-------|
-| 1 | `array` | 7 | 19.9s |  |
-| 2 | `bitmapdata/getPixel` | 2 | 19.9s |  |
-| 3 | `callee` | 2 | 18.8s |  |
-| 4 | `depth` | 6 | 19.6s |  |
-| 5 | `doactionorder/symbolclass` | 4 | 19.4s |  |
-| 6 | `externalinterface` | 4 | 19.0s |  |
-| 7 | `filters` | 149 | 20.5s |  |
-| 8 | `haxe/flocons1` | 2 | 20.6s |  |
-| 9 | `label` | 4 | 19.2s |  |
-| 10 | `levels` | 9 | 19.2s |  |
-| 11 | `loadevent` | 9 | 21.1s |  |
-| 12 | `loadvariables/loadvariables` | 7 | 21.2s |  |
-| 13 | `lookup` | 3 | 19.1s |  |
-| 14 | `mouse-transparency` | 1 | 20.4s |  |
-| 15 | `nativeinheritance` | 6 | 19.1s |  |
-| 16 | `nested-button` | 1 | 19.2s |  |
-| 17 | `operations` | 13 | 15.4s |  |
-| 18 | `property-paths/property-paths-7` | 7 | 20.0s |  |
-| 19 | `propertycase/propertycase` | 7 | 20.0s |  |
-| 20 | `propertycase/propertycase-preserving-7` | 5 | 19.9s |  |
-| 21 | `rollover` | 4 | 19.4s |  |
+| 1 | `array` | 7 | 15.2s |  |
+| 2 | `bitmapdata/getPixel` | 2 | 15.2s |  |
+| 3 | `callee` | 2 | 19.2s |  |
+| 4 | `depth` | 6 | 19.3s |  |
+| 5 | `doactionorder/symbolclass` | 4 | 20.6s |  |
+| 6 | `externalinterface` | 4 | 18.9s |  |
+| 7 | `filters` | 149 | 20.0s |  |
+| 8 | `haxe/flocons1` | 2 | 20.0s |  |
+| 9 | `label` | 4 | 21.4s |  |
+| 10 | `levels` | 9 | 20.9s |  |
+| 11 | `loadevent` | 9 | 18.8s |  |
+| 12 | `loadvariables/loadvariables` | 7 | 19.0s |  |
+| 13 | `lookup` | 3 | 19.5s |  |
+| 14 | `mouse-transparency` | 1 | 19.2s |  |
+| 15 | `nativeinheritance` | 6 | 20.9s |  |
+| 16 | `nested-button` | 1 | 21.3s |  |
+| 17 | `operations` | 13 | 20.4s |  |
+| 18 | `property-paths/property-paths-7` | 7 | 19.3s |  |
+| 19 | `propertycase/propertycase` | 7 | 19.5s |  |
+| 20 | `propertycase/propertycase-preserving-7` | 5 | 19.0s |  |
+| 21 | `rollover` | 4 | 19.2s |  |
 | 22 | `scope` | 14 | 19.1s |  |
-| 23 | `setinterval` | 20 | 19.6s |  |
-| 24 | `settimeout` | 17 | 20.0s |  |
-| 25 | `super` | 11 | 15.3s |  |
-| 26 | `target` | 18 | 20.9s |  |
-| 27 | `text-bind` | 0 | 20.1s |  |
-| 28 | `undefined/undefined-swf6` | 39 | 20.9s |  |
-| 29 | `undefined/undefined-swf7` | 39 | 19.3s |  |
-| 30 | `watch` | 2 | 19.2s |  |
-| 31 | `xml/xmlbuild` | 1 | 19.1s |  |
-| 32 | `xml/xmlstring` | 9 | 20.0s |  |
+| 23 | `setinterval` | 20 | 19.8s |  |
+| 24 | `settimeout` | 17 | 19.5s |  |
+| 25 | `super` | 11 | 19.0s |  |
+| 26 | `target` | 18 | 18.9s |  |
+| 27 | `text-bind` | 0 | 19.1s |  |
+| 28 | `undefined/undefined-swf6` | 39 | 19.7s |  |
+| 29 | `undefined/undefined-swf7` | 39 | 20.4s |  |
+| 30 | `watch` | 2 | 19.6s |  |
+| 31 | `xml/xmlbuild` | 1 | 19.2s |  |
+| 32 | `xml/xmlstring` | 9 | 19.3s |  |
 
 ## Near-Passing Tests
 
