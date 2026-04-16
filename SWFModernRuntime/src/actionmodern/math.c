@@ -260,8 +260,14 @@ static int32_t RandomPureHasher(int32_t iSeed) {
 static int32_t GenerateRandomNumber(TRandomFast *pRandomFast) {
 	// Initialize if needed (first call or uninitialized)
 	if (pRandomFast->uValue == 0) {
-		// Use time-based seed for first initialization
+#ifdef MOCK_DATE_TIME
+		// Deterministic seed matching Ruffle's test/deterministic mode:
+		// Ruffle's avm_rng seeds from get_current_date_time().timestamp_micros()
+		// as u32. MOCK_DATE_TIME is in milliseconds, so multiply by 1000.
+		RandomFastInit(pRandomFast, (uint32_t)((int64_t)(MOCK_DATE_TIME) * 1000LL));
+#else
 		RandomFastInit(pRandomFast, (uint32_t)time(NULL));
+#endif
 	}
 
 	int32_t aNum = RandomFastNext(pRandomFast);
