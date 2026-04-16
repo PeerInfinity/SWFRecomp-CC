@@ -13,6 +13,56 @@
 
 ---
 
+## UPDATE: April 15, 2026
+
+### Upstream PRs — Prelude SWF, ECMA-262, Math Moved to AS2
+
+Major architectural shift: upstream now implements AS2 standard library classes in **ActionScript** (compiled via MTASC to a prelude SWF) rather than in C. New repos: [SWFRecomp/AS2Runtime](https://github.com/SWFRecomp/AS2Runtime), [SWFRecomp/mtasc](https://github.com/SWFRecomp/mtasc).
+
+#### New Commits Since Last Update
+
+**SWFRecomp PR #4** — now 14 commits (was 10):
+- `5081630` - remove extra indents
+- `de58faa` - **implement prelude SWF recompilation** — `prelude_swf_path` config, `parsePrelude()`, `DoInitAction` (tag 59), separate SWF loading/parsing
+- `65b035d` - **add Less2**, add `y` and `z` string IDs
+- `2656636` - cleanup, **add Add2**
+
+**SWFModernRuntime PR #3** — now 31 commits (was 26):
+- `c559193` - **implement prelude runtime SWF support** — `ASSetPropFlags` top-level function, `SWFAppContext.version`, version-aware `actionNot()`, `convertBool()`, scoped registers, boolean ActionVar field
+- `29564ef` - add `unimplemented`/`unreachable` macros
+- `420c627` - **refactor prototypes and getProperty**
+- `7af14f6` - fix anonymous function types
+- `ba336f9` - **ECMA-262 ToNumber**, **Less2**, `PUSH_INT`/`PUSH_BOOL` macros, `destroyObject()`, **remove Math** (moved to AS2Runtime), fix refcount bug with registers
+
+**AS2Runtime** — 4 commits:
+- `fd51fbb` - init repo
+- `6fdf335` - add README
+- `154bc8e` - fix Linux build permissions
+- `f7fcab3` - use `-recompruntime` flag to exclude RecompInclude
+
+#### Architectural Shift: Hybrid C + AS2 Runtime
+
+Upstream is moving to a **hybrid architecture**:
+- **Core opcodes and infrastructure** remain in C (SWFModernRuntime)
+- **Standard library classes** (Math, etc.) implemented in ActionScript 2, compiled via MTASC to a prelude SWF (AS2Runtime)
+- **Prelude SWF** is loaded by the recompiler before the user's SWF via `prelude_swf_path` config
+- **DoInitAction** (tag 59) handles MTASC class registration (`__Packages`)
+- **ASSetPropFlags** controls property enumeration flags
+
+This is different from our approach (everything in C) but potentially more maintainable — class implementations are written in the same language they represent, and changes don't require recompiling the C runtime.
+
+#### Updated Architectural Comparison
+
+| Aspect | Upstream | Our Fork |
+|--------|----------|----------|
+| Standard library | AS2 via prelude SWF (Math moved out of C) | All in C (~50K lines action.c) |
+| Class registration | DoInitAction + MTASC `__Packages` | Inline registration in `initGlobalObject()` |
+| Property flags | ASSetPropFlags (AS2-callable) | `setPropertyWithFlags()` in C |
+| Type coercion | ECMA-262 ToNumber (`ba336f9`) | `varToDouble()`/`convertFloat()` |
+| Opcodes added | Less2, Add2 | Full set (~100+ opcodes) |
+
+---
+
 ## UPDATE: March 17, 2026
 
 ### Upstream Objects & Functions PRs — GC Implementation Added
@@ -36,7 +86,7 @@ LittleCube has added **garbage collection** to the runtime PR (commit `f02311c`,
 
 #### Updated PR Status
 
-**SWFRecomp PR #4** — now 10 commits (was 5):
+**SWFRecomp PR #4** — 10 commits as of March 17 (now 14, see April update):
 - Previous 5 commits (objects and functions infrastructure)
 - `c7348af` - remove arg initial strings, add null/undefined push values
 - `3a30821` - **implement pushing f64s** — `ACTION_STACK_VALUE_F64 = 6`, reads two 32-bit values into 64-bit hex literal
@@ -44,7 +94,7 @@ LittleCube has added **garbage collection** to the runtime PR (commit `f02311c`,
 - `124933f` - **implement DefineFunction2** — `Function2Param` struct (reg + string_id), register tracking maps, `ACTION_STACK_VALUE_REGISTER = 4`, initial strings `"_root"`/`"_parent"`/`"arguments"`/`"super"`, config refactor
 - `a54734d` - remove extra tabs in script limits
 
-**SWFModernRuntime PR #3** — now 21 commits (was 14):
+**SWFModernRuntime PR #3** — 26 commits as of March 17 (now 31, see April update):
 - Previous 14 commits (objects and functions infrastructure)
 - `f02311c` - **first attempt at garbage collection** (concurrent GC with cycle detection)
 - `f1d2da9` - move free thread functions to separate file (`free_thread.c`/`free_thread.h`)
