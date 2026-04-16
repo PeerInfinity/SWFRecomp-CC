@@ -58,3 +58,4 @@ Since our actual diff has the four right *contents* but wrong *order*, fixing is
 
 - AVM1 tests already fixed for similar ordering: `execution_order3`, `goto_execution_order2`, `on_construct`, `register_and_init_order`. Our runtime generally gets this right. This specific test exposes a remaining corner case when the *root*'s DoAction is what triggers the nested-sprite placement.
 - `known_failure` mechanism: see `complete/RUFFLE_KNOWN_FAILURE_HANDLING_PLAN.md`.
+- `from_shumway/_investigation/incomplete/SHUMWAY_FUZZ_TIMELINE_PLAN.md` covers `timeline/timeline_as2_1` and `timeline/timeline_as2_5`, which exhibit the same sprite/root DoAction ordering topic. Expect that investigation to co-fix these tests.
