@@ -1,8 +1,8 @@
 {
   "metadata": {
-    "timestamp": "2026-04-16T17:04:34.468984+00:00",
-    "git_sha": "998e879af4ba67924e252636681a4a8e1dbc3ab5",
-    "duration_seconds": 59.83,
+    "timestamp": "2026-04-16T17:46:27.627461+00:00",
+    "git_sha": "a218080f6e4ea02180371a4f2f2e00d1e84f2118",
+    "duration_seconds": 23.23,
     "total_available": 3
   },
   "total": 3,
@@ -18,13 +18,18 @@
   "tests": [
     {
       "test": "global_instance_decls",
+      "phases": {
+        "recomp": 0.0,
+        "compile": 20.867,
+        "run": 0.029
+      },
       "num_frames": 1,
       "lines": {
         "actual_lines": 873,
         "expected_lines": 853,
         "matching_lines": 587
       },
-      "duration": 20.2,
+      "duration": 20.9,
       "status": "output_mismatch",
       "detail": "286 line(s) differ (actual=873, expected=853)",
       "actual_output": "... (567 lines before) ...\n  resolve, DONT_ENUM, type=[function]\n_global.System.security.__constructor__, instance=[[object Object]], type=[object]\n  __proto__, own, type=[object]\n  __constructor__, own, type=[function]\n_global.System.Product, instance=[[object Object]], type=[object]\n  __proto__, own, READ_ONLY, DONT_DELETE, type=[object]\n  __constructor__, own, type=[function]\n_global.Video, instance=[[object Object]], type=[object]\n  __proto__, own, type=[object]\n  __constructor__, own, type=[function]\n_global.Stage, instance=[undefined], type=[undefined]\n_global.TextFormat, instance=[[object Object]], type=[object]\n  __proto__, own, type=[object]\n  __constructor__, own, type=[function]\n  font, DONT_ENUM, type=[undefined]\n  size, DONT_ENUM, READ_ONLY, type=[undefined]\n  color, DONT_ENUM, READ_ONLY, type=[undefined]\n  url, DONT_ENUM, type=[undefined]\n  target, DONT_ENUM, type=[undefined]\n  bold, DONT_ENUM, READ_ONLY, type=[undefined]\n  italic, DONT_ENUM, READ_ONLY, type=[undefined]\n  underline, DONT_ENUM, READ_ONLY, type=[undefined]\n  align, DONT_ENUM, READ_ONLY, type=[undefined]\n  leftMargin, DONT_ENUM, READ_ONLY, type=[undefined]\n  rightMargin, DONT_ENUM, READ_ONLY, type=[undefined]\n  indent, DONT_ENUM, READ_ONLY, type=[undefined]\n  leading, DONT_ENUM, READ_ONLY, type=[undefined]\n  blockIndent, DONT_ENUM, READ_ONLY, type=[undefined]\n  tabStops, DONT_ENUM, READ_ONLY, type=[undefined]\n  bullet, DONT_ENUM, READ_ONLY, type=[undefined]\n  display, DONT_ENUM, READ_ONLY, type=[undefined]\n_global.TextField, instance=[[object Object]], type=[object]\n  __proto__, own, type=[object]\n  __constructor__, own, type=[function]\n  gridFitType, DONT_ENUM, READ_ONLY, type=[undefined]\n  antiAliasType, DONT_ENUM, READ_ONLY, type=[undefined]\n  thickness, DONT_ENUM, READ_ONLY, type=[undefined]\n  sharpness, DONT_ENUM, READ_ONLY, type=[undefined]\n  filters, DONT_ENUM, READ_ONLY, type=[undefined]\n  scroll, DONT_ENUM, READ_ONLY, type=[undefined]\n  maxscroll, DONT_ENUM, READ_ONLY, type=[undefined]\n  borderColor, DONT_ENUM, READ_ONLY, type=[undefined]\n  backgroundColor, DONT_ENUM, READ_ONLY, type=[undefined]\n  textColor, DONT_ENUM, READ_ONLY, type=[undefined]\n  tabIndex, DONT_ENUM, READ_ONLY, type=[undefined]\n  autoSize, DONT_ENUM, READ_ONLY, type=[undefined]\n  text, DONT_ENUM, READ_ONLY, type=[undefined]\n  type, DONT_ENUM, READ_ONLY, type=[undefined]\n  htmlText, DONT_ENUM, READ_ONLY, type=[undefined]\n  variable, DONT_ENUM, READ_ONLY, type=[undefined]\n... (256 lines after) ...",
@@ -32,13 +37,18 @@
     },
     {
       "test": "global_proto_decls",
+      "phases": {
+        "recomp": 0.0,
+        "compile": 1.117,
+        "run": 0.025
+      },
       "num_frames": 1,
       "lines": {
         "actual_lines": 3762,
         "expected_lines": 3714,
         "matching_lines": 2734
       },
-      "duration": 19.88,
+      "duration": 1.15,
       "status": "output_mismatch",
       "detail": "1028 line(s) differ (actual=3762, expected=3714)",
       "actual_output": "... (516 lines before) ...\nTesting _global.System\n  privateBytes, own, READ_ONLY, type=[number]\n  IME, own, type=[object]\n  setClipboard, own, type=[function]\n  security, own, type=[object]\n  useCodepage, own, type=[boolean]\n  exactSettings, own, type=[boolean]\n  showSettings, own, type=[function]\n  Product, own, type=[function]\n  capabilities, own, type=[object]\n  __proto__, own, type=[object]\n  constructor, own, type=[function]\nTesting _global.System.privateBytes\nTesting _global.System.IME\n  _listeners, own, DONT_ENUM, READ_ONLY, type=[object]\n  removeListener, own, DONT_ENUM, READ_ONLY, type=[function]\n  addListener, own, DONT_ENUM, READ_ONLY, type=[function]\n  broadcastMessage, own, DONT_ENUM, READ_ONLY, type=[function]\n  doConversion, own, DONT_ENUM, READ_ONLY, type=[function]\n  setCompositionString, own, DONT_ENUM, READ_ONLY, type=[function]\n  setConversionMode, own, DONT_ENUM, READ_ONLY, type=[function]\n  getConversionMode, own, DONT_ENUM, READ_ONLY, type=[function]\n  setEnabled, own, DONT_ENUM, READ_ONLY, type=[function]\n  getEnabled, own, DONT_ENUM, READ_ONLY, type=[function]\n  ALPHANUMERIC_FULL, own, DONT_ENUM, READ_ONLY, type=[string]\n  ALPHANUMERIC_HALF, own, DONT_ENUM, READ_ONLY, type=[string]\n  CHINESE, own, DONT_ENUM, READ_ONLY, type=[string]\n  JAPANESE_HIRAGANA, own, DONT_ENUM, READ_ONLY, type=[string]\n  JAPANESE_KATAKANA_FULL, own, DONT_ENUM, READ_ONLY, type=[string]\n  JAPANESE_KATAKANA_HALF, own, DONT_ENUM, READ_ONLY, type=[string]\n  KOREAN, own, DONT_ENUM, READ_ONLY, type=[string]\n  UNKNOWN, own, DONT_ENUM, READ_ONLY, type=[string]\n  __proto__, own, READ_ONLY, type=[object]\n  constructor, own, READ_ONLY, type=[function]\nTesting _global.System.IME._listeners\nTesting _global.System.IME.removeListener\n  prototype, own, DONT_ENUM, type=[object]\n  __proto__, own, type=[object]\n  constructor, own, type=[function]\nTesting _global.System.IME.removeListener.prototype\n  __proto__, own, type=[object]\n  constructor, own, type=[function]\nTesting _global.System.IME.addListener\n  prototype, own, DONT_ENUM, type=[object]\n  __proto__, own, type=[object]\n  constructor, own, type=[function]\nTesting _global.System.IME.addListener.prototype\n  __proto__, own, type=[object]\n  constructor, own, type=[function]\nTesting _global.System.IME.broadcastMessage\n... (3196 lines after) ...",
@@ -46,13 +56,18 @@
     },
     {
       "test": "global_proto_decls_delete",
+      "phases": {
+        "recomp": 0.0,
+        "compile": 0.977,
+        "run": 0.009
+      },
       "num_frames": 1,
       "lines": {
         "actual_lines": 907,
         "expected_lines": 874,
         "matching_lines": 351
       },
-      "duration": 19.57,
+      "duration": 0.99,
       "status": "output_mismatch",
       "detail": "556 line(s) differ (actual=907, expected=874)",
       "actual_output": "... (326 lines before) ...\n  UNKNOWN, DONT_DELETE\n  __proto__, DONT_DELETE\n  constructor, DONT_DELETE\nTesting _global.System.setClipboard\nTesting _global.System.security.PolicyFileResolver\n  prototype, DONT_DELETE\nTesting _global.System.security.PolicyFileResolver.prototype\nTesting _global.System.security.sandboxType\nTesting _global.System.security.escapeDomain\nTesting _global.System.security.chooseLocalSwfPath\nTesting _global.System.security.loadPolicyFile\nTesting _global.System.security.allowInsecureDomain\nTesting _global.System.security.allowDomain\nTesting _global.System.security.__constructor__\n  prototype, DONT_DELETE\nTesting _global.System.security.__constructor__.prototype\n  constructor, DONT_DELETE\nTesting _global.System.security\n  __proto__, DONT_DELETE\nTesting _global.System.useCodepage\nTesting _global.System.exactSettings\nTesting _global.System.showSettings\nTesting _global.System.Product\n  prototype, DONT_DELETE\nTesting _global.System.Product.prototype\nTesting _global.System.capabilities._internal\nTesting _global.System.capabilities.supports64BitProcesses\nTesting _global.System.capabilities.supports32BitProcesses\nTesting _global.System.capabilities.hasIME\nTesting _global.System.capabilities.language\nTesting _global.System.capabilities.cpuAddressSize\nTesting _global.System.capabilities.cpuArchitecture\nTesting _global.System.capabilities.os\nTesting _global.System.capabilities.manufacturer\nTesting _global.System.capabilities.isEmbeddedInAcrobat\nTesting _global.System.capabilities.maxLevelIDC\nTesting _global.System.capabilities.windowlessDisable\nTesting _global.System.capabilities.localFileReadDisable\nTesting _global.System.capabilities.avHardwareDisable\nTesting _global.System.capabilities.playerType\nTesting _global.System.capabilities.isDebugger\nTesting _global.System.capabilities.hasScreenBroadcast\nTesting _global.System.capabilities.hasScreenPlayback\nTesting _global.System.capabilities.hasPrinting\nTesting _global.System.capabilities.hasEmbeddedVideo\nTesting _global.System.capabilities.hasStreamingVideo\nTesting _global.System.capabilities.hasStreamingAudio\nTesting _global.System.capabilities.version\nTesting _global.System.capabilities.serverString\nTesting _global.System.capabilities.hasAudio\n... (531 lines after) ...",
