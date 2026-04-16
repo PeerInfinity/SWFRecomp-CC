@@ -49,7 +49,7 @@ The original 30 AVM2/AS3 tests (listed in `ignored_tests.txt`) are no longer in 
 
 **Status from earlier**: 9 original tests fixed (2026-04-10/11): scope, settimeout, setinterval, watch, nested-button, nativeinheritance, array, target, + drag_drop AVM1 regression fix. Original 3 remaining: hitarea (Ruffle known_failure), moviecliploader (blocked on multi-SWF loading), filters (blocked on mc.filters getter). See `complete/SHUMWAY_AVM1_PLAN.md`.
 
-**New work**: 12 filtered failures come from the newly-added category sub-trees. Needs fresh triage — no investigation docs yet for `duplicateMovieClip/`, `propertycase/`, `xml/`, `bitmapdata/`, `doactionorder/`, `haxe/`, `loadvariables/`, `property-paths/`, `textfield/`, `undefined/`.
+**New work**: 12 filtered failures come from the newly-added category sub-trees. Triaged in `incomplete/SHUMWAY_AVM1_SUBTREES_PLAN.md` (2026-04-16) — 10 clusters grouped by feature (duplicateMovieClip, textfield, property-paths / propertycase, haxe, doactionorder, loadvariables, bitmapdata/loadBitmap, xml/xmlload, moviecliploader).
 
 ## Related Documents
 

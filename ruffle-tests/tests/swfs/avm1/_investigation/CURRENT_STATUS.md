@@ -141,7 +141,7 @@ No crashes or segfaults remain. All previous crashes have been fixed.
 
 ### New `bitmap_data_thorough/*` sub-test cluster (20 tests)
 
-Created by splitting the monolithic `bitmap_data_thorough` test into per-method sub-tests. Most have very low match rates — this is a systematic thoroughness suite that stresses many BitmapData edge cases at once.
+Triaged in `incomplete/BITMAP_DATA_THOROUGH_PLAN.md` (2026-04-16). Most have very low match rates (2-7%) because a shared-harness variable resolution bug cascades through the output — the plan hypothesizes that frame-script `var` declarations written inside nested functions don't update the timeline MC's dynamic_props slot, leaving `disposedBmd`/`transparentBmd`/`opaqueBmd` as `undefined` inside `valueToString`. Fixing that alone is expected to lift most sub-tests above 80%.
 
 | Sub-test | Match Rate | Matching | Total | Likely root cause |
 |----------|------------|----------|-------|-------------------|
@@ -170,7 +170,7 @@ The low match rates (most under 5%) suggest a systematic issue rather than per-m
 
 | Test | Notes |
 |------|-------|
-| `depth_replacement_audio_unloading` | Recompiler rejects SWF. Test has `child.swf` + `sound.mp3`. Needs investigation in `SWFRecomp/src/action/action.cpp`. |
+| `depth_replacement_audio_unloading` | Triaged in `incomplete/DEPTH_REPLACEMENT_AUDIO_UNLOADING_PLAN.md` (2026-04-16). Root cause: `verify_output.py:generate_child_movie_file()` only extracts `transform_data` from the child's draws.c, not `sound_data`. Fix is a ~30-line extension. First AVM1 test with a DefineSound in a child SWF. |
 
 ## Near-Passing Tests (previously)
 

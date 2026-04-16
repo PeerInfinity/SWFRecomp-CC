@@ -1,5 +1,5 @@
 # Shumway AVM1 Subdirectory Tests Plan
-<!-- TESTS: scope, nativeinheritance, hitarea, nested-button, settimeout, setinterval, array, target, moviecliploader, filters, watch -->
+<!-- TESTS: scope, nativeinheritance, hitarea, nested-button, settimeout, setinterval, array, target, moviecliploader, filters, watch, avm1/scope, avm1/nativeinheritance, avm1/hitarea, avm1/nested-button, avm1/settimeout, avm1/setinterval, avm1/array, avm1/target, avm1/moviecliploader, avm1/filters, avm1/watch -->
 
 <!-- PLAN_META
 id: SHUMWAY_AVM1
