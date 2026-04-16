@@ -1,10 +1,10 @@
 # Ruffle Test Results (Filtered)
 
-**Date**: 2026-04-16 22:06 UTC
+**Date**: 2026-04-16 22:43 UTC
 
-**Git SHA**: `053677eade`
+**Git SHA**: `4c539f9568`
 
-**Run Duration**: 1m 35s
+**Run Duration**: 1m 31s
 
 **Filtered**: 2 tests ignored out of 47 available
 
@@ -31,38 +31,38 @@
 
 | # | Test | Lines | Duration | Notes |
 |---|------|-------|----------|-------|
-| 1 | `array` | 7 | 0.3s |  |
-| 2 | `bitmapdata/getPixel` | 2 | 0.3s |  |
-| 3 | `callee` | 2 | 0.3s |  |
-| 4 | `depth` | 6 | 0.4s |  |
+| 1 | `array` | 7 | 0.2s |  |
+| 2 | `bitmapdata/getPixel` | 2 | 0.2s |  |
+| 3 | `callee` | 2 | 0.2s |  |
+| 4 | `depth` | 6 | 0.2s |  |
 | 5 | `doactionorder/symbolclass` | 4 | 0.3s |  |
 | 6 | `externalinterface` | 4 | 0.3s |  |
-| 7 | `filters` | 149 | 0.3s |  |
-| 8 | `haxe/flocons1` | 2 | 0.3s |  |
-| 9 | `label` | 4 | 16.1s |  |
-| 10 | `levels` | 9 | 0.4s |  |
-| 11 | `loadevent` | 9 | 0.4s |  |
-| 12 | `loadvariables/loadvariables` | 7 | 0.3s |  |
-| 13 | `lookup` | 3 | 0.3s |  |
+| 7 | `filters` | 149 | 0.2s |  |
+| 8 | `haxe/flocons1` | 2 | 0.2s |  |
+| 9 | `label` | 4 | 14.8s |  |
+| 10 | `levels` | 9 | 0.3s |  |
+| 11 | `loadevent` | 9 | 0.3s |  |
+| 12 | `loadvariables/loadvariables` | 7 | 0.2s |  |
+| 13 | `lookup` | 3 | 0.2s |  |
 | 14 | `mouse-transparency` | 1 | 0.3s |  |
-| 15 | `nativeinheritance` | 6 | 0.3s |  |
-| 16 | `nested-button` | 1 | 15.3s |  |
-| 17 | `operations` | 13 | 0.3s |  |
-| 18 | `property-paths/property-paths-7` | 7 | 0.3s |  |
-| 19 | `propertycase/propertycase` | 7 | 0.3s |  |
-| 20 | `propertycase/propertycase-preserving-7` | 5 | 0.3s |  |
+| 15 | `nativeinheritance` | 6 | 0.2s |  |
+| 16 | `nested-button` | 1 | 15.9s |  |
+| 17 | `operations` | 13 | 0.2s |  |
+| 18 | `property-paths/property-paths-7` | 7 | 0.2s |  |
+| 19 | `propertycase/propertycase` | 7 | 0.2s |  |
+| 20 | `propertycase/propertycase-preserving-7` | 5 | 0.2s |  |
 | 21 | `rollover` | 4 | 0.3s |  |
-| 22 | `scope` | 14 | 0.3s |  |
+| 22 | `scope` | 14 | 0.2s |  |
 | 23 | `setinterval` | 20 | 0.3s |  |
-| 24 | `settimeout` | 17 | 0.3s |  |
-| 25 | `super` | 11 | 0.3s |  |
+| 24 | `settimeout` | 17 | 0.2s |  |
+| 25 | `super` | 11 | 0.2s |  |
 | 26 | `target` | 18 | 0.3s |  |
-| 27 | `text-bind` | 0 | 16.1s |  |
-| 28 | `undefined/undefined-swf6` | 39 | 0.3s |  |
+| 27 | `text-bind` | 0 | 15.2s |  |
+| 28 | `undefined/undefined-swf6` | 39 | 0.2s |  |
 | 29 | `undefined/undefined-swf7` | 39 | 0.3s |  |
-| 30 | `watch` | 2 | 0.3s |  |
-| 31 | `xml/xmlbuild` | 1 | 0.4s |  |
-| 32 | `xml/xmlstring` | 9 | 0.3s |  |
+| 30 | `watch` | 2 | 0.2s |  |
+| 31 | `xml/xmlbuild` | 1 | 0.2s |  |
+| 32 | `xml/xmlstring` | 9 | 0.2s |  |
 
 ## Near-Passing Tests
 
