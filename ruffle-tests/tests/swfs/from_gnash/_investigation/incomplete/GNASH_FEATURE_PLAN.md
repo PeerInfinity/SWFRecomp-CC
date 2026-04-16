@@ -22,8 +22,49 @@ dependencies: []
 blockers: []
 -->
 
-Last updated: 2026-04-15 (Phase 3 in progress — Transform-v6/v7 passing,
-Matrix-v7 ruffle_matched)
+Last updated: 2026-04-15 (Phase 3 in progress — primitive auto-boxing,
+convertFloat FUNCTION valueOf)
+
+## 2026-04-15 session 2 (primitive auto-boxing + convertFloat FUNCTION valueOf)
+
+Two fixes in `SWFModernRuntime/src/actionmodern/action.c`:
+
+1. **Primitive auto-boxing in actionGetMember** — When GetMember receives a
+   primitive number (F32/F64) or boolean, look up properties on
+   Number.prototype / Boolean.prototype via `getPrimitiveWrapperProto()`.
+   Handles Flash's auto-boxing semantics: `var a = 1; typeof(a.toString)`
+   returns 'function', `a.__proto__` returns Number.prototype. Previously
+   returned undefined for all property access on primitives.
+
+2. **convertFloat FUNCTION valueOf dispatch** — The OBJECT/FUNCTION/ARRAY
+   valueOf dispatch in `convertFloat` was missing a FUNCTION handler. When
+   `STACK_TOP_TYPE == ACTION_STACK_VALUE_FUNCTION`, `obj` was NULL, so
+   custom valueOf on function objects was never invoked during toNumber
+   coercion (e.g., `obj = function(){}; obj.valueOf = function(){ return 9 };
+   toNumber(obj)` returned NaN instead of 9). Now sets `obj = fn->own_props`.
+
+**Impact on Number tests:**
+- Number-v7: 9→4 failures (5 lines fixed: 3 auto-boxing + 2 valueOf dispatch)
+- Number-v8: 9→4 failures (5 lines fixed)
+- Number-v6: 15→8 failures (7 lines fixed)
+- Number-v5: 21→14 failures (7 lines fixed)
+
+Remaining 4 per-test failures are float precision (last-digit rounding at
+e-308 and e-6). C's `%.14e` and Flash disagree on the 15th sig digit for
+`0x0008E0A3A2DE80EB` — C produces `1.23456789123456e-308` while Flash
+produces `1.23456789123457e-308`. The exact double has its 16th sig digit
+at `4`, but Flash rounds up. This is likely a difference in the
+double-to-string algorithm (David Gay's dtoa vs glibc snprintf).
+
+**Broader impact:** ~2 lines improved across AsBroadcaster, Instance,
+Rectangle, ContextMenu, HitTest, Matrix, TextFormat, and other tests that
+access `__proto__` or methods on primitive values.
+
+No regressions on avm1 suite (string_coercion, mutable_this, this_scoping,
+textsnapshot_available_text, global_is_bare, enumerate, array_enumerate,
+register_class_return_value, text_format, add, as2_super_and_this_v6,
+swf5_no_closure, set_interval, goto_frame, unload, selection).
+No regressions on misc-mtasc (function_test, exception, inheritance, hello).
 
 ## 2026-04-15 session (flash package version-hiding)
 
@@ -701,10 +742,29 @@ The old Enumerate opcode (SWF5 for-in) wasn't checking the scope chain for varia
 
 **Impact**: toString_valueOf-v6/v7/v8 each +2 lines (parseInt lines fixed). Also improves any test using `parseInt(obj)` with custom toString.
 
+### 3m: Primitive auto-boxing in GetMember — DONE (2026-04-15)
+
+Primitive number (F32/F64) and boolean property access now looks up properties on
+Number.prototype / Boolean.prototype via `getPrimitiveWrapperProto()`. Fixes
+`typeof(1 .toString) == 'function'` and `(1).__proto__ == Number.prototype`.
+
+**Impact**: Number-v7/v8 each -5 diffs, Number-v5/v6 each -7 diffs. Also ~2 lines
+improved across AsBroadcaster, Instance, Rectangle, ContextMenu, HitTest, Matrix,
+TextFormat, and other tests.
+
+### 3n: convertFloat FUNCTION valueOf dispatch — DONE (2026-04-15)
+
+The FUNCTION case in convertFloat's valueOf dispatch was missing — `obj` stayed NULL
+so custom valueOf on function objects was never invoked. Now sets `obj = fn->own_props`.
+Fixes `toNumber(funcWithCustomValueOf)` returning NaN instead of the valueOf result.
+
+**Impact**: Number-v7/v8 +2 lines (val == 9 tests), cascading improvements.
+
 ### Phase 3 remaining work:
-- **Number wrapper valueOf override**: `new Number(10)` wrapper doesn't dispatch custom valueOf (1 line per Number test)
-- **Number float precision**: last-digit rounding at e-308 (4 lines per Number test)
-- **toString_valueOf dispatch**: valueOf/toString not called during implicit coercion in some paths (~18 diffs per v6/v7/v8)
+- ~~**Number wrapper valueOf override**: `new Number(10)` wrapper doesn't dispatch custom valueOf~~ (DONE — 3m auto-boxing fix)
+- **Number float precision**: last-digit rounding at e-308 (4 lines per Number test) — platform difference in dtoa algorithm, likely unfixable
+- ~~**convertFloat SWF6 NaN threshold**~~: DONE. Changed fallback from `SWF<7→0.0` to `SWF<6→0.0` (Flash returns NaN for object-to-number starting at SWF6, not SWF7). Note: toString fallback was NOT implemented — Flash does not call toString during toNumber (unlike ECMA-262).
+- **toString_valueOf dispatch**: valueOf/toString not called during implicit coercion in some paths (~13 diffs per v6/v7/v8)
 - **enumerate child MC type**: child MCs returned as 'number' instead of 'movieclip' (12 diffs per enumerate test)
 - **enumerate hasOwnProperty**: child MCs stored in dynamic_props → hasOwnProperty returns true (6 diffs per enumerate test)
 - **with auto-boxing**: `with(number)` should auto-box to Number.prototype scope (not addressed)

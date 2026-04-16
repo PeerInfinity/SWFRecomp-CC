@@ -2,6 +2,20 @@
 
 Last updated: 2026-04-15 (Phase 3 work in progress)
 
+### Latest fixes (2026-04-15, session 2 — not yet in CI)
+- **Primitive auto-boxing in GetMember** — Primitive number (F32/F64) and
+  boolean property access now looks up properties on Number.prototype /
+  Boolean.prototype via `getPrimitiveWrapperProto()`. Handles Flash's
+  auto-boxing: `typeof(1 .toString) == 'function'` and
+  `(1).__proto__ == Number.prototype`. Number-v7/v8 each -5 diffs,
+  Number-v5/v6 each -7 diffs. ~2 lines improved across many other tests.
+- **convertFloat FUNCTION valueOf dispatch** — The FUNCTION case in
+  convertFloat was missing an obj handler, so custom valueOf on function
+  objects was never invoked during toNumber. Number-v7/v8 +2 lines each.
+- **convertFloat SWF6+ NaN threshold** — Object-to-number fallback changed
+  from `SWF<7→0.0` to `SWF<6→0.0` (Flash returns NaN starting at SWF6).
+  **Color-v6 → PASS** (+1 test). Number-v6: 8→4 failures.
+
 ### Latest fixes (2026-04-15, not yet in CI)
 - **TextFormat-v5/v6 → PASS (+2).** Three fixes to TextFormat in
   `SWFModernRuntime/src/actionmodern/action.c`: (1) `tfCoerceAlign` is now
