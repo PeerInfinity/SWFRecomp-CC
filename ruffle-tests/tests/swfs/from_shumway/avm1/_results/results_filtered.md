@@ -1,10 +1,10 @@
 # Ruffle Test Results (Filtered)
 
-**Date**: 2026-04-16 20:33 UTC
+**Date**: 2026-04-16 21:11 UTC
 
-**Git SHA**: `4c09b6ad8e`
+**Git SHA**: `f42c9fc230`
 
-**Run Duration**: 1m 34s
+**Run Duration**: 1m 33s
 
 **Filtered**: 2 tests ignored out of 47 available
 
@@ -34,12 +34,12 @@
 | 1 | `array` | 7 | 0.3s |  |
 | 2 | `bitmapdata/getPixel` | 2 | 0.3s |  |
 | 3 | `callee` | 2 | 0.3s |  |
-| 4 | `depth` | 6 | 0.3s |  |
+| 4 | `depth` | 6 | 0.4s |  |
 | 5 | `doactionorder/symbolclass` | 4 | 0.3s |  |
 | 6 | `externalinterface` | 4 | 0.3s |  |
 | 7 | `filters` | 149 | 0.3s |  |
 | 8 | `haxe/flocons1` | 2 | 0.3s |  |
-| 9 | `label` | 4 | 15.8s |  |
+| 9 | `label` | 4 | 15.2s |  |
 | 10 | `levels` | 9 | 0.3s |  |
 | 11 | `loadevent` | 9 | 0.3s |  |
 | 12 | `loadvariables/loadvariables` | 7 | 0.3s |  |
@@ -49,7 +49,7 @@
 | 16 | `nested-button` | 1 | 15.6s |  |
 | 17 | `operations` | 13 | 0.3s |  |
 | 18 | `property-paths/property-paths-7` | 7 | 0.3s |  |
-| 19 | `propertycase/propertycase` | 7 | 0.3s |  |
+| 19 | `propertycase/propertycase` | 7 | 0.2s |  |
 | 20 | `propertycase/propertycase-preserving-7` | 5 | 0.3s |  |
 | 21 | `rollover` | 4 | 0.3s |  |
 | 22 | `scope` | 14 | 0.3s |  |
@@ -57,7 +57,7 @@
 | 24 | `settimeout` | 17 | 0.3s |  |
 | 25 | `super` | 11 | 0.3s |  |
 | 26 | `target` | 18 | 0.3s |  |
-| 27 | `text-bind` | 0 | 16.8s |  |
+| 27 | `text-bind` | 0 | 15.1s |  |
 | 28 | `undefined/undefined-swf6` | 39 | 0.3s |  |
 | 29 | `undefined/undefined-swf7` | 39 | 0.3s |  |
 | 30 | `watch` | 2 | 0.3s |  |
