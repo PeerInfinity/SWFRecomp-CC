@@ -1245,6 +1245,7 @@ def compile_native(test_dir, num_frames, build_dir, headless=False, has_image_co
     core_sources = [
         "src/actionmodern/action.c",
         "src/actionmodern/math.c",
+        "src/actionmodern/date.c",
         "src/actionmodern/variables.c",
         "src/actionmodern/object.c",
         "src/actionmodern/unicode_case_tables.h",
@@ -1558,6 +1559,7 @@ def compile_wasm(test_dir, num_frames, build_dir):
     core_sources = [
         "src/actionmodern/action.c",
         "src/actionmodern/math.c",
+        "src/actionmodern/date.c",
         "src/actionmodern/variables.c",
         "src/actionmodern/object.c",
         "src/actionmodern/unicode_case_tables.h",

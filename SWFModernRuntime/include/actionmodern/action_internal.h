@@ -14,6 +14,17 @@
 // Simple-function pointer (Function2Ptr is already in action.h)
 typedef void (*SimpleFunctionPtr)(SWFAppContext* app_context);
 
+// Function-call recursion depth. Incremented on entry to a user-defined
+// function and decremented on exit. Used by EFFECTIVE_SWF_VERSION() below
+// and by various SWF4/5-gated code paths.
+extern u32 g_call_depth;
+
+// Effective SWF version (accounts for function context).
+// In Flash, DefineFunction (SWF5 opcode) causes code inside functions to
+// behave as SWF5+ even in a SWF4 file. When inside a function call
+// (g_call_depth > 0) and g_swf_version < 5, we promote to 5.
+#define EFFECTIVE_SWF_VERSION() ((g_swf_version < 5 && g_call_depth > 0) ? 5 : g_swf_version)
+
 // ------------------------------------------------------------------
 // ASFunction — built-in and user-defined function object.
 // Used by all subsystem files; definition lives here so every .c in
@@ -71,6 +82,16 @@ void popVar(SWFAppContext* app_context, ActionVar* var);
 ActionStackValueType convertFloat(SWFAppContext* app_context);
 double varToDoubleSWF(SWFAppContext* app_context, ActionVar* v, int swf_version);
 
+// Simple SWF5-style number coercion (no hex/octal, no valueOf call).
+// Used by Date argument coercion alongside varToDoubleSWF.
+double varToDoubleSimple(ActionVar* v);
+
+// UTF-8 → malloc-allocated UTF-16 conversion. Returned pointer owns
+// its buffer (freed via ActionVar refcount semantics or explicit free).
+// Uses plain malloc (not the heap arena) so long-lived strings don't
+// exhaust it.
+uint16_t* utf8_to_u16(SWFAppContext* app_context, const char* utf8, u32 byte_len, u32* out_u16_len);
+
 // Coerce first min(arg_count,max_args) args to f64 via pushVar/convertFloat/popVar
 // (calls valueOf on objects). Used by Math builtins, ASnative, and Date.
 void coerceMathArgs(SWFAppContext* app_context, ActionVar* args, u32 arg_count, u32 max_args);
@@ -97,3 +118,9 @@ void setObjectProto(SWFAppContext* app_context, ASObject* obj);
 // Make __proto__ READ_ONLY on an object (after setObjectProto established it).
 // Used for singleton globals (Accessibility, Key, Math, Mouse, Selection, etc.)
 void makeProtoReadOnly(ASObject* obj);
+
+// Register a native ASFunction in the global function_registry so
+// lookupFunctionByName() can find it. Bounds-checked; silently no-ops
+// if the registry is full. Used by subsystem files (date.c, etc.)
+// carved out of action.c.
+void registerNativeFunction(ASFunction* fn);
