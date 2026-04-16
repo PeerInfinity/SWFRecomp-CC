@@ -22424,6 +22424,11 @@ ActionStackValueType convertFloat(SWFAppContext* app_context)
 			ASObject* obj = NULL;
 			if (STACK_TOP_TYPE == ACTION_STACK_VALUE_OBJECT)
 				obj = (ASObject*) STACK_TOP_VALUE;
+			else if (STACK_TOP_TYPE == ACTION_STACK_VALUE_FUNCTION) {
+				// Functions have own_props for property storage
+				ASFunction* fn = (ASFunction*) STACK_TOP_VALUE;
+				if (fn != NULL) obj = fn->own_props;
+			}
 			else if (STACK_TOP_TYPE == ACTION_STACK_VALUE_ARRAY) {
 				// ASArray has a different struct layout — use props sub-object
 				ASArray* arr = (ASArray*) STACK_TOP_VALUE;
@@ -41418,9 +41423,36 @@ void actionGetMember(SWFAppContext* app_context)
 
 		pushUndefined(app_context);
 	}
+	else if (obj_var.type == ACTION_STACK_VALUE_F32 ||
+	         obj_var.type == ACTION_STACK_VALUE_F64 ||
+	         obj_var.type == ACTION_STACK_VALUE_BOOLEAN)
+	{
+		// Primitive number/boolean property access: look up on Number/Boolean.prototype
+		// This handles cases like: var a = 1; typeof(a.toString) == 'function'
+		// Flash auto-boxes primitives for property access.
+		if (prop_name_len == 9 && strncmp(prop_name, "__proto__", 9) == 0) {
+			// a.__proto__ returns Number/Boolean.prototype
+			ASObject* proto = getPrimitiveWrapperProto(obj_var.type);
+			if (proto != NULL) {
+				PUSH(ACTION_STACK_VALUE_OBJECT, (u64)proto);
+			} else {
+				pushUndefined(app_context);
+			}
+		} else {
+			ASObject* proto = getPrimitiveWrapperProto(obj_var.type);
+			if (proto != NULL) {
+				ActionVar* prop = getPropertyWithPrototype(proto, prop_name, prop_name_len);
+				if (prop != NULL) {
+					pushVar(app_context, prop);
+					return;
+				}
+			}
+			pushUndefined(app_context);
+		}
+	}
 	else
 	{
-		// Other primitive types (number, undefined, etc.) - push undefined
+		// Other primitive types (undefined, null, etc.) - push undefined
 		pushUndefined(app_context);
 	}
 }
