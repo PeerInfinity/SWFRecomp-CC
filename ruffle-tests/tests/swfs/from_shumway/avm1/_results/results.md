@@ -1,10 +1,10 @@
 # Ruffle Test Results (Unfiltered)
 
-**Date**: 2026-04-16 01:25 UTC
+**Date**: 2026-04-16 04:51 UTC
 
-**Git SHA**: `6004ee88e4`
+**Git SHA**: `82a6ea07ad`
 
-**Run Duration**: 15m 13s
+**Run Duration**: 15m 19s
 
 ## Summary
 
@@ -32,37 +32,37 @@
 | # | Test | Lines | Duration | Notes |
 |---|------|-------|----------|-------|
 | 1 | `array` | 7 | 19.9s |  |
-| 2 | `bitmapdata/getPixel` | 2 | 19.5s |  |
-| 3 | `callee` | 2 | 20.9s |  |
+| 2 | `bitmapdata/getPixel` | 2 | 19.9s |  |
+| 3 | `callee` | 2 | 18.8s |  |
 | 4 | `depth` | 6 | 19.6s |  |
-| 5 | `doactionorder/symbolclass` | 4 | 20.2s |  |
-| 6 | `externalinterface` | 4 | 18.9s |  |
-| 7 | `filters` | 149 | 19.3s |  |
-| 8 | `haxe/flocons1` | 2 | 19.1s |  |
-| 9 | `label` | 4 | 15.9s |  |
-| 10 | `levels` | 9 | 16.3s |  |
-| 11 | `loadevent` | 9 | 19.6s |  |
-| 12 | `loadvariables/loadvariables` | 7 | 19.6s |  |
-| 13 | `lookup` | 3 | 18.9s |  |
-| 14 | `mouse-transparency` | 1 | 20.6s |  |
+| 5 | `doactionorder/symbolclass` | 4 | 19.4s |  |
+| 6 | `externalinterface` | 4 | 19.0s |  |
+| 7 | `filters` | 149 | 20.5s |  |
+| 8 | `haxe/flocons1` | 2 | 20.6s |  |
+| 9 | `label` | 4 | 19.2s |  |
+| 10 | `levels` | 9 | 19.2s |  |
+| 11 | `loadevent` | 9 | 21.1s |  |
+| 12 | `loadvariables/loadvariables` | 7 | 21.2s |  |
+| 13 | `lookup` | 3 | 19.1s |  |
+| 14 | `mouse-transparency` | 1 | 20.4s |  |
 | 15 | `nativeinheritance` | 6 | 19.1s |  |
-| 16 | `nested-button` | 1 | 19.1s |  |
-| 17 | `operations` | 13 | 19.6s |  |
-| 18 | `property-paths/property-paths-7` | 7 | 18.7s |  |
-| 19 | `propertycase/propertycase` | 7 | 18.7s |  |
-| 20 | `propertycase/propertycase-preserving-7` | 5 | 19.8s |  |
-| 21 | `rollover` | 4 | 19.5s |  |
-| 22 | `scope` | 14 | 20.2s |  |
-| 23 | `setinterval` | 20 | 19.2s |  |
-| 24 | `settimeout` | 17 | 19.2s |  |
-| 25 | `super` | 11 | 19.3s |  |
-| 26 | `target` | 18 | 19.5s |  |
-| 27 | `text-bind` | 0 | 19.7s |  |
-| 28 | `undefined/undefined-swf6` | 39 | 19.8s |  |
-| 29 | `undefined/undefined-swf7` | 39 | 19.1s |  |
-| 30 | `watch` | 2 | 19.6s |  |
-| 31 | `xml/xmlbuild` | 1 | 18.9s |  |
-| 32 | `xml/xmlstring` | 9 | 19.6s |  |
+| 16 | `nested-button` | 1 | 19.2s |  |
+| 17 | `operations` | 13 | 15.4s |  |
+| 18 | `property-paths/property-paths-7` | 7 | 20.0s |  |
+| 19 | `propertycase/propertycase` | 7 | 20.0s |  |
+| 20 | `propertycase/propertycase-preserving-7` | 5 | 19.9s |  |
+| 21 | `rollover` | 4 | 19.4s |  |
+| 22 | `scope` | 14 | 19.1s |  |
+| 23 | `setinterval` | 20 | 19.6s |  |
+| 24 | `settimeout` | 17 | 20.0s |  |
+| 25 | `super` | 11 | 15.3s |  |
+| 26 | `target` | 18 | 20.9s |  |
+| 27 | `text-bind` | 0 | 20.1s |  |
+| 28 | `undefined/undefined-swf6` | 39 | 20.9s |  |
+| 29 | `undefined/undefined-swf7` | 39 | 19.3s |  |
+| 30 | `watch` | 2 | 19.2s |  |
+| 31 | `xml/xmlbuild` | 1 | 19.1s |  |
+| 32 | `xml/xmlstring` | 9 | 20.0s |  |
 
 ## Ruffle-Matched Tests
 
@@ -70,7 +70,7 @@
 
 | # | Test | Our diffs | Ruffle diffs | Duration | Notes |
 |---|------|-----------|--------------|----------|-------|
-| 1 | `hitarea` | 2 | 2 | 19.1s |  |
+| 1 | `hitarea` | 2 | 2 | 22.3s |  |
 
 ## Near-Passing Tests
 
