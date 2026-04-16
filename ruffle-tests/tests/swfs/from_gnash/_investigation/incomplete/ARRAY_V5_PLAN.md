@@ -1,9 +1,9 @@
 # array-v5 Investigation Plan
 <!-- TESTS: array-v5 -->
 
-Last updated: 2026-04-04
+Last updated: 2026-04-16
 
-## Status: IN PROGRESS — 450/560 lines match (80.4%), 110 remaining failures
+## Status: IN PROGRESS — 460/560 lines match (82.1%), 100 remaining failures
 
 ---
 
@@ -21,6 +21,8 @@ The `array-v5` test exercises extensive Array operations (560 expected lines). C
 | 2026-03-29 (session) | 440/560 (78.6%) | +18 lines: HOLE sort, concat/splice densify, sortOn UNIQUESORT fix |
 | 2026-04-04 (CI) | 448/560 (80.0%) | +8 vs prior: includes inter-session fixes; this session: dual Array constructor prototype unification (+3 local) |
 | 2026-04-05 (session) | 450/560 (80.4%) | +2 net: ASnative class 252 implementation (constructor + prototype methods) |
+| 2026-04-11 (CI)       | 459/560 (82.0%) | +9 vs 2026-04-05: cumulative effect of unrelated fixes landing (primitive auto-boxing, convertFloat NaN threshold, etc.) |
+| 2026-04-16 (session) | 460/560 (82.1%) | +1: `actionToInteger` now wraps via `ecmaToInt32` (matches Ruffle `coerce_to_i32`) so `int(-2147483649) === 2147483647` instead of saturating to INT_MIN |
 
 ## Completed Fixes
 
@@ -60,7 +62,27 @@ Added `g_call_this_type` global and dispatch logic in `builtin_array_method` so 
 ### 12. ASnative Class 252 (Array) — FIXED (commit eddd9b98)
 Implemented ASnative(252, 0) as a callable Array constructor, plus indices 1-12 for all Array.prototype methods. The constructor creates properly initialized arrays with prototype chain set up via `initArrayProto()`. Fixes lines 34-36: `typeof(f) == 'function'`, `typeof(a) == 'object'`, `typeof(a.pop) == 'function'`.
 
-## Remaining Failures (110 lines, categorized)
+### 13. actionToInteger ECMA wrapping — FIXED (2026-04-16)
+`actionToInteger` (ActionToInteger opcode, emitted by `int(x)`) now wraps via
+`ecmaToInt32` instead of using a direct `(int32_t)d` cast, which was UB /
+saturating for out-of-range doubles. Matches Ruffle's `coerce_to_i32` /
+`f64_to_wrapping_i32`. Fixes line 132: `c[int(-2147483649)] == undefined`
+— previously `int(-2147483649)` saturated to INT_MIN on x86 and hit the
+previously-stored `c[-2147483648] = "lowest int"`; now it wraps to 2147483647,
+which is undefined. +1 line. No regressions on `action_to_integer`,
+`parse_int`, `typeof`.
+
+## Ruffle-matched assessment (2026-04-16)
+
+`array-v5` is marked `known_failure = true` in its upstream `test.toml` and has
+an `output.ruffle.txt` reference. Our diffs against `output.txt` (100) are
+still **not** a subset of Ruffle's diffs (30), so the `verify_output.py`
+subset-match cannot auto-promote this test to `ruffle_matched`. Bridging the
+gap needs either (a) closing most of the remaining categories below, or
+(b) discovering that a subset of our diffs aligns exactly with Ruffle's and
+accepting the rest.
+
+## Remaining Failures (100 lines, categorized)
 
 ### Category A: typeof(f) == "undefined" — FIXED (3 lines)
 **Lines**: 34-36 — `typeof(f)` where `f = ASnative(252, 0)` (Array constructor)

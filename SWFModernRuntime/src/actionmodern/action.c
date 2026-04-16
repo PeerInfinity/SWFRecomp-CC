@@ -21888,13 +21888,11 @@ void actionToInteger(SWFAppContext* app_context)
 	popVar(app_context, &v);
 
 	double d = varToDouble(&v);
-	double result;
-
-	if (isnan(d) || isinf(d)) {
-		result = 0.0;
-	} else {
-		result = (double)(int32_t)d;
-	}
+	// ECMA ToInt32 wrapping (matches Ruffle `coerce_to_i32`): NaN/Inf → 0,
+	// otherwise wrap into [-2^31, 2^31). Direct C cast on out-of-range doubles
+	// is UB/saturating; ecmaToInt32 performs the spec-compliant wrap that
+	// lets `int(-2147483649) === 2147483647`.
+	double result = (double)ecmaToInt32(d);
 
 	PUSH(ACTION_STACK_VALUE_F64, VAL(u64, &result));
 }
