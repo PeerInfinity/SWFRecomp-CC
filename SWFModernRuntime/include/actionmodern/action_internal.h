@@ -92,6 +92,27 @@ double varToDoubleSimple(ActionVar* v);
 // exhaust it.
 uint16_t* utf8_to_u16(SWFAppContext* app_context, const char* utf8, u32 byte_len, u32* out_u16_len);
 
+// UTF-16 → UTF-8 into caller-provided buffer. Returns bytes written
+// (not including NUL). Pair of utf8_to_u16.
+int u16_to_utf8(const uint16_t* u16, u32 u16_len, char* out, int out_size);
+
+// Return the u16 character pointer for an ActionVar of STRING type
+// (handles both heap-owned and ID-based storage). Returns NULL for
+// non-strings or empty/zero-size strings.
+const uint16_t* varGetU16Ptr(ActionVar* v);
+
+// Push an UNDEFINED ActionVar onto the VM stack.
+void pushUndefined(SWFAppContext* app_context);
+
+// Convert the top-of-stack value to STRING in place. Used whenever a
+// builtin needs to read a string from whatever the caller passed
+// (including objects with toString).
+ActionStackValueType convertString(SWFAppContext* app_context, char* var_str);
+
+// Flush a deferred onChanged handler queued by replaceSel, if any.
+// Timer tick hook — called from processTimers after each timer fires.
+void actionFlushPendingOnChanged(SWFAppContext* app_context);
+
 // Coerce first min(arg_count,max_args) args to f64 via pushVar/convertFloat/popVar
 // (calls valueOf on objects). Used by Math builtins, ASnative, and Date.
 void coerceMathArgs(SWFAppContext* app_context, ActionVar* args, u32 arg_count, u32 max_args);
