@@ -124,3 +124,39 @@ void makeProtoReadOnly(ASObject* obj);
 // if the registry is full. Used by subsystem files (date.c, etc.)
 // carved out of action.c.
 void registerNativeFunction(ASFunction* fn);
+
+// ------------------------------------------------------------------
+// Call-dispatch state (exposed so subsystem files carved out of
+// action.c can inline call-dispatch patterns without duplicating the
+// storage or the push/pop bookkeeping).
+// ------------------------------------------------------------------
+
+// WITH scope chain + function local scope
+#define MAX_SCOPE_DEPTH 32
+extern ASObject* scope_chain[MAX_SCOPE_DEPTH];
+extern u8 scope_is_with[MAX_SCOPE_DEPTH];
+extern MovieClip* scope_mc[MAX_SCOPE_DEPTH];
+extern u32 scope_depth;
+
+// Per-call-frame `this` binding stack (GetVariable("this") checks this
+// before the scope chain).
+#define MAX_THIS_DEPTH 64
+extern ActionVar g_this_stack[MAX_THIS_DEPTH];
+extern u32 g_this_depth;
+
+// MovieClip receiver context for clip-event handlers; consumed by
+// DefineFunction2 preload_this so generated code sees MC type.
+extern MovieClip* g_event_this_mc;
+
+// MovieClip currently executing (targetClip/base_clip interaction).
+extern MovieClip* g_current_context;
+
+// Super context stack — (this, depth, mc) triple tracks prototype
+// chain position for super() / super.method() resolution.
+void pushSuperContextWithMC(void* this_obj, u8 depth, void* mc);
+void popSuperContext(void);
+
+// Constructor context stack — marks whether the active call is a
+// constructor invocation (changes return-value semantics).
+void pushCtorContext(u8 is_constructor);
+void popCtorContext(void);
