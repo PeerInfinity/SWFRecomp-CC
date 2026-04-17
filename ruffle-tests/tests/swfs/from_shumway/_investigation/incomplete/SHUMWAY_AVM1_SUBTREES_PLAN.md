@@ -283,3 +283,85 @@ Both parts together: +2 tests in `from_shumway/avm1/` (to 46/47 = 97.9% filtered
 ## Handoff
 
 This plan is actionable in `incomplete/` — a future session can pick up either part independently. Each part has a baseline-verified root cause, a specific file:line change list, a named canary test set, and a sequencing order.
+
+---
+
+## Implementation progress — 2026-04-17 session
+
+### Part B — landed (commit `1a1bf852`)
+
+Two-bucket MCL queue + top-of-tick promotion + final drain + soft tick cap. All 25 MCL canaries green. `from_shumway/avm1/moviecliploader` improved from 1/7 to 6/7 matching lines; last line (`loadee frame 2`) blocked by a separate pre-existing gap — the loadee child SWF's frame functions aren't advanced on subsequent ticks after `actionFirePendingLoadInits` runs frame_0. Needs a mechanism (see Part C below) that ticks the child MC's own timeline on each subsequent tick.
+
+### Part A — attempted A2, reverted
+
+Implemented:
+1. Recompiler emitted each root `SWF_TAG_DO_ACTION` call inline at tag position (advancing `last_queued_script` to keep the three flush loops as no-ops).
+2. Runtime added an eager Phase 2 block at the end of `tagPlaceObject2` / `tagPlaceObject2Ratio` that called `process_sprite_init_at_depth` for `sprite_needs_init==2` at top level + `!catch_up_mode` + `!g_defer_sprite_init`.
+
+Outcome: `from_shumway/avm1/doactionorder/doactionorder` improved from 3/7 to 6/7, but the single remaining diff revealed the **fundamental incompatibility of Approach A2 with Ruffle's model**. 6 tests from the RUFFLE_VS_FLASH_DIFFERENCES.md:17–27 canary list regressed:
+
+| Test | Why |
+|---|---|
+| `execution_order1` | Root DoAction B reads sprite property set by nested DoAction — A2 runs sprite Phase 2 too early |
+| `execution_order4` | Same class of ordering — parent/nested-child visibility |
+| `clip_events` | CLIP_EVENT_LOAD fires at a different point relative to root DoAction |
+| `register_and_init_order` | RegisterClass constructor ordering interacts with Phase 2 |
+| `variable_args` | `arguments` object visibility in sprite DoAction depends on Phase 2 position |
+| `define_function2_preload_order` | Preload register layout depends on script execution relative to placements |
+
+**Key insight from `doactionorder` diff**: even the target test isn't fully fixed by A2. The expected output has `sym1: _level0.sym1` on line 2 — root1's first access to `sym1` sees the sprite already placed. Under Ruffle's model (`~/CC/ruffle/core/src/display_object/movie_clip.rs:1282–1492`) ALL tags are processed (placements immediate, DoActions queued) BEFORE the queue drains. So by the time root1 runs, sym1 has been placed. A2's inline-execution of root DoAction runs it BEFORE the subsequent `PlaceObject2`, so sym1 isn't placed yet → `sym1: undefined`.
+
+A2 changes reverted. Current state matches Part B only.
+
+### Part A — revised plan: **Approach A3 (true ActionQueue)**
+
+The only implementation that actually matches Ruffle's semantics is a unified FIFO ActionQueue. Concretely:
+
+1. **Runtime** (`SWFModernRuntime/src/actionmodern/action.c` or a new `action_queue.c`):
+   ```c
+   typedef void (*ScriptFunc)(SWFAppContext*);
+   void actionQueueScript(ScriptFunc fn);   // push onto FIFO
+   void actionDrainActionQueue(SWFAppContext*);  // pop & run until empty
+   ```
+   Static array-backed queue (MAX ~64). Drain processes re-queued scripts too.
+
+2. **Recompiler** (`SWFRecomp/src/swf.cpp`):
+   - In `SWF_TAG_DO_ACTION` (line 2527), emit `actionQueueScript(script_<N>);` inline at tag position (NOT a direct call).
+   - In sprite `SWF_TAG_DO_ACTION` inside `SWF_TAG_DEFINE_SPRITE` (line 4914), also emit `actionQueueScript(script_<N>);` — and REMOVE the current `if (!catch_up_mode) script_<N>(app_context);` pattern. The queue itself becomes the gate: queueing happens during Phase 1, and scripts run only when the drain is invoked.
+   - At `SWF_TAG_SHOW_FRAME` (line 850), emit `actionDrainActionQueue(app_context);` BEFORE `tagShowFrame`.
+   - Also drain at `SWF_TAG_END_TAG` / early-exit.
+   - Remove the three flush loops at lines 548–556, 807–815, 861–868.
+
+3. **Runtime — sprite Phase 2 removal**:
+   - `process_sprite_init_at_depth` currently re-runs sprite frame_0 with `g_script_only_mode=1` to execute scripts. Under A3, scripts queue themselves during Phase 1 so there's no need for Phase 2 frame_funcs[0] re-run. But the other Phase 2 side effects (CLIP_EVENT_LOAD, `actionQueueMCOnLoad`, `sprite_initialized=1`, `process_sprite_needs_init` child recurse) still need to happen.
+   - Factor them into a separate `finalize_sprite_after_placement` helper called from `tagPlaceObject2` (once, at top level) AND keep `process_sprite_init_at_depth` callable from the goto 3-phase paths.
+
+4. **Goto catch-up interaction**:
+   - During `catch_up_mode`, `actionQueueScript` should queue BUT never drain inside the catch-up. Intermediate frames' scripts go into the queue, but before draining, they should be discarded? Or: gate queueing itself on `!catch_up_mode`. This is probably the right move since the existing `!catch_up_mode` gate in sprite frame bodies protects against catch-up script execution. Preserve that: emit `if (!catch_up_mode || g_tag_skip_mode) actionQueueScript(script_<N>);` for root DoActions, and `if (!catch_up_mode) actionQueueScript(script_<N>);` for sprite DoActions.
+   - `g_tag_skip_mode` = target-frame-replay mode. Scripts need to queue there (and drain at that frame's ShowFrame). Current recompiler already uses this gate correctly.
+
+5. **`tagShowFrame` changes**:
+   - Between `actionFirePendingUnloads` and `process_sprite_needs_init`, add `actionDrainActionQueue(app_context)` as a safety drain for any queued scripts from within tag processing. (Or move the drain to a single call site in the recompiler-emitted frame function right before `tagShowFrame`.)
+   - `process_sprite_needs_init` still runs to handle onLoad / queueMCOnLoad / sprite_initialized upgrades for sprites placed during this frame.
+
+### Recommended next session sequence
+
+1. Implement Runtime queue API (~50 lines).
+2. Implement Recompiler changes (~30 lines of edits to swf.cpp).
+3. Run the 6-test canary set (`execution_order{1,4}`, `clip_events`, `register_and_init_order`, `variable_args`, `define_function2_preload_order`) to verify A3 matches their expectations.
+4. Run `from_shumway/avm1/doactionorder/doactionorder` — expect 7/7.
+5. Run `from_shumway/avm1/moviecliploader` — still 6/7 (Part C addresses the last line).
+6. Run the rest of the AVM1 canary set. Expect `stage_object_enumerate` to flip to pass.
+7. Commit. Trigger full CI. Verify no net regressions.
+
+### Part C (new) — child-SWF multi-frame advance
+
+Blocker for `from_shumway/avm1/moviecliploader` line 7 (`loadee frame 2`). After Phase 2 of `actionFirePendingLoadInits` runs `entry->init_func` + `entry->frame_funcs[0]` in the target MC's context, there's no mechanism for `entry->frame_funcs[1..N-1]` to run on subsequent ticks. The target MC needs its `sprite_frame_funcs` + `sprite_frame_count` bound to `entry`'s frame functions, and `sprite_is_playing` set, so `advance_sprite_frames` picks it up.
+
+Rough sketch: in `actionFirePendingLoadInits` Phase 2, after running `frame_funcs[0]`, also set:
+- `target_mc->sprite_frame_funcs = entry->frame_funcs`
+- `target_mc->sprite_frame_count = entry->frame_count`
+- `target_mc->sprite_current_frame = 1` (next tick runs frame_funcs[1])
+- `target_mc->sprite_is_playing = 1`
+
+Or equivalently — pre-create a synthetic DisplayObject in parent's DL that points at `entry`'s frame functions. Verify against `loadmovie_replace_root` and `loadmovie_var_persistence` which work today without multi-frame advance because their tests don't poke at it.

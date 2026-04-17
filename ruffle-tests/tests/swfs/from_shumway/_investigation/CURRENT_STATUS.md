@@ -88,10 +88,10 @@ Last updated: 2026-04-17 (CI run at db6a0198)
 
 ## Still Failing (2 in `avm1/`, both also at flat)
 
-See `incomplete/SHUMWAY_AVM1_SUBTREES_PLAN.md` for the fix plan (Part A + Part B, recommended landing order B→A).
+See `incomplete/SHUMWAY_AVM1_SUBTREES_PLAN.md` for the fix plan and current implementation progress.
 
-- `doactionorder/doactionorder` (3/7) — recompiler batches root DoAction calls at ShowFrame instead of emitting them inline in tag order. Ruffle queues DoAction and sprite scripts FIFO across sources; our model runs all root scripts first and sprite scripts at ShowFrame. Plan: emit root DoActions inline + run sprite Phase 2 eagerly at `tagPlaceObject2`. 4 canary tests (`execution_order1`, `execution_order2`, `variable_args`, `define_function2_preload_order`). May also fix `stage_object_enumerate`.
-- `moviecliploader` (1/7) — `onLoadStart`/`onLoadComplete` fire synchronously during the same `tagShowFrame` as `loadMovie`/`loadClip`, but should defer one frame tick so the loader's next-frame tag scripts run first. Plan: two-bucket MCL queue with top-of-tick promotion in `swf_core.c`. 25 MCL/loadMovie canaries, low observed regression risk.
+- `doactionorder/doactionorder` (3/7) — UNCHANGED. Part A Approach A2 (eager Phase 2 at `tagPlaceObject2` + inline root DoAction emission) was attempted on 2026-04-17 and reverted: it regressed 6 canary tests (`execution_order1/4`, `clip_events`, `register_and_init_order`, `variable_args`, `define_function2_preload_order`) because it doesn't match Ruffle's true FIFO ActionQueue semantics — Ruffle processes all tags (placements synchronously, scripts queued) BEFORE the queue drains. Plan updated to Approach A3 (unified runtime ActionQueue with recompiler emitting `actionQueueScript` instead of direct calls). See plan file for step-by-step.
+- `moviecliploader` (1/7 → 6/7) — Part B landed (commit `1a1bf852`): two-bucket MCL queue with top-of-tick promotion. Events now fire on the tick AFTER loadClip. Last line (`loadee frame 2`) still missing — requires child-SWF multi-frame advance (Part C of plan), orthogonal to the deferral fix. All 25 MCL/loadMovie canaries green.
 
 ---
 
