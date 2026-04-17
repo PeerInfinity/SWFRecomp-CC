@@ -9539,39 +9539,49 @@ static ActionVar bitmapDataCopyChannel(SWFAppContext* app_context, ActionVar* ar
     (void)registers;
     ASObject* obj = (ASObject*) this_obj;
     BitmapDataNative* dest_bmp = getBitmapNative(obj);
-    ActionVar r = {0}; r.type = ACTION_STACK_VALUE_UNDEFINED;
+    ActionVar r = {0};
+    // Ruffle codes: -1 (<5 args / disposed dest / success), -2 (src not bitmap),
+    // -3 (src disposed), -4 (rect missing x/y/w/h). Invalid channel → no-op, -1.
+    if (arg_count < 5) { r = makeF64(-1); return r; }
     if (!dest_bmp || dest_bmp->disposed) { r = makeF64(-1); return r; }
-    if (arg_count < 5) return r;
-    // arg0: source BitmapData, arg1: sourceRect, arg2: destPoint, arg3: sourceChannel, arg4: destChannel
-    if (args[0].type != ACTION_STACK_VALUE_OBJECT) return r;
+    if (args[0].type != ACTION_STACK_VALUE_OBJECT) { r = makeF64(-2); return r; }
     ASObject* src_obj = (ASObject*) args[0].data.numeric_value;
+    if (!src_obj || src_obj->native_type != NATIVE_BITMAPDATA) { r = makeF64(-2); return r; }
     BitmapDataNative* src_bmp = getBitmapNative(src_obj);
-    if (!src_bmp || src_bmp->disposed) return r;
-    if (args[1].type != ACTION_STACK_VALUE_OBJECT) return r;
+    if (!src_bmp) { r = makeF64(-2); return r; }
+    if (src_bmp->disposed) { r = makeF64(-3); return r; }
+    if (args[1].type != ACTION_STACK_VALUE_OBJECT) { r = makeF64(-4); return r; }
     ASObject* src_rect = (ASObject*) args[1].data.numeric_value;
-    if (!src_rect) return r;
-    if (args[2].type != ACTION_STACK_VALUE_OBJECT) return r;
-    ASObject* dest_pt = (ASObject*) args[2].data.numeric_value;
-    if (!dest_pt) return r;
-    int src_channel = (int)varToDoubleSimple(&args[3]);
-    int dest_channel = (int)varToDoubleSimple(&args[4]);
-    // Validate channels (must be power of 2: 1, 2, 4, or 8)
-    if (src_channel != 1 && src_channel != 2 && src_channel != 4 && src_channel != 8) return r;
-    if (dest_channel != 1 && dest_channel != 2 && dest_channel != 4 && dest_channel != 8) return r;
-    // Read rect and point
-    ActionVar* srx = getProperty(src_rect, "x", 1);
-    ActionVar* sry = getProperty(src_rect, "y", 1);
-    ActionVar* srw = getProperty(src_rect, "width", 5);
-    ActionVar* srh = getProperty(src_rect, "height", 6);
-    int rx = srx ? (int)varToDoubleSimple(srx) : 0;
-    int ry = sry ? (int)varToDoubleSimple(sry) : 0;
-    int rw = srw ? (int)varToDoubleSimple(srw) : 0;
-    int rh = srh ? (int)varToDoubleSimple(srh) : 0;
-    ActionVar* dpx = getProperty(dest_pt, "x", 1);
-    ActionVar* dpy = getProperty(dest_pt, "y", 1);
-    int dx = dpx ? (int)varToDoubleSimple(dpx) : 0;
-    int dy = dpy ? (int)varToDoubleSimple(dpy) : 0;
-    // Copy channel
+    if (!src_rect) { r = makeF64(-4); return r; }
+    ActionVar* srx = getPropertyWithPrototype(src_rect, "x", 1);
+    ActionVar* sry = getPropertyWithPrototype(src_rect, "y", 1);
+    ActionVar* srw = getPropertyWithPrototype(src_rect, "width", 5);
+    ActionVar* srh = getPropertyWithPrototype(src_rect, "height", 6);
+    if (!srx || !sry || !srw || !srh) { r = makeF64(-4); return r; }
+    int rx = (int)tsArgToDouble_ctx(app_context, srx);
+    int ry = (int)tsArgToDouble_ctx(app_context, sry);
+    int rw = (int)tsArgToDouble_ctx(app_context, srw);
+    int rh = (int)tsArgToDouble_ctx(app_context, srh);
+    // destPoint: null/undefined/non-object → (0,0)
+    int dx = 0, dy = 0;
+    if (args[2].type == ACTION_STACK_VALUE_OBJECT) {
+        ASObject* dest_pt = (ASObject*) args[2].data.numeric_value;
+        if (dest_pt != NULL) {
+            ActionVar* dpx = getPropertyWithPrototype(dest_pt, "x", 1);
+            ActionVar* dpy = getPropertyWithPrototype(dest_pt, "y", 1);
+            if (dpx) dx = (int)tsArgToDouble_ctx(app_context, dpx);
+            if (dpy) dy = (int)tsArgToDouble_ctx(app_context, dpy);
+        }
+    }
+    int src_channel = (int)tsArgToDouble_ctx(app_context, &args[3]);
+    int dest_channel = (int)tsArgToDouble_ctx(app_context, &args[4]);
+    // Channel shifts: 1=R(16), 2=G(8), 4=B(0), 8=A(24). Invalid src → read 0.
+    // Invalid dest → preserve pixel unchanged (Ruffle's `_ => original_color`).
+    int src_shift = -1, dst_shift = -1;
+    switch (src_channel) { case 1: src_shift = 16; break; case 2: src_shift = 8; break;
+                            case 4: src_shift = 0; break; case 8: src_shift = 24; break; }
+    switch (dest_channel) { case 1: dst_shift = 16; break; case 2: dst_shift = 8; break;
+                             case 4: dst_shift = 0; break; case 8: dst_shift = 24; break; }
     for (int sy = 0; sy < rh; sy++) {
         for (int sx = 0; sx < rw; sx++) {
             int src_x = rx + sx;
@@ -9580,12 +9590,20 @@ static ActionVar bitmapDataCopyChannel(SWFAppContext* app_context, ActionVar* ar
             int dst_y = dy + sy;
             if (src_x < 0 || src_x >= src_bmp->width || src_y < 0 || src_y >= src_bmp->height) continue;
             if (dst_x < 0 || dst_x >= dest_bmp->width || dst_y < 0 || dst_y >= dest_bmp->height) continue;
-            uint32_t src_px = src_bmp->pixels[src_y * src_bmp->width + src_x];
-            uint8_t val = extractChannel(src_px, src_channel);
-            uint32_t dst_px = dest_bmp->pixels[dst_y * dest_bmp->width + dst_x];
-            dest_bmp->pixels[dst_y * dest_bmp->width + dst_x] = injectChannel(dst_px, dest_channel, val);
+            uint32_t dst_px = unpremultiplyAlpha(dest_bmp->pixels[dst_y * dest_bmp->width + dst_x]);
+            uint32_t new_px;
+            if (dst_shift < 0) {
+                new_px = dst_px;
+            } else {
+                uint32_t src_px = unpremultiplyAlpha(src_bmp->pixels[src_y * src_bmp->width + src_x]);
+                uint8_t val = (src_shift < 0) ? 0 : (uint8_t)((src_px >> src_shift) & 0xFF);
+                new_px = (dst_px & ~((uint32_t)0xFF << dst_shift)) | ((uint32_t)val << dst_shift);
+            }
+            if (!dest_bmp->transparent) new_px |= 0xFF000000;
+            dest_bmp->pixels[dst_y * dest_bmp->width + dst_x] = premultiplyAlpha(new_px);
         }
     }
+    r = makeF64(-1);
     return r;
 }
 
@@ -10549,14 +10567,90 @@ static ActionVar bitmapDataMerge(SWFAppContext* app_context, ActionVar* args, u3
     return r;
 }
 
-// PaletteMap stub
 static ActionVar bitmapDataPaletteMap(SWFAppContext* app_context, ActionVar* args, u32 arg_count, ActionVar* registers, void* this_obj)
 {
     (void)registers;
     ASObject* obj = (ASObject*) this_obj;
-    BitmapDataNative* bmp = getBitmapNative(obj);
-    ActionVar r = {0}; r.type = ACTION_STACK_VALUE_UNDEFINED;
-    if (!bmp || bmp->disposed) { r = makeF64(-1); return r; }
+    BitmapDataNative* dest_bmp = getBitmapNative(obj);
+    ActionVar r = {0};
+    // Ruffle: -1 (<4 args, disposed dest, on success), -2 (src not bitmap),
+    // -3 (src disposed), -4 (rect missing x/y/width/height).
+    if (arg_count < 4) { r = makeF64(-1); return r; }
+    if (!dest_bmp || dest_bmp->disposed) { r = makeF64(-1); return r; }
+    if (args[0].type != ACTION_STACK_VALUE_OBJECT) { r = makeF64(-2); return r; }
+    ASObject* src_obj = (ASObject*) args[0].data.numeric_value;
+    if (!src_obj || src_obj->native_type != NATIVE_BITMAPDATA) { r = makeF64(-2); return r; }
+    BitmapDataNative* src_bmp = getBitmapNative(src_obj);
+    if (!src_bmp) { r = makeF64(-2); return r; }
+    if (src_bmp->disposed) { r = makeF64(-3); return r; }
+    if (args[1].type != ACTION_STACK_VALUE_OBJECT) { r = makeF64(-4); return r; }
+    ASObject* src_rect = (ASObject*) args[1].data.numeric_value;
+    if (!src_rect) { r = makeF64(-4); return r; }
+    ActionVar* srx = getPropertyWithPrototype(src_rect, "x", 1);
+    ActionVar* sry = getPropertyWithPrototype(src_rect, "y", 1);
+    ActionVar* srw = getPropertyWithPrototype(src_rect, "width", 5);
+    ActionVar* srh = getPropertyWithPrototype(src_rect, "height", 6);
+    if (!srx || !sry || !srw || !srh) { r = makeF64(-4); return r; }
+    int rx = (int)tsArgToDouble_ctx(app_context, srx);
+    int ry = (int)tsArgToDouble_ctx(app_context, sry);
+    int rw = (int)tsArgToDouble_ctx(app_context, srw);
+    int rh = (int)tsArgToDouble_ctx(app_context, srh);
+    // destPoint: null/undefined/non-object → (0,0)
+    int dxo = 0, dyo = 0;
+    if (args[2].type == ACTION_STACK_VALUE_OBJECT) {
+        ASObject* dest_pt = (ASObject*) args[2].data.numeric_value;
+        if (dest_pt != NULL) {
+            ActionVar* dpx = getPropertyWithPrototype(dest_pt, "x", 1);
+            ActionVar* dpy = getPropertyWithPrototype(dest_pt, "y", 1);
+            if (dpx) dxo = (int)tsArgToDouble_ctx(app_context, dpx);
+            if (dpy) dyo = (int)tsArgToDouble_ctx(app_context, dpy);
+        }
+    }
+    // Build 256-entry LUTs for each channel. If the arg is an Array, index into
+    // it (u32 & 0xFF wrap on missing/undefined elements stays 0). Otherwise use
+    // an identity mapping (channel << shift) — matching Ruffle's behavior.
+    u32 red_lut[256], grn_lut[256], blu_lut[256], alp_lut[256];
+    const int shifts[4] = {16, 8, 0, 24};
+    u32* luts[4] = {red_lut, grn_lut, blu_lut, alp_lut};
+    for (int ch = 0; ch < 4; ch++) {
+        int arg_idx = 3 + ch;
+        ASArray* arr = NULL;
+        if (arg_idx < (int)arg_count && args[arg_idx].type == ACTION_STACK_VALUE_ARRAY)
+            arr = (ASArray*)(uintptr_t) args[arg_idx].data.numeric_value;
+        for (int i = 0; i < 256; i++) {
+            if (arr != NULL) {
+                ActionVar* elem = getArrayElement(arr, (u32)i);
+                u32 v = 0;
+                if (elem != NULL && elem->type != ACTION_STACK_VALUE_HOLE &&
+                    elem->type != ACTION_STACK_VALUE_UNDEFINED)
+                    v = doubleToUint32(tsArgToDouble_ctx(app_context, elem)) & 0xFFFFFFFF;
+                luts[ch][i] = v;
+            } else {
+                luts[ch][i] = ((u32)i) << shifts[ch];
+            }
+        }
+    }
+    // Per-pixel: unpremul source, look up each channel's LUT, wrap-add the four
+    // 32-bit values, premul the result. Note the addition is in packed ARGB
+    // space, so carries can leak between channels — matching Ruffle.
+    for (int py = 0; py < rh; py++) {
+        for (int px = 0; px < rw; px++) {
+            int src_x = rx + px;
+            int src_y = ry + py;
+            int dst_x = dxo + px;
+            int dst_y = dyo + py;
+            if (src_x < 0 || src_x >= src_bmp->width || src_y < 0 || src_y >= src_bmp->height) continue;
+            if (dst_x < 0 || dst_x >= dest_bmp->width || dst_y < 0 || dst_y >= dest_bmp->height) continue;
+            uint32_t src_px = unpremultiplyAlpha(src_bmp->pixels[src_y * src_bmp->width + src_x]);
+            u8 sr = (src_px >> 16) & 0xFF;
+            u8 sg = (src_px >> 8) & 0xFF;
+            u8 sb = src_px & 0xFF;
+            u8 sa = (src_px >> 24) & 0xFF;
+            u32 sum = red_lut[sr] + grn_lut[sg] + blu_lut[sb] + alp_lut[sa];
+            dest_bmp->pixels[dst_y * dest_bmp->width + dst_x] = premultiplyAlpha(sum);
+        }
+    }
+    r = makeF64(-1);
     return r;
 }
 
