@@ -2924,6 +2924,15 @@ MovieClip* ng_duplicateMovieClip(SWFAppContext* app_context, const char* source_
 		clone_mc->totalframes   = src_mc->totalframes;
 		clone_mc->framesloaded  = src_mc->framesloaded;
 		clone_mc->as_set_flags  = src_mc->as_set_flags;
+		// Drawing-API bounds — cloning a dynamically-built MC (createEmptyMovieClip
+		// + lineTo/beginFill) must preserve the source's accumulated bounds, since
+		// the clone is born empty and mcGetOriginalBounds would otherwise fall
+		// through to the child-MC bounds walk (and the clone has no children).
+		clone_mc->draw_has_bounds = src_mc->draw_has_bounds;
+		clone_mc->draw_xmin = src_mc->draw_xmin;
+		clone_mc->draw_xmax = src_mc->draw_xmax;
+		clone_mc->draw_ymin = src_mc->draw_ymin;
+		clone_mc->draw_ymax = src_mc->draw_ymax;
 		// Inherit the source's TextSnapshot stale flag BEFORE marking the
 		// source itself. Ruffle's clone_sprite via instantiate_by_id
 		// produces an instance whose TextSnapshot availability tracks the

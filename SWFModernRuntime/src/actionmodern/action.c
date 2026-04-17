@@ -45571,6 +45571,61 @@ void actionCallFunction(SWFAppContext* app_context, char* str_buffer)
 		PUSH(ACTION_STACK_VALUE_F64, VAL(u64, &v));
 		builtin_handled = 1;
 	}
+	// getInstanceAtDepth(depth) — as a global function, operates on current context.
+	// Mirrors the method handler in actionCallMethod. Accepts either AS-depth
+	// (what Ruffle-method convention uses; stored by attachMovie / createEmptyMovieClip)
+	// or SWF-depth (stored by CloneSprite / duplicateMovieClip — the bytecode-biased
+	// form). Checking both lets clones placed at SWF-space depths still resolve.
+	else if (func_name_len == 18 && strncmp(func_name, "getInstanceAtDepth", 18) == 0)
+	{
+#ifdef NO_GRAPHICS
+		extern MovieClip root_movieclip;
+		MovieClip* parent_mc = g_current_context ? g_current_context : &root_movieclip;
+		if (num_args == 0 ||
+		    args[0].type == ACTION_STACK_VALUE_UNDEFINED ||
+		    args[0].type == ACTION_STACK_VALUE_NULL) {
+			if (args != NULL) FREE(args);
+			pushUndefined(app_context);
+			builtin_handled = 1;
+		} else {
+			int _as_depth = ecmaToInt32(varToDouble(&args[0]));
+			int _swf_depth_q = _as_depth + 16384;
+			if (args != NULL) FREE(args);
+			int _pushed = 0;
+			for (int _i = 0; _i < child_mc_count; _i++) {
+				MovieClip* _ch = child_mc_cache[_i];
+				if (_ch != NULL && _ch->parent == parent_mc &&
+				    (_ch->depth == _as_depth || _ch->depth == _swf_depth_q)) {
+					PUSH(ACTION_STACK_VALUE_MOVIECLIP, (u64)_ch);
+					_pushed = 1;
+					break;
+				}
+			}
+			if (!_pushed && _as_depth >= -16384) {
+				size_t _swf_depth = (size_t)_swf_depth_q;
+				char _inst_name[64] = {0};
+				int _found_type = ng_findRootChildAtSWFDepth(_swf_depth, _inst_name, sizeof(_inst_name));
+				if ((_found_type == 2 || _found_type == 3) && _inst_name[0]) {
+					MovieClip* _sprite_mc = findOrCreateMovieClip(app_context, _inst_name, parent_mc);
+					if (_sprite_mc) {
+						_sprite_mc->depth = _as_depth;
+						PUSH(ACTION_STACK_VALUE_MOVIECLIP, (u64)_sprite_mc);
+						_pushed = 1;
+					}
+				} else if (_found_type == 1) {
+					PUSH(ACTION_STACK_VALUE_MOVIECLIP, (u64)parent_mc);
+					_pushed = 1;
+				}
+			}
+			if (!_pushed) pushUndefined(app_context);
+			builtin_handled = 1;
+		}
+#else
+		if (args != NULL) FREE(args);
+		pushUndefined(app_context);
+		builtin_handled = 1;
+#endif
+	}
 
 	// setInterval(func, delay, ...args) or setInterval(obj, methodName, delay, ...args)
 	else if (func_name_len == 11 && strncmp(func_name, "setInterval", 11) == 0)
@@ -52956,11 +53011,15 @@ void actionCallMethod(SWFAppContext* app_context, char* str_buffer)
 				return;
 			}
 			int _target_depth = ecmaToInt32(varToDouble(&args[0]));
+			int _target_depth_swf = _target_depth + 16384;
 			if (args != NULL) FREE(args);
-			// 1. Scan child_mc_cache for matching parent + depth
+			// 1. Scan child_mc_cache for matching parent + depth (AS or SWF-space).
+			// CloneSprite / duplicateMovieClip store the raw SWF-biased depth while
+			// attachMovie / createEmptyMovieClip store AS depth; accept either.
 			for (int _i = 0; _i < child_mc_count; _i++) {
 				MovieClip* _ch = child_mc_cache[_i];
-				if (_ch != NULL && _ch->parent == mc && _ch->depth == _target_depth) {
+				if (_ch != NULL && _ch->parent == mc &&
+				    (_ch->depth == _target_depth || _ch->depth == _target_depth_swf)) {
 					PUSH(ACTION_STACK_VALUE_MOVIECLIP, (u64)_ch);
 					return;
 				}
@@ -52968,7 +53027,7 @@ void actionCallMethod(SWFAppContext* app_context, char* str_buffer)
 			// 2. Check display list via ng_findRootChildAtSWFDepth
 			// (only handles root children for now; swf_depth = AS_depth + 16384)
 			if (_target_depth >= -16384) {
-				size_t _swf_depth = (size_t)(_target_depth + 16384);
+				size_t _swf_depth = (size_t)_target_depth_swf;
 				char _inst_name[64] = {0};
 				int _found_type = ng_findRootChildAtSWFDepth(_swf_depth, _inst_name, sizeof(_inst_name));
 				if ((_found_type == 2 || _found_type == 3) && _inst_name[0]) {
