@@ -22014,11 +22014,16 @@ typedef struct EnumeratedName {
  */
 static int isPropertyEnumerated(EnumeratedName* head, const char* name, u32 name_length)
 {
+	// In SWF<=6, property names are case-insensitive, so "MixEdcase" and
+	// "MIXEDcase" refer to the same slot. Enumerate dedup must match that.
+	int case_insensitive = (g_swf_version <= 6);
 	EnumeratedName* current = head;
 	while (current != NULL)
 	{
 		if (current->name_length == name_length &&
-		    strncmp(current->name, name, name_length) == 0)
+		    (case_insensitive
+		     ? strncasecmp(current->name, name, name_length) == 0
+		     : strncmp(current->name, name, name_length) == 0))
 		{
 			return 1; // Found - property was already enumerated
 		}
@@ -29234,6 +29239,100 @@ void actionGetVariable(SWFAppContext* app_context)
 					PUSH(ACTION_STACK_VALUE_UNDEFINED, 0);
 					return;
 				}
+				// Slash-path walk: target contains ':' separator and possibly embedded
+				// dot navigation (e.g., /obj:inNeR.TeSt). Tokenize the target like
+				// SetVariable does and resolve MC children → variables → members step
+				// by step, then GetMember the final prop. Matches Ruffle's walker.
+				// Skip this walk when the target has trailing colons, which the old
+				// fallback path (resolveFlashPathToMC + dot-path rewrite) already
+				// treats as invalid — preserving path_string compatibility for
+				// paths like `.../clip3:::clip4`.
+				if (target_len > 0 && prop_len > 0 &&
+					memchr(var_name, ':', target_len) != NULL &&
+					var_name[target_len - 1] != ':')
+				{
+					MovieClip* ctx = g_current_context ? g_current_context : &root_movieclip;
+					const char* tp = var_name;
+					u32 tp_remaining = target_len;
+					int is_slash = 0;
+					int first_seg = 1;
+					int walk_ok = 1;
+					PUSH(ACTION_STACK_VALUE_MOVIECLIP, (u64)ctx);
+					while (tp_remaining > 0 && walk_ok)
+					{
+						while (tp_remaining > 0 && *tp == ':') { tp++; tp_remaining--; }
+						if (tp_remaining == 0) break;
+						u32 seg_len = 0;
+						while (seg_len < tp_remaining) {
+							char c = tp[seg_len];
+							if (c == ':') break;
+							if (c == '.' && !is_slash) break;
+							if (c == '/') { is_slash = 1; break; }
+							seg_len++;
+						}
+						if (seg_len == 0) { tp++; tp_remaining--; continue; }
+						if (first_seg) {
+							POP();
+							if (seg_len == 5 && strncmp(tp, "_root", 5) == 0) {
+								PUSH(ACTION_STACK_VALUE_MOVIECLIP, (u64)&root_movieclip);
+							} else if (seg_len == 4 && strncmp(tp, "this", 4) == 0) {
+								PUSH(ACTION_STACK_VALUE_MOVIECLIP, (u64)ctx);
+							} else {
+								MovieClip* child = resolveSlashPathToMC(app_context, (char*)tp, seg_len, ctx);
+								if (child != NULL) {
+									PUSH(ACTION_STACK_VALUE_MOVIECLIP, (u64)child);
+								} else {
+									PUSH_STR(tp, seg_len);
+									actionGetVariable(app_context);
+								}
+							}
+							first_seg = 0;
+						} else {
+							if (STACK_TOP_TYPE == ACTION_STACK_VALUE_MOVIECLIP) {
+								MovieClip* parent_mc = (MovieClip*)VAL(u64, &STACK[SP + 16]);
+								if (seg_len == 5 && strncmp(tp, "_root", 5) == 0) {
+									POP();
+									PUSH(ACTION_STACK_VALUE_MOVIECLIP, (u64)&root_movieclip);
+								} else if (seg_len == 7 && strncmp(tp, "_parent", 7) == 0) {
+									POP();
+									if (parent_mc->parent) {
+										PUSH(ACTION_STACK_VALUE_MOVIECLIP, (u64)parent_mc->parent);
+									} else {
+										PUSH(ACTION_STACK_VALUE_UNDEFINED, 0);
+										walk_ok = 0;
+									}
+								} else {
+									MovieClip* child = resolveSlashPathToMC(app_context, (char*)tp, seg_len, parent_mc);
+									if (child != NULL) {
+										POP();
+										PUSH(ACTION_STACK_VALUE_MOVIECLIP, (u64)child);
+									} else {
+										PUSH_STR(tp, seg_len);
+										actionGetMember(app_context);
+									}
+								}
+							} else if (STACK_TOP_TYPE != ACTION_STACK_VALUE_UNDEFINED &&
+							           STACK_TOP_TYPE != ACTION_STACK_VALUE_NULL) {
+								PUSH_STR(tp, seg_len);
+								actionGetMember(app_context);
+							} else {
+								walk_ok = 0;
+							}
+						}
+						tp += seg_len;
+						tp_remaining -= seg_len;
+						if (tp_remaining > 0) { tp++; tp_remaining--; }
+					}
+					if (walk_ok && STACK_TOP_TYPE != ACTION_STACK_VALUE_UNDEFINED &&
+					    STACK_TOP_TYPE != ACTION_STACK_VALUE_NULL) {
+						PUSH_STR(prop_name, prop_len);
+						actionGetMember(app_context);
+						return;
+					}
+					POP();
+					PUSH(ACTION_STACK_VALUE_UNDEFINED, 0);
+					return;
+				}
 				// For colon-separated slash paths (variable access like /ruffle/:def),
 				// try resolving the target as a non-MC Object via GetVariable
 				if (*last_sep == ':' && target_len > 0 && prop_len > 0) {
@@ -36379,6 +36478,36 @@ void actionSetMember(SWFAppContext* app_context)
 				value_var.type = ACTION_STACK_VALUE_F64;
 				VAL(double, &value_var.data.numeric_value) = (double)masked;
 			}
+			// TextField text/htmlText setter: coerce any non-string value (undefined, null,
+			// number, boolean, object) to a string. Flash textfields always store text as string.
+			if (MC_IS_TEXTFIELD(mc) &&
+				((prop_name_len == 4 && strncmp(prop_name, "text", 4) == 0) ||
+				 (prop_name_len == 8 && strncmp(prop_name, "htmlText", 8) == 0)) &&
+				value_var.type != ACTION_STACK_VALUE_STRING)
+			{
+				if (value_var.type == ACTION_STACK_VALUE_OBJECT ||
+					value_var.type == ACTION_STACK_VALUE_ARRAY ||
+					value_var.type == ACTION_STACK_VALUE_FUNCTION ||
+					value_var.type == ACTION_STACK_VALUE_MOVIECLIP)
+				{
+					ActionVar _str_result = objectCallToString(app_context, &value_var, NULL);
+					if (_str_result.type == ACTION_STACK_VALUE_STRING) {
+						value_var = _str_result;
+					} else {
+						char _ts_buf[17];
+						pushVar(app_context, &value_var);
+						convertString(app_context, _ts_buf);
+						popVar(app_context, &value_var);
+					}
+				}
+				else
+				{
+					char _ts_buf[17];
+					pushVar(app_context, &value_var);
+					convertString(app_context, _ts_buf);
+					popVar(app_context, &value_var);
+				}
+			}
 			// TextField text: update length when text is set
 			if (strcmp(prop_name, "text") == 0 && mc->dynamic_props != NULL)
 			{
@@ -39142,7 +39271,13 @@ void actionGetMember(SWFAppContext* app_context)
 				if (prop_name_len == 8 && memcmp(prop_name, "htmlText", 8) == 0 &&
 				    MC_IS_TEXTFIELD(mc))
 				{
-					TFRunTable* _ht_table = tf_find_table(mc);
+					// If html flag is false, return stored value directly without serialization.
+					// Switching html=true→false mid-stream should not serialize old format runs.
+					ActionVar* _ht_html_flag = getProperty((ASObject*) mc->dynamic_props, "html", 4);
+					int _ht_html_on = (_ht_html_flag != NULL &&
+						_ht_html_flag->type == ACTION_STACK_VALUE_BOOLEAN &&
+						_ht_html_flag->data.numeric_value);
+					TFRunTable* _ht_table = _ht_html_on ? tf_find_table(mc) : NULL;
 					if (_ht_table != NULL) {
 						// Table exists = content was parsed. Empty run_count means empty result.
 						int _ht_multiline = 0;
@@ -45050,7 +45185,11 @@ void actionCallFunction(SWFAppContext* app_context, char* str_buffer)
 			strncpy(child->url, mc->url[0] ? mc->url : root_movieclip.url, sizeof(child->url) - 1);
 			child->url[sizeof(child->url) - 1] = '\0';
 
-			// Register child on parent MC's dynamic_props
+			// Register child on parent MC's dynamic_props — but don't overwrite
+			// an existing own property with the same name. In Ruffle, createEmptyMovieClip
+			// only attaches the child to the display list; it does not assign a
+			// ScriptObject slot. Pre-existing own properties (and root timeline vars)
+			// shadow the child on name resolution.
 			if (mc->dynamic_props == NULL) {
 				mc->dynamic_props = (void*) allocObject(app_context, 8);
 				retainObject((ASObject*) mc->dynamic_props);
@@ -45058,8 +45197,29 @@ void actionCallFunction(SWFAppContext* app_context, char* str_buffer)
 			ActionVar mc_var = {0};
 			mc_var.type = ACTION_STACK_VALUE_MOVIECLIP;
 			mc_var.data.numeric_value = (u64)child;
-			setProperty(app_context, (ASObject*) mc->dynamic_props, inst_name, strlen(inst_name), &mc_var);
-			setVariableByName(inst_name, &mc_var);
+			u32 _cemc_inst_len = (u32)strlen(inst_name);
+			ActionVar* _cemc_existing = getProperty((ASObject*) mc->dynamic_props, inst_name, _cemc_inst_len);
+			int _cemc_has_existing = (_cemc_existing != NULL &&
+				_cemc_existing->type != ACTION_STACK_VALUE_UNDEFINED);
+			if (!_cemc_has_existing) {
+				setProperty(app_context, (ASObject*) mc->dynamic_props, inst_name, _cemc_inst_len, &mc_var);
+			}
+			// Root-level global var_map shadow only when no existing variable
+			if (mc == &root_movieclip) {
+				extern hashmap* var_map;
+				ActionVar* _cemc_gvar = NULL;
+				int _cemc_has_gvar = 0;
+				if (var_map != NULL && hashmap_get(var_map, inst_name, _cemc_inst_len, (uintptr_t*)&_cemc_gvar)) {
+					_cemc_has_gvar = (_cemc_gvar != NULL &&
+						!(_cemc_gvar->type == ACTION_STACK_VALUE_STRING &&
+						  _cemc_gvar->str_size == 0 &&
+						  _cemc_gvar->data.string_data.heap_ptr == NULL) &&
+						_cemc_gvar->type != ACTION_STACK_VALUE_UNDEFINED);
+				}
+				if (!_cemc_has_gvar) {
+					setVariableByName(inst_name, &mc_var);
+				}
+			}
 
 			// Find a free slot or append
 			int _slot = -1;
