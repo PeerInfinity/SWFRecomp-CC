@@ -1,9 +1,9 @@
 {
   "metadata": {
-    "old_timestamp": "2026-04-17T16:55:43.981414+00:00",
-    "old_git_sha": "b3deda13c6a9d434beaa3896ffe4fa4bb0751c57",
-    "new_timestamp": "2026-04-17T17:11:31.829447+00:00",
-    "new_git_sha": "1ff61eebf406c56a943fb6d079e0efe93d3056b8",
+    "old_timestamp": "2026-04-17T17:11:31.829447+00:00",
+    "old_git_sha": "1ff61eebf406c56a943fb6d079e0efe93d3056b8",
+    "new_timestamp": "2026-04-17T17:56:32.383043+00:00",
+    "new_git_sha": "f7ed2ce37c0406f4ce7fd9e813a70ca53db6663b",
     "partial": false,
     "same_commit": false
   },
@@ -18,33 +18,16 @@
     "new_effective_pass": 61,
     "new_total": 92,
     "new_pass_rate": 65.2,
-    "old_mismatched_lines": 615,
+    "old_mismatched_lines": 620,
     "new_mismatched_lines": 620,
-    "increased_mismatches": 5,
+    "increased_mismatches": 0,
     "decreased_mismatches": 0,
     "newly_passing": 0,
     "newly_failing": 0,
     "status_changed": 0,
-    "unchanged": 91,
+    "unchanged": 92,
     "added": 0,
     "removed": 0
   },
-  "changes": [
-    {
-      "test": "avm1/moviecliploader",
-      "change_type": "changed",
-      "old_status": "output_mismatch",
-      "new_status": "output_mismatch",
-      "old_lines": {
-        "actual_lines": 6,
-        "expected_lines": 7,
-        "matching_lines": 6
-      },
-      "new_lines": {
-        "actual_lines": 6,
-        "expected_lines": 7,
-        "matching_lines": 1
-      }
-    }
-  ]
+  "changes": []
 }

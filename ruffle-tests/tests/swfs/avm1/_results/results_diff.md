@@ -1,22 +1,15 @@
 # Ruffle Test Results Diff
 
-**Previous:** `b3deda13c6a9` (2026-04-17T16:55:43.962909+00:00)
-**Current:** `1ff61eebf406` (2026-04-17T17:11:31.810919+00:00)
+**Previous:** `1ff61eebf406` (2026-04-17T17:11:31.810919+00:00)
+**Current:** `f7ed2ce37c04` (2026-04-17T17:56:32.360173+00:00)
 
 ## Summary
 
 | Metric | Previous | Current | Delta |
 |--------|----------|---------|-------|
-| Passing | 577 | 580 | +3 |
+| Passing | 580 | 580 | 0 |
 | Total | 641 | 641 | 0 |
-| Pass rate | 90.0% | 90.5% | +0.5% |
-| Mismatched lines | 30711 | 30572 | -139 |
-|   Decreased | | | -139 |
+| Pass rate | 90.5% | 90.5% | 0% |
+| Mismatched lines | 30572 | 30572 | 0 |
 
-## Newly Passing (3)
-
-| Test | Previous Status | Lines (prev) | Lines (now) |
-|------|----------------|--------------|-------------|
-| `movieclip_invalid_get_bounds_1` | runtime_error | 8/75 | 75/75 |
-| `movieclip_invalid_get_bounds_2` | runtime_error | 8/75 | 75/75 |
-| `string_paths_eval2` | output_mismatch | 2/7 | 7/7 |
+No changes detected.
