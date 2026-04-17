@@ -288,9 +288,20 @@ This plan is actionable in `incomplete/` — a future session can pick up either
 
 ## Implementation progress — 2026-04-17 session
 
-### Part B — landed (commit `1a1bf852`)
+### Part B — landed, then reverted (commits `1a1bf852` + revert `59533be3`)
 
-Two-bucket MCL queue + top-of-tick promotion + final drain + soft tick cap. All 25 MCL canaries green. `from_shumway/avm1/moviecliploader` improved from 1/7 to 6/7 matching lines; last line (`loadee frame 2`) blocked by a separate pre-existing gap — the loadee child SWF's frame functions aren't advanced on subsequent ticks after `actionFirePendingLoadInits` runs frame_0. Needs a mechanism (see Part C below) that ticks the child MC's own timeline on each subsequent tick.
+Two-bucket MCL queue + top-of-tick promotion + final drain + soft tick cap. All 25 MCL/loadMovie canaries passed locally. `from_shumway/avm1/moviecliploader` improved from 1/7 to 6/7 matching lines.
+
+**However, CI revealed 3 AVM1 suite regressions** not caught by the 25-test local canary:
+- `movieclip_invalid_get_bounds_1` (75/75 → 8/75, runtime_error: `free(): unaligned chunk detected`)
+- `movieclip_invalid_get_bounds_2` (75/75 → 8/75, same heap corruption)
+- `string_paths_eval2` (7/7 → 2/7, output mismatch — `setInterval` chained off `onLoadComplete` no longer fires in time)
+
+Local reproduction confirmed: reverting only the `_next` → `_this` enqueue split (keeping everything else) makes all 3 pass again. The regressions are not heap bugs in Part B per se — they are latent interactions that the one-tick deferral exposes:
+- `movieclip_invalid_get_bounds_1/2` do repeated `loadClip`s across 150 frames, hitting a use-after-free pattern when events fire one tick after the load was queued rather than same-tick.
+- `string_paths_eval2` uses `setInterval(300ms)` inside `onLoadComplete`; `num_frames=5` at FPS=12 (~83ms/tick) means the timer needs ticks 0-4 under the old same-tick model but tick 5+ under deferred model. Soft tick cap (MCL pending only) doesn't extend because MCL queue is empty by then.
+
+**Decision**: revert Part B. The net change (−3 AVM1 tests passing, +0 shumway tests passing since moviecliploader is still 6/7 not 7/7) is negative. A future attempt needs either (a) fixing the latent use-after-free in getBounds handling so deferred events don't trigger it, (b) a wider tick cap (full `hasActiveTimers()` gate) coupled with fixing the long-run lifecycle bugs that such a cap exposes, or (c) Approach A3 (full ActionQueue) which may obviate the two-bucket queue entirely since the new queue itself would handle the ordering.
 
 ### Part A — attempted A2, reverted
 
