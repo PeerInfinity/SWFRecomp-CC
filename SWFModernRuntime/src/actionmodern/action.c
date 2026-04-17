@@ -10538,9 +10538,10 @@ static ActionVar bitmapDataMerge(SWFAppContext* app_context, ActionVar* args, u3
     int rm = (int)tsArgToDouble_ctx(app_context, &args[3]); if (rm < 0) rm = 0; if (rm > 256) rm = 256;
     int gm = (int)tsArgToDouble_ctx(app_context, &args[4]); if (gm < 0) gm = 0; if (gm > 256) gm = 256;
     int bm = (int)tsArgToDouble_ctx(app_context, &args[5]); if (bm < 0) bm = 0; if (bm > 256) bm = 256;
-    // Ruffle default when alphaMult arg is missing/undefined is 0xFF (255), not 0.
+    // Ruffle try_get_i32(idx, UndefinedAs::Some).unwrap_or(0xFF): present
+    // `undefined` coerces to 0; truly missing arg (len < 7) defaults to 0xFF.
     int am = 0xFF;
-    if (arg_count >= 7 && args[6].type != ACTION_STACK_VALUE_UNDEFINED)
+    if (arg_count >= 7)
         am = (int)tsArgToDouble_ctx(app_context, &args[6]);
     if (am < 0) am = 0; if (am > 256) am = 256;
     for (int sy = 0; sy < rh; sy++) {
