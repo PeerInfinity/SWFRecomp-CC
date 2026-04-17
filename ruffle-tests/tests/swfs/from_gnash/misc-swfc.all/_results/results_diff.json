@@ -1,9 +1,9 @@
 {
   "metadata": {
-    "old_timestamp": "2026-04-17T17:56:32.403247+00:00",
-    "old_git_sha": "f7ed2ce37c0406f4ce7fd9e813a70ca53db6663b",
-    "new_timestamp": "2026-04-17T18:49:25.967280+00:00",
-    "new_git_sha": "fbb6ab57a909f63a8e86210040aa3d5d78a6441c",
+    "old_timestamp": "2026-04-17T18:49:25.967280+00:00",
+    "old_git_sha": "fbb6ab57a909f63a8e86210040aa3d5d78a6441c",
+    "new_timestamp": "2026-04-17T20:16:04.851227+00:00",
+    "new_git_sha": "f3ab5c9dd4cbd96b5ccf29870f5d8da278f45bc0",
     "partial": false,
     "same_commit": false
   },
@@ -19,15 +19,48 @@
     "new_total": 16,
     "new_pass_rate": 12.5,
     "old_mismatched_lines": 277,
-    "new_mismatched_lines": 277,
-    "increased_mismatches": 0,
+    "new_mismatched_lines": 284,
+    "increased_mismatches": 7,
     "decreased_mismatches": 0,
     "newly_passing": 0,
     "newly_failing": 0,
     "status_changed": 0,
-    "unchanged": 16,
+    "unchanged": 14,
     "added": 0,
     "removed": 0
   },
-  "changes": []
+  "changes": [
+    {
+      "test": "movieclip_destruction_test2",
+      "change_type": "changed",
+      "old_status": "output_mismatch",
+      "new_status": "output_mismatch",
+      "old_lines": {
+        "actual_lines": 56,
+        "expected_lines": 56,
+        "matching_lines": 41
+      },
+      "new_lines": {
+        "actual_lines": 56,
+        "expected_lines": 56,
+        "matching_lines": 37
+      }
+    },
+    {
+      "test": "soft_reference_test1",
+      "change_type": "changed",
+      "old_status": "output_mismatch",
+      "new_status": "output_mismatch",
+      "old_lines": {
+        "actual_lines": 42,
+        "expected_lines": 45,
+        "matching_lines": 17
+      },
+      "new_lines": {
+        "actual_lines": 42,
+        "expected_lines": 45,
+        "matching_lines": 14
+      }
+    }
+  ]
 }

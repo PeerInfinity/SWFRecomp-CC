@@ -1,10 +1,10 @@
 # Ruffle Test Results (Unfiltered)
 
-**Date**: 2026-04-17 18:49 UTC
+**Date**: 2026-04-17 20:16 UTC
 
-**Git SHA**: `fbb6ab57a9`
+**Git SHA**: `f3ab5c9dd4`
 
-**Run Duration**: 4m 39s
+**Run Duration**: 4m 32s
 
 ## Summary
 
@@ -31,20 +31,20 @@
 
 | # | Test | Lines | Duration | Notes |
 |---|------|-------|----------|-------|
-| 1 | `afunc_dict` | 2 | 15.3s |  |
-| 2 | `background` | 0 | 15.9s |  |
-| 3 | `dict_callframe` | 3 | 15.9s |  |
-| 4 | `dict_cross` | 3 | 15.1s |  |
-| 5 | `dict_override` | 2 | 15.0s |  |
-| 6 | `func_dict` | 3 | 16.0s |  |
-| 7 | `initaction_in_definesprite` | 2 | 15.2s |  |
-| 8 | `jump_after_end` | 3 | 15.4s |  |
-| 9 | `missing_bitmap` | 0 | 15.4s |  |
-| 10 | `mixed-bytecode-as2` | 1 | 15.4s |  |
-| 11 | `trace-as2/shortstack` | 2 | 15.6s |  |
+| 1 | `afunc_dict` | 2 | 15.4s |  |
+| 2 | `background` | 0 | 15.6s |  |
+| 3 | `dict_callframe` | 3 | 15.3s |  |
+| 4 | `dict_cross` | 3 | 15.4s |  |
+| 5 | `dict_override` | 2 | 15.4s |  |
+| 6 | `func_dict` | 3 | 15.6s |  |
+| 7 | `initaction_in_definesprite` | 2 | 15.6s |  |
+| 8 | `jump_after_end` | 3 | 15.7s |  |
+| 9 | `missing_bitmap` | 0 | 15.2s |  |
+| 10 | `mixed-bytecode-as2` | 1 | 12.6s |  |
+| 11 | `trace-as2/shortstack` | 2 | 12.8s |  |
 | 12 | `trace-as2/super` | 8 | 15.3s |  |
-| 13 | `trace-as2/this` | 8 | 16.1s |  |
-| 14 | `zeroframe_definesprite` | 3 | 15.3s |  |
+| 13 | `trace-as2/this` | 8 | 15.3s |  |
+| 14 | `zeroframe_definesprite` | 3 | 15.4s |  |
 
 ## Ruffle-Matched Tests
 
@@ -52,7 +52,7 @@
 
 | # | Test | Our diffs | Ruffle diffs | Duration | Notes |
 |---|------|-----------|--------------|----------|-------|
-| 1 | `dict_event` | 2 | 2 | 16.1s |  |
+| 1 | `dict_event` | 2 | 2 | 16.3s |  |
 
 ## Near-Passing Tests
 
