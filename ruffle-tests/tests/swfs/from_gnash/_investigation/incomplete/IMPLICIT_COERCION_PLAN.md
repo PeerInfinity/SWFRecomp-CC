@@ -1,8 +1,8 @@
 # Implicit Coercion (valueOf / toString Dispatch) Plan
 <!-- TESTS: Matrix-v6, Rectangle-v8, toString_valueOf-v5, toString_valueOf-v6, toString_valueOf-v7, toString_valueOf-v8 -->
 
-Last updated: 2026-04-17
-Status: IN PROGRESS — 6 tests, ~83-91% line match
+Last updated: 2026-04-17 (Phase 1 done — Rectangle/Matrix builtins dispatch valueOf)
+Status: IN PROGRESS — Phase 1 complete, Phases 2-4 open
 
 ---
 
@@ -96,15 +96,28 @@ toString, then string comparison.
 
 ## Phases
 
-### Phase 1 — Geometry builtin arg coercion
-- Rewrite `rectEquals`, `rectContains`, `rectContainsPoint`,
-  `rectContainsRectangle`, `rectIntersects`, `rectIntersection`, `rectUnion`,
-  `rectInflate`, `rectInflatePoint`, `rectOffset`, `rectOffsetPoint` to use
-  `varToDoubleSWF`.
-- Same for Matrix builtins (`matrixConcat`, `matrixTransformPoint`,
-  `matrixDeltaTransformPoint`, `matrixInvert`, `matrixRotate`, `matrixScale`,
-  `matrixTranslate`, `matrixToString`).
-- Expected impact: Matrix-v6 +10-15 lines, Rectangle-v8 +15-20 lines.
+### Phase 1 — Geometry builtin arg coercion — DONE (2026-04-17)
+- Added `propToDoubleSWF(app_context, obj, name, name_len)` helper which
+  dispatches custom valueOf on OBJECT/ARRAY via `varToDoubleSWF`.
+- Rewrote `rectEquals`, `rectContains`, `rectContainsPoint`,
+  `rectContainsRectangle`, `rectIsEmpty`, `rectIntersects`,
+  `rectIntersection`, `rectUnion`, `rectInflate`, `rectInflatePoint`,
+  `rectOffset`, `rectOffsetPoint` and Matrix builtins (`matrixScale`,
+  `matrixRotate`, `matrixTranslate`, `matrixConcat`, `matrixInvert`,
+  `matrixCreateBox`, `matrixCreateGradientBox`, `matrixTransformPoint`,
+  `matrixDeltaTransformPoint`) to use `propToDoubleSWF` / `varToDoubleSWF`.
+- **Impact (local diff-line deltas):**
+  - Rectangle-v8: 24 → 20 diffs (-4)
+  - HitTest-v6/v7: 18 → 16 diffs each (-2)
+  - HitTest-v8: 17 → 15 diffs (-2)
+  - Matrix-v6 unchanged (remaining diffs are Flash native-state semantics,
+    unrelated to arg coercion)
+- No regressions on avm1 (`string_coercion`, `mutable_this`, `this_scoping`,
+  `register_class_return_value`, `enumerate`, `add`, `unload`,
+  `array_enumerate`, `text_format`, `textsnapshot_available_text`,
+  `as2_super_and_this_v6`, `swf5_no_closure`, `goto_frame`, `set_interval`)
+  or gnash (`Point-v5..v8`, `Color-v5..v8`, `ColorTransform-v5..v8`,
+  `Error-v5..v8`, `Transform-v6/v7`, `Matrix-v5/v7/v8`).
 
 ### Phase 2 — `+` operator MOVIECLIP + STRING path
 - Audit `actionAdd2` and `avAdditionEcma` for MOVIECLIP-operand handling.

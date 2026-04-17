@@ -7207,6 +7207,17 @@ static double propToDouble(ASObject* obj, const char* name, u32 name_len)
 	return varToDoubleSimple(prop);
 }
 
+// Like propToDouble but dispatches user-defined valueOf on OBJECT/ARRAY
+// values via varToDoubleSWF. Use in geometry builtins (Rectangle, Matrix)
+// where the caller's x/y/width/height may be an object with a custom
+// valueOf. Missing property still returns NAN.
+static double propToDoubleSWF(SWFAppContext* app_context, ASObject* obj, const char* name, u32 name_len)
+{
+	ActionVar* prop = getPropertyWithPrototype(obj, name, name_len);
+	if (prop == NULL) return NAN;
+	return varToDoubleSWF(app_context, prop, g_swf_version);
+}
+
 // Helper: create a Point object with x and y properties
 static ASObject* createPointObj(SWFAppContext* app_context, ActionVar* x_val, ActionVar* y_val)
 {
@@ -7809,16 +7820,16 @@ static ActionVar matrixScale(SWFAppContext* app_context, ActionVar* args, u32 ar
 	ASObject* obj = (ASObject*) this_obj;
 	if (obj == NULL) { ActionVar r = {0}; r.type = ACTION_STACK_VALUE_UNDEFINED; return r; }
 
-	double sx = (arg_count > 0) ? varToDoubleSimple(&args[0]) : NAN;
-	double sy = (arg_count > 1) ? varToDoubleSimple(&args[1]) : NAN;
+	double sx = (arg_count > 0) ? varToDoubleSWF(app_context, &args[0], g_swf_version) : NAN;
+	double sy = (arg_count > 1) ? varToDoubleSWF(app_context, &args[1], g_swf_version) : NAN;
 
 	// a*=sx, c*=sx, tx*=sx, b*=sy, d*=sy, ty*=sy
-	double a = varToDoubleSimple(getProperty(obj, "a", 1));
-	double b = varToDoubleSimple(getProperty(obj, "b", 1));
-	double c = varToDoubleSimple(getProperty(obj, "c", 1));
-	double d = varToDoubleSimple(getProperty(obj, "d", 1));
-	double tx = varToDoubleSimple(getProperty(obj, "tx", 2));
-	double ty = varToDoubleSimple(getProperty(obj, "ty", 2));
+	double a = propToDoubleSWF(app_context, obj, "a", 1);
+	double b = propToDoubleSWF(app_context, obj, "b", 1);
+	double c = propToDoubleSWF(app_context, obj, "c", 1);
+	double d = propToDoubleSWF(app_context, obj, "d", 1);
+	double tx = propToDoubleSWF(app_context, obj, "tx", 2);
+	double ty = propToDoubleSWF(app_context, obj, "ty", 2);
 
 	ActionVar va = makeF64(a * sx); setProperty(app_context, obj, "a", 1, &va);
 	ActionVar vb = makeF64(b * sy); setProperty(app_context, obj, "b", 1, &vb);
@@ -7836,15 +7847,15 @@ static ActionVar matrixRotate(SWFAppContext* app_context, ActionVar* args, u32 a
 	ASObject* obj = (ASObject*) this_obj;
 	if (obj == NULL) { ActionVar r = {0}; r.type = ACTION_STACK_VALUE_UNDEFINED; return r; }
 
-	double angle = (arg_count > 0) ? varToDoubleSimple(&args[0]) : NAN;
+	double angle = (arg_count > 0) ? varToDoubleSWF(app_context, &args[0], g_swf_version) : NAN;
 	double cosA = cos(angle), sinA = sin(angle);
 
-	double a = varToDoubleSimple(getProperty(obj, "a", 1));
-	double b = varToDoubleSimple(getProperty(obj, "b", 1));
-	double c = varToDoubleSimple(getProperty(obj, "c", 1));
-	double d = varToDoubleSimple(getProperty(obj, "d", 1));
-	double tx = varToDoubleSimple(getProperty(obj, "tx", 2));
-	double ty = varToDoubleSimple(getProperty(obj, "ty", 2));
+	double a = propToDoubleSWF(app_context, obj, "a", 1);
+	double b = propToDoubleSWF(app_context, obj, "b", 1);
+	double c = propToDoubleSWF(app_context, obj, "c", 1);
+	double d = propToDoubleSWF(app_context, obj, "d", 1);
+	double tx = propToDoubleSWF(app_context, obj, "tx", 2);
+	double ty = propToDoubleSWF(app_context, obj, "ty", 2);
 
 	double na = a * cosA + b * (-sinA);
 	double nb = a * sinA + b * cosA;
@@ -7869,11 +7880,11 @@ static ActionVar matrixTranslate(SWFAppContext* app_context, ActionVar* args, u3
 	ASObject* obj = (ASObject*) this_obj;
 	if (obj == NULL) { ActionVar r = {0}; r.type = ACTION_STACK_VALUE_UNDEFINED; return r; }
 
-	double dx = (arg_count > 0) ? varToDoubleSimple(&args[0]) : NAN;
-	double dy = (arg_count > 1) ? varToDoubleSimple(&args[1]) : NAN;
+	double dx = (arg_count > 0) ? varToDoubleSWF(app_context, &args[0], g_swf_version) : NAN;
+	double dy = (arg_count > 1) ? varToDoubleSWF(app_context, &args[1], g_swf_version) : NAN;
 
-	double tx = varToDoubleSimple(getProperty(obj, "tx", 2));
-	double ty = varToDoubleSimple(getProperty(obj, "ty", 2));
+	double tx = propToDoubleSWF(app_context, obj, "tx", 2);
+	double ty = propToDoubleSWF(app_context, obj, "ty", 2);
 
 	ActionVar vtx = makeF64(tx + dx); setProperty(app_context, obj, "tx", 2, &vtx);
 	ActionVar vty = makeF64(ty + dy); setProperty(app_context, obj, "ty", 2, &vty);
@@ -7887,22 +7898,22 @@ static ActionVar matrixConcat(SWFAppContext* app_context, ActionVar* args, u32 a
 	ASObject* obj = (ASObject*) this_obj;
 	if (obj == NULL) { ActionVar r = {0}; r.type = ACTION_STACK_VALUE_UNDEFINED; return r; }
 
-	double a = varToDoubleSimple(getProperty(obj, "a", 1));
-	double b = varToDoubleSimple(getProperty(obj, "b", 1));
-	double c = varToDoubleSimple(getProperty(obj, "c", 1));
-	double d = varToDoubleSimple(getProperty(obj, "d", 1));
-	double tx = varToDoubleSimple(getProperty(obj, "tx", 2));
-	double ty = varToDoubleSimple(getProperty(obj, "ty", 2));
+	double a = propToDoubleSWF(app_context, obj, "a", 1);
+	double b = propToDoubleSWF(app_context, obj, "b", 1);
+	double c = propToDoubleSWF(app_context, obj, "c", 1);
+	double d = propToDoubleSWF(app_context, obj, "d", 1);
+	double tx = propToDoubleSWF(app_context, obj, "tx", 2);
+	double ty = propToDoubleSWF(app_context, obj, "ty", 2);
 
 	double ma = NAN, mb = NAN, mc = NAN, md = NAN, mtx = NAN, mty = NAN;
 	if (arg_count > 0 && args[0].type == ACTION_STACK_VALUE_OBJECT && args[0].data.numeric_value != 0) {
 		ASObject* m = (ASObject*)args[0].data.numeric_value;
-		ma = varToDoubleSimple(getProperty(m, "a", 1));
-		mb = varToDoubleSimple(getProperty(m, "b", 1));
-		mc = varToDoubleSimple(getProperty(m, "c", 1));
-		md = varToDoubleSimple(getProperty(m, "d", 1));
-		mtx = varToDoubleSimple(getProperty(m, "tx", 2));
-		mty = varToDoubleSimple(getProperty(m, "ty", 2));
+		ma = propToDoubleSWF(app_context, m, "a", 1);
+		mb = propToDoubleSWF(app_context, m, "b", 1);
+		mc = propToDoubleSWF(app_context, m, "c", 1);
+		md = propToDoubleSWF(app_context, m, "d", 1);
+		mtx = propToDoubleSWF(app_context, m, "tx", 2);
+		mty = propToDoubleSWF(app_context, m, "ty", 2);
 	}
 
 	// Right multiply: this = this * m
@@ -7929,12 +7940,12 @@ static ActionVar matrixInvert(SWFAppContext* app_context, ActionVar* args, u32 a
 	ASObject* obj = (ASObject*) this_obj;
 	if (obj == NULL) { ActionVar r = {0}; r.type = ACTION_STACK_VALUE_UNDEFINED; return r; }
 
-	double a = varToDoubleSimple(getProperty(obj, "a", 1));
-	double b = varToDoubleSimple(getProperty(obj, "b", 1));
-	double c = varToDoubleSimple(getProperty(obj, "c", 1));
-	double d = varToDoubleSimple(getProperty(obj, "d", 1));
-	double tx = varToDoubleSimple(getProperty(obj, "tx", 2));
-	double ty = varToDoubleSimple(getProperty(obj, "ty", 2));
+	double a = propToDoubleSWF(app_context, obj, "a", 1);
+	double b = propToDoubleSWF(app_context, obj, "b", 1);
+	double c = propToDoubleSWF(app_context, obj, "c", 1);
+	double d = propToDoubleSWF(app_context, obj, "d", 1);
+	double tx = propToDoubleSWF(app_context, obj, "tx", 2);
+	double ty = propToDoubleSWF(app_context, obj, "ty", 2);
 
 	double det = a * d - b * c;
 	double na, nb, nc, nd, ntx, nty;
@@ -7971,11 +7982,11 @@ static ActionVar matrixCreateBox(SWFAppContext* app_context, ActionVar* args, u3
 	ASObject* obj = (ASObject*) this_obj;
 	if (obj == NULL) { ActionVar r = {0}; r.type = ACTION_STACK_VALUE_UNDEFINED; return r; }
 
-	double sx = (arg_count > 0) ? varToDoubleSimple(&args[0]) : NAN;
-	double sy = (arg_count > 1) ? varToDoubleSimple(&args[1]) : NAN;
-	double rot = (arg_count > 2) ? varToDoubleSimple(&args[2]) : NAN;
-	double dtx = (arg_count > 3) ? varToDoubleSimple(&args[3]) : 0.0;
-	double dty = (arg_count > 4) ? varToDoubleSimple(&args[4]) : 0.0;
+	double sx = (arg_count > 0) ? varToDoubleSWF(app_context, &args[0], g_swf_version) : NAN;
+	double sy = (arg_count > 1) ? varToDoubleSWF(app_context, &args[1], g_swf_version) : NAN;
+	double rot = (arg_count > 2) ? varToDoubleSWF(app_context, &args[2], g_swf_version) : NAN;
+	double dtx = (arg_count > 3) ? varToDoubleSWF(app_context, &args[3], g_swf_version) : 0.0;
+	double dty = (arg_count > 4) ? varToDoubleSWF(app_context, &args[4], g_swf_version) : 0.0;
 
 	double cosR = cos(rot), sinR = sin(rot);
 	ActionVar va = makeF64(sx * cosR); setProperty(app_context, obj, "a", 1, &va);
@@ -7994,11 +8005,11 @@ static ActionVar matrixCreateGradientBox(SWFAppContext* app_context, ActionVar* 
 	ASObject* obj = (ASObject*) this_obj;
 	if (obj == NULL) { ActionVar r = {0}; r.type = ACTION_STACK_VALUE_UNDEFINED; return r; }
 
-	double w = (arg_count > 0) ? varToDoubleSimple(&args[0]) : NAN;
-	double h = (arg_count > 1) ? varToDoubleSimple(&args[1]) : NAN;
-	double rot = (arg_count > 2) ? varToDoubleSimple(&args[2]) : 0.0;
-	double dtx = (arg_count > 3) ? varToDoubleSimple(&args[3]) : 0.0;
-	double dty = (arg_count > 4) ? varToDoubleSimple(&args[4]) : 0.0;
+	double w = (arg_count > 0) ? varToDoubleSWF(app_context, &args[0], g_swf_version) : NAN;
+	double h = (arg_count > 1) ? varToDoubleSWF(app_context, &args[1], g_swf_version) : NAN;
+	double rot = (arg_count > 2) ? varToDoubleSWF(app_context, &args[2], g_swf_version) : 0.0;
+	double dtx = (arg_count > 3) ? varToDoubleSWF(app_context, &args[3], g_swf_version) : 0.0;
+	double dty = (arg_count > 4) ? varToDoubleSWF(app_context, &args[4], g_swf_version) : 0.0;
 
 	double scaleX = w / 1638.4;
 	double scaleY = h / 1638.4;
@@ -8017,18 +8028,18 @@ static ActionVar matrixTransformPoint(SWFAppContext* app_context, ActionVar* arg
 {
 	(void)registers;
 	ASObject* obj = (ASObject*) this_obj;
-	double a = varToDoubleSimple(obj ? getProperty(obj, "a", 1) : NULL);
-	double b = varToDoubleSimple(obj ? getProperty(obj, "b", 1) : NULL);
-	double c = varToDoubleSimple(obj ? getProperty(obj, "c", 1) : NULL);
-	double d = varToDoubleSimple(obj ? getProperty(obj, "d", 1) : NULL);
-	double tx = varToDoubleSimple(obj ? getProperty(obj, "tx", 2) : NULL);
-	double ty = varToDoubleSimple(obj ? getProperty(obj, "ty", 2) : NULL);
+	double a = obj ? propToDoubleSWF(app_context, obj, "a", 1) : 0.0;
+	double b = obj ? propToDoubleSWF(app_context, obj, "b", 1) : 0.0;
+	double c = obj ? propToDoubleSWF(app_context, obj, "c", 1) : 0.0;
+	double d = obj ? propToDoubleSWF(app_context, obj, "d", 1) : 0.0;
+	double tx = obj ? propToDoubleSWF(app_context, obj, "tx", 2) : 0.0;
+	double ty = obj ? propToDoubleSWF(app_context, obj, "ty", 2) : 0.0;
 
 	double px = NAN, py = NAN;
 	if (arg_count > 0 && args[0].type == ACTION_STACK_VALUE_OBJECT && args[0].data.numeric_value != 0) {
 		ASObject* pt = (ASObject*)args[0].data.numeric_value;
-		px = propToDouble(pt, "x", 1);
-		py = propToDouble(pt, "y", 1);
+		px = propToDoubleSWF(app_context, pt, "x", 1);
+		py = propToDoubleSWF(app_context, pt, "y", 1);
 	}
 
 	ASObject* result = createPointObjF64(app_context, a * px + c * py + tx, b * px + d * py + ty);
@@ -8042,16 +8053,16 @@ static ActionVar matrixDeltaTransformPoint(SWFAppContext* app_context, ActionVar
 {
 	(void)registers;
 	ASObject* obj = (ASObject*) this_obj;
-	double a = varToDoubleSimple(obj ? getProperty(obj, "a", 1) : NULL);
-	double b = varToDoubleSimple(obj ? getProperty(obj, "b", 1) : NULL);
-	double c = varToDoubleSimple(obj ? getProperty(obj, "c", 1) : NULL);
-	double d = varToDoubleSimple(obj ? getProperty(obj, "d", 1) : NULL);
+	double a = obj ? propToDoubleSWF(app_context, obj, "a", 1) : 0.0;
+	double b = obj ? propToDoubleSWF(app_context, obj, "b", 1) : 0.0;
+	double c = obj ? propToDoubleSWF(app_context, obj, "c", 1) : 0.0;
+	double d = obj ? propToDoubleSWF(app_context, obj, "d", 1) : 0.0;
 
 	double px = NAN, py = NAN;
 	if (arg_count > 0 && args[0].type == ACTION_STACK_VALUE_OBJECT && args[0].data.numeric_value != 0) {
 		ASObject* pt = (ASObject*)args[0].data.numeric_value;
-		px = propToDouble(pt, "x", 1);
-		py = propToDouble(pt, "y", 1);
+		px = propToDoubleSWF(app_context, pt, "x", 1);
+		py = propToDoubleSWF(app_context, pt, "y", 1);
 	}
 
 	ASObject* result = createPointObjF64(app_context, a * px + c * py, b * px + d * py);
@@ -8233,7 +8244,7 @@ static ActionVar rectClone(SWFAppContext* app_context, ActionVar* args, u32 arg_
 
 static ActionVar rectEquals(SWFAppContext* app_context, ActionVar* args, u32 arg_count, ActionVar* registers, void* this_obj)
 {
-	(void)app_context; (void)registers;
+	(void)registers;
 	ASObject* obj = (ASObject*) this_obj;
 	ActionVar r = {0};
 	r.type = ACTION_STACK_VALUE_BOOLEAN;
@@ -8247,14 +8258,14 @@ static ActionVar rectEquals(SWFAppContext* app_context, ActionVar* args, u32 arg
 	if (proto == NULL || proto->type != ACTION_STACK_VALUE_OBJECT ||
 	    (ASObject*)proto->data.numeric_value != g_rect_prototype) return r;
 
-	double sx = varToDoubleSimple(getProperty(obj, "x", 1));
-	double sy = varToDoubleSimple(getProperty(obj, "y", 1));
-	double sw = varToDoubleSimple(getProperty(obj, "width", 5));
-	double sh = varToDoubleSimple(getProperty(obj, "height", 6));
-	double ox = propToDouble(other, "x", 1);
-	double oy = propToDouble(other, "y", 1);
-	double ow = propToDouble(other, "width", 5);
-	double oh = propToDouble(other, "height", 6);
+	double sx = propToDoubleSWF(app_context, obj, "x", 1);
+	double sy = propToDoubleSWF(app_context, obj, "y", 1);
+	double sw = propToDoubleSWF(app_context, obj, "width", 5);
+	double sh = propToDoubleSWF(app_context, obj, "height", 6);
+	double ox = propToDoubleSWF(app_context, other, "x", 1);
+	double oy = propToDoubleSWF(app_context, other, "y", 1);
+	double ow = propToDoubleSWF(app_context, other, "width", 5);
+	double oh = propToDoubleSWF(app_context, other, "height", 6);
 
 	if (sx == ox && sy == oy && sw == ow && sh == oh)
 		r.data.numeric_value = 1;
@@ -8263,12 +8274,12 @@ static ActionVar rectEquals(SWFAppContext* app_context, ActionVar* args, u32 arg
 
 static ActionVar rectIsEmpty(SWFAppContext* app_context, ActionVar* args, u32 arg_count, ActionVar* registers, void* this_obj)
 {
-	(void)app_context; (void)args; (void)arg_count; (void)registers;
+	(void)args; (void)arg_count; (void)registers;
 	ASObject* obj = (ASObject*) this_obj;
 	ActionVar r = {0};
 	r.type = ACTION_STACK_VALUE_BOOLEAN;
-	double w = varToDoubleSimple(obj ? getProperty(obj, "width", 5) : NULL);
-	double h = varToDoubleSimple(obj ? getProperty(obj, "height", 6) : NULL);
+	double w = obj ? propToDoubleSWF(app_context, obj, "width", 5) : 0.0;
+	double h = obj ? propToDoubleSWF(app_context, obj, "height", 6) : 0.0;
 	// isEmpty: !(width > 0 && height > 0) — NaN/undefined → true
 	r.data.numeric_value = (w > 0 && h > 0) ? 0 : 1;
 	return r;
@@ -8290,20 +8301,20 @@ static ActionVar rectSetEmpty(SWFAppContext* app_context, ActionVar* args, u32 a
 
 static ActionVar rectContains(SWFAppContext* app_context, ActionVar* args, u32 arg_count, ActionVar* registers, void* this_obj)
 {
-	(void)app_context; (void)registers;
+	(void)registers;
 	ASObject* obj = (ASObject*) this_obj;
 	ActionVar r = {0};
 
 	if (arg_count < 2) { r.type = ACTION_STACK_VALUE_UNDEFINED; return r; }
 
-	double px = varToDoubleSimple(&args[0]);
-	double py = varToDoubleSimple(&args[1]);
+	double px = varToDoubleSWF(app_context, &args[0], g_swf_version);
+	double py = varToDoubleSWF(app_context, &args[1], g_swf_version);
 	if (isnan(px) || isnan(py)) { r.type = ACTION_STACK_VALUE_UNDEFINED; return r; }
 
-	double x = varToDoubleSimple(obj ? getProperty(obj, "x", 1) : NULL);
-	double y = varToDoubleSimple(obj ? getProperty(obj, "y", 1) : NULL);
-	double w = varToDoubleSimple(obj ? getProperty(obj, "width", 5) : NULL);
-	double h = varToDoubleSimple(obj ? getProperty(obj, "height", 6) : NULL);
+	double x = obj ? propToDoubleSWF(app_context, obj, "x", 1) : 0.0;
+	double y = obj ? propToDoubleSWF(app_context, obj, "y", 1) : 0.0;
+	double w = obj ? propToDoubleSWF(app_context, obj, "width", 5) : 0.0;
+	double h = obj ? propToDoubleSWF(app_context, obj, "height", 6) : 0.0;
 
 	r.type = ACTION_STACK_VALUE_BOOLEAN;
 	r.data.numeric_value = (px >= x && px < x + w && py >= y && py < y + h) ? 1 : 0;
@@ -8321,18 +8332,18 @@ static ActionVar rectContainsPoint(SWFAppContext* app_context, ActionVar* args, 
 	double px, py;
 	if (args[0].type == ACTION_STACK_VALUE_OBJECT && args[0].data.numeric_value != 0) {
 		ASObject* pt = (ASObject*)args[0].data.numeric_value;
-		px = propToDouble(pt, "x", 1);
-		py = propToDouble(pt, "y", 1);
+		px = propToDoubleSWF(app_context, pt, "x", 1);
+		py = propToDoubleSWF(app_context, pt, "y", 1);
 	} else {
 		px = NAN; py = NAN;
 	}
 
 	if (isnan(px) || isnan(py)) { r.type = ACTION_STACK_VALUE_UNDEFINED; return r; }
 
-	double x = varToDoubleSimple(obj ? getProperty(obj, "x", 1) : NULL);
-	double y = varToDoubleSimple(obj ? getProperty(obj, "y", 1) : NULL);
-	double w = varToDoubleSimple(obj ? getProperty(obj, "width", 5) : NULL);
-	double h = varToDoubleSimple(obj ? getProperty(obj, "height", 6) : NULL);
+	double x = obj ? propToDoubleSWF(app_context, obj, "x", 1) : 0.0;
+	double y = obj ? propToDoubleSWF(app_context, obj, "y", 1) : 0.0;
+	double w = obj ? propToDoubleSWF(app_context, obj, "width", 5) : 0.0;
+	double h = obj ? propToDoubleSWF(app_context, obj, "height", 6) : 0.0;
 
 	r.type = ACTION_STACK_VALUE_BOOLEAN;
 	r.data.numeric_value = (px >= x && px < x + w && py >= y && py < y + h) ? 1 : 0;
@@ -8350,19 +8361,19 @@ static ActionVar rectContainsRectangle(SWFAppContext* app_context, ActionVar* ar
 	}
 
 	ASObject* other = (ASObject*)args[0].data.numeric_value;
-	double ox = propToDouble(other, "x", 1);
-	double oy = propToDouble(other, "y", 1);
-	double ow = propToDouble(other, "width", 5);
-	double oh = propToDouble(other, "height", 6);
+	double ox = propToDoubleSWF(app_context, other, "x", 1);
+	double oy = propToDoubleSWF(app_context, other, "y", 1);
+	double ow = propToDoubleSWF(app_context, other, "width", 5);
+	double oh = propToDoubleSWF(app_context, other, "height", 6);
 
 	if (isnan(ox) || isnan(oy) || isnan(ow) || isnan(oh)) {
 		r.type = ACTION_STACK_VALUE_UNDEFINED; return r;
 	}
 
-	double x = varToDoubleSimple(obj ? getProperty(obj, "x", 1) : NULL);
-	double y = varToDoubleSimple(obj ? getProperty(obj, "y", 1) : NULL);
-	double w = varToDoubleSimple(obj ? getProperty(obj, "width", 5) : NULL);
-	double h = varToDoubleSimple(obj ? getProperty(obj, "height", 6) : NULL);
+	double x = obj ? propToDoubleSWF(app_context, obj, "x", 1) : 0.0;
+	double y = obj ? propToDoubleSWF(app_context, obj, "y", 1) : 0.0;
+	double w = obj ? propToDoubleSWF(app_context, obj, "width", 5) : 0.0;
+	double h = obj ? propToDoubleSWF(app_context, obj, "height", 6) : 0.0;
 
 	double right = x + w, bottom = y + h;
 	double oright = ox + ow, obottom = oy + oh;
@@ -8378,13 +8389,13 @@ static ActionVar rectInflate(SWFAppContext* app_context, ActionVar* args, u32 ar
 	ASObject* obj = (ASObject*) this_obj;
 	if (obj == NULL) { ActionVar r = {0}; r.type = ACTION_STACK_VALUE_UNDEFINED; return r; }
 
-	double dx = (arg_count > 0) ? varToDoubleSimple(&args[0]) : NAN;
-	double dy = (arg_count > 1) ? varToDoubleSimple(&args[1]) : NAN;
+	double dx = (arg_count > 0) ? varToDoubleSWF(app_context, &args[0], g_swf_version) : NAN;
+	double dy = (arg_count > 1) ? varToDoubleSWF(app_context, &args[1], g_swf_version) : NAN;
 
-	double x = varToDoubleSimple(getProperty(obj, "x", 1));
-	double y = varToDoubleSimple(getProperty(obj, "y", 1));
-	double w = varToDoubleSimple(getProperty(obj, "width", 5));
-	double h = varToDoubleSimple(getProperty(obj, "height", 6));
+	double x = propToDoubleSWF(app_context, obj, "x", 1);
+	double y = propToDoubleSWF(app_context, obj, "y", 1);
+	double w = propToDoubleSWF(app_context, obj, "width", 5);
+	double h = propToDoubleSWF(app_context, obj, "height", 6);
 
 	ActionVar vx = makeF64(x - dx); setProperty(app_context, obj, "x", 1, &vx);
 	ActionVar vy = makeF64(y - dy); setProperty(app_context, obj, "y", 1, &vy);
@@ -8403,14 +8414,14 @@ static ActionVar rectInflatePoint(SWFAppContext* app_context, ActionVar* args, u
 	double dx = NAN, dy = NAN;
 	if (arg_count > 0 && args[0].type == ACTION_STACK_VALUE_OBJECT && args[0].data.numeric_value != 0) {
 		ASObject* pt = (ASObject*)args[0].data.numeric_value;
-		dx = propToDouble(pt, "x", 1);
-		dy = propToDouble(pt, "y", 1);
+		dx = propToDoubleSWF(app_context, pt, "x", 1);
+		dy = propToDoubleSWF(app_context, pt, "y", 1);
 	}
 
-	double x = varToDoubleSimple(getProperty(obj, "x", 1));
-	double y = varToDoubleSimple(getProperty(obj, "y", 1));
-	double w = varToDoubleSimple(getProperty(obj, "width", 5));
-	double h = varToDoubleSimple(getProperty(obj, "height", 6));
+	double x = propToDoubleSWF(app_context, obj, "x", 1);
+	double y = propToDoubleSWF(app_context, obj, "y", 1);
+	double w = propToDoubleSWF(app_context, obj, "width", 5);
+	double h = propToDoubleSWF(app_context, obj, "height", 6);
 
 	ActionVar vx = makeF64(x - dx); setProperty(app_context, obj, "x", 1, &vx);
 	ActionVar vy = makeF64(y - dy); setProperty(app_context, obj, "y", 1, &vy);
@@ -8425,18 +8436,18 @@ static ActionVar rectIntersection(SWFAppContext* app_context, ActionVar* args, u
 	(void)registers;
 	ASObject* obj = (ASObject*) this_obj;
 
-	double x = varToDoubleSimple(obj ? getProperty(obj, "x", 1) : NULL);
-	double y = varToDoubleSimple(obj ? getProperty(obj, "y", 1) : NULL);
-	double w = varToDoubleSimple(obj ? getProperty(obj, "width", 5) : NULL);
-	double h = varToDoubleSimple(obj ? getProperty(obj, "height", 6) : NULL);
+	double x = obj ? propToDoubleSWF(app_context, obj, "x", 1) : 0.0;
+	double y = obj ? propToDoubleSWF(app_context, obj, "y", 1) : 0.0;
+	double w = obj ? propToDoubleSWF(app_context, obj, "width", 5) : 0.0;
+	double h = obj ? propToDoubleSWF(app_context, obj, "height", 6) : 0.0;
 
 	double ox = NAN, oy = NAN, ow = NAN, oh = NAN;
 	if (arg_count > 0 && args[0].type == ACTION_STACK_VALUE_OBJECT && args[0].data.numeric_value != 0) {
 		ASObject* other = (ASObject*)args[0].data.numeric_value;
-		ox = propToDouble(other, "x", 1);
-		oy = propToDouble(other, "y", 1);
-		ow = propToDouble(other, "width", 5);
-		oh = propToDouble(other, "height", 6);
+		ox = propToDoubleSWF(app_context, other, "x", 1);
+		oy = propToDoubleSWF(app_context, other, "y", 1);
+		ow = propToDoubleSWF(app_context, other, "width", 5);
+		oh = propToDoubleSWF(app_context, other, "height", 6);
 	}
 
 	double left = (x > ox) ? x : ox;
@@ -8468,18 +8479,18 @@ static ActionVar rectIntersects(SWFAppContext* app_context, ActionVar* args, u32
 	r.type = ACTION_STACK_VALUE_BOOLEAN;
 	r.data.numeric_value = 0;
 
-	double x = varToDoubleSimple(obj ? getProperty(obj, "x", 1) : NULL);
-	double y = varToDoubleSimple(obj ? getProperty(obj, "y", 1) : NULL);
-	double w = varToDoubleSimple(obj ? getProperty(obj, "width", 5) : NULL);
-	double h = varToDoubleSimple(obj ? getProperty(obj, "height", 6) : NULL);
+	double x = obj ? propToDoubleSWF(app_context, obj, "x", 1) : 0.0;
+	double y = obj ? propToDoubleSWF(app_context, obj, "y", 1) : 0.0;
+	double w = obj ? propToDoubleSWF(app_context, obj, "width", 5) : 0.0;
+	double h = obj ? propToDoubleSWF(app_context, obj, "height", 6) : 0.0;
 
 	double ox = NAN, oy = NAN, ow = NAN, oh = NAN;
 	if (arg_count > 0 && args[0].type == ACTION_STACK_VALUE_OBJECT && args[0].data.numeric_value != 0) {
 		ASObject* other = (ASObject*)args[0].data.numeric_value;
-		ox = propToDouble(other, "x", 1);
-		oy = propToDouble(other, "y", 1);
-		ow = propToDouble(other, "width", 5);
-		oh = propToDouble(other, "height", 6);
+		ox = propToDoubleSWF(app_context, other, "x", 1);
+		oy = propToDoubleSWF(app_context, other, "y", 1);
+		ow = propToDoubleSWF(app_context, other, "width", 5);
+		oh = propToDoubleSWF(app_context, other, "height", 6);
 	}
 
 	double left = (x > ox) ? x : ox;
@@ -8498,11 +8509,11 @@ static ActionVar rectOffset(SWFAppContext* app_context, ActionVar* args, u32 arg
 	ASObject* obj = (ASObject*) this_obj;
 	if (obj == NULL) { ActionVar r = {0}; r.type = ACTION_STACK_VALUE_UNDEFINED; return r; }
 
-	double dx = (arg_count > 0) ? varToDoubleSimple(&args[0]) : NAN;
-	double dy = (arg_count > 1) ? varToDoubleSimple(&args[1]) : NAN;
+	double dx = (arg_count > 0) ? varToDoubleSWF(app_context, &args[0], g_swf_version) : NAN;
+	double dy = (arg_count > 1) ? varToDoubleSWF(app_context, &args[1], g_swf_version) : NAN;
 
-	double x = varToDoubleSimple(getProperty(obj, "x", 1));
-	double y = varToDoubleSimple(getProperty(obj, "y", 1));
+	double x = propToDoubleSWF(app_context, obj, "x", 1);
+	double y = propToDoubleSWF(app_context, obj, "y", 1);
 
 	ActionVar vx = makeF64(x + dx); setProperty(app_context, obj, "x", 1, &vx);
 	ActionVar vy = makeF64(y + dy); setProperty(app_context, obj, "y", 1, &vy);
@@ -8519,12 +8530,12 @@ static ActionVar rectOffsetPoint(SWFAppContext* app_context, ActionVar* args, u3
 	double dx = NAN, dy = NAN;
 	if (arg_count > 0 && args[0].type == ACTION_STACK_VALUE_OBJECT && args[0].data.numeric_value != 0) {
 		ASObject* pt = (ASObject*)args[0].data.numeric_value;
-		dx = propToDouble(pt, "x", 1);
-		dy = propToDouble(pt, "y", 1);
+		dx = propToDoubleSWF(app_context, pt, "x", 1);
+		dy = propToDoubleSWF(app_context, pt, "y", 1);
 	}
 
-	double x = varToDoubleSimple(getProperty(obj, "x", 1));
-	double y = varToDoubleSimple(getProperty(obj, "y", 1));
+	double x = propToDoubleSWF(app_context, obj, "x", 1);
+	double y = propToDoubleSWF(app_context, obj, "y", 1);
 
 	ActionVar vx = makeF64(x + dx); setProperty(app_context, obj, "x", 1, &vx);
 	ActionVar vy = makeF64(y + dy); setProperty(app_context, obj, "y", 1, &vy);
@@ -8537,18 +8548,18 @@ static ActionVar rectUnion(SWFAppContext* app_context, ActionVar* args, u32 arg_
 	(void)registers;
 	ASObject* obj = (ASObject*) this_obj;
 
-	double x = varToDoubleSimple(obj ? getProperty(obj, "x", 1) : NULL);
-	double y = varToDoubleSimple(obj ? getProperty(obj, "y", 1) : NULL);
-	double w = varToDoubleSimple(obj ? getProperty(obj, "width", 5) : NULL);
-	double h = varToDoubleSimple(obj ? getProperty(obj, "height", 6) : NULL);
+	double x = obj ? propToDoubleSWF(app_context, obj, "x", 1) : 0.0;
+	double y = obj ? propToDoubleSWF(app_context, obj, "y", 1) : 0.0;
+	double w = obj ? propToDoubleSWF(app_context, obj, "width", 5) : 0.0;
+	double h = obj ? propToDoubleSWF(app_context, obj, "height", 6) : 0.0;
 
 	double ox = NAN, oy = NAN, ow = NAN, oh = NAN;
 	if (arg_count > 0 && args[0].type == ACTION_STACK_VALUE_OBJECT && args[0].data.numeric_value != 0) {
 		ASObject* other = (ASObject*)args[0].data.numeric_value;
-		ox = propToDouble(other, "x", 1);
-		oy = propToDouble(other, "y", 1);
-		ow = propToDouble(other, "width", 5);
-		oh = propToDouble(other, "height", 6);
+		ox = propToDoubleSWF(app_context, other, "x", 1);
+		oy = propToDoubleSWF(app_context, other, "y", 1);
+		ow = propToDoubleSWF(app_context, other, "width", 5);
+		oh = propToDoubleSWF(app_context, other, "height", 6);
 	}
 
 	double left = (x < ox) ? x : ox;
