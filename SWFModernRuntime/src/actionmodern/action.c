@@ -13910,6 +13910,7 @@ static ASFunction g_xml_fn_getPrefixForNamespace;
 static ASFunction g_xml_fn_getBytesLoaded;
 static ASFunction g_xml_fn_getBytesTotal;
 static ASFunction g_xml_fn_load;
+static ASFunction g_xml_fn_onData;
 
 // Check if obj is an XML/XMLNode instance (walks __proto__ chain)
 static int isXMLNodeInstance(ASObject* obj) {
@@ -15120,15 +15121,71 @@ static ActionVar builtin_xml_getPrefixForNamespace(SWFAppContext* app_context, A
 
 static ActionVar builtin_xml_getBytesLoaded(SWFAppContext* app_context, ActionVar* args, u32 arg_count, ActionVar* registers, void* this_obj) {
 	ActionVar ret = {0}; ret.type = ACTION_STACK_VALUE_UNDEFINED;
+	if (this_obj != NULL) {
+		ASObject* doc = (ASObject*) this_obj;
+		ActionVar* bl = getProperty(doc, "_bytesLoaded", 12);
+		if (bl != NULL && bl->type != ACTION_STACK_VALUE_UNDEFINED) {
+			return *bl;
+		}
+	}
 	return ret;
 }
 
 static ActionVar builtin_xml_getBytesTotal(SWFAppContext* app_context, ActionVar* args, u32 arg_count, ActionVar* registers, void* this_obj) {
 	ActionVar ret = {0}; ret.type = ACTION_STACK_VALUE_UNDEFINED;
+	if (this_obj != NULL) {
+		ASObject* doc = (ASObject*) this_obj;
+		ActionVar* bt = getProperty(doc, "_bytesTotal", 11);
+		if (bt != NULL && bt->type != ACTION_STACK_VALUE_UNDEFINED) {
+			return *bt;
+		}
+	}
 	return ret;
 }
 
-// XML.load(url) — load XML from embedded data file and fire onLoad callback
+// Default XML.prototype.onData: parses the raw string and fires onLoad.
+// User code can override (instance) or monkey-patch (prototype). A common
+// pattern is to save the prototype's onData and call it from an override.
+static ActionVar builtin_xml_onData(SWFAppContext* app_context, ActionVar* args, u32 arg_count, ActionVar* registers, void* this_obj) {
+	ActionVar ret = {0}; ret.type = ACTION_STACK_VALUE_UNDEFINED;
+	if (this_obj == NULL) return ret;
+	ASObject* doc = (ASObject*) this_obj;
+
+	int src_is_string = (arg_count > 0 && args[0].type == ACTION_STACK_VALUE_STRING);
+	if (!src_is_string) {
+		// src is undefined / null / non-string → onLoad(false)
+		ActionVar cb = {0};
+		cb.type = ACTION_STACK_VALUE_BOOLEAN;
+		cb.data.numeric_value = 0;
+		soundFireCallback(app_context, doc, "onLoad", 6, &cb, 1);
+		return ret;
+	}
+
+	// parseXML(src) + loaded=true + onLoad(true)
+	const uint16_t* u16 = varGetU16Ptr(&args[0]);
+	u32 u16_len = args[0].str_size;
+	char* buf = (char*) malloc((size_t)u16_len * 4 + 1);
+	if (buf != NULL) {
+		u32 utf8_len = (u32) u16_to_utf8(u16, u16_len, buf, u16_len * 4 + 1);
+		xml_parse_into(app_context, doc, buf, utf8_len);
+		free(buf);
+	}
+
+	ActionVar lv = {0}; lv.type = ACTION_STACK_VALUE_BOOLEAN; lv.data.numeric_value = 1;
+	setProperty(app_context, doc, "loaded", 6, &lv);
+
+	ActionVar cb = {0};
+	cb.type = ACTION_STACK_VALUE_BOOLEAN;
+	cb.data.numeric_value = 1;
+	soundFireCallback(app_context, doc, "onLoad", 6, &cb, 1);
+	return ret;
+}
+
+// XML.load(url) — load XML from embedded data file, track bytes loaded/total,
+// orphan any previous children, then invoke this.onData(raw_string) which by
+// default parses + fires onLoad. When onData is overridden (e.g., to intercept
+// raw data), the override owns parsing; the default remains accessible via
+// XML.prototype.onData.
 static ActionVar builtin_xml_load(SWFAppContext* app_context, ActionVar* args, u32 arg_count, ActionVar* registers, void* this_obj) {
 	ActionVar ret = {0}; ret.type = ACTION_STACK_VALUE_BOOLEAN;
 	if (this_obj == NULL) { ret.data.numeric_value = 0; return ret; }
@@ -15175,22 +15232,30 @@ static ActionVar builtin_xml_load(SWFAppContext* app_context, ActionVar* args, u
 		xml_set_null(app_context, doc, "firstChild", 10);
 		xml_set_null(app_context, doc, "lastChild", 9);
 
-		// Parse the XML content
-		xml_parse_into(app_context, doc, data->content, (u32)data->content_length);
-
-		// Set loaded = true, status = 0
-		ActionVar lv = {0}; lv.type = ACTION_STACK_VALUE_BOOLEAN; lv.data.numeric_value = 1;
-		setProperty(app_context, doc, "loaded", 6, &lv);
+		// Track bytesLoaded / bytesTotal (DONT_ENUM) for getBytesLoaded / getBytesTotal
+		ActionVar bv = {0}; bv.type = ACTION_STACK_VALUE_F64;
+		VAL(double, &bv.data.numeric_value) = (double)data->content_length;
+		setPropertyWithFlags(app_context, doc, "_bytesLoaded", 12, &bv, PROPERTY_FLAGS_DONTENUM);
+		setPropertyWithFlags(app_context, doc, "_bytesTotal", 11, &bv, PROPERTY_FLAGS_DONTENUM);
 		ActionVar sv = {0}; sv.type = ACTION_STACK_VALUE_F64; sv.data.numeric_value = 0;
 		setProperty(app_context, doc, "status", 6, &sv);
 		success = 1;
-	}
 
-	// Fire onLoad callback
-	ActionVar cb_arg;
-	cb_arg.type = ACTION_STACK_VALUE_BOOLEAN;
-	cb_arg.data.numeric_value = success ? 1 : 0;
-	soundFireCallback(app_context, doc, "onLoad", 6, &cb_arg, 1);
+		// Build raw src string and call this.onData(src). Default onData parses
+		// and fires onLoad(true); overrides may intercept.
+		u32 src_u16_len;
+		uint16_t* src_u16 = utf8_to_u16(app_context, data->content, (u32)data->content_length, &src_u16_len);
+		ActionVar src_arg = {0};
+		src_arg.type = ACTION_STACK_VALUE_STRING;
+		src_arg.str_size = src_u16_len;
+		VAL(u64, &src_arg.data.numeric_value) = (u64)src_u16;
+		soundFireCallback(app_context, doc, "onData", 6, &src_arg, 1);
+	} else {
+		// Failure: call onData(undefined) which default-fires onLoad(false).
+		ActionVar undef_arg = {0};
+		undef_arg.type = ACTION_STACK_VALUE_UNDEFINED;
+		soundFireCallback(app_context, doc, "onData", 6, &undef_arg, 1);
+	}
 
 	ret.data.numeric_value = success ? 1 : 0;
 	return ret;
@@ -15223,6 +15288,7 @@ static void initXMLPrototype(SWFAppContext* app_context) {
 	xml_init_method(&g_xml_fn_getBytesLoaded, "getBytesLoaded", builtin_xml_getBytesLoaded);
 	xml_init_method(&g_xml_fn_getBytesTotal, "getBytesTotal", builtin_xml_getBytesTotal);
 	xml_init_method(&g_xml_fn_load, "load", builtin_xml_load);
+	xml_init_method(&g_xml_fn_onData, "onData", builtin_xml_onData);
 
 	// ---- XMLNode constructor ----
 	memset(&g_xmlnode_constructor, 0, sizeof(ASFunction));
@@ -15282,6 +15348,7 @@ static void initXMLPrototype(SWFAppContext* app_context) {
 	INSTALL_METHOD("createElement", 13, &g_xml_fn_createElement);
 	INSTALL_METHOD("createTextNode", 14, &g_xml_fn_createTextNode);
 	INSTALL_METHOD("load", 4, &g_xml_fn_load);
+	INSTALL_METHOD("onData", 6, &g_xml_fn_onData);
 
 	// Default ignoreWhite = false on XML.prototype (tests override via XML.prototype.ignoreWhite = true)
 	{
