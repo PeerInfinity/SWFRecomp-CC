@@ -7,7 +7,7 @@ The TESTS list above includes both bare names (matching `from_shumway/avm1/_resu
 
 Location: `ruffle-tests/tests/swfs/from_shumway/avm1/<category>/<name>`
 
-Status (CI at 82a6ea07): 14 output_mismatch failures across 10 categories. 1 ruffle_matched (`hitarea`) already passes filtered. Running in-suite via:
+Status (2026-04-16 local run, after this session's fixes): 5 failing / 14 — 9 clusters now fully green. See "Progress (2026-04-16)" at bottom for detail. 1 ruffle_matched (`hitarea`) already passes filtered. Running in-suite via:
 
 ```bash
 python3 ruffle-tests/verify_output.py \
@@ -235,3 +235,32 @@ Larger/blocked:
 - Are any of these tests already marked `known_failure=true` in upstream Shumway or Ruffle? Check each sub-test dir for `output.ruffle.txt` — if present, we can rely on `ruffle_matched` auto-promotion for the harder ones (`moviecliploader`, `doactionorder`).
 - Two tests currently report `ruffle_matched` in avm1/ (and 1 in flat): `avm1/hitarea`. Any other auto-promotable candidates after adding `output.ruffle.txt`?
 - `hitarea` is a Ruffle known_failure. What are the diffs there? If trivial, consider whether we can actually match Flash rather than Ruffle.
+
+## Progress (2026-04-16)
+
+Passing (9/14 previously failing tests now green; confirmed locally, pending CI):
+
+- `textfield/textfield-text-setters` — TextField text/htmlText setter coerces non-string values to string; htmlText getter skips HTML serialization when `html=false` so plain-text setters round-trip.
+- `textfield/textfield-html` — fell out of the same fix above.
+- `haxe/flocons2` — `createEmptyMovieClip` no longer overwrites an existing own-property / root timeline variable with the same name as the new child, matching Ruffle's display-list-only attachment.
+- `propertycase/propertycase-preserving-6` — SWF ≤ 6 `for...in` dedup is case-insensitive across prototype + own.
+- `property-paths/property-paths-6` — `GetVariable` slash-path walk now handles `/obj:prop.sub` when `obj` is a plain ScriptObject reached via `GetVariable`. (Skipped when target ends in `:` to preserve `path_string` compatibility.)
+- `duplicateMovieClip/name-coercion` — `duplicateMovieClip` target-name coercion now runs through convertString / objectCallToString for `null`, `undefined`, numbers, etc.
+- `duplicateMovieClip/duplicateMovieClip` — initObject is applied via `applyInitObjectPropToMC`, so MC builtins (`_x/_y/_width/_height/…`) and prototype-chain addProperty setters route correctly. Still fails 2/4 on `_width`/`_height` (see below).
+- `xml/xmlload` — `XML.load` fires `this.onData(raw)` and records `_bytesLoaded/_bytesTotal`; added `builtin_xml_onData` as the default prototype method that parses and fires `onLoad(true)`.
+- `loadvariables/loadvars` — `LoadVars.load` is no longer a stub; it fetches the data file, URL-decodes each pair into own properties, sets `_bytesLoaded/_bytesTotal`, marks `loaded=true`, and dispatches `onLoad(success)`.
+- `bitmapdata/loadBitmap` — `defineBitmap` in NO_GRAPHICS builds now registers bitmap metadata via a shared `ng_registerBitmapMetadata`, so `BitmapData.loadBitmap(export)` resolves dimensions and the rectangle getter works.
+
+Still failing (5/14):
+
+- `duplicateMovieClip/duplicateMovieClip` (2/4 → 2/4 remaining) — clone's `_width`/`_height` are `0` instead of `100`/`50`. Ruffle's `clone_sprite` for a dynamically created MC does NOT copy children; container's width/height therefore comes from its dynamic children via `bounds_with_transform`, and an empty clone should reflect the source's bounds. Our `mcGetOriginalBounds` fallback over `child_mc_cache` only walks children of `mc` — the clone has none, so both dimensions resolve to 0. Needs a different source of bounds for dynamic MC clones (possibly snapshotted bounds, or a copy of the child-derived AABB at clone time).
+- `duplicateMovieClip/dontremove` (3/6) — `GetVariable("test")` returns undefined even for the timeline-placed MC. The DuplicateSprite side-effect somehow breaks name resolution for the original at the root level. Suspected: `ng_cloneSprite` may be clobbering/shadowing the source's display-list or var-map entry (worth checking `instance_name_owned` handling after copy, and any write to `setVariableByName` for the source name). Needs a focused repro.
+- `duplicateMovieClip/samedepth` (4/6) — `getInstanceAtDepth(AS-depth)` fails to find clones placed via `DuplicateSprite` at SWF depth 32769 (AS depth 16385). Likely a depth-space translation issue in our `getInstanceAtDepth`; compare with Ruffle's `child_by_depth` using `AVM_DEPTH_BIAS`.
+- `doactionorder/doactionorder` (3/7) — DoAction sequencing: `sym1` tag action runs after `root2` instead of before, and a variable set in an earlier DoAction (`test2 = "hello"`) is not visible to a later one. Likely interacts with `g_sprite_init_filter_active` / `g_defer_sprite_init` from the 3-phase goto ordering; needs a targeted repro.
+- `moviecliploader` (1/7) — `onLoadStart` fires synchronously during `loadMovie`/`loadClip` instead of deferring to the next frame tick. Needs to schedule the MCL event sequence across frames to match Ruffle's real Flash-player-style timing.
+
+## Handoff notes
+
+- Fix order for the next session: start with `duplicateMovieClip/samedepth` (likely a small depth-bias bug) and `dontremove` (name-resolution after clone). `moviecliploader` and `doactionorder` are the larger/blocked items.
+- `xml_getbytes` in the Ruffle AVM1 suite is unchanged by this session's XML work — it was already failing because our sync-load model collapses the two-phase "before onData → after onData" state that the test polls.
+
