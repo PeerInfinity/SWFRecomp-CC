@@ -62,7 +62,7 @@ Last updated: 2026-04-17 (CI run at db6a0198)
 | `FAILING_TESTS_BY_FEATURE.md` | Flat-suite failures categorized (historical — 30 AVM2 + 2 AVM1, all resolved) |
 | `REMAINING_FAILURES_ANALYSIS.md` | Analysis of the 2 fixed flat-suite AVM1 tests + AVM2 ignore list |
 | `complete/SHUMWAY_AVM1_PLAN.md` | Completed plan for the original 11 `avm1/` subdirectory failures |
-| `incomplete/SHUMWAY_AVM1_SUBTREES_PLAN.md` | Active plan — 5 remaining sub-tree failures, handoff notes |
+| `blocked/SHUMWAY_AVM1_SUBTREES_PLAN.md` | Blocker notes for the 2 remaining sub-tree failures (`doactionorder`, `moviecliploader`) — both need coordinated recompiler+runtime work |
 
 ---
 
@@ -86,15 +86,12 @@ Last updated: 2026-04-17 (CI run at db6a0198)
 
 ---
 
-## Still Failing (5 in `avm1/`, plus `moviecliploader` at flat)
+## Still Failing (2 in `avm1/`, both also at flat)
 
-See `incomplete/SHUMWAY_AVM1_SUBTREES_PLAN.md` for per-cluster analysis and handoff notes.
+See `blocked/SHUMWAY_AVM1_SUBTREES_PLAN.md` for root-cause analysis and sketches of the needed fixes.
 
-- `duplicateMovieClip/duplicateMovieClip` (2/4) — clone bounds for dynamic MCs.
-- `duplicateMovieClip/dontremove` (3/6) — source timeline MC name-resolution after clone.
-- `duplicateMovieClip/samedepth` (4/6) — `getInstanceAtDepth` depth-bias mismatch for DuplicateSprite-placed clones.
-- `doactionorder/doactionorder` (3/7) — DoAction sequencing / cross-script variable visibility.
-- `moviecliploader` (1/7) — async `onLoadStart` deferral across frame tick.
+- `doactionorder/doactionorder` (3/7) — recompiler batches root DoAction calls at ShowFrame instead of emitting them inline in tag order. Ruffle queues DoAction and sprite scripts FIFO across sources; our model runs all root scripts first and sprite scripts at ShowFrame. Coupled recompiler + runtime change needed.
+- `moviecliploader` (1/7) — `onLoadStart`/`onLoadComplete` fire synchronously during the same `tagShowFrame` as `loadMovie`/`loadClip`, but should defer one frame tick so the loader's next-frame tag scripts run first. Needs a two-bucket MCL queue that promotes at the top of each tick.
 
 ---
 

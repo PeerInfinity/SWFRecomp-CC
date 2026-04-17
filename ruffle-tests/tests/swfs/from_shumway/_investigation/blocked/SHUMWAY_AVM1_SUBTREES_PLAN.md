@@ -7,7 +7,7 @@ The TESTS list above includes both bare names (matching `from_shumway/avm1/_resu
 
 Location: `ruffle-tests/tests/swfs/from_shumway/avm1/<category>/<name>`
 
-Status (2026-04-17 local run, after this session's fixes): 2 failing / 14 — 12 clusters now fully green. See "Progress (2026-04-17)" at bottom for detail. 1 ruffle_matched (`hitarea`) already passes filtered. Running in-suite via:
+Status (2026-04-17, second session baseline): 2 failing / 14 — 12 clusters now fully green. Both remaining tests need non-trivial architectural work in the recompiler/runtime and are moved to `blocked/`. See "Progress (2026-04-17 session 2)" at bottom. 1 ruffle_matched (`hitarea`) already passes filtered. Running in-suite via:
 
 ```bash
 python3 ruffle-tests/verify_output.py \
@@ -276,4 +276,77 @@ Now failing (2/14):
 
 - `doactionorder/doactionorder` (3/7) — unchanged. Likely a recompiler-level ordering issue: the generated `frame_0` hoists all `tagPlaceObject2` calls before the per-script calls, but in this test the first root `DoAction` tag appears *before* the sprite's `PlaceObject2` in the SWF, and Ruffle queues both into a single execution list so the sprite's own `DoAction` executes *between* the two root `DoAction`s. Fix likely needs recompiler work in `SWFRecomp/src/action/action.cpp` / `swf.cpp` to preserve tag order for `DoAction` vs `PlaceObject2` within a frame.
 - `moviecliploader` (1/7) — unchanged; still a frame-scheduling problem, not a simple dispatch ordering one.
+
+## Progress (2026-04-17 session 2) — blockers documented
+
+No new fixes this session. Confirmed baseline: 2 failing locally and in CI (`db6a0198`).
+
+### Blocker 1: `doactionorder/doactionorder` (3/7) — FIFO DoAction/sprite interleaving
+
+**Observed diff**
+```
+expected:                         actual:
+root1                             root1
+sym1: _level0.sym1                sym1: _level0.sym1
+test1: undefined                  test1: undefined
+sym1                              root2                  <-- root DoAction #2 runs too early
+root2                             sym1: _level0.sym1
+sym1: _level0.sym1                test2: undefined       <-- sym1.test not yet set
+test2: hello                      sym1                   <-- sprite DoAction runs last
+```
+
+**Root cause (in recompiler)**
+`SWFRecomp/src/swf.cpp` queues root `SWF_TAG_DO_ACTION` script calls and flushes them at the `SWF_TAG_SHOW_FRAME` site — so the generated `frame_0` body is:
+```
+<all tagPlaceObject2 calls>
+script_0(app_context);  // root DoAction #1
+script_2(app_context);  // root DoAction #2
+tagShowFrame(app_context);
+```
+then `tagShowFrame` → `process_sprite_needs_init` runs the sprite's Phase 2 scripts (including `script_1`) LAST. That yields order: `root1 → root2 → sprite`.
+
+**Ruffle model**
+Ruffle's `ActionQueue` is FIFO across all sources. The sprite's own `DoAction` is queued when the sprite's `PlaceObject2` is processed (inside the sprite's frame tag stream). So the queueing order is `script_0` → `script_1` → `script_2`, and the flush order is the same.
+
+**What a fix looks like**
+Two coupled changes:
+1. **Recompiler (`SWFRecomp/src/swf.cpp` `SWF_TAG_DO_ACTION` case and the flush loops at ShowFrame / END_TAG)** — emit each root `script_N(app_context)` call INLINE at the point the DoAction tag is parsed (not batched at ShowFrame). Remove (or restrict to sprite-only) the `last_queued_script < next_script_i` flush loops around lines 548–555 / 807–815 / 861–868.
+2. **Runtime (`SWFModernRuntime/src/libswf/tag.c` `tagPlaceObject2`)** — after the existing Phase 1 eager init (lines 3401–3432), also run Phase 2 (scripts) inline for the just-placed sprite, then clear `sprite_needs_init` so `tagShowFrame`'s `process_sprite_needs_init` won't re-run it. Needs care to replicate the tail-end housekeeping in `process_sprite_init_at_depth` (onLoad clip events, `ng_fire_pending_loads`, `actionFlushPendingOnLoads`, `actionFirePendingLoadInits`, `upgrade_sprite_initialized`, etc.).
+
+**Risk**: this changes the global ordering of DoAction vs sprite scripts across all tests. Many currently-passing tests may depend on the current (non-FIFO) ordering either by accident or by design. A sweep of `execution_order*`, `goto_execution_order*`, `issue_*`, and `clip_events` tests is required before committing.
+
+### Blocker 2: `moviecliploader` (1/7) — one-frame deferral of `onLoadStart`
+
+**Observed diff**
+```
+expected:                         actual:
+loading started                   loading started
+loader frame 2                    onLoadStart ...        <-- fires at same-frame ShowFrame
+onLoadStart ...                   onLoadComplete ...
+onLoadComplete ...                loadee frame 1
+loadee frame 1                    onLoadInit ...
+onLoadInit ...                    loader frame 2         <-- fires at next-frame tick
+loadee frame 2                    <end>
+```
+
+**Root cause**
+`actionLoadClip` queues the load into `g_pending_mcl_loads`; `tagShowFrame` of the SAME frame calls `actionFirePendingLoadInits`, which fires `onLoadStart` → `onLoadComplete` → child init + frame 0 → `onLoadInit` all in one go. Expected: `onLoadStart` should fire on the NEXT frame tick (after the loader MC has advanced to and executed frame 2).
+
+**What a fix looks like**
+Real Flash's MovieClipLoader spreads the event sequence across ≥2 frame ticks:
+- Tick T (loadMovie call): no MCL events.
+- Tick T+1: the LOADER's frame tag script runs (so `loader frame 2` traces), THEN `onLoadStart`/`onLoadComplete` fire, THEN the loadee's first frame runs (so `loadee frame 1` traces), THEN `onLoadInit` fires.
+- Tick T+2+: loadee frame advances continue (`loadee frame 2`).
+
+Possible implementation path:
+- Split `g_pending_mcl_loads` into two lists: `g_mcl_loads_next_tick` (queued by loadMovie/loadClip in the CURRENT frame) and `g_mcl_loads_firing` (promoted at the START of the next frame's tick).
+- At the start of each frame's tick (before any `frame_N` script runs), move entries from `next_tick` into `firing`.
+- `firing` entries drive `actionFirePendingLoadInits` — but that itself must run AFTER the loader's frame tags have executed for the new frame, so call it from the same slot in `tagShowFrame` as today.
+- Audit other MCL tests (`movieclipLoader_events`, `loadclip_*`) before/after the change.
+
+**Risk**: timing change affects every MCL-based test. Probably requires net-positive adjustments to `MOVIECLIPLOADER_PLAN.md` (marked `complete/`) and a full local Ruffle-suite dry run before commit.
+
+## Handoff
+
+Leaving at 2/14 failing. Both items need coordinated recompiler + runtime work that touches broadly-exercised codepaths, and fall outside the scope of the "fix the sub-tree failures" plan. Moving this file to `blocked/` so a future session picks it up deliberately.
 
