@@ -1,10 +1,10 @@
 # Ruffle Test Results (Filtered)
 
-**Date**: 2026-04-17 16:55 UTC
+**Date**: 2026-04-17 17:11 UTC
 
-**Git SHA**: `b3deda13c6`
+**Git SHA**: `1ff61eebf4`
 
-**Run Duration**: 1m 41s
+**Run Duration**: 0m 10s
 
 **Filtered**: 2 tests ignored out of 47 available
 
@@ -31,50 +31,50 @@
 
 | # | Test | Lines | Duration | Notes |
 |---|------|-------|----------|-------|
-| 1 | `array` | 7 | 0.4s |  |
-| 2 | `bitmapdata/getPixel` | 2 | 0.4s |  |
-| 3 | `bitmapdata/loadBitmap` | 3 | 0.5s |  |
-| 4 | `callee` | 2 | 0.5s |  |
-| 5 | `depth` | 6 | 0.5s |  |
-| 6 | `doactionorder/symbolclass` | 4 | 0.5s |  |
-| 7 | `duplicateMovieClip/dontremove` | 6 | 15.2s |  |
-| 8 | `duplicateMovieClip/duplicateMovieClip` | 4 | 0.5s |  |
-| 9 | `duplicateMovieClip/name-coercion` | 3 | 0.4s |  |
-| 10 | `duplicateMovieClip/samedepth` | 6 | 0.4s |  |
-| 11 | `externalinterface` | 4 | 0.4s |  |
-| 12 | `filters` | 149 | 0.4s |  |
-| 13 | `haxe/flocons1` | 2 | 0.4s |  |
-| 14 | `haxe/flocons2` | 3 | 0.5s |  |
-| 15 | `label` | 4 | 16.0s |  |
-| 16 | `levels` | 9 | 0.5s |  |
-| 17 | `loadevent` | 9 | 0.4s |  |
-| 18 | `loadvariables/loadvariables` | 7 | 0.4s |  |
-| 19 | `loadvariables/loadvars` | 2 | 0.5s |  |
-| 20 | `lookup` | 3 | 0.4s |  |
-| 21 | `mouse-transparency` | 1 | 0.5s |  |
-| 22 | `nativeinheritance` | 6 | 0.5s |  |
-| 23 | `nested-button` | 1 | 16.1s |  |
-| 24 | `operations` | 13 | 0.4s |  |
-| 25 | `property-paths/property-paths-6` | 6 | 0.4s |  |
-| 26 | `property-paths/property-paths-7` | 7 | 0.4s |  |
-| 27 | `propertycase/propertycase` | 7 | 0.4s |  |
-| 28 | `propertycase/propertycase-preserving-6` | 2 | 0.4s |  |
-| 29 | `propertycase/propertycase-preserving-7` | 5 | 0.2s |  |
-| 30 | `rollover` | 4 | 0.5s |  |
-| 31 | `scope` | 14 | 0.4s |  |
-| 32 | `setinterval` | 20 | 0.5s |  |
-| 33 | `settimeout` | 17 | 0.4s |  |
-| 34 | `super` | 11 | 0.4s |  |
-| 35 | `target` | 18 | 0.5s |  |
-| 36 | `text-bind` | 0 | 16.3s |  |
-| 37 | `textfield/textfield-html` | 4 | 0.4s |  |
-| 38 | `textfield/textfield-text-setters` | 8 | 0.5s |  |
-| 39 | `undefined/undefined-swf6` | 39 | 0.5s |  |
-| 40 | `undefined/undefined-swf7` | 39 | 0.5s |  |
+| 1 | `array` | 7 | 0.1s |  |
+| 2 | `bitmapdata/getPixel` | 2 | 0.1s |  |
+| 3 | `bitmapdata/loadBitmap` | 3 | 0.1s |  |
+| 4 | `callee` | 2 | 0.1s |  |
+| 5 | `depth` | 6 | 0.2s |  |
+| 6 | `doactionorder/symbolclass` | 4 | 0.2s |  |
+| 7 | `duplicateMovieClip/dontremove` | 6 | 0.2s |  |
+| 8 | `duplicateMovieClip/duplicateMovieClip` | 4 | 0.1s |  |
+| 9 | `duplicateMovieClip/name-coercion` | 3 | 0.1s |  |
+| 10 | `duplicateMovieClip/samedepth` | 6 | 0.1s |  |
+| 11 | `externalinterface` | 4 | 0.1s |  |
+| 12 | `filters` | 149 | 0.1s |  |
+| 13 | `haxe/flocons1` | 2 | 0.2s |  |
+| 14 | `haxe/flocons2` | 3 | 0.1s |  |
+| 15 | `label` | 4 | 0.1s |  |
+| 16 | `levels` | 9 | 0.2s |  |
+| 17 | `loadevent` | 9 | 0.2s |  |
+| 18 | `loadvariables/loadvariables` | 7 | 0.1s |  |
+| 19 | `loadvariables/loadvars` | 2 | 0.1s |  |
+| 20 | `lookup` | 3 | 0.1s |  |
+| 21 | `mouse-transparency` | 1 | 0.1s |  |
+| 22 | `nativeinheritance` | 6 | 0.2s |  |
+| 23 | `nested-button` | 1 | 0.1s |  |
+| 24 | `operations` | 13 | 0.1s |  |
+| 25 | `property-paths/property-paths-6` | 6 | 0.1s |  |
+| 26 | `property-paths/property-paths-7` | 7 | 0.1s |  |
+| 27 | `propertycase/propertycase` | 7 | 0.1s |  |
+| 28 | `propertycase/propertycase-preserving-6` | 2 | 0.1s |  |
+| 29 | `propertycase/propertycase-preserving-7` | 5 | 0.1s |  |
+| 30 | `rollover` | 4 | 0.1s |  |
+| 31 | `scope` | 14 | 0.1s |  |
+| 32 | `setinterval` | 20 | 0.1s |  |
+| 33 | `settimeout` | 17 | 0.1s |  |
+| 34 | `super` | 11 | 0.1s |  |
+| 35 | `target` | 18 | 0.1s |  |
+| 36 | `text-bind` | 0 | 0.2s |  |
+| 37 | `textfield/textfield-html` | 4 | 0.1s |  |
+| 38 | `textfield/textfield-text-setters` | 8 | 0.1s |  |
+| 39 | `undefined/undefined-swf6` | 39 | 0.1s |  |
+| 40 | `undefined/undefined-swf7` | 39 | 0.2s |  |
 | 41 | `watch` | 2 | 0.4s |  |
-| 42 | `xml/xmlbuild` | 1 | 0.4s |  |
-| 43 | `xml/xmlload` | 4 | 0.5s |  |
-| 44 | `xml/xmlstring` | 9 | 0.4s |  |
+| 42 | `xml/xmlbuild` | 1 | 0.1s |  |
+| 43 | `xml/xmlload` | 4 | 0.1s |  |
+| 44 | `xml/xmlstring` | 9 | 0.1s |  |
 
 ## Near-Passing Tests
 

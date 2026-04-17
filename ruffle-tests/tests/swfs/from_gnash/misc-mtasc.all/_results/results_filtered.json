@@ -1,8 +1,8 @@
 {
   "metadata": {
-    "timestamp": "2026-04-17T16:55:43.997610+00:00",
-    "git_sha": "b3deda13c6a9d434beaa3896ffe4fa4bb0751c57",
-    "duration_seconds": 96.12,
+    "timestamp": "2026-04-17T17:11:31.845082+00:00",
+    "git_sha": "1ff61eebf406c56a943fb6d079e0efe93d3056b8",
+    "duration_seconds": 1.99,
     "total_available": 9,
     "shards": 30,
     "expected_shards": 30,
@@ -25,7 +25,7 @@
       "test": "TextFieldTest",
       "phases": {
         "recomp": 0.0,
-        "compile": 15.201,
+        "compile": 0.152,
         "run": 0.003
       },
       "num_frames": 30,
@@ -34,7 +34,7 @@
         "expected_lines": 8,
         "matching_lines": 7
       },
-      "duration": 15.21,
+      "duration": 0.16,
       "ruffle_diff_count": 1,
       "ours_diff_count": 1,
       "status": "ruffle_matched",
@@ -44,7 +44,7 @@
       "test": "enum",
       "phases": {
         "recomp": 0.0,
-        "compile": 17.208,
+        "compile": 0.155,
         "run": 0.003
       },
       "num_frames": 30,
@@ -53,15 +53,15 @@
         "expected_lines": 19,
         "matching_lines": 19
       },
-      "duration": 17.21,
+      "duration": 0.16,
       "status": "pass"
     },
     {
       "test": "exception",
       "phases": {
         "recomp": 0.0,
-        "compile": 15.976,
-        "run": 0.004
+        "compile": 0.141,
+        "run": 0.003
       },
       "num_frames": 30,
       "lines": {
@@ -69,14 +69,14 @@
         "expected_lines": 35,
         "matching_lines": 35
       },
-      "duration": 15.98,
+      "duration": 0.15,
       "status": "pass"
     },
     {
       "test": "function_test",
       "phases": {
         "recomp": 0.0,
-        "compile": 15.293,
+        "compile": 0.155,
         "run": 0.003
       },
       "num_frames": 30,
@@ -85,14 +85,14 @@
         "expected_lines": 26,
         "matching_lines": 26
       },
-      "duration": 15.3,
+      "duration": 0.16,
       "status": "pass"
     },
     {
       "test": "hello",
       "phases": {
         "recomp": 0.0,
-        "compile": 15.311,
+        "compile": 0.151,
         "run": 0.003
       },
       "num_frames": 30,
@@ -101,14 +101,14 @@
         "expected_lines": 8,
         "matching_lines": 8
       },
-      "duration": 15.32,
+      "duration": 0.16,
       "status": "pass"
     },
     {
       "test": "implementsOpTest",
       "phases": {
         "recomp": 0.0,
-        "compile": 15.166,
+        "compile": 0.153,
         "run": 0.003
       },
       "num_frames": 30,
@@ -117,14 +117,14 @@
         "expected_lines": 28,
         "matching_lines": 28
       },
-      "duration": 15.17,
+      "duration": 0.16,
       "status": "pass"
     },
     {
       "test": "inheritance",
       "phases": {
         "recomp": 0.0,
-        "compile": 0.396,
+        "compile": 0.156,
         "run": 0.003
       },
       "num_frames": 30,
@@ -133,14 +133,14 @@
         "expected_lines": 22,
         "matching_lines": 22
       },
-      "duration": 0.4,
+      "duration": 0.16,
       "status": "pass"
     },
     {
       "test": "levels",
       "phases": {
         "recomp": 0.0,
-        "compile": 0.535,
+        "compile": 0.202,
         "run": 0.003
       },
       "num_frames": 30,
@@ -149,7 +149,7 @@
         "expected_lines": 68,
         "matching_lines": 11
       },
-      "duration": 0.54,
+      "duration": 0.21,
       "status": "output_mismatch",
       "detail": "57 line(s) differ (actual=14, expected=68)",
       "actual_output": "main class running\nPASSED: -16384 == -16384  [levels.as:37]\nPASSED: _level0 == _level0  [levels.as:40]\nPASSED: 1 == 1  [level5.as:30]\nFAILED: _level0.frameno >= 1  [level5.as:32]\nFAILED: expected: \"-16379\" , obtained: \"0\"  [level5.as:35]\nFAILED: expected: \"_level5\" , obtained: \"_level0._level5\"  [level5.as:38]\nPASSED: _level0 == _level0  [level5.as:41]\nPASSED: 1239 == 1239  [level5.as:44]\nPASSED:  ==   [level5.as:47]\nPASSED: 6789 == 6789  [level5.as:49]\nPASSED:  ==   [level5.as:52]\nPASSED: true == true  [level5.as:54]\nPASSED: _level5/ch == _level5/ch  [level5.as:79]",
@@ -159,8 +159,8 @@
       "test": "super_test1",
       "phases": {
         "recomp": 0.0,
-        "compile": 0.45,
-        "run": 0.003
+        "compile": 0.118,
+        "run": 0.004
       },
       "num_frames": 30,
       "lines": {
@@ -168,7 +168,7 @@
         "expected_lines": 17,
         "matching_lines": 17
       },
-      "duration": 0.46,
+      "duration": 0.12,
       "status": "pass"
     }
   ]

@@ -1,9 +1,9 @@
 {
   "metadata": {
-    "old_timestamp": "2026-04-17T15:38:38.847667+00:00",
-    "old_git_sha": "0d3478bc74185dba3e4691c490a91823bed6b221",
-    "new_timestamp": "2026-04-17T16:55:43.981414+00:00",
-    "new_git_sha": "b3deda13c6a9d434beaa3896ffe4fa4bb0751c57",
+    "old_timestamp": "2026-04-17T16:55:43.981414+00:00",
+    "old_git_sha": "b3deda13c6a9d434beaa3896ffe4fa4bb0751c57",
+    "new_timestamp": "2026-04-17T17:11:31.829447+00:00",
+    "new_git_sha": "1ff61eebf406c56a943fb6d079e0efe93d3056b8",
     "partial": false,
     "same_commit": false
   },
@@ -18,10 +18,10 @@
     "new_effective_pass": 61,
     "new_total": 92,
     "new_pass_rate": 65.2,
-    "old_mismatched_lines": 620,
-    "new_mismatched_lines": 615,
-    "increased_mismatches": 0,
-    "decreased_mismatches": 5,
+    "old_mismatched_lines": 615,
+    "new_mismatched_lines": 620,
+    "increased_mismatches": 5,
+    "decreased_mismatches": 0,
     "newly_passing": 0,
     "newly_failing": 0,
     "status_changed": 0,
@@ -38,12 +38,12 @@
       "old_lines": {
         "actual_lines": 6,
         "expected_lines": 7,
-        "matching_lines": 1
+        "matching_lines": 6
       },
       "new_lines": {
         "actual_lines": 6,
         "expected_lines": 7,
-        "matching_lines": 6
+        "matching_lines": 1
       }
     }
   ]
