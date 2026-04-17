@@ -26478,6 +26478,87 @@ static void initContextMenuItemPrototype(SWFAppContext* app_context, ASFunction*
 	addStubMethodToProto(app_context, ctor->prototype_obj, "copy", 4, mflags);
 }
 
+// LoadVars.load(url): fetch embedded data file, parse URL-encoded body into
+// own properties of the LoadVars instance, and fire this.onLoad(success).
+static ActionVar builtin_loadvars_load(SWFAppContext* app_context, ActionVar* args, u32 arg_count,
+	ActionVar* registers, void* this_obj)
+{
+	ActionVar ret = {0}; ret.type = ACTION_STACK_VALUE_BOOLEAN;
+	if (this_obj == NULL) { ret.data.numeric_value = 0; return ret; }
+	ASObject* lv = (ASObject*) this_obj;
+
+	char url_utf8[512];
+	url_utf8[0] = '\0';
+	if (arg_count > 0 && args[0].type == ACTION_STACK_VALUE_STRING) {
+		const uint16_t* u16 = varGetU16Ptr(&args[0]);
+		u16_to_utf8(u16, args[0].str_size, url_utf8, sizeof(url_utf8));
+	}
+
+	// Initial loaded = false
+	{
+		ActionVar lf = {0}; lf.type = ACTION_STACK_VALUE_BOOLEAN; lf.data.numeric_value = 0;
+		setProperty(app_context, lv, "loaded", 6, &lf);
+	}
+
+	extern DataFileEntry* findDataFile(const char* name);
+	DataFileEntry* data = findDataFile(url_utf8);
+	int success = 0;
+
+	if (data != NULL && data->content != NULL && data->content_length > 0) {
+		int _lv_len = data->content_length;
+		if (_lv_len > 4096) _lv_len = 4096;
+		char _lv_buf[4097];
+		memcpy(_lv_buf, data->content, _lv_len);
+		_lv_buf[_lv_len] = '\0';
+
+		// Parse key=value&key=value... into properties on `lv`.
+		char* pair = _lv_buf;
+		while (pair && *pair) {
+			char* next = strchr(pair, '&');
+			if (next) *next++ = '\0';
+			char* eq = strchr(pair, '=');
+			if (eq) {
+				*eq = '\0';
+				char* key = pair; char* value = eq + 1;
+				urlDecode(key); urlDecode(value);
+				int key_len = (int)strlen(key);
+				int val_len = (int)strlen(value);
+				if (key_len > 0) {
+					u32 u16_len = 0;
+					uint16_t* u16_val = utf8_to_u16(app_context, value, val_len, &u16_len);
+					ActionVar sv = {0};
+					sv.type = ACTION_STACK_VALUE_STRING;
+					sv.str_size = u16_len;
+					if (u16_len > 0 && u16_val != NULL) {
+						sv.data.numeric_value = (u64)(uintptr_t)u16_val;
+					}
+					setProperty(app_context, lv, key, key_len, &sv);
+				}
+			}
+			pair = next;
+		}
+
+		// Track byte counts + mark loaded = true
+		ActionVar bv = {0}; bv.type = ACTION_STACK_VALUE_F64;
+		VAL(double, &bv.data.numeric_value) = (double)data->content_length;
+		setPropertyWithFlags(app_context, lv, "_bytesLoaded", 12, &bv, PROPERTY_FLAGS_DONTENUM);
+		setPropertyWithFlags(app_context, lv, "_bytesTotal", 11, &bv, PROPERTY_FLAGS_DONTENUM);
+		ActionVar lt = {0}; lt.type = ACTION_STACK_VALUE_BOOLEAN; lt.data.numeric_value = 1;
+		setProperty(app_context, lv, "loaded", 6, &lt);
+		success = 1;
+	}
+
+	// Fire onLoad(success)
+	ActionVar cb = {0}; cb.type = ACTION_STACK_VALUE_BOOLEAN;
+	cb.data.numeric_value = success ? 1 : 0;
+	soundFireCallback(app_context, lv, "onLoad", 6, &cb, 1);
+
+	ret.data.numeric_value = success ? 1 : 0;
+	return ret;
+}
+
+static ASFunction g_loadvars_fn_load;
+
 // LoadVars.prototype: 9 methods + contentType string
 static void initLoadVarsPrototype(SWFAppContext* app_context, ASFunction* ctor)
 {
@@ -26492,7 +26573,19 @@ static void initLoadVarsPrototype(SWFAppContext* app_context, ASFunction* ctor)
 	// __proto__ → Object.prototype (enumerated before constructor in LIFO)
 	setObjectProto(app_context, ctor->prototype_obj);
 	const u8 mflags = PROPERTY_FLAG_WRITABLE; // DONT_ENUM + DONT_DELETE
-	addStubMethodToProto(app_context, ctor->prototype_obj, "load", 4, mflags);
+	// Real load() — replaces the stub
+	memset(&g_loadvars_fn_load, 0, sizeof(ASFunction));
+	strncpy(g_loadvars_fn_load.name, "load", 255);
+	g_loadvars_fn_load.function_type = 2;
+	g_loadvars_fn_load.advanced_func = (Function2Ptr) builtin_loadvars_load;
+	setupNativeFuncOwnProps(app_context, &g_loadvars_fn_load);
+	if (function_count < MAX_FUNCTIONS) function_registry[function_count++] = &g_loadvars_fn_load;
+	{
+		ActionVar fv = {0};
+		fv.type = ACTION_STACK_VALUE_FUNCTION;
+		fv.data.numeric_value = (u64) &g_loadvars_fn_load;
+		setPropertyWithFlags(app_context, ctor->prototype_obj, "load", 4, &fv, mflags);
+	}
 	addStubMethodToProto(app_context, ctor->prototype_obj, "send", 4, mflags);
 	addStubMethodToProto(app_context, ctor->prototype_obj, "sendAndLoad", 11, mflags);
 	addStubMethodToProto(app_context, ctor->prototype_obj, "decode", 6, mflags);
