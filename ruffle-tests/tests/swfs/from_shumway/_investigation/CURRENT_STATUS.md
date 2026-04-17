@@ -62,7 +62,7 @@ Last updated: 2026-04-17 (CI run at db6a0198)
 | `FAILING_TESTS_BY_FEATURE.md` | Flat-suite failures categorized (historical — 30 AVM2 + 2 AVM1, all resolved) |
 | `REMAINING_FAILURES_ANALYSIS.md` | Analysis of the 2 fixed flat-suite AVM1 tests + AVM2 ignore list |
 | `complete/SHUMWAY_AVM1_PLAN.md` | Completed plan for the original 11 `avm1/` subdirectory failures |
-| `blocked/SHUMWAY_AVM1_SUBTREES_PLAN.md` | Blocker notes for the 2 remaining sub-tree failures (`doactionorder`, `moviecliploader`) — both need coordinated recompiler+runtime work |
+| `incomplete/SHUMWAY_AVM1_SUBTREES_PLAN.md` | Concrete fix plan for the 2 remaining sub-tree failures — Part A (FIFO DoAction queueing) + Part B (one-tick MCL deferral). Ruffle-referenced, canary list included. |
 
 ---
 
@@ -88,10 +88,10 @@ Last updated: 2026-04-17 (CI run at db6a0198)
 
 ## Still Failing (2 in `avm1/`, both also at flat)
 
-See `blocked/SHUMWAY_AVM1_SUBTREES_PLAN.md` for root-cause analysis and sketches of the needed fixes.
+See `incomplete/SHUMWAY_AVM1_SUBTREES_PLAN.md` for the fix plan (Part A + Part B, recommended landing order B→A).
 
-- `doactionorder/doactionorder` (3/7) — recompiler batches root DoAction calls at ShowFrame instead of emitting them inline in tag order. Ruffle queues DoAction and sprite scripts FIFO across sources; our model runs all root scripts first and sprite scripts at ShowFrame. Coupled recompiler + runtime change needed.
-- `moviecliploader` (1/7) — `onLoadStart`/`onLoadComplete` fire synchronously during the same `tagShowFrame` as `loadMovie`/`loadClip`, but should defer one frame tick so the loader's next-frame tag scripts run first. Needs a two-bucket MCL queue that promotes at the top of each tick.
+- `doactionorder/doactionorder` (3/7) — recompiler batches root DoAction calls at ShowFrame instead of emitting them inline in tag order. Ruffle queues DoAction and sprite scripts FIFO across sources; our model runs all root scripts first and sprite scripts at ShowFrame. Plan: emit root DoActions inline + run sprite Phase 2 eagerly at `tagPlaceObject2`. 4 canary tests (`execution_order1`, `execution_order2`, `variable_args`, `define_function2_preload_order`). May also fix `stage_object_enumerate`.
+- `moviecliploader` (1/7) — `onLoadStart`/`onLoadComplete` fire synchronously during the same `tagShowFrame` as `loadMovie`/`loadClip`, but should defer one frame tick so the loader's next-frame tag scripts run first. Plan: two-bucket MCL queue with top-of-tick promotion in `swf_core.c`. 25 MCL/loadMovie canaries, low observed regression risk.
 
 ---
 
