@@ -3014,7 +3014,9 @@ MovieClip* ng_duplicateMovieClip(SWFAppContext* app_context, const char* source_
 // the renderer. These stubs are only needed in pure NO_GRAPHICS mode.
 void defineBitmap(size_t offset, size_t size, u32 width, u32 height, u16 char_id)
 {
-	(void)offset; (void)size; (void)width; (void)height; (void)char_id;
+	// Register metadata so BitmapData.loadBitmap can resolve dimensions/offsets
+	// even when the renderer is absent (NO_GRAPHICS builds).
+	ng_registerBitmapMetadata(char_id, offset, size, width, height);
 }
 
 void finalizeBitmaps(void)

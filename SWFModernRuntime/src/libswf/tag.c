@@ -4844,10 +4844,8 @@ int ng_getBitmapMetadata(u16 char_id, size_t* out_offset, size_t* out_size, u32*
 	return 0;
 }
 
-#if !defined(NO_GRAPHICS) || defined(HEADLESS_GRAPHICS)
-void defineBitmap(size_t offset, size_t size, u32 width, u32 height, u16 char_id)
+void ng_registerBitmapMetadata(u16 char_id, size_t offset, size_t size, u32 width, u32 height)
 {
-	renderer_upload_bitmap(context, offset, size, width, height);
 	if (g_bitmap_def_count < MAX_BITMAP_DEFS) {
 		g_bitmap_defs[g_bitmap_def_count].char_id = char_id;
 		g_bitmap_defs[g_bitmap_def_count].offset = offset;
@@ -4856,6 +4854,13 @@ void defineBitmap(size_t offset, size_t size, u32 width, u32 height, u16 char_id
 		g_bitmap_defs[g_bitmap_def_count].height = height;
 		g_bitmap_def_count++;
 	}
+}
+
+#if !defined(NO_GRAPHICS) || defined(HEADLESS_GRAPHICS)
+void defineBitmap(size_t offset, size_t size, u32 width, u32 height, u16 char_id)
+{
+	renderer_upload_bitmap(context, offset, size, width, height);
+	ng_registerBitmapMetadata(char_id, offset, size, width, height);
 }
 
 void finalizeBitmaps()

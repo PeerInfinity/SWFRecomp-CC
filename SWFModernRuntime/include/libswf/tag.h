@@ -221,6 +221,7 @@ int ng_lookupExportVersion(const char* name);
 int ng_lookupExportVersionForMovie(const char* name, u8 movie_id);
 int32_t ng_getSoundDuration(u16 char_id);
 int ng_getBitmapMetadata(u16 char_id, size_t* out_offset, size_t* out_size, u32* out_width, u32* out_height);
+void ng_registerBitmapMetadata(u16 char_id, size_t offset, size_t size, u32 width, u32 height);
 extern u8 g_current_movie_id;
 void ng_on_place_object2(SWFAppContext* app_context, size_t depth, size_t char_id);
 void ng_on_remove_object(SWFAppContext* app_context, size_t depth);
