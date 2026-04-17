@@ -11079,6 +11079,10 @@ static void initBitmapDataPrototype(SWFAppContext* app_context)
     // NOTE: loadBitmap is a static method on BitmapData constructor, NOT on prototype
 }
 
+// Forward declarations needed by objectCallValueOf / objectCallToString
+static inline void switchToFunctionVersion(ASFunction* func, int* saved_ver, ASObject** saved_global, int* saved_movie_idx);
+static inline void restoreFunctionVersion(int saved_ver, ASObject* saved_global, int saved_movie_idx);
+
 // Call just valueOf on an object. Returns the raw result (even if non-primitive).
 // Sets *found=1 if valueOf was found and called, 0 otherwise.
 // If the input is not an object, returns it unchanged with *found=0.
@@ -11163,6 +11167,24 @@ static ActionVar objectCallValueOf(SWFAppContext* app_context, ActionVar* obj_va
 			{
 				*found = 1;
 				ActionVar result;
+				// Switch to function's base_clip and SWF version (closure context),
+				// set up captured scopes and this-stack for type 1 functions.
+				MovieClip* _vof_saved_ctx = g_current_context;
+				int _vof_saved_ver; ASObject* _vof_saved_global; int _vof_saved_midx;
+				switchToFunctionVersion(func, &_vof_saved_ver, &_vof_saved_global, &_vof_saved_midx);
+				if (func->base_clip != NULL)
+					actionSetCurrentContext(func->base_clip);
+				u32 _vof_saved_scope_depth = scope_depth;
+				u8 _vof_captured = func->captured_scope_count;
+				for (u8 ci = 0; ci < _vof_captured; ci++) {
+					if (scope_depth < MAX_SCOPE_DEPTH) {
+						scope_is_with[scope_depth] = func->captured_scope_is_with[ci];
+						scope_mc[scope_depth] = func->captured_scope_mc[ci];
+						scope_chain[scope_depth++] = func->captured_scope[ci];
+					}
+				}
+				ASFunction* _vof_prev_exec_func = g_current_executing_func;
+				g_current_executing_func = func;
 				if (func->function_type == 2 && func->advanced_func != NULL)
 				{
 					ActionVar* regs = NULL;
@@ -11173,13 +11195,25 @@ static ActionVar objectCallValueOf(SWFAppContext* app_context, ActionVar* obj_va
 				}
 				else if (func->function_type == 1 && func->simple_func != NULL)
 				{
+					// Push this=obj for type 1 functions (they access this via getVariable("this"))
+					u32 _vof_saved_this_depth = g_this_depth;
+					if (g_this_depth < MAX_THIS_DEPTH) {
+						g_this_stack[g_this_depth].type = ACTION_STACK_VALUE_OBJECT;
+						g_this_stack[g_this_depth].data.numeric_value = (u64)obj;
+						g_this_depth++;
+					}
 					result = ((ActionVar(*)(SWFAppContext*))func->simple_func)(app_context);
+					g_this_depth = _vof_saved_this_depth;
 				}
 				else
 				{
 					result.type = ACTION_STACK_VALUE_UNDEFINED;
 					result.data.numeric_value = 0;
 				}
+				g_current_executing_func = _vof_prev_exec_func;
+				scope_depth = _vof_saved_scope_depth;
+				actionSetCurrentContext(_vof_saved_ctx);
+				restoreFunctionVersion(_vof_saved_ver, _vof_saved_global, _vof_saved_midx);
 				return result;
 			}
 		}

@@ -22,8 +22,43 @@ dependencies: []
 blockers: []
 -->
 
-Last updated: 2026-04-15 (Phase 3 in progress — primitive auto-boxing,
-convertFloat FUNCTION valueOf)
+Last updated: 2026-04-17 (Phase 3 in progress — objectCallValueOf type 1 `this` context fix)
+
+## 2026-04-17 session (objectCallValueOf type 1 `this` + scope setup)
+
+Matched `objectCallValueOf` to `objectCallToString`'s type 1 handling in
+`SWFModernRuntime/src/actionmodern/action.c`. Previously, the FUNCTION path
+in `objectCallValueOf` called `simple_func(app_context)` without setting
+`this` on `g_this_stack`, without pushing captured scopes, and without
+`switchToFunctionVersion` / `base_clip` context. This broke custom valueOf
+invoked through implicit coercion (e.g., `obj == primitive`, `+ obj`,
+arithmetic on objects with user-defined valueOf). The type 1 branch is
+hit whenever a user-defined function (not a builtin) was assigned to
+`obj.valueOf` in code compiled as a SWF5-style DefineFunction.
+
+**Fix:** wrap the FUNCTION dispatch with the same setup/teardown used by
+`objectCallToString`: save/restore `g_current_context`, SWF version,
+global, movie index, `g_current_executing_func`; push captured WITH
+scopes into `scope_chain`; and for type 1, push `this=obj` onto
+`g_this_stack` around the `simple_func` call.
+
+**Impact (diff-line deltas, per local run at 2026-04-17):**
+- toString_valueOf-v5: 47 → 44 diffs (-3)
+- toString_valueOf-v6: 14 → 11 diffs (-3)
+- toString_valueOf-v7: 15 → 13 diffs (-2)
+- toString_valueOf-v8: 15 → 13 diffs (-2)
+- Rectangle-v8: 26 → 24 diffs (-2)
+- Matrix-v6: 31 → 29 diffs (-2)
+
+No tests cross the pass threshold from this fix alone. No regressions on
+avm1 (`string_coercion`, `mutable_this`, `this_scoping`,
+`textsnapshot_available_text`, `register_class_return_value`, `enumerate`,
+`as2_super_and_this_v6`, `swf5_no_closure`) or Gnash
+(`Color-v5..v8`, `ColorTransform-v5..v8`, `Error-v5..v8`, `Point-v5..v8`,
+`Matrix-v7/v8`, `Number-v6/v7/v8`) checked locally. Remaining
+toString_valueOf failures involve MovieClip + string coercion (`y == _level0.mc1`)
+and implicit toString dispatch from `+` operator — separate issue from
+this valueOf dispatch path.
 
 ## 2026-04-15 session 2 (primitive auto-boxing + convertFloat FUNCTION valueOf)
 
