@@ -45594,8 +45594,13 @@ void actionCallFunction(SWFAppContext* app_context, char* str_buffer)
 			int _pushed = 0;
 			for (int _i = 0; _i < child_mc_count; _i++) {
 				MovieClip* _ch = child_mc_cache[_i];
-				if (_ch != NULL && _ch->parent == parent_mc &&
-				    (_ch->depth == _as_depth || _ch->depth == _swf_depth_q)) {
+				if (_ch == NULL || _ch->parent != parent_mc) continue;
+				// Match AS-depth (attachMovie / createEmptyMovieClip convention), or
+				// SWF-biased depth (CloneSprite / duplicateMovieClip convention).
+				// Gate the SWF-biased comparison on depth >= 16384 so a dynamic MC
+				// stored at AS depth 0/1 doesn't spuriously match queries at -16384/-16383.
+				if (_ch->depth == _as_depth ||
+				    (_ch->depth >= 16384 && _ch->depth == _swf_depth_q)) {
 					PUSH(ACTION_STACK_VALUE_MOVIECLIP, (u64)_ch);
 					_pushed = 1;
 					break;
@@ -53016,10 +53021,13 @@ void actionCallMethod(SWFAppContext* app_context, char* str_buffer)
 			// 1. Scan child_mc_cache for matching parent + depth (AS or SWF-space).
 			// CloneSprite / duplicateMovieClip store the raw SWF-biased depth while
 			// attachMovie / createEmptyMovieClip store AS depth; accept either.
+			// Gate the SWF-biased comparison on depth >= 16384 so a dynamic MC
+			// stored at AS depth 0/1 doesn't spuriously match negative-AS queries.
 			for (int _i = 0; _i < child_mc_count; _i++) {
 				MovieClip* _ch = child_mc_cache[_i];
-				if (_ch != NULL && _ch->parent == mc &&
-				    (_ch->depth == _target_depth || _ch->depth == _target_depth_swf)) {
+				if (_ch == NULL || _ch->parent != mc) continue;
+				if (_ch->depth == _target_depth ||
+				    (_ch->depth >= 16384 && _ch->depth == _target_depth_swf)) {
 					PUSH(ACTION_STACK_VALUE_MOVIECLIP, (u64)_ch);
 					return;
 				}
