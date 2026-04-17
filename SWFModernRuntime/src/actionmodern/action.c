@@ -51644,19 +51644,41 @@ void actionCallMethod(SWFAppContext* app_context, char* str_buffer)
 			// Returns the new MovieClip.
 #ifdef NO_GRAPHICS
 			if (num_args >= 2) {
-				// Convert args[0] (target name) to string — may require toString() call on objects
+				// Coerce args[0] to string — Ruffle uses coerce_to_string which turns
+				// null → "null", undefined → "undefined" (SWF≥7) or "" (SWF<7), numbers
+				// to their decimal representation, and objects via toString().
 				char _dmc_tgt_buf[512];
 				const char* tgt_name = "";
-				if (args[0].type == ACTION_STACK_VALUE_STRING && args[0].str_size > 0) {
+				if (args[0].type == ACTION_STACK_VALUE_STRING) {
 					const uint16_t* _dmc_u16 = varGetU16Ptr(&args[0]);
 					u16_to_utf8(_dmc_u16, args[0].str_size, _dmc_tgt_buf, sizeof(_dmc_tgt_buf));
 					tgt_name = _dmc_tgt_buf;
 				} else if ((args[0].type == ACTION_STACK_VALUE_OBJECT ||
 				            args[0].type == ACTION_STACK_VALUE_FUNCTION) && args[0].data.numeric_value != 0) {
 					ActionVar _dmc_ts = objectCallToString(app_context, &args[0], NULL);
-					if (_dmc_ts.type == ACTION_STACK_VALUE_STRING && _dmc_ts.str_size > 0) {
+					if (_dmc_ts.type == ACTION_STACK_VALUE_STRING) {
 						const uint16_t* _dmc_ts_u16 = varGetU16Ptr(&_dmc_ts);
 						u16_to_utf8(_dmc_ts_u16, _dmc_ts.str_size, _dmc_tgt_buf, sizeof(_dmc_tgt_buf));
+						tgt_name = _dmc_tgt_buf;
+					} else {
+						pushVar(app_context, &args[0]);
+						convertString(app_context, _dmc_tgt_buf);
+						ActionVar _dmc_tsp;
+						popVar(app_context, &_dmc_tsp);
+						if (_dmc_tsp.type == ACTION_STACK_VALUE_STRING) {
+							const uint16_t* _dmc_u16 = varGetU16Ptr(&_dmc_tsp);
+							u16_to_utf8(_dmc_u16, _dmc_tsp.str_size, _dmc_tgt_buf, sizeof(_dmc_tgt_buf));
+							tgt_name = _dmc_tgt_buf;
+						}
+					}
+				} else {
+					pushVar(app_context, &args[0]);
+					convertString(app_context, _dmc_tgt_buf);
+					ActionVar _dmc_tsp;
+					popVar(app_context, &_dmc_tsp);
+					if (_dmc_tsp.type == ACTION_STACK_VALUE_STRING) {
+						const uint16_t* _dmc_u16 = varGetU16Ptr(&_dmc_tsp);
+						u16_to_utf8(_dmc_u16, _dmc_tsp.str_size, _dmc_tgt_buf, sizeof(_dmc_tgt_buf));
 						tgt_name = _dmc_tgt_buf;
 					}
 				}
@@ -51680,18 +51702,16 @@ void actionCallMethod(SWFAppContext* app_context, char* str_buffer)
 					clone_mc = ng_cloneSpriteFromMC(app_context, mc, tgt_name, depth_val);
 				}
 
-				// Apply initObject properties (args[2]) to the clone
+				// Apply initObject properties (args[2]) to the clone — via
+				// applyInitObjectPropToMC so MC builtins (_x/_y/_width/_height…)
+				// and prototype-chain addProperty setters route correctly.
 				if (clone_mc != NULL && num_args >= 3 &&
 				    args[2].type == ACTION_STACK_VALUE_OBJECT && args[2].data.numeric_value != 0) {
 					ASObject* init_obj = (ASObject*)(uintptr_t)args[2].data.numeric_value;
-					if (clone_mc->dynamic_props == NULL) {
-						clone_mc->dynamic_props = (void*)allocObject(app_context, 8);
-						retainObject((ASObject*)clone_mc->dynamic_props);
-					}
 					for (u32 _ip = 0; _ip < init_obj->num_used; _ip++) {
 						ASProperty* _prop = &init_obj->properties[_ip];
 						if (_prop->name && (_prop->flags & PROPERTY_FLAG_ENUMERABLE)) {
-							setProperty(app_context, (ASObject*)clone_mc->dynamic_props,
+							applyInitObjectPropToMC(app_context, clone_mc,
 							    _prop->name, _prop->name_length, &_prop->value);
 						}
 					}
