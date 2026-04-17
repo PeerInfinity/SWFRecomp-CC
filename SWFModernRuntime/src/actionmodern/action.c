@@ -24244,8 +24244,15 @@ typedef struct {
     int is_swf_url;      // 1 if URL ends in .swf (affects error vs init behavior)
     char url[128];       // Requested URL (for _url update on failed loads)
 } PendingMCLLoad;
+// Two-bucket MCL queue to defer events one frame tick (Flash parity).
+// `_pending` holds loads ready to fire THIS tick (drained by actionFirePendingLoadInits).
+// `_next` holds loads enqueued by loadClip DURING this tick. At the top of each tick,
+// actionPromotePendingMCLLoads moves _next into _pending, so events fire on the tick
+// AFTER the one that called loadClip — matching Flash (see shumway moviecliploader test).
 static PendingMCLLoad g_pending_mcl_loads[MAX_PENDING_MCL_LOADS];
 int g_pending_mcl_load_count = 0;
+static PendingMCLLoad g_pending_mcl_loads_next[MAX_PENDING_MCL_LOADS];
+int g_pending_mcl_load_next_count = 0;
 
 // Helper: create an ActionVar string from an ASCII C string
 static ActionVar makeStringVar(SWFAppContext* app_context, const char* str)
@@ -24439,22 +24446,25 @@ static ActionVar builtin_mcl_loadClip(SWFAppContext* app_context, ActionVar* arg
         setProperty(app_context, (ASObject*)target_mc->dynamic_props, "__mcl_bytes", 11, &sz);
     }
 
-    // Queue load for deferred event dispatch at ShowFrame
-    if (g_pending_mcl_load_count < MAX_PENDING_MCL_LOADS) {
-        g_pending_mcl_loads[g_pending_mcl_load_count].mcl = mcl;
-        g_pending_mcl_loads[g_pending_mcl_load_count].target = target_mc;
-        g_pending_mcl_loads[g_pending_mcl_load_count].entry = entry;
-        g_pending_mcl_loads[g_pending_mcl_load_count].file_size = file_size;
+    // Queue load into the "next tick" bucket. actionPromotePendingMCLLoads
+    // (called at the top of each tick from swf_core.c) will move this entry
+    // into g_pending_mcl_loads before tagShowFrame drains that queue, so the
+    // MCL events fire on the NEXT frame tick — matching Flash.
+    if (g_pending_mcl_load_next_count < MAX_PENDING_MCL_LOADS) {
+        g_pending_mcl_loads_next[g_pending_mcl_load_next_count].mcl = mcl;
+        g_pending_mcl_loads_next[g_pending_mcl_load_next_count].target = target_mc;
+        g_pending_mcl_loads_next[g_pending_mcl_load_next_count].entry = entry;
+        g_pending_mcl_loads_next[g_pending_mcl_load_next_count].file_size = file_size;
         // Check if URL ends in .swf (affects onLoadError vs onLoadInit for missing files)
         {
             int url_len = (int)strlen(url_utf8);
-            g_pending_mcl_loads[g_pending_mcl_load_count].is_swf_url =
+            g_pending_mcl_loads_next[g_pending_mcl_load_next_count].is_swf_url =
                 (url_len >= 4 && strcasecmp(url_utf8 + url_len - 4, ".swf") == 0) ? 1 : 0;
         }
-        snprintf(g_pending_mcl_loads[g_pending_mcl_load_count].url,
-                 sizeof(g_pending_mcl_loads[g_pending_mcl_load_count].url),
+        snprintf(g_pending_mcl_loads_next[g_pending_mcl_load_next_count].url,
+                 sizeof(g_pending_mcl_loads_next[g_pending_mcl_load_next_count].url),
                  "%s", url_utf8);
-        g_pending_mcl_load_count++;
+        g_pending_mcl_load_next_count++;
     }
 
     return result;
@@ -24609,6 +24619,26 @@ void actionImportAssets(SWFAppContext* app_context, const char* url)
 	g_swf_version = _saved_ver;
 	global_object = _saved_global;
 	g_current_movie_id = _saved_movie_id;
+}
+
+// Move loads from the "next tick" bucket into the "firing" bucket.
+// Called from swf_core.c at the top of each frame tick (after actionFinalizePendingRemovals,
+// before sprite advance + root frame func), so that loads enqueued by loadClip during
+// tick N fire their events during tick N+1 — matching Flash's MovieClipLoader semantics.
+void actionPromotePendingMCLLoads(void)
+{
+    if (g_pending_mcl_load_next_count == 0) return;
+
+    // Append next-tick entries to the firing queue. In the common case
+    // g_pending_mcl_load_count is 0 at promote time, but fall back to append
+    // in case a prior tick left entries un-drained (e.g. during goto catch-up).
+    int slots = MAX_PENDING_MCL_LOADS - g_pending_mcl_load_count;
+    int n = g_pending_mcl_load_next_count;
+    if (n > slots) n = slots;
+    for (int i = 0; i < n; i++)
+        g_pending_mcl_loads[g_pending_mcl_load_count + i] = g_pending_mcl_loads_next[i];
+    g_pending_mcl_load_count += n;
+    g_pending_mcl_load_next_count = 0;
 }
 
 // 1. For each load (FIFO): fire onLoadStart, onLoadProgress, onLoadComplete
