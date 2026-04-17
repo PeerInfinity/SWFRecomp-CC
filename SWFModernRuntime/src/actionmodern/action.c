@@ -39427,17 +39427,23 @@ void actionGetMember(SWFAppContext* app_context)
 			if (prop != NULL)
 			{
 #ifdef NO_GRAPHICS
-				// TextField htmlText getter: re-serialize from format runs
+				// TextField htmlText getter: re-serialize from format runs.
+				// Ruffle returns the format-serialized HTML only when the field is
+				// "effectively HTML" — the html flag is set OR a styleSheet is active.
+				// Without that, htmlText behaves like plain text.
 				if (prop_name_len == 8 && memcmp(prop_name, "htmlText", 8) == 0 &&
 				    MC_IS_TEXTFIELD(mc))
 				{
-					// If html flag is false, return stored value directly without serialization.
-					// Switching html=true→false mid-stream should not serialize old format runs.
 					ActionVar* _ht_html_flag = getProperty((ASObject*) mc->dynamic_props, "html", 4);
 					int _ht_html_on = (_ht_html_flag != NULL &&
 						_ht_html_flag->type == ACTION_STACK_VALUE_BOOLEAN &&
 						_ht_html_flag->data.numeric_value);
-					TFRunTable* _ht_table = _ht_html_on ? tf_find_table(mc) : NULL;
+					ActionVar* _ht_ss_flag = getProperty((ASObject*) mc->dynamic_props, "styleSheet", 10);
+					int _ht_ss_on = (_ht_ss_flag != NULL &&
+						_ht_ss_flag->type == ACTION_STACK_VALUE_OBJECT &&
+						_ht_ss_flag->data.numeric_value != 0);
+					int _ht_effective_html = _ht_html_on || _ht_ss_on;
+					TFRunTable* _ht_table = _ht_effective_html ? tf_find_table(mc) : NULL;
 					if (_ht_table != NULL) {
 						// Table exists = content was parsed. Empty run_count means empty result.
 						int _ht_multiline = 0;
