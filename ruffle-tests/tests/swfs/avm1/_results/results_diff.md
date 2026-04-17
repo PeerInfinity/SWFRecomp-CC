@@ -1,20 +1,20 @@
 # Ruffle Test Results Diff
 
-**Previous:** `57761062335c` (2026-04-17T03:35:23.420257+00:00)
-**Current:** `6ddedca895ed` (2026-04-17T04:43:39.098557+00:00)
+**Previous:** `6ddedca895ed` (2026-04-17T04:43:39.098557+00:00)
+**Current:** `e1bee99f0101` (2026-04-17T05:33:51.866646+00:00)
 
 ## Summary
 
 | Metric | Previous | Current | Delta |
 |--------|----------|---------|-------|
-| Passing | 579 | 580 | +1 |
+| Passing | 580 | 580 | 0 |
 | Total | 641 | 641 | 0 |
-| Pass rate | 90.3% | 90.5% | +0.2% |
-| Mismatched lines | 30573 | 30572 | -1 |
-|   Decreased | | | -1 |
+| Pass rate | 90.5% | 90.5% | 0% |
+| Mismatched lines | 30572 | 30573 | +1 |
+|   Increased | | | +1 |
 
-## Newly Passing (1)
+## Line Count Changed (1)
 
-| Test | Previous Status | Lines (prev) | Lines (now) |
-|------|----------------|--------------|-------------|
-| `clone_sprite_edittext` | output_mismatch | 93/94 | 94/94 |
+| Test | Status | Lines (prev) | Lines (now) | Diff |
+|------|--------|--------------|-------------|------|
+| `global_instance_decls` | output_mismatch | 14/758 | 13/758 | +1 |

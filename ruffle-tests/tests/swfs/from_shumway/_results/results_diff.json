@@ -1,31 +1,31 @@
 {
   "metadata": {
-    "old_timestamp": "2026-04-17T03:35:23.438749+00:00",
-    "old_git_sha": "57761062335cfaeb38b7e93d105f7ef4396da3bf",
-    "new_timestamp": "2026-04-17T04:43:39.117063+00:00",
-    "new_git_sha": "6ddedca895ed0558a623808035bab645d6b00467",
+    "old_timestamp": "2026-04-17T04:43:39.117063+00:00",
+    "old_git_sha": "6ddedca895ed0558a623808035bab645d6b00467",
+    "new_timestamp": "2026-04-17T05:33:51.888379+00:00",
+    "new_git_sha": "e1bee99f010151b0187a09800d0164b5cfdae53b",
     "partial": false,
     "same_commit": false
   },
   "summary": {
-    "old_pass": 57,
+    "old_pass": 58,
     "old_ruffle_matched": 1,
-    "old_effective_pass": 58,
+    "old_effective_pass": 59,
     "old_total": 92,
-    "old_pass_rate": 62.0,
-    "new_pass": 58,
+    "old_pass_rate": 63.0,
+    "new_pass": 60,
     "new_ruffle_matched": 1,
-    "new_effective_pass": 59,
+    "new_effective_pass": 61,
     "new_total": 92,
-    "new_pass_rate": 63.0,
+    "new_pass_rate": 65.2,
     "old_mismatched_lines": 627,
-    "new_mismatched_lines": 627,
-    "increased_mismatches": 4,
-    "decreased_mismatches": 4,
+    "new_mismatched_lines": 620,
+    "increased_mismatches": 0,
+    "decreased_mismatches": 7,
     "newly_passing": 2,
-    "newly_failing": 1,
-    "status_changed": 3,
-    "unchanged": 89,
+    "newly_failing": 0,
+    "status_changed": 2,
+    "unchanged": 90,
     "added": 0,
     "removed": 0
   },
@@ -33,44 +33,28 @@
     {
       "test": "avm1/depth",
       "change_type": "changed",
-      "old_status": "pass",
-      "new_status": "output_mismatch",
+      "old_status": "output_mismatch",
+      "new_status": "pass",
       "old_lines": {
-        "actual_lines": 6,
-        "expected_lines": 6,
-        "matching_lines": 6
-      },
-      "new_lines": {
         "actual_lines": 7,
         "expected_lines": 6,
         "matching_lines": 2
-      }
-    },
-    {
-      "test": "avm1/duplicateMovieClip/duplicateMovieClip",
-      "change_type": "changed",
-      "old_status": "output_mismatch",
-      "new_status": "pass",
-      "old_lines": {
-        "actual_lines": 4,
-        "expected_lines": 4,
-        "matching_lines": 2
       },
       "new_lines": {
-        "actual_lines": 4,
-        "expected_lines": 4,
-        "matching_lines": 4
+        "actual_lines": 6,
+        "expected_lines": 6,
+        "matching_lines": 6
       }
     },
     {
-      "test": "avm1/duplicateMovieClip/samedepth",
+      "test": "avm1/duplicateMovieClip/dontremove",
       "change_type": "changed",
       "old_status": "output_mismatch",
       "new_status": "pass",
       "old_lines": {
         "actual_lines": 6,
         "expected_lines": 6,
-        "matching_lines": 4
+        "matching_lines": 3
       },
       "new_lines": {
         "actual_lines": 6,

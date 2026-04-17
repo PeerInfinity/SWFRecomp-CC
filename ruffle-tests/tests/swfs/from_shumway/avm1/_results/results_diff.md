@@ -1,28 +1,21 @@
 # Ruffle Test Results Diff
 
-**Previous:** `57761062335c` (2026-04-17T03:35:23.434848+00:00)
-**Current:** `6ddedca895ed` (2026-04-17T04:43:39.113046+00:00)
+**Previous:** `6ddedca895ed` (2026-04-17T04:43:39.113046+00:00)
+**Current:** `e1bee99f0101` (2026-04-17T05:33:51.883068+00:00)
 
 ## Summary
 
 | Metric | Previous | Current | Delta |
 |--------|----------|---------|-------|
-| Passing | 41 | 42 | +1 |
+| Passing | 42 | 44 | +2 |
 | Total | 47 | 47 | 0 |
-| Pass rate | 87.2% | 89.4% | +2.2% |
-| Mismatched lines | 19 | 19 | 0 |
-|   Decreased | | | -4 |
-|   Increased | | | +4 |
+| Pass rate | 89.4% | 93.6% | +4.2% |
+| Mismatched lines | 19 | 12 | -7 |
+|   Decreased | | | -7 |
 
 ## Newly Passing (2)
 
 | Test | Previous Status | Lines (prev) | Lines (now) |
 |------|----------------|--------------|-------------|
-| `duplicateMovieClip/duplicateMovieClip` | output_mismatch | 2/4 | 4/4 |
-| `duplicateMovieClip/samedepth` | output_mismatch | 4/6 | 6/6 |
-
-## Newly Failing (1)
-
-| Test | New Status | Lines (prev) | Lines (now) |
-|------|-----------|--------------|-------------|
-| `depth` | output_mismatch | 6/6 | 2/6 |
+| `depth` | output_mismatch | 2/6 | 6/6 |
+| `duplicateMovieClip/dontremove` | output_mismatch | 3/6 | 6/6 |
