@@ -868,13 +868,6 @@ void swfStart(SWFAppContext* app_context)
 		// They persisted for one frame (scripts could still access them); now invalidate.
 		actionFinalizePendingRemovals(app_context);
 
-		// Promote MCL loads queued by loadClip in the previous tick into the
-		// firing queue (see matching call in swf_core.c for rationale).
-		{
-			extern void actionPromotePendingMCLLoads(void);
-			actionPromotePendingMCLLoads();
-		}
-
 		// Frame-first: advance sprites and run frame scripts before delivering events.
 		// This ensures that listeners registered in frame scripts receive events from
 		// the same tick (matching Flash/Ruffle's frame-then-event execution order).
@@ -933,16 +926,11 @@ void swfStart(SWFAppContext* app_context)
 			// Past the last frame: keep dispatching per-tick AS handlers
 			// (onEnterFrame, sprite timelines, clip ENTER_FRAME events).
 			// Break if quit_swf and no remaining input events, handlers, or playing sprites.
-			{
-				extern int g_pending_mcl_load_next_count;
-				if (quit_swf && !(g_events && g_event_pos < g_event_count)
-				    && !actionHasEnterFrameHandlers()
-				    && !hasPlayingSprites()
-				    && !hasActiveTimers()
-				    && !hasClipEnterFrameHandlers()
-				    && g_pending_mcl_load_count == 0
-				    && g_pending_mcl_load_next_count == 0) break;
-			}
+			if (quit_swf && !(g_events && g_event_pos < g_event_count)
+			    && !actionHasEnterFrameHandlers()
+			    && !hasPlayingSprites()
+			    && !hasActiveTimers()
+			    && !hasClipEnterFrameHandlers()) break;
 			{
 				extern int g_advance_defer_nested;
 				g_advance_defer_nested = 1;
@@ -1214,11 +1202,7 @@ void swfStart(SWFAppContext* app_context)
 			if (hasActiveTimers()) continue;
 			if (g_events && g_event_pos < g_event_count) continue;
 			if (actionHasEnterFrameHandlers() || hasPlayingSprites() || hasClipEnterFrameHandlers()) continue;
-			{
-				extern int g_pending_mcl_load_next_count;
-				if (g_pending_mcl_load_count > 0) continue;
-				if (g_pending_mcl_load_next_count > 0) continue;
-			}
+			if (g_pending_mcl_load_count > 0) continue;
 			break;
 		}
 		else if (manual_next_frame)
@@ -1260,18 +1244,6 @@ void swfStart(SWFAppContext* app_context)
 		}
 	}
 #endif
-
-	// Final MCL drain: if loadClip was called on the very last tick (single-frame
-	// tests where MAX_FRAMES=1), the two-bucket deferral would otherwise leave events
-	// un-fired. Promote+drain once so trace output is emitted before exit.
-	{
-		extern void actionPromotePendingMCLLoads(void);
-		extern void actionFirePendingLoadInits(SWFAppContext*);
-		actionPromotePendingMCLLoads();
-		int _mcl_drain_guard = 0;
-		while (g_pending_mcl_load_count > 0 && _mcl_drain_guard++ < 32)
-			actionFirePendingLoadInits(app_context);
-	}
 
 	printf("\n=== SWF Execution Completed ===\n");
 
