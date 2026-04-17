@@ -1,6 +1,9 @@
 # Disabled git directories (for submodules converted to regular directories)
 .git.disabled
 
+# Pipeline driver state (used by /pipeline slash command)
+.pipeline-state
+
 # Visual Studio
 .vs/
 

@@ -28,7 +28,7 @@ on:
           - '10'
           - '20'
           - '30'
-        default: '10'
+        default: '30'
   workflow_call:
     inputs:
       categories:
@@ -44,7 +44,7 @@ on:
       parallel:
         description: 'Number of parallel runners'
         required: false
-        default: '10'
+        default: '30'
         type: string
 
 permissions:
