@@ -1,6 +1,14 @@
-# Gnash Failing Tests by Feature Category
-<!-- TESTS: ASnative-v5, ASnative-v6, ASnative-v7, ASnative-v8, AsBroadcaster-v6, AsBroadcaster-v7, AsBroadcaster-v8, BitmapData-v8, ContextMenu-v7, ContextMenu-v8, ExternalInterface-v6, ExternalInterface-v7, Global-v6, Global-v7, Global-v8, HitTest-v6, HitTest-v7, HitTest-v8, Instance-v5, Instance-v6, Instance-v7, Instance-v8, LoadVars-v6, LoadVars-v7, LoadVars-v8, Matrix-v6, Matrix-v7, Matrix-v8, MovieClip-v5, MovieClipLoader-v7, MovieClipLoader-v8, Number-v5, Number-v6, Number-v7, Number-v8, Rectangle-v8, Sound-v6, Sound-v7, Sound-v8, String-v5, String-v6, String-v7, String-v8, TextFormat-v5, TextFormat-v6, TextFormat-v7, case-v6, toString_valueOf-v5, toString_valueOf-v6, toString_valueOf-v7, toString_valueOf-v8, with-v5, with-v6, with-v7, with-v8 -->
+# Gnash Failing Tests by Feature Category (Umbrella Plan)
+<!-- TESTS: AsBroadcaster-v6, AsBroadcaster-v7, AsBroadcaster-v8, ContextMenu-v7, ContextMenu-v8, ExternalInterface-v6, ExternalInterface-v7, Global-v6, Global-v7, Global-v8, HitTest-v6, HitTest-v7, HitTest-v8, Instance-v5, Instance-v6, Instance-v7, Instance-v8, Matrix-v7, Matrix-v8, MovieClip-v5, Number-v5, Number-v6, Number-v7, Number-v8, Sound-v6, Sound-v7, Sound-v8, TextFormat-v5, TextFormat-v6, TextFormat-v7, case-v6 -->
 <!-- PASSING (removed from TESTS): Point-v8 (ruffle_matched, 2026-04-14), TextSnapshot-v6/v7/v8 (pass), delete-v5..v8 (pass), enumerate-v6..v8 (pass), Camera-v6/v7/v8 (ruffle_matched), Microphone-v6/v7/v8 (ruffle_matched), Sound-v5 (ruffle_matched), case-v7/v8 (ruffle_matched), targetPath-v6/v7/v8 (ruffle_matched), System-v5/v6/v7/v8 (pass, 2026-04-14 session 3) -->
+<!-- SPLIT OUT TO DEDICATED PLANS (2026-04-17):
+  - ASnative-v5/v6/v7/v8 → ASNATIVE_CLASSES_PLAN.md
+  - String-v5/v6/v7/v8 → STRING_REGEX_PLAN.md
+  - BitmapData-v8 → BITMAPDATA_PLAN.md
+  - LoadVars-v6/v7/v8, MovieClipLoader-v7/v8 → LOADVARS_MOVIECLIPLOADER_PLAN.md
+  - with-v5/v6/v7/v8 → WITH_AUTOBOXING_PLAN.md
+  - Matrix-v6, Rectangle-v8, toString_valueOf-v5/v6/v7/v8 → IMPLICIT_COERCION_PLAN.md
+-->
 
 <!-- PLAN_META
 id: GNASH_FAILING_BY_FEATURE
