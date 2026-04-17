@@ -7,7 +7,7 @@ The TESTS list above includes both bare names (matching `from_shumway/avm1/_resu
 
 Location: `ruffle-tests/tests/swfs/from_shumway/avm1/<category>/<name>`
 
-Status (2026-04-17 local run, after this session's fixes): 3 failing / 14 — 11 clusters now fully green. See "Progress (2026-04-17)" at bottom for detail. 1 ruffle_matched (`hitarea`) already passes filtered. Running in-suite via:
+Status (2026-04-17 local run, after this session's fixes): 2 failing / 14 — 12 clusters now fully green. See "Progress (2026-04-17)" at bottom for detail. 1 ruffle_matched (`hitarea`) already passes filtered. Running in-suite via:
 
 ```bash
 python3 ruffle-tests/verify_output.py \
@@ -266,14 +266,14 @@ Still failing (5/14):
 
 ## Progress (2026-04-17)
 
-Two more tests fixed this session (confirmed locally, pending CI):
+Three more tests fixed this session (confirmed locally, pending CI):
 
 - `duplicateMovieClip/samedepth` — `getInstanceAtDepth(depth)` had no global-function handler, so calling it at timeline level fell through to the unimplemented `g_mc_method_funcs` slot and always returned `undefined`. Added a global handler in `actionCallFunction` that operates on `g_current_context`. To cope with the mixed depth-space convention (attachMovie/createEmptyMovieClip store AS depth; CloneSprite/duplicateMovieClip store SWF-biased depth), both the new global handler and the existing method handler now accept either AS-depth or SWF-depth matches when scanning `child_mc_cache`.
 - `duplicateMovieClip/duplicateMovieClip` — `ng_duplicateMovieClip` was not copying Drawing-API bounds (`draw_has_bounds`, `draw_xmin/xmax/ymin/ymax`) from the source. When cloning a dynamic MC built via `createEmptyMovieClip` + `lineTo`/`beginFill`, the clone is born with no children, so `mcGetOriginalBounds` fell through to the child-MC bounds walk and returned 0 for both dimensions. Added the five-field copy so the clone reflects the source's accumulated draw bounds. (Earlier attempt also normalized `ng_cloneSprite{,FromMC}` to store AS-depth, but that regressed `textsnapshot_available_text`; the `getInstanceAtDepth` both-depths check avoids needing the storage-side normalization.)
+- `duplicateMovieClip/dontremove` — two bugs: (1) `actionDefineLocal`/`actionSetVariable` were trusting `string_id` at stack slot +12 even when the name slot type wasn't STRING. The `PUSH(type, value)` macro only writes +0/+4/+16, so +12 still held the *previous* owner's string_id. When `Push undef; Push undef; DefineLocal` ran on a stack slot that previously held `Push "test"` (string_id 2), the DefineLocal wrote `undefined` into `var_array[2]` — clobbering the `test` global. Fixed both opcodes to ignore `string_id` unless the name slot's type is STRING. (2) `actionRewindCleanup` (called on backward `GotoFrame`) was wiping ALL dynamically-created MCs, including `CloneSprite` clones at high SWF depths. Ruffle preserves clones above the AS positive range across backward goto; gated the wipe on `ch->depth < 16384` so SWF-space clones persist.
 
-Now failing (3/14):
+Now failing (2/14):
 
-- `duplicateMovieClip/dontremove` (3/6) — unchanged; stage-placed `test` still resolves to `undefined`. See still-failing entry above.
 - `doactionorder/doactionorder` (3/7) — unchanged. Likely a recompiler-level ordering issue: the generated `frame_0` hoists all `tagPlaceObject2` calls before the per-script calls, but in this test the first root `DoAction` tag appears *before* the sprite's `PlaceObject2` in the SWF, and Ruffle queues both into a single execution list so the sprite's own `DoAction` executes *between* the two root `DoAction`s. Fix likely needs recompiler work in `SWFRecomp/src/action/action.cpp` / `swf.cpp` to preserve tag order for `DoAction` vs `PlaceObject2` within a frame.
 - `moviecliploader` (1/7) — unchanged; still a frame-scheduling problem, not a simple dispatch ordering one.
 

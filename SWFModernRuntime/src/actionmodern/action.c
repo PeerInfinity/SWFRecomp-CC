@@ -17524,6 +17524,14 @@ void actionRewindCleanup(SWFAppContext* app_context)
 		size_t dl_depth = ng_findDisplayEntryByName(ch->name);
 		if (dl_depth == SIZE_MAX) {
 			// No display list entry — this is a dynamically created MC.
+			// CloneSprite/duplicateMovieClip clones placed at SWF-space depth
+			// above the AS positive range (>= 16384 SWF, i.e. >= 0 AS) persist
+			// across backward goto in Ruffle. Preserving them lets tests like
+			// from_shumway/avm1/duplicateMovieClip/dontremove still see clones
+			// on the second pass through the loop frame.
+			if (ch->depth >= 16384) {
+				continue;
+			}
 			// Remove from parent's dynamic_props.
 			if (root_movieclip.dynamic_props != NULL) {
 				ActionVar undef = {0};
@@ -30863,12 +30871,16 @@ void actionSetVariable(SWFAppContext* app_context)
 	u32 value_sp = SP;
 	u32 var_name_sp = SP_SECOND_TOP;
 
-	// Read variable name info
+	// Read variable name info.
 	// Stack layout for strings: +0=type, +4=oldSP, +8=length, +12=string_id, +16=pointer
-	u32 string_id = VAL(u32, &STACK[var_name_sp + 12]);
+	// PUSH() only writes +0, +4 and +16 — see actionDefineLocal for rationale.
+	u8 _sv_name_type = STACK[var_name_sp];
+	u32 string_id = (_sv_name_type == ACTION_STACK_VALUE_STRING)
+		? VAL(u32, &STACK[var_name_sp + 12]) : 0;
 
 	char _sv_buf[512];
-	u32 _sv_u16_len = VAL(u32, &STACK[var_name_sp + 8]);
+	u32 _sv_u16_len = (_sv_name_type == ACTION_STACK_VALUE_STRING)
+		? VAL(u32, &STACK[var_name_sp + 8]) : 0;
 	u32 var_name_len = (u32)u16_to_utf8((const uint16_t*)VAL(u64, &STACK[var_name_sp + 16]), _sv_u16_len, _sv_buf, sizeof(_sv_buf));
 	char* var_name = _sv_buf;
 
@@ -31407,9 +31419,16 @@ void actionDefineLocal(SWFAppContext* app_context)
 
 	// Read variable name info
 	// Stack layout for strings: +0=type, +4=oldSP, +8=length, +12=string_id, +16=pointer
-	u32 string_id = VAL(u32, &STACK[var_name_sp + 12]);
+	// The PUSH macro only writes +0, +4 and +16, leaving +8 (length) and +12
+	// (string_id) holding whatever the previous owner of this stack slot had.
+	// Ignore string_id when the name isn't actually a STRING, otherwise a stale
+	// string_id can resolve to the wrong var_array slot.
+	u8 _dl_name_type = STACK[var_name_sp];
+	u32 string_id = (_dl_name_type == ACTION_STACK_VALUE_STRING)
+		? VAL(u32, &STACK[var_name_sp + 12]) : 0;
 	char _dl_buf[512];
-	u32 _dl_u16_len = VAL(u32, &STACK[var_name_sp + 8]);
+	u32 _dl_u16_len = (_dl_name_type == ACTION_STACK_VALUE_STRING)
+		? VAL(u32, &STACK[var_name_sp + 8]) : 0;
 	u32 var_name_len = (u32)u16_to_utf8((const uint16_t*)VAL(u64, &STACK[var_name_sp + 16]), _dl_u16_len, _dl_buf, sizeof(_dl_buf));
 	char* var_name = _dl_buf;
 
