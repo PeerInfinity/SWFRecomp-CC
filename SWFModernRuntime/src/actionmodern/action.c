@@ -49442,6 +49442,7 @@ void actionCallMethod(SWFAppContext* app_context, char* str_buffer)
 			ASObject* _cme_saved_sc[MAX_SCOPE_DEPTH];
 			u8 _cme_saved_sw[MAX_SCOPE_DEPTH];
 			MovieClip* _cme_saved_sm[MAX_SCOPE_DEPTH];
+			ASObject* _cme_local_scope = NULL;
 			if (_cme_caller_ver >= 6 && func != NULL) {
 				switchToFunctionVersion(func, &_cme_saved_ver, &_cme_saved_global, &_cme_saved_midx);
 				for (u32 si = 0; si < scope_depth; si++) {
@@ -49454,6 +49455,24 @@ void actionCallMethod(SWFAppContext* app_context, char* str_buffer)
 					MovieClip* _bc = reResolveDeadBaseClip(app_context, (MovieClip*)func->base_clip);
 					actionSetCurrentContext(_bc);
 					g_current_sprite_obj = NULL;
+				}
+				// Push captured scopes from function definition, then a fresh local scope.
+				// Without this, nested functions cannot resolve variables from their enclosing
+				// scope (e.g. `var` locals of an outer function), which cascades into every
+				// reference in the callee appearing undefined.
+				u8 cap_count = func->captured_scope_count;
+				for (u8 ci = 0; ci < cap_count; ci++) {
+					if (scope_depth < MAX_SCOPE_DEPTH) {
+						scope_is_with[scope_depth] = func->captured_scope_is_with[ci];
+						scope_mc[scope_depth] = func->captured_scope_mc[ci];
+						scope_chain[scope_depth++] = func->captured_scope[ci];
+					}
+				}
+				_cme_local_scope = allocObject(app_context, 8);
+				if (scope_depth < MAX_SCOPE_DEPTH) {
+					scope_is_with[scope_depth] = 0;
+					scope_mc[scope_depth] = NULL;
+					scope_chain[scope_depth++] = _cme_local_scope;
 				}
 			}
 
@@ -49485,6 +49504,7 @@ void actionCallMethod(SWFAppContext* app_context, char* str_buffer)
 
 				// Restore closure context
 				if (_cme_caller_ver >= 6) {
+					if (_cme_local_scope != NULL) releaseObject(app_context, _cme_local_scope);
 					scope_depth = _cme_saved_scope;
 					for (u32 si = 0; si < _cme_saved_scope; si++) {
 						scope_chain[si] = _cme_saved_sc[si];
@@ -49534,6 +49554,7 @@ void actionCallMethod(SWFAppContext* app_context, char* str_buffer)
 
 				// Restore closure context
 				if (_cme_caller_ver >= 6) {
+					if (_cme_local_scope != NULL) releaseObject(app_context, _cme_local_scope);
 					scope_depth = _cme_saved_scope;
 					for (u32 si = 0; si < _cme_saved_scope; si++) {
 						scope_chain[si] = _cme_saved_sc[si];
@@ -49554,6 +49575,7 @@ void actionCallMethod(SWFAppContext* app_context, char* str_buffer)
 				if (args != NULL) FREE(args);
 				// Restore closure context
 				if (_cme_caller_ver >= 6) {
+					if (_cme_local_scope != NULL) releaseObject(app_context, _cme_local_scope);
 					scope_depth = _cme_saved_scope;
 					for (u32 si = 0; si < _cme_saved_scope; si++) {
 						scope_chain[si] = _cme_saved_sc[si];

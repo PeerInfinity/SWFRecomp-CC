@@ -3,19 +3,28 @@
 
 Tests: `ruffle-tests/tests/swfs/avm1/bitmap_data_thorough/*` (20 sub-tests)
 
-Status (as of CI run 82a6ea07): all 20 sub-tests failing. Match rates vary wildly — 4 are in the 40-84% range (salvageable), the remaining 16 are in the 2-7% range (one early divergence cascades).
+Status after cascade fix (2026-04-17): 1/20 passing, 19 improved dramatically. Match rates below.
 
-| Sub-test | Match rate | Likely bucket |
-|----------|------------|---------------|
-| `getColorBoundsRect` | 83.5% (238/285) | Small semantic bugs, tractable |
-| `getPixel` / `getPixel32` | 78.7% (111/141) | Premultiplied-alpha precision + undefined arg coercion |
-| `hitTest` | 54.9% (285/519) | |
-| `compare` | 42.0% (29/69) | |
-| `constructor` | 6.7% (21/313) | **Cascading** — shared-harness early divergence |
-| `perlinNoise` | 5.1% | Cascading |
-| `colorTransform` | 2.9% | Cascading |
-| `fillRect` | 2.6% | Cascading (confirmed — see below) |
-| `scroll` / `threshold` / `setPixel` / `setPixel32` / `floodFill` / `pixelDissolve` / `copyPixels` / `merge` / `noise` / `paletteMap` / `copyChannel` | 1.8-2.5% | Cascading |
+| Sub-test | Match rate (pre-fix → post-fix) | Remaining work |
+|----------|--------------------------------|----------------|
+| `compare` | 42.0% → **100.0% PASS** | — |
+| `hitTest` | 54.9% → 98.8% | 6 diffs |
+| `getColorBoundsRect` | 83.5% → 97.5% | 7 diffs |
+| `getPixel` / `getPixel32` | 78.7% → 89.4% | Premultiplied-alpha precision + undefined arg coercion |
+| `pixelDissolve` | 2.0% → 78.4% | Per-method bugs |
+| `noise` | 1.9% → 78.3% | |
+| `floodFill` | 2.1% → 77.7% | |
+| `colorTransform` | 2.9% → 76.7% | |
+| `scroll` | 2.6% → 76.6% | |
+| `threshold` | 2.4% → 76.0% | |
+| `setPixel` / `setPixel32` | 2.3% → 75.1% | |
+| `copyPixels` | 1.9% → 73.2% | |
+| `fillRect` | 2.6% → 71.3% | Return-value mismatch (`undefined` vs `-1`/`0`) + pixel LSB |
+| `merge` | 1.9% → 70.8% | |
+| `paletteMap` | 1.9% → 69.8% | |
+| `copyChannel` | 1.8% → 66.9% | |
+| `perlinNoise` | 5.1% → 25.4% | RNG/seeded output |
+| `constructor` | 6.7% → 6.7% | Different cascade — did not benefit from scope fix |
 
 ## Shared structure
 
@@ -40,7 +49,17 @@ ruffle-tests/tests/swfs/avm1/bitmap_data_thorough/<method>/
 
 The `valueToString` helper is the key to reading the test's output. It compares the value against module-scope sentinels using `===`.
 
-## Root cause for the 16 "cascading" sub-tests — frame-script var capture
+## Cascade root cause — FIXED 2026-04-17
+
+**Actual root cause** (different from the frame-script var hypothesis): `actionCallMethod` in `SWFModernRuntime/src/actionmodern/action.c` — the "empty method name + FUNCTION receiver" path (used when code does `f.apply(this, args)` or direct function invocation via `CallMethod(..., undefined)`) wipes the scope chain (`scope_depth = 0`) before invoking the callee but **never restores the function's `captured_scope[]`**. As a result, nested functions lose access to variables from their enclosing function.
+
+In `fillRect/Test.as`, `main()` defines `createTransparent`/`createOpaque` as local vars, then calls `createDisposed()` (a closure that references `createTransparent`). Our old code wiped the scope chain before calling `createDisposed`, so its `GetVariable "createTransparent"` returned undefined, making `disposedBmd` undefined, making every `valueToString(v)` output match the first `v === disposedBmd` branch (`"disposedBmd"`) instead of the intended `"undefined"` / bitmap name. Every line in the output cascaded.
+
+The fix (committed 2026-04-17): after `scope_depth = 0` in the empty-method-name path, push `func->captured_scope[]` entries onto the scope chain, then allocate and push a fresh local scope object. Mirrors the setup in `actionCallFunction` at line ~46066. Identical fixup applied in both FUNCTION-type-2 and FUNCTION-type-1 branches, with matching `releaseObject` on restore.
+
+Original hypothesis (below, preserved for history) turned out to be wrong — frame-script top-level `var`s and nested writes are fine via our existing string_id var_array path.
+
+## (Historical) Frame-script var capture hypothesis
 
 Confirmed by inspecting fillRect's generated code and comparing expected vs actual output:
 
