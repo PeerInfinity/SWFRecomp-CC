@@ -136,6 +136,39 @@ toString, then string comparison.
   compare as strings.
 - Expected impact: toString_valueOf-v6 +2 lines.
 
+### Phase 2a — MC CallMethod dispatch order — DONE (2026-04-17)
+- `actionCallMethod` for MOVIECLIP receiver previously fell back to
+  `lookupFunctionByName(method_name)` **before** walking
+  `MovieClip.prototype → Object.prototype`. Because `lookupFunctionByName`
+  searches in reverse registration order, "valueOf" resolved to
+  `g_wrapper_valueOf_func` (the primitive wrapper helper) instead of
+  `g_object_valueOf_func` (the MC's inherited `Object.prototype.valueOf`).
+  That made `mc.valueOf()` and `mc.toString()` return UNDEFINED/empty.
+- Fix: reorder — check `MovieClip.prototype` chain **before**
+  `lookupFunctionByName`, so MC method calls hit the inherited
+  Object.prototype.{valueOf, toString} first.
+- Also updated `builtin_object_valueOf` to return the receiver with the
+  correct type tag: MOVIECLIP (from `g_event_this_mc`) when the caller
+  passed `this_obj=NULL`, or the matching type from `g_this_stack` for
+  OBJECT/ARRAY/FUNCTION receivers. Previously it always returned OBJECT.
+- **Impact:**
+  - toString_valueOf-v6: 14 → 8 diffs (-6)
+  - toString_valueOf-v7: 15 → 10 diffs (-5)
+  - toString_valueOf-v8: 15 → 10 diffs (-5)
+- No regressions on avm1 (MC-heavy tests: `duplicate_movie_clip`,
+  `clone_sprite_edittext`, `clone_sprite_types`,
+  `empty_movieclip_can_attach_movies`, `on_construct`, `this_scoping`,
+  `swf5_to_6_cross_call`, `swf5_no_closure`, `object_resolve`,
+  `init_object_order`, `register_and_init_order`, `extends_chain`,
+  `as2_super_and_this_v8`, `super_edge_cases`, `global_is_bare`,
+  `loadvariables`) or on gnash (`Point-v5..v8`, `Color-v5..v8`,
+  `ColorTransform-v8`, `Error-v5..v8`, `Matrix-v5/v7/v8`,
+  `Transform-v6/v7`, `System-v5..v8`).
+- Remaining toString_valueOf diffs correspond to String-wrapper-vs-MC
+  confusion (lines 188/192/196 — also failed in Ruffle), and custom
+  toString/valueOf on plain objects via `+` (lines 206, 215/216, 262/263)
+  which fall into Phase 2b / Phase 3 territory below.
+
 ## Success Criteria
 
 - Rectangle-v8 and Matrix-v6 cross 95% line match (target: 158/166 and

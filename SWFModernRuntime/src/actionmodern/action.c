@@ -3655,18 +3655,36 @@ static ActionVar builtin_object_isPrototypeOf(SWFAppContext* app_context, Action
 static ActionVar builtin_object_valueOf(SWFAppContext* app_context, ActionVar* args, u32 arg_count, ActionVar* registers, void* this_obj)
 {
 	ActionVar ret;
-	if (this_obj != NULL)
+	ret.str_size = 0;
+	// MovieClip receiver path: actionCallMethod passes this_obj=NULL and
+	// communicates the MC via g_event_this_mc. Object.prototype.valueOf
+	// must return `this` as MOVIECLIP so `typeof(mc.valueOf())` is 'movieclip'
+	// and it string-coerces to the MC's path.
+	if (this_obj == NULL && g_event_this_mc != NULL)
 	{
-		ret.type = ACTION_STACK_VALUE_OBJECT;
-		ret.str_size = 0;
-		ret.data.numeric_value = (u64) this_obj;
+		ret.type = ACTION_STACK_VALUE_MOVIECLIP;
+		ret.data.numeric_value = (u64) g_event_this_mc;
+		return ret;
+	}
+	if (this_obj == NULL)
+	{
+		ret.type = ACTION_STACK_VALUE_UNDEFINED;
+		ret.data.numeric_value = 0;
+		return ret;
+	}
+	// For OBJECT/ARRAY/FUNCTION receivers, the caller's CallMethod path pushes
+	// this onto g_this_stack with the right type tag; read it back so we
+	// preserve MOVIECLIP/FUNCTION/ARRAY identity instead of forcing OBJECT.
+	if (g_this_depth > 0 &&
+	    g_this_stack[g_this_depth - 1].data.numeric_value == (u64) this_obj)
+	{
+		ret.type = g_this_stack[g_this_depth - 1].type;
 	}
 	else
 	{
-		ret.type = ACTION_STACK_VALUE_UNDEFINED;
-		ret.str_size = 0;
-		ret.data.numeric_value = 0;
+		ret.type = ACTION_STACK_VALUE_OBJECT;
 	}
+	ret.data.numeric_value = (u64) this_obj;
 	return ret;
 }
 
@@ -54781,6 +54799,22 @@ void actionCallMethod(SWFAppContext* app_context, char* str_buffer)
 					_mc_user_func = (ASFunction*) method_var->data.numeric_value;
 				}
 			}
+			// Check MovieClip.prototype chain (→ Object.prototype) before
+			// function_registry: names like "valueOf" and "toString" are registered
+			// in function_registry under multiple targets (primitive wrappers,
+			// Object.prototype, etc.) and lookupFunctionByName would return the
+			// most recently registered one, which is wrong for MC.valueOf() /
+			// MC.toString() — those should resolve to MovieClip.prototype.{valueOf,
+			// toString} = Object.prototype.{valueOf, toString}.
+			if (_mc_user_func == NULL) {
+				initMovieClipPrototype(app_context);
+				ASObject* mc_proto = getMovieClipPrototype(g_swf_version);
+				if (mc_proto != NULL) {
+					ActionVar* _mp_var = getPropertyWithPrototype(mc_proto, method_name, method_name_len);
+					if (_mp_var != NULL && _mp_var->type == ACTION_STACK_VALUE_FUNCTION)
+						_mc_user_func = (ASFunction*) _mp_var->data.numeric_value;
+				}
+			}
 			// Fallback: check variable scope (DefineFunction stores in function_registry
 			// and var_map, not on dynamic_props). This handles mc.method() where method
 			// was defined via DefineFunction on the MC's timeline.
@@ -54808,18 +54842,6 @@ void actionCallMethod(SWFAppContext* app_context, char* str_buffer)
 				// Also check function registry (covers child MCs and root)
 				if (_mc_user_func == NULL)
 					_mc_user_func = lookupFunctionByName(method_name, method_name_len);
-			}
-			// Fallback: check MovieClip.prototype chain (→ Object.prototype)
-			// dynamic_props may not have __proto__ linked to MovieClip.prototype,
-			// so methods like toString/valueOf from Object.prototype won't be found above.
-			if (_mc_user_func == NULL) {
-				initMovieClipPrototype(app_context);
-				ASObject* mc_proto = getMovieClipPrototype(g_swf_version);
-				if (mc_proto != NULL) {
-					ActionVar* _mp_var = getPropertyWithPrototype(mc_proto, method_name, method_name_len);
-					if (_mp_var != NULL && _mp_var->type == ACTION_STACK_VALUE_FUNCTION)
-						_mc_user_func = (ASFunction*) _mp_var->data.numeric_value;
-				}
 			}
 			if (_mc_user_func != NULL) {
 					ASFunction* func = _mc_user_func;
