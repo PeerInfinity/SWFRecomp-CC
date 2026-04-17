@@ -84,6 +84,16 @@ EOF
 **IMPORTANT: Do NOT run the full test suite.** Only run individual tests with \`--test=TEST_NAME\`.
 EOF
     fi
+
+    cat >> "$output_file" <<'EOF'
+
+**When you're done — whether finished, stopped at a blocker, or pausing with progress — hand off to the pipeline:**
+
+1. Commit your changes.
+2. Read `.pipeline-state` at the repo root (create it as `{"stage":"idle","auto":false,"run_id":null,"branch":null}` if missing). Set `stage` to `committed` and save.
+3. **If `auto` is `true`:** drive the remaining stages yourself by following the instructions in `.claude/commands/pipeline.md` — push, trigger the workflow, watch it to completion, fetch and merge `ruffle-test-results`, then diff and summarize regressions. Update `.pipeline-state` between stages exactly as that file describes. Stop only on error, merge conflict, or after the `analyzing` stage completes.
+4. **If `auto` is `false`:** stop and tell the user: `Ready — run /pipeline next to push, trigger the ruffle-tests workflow, merge results, and analyze regressions. (Or /pipeline auto on first to chain them.)`
+EOF
 }
 
 for suite in avm1 from_gnash from_shumway; do
