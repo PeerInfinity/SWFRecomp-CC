@@ -25099,6 +25099,7 @@ void actionFirePendingLoadInits(SWFAppContext* app_context)
             u8 _saved_movie_id = g_current_movie_id;
             extern int quit_swf;
             int _saved_quit = quit_swf;
+            int _saved_is_playing = is_playing;
             g_swf_version = loads[i].entry->swf_version;
             g_child_swf_init = 1;
             g_current_movie_id = loads[i].entry->movie_id;
@@ -25137,6 +25138,7 @@ void actionFirePendingLoadInits(SWFAppContext* app_context)
             g_child_swf_init = _saved_child_init;
             g_current_movie_id = _saved_movie_id;
             quit_swf = _saved_quit;  // Restore: child's quit_swf must not terminate parent
+            is_playing = _saved_is_playing;  // Child's stop()/play() must not affect parent timeline
         }
     }
 
@@ -46105,8 +46107,9 @@ void actionCallFunction(SWFAppContext* app_context, char* str_buffer)
 		if (num_args >= 1) {
 			pushVar(app_context, &args[0]);
 		} else {
+			// Bare object with no __proto__ — toString falls through to "[type Object]"
+			// and `.__proto__` access returns undefined (matches Flash behavior).
 			ASObject* obj = allocObject(app_context, 4);
-			setObjectProto(app_context, obj);
 			ActionVar r = {0};
 			r.type = ACTION_STACK_VALUE_OBJECT;
 			r.data.numeric_value = (u64)obj;

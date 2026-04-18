@@ -855,11 +855,29 @@ def generate_child_movie_file(child_swf_name, child_recomp_dir, build_dir, swf_f
             if sym not in all_renames:
                 all_renames[sym] = f'{prefix}_{sym}'
 
+    # draws.c arrays referenced from tagMain (passed by raw pointer to draw/define
+    # tags). Each child must own its prefixed copy so they don't collide.
+    DRAWS_ARRAY_NAMES = (
+        "shape_data", "transform_data", "color_data", "uninv_mat_data",
+        "gradient_data", "bitmap_data", "glyph_data", "text_data",
+        "text_char_codes", "cxform_data", "morph_end_shape_data",
+        "morph_end_color_data", "sound_data", "path_data",
+    )
+    if tag_main_text:
+        for arr_name in DRAWS_ARRAY_NAMES:
+            if re.search(rf'\b{arr_name}\b', tag_main_text):
+                all_renames[arr_name] = f'{prefix}_{arr_name}'
+
     # Build a single compiled regex for all renames (single-pass replacement)
     # Match known symbol prefixes and check against rename dict in callback
     if all_renames:
         _rename_pattern = re.compile(
-            r'\b(str_\d+|script_\d+|func2?_\w+|button_\d+_\w+|clip_action(?:s)?_\d+|sprite_\d+_frame_\w+)\b')
+            r'\b(str_\d+|script_\d+|func2?_\w+|button_\d+_\w+'
+            r'|clip_action(?:s)?_\d+|sprite_\d+_frame_\w+'
+            r'|shape_data|transform_data|color_data|uninv_mat_data'
+            r'|gradient_data|bitmap_data|glyph_data|text_data'
+            r'|text_char_codes|cxform_data|morph_end_shape_data'
+            r'|morph_end_color_data|sound_data|path_data)\b')
         _renames = all_renames  # capture for closure
 
         def apply_renames(text):
@@ -919,6 +937,19 @@ def generate_child_movie_file(child_swf_name, child_recomp_dir, build_dir, swf_f
             lines.append(f"extern ButtonAction {prefix}_{m.group(1)}[];")
         for m in re.finditer(r'^ClipAction\s+(clip_actions_\d+)\s*\[\]', tag_main_text, re.MULTILINE):
             lines.append(f"extern ClipAction {prefix}_{m.group(1)}[];")
+    # Forward declarations for any draws.c arrays referenced from tagMain.
+    # The actual definitions are appended later (extracted from child draws.c).
+    _draws_extern_types = {
+        "shape_data": "u32", "transform_data": "float", "color_data": "float",
+        "uninv_mat_data": "float", "gradient_data": "u8", "bitmap_data": "u8",
+        "glyph_data": "u32", "text_data": "u32", "text_char_codes": "u16",
+        "cxform_data": "float", "morph_end_shape_data": "float",
+        "morph_end_color_data": "float", "sound_data": "u8", "path_data": "float",
+    }
+    for arr_name in DRAWS_ARRAY_NAMES:
+        if arr_name in all_renames:
+            ctype = _draws_extern_types[arr_name]
+            lines.append(f"extern {ctype} {prefix}_{arr_name}[];")
     lines.append("")
 
     # Include script_defs.c content (string definitions + function implementations)
@@ -1010,6 +1041,10 @@ def generate_child_movie_file(child_swf_name, child_recomp_dir, build_dir, swf_f
         modified = re.sub(
             r'// Frame labels.*?size_t frame_label_count = \d+;',
             '', modified, flags=re.DOTALL)
+        # Strip `quit_swf = 1;` — the recompiler emits this in the last frame of
+        # single-/few-frame movies to terminate the test, but for a child SWF
+        # it would also stop the parent's frame loop.
+        modified = re.sub(r'\n\s*quit_swf\s*=\s*1\s*;\s*\n', '\n', modified)
         # Prefix frame_N functions
         frame_funcs_in_tag = list(set(re.findall(r'\b(frame_\d+)\b', tag_main_text)))
         for ff in frame_funcs_in_tag:
@@ -1030,24 +1065,45 @@ def generate_child_movie_file(child_swf_name, child_recomp_dir, build_dir, swf_f
         lines.append(modified)
         lines.append("")
 
-    # Extract and include child's transform_data from draws.c (for correct getBounds
-    # on loaded movies — ng_cache_transform needs the child SWF's transform array).
+    # Extract and include child's draws.c array definitions. Anything tagMain.c
+    # passes to a draw/define tag as a raw pointer (sound_data + N, etc.) needs
+    # to live in the combined wrapper, with prefixed names so multiple children
+    # don't collide.
     draws_c_path = child_recomp_dir / "RecompiledTags" / "draws.c"
     has_child_transforms = False
+    extracted_array_names = set()
     if draws_c_path.exists():
         draws_text = draws_c_path.read_text(encoding="latin-1")
-        # Extract transform_data array definition
-        td_match = re.search(
-            r'(float\s+transform_data\[\d+\]\[16\]\s*=\s*\{.*?\};)',
-            draws_text, re.DOTALL)
-        if td_match:
-            td_def = td_match.group(1)
-            # Rename to prefixed name
-            td_def = td_def.replace('transform_data', f'{prefix}_transform_data', 1)
-            lines.append(f"// Child SWF transform data (for getBounds on loaded movies)")
-            lines.append(td_def)
-            lines.append("")
-            has_child_transforms = True
+        # All raw-data arrays emitted in draws.c (see SWFRecomp/src/swf.cpp).
+        # Each is matched by its full type signature so the regex doesn't drift.
+        draws_arrays = [
+            (r'u32\s+shape_data\s*\[\s*3?\s*\*?\s*\d+\s*\]\s*\[\s*4\s*\]', 'shape_data'),
+            (r'float\s+transform_data\s*\[\s*\d+\s*\]\s*\[\s*16\s*\]', 'transform_data'),
+            (r'float\s+color_data\s*\[\s*\d+\s*\]\s*\[\s*4\s*\]', 'color_data'),
+            (r'float\s+uninv_mat_data\s*\[\s*\d+(?:\s*\*\s*16)?\s*\]', 'uninv_mat_data'),
+            (r'u8\s+gradient_data\s*\[\s*\d+\s*\]\s*\[\s*4\s*\]', 'gradient_data'),
+            (r'u8\s+bitmap_data\s*\[\s*\d+\s*\]', 'bitmap_data'),
+            (r'u32\s+glyph_data\s*\[\s*\d+\s*\]\s*\[\s*1\s*\]', 'glyph_data'),
+            (r'u32\s+text_data\s*\[\s*\d+\s*\]', 'text_data'),
+            (r'u16\s+text_char_codes\s*\[\s*\d+\s*\]', 'text_char_codes'),
+            (r'float\s+cxform_data\s*\[\s*\d+(?:\s*\*\s*20)?\s*\]', 'cxform_data'),
+            (r'float\s+morph_end_shape_data\s*\[\s*\d+\s*\]\s*\[\s*2\s*\]', 'morph_end_shape_data'),
+            (r'float\s+morph_end_color_data\s*\[\s*\d+\s*\]\s*\[\s*4\s*\]', 'morph_end_color_data'),
+            (r'u8\s+sound_data\s*\[\s*\d+\s*\]', 'sound_data'),
+            (r'float\s+path_data\s*\[\s*\d+\s*\]\s*\[\s*3\s*\]', 'path_data'),
+        ]
+        for sig_re, name in draws_arrays:
+            m = re.search(rf'({sig_re}\s*=\s*\{{.*?\}};)', draws_text, re.DOTALL)
+            if m:
+                arr_def = m.group(1)
+                # Rename only the first occurrence of `name` (the declaration);
+                # don't touch any inline references inside the initializer.
+                arr_def = re.sub(rf'\b{name}\b', f'{prefix}_{name}', arr_def, count=1)
+                lines.append(arr_def)
+                lines.append("")
+                extracted_array_names.add(name)
+                if name == 'transform_data':
+                    has_child_transforms = True
 
     # Generate the movie entry struct access function
     lines.append(f"// Movie entry for {child_swf_name}")

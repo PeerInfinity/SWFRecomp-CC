@@ -131,3 +131,4 @@ ruffle-tests/tests/swfs/from_gnash/actionscript.all/*/
 # Transient result files (not committed)
 ruffle-tests/tests/swfs/**/_results/results_current.json
 ruffle-tests/tests/swfs/**/_results/results_previous.json
+.claude/scheduled_tasks.lock

@@ -3,7 +3,26 @@
 
 Test: `ruffle-tests/tests/swfs/avm1/depth_replacement_audio_unloading/`
 
-Status (as of CI run 82a6ea07): **compile_fail**. The test never runs.
+Status: **PASS** (2026-04-17 session). All 3 trace lines match.
+
+## Resolution
+
+**Phase 1 — compile fix** (`verify_output.py:generate_child_movie_file`):
+- Extract all 14 raw-data arrays from the child's `draws.c` (`sound_data`, `transform_data`, `bitmap_data`, etc.) and emit prefixed copies into `movie_<prefix>.c`.
+- Add the array names to `apply_renames` so tagMain's `tagDefineSound(..., sound_data + 0, ...)` becomes `tagDefineSound(..., child_sound_data + 0, ...)`.
+- Emit `extern` forward declarations so the renamed tagMain references resolve at compile time.
+- Strip `quit_swf = 1;` from the child's frame functions (the recompiler emits this in the last frame of single-frame movies, but for a child SWF it would terminate the parent's frame loop).
+
+**Phase 2 — runtime fix** (`SWFModernRuntime/src/actionmodern/action.c:actionFirePendingLoadInits`):
+- Save and restore the global `is_playing` around the child's frame execution. The child's `script_0` ends with `actionStop()` which sets the global `is_playing = 0`; without restoration this stops the parent's frame loop before frames 1/2/3 ever run.
+
+Audio assertions (`audio_assertions.sound`, `audio_assertions.silence`) are not enforced by `verify_output.py`, so the trace match is sufficient.
+
+---
+
+(Original plan below for reference.)
+
+Status (originally): **compile_fail**. The test never ran.
 
 ## Test shape
 
