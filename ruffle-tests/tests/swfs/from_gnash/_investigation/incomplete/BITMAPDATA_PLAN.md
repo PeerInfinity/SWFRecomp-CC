@@ -1,8 +1,61 @@
 # BitmapData Plan
 <!-- TESTS: BitmapData-v8 -->
 
-Last updated: 2026-04-17
-Status: NOT STARTED — 1 test, 259/417 lines (62.1%) — ~160 diffs
+Last updated: 2026-04-18
+Status: IN PROGRESS — 1 test, 366/410 tests pass (89%) — 44 diffs remaining
+
+## 2026-04-18 Session
+
+**Fix landed: Bitmap alias routed to native BitmapData constructor.**
+Root cause: The test aliases `Bitmap = flash.display.BitmapData`, so
+`new Bitmap(10, 10, true, 0xFFFFFF)` enters `actionNewObject` with
+`ctor_name="Bitmap"`. The existing BitmapData branch only matched the
+literal name "BitmapData", so `Bitmap` fell through to the generic
+user-defined-ctor path, which saw the stub constructor (simple_func/
+advanced_func both NULL) and returned a plain object with no native
+BitmapData backing — every getter returned -1.
+
+Fix in `SWFModernRuntime/src/actionmodern/action.c`:
+1. Added `pushBitmapDataConstruct(app_context, args, num_args)` helper
+   that centralises the width/height/transparent/fillColor validation
+   and native construction (used by both actionNewObject and
+   actionNewMethod paths going forward).
+2. In `actionNewObject`, after ctor_func resolution, added a redirect:
+   if ctor_func is a stub and `ctor_func->name == "BitmapData"`,
+   dispatch to the helper. This covers both direct `new BitmapData()`
+   and aliases like `new Bitmap()`.
+
+Impact: BitmapData-v8 jumped from 259/417 → 366/410 tests passing.
+v5/v6/v7 still PASS (no regressions).
+
+## Remaining 44 Diffs (Phase 2+)
+
+1. **rectangle getter on disposed/edge-case BMD (~4 diffs)** —
+   tests expect `bmp.rectangle == -1` or `bmp.rectangle.toString() ==
+   "[object Object]"` when `bmp` has been disposed or had `rectangle`
+   monkey-patched. Our getter always returns a fresh Rectangle.
+
+2. **clone() not preserving __proto__/constructor (~4 diffs)** —
+   tests at BitmapData.as:1126-1129 expect that if the source has
+   had its prototype chain modified (e.g. `BitmapData.prototype = o`),
+   the clone inherits the same chain. Our `bitmapDataClone` hardcodes
+   `__proto__ = g_bitmapdata_prototype`.
+
+3. **Pixel ops producing wrong color at certain coords (~30 diffs)** —
+   `b.getPixel(21, 21) == 0x00ff00` fails with white (0xffffff), suggesting
+   `fillRect`, `floodFill`, `applyFilter`, or `copyPixels` dropping
+   fills in some coordinate ranges. Source required for root cause.
+
+4. **copyPixels dispatches wrong color (~1 diff)** —
+   `source.getPixel(90, 90) == 0xffffff` returns `0x0000ff00`.
+
+5. **Final assertion count differs** — 2 #passed/#failed lines.
+
+Each class of diff deserves its own investigation in a follow-up session.
+
+---
+
+## Original Plan (for reference)
 
 ---
 

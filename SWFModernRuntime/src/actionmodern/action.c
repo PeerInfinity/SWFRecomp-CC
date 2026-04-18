@@ -11606,6 +11606,48 @@ static ActionVar bdTransparentGetter(SWFAppContext* app_context, ActionVar* args
     return makeF64(-1);
 }
 
+// Shared BitmapData(width, height, transparent?, fillColor?) constructor:
+// validates args, creates backing native, attaches it, pushes OBJECT or UNDEFINED.
+// Called from actionNewObject (ctor_name=="BitmapData" and via stub fc_BitmapData alias),
+// and from actionNewMethod's two BitmapData paths.
+static void pushBitmapDataConstruct(SWFAppContext* app_context, ActionVar* args, u32 num_args)
+{
+    initBitmapDataPrototype(app_context);
+    if (num_args < 2) { pushUndefined(app_context); return; }
+    double w = varToDoubleSimple(&args[0]);
+    double h = varToDoubleSimple(&args[1]);
+    bool valid;
+    if (g_swf_version >= 10)
+        valid = (w >= 1 && w <= 8191 && h >= 1 && h <= 8191 && w * h <= 16777215);
+    else
+        valid = (w >= 1 && w <= 2880 && h >= 1 && h <= 2880);
+    if (!valid) { pushUndefined(app_context); return; }
+    int iw = (int)w;
+    int ih = (int)h;
+    int transparent = 1;
+    if (num_args >= 3) transparent = (int)varToDoubleSimple(&args[2]);
+    uint32_t fill_color = 0xFFFFFFFF;
+    if (num_args >= 4) fill_color = doubleToUint32(varToDoubleSimple(&args[3]));
+    if (!transparent) fill_color = fill_color | 0xFF000000;
+    ASObject* bmp = allocObject(app_context, 4);
+    bmp->native_type = NATIVE_BITMAPDATA;
+    ActionVar proto_var = {0};
+    proto_var.type = ACTION_STACK_VALUE_OBJECT;
+    proto_var.data.numeric_value = (u64) g_bitmapdata_prototype;
+    setProperty(app_context, bmp, "__proto__", 9, &proto_var);
+    BitmapDataNative* native = (BitmapDataNative*) malloc(sizeof(BitmapDataNative));
+    native->width = iw;
+    native->height = ih;
+    native->transparent = (uint8_t)transparent;
+    native->disposed = 0;
+    size_t pxsize = (size_t)iw * (size_t)ih * sizeof(uint32_t);
+    native->pixels = (uint32_t*) malloc(pxsize);
+    uint32_t premul_fill = premultiplyAlpha(fill_color);
+    for (int i = 0; i < iw * ih; i++) native->pixels[i] = premul_fill;
+    setBitmapNative(bmp, native);
+    PUSH(ACTION_STACK_VALUE_OBJECT, (u64) bmp);
+}
+
 // Initialize BitmapData prototype and methods
 static void initBitmapDataPrototype(SWFAppContext* app_context)
 {
@@ -41951,6 +41993,18 @@ void actionNewObject(SWFAppContext* app_context)
 			if (rvar != NULL && rvar->type == ACTION_STACK_VALUE_FUNCTION)
 				ctor_func = (ASFunction*) rvar->data.numeric_value;
 		}
+		// If ctor_func resolves to a built-in stub constructor with native construction
+		// semantics (e.g. flash.display.BitmapData), dispatch to its native builder
+		// instead of generic user-defined-ctor handling. This covers both `new BitmapData()`
+		// and aliases like `var Bitmap = flash.display.BitmapData; new Bitmap(...)`.
+		if (ctor_func != NULL && ctor_func->name[0] != '\0' &&
+		    ctor_func->simple_func == NULL && ctor_func->advanced_func == NULL &&
+		    strcmp(ctor_func->name, "BitmapData") == 0)
+		{
+			pushBitmapDataConstruct(app_context, args, num_args);
+			return;
+		}
+
 		if (ctor_func != NULL)
 		{
 			// User-defined constructor found
