@@ -12558,17 +12558,24 @@ static ASFunction g_stylesheet_constructor_global; // forward decl
 
 static void initTextFieldPrototype(SWFAppContext* app_context)
 {
-	if (g_textfield_constructor_init) return;
+	// Two-stage init: SWF5 run (e.g. via Dejagnu.swf child-SWF init) allocates the
+	// prototype so `new TextField() instanceof TextField` works, but skips SWF6+
+	// virtual-properties/methods/__proto__ wiring. When re-entered under SWF6+
+	// (usually after Dejagnu's SWF5 init), we upgrade and install the full set.
+	if (g_textfield_constructor_init && (g_textfield_constructor_init >= 2 || g_swf_version < 6))
+		return;
 
-	memset(&g_textfield_constructor, 0, sizeof(ASFunction));
-	strncpy(g_textfield_constructor.name, "TextField", 255);
-	g_textfield_constructor.function_type = 1;
-	g_textfield_constructor.param_count = 0;
+	if (!g_textfield_constructor_init) {
+		memset(&g_textfield_constructor, 0, sizeof(ASFunction));
+		strncpy(g_textfield_constructor.name, "TextField", 255);
+		g_textfield_constructor.function_type = 1;
+		g_textfield_constructor.param_count = 0;
 
-	// Create prototype with capacity for 35 properties + 8 methods + __proto__ + __constructor__
-	ASObject* proto = allocObject(app_context, 48);
-	retainObject(proto);
-	g_textfield_constructor.prototype_obj = proto;
+		// Create prototype with capacity for 35 properties + 8 methods + __proto__ + __constructor__
+		ASObject* proto = allocObject(app_context, 48);
+		retainObject(proto);
+		g_textfield_constructor.prototype_obj = proto;
+	}
 
 	// In SWF5, TextField.prototype is hidden from user code (returns undefined),
 	// but the internal prototype_obj is used so `new TextField() instanceof TextField`
@@ -12576,9 +12583,11 @@ static void initTextFieldPrototype(SWFAppContext* app_context)
 	// wiring __proto__ — Object.prototype isn't fully populated during SWF5 init
 	// and wiring it here causes side effects in other Gnash SWF5 tests.
 	if (g_swf_version < 6) {
-		g_textfield_constructor_init = 1;
+		g_textfield_constructor_init = 1; // stage 1 only — allow later SWF6+ upgrade
 		return;
 	}
+
+	ASObject* proto = g_textfield_constructor.prototype_obj;
 
 	// Set __proto__ to Object.prototype
 	setObjectProto(app_context, proto);
@@ -12685,7 +12694,7 @@ static void initTextFieldPrototype(SWFAppContext* app_context)
 		setProperty(app_context, g_textfield_constructor.own_props, "StyleSheet", 10, &ss_val);
 	}
 
-	g_textfield_constructor_init = 1;
+	g_textfield_constructor_init = 2; // full SWF6+ init complete
 }
 
 // ============================================================
