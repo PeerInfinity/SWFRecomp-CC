@@ -3,28 +3,37 @@
 
 Tests: `ruffle-tests/tests/swfs/avm1/bitmap_data_thorough/*` (20 sub-tests)
 
-Status after cascade fix (2026-04-17): 1/20 passing, 19 improved dramatically. Match rates below.
+Status after per-method fixes (2026-04-17, session 2): **14 / 20 effective pass** (13 pass + 1 ruffle_matched). Remaining 6 all >= 91% except perlinNoise (algorithmic divergence).
 
-| Sub-test | Match rate (pre-fix → post-fix) | Remaining work |
-|----------|--------------------------------|----------------|
-| `compare` | 42.0% → **100.0% PASS** | — |
-| `hitTest` | 54.9% → 98.8% | 6 diffs |
-| `getColorBoundsRect` | 83.5% → 97.5% | 7 diffs |
-| `getPixel` / `getPixel32` | 78.7% → 89.4% | Premultiplied-alpha precision + undefined arg coercion |
-| `pixelDissolve` | 2.0% → 78.4% | Per-method bugs |
-| `noise` | 1.9% → 78.3% | |
-| `floodFill` | 2.1% → 77.7% | |
-| `colorTransform` | 2.9% → 76.7% | |
-| `scroll` | 2.6% → 76.6% | |
-| `threshold` | 2.4% → 76.0% | |
-| `setPixel` / `setPixel32` | 2.3% → 75.1% | |
-| `copyPixels` | 1.9% → 73.2% | |
-| `fillRect` | 2.6% → 71.3% | Return-value mismatch (`undefined` vs `-1`/`0`) + pixel LSB |
-| `merge` | 1.9% → 70.8% | |
-| `paletteMap` | 1.9% → 69.8% | |
-| `copyChannel` | 1.8% → 66.9% | |
-| `perlinNoise` | 5.1% → 25.4% | RNG/seeded output |
-| `constructor` | 6.7% → 6.7% | Different cascade — did not benefit from scope fix |
+| Sub-test | Initial | After scope fix | After per-method fixes |
+|----------|---------|-----------------|------------------------|
+| `compare` | 42.0% | 100% PASS | **PASS** |
+| `hitTest` | 54.9% | 98.8% | **PASS** (100%) |
+| `getColorBoundsRect` | 83.5% | 97.5% | **PASS** (100%) |
+| `getPixel` / `getPixel32` | 78.7% | 89.4% | **PASS** (100%) |
+| `fillRect` | 2.6% | 71.3% | **PASS** (100%) |
+| `scroll` | 2.6% | 76.6% | **PASS** (100%) |
+| `colorTransform` | 2.9% | 76.7% | **PASS** (100%) |
+| `setPixel` / `setPixel32` | 2.3% | 75.1% | **PASS** (100%) |
+| `floodFill` | 2.1% | 77.7% | **PASS** (100%) |
+| `merge` | 1.9% | 70.8% | **PASS** (100%) |
+| `constructor` | 6.7% | 6.7% | **PASS** (100%, different cascade — `_global.flash.display` lazy init) |
+| `copyPixels` | 1.9% | 73.2% | ruffle_matched (94.3%) |
+| `paletteMap` | 1.9% | 69.8% | 94.5% |
+| `noise` | 1.9% | 78.3% | 93.9% |
+| `copyChannel` | 1.8% | 66.9% | 93.4% |
+| `threshold` | 2.4% | 76.0% | 93.4% |
+| `pixelDissolve` | 2.0% | 78.4% | 91.8% |
+| `perlinNoise` | 5.1% | 25.4% | 29.6% (algorithm port mismatches Ruffle's exact pixel values) |
+
+## Remaining issues by sub-test (all at 91%+ except perlinNoise)
+
+- **copyChannel**: bitmap printBmd shows empty rows after specific arg combinations involving `objLooksLikeNum`. The bmd ends up looking "disposed" post-call. Root cause unknown — possibly stack state corruption during valueOf invocation from a native handler.
+- **paletteMap**: a few pixel mismatches in edge cases, likely related to how Ruffle's `to_premultiplied_alpha(true)` post-sum interacts with opaque bitmaps.
+- **noise**: RNG divergence in a minority of cases, possibly grayscale alpha handling.
+- **threshold**: small Flash/Ruffle-specific edge case differences in source/dest coordinate handling.
+- **pixelDissolve**: not investigated in this session — Feistel permutation details may differ.
+- **perlinNoise**: gradient table and noise formula differ from Ruffle's exact port.
 
 ## Shared structure
 
