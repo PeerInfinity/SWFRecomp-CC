@@ -12570,16 +12570,18 @@ static void initTextFieldPrototype(SWFAppContext* app_context)
 	retainObject(proto);
 	g_textfield_constructor.prototype_obj = proto;
 
-	// Set __proto__ to Object.prototype
-	setObjectProto(app_context, proto);
-
 	// In SWF5, TextField.prototype is hidden from user code (returns undefined),
 	// but the internal prototype_obj is used so `new TextField() instanceof TextField`
-	// works. Skip installing the SWF6+ virtual properties/methods on it.
+	// works. Skip installing the SWF6+ virtual properties/methods on it, and skip
+	// wiring __proto__ — Object.prototype isn't fully populated during SWF5 init
+	// and wiring it here causes side effects in other Gnash SWF5 tests.
 	if (g_swf_version < 6) {
 		g_textfield_constructor_init = 1;
 		return;
 	}
+
+	// Set __proto__ to Object.prototype
+	setObjectProto(app_context, proto);
 
 	// Add 35 enumerable properties in the exact order Flash enumerates them.
 	// All start as undefined on the prototype; instances shadow them with real values.
