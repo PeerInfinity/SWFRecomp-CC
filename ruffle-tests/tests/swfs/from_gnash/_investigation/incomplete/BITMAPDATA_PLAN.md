@@ -1,8 +1,8 @@
 # BitmapData Plan
 <!-- TESTS: BitmapData-v8 -->
 
-Last updated: 2026-04-18 (session 2)
-Status: IN PROGRESS — 1 test, 371/417 lines matching (89%) — 44 diffs remaining
+Last updated: 2026-04-18 (session 3)
+Status: IN PROGRESS — 1 test, 375/417 lines matching (90%) — 40 diffs remaining
 
 ---
 
@@ -29,11 +29,28 @@ Reverse-engineered test logic from `RecompiledScripts/script_2.c` +
 `output.txt` + `script_defs.c` constant-pool strings. Classified the
 44 remaining diffs into four root causes with fix recommendations.
 
+### Session 3 (2026-04-18) — Cat 1 fix landed
+`bdRectangleGetter` now resolves `flash.geom.Rectangle` at call time
+(via `global_object → flash → geom → Rectangle`) instead of always
+using the built-in `createRectObj`. If the resolved value is
+non-function, returns -1 (matches Flash when Rectangle was overwritten
+with a number). If it's a stub (simple_func/advanced_func both NULL),
+falls back to `createRectObj` — preserving the default path with the
+native toString. Otherwise invokes the user function as constructor
+with `(0, 0, width, height)` and returns the produced object (its
+prototype chain determines toString — an empty anonymous function
+gives "[object Object]" via Object.prototype).
+
+Result: BitmapData-v8 diffs 44 → 40 (4 Cat 1 tests fixed:
+315/324/329/334). BitmapData-v5/v6/v7 still PASS. AVM1 bitmap tests
+unchanged. Rectangle-v5/v6/v7 unchanged; Rectangle-v8 was already
+failing before the fix (unrelated Rectangle.containsPoint bugs).
+
 ---
 
 ## Remaining 44 Diffs — Root Causes
 
-### Cat 1. `bmp.rectangle` getter ignores user override of `flash.geom.Rectangle` (4 diffs)
+### Cat 1. `bmp.rectangle` getter ignores user override of `flash.geom.Rectangle` (4 diffs) — **FIXED (session 3)**
 
 Tests: `BitmapData.as:315`, `324`, `329`, `334`. Cluster around test code that
 monkey-patches the global `flash.geom.Rectangle` between assertions:

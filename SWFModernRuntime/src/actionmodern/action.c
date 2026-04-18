@@ -11581,8 +11581,40 @@ static ActionVar bdRectangleGetter(SWFAppContext* app_context, ActionVar* args, 
     (void)args; (void)arg_count; (void)registers;
     ASObject* obj = (ASObject*)this_obj;
     BitmapDataNative* bmp = obj ? getBitmapNative(obj) : NULL;
-    if (bmp && !bmp->disposed) {
-        initGeomPrototypes(app_context);
+    if (!bmp || bmp->disposed) return makeF64(-1);
+
+    // Resolve flash.geom.Rectangle at call time so user overrides of the
+    // constructor (e.g. `flash.geom.Rectangle = 2` or
+    // `flash.geom.Rectangle = function(){}`) are honored.
+    ActionVar* rect_val = NULL;
+    extern ASObject* global_object;
+    if (global_object != NULL) {
+        ActionVar* fv = getPropertyWithPrototype(global_object, "flash", 5);
+        if (fv && fv->type == ACTION_STACK_VALUE_OBJECT && fv->data.numeric_value != 0) {
+            ASObject* flash_obj = (ASObject*)fv->data.numeric_value;
+            ActionVar* gv = getPropertyWithPrototype(flash_obj, "geom", 4);
+            if (gv && gv->type == ACTION_STACK_VALUE_OBJECT && gv->data.numeric_value != 0) {
+                ASObject* geom_obj = (ASObject*)gv->data.numeric_value;
+                rect_val = getPropertyWithPrototype(geom_obj, "Rectangle", 9);
+            }
+        }
+    }
+
+    // If Rectangle was overridden to a non-function, Flash treats the
+    // getter as uninitialized and returns -1 (matches Gnash BitmapData-v8
+    // test 315 where `flash.geom.Rectangle = 2` and `bmp.rectangle == -1`).
+    if (rect_val != NULL && rect_val->type != ACTION_STACK_VALUE_FUNCTION) {
+        return makeF64(-1);
+    }
+
+    ASFunction* rect_func = (rect_val != NULL) ? (ASFunction*)rect_val->data.numeric_value : NULL;
+
+    initGeomPrototypes(app_context);
+
+    // Stub/default Rectangle: use the built-in rect path (x/y/width/height own
+    // props + __proto__ = g_rect_prototype with native toString).
+    if (rect_func == NULL ||
+        (rect_func->simple_func == NULL && rect_func->advanced_func == NULL)) {
         ActionVar rx = makeF64(0), ry = makeF64(0);
         ActionVar rw = makeF64(bmp->width), rh = makeF64(bmp->height);
         ASObject* rect = createRectObj(app_context, &rx, &ry, &rw, &rh);
@@ -11590,7 +11622,45 @@ static ActionVar bdRectangleGetter(SWFAppContext* app_context, ActionVar* args, 
         v.data.numeric_value = (u64)rect;
         return v;
     }
-    return makeF64(-1);
+
+    // User-defined Rectangle: construct via the user function. Set
+    // __proto__ = func.prototype and call with (0, 0, width, height).
+    ASObject* rect = allocObject(app_context, 8);
+    if (rect_func->prototype_obj == NULL) {
+        rect_func->prototype_obj = allocObject(app_context, 4);
+        retainObject(rect_func->prototype_obj);
+        setObjectProto(app_context, rect_func->prototype_obj);
+    }
+    ActionVar proto_var = {0};
+    proto_var.type = ACTION_STACK_VALUE_OBJECT;
+    proto_var.data.numeric_value = (u64)rect_func->prototype_obj;
+    setProperty(app_context, rect, "__proto__", 9, &proto_var);
+
+    ActionVar ctor_args[4];
+    ctor_args[0] = makeF64(0);
+    ctor_args[1] = makeF64(0);
+    ctor_args[2] = makeF64(bmp->width);
+    ctor_args[3] = makeF64(bmp->height);
+
+    if (rect_func->function_type == 2 && rect_func->advanced_func != NULL) {
+        ActionVar ctor_regs[256] = {0};
+        rect_func->advanced_func(app_context, ctor_args, 4, ctor_regs, rect);
+    } else if (rect_func->simple_func != NULL) {
+        for (int i = 3; i >= 0; i--) pushVar(app_context, &ctor_args[i]);
+        if (g_this_depth < MAX_THIS_DEPTH) {
+            g_this_stack[g_this_depth].type = ACTION_STACK_VALUE_OBJECT;
+            g_this_stack[g_this_depth].data.numeric_value = (u64)rect;
+            g_this_depth++;
+        }
+        ((ActionVar(*)(SWFAppContext*))rect_func->simple_func)(app_context);
+        if (g_this_depth > 0) g_this_depth--;
+        POP();
+    }
+
+    ActionVar v = {0};
+    v.type = ACTION_STACK_VALUE_OBJECT;
+    v.data.numeric_value = (u64)rect;
+    return v;
 }
 
 static ActionVar bdTransparentGetter(SWFAppContext* app_context, ActionVar* args, u32 arg_count, ActionVar* registers, void* this_obj)
