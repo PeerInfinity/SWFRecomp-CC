@@ -1,31 +1,31 @@
 {
   "metadata": {
-    "old_timestamp": "2026-04-17T20:16:04.806651+00:00",
-    "old_git_sha": "f3ab5c9dd4cbd96b5ccf29870f5d8da278f45bc0",
-    "new_timestamp": "2026-04-17T21:43:57.033307+00:00",
-    "new_git_sha": "f238a909f91f6a503dc0751274e43caebb2da377",
+    "old_timestamp": "2026-04-17T21:43:57.033307+00:00",
+    "old_git_sha": "f238a909f91f6a503dc0751274e43caebb2da377",
+    "new_timestamp": "2026-04-18T00:16:44.588410+00:00",
+    "new_git_sha": "8a50e569da3e8f2dd796881ece3a6efb5a9893f1",
     "partial": false,
     "same_commit": false
   },
   "summary": {
-    "old_pass": 580,
+    "old_pass": 581,
     "old_ruffle_matched": 5,
-    "old_effective_pass": 585,
+    "old_effective_pass": 586,
     "old_total": 641,
-    "old_pass_rate": 90.5,
-    "new_pass": 581,
-    "new_ruffle_matched": 5,
-    "new_effective_pass": 586,
+    "old_pass_rate": 90.6,
+    "new_pass": 593,
+    "new_ruffle_matched": 6,
+    "new_effective_pass": 599,
     "new_total": 641,
-    "new_pass_rate": 90.6,
-    "old_mismatched_lines": 30572,
-    "new_mismatched_lines": 19090,
-    "increased_mismatches": 0,
-    "decreased_mismatches": 11482,
-    "newly_passing": 1,
+    "new_pass_rate": 92.5,
+    "old_mismatched_lines": 19090,
+    "new_mismatched_lines": 15483,
+    "increased_mismatches": 1,
+    "decreased_mismatches": 3608,
+    "newly_passing": 13,
     "newly_failing": 0,
-    "status_changed": 1,
-    "unchanged": 622,
+    "status_changed": 13,
+    "unchanged": 621,
     "added": 0,
     "removed": 0
   },
@@ -34,32 +34,32 @@
       "test": "bitmap_data_thorough/colorTransform",
       "change_type": "changed",
       "old_status": "output_mismatch",
-      "new_status": "output_mismatch",
+      "new_status": "pass",
       "old_lines": {
-        "actual_lines": 123,
+        "actual_lines": 279,
         "expected_lines": 279,
-        "matching_lines": 8
+        "matching_lines": 214
       },
       "new_lines": {
         "actual_lines": 279,
         "expected_lines": 279,
-        "matching_lines": 214
+        "matching_lines": 279
       }
     },
     {
-      "test": "bitmap_data_thorough/compare",
+      "test": "bitmap_data_thorough/constructor",
       "change_type": "changed",
       "old_status": "output_mismatch",
       "new_status": "pass",
       "old_lines": {
-        "actual_lines": 60,
-        "expected_lines": 69,
-        "matching_lines": 29
+        "actual_lines": 163,
+        "expected_lines": 313,
+        "matching_lines": 21
       },
       "new_lines": {
-        "actual_lines": 69,
-        "expected_lines": 69,
-        "matching_lines": 69
+        "actual_lines": 313,
+        "expected_lines": 313,
+        "matching_lines": 313
       }
     },
     {
@@ -68,142 +68,142 @@
       "old_status": "output_mismatch",
       "new_status": "output_mismatch",
       "old_lines": {
-        "actual_lines": 1131,
+        "actual_lines": 2700,
         "expected_lines": 2715,
-        "matching_lines": 49
+        "matching_lines": 1815
       },
       "new_lines": {
         "actual_lines": 2700,
         "expected_lines": 2715,
-        "matching_lines": 1815
+        "matching_lines": 2537
       }
     },
     {
       "test": "bitmap_data_thorough/copyPixels",
       "change_type": "changed",
       "old_status": "output_mismatch",
-      "new_status": "output_mismatch",
+      "new_status": "ruffle_matched",
       "old_lines": {
-        "actual_lines": 492,
+        "actual_lines": 1203,
         "expected_lines": 1203,
-        "matching_lines": 23
+        "matching_lines": 880
       },
       "new_lines": {
         "actual_lines": 1203,
         "expected_lines": 1203,
-        "matching_lines": 880
+        "matching_lines": 1135
       }
     },
     {
       "test": "bitmap_data_thorough/fillRect",
       "change_type": "changed",
       "old_status": "output_mismatch",
-      "new_status": "output_mismatch",
+      "new_status": "pass",
       "old_lines": {
-        "actual_lines": 150,
+        "actual_lines": 342,
         "expected_lines": 342,
-        "matching_lines": 9
+        "matching_lines": 244
       },
       "new_lines": {
         "actual_lines": 342,
         "expected_lines": 342,
-        "matching_lines": 244
+        "matching_lines": 342
       }
     },
     {
       "test": "bitmap_data_thorough/floodFill",
       "change_type": "changed",
       "old_status": "output_mismatch",
-      "new_status": "output_mismatch",
+      "new_status": "pass",
       "old_lines": {
-        "actual_lines": 375,
+        "actual_lines": 867,
         "expected_lines": 867,
-        "matching_lines": 18
+        "matching_lines": 674
       },
       "new_lines": {
         "actual_lines": 867,
         "expected_lines": 867,
-        "matching_lines": 674
+        "matching_lines": 867
       }
     },
     {
       "test": "bitmap_data_thorough/getColorBoundsRect",
       "change_type": "changed",
       "old_status": "output_mismatch",
-      "new_status": "output_mismatch",
+      "new_status": "pass",
       "old_lines": {
         "actual_lines": 285,
         "expected_lines": 285,
-        "matching_lines": 238
+        "matching_lines": 278
       },
       "new_lines": {
         "actual_lines": 285,
         "expected_lines": 285,
-        "matching_lines": 278
+        "matching_lines": 285
       }
     },
     {
       "test": "bitmap_data_thorough/getPixel",
       "change_type": "changed",
       "old_status": "output_mismatch",
-      "new_status": "output_mismatch",
+      "new_status": "pass",
       "old_lines": {
         "actual_lines": 141,
         "expected_lines": 141,
-        "matching_lines": 111
+        "matching_lines": 126
       },
       "new_lines": {
         "actual_lines": 141,
         "expected_lines": 141,
-        "matching_lines": 126
+        "matching_lines": 141
       }
     },
     {
       "test": "bitmap_data_thorough/getPixel32",
       "change_type": "changed",
       "old_status": "output_mismatch",
-      "new_status": "output_mismatch",
+      "new_status": "pass",
       "old_lines": {
         "actual_lines": 141,
         "expected_lines": 141,
-        "matching_lines": 111
+        "matching_lines": 126
       },
       "new_lines": {
         "actual_lines": 141,
         "expected_lines": 141,
-        "matching_lines": 126
+        "matching_lines": 141
       }
     },
     {
       "test": "bitmap_data_thorough/hitTest",
       "change_type": "changed",
       "old_status": "output_mismatch",
-      "new_status": "output_mismatch",
+      "new_status": "pass",
       "old_lines": {
-        "actual_lines": 510,
+        "actual_lines": 519,
         "expected_lines": 519,
-        "matching_lines": 285
+        "matching_lines": 513
       },
       "new_lines": {
         "actual_lines": 519,
         "expected_lines": 519,
-        "matching_lines": 513
+        "matching_lines": 519
       }
     },
     {
       "test": "bitmap_data_thorough/merge",
       "change_type": "changed",
       "old_status": "output_mismatch",
-      "new_status": "output_mismatch",
+      "new_status": "pass",
       "old_lines": {
-        "actual_lines": 510,
+        "actual_lines": 1203,
         "expected_lines": 1203,
-        "matching_lines": 23
+        "matching_lines": 852
       },
       "new_lines": {
         "actual_lines": 1203,
         "expected_lines": 1203,
-        "matching_lines": 852
+        "matching_lines": 1203
       }
     },
     {
@@ -212,14 +212,14 @@
       "old_status": "output_mismatch",
       "new_status": "output_mismatch",
       "old_lines": {
-        "actual_lines": 654,
+        "actual_lines": 1518,
         "expected_lines": 1518,
-        "matching_lines": 29
+        "matching_lines": 1189
       },
       "new_lines": {
         "actual_lines": 1518,
         "expected_lines": 1518,
-        "matching_lines": 1189
+        "matching_lines": 1426
       }
     },
     {
@@ -228,14 +228,14 @@
       "old_status": "output_mismatch",
       "new_status": "output_mismatch",
       "old_lines": {
-        "actual_lines": 402,
+        "actual_lines": 951,
         "expected_lines": 951,
-        "matching_lines": 18
+        "matching_lines": 664
       },
       "new_lines": {
         "actual_lines": 951,
         "expected_lines": 951,
-        "matching_lines": 664
+        "matching_lines": 899
       }
     },
     {
@@ -244,14 +244,14 @@
       "old_status": "output_mismatch",
       "new_status": "output_mismatch",
       "old_lines": {
-        "actual_lines": 5274,
+        "actual_lines": 6270,
         "expected_lines": 8481,
-        "matching_lines": 435
+        "matching_lines": 2156
       },
       "new_lines": {
         "actual_lines": 6270,
         "expected_lines": 8481,
-        "matching_lines": 2156
+        "matching_lines": 2507
       }
     },
     {
@@ -260,62 +260,62 @@
       "old_status": "output_mismatch",
       "new_status": "output_mismatch",
       "old_lines": {
-        "actual_lines": 573,
+        "actual_lines": 1371,
         "expected_lines": 1371,
-        "matching_lines": 28
+        "matching_lines": 1075
       },
       "new_lines": {
         "actual_lines": 1371,
         "expected_lines": 1371,
-        "matching_lines": 1075
+        "matching_lines": 1259
       }
     },
     {
       "test": "bitmap_data_thorough/scroll",
       "change_type": "changed",
       "old_status": "output_mismatch",
-      "new_status": "output_mismatch",
+      "new_status": "pass",
       "old_lines": {
-        "actual_lines": 168,
+        "actual_lines": 384,
         "expected_lines": 384,
-        "matching_lines": 10
+        "matching_lines": 294
       },
       "new_lines": {
         "actual_lines": 384,
         "expected_lines": 384,
-        "matching_lines": 294
+        "matching_lines": 384
       }
     },
     {
       "test": "bitmap_data_thorough/setPixel",
       "change_type": "changed",
       "old_status": "output_mismatch",
-      "new_status": "output_mismatch",
+      "new_status": "pass",
       "old_lines": {
-        "actual_lines": 231,
+        "actual_lines": 531,
         "expected_lines": 531,
-        "matching_lines": 12
+        "matching_lines": 399
       },
       "new_lines": {
         "actual_lines": 531,
         "expected_lines": 531,
-        "matching_lines": 399
+        "matching_lines": 531
       }
     },
     {
       "test": "bitmap_data_thorough/setPixel32",
       "change_type": "changed",
       "old_status": "output_mismatch",
-      "new_status": "output_mismatch",
+      "new_status": "pass",
       "old_lines": {
-        "actual_lines": 231,
+        "actual_lines": 531,
         "expected_lines": 531,
-        "matching_lines": 12
+        "matching_lines": 399
       },
       "new_lines": {
         "actual_lines": 531,
         "expected_lines": 531,
-        "matching_lines": 399
+        "matching_lines": 531
       }
     },
     {
@@ -324,14 +324,30 @@
       "old_status": "output_mismatch",
       "new_status": "output_mismatch",
       "old_lines": {
-        "actual_lines": 555,
+        "actual_lines": 1308,
         "expected_lines": 1308,
-        "matching_lines": 31
+        "matching_lines": 994
       },
       "new_lines": {
         "actual_lines": 1308,
         "expected_lines": 1308,
-        "matching_lines": 994
+        "matching_lines": 1222
+      }
+    },
+    {
+      "test": "movieclip_hittest_shapeflag",
+      "change_type": "changed",
+      "old_status": "output_mismatch",
+      "new_status": "output_mismatch",
+      "old_lines": {
+        "actual_lines": 338,
+        "expected_lines": 338,
+        "matching_lines": 329
+      },
+      "new_lines": {
+        "actual_lines": 338,
+        "expected_lines": 338,
+        "matching_lines": 328
       }
     }
   ]
