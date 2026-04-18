@@ -3,37 +3,55 @@
 
 Tests: `ruffle-tests/tests/swfs/avm1/bitmap_data_thorough/*` (20 sub-tests)
 
-Status after per-method fixes (2026-04-17, session 2): **14 / 20 effective pass** (13 pass + 1 ruffle_matched). Remaining 6 all >= 91% except perlinNoise (algorithmic divergence).
+Status after session 3 fixes (2026-04-17): **16 / 20 effective pass** (15 pass + 2 ruffle_matched). Remaining 4 (copyChannel, pixelDissolve, perlinNoise) need deeper work.
 
-| Sub-test | Initial | After scope fix | After per-method fixes |
-|----------|---------|-----------------|------------------------|
-| `compare` | 42.0% | 100% PASS | **PASS** |
-| `hitTest` | 54.9% | 98.8% | **PASS** (100%) |
-| `getColorBoundsRect` | 83.5% | 97.5% | **PASS** (100%) |
-| `getPixel` / `getPixel32` | 78.7% | 89.4% | **PASS** (100%) |
-| `fillRect` | 2.6% | 71.3% | **PASS** (100%) |
-| `scroll` | 2.6% | 76.6% | **PASS** (100%) |
-| `colorTransform` | 2.9% | 76.7% | **PASS** (100%) |
-| `setPixel` / `setPixel32` | 2.3% | 75.1% | **PASS** (100%) |
-| `floodFill` | 2.1% | 77.7% | **PASS** (100%) |
-| `merge` | 1.9% | 70.8% | **PASS** (100%) |
-| `constructor` | 6.7% | 6.7% | **PASS** (100%, different cascade — `_global.flash.display` lazy init) |
-| `copyPixels` | 1.9% | 73.2% | ruffle_matched (94.3%) |
-| `paletteMap` | 1.9% | 69.8% | 94.5% |
-| `noise` | 1.9% | 78.3% | 93.9% |
-| `copyChannel` | 1.8% | 66.9% | 93.4% |
-| `threshold` | 2.4% | 76.0% | 93.4% |
-| `pixelDissolve` | 2.0% | 78.4% | 91.8% |
-| `perlinNoise` | 5.1% | 25.4% | 29.6% (algorithm port mismatches Ruffle's exact pixel values) |
+| Sub-test | Initial | After scope fix | After per-method fixes | Session 3 |
+|----------|---------|-----------------|------------------------|-----------|
+| `compare` | 42.0% | 100% PASS | **PASS** | **PASS** |
+| `hitTest` | 54.9% | 98.8% | **PASS** (100%) | **PASS** |
+| `getColorBoundsRect` | 83.5% | 97.5% | **PASS** (100%) | **PASS** |
+| `getPixel` / `getPixel32` | 78.7% | 89.4% | **PASS** (100%) | **PASS** |
+| `fillRect` | 2.6% | 71.3% | **PASS** (100%) | **PASS** |
+| `scroll` | 2.6% | 76.6% | **PASS** (100%) | **PASS** |
+| `colorTransform` | 2.9% | 76.7% | **PASS** (100%) | **PASS** |
+| `setPixel` / `setPixel32` | 2.3% | 75.1% | **PASS** (100%) | **PASS** |
+| `floodFill` | 2.1% | 77.7% | **PASS** (100%) | **PASS** |
+| `merge` | 1.9% | 70.8% | **PASS** (100%) | **PASS** |
+| `constructor` | 6.7% | 6.7% | **PASS** (100%) | **PASS** |
+| `threshold` | 2.4% | 76.0% | 93.4% | **PASS** (100%) — opaque-bmd getPixel32 raw read + mask-undefined coercion |
+| `noise` | 1.9% | 78.3% | 93.9% | **PASS** (100%) — high=undefined coerces to 0; alpha-channel skip when !transparent; ECMA NaN→0 seed |
+| `copyPixels` | 1.9% | 73.2% | ruffle_matched (94.3%) | ruffle_matched |
+| `paletteMap` | 1.9% | 69.8% | 94.5% | **ruffle_matched** — Object-arg LUT lookup + & 0xFF mask |
+| `copyChannel` | 1.8% | 66.9% | 93.4% | 93.4% — test sequence dedup drift; needs investigation |
+| `pixelDissolve` | 2.0% | 78.4% | 91.8% | improved (~94%) — Flash-specific Feistel/return value behavior |
+| `perlinNoise` | 5.1% | 25.4% | 29.6% | 29.6% — algorithm port mismatches (known_failure upstream) |
 
-## Remaining issues by sub-test (all at 91%+ except perlinNoise)
+## Session 3 fixes (2026-04-17)
 
-- **copyChannel**: bitmap printBmd shows empty rows after specific arg combinations involving `objLooksLikeNum`. The bmd ends up looking "disposed" post-call. Root cause unknown — possibly stack state corruption during valueOf invocation from a native handler.
-- **paletteMap**: a few pixel mismatches in edge cases, likely related to how Ruffle's `to_premultiplied_alpha(true)` post-sum interacts with opaque bitmaps.
-- **noise**: RNG divergence in a minority of cases, possibly grayscale alpha handling.
-- **threshold**: small Flash/Ruffle-specific edge case differences in source/dest coordinate handling.
-- **pixelDissolve**: not investigated in this session — Feistel permutation details may differ.
-- **perlinNoise**: gradient table and noise formula differ from Ruffle's exact port.
+1. **threshold** (now PASS):
+   - `bitmapDataGetPixel32`: opaque BMDs return raw stored pixel (no un-premul); only transparent BMDs un-premultiply. Matches Ruffle `get_pixel32` behavior.
+   - `mask` arg defaults to `0xFFFFFFFF` only when missing; `undefined` coerces to `0` per Ruffle AVM1 `try_get_u32(UndefinedAs::Some)`.
+
+2. **noise** (now PASS):
+   - `high` arg defaults to `0xFF` only when missing; `undefined` coerces to `0`.
+   - Alpha channel RNG only fires for transparent BMDs (not just `channelOptions & 8`). Prevents RNG state divergence on opaque BMDs.
+   - Seed/low/high coerced via `doubleToUint32` → cast to `int32_t` so NaN/Infinity → 0 (ECMA ToInt32). Fixes `noise({}, ...)` where `{}` coerces to NaN.
+
+3. **paletteMap** (now ruffle_matched):
+   - Treat `OBJECT` (e.g. `{}`) as well as `ARRAY` for channel-array args, looking up numeric-indexed elements via `getPropertyWithPrototype`.
+   - Mask each LUT entry with `& 0xFF` (Ruffle's per-channel byte contribution).
+
+4. **pixelDissolve** (improved):
+   - Require 5 args minimum (was 4) — `pixelDissolve(src, rect, point, seed)` now returns -1.
+   - Validate rect has all `x/y/width/height` props → return -4.
+   - Empty source/dest region returns `random_seed` (Flash behavior, not Ruffle's 0).
+   - Use `getPropertyWithPrototype` for rect/point fields.
+
+## Remaining issues by sub-test
+
+- **copyChannel** (~93%): test sequence diverges after a specific `objLooksLikeNum` call — `printBmd(object)` outputs zero rows for one specific iteration, and subsequent `generateArgSets` dedup produces a different sequence. ASAN clean (no memory corruption). The dedup logic uses `arraysEqual` with `===`. Need a minimal repro to determine whether `===` between two distinct `{}` literals or between `null`/`undefined` returns true incorrectly in some context (basic test case passes, so it's situational). Skipped this session.
+- **pixelDissolve** (~94%): Flash-specific Feistel return-value semantics differ from Ruffle. Test is `known_failure.panic` upstream (Ruffle panics). Hard to match Flash exactly without a Flash Player oracle. Could mark as accepted diff or generate `output.ruffle.txt` for `ruffle_matched` promotion.
+- **perlinNoise** (29.6%): gradient table / noise formula port mismatches Ruffle's exact pixel values. Test is `known_failure = true` upstream. `output.ruffle.txt` exists and our diff may be subset of Ruffle's, but apparently not enough to promote.
 
 ## Shared structure
 
