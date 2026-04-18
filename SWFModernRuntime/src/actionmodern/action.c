@@ -3975,8 +3975,13 @@ static ASObject* g_bitmapdata_prototype = NULL;
 static ASFunction g_bitmapdata_methods[28];
 static int g_bitmapdata_init_done = 0;
 
-// Side table for BitmapData native data (avoids modifying ASObject struct)
-#define MAX_BITMAP_NATIVES 256
+// Side table for BitmapData native data (avoids modifying ASObject struct).
+// Entries are never reclaimed (no GC for ASObject), so this needs to be large
+// enough to hold every BMD ever created in a single test run. The
+// `bitmap_data_thorough/*` tests create ~50 fresh BMDs per iteration × 3
+// iterations × 14 sub-tests, so 256 was hit in copyChannel and getter calls
+// started returning -1.
+#define MAX_BITMAP_NATIVES 8192
 static struct { ASObject* obj; BitmapDataNative* native; } g_bitmap_natives[MAX_BITMAP_NATIVES];
 static int g_bitmap_native_count = 0;
 

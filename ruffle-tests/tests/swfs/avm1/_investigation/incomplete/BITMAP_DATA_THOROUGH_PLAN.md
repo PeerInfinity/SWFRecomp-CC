@@ -3,7 +3,7 @@
 
 Tests: `ruffle-tests/tests/swfs/avm1/bitmap_data_thorough/*` (20 sub-tests)
 
-Status after session 3 fixes (2026-04-17): **16 / 20 effective pass** (15 pass + 2 ruffle_matched). Remaining 4 (copyChannel, pixelDissolve, perlinNoise) need deeper work.
+Status after session 3 fixes (2026-04-17): **18 / 20 effective pass** (16 pass + 2 ruffle_matched). Remaining 2 (pixelDissolve, perlinNoise) both have `known_failure` markers upstream and need Flash-oracle data to fix.
 
 | Sub-test | Initial | After scope fix | After per-method fixes | Session 3 |
 |----------|---------|-----------------|------------------------|-----------|
@@ -22,7 +22,7 @@ Status after session 3 fixes (2026-04-17): **16 / 20 effective pass** (15 pass +
 | `noise` | 1.9% | 78.3% | 93.9% | **PASS** (100%) — high=undefined coerces to 0; alpha-channel skip when !transparent; ECMA NaN→0 seed |
 | `copyPixels` | 1.9% | 73.2% | ruffle_matched (94.3%) | ruffle_matched |
 | `paletteMap` | 1.9% | 69.8% | 94.5% | **ruffle_matched** — Object-arg LUT lookup + & 0xFF mask |
-| `copyChannel` | 1.8% | 66.9% | 93.4% | 93.4% — test sequence dedup drift; needs investigation |
+| `copyChannel` | 1.8% | 66.9% | 93.4% | **PASS** (100%) — `MAX_BITMAP_NATIVES` 256 → 8192; the side table was overflowing partway through the Opaque iteration, leaving new BMDs unregistered → `bdHeightGetter` returned -1 → `printBmd` loop skipped |
 | `pixelDissolve` | 2.0% | 78.4% | 91.8% | improved (~94%) — Flash-specific Feistel/return value behavior |
 | `perlinNoise` | 5.1% | 25.4% | 29.6% | 29.6% — algorithm port mismatches (known_failure upstream) |
 
@@ -49,9 +49,12 @@ Status after session 3 fixes (2026-04-17): **16 / 20 effective pass** (15 pass +
 
 ## Remaining issues by sub-test
 
-- **copyChannel** (~93%): test sequence diverges after a specific `objLooksLikeNum` call — `printBmd(object)` outputs zero rows for one specific iteration, and subsequent `generateArgSets` dedup produces a different sequence. ASAN clean (no memory corruption). The dedup logic uses `arraysEqual` with `===`. Need a minimal repro to determine whether `===` between two distinct `{}` literals or between `null`/`undefined` returns true incorrectly in some context (basic test case passes, so it's situational). Skipped this session.
-- **pixelDissolve** (~94%): Flash-specific Feistel return-value semantics differ from Ruffle. Test is `known_failure.panic` upstream (Ruffle panics). Hard to match Flash exactly without a Flash Player oracle. Could mark as accepted diff or generate `output.ruffle.txt` for `ruffle_matched` promotion.
+- **pixelDissolve** (~97%): Flash-specific Feistel return-value semantics differ from Ruffle. Test is `known_failure.panic` upstream (Ruffle panics). Hard to match Flash exactly without a Flash Player oracle. Could mark as accepted diff or generate `output.ruffle.txt` for `ruffle_matched` promotion.
 - **perlinNoise** (29.6%): gradient table / noise formula port mismatches Ruffle's exact pixel values. Test is `known_failure = true` upstream. `output.ruffle.txt` exists and our diff may be subset of Ruffle's, but apparently not enough to promote.
+
+## Session 4 fixes (2026-04-17)
+
+- **copyChannel** (now PASS): Bumped `MAX_BITMAP_NATIVES` from 256 to 8192. The `bitmap_data_thorough/copyChannel` test creates ~50 fresh BMDs per top-level iteration (Transparent / Opaque / Disposed), and the side table was full partway through Opaque. Once full, `setBitmapNative` silently drops new entries → `getBitmapNative` returns `NULL` → `bdHeightGetter` returns -1 → the test's `for (var y = 0; y < bmd.height; y++)` doesn't iterate → no rows in the bitmap dump. Five specific calls had this drift, all in the Opaque iteration after the table filled.
 
 ## Shared structure
 
