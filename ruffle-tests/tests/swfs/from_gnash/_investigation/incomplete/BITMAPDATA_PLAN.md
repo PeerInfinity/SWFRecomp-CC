@@ -1,8 +1,8 @@
 # BitmapData Plan
 <!-- TESTS: BitmapData-v8 -->
 
-Last updated: 2026-04-18 (session 3)
-Status: IN PROGRESS — 1 test, 375/417 lines matching (90%) — 40 diffs remaining
+Last updated: 2026-04-18 (session 4)
+Status: IN PROGRESS — 1 test, 376/417 lines matching (90%) — 39 diffs remaining
 
 ---
 
@@ -45,6 +45,26 @@ Result: BitmapData-v8 diffs 44 → 40 (4 Cat 1 tests fixed:
 315/324/329/334). BitmapData-v5/v6/v7 still PASS. AVM1 bitmap tests
 unchanged. Rectangle-v5/v6/v7 unchanged; Rectangle-v8 was already
 failing before the fix (unrelated Rectangle.containsPoint bugs).
+
+### Session 4 (2026-04-18) — Cat 4 fix landed
+Root cause isolated: when `src == dest` and the source/dest rects
+overlap, `bitmapDataCopyPixels` read-and-wrote in place. Early iterations
+overwrite pixels that later iterations read as source — those reads
+pick up already-copied pixels instead of the original source. For the
+failing case `source.copyPixels(source, Rect(20,20,50,50), Point(45,45))`:
+at (sx=20, sy=20), we write `dest[65,65] = src[40,40] = green`; then
+at (sx=45, sy=45), we read `src[65,65]` which was just overwritten to
+green and write it to `dest[90,90]` — but Flash expects white there
+because the original `src[65,65]` was outside the green fillRect.
+
+Fix: when `src_bmp == dest_bmp` (or the alpha bitmap aliases the dest),
+snapshot the source pixels into a temp buffer before the copy loop and
+read from the snapshot. Free the snapshot after. Both loops (transparent
+alpha path and no-alpha path) now read from `src_pixels` which aliases
+to either the snapshot or the original buffer.
+
+Result: BitmapData-v8 diffs 40 → 39 (Cat 4 test 688 fixed). No
+regressions on BitmapData-v5/v6/v7, AVM1 bitmap tests.
 
 ---
 
@@ -183,7 +203,7 @@ hardest to fix. Deferred to its own plan.
 
 ---
 
-### Cat 4. `copyPixels` writes outside the dest rect (1 diff)
+### Cat 4. `copyPixels` writes outside the dest rect (1 diff) — **FIXED (session 4)**
 
 Test: `BitmapData.as:688` — after
 `source.copyPixels(source, new Rectangle(50, 50, 20, 20), new Point(45, 45))`,

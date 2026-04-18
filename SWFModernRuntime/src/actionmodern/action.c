@@ -10238,6 +10238,26 @@ static ActionVar bitmapDataCopyPixels(SWFAppContext* app_context, ActionVar* arg
     }
     int mergeAlpha = 0;
     if (arg_count >= 6) mergeAlpha = (int)varToDoubleSimple(&args[5]);
+
+    // When source and destination are the same BitmapData (or the alpha
+    // bitmap aliases either of them), we can't read-as-we-write: later
+    // iterations would pick up already-overwritten pixels. Snapshot the
+    // aliasing source(s) into temp buffers before the loop.
+    uint32_t* src_snapshot = NULL;
+    uint32_t* alpha_snapshot = NULL;
+    if (src_bmp == dest_bmp) {
+        size_t nb = (size_t)src_bmp->width * (size_t)src_bmp->height * sizeof(uint32_t);
+        src_snapshot = (uint32_t*) malloc(nb);
+        memcpy(src_snapshot, src_bmp->pixels, nb);
+    }
+    if (alpha_bmp && alpha_bmp == dest_bmp) {
+        size_t nb = (size_t)alpha_bmp->width * (size_t)alpha_bmp->height * sizeof(uint32_t);
+        alpha_snapshot = (uint32_t*) malloc(nb);
+        memcpy(alpha_snapshot, alpha_bmp->pixels, nb);
+    }
+    uint32_t* src_pixels = src_snapshot ? src_snapshot : src_bmp->pixels;
+    uint32_t* alpha_pixels = (alpha_bmp ? (alpha_snapshot ? alpha_snapshot : alpha_bmp->pixels) : NULL);
+
     if (alpha_bmp && !alpha_bmp->disposed && alpha_bmp->transparent) {
         // Transparent alpha bitmap path — blend when mergeAlpha || dest is opaque
         int alpha_blend = mergeAlpha || !dest_bmp->transparent;
@@ -10253,9 +10273,9 @@ static ActionVar bitmapDataCopyPixels(SWFAppContext* app_context, ActionVar* arg
                 int abx = alpha_pt_x + sx;
                 int aby = alpha_pt_y + sy;
                 if (abx < 0 || abx >= alpha_bmp->width || aby < 0 || aby >= alpha_bmp->height) continue;
-                uint32_t ab_px = alpha_bmp->pixels[aby * alpha_bmp->width + abx];
+                uint32_t ab_px = alpha_pixels[aby * alpha_bmp->width + abx];
                 uint32_t ab_alpha = (ab_px >> 24) & 0xFF;
-                uint32_t src_px = src_bmp->pixels[src_y * src_bmp->width + src_x];
+                uint32_t src_px = src_pixels[src_y * src_bmp->width + src_x];
                 // Unpremultiply source, compute new alpha, re-premultiply
                 uint32_t straight = unpremultiplyAlpha(src_px);
                 uint32_t sa = (straight >> 24) & 0xFF;
@@ -10305,7 +10325,7 @@ static ActionVar bitmapDataCopyPixels(SWFAppContext* app_context, ActionVar* arg
                 int dst_y = dy + sy;
                 if (src_x < 0 || src_x >= src_bmp->width || src_y < 0 || src_y >= src_bmp->height) continue;
                 if (dst_x < 0 || dst_x >= dest_bmp->width || dst_y < 0 || dst_y >= dest_bmp->height) continue;
-                uint32_t src_px = src_bmp->pixels[src_y * src_bmp->width + src_x];
+                uint32_t src_px = src_pixels[src_y * src_bmp->width + src_x];
                 if (blend) {
                     uint32_t dst_px = dest_bmp->pixels[dst_y * dest_bmp->width + dst_x];
                     uint32_t sa = (src_px >> 24) & 0xFF;
@@ -10332,6 +10352,8 @@ static ActionVar bitmapDataCopyPixels(SWFAppContext* app_context, ActionVar* arg
             }
         }
     }
+    if (src_snapshot) free(src_snapshot);
+    if (alpha_snapshot) free(alpha_snapshot);
     r = makeF64(0);
     return r;
 }
