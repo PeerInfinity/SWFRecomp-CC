@@ -10145,15 +10145,20 @@ static ActionVar bitmapDataThreshold(SWFAppContext* app_context, ActionVar* args
     // When source==dest, Flash writes at source coordinates (ignoring destPoint)
     // and counts all matching source pixels regardless of dest bounds
     int self_threshold = (src_bmp == dest_bmp);
+    // Ruffle compares masked source against masked threshold in PREMULTIPLIED space
+    // (raw pixel value, not un-premultiplied). It also writes fill_color via
+    // Color::to_premultiplied_alpha(true) and copies the raw source pixel on
+    // non-match when copy_source is true.
+    uint32_t thresh_masked = threshold_val & mask_val;
+    uint32_t fill_premul = premultiplyAlpha(fill_color);
     int count = 0;
     for (int sy = 0; sy < rh; sy++) {
         for (int sx = 0; sx < rw; sx++) {
             int src_x = rx + sx;
             int src_y = ry + sy;
             if (src_x < 0 || src_x >= src_bmp->width || src_y < 0 || src_y >= src_bmp->height) continue;
-            uint32_t src_px_unpremul = unpremultiplyAlpha(src_bmp->pixels[src_y * src_bmp->width + src_x]);
-            uint32_t masked = src_px_unpremul & mask_val;
-            uint32_t thresh_masked = threshold_val & mask_val;
+            uint32_t src_px_raw = src_bmp->pixels[src_y * src_bmp->width + src_x];
+            uint32_t masked = src_px_raw & mask_val;
             int passes = 0;
             switch (op) {
                 case 1: passes = (masked < thresh_masked); break;
@@ -10168,10 +10173,10 @@ static ActionVar bitmapDataThreshold(SWFAppContext* app_context, ActionVar* args
             if (passes) {
                 count++;
                 if (write_x >= 0 && write_x < dest_bmp->width && write_y >= 0 && write_y < dest_bmp->height)
-                    dest_bmp->pixels[write_y * dest_bmp->width + write_x] = premultiplyAlpha(fill_color);
+                    dest_bmp->pixels[write_y * dest_bmp->width + write_x] = fill_premul;
             } else if (copySource && !self_threshold) {
                 if (write_x >= 0 && write_x < dest_bmp->width && write_y >= 0 && write_y < dest_bmp->height)
-                    dest_bmp->pixels[write_y * dest_bmp->width + write_x] = src_bmp->pixels[src_y * src_bmp->width + src_x];
+                    dest_bmp->pixels[write_y * dest_bmp->width + write_x] = src_px_raw;
             }
         }
     }
@@ -10850,22 +10855,22 @@ static ActionVar bitmapDataPerlinNoise(SWFAppContext* app_context, ActionVar* ar
     (void)registers;
     ASObject* obj = (ASObject*) this_obj;
     BitmapDataNative* bmp = getBitmapNative(obj);
-    ActionVar r = {0}; r.type = ACTION_STACK_VALUE_UNDEFINED;
+    ActionVar r = {0};
+    // Ruffle: returns -1 for <6 args / disposed; 0 on success.
+    if (arg_count < 6) { r = makeF64(-1); return r; }
     if (!bmp || bmp->disposed) { r = makeF64(-1); return r; }
-    if (arg_count < 6) return r;
 
-    double base_x = varToDoubleSimple(&args[0]);
-    double base_y = varToDoubleSimple(&args[1]);
-    int num_octaves = (int)varToDoubleSimple(&args[2]);
-    int64_t random_seed = (int64_t)(int32_t)varToDoubleSimple(&args[3]);
-    int stitch = (int)varToDoubleSimple(&args[4]);
-    int fractal_noise = (int)varToDoubleSimple(&args[5]);
-    int channel_options = (arg_count >= 7) ? (int)varToDoubleSimple(&args[6]) : 7;
-    int grayscale = 0;
-    if (arg_count >= 8) {
-        double gs_val = varToDoubleSimple(&args[7]);
-        grayscale = (!isnan(gs_val) && gs_val != 0.0) ? 1 : 0;
-    }
+    double base_x = tsArgToDouble_ctx(app_context, &args[0]);
+    double base_y = tsArgToDouble_ctx(app_context, &args[1]);
+    int num_octaves = (int)tsArgToDouble_ctx(app_context, &args[2]);
+    if (num_octaves < 0) num_octaves = 0;
+    int64_t random_seed = (int64_t)(int32_t)tsArgToDouble_ctx(app_context, &args[3]);
+    int stitch = tsArgTruthy(&args[4]);
+    int fractal_noise = tsArgTruthy(&args[5]);
+    int channel_options = 7;
+    if (arg_count >= 7 && args[6].type != ACTION_STACK_VALUE_UNDEFINED)
+        channel_options = ((int)tsArgToDouble_ctx(app_context, &args[6])) & 0xFF;
+    int grayscale = (arg_count >= 8) ? tsArgTruthy(&args[7]) : 0;
 
     if (num_octaves < 0) num_octaves = 0;
 
@@ -10958,6 +10963,7 @@ static ActionVar bitmapDataPerlinNoise(SWFAppContext* app_context, ActionVar* ar
         }
     }
 
+    r = makeF64(0);
     return r;
 }
 
