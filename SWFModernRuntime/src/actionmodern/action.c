@@ -25725,17 +25725,20 @@ static void installKeyMethods(SWFAppContext* app_context, ASObject* key_obj)
     ActionVar fv = {0};
     fv.type = ACTION_STACK_VALUE_FUNCTION;
 
+    // Ruffle marks Key methods and constants as DONT_ENUM | DONT_DELETE |
+    // READ_ONLY (= 0 in our positive-flag system). Keeps them out of
+    // for-in / _toXML while still letting the test read them.
     fv.data.numeric_value = (u64)&g_key_isDown_func;
-    setProperty(app_context, key_obj, "isDown", 6, &fv);
+    setPropertyWithFlags(app_context, key_obj, "isDown", 6, &fv, 0);
 
     fv.data.numeric_value = (u64)&g_key_getCode_func;
-    setProperty(app_context, key_obj, "getCode", 7, &fv);
+    setPropertyWithFlags(app_context, key_obj, "getCode", 7, &fv, 0);
 
     fv.data.numeric_value = (u64)&g_key_getAscii_func;
-    setProperty(app_context, key_obj, "getAscii", 8, &fv);
+    setPropertyWithFlags(app_context, key_obj, "getAscii", 8, &fv, 0);
 
     fv.data.numeric_value = (u64)&g_key_isToggled_func;
-    setProperty(app_context, key_obj, "isToggled", 9, &fv);
+    setPropertyWithFlags(app_context, key_obj, "isToggled", 9, &fv, 0);
 
     // isAccessible (stub, always returns false)
     {
@@ -25748,10 +25751,10 @@ static void installKeyMethods(SWFAppContext* app_context, ASObject* key_obj)
             setupNativeFuncOwnProps(app_context, &g_key_isAccessible_func);
         }
         fv.data.numeric_value = (u64)&g_key_isAccessible_func;
-        setProperty(app_context, key_obj, "isAccessible", 12, &fv);
+        setPropertyWithFlags(app_context, key_obj, "isAccessible", 12, &fv, 0);
     }
 
-    // Key constants (19 named key codes)
+    // Key constants (19 named key codes) — also DONT_ENUM | DONT_DELETE | READ_ONLY.
     {
         ActionVar nv = {0}; nv.type = ACTION_STACK_VALUE_F64;
         struct { const char* name; u32 len; int value; } key_consts[] = {
@@ -25766,7 +25769,7 @@ static void installKeyMethods(SWFAppContext* app_context, ASObject* key_obj)
         for (int i = 0; i < 19; i++) {
             double v = (double)key_consts[i].value;
             VAL(u64, &nv.data.numeric_value) = VAL(u64, &v);
-            setProperty(app_context, key_obj, key_consts[i].name, key_consts[i].len, &nv);
+            setPropertyWithFlags(app_context, key_obj, key_consts[i].name, key_consts[i].len, &nv, 0);
         }
     }
 }
@@ -26179,25 +26182,29 @@ static void installAsBroadcaster(SWFAppContext* app_context, ASObject* obj)
 {
     initAsBroadcasterFuncs(app_context);
 
-    // Install _listeners array
+    // Ruffle marks these as DONT_ENUM (and methods also DONT_DELETE). Matching
+    // those flags keeps AsBroadcaster methods out of for-in/_toXML
+    // enumerations, matching Flash's observable behavior.
+    const u8 listeners_flags = PROPERTY_FLAG_WRITABLE | PROPERTY_FLAG_CONFIGURABLE;
+    const u8 method_flags    = PROPERTY_FLAG_WRITABLE;
+
     ASArray* listeners = allocArray(app_context, 4);
     ActionVar lv = {0};
     lv.type = ACTION_STACK_VALUE_ARRAY;
     lv.data.numeric_value = (u64)listeners;
-    setProperty(app_context, obj, "_listeners", 10, &lv);
+    setPropertyWithFlags(app_context, obj, "_listeners", 10, &lv, listeners_flags);
 
-    // Install methods
     ActionVar fv = {0};
     fv.type = ACTION_STACK_VALUE_FUNCTION;
 
     fv.data.numeric_value = (u64)&g_ab_addListener_func;
-    setProperty(app_context, obj, "addListener", 11, &fv);
+    setPropertyWithFlags(app_context, obj, "addListener", 11, &fv, method_flags);
 
     fv.data.numeric_value = (u64)&g_ab_removeListener_func;
-    setProperty(app_context, obj, "removeListener", 14, &fv);
+    setPropertyWithFlags(app_context, obj, "removeListener", 14, &fv, method_flags);
 
     fv.data.numeric_value = (u64)&g_ab_broadcastMessage_func;
-    setProperty(app_context, obj, "broadcastMessage", 16, &fv);
+    setPropertyWithFlags(app_context, obj, "broadcastMessage", 16, &fv, method_flags);
 }
 
 // Mark AsBroadcaster methods as SWF6+ (hidden in SWF5 via flash_flags).
@@ -28616,6 +28623,8 @@ static void ensureGlobalInit(SWFAppContext* app_context)
 	installAsBroadcaster(app_context, g_mouse_obj);
 	markAsBroadcasterSWF6(g_mouse_obj);
 	// Mouse methods: show, hide, setTrailer, setTrailerPosition, setTrailerMode
+	// Ruffle marks these as DONT_DELETE | DONT_ENUM | READ_ONLY (flags=0 in our
+	// positive-flag system). Keeps them out of for-in / _toXML.
 	{
 		static ASFunction mouse_methods[5];
 		static int mouse_methods_init = 0;
@@ -28630,7 +28639,7 @@ static void ensureGlobalInit(SWFAppContext* app_context)
 				setupNativeFuncOwnProps(app_context, &mouse_methods[i]);
 			}
 			fv.data.numeric_value = (u64)&mouse_methods[i];
-			setProperty(app_context, g_mouse_obj, mouse_names[i], (u32)strlen(mouse_names[i]), &fv);
+			setPropertyWithFlags(app_context, g_mouse_obj, mouse_names[i], (u32)strlen(mouse_names[i]), &fv, 0);
 		}
 		mouse_methods_init = 1;
 	}
