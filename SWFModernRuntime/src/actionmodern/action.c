@@ -37629,58 +37629,17 @@ void actionSetMember(SWFAppContext* app_context)
 						VAL(double, &len_val.data.numeric_value) = (double)value_var.str_size;
 						setProperty(app_context, props, "length", 6, &len_val);
 #ifdef NO_GRAPHICS
-						// Rebuild the run table with default formatting so a subsequent
-						// htmlText read (after html is re-enabled) regenerates HTML from
-						// the new plain text — not stale runs from a prior HTML write.
+						// Invalidate any existing run table so a subsequent htmlText read
+						// (after html is re-enabled or a stylesheet is attached) regenerates
+						// from the new plain text via the raw-content fallback path — not
+						// from stale runs left over from a prior HTML write.
 						{
-							const uint16_t* _nhr_u16 = varGetU16Ptr(&value_var);
-							char _nhr_buf[16384];
-							if (_nhr_u16 && value_var.str_size > 0)
-								u16_to_utf8(_nhr_u16, value_var.str_size, _nhr_buf, sizeof(_nhr_buf));
-							else
-								_nhr_buf[0] = '\0';
-							u32 _nhr_len = (u32)strlen(_nhr_buf);
-							TFRunTable* _nhr_table = tf_get_table(mc);
-							_nhr_table->from_html_text = 0;
-							_nhr_table->run_count = 0;
-							_nhr_table->text_len = 0;
-							TFRun _nhr_def;
-							tf_get_defaults(mc, &_nhr_def);
-							ActionVar* _nhr_tc = getProperty(props, "textColor", 9);
-							if (_nhr_tc != NULL && _nhr_tc->type == ACTION_STACK_VALUE_F64) {
-								double _nhr_tcd; memcpy(&_nhr_tcd, &_nhr_tc->data.numeric_value, sizeof(double));
-								_nhr_def.color = (u32)_nhr_tcd & 0x00FFFFFF;
-							}
-							u32 _nhr_ti = 0;
-							for (u32 _nhr_si = 0; _nhr_si < _nhr_len && _nhr_ti < sizeof(_nhr_table->text) - 1; _nhr_si++) {
-								if (_nhr_buf[_nhr_si] == '\r') _nhr_table->text[_nhr_ti++] = '\n';
-								else _nhr_table->text[_nhr_ti++] = _nhr_buf[_nhr_si];
-							}
-							_nhr_table->text[_nhr_ti] = '\0';
-							_nhr_table->text_len = _nhr_ti;
-							u32 _nhr_pstart = 0;
-							for (u32 _nhr_pi = 0; _nhr_pi <= _nhr_ti; _nhr_pi++) {
-								if (_nhr_pi == _nhr_ti || _nhr_table->text[_nhr_pi] == '\n') {
-									if (_nhr_pi > _nhr_pstart) {
-										if (_nhr_table->run_count < TF_MAX_RUNS) {
-											TFRun* _nhr_r = &_nhr_table->runs[_nhr_table->run_count];
-											*_nhr_r = _nhr_def;
-											_nhr_r->start = _nhr_pstart;
-											_nhr_r->length = _nhr_pi - _nhr_pstart;
-											_nhr_table->run_count++;
-										}
-									}
-									if (_nhr_pi < _nhr_ti && _nhr_table->text[_nhr_pi] == '\n') {
-										if (_nhr_table->run_count < TF_MAX_RUNS) {
-											TFRun* _nhr_r = &_nhr_table->runs[_nhr_table->run_count];
-											*_nhr_r = _nhr_def;
-											_nhr_r->start = _nhr_pi;
-											_nhr_r->length = 1;
-											_nhr_table->run_count++;
-										}
-									}
-									_nhr_pstart = _nhr_pi + 1;
-								}
+							TFRunTable* _inv_table = tf_find_table(mc);
+							if (_inv_table != NULL) {
+								_inv_table->mc = NULL;
+								_inv_table->run_count = 0;
+								_inv_table->text_len = 0;
+								_inv_table->from_html_text = 0;
 							}
 						}
 #endif
@@ -40200,13 +40159,16 @@ void actionGetMember(SWFAppContext* app_context)
 						PUSH_U16(_hs_u16, _hs_u16_len);
 						return;
 					}
-					// No format table: check if stylesheet active + raw content flag
-					// When htmlText was set without a stylesheet, then a stylesheet was
-					// assigned later, Flash re-formats the raw text as HTML.
+					// No format table: re-generate HTML from the raw text.
+					// This fires when htmlText was set with html=false (no stylesheet),
+					// then a stylesheet was attached OR html was re-enabled — Flash serializes
+					// the stored text with the current default format.
 					ASObject* _ht_dprops = (ASObject*) mc->dynamic_props;
 					ActionVar* _ht_ss = getProperty(_ht_dprops, "styleSheet", 10);
 					ActionVar* _ht_rc = getProperty(_ht_dprops, "_tf_raw_content", 15);
-					if (_ht_ss != NULL && _ht_ss->type == ACTION_STACK_VALUE_OBJECT &&
+					int _ht_ss_active = (_ht_ss != NULL && _ht_ss->type == ACTION_STACK_VALUE_OBJECT);
+					if (_ht_effective_html &&
+					    (_ht_ss_active || _ht_html_on) &&
 					    _ht_rc != NULL && _ht_rc->type == ACTION_STACK_VALUE_F64) {
 						double _rc_d; memcpy(&_rc_d, &_ht_rc->data.numeric_value, sizeof(double));
 						if (_rc_d == 1.0) {
