@@ -1,26 +1,33 @@
 # Ruffle Test Results Diff
 
-**Previous:** `3976fcb7b067` (2026-04-18T16:11:15.367563+00:00)
-**Current:** `d6d009974a92` (2026-04-18T17:48:29.279286+00:00)
+**Previous:** `d6d009974a92` (2026-04-18T17:48:29.279286+00:00)
+**Current:** `924dce10a243` (2026-04-18T18:58:39.491977+00:00)
 
 ## Summary
 
 | Metric | Previous | Current | Delta |
 |--------|----------|---------|-------|
-| Passing | 106 | 106 | 0 |
+| Passing | 106 | 107 | +1 |
 | Total | 190 | 190 | 0 |
-| Pass rate | 55.8% | 55.8% | 0% |
-| Mismatched lines | 3103 | 3098 | -5 |
-|   Decreased | | | -5 |
+| Pass rate | 55.8% | 56.3% | +0.5% |
+| Mismatched lines | 3098 | 3087 | -11 |
+|   Decreased | | | -15 |
+|   Increased | | | +4 |
 
-## Status Changed (1)
+## Newly Passing (1)
 
-| Test | Previous | Current | Lines (prev) | Lines (now) |
-|------|----------|---------|--------------|-------------|
-| `ExternalInterface-v8` | output_mismatch | ruffle_matched | 113/118 | 114/118 |
+| Test | Previous Status | Lines (prev) | Lines (now) |
+|------|----------------|--------------|-------------|
+| `TextField-v5` | output_mismatch | 9/12 | 12/12 |
 
-## Line Count Changed (1)
+## Line Count Changed (7)
 
 | Test | Status | Lines (prev) | Lines (now) | Diff |
 |------|--------|--------------|-------------|------|
-| `array-v5` | output_mismatch | 499/560 | 503/560 | -4 |
+| `Selection-v6` | output_mismatch | 114/125 | 117/125 | -3 |
+| `Selection-v7` | output_mismatch | 114/125 | 117/125 | -3 |
+| `Selection-v8` | output_mismatch | 114/125 | 117/125 | -3 |
+| `TextFieldHTML-v6` | output_mismatch | 33/37 | 34/37 | -1 |
+| `TextFieldHTML-v7` | output_mismatch | 33/37 | 34/37 | -1 |
+| `TextFieldHTML-v8` | output_mismatch | 33/37 | 34/37 | -1 |
+| `array-v5` | output_mismatch | 503/560 | 499/560 | +4 |
