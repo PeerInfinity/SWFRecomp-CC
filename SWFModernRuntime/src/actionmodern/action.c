@@ -9573,8 +9573,9 @@ static ActionVar bitmapDataCopyChannel(SWFAppContext* app_context, ActionVar* ar
             if (dpy) dy = (int)tsArgToDouble_ctx(app_context, dpy);
         }
     }
-    int src_channel = (int)tsArgToDouble_ctx(app_context, &args[3]);
-    int dest_channel = (int)tsArgToDouble_ctx(app_context, &args[4]);
+    // Coerce channels via valueOf. coerceCoordI32 normalizes NaN → 0 and wraps.
+    int src_channel = coerceCoordI32(app_context, &args[3]);
+    int dest_channel = coerceCoordI32(app_context, &args[4]);
     // Channel shifts: 1=R(16), 2=G(8), 4=B(0), 8=A(24). Invalid src → read 0.
     // Invalid dest → preserve pixel unchanged (Ruffle's `_ => original_color`).
     int src_shift = -1, dst_shift = -1;
@@ -9792,8 +9793,18 @@ static ActionVar bitmapDataNoise(SWFAppContext* app_context, ActionVar* args, u3
     if (arg_count < 1) { r = makeF64(-1); return r; }
     if (!bmp || bmp->disposed) { r = makeF64(-1); return r; }
     int32_t seed = (int32_t)tsArgToDouble_ctx(app_context, &args[0]);
-    uint8_t low = (arg_count >= 2) ? (uint8_t)(int)tsArgToDouble_ctx(app_context, &args[1]) : 0;
-    uint8_t high = (arg_count >= 3) ? (uint8_t)(int)tsArgToDouble_ctx(app_context, &args[2]) : 255;
+    // Ruffle: low/high coerced to i32, then clamped to [0, 255]. Negative values
+    // become 0 (not wrapped to 255 as a plain uint8_t cast would give).
+    int low_i = (arg_count >= 2) ? (int)tsArgToDouble_ctx(app_context, &args[1]) : 0;
+    int high_i = 0xFF;
+    if (arg_count >= 3 && args[2].type != ACTION_STACK_VALUE_UNDEFINED)
+        high_i = (int)tsArgToDouble_ctx(app_context, &args[2]);
+    if (low_i < 0) low_i = 0; if (low_i > 255) low_i = 255;
+    if (high_i < 0) high_i = 0; if (high_i > 255) high_i = 255;
+    // Ensure high >= low (Ruffle does high.max(low)).
+    if (high_i < low_i) high_i = low_i;
+    uint8_t low = (uint8_t)low_i;
+    uint8_t high = (uint8_t)high_i;
     int channelOptions = (arg_count >= 4) ? (int)tsArgToDouble_ctx(app_context, &args[3]) : 7;
     int grayScale = (arg_count >= 5) ? tsArgTruthy(&args[4]) : 0;
     // Seed handling: if seed <= 0, use -seed + 1
@@ -9810,6 +9821,8 @@ static ActionVar bitmapDataNoise(SWFAppContext* app_context, ActionVar* args, u3
         return r;
     }
     #define LEHMER_NEXT(s) (s = (uint32_t)(((uint64_t)(s) * 16807ULL) % 2147483647ULL))
+    // Ruffle's LehmerRng::random_range(Range<u8>) treats the range as inclusive
+    // via a `+ 1` on the modulus divisor: `start + (rand % ((end - start) + 1))`.
     #define LEHMER_RANGE(s, lo, hi) ((lo) + (uint8_t)(LEHMER_NEXT(s) % ((uint32_t)((hi) - (lo)) + 1)))
     for (int py = 0; py < bmp->height; py++) {
         for (int px = 0; px < bmp->width; px++) {
