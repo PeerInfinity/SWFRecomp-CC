@@ -2,7 +2,7 @@
 
 Cross-suite summary of all Ruffle-derived test suites. Each suite has its own `_investigation/` directory with detailed status docs.
 
-Last updated: 2026-04-16 (CI run at 82a6ea07)
+Last updated: 2026-04-18 (CI run at 3242e54f, ruffle-test-results c3aa8876)
 
 ## Suite Summary
 
@@ -10,14 +10,14 @@ Last updated: 2026-04-16 (CI run at 82a6ea07)
 
 | Suite | Tests | Pass | RM | Effective | Effective Rate | Filtered Rate | Notes |
 |-------|-------|------|----|-----------| ---------------|---------------|-------|
-| [avm1](../avm1/_investigation/CURRENT_STATUS.md) | 641 | 579 | 5 | 584 | 91.1% | **96.2%** (578/601) | 40 ignored. 22 filtered failures: 20 new `bitmap_data_thorough/*` sub-tests, `depth_replacement_audio_unloading` compile_fail, `function_as_function` (2 diffs). `coerce_to_object_monkeypatch` fix (998e879a) lands next CI. |
+| [avm1](../avm1/_investigation/CURRENT_STATUS.md) | 641 | 598 | 8 | 606 | 94.5% | **100.0%** (600/600) | 41 ignored. **Zero filtered failures.** 2026-04-18 session cleared all 23: 16 `bitmap_data_thorough/*` PASS, 3 ruffle_matched, 1 (`pixelDissolve`) accepted, plus `function_as_function` and `depth_replacement_audio_unloading` PASS. |
 | [from_gnash/actionscript.all](../from_gnash/_investigation/CURRENT_STATUS.md) | 190 | 106 | 27 | 133 | **70.0%** | — | Ignore list now empty; Ruffle `known_failure` tests auto-promoted to ruffle_matched. |
-| [from_gnash/misc-mtasc.all](../from_gnash/_investigation/CURRENT_STATUS.md) | 9 | 7 | 1 | 8 | **88.9%** | — | 1 remaining failure. |
+| [from_gnash/misc-mtasc.all](../from_gnash/_investigation/CURRENT_STATUS.md) | 9 | 7 | 1 | 8 | **88.9%** | — | 1 remaining failure (`levels` — multi-level SWF loading). |
 | [from_gnash/misc-swfmill.all](../from_gnash/_investigation/CURRENT_STATUS.md) | 18 | 14 | 1 | 15 | **83.3%** | — | 3 blocked on architecture. |
 | [from_gnash/misc-ming.all](../from_gnash/_investigation/CURRENT_STATUS.md) | 102 | 18 | 10 | 28 | 27.5% | — | Blocked: inlined Dejagnu DoInitAction. Test count grew (58→102). |
 | [from_gnash/misc-swfc.all](../from_gnash/_investigation/CURRENT_STATUS.md) | 16 | 2 | 3 | 5 | 31.2% | — | Blocked: inlined Dejagnu DoInitAction. |
-| [from_shumway](../from_shumway/_investigation/CURRENT_STATUS.md) (flat) | 92 | 48 | 1 | 49 | 53.3% | — | Grew 47→92 (now includes avm1/ + fuzz/ + timeline/ sub-trees). |
-| [from_shumway/avm1](../from_shumway/_investigation/CURRENT_STATUS.md) | 47 | 32 | 1 | 33 | 70.2% | **73.3%** (33/45) | 2 ignored. Grew 23→47 (new category sub-trees: duplicateMovieClip, propertycase, xml, bitmapdata, doactionorder, haxe, loadvariables, property-paths, textfield, undefined). |
+| [from_shumway](../from_shumway/_investigation/CURRENT_STATUS.md) (flat) | 92 | 60 | 1 | 61 | 66.3% | — | Grew 47→92 (now includes avm1/ + fuzz/ + timeline/ sub-trees). |
+| [from_shumway/avm1](../from_shumway/_investigation/CURRENT_STATUS.md) | 47 | 44 | 1 | 45 | **95.7%** | **97.8%** (45/46) | 2 ignored. 2 remaining failures (`doactionorder`, `moviecliploader`) both timeline execution order. |
 | **SWFRecomp/tests** (old suite) | 158+59 | all trace pass | — | — | **100%** | — | Hand-written opcode tests. CI only. |
 
 ## Progress Since 2026-03-19

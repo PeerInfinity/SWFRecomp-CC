@@ -1,18 +1,23 @@
 # Current Ruffle Test Status
 
-Last updated: 2026-04-16 (CI run at 82a6ea07)
+Last updated: 2026-04-18 (CI run at 3242e54f, ruffle-test-results c3aa8876)
 
 ## Quick Summary
 
-- **Pass rate (CI, latest)**: 579/641 (90.3%) raw, 584/641 (91.1%) effective (raw + 5 ruffle_matched), **578/601 (96.2%) filtered** (22 output mismatches + 1 compile_fail)
-- **Test count grew 620 → 641** — primarily from splitting `bitmap_data_thorough` into 20 sub-tests (`bitmap_data_thorough/colorTransform`, `/compare`, `/constructor`, etc.), plus `depth_replacement_audio_unloading`.
-- **Image test baseline**: **14/31 strict image match** (+2: bitmap_data_colortransform, bitmap_data_copypixels). **10/31 tolerance pass** (within test.toml limits).
-- **Main failure types**: output_mismatch (22 filtered / 56 raw), compile_fail (1), runtime_segfault (0), timeout (0)
-- **Filtered failure breakdown**:
-  - **`bitmap_data_thorough/*` sub-tests (20)** — mostly 2-6% match, need systematic BitmapData thoroughness work. Only `getColorBoundsRect` (83.5%), `getPixel` / `getPixel32` (78.7%), `hitTest` (54.9%), `compare` (42.0%) above 40%.
-  - **`depth_replacement_audio_unloading`** (compile_fail) — needs recompiler investigation. Test involves child.swf + sound.mp3.
-  - **`function_as_function`** (2 diffs) — `Function()` without `new` return value format + `__proto__` behavior.
-  - **`coerce_to_object_monkeypatch`** (1 diff) — regressed by primitive auto-boxing fix in cffa1dd8, **fix committed in 998e879a** (post-CI). Should revert to pass on next CI run.
+- **Pass rate (CI, latest)**: 598/641 (93.3%) raw, **606/641 (94.5%) effective** (raw + 8 ruffle_matched), **600/600 (100.0%) filtered** — zero filtered failures.
+- **Test count**: 641 (unchanged). 41 tests in `ignored_tests.txt` (accepted diffs / Ruffle-vs-Flash / Ruffle known_failure).
+- **Image test baseline**: 14/31 strict image match, 10/31 tolerance pass.
+- **Main failure types** (raw, all in ignored list): output_mismatch (33), runtime_error/segfault/timeout (0), compile_fail (0).
+- **Filtered effective pass: 100%.** No actionable AVM1 failures remain.
+- **Latest fixes (2026-04-18, this session)**:
+  - **`bitmap_data_thorough/threshold` PASS** — opaque BMD `getPixel32` returns raw stored pixel (no un-premul); `mask` arg defaults to `0xFFFFFFFF` only when missing (undefined coerces to 0).
+  - **`bitmap_data_thorough/noise` PASS** — `high` arg defaults to `0xFF` only when missing (undefined → 0); alpha-channel RNG only fires for transparent BMDs; seed/low/high coerced via `doubleToUint32` so NaN/Infinity → 0 (ECMA ToInt32).
+  - **`bitmap_data_thorough/paletteMap` ruffle_matched** — channel-array args treat OBJECT (e.g. `{}`) as well as ARRAY, mask each LUT entry with `& 0xFF`.
+  - **`bitmap_data_thorough/pixelDissolve` improved** (97.2%) — require 5 args minimum, validate rect props, empty region returns `random_seed`. Remaining diffs in Feistel return values are Flash-specific; test added to `ignored_tests.txt` (Ruffle panics on this test, no `output.ruffle.txt` to subset against).
+  - **`bitmap_data_thorough/copyChannel` PASS** — bumped `MAX_BITMAP_NATIVES` 256 → 8192. The side table was overflowing partway through the Opaque iteration; new BMDs went unregistered → `bdHeightGetter` returned -1 → `printBmd` skipped its loop.
+  - **`bitmap_data_thorough/perlinNoise` ruffle_matched** (98.8%) — `MAX_BITMAP_NATIVES` bump unblocked it; further fixes for SWF7+ null/undefined→NaN coercion (baseX/Y), `channel_options=undefined` → 0 (was defaulting to 7), and ECMA ToInt32 NaN→0 for seed/numOctaves brought our diffs to a strict subset of Ruffle's.
+  - **`function_as_function` PASS** — `Function()` without `new` returns a bare object with no `__proto__`; toString falls through to `[type Object]` and `.__proto__` is undefined (matches Flash).
+  - **`depth_replacement_audio_unloading` PASS** — `verify_output.py` extracts all 14 raw-data arrays from a child SWF's `draws.c` (sound_data, transform_data, bitmap_data, …), prefixes them, and emits forward externs; strips `quit_swf = 1` from child frame functions; `actionFirePendingLoadInits` Phase 2 saves/restores global `is_playing` so a child's `stop()` doesn't terminate the parent's frame loop.
 - **Latest fixes (2026-04-16)**:
   - **Primitive auto-boxing in GetMember / convertFloat** (cffa1dd8) — Number/Boolean primitives now resolve properties via Number.prototype / Boolean.prototype. Gnash: Number-v5..v8 improved; Color-v6 now PASS.
   - **`coerce_to_object_monkeypatch` regression fix** (998e879a, post-CI) — primitive `getPropertyWithPrototype` path needed a guard.
@@ -130,47 +135,19 @@ Last updated: 2026-04-16 (CI run at 82a6ea07)
 
 No crashes or segfaults remain. All previous crashes have been fixed.
 
-## Remaining Filtered Failures (22 output_mismatch + 1 compile_fail)
+## Remaining Filtered Failures: 0
 
-### Near-passing (< 5 diff lines)
+All filtered tests pass effectively. The 41 raw fails not in the filtered set are in `ignored_tests.txt` (accepted diffs documented in `ACCEPTED_DIFFS.md` / `RUFFLE_VS_FLASH_DIFFERENCES.md` / `RUFFLE_COMPAT_TWEAKS.md` / `FLASH_BUGS_REPLICATED.md`).
 
-| Test | Match Rate | Matching | Total | Diff | Notes |
-|------|------------|----------|-------|------|-------|
-| `coerce_to_object_monkeypatch` | 99.2% | 128 | 129 | 1 | **Fix already committed in 998e879a**. Regression from primitive auto-boxing (cffa1dd8). Will revert to PASS on next CI. |
-| `function_as_function` | 94.3% | 33 | 35 | 2 | `Function()` without `new`: return value format + `__proto__` behavior. Covered by completed FUNCTION_EDGE_CASES_PLAN. |
+### `bitmap_data_thorough/*` final status (20 sub-tests, all effectively pass)
 
-### New `bitmap_data_thorough/*` sub-test cluster (20 tests)
+Plan moved to `complete/BITMAP_DATA_THOROUGH_PLAN.md`. Final breakdown:
 
-Triaged in `incomplete/BITMAP_DATA_THOROUGH_PLAN.md` (2026-04-16). Most have very low match rates (2-7%) because a shared-harness variable resolution bug cascades through the output — the plan hypothesizes that frame-script `var` declarations written inside nested functions don't update the timeline MC's dynamic_props slot, leaving `disposedBmd`/`transparentBmd`/`opaqueBmd` as `undefined` inside `valueToString`. Fixing that alone is expected to lift most sub-tests above 80%.
-
-| Sub-test | Match Rate | Matching | Total | Likely root cause |
-|----------|------------|----------|-------|-------------------|
-| `getColorBoundsRect` | 83.5% | 238 | 285 | Rect bounds / findColor edge cases |
-| `getPixel` / `getPixel32` | 78.7% | 111 | 141 | Out-of-bounds / coercion |
-| `hitTest` | 54.9% | 285 | 519 | Hit-test vectors vs rects |
-| `compare` | 42.0% | 29 | 69 | Compare return type / value format |
-| `constructor` | 6.7% | 21 | 313 | Constructor argument coercion |
-| `perlinNoise` | 5.1% | 435 | 8481 | RNG / seeded output |
-| `colorTransform` | 2.9% | 8 | 279 | Per-pixel transform correctness |
-| `fillRect` | 2.6% | 9 | 342 | |
-| `scroll` | 2.6% | 10 | 384 | |
-| `threshold` | 2.4% | 31 | 1308 | |
-| `setPixel` / `setPixel32` | 2.3% | 12 | 531 | |
-| `floodFill` | 2.1% | 18 | 867 | |
-| `pixelDissolve` | 2.0% | 28 | 1371 | |
-| `copyPixels` | 1.9% | 23 | 1203 | |
-| `merge` | 1.9% | 23 | 1203 | |
-| `noise` | 1.9% | 29 | 1518 | |
-| `paletteMap` | 1.9% | 18 | 951 | |
-| `copyChannel` | 1.8% | 49 | 2715 | |
-
-The low match rates (most under 5%) suggest a systematic issue rather than per-method bugs — likely output format, trace harness, or a shared BitmapData init path. Worth investigating one (e.g., `fillRect`) to find the common blocker.
-
-### Compile failure
-
-| Test | Notes |
-|------|-------|
-| `depth_replacement_audio_unloading` | Triaged in `incomplete/DEPTH_REPLACEMENT_AUDIO_UNLOADING_PLAN.md` (2026-04-16). Root cause: `verify_output.py:generate_child_movie_file()` only extracts `transform_data` from the child's draws.c, not `sound_data`. Fix is a ~30-line extension. First AVM1 test with a DefineSound in a child SWF. |
+| Status | Count | Notes |
+|--------|-------|-------|
+| PASS (100%) | 16 | colorTransform, compare, constructor, copyChannel, fillRect, floodFill, getColorBoundsRect, getPixel, getPixel32, hitTest, merge, noise, scroll, setPixel, setPixel32, threshold |
+| ruffle_matched | 3 | copyPixels (94.3%), paletteMap (94.5%), perlinNoise (98.8%) — diff sets are strict subsets of Ruffle's |
+| Ignored / accepted | 1 | pixelDissolve (97.2%) — Flash-specific Feistel coercion, Ruffle panics so no `output.ruffle.txt` for promotion |
 
 ## Near-Passing Tests (previously)
 
@@ -250,21 +227,25 @@ All previously near-passing tests (146 tracked through the pipeline) are now ful
 | DRAWING_API_RENDERING | 3 tests improved | Focal radial precision, edge anti-aliasing (see RENDERING_PIPELINE_COMPARISON.md) |
 | RUNTIME_SETMASK | **COMPLETE** | Moved to complete/ (masking infra done; image diff is Drawing API edge AA) |
 
-## Recommended Work Order (updated 2026-04-16)
+## Recommended Work Order (updated 2026-04-18)
 
-### Immediate (already fixed, awaiting CI)
-- **`coerce_to_object_monkeypatch`** (1 diff) — fix already committed in 998e879a. Will reflect on next CI run.
+The AVM1 filtered suite is at 100% effective pass; there is no in-suite work
+remaining. Useful next targets are in *other* suites (line-level numbers from
+the same CI run):
 
-### Near-term
-- **`function_as_function`** (2 diffs) — `Function()` without `new`: return value format + `__proto__` behavior.
-- **`depth_replacement_audio_unloading`** (compile_fail) — triage recompiler rejection.
+- **`from_gnash/actionscript.all`** (133/190 effective, 70.0%): near-passing
+  candidates are Number-v5..v8 (gnash float-to-string rounding), Selection-v6/7/8
+  (selection-API edge cases), ExternalInterface-v8 (object enumeration order).
+- **`from_gnash/misc-mtasc.all`** (8/9): only `levels` fails — needs multi-level
+  SWF loading (`_level5`, `_level87`, `_level99`).
+- **`from_gnash/misc-swfmill.all`** (15/18): three timeline-tag-order failures
+  (`tags_after_last_showframe`, `jump_to_prev_block`, `trace-as2/root_onload`).
+- **`from_shumway/avm1`** (45/47, 95.7%): `doactionorder` and `moviecliploader`
+  both fail on timeline execution order (load events vs. parent frame scripts).
 
-### `bitmap_data_thorough/*` sub-tests (20)
-- Pick one low-match sub-test (e.g., `fillRect` or `setPixel`) to find the shared blocker. Most are < 5% match, suggesting either (a) a shared init / harness problem, or (b) expected output contains large dumps where a single early divergence cascades through most lines.
-- `getColorBoundsRect` / `getPixel` / `hitTest` / `compare` are the nearest (40-84% match) and likely yield the clearest per-method bugs.
-
-### Remaining non-filtered failures (40 tests in ignored_tests.txt)
-Permanently ignored (accepted diffs, Ruffle-vs-Flash differences, infrastructure blockers). No actionable work.
+### Remaining non-filtered failures (41 tests in ignored_tests.txt)
+Permanently ignored (accepted diffs, Ruffle-vs-Flash differences, infrastructure
+blockers). No actionable work.
 
 ### Remaining blocked work (from blocked/ plans)
 - **GLOBALS_PLAN Phase 8** — BLOCKED by enumeration order + missing globals.

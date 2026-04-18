@@ -22,16 +22,16 @@ python3 ruffle-tests/verify_output.py --test=TEST_NAME --diff --verbose
 - `SWFRecomp/` — Recompiler: converts SWF bytecode to C (`src/action/action.cpp` is the main bytecode→C translator)
 - `SWFModernRuntime/` — Runtime: executes the generated C (`src/actionmodern/action.c` is ~50K lines, the core runtime)
 - `ruffle-tests/` — Ruffle test suites:
-  - `tests/swfs/avm1/` — 619 AVM1 tests from Ruffle (97.5% filtered pass rate)
-  - `tests/swfs/from_gnash/` — 204 tests from Gnash (42 passing)
-  - `tests/swfs/from_shumway/` — 47 tests from Shumway (15 passing)
+  - `tests/swfs/avm1/` — 641 AVM1 tests from Ruffle (100% filtered pass rate)
+  - `tests/swfs/from_gnash/` — 335 tests from Gnash (147 effective pass across 5 sub-suites)
+  - `tests/swfs/from_shumway/` — 92 flat + 47 avm1 tests from Shumway (61 + 45 effective)
 - `SWFRecomp/tests/` — Old hand-written test suite (158 trace tests + 59 graphics tests, all passing)
 - `SWFRecomp/scripts/` — Build scripts (build_test.sh, deploy_example.sh, etc.)
 - `scripts/` — Test result processing scripts (diff, markdown generation)
 
 ## Two Test Systems
 
-1. **Ruffle tests** (`ruffle-tests/tests/swfs/avm1/`): 616 tests from Ruffle project. Shared runner `verify_output.py`. Expected output in `output.txt` per test. Results in `results.json`. CI via GitHub Actions workflow (manual dispatch).
+1. **Ruffle tests** (`ruffle-tests/tests/swfs/avm1/`): 641 tests from Ruffle project. Shared runner `verify_output.py`. Expected output in `output.txt` per test. Results in `results.json`. CI via GitHub Actions workflow (manual dispatch).
 
 2. **Old tests** (`SWFRecomp/tests/`): 115 hand-written tests. Per-test `validate.py` validators. Runner is `all_tests.sh`. Results in `test_results.json`. Run locally only.
 
