@@ -5242,8 +5242,223 @@ static ActionVar asnative_100_trace(SWFAppContext* app_context, ActionVar* args,
 	return undef;
 }
 
-// Class 100 function table: (0=escape, 1=unescape, 4=trace)
-// parseInt(2) and parseFloat(3) are complex and not needed for current tests.
+// ASnative(100, 2) = parseInt. Matches Flash/Ruffle semantics: leading
+// whitespace skipped, optional sign, 0x prefix → hex (unless explicit
+// radix), leading zeros → octal, stops at first non-digit.
+static ActionVar asnative_100_parseInt(SWFAppContext* app_context, ActionVar* args, u32 arg_count, ActionVar* registers, void* this_obj)
+{
+	(void)registers; (void)this_obj;
+	ActionVar undef = {0};
+	undef.type = ACTION_STACK_VALUE_UNDEFINED;
+	if (arg_count == 0) return undef;
+
+	// Coerce arg[0] to UTF-8 string
+	char sbuf[1024];
+	const char* s = NULL;
+	if (args[0].type == ACTION_STACK_VALUE_STRING) {
+		const uint16_t* u16 = varGetU16Ptr(&args[0]);
+		u16_to_utf8(u16, args[0].str_size, sbuf, sizeof(sbuf));
+		s = sbuf;
+	} else if (args[0].type == ACTION_STACK_VALUE_F32) {
+		float f = VAL(float, &args[0].data.numeric_value);
+		flash_format_double(sbuf, sizeof(sbuf), (double)f);
+		s = sbuf;
+	} else if (args[0].type == ACTION_STACK_VALUE_F64) {
+		double d = VAL(double, &args[0].data.numeric_value);
+		flash_format_double(sbuf, sizeof(sbuf), d);
+		s = sbuf;
+	} else if (args[0].type == ACTION_STACK_VALUE_BOOLEAN) {
+		s = args[0].data.numeric_value ? "true" : "false";
+	} else if (args[0].type == ACTION_STACK_VALUE_NULL) {
+		s = "null";
+	} else if (args[0].type == ACTION_STACK_VALUE_OBJECT ||
+	           args[0].type == ACTION_STACK_VALUE_ARRAY ||
+	           args[0].type == ACTION_STACK_VALUE_FUNCTION) {
+		int slen = varToStringBuf(app_context, &args[0], sbuf, sizeof(sbuf) - 1);
+		sbuf[slen] = '\0';
+		s = sbuf;
+	} else {
+		s = "undefined";
+	}
+
+	int has_explicit_radix = (arg_count >= 2);
+	int radix = 0;
+	int radix_valid = 1;
+	if (has_explicit_radix) {
+		double rv = 0.0;
+		if (args[1].type == ACTION_STACK_VALUE_F32)      rv = (double)VAL(float, &args[1].data.numeric_value);
+		else if (args[1].type == ACTION_STACK_VALUE_F64) rv = VAL(double, &args[1].data.numeric_value);
+		else if (args[1].type == ACTION_STACK_VALUE_BOOLEAN) rv = args[1].data.numeric_value ? 1.0 : 0.0;
+		if (rv != rv || rv == 0.0) radix = 0;
+		else radix = (int)rv;
+		if (radix < 2 || radix > 36) radix_valid = 0;
+	}
+
+	double result = NAN;
+	if (radix_valid) {
+		int slen = (int)strlen(s);
+		int has_sign = (slen > 0 && (s[0] == '+' || s[0] == '-'));
+		int sign_off = has_sign ? 1 : 0;
+
+		int is_hex = 0;
+		if (sign_off < slen && s[sign_off] == '0' && sign_off + 1 < slen &&
+		    (s[sign_off + 1] == 'x' || s[sign_off + 1] == 'X')) {
+			is_hex = 1;
+		}
+
+		int ignore_sign = 0;
+		const char* p = s;
+		int parse_radix = radix ? radix : 10;
+
+		if (is_hex) {
+			if (has_sign) {
+				if (!has_explicit_radix || parse_radix <= 33) goto pi_done;
+				ignore_sign = 1;
+			} else {
+				p = s + 2;
+				if (!has_explicit_radix) parse_radix = 16;
+			}
+		} else if (!has_explicit_radix && sign_off < slen && s[sign_off] == '0') {
+			int all_octal = 1;
+			for (int i = sign_off; i < slen; i++) {
+				if (s[i] < '0' || s[i] > '7') { all_octal = 0; break; }
+			}
+			if (all_octal) parse_radix = 8;
+		}
+
+		while (*p == ' ' || *p == '\t' || *p == '\n' || *p == '\r') p++;
+
+		double sign = 1.0;
+		if (*p == '+' || *p == '-') {
+			if (!ignore_sign) sign = (*p == '-') ? -1.0 : 1.0;
+			p++;
+		}
+
+		int found = 0;
+		result = 0.0;
+		while (*p) {
+			int digit = -1;
+			char c = *p;
+			if (c >= '0' && c <= '9') digit = c - '0';
+			else if (c >= 'a' && c <= 'z') digit = 10 + (c - 'a');
+			else if (c >= 'A' && c <= 'Z') digit = 10 + (c - 'A');
+			if (digit < 0 || digit >= parse_radix) break;
+			result = result * (double)parse_radix + (double)digit;
+			found = 1;
+			p++;
+		}
+
+		if (!found) result = NAN;
+		else if (sign < 0) result = -result;
+	}
+
+pi_done: {
+		ActionVar r = {0};
+		if (result != result) {
+			float nan_val = 0.0f / 0.0f;
+			r.type = ACTION_STACK_VALUE_F32;
+			VAL(u32, &r.data.numeric_value) = VAL(u32, &nan_val);
+		} else if (result == (double)(float)result && result < 1e18) {
+			float fres = (float)result;
+			r.type = ACTION_STACK_VALUE_F32;
+			VAL(u32, &r.data.numeric_value) = VAL(u32, &fres);
+		} else {
+			r.type = ACTION_STACK_VALUE_F64;
+			VAL(u64, &r.data.numeric_value) = VAL(u64, &result);
+		}
+		return r;
+	}
+}
+
+// ASnative(100, 3) = parseFloat. Matches Flash semantics: skip ws, optional
+// sign, digits with optional decimal, optional exponent with wrapping i32
+// arithmetic, multiple dots OK, stops at first non-digit.
+static ActionVar asnative_100_parseFloat(SWFAppContext* app_context, ActionVar* args, u32 arg_count, ActionVar* registers, void* this_obj)
+{
+	(void)registers; (void)this_obj;
+	ActionVar undef = {0};
+	undef.type = ACTION_STACK_VALUE_UNDEFINED;
+	if (arg_count == 0) return undef;
+
+	char cs_buf[17];
+	pushVar(app_context, &args[0]);
+	convertString(app_context, cs_buf);
+	ActionVar str_var;
+	popVar(app_context, &str_var);
+	char buf[512];
+	const uint16_t* u16 = varGetU16Ptr(&str_var);
+	u16_to_utf8(u16, str_var.str_size, buf, sizeof(buf));
+	const char* s = buf;
+
+	while (*s == ' ' || *s == '\t' || *s == '\r' || *s == '\n' || *s == '\f') s++;
+
+	int is_neg = 0;
+	if (*s == '-') { is_neg = 1; s++; }
+	else if (*s == '+') s++;
+
+	const char* after_sign = s;
+	while (*s >= '0' && *s <= '9') s++;
+	int digits_before = (int)(s - after_sign);
+
+	if (*s == '.') s++;
+	const char* after_dot = s;
+	while (*s >= '0' && *s <= '9') s++;
+	int digits_after = (int)(s - after_dot);
+
+	if (digits_before == 0 && digits_after == 0) {
+		ActionVar r = {0};
+		double nan_val = NAN;
+		r.type = ACTION_STACK_VALUE_F64;
+		VAL(u64, &r.data.numeric_value) = VAL(u64, &nan_val);
+		return r;
+	}
+
+	int total_int_digits = digits_before;
+	int32_t exp = (int32_t)(total_int_digits - 1);
+
+	if (*s == 'e' || *s == 'E') {
+		s++;
+		int exp_neg = 0;
+		if (*s == '-') { exp_neg = 1; s++; }
+		else if (*s == '+') s++;
+		int32_t exponent = 0;
+		const char* exp_start = s;
+		while (*s >= '0' && *s <= '9') {
+			exponent = (int32_t)((uint32_t)exponent * 10u);
+			exponent = (int32_t)((uint32_t)exponent + (uint32_t)(*s - '0'));
+			s++;
+		}
+		if (s > exp_start) {
+			if (exp_neg) exponent = (int32_t)(-(uint32_t)exponent);
+			exp = (int32_t)((uint32_t)exp + (uint32_t)exponent);
+		}
+	}
+
+	double result = 0.0;
+	const char* p = after_sign;
+	int32_t cur_exp = exp;
+	while (*p) {
+		if (*p >= '0' && *p <= '9') {
+			int digit = *p - '0';
+			if (digit != 0) result += (double)digit * pow(10.0, (double)cur_exp);
+			cur_exp = (int32_t)((uint32_t)cur_exp - 1u);
+		} else if (*p == '.') {
+			// multiple dots skipped
+		} else {
+			break;
+		}
+		p++;
+	}
+
+	if (is_neg) result = -result;
+
+	ActionVar r = {0};
+	r.type = ACTION_STACK_VALUE_F64;
+	VAL(u64, &r.data.numeric_value) = VAL(u64, &result);
+	return r;
+}
+
+// Class 100 function table: (0=escape, 1=unescape, 2=parseInt, 3=parseFloat, 4=trace)
 #define ASNATIVE_100_COUNT 5
 static ASFunction g_asnative_100_funcs[ASNATIVE_100_COUNT];
 static int g_asnative_100_init = 0;
@@ -5254,8 +5469,8 @@ static void init_asnative_100(void)
 	struct { const char* name; Function2Ptr func; } table[] = {
 		{"escape",     (Function2Ptr)asnative_100_escape},
 		{"unescape",   (Function2Ptr)asnative_100_unescape},
-		{"parseInt",   NULL},  // placeholder
-		{"parseFloat", NULL},  // placeholder
+		{"parseInt",   (Function2Ptr)asnative_100_parseInt},
+		{"parseFloat", (Function2Ptr)asnative_100_parseFloat},
 		{"trace",      (Function2Ptr)asnative_100_trace},
 	};
 	for (int i = 0; i < ASNATIVE_100_COUNT; i++) {
@@ -5420,10 +5635,54 @@ static ActionVar builtin_asnative(SWFAppContext* app_context, ActionVar* args, u
 		return undef;
 	}
 
+	// Class 103: Date — getters/setters, constructor, and UTC. Index mapping in date.c.
+	if (class_id == 103) {
+		// method_u32 is the already-saturated u16 index, so use it directly for the
+		// date table (which supports indices up to 257).
+		u16 idx = (method_u32 <= 0xFFFF) ? (u16)method_u32 : 0xFFFF;
+		ASFunction* fn = actionDateGetASnativeMethod(app_context, idx);
+		if (fn != NULL) {
+			ActionVar result = {0};
+			result.type = ACTION_STACK_VALUE_FUNCTION;
+			VAL(u64, &result.data.numeric_value) = (u64)fn;
+			return result;
+		}
+		return undef;
+	}
+
 	if (class_id == 200) {
 		// Math class: ensure the Math object and its function table are ready
 		initMathObject(app_context);
-		ASFunction* fn = actionMathGetFunc((int)method_index);
+		// Flash ASnative(200, N) index order (matches Ruffle and Flash docs):
+		//  0=abs  1=min    2=max   3=sin  4=cos   5=atan2 6=tan  7=exp  8=log
+		//  9=sqrt 10=round 11=random 12=floor 13=ceil 14=atan 15=asin 16=acos
+		// 17=pow. Our internal g_math_funcs[] order differs (abs, sin, cos, ...),
+		// so remap through a small table.
+		static const int asnative_200_to_math[] = {
+			 0,  // 0 = abs
+			15,  // 1 = min
+			16,  // 2 = max
+			 1,  // 3 = sin
+			 2,  // 4 = cos
+			13,  // 5 = atan2
+			 3,  // 6 = tan
+			 4,  // 7 = exp
+			 5,  // 8 = log
+			 6,  // 9 = sqrt
+			 7,  // 10 = round
+			17,  // 11 = random
+			 8,  // 12 = floor
+			 9,  // 13 = ceil
+			10,  // 14 = atan
+			11,  // 15 = asin
+			12,  // 16 = acos
+			14,  // 17 = pow
+		};
+		int internal_idx = -1;
+		if (method_index < (sizeof(asnative_200_to_math) / sizeof(asnative_200_to_math[0]))) {
+			internal_idx = asnative_200_to_math[method_index];
+		}
+		ASFunction* fn = (internal_idx >= 0) ? actionMathGetFunc(internal_idx) : NULL;
 		if (fn == NULL) {
 			// Out-of-range index → NaN stub (still coerces its args via valueOf)
 			fn = actionMathGetNaNStub();

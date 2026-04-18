@@ -1,6 +1,12 @@
 # Gnash Test Suite Status
 
-Last updated: 2026-04-16 (CI run at 82a6ea07)
+Last updated: 2026-04-17 (CI run at 82a6ea07)
+
+### Latest fixes (2026-04-17, not yet in CI)
+- **ASnative-v5/v6/v7/v8 → ruffle_matched (+4).** Three-part fix in `SWFModernRuntime/src/actionmodern/`:
+  (1) ASnative class 103 (Date) dispatcher in `date.c` wired to existing Date prototype methods via Ruffle's index scheme (0-20 local, 128-143 UTC, 256 constructor, 257 Date.UTC); index 256 returns a bare ASFunction with `prototype_obj = NULL` so `new f()` produces a plain object (matches Ruffle `FunctionObject::table_native`).
+  (2) ASnative class 200 (Math) remap table — Flash's order (0=abs, 1=min, 2=max, 3=sin, 4=cos, 5=atan2, ...) differs from internal `g_math_funcs[]` registration order.
+  (3) ASnative class 100 indexes 2 (parseInt) and 3 (parseFloat) — standalone advanced_func implementations; previous NULL placeholders only worked via the name-dispatch path. See `complete/ASNATIVE_CLASSES_PLAN.md`.
 
 ### Latest fixes (2026-04-15/16, now in CI)
 - **Primitive auto-boxing in GetMember** (cffa1dd8) — Primitive number (F32/F64) and

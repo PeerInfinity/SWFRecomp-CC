@@ -2,7 +2,15 @@
 <!-- TESTS: ASnative-v5, ASnative-v6, ASnative-v7, ASnative-v8 -->
 
 Last updated: 2026-04-17
-Status: NOT STARTED — 4 tests, ~77-81 diffs each (22-25% line match)
+Status: **COMPLETE** — all 4 ASnative-v5/v6/v7/v8 tests now ruffle_matched (effective pass).
+  - Before: 22-24% line match, 58-86 diffs vs Flash.
+  - After: our diffs are a strict subset of Ruffle's `output.ruffle.txt` diffs vs Flash.
+
+Landed fixes:
+- ASnative class 103 (Date) dispatcher wired to existing `date.c` methods via Ruffle's index scheme — 0-20 for local getters/setters, 128-143 for UTC variants, 256 for constructor, 257 for Date.UTC. See `actionDateGetASnativeMethod` in `SWFModernRuntime/src/actionmodern/date.c`.
+- ASnative(103, 256) returns a bare ASFunction with `prototype_obj = NULL` so `new f()` produces a plain object (no Date.prototype chain). Matches Ruffle `FunctionObject::table_native`.
+- ASnative class 200 (Math) index remap: Flash's order (0=abs, 1=min, 2=max, 3=sin, 4=cos, 5=atan2, 6=tan, 7=exp, 8=log, 9=sqrt, 10=round, 11=random, 12=floor, 13=ceil, 14=atan, 15=asin, 16=acos, 17=pow) differs from internal `g_math_funcs[]` order. Remap table added in `builtin_asnative` class 200 branch.
+- ASnative class 100 indexes 2 (parseInt) and 3 (parseFloat): standalone advanced_func implementations added in `action.c`. Previously NULL placeholders relied on the name-dispatch path, which only runs when invoked by name.
 
 ---
 

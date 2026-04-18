@@ -32,6 +32,11 @@
 
 static ASFunction g_date_constructor;
 static ASFunction g_date_funcs[40]; // 20 getters + 17 setters + toString + valueOf + UTC
+static ASFunction g_date_utc_func;
+// Bare constructor handle returned by ASnative(103, 256). Must have
+// prototype_obj == NULL so `new ASnative(103, 256)()` produces a plain
+// object (no Date.prototype chain), matching Ruffle's FunctionObject::table_native.
+static ASFunction g_date_asnative_ctor_func;
 static ASObject* g_date_prototype = NULL;
 static int g_date_init_done = 0;
 static double g_date_local_tza_ms = 0.0; // local timezone offset in ms (positive = east of UTC)
@@ -849,7 +854,6 @@ void initDatePrototype(SWFAppContext* app_context) {
 
 	// Register Date.UTC as a static method on the constructor
 	{
-		static ASFunction g_date_utc_func;
 		memset(&g_date_utc_func, 0, sizeof(ASFunction));
 		strncpy(g_date_utc_func.name, "UTC", 255);
 		g_date_utc_func.function_type = 2;
@@ -885,4 +889,88 @@ ActionVar actionDateToString(SWFAppContext* app_context, ASObject* date_obj) {
 ASFunction* actionDateGetConstructor(SWFAppContext* app_context) {
 	initDatePrototype(app_context);
 	return &g_date_constructor;
+}
+
+// ASnative(103, N) dispatch. Index mapping follows Ruffle's
+// core/src/avm1/globals/date.rs method table (with `GET_*` base 0,
+// `SET_*` sharing the same base, `GET_UTC_* / SET_UTC_*` = 128 + base,
+// CONSTRUCTOR = 256, UTC = 257).
+ASFunction* actionDateGetASnativeMethod(SWFAppContext* app_context, u16 index) {
+	initDatePrototype(app_context);
+	// g_date_funcs layout (registration order in initDatePrototype):
+	//  [0] toString            [1] valueOf
+	//  [2] getFullYear         [3] getYear
+	//  [4] getMonth            [5] getDate
+	//  [6] getDay              [7] getHours
+	//  [8] getMinutes          [9] getSeconds
+	// [10] getMilliseconds    [11] getTime
+	// [12] getTimezoneOffset  [13] getUTCFullYear
+	// [14] getUTCYear         [15] getUTCMonth
+	// [16] getUTCDate         [17] getUTCDay
+	// [18] getUTCHours        [19] getUTCMinutes
+	// [20] getUTCSeconds      [21] getUTCMilliseconds
+	// [22] setFullYear        [23] setMonth
+	// [24] setDate            [25] setHours
+	// [26] setMinutes         [27] setSeconds
+	// [28] setMilliseconds    [29] setTime
+	// [30] setYear            [31] setUTCFullYear
+	// [32] setUTCMonth        [33] setUTCDate
+	// [34] setUTCHours        [35] setUTCMinutes
+	// [36] setUTCSeconds      [37] setUTCMilliseconds
+	switch (index) {
+		case 0:   return &g_date_funcs[2];
+		case 1:   return &g_date_funcs[3];
+		case 2:   return &g_date_funcs[4];
+		case 3:   return &g_date_funcs[5];
+		case 4:   return &g_date_funcs[6];
+		case 5:   return &g_date_funcs[7];
+		case 6:   return &g_date_funcs[8];
+		case 7:   return &g_date_funcs[9];
+		case 8:   return &g_date_funcs[10];
+		case 9:   return &g_date_funcs[22];
+		case 10:  return &g_date_funcs[23];
+		case 11:  return &g_date_funcs[24];
+		case 12:  return &g_date_funcs[25];
+		case 13:  return &g_date_funcs[26];
+		case 14:  return &g_date_funcs[27];
+		case 15:  return &g_date_funcs[28];
+		case 16:  return &g_date_funcs[11];
+		case 17:  return &g_date_funcs[29];
+		case 18:  return &g_date_funcs[12];
+		case 19:  return &g_date_funcs[0];
+		case 20:  return &g_date_funcs[30];
+		case 128: return &g_date_funcs[13];
+		case 129: return &g_date_funcs[14];
+		case 130: return &g_date_funcs[15];
+		case 131: return &g_date_funcs[16];
+		case 132: return &g_date_funcs[17];
+		case 133: return &g_date_funcs[18];
+		case 134: return &g_date_funcs[19];
+		case 135: return &g_date_funcs[20];
+		case 136: return &g_date_funcs[21];
+		case 137: return &g_date_funcs[31];
+		case 138: return &g_date_funcs[32];
+		case 139: return &g_date_funcs[33];
+		case 140: return &g_date_funcs[34];
+		case 141: return &g_date_funcs[35];
+		case 142: return &g_date_funcs[36];
+		case 143: return &g_date_funcs[37];
+		case 256: {
+			// Initialize bare constructor handle on first use. Shares the
+			// same advanced_func as the real Date constructor so `new f()`
+			// still initializes the new object as a Date, but has no
+			// prototype_obj of its own (matches Ruffle table_native).
+			if (g_date_asnative_ctor_func.advanced_func == NULL) {
+				memset(&g_date_asnative_ctor_func, 0, sizeof(ASFunction));
+				strncpy(g_date_asnative_ctor_func.name, "Date", 255);
+				g_date_asnative_ctor_func.function_type = 2;
+				g_date_asnative_ctor_func.param_count = 0;
+				g_date_asnative_ctor_func.advanced_func = g_date_constructor.advanced_func;
+				registerNativeFunction(&g_date_asnative_ctor_func);
+			}
+			return &g_date_asnative_ctor_func;
+		}
+		case 257: return &g_date_utc_func;
+		default:  return NULL;
+	}
 }

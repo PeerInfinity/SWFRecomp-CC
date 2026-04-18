@@ -32,3 +32,8 @@ ActionVar actionDateToString(SWFAppContext* app_context, ASObject* date_obj);
 // registration, secondary-global copies, and enumeration tables.
 // Calls initDatePrototype internally.
 ASFunction* actionDateGetConstructor(SWFAppContext* app_context);
+
+// Look up a Date method by ASnative index (class 103). Returns NULL
+// for unmapped indices. Index scheme follows Ruffle's date.rs method
+// table (see date.c for the full mapping).
+ASFunction* actionDateGetASnativeMethod(SWFAppContext* app_context, u16 index);
