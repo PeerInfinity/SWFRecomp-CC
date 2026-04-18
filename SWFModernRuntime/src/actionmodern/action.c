@@ -12559,7 +12559,6 @@ static ASFunction g_stylesheet_constructor_global; // forward decl
 static void initTextFieldPrototype(SWFAppContext* app_context)
 {
 	if (g_textfield_constructor_init) return;
-	if (g_swf_version < 6) return; // TextField constructor doesn't exist in SWF5
 
 	memset(&g_textfield_constructor, 0, sizeof(ASFunction));
 	strncpy(g_textfield_constructor.name, "TextField", 255);
@@ -12573,6 +12572,14 @@ static void initTextFieldPrototype(SWFAppContext* app_context)
 
 	// Set __proto__ to Object.prototype
 	setObjectProto(app_context, proto);
+
+	// In SWF5, TextField.prototype is hidden from user code (returns undefined),
+	// but the internal prototype_obj is used so `new TextField() instanceof TextField`
+	// works. Skip installing the SWF6+ virtual properties/methods on it.
+	if (g_swf_version < 6) {
+		g_textfield_constructor_init = 1;
+		return;
+	}
 
 	// Add 35 enumerable properties in the exact order Flash enumerates them.
 	// All start as undefined on the prototype; instances shadow them with real values.
@@ -16936,9 +16943,10 @@ static MovieClip* findOrCreateMovieClip(SWFAppContext* app_context, const char* 
 				}
 				ASObject* props = (ASObject*) mc->dynamic_props;
 				props->native_type = NATIVE_TEXTFIELD;
-				// Set __proto__ to TextField.prototype
+				// Set __proto__ to TextField.prototype (SWF6+ only — in SWF5,
+				// MC textfields are not instanceof TextField).
 				initTextFieldPrototype(app_context);
-				if (g_textfield_constructor.prototype_obj != NULL) {
+				if (g_swf_version >= 6 && g_textfield_constructor.prototype_obj != NULL) {
 					ActionVar proto_val = {0};
 					proto_val.type = ACTION_STACK_VALUE_OBJECT;
 					proto_val.data.numeric_value = (u64) g_textfield_constructor.prototype_obj;
@@ -17114,9 +17122,10 @@ static MovieClip* findOrCreateMovieClip(SWFAppContext* app_context, const char* 
 				ASObject* props = (ASObject*) mc->dynamic_props;
 				props->native_type = NATIVE_TEXTFIELD;
 
-				// Set __proto__ to TextField.prototype
+				// Set __proto__ to TextField.prototype (SWF6+ only — in SWF5,
+				// MC textfields are not instanceof TextField).
 				initTextFieldPrototype(app_context);
-				if (g_textfield_constructor.prototype_obj != NULL) {
+				if (g_swf_version >= 6 && g_textfield_constructor.prototype_obj != NULL) {
 					ActionVar proto_val = {0};
 					proto_val.type = ACTION_STACK_VALUE_OBJECT;
 					proto_val.data.numeric_value = (u64) g_textfield_constructor.prototype_obj;
@@ -17576,8 +17585,9 @@ void actionInitDynTextFieldClone(SWFAppContext* app_context, MovieClip* mc) {
 	ASObject* props = (ASObject*) mc->dynamic_props;
 	props->native_type = NATIVE_TEXTFIELD;
 
+	// In SWF5, MC textfields (including clones) are not instanceof TextField.
 	initTextFieldPrototype(app_context);
-	if (g_textfield_constructor.prototype_obj != NULL) {
+	if (g_swf_version >= 6 && g_textfield_constructor.prototype_obj != NULL) {
 		ActionVar proto_val = {0};
 		proto_val.type = ACTION_STACK_VALUE_OBJECT;
 		proto_val.data.numeric_value = (u64) g_textfield_constructor.prototype_obj;
@@ -37608,8 +37618,8 @@ void actionSetMember(SWFAppContext* app_context)
 						VAL(double, &len_val.data.numeric_value) = (double)text_u16_len;
 						setProperty(app_context, props, "length", 6, &len_val);
 					} else {
-						// No stylesheet: text and htmlText are synonyms
-						// Set raw-content flag (content set without HTML parsing or stylesheet)
+						// No stylesheet: text and htmlText are synonyms.
+						// Set raw-content flag (content set without HTML parsing or stylesheet).
 						ActionVar _rc_one = {0}; _rc_one.type = ACTION_STACK_VALUE_F64;
 						VAL(double, &_rc_one.data.numeric_value) = 1.0;
 						setProperty(app_context, props, "_tf_raw_content", 15, &_rc_one);
@@ -37618,6 +37628,62 @@ void actionSetMember(SWFAppContext* app_context)
 						len_val.type = ACTION_STACK_VALUE_F64;
 						VAL(double, &len_val.data.numeric_value) = (double)value_var.str_size;
 						setProperty(app_context, props, "length", 6, &len_val);
+#ifdef NO_GRAPHICS
+						// Rebuild the run table with default formatting so a subsequent
+						// htmlText read (after html is re-enabled) regenerates HTML from
+						// the new plain text — not stale runs from a prior HTML write.
+						{
+							const uint16_t* _nhr_u16 = varGetU16Ptr(&value_var);
+							char _nhr_buf[16384];
+							if (_nhr_u16 && value_var.str_size > 0)
+								u16_to_utf8(_nhr_u16, value_var.str_size, _nhr_buf, sizeof(_nhr_buf));
+							else
+								_nhr_buf[0] = '\0';
+							u32 _nhr_len = (u32)strlen(_nhr_buf);
+							TFRunTable* _nhr_table = tf_get_table(mc);
+							_nhr_table->from_html_text = 0;
+							_nhr_table->run_count = 0;
+							_nhr_table->text_len = 0;
+							TFRun _nhr_def;
+							tf_get_defaults(mc, &_nhr_def);
+							ActionVar* _nhr_tc = getProperty(props, "textColor", 9);
+							if (_nhr_tc != NULL && _nhr_tc->type == ACTION_STACK_VALUE_F64) {
+								double _nhr_tcd; memcpy(&_nhr_tcd, &_nhr_tc->data.numeric_value, sizeof(double));
+								_nhr_def.color = (u32)_nhr_tcd & 0x00FFFFFF;
+							}
+							u32 _nhr_ti = 0;
+							for (u32 _nhr_si = 0; _nhr_si < _nhr_len && _nhr_ti < sizeof(_nhr_table->text) - 1; _nhr_si++) {
+								if (_nhr_buf[_nhr_si] == '\r') _nhr_table->text[_nhr_ti++] = '\n';
+								else _nhr_table->text[_nhr_ti++] = _nhr_buf[_nhr_si];
+							}
+							_nhr_table->text[_nhr_ti] = '\0';
+							_nhr_table->text_len = _nhr_ti;
+							u32 _nhr_pstart = 0;
+							for (u32 _nhr_pi = 0; _nhr_pi <= _nhr_ti; _nhr_pi++) {
+								if (_nhr_pi == _nhr_ti || _nhr_table->text[_nhr_pi] == '\n') {
+									if (_nhr_pi > _nhr_pstart) {
+										if (_nhr_table->run_count < TF_MAX_RUNS) {
+											TFRun* _nhr_r = &_nhr_table->runs[_nhr_table->run_count];
+											*_nhr_r = _nhr_def;
+											_nhr_r->start = _nhr_pstart;
+											_nhr_r->length = _nhr_pi - _nhr_pstart;
+											_nhr_table->run_count++;
+										}
+									}
+									if (_nhr_pi < _nhr_ti && _nhr_table->text[_nhr_pi] == '\n') {
+										if (_nhr_table->run_count < TF_MAX_RUNS) {
+											TFRun* _nhr_r = &_nhr_table->runs[_nhr_table->run_count];
+											*_nhr_r = _nhr_def;
+											_nhr_r->start = _nhr_pi;
+											_nhr_r->length = 1;
+											_nhr_table->run_count++;
+										}
+									}
+									_nhr_pstart = _nhr_pi + 1;
+								}
+							}
+						}
+#endif
 					}
 				}
 			}
@@ -39680,8 +39746,10 @@ void actionGetMember(SWFAppContext* app_context)
 		ASFunction* func = (ASFunction*) obj_var.data.numeric_value;
 		if (func != NULL && strcmp(prop_name, "prototype") == 0)
 		{
-			// In SWF5, AsBroadcaster and TextField have no prototype
-			if (func->prototype_obj == NULL && g_swf_version < 6 &&
+			// In SWF5, AsBroadcaster and TextField have no user-visible prototype.
+			// TextField keeps an internal prototype_obj so `new TextField() instanceof TextField`
+			// works, but reads of TextField.prototype still return undefined.
+			if (g_swf_version < 6 &&
 			    (func == &g_stub_ctors[0] || func == &g_textfield_constructor))
 			{
 				pushUndefined(app_context);
@@ -41411,7 +41479,6 @@ void actionNewObject(SWFAppContext* app_context)
 	else if (strcmp(ctor_name, "TextField") == 0)
 	{
 		// Handle TextField constructor — new TextField()
-		// SWF7+: Handle TextField constructor — new TextField()
 		// Creates an empty object with __proto__ set to TextField.prototype
 		ASObject* tf_obj = allocObject(app_context, 4);
 		tf_obj->native_type = NATIVE_TEXTFIELD;
@@ -41432,10 +41499,15 @@ void actionNewObject(SWFAppContext* app_context)
 		}
 		else
 		{
-			// SWF5: no TextField.prototype; use Object.prototype as __proto__
+			// Prototype init was skipped (shouldn't happen — initTextFieldPrototype
+			// always creates a prototype object). Fall back to Object.prototype.
 			setObjectProto(app_context, tf_obj);
+		}
+		if (g_swf_version < 6)
+		{
 			// In SWF5, new TextField() populates 35 properties as own enumerable
-			// properties (since there's no TextField.prototype to inherit from).
+			// properties (TextField.prototype is user-visible as undefined, so
+			// instances can't rely on inheritance to expose the virtual field list).
 			// Add in REVERSE insertion order so actionEnumerate2 (LIFO) yields
 			// them in forward order: styleSheet first, gridFitType last.
 			ActionVar undef_val = {0};
@@ -41464,9 +41536,6 @@ void actionNewObject(SWFAppContext* app_context)
 			};
 			for (int i = 34; i >= 0; i--)
 			{
-				// Properties 0-29 (styleSheet through scroll) are NOT writable in SWF5
-				// (they are internal AVM1 properties that ignore SetMember).
-				// Properties 30-34 (filters through gridFitType) ARE writable.
 				u8 flags = (i >= 30) ? PROPERTY_FLAGS_DEFAULT :
 				                       (PROPERTY_FLAG_ENUMERABLE | PROPERTY_FLAG_CONFIGURABLE);
 				setPropertyWithFlags(app_context, tf_obj, swf5_tf_prop_names[i], swf5_tf_prop_lens[i], &undef_val, flags);
@@ -45886,8 +45955,10 @@ void actionCallFunction(SWFAppContext* app_context, char* str_buffer)
 				setProperty(app_context, props, "_tf_visualOffY", 14, &_voy);
 			}
 
+			// In SWF5, createTextField's MC textfield is NOT instanceof TextField —
+			// only `new TextField()` instances are. So skip hooking up TextField.prototype.
 			initTextFieldPrototype(app_context);
-			if (g_textfield_constructor.prototype_obj != NULL) {
+			if (g_swf_version >= 6 && g_textfield_constructor.prototype_obj != NULL) {
 				ActionVar proto_val = {0};
 				proto_val.type = ACTION_STACK_VALUE_OBJECT;
 				proto_val.data.numeric_value = (u64) g_textfield_constructor.prototype_obj;
@@ -52205,9 +52276,10 @@ void actionCallMethod(SWFAppContext* app_context, char* str_buffer)
 					setProperty(app_context, props, "_tf_visualOffY", 14, &_voy);
 				}
 
-				// Set __proto__ to TextField.prototype
+				// Set __proto__ to TextField.prototype (SWF6+ only — SWF5 MC
+				// textfields are not instanceof TextField).
 				initTextFieldPrototype(app_context);
-				if (g_textfield_constructor.prototype_obj != NULL) {
+				if (g_swf_version >= 6 && g_textfield_constructor.prototype_obj != NULL) {
 					ActionVar proto_val = {0};
 					proto_val.type = ACTION_STACK_VALUE_OBJECT;
 					proto_val.data.numeric_value = (u64) g_textfield_constructor.prototype_obj;
@@ -56701,6 +56773,8 @@ static ActionVar builtin_selection_setFocus(SWFAppContext* app_context, ActionVa
 	(void)registers; (void)this_obj;
 	ActionVar ret = {0}; ret.type = ACTION_STACK_VALUE_BOOLEAN; ret.data.numeric_value = 0;
 	if (arg_count < 1) return ret;
+	// Flash/Gnash: setFocus accepts exactly 1 argument; extras → no-op returning false.
+	if (arg_count > 1) return ret;
 	ActionVar* arg = &args[0];
 	// setFocus(false) — returns false (boolean arg is not a valid target)
 	if (arg->type == ACTION_STACK_VALUE_BOOLEAN && arg->data.numeric_value == 0) {
@@ -56785,13 +56859,32 @@ static ActionVar builtin_selection_getFocus(SWFAppContext* app_context, ActionVa
 	return result;
 }
 
+// Clamp stored selection index to current text length of the focused textfield.
+// Flash clamps getBeginIndex/getCaretIndex/getEndIndex to the current text length,
+// so shortening the text does not require actively updating the stored indices.
+// Only clamp when the stored index was positive (selection was actively set) —
+// negative/-1 is preserved as "no valid selection" sentinel.
+static int ng_clamp_selection_index(int stored)
+{
+	if (stored < 0) return stored;
+	if (g_focused_mc == NULL || !MC_IS_TEXTFIELD(g_focused_mc)) return stored;
+	if (g_focused_mc->dynamic_props == NULL) return stored;
+	ActionVar* tv = getProperty((ASObject*)g_focused_mc->dynamic_props, "text", 4);
+	// Without a readable STRING text property, don't clamp — many static
+	// textfields hold their text via ng_textfield_idx, not dynamic_props.
+	if (tv == NULL || tv->type != ACTION_STACK_VALUE_STRING) return stored;
+	int text_len = (int)tv->str_size;
+	if (stored > text_len) return text_len;
+	return stored;
+}
+
 // Selection.getBeginIndex() — returns begin index of selection, or -1 if no text field focused.
 static ActionVar builtin_selection_getBeginIndex(SWFAppContext* app_context, ActionVar* args, u32 arg_count, ActionVar* registers, void* this_obj)
 {
 	(void)app_context; (void)args; (void)arg_count; (void)registers; (void)this_obj;
 	ActionVar ret = {0};
 	ret.type = ACTION_STACK_VALUE_F64;
-	double v = (g_focused_mc && MC_IS_TEXTFIELD(g_focused_mc)) ? (double)g_selection_begin : -1.0;
+	double v = (g_focused_mc && MC_IS_TEXTFIELD(g_focused_mc)) ? (double)ng_clamp_selection_index(g_selection_begin) : -1.0;
 	memcpy(&ret.data.numeric_value, &v, sizeof(double));
 	return ret;
 }
@@ -56802,7 +56895,7 @@ static ActionVar builtin_selection_getCaretIndex(SWFAppContext* app_context, Act
 	(void)app_context; (void)args; (void)arg_count; (void)registers; (void)this_obj;
 	ActionVar ret = {0};
 	ret.type = ACTION_STACK_VALUE_F64;
-	double v = (g_focused_mc && MC_IS_TEXTFIELD(g_focused_mc)) ? (double)g_selection_caret : -1.0;
+	double v = (g_focused_mc && MC_IS_TEXTFIELD(g_focused_mc)) ? (double)ng_clamp_selection_index(g_selection_caret) : -1.0;
 	memcpy(&ret.data.numeric_value, &v, sizeof(double));
 	return ret;
 }
@@ -56813,7 +56906,7 @@ static ActionVar builtin_selection_getEndIndex(SWFAppContext* app_context, Actio
 	(void)app_context; (void)args; (void)arg_count; (void)registers; (void)this_obj;
 	ActionVar ret = {0};
 	ret.type = ACTION_STACK_VALUE_F64;
-	double v = (g_focused_mc && MC_IS_TEXTFIELD(g_focused_mc)) ? (double)g_selection_end : -1.0;
+	double v = (g_focused_mc && MC_IS_TEXTFIELD(g_focused_mc)) ? (double)ng_clamp_selection_index(g_selection_end) : -1.0;
 	memcpy(&ret.data.numeric_value, &v, sizeof(double));
 	return ret;
 }
@@ -56835,28 +56928,26 @@ static ActionVar builtin_selection_setSelection(SWFAppContext* app_context, Acti
 			text_len = (int)tv->str_size;
 	}
 
+	// Ruffle-compatible: arg0 defaults to 0, arg1 defaults to INT_MAX (clamped to text length).
+	// Extra args are ignored. Gnash/Flash treats odd arg counts as no-op; Ruffle diverges here,
+	// and AVM1 tests expect the Ruffle behavior.
 	int a, b;
-	if (arg_count == 1) {
-		// Single arg: select from arg to end of text
-		PUSH(args[0].type, args[0].data.numeric_value);
-		convertFloat(app_context);
-		ActionVar cv; popVar(app_context, &cv);
-		double dv; memcpy(&dv, &cv.data.numeric_value, sizeof(double));
-		a = (dv != dv) ? 0 : (int)dv;  // NaN → 0
-		b = text_len;
-	} else {
-		// Two args: explicit begin and end
+	{
 		PUSH(args[0].type, args[0].data.numeric_value);
 		convertFloat(app_context);
 		ActionVar cv0; popVar(app_context, &cv0);
 		double d0; memcpy(&d0, &cv0.data.numeric_value, sizeof(double));
 		a = (d0 != d0) ? 0 : (int)d0;
 
-		PUSH(args[1].type, args[1].data.numeric_value);
-		convertFloat(app_context);
-		ActionVar cv1; popVar(app_context, &cv1);
-		double d1; memcpy(&d1, &cv1.data.numeric_value, sizeof(double));
-		b = (d1 != d1) ? 0 : (int)d1;
+		if (arg_count >= 2) {
+			PUSH(args[1].type, args[1].data.numeric_value);
+			convertFloat(app_context);
+			ActionVar cv1; popVar(app_context, &cv1);
+			double d1; memcpy(&d1, &cv1.data.numeric_value, sizeof(double));
+			b = (d1 != d1) ? 0 : (int)d1;
+		} else {
+			b = INT_MAX;
+		}
 	}
 
 	// Clamp to [0, text_len]

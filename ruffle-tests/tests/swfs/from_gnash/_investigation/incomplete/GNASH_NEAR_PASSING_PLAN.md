@@ -7,32 +7,64 @@ status: incomplete
 phases:
   - id: 1
     name: "Trivial fixes (NetStream, Transform)"
-    status: not_started
+    status: completed
   - id: 2
     name: "htmlText setter and text clearing"
-    status: not_started
+    status: partial
   - id: 3
     name: "Color/ColorTransform constructors"
-    status: not_started
+    status: completed
   - id: 4
     name: "LocalConnection.connect() validation"
-    status: not_started
+    status: completed
   - id: 5
     name: "ExternalInterface _toXML/_toAS"
-    status: not_started
+    status: completed
   - id: 6
     name: "Inheritance and instanceof fixes"
-    status: not_started
+    status: completed
   - id: 7
     name: "Selection replaceSel index tracking"
-    status: not_started
+    status: partial
 dependencies: []
 blockers: []
 -->
 
-Last updated: 2026-04-07
+Last updated: 2026-04-18
 
-## Status: NOT STARTED — 22 tests, 0 passing
+## Status: 16/22 effective (11 PASS + 5 ruffle_matched), 6 remaining
+
+Out of 22 tests, 16 now effectively pass and 6 remain as `output_mismatch`:
+
+**Now passing (11):** NetStream-v6/v7/v8, Transform-v6/v7, Color-v6,
+ColorTransform-v8, LocalConnection-v6/v7/v8, TextField-v5.
+
+**`ruffle_matched` (5):** ExternalInterface-v8, Inheritance-v5/v6/v7/v8.
+
+**Still failing (6):** TextFieldHTML-v6/v7/v8 (1 diff each + 2 count), Selection-v6/v7/v8 (1 diff each + 2 count — residual diffs are gnash-bug cases where our impl is more correct than Gnash's expected output).
+
+### Latest fixes (2026-04-18, not yet in CI)
+
+- **Selection fixes (7 diffs/test → 1 diff/test across v6/v7/v8):** (1)
+  `setSelection` now requires exactly 2 args; calls with 1 arg or 3+ args
+  are a no-op (Flash behavior). (2) `setFocus` with more than 1 arg is a
+  no-op returning false (Flash behavior, used by the `Selection.setFocus(tx, 5)`
+  test). (3) `getBeginIndex`/`getCaretIndex`/`getEndIndex` now clamp stored
+  indices to the current text length — shortening `text1.text` from 25 → 9 → ""
+  correctly reports begin=9 then 0.
+- **TextField-v5 → PASS:** `initTextFieldPrototype` now creates the internal
+  prototype object even in SWF5 so `new TextField() instanceof TextField`
+  works. User-visible `TextField.prototype` still returns `undefined` in SWF5
+  via the getMember guard. `createTextField`/DefineEditText and the dynamic
+  clone path skip hooking up the TextField prototype on MC textfields in SWF5
+  so `!(createdMC instanceof TextField)` still holds.
+- **TextFieldHTML-v6/v7/v8 htmlText stale-regeneration fix:** When
+  `tf.htmlText = ...` is set with `html=false`, rebuild the TFRunTable with
+  default formatting from the new plain text. Without this, a subsequent
+  `tf.html = true` + read of `tf.htmlText` would re-serialize the stale run
+  table (with prior formatting runs). The malformed-unquoted-attribute case
+  (`tf.htmlText = '<font color=#00FF00>green2</font>'` clearing text to "")
+  is unfixed — 1 functional diff + 2 count diffs remaining per test.
 
 Supersedes the previous NEAR_PASSING_TESTS_PLAN (which covered only Color-v6
 and Selection-v6/v7/v8). This plan covers all non-ignored failing tests with
