@@ -10884,16 +10884,34 @@ static ActionVar bitmapDataPerlinNoise(SWFAppContext* app_context, ActionVar* ar
     if (arg_count < 6) { r = makeF64(-1); return r; }
     if (!bmp || bmp->disposed) { r = makeF64(-1); return r; }
 
-    double base_x = tsArgToDouble_ctx(app_context, &args[0]);
-    double base_y = tsArgToDouble_ctx(app_context, &args[1]);
-    int num_octaves = (int)tsArgToDouble_ctx(app_context, &args[2]);
+    // ECMA ToNumber for null/undefined: SWF7+ → NaN, SWF<7 → 0. tsArgToDouble_ctx
+    // returns 0 for null/undefined (SWF<7 behavior), but Ruffle's perlinNoise uses
+    // get_f64 → coerce_to_f64 which is SWF-version-aware. Push + convertFloat gives
+    // the correct version-aware value, with NaN propagation matching Ruffle.
+    #define _PERLIN_COERCE(arg_var) ({ \
+        ActionVar* _a = (arg_var); \
+        PUSH(_a->type, _a->data.numeric_value); STACK_TOP_N = _a->str_size; \
+        convertFloat(app_context); \
+        double _r = 0.0; \
+        if (STACK_TOP_TYPE == ACTION_STACK_VALUE_F64) _r = VAL(double, &STACK_TOP_VALUE); \
+        else if (STACK_TOP_TYPE == ACTION_STACK_VALUE_F32) _r = (double)VAL(float, &STACK_TOP_VALUE); \
+        POP(); _r; })
+    double base_x = _PERLIN_COERCE(&args[0]);
+    double base_y = _PERLIN_COERCE(&args[1]);
+    #undef _PERLIN_COERCE
+    // ECMA ToInt32 handles NaN/Infinity → 0; raw (int) cast is UB on NaN.
+    int num_octaves = (int32_t)doubleToUint32(tsArgToDouble_ctx(app_context, &args[2]));
     if (num_octaves < 0) num_octaves = 0;
-    int64_t random_seed = (int64_t)(int32_t)tsArgToDouble_ctx(app_context, &args[3]);
+    int64_t random_seed = (int64_t)(int32_t)doubleToUint32(tsArgToDouble_ctx(app_context, &args[3]));
     int stitch = tsArgTruthy(&args[4]);
     int fractal_noise = tsArgTruthy(&args[5]);
+    // Ruffle: channel_options = try_get_u8(idx=6, UndefinedAs::Some) ?? RGB.
+    // When the arg is missing entirely, default to RGB (7). When present (even
+    // as undefined / non-numeric), coerce to u8 — undefined → 0 → no channels.
     int channel_options = 7;
-    if (arg_count >= 7 && args[6].type != ACTION_STACK_VALUE_UNDEFINED)
-        channel_options = ((int)tsArgToDouble_ctx(app_context, &args[6])) & 0xFF;
+    if (arg_count >= 7) {
+        channel_options = (int)doubleToUint32(tsArgToDouble_ctx(app_context, &args[6])) & 0xFF;
+    }
     int grayscale = (arg_count >= 8) ? tsArgTruthy(&args[7]) : 0;
 
     if (num_octaves < 0) num_octaves = 0;

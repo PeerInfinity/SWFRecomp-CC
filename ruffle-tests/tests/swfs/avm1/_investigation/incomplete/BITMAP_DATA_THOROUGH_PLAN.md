@@ -24,7 +24,7 @@ Status after session 3 fixes (2026-04-17): **18 / 20 effective pass** (16 pass +
 | `paletteMap` | 1.9% | 69.8% | 94.5% | **ruffle_matched** — Object-arg LUT lookup + & 0xFF mask |
 | `copyChannel` | 1.8% | 66.9% | 93.4% | **PASS** (100%) — `MAX_BITMAP_NATIVES` 256 → 8192; the side table was overflowing partway through the Opaque iteration, leaving new BMDs unregistered → `bdHeightGetter` returned -1 → `printBmd` loop skipped |
 | `pixelDissolve` | 2.0% | 78.4% | 91.8% | improved (~94%) — Flash-specific Feistel/return value behavior |
-| `perlinNoise` | 5.1% | 25.4% | 29.6% | 29.6% — algorithm port mismatches (known_failure upstream) |
+| `perlinNoise` | 5.1% | 25.4% | 29.6% | **ruffle_matched** (98.8%) — `MAX_BITMAP_NATIVES` bump unblocked it; further fixes for SWF7+ null/undefined→NaN coercion (baseX/Y), undefined channel_options→0 (was defaulting to 7), and ECMA ToInt32 NaN→0 for seed/numOctaves brought our diffs to a strict subset of Ruffle's |
 
 ## Session 3 fixes (2026-04-17)
 
@@ -55,6 +55,11 @@ Status after session 3 fixes (2026-04-17): **18 / 20 effective pass** (16 pass +
 ## Session 4 fixes (2026-04-17)
 
 - **copyChannel** (now PASS): Bumped `MAX_BITMAP_NATIVES` from 256 to 8192. The `bitmap_data_thorough/copyChannel` test creates ~50 fresh BMDs per top-level iteration (Transparent / Opaque / Disposed), and the side table was full partway through Opaque. Once full, `setBitmapNative` silently drops new entries → `getBitmapNative` returns `NULL` → `bdHeightGetter` returns -1 → the test's `for (var y = 0; y < bmd.height; y++)` doesn't iterate → no rows in the bitmap dump. Five specific calls had this drift, all in the Opaque iteration after the table filled.
+
+- **perlinNoise** (now ruffle_matched): three argument-coercion fixes brought our diff-set to a strict subset of Ruffle's:
+  - `baseX` / `baseY`: use `convertFloat`-based coercion so SWF7+ null/undefined → NaN (matching Ruffle's `args.get_f64`). `tsArgToDouble_ctx` returns 0.0 for null/undefined which made `base_freq = 0` and the perlin computation produced random output instead of NaN-propagated zeros.
+  - `channel_options`: when arg present but undefined, coerce to 0 (matching Ruffle's `try_get_u8(UndefinedAs::Some)`). Previously we defaulted to 7 (RGB) on both missing AND undefined, so calls like `perlinNoise(.., undefined, false, null)` produced random RGB instead of all-zero.
+  - `random_seed` / `num_octaves`: route through `doubleToUint32` then cast to `int32_t` — handles NaN/Infinity → 0 per ECMA ToInt32, matching Ruffle's `coerce_to_i32`. `(int)NaN` directly is C UB and was producing garbage seeds for `{}`-typed args.
 
 ## Shared structure
 
