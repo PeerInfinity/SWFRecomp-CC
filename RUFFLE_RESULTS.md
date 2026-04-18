@@ -2,9 +2,9 @@
 
 *See [RUFFLE_RESULTS_FILTERED.md](RUFFLE_RESULTS_FILTERED.md) for results with ignored tests excluded.*
 
-**Commit:** `5541b623f4d0`  
-**Date:** 2026-04-18 04:19 UTC  
-**Total duration:** 1h45m32s
+**Commit:** `88e7c139f118`  
+**Date:** 2026-04-18 15:25 UTC  
+**Total duration:** 4m39s
 
 ## Results by Suite
 
@@ -25,14 +25,14 @@
 | Suite | Matching | Expected | Accuracy |
 |-------|--------:|---------:|---------:|
 | avm1 | 105,618 | 114,749 | 92.0% |
-| from_gnash/actionscript.all | 13,849 | 16,957 | 81.7% |
+| from_gnash/actionscript.all | 13,845 | 16,957 | 81.6% |
 | from_gnash/misc-ming.all | 2,119 | 4,541 | 46.7% |
 | from_gnash/misc-mtasc.all | 173 | 231 | 74.9% |
 | from_gnash/misc-swfc.all | 215 | 499 | 43.1% |
 | from_gnash/misc-swfmill.all | 45 | 51 | 88.2% |
 | from_shumway | 656 | 1,276 | 51.4% |
 | from_shumway/avm1 | 479 | 491 | 97.6% |
-| **Total** | **123,154** | **138,795** | **88.7%** |
+| **Total** | **123,150** | **138,795** | **88.7%** |
 
 ## Failure Breakdown
 
@@ -93,9 +93,9 @@ Tests with `output_mismatch` status but ≥80% of expected lines matching.
 
 | Suite | Newly Passing | Newly Failing | Lines Improved | Lines Regressed |
 |-------|-------------:|-------------:|--------------:|----------------:|
-| from_gnash/actionscript.all | 4 | - | 184 | - |
+| from_gnash/actionscript.all | - | - | - | 4 |
 
-*Comparing `3242e54f1143` → `5541b623f4d0`*
+*Comparing `5541b623f4d0` → `88e7c139f118`*
 
 ## Flash-Spec Results
 
@@ -110,55 +110,55 @@ Tests verified against Flash's actual output (`output.flash.txt`).
 ### avm1
 
 - **Pass:** 598/641 (93.3%)
-- **Duration:** 49m49s across 30 shards
+- **Duration:** 2m33s across 30 shards
 - **Lines:** 105,618/114,749 matching (92.0%)
-- **Avg test duration:** 4.6s — slowest: `issue_1671` (19.0s)
+- **Avg test duration:** 0.2s — slowest: `edittext_newline_stripping` (6.2s)
 
 ### from_gnash/actionscript.all
 
 - **Pass:** 106/190 (55.8%)
-- **Duration:** 10m45s across 30 shards
-- **Lines:** 13,849/16,957 matching (81.7%)
-- **Avg test duration:** 3.3s — slowest: `Stage-v5` (17.6s)
+- **Duration:** 51s across 30 shards
+- **Lines:** 13,845/16,957 matching (81.6%)
+- **Avg test duration:** 0.2s — slowest: `Transform-v6` (0.4s)
 
 ### from_gnash/misc-ming.all
 
 - **Pass:** 18/102 (17.6%)
-- **Duration:** 21m31s across 30 shards
+- **Duration:** 33s across 30 shards
 - **Lines:** 2,119/4,541 matching (46.7%)
-- **Avg test duration:** 12.6s — slowest: `matrix_test` (19.3s)
+- **Avg test duration:** 0.3s — slowest: `matrix_test` (4.1s)
 
 ### from_gnash/misc-mtasc.all
 
 - **Pass:** 7/9 (77.8%)
-- **Duration:** 1m37s across 30 shards
+- **Duration:** 2s across 30 shards
 - **Lines:** 173/231 matching (74.9%)
-- **Avg test duration:** 10.7s — slowest: `function_test` (17.1s)
+- **Avg test duration:** 0.2s — slowest: `levels` (0.2s)
 
 ### from_gnash/misc-swfc.all
 
 - **Pass:** 2/16 (12.5%)
-- **Duration:** 3m45s across 30 shards
+- **Duration:** 5s across 30 shards
 - **Lines:** 215/499 matching (43.1%)
-- **Avg test duration:** 14.0s — slowest: `opcode_guard_test2` (17.3s)
+- **Avg test duration:** 0.3s — slowest: `opcode_guard_test2` (2.0s)
 
 ### from_gnash/misc-swfmill.all
 
 - **Pass:** 14/18 (77.8%)
-- **Duration:** 4m43s across 30 shards
+- **Duration:** 4s across 30 shards
 - **Lines:** 45/51 matching (88.2%)
-- **Avg test duration:** 15.7s — slowest: `dict_cross` (17.8s)
+- **Avg test duration:** 0.2s — slowest: `trace-as2/super` (0.2s)
 
 ### from_shumway
 
 - **Pass:** 60/92 (65.2%)
-- **Duration:** 11m43s across 30 shards
+- **Duration:** 21s across 30 shards
 - **Lines:** 656/1,276 matching (51.4%)
-- **Avg test duration:** 7.6s — slowest: `timeline/timeline_as2_4` (16.9s)
+- **Avg test duration:** 0.2s — slowest: `fuzz/42f71d860e22e456a9bd61c2d9e8c8da9536152b879a131dd7a400ff61a4a3e3` (0.3s)
 
 ### from_shumway/avm1
 
 - **Pass:** 44/47 (93.6%)
-- **Duration:** 1m35s across 30 shards
+- **Duration:** 10s across 30 shards
 - **Lines:** 479/491 matching (97.6%)
-- **Avg test duration:** 2.0s — slowest: `duplicateMovieClip/dontremove` (18.0s)
+- **Avg test duration:** 0.1s — slowest: `depth` (0.2s)
