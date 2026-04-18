@@ -1,16 +1,16 @@
 {
   "metadata": {
-    "old_timestamp": "2026-04-18T02:20:47.864932+00:00",
-    "old_git_sha": "d785daf6664c9156c9a1297728a27ef975e3d5a1",
-    "new_timestamp": "2026-04-18T02:42:39.839616+00:00",
-    "new_git_sha": "743aad9b38abbea15fd0ecddc8ad89a9a4c93d44",
+    "old_timestamp": "2026-04-18T02:42:39.839616+00:00",
+    "old_git_sha": "743aad9b38abbea15fd0ecddc8ad89a9a4c93d44",
+    "new_timestamp": "2026-04-18T03:01:38.247327+00:00",
+    "new_git_sha": "3242e54f11438e9bfd201721d346b8ad808401ea",
     "partial": false,
     "same_commit": false
   },
   "summary": {
     "old_pass": 598,
-    "old_ruffle_matched": 7,
-    "old_effective_pass": 605,
+    "old_ruffle_matched": 8,
+    "old_effective_pass": 606,
     "old_total": 641,
     "old_pass_rate": 93.3,
     "new_pass": 598,
@@ -18,32 +18,32 @@
     "new_effective_pass": 606,
     "new_total": 641,
     "new_pass_rate": 93.3,
-    "old_mismatched_lines": 9195,
-    "new_mismatched_lines": 9133,
+    "old_mismatched_lines": 9133,
+    "new_mismatched_lines": 9131,
     "increased_mismatches": 0,
-    "decreased_mismatches": 62,
-    "newly_passing": 1,
+    "decreased_mismatches": 2,
+    "newly_passing": 0,
     "newly_failing": 0,
-    "status_changed": 1,
+    "status_changed": 0,
     "unchanged": 640,
     "added": 0,
     "removed": 0
   },
   "changes": [
     {
-      "test": "bitmap_data_thorough/perlinNoise",
+      "test": "bitmap_data_thorough/pixelDissolve",
       "change_type": "changed",
       "old_status": "output_mismatch",
-      "new_status": "ruffle_matched",
+      "new_status": "output_mismatch",
       "old_lines": {
-        "actual_lines": 8481,
-        "expected_lines": 8481,
-        "matching_lines": 8379
+        "actual_lines": 1371,
+        "expected_lines": 1371,
+        "matching_lines": 1333
       },
       "new_lines": {
-        "actual_lines": 8481,
-        "expected_lines": 8481,
-        "matching_lines": 8441
+        "actual_lines": 1371,
+        "expected_lines": 1371,
+        "matching_lines": 1335
       }
     }
   ]
