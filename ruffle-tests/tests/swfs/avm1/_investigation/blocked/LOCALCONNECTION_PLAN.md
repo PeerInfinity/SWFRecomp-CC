@@ -2,7 +2,7 @@
 
 <!-- PLAN_META
 id: LOCALCONNECTION
-status: incomplete
+status: blocked
 phases:
   - id: 1
     name: "Core LocalConnection protocol"
@@ -22,12 +22,19 @@ phases:
 dependencies: []
 blockers:
   - blocker: 5
-    reason: "Child SWF loading requires avm1child/avm2child SWFs"
+    reason: "Child SWF loading requires avm1child/avm2child SWFs (not copied locally; avm2child uses AS3)"
 -->
 
 # LocalConnection Plan
 
-## Status: INCOMPLETE — 433/579 lines matching (74.8%), up from 74/579 (12.8%)
+## Status: BLOCKED — 433/579 lines matching (74.8%), up from 74/579 (12.8%)
+
+Last verified: 2026-04-18. All implementable phases (1–4) are complete.
+Phase 5 is the only remaining work and is genuinely blocked: the child SWFs
+(`avm1child/child.swf`, `avm2child/child.swf`) are not present in the test
+directory and `avm2child` uses AVM2/AS3, which our recompiler cannot execute.
+The remaining 45 mismatched lines (after leading-blank strip) are entirely
+within the last five frames of the test and depend on child SWF execution.
 
 ## Test Summary
 
