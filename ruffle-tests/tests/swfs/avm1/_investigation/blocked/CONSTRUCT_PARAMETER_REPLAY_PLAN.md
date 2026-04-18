@@ -3,32 +3,60 @@
 
 <!-- PLAN_META
 id: CONSTRUCT_PARAMETER_REPLAY
-status: incomplete
+status: blocked
 phases:
   - id: 1
     name: "Investigate Flash's actual SetVariable/addProperty behavior during CONSTRUCT"
-    status: incomplete
+    status: blocked
   - id: 2
     name: "Implement CONSTRUCT parameter capture"
-    status: incomplete
+    status: blocked
   - id: 3
     name: "Implement post-constructor parameter replay"
-    status: incomplete
+    status: blocked
   - id: 4
     name: "Validate with FLVPlayback component"
-    status: incomplete
+    status: blocked
 dependencies:
   - plan: FLV_PLAYBACK
     phases: [5, 6, 7, 8]
     type: extends
     reason: "FLVPlayback component video rendering is the motivating use case"
 blockers:
-  - "Phase 1 investigation needed before implementation design is finalized"
+  - "Phase 1 requires real Flash Player access to determine whether SetVariable during CONSTRUCT invokes addProperty setters from __proto__ — no Flash Player is available in this environment"
+  - "Motivating test (netstream_play_flv_screen image) is marked with_renderer = { optional = true } — Ruffle has the same limitation, so there is no reference output to promote against"
 -->
 
-Last updated: 2026-04-07
+Last updated: 2026-04-18
 
-## Status: INCOMPLETE — Investigation phase, implementation design pending
+## Status: BLOCKED — Phase 1 investigation requires real Flash Player access
+
+## 2026-04-18 re-assessment
+
+Every trace test in this plan's scope is already PASSING in the current CI run
+(`c3aa8876`, AVM1 results.json):
+
+| Test | Status | Lines |
+|------|--------|-------|
+| on_construct | PASS | 25/25 |
+| netstream_play_flv | PASS | 21/21 |
+| netstream_play_flv_screen | PASS | 0/0 (zero expected lines) |
+| netstream_seek_flv | PASS | 25/25 |
+| register_and_init_order | PASS | 231/231 |
+| register_class_return_value | PASS | 16/16 |
+
+Local re-runs of `on_construct` and `netstream_play_flv_screen` confirm PASS.
+
+The plan's remaining goal is FLVPlayback **video rendering** (image output),
+not any trace test. Progress here is gated on:
+
+1. Flash Player behavior investigation (Phase 1) — no Flash Player available.
+2. A reference image to compare against — Ruffle has the same limitation, and
+   the image comparison in `netstream_play_flv_screen/test.toml` is
+   `with_renderer = { optional = true }`.
+
+Moved from `incomplete/` to `blocked/` pending either Flash Player access or
+a reference rendering from an alternative source.
 
 ## Problem Statement
 
