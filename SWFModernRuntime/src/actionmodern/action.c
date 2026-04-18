@@ -48330,7 +48330,7 @@ static int callArrayMethod(SWFAppContext* app_context,
 					{
 						ActionVar _ures = _invoke_sort_comparator(app_context, comparator,
 						                                          &arr->elements[_ui], &arr->elements[_uj]);
-						double _ud = varToDouble(&_ures);
+						double _ud = varToDoubleSWF(app_context, &_ures, g_swf_version);
 						_ucmp = (_ud < 0) ? -1 : (_ud > 0) ? 1 : 0;
 					}
 					else
@@ -48389,7 +48389,7 @@ static int callArrayMethod(SWFAppContext* app_context,
 									                                          &arr->elements[_qpivot_idx],
 									                                          &arr->elements[_idx[_qleft]]);
 									if (g_execution_halted) break;
-									double _qd = varToDouble(&_qres);
+									double _qd = varToDoubleSWF(app_context, &_qres, g_swf_version);
 									_qcmp = (_qd < 0) ? -1 : (_qd > 0) ? 1 : 0;
 								}
 								else
@@ -48410,7 +48410,7 @@ static int callArrayMethod(SWFAppContext* app_context,
 									                                          &arr->elements[_qpivot_idx],
 									                                          &arr->elements[_idx[_qright]]);
 									if (g_execution_halted) break;
-									double _qd = varToDouble(&_qres);
+									double _qd = varToDoubleSWF(app_context, &_qres, g_swf_version);
 									_qcmp = (_qd < 0) ? -1 : (_qd > 0) ? 1 : 0;
 								}
 								else
@@ -48515,7 +48515,7 @@ static int callArrayMethod(SWFAppContext* app_context,
 								ActionVar _qres = _invoke_sort_comparator(app_context, comparator,
 								                                          &_qpivot, &arr->elements[_qleft]);
 								if (g_execution_halted) break;
-								double _qd = varToDouble(&_qres);
+								double _qd = varToDoubleSWF(app_context, &_qres, g_swf_version);
 								_qcmp = (_qd < 0) ? -1 : (_qd > 0) ? 1 : 0;
 							}
 							else
@@ -48535,7 +48535,7 @@ static int callArrayMethod(SWFAppContext* app_context,
 								ActionVar _qres = _invoke_sort_comparator(app_context, comparator,
 								                                          &_qpivot, &arr->elements[_qright]);
 								if (g_execution_halted) break;
-								double _qd = varToDouble(&_qres);
+								double _qd = varToDoubleSWF(app_context, &_qres, g_swf_version);
 								_qcmp = (_qd < 0) ? -1 : (_qd > 0) ? 1 : 0;
 							}
 							else
