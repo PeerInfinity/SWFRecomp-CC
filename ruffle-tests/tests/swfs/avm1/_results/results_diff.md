@@ -1,26 +1,20 @@
 # Ruffle Test Results Diff
 
-**Previous:** `651d44fcad1f` (2026-04-18T01:59:48.567832+00:00)
-**Current:** `d785daf6664c` (2026-04-18T02:20:47.864932+00:00)
+**Previous:** `d785daf6664c` (2026-04-18T02:20:47.864932+00:00)
+**Current:** `743aad9b38ab` (2026-04-18T02:42:39.839616+00:00)
 
 ## Summary
 
 | Metric | Previous | Current | Delta |
 |--------|----------|---------|-------|
-| Passing | 597 | 598 | +1 |
+| Passing | 598 | 598 | 0 |
 | Total | 641 | 641 | 0 |
-| Pass rate | 93.1% | 93.3% | +0.2% |
-| Mismatched lines | 15245 | 9195 | -6050 |
-|   Decreased | | | -6050 |
+| Pass rate | 93.3% | 93.3% | 0% |
+| Mismatched lines | 9195 | 9133 | -62 |
+|   Decreased | | | -62 |
 
-## Newly Passing (1)
+## Status Changed (1)
 
-| Test | Previous Status | Lines (prev) | Lines (now) |
-|------|----------------|--------------|-------------|
-| `bitmap_data_thorough/copyChannel` | output_mismatch | 2537/2715 | 2715/2715 |
-
-## Line Count Changed (1)
-
-| Test | Status | Lines (prev) | Lines (now) | Diff |
-|------|--------|--------------|-------------|------|
-| `bitmap_data_thorough/perlinNoise` | output_mismatch | 2507/8481 | 8379/8481 | -5872 |
+| Test | Previous | Current | Lines (prev) | Lines (now) |
+|------|----------|---------|--------------|-------------|
+| `bitmap_data_thorough/perlinNoise` | output_mismatch | ruffle_matched | 8379/8481 | 8441/8481 |
