@@ -10367,9 +10367,12 @@ static ActionVar bitmapDataPixelDissolve(SWFAppContext* app_context, ActionVar* 
         if (dpy) dest_y = (int)varToDoubleSimple(dpy);
     }
 
-    int32_t random_seed = (int32_t)varToDoubleSimple(&args[3]);
-    int num_pixels = (int)varToDoubleSimple(&args[4]);
-    uint32_t fill_color = (arg_count >= 6) ? doubleToUint32(varToDoubleSimple(&args[5])) : 0;
+    // tsArgToDouble_ctx invokes valueOf for OBJECT (e.g. objLooksLikeNum) and
+    // gives SWF-version-aware NaN/0 for null/undefined. doubleToUint32 then
+    // performs ECMA ToInt32/ToUint32 (NaN/Infinity → 0).
+    int32_t random_seed = (int32_t)doubleToUint32(tsArgToDouble_ctx(app_context, &args[3]));
+    int num_pixels = (int32_t)doubleToUint32(tsArgToDouble_ctx(app_context, &args[4]));
+    uint32_t fill_color = (arg_count >= 6) ? doubleToUint32(tsArgToDouble_ctx(app_context, &args[5])) : 0;
 
     if (src_w < 0) src_w = 0;
     if (src_h < 0) src_h = 0;

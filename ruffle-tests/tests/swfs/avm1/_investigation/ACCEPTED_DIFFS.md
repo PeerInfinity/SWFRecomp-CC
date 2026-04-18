@@ -280,6 +280,33 @@ the 293-line test causes this 4-line known-failure test to fail.
 
 **Decision:** Accept; Ruffle known failure, contradicts `tab_ordering_properties` expectations.
 
+### `bitmap_data_thorough/pixelDissolve` — Flash-specific Feistel return value (Ruffle panics)
+
+**Ruffle test.toml:**
+```toml
+num_frames = 1
+known_failure.panic = "attempt to add with overflow"
+```
+
+**Status:** 1333 / 1371 (97.2%) match. Remaining 38 diff lines are all in the
+`pixelDissolve` return value (Feistel `raw_perm_index`) and the dest pixel
+positions chosen by the Feistel permutation, for calls where `random_seed` is
+something other than a plain finite integer (e.g. `null`, `undefined`,
+`objLooksLikeNum.valueOf()`).
+
+Ruffle panics with `attempt to add with overflow` while running this test, so
+no `output.ruffle.txt` exists for `ruffle_subset_match` to promote us. The
+expected `output.txt` was produced by Flash Player itself. Without a Flash
+oracle, we can't determine whether Flash's coercion path is `coerce_to_i32`
+(invokes `valueOf`), some plain integer cast, or something else entirely for
+each arg type — and small differences in the seed change the entire Feistel
+sequence.
+
+**Decision:** Accept; Ruffle known-failure (panic) prevents `ruffle_matched`
+promotion, and matching Flash exactly requires reverse-engineering Adobe's
+exact coercion semantics. Most pixel placements (and all sentinel return
+codes for missing/invalid args) match.
+
 ---
 
 ## Category 8: Shape Hit Test Accuracy Limits
@@ -366,3 +393,4 @@ investigated but fixing this point introduced 2 regressions at other scribble bo
 | `movieclip_hittest_shapeflag` | Hit test accuracy (Noto Sans glyph outlines) | 7 | Accept; proprietary Flash font metrics |
 | `movieclip_hittest_shapeflag` | Hit test accuracy (morph boundary precision) | 1 | Accept; float vs integer precision |
 | `movieclip_hittest_shapeflag` | Hit test accuracy (Drawing API stroke tessellation) | 1 | Accept; tessellation boundary |
+| `bitmap_data_thorough/pixelDissolve` | Ruffle known failure (panic) + Flash-specific Feistel coercion | ~38 | Accept; 97.2% match, no Ruffle oracle for `ruffle_matched` |
