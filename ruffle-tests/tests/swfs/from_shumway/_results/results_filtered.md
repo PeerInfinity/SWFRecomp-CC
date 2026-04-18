@@ -1,10 +1,10 @@
 # Ruffle Test Results (Filtered)
 
-**Date**: 2026-04-18 15:25 UTC
+**Date**: 2026-04-18 15:39 UTC
 
-**Git SHA**: `88e7c139f1`
+**Git SHA**: `3d326df746`
 
-**Run Duration**: 0m 21s
+**Run Duration**: 0m 22s
 
 **Filtered**: 0 tests ignored out of 92 available
 
@@ -38,27 +38,27 @@
 | 3 | `avm1/bitmapdata/getPixel` | 2 | 0.1s |  |
 | 4 | `avm1/bitmapdata/loadBitmap` | 3 | 0.1s |  |
 | 5 | `avm1/callee` | 2 | 0.1s |  |
-| 6 | `avm1/depth` | 6 | 0.3s |  |
-| 7 | `avm1/doactionorder/symbolclass` | 4 | 0.2s |  |
+| 6 | `avm1/depth` | 6 | 0.2s |  |
+| 7 | `avm1/doactionorder/symbolclass` | 4 | 0.1s |  |
 | 8 | `avm1/duplicateMovieClip/dontremove` | 6 | 0.1s |  |
 | 9 | `avm1/duplicateMovieClip/duplicateMovieClip` | 4 | 0.1s |  |
-| 10 | `avm1/duplicateMovieClip/name-coercion` | 3 | 0.1s |  |
+| 10 | `avm1/duplicateMovieClip/name-coercion` | 3 | 0.2s |  |
 | 11 | `avm1/duplicateMovieClip/samedepth` | 6 | 0.1s |  |
 | 12 | `avm1/externalinterface` | 4 | 0.1s |  |
 | 13 | `avm1/filters` | 149 | 0.1s | [1](ruffle-tests/tests/swfs/from_shumway/_investigation/complete/SHUMWAY_AVM1_PLAN.md) |
 | 14 | `avm1/haxe/flocons1` | 2 | 0.1s |  |
 | 15 | `avm1/haxe/flocons2` | 3 | 0.1s |  |
-| 16 | `avm1/label` | 4 | 0.2s |  |
-| 17 | `avm1/levels` | 9 | 0.2s |  |
-| 18 | `avm1/loadevent` | 9 | 0.2s |  |
+| 16 | `avm1/label` | 4 | 0.1s |  |
+| 17 | `avm1/levels` | 9 | 0.1s |  |
+| 18 | `avm1/loadevent` | 9 | 0.1s |  |
 | 19 | `avm1/loadvariables/loadvariables` | 7 | 0.1s |  |
 | 20 | `avm1/loadvariables/loadvars` | 2 | 0.1s |  |
 | 21 | `avm1/lookup` | 3 | 0.1s |  |
 | 22 | `avm1/mouse-transparency` | 1 | 0.1s |  |
 | 23 | `avm1/nativeinheritance` | 6 | 0.1s | [1](ruffle-tests/tests/swfs/from_shumway/_investigation/complete/SHUMWAY_AVM1_PLAN.md) |
-| 24 | `avm1/nested-button` | 1 | 0.2s | [1](ruffle-tests/tests/swfs/from_shumway/_investigation/complete/SHUMWAY_AVM1_PLAN.md) |
-| 25 | `avm1/operations` | 13 | 0.2s |  |
-| 26 | `avm1/property-paths/property-paths-6` | 6 | 0.1s |  |
+| 24 | `avm1/nested-button` | 1 | 0.5s | [1](ruffle-tests/tests/swfs/from_shumway/_investigation/complete/SHUMWAY_AVM1_PLAN.md) |
+| 25 | `avm1/operations` | 13 | 0.7s |  |
+| 26 | `avm1/property-paths/property-paths-6` | 6 | 0.8s |  |
 | 27 | `avm1/property-paths/property-paths-7` | 7 | 0.1s |  |
 | 28 | `avm1/propertycase/propertycase` | 7 | 0.1s |  |
 | 29 | `avm1/propertycase/propertycase-preserving-6` | 2 | 0.1s |  |
@@ -85,8 +85,8 @@
 | 50 | `fscommand1` | 1 | 0.1s |  |
 | 51 | `fuzz/0db0a01a92ae6ad0d2805dcfbac2ddf9a9689e77cd007924adfac57b543b1ed2` | 0 | 0.1s |  |
 | 52 | `fuzz/6f3b6cbd618b5b816edbf27e14f631aef42da1a4bcc467fb1aa2951d6c85ee48` | 0 | 0.1s |  |
-| 53 | `fuzz/9cad44804736a4fbd806d349c97b81d33c3f09ed4d9278acc4ef5cfbab147f3c` | 0 | 0.2s |  |
-| 54 | `gradientTransform` | 0 | 0.1s |  |
+| 53 | `fuzz/9cad44804736a4fbd806d349c97b81d33c3f09ed4d9278acc4ef5cfbab147f3c` | 0 | 0.1s |  |
+| 54 | `gradientTransform` | 0 | 0.2s |  |
 | 55 | `invalidClipDepth` | 0 | 0.1s |  |
 | 56 | `movieinfo1` | 3 | 0.1s |  |
 | 57 | `targetPath1` | 8 | 0.1s |  |

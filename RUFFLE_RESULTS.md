@@ -2,8 +2,8 @@
 
 *See [RUFFLE_RESULTS_FILTERED.md](RUFFLE_RESULTS_FILTERED.md) for results with ignored tests excluded.*
 
-**Commit:** `88e7c139f118`  
-**Date:** 2026-04-18 15:25 UTC  
+**Commit:** `3d326df746f1`  
+**Date:** 2026-04-18 15:39 UTC  
 **Total duration:** 4m39s
 
 ## Results by Suite
@@ -91,11 +91,9 @@ Tests with `output_mismatch` status but ≥80% of expected lines matching.
 
 ## Changes Since Last Run
 
-| Suite | Newly Passing | Newly Failing | Lines Improved | Lines Regressed |
-|-------|-------------:|-------------:|--------------:|----------------:|
-| from_gnash/actionscript.all | - | - | - | 4 |
+*No changes since last run.*
 
-*Comparing `5541b623f4d0` → `88e7c139f118`*
+*Comparing `88e7c139f118` → `3d326df746f1`*
 
 ## Flash-Spec Results
 
@@ -110,23 +108,23 @@ Tests verified against Flash's actual output (`output.flash.txt`).
 ### avm1
 
 - **Pass:** 598/641 (93.3%)
-- **Duration:** 2m33s across 30 shards
+- **Duration:** 2m32s across 30 shards
 - **Lines:** 105,618/114,749 matching (92.0%)
-- **Avg test duration:** 0.2s — slowest: `edittext_newline_stripping` (6.2s)
+- **Avg test duration:** 0.2s — slowest: `edittext_newline_stripping` (6.1s)
 
 ### from_gnash/actionscript.all
 
 - **Pass:** 106/190 (55.8%)
-- **Duration:** 51s across 30 shards
+- **Duration:** 50s across 30 shards
 - **Lines:** 13,845/16,957 matching (81.6%)
-- **Avg test duration:** 0.2s — slowest: `Transform-v6` (0.4s)
+- **Avg test duration:** 0.2s — slowest: `Sound-v7` (0.4s)
 
 ### from_gnash/misc-ming.all
 
 - **Pass:** 18/102 (17.6%)
-- **Duration:** 33s across 30 shards
+- **Duration:** 31s across 30 shards
 - **Lines:** 2,119/4,541 matching (46.7%)
-- **Avg test duration:** 0.3s — slowest: `matrix_test` (4.1s)
+- **Avg test duration:** 0.2s — slowest: `matrix_test` (3.1s)
 
 ### from_gnash/misc-mtasc.all
 
@@ -147,18 +145,18 @@ Tests verified against Flash's actual output (`output.flash.txt`).
 - **Pass:** 14/18 (77.8%)
 - **Duration:** 4s across 30 shards
 - **Lines:** 45/51 matching (88.2%)
-- **Avg test duration:** 0.2s — slowest: `trace-as2/super` (0.2s)
+- **Avg test duration:** 0.2s — slowest: `jump_after_end` (0.7s)
 
 ### from_shumway
 
 - **Pass:** 60/92 (65.2%)
-- **Duration:** 21s across 30 shards
+- **Duration:** 22s across 30 shards
 - **Lines:** 656/1,276 matching (51.4%)
-- **Avg test duration:** 0.2s — slowest: `fuzz/42f71d860e22e456a9bd61c2d9e8c8da9536152b879a131dd7a400ff61a4a3e3` (0.3s)
+- **Avg test duration:** 0.2s — slowest: `avm1/property-paths/property-paths-6` (0.8s)
 
 ### from_shumway/avm1
 
 - **Pass:** 44/47 (93.6%)
-- **Duration:** 10s across 30 shards
+- **Duration:** 12s across 30 shards
 - **Lines:** 479/491 matching (97.6%)
-- **Avg test duration:** 0.1s — slowest: `depth` (0.2s)
+- **Avg test duration:** 0.2s — slowest: `label` (1.6s)
