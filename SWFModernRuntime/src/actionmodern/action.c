@@ -50565,7 +50565,10 @@ void actionCallMethod(SWFAppContext* app_context, char* str_buffer)
 				g_prev_executing_func = prev_executing_func_am2;
 				g_current_executing_func = func;
 				g_c_function_this_obj = (ASObject*)obj;
+				u8 _saved_call_this_type_om2 = g_call_this_type;
+				g_call_this_type = ACTION_STACK_VALUE_OBJECT;
 				ActionVar result = func->advanced_func(app_context, args, num_args, registers, obj);
+				g_call_this_type = _saved_call_this_type_om2;
 				g_c_function_this_obj = NULL;
 				g_current_executing_func = prev_executing_func_am2;
 				g_call_depth--;

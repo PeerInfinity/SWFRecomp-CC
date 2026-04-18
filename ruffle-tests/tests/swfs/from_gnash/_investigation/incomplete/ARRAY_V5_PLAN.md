@@ -1,9 +1,14 @@
 # array-v5 Investigation Plan
 <!-- TESTS: array-v5 -->
 
-Last updated: 2026-04-16
+Last updated: 2026-04-18
 
-## Status: IN PROGRESS — 494/560 lines match (88.2%), 66 remaining failures
+## Status: IN PROGRESS — 499/560 lines match (89.1%), 61 remaining failures
+
+**Baseline note:** CI at 3d326df7 (2026-04-18) reported 490/560, not 494/560 as
+the 2026-04-16 entry claimed — the session-local rerun was transiently higher,
+probably due to a recompile artefact that was later reverted. Today's 499/560
+is +9 over that CI baseline.
 
 ---
 
@@ -25,6 +30,8 @@ The `array-v5` test exercises extensive Array operations (560 expected lines). C
 | 2026-04-16 (session) | 460/560 (82.1%) | +1: `actionToInteger` now wraps via `ecmaToInt32` (matches Ruffle `coerce_to_i32`) so `int(-2147483649) === 2147483647` instead of saturating to INT_MIN |
 | 2026-04-16 (session) | 466/560 (83.2%) | +6: sort custom-comparator arg-push order was inverted at 5 sites, making every `a.sort(cmpFn)` call produce the reverse-of-expected order. Fix: push `args[0]` (pivot) first then `args[1]` (elem) so the generated `pop→y; pop→x` prelude binds `x=pivot, y=elem`. |
 | 2026-04-16 (session) | 494/560 (88.2%) | +28: sort custom-comparator dispatch was invoking `simple_func` without pushing a local scope, so the callee's param/this `setVariableByName` writes fell through to globals. `randomComparator(a, b)` during an earlier sort therefore overwrote global `a` and `b`, corrupting the array under test and cascading into 25+ subsequent line failures (popped, b.length, b.toString, concatted, portion, mixed, basic, count==6). Extracted `_invoke_sort_comparator` helper that mirrors `actionCallFunction`'s type-1 setup (local scope + captured scopes + base_clip + `this`) and routed all 5 sort dispatch sites through it. |
+| 2026-04-18 (CI baseline) | 490/560 (87.5%) | CI at 3d326df7 settled on 490/560 rather than the 494 claimed by the 2026-04-16 session; treating 490 as the true pre-session number. |
+| 2026-04-18 (session) | 499/560 (89.1%) | +9: `g_call_this_type` was only being set when Array.prototype methods were invoked via `Function.prototype.call`/`.apply`. Direct method dispatch on an OBJECT receiver (`o.shift = Array.prototype.shift; o.shift()`) left `g_call_this_type == 0`, so `builtin_array_method`'s object-this branch never fired and the generic object was not mutated. Fix: save/set `g_call_this_type = ACTION_STACK_VALUE_OBJECT` around the OBJECT-receiver `advanced_func` call in `actionCallMethod` (line ~50568). Unblocks array-method-on-object dispatch for lines 514–543 — several now fully match, the rest still diverge on Flash's specific enumeration-order semantics (e.g. `traceProps(o)` after shift shows `0,shift,length,7,6,4,3,2,1,` vs expected `4,3,2,1,0,shift,length,7,6,5,`). No regressions across 16 avm1 array/method tests (`array_call_method`, `array_concat`, `array_sort`, `mutable_this`, `this_scoping`, etc.) or 10 object/super tests. |
 
 ## Completed Fixes
 
@@ -142,9 +149,11 @@ accepting the rest.
 **Root cause**: Various — gaparray splice return values, sparse reverse, ASSetPropFlags-protected shift/splice
 **Note**: Lines 485-506 are about ASSetPropFlags protection during shift/splice (not implemented)
 
-### Category E: Array methods on generic objects (18 lines)
-**Lines**: 507-543 — `Array.prototype.method.apply(obj)` on plain objects
-**Root cause**: Same as Category B — `builtin_array_method` returns undefined for non-array `this_obj` in SWF5.
+### Category E: Array methods on generic objects (PARTIALLY FIXED, ~11 lines remaining)
+**Lines**: 508–543 — direct method calls like `o.shift = Array.prototype.shift; o.shift()` on plain objects (the test assigns the prototype methods as own properties, it does not use `.apply()`).
+**Original root cause**: `builtin_array_method` only dispatched the object-this branch when `g_call_this_type == ACTION_STACK_VALUE_OBJECT`, but that global was only set by the `Function.prototype.call`/`.apply` path. Direct method dispatch on an OBJECT receiver never set it, so `builtin_array_method` returned undefined and the object was not mutated.
+**Fix (2026-04-18)**: Save/set `g_call_this_type = ACTION_STACK_VALUE_OBJECT` around the OBJECT-receiver `advanced_func` call in `actionCallMethod` (line ~50568 of `action.c`). Now `builtin_array_method` routes through `objectToTempArray` → `callArrayMethod` → `syncArrayToObject`. +9 lines in array-v5.
+**Residual**: Lines 508/509/511/512/515/516/518/520/524/542/543 still differ. The method now mutates the object, but `traceProps(o)` enumeration order and the exact final `length` disagree with Flash (e.g. after shift on `{shift,length:7,1..7:...}`, Flash reports `"4,3,2,1,0,shift,length,7,6,5,"` and `length==6`; we report `"0,shift,length,7,6,4,3,2,1,"` and `length==5`). This is Flash-specific sparse-object semantics during shift/unshift/splice/reverse/sort — our generic impl reads `length` and iterates `0..length-1`, which differs on objects where some indices are missing or `length` is larger than the populated range.
 
 ### Category F: ASSetPropFlags-protected delete (3 lines)
 **Lines**: 278-280 — `! delete c[2]` should return false when protected
@@ -180,14 +189,15 @@ Two separate Array constructors exist (`g_array_constructor` from `actionGetVari
 3. **Accept ASSetPropFlags limitation** — Categories D (partial) and F. ASSetPropFlags on arrays is unimplemented.
 4. **Investigate Category B** — Now independent of Category A. Variables `a`/`b` become undefined via intermediate operations. Requires deep bytecode analysis.
 5. **Category H deeper investigation** — The `t[2] = "om"` failure on plain objects with numeric properties needs investigation separate from __resolve.
+6. **Category E residual (11 lines)** — Refine Flash-compatible semantics of `Array.prototype.{shift,unshift,splice,reverse,sort}` when applied to a generic object (`this != ASArray`). Current impl reads `length`, materialises a temp ASArray via `objectToTempArray` (which fills missing indices with UNDEFINED), mutates, then writes back via `syncArrayToObject`. Flash seems to preserve "holes" (missing indices are not materialised) and computes the new `length` based on densely-populated indices rather than the original `length`. Needs to track which indices actually existed before mutation and skip writing undefined into absent slots.
 
 ## Test Details
 
 | Metric | Value |
 |--------|-------|
 | Expected output | 560 lines |
-| Current matching | ~450 lines (80.4%) |
-| Remaining failures | ~110 lines |
+| Current matching | 499 lines (89.1%) |
+| Remaining failures | 61 lines |
 | Compilation time | ~72 seconds |
 | Script size | 70,731 lines (script_2.c) |
 | SWF version | 5 |
