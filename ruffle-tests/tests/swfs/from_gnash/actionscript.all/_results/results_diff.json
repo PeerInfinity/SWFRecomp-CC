@@ -1,9 +1,9 @@
 {
   "metadata": {
-    "old_timestamp": "2026-04-18T15:39:49.041904+00:00",
-    "old_git_sha": "3d326df746f1bd15fa951f99665ac2643d082031",
-    "new_timestamp": "2026-04-18T16:11:15.367563+00:00",
-    "new_git_sha": "3976fcb7b067e713424d3b0d0983e4c140534525",
+    "old_timestamp": "2026-04-18T16:11:15.367563+00:00",
+    "old_git_sha": "3976fcb7b067e713424d3b0d0983e4c140534525",
+    "new_timestamp": "2026-04-18T17:48:29.279286+00:00",
+    "new_git_sha": "d6d009974a92668d67421d0bd832631cea8d9103",
     "partial": false,
     "same_commit": false
   },
@@ -14,22 +14,38 @@
     "old_total": 190,
     "old_pass_rate": 55.8,
     "new_pass": 106,
-    "new_ruffle_matched": 31,
-    "new_effective_pass": 137,
+    "new_ruffle_matched": 32,
+    "new_effective_pass": 138,
     "new_total": 190,
     "new_pass_rate": 55.8,
-    "old_mismatched_lines": 3112,
-    "new_mismatched_lines": 3103,
+    "old_mismatched_lines": 3103,
+    "new_mismatched_lines": 3098,
     "increased_mismatches": 0,
-    "decreased_mismatches": 9,
-    "newly_passing": 0,
+    "decreased_mismatches": 5,
+    "newly_passing": 1,
     "newly_failing": 0,
-    "status_changed": 0,
-    "unchanged": 189,
+    "status_changed": 1,
+    "unchanged": 188,
     "added": 0,
     "removed": 0
   },
   "changes": [
+    {
+      "test": "ExternalInterface-v8",
+      "change_type": "changed",
+      "old_status": "output_mismatch",
+      "new_status": "ruffle_matched",
+      "old_lines": {
+        "actual_lines": 118,
+        "expected_lines": 118,
+        "matching_lines": 113
+      },
+      "new_lines": {
+        "actual_lines": 118,
+        "expected_lines": 118,
+        "matching_lines": 114
+      }
+    },
     {
       "test": "array-v5",
       "change_type": "changed",
@@ -38,12 +54,12 @@
       "old_lines": {
         "actual_lines": 560,
         "expected_lines": 560,
-        "matching_lines": 490
+        "matching_lines": 499
       },
       "new_lines": {
         "actual_lines": 560,
         "expected_lines": 560,
-        "matching_lines": 499
+        "matching_lines": 503
       }
     }
   ]
