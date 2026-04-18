@@ -36730,6 +36730,10 @@ void actionSetMember(SWFAppContext* app_context)
 					return;
 				}
 			}
+			// Empty-string key on Array is a no-op (Flash discards: length unchanged,
+			// value not retrievable via arr[""])
+			if (prop_name_len == 0)
+				return;
 			// Check for "length" property
 			if (prop_name_len == 6 && strncmp(prop_name, "length", 6) == 0)
 			{
@@ -39666,7 +39670,7 @@ void actionGetMember(SWFAppContext* app_context)
 
 			// Check if conversion was successful and entire string was consumed
 			// Valid array indices are 0 to INT_MAX (2147483647)
-			if (*endptr == '\0' && index >= 0 && index <= 2147483647LL)
+			if (prop_name_len > 0 && *endptr == '\0' && index >= 0 && index <= 2147483647LL)
 			{
 				// Valid numeric index — try elements array first
 				ActionVar* elem = getArrayElement(arr, (u32)index);
@@ -39676,8 +39680,9 @@ void actionGetMember(SWFAppContext* app_context)
 				}
 				else if (arr->props != NULL)
 				{
-					// Might be stored in props (large index)
-					ActionVar* pv = getProperty(arr->props, prop_name, prop_name_len);
+					// Missing/HOLE element: crawl Array.prototype chain
+					// (e.g. Array.prototype[3] = 3 should be visible via sparse[3])
+					ActionVar* pv = getPropertyWithPrototype(arr->props, prop_name, prop_name_len);
 					if (pv != NULL)
 						pushVar(app_context, pv);
 					else
@@ -41065,12 +41070,9 @@ void actionNewObject(SWFAppContext* app_context)
 				}
 			}
 		}
-		// Pre-create props with native_type for __initializeNative detection
-		if (arr->props == NULL) {
-			arr->props = allocObject(app_context, 4);
-			retainObject(arr->props);
-		}
-		arr->props->native_type = NATIVE_ARRAY;
+		// Pre-create props with native_type and __proto__ pointing to Array.prototype
+		// so that instanceof Array works and sparse[N] crawls Array.prototype[N]
+		initArrayProto(app_context, arr);
 		new_obj = arr;
 		obj_type = ACTION_STACK_VALUE_ARRAY;
 		PUSH(ACTION_STACK_VALUE_ARRAY, (u64) new_obj);

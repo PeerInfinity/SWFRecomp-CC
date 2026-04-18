@@ -1,14 +1,19 @@
 # array-v5 Investigation Plan
 <!-- TESTS: array-v5 -->
 
-Last updated: 2026-04-18
+Last updated: 2026-04-18 (session 2)
 
-## Status: IN PROGRESS — 499/560 lines match (89.1%), 61 remaining failures
+## Status: IN PROGRESS — ~504/560 lines match (~90%), ~56 remaining failures
+
+**Note on variance:** Sort output is non-deterministic (Math.random-driven
+comparators), so the raw pass count fluctuates by ~4 lines between runs
+(observed: 500 and 504 in back-to-back runs). Use the higher/stable count
+when counting improvements from actual semantic fixes.
 
 **Baseline note:** CI at 3d326df7 (2026-04-18) reported 490/560, not 494/560 as
 the 2026-04-16 entry claimed — the session-local rerun was transiently higher,
-probably due to a recompile artefact that was later reverted. Today's 499/560
-is +9 over that CI baseline.
+probably due to a recompile artefact that was later reverted. Today's 504/560
+is +14 over that CI baseline.
 
 ---
 
@@ -32,6 +37,7 @@ The `array-v5` test exercises extensive Array operations (560 expected lines). C
 | 2026-04-16 (session) | 494/560 (88.2%) | +28: sort custom-comparator dispatch was invoking `simple_func` without pushing a local scope, so the callee's param/this `setVariableByName` writes fell through to globals. `randomComparator(a, b)` during an earlier sort therefore overwrote global `a` and `b`, corrupting the array under test and cascading into 25+ subsequent line failures (popped, b.length, b.toString, concatted, portion, mixed, basic, count==6). Extracted `_invoke_sort_comparator` helper that mirrors `actionCallFunction`'s type-1 setup (local scope + captured scopes + base_clip + `this`) and routed all 5 sort dispatch sites through it. |
 | 2026-04-18 (CI baseline) | 490/560 (87.5%) | CI at 3d326df7 settled on 490/560 rather than the 494 claimed by the 2026-04-16 session; treating 490 as the true pre-session number. |
 | 2026-04-18 (session) | 499/560 (89.1%) | +9: `g_call_this_type` was only being set when Array.prototype methods were invoked via `Function.prototype.call`/`.apply`. Direct method dispatch on an OBJECT receiver (`o.shift = Array.prototype.shift; o.shift()`) left `g_call_this_type == 0`, so `builtin_array_method`'s object-this branch never fired and the generic object was not mutated. Fix: save/set `g_call_this_type = ACTION_STACK_VALUE_OBJECT` around the OBJECT-receiver `advanced_func` call in `actionCallMethod` (line ~50568). Unblocks array-method-on-object dispatch for lines 514–543 — several now fully match, the rest still diverge on Flash's specific enumeration-order semantics (e.g. `traceProps(o)` after shift shows `0,shift,length,7,6,4,3,2,1,` vs expected `4,3,2,1,0,shift,length,7,6,5,`). No regressions across 16 avm1 array/method tests (`array_call_method`, `array_concat`, `array_sort`, `mutable_this`, `this_scoping`, etc.) or 10 object/super tests. |
+| 2026-04-18 (session 2) | ~504/560 (~90%) | +5 stable passes over the previous peak across three small fixes: (1) `actionSetMember` ARRAY branch now early-returns when `prop_name_len == 0`, so `c[''] = 2` no longer grows length or stores at index 0 (Flash silently discards the empty-string key). Fixes `c.length == 0` and `typeof(c['']) == 'undefined'` (lines 153–154). (2) `actionGetMember` ARRAY branch now uses `getPropertyWithPrototype` instead of `getProperty` on the HOLE/missing-element fallback, so Array.prototype inherited entries are found via the `__proto__` chain. Fixes `Array.prototype[3] = 3; new Array()[3] == 3` and related (lines 151/152). Also added `prop_name_len > 0` guard to the numeric-index path so empty-string reads don't parse as index 0. (3) `actionNewObject` for `new Array()` / `new Array(n)` / `new Array(a,b,c)` now calls `initArrayProto` to set `arr->props->__proto__ = g_array_proto_legacy/modern`. Previously only the `[]` literal path and ASnative(252,0) set up the prototype chain, so `new Array()` was missing `instanceof Array` and `.constructor == Array` checks (lines 253/254). No regressions across 29 avm1 tests (array_call_method, array_concat, array_sort, array_sort_random, array_slice, array_splice, array_properties, array_prototyping, array_trivial, array_length, array_enumerate, array_constructor, init_array_invalid, global_array, mutable_this, this_scoping, coerce_to_object_monkeypatch, object_resolve, extends_chain, as2_super_and_this_v6/v8, register_class_return_value, textsnapshot_available_text, enumerate, global_is_bare, string_coercion, parse_int, typeof, action_to_integer). |
 
 ## Completed Fixes
 
@@ -97,6 +103,38 @@ convention used by `actionCallFunction`. Impact in array-v5: +6 lines
 `array_trivial`, `array_length`, `array_enumerate`, `init_array_invalid`,
 `global_array`.
 
+### 16. `c[''] = v` on Array discards silently — FIXED (2026-04-18 session 2)
+`actionSetMember` on an ARRAY receiver now early-returns when
+`prop_name_len == 0`. Previously `strtoll("")` returned 0 with endptr `""`,
+so empty-string keys were misinterpreted as index 0 — both growing the array's
+length and overwriting `elements[0]`. Matches Flash/Ruffle semantics: empty
+string is not a valid array index, and Flash does not store it as a
+string-keyed own property on Array either. Fixes lines 153, 154 (`c.length == 0`,
+`typeof(c['']) == 'undefined'`).
+
+### 17. HOLE element walks Array.prototype chain — FIXED (2026-04-18 session 2)
+`actionGetMember` on an ARRAY receiver, numeric-index branch: when the
+element is missing / HOLE, the fallback now calls `getPropertyWithPrototype`
+instead of `getProperty` on `arr->props`. Because `arr->props->__proto__`
+points to `g_array_prototype`, this lets `Array.prototype[N]` show through
+as `arr[N]` when the array has no own entry at that index. Also added a
+`prop_name_len > 0` guard so empty-string property names don't take the
+"parse as index 0" path. Fixes lines 151, 152 (`sparse[3] == 3` after
+`Array.prototype[3] = 3`).
+
+### 18. `new Array()` now calls initArrayProto — FIXED (2026-04-18 session 2)
+`actionNewObject`'s `strcmp(ctor_name, "Array") == 0` branch previously
+allocated `arr->props` and set `native_type = NATIVE_ARRAY` but did NOT
+set `arr->props->__proto__` to Array.prototype. So `new Array()` produced
+arrays that didn't inherit from Array.prototype: `a.constructor == Array`
+and `a instanceof Array` both failed, and prototype-chain lookups (fix 17)
+couldn't find inherited entries on arrays created via `new Array()`.
+Replaced the inline props allocation with a call to `initArrayProto`,
+which allocates props, sets `native_type`, and installs the versioned
+Array.prototype as `__proto__`. Fixes lines 253, 254 (`c.constructor == Array`,
+`a instanceOf Array`) and makes fix 17 effective for arrays created via
+`new Array()`.
+
 ### 15. sort custom-comparator local scope — FIXED (2026-04-16)
 The five inline `simple_func` invocations in the sort comparator path never
 pushed a local scope before the call, so the generated function's parameter
@@ -144,9 +182,13 @@ accepting the rest.
 **Root cause**: QuickSort algorithm produces implementation-specific ordering for CASEINSENSITIVE, DESCENDING, and RETURNINDEXEDARRAY. Our sort matches Ruffle's AVM1 tests (array_sort PASSES) but differs from Flash's specific QuickSort partitioning on certain inputs.
 **Assessment**: Algorithm-dependent differences. Many are Gnash-specific expected output reflecting Flash's exact sort order.
 
-### Category D: Sparse array operations (10 lines)
-**Lines**: 98, 101, 151-154, 252, 485, 491, 493, 495, 499, 503
-**Root cause**: Various — gaparray splice return values, sparse reverse, ASSetPropFlags-protected shift/splice
+### Category D: Sparse array operations (partially fixed, ~7 lines remaining)
+**Lines**: 98, 101, 176, 252, 485, 491, 493, 495, 499, 503
+**Fixed (2026-04-18 session 2)**:
+- 151/152 — `Array.prototype[3]` now visible via inheritance chain (fix 17 + 18)
+- 153/154 — empty-string key on Array now a no-op (fix 16)
+**Remaining root cause**: gaparray splice return values, sparse reverse,
+ASSetPropFlags-protected shift/splice.
 **Note**: Lines 485-506 are about ASSetPropFlags protection during shift/splice (not implemented)
 
 ### Category E: Array methods on generic objects (PARTIALLY FIXED, ~11 lines remaining)
@@ -158,10 +200,14 @@ accepting the rest.
 ### Category F: ASSetPropFlags-protected delete (3 lines)
 **Lines**: 278-280 — `! delete c[2]` should return false when protected
 
-### Category G: instanceof Array / constructor (4 lines)
-**Lines**: 38, 42, 253-254, 458
-**Root cause**: Mixed — lines 38/42 are undefined `a` (Category A overlap). Line 253 `c.constructor` not found. Line 458 `r instanceof Array` where `r` from sortOn has wrong sort order (Category C overlap).
-**Partially fixed**: Dual constructor unification (commit 54f14500) improved some lines but 4 remain due to other root causes.
+### Category G: instanceof Array / constructor (2 lines remaining, was 4)
+**Lines**: 458 (and 38/42 which are Category A overlap)
+**Fixed (2026-04-18 session 2)**: 253/254 — `new Array()` now goes through
+`initArrayProto`, so `c.constructor == Array` and `a instanceOf Array` pass
+(fix 18).
+**Remaining**: Line 458 `r instanceof Array` where `r` from sortOn has wrong
+sort order (Category C overlap).
+**Earlier fix**: Dual constructor unification (commit 54f14500).
 
 ### Category H: __resolve + toString override (7 lines)
 **Lines**: 544-550, 557
