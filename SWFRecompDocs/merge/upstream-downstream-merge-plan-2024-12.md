@@ -13,28 +13,66 @@
 
 ---
 
+## UPDATE: April 17, 2026
+
+### Upstream PRs — Rapid Opcode Expansion, Custom ABI, Number Init
+
+Upstream is rapidly filling in opcode coverage and infrastructure. Custom calling convention for native runtime functions now implemented.
+
+#### New Commits Since April 15
+
+**SWFRecomp PR #4** — now 18 commits (was 14):
+- `a674fcf` - **add Equals2**
+- `090f6e1` - **add Modulo**
+- `154c11e` - **add Increment, Decrement, and bitwise ops**
+- `5a765d4` - add string IDs for Number
+
+**SWFModernRuntime PR #3** — now 37 commits (was 31):
+- `cac87a9` - binary operators, fix conditional evaluation
+- `8482c49` - **stack-based strings** — strings stored inline on execution stack via `PUSH_STR_STACK(n)`, Add2 string concat avoids heap allocation
+- `bc1f9aa` - **Modulo**
+- `18d2a3e` - register fixes, bitwise ops
+- `d66d0de` - **custom ABI for runtime funcs** (`FUNC_TYPE_3`) — new `action_runtime_func(SWFAppContext*, u32 num_args)` typedef, functions read args from stack directly (the calling convention optimization LittleCube discussed earlier)
+- `4421d6a` - **Number static initialization** — `initNumber()` with NaN/Infinity/MAX_VALUE/MIN_VALUE, static initializer system, `convertString()` with `%.15g`, `DISCARD_ARGS` macro
+
+**AS2Runtime** — now 7 commits (was 4):
+- `4af8204` - add Math constants
+- `09dd18d` - add temporary Math constructor
+- `d743e41` - remove runtime SWF from repo (build artifact)
+
+#### Updated Architectural Comparison
+
+| Aspect | Upstream | Our Fork |
+|--------|----------|----------|
+| Standard library | AS2 via prelude SWF (Math) + C static initializers (Number) | All in C (~50K lines action.c) |
+| Calling convention | 3 types: FUNC_TYPE_1 (simple), FUNC_TYPE_2 (advanced), FUNC_TYPE_3 (custom ABI — `(app_context, num_args)`, reads args from stack) | Function2Ptr `(app_context, args, arg_count, registers, this_obj)` |
+| String storage | Stack-based inline strings (`PUSH_STR_STACK`) + heap strings | Heap-allocated strings via PUSH_STR macro |
+| Opcodes added | Less2, Add2, Equals2, Modulo, Increment, Decrement, bitwise ops | Full set (~100+ opcodes) |
+
+---
+
 ## UPDATE: April 15, 2026
 
 ### Upstream PRs — Prelude SWF, ECMA-262, Math Moved to AS2
 
 Major architectural shift: upstream now implements AS2 standard library classes in **ActionScript** (compiled via MTASC to a prelude SWF) rather than in C. New repos: [SWFRecomp/AS2Runtime](https://github.com/SWFRecomp/AS2Runtime), [SWFRecomp/mtasc](https://github.com/SWFRecomp/mtasc).
 
-#### New Commits Since Last Update
+#### Commits April 10-15
 
-**SWFRecomp PR #4** — now 14 commits (was 10):
+**SWFRecomp PR #4** — 14 commits as of April 15:
 - `5081630` - remove extra indents
 - `de58faa` - **implement prelude SWF recompilation** — `prelude_swf_path` config, `parsePrelude()`, `DoInitAction` (tag 59), separate SWF loading/parsing
 - `65b035d` - **add Less2**, add `y` and `z` string IDs
 - `2656636` - cleanup, **add Add2**
 
-**SWFModernRuntime PR #3** — now 31 commits (was 26):
+**SWFModernRuntime PR #3** — 31 commits as of April 15:
 - `c559193` - **implement prelude runtime SWF support** — `ASSetPropFlags` top-level function, `SWFAppContext.version`, version-aware `actionNot()`, `convertBool()`, scoped registers, boolean ActionVar field
 - `29564ef` - add `unimplemented`/`unreachable` macros
 - `420c627` - **refactor prototypes and getProperty**
 - `7af14f6` - fix anonymous function types
 - `ba336f9` - **ECMA-262 ToNumber**, **Less2**, `PUSH_INT`/`PUSH_BOOL` macros, `destroyObject()`, **remove Math** (moved to AS2Runtime), fix refcount bug with registers
 
-**AS2Runtime** — 4 commits:
+**AS2Runtime** — 4 commits as of April 15:
 - `fd51fbb` - init repo
 - `6fdf335` - add README
 - `154bc8e` - fix Linux build permissions
