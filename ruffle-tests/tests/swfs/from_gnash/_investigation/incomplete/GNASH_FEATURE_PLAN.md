@@ -7,7 +7,7 @@
   - BitmapData-v8 → BITMAPDATA_PLAN.md
   - LoadVars-v6/v7/v8, MovieClipLoader-v7/v8 → LOADVARS_MOVIECLIPLOADER_PLAN.md
   - with-v5/v6/v7/v8 → WITH_AUTOBOXING_PLAN.md
-  - Matrix-v6, Rectangle-v8, toString_valueOf-v5/v6/v7/v8 → IMPLICIT_COERCION_PLAN.md
+  - Matrix-v6, Rectangle-v8, toString_valueOf-v5/v6/v7/v8 → complete/IMPLICIT_COERCION_PLAN.md (all ruffle_matched 2026-04-19)
 -->
 
 <!-- PLAN_META

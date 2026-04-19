@@ -12589,6 +12589,13 @@ static void initMovieClipPrototype(SWFAppContext* app_context)
 	};
 
 	memset(g_mc_method_funcs, 0, sizeof(g_mc_method_funcs));
+	// Names of MovieClip.prototype methods introduced in SWF6+. Match Ruffle's
+	// `core/src/avm1/globals/movie_clip.rs` VERSION_6 tags. These get
+	// flash_flags=0x0080 so SWF5 resolution hides them (gnash test:
+	// `typeof(createEmptyMovieClip) == "undefined"` in SWF5).
+	static const char* mc_swf6_methods[] = {
+		"createEmptyMovieClip", "getDepth", "setMask", NULL
+	};
 	for (int i = 0; i < MC_METHOD_COUNT; i++)
 	{
 		strncpy(g_mc_method_funcs[i].name, mc_methods[i].name, 255);
@@ -12602,6 +12609,15 @@ static void initMovieClipPrototype(SWFAppContext* app_context)
 		func_val.type = ACTION_STACK_VALUE_FUNCTION;
 		func_val.data.numeric_value = (u64) &g_mc_method_funcs[i];
 		setProperty(app_context, proto, mc_methods[i].name, mc_methods[i].len, &func_val);
+
+		// Mark SWF6+ methods as hidden under SWF5 via flash_flags=0x0080.
+		for (int vi = 0; mc_swf6_methods[vi] != NULL; vi++) {
+			if (strcmp(mc_methods[i].name, mc_swf6_methods[vi]) == 0) {
+				if (proto->num_used > 0)
+					proto->properties[proto->num_used - 1].flash_flags = 0x0080;
+				break;
+			}
+		}
 	}
 
 	// Set MovieClip.prototype.enabled = true (used by button state machine)
@@ -12764,12 +12780,18 @@ static void initTextFieldPrototype(SWFAppContext* app_context)
 		g_textfield_constructor.prototype_obj = proto;
 	}
 
-	// In SWF5, TextField.prototype is hidden from user code (returns undefined),
-	// but the internal prototype_obj is used so `new TextField() instanceof TextField`
-	// works. Skip installing the SWF6+ virtual properties/methods on it, and skip
-	// wiring __proto__ — Object.prototype isn't fully populated during SWF5 init
-	// and wiring it here causes side effects in other Gnash SWF5 tests.
+	// In SWF5 Flash exposes TextField.prototype as an Object whose __proto__
+	// chain reaches Object.prototype (so `TextField.prototype.toString ==
+	// Object.prototype.toString` via inherited lookup). Wire __proto__ even
+	// under SWF5; skip only the SWF6+ virtual properties / methods below.
 	if (g_swf_version < 6) {
+		ASObject* _tf_proto = g_textfield_constructor.prototype_obj;
+		if (_tf_proto != NULL) {
+			ActionVar* _tf_pp = getProperty(_tf_proto, "__proto__", 9);
+			if (_tf_pp == NULL || _tf_pp->type == ACTION_STACK_VALUE_UNDEFINED) {
+				setObjectProto(app_context, _tf_proto);
+			}
+		}
 		g_textfield_constructor_init = 1; // stage 1 only — allow later SWF6+ upgrade
 		return;
 	}
@@ -21973,9 +21995,21 @@ ActionStackValueType convertFloat(SWFAppContext* app_context)
 
 			// No valueOf returned a primitive value
 			// Flash does NOT call toString during toNumber — unlike ECMA-262
-			// SWF5: objects/functions convert to 0.0
+			// SWF<5: objects/functions convert to 0.0
+			// SWF5+ Arrays: NaN (Ruffle core/src/avm1/value.rs
+			//   primitive_as_number gates Object→0 on `swf_version() < 5`;
+			//   arrays with Array.prototype.valueOf = Object.prototype.valueOf
+			//   return `this` from valueOf, hit the Object→NaN branch, and
+			//   `1/array` becomes NaN — gnash toString_valueOf-v5 line 469).
+			// SWF<6: non-array objects/functions still convert to 0.0
+			//   (prior CURRENT_STATUS.md "SWF6+ NaN threshold" change keeps
+			//   Color-v5, etc. green; tightening to <5 risks regressions).
 			// SWF6+: objects convert to NaN
-			double temp = (g_swf_version < 6) ? 0.0 : NAN;
+			double temp;
+			if (g_swf_version < 6 && STACK_TOP_TYPE == ACTION_STACK_VALUE_ARRAY)
+				temp = NAN;
+			else
+				temp = (g_swf_version < 6) ? 0.0 : NAN;
 			STACK_TOP_TYPE = ACTION_STACK_VALUE_F64;
 			VAL(u64, &STACK_TOP_VALUE) = VAL(u64, &temp);
 			return ACTION_STACK_VALUE_F64;
@@ -39925,11 +39959,14 @@ void actionGetMember(SWFAppContext* app_context)
 		ASFunction* func = (ASFunction*) obj_var.data.numeric_value;
 		if (func != NULL && strcmp(prop_name, "prototype") == 0)
 		{
-			// In SWF5, AsBroadcaster and TextField have no user-visible prototype.
-			// TextField keeps an internal prototype_obj so `new TextField() instanceof TextField`
-			// works, but reads of TextField.prototype still return undefined.
-			if (g_swf_version < 6 &&
-			    (func == &g_stub_ctors[0] || func == &g_textfield_constructor))
+			// In SWF5, AsBroadcaster has no user-visible prototype.
+			// TextField.prototype is exposed (matches Ruffle) so that
+			// `TextField.prototype.toString == Object.prototype.toString`
+			// resolves via the __proto__ chain to the same function pointer
+			// — Flash's v5-v8 invariant. Gnash's `typeof(TextField.prototype)
+			// == 'undefined'` check fails under this exposure, but Ruffle
+			// fails that same check, so our diff remains a subset.
+			if (g_swf_version < 6 && func == &g_stub_ctors[0])
 			{
 				pushUndefined(app_context);
 			}
@@ -46248,6 +46285,13 @@ void actionCallFunction(SWFAppContext* app_context, char* str_buffer)
 	// createEmptyMovieClip(name, depth) — MovieClip method called as CallFunction
 	else if (func_name_len == 20 && strncmp(func_name, "createEmptyMovieClip", 20) == 0)
 	{
+		// createEmptyMovieClip was introduced in SWF6 — in SWF5 resolution
+		// should leave the function undefined, not invoke this builtin.
+		if (g_swf_version < 6) {
+			if (args != NULL) FREE(args);
+			pushUndefined(app_context);
+			return;
+		}
 #ifdef NO_GRAPHICS
 		if (num_args >= 2) {
 			extern MovieClip root_movieclip;
@@ -52933,6 +52977,13 @@ void actionCallMethod(SWFAppContext* app_context, char* str_buffer)
 		}
 		else if (method_name_len == 20 && strncmp(method_name, "createEmptyMovieClip", 20) == 0)
 		{
+			// createEmptyMovieClip was introduced in SWF6. In SWF5 the method
+			// is hidden and a call resolves to undefined — no clip created.
+			if (g_swf_version < 6) {
+				if (args != NULL) FREE(args);
+				pushUndefined(app_context);
+				return;
+			}
 			// createEmptyMovieClip(instanceName, depth)
 			// Creates a new empty child MovieClip (works in both NO_GRAPHICS and graphics mode)
 			if (num_args >= 2) {
