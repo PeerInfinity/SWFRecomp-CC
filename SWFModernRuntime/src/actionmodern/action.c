@@ -16312,7 +16312,7 @@ static void selection_do_focus_change(SWFAppContext* app_context, MovieClip* old
 
 // Forward declaration for _level management (defined after child_mc_cache)
 #ifndef MAX_LEVELS
-#define MAX_LEVELS 16
+#define MAX_LEVELS 128
 #endif
 extern MovieClip* g_levels[MAX_LEVELS];
 
@@ -16332,6 +16332,8 @@ static MovieClip* getMovieClipByTarget(const char* target) {
 		return &root_movieclip;
 	}
 	// _levelN (N > 0) — check the levels array
+	const char* level_dot_rest = NULL;
+	MovieClip* level_dot_mc = NULL;
 	if (strncmp(target, "_level", 6) == 0) {
 		const char* after = target + 6;
 		// Check if rest is just a number (bare _levelN)
@@ -16343,12 +16345,20 @@ static MovieClip* getMovieClipByTarget(const char* target) {
 				// Bare _levelN
 				return g_levels[level_num];
 			}
+			// _levelN.child.grandchild — resolve relative to level root
+			if (g_levels[level_num] != NULL) {
+				level_dot_mc = g_levels[level_num];
+				level_dot_rest = dot + 1;
+			}
 		}
 	}
 	// Dot-path resolution: _level0.child.grandchild or _root.child.grandchild
 	const char* rest = NULL;
 	MovieClip* mc = NULL;
-	if (strncmp(target, "_level0.", 8) == 0) {
+	if (level_dot_mc != NULL) {
+		mc = level_dot_mc;
+		rest = level_dot_rest;
+	} else if (strncmp(target, "_level0.", 8) == 0) {
 		mc = &root_movieclip;
 		rest = target + 8;
 	} else if (strncmp(target, "_root.", 6) == 0) {
@@ -16981,7 +16991,7 @@ int g_root_enterframe_eligible = 0;
 
 // _level management: _level0 is always root_movieclip.
 // Higher levels are synthetic MCs created by loadMovieNum/loadClip.
-#define MAX_LEVELS 16
+#define MAX_LEVELS 128
 MovieClip* g_levels[MAX_LEVELS];  // g_levels[0] = &root_movieclip, set in ensureGlobalInit
 
 static MovieClip* getOrCreateLevel(SWFAppContext* app_context, int level_num) {
@@ -16995,6 +17005,7 @@ static MovieClip* getOrCreateLevel(SWFAppContext* app_context, int level_num) {
     snprintf(mc->name, sizeof(mc->name), "_level%d", level_num);
     snprintf(mc->target, sizeof(mc->target), "_level%d", level_num);
     strncpy(mc->original_target, mc->target, sizeof(mc->original_target));
+    mc->depth = level_num - 16384;
     g_levels[level_num] = mc;
     // Register in child_mc_cache so lookups find it
     if (child_mc_count < MAX_CHILD_MOVIECLIPS) {
@@ -18168,6 +18179,21 @@ void actionFirePendingDirectLoads(SWFAppContext* app_context)
 	PendingDirectLoad loads[MAX_PENDING_DIRECT_LOADS];
 	for (int i = 0; i < count; i++) loads[i] = g_pending_direct_loads[i];
 	g_pending_direct_load_count = 0;
+
+	// Stable sort level loads by level number (mc->depth) ascending so lower
+	// levels run their init scripts first — matches Flash/Ruffle ordering when
+	// multiple loadMovieNum calls are queued in a single tick.
+	for (int i = 1; i < count; i++) {
+		PendingDirectLoad tmp = loads[i];
+		if (!tmp.is_level || tmp.target == NULL) continue;
+		int j = i;
+		while (j > 0 && loads[j-1].is_level && loads[j-1].target != NULL
+		       && loads[j-1].target->depth > tmp.target->depth) {
+			loads[j] = loads[j-1];
+			j--;
+		}
+		loads[j] = tmp;
+	}
 
 	for (int i = 0; i < count; i++) {
 		MovieClip* mc = loads[i].target;
@@ -21368,6 +21394,11 @@ ActionStackValueType convertString(SWFAppContext* app_context, char* var_str)
 						tmp[sizeof(tmp) - 1] = '\0';
 						for (char* p = tmp; *p; p++) { if (*p == '/') *p = '.'; }
 						snprintf(mc_rm_path_buf, sizeof(mc_rm_path_buf), "_level0.%s", tmp);
+					} else if (strncmp(tgt, "_level", 6) == 0) {
+						int wi = 0;
+						for (const char* p = tgt; *p && wi < (int)sizeof(mc_rm_path_buf) - 1; p++)
+							mc_rm_path_buf[wi++] = (*p == '/') ? '.' : *p;
+						mc_rm_path_buf[wi] = '\0';
 					} else {
 						snprintf(mc_rm_path_buf, sizeof(mc_rm_path_buf), "_level0.%s", tgt);
 					}
@@ -21394,6 +21425,13 @@ ActionStackValueType convertString(SWFAppContext* app_context, char* var_str)
 					tmp[sizeof(tmp) - 1] = '\0';
 					for (char* p = tmp; *p; p++) { if (*p == '/') *p = '.'; }
 					snprintf(mc_path_buf, sizeof(mc_path_buf), "_level0.%s", tmp);
+				} else if (strncmp(tgt, "_level", 6) == 0) {
+					// Level-root MC or its child: "_levelN" stays as-is; children
+					// have slash-path "_levelN/child" which needs slash-to-dot
+					int wi = 0;
+					for (const char* p = tgt; *p && wi < (int)sizeof(mc_path_buf) - 1; p++)
+						mc_path_buf[wi++] = (*p == '/') ? '.' : *p;
+					mc_path_buf[wi] = '\0';
 				} else {
 					snprintf(mc_path_buf, sizeof(mc_path_buf), "_level0.%s", mc->name);
 				}
@@ -23883,8 +23921,14 @@ void actionTrace(SWFAppContext* app_context)
 			}
 			else if (strncmp(trace_target, "_level", 6) == 0)
 			{
-				// _level targets already have their full path (e.g. "_level1")
-				printf("%s\n", trace_target);
+				// _level targets already have their full path (e.g. "_level1"),
+				// but child slashes still need conversion ("_level99/ch" -> "_level99.ch")
+				char dot_path[512];
+				int pos = 0;
+				for (const char* p = trace_target; *p && pos < (int)sizeof(dot_path) - 1; p++)
+					dot_path[pos++] = (*p == '/') ? '.' : *p;
+				dot_path[pos] = '\0';
+				printf("%s\n", dot_path);
 			}
 			else
 			{
