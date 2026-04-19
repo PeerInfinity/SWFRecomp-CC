@@ -19,7 +19,7 @@ pass). 6 literal-line diffs remain, concentrated in overlap/boundary pixels.
 - Recursive child rendering via `child_mc_cache[]` in depth-ascending order
   with local (x, y, xscale, yscale, rotation) composed into the outer matrix.
 
-### Session 2 (this commit)
+### Session 2 (this commit, CI-confirmed at `9a01d3c6`)
 - **WITH-scope drawing API dispatch.** Added a block at the top of
   `actionCallFunction` that detects a MovieClip in the current WITH scope
   (via `scope_mc[]` + `scope_is_with[]`) and forwards calls to
@@ -40,13 +40,26 @@ pass). 6 literal-line diffs remain, concentrated in overlap/boundary pixels.
   the matching `*Offset` properties off the passed object and applies
   `c' = c*mult + off` per-channel (clamped) to every fill/stroke colour
   during rasterisation.
-- **Impact:** BitmapData-v8 `output_mismatch` → `ruffle_matched`
-  (lines 404/417 → 410/417 effective; 6 literal diffs remain). Effective
-  pass rate on gnash `actionscript.all` moves from 151 → 152 (pass+RM
-  combined). Suite-wide regression check (avm1 BitmapData family,
-  `mask_with_drawing`, `duplicate_movie_clip_drawing`, `with-v5..v8`,
-  `movieclip_begin_gradient_fill`, `movieclip_line_gradient_style`,
-  `hittest_lockroot`, `define_local_with_paths`): all unchanged.
+- **Impact (CI):**
+  - `BitmapData-v8`: `output_mismatch` → **ruffle_matched** (lines
+    404/417 → 409/417, +1 effective pass on gnash actionscript.all).
+  - `DrawingApiTest` (misc-ming): 20/93 → 43/93 (-23 mismatched lines)
+    from the WITH-scope dispatch finally populating drawing state.
+  - `masks_test` (misc-ming): 20/175 → 28/175 (-8 mismatched lines).
+  - `displaylist_depths_test` (misc-ming): 79/111 → 70/111
+    (+9 mismatched lines). This is a **regression exposed** but not
+    caused by the change: the test expects `mc._width` to equal
+    `mc_dup._width` for various duplicate pairs. Previously both were
+    empty (drawing API was a no-op), so they compared equal. Now the
+    originals have non-empty drawing bounds from WITH blocks but
+    `ng_cloneSpriteFromMC` / `ng_duplicateMovieClip` don't clone the
+    child MCs' drawing state — so bounds diverge between src/dup when
+    the src has children with drawing. Fixing this requires extending
+    duplicateMovieClip to recursively clone children (and their
+    drawing_state), which is out of scope.
+  - **Net:** misc-ming.all mismatched lines 2423 → 2401 (-22);
+    actionscript.all mismatched lines 2661 → 2632 (-29) with +1
+    effective pass. No changes in avm1, Shumway, misc-mtasc/swfc/swfmill.
 
 ## Remaining diffs (6 lines)
 
