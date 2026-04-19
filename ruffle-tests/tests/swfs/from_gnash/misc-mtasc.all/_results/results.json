@@ -1,8 +1,8 @@
 {
   "metadata": {
-    "timestamp": "2026-04-19T17:09:10.009216+00:00",
-    "git_sha": "b5eac5ad2952f5d98f256ab5dd8b8034eba10e7a",
-    "duration_seconds": 92.91,
+    "timestamp": "2026-04-19T18:18:58.074906+00:00",
+    "git_sha": "36679ae3b21c2b0111b355dd6952b6fe578c4b69",
+    "duration_seconds": 93.77,
     "total_available": 9,
     "shards": 30,
     "expected_shards": 30
@@ -22,7 +22,7 @@
       "test": "TextFieldTest",
       "phases": {
         "recomp": 0.0,
-        "compile": 16.045,
+        "compile": 16.513,
         "run": 0.003
       },
       "num_frames": 30,
@@ -31,7 +31,7 @@
         "expected_lines": 8,
         "matching_lines": 7
       },
-      "duration": 16.05,
+      "duration": 16.52,
       "ruffle_diff_count": 1,
       "ours_diff_count": 1,
       "status": "ruffle_matched",
@@ -41,8 +41,8 @@
       "test": "enum",
       "phases": {
         "recomp": 0.0,
-        "compile": 12.329,
-        "run": 0.002
+        "compile": 15.703,
+        "run": 0.004
       },
       "num_frames": 30,
       "lines": {
@@ -50,14 +50,14 @@
         "expected_lines": 19,
         "matching_lines": 19
       },
-      "duration": 12.33,
+      "duration": 15.71,
       "status": "pass"
     },
     {
       "test": "exception",
       "phases": {
         "recomp": 0.0,
-        "compile": 15.437,
+        "compile": 15.409,
         "run": 0.003
       },
       "num_frames": 30,
@@ -66,14 +66,14 @@
         "expected_lines": 35,
         "matching_lines": 35
       },
-      "duration": 15.44,
+      "duration": 15.41,
       "status": "pass"
     },
     {
       "test": "function_test",
       "phases": {
         "recomp": 0.0,
-        "compile": 16.187,
+        "compile": 14.002,
         "run": 0.003
       },
       "num_frames": 30,
@@ -82,14 +82,14 @@
         "expected_lines": 26,
         "matching_lines": 26
       },
-      "duration": 16.19,
+      "duration": 14.01,
       "status": "pass"
     },
     {
       "test": "hello",
       "phases": {
         "recomp": 0.0,
-        "compile": 16.037,
+        "compile": 15.418,
         "run": 0.003
       },
       "num_frames": 30,
@@ -98,15 +98,15 @@
         "expected_lines": 8,
         "matching_lines": 8
       },
-      "duration": 16.04,
+      "duration": 15.42,
       "status": "pass"
     },
     {
       "test": "implementsOpTest",
       "phases": {
         "recomp": 0.0,
-        "compile": 15.431,
-        "run": 0.004
+        "compile": 15.391,
+        "run": 0.003
       },
       "num_frames": 30,
       "lines": {
@@ -114,14 +114,14 @@
         "expected_lines": 28,
         "matching_lines": 28
       },
-      "duration": 15.44,
+      "duration": 15.4,
       "status": "pass"
     },
     {
       "test": "inheritance",
       "phases": {
         "recomp": 0.0,
-        "compile": 0.259,
+        "compile": 0.254,
         "run": 0.003
       },
       "num_frames": 30,
@@ -137,7 +137,7 @@
       "test": "levels",
       "phases": {
         "recomp": 0.0,
-        "compile": 0.332,
+        "compile": 0.275,
         "run": 0.004
       },
       "num_frames": 30,
@@ -146,7 +146,7 @@
         "expected_lines": 68,
         "matching_lines": 43
       },
-      "duration": 0.34,
+      "duration": 0.28,
       "status": "output_mismatch",
       "detail": "25 line(s) differ (actual=68, expected=68)",
       "actual_output": "main class running\nPASSED: -16384 == -16384  [levels.as:37]\nPASSED: _level0 == _level0  [levels.as:40]\nPASSED: 1 == 1  [level5.as:30]\nFAILED: _level0.frameno >= 1  [level5.as:32]\nPASSED: -16379 == -16379  [level5.as:35]\nPASSED: _level5 == _level5  [level5.as:38]\nPASSED: _level0 == _level0  [level5.as:41]\nPASSED: 1239 == 1239  [level5.as:44]\nPASSED:  ==   [level5.as:47]\nPASSED: 6789 == 6789  [level5.as:49]\nPASSED:  ==   [level5.as:52]\nPASSED: true == true  [level5.as:54]\nPASSED: _level5/ch == _level5/ch  [level5.as:79]\nPASSED: 1 == 1  [level87.as:47]\nPASSED: -16297 == -16297  [level87.as:50]\nPASSED: _level87 == _level87  [level87.as:53]\nFAILED: _level0.frameno >= 2  [level87.as:65]\nPASSED: 1 == 1  [level87.as:75]\nPASSED: 1 == 1  [level99.as:47]\nFAILED: _level0.frameno >= 2  [level99.as:49]\nPASSED: -16285 == -16285  [level99.as:52]\nPASSED: _level99 == _level99  [level99.as:55]\nPASSED: _level99 == _level99  [level99.as:56]\nFAILED: expected: \"_level99.ch\" , obtained: \"\"  [level99.as:58]\nPASSED: _level99 == _level99  [level99.as:61]\nPASSED: _level0 == _level0  [level99.as:64]\nPASSED: 1239 == 1239  [level99.as:67]\nPASSED: true == true  [level99.as:68]\nPASSED: 6789 == 6789  [level99.as:71]\nPASSED:  ==   [level99.as:74]\nPASSED: hello == hello  [level99.as:76]\nPASSED:  ==   [level99.as:79]\nPASSED: goodbye == goodbye  [level99.as:81]\nFAILED: expected: \"movieclip\" , obtained: \"object\"  [level99.as:83]\nPASSED: -16379 == -16379  [level99.as:85]\nFAILED: expected: \"undefined\" , obtained: \"object\"  [level99.as:87]\nFAILED: expected: \"movieclip\" , obtained: \"object\"  [level99.as:88]\nPASSED: 10 == 10  [level99.as:89]\nFAILED: expected: \"_level16394\" , obtained: \"_level5\"  [level99.as:90]\nFAILED: expected: \"movieclip\" , obtained: \"undefined\"  [level99.as:91]\nFAILED: expected: \"10\" , obtained: \"20\"  [level99.as:93]\nFAILED: expected: \"_level16394\" , obtained: \"_level5\"  [level99.as:94]\nFAILED: expected: \"\" , obtained: \"_level5\"  [level99.as:95]\nPASSED: _level5 == _level5  [level99.as:96]\nPASSED: 30 == 30  [level99.as:100]\nFAILED: expected: \"_level16414\" , obtained: \"_level99\"  [level99.as:101]\nFAILED: expected: \"30\" , obtained: \"40\"  [level99.as:103]\nFAILED: expected: \"_level16414\" , obtained: \"_level99\"  [level99.as:104]\nFAILED: expected: \"\" , obtained: \"_level99\"  [level99.as:105]\n... (18 lines after) ...",
@@ -156,7 +156,7 @@
       "test": "super_test1",
       "phases": {
         "recomp": 0.0,
-        "compile": 0.268,
+        "compile": 0.254,
         "run": 0.003
       },
       "num_frames": 30,
@@ -165,7 +165,7 @@
         "expected_lines": 17,
         "matching_lines": 17
       },
-      "duration": 0.27,
+      "duration": 0.26,
       "status": "pass"
     }
   ]
