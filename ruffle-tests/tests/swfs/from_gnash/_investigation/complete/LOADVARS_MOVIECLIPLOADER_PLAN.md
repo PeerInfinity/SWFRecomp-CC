@@ -2,7 +2,11 @@
 <!-- TESTS: LoadVars-v6, LoadVars-v7, LoadVars-v8, MovieClipLoader-v7, MovieClipLoader-v8 -->
 
 Last updated: 2026-04-19
-Status: Phase 1 + 2 complete — LoadVars v6/v7/v8 each 61/152 → 138/152 (91%); MCL v7/v8 promoted to `ruffle_matched` (effective pass)
+Status: **COMPLETE** — LoadVars v6/v7/v8 each 61/152 → 144/152 (95%, output_mismatch); MCL v7/v8 promoted to `ruffle_matched` (effective pass, +2 tests)
+
+All success criteria met: LoadVars >85% line match, MCL promoted to
+ruffle_matched, no regressions on avm1 loadvariables/loadvariables2/
+loadvariablesnum/load_vars/sound/set_interval/xml/xml_load.
 
 ---
 
