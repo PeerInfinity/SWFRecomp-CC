@@ -2,70 +2,87 @@
 <!-- TESTS: BitmapData-v8 (30+ lines), bitmap_data_draw_cliprect, potentially others -->
 
 Last updated: 2026-04-19
-Status: PARTIAL — software rasterizer shipped; MC hierarchy + masks still missing.
+Status: PARTIAL — rasterizer, WITH-scope drawing dispatch, setMask stencil,
+and ColorTransform now wired. BitmapData-v8 is `ruffle_matched` (filtered
+pass). 6 literal-line diffs remain, concentrated in overlap/boundary pixels.
 
 ## 2026-04-19 progress
 
-- Added a barycentric triangle rasterizer in
-  `SWFModernRuntime/src/actionmodern/action.c` (`rasterizeMovieClipToBitmap`).
-  It renders a MovieClip's finalized `DrawingState.paths` (tessellated fill
-  triangles and expanded line-stroke quads, stored in twips) into the
-  destination `BitmapDataNative` pixel buffer using half-plane edge tests at
-  pixel centers.
-- `bitmapDataDraw` now dispatches on `ACTION_STACK_VALUE_MOVIECLIP` source
-  (previously only BitmapData sources were accepted). Matrix (arg 1) and
-  `clipRect` (arg 4) from the `draw(source, matrix, ct, bm, clipRect)` call
-  are honoured; colorTransform and blendMode are still ignored (no tests
-  depend on them yet).
-- The rasterizer recursively renders `child_mc_cache[]` children by depth
-  so a parent MC with children like `createEmptyMovieClip` are drawn,
-  composing `(x, y, xscale, yscale, rotation)` into the outer matrix.
-- **Impact:** BitmapData-v8 line-match 380/417 → 404/417 (-24 mismatched
-  lines). Passes avm1 `bitmap_data_draw_cliprect`, `mask_with_drawing`,
-  `duplicate_movie_clip_drawing`, and all four gnash `BitmapData-v{5,6,7,8}`
-  baselines that were already passing.
+### Session 1
+- Added a barycentric triangle rasterizer
+  `rasterizeMovieClipToBitmap` in `SWFModernRuntime/src/actionmodern/action.c`.
+  Renders `DrawingState.paths` (tessellated fill triangles + expanded line
+  quads, in twips) into the destination `BitmapDataNative` pixel buffer via
+  half-plane edge tests at pixel centers.
+- `bitmapDataDraw` now dispatches on `ACTION_STACK_VALUE_MOVIECLIP` source;
+  handles matrix (arg 1) and `clipRect` (arg 4).
+- Recursive child rendering via `child_mc_cache[]` in depth-ascending order
+  with local (x, y, xscale, yscale, rotation) composed into the outer matrix.
 
-## Remaining blockers (13 mismatched lines)
+### Session 2 (this commit)
+- **WITH-scope drawing API dispatch.** Added a block at the top of
+  `actionCallFunction` that detects a MovieClip in the current WITH scope
+  (via `scope_mc[]` + `scope_is_with[]`) and forwards calls to
+  `beginFill`/`moveTo`/`lineTo`/`curveTo`/`endFill`/`lineStyle`/`clear`
+  directly into that MC's `DrawingState`. Previously these calls resolved
+  to `builtin_noop_func` stubs installed on `MovieClip.prototype`, so
+  `with (mc) { beginFill(...); moveTo(...); ... }` was a no-op.
+- **`setMask` stencil clipping.** When the source MC has `mask_mc` set, we
+  allocate a byte-per-pixel stencil buffer sized to `dest` and rasterise
+  the mask into it (1 = covered, 0 = not) using the same rasteriser with a
+  second-output mode. The mask's own local transform (`_x`, `_y`, rotation,
+  scale) is composed on top of the draw() matrix before rasterising — so
+  shifting `mask._x` shifts the masked area. Source pixels are only
+  written where the stencil is non-zero. Children that have `is_mask=1`
+  are skipped in the content pass so a mask MC doesn't paint itself.
+- **ColorTransform (arg 2) on MC source.** Parses
+  `redMultiplier`/`greenMultiplier`/`blueMultiplier`/`alphaMultiplier` and
+  the matching `*Offset` properties off the passed object and applies
+  `c' = c*mult + off` per-channel (clamped) to every fill/stroke colour
+  during rasterisation.
+- **Impact:** BitmapData-v8 `output_mismatch` → `ruffle_matched`
+  (lines 404/417 → 410/417 effective; 6 literal diffs remain). Effective
+  pass rate on gnash `actionscript.all` moves from 151 → 152 (pass+RM
+  combined). Suite-wide regression check (avm1 BitmapData family,
+  `mask_with_drawing`, `duplicate_movie_clip_drawing`, `with-v5..v8`,
+  `movieclip_begin_gradient_fill`, `movieclip_line_gradient_style`,
+  `hittest_lockroot`, `define_local_with_paths`): all unchanged.
 
-All remaining BitmapData-v8 diffs come from tests that use
-`with (child_mc) { beginFill(...); moveTo(...); lineTo(...); }` to populate
-child clips of an MC that is then passed to `bm.draw(parent_mc)`, with
-`parent_mc.setMask(mask)` applied. Unblocking them requires three separate
-features:
+## Remaining diffs (6 lines)
 
-1. **Drawing API via CallFunction inside `with (mc) { ... }`.**
-   Currently `MovieClip.prototype.beginFill/moveTo/lineTo/endFill/...` are
-   installed as `builtin_noop_func` stubs, so WITH-scope calls don't reach
-   the real handlers and no `DrawingState` is populated. An earlier attempt
-   to dispatch these in `actionCallFunction` (using `scope_mc[]` as the
-   target) populated `DrawingState` correctly but regressed BitmapData-v8
-   further because…
+All in the gradient/overlap blocks of BitmapData-v8:
 
-2. **Mask respect in `BitmapData.draw`.** BitmapData-v8 applies
-   `mc.setMask(mask)` before the draw; the expected output has only the
-   masked pixels written. Without mask support, painting the child MCs
-   hits pixels the test expects to remain white (regression pattern
-   "got 0xFF0000 expected 0xFFFFFF" at (5,5), etc.).
+- Lines 571–572: expect `0x00ff00` at (23, 15) and (24, 15); we produce
+  a different colour at those pixels.
+- Lines 588–591: expect `0xff0000` at (23, 15)/(24, 15) and `0x00ff00`
+  at (25, 15)/(26, 15); all four are wrong.
 
-3. **ColorTransform + blendMode arguments.** Some of the bm-test blocks
-   use a `ColorTransform` arg to shift channels for overlap tests
-   (`near(bm, 23, 15, 0x00ff00)` → `near(bm, 26, 15, 0x0000ff)`). Those
-   will still diverge even with 1+2 fixed.
+These are pixel-accurate boundary tests between two shapes that meet at
+a sub-pixel boundary (likely x = 24.5 in source coords). Root cause is
+almost certainly our triangle-rasterizer top-left rule versus Flash's
+winding rule on edges shared between adjacent triangles. Fixing would
+require either (a) emulating Flash's exact fill rule on shared edges, or
+(b) running a separate analytic pass over polygons rather than the
+tessellated triangles. Low ROI for the last 6 lines.
 
-## Suggested next steps
+## What's wired vs not
 
-- Factor the `CallMethod` drawing handlers (`beginFill`, `moveTo`,
-  `lineTo`, `curveTo`, `endFill`, `lineStyle`, `clear`) into small shared
-  helpers that take `(MovieClip*, args, num_args)`, then call them from both
-  the CallMethod path and a new CallFunction WITH-scope dispatch block.
-- Extend `bitmapDataDraw` to honour `mc->mask_mc`. Conceptually: rasterize
-  the mask into a stencil buffer first, then restrict pixel writes to the
-  stencil's non-zero area. For trace-only tests this can be a 1-bit buffer
-  the size of the clip region.
-- Plumb `ColorTransform` arg through the rasterizer (already partially
-  present in `bitmapDataDraw` for BitmapData → BitmapData; need to apply
-  it per-pixel during MC rasterization too).
-- The full unblocker is probably 1-2 days per sub-feature.
+| Feature                                     | Status |
+|---------------------------------------------|--------|
+| Polygon fill rasterisation                  | ✅     |
+| Line-stroke rasterisation                   | ✅     |
+| `draw(source)` with MC source               | ✅     |
+| `draw(source, matrix)`                      | ✅     |
+| `draw(source, matrix, colorTransform)`      | ✅     |
+| `draw(source, ..., clipRect)`               | ✅     |
+| Child MC recursion with transforms          | ✅     |
+| `with (mc) { beginFill/moveTo/... }`        | ✅     |
+| `mc.setMask(mask)` stencil clipping         | ✅     |
+| Blend modes (`blendMode` arg, arg 3)        | ❌     |
+| Gradient fills in rasteriser                | ❌     |
+| Bitmap fills in rasteriser                  | ❌     |
+| Sub-pixel coverage / AA                     | ❌     |
+| Anti-aliased boundary between triangles     | ❌     |
 
 ---
 

@@ -11440,28 +11440,50 @@ static void drawingFinalizePath(DrawingState* ds);
 extern MovieClip* child_mc_cache[];
 extern int child_mc_count;
 
-// Rasterize a MovieClip's finalized drawing paths into a BitmapData, then
-// recursively rasterize its children (dynamic child MCs registered on
-// child_mc_cache). Fills/strokes are stored as triangles in twips (20 twips
-// = 1 pixel). The (ma..mty) matrix maps source-pixel coords to dest-pixel
-// coords. Children contribute their own local transform (mc->x, mc->y,
-// xscale, yscale, rotation) which is composed on top of the caller's matrix.
+// ColorTransform for BitmapData.draw. Each channel: result = src * mult + add
+// (clamped to [0, 255]). Identity is {1,1,1,1, 0,0,0,0}.
+typedef struct {
+    double rm, gm, bm, am;
+    double ro, go, bo, ao;
+} DrawColorTransform;
+
+// Rasterize a MovieClip's finalized drawing paths into `dest_pixels`/`stencil`,
+// then recursively rasterize children (dynamic MCs on child_mc_cache).
+// - `dest_pixels` may be NULL when we're only writing a stencil.
+// - `stencil` (w*h u8 buffer, one byte per pixel) restricts pixel writes: a
+//   non-zero value means "write allowed". If `stencil_write_value != 0`, the
+//   rasterizer *writes* that value into the stencil at covered pixels instead
+//   of ARGB into the bitmap (used to rasterize mask MCs into a stencil).
+// Fills/strokes are stored as triangles in twips (20 twips = 1 pixel). The
+// (ma..mty) matrix maps source-pixel coords to dest-pixel coords. Child local
+// transforms (x, y, xscale, yscale, rotation) compose on top of the caller's
+// matrix. `cx` (optional, may be NULL) applies ColorTransform per-channel to
+// fill/stroke colors.
 static void rasterizeMovieClipToBitmap(BitmapDataNative* dest, MovieClip* mc,
                                        double ma, double mb, double mc_, double md,
                                        double mtx, double mty,
-                                       int dx0, int dy0, int dx1, int dy1)
+                                       int dx0, int dy0, int dx1, int dy1,
+                                       const uint8_t* stencil,
+                                       uint8_t stencil_write_value,
+                                       uint8_t* stencil_out,
+                                       const DrawColorTransform* cx)
 {
     if (mc == NULL) return;
+    int w = dest->width, h = dest->height;
     // Clamp clip to dest bounds.
     if (dx0 < 0) dx0 = 0;
     if (dy0 < 0) dy0 = 0;
-    if (dx1 > dest->width)  dx1 = dest->width;
-    if (dy1 > dest->height) dy1 = dest->height;
+    if (dx1 > w) dx1 = w;
+    if (dy1 > h) dy1 = h;
     if (dx0 >= dx1 || dy0 >= dy1) return;
 
     // Helper: rasterize one triangle with pixel centers at (px+0.5, py+0.5).
-    #define RASTER_TRI(ax, ay, bx, by, cx, cy, color_argb) do { \
-        double _ax = (ax), _ay = (ay), _bx = (bx), _by = (by), _cx = (cx), _cy = (cy); \
+    // Writes ARGB `color_argb` into dest->pixels at covered pixels (if not
+    // writing stencil), or `stencil_write_value` into stencil_out. When
+    // `stencil` is non-NULL, a pixel is only written if its stencil byte is
+    // non-zero.
+    #define RASTER_TRI(ax, ay, bx, by, cx_, cy, color_argb) do { \
+        double _ax = (ax), _ay = (ay), _bx = (bx), _by = (by), _cx = (cx_), _cy = (cy); \
         double _tx_min = _ax < _bx ? _ax : _bx; if (_cx < _tx_min) _tx_min = _cx; \
         double _tx_max = _ax > _bx ? _ax : _bx; if (_cx > _tx_max) _tx_max = _cx; \
         double _ty_min = _ay < _by ? _ay : _by; if (_cy < _ty_min) _ty_min = _cy; \
@@ -11476,14 +11498,18 @@ static void rasterizeMovieClipToBitmap(BitmapDataNative* dest, MovieClip* mc,
         double _sgn = _signed > 0 ? 1.0 : -1.0; \
         for (int _py = _ylo; _py <= _yhi; _py++) { \
             double _qy = (double)_py + 0.5; \
-            uint32_t* _row = dest->pixels + (size_t)_py * dest->width; \
+            uint32_t* _row = dest->pixels + (size_t)_py * w; \
+            uint8_t* _srow = stencil_out ? (stencil_out + (size_t)_py * w) : NULL; \
+            const uint8_t* _stencil_row = stencil ? (stencil + (size_t)_py * w) : NULL; \
             for (int _px = _xlo; _px <= _xhi; _px++) { \
                 double _qx = (double)_px + 0.5; \
                 double _w0 = ((_bx - _ax) * (_qy - _ay) - (_by - _ay) * (_qx - _ax)) * _sgn; \
                 double _w1 = ((_cx - _bx) * (_qy - _by) - (_cy - _by) * (_qx - _bx)) * _sgn; \
                 double _w2 = ((_ax - _cx) * (_qy - _cy) - (_ay - _cy) * (_qx - _cx)) * _sgn; \
                 if (_w0 >= 0 && _w1 >= 0 && _w2 >= 0) { \
-                    _row[_px] = (color_argb); \
+                    if (_stencil_row && !_stencil_row[_px]) { /* masked out */ } \
+                    else if (_srow) { _srow[_px] = stencil_write_value; } \
+                    else { _row[_px] = (color_argb); } \
                 } \
             } \
         } \
@@ -11496,11 +11522,22 @@ static void rasterizeMovieClipToBitmap(BitmapDataNative* dest, MovieClip* mc,
         for (u32 p = 0; p < ds->path_count; p++) {
             DrawPath* path = &ds->paths[p];
             if (path->has_fill && path->fill_vert_count >= 3) {
-                double fa = path->fill_a; if (fa < 0) fa = 0; if (fa > 1) fa = 1;
-                uint32_t fr = (uint32_t)(path->fill_r * 255.0f + 0.5f);
-                uint32_t fg = (uint32_t)(path->fill_g * 255.0f + 0.5f);
-                uint32_t fb = (uint32_t)(path->fill_b * 255.0f + 0.5f);
-                uint32_t fa8 = dest->transparent ? (uint32_t)(fa * 255.0 + 0.5) : 0xFF;
+                double fr_d = path->fill_r * 255.0, fg_d = path->fill_g * 255.0;
+                double fb_d = path->fill_b * 255.0, fa_d = path->fill_a * 255.0;
+                if (cx) {
+                    fr_d = fr_d * cx->rm + cx->ro;
+                    fg_d = fg_d * cx->gm + cx->go;
+                    fb_d = fb_d * cx->bm + cx->bo;
+                    fa_d = fa_d * cx->am + cx->ao;
+                }
+                if (fr_d < 0) fr_d = 0; if (fr_d > 255) fr_d = 255;
+                if (fg_d < 0) fg_d = 0; if (fg_d > 255) fg_d = 255;
+                if (fb_d < 0) fb_d = 0; if (fb_d > 255) fb_d = 255;
+                if (fa_d < 0) fa_d = 0; if (fa_d > 255) fa_d = 255;
+                uint32_t fr = (uint32_t)(fr_d + 0.5);
+                uint32_t fg = (uint32_t)(fg_d + 0.5);
+                uint32_t fb = (uint32_t)(fb_d + 0.5);
+                uint32_t fa8 = dest->transparent ? (uint32_t)(fa_d + 0.5) : 0xFF;
                 uint32_t color = (fa8 << 24) | (fr << 16) | (fg << 8) | fb;
                 for (u32 v = 0; v + 5 < path->fill_vert_count * 2; v += 6) {
                     float* fv = &path->fill_verts[v];
@@ -11517,11 +11554,22 @@ static void rasterizeMovieClipToBitmap(BitmapDataNative* dest, MovieClip* mc,
                 }
             }
             if (path->has_line && path->line_vert_count >= 3) {
-                double la = path->line_a; if (la < 0) la = 0; if (la > 1) la = 1;
-                uint32_t lr = (uint32_t)(path->line_r * 255.0f + 0.5f);
-                uint32_t lg = (uint32_t)(path->line_g * 255.0f + 0.5f);
-                uint32_t lb = (uint32_t)(path->line_b * 255.0f + 0.5f);
-                uint32_t la8 = dest->transparent ? (uint32_t)(la * 255.0 + 0.5) : 0xFF;
+                double lr_d = path->line_r * 255.0, lg_d = path->line_g * 255.0;
+                double lb_d = path->line_b * 255.0, la_d = path->line_a * 255.0;
+                if (cx) {
+                    lr_d = lr_d * cx->rm + cx->ro;
+                    lg_d = lg_d * cx->gm + cx->go;
+                    lb_d = lb_d * cx->bm + cx->bo;
+                    la_d = la_d * cx->am + cx->ao;
+                }
+                if (lr_d < 0) lr_d = 0; if (lr_d > 255) lr_d = 255;
+                if (lg_d < 0) lg_d = 0; if (lg_d > 255) lg_d = 255;
+                if (lb_d < 0) lb_d = 0; if (lb_d > 255) lb_d = 255;
+                if (la_d < 0) la_d = 0; if (la_d > 255) la_d = 255;
+                uint32_t lr = (uint32_t)(lr_d + 0.5);
+                uint32_t lg = (uint32_t)(lg_d + 0.5);
+                uint32_t lb = (uint32_t)(lb_d + 0.5);
+                uint32_t la8 = dest->transparent ? (uint32_t)(la_d + 0.5) : 0xFF;
                 uint32_t color = (la8 << 24) | (lr << 16) | (lg << 8) | lb;
                 for (u32 v = 0; v + 5 < path->line_vert_count * 2; v += 6) {
                     float* lv = &path->line_verts[v];
@@ -11552,6 +11600,10 @@ static void rasterizeMovieClipToBitmap(BitmapDataNative* dest, MovieClip* mc,
         if (child == NULL || child->parent != mc) continue;
         if (child->depth == INT_MIN) continue;
         if (!child->visible) continue;
+        // Skip clips that are acting as a mask for someone else (they aren't
+        // drawn directly in display render, and also shouldn't be drawn as
+        // content when their parent is rasterized to a bitmap).
+        if (child->is_mask) continue;
         if (render_count < (int)(sizeof(ordered)/sizeof(ordered[0])))
             ordered[render_count++] = child;
     }
@@ -11574,14 +11626,9 @@ static void rasterizeMovieClipToBitmap(BitmapDataNative* dest, MovieClip* mc,
         double sy = child->yscale / 100.0;
         double rot = child->rotation * (3.14159265358979323846 / 180.0);
         double cr = cos(rot), sr = sin(rot);
-        // Local-to-parent matrix: P = [sx*cr, -sy*sr; sx*sr, sy*cr] (local pos
-        // rotated + scaled), plus translation (child->x, child->y).
         double la = sx * cr,  lb = sx * sr;
         double lc = -sy * sr, ld = sy * cr;
         double ltx = child->x, lty = child->y;
-        // Compose outer = (ma,mb,mc_,md,mtx,mty) with local = (la,lb,lc,ld,ltx,lty):
-        // out_x = ma*(la*x + lc*y + ltx) + mc_*(lb*x + ld*y + lty) + mtx
-        //       = (ma*la + mc_*lb)*x + (ma*lc + mc_*ld)*y + (ma*ltx + mc_*lty + mtx)
         double ca = ma * la + mc_ * lb;
         double cb = mb * la + md  * lb;
         double cc = ma * lc + mc_ * ld;
@@ -11589,7 +11636,8 @@ static void rasterizeMovieClipToBitmap(BitmapDataNative* dest, MovieClip* mc,
         double ctx = ma * ltx + mc_ * lty + mtx;
         double cty = mb * ltx + md  * lty + mty;
         rasterizeMovieClipToBitmap(dest, child, ca, cb, cc, cd, ctx, cty,
-                                   dx0, dy0, dx1, dy1);
+                                   dx0, dy0, dx1, dy1,
+                                   stencil, stencil_write_value, stencil_out, cx);
     }
 }
 
@@ -11618,6 +11666,22 @@ static ActionVar bitmapDataDraw(SWFAppContext* app_context, ActionVar* args, u32
             av = getProperty(mat, "tx", 2); if (av) mtx = varToDoubleSimple(av);
             av = getProperty(mat, "ty", 2); if (av) mty = varToDoubleSimple(av);
         }
+        // ColorTransform (arg2) — multipliers 0..1, offsets -255..255.
+        DrawColorTransform _cxdc = {1,1,1,1, 0,0,0,0};
+        DrawColorTransform* cx_ptr = NULL;
+        if (arg_count >= 3 && args[2].type == ACTION_STACK_VALUE_OBJECT && args[2].data.numeric_value != 0) {
+            ASObject* ct = (ASObject*) args[2].data.numeric_value;
+            ActionVar* av;
+            av = getProperty(ct, "redMultiplier", 13);     if (av) _cxdc.rm = varToDoubleSimple(av);
+            av = getProperty(ct, "greenMultiplier", 15);   if (av) _cxdc.gm = varToDoubleSimple(av);
+            av = getProperty(ct, "blueMultiplier", 14);    if (av) _cxdc.bm = varToDoubleSimple(av);
+            av = getProperty(ct, "alphaMultiplier", 15);   if (av) _cxdc.am = varToDoubleSimple(av);
+            av = getProperty(ct, "redOffset", 9);          if (av) _cxdc.ro = varToDoubleSimple(av);
+            av = getProperty(ct, "greenOffset", 11);       if (av) _cxdc.go = varToDoubleSimple(av);
+            av = getProperty(ct, "blueOffset", 10);        if (av) _cxdc.bo = varToDoubleSimple(av);
+            av = getProperty(ct, "alphaOffset", 11);       if (av) _cxdc.ao = varToDoubleSimple(av);
+            cx_ptr = &_cxdc;
+        }
         // clipRect (arg4) restricts dest pixels written.
         int dx0 = 0, dy0 = 0, dx1 = dest_bmp->width, dy1 = dest_bmp->height;
         if (arg_count >= 5 && args[4].type == ACTION_STACK_VALUE_OBJECT && args[4].data.numeric_value != 0) {
@@ -11635,7 +11699,49 @@ static ActionVar bitmapDataDraw(SWFAppContext* app_context, ActionVar* args, u32
             if (cx0 + cw0 < dx1) dx1 = cx0 + cw0;
             if (cy0 + ch0 < dy1) dy1 = cy0 + ch0;
         }
-        rasterizeMovieClipToBitmap(dest_bmp, src_mc, ma, mb, mcc, md, mtx, mty, dx0, dy0, dx1, dy1);
+
+        // If the source MC has a setMask mask, build a stencil buffer of the
+        // mask's rasterised coverage so we only paint source pixels where the
+        // mask is opaque. Both the mask and the source are rasterised with the
+        // same outer matrix (draw() matrix) since the mask shares the source's
+        // parent coord space. The mask's OWN local transform (_x, _y, rotation,
+        // scale) must be composed on top of the outer matrix — otherwise
+        // shifting mask._x wouldn't shift the masked area.
+        uint8_t* stencil_buf = NULL;
+        if (src_mc->mask_mc != NULL) {
+            MovieClip* mask_mc = (MovieClip*) src_mc->mask_mc;
+            size_t sbytes = (size_t)dest_bmp->width * (size_t)dest_bmp->height;
+            stencil_buf = (uint8_t*) calloc(sbytes, 1);
+            if (stencil_buf != NULL) {
+                double sx = mask_mc->xscale / 100.0;
+                double sy = mask_mc->yscale / 100.0;
+                double rot = mask_mc->rotation * (3.14159265358979323846 / 180.0);
+                double cr = cos(rot), sr = sin(rot);
+                double la = sx * cr,  lb = sx * sr;
+                double lc = -sy * sr, ld = sy * cr;
+                double ltx = mask_mc->x, lty = mask_mc->y;
+                double ca = ma * la + mcc * lb;
+                double cb = mb * la + md  * lb;
+                double cc_ = ma * lc + mcc * ld;
+                double cd = mb * lc + md  * ld;
+                double ctx = ma * ltx + mcc * lty + mtx;
+                double cty = mb * ltx + md  * lty + mty;
+                // Temporarily clear is_mask so the recursive child walk in
+                // rasterizeMovieClipToBitmap will descend into this MC (we
+                // normally skip masks to avoid rendering them as content).
+                uint8_t saved_is_mask = mask_mc->is_mask;
+                mask_mc->is_mask = 0;
+                rasterizeMovieClipToBitmap(dest_bmp, mask_mc, ca, cb, cc_, cd, ctx, cty,
+                                           dx0, dy0, dx1, dy1,
+                                           NULL, 1, stencil_buf, NULL);
+                mask_mc->is_mask = saved_is_mask;
+            }
+        }
+
+        rasterizeMovieClipToBitmap(dest_bmp, src_mc, ma, mb, mcc, md, mtx, mty,
+                                   dx0, dy0, dx1, dy1,
+                                   stencil_buf, 0, NULL, cx_ptr);
+        if (stencil_buf) free(stencil_buf);
         r = makeF64(0);
         return r;
     }
@@ -46038,6 +46144,104 @@ void actionCallFunction(SWFAppContext* app_context, char* str_buffer)
 
 	// Check for built-in global functions first
 	int builtin_handled = 0;
+
+	// Drawing API dispatch: MovieClip.prototype.beginFill/moveTo/lineTo/etc.
+	// are installed as builtin_noop_func stubs, so calling them as bare names
+	// inside `with (mc) { ... }` would do nothing. When a WITH-scope target
+	// MovieClip is on the scope chain, forward the call to that MC's drawing
+	// state, mirroring the CallMethod handlers. This is required for e.g.
+	// BitmapData-v8's `with (sprite) { beginFill(...); moveTo(...); }`
+	// idiom so `bm.draw(parent)` can rasterize the sprite's paths.
+	{
+		MovieClip* _with_mc = NULL;
+		for (int _s = (int)scope_depth - 1; _s >= 0; _s--) {
+			if (scope_is_with[_s] && scope_mc[_s] != NULL) { _with_mc = scope_mc[_s]; break; }
+		}
+		if (_with_mc != NULL) {
+			int _draw_handled = 1;
+			if (func_name_len == 9 && strncmp(func_name, "beginFill", 9) == 0) {
+				DrawingState* ds = getOrCreateDrawingState(_with_mc);
+				if (ds->cmd_count > 0) drawingFinalizePath(ds);
+				u32 rgb = (num_args >= 1) ? (u32)varToDouble(&args[0]) : 0;
+				float alpha = 1.0f;
+				if (num_args >= 2) {
+					alpha = (float)varToDouble(&args[1]) / 100.0f;
+					if (alpha < 0) alpha = 0; if (alpha > 1) alpha = 1;
+				}
+				ds->fill_r = ((rgb >> 16) & 0xFF) / 255.0f;
+				ds->fill_g = ((rgb >> 8) & 0xFF) / 255.0f;
+				ds->fill_b = (rgb & 0xFF) / 255.0f;
+				ds->fill_a = alpha;
+				ds->has_fill = 1;
+				ds->has_gradient = 0;
+			} else if (func_name_len == 7 && strncmp(func_name, "endFill", 7) == 0) {
+				if (_with_mc->drawing_state != NULL) {
+					DrawingState* ds = (DrawingState*)_with_mc->drawing_state;
+					drawingFinalizePath(ds);
+					ds->has_fill = 0;
+					ds->has_gradient = 0;
+				}
+			} else if (func_name_len == 6 && strncmp(func_name, "moveTo", 6) == 0) {
+				if (num_args >= 2) {
+					float x = (float)varToDouble(&args[0]);
+					float y = (float)varToDouble(&args[1]);
+					drawingUpdateBounds(_with_mc, x, y);
+					DrawingState* ds = getOrCreateDrawingState(_with_mc);
+					drawingAddCmd(ds, 0, x, y, 0, 0);
+					ds->pen_x = x; ds->pen_y = y; ds->pen_set = 1;
+				}
+			} else if (func_name_len == 6 && strncmp(func_name, "lineTo", 6) == 0) {
+				if (num_args >= 2) {
+					float x = (float)varToDouble(&args[0]);
+					float y = (float)varToDouble(&args[1]);
+					drawingUpdateBounds(_with_mc, x, y);
+					DrawingState* ds = getOrCreateDrawingState(_with_mc);
+					drawingAddCmd(ds, 1, x, y, 0, 0);
+					ds->pen_x = x; ds->pen_y = y; ds->pen_set = 1;
+				}
+			} else if (func_name_len == 7 && strncmp(func_name, "curveTo", 7) == 0) {
+				if (num_args >= 4) {
+					float cx = (float)varToDouble(&args[0]);
+					float cy = (float)varToDouble(&args[1]);
+					float ax = (float)varToDouble(&args[2]);
+					float ay = (float)varToDouble(&args[3]);
+					drawingUpdateBounds(_with_mc, cx, cy);
+					drawingUpdateBounds(_with_mc, ax, ay);
+					DrawingState* ds = getOrCreateDrawingState(_with_mc);
+					drawingAddCmd(ds, 2, ax, ay, cx, cy);
+					ds->pen_x = ax; ds->pen_y = ay; ds->pen_set = 1;
+				}
+			} else if (func_name_len == 9 && strncmp(func_name, "lineStyle", 9) == 0) {
+				DrawingState* ds = getOrCreateDrawingState(_with_mc);
+				if (num_args == 0) {
+					ds->has_line = 0; ds->line_w = 0;
+				} else {
+					float thickness = (float)varToDouble(&args[0]);
+					u32 rgb = (num_args >= 2) ? (u32)varToDouble(&args[1]) : 0;
+					float alpha = 1.0f;
+					if (num_args >= 3) {
+						alpha = (float)varToDouble(&args[2]) / 100.0f;
+						if (alpha < 0) alpha = 0; if (alpha > 1) alpha = 1;
+					}
+					ds->line_w = thickness;
+					ds->line_r = ((rgb >> 16) & 0xFF) / 255.0f;
+					ds->line_g = ((rgb >> 8) & 0xFF) / 255.0f;
+					ds->line_b = (rgb & 0xFF) / 255.0f;
+					ds->line_a = alpha;
+					ds->has_line = 1;
+				}
+			} else if (func_name_len == 5 && strncmp(func_name, "clear", 5) == 0) {
+				drawingClear(_with_mc);
+			} else {
+				_draw_handled = 0;
+			}
+			if (_draw_handled) {
+				if (args != NULL) FREE(args);
+				pushUndefined(app_context);
+				return;
+			}
+		}
+	}
 
 	// parseInt(string [, radix]) - Parse string to integer (Flash/ECMA-262 semantics)
 	if (func_name_len == 8 && strncmp(func_name, "parseInt", 8) == 0)
