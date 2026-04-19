@@ -1,8 +1,71 @@
 # MovieClip-Source BitmapData.draw Plan
 <!-- TESTS: BitmapData-v8 (30+ lines), bitmap_data_draw_cliprect, potentially others -->
 
-Last updated: 2026-04-18
-Status: NOT STARTED — major undertaking, sub-plan of BITMAPDATA_PLAN.md
+Last updated: 2026-04-19
+Status: PARTIAL — software rasterizer shipped; MC hierarchy + masks still missing.
+
+## 2026-04-19 progress
+
+- Added a barycentric triangle rasterizer in
+  `SWFModernRuntime/src/actionmodern/action.c` (`rasterizeMovieClipToBitmap`).
+  It renders a MovieClip's finalized `DrawingState.paths` (tessellated fill
+  triangles and expanded line-stroke quads, stored in twips) into the
+  destination `BitmapDataNative` pixel buffer using half-plane edge tests at
+  pixel centers.
+- `bitmapDataDraw` now dispatches on `ACTION_STACK_VALUE_MOVIECLIP` source
+  (previously only BitmapData sources were accepted). Matrix (arg 1) and
+  `clipRect` (arg 4) from the `draw(source, matrix, ct, bm, clipRect)` call
+  are honoured; colorTransform and blendMode are still ignored (no tests
+  depend on them yet).
+- The rasterizer recursively renders `child_mc_cache[]` children by depth
+  so a parent MC with children like `createEmptyMovieClip` are drawn,
+  composing `(x, y, xscale, yscale, rotation)` into the outer matrix.
+- **Impact:** BitmapData-v8 line-match 380/417 → 404/417 (-24 mismatched
+  lines). Passes avm1 `bitmap_data_draw_cliprect`, `mask_with_drawing`,
+  `duplicate_movie_clip_drawing`, and all four gnash `BitmapData-v{5,6,7,8}`
+  baselines that were already passing.
+
+## Remaining blockers (13 mismatched lines)
+
+All remaining BitmapData-v8 diffs come from tests that use
+`with (child_mc) { beginFill(...); moveTo(...); lineTo(...); }` to populate
+child clips of an MC that is then passed to `bm.draw(parent_mc)`, with
+`parent_mc.setMask(mask)` applied. Unblocking them requires three separate
+features:
+
+1. **Drawing API via CallFunction inside `with (mc) { ... }`.**
+   Currently `MovieClip.prototype.beginFill/moveTo/lineTo/endFill/...` are
+   installed as `builtin_noop_func` stubs, so WITH-scope calls don't reach
+   the real handlers and no `DrawingState` is populated. An earlier attempt
+   to dispatch these in `actionCallFunction` (using `scope_mc[]` as the
+   target) populated `DrawingState` correctly but regressed BitmapData-v8
+   further because…
+
+2. **Mask respect in `BitmapData.draw`.** BitmapData-v8 applies
+   `mc.setMask(mask)` before the draw; the expected output has only the
+   masked pixels written. Without mask support, painting the child MCs
+   hits pixels the test expects to remain white (regression pattern
+   "got 0xFF0000 expected 0xFFFFFF" at (5,5), etc.).
+
+3. **ColorTransform + blendMode arguments.** Some of the bm-test blocks
+   use a `ColorTransform` arg to shift channels for overlap tests
+   (`near(bm, 23, 15, 0x00ff00)` → `near(bm, 26, 15, 0x0000ff)`). Those
+   will still diverge even with 1+2 fixed.
+
+## Suggested next steps
+
+- Factor the `CallMethod` drawing handlers (`beginFill`, `moveTo`,
+  `lineTo`, `curveTo`, `endFill`, `lineStyle`, `clear`) into small shared
+  helpers that take `(MovieClip*, args, num_args)`, then call them from both
+  the CallMethod path and a new CallFunction WITH-scope dispatch block.
+- Extend `bitmapDataDraw` to honour `mc->mask_mc`. Conceptually: rasterize
+  the mask into a stencil buffer first, then restrict pixel writes to the
+  stencil's non-zero area. For trace-only tests this can be a 1-bit buffer
+  the size of the clip region.
+- Plumb `ColorTransform` arg through the rasterizer (already partially
+  present in `bitmapDataDraw` for BitmapData → BitmapData; need to apply
+  it per-pixel during MC rasterization too).
+- The full unblocker is probably 1-2 days per sub-feature.
 
 ---
 

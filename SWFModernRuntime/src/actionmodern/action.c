@@ -11434,6 +11434,165 @@ static ActionVar bitmapDataApplyFilter(SWFAppContext* app_context, ActionVar* ar
     return r;
 }
 
+// Forward decl: drawingFinalizePath is defined later in this file.
+static void drawingFinalizePath(DrawingState* ds);
+// Forward decl: child_mc_cache registry is defined later.
+extern MovieClip* child_mc_cache[];
+extern int child_mc_count;
+
+// Rasterize a MovieClip's finalized drawing paths into a BitmapData, then
+// recursively rasterize its children (dynamic child MCs registered on
+// child_mc_cache). Fills/strokes are stored as triangles in twips (20 twips
+// = 1 pixel). The (ma..mty) matrix maps source-pixel coords to dest-pixel
+// coords. Children contribute their own local transform (mc->x, mc->y,
+// xscale, yscale, rotation) which is composed on top of the caller's matrix.
+static void rasterizeMovieClipToBitmap(BitmapDataNative* dest, MovieClip* mc,
+                                       double ma, double mb, double mc_, double md,
+                                       double mtx, double mty,
+                                       int dx0, int dy0, int dx1, int dy1)
+{
+    if (mc == NULL) return;
+    // Clamp clip to dest bounds.
+    if (dx0 < 0) dx0 = 0;
+    if (dy0 < 0) dy0 = 0;
+    if (dx1 > dest->width)  dx1 = dest->width;
+    if (dy1 > dest->height) dy1 = dest->height;
+    if (dx0 >= dx1 || dy0 >= dy1) return;
+
+    // Helper: rasterize one triangle with pixel centers at (px+0.5, py+0.5).
+    #define RASTER_TRI(ax, ay, bx, by, cx, cy, color_argb) do { \
+        double _ax = (ax), _ay = (ay), _bx = (bx), _by = (by), _cx = (cx), _cy = (cy); \
+        double _tx_min = _ax < _bx ? _ax : _bx; if (_cx < _tx_min) _tx_min = _cx; \
+        double _tx_max = _ax > _bx ? _ax : _bx; if (_cx > _tx_max) _tx_max = _cx; \
+        double _ty_min = _ay < _by ? _ay : _by; if (_cy < _ty_min) _ty_min = _cy; \
+        double _ty_max = _ay > _by ? _ay : _by; if (_cy > _ty_max) _ty_max = _cy; \
+        int _xlo = (int)floor(_tx_min - 0.5); if (_xlo < dx0) _xlo = dx0; \
+        int _xhi = (int)ceil (_tx_max - 0.5); if (_xhi > dx1 - 1) _xhi = dx1 - 1; \
+        int _ylo = (int)floor(_ty_min - 0.5); if (_ylo < dy0) _ylo = dy0; \
+        int _yhi = (int)ceil (_ty_max - 0.5); if (_yhi > dy1 - 1) _yhi = dy1 - 1; \
+        if (_xhi < _xlo || _yhi < _ylo) break; \
+        double _signed = (_bx - _ax) * (_cy - _ay) - (_by - _ay) * (_cx - _ax); \
+        if (_signed == 0.0) break; \
+        double _sgn = _signed > 0 ? 1.0 : -1.0; \
+        for (int _py = _ylo; _py <= _yhi; _py++) { \
+            double _qy = (double)_py + 0.5; \
+            uint32_t* _row = dest->pixels + (size_t)_py * dest->width; \
+            for (int _px = _xlo; _px <= _xhi; _px++) { \
+                double _qx = (double)_px + 0.5; \
+                double _w0 = ((_bx - _ax) * (_qy - _ay) - (_by - _ay) * (_qx - _ax)) * _sgn; \
+                double _w1 = ((_cx - _bx) * (_qy - _by) - (_cy - _by) * (_qx - _bx)) * _sgn; \
+                double _w2 = ((_ax - _cx) * (_qy - _cy) - (_ay - _cy) * (_qx - _cx)) * _sgn; \
+                if (_w0 >= 0 && _w1 >= 0 && _w2 >= 0) { \
+                    _row[_px] = (color_argb); \
+                } \
+            } \
+        } \
+    } while (0)
+
+    // Rasterize this MC's own drawing paths (if any).
+    if (mc->drawing_state != NULL) {
+        DrawingState* ds = (DrawingState*) mc->drawing_state;
+        if (ds->cmd_count > 0) drawingFinalizePath(ds);
+        for (u32 p = 0; p < ds->path_count; p++) {
+            DrawPath* path = &ds->paths[p];
+            if (path->has_fill && path->fill_vert_count >= 3) {
+                double fa = path->fill_a; if (fa < 0) fa = 0; if (fa > 1) fa = 1;
+                uint32_t fr = (uint32_t)(path->fill_r * 255.0f + 0.5f);
+                uint32_t fg = (uint32_t)(path->fill_g * 255.0f + 0.5f);
+                uint32_t fb = (uint32_t)(path->fill_b * 255.0f + 0.5f);
+                uint32_t fa8 = dest->transparent ? (uint32_t)(fa * 255.0 + 0.5) : 0xFF;
+                uint32_t color = (fa8 << 24) | (fr << 16) | (fg << 8) | fb;
+                for (u32 v = 0; v + 5 < path->fill_vert_count * 2; v += 6) {
+                    float* fv = &path->fill_verts[v];
+                    double s0x = fv[0] / 20.0, s0y = fv[1] / 20.0;
+                    double s1x = fv[2] / 20.0, s1y = fv[3] / 20.0;
+                    double s2x = fv[4] / 20.0, s2y = fv[5] / 20.0;
+                    double d0x = ma * s0x + mc_ * s0y + mtx;
+                    double d0y = mb * s0x + md  * s0y + mty;
+                    double d1x = ma * s1x + mc_ * s1y + mtx;
+                    double d1y = mb * s1x + md  * s1y + mty;
+                    double d2x = ma * s2x + mc_ * s2y + mtx;
+                    double d2y = mb * s2x + md  * s2y + mty;
+                    RASTER_TRI(d0x, d0y, d1x, d1y, d2x, d2y, color);
+                }
+            }
+            if (path->has_line && path->line_vert_count >= 3) {
+                double la = path->line_a; if (la < 0) la = 0; if (la > 1) la = 1;
+                uint32_t lr = (uint32_t)(path->line_r * 255.0f + 0.5f);
+                uint32_t lg = (uint32_t)(path->line_g * 255.0f + 0.5f);
+                uint32_t lb = (uint32_t)(path->line_b * 255.0f + 0.5f);
+                uint32_t la8 = dest->transparent ? (uint32_t)(la * 255.0 + 0.5) : 0xFF;
+                uint32_t color = (la8 << 24) | (lr << 16) | (lg << 8) | lb;
+                for (u32 v = 0; v + 5 < path->line_vert_count * 2; v += 6) {
+                    float* lv = &path->line_verts[v];
+                    double s0x = lv[0] / 20.0, s0y = lv[1] / 20.0;
+                    double s1x = lv[2] / 20.0, s1y = lv[3] / 20.0;
+                    double s2x = lv[4] / 20.0, s2y = lv[5] / 20.0;
+                    double d0x = ma * s0x + mc_ * s0y + mtx;
+                    double d0y = mb * s0x + md  * s0y + mty;
+                    double d1x = ma * s1x + mc_ * s1y + mtx;
+                    double d1y = mb * s1x + md  * s1y + mty;
+                    double d2x = ma * s2x + mc_ * s2y + mtx;
+                    double d2y = mb * s2x + md  * s2y + mty;
+                    RASTER_TRI(d0x, d0y, d1x, d1y, d2x, d2y, color);
+                }
+            }
+        }
+    }
+
+    #undef RASTER_TRI
+
+    // Recursively render children. The registry holds dynamic child MCs in no
+    // particular order — we render them in ascending depth so the higher depth
+    // paints over the lower one (Flash's z-order).
+    int render_count = 0;
+    MovieClip* ordered[128];
+    for (int i = 0; i < child_mc_count; i++) {
+        MovieClip* child = child_mc_cache[i];
+        if (child == NULL || child->parent != mc) continue;
+        if (child->depth == INT_MIN) continue;
+        if (!child->visible) continue;
+        if (render_count < (int)(sizeof(ordered)/sizeof(ordered[0])))
+            ordered[render_count++] = child;
+    }
+    // Insertion sort by depth ascending (small list, stable enough).
+    for (int i = 1; i < render_count; i++) {
+        MovieClip* key = ordered[i];
+        int j = i - 1;
+        while (j >= 0 && ordered[j]->depth > key->depth) {
+            ordered[j + 1] = ordered[j];
+            j--;
+        }
+        ordered[j + 1] = key;
+    }
+    for (int i = 0; i < render_count; i++) {
+        MovieClip* child = ordered[i];
+        // Child local transform: translate (x, y) then scale (xscale%, yscale%)
+        // then rotate (rotation degrees). Flash's convention is S*R*T (scale
+        // and rotate about origin, then translate).
+        double sx = child->xscale / 100.0;
+        double sy = child->yscale / 100.0;
+        double rot = child->rotation * (3.14159265358979323846 / 180.0);
+        double cr = cos(rot), sr = sin(rot);
+        // Local-to-parent matrix: P = [sx*cr, -sy*sr; sx*sr, sy*cr] (local pos
+        // rotated + scaled), plus translation (child->x, child->y).
+        double la = sx * cr,  lb = sx * sr;
+        double lc = -sy * sr, ld = sy * cr;
+        double ltx = child->x, lty = child->y;
+        // Compose outer = (ma,mb,mc_,md,mtx,mty) with local = (la,lb,lc,ld,ltx,lty):
+        // out_x = ma*(la*x + lc*y + ltx) + mc_*(lb*x + ld*y + lty) + mtx
+        //       = (ma*la + mc_*lb)*x + (ma*lc + mc_*ld)*y + (ma*ltx + mc_*lty + mtx)
+        double ca = ma * la + mc_ * lb;
+        double cb = mb * la + md  * lb;
+        double cc = ma * lc + mc_ * ld;
+        double cd = mb * lc + md  * ld;
+        double ctx = ma * ltx + mc_ * lty + mtx;
+        double cty = mb * ltx + md  * lty + mty;
+        rasterizeMovieClipToBitmap(dest, child, ca, cb, cc, cd, ctx, cty,
+                                   dx0, dy0, dx1, dy1);
+    }
+}
+
 // Draw: BitmapData.draw(source, matrix, colorTransform, blendMode, clipRect, smooth)
 static ActionVar bitmapDataDraw(SWFAppContext* app_context, ActionVar* args, u32 arg_count, ActionVar* registers, void* this_obj)
 {
@@ -11443,7 +11602,45 @@ static ActionVar bitmapDataDraw(SWFAppContext* app_context, ActionVar* args, u32
     ActionVar r = {0}; r.type = ACTION_STACK_VALUE_UNDEFINED;
     if (!dest_bmp || dest_bmp->disposed) { r = makeF64(-1); return r; }
     if (arg_count < 1) return r;
-    // Source must be a BitmapData object (MovieClip drawing not supported in NO_GRAPHICS)
+
+    // MovieClip source: rasterize the MC's drawing-API paths into the dest bitmap.
+    if (args[0].type == ACTION_STACK_VALUE_MOVIECLIP && args[0].data.numeric_value != 0) {
+        MovieClip* src_mc = (MovieClip*) (uintptr_t) args[0].data.numeric_value;
+        // Extract matrix (arg1) — defaults to identity
+        double ma = 1, mb = 0, mcc = 0, md = 1, mtx = 0, mty = 0;
+        if (arg_count >= 2 && args[1].type == ACTION_STACK_VALUE_OBJECT && args[1].data.numeric_value != 0) {
+            ASObject* mat = (ASObject*) args[1].data.numeric_value;
+            ActionVar* av;
+            av = getProperty(mat, "a", 1);  if (av) ma  = varToDoubleSimple(av);
+            av = getProperty(mat, "b", 1);  if (av) mb  = varToDoubleSimple(av);
+            av = getProperty(mat, "c", 1);  if (av) mcc = varToDoubleSimple(av);
+            av = getProperty(mat, "d", 1);  if (av) md  = varToDoubleSimple(av);
+            av = getProperty(mat, "tx", 2); if (av) mtx = varToDoubleSimple(av);
+            av = getProperty(mat, "ty", 2); if (av) mty = varToDoubleSimple(av);
+        }
+        // clipRect (arg4) restricts dest pixels written.
+        int dx0 = 0, dy0 = 0, dx1 = dest_bmp->width, dy1 = dest_bmp->height;
+        if (arg_count >= 5 && args[4].type == ACTION_STACK_VALUE_OBJECT && args[4].data.numeric_value != 0) {
+            ASObject* clip = (ASObject*) args[4].data.numeric_value;
+            ActionVar* cx = getProperty(clip, "x", 1);
+            ActionVar* cy = getProperty(clip, "y", 1);
+            ActionVar* cw = getProperty(clip, "width", 5);
+            ActionVar* ch = getProperty(clip, "height", 6);
+            int cx0 = cx ? (int)varToDoubleSimple(cx) : 0;
+            int cy0 = cy ? (int)varToDoubleSimple(cy) : 0;
+            int cw0 = cw ? (int)varToDoubleSimple(cw) : 0;
+            int ch0 = ch ? (int)varToDoubleSimple(ch) : 0;
+            if (cx0 > dx0) dx0 = cx0;
+            if (cy0 > dy0) dy0 = cy0;
+            if (cx0 + cw0 < dx1) dx1 = cx0 + cw0;
+            if (cy0 + ch0 < dy1) dy1 = cy0 + ch0;
+        }
+        rasterizeMovieClipToBitmap(dest_bmp, src_mc, ma, mb, mcc, md, mtx, mty, dx0, dy0, dx1, dy1);
+        r = makeF64(0);
+        return r;
+    }
+
+    // Source must be a BitmapData object otherwise.
     if (args[0].type != ACTION_STACK_VALUE_OBJECT) return r;
     ASObject* src_obj = (ASObject*) args[0].data.numeric_value;
     BitmapDataNative* src_bmp = getBitmapNative(src_obj);
