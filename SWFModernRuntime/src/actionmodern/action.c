@@ -11928,7 +11928,17 @@ static ActionVar objectCallValueOf(SWFAppContext* app_context, ActionVar* obj_va
 					ActionVar* regs = NULL;
 					if (func->register_count > 0)
 						regs = (ActionVar*) HCALLOC(func->register_count, sizeof(ActionVar));
+					// Push this=obj so the function body's `this` lookups resolve
+					// to obj regardless of whether the compiler emitted
+					// register-preload or GetVariable("this") for `this`.
+					u32 _vof_saved_this_depth = g_this_depth;
+					if (g_this_depth < MAX_THIS_DEPTH) {
+						g_this_stack[g_this_depth].type = ACTION_STACK_VALUE_OBJECT;
+						g_this_stack[g_this_depth].data.numeric_value = (u64)obj;
+						g_this_depth++;
+					}
 					result = func->advanced_func(app_context, NULL, 0, regs, obj);
+					g_this_depth = _vof_saved_this_depth;
 					if (regs != NULL) FREE(regs);
 				}
 				else if (func->function_type == 1 && func->simple_func != NULL)
@@ -12107,7 +12117,17 @@ static ActionVar objectCallToString(SWFAppContext* app_context, ActionVar* obj_v
 				ActionVar* regs = NULL;
 				if (func->register_count > 0)
 					regs = (ActionVar*) HCALLOC(func->register_count, sizeof(ActionVar));
+				// Push this=obj so the function body's `this` lookups resolve
+				// to obj regardless of whether the compiler emitted
+				// register-preload or GetVariable("this") for `this`.
+				u32 _ts_saved_this_depth = g_this_depth;
+				if (g_this_depth < MAX_THIS_DEPTH) {
+					g_this_stack[g_this_depth].type = ACTION_STACK_VALUE_OBJECT;
+					g_this_stack[g_this_depth].data.numeric_value = (u64)obj;
+					g_this_depth++;
+				}
 				result = func->advanced_func(app_context, NULL, 0, regs, obj);
+				g_this_depth = _ts_saved_this_depth;
 				if (regs != NULL) FREE(regs);
 			}
 			else if (func->function_type == 1 && func->simple_func != NULL)

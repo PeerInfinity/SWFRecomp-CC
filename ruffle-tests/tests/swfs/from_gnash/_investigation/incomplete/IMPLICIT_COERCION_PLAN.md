@@ -1,8 +1,8 @@
 # Implicit Coercion (valueOf / toString Dispatch) Plan
 <!-- TESTS: Matrix-v6, Rectangle-v8, toString_valueOf-v5, toString_valueOf-v6, toString_valueOf-v7, toString_valueOf-v8 -->
 
-Last updated: 2026-04-18 (Phase 2b done — String wrapper shadow + convertString shortcut)
-Status: IN PROGRESS — Phases 1, 2a, 2b complete; v6 → ruffle_matched; v7/v8 close
+Last updated: 2026-04-18 (Phase 3 done — push this-stack for type 2 valueOf/toString dispatch)
+Status: IN PROGRESS — Phases 1, 2a, 2b, 3 complete; v6/v7/v8 → ruffle_matched
 
 ---
 
@@ -26,8 +26,8 @@ sub-cluster of these failures but didn't cover the rest.
 | Rectangle-v8 | 144/166 (86.7%) | — | 20 | output_mismatch |
 | toString_valueOf-v5 | 95/137 (69.3%) | — | 39 | output_mismatch |
 | toString_valueOf-v6 | 152/155 (98.1%) | — | 3 | **ruffle_matched** |
-| toString_valueOf-v7 | 144/155 (92.9%) | — | 5 | output_mismatch |
-| toString_valueOf-v8 | 144/155 (92.9%) | — | 5 | output_mismatch |
+| toString_valueOf-v7 | 146/155 (94.2%) | — | 3 | **ruffle_matched** |
+| toString_valueOf-v8 | 146/155 (94.2%) | — | 3 | **ruffle_matched** |
 
 ## Sub-clusters
 
@@ -153,12 +153,31 @@ toString, then string comparison.
   `Boolean-v5..v8`, `Number-v6..v8`, `Matrix-v5/v7/v8`, `Point-v5..v8`,
   `Rectangle-v5..v7`, `ColorTransform-v8`.
 
-### Phase 3 — Remaining `simple_func` this-context sites
-- Grep for `simple_func)(app_context)` in `action.c`; audit each site for
-  `this_obj` argument / g_this_stack setup.
-- Build a shared helper that wraps the invocation pattern so future sites
-  don't regress.
-- Expected impact: toString_valueOf-v5 +5-8 lines.
+### Phase 3 — `this` stack push for type 2 valueOf/toString dispatch — DONE (2026-04-18)
+- `objectCallValueOf` and `objectCallToString` pushed `g_this_stack`
+  only for type 1 (simple_func) user-defined functions. Type 2
+  (advanced_func) dispatch relied solely on `preload_this` register
+  loading, which silently failed for SWF7+ DefineFunction2 bodies that
+  resolved `this` via `GetVariable("this")` rather than the preloaded
+  register.
+- Fix: push `{type=OBJECT, data=obj}` onto `g_this_stack` (with
+  save/restore of `g_this_depth`) around the advanced_func invocation
+  in both helpers. Safe — a preload_this body reads its register and
+  ignores the `this` global; a GetVariable("this") body now finds
+  `obj` at the top of the stack.
+- **Impact:**
+  - toString_valueOf-v7: 5 → 3 diffs → **ruffle_matched** (+1 test)
+  - toString_valueOf-v8: 5 → 3 diffs → **ruffle_matched** (+1 test)
+  - Lines fixed: `o.valueOfCalls == 1` and `o.toStringCalls == 1` —
+    counters on a plain `new Object()` receiver are now incremented by
+    the user's `v`/`s` functions during `a = "" + o`.
+- No regressions on avm1 `as2_super_and_this_v6/v8`,
+  `coerce_to_object_monkeypatch`, `enumerate`, `extends_chain`,
+  `init_object_order`, `mutable_this`, `object_resolve`,
+  `register_and_init_order`, `register_class_return_value`,
+  `string_coercion`, `super_edge_cases`, `text_format`, `this_scoping`,
+  `array_enumerate`; or on gnash `Color-v5..v8`, `ColorTransform-v8`,
+  `Error-v5..v8`, `Matrix-v5/v7/v8`, `Point-v5..v8`, `Rectangle-v5..v7`.
 
 ### Phase 4 — MOVIECLIP equality coercion
 - `actionEquals2` (MOVIECLIP, STRING) case: coerce MC via toString, then
