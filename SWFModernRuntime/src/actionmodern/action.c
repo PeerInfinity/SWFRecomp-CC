@@ -27431,6 +27431,207 @@ static void initContextMenuItemPrototype(SWFAppContext* app_context, ASFunction*
 	addStubMethodToProto(app_context, ctor->prototype_obj, "copy", 4, mflags);
 }
 
+// LoadVars.decode(queryString): parse URL-encoded string into own properties
+// of the LoadVars instance. Returns undefined on success; returns boolean false
+// when called with no argument (matches Gnash/Flash).
+static ActionVar builtin_loadvars_decode(SWFAppContext* app_context, ActionVar* args, u32 arg_count,
+	ActionVar* registers, void* this_obj)
+{
+	(void)registers;
+	ActionVar ret = {0}; ret.type = ACTION_STACK_VALUE_UNDEFINED;
+	if (arg_count < 1) {
+		ret.type = ACTION_STACK_VALUE_BOOLEAN;
+		ret.data.numeric_value = 0;
+		return ret;
+	}
+	if (this_obj == NULL) return ret;
+	ASObject* lv = (ASObject*) this_obj;
+
+	// Coerce arg to string
+	pushVar(app_context, &args[0]);
+	char sbuf[17];
+	convertString(app_context, sbuf);
+	const uint16_t* u16 = (const uint16_t*) STACK_TOP_VALUE;
+	u32 u16_len = STACK_TOP_N;
+	char utf8_buf[8192];
+	int utf8_len = u16_to_utf8(u16, u16_len, utf8_buf, sizeof(utf8_buf) - 1);
+	POP();
+	if (utf8_len <= 0) return ret;
+	utf8_buf[utf8_len] = '\0';
+
+	// Parse key=value&key=value... into own properties of `lv`.
+	char* pair = utf8_buf;
+	while (pair && *pair) {
+		char* next = strchr(pair, '&');
+		if (next) *next++ = '\0';
+		char* eq = strchr(pair, '=');
+		if (eq) {
+			*eq = '\0';
+			char* key = pair;
+			char* value = eq + 1;
+			urlDecode(key);
+			urlDecode(value);
+			int key_len = (int)strlen(key);
+			int val_len = (int)strlen(value);
+			if (key_len > 0) {
+				u32 v16_len = 0;
+				uint16_t* u16_val = utf8_to_u16(app_context, value, val_len, &v16_len);
+				ActionVar sv = {0};
+				sv.type = ACTION_STACK_VALUE_STRING;
+				sv.str_size = v16_len;
+				if (v16_len > 0 && u16_val != NULL) {
+					sv.data.numeric_value = (u64)(uintptr_t)u16_val;
+				}
+				setProperty(app_context, lv, key, key_len, &sv);
+			}
+		}
+		pair = next;
+	}
+	return ret;
+}
+
+// Helper: URL-encode a raw UTF-8 byte string. Matches Flash's percent-encoding
+// (space → %20, only A-Z/a-z/0-9 preserved; everything else %XX).
+static int lv_url_encode(const char* in, int in_len, char* out, int out_size)
+{
+	int o = 0;
+	for (int i = 0; i < in_len && o < out_size - 4; i++) {
+		unsigned char c = (unsigned char) in[i];
+		if ((c >= 'A' && c <= 'Z') || (c >= 'a' && c <= 'z') || (c >= '0' && c <= '9')) {
+			out[o++] = (char) c;
+		} else {
+			out[o++] = '%';
+			out[o++] = "0123456789ABCDEF"[c >> 4];
+			out[o++] = "0123456789ABCDEF"[c & 0x0F];
+		}
+	}
+	if (o < out_size) out[o] = '\0';
+	return o;
+}
+
+// LoadVars.toString(): URL-encode own enumerable properties in LIFO
+// (reverse-insertion) order, joined by '&'.
+static ActionVar builtin_loadvars_toString(SWFAppContext* app_context, ActionVar* args, u32 arg_count,
+	ActionVar* registers, void* this_obj)
+{
+	(void)args; (void)arg_count; (void)registers;
+	ActionVar ret = {0}; ret.type = ACTION_STACK_VALUE_STRING;
+	ret.str_size = 0; ret.data.numeric_value = 0;
+	if (this_obj == NULL) return ret;
+	ASObject* lv = (ASObject*) this_obj;
+
+	char* out_buf = (char*) HALLOC(16384);
+	if (out_buf == NULL) return ret;
+	int out_pos = 0;
+	out_buf[0] = '\0';
+	int first = 1;
+
+	// LIFO enumeration: iterate own_props from end to start.
+	for (int32_t i = (int32_t)lv->num_used - 1; i >= 0; i--) {
+		ASProperty* p = &lv->properties[i];
+		if (p->name == NULL || p->name_length == 0) continue;
+		if (!(p->flags & PROPERTY_FLAG_ENUMERABLE)) continue;
+		if (isPropertyHiddenAtVersion(p->flash_flags)) continue;
+
+		// Coerce value to string (calls valueOf / toString on objects).
+		char val_buf[2048];
+		int val_len = 0;
+		pushVar(app_context, &p->value);
+		char _tmp[17];
+		convertString(app_context, _tmp);
+		{
+			const uint16_t* vu16 = (const uint16_t*) STACK_TOP_VALUE;
+			u32 vu16_len = STACK_TOP_N;
+			val_len = u16_to_utf8(vu16, vu16_len, val_buf, sizeof(val_buf));
+		}
+		POP();
+
+		char key_enc[1024];
+		int key_enc_len = lv_url_encode(p->name, (int)p->name_length, key_enc, sizeof(key_enc));
+		char val_enc[6144];
+		int val_enc_len = lv_url_encode(val_buf, val_len, val_enc, sizeof(val_enc));
+
+		if (!first) {
+			if (out_pos < 16383) out_buf[out_pos++] = '&';
+		}
+		first = 0;
+		int copy_key = key_enc_len;
+		if (out_pos + copy_key >= 16383) copy_key = 16383 - out_pos;
+		if (copy_key > 0) memcpy(out_buf + out_pos, key_enc, copy_key);
+		out_pos += copy_key;
+		if (out_pos < 16383) out_buf[out_pos++] = '=';
+		int copy_val = val_enc_len;
+		if (out_pos + copy_val >= 16383) copy_val = 16383 - out_pos;
+		if (copy_val > 0) memcpy(out_buf + out_pos, val_enc, copy_val);
+		out_pos += copy_val;
+	}
+	out_buf[out_pos] = '\0';
+
+	u32 res_u16_len = 0;
+	uint16_t* res_u16 = utf8_to_u16(app_context, out_buf, out_pos, &res_u16_len);
+	ret.str_size = res_u16_len;
+	ret.data.numeric_value = (u64)(uintptr_t) res_u16;
+	return ret;
+}
+
+// LoadVars.getBytesLoaded(): returns this._bytesLoaded (undefined if not set).
+static ActionVar builtin_loadvars_getBytesLoaded(SWFAppContext* app_context, ActionVar* args, u32 arg_count,
+	ActionVar* registers, void* this_obj)
+{
+	(void)app_context; (void)args; (void)arg_count; (void)registers;
+	ActionVar ret = {0}; ret.type = ACTION_STACK_VALUE_UNDEFINED;
+	if (this_obj == NULL) return ret;
+	ASObject* lv = (ASObject*) this_obj;
+	ActionVar* bv = getProperty(lv, "_bytesLoaded", 12);
+	if (bv != NULL) ret = *bv;
+	return ret;
+}
+
+// LoadVars.getBytesTotal(): returns this._bytesTotal (undefined if not set).
+static ActionVar builtin_loadvars_getBytesTotal(SWFAppContext* app_context, ActionVar* args, u32 arg_count,
+	ActionVar* registers, void* this_obj)
+{
+	(void)app_context; (void)args; (void)arg_count; (void)registers;
+	ActionVar ret = {0}; ret.type = ACTION_STACK_VALUE_UNDEFINED;
+	if (this_obj == NULL) return ret;
+	ASObject* lv = (ASObject*) this_obj;
+	ActionVar* bv = getProperty(lv, "_bytesTotal", 11);
+	if (bv != NULL) ret = *bv;
+	return ret;
+}
+
+// LoadVars.sendAndLoad(url, target, method?): if target is a suitable object,
+// set target.loaded = false and return true. Otherwise return false.
+// Our offline implementation never fires onLoad because the "network" never
+// completes.
+//
+// Gnash's behavior: accepts any non-Date object. Date instances are rejected
+// because Date has a Flash-internal marker that sendAndLoad checks against.
+static ActionVar builtin_loadvars_sendAndLoad(SWFAppContext* app_context, ActionVar* args, u32 arg_count,
+	ActionVar* registers, void* this_obj)
+{
+	(void)registers; (void)this_obj;
+	ActionVar ret = {0}; ret.type = ACTION_STACK_VALUE_BOOLEAN;
+	ret.data.numeric_value = 0;
+	if (arg_count < 2) return ret;
+	if (args[1].type != ACTION_STACK_VALUE_OBJECT) return ret;
+	ASObject* target = (ASObject*) args[1].data.numeric_value;
+	if (target == NULL) return ret;
+	// Reject Date instances — matches Gnash's test expectation.
+	if (target->native_type == NATIVE_DATE) return ret;
+
+	ActionVar lf = {0}; lf.type = ACTION_STACK_VALUE_BOOLEAN; lf.data.numeric_value = 0;
+	setProperty(app_context, target, "loaded", 6, &lf);
+	// Initialize _bytesLoaded = 0 / _bytesTotal = 0 on the target so
+	// getBytesLoaded()/getBytesTotal() return numbers instead of undefined.
+	ActionVar bv = {0}; bv.type = ACTION_STACK_VALUE_F64;
+	VAL(double, &bv.data.numeric_value) = 0.0;
+	setPropertyWithFlags(app_context, target, "_bytesLoaded", 12, &bv, PROPERTY_FLAGS_DONTENUM);
+	setPropertyWithFlags(app_context, target, "_bytesTotal", 11, &bv, PROPERTY_FLAGS_DONTENUM);
+	ret.data.numeric_value = 1;
+	return ret;
+}
+
 // LoadVars.load(url): fetch embedded data file, parse URL-encoded body into
 // own properties of the LoadVars instance, and fire this.onLoad(success).
 static ActionVar builtin_loadvars_load(SWFAppContext* app_context, ActionVar* args, u32 arg_count,
@@ -27511,6 +27712,29 @@ static ActionVar builtin_loadvars_load(SWFAppContext* app_context, ActionVar* ar
 }
 
 static ASFunction g_loadvars_fn_load;
+static ASFunction g_loadvars_fn_decode;
+static ASFunction g_loadvars_fn_toString;
+static ASFunction g_loadvars_fn_getBytesLoaded;
+static ASFunction g_loadvars_fn_getBytesTotal;
+static ASFunction g_loadvars_fn_sendAndLoad;
+
+// Helper: register a native ASFunction on a prototype (DONT_ENUM by default
+// via mflags = PROPERTY_FLAG_WRITABLE).
+static void registerLoadVarsNative(SWFAppContext* app_context, ASObject* proto,
+	const char* method_name, u32 method_name_len,
+	ASFunction* fn, Function2Ptr impl, u8 prop_flags)
+{
+	memset(fn, 0, sizeof(ASFunction));
+	strncpy(fn->name, method_name, 255);
+	fn->function_type = 2;
+	fn->advanced_func = impl;
+	setupNativeFuncOwnProps(app_context, fn);
+	if (function_count < MAX_FUNCTIONS) function_registry[function_count++] = fn;
+	ActionVar fv = {0};
+	fv.type = ACTION_STACK_VALUE_FUNCTION;
+	fv.data.numeric_value = (u64) fn;
+	setPropertyWithFlags(app_context, proto, method_name, method_name_len, &fv, prop_flags);
+}
 
 // LoadVars.prototype: 9 methods + contentType string
 static void initLoadVarsPrototype(SWFAppContext* app_context, ASFunction* ctor)
@@ -27526,26 +27750,21 @@ static void initLoadVarsPrototype(SWFAppContext* app_context, ASFunction* ctor)
 	// __proto__ → Object.prototype (enumerated before constructor in LIFO)
 	setObjectProto(app_context, ctor->prototype_obj);
 	const u8 mflags = PROPERTY_FLAG_WRITABLE; // DONT_ENUM + DONT_DELETE
-	// Real load() — replaces the stub
-	memset(&g_loadvars_fn_load, 0, sizeof(ASFunction));
-	strncpy(g_loadvars_fn_load.name, "load", 255);
-	g_loadvars_fn_load.function_type = 2;
-	g_loadvars_fn_load.advanced_func = (Function2Ptr) builtin_loadvars_load;
-	setupNativeFuncOwnProps(app_context, &g_loadvars_fn_load);
-	if (function_count < MAX_FUNCTIONS) function_registry[function_count++] = &g_loadvars_fn_load;
-	{
-		ActionVar fv = {0};
-		fv.type = ACTION_STACK_VALUE_FUNCTION;
-		fv.data.numeric_value = (u64) &g_loadvars_fn_load;
-		setPropertyWithFlags(app_context, ctor->prototype_obj, "load", 4, &fv, mflags);
-	}
+	// Real load()/decode()/toString()/getBytes*()/sendAndLoad() — replace stubs
+	registerLoadVarsNative(app_context, ctor->prototype_obj, "load", 4,
+		&g_loadvars_fn_load, (Function2Ptr) builtin_loadvars_load, mflags);
+	registerLoadVarsNative(app_context, ctor->prototype_obj, "decode", 6,
+		&g_loadvars_fn_decode, (Function2Ptr) builtin_loadvars_decode, mflags);
+	registerLoadVarsNative(app_context, ctor->prototype_obj, "getBytesLoaded", 14,
+		&g_loadvars_fn_getBytesLoaded, (Function2Ptr) builtin_loadvars_getBytesLoaded, mflags);
+	registerLoadVarsNative(app_context, ctor->prototype_obj, "getBytesTotal", 13,
+		&g_loadvars_fn_getBytesTotal, (Function2Ptr) builtin_loadvars_getBytesTotal, mflags);
+	registerLoadVarsNative(app_context, ctor->prototype_obj, "sendAndLoad", 11,
+		&g_loadvars_fn_sendAndLoad, (Function2Ptr) builtin_loadvars_sendAndLoad, mflags);
 	addStubMethodToProto(app_context, ctor->prototype_obj, "send", 4, mflags);
-	addStubMethodToProto(app_context, ctor->prototype_obj, "sendAndLoad", 11, mflags);
-	addStubMethodToProto(app_context, ctor->prototype_obj, "decode", 6, mflags);
-	addStubMethodToProto(app_context, ctor->prototype_obj, "getBytesLoaded", 14, mflags);
-	addStubMethodToProto(app_context, ctor->prototype_obj, "getBytesTotal", 13, mflags);
 	// toString is NOT DONT_ENUM (overrides Object.prototype.toString)
-	addStubMethodToProto(app_context, ctor->prototype_obj, "toString", 8, PROPERTY_FLAGS_DEFAULT);
+	registerLoadVarsNative(app_context, ctor->prototype_obj, "toString", 8,
+		&g_loadvars_fn_toString, (Function2Ptr) builtin_loadvars_toString, PROPERTY_FLAGS_DEFAULT);
 	// contentType is a DONT_ENUM string property
 	ActionVar sv = makeStringActionVar(app_context, "application/x-www-form-urlencoded", 33);
 	setPropertyWithFlags(app_context, ctor->prototype_obj, "contentType", 11, &sv, mflags);

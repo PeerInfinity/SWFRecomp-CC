@@ -1,8 +1,8 @@
 # LoadVars + MovieClipLoader Plan
 <!-- TESTS: LoadVars-v6, LoadVars-v7, LoadVars-v8, MovieClipLoader-v7, MovieClipLoader-v8 -->
 
-Last updated: 2026-04-17
-Status: NOT STARTED — 5 tests, ~40%-28% line match
+Last updated: 2026-04-19
+Status: Phase 1 complete — LoadVars v6/v7/v8 each 61/152 → 97/152 (64%); MCL v7/v8 unchanged
 
 ---
 
@@ -24,11 +24,70 @@ event sequence and payloads.
 
 | Test | Match | Expected | Diffs |
 |------|-------|----------|-------|
-| LoadVars-v6 | 61 / 152 | — | ~91 |
-| LoadVars-v7 | 61 / 152 | — | ~91 |
-| LoadVars-v8 | 61 / 152 | — | ~91 |
-| MovieClipLoader-v7 | 46 / 165 | — | ~119 |
-| MovieClipLoader-v8 | 46 / 165 | — | ~119 |
+| LoadVars-v6 | 97 / 152 | — | ~55 |
+| LoadVars-v7 | 97 / 152 | — | ~55 |
+| LoadVars-v8 | 97 / 152 | — | ~55 |
+| MovieClipLoader-v7 | 46 / 165 | — | ~120 |
+| MovieClipLoader-v8 | 46 / 165 | — | ~120 |
+
+### Phase 1 Results (2026-04-19)
+
+LoadVars prototype methods replaced from stubs to real implementations in
+`SWFModernRuntime/src/actionmodern/action.c`:
+
+- `decode(queryString)` — URL-decodes and assigns key=value pairs as own
+  properties on the LoadVars instance. Returns boolean false when called with
+  no argument (Gnash/Flash compatibility).
+- `toString()` — URL-encodes own enumerable properties in LIFO
+  (reverse-insertion) order, joined by '&'. Uses percent-encoding matching
+  Flash's behavior (A-Z/a-z/0-9 preserved, all else %XX including space→%20).
+- `getBytesLoaded()` / `getBytesTotal()` — return the instance's own
+  `_bytesLoaded` / `_bytesTotal` F64 properties (undefined if not set).
+- `sendAndLoad(url, target)` — sets `target.loaded=false`,
+  `target._bytesLoaded=0`, `target._bytesTotal=0` as own properties; returns
+  true for any non-Date OBJECT target, false otherwise (Date instances
+  specifically excluded).
+
+A `registerLoadVarsNative` helper factors out the repeated pattern of
+allocating an ASFunction, setting up native own_props, registering with the
+function registry, and installing on the prototype.
+
+No regressions on avm1 `loadvariables`, `loadvariables2`, `loadvariablesnum`
+(all still pass).
+
+## Remaining Work
+
+**Phase 2 (async load()) — est. ~30 lines/test of the 55 remaining diffs:**
+`load()` currently fires onLoad synchronously. The test expects:
+1. `load()` returns true and sets `_bytesLoaded=0`, `_bytesTotal=undefined`,
+   `loaded=false` on the instance.
+2. On the NEXT frame tick (before subsequent frame scripts):
+   set `_bytesLoaded = _bytesTotal = content_length`, then fire
+   `onData(content_string)`.
+3. The default `onData` (installed on the prototype) should call
+   `this.decode(src)` and `this.onLoad(true)`. The test overrides onData to
+   check intermediate state, then calls decode + onLoad manually.
+
+Requires: a deferred-LoadVars-dispatch queue, a `processLoadVarsLoads()`
+called from `swf_core.c` between frame scripts and timers, and a default
+`onData` implementation on `LoadVars.prototype`.
+
+**Phase 3/4 (MovieClipLoader) — not started:** The 120-line MCL gap requires
+`loadClip` to fire `onLoadError` async for non-existent URLs and
+`onLoadStart` / `onLoadProgress` / `onLoadComplete` / `onLoadInit` for
+successful loads. Shares infrastructure with Phase 2's async dispatcher.
+
+**Misc remaining LoadVars failures (~10 lines/test):**
+- `sendAndLoad` block 2/3 expectations (line 54, 63-66): target doesn't get
+  `loaded` as OWN but does get it inherited; block 3 return value differs.
+  Needs source inspection to understand exactly what the test passes.
+- `[type Object]` vs `[object Object]` in toString (line 98): Flash's
+  LoadVars.toString serializes certain native-typed objects to
+  `[type Object]`, we emit `[object Object]` from Object.prototype.toString.
+  One line per test.
+- `lv.toString()` override via own `toString` property (line 101): needs the
+  recompiler/runtime to invoke the instance-overridden toString instead of
+  the prototype's.
 
 ## Root Cause
 
