@@ -1067,6 +1067,11 @@ void swfStart(SWFAppContext* app_context)
 		{
 			double frame_duration_ms = (app_context->fps > 0) ? (1000.0 / app_context->fps) : 83.33;
 			processTimers(app_context, frame_duration_ms);
+			// Fire deferred LoadVars.load() onData callbacks.
+			{
+				extern void processLoadVarsLoads(SWFAppContext*);
+				processLoadVarsLoads(app_context);
+			}
 			// Process sound playback (fire onSoundComplete callbacks)
 			{
 				extern void processSoundPlayback(SWFAppContext*, double);

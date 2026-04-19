@@ -2,7 +2,7 @@
 <!-- TESTS: LoadVars-v6, LoadVars-v7, LoadVars-v8, MovieClipLoader-v7, MovieClipLoader-v8 -->
 
 Last updated: 2026-04-19
-Status: Phase 1 complete — LoadVars v6/v7/v8 each 61/152 → 97/152 (64%); MCL v7/v8 unchanged
+Status: Phase 1 + Phase 2 complete — LoadVars v6/v7/v8 each 61/152 → 138/152 (91%); MCL v7/v8 unchanged
 
 ---
 
@@ -24,9 +24,9 @@ event sequence and payloads.
 
 | Test | Match | Expected | Diffs |
 |------|-------|----------|-------|
-| LoadVars-v6 | 97 / 152 | — | ~55 |
-| LoadVars-v7 | 97 / 152 | — | ~55 |
-| LoadVars-v8 | 97 / 152 | — | ~55 |
+| LoadVars-v6 | 138 / 152 | — | ~14 |
+| LoadVars-v7 | 138 / 152 | — | ~14 |
+| LoadVars-v8 | 138 / 152 | — | ~14 |
 | MovieClipLoader-v7 | 46 / 165 | — | ~120 |
 | MovieClipLoader-v8 | 46 / 165 | — | ~120 |
 
@@ -55,39 +55,57 @@ function registry, and installing on the prototype.
 No regressions on avm1 `loadvariables`, `loadvariables2`, `loadvariablesnum`
 (all still pass).
 
+### Phase 2 Results (2026-04-19)
+
+`load()` now async. Added deferred-LoadVars-load queue
+(`g_pending_lv_loads`), `processLoadVarsLoads()` called from the frame loop
+in `swf_core.c` and `swf_headless.c` right after `processTimers()`.
+
+- `load(url)` sets `_bytesLoaded=0` (F64), `_bytesTotal=undefined`,
+  `loaded=false` on the instance; enqueues a pending load with a heap-copy
+  of the UTF-16 content (UTF-8 BOM stripped — Flash treats BOM as
+  transport metadata); returns `true`.
+- `processLoadVarsLoads()` updates `_bytesLoaded` / `_bytesTotal` to the
+  final byte count (BOM included) then fires `onData(content_string)` on
+  each pending instance.
+- Default `LoadVars.prototype.onData`: calls `this.decode(src)`, sets
+  `loaded=true`, then fires `this.onLoad(true)`. On failure, fires
+  `onLoad(false)`.
+- `fireLoadVarsCallback()` helper correctly invokes user-defined
+  DefineFunction (type 1) / DefineFunction2 (type 2) callbacks with:
+  `this` pushed onto `g_this_stack`, `g_current_executing_func` set,
+  captured scope chain restored, local scope populated with an
+  `arguments` array, and base_clip-based SWF6+ closure context.
+  (`soundFireCallback` alone misses most of these — likely fine for sound
+  callbacks that don't probe `this`/`arguments` but insufficient for
+  LoadVars.)
+
+No regressions on avm1 `loadvariables`, `loadvariables2`, `loadvariablesnum`,
+`load_vars`, `sound`, `set_interval`.
+
 ## Remaining Work
-
-**Phase 2 (async load()) — est. ~30 lines/test of the 55 remaining diffs:**
-`load()` currently fires onLoad synchronously. The test expects:
-1. `load()` returns true and sets `_bytesLoaded=0`, `_bytesTotal=undefined`,
-   `loaded=false` on the instance.
-2. On the NEXT frame tick (before subsequent frame scripts):
-   set `_bytesLoaded = _bytesTotal = content_length`, then fire
-   `onData(content_string)`.
-3. The default `onData` (installed on the prototype) should call
-   `this.decode(src)` and `this.onLoad(true)`. The test overrides onData to
-   check intermediate state, then calls decode + onLoad manually.
-
-Requires: a deferred-LoadVars-dispatch queue, a `processLoadVarsLoads()`
-called from `swf_core.c` between frame scripts and timers, and a default
-`onData` implementation on `LoadVars.prototype`.
 
 **Phase 3/4 (MovieClipLoader) — not started:** The 120-line MCL gap requires
 `loadClip` to fire `onLoadError` async for non-existent URLs and
 `onLoadStart` / `onLoadProgress` / `onLoadComplete` / `onLoadInit` for
-successful loads. Shares infrastructure with Phase 2's async dispatcher.
+successful loads. Can reuse the Phase 2 `fireLoadVarsCallback` dispatcher
+verbatim (or generalize its name). Listener dispatch is via AsBroadcaster —
+iterate `mcl._listeners` and fire each.
 
-**Misc remaining LoadVars failures (~10 lines/test):**
+**Misc remaining LoadVars failures (~14 lines/test):**
 - `sendAndLoad` block 2/3 expectations (line 54, 63-66): target doesn't get
-  `loaded` as OWN but does get it inherited; block 3 return value differs.
-  Needs source inspection to understand exactly what the test passes.
+  `loaded` as OWN in block 2, or block 3 return value is false.
 - `[type Object]` vs `[object Object]` in toString (line 98): Flash's
   LoadVars.toString serializes certain native-typed objects to
   `[type Object]`, we emit `[object Object]` from Object.prototype.toString.
   One line per test.
-- `lv.toString()` override via own `toString` property (line 101): needs the
-  recompiler/runtime to invoke the instance-overridden toString instead of
-  the prototype's.
+- `lv.toString()` override via own `toString` property (line 101): likely
+  needs a special dispatch path for own-property `toString` before the
+  prototype's native toString.
+- Lines 147-149 (end of test): second `sendAndLoad` block fails; probably
+  another target-type edge case.
+- `#passed: 144` / `#failed: 0` summary counts are off because we fail a
+  handful of individual checks above.
 
 ## Root Cause
 

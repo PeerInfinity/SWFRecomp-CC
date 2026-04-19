@@ -27632,23 +27632,220 @@ static ActionVar builtin_loadvars_sendAndLoad(SWFAppContext* app_context, Action
 	return ret;
 }
 
-// LoadVars.load(url): fetch embedded data file, parse URL-encoded body into
-// own properties of the LoadVars instance, and fire this.onLoad(success).
+// Deferred LoadVars-load queue. Entries are enqueued by load() and processed
+// after frame scripts complete (see processLoadVarsLoads()).
+#define MAX_PENDING_LV_LOADS 32
+typedef struct PendingLoadVarsLoad {
+	ASObject* lv;           // LoadVars instance (refcount held)
+	uint16_t* content_u16;  // heap-allocated UTF-16 copy (NULL on failure)
+	u32 content_u16_len;    // length in u16 code units
+	int content_bytes;      // original UTF-8 byte count (for _bytesLoaded/_bytesTotal)
+	int success;            // 0 = failure (file missing), 1 = success
+} PendingLoadVarsLoad;
+static PendingLoadVarsLoad g_pending_lv_loads[MAX_PENDING_LV_LOADS];
+static int g_pending_lv_load_count = 0;
+
+int actionHasPendingLoadVarsLoads(void) { return g_pending_lv_load_count > 0; }
+
+// Helper: invoke an AS callback method on an object with proper `this`
+// binding, arg passing, and g_current_executing_func set so that the
+// recompiler-emitted `arguments`-object setup works inside the callback body.
+// Handles both DefineFunction (type 1, pops args off stack) and
+// DefineFunction2 (type 2, reads args from args[] param).
+static void fireLoadVarsCallback(SWFAppContext* app_context, ASObject* obj,
+	const char* name, u32 name_len, ActionVar* cb_args, u32 cb_arg_count)
+{
+	ActionVar* handler = getPropertyWithPrototype(obj, name, name_len);
+	if (handler == NULL || handler->type != ACTION_STACK_VALUE_FUNCTION) return;
+	ASFunction* func = (ASFunction*)(uintptr_t) handler->data.numeric_value;
+	if (func == NULL) return;
+
+	g_special_depth++;
+	if (g_special_depth >= MAX_SPECIAL_DEPTH) { g_special_depth--; return; }
+
+	// Push `this` so callbacks using `getVariable("this")` see the target obj.
+	u32 saved_this_depth = g_this_depth;
+	if (g_this_depth < MAX_THIS_DEPTH) {
+		g_this_stack[g_this_depth].type = ACTION_STACK_VALUE_OBJECT;
+		g_this_stack[g_this_depth].str_size = 0;
+		g_this_stack[g_this_depth].data.numeric_value = (u64)(uintptr_t) obj;
+		g_this_depth++;
+	}
+
+	// Set g_current_executing_func so swf_setup_arguments_props finds the
+	// callee when the recompiler-emitted body populates `arguments`.
+	ASFunction* prev_cur = g_current_executing_func;
+	ASFunction* prev_prev = g_prev_executing_func;
+	g_prev_executing_func = g_current_executing_func;
+	g_current_executing_func = func;
+
+	// Restore captured scope chain (closure support).
+	u32 captured_count = func->captured_scope_count;
+	for (u32 ci = 0; ci < captured_count; ci++) {
+		if (scope_depth < MAX_SCOPE_DEPTH) {
+			scope_is_with[scope_depth] = func->captured_scope_is_with[ci];
+			scope_mc[scope_depth] = (MovieClip*) func->captured_scope_mc[ci];
+			scope_chain[scope_depth++] = (ASObject*) func->captured_scope[ci];
+		}
+	}
+
+	// Local scope for function-local variables.
+	ASObject* local_scope = allocObject(app_context, 8);
+	if (scope_depth < MAX_SCOPE_DEPTH) {
+		scope_is_with[scope_depth] = 0;
+		scope_mc[scope_depth] = NULL;
+		scope_chain[scope_depth++] = local_scope;
+	}
+
+	// Build `arguments` array on local_scope so the callback body can read
+	// `arguments.length` and `arguments[i]`. Mirrors actionCallFunction's
+	// type-1 path at action.c ~47538.
+	{
+		ASArray* arguments_arr = allocArray(app_context, cb_arg_count > 0 ? cb_arg_count : 1);
+		for (u32 i = 0; i < cb_arg_count; i++)
+			setArrayElement(app_context, arguments_arr, i, &cb_args[i]);
+		setupArgumentsProps(app_context, arguments_arr, func, prev_prev);
+		ActionVar args_var = {0};
+		args_var.type = ACTION_STACK_VALUE_ARRAY;
+		args_var.data.numeric_value = (u64)(uintptr_t) arguments_arr;
+		setProperty(app_context, local_scope, "arguments", 9, &args_var);
+	}
+
+	// Switch to function's base_clip (SWF6+ closure semantics).
+	MovieClip* saved_context = g_current_context;
+	if (g_swf_version >= 6 && func->base_clip != NULL)
+		g_current_context = (MovieClip*) func->base_clip;
+
+	if (func->function_type == 2) {
+		ActionVar* regs = NULL;
+		if (func->register_count > 0)
+			regs = (ActionVar*) HCALLOC(func->register_count, sizeof(ActionVar));
+		g_call_depth++;
+		func->advanced_func(app_context, cb_args, cb_arg_count, regs, (void*) obj);
+		g_call_depth--;
+		if (regs != NULL) FREE(regs);
+	} else {
+		// Type 1: push args on stack (reverse order so first-popped == args[0]).
+		for (int i = (int)cb_arg_count - 1; i >= 0; i--)
+			pushVar(app_context, &cb_args[i]);
+		g_call_depth++;
+		((ActionVar(*)(SWFAppContext*)) func->simple_func)(app_context);
+		g_call_depth--;
+	}
+
+	g_current_context = saved_context;
+	// Pop local scope + captured scopes
+	for (u32 ci = 0; ci < captured_count + 1; ci++)
+		if (scope_depth > 0) scope_depth--;
+	releaseObject(app_context, local_scope);
+
+	g_current_executing_func = prev_cur;
+	g_prev_executing_func = prev_prev;
+	g_this_depth = saved_this_depth;
+	g_special_depth--;
+}
+
+// Called from swf_core.c frame loop. Fires onData on each pending LoadVars
+// instance; default onData calls decode() + onLoad(true) or onLoad(false).
+void processLoadVarsLoads(SWFAppContext* app_context)
+{
+	int guard = 0;
+	while (g_pending_lv_load_count > 0 && guard++ < 16) {
+		// Copy locally so onData handlers that call load() again don't
+		// clobber our array.
+		PendingLoadVarsLoad local[MAX_PENDING_LV_LOADS];
+		int count = g_pending_lv_load_count;
+		for (int i = 0; i < count; i++) local[i] = g_pending_lv_loads[i];
+		g_pending_lv_load_count = 0;
+
+		for (int i = 0; i < count; i++) {
+			PendingLoadVarsLoad* p = &local[i];
+			ASObject* lv = p->lv;
+			if (lv == NULL) continue;
+
+			// On success, update _bytesLoaded / _bytesTotal to the final
+			// content length before dispatching onData.
+			if (p->success) {
+				ActionVar bv = {0}; bv.type = ACTION_STACK_VALUE_F64;
+				VAL(double, &bv.data.numeric_value) = (double)p->content_bytes;
+				setPropertyWithFlags(app_context, lv, "_bytesLoaded", 12, &bv, PROPERTY_FLAGS_DONTENUM);
+				setPropertyWithFlags(app_context, lv, "_bytesTotal", 11, &bv, PROPERTY_FLAGS_DONTENUM);
+			}
+
+			// Fire onData(content_string) on success; onData(undefined) on failure.
+			ActionVar cb = {0};
+			if (p->success && p->content_u16 != NULL) {
+				cb.type = ACTION_STACK_VALUE_STRING;
+				cb.str_size = p->content_u16_len;
+				cb.data.numeric_value = (u64)(uintptr_t) p->content_u16;
+			} else {
+				cb.type = ACTION_STACK_VALUE_UNDEFINED;
+			}
+			fireLoadVarsCallback(app_context, lv, "onData", 6, &cb, 1);
+
+			releaseObject(app_context, lv);
+		}
+	}
+}
+
+// Default LoadVars.prototype.onData: calls decode(src) and then onLoad(true)
+// on the LoadVars instance. Mirrors Flash's spec-level default handler.
+// Invoked async from processLoadVarsLoads when the user hasn't overridden
+// onData on the instance.
+static ActionVar builtin_loadvars_default_onData(SWFAppContext* app_context, ActionVar* args, u32 arg_count,
+	ActionVar* registers, void* this_obj)
+{
+	(void)registers;
+	ActionVar ret = {0}; ret.type = ACTION_STACK_VALUE_UNDEFINED;
+	if (this_obj == NULL) return ret;
+	ASObject* lv = (ASObject*) this_obj;
+
+	int success = (arg_count >= 1 && args[0].type == ACTION_STACK_VALUE_STRING);
+	if (success) {
+		builtin_loadvars_decode(app_context, args, 1, NULL, this_obj);
+		ActionVar lt = {0}; lt.type = ACTION_STACK_VALUE_BOOLEAN; lt.data.numeric_value = 1;
+		setProperty(app_context, lv, "loaded", 6, &lt);
+	} else {
+		ActionVar lf = {0}; lf.type = ACTION_STACK_VALUE_BOOLEAN; lf.data.numeric_value = 0;
+		setProperty(app_context, lv, "loaded", 6, &lf);
+	}
+	ActionVar cb = {0}; cb.type = ACTION_STACK_VALUE_BOOLEAN;
+	cb.data.numeric_value = success ? 1 : 0;
+	fireLoadVarsCallback(app_context, lv, "onLoad", 6, &cb, 1);
+	return ret;
+}
+
+// LoadVars.load(url): set initial state (_bytesLoaded=0, _bytesTotal=undefined,
+// loaded=false), enqueue a deferred dispatch that will fire onData(src) on the
+// next frame-loop tick, and return true. Returns false if no URL was given.
 static ActionVar builtin_loadvars_load(SWFAppContext* app_context, ActionVar* args, u32 arg_count,
 	ActionVar* registers, void* this_obj)
 {
+	(void)registers;
 	ActionVar ret = {0}; ret.type = ACTION_STACK_VALUE_BOOLEAN;
-	if (this_obj == NULL) { ret.data.numeric_value = 0; return ret; }
+	ret.data.numeric_value = 0;
+	if (this_obj == NULL) return ret;
+	if (arg_count < 1 || args[0].type != ACTION_STACK_VALUE_STRING) return ret;
 	ASObject* lv = (ASObject*) this_obj;
 
 	char url_utf8[512];
 	url_utf8[0] = '\0';
-	if (arg_count > 0 && args[0].type == ACTION_STACK_VALUE_STRING) {
+	{
 		const uint16_t* u16 = varGetU16Ptr(&args[0]);
 		u16_to_utf8(u16, args[0].str_size, url_utf8, sizeof(url_utf8));
 	}
+	if (url_utf8[0] == '\0') return ret;
 
-	// Initial loaded = false
+	// Initial state: _bytesLoaded = 0 (F64), _bytesTotal = undefined, loaded = false.
+	{
+		ActionVar bv = {0}; bv.type = ACTION_STACK_VALUE_F64;
+		VAL(double, &bv.data.numeric_value) = 0.0;
+		setPropertyWithFlags(app_context, lv, "_bytesLoaded", 12, &bv, PROPERTY_FLAGS_DONTENUM);
+	}
+	{
+		ActionVar uv = {0}; uv.type = ACTION_STACK_VALUE_UNDEFINED;
+		setPropertyWithFlags(app_context, lv, "_bytesTotal", 11, &uv, PROPERTY_FLAGS_DONTENUM);
+	}
 	{
 		ActionVar lf = {0}; lf.type = ACTION_STACK_VALUE_BOOLEAN; lf.data.numeric_value = 0;
 		setProperty(app_context, lv, "loaded", 6, &lf);
@@ -27656,58 +27853,38 @@ static ActionVar builtin_loadvars_load(SWFAppContext* app_context, ActionVar* ar
 
 	extern DataFileEntry* findDataFile(const char* name);
 	DataFileEntry* data = findDataFile(url_utf8);
-	int success = 0;
 
-	if (data != NULL && data->content != NULL && data->content_length > 0) {
-		int _lv_len = data->content_length;
-		if (_lv_len > 4096) _lv_len = 4096;
-		char _lv_buf[4097];
-		memcpy(_lv_buf, data->content, _lv_len);
-		_lv_buf[_lv_len] = '\0';
-
-		// Parse key=value&key=value... into properties on `lv`.
-		char* pair = _lv_buf;
-		while (pair && *pair) {
-			char* next = strchr(pair, '&');
-			if (next) *next++ = '\0';
-			char* eq = strchr(pair, '=');
-			if (eq) {
-				*eq = '\0';
-				char* key = pair; char* value = eq + 1;
-				urlDecode(key); urlDecode(value);
-				int key_len = (int)strlen(key);
-				int val_len = (int)strlen(value);
-				if (key_len > 0) {
-					u32 u16_len = 0;
-					uint16_t* u16_val = utf8_to_u16(app_context, value, val_len, &u16_len);
-					ActionVar sv = {0};
-					sv.type = ACTION_STACK_VALUE_STRING;
-					sv.str_size = u16_len;
-					if (u16_len > 0 && u16_val != NULL) {
-						sv.data.numeric_value = (u64)(uintptr_t)u16_val;
-					}
-					setProperty(app_context, lv, key, key_len, &sv);
-				}
+	// Enqueue deferred dispatch.
+	if (g_pending_lv_load_count < MAX_PENDING_LV_LOADS) {
+		PendingLoadVarsLoad* p = &g_pending_lv_loads[g_pending_lv_load_count++];
+		p->lv = lv;
+		retainObject(lv);
+		if (data != NULL && data->content != NULL && data->content_length > 0) {
+			// Keep the raw byte count for _bytesLoaded/_bytesTotal (matches
+			// Flash — it reports the transfered byte count, BOM included).
+			p->content_bytes = data->content_length;
+			// Strip UTF-8 BOM (EF BB BF) before passing to onData — Flash
+			// treats the BOM as transport metadata, not content.
+			const char* body = data->content;
+			int body_len = data->content_length;
+			if (body_len >= 3 && (unsigned char)body[0] == 0xEF &&
+			    (unsigned char)body[1] == 0xBB && (unsigned char)body[2] == 0xBF) {
+				body += 3;
+				body_len -= 3;
 			}
-			pair = next;
+			u32 u16_len = 0;
+			p->content_u16 = utf8_to_u16(app_context, body, body_len, &u16_len);
+			p->content_u16_len = u16_len;
+			p->success = 1;
+		} else {
+			p->content_u16 = NULL;
+			p->content_u16_len = 0;
+			p->content_bytes = 0;
+			p->success = 0;
 		}
-
-		// Track byte counts + mark loaded = true
-		ActionVar bv = {0}; bv.type = ACTION_STACK_VALUE_F64;
-		VAL(double, &bv.data.numeric_value) = (double)data->content_length;
-		setPropertyWithFlags(app_context, lv, "_bytesLoaded", 12, &bv, PROPERTY_FLAGS_DONTENUM);
-		setPropertyWithFlags(app_context, lv, "_bytesTotal", 11, &bv, PROPERTY_FLAGS_DONTENUM);
-		ActionVar lt = {0}; lt.type = ACTION_STACK_VALUE_BOOLEAN; lt.data.numeric_value = 1;
-		setProperty(app_context, lv, "loaded", 6, &lt);
-		success = 1;
 	}
 
-	// Fire onLoad(success)
-	ActionVar cb = {0}; cb.type = ACTION_STACK_VALUE_BOOLEAN;
-	cb.data.numeric_value = success ? 1 : 0;
-	soundFireCallback(app_context, lv, "onLoad", 6, &cb, 1);
-
-	ret.data.numeric_value = success ? 1 : 0;
+	ret.data.numeric_value = 1;
 	return ret;
 }
 
@@ -27717,6 +27894,7 @@ static ASFunction g_loadvars_fn_toString;
 static ASFunction g_loadvars_fn_getBytesLoaded;
 static ASFunction g_loadvars_fn_getBytesTotal;
 static ASFunction g_loadvars_fn_sendAndLoad;
+static ASFunction g_loadvars_fn_default_onData;
 
 // Helper: register a native ASFunction on a prototype (DONT_ENUM by default
 // via mflags = PROPERTY_FLAG_WRITABLE).
@@ -27765,11 +27943,15 @@ static void initLoadVarsPrototype(SWFAppContext* app_context, ASFunction* ctor)
 	// toString is NOT DONT_ENUM (overrides Object.prototype.toString)
 	registerLoadVarsNative(app_context, ctor->prototype_obj, "toString", 8,
 		&g_loadvars_fn_toString, (Function2Ptr) builtin_loadvars_toString, PROPERTY_FLAGS_DEFAULT);
+	// Default onData: decode(src) + onLoad(true) / onLoad(false) on failure.
+	// Overridable by assigning to lv.onData on the instance.
+	registerLoadVarsNative(app_context, ctor->prototype_obj, "onData", 6,
+		&g_loadvars_fn_default_onData, (Function2Ptr) builtin_loadvars_default_onData, mflags);
 	// contentType is a DONT_ENUM string property
 	ActionVar sv = makeStringActionVar(app_context, "application/x-www-form-urlencoded", 33);
 	setPropertyWithFlags(app_context, ctor->prototype_obj, "contentType", 11, &sv, mflags);
 	addStubMethodToProto(app_context, ctor->prototype_obj, "onLoad", 6, mflags);
-	addStubMethodToProto(app_context, ctor->prototype_obj, "onData", 6, mflags);
+	// onData already installed above with real default impl
 	addStubMethodToProto(app_context, ctor->prototype_obj, "addRequestHeader", 16, mflags);
 }
 
