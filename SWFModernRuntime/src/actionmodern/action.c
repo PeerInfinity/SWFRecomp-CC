@@ -25400,12 +25400,13 @@ static ActionVar builtin_mcl_unloadClip(SWFAppContext* app_context, ActionVar* a
 {
     (void)registers;
     ActionVar result = {0};
-    result.type = ACTION_STACK_VALUE_BOOLEAN;
 
     if (arg_count < 1) {
-        VAL(u64, &result.data.numeric_value) = 0;
+        // Flash returns undefined when called with no arguments.
+        result.type = ACTION_STACK_VALUE_UNDEFINED;
         return result;
     }
+    result.type = ACTION_STACK_VALUE_BOOLEAN;
 
     int is_level = 0;
     MovieClip* target_mc = resolveMCLTarget(app_context, &args[0], &is_level);

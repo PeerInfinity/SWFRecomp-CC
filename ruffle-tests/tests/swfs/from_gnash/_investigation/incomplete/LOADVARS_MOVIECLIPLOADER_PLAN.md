@@ -2,7 +2,7 @@
 <!-- TESTS: LoadVars-v6, LoadVars-v7, LoadVars-v8, MovieClipLoader-v7, MovieClipLoader-v8 -->
 
 Last updated: 2026-04-19
-Status: Phase 1 + Phase 2 complete — LoadVars v6/v7/v8 each 61/152 → 138/152 (91%); MCL v7/v8 unchanged
+Status: Phase 1 + 2 complete — LoadVars v6/v7/v8 each 61/152 → 138/152 (91%); MCL v7/v8 promoted to `ruffle_matched` (effective pass)
 
 ---
 
@@ -27,8 +27,8 @@ event sequence and payloads.
 | LoadVars-v6 | 138 / 152 | — | ~14 |
 | LoadVars-v7 | 138 / 152 | — | ~14 |
 | LoadVars-v8 | 138 / 152 | — | ~14 |
-| MovieClipLoader-v7 | 46 / 165 | — | ~120 |
-| MovieClipLoader-v8 | 46 / 165 | — | ~120 |
+| MovieClipLoader-v7 | 46 / 165 | — | ~120 — ruffle_matched (effective pass) |
+| MovieClipLoader-v8 | 46 / 165 | — | ~120 — ruffle_matched (effective pass) |
 
 ### Phase 1 Results (2026-04-19)
 
@@ -85,12 +85,20 @@ No regressions on avm1 `loadvariables`, `loadvariables2`, `loadvariablesnum`,
 
 ## Remaining Work
 
-**Phase 3/4 (MovieClipLoader) — not started:** The 120-line MCL gap requires
-`loadClip` to fire `onLoadError` async for non-existent URLs and
-`onLoadStart` / `onLoadProgress` / `onLoadComplete` / `onLoadInit` for
-successful loads. Can reuse the Phase 2 `fireLoadVarsCallback` dispatcher
-verbatim (or generalize its name). Listener dispatch is via AsBroadcaster —
-iterate `mcl._listeners` and fire each.
+**Phase 3/4 (MovieClipLoader) — promoted to ruffle_matched:** A single-line
+fix to `builtin_mcl_unloadClip` (return `undefined` instead of boolean `false`
+when called with no arguments, matching Flash) was enough to drop our diff
+below Ruffle's upstream known_failure diff, so both MCL tests are now
+effective passes via `ruffle_matched`. The remaining 120-line gap between
+our output and Flash's reference is the full async-image-load lifecycle
+(`onLoadStart` / `onLoadProgress` / `onLoadComplete` / `onLoadInit` for
+successful loads, `onLoadError("URLNotFound")` for missing URLs) plus image
+dimension handling — all of which Ruffle also cannot pass. If we ever want
+to land "real" passes on these tests (not just ruffle_matched), we'd need
+to implement the full event lifecycle in `actionFirePendingLoadInits`
+including: onLoadError for any non-existent URL (not just .swf), DataFile
+entry support so vars.txt produces a success sequence with file_size=1126,
+and image load simulation for green.jpg (target._width/_height = 170).
 
 **Misc remaining LoadVars failures (~14 lines/test):**
 - `sendAndLoad` block 2/3 expectations (line 54, 63-66): target doesn't get
