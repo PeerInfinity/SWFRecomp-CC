@@ -9744,10 +9744,15 @@ static ActionVar bitmapDataClone(SWFAppContext* app_context, ActionVar* args, u3
     // Create new BitmapData
     ASObject* clone_obj = allocObject(app_context, 4);
     clone_obj->native_type = NATIVE_BITMAPDATA;
-    ActionVar proto_var = {0};
-    proto_var.type = ACTION_STACK_VALUE_OBJECT;
-    proto_var.data.numeric_value = (u64) g_bitmapdata_prototype;
-    setProperty(app_context, clone_obj, "__proto__", 9, &proto_var);
+    // Ruffle: `new_bitmap_data(this.get_local_stored("__proto__"), ...)`.
+    // Clone's __proto__ is copied from source's own __proto__ property, not
+    // hardcoded to BitmapData.prototype. This lets the user monkey-patch the
+    // source's __proto__ before cloning (Gnash BitmapData-v8 test 1126 sets
+    // orig.__proto__ = o, then expects cl.__proto__ == o).
+    ActionVar* src_proto = obj ? getProperty(obj, "__proto__", 9) : NULL;
+    if (src_proto != NULL) {
+        setProperty(app_context, clone_obj, "__proto__", 9, src_proto);
+    }
     BitmapDataNative* clone_bmp = (BitmapDataNative*) malloc(sizeof(BitmapDataNative));
     clone_bmp->width = bmp->width;
     clone_bmp->height = bmp->height;

@@ -1,8 +1,8 @@
 # BitmapData Plan
 <!-- TESTS: BitmapData-v8 -->
 
-Last updated: 2026-04-18 (session 4)
-Status: IN PROGRESS — 1 test, 376/417 lines matching (90%) — 39 diffs remaining
+Last updated: 2026-04-18 (session 5)
+Status: IN PROGRESS — 1 test, 375/410 check lines pass (35 failed) — remaining diffs are Cat 3 (MovieClip draw) blocked on software rasterizer (`MOVIECLIP_DRAW_PLAN.md`)
 
 ---
 
@@ -45,6 +45,26 @@ Result: BitmapData-v8 diffs 44 → 40 (4 Cat 1 tests fixed:
 315/324/329/334). BitmapData-v5/v6/v7 still PASS. AVM1 bitmap tests
 unchanged. Rectangle-v5/v6/v7 unchanged; Rectangle-v8 was already
 failing before the fix (unrelated Rectangle.containsPoint bugs).
+
+### Session 5 (2026-04-18) — Cat 2 fix landed
+`bitmapDataClone` now copies the source's own `__proto__` property to the
+clone instead of hardcoding `g_bitmapdata_prototype`. This matches Ruffle's
+AVM1 impl (`core/src/avm1/globals/bitmap_data.rs::clone`), which calls
+`this.get_local_stored(istr!("__proto__"), activation)` and passes the
+result to `new_bitmap_data` — so the clone inherits whatever __proto__ the
+user monkey-patched onto the source.
+
+Test 1126: `orig.__proto__ = o; cl = orig.clone(); cl.__proto__ == o` now
+passes. 1127-1129 pass because property lookup walks `cl.__proto__ = o`
+and finds `o.constructor = 25`, `o.width = 20`, `o.height = 21`. Later
+tests at 1131/1132 (`cl.width == 10, cl.height == 10`) also still pass
+because when __proto__ is restored to the original BitmapData.prototype
+the width/height getters resolve to the native clone's dimensions.
+
+Result: BitmapData-v8 diffs 39 → 35 (Cat 2 tests 1126-1129 fixed). No
+regressions on BitmapData-v5/v6/v7 or avm1 bitmap_data*, bitmap_data_compare,
+bitmap_data_copypixels, bitmap_data_fillrect, bitmap_data_hittest,
+bitmap_data_colortransform.
 
 ### Session 4 (2026-04-18) — Cat 4 fix landed
 Root cause isolated: when `src == dest` and the source/dest rects
@@ -111,7 +131,7 @@ Impact: +4 diffs.
 
 ---
 
-### Cat 2. `clone()` returns -1 when `this` isn't a real BitmapData (4 diffs)
+### Cat 2. `clone()` hardcoded clone's __proto__ to BitmapData.prototype (4 diffs) — **FIXED (session 5)**
 
 Tests: `BitmapData.as:1126, 1127, 1128, 1129`. The test pattern (reconstructed
 from `script_2.c:50017-50138`):
@@ -233,15 +253,16 @@ summary. These will converge automatically once the above fixes land.
 
 ## Recommended Fix Order
 
-1. **Cat 1 (rectangle getter)** — 4 diffs, small isolated runtime change.
-2. **Cat 4 (copyPixels clipping)** — 1 diff, likely a small bug to track down.
-3. **Cat 2 (clone fallback)** — 4 diffs, straightforward but has a sub-puzzle
-   (width=10 mystery) to resolve first.
-4. **Cat 3 (draw rasterizer)** — 30 diffs, large undertaking — see separate
-   `MOVIECLIP_DRAW_PLAN.md`.
+1. ~~**Cat 1 (rectangle getter)**~~ — DONE (session 3).
+2. ~~**Cat 4 (copyPixels clipping)**~~ — DONE (session 4).
+3. ~~**Cat 2 (clone __proto__ inheritance)**~~ — DONE (session 5).
+4. **Cat 3 (draw rasterizer)** — ~30 diffs, large undertaking — see separate
+   `MOVIECLIP_DRAW_PLAN.md`. This is the only remaining category; all other
+   diffs are the Cat 5 #passed/#failed summary lines that converge once
+   Cat 3 is resolved.
 
-After Cats 1-4: expected ~44-35 = 9 diffs remaining (most being `draw`
-without a rasterizer). After Cat 3: test passes or near-passes.
+Current status after Cats 1-2-4: 35 diffs remaining, all Cat 3 (or
+summary). Test passes or near-passes once Cat 3 lands.
 
 ---
 
