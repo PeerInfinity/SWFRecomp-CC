@@ -1,8 +1,8 @@
 # Implicit Coercion (valueOf / toString Dispatch) Plan
 <!-- TESTS: Matrix-v6, Rectangle-v8, toString_valueOf-v5, toString_valueOf-v6, toString_valueOf-v7, toString_valueOf-v8 -->
 
-Last updated: 2026-04-17 (Phase 1 done — Rectangle/Matrix builtins dispatch valueOf)
-Status: IN PROGRESS — Phase 1 complete, Phases 2-4 open
+Last updated: 2026-04-18 (Phase 2b done — String wrapper shadow + convertString shortcut)
+Status: IN PROGRESS — Phases 1, 2a, 2b complete; v6 → ruffle_matched; v7/v8 close
 
 ---
 
@@ -20,14 +20,14 @@ sub-cluster of these failures but didn't cover the rest.
 
 ## Current Line Match
 
-| Test | Match | Expected | Diffs |
-|------|-------|----------|-------|
-| Matrix-v6 | 137/168 (81.5%) | — | 29 |
-| Rectangle-v8 | 140/166 (84.3%) | — | 24 |
-| toString_valueOf-v5 | 90/137 (65.7%) | — | 44 |
-| toString_valueOf-v6 | 141/155 (91.0%) | — | 11 |
-| toString_valueOf-v7 | 140/155 (90.3%) | — | 13 |
-| toString_valueOf-v8 | 140/155 (90.3%) | — | 13 |
+| Test | Match | Expected | Diffs | Status |
+|------|-------|----------|-------|--------|
+| Matrix-v6 | 137/168 (81.5%) | — | 31 | output_mismatch |
+| Rectangle-v8 | 144/166 (86.7%) | — | 20 | output_mismatch |
+| toString_valueOf-v5 | 95/137 (69.3%) | — | 39 | output_mismatch |
+| toString_valueOf-v6 | 152/155 (98.1%) | — | 3 | **ruffle_matched** |
+| toString_valueOf-v7 | 144/155 (92.9%) | — | 5 | output_mismatch |
+| toString_valueOf-v8 | 144/155 (92.9%) | — | 5 | output_mismatch |
 
 ## Sub-clusters
 
@@ -123,6 +123,35 @@ toString, then string comparison.
 - Audit `actionAdd2` and `avAdditionEcma` for MOVIECLIP-operand handling.
 - Ensure `objectCallToString` is invoked with proper context.
 - Expected impact: toString_valueOf-v6/v7/v8 +3-5 lines each.
+
+### Phase 2b — String/Boolean wrapper own-property shadowing — DONE (2026-04-18)
+- `new String(x)` and `new Boolean(x)` were installing their own
+  `valueOf` / `toString` as DontEnum own properties on the wrapper
+  instance, which shadowed user overrides to `String.prototype.valueOf` /
+  `.toString`. Removed the own-prop installs; wrappers now inherit
+  valueOf/toString from their prototype (matches Number constructor).
+- To preserve ToString short-circuit for String wrappers (Ruffle's
+  `value.rs` Value::coerce_to_string bypasses user toString when
+  `NativeObject::String`), added a `native_type == NATIVE_STRING` shortcut
+  to both `convertString` (OBJECT case) and `varToStringBuf` (OBJECT case):
+  when present, returns the stored `valueOf_value` primitive directly
+  without invoking toString. Keeps `parseInt(str_wrapper)` / string
+  concat with a String wrapper working after user overrides.
+- **Impact:**
+  - toString_valueOf-v6: 8 → 3 diffs → **ruffle_matched** (+1 test)
+  - toString_valueOf-v7: 8 → 5 diffs
+  - toString_valueOf-v8: 8 → 5 diffs
+  - Remaining diffs on v7/v8: lines 57/58/59 (svo standalone on MC/func/bool
+    receiver — Ruffle also fails 57/58, we differ on 59) and lines 147/148
+    (user valueOf/toString on plain Object during `"" + o`: counters stay
+    0 in v7/v8 but pass in v6 — SWF version-specific path not yet
+    identified).
+- No regressions on avm1 `add`, `array_enumerate`,
+  `coerce_to_object_monkeypatch`, `enumerate`, `mutable_this`,
+  `register_class_return_value`, `string_coercion`, `text_format`,
+  `textsnapshot_available_text`, `this_scoping`, `unload`; nor on gnash
+  `Boolean-v5..v8`, `Number-v6..v8`, `Matrix-v5/v7/v8`, `Point-v5..v8`,
+  `Rectangle-v5..v7`, `ColorTransform-v8`.
 
 ### Phase 3 — Remaining `simple_func` this-context sites
 - Grep for `simple_func)(app_context)` in `action.c`; audit each site for

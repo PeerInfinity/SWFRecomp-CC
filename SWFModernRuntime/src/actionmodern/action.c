@@ -21368,6 +21368,23 @@ ActionStackValueType convertString(SWFAppContext* app_context, char* var_str)
 			ActionVar _cs_obj;
 			_cs_obj.type = ACTION_STACK_VALUE_OBJECT;
 			_cs_obj.data.numeric_value = STACK_TOP_VALUE;
+			// Ruffle shortcut: a String wrapper (NativeObject::String) returns its
+			// stored primitive directly, bypassing user toString. Matches
+			// core/src/avm1/value.rs Value::coerce_to_string.
+			{
+				ASObject* _cs_str_obj = (ASObject*) STACK_TOP_VALUE;
+				if (_cs_str_obj != NULL && _cs_str_obj->native_type == NATIVE_STRING)
+				{
+					ActionVar* _cs_prim = getProperty(_cs_str_obj, "valueOf_value", 13);
+					if (_cs_prim != NULL && _cs_prim->type == ACTION_STACK_VALUE_STRING)
+					{
+						STACK_TOP_TYPE = ACTION_STACK_VALUE_STRING;
+						VAL(u64, &STACK_TOP_VALUE) = _cs_prim->data.numeric_value;
+						STACK_TOP_N = _cs_prim->str_size;
+						break;
+					}
+				}
+			}
 			int _cs_found = 0;
 			ActionVar _cs_ts = objectCallToString(app_context, &_cs_obj, &_cs_found);
 			STACK_TOP_TYPE = ACTION_STACK_VALUE_STRING;
@@ -41414,37 +41431,10 @@ void actionNewObject(SWFAppContext* app_context)
 			setPropertyWithFlags(app_context, str_obj, "length", 6, &len_var, PROPERTY_FLAG_WRITABLE);
 		}
 
-		// Set up valueOf and toString using the wrapper infrastructure
-		if (!g_wrapper_funcs_init)
-		{
-			memset(&g_wrapper_valueOf_func, 0, sizeof(ASFunction));
-			strncpy(g_wrapper_valueOf_func.name, "valueOf", 255);
-			g_wrapper_valueOf_func.function_type = 2;
-			g_wrapper_valueOf_func.param_count = 0;
-			g_wrapper_valueOf_func.advanced_func = (Function2Ptr) builtin_wrapper_valueOf;
-			if (function_count < MAX_FUNCTIONS)
-				function_registry[function_count++] = &g_wrapper_valueOf_func;
-
-			memset(&g_prim_wrapper_toString_func, 0, sizeof(ASFunction));
-			strncpy(g_prim_wrapper_toString_func.name, "toString", 255);
-			g_prim_wrapper_toString_func.function_type = 2;
-			g_prim_wrapper_toString_func.param_count = 0;
-			g_prim_wrapper_toString_func.advanced_func = (Function2Ptr) builtin_prim_wrapper_toString;
-			if (function_count < MAX_FUNCTIONS)
-				function_registry[function_count++] = &g_prim_wrapper_toString_func;
-
-			g_wrapper_funcs_init = 1;
-		}
-
-		ActionVar vo_val = {0};
-		vo_val.type = ACTION_STACK_VALUE_FUNCTION;
-		VAL(u64, &vo_val.data.numeric_value) = (u64) &g_wrapper_valueOf_func;
-		setPropertyWithFlags(app_context, str_obj, "valueOf", 7, &vo_val, PROPERTY_FLAGS_DONTENUM);
-
-		ActionVar ts_val = {0};
-		ts_val.type = ACTION_STACK_VALUE_FUNCTION;
-		VAL(u64, &ts_val.data.numeric_value) = (u64) &g_prim_wrapper_toString_func;
-		setPropertyWithFlags(app_context, str_obj, "toString", 8, &ts_val, PROPERTY_FLAGS_DONTENUM);
+		// valueOf/toString live on String.prototype, NOT as own properties on
+		// the wrapper instance (matches Number constructor and Flash behavior).
+		// Installing them as own props shadows user overrides to
+		// String.prototype.valueOf / .toString.
 
 		new_obj = str_obj;
 		PUSH(ACTION_STACK_VALUE_OBJECT, (u64) new_obj);
@@ -41560,31 +41550,8 @@ void actionNewObject(SWFAppContext* app_context)
 		setPropertyWithFlags(app_context, bool_obj, "valueOf_value", 13, &value_var, PROPERTY_FLAGS_DONTENUM);
 		setPropertyWithFlags(app_context, bool_obj, "value", 5, &value_var, PROPERTY_FLAGS_DONTENUM);
 
-		// Set up valueOf and toString using the wrapper infrastructure
-		if (!g_wrapper_funcs_init)
-		{
-			memset(&g_wrapper_valueOf_func, 0, sizeof(ASFunction));
-			strncpy(g_wrapper_valueOf_func.name, "valueOf", 255);
-			g_wrapper_valueOf_func.function_type = 2;
-			g_wrapper_valueOf_func.param_count = 0;
-			g_wrapper_valueOf_func.advanced_func = (Function2Ptr) builtin_wrapper_valueOf;
-			if (function_count < MAX_FUNCTIONS)
-				function_registry[function_count++] = &g_wrapper_valueOf_func;
-			memset(&g_prim_wrapper_toString_func, 0, sizeof(ASFunction));
-			strncpy(g_prim_wrapper_toString_func.name, "toString", 255);
-			g_prim_wrapper_toString_func.function_type = 2;
-			g_prim_wrapper_toString_func.param_count = 0;
-			g_prim_wrapper_toString_func.advanced_func = (Function2Ptr) builtin_prim_wrapper_toString;
-			if (function_count < MAX_FUNCTIONS)
-				function_registry[function_count++] = &g_prim_wrapper_toString_func;
-			g_wrapper_funcs_init = 1;
-		}
-		ActionVar _bvo = {0}; _bvo.type = ACTION_STACK_VALUE_FUNCTION;
-		VAL(u64, &_bvo.data.numeric_value) = (u64) &g_wrapper_valueOf_func;
-		setPropertyWithFlags(app_context, bool_obj, "valueOf", 7, &_bvo, PROPERTY_FLAGS_DONTENUM);
-		ActionVar _bts = {0}; _bts.type = ACTION_STACK_VALUE_FUNCTION;
-		VAL(u64, &_bts.data.numeric_value) = (u64) &g_prim_wrapper_toString_func;
-		setPropertyWithFlags(app_context, bool_obj, "toString", 8, &_bts, PROPERTY_FLAGS_DONTENUM);
+		// valueOf/toString live on Boolean.prototype, NOT as own properties on
+		// the wrapper instance. See matching String/Number note above.
 
 		new_obj = bool_obj;
 		PUSH(ACTION_STACK_VALUE_OBJECT, (u64) new_obj);
@@ -47548,6 +47515,19 @@ static int varToStringBuf(SWFAppContext* app_context, ActionVar* v, char* buf, i
 		case ACTION_STACK_VALUE_OBJECT:
 		{
 			if (v->data.numeric_value != 0) {
+				// Ruffle shortcut: String wrapper returns its primitive directly,
+				// bypassing user toString (matches value.rs coerce_to_string).
+				ASObject* _vsb_str_obj = (ASObject*) v->data.numeric_value;
+				if (_vsb_str_obj != NULL && _vsb_str_obj->native_type == NATIVE_STRING)
+				{
+					ActionVar* _vsb_prim = getProperty(_vsb_str_obj, "valueOf_value", 13);
+					if (_vsb_prim != NULL && _vsb_prim->type == ACTION_STACK_VALUE_STRING)
+					{
+						const uint16_t* _u16 = varGetU16Ptr(_vsb_prim);
+						if (_u16 != NULL)
+							return u16_to_utf8(_u16, _vsb_prim->str_size, buf, buf_size);
+					}
+				}
 				int ts_found = 0;
 				ActionVar ts = objectCallToString(app_context, v, &ts_found);
 				if (ts_found && ts.type == ACTION_STACK_VALUE_STRING) {
