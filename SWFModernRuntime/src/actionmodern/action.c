@@ -7648,10 +7648,20 @@ static ActionVar pointToString(SWFAppContext* app_context, ActionVar* args, u32 
 	ASObject* obj = (ASObject*) this_obj;
 	char buf[512];
 	char xbuf[128], ybuf[128];
-	ActionVar* xv = obj ? getProperty(obj, "x", 1) : NULL;
-	ActionVar* yv = obj ? getProperty(obj, "y", 1) : NULL;
-	varToStringBufFull(app_context, xv, xbuf, sizeof(xbuf));
-	varToStringBufFull(app_context, yv, ybuf, sizeof(ybuf));
+	// SWF<7 renders undefined as "", SWF>=7 as "undefined". Missing
+	// property reads as undefined in ECMA.
+	#define _PT_TOSTR_FIELD(name, nlen, out) do { \
+		ActionVar* _v = obj ? getProperty(obj, (name), (nlen)) : NULL; \
+		if (_v == NULL || _v->type == ACTION_STACK_VALUE_UNDEFINED) { \
+			if (g_swf_version >= 7) snprintf((out), sizeof(out), "undefined"); \
+			else (out)[0] = '\0'; \
+		} else { \
+			varToStringBufFull(app_context, _v, (out), sizeof(out)); \
+		} \
+	} while (0)
+	_PT_TOSTR_FIELD("x", 1, xbuf);
+	_PT_TOSTR_FIELD("y", 1, ybuf);
+	#undef _PT_TOSTR_FIELD
 	int len = snprintf(buf, sizeof(buf), "(x=%s, y=%s)", xbuf, ybuf);
 
 	ActionVar r = {0};
@@ -8070,8 +8080,18 @@ static ActionVar matrixToStringDynamic(SWFAppContext* app_context, ActionVar* ar
 	static const char* names[] = {"a","b","c","d","tx","ty"};
 	static const u32 lens[] = {1,1,1,1,2,2};
 	char vals[6][128];
+	// SWF<7 renders undefined as "", SWF>=7 as "undefined". varToStringBuf
+	// always emits "undefined"; short-circuit UNDEFINED/missing to match
+	// Flash's string-concat version gating.
 	for (int i = 0; i < 6; i++) {
 		ActionVar* v = obj ? getProperty(obj, names[i], lens[i]) : NULL;
+		if (v == NULL || v->type == ACTION_STACK_VALUE_UNDEFINED) {
+			if (g_swf_version >= 7)
+				snprintf(vals[i], sizeof(vals[i]), "undefined");
+			else
+				vals[i][0] = '\0';
+			continue;
+		}
 		varToStringBufFull(app_context, v, vals[i], sizeof(vals[i]));
 	}
 	int len = snprintf(buf, sizeof(buf), "(a=%s, b=%s, c=%s, d=%s, tx=%s, ty=%s)",
@@ -8518,14 +8538,22 @@ static ActionVar rectToStringDynamic(SWFAppContext* app_context, ActionVar* args
 	ASObject* obj = (ASObject*) this_obj;
 	char buf[512];
 	char xb[64], yb[64], wb[64], hb[64];
-	ActionVar* xv = obj ? getProperty(obj, "x", 1) : NULL;
-	ActionVar* yv = obj ? getProperty(obj, "y", 1) : NULL;
-	ActionVar* wv = obj ? getProperty(obj, "width", 5) : NULL;
-	ActionVar* hv = obj ? getProperty(obj, "height", 6) : NULL;
-	varToStringBufFull(app_context, xv, xb, sizeof(xb));
-	varToStringBufFull(app_context, yv, yb, sizeof(yb));
-	varToStringBufFull(app_context, wv, wb, sizeof(wb));
-	varToStringBufFull(app_context, hv, hb, sizeof(hb));
+	// SWF<7 renders undefined as "", SWF>=7 as "undefined". Missing
+	// property (e.g. after `delete r0.x`) also reads as undefined in ECMA.
+	#define _RECT_TOSTR_FIELD(name, nlen, out) do { \
+		ActionVar* _v = obj ? getProperty(obj, (name), (nlen)) : NULL; \
+		if (_v == NULL || _v->type == ACTION_STACK_VALUE_UNDEFINED) { \
+			if (g_swf_version >= 7) snprintf((out), sizeof(out), "undefined"); \
+			else (out)[0] = '\0'; \
+		} else { \
+			varToStringBufFull(app_context, _v, (out), sizeof(out)); \
+		} \
+	} while (0)
+	_RECT_TOSTR_FIELD("x", 1, xb);
+	_RECT_TOSTR_FIELD("y", 1, yb);
+	_RECT_TOSTR_FIELD("width", 5, wb);
+	_RECT_TOSTR_FIELD("height", 6, hb);
+	#undef _RECT_TOSTR_FIELD
 	int len = snprintf(buf, sizeof(buf), "(x=%s, y=%s, w=%s, h=%s)", xb, yb, wb, hb);
 
 	ActionVar r = {0};

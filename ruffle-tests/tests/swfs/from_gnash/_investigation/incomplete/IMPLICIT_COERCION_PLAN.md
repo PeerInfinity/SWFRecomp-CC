@@ -1,8 +1,8 @@
 # Implicit Coercion (valueOf / toString Dispatch) Plan
 <!-- TESTS: Matrix-v6, Rectangle-v8, toString_valueOf-v5, toString_valueOf-v6, toString_valueOf-v7, toString_valueOf-v8 -->
 
-Last updated: 2026-04-18 (Phase 3 done — push this-stack for type 2 valueOf/toString dispatch)
-Status: IN PROGRESS — Phases 1, 2a, 2b, 3 complete; v6/v7/v8 → ruffle_matched
+Last updated: 2026-04-18 (Phase 5 done — geom toString undefined rendering version gate)
+Status: IN PROGRESS — Phases 1, 2a, 2b, 3, 5 complete; only v5 still output_mismatch
 
 ---
 
@@ -22,8 +22,8 @@ sub-cluster of these failures but didn't cover the rest.
 
 | Test | Match | Expected | Diffs | Status |
 |------|-------|----------|-------|--------|
-| Matrix-v6 | 137/168 (81.5%) | — | 31 | output_mismatch |
-| Rectangle-v8 | 144/166 (86.7%) | — | 20 | output_mismatch |
+| Matrix-v6 | 160/168 (95.2%) | — | 8 | **ruffle_matched** |
+| Rectangle-v8 | 160/166 (96.4%) | — | 6 | **ruffle_matched** |
 | toString_valueOf-v5 | 95/137 (69.3%) | — | 39 | output_mismatch |
 | toString_valueOf-v6 | 152/155 (98.1%) | — | 3 | **ruffle_matched** |
 | toString_valueOf-v7 | 146/155 (94.2%) | — | 3 | **ruffle_matched** |
@@ -183,6 +183,25 @@ toString, then string comparison.
 - `actionEquals2` (MOVIECLIP, STRING) case: coerce MC via toString, then
   compare as strings.
 - Expected impact: toString_valueOf-v6 +2 lines.
+
+### Phase 5 — Geom toString undefined rendering — DONE (2026-04-18)
+- `pointToString`, `rectToStringDynamic`, and `matrixToStringDynamic`
+  rendered missing / UNDEFINED fields using `varToStringBufFull`,
+  which unconditionally emits "undefined" for UNDEFINED. Flash's
+  string-concat / toString emits "" under SWF<7 and "undefined" under
+  SWF>=7 (matching `convertString`).
+- Fix: short-circuit missing (NULL) / UNDEFINED fields with a
+  version-gated format — `""` for SWF<7, `"undefined"` for SWF>=7 —
+  before falling through to `varToStringBufFull`. Also matches ECMA
+  "missing property reads as undefined" semantics (e.g. after
+  `delete r0.x`).
+- **Impact:**
+  - Matrix-v6: 31 → 8 diffs → **ruffle_matched** (+1 test)
+  - Rectangle-v8: 20 → 6 diffs → **ruffle_matched** (+1 test)
+- No regressions on avm1 `matrix`, `point`, `rectangle`; or on gnash
+  `Matrix-v5/v7/v8`, `Point-v5..v8`, `Rectangle-v5..v7`,
+  `ColorTransform-v5..v8`, `Transform-v6/v7`, `HitTest-v6..v8`,
+  `toString_valueOf-v6..v8`.
 
 ### Phase 2a — MC CallMethod dispatch order — DONE (2026-04-17)
 - `actionCallMethod` for MOVIECLIP receiver previously fell back to
