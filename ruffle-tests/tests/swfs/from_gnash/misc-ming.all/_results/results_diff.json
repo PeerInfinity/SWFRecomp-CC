@@ -1,9 +1,9 @@
 {
   "metadata": {
-    "old_timestamp": "2026-04-19T20:31:23.373081+00:00",
-    "old_git_sha": "6ea2eaae1917e2cf966a64f029f2da4d73a6b621",
-    "new_timestamp": "2026-04-19T21:24:53.344452+00:00",
-    "new_git_sha": "15b930bf53d2ac77278bfc0213ae3fb0d0af2a79",
+    "old_timestamp": "2026-04-19T21:24:53.344452+00:00",
+    "old_git_sha": "15b930bf53d2ac77278bfc0213ae3fb0d0af2a79",
+    "new_timestamp": "2026-04-19T22:30:49.891475+00:00",
+    "new_git_sha": "9a01d3c6ec50883abbec4965ea7323fb12d4d602",
     "partial": false,
     "same_commit": false
   },
@@ -19,15 +19,64 @@
     "new_total": 102,
     "new_pass_rate": 17.6,
     "old_mismatched_lines": 2423,
-    "new_mismatched_lines": 2423,
-    "increased_mismatches": 0,
-    "decreased_mismatches": 0,
+    "new_mismatched_lines": 2401,
+    "increased_mismatches": 9,
+    "decreased_mismatches": 31,
     "newly_passing": 0,
     "newly_failing": 0,
     "status_changed": 0,
-    "unchanged": 102,
+    "unchanged": 99,
     "added": 0,
     "removed": 0
   },
-  "changes": []
+  "changes": [
+    {
+      "test": "DrawingApiTest",
+      "change_type": "changed",
+      "old_status": "output_mismatch",
+      "new_status": "output_mismatch",
+      "old_lines": {
+        "actual_lines": 93,
+        "expected_lines": 93,
+        "matching_lines": 20
+      },
+      "new_lines": {
+        "actual_lines": 93,
+        "expected_lines": 93,
+        "matching_lines": 43
+      }
+    },
+    {
+      "test": "displaylist_depths/displaylist_depths_test",
+      "change_type": "changed",
+      "old_status": "output_mismatch",
+      "new_status": "output_mismatch",
+      "old_lines": {
+        "actual_lines": 111,
+        "expected_lines": 111,
+        "matching_lines": 79
+      },
+      "new_lines": {
+        "actual_lines": 111,
+        "expected_lines": 111,
+        "matching_lines": 70
+      }
+    },
+    {
+      "test": "masks_test",
+      "change_type": "changed",
+      "old_status": "output_mismatch",
+      "new_status": "output_mismatch",
+      "old_lines": {
+        "actual_lines": 28,
+        "expected_lines": 175,
+        "matching_lines": 20
+      },
+      "new_lines": {
+        "actual_lines": 28,
+        "expected_lines": 175,
+        "matching_lines": 28
+      }
+    }
+  ]
 }
