@@ -1,10 +1,10 @@
 # Ruffle Test Results (Filtered)
 
-**Date**: 2026-04-19 02:19 UTC
+**Date**: 2026-04-19 03:19 UTC
 
-**Git SHA**: `1f94cb88e1`
+**Git SHA**: `60dfc4199e`
 
-**Run Duration**: 21m 27s
+**Run Duration**: 21m 16s
 
 **Filtered**: 0 tests ignored out of 102 available
 
@@ -18,8 +18,8 @@
 | Effective pass | **28** (27.5%) |
 | Failing | 74 |
 | Total expected lines | 4541 |
-| Matching lines | 2119 (46.7%) |
-| Mismatched lines | 2422 |
+| Matching lines | 2121 (46.7%) |
+| Mismatched lines | 2420 |
 
 ### Failure Breakdown
 
@@ -36,22 +36,22 @@
 |---|------|-------|----------|-------|
 | 1 | `PlaceObject2Test` | 9 | 15.4s |  |
 | 2 | `VarAndCharClashTest` | 13 | 0.2s |  |
-| 3 | `Video-EmbedSquareTest` | 2 | 15.8s |  |
-| 4 | `action_order/action_execution_order_test1` | 10 | 15.4s |  |
-| 5 | `action_order/action_execution_order_test7` | 7 | 15.5s |  |
+| 3 | `Video-EmbedSquareTest` | 2 | 15.7s |  |
+| 4 | `action_order/action_execution_order_test1` | 10 | 15.3s |  |
+| 5 | `action_order/action_execution_order_test7` | 7 | 15.4s |  |
 | 6 | `action_order/action_execution_order_test9` | 4 | 15.5s |  |
-| 7 | `displaylist_depths/displaylist_depths_test10` | 10 | 16.3s |  |
-| 8 | `displaylist_depths/displaylist_depths_test4` | 26 | 16.1s |  |
+| 7 | `displaylist_depths/displaylist_depths_test10` | 10 | 15.9s |  |
+| 8 | `displaylist_depths/displaylist_depths_test4` | 26 | 16.3s |  |
 | 9 | `displaylist_depths/displaylist_depths_test5` | 25 | 0.3s |  |
 | 10 | `displaylist_depths/displaylist_depths_test6` | 13 | 0.3s |  |
 | 11 | `displaylist_depths/displaylist_depths_test7` | 14 | 0.3s |  |
-| 12 | `getTimer_test` | 8 | 17.2s |  |
-| 13 | `loop/simple_loop_test` | 0 | 15.6s |  |
-| 14 | `masks_test2` | 10 | 15.5s |  |
-| 15 | `morph_test1` | 0 | 15.8s |  |
-| 16 | `move_object_test` | 11 | 15.8s |  |
-| 17 | `multi_doactions_and_goto_frame_test` | 6 | 15.7s |  |
-| 18 | `unload_movieclip_test1` | 6 | 16.3s |  |
+| 12 | `getTimer_test` | 8 | 16.0s |  |
+| 13 | `loop/simple_loop_test` | 0 | 15.3s |  |
+| 14 | `masks_test2` | 10 | 15.7s |  |
+| 15 | `morph_test1` | 0 | 16.0s |  |
+| 16 | `move_object_test` | 11 | 18.0s |  |
+| 17 | `multi_doactions_and_goto_frame_test` | 6 | 18.0s |  |
+| 18 | `unload_movieclip_test1` | 6 | 15.7s |  |
 
 ## Ruffle-Matched Tests
 
@@ -59,14 +59,14 @@
 
 | # | Test | Our diffs | Ruffle diffs | Duration | Notes |
 |---|------|-----------|--------------|----------|-------|
-| 1 | `KeyEventOrder` | 20 | 23 | 15.4s |  |
+| 1 | `KeyEventOrder` | 20 | 23 | 15.3s |  |
 | 2 | `action_order/action_execution_order_test4` | 14 | 26 | 0.3s |  |
-| 3 | `attachExtImported` | 1 | 1 | 15.6s |  |
-| 4 | `callFunction_test` | 5 | 11 | 15.6s |  |
-| 5 | `init_action/InitActionTest` | 17 | 17 | 15.9s |  |
-| 6 | `init_action/InitActionTest2` | 30 | 30 | 15.9s |  |
-| 7 | `path_format_test` | 28 | 28 | 15.7s |  |
-| 8 | `place_object_test` | 14 | 14 | 16.4s |  |
+| 3 | `attachExtImported` | 1 | 1 | 15.5s |  |
+| 4 | `callFunction_test` | 5 | 11 | 15.4s |  |
+| 5 | `init_action/InitActionTest` | 17 | 17 | 15.4s |  |
+| 6 | `init_action/InitActionTest2` | 30 | 30 | 15.5s |  |
+| 7 | `path_format_test` | 28 | 28 | 16.0s |  |
+| 8 | `place_object_test` | 14 | 14 | 16.3s |  |
 | 9 | `place_object_test2` | 16 | 23 | 16.1s |  |
 | 10 | `runtime_vm_stack_test` | 5 | 8 | 15.8s |  |
 
@@ -79,8 +79,8 @@ Tests with output mismatch but >= 50% line match rate (low-hanging fruit).
 | # | Test | Match Rate | Matching | Total | Diff Lines | Notes |
 |---|------|------------|----------|-------|------------|-------|
 | 1 | `DefineEditTextTest` | 95.4% | 146 | 153 | 7 |  |
-| 2 | `matrix_test` | 83.6% | 908 | 1086 | 178 |  |
-| 3 | `get_frame_number_test` | 80.6% | 25 | 31 | 6 |  |
+| 2 | `get_frame_number_test` | 87.1% | 27 | 31 | 4 |  |
+| 3 | `matrix_test` | 83.6% | 908 | 1086 | 178 |  |
 | 4 | `RollOverOutTest` | 80.0% | 4 | 5 | 1 |  |
 | 5 | `displaylist_depths/displaylist_depths_test11` | 80.0% | 12 | 15 | 3 |  |
 | 6 | `place_and_remove_object_test` | 76.9% | 10 | 13 | 3 |  |
@@ -133,8 +133,8 @@ No timeouts.
 | # | Test | Match Rate | Matching/Total | Actual | Expected | Notes |
 |---|------|------------|----------------|--------|----------|-------|
 | 1 | `DefineEditTextTest` | 95.4% | 146/153 | 153 | 153 |  |
-| 2 | `matrix_test` | 83.6% | 908/1086 | 1086 | 1086 |  |
-| 3 | `get_frame_number_test` | 80.6% | 25/31 | 31 | 31 |  |
+| 2 | `get_frame_number_test` | 87.1% | 27/31 | 31 | 31 |  |
+| 3 | `matrix_test` | 83.6% | 908/1086 | 1086 | 1086 |  |
 | 4 | `RollOverOutTest` | 80.0% | 4/5 | 5 | 5 |  |
 | 5 | `displaylist_depths/displaylist_depths_test11` | 80.0% | 12/15 | 15 | 15 |  |
 | 6 | `place_and_remove_object_test` | 76.9% | 10/13 | 13 | 13 |  |
