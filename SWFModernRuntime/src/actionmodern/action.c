@@ -16215,6 +16215,13 @@ static void initXMLPrototype(SWFAppContext* app_context) {
 		ActionVar fw = {0}; fw.type = ACTION_STACK_VALUE_BOOLEAN;
 		setProperty(app_context, xml_proto, "ignoreWhite", 11, &fw);
 	}
+	// Default loaded = false on XML.prototype. XML.load() overrides this with
+	// an own property. LoadVars.sendAndLoad inspects this via
+	// getPropertyWithPrototype to decide whether to add an own `loaded`.
+	{
+		ActionVar lf = {0}; lf.type = ACTION_STACK_VALUE_BOOLEAN;
+		setProperty(app_context, xml_proto, "loaded", 6, &lf);
+	}
 
 	#undef INSTALL_METHOD
 
@@ -27601,13 +27608,13 @@ static ActionVar builtin_loadvars_getBytesTotal(SWFAppContext* app_context, Acti
 	return ret;
 }
 
-// LoadVars.sendAndLoad(url, target, method?): if target is a suitable object,
-// set target.loaded = false and return true. Otherwise return false.
+// LoadVars.sendAndLoad(url, target, method?): if target is any OBJECT (Object,
+// XML, LoadVars, Date, etc.), return true and set target.loaded=false as an
+// own property unless the target already inherits `loaded` from its
+// prototype chain (e.g. XML.prototype.loaded). Returns false for primitives
+// (number, string, null, undefined).
 // Our offline implementation never fires onLoad because the "network" never
 // completes.
-//
-// Gnash's behavior: accepts any non-Date object. Date instances are rejected
-// because Date has a Flash-internal marker that sendAndLoad checks against.
 static ActionVar builtin_loadvars_sendAndLoad(SWFAppContext* app_context, ActionVar* args, u32 arg_count,
 	ActionVar* registers, void* this_obj)
 {
@@ -27618,11 +27625,15 @@ static ActionVar builtin_loadvars_sendAndLoad(SWFAppContext* app_context, Action
 	if (args[1].type != ACTION_STACK_VALUE_OBJECT) return ret;
 	ASObject* target = (ASObject*) args[1].data.numeric_value;
 	if (target == NULL) return ret;
-	// Reject Date instances — matches Gnash's test expectation.
-	if (target->native_type == NATIVE_DATE) return ret;
 
-	ActionVar lf = {0}; lf.type = ACTION_STACK_VALUE_BOOLEAN; lf.data.numeric_value = 0;
-	setProperty(app_context, target, "loaded", 6, &lf);
+	// Only create own `loaded` if target doesn't already inherit one from
+	// its prototype chain. XML.prototype.loaded is the canonical case: it
+	// already has a boolean `loaded` so sendAndLoad shouldn't shadow it.
+	ActionVar* existing_loaded = getPropertyWithPrototype(target, "loaded", 6);
+	if (existing_loaded == NULL) {
+		ActionVar lf = {0}; lf.type = ACTION_STACK_VALUE_BOOLEAN; lf.data.numeric_value = 0;
+		setProperty(app_context, target, "loaded", 6, &lf);
+	}
 	// Initialize _bytesLoaded = 0 / _bytesTotal = 0 on the target so
 	// getBytesLoaded()/getBytesTotal() return numbers instead of undefined.
 	ActionVar bv = {0}; bv.type = ACTION_STACK_VALUE_F64;
