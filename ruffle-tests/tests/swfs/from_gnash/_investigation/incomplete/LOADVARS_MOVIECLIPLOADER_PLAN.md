@@ -24,9 +24,9 @@ event sequence and payloads.
 
 | Test | Match | Expected | Diffs |
 |------|-------|----------|-------|
-| LoadVars-v6 | 143 / 152 | — | ~9 |
-| LoadVars-v7 | 143 / 152 | — | ~9 |
-| LoadVars-v8 | 143 / 152 | — | ~9 |
+| LoadVars-v6 | 144 / 152 | — | ~8 |
+| LoadVars-v7 | 144 / 152 | — | ~8 |
+| LoadVars-v8 | 144 / 152 | — | ~8 |
 | MovieClipLoader-v7 | 46 / 165 | — | ~120 — ruffle_matched (effective pass) |
 | MovieClipLoader-v8 | 46 / 165 | — | ~120 — ruffle_matched (effective pass) |
 

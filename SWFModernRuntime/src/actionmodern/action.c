@@ -27498,10 +27498,34 @@ static ActionVar builtin_loadvars_decode(SWFAppContext* app_context, ActionVar* 
 	return ret;
 }
 
-// Helper: URL-encode a raw UTF-8 byte string. Matches Flash's percent-encoding
-// (space → %20, only A-Z/a-z/0-9 preserved; everything else %XX).
-static int lv_url_encode(const char* in, int in_len, char* out, int out_size)
+// Helper: URL-encode a raw UTF-8 byte string by calling _global.escape so
+// test-level overrides of `_global.escape` propagate through
+// LoadVars.toString (Gnash behavior; see LoadVars.as:267 'FAKED!=FAKED!').
+// Uses the native g_escape_func directly when the property value points at
+// it (avoids an invokeSpecialFunction round-trip that breaks for native
+// functions when called outside a bytecode context); otherwise invokes the
+// user override via invokeSpecialFunction.
+static int lv_url_encode(SWFAppContext* app_context, const char* in, int in_len,
+	char* out, int out_size)
 {
+	extern ASFunction g_escape_func;
+	ActionVar* esc_prop = (global_object != NULL)
+		? getProperty(global_object, "escape", 6) : NULL;
+	ASFunction* fn = NULL;
+	if (esc_prop != NULL && esc_prop->type == ACTION_STACK_VALUE_FUNCTION)
+		fn = (ASFunction*)(uintptr_t) esc_prop->data.numeric_value;
+	int user_override = (fn != NULL && fn != &g_escape_func);
+	if (user_override) {
+		ActionVar arg = makeStringActionVar(app_context, in, in_len);
+		ActionVar r = invokeSpecialFunction(app_context, fn, &arg);
+		if (r.type == ACTION_STACK_VALUE_STRING) {
+			const uint16_t* u16 = varGetU16Ptr(&r);
+			return u16_to_utf8(u16, r.str_size, out, out_size);
+		}
+		return varToStringBuf(app_context, &r, out, out_size);
+	}
+	// Native escape path: inline percent-encoding (A-Z/a-z/0-9 preserved;
+	// everything else %XX including space → %20).
 	int o = 0;
 	for (int i = 0; i < in_len && o < out_size - 4; i++) {
 		unsigned char c = (unsigned char) in[i];
@@ -27555,9 +27579,9 @@ static ActionVar builtin_loadvars_toString(SWFAppContext* app_context, ActionVar
 		POP();
 
 		char key_enc[1024];
-		int key_enc_len = lv_url_encode(p->name, (int)p->name_length, key_enc, sizeof(key_enc));
+		int key_enc_len = lv_url_encode(app_context, p->name, (int)p->name_length, key_enc, sizeof(key_enc));
 		char val_enc[6144];
-		int val_enc_len = lv_url_encode(val_buf, val_len, val_enc, sizeof(val_enc));
+		int val_enc_len = lv_url_encode(app_context, val_buf, val_len, val_enc, sizeof(val_enc));
 
 		if (!first) {
 			if (out_pos < 16383) out_buf[out_pos++] = '&';
