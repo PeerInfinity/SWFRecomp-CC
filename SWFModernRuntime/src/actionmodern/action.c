@@ -47222,69 +47222,233 @@ void actionCallFunction(SWFAppContext* app_context, char* str_buffer)
 //   1. No leading zeros in exponents (e-7 not e-07)
 //   2. Decimal format for exponent -5 (C uses scientific)
 // Flash threshold: decimal when -5 <= exponent <= 14, scientific otherwise.
-static int flash_format_double(char* buf, int buf_size, double d)
+// Port of Ruffle's `decimal_shift` (core/src/avm1/value.rs).
+// Computes value * 10^exp via repeated multiplication or division. The mul/div
+// branches are intentionally separate to match Flash's accumulated rounding.
+static double decimal_shift(double value, int exp)
 {
-	if (isnan(d)) return snprintf(buf, buf_size, "NaN");
-	if (isinf(d)) return snprintf(buf, buf_size, "%sInfinity", d < 0 ? "-" : "");
-	if (d == 0.0) return snprintf(buf, buf_size, "0");
-
-	double abs_d = fabs(d);
-	int exponent = (int)floor(log10(abs_d));
-
-	// Flash uses decimal format for exponent -5 through 14
-	// C's %.15g uses -4 through 14, so we need to handle exponent -5 specially
-	if (exponent >= -5 && exponent <= 14)
+	double base = 10.0;
+	if (exp > 0)
 	{
-		// Decimal format with 15 significant digits
-		int precision = 14 - exponent;
-		if (precision < 0) precision = 0;
-		int len = snprintf(buf, buf_size, "%.*f", precision, d);
-		if (len < 0 || len >= buf_size) return buf_size - 1;
-		// Remove trailing zeros after decimal point
-		if (precision > 0)
+		while (exp > 0)
 		{
-			while (len > 0 && buf[len - 1] == '0') len--;
-			if (len > 0 && buf[len - 1] == '.') len--;
-			buf[len] = '\0';
+			if ((exp & 1) != 0) value *= base;
+			exp >>= 1;
+			base *= base;
 		}
-		return len;
 	}
 	else
 	{
-		// Scientific format with 15 significant digits
-		int len = snprintf(buf, buf_size, "%.14e", d);
-		if (len < 0 || len >= buf_size) return buf_size - 1;
-
-		// Find the 'e' in the output
-		char* e_pos = strchr(buf, 'e');
-		if (!e_pos) return len;
-
-		// Remove trailing zeros from mantissa (between '.' and 'e')
-		char* dot = strchr(buf, '.');
-		if (dot && dot < e_pos)
+		// Avoid overflow when exp == INT_MIN.
+		unsigned int uexp = (exp == INT_MIN) ? ((unsigned int)INT_MAX + 1U) : (unsigned int)(-exp);
+		while (uexp > 0)
 		{
-			char* p = e_pos - 1;
-			while (p > dot && *p == '0') p--;
-			if (p == dot) p--; // remove decimal point if no fractional digits
-			p++;
-			memmove(p, e_pos, strlen(e_pos) + 1);
-			e_pos = p + (e_pos[0] == 'e' ? 0 : 0);
-			e_pos = strchr(buf, 'e'); // re-find after memmove
+			if ((uexp & 1) != 0) value /= base;
+			uexp >>= 1;
+			base *= base;
 		}
-
-		// Remove leading zeros from exponent
-		if (e_pos)
-		{
-			char* exp_start = e_pos + 1;
-			if (*exp_start == '+' || *exp_start == '-') exp_start++;
-			char* first_nonzero = exp_start;
-			while (*first_nonzero == '0' && *(first_nonzero + 1) != '\0') first_nonzero++;
-			if (first_nonzero > exp_start)
-				memmove(exp_start, first_nonzero, strlen(first_nonzero) + 1);
-		}
-
-		return (int)strlen(buf);
 	}
+	return value;
+}
+
+// Port of Ruffle's `f64_to_string` (core/src/avm1/value.rs:611-793).
+// Flash AVM1-compatible f64 → string, reproducing Flash's decimal-shift-and-round
+// algorithm so that IEEE-correct rounding quirks match Flash/Ruffle output.
+// 15 significant digits; scientific notation for exp <= -5 or >= 15.
+static int flash_format_double(char* buf, int buf_size, double n)
+{
+	if (isnan(n)) return snprintf(buf, buf_size, "NaN");
+	if (n == INFINITY) return snprintf(buf, buf_size, "Infinity");
+	if (n == -INFINITY) return snprintf(buf, buf_size, "-Infinity");
+	if (n == 0.0) return snprintf(buf, buf_size, "0");
+
+	// Fast path for integers in int32 range.
+	if (n >= -2147483648.0 && n <= 2147483647.0 && floor(n) == n)
+	{
+		int32_t i = (int32_t)n;
+		return snprintf(buf, buf_size, "%ld", (long)i);
+	}
+
+	// Digit accumulator — 1 sign + up to 17 digit/dot + "e+nnn" tail.
+	char digits[48];
+	int pos = 0;
+	int is_negative = 0;
+
+	if (n < 0.0)
+	{
+		n = -n;
+		digits[pos++] = '-';
+		is_negative = 1;
+	}
+
+	// Extract biased base-2 exponent from IEEE 754 bits.
+	uint64_t bits;
+	memcpy(&bits, &n, sizeof(bits));
+	const int EXPONENT_BIAS = 1023;
+	int exp_base2 = (int)((bits >> 52) & 0x7ffULL) - EXPONENT_BIAS;
+
+	if (exp_base2 == -EXPONENT_BIAS)
+	{
+		// Subnormal: scale by 2^54 and re-extract exponent.
+		const double NORMAL_SCALE = 1.801439850948198e16;
+		double n_scaled = n * NORMAL_SCALE;
+		uint64_t bits2;
+		memcpy(&bits2, &n_scaled, sizeof(bits2));
+		exp_base2 = (int)((bits2 >> 52) & 0x7ffULL) - EXPONENT_BIAS - 54;
+	}
+
+	// Imprecise log10(2) — Flash's actual constant, NOT Rust's f64::LOG10_2.
+	const double LOG10_2 = 0.301029995663981;
+	int exp = (int)round((double)exp_base2 * LOG10_2);
+
+	// Shift into [0.0, 10.0).
+	double mantissa = decimal_shift(n, -exp);
+	if ((int)mantissa == 0)
+	{
+		exp -= 1;
+		mantissa = decimal_shift(n, -exp);
+	}
+	if ((int)mantissa >= 10)
+	{
+		exp += 1;
+		mantissa = decimal_shift(n, -exp);
+	}
+
+	#define NEXT_DIGIT() ({ \
+		int _d = (int)mantissa; \
+		mantissa -= (double)_d; \
+		mantissa *= 10.0; \
+		(char)('0' + _d); \
+	})
+
+	const int MAX_DECIMAL_PLACES = 15;
+
+	if (exp >= 15)
+	{
+		// 1.2345e+15 — note: does NOT push a leading 0, causing the Flash
+		// 9.999→10 carry bug for large magnitudes.
+		digits[pos++] = NEXT_DIGIT();
+		digits[pos++] = '.';
+		for (int i = 0; i < MAX_DECIMAL_PLACES - 1; i++)
+			digits[pos++] = NEXT_DIGIT();
+	}
+	else if (exp >= 0 && exp <= 14)
+	{
+		// 12345.678901234
+		digits[pos++] = '0';
+		for (int i = 0; i <= exp; i++)
+			digits[pos++] = NEXT_DIGIT();
+		digits[pos++] = '.';
+		int tail = MAX_DECIMAL_PLACES - exp - 1;
+		for (int i = 0; i < tail; i++)
+			digits[pos++] = NEXT_DIGIT();
+		exp = 0;
+	}
+	else if (exp >= -5 && exp <= -1)
+	{
+		// 0.0012345678901234
+		digits[pos++] = '0';
+		digits[pos++] = '0';
+		digits[pos++] = '.';
+		int zeros = (-exp) - 1;
+		for (int i = 0; i < zeros; i++)
+			digits[pos++] = '0';
+		for (int i = 0; i < MAX_DECIMAL_PLACES; i++)
+			digits[pos++] = NEXT_DIGIT();
+		exp = 0;
+	}
+	else
+	{
+		// 1.345e-15
+		digits[pos++] = '0';
+		char c = NEXT_DIGIT();
+		if (c != '0')
+			digits[pos++] = c;
+		digits[pos++] = '.';
+		for (int i = 0; i < MAX_DECIMAL_PLACES - 1; i++)
+			digits[pos++] = NEXT_DIGIT();
+	}
+
+	// Rounding: peek next digit; round away from zero if >= '5'.
+	if (NEXT_DIGIT() >= '5')
+	{
+		for (int i = pos - 1; i >= 0; i--)
+		{
+			if (digits[i] == '9')
+				digits[i] = '0';
+			else if (digits[i] >= '0')
+			{
+				digits[i] += 1;
+				break;
+			}
+		}
+	}
+
+	#undef NEXT_DIGIT
+
+	// Trim trailing zeros and a dangling decimal point.
+	while (pos > 0 && digits[pos - 1] == '0') pos--;
+	if (pos > 0 && digits[pos - 1] == '.') pos--;
+
+	int start = 0;
+	if (exp != 0)
+	{
+		// Trim leading zeros (band-aid for rounding artefacts).
+		int first_nonzero = pos;
+		for (int i = 0; i < pos; i++)
+		{
+			if (digits[i] != '0') { first_nonzero = i; break; }
+		}
+		if (first_nonzero != 0 && first_nonzero < pos)
+		{
+			memmove(digits, digits + first_nonzero, pos - first_nonzero);
+			pos -= first_nonzero;
+		}
+
+		if (pos == 0)
+		{
+			// 9.99999 rounded to 0.00000 — no digits survived; push '1', bump exp.
+			digits[pos++] = '1';
+			exp += 1;
+		}
+		else
+		{
+			// Fix up 100e15 → 1e17.
+			int last_nonzero = 0;
+			for (int i = pos - 1; i >= 0; i--)
+			{
+				if (digits[i] != '0') { last_nonzero = i; break; }
+			}
+			if (last_nonzero == 0)
+			{
+				exp += pos - 1;
+				pos = 1;
+			}
+		}
+
+		// Append "e{:+}" (explicit sign).
+		char exp_buf[16];
+		int exp_len = snprintf(exp_buf, sizeof(exp_buf), "e%+d", exp);
+		for (int i = 0; i < exp_len && pos < (int)sizeof(digits); i++)
+			digits[pos++] = exp_buf[i];
+	}
+
+	// Final band-aid: eliminate a leading '0' before a digit (not a dot),
+	// which can remain after trimming. For negatives, shifts '-' into place.
+	int sign_off = is_negative ? 1 : 0;
+	if (sign_off < pos && digits[sign_off] == '0'
+		&& (sign_off + 1 >= pos || digits[sign_off + 1] != '.'))
+	{
+		if (sign_off > 0) digits[sign_off] = digits[sign_off - 1];
+		start = 1;
+	}
+
+	int out_len = pos - start;
+	if (out_len < 0) out_len = 0;
+	if (out_len >= buf_size) out_len = buf_size - 1;
+	memcpy(buf, digits + start, out_len);
+	buf[out_len] = '\0';
+	return out_len;
 }
 
 // Helper: convert an ActionVar to a string for array join/toString.
