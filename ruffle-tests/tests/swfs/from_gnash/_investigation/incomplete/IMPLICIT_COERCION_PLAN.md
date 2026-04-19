@@ -1,8 +1,8 @@
 # Implicit Coercion (valueOf / toString Dispatch) Plan
 <!-- TESTS: Matrix-v6, Rectangle-v8, toString_valueOf-v5, toString_valueOf-v6, toString_valueOf-v7, toString_valueOf-v8 -->
 
-Last updated: 2026-04-18 (Phase 5 done — geom toString undefined rendering version gate)
-Status: IN PROGRESS — Phases 1, 2a, 2b, 3, 5 complete; only v5 still output_mismatch
+Last updated: 2026-04-19 (v5 research — 14 blockers grouped into Phases 6-9)
+Status: IN PROGRESS — Phases 1, 2a, 2b, 3, 5 complete; Phases 6-9 queued for v5
 
 ---
 
@@ -236,12 +236,103 @@ toString, then string comparison.
   toString/valueOf on plain objects via `+` (lines 206, 215/216, 262/263)
   which fall into Phase 2b / Phase 3 territory below.
 
+## Remaining work — toString_valueOf-v5 (2026-04-19 research)
+
+v6/v7/v8 plus Matrix-v6 and Rectangle-v8 are all now `ruffle_matched`.
+Only `toString_valueOf-v5` remains at output_mismatch (95/137 = 69.3%).
+
+### Diff breakdown
+
+Our 41 failing output indices vs Ruffle's 34. Of those:
+
+- **27 are both-fail** (our diff ⊆ Ruffle's on these lines) — rooted in
+  Flash's SWF5 "any function is equal to undefined in equality context"
+  rule. Tests like `Object.prototype.toString == undefined`,
+  `obj.toString == obj.valueOf`, `Array.prototype.toString == undefined`.
+  Ruffle's `abstract_eq` (core/src/avm1/value.rs:505) does call
+  `to_primitive_num` on both sides under SWFv5, but that ends up
+  returning the function itself (non-primitive), so the Object-Object
+  branch compares by pointer and these fail in Ruffle too. No fix
+  needed on our side — these are identically failing on Ruffle.
+
+- **14 are our-fail-ruffle-passes** — where our implementation diverges
+  from Ruffle's behavior. These are the blockers for ruffle_matched.
+
+### Category breakdown of the 14 blockers
+
+| # | Lines | Source | Root cause |
+|---|-------|--------|------------|
+| 1 | 9 | 243,244,245,246,265,266,278,279,280 | `_root.createEmptyMovieClip("mc1", 1)` succeeds in our impl under SWF5 — it's a SWF6+ method. Ruffle gates it off, returning undefined for `mc1`/`mc2` and `createEmptyMovieClip` itself. |
+| 2 | 2 | 297,298 | `TextField.prototype` exists in our impl under SWF5 — should be undefined (introduced SWF6+). With `TextField.prototype == undefined`, `TextField.prototype.toString` reads as undefined, so `undefined == Object.prototype.toString` trips the SWF5 function-equality rule (same fail as other-categorized-Ruffle-also-fails lines). Today we instead compare two distinct function refs. |
+| 3 | 2 | 328,331 | `y = text1.valueOf()` / `text1 != "A STRING"`. TextField wrapper's coercion through valueOf/toString. Our impl returns empty for `y`, failing MC-like string path. Likely related to TextField prototype gating above. |
+| 4 | 1 | 469 | `a3 = 1/a1` where `a1 = new Array(...)`. Expected `isNaN(a3)` (because Array.valueOf returns non-primitive, falls through to toString "1,2,3,4", which is NaN as number). Our `convertFloat` path for ARRAY in SWF5 returns 0, giving `a3 = Infinity` (not NaN). |
+
+## Phases
+
+### Phase 6 — SWF5 `createEmptyMovieClip` version gate
+- `MovieClip.prototype.createEmptyMovieClip` was introduced in SWF6
+  (per Flash docs and Ruffle source).
+- Currently accessible in SWF5 via our MC prototype method stub table.
+- Fix: gate the method with `flash_flags=0x0080` (hidden in SWF5) like
+  the pattern in `CURRENT_STATUS.md` "SWF5 version hiding via
+  flash_flags" for Key/AsBroadcaster/LocalConnection. Also ensure
+  failed `createEmptyMovieClip` returns undefined so `mc1 = _root.x(..)`
+  leaves `mc1` undefined.
+- **Expected impact:** toString_valueOf-v5 -9 diffs (243,244,245,246,
+  265,266,278,279,280). Dependent tests: any v5 test that touches
+  `createEmptyMovieClip` should verify no regression (grep for hits in
+  the actionscript.all v5 tests).
+
+### Phase 7 — SWF5 `TextField.prototype` hidden
+- `TextField.prototype` was introduced in SWF6 (gnash test comment:
+  "TextField in swf5 does not have a prototype by default").
+- Currently we always expose it.
+- Fix: gate `prototype` access on TextField with `flash_flags=0x0080`
+  under SWF5. `TextField.prototype` → undefined. Then SWF5 code
+  `TextField.prototype.toString` reads as undefined, and
+  `undefined == Object.prototype.toString` will fail the same way
+  Ruffle's does (lines become both-fail, subset-match).
+- **Expected impact:** toString_valueOf-v5 -2 diffs (297, 298).
+  Need to check: tests that explicitly access TextField.prototype
+  in SWF5 (grep output.txt for patterns).
+
+### Phase 8 — SWF5 TextField coerce-to-primitive
+- Lines 328, 331: TextField wrapper equality with a string, and
+  passing a TextField through valueOf. Our output for line 328 is
+  empty (TextField path in `convertString`/`valueOf` returns empty in
+  SWF5). Ruffle returns the textfield itself (as a reference, compared
+  pointer-wise in the Object-Object branch).
+- Fix: audit `objectCallValueOf` and convertString OBJECT case for
+  TextField native_type — should return `this` (the wrapper) in SWF5,
+  not empty. Similar to MovieClip coerce behavior.
+- **Expected impact:** toString_valueOf-v5 -2 diffs (328, 331).
+  May be gated by Phase 7 since the test probably depends on
+  TextField.prototype being absent.
+
+### Phase 9 — Array ToNumber in SWF5
+- `1/a1` where a1 is an Array should produce NaN in SWF5 (Array.valueOf
+  returns non-primitive, toString returns "1,2,3,4", Number("1,2,3,4")
+  = NaN). Our impl returns 0 for array-to-number, giving Infinity.
+- Fix: locate the SWF5 branch in `convertFloat` / `varToDoubleSWF` that
+  handles ARRAY and make it follow the valueOf → toString → Number
+  chain instead of defaulting to 0.
+- **Expected impact:** toString_valueOf-v5 -1 diff (469). Other v5
+  arithmetic-on-array tests may benefit.
+
+### Dependencies
+
+Phases 6 and 7 are independent. Phases 8 and 9 may be unblocked (or
+partially resolved) after Phase 7 lands — the expected output for
+lines 328/331/469 depends on earlier TextField/Array prototype access
+paths.
+
 ## Success Criteria
 
 - Rectangle-v8 and Matrix-v6 cross 95% line match (target: 158/166 and
-  160/168).
+  160/168). **DONE — both ruffle_matched.**
 - toString_valueOf-v5/v6/v7/v8 cross 95% line match (target: 130+ / 147+ /
-  147+ / 147+).
+  147+ / 147+). **DONE for v6/v7/v8 (ruffle_matched); v5 → pending
+  Phases 6-9, target is ruffle_matched (our diffs ⊆ Ruffle's 34).**
 - No regression on avm1 `string_coercion`, `mutable_this`, `this_scoping`,
   nor on Point-v5..v8, Color-v5..v8, ColorTransform-v5..v8, Error-v5..v8.
 
