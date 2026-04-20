@@ -21,6 +21,9 @@ extern RenderContext* context;
 // action.h is needed in all modes (g_current_context, actionFindOrCreateMovieClip, etc.)
 #include <action.h>
 
+// ActionQueue API for clip-event migration (Phase 4+ of ACTION_QUEUE_PLAN).
+#include <actionmodern/action_queue.h>
+
 // Frame execution state — defined in swf_core.c (NO_GRAPHICS), swf_headless.c (HEADLESS), swf.c (GRAPHICS)
 extern int catch_up_mode;
 extern int g_tag_skip_mode;
@@ -2050,6 +2053,15 @@ void tagShowFrame(SWFAppContext* app_context)
 #ifdef NO_GRAPHICS
 	if (g_tag_skip_mode) return;
 	if (g_in_action_call) return;
+
+	// Phase 4 safety drain: any CLIP_EVENT_INITIALIZE handlers that were queued
+	// during this frame's placements but weren't drained by the outermost
+	// tagPlaceObject2 CONSTRUCT block (e.g. goto catch-up, where the outer
+	// tagPlaceObject2 runs under catch_up_mode=1 and the CONSTRUCT block is
+	// skipped) drain here. In the common case the queue is empty and this is
+	// a no-op — the CONSTRUCT-block drain already covered it.
+	actionDrainActionQueueByKind(app_context, AQ_KIND_CLIP_INIT);
+
 	// --- Fire deferred onUnload handlers from removeMovieClip ---
 	// These are queued mid-script and fire between frames, matching Flash behavior.
 	actionFirePendingUnloads(app_context);
@@ -3133,6 +3145,52 @@ static void fire_eager_constructors(SWFAppContext* app_context, DisplayObject* d
 }
 #endif
 
+#ifdef NO_GRAPHICS
+// Phase 4 of ACTION_QUEUE_PLAN: CLIP_EVENT_INITIALIZE handlers are routed
+// through the unified ActionQueue at AQ_PRIORITY_INITIALIZE / AQ_KIND_CLIP_INIT.
+// The queue drains just before the CONSTRUCT sync fire at the outermost
+// tagPlaceObject2 level (nested recursive calls under catch_up_mode=1 queue
+// but don't drain). This preserves the pre-migration ordering — all INITs
+// fire before any CONSTRUCTs — while moving the storage onto the shared queue.
+// A safety drain runs at the end of tagShowFrame in case something queues an
+// INIT outside the normal placement path.
+typedef struct {
+	MovieClip* mc;
+	frame_func action;
+} PendingClipInit;
+
+static void aq_dispatch_clip_init(SWFAppContext* app_context, void* user)
+{
+	PendingClipInit* pci = (PendingClipInit*) user;
+	if (pci == NULL) return;
+	MovieClip* saved_ctx = g_current_context;
+	if (pci->mc) actionSetCurrentContext(pci->mc);
+	pci->action(app_context);
+	actionSetCurrentContext(saved_ctx);
+	free(pci);
+}
+
+static void queue_clip_init_events(SWFAppContext* app_context, size_t depth)
+{
+	if (display_list[depth].clip_action_count == 0) return;
+	if (display_list[depth].instance_name == NULL) return;
+	MovieClip* _parent_mc = g_current_context ? g_current_context : &root_movieclip;
+	MovieClip* _mc = actionFindOrCreateMovieClip(
+		app_context, display_list[depth].instance_name, _parent_mc);
+	for (size_t a = 0; a < display_list[depth].clip_action_count; a++) {
+		if (!(display_list[depth].clip_actions[a].event_flags & CLIP_EVENT_INITIALIZE))
+			continue;
+		PendingClipInit* pci = (PendingClipInit*) malloc(sizeof(PendingClipInit));
+		if (pci == NULL) continue;
+		pci->mc = _mc;
+		pci->action = display_list[depth].clip_actions[a].action;
+		actionQueueCallbackEx(app_context, aq_dispatch_clip_init, (void*)pci,
+		                      AQ_PRIORITY_INITIALIZE, _mc, /*is_unload=*/0,
+		                      AQ_KIND_CLIP_INIT);
+	}
+}
+#endif
+
 void tagPlaceObject2(SWFAppContext* app_context, size_t depth, size_t char_id, u32 transform_id, u32 cxform_id, u16 clip_depth)
 {
 #ifdef NO_GRAPHICS
@@ -3381,18 +3439,11 @@ void tagPlaceObject2(SWFAppContext* app_context, size_t depth, size_t char_id, u
 		g_pending_clip_action_count = 0;
 	}
 
-	// Fire CLIP_EVENT_INITIALIZE immediately at placement time (before eager init)
-	if (display_list[depth].clip_action_count > 0 && display_list[depth].instance_name != NULL) {
-		MovieClip* _parent_mc = g_current_context ? g_current_context : &root_movieclip;
-		MovieClip* saved_ctx = g_current_context;
-		MovieClip* _mc = actionFindOrCreateMovieClip(app_context, display_list[depth].instance_name, _parent_mc);
-		if (_mc) actionSetCurrentContext(_mc);
-		for (size_t a = 0; a < display_list[depth].clip_action_count; a++) {
-			if (display_list[depth].clip_actions[a].event_flags & CLIP_EVENT_INITIALIZE)
-				display_list[depth].clip_actions[a].action(app_context);
-		}
-		actionSetCurrentContext(saved_ctx);
-	}
+	// Queue CLIP_EVENT_INITIALIZE handlers on the unified ActionQueue at
+	// AQ_PRIORITY_INITIALIZE / AQ_KIND_CLIP_INIT. Nested (catch_up_mode=1)
+	// calls queue but don't drain; the outermost placement drains all queued
+	// INITs before CONSTRUCT fires, preserving the pre-Phase-4 ordering.
+	queue_clip_init_events(app_context, depth);
 
 	// Eagerly execute sprite frame 0 immediately after placement so the sprite's
 	// internal display list is populated BEFORE the parent frame's ActionScript runs.
@@ -3435,6 +3486,11 @@ void tagPlaceObject2(SWFAppContext* app_context, size_t depth, size_t char_id, u
 	// But only at the top level — during catch_up_mode (inside another clip's eager init),
 	// CONSTRUCT is deferred to fire_deferred_construct below.
 	if (!catch_up_mode && display_list[depth].clip_action_count > 0 && display_list[depth].instance_name != NULL) {
+		// Drain any CLIP_EVENT_INITIALIZE handlers queued at this outermost level
+		// (including nested INITs accumulated during the eager-init recursion above)
+		// before we synchronously fire CONSTRUCT. Priority ordering + FIFO within
+		// priority guarantees INITs fire in placement order, all before CONSTRUCT.
+		actionDrainActionQueueByKind(app_context, AQ_KIND_CLIP_INIT);
 		MovieClip* _parent_mc = g_current_context ? g_current_context : &root_movieclip;
 		MovieClip* saved_ctx = g_current_context;
 		MovieClip* _mc = actionFindOrCreateMovieClip(app_context, display_list[depth].instance_name, _parent_mc);
@@ -3657,18 +3713,9 @@ void tagPlaceObject2Ratio(SWFAppContext* app_context, size_t depth, size_t char_
 		g_pending_clip_action_count = 0;
 	}
 
-	// Fire CLIP_EVENT_INITIALIZE immediately at placement time (before eager init)
-	if (display_list[depth].clip_action_count > 0 && display_list[depth].instance_name != NULL) {
-		MovieClip* _parent_mc = g_current_context ? g_current_context : &root_movieclip;
-		MovieClip* saved_ctx = g_current_context;
-		MovieClip* _mc = actionFindOrCreateMovieClip(app_context, display_list[depth].instance_name, _parent_mc);
-		if (_mc) actionSetCurrentContext(_mc);
-		for (size_t a = 0; a < display_list[depth].clip_action_count; a++) {
-			if (display_list[depth].clip_actions[a].event_flags & CLIP_EVENT_INITIALIZE)
-				display_list[depth].clip_actions[a].action(app_context);
-		}
-		actionSetCurrentContext(saved_ctx);
-	}
+	// Queue CLIP_EVENT_INITIALIZE handlers on the unified ActionQueue
+	// (see tagPlaceObject2 for the ordering rationale).
+	queue_clip_init_events(app_context, depth);
 
 	// Eagerly execute sprite frame 0 immediately after placement so the sprite's
 	// internal display list is populated BEFORE the parent frame's ActionScript runs.
@@ -3710,6 +3757,9 @@ void tagPlaceObject2Ratio(SWFAppContext* app_context, size_t depth, size_t char_
 	// But only at the top level — during catch_up_mode (inside another clip's eager init),
 	// CONSTRUCT is deferred to fire_deferred_construct below.
 	if (!catch_up_mode && display_list[depth].clip_action_count > 0 && display_list[depth].instance_name != NULL) {
+		// Drain queued CLIP_EVENT_INITIALIZE handlers before CONSTRUCT sync fires
+		// (see tagPlaceObject2 for the rationale).
+		actionDrainActionQueueByKind(app_context, AQ_KIND_CLIP_INIT);
 		MovieClip* _parent_mc = g_current_context ? g_current_context : &root_movieclip;
 		MovieClip* saved_ctx = g_current_context;
 		MovieClip* _mc = actionFindOrCreateMovieClip(app_context, display_list[depth].instance_name, _parent_mc);

@@ -104,7 +104,29 @@ deferral mechanisms into one queue. Last updated 2026-04-19.
   from_gnash attachExtImported still ruffle_matched; the three pre-existing
   attachImported / attachMovieLoopingTest / attachMovieTest failures in
   that suite are unchanged from baseline.
-- **Phase 4 — not started.**
+- **Phase 4 — landed 2026-04-20** — `CLIP_EVENT_INITIALIZE` clip-action
+  handlers (the sync loops at `tag.c:3391-3392` and the `tagPlaceObject2Ratio`
+  parallel loop at `tag.c:3667-3668`) now route through the unified queue at
+  `AQ_PRIORITY_INITIALIZE / AQ_KIND_CLIP_INIT`. Each INIT action enqueues a
+  heap-allocated `PendingClipInit{mc, action}` payload via
+  `actionQueueCallbackEx`; the dispatch callback sets context, fires the
+  handler, restores context, and frees the payload. The drain happens at
+  the outermost tagPlaceObject2's `!catch_up_mode` CONSTRUCT block — right
+  before the synchronous CONSTRUCT fire — so queued parent+nested INITs
+  all drain together, in FIFO-within-priority order, before any CONSTRUCT
+  runs. Nested placements under `catch_up_mode=1` queue but do not drain;
+  the outer drain catches them. A safety drain at the top of `tagShowFrame`
+  (`actionDrainActionQueueByKind(AQ_KIND_CLIP_INIT)`) covers the
+  goto-catch-up case, where the outermost `tagPlaceObject2` itself runs
+  under `catch_up_mode=1` and the CONSTRUCT-block drain is skipped.
+  Added `AQ_KIND_CLIP_INIT=4` to `action_queue.h` (bumped `AQ_KIND_COUNT`
+  to 5). Canaries 29/29 PASS locally (clip_events, register_and_init_order,
+  on_construct, clip_constructors, clip_event_propagation_order,
+  execution_order1-4, goto_execution_order[2], goto_rewind3, button_order,
+  variable_args, define_function2_preload_order, issue_1104, attach_movie
+  [_stop], empty_movieclip_can_attach_movies, register_class_return_value,
+  unload, stage_object_enumerate, set_interval, bad_placeobject_clipaction,
+  movieclip_in_removed_button, goto_frame[2], goto_label, goto_methods).
 - **Phases 5–9** — not started.
 
 The Phase 0 API intentionally provides only the generic `actionQueueCallback`
