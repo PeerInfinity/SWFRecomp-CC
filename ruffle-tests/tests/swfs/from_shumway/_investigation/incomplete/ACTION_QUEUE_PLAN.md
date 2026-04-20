@@ -68,12 +68,30 @@ deferral mechanisms into one queue. Last updated 2026-04-19.
   automatically safe. `duplicateMovieClip` canaries 4/4 PASS stably, and the
   padded-`ActionQueueEntry` repro no longer triggers the regression — Phase
   3b's struct change is unblocked.
-- **Phase 3b — not started** — actual storage migrations for
-  `g_pending_loads`, `g_deferred_roll_queue`, and `g_pending_attach_inits`
-  can now land; the duplicateMovieClip latent bug that blocked them is
-  fixed. API surface is already in place so Phase 3b is a pure
-  implementation change inside `action_queue.c` + the three enqueue call
-  sites.
+- **Phase 3b — landed 2026-04-19** — `g_pending_loads` (tag_stubs.c) and
+  `g_deferred_roll_queue` (action.c) migrated to the unified ActionQueue.
+  `ActionQueueEntry` gained its `kind` field; `actionQueueCallbackEx` now
+  sets it; `actionDrainActionQueueFiltered` now filters to kind=ONLOAD so
+  the tag.c:2090 onload drain does NOT steal LOAD / ROLL entries;
+  `actionDrainActionQueueByKind(ctx, kind)` is no longer a stub.
+  - `g_pending_loads` pushes AQ_KIND_LOAD entries with heap-allocated
+    `PendingLoad` payloads. `ng_fire_pending_loads` is now a thin wrapper
+    over `actionDrainActionQueueByKind(ctx, AQ_KIND_LOAD)`. The
+    MAX_PENDING_LOADS=64 silent-overflow limit is gone.
+  - `g_deferred_roll_queue` pushes AQ_KIND_ROLL entries with heap-allocated
+    `DeferredRollEntry` payloads. Both enqueue sites (focus change and
+    hover-rollout on focus change) migrated. The MAX_DEFERRED_ROLLOVERS=32
+    limit is gone.
+- **Phase 3c — not started** — `g_pending_attach_inits` migration, deferred
+  because of two semantics that don't map onto the generic queue API:
+  (1) coalesce-by-swf_depth at enqueue time (if attachMovie fires at a
+  depth that already has a queued entry, the new one *replaces* the old
+  one rather than appending); (2) an outer while-loop dispatch that re-runs
+  after inner dispatches (needed because attach init scripts can themselves
+  attachMovie). Option (1) is the blocker; the unified drain's loop-until-empty
+  behavior naturally covers (2). Options for (1): expose a find-and-update
+  primitive on the queue API, or coalesce at dispatch time by checking
+  whether the depth still belongs to this payload's MC.
 - **Phases 4–9** — not started.
 
 The Phase 0 API intentionally provides only the generic `actionQueueCallback`

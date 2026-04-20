@@ -480,31 +480,52 @@ MovieClip* ng_attachMovie(SWFAppContext* app_context, size_t char_id, const char
 // Duplicate clips live at SWF depths 16384+ — too large for display_list.
 // Instead, enqueue their onLoad callbacks here and fire them in tagShowFrame.
 // ---------------------------------------------------------------------------
-#define MAX_PENDING_LOADS 64
+// Phase 3b of ACTION_QUEUE_PLAN: backing storage is the unified ActionQueue
+// (AQ_KIND_LOAD entries). The payload is a heap-allocated PendingLoad; the
+// aq_dispatch_pending_load callback owns its lifetime and frees it after
+// dispatch. The MAX_PENDING_LOADS=64 silent-overflow limit is gone —
+// dynamic queue growth replaces it.
 typedef struct {
 	char instance_name[64];
 	ClipAction* clip_actions;
 	size_t clip_action_count;
 } PendingLoad;
-static PendingLoad g_pending_loads[MAX_PENDING_LOADS];
-static size_t g_pending_load_count = 0;
+
+static void aq_dispatch_pending_load(SWFAppContext* app_context, void* user)
+{
+	PendingLoad* pl = (PendingLoad*) user;
+	if (pl == NULL) return;
+	MovieClip* saved_ctx = g_current_context;
+	MovieClip* mc = actionFindOrCreateMovieClip(
+		app_context, pl->instance_name, &root_movieclip);
+	if (mc) actionSetCurrentContext(mc);
+	for (size_t a = 0; a < pl->clip_action_count; a++)
+	{
+		if (pl->clip_actions[a].event_flags & CLIP_EVENT_LOAD)
+			pl->clip_actions[a].action(app_context);
+	}
+	actionSetCurrentContext(saved_ctx);
+	free(pl);
+}
+
+static void ng_queue_pending_load(const char* target_name,
+                                  ClipAction* clip_actions,
+                                  size_t clip_action_count)
+{
+	PendingLoad* pl = (PendingLoad*) malloc(sizeof(PendingLoad));
+	if (pl == NULL) return;
+	strncpy(pl->instance_name, target_name, sizeof(pl->instance_name) - 1);
+	pl->instance_name[sizeof(pl->instance_name) - 1] = '\0';
+	pl->clip_actions = clip_actions;
+	pl->clip_action_count = clip_action_count;
+	actionQueueCallbackEx(NULL, aq_dispatch_pending_load, (void*)pl,
+	                      AQ_PRIORITY_NORMAL, NULL, /*is_unload=*/0,
+	                      AQ_KIND_LOAD);
+}
 
 void ng_fire_pending_loads(SWFAppContext* app_context)
 {
-	for (size_t p = 0; p < g_pending_load_count; p++)
-	{
-		MovieClip* saved_ctx = g_current_context;
-		MovieClip* mc = actionFindOrCreateMovieClip(
-			app_context, g_pending_loads[p].instance_name, &root_movieclip);
-		if (mc) actionSetCurrentContext(mc);
-		for (size_t a = 0; a < g_pending_loads[p].clip_action_count; a++)
-		{
-			if (g_pending_loads[p].clip_actions[a].event_flags & CLIP_EVENT_LOAD)
-				g_pending_loads[p].clip_actions[a].action(app_context);
-		}
-		actionSetCurrentContext(saved_ctx);
-	}
-	g_pending_load_count = 0;
+	actionDrainActionQueueByKind(app_context, AQ_KIND_LOAD);
 }
 
 // ---------------------------------------------------------------------------
@@ -2588,14 +2609,11 @@ MovieClip* ng_cloneSprite(SWFAppContext* app_context, const char* source_name,
 
 		// CloneSprite fires onLoad for the clone (unlike duplicateMovieClip).
 		// Clone depths are often too large for display_list[], so use pending queue.
-		if (display_list[src_depth].clip_action_count > 0 &&
-		    g_pending_load_count < MAX_PENDING_LOADS)
+		if (display_list[src_depth].clip_action_count > 0)
 		{
-			PendingLoad* pl = &g_pending_loads[g_pending_load_count++];
-			strncpy(pl->instance_name, target_name, sizeof(pl->instance_name) - 1);
-			pl->instance_name[sizeof(pl->instance_name) - 1] = '\0';
-			pl->clip_actions = display_list[src_depth].clip_actions;
-			pl->clip_action_count = display_list[src_depth].clip_action_count;
+			ng_queue_pending_load(target_name,
+				display_list[src_depth].clip_actions,
+				display_list[src_depth].clip_action_count);
 		}
 	}
 
@@ -2870,14 +2888,11 @@ MovieClip* ng_cloneSpriteFromMC(SWFAppContext* app_context, MovieClip* src_mc,
 	}
 
 	// CloneSprite fires onLoad for the clone — look up source's clip_actions by name
-	if (src_depth != SIZE_MAX && display_list[src_depth].clip_action_count > 0 &&
-	    g_pending_load_count < MAX_PENDING_LOADS)
+	if (src_depth != SIZE_MAX && display_list[src_depth].clip_action_count > 0)
 	{
-		PendingLoad* pl = &g_pending_loads[g_pending_load_count++];
-		strncpy(pl->instance_name, target_name, sizeof(pl->instance_name) - 1);
-		pl->instance_name[sizeof(pl->instance_name) - 1] = '\0';
-		pl->clip_actions = display_list[src_depth].clip_actions;
-		pl->clip_action_count = display_list[src_depth].clip_action_count;
+		ng_queue_pending_load(target_name,
+			display_list[src_depth].clip_actions,
+			display_list[src_depth].clip_action_count);
 	}
 
 	// Evict any old clone at this SWF depth, then register new one
