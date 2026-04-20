@@ -1,22 +1,22 @@
 # Ruffle Test Results (Unfiltered)
 
-**Date**: 2026-04-20 20:43 UTC
+**Date**: 2026-04-20 22:23 UTC
 
-**Git SHA**: `a427f5fc2d`
+**Git SHA**: `483fff6cfb`
 
-**Run Duration**: 4m 39s
+**Run Duration**: 0m 21s
 
 ## Summary
 
 | Metric | Value |
 |--------|-------|
-| Total tests | 17 |
-| Passing | **13** (76.5%) |
+| Total tests | 18 |
+| Passing | **14** (77.8%) |
 | Ruffle-matched | 1 (diffs ⊆ Ruffle's against Flash) |
-| Effective pass | **14** (82.4%) |
+| Effective pass | **15** (83.3%) |
 | Failing | 3 |
-| Total expected lines | 49 |
-| Matching lines | 43 (87.8%) |
+| Total expected lines | 51 |
+| Matching lines | 45 (88.2%) |
 | Mismatched lines | 6 |
 
 ### Failure Breakdown
@@ -27,23 +27,24 @@
 
 ## Passing Tests
 
-**13 tests passing**
+**14 tests passing**
 
 | # | Test | Lines | Duration | Notes |
 |---|------|-------|----------|-------|
-| 1 | `afunc_dict` | 2 | 16.3s |  |
-| 2 | `background` | 0 | 13.2s |  |
-| 3 | `dict_callframe` | 3 | 15.8s |  |
-| 4 | `dict_cross` | 3 | 16.1s |  |
-| 5 | `dict_override` | 2 | 16.8s |  |
-| 6 | `func_dict` | 3 | 16.6s |  |
-| 7 | `initaction_in_definesprite` | 2 | 16.7s |  |
-| 8 | `jump_after_end` | 3 | 17.3s |  |
-| 9 | `missing_bitmap` | 0 | 16.8s |  |
-| 10 | `mixed-bytecode-as2` | 1 | 16.4s |  |
-| 11 | `trace-as2/super` | 8 | 17.1s |  |
-| 12 | `trace-as2/this` | 8 | 16.4s |  |
-| 13 | `zeroframe_definesprite` | 3 | 16.3s |  |
+| 1 | `afunc_dict` | 2 | 0.1s |  |
+| 2 | `background` | 0 | 0.2s |  |
+| 3 | `dict_callframe` | 3 | 0.2s |  |
+| 4 | `dict_cross` | 3 | 0.2s |  |
+| 5 | `dict_override` | 2 | 0.2s |  |
+| 6 | `func_dict` | 3 | 0.2s |  |
+| 7 | `initaction_in_definesprite` | 2 | 0.2s |  |
+| 8 | `jump_after_end` | 3 | 0.1s |  |
+| 9 | `missing_bitmap` | 0 | 0.1s |  |
+| 10 | `mixed-bytecode-as2` | 1 | 0.2s |  |
+| 11 | `trace-as2/shortstack` | 2 | 16.9s |  |
+| 12 | `trace-as2/super` | 8 | 0.2s |  |
+| 13 | `trace-as2/this` | 8 | 0.2s |  |
+| 14 | `zeroframe_definesprite` | 3 | 0.2s |  |
 
 ## Ruffle-Matched Tests
 
@@ -51,7 +52,7 @@
 
 | # | Test | Our diffs | Ruffle diffs | Duration | Notes |
 |---|------|-----------|--------------|----------|-------|
-| 1 | `dict_event` | 2 | 2 | 16.1s |  |
+| 1 | `dict_event` | 2 | 2 | 0.2s |  |
 
 ## Near-Passing Tests
 
