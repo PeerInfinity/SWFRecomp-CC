@@ -1,10 +1,10 @@
 # Ruffle Test Results (Filtered)
 
-**Date**: 2026-04-20 17:51 UTC
+**Date**: 2026-04-20 20:43 UTC
 
-**Git SHA**: `749db868f7`
+**Git SHA**: `a427f5fc2d`
 
-**Run Duration**: 3m 46s
+**Run Duration**: 3m 50s
 
 **Filtered**: 0 tests ignored out of 16 available
 
@@ -12,20 +12,20 @@
 
 | Metric | Value |
 |--------|-------|
-| Total tests | 16 |
-| Passing | **2** (12.5%) |
+| Total tests | 15 |
+| Passing | **2** (13.3%) |
 | Ruffle-matched | 3 (diffs ⊆ Ruffle's against Flash) |
-| Effective pass | **5** (31.2%) |
-| Failing | 11 |
-| Total expected lines | 499 |
-| Matching lines | 215 (43.1%) |
-| Mismatched lines | 284 |
+| Effective pass | **5** (33.3%) |
+| Failing | 10 |
+| Total expected lines | 495 |
+| Matching lines | 215 (43.4%) |
+| Mismatched lines | 280 |
 
 ### Failure Breakdown
 
 | Category | Count | % of Failures |
 |----------|-------|---------------|
-| Output Mismatch | 11 | 100.0% |
+| Output Mismatch | 10 | 100.0% |
 
 ## Passing Tests
 
@@ -33,8 +33,8 @@
 
 | # | Test | Lines | Duration | Notes |
 |---|------|-------|----------|-------|
-| 1 | `gotoFrameLabelAsFunction` | 6 | 16.2s |  |
-| 2 | `hello` | 4 | 17.9s |  |
+| 1 | `gotoFrameLabelAsFunction` | 6 | 16.5s |  |
+| 2 | `hello` | 4 | 16.1s |  |
 
 ## Ruffle-Matched Tests
 
@@ -42,9 +42,9 @@
 
 | # | Test | Our diffs | Ruffle diffs | Duration | Notes |
 |---|------|-----------|--------------|----------|-------|
-| 1 | `action_execution_order_test10` | 14 | 14 | 15.6s |  |
-| 2 | `movieclip_destruction_test1` | 52 | 52 | 17.2s |  |
-| 3 | `registerclass_test3` | 20 | 20 | 12.6s |  |
+| 1 | `action_execution_order_test10` | 14 | 14 | 18.0s |  |
+| 2 | `movieclip_destruction_test1` | 52 | 52 | 18.2s |  |
+| 3 | `registerclass_test3` | 20 | 20 | 17.5s |  |
 
 ## Near-Passing Tests
 
@@ -74,7 +74,7 @@ No timeouts.
 
 ## All Output Mismatches
 
-**11 tests** with output mismatch, sorted by match rate (best first)
+**10 tests** with output mismatch, sorted by match rate (best first)
 
 | # | Test | Match Rate | Matching/Total | Actual | Expected | Notes |
 |---|------|------------|----------------|--------|----------|-------|
@@ -88,4 +88,3 @@ No timeouts.
 | 8 | `button_test1` | 25.8% | 8/31 | 20 | 31 |  |
 | 9 | `movieclip_destruction_test4` | 20.0% | 8/40 | 24 | 40 |  |
 | 10 | `opcode_guard_test2` | 0.0% | 0/28 | 28 | 24 |  |
-| 11 | `submoviegetvar` | 0.0% | 0/4 | 4 | 4 |  |
