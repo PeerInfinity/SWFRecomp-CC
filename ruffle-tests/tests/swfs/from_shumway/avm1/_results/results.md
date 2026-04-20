@@ -1,10 +1,10 @@
 # Ruffle Test Results (Unfiltered)
 
-**Date**: 2026-04-20 15:57 UTC
+**Date**: 2026-04-20 17:00 UTC
 
-**Git SHA**: `673b68a7f1`
+**Git SHA**: `cd098b274e`
 
-**Run Duration**: 1m 36s
+**Run Duration**: 1m 35s
 
 ## Summary
 
@@ -35,9 +35,9 @@
 | 2 | `bitmapdata/getPixel` | 2 | 0.3s |  |
 | 3 | `bitmapdata/loadBitmap` | 3 | 0.3s |  |
 | 4 | `callee` | 2 | 0.3s |  |
-| 5 | `depth` | 6 | 0.4s |  |
+| 5 | `depth` | 6 | 0.5s |  |
 | 6 | `doactionorder/symbolclass` | 4 | 0.3s |  |
-| 7 | `duplicateMovieClip/dontremove` | 6 | 16.4s |  |
+| 7 | `duplicateMovieClip/dontremove` | 6 | 16.3s |  |
 | 8 | `duplicateMovieClip/duplicateMovieClip` | 4 | 0.3s |  |
 | 9 | `duplicateMovieClip/name-coercion` | 3 | 0.3s |  |
 | 10 | `duplicateMovieClip/samedepth` | 6 | 0.3s |  |
@@ -45,7 +45,7 @@
 | 12 | `filters` | 149 | 0.3s |  |
 | 13 | `haxe/flocons1` | 2 | 0.3s |  |
 | 14 | `haxe/flocons2` | 3 | 0.3s |  |
-| 15 | `label` | 4 | 15.9s |  |
+| 15 | `label` | 4 | 16.5s |  |
 | 16 | `levels` | 9 | 0.3s |  |
 | 17 | `loadevent` | 9 | 0.3s |  |
 | 18 | `loadvariables/loadvariables` | 7 | 0.3s |  |
@@ -53,23 +53,23 @@
 | 20 | `lookup` | 3 | 0.3s |  |
 | 21 | `mouse-transparency` | 1 | 0.3s |  |
 | 22 | `nativeinheritance` | 6 | 0.3s |  |
-| 23 | `nested-button` | 1 | 15.9s |  |
+| 23 | `nested-button` | 1 | 12.8s |  |
 | 24 | `operations` | 13 | 0.3s |  |
 | 25 | `property-paths/property-paths-6` | 6 | 0.3s |  |
 | 26 | `property-paths/property-paths-7` | 7 | 0.3s |  |
 | 27 | `propertycase/propertycase` | 7 | 0.3s |  |
 | 28 | `propertycase/propertycase-preserving-6` | 2 | 0.3s |  |
-| 29 | `propertycase/propertycase-preserving-7` | 5 | 0.2s |  |
+| 29 | `propertycase/propertycase-preserving-7` | 5 | 0.3s |  |
 | 30 | `rollover` | 4 | 0.3s |  |
 | 31 | `scope` | 14 | 0.3s |  |
 | 32 | `setinterval` | 20 | 0.3s |  |
 | 33 | `settimeout` | 17 | 0.3s |  |
 | 34 | `super` | 11 | 0.3s |  |
 | 35 | `target` | 18 | 0.3s |  |
-| 36 | `text-bind` | 0 | 15.8s |  |
+| 36 | `text-bind` | 0 | 16.7s |  |
 | 37 | `textfield/textfield-html` | 4 | 0.3s |  |
 | 38 | `textfield/textfield-text-setters` | 8 | 0.3s |  |
-| 39 | `undefined/undefined-swf6` | 39 | 0.2s |  |
+| 39 | `undefined/undefined-swf6` | 39 | 0.3s |  |
 | 40 | `undefined/undefined-swf7` | 39 | 0.3s |  |
 | 41 | `watch` | 2 | 0.3s |  |
 | 42 | `xml/xmlbuild` | 1 | 0.3s |  |
@@ -82,7 +82,7 @@
 
 | # | Test | Our diffs | Ruffle diffs | Duration | Notes |
 |---|------|-----------|--------------|----------|-------|
-| 1 | `hitarea` | 2 | 2 | 16.6s |  |
+| 1 | `hitarea` | 2 | 2 | 16.5s |  |
 
 ## Near-Passing Tests
 
