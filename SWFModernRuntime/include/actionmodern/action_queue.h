@@ -79,3 +79,13 @@ void actionResetActionQueue(SWFAppContext* app_context);
 
 // Non-zero if the queue has any pending entries (for loop-exit checks).
 size_t actionActionQueuePending(void);
+
+// Find the first queued entry of `kind` whose user payload satisfies `pred`
+// (pred returns non-zero). Returns the user pointer, or NULL if no match.
+// Used by coalescing enqueue sites that need to update an already-queued
+// entry in place (e.g. attachMovie at the same swf_depth supersedes prior).
+// The returned pointer remains owned by the queue and is freed by the
+// dispatch callback when the entry drains; mutate its fields, do not free.
+void* actionQueueFindUserByKind(ActionQueueKind kind,
+                                int (*pred)(void* user, void* ctx),
+                                void* ctx);

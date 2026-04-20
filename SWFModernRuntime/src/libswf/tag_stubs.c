@@ -145,6 +145,15 @@ static DisplayObject* ng_entry_to_obj(size_t entry_idx)
 // ---------------------------------------------------------------------------
 // Pending attach init queue — deferred frame-0 script execution for attachMovie
 // ---------------------------------------------------------------------------
+// Phase 3c of ACTION_QUEUE_PLAN: backing storage is the unified ActionQueue
+// (AQ_KIND_ATTACH_INIT entries). Coalesce-by-swf_depth at enqueue time is
+// preserved via actionQueueFindUserByKind — if attachMovie fires at a depth
+// that already has a queued entry, its payload is mutated in place so the
+// last-attached version wins (the prior init never runs). The outer
+// while-loop dispatch the old implementation used is handled for free by
+// the unified drain's pop-until-empty behavior: re-entrant attachMovie calls
+// push new entries that the outer drain picks up naturally. The old
+// MAX_PENDING_ATTACH_INITS=64 silent-overflow limit is gone.
 extern MovieClip* actionFindOrCreateMovieClip(SWFAppContext* app_context, const char* name, MovieClip* parent);
 extern void setVariableByName(const char* var_name, ActionVar* value);
 extern void actionSetCurrentContext(MovieClip* mc);
@@ -153,115 +162,116 @@ extern int g_settarget_explicit_root;
 extern DisplayObject* g_current_sprite_obj;
 extern MovieClip* g_current_context;
 
-#define MAX_PENDING_ATTACH_INITS 64
 typedef struct {
 	char instance_name[256];
 	char export_name[128];  // For registered class constructor invocation
 	frame_func func;
 	int swf_depth;
 } PendingAttachInit;
-static PendingAttachInit g_pending_attach_inits[MAX_PENDING_ATTACH_INITS];
-static size_t g_pending_attach_init_count = 0;
+
+static void aq_dispatch_pending_attach_init(SWFAppContext* app_context, void* user)
+{
+	PendingAttachInit* pai = (PendingAttachInit*) user;
+	if (pai == NULL) return;
+
+	// Set context and base clip to the attached clip for correct variable resolution
+	MovieClip* saved_ctx = g_current_context;
+	extern void actionSetBaseClip(MovieClip* mc);
+	extern MovieClip* actionGetBaseClip(void);
+	MovieClip* saved_base = actionGetBaseClip();
+	MovieClip* mc = actionFindOrCreateMovieClip(
+		app_context, pai->instance_name, &root_movieclip);
+	if (mc) { actionSetCurrentContext(mc); actionSetBaseClip(mc); }
+
+	// Save display list state and switch to the MC's sprite display list
+	DisplayObject* saved_dl = display_list;
+	size_t saved_max = max_depth;
+	size_t saved_cap = display_list_capacity;
+	DisplayObject* saved_sprite_obj = g_current_sprite_obj;
+	int saved_settarget = g_settarget_explicit_root;
+	extern int g_settarget_invalid;
+	extern int g_settarget_none;
+	int saved_invalid = g_settarget_invalid;
+	int saved_none = g_settarget_none;
+
+	// Use the MC's own sprite display list (created during ng_attachMovie)
+	if (mc != NULL && mc->display_obj != NULL) {
+		DisplayObject* dobj = (DisplayObject*)mc->display_obj;
+		display_list = dobj->sprite_display_list;
+		max_depth = dobj->sprite_max_depth;
+		display_list_capacity = dobj->sprite_dl_capacity;
+	} else {
+		// Fallback: create a temp display list
+		size_t tmp_cap = 64;
+		display_list = calloc(tmp_cap, sizeof(DisplayObject));
+		max_depth = 0;
+		display_list_capacity = tmp_cap;
+	}
+	g_settarget_explicit_root = 0;
+	g_settarget_invalid = 0;
+	g_settarget_none = 0;
+	g_current_sprite_obj = NULL;
+
+	// Run the frame function in script-only mode: placement tags already ran during
+	// ng_attachMovie with catch_up_mode=1, so only scripts need to execute now.
+	// Without script_only_mode, tagPlaceObject2's loop-back preservation check
+	// would clear sprite_needs_init on children (e.g. "box"), preventing Phase 2.
+	{
+		extern void ng_set_script_only_mode(int mode);
+		ng_set_script_only_mode(1);
+		pai->func(app_context);
+		ng_set_script_only_mode(0);
+	}
+
+	// Recursively initialize any child sprites placed by the frame function.
+	// Without this, children of attachMovie'd sprites (e.g. sprite_2's child
+	// sprite_1 instances) never run their frame 0 scripts.
+	{
+		extern void process_sprite_needs_init_public(SWFAppContext* app_context, MovieClip* parent_mc);
+		process_sprite_needs_init_public(app_context, mc);
+	}
+
+	// Persist updated display list state back to the MC's display obj
+	if (mc != NULL && mc->display_obj != NULL) {
+		DisplayObject* dobj = (DisplayObject*)mc->display_obj;
+		dobj->sprite_display_list = display_list;
+		dobj->sprite_max_depth = max_depth;
+		dobj->sprite_dl_capacity = display_list_capacity;
+		// Mark eligible for AS2 onEnterFrame dispatch on the init tick
+		// (mirrors process_sprite_init_at_depth which sets this for timeline sprites)
+		dobj->enterframe_eligible = 1;
+	} else {
+		free(display_list);
+	}
+
+	// Restore
+	actionSetCurrentContext(saved_ctx);
+	actionSetBaseClip(saved_base);
+	g_current_sprite_obj = saved_sprite_obj;
+	g_settarget_explicit_root = saved_settarget;
+	g_settarget_invalid = saved_invalid;
+	g_settarget_none = saved_none;
+	display_list = saved_dl;
+	max_depth = saved_max;
+	display_list_capacity = saved_cap;
+
+	// NOTE: Registered class constructor is now fired synchronously during
+	// attachMovie (in action.c), not deferred here. This ensures the constructor
+	// runs before attachMovie returns to the caller script.
+
+	free(pai);
+}
+
+static int attach_init_match_depth(void* user, void* ctx)
+{
+	PendingAttachInit* pai = (PendingAttachInit*) user;
+	int swf_depth = *(int*) ctx;
+	return pai && pai->swf_depth == swf_depth;
+}
 
 void ng_fire_pending_attach_inits(SWFAppContext* app_context)
 {
-	// Use a while loop with local copy: init scripts may call attachMovie at
-	// the same depth, which replaces the current entry. By copying locally and
-	// clearing the global queue first, new entries are picked up on the next pass.
-	while (g_pending_attach_init_count > 0) {
-		PendingAttachInit local_inits[MAX_PENDING_ATTACH_INITS];
-		size_t local_count = g_pending_attach_init_count;
-		for (size_t j = 0; j < local_count; j++)
-			local_inits[j] = g_pending_attach_inits[j];
-		g_pending_attach_init_count = 0;
-
-		for (size_t i = 0; i < local_count; i++) {
-		// Set context and base clip to the attached clip for correct variable resolution
-		MovieClip* saved_ctx = g_current_context;
-		extern void actionSetBaseClip(MovieClip* mc);
-		extern MovieClip* actionGetBaseClip(void);
-		MovieClip* saved_base = actionGetBaseClip();
-		MovieClip* mc = actionFindOrCreateMovieClip(
-			app_context, local_inits[i].instance_name, &root_movieclip);
-		if (mc) { actionSetCurrentContext(mc); actionSetBaseClip(mc); }
-
-		// Save display list state and switch to the MC's sprite display list
-		DisplayObject* saved_dl = display_list;
-		size_t saved_max = max_depth;
-		size_t saved_cap = display_list_capacity;
-		DisplayObject* saved_sprite_obj = g_current_sprite_obj;
-		int saved_settarget = g_settarget_explicit_root;
-		extern int g_settarget_invalid;
-		extern int g_settarget_none;
-		int saved_invalid = g_settarget_invalid;
-		int saved_none = g_settarget_none;
-
-		// Use the MC's own sprite display list (created during ng_attachMovie)
-		if (mc != NULL && mc->display_obj != NULL) {
-			DisplayObject* dobj = (DisplayObject*)mc->display_obj;
-			display_list = dobj->sprite_display_list;
-			max_depth = dobj->sprite_max_depth;
-			display_list_capacity = dobj->sprite_dl_capacity;
-		} else {
-			// Fallback: create a temp display list
-			size_t tmp_cap = 64;
-			display_list = calloc(tmp_cap, sizeof(DisplayObject));
-			max_depth = 0;
-			display_list_capacity = tmp_cap;
-		}
-		g_settarget_explicit_root = 0;
-		g_settarget_invalid = 0;
-		g_settarget_none = 0;
-		g_current_sprite_obj = NULL;
-
-		// Run the frame function in script-only mode: placement tags already ran during
-		// ng_attachMovie with catch_up_mode=1, so only scripts need to execute now.
-		// Without script_only_mode, tagPlaceObject2's loop-back preservation check
-		// would clear sprite_needs_init on children (e.g. "box"), preventing Phase 2.
-		{
-			extern void ng_set_script_only_mode(int mode);
-			ng_set_script_only_mode(1);
-			local_inits[i].func(app_context);
-			ng_set_script_only_mode(0);
-		}
-
-		// Recursively initialize any child sprites placed by the frame function.
-		// Without this, children of attachMovie'd sprites (e.g. sprite_2's child
-		// sprite_1 instances) never run their frame 0 scripts.
-		{
-			extern void process_sprite_needs_init_public(SWFAppContext* app_context, MovieClip* parent_mc);
-			process_sprite_needs_init_public(app_context, mc);
-		}
-
-		// Persist updated display list state back to the MC's display obj
-		if (mc != NULL && mc->display_obj != NULL) {
-			DisplayObject* dobj = (DisplayObject*)mc->display_obj;
-			dobj->sprite_display_list = display_list;
-			dobj->sprite_max_depth = max_depth;
-			dobj->sprite_dl_capacity = display_list_capacity;
-			// Mark eligible for AS2 onEnterFrame dispatch on the init tick
-			// (mirrors process_sprite_init_at_depth which sets this for timeline sprites)
-			dobj->enterframe_eligible = 1;
-		} else {
-			free(display_list);
-		}
-
-		// Restore
-		actionSetCurrentContext(saved_ctx);
-		actionSetBaseClip(saved_base);
-		g_current_sprite_obj = saved_sprite_obj;
-		g_settarget_explicit_root = saved_settarget;
-		g_settarget_invalid = saved_invalid;
-		g_settarget_none = saved_none;
-		display_list = saved_dl;
-		max_depth = saved_max;
-		display_list_capacity = saved_cap;
-
-		// NOTE: Registered class constructor is now fired synchronously during
-		// attachMovie (in action.c), not deferred here. This ensures the constructor
-		// runs before attachMovie returns to the caller script.
-		}
-	}
+	actionDrainActionQueueByKind(app_context, AQ_KIND_ATTACH_INIT);
 }
 
 // ---------------------------------------------------------------------------
@@ -401,35 +411,34 @@ MovieClip* ng_attachMovie(SWFAppContext* app_context, size_t char_id, const char
 
 		// Queue the frame function for deferred script execution
 		// (Flash runs attached clip init scripts at end of frame)
-		// If an init is already pending for the same SWF depth, replace it
-		// (re-attaching at the same depth supersedes the previous init)
+		// If an init is already pending for the same SWF depth, mutate it in
+		// place (re-attaching at the same depth supersedes the previous init).
 		{
 			const char* exp_name = ng_lookupExportName(char_id);
-			int found = 0;
-			for (size_t qi = 0; qi < g_pending_attach_init_count; qi++) {
-				if (g_pending_attach_inits[qi].swf_depth == swf_depth) {
-					strncpy(g_pending_attach_inits[qi].instance_name,
-						new_name, sizeof(g_pending_attach_inits[0].instance_name) - 1);
-					g_pending_attach_inits[qi].instance_name[
-						sizeof(g_pending_attach_inits[0].instance_name) - 1] = '\0';
-					g_pending_attach_inits[qi].func = funcs[0];
-					if (exp_name) { strncpy(g_pending_attach_inits[qi].export_name, exp_name, 127); g_pending_attach_inits[qi].export_name[127] = '\0'; }
-					else g_pending_attach_inits[qi].export_name[0] = '\0';
-					found = 1;
-					break;
-				}
+			PendingAttachInit* pai = (PendingAttachInit*)
+				actionQueueFindUserByKind(AQ_KIND_ATTACH_INIT,
+				                          attach_init_match_depth, &swf_depth);
+			if (pai == NULL) {
+				pai = (PendingAttachInit*) malloc(sizeof(PendingAttachInit));
+				if (pai == NULL) goto skip_attach_init_queue;
+				pai->swf_depth = swf_depth;
+				actionQueueCallbackEx(app_context,
+				                      aq_dispatch_pending_attach_init,
+				                      (void*)pai,
+				                      AQ_PRIORITY_NORMAL, NULL,
+				                      /*is_unload=*/0,
+				                      AQ_KIND_ATTACH_INIT);
 			}
-			if (!found && g_pending_attach_init_count < MAX_PENDING_ATTACH_INITS) {
-				strncpy(g_pending_attach_inits[g_pending_attach_init_count].instance_name,
-					new_name, sizeof(g_pending_attach_inits[0].instance_name) - 1);
-				g_pending_attach_inits[g_pending_attach_init_count].instance_name[
-					sizeof(g_pending_attach_inits[0].instance_name) - 1] = '\0';
-				g_pending_attach_inits[g_pending_attach_init_count].func = funcs[0];
-				g_pending_attach_inits[g_pending_attach_init_count].swf_depth = swf_depth;
-				if (exp_name) { strncpy(g_pending_attach_inits[g_pending_attach_init_count].export_name, exp_name, 127); g_pending_attach_inits[g_pending_attach_init_count].export_name[127] = '\0'; }
-				else g_pending_attach_inits[g_pending_attach_init_count].export_name[0] = '\0';
-				g_pending_attach_init_count++;
+			strncpy(pai->instance_name, new_name, sizeof(pai->instance_name) - 1);
+			pai->instance_name[sizeof(pai->instance_name) - 1] = '\0';
+			pai->func = funcs[0];
+			if (exp_name) {
+				strncpy(pai->export_name, exp_name, sizeof(pai->export_name) - 1);
+				pai->export_name[sizeof(pai->export_name) - 1] = '\0';
+			} else {
+				pai->export_name[0] = '\0';
 			}
+		skip_attach_init_queue: ;
 		}
 	}
 

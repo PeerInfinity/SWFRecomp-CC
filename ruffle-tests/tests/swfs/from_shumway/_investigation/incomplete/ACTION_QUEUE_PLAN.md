@@ -82,17 +82,30 @@ deferral mechanisms into one queue. Last updated 2026-04-19.
     `DeferredRollEntry` payloads. Both enqueue sites (focus change and
     hover-rollout on focus change) migrated. The MAX_DEFERRED_ROLLOVERS=32
     limit is gone.
-- **Phase 3c — not started** — `g_pending_attach_inits` migration, deferred
-  because of two semantics that don't map onto the generic queue API:
-  (1) coalesce-by-swf_depth at enqueue time (if attachMovie fires at a
-  depth that already has a queued entry, the new one *replaces* the old
-  one rather than appending); (2) an outer while-loop dispatch that re-runs
-  after inner dispatches (needed because attach init scripts can themselves
-  attachMovie). Option (1) is the blocker; the unified drain's loop-until-empty
-  behavior naturally covers (2). Options for (1): expose a find-and-update
-  primitive on the queue API, or coalesce at dispatch time by checking
-  whether the depth still belongs to this payload's MC.
-- **Phases 4–9** — not started.
+- **Phase 3c — landed 2026-04-20** — `g_pending_attach_inits` migrated to the
+  unified ActionQueue (AQ_KIND_ATTACH_INIT). Chose the find-and-update option
+  of the two documented: added `actionQueueFindUserByKind(kind, pred, ctx)`
+  to `action_queue.{h,c}` and used it at enqueue to locate an existing
+  queued payload for the same swf_depth. When found, the caller mutates
+  `instance_name` / `func` / `export_name` in place (queue entry untouched);
+  when not found, the caller heap-allocates a new `PendingAttachInit` and
+  enqueues via `actionQueueCallbackEx(..., AQ_KIND_ATTACH_INIT)`. The
+  outer while-loop dispatch the old implementation used is handled for
+  free by `actionDrainActionQueueByKind`'s pop-until-empty: re-entrant
+  attachMovie calls during init dispatch push new entries that the outer
+  drain picks up naturally. `ng_fire_pending_attach_inits` is now a thin
+  wrapper. The MAX_PENDING_ATTACH_INITS=64 silent-overflow limit is gone.
+  Canaries 21/21 PASS locally (attach_movie, attach_movie_stop,
+  empty_movieclip_can_attach_movies, register_and_init_order, on_construct,
+  clip_events, register_class_return_value, clip_constructors,
+  execution_order1-4, goto_execution_order, goto_execution_order2,
+  goto_rewind3, button_order, define_function2_preload_order, variable_args,
+  issue_1104, stage_object_enumerate, unload, set_interval);
+  from_gnash attachExtImported still ruffle_matched; the three pre-existing
+  attachImported / attachMovieLoopingTest / attachMovieTest failures in
+  that suite are unchanged from baseline.
+- **Phase 4 — not started.**
+- **Phases 5–9** — not started.
 
 The Phase 0 API intentionally provides only the generic `actionQueueCallback`
 kind. The typed wrappers sketched in §Data structure (queueScript,

@@ -168,3 +168,16 @@ size_t actionActionQueuePending(void)
 {
 	return g_aq_count;
 }
+
+void* actionQueueFindUserByKind(ActionQueueKind kind,
+                                int (*pred)(void* user, void* ctx),
+                                void* ctx)
+{
+	if (pred == NULL) return NULL;
+	if (kind >= AQ_KIND_COUNT) return NULL;
+	for (size_t i = 0; i < g_aq_count; i++) {
+		if (g_aq[i].kind != kind) continue;
+		if (pred(g_aq[i].user, ctx)) return g_aq[i].user;
+	}
+	return NULL;
+}
