@@ -20,13 +20,23 @@ deferral mechanisms into one queue. Last updated 2026-04-19.
   `actionQueueMCOnLoad` now pushes into the ActionQueue at `AQ_PRIORITY_NORMAL`
   with `clip=NULL, is_unload=0` (NULL clip preserves the pre-migration
   "always fire, never skip on removal" semantic — gating comes later).
-  `actionFlushPendingOnLoads` becomes a thin `actionDrainActionQueue` wrapper.
-  `actionHasPendingOnLoads` reads `actionActionQueuePending`. The old fixed
-  `g_pending_onloads[64]` array is deleted — dynamic queue growth replaces
-  the `MAX_PENDING_ONLOADS=64` silent-overflow limit. Canaries 17/17 PASS
-  locally (onload-sensitive: `movieclip_invalid_get_bounds_2/5`,
-  `string_paths_eval2`).
-- **Phases 2–9** — not started.
+  `actionFlushPendingOnLoads` drains only non-unload entries via
+  `actionDrainActionQueueFiltered(ctx, 0)` so it composes cleanly with
+  Phase 2 and later phases. `actionHasPendingOnLoads` reads
+  `actionActionQueuePending`. The old fixed `g_pending_onloads[64]` array is
+  deleted — dynamic queue growth replaces the `MAX_PENDING_ONLOADS=64`
+  silent-overflow limit. CI confirmed zero regressions across all 8 suites.
+- **Phase 2 — landed 2026-04-19** — `g_pending_unloads` storage migrated.
+  Added `actionDrainActionQueueFiltered(ctx, is_unload_filter)` so unload
+  entries drain at `actionFirePendingUnloads` (tag.c:2055) while non-unload
+  entries wait for the later `actionFlushPendingOnLoads` drain (tag.c:2090),
+  preserving the current tick-level ordering. `queueOnUnload` heap-allocates
+  a small `PendingUnload{func,mc}` payload with plain `malloc` (callers have
+  no app_context in scope); the dispatch callback frees it. `g_execution_halted`
+  mid-drain behavior matches the old loop's early-break (drop-remaining).
+  The old fixed `g_pending_unloads[64]` array and `g_pending_unload_count` are
+  deleted. Canaries 19/19 PASS locally (`unload` + onload canaries).
+- **Phases 3–9** — not started.
 
 The Phase 0 API intentionally provides only the generic `actionQueueCallback`
 kind. The typed wrappers sketched in §Data structure (queueScript,

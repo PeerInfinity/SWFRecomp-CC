@@ -36,6 +36,14 @@ void actionQueueCallback(SWFAppContext* app_context,
 // by subsequent iterations (matching Ruffle Player::run_actions).
 void actionDrainActionQueue(SWFAppContext* app_context);
 
+// Filtered drain: pops only entries whose `is_unload` matches `is_unload_filter`
+// (0 or 1). Non-matching entries stay queued. Use during phased migration to
+// preserve call-site-specific semantics (e.g. unload drain point at
+// tag.c:actionFirePendingUnloads fires only unload events, leaving onloads
+// for the later actionFlushPendingOnLoads drain).
+void actionDrainActionQueueFiltered(SWFAppContext* app_context,
+                                    int is_unload_filter);
+
 // Discard all queued entries without dispatching (e.g. catch-up resets).
 void actionResetActionQueue(SWFAppContext* app_context);
 

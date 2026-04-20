@@ -18642,19 +18642,43 @@ void actionFirePendingDirectLoads(SWFAppContext* app_context)
 // --- Deferred onUnload queue ---
 // When removeMovieClip/actionRemoveSprite removes a dynamic clip, the AS-set onUnload
 // handler is queued here and fired at ShowFrame time (between frames), matching Flash.
-#define MAX_PENDING_UNLOADS 64
+// Phase 2 of ACTION_QUEUE_PLAN: storage migrated to the unified ActionQueue.
+// Entries carry is_unload=1 so they only drain at actionFirePendingUnloads and
+// so they fire even if the MC has been marked avm1_removed (which is always
+// true for unload events by definition).
 typedef struct { ASFunction* func; MovieClip* mc; } PendingUnload;
-static PendingUnload g_pending_unloads[MAX_PENDING_UNLOADS];
-static int g_pending_unload_count = 0;
+
+// Payload uses plain malloc/free (not HCALLOC) because queueOnUnload has no
+// app_context in scope at its callers. The payload is a tiny two-pointer
+// struct freed in aq_dispatch_unload, so it doesn't pressure the heap arena.
+static void aq_dispatch_unload(SWFAppContext* app_context, void* user)
+{
+	PendingUnload* pu = (PendingUnload*) user;
+	if (pu == NULL) return;
+	if (!g_execution_halted) {
+		MovieClip* saved = g_current_context;
+		actionSetCurrentContext(pu->mc);
+		if (g_this_depth < MAX_SCOPE_DEPTH) {
+			g_this_stack[g_this_depth].type = ACTION_STACK_VALUE_MOVIECLIP;
+			g_this_stack[g_this_depth].data.numeric_value = (u64)(uintptr_t)pu->mc;
+			g_this_depth++;
+		}
+		invokeSpecialFunction(app_context, pu->func, NULL);
+		if (g_this_depth > 0) g_this_depth--;
+		actionSetCurrentContext(saved);
+	}
+	free(pu);
+}
 
 // Enqueue an onUnload handler to fire at next ShowFrame.
 static void queueOnUnload(ASFunction* func, MovieClip* mc)
 {
-	if (g_pending_unload_count < MAX_PENDING_UNLOADS) {
-		g_pending_unloads[g_pending_unload_count].func = func;
-		g_pending_unloads[g_pending_unload_count].mc   = mc;
-		g_pending_unload_count++;
-	}
+	PendingUnload* pu = (PendingUnload*) malloc(sizeof(PendingUnload));
+	if (pu == NULL) return;
+	pu->func = func;
+	pu->mc = mc;
+	actionQueueCallback(NULL, aq_dispatch_unload, (void*)pu,
+	                    AQ_PRIORITY_NORMAL, NULL, /*is_unload=*/1);
 }
 
 // Recursively queue onUnload handlers for children of a removed MovieClip.
@@ -18685,25 +18709,12 @@ static void queueChildOnUnloads(MovieClip* parent_mc)
 }
 
 // Fire all queued onUnload handlers (called from tagShowFrame in tag.c).
+// Phase 2 of ACTION_QUEUE_PLAN: drains only is_unload=1 entries so unload
+// dispatch remains ordered BEFORE onloads/loads/attach_inits (whose drain
+// sites fire later in tagShowFrame).
 void actionFirePendingUnloads(SWFAppContext* app_context)
 {
-	int count = g_pending_unload_count;
-	g_pending_unload_count = 0;  // reset first (handlers may queue more)
-	for (int i = 0; i < count; i++) {
-		if (g_execution_halted) break;
-		MovieClip* saved = g_current_context;
-		MovieClip* mc = g_pending_unloads[i].mc;
-		actionSetCurrentContext(mc);
-		// Push 'this' = the unloading MC so GetVariable("this") finds it
-		if (g_this_depth < MAX_SCOPE_DEPTH) {
-			g_this_stack[g_this_depth].type = ACTION_STACK_VALUE_MOVIECLIP;
-			g_this_stack[g_this_depth].data.numeric_value = (u64)(uintptr_t)mc;
-			g_this_depth++;
-		}
-		invokeSpecialFunction(app_context, g_pending_unloads[i].func, NULL);
-		if (g_this_depth > 0) g_this_depth--;
-		actionSetCurrentContext(saved);
-	}
+	actionDrainActionQueueFiltered(app_context, /*is_unload_filter=*/1);
 }
 
 #ifdef NO_GRAPHICS
@@ -26696,9 +26707,11 @@ void actionQueueMCOnLoad(MovieClip* mc)
 }
 
 // Flush all pending onLoad dispatches. Called after frame scripts complete.
+// Only drains non-unload entries — unloads have their own drain site at
+// actionFirePendingUnloads (tag.c:2055) to preserve pre-migration ordering.
 void actionFlushPendingOnLoads(SWFAppContext* app_context)
 {
-	actionDrainActionQueue(app_context);
+	actionDrainActionQueueFiltered(app_context, /*is_unload_filter=*/0);
 }
 
 int actionHasPendingOnLoads(void)

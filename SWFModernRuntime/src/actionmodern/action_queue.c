@@ -51,13 +51,17 @@ void actionQueueCallback(SWFAppContext* app_context,
 	e->is_unload = is_unload ? 1 : 0;
 }
 
-static int aq_pop_index(int* out_index)
+static int aq_pop_index(int* out_index, int is_unload_filter)
 {
 	// Ruffle drains highest priority first, FIFO within priority. Scan all
 	// entries; track the earliest index at the highest priority seen.
+	// When is_unload_filter >= 0, only entries with matching is_unload are
+	// considered.
 	int best = -1;
 	int best_pri = -1;
 	for (size_t i = 0; i < g_aq_count; i++) {
+		if (is_unload_filter >= 0 && g_aq[i].is_unload != is_unload_filter)
+			continue;
 		int pri = (int)g_aq[i].priority;
 		if (pri > best_pri) {
 			best_pri = pri;
@@ -69,13 +73,13 @@ static int aq_pop_index(int* out_index)
 	return 1;
 }
 
-void actionDrainActionQueue(SWFAppContext* app_context)
+static void aq_drain(SWFAppContext* app_context, int is_unload_filter)
 {
-	// Loop until empty. Re-entrant queues (dispatch pushes more entries) are
-	// handled naturally: each iteration re-scans for the highest-priority head.
-	while (g_aq_count > 0) {
+	// Loop until no matching entries remain. Re-entrant queues (dispatch
+	// pushes more entries) are handled naturally: each iteration re-scans.
+	for (;;) {
 		int idx = 0;
-		if (!aq_pop_index(&idx)) break;
+		if (!aq_pop_index(&idx, is_unload_filter)) break;
 		ActionQueueEntry entry = g_aq[idx];
 		// Remove the entry by sliding tail down (preserves FIFO order within
 		// each priority bucket).
@@ -94,6 +98,19 @@ void actionDrainActionQueue(SWFAppContext* app_context)
 		}
 		entry.fn(app_context, entry.user);
 	}
+}
+
+void actionDrainActionQueue(SWFAppContext* app_context)
+{
+	aq_drain(app_context, -1);
+}
+
+void actionDrainActionQueueFiltered(SWFAppContext* app_context,
+                                    int is_unload_filter)
+{
+	// Clamp defensively to the documented {0,1} domain. Pass -1 for "drain all".
+	if (is_unload_filter != 0 && is_unload_filter != 1) is_unload_filter = -1;
+	aq_drain(app_context, is_unload_filter);
 }
 
 void actionResetActionQueue(SWFAppContext* app_context)
