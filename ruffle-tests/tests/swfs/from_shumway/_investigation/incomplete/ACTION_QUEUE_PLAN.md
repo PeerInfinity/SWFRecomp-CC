@@ -177,7 +177,49 @@ deferral mechanisms into one queue. Last updated 2026-04-19.
     empty_movieclip_can_attach_movies, unload, stage_object_enumerate,
     set_interval, bad_placeobject_clipaction, movieclip_in_removed_button,
     goto_frame[2], goto_label, goto_methods.
-- **Phases 6–9** — not started.
+- **Phase 6 — landed 2026-04-20** — root DoAction emission migrated from the
+  batched end-of-frame flush loops to inline `actionQueueScript` at each
+  `SWF_TAG_DO_ACTION` tag's actual position. The three batched flush loops at
+  the early-exit, `SWF_TAG_END_TAG`, and `SWF_TAG_SHOW_FRAME` sites are
+  replaced with a kind-filtered drain: `actionDrainActionQueueByKind(app_context,
+  AQ_KIND_SCRIPT)`. The queue gate `if (!catch_up_mode || g_tag_skip_mode)`
+  matches the old inline call gate — root scripts don't queue during goto
+  catch-up, but do queue during the target-frame scripts-only replay.
+  - **New kind** — `AQ_KIND_SCRIPT = 7` with `AQ_KIND_COUNT = 8` in
+    `action_queue.h`. `actionQueueScript(app_context, fn)` is a thin wrapper
+    over `actionQueueCallbackEx(AQ_KIND_SCRIPT, AQ_PRIORITY_NORMAL,
+    clip=NULL, is_unload=0)` with a trivial dispatcher that calls
+    `fn(app_context)` and frees the `PendingScript{fn}` payload. Included
+    `action_queue.h` in `libswf/recomp.h` so the generated tag_main.c sees
+    the new API.
+  - **Kind-filtered drain (not all-kinds)** — the first implementation used
+    `actionDrainActionQueue` (all kinds). `register_and_init_order` regressed
+    from 233/233 → 191/233 (lost the "a first frame" block): the all-kinds
+    drain inside the caller chain (script_4 → actionGotoFrame →
+    ng_executeGotoCatchUp → frame_1's `actionDrainActionQueue`) pulled
+    Phase 4/5 CLIP_INIT/CONSTRUCT/REGISTER_CTOR entries earlier than the
+    pre-Phase-6 tagShowFrame safety-drain timing, shifting the state the
+    subsequent deferred-goto 3-phase loop saw. Switching to
+    `actionDrainActionQueueByKind(AQ_KIND_SCRIPT)` preserves the Phase 5
+    ordering contract (outermost tagPlaceObject2 + tagShowFrame safety drain
+    own INIT/CONSTRUCT/CTOR).
+  - **Scope restriction vs plan** — the plan's "Phase 2 re-runs become queue
+    inserts" line is Phase 7 work (sprite DoAction emission) and was
+    deliberately out of scope. Root scripts only ever emit from root frame
+    functions (not from sprite frame_0), so the plan's proposed
+    `g_action_queue_active` flag is not needed yet — the simpler
+    `if (!catch_up_mode || g_tag_skip_mode)` gate works for root-only.
+  - **Phase 6 targets — status unchanged** — `root_onload` (output_mismatch),
+    `doactionorder` (output_mismatch), `timeline_as2_1/5` (output_mismatch),
+    `dict_event` (ruffle_matched). Phase 6 alone doesn't flip these because
+    sprite frame DoActions still fire via `process_sprite_needs_init` Phase 2
+    (the old batched emission path), not via the queue. Phase 7 will migrate
+    sprite DoAction emission and — combined with Phase 6's root-side inline
+    ordering — should flip all five targets.
+  - Canaries 32/32 PASS locally: the 29 Phase 5 canaries plus the three
+    latent-bug trip-wires (`movieclip_invalid_get_bounds_1/2`,
+    `string_paths_eval2`).
+- **Phases 7–9** — not started.
 
 The Phase 0 API intentionally provides only the generic `actionQueueCallback`
 kind. The typed wrappers sketched in §Data structure (queueScript,

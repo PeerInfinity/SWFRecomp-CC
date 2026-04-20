@@ -181,3 +181,27 @@ void* actionQueueFindUserByKind(ActionQueueKind kind,
 	}
 	return NULL;
 }
+
+// Phase 6: AQ_KIND_SCRIPT dispatcher. The payload is just the function
+// pointer boxed so the generic ActionQueueFn signature can carry it.
+typedef struct {
+	void (*fn)(SWFAppContext*);
+} PendingScript;
+
+static void aq_dispatch_script(SWFAppContext* app_context, void* user)
+{
+	PendingScript* p = (PendingScript*)user;
+	if (p && p->fn) p->fn(app_context);
+	free(p);
+}
+
+void actionQueueScript(SWFAppContext* app_context,
+                       void (*fn)(SWFAppContext*))
+{
+	if (!fn) return;
+	PendingScript* p = (PendingScript*)malloc(sizeof(*p));
+	if (!p) return;
+	p->fn = fn;
+	actionQueueCallbackEx(app_context, aq_dispatch_script, p,
+	                      AQ_PRIORITY_NORMAL, NULL, 0, AQ_KIND_SCRIPT);
+}

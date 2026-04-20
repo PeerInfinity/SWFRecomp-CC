@@ -547,13 +547,12 @@ namespace SWFRecomp
 		{
 			// Flush pending ENTER_FRAME dispatch (after RemoveObject, before DoAction)
 			context.tag_main << "\t" << "tagFlushPendingEnterFrame(app_context);" << endl;
-			// Emit any queued script calls (skip sprite/clip/button-owned scripts)
-			while (last_queued_script < next_script_i)
-			{
-				if (non_timeline_scripts.find(last_queued_script) == non_timeline_scripts.end())
-					context.tag_main << "\t" << "if (!catch_up_mode || g_tag_skip_mode) script_" << to_string(last_queued_script) << "(app_context);" << endl;
-				last_queued_script += 1;
-			}
+			// Phase 6: drain queued root DoAction scripts. Kind-filtered so
+			// Phase 4/5 CLIP_INIT/CONSTRUCT/REGISTER_CTOR entries stay on their
+			// original drain timeline (outermost tagPlaceObject2 / tagShowFrame
+			// safety drain).
+			context.tag_main << "\t" << "actionDrainActionQueueByKind(app_context, AQ_KIND_SCRIPT);" << endl;
+			last_queued_script = next_script_i;
 
 			if (next_frame_i == 1)
 			{
@@ -806,13 +805,11 @@ namespace SWFRecomp
 			{
 				// Flush pending ENTER_FRAME dispatch (after RemoveObject, before DoAction)
 				context.tag_main << "\t" << "tagFlushPendingEnterFrame(app_context);" << endl;
-				// Emit any queued script calls (skip sprite/clip/button-owned scripts)
-				while (last_queued_script < next_script_i)
-				{
-					if (non_timeline_scripts.find(last_queued_script) == non_timeline_scripts.end())
-						context.tag_main << "\t" << "if (!catch_up_mode || g_tag_skip_mode) script_" << to_string(last_queued_script) << "(app_context);" << endl;
-					last_queued_script += 1;
-				}
+				// Phase 6: drain queued root DoAction scripts before the frame
+				// footer (quit_swf / next_frame scheduling). Kind-filtered so
+				// Phase 4/5 entries remain owned by their own drain sites.
+				context.tag_main << "\t" << "actionDrainActionQueueByKind(app_context, AQ_KIND_SCRIPT);" << endl;
+				last_queued_script = next_script_i;
 
 				if (next_frame_i == 1)
 				{
@@ -860,12 +857,13 @@ namespace SWFRecomp
 
 				// Flush pending ENTER_FRAME dispatch (after RemoveObject, before DoAction)
 				context.tag_main << "\t" << "tagFlushPendingEnterFrame(app_context);" << endl;
-				while (last_queued_script < next_script_i)
-				{
-					if (non_timeline_scripts.find(last_queued_script) == non_timeline_scripts.end())
-						context.tag_main << "\t" << "if (!catch_up_mode || g_tag_skip_mode) script_" << to_string(last_queued_script) << "(app_context);" << endl;
-					last_queued_script += 1;
-				}
+				// Phase 6: drain queued root DoAction scripts at the ShowFrame
+				// boundary. Kind-filtered (AQ_KIND_SCRIPT only) so Phase 4/5
+				// CLIP_INIT / CONSTRUCT / REGISTER_CTOR entries continue to
+				// drain at the outermost tagPlaceObject2 / tagShowFrame safety
+				// drain — preserving the Phase 5 ordering contract.
+				context.tag_main << "\t" << "actionDrainActionQueueByKind(app_context, AQ_KIND_SCRIPT);" << endl;
+				last_queued_script = next_script_i;
 
 				context.tag_main << "\t" << "tagShowFrame(app_context);" << endl;
 
@@ -2537,6 +2535,7 @@ namespace SWFRecomp
 				out_script << "\t" << "char str_buffer[17];" << endl << endl;
 				out_script << "\t" << "actionResetRegisters();" << endl << endl;
 
+				size_t root_script_id = next_script_i;
 				next_script_i += 1;
 
 				// Parse actions using a bounded temp buffer to prevent overrun
@@ -2554,6 +2553,14 @@ namespace SWFRecomp
 				}
 
 				out_script << "}";
+
+				// Phase 6: queue the root DoAction inline at this tag's
+				// position. The drain at ShowFrame/EndTag pops in FIFO order,
+				// fixing the DoAction-A → PlaceObject → DoAction-B ordering.
+				// Gate: skip during catch-up replay, but queue during the
+				// target-frame scripts-only replay (g_tag_skip_mode=1).
+				context.tag_main << "\t" << "if (!catch_up_mode || g_tag_skip_mode) actionQueueScript(app_context, script_"
+								 << to_string(root_script_id) << ");" << endl;
 
 				break;
 			}

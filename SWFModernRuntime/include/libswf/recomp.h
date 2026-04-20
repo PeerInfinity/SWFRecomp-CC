@@ -8,6 +8,7 @@
 
 // actionmodern
 #include <action.h>
+#include <action_queue.h>
 #include <variables.h>
 #include <object.h>
 

@@ -25,7 +25,8 @@ typedef enum {
 	AQ_KIND_CLIP_INIT      = 4, // Phase 4: CLIP_EVENT_INITIALIZE from tagPlaceObject2
 	AQ_KIND_CLIP_CONSTRUCT = 5, // Phase 5: CLIP_EVENT_CONSTRUCT from tagPlaceObject2
 	AQ_KIND_REGISTER_CTOR  = 6, // Phase 5: registerClass constructor from tagPlaceObject2
-	AQ_KIND_COUNT          = 7,
+	AQ_KIND_SCRIPT         = 7, // Phase 6: root DoAction script (recompiler-emitted)
+	AQ_KIND_COUNT          = 8,
 } ActionQueueKind;
 
 // Generic queue callback: user code provides the dispatch logic.
@@ -92,3 +93,9 @@ size_t actionActionQueuePending(void);
 void* actionQueueFindUserByKind(ActionQueueKind kind,
                                 int (*pred)(void* user, void* ctx),
                                 void* ctx);
+
+// Phase 6: queue a recompiler-generated root DoAction script. Thin wrapper
+// over actionQueueCallbackEx with AQ_KIND_SCRIPT / AQ_PRIORITY_NORMAL. The
+// dispatch callback simply invokes fn(app_context) and frees its payload.
+void actionQueueScript(SWFAppContext* app_context,
+                       void (*fn)(SWFAppContext*));
