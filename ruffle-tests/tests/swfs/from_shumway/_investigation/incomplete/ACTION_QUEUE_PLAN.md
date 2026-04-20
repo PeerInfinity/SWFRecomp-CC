@@ -36,25 +36,32 @@ deferral mechanisms into one queue. Last updated 2026-04-19.
   mid-drain behavior matches the old loop's early-break (drop-remaining).
   The old fixed `g_pending_unloads[64]` array and `g_pending_unload_count` are
   deleted. Canaries 19/19 PASS locally (`unload` + onload canaries).
-- **Phase 3 — not started** — risk assessment: Phase 3 migrates three
-  separate queues (`g_pending_loads`, `g_pending_attach_inits`,
-  `g_deferred_roll_queue`) that each have their own drain call site today
-  (`ng_fire_pending_loads` at tag.c:2081, `ng_fire_pending_attach_inits` at
-  tag.c:2084, roll queue drain in action.c). Unlike Phase 2, the is_unload
-  filter does not disambiguate them — they're all non-unload events. Two
-  paths forward:
-  1. **Expand the queue API** with a "kind" tag (e.g. `AQ_KIND_LOAD`,
-     `AQ_KIND_ATTACH_INIT`, `AQ_KIND_ROLL`, `AQ_KIND_ONLOAD`) and a
-     `actionDrainActionQueueByKind` API. Preserves current ordering exactly,
-     at the cost of pushing back the "one unified drain per tick" invariant.
-  2. **Unify drain sites at tag.c:2090**: delete the 2081+2084 drain calls,
-     let everything drain together. This is the plan's intended end state,
-     but changes ordering: today attach_inits always fire before onloads;
-     under unified FIFO, insertions interleave. Any test depending on
-     "all attach_inits then all onloads" could regress.
-
-  Both warrant a dedicated session with a careful canary run. Stopping here
-  keeps Phases 0–2 as a clean, zero-regression increment.
+- **Phase 3 — partially landed 2026-04-19** — Path 1 (kind-tag API) was taken.
+  `ActionQueueKind` enum added to `action_queue.h` with values ONLOAD, LOAD,
+  ATTACH_INIT (reserved), ROLL. `actionQueueCallbackEx` accepts a kind;
+  `actionQueueCallback` defaults to ONLOAD (unchanged semantics for Phase 1/2).
+  `actionDrainActionQueueFiltered` now restricts to kind=ONLOAD, so the
+  tag.c:2090 onload drain does NOT steal LOAD/ROLL entries from their own
+  drain sites. New `actionDrainActionQueueByKind(ctx, kind)` drains one kind
+  regardless of is_unload.
+  - `g_pending_loads` (tag_stubs.c) migrated to AQ_KIND_LOAD. The static
+    array + MAX_PENDING_LOADS=64 silent-overflow limit is gone; heap-
+    allocated `PendingLoad` payloads live on the queue until drain.
+    `ng_fire_pending_loads` is now a thin wrapper over
+    `actionDrainActionQueueByKind(ctx, AQ_KIND_LOAD)`.
+  - `g_deferred_roll_queue` (action.c) migrated to AQ_KIND_ROLL. The static
+    array + MAX_DEFERRED_ROLLOVERS=32 limit is gone; heap-allocated
+    `DeferredRollEntry` payloads live on the queue. `queue_hover_rollout_on_focus_change`
+    also updated. `actionFlushDeferredRollEvents` is now a thin wrapper.
+  - `g_pending_attach_inits` (tag_stubs.c) **intentionally deferred to Phase 3b**.
+    It has coalesce-by-swf_depth semantics at enqueue time plus an outer
+    while-loop dispatch that re-runs if new entries are queued during the
+    inner loop. Neither maps cleanly onto the generic queue API without
+    exposing a find-and-update primitive. Leaving it on its own static array
+    preserves its semantics unchanged.
+- **Phase 3b — not started** — `g_pending_attach_inits` migration. Requires
+  either a queue-entry-find-by-key API (for the same-depth coalesce) or a
+  redesign of the enqueue callers to do the coalesce outside the queue.
 - **Phases 4–9** — not started.
 
 The Phase 0 API intentionally provides only the generic `actionQueueCallback`

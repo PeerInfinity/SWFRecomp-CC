@@ -12,11 +12,24 @@ typedef enum {
 	AQ_PRIORITY_COUNT      = 3,
 } ActionQueuePriority;
 
+// Action kinds. Used by phased migration to disambiguate drain sites that
+// historically had their own storage. Each drain site filters by kind so the
+// pre-migration ordering is preserved. ONLOAD is the default kind (Phase 1 +
+// Phase 2) and is drained by actionDrainActionQueueFiltered. New kinds
+// introduced in Phase 3+ must drain via actionDrainActionQueueByKind.
+typedef enum {
+	AQ_KIND_ONLOAD      = 0, // Phase 1/2: pending_onloads + pending_unloads
+	AQ_KIND_LOAD        = 1, // Phase 3: CLIP_EVENT_LOAD for duplicated clips
+	AQ_KIND_ATTACH_INIT = 2, // Phase 3b: attachMovie frame-0 init (unmigrated)
+	AQ_KIND_ROLL        = 3, // Phase 3: deferred rollOver/rollOut from focus changes
+	AQ_KIND_COUNT       = 4,
+} ActionQueueKind;
+
 // Generic queue callback: user code provides the dispatch logic.
 // When the entry drains, `fn(app_context, user)` is invoked.
 typedef void (*ActionQueueFn)(SWFAppContext* app_context, void* user);
 
-// Queue a generic callback.
+// Queue a generic callback with default kind (AQ_KIND_ONLOAD).
 //   clip       — MovieClip this action is bound to (NULL = unbound). Used by
 //                is_unload gating: if clip is removed (avm1_removed or
 //                pending_removal) and is_unload==0, the callback is skipped.
@@ -31,18 +44,35 @@ void actionQueueCallback(SWFAppContext* app_context,
                          MovieClip* clip,
                          int is_unload);
 
+// Kind-aware enqueue. Callers that push non-ONLOAD kinds must use this so
+// the entries drain at their own drain sites instead of leaking into the
+// ONLOAD drain.
+void actionQueueCallbackEx(SWFAppContext* app_context,
+                           ActionQueueFn fn,
+                           void* user,
+                           ActionQueuePriority priority,
+                           MovieClip* clip,
+                           int is_unload,
+                           ActionQueueKind kind);
+
 // Drain the queue until empty. Pops highest-priority non-empty bucket first,
 // FIFO within each priority. New entries queued during dispatch are picked up
 // by subsequent iterations (matching Ruffle Player::run_actions).
 void actionDrainActionQueue(SWFAppContext* app_context);
 
-// Filtered drain: pops only entries whose `is_unload` matches `is_unload_filter`
-// (0 or 1). Non-matching entries stay queued. Use during phased migration to
-// preserve call-site-specific semantics (e.g. unload drain point at
-// tag.c:actionFirePendingUnloads fires only unload events, leaving onloads
-// for the later actionFlushPendingOnLoads drain).
+// Filtered drain for AQ_KIND_ONLOAD entries by is_unload. Pops only entries
+// whose kind == AQ_KIND_ONLOAD AND whose `is_unload` matches `is_unload_filter`
+// (0 or 1). Other kinds and non-matching is_unload stay queued. Phase 1/2
+// uses this at the unload drain site (is_unload_filter=1) and the onload
+// drain site (is_unload_filter=0) to preserve ordering.
 void actionDrainActionQueueFiltered(SWFAppContext* app_context,
                                     int is_unload_filter);
+
+// Kind-filtered drain. Pops entries whose kind matches `kind_filter`
+// regardless of is_unload. Phase 3+ drain sites (pending_loads, deferred
+// rolls, etc.) use this to drain only their own entries.
+void actionDrainActionQueueByKind(SWFAppContext* app_context,
+                                  ActionQueueKind kind_filter);
 
 // Discard all queued entries without dispatching (e.g. catch-up resets).
 void actionResetActionQueue(SWFAppContext* app_context);

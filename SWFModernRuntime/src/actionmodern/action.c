@@ -26942,13 +26942,14 @@ static MovieClip* g_mouse_hovered_mc = NULL;
 // Deferred rollOver/rollOut queue — when Selection.setFocus() changes focus,
 // rollOver/rollOut events are queued and fire asynchronously (after script completes).
 // During Tab focus changes, they fire synchronously (handled inline in actionAdvanceTabFocus).
-#define MAX_DEFERRED_ROLLOVERS 32
+//
+// Phase 3 of ACTION_QUEUE_PLAN: backing storage is the unified ActionQueue
+// (AQ_KIND_ROLL entries). The old fixed MAX_DEFERRED_ROLLOVERS=32 static array
+// is gone — dynamic queue growth replaces the silent-overflow limit.
 typedef struct {
 	MovieClip* mc;
-	int is_rollout;  // 1 = rollOut, 0 = rollOver
+	int is_rollout;  // 0=rollOver AS2, 1=rollOut AS2, 2=button rollOut DoAction, 3=button rollOver DoAction
 } DeferredRollEntry;
-static DeferredRollEntry g_deferred_roll_queue[MAX_DEFERRED_ROLLOVERS];
-static int g_deferred_roll_count = 0;
 
 // Clipboard buffer for SetClipboardText / TextControl operations
 static char g_clipboard_text[1024] = {0};
@@ -57908,6 +57909,46 @@ static int mc_get_explicit_tab_index(MovieClip* mc)
 	return idx;
 }
 
+// Dispatch one queued roll event. Called by actionDrainActionQueueByKind for
+// each AQ_KIND_ROLL entry. Owns the heap-allocated DeferredRollEntry payload.
+static void aq_dispatch_deferred_roll(SWFAppContext* app_context, void* user)
+{
+	DeferredRollEntry* e = (DeferredRollEntry*) user;
+	if (e == NULL) return;
+	MovieClip* mc = e->mc;
+	int kind = e->is_rollout;
+	if (kind == 2) {
+		// Button DoAction rollOut
+		ng_simulateButtonTransition(app_context, mc, 0x0002);
+	} else if (kind == 3) {
+		// Button DoAction rollOver
+		ng_simulateButtonTransition(app_context, mc, 0x0001);
+	} else if (kind == 1) {
+		// AS2 onRollOut
+		mc_call_as2_handler_ng(app_context, mc, "onRollOut", 9, NULL, 0);
+		mc->mc_mouse_inside = 0;
+		if (g_tab_hovered_mc == mc) g_tab_hovered_mc = NULL;
+	} else {
+		// AS2 onRollOver
+		mc_call_as2_handler_ng(app_context, mc, "onRollOver", 10, NULL, 0);
+		mc->mc_mouse_inside = 1;
+		g_tab_hovered_mc = mc;
+		g_mouse_hovered_mc = NULL;
+	}
+	free(e);
+}
+
+static void queue_one_deferred_roll(MovieClip* mc, int kind)
+{
+	DeferredRollEntry* e = (DeferredRollEntry*) malloc(sizeof(DeferredRollEntry));
+	if (e == NULL) return;
+	e->mc = mc;
+	e->is_rollout = kind;
+	actionQueueCallbackEx(NULL, aq_dispatch_deferred_roll, (void*)e,
+	                      AQ_PRIORITY_NORMAL, NULL, /*is_unload=*/0,
+	                      AQ_KIND_ROLL);
+}
+
 // Queue deferred rollOver/rollOut for a focus transition (called from Selection.setFocus).
 // Text fields are excluded from rollOver/rollOut (Flash behavior).
 static void queue_deferred_roll(MovieClip* old_mc, MovieClip* new_mc)
@@ -57917,53 +57958,29 @@ static void queue_deferred_roll(MovieClip* old_mc, MovieClip* new_mc)
 	int new_is_tf = (new_mc != NULL &&
 	    (new_mc->ng_textfield_idx >= 0 || new_mc->ng_textfield_idx == -2));
 	// Queue rollOut on old (if not text field)
-	if (!old_is_tf && old_mc != NULL && g_deferred_roll_count < MAX_DEFERRED_ROLLOVERS) {
+	if (!old_is_tf && old_mc != NULL) {
 		// If old is a button, queue button DoAction rollOut first (fires before AS2 handler)
-		if (old_mc->is_button_mc && g_deferred_roll_count + 1 < MAX_DEFERRED_ROLLOVERS) {
+		if (old_mc->is_button_mc) {
 			// Use is_rollout=2 to signal "button DoAction rollOut"
-			g_deferred_roll_queue[g_deferred_roll_count++] = (DeferredRollEntry){old_mc, 2};
+			queue_one_deferred_roll(old_mc, 2);
 		}
-		g_deferred_roll_queue[g_deferred_roll_count++] = (DeferredRollEntry){old_mc, 1};
+		queue_one_deferred_roll(old_mc, 1);
 	}
 	// Queue rollOver on new (if not text field)
-	if (!new_is_tf && new_mc != NULL && g_deferred_roll_count < MAX_DEFERRED_ROLLOVERS) {
+	if (!new_is_tf && new_mc != NULL) {
 		// If new is a button, queue button DoAction rollOver first
-		if (new_mc->is_button_mc && g_deferred_roll_count + 1 < MAX_DEFERRED_ROLLOVERS) {
+		if (new_mc->is_button_mc) {
 			// Use is_rollout=3 to signal "button DoAction rollOver"
-			g_deferred_roll_queue[g_deferred_roll_count++] = (DeferredRollEntry){new_mc, 3};
+			queue_one_deferred_roll(new_mc, 3);
 		}
-		g_deferred_roll_queue[g_deferred_roll_count++] = (DeferredRollEntry){new_mc, 0};
+		queue_one_deferred_roll(new_mc, 0);
 	}
 }
 
 // Flush the deferred rollOver/rollOut queue. Called after script execution completes.
 void actionFlushDeferredRollEvents(SWFAppContext* app_context)
 {
-	if (g_deferred_roll_count == 0) return;
-	int count = g_deferred_roll_count;
-	g_deferred_roll_count = 0;  // Reset before processing to prevent re-entrancy
-	for (int i = 0; i < count; i++) {
-		MovieClip* mc = g_deferred_roll_queue[i].mc;
-		int kind = g_deferred_roll_queue[i].is_rollout;
-		if (kind == 2) {
-			// Button DoAction rollOut
-			ng_simulateButtonTransition(app_context, mc, 0x0002);
-		} else if (kind == 3) {
-			// Button DoAction rollOver
-			ng_simulateButtonTransition(app_context, mc, 0x0001);
-		} else if (kind == 1) {
-			// AS2 onRollOut
-			mc_call_as2_handler_ng(app_context, mc, "onRollOut", 9, NULL, 0);
-			mc->mc_mouse_inside = 0;
-			if (g_tab_hovered_mc == mc) g_tab_hovered_mc = NULL;
-		} else {
-			// AS2 onRollOver
-			mc_call_as2_handler_ng(app_context, mc, "onRollOver", 10, NULL, 0);
-			mc->mc_mouse_inside = 1;
-			g_tab_hovered_mc = mc;
-			g_mouse_hovered_mc = NULL;
-		}
-	}
+	actionDrainActionQueueByKind(app_context, AQ_KIND_ROLL);
 }
 
 // Fire focus change events and update g_focused_mc.
@@ -58801,10 +58818,9 @@ static void queue_hover_rollout_on_focus_change(void)
 		if (mc->ng_textfield_idx >= 0 || mc->ng_textfield_idx == -2) continue;
 		if (mc->dynamic_props == NULL) continue;
 		// Queue button DoAction rollOut first if it's a button MC
-		if (mc->is_button_mc && g_deferred_roll_count + 1 < MAX_DEFERRED_ROLLOVERS)
-			g_deferred_roll_queue[g_deferred_roll_count++] = (DeferredRollEntry){mc, 2};
-		if (g_deferred_roll_count < MAX_DEFERRED_ROLLOVERS)
-			g_deferred_roll_queue[g_deferred_roll_count++] = (DeferredRollEntry){mc, 1};
+		if (mc->is_button_mc)
+			queue_one_deferred_roll(mc, 2);
+		queue_one_deferred_roll(mc, 1);
 		mc->mc_mouse_inside = 0;
 	}
 }
