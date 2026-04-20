@@ -219,7 +219,98 @@ deferral mechanisms into one queue. Last updated 2026-04-19.
   - Canaries 32/32 PASS locally: the 29 Phase 5 canaries plus the three
     latent-bug trip-wires (`movieclip_invalid_get_bounds_1/2`,
     `string_paths_eval2`).
-- **Phases 7–9** — not started.
+- **Phase 7 — attempted 2026-04-20, not landed (canary regressions).**
+  The sprite-side migration (recompiler-emitted inline
+  `actionQueueScript(app_context, script_<N>)` at each sprite
+  `SWF_TAG_DO_ACTION` with `sprite_frame_scripts` buffer deleted and
+  SHOW_FRAME/END_TAG flushes dropped, same pattern as Phase 6's root
+  emission) was implemented and verified:
+  - Gate: `if ((!catch_up_mode || g_tag_skip_mode || actionEagerInitActive())
+    && !actionScriptOnlyMode()) actionQueueScript(...)` — the
+    `actionEagerInitActive` accessor covers `tagPlaceObject2`'s Phase 1
+    eager init AND `ng_attachMovie` / `ng_cloneSprite` /
+    `ng_duplicateMovieClip` runtime-attach paths (eager-init bumps added
+    at those sites with `g_eager_init_depth` made non-static); the
+    `actionScriptOnlyMode` accessor prevents `process_sprite_init_at_depth`'s
+    Phase 2 `was_eager=1` re-run from double-queueing scripts Phase 1
+    already queued.
+  - Phase 7 targets — partial flip:
+    - `from_gnash/misc-swfmill.all/trace-as2/root_onload` — flipped from
+      `output_mismatch` to **PASS** (deepest-first `CC.C.R.L.` order
+      emerges naturally from the FIFO queue walking depth-first-postorder
+      when sprite DoActions come AFTER nested PlaceObject in the tag
+      stream, as they do in this SWF).
+    - `from_shumway/avm1/doactionorder/doactionorder` — improved from
+      3/7 to **6/7** matching lines. The remaining mismatch
+      (`test2: hello` vs `test2: undefined`) is a distinct value-resolution
+      bug the queue rework exposes but does not cause, out of Phase 7 scope.
+    - `from_shumway/timeline/timeline_as2_1` — unchanged (empty output);
+      blocked on a separate frame-navigation issue unrelated to the queue.
+    - `from_shumway/timeline/timeline_as2_5` — unchanged (3/4 lines,
+      missing `end`); blocked on the same frame-navigation issue.
+    - `from_gnash/misc-swfmill.all/dict_event` — unchanged (`ruffle_matched`).
+  - Canary regressions blocking land:
+    - **`avm1/clip_events`** (19 → 4 diff): expected interleave is
+      `clip load → clip frame 1 → child load → child frame 1`; Phase 7
+      produces `clip frame 1 → child frame 1 → clip load → child load`.
+      Root cause: `CLIP_EVENT_LOAD` still fires synchronously inside
+      `process_sprite_init_at_depth` (tag.c:358–370), which runs inside
+      `tagShowFrame` AFTER the recompiler-emitted
+      `actionDrainActionQueueByKind(AQ_KIND_SCRIPT)` at the root
+      `SWF_TAG_SHOW_FRAME` boundary. So sprite DoAction scripts drain
+      before any sprite sees its LOAD event. Pre-Phase-7 worked because
+      Phase 2's `was_eager=1` re-run fired sprite DoActions
+      synchronously, after its own LOAD fire, per sprite — giving the
+      interleave.
+    - **`avm1/execution_order1`** (5→4, missing `root 3`),
+      **`execution_order2`** (5-line reorder), **`execution_order4`**
+      (9-line diff with wrong-context labels), **`attach_movie`** (5
+      diff), **`attach_movie_stop`** (2 missing), **`button_order`**
+      (missing `enterFrame instance3`/`instance2` path),
+      **`define_function2_preload_order`** (2 reorder),
+      **`goto_frame` / `goto_frame2` / `goto_label`** (large regressions
+      — 9/40/14 diffs; goto's deferred-script 3-phase loop's reliance on
+      Phase 2 synchronous sprite-script firing is broken by the migration),
+      **`movieclip_in_removed_button`** (4 diff), and
+      **`register_and_init_order`** (287 actual vs 231 expected — 76-line
+      regression).
+  - Loop tripwires `loop_test4/5/7` stayed byte-identical to master
+    pre-Phase-6 baseline (still failing with the same 2-line regression
+    on each, pre-existing and unrelated to Phase 7).
+  - **Architectural blocker** — resolving the interleave regression
+    requires one of:
+    1. Migrating sprite `CLIP_EVENT_LOAD` clip-action firing to Phase 1
+       placement time (queued at `AQ_PRIORITY_NORMAL` so it interleaves
+       FIFO with sprite scripts in the same drain), matching Ruffle's
+       `instantiate_child` → `enter_frame` → `run_frame_avm1` sequence
+       where LOAD dispatch happens synchronously during placement before
+       the child's tag stream is walked.
+    2. Per-sprite drains inside Phase 2 `process_sprite_init_at_depth` —
+       fire the queued `AQ_KIND_SCRIPT` entries belonging to this sprite
+       after its LOAD clip-action fire but before recursing into its
+       children. Requires tagging queue entries by owning sprite or a
+       separate per-sprite kind.
+    3. Moving the root-level `AQ_KIND_SCRIPT` drain later (inside
+       `tagShowFrame` after Phase 2's LOAD fires), OR splitting root and
+       sprite DoActions into separate queue kinds and draining them at
+       different points.
+    Option 1 is closest to Ruffle's model and would also align with
+    §"Proposed architecture" →`tag.c:process_sprite_init_at_depth`
+    (lines 462–464) which already plans this migration. It's sizeable
+    enough to warrant its own phase (Phase 7.5 or a reshuffled Phase 7:
+    migrate LOAD first, then sprite DoAction together). Option 2 is more
+    invasive structurally. Option 3 is fragile — the root drain moving
+    later re-opens cross-root/sprite ordering bugs Phase 6 just closed.
+  - Code from the attempt is not committed (no landing happened). The
+    full delta (58 insertions / 33 deletions across
+    `action_queue.h` / `tag.c` / `tag_stubs.c` / `swf.cpp`) is
+    reproducible from this Status entry. A next-session follow-up should
+    pick Option 1: design a `tagPlaceObject2` / `tagPlaceObject2Ratio`
+    change that queues `CLIP_EVENT_LOAD` clip-actions at `AQ_KIND_LOAD`
+    (or a new kind) at placement time, remove the synchronous fire from
+    `process_sprite_init_at_depth`, THEN migrate sprite DoActions as
+    attempted above. All canaries must pass through both steps.
+- **Phases 8–9** — not started.
 
 The Phase 0 API intentionally provides only the generic `actionQueueCallback`
 kind. The typed wrappers sketched in §Data structure (queueScript,
