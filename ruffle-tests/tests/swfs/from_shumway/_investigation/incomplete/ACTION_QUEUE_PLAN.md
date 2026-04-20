@@ -15,7 +15,18 @@ deferral mechanisms into one queue. Last updated 2026-04-19.
   `ruffle-tests/verify_output.py` (native + emcc paths). Canary run locally
   (14 tests including all execution_order[1-4], clip_events,
   register_and_init_order, stage_object_enumerate, goto_rewind3): 14/14 PASS.
-- **Phases 1–9** — not started.
+  CI confirmed zero regressions across all 8 suites.
+- **Phase 1 — landed 2026-04-19** — `g_pending_onloads` storage migrated.
+  `actionQueueMCOnLoad` now pushes into the ActionQueue at `AQ_PRIORITY_NORMAL`
+  with `clip=NULL, is_unload=0` (NULL clip preserves the pre-migration
+  "always fire, never skip on removal" semantic — gating comes later).
+  `actionFlushPendingOnLoads` becomes a thin `actionDrainActionQueue` wrapper.
+  `actionHasPendingOnLoads` reads `actionActionQueuePending`. The old fixed
+  `g_pending_onloads[64]` array is deleted — dynamic queue growth replaces
+  the `MAX_PENDING_ONLOADS=64` silent-overflow limit. Canaries 17/17 PASS
+  locally (onload-sensitive: `movieclip_invalid_get_bounds_2/5`,
+  `string_paths_eval2`).
+- **Phases 2–9** — not started.
 
 The Phase 0 API intentionally provides only the generic `actionQueueCallback`
 kind. The typed wrappers sketched in §Data structure (queueScript,

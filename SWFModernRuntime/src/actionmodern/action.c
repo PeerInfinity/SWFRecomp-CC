@@ -38,6 +38,7 @@
 #include <actionmodern/actiondate.h>
 #include <actionmodern/actionregclass.h>
 #include <actionmodern/actiontimer.h>
+#include <actionmodern/action_queue.h>
 #include "unicode_case_tables.h"
 
 // Forward declarations for array helpers (defined later in file)
@@ -26676,38 +26677,33 @@ void actionDispatchMCOnLoad(SWFAppContext* app_context, MovieClip* mc)
 // Pending onLoad queue for dynamically-attached MCs.
 // onLoad is queued during attachMovie/createEmptyMovieClip but fires after
 // the current script finishes (deferred dispatch).
-#define MAX_PENDING_ONLOADS 64
-static MovieClip* g_pending_onloads[MAX_PENDING_ONLOADS];
-static int g_pending_onload_count = 0;
+//
+// Phase 1 of ACTION_QUEUE_PLAN: backing storage is the unified ActionQueue.
+// Clip=NULL on the enqueue to preserve the pre-migration semantics of
+// "always fire the onLoad, even if the MC was removed before drain".
+
+static void aq_dispatch_mc_onload(SWFAppContext* app_context, void* user)
+{
+	MovieClip* mc = (MovieClip*) user;
+	if (mc != NULL) actionDispatchMCOnLoad(app_context, mc);
+}
 
 void actionQueueMCOnLoad(MovieClip* mc)
 {
-	if (g_pending_onload_count < MAX_PENDING_ONLOADS)
-		g_pending_onloads[g_pending_onload_count++] = mc;
+	if (mc == NULL) return;
+	actionQueueCallback(NULL, aq_dispatch_mc_onload, (void*)mc,
+	                    AQ_PRIORITY_NORMAL, NULL, /*is_unload=*/0);
 }
 
 // Flush all pending onLoad dispatches. Called after frame scripts complete.
 void actionFlushPendingOnLoads(SWFAppContext* app_context)
 {
-	while (g_pending_onload_count > 0) {
-		// Copy locally: onLoad handlers may call attachMovie which queues more
-		// entries into the same g_pending_onloads array, overwriting entries
-		// we haven't dispatched yet.
-		MovieClip* local_onloads[MAX_PENDING_ONLOADS];
-		int count = g_pending_onload_count;
-		for (int i = 0; i < count; i++)
-			local_onloads[i] = g_pending_onloads[i];
-		g_pending_onload_count = 0;
-		for (int i = 0; i < count; i++) {
-			if (local_onloads[i] != NULL)
-				actionDispatchMCOnLoad(app_context, local_onloads[i]);
-		}
-	}
+	actionDrainActionQueue(app_context);
 }
 
 int actionHasPendingOnLoads(void)
 {
-	return g_pending_onload_count > 0;
+	return (int) actionActionQueuePending();
 }
 
 // Dispatch _root.onLoad (fires once after first frame).
