@@ -1,7 +1,7 @@
 # Ruffle Test Results Diff
 
-**Previous:** `673b68a7f1ae` (2026-04-20T15:57:44.775358+00:00)
-**Current:** `cd098b274e8a` (2026-04-20T17:00:45.064238+00:00)
+**Previous:** `cd098b274e8a` (2026-04-20T17:00:45.064238+00:00)
+**Current:** `749db868f78a` (2026-04-20T17:51:29.405864+00:00)
 
 ## Summary
 
@@ -12,4 +12,8 @@
 | Pass rate | 12.5% | 12.5% | 0% |
 | Mismatched lines | 284 | 284 | 0 |
 
-No changes detected.
+## Status Changed (1)
+
+| Test | Previous | Current | Lines (prev) | Lines (now) |
+|------|----------|---------|--------------|-------------|
+| `opcode_guard_test2` | runtime_error | output_mismatch | 0/24 | 0/24 |

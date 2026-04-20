@@ -1,9 +1,9 @@
 {
   "metadata": {
-    "old_timestamp": "2026-04-20T15:57:44.775358+00:00",
-    "old_git_sha": "673b68a7f1ae7c0a711f77cd74a084f6a1dd875c",
-    "new_timestamp": "2026-04-20T17:00:45.064238+00:00",
-    "new_git_sha": "cd098b274e8a4a248745caeba61d6caf20ee973a",
+    "old_timestamp": "2026-04-20T17:00:45.064238+00:00",
+    "old_git_sha": "cd098b274e8a4a248745caeba61d6caf20ee973a",
+    "new_timestamp": "2026-04-20T17:51:29.405864+00:00",
+    "new_git_sha": "749db868f78a614b8596fe6830d548ef9d96b845",
     "partial": false,
     "same_commit": false
   },
@@ -24,10 +24,27 @@
     "decreased_mismatches": 0,
     "newly_passing": 0,
     "newly_failing": 0,
-    "status_changed": 0,
-    "unchanged": 16,
+    "status_changed": 1,
+    "unchanged": 15,
     "added": 0,
     "removed": 0
   },
-  "changes": []
+  "changes": [
+    {
+      "test": "opcode_guard_test2",
+      "change_type": "changed",
+      "old_status": "runtime_error",
+      "new_status": "output_mismatch",
+      "old_lines": {
+        "actual_lines": 12,
+        "expected_lines": 24,
+        "matching_lines": 0
+      },
+      "new_lines": {
+        "actual_lines": 28,
+        "expected_lines": 24,
+        "matching_lines": 0
+      }
+    }
+  ]
 }

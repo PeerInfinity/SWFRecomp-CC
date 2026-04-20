@@ -1,10 +1,10 @@
 # Ruffle Test Results (Filtered)
 
-**Date**: 2026-04-20 17:00 UTC
+**Date**: 2026-04-20 17:51 UTC
 
-**Git SHA**: `cd098b274e`
+**Git SHA**: `749db868f7`
 
-**Run Duration**: 3m 48s
+**Run Duration**: 3m 46s
 
 **Filtered**: 0 tests ignored out of 16 available
 
@@ -25,8 +25,7 @@
 
 | Category | Count | % of Failures |
 |----------|-------|---------------|
-| Output Mismatch | 10 | 90.9% |
-| Runtime Error | 1 | 9.1% |
+| Output Mismatch | 11 | 100.0% |
 
 ## Passing Tests
 
@@ -34,8 +33,8 @@
 
 | # | Test | Lines | Duration | Notes |
 |---|------|-------|----------|-------|
-| 1 | `gotoFrameLabelAsFunction` | 6 | 16.4s |  |
-| 2 | `hello` | 4 | 16.1s |  |
+| 1 | `gotoFrameLabelAsFunction` | 6 | 16.2s |  |
+| 2 | `hello` | 4 | 17.9s |  |
 
 ## Ruffle-Matched Tests
 
@@ -43,9 +42,9 @@
 
 | # | Test | Our diffs | Ruffle diffs | Duration | Notes |
 |---|------|-----------|--------------|----------|-------|
-| 1 | `action_execution_order_test10` | 14 | 14 | 17.3s |  |
-| 2 | `movieclip_destruction_test1` | 52 | 52 | 16.3s |  |
-| 3 | `registerclass_test3` | 20 | 20 | 16.1s |  |
+| 1 | `action_execution_order_test10` | 14 | 14 | 15.6s |  |
+| 2 | `movieclip_destruction_test1` | 52 | 52 | 17.2s |  |
+| 3 | `registerclass_test3` | 20 | 20 | 12.6s |  |
 
 ## Near-Passing Tests
 
@@ -67,11 +66,7 @@ No segfaults.
 
 ## Runtime Errors
 
-**1 tests** fail with runtime errors
-
-| # | Test | Detail | Duration | Notes |
-|---|------|--------|----------|-------|
-| 1 | `opcode_guard_test2` | exit code -6 | 17.7s |  |
+No runtime errors.
 
 ## Timeouts
 
@@ -79,7 +74,7 @@ No timeouts.
 
 ## All Output Mismatches
 
-**10 tests** with output mismatch, sorted by match rate (best first)
+**11 tests** with output mismatch, sorted by match rate (best first)
 
 | # | Test | Match Rate | Matching/Total | Actual | Expected | Notes |
 |---|------|------------|----------------|--------|----------|-------|
@@ -92,4 +87,5 @@ No timeouts.
 | 7 | `soft_reference_test1` | 31.1% | 14/45 | 42 | 45 |  |
 | 8 | `button_test1` | 25.8% | 8/31 | 20 | 31 |  |
 | 9 | `movieclip_destruction_test4` | 20.0% | 8/40 | 24 | 40 |  |
-| 10 | `submoviegetvar` | 0.0% | 0/4 | 4 | 4 |  |
+| 10 | `opcode_guard_test2` | 0.0% | 0/28 | 28 | 24 |  |
+| 11 | `submoviegetvar` | 0.0% | 0/4 | 4 | 4 |  |
