@@ -1,16 +1,16 @@
 {
   "metadata": {
-    "old_timestamp": "2026-04-19T21:24:53.333886+00:00",
-    "old_git_sha": "15b930bf53d2ac77278bfc0213ae3fb0d0af2a79",
-    "new_timestamp": "2026-04-19T22:30:49.881721+00:00",
-    "new_git_sha": "9a01d3c6ec50883abbec4965ea7323fb12d4d602",
+    "old_timestamp": "2026-04-19T22:30:49.881721+00:00",
+    "old_git_sha": "9a01d3c6ec50883abbec4965ea7323fb12d4d602",
+    "new_timestamp": "2026-04-20T02:07:18.595109+00:00",
+    "new_git_sha": "a8995c83e435e6bcbc74cb907f36c638f0aabc2d",
     "partial": false,
     "same_commit": false
   },
   "summary": {
     "old_pass": 109,
-    "old_ruffle_matched": 42,
-    "old_effective_pass": 151,
+    "old_ruffle_matched": 43,
+    "old_effective_pass": 152,
     "old_total": 190,
     "old_pass_rate": 57.4,
     "new_pass": 109,
@@ -18,33 +18,16 @@
     "new_effective_pass": 152,
     "new_total": 190,
     "new_pass_rate": 57.4,
-    "old_mismatched_lines": 2637,
+    "old_mismatched_lines": 2632,
     "new_mismatched_lines": 2632,
     "increased_mismatches": 0,
-    "decreased_mismatches": 5,
-    "newly_passing": 1,
+    "decreased_mismatches": 0,
+    "newly_passing": 0,
     "newly_failing": 0,
-    "status_changed": 1,
-    "unchanged": 189,
+    "status_changed": 0,
+    "unchanged": 190,
     "added": 0,
     "removed": 0
   },
-  "changes": [
-    {
-      "test": "BitmapData-v8",
-      "change_type": "changed",
-      "old_status": "output_mismatch",
-      "new_status": "ruffle_matched",
-      "old_lines": {
-        "actual_lines": 417,
-        "expected_lines": 417,
-        "matching_lines": 404
-      },
-      "new_lines": {
-        "actual_lines": 417,
-        "expected_lines": 417,
-        "matching_lines": 409
-      }
-    }
-  ]
+  "changes": []
 }
