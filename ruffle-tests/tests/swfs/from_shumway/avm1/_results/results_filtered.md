@@ -1,8 +1,8 @@
 # Ruffle Test Results (Filtered)
 
-**Date**: 2026-04-20 04:06 UTC
+**Date**: 2026-04-20 04:37 UTC
 
-**Git SHA**: `a7c046709d`
+**Git SHA**: `1d3f001f1b`
 
 **Run Duration**: 1m 36s
 
@@ -13,77 +13,76 @@
 | Metric | Value |
 |--------|-------|
 | Total tests | 45 |
-| Passing | **43** (95.6%) |
-| Failing | 2 |
+| Passing | **44** (97.8%) |
+| Failing | 1 |
 | Total expected lines | 480 |
-| Matching lines | 474 (98.8%) |
-| Mismatched lines | 6 |
+| Matching lines | 476 (99.2%) |
+| Mismatched lines | 4 |
 
 ### Failure Breakdown
 
 | Category | Count | % of Failures |
 |----------|-------|---------------|
-| Output Mismatch | 2 | 100.0% |
+| Output Mismatch | 1 | 100.0% |
 
 ## Passing Tests
 
-**43 tests passing**
+**44 tests passing**
 
 | # | Test | Lines | Duration | Notes |
 |---|------|-------|----------|-------|
 | 1 | `array` | 7 | 0.3s |  |
-| 2 | `bitmapdata/getPixel` | 2 | 0.3s |  |
+| 2 | `bitmapdata/getPixel` | 2 | 0.2s |  |
 | 3 | `bitmapdata/loadBitmap` | 3 | 0.3s |  |
 | 4 | `callee` | 2 | 0.3s |  |
-| 5 | `depth` | 6 | 0.4s |  |
+| 5 | `depth` | 6 | 0.3s |  |
 | 6 | `doactionorder/symbolclass` | 4 | 0.3s |  |
 | 7 | `duplicateMovieClip/dontremove` | 6 | 16.2s |  |
-| 8 | `duplicateMovieClip/name-coercion` | 3 | 0.3s |  |
-| 9 | `duplicateMovieClip/samedepth` | 6 | 0.3s |  |
-| 10 | `externalinterface` | 4 | 0.3s |  |
-| 11 | `filters` | 149 | 0.3s |  |
-| 12 | `haxe/flocons1` | 2 | 0.3s |  |
-| 13 | `haxe/flocons2` | 3 | 0.2s |  |
-| 14 | `label` | 4 | 16.2s |  |
-| 15 | `levels` | 9 | 0.3s |  |
-| 16 | `loadevent` | 9 | 0.3s |  |
-| 17 | `loadvariables/loadvariables` | 7 | 0.3s |  |
-| 18 | `loadvariables/loadvars` | 2 | 0.3s |  |
-| 19 | `lookup` | 3 | 0.3s |  |
-| 20 | `mouse-transparency` | 1 | 0.3s |  |
-| 21 | `nativeinheritance` | 6 | 0.3s |  |
-| 22 | `nested-button` | 1 | 15.9s |  |
-| 23 | `operations` | 13 | 0.3s |  |
-| 24 | `property-paths/property-paths-6` | 6 | 0.3s |  |
-| 25 | `property-paths/property-paths-7` | 7 | 0.3s |  |
-| 26 | `propertycase/propertycase` | 7 | 0.3s |  |
-| 27 | `propertycase/propertycase-preserving-6` | 2 | 0.3s |  |
-| 28 | `propertycase/propertycase-preserving-7` | 5 | 0.2s |  |
-| 29 | `rollover` | 4 | 0.3s |  |
-| 30 | `scope` | 14 | 0.3s |  |
-| 31 | `setinterval` | 20 | 0.3s |  |
-| 32 | `settimeout` | 17 | 0.3s |  |
-| 33 | `super` | 11 | 0.3s |  |
-| 34 | `target` | 18 | 0.3s |  |
-| 35 | `text-bind` | 0 | 16.8s |  |
-| 36 | `textfield/textfield-html` | 4 | 0.3s |  |
-| 37 | `textfield/textfield-text-setters` | 8 | 0.3s |  |
-| 38 | `undefined/undefined-swf6` | 39 | 0.3s |  |
-| 39 | `undefined/undefined-swf7` | 39 | 0.3s |  |
-| 40 | `watch` | 2 | 0.3s |  |
-| 41 | `xml/xmlbuild` | 1 | 0.3s |  |
-| 42 | `xml/xmlload` | 4 | 0.3s |  |
-| 43 | `xml/xmlstring` | 9 | 0.2s |  |
+| 8 | `duplicateMovieClip/duplicateMovieClip` | 4 | 0.3s |  |
+| 9 | `duplicateMovieClip/name-coercion` | 3 | 0.3s |  |
+| 10 | `duplicateMovieClip/samedepth` | 6 | 0.2s |  |
+| 11 | `externalinterface` | 4 | 0.2s |  |
+| 12 | `filters` | 149 | 0.3s |  |
+| 13 | `haxe/flocons1` | 2 | 0.2s |  |
+| 14 | `haxe/flocons2` | 3 | 0.3s |  |
+| 15 | `label` | 4 | 17.0s |  |
+| 16 | `levels` | 9 | 0.3s |  |
+| 17 | `loadevent` | 9 | 0.3s |  |
+| 18 | `loadvariables/loadvariables` | 7 | 0.3s |  |
+| 19 | `loadvariables/loadvars` | 2 | 0.2s |  |
+| 20 | `lookup` | 3 | 0.2s |  |
+| 21 | `mouse-transparency` | 1 | 0.3s |  |
+| 22 | `nativeinheritance` | 6 | 0.2s |  |
+| 23 | `nested-button` | 1 | 16.7s |  |
+| 24 | `operations` | 13 | 0.3s |  |
+| 25 | `property-paths/property-paths-6` | 6 | 0.2s |  |
+| 26 | `property-paths/property-paths-7` | 7 | 0.3s |  |
+| 27 | `propertycase/propertycase` | 7 | 0.3s |  |
+| 28 | `propertycase/propertycase-preserving-6` | 2 | 0.3s |  |
+| 29 | `propertycase/propertycase-preserving-7` | 5 | 0.2s |  |
+| 30 | `rollover` | 4 | 0.3s |  |
+| 31 | `scope` | 14 | 0.3s |  |
+| 32 | `setinterval` | 20 | 0.3s |  |
+| 33 | `settimeout` | 17 | 0.3s |  |
+| 34 | `super` | 11 | 0.3s |  |
+| 35 | `target` | 18 | 0.2s |  |
+| 36 | `text-bind` | 0 | 16.1s |  |
+| 37 | `textfield/textfield-html` | 4 | 0.3s |  |
+| 38 | `textfield/textfield-text-setters` | 8 | 0.3s |  |
+| 39 | `undefined/undefined-swf6` | 39 | 0.3s |  |
+| 40 | `undefined/undefined-swf7` | 39 | 0.3s |  |
+| 41 | `watch` | 2 | 0.3s |  |
+| 42 | `xml/xmlbuild` | 1 | 0.3s |  |
+| 43 | `xml/xmlload` | 4 | 0.3s |  |
+| 44 | `xml/xmlstring` | 9 | 0.3s |  |
 
 ## Near-Passing Tests
 
 Tests with output mismatch but >= 50% line match rate (low-hanging fruit).
 
-**1 tests** within reach
+**0 tests** within reach
 
-| # | Test | Match Rate | Matching | Total | Diff Lines | Notes |
-|---|------|------------|----------|-------|------------|-------|
-| 1 | `duplicateMovieClip/duplicateMovieClip` | 50.0% | 2 | 4 | 2 |  |
+No tests above 50% match threshold.
 
 ## Segfaults
 
@@ -99,9 +98,8 @@ No timeouts.
 
 ## All Output Mismatches
 
-**2 tests** with output mismatch, sorted by match rate (best first)
+**1 tests** with output mismatch, sorted by match rate (best first)
 
 | # | Test | Match Rate | Matching/Total | Actual | Expected | Notes |
 |---|------|------------|----------------|--------|----------|-------|
-| 1 | `duplicateMovieClip/duplicateMovieClip` | 50.0% | 2/4 | 4 | 4 |  |
-| 2 | `doactionorder/doactionorder` | 42.9% | 3/7 | 7 | 7 |  |
+| 1 | `doactionorder/doactionorder` | 42.9% | 3/7 | 7 | 7 |  |

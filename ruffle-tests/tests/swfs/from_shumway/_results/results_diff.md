@@ -1,20 +1,20 @@
 # Ruffle Test Results Diff
 
-**Previous:** `11c6dccf9480` (2026-04-20T03:32:26.273821+00:00)
-**Current:** `a7c046709db0` (2026-04-20T04:06:48.507905+00:00)
+**Previous:** `a7c046709db0` (2026-04-20T04:06:48.507905+00:00)
+**Current:** `1d3f001f1bf1` (2026-04-20T04:37:35.132616+00:00)
 
 ## Summary
 
 | Metric | Previous | Current | Delta |
 |--------|----------|---------|-------|
-| Passing | 60 | 59 | -1 |
+| Passing | 59 | 60 | +1 |
 | Total | 92 | 92 | 0 |
-| Pass rate | 65.2% | 64.1% | -1.1% |
-| Mismatched lines | 620 | 622 | +2 |
-|   Increased | | | +2 |
+| Pass rate | 64.1% | 65.2% | +1.1% |
+| Mismatched lines | 622 | 620 | -2 |
+|   Decreased | | | -2 |
 
-## Newly Failing (1)
+## Newly Passing (1)
 
-| Test | New Status | Lines (prev) | Lines (now) |
-|------|-----------|--------------|-------------|
-| `avm1/duplicateMovieClip/duplicateMovieClip` | output_mismatch | 4/4 | 2/4 |
+| Test | Previous Status | Lines (prev) | Lines (now) |
+|------|----------------|--------------|-------------|
+| `avm1/duplicateMovieClip/duplicateMovieClip` | output_mismatch | 2/4 | 4/4 |
