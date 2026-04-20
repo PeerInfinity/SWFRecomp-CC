@@ -1,50 +1,33 @@
 {
   "metadata": {
-    "old_timestamp": "2026-04-20T04:06:48.507905+00:00",
-    "old_git_sha": "a7c046709db0f855cd2a56ed62f8bacc72426a6f",
-    "new_timestamp": "2026-04-20T04:37:35.132616+00:00",
-    "new_git_sha": "1d3f001f1bf149fd66d0bc82fddec62974843c15",
+    "old_timestamp": "2026-04-20T04:37:35.132616+00:00",
+    "old_git_sha": "1d3f001f1bf149fd66d0bc82fddec62974843c15",
+    "new_timestamp": "2026-04-20T06:18:16.718338+00:00",
+    "new_git_sha": "279c070199fc5e9270c67431649abe2f1a0909ae",
     "partial": false,
     "same_commit": false
   },
   "summary": {
-    "old_pass": 59,
+    "old_pass": 60,
     "old_ruffle_matched": 1,
-    "old_effective_pass": 60,
+    "old_effective_pass": 61,
     "old_total": 92,
-    "old_pass_rate": 64.1,
+    "old_pass_rate": 65.2,
     "new_pass": 60,
     "new_ruffle_matched": 1,
     "new_effective_pass": 61,
     "new_total": 92,
     "new_pass_rate": 65.2,
-    "old_mismatched_lines": 622,
+    "old_mismatched_lines": 620,
     "new_mismatched_lines": 620,
     "increased_mismatches": 0,
-    "decreased_mismatches": 2,
-    "newly_passing": 1,
+    "decreased_mismatches": 0,
+    "newly_passing": 0,
     "newly_failing": 0,
-    "status_changed": 1,
-    "unchanged": 91,
+    "status_changed": 0,
+    "unchanged": 92,
     "added": 0,
     "removed": 0
   },
-  "changes": [
-    {
-      "test": "avm1/duplicateMovieClip/duplicateMovieClip",
-      "change_type": "changed",
-      "old_status": "output_mismatch",
-      "new_status": "pass",
-      "old_lines": {
-        "actual_lines": 4,
-        "expected_lines": 4,
-        "matching_lines": 2
-      },
-      "new_lines": {
-        "actual_lines": 4,
-        "expected_lines": 4,
-        "matching_lines": 4
-      }
-    }
-  ]
+  "changes": []
 }
