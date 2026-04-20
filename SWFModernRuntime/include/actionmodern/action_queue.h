@@ -18,12 +18,14 @@ typedef enum {
 // Phase 2) and is drained by actionDrainActionQueueFiltered. New kinds
 // introduced in Phase 3+ must drain via actionDrainActionQueueByKind.
 typedef enum {
-	AQ_KIND_ONLOAD      = 0, // Phase 1/2: pending_onloads + pending_unloads
-	AQ_KIND_LOAD        = 1, // Phase 3: CLIP_EVENT_LOAD for duplicated clips
-	AQ_KIND_ATTACH_INIT = 2, // Phase 3c: attachMovie frame-0 init
-	AQ_KIND_ROLL        = 3, // Phase 3: deferred rollOver/rollOut from focus changes
-	AQ_KIND_CLIP_INIT   = 4, // Phase 4: CLIP_EVENT_INITIALIZE from tagPlaceObject2
-	AQ_KIND_COUNT       = 5,
+	AQ_KIND_ONLOAD         = 0, // Phase 1/2: pending_onloads + pending_unloads
+	AQ_KIND_LOAD           = 1, // Phase 3: CLIP_EVENT_LOAD for duplicated clips
+	AQ_KIND_ATTACH_INIT    = 2, // Phase 3c: attachMovie frame-0 init
+	AQ_KIND_ROLL           = 3, // Phase 3: deferred rollOver/rollOut from focus changes
+	AQ_KIND_CLIP_INIT      = 4, // Phase 4: CLIP_EVENT_INITIALIZE from tagPlaceObject2
+	AQ_KIND_CLIP_CONSTRUCT = 5, // Phase 5: CLIP_EVENT_CONSTRUCT from tagPlaceObject2
+	AQ_KIND_REGISTER_CTOR  = 6, // Phase 5: registerClass constructor from tagPlaceObject2
+	AQ_KIND_COUNT          = 7,
 } ActionQueueKind;
 
 // Generic queue callback: user code provides the dispatch logic.

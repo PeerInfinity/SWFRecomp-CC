@@ -2054,13 +2054,17 @@ void tagShowFrame(SWFAppContext* app_context)
 	if (g_tag_skip_mode) return;
 	if (g_in_action_call) return;
 
-	// Phase 4 safety drain: any CLIP_EVENT_INITIALIZE handlers that were queued
-	// during this frame's placements but weren't drained by the outermost
-	// tagPlaceObject2 CONSTRUCT block (e.g. goto catch-up, where the outer
-	// tagPlaceObject2 runs under catch_up_mode=1 and the CONSTRUCT block is
-	// skipped) drain here. In the common case the queue is empty and this is
-	// a no-op — the CONSTRUCT-block drain already covered it.
+	// Phase 4/5 safety drain: any CLIP_EVENT_INITIALIZE / CLIP_EVENT_CONSTRUCT
+	// / registerClass-ctor entries that were queued during this frame's
+	// placements but weren't drained by the outermost tagPlaceObject2
+	// (e.g. goto catch-up, where the outer tagPlaceObject2 runs under
+	// catch_up_mode=1 and the in-function drain block is skipped) drain here.
+	// In the common case the queue is empty and these calls are no-ops — the
+	// in-function drain already covered them. Drain in priority order
+	// (INIT → CONSTRUCT → REGISTER_CTOR) to preserve the pre-Phase-5 ordering.
 	actionDrainActionQueueByKind(app_context, AQ_KIND_CLIP_INIT);
+	actionDrainActionQueueByKind(app_context, AQ_KIND_CLIP_CONSTRUCT);
+	actionDrainActionQueueByKind(app_context, AQ_KIND_REGISTER_CTOR);
 
 	// --- Fire deferred onUnload handlers from removeMovieClip ---
 	// These are queued mid-script and fire between frames, matching Flash behavior.
@@ -3079,33 +3083,11 @@ static size_t g_pending_clip_action_count = 0;
 const char* g_pending_instance_name = NULL;
 int g_skip_pending_removal_mc = 0;  // When set, findOrCreateMovieClip skips pending_removal MCs
 
-// Recursively fire CLIP_EVENT_CONSTRUCT for child sprite display list entries
-// that had CONSTRUCT deferred (placed during eager init with catch_up_mode=1).
-static void fire_deferred_construct(SWFAppContext* app_context, DisplayObject* dl, size_t dl_max, MovieClip* parent_mc)
-{
-#ifdef NO_GRAPHICS
-	for (size_t i = 1; i <= dl_max; i++) {
-		if (dl[i].char_id == 0 || dl[i].clip_action_count == 0) continue;
-		if (dl[i].instance_name == NULL) continue;
-		MovieClip* mc = actionFindOrCreateMovieClip(app_context, dl[i].instance_name, parent_mc);
-		MovieClip* saved_ctx = g_current_context;
-		if (mc) actionSetCurrentContext(mc);
-		for (size_t a = 0; a < dl[i].clip_action_count; a++) {
-			if (dl[i].clip_actions[a].event_flags & CLIP_EVENT_CONSTRUCT)
-				dl[i].clip_actions[a].action(app_context);
-		}
-		actionSetCurrentContext(saved_ctx);
-		// Recurse into sprite children
-		if (dl[i].sprite_display_list != NULL && dl[i].sprite_max_depth > 0) {
-			fire_deferred_construct(app_context, dl[i].sprite_display_list, dl[i].sprite_max_depth, mc ? mc : parent_mc);
-		}
-	}
-#endif
-}
-
 // Helper: recursively fire registered class constructors for child sprites
-// placed during eager init. Called after the parent's constructor fires
-// to match Flash's DFS parent-first constructor ordering.
+// placed during eager init. Phase 5 of ACTION_QUEUE_PLAN retired the
+// tagPlaceObject2 call site (constructors now queue through the ActionQueue
+// at placement time); this helper is still called from ng_fire_child_constructors
+// for the attachMovie AS-level path, which follows a different flow.
 #ifdef NO_GRAPHICS
 static void fire_eager_constructors(SWFAppContext* app_context, DisplayObject* dl, size_t dl_max, MovieClip* parent_mc)
 {
@@ -3148,12 +3130,24 @@ static void fire_eager_constructors(SWFAppContext* app_context, DisplayObject* d
 #ifdef NO_GRAPHICS
 // Phase 4 of ACTION_QUEUE_PLAN: CLIP_EVENT_INITIALIZE handlers are routed
 // through the unified ActionQueue at AQ_PRIORITY_INITIALIZE / AQ_KIND_CLIP_INIT.
-// The queue drains just before the CONSTRUCT sync fire at the outermost
-// tagPlaceObject2 level (nested recursive calls under catch_up_mode=1 queue
-// but don't drain). This preserves the pre-migration ordering — all INITs
-// fire before any CONSTRUCTs — while moving the storage onto the shared queue.
-// A safety drain runs at the end of tagShowFrame in case something queues an
-// INIT outside the normal placement path.
+//
+// Phase 5 of ACTION_QUEUE_PLAN: CLIP_EVENT_CONSTRUCT handlers and the
+// registerClass constructor are likewise routed through the queue at
+// AQ_PRIORITY_CONSTRUCT, via separate kinds (CLIP_CONSTRUCT, REGISTER_CTOR)
+// and separate dispatch callbacks. Recursion for nested children happens
+// at queue time (each nested tagPlaceObject2 call queues its own entries)
+// rather than via a drain-time walk of sprite_display_list — which is what
+// retired fire_deferred_construct and the in-tagPlaceObject2 call to
+// fire_eager_constructors.
+//
+// All three kinds drain at the outermost tagPlaceObject2 !catch_up_mode
+// site in priority order (INITIALIZE → CONSTRUCT), with per-kind drain
+// calls issued in the order CLIP_INIT → CLIP_CONSTRUCT → REGISTER_CTOR to
+// preserve the pre-migration ordering: every INIT runs first, then every
+// CONSTRUCT clip event, and finally every register-class constructor.
+// Safety drains for all three kinds run at the top of tagShowFrame in case
+// the outermost placement itself occurred under catch_up_mode=1 (goto
+// catch-up); in the common path the safety drain is a no-op.
 typedef struct {
 	MovieClip* mc;
 	frame_func action;
@@ -3188,6 +3182,142 @@ static void queue_clip_init_events(SWFAppContext* app_context, size_t depth)
 		                      AQ_PRIORITY_INITIALIZE, _mc, /*is_unload=*/0,
 		                      AQ_KIND_CLIP_INIT);
 	}
+}
+
+// Phase 5: CLIP_EVENT_CONSTRUCT bundle. clip_actions is a pointer to
+// recompiler-emitted static ClipAction[] storage (stable across drain).
+// char_id is captured for ng_lookupExportName at dispatch (resolves the
+// registered-class prototype before CONSTRUCT handlers fire).
+typedef struct {
+	MovieClip* mc;
+	ClipAction* clip_actions;
+	size_t clip_action_count;
+	size_t char_id;
+} PendingClipConstruct;
+
+static void aq_dispatch_clip_construct(SWFAppContext* app_context, void* user)
+{
+	PendingClipConstruct* pcc = (PendingClipConstruct*) user;
+	if (pcc == NULL) return;
+	MovieClip* saved_ctx = g_current_context;
+	if (pcc->mc) actionSetCurrentContext(pcc->mc);
+	// Set __proto__ to registered class prototype before CONSTRUCT handlers fire
+	// so prototype properties are accessible in the handler (matches the
+	// pre-Phase-5 sync ordering at the outermost placement site).
+	{
+		extern const char* ng_lookupExportName(size_t char_id);
+		extern void actionSetupRegisteredClassPrototype(SWFAppContext*, const char*, MovieClip*);
+		const char* _exp = ng_lookupExportName(pcc->char_id);
+		if (_exp != NULL && pcc->mc != NULL)
+			actionSetupRegisteredClassPrototype(app_context, _exp, pcc->mc);
+	}
+	for (size_t a = 0; a < pcc->clip_action_count; a++) {
+		if (pcc->clip_actions[a].event_flags & CLIP_EVENT_CONSTRUCT)
+			pcc->clip_actions[a].action(app_context);
+	}
+	actionSetCurrentContext(saved_ctx);
+	free(pcc);
+}
+
+static void queue_clip_construct_events(SWFAppContext* app_context, size_t depth)
+{
+	if (display_list[depth].clip_action_count == 0) return;
+	if (display_list[depth].instance_name == NULL) return;
+	// Skip enqueueing entirely when there is no CONSTRUCT handler on this
+	// entry — avoids dispatch-time work (and a spurious setupPrototype) for
+	// entries that only carry non-CONSTRUCT clip events.
+	int _has_construct = 0;
+	for (size_t a = 0; a < display_list[depth].clip_action_count; a++) {
+		if (display_list[depth].clip_actions[a].event_flags & CLIP_EVENT_CONSTRUCT) {
+			_has_construct = 1;
+			break;
+		}
+	}
+	if (!_has_construct) return;
+
+	MovieClip* _parent_mc = g_current_context ? g_current_context : &root_movieclip;
+	MovieClip* _mc = actionFindOrCreateMovieClip(
+		app_context, display_list[depth].instance_name, _parent_mc);
+
+	PendingClipConstruct* pcc = (PendingClipConstruct*) malloc(sizeof(PendingClipConstruct));
+	if (pcc == NULL) return;
+	pcc->mc = _mc;
+	pcc->clip_actions = display_list[depth].clip_actions;
+	pcc->clip_action_count = display_list[depth].clip_action_count;
+	pcc->char_id = display_list[depth].char_id;
+	actionQueueCallbackEx(app_context, aq_dispatch_clip_construct, (void*)pcc,
+	                      AQ_PRIORITY_CONSTRUCT, _mc, /*is_unload=*/0,
+	                      AQ_KIND_CLIP_CONSTRUCT);
+}
+
+// Phase 5: registerClass constructor. Queued at placement time; dispatched
+// at the outermost !catch_up_mode drain. The dispatcher mirrors the
+// pre-Phase-5 sync block at tag.c:3524–3555: assigns mc->display_obj, sets
+// __proto__ via actionSetupRegisteredClassPrototype, invokes the ctor,
+// and marks the DisplayObject constructor_invoked=1. display_obj is
+// captured at queue time (same window during which the pre-Phase-5 sync
+// block dereferenced &display_list[depth]) so realloc-staleness risk is
+// no worse than before.
+typedef struct {
+	MovieClip* mc;
+	DisplayObject* display_obj;
+	char* export_name;
+} PendingRegisterCtor;
+
+static void aq_dispatch_register_ctor(SWFAppContext* app_context, void* user)
+{
+	PendingRegisterCtor* prc = (PendingRegisterCtor*) user;
+	if (prc == NULL) return;
+	if (prc->mc != NULL && prc->export_name != NULL && prc->display_obj != NULL
+	    && !prc->display_obj->constructor_invoked) {
+		// Skip if another path (e.g. ng_fire_child_constructors for attachMovie
+		// children, which still walks display lists synchronously) already
+		// invoked the ctor for this DisplayObject after we queued. The check
+		// mirrors fire_eager_constructors' own `if (obj->constructor_invoked)
+		// continue` guard and keeps register_and_init_order idempotent.
+		extern void actionInvokeRegisteredClassConstructor(SWFAppContext*, const char*, MovieClip*);
+		extern void actionSetupRegisteredClassPrototype(SWFAppContext*, const char*, MovieClip*);
+		prc->mc->display_obj = (void*)prc->display_obj;
+		actionSetupRegisteredClassPrototype(app_context, prc->export_name, prc->mc);
+		actionInvokeRegisteredClassConstructor(app_context, prc->export_name, prc->mc);
+		prc->display_obj->constructor_invoked = 1;
+	}
+	free(prc->export_name);
+	free(prc);
+}
+
+static void queue_register_ctor(SWFAppContext* app_context, size_t depth, size_t char_id)
+{
+	extern const char* ng_lookupExportName(size_t char_id);
+	// Gate on the same conditions the pre-Phase-5 sync CTOR block used.
+	if (!display_list[depth].sprite_needs_init) return;
+	if (display_list[depth].constructor_invoked) return;
+	if (display_list[depth].instance_name == NULL) return;
+	if (dictionary[char_id].type != CHAR_TYPE_SPRITE) return;
+
+	const char* exp = ng_lookupExportName(char_id);
+	// Only create the MC when there's a registered class — premature creation
+	// causes zombie MCs with wrong depth/parent (same rationale as the old
+	// fire_eager_constructors path).
+	if (exp == NULL) return;
+
+	MovieClip* _parent_mc = g_current_context ? g_current_context : &root_movieclip;
+	MovieClip* _mc = actionFindOrCreateMovieClip(
+		app_context, display_list[depth].instance_name, _parent_mc);
+	if (_mc == NULL) return;
+
+	PendingRegisterCtor* prc = (PendingRegisterCtor*) malloc(sizeof(PendingRegisterCtor));
+	if (prc == NULL) return;
+	prc->mc = _mc;
+	prc->display_obj = &display_list[depth];
+	prc->export_name = strdup(exp);
+	if (prc->export_name == NULL) {
+		free(prc);
+		return;
+	}
+	actionQueueCallbackEx(app_context, aq_dispatch_register_ctor, (void*)prc,
+	                      AQ_PRIORITY_CONSTRUCT, _mc, /*is_unload=*/0,
+	                      AQ_KIND_REGISTER_CTOR);
 }
 #endif
 
@@ -3439,16 +3569,23 @@ void tagPlaceObject2(SWFAppContext* app_context, size_t depth, size_t char_id, u
 		g_pending_clip_action_count = 0;
 	}
 
-	// Queue CLIP_EVENT_INITIALIZE handlers on the unified ActionQueue at
-	// AQ_PRIORITY_INITIALIZE / AQ_KIND_CLIP_INIT. Nested (catch_up_mode=1)
-	// calls queue but don't drain; the outermost placement drains all queued
-	// INITs before CONSTRUCT fires, preserving the pre-Phase-4 ordering.
+	// Queue CLIP_EVENT_INITIALIZE / CLIP_EVENT_CONSTRUCT handlers and the
+	// registerClass constructor onto the unified ActionQueue. Nested
+	// placements (catch_up_mode=1 during eager init) queue but do not drain;
+	// the outermost placement drains all three kinds in order (INIT then
+	// CONSTRUCT then REGISTER_CTOR) before returning, preserving the
+	// pre-Phase-5 ordering where every INIT fires, then every CONSTRUCT
+	// clip event, then every register-class constructor.
 	queue_clip_init_events(app_context, depth);
+	queue_clip_construct_events(app_context, depth);
+	queue_register_ctor(app_context, depth, char_id);
 
 	// Eagerly execute sprite frame 0 immediately after placement so the sprite's
 	// internal display list is populated BEFORE the parent frame's ActionScript runs.
 	// This matches Flash AVM1 behavior: sprites placed via PlaceObject2 are
 	// "constructed" (frame 0 executed) before the parent's DoAction scripts.
+	// During eager init, nested tagPlaceObject2 calls run with catch_up_mode=1
+	// and enqueue their own INIT/CONSTRUCT/CTOR entries into the shared queue.
 	if (display_list[depth].sprite_needs_init)
 	{
 		if (dictionary[char_id].type == CHAR_TYPE_SPRITE)
@@ -3482,76 +3619,15 @@ void tagPlaceObject2(SWFAppContext* app_context, size_t depth, size_t char_id, u
 		}
 	}
 
-	// Fire CLIP_EVENT_CONSTRUCT after eager init (children placed, their initialize fired)
-	// But only at the top level — during catch_up_mode (inside another clip's eager init),
-	// CONSTRUCT is deferred to fire_deferred_construct below.
-	if (!catch_up_mode && display_list[depth].clip_action_count > 0 && display_list[depth].instance_name != NULL) {
-		// Drain any CLIP_EVENT_INITIALIZE handlers queued at this outermost level
-		// (including nested INITs accumulated during the eager-init recursion above)
-		// before we synchronously fire CONSTRUCT. Priority ordering + FIFO within
-		// priority guarantees INITs fire in placement order, all before CONSTRUCT.
+	// Drain INIT → CONSTRUCT → REGISTER_CTOR at the outermost placement.
+	// Under catch_up_mode=1 (nested eager init, or goto catch-up where the
+	// outermost tagPlaceObject2 itself runs under catch_up_mode=1) we skip
+	// draining here; the enclosing !catch_up_mode placement or the
+	// tagShowFrame safety drain will pick up our queued entries.
+	if (!catch_up_mode) {
 		actionDrainActionQueueByKind(app_context, AQ_KIND_CLIP_INIT);
-		MovieClip* _parent_mc = g_current_context ? g_current_context : &root_movieclip;
-		MovieClip* saved_ctx = g_current_context;
-		MovieClip* _mc = actionFindOrCreateMovieClip(app_context, display_list[depth].instance_name, _parent_mc);
-		if (_mc) actionSetCurrentContext(_mc);
-		// Set __proto__ to registered class prototype BEFORE on(construct) fires
-		// so prototype properties are accessible in the handler
-		{
-			extern const char* ng_lookupExportName(size_t char_id);
-			extern void actionSetupRegisteredClassPrototype(SWFAppContext*, const char*, MovieClip*);
-			const char* _exp = ng_lookupExportName(display_list[depth].char_id);
-			if (_exp != NULL && _mc != NULL)
-				actionSetupRegisteredClassPrototype(app_context, _exp, _mc);
-		}
-		for (size_t a = 0; a < display_list[depth].clip_action_count; a++) {
-			if (display_list[depth].clip_actions[a].event_flags & CLIP_EVENT_CONSTRUCT)
-				display_list[depth].clip_actions[a].action(app_context);
-		}
-		actionSetCurrentContext(saved_ctx);
-		// Fire deferred CONSTRUCT for child clips placed during eager init
-		if (display_list[depth].sprite_display_list != NULL && display_list[depth].sprite_max_depth > 0) {
-			fire_deferred_construct(app_context, display_list[depth].sprite_display_list,
-				display_list[depth].sprite_max_depth, _mc ? _mc : _parent_mc);
-		}
-	}
-
-	// Fire registered class constructor at placement time (before DoAction).
-	// In Flash, timeline-placed sprites get their constructors invoked immediately
-	// after PlaceObject2, BEFORE the parent frame's DoAction runs.
-	// Only at top level — during catch_up_mode (nested eager init), constructors
-	// are deferred to the parent's fire_eager_constructors recursion.
-	if (!catch_up_mode && display_list[depth].sprite_needs_init
-	    && !display_list[depth].constructor_invoked
-	    && display_list[depth].instance_name != NULL
-	    && dictionary[char_id].type == CHAR_TYPE_SPRITE)
-	{
-		extern const char* ng_lookupExportName(size_t char_id);
-		extern void actionInvokeRegisteredClassConstructor(SWFAppContext*, const char*, MovieClip*);
-		extern void actionSetupRegisteredClassPrototype(SWFAppContext*, const char*, MovieClip*);
-		extern MovieClip root_movieclip;
-		MovieClip* _ctor_parent = g_current_context ? g_current_context : &root_movieclip;
-		MovieClip* _ctor_mc = NULL;
-
-		// Only create MC when there's a registered class — premature creation
-		// causes zombie MCs with wrong depth/parent
-		const char* _ctor_exp = ng_lookupExportName(char_id);
-		if (_ctor_exp != NULL)
-		{
-			_ctor_mc = actionFindOrCreateMovieClip(app_context, display_list[depth].instance_name, _ctor_parent);
-			if (_ctor_mc != NULL)
-			{
-				_ctor_mc->display_obj = (void*)&display_list[depth];
-				actionSetupRegisteredClassPrototype(app_context, _ctor_exp, _ctor_mc);
-				actionInvokeRegisteredClassConstructor(app_context, _ctor_exp, _ctor_mc);
-				display_list[depth].constructor_invoked = 1;
-			}
-		}
-
-		// Recursively fire constructors for child sprites placed during eager init
-		if (display_list[depth].sprite_display_list != NULL && display_list[depth].sprite_max_depth > 0)
-			fire_eager_constructors(app_context, display_list[depth].sprite_display_list,
-				display_list[depth].sprite_max_depth, _ctor_mc ? _ctor_mc : _ctor_parent);
+		actionDrainActionQueueByKind(app_context, AQ_KIND_CLIP_CONSTRUCT);
+		actionDrainActionQueueByKind(app_context, AQ_KIND_REGISTER_CTOR);
 	}
 
 #else
@@ -3713,9 +3789,12 @@ void tagPlaceObject2Ratio(SWFAppContext* app_context, size_t depth, size_t char_
 		g_pending_clip_action_count = 0;
 	}
 
-	// Queue CLIP_EVENT_INITIALIZE handlers on the unified ActionQueue
-	// (see tagPlaceObject2 for the ordering rationale).
+	// Queue INIT/CONSTRUCT/REGISTER_CTOR on the unified ActionQueue (same
+	// ordering rationale as tagPlaceObject2). Nested placements queue but
+	// don't drain; the outermost placement drains.
 	queue_clip_init_events(app_context, depth);
+	queue_clip_construct_events(app_context, depth);
+	queue_register_ctor(app_context, depth, char_id);
 
 	// Eagerly execute sprite frame 0 immediately after placement so the sprite's
 	// internal display list is populated BEFORE the parent frame's ActionScript runs.
@@ -3753,36 +3832,12 @@ void tagPlaceObject2Ratio(SWFAppContext* app_context, size_t depth, size_t char_
 		}
 	}
 
-	// Fire CLIP_EVENT_CONSTRUCT after eager init (children placed, their initialize fired)
-	// But only at the top level — during catch_up_mode (inside another clip's eager init),
-	// CONSTRUCT is deferred to fire_deferred_construct below.
-	if (!catch_up_mode && display_list[depth].clip_action_count > 0 && display_list[depth].instance_name != NULL) {
-		// Drain queued CLIP_EVENT_INITIALIZE handlers before CONSTRUCT sync fires
-		// (see tagPlaceObject2 for the rationale).
+	// Drain INIT → CONSTRUCT → REGISTER_CTOR at the outermost placement.
+	// See tagPlaceObject2 for the rationale.
+	if (!catch_up_mode) {
 		actionDrainActionQueueByKind(app_context, AQ_KIND_CLIP_INIT);
-		MovieClip* _parent_mc = g_current_context ? g_current_context : &root_movieclip;
-		MovieClip* saved_ctx = g_current_context;
-		MovieClip* _mc = actionFindOrCreateMovieClip(app_context, display_list[depth].instance_name, _parent_mc);
-		if (_mc) actionSetCurrentContext(_mc);
-		// Set __proto__ to registered class prototype BEFORE on(construct) fires
-		// so prototype properties are accessible in the handler
-		{
-			extern const char* ng_lookupExportName(size_t char_id);
-			extern void actionSetupRegisteredClassPrototype(SWFAppContext*, const char*, MovieClip*);
-			const char* _exp = ng_lookupExportName(display_list[depth].char_id);
-			if (_exp != NULL && _mc != NULL)
-				actionSetupRegisteredClassPrototype(app_context, _exp, _mc);
-		}
-		for (size_t a = 0; a < display_list[depth].clip_action_count; a++) {
-			if (display_list[depth].clip_actions[a].event_flags & CLIP_EVENT_CONSTRUCT)
-				display_list[depth].clip_actions[a].action(app_context);
-		}
-		actionSetCurrentContext(saved_ctx);
-		// Fire deferred CONSTRUCT for child clips placed during eager init
-		if (display_list[depth].sprite_display_list != NULL && display_list[depth].sprite_max_depth > 0) {
-			fire_deferred_construct(app_context, display_list[depth].sprite_display_list,
-				display_list[depth].sprite_max_depth, _mc ? _mc : _parent_mc);
-		}
+		actionDrainActionQueueByKind(app_context, AQ_KIND_CLIP_CONSTRUCT);
+		actionDrainActionQueueByKind(app_context, AQ_KIND_REGISTER_CTOR);
 	}
 
 #else

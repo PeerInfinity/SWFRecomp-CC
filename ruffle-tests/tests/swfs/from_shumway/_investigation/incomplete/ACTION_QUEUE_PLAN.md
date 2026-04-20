@@ -127,7 +127,57 @@ deferral mechanisms into one queue. Last updated 2026-04-19.
   [_stop], empty_movieclip_can_attach_movies, register_class_return_value,
   unload, stage_object_enumerate, set_interval, bad_placeobject_clipaction,
   movieclip_in_removed_button, goto_frame[2], goto_label, goto_methods).
-- **Phases 5–9** — not started.
+- **Phase 5 — landed 2026-04-20** — `CLIP_EVENT_CONSTRUCT` clip-action
+  handlers and the `actionInvokeRegisteredClassConstructor` fire (tag.c's
+  pre-Phase-5 sync blocks at the outermost `!catch_up_mode` site in
+  `tagPlaceObject2` and `tagPlaceObject2Ratio`) now route through the
+  unified queue at `AQ_PRIORITY_CONSTRUCT`, via two new kinds with separate
+  payloads and dispatchers. Each `tagPlaceObject2` / `tagPlaceObject2Ratio`
+  call (including nested under `catch_up_mode=1`) queues a
+  `PendingClipConstruct{mc, clip_actions, count, char_id}` via
+  `actionQueueCallbackEx(AQ_KIND_CLIP_CONSTRUCT)` and a
+  `PendingRegisterCtor{mc, display_obj, export_name}` via
+  `actionQueueCallbackEx(AQ_KIND_REGISTER_CTOR)`. The drain happens at the
+  outermost `!catch_up_mode` placement in the order `CLIP_INIT` →
+  `CLIP_CONSTRUCT` → `REGISTER_CTOR`, preserving the pre-Phase-5 ordering
+  (every INIT → every CONSTRUCT → every register-ctor). The tagShowFrame
+  safety drain now drains all three kinds in the same priority order for
+  the goto-catch-up case. The legacy `fire_deferred_construct` helper
+  (only called by the sync CONSTRUCT blocks we removed) is deleted;
+  `fire_eager_constructors` is kept because the attachMovie AS-level
+  path's `ng_fire_child_constructors` still uses it synchronously
+  (that path is not part of Phase 5's scope).
+  - **Idempotency guard in REGISTER_CTOR dispatch** — `aq_dispatch_register_ctor`
+    now checks `display_obj->constructor_invoked` before firing. Needed
+    because `ng_fire_child_constructors` (attachMovie post-ctor child walk)
+    still fires ctors synchronously via the retained `fire_eager_constructors`;
+    without the check, queued REGISTER_CTOR entries from tagPlaceObject2
+    calls made during `ng_attachMovie`'s frame-0 run would double-fire at
+    the next drain (caught by the `register_and_init_order` canary:
+    duplicate `aaclass constructor` for `box` at line 156). The guard
+    mirrors the `if (obj->constructor_invoked) continue;` check inside
+    `fire_eager_constructors` itself.
+  - **Per-depth bundle shape vs Ruffle** — Ruffle's `ActionType::Construct`
+    bundles setProto + CONSTRUCT events + ctor as one atomic entry per
+    depth (core/src/player.rs:2161–2203). We enqueue two separate entries
+    per depth (CLIP_CONSTRUCT + REGISTER_CTOR) and drain them in separate
+    `actionDrainActionQueueByKind` calls, which produces a different
+    across-depth order (all CLIP_CONSTRUCTs before any REGISTER_CTORs)
+    than Ruffle's per-depth bundling (CONSTRUCT_parent → CTOR_parent →
+    CONSTRUCT_child → CTOR_child). The current canary set does not
+    distinguish these orderings (both pass); the two-kind split was
+    chosen because the prompt specified separate payload shapes and
+    because it exactly preserves the pre-Phase-5 sync ordering where
+    `fire_deferred_construct` ran before `fire_eager_constructors`.
+  - Canaries 29/29 PASS locally: clip_events, register_and_init_order,
+    on_construct, clip_constructors, clip_event_propagation_order,
+    register_class_return_value, execution_order1-4,
+    goto_execution_order[2], goto_rewind3, button_order, variable_args,
+    define_function2_preload_order, issue_1104, attach_movie[_stop],
+    empty_movieclip_can_attach_movies, unload, stage_object_enumerate,
+    set_interval, bad_placeobject_clipaction, movieclip_in_removed_button,
+    goto_frame[2], goto_label, goto_methods.
+- **Phases 6–9** — not started.
 
 The Phase 0 API intentionally provides only the generic `actionQueueCallback`
 kind. The typed wrappers sketched in §Data structure (queueScript,
