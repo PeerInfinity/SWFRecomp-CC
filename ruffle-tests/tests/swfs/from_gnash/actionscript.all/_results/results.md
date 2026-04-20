@@ -1,10 +1,10 @@
 # Ruffle Test Results (Unfiltered)
 
-**Date**: 2026-04-20 02:07 UTC
+**Date**: 2026-04-20 02:51 UTC
 
-**Git SHA**: `a8995c83e4`
+**Git SHA**: `d5ddaa71eb`
 
-**Run Duration**: 0m 52s
+**Run Duration**: 0m 54s
 
 ## Summary
 
@@ -75,7 +75,7 @@
 | 42 | `Mouse-v7` | 21 | 0.2s |  |
 | 43 | `Mouse-v8` | 21 | 0.2s |  |
 | 44 | `MovieClipLoader-v5` | 6 | 0.2s |  |
-| 45 | `MovieClipLoader-v6` | 6 | 0.2s |  |
+| 45 | `MovieClipLoader-v6` | 6 | 0.4s |  |
 | 46 | `NetConnection-v5` | 7 | 0.2s |  |
 | 47 | `NetStream-v5` | 6 | 0.2s |  |
 | 48 | `NetStream-v6` | 80 | 0.2s |  |
@@ -88,13 +88,13 @@
 | 55 | `Point-v6` | 7 | 0.2s |  |
 | 56 | `Point-v7` | 7 | 0.2s |  |
 | 57 | `Random-v5` | 30 | 0.2s |  |
-| 58 | `Random-v6` | 30 | 0.3s |  |
+| 58 | `Random-v6` | 30 | 0.2s |  |
 | 59 | `Random-v7` | 30 | 0.2s |  |
 | 60 | `Random-v8` | 30 | 0.2s |  |
 | 61 | `Rectangle-v5` | 7 | 0.2s |  |
 | 62 | `Rectangle-v6` | 7 | 0.2s |  |
 | 63 | `Rectangle-v7` | 7 | 0.2s |  |
-| 64 | `Selection-v5` | 21 | 0.6s |  |
+| 64 | `Selection-v5` | 21 | 0.2s |  |
 | 65 | `Stage-v5` | 38 | 0.2s |  |
 | 66 | `System-v5` | 67 | 0.2s |  |
 | 67 | `System-v6` | 100 | 0.2s |  |
@@ -147,7 +147,7 @@
 
 | # | Test | Our diffs | Ruffle diffs | Duration | Notes |
 |---|------|-----------|--------------|----------|-------|
-| 1 | `ASnative-v5` | 35 | 35 | 0.2s |  |
+| 1 | `ASnative-v5` | 35 | 35 | 0.3s |  |
 | 2 | `ASnative-v6` | 40 | 40 | 0.2s |  |
 | 3 | `ASnative-v7` | 40 | 40 | 0.2s |  |
 | 4 | `ASnative-v8` | 40 | 40 | 0.2s |  |
@@ -174,8 +174,8 @@
 | 25 | `MovieClipLoader-v8` | 118 | 118 | 0.2s |  |
 | 26 | `Point-v8` | 3 | 20 | 0.2s |  |
 | 27 | `Rectangle-v8` | 21 | 21 | 0.2s |  |
-| 28 | `Sound-v5` | 27 | 27 | 0.3s |  |
-| 29 | `Sound-v6` | 30 | 51 | 0.3s |  |
+| 28 | `Sound-v5` | 27 | 27 | 0.4s |  |
+| 29 | `Sound-v6` | 30 | 51 | 0.4s |  |
 | 30 | `Sound-v7` | 28 | 51 | 0.4s |  |
 | 31 | `Sound-v8` | 28 | 51 | 0.3s |  |
 | 32 | `TextField-v5` | 3 | 3 | 0.2s |  |
@@ -187,7 +187,7 @@
 | 38 | `targetPath-v8` | 17 | 17 | 0.2s |  |
 | 39 | `toString_valueOf-v5` | 34 | 34 | 0.2s |  |
 | 40 | `toString_valueOf-v6` | 5 | 5 | 0.2s |  |
-| 41 | `toString_valueOf-v7` | 5 | 5 | 0.3s |  |
+| 41 | `toString_valueOf-v7` | 5 | 5 | 0.2s |  |
 | 42 | `toString_valueOf-v8` | 5 | 5 | 0.2s |  |
 | 43 | `with-v5` | 42 | 42 | 0.2s |  |
 
