@@ -36,32 +36,32 @@ deferral mechanisms into one queue. Last updated 2026-04-19.
   mid-drain behavior matches the old loop's early-break (drop-remaining).
   The old fixed `g_pending_unloads[64]` array and `g_pending_unload_count` are
   deleted. Canaries 19/19 PASS locally (`unload` + onload canaries).
-- **Phase 3 — partially landed 2026-04-19** — Path 1 (kind-tag API) was taken.
-  `ActionQueueKind` enum added to `action_queue.h` with values ONLOAD, LOAD,
-  ATTACH_INIT (reserved), ROLL. `actionQueueCallbackEx` accepts a kind;
-  `actionQueueCallback` defaults to ONLOAD (unchanged semantics for Phase 1/2).
-  `actionDrainActionQueueFiltered` now restricts to kind=ONLOAD, so the
-  tag.c:2090 onload drain does NOT steal LOAD/ROLL entries from their own
-  drain sites. New `actionDrainActionQueueByKind(ctx, kind)` drains one kind
-  regardless of is_unload.
-  - `g_pending_loads` (tag_stubs.c) migrated to AQ_KIND_LOAD. The static
-    array + MAX_PENDING_LOADS=64 silent-overflow limit is gone; heap-
-    allocated `PendingLoad` payloads live on the queue until drain.
-    `ng_fire_pending_loads` is now a thin wrapper over
-    `actionDrainActionQueueByKind(ctx, AQ_KIND_LOAD)`.
-  - `g_deferred_roll_queue` (action.c) migrated to AQ_KIND_ROLL. The static
-    array + MAX_DEFERRED_ROLLOVERS=32 limit is gone; heap-allocated
-    `DeferredRollEntry` payloads live on the queue. `queue_hover_rollout_on_focus_change`
-    also updated. `actionFlushDeferredRollEvents` is now a thin wrapper.
-  - `g_pending_attach_inits` (tag_stubs.c) **intentionally deferred to Phase 3b**.
-    It has coalesce-by-swf_depth semantics at enqueue time plus an outer
-    while-loop dispatch that re-runs if new entries are queued during the
-    inner loop. Neither maps cleanly onto the generic queue API without
-    exposing a find-and-update primitive. Leaving it on its own static array
-    preserves its semantics unchanged.
-- **Phase 3b — not started** — `g_pending_attach_inits` migration. Requires
-  either a queue-entry-find-by-key API (for the same-depth coalesce) or a
-  redesign of the enqueue callers to do the coalesce outside the queue.
+- **Phase 3a — landed 2026-04-19** — header-only API scaffolding, no
+  runtime semantics changed. The kind-tag API was added (Path 1):
+  `ActionQueueKind` enum in `action_queue.h` with ONLOAD/LOAD/ATTACH_INIT/ROLL.
+  `actionQueueCallbackEx` is declared and implemented as a thin delegator to
+  `actionQueueCallback` (kind is ignored at runtime). `actionDrainActionQueueByKind`
+  is declared and implemented as a no-op (no LOAD/ROLL/ATTACH_INIT entries
+  exist yet). `ActionQueueEntry` struct is unchanged — no `kind` field.
+  Phase 1/2 behavior is bit-identical to before.
+  - **Why no struct change** — the first Phase 3 attempt added a `kind` field
+    to `ActionQueueEntry` and migrated `g_pending_loads` +
+    `g_deferred_roll_queue`. Local canaries (31 AVM1 tests) passed, but CI
+    revealed a regression in `from_shumway/avm1/duplicateMovieClip/duplicateMovieClip`
+    (4/4 → 2/4, non-deterministic garbage values for `_width` / `_height` of
+    the cloned MC). Bisection showed the regression reproduces from a single
+    change: adding ANY 4-byte field to `ActionQueueEntry` (even an unused
+    padding int). The regression is a pre-existing latent heap-layout bug in
+    the duplicateMovieClip/`attachMovie` bounds path, exposed by any shift in
+    malloc ordering / allocation size that this queue produces. It is the
+    same family of bug the plan flagged as blockers for Phase 6
+    (`movieclip_invalid_get_bounds_1/2` heap corruption).
+- **Phase 3b — not started** — actual storage migrations for
+  `g_pending_loads`, `g_deferred_roll_queue`, and `g_pending_attach_inits`
+  must wait until the duplicateMovieClip bounds latent bug is found and
+  fixed. The API surface is already in place so Phase 3b can land as a
+  pure implementation change inside `action_queue.c` + the three enqueue
+  call sites.
 - **Phases 4–9** — not started.
 
 The Phase 0 API intentionally provides only the generic `actionQueueCallback`
