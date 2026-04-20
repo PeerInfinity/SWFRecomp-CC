@@ -51,17 +51,29 @@ deferral mechanisms into one queue. Last updated 2026-04-19.
     (4/4 → 2/4, non-deterministic garbage values for `_width` / `_height` of
     the cloned MC). Bisection showed the regression reproduces from a single
     change: adding ANY 4-byte field to `ActionQueueEntry` (even an unused
-    padding int). The regression is a pre-existing latent heap-layout bug in
-    the duplicateMovieClip/`attachMovie` bounds path, exposed by any shift in
-    malloc ordering / allocation size that this queue produces. It is the
-    same family of bug the plan flagged as blockers for Phase 6
-    (`movieclip_invalid_get_bounds_1/2` heap corruption).
+    padding int).
+- **Latent duplicateMovieClip bug — fixed 2026-04-19** — root cause located
+  via valgrind `--track-origins=yes`: `createMovieClip`
+  (`SWFModernRuntime/src/actionmodern/action.c:17190`) used `malloc` +
+  partial field initialization. Fields added to `struct MovieClip` after
+  `createMovieClip` was written (notably `loaded_image_width` /
+  `loaded_image_height`, plus `unloaded` / `load_failed` / `pending_removal`
+  / `avm1_removed` / `byte_size` / `movie_id`) were never initialized.
+  `mcGetOriginalBounds` (action.c:21211) branches on `mc->loaded_image_width
+  > 0` as its first check and returns the garbage u16 as the width when that
+  branch is taken — which it was non-deterministically, depending on whatever
+  happened to sit at that byte offset in the allocator's freelist. Fix: swap
+  `malloc` → `calloc(1, sizeof(MovieClip))` and drop the now-redundant
+  explicit zero-initializations. New fields added to the struct are
+  automatically safe. `duplicateMovieClip` canaries 4/4 PASS stably, and the
+  padded-`ActionQueueEntry` repro no longer triggers the regression — Phase
+  3b's struct change is unblocked.
 - **Phase 3b — not started** — actual storage migrations for
   `g_pending_loads`, `g_deferred_roll_queue`, and `g_pending_attach_inits`
-  must wait until the duplicateMovieClip bounds latent bug is found and
-  fixed. The API surface is already in place so Phase 3b can land as a
-  pure implementation change inside `action_queue.c` + the three enqueue
-  call sites.
+  can now land; the duplicateMovieClip latent bug that blocked them is
+  fixed. API surface is already in place so Phase 3b is a pure
+  implementation change inside `action_queue.c` + the three enqueue call
+  sites.
 - **Phases 4–9** — not started.
 
 The Phase 0 API intentionally provides only the generic `actionQueueCallback`

@@ -17188,20 +17188,21 @@ static void cloneMovieClip(const char* source_name, const char* target_name, int
  * Note: The caller is responsible for freeing the returned MovieClip
  */
 static MovieClip* createMovieClip(const char* instance_name, MovieClip* parent) {
-	MovieClip* mc = (MovieClip*)malloc(sizeof(MovieClip));
+	// calloc zero-initializes every field. Fields that need a non-zero default
+	// are set explicitly below; adding a new field to struct MovieClip is
+	// automatically safe (zero) without a matching update here. Previously
+	// malloc+partial-init left `loaded_image_{width,height}` (and other newer
+	// fields) uninitialized, which mcGetOriginalBounds read on the first
+	// branch — manifesting as non-deterministic _width/_height on dynamic MCs
+	// whenever the surrounding heap layout shifted.
+	MovieClip* mc = (MovieClip*)calloc(1, sizeof(MovieClip));
 	if (!mc) {
 		return NULL;
 	}
 
-	// Initialize with default values similar to root_movieclip
-	mc->x = 0.0f;
-	mc->y = 0.0f;
 	mc->xscale = 100.0f;
 	mc->yscale = 100.0f;
-	mc->rotation = 0.0f;
 	mc->alpha = 100.0f;
-	mc->width = 0.0f;
-	mc->height = 0.0f;
 	mc->visible = 1;
 	mc->currentframe = 1;
 	mc->totalframes = 1;
@@ -17210,48 +17211,20 @@ static MovieClip* createMovieClip(const char* instance_name, MovieClip* parent) 
 	mc->focusrect = -1.0f;   // -1.0f sentinel = null
 	mc->soundbuftime = 5.0f;
 	strcpy(mc->quality, "HIGH");
-	mc->xmouse = 0.0f;
-	mc->ymouse = 0.0f;
-	mc->droptarget[0] = '\0';
 	// Inherit URL from parent (or root); overridden by createEmptyMovieClip/loadMovie
 	if (parent != NULL && parent->url[0] != '\0') {
 		strncpy(mc->url, parent->url, sizeof(mc->url) - 1);
-		mc->url[sizeof(mc->url) - 1] = '\0';
 	} else {
 		extern MovieClip root_movieclip;
 		if (root_movieclip.url[0] != '\0') {
 			strncpy(mc->url, root_movieclip.url, sizeof(mc->url) - 1);
-			mc->url[sizeof(mc->url) - 1] = '\0';
-		} else {
-			mc->url[0] = '\0';
 		}
 	}
-	mc->dynamic_props = NULL;
-	mc->lockroot = 0;
-	mc->blend_mode = 0;
-	mc->is_button_mc = 0;
-	mc->depth = 0;
-	mc->depth_swapped = 0;
 	// Inherit SWF version from parent; overridden by loadMovie
 	mc->swf_version = parent ? parent->swf_version : (u16)g_swf_version;
-	mc->last_transform_id = 0;
-	mc->as_set_flags = 0;
 	mc->ng_textfield_idx = -1;
-	mc->draw_xmin = mc->draw_xmax = mc->draw_ymin = mc->draw_ymax = 0.0f;
-	mc->draw_has_bounds = 0;
-	mc->drawing_state = NULL;
-	mc->mask_mc = NULL;
-	mc->is_mask = 0;
-	mc->mc_mouse_inside = 0;
-	mc->mc_as_pressed = 0;
-	mc->attached_bitmap_pixels = NULL;
-	mc->attached_bitmap_width = 0;
-	mc->attached_bitmap_height = 0;
-	mc->mc_enterframe_eligible = 0;
-	mc->display_obj = NULL;
 	// Color transform defaults for dynamic MCs
 	mc->cx_ra = 100.0f; mc->cx_ga = 100.0f; mc->cx_ba = 100.0f; mc->cx_aa = 100.0f;
-	mc->cx_rb = 0.0f;   mc->cx_gb = 0.0f;   mc->cx_bb = 0.0f;   mc->cx_ab = 0.0f;
 
 	// Set instance name
 	strncpy(mc->name, instance_name, sizeof(mc->name) - 1);
