@@ -92,6 +92,12 @@ Normal). Move all INITIALIZE/CONSTRUCT/LOAD/DoAction firings from synchronous
 execution at `tagPlaceObject2` and `process_sprite_needs_init` into queue inserts.
 Drain the queue at the appropriate frame boundaries.
 
+See `ruffle-tests/tests/swfs/from_shumway/_investigation/incomplete/ACTION_QUEUE_PLAN.md` for the full
+cross-suite architectural plan: Ruffle model summary, comprehensive map of every
+synchronous firing site in our runtime, ad-hoc queues that would be unified,
+phased migration order, canary test list, known latent bugs that the rework
+risks re-exposing, and effort estimate.
+
 This is a substantial architectural change touching `tag.c`, `swf_core.c`,
 recompiler-emitted DoAction call sites, sprite eager-init flow, and goto
 catch-up. Estimated risk: many existing passing tests would need re-verification.
