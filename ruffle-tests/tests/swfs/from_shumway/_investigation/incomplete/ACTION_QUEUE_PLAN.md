@@ -36,7 +36,26 @@ deferral mechanisms into one queue. Last updated 2026-04-19.
   mid-drain behavior matches the old loop's early-break (drop-remaining).
   The old fixed `g_pending_unloads[64]` array and `g_pending_unload_count` are
   deleted. Canaries 19/19 PASS locally (`unload` + onload canaries).
-- **Phases 3–9** — not started.
+- **Phase 3 — not started** — risk assessment: Phase 3 migrates three
+  separate queues (`g_pending_loads`, `g_pending_attach_inits`,
+  `g_deferred_roll_queue`) that each have their own drain call site today
+  (`ng_fire_pending_loads` at tag.c:2081, `ng_fire_pending_attach_inits` at
+  tag.c:2084, roll queue drain in action.c). Unlike Phase 2, the is_unload
+  filter does not disambiguate them — they're all non-unload events. Two
+  paths forward:
+  1. **Expand the queue API** with a "kind" tag (e.g. `AQ_KIND_LOAD`,
+     `AQ_KIND_ATTACH_INIT`, `AQ_KIND_ROLL`, `AQ_KIND_ONLOAD`) and a
+     `actionDrainActionQueueByKind` API. Preserves current ordering exactly,
+     at the cost of pushing back the "one unified drain per tick" invariant.
+  2. **Unify drain sites at tag.c:2090**: delete the 2081+2084 drain calls,
+     let everything drain together. This is the plan's intended end state,
+     but changes ordering: today attach_inits always fire before onloads;
+     under unified FIFO, insertions interleave. Any test depending on
+     "all attach_inits then all onloads" could regress.
+
+  Both warrant a dedicated session with a careful canary run. Stopping here
+  keeps Phases 0–2 as a clean, zero-regression increment.
+- **Phases 4–9** — not started.
 
 The Phase 0 API intentionally provides only the generic `actionQueueCallback`
 kind. The typed wrappers sketched in §Data structure (queueScript,
