@@ -551,7 +551,7 @@ namespace SWFRecomp
 			// Phase 4/5 CLIP_INIT/CONSTRUCT/REGISTER_CTOR entries stay on their
 			// original drain timeline (outermost tagPlaceObject2 / tagShowFrame
 			// safety drain).
-			context.tag_main << "\t" << "actionDrainActionQueueByKind(app_context, AQ_KIND_SCRIPT);" << endl;
+			context.tag_main << "\t" << "if (!catch_up_mode || g_tag_skip_mode) actionDrainActionQueueByKind(app_context, AQ_KIND_SCRIPT);" << endl;
 			last_queued_script = next_script_i;
 
 			if (next_frame_i == 1)
@@ -808,7 +808,7 @@ namespace SWFRecomp
 				// Phase 6: drain queued root DoAction scripts before the frame
 				// footer (quit_swf / next_frame scheduling). Kind-filtered so
 				// Phase 4/5 entries remain owned by their own drain sites.
-				context.tag_main << "\t" << "actionDrainActionQueueByKind(app_context, AQ_KIND_SCRIPT);" << endl;
+				context.tag_main << "\t" << "if (!catch_up_mode || g_tag_skip_mode) actionDrainActionQueueByKind(app_context, AQ_KIND_SCRIPT);" << endl;
 				last_queued_script = next_script_i;
 
 				if (next_frame_i == 1)
@@ -862,7 +862,7 @@ namespace SWFRecomp
 				// CLIP_INIT / CONSTRUCT / REGISTER_CTOR entries continue to
 				// drain at the outermost tagPlaceObject2 / tagShowFrame safety
 				// drain — preserving the Phase 5 ordering contract.
-				context.tag_main << "\t" << "actionDrainActionQueueByKind(app_context, AQ_KIND_SCRIPT);" << endl;
+				context.tag_main << "\t" << "if (!catch_up_mode || g_tag_skip_mode) actionDrainActionQueueByKind(app_context, AQ_KIND_SCRIPT);" << endl;
 				last_queued_script = next_script_i;
 
 				context.tag_main << "\t" << "tagShowFrame(app_context);" << endl;
