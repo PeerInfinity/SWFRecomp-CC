@@ -26,6 +26,7 @@ set(CORE_SOURCES
     ${PROJECT_SOURCE_DIR}/src/actionmodern/timer.c
     ${PROJECT_SOURCE_DIR}/src/actionmodern/variables.c
     ${PROJECT_SOURCE_DIR}/src/actionmodern/object.c
+    ${PROJECT_SOURCE_DIR}/src/actionmodern/action_queue.c
     ${PROJECT_SOURCE_DIR}/src/utils.c
 
     # Compile hashmap file directly to avoid undefined symbols on Linux

@@ -5,6 +5,24 @@ This is an architectural plan, not a per-test plan. Implementing it would unbloc
 multiple individual test plans across all four suites and unify ~10 ad-hoc
 deferral mechanisms into one queue. Last updated 2026-04-19.
 
+## Status
+
+- **Phase 0 — landed 2026-04-19** — `SWFModernRuntime/include/actionmodern/action_queue.h`
+  + `SWFModernRuntime/src/actionmodern/action_queue.c` provide the queue API
+  (`actionQueueCallback`, `actionDrainActionQueue`, `actionResetActionQueue`,
+  `actionActionQueuePending`) with priority + FIFO + `is_unload` gating. No
+  callsites yet. Wired into `CMakeLists.txt` and the two source lists in
+  `ruffle-tests/verify_output.py` (native + emcc paths). Canary run locally
+  (14 tests including all execution_order[1-4], clip_events,
+  register_and_init_order, stage_object_enumerate, goto_rewind3): 14/14 PASS.
+- **Phases 1–9** — not started.
+
+The Phase 0 API intentionally provides only the generic `actionQueueCallback`
+kind. The typed wrappers sketched in §Data structure (queueScript,
+queueClipEvent, queueMethod, queueConstructor) will be added as each
+migration phase needs them — avoids unused-dispatch code churning before
+it has a caller.
+
 ## Why this matters
 
 Several blocked/incomplete plans share a single root cause: our runtime fires AVM1
