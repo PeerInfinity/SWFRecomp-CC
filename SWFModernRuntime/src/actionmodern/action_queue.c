@@ -255,6 +255,26 @@ extern void actionSetCurrentContext(MovieClip* mc);
 extern void actionSetBaseClip(MovieClip* mc);
 extern MovieClip* actionGetBaseClip(void);
 
+extern int g_settarget_explicit_root;
+extern int g_settarget_invalid;
+extern int g_settarget_none;
+extern int g_settarget_context_changed;
+extern MovieClip* g_settarget_saved_context;
+
+// Phase 7b fix: bump sprite-init depth during sprite-script dispatch so
+// ng_isInsideSpriteInit() reports true for the duration. Pre-7b ran sprite
+// DoActions from inside process_sprite_init_at_depth (g_sprite_init_depth>0),
+// which made actionGotoFrame / actionNextFrame / CallMethod("nextFrame" etc.)
+// take the inline-goto-catch-up path inside the script — so removing _root
+// went through tagRemoveObject2 synchronously, updating avm1_removed before
+// the next halt check. Under 7b, the script runs from the drain at root
+// level where sprite_init_depth was 0, and those paths silently deferred the
+// goto — the MC stayed alive for the rest of the script, so continuation
+// lines like "clip 6 BAD" printed that pre-7b halted at.
+extern int ng_isInsideSpriteInit(void);
+extern void ng_bumpSpriteInitDepth(void);
+extern void ng_unbumpSpriteInitDepth(void);
+
 static void aq_dispatch_sprite_script(SWFAppContext* app_context, void* user)
 {
 	PendingSpriteScript* p = (PendingSpriteScript*)user;
@@ -262,15 +282,38 @@ static void aq_dispatch_sprite_script(SWFAppContext* app_context, void* user)
 	MovieClip* saved_ctx = g_current_context;
 	MovieClip* saved_base = actionGetBaseClip();
 	DisplayObject* saved_obj = g_current_sprite_obj;
+	// Save g_settarget_* flags so any SetTarget state mutated by the sprite
+	// script (e.g. SetTarget("") against a removed base_clip which sets
+	// g_settarget_none=1) doesn't leak out to sibling scripts in the same
+	// drain batch (script_10 actionPlay would early-return and root stays
+	// stopped). Pre-7b's process_sprite_init_at_depth Phase 2 path already
+	// did this; aq_dispatch_sprite_script needs to match.
+	int saved_explicit_root = g_settarget_explicit_root;
+	int saved_invalid = g_settarget_invalid;
+	int saved_none = g_settarget_none;
+	int saved_ctx_changed = g_settarget_context_changed;
+	MovieClip* saved_ctx_save = g_settarget_saved_context;
+	g_settarget_explicit_root = 0;
+	g_settarget_invalid = 0;
+	g_settarget_none = 0;
+	g_settarget_context_changed = 0;
+	g_settarget_saved_context = NULL;
 	if (p->ctx_mc) {
 		actionSetCurrentContext(p->ctx_mc);
 		actionSetBaseClip(p->ctx_base ? p->ctx_base : p->ctx_mc);
 		g_current_sprite_obj = p->ctx_sprite_obj;
 	}
+	ng_bumpSpriteInitDepth();
 	if (p->fn) p->fn(app_context);
+	ng_unbumpSpriteInitDepth();
 	actionSetCurrentContext(saved_ctx);
 	actionSetBaseClip(saved_base);
 	g_current_sprite_obj = saved_obj;
+	g_settarget_explicit_root = saved_explicit_root;
+	g_settarget_invalid = saved_invalid;
+	g_settarget_none = saved_none;
+	g_settarget_context_changed = saved_ctx_changed;
+	g_settarget_saved_context = saved_ctx_save;
 	free(p);
 }
 

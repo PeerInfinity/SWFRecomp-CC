@@ -18221,9 +18221,21 @@ void actionInitDynTextFieldClone(SWFAppContext* app_context, MovieClip* mc) {
 
 // Find a cached MovieClip by name only (no parent constraint, no creation).
 // Used by advance_sprite_frames to set context without side effects.
+// Skip dead entries (depth == INT_MIN) so a previous placement at the same
+// name that was later removed doesn't shadow the current live MC. Without
+// this, a replace-at-same-depth-and-name sequence (sprite 5 "clip" → remove
+// → sprite 6 "clip" → remove → sprite 7 "clip") has exec_sprite_frame picking
+// up the FIRST cache entry (dead MC from sprite 5's placement) instead of
+// the live one just created by the Phase 7b pre-create in tagPlaceObject2.
+// The base_clip captured by DefineFunction then points to a dead MC, and
+// actionBaseClipRemoved sees avm1_removed=1 permanently — except the caller
+// relies on re-resolution via reResolveDeadBaseClip, which only fires for
+// SWF6+ DefineFunction2 on the g_current_context swap path — not for the
+// halt-check that reads func->base_clip raw. Matches findOrCreateMovieClip.
 MovieClip* actionFindMovieClipByName(const char* instance_name) {
 	for (int i = 0; i < child_mc_count; i++) {
 		if (child_mc_cache[i] != NULL &&
+		    child_mc_cache[i]->depth != INT_MIN &&
 		    swf_name_match(child_mc_cache[i]->name, instance_name)) {
 			return child_mc_cache[i];
 		}

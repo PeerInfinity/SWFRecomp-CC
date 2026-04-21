@@ -254,6 +254,8 @@ void ng_playCurrentSprite(void);
 
 // Root DL swap for inline catch-up from sprite init context
 int ng_isInsideSpriteInit(void);
+void ng_bumpSpriteInitDepth(void);
+void ng_unbumpSpriteInitDepth(void);
 int ng_swapToRootDL(DisplayObject** saved_dl, size_t* saved_max, size_t* saved_cap);
 void ng_restoreFromRootDL(DisplayObject* saved_dl, size_t saved_max, size_t saved_cap);
 void ng_gotoFrameCurrentSprite(u16 frame);

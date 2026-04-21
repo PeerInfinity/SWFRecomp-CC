@@ -391,9 +391,20 @@ MovieClip* ng_attachMovie(SWFAppContext* app_context, size_t char_id, const char
 		// but too early relative to the attach_init contract). See
 		// aq_dispatch_pending_attach_init which bumps eager + deferred for
 		// its pai->func call so scripts fire synchronously there.
+		//
+		// ALSO save/restore g_tag_skip_mode: when attachMovie is called from
+		// inside a deferred-goto Phase 2 target-frame replay (tag_skip_mode=1),
+		// inheriting tag_skip=1 into funcs[0] would match the sprite gate's
+		// g_tag_skip_mode branch and queue the nested sprite's script here,
+		// then PAI drain would fire it AGAIN — double-fire. Reset tag_skip=0
+		// for the nested init (we want catch_up_mode=1 to fully skip scripts).
+		extern int g_tag_skip_mode;
+		int _am_saved_tag_skip = g_tag_skip_mode;
+		g_tag_skip_mode = 0;
 		catch_up_mode = 1;
 		funcs[0](app_context);
 		catch_up_mode = saved_catch_up;
+		g_tag_skip_mode = _am_saved_tag_skip;
 
 		// Restore context
 		actionSetCurrentContext(saved_ctx);

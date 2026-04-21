@@ -91,6 +91,34 @@ static int g_sprite_init_depth = 0;
 
 int ng_isInsideSpriteInit(void) { return g_sprite_init_depth > 0; }
 
+// Phase 7b: exposed for aq_dispatch_sprite_script so sprite DoAction scripts
+// drained at the root-level SHOW_FRAME pre-drain still report "inside sprite
+// init" — pre-7b ran them inside process_sprite_init_at_depth which kept
+// this flag >0 for the duration. Inline goto catch-up (actionNextFrame /
+// actionGotoFrame / CallMethod("nextFrame"...)) depends on this flag to
+// remove _root display entries synchronously before the next halt check —
+// without it, the MC outlives the script and halt-on-removal is skipped.
+// Matching depth bump ALSO sets g_root_dl_backup on the 0→1 transition so
+// that nested ng_executeGotoCatchUp's ng_swapToRootDL finds the right root DL
+// (harmless no-op when dispatch is already running in root DL context).
+void ng_bumpSpriteInitDepth(void) {
+	if (g_sprite_init_depth == 0) {
+		g_root_dl_backup = display_list;
+		g_root_dl_max_backup = max_depth;
+		g_root_dl_cap_backup = display_list_capacity;
+	}
+	g_sprite_init_depth++;
+}
+void ng_unbumpSpriteInitDepth(void) {
+	if (g_sprite_init_depth > 0) g_sprite_init_depth--;
+	if (g_sprite_init_depth == 0) {
+		// Restore display list in case inline catch-up swapped
+		display_list = g_root_dl_backup;
+		max_depth = g_root_dl_max_backup;
+		display_list_capacity = g_root_dl_cap_backup;
+	}
+}
+
 int ng_swapToRootDL(DisplayObject** saved_dl, size_t* saved_max, size_t* saved_cap) {
 	if (g_sprite_init_depth <= 0) return 0;
 	// Save current (sprite) DL

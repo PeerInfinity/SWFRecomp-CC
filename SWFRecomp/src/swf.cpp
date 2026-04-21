@@ -4961,8 +4961,16 @@ namespace SWFRecomp
 								<< "(actionEagerInitActive() && !actionGotoCatchupActive())) "
 								<< "&& !actionScriptOnlyMode()) "
 								<< "actionQueueSpriteScript(app_context, " << script_name << ");" << endl;
+							// Sync-fire path requires !catch_up_mode. A nested
+							// ng_attachMovie (triggered from inside the outer
+							// deferred dispatcher's pai->func call) sets
+							// catch_up_mode=1 for the inner sprite's funcs[0]
+							// but inherits scriptOnly=1 + deferred=1 from the
+							// outer state. Without the !catch_up_mode guard,
+							// the inner script fires here AND again later when
+							// its own PAI drains.
 							sprite_definitions
-								<< "\t" << "else if (actionScriptOnlyMode() && actionDeferredSpriteInitActive()) "
+								<< "\t" << "else if (!catch_up_mode && actionScriptOnlyMode() && actionDeferredSpriteInitActive()) "
 								<< script_name << "(app_context);" << endl;
 
 							// Mark this sprite script as non-timeline
