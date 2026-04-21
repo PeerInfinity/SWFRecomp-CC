@@ -448,6 +448,33 @@ deferral mechanisms into one queue. Last updated 2026-04-19.
     movieclip_invalid_get_bounds_1/2, string_paths_eval2,
     function_base_clip_readded.
 
+  - **CI (full Ruffle suite) — net -1 across all suites** (gained +5,
+    lost -6). The local canary set did not cover these regressions:
+    - avm1: **-6** — `call` (63/63→36/63), `default_names` (52/52→43/52),
+      `issue_9885` (2/2→2/2 status change), `register_and_init_order`
+      (231/231→212/231, known), `removed_clip_halts_script`
+      (15/15→3/15 — massive, execution halts after "clip 5 OK"),
+      `target_clip_removed` (5/5→4/5).
+    - from_gnash/misc-swfmill.all: **-1** `zeroframe_definesprite`
+      (ruffle_matched 3/3 → output_mismatch 1/3).
+    - from_shumway/avm1: **+1** `doactionorder/doactionorder` PASS (3/7→7/7).
+    - from_gnash/misc-swfmill.all: **+2** `root_onload` PASS (2/4→4/4),
+      `dict_event` improved 3/5→5/5.
+    - from_gnash/misc-ming.all: **+1** `timeline_var_test`
+      (8/11→11/11), plus several action_order improvements
+      (`action_execution_order_test4` 12/26→18/26 ruffle_matched,
+      `action_execution_order_test5` 22/35→26/35, `ActionOrderTest4`
+      9/64→10/64, more). `action_execution_order_test6` shifted from
+      output_mismatch → ruffle_matched (5/24 unchanged).
+    - from_gnash/misc-swfc.all: **+1** `submoviegetvar` PASS (0/4→4/4).
+    - from_shumway/timeline/timeline_as2_5: 1/4 → 3/4 (closer, still failing).
+    The severity of `removed_clip_halts_script` (15/15→3/15), `call`
+    (63/63→36/63), and `default_names` (52/52→43/52) suggests a
+    fundamental issue with sprite script firing when clips are
+    involved — likely the `actionBaseClipRemoved()` guard interaction
+    with queued+deferred script firing, or context binding for
+    scripts that fire after their clip is removed. Not narrowed down.
+
   - **Targets — flipped:**
     - `from_gnash/misc-swfmill.all/trace-as2/root_onload`:
       `output_mismatch` → **PASS**.
