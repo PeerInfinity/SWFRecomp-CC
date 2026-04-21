@@ -500,6 +500,81 @@ deferral mechanisms into one queue. Last updated 2026-04-19.
       lines ~408-414 is kept as safety net, now a safe no-op under
       the 7b gate. Phase 8 should delete it.
 
+  - **Post-landing fixes — 2026-04-21 (commit 23e11744, CI run 24731283277):**
+    `aq_dispatch_sprite_script` was missing several pieces of the
+    `process_sprite_init_at_depth` Phase 2 context that pre-7b sprite
+    scripts implicitly relied on. Five coordinated fixes landed after
+    the 7b-landed CI delta showed net -1 across suites:
+    - Dispatch now saves/restores `g_settarget_*` (explicit_root,
+      invalid, none, context_changed, saved_context). Pre-7b's
+      `process_sprite_init_at_depth` already did this. Without it,
+      a sprite script's `SetTarget("")` against a removed base_clip
+      sets `g_settarget_none=1` which leaks out to sibling scripts
+      in the same drain — e.g. root's `frame_6` `actionPlay`
+      early-returns and `is_playing` stays 0, so the loop stops
+      advancing. Direct cause of `removed_clip_halts_script`
+      halting after "clip 5 OK".
+    - Dispatch bumps `g_sprite_init_depth` for the script duration
+      via new `ng_bumpSpriteInitDepth`/`ng_unbumpSpriteInitDepth`
+      helpers in `tag.c`. Pre-7b scripts ran inside
+      `process_sprite_init_at_depth` where this was already
+      non-zero; inline goto catch-up in `actionNextFrame` /
+      `actionGotoFrame` / `CallMethod("nextFrame" etc.)` gates on
+      `ng_isInsideSpriteInit()` to decide between synchronous
+      `ng_executeGotoCatchUp` (which invalidates the `_root`
+      display entry's MC before the next halt check) and deferred.
+      Without the bump, scripts deferred the goto — the MC outlived
+      the script — continuation lines after the halt check
+      ("clip 6 BAD" etc.) printed that pre-7b halted at.
+    - `ng_attachMovie` saves/clears `g_tag_skip_mode` around its
+      `catch_up_mode=1 funcs[0]` call. When attachMovie is called
+      from inside a deferred-goto Phase 2 target-frame replay
+      (`g_tag_skip_mode=1` inherited), the nested sprite's funcs[0]
+      would see the sprite gate's `g_tag_skip_mode` branch evaluate
+      true, queueing the script at `AQ_KIND_SCRIPT`. Then the PAI
+      drain fires the script a SECOND time via the sync path —
+      double-fire.
+    - Recompiler's sprite DoAction sync-fire branch now requires
+      `!catch_up_mode`. A nested `ng_attachMovie` inside the outer
+      PAI's `pai->func` sets `catch_up_mode=1` for its inner
+      sprite's `funcs[0]` but inherits `scriptOnly=1 + deferred=1`
+      from the outer state. Pre-fix the sync branch was
+      `(scriptOnly && deferred)`, firing the inner sprite's script
+      here AND again when its own PAI drained — double-fire
+      (`removed_clip_halts_script` `script_0` "clip 3" fired twice
+      pre-fix).
+    - `actionFindMovieClipByName` filters `depth==INT_MIN` entries
+      to match `findOrCreateMovieClip`. Without this, a
+      replace-at-same-depth-and-name sequence (sprite 5 "clip" →
+      remove → sprite 6 "clip" → remove → …) leaves
+      `exec_sprite_frame` picking up the FIRST cache entry
+      (long-dead MC) instead of the live one just created by the
+      7b pre-create in `tagPlaceObject2`. `DefineFunction` then
+      captures the dead MC as base_clip, and
+      `actionBaseClipRemoved` reports `avm1_removed=1` raw
+      regardless of any current live MC (the SWF6+ closure
+      re-resolve path only fixes `g_current_context`, not the
+      func's captured base_clip pointer).
+
+  - **CI delta for 23e11744 vs 06feeaca (the 7b-landed baseline):**
+    avm1 **+2 passing** (591/641 → 593/641, 92.2% → 92.5%, -14
+    mismatched lines): `removed_clip_halts_script`
+    `output_mismatch 3/15` → **PASS 15/15**, `target_clip_removed`
+    `output_mismatch 4/5` → **PASS 5/5**, `default_names` lines
+    43/52 → 44/52 (still `output_mismatch` overall).
+    All other suites unchanged — `from_gnash/misc-ming.all`,
+    `from_gnash/misc-swfc.all`, `from_gnash/misc-swfmill.all`,
+    `from_gnash/misc-mtasc.all`, `from_gnash/actionscript.all`,
+    `from_shumway`, `from_shumway/avm1` all show **no changes**.
+    Net vs pre-7a baseline (`ec66bc33`): still +1 newly passing
+    (doactionorder, root_onload flips stayed) plus the 2 newly
+    passing from this round minus the call / register_and_init_order /
+    issue_9885 regressions that are now only partial (line-count
+    improvements, status still `output_mismatch` — those three plus
+    `default_names` remain as Phase 7c follow-ups).
+    Loop tripwires `loop_test4/5/7` remain byte-identical to
+    pre-7a baselines.
+
 - **Phase 7 — attempted 2026-04-20, not landed (canary regressions).**
   The sprite-side migration (recompiler-emitted inline
   `actionQueueScript(app_context, script_<N>)` at each sprite
