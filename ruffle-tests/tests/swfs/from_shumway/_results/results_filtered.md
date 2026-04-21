@@ -1,10 +1,10 @@
 # Ruffle Test Results (Filtered)
 
-**Date**: 2026-04-21 18:09 UTC
+**Date**: 2026-04-21 18:35 UTC
 
-**Git SHA**: `61ba7bd855`
+**Git SHA**: `fe74d7aa3a`
 
-**Run Duration**: 0m 24s
+**Run Duration**: 0m 23s
 
 **Filtered**: 0 tests ignored out of 92 available
 
@@ -35,16 +35,16 @@
 |---|------|-------|----------|-------|
 | 1 | `add` | 11 | 0.1s |  |
 | 2 | `avm1/array` | 7 | 0.1s | [2](ruffle-tests/tests/swfs/from_shumway/_investigation/complete/SHUMWAY_AVM1_PLAN.md) |
-| 3 | `avm1/bitmapdata/getPixel` | 2 | 0.1s |  |
+| 3 | `avm1/bitmapdata/getPixel` | 2 | 0.2s |  |
 | 4 | `avm1/bitmapdata/loadBitmap` | 3 | 0.1s |  |
 | 5 | `avm1/callee` | 2 | 0.1s |  |
-| 6 | `avm1/depth` | 6 | 0.3s |  |
-| 7 | `avm1/doactionorder/doactionorder` | 7 | 0.1s | [1](ruffle-tests/tests/swfs/from_shumway/_investigation/incomplete/ACTION_QUEUE_PLAN.md) [3](ruffle-tests/tests/swfs/from_shumway/_investigation/incomplete/SHUMWAY_AVM1_SUBTREES_PLAN.md) |
+| 6 | `avm1/depth` | 6 | 0.2s |  |
+| 7 | `avm1/doactionorder/doactionorder` | 7 | 0.1s | [1](ruffle-tests/tests/swfs/from_shumway/_investigation/complete/ACTION_QUEUE_PLAN.md) [3](ruffle-tests/tests/swfs/from_shumway/_investigation/incomplete/SHUMWAY_AVM1_SUBTREES_PLAN.md) |
 | 8 | `avm1/doactionorder/symbolclass` | 4 | 0.1s |  |
-| 9 | `avm1/duplicateMovieClip/dontremove` | 6 | 0.9s |  |
-| 10 | `avm1/duplicateMovieClip/duplicateMovieClip` | 4 | 0.9s |  |
-| 11 | `avm1/duplicateMovieClip/name-coercion` | 3 | 0.8s |  |
-| 12 | `avm1/duplicateMovieClip/samedepth` | 6 | 0.1s |  |
+| 9 | `avm1/duplicateMovieClip/dontremove` | 6 | 0.2s |  |
+| 10 | `avm1/duplicateMovieClip/duplicateMovieClip` | 4 | 0.2s |  |
+| 11 | `avm1/duplicateMovieClip/name-coercion` | 3 | 0.2s |  |
+| 12 | `avm1/duplicateMovieClip/samedepth` | 6 | 0.2s |  |
 | 13 | `avm1/externalinterface` | 4 | 0.1s |  |
 | 14 | `avm1/filters` | 149 | 0.1s | [2](ruffle-tests/tests/swfs/from_shumway/_investigation/complete/SHUMWAY_AVM1_PLAN.md) |
 | 15 | `avm1/haxe/flocons1` | 2 | 0.1s |  |
@@ -52,8 +52,8 @@
 | 17 | `avm1/label` | 4 | 0.2s |  |
 | 18 | `avm1/levels` | 9 | 0.2s |  |
 | 19 | `avm1/loadevent` | 9 | 0.2s |  |
-| 20 | `avm1/loadvariables/loadvariables` | 7 | 0.2s |  |
-| 21 | `avm1/loadvariables/loadvars` | 2 | 0.2s |  |
+| 20 | `avm1/loadvariables/loadvariables` | 7 | 0.1s |  |
+| 21 | `avm1/loadvariables/loadvars` | 2 | 0.1s |  |
 | 22 | `avm1/lookup` | 3 | 0.1s |  |
 | 23 | `avm1/mouse-transparency` | 1 | 0.1s |  |
 | 24 | `avm1/nativeinheritance` | 6 | 0.1s | [2](ruffle-tests/tests/swfs/from_shumway/_investigation/complete/SHUMWAY_AVM1_PLAN.md) |
@@ -69,9 +69,9 @@
 | 34 | `avm1/setinterval` | 20 | 0.1s | [2](ruffle-tests/tests/swfs/from_shumway/_investigation/complete/SHUMWAY_AVM1_PLAN.md) |
 | 35 | `avm1/settimeout` | 17 | 0.1s | [2](ruffle-tests/tests/swfs/from_shumway/_investigation/complete/SHUMWAY_AVM1_PLAN.md) |
 | 36 | `avm1/super` | 11 | 0.1s |  |
-| 37 | `avm1/target` | 18 | 0.2s | [2](ruffle-tests/tests/swfs/from_shumway/_investigation/complete/SHUMWAY_AVM1_PLAN.md) |
-| 38 | `avm1/text-bind` | 0 | 0.2s |  |
-| 39 | `avm1/textfield/textfield-html` | 4 | 0.1s |  |
+| 37 | `avm1/target` | 18 | 0.5s | [2](ruffle-tests/tests/swfs/from_shumway/_investigation/complete/SHUMWAY_AVM1_PLAN.md) |
+| 38 | `avm1/text-bind` | 0 | 0.5s |  |
+| 39 | `avm1/textfield/textfield-html` | 4 | 0.4s |  |
 | 40 | `avm1/textfield/textfield-text-setters` | 8 | 0.1s |  |
 | 41 | `avm1/undefined/undefined-swf6` | 39 | 0.1s |  |
 | 42 | `avm1/undefined/undefined-swf7` | 39 | 0.1s |  |
@@ -79,8 +79,8 @@
 | 44 | `avm1/xml/xmlbuild` | 1 | 0.1s |  |
 | 45 | `avm1/xml/xmlload` | 4 | 0.1s |  |
 | 46 | `avm1/xml/xmlstring` | 9 | 0.1s |  |
-| 47 | `avm1timeline1` | 3 | 0.1s |  |
-| 48 | `avm1timeline2` | 6 | 0.1s |  |
+| 47 | `avm1timeline1` | 3 | 0.2s |  |
+| 48 | `avm1timeline2` | 6 | 0.2s |  |
 | 49 | `button3` | 1 | 0.2s |  |
 | 50 | `doubleAndRegister` | 2 | 0.2s |  |
 | 51 | `fscommand1` | 1 | 0.1s |  |
@@ -88,10 +88,10 @@
 | 53 | `fuzz/6f3b6cbd618b5b816edbf27e14f631aef42da1a4bcc467fb1aa2951d6c85ee48` | 0 | 0.1s |  |
 | 54 | `fuzz/9cad44804736a4fbd806d349c97b81d33c3f09ed4d9278acc4ef5cfbab147f3c` | 0 | 0.1s |  |
 | 55 | `gradientTransform` | 0 | 0.2s |  |
-| 56 | `invalidClipDepth` | 0 | 0.2s |  |
+| 56 | `invalidClipDepth` | 0 | 0.1s |  |
 | 57 | `movieinfo1` | 3 | 0.1s |  |
 | 58 | `targetPath1` | 8 | 0.1s |  |
-| 59 | `timeline/timeline_as2_2` | 3 | 0.1s |  |
+| 59 | `timeline/timeline_as2_2` | 3 | 0.2s |  |
 | 60 | `timeline/timeline_as2_3` | 3 | 0.1s |  |
 | 61 | `timeline/timeline_as2_4` | 2 | 0.1s |  |
 
@@ -111,7 +111,7 @@ Tests with output mismatch but >= 50% line match rate (low-hanging fruit).
 
 | # | Test | Match Rate | Matching | Total | Diff Lines | Notes |
 |---|------|------------|----------|-------|------------|-------|
-| 1 | `timeline/timeline_as2_5` | 75.0% | 3 | 4 | 1 | [1](ruffle-tests/tests/swfs/from_shumway/_investigation/incomplete/ACTION_QUEUE_PLAN.md) [4](ruffle-tests/tests/swfs/from_shumway/_investigation/incomplete/SHUMWAY_FUZZ_TIMELINE_PLAN.md) |
+| 1 | `timeline/timeline_as2_5` | 75.0% | 3 | 4 | 1 | [1](ruffle-tests/tests/swfs/from_shumway/_investigation/complete/ACTION_QUEUE_PLAN.md) [4](ruffle-tests/tests/swfs/from_shumway/_investigation/incomplete/SHUMWAY_FUZZ_TIMELINE_PLAN.md) |
 
 ## Segfaults
 
@@ -131,7 +131,7 @@ No timeouts.
 
 | # | Test | Match Rate | Matching/Total | Actual | Expected | Notes |
 |---|------|------------|----------------|--------|----------|-------|
-| 1 | `timeline/timeline_as2_5` | 75.0% | 3/4 | 3 | 4 | [1](ruffle-tests/tests/swfs/from_shumway/_investigation/incomplete/ACTION_QUEUE_PLAN.md) [4](ruffle-tests/tests/swfs/from_shumway/_investigation/incomplete/SHUMWAY_FUZZ_TIMELINE_PLAN.md) |
+| 1 | `timeline/timeline_as2_5` | 75.0% | 3/4 | 3 | 4 | [1](ruffle-tests/tests/swfs/from_shumway/_investigation/complete/ACTION_QUEUE_PLAN.md) [4](ruffle-tests/tests/swfs/from_shumway/_investigation/incomplete/SHUMWAY_FUZZ_TIMELINE_PLAN.md) |
 | 2 | `avm1/moviecliploader` | 14.3% | 1/7 | 6 | 7 | [2](ruffle-tests/tests/swfs/from_shumway/_investigation/complete/SHUMWAY_AVM1_PLAN.md) [3](ruffle-tests/tests/swfs/from_shumway/_investigation/incomplete/SHUMWAY_AVM1_SUBTREES_PLAN.md) |
 | 3 | `fuzz/81004241e3a9278ee3c26c5d7d04a3677e7a28618dd0dd2ad041a98374a280f0` | 10.7% | 3/28 | 28 | 3 | [4](ruffle-tests/tests/swfs/from_shumway/_investigation/incomplete/SHUMWAY_FUZZ_TIMELINE_PLAN.md) |
 | 4 | `fuzz/ac93c8c9a3efe3e9a0421d6163158827696b5e4d0ac4fa1262f32e8c5bb7f732` | 9.3% | 5/54 | 54 | 8 | [4](ruffle-tests/tests/swfs/from_shumway/_investigation/incomplete/SHUMWAY_FUZZ_TIMELINE_PLAN.md) |
@@ -160,13 +160,13 @@ No timeouts.
 | 27 | `fuzz/b480790b84c3a62fe6fa3486d26fd23988a5acd038261c04349ad4368107e6ca` | 0.6% | 1/180 | 180 | 5 | [4](ruffle-tests/tests/swfs/from_shumway/_investigation/incomplete/SHUMWAY_FUZZ_TIMELINE_PLAN.md) |
 | 28 | `fuzz/4935e4aed5e63f07d9e6cc76e97d080f042b029a838630fb2b276b5da0affd26` | 0.0% | 0/127 | 127 | 7 | [4](ruffle-tests/tests/swfs/from_shumway/_investigation/incomplete/SHUMWAY_FUZZ_TIMELINE_PLAN.md) |
 | 29 | `fuzz/a86fee6d68f77c63cd83f33d136be2c48f0ab7ab0414a93a0b711ec2a19c6883` | 0.0% | 0/73 | 73 | 3 | [4](ruffle-tests/tests/swfs/from_shumway/_investigation/incomplete/SHUMWAY_FUZZ_TIMELINE_PLAN.md) |
-| 30 | `timeline/timeline_as2_1` | 0.0% | 0/3 | 0 | 3 | [1](ruffle-tests/tests/swfs/from_shumway/_investigation/incomplete/ACTION_QUEUE_PLAN.md) [4](ruffle-tests/tests/swfs/from_shumway/_investigation/incomplete/SHUMWAY_FUZZ_TIMELINE_PLAN.md) |
+| 30 | `timeline/timeline_as2_1` | 0.0% | 0/3 | 0 | 3 | [1](ruffle-tests/tests/swfs/from_shumway/_investigation/complete/ACTION_QUEUE_PLAN.md) [4](ruffle-tests/tests/swfs/from_shumway/_investigation/incomplete/SHUMWAY_FUZZ_TIMELINE_PLAN.md) |
 
 ## Investigation Documents
 
 | # | Document | Tests | Passing | Failing |
 |---|----------|-------|---------|---------|
-| 1 | [ACTION_QUEUE_PLAN.md](ruffle-tests/tests/swfs/from_shumway/_investigation/incomplete/ACTION_QUEUE_PLAN.md) | 3 | 1 | 2 |
+| 1 | [ACTION_QUEUE_PLAN.md](ruffle-tests/tests/swfs/from_shumway/_investigation/complete/ACTION_QUEUE_PLAN.md) | 3 | 1 | 2 |
 | 2 | [SHUMWAY_AVM1_PLAN.md](ruffle-tests/tests/swfs/from_shumway/_investigation/complete/SHUMWAY_AVM1_PLAN.md) | 11 | 9 | 2 |
 | 3 | [SHUMWAY_AVM1_SUBTREES_PLAN.md](ruffle-tests/tests/swfs/from_shumway/_investigation/incomplete/SHUMWAY_AVM1_SUBTREES_PLAN.md) | 2 | 1 | 1 |
 | 4 | [SHUMWAY_FUZZ_TIMELINE_PLAN.md](ruffle-tests/tests/swfs/from_shumway/_investigation/incomplete/SHUMWAY_FUZZ_TIMELINE_PLAN.md) | 29 | 0 | 29 |
