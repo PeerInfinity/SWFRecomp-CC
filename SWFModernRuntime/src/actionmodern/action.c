@@ -50133,6 +50133,10 @@ static double stringArgToNumber(SWFAppContext* app_context, ActionVar* v)
 			if (endptr == buf) return NAN;
 			return d;
 		}
+		case ACTION_STACK_VALUE_OBJECT:
+		case ACTION_STACK_VALUE_ARRAY:
+		case ACTION_STACK_VALUE_FUNCTION:
+			return varToDoubleSWF(app_context, v, g_swf_version);
 		default: return NAN;
 	}
 }
@@ -50625,14 +50629,20 @@ static int callStringPrimitiveMethod(SWFAppContext* app_context, char* str_buffe
 
 		// Parse end index (position to start searching backwards from, in UTF-16 units)
 		int end_index = slen; // default: search from end
-		if (num_args > 1)
+		if (num_args > 1 && args[1].type != ACTION_STACK_VALUE_UNDEFINED)
 		{
 			double ev = stringArgToNumber(app_context, &args[1]);
-			if (!isnan(ev))
+			if (isnan(ev))
+			{
+				// Ruffle: coerce_to_i32(NaN) == 0. lastIndexOf then uses
+				// start_index = 0 + pattern.len(), so a backward search at
+				// position < pattern.len() finds nothing → -1.
+				end_index = 0;
+			}
+			else
 			{
 				end_index = (int32_t)(int64_t)ev;
 			}
-			// else: undefined -> search from end (keep default)
 		}
 
 		// Search backwards
@@ -51784,6 +51794,53 @@ void actionCallMethod(SWFAppContext* app_context, char* str_buffer)
 		}
 		// Clamp depth to at least 1 (Ruffle: depth.max(1))
 		if (method_search_depth < 1) method_search_depth = 1;
+
+		// String.prototype stub dispatch: String.prototype stores placeholder
+		// stub methods (builtin_stub_method → undefined) for built-in string
+		// methods (charCodeAt, indexOf, split, ...) so hasOwnProperty checks
+		// work. When the resolved method is that stub, coerce `this` to a
+		// string and dispatch via callStringPrimitiveMethod. Covers:
+		//   - String wrappers: `new String("x").charCodeAt(0)` — uses valueOf_value
+		//   - Plain objects with toString: `o.substr(0,2)` — uses toString
+		// User-defined overrides win because getProperty walks the obj chain
+		// first and hits them before String.prototype's stub.
+		// callStringPrimitiveMethod returns 0 for unknown method names, so the
+		// fallthrough is safe if this stub happens to not be a string method.
+		if (method_prop != NULL && method_prop->type == ACTION_STACK_VALUE_FUNCTION) {
+			ASFunction* _ws_mf = lookupFunctionFromVar(method_prop);
+			if (_ws_mf != NULL && _ws_mf->function_type == 2
+			    && _ws_mf->advanced_func == (Function2Ptr) builtin_stub_method) {
+				const uint16_t* _ws_str = NULL;
+				u32 _ws_len = 0;
+				ActionVar _ws_ts = {0};
+				if (obj->native_type == NATIVE_STRING) {
+					ActionVar* _ws_prim = getProperty(obj, "valueOf_value", 13);
+					if (_ws_prim != NULL && _ws_prim->type == ACTION_STACK_VALUE_STRING) {
+						_ws_str = varGetU16Ptr(_ws_prim);
+						_ws_len = _ws_prim->str_size;
+					}
+				} else {
+					ActionVar _ws_obj_var = {0};
+					_ws_obj_var.type = ACTION_STACK_VALUE_OBJECT;
+					_ws_obj_var.data.numeric_value = (u64)obj;
+					int _ws_ts_found = 0;
+					_ws_ts = objectCallToString(app_context, &_ws_obj_var, &_ws_ts_found);
+					if (_ws_ts_found && _ws_ts.type == ACTION_STACK_VALUE_STRING) {
+						_ws_str = varGetU16Ptr(&_ws_ts);
+						_ws_len = _ws_ts.str_size;
+					}
+				}
+				if (_ws_str != NULL) {
+					int _ws_handled = callStringPrimitiveMethod(
+						app_context, str_buffer, _ws_str, _ws_len,
+						method_name, method_name_len, args, num_args);
+					if (_ws_handled) {
+						if (args != NULL) FREE(args);
+						return;
+					}
+				}
+			}
+		}
 
 		if (method_prop != NULL && method_prop->type == ACTION_STACK_VALUE_FUNCTION)
 		{

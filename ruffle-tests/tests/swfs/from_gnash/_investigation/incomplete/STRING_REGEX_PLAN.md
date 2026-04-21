@@ -1,8 +1,8 @@
 # String Regex Support Plan
 <!-- TESTS: String-v5, String-v6, String-v7, String-v8 -->
 
-Last updated: 2026-04-17
-Status: NOT STARTED — 4 tests, ~140-153 diffs each (~60% line match)
+Last updated: 2026-04-21
+Status: IN PROGRESS — non-regex String-wrapper method dispatch landed (+71–88 lines per test). Regex itself still not implemented.
 
 ---
 
@@ -25,13 +25,62 @@ via MTASC to `new RegExp(pattern, flags)` so most of the work is runtime-side).
 
 | Test | Match | Expected | Diffs |
 |------|-------|----------|-------|
-| String-v5 | 242 / 358 | — | 116 |
-| String-v6 | 262 / 377 | — | 115 |
-| String-v7 | 259 / 377 | — | 118 |
-| String-v8 | 259 / 377 | — | 118 |
+| String-v5 | 314 / 358 | — | 44 |
+| String-v6 | 351 / 377 | — | 26 |
+| String-v7 | 348 / 377 | — | 29 |
+| String-v8 | 348 / 377 | — | 29 |
 
-Line counts suggest ~100 diffs per test are regex-related; the rest are
-charAt boundary behavior, fromCharCode, and case-mapping edge cases.
+## Fixes landed (2026-04-21, not yet in CI)
+
+Initial investigation showed that most diffs were NOT regex-related —
+they were String-wrapper method dispatch bugs. `new String("foo").charCodeAt(0)`
+was returning `undefined` because `String.prototype.charCodeAt` is registered
+as a placeholder stub (`builtin_stub_method` → returns `undefined`) so
+that `hasOwnProperty('charCodeAt')` works. The real implementation lives
+in `callStringPrimitiveMethod` and only ran when the receiver was a
+primitive `STRING` value.
+
+Three fixes in `SWFModernRuntime/src/actionmodern/action.c`:
+
+1. **Stub dispatch to primitive method** (`actionCallMethod` OBJECT branch)
+   — when the resolved method is `builtin_stub_method`, coerce `this` to
+   a string (via `valueOf_value` for NATIVE_STRING wrappers, else
+   `objectCallToString`) and dispatch through `callStringPrimitiveMethod`.
+   `callStringPrimitiveMethod` returns 0 for unknown names, so the
+   fallthrough is safe for non-string stubs.
+
+2. **`stringArgToNumber` object coercion** — OBJECT/ARRAY/FUNCTION args
+   now go through `varToDoubleSWF` (which calls `valueOf`), instead of
+   returning NaN unconditionally. Fixes `a.indexOf("a", o) == 4` when `o`
+   has `valueOf()` returning 4.
+
+3. **`lastIndexOf` NaN-fromIndex → 0** — matches Ruffle's
+   `n.coerce_to_i32(activation)` which saturates NaN to 0. Fixes
+   `r.lastIndexOf("ghi", "rt") == -1`.
+
+Impact per test:
+
+| Test | Before | After | Δ |
+|------|--------|-------|---|
+| String-v5 | 243 / 358 | 314 / 358 | +71 |
+| String-v6 | 263 / 377 | 351 / 377 | +88 |
+| String-v7 | 260 / 377 | 348 / 377 | +88 |
+| String-v8 | 260 / 377 | 348 / 377 | +88 |
+
+No regressions on: `string_methods`, `string_methods_swfv5`,
+`string_methods_negative_args`, `string_coercion`, `primitive_type_globals`,
+`coerce_to_object_monkeypatch`, `coerce_to_primitive_resolve`,
+`object_string_coerce_swf5/swf6`, `mutable_this`, `this_scoping`, `typeof`,
+`delete-v7`, `enumerate-v7`, `TextFormat-v5/v7`, `Color-v7`,
+`toString_valueOf-v5/v6/v7`, `Number-v5/v6/v7`, `Boolean-v7`.
+
+Remaining diffs (~26–44 per test) are a mix of:
+- Regex usage (`split(/regex/)`, `match`, `replace`, `search`) — the
+  core of this plan.
+- `String.prototype.slice.call(obj, ...)` / `a.slice.call(a, ...)` —
+  Function.prototype.call path doesn't trigger the stub-dispatch fix.
+- Prototype.toString override semantics (`String.prototype.toString = function(){return "toString"}` then `a.toString()` should return "toString" not empty).
+- Edge cases in `split("")` and empty-separator paths.
 
 ## Root Cause
 
