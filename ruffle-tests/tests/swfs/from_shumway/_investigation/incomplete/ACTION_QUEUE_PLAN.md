@@ -219,6 +219,75 @@ deferral mechanisms into one queue. Last updated 2026-04-19.
   - Canaries 32/32 PASS locally: the 29 Phase 5 canaries plus the three
     latent-bug trip-wires (`movieclip_invalid_get_bounds_1/2`,
     `string_paths_eval2`).
+- **Phase 7a — landed 2026-04-20** — sprite `CLIP_EVENT_LOAD` clip-action
+  firing migrated from the synchronous Phase 2 site at
+  `process_sprite_init_at_depth` (tag.c:354–365 before this phase) into
+  placement-time queueing. `AQ_KIND_CLIP_LOAD = 8` added (AQ_KIND_COUNT→9).
+  `queue_clip_load_events` in tag.c mirrors the Phase 4 `PendingClipInit`
+  pattern: a heap-allocated `PendingClipLoad{mc, action}` payload per LOAD
+  clip-action, enqueued at `AQ_PRIORITY_NORMAL` / `AQ_KIND_CLIP_LOAD` with
+  `clip=_mc`. The enqueue site in `tagPlaceObject2` and `tagPlaceObject2Ratio`
+  sits after `queue_register_ctor` and before the eager-init `CALL_FRAME`
+  block, so this sprite's LOAD is FIFO-first among its own Normal-priority
+  entries — the ordering 7b will rely on when sprite DoAction joins the
+  queue.
+  - **Per-clip drain (not SHOW_FRAME drain)** — the prompt's suggestion to
+    drain CLIP_LOAD at the root `SWF_TAG_SHOW_FRAME` kind-filtered site in
+    `swf.cpp` would regress `clip_events` in 7a-alone: sprite DoAction is
+    still firing synchronously via Phase 2 inside `tagShowFrame`, so a
+    bulk SHOW_FRAME drain of LOAD exhausts all LOADs before any DoAction
+    runs → loses the per-sprite `LOAD → frame_0 → child LOAD → child
+    frame_0` interleave. Instead, added
+    `actionDrainActionQueueForClip(ctx, MovieClip*, kind)` to
+    `action_queue.{h,c}` and drained per-sprite inside
+    `process_sprite_init_at_depth` at exactly the observable point the
+    pre-migration synchronous fire lived. Each per-sprite drain consumes
+    only that MC's CLIP_LOAD entries (matched by clip pointer); nested
+    children's entries stay queued and fire when the recursion reaches
+    them. When 7b lands (sprite DoAction at SCRIPT kind, Phase 2
+    deleted), the per-sprite drain goes away and a single Normal-priority
+    FIFO drain at SHOW_FRAME produces the same interleave naturally.
+  - **Safety drain moved to post-Phase-2** — a top-of-`tagShowFrame`
+    CLIP_LOAD drain in the first attempt regressed `clip_events` because
+    it exhausted the queue before `process_sprite_needs_init` ran. Moved
+    the safety drain to after `process_sprite_needs_init` (alongside the
+    existing `ng_fire_pending_loads` / attach_inits / onLoad flushes) so
+    leftover entries from edge-case paths (e.g. sprites placed via
+    `tagReplaceObject2RatioWithClipActions` where new clip_actions are
+    installed after the base PlaceObject) still fire. Common path: queue
+    is empty here, drain is a no-op.
+  - **Kind choice — new vs reuse** — `AQ_KIND_LOAD` (Phase 3) is owned by
+    `ng_fire_pending_loads` at `tag.c:2102`, after `process_sprite_needs_init`.
+    That drain is for duplicated clips (swf depths 16384+, not in
+    display_list), which have different lifecycle semantics. Reusing
+    AQ_KIND_LOAD would either force those entries to drain earlier
+    (breaking duplicateMovieClip semantics) or mix two ordering contracts
+    into one kind. Added a dedicated AQ_KIND_CLIP_LOAD instead.
+  - **Pre-Phase-4/5 divergence preserved for replace path** —
+    `tagReplaceObject2RatioWithClipActions` calls the base
+    `tagPlaceObject2Ratio` before installing `new_clip_actions`, so
+    `queue_clip_load_events` sees empty clip_actions and skips. The
+    pre-7a synchronous fire would have read `new_clip_actions` at Phase 2
+    time and fired their LOAD handlers. `unload` (the only test that
+    exercises this path) uses UNLOAD-only handlers — no LOAD to lose.
+    If a future test hits this divergence, move the clip_actions install
+    to before the base PlaceObject (via `g_pending_clip_actions`) so the
+    queue helper picks them up. Noted here rather than fixed speculatively.
+  - Canaries 32/32 PASS locally (same 32 as Phase 6): clip_events,
+    register_and_init_order, on_construct, clip_constructors,
+    clip_event_propagation_order, register_class_return_value,
+    execution_order1-4, goto_execution_order[2], goto_rewind3,
+    button_order, variable_args, define_function2_preload_order,
+    issue_1104, attach_movie[_stop], empty_movieclip_can_attach_movies,
+    unload, stage_object_enumerate, set_interval,
+    bad_placeobject_clipaction, movieclip_in_removed_button,
+    goto_frame[2], goto_label, goto_methods,
+    movieclip_invalid_get_bounds_1/2, string_paths_eval2. Loop
+    tripwires `loop_test4/5/7` byte-identical to master pre-7a
+    baselines. 7b targets (`root_onload`, `doactionorder`,
+    `timeline_as2_1/5`) still fail as expected — 7a unblocks 7b but
+    doesn't flip them on its own.
+
 - **Phase 7 — attempted 2026-04-20, not landed (canary regressions).**
   The sprite-side migration (recompiler-emitted inline
   `actionQueueScript(app_context, script_<N>)` at each sprite
@@ -608,7 +677,7 @@ Suggested order:
 | 4 | Migrate INITIALIZE clip events: switch `tagPlaceObject2:3391–3392` to `actionQueueClipEvent(..., INITIALIZE)`. Add drain at frame end. | Full CI. Watch `clip_events`, `register_and_init_order`, `on_construct`. |
 | 5 | Migrate CONSTRUCT clip events + RegisterClass constructor. | Same canaries. Add `clip_constructors`, `register_class_return_value`. |
 | 6 | Migrate root DoAction emission (recompiler change 1, 3, 6 above) + tagPlaceObject2 Phase 2 re-runs become queue inserts. **This is the breaking-point step that fixes root_onload, doactionorder, etc.** | Full canary set including `execution_order1-4`, `clip_events`, `goto_execution_order2`, `variable_args`, `define_function2_preload_order`, `stage_object_enumerate`, `register_and_init_order`. Expect targets to flip green. |
-| 7a | **Migrate sprite `CLIP_EVENT_LOAD` clip-action firing from Phase 2 to Phase 1 placement-time queueing.** Move the synchronous `CLIP_EVENT_LOAD` fire at `tag.c:process_sprite_init_at_depth:358–370` into `tagPlaceObject2` / `tagPlaceObject2Ratio` just before (or just after) the Phase 1 `CALL_FRAME(sprite.frame_0)` block — queue at `AQ_PRIORITY_NORMAL` with a new kind (e.g. `AQ_KIND_CLIP_LOAD`) or reuse `AQ_KIND_LOAD`, decide after auditing the existing Phase 3 `g_pending_loads` drain site. Drain in the same root `SWF_TAG_SHOW_FRAME` kind-filtered drain as Phase 7b, in FIFO order, so per-sprite `LOAD → frame_0` interleave falls out of the queue naturally. Prerequisite for 7b. | Full canary set. `clip_events` must still pass with the Phase 2 `CLIP_EVENT_LOAD` fire deleted (queue replaces it). `unload` + `onLoad` tests must still pass (ensure `AQ_PRIORITY_NORMAL` LOAD drains at the same observable point pre-rework). |
+| 7a | **Landed 2026-04-20.** Migrated sprite `CLIP_EVENT_LOAD` clip-action firing from the synchronous Phase 2 site to placement-time queueing. New kind `AQ_KIND_CLIP_LOAD = 8` (`AQ_KIND_COUNT = 9`); `queue_clip_load_events` enqueues at `AQ_PRIORITY_NORMAL` before the eager-init `CALL_FRAME` block in both `tagPlaceObject2` and `tagPlaceObject2Ratio`. Per-sprite drain inside `process_sprite_init_at_depth` (via new `actionDrainActionQueueForClip(ctx, MC*, kind)` API) replaces the synchronous fire at the exact same observable point, preserving the `LOAD → frame_0 → child LOAD → child frame_0` interleave while sprite DoAction still fires synchronously via Phase 2 (until 7b). Post-Phase-2 safety drain in `tagShowFrame` catches edge-case leftovers. Prerequisite for 7b. | Full canary set 32/32. `clip_events` passes with Phase 2 `CLIP_EVENT_LOAD` fire deleted (queue replaces it per-sprite). `unload` + onLoad-sensitive tests still pass. Loop tripwires `loop_test4/5/7` byte-identical to baseline. |
 | 7b | Migrate sprite DoAction emission (recompiler change 2: inline `actionQueueScript` at sprite `SWF_TAG_DO_ACTION` with the gate `if ((!catch_up_mode \|\| g_tag_skip_mode \|\| actionEagerInitActive()) && !actionScriptOnlyMode())`). Drop `sprite_frame_scripts` buffer; emit sprite `DO_INIT_ACTION` inline via `tagDoInitActionGuarded` too (prepend pattern becomes implicit — DoInitAction fires synchronously while DoAction queues). Add `g_eager_init_depth` bumps to `ng_attachMovie` / `ng_cloneSprite` / `ng_duplicateMovieClip` frame_0 call sites (and remove `static` from `g_eager_init_depth` so `tag_stubs.c` can `extern` it). Add `actionEagerInitActive()` + `actionScriptOnlyMode()` accessors in `action_queue.h`. See 2026-04-20 Phase 7 attempt Status entry above for the full delta and canary-regression matrix. | Full canary set. Targets expected to flip: `root_onload` → PASS, `doactionorder` → improves to 6/7 or 7/7, `timeline_as2_1/5` likely still blocked on frame-nav (unrelated), `dict_event` remains `ruffle_matched`. Re-verify loop tripwires (`loop_test4/5/7`) stay byte-identical to master pre-Phase-6. |
 | 8 | Cleanup: remove `g_defer_sprite_init`, `g_pending_*` queues that were migrated, `non_timeline_scripts` if no longer needed. Delete Phase 2 `was_eager=1` re-run block at `tag.c:390–400` (dead weight once 7b lands — scripts queue in Phase 1, LOAD queues in 7a). | Full CI. |
 | 9 | (Optional) Replace `MAX_DEFERRED_GOTO_QUEUE=16` static array with the unified queue. | `goto_*` tests + the misc-ming/swfc deeply-recursive goto cases. |

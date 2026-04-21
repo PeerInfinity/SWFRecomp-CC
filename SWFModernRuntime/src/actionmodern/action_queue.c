@@ -158,6 +158,43 @@ void actionDrainActionQueueByKind(SWFAppContext* app_context,
 	aq_drain(app_context, &f);
 }
 
+void actionDrainActionQueueForClip(SWFAppContext* app_context,
+                                   MovieClip* clip,
+                                   ActionQueueKind kind_filter)
+{
+	if (kind_filter >= AQ_KIND_COUNT) return;
+	// Local scan + dispatch loop mirroring aq_drain, but matching both kind
+	// AND clip. Can't reuse aq_drain/DrainFilter because DrainFilter has no
+	// clip field — adding one for a single caller felt heavier than a
+	// dedicated loop. If more per-clip drain callers appear, generalize.
+	for (;;) {
+		int best = -1;
+		int best_pri = -1;
+		for (size_t i = 0; i < g_aq_count; i++) {
+			if ((int)g_aq[i].kind != (int)kind_filter) continue;
+			if (g_aq[i].clip != clip) continue;
+			int pri = (int)g_aq[i].priority;
+			if (pri > best_pri) {
+				best_pri = pri;
+				best = (int)i;
+			}
+		}
+		if (best < 0) break;
+		ActionQueueEntry entry = g_aq[best];
+		if ((size_t)best + 1 < g_aq_count) {
+			memmove(&g_aq[best], &g_aq[best + 1],
+			        (g_aq_count - (size_t)best - 1) * sizeof(*g_aq));
+		}
+		g_aq_count--;
+		if (!entry.is_unload && entry.clip) {
+			if (entry.clip->avm1_removed || entry.clip->pending_removal) {
+				continue;
+			}
+		}
+		entry.fn(app_context, entry.user);
+	}
+}
+
 void actionResetActionQueue(SWFAppContext* app_context)
 {
 	(void)app_context;

@@ -350,18 +350,20 @@ static void process_sprite_init_at_depth(SWFAppContext* app_context, MovieClip* 
 			max_depth             = obj->sprite_max_depth;
 			display_list_capacity = obj->sprite_dl_capacity;
 
-			// Fire onLoad clip actions BEFORE frame scripts (Flash fires load before frame 0 scripts)
+			// Phase 7a: CLIP_EVENT_LOAD clip-actions are queued at placement
+			// time in tagPlaceObject2 / tagPlaceObject2Ratio (AQ_KIND_CLIP_LOAD,
+			// NORMAL priority). Drain THIS sprite's entries now — same
+			// observable point as the pre-migration synchronous fire. Nested
+			// children's CLIP_LOAD entries stay queued and drain when we
+			// recurse into them below. The actionFindOrCreateMovieClip call
+			// matches the one in queue_clip_load_events, so the MC pointer
+			// filter hits the entries we queued at placement.
 			if (obj->clip_action_count > 0 && obj->instance_name != NULL)
 			{
-				MovieClip* saved_ctx2 = g_current_context;
 				MovieClip* mc2 = actionFindOrCreateMovieClip(app_context, obj->instance_name, parent_mc);
-				if (mc2) actionSetCurrentContext(mc2);
-				for (size_t a = 0; a < obj->clip_action_count; a++)
-				{
-					if (obj->clip_actions[a].event_flags & CLIP_EVENT_LOAD)
-						obj->clip_actions[a].action(app_context);
+				if (mc2) {
+					actionDrainActionQueueForClip(app_context, mc2, AQ_KIND_CLIP_LOAD);
 				}
-				actionSetCurrentContext(saved_ctx2);
 			}
 
 			// Run frame 0 with correct MC context
@@ -2065,6 +2067,11 @@ void tagShowFrame(SWFAppContext* app_context)
 	actionDrainActionQueueByKind(app_context, AQ_KIND_CLIP_INIT);
 	actionDrainActionQueueByKind(app_context, AQ_KIND_CLIP_CONSTRUCT);
 	actionDrainActionQueueByKind(app_context, AQ_KIND_REGISTER_CTOR);
+	// Phase 7a: do NOT drain AQ_KIND_CLIP_LOAD here. LOAD entries are drained
+	// per-sprite inside process_sprite_init_at_depth so the LOAD → DoAction →
+	// recurse-into-children interleave is preserved while sprite DoAction is
+	// still firing synchronously via Phase 2. The post-Phase-2 safety drain
+	// at the end of this function handles any leftovers.
 
 	// --- Fire deferred onUnload handlers from removeMovieClip ---
 	// These are queued mid-script and fire between frames, matching Flash behavior.
@@ -2092,6 +2099,13 @@ void tagShowFrame(SWFAppContext* app_context)
 		MovieClip* _si_parent = (g_current_context != NULL) ? g_current_context : &root_movieclip;
 		process_sprite_needs_init(app_context, _si_parent);
 		catch_up_mode = saved_catch_up;
+
+		// Phase 7a safety drain: catch any CLIP_EVENT_LOAD entries that
+		// were queued at placement but weren't consumed by the per-sprite
+		// drain inside process_sprite_init_at_depth (e.g. sprites placed
+		// via paths where sprite_needs_init didn't reach Phase 2). Common
+		// path: queue is empty here, drain is a no-op.
+		actionDrainActionQueueByKind(app_context, AQ_KIND_CLIP_LOAD);
 
 		// Fire onLoad events for duplicated clips (queued by ng_duplicateMovieClip)
 		ng_fire_pending_loads(app_context);
@@ -3319,6 +3333,63 @@ static void queue_register_ctor(SWFAppContext* app_context, size_t depth, size_t
 	                      AQ_PRIORITY_CONSTRUCT, _mc, /*is_unload=*/0,
 	                      AQ_KIND_REGISTER_CTOR);
 }
+
+// Phase 7a: CLIP_EVENT_LOAD clip-action enqueue. Queued at placement time in
+// tagPlaceObject2 / tagPlaceObject2Ratio (before eager init so this sprite's
+// LOAD is FIFO-first among its own NORMAL-priority entries — the ordering
+// 7b relies on when sprite DoAction joins the queue). Drained per-sprite
+// inside process_sprite_init_at_depth at the same observable point where
+// the pre-migration synchronous fire lived, via actionDrainActionQueueForClip,
+// so the LOAD → DoAction → recurse interleave is preserved while sprite
+// DoAction still fires synchronously via Phase 2 (deleted in Phase 8 after
+// 7b lands).
+typedef struct {
+	MovieClip* mc;
+	frame_func action;
+} PendingClipLoad;
+
+static void aq_dispatch_clip_load(SWFAppContext* app_context, void* user)
+{
+	PendingClipLoad* pcl = (PendingClipLoad*) user;
+	if (pcl == NULL) return;
+	MovieClip* saved_ctx = g_current_context;
+	if (pcl->mc) actionSetCurrentContext(pcl->mc);
+	pcl->action(app_context);
+	actionSetCurrentContext(saved_ctx);
+	free(pcl);
+}
+
+static void queue_clip_load_events(SWFAppContext* app_context, size_t depth)
+{
+	if (display_list[depth].clip_action_count == 0) return;
+	if (display_list[depth].instance_name == NULL) return;
+	// Bail early when there's no LOAD handler on this entry — avoids a
+	// spurious actionFindOrCreateMovieClip for entries that only carry
+	// INITIALIZE/CONSTRUCT/UNLOAD/etc.
+	int _has_load = 0;
+	for (size_t a = 0; a < display_list[depth].clip_action_count; a++) {
+		if (display_list[depth].clip_actions[a].event_flags & CLIP_EVENT_LOAD) {
+			_has_load = 1;
+			break;
+		}
+	}
+	if (!_has_load) return;
+
+	MovieClip* _parent_mc = g_current_context ? g_current_context : &root_movieclip;
+	MovieClip* _mc = actionFindOrCreateMovieClip(
+		app_context, display_list[depth].instance_name, _parent_mc);
+	for (size_t a = 0; a < display_list[depth].clip_action_count; a++) {
+		if (!(display_list[depth].clip_actions[a].event_flags & CLIP_EVENT_LOAD))
+			continue;
+		PendingClipLoad* pcl = (PendingClipLoad*) malloc(sizeof(PendingClipLoad));
+		if (pcl == NULL) continue;
+		pcl->mc = _mc;
+		pcl->action = display_list[depth].clip_actions[a].action;
+		actionQueueCallbackEx(app_context, aq_dispatch_clip_load, (void*)pcl,
+		                      AQ_PRIORITY_NORMAL, _mc, /*is_unload=*/0,
+		                      AQ_KIND_CLIP_LOAD);
+	}
+}
 #endif
 
 void tagPlaceObject2(SWFAppContext* app_context, size_t depth, size_t char_id, u32 transform_id, u32 cxform_id, u16 clip_depth)
@@ -3579,6 +3650,15 @@ void tagPlaceObject2(SWFAppContext* app_context, size_t depth, size_t char_id, u
 	queue_clip_init_events(app_context, depth);
 	queue_clip_construct_events(app_context, depth);
 	queue_register_ctor(app_context, depth, char_id);
+	// Phase 7a: queue CLIP_EVENT_LOAD clip-actions at NORMAL priority BEFORE
+	// eager init. Drained per-sprite inside process_sprite_init_at_depth
+	// (replacing the pre-migration synchronous fire at the same observable
+	// point). The "before eager init" placement is what 7b will rely on:
+	// this sprite's LOAD is FIFO-first among its NORMAL entries, so when
+	// sprite DoAction joins the queue in 7b, the per-sprite
+	// LOAD → frame_0 → nested-LOAD → nested-frame_0 interleave falls out
+	// of a single Normal-priority FIFO drain.
+	queue_clip_load_events(app_context, depth);
 
 	// Eagerly execute sprite frame 0 immediately after placement so the sprite's
 	// internal display list is populated BEFORE the parent frame's ActionScript runs.
@@ -3795,6 +3875,15 @@ void tagPlaceObject2Ratio(SWFAppContext* app_context, size_t depth, size_t char_
 	queue_clip_init_events(app_context, depth);
 	queue_clip_construct_events(app_context, depth);
 	queue_register_ctor(app_context, depth, char_id);
+	// Phase 7a: queue CLIP_EVENT_LOAD clip-actions at NORMAL priority BEFORE
+	// eager init. Drained per-sprite inside process_sprite_init_at_depth
+	// (replacing the pre-migration synchronous fire at the same observable
+	// point). The "before eager init" placement is what 7b will rely on:
+	// this sprite's LOAD is FIFO-first among its NORMAL entries, so when
+	// sprite DoAction joins the queue in 7b, the per-sprite
+	// LOAD → frame_0 → nested-LOAD → nested-frame_0 interleave falls out
+	// of a single Normal-priority FIFO drain.
+	queue_clip_load_events(app_context, depth);
 
 	// Eagerly execute sprite frame 0 immediately after placement so the sprite's
 	// internal display list is populated BEFORE the parent frame's ActionScript runs.

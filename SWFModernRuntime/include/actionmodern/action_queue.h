@@ -26,7 +26,8 @@ typedef enum {
 	AQ_KIND_CLIP_CONSTRUCT = 5, // Phase 5: CLIP_EVENT_CONSTRUCT from tagPlaceObject2
 	AQ_KIND_REGISTER_CTOR  = 6, // Phase 5: registerClass constructor from tagPlaceObject2
 	AQ_KIND_SCRIPT         = 7, // Phase 6: root DoAction script (recompiler-emitted)
-	AQ_KIND_COUNT          = 8,
+	AQ_KIND_CLIP_LOAD      = 8, // Phase 7a: sprite CLIP_EVENT_LOAD from tagPlaceObject2
+	AQ_KIND_COUNT          = 9,
 } ActionQueueKind;
 
 // Generic queue callback: user code provides the dispatch logic.
@@ -77,6 +78,14 @@ void actionDrainActionQueueFiltered(SWFAppContext* app_context,
 // rolls, etc.) use this to drain only their own entries.
 void actionDrainActionQueueByKind(SWFAppContext* app_context,
                                   ActionQueueKind kind_filter);
+
+// Per-clip + kind drain. Pops entries whose kind == `kind_filter` AND whose
+// clip pointer == `clip`. Phase 7a uses this inside process_sprite_init_at_depth
+// to fire a specific sprite's CLIP_EVENT_LOAD entries (queued at placement
+// time) in the observable position of the pre-migration synchronous fire.
+void actionDrainActionQueueForClip(SWFAppContext* app_context,
+                                   MovieClip* clip,
+                                   ActionQueueKind kind_filter);
 
 // Discard all queued entries without dispatching (e.g. catch-up resets).
 void actionResetActionQueue(SWFAppContext* app_context);
