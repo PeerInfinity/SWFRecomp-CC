@@ -656,6 +656,89 @@ deferral mechanisms into one queue. Last updated 2026-04-19.
     `loop_test4/5/7` remain byte-identical. 7b targets (`root_onload`,
     `doactionorder`) still PASS.
 
+  - **Post-landing fixes round 3 — 2026-04-21 (`register_and_init_order`
+    resolved, action_queue.c):** The remaining 19-line output_mismatch
+    (212/231 matching) turned out to be the interaction between the
+    Phase 1 eager queue gate and a mid-drain `GotoFrame`. Sequence on
+    root frame 0:
+
+    1. Timeline places `a` (sprite 6) and `b` (sprite 4). Each
+       placement's Phase 1 eager enters the sprite gate with
+       `catch_up=1, eager=1, goto=0` and **queues** `script_3`,
+       `script_2`, `script_1` via `actionQueueSpriteScript` — each
+       entry captures `g_current_context` (the sprite's own MC) at
+       queue time. Queue order after both placements:
+       `[script_4, script_3, script_2, script_1]` (all `AQ_KIND_SCRIPT`
+       / `AQ_PRIORITY_NORMAL`).
+    2. `actionDrainActionQueueByKind(AQ_KIND_SCRIPT)` fires. `script_4`
+       runs first: traces "root first frame", calls `attachMovie("a",
+       c, ...)` (scripts fire later via PAI — those are correct), then
+       calls `GotoFrame(1)`.
+    3. `actionGotoFrame` at root level calls `ng_executeGotoCatchUp`
+       inline. Frame 1's tags run with `catch_up_mode=1` /
+       `gotoCatchupActive` → sprite gate is FALSE, no new queueing.
+       `tagRemoveObject2(1)` / `tagRemoveObject2(3)` fire
+       `fire_recursive_child_unloads` + `ng_on_remove_object`, which
+       invalidates `MC_a` and `MC_b` (`avm1_removed=1`,
+       `dynamic_props=NULL`, `depth=INT_MIN`). `MC_a.box` is not
+       directly invalidated because `fire_recursive_child_unloads`
+       matches children by `(name, parent-DL-depth)` while
+       `createMovieClip` leaves the child MC's `depth` field at 0, so
+       the name/depth match misses — but the parent chain is still
+       set, which is what this fix keys on.
+    4. `script_4` returns. Drain resumes with `script_3`, `script_2`,
+       `script_1` — pre-fix, these dispatched against captured MCs
+       that were either directly invalidated (`MC_a`, `MC_b` →
+       `dynamic_props=NULL` so `this._name` / `this.box` /
+       `this.custom` all trace `undefined`) or indirectly orphaned
+       (`MC_a.box`, whose parent `MC_a` is removed).
+
+    Pre-7b these scripts never ran: Phase 1 eager didn't queue; Phase
+    2 in `tagShowFrame` fired scripts synchronously via the old
+    `if (!catch_up_mode) script_N(app_context)` gate, and by the time
+    `process_sprite_needs_init` walked the root DL the offending
+    entries had been cleared by `tagRemoveObject2`. 7b's queue-then-
+    drain decouples "queue the script" from "is the sprite still
+    alive at drain time?" and there was no is-still-alive check.
+
+    **Fix** (`action_queue.c`): add `aq_sprite_ctx_removed(mc)` that
+    walks the captured MC's parent chain and returns 1 if any ancestor
+    has `avm1_removed`, `pending_removal`, or `depth == INT_MIN`. Call
+    it at the top of `aq_dispatch_sprite_script`; if true, free the
+    payload and return without firing the script. Ancestor walk is
+    required to cover nested children (`MC_a.box`) whose own flags
+    aren't set by `fire_recursive_child_unloads`.
+
+    Considered but rejected: setting `clip = g_current_context` in
+    `actionQueueSpriteScript` so `aq_drain`'s `is_unload` gating
+    skips the entry. That only catches the direct case (`MC_a`,
+    `MC_b`) — `MC_a.box` has `avm1_removed=0`, so the drain would
+    still dispatch it, then the script traces `undefined` for
+    `this._name` because `MC_a.box.dynamic_props` was never populated
+    (its aaclass constructor fires only for Phase 2, which 7b skipped
+    for timeline sprites). The parent-chain walk catches this.
+
+    Also considered: suppressing Phase 1 eager queueing for timeline
+    placements (bracket `tagPlaceObject2`'s `CALL_FRAME` with
+    `actionGotoCatchupEnter/Leave`, same as round-2 did for
+    `ng_attachMovie`). Rejected because 7b's design relies on Phase
+    1 eager queueing for the common case where the sprite *isn't*
+    removed mid-drain — suppressing it would force Phase 2 to fire
+    the scripts, and `tagShowFrame`'s `process_sprite_needs_init`
+    call (line 2194) isn't bracketed with
+    `actionDeferredSpriteInitEnter/Leave`, so the sync-fire branch
+    would be inactive and scripts wouldn't fire at all. Fixing *that*
+    would be a larger change with unclear canary implications.
+
+    Results:
+    - `register_and_init_order` output_mismatch 212/231 → **PASS 231/231**.
+    - All 33 local canaries verified PASS (including the round-1
+      fixes `removed_clip_halts_script`, `target_clip_removed` and
+      the round-2 fixes `issue_9885`, `default_names`, `call`).
+    - 7b targets `root_onload` and `doactionorder` still PASS.
+    - Loop tripwires `loop_test4/5/7` byte-identical to pre-fix
+      actual output (verified via git-stash baseline capture).
+
 - **Phase 7 — attempted 2026-04-20, not landed (canary regressions).**
   The sprite-side migration (recompiler-emitted inline
   `actionQueueScript(app_context, script_<N>)` at each sprite

@@ -2,6 +2,7 @@
 
 #include <stdlib.h>
 #include <string.h>
+#include <limits.h>
 
 // Single dynamic-growth array. Drain scans for highest-priority non-empty
 // bucket. For tens-of-entries scale (typical frame queue is <20 entries)
@@ -275,10 +276,35 @@ extern int ng_isInsideSpriteInit(void);
 extern void ng_bumpSpriteInitDepth(void);
 extern void ng_unbumpSpriteInitDepth(void);
 
+// Phase 7b fix: return 1 if the captured MC or any ancestor has been removed
+// (avm1_removed, pending_removal, or depth==INT_MIN marker). Covers nested
+// children whose own avm1_removed isn't set because fire_recursive_child_unloads
+// invalidates by (name, parent-DL-depth) and the child MC's depth field wasn't
+// synced to that DL depth. Pre-7b, timeline sprite scripts fired via
+// tagShowFrame's Phase 2 which was a no-op if sprite_needs_init was cleared by
+// removal; 7b queues scripts at Phase 1 eager and fires them at root-level
+// drain, where a mid-drain GotoFrame can remove the MC before its script runs.
+// Key canary: avm1/register_and_init_order — script_4's GotoFrame(1) removes
+// timeline "a"/"b" before the FIFO drain reaches their queued sprite DoActions.
+static int aq_sprite_ctx_removed(MovieClip* mc)
+{
+	for (MovieClip* cur = mc; cur != NULL; cur = cur->parent) {
+		if (cur->avm1_removed || cur->pending_removal || cur->depth == INT_MIN)
+			return 1;
+	}
+	return 0;
+}
+
 static void aq_dispatch_sprite_script(SWFAppContext* app_context, void* user)
 {
 	PendingSpriteScript* p = (PendingSpriteScript*)user;
 	if (!p) return;
+	// Skip if the captured MC (or any ancestor) was removed between queue and
+	// dispatch — see aq_sprite_ctx_removed above.
+	if (p->ctx_mc != NULL && aq_sprite_ctx_removed(p->ctx_mc)) {
+		free(p);
+		return;
+	}
 	MovieClip* saved_ctx = g_current_context;
 	MovieClip* saved_base = actionGetBaseClip();
 	DisplayObject* saved_obj = g_current_sprite_obj;
