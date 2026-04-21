@@ -1,10 +1,10 @@
 # Ruffle Test Results (Filtered)
 
-**Date**: 2026-04-21 03:00 UTC
+**Date**: 2026-04-21 05:44 UTC
 
-**Git SHA**: `ec66bc3379`
+**Git SHA**: `06feeaca16`
 
-**Run Duration**: 4m 4s
+**Run Duration**: 4m 11s
 
 **Filtered**: 0 tests ignored out of 16 available
 
@@ -13,28 +13,29 @@
 | Metric | Value |
 |--------|-------|
 | Total tests | 16 |
-| Passing | **2** (12.5%) |
+| Passing | **3** (18.8%) |
 | Ruffle-matched | 3 (diffs ⊆ Ruffle's against Flash) |
-| Effective pass | **5** (31.2%) |
-| Failing | 11 |
+| Effective pass | **6** (37.5%) |
+| Failing | 10 |
 | Total expected lines | 499 |
-| Matching lines | 215 (43.1%) |
-| Mismatched lines | 284 |
+| Matching lines | 217 (43.5%) |
+| Mismatched lines | 282 |
 
 ### Failure Breakdown
 
 | Category | Count | % of Failures |
 |----------|-------|---------------|
-| Output Mismatch | 11 | 100.0% |
+| Output Mismatch | 10 | 100.0% |
 
 ## Passing Tests
 
-**2 tests passing**
+**3 tests passing**
 
 | # | Test | Lines | Duration | Notes |
 |---|------|-------|----------|-------|
-| 1 | `gotoFrameLabelAsFunction` | 6 | 16.5s |  |
-| 2 | `hello` | 4 | 17.4s |  |
+| 1 | `gotoFrameLabelAsFunction` | 6 | 16.9s |  |
+| 2 | `hello` | 4 | 17.0s |  |
+| 3 | `submoviegetvar` | 4 | 17.2s |  |
 
 ## Ruffle-Matched Tests
 
@@ -42,9 +43,9 @@
 
 | # | Test | Our diffs | Ruffle diffs | Duration | Notes |
 |---|------|-----------|--------------|----------|-------|
-| 1 | `action_execution_order_test10` | 14 | 14 | 18.7s |  |
-| 2 | `movieclip_destruction_test1` | 52 | 52 | 18.1s |  |
-| 3 | `registerclass_test3` | 20 | 20 | 13.5s |  |
+| 1 | `action_execution_order_test10` | 14 | 14 | 18.6s |  |
+| 2 | `movieclip_destruction_test1` | 52 | 52 | 18.4s |  |
+| 3 | `registerclass_test3` | 20 | 20 | 17.6s |  |
 
 ## Near-Passing Tests
 
@@ -74,7 +75,7 @@ No timeouts.
 
 ## All Output Mismatches
 
-**11 tests** with output mismatch, sorted by match rate (best first)
+**10 tests** with output mismatch, sorted by match rate (best first)
 
 | # | Test | Match Rate | Matching/Total | Actual | Expected | Notes |
 |---|------|------------|----------------|--------|----------|-------|
@@ -86,6 +87,5 @@ No timeouts.
 | 6 | `sound` | 41.7% | 5/12 | 12 | 7 |  |
 | 7 | `soft_reference_test1` | 31.1% | 14/45 | 42 | 45 |  |
 | 8 | `button_test1` | 25.8% | 8/31 | 20 | 31 |  |
-| 9 | `movieclip_destruction_test4` | 20.0% | 8/40 | 24 | 40 |  |
-| 10 | `opcode_guard_test2` | 0.0% | 0/28 | 28 | 24 |  |
-| 11 | `submoviegetvar` | 0.0% | 0/4 | 4 | 4 |  |
+| 9 | `movieclip_destruction_test4` | 15.0% | 6/40 | 24 | 40 |  |
+| 10 | `opcode_guard_test2` | 0.0% | 0/26 | 26 | 24 |  |
