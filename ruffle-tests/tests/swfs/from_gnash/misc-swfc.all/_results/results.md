@@ -1,10 +1,10 @@
 # Ruffle Test Results (Unfiltered)
 
-**Date**: 2026-04-21 18:35 UTC
+**Date**: 2026-04-21 20:27 UTC
 
-**Git SHA**: `fe74d7aa3a`
+**Git SHA**: `d05bbd564a`
 
-**Run Duration**: 0m 4s
+**Run Duration**: 3m 50s
 
 ## Summary
 
@@ -31,9 +31,9 @@
 
 | # | Test | Lines | Duration | Notes |
 |---|------|-------|----------|-------|
-| 1 | `gotoFrameLabelAsFunction` | 6 | 0.2s |  |
-| 2 | `hello` | 4 | 0.1s |  |
-| 3 | `submoviegetvar` | 4 | 0.1s |  |
+| 1 | `gotoFrameLabelAsFunction` | 6 | 17.0s |  |
+| 2 | `hello` | 4 | 15.6s |  |
+| 3 | `submoviegetvar` | 4 | 17.3s |  |
 
 ## Ruffle-Matched Tests
 
@@ -41,9 +41,9 @@
 
 | # | Test | Our diffs | Ruffle diffs | Duration | Notes |
 |---|------|-----------|--------------|----------|-------|
-| 1 | `action_execution_order_test10` | 14 | 14 | 0.2s |  |
-| 2 | `movieclip_destruction_test1` | 52 | 52 | 0.2s |  |
-| 3 | `registerclass_test3` | 20 | 20 | 0.2s |  |
+| 1 | `action_execution_order_test10` | 14 | 14 | 15.9s |  |
+| 2 | `movieclip_destruction_test1` | 52 | 52 | 16.3s |  |
+| 3 | `registerclass_test3` | 20 | 20 | 15.8s |  |
 
 ## Near-Passing Tests
 

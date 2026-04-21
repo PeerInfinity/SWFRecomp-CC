@@ -1,9 +1,9 @@
 {
   "metadata": {
-    "old_timestamp": "2026-04-21T18:09:36.175075+00:00",
-    "old_git_sha": "61ba7bd8558d27ead1b69e9c45fbc1d5c3e9f30c",
-    "new_timestamp": "2026-04-21T18:35:53.928164+00:00",
-    "new_git_sha": "fe74d7aa3adaf0d6c837d4c19ec96f295e6df34d",
+    "old_timestamp": "2026-04-21T18:35:53.928164+00:00",
+    "old_git_sha": "fe74d7aa3adaf0d6c837d4c19ec96f295e6df34d",
+    "new_timestamp": "2026-04-21T20:27:48.349550+00:00",
+    "new_git_sha": "d05bbd564afaf0fd43f56ee9230f4e47c9b3f6b6",
     "partial": false,
     "same_commit": false
   },
@@ -19,15 +19,80 @@
     "new_total": 190,
     "new_pass_rate": 57.4,
     "old_mismatched_lines": 2632,
-    "new_mismatched_lines": 2632,
+    "new_mismatched_lines": 2297,
     "increased_mismatches": 0,
-    "decreased_mismatches": 0,
+    "decreased_mismatches": 335,
     "newly_passing": 0,
     "newly_failing": 0,
     "status_changed": 0,
-    "unchanged": 190,
+    "unchanged": 186,
     "added": 0,
     "removed": 0
   },
-  "changes": []
+  "changes": [
+    {
+      "test": "String-v5",
+      "change_type": "changed",
+      "old_status": "output_mismatch",
+      "new_status": "output_mismatch",
+      "old_lines": {
+        "actual_lines": 358,
+        "expected_lines": 358,
+        "matching_lines": 243
+      },
+      "new_lines": {
+        "actual_lines": 358,
+        "expected_lines": 358,
+        "matching_lines": 314
+      }
+    },
+    {
+      "test": "String-v6",
+      "change_type": "changed",
+      "old_status": "output_mismatch",
+      "new_status": "output_mismatch",
+      "old_lines": {
+        "actual_lines": 377,
+        "expected_lines": 377,
+        "matching_lines": 263
+      },
+      "new_lines": {
+        "actual_lines": 377,
+        "expected_lines": 377,
+        "matching_lines": 351
+      }
+    },
+    {
+      "test": "String-v7",
+      "change_type": "changed",
+      "old_status": "output_mismatch",
+      "new_status": "output_mismatch",
+      "old_lines": {
+        "actual_lines": 377,
+        "expected_lines": 377,
+        "matching_lines": 260
+      },
+      "new_lines": {
+        "actual_lines": 377,
+        "expected_lines": 377,
+        "matching_lines": 348
+      }
+    },
+    {
+      "test": "String-v8",
+      "change_type": "changed",
+      "old_status": "output_mismatch",
+      "new_status": "output_mismatch",
+      "old_lines": {
+        "actual_lines": 377,
+        "expected_lines": 377,
+        "matching_lines": 260
+      },
+      "new_lines": {
+        "actual_lines": 377,
+        "expected_lines": 377,
+        "matching_lines": 348
+      }
+    }
+  ]
 }
