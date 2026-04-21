@@ -232,9 +232,18 @@ static void aq_dispatch_pending_attach_init(SWFAppContext* app_context, void* us
 	// Recursively initialize any child sprites placed by the frame function.
 	// Without this, children of attachMovie'd sprites (e.g. sprite_2's child
 	// sprite_1 instances) never run their frame 0 scripts.
+	// Phase 7b fix: bracket with DeferredSpriteInit so the Phase 2 re-run for
+	// child sprites (scriptOnly=1) takes the sync-fire branch of the sprite
+	// DoAction gate. Without this, the children's DoActions were only firing
+	// because ng_attachMovie's outer funcs[0] call queued them into SCRIPT
+	// (which reorders them ahead of the parent's PAI — bug in default_names).
+	// Now that ng_attachMovie suppresses that queueing via goto-catchup, the
+	// children must fire through this path instead.
 	{
 		extern void process_sprite_needs_init_public(SWFAppContext* app_context, MovieClip* parent_mc);
+		actionDeferredSpriteInitEnter();
 		process_sprite_needs_init_public(app_context, mc);
+		actionDeferredSpriteInitLeave();
 	}
 
 	// Persist updated display list state back to the MC's display obj
@@ -402,7 +411,18 @@ MovieClip* ng_attachMovie(SWFAppContext* app_context, size_t char_id, const char
 		int _am_saved_tag_skip = g_tag_skip_mode;
 		g_tag_skip_mode = 0;
 		catch_up_mode = 1;
+		// Phase 7b fix: suppress sprite DoAction queueing for nested Phase 1
+		// eager inits that run inside funcs[0]. Without this, a child sprite's
+		// frame_0 Phase 1 eager (catch_up=1, eager=1, gotoCatchup=0) hits the
+		// queue branch of the sprite gate — queueing the child's DoAction into
+		// AQ_KIND_SCRIPT ahead of the parent's PAI dispatch. Reusing goto
+		// catchup's flag semantically says "placement-only replay: scripts
+		// fire later via PAI, not inline". Key test: avm1/default_names.
+		extern void actionGotoCatchupEnter(void);
+		extern void actionGotoCatchupLeave(void);
+		actionGotoCatchupEnter();
 		funcs[0](app_context);
+		actionGotoCatchupLeave();
 		catch_up_mode = saved_catch_up;
 		g_tag_skip_mode = _am_saved_tag_skip;
 

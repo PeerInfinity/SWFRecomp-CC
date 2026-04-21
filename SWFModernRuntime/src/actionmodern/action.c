@@ -36226,6 +36226,16 @@ int actionCall(SWFAppContext* app_context)
 		g_settarget_saved_context = NULL; \
 		if ((ctx_mc) != NULL) setCurrentContext((MovieClip*)(ctx_mc)); \
 		(funcs)[(idx)](app_context); \
+		/* Phase 7b: sprite frame functions queue their DoAction into       \
+		 * AQ_KIND_SCRIPT instead of calling script_N() inline (pre-7b).    \
+		 * Sprite frames have no self-emitted drain — only root frames      \
+		 * emit actionDrainActionQueueByKind. call() invoking a sprite      \
+		 * frame therefore leaves the script in the queue, and it fires    \
+		 * later via an unrelated drain, reordering output. Drain here so  \
+		 * the called frame's scripts fire inline. (Root frames self-drain,\
+		 * so this is a no-op for them.) Key test: avm1/call.              \
+		 */ \
+		actionDrainActionQueueByKind(app_context, AQ_KIND_SCRIPT); \
 		quit_swf = _saved_quit; \
 		next_frame = _saved_nf; \
 		manual_next_frame = _saved_man; \

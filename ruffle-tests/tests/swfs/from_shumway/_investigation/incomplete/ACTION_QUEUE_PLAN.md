@@ -575,6 +575,87 @@ deferral mechanisms into one queue. Last updated 2026-04-19.
     Loop tripwires `loop_test4/5/7` remain byte-identical to
     pre-7a baselines.
 
+  - **Post-landing fixes round 2 — 2026-04-21:** Three further 7b
+    fallout fixes addressing the remaining four output_mismatch
+    regressions from the 23e11744 CI delta:
+
+    - **`issue_9885` button state transition (avm1/tag.c)** — the 7b
+      sprite DoAction gate's eager-init term queued scripts during
+      `ng_update_button_states_in_dl`'s state func re-run. When the
+      button's hit area covered the default mouse position (0, 0),
+      the first tick's state re-eval transitioned 0→1 (up→over) and
+      ran `button_state_funcs[over]` which re-placed the button's
+      sprite child, whose tagPlaceObject2 Phase 1 eager (catch_up=1,
+      eager=1, goto_catchup=0) queued the child's DoAction a SECOND
+      time into AQ_KIND_SCRIPT. Pre-7b Phase 1 eager under
+      catch_up_mode=1 didn't queue (gate was just
+      `!catch_up_mode || g_tag_skip_mode`); 7b's gate widened to also
+      fire during eager init. Flash/Ruffle's button-state model keeps
+      state children persistent — their frame_0 scripts only fire on
+      initial construction. Added `g_button_state_change_depth`
+      counter bumped around the state func call; `actionEagerInitActive()`
+      now returns 0 while it's non-zero, so the eager-init term of
+      the sprite DoAction gate evaluates false and Phase 1 init
+      becomes visual-only during state transitions. issue_9885
+      output_mismatch 2/2 → **PASS**.
+
+    - **`default_names` attachMovie child Phase 1 queueing
+      (tag_stubs.c)** — inside `ng_attachMovie`'s initial `funcs[0]`
+      placement-only run (with catch_up_mode=1), a child sprite's
+      Phase 1 eager init (e.g. Symbol inside attached `children2`)
+      hits the same widened 7b gate — `(eager && !gotoCatchup)` = 1
+      — and queues the child's DoAction into AQ_KIND_SCRIPT. The
+      parent's own DoAction is deferred to `aq_dispatch_pending_attach_init`'s
+      scriptOnly+deferred sync-fire path, which runs later. So
+      children's traces fire BEFORE the parent's trace — opposite of
+      Ruffle/Flash order. Fix bracketed the `funcs[0]` call with
+      `actionGotoCatchupEnter/Leave` — reuses the existing "placement
+      replay, scripts fire later via separate path" flag semantics.
+      Children no longer queue into SCRIPT here; they now fire via
+      the PAI dispatcher's recursive `process_sprite_needs_init_public`
+      Phase 2 re-run. That path previously set scriptOnly=1 without
+      deferred=1 (which the sprite gate's sync-fire branch requires),
+      so Phase 2 children were being silently dropped — only firing
+      by accident via the pre-fix AQ_KIND_SCRIPT queueing. Bracketed
+      `process_sprite_needs_init_public` with
+      `actionDeferredSpriteInitEnter/Leave` so the sync-fire branch
+      activates. Order now matches: parent's DoAction → kids'
+      DoActions. default_names output_mismatch 44/52 → **PASS**.
+
+    - **`call` test sprite frame script drain (action.c)** —
+      `CALL_FRAME_FUNC` sets tag_skip=1 and invokes the frame
+      function, expecting scripts to fire inline. Root frame
+      functions self-drain (emit
+      `actionDrainActionQueueByKind(AQ_KIND_SCRIPT)` at the end of
+      each recompiled `frame_N`), so call()-ing a root frame works.
+      Sprite frame functions do NOT self-drain — they only emit the
+      queueing logic for their DoAction. Pre-7b sprite frames called
+      `script_N()` inline (no queue involved), so this wasn't an
+      issue. In 7b, call()-ing a sprite frame (e.g.
+      `call('/mc:theframe')` for a sprite label resolving to a frame
+      N of mc sprite) queues the DoAction but never drains — the
+      script fires later via some unrelated drain, causing
+      call-at-a-time trace output to pile up at the end instead of
+      interleaving with the `// call(...)` markers. Fix: added
+      `actionDrainActionQueueByKind(app_context, AQ_KIND_SCRIPT)`
+      inside `CALL_FRAME_FUNC` immediately after the frame function
+      call. Root frames are unchanged (their queue is already empty
+      when this fires because their self-drain ran). call
+      output_mismatch 52/64 → **PASS**.
+
+    - **`register_and_init_order` unchanged — still 212/231
+      matching.** The 54 extra "aa first frame" / "b first frame" /
+      "a first frame" blocks with `this._name/this.box/this.custom`
+      resolving to `undefined` are a deeper `this` binding issue in
+      the sync-fire path's interaction with attachMovie's
+      registered-class prototype setup. The default_names fix above
+      re-orders (but does not remove) those extra blocks. Remains a
+      Phase 7c follow-up.
+
+    All 33 local canaries verified PASS. Loop tripwires
+    `loop_test4/5/7` remain byte-identical. 7b targets (`root_onload`,
+    `doactionorder`) still PASS.
+
 - **Phase 7 — attempted 2026-04-20, not landed (canary regressions).**
   The sprite-side migration (recompiler-emitted inline
   `actionQueueScript(app_context, script_<N>)` at each sprite

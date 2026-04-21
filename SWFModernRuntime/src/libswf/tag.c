@@ -165,7 +165,24 @@ int g_defer_sprite_init = 0;
 // sprite DoAction queue calls fire during runtime-attach paths too.
 static int g_eager_init_depth = 0;
 
-int actionEagerInitActive(void) { return g_eager_init_depth > 0; }
+// Set while ng_update_button_states_in_dl re-runs a button's state function
+// after a state transition (e.g. up → over when the mouse is inside the hit
+// area on the first tick). The state func re-places the button's children,
+// which re-triggers tagPlaceObject2's Phase 1 eager init for any sprite
+// children and would re-queue their frame_0 scripts via the 7b sprite DoAction
+// gate. Pre-7b, Phase 1 eager did not queue scripts (catch_up_mode=1 was
+// enough to suppress); 7b's gate widened to also queue during eager init, so
+// the button-state-transition path started double-firing sprite scripts.
+// Flash/Ruffle button state children persist across transitions — their
+// frame_0 scripts only fire on initial construction. Suppress the eager
+// init term of the sprite DoAction gate while this counter is non-zero so
+// the transition's re-placement is visual-only, matching pre-7b.
+// Key test: avm1/issue_9885.
+static int g_button_state_change_depth = 0;
+
+int actionEagerInitActive(void) {
+	return g_eager_init_depth > 0 && g_button_state_change_depth == 0;
+}
 int actionScriptOnlyMode(void)  { return g_script_only_mode; }
 
 // Phase 7b: set by ng_executeGotoCatchUp around its funcs[f] replay loop
@@ -1518,7 +1535,9 @@ static void ng_update_button_states_in_dl(SWFAppContext* app_context,
 				max_depth = obj->sprite_max_depth;
 				display_list_capacity = obj->sprite_dl_capacity;
 
+				g_button_state_change_depth++;
 				ch->button_state_funcs[effective_state](app_context);
+				g_button_state_change_depth--;
 
 				obj->sprite_display_list = display_list;
 				obj->sprite_max_depth = max_depth;
