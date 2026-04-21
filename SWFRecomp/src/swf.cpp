@@ -4078,14 +4078,17 @@ namespace SWFRecomp
 								 << to_string(sprite_frame_count_declared) << ", "
 								 << to_string(tag.length >= 4 ? tag.length - 4 : 0) << ");";
 
-				// Parse sprite sub-tags and generate sprite frame functions
+				// Parse sprite sub-tags and generate sprite frame functions.
+				// Phase 7b: sprite DoAction is emitted INLINE at its actual SWF
+				// tag position (via actionQueueScript) — no more end-of-frame
+				// buffered flush. The inline position is critical: the
+				// SWF-tag-order queue position determines FIFO drain order, and
+				// some SWFs (e.g. clip_events) put DoAction BEFORE nested
+				// PlaceObject, which must show up as SCRIPT queued BEFORE
+				// nested sprite's LOAD.
 				size_t sprite_frame_i = 0;
 				std::unordered_map<std::string, size_t> sprite_labels;
 				bool sprite_another_frame = false;
-				// Buffer for DoAction (script) calls in current sprite frame.
-				// These are emitted AFTER all placement tags to match Flash Player
-				// execution order (PlaceObject always runs before DoAction in a frame).
-				std::ostringstream sprite_frame_scripts;
 
 				sprite_definitions << "void " << sp << "_frame_" << to_string(sprite_frame_i)
 								   << "(SWFAppContext* app_context)" << endl
@@ -4102,13 +4105,11 @@ namespace SWFRecomp
 						break;
 
 					sub_tag.parseHeader(cur_pos);
-	
+
 
 					// Open new frame function if previous was closed by ShowFrame
 					if (sprite_another_frame && sub_tag.code != SWF_TAG_END_TAG)
 					{
-						sprite_frame_scripts.str("");
-						sprite_frame_scripts.clear();
 						sprite_definitions << "void " << sp << "_frame_" << to_string(sprite_frame_i)
 										   << "(SWFAppContext* app_context)" << endl
 										   << "{" << endl;
@@ -4120,10 +4121,6 @@ namespace SWFRecomp
 					{
 						case SWF_TAG_SHOW_FRAME:
 						{
-							// Emit buffered script calls AFTER placements (Flash exec order)
-							sprite_definitions << sprite_frame_scripts.str();
-							sprite_frame_scripts.str("");
-							sprite_frame_scripts.clear();
 							sprite_definitions << "}" << endl << endl;
 							sprite_another_frame = true;
 							break;
@@ -4898,9 +4895,6 @@ namespace SWFRecomp
 							if (!sprite_another_frame)
 							{
 								// Close the last frame function if ShowFrame didn't close it
-								sprite_definitions << sprite_frame_scripts.str();
-								sprite_frame_scripts.str("");
-								sprite_frame_scripts.clear();
 								sprite_definitions << "}" << endl << endl;
 							}
 							break;
@@ -4920,7 +4914,11 @@ namespace SWFRecomp
 
 						case SWF_TAG_DO_ACTION:
 						{
-							// DoAction inside sprite — create script file and emit call
+							// DoAction inside sprite — create script file and emit
+							// inline actionQueueScript at this tag's SWF position.
+							// Phase 7b: the SWF-tag-order queue position is
+							// observable — clip_events relies on sprite DoAction
+							// queueing BEFORE nested PlaceObject's LOAD entries.
 							std::string script_name = "script_" + to_string(next_script_i);
 							context.out_script_header << endl << "void " << script_name << "(SWFAppContext* app_context);";
 
@@ -4939,10 +4937,33 @@ namespace SWFRecomp
 
 							sprite_out_script << "}";
 
-							// Emit the script call into the deferred scripts buffer.
-							// It will be written after all placement tags at ShowFrame.
-							// Guard with !catch_up_mode so placement-only passes skip scripts.
-							sprite_frame_scripts << "\t" << "if (!catch_up_mode) " << script_name << "(app_context);" << endl;
+							// Phase 7b: sprite DoAction dispatch has two paths:
+							//   (a) Queue: normal frame processing, target-frame
+							//       scripts-only replay (g_tag_skip_mode=1), or
+							//       Phase 1 eager init from tagPlaceObject2 /
+							//       runtime-attach paths — EXCEPT during goto
+							//       catch-up (actionGotoCatchupActive) where
+							//       queueing would put sprite scripts ahead of
+							//       the target frame's root DoAction in FIFO.
+							//       Suppressed via scriptOnly (Phase 2 re-run)
+							//       so already-queued scripts don't re-queue.
+							//   (b) Synchronous fire: Phase 2 re-run of the
+							//       goto-deferred sprite init path, where Phase 1
+							//       didn't queue (catch-up suppressed it) so we
+							//       fire inline now, after the target frame's
+							//       root DoAction already drained.
+							// actionQueueSpriteScript (not actionQueueScript)
+							// binds the sprite's MC context at queue time so
+							// drains in root context still run scripts in the
+							// sprite's context.
+							sprite_definitions
+								<< "\t" << "if ((!catch_up_mode || g_tag_skip_mode || "
+								<< "(actionEagerInitActive() && !actionGotoCatchupActive())) "
+								<< "&& !actionScriptOnlyMode()) "
+								<< "actionQueueSpriteScript(app_context, " << script_name << ");" << endl;
+							sprite_definitions
+								<< "\t" << "else if (actionScriptOnlyMode() && actionDeferredSpriteInitActive()) "
+								<< script_name << "(app_context);" << endl;
 
 							// Mark this sprite script as non-timeline
 							non_timeline_scripts.insert(next_script_i - 1);
@@ -4952,7 +4973,14 @@ namespace SWFRecomp
 
 						case SWF_TAG_DO_INIT_ACTION:
 						{
-							// DoInitAction inside DefineSprite — parse SpriteId and emit guarded call
+							// DoInitAction inside DefineSprite — parse SpriteId and emit
+							// guarded call inline at this tag's SWF position.
+							// Phase 7b: DoInitAction continues to fire synchronously
+							// (not queued) via tagDoInitActionGuarded — it must run
+							// before the sprite is constructed, not at SHOW_FRAME
+							// drain time. The "prepend-to-buffer" pattern is now
+							// implicit in SWF tag ordering (DoInitAction precedes
+							// other DoAction tags in the stream).
 							sub_tag.clearFields();
 							sub_tag.setFieldCount(1);
 							sub_tag.configureNextField(SWF_FIELD_UI16);
@@ -4977,13 +5005,7 @@ namespace SWFRecomp
 
 							sprite_init_script << "}";
 
-							// Emit guarded call (once-per-character-id) into sprite frame scripts buffer.
-							// DoInitAction fires before frame actions, so prepend to buffer.
-							std::string prev = sprite_frame_scripts.str();
-							sprite_frame_scripts.str("");
-							sprite_frame_scripts.clear();
-							sprite_frame_scripts << "\t" << "tagDoInitActionGuarded(app_context, " << init_sprite_id << ", " << script_name << ");" << endl;
-							sprite_frame_scripts << prev;
+							sprite_definitions << "\t" << "tagDoInitActionGuarded(app_context, " << init_sprite_id << ", " << script_name << ");" << endl;
 
 							non_timeline_scripts.insert(next_script_i - 1);
 

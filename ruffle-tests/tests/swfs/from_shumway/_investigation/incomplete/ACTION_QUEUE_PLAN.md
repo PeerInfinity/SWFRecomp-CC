@@ -307,6 +307,172 @@ deferral mechanisms into one queue. Last updated 2026-04-19.
     `timeline_as2_1/5`) still fail as expected — 7a unblocks 7b but
     doesn't flip them on its own.
 
+- **Phase 7b — landed 2026-04-20** — sprite DoAction emission migrated from
+  the end-of-frame `sprite_frame_scripts` buffered flush to inline
+  `actionQueueSpriteScript` calls at each sprite `SWF_TAG_DO_ACTION`'s actual
+  SWF tag position. Sprite `CLIP_EVENT_LOAD` retired from its own kind back
+  into `AQ_KIND_SCRIPT` so a single NORMAL-priority FIFO drain handles both
+  sprite DoAction + sprite LOAD events at the Phase 6 SHOW_FRAME pre-drain.
+  7a's per-sprite CLIP_LOAD drain inside `process_sprite_init_at_depth`
+  removed (redundant); the post-Phase-2 `tagShowFrame` safety drain switched
+  from `AQ_KIND_CLIP_LOAD` to `AQ_KIND_SCRIPT`.
+
+  - **Drain strategy chosen (Option B from prompt)** — three options were
+    considered: A (per-sprite SPRITE_SCRIPT drain mirroring 7a's CLIP_LOAD
+    drain), B (consolidate LOAD+SCRIPT at SHOW_FRAME, single FIFO drain),
+    C (hybrid). Traced both canaries on paper using actual SWF tag order
+    (swfmill swf2xml):
+      - `clip_events` sprite_4 frame_0 tag order: `DoAction("clip frame 1")
+        → PlaceObject(shape) → PlaceObject(child)`. Inline-at-tag-position
+        queueing during Phase 1 eager init gives NORMAL FIFO `frame 2,
+        clip load, clip frame 1, child load, child frame 1` — matches
+        expected.
+      - `root_onload` sprite_2 frame_0 tag order: `PlaceObject(sprite_1)
+        → DoAction("C.")`. Inline emit queues nested `CC.` before outer
+        `C.` before root `R.` (root queued last). Single-pass FIFO drain
+        gives `CC., C., R.` — matches expected.
+    Option A dismissed: root_onload expects nested sprite SCRIPT before
+    root SCRIPT, but option A would fire root SCRIPT first via the
+    pre-`tagShowFrame` drain then sprite SCRIPTs via
+    process_sprite_needs_init traversal — wrong.
+
+  - **`actionQueueSpriteScript` with context binding** — `actionQueueScript`
+    (Phase 6) doesn't capture context; its dispatcher just calls
+    `fn(app_context)`. That works for root scripts (g_current_context is
+    root at both queue and drain time). For sprite scripts, Phase 1 eager
+    init sets `g_current_context` to the sprite's MC (via
+    `exec_sprite_frame`'s `actionSetCurrentContext(child_mc)` /
+    `actionSetBaseClip(child_mc)`), but that context is restored to root
+    when Phase 1 returns — so by the SHOW_FRAME drain the sprite's MC
+    context is gone. Added `actionQueueSpriteScript(app_context, fn)`
+    which captures `g_current_context`, `actionGetBaseClip()`, and
+    `g_current_sprite_obj` at queue time into a `PendingSpriteScript`
+    payload; the dispatcher `aq_dispatch_sprite_script` saves/sets/
+    restores all three around the call. Without this, sprite scripts
+    resolving `this`, `_parent`, with-scope vars, etc. would resolve
+    against root (function_base_clip_readded the canonical canary).
+
+  - **MC pre-create in tagPlaceObject2 / tagPlaceObject2Ratio** — when a
+    named sprite is placed and Phase 1 eager init is about to run its
+    frame_0, the sprite's MC must exist so `exec_sprite_frame`'s
+    `actionFindMovieClipByName` (no-create) finds it and switches
+    `g_current_context` correctly. Without the pre-create, nested
+    PlaceObjects during that sprite's frame_0 see `g_current_context` as
+    the grandparent (or root), and `queue_clip_load_events` captures the
+    wrong `parent_mc` → CLIP_LOAD handlers resolve `_parent` to root
+    instead of the actual parent. Added
+    `actionFindOrCreateMovieClip(app_context, obj->instance_name, g_current_context)`
+    just before the CALL_FRAME block; `g_current_context` is the caller's
+    context, i.e. the correct parent for the placed sprite.
+
+  - **PendingClipLoad payload carries parent_mc** — 7a's payload stored
+    `DisplayObject* obj` and relied on the per-sprite drain in
+    `process_sprite_init_at_depth` to look up the MC with the correct
+    parent. With per-sprite drain removed, the dispatcher needs the
+    parent on hand; added `parent_mc` field captured at queue time
+    from `g_current_context`. Combined with the MC pre-create above,
+    this makes `aq_dispatch_clip_load`'s MC lookup parent-correct.
+
+  - **Goto catchup + deferred Phase 2 flags** — the naive 7b gate
+    `(!catch_up_mode || g_tag_skip_mode || actionEagerInitActive()) && !actionScriptOnlyMode()`
+    regressed goto-forward tests (execution_order2 expects `root 2,
+    childA frame 1, childB frame 1`; got `childA frame 1, childB frame 1,
+    root 2`). Root cause: during `ng_executeGotoCatchUp`'s step 2
+    (intermediate/target frame replay with catch_up_mode=1), Phase 1
+    eager init for placed sprites BUMPED eager, and the gate queued sprite
+    scripts there — before the target frame's root script queues in step 3
+    (where main loop runs funcs[target] with g_tag_skip_mode=1). FIFO
+    drain then fires sprite scripts first.
+    - Fix: added `g_goto_catchup_active` flag set by `ng_executeGotoCatchUp`
+      around its funcs[f] loop. Gate extended to
+      `(... || (actionEagerInitActive() && !actionGotoCatchupActive())) ...`
+      so sprite scripts don't queue during goto catch-up.
+    - Added `g_deferred_sprite_init_active` flag set by
+      `ng_run_deferred_sprite_init_impl` around its
+      `process_sprite_needs_init` call, and by
+      `aq_dispatch_pending_attach_init` around its pai->func call.
+      Recompiler emits a second gate branch
+      `else if (actionScriptOnlyMode() && actionDeferredSpriteInitActive())
+      script_<N>(app_context)` — synchronous-fire path for the Phase 2
+      re-run that follows goto deferred init and for the attachMovie
+      deferred-init path. Scripts that Phase 1 deliberately didn't queue
+      (because goto catch-up suppressed them) fire here, after the
+      target frame's root DoAction already drained.
+
+  - **Button branch context switch** — `process_sprite_init_at_depth`'s
+    button branch previously explicitly said "Do NOT change g_current_context
+    — button state funcs don't run AS2 scripts." Under 7b this regressed
+    `movieclip_in_removed_button`: button children (e.g. `instance1`
+    auto-named sprite) were created with parent = button's own parent (root)
+    instead of button_mc, because the MC pre-create saw
+    `g_current_context` as root. Fix: briefly set g_current_context to
+    button_mc around `ch->button_state_funcs[0](app_context)` and the
+    recursive `process_sprite_needs_init`, then restore.
+
+  - **End-of-tick SCRIPT drain in swf_core.c** — sprite scripts queued by
+    `advance_sprite_frames` (e.g. when a clip is playing and advances to
+    its next frame) drained only if `funcs[current_frame]` ran, because
+    the recompiler-emitted drain lives inside the root frame function.
+    When the root is stopped (`is_playing=0`), funcs doesn't run, scripts
+    orphan in the queue → `goto_frame`/`goto_frame2`/`goto_label`
+    regressions where a `clip.run()` method defined in a stopped frame
+    never fires. Added `actionDrainActionQueueByKind(AQ_KIND_SCRIPT)` at
+    the end of each frame-loop tick (both the normal branch after Phase 3
+    `advance_nested_sprite_frames` and the past-last-frame branch).
+
+  - **ng_attachMovie path (no eager bump)** — attempted bumping
+    `actionEagerInitEnter/Leave` around ng_attachMovie's funcs[0] call
+    to queue scripts in Phase 1. That produced double-fires
+    (register_and_init_order, attach_movie), because scripts would queue
+    there AND `aq_dispatch_pending_attach_init` also tried to fire them.
+    Reverted to no-bump in ng_attachMovie; attach_init's dispatcher
+    bumps `actionDeferredSpriteInitEnter` so its pai->func call fires
+    scripts synchronously via the sync-fire gate branch. ng_cloneSprite
+    and ng_duplicateMovieClip also kept without eager bumps — matches
+    pre-7b behavior (clone frame_0 scripts didn't fire under
+    `if (!catch_up_mode) script_N`).
+
+  - **Canaries: 32/33 PASS locally.** `register_and_init_order` still
+    fails (73-line regression: scripts firing with `this` undefined in
+    some registerClass attachMovie path — likely context propagation
+    inside the aq_dispatch_pending_attach_init sync path, but not
+    narrowed down). Loop tripwires `loop_test4/5/7` byte-identical to
+    master pre-7a baselines. Canaries verified: clip_events,
+    on_construct, clip_constructors, clip_event_propagation_order,
+    register_class_return_value, execution_order1-4,
+    goto_execution_order[2], goto_rewind3, button_order, variable_args,
+    define_function2_preload_order, issue_1104, attach_movie[_stop],
+    empty_movieclip_can_attach_movies, unload, stage_object_enumerate,
+    set_interval, bad_placeobject_clipaction, movieclip_in_removed_button,
+    goto_frame[2], goto_label, goto_methods,
+    movieclip_invalid_get_bounds_1/2, string_paths_eval2,
+    function_base_clip_readded.
+
+  - **Targets — flipped:**
+    - `from_gnash/misc-swfmill.all/trace-as2/root_onload`:
+      `output_mismatch` → **PASS**.
+    - `from_shumway/avm1/doactionorder/doactionorder`: 3/7 → **PASS**
+      (all 7 lines match).
+    - `from_shumway/timeline/timeline_as2_1/5`: unchanged (unrelated
+      frame-nav blocker, as expected).
+    - `from_gnash/misc-swfmill.all/dict_event`: unchanged
+      (`ruffle_matched`).
+
+  - **Known follow-ups (Phase 8 / 7c):**
+    - `register_and_init_order` 73-line regression — needs deeper
+      investigation into the registerClass + attachMovie + deferred
+      sync-fire interaction. `this._name`, `this.box`, `this.custom`
+      resolve to undefined in scripts that fire via the sync path,
+      suggesting either `this` register setup or MC property
+      propagation differs from pre-7b when scripts fire inline under
+      scriptOnly=1. Worth checking whether the pre-7b direct-call
+      from the sprite frame function (via
+      `if (!catch_up_mode) script_N`) set up registers/context that
+      the 7b sync-fire branch skips.
+    - Phase 2 `was_eager=1` re-run at `process_sprite_init_at_depth`
+      lines ~408-414 is kept as safety net, now a safe no-op under
+      the 7b gate. Phase 8 should delete it.
+
 - **Phase 7 — attempted 2026-04-20, not landed (canary regressions).**
   The sprite-side migration (recompiler-emitted inline
   `actionQueueScript(app_context, script_<N>)` at each sprite
@@ -697,7 +863,7 @@ Suggested order:
 | 5 | Migrate CONSTRUCT clip events + RegisterClass constructor. | Same canaries. Add `clip_constructors`, `register_class_return_value`. |
 | 6 | Migrate root DoAction emission (recompiler change 1, 3, 6 above) + tagPlaceObject2 Phase 2 re-runs become queue inserts. **This is the breaking-point step that fixes root_onload, doactionorder, etc.** | Full canary set including `execution_order1-4`, `clip_events`, `goto_execution_order2`, `variable_args`, `define_function2_preload_order`, `stage_object_enumerate`, `register_and_init_order`. Expect targets to flip green. |
 | 7a | **Landed 2026-04-20.** Migrated sprite `CLIP_EVENT_LOAD` clip-action firing from the synchronous Phase 2 site to placement-time queueing. New kind `AQ_KIND_CLIP_LOAD = 8` (`AQ_KIND_COUNT = 9`); `queue_clip_load_events` enqueues at `AQ_PRIORITY_NORMAL` before the eager-init `CALL_FRAME` block in both `tagPlaceObject2` and `tagPlaceObject2Ratio`. Per-sprite drain inside `process_sprite_init_at_depth` (via new `actionDrainActionQueueForClip(ctx, MC*, kind)` API) replaces the synchronous fire at the exact same observable point, preserving the `LOAD → frame_0 → child LOAD → child frame_0` interleave while sprite DoAction still fires synchronously via Phase 2 (until 7b). Post-Phase-2 safety drain in `tagShowFrame` catches edge-case leftovers. Prerequisite for 7b. | Full canary set 32/32. `clip_events` passes with Phase 2 `CLIP_EVENT_LOAD` fire deleted (queue replaces it per-sprite). `unload` + onLoad-sensitive tests still pass. Loop tripwires `loop_test4/5/7` byte-identical to baseline. |
-| 7b | Migrate sprite DoAction emission (recompiler change 2: inline `actionQueueScript` at sprite `SWF_TAG_DO_ACTION` with the gate `if ((!catch_up_mode \|\| g_tag_skip_mode \|\| actionEagerInitActive()) && !actionScriptOnlyMode())`). Drop `sprite_frame_scripts` buffer; emit sprite `DO_INIT_ACTION` inline via `tagDoInitActionGuarded` too (prepend pattern becomes implicit — DoInitAction fires synchronously while DoAction queues). Add `g_eager_init_depth` bumps to `ng_attachMovie` / `ng_cloneSprite` / `ng_duplicateMovieClip` frame_0 call sites (and remove `static` from `g_eager_init_depth` so `tag_stubs.c` can `extern` it). Add `actionEagerInitActive()` + `actionScriptOnlyMode()` accessors in `action_queue.h`. See 2026-04-20 Phase 7 attempt Status entry above for the full delta and canary-regression matrix. | Full canary set. Targets expected to flip: `root_onload` → PASS, `doactionorder` → improves to 6/7 or 7/7, `timeline_as2_1/5` likely still blocked on frame-nav (unrelated), `dict_event` remains `ruffle_matched`. Re-verify loop tripwires (`loop_test4/5/7`) stay byte-identical to master pre-Phase-6. |
+| 7b | **Landed 2026-04-20.** Recompiler emits sprite DoAction inline at each SWF tag's actual position via `actionQueueSpriteScript` (new helper that captures `g_current_context` + base_clip + `g_current_sprite_obj` at queue time); `sprite_frame_scripts` buffer deleted. Gate is `if ((!catch_up_mode \|\| g_tag_skip_mode \|\| (actionEagerInitActive() && !actionGotoCatchupActive())) && !actionScriptOnlyMode()) actionQueueSpriteScript(...)` with a synchronous-fire else-branch `else if (actionScriptOnlyMode() && actionDeferredSpriteInitActive()) script_<N>(app_context)` for the goto-deferred Phase 2 re-run and the `aq_dispatch_pending_attach_init` path. `AQ_KIND_CLIP_LOAD` retired into `AQ_KIND_SCRIPT` (same kind drains both sprite LOAD + sprite DoAction in FIFO order at the Phase 6 SHOW_FRAME pre-drain); 7a's per-sprite `actionQueuePopMatching` drain in `process_sprite_init_at_depth` is removed, and the post-Phase-2 safety drain now targets SCRIPT. `actionGotoCatchupEnter/Leave` wraps `ng_executeGotoCatchUp`'s funcs[f] replay loop to suppress sprite-DoAction queueing there (otherwise scripts would land in the SCRIPT FIFO before the target frame's root DoAction). `actionDeferredSpriteInitEnter/Leave` wraps `ng_run_deferred_sprite_init_impl`'s `process_sprite_needs_init` and `aq_dispatch_pending_attach_init`'s pai->func so the sync-fire path activates. tagPlaceObject2 / tagPlaceObject2Ratio pre-create the sprite's MC with `g_current_context` as parent before CALL_FRAME, so `exec_sprite_frame`'s findMovieClipByName resolves context correctly during Phase 1 eager init (without this, nested sprites' CLIP_LOAD handlers + DoActions misparent, regressing `function_base_clip_readded`, `execution_order4`, `define_function2_preload_order`). Button branch in `process_sprite_init_at_depth` also switches g_current_context to button_mc around state_funcs (movieclip_in_removed_button). `swf_core.c` adds end-of-tick `actionDrainActionQueueByKind(SCRIPT)` calls after Phase 3 `advance_nested_sprite_frames` (covers sprite scripts queued during `advance_sprite_frames` when root is stopped and `funcs[current_frame]` didn't run — goto_frame regression). See 2026-04-20 Phase 7b Status entry below for the full delta + decision rationale. | 32/33 canaries PASS locally (`register_and_init_order` still has a 73-line regression — scripts firing in wrong context somewhere in the registerClass + attachMovie interaction, documented as known-blocker). Loop tripwires `loop_test4/5/7` byte-identical to master pre-7a baselines. Targets flipped: `root_onload` → **PASS**, `doactionorder` → **PASS** (was 3/7). `timeline_as2_1/5` unchanged (unrelated frame-nav issue). `dict_event` unchanged (`ruffle_matched`). |
 | 8 | Cleanup: remove `g_defer_sprite_init`, `g_pending_*` queues that were migrated, `non_timeline_scripts` if no longer needed. Delete Phase 2 `was_eager=1` re-run block at `tag.c:390–400` (dead weight once 7b lands — scripts queue in Phase 1, LOAD queues in 7a). | Full CI. |
 | 9 | (Optional) Replace `MAX_DEFERRED_GOTO_QUEUE=16` static array with the unified queue. | `goto_*` tests + the misc-ming/swfc deeply-recursive goto cases. |
 

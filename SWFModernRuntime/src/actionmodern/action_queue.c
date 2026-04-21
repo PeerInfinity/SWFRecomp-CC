@@ -235,3 +235,59 @@ void actionQueueScript(SWFAppContext* app_context,
 	actionQueueCallbackEx(app_context, aq_dispatch_script, p,
 	                      AQ_PRIORITY_NORMAL, NULL, 0, AQ_KIND_SCRIPT);
 }
+
+// Phase 7b: sprite DoAction dispatcher. Restores the sprite's MC context
+// (captured at queue time) before firing the script, then restores whatever
+// context was active at drain time. Required because the SHOW_FRAME
+// pre-drain runs with root-level g_current_context, but sprite scripts
+// expect to see their sprite's MC — they resolve `this`, `_parent`,
+// local vars, etc. against it.
+typedef struct {
+	void (*fn)(SWFAppContext*);
+	MovieClip* ctx_mc;
+	MovieClip* ctx_base;
+	DisplayObject* ctx_sprite_obj;
+} PendingSpriteScript;
+
+extern MovieClip* g_current_context;
+extern DisplayObject* g_current_sprite_obj;
+extern void actionSetCurrentContext(MovieClip* mc);
+extern void actionSetBaseClip(MovieClip* mc);
+extern MovieClip* actionGetBaseClip(void);
+
+static void aq_dispatch_sprite_script(SWFAppContext* app_context, void* user)
+{
+	PendingSpriteScript* p = (PendingSpriteScript*)user;
+	if (!p) return;
+	MovieClip* saved_ctx = g_current_context;
+	MovieClip* saved_base = actionGetBaseClip();
+	DisplayObject* saved_obj = g_current_sprite_obj;
+	if (p->ctx_mc) {
+		actionSetCurrentContext(p->ctx_mc);
+		actionSetBaseClip(p->ctx_base ? p->ctx_base : p->ctx_mc);
+		g_current_sprite_obj = p->ctx_sprite_obj;
+	}
+	if (p->fn) p->fn(app_context);
+	actionSetCurrentContext(saved_ctx);
+	actionSetBaseClip(saved_base);
+	g_current_sprite_obj = saved_obj;
+	free(p);
+}
+
+void actionQueueSpriteScript(SWFAppContext* app_context,
+                              void (*fn)(SWFAppContext*))
+{
+	if (!fn) return;
+	PendingSpriteScript* p = (PendingSpriteScript*)malloc(sizeof(*p));
+	if (!p) return;
+	p->fn = fn;
+	// Capture at queue time. During Phase 1 eager init, g_current_context is
+	// the sprite whose frame_0 is executing; exec_sprite_frame sets it via
+	// actionSetCurrentContext + actionSetBaseClip; g_current_sprite_obj tracks
+	// the DisplayObject.
+	p->ctx_mc = g_current_context;
+	p->ctx_base = actionGetBaseClip();
+	p->ctx_sprite_obj = g_current_sprite_obj;
+	actionQueueCallbackEx(app_context, aq_dispatch_sprite_script, p,
+	                      AQ_PRIORITY_NORMAL, NULL, 0, AQ_KIND_SCRIPT);
+}

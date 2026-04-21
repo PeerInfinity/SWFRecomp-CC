@@ -25,8 +25,14 @@ typedef enum {
 	AQ_KIND_CLIP_INIT      = 4, // Phase 4: CLIP_EVENT_INITIALIZE from tagPlaceObject2
 	AQ_KIND_CLIP_CONSTRUCT = 5, // Phase 5: CLIP_EVENT_CONSTRUCT from tagPlaceObject2
 	AQ_KIND_REGISTER_CTOR  = 6, // Phase 5: registerClass constructor from tagPlaceObject2
-	AQ_KIND_SCRIPT         = 7, // Phase 6: root DoAction script (recompiler-emitted)
-	AQ_KIND_CLIP_LOAD      = 8, // Phase 7a: sprite CLIP_EVENT_LOAD from tagPlaceObject2
+	AQ_KIND_SCRIPT         = 7, // Phase 6/7b: root DoAction, sprite DoAction,
+	                            // sprite CLIP_EVENT_LOAD. All three consolidated
+	                            // at NORMAL priority, FIFO-interleaved so the
+	                            // per-sprite LOAD→frame_0 interleave emerges
+	                            // naturally from SWF-tag-order inline queueing.
+	AQ_KIND_CLIP_LOAD      = 8, // Retired in Phase 7b (merged into AQ_KIND_SCRIPT).
+	                            // Enum slot kept for ABI stability of the kind
+	                            // index; no new entries push at this kind.
 	AQ_KIND_COUNT          = 9,
 } ActionQueueKind;
 
@@ -114,3 +120,54 @@ void* actionQueueFindUserByKind(ActionQueueKind kind,
 // dispatch callback simply invokes fn(app_context) and frees its payload.
 void actionQueueScript(SWFAppContext* app_context,
                        void (*fn)(SWFAppContext*));
+
+// Phase 7b: queue a recompiler-generated sprite DoAction script with its
+// firing context bound at queue time. Captures g_current_context (and
+// base_clip + g_current_sprite_obj) so that at drain time — which happens
+// at the root-level SHOW_FRAME pre-drain where g_current_context has been
+// restored to root — the script still fires in the sprite's MC context.
+// This is necessary because sprite DoActions can access `this`, `_parent`,
+// local with-scope vars, etc., which depend on g_current_context.
+void actionQueueSpriteScript(SWFAppContext* app_context,
+                              void (*fn)(SWFAppContext*));
+
+// Phase 7b: gate accessors used by recompiler-emitted sprite DoAction
+// queue calls. The gate fires `actionQueueScript` when any of:
+//   - normal root tag stream (!catch_up_mode)
+//   - target-frame scripts-only replay during goto (g_tag_skip_mode)
+//   - parent's Phase 1 eager init of a sprite's frame_0 (actionEagerInitActive)
+// ...but only when not inside Phase 2's was_eager script-only re-run
+// (actionScriptOnlyMode) — that path is a safety net and must not re-queue
+// scripts already queued during Phase 1.
+int actionEagerInitActive(void);
+int actionScriptOnlyMode(void);
+
+// True during ng_executeGotoCatchUp's step 2 (intermediate + target frame
+// tag replay with catch_up_mode=1). The gate must NOT queue sprite scripts
+// during this window, because they'd end up in the queue BEFORE the target
+// frame's root DoAction (queued later in step 3 with g_tag_skip_mode=1),
+// producing a sprite-first-then-root FIFO drain — wrong. Instead, sprite
+// scripts for goto-placed sprites fire synchronously during the deferred
+// Phase 2 re-run later (actionDeferredSpriteInitActive below).
+int actionGotoCatchupActive(void);
+
+// True during ng_run_deferred_sprite_init_impl's process_sprite_needs_init
+// call (goto Phase 2 re-run). Combined with actionScriptOnlyMode in the
+// sprite DoAction gate, this takes the synchronous-fire path — scripts
+// fire inline here because the target frame's root DoAction has already
+// drained, and these sprite scripts must fire after it.
+int actionDeferredSpriteInitActive(void);
+
+// Phase 7b: runtime-attach paths (ng_attachMovie / ng_cloneSprite /
+// ng_duplicateMovieClip) bracket their frame_0 invocation with these
+// wrappers, so actionEagerInitActive() reports true during those attaches
+// — making recompiler-emitted sprite DoAction queue calls fire the same
+// way as timeline-placed eager init.
+void actionEagerInitEnter(void);
+void actionEagerInitLeave(void);
+
+// Phase 7b: Enter/Leave for the two new goto-sensitive contexts above.
+void actionGotoCatchupEnter(void);
+void actionGotoCatchupLeave(void);
+void actionDeferredSpriteInitEnter(void);
+void actionDeferredSpriteInitLeave(void);

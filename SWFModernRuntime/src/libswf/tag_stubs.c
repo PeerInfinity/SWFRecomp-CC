@@ -216,10 +216,16 @@ static void aq_dispatch_pending_attach_init(SWFAppContext* app_context, void* us
 	// ng_attachMovie with catch_up_mode=1, so only scripts need to execute now.
 	// Without script_only_mode, tagPlaceObject2's loop-back preservation check
 	// would clear sprite_needs_init on children (e.g. "box"), preventing Phase 2.
+	// Phase 7b: bracket with actionDeferredSpriteInitEnter so the recompiler-
+	// emitted sprite DoAction gate's sync-fire path activates
+	// (scriptOnly && deferred) and scripts run inline here (with the correct
+	// MC context already set above) instead of being silently dropped.
 	{
 		extern void ng_set_script_only_mode(int mode);
 		ng_set_script_only_mode(1);
+		actionDeferredSpriteInitEnter();
 		pai->func(app_context);
+		actionDeferredSpriteInitLeave();
 		ng_set_script_only_mode(0);
 	}
 
@@ -375,7 +381,16 @@ MovieClip* ng_attachMovie(SWFAppContext* app_context, size_t char_id, const char
 		actionSetCurrentContext(new_mc);
 		g_current_sprite_obj = NULL;
 
-		// Run frame 0 with catch_up_mode=1 to skip scripts (only placement tags run)
+		// Run frame 0 with catch_up_mode=1 to skip scripts (only placement tags run).
+		// Phase 7b note: we intentionally do NOT bump eager here, because
+		// ng_attachMovie's scripts are run later by aq_dispatch_pending_attach_init
+		// via its own pai->func call. Bumping eager here would queue scripts
+		// now, and then the deferred re-run (with scriptOnly=1) would be a
+		// no-op, but the queued scripts would fire at next SHOW_FRAME pre-drain
+		// in root context (bound to the attached MC via actionQueueSpriteScript,
+		// but too early relative to the attach_init contract). See
+		// aq_dispatch_pending_attach_init which bumps eager + deferred for
+		// its pai->func call so scripts fire synchronously there.
 		catch_up_mode = 1;
 		funcs[0](app_context);
 		catch_up_mode = saved_catch_up;
@@ -2744,6 +2759,10 @@ MovieClip* ng_cloneSprite(SWFAppContext* app_context, const char* source_name,
 				actionSetCurrentContext(clone_mc);
 				g_current_sprite_obj = NULL;
 
+				// Phase 7b note: do NOT bump eager here. Pre-7b skipped scripts
+				// during ng_cloneSprite (catch_up_mode=1 + old `if (!catch_up_mode) script_N` gate).
+				// Under 7b gate, this stays equivalent: catch=1, eager=0 → queue path FALSE,
+				// sync path FALSE. Matches pre-7b behavior.
 				catch_up_mode = 1;
 				funcs[0](app_context);
 				catch_up_mode = saved_catch_up;
@@ -3018,6 +3037,7 @@ MovieClip* ng_duplicateMovieClip(SWFAppContext* app_context, const char* source_
 				actionSetCurrentContext(clone_mc);
 				g_current_sprite_obj = NULL;
 
+				// Phase 7b note: no eager bump (see ng_cloneSprite for rationale).
 				catch_up_mode = 1;
 				funcs[0](app_context);
 				catch_up_mode = saved_catch_up;

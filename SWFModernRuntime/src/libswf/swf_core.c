@@ -17,6 +17,7 @@
 #endif
 #include <tag.h>
 #include <action.h>
+#include <action_queue.h>
 #include <variables.h>
 #include <utils.h>
 #include <heap.h>
@@ -113,6 +114,13 @@ void ng_executeGotoCatchUp(SWFAppContext* app_context)
 	g_tag_skip_mode = 0;
 	g_defer_sprite_init = 1;
 	catch_up_mode = 1;
+	// Phase 7b: suppress sprite-DoAction queueing while we replay goto tags —
+	// queued scripts would land in the SCRIPT FIFO before the target frame's
+	// root DoAction (queued later when the main loop runs funcs[target] with
+	// g_tag_skip_mode=1), producing sprite-first-then-root order. Instead,
+	// sprite scripts fire synchronously inside ng_run_deferred_sprite_init_impl
+	// after the target frame's root script drains.
+	actionGotoCatchupEnter();
 	if (target <= original_frame)
 	{
 #ifdef NO_GRAPHICS
@@ -139,6 +147,7 @@ void ng_executeGotoCatchUp(SWFAppContext* app_context)
 			if (funcs[f]) funcs[f](app_context);
 		}
 	}
+	actionGotoCatchupLeave();
 	catch_up_mode = 0;
 	g_tag_skip_mode = saved_tag_skip;
 	// Do NOT restore g_defer_sprite_init here — keep it set so that the
@@ -843,6 +852,16 @@ void swfStart(SWFAppContext* app_context)
 			}
 			// Phase 3: advance nested sprite children (deferred from Phase 1)
 			advance_nested_sprite_frames(app_context);
+
+			// Phase 7b: drain any AQ_KIND_SCRIPT entries queued during
+			// advance_sprite_frames (Phase 1 + Phase 3) that weren't covered
+			// by the recompiler-emitted SHOW_FRAME drain inside
+			// funcs[current_frame] — happens when root is stopped
+			// (is_playing=0) and funcs didn't run, leaving sprite-tick
+			// scripts orphaned in the queue. Also catches sprite scripts
+			// queued AFTER funcs returned (advance_nested_sprite_frames
+			// runs after funcs).
+			actionDrainActionQueueByKind(app_context, AQ_KIND_SCRIPT);
 		}
 		else
 		{
@@ -880,6 +899,13 @@ void swfStart(SWFAppContext* app_context)
 			actionDispatchEnterFrameHandlers(app_context);
 			actionDispatchRootVarMapEnterFrame(app_context);
 			advance_nested_sprite_frames(app_context);
+
+			// Phase 7b: drain sprite SCRIPT entries queued during
+			// advance_sprite_frames in the past-last-frame branch
+			// (no funcs[current_frame] runs here, so the recompiler-emitted
+			// drain doesn't fire — same orphaned-script issue as the
+			// is_playing=0 branch above).
+			actionDrainActionQueueByKind(app_context, AQ_KIND_SCRIPT);
 		}
 
 		// Mark dynamic MCs (createEmptyMovieClip) as eligible for next tick's enterFrame.
