@@ -416,6 +416,12 @@ void initMathObject(SWFAppContext* app_context)
 	// Math is a native static object — always returns "[object Object]" regardless of SWF version
 	installNativeToString(app_context, g_math_object);
 
+	// Math properties (constants + methods) are DONT_ENUM in Flash/Ruffle.
+	// setProperty defaults to ENUMERABLE, so clear the flag after init.
+	// Gnash Math-v6/v7/v8 tests expect `for (m in Math) count++; count == 0`.
+	for (u32 i = 0; i < g_math_object->num_used; i++)
+		g_math_object->properties[i].flags &= ~PROPERTY_FLAG_ENUMERABLE;
+
 	g_math_init_done = 1;
 }
 

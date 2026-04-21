@@ -6493,10 +6493,40 @@ static int tryAutoBoxPrimitive(SWFAppContext* app_context, ActionVar* obj_var, A
 	box_args[0] = *obj_var;
 	if (box_ctor->function_type == 2 && box_ctor->advanced_func != NULL) {
 		pushSuperContext((void*)wrapper, 1);
+		// Set up local scope with `this` bound to the wrapper so the user
+		// constructor body's `this.prop = value` resolves correctly. Needed
+		// for SWF7+ DefineFunction2 constructors — without this, GetVariable
+		// ("this") inside the function body falls back to parent context
+		// (often undefined), and `this.id = "wonder1"` writes to the wrong
+		// object. Mirrors the OBJECT/type-2 dispatch in actionCallMethod.
+		ASObject* _box_local_scope = allocObject(app_context, 4);
+		retainObject(_box_local_scope);
+		int _box_pushed_scope = 0;
+		if (scope_depth < MAX_SCOPE_DEPTH) {
+			scope_is_with[scope_depth] = 0;
+			scope_mc[scope_depth] = NULL;
+			scope_chain[scope_depth++] = _box_local_scope;
+			_box_pushed_scope = 1;
+		}
+		u32 _box_saved_this_depth = g_this_depth;
+		u16 _box_flags = box_ctor->flags;
+		if (!(_box_flags & 0x0001) && !(_box_flags & 0x0002)) {
+			ActionVar _box_tv = {0};
+			_box_tv.type = ACTION_STACK_VALUE_OBJECT;
+			_box_tv.data.numeric_value = (u64) wrapper;
+			setProperty(app_context, _box_local_scope, "this", 4, &_box_tv);
+			if (g_this_depth < MAX_THIS_DEPTH) {
+				g_this_stack[g_this_depth] = _box_tv;
+				g_this_depth++;
+			}
+		}
 		ActionVar registers[256] = {0};
 		g_call_depth++;
 		box_ctor->advanced_func(app_context, box_args, 1, registers, (void*)wrapper);
 		g_call_depth--;
+		g_this_depth = _box_saved_this_depth;
+		if (_box_pushed_scope && scope_depth > 0) scope_depth--;
+		releaseObject(app_context, _box_local_scope);
 		popSuperContext();
 	} else if (box_ctor->function_type == 1 && box_ctor->simple_func != NULL) {
 		ActionVar this_var = {0};
@@ -23569,6 +23599,28 @@ void actionEnumerate(SWFAppContext* app_context, char* str_buffer)
 		}
 	}
 
+	// Step 2d: If still uninitialized, fall back to actionGetVariable so we
+	// resolve built-in globals (e.g., "String", "Array", "Object") that
+	// actionGetVariable handles via hardcoded special-case paths rather
+	// than via var_map. Without this, `for (v in String)` at root context
+	// hits the empty var_map slot and returns an empty enumeration.
+	static ActionVar _en_resolved_var;
+	if ((var == NULL || (var->type == ACTION_STACK_VALUE_STRING && var->str_size == 0 &&
+	                      var->data.string_data.heap_ptr == NULL))
+	    && var_name_len > 0 && memchr(var_name, '.', var_name_len) == NULL)
+	{
+		PUSH_STR(var_name, var_name_len);
+		actionGetVariable(app_context);
+		popVar(app_context, &_en_resolved_var);
+		if (_en_resolved_var.type == ACTION_STACK_VALUE_OBJECT ||
+		    _en_resolved_var.type == ACTION_STACK_VALUE_ARRAY ||
+		    _en_resolved_var.type == ACTION_STACK_VALUE_MOVIECLIP ||
+		    _en_resolved_var.type == ACTION_STACK_VALUE_FUNCTION)
+		{
+			var = &_en_resolved_var;
+		}
+	}
+
 	// Step 3: Check if variable exists and is an enumerable type
 	if (!var || (var->type != ACTION_STACK_VALUE_OBJECT &&
 	             var->type != ACTION_STACK_VALUE_MOVIECLIP &&
@@ -32081,7 +32133,25 @@ check_special_vars:
 				ActionVar fcc_val = {0};
 				fcc_val.type = ACTION_STACK_VALUE_FUNCTION;
 				VAL(u64, &fcc_val.data.numeric_value) = (u64) &g_string_fromCharCode_func;
-				setProperty(app_context, g_string_constructor.own_props, "fromCharCode", 12, &fcc_val);
+				// DONT_ENUM: fromCharCode shouldn't appear in for-in on String
+				// (Flash/Ruffle match; without this, our for-in yields
+				// "fromCharCode" instead of "toString").
+				setPropertyWithFlags(app_context, g_string_constructor.own_props, "fromCharCode", 12, &fcc_val, PROPERTY_FLAGS_DONTENUM);
+				// Set own_props.__proto__ = Function.prototype so for-in on
+				// String walks up the chain and finds Function.prototype.toString.
+				// Phase 8c-2 does this for g_ctors[2] but not the lazy
+				// g_string_constructor returned by actionGetVariable("String")
+				// at root context.
+				{
+					ensureGlobalInit(app_context);
+					ASObject* _fn_proto = getFunctionProto(g_swf_version);
+					if (_fn_proto != NULL) {
+						ActionVar _fpv = {0};
+						_fpv.type = ACTION_STACK_VALUE_OBJECT;
+						_fpv.data.numeric_value = (u64) _fn_proto;
+						setPropertyWithFlags(app_context, g_string_constructor.own_props, "__proto__", 9, &_fpv, PROPERTY_FLAGS_DONTENUM);
+					}
+				}
 
 				// Share prototype_obj with the primary String constructor
 				// (registered on global_object as "String" via REG_FUNC) so
@@ -50767,6 +50837,13 @@ static int callStringPrimitiveMethod(SWFAppContext* app_context, char* str_buffe
 			}
 		}
 
+		// SWF5: empty separator + limit 0/-1 → return whole string as single
+		// element (ignore limit). Gnash String-v5 expects
+		// "aa".split("", 0) → ["aa"] and "".split("", 0) → [""].
+		// Non-empty separator still honors limit=0 → empty array.
+		if (swf_ver < 6 && delim_len == 0 && limit == 0)
+			limit = -1;
+
 		if (limit == 0)
 		{
 			PUSH(ACTION_STACK_VALUE_ARRAY, (u64)allocArray(app_context, 1));
@@ -52455,11 +52532,14 @@ void actionCallMethod(SWFAppContext* app_context, char* str_buffer)
 					    _sp_fn->advanced_func == (Function2Ptr) builtin_prim_wrapper_toString ||
 					    _sp_fn->advanced_func == (Function2Ptr) builtin_wrapper_valueOf))
 						_sp_is_builtin = 1;
-					if (_sp_fn != NULL && !_sp_is_builtin) {
+					if (_sp_fn != NULL && !_sp_is_builtin
+					    && ((_sp_fn->function_type == 2 && _sp_fn->advanced_func != NULL)
+					        || (_sp_fn->function_type == 1 && _sp_fn->simple_func != NULL))) {
 						// User-overridden method — build a minimal String wrapper
-						// directly so we don't depend on tryAutoBoxPrimitive
-						// (which returns -1 for the built-in String ctor with no
-						// simple_func/advanced_func). Re-dispatch via CallMethod.
+						// for `this`, then dispatch the user function directly
+						// (no recursion through the stack PUSH/POP dance, which
+						// turned out to be unreliable — GCC O2 reorders SP reads
+						// across pushVar calls, clobbering the F64 num_args slot).
 						ASObject* _sp_wrap = allocObject(app_context, 4);
 						retainObject(_sp_wrap);
 						_sp_wrap->native_type = NATIVE_STRING;
@@ -52468,7 +52548,6 @@ void actionCallMethod(SWFAppContext* app_context, char* str_buffer)
 						_sp_proto_val.data.numeric_value = (u64) _sp_proto;
 						setPropertyWithFlags(app_context, _sp_wrap, "__proto__", 9, &_sp_proto_val, PROPERTY_FLAGS_DONTENUM);
 						setPropertyWithFlags(app_context, _sp_wrap, "valueOf_value", 13, &obj_var, PROPERTY_FLAGS_DONTENUM);
-						// length as a DontEnum own property (mirrors new String() path)
 						{
 							ActionVar _sp_len = {0};
 							_sp_len.type = ACTION_STACK_VALUE_F64;
@@ -52476,21 +52555,130 @@ void actionCallMethod(SWFAppContext* app_context, char* str_buffer)
 							VAL(double, &_sp_len.data.numeric_value) = _sp_len_d;
 							setPropertyWithFlags(app_context, _sp_wrap, "length", 6, &_sp_len, PROPERTY_FLAG_WRITABLE);
 						}
-						ActionVar _sp_this = {0};
-						_sp_this.type = ACTION_STACK_VALUE_OBJECT;
-						_sp_this.data.numeric_value = (u64) _sp_wrap;
 
-						// Push args back in reverse order, then num_args, receiver, method name
-						for (int i = (int)num_args - 1; i >= 0; i--)
-							pushVar(app_context, &args[i]);
-						ActionVar _na = {0};
-						_na.type = ACTION_STACK_VALUE_F64;
-						VAL(double, &_na.data.numeric_value) = (double)num_args;
-						pushVar(app_context, &_na);
-						pushVar(app_context, &_sp_this);
-						PUSH_STR(method_name, method_name_len);
+						if (g_call_depth >= g_max_call_depth - 1) {
+							if (args != NULL) FREE(args);
+							releaseObject(app_context, _sp_wrap);
+							g_execution_halted = 1;
+							pushUndefined(app_context);
+							return;
+						}
+
+						// Inline the OBJECT/type-2 dispatch machinery so the
+						// user function runs with `this`/`arguments`/`super`
+						// accessible via scope chain (same as a normal method
+						// call with an auto-boxed wrapper).
+						pushSuperContext((void*)_sp_wrap, 1);
+
+						int _sp_saved_ver = 0;
+						ASObject* _sp_saved_global = NULL;
+						int _sp_saved_midx = 0;
+						switchToFunctionVersion(_sp_fn, &_sp_saved_ver, &_sp_saved_global, &_sp_saved_midx);
+						int _sp_caller_ver = _sp_saved_ver;
+
+						MovieClip* _sp_saved_ctx = g_current_context;
+						if (_sp_caller_ver >= 6 && _sp_fn->base_clip != NULL) {
+							MovieClip* _bc = reResolveDeadBaseClip(app_context, (MovieClip*)_sp_fn->base_clip);
+							if (_bc->depth != INT_MIN)
+								g_current_context = _bc;
+						}
+
+						ASObject* _sp_local_scope = allocObject(app_context, 8);
+						retainObject(_sp_local_scope);
+						int _sp_pushed_scope = 0;
+						if (scope_depth < MAX_SCOPE_DEPTH) {
+							scope_is_with[scope_depth] = 0;
+							scope_mc[scope_depth] = NULL;
+							scope_chain[scope_depth++] = _sp_local_scope;
+							_sp_pushed_scope = 1;
+						}
+
+						u32 _sp_saved_this_depth = g_this_depth;
+						u16 _sp_flags = _sp_fn->flags;
+						int _sp_preload_this = (_sp_flags & 0x0001);
+						int _sp_suppress_this = (_sp_flags & 0x0002);
+						int _sp_preload_args = (_sp_flags & 0x0004);
+						int _sp_suppress_args = (_sp_flags & 0x0008);
+						int _sp_preload_super = (_sp_flags & 0x0010);
+						int _sp_suppress_super = (_sp_flags & 0x0020);
+
+						if (!_sp_preload_this && !_sp_suppress_this) {
+							ActionVar _sp_tv = {0};
+							_sp_tv.type = ACTION_STACK_VALUE_OBJECT;
+							_sp_tv.data.numeric_value = (u64) _sp_wrap;
+							setProperty(app_context, _sp_local_scope, "this", 4, &_sp_tv);
+							if (g_this_depth < MAX_THIS_DEPTH) {
+								g_this_stack[g_this_depth] = _sp_tv;
+								g_this_depth++;
+							}
+						}
+
+						ASFunction* _sp_prev_exec = g_current_executing_func;
+						if (!_sp_preload_args && !_sp_suppress_args) {
+							ASArray* _sp_args_arr = allocArray(app_context, num_args > 0 ? num_args : 1);
+							for (u32 i = 0; i < num_args; i++)
+								setArrayElement(app_context, _sp_args_arr, i, &args[i]);
+							setupArgumentsProps(app_context, _sp_args_arr, _sp_fn, _sp_prev_exec);
+							ActionVar _sp_av = {0};
+							_sp_av.type = ACTION_STACK_VALUE_ARRAY;
+							_sp_av.data.numeric_value = (u64) _sp_args_arr;
+							setProperty(app_context, _sp_local_scope, "arguments", 9, &_sp_av);
+						}
+						{
+							ActionVar _sp_sv = {0};
+							_sp_sv.type = ACTION_STACK_VALUE_UNDEFINED;
+							if (!_sp_preload_super && !_sp_suppress_super && hasSuperContext()) {
+								_sp_sv.type = ACTION_STACK_VALUE_SUPER;
+								_sp_sv.data.numeric_value = (u64) getSuperThis();
+								_sp_sv.str_size = (u32) getSuperDepth();
+							}
+							setProperty(app_context, _sp_local_scope, "super", 5, &_sp_sv);
+						}
+
+						ActionVar _sp_result = {0};
+						_sp_result.type = ACTION_STACK_VALUE_UNDEFINED;
+
+						if (_sp_fn->function_type == 2 && _sp_fn->advanced_func != NULL) {
+							ActionVar* _sp_registers = NULL;
+							if (_sp_fn->register_count > 0)
+								_sp_registers = (ActionVar*) HCALLOC(_sp_fn->register_count, sizeof(ActionVar));
+
+							g_call_depth++;
+							g_prev_executing_func = _sp_prev_exec;
+							g_current_executing_func = _sp_fn;
+							g_c_function_this_obj = _sp_wrap;
+							u8 _sp_saved_call_this_type = g_call_this_type;
+							g_call_this_type = ACTION_STACK_VALUE_OBJECT;
+							_sp_result = _sp_fn->advanced_func(app_context, args, num_args, _sp_registers, (void*) _sp_wrap);
+							g_call_this_type = _sp_saved_call_this_type;
+							g_c_function_this_obj = NULL;
+							g_current_executing_func = _sp_prev_exec;
+							g_call_depth--;
+
+							if (_sp_registers != NULL) FREE(_sp_registers);
+						} else if (_sp_fn->function_type == 1 && _sp_fn->simple_func != NULL) {
+							// Type 1 uses stack-based calling convention: push args
+							// onto the AS stack; simple_func pops them.
+							for (u32 i = 0; i < num_args; i++)
+								pushVar(app_context, &args[i]);
+
+							g_call_depth++;
+							g_prev_executing_func = _sp_prev_exec;
+							g_current_executing_func = _sp_fn;
+							_sp_result = ((ActionVar(*)(SWFAppContext*))_sp_fn->simple_func)(app_context);
+							g_current_executing_func = _sp_prev_exec;
+							g_call_depth--;
+						}
+
+						g_current_context = _sp_saved_ctx;
+						if (_sp_pushed_scope && scope_depth > 0) scope_depth--;
+						releaseObject(app_context, _sp_local_scope);
+						g_this_depth = _sp_saved_this_depth;
+						popSuperContext();
+						restoreFunctionVersion(_sp_saved_ver, _sp_saved_global, _sp_saved_midx);
+
 						if (args != NULL) FREE(args);
-						actionCallMethod(app_context, str_buffer);
+						pushVar(app_context, &_sp_result);
 						return;
 					}
 				}

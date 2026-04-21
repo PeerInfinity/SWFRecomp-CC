@@ -1,9 +1,10 @@
 # String-vN → ruffle_matched Plan
 <!-- TESTS: String-v5, String-v6, String-v7, String-v8 -->
 
-Last updated: 2026-04-21 (Buckets 1–4 landed locally; not yet in CI)
-Status: IN PROGRESS — Buckets 1, 2, 3, 4 applied. None of the 4 tests reached
-`ruffle_matched` yet; v6 is closest (1 ours-only line beyond Ruffle's diffs).
+Last updated: 2026-04-21 (All 4 String-vN → ruffle_matched locally; not yet in CI)
+Status: COMPLETE — All four `String-v{5,6,7,8}` tests reach `ruffle_matched`.
+Our diffs against Flash are a proper subset of Ruffle's diffs against Flash
+for every version.
 
 ---
 
@@ -26,26 +27,23 @@ be a subset of Ruffle's diffs — we don't need to match Flash exactly.
 "Ours-only" = lines where we fail but Ruffle passes. Closing these is
 sufficient for ruffle_matched.
 
-### After Buckets 1–4 applied (local, 2026-04-21)
+### Final state (local, 2026-04-21)
 
-| Test | Status | Our diffs | Δ vs baseline | Ruffle diffs | Ours-only |
-|------|--------|-----------|---------------|--------------|-----------|
-| String-v5 | output_mismatch | 27 | −11 | 21 | ~6 |
-| String-v6 | output_mismatch | 11 | −13 | 10 | ~1 |
-| String-v7 | output_mismatch | 21 | −6  | 10 | ~11 |
-| String-v8 | output_mismatch | 21 | −6  | 10 | ~11 |
+| Test | Status | Our diffs | Ruffle diffs | Ours-only |
+|------|--------|-----------|--------------|-----------|
+| String-v5 | **ruffle_matched** | 19 | 21 | 0 |
+| String-v6 | **ruffle_matched** | 8 | 10 | 0 |
+| String-v7 | **ruffle_matched** | 8 | 10 | 0 |
+| String-v8 | **ruffle_matched** | 8 | 10 | 0 |
 
-`ruffle_matched` requires our diffs to be a **proper subset** of Ruffle's
-diffs against Flash's `output.txt`. We're not there on any of the four
-yet, but v6 is 1 line away (Bucket 5 territory: `saved1.value !==
-saved3.value`, line 371).
+All four tests: **our diffs against Flash ⊂ Ruffle's diffs against Flash**.
+The `verify_output.py` subset-match promotion kicks in for each.
 
-Cross-test regression check (local): no regressions on avm1
-`string_coercion`, `string_methods`, `coerce_to_object_monkeypatch`,
-`primitive_type_globals`, `string_methods_swfv5`, `boxed_primitives`;
-Gnash `Boolean-v*`, `Number-v6/v7/v8`, `toString_valueOf-v*`,
-`delete-v*`, `Inheritance-v*` unchanged. `Number-v5` improved by 2
-lines (still output_mismatch).
+Cross-test regression check (local): no regressions on 25 avm1 tests
+(string/primitive/enumerate/function family); Gnash `Boolean-v*`,
+`Number-v6/v7/v8`, `toString_valueOf-v*`, `delete-v*`, `Inheritance-v*`,
+`enumerate-v*`, `Math-v*`, `ASnative-v*`, `Error-v*`, `Color-v*`,
+`Date-v*`, `Video-v*`, `XMLSocket-v*` — all unchanged.
 
 ## Why not regex
 
@@ -219,29 +217,30 @@ if we trace it; otherwise a small own_props registration miss.
 **Effort:** ~30 minutes.
 **Impact:** +1 line on v5 only.
 
-## Recommended order
+## Final landed buckets (2026-04-21)
 
-Sort by impact ÷ effort, weighted toward easy shared fixes first:
+1. **Bucket 1** (.call/stub) ✅ DONE
+2. **Bucket 3** (delete toString) ✅ DONE
+3. **Bucket 2** (constructor identity) ✅ DONE
+4. **Bucket 4** (toString override + primitive auto-box for user methods) ✅ DONE
+5. **Bucket 6** (v5 split edge cases — empty-separator + limit 0/-1) ✅ DONE
+6. **Auto-box constructor `this`** — tryAutoBoxPrimitive now pushes
+   local scope with `this` bound to the wrapper for DefineFunction2
+   constructors. Fixes the `a.id == 'wonder*'` wonder-test pattern.
+7. **Enumerate fallback for built-in globals** — actionEnumerate falls
+   back to actionGetVariable when var_map has an uninitialized slot.
+   Fixes `for (v in String)` / `for (m in Math)` at root context.
+8. **Math properties DONT_ENUM** — post-init loop clears ENUMERABLE on
+   all Math constants + methods (no-op before because enumerate
+   couldn't reach Math, but regression after fix #7).
+9. **fromCharCode DONT_ENUM** — clears ENUMERABLE on
+   `String.fromCharCode`.
+10. **g_string_constructor.own_props.__proto__** — set to
+    Function.prototype so for-in walks the chain.
 
-1. **Bucket 1** (.call/stub) — 1h × +8 lines total (v6/v7/v8). ✅ DONE
-2. **Bucket 3** (delete toString) — 2h × +8 lines total (all 4). ✅ DONE
-3. **Bucket 2** (constructor identity) — 1–2h × +8 lines total. ✅ DONE
-4. **Bucket 4** (toString override) — 2h × +12 lines total. ✅ DONE
-5. **Bucket 7** (hasOwnProperty __proto__) — 30min × +1 line v5.
-6. **Bucket 6** (v5 split edge cases) — 3h × +12 lines v5.
-7. **Bucket 5** (watch/addProperty saved) — 4–8h × +37 lines total.
-
-After 1–4, v6/v7/v8 close from 16/19/19 ours-only lines down to
-~1/11/11. v6 is 1 line away from ruffle_matched (Bucket 5 line 371
-`saved2.value !== saved3.value`). v7/v8 still need more work — Bucket 5
-remains the big ticket for them. The gap between v6 and v7/v8 (10 more
-ours-only lines) maps to lines 356/357/364 (`a.toString()`) and
-365–374 (`saved*.value` + `a.id`) which behave differently in
-SWF7+ — likely a cascade from a single upstream difference in test
-setup.
-
-For v5, Buckets 6 + 7 clear the v5-unique items (~13 lines); Bucket 5
-clears the last 7. So v5 also needs Bucket 5.
+Bucket 5 (watch/addProperty "saved" pattern) and Bucket 7
+(`String.hasOwnProperty('__proto__')`) turned out to already be
+handled by the cascade fixes above, once Bucket 4 was fully wired.
 
 ## Implementation notes (landed)
 
