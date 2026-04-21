@@ -1,10 +1,10 @@
 # Ruffle Test Results (Filtered)
 
-**Date**: 2026-04-21 15:42 UTC
+**Date**: 2026-04-21 17:04 UTC
 
-**Git SHA**: `23e1174436`
+**Git SHA**: `491435c0ec`
 
-**Run Duration**: 4m 13s
+**Run Duration**: 3m 54s
 
 **Filtered**: 0 tests ignored out of 16 available
 
@@ -18,8 +18,8 @@
 | Effective pass | **6** (37.5%) |
 | Failing | 10 |
 | Total expected lines | 499 |
-| Matching lines | 217 (43.5%) |
-| Mismatched lines | 282 |
+| Matching lines | 219 (43.9%) |
+| Mismatched lines | 280 |
 
 ### Failure Breakdown
 
@@ -33,9 +33,9 @@
 
 | # | Test | Lines | Duration | Notes |
 |---|------|-------|----------|-------|
-| 1 | `gotoFrameLabelAsFunction` | 6 | 19.1s |  |
-| 2 | `hello` | 4 | 17.1s |  |
-| 3 | `submoviegetvar` | 4 | 18.1s |  |
+| 1 | `gotoFrameLabelAsFunction` | 6 | 16.9s |  |
+| 2 | `hello` | 4 | 16.8s |  |
+| 3 | `submoviegetvar` | 4 | 15.8s |  |
 
 ## Ruffle-Matched Tests
 
@@ -43,9 +43,9 @@
 
 | # | Test | Our diffs | Ruffle diffs | Duration | Notes |
 |---|------|-----------|--------------|----------|-------|
-| 1 | `action_execution_order_test10` | 14 | 14 | 17.5s |  |
-| 2 | `movieclip_destruction_test1` | 52 | 52 | 18.4s |  |
-| 3 | `registerclass_test3` | 20 | 20 | 17.6s |  |
+| 1 | `action_execution_order_test10` | 14 | 14 | 19.2s |  |
+| 2 | `movieclip_destruction_test1` | 52 | 52 | 16.4s |  |
+| 3 | `registerclass_test3` | 20 | 20 | 15.8s |  |
 
 ## Near-Passing Tests
 
@@ -87,5 +87,5 @@ No timeouts.
 | 6 | `sound` | 41.7% | 5/12 | 12 | 7 |  |
 | 7 | `soft_reference_test1` | 31.1% | 14/45 | 42 | 45 |  |
 | 8 | `button_test1` | 25.8% | 8/31 | 20 | 31 |  |
-| 9 | `movieclip_destruction_test4` | 15.0% | 6/40 | 24 | 40 |  |
+| 9 | `movieclip_destruction_test4` | 20.0% | 8/40 | 24 | 40 |  |
 | 10 | `opcode_guard_test2` | 0.0% | 0/26 | 26 | 24 |  |
