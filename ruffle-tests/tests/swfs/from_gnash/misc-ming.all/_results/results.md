@@ -1,10 +1,10 @@
 # Ruffle Test Results (Unfiltered)
 
-**Date**: 2026-04-21 05:44 UTC
+**Date**: 2026-04-21 15:42 UTC
 
-**Git SHA**: `06feeaca16`
+**Git SHA**: `23e1174436`
 
-**Run Duration**: 27m 17s
+**Run Duration**: 27m 23s
 
 ## Summary
 
@@ -32,25 +32,25 @@
 
 | # | Test | Lines | Duration | Notes |
 |---|------|-------|----------|-------|
-| 1 | `PlaceObject2Test` | 9 | 17.5s |  |
+| 1 | `PlaceObject2Test` | 9 | 19.7s |  |
 | 2 | `VarAndCharClashTest` | 13 | 1.4s |  |
-| 3 | `Video-EmbedSquareTest` | 2 | 17.8s |  |
-| 4 | `action_order/action_execution_order_test1` | 10 | 17.2s |  |
+| 3 | `Video-EmbedSquareTest` | 2 | 18.1s |  |
+| 4 | `action_order/action_execution_order_test1` | 10 | 18.2s |  |
 | 5 | `action_order/action_execution_order_test7` | 7 | 17.2s |  |
-| 6 | `action_order/action_execution_order_test9` | 4 | 17.2s |  |
-| 7 | `displaylist_depths/displaylist_depths_test10` | 10 | 17.4s |  |
-| 8 | `displaylist_depths/displaylist_depths_test4` | 26 | 17.7s |  |
+| 6 | `action_order/action_execution_order_test9` | 4 | 17.7s |  |
+| 7 | `displaylist_depths/displaylist_depths_test10` | 10 | 17.2s |  |
+| 8 | `displaylist_depths/displaylist_depths_test4` | 26 | 17.3s |  |
 | 9 | `displaylist_depths/displaylist_depths_test5` | 25 | 1.6s |  |
 | 10 | `displaylist_depths/displaylist_depths_test6` | 13 | 1.5s |  |
 | 11 | `displaylist_depths/displaylist_depths_test7` | 14 | 0.9s |  |
-| 12 | `getTimer_test` | 8 | 17.5s |  |
-| 13 | `loop/simple_loop_test` | 0 | 17.3s |  |
-| 14 | `masks_test2` | 10 | 17.8s |  |
-| 15 | `morph_test1` | 0 | 17.2s |  |
-| 16 | `move_object_test` | 11 | 17.7s |  |
-| 17 | `multi_doactions_and_goto_frame_test` | 6 | 17.7s |  |
-| 18 | `timeline_var_test` | 11 | 13.9s |  |
-| 19 | `unload_movieclip_test1` | 6 | 13.6s |  |
+| 12 | `getTimer_test` | 8 | 18.8s |  |
+| 13 | `loop/simple_loop_test` | 0 | 14.4s |  |
+| 14 | `masks_test2` | 10 | 16.9s |  |
+| 15 | `morph_test1` | 0 | 16.5s |  |
+| 16 | `move_object_test` | 11 | 17.6s |  |
+| 17 | `multi_doactions_and_goto_frame_test` | 6 | 17.5s |  |
+| 18 | `timeline_var_test` | 11 | 18.0s |  |
+| 19 | `unload_movieclip_test1` | 6 | 17.7s |  |
 
 ## Ruffle-Matched Tests
 
@@ -58,17 +58,17 @@
 
 | # | Test | Our diffs | Ruffle diffs | Duration | Notes |
 |---|------|-----------|--------------|----------|-------|
-| 1 | `KeyEventOrder` | 20 | 23 | 17.8s |  |
-| 2 | `action_order/action_execution_order_test4` | 8 | 26 | 2.6s |  |
-| 3 | `action_order/action_execution_order_test6` | 19 | 21 | 18.4s |  |
-| 4 | `attachExtImported` | 1 | 1 | 18.1s |  |
-| 5 | `callFunction_test` | 5 | 11 | 18.3s |  |
-| 6 | `init_action/InitActionTest` | 17 | 17 | 17.9s |  |
+| 1 | `KeyEventOrder` | 20 | 23 | 17.5s |  |
+| 2 | `action_order/action_execution_order_test4` | 8 | 26 | 2.7s |  |
+| 3 | `action_order/action_execution_order_test6` | 19 | 21 | 18.1s |  |
+| 4 | `attachExtImported` | 1 | 1 | 19.0s |  |
+| 5 | `callFunction_test` | 5 | 11 | 18.0s |  |
+| 6 | `init_action/InitActionTest` | 17 | 17 | 18.1s |  |
 | 7 | `init_action/InitActionTest2` | 30 | 30 | 19.3s |  |
-| 8 | `path_format_test` | 28 | 28 | 20.8s |  |
-| 9 | `place_object_test` | 14 | 14 | 18.9s |  |
-| 10 | `place_object_test2` | 16 | 23 | 18.6s |  |
-| 11 | `runtime_vm_stack_test` | 5 | 8 | 18.4s |  |
+| 8 | `path_format_test` | 28 | 28 | 20.2s |  |
+| 9 | `place_object_test` | 14 | 14 | 17.8s |  |
+| 10 | `place_object_test2` | 16 | 23 | 18.5s |  |
+| 11 | `runtime_vm_stack_test` | 5 | 8 | 17.9s |  |
 
 ## Near-Passing Tests
 
