@@ -143,6 +143,13 @@ static int g_sprite_init_filter_active = 0;
 static int g_sprite_init_before_target = 0;
 static size_t g_sprite_init_target_frame = 0;
 
+// Phase 7a forward declarations (definitions after queue_register_ctor).
+static int pcl_obj_matches(void* user, void* ctx);
+typedef struct {
+	DisplayObject* obj;
+	frame_func action;
+} PendingClipLoad;
+
 // g_settarget_explicit_root: set by actionSetTarget("_root"/"") to distinguish
 // "goto root" from "goto unnamed sprite with inherited root context".
 // Declared in action.c; saved/cleared/restored here per sprite-frame invocation.
@@ -352,17 +359,31 @@ static void process_sprite_init_at_depth(SWFAppContext* app_context, MovieClip* 
 
 			// Phase 7a: CLIP_EVENT_LOAD clip-actions are queued at placement
 			// time in tagPlaceObject2 / tagPlaceObject2Ratio (AQ_KIND_CLIP_LOAD,
-			// NORMAL priority). Drain THIS sprite's entries now — same
-			// observable point as the pre-migration synchronous fire. Nested
-			// children's CLIP_LOAD entries stay queued and drain when we
-			// recurse into them below. The actionFindOrCreateMovieClip call
-			// matches the one in queue_clip_load_events, so the MC pointer
-			// filter hits the entries we queued at placement.
+			// NORMAL priority, keyed on the DisplayObject pointer). Drain
+			// THIS sprite's entries now — same observable point as the
+			// pre-migration synchronous fire. Nested children's CLIP_LOAD
+			// entries stay queued (their DisplayObject pointer belongs to
+			// a different obj) and drain when we recurse into them below.
+			// MC lookup happens here rather than at queue time so it uses
+			// the correct parent_mc (queue-time lookup can misparent when
+			// a clip_actions-less parent's eager init hasn't set
+			// g_current_context yet — see function_base_clip_readded).
 			if (obj->clip_action_count > 0 && obj->instance_name != NULL)
 			{
-				MovieClip* mc2 = actionFindOrCreateMovieClip(app_context, obj->instance_name, parent_mc);
+				MovieClip* mc2 = actionFindOrCreateMovieClip(
+					app_context, obj->instance_name, parent_mc);
 				if (mc2) {
-					actionDrainActionQueueForClip(app_context, mc2, AQ_KIND_CLIP_LOAD);
+					for (;;) {
+						void* user = actionQueuePopMatching(
+							AQ_KIND_CLIP_LOAD, pcl_obj_matches, (void*)obj);
+						if (user == NULL) break;
+						PendingClipLoad* pcl = (PendingClipLoad*) user;
+						MovieClip* saved_ctx2 = g_current_context;
+						actionSetCurrentContext(mc2);
+						pcl->action(app_context);
+						actionSetCurrentContext(saved_ctx2);
+						free(pcl);
+					}
 				}
 			}
 
@@ -3339,32 +3360,54 @@ static void queue_register_ctor(SWFAppContext* app_context, size_t depth, size_t
 // LOAD is FIFO-first among its own NORMAL-priority entries — the ordering
 // 7b relies on when sprite DoAction joins the queue). Drained per-sprite
 // inside process_sprite_init_at_depth at the same observable point where
-// the pre-migration synchronous fire lived, via actionDrainActionQueueForClip,
-// so the LOAD → DoAction → recurse interleave is preserved while sprite
-// DoAction still fires synchronously via Phase 2 (deleted in Phase 8 after
-// 7b lands).
-typedef struct {
-	MovieClip* mc;
-	frame_func action;
-} PendingClipLoad;
+// the pre-migration synchronous fire lived. The payload stores a pointer
+// to the DisplayObject (stable within the parent's sprite_display_list)
+// rather than a MovieClip pointer, because at queue time (during nested
+// eager init) g_current_context may not yet point at the parent sprite's
+// MC — a clip_actions-less parent's MC isn't pre-created by the queue
+// helpers, so exec_sprite_frame's findMovieClipByName returns NULL and
+// the MC lookup would misparent the child to root. Deferring the MC
+// lookup to drain time avoids the issue: process_sprite_init_at_depth
+// already has the correctly-parented child_mc in hand when it drains.
+// (PendingClipLoad struct forward-declared near top of file.)
 
+// Dispatch fallback for the tagShowFrame safety drain (called via
+// actionDrainActionQueueByKind when per-sprite drain missed an entry).
+// Looks up the MC via the display object's instance_name with root as
+// fallback parent. Edge-case path only; the common path consumes all
+// entries through the per-sprite drain in process_sprite_init_at_depth
+// (which has the correct parent chain).
 static void aq_dispatch_clip_load(SWFAppContext* app_context, void* user)
 {
 	PendingClipLoad* pcl = (PendingClipLoad*) user;
 	if (pcl == NULL) return;
 	MovieClip* saved_ctx = g_current_context;
-	if (pcl->mc) actionSetCurrentContext(pcl->mc);
+	if (pcl->obj != NULL && pcl->obj->instance_name != NULL) {
+		MovieClip* mc = actionFindOrCreateMovieClip(
+			app_context, pcl->obj->instance_name, &root_movieclip);
+		if (mc) actionSetCurrentContext(mc);
+	}
 	pcl->action(app_context);
 	actionSetCurrentContext(saved_ctx);
 	free(pcl);
 }
 
+// Predicate for actionQueuePopMatching: match a PendingClipLoad whose
+// obj pointer equals the DisplayObject we're currently initializing.
+static int pcl_obj_matches(void* user, void* ctx)
+{
+	PendingClipLoad* pcl = (PendingClipLoad*) user;
+	DisplayObject*   obj = (DisplayObject*) ctx;
+	return (pcl != NULL && pcl->obj == obj);
+}
+
 static void queue_clip_load_events(SWFAppContext* app_context, size_t depth)
 {
+	(void)app_context;
 	if (display_list[depth].clip_action_count == 0) return;
 	if (display_list[depth].instance_name == NULL) return;
 	// Bail early when there's no LOAD handler on this entry — avoids a
-	// spurious actionFindOrCreateMovieClip for entries that only carry
+	// spurious queue entry for sprites that only carry
 	// INITIALIZE/CONSTRUCT/UNLOAD/etc.
 	int _has_load = 0;
 	for (size_t a = 0; a < display_list[depth].clip_action_count; a++) {
@@ -3375,18 +3418,21 @@ static void queue_clip_load_events(SWFAppContext* app_context, size_t depth)
 	}
 	if (!_has_load) return;
 
-	MovieClip* _parent_mc = g_current_context ? g_current_context : &root_movieclip;
-	MovieClip* _mc = actionFindOrCreateMovieClip(
-		app_context, display_list[depth].instance_name, _parent_mc);
 	for (size_t a = 0; a < display_list[depth].clip_action_count; a++) {
 		if (!(display_list[depth].clip_actions[a].event_flags & CLIP_EVENT_LOAD))
 			continue;
 		PendingClipLoad* pcl = (PendingClipLoad*) malloc(sizeof(PendingClipLoad));
 		if (pcl == NULL) continue;
-		pcl->mc = _mc;
+		pcl->obj    = &display_list[depth];
 		pcl->action = display_list[depth].clip_actions[a].action;
+		// clip=NULL: is_unload gating is disabled for CLIP_LOAD entries.
+		// Placement-time queueing + per-sprite drain inside
+		// process_sprite_init_at_depth make removal-before-drain
+		// effectively impossible in the common path — the sprite is
+		// either initialized (drain fires) or pre-removed with its
+		// clip_actions overwritten (no entry in the queue for that obj).
 		actionQueueCallbackEx(app_context, aq_dispatch_clip_load, (void*)pcl,
-		                      AQ_PRIORITY_NORMAL, _mc, /*is_unload=*/0,
+		                      AQ_PRIORITY_NORMAL, /*clip=*/NULL, /*is_unload=*/0,
 		                      AQ_KIND_CLIP_LOAD);
 	}
 }

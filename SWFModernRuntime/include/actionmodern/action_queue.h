@@ -79,13 +79,19 @@ void actionDrainActionQueueFiltered(SWFAppContext* app_context,
 void actionDrainActionQueueByKind(SWFAppContext* app_context,
                                   ActionQueueKind kind_filter);
 
-// Per-clip + kind drain. Pops entries whose kind == `kind_filter` AND whose
-// clip pointer == `clip`. Phase 7a uses this inside process_sprite_init_at_depth
-// to fire a specific sprite's CLIP_EVENT_LOAD entries (queued at placement
-// time) in the observable position of the pre-migration synchronous fire.
-void actionDrainActionQueueForClip(SWFAppContext* app_context,
-                                   MovieClip* clip,
-                                   ActionQueueKind kind_filter);
+// Pop the highest-priority entry of `kind_filter` whose user payload
+// satisfies `pred(user, ctx)`, returning the user pointer (caller owns
+// lifetime). Returns NULL when no matching entries remain. Unlike
+// actionDrainActionQueueByKind, the entry's dispatch fn is NOT called —
+// the caller has full control over dispatch. Used by Phase 7a's
+// per-sprite CLIP_LOAD drain: queue-time findOrCreate would misparent
+// child MCs when a clip_actions-less parent's eager init hadn't yet
+// set g_current_context to the parent MC, so the payload instead
+// stores a DisplayObject pointer and the MC lookup happens at drain
+// time against the correct parent chain.
+void* actionQueuePopMatching(ActionQueueKind kind_filter,
+                             int (*pred)(void* user, void* ctx),
+                             void* ctx);
 
 // Discard all queued entries without dispatching (e.g. catch-up resets).
 void actionResetActionQueue(SWFAppContext* app_context);

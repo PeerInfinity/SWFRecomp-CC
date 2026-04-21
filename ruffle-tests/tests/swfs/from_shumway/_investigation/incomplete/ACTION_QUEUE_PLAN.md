@@ -223,30 +223,49 @@ deferral mechanisms into one queue. Last updated 2026-04-19.
   firing migrated from the synchronous Phase 2 site at
   `process_sprite_init_at_depth` (tag.c:354–365 before this phase) into
   placement-time queueing. `AQ_KIND_CLIP_LOAD = 8` added (AQ_KIND_COUNT→9).
-  `queue_clip_load_events` in tag.c mirrors the Phase 4 `PendingClipInit`
-  pattern: a heap-allocated `PendingClipLoad{mc, action}` payload per LOAD
-  clip-action, enqueued at `AQ_PRIORITY_NORMAL` / `AQ_KIND_CLIP_LOAD` with
-  `clip=_mc`. The enqueue site in `tagPlaceObject2` and `tagPlaceObject2Ratio`
-  sits after `queue_register_ctor` and before the eager-init `CALL_FRAME`
-  block, so this sprite's LOAD is FIFO-first among its own Normal-priority
-  entries — the ordering 7b will rely on when sprite DoAction joins the
-  queue.
-  - **Per-clip drain (not SHOW_FRAME drain)** — the prompt's suggestion to
-    drain CLIP_LOAD at the root `SWF_TAG_SHOW_FRAME` kind-filtered site in
-    `swf.cpp` would regress `clip_events` in 7a-alone: sprite DoAction is
-    still firing synchronously via Phase 2 inside `tagShowFrame`, so a
-    bulk SHOW_FRAME drain of LOAD exhausts all LOADs before any DoAction
-    runs → loses the per-sprite `LOAD → frame_0 → child LOAD → child
-    frame_0` interleave. Instead, added
-    `actionDrainActionQueueForClip(ctx, MovieClip*, kind)` to
-    `action_queue.{h,c}` and drained per-sprite inside
-    `process_sprite_init_at_depth` at exactly the observable point the
-    pre-migration synchronous fire lived. Each per-sprite drain consumes
-    only that MC's CLIP_LOAD entries (matched by clip pointer); nested
-    children's entries stay queued and fire when the recursion reaches
-    them. When 7b lands (sprite DoAction at SCRIPT kind, Phase 2
-    deleted), the per-sprite drain goes away and a single Normal-priority
-    FIFO drain at SHOW_FRAME produces the same interleave naturally.
+  `queue_clip_load_events` in tag.c sits after `queue_register_ctor` and
+  before the eager-init `CALL_FRAME` block in both `tagPlaceObject2` and
+  `tagPlaceObject2Ratio`, so this sprite's LOAD is FIFO-first among its
+  own Normal-priority entries — the ordering 7b will rely on when sprite
+  DoAction joins the queue.
+  - **Per-sprite drain (not SHOW_FRAME drain)** — the plan's suggestion
+    to drain CLIP_LOAD at the root `SWF_TAG_SHOW_FRAME` kind-filtered
+    site in `swf.cpp` would regress `clip_events` in 7a-alone: sprite
+    DoAction is still firing synchronously via Phase 2 inside
+    `tagShowFrame`, so a bulk SHOW_FRAME drain of LOAD exhausts all
+    LOADs before any DoAction runs → loses the per-sprite
+    `LOAD → frame_0 → child LOAD → child frame_0` interleave. Instead,
+    drained per-sprite inside `process_sprite_init_at_depth` at exactly
+    the observable point the pre-migration synchronous fire lived. Each
+    per-sprite drain consumes only that sprite's CLIP_LOAD entries
+    (matched by DisplayObject pointer); nested children's entries stay
+    queued and fire when the recursion reaches them. When 7b lands
+    (sprite DoAction at SCRIPT kind, Phase 2 deleted), the per-sprite
+    drain goes away and a single Normal-priority FIFO drain at
+    SHOW_FRAME produces the same interleave naturally.
+  - **Deferred MC lookup (payload keyed on DisplayObject, not
+    MovieClip)** — an initial attempt keyed queue entries on a
+    MovieClip pointer obtained at queue time via
+    `actionFindOrCreateMovieClip(instance_name, g_current_context)`.
+    That regressed `function_base_clip_readded` because during nested
+    eager init, a clip_actions-less parent sprite's MC isn't
+    pre-created by any queue helper, so `exec_sprite_frame`'s
+    `actionFindMovieClipByName` returns NULL, `g_current_context`
+    stays pointing at the outer (wrong) context, and the child's
+    `queue_clip_load_events` misparents the child MC to root. Fix:
+    defer MC lookup to drain time. Payload now stores a
+    `DisplayObject* obj` (stable within the parent's
+    sprite_display_list); `queue_clip_load_events` does no
+    `findOrCreate`. A new `actionQueuePopMatching(kind, pred, ctx)`
+    lets the drain site pop entries by DisplayObject predicate; the
+    caller (inside `process_sprite_init_at_depth`) already has the
+    correctly-parented `mc2` via `findOrCreate(obj->instance_name,
+    parent_mc)` and sets `g_current_context` to that for each popped
+    entry. A secondary `aq_dispatch_clip_load` covers the
+    `actionDrainActionQueueByKind` safety drain in `tagShowFrame` by
+    looking up the MC from `pcl->obj->instance_name` with
+    `&root_movieclip` as the fallback parent — edge-case only; the
+    common path consumes everything through the per-sprite drain.
   - **Safety drain moved to post-Phase-2** — a top-of-`tagShowFrame`
     CLIP_LOAD drain in the first attempt regressed `clip_events` because
     it exhausted the queue before `process_sprite_needs_init` ran. Moved
