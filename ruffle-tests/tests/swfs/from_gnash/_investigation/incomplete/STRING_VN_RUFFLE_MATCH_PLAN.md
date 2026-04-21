@@ -1,8 +1,9 @@
 # String-vN → ruffle_matched Plan
 <!-- TESTS: String-v5, String-v6, String-v7, String-v8 -->
 
-Last updated: 2026-04-21
-Status: NOT STARTED (supersedes `blocked/STRING_REGEX_PLAN.md`)
+Last updated: 2026-04-21 (Buckets 1–4 landed locally; not yet in CI)
+Status: IN PROGRESS — Buckets 1, 2, 3, 4 applied. None of the 4 tests reached
+`ruffle_matched` yet; v6 is closest (1 ours-only line beyond Ruffle's diffs).
 
 ---
 
@@ -24,6 +25,27 @@ be a subset of Ruffle's diffs — we don't need to match Flash exactly.
 
 "Ours-only" = lines where we fail but Ruffle passes. Closing these is
 sufficient for ruffle_matched.
+
+### After Buckets 1–4 applied (local, 2026-04-21)
+
+| Test | Status | Our diffs | Δ vs baseline | Ruffle diffs | Ours-only |
+|------|--------|-----------|---------------|--------------|-----------|
+| String-v5 | output_mismatch | 27 | −11 | 21 | ~6 |
+| String-v6 | output_mismatch | 11 | −13 | 10 | ~1 |
+| String-v7 | output_mismatch | 21 | −6  | 10 | ~11 |
+| String-v8 | output_mismatch | 21 | −6  | 10 | ~11 |
+
+`ruffle_matched` requires our diffs to be a **proper subset** of Ruffle's
+diffs against Flash's `output.txt`. We're not there on any of the four
+yet, but v6 is 1 line away (Bucket 5 territory: `saved1.value !==
+saved3.value`, line 371).
+
+Cross-test regression check (local): no regressions on avm1
+`string_coercion`, `string_methods`, `coerce_to_object_monkeypatch`,
+`primitive_type_globals`, `string_methods_swfv5`, `boxed_primitives`;
+Gnash `Boolean-v*`, `Number-v6/v7/v8`, `toString_valueOf-v*`,
+`delete-v*`, `Inheritance-v*` unchanged. `Number-v5` improved by 2
+lines (still output_mismatch).
 
 ## Why not regex
 
@@ -201,20 +223,66 @@ if we trace it; otherwise a small own_props registration miss.
 
 Sort by impact ÷ effort, weighted toward easy shared fixes first:
 
-1. **Bucket 1** (.call/stub) — 1h × +8 lines total (v6/v7/v8).
-2. **Bucket 3** (delete toString) — 2h × +8 lines total (all 4).
-3. **Bucket 2** (constructor identity) — 1–2h × +8 lines total.
-4. **Bucket 4** (toString override) — 2h × +12 lines total.
+1. **Bucket 1** (.call/stub) — 1h × +8 lines total (v6/v7/v8). ✅ DONE
+2. **Bucket 3** (delete toString) — 2h × +8 lines total (all 4). ✅ DONE
+3. **Bucket 2** (constructor identity) — 1–2h × +8 lines total. ✅ DONE
+4. **Bucket 4** (toString override) — 2h × +12 lines total. ✅ DONE
 5. **Bucket 7** (hasOwnProperty __proto__) — 30min × +1 line v5.
 6. **Bucket 6** (v5 split edge cases) — 3h × +12 lines v5.
 7. **Bucket 5** (watch/addProperty saved) — 4–8h × +37 lines total.
 
 After 1–4, v6/v7/v8 close from 16/19/19 ours-only lines down to
-~4/5/5, still short of ruffle_matched. Bucket 5 is mandatory to cross
-the line on v6/v7/v8.
+~1/11/11. v6 is 1 line away from ruffle_matched (Bucket 5 line 371
+`saved2.value !== saved3.value`). v7/v8 still need more work — Bucket 5
+remains the big ticket for them. The gap between v6 and v7/v8 (10 more
+ours-only lines) maps to lines 356/357/364 (`a.toString()`) and
+365–374 (`saved*.value` + `a.id`) which behave differently in
+SWF7+ — likely a cascade from a single upstream difference in test
+setup.
 
 For v5, Buckets 6 + 7 clear the v5-unique items (~13 lines); Bucket 5
 clears the last 7. So v5 also needs Bucket 5.
+
+## Implementation notes (landed)
+
+### Bucket 1 — `.call`/`.apply` on String stub methods
+`actionCallMethod` FUNCTION handler: when the callee is
+`builtin_stub_method` and `thisArg` is a String wrapper or
+string-coercible object, coerce to UTF-16 and dispatch via
+`callStringPrimitiveMethod` using `func->name`. SWF6+ only
+(Function.prototype.call was introduced in SWF6 — SWF5 gnash test
+expects undefined for this pattern). Mirror for `.apply` with
+array/array-like args.
+
+### Bucket 3 — DontDelete on Object.prototype methods
+Switched all Object.prototype methods (watch/unwatch/addProperty/
+valueOf/toString/hasOwnProperty/isPrototypeOf/isPropertyEnumerable/
+toLocaleString, plus the `constructor` placeholder) from `setProperty`
+(which defaults to ENUMERABLE|WRITABLE|CONFIGURABLE) to
+`setPropertyWithFlags` with ENUMERABLE|WRITABLE only. Matches Ruffle's
+PROTO_DECLS which use `DONT_ENUM | DONT_DELETE`.
+
+### Bucket 2 — `String.prototype.constructor == String`
+`getObjectPrototype` aside, the real issue was that
+`actionGetVariable("String")` at root context was falling through to a
+separate lazy static (`g_string_constructor`) with its own
+`prototype_obj`, while `new String()` and `getPrimitiveWrapperProto`
+used `&g_ctors[2].prototype_obj`. Bucket 2's fix: share `prototype_obj`
+between the two — at lazy-init time, `g_string_constructor.prototype_obj
+= getPropertyWithPrototype(global_object, "String").prototype_obj`.
+Also set `constructor = &g_string_constructor` on the shared prototype
+so `String.prototype.constructor == String` holds at root context.
+
+### Bucket 4 — primitive-string method dispatch via user override
+`actionCallMethod` STRING-type path: before falling through to
+`callStringPrimitiveMethod`, look up `method_name` on
+`getPrimitiveWrapperProto(STRING)`. If found and it's **not** one of
+the built-in wrappers (`builtin_stub_method`,
+`builtin_prim_wrapper_toString`, `builtin_wrapper_valueOf`), build a
+minimal String wrapper (native_type=NATIVE_STRING, __proto__=
+String.prototype, valueOf_value=primitive, length) and re-dispatch via
+`actionCallMethod` so the OBJECT-type path handles invocation through
+the full scope-chain/base_clip machinery.
 
 ## Success criteria
 

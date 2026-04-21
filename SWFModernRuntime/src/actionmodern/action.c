@@ -5907,11 +5907,17 @@ static ASObject* getObjectPrototype(SWFAppContext* app_context)
 		// So insert in reverse: constructor(placeholder), watch, unwatch, addProperty, valueOf,
 		//   toString, hasOwnProperty, isPrototypeOf, isPropertyEnumerable, toLocaleString
 
+		// Object.prototype methods are DONTDELETE in Flash/Ruffle (ECMAScript default
+		// for built-in prototypes). We keep ENUMERABLE since enumerate tests rely on
+		// the current behavior, but clear CONFIGURABLE so delete returns false until
+		// ASSetPropFlags re-enables deletion. Flags = ENUMERABLE|WRITABLE.
+		#define _OBJPROTO_DONTDELETE (PROPERTY_FLAG_ENUMERABLE | PROPERTY_FLAG_WRITABLE)
+
 		// constructor placeholder — filled in by ensureGlobalInit with Object constructor.
 		// Inserted first so it enumerates last in LIFO.
 		{
 			ActionVar _u = {0}; _u.type = ACTION_STACK_VALUE_UNDEFINED;
-			setProperty(app_context, g_object_prototype, "constructor", 11, &_u);
+			setPropertyWithFlags(app_context, g_object_prototype, "constructor", 11, &_u, PROPERTY_FLAG_WRITABLE);
 		}
 
 		// watch
@@ -5925,7 +5931,7 @@ static ASObject* getObjectPrototype(SWFAppContext* app_context)
 		{
 			ActionVar fv = {0}; fv.type = ACTION_STACK_VALUE_FUNCTION;
 			fv.data.numeric_value = (u64) &g_object_watch_func;
-			setProperty(app_context, g_object_prototype, "watch", 5, &fv);
+			setPropertyWithFlags(app_context, g_object_prototype, "watch", 5, &fv, _OBJPROTO_DONTDELETE);
 		}
 
 		// unwatch
@@ -5939,7 +5945,7 @@ static ASObject* getObjectPrototype(SWFAppContext* app_context)
 		{
 			ActionVar fv = {0}; fv.type = ACTION_STACK_VALUE_FUNCTION;
 			fv.data.numeric_value = (u64) &g_object_unwatch_func;
-			setProperty(app_context, g_object_prototype, "unwatch", 7, &fv);
+			setPropertyWithFlags(app_context, g_object_prototype, "unwatch", 7, &fv, _OBJPROTO_DONTDELETE);
 		}
 
 		// addProperty
@@ -5953,7 +5959,7 @@ static ASObject* getObjectPrototype(SWFAppContext* app_context)
 		{
 			ActionVar fv = {0}; fv.type = ACTION_STACK_VALUE_FUNCTION;
 			fv.data.numeric_value = (u64) &g_object_addProperty_func;
-			setProperty(app_context, g_object_prototype, "addProperty", 11, &fv);
+			setPropertyWithFlags(app_context, g_object_prototype, "addProperty", 11, &fv, _OBJPROTO_DONTDELETE);
 		}
 
 		// valueOf
@@ -5967,7 +5973,7 @@ static ASObject* getObjectPrototype(SWFAppContext* app_context)
 		{
 			ActionVar fv = {0}; fv.type = ACTION_STACK_VALUE_FUNCTION;
 			fv.data.numeric_value = (u64) &g_object_valueOf_func;
-			setProperty(app_context, g_object_prototype, "valueOf", 7, &fv);
+			setPropertyWithFlags(app_context, g_object_prototype, "valueOf", 7, &fv, _OBJPROTO_DONTDELETE);
 		}
 
 		// toString
@@ -5981,7 +5987,7 @@ static ASObject* getObjectPrototype(SWFAppContext* app_context)
 		{
 			ActionVar fv = {0}; fv.type = ACTION_STACK_VALUE_FUNCTION;
 			fv.data.numeric_value = (u64) &g_object_toString_func;
-			setProperty(app_context, g_object_prototype, "toString", 8, &fv);
+			setPropertyWithFlags(app_context, g_object_prototype, "toString", 8, &fv, _OBJPROTO_DONTDELETE);
 		}
 
 		// hasOwnProperty
@@ -5995,7 +6001,7 @@ static ASObject* getObjectPrototype(SWFAppContext* app_context)
 		{
 			ActionVar fv = {0}; fv.type = ACTION_STACK_VALUE_FUNCTION;
 			fv.data.numeric_value = (u64) &g_object_hasOwnProperty_func;
-			setProperty(app_context, g_object_prototype, "hasOwnProperty", 14, &fv);
+			setPropertyWithFlags(app_context, g_object_prototype, "hasOwnProperty", 14, &fv, _OBJPROTO_DONTDELETE);
 		}
 
 		// isPrototypeOf
@@ -6009,7 +6015,7 @@ static ASObject* getObjectPrototype(SWFAppContext* app_context)
 		{
 			ActionVar fv = {0}; fv.type = ACTION_STACK_VALUE_FUNCTION;
 			fv.data.numeric_value = (u64) &g_object_isPrototypeOf_func;
-			setProperty(app_context, g_object_prototype, "isPrototypeOf", 13, &fv);
+			setPropertyWithFlags(app_context, g_object_prototype, "isPrototypeOf", 13, &fv, _OBJPROTO_DONTDELETE);
 		}
 
 		// isPropertyEnumerable
@@ -6023,7 +6029,7 @@ static ASObject* getObjectPrototype(SWFAppContext* app_context)
 		{
 			ActionVar fv = {0}; fv.type = ACTION_STACK_VALUE_FUNCTION;
 			fv.data.numeric_value = (u64) &g_object_isPropertyEnumerable_func;
-			setProperty(app_context, g_object_prototype, "isPropertyEnumerable", 20, &fv);
+			setPropertyWithFlags(app_context, g_object_prototype, "isPropertyEnumerable", 20, &fv, _OBJPROTO_DONTDELETE);
 		}
 
 		// toLocaleString (delegates to toString)
@@ -6038,7 +6044,7 @@ static ASObject* getObjectPrototype(SWFAppContext* app_context)
 				function_registry[function_count++] = &g_object_toLocaleString_func;
 			ActionVar fv = {0}; fv.type = ACTION_STACK_VALUE_FUNCTION;
 			fv.data.numeric_value = (u64) &g_object_toLocaleString_func;
-			setProperty(app_context, g_object_prototype, "toLocaleString", 14, &fv);
+			setPropertyWithFlags(app_context, g_object_prototype, "toLocaleString", 14, &fv, _OBJPROTO_DONTDELETE);
 
 			// Set up own_props (constructor + __proto__) and no_lazy_prototype on all
 			// Object.prototype method functions. This prevents lazy prototype creation
@@ -32077,10 +32083,29 @@ check_special_vars:
 				VAL(u64, &fcc_val.data.numeric_value) = (u64) &g_string_fromCharCode_func;
 				setProperty(app_context, g_string_constructor.own_props, "fromCharCode", 12, &fcc_val);
 
-				// Create String.prototype with own valueOf/toString
-				g_string_constructor.prototype_obj = allocObject(app_context, 8);
-				retainObject(g_string_constructor.prototype_obj);
-				setObjectProto(app_context, g_string_constructor.prototype_obj);
+				// Share prototype_obj with the primary String constructor
+				// (registered on global_object as "String" via REG_FUNC) so
+				// that user modifications via either path are visible to both.
+				// This is critical for primitive-string method dispatch, where
+				// my STRING-type handler in actionCallMethod looks up method on
+				// String.prototype via getPrimitiveWrapperProto (global path).
+				ensureGlobalInit(app_context);
+				ASObject* _shared_proto = NULL;
+				if (global_object != NULL) {
+					ActionVar* _sv = getPropertyWithPrototype(global_object, "String", 6);
+					if (_sv != NULL && _sv->type == ACTION_STACK_VALUE_FUNCTION) {
+						ASFunction* _sf = (ASFunction*)(uintptr_t) _sv->data.numeric_value;
+						if (_sf != NULL) _shared_proto = _sf->prototype_obj;
+					}
+				}
+				if (_shared_proto != NULL) {
+					g_string_constructor.prototype_obj = _shared_proto;
+					retainObject(g_string_constructor.prototype_obj);
+				} else {
+					g_string_constructor.prototype_obj = allocObject(app_context, 8);
+					retainObject(g_string_constructor.prototype_obj);
+					setObjectProto(app_context, g_string_constructor.prototype_obj);
+				}
 				if (!g_wrapper_funcs_init) {
 					memset(&g_wrapper_valueOf_func, 0, sizeof(ASFunction));
 					strncpy(g_wrapper_valueOf_func.name, "valueOf", 255);
@@ -32101,6 +32126,14 @@ check_special_vars:
 					ActionVar _ts = {0}; _ts.type = ACTION_STACK_VALUE_FUNCTION;
 					_ts.data.numeric_value = (u64)&g_prim_wrapper_toString_func;
 					setPropertyWithFlags(app_context, g_string_constructor.prototype_obj, "toString", 8, &_ts, PROPERTY_FLAG_WRITABLE);
+					// String.prototype.constructor = String (identity match with
+					// GetVariable("String") at root context, which returns the
+					// lazy g_string_constructor static). Note: g_string_constructor
+					// and the primary g_ctors[2] share prototype_obj, so writing
+					// constructor here is the single source of truth.
+					ActionVar _ctor = {0}; _ctor.type = ACTION_STACK_VALUE_FUNCTION;
+					_ctor.data.numeric_value = (u64)&g_string_constructor;
+					setPropertyWithFlags(app_context, g_string_constructor.prototype_obj, "constructor", 11, &_ctor, PROPERTY_FLAG_WRITABLE);
 				}
 				// Core String methods on prototype (for typeof/hasOwnProperty checks)
 				{
@@ -52402,7 +52435,68 @@ void actionCallMethod(SWFAppContext* app_context, char* str_buffer)
 	}
 	else if (obj_var.type == ACTION_STACK_VALUE_STRING)
 	{
-		// String primitive - call built-in string methods (UTF-16 native)
+		// String primitive - call built-in string methods (UTF-16 native).
+		// First check for user-overridden methods on String.prototype: Flash
+		// auto-boxes primitives for method access, and overriding
+		// String.prototype.toString / valueOf / any method should win over the
+		// built-in fast path. The built-in wrappers (builtin_stub_method,
+		// builtin_prim_wrapper_toString, builtin_wrapper_valueOf) are
+		// placeholders that we bypass; user-defined functions dispatch via
+		// auto-box + normal method invocation.
+		{
+			ASObject* _sp_proto = getPrimitiveWrapperProto(ACTION_STACK_VALUE_STRING);
+			if (_sp_proto != NULL) {
+				ActionVar* _sp_method = getPropertyWithPrototype(_sp_proto, method_name, method_name_len);
+				if (_sp_method != NULL && _sp_method->type == ACTION_STACK_VALUE_FUNCTION) {
+					ASFunction* _sp_fn = lookupFunctionFromVar(_sp_method);
+					int _sp_is_builtin = 0;
+					if (_sp_fn != NULL && _sp_fn->function_type == 2 && (
+					    _sp_fn->advanced_func == (Function2Ptr) builtin_stub_method ||
+					    _sp_fn->advanced_func == (Function2Ptr) builtin_prim_wrapper_toString ||
+					    _sp_fn->advanced_func == (Function2Ptr) builtin_wrapper_valueOf))
+						_sp_is_builtin = 1;
+					if (_sp_fn != NULL && !_sp_is_builtin) {
+						// User-overridden method — build a minimal String wrapper
+						// directly so we don't depend on tryAutoBoxPrimitive
+						// (which returns -1 for the built-in String ctor with no
+						// simple_func/advanced_func). Re-dispatch via CallMethod.
+						ASObject* _sp_wrap = allocObject(app_context, 4);
+						retainObject(_sp_wrap);
+						_sp_wrap->native_type = NATIVE_STRING;
+						ActionVar _sp_proto_val = {0};
+						_sp_proto_val.type = ACTION_STACK_VALUE_OBJECT;
+						_sp_proto_val.data.numeric_value = (u64) _sp_proto;
+						setPropertyWithFlags(app_context, _sp_wrap, "__proto__", 9, &_sp_proto_val, PROPERTY_FLAGS_DONTENUM);
+						setPropertyWithFlags(app_context, _sp_wrap, "valueOf_value", 13, &obj_var, PROPERTY_FLAGS_DONTENUM);
+						// length as a DontEnum own property (mirrors new String() path)
+						{
+							ActionVar _sp_len = {0};
+							_sp_len.type = ACTION_STACK_VALUE_F64;
+							double _sp_len_d = (double) obj_var.str_size;
+							VAL(double, &_sp_len.data.numeric_value) = _sp_len_d;
+							setPropertyWithFlags(app_context, _sp_wrap, "length", 6, &_sp_len, PROPERTY_FLAG_WRITABLE);
+						}
+						ActionVar _sp_this = {0};
+						_sp_this.type = ACTION_STACK_VALUE_OBJECT;
+						_sp_this.data.numeric_value = (u64) _sp_wrap;
+
+						// Push args back in reverse order, then num_args, receiver, method name
+						for (int i = (int)num_args - 1; i >= 0; i--)
+							pushVar(app_context, &args[i]);
+						ActionVar _na = {0};
+						_na.type = ACTION_STACK_VALUE_F64;
+						VAL(double, &_na.data.numeric_value) = (double)num_args;
+						pushVar(app_context, &_na);
+						pushVar(app_context, &_sp_this);
+						PUSH_STR(method_name, method_name_len);
+						if (args != NULL) FREE(args);
+						actionCallMethod(app_context, str_buffer);
+						return;
+					}
+				}
+			}
+		}
+
 		const uint16_t* str_value = varGetU16Ptr(&obj_var);
 		if (str_value == NULL) str_value = u16_empty;
 		u32 str_len = obj_var.str_size;
@@ -52512,6 +52606,58 @@ void actionCallMethod(SWFAppContext* app_context, char* str_buffer)
 		if (method_name_len == 4 && strncmp(method_name, "call", 4) == 0)
 		{
 			// Function.call(thisArg, arg1, arg2, ...)
+			// String.prototype stub dispatch via Function.prototype.call:
+			// `String.prototype.slice.call(a, -5, -3)` — the callee is the stub
+			// and thisArg is a String wrapper or any value we can coerce via
+			// toString. Mirror the direct-method dispatch at ~51809 so both
+			// invocation styles share the same semantics. SWF6+ only:
+			// Function.prototype.call was introduced in SWF6 (hidden in SWF5 via
+			// flash_flags); v5 gnash String test expects undefined here.
+			if (g_swf_version >= 6 && func != NULL && func->function_type == 2
+			    && func->advanced_func == (Function2Ptr) builtin_stub_method
+			    && num_args >= 1)
+			{
+				const uint16_t* _cs_str = NULL;
+				u32 _cs_len = 0;
+				ActionVar _cs_ts = {0};
+				if (args[0].type == ACTION_STACK_VALUE_STRING) {
+					_cs_str = varGetU16Ptr(&args[0]);
+					_cs_len = args[0].str_size;
+				} else if (args[0].type == ACTION_STACK_VALUE_OBJECT) {
+					ASObject* _cs_obj = (ASObject*)(uintptr_t) args[0].data.numeric_value;
+					if (_cs_obj != NULL && _cs_obj->native_type == NATIVE_STRING) {
+						ActionVar* _cs_prim = getProperty(_cs_obj, "valueOf_value", 13);
+						if (_cs_prim != NULL && _cs_prim->type == ACTION_STACK_VALUE_STRING) {
+							_cs_str = varGetU16Ptr(_cs_prim);
+							_cs_len = _cs_prim->str_size;
+						}
+					}
+					if (_cs_str == NULL && _cs_obj != NULL) {
+						int _cs_ts_found = 0;
+						_cs_ts = objectCallToString(app_context, &args[0], &_cs_ts_found);
+						if (_cs_ts_found && _cs_ts.type == ACTION_STACK_VALUE_STRING) {
+							_cs_str = varGetU16Ptr(&_cs_ts);
+							_cs_len = _cs_ts.str_size;
+						}
+					}
+				}
+				if (_cs_str != NULL) {
+					u32 _cs_argc = num_args > 1 ? num_args - 1 : 0;
+					ActionVar* _cs_args = NULL;
+					if (_cs_argc > 0) {
+						_cs_args = (ActionVar*) HALLOC(sizeof(ActionVar) * _cs_argc);
+						for (u32 i = 0; i < _cs_argc; i++) _cs_args[i] = args[i + 1];
+					}
+					int _cs_handled = callStringPrimitiveMethod(
+						app_context, str_buffer, _cs_str, _cs_len,
+						func->name, (u32)strlen(func->name), _cs_args, _cs_argc);
+					if (_cs_args != NULL) FREE(_cs_args);
+					if (_cs_handled) {
+						if (args != NULL) FREE(args);
+						return;
+					}
+				}
+			}
 			if (func != NULL)
 			{
 				// Extract thisArg — use g_event_this_mc for MovieClip to preserve type info
@@ -52733,6 +52879,63 @@ void actionCallMethod(SWFAppContext* app_context, char* str_buffer)
 		if (method_name_len == 5 && strncmp(method_name, "apply", 5) == 0)
 		{
 			// Function.apply(thisArg, argsArray)
+			// String.prototype stub dispatch via Function.prototype.apply, mirror
+			// of the .call handler above. argsArray is args[1], either an ASArray
+			// or an array-like object with length+numeric indices.
+			if (g_swf_version >= 6 && func != NULL && func->function_type == 2
+			    && func->advanced_func == (Function2Ptr) builtin_stub_method
+			    && num_args >= 1)
+			{
+				const uint16_t* _as_str = NULL;
+				u32 _as_len = 0;
+				ActionVar _as_ts = {0};
+				if (args[0].type == ACTION_STACK_VALUE_STRING) {
+					_as_str = varGetU16Ptr(&args[0]);
+					_as_len = args[0].str_size;
+				} else if (args[0].type == ACTION_STACK_VALUE_OBJECT) {
+					ASObject* _as_obj = (ASObject*)(uintptr_t) args[0].data.numeric_value;
+					if (_as_obj != NULL && _as_obj->native_type == NATIVE_STRING) {
+						ActionVar* _as_prim = getProperty(_as_obj, "valueOf_value", 13);
+						if (_as_prim != NULL && _as_prim->type == ACTION_STACK_VALUE_STRING) {
+							_as_str = varGetU16Ptr(_as_prim);
+							_as_len = _as_prim->str_size;
+						}
+					}
+					if (_as_str == NULL && _as_obj != NULL) {
+						int _as_ts_found = 0;
+						_as_ts = objectCallToString(app_context, &args[0], &_as_ts_found);
+						if (_as_ts_found && _as_ts.type == ACTION_STACK_VALUE_STRING) {
+							_as_str = varGetU16Ptr(&_as_ts);
+							_as_len = _as_ts.str_size;
+						}
+					}
+				}
+				if (_as_str != NULL) {
+					ActionVar* _as_args = NULL;
+					u32 _as_argc = 0;
+					if (num_args >= 2 && args[1].type == ACTION_STACK_VALUE_ARRAY) {
+						ASArray* _as_arr = (ASArray*)(uintptr_t) args[1].data.numeric_value;
+						if (_as_arr != NULL) {
+							_as_argc = _as_arr->length;
+							if (_as_argc > 0) {
+								_as_args = (ActionVar*) HALLOC(sizeof(ActionVar) * _as_argc);
+								for (u32 i = 0; i < _as_argc; i++) {
+									ActionVar* _el = getArrayElement(_as_arr, i);
+									_as_args[i] = _el ? *_el : (ActionVar){.type = ACTION_STACK_VALUE_UNDEFINED};
+								}
+							}
+						}
+					}
+					int _as_handled = callStringPrimitiveMethod(
+						app_context, str_buffer, _as_str, _as_len,
+						func->name, (u32)strlen(func->name), _as_args, _as_argc);
+					if (_as_args != NULL) FREE(_as_args);
+					if (_as_handled) {
+						if (args != NULL) FREE(args);
+						return;
+					}
+				}
+			}
 			if (func != NULL)
 			{
 				// Extract thisArg — use g_event_this_mc for MovieClip to preserve type info
