@@ -2595,9 +2595,6 @@ namespace SWFRecomp
 				// Emit call in tagInit (runs once at startup, after initVarArray)
 				tag_init_scripts << endl << "\t" << func_name << "(app_context);";
 
-				// Mark this init script as non-timeline (called from tagInit, not frame functions)
-				non_timeline_scripts.insert(next_script_i - 1);
-
 
 
 				break;
@@ -3485,7 +3482,6 @@ namespace SWFRecomp
 					struct ClipActionEntry { u32 event_flags; std::string func_name; };
 					std::vector<ClipActionEntry> clip_entries;
 
-					size_t clip_scripts_start = next_script_i;
 					size_t clip_action_iter = 0;
 					while (all_event_flags != 0)
 					{
@@ -3550,9 +3546,6 @@ namespace SWFRecomp
 
 						clip_entries.push_back({ event_flags, func_name });
 					}
-					// Mark clip action scripts as non-timeline (called via dispatch, not inline)
-					for (size_t ci = clip_scripts_start; ci < next_script_i; ci++)
-						non_timeline_scripts.insert(ci);
 
 					if (!clip_entries.empty())
 					{
@@ -4068,7 +4061,6 @@ namespace SWFRecomp
 				// (sprite sub-tags create scripts with shared indices that should NOT
 				// be emitted in the main timeline frame function at ShowFrame time)
 				size_t saved_last_queued = last_queued_script;
-				size_t scripts_before_sprite = next_script_i;
 
 				// Emit tagDefineSprite call in tagInit (before any scripts)
 				// so that DoInitAction scripts can reference the sprite dictionary
@@ -4648,7 +4640,6 @@ namespace SWFRecomp
 
 								struct ClipActionEntry { u32 event_flags; std::string func_name; };
 								std::vector<ClipActionEntry> clip_entries;
-								size_t clip_scripts_start = next_script_i;
 								size_t sprite_clip_action_count = 0;
 
 								while (all_event_flags != 0)
@@ -4709,9 +4700,6 @@ namespace SWFRecomp
 
 									clip_entries.push_back({ event_flags, func_name });
 								}
-
-								for (size_t ci = clip_scripts_start; ci < next_script_i; ci++)
-									non_timeline_scripts.insert(ci);
 
 								if (!clip_entries.empty())
 								{
@@ -4973,9 +4961,6 @@ namespace SWFRecomp
 								<< "\t" << "else if (!catch_up_mode && actionScriptOnlyMode() && actionDeferredSpriteInitActive()) "
 								<< script_name << "(app_context);" << endl;
 
-							// Mark this sprite script as non-timeline
-							non_timeline_scripts.insert(next_script_i - 1);
-
 							break;
 						}
 
@@ -5014,8 +4999,6 @@ namespace SWFRecomp
 							sprite_init_script << "}";
 
 							sprite_definitions << "\t" << "tagDoInitActionGuarded(app_context, " << init_sprite_id << ", " << script_name << ");" << endl;
-
-							non_timeline_scripts.insert(next_script_i - 1);
 
 							break;
 						}
@@ -5071,9 +5054,6 @@ namespace SWFRecomp
 
 				// Restore main timeline script queue — sprite-created scripts are
 				// called from sprite frame functions, not from main timeline frames.
-				// Mark all scripts created during DefineSprite as non-timeline.
-				for (size_t si = scripts_before_sprite; si < next_script_i; si++)
-					non_timeline_scripts.insert(si);
 				last_queued_script = saved_last_queued;
 
 				break;
@@ -5349,7 +5329,6 @@ namespace SWFRecomp
 				struct BtnAction { u16 condition; std::string func_name; };
 				std::vector<BtnAction> btn_actions;
 
-				size_t btn_scripts_start = next_script_i;
 				if (!is_button2)
 				{
 					// DefineButton: remaining bytes are a simple ActionRecord sequence
@@ -5408,10 +5387,6 @@ namespace SWFRecomp
 							break; // Last block
 					}
 				}
-				// Mark button action scripts as non-timeline (called via button dispatch)
-				for (size_t bi = btn_scripts_start; bi < next_script_i; bi++)
-					non_timeline_scripts.insert(bi);
-
 				// Generate ButtonAction array (or NULL if no actions)
 				if (!btn_actions.empty())
 				{

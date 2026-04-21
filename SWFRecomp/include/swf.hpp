@@ -164,8 +164,7 @@ namespace SWFRecomp
 		bool another_frame;
 		size_t next_script_i;
 		size_t last_queued_script;
-		std::set<size_t> non_timeline_scripts;
-		
+
 		std::stringstream tag_init;
 		std::stringstream tag_init_scripts;  // DoInitAction calls (emitted after initVarArray)
 
