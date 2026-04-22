@@ -1,10 +1,10 @@
 # Ruffle Test Results (Filtered)
 
-**Date**: 2026-04-22 01:08 UTC
+**Date**: 2026-04-22 01:27 UTC
 
-**Git SHA**: `2c77b6b693`
+**Git SHA**: `7a13fd68b1`
 
-**Run Duration**: 0m 35s
+**Run Duration**: 0m 33s
 
 **Filtered**: 0 tests ignored out of 102 available
 
@@ -34,18 +34,18 @@
 
 | # | Test | Lines | Duration | Notes |
 |---|------|-------|----------|-------|
-| 1 | `PlaceObject2Test` | 9 | 0.3s |  |
-| 2 | `VarAndCharClashTest` | 13 | 0.2s |  |
-| 3 | `Video-EmbedSquareTest` | 2 | 0.2s |  |
+| 1 | `PlaceObject2Test` | 9 | 0.2s |  |
+| 2 | `VarAndCharClashTest` | 13 | 0.1s |  |
+| 3 | `Video-EmbedSquareTest` | 2 | 0.1s |  |
 | 4 | `action_order/action_execution_order_test1` | 10 | 0.2s |  |
 | 5 | `action_order/action_execution_order_test7` | 7 | 0.2s |  |
-| 6 | `action_order/action_execution_order_test9` | 4 | 0.2s |  |
+| 6 | `action_order/action_execution_order_test9` | 4 | 0.1s |  |
 | 7 | `displaylist_depths/displaylist_depths_test10` | 10 | 0.1s |  |
 | 8 | `displaylist_depths/displaylist_depths_test4` | 26 | 0.2s |  |
 | 9 | `displaylist_depths/displaylist_depths_test5` | 25 | 0.2s |  |
 | 10 | `displaylist_depths/displaylist_depths_test6` | 13 | 0.2s |  |
 | 11 | `displaylist_depths/displaylist_depths_test7` | 14 | 0.2s |  |
-| 12 | `getTimer_test` | 8 | 0.1s |  |
+| 12 | `getTimer_test` | 8 | 0.2s |  |
 | 13 | `loop/simple_loop_test` | 0 | 0.2s |  |
 | 14 | `masks_test2` | 10 | 0.2s |  |
 | 15 | `morph_test1` | 0 | 0.2s |  |
@@ -60,13 +60,13 @@
 
 | # | Test | Our diffs | Ruffle diffs | Duration | Notes |
 |---|------|-----------|--------------|----------|-------|
-| 1 | `KeyEventOrder` | 20 | 23 | 0.1s |  |
+| 1 | `KeyEventOrder` | 20 | 23 | 0.2s |  |
 | 2 | `action_order/action_execution_order_test4` | 8 | 26 | 0.2s |  |
 | 3 | `action_order/action_execution_order_test6` | 19 | 21 | 0.2s |  |
-| 4 | `attachExtImported` | 1 | 1 | 0.3s |  |
+| 4 | `attachExtImported` | 1 | 1 | 0.2s |  |
 | 5 | `callFunction_test` | 5 | 11 | 0.2s |  |
 | 6 | `init_action/InitActionTest` | 17 | 17 | 0.2s |  |
-| 7 | `init_action/InitActionTest2` | 30 | 30 | 0.2s |  |
+| 7 | `init_action/InitActionTest2` | 30 | 30 | 0.3s |  |
 | 8 | `path_format_test` | 27 | 28 | 0.3s |  |
 | 9 | `place_object_test` | 14 | 14 | 0.2s |  |
 | 10 | `place_object_test2` | 16 | 23 | 0.2s |  |

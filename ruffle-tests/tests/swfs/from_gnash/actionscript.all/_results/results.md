@@ -1,10 +1,10 @@
 # Ruffle Test Results (Unfiltered)
 
-**Date**: 2026-04-22 01:08 UTC
+**Date**: 2026-04-22 01:27 UTC
 
-**Git SHA**: `2c77b6b693`
+**Git SHA**: `7a13fd68b1`
 
-**Run Duration**: 0m 52s
+**Run Duration**: 0m 51s
 
 ## Summary
 
@@ -129,7 +129,7 @@
 | 96 | `delete-v6` | 60 | 0.2s |  |
 | 97 | `delete-v7` | 60 | 0.2s |  |
 | 98 | `delete-v8` | 60 | 0.2s |  |
-| 99 | `enumerate-v5` | 6 | 0.3s |  |
+| 99 | `enumerate-v5` | 6 | 0.2s |  |
 | 100 | `enumerate-v6` | 49 | 0.2s |  |
 | 101 | `enumerate-v7` | 49 | 0.2s |  |
 | 102 | `enumerate-v8` | 49 | 0.2s |  |
@@ -139,7 +139,7 @@
 | 106 | `swap-v5` | 7 | 0.2s |  |
 | 107 | `swap-v6` | 7 | 0.2s |  |
 | 108 | `swap-v7` | 7 | 0.2s |  |
-| 109 | `swap-v8` | 7 | 0.2s |  |
+| 109 | `swap-v8` | 7 | 0.3s |  |
 | 110 | `targetPath-v5` | 12 | 0.2s |  |
 
 ## Ruffle-Matched Tests
@@ -148,11 +148,11 @@
 
 | # | Test | Our diffs | Ruffle diffs | Duration | Notes |
 |---|------|-----------|--------------|----------|-------|
-| 1 | `ASnative-v5` | 35 | 35 | 0.2s |  |
+| 1 | `ASnative-v5` | 35 | 35 | 0.3s |  |
 | 2 | `ASnative-v6` | 40 | 40 | 0.2s |  |
 | 3 | `ASnative-v7` | 40 | 40 | 0.2s |  |
 | 4 | `ASnative-v8` | 40 | 40 | 0.2s |  |
-| 5 | `BitmapData-v8` | 8 | 13 | 0.3s |  |
+| 5 | `BitmapData-v8` | 8 | 13 | 0.4s |  |
 | 6 | `Camera-v6` | 57 | 57 | 0.2s |  |
 | 7 | `Camera-v7` | 57 | 57 | 0.2s |  |
 | 8 | `Camera-v8` | 57 | 57 | 0.2s |  |
@@ -174,14 +174,14 @@
 | 24 | `MovieClipLoader-v7` | 118 | 118 | 0.2s |  |
 | 25 | `MovieClipLoader-v8` | 118 | 118 | 0.2s |  |
 | 26 | `Rectangle-v8` | 21 | 21 | 0.2s |  |
-| 27 | `Sound-v5` | 27 | 27 | 0.3s |  |
-| 28 | `Sound-v6` | 30 | 51 | 0.3s |  |
-| 29 | `Sound-v7` | 28 | 51 | 0.4s |  |
+| 27 | `Sound-v5` | 27 | 27 | 0.4s |  |
+| 28 | `Sound-v6` | 30 | 51 | 0.4s |  |
+| 29 | `Sound-v7` | 28 | 51 | 0.3s |  |
 | 30 | `Sound-v8` | 28 | 51 | 0.3s |  |
-| 31 | `String-v5` | 19 | 21 | 0.3s |  |
-| 32 | `String-v6` | 10 | 10 | 0.3s |  |
+| 31 | `String-v5` | 19 | 21 | 0.2s |  |
+| 32 | `String-v6` | 10 | 10 | 0.2s |  |
 | 33 | `String-v7` | 10 | 10 | 0.2s |  |
-| 34 | `String-v8` | 10 | 10 | 0.3s |  |
+| 34 | `String-v8` | 10 | 10 | 0.2s |  |
 | 35 | `TextField-v5` | 3 | 3 | 0.2s |  |
 | 36 | `case-v7` | 54 | 54 | 0.2s |  |
 | 37 | `case-v8` | 54 | 54 | 0.2s |  |
@@ -191,7 +191,7 @@
 | 41 | `targetPath-v8` | 17 | 17 | 0.2s |  |
 | 42 | `toString_valueOf-v5` | 34 | 34 | 0.2s |  |
 | 43 | `toString_valueOf-v6` | 5 | 5 | 0.2s |  |
-| 44 | `toString_valueOf-v7` | 5 | 5 | 0.3s |  |
+| 44 | `toString_valueOf-v7` | 5 | 5 | 0.2s |  |
 | 45 | `toString_valueOf-v8` | 5 | 5 | 0.2s |  |
 | 46 | `with-v5` | 42 | 42 | 0.2s |  |
 
