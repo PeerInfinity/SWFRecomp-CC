@@ -20720,6 +20720,18 @@ static void ng_syncTextToVar(SWFAppContext* app_context, MovieClip* mc, ActionVa
 
 	// Simple variable name — update global variable
 	setVariableByName(var_name, text_value);
+	// Also mirror to _root.dynamic_props so _root.varName reads the new value
+	// and hasOwnProperty returns true (matches actionSetVariable + actionSetMember
+	// on _root, both of which update dynamic_props alongside var_map).
+	{
+		extern MovieClip root_movieclip;
+		if (root_movieclip.dynamic_props == NULL) {
+			root_movieclip.dynamic_props = (void*) allocObject(app_context, 4);
+			retainObject((ASObject*) root_movieclip.dynamic_props);
+		}
+		setProperty(app_context, (ASObject*) root_movieclip.dynamic_props,
+			var_name, (u32)strlen(var_name), text_value);
+	}
 
 	// Also sync to all other text fields with the same binding
 	u32 var_name_len = strlen(var_name);
@@ -39036,6 +39048,21 @@ void actionSetMember(SWFAppContext* app_context)
 							init_val.str_size = use_len;
 							VAL(u64, &init_val.data.numeric_value) = (u64)use_text;
 							setVariableByName(new_var, &init_val);
+							// Also expose as an own property on _root so
+							// _root.hasOwnProperty(new_var) returns true
+							// (matches Flash: textfield-auto-created variables
+							// are timeline properties, not just globals).
+							// Only for simple names; path names resolve via
+							// their own container.
+							if (strchr(new_var, '.') == NULL) {
+								extern MovieClip root_movieclip;
+								if (root_movieclip.dynamic_props == NULL) {
+									root_movieclip.dynamic_props = (void*) allocObject(app_context, 4);
+									retainObject((ASObject*) root_movieclip.dynamic_props);
+								}
+								setProperty(app_context, (ASObject*) root_movieclip.dynamic_props,
+									new_var, (u32)nvlen, &init_val);
+							}
 						}
 						// Update text field to variable value (or initial text)
 						ActionVar text_val = {0};
@@ -39533,8 +39560,15 @@ void actionSetMember(SWFAppContext* app_context)
 			// (timeline variables on root are also accessible as globals)
 			// Child MC properties must NOT leak into global scope.
 			extern MovieClip root_movieclip;
-			if (mc == &root_movieclip)
+			if (mc == &root_movieclip) {
 				setVariableByName(prop_name, &value_var);
+#ifdef NO_GRAPHICS
+				// Also sync to any textfields bound to this simple variable name
+				// (e.g., textfield.variable = "textVar1" and user writes `_root.textVar1 = X`).
+				// Path-bound fields are handled by the loop below.
+				ng_syncVarToTextFields(app_context, prop_name, prop_name_len, &value_var);
+#endif
+			}
 #ifdef NO_GRAPHICS
 			// Sync path variable → text fields when setting a property on a MovieClip
 			// E.g., mc.theVar = "Test1" should update textfields bound to "_root.mc.theVar"

@@ -55,7 +55,7 @@ These are one or two small fixes away from passing. Tackle these first for broad
 | shape_test (misc-ming) | 71.4% | 15 | 21 | Incomplete — shapes promoted to movieclip should have `getDepth() == undefined` and should not appear via `getInstanceAtDepth`. Needs a "shape MC is not scriptable for depth-enumeration" branch. |
 | RollOverOutTest (misc-ming) | 80.0% | 4 | 5 | Skipped — requires mouse input simulation via `input.json`; our runner doesn't drive input. |
 | displaylist_depths_test11 (misc-ming) | 60.0% | 9 | 15 | Incomplete — ordering mismatch around `onClipConstruct` vs assigning `_root.depth3Constructed` (registerClass constructor vs parent script ordering). |
-| edittext_test1 (misc-swfc) | 76.6% | 36 | 47 | Incomplete — TextField variable binding: (a) re-binding `edtext1.variable` to new name should create that variable on the container, (b) switching variable back should preserve the prior value. |
+| edittext_test1 (misc-swfc) | 76.6% | 36 | 47 | **PASS** (2026-04-22) — Three-part TextField binding fix: (1) `actionSetMember` on root now calls `ng_syncVarToTextFields` so `_root.varName = X` propagates to bound textfields; (2) `.variable = "newName"` rebind creates the new var as an own property on root.dynamic_props so `hasOwnProperty(newName)` is true; (3) `ng_syncTextToVar` simple-name path now mirrors into root.dynamic_props so `_root.varName` always reads the current textfield text. |
 
 For each, run `--diff --verbose` and cluster the diff lines by type. Many will resolve with a single targeted fix that's shared across a handful of near-passing tests.
 
