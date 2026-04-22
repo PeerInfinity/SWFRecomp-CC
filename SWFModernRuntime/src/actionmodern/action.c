@@ -47888,9 +47888,19 @@ void actionCallFunction(SWFAppContext* app_context, char* str_buffer)
 						PUSH(ACTION_STACK_VALUE_MOVIECLIP, (u64)_sprite_mc);
 						_pushed = 1;
 					}
+				} else if (_found_type == 1) {
+					// Non-scriptable placement (shape / morph / static text):
+					// Flash returns undefined for a *named* shape (Gnash
+					// shape_test) but returns the parent MC for an unnamed
+					// one (Ruffle movieclip_get_instance_at_depth, which
+					// matches Ruffle's "no AVM object → parent" semantics).
+					extern DisplayObject* display_list;
+					const char* _pl_name = display_list[_swf_depth].instance_name;
+					if (_pl_name == NULL || _pl_name[0] == '\0') {
+						PUSH(ACTION_STACK_VALUE_MOVIECLIP, (u64)parent_mc);
+						_pushed = 1;
+					}
 				}
-				// _found_type == 1 (shape / morph / static text) intentionally
-				// falls through to undefined below to match Flash.
 			}
 			if (!_pushed) pushUndefined(app_context);
 			builtin_handled = 1;
@@ -55887,9 +55897,17 @@ void actionCallMethod(SWFAppContext* app_context, char* str_buffer)
 						PUSH(ACTION_STACK_VALUE_MOVIECLIP, (u64)_sprite_mc);
 						return;
 					}
+				} else if (_found_type == 1) {
+					// Non-scriptable placement (shape / morph / static text):
+					// named → undefined (Gnash shape_test), unnamed → parent MC
+					// (Ruffle movieclip_get_instance_at_depth).
+					extern DisplayObject* display_list;
+					const char* _pl_name = display_list[_swf_depth].instance_name;
+					if (_pl_name == NULL || _pl_name[0] == '\0') {
+						PUSH(ACTION_STACK_VALUE_MOVIECLIP, (u64)mc);
+						return;
+					}
 				}
-				// _found_type == 1 (shape / morph / static text) intentionally
-				// falls through to undefined — matches Flash.
 			}
 			pushUndefined(app_context);
 #else
