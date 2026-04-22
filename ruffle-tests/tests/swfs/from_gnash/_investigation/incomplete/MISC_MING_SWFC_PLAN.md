@@ -56,6 +56,7 @@ These are one or two small fixes away from passing. Tackle these first for broad
 | RollOverOutTest (misc-ming) | 80.0% | 4 | 5 | Skipped — requires mouse input simulation via `input.json`; our runner doesn't drive input. |
 | displaylist_depths_test11 (misc-ming) | 60.0% | 9 | 15 | Incomplete — ordering mismatch around `onClipConstruct` vs assigning `_root.depth3Constructed` (registerClass constructor vs parent script ordering). |
 | edittext_test1 (misc-swfc) | 76.6% | 36 | 47 | **PASS** (2026-04-22) — Three-part TextField binding fix: (1) `actionSetMember` on root now calls `ng_syncVarToTextFields` so `_root.varName = X` propagates to bound textfields; (2) `.variable = "newName"` rebind creates the new var as an own property on root.dynamic_props so `hasOwnProperty(newName)` is true; (3) `ng_syncTextToVar` simple-name path now mirrors into root.dynamic_props so `_root.varName` always reads the current textfield text. |
+| attachMovieTest (misc-ming) | 75.0% | 9 | 12 | **PASS** (2026-04-22) — `attachMovie` now skips the init-object property loop when the attached symbol is a Button (`attached->is_button_mc`). Flash behavior: the init object is not used for Buttons (test comment: "init object is not used for Buttons"). Both the CallFunction (`attachMovie` global) and CallMethod (`mc.attachMovie`) paths updated in `action.c`. No regressions on AVM1 `attach_movie` / `attach_movie_stop` / `empty_movieclip_can_attach_movies` / `init_object_invalid` / `init_object_order` / `movieclip_init_object` / `button_children` / `clip_events`. |
 
 For each, run `--diff --verbose` and cluster the diff lines by type. Many will resolve with a single targeted fix that's shared across a handful of near-passing tests.
 
@@ -127,7 +128,6 @@ Display list depth transformations, clip_depth, swap_depths, level vs timeline d
 Various tests exercising `attachMovie`, `duplicateMovieClip`, `goto`, `unload`. Candidates for near-passing attack:
 
 - `place_and_remove_object_test` (76.9%)
-- `attachMovieTest` (75.0%)
 - `new_child_in_unload_test` (72.7%)
 - `timeline_var_test` (72.7%)
 - `static_vs_dynamic2` (72.2%)

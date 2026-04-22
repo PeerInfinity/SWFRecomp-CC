@@ -47756,8 +47756,10 @@ void actionCallFunction(SWFAppContext* app_context, char* str_buffer)
 							}
 						}
 					}
-					// Apply initObject if present (checks addProperty setters on prototype chain)
-					if (num_args >= 4 && args[3].type == ACTION_STACK_VALUE_OBJECT) {
+					// Apply initObject if present (checks addProperty setters on prototype chain).
+					// Button symbols ignore the init object (Flash behavior: the init
+					// object is not used for Buttons).
+					if (num_args >= 4 && args[3].type == ACTION_STACK_VALUE_OBJECT && !attached->is_button_mc) {
 						ASObject* init_obj = (ASObject*)(uintptr_t)args[3].data.numeric_value;
 						if (init_obj != NULL) {
 							for (u32 pi = 0; pi < init_obj->num_used; pi++) {
@@ -54514,9 +54516,10 @@ void actionCallMethod(SWFAppContext* app_context, char* str_buffer)
 							}
 						}
 
-						// Apply initObject properties (arg 3) if provided
-						// Uses applyInitObjectPropToMC to invoke addProperty setters on prototype chain
-						if (num_args >= 4 && args[3].type == ACTION_STACK_VALUE_OBJECT) {
+						// Apply initObject properties (arg 3) if provided.
+						// Uses applyInitObjectPropToMC to invoke addProperty setters on prototype chain.
+						// Button symbols ignore the init object (Flash behavior).
+						if (num_args >= 4 && args[3].type == ACTION_STACK_VALUE_OBJECT && !attached->is_button_mc) {
 							ASObject* init_obj = (ASObject*) args[3].data.numeric_value;
 							if (init_obj != NULL) {
 								for (u32 pi = 0; pi < init_obj->num_used; pi++) {

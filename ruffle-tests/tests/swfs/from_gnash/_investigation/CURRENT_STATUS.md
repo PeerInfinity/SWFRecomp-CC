@@ -1,8 +1,22 @@
 # Gnash Test Suite Status
 
-Last updated: 2026-04-22 (post-shape_test fix; not yet in CI)
+Last updated: 2026-04-22 (post-attachMovieTest fix; not yet in CI)
 
 ### Latest fixes (2026-04-22, not yet in CI)
+- **attachMovieTest (misc-ming) → PASS (+1).** `attachMovie` now skips the
+  init-object property loop when the attached symbol is a Button
+  (`attached->is_button_mc`). Flash behavior: the init object is not used
+  for Buttons — test comment: "init object is not used for Buttons", and
+  `butatt.f` is expected to be `undefined` even though `o.f = 56` was the
+  init object's property. Both the CallFunction (`attachMovie` global)
+  and CallMethod (`mc.attachMovie`) paths in
+  `SWFModernRuntime/src/actionmodern/action.c` updated. The existing
+  `!attached->is_button_mc` gate for registerClass constructor firing
+  already matched the Flash semantics here — this just extends the same
+  rule to the init-object application. No regressions on AVM1
+  `attach_movie`, `attach_movie_stop`, `empty_movieclip_can_attach_movies`,
+  `init_object_invalid`, `init_object_order`, `movieclip_init_object`,
+  `button_children`, or `clip_events`.
 - **shape_test (misc-ming) → PASS (+1).** Three-part fix in
   `SWFModernRuntime/src/actionmodern/action.c` for Flash's shape-as-MC quirk:
   (1) `getInstanceAtDepth` no longer returns the parent MC for
