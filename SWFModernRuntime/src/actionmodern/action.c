@@ -16812,10 +16812,19 @@ static MovieClip* reResolveDeadBaseClip(SWFAppContext* app_context, MovieClip* m
 	return mc;
 }
 
+// Set to 1 by the path resolvers (resolveSlashPathToMC / resolveFlashPathToMC)
+// when they return a parent MC as a stand-in for a shape / morph / static-text
+// child placed with an instance name — Flash's "sh1.var = 10" actually sets
+// var on the parent MC. actionCallMethod checks this flag to emulate Flash's
+// quirk that getDepth on such an alias returns undefined even though
+// typeof(sh1) == "movieclip". Cleared at the start of each path resolution.
+static int g_shape_alias_resolution = 0;
+
 // Resolve a slash-separated MC path (e.g., "/clip1/clip2", "../clip1/clip2", "clip2")
 // relative to a starting MC. Returns the target MC or NULL if not found.
 // Does NOT handle colon — caller should split on ':' first.
 static MovieClip* resolveSlashPathToMC(SWFAppContext* app_context, const char* path, u32 path_len, MovieClip* start_mc) {
+	g_shape_alias_resolution = 0;
 	if (path_len == 0 || start_mc == NULL) return NULL;
 
 	MovieClip* mc = start_mc;
@@ -16990,6 +16999,9 @@ static MovieClip* resolveSlashPathToMC(SWFAppContext* app_context, const char* p
 						extern int ng_isScriptableChar(size_t char_id);
 						if (!ng_isScriptableChar(check_char_id)) {
 							// Non-scriptable (shape, morph, static text) — return parent MC, don't descend
+							// Flag so actionCallMethod can emulate Flash's
+							// `typeof(sh.getDepth()) == 'undefined'` quirk.
+							g_shape_alias_resolution = 1;
 							return mc;
 						}
 					}
@@ -17077,6 +17089,7 @@ static MovieClip* resolveSlashPathToMC(SWFAppContext* app_context, const char* p
 // - If first_element is true: "this" resolves to g_current_context, "_root" to root
 // - If first_element is false: all names go through child/property lookup
 static MovieClip* resolveFlashPathToMC(SWFAppContext* app_context, const char* path, u32 path_len, MovieClip* start_mc, int first_element) {
+	g_shape_alias_resolution = 0;
 	if (path_len == 0 || start_mc == NULL) return NULL;
 
 	MovieClip* mc = start_mc;
@@ -17592,6 +17605,28 @@ static size_t findDisplayEntryInParent(const char* instance_name, MovieClip* par
 		}
 	}
 	return SIZE_MAX;
+}
+
+// Returns 1 if `mc` represents a non-scriptable display character (shape,
+// morph shape, static text, bitmap) placed on its parent's display list.
+// Flash's `getDepth` returns undefined and `getInstanceAtDepth` returns
+// undefined for these, even though we still allow property access so tests
+// like `sh1.var1 = 10` work (typeof is "movieclip").
+static int mc_is_nonscriptable_shape(MovieClip* mc) {
+	extern MovieClip root_movieclip;
+	if (mc == NULL || mc == &root_movieclip) return 0;
+	extern DisplayObject* display_list;
+	extern int ng_isScriptableChar(size_t char_id);
+	size_t cid = 0;
+	if (mc->display_obj != NULL) {
+		cid = ((DisplayObject*)mc->display_obj)->char_id;
+	}
+	if (cid == 0 && mc->name[0] != '\0') {
+		size_t d = ng_findDisplayEntryByName(mc->name);
+		if (d != SIZE_MAX) cid = display_list[d].char_id;
+	}
+	if (cid == 0) return 0;
+	return !ng_isScriptableChar(cid);
 }
 #endif
 
@@ -32702,9 +32737,15 @@ check_special_vars:
 			{
 				extern MovieClip root_movieclip;
 				if (!ng_isScriptableAtDepth(child_depth)) {
+					// Flash quirk: sh.var = 10 actually sets var on the parent,
+					// so a shape/morph/static-text name resolves to the parent
+					// MC. Flag so actionCallMethod emulates
+					// `typeof(sh.getDepth()) == 'undefined'`.
+					g_shape_alias_resolution = 1;
 					PUSH(ACTION_STACK_VALUE_MOVIECLIP, (u64)&root_movieclip);
 					return;
 				}
+				g_shape_alias_resolution = 0;
 				// SWF5: buttons are transparent — accessing button by name returns parent MC
 				if (g_swf_version < 6) {
 					extern DisplayObject* display_list;
@@ -47827,6 +47868,10 @@ void actionCallFunction(SWFAppContext* app_context, char* str_buffer)
 				// stored at AS depth 0/1 doesn't spuriously match queries at -16384/-16383.
 				if (_ch->depth == _as_depth ||
 				    (_ch->depth >= 16384 && _ch->depth == _swf_depth_q)) {
+					// Shape / morph / static-text placements are cached as MCs
+					// (to allow sh.var = 10) but Flash hides them from
+					// getInstanceAtDepth — fall through to undefined.
+					if (mc_is_nonscriptable_shape(_ch)) continue;
 					PUSH(ACTION_STACK_VALUE_MOVIECLIP, (u64)_ch);
 					_pushed = 1;
 					break;
@@ -47843,10 +47888,9 @@ void actionCallFunction(SWFAppContext* app_context, char* str_buffer)
 						PUSH(ACTION_STACK_VALUE_MOVIECLIP, (u64)_sprite_mc);
 						_pushed = 1;
 					}
-				} else if (_found_type == 1) {
-					PUSH(ACTION_STACK_VALUE_MOVIECLIP, (u64)parent_mc);
-					_pushed = 1;
 				}
+				// _found_type == 1 (shape / morph / static text) intentionally
+				// falls through to undefined below to match Flash.
 			}
 			if (!_pushed) pushUndefined(app_context);
 			builtin_handled = 1;
@@ -55463,6 +55507,18 @@ void actionCallMethod(SWFAppContext* app_context, char* str_buffer)
 		{
 			// Return the ActionScript depth of this clip
 			if (args != NULL) FREE(args);
+#ifdef NO_GRAPHICS
+			// Shape / morph / static-text placements allow property access but
+			// are not real scriptable display objects — getDepth returns undefined.
+			// Two cases: (a) a shape has its own cached MC (rare), (b) the
+			// receiver came from `sh1` aliasing to its parent MC — the resolver
+			// set g_shape_alias_resolution so we can match Flash's quirk.
+			if (mc_is_nonscriptable_shape(mc) || g_shape_alias_resolution) {
+				g_shape_alias_resolution = 0;
+				pushUndefined(app_context);
+				return;
+			}
+#endif
 			double v = (double)mc->depth;
 			PUSH(ACTION_STACK_VALUE_F64, VAL(u64, &v));
 			return;
@@ -55810,6 +55866,9 @@ void actionCallMethod(SWFAppContext* app_context, char* str_buffer)
 				if (_ch == NULL || _ch->parent != mc) continue;
 				if (_ch->depth == _target_depth ||
 				    (_ch->depth >= 16384 && _ch->depth == _target_depth_swf)) {
+					// Shape / morph / static-text placements are cached as MCs
+					// but Flash hides them from getInstanceAtDepth.
+					if (mc_is_nonscriptable_shape(_ch)) continue;
 					PUSH(ACTION_STACK_VALUE_MOVIECLIP, (u64)_ch);
 					return;
 				}
@@ -55828,11 +55887,9 @@ void actionCallMethod(SWFAppContext* app_context, char* str_buffer)
 						PUSH(ACTION_STACK_VALUE_MOVIECLIP, (u64)_sprite_mc);
 						return;
 					}
-				} else if (_found_type == 1) {
-					// Non-sprite, non-textfield (shape, text) — return the parent MC
-					PUSH(ACTION_STACK_VALUE_MOVIECLIP, (u64)mc);
-					return;
 				}
+				// _found_type == 1 (shape / morph / static text) intentionally
+				// falls through to undefined — matches Flash.
 			}
 			pushUndefined(app_context);
 #else

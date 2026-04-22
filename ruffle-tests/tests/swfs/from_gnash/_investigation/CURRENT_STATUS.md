@@ -1,6 +1,30 @@
 # Gnash Test Suite Status
 
-Last updated: 2026-04-21 (CI run at 7155a774 — with-v6/v7/v8 fix now confirmed)
+Last updated: 2026-04-22 (post-shape_test fix; not yet in CI)
+
+### Latest fixes (2026-04-22, not yet in CI)
+- **shape_test (misc-ming) → PASS (+1).** Three-part fix in
+  `SWFModernRuntime/src/actionmodern/action.c` for Flash's shape-as-MC quirk:
+  (1) `getInstanceAtDepth` no longer returns the parent MC for
+  `_found_type == 1` (shape / morph / static text) placements — both the
+  global and method-form handlers now fall through to undefined. (2) The
+  same handlers skip cached MCs that `mc_is_nonscriptable_shape` flags, so
+  shapes which happen to have their own cache entry also return undefined.
+  (3) `actionGetVariable` (via the `!ng_isScriptableAtDepth` branch) and
+  `resolveSlashPathToMC` now set `g_shape_alias_resolution = 1` whenever a
+  shape's instance name resolves to its parent MC. The `getDepth` method
+  handler in `actionCallMethod` consumes the flag and pushes undefined on a
+  shape-aliased receiver — matching Flash's `typeof(sh.getDepth()) ==
+  'undefined'`. Property access like `sh.var = 10` / `sh._x` still lands
+  on the parent MC. No regressions on AVM1 `movieclip_depth_methods`,
+  `movieclip_state_values`, `movieclip_library_state_values`,
+  `swf5_to_6_cross_call`, `swf6_to_5_cross_call`, `global_is_bare`,
+  `enumerate`, `array_enumerate`, `register_class_return_value`, nor on
+  Gnash `place_and_remove_object_test`, `DepthLimitsTest`, `attachMovieTest`,
+  `reverse_execute_PlaceObject2_test2`, `displaylist_depths_test`,
+  `case-v5..v8`, `MovieClip-v5`.
+
+### Latest fixes (2026-04-21, confirmed in CI at 7155a774)
 
 ### Latest fixes (2026-04-21, confirmed in CI at 7155a774)
 - **with-v6/v7/v8 → `ruffle_matched` (+3 effective).** Added
