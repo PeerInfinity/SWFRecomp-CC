@@ -4235,6 +4235,15 @@ static ActionVar actionASSetPropFlags_func2(SWFAppContext* app_context, ActionVa
 		ASFunction* func = (ASFunction*)(u64)args[0].data.numeric_value;
 		if (func != NULL) obj = func->own_props;
 	}
+	else if (args[0].type == ACTION_STACK_VALUE_MOVIECLIP) {
+		// For MovieClips, ASSetPropFlags operates on dynamic_props (timeline vars)
+		MovieClip* mc = (MovieClip*)(u64)args[0].data.numeric_value;
+		if (mc != NULL) {
+			if (mc->dynamic_props == NULL)
+				mc->dynamic_props = (void*) allocObject(app_context, 8);
+			obj = (ASObject*) mc->dynamic_props;
+		}
+	}
 	if (obj == NULL) return result;
 	// Coerce set_flags (args[2]) via valueOf if it's an object
 	if (args[2].type == ACTION_STACK_VALUE_OBJECT || args[2].type == ACTION_STACK_VALUE_ARRAY) {
@@ -32835,6 +32844,15 @@ void actionSetVariable(SWFAppContext* app_context)
 					peekVar(app_context, &value_var);
 					POP_2();
 					invokePropertySetter(app_context, (ASFunction*)prop_struct->setter, (void*)scope_chain[i], &value_var);
+					return;
+				}
+				// Non-writable (ReadOnly) property — silently drop the assignment.
+				// Flash's ASSetPropFlags can mark properties readonly; within a WITH
+				// scope, writes to such properties are ignored, not forwarded to
+				// an outer scope. See with.as:525 (ASSetPropFlags + with(mc)).
+				if (scope_is_with[i] && !(prop_struct->flags & PROPERTY_FLAG_WRITABLE))
+				{
+					POP_2();
 					return;
 				}
 				// Regular property — set it on the direct scope object

@@ -2,8 +2,32 @@
 <!-- TESTS: with-v6, with-v7, with-v8 (secondary blocker alongside SETTARGET_OBJECT_PATH_PLAN) -->
 
 Last updated: 2026-04-21
-Status: NOT STARTED — 2 diff lines per test, but needed (alongside
-SETTARGET_OBJECT_PATH_PLAN) to reach `ruffle_matched`.
+Status: COMPLETE — both fixes landed. Lines 531 ("nooverride ==
+\"nooverride\"") and 539 ("mc.nooverride == 'nooverride'") now match
+expected on with-v6/v7/v8. Tests remain `output_mismatch` (not
+`ruffle_matched`) because the remaining ~12 diffs come from
+`SETTARGET_OBJECT_PATH_PLAN.md` (target-path resolution, child MC
+lookup, etc.). Once that sibling plan lands, with-v6/v7/v8 should
+reach `ruffle_matched`.
+
+## Landed changes
+
+- **Fix A** — `actionASSetPropFlags_func2` (action.c:4225) now unwraps
+  `ACTION_STACK_VALUE_MOVIECLIP` to `mc->dynamic_props`, lazy-allocating
+  an 8-slot ASObject if dynamic_props was NULL.
+- **Fix B** — WITH-scope branch of `actionSetVariable` now checks
+  `prop_struct->flags & PROPERTY_FLAG_WRITABLE` before calling
+  `setProperty`. When clear, the assignment is silently dropped and the
+  stack is popped. Gated on `scope_is_with[i]` to match the plan's
+  narrow scope; non-WITH scope paths are unchanged.
+
+Local verification: with-v6/v7/v8 each `#passed 87 → 89`, `#failed 14 → 12`.
+Spot-checked regression set (avm1 with/with_return/with_variable_scopes/
+enumerate/global_is_bare/mutable_this/this_scoping/as_set_prop_flags[\_version[\_swf5-9]]/
+define_local[\_with_paths]/prototype_delete/prototype_enumerate/
+prototype_properties/set_variable_scope/on_construct/
+register_and_init_order/mcl_events_swf_version + Gnash Inheritance-v5..v8/
+case-v5/Try-v6/delete-v5..v8/enumerate-v6..v8) — no regressions.
 
 ---
 
