@@ -51,7 +51,7 @@ These are one or two small fixes away from passing. Tackle these first for broad
 |------|-------|----------|-------|--------|
 | DefineEditTextTest (misc-ming) | 95.4% | 146 | 153 | **PASS** (2026-04-21) — hasOwnProperty hides TextField native props on instance |
 | matrix_test (misc-ming) | 83.6% | 908 | 1086 | Incomplete — matrix-after-negative-_yscale diffs (`d` sign/value mismatch), `getBounds` after scale-with-rotation, and `sin(90°)` `6e-17` residuals. Not a single fix. |
-| get_frame_number_test (misc-ming) | 87.1% | 27 | 31 | Incomplete — `gotoAndStop(4.8)` / `gotoAndStop(6.1)` should land on frame 5. Our `actionGotoFrame2` is Ruffle-style (non-integer → no-op); Flash/Gnash rounds. |
+| get_frame_number_test (misc-ming) | 87.1% | 27 | 31 | **PASS** (2026-04-22) — `actionGotoFrame2` now handles non-integer Number args by coercing to string, trying frame label lookup, then strict integer parse. Mirrors Flash's observable behavior (Ruffle panics on this test, `known_failure.panic`). |
 | shape_test (misc-ming) | 71.4% | 15 | 21 | Incomplete — shapes promoted to movieclip should have `getDepth() == undefined` and should not appear via `getInstanceAtDepth`. Needs a "shape MC is not scriptable for depth-enumeration" branch. |
 | RollOverOutTest (misc-ming) | 80.0% | 4 | 5 | Skipped — requires mouse input simulation via `input.json`; our runner doesn't drive input. |
 | displaylist_depths_test11 (misc-ming) | 60.0% | 9 | 15 | Incomplete — ordering mismatch around `onClipConstruct` vs assigning `_root.depth3Constructed` (registerClass constructor vs parent script ordering). |

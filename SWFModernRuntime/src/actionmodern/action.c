@@ -24954,22 +24954,42 @@ void actionGotoFrame2(SWFAppContext* app_context, u8 play_flag, u16 scene_bias)
 	s32 frame_num = -1;
 	int resolved = 0;
 
-	if (frame_var.type == ACTION_STACK_VALUE_F32) {
-		float frame_float;
-		memcpy(&frame_float, &frame_var.data.numeric_value, sizeof(float));
-		if (isnan(frame_float) || isinf(frame_float)) return;
-		if (frame_float != floorf(frame_float)) return; // non-integer: no-op
-		frame_num = (s32)frame_float;
-		resolved = 1;
-	}
-	else if (frame_var.type == ACTION_STACK_VALUE_F64) {
+	if (frame_var.type == ACTION_STACK_VALUE_F32 || frame_var.type == ACTION_STACK_VALUE_F64) {
 		double frame_double;
-		memcpy(&frame_double, &frame_var.data.numeric_value, sizeof(double));
+		if (frame_var.type == ACTION_STACK_VALUE_F32) {
+			float frame_float;
+			memcpy(&frame_float, &frame_var.data.numeric_value, sizeof(float));
+			frame_double = (double)frame_float;
+		} else {
+			memcpy(&frame_double, &frame_var.data.numeric_value, sizeof(double));
+		}
 		if (isnan(frame_double) || isinf(frame_double)) return;
-		if (frame_double != floor(frame_double)) return; // non-integer: no-op
-		// Use i32 wrapping like Ruffle: f64_to_wrapping_i32
-		frame_num = (s32)(s64)frame_double;
-		resolved = 1;
+		if (frame_double == floor(frame_double)) {
+			// Integer: direct goto. Use i32 wrapping like Ruffle: f64_to_wrapping_i32
+			frame_num = (s32)(s64)frame_double;
+			resolved = 1;
+		} else {
+			// Non-integer: Flash coerces to string, tries label lookup first,
+			// then strict integer parse. Mismatches Ruffle (which panics here —
+			// see gnash misc-ming get_frame_number_test). Examples:
+			//   gotoAndStop(4.8) → label "4.8" exists → goto that frame
+			//   gotoAndStop(6.1) → no label "6.1" and "6.1" isn't an integer → no-op
+			char numstr[64];
+			flash_format_double(numstr, sizeof(numstr), frame_double);
+			int label_frame = findFrameByLabel(numstr);
+			if (label_frame >= 0) {
+				frame_num = label_frame + 1;
+				resolved = 1;
+			} else {
+				char* endptr;
+				long parsed = strtol(numstr, &endptr, 10);
+				if (endptr != numstr && *endptr == '\0') {
+					frame_num = (s32)parsed;
+					resolved = 1;
+				}
+				// else: no-op
+			}
+		}
 	}
 	else if (frame_var.type == ACTION_STACK_VALUE_I32) {
 		s32 frame_int;
