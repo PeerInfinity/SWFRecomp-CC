@@ -2,6 +2,20 @@
 
 Last updated: 2026-04-21
 
+### Latest fixes (2026-04-21, not yet in CI)
+- **with-v6/v7/v8 → `ruffle_matched` (+3 effective).** Added
+  `resolveObjectPathToMC` in `action.c` (after `resolveFlashPathToMC`) to
+  walk dotted/colon path segments via property lookup when they don't
+  resolve as timeline children. Mirrors Ruffle's
+  `Activation::resolve_target_path` (`core/src/avm1/activation.rs:2513`):
+  each segment tries display-list `child_by_name` first, then falls back
+  to `object.get(name)` which walks `__proto__`. Final value must be a
+  `MOVIECLIP`. `actionSetTarget` now calls this helper as a fallback when
+  the path contains `.`, `:`, or `/`. Paths like `o.t`, `o:t`,
+  `o2.o.t`, and `o2.inh.t` (inherited via `__proto__`) now resolve to
+  the underlying MC, eliminating the ~14 stray `Target not found`/
+  `FAILED _target==` lines per test. See `complete/SETTARGET_OBJECT_PATH_PLAN.md`.
+
 ### Plan rescoping (2026-04-21, no test deltas)
 - **`WITH_AUTOBOXING_PLAN.md` shelved** (moved incomplete/ → blocked/).
   with-v5 already `ruffle_matched`; v6/v7/v8 failures are *not*
@@ -10,15 +24,15 @@ Last updated: 2026-04-21
   already pass in our output via the Object.prototype inheritance path.
   The real remaining blockers for with-v6/v7/v8 are three unrelated
   features; see new plans below.
-- **New incomplete plans:**
-  - `SETTARGET_OBJECT_PATH_PLAN.md` — extend `actionSetTarget` to
-    resolve dotted/colon object paths via property lookup (not just
-    MovieClip parent/child). Biggest lever: ~14 diff lines each on
+- **Plans:**
+  - `complete/SETTARGET_OBJECT_PATH_PLAN.md` — Done. Extended
+    `actionSetTarget` to resolve dotted/colon object paths via property
+    lookup (not just MovieClip parent/child). ~14 diff lines each on
     with-v6/v7/v8 (6 stray `Target not found` traces + 8 `_target` FAILs).
-  - `ASSETPROPFLAGS_WITH_READONLY_PLAN.md` — (a) handle MOVIECLIP arg in
+  - `complete/ASSETPROPFLAGS_WITH_READONLY_PLAN.md` — Done earlier
+    (73983b0e). (a) handle MOVIECLIP arg in
     `actionASSetPropFlags_func2`; (b) honour `PROPERTY_FLAG_WRITABLE`
-    in WITH-scope assignment. ~2 lines each per test, needed alongside
-    the setTarget plan to reach `ruffle_matched`.
+    in WITH-scope assignment.
 
 ### Latest fixes (2026-04-17, not yet in CI)
 - **ASnative-v5/v6/v7/v8 → ruffle_matched (+4).** Three-part fix in `SWFModernRuntime/src/actionmodern/`:
@@ -157,8 +171,8 @@ Last updated: 2026-04-21
 | `REMAINING_FAILURES_ANALYSIS.md` | Detailed tiered analysis with estimated fix effort |
 | `incomplete/GNASH_NEAR_PASSING_PLAN.md` | 22 near-passing tests (<=18 diffs), 7 phases |
 | `incomplete/ARRAY_V5_PLAN.md` | array-v5 investigation (450/560 = 80.4%) |
-| `incomplete/SETTARGET_OBJECT_PATH_PLAN.md` | Extend setTarget to resolve dotted/colon object paths via property lookup (primary with-v6/v7/v8 blocker) |
-| `incomplete/ASSETPROPFLAGS_WITH_READONLY_PLAN.md` | ASSetPropFlags MOVIECLIP handling + WRITABLE check in WITH assignment (secondary with-v6/v7/v8 blocker) |
+| `complete/SETTARGET_OBJECT_PATH_PLAN.md` | Extended setTarget to resolve dotted/colon object paths via property lookup (primary with-v6/v7/v8 blocker) — landed 2026-04-21 |
+| `complete/ASSETPROPFLAGS_WITH_READONLY_PLAN.md` | ASSetPropFlags MOVIECLIP handling + WRITABLE check in WITH assignment (secondary with-v6/v7/v8 blocker) — landed 73983b0e |
 | `blocked/WITH_AUTOBOXING_PLAN.md` | Shelved — primitive auto-boxing effectively works; see plan for actual remaining root causes |
 | `complete/INHERITANCE_SEGFAULT_PLAN.md` | All 4 Inheritance tests pass filtered (v5 via SWF5 gates, v6/v7/v8 via Ruffle-matching acceptance) |
 | `complete/RUFFLE_KNOWN_FAILURE_HANDLING_PLAN.md` | Phase 3 landed: `verify_output.py` auto-promotes `known_failure`+`output.ruffle.txt` tests to `ruffle_matched` when our diffs ⊆ Ruffle's diffs against Flash |

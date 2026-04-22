@@ -2,7 +2,33 @@
 <!-- TESTS: with-v6, with-v7, with-v8 (primary). Candidates for collateral impact: tell_target_*, setproperty -->
 
 Last updated: 2026-04-21
-Status: NOT STARTED — largest remaining blocker on with-v6/v7/v8
+Status: COMPLETE (pending CI confirmation) — with-v6/v7/v8 reach `ruffle_matched` locally.
+
+**Implementation (2026-04-21):** Added `resolveObjectPathToMC` in
+`SWFModernRuntime/src/actionmodern/action.c` (right after `resolveFlashPathToMC`).
+It walks the path segment-by-segment on the operand stack: for MOVIECLIP
+values it uses `resolveSlashPathToMC` for display-list children first, then
+falls back to `actionGetMember` (which already handles MC builtins,
+`dynamic_props`, `MovieClip.prototype` chain, and root-MC `var_map` lookup).
+For `OBJECT`/`FUNCTION`/`ARRAY` values it uses `actionGetMember`
+(prototype-chain aware). `_root`/`_level0`/`_parent`/`this`/`..` are handled
+as keyword segments. Result must be a `MOVIECLIP` at the end or the
+resolver returns `NULL`.
+
+`actionSetTarget` now falls back to this helper after `resolveFlashPathToMC`
+fails, only when the target contains at least one of `.`, `:`, or `/`.
+Legacy bare-name resolution still runs afterward, so plain target names are
+unchanged.
+
+**Local results (pre-CI):**
+- with-v5/v6/v7/v8 → all `ruffle_matched` (with-v5 was already matched).
+- Regression checks: avm1 `tell_target`, `tell_target_invalid`,
+  `tell_target_invalid_swf6`, `path_string`, `target_clip_removed`,
+  `target_clip_swf5`, `target_clip_swf6`, `target_path`, `string_paths_basic`,
+  `string_paths_eval`, `string_paths_eval2`, `string_paths_hidden`,
+  `removed_target_clip_scope`, `root_global_parent`,
+  `get_variable_in_scope`, `set_variable_scope`, `with_return`,
+  `with_variable_scopes`, `define_local_with_paths` all still PASS.
 
 ---
 

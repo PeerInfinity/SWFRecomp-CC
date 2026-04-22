@@ -17194,6 +17194,163 @@ static MovieClip* resolveFlashPathToMC(SWFAppContext* app_context, const char* p
 	return mc;
 }
 
+// ----------------------------------------------------------------
+// resolveObjectPathToMC
+// ----------------------------------------------------------------
+// Mirrors Ruffle's Activation::resolve_target_path (activation.rs:2513):
+// at each path segment, first try MovieClip display-list child lookup, then
+// fall back to ordinary property lookup (object.get, which walks __proto__).
+// The final value must be a MovieClip or resolution fails.
+//
+// Used as a fallback to resolveFlashPathToMC when a path segment is not a
+// timeline child but *is* a property holding a MovieClip reference
+// (e.g., `o.t` where `o = {}; o.t = _root.clip1;`).
+//
+// Uses the operand stack for intermediate state — actionSetTarget and
+// friends do not use the stack themselves, so push/pop pairs leave the
+// caller's stack untouched.
+static MovieClip* resolveObjectPathToMC(SWFAppContext* app_context,
+                                        const char* path, u32 path_len,
+                                        MovieClip* start_mc,
+                                        int first_element)
+{
+	if (path_len == 0 || start_mc == NULL) return NULL;
+
+	extern MovieClip root_movieclip;
+
+	const char* p = path;
+	u32 remaining = path_len;
+	int is_slash_path = 0;
+	MovieClip* cur_start = start_mc;
+
+	// Leading '/' = absolute from root
+	if (p[0] == '/') {
+		cur_start = &root_movieclip;
+		is_slash_path = 1;
+		p++; remaining--;
+		if (remaining == 0) return cur_start;
+	}
+
+	PUSH(ACTION_STACK_VALUE_MOVIECLIP, (u64)cur_start);
+	int walk_ok = 1;
+
+	while (remaining > 0 && walk_ok) {
+		// Skip leading colons (`:foo`, `:::foo` == `foo`)
+		while (remaining > 0 && *p == ':') { p++; remaining--; }
+		if (remaining == 0) break;
+
+		// ".." parent navigation
+		if (remaining >= 2 && p[0] == '.' && p[1] == '.') {
+			int is_parent = 0;
+			if (remaining == 2) is_parent = 1;
+			else if (p[2] == '/') { is_parent = 1; is_slash_path = 1; }
+			else if (p[2] == ':') is_parent = 1;
+
+			if (is_parent) {
+				if (STACK_TOP_TYPE == ACTION_STACK_VALUE_MOVIECLIP) {
+					MovieClip* cur = (MovieClip*)VAL(u64, &STACK[SP + 16]);
+					if (cur && cur->parent) {
+						POP();
+						PUSH(ACTION_STACK_VALUE_MOVIECLIP, (u64)cur->parent);
+					} else {
+						walk_ok = 0;
+					}
+				} else {
+					walk_ok = 0;
+				}
+				first_element = 0;
+				if (remaining <= 2) remaining = 0;
+				else { p += 3; remaining -= 3; }
+				continue;
+			}
+		}
+
+		// Scan for delimiter
+		u32 seg_len = 0;
+		while (seg_len < remaining) {
+			char c = p[seg_len];
+			if (c == ':') break;
+			if (c == '.' && !is_slash_path) break;
+			if (c == '/') { is_slash_path = 1; break; }
+			seg_len++;
+		}
+
+		if (seg_len == 0) { p++; remaining--; continue; }
+
+		if (first_element) {
+			if (seg_len == 5 && strncmp(p, "_root", 5) == 0) {
+				POP();
+				PUSH(ACTION_STACK_VALUE_MOVIECLIP, (u64)&root_movieclip);
+			} else if (seg_len == 7 && strncmp(p, "_level0", 7) == 0) {
+				POP();
+				PUSH(ACTION_STACK_VALUE_MOVIECLIP, (u64)&root_movieclip);
+			} else if (seg_len == 4 && strncmp(p, "this", 4) == 0) {
+				extern MovieClip* g_current_context;
+				MovieClip* ctx = g_current_context ? g_current_context : &root_movieclip;
+				POP();
+				PUSH(ACTION_STACK_VALUE_MOVIECLIP, (u64)ctx);
+			} else {
+				// Ruffle: object.as_display_object().child_by_name(name) first,
+				// then fall back to object.get(name). We've just pushed start_mc;
+				// actionGetMember on an MC does the same sequence internally
+				// (child clip check → builtins → dynamic_props → var_map for root
+				// → MovieClip.prototype chain).
+				PUSH_STR((char*)p, seg_len);
+				actionGetMember(app_context);
+			}
+			first_element = 0;
+		} else {
+			u8 top_type = STACK_TOP_TYPE;
+			if (top_type == ACTION_STACK_VALUE_MOVIECLIP) {
+				MovieClip* parent_mc = (MovieClip*)VAL(u64, &STACK[SP + 16]);
+				if (seg_len == 5 && strncmp(p, "_root", 5) == 0) {
+					POP();
+					PUSH(ACTION_STACK_VALUE_MOVIECLIP, (u64)&root_movieclip);
+				} else if (seg_len == 7 && strncmp(p, "_level0", 7) == 0) {
+					POP();
+					PUSH(ACTION_STACK_VALUE_MOVIECLIP, (u64)&root_movieclip);
+				} else if (seg_len == 7 && strncmp(p, "_parent", 7) == 0) {
+					if (parent_mc && parent_mc->parent) {
+						POP();
+						PUSH(ACTION_STACK_VALUE_MOVIECLIP, (u64)parent_mc->parent);
+					} else {
+						walk_ok = 0;
+					}
+				} else {
+					PUSH_STR((char*)p, seg_len);
+					actionGetMember(app_context);
+				}
+			} else if (top_type == ACTION_STACK_VALUE_OBJECT ||
+			           top_type == ACTION_STACK_VALUE_FUNCTION ||
+			           top_type == ACTION_STACK_VALUE_ARRAY) {
+				PUSH_STR((char*)p, seg_len);
+				actionGetMember(app_context);
+			} else {
+				// Primitive / undefined / null → fail
+				walk_ok = 0;
+			}
+		}
+
+		// Advance past segment + delimiter
+		if (seg_len < remaining) {
+			p += seg_len + 1;
+			remaining -= seg_len + 1;
+		} else {
+			remaining = 0;
+		}
+	}
+
+	// Final value must be a MovieClip
+	MovieClip* result = NULL;
+	if (walk_ok && STACK_TOP_TYPE == ACTION_STACK_VALUE_MOVIECLIP) {
+		result = (MovieClip*)VAL(u64, &STACK[SP + 16]);
+	}
+	POP();
+
+	if (result != NULL && result->depth == INT_MIN) return NULL;
+	return result;
+}
+
 #ifndef NO_GRAPHICS
 // Targeted sprite for SetTarget — when non-NULL, play/stop/goto operate on this sprite
 static DisplayObject* targeted_sprite = NULL;
@@ -44694,6 +44851,22 @@ void actionSetTarget(SWFAppContext* app_context, const char* target_name)
 			g_settarget_none = 0;
 #endif
 			return;
+		}
+
+		// Fallback: per-segment object-property walk (Ruffle resolve_target_path).
+		// Picks up paths like `o.t` / `o2.inh.t` where a segment is an MC held in
+		// an Object property rather than on the display list.
+		if (strchr(target_name, '.') || strchr(target_name, ':') || strchr(target_name, '/')) {
+			MovieClip* obj_target_mc = resolveObjectPathToMC(app_context, target_name, tn_len, base, 0);
+			if (obj_target_mc && obj_target_mc->depth != INT_MIN) {
+				setCurrentContext(obj_target_mc);
+#ifdef NO_GRAPHICS
+				g_settarget_explicit_root = (obj_target_mc == &root_movieclip) ? 1 : 0;
+				g_settarget_invalid = 0;
+				g_settarget_none = 0;
+#endif
+				return;
+			}
 		}
 	}
 
