@@ -3491,6 +3491,8 @@ static void addStubMethodToProto(SWFAppContext* app_context, ASObject* proto, co
 	setPropertyWithFlags(app_context, proto, name, name_len, &fv, flags);
 }
 
+static int isNativeTextFieldProperty(const char* name, u32 len); // forward decl
+
 // Built-in hasOwnProperty checks if a property exists directly on the object
 static ActionVar builtin_object_hasOwnProperty(SWFAppContext* app_context, ActionVar* args, u32 arg_count, ActionVar* registers, void* this_obj)
 {
@@ -3534,6 +3536,15 @@ static ActionVar builtin_object_hasOwnProperty(SWFAppContext* app_context, Actio
 
 		if (prop_name != NULL)
 		{
+			// TextField native properties live on TextField.prototype as placeholders,
+			// not as own properties on the instance — even though we also mirror them
+			// on `dynamic_props` for read/write access, hasOwnProperty on the instance
+			// must return false for them to match Flash.
+			if (obj->native_type == NATIVE_TEXTFIELD &&
+			    isNativeTextFieldProperty(prop_name, prop_name_len))
+			{
+				return ret; // false
+			}
 			// Use hasPropertyRaw to check existence ignoring flash_flags visibility
 			// (hasOwnProperty returns true even for hidden properties)
 			if (hasPropertyRaw(obj, prop_name, prop_name_len))
@@ -57261,9 +57272,19 @@ void actionCallMethod(SWFAppContext* app_context, char* str_buffer)
 				// are display-list children, not own properties. Flash's hasOwnProperty returns
 				// false for child MC names (they're resolved via the display list, not as props).
 				if (mc->dynamic_props != NULL) {
-					ASProperty* _hop_prop = findPropertyRaw((ASObject*)mc->dynamic_props, _hop_name, _hop_len);
-					if (_hop_prop != NULL && _hop_prop->value.type != ACTION_STACK_VALUE_MOVIECLIP)
-						_hop_result = 1;
+					ASObject* _hop_props = (ASObject*) mc->dynamic_props;
+					// TextField native properties (text, background, textColor, embedFonts, …)
+					// live on TextField.prototype as placeholders — we mirror them on the
+					// instance's dynamic_props for read/write but hasOwnProperty must return
+					// false for them to match Flash.
+					if (_hop_props->native_type == NATIVE_TEXTFIELD &&
+					    isNativeTextFieldProperty(_hop_name, _hop_len)) {
+						_hop_result = 0;
+					} else {
+						ASProperty* _hop_prop = findPropertyRaw(_hop_props, _hop_name, _hop_len);
+						if (_hop_prop != NULL && _hop_prop->value.type != ACTION_STACK_VALUE_MOVIECLIP)
+							_hop_result = 1;
+					}
 				}
 			}
 			if (args != NULL) FREE(args);

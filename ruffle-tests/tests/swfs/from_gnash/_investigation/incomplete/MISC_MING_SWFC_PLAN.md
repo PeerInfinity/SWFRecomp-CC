@@ -47,15 +47,15 @@ The other ~76 tests produce *some* output — they're running, their Dejagnu che
 
 These are one or two small fixes away from passing. Tackle these first for broad gains.
 
-| Test | Match | Matching | Total | Likely fix area |
-|------|-------|----------|-------|-----------------|
-| DefineEditTextTest (misc-ming) | 95.4% | 146 | 153 | TextField property edge cases |
-| matrix_test (misc-ming) | 83.6% | 908 | 1086 | Matrix method edge cases |
-| shape_test (misc-ming) | 81.0% | 17 | 21 | DefineShape trace edges |
-| get_frame_number_test (misc-ming) | 80.6% | 25 | 31 | `_currentframe` timing |
-| RollOverOutTest (misc-ming) | 80.0% | 4 | 5 | Mouse rollover event |
-| displaylist_depths_test11 (misc-ming) | 80.0% | 12 | 15 | depth-system edge |
-| edittext_test1 (misc-swfc) | 76.6% | 36 | 47 | TextField edges |
+| Test | Match | Matching | Total | Status |
+|------|-------|----------|-------|--------|
+| DefineEditTextTest (misc-ming) | 95.4% | 146 | 153 | **PASS** (2026-04-21) — hasOwnProperty hides TextField native props on instance |
+| matrix_test (misc-ming) | 83.6% | 908 | 1086 | Incomplete — matrix-after-negative-_yscale diffs (`d` sign/value mismatch), `getBounds` after scale-with-rotation, and `sin(90°)` `6e-17` residuals. Not a single fix. |
+| get_frame_number_test (misc-ming) | 87.1% | 27 | 31 | Incomplete — `gotoAndStop(4.8)` / `gotoAndStop(6.1)` should land on frame 5. Our `actionGotoFrame2` is Ruffle-style (non-integer → no-op); Flash/Gnash rounds. |
+| shape_test (misc-ming) | 71.4% | 15 | 21 | Incomplete — shapes promoted to movieclip should have `getDepth() == undefined` and should not appear via `getInstanceAtDepth`. Needs a "shape MC is not scriptable for depth-enumeration" branch. |
+| RollOverOutTest (misc-ming) | 80.0% | 4 | 5 | Skipped — requires mouse input simulation via `input.json`; our runner doesn't drive input. |
+| displaylist_depths_test11 (misc-ming) | 60.0% | 9 | 15 | Incomplete — ordering mismatch around `onClipConstruct` vs assigning `_root.depth3Constructed` (registerClass constructor vs parent script ordering). |
+| edittext_test1 (misc-swfc) | 76.6% | 36 | 47 | Incomplete — TextField variable binding: (a) re-binding `edtext1.variable` to new name should create that variable on the container, (b) switching variable back should preserve the prior value. |
 
 For each, run `--diff --verbose` and cluster the diff lines by type. Many will resolve with a single targeted fix that's shared across a handful of near-passing tests.
 
