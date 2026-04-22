@@ -2707,7 +2707,9 @@ MovieClip* ng_cloneSprite(SWFAppContext* app_context, const char* source_name,
 		src_mc->ts_stale_source = 1;
 	}
 	clone_mc->currentframe = 1;
-	clone_mc->depth = depth;
+	// CloneSprite bytecode passes SWF-biased depth (AS depth + 16384); store AS depth
+	// on the clone so clone_mc.getDepth() matches Flash (user-visible depth).
+	clone_mc->depth = depth - 16384;
 
 	// For dynamic textfield clones (no DefineEditText tag), init default props
 	if (src_mc != NULL && src_mc->ng_textfield_idx == -2 && clone_mc->ng_textfield_idx != -2) {
@@ -2896,7 +2898,9 @@ MovieClip* ng_cloneSpriteFromMC(SWFAppContext* app_context, MovieClip* src_mc,
 	clone_mc->ts_stale_source = src_mc->ts_stale_source;
 	src_mc->ts_stale_source = 1;
 	clone_mc->currentframe = 1;
-	clone_mc->depth = depth;
+	// `depth` is the SWF-biased depth (both call sites pass AS depth + 16384); store
+	// AS depth on the clone so clone_mc.getDepth() matches Flash.
+	clone_mc->depth = depth - 16384;
 
 	// For dynamic textfield clones (src has ng_textfield_idx == -2 but no DefineEditText tag),
 	// actionFindOrCreateMovieClip won't detect the textfield from the display list.
