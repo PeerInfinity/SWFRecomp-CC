@@ -61,6 +61,25 @@ These are one or two small fixes away from passing. Tackle these first for broad
 
 For each, run `--diff --verbose` and cluster the diff lines by type. Many will resolve with a single targeted fix that's shared across a handful of near-passing tests.
 
+### Empty-DL-slot RemoveObject2 fallback (2026-04-22, not yet in CI)
+
+- **static_vs_dynamic2 (misc-ming) → PASS (+1).** Added
+  `actionInvalidateMCAtASDepth` helper in
+  `SWFModernRuntime/src/actionmodern/action.c`, invoked from
+  `tagRemoveObject2` (`SWFModernRuntime/src/libswf/tag.c`) when the
+  target display-list slot is empty. The test's sequence
+  (`duplicateMovieClip('mc1', 'dup', 1)` → `mc1.swapDepths(dup)` →
+  `RemoveObject2` at SWF depth 2) leaves dup at AS depth -16382 but
+  without a DL entry (ng_cloneSprite's INITIAL_DISPLAYLIST_CAPACITY
+  gate skips placement). The fallback scans `child_mc_cache` for a
+  root-level MC whose `depth` matches the tag's AS depth and marks it
+  `avm1_removed` + `depth = INT_MIN`. Also clears the global `var_map`
+  entry (via `setVariableByName(name, undefined)`), because CloneSprite
+  registers the clone's name there and `_root.dup` resolves through
+  var_map bypassing the normal display-list/child_mc_cache path — so
+  without clearing var_map, `typeof(dup)` still returned `'movieclip'`.
+  No regressions on a 47-test AVM1 battery.
+
 ### Backward-goto dynamic-depth preservation (2026-04-22, not yet in CI)
 
 - **loop/loop_test9 (misc-ming) → PASS (+1).** Added dynamic-range gate to
@@ -182,7 +201,7 @@ Various tests exercising `attachMovie`, `duplicateMovieClip`, `goto`, `unload`. 
 
 - `new_child_in_unload_test` (72.7%)
 - `timeline_var_test` (72.7%)
-- `static_vs_dynamic2` (72.2%)
+- `static_vs_dynamic2` (72.2%) — **PASS** (2026-04-22, see "Empty-DL-slot RemoveObject2 fallback" above)
 - `attachMovieLoopingTest` (70.7%)
 - `reverse_execute_PlaceObject2_test2` (70.0%)
 

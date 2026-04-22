@@ -4384,6 +4384,22 @@ void tagRemoveObject2(SWFAppContext* app_context, size_t depth)
 #endif
 		clear_display_entry(app_context, depth);
 	}
+#ifdef NO_GRAPHICS
+	else
+	{
+		// Display list slot is empty. A duplicateMovieClip clone swapped
+		// into this depth from the dynamic range may live only in
+		// child_mc_cache — its display_list entry was never populated
+		// because `target_swf_depth >= INITIAL_DISPLAYLIST_CAPACITY` takes
+		// the skip-DL path in `ng_cloneSprite`. After `mc1.swapDepths(dup)`
+		// followed by a RemoveObject2 targeting mc1's original SWF depth,
+		// dup lives at `mc->depth == depth - 16384` with no DL entry and
+		// must still be invalidated. Matches Ruffle behaviour in
+		// from_gnash/misc-ming.all/static_vs_dynamic2.
+		extern void actionInvalidateMCAtASDepth(SWFAppContext*, int);
+		actionInvalidateMCAtASDepth(app_context, (int)depth - 16384);
+	}
+#endif
 #if !defined(NO_GRAPHICS) && !defined(HEADLESS_GRAPHICS)
 	(void)app_context;
 #endif

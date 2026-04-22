@@ -1,8 +1,28 @@
 # Gnash Test Suite Status
 
-Last updated: 2026-04-22 (post-loop_test9 fix; not yet in CI)
+Last updated: 2026-04-22 (post-static_vs_dynamic2 fix; not yet in CI)
 
 ### Latest fixes (2026-04-22, not yet in CI)
+- **static_vs_dynamic2 (misc-ming) → PASS (+1).** Two-part fix for
+  `RemoveObject2` targeting a depth whose display-list slot is empty
+  because a swap moved the original occupant to a different SWF depth.
+  After `duplicateMovieClip('mc1', 'dup', 1)` + `mc1.swapDepths(dup)`,
+  mc1 moves to SWF 16385 and dup's AS depth becomes -16382 (SWF 2), but
+  dup has no DL entry (ng_cloneSprite's `target_swf_depth >=
+  INITIAL_DISPLAYLIST_CAPACITY` gate skipped DL placement). A subsequent
+  `RemoveObject2` at SWF depth 2 found `display_list[2].char_id == 0`
+  and returned silently, leaving `_root.dup` resolving to the stale
+  clone. Fix: (1) `tagRemoveObject2` (tag.c) now falls through to a
+  new `actionInvalidateMCAtASDepth` helper on empty DL slots, scanning
+  `child_mc_cache` for a root-level MC whose current `depth` matches
+  the AS depth of the removed tag and marking it `avm1_removed`.
+  (2) `actionInvalidateMCAtASDepth` also clears the global `var_map`
+  entry for the MC's name (via `setVariableByName(name, undefined)`)
+  — CloneSprite registers the clone there, and `_root.dup` resolves
+  through var_map bypassing the normal display-list / child_mc_cache
+  path. Without step 2 `typeof(dup)` returned `'movieclip'` even after
+  the MC was invalidated. No regressions on a 47-test AVM1 battery
+  (rewind/unload/placement/clone/attachMovie/construct).
 - **loop/loop_test9 (misc-ming) → PASS (+1).** Added a dynamic-range gate
   to `ng_display_clear_after` in `SWFModernRuntime/src/libswf/tag.c`:
   the loop now `break`s at `i >= 16384` so display entries at SWF depth

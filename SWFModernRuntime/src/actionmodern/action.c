@@ -18525,6 +18525,56 @@ void actionInvalidateCachedMovieClip(SWFAppContext* app_context, const char* nam
 	}
 }
 
+// Invalidate a root child MC whose current AS depth matches the given value,
+// regardless of name. Used by tagRemoveObject2 when RemoveObject2 targets a
+// depth that has no display-list entry (e.g. after `mc.swapDepths(dup)`
+// moved the DL entry away and dup, whose clone was never given a DL slot
+// due to the `INITIAL_DISPLAYLIST_CAPACITY` guard in ng_cloneSprite, is
+// now the "occupant" of that AS depth). Mirrors Ruffle's RemoveObject2
+// semantics: the tag removes whatever display object currently lives at
+// that depth, not the one that was originally placed there.
+void actionInvalidateMCAtASDepth(SWFAppContext* app_context, int as_depth)
+{
+	(void)app_context;
+	for (int i = 0; i < child_mc_count; i++) {
+		MovieClip* ch = child_mc_cache[i];
+		if (ch == NULL) continue;
+		if (ch->avm1_removed || ch->pending_removal) continue;
+		if (ch->depth == INT_MIN) continue;
+		if (ch->parent != &root_movieclip) continue;
+		if (ch->depth != as_depth) continue;
+		// Clear focus if this MC or a descendant held it
+		if (g_focused_mc != NULL) {
+			int is_focus_chain = (g_focused_mc == ch);
+			if (!is_focus_chain) {
+				MovieClip* p = g_focused_mc->parent;
+				while (p != NULL) {
+					if (p == ch) { is_focus_chain = 1; break; }
+					p = p->parent;
+				}
+			}
+			if (is_focus_chain)
+				selection_do_focus_change(app_context, g_focused_mc, NULL);
+		}
+		ch->avm1_removed = 1;
+		ch->dynamic_props = NULL;
+		ch->ng_textfield_idx = -1;
+		// Clear the global variable entry that setVariableByName created at
+		// clone time. Without this, `_root.dup` still resolves to the stale
+		// MC pointer via var_map and typeof() returns 'movieclip' instead
+		// of 'undefined'. (PlaceObject2-placed MCs are looked up via
+		// display_list/child_mc_cache and don't need this; only
+		// duplicateMovieClip/CloneSprite clones are stored in var_map.)
+		if (ch->name[0] != '\0') {
+			ActionVar undef = {0};
+			undef.type = ACTION_STACK_VALUE_UNDEFINED;
+			setVariableByName(ch->name, &undef);
+		}
+		ch->depth = INT_MIN;
+		break;
+	}
+}
+
 // Mark a MovieClip for deferred removal: transform its depth to the "removed" zone
 // (depth = -(internal_depth) - 1 - 16384) and set pending_removal flag.
 // The MC persists for one more frame so scripts can still access it.
