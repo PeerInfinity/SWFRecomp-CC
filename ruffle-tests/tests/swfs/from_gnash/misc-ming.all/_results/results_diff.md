@@ -1,29 +1,26 @@
 # Ruffle Test Results Diff
 
-**Previous:** `ca42bde6a104` (2026-04-22T21:35:23.899682+00:00)
-**Current:** `7f5dd0f68ff9` (2026-04-22T21:57:57.847300+00:00)
+**Previous:** `7f5dd0f68ff9` (2026-04-22T21:57:57.847300+00:00)
+**Current:** `e0ddd339fb95` (2026-04-22T22:48:18.358984+00:00)
 
 ## Summary
 
 | Metric | Previous | Current | Delta |
 |--------|----------|---------|-------|
-| Passing | 23 | 24 | +1 |
+| Passing | 24 | 25 | +1 |
 | Total | 102 | 102 | 0 |
-| Pass rate | 22.5% | 23.5% | +1.0% |
-| Mismatched lines | 2337 | 2335 | -2 |
-|   Decreased | | | -4 |
-|   Increased | | | +2 |
+| Pass rate | 23.5% | 24.5% | +1.0% |
+| Mismatched lines | 2335 | 2330 | -5 |
+|   Decreased | | | -5 |
 
 ## Newly Passing (1)
 
 | Test | Previous Status | Lines (prev) | Lines (now) |
 |------|----------------|--------------|-------------|
-| `place_and_remove_object_test` | output_mismatch | 10/13 | 13/13 |
+| `loop/loop_test9` | output_mismatch | 11/15 | 15/15 |
 
-## Line Count Changed (3)
+## Line Count Changed (1)
 
 | Test | Status | Lines (prev) | Lines (now) | Diff |
 |------|--------|--------------|-------------|------|
-| `goto_frame_test` | output_mismatch | 3/15 | 4/15 | -1 |
-| `replace_shapes1test` | output_mismatch | 0/23 | 0/23 | 0 |
-| `loop/loop_test` | output_mismatch | 7/21 | 5/21 | +2 |
+| `static_vs_dynamic1` | output_mismatch | 13/17 | 14/17 | -1 |

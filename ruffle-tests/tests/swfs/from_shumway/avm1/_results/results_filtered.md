@@ -1,10 +1,10 @@
 # Ruffle Test Results (Filtered)
 
-**Date**: 2026-04-22 21:57 UTC
+**Date**: 2026-04-22 22:48 UTC
 
-**Git SHA**: `7f5dd0f68f`
+**Git SHA**: `e0ddd339fb`
 
-**Run Duration**: 0m 11s
+**Run Duration**: 0m 13s
 
 **Filtered**: 2 tests ignored out of 47 available
 
@@ -27,8 +27,8 @@
 |---|------|-------|----------|-------|
 | 1 | `array` | 7 | 0.2s |  |
 | 2 | `bitmapdata/getPixel` | 2 | 0.2s |  |
-| 3 | `bitmapdata/loadBitmap` | 3 | 0.1s |  |
-| 4 | `callee` | 2 | 0.1s |  |
+| 3 | `bitmapdata/loadBitmap` | 3 | 0.2s |  |
+| 4 | `callee` | 2 | 0.2s |  |
 | 5 | `depth` | 6 | 0.3s |  |
 | 6 | `doactionorder/doactionorder` | 7 | 0.2s |  |
 | 7 | `doactionorder/symbolclass` | 4 | 0.2s |  |
@@ -39,25 +39,25 @@
 | 12 | `externalinterface` | 4 | 0.2s |  |
 | 13 | `filters` | 149 | 0.2s |  |
 | 14 | `haxe/flocons1` | 2 | 0.2s |  |
-| 15 | `haxe/flocons2` | 3 | 0.2s |  |
+| 15 | `haxe/flocons2` | 3 | 0.1s |  |
 | 16 | `label` | 4 | 0.2s |  |
 | 17 | `levels` | 9 | 0.2s |  |
 | 18 | `loadevent` | 9 | 0.2s |  |
-| 19 | `loadvariables/loadvariables` | 7 | 0.1s |  |
-| 20 | `loadvariables/loadvars` | 2 | 0.2s |  |
-| 21 | `lookup` | 3 | 0.2s |  |
+| 19 | `loadvariables/loadvariables` | 7 | 0.2s |  |
+| 20 | `loadvariables/loadvars` | 2 | 0.1s |  |
+| 21 | `lookup` | 3 | 0.1s |  |
 | 22 | `mouse-transparency` | 1 | 0.2s |  |
-| 23 | `nativeinheritance` | 6 | 0.2s |  |
-| 24 | `nested-button` | 1 | 0.2s |  |
+| 23 | `nativeinheritance` | 6 | 0.1s |  |
+| 24 | `nested-button` | 1 | 0.1s |  |
 | 25 | `operations` | 13 | 0.2s |  |
 | 26 | `property-paths/property-paths-6` | 6 | 0.2s |  |
 | 27 | `property-paths/property-paths-7` | 7 | 0.2s |  |
 | 28 | `propertycase/propertycase` | 7 | 0.2s |  |
 | 29 | `propertycase/propertycase-preserving-6` | 2 | 0.2s |  |
 | 30 | `propertycase/propertycase-preserving-7` | 5 | 0.1s |  |
-| 31 | `rollover` | 4 | 0.2s |  |
-| 32 | `scope` | 14 | 0.2s |  |
-| 33 | `setinterval` | 20 | 0.1s |  |
+| 31 | `rollover` | 4 | 1.1s |  |
+| 32 | `scope` | 14 | 0.9s |  |
+| 33 | `setinterval` | 20 | 0.2s |  |
 | 34 | `settimeout` | 17 | 0.2s |  |
 | 35 | `super` | 11 | 0.2s |  |
 | 36 | `target` | 18 | 0.2s |  |

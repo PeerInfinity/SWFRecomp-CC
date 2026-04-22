@@ -1,10 +1,10 @@
 # Ruffle Test Results (Unfiltered)
 
-**Date**: 2026-04-22 21:57 UTC
+**Date**: 2026-04-22 22:48 UTC
 
-**Git SHA**: `7f5dd0f68f`
+**Git SHA**: `e0ddd339fb`
 
-**Run Duration**: 0m 24s
+**Run Duration**: 0m 39s
 
 ## Summary
 
@@ -36,9 +36,9 @@
 | 3 | `avm1/bitmapdata/getPixel` | 2 | 0.1s |  |
 | 4 | `avm1/bitmapdata/loadBitmap` | 3 | 0.2s |  |
 | 5 | `avm1/callee` | 2 | 0.1s |  |
-| 6 | `avm1/depth` | 6 | 0.2s |  |
-| 7 | `avm1/doactionorder/doactionorder` | 7 | 0.1s | [1](ruffle-tests/tests/swfs/from_shumway/_investigation/complete/ACTION_QUEUE_PLAN.md) [3](ruffle-tests/tests/swfs/from_shumway/_investigation/incomplete/SHUMWAY_AVM1_SUBTREES_PLAN.md) |
-| 8 | `avm1/doactionorder/symbolclass` | 4 | 0.1s |  |
+| 6 | `avm1/depth` | 6 | 0.3s |  |
+| 7 | `avm1/doactionorder/doactionorder` | 7 | 0.2s | [1](ruffle-tests/tests/swfs/from_shumway/_investigation/complete/ACTION_QUEUE_PLAN.md) [3](ruffle-tests/tests/swfs/from_shumway/_investigation/incomplete/SHUMWAY_AVM1_SUBTREES_PLAN.md) |
+| 8 | `avm1/doactionorder/symbolclass` | 4 | 0.2s |  |
 | 9 | `avm1/duplicateMovieClip/dontremove` | 6 | 0.2s |  |
 | 10 | `avm1/duplicateMovieClip/duplicateMovieClip` | 4 | 0.2s |  |
 | 11 | `avm1/duplicateMovieClip/name-coercion` | 3 | 0.2s |  |
@@ -53,23 +53,23 @@
 | 20 | `avm1/loadvariables/loadvariables` | 7 | 0.2s |  |
 | 21 | `avm1/loadvariables/loadvars` | 2 | 0.2s |  |
 | 22 | `avm1/lookup` | 3 | 0.2s |  |
-| 23 | `avm1/mouse-transparency` | 1 | 0.2s |  |
-| 24 | `avm1/nativeinheritance` | 6 | 0.2s | [2](ruffle-tests/tests/swfs/from_shumway/_investigation/complete/SHUMWAY_AVM1_PLAN.md) |
+| 23 | `avm1/mouse-transparency` | 1 | 0.1s |  |
+| 24 | `avm1/nativeinheritance` | 6 | 0.1s | [2](ruffle-tests/tests/swfs/from_shumway/_investigation/complete/SHUMWAY_AVM1_PLAN.md) |
 | 25 | `avm1/nested-button` | 1 | 0.2s | [2](ruffle-tests/tests/swfs/from_shumway/_investigation/complete/SHUMWAY_AVM1_PLAN.md) |
 | 26 | `avm1/operations` | 13 | 0.2s |  |
 | 27 | `avm1/property-paths/property-paths-6` | 6 | 0.2s |  |
-| 28 | `avm1/property-paths/property-paths-7` | 7 | 0.1s |  |
-| 29 | `avm1/propertycase/propertycase` | 7 | 0.1s |  |
-| 30 | `avm1/propertycase/propertycase-preserving-6` | 2 | 0.1s |  |
-| 31 | `avm1/propertycase/propertycase-preserving-7` | 5 | 0.2s |  |
-| 32 | `avm1/rollover` | 4 | 0.2s |  |
-| 33 | `avm1/scope` | 14 | 0.2s | [2](ruffle-tests/tests/swfs/from_shumway/_investigation/complete/SHUMWAY_AVM1_PLAN.md) |
+| 28 | `avm1/property-paths/property-paths-7` | 7 | 0.2s |  |
+| 29 | `avm1/propertycase/propertycase` | 7 | 0.2s |  |
+| 30 | `avm1/propertycase/propertycase-preserving-6` | 2 | 0.2s |  |
+| 31 | `avm1/propertycase/propertycase-preserving-7` | 5 | 0.1s |  |
+| 32 | `avm1/rollover` | 4 | 0.1s |  |
+| 33 | `avm1/scope` | 14 | 0.1s | [2](ruffle-tests/tests/swfs/from_shumway/_investigation/complete/SHUMWAY_AVM1_PLAN.md) |
 | 34 | `avm1/setinterval` | 20 | 0.2s | [2](ruffle-tests/tests/swfs/from_shumway/_investigation/complete/SHUMWAY_AVM1_PLAN.md) |
 | 35 | `avm1/settimeout` | 17 | 0.2s | [2](ruffle-tests/tests/swfs/from_shumway/_investigation/complete/SHUMWAY_AVM1_PLAN.md) |
 | 36 | `avm1/super` | 11 | 0.2s |  |
-| 37 | `avm1/target` | 18 | 0.2s | [2](ruffle-tests/tests/swfs/from_shumway/_investigation/complete/SHUMWAY_AVM1_PLAN.md) |
+| 37 | `avm1/target` | 18 | 0.1s | [2](ruffle-tests/tests/swfs/from_shumway/_investigation/complete/SHUMWAY_AVM1_PLAN.md) |
 | 38 | `avm1/text-bind` | 0 | 0.2s |  |
-| 39 | `avm1/textfield/textfield-html` | 4 | 0.2s |  |
+| 39 | `avm1/textfield/textfield-html` | 4 | 0.1s |  |
 | 40 | `avm1/textfield/textfield-text-setters` | 8 | 0.2s |  |
 | 41 | `avm1/undefined/undefined-swf6` | 39 | 0.2s |  |
 | 42 | `avm1/undefined/undefined-swf7` | 39 | 0.1s |  |
@@ -79,11 +79,11 @@
 | 46 | `avm1/xml/xmlstring` | 9 | 0.2s |  |
 | 47 | `avm1timeline1` | 3 | 0.2s |  |
 | 48 | `avm1timeline2` | 6 | 0.2s |  |
-| 49 | `button3` | 1 | 0.2s |  |
-| 50 | `doubleAndRegister` | 2 | 0.2s |  |
-| 51 | `fscommand1` | 1 | 0.2s |  |
-| 52 | `fuzz/0db0a01a92ae6ad0d2805dcfbac2ddf9a9689e77cd007924adfac57b543b1ed2` | 0 | 0.1s |  |
-| 53 | `fuzz/6f3b6cbd618b5b816edbf27e14f631aef42da1a4bcc467fb1aa2951d6c85ee48` | 0 | 0.1s |  |
+| 49 | `button3` | 1 | 14.1s |  |
+| 50 | `doubleAndRegister` | 2 | 1.2s |  |
+| 51 | `fscommand1` | 1 | 0.8s |  |
+| 52 | `fuzz/0db0a01a92ae6ad0d2805dcfbac2ddf9a9689e77cd007924adfac57b543b1ed2` | 0 | 0.2s |  |
+| 53 | `fuzz/6f3b6cbd618b5b816edbf27e14f631aef42da1a4bcc467fb1aa2951d6c85ee48` | 0 | 0.2s |  |
 | 54 | `fuzz/9cad44804736a4fbd806d349c97b81d33c3f09ed4d9278acc4ef5cfbab147f3c` | 0 | 0.2s |  |
 | 55 | `gradientTransform` | 0 | 0.2s |  |
 | 56 | `invalidClipDepth` | 0 | 0.2s |  |
