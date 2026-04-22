@@ -1,8 +1,29 @@
 # Gnash Test Suite Status
 
-Last updated: 2026-04-22 (post-attachMovieTest fix; not yet in CI)
+Last updated: 2026-04-22 (post-place_and_remove_object_test fix; not yet in CI)
 
 ### Latest fixes (2026-04-22, not yet in CI)
+- **place_and_remove_object_test (misc-ming) → PASS (+1).**
+  `tagSetInstanceName` in `SWFModernRuntime/src/libswf/tag.c` now also sets
+  `g_pending_instance_name` in the path where the display entry already
+  exists (`display_list[depth].char_id != 0`). Without this, a subsequent
+  `tagPlaceObject2` that replaces the old character with a different
+  `char_id` walked the full-placement path and wiped `instance_name` back
+  to NULL (because `g_pending_instance_name` was NULL — the existing
+  branch set the name directly on the display entry but didn't stage it
+  as pending). The test exposed it via the natural end-of-movie loopback:
+  frame 0's `tagSetInstanceName(3, "sh1"); tagPlaceObject2(3, sh1, …)`
+  ran against a depth still holding frame 2's sh2 (char_id=5), so the
+  replace path lost "sh1" and `_root.sh1` resolved to undefined.
+  Verified no regressions on AVM1 placement / MC-lifecycle tests
+  (`access_unnamed_shape`, `conflicting_instance_names`, `default_names`,
+  `depth_replacement_audio_unloading`, `movieclip_depth_methods`,
+  `movieclip_get_instance_at_depth`, `movieclip_name_from_timeline`,
+  `named_shapes`, `place_and_lookup`, `bad_placeobject_clipaction`,
+  `clip_events`, `register_and_init_order`, `goto_rewind3`,
+  `execution_order3`, `goto_execution_order2`,
+  `movieclip_in_removed_button`, `unload`, `on_construct`,
+  `movieclip_state_values`).
 - **attachMovieTest (misc-ming) → PASS (+1).** `attachMovie` now skips the
   init-object property loop when the attached symbol is a Button
   (`attached->is_button_mc`). Flash behavior: the init object is not used

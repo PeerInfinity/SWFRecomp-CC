@@ -4894,6 +4894,14 @@ void tagSetInstanceName(SWFAppContext* app_context, size_t depth, const char* na
 		}
 		display_list[depth].instance_name = (char*)name;
 		display_list[depth].instance_name_owned = 0;
+		// Also set the pending name so that a subsequent tagPlaceObject2 at
+		// this depth (replacing the existing entry with a different char_id)
+		// can consume it through its full-placement path — otherwise that
+		// path wipes instance_name back to NULL, losing the name we just set.
+		// Observed on natural end-of-movie loopback where frame 0 re-issues
+		// tagSetInstanceName+tagPlaceObject2 against a depth still holding
+		// the previous iteration's character.
+		g_pending_instance_name = name;
 
 #ifdef NO_GRAPHICS
 		// Invoke registered class constructor now that the instance name is set.
