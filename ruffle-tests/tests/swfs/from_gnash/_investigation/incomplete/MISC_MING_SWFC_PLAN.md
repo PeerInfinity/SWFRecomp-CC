@@ -59,6 +59,44 @@ These are one or two small fixes away from passing. Tackle these first for broad
 
 For each, run `--diff --verbose` and cluster the diff lines by type. Many will resolve with a single targeted fix that's shared across a handful of near-passing tests.
 
+### CloneSprite depth-bias trade-off (open)
+
+Partial fix landed 2026-04-22 (`a232eaf4`, replacing the initial always-unbias
+attempt in `8efcb774`). `static_vs_dynamic1`/`static_vs_dynamic2` pick up
+the trivial `dup.getDepth() == 1` / `== 2` lines; `displaylist_depths/
+displaylist_depths_test`, `DepthLimitsTest`, and other tests that bias
+*negative* AS depths (e.g. `Push(-2001) Push(16384) Add → 14383`) are still
+off because the gate only strips the bias when the stack value is
+`>= AVM_DEPTH_BIAS` (16384).
+
+Why the gate exists: always-unbias (`clone_mc->depth = depth - 16384`)
+correctly matches Ruffle's `core/src/avm1/globals/movie_clip.rs::clone_sprite`
+semantics, but some SWFs pass `getNextHighestDepth()` directly to
+`CloneSprite` without biasing (e.g. the avm1 `textsnapshot_available_text`
+test produces a stack value of 0). With always-unbias, those clones end up
+at AS depth `-16384`, which collides with `root_movieclip.depth` and causes
+downstream lookups to misidentify the clone. Result: the textsnapshot test
+regresses by 1 line whenever we try to fully match Ruffle.
+
+**Real fix (punted):** make `actionCloneSprite` responsible for biasing
+so `ng_cloneSprite` / `ng_cloneSpriteFromMC` always receive AS depth.
+This requires distinguishing the two caller conventions at the bytecode
+site (SWF-biased vs. unbiased). Options:
+
+1. Always treat the stack value as SWF-biased — matches Ruffle but
+   requires fixing whatever breaks when clones live at `mc->depth ==
+   -16384` (likely the `ch == &root_movieclip` identity checks elsewhere
+   that currently conflate "root" with "AS depth -16384"). That's the
+   architecturally correct path.
+2. Detect bias via a version / compiler hint — fragile; nothing in the
+   bytecode distinguishes Ming's `Push(N) Push(16384) Add` from a direct
+   `Push(N+16384)` or from an already-unbiased depth.
+
+Pursuing (1) means auditing runtime identity checks to stop using
+`mc->depth == -16384` as a proxy for "is root" (use the pointer identity
+`mc == &root_movieclip` instead) and confirming `clone_depth_register` /
+`actionInvalidateCachedMovieClip` tolerate negative AS depths.
+
 ## Phase 2 — Mid-rate cluster fixes
 
 Failures at 10-80% match, grouped by apparent feature cluster. The cluster shape suggests which existing subsystem is being stressed:
