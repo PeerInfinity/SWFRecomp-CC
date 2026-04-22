@@ -1,10 +1,10 @@
 # Ruffle Test Results (Filtered)
 
-**Date**: 2026-04-22 16:45 UTC
+**Date**: 2026-04-22 17:35 UTC
 
-**Git SHA**: `d08236d9c2`
+**Git SHA**: `41d96d87d2`
 
-**Run Duration**: 24m 30s
+**Run Duration**: 22m 35s
 
 **Filtered**: 0 tests ignored out of 102 available
 
@@ -34,27 +34,27 @@
 
 | # | Test | Lines | Duration | Notes |
 |---|------|-------|----------|-------|
-| 1 | `DefineEditTextTest` | 153 | 28.1s |  |
-| 2 | `PlaceObject2Test` | 9 | 18.2s |  |
-| 3 | `VarAndCharClashTest` | 13 | 1.3s |  |
-| 4 | `Video-EmbedSquareTest` | 2 | 14.2s |  |
-| 5 | `action_order/action_execution_order_test1` | 10 | 16.4s |  |
-| 6 | `action_order/action_execution_order_test7` | 7 | 18.0s |  |
-| 7 | `action_order/action_execution_order_test9` | 4 | 17.1s |  |
-| 8 | `displaylist_depths/displaylist_depths_test10` | 10 | 14.4s |  |
-| 9 | `displaylist_depths/displaylist_depths_test4` | 26 | 16.1s |  |
-| 10 | `displaylist_depths/displaylist_depths_test5` | 25 | 0.3s |  |
-| 11 | `displaylist_depths/displaylist_depths_test6` | 13 | 0.3s |  |
-| 12 | `displaylist_depths/displaylist_depths_test7` | 14 | 0.3s |  |
-| 13 | `getTimer_test` | 8 | 16.9s |  |
+| 1 | `DefineEditTextTest` | 153 | 17.3s |  |
+| 2 | `PlaceObject2Test` | 9 | 16.5s |  |
+| 3 | `VarAndCharClashTest` | 13 | 0.3s |  |
+| 4 | `Video-EmbedSquareTest` | 2 | 16.1s |  |
+| 5 | `action_order/action_execution_order_test1` | 10 | 18.7s |  |
+| 6 | `action_order/action_execution_order_test7` | 7 | 16.3s |  |
+| 7 | `action_order/action_execution_order_test9` | 4 | 17.0s |  |
+| 8 | `displaylist_depths/displaylist_depths_test10` | 10 | 16.1s |  |
+| 9 | `displaylist_depths/displaylist_depths_test4` | 26 | 13.6s |  |
+| 10 | `displaylist_depths/displaylist_depths_test5` | 25 | 0.2s |  |
+| 11 | `displaylist_depths/displaylist_depths_test6` | 13 | 0.2s |  |
+| 12 | `displaylist_depths/displaylist_depths_test7` | 14 | 0.2s |  |
+| 13 | `getTimer_test` | 8 | 16.6s |  |
 | 14 | `get_frame_number_test` | 31 | 16.9s |  |
-| 15 | `loop/simple_loop_test` | 0 | 16.9s |  |
-| 16 | `masks_test2` | 10 | 16.2s |  |
-| 17 | `morph_test1` | 0 | 16.2s |  |
-| 18 | `move_object_test` | 11 | 18.1s |  |
-| 19 | `multi_doactions_and_goto_frame_test` | 6 | 18.0s |  |
-| 20 | `timeline_var_test` | 11 | 16.3s |  |
-| 21 | `unload_movieclip_test1` | 6 | 16.3s |  |
+| 15 | `loop/simple_loop_test` | 0 | 15.8s |  |
+| 16 | `masks_test2` | 10 | 16.1s |  |
+| 17 | `morph_test1` | 0 | 16.5s |  |
+| 18 | `move_object_test` | 11 | 15.8s |  |
+| 19 | `multi_doactions_and_goto_frame_test` | 6 | 15.7s |  |
+| 20 | `timeline_var_test` | 11 | 16.9s |  |
+| 21 | `unload_movieclip_test1` | 6 | 16.9s |  |
 
 ## Ruffle-Matched Tests
 
@@ -62,17 +62,17 @@
 
 | # | Test | Our diffs | Ruffle diffs | Duration | Notes |
 |---|------|-----------|--------------|----------|-------|
-| 1 | `KeyEventOrder` | 20 | 23 | 19.5s |  |
-| 2 | `action_order/action_execution_order_test4` | 8 | 26 | 0.3s |  |
-| 3 | `action_order/action_execution_order_test6` | 19 | 21 | 19.1s |  |
-| 4 | `attachExtImported` | 1 | 1 | 17.4s |  |
-| 5 | `callFunction_test` | 5 | 11 | 15.7s |  |
-| 6 | `init_action/InitActionTest` | 17 | 17 | 16.6s |  |
-| 7 | `init_action/InitActionTest2` | 30 | 30 | 16.4s |  |
-| 8 | `path_format_test` | 27 | 28 | 16.3s |  |
-| 9 | `place_object_test` | 14 | 14 | 16.6s |  |
-| 10 | `place_object_test2` | 16 | 23 | 16.2s |  |
-| 11 | `runtime_vm_stack_test` | 5 | 8 | 16.7s |  |
+| 1 | `KeyEventOrder` | 20 | 23 | 12.8s |  |
+| 2 | `action_order/action_execution_order_test4` | 8 | 26 | 0.4s |  |
+| 3 | `action_order/action_execution_order_test6` | 19 | 21 | 16.3s |  |
+| 4 | `attachExtImported` | 1 | 1 | 17.0s |  |
+| 5 | `callFunction_test` | 5 | 11 | 17.1s |  |
+| 6 | `init_action/InitActionTest` | 17 | 17 | 16.3s |  |
+| 7 | `init_action/InitActionTest2` | 30 | 30 | 16.2s |  |
+| 8 | `path_format_test` | 27 | 28 | 16.8s |  |
+| 9 | `place_object_test` | 14 | 14 | 18.1s |  |
+| 10 | `place_object_test2` | 16 | 23 | 17.3s |  |
+| 11 | `runtime_vm_stack_test` | 5 | 8 | 16.8s |  |
 
 ## Near-Passing Tests
 
