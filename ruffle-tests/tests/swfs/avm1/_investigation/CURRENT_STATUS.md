@@ -1,14 +1,15 @@
 # Current Ruffle Test Status
 
-Last updated: 2026-04-18 (CI run at 3242e54f, ruffle-test-results c3aa8876)
+Last updated: 2026-04-21 (CI run at 7155a774, ruffle-test-results 41667cc4)
 
 ## Quick Summary
 
-- **Pass rate (CI, latest)**: 598/641 (93.3%) raw, **606/641 (94.5%) effective** (raw + 8 ruffle_matched), **600/600 (100.0%) filtered** — zero filtered failures.
+- **Pass rate (CI, latest)**: 597/641 (93.1%) raw, **606/641 (94.5%) effective** (raw + 9 ruffle_matched), **600/600 (100.0%) filtered** — zero filtered failures.
 - **Test count**: 641 (unchanged). 41 tests in `ignored_tests.txt` (accepted diffs / Ruffle-vs-Flash / Ruffle known_failure).
 - **Image test baseline**: 14/31 strict image match, 10/31 tolerance pass.
-- **Main failure types** (raw, all in ignored list): output_mismatch (33), runtime_error/segfault/timeout (0), compile_fail (0).
+- **Main failure types** (raw, all in ignored list): output_mismatch (35), runtime_error/segfault/timeout (0), compile_fail (0).
 - **Filtered effective pass: 100%.** No actionable AVM1 failures remain.
+- **Change from 2026-04-18 snapshot:** unchanged at the effective level; one test reclassified pass→ruffle_matched.
 - **Latest fixes (2026-04-18, this session)**:
   - **`bitmap_data_thorough/threshold` PASS** — opaque BMD `getPixel32` returns raw stored pixel (no un-premul); `mask` arg defaults to `0xFFFFFFFF` only when missing (undefined coerces to 0).
   - **`bitmap_data_thorough/noise` PASS** — `high` arg defaults to `0xFF` only when missing (undefined → 0); alpha-channel RNG only fires for transparent BMDs; seed/low/high coerced via `doubleToUint32` so NaN/Infinity → 0 (ECMA ToInt32).

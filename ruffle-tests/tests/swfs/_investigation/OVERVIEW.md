@@ -2,7 +2,7 @@
 
 Cross-suite summary of all Ruffle-derived test suites. Each suite has its own `_investigation/` directory with detailed status docs.
 
-Last updated: 2026-04-18 (CI run at 3242e54f, ruffle-test-results c3aa8876)
+Last updated: 2026-04-21 (CI run at 7155a774, ruffle-test-results 41667cc4)
 
 ## Suite Summary
 
@@ -10,15 +10,24 @@ Last updated: 2026-04-18 (CI run at 3242e54f, ruffle-test-results c3aa8876)
 
 | Suite | Tests | Pass | RM | Effective | Effective Rate | Filtered Rate | Notes |
 |-------|-------|------|----|-----------| ---------------|---------------|-------|
-| [avm1](../avm1/_investigation/CURRENT_STATUS.md) | 641 | 598 | 8 | 606 | 94.5% | **100.0%** (600/600) | 41 ignored. **Zero filtered failures.** 2026-04-18 session cleared all 23: 16 `bitmap_data_thorough/*` PASS, 3 ruffle_matched, 1 (`pixelDissolve`) accepted, plus `function_as_function` and `depth_replacement_audio_unloading` PASS. |
-| [from_gnash/actionscript.all](../from_gnash/_investigation/CURRENT_STATUS.md) | 190 | 106 | 27 | 133 | **70.0%** | — | Ignore list now empty; Ruffle `known_failure` tests auto-promoted to ruffle_matched. |
+| [avm1](../avm1/_investigation/CURRENT_STATUS.md) | 641 | 597 | 9 | 606 | 94.5% | **100.0%** (600/600) | 41 ignored. **Zero filtered failures.** Unchanged vs 2026-04-18; one test reclassified pass→RM. |
+| [from_gnash/actionscript.all](../from_gnash/_investigation/CURRENT_STATUS.md) | 190 | 110 | 49 | 159 | **83.7%** | — | +26 effective since 2026-04-18. Mostly from String-vN ruffle-match, with-v6/v7/v8 fixes, and primitive auto-boxing. |
 | [from_gnash/misc-mtasc.all](../from_gnash/_investigation/CURRENT_STATUS.md) | 9 | 7 | 1 | 8 | **88.9%** | — | 1 remaining failure (`levels` — multi-level SWF loading). |
-| [from_gnash/misc-swfmill.all](../from_gnash/_investigation/CURRENT_STATUS.md) | 18 | 14 | 1 | 15 | **83.3%** | — | 3 blocked on architecture. |
-| [from_gnash/misc-ming.all](../from_gnash/_investigation/CURRENT_STATUS.md) | 102 | 18 | 10 | 28 | 27.5% | — | Blocked: inlined Dejagnu DoInitAction. Test count grew (58→102). |
-| [from_gnash/misc-swfc.all](../from_gnash/_investigation/CURRENT_STATUS.md) | 16 | 2 | 3 | 5 | 31.2% | — | Blocked: inlined Dejagnu DoInitAction. |
-| [from_shumway](../from_shumway/_investigation/CURRENT_STATUS.md) (flat) | 92 | 60 | 1 | 61 | 66.3% | — | Grew 47→92 (now includes avm1/ + fuzz/ + timeline/ sub-trees). |
-| [from_shumway/avm1](../from_shumway/_investigation/CURRENT_STATUS.md) | 47 | 44 | 1 | 45 | **95.7%** | **97.8%** (45/46) | 2 ignored. 2 remaining failures (`doactionorder`, `moviecliploader`) both timeline execution order. |
+| [from_gnash/misc-swfmill.all](../from_gnash/_investigation/CURRENT_STATUS.md) | 18 | 15 | 1 | 16 | **88.9%** | — | 2 remaining (`jump_to_prev_block`, `tags_after_last_showframe`). |
+| [from_gnash/misc-ming.all](../from_gnash/_investigation/CURRENT_STATUS.md) | 102 | 19 | 11 | 30 | 29.4% | — | Blocked: inlined Dejagnu DoInitAction. |
+| [from_gnash/misc-swfc.all](../from_gnash/_investigation/CURRENT_STATUS.md) | 16 | 3 | 3 | 6 | 37.5% | — | Blocked: inlined Dejagnu DoInitAction. |
+| [from_shumway](../from_shumway/_investigation/CURRENT_STATUS.md) (flat) | 92 | 61 | 1 | 62 | 67.4% | — | Grew 47→92 (now includes avm1/ + fuzz/ + timeline/ sub-trees). |
+| [from_shumway/avm1](../from_shumway/_investigation/CURRENT_STATUS.md) | 47 | 45 | 1 | 46 | **97.9%** | **100.0%** (45/45) | 2 ignored. Only `moviecliploader` remains (MCL one-tick deferral). |
 | **SWFRecomp/tests** (old suite) | 158+59 | all trace pass | — | — | **100%** | — | Hand-written opcode tests. CI only. |
+
+## Progress Since 2026-04-18
+
+- **ACTION_QUEUE_PLAN** — multi-phase architectural rework landing a Ruffle-style unified ActionQueue (Phases 0–8 all landed, plan marked complete at commit fe74d7aa). Motivated by `from_shumway/avm1/doactionorder` and timeline execution-order parity; enabled subsequent gnash and shumway fixes.
+- **String wrapper dispatch + ruffle-match** (Gnash) — d05bbd56, f70ecdb0, 41f62c81. String-vN tests auto-promoted to `ruffle_matched` via stubbed call/apply, DontDelete, constructor, override, direct method dispatch, and enumerate fallback.
+- **with-v6/v7/v8 → `ruffle_matched`** (Gnash) — 73983b0e + 7155a774 (latest CI delta). Two fixes: (a) `actionASSetPropFlags_func2` MOVIECLIP handling + WRITABLE check in WITH-scope assignment, (b) `resolveObjectPathToMC` walks dotted/colon paths via property lookup with `__proto__` fallback. Eliminated ~14 stray `Target not found`/`FAILED _target==` lines per test.
+- **`depth_replacement_audio_unloading` PASS** (AVM1) — `verify_output.py` extracts all 14 raw-data arrays from a child SWF's `draws.c` and prefixes them; `actionFirePendingLoadInits` Phase 2 saves/restores `is_playing` so a child's `stop()` doesn't terminate the parent's frame loop.
+- **`function_as_function` PASS** (AVM1) — `Function()` without `new` returns a bare object with no `__proto__`.
+- **`bitmap_data_thorough/*` final cleanup** (AVM1) — suite now 16 PASS + 3 ruffle_matched + 1 accepted (pixelDissolve). All plan work complete.
 
 ## Progress Since 2026-03-19
 
@@ -95,9 +104,12 @@ Note: Boolean-v5/v6/v7/v8, Video-v6/v7/v8, Selection-v5, Stage-v5 were already p
 
 ## Where to Focus
 
-1. **AVM1 `bitmap_data_thorough/*` sub-tests** — 20 new sub-tests, most at 2-6% match rate. Only `getColorBoundsRect` / `getPixel` / `getPixel32` are above 50%. Likely a bulk BitmapData thoroughness test that needs systematic work across many methods.
-2. **AVM1 `depth_replacement_audio_unloading`** — New compile_fail test. Needs recompiler investigation.
-3. **AVM1 `function_as_function`** — 2 diffs remaining: `Function()` without `new` return value format + `__proto__`.
-4. **AVM1 image tests** — 14/31 strict pass, remaining need Drawing API anti-aliasing, text layout, dynamic masks, or external media loading.
-5. **Gnash near-passing** — 22 tests with <=18 diffs. See `from_gnash/_investigation/incomplete/GNASH_NEAR_PASSING_PLAN.md`.
-6. **Shumway avm1/** expanded sub-trees — grew 23→47. 14 failures; see `from_shumway/_investigation/incomplete/SHUMWAY_AVM1_PLAN.md` for the new categories (duplicateMovieClip, xml, bitmapdata, etc.).
+AVM1 filtered suite is at 100%; remaining actionable work is in the Gnash and Shumway suites.
+
+1. **Gnash actionscript.all near-passing** — 22+ tests with <=18 line diffs. `global_proto_decls*` enumeration/ordering, `Number-v5..v8` float-to-string rounding, `Selection-v6/7/8`, `ExternalInterface-v8`. See `from_gnash/_investigation/incomplete/GNASH_NEAR_PASSING_PLAN.md`.
+2. **Gnash `misc-mtasc/levels`** — only 1 failure in that sub-suite; needs multi-level SWF loading (`_level5`, `_level87`, `_level99`). See `LEVELS_PLAN.md`.
+3. **Gnash `misc-swfmill`** — 2 remaining timeline-tag-order failures (`tags_after_last_showframe`, `jump_to_prev_block`). ActionQueue rework may have moved these; needs re-verification.
+4. **Shumway `avm1/moviecliploader`** — sole remaining filtered failure. One-tick MCL deferral exposes latent getBounds / chained setInterval bugs. See `from_shumway/_investigation/incomplete/SHUMWAY_AVM1_SUBTREES_PLAN.md` Part B.
+5. **Shumway `fuzz/*`** — 27 fuzzer-generated SWFs failing in the flat suite. Useful as an edge-case discovery source for runtime/recompiler.
+6. **AVM1 image tests** — 14/31 strict pass, 10/31 tolerance. Remaining need Drawing API anti-aliasing, text layout, dynamic masks, or external media loading. Tracked in `IMAGE_COMPARISON_TESTS.md`.
+7. **Gnash `misc-ming.all` / `misc-swfc.all`** — ~76 of ~83 failing tests are actionable via Phase 1 (near-passing) + Phase 2 (mid-rate cluster fixes); only ~7 zero-output tests are blocked on the inlined-Dejagnu DoInitAction architectural issue (Phase 3). See `incomplete/MISC_MING_SWFC_PLAN.md`.

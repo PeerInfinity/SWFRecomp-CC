@@ -1,6 +1,6 @@
 # Shumway Test Suite Status
 
-Last updated: 2026-04-17 (CI run at db6a0198)
+Last updated: 2026-04-21 (CI run at 7155a774)
 
 ## Quick Summary
 
@@ -9,35 +9,37 @@ Last updated: 2026-04-17 (CI run at db6a0198)
 | Metric | Value |
 |--------|-------|
 | Total tests | 92 |
-| Passing | **57** (62.0%) |
+| Passing | **61** (66.3%) |
 | Ruffle-matched | 1 |
-| Effective pass | **58** (63.0%) |
-| Failing | 34 |
+| Effective pass | **62** (67.4%) |
+| Failing | 30 |
 
 **Breakdown by sub-tree** (flat suite recurses into subdirs):
 
 | Sub-tree | Total | Pass | RM | Fail |
 |----------|-------|------|----|------|
 | Flat root (no subdir) | 10 | 10 | 0 | 0 |
-| `avm1/` | 47 | 41 | 1 | 5 |
+| `avm1/` | 47 | 45 | 1 | 1 (`moviecliploader`) |
 | `fuzz/` | 30 | 3 | 0 | 27 |
-| `timeline/` | 5 | 3 | 0 | 2 |
+| `timeline/` | 5 | 3 | 0 | 2 (`timeline_as2_1`, `timeline_as2_5`) |
 
 **Flat root is still 100% passing**: all 10 remaining tests (add, avm1timeline1, avm1timeline2, button3, doubleAndRegister, fscommand1, gradientTransform, invalidClipDepth, movieinfo1, targetPath1) pass.
 
-**Remaining failing clusters** come from `fuzz/` (27 fail — fuzzer-generated SWFs, likely useful for finding edge cases in runtime/recompiler), `avm1/` sub-tree (5 fail — see below), and `timeline/` (2 fail).
+**Remaining failing clusters** come from `fuzz/` (27 fail — fuzzer-generated SWFs, useful as an edge-case source for the runtime/recompiler), `avm1/` sub-tree (1 fail — see below), and `timeline/` (2 fail).
 
 ### AVM1 subdirectory (`from_shumway/avm1/`)
 
 | Metric | Value |
 |--------|-------|
 | Total tests | 47 |
-| Passing | **41** (87.2%) |
+| Passing | **45** (95.7%) |
 | Ruffle-matched | 1 |
-| Effective pass | **42** (89.4%) |
+| Effective pass | **46** (97.9%) |
 | Ignored | 2 |
-| **Filtered pass rate** | **41/45 (91.1%)** |
-| Failing (filtered) | 4 |
+| **Filtered pass rate** | **45/45 (100.0%)** |
+| Failing (filtered) | 0 |
+
+The sole unfiltered fail is `moviecliploader` (1/7 — MCL one-tick deferral, tracked in `incomplete/SHUMWAY_AVM1_SUBTREES_PLAN.md` Part B). `doactionorder` now passes following Phase 6 of the ActionQueue rework.
 
 **Per-category status:**
 
@@ -45,8 +47,8 @@ Last updated: 2026-04-17 (CI run at db6a0198)
 |----------|-------|------|------|
 | Flat (root-level tests) | 23 | 21 (+1 RM) | 1 (`moviecliploader`) |
 | `bitmapdata/` | 2 | 2 | 0 |
-| `doactionorder/` | 2 | 1 | 1 (`doactionorder`) |
-| `duplicateMovieClip/` | 4 | 1 | 3 (`duplicateMovieClip`, `dontremove`, `samedepth`) |
+| `doactionorder/` | 2 | 2 | 0 |
+| `duplicateMovieClip/` | 4 | 4 | 0 |
 | `haxe/` | 2 | 2 | 0 |
 | `loadvariables/` | 2 | 2 | 0 |
 | `property-paths/` | 2 | 2 | 0 |
@@ -86,12 +88,14 @@ Last updated: 2026-04-17 (CI run at db6a0198)
 
 ---
 
-## Still Failing (2 in `avm1/`, both also at flat)
+## Still Failing (1 in `avm1/`, also at flat)
 
-See `incomplete/SHUMWAY_AVM1_SUBTREES_PLAN.md` for the fix plan and current implementation progress.
+See `incomplete/SHUMWAY_AVM1_SUBTREES_PLAN.md` for the fix plan.
 
-- `doactionorder/doactionorder` (3/7) — UNCHANGED. Part A Approach A2 (eager Phase 2 at `tagPlaceObject2` + inline root DoAction emission) was attempted on 2026-04-17 and reverted: it regressed 6 canary tests (`execution_order1/4`, `clip_events`, `register_and_init_order`, `variable_args`, `define_function2_preload_order`) because it doesn't match Ruffle's true FIFO ActionQueue semantics — Ruffle processes all tags (placements synchronously, scripts queued) BEFORE the queue drains. Plan updated to Approach A3 (unified runtime ActionQueue with recompiler emitting `actionQueueScript` instead of direct calls). See plan file for step-by-step.
-- `moviecliploader` (1/7) — UNCHANGED. Part B landed briefly (commit `1a1bf852`) improving this to 6/7, but CI revealed 3 AVM1 regressions (`movieclip_invalid_get_bounds_1/2` heap corruption, `string_paths_eval2` timer shift). Reverted in `59533be3`. The one-tick deferral exposes pre-existing latent bugs in getBounds handling and test calibration for chained setInterval. See plan file for the three paths forward.
+- `doactionorder/doactionorder` — **RESOLVED** by Phase 6 of the ActionQueue rework (commit `a427f5fc`, "Land Phase 6 of ActionQueue rework: inline root DoAction queueing"). Plan's Approach A3 effectively became the ACTION_QUEUE_PLAN, now complete (marked at commit `fe74d7aa`).
+- `moviecliploader` (1/7) — STILL FAILING. Part B landed briefly (commit `1a1bf852`) improving this to 6/7, but CI revealed 3 AVM1 regressions (`movieclip_invalid_get_bounds_1/2` heap corruption, `string_paths_eval2` timer shift). Reverted in `59533be3`. The one-tick deferral exposes pre-existing latent bugs in getBounds handling and test calibration for chained setInterval. See plan file for the three paths forward.
+
+Other previously-failing `avm1/` sub-tree tests (`duplicateMovieClip/*`, `doactionorder/doactionorder`) all now pass.
 
 ---
 

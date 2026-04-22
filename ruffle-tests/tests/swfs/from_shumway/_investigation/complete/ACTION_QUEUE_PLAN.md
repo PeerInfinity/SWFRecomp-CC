@@ -865,7 +865,7 @@ Plans currently blocked or partially blocked on this:
 | `from_gnash/blocked/ROOT_ONLOAD_PLAN.md` | `trace-as2/root_onload` (50% → 100% or `ruffle_matched`) |
 | `from_shumway/incomplete/SHUMWAY_AVM1_SUBTREES_PLAN.md` Part A | `avm1/doactionorder/doactionorder` (3/7 → 7/7 expected) |
 | `from_shumway/incomplete/SHUMWAY_FUZZ_TIMELINE_PLAN.md` | `timeline/timeline_as2_1`, `timeline/timeline_as2_5` |
-| `from_gnash/blocked/MISC_MING_SWFC_PLAN.md` (deferred-DoAction subset) | `action_execution_order_test8-v5/v6`, `ActionOrderTest3/4`, similar |
+| `from_gnash/incomplete/MISC_MING_SWFC_PLAN.md` (deferred-DoAction subset) | `action_execution_order_test8-v5/v6`, `ActionOrderTest3/4`, similar |
 | `from_gnash/blocked/MISC_SWFMILL_PLAN.md` | `dict_event` (interleaved DoAction/PlaceObject) |
 | `avm1/RUFFLE_VS_FLASH_DIFFERENCES.md` (stage_object_enumerate entry) | `stage_object_enumerate` (would flip to passing) |
 
@@ -1238,7 +1238,7 @@ compressed to 6–8 sessions by skipping the parallel-queue step in Phases 1–3
 - `from_gnash/_investigation/blocked/ROOT_ONLOAD_PLAN.md` (test-level analysis
   of the simplest case this rework fixes)
 - `from_shumway/_investigation/incomplete/SHUMWAY_FUZZ_TIMELINE_PLAN.md`
-- `from_gnash/_investigation/blocked/MISC_MING_SWFC_PLAN.md`
+- `from_gnash/_investigation/incomplete/MISC_MING_SWFC_PLAN.md`
 - `from_gnash/_investigation/blocked/MISC_SWFMILL_PLAN.md`
 - `avm1/_investigation/RUFFLE_VS_FLASH_DIFFERENCES.md` (stage_object_enumerate
   entry — same root cause from the opposite direction)

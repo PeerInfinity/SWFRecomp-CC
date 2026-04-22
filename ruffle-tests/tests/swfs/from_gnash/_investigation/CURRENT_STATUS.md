@@ -1,8 +1,8 @@
 # Gnash Test Suite Status
 
-Last updated: 2026-04-21
+Last updated: 2026-04-21 (CI run at 7155a774 — with-v6/v7/v8 fix now confirmed)
 
-### Latest fixes (2026-04-21, not yet in CI)
+### Latest fixes (2026-04-21, confirmed in CI at 7155a774)
 - **with-v6/v7/v8 → `ruffle_matched` (+3 effective).** Added
   `resolveObjectPathToMC` in `action.c` (after `resolveFlashPathToMC`) to
   walk dotted/colon path segments via property lookup when they don't
@@ -89,21 +89,22 @@ Last updated: 2026-04-21
 
 | Sub-suite | Tests | Pass | RM | Effective | Effective Rate | Ignored |
 |-----------|-------|------|----|-----------| ---------------|---------|
-| **actionscript.all** | 190 | 106 | 27 | 133 | **70.0%** | 0 (ignore list empty; see below) |
+| **actionscript.all** | 190 | 110 | 49 | 159 | **83.7%** | 0 (ignore list empty; see below) |
 | **misc-mtasc.all** | 9 | 7 | 1 | 8 | **88.9%** | 0 |
-| **misc-swfmill.all** | 18 | 14 | 1 | 15 | **83.3%** | 0 |
-| **misc-ming.all** | 102 | 18 | 10 | 28 | 27.5% | 0 |
-| **misc-swfc.all** | 16 | 2 | 3 | 5 | 31.2% | 0 |
-| **Total** | 335 | 147 | 42 | 189 | **56.4%** | 0 |
+| **misc-swfmill.all** | 18 | 15 | 1 | 16 | **88.9%** | 0 |
+| **misc-ming.all** | 102 | 19 | 11 | 30 | 29.4% | 0 |
+| **misc-swfc.all** | 16 | 3 | 3 | 6 | 37.5% | 0 |
+| **Total** | 335 | 154 | 65 | 219 | **65.4%** | 0 |
 
 "RM" = `ruffle_matched`: our diffs against Flash's `output.txt` are a proper subset of Ruffle's diffs (the test has `known_failure = true` + `output.ruffle.txt` in the Ruffle source repo, so matching Ruffle is as good as passing).
 
-**Notable growth since 2026-04-11**:
-- actionscript.all: 95 pass → 106 pass (+11), +27 ruffle_matched tracked separately. Effective rate jumped to 70.0%.
-- misc-swfmill.all: 14 → 18 tests (4 new tests; all 4 pass).
-- misc-ming.all: 58 → 102 tests (44 new tests; 9 pass + 10 ruffle_matched).
-- actionscript.all `ignored_tests.txt` is now empty — previously-ignored Math-v5/v6/v7/v8, ops-v8, Inheritance-v5..v8 are auto-promoted to ruffle_matched by `verify_output.py` subset-match. See `complete/RUFFLE_KNOWN_FAILURE_HANDLING_PLAN.md`.
-- Remaining 3 misc-swfmill failures (dict_event, tags_after_last_showframe, jump_to_prev_block) are blocked on architectural limitations — see `blocked/MISC_SWFMILL_PLAN.md`.
+**Notable growth since 2026-04-18** (OVERVIEW's previous snapshot):
+- actionscript.all: 106 → 110 pass (+4), 27 → 49 ruffle_matched (+22). Effective +26 → 159/190 (**83.7%**).
+  - +22 RM from: String-vN ruffle-match bundles (`d05bbd56`, `f70ecdb0`, `41f62c81`), with-v6/v7/v8 (`73983b0e`, `7155a774`), remaining auto-promotions as plan work landed.
+- misc-swfmill.all: `dict_event` resolved (+1 effective → 16/18). Remaining 2: `jump_to_prev_block`, `tags_after_last_showframe`.
+- misc-ming.all: +2 effective (28 → 30).
+- misc-swfc.all: +1 effective (5 → 6).
+- actionscript.all `ignored_tests.txt` is still empty — previously-ignored Math/ops/Inheritance tests are auto-promoted to ruffle_matched by `verify_output.py` subset-match. See `complete/RUFFLE_KNOWN_FAILURE_HANDLING_PLAN.md`.
 
 ### Latest fixes (2026-04-13, confirmed in CI at 83d3748a)
 - **Inheritance-v5 SWF5 version gates** — Four gates applied in `action.c`: (1) `actionExtends` skips `__constructor__` in SWF5 (gnash comment: "SWF5 or below don't set __constructor__"); (2) `actionGetVariable` "super" fallback gated on SWF ≥ 6 so SWF5 function bodies see super as undefined; (3) `actionCallFunction("super")` handler gated on SWF ≥ 6 so `super()` in SWF5 becomes an undefined-variable no-op; (4) `Function.prototype.apply`/`.call` marked `flash_flags=0x0080` (hidden in SWF5 per Gnash test source comment "Function.apply was introduced in SWF6"). **Impact:** Inheritance-v5 line-match 100/114 → 114/114 (all expected lines match); only residual diff is the 1 extra egg/chicken line. Added to `ignored_tests.txt` → passing via filtered results. See `complete/INHERITANCE_SEGFAULT_PLAN.md` Fix 3.

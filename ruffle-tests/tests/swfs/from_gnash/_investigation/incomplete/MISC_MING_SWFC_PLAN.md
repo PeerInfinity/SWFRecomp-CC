@@ -3,7 +3,7 @@
 
 <!-- PLAN_META
 id: MISC_MING_SWFC
-status: blocked
+status: in_progress
 phases:
   - id: 1
     name: "Near-passing (>=80%) attack — low risk, broad win"
@@ -16,12 +16,12 @@ phases:
     status: blocked
 dependencies: [DEJAGNU_FRAMEWORK]
 blockers:
-  - reason: "7 zero-output tests blocked on DoInitAction-for-unplaced-library-exports; see complete/DEJAGNU_FRAMEWORK_PLAN.md"
+  - reason: "Phase 3 only: 7 zero-output tests blocked on DoInitAction-for-unplaced-library-exports; see complete/DEJAGNU_FRAMEWORK_PLAN.md. Phases 1 and 2 are actionable and cover ~76 of the ~83 failing tests."
 -->
 
 Covers **misc-ming.all** (74 failing / 102 total) and **misc-swfc.all** (11 failing / 16 total). Both suites use the inlined-Dejagnu harness described in `complete/DEJAGNU_FRAMEWORK_PLAN.md`.
 
-Status (CI at 82a6ea07): **blocked for ~7 tests**, the rest are actionable.
+Status (CI at 82a6ea07): **Phase 3 blocked for ~7 tests; Phases 1–2 actionable and cover the remaining ~76 tests.**
 
 ## Key finding: the blocker is not universal
 
