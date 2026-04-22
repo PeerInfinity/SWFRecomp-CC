@@ -1,6 +1,24 @@
 # Gnash Test Suite Status
 
-Last updated: 2026-04-17 (CI run at 82a6ea07)
+Last updated: 2026-04-21
+
+### Plan rescoping (2026-04-21, no test deltas)
+- **`WITH_AUTOBOXING_PLAN.md` shelved** (moved incomplete/ → blocked/).
+  with-v5 already `ruffle_matched`; v6/v7/v8 failures are *not*
+  primitive-auto-boxing. The diffs targeted by the plan's
+  `Number.prototype.checkpoint`/`String.prototype.checkpoint` assertions
+  already pass in our output via the Object.prototype inheritance path.
+  The real remaining blockers for with-v6/v7/v8 are three unrelated
+  features; see new plans below.
+- **New incomplete plans:**
+  - `SETTARGET_OBJECT_PATH_PLAN.md` — extend `actionSetTarget` to
+    resolve dotted/colon object paths via property lookup (not just
+    MovieClip parent/child). Biggest lever: ~14 diff lines each on
+    with-v6/v7/v8 (6 stray `Target not found` traces + 8 `_target` FAILs).
+  - `ASSETPROPFLAGS_WITH_READONLY_PLAN.md` — (a) handle MOVIECLIP arg in
+    `actionASSetPropFlags_func2`; (b) honour `PROPERTY_FLAG_WRITABLE`
+    in WITH-scope assignment. ~2 lines each per test, needed alongside
+    the setTarget plan to reach `ruffle_matched`.
 
 ### Latest fixes (2026-04-17, not yet in CI)
 - **ASnative-v5/v6/v7/v8 → ruffle_matched (+4).** Three-part fix in `SWFModernRuntime/src/actionmodern/`:
@@ -139,6 +157,9 @@ Last updated: 2026-04-17 (CI run at 82a6ea07)
 | `REMAINING_FAILURES_ANALYSIS.md` | Detailed tiered analysis with estimated fix effort |
 | `incomplete/GNASH_NEAR_PASSING_PLAN.md` | 22 near-passing tests (<=18 diffs), 7 phases |
 | `incomplete/ARRAY_V5_PLAN.md` | array-v5 investigation (450/560 = 80.4%) |
+| `incomplete/SETTARGET_OBJECT_PATH_PLAN.md` | Extend setTarget to resolve dotted/colon object paths via property lookup (primary with-v6/v7/v8 blocker) |
+| `incomplete/ASSETPROPFLAGS_WITH_READONLY_PLAN.md` | ASSetPropFlags MOVIECLIP handling + WRITABLE check in WITH assignment (secondary with-v6/v7/v8 blocker) |
+| `blocked/WITH_AUTOBOXING_PLAN.md` | Shelved — primitive auto-boxing effectively works; see plan for actual remaining root causes |
 | `complete/INHERITANCE_SEGFAULT_PLAN.md` | All 4 Inheritance tests pass filtered (v5 via SWF5 gates, v6/v7/v8 via Ruffle-matching acceptance) |
 | `complete/RUFFLE_KNOWN_FAILURE_HANDLING_PLAN.md` | Phase 3 landed: `verify_output.py` auto-promotes `known_failure`+`output.ruffle.txt` tests to `ruffle_matched` when our diffs ⊆ Ruffle's diffs against Flash |
 | `blocked/MISC_SWFMILL_PLAN.md` | 3 remaining misc-swfmill failures (architectural) |
