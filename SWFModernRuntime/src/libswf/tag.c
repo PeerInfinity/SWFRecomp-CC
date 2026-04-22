@@ -5163,10 +5163,15 @@ void ng_run_deferred_sprite_init_on_or_after(SWFAppContext* app_context, size_t 
 
 // Clear display entries whose placed_at_frame is after target_frame.
 // Used by swf_core.c when seeking backward on the main timeline.
+// Entries at SWF depth >= AVM_DEPTH_BIAS (16384, i.e. AS depth >= 0, the
+// "dynamic" range) survive backward jumps, matching Ruffle's AVM1
+// survives_rewind rule: `old_object.depth() < AVM_DEPTH_BIAS` is the
+// precondition for considering an object for removal during rewind.
 void ng_display_clear_after(SWFAppContext* app_context, size_t target_frame)
 {
 	for (size_t i = 1; i <= max_depth; i++)
 	{
+		if (i >= 16384) break;  // dynamic-range entries survive rewind
 		if (display_list[i].char_id != 0 &&
 		    display_list[i].placed_at_frame > target_frame)
 		{

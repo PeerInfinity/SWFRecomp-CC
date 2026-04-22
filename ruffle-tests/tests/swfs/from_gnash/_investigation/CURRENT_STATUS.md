@@ -1,8 +1,24 @@
 # Gnash Test Suite Status
 
-Last updated: 2026-04-22 (post-place_and_remove_object_test fix; not yet in CI)
+Last updated: 2026-04-22 (post-loop_test9 fix; not yet in CI)
 
 ### Latest fixes (2026-04-22, not yet in CI)
+- **loop/loop_test9 (misc-ming) → PASS (+1).** Added a dynamic-range gate
+  to `ng_display_clear_after` in `SWFModernRuntime/src/libswf/tag.c`:
+  the loop now `break`s at `i >= 16384` so display entries at SWF depth
+  >= `AVM_DEPTH_BIAS` survive backward jumps. This matches Ruffle's
+  `survives_rewind` rule (`core/src/display_object/movie_clip.rs:1824`):
+  for AVM1, `old_object.depth() < AVM_DEPTH_BIAS` is the precondition
+  for considering an object for removal during rewind. Previously we
+  cleared every entry placed after the target frame regardless of
+  depth, which killed `movieClip2` (placed at SWF depth 30000 = AS
+  13616) on `gotoAndStop(1)` even though it lives in the dynamic range.
+  `static_vs_dynamic1` also partially improves: `typeof(mc1)` after
+  swap-to-dynamic loopback now matches; the remaining `typeof(dup2)`
+  diff is blocked on the punted CloneSprite depth-bias always-strip
+  (preserving duplicateMovieClip clones would regress
+  `from_shumway/avm1/duplicateMovieClip/dontremove`). No regressions
+  on a 45-test AVM1 rewind/unload/placement battery (see MISC_MING_SWFC_PLAN).
 - **place_and_remove_object_test (misc-ming) → PASS (+1).**
   `tagSetInstanceName` in `SWFModernRuntime/src/libswf/tag.c` now also sets
   `g_pending_instance_name` in the path where the display entry already
