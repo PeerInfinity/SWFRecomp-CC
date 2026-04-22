@@ -54652,10 +54652,8 @@ void actionCallMethod(SWFAppContext* app_context, char* str_buffer)
 				// Use ng_duplicateMovieClip: stores at SWF depth (depth+16384), no variable registration
 				MovieClip* clone_mc = ng_duplicateMovieClip(app_context, mc->name, tgt_name, depth_val);
 				if (clone_mc == NULL) {
-					// Source not in ng_display (script-created MC): direct clone via MC.
-					// ng_cloneSpriteFromMC expects SWF-biased depth (matching CloneSprite
-					// bytecode convention), so bias the AS depth_val here.
-					clone_mc = ng_cloneSpriteFromMC(app_context, mc, tgt_name, depth_val + 16384);
+					// Source not in ng_display (script-created MC): direct clone via MC
+					clone_mc = ng_cloneSpriteFromMC(app_context, mc, tgt_name, depth_val);
 				}
 
 				// Apply initObject properties (args[2]) to the clone — via

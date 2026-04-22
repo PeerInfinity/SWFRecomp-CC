@@ -2707,9 +2707,15 @@ MovieClip* ng_cloneSprite(SWFAppContext* app_context, const char* source_name,
 		src_mc->ts_stale_source = 1;
 	}
 	clone_mc->currentframe = 1;
-	// CloneSprite bytecode passes SWF-biased depth (AS depth + 16384); store AS depth
-	// on the clone so clone_mc.getDepth() matches Flash (user-visible depth).
-	clone_mc->depth = depth - 16384;
+	// CloneSprite bytecode may be handed a raw SWF-biased depth (AS depth + 16384,
+	// as in Ming-generated `Push(N) Push(16384) Add`), or an unbiased AS depth
+	// (as produced by SWF compilers that pass `getNextHighestDepth()` straight
+	// to `duplicateMovieClip`). Heuristic: only strip the bias when the stack
+	// value clearly lies in the SWF-biased range (>= AVM_DEPTH_BIAS = 16384).
+	// That keeps `clone.getDepth()` matching Flash for biased callers without
+	// pushing already-unbiased callers into the negative range (which would
+	// regress e.g. avm1/textsnapshot_available_text).
+	clone_mc->depth = (depth >= 16384) ? (depth - 16384) : depth;
 
 	// For dynamic textfield clones (no DefineEditText tag), init default props
 	if (src_mc != NULL && src_mc->ng_textfield_idx == -2 && clone_mc->ng_textfield_idx != -2) {
@@ -2898,9 +2904,11 @@ MovieClip* ng_cloneSpriteFromMC(SWFAppContext* app_context, MovieClip* src_mc,
 	clone_mc->ts_stale_source = src_mc->ts_stale_source;
 	src_mc->ts_stale_source = 1;
 	clone_mc->currentframe = 1;
-	// `depth` is the SWF-biased depth (both call sites pass AS depth + 16384); store
-	// AS depth on the clone so clone_mc.getDepth() matches Flash.
-	clone_mc->depth = depth - 16384;
+	// See comment in ng_cloneSprite — strip the SWF depth bias only when the
+	// caller passed a value clearly in the SWF-biased range, so both
+	// `duplicateMovieClip(name, asDepth)` callers (biased via the method) and
+	// `CloneSprite`-with-unbiased-depth callers report sensible `getDepth()`.
+	clone_mc->depth = (depth >= 16384) ? (depth - 16384) : depth;
 
 	// For dynamic textfield clones (src has ng_textfield_idx == -2 but no DefineEditText tag),
 	// actionFindOrCreateMovieClip won't detect the textfield from the display list.
