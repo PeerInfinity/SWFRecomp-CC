@@ -1,6 +1,31 @@
 # Gnash Test Suite Status
 
-Last updated: 2026-04-22 (post-instanceNameTest fix; not yet in CI)
+Last updated: 2026-04-23 (post-TextFieldHTML malformed-attr fix; not yet in CI)
+
+### Latest fixes (2026-04-23, not yet in CI)
+
+- **TextFieldHTML-v6/v7/v8 (actionscript.all) → PASS (+3).** Flash's HTML
+  parser (and Ruffle's, which uses `quick_xml::Reader`) rejects unquoted
+  attribute values per XML spec. When a start tag contains `name=value`
+  without quotes around the value, parsing aborts and the resulting `text`
+  is empty. Our `tf_parse_html` was too lenient: `tf_get_attr` happily
+  read unquoted values up to the next whitespace or `>`, so
+  `<font color=#00FF00>green2</font>` was treated as a valid font tag and
+  left "green2" in `tf.text`. Fix (two parts in
+  `SWFModernRuntime/src/actionmodern/action.c`):
+  (1) New helper `tf_tag_has_malformed_attr(tag_content, tag_len)` scans
+  for any `attr=X` where X is not a quote char, returning 1 if malformed.
+  (2) In `tf_parse_html`, after a start tag is extracted, call the helper
+  on the tag content; if malformed, clear the run table (`run_count=0`,
+  `text_len=0`) and return, matching Ruffle's abort-on-parse-error
+  behavior in `text_format.rs`. No regressions on an 19-test AVM1
+  edittext/textfield/htmlText battery (`edittext_html_align_swf7/8`,
+  `edittext_html_color`, `edittext_html_condensewhite_swf7/8`,
+  `edittext_html_entity`, `edittext_html_roundtrip`,
+  `edittext_html_swf6/7/8`, `edittext_stylesheet`, `clone_sprite_edittext`,
+  `clone_sprite_edittext_dynamic`, `text_format`,
+  `text_format_rounding_swf7/8`, `text_format_font_max_length`,
+  `text_format_display`, `text_format_get_text_extent_undefined_width`).
 
 ### Latest fixes (2026-04-22, not yet in CI)
 - **instanceNameTest (misc-ming) → PASS (+1).** SWF's PlaceObject2

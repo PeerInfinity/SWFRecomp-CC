@@ -19444,6 +19444,48 @@ static int tf_get_attr(const char* tag_content, u32 tag_len, const char* attr_na
 	return 0;
 }
 
+// Scan a start-tag's content for any `name=value` where value is not quoted.
+// Matches Ruffle's behavior via quick_xml::Reader which rejects unquoted
+// attribute values per XML spec. When found, tf_parse_html aborts and
+// leaves the text empty. Flash TextField HTML parsing shows the same
+// observable behavior (see TextFieldHTML-v6/v7/v8 tests).
+// tag_content/tag_len cover the chars between '<' and '>', minus any trailing
+// self-close '/'. Tag name must come first.
+static int tf_tag_has_malformed_attr(const char* tag_content, u32 tag_len) {
+	u32 i = 0;
+	// Skip tag name
+	while (i < tag_len && tag_content[i] != ' ' && tag_content[i] != '\t' &&
+	       tag_content[i] != '\n' && tag_content[i] != '\r' && tag_content[i] != '/' &&
+	       tag_content[i] != '=') {
+		i++;
+	}
+	while (i < tag_len) {
+		// Skip whitespace between attributes
+		while (i < tag_len && (tag_content[i] == ' ' || tag_content[i] == '\t' ||
+		       tag_content[i] == '\n' || tag_content[i] == '\r')) i++;
+		if (i >= tag_len) break;
+		if (tag_content[i] == '/') break;
+		// Read attribute name
+		u32 name_start = i;
+		while (i < tag_len && tag_content[i] != '=' && tag_content[i] != ' ' &&
+		       tag_content[i] != '\t' && tag_content[i] != '\n' && tag_content[i] != '\r' &&
+		       tag_content[i] != '/') i++;
+		if (i == name_start) { i++; continue; }
+		if (i < tag_len && tag_content[i] == '=') {
+			i++;
+			if (i >= tag_len || (tag_content[i] != '"' && tag_content[i] != '\'')) {
+				return 1;
+			}
+			char q = tag_content[i];
+			i++;
+			while (i < tag_len && tag_content[i] != q) i++;
+			if (i < tag_len) i++;
+		}
+		// else: bare attribute with no value — allowed
+	}
+	return 0;
+}
+
 // Case-insensitive tag name match
 static int tf_tag_is(const char* tag, u32 tag_len, const char* name) {
 	u32 name_len = (u32)strlen(name);
@@ -19629,6 +19671,13 @@ static int tf_parse_html(TFRunTable* table, const char* html, u32 html_len,
 			u32 tname_len = is_close ? tag_len - 1 : tag_len;
 			int self_close = (tag_len > 0 && tag[tag_len - 1] == '/');
 			if (self_close && tname_len > 0) tname_len--;
+
+			if (!is_close && tf_tag_has_malformed_attr(tname, tname_len)) {
+				table->run_count = 0;
+				table->text_len = 0;
+				table->text[0] = '\0';
+				return 0;
+			}
 
 			if (!is_close && tf_tag_is(tname, tname_len, "br")) {
 				ADD_BR_BREAK(cur_para_type);
