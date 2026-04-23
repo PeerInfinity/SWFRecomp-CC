@@ -56,6 +56,11 @@ void tagMain(SWFAppContext* app_context)
 #ifdef __EMSCRIPTEN__
 		double frame_start = emscripten_get_now();
 #endif
+		// Flash clears the action stack at each frame boundary — see swf_core.c
+		// for rationale. Key test: misc-swfc/stackscope.
+		app_context->sp = INITIAL_SP;
+		app_context->oldSP = 0;
+
 		current_frame = next_frame;
 		app_context->mouse.clicked = 0;
 		app_context->mouse.released = 0;

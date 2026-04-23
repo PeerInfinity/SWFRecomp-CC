@@ -1,8 +1,26 @@
 # Gnash Test Suite Status
 
-Last updated: 2026-04-23 (post-TextFieldHTML malformed-attr fix; not yet in CI)
+Last updated: 2026-04-23 (post-stackscope per-tick stack reset; not yet in CI)
 
 ### Latest fixes (2026-04-23, not yet in CI)
+
+- **stackscope (misc-swfc) → PASS (+1).** Flash clears the AVM1 action
+  stack at each frame boundary; within a single frame, multiple DoAction
+  blocks share the stack so later blocks see leftover pushes from earlier
+  blocks (this is how `_root.var1 = val1` propagates from `script_0`'s
+  trailing `Push "_root.var1", Push "val1"` into `script_1`'s `SetVariable`
+  — and `var2` flows cross-sprite from `script_1` to `mc1`'s `script_2`
+  the same way). Between frames, though, the stack must reset — otherwise
+  `_root.var3 / val3` leaks into frame 1's `script_3` and sets
+  `_root.var3 = "val3"`, whereas the test expects it to stay undefined.
+  Our runtime never reset the stack, so we were persisting across frames
+  indefinitely; Ruffle goes the other direction and clears per DoAction
+  (stricter — `output.ruffle.txt` shows var1/var2 failing as `""`). Fix:
+  add `app_context->sp = INITIAL_SP; app_context->oldSP = 0;` at the top
+  of each tick in `SWFModernRuntime/src/libswf/swf_core.c` (NO_GRAPHICS),
+  `swf_headless.c` (HEADLESS), and `swf.c` (GRAPHICS). No regressions on
+  a 48-test AVM1 battery, a 9-test misc-ming battery of recently-fixed
+  placement/rewind tests, or on misc-mtasc/misc-swfmill.
 
 - **TextFieldHTML-v6/v7/v8 (actionscript.all) → PASS (+3).** Flash's HTML
   parser (and Ruffle's, which uses `quick_xml::Reader`) rejects unquoted

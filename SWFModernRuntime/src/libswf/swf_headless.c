@@ -844,6 +844,11 @@ void swfStart(SWFAppContext* app_context)
 	{
 		tick_count++;
 
+		// Flash clears the action stack at each frame boundary — see swf_core.c
+		// for rationale. Key test: misc-swfc/stackscope.
+		app_context->sp = INITIAL_SP;
+		app_context->oldSP = 0;
+
 		// --- Capture scheduling: request capture before frame renders ---
 #ifdef HEADLESS_RENDER_ENABLED
 		if (context->renderer_ok) {

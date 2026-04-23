@@ -792,6 +792,15 @@ void swfStart(SWFAppContext* app_context)
 	{
 		tick_count++;
 
+		// Flash clears the action stack at each frame boundary: DoAction blocks
+		// within a frame share stack (later blocks see earlier pushes), but the
+		// stack resets between frames so leftover pushes don't leak to the next
+		// frame. Matches Flash/Gnash — Ruffle clears per-DoAction (stricter).
+		// Key test: misc-swfc/stackscope (var1/var2 set via cross-block share;
+		// var3 undefined because it would require cross-frame leakage).
+		app_context->sp = INITIAL_SP;
+		app_context->oldSP = 0;
+
 		// Check execution timeout — if halted, stop all further processing
 		{
 			extern u8 g_execution_halted;
