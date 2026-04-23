@@ -3590,7 +3590,10 @@ namespace SWFRecomp
 				// Emit instance name BEFORE placement so g_pending_instance_name prevents
 				// auto-naming and counter increment. For clip-action cases, the name is
 				// already emitted before placement below (guarded by clip_action_count > 0).
-				if (!instance_name_str.empty() && clip_action_count == 0)
+				// Use `has_name` so an explicit empty name ("") is still propagated — Ming's
+				// instanceNameTest distinguishes `setName("")` (target "/") from "no name"
+				// (auto-named "/instanceN").
+				if (has_name && clip_action_count == 0)
 				{
 					std::string escaped_name = "";
 					for (char c : instance_name_str) {
@@ -3610,7 +3613,7 @@ namespace SWFRecomp
 					// Remove+replace at same depth with clip_actions on both old and new.
 					// Emit tagReplaceObject2RatioWithClipActions to accumulate old clip
 					// actions instead of firing them during the remove.
-					if (!instance_name_str.empty())
+					if (has_name)
 					{
 						std::string escaped_name = "";
 						for (char c : instance_name_str) {
@@ -3629,7 +3632,7 @@ namespace SWFRecomp
 				else if (has_ratio && clip_action_count > 0)
 				{
 					// When clip actions are present, emit instance name BEFORE placement
-					if (!instance_name_str.empty())
+					if (has_name)
 					{
 						std::string escaped_name = "";
 						for (char c : instance_name_str) {
@@ -3653,7 +3656,7 @@ namespace SWFRecomp
 				{
 					// When clip actions are present, emit instance name BEFORE placement
 					// so CLIP_EVENT_CONSTRUCT fires with the correct name (not auto "instanceN").
-					if (!instance_name_str.empty())
+					if (has_name)
 					{
 						std::string escaped_name = "";
 						for (char c : instance_name_str) {
@@ -4722,7 +4725,8 @@ namespace SWFRecomp
 
 							// Emit instance name BEFORE placement so g_pending_instance_name
 							// prevents auto-naming. Clip-action cases also emit before placement.
-							if (!sp_instance_name.empty() && clip_action_count == 0)
+							// Use `has_name` so an explicit empty name ("") propagates.
+							if (has_name && clip_action_count == 0)
 							{
 								std::string escaped = "";
 								for (char c : sp_instance_name) {
@@ -4746,7 +4750,7 @@ namespace SWFRecomp
 							else if (has_ratio && clip_action_count > 0)
 							{
 								// When clip actions are present, emit instance name BEFORE placement
-								if (!sp_instance_name.empty())
+								if (has_name)
 								{
 									std::string escaped = "";
 									for (char c : sp_instance_name) {
@@ -4786,7 +4790,7 @@ namespace SWFRecomp
 							else if (clip_action_count > 0)
 							{
 								// When clip actions are present, emit instance name BEFORE placement
-								if (!sp_instance_name.empty())
+								if (has_name)
 								{
 									std::string escaped = "";
 									for (char c : sp_instance_name) {

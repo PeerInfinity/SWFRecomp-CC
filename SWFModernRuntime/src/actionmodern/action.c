@@ -1536,6 +1536,10 @@ static ActionVar builtin_sound_attachSound(SWFAppContext* app_context, ActionVar
 		setPropertyWithFlags(app_context, sound_obj, "__duration__", 12, &dur_var, PROPERTY_FLAGS_DONTENUM);
 		setPropertyWithFlags(app_context, sound_obj, "duration", 8, &dur_var, PROPERTY_FLAGS_DONTENUM);
 	}
+	// Mark sound as loaded so native position/duration getters are active
+	// (Ruffle: attachSound calls sound.load_sound + set_position(0))
+	ActionVar loaded = {0}; loaded.type = ACTION_STACK_VALUE_BOOLEAN; loaded.data.numeric_value = 1;
+	setPropertyWithFlags(app_context, sound_obj, "__loaded__", 10, &loaded, PROPERTY_FLAGS_DONTENUM);
 	return ret;
 }
 

@@ -1,8 +1,37 @@
 # Gnash Test Suite Status
 
-Last updated: 2026-04-22 (post-loop_test5 fix; not yet in CI)
+Last updated: 2026-04-22 (post-instanceNameTest fix; not yet in CI)
 
 ### Latest fixes (2026-04-22, not yet in CI)
+- **instanceNameTest (misc-ming) → PASS (+1).** SWF's PlaceObject2
+  `HasName` flag distinguishes "name present but empty" (`setName("")`)
+  from "no name at all", and Flash preserves that distinction (empty
+  name → `_target == "/"`; no name → auto-assigned `instance2`). The
+  recompiler's `tagSetInstanceName` emission sites used
+  `!instance_name_str.empty()` to decide whether to write the call,
+  collapsing the two cases and causing every explicit-empty-name MC
+  to hit the runtime's auto-naming path — shifting every subsequent
+  auto-index by one (hence our `/instance2` + `/instance3` diff vs.
+  expected `/` + `/instance2`). Fix: seven sites in `swf.cpp` (four in
+  `tag_main`, three in `sprite_definitions`) now gate on `has_name`
+  instead of string emptiness. The runtime already handles the empty
+  string via `g_pending_instance_name` (non-NULL pointer). No
+  regressions on an 18-test AVM1 placement/name battery, the 8-test
+  misc-ming cluster fixed earlier this session, or the Shumway
+  duplicateMovieClip suite.
+
+- **sound (misc-swfc) — partial +1 line.** `builtin_sound_attachSound`
+  now sets `__loaded__ = true`, mirroring Ruffle's `attach_sound`
+  (`core/src/avm1/globals/sound.rs:395-404`, which calls
+  `sound.load_sound(...)` + `sound.set_position(0)`). Without it,
+  `snd.position` returned `undefined` between `attachSound()` and
+  `start()` — the getter required `__loaded__` to enter the computed
+  path. With the flag set, it falls through to
+  `soundGetElapsedForObject` → 0 for an inactive sound. Test still
+  fails overall (separate timing-based frame-loop issue reaches
+  frame 8 too early). No regressions on the 10-test AVM1 sound
+  suite.
+
 - **loop/loop_test5 (misc-ming) → PASS (+1).** After the survives-rewind
   landing took this test from 13/24 to 21/24, the one remaining diff was
   `typeof(movieClip1) == 'movieclip'` returning undefined after the rewind
