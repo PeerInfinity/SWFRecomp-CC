@@ -1,8 +1,28 @@
 # Gnash Test Suite Status
 
-Last updated: 2026-04-23 (post-static_vs_dynamic1 survives_rewind via clone_depth_table; not yet in CI)
+Last updated: 2026-04-23 (post-action_execution_order_test8 nested-goto sprite-init filter; not yet in CI)
 
 ### Latest fixes (2026-04-23, not yet in CI)
+
+- **action_execution_order_test8-v5/v6 (misc-ming) → PASS (+2).**
+  Tightened the Phase 3 filter in `process_sprite_needs_init` (libswf/
+  tag.c) from `placed_at_frame >= g_sprite_init_target_frame` to
+  `placed_at_frame == g_sprite_init_target_frame`. The `>=` semantics
+  was wrong under nested gotos: `frame 2 DoAction → gotoAndPlay(4)`
+  (inside the outer goto's Phase 2 for target=2) triggers
+  `ng_executeGotoCatchUp` for the inner goto, which immediately runs
+  frames 3–4 and places mc1 at frame 4. With `>=`, the OUTER Phase 3
+  (filter `>= 2`) then fires mc1 before the inner goto's Phase 2 runs
+  — producing mc1's `_root.gotoAndStop(6)` trace *before* the expected
+  "root frame 4" / `typeof(_root.x)=='undefined'` lines. `==` restricts
+  each goto's Phase 3 to sprites placed at exactly its own target
+  frame, so mc1 fires during the inner goto's Phase 3 (target=4)
+  as Ruffle expects. In a non-nested single goto, catch-up only places
+  sprites up to target_frame, so `==` and `>=` are equivalent.
+  No regressions on a 54-test AVM1 execution-order/rewind/clip-event
+  battery, the Gnash action_order cluster (7 pre-existing failures
+  unchanged — line counts identical), or the Shumway duplicateMovieClip
+  suite.
 
 - **static_vs_dynamic1 (misc-ming) → PASS (+1).** `actionRewindCleanup`
   now decides whether a display-list-less clone survives a backward

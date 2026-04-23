@@ -277,7 +277,9 @@ Failures at 10-80% match, grouped by apparent feature cluster. The cluster shape
 
 ### Cluster: `action_order/*` (10 tests, 0-73%)
 
-Deferred-DoAction / sprite-init execution order. Similar to the AVM1 `execution_order*` fixes in `avm1/_investigation/complete/SESSION_NOTES.md`. The two near-passing tests (`action_execution_order_test8-v5` and `-v6`, both at 72.7%) are prime investigation candidates. The long tail (ActionOrderTest3 at 5.7%, ActionOrderTest4 at 7.4%) likely combines multiple ordering bugs.
+Deferred-DoAction / sprite-init execution order. Similar to the AVM1 `execution_order*` fixes in `avm1/_investigation/complete/SESSION_NOTES.md`. The long tail (ActionOrderTest3 at 5.7%, ActionOrderTest4 at 7.4%) likely combines multiple ordering bugs.
+
+- **action_execution_order_test8-v5/v6 (misc-ming) → PASS (+2, 2026-04-23, not yet in CI).** Tightened the Phase 3 filter in `process_sprite_needs_init` (tag.c) from `placed_at_frame >= target_frame` to `placed_at_frame == target_frame`. The `>=` semantics was wrong under nested gotos: when frame 2's DoAction calls `gotoAndPlay(4)` from inside the outer goto's Phase 2 (target=2), `ng_executeGotoCatchUp` for the inner goto runs frames 3–4 immediately and places mc1 at frame 4. With `>=`, the outer Phase 3 (filter `>= 2`) then fires mc1 before the inner goto's Phase 2 runs the target frame's root script — producing mc1's `_root.gotoAndStop(6)` trace *before* the expected "root frame 4" / `typeof(_root.x)=='undefined'` lines. `==` restricts Phase 3 to sprites placed at exactly the goto's own target, leaving mc1 to fire during the inner goto's Phase 3 (target=4). No regressions on a 54-test AVM1 execution-order/rewind/clip-event battery, the Gnash action_order cluster (7 pre-existing failures unchanged — line counts identical), the Shumway duplicateMovieClip suite, or a 12-test misc-ming battery (`displaylist_depths_test11`, `place_and_remove_object_test`, `loop_test5/9`, `static_vs_dynamic1/2`, `shape_test`, `attachMovieTest`, `get_frame_number_test`, `instanceNameTest`, `test8-v5/v6`).
 
 ### Cluster: `displaylist_depths/*` (6 tests, 13-80%)
 

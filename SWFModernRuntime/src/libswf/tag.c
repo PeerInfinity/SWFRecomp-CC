@@ -217,7 +217,11 @@ static int g_constructor_only_mode = 0;
 // Frame filter for process_sprite_needs_init during deferred init.
 // When g_sprite_init_filter_active=1, only process sprites matching the filter:
 //   g_sprite_init_before_target=1: only placed_at_frame < g_sprite_init_target_frame
-//   g_sprite_init_before_target=0: only placed_at_frame >= g_sprite_init_target_frame
+//   g_sprite_init_before_target=0: only placed_at_frame == g_sprite_init_target_frame
+// The on_or_after case uses == (not >=) so a nested goto placing sprites at
+// frames beyond the outer goto's target doesn't spuriously fire them during
+// the outer Phase 3. In a single non-nested goto, catch-up only places
+// sprites up to target_frame inclusive, so == and >= would be equivalent.
 static int g_sprite_init_filter_active = 0;
 static int g_sprite_init_before_target = 0;
 static size_t g_sprite_init_target_frame = 0;
@@ -320,7 +324,7 @@ static void process_sprite_needs_init(SWFAppContext* app_context, MovieClip* par
 			if (obj->char_id == 0 || !obj->sprite_needs_init) continue;
 			if (g_sprite_init_before_target && obj->placed_at_frame >= g_sprite_init_target_frame)
 				continue;
-			if (!g_sprite_init_before_target && obj->placed_at_frame < g_sprite_init_target_frame)
+			if (!g_sprite_init_before_target && obj->placed_at_frame != g_sprite_init_target_frame)
 				continue;
 			eligible[eligible_count++] = i;
 		}
