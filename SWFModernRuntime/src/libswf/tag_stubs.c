@@ -112,6 +112,40 @@ static void clone_depth_register(int swf_depth, const char* name)
 	}
 }
 
+// Look up the registered SWF depth for a clone by name.
+// Returns INT_MIN if the name isn't registered. Used by actionRewindCleanup
+// to decide whether a display-list-less clone survives a backward goto —
+// Ruffle's survives_rewind rule preserves objects whose SWF depth lives in
+// the dynamic range (>= AVM_DEPTH_BIAS = 16384). We key off the registered
+// SWF depth rather than `ch->depth` because the MC's stored depth can be a
+// mix of AS-depth and SWF-depth conventions (see comments in
+// ng_cloneSprite about the Ming-vs-Shumway bias heuristic).
+int ng_clone_get_swf_depth(const char* name)
+{
+	if (name == NULL) return INT_MIN;
+	for (size_t i = 0; i < g_clone_depth_count; i++) {
+		if (strcmp(g_clone_depth_table[i].name, name) == 0) {
+			return g_clone_depth_table[i].swf_depth;
+		}
+	}
+	return INT_MIN;
+}
+
+// Rewrite a clone's registered SWF depth (no eviction). Used by swapDepths
+// to keep the clone-depth table in sync when a clone is moved — without
+// this, a duplicateMovieClip clone that swapDepths'd into the static range
+// would still appear "dynamic" to survives_rewind and vice-versa.
+void ng_clone_update_swf_depth(const char* name, int new_swf_depth)
+{
+	if (name == NULL) return;
+	for (size_t i = 0; i < g_clone_depth_count; i++) {
+		if (strcmp(g_clone_depth_table[i].name, name) == 0) {
+			g_clone_depth_table[i].swf_depth = new_swf_depth;
+			return;
+		}
+	}
+}
+
 // ---------------------------------------------------------------------------
 // entry_idx encoding for ng_* query functions
 // ---------------------------------------------------------------------------

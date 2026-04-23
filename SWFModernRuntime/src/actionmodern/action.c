@@ -19022,12 +19022,17 @@ void actionRewindCleanup(SWFAppContext* app_context)
 		size_t dl_depth = ng_findDisplayEntryByName(ch->name);
 		if (dl_depth == SIZE_MAX) {
 			// No display list entry — this is a dynamically created MC.
-			// CloneSprite/duplicateMovieClip clones placed at SWF-space depth
-			// above the AS positive range (>= 16384 SWF, i.e. >= 0 AS) persist
-			// across backward goto in Ruffle. Preserving them lets tests like
-			// from_shumway/avm1/duplicateMovieClip/dontremove still see clones
-			// on the second pass through the loop frame.
-			if (ch->depth >= 16384) {
+			// CloneSprite/duplicateMovieClip clones at SWF depth >=
+			// AVM_DEPTH_BIAS (16384) survive backward goto per Ruffle's
+			// survives_rewind rule (core/src/display_object/movie_clip.rs).
+			// Look up the registered SWF depth via the clone-depth table
+			// rather than trusting `ch->depth`: the stored depth can be
+			// either AS depth (biased path) or SWF depth (unbiased path),
+			// and the sign/magnitude isn't a reliable signal. The table
+			// always holds the raw SWF depth produced by the bytecode.
+			extern int ng_clone_get_swf_depth(const char* name);
+			int clone_swf = ng_clone_get_swf_depth(ch->name);
+			if (clone_swf >= 16384) {
 				continue;
 			}
 			// Remove from parent's dynamic_props.
@@ -55917,6 +55922,14 @@ void actionCallMethod(SWFAppContext* app_context, char* str_buffer)
 								ng_updateDisplayDepth(_target->name, _target->depth);
 						}
 #endif
+						// Sync clone-depth table for each MC that has an entry
+						{
+							extern void ng_clone_update_swf_depth(const char* name, int new_swf_depth);
+							if (mc->name[0])
+								ng_clone_update_swf_depth(mc->name, mc->depth + 16384);
+							if (_target->name[0])
+								ng_clone_update_swf_depth(_target->name, _target->depth + 16384);
+						}
 					}
 					// Cross-parent swap is a no-op (Flash ignores it)
 				}
@@ -55964,6 +55977,13 @@ void actionCallMethod(SWFAppContext* app_context, char* str_buffer)
 						if (mc->name[0] && _target_mc->name[0])
 							ng_swapDisplayDepths(mc->name, _target_mc->name);
 #endif
+						{
+							extern void ng_clone_update_swf_depth(const char* name, int new_swf_depth);
+							if (mc->name[0])
+								ng_clone_update_swf_depth(mc->name, mc->depth + 16384);
+							if (_target_mc->name[0])
+								ng_clone_update_swf_depth(_target_mc->name, _target_mc->depth + 16384);
+						}
 					}
 				}
 				pushUndefined(app_context);
@@ -55987,6 +56007,13 @@ void actionCallMethod(SWFAppContext* app_context, char* str_buffer)
 			if (mc->name[0])
 				ng_updateDisplayDepth(mc->name, _new_depth);
 #endif
+			// Keep the clone-depth table in sync so survives_rewind uses the
+			// post-swap SWF depth. No-op for timeline MCs (not registered).
+			{
+				extern void ng_clone_update_swf_depth(const char* name, int new_swf_depth);
+				if (mc->name[0])
+					ng_clone_update_swf_depth(mc->name, _new_depth + 16384);
+			}
 			pushUndefined(app_context);
 			return;
 		}

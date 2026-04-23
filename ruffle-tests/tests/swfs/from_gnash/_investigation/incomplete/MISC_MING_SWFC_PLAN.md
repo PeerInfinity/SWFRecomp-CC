@@ -58,6 +58,7 @@ These are one or two small fixes away from passing. Tackle these first for broad
 | edittext_test1 (misc-swfc) | 76.6% | 36 | 47 | **PASS** (2026-04-22) — Three-part TextField binding fix: (1) `actionSetMember` on root now calls `ng_syncVarToTextFields` so `_root.varName = X` propagates to bound textfields; (2) `.variable = "newName"` rebind creates the new var as an own property on root.dynamic_props so `hasOwnProperty(newName)` is true; (3) `ng_syncTextToVar` simple-name path now mirrors into root.dynamic_props so `_root.varName` always reads the current textfield text. |
 | attachMovieTest (misc-ming) | 75.0% | 9 | 12 | **PASS** (2026-04-22) — `attachMovie` now skips the init-object property loop when the attached symbol is a Button (`attached->is_button_mc`). Flash behavior: the init object is not used for Buttons (test comment: "init object is not used for Buttons"). Both the CallFunction (`attachMovie` global) and CallMethod (`mc.attachMovie`) paths updated in `action.c`. No regressions on AVM1 `attach_movie` / `attach_movie_stop` / `empty_movieclip_can_attach_movies` / `init_object_invalid` / `init_object_order` / `movieclip_init_object` / `button_children` / `clip_events`. |
 | place_and_remove_object_test (misc-ming) | 76.9% | 10 | 13 | **PASS** (2026-04-22) — `tagSetInstanceName` now also sets `g_pending_instance_name` in the path where the display entry already exists, so a subsequent `tagPlaceObject2` that replaces the old character with a different `char_id` preserves the just-assigned name. Without this, the full-placement path in `tagPlaceObject2` wiped `instance_name` to NULL when `g_pending_instance_name` was NULL — losing `sh1` on loopback when frame 0 replaced frame 2's sh2 at depth 3. Verified no regressions on AVM1 `access_unnamed_shape`, `conflicting_instance_names`, `default_names`, `depth_replacement_audio_unloading`, `movieclip_depth_methods`, `movieclip_get_instance_at_depth`, `movieclip_name_from_timeline`, `named_shapes`, `place_and_lookup`, `bad_placeobject_clipaction`, `clip_events`, `register_and_init_order`, `goto_rewind3`, `execution_order3`, `goto_execution_order2`, `movieclip_in_removed_button`, `unload`, `on_construct`, `movieclip_state_values`. |
+| static_vs_dynamic1 (misc-ming) | 82.4% | 14 | 17 | **PASS** (2026-04-23) — `actionRewindCleanup` now keys the survives_rewind decision for display-list-less clones off the clone's *registered* SWF depth (via new `ng_clone_get_swf_depth` lookup into `g_clone_depth_table`), not `ch->depth`. `swapDepths` (all three dispatch paths) calls new `ng_clone_update_swf_depth` to keep the table in sync when a clone is moved. See "survives_rewind via clone_depth_table" below. |
 
 For each, run `--diff --verbose` and cluster the diff lines by type. Many will resolve with a single targeted fix that's shared across a handful of near-passing tests.
 
@@ -170,24 +171,67 @@ For each, run `--diff --verbose` and cluster the diff lines by type. Many will r
   `duplicateMovieClip/duplicateMovieClip`,
   `duplicateMovieClip/samedepth`, `duplicateMovieClip/name-coercion`).
 - **Partial progress on static_vs_dynamic1/2 and loop_test4**:
-  - `static_vs_dynamic1` line 11 (`typeof(mc1)` after swap-to-dynamic
-    loopback) now matches via this fix — mc1's display entry at SWF
-    16394 survives. The remaining `typeof(dup2)` diff requires
-    preserving duplicateMovieClip clones (whose display entries are
-    never created because `target_swf_depth > INITIAL_DISPLAYLIST_CAPACITY`
-    takes the display-list-omitted path in `ng_cloneSprite`). Gating
-    `actionRewindCleanup` on `ch->depth >= 0` instead of `>= 16384`
-    would preserve those clones but regresses
-    `from_shumway/avm1/duplicateMovieClip/dontremove` (whose static-range
-    `test2` clone lives at `ch->depth == 16379` due to the known
-    Ming-vs-Flash SWF-bias heuristic ambiguity — see "CloneSprite
-    depth-bias trade-off" below). Not applied. Follow-up: the real fix
-    is the punted always-strip approach.
+  - `static_vs_dynamic1` → **PASS** (2026-04-23, see "survives_rewind via
+    clone_depth_table" below). The remaining `typeof(dup2)` diff is
+    resolved by keying survives_rewind off the clone's *registered* SWF
+    depth (stored in `g_clone_depth_table` at CloneSprite time) rather
+    than the MC's cached `depth` field, which is a mix of AS-depth and
+    SWF-depth conventions depending on the bias heuristic.
   - `loop_test4` still fails (`typeof(movieClip1/2) == undefined` after
     `gotoAndStop(3)`) despite the CONSTRUCT events firing — separate
     from this change; likely a distinct backward-catch-up replacement
     ordering issue (movieClip3 at depth 3 placed frame 5 is cleared;
     movieClip1 replacement's _root name resolution may be the issue).
+
+### survives_rewind via clone_depth_table (2026-04-23, not yet in CI)
+
+- **static_vs_dynamic1 (misc-ming) → PASS (+1).** `actionRewindCleanup` in
+  `SWFModernRuntime/src/actionmodern/action.c` now looks up the clone's
+  registered SWF depth from `g_clone_depth_table` (via new
+  `ng_clone_get_swf_depth` helper exported from `libswf/tag_stubs.c`)
+  rather than checking `ch->depth >= 16384`. The table holds the raw
+  SWF depth produced by bytecode — whether Ming-style biased (`Push(N)
+  Push(16384) Add`) or Shumway-style already-biased (`Push(16385)`) — so
+  the >= 16384 test correctly distinguishes dynamic-range clones that
+  survive rewind from static-range clones that don't, without the
+  Ming-vs-Shumway heuristic ambiguity that the "CloneSprite depth-bias
+  trade-off" section below describes. To keep the table in sync when a
+  clone is moved post-create, `swapDepths` (both numeric, MC-ref, and
+  path-string paths) now calls new `ng_clone_update_swf_depth` after
+  updating `mc->depth`. Verified:
+    - `static_vs_dynamic1` final `typeof(dup2)` check matches (dup2 at
+      SWF 16386 survives, as expected).
+    - `from_shumway/avm1/duplicateMovieClip/dontremove` (`test2` at SWF
+      16379) still passes (16379 < 16384 → removed, correct).
+    - `static_vs_dynamic1`'s `dup1.swapDepths(-10)` updates the table to
+      SWF 16374 so dup1 is removed on rewind (was previously 16385 and
+      would have regressed).
+  No regressions on a 45-test battery covering AVM1 rewind/unload
+  (`goto_rewind1/2/3`, `execution_order1/2/3`, `goto_execution_order/2`,
+  `goto_both_ways1/2`, `rewind_depth`, `unload`, `unload_clip_event`,
+  `unload_nested_child`, `unloadmovie`, `mcl_unloadclip`,
+  `depth_replacement_audio_unloading`, `textsnapshot_available_text`,
+  `set_interval`, `swf5_to_6_cross_call`, `swf5_no_closure`,
+  `swf6_to_5_cross_call`), MC placement/name
+  (`movieclip_depth_methods`, `movieclip_get_instance_at_depth`,
+  `movieclip_name_from_timeline`, `movieclip_state_values`,
+  `movieclip_library_state_values`, `placeobject_occupied_depth`,
+  `bad_placeobject_clipaction`, `conflicting_instance_names`,
+  `default_names`, `access_unnamed_shape`, `named_shapes`,
+  `place_and_lookup`, `button_children`, `movieclip_in_removed_button`,
+  `register_and_init_order`, `on_construct`, `init_object_order`,
+  `init_object_invalid`, `movieclip_init_object`,
+  `coerce_to_object_monkeypatch`, `attach_movie`, `attach_movie_stop`,
+  `empty_movieclip_can_attach_movies`, `clip_events`), the Shumway
+  duplicateMovieClip suite (`dontremove`, `duplicateMovieClip`,
+  `samedepth`, `name-coercion`), and the previously-landed misc-ming
+  near-passing tests (`displaylist_depths_test11`,
+  `place_and_remove_object_test`, `loop_test5`, `loop_test9`,
+  `static_vs_dynamic2`, `shape_test`, `attachMovieTest`,
+  `get_frame_number_test`, `instanceNameTest`). The pre-existing
+  `duplicate_movie_clip_test2` dup6/dup7/dup8 diffs (nested-path
+  `duplicateMovieClip` refusing to fail) are unchanged — those are a
+  separate path-resolution bug.
 
 ### CloneSprite depth-bias trade-off (open)
 

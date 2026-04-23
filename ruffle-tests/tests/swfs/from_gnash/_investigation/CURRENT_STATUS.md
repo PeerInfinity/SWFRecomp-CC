@@ -1,8 +1,29 @@
 # Gnash Test Suite Status
 
-Last updated: 2026-04-23 (post-stackscope per-tick stack reset; not yet in CI)
+Last updated: 2026-04-23 (post-static_vs_dynamic1 survives_rewind via clone_depth_table; not yet in CI)
 
 ### Latest fixes (2026-04-23, not yet in CI)
+
+- **static_vs_dynamic1 (misc-ming) → PASS (+1).** `actionRewindCleanup`
+  now decides whether a display-list-less clone survives a backward
+  goto by looking up the clone's registered SWF depth in
+  `g_clone_depth_table` (via new `ng_clone_get_swf_depth` helper
+  exported from `libswf/tag_stubs.c`), not by testing `ch->depth >=
+  16384`. The table is populated at `clone_depth_register` time with
+  the raw SWF depth produced by bytecode — so both Ming-biased
+  (`Push(N) Push(16384) Add`) and Shumway-already-biased (`Push(N+16384)`)
+  callers end up with the same canonical value, avoiding the heuristic
+  ambiguity that the existing `ng_cloneSprite` bias-strip code inflicts
+  on `ch->depth`. To keep the table in sync when a clone is moved
+  post-create, `swapDepths` (numeric, MC-ref, and path-string paths in
+  `action.c`) calls new `ng_clone_update_swf_depth` after updating
+  `mc->depth`. Fixes the final `typeof(dup2)` check in
+  static_vs_dynamic1 (dup2 at SWF 16386 now survives rewind, matching
+  Ruffle's `survives_rewind` for the dynamic range). No regressions on
+  the Shumway duplicateMovieClip suite (which relies on 16379 < 16384
+  → removed) or a 45-test AVM1 rewind/unload/placement/clone battery.
+  See `incomplete/MISC_MING_SWFC_PLAN.md` "survives_rewind via
+  clone_depth_table".
 
 - **stackscope (misc-swfc) → PASS (+1).** Flash clears the AVM1 action
   stack at each frame boundary; within a single frame, multiple DoAction
