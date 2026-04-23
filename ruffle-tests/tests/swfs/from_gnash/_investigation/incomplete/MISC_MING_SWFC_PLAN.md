@@ -186,6 +186,26 @@ Display list depth transformations, clip_depth, swap_depths, level vs timeline d
 
 `while` / `for` / `do-while` opcode handling. `loop_test9` at 73% and `loop_test3` at 69% are attack points. `loop_test10` at 3.6% suggests a feature not implemented yet (probably `for-in` or iterator-style).
 
+- **loop_test5 (misc-ming) → PASS (2026-04-22).** After the survives-rewind
+  landing boosted it from 13/24 to 21/24, the remaining diff was
+  `typeof(movieClip1) == 'movieclip'` returning undefined after the rewind
+  re-created movieClip1 at depth 3 (different ratio forced a full replace).
+  Root cause was in `actionRewindCleanup` (action.c): for each child MC not
+  in the current display list, the code unconditionally set
+  `root_movieclip.dynamic_props[name] = UNDEFINED`. For CloneSprite /
+  duplicateMovieClip clones that's correct (they live in dynamic_props).
+  For timeline-placed MCs it's wrong — the entry later shadows the
+  display-list fallback in `actionGetVariable` (a plain UNDEFINED own-prop
+  is hit before the `check_special_vars` block that scans
+  `ng_findDisplayEntryByName`). Fix: narrow the clear to only happen when
+  `dynamic_props[name]` currently points to THIS MC (a MOVIECLIP value
+  identifying `ch`), which distinguishes clone registrations from
+  incidental entries. No regressions on a 32-test AVM1 rewind/placement/
+  attachMovie/register-class/coerce-to-object battery or the 7-test
+  misc-ming cluster (displaylist_depths_test11, place_and_remove_object,
+  static_vs_dynamic2, loop_test9, loop_test5, shape_test, attachMovieTest)
+  or the Shumway duplicateMovieClip suite.
+
 ### Cluster: `register_class/*` (4 tests, 4-21%)
 
 `Object.registerClass` combined with attachMovie / frame scripting. Overlaps AVM1's `complete/REGISTERCLASS_PLAN.md`. Low rates suggest the tests exercise edges not covered by AVM1 tests.

@@ -19028,17 +19028,49 @@ void actionRewindCleanup(SWFAppContext* app_context)
 			}
 			// Remove from parent's dynamic_props.
 			if (root_movieclip.dynamic_props != NULL) {
-				ActionVar undef = {0};
-				undef.type = ACTION_STACK_VALUE_UNDEFINED;
-				setProperty(app_context, (ASObject*)root_movieclip.dynamic_props,
-					ch->name, strlen(ch->name), &undef);
+				// Only overwrite the dynamic_props entry if it currently
+				// points to THIS MC (a clone registration) — otherwise a
+				// re-placed timeline MC with the same name would be
+				// shadowed by the leftover UNDEFINED entry.
+				ActionVar* existing_dp = getProperty(
+					(ASObject*)root_movieclip.dynamic_props,
+					ch->name, strlen(ch->name));
+				if (existing_dp != NULL
+				    && existing_dp->type == ACTION_STACK_VALUE_MOVIECLIP
+				    && (MovieClip*)(uintptr_t)existing_dp->data.numeric_value == ch)
+				{
+					ActionVar undef = {0};
+					undef.type = ACTION_STACK_VALUE_UNDEFINED;
+					setProperty(app_context, (ASObject*)root_movieclip.dynamic_props,
+						ch->name, strlen(ch->name), &undef);
+				}
 			}
-			// Also clear from global variable table
+			// Also clear from global variable table — BUT ONLY if the name
+			// currently resolves to THIS MC pointer. CloneSprite/
+			// duplicateMovieClip register their clones as explicit
+			// MOVIECLIP var_map entries; timeline-placed MCs do not. Any
+			// entry that is a lazy-created empty-string placeholder (from
+			// prior `typeof(name)` / GetVariable("name") calls) must be
+			// left alone — overwriting it with UNDEFINED would shadow
+			// display-list lookups for a re-placed timeline MC of the same
+			// name (VAR_NOT_FOUND in actionGetVariable treats explicit
+			// UNDEFINED as "found", skipping the display-list fallback).
 			{
-				ActionVar undef = {0};
-				undef.type = ACTION_STACK_VALUE_UNDEFINED;
-				extern void setVariableByName(const char* var_name, ActionVar* value);
-				setVariableByName(ch->name, &undef);
+				extern bool hasVariable(char* var_name, size_t key_size);
+				extern ActionVar* getVariable(char* var_name, size_t key_size);
+				size_t _nl = strlen(ch->name);
+				if (hasVariable(ch->name, _nl)) {
+					ActionVar* existing = getVariable(ch->name, _nl);
+					int is_self_clone_entry = (existing != NULL
+					    && existing->type == ACTION_STACK_VALUE_MOVIECLIP
+					    && (MovieClip*)(uintptr_t)existing->data.numeric_value == ch);
+					if (is_self_clone_entry) {
+						ActionVar undef = {0};
+						undef.type = ACTION_STACK_VALUE_UNDEFINED;
+						extern void setVariableByName(const char* var_name, ActionVar* value);
+						setVariableByName(ch->name, &undef);
+					}
+				}
 			}
 			ch->depth = INT_MIN;
 			child_mc_cache[i] = NULL;

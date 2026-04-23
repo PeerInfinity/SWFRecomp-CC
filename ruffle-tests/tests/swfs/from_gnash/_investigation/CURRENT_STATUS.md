@@ -1,8 +1,31 @@
 # Gnash Test Suite Status
 
-Last updated: 2026-04-22 (post-displaylist_depths_test11 fix; not yet in CI)
+Last updated: 2026-04-22 (post-loop_test5 fix; not yet in CI)
 
 ### Latest fixes (2026-04-22, not yet in CI)
+- **loop/loop_test5 (misc-ming) → PASS (+1).** After the survives-rewind
+  landing took this test from 13/24 to 21/24, the one remaining diff was
+  `typeof(movieClip1) == 'movieclip'` returning undefined after the rewind
+  re-created movieClip1 at depth 3 (different ratio vs. the surviving
+  movieClip4 at depth 4 forced a full-replace path for depth 3). The root
+  cause was in `actionRewindCleanup` in
+  `SWFModernRuntime/src/actionmodern/action.c`: for each child MC not
+  present in the current display list, the code unconditionally wrote
+  `root_movieclip.dynamic_props[name] = UNDEFINED`. That's correct for
+  CloneSprite / duplicateMovieClip clones (which live in dynamic_props),
+  but wrong for timeline-placed MCs — the leftover UNDEFINED entry later
+  shadows the display-list fallback inside `actionGetVariable` (the plain
+  own-prop hit in the dynamic_props check returns before
+  `check_special_vars` scans `ng_findDisplayEntryByName`). Fix: narrow the
+  clear so it only fires when `dynamic_props[name]` currently points to
+  THIS MC (a MOVIECLIP value whose target equals `ch`), distinguishing
+  genuine clone registrations from incidental entries. The var_map
+  clearing was also narrowed the same way for symmetry. No regressions
+  on a 32-test AVM1 rewind/placement/attachMovie/register-class/
+  coerce-to-object battery, a 7-test misc-ming cluster (test11,
+  place_and_remove_object, static_vs_dynamic2, loop_test9, loop_test5,
+  shape_test, attachMovieTest), or the Shumway duplicateMovieClip suite.
+
 - **displaylist_depths_test11 (misc-ming) → PASS (+1).** Backward-goto MovieClip
   survives-rewind implementation. During backward goto catch-up, initialized
   sprites whose `char_id` + `ratio` match the target frame's placement are
