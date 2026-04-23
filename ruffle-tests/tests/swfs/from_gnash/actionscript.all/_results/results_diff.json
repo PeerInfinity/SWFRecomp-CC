@@ -1,9 +1,9 @@
 {
   "metadata": {
-    "old_timestamp": "2026-04-23T01:30:52.377158+00:00",
-    "old_git_sha": "ac84d98fed2b0e44e76fccfe145c94c7da8fab9a",
-    "new_timestamp": "2026-04-23T04:02:05.290566+00:00",
-    "new_git_sha": "f8c7b53ea39c5446d34f079ae37c319cd14e5b87",
+    "old_timestamp": "2026-04-23T04:02:05.290566+00:00",
+    "old_git_sha": "f8c7b53ea39c5446d34f079ae37c319cd14e5b87",
+    "new_timestamp": "2026-04-23T19:37:54.442266+00:00",
+    "new_git_sha": "abacc3d612aedb13e5e11c32d8b3bd1c5e0f6bfa",
     "partial": false,
     "same_commit": false
   },
@@ -13,21 +13,70 @@
     "old_effective_pass": 159,
     "old_total": 190,
     "old_pass_rate": 57.9,
-    "new_pass": 110,
+    "new_pass": 113,
     "new_ruffle_matched": 49,
-    "new_effective_pass": 159,
+    "new_effective_pass": 162,
     "new_total": 190,
-    "new_pass_rate": 57.9,
+    "new_pass_rate": 59.5,
     "old_mismatched_lines": 2215,
-    "new_mismatched_lines": 2215,
+    "new_mismatched_lines": 2206,
     "increased_mismatches": 0,
-    "decreased_mismatches": 0,
-    "newly_passing": 0,
+    "decreased_mismatches": 9,
+    "newly_passing": 3,
     "newly_failing": 0,
-    "status_changed": 0,
-    "unchanged": 190,
+    "status_changed": 3,
+    "unchanged": 187,
     "added": 0,
     "removed": 0
   },
-  "changes": []
+  "changes": [
+    {
+      "test": "TextFieldHTML-v6",
+      "change_type": "changed",
+      "old_status": "output_mismatch",
+      "new_status": "pass",
+      "old_lines": {
+        "actual_lines": 37,
+        "expected_lines": 37,
+        "matching_lines": 34
+      },
+      "new_lines": {
+        "actual_lines": 37,
+        "expected_lines": 37,
+        "matching_lines": 37
+      }
+    },
+    {
+      "test": "TextFieldHTML-v7",
+      "change_type": "changed",
+      "old_status": "output_mismatch",
+      "new_status": "pass",
+      "old_lines": {
+        "actual_lines": 37,
+        "expected_lines": 37,
+        "matching_lines": 34
+      },
+      "new_lines": {
+        "actual_lines": 37,
+        "expected_lines": 37,
+        "matching_lines": 37
+      }
+    },
+    {
+      "test": "TextFieldHTML-v8",
+      "change_type": "changed",
+      "old_status": "output_mismatch",
+      "new_status": "pass",
+      "old_lines": {
+        "actual_lines": 37,
+        "expected_lines": 37,
+        "matching_lines": 34
+      },
+      "new_lines": {
+        "actual_lines": 37,
+        "expected_lines": 37,
+        "matching_lines": 37
+      }
+    }
+  ]
 }
