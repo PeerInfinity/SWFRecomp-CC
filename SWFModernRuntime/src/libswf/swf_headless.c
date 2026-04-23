@@ -129,6 +129,10 @@ void ng_executeGotoCatchUp(SWFAppContext* app_context)
 			if (funcs[f]) funcs[f](app_context);
 		}
 		catch_up_backward = 0;
+		{
+			extern void ng_display_cleanup_unplaced_after(SWFAppContext*, size_t);
+			ng_display_cleanup_unplaced_after(app_context, target);
+		}
 	}
 	else
 	{
@@ -213,6 +217,10 @@ void ng_executeGotoTagsOnly(SWFAppContext* app_context)
 			if (funcs[f]) funcs[f](app_context);
 		}
 		catch_up_backward = 0;
+		{
+			extern void ng_display_cleanup_unplaced_after(SWFAppContext*, size_t);
+			ng_display_cleanup_unplaced_after(app_context, target);
+		}
 	}
 	else
 	{
@@ -1030,6 +1038,10 @@ void swfStart(SWFAppContext* app_context)
 					if (funcs[target]) funcs[target](app_context);
 				}
 				catch_up_backward = 0;
+				{
+					extern void ng_display_cleanup_unplaced_after(SWFAppContext*, size_t);
+					ng_display_cleanup_unplaced_after(app_context, target);
+				}
 			}
 			else
 			{

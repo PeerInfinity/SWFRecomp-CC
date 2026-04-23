@@ -1,6 +1,48 @@
 # Gnash Test Suite Status
 
-Last updated: 2026-04-22 (post-static_vs_dynamic2 fix; not yet in CI)
+Last updated: 2026-04-22 (post-displaylist_depths_test11 fix; not yet in CI)
+
+### Latest fixes (2026-04-22, not yet in CI)
+- **displaylist_depths_test11 (misc-ming) → PASS (+1).** Backward-goto MovieClip
+  survives-rewind implementation. During backward goto catch-up, initialized
+  sprites whose `char_id` + `ratio` match the target frame's placement are
+  preserved (instance_name, constructor state) instead of being cleared and
+  re-created. Mirrors Ruffle `MovieClip::survives_rewind` and the
+  `apply_place_object` comment that "name... can not be modified by subsequent
+  PlaceObject tags". Four-part fix across `SWFModernRuntime/src/libswf/tag.c`
+  and `libswf/swf_core.c`/`swf_headless.c`:
+  (1) `ng_display_clear_after` now preserves entries with
+  `sprite_display_list != NULL` (initialized MovieClips).
+  (2) `tagPlaceObject2`/`tagPlaceObject2Ratio` backward-catch-up branch
+  checks `(char_id == existing) && (ratio == existing)`. If matches → modify
+  path (preserves `instance_name`, clears `g_pending_instance_name` BEFORE
+  `ng_on_place_object2` so the preserved name survives). If not matches AND
+  existing `placed_at_frame > catch_up_target` (truly stale from pre-rewind
+  state) → clear and fall through to full placement. If not matches but within
+  `[0, target]` (earlier catch-up replay of a later frame's intermediate
+  placement) → skip (preserves previous behavior).
+  (3) `tagSetInstanceName` during `catch_up_backward` with
+  `placed_at_frame > current_frame` pends the name but doesn't rename
+  in-place. Ruffle doesn't update name on surviving children. Also gated on
+  `g_tag_skip_mode` so the deferred target-frame replay (`funcs[target]`
+  called with `g_tag_skip_mode=1`) doesn't re-rename preserved entries.
+  (4) Post-catch-up cleanup `ng_display_cleanup_unplaced_after` clears
+  sprites whose depth wasn't re-placed during catch-up (effectively failed
+  survives_rewind).
+  No regressions on a 44-test AVM1 battery (goto_rewind1-3,
+  execution_order1-3, goto_execution_order, goto_execution_order2,
+  unload/unload_nested_child/unloadmovie/mcl_unloadclip, rewind_depth,
+  goto_both_ways1/2, depth_replacement_audio_unloading,
+  access_unnamed_shape, conflicting_instance_names, default_names,
+  movieclip_depth_methods/get_instance_at_depth/name_from_timeline,
+  named_shapes, place_and_lookup, bad_placeobject_clipaction, clip_events,
+  register_and_init_order, on_construct, movieclip_state_values,
+  movieclip_library_state_values, register_class_return_value,
+  attach_movie, attach_movie_stop, empty_movieclip_can_attach_movies,
+  init_object_invalid, init_object_order, movieclip_init_object,
+  button_children, array_enumerate, enumerate, swf5_to_6_cross_call,
+  swf6_to_5_cross_call, textsnapshot_available_text) and Shumway
+  duplicateMovieClip/dontremove/duplicateMovieClip/samedepth/name-coercion.
 
 ### Latest fixes (2026-04-22, not yet in CI)
 - **static_vs_dynamic2 (misc-ming) → PASS (+1).** Two-part fix for

@@ -138,6 +138,14 @@ void ng_executeGotoCatchUp(SWFAppContext* app_context)
 			if (funcs[f]) funcs[f](app_context);
 		}
 		catch_up_backward = 0;
+		// ng_display_clear_after preserved initialized sprite entries so
+		// tagPlaceObject2's catch-up path could modify them (matching Ruffle's
+		// survives_rewind). Any sprite whose depth was not re-placed during
+		// catch-up must be cleared now.
+		{
+			extern void ng_display_cleanup_unplaced_after(SWFAppContext*, size_t);
+			ng_display_cleanup_unplaced_after(app_context, target);
+		}
 	}
 	else
 	{
@@ -223,6 +231,10 @@ void ng_executeGotoTagsOnly(SWFAppContext* app_context)
 			if (funcs[f]) funcs[f](app_context);
 		}
 		catch_up_backward = 0;
+		{
+			extern void ng_display_cleanup_unplaced_after(SWFAppContext*, size_t);
+			ng_display_cleanup_unplaced_after(app_context, target);
+		}
 	}
 	else
 	{
@@ -990,6 +1002,10 @@ void swfStart(SWFAppContext* app_context)
 					if (funcs[target]) funcs[target](app_context);
 				}
 				catch_up_backward = 0;
+				{
+					extern void ng_display_cleanup_unplaced_after(SWFAppContext*, size_t);
+					ng_display_cleanup_unplaced_after(app_context, target);
+				}
 			}
 			else
 			{
