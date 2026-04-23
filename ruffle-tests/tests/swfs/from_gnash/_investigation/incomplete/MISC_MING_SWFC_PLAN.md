@@ -61,6 +61,55 @@ These are one or two small fixes away from passing. Tackle these first for broad
 
 For each, run `--diff --verbose` and cluster the diff lines by type. Many will resolve with a single targeted fix that's shared across a handful of near-passing tests.
 
+### loop_test7 — deferred CLIP_EVENT_UNLOAD clip actions (2026-04-23, attempted and reverted)
+
+- **loop/loop_test7 (misc-ming) — attempted fix reverted.** Flash (and
+  Ruffle, per `core/src/display_object/movie_clip.rs:2849`) queues
+  tag-level `CLIP_EVENT_UNLOAD` clip actions on the action queue with
+  `is_unload=true` rather than firing them inline when `RemoveObject2`
+  runs. The test's gnash source calls this out explicitly:
+  *"RemoveObject2 tag is after the DoAction tag which contains the
+  following check. So it's not surprise that we can still access
+  movieClip1 here when considering the global ActionQueue model!"*.
+  Our `tagRemoveObject2` fires the unload inline, so the
+  "_level0.movieClip1 unloaded" trace prints **between** the two
+  already-queued DoAction scripts instead of after them.
+- **Attempted fix (reverted in this session):** added
+  `actionQueueClipUnload(fn, mc)` helper and routed the primary
+  `clip_action_count` loop in `tagRemoveObject2` through it
+  (deferred via `AQ_KIND_ONLOAD` / `is_unload=1`, drained at
+  `actionFirePendingUnloads` during `tagShowFrame`). `loop_test7`
+  flipped `output_mismatch` → `ruffle_matched` in isolation.
+- **Why reverted:** deferring only the tag-level clip-action inverted
+  the order on `avm1/unload_clip_event` and `avm1/clip_events`. Both
+  tests expect the tag-level `UNLOAD` ("clipEvent" / "clip unload")
+  trace *before* the AS-level `onUnload` ("handler" / "clip onUnload")
+  trace. `actionFireOnUnload` (invoked from `ng_on_remove_object`)
+  still fires the AS-level handler inline, so the inline handler
+  prints before the deferred clip-action. Additionally deferring
+  `actionFireOnUnload` (via a `queueOnUnload` call) fixed those two
+  tests but regressed `avm1/unload`: `Unload clip5` slipped from
+  end-of-frame-1 to end-of-frame-2, suggesting the deferred AS-level
+  handler's target MC state is being cleared by
+  `actionMarkMCPendingRemoval` / `clear_display_entry` between
+  queue-time and frame-1 drain-time in a way that prevents the
+  handler from firing at the intended `tagShowFrame`.
+- **Blocker for future session:** a clean fix needs to defer *both*
+  tag-level clip-action `UNLOAD` *and* AS-level `onUnload` to the
+  action queue (ordered clip-action first, `onUnload` second) **and**
+  ensure the `MovieClip`'s state survives until the deferred drain.
+  The latter is non-trivial — `actionMarkMCPendingRemoval` +
+  `clear_display_entry` run immediately after `actionFireOnUnload`
+  inside `tagRemoveObject2`, and anything the deferred handler
+  touches (dynamic_props, display children, etc.) must still be
+  reachable at drain time. Likely requires restructuring so the
+  "queue unloads" step leaves the MC live and everything past it
+  (pending_removal, `clear_display_entry`, child invalidation)
+  moves to a new deferred-finalize step that runs after
+  `actionFirePendingUnloads`. Alternatively, attach the MC state the
+  AS-level handler needs to the queued payload itself (copy the
+  handler + any bindings at queue time, don't rely on live MC state).
+
 ### instanceNameTest — empty-name preservation (2026-04-22, not yet in CI)
 
 - **instanceNameTest (misc-ming) → PASS (+1).** SWF's `PlaceObject2` distinguishes "name is present but empty" (HasName bit set, name=`""`) from "no name at all" (HasName bit unset). Ming's `SWFDisplayItem_setName(it, "")` produces the former, and Flash preserves that as `this._target == "/"` (not `/instanceN`). The recompiler's emission sites used `!instance_name_str.empty()` to decide whether to emit `tagSetInstanceName`, which collapses "empty name" and "no name" into the same branch — so the empty-named MC fell through to the runtime's auto-naming path and got `instance2`, shifting every subsequent auto-index by one. Fix: seven emission sites in `SWFRecomp/src/swf.cpp` (four in `tag_main`, three in `sprite_definitions`) now gate on `has_name` — which reflects the PlaceObject2 HasName flag — so an explicit empty name produces `tagSetInstanceName(app_context, depth, "")`. The runtime's `tagSetInstanceName` already stores the empty string as a non-NULL pointer, so `ng_on_place_object2` sees `g_pending_instance_name != NULL` and skips auto-naming. No regressions on an 18-test AVM1 placement/name-resolution battery (`access_unnamed_shape`, `conflicting_instance_names`, `default_names`, `named_shapes`, `movieclip_depth_methods`, `movieclip_get_instance_at_depth`, `movieclip_name_from_timeline`, `place_and_lookup`, `bad_placeobject_clipaction`, `clip_events`, `register_and_init_order`, `goto_rewind3`, `execution_order3`, `goto_execution_order2`, `movieclip_in_removed_button`, `unload`, `on_construct`, `movieclip_state_values`) or a cross-check of previously-landed misc-ming fixes (`displaylist_depths_test11`, `place_and_remove_object_test`, `attachMovieTest`, `shape_test`, `get_frame_number_test`, `loop_test5`, `loop_test9`, `static_vs_dynamic2`) or the Shumway duplicateMovieClip suite.
