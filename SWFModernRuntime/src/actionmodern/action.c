@@ -7001,6 +7001,11 @@ static void getLocalMatrixForMC(MovieClip* mc,
 		double ys = (double)mc->yscale / 100.0;
 		double rot = (double)mc->rotation * 3.14159265358979323846 / 180.0;
 		double cr = cos(rot), sr = sin(rot);
+		// Snap to exact 0/±1 at multiples of 90° — C's cos(M_PI/2)
+		// returns ~6.12e-17 which surfaces as `a=6.12323399573677e-17`
+		// in Matrix.toString. Flash uses exact 0 at 90° multiples.
+		if (fabs(cr) < 1e-12) cr = 0.0;
+		if (fabs(sr) < 1e-12) sr = 0.0;
 		ba = xs*cr; bb = xs*sr; bc = -(ys*sr); bd = ys*cr;
 		btx = (double)mc->x; bty = (double)mc->y;
 	}
@@ -7010,6 +7015,8 @@ static void getLocalMatrixForMC(MovieClip* mc,
 		double ys = (double)mc->yscale / 100.0;
 		double rot = (double)mc->rotation * 3.14159265358979323846 / 180.0;
 		double cr = cos(rot), sr = sin(rot);
+		if (fabs(cr) < 1e-12) cr = 0.0;
+		if (fabs(sr) < 1e-12) sr = 0.0;
 		ba = xs*cr; bb = xs*sr; bc = -(ys*sr); bd = ys*cr;
 	}
 	if (mc->as_set_flags & 1) btx = (double)mc->x;
