@@ -1,9 +1,9 @@
 {
   "metadata": {
-    "old_timestamp": "2026-04-24T00:02:25.363843+00:00",
-    "old_git_sha": "160f34d41f585fcd066e88dc225c5e13e4991761",
-    "new_timestamp": "2026-04-24T02:27:53.356948+00:00",
-    "new_git_sha": "d2fb682e29c384f41b8c96f299b263d5eb73cbb5",
+    "old_timestamp": "2026-04-24T02:27:53.356948+00:00",
+    "old_git_sha": "d2fb682e29c384f41b8c96f299b263d5eb73cbb5",
+    "new_timestamp": "2026-04-24T02:43:04.963548+00:00",
+    "new_git_sha": "1dc344c1471fb0942e70258bc4df4459d2f3a18e",
     "partial": false,
     "same_commit": false
   },
@@ -18,33 +18,16 @@
     "new_effective_pass": 46,
     "new_total": 102,
     "new_pass_rate": 35.3,
-    "old_mismatched_lines": 2278,
+    "old_mismatched_lines": 2271,
     "new_mismatched_lines": 2271,
     "increased_mismatches": 0,
-    "decreased_mismatches": 7,
+    "decreased_mismatches": 0,
     "newly_passing": 0,
     "newly_failing": 0,
     "status_changed": 0,
-    "unchanged": 101,
+    "unchanged": 102,
     "added": 0,
     "removed": 0
   },
-  "changes": [
-    {
-      "test": "DefineEditTextVariableNameTest2",
-      "change_type": "changed",
-      "old_status": "output_mismatch",
-      "new_status": "output_mismatch",
-      "old_lines": {
-        "actual_lines": 39,
-        "expected_lines": 39,
-        "matching_lines": 29
-      },
-      "new_lines": {
-        "actual_lines": 39,
-        "expected_lines": 39,
-        "matching_lines": 36
-      }
-    }
-  ]
+  "changes": []
 }
