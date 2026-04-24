@@ -1,10 +1,10 @@
 # Ruffle Test Results (Unfiltered)
 
-**Date**: 2026-04-24 04:24 UTC
+**Date**: 2026-04-24 17:11 UTC
 
-**Git SHA**: `032524fc03`
+**Git SHA**: `d4c3b8d81d`
 
-**Run Duration**: 3m 51s
+**Run Duration**: 3m 49s
 
 ## Summary
 
@@ -16,8 +16,8 @@
 | Effective pass | **8** (50.0%) |
 | Failing | 8 |
 | Total expected lines | 499 |
-| Matching lines | 235 (47.1%) |
-| Mismatched lines | 264 |
+| Matching lines | 239 (47.9%) |
+| Mismatched lines | 260 |
 
 ### Failure Breakdown
 
@@ -31,11 +31,11 @@
 
 | # | Test | Lines | Duration | Notes |
 |---|------|-------|----------|-------|
-| 1 | `edittext_test1` | 47 | 13.1s |  |
-| 2 | `gotoFrameLabelAsFunction` | 6 | 16.1s |  |
-| 3 | `hello` | 4 | 17.0s |  |
-| 4 | `stackscope` | 11 | 16.8s |  |
-| 5 | `submoviegetvar` | 4 | 16.3s |  |
+| 1 | `edittext_test1` | 47 | 16.1s |  |
+| 2 | `gotoFrameLabelAsFunction` | 6 | 16.6s |  |
+| 3 | `hello` | 4 | 16.2s |  |
+| 4 | `stackscope` | 11 | 15.9s |  |
+| 5 | `submoviegetvar` | 4 | 15.8s |  |
 
 ## Ruffle-Matched Tests
 
@@ -43,9 +43,9 @@
 
 | # | Test | Our diffs | Ruffle diffs | Duration | Notes |
 |---|------|-----------|--------------|----------|-------|
-| 1 | `action_execution_order_test10` | 14 | 14 | 17.6s |  |
-| 2 | `movieclip_destruction_test1` | 52 | 52 | 16.6s |  |
-| 3 | `registerclass_test3` | 20 | 20 | 17.0s |  |
+| 1 | `action_execution_order_test10` | 14 | 14 | 16.4s |  |
+| 2 | `movieclip_destruction_test1` | 52 | 52 | 16.7s |  |
+| 3 | `registerclass_test3` | 20 | 20 | 17.1s |  |
 
 ## Near-Passing Tests
 
@@ -55,7 +55,7 @@ Tests with output mismatch but >= 50% line match rate (low-hanging fruit).
 
 | # | Test | Match Rate | Matching | Total | Diff Lines | Notes |
 |---|------|------------|----------|-------|------------|-------|
-| 1 | `movieclip_destruction_test2` | 66.1% | 37 | 56 | 19 |  |
+| 1 | `movieclip_destruction_test2` | 73.2% | 41 | 56 | 15 |  |
 | 2 | `swf4opcode` | 63.2% | 74 | 117 | 43 |  |
 | 3 | `sound` | 58.3% | 7 | 12 | 5 |  |
 | 4 | `mouse_drag_test` | 50.0% | 6 | 12 | 6 |  |
@@ -78,7 +78,7 @@ No timeouts.
 
 | # | Test | Match Rate | Matching/Total | Actual | Expected | Notes |
 |---|------|------------|----------------|--------|----------|-------|
-| 1 | `movieclip_destruction_test2` | 66.1% | 37/56 | 56 | 56 |  |
+| 1 | `movieclip_destruction_test2` | 73.2% | 41/56 | 56 | 56 |  |
 | 2 | `swf4opcode` | 63.2% | 74/117 | 117 | 117 |  |
 | 3 | `sound` | 58.3% | 7/12 | 12 | 7 |  |
 | 4 | `mouse_drag_test` | 50.0% | 6/12 | 12 | 12 |  |
