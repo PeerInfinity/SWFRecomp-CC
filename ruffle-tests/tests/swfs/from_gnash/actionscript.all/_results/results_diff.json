@@ -1,9 +1,9 @@
 {
   "metadata": {
-    "old_timestamp": "2026-04-24T20:40:24.844264+00:00",
-    "old_git_sha": "9d48962d4ca362502d78aa09a9c97930fff92cc7",
-    "new_timestamp": "2026-04-24T22:42:03.587260+00:00",
-    "new_git_sha": "285ebcf1f03f3c4dfb7acbc9a8dd9097c3eec14a",
+    "old_timestamp": "2026-04-24T22:42:03.587260+00:00",
+    "old_git_sha": "285ebcf1f03f3c4dfb7acbc9a8dd9097c3eec14a",
+    "new_timestamp": "2026-04-24T23:19:44.052592+00:00",
+    "new_git_sha": "652864e27b1eabd1fd4a044c68893ed6f67ce126",
     "partial": false,
     "same_commit": false
   },
@@ -14,20 +14,69 @@
     "old_total": 190,
     "old_pass_rate": 59.5,
     "new_pass": 113,
-    "new_ruffle_matched": 52,
-    "new_effective_pass": 165,
+    "new_ruffle_matched": 55,
+    "new_effective_pass": 168,
     "new_total": 190,
     "new_pass_rate": 59.5,
     "old_mismatched_lines": 2206,
-    "new_mismatched_lines": 2206,
+    "new_mismatched_lines": 2203,
     "increased_mismatches": 0,
-    "decreased_mismatches": 0,
-    "newly_passing": 0,
+    "decreased_mismatches": 3,
+    "newly_passing": 3,
     "newly_failing": 0,
-    "status_changed": 0,
-    "unchanged": 190,
+    "status_changed": 3,
+    "unchanged": 187,
     "added": 0,
     "removed": 0
   },
-  "changes": []
+  "changes": [
+    {
+      "test": "Selection-v6",
+      "change_type": "changed",
+      "old_status": "output_mismatch",
+      "new_status": "ruffle_matched",
+      "old_lines": {
+        "actual_lines": 125,
+        "expected_lines": 125,
+        "matching_lines": 117
+      },
+      "new_lines": {
+        "actual_lines": 125,
+        "expected_lines": 125,
+        "matching_lines": 118
+      }
+    },
+    {
+      "test": "Selection-v7",
+      "change_type": "changed",
+      "old_status": "output_mismatch",
+      "new_status": "ruffle_matched",
+      "old_lines": {
+        "actual_lines": 125,
+        "expected_lines": 125,
+        "matching_lines": 117
+      },
+      "new_lines": {
+        "actual_lines": 125,
+        "expected_lines": 125,
+        "matching_lines": 118
+      }
+    },
+    {
+      "test": "Selection-v8",
+      "change_type": "changed",
+      "old_status": "output_mismatch",
+      "new_status": "ruffle_matched",
+      "old_lines": {
+        "actual_lines": 125,
+        "expected_lines": 125,
+        "matching_lines": 117
+      },
+      "new_lines": {
+        "actual_lines": 125,
+        "expected_lines": 125,
+        "matching_lines": 118
+      }
+    }
+  ]
 }
