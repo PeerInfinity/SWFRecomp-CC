@@ -25544,7 +25544,9 @@ void actionGetURL(SWFAppContext* app_context, const char* url, const char* targe
 		const char* cmd = url + 10;
 		if (strcasecmp(cmd, "quit") == 0) {
 			extern int quit_swf;
+			extern int g_force_quit;
 			quit_swf = 1;
+			g_force_quit = 1;
 		}
 #ifdef HEADLESS_GRAPHICS
 		else if (strcasecmp(cmd, "capture") == 0) {
@@ -36985,7 +36987,9 @@ void actionGetURL2(SWFAppContext* app_context, u8 send_vars_method, u8 load_targ
 			const char* cmd = url_utf8 + 10;
 			if (strcasecmp(cmd, "quit") == 0) {
 				extern int quit_swf;
+				extern int g_force_quit;
 				quit_swf = 1;
+				g_force_quit = 1;
 			}
 #ifdef HEADLESS_GRAPHICS
 			else if (strcasecmp(cmd, "capture") == 0) {

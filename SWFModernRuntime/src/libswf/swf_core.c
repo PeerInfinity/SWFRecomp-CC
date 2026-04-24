@@ -24,6 +24,11 @@
 
 // Core runtime state - exported
 int quit_swf = 0;
+// Set ONLY by FSCommand:quit (either form of actionGetURL). Unlike
+// `quit_swf` which is also emitted at the end of a SWF's last frame as
+// a normal end-of-movie marker, `g_force_quit` means the SWF explicitly
+// asked to terminate: break out of the tick loop on next iteration.
+int g_force_quit = 0;
 int is_playing = 1;
 int bad_poll = 0;
 size_t current_frame = 0;
@@ -690,6 +695,7 @@ void swfStart(SWFAppContext* app_context)
 
 	// Initialize subsystems
 	quit_swf = 0;
+	g_force_quit = 0;
 	is_playing = 1;
 	bad_poll = 0;
 	current_frame = 0;
@@ -811,14 +817,18 @@ void swfStart(SWFAppContext* app_context)
 		// is still asking to run. Without this, SWFs that FSCommand:quit from
 		// a non-last frame but still have the natural end-of-movie loopback
 		// (manual_next_frame=1, next_frame=0) would restart frame 0 and loop
-		// forever. Same conditions as the past-last-frame branch below, but we
-		// also bypass `hasPlayingSprites`: once `quit_swf` is set, sprites that
-		// loop forever (no AS stop()) must not keep the player alive — that's
-		// the pattern that makes the fuzz `81004241…` test loop indefinitely.
+		// forever. Uses `g_force_quit` — set only by the FSCommand:quit path,
+		// NOT by the recompiler-emitted `quit_swf = 1` at the end of the last
+		// frame (that's the regular end-of-movie marker, which needs to allow
+		// sprite scripts queued that tick to still drain). Bypasses
+		// `hasPlayingSprites`: once FSCommand:quit fires, sprites that loop
+		// forever (no AS stop()) must not keep the player alive — that's the
+		// pattern behind the fuzz `81004241…` indefinite loop.
 		{
 			extern int hasPlayingSounds(void);
 			extern int hasActiveNetStreams(void);
-			if (quit_swf && !(g_events && g_event_pos < g_event_count)
+			extern int g_force_quit;
+			if (g_force_quit && !(g_events && g_event_pos < g_event_count)
 			    && !actionHasEnterFrameHandlers()
 			    && !hasActiveTimers()
 			    && !hasPlayingSounds()
