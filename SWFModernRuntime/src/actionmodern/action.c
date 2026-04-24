@@ -41183,6 +41183,33 @@ void actionGetMember(SWFAppContext* app_context)
 			float len = (float) obj_var.str_size;
 			PUSH(ACTION_STACK_VALUE_F32, VAL(u32, &len));
 		}
+		else if (_autobox_result == -1)
+		{
+			// Primitive string property access: look up on String.prototype.
+			// Flash auto-boxes primitives for property access, so
+			// `var s = "x"; typeof(s.toString) == 'function'` is true.
+			// Only when the original built-in String constructor is in place
+			// (_autobox_result == -1). If String was monkey-patched,
+			// tryAutoBoxPrimitive would have boxed it and fallen into OBJECT.
+			if (prop_name_len == 9 && strncmp(prop_name, "__proto__", 9) == 0) {
+				ASObject* proto = getPrimitiveWrapperProto(ACTION_STACK_VALUE_STRING);
+				if (proto != NULL) {
+					PUSH(ACTION_STACK_VALUE_OBJECT, (u64)proto);
+				} else {
+					pushUndefined(app_context);
+				}
+			} else {
+				ASObject* proto = getPrimitiveWrapperProto(ACTION_STACK_VALUE_STRING);
+				if (proto != NULL) {
+					ActionVar* prop = getPropertyWithPrototype(proto, prop_name, prop_name_len);
+					if (prop != NULL) {
+						pushVar(app_context, prop);
+						return;
+					}
+				}
+				pushUndefined(app_context);
+			}
+		}
 		else
 		{
 			// Other properties don't exist on strings

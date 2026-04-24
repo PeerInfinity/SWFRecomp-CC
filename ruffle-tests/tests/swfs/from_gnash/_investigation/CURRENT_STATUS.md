@@ -1,8 +1,25 @@
 # Gnash Test Suite Status
 
-Last updated: 2026-04-23 (post-DefineEditTextVariableNameTest2 sync-to-textfield Object coercion; not yet in CI)
+Last updated: 2026-04-23 (post-DefineEditTextVariableNameTest2 PASS via string primitive auto-boxing; not yet in CI)
 
 ### Latest fixes (2026-04-23, not yet in CI)
+
+- **DefineEditTextVariableNameTest2 (misc-ming) → PASS (+1).** Extended
+  primitive auto-boxing in `actionGetMember` (action.c) to STRING values.
+  The final failing line `typeof(dtext4.text.toString) == 'function'`
+  resolved: the STRING branch of `actionGetMember` previously handled only
+  `.length` and returned undefined for every other member. Now, when the
+  built-in `String` constructor is still in place (i.e.
+  `tryAutoBoxPrimitive` returned `_autobox_result == -1` — same gate the
+  existing F32/F64/BOOLEAN fallback uses), string property access falls
+  back to `getPrimitiveWrapperProto(ACTION_STACK_VALUE_STRING)` and reads
+  via `getPropertyWithPrototype` on String.prototype. `__proto__` on a
+  STRING primitive returns String.prototype. No regressions on a 16-test
+  AVM1 string battery (string_methods*, string_paths_*, string_coercion,
+  object_string_coerce_swf5/6, path_string), a 17-test AVM1
+  object/prototype battery, or a 12-test Gnash String-v5..v8,
+  Number-v5..v8, Boolean-v5..v8 battery (all previously-pass/RM tests
+  unchanged).
 
 - **DefineEditTextVariableNameTest2 (misc-ming) — partial (+7 lines,
   28/36 → 35/36).** `ng_syncVarToTextFields` was skipping OBJECT / ARRAY /
