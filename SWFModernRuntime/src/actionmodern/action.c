@@ -18529,11 +18529,18 @@ MovieClip* actionFindMovieClipByName(const char* instance_name) {
 void actionInvalidateCachedMovieClip(SWFAppContext* app_context, const char* name, int swf_depth)
 {
 	int as_depth = swf_depth - 16384;
+	int shifted_depth = -(int)swf_depth - 1 - 16384;
+	// actionFireOnUnload may have already shifted the MC's depth even when the MC
+	// has no clip-event UNLOAD or recursive-child UNLOAD (the AS-level handler is
+	// counted in has_unload, so this case is uncommon, but a depth-only AS-level
+	// onUnload that returns early without preserving state could still land here).
 	for (int i = 0; i < child_mc_count; i++) {
 		if (child_mc_cache[i] != NULL &&
 		    !child_mc_cache[i]->pending_removal &&
 		    child_mc_cache[i]->depth != INT_MIN &&
-		    (child_mc_cache[i]->depth == as_depth || child_mc_cache[i]->depth == swf_depth) &&
+		    (child_mc_cache[i]->depth == as_depth ||
+		     child_mc_cache[i]->depth == swf_depth ||
+		     child_mc_cache[i]->depth == shifted_depth) &&
 		    strcmp(child_mc_cache[i]->name, name) == 0) {
 			// Clear focus if the invalidated MC (or one of its children) is focused
 			if (g_focused_mc != NULL) {
@@ -18615,16 +18622,24 @@ void actionMarkMCPendingRemoval(SWFAppContext* app_context, const char* name, in
 {
 	(void)app_context;
 	int as_depth = swf_depth - 16384;
+	int shifted_depth = -(int)swf_depth - 1 - 16384;
+	// actionFireOnUnload may have already shifted the MC's depth; accept any of
+	// (as_depth, swf_depth, shifted_depth) when matching by name+depth.
 	for (int i = 0; i < child_mc_count; i++) {
 		if (child_mc_cache[i] != NULL &&
 		    !child_mc_cache[i]->pending_removal &&
 		    child_mc_cache[i]->depth != INT_MIN &&
-		    (child_mc_cache[i]->depth == as_depth || child_mc_cache[i]->depth == swf_depth) &&
+		    (child_mc_cache[i]->depth == as_depth ||
+		     child_mc_cache[i]->depth == swf_depth ||
+		     child_mc_cache[i]->depth == shifted_depth) &&
 		    strcmp(child_mc_cache[i]->name, name) == 0) {
 			MovieClip* mc = child_mc_cache[i];
 			mc->avm1_removed = 1;
-			// Transform depth: -(internal_depth) - 1, then subtract AVM_DEPTH_BIAS for AS-facing
-			mc->depth = -(int)swf_depth - 1 - 16384;
+			// Transform depth: -(internal_depth) - 1, then subtract AVM_DEPTH_BIAS for AS-facing.
+			// Skip if actionFireOnUnload already shifted it.
+			if (mc->depth != shifted_depth) {
+				mc->depth = shifted_depth;
+			}
 			mc->pending_removal = 1;
 			mc->display_obj = NULL;  // Detach from display list entry
 			break;
@@ -18738,6 +18753,13 @@ void actionFireOnUnload(SWFAppContext* app_context, const char* instance_name, i
 
 	ASFunction* func = (ASFunction*) handler->data.numeric_value;
 	if (func == NULL) return;
+
+	// Shift depth to the post-removal "removed depth zone" BEFORE firing the
+	// handler, so getDepth() inside onUnload returns -(swf_depth)-1-16384.
+	// Matches Flash's "already shifted inside unload handler" semantics
+	// (gnash misc-swfc movieclip_destruction_test2 lines 88-89).
+	target_mc->avm1_removed = 1;
+	target_mc->depth = -(int)swf_depth - 1 - 16384;
 
 	// Set context to the MC and invoke the handler with no arguments
 	MovieClip* saved_context = g_current_context;
@@ -56017,10 +56039,19 @@ void actionCallMethod(SWFAppContext* app_context, char* str_buffer)
 				pushUndefined(app_context);
 				return;
 			}
+			// Removed/pending-removal MCs ignore swapDepths (Flash semantics:
+			// once shifted into the removed-depth zone, the depth is fixed).
+			// gnash misc-swfc movieclip_destruction_test2 lines 130-137.
+			if (mc->avm1_removed || mc->pending_removal) {
+				if (args != NULL) FREE(args);
+				pushUndefined(app_context);
+				return;
+			}
 			if (args[0].type == ACTION_STACK_VALUE_MOVIECLIP) {
 				// Swap depths with target clip (same-parent only; cross-parent is no-op in Flash)
 				MovieClip* _target = (MovieClip*) args[0].data.numeric_value;
-				if (_target != NULL && _target != mc) {
+				if (_target != NULL && _target != mc &&
+				    !_target->avm1_removed && !_target->pending_removal) {
 					MovieClip* _mc_parent = mc->parent ? mc->parent : &root_movieclip;
 					MovieClip* _tg_parent = _target->parent ? _target->parent : &root_movieclip;
 					if (_mc_parent == _tg_parent) {
@@ -56122,9 +56153,14 @@ void actionCallMethod(SWFAppContext* app_context, char* str_buffer)
 			} else {
 				_new_depth = ecmaToInt32(_dval);
 			}
-			// Clamp to valid range [-16384, 2130690044]
-			if (_new_depth < -16384) _new_depth = -16384;
-			if (_new_depth > 2130690044) _new_depth = 2130690044;
+			// Out-of-range depth: Flash treats this as a no-op (the depth doesn't
+			// change). gnash misc-swfc movieclip_destruction_test2 lines 175-183:
+			// `mc1.swapDepths(-16385)` and `mc1.swapDepths(-32769)` leave depth
+			// unchanged; `mc1.swapDepths(-16384)` works.
+			if (_new_depth < -16384 || _new_depth > 2130690044) {
+				pushUndefined(app_context);
+				return;
+			}
 			mc->depth = _new_depth;
 			mc->depth_swapped = 1;
 #ifdef NO_GRAPHICS

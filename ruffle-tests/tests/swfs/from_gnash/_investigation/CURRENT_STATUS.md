@@ -1,8 +1,55 @@
 # Gnash Test Suite Status
 
-Last updated: 2026-04-24 (loop_test3 → PASS via per-depth placed_at_frame on swap + ratio-only MC survives_rewind; not yet in CI)
+Last updated: 2026-04-24 (movieclip_destruction_test2 → 50/52 via onUnload-depth-shift + swapDepths gating on removed MCs; loop_test3 → PASS via per-depth placed_at_frame on swap + ratio-only MC survives_rewind; not yet in CI)
 
 ### Latest fixes (2026-04-24, not yet in CI)
+
+- **movieclip_destruction_test2 (misc-swfc) — +9 lines (41/56 → 50/56 matching).**
+  Three-part fix to make removed-but-still-referenced MCs match Flash's
+  "removed depth zone" semantics:
+  1. `actionFireOnUnload` (`SWFModernRuntime/src/actionmodern/action.c`)
+     now sets `mc->avm1_removed = 1` and shifts
+     `mc->depth = -(swf_depth) - 1 - 16384` BEFORE invoking the AS-level
+     handler — so `getDepth()` inside `mc.onUnload` returns the
+     post-removal depth (test expects -16387 for a swf_depth=2 MC).
+     `actionMarkMCPendingRemoval` and `actionInvalidateCachedMovieClip`
+     were updated to accept the shifted depth in their lookups and skip
+     the redundant re-shift. `ng_on_remove_object`
+     (`SWFModernRuntime/src/libswf/tag_stubs.c`) now computes
+     `has_unload` (including the AS-level `actionMCHasOnUnloadProperty`
+     check) BEFORE the depth shift, since the property lookup uses the
+     pre-shift `as_depth`.
+  2. `swapDepths` (the MC method handler in
+     `SWFModernRuntime/src/actionmodern/action.c`) now early-returns
+     when the receiver `mc->avm1_removed`/`pending_removal` is set, AND
+     when the MOVIECLIP target argument is similarly removed. Removed
+     MCs in the "removed-depth zone" have a fixed depth that swap can't
+     change.
+  3. Numeric-form `swapDepths(N)` no longer clamps out-of-range depths
+     to `[-16384, 2130690044]` — it now early-returns leaving depth
+     unchanged when `N < -16384` or `N > 2130690044`. Test lines 175-183:
+     `mc1.swapDepths(-16385)` / `swapDepths(-32769)` are no-ops; only
+     the in-range `swapDepths(-16384)` succeeds.
+  Two failing lines remain (`mc2UnlaodedCount == 2` after explicit
+  `mc2.onUnload()` call at lines 156-157). The user-method dispatch IS
+  invoking the function on the pending-removal MC (debug-confirmed
+  during this session) but the function body produces no trace output
+  despite running through ~8 `actionBaseClipRemoved` checks (all
+  returning 0). Likely a deeper issue with how the inner
+  `_root.check_equals` calls behave when invoked from a
+  user-method-dispatched function on a pending-removal MC. Not a
+  regression — these lines were already failing pre-fix. No regressions
+  on a 24-test AVM1 lifecycle battery (unload/clip_event/goto_rewind/
+  execution_order/on_construct/register_and_init_order/movieclip_state_values/
+  set_interval/swf5_to_6_cross_call/attach_movie etc. — 24/24 effective),
+  16-test misc-ming recently-fixed battery (loop_test3/5/9,
+  instanceNameTest, attachMovieTest, DefineEditTextTest,
+  DefineEditTextVariableNameTest2, static_vs_dynamic1/2,
+  displaylist_depths_test11, place_and_remove_object_test,
+  get_frame_number_test, shape_test, action_execution_order_test8-v5/v6,
+  new_child_in_unload_test — 16/16 pass), or the Shumway
+  duplicateMovieClip suite (4/4 pass).
+
 
 - **loop/loop_test3 (misc-ming) → PASS (+1).** Three-part fix so a
   `swapDepths`-then-backward-`gotoAndStop` correctly preserves the MC

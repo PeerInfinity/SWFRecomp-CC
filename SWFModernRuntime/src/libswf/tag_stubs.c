@@ -745,11 +745,9 @@ void ng_on_remove_object(SWFAppContext* app_context, size_t depth)
 {
 	if (depth > max_depth || display_list[depth].char_id == 0) return;
 	if (display_list[depth].instance_name != NULL) {
-		// Fire AS-set onUnload handler
-		actionFireOnUnload(app_context, display_list[depth].instance_name, (int)depth);
-		// Only persist the MC (pending_removal) if it has an unload handler:
-		// either clip_actions with UNLOAD event (0x4) or AS-level onUnload property.
-		// MCs without unload handlers are immediately invalidated.
+		// Determine has_unload BEFORE firing the AS-level handler — the handler
+		// shifts the MC's depth, which would invalidate name+depth lookups in
+		// actionMCHasOnUnloadProperty if we did the check after.
 		int has_unload = 0;
 		// Check clip_actions for UNLOAD event
 		for (size_t ca = 0; ca < display_list[depth].clip_action_count; ca++) {
@@ -777,6 +775,10 @@ void ng_on_remove_object(SWFAppContext* app_context, size_t depth)
 			has_unload = has_child_unload_handler(display_list[depth].sprite_display_list,
 			                                      display_list[depth].sprite_max_depth);
 		}
+		// Fire AS-set onUnload handler (shifts depth to the "removed depth zone"
+		// before invocation so getDepth() inside the handler returns the shifted
+		// value, matching Flash semantics).
+		actionFireOnUnload(app_context, display_list[depth].instance_name, (int)depth);
 		if (has_unload) {
 			actionMarkMCPendingRemoval(app_context, display_list[depth].instance_name, (int)depth);
 		} else {
