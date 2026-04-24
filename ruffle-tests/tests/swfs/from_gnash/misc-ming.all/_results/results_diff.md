@@ -1,20 +1,20 @@
 # Ruffle Test Results Diff
 
-**Previous:** `1dc344c1471f` (2026-04-24T02:43:04.963548+00:00)
-**Current:** `384d1d94f061` (2026-04-24T03:18:51.971734+00:00)
+**Previous:** `384d1d94f061` (2026-04-24T03:18:51.971734+00:00)
+**Current:** `9fee5dc13976` (2026-04-24T04:05:58.691432+00:00)
 
 ## Summary
 
 | Metric | Previous | Current | Delta |
 |--------|----------|---------|-------|
-| Passing | 36 | 37 | +1 |
+| Passing | 37 | 37 | 0 |
 | Total | 102 | 102 | 0 |
-| Pass rate | 35.3% | 36.3% | +1.0% |
-| Mismatched lines | 2271 | 2268 | -3 |
-|   Decreased | | | -3 |
+| Pass rate | 36.3% | 36.3% | 0% |
+| Mismatched lines | 2268 | 2264 | -4 |
+|   Decreased | | | -4 |
 
-## Newly Passing (1)
+## Line Count Changed (1)
 
-| Test | Previous Status | Lines (prev) | Lines (now) |
-|------|----------------|--------------|-------------|
-| `DefineEditTextVariableNameTest2` | output_mismatch | 36/39 | 39/39 |
+| Test | Status | Lines (prev) | Lines (now) | Diff |
+|------|--------|--------------|-------------|------|
+| `matrix_test` | output_mismatch | 908/1086 | 912/1086 | -4 |
