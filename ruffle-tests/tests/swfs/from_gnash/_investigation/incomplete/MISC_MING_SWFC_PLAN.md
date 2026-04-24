@@ -336,6 +336,30 @@ Also `movieclip_destruction_test2` (73.2%) from misc-swfc.
 - `edittext_test1` (76.6% — near-passing).
 Text field property coverage; may overlap AVM1's `TEXTFIELD_PLAN`.
 
+- **DefineEditTextVariableNameTest2 (misc-ming) — partial (+7 lines, 28/36 → 35/36, 2026-04-23 not yet in CI).**
+  `ng_syncVarToTextFields` in `SWFModernRuntime/src/actionmodern/action.c` was
+  skipping OBJECT/ARRAY/FUNCTION values with a "no side effects" comment, so
+  `edit_text_var = new Object()` never propagated to bound textfields — the
+  textfield kept its previous string value instead of coercing the object to
+  `'[object Object]'` (or the user's Object.prototype.toString result). Ruffle's
+  `notify_property_change` (`core/src/avm1/object/stage_object.rs:87`) calls
+  `value.coerce_to_string(activation)` on every value type, so the side-effect
+  concern is actually part of the observable Flash/Ruffle behavior. Fix: route
+  all non-STRING/non-UNDEFINED values (including OBJECT/ARRAY/FUNCTION) through
+  `varToStringBuf`, which already invokes `objectCallToString` for OBJECT via
+  the type-11 handler at action.c:49049. No regressions on a 12-test AVM1
+  edittext/textfield battery (`edittext_html_align_swf7/8`,
+  `edittext_html_color`, `edittext_html_swf6/7/8`, `edittext_stylesheet`,
+  `clone_sprite_edittext`, `clone_sprite_edittext_dynamic`, `text_format`,
+  `text_format_display`, `textsnapshot_available_text`) nor on a
+  5-test misc-ming battery (`DefineEditTextVariableNameTest`,
+  `DefineEditTextTest`, `DefineTextTest`, `matrix_test`,
+  `place_and_remove_object_test` — 2 passing / 3 pre-existing failures unchanged).
+  The one remaining failing line in v2 is `typeof(dtext4.text.toString) == 'function'`,
+  which fails because string-primitive-to-String.prototype auto-boxing is not
+  implemented for GetMember on STRING values (pre-existing limitation, line
+  41167 returns undefined for everything except "length" on STRING type).
+
 ### Cluster: events / input
 
 - `event_handler_scope_test` (62.5%)

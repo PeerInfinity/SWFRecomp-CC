@@ -20726,14 +20726,18 @@ static void ng_syncVarToTextFields(SWFAppContext* app_context, const char* var_n
 	if (value->type == ACTION_STACK_VALUE_STRING) {
 		text_u16 = varGetU16Ptr(value);
 		text_len = value->str_size;
-	} else if (value->type == ACTION_STACK_VALUE_F32 ||
-	           value->type == ACTION_STACK_VALUE_F64 ||
-	           value->type == ACTION_STACK_VALUE_BOOLEAN ||
-	           value->type == ACTION_STACK_VALUE_NULL ||
-	           value->type == ACTION_STACK_VALUE_MOVIECLIP) {
-		// Only convert simple types without side effects.
-		// Object/Array/Function conversion would invoke toString() which has observable
-		// side effects (e.g., custom toString functions that call trace()).
+	} else if (value->type == ACTION_STACK_VALUE_UNDEFINED ||
+	           value->type == ACTION_STACK_VALUE_HOLE) {
+		return;  // undefined — don't sync
+	} else {
+		// F32/F64/BOOLEAN/NULL/MOVIECLIP/OBJECT/ARRAY/FUNCTION:
+		// coerce to string via varToStringBuf (matches Ruffle's
+		// notify_property_change → value.coerce_to_string in
+		// avm1/object/stage_object.rs). OBJECT path invokes
+		// custom toString — required for DefineEditTextVariableNameTest2
+		// where `edit_text_var = new Object()` must sync
+		// `dtext4.text = '[object Object]'` (or the user-supplied
+		// Object.prototype.toString result).
 		char _sv_buf[512];
 		int n = varToStringBuf(app_context, value, _sv_buf, sizeof(_sv_buf));
 		if (n > 0) {
@@ -20741,8 +20745,6 @@ static void ng_syncVarToTextFields(SWFAppContext* app_context, const char* var_n
 			text_u16 = utf8_to_u16(app_context, _sv_buf, (u32)n, &_sv_u16_len);
 			text_len = _sv_u16_len;
 		}
-	} else {
-		return;  // undefined/object/array/function — don't sync
 	}
 
 	for (int i = 0; i < child_mc_count; i++) {

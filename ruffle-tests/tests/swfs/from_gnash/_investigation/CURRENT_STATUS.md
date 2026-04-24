@@ -1,8 +1,26 @@
 # Gnash Test Suite Status
 
-Last updated: 2026-04-23 (post-action_execution_order_test8 nested-goto sprite-init filter; not yet in CI)
+Last updated: 2026-04-23 (post-DefineEditTextVariableNameTest2 sync-to-textfield Object coercion; not yet in CI)
 
 ### Latest fixes (2026-04-23, not yet in CI)
+
+- **DefineEditTextVariableNameTest2 (misc-ming) — partial (+7 lines,
+  28/36 → 35/36).** `ng_syncVarToTextFields` was skipping OBJECT / ARRAY /
+  FUNCTION values with a "no side effects" comment, so
+  `edit_text_var = new Object()` never propagated to bound textfields — the
+  textfield kept its previous string value instead of coercing the object to
+  `'[object Object]'` (or the user's `Object.prototype.toString` result when
+  the test overrides it). Ruffle's `notify_property_change`
+  (`core/src/avm1/object/stage_object.rs:87`) calls
+  `value.coerce_to_string(activation)` on every value type, so the side-effect
+  concern is actually part of the observable Flash/Ruffle behavior. Fix:
+  route all non-STRING / non-UNDEFINED values (including OBJECT/ARRAY/FUNCTION)
+  through `varToStringBuf`, which already invokes `objectCallToString` for
+  OBJECT. No regressions on a 12-test AVM1 edittext/textfield battery or a
+  5-test misc-ming battery. The one remaining failing line
+  (`typeof(dtext4.text.toString) == 'function'`) is a separate, pre-existing
+  limitation (STRING-primitive-to-String.prototype auto-boxing is only
+  implemented for `.length`).
 
 - **action_execution_order_test8-v5/v6 (misc-ming) → PASS (+2).**
   Tightened the Phase 3 filter in `process_sprite_needs_init` (libswf/
