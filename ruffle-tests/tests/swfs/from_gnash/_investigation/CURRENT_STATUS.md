@@ -1,6 +1,10 @@
 # Gnash Test Suite Status
 
-Last updated: 2026-04-23 (post-DefineEditTextVariableNameTest2 PASS via string primitive auto-boxing + FSCommand:quit handling for literal-URL GetURL; not yet in CI)
+Last updated: 2026-04-24 (dead-MC valueOf returns null — partial fix on misc-swfc/movieclip_destruction_test2; not yet in CI)
+
+### Latest fixes (2026-04-24, not yet in CI)
+
+- **movieclip_destruction_test2 (misc-swfc) — partial (+4 lines, 37/56 → 41/56 match).** `builtin_object_valueOf` now returns `ACTION_STACK_VALUE_NULL` when the MovieClip receiver has been invalidated (`g_event_this_mc->depth == INT_MIN`). Previously returned a MOVIECLIP value pointing to the dead MC, which coerced to `""` — test expected `"null"` (Flash semantics: `typeof(mcRef) == 'undefined'` but `mcRef.valueOf() == null` after removeMovieClip). Scoped to the `this_obj == NULL && g_event_this_mc != NULL` path for method-style MC receivers. Also improves `misc-ming/new_child_in_unload_test` by 3 lines (same `dyn1Ref.valueof() == null` pattern, though that test still fails on a separate cascading-unload issue). No regressions on a 5-test AVM1 unload battery, 14-test valueOf-exercising battery, or the 13 misc-ming tests passing at CI snapshot. See `incomplete/MISC_MING_SWFC_PLAN.md` "dead MC valueOf returns null".
 
 ### Latest fixes (2026-04-23, not yet in CI)
 

@@ -3678,6 +3678,14 @@ static ActionVar builtin_object_valueOf(SWFAppContext* app_context, ActionVar* a
 	// and it string-coerces to the MC's path.
 	if (this_obj == NULL && g_event_this_mc != NULL)
 	{
+		// Dead MC (removeMovieClip / unloadMovie): Flash returns null from
+		// valueOf on a stale MC reference (typeof is still undefined).
+		if (g_event_this_mc->depth == INT_MIN)
+		{
+			ret.type = ACTION_STACK_VALUE_NULL;
+			ret.data.numeric_value = 0;
+			return ret;
+		}
 		ret.type = ACTION_STACK_VALUE_MOVIECLIP;
 		ret.data.numeric_value = (u64) g_event_this_mc;
 		return ret;

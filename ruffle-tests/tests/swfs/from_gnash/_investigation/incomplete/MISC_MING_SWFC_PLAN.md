@@ -63,6 +63,33 @@ These are one or two small fixes away from passing. Tackle these first for broad
 
 For each, run `--diff --verbose` and cluster the diff lines by type. Many will resolve with a single targeted fix that's shared across a handful of near-passing tests.
 
+### movieclip_destruction_test2 (misc-swfc) — dead MC valueOf returns null (2026-04-24, not yet in CI)
+
+- **movieclip_destruction_test2 (misc-swfc) — partial (+4 lines, 37/56 → 41/56 match).**
+  `builtin_object_valueOf` in `SWFModernRuntime/src/actionmodern/action.c` now returns
+  `ACTION_STACK_VALUE_NULL` when the MovieClip receiver has been invalidated (i.e.
+  `g_event_this_mc->depth == INT_MIN`, the sentinel our runtime sets on
+  `actionMarkMCPendingRemoval`/finalize). Previously it returned a `MOVIECLIP` value
+  pointing to the dead MC, which coerced to `""` through `varToStringBuf` — the test
+  expects `"null"` (Flash semantics: `typeof(mcRef) == 'undefined'` but
+  `mcRef.valueOf() == null` after removeMovieClip). The check is scoped to the
+  `this_obj == NULL && g_event_this_mc != NULL` path that handles method-style
+  MC receivers (via actionCallMethod → `g_event_this_mc`). No regressions on a
+  5-test AVM1 unload battery (`unload`, `unloadmovie`, `unload_clip_event`,
+  `unload_nested_child`, `mcl_unloadclip`), a 14-test valueOf-exercising battery
+  (`duplicate_movie_clip`, `bitmap_data_hittest`, `coerce_to_primitive_resolve`,
+  `asnew`, `add2`, `string_coercion`, `mutable_this`, `this_scoping`,
+  `set_interval`, `native_objects_swf7`, `native_objects_swf8`,
+  `movieclip_state_values`, `movieclip_library_state_values`), or on the 13
+  misc-ming tests that were passing at CI snapshot (`DefineEditTextTest`,
+  `DefineEditTextVariableNameTest2`, `PlaceObject2Test`, `VarAndCharClashTest`,
+  `Video-EmbedSquareTest`, `getTimer_test`, `masks_test2`, `morph_test1`,
+  `move_object_test`, `multi_doactions_and_goto_frame_test`, `runtime_vm_stack_test`,
+  `unload_movieclip_test1`, `simple_loop_test`). Also fixes 3 lines on
+  `misc-ming/new_child_in_unload_test` for the same `dyn1Ref.valueof() == null`
+  pattern (though that test still fails due to a separate cascading-unload issue
+  where an unloaded-parent's dynamic child doesn't get its own `depth=INT_MIN`).
+
 ### loop_test7 — deferred CLIP_EVENT_UNLOAD clip actions (2026-04-23, attempted and reverted)
 
 - **loop/loop_test7 (misc-ming) — attempted fix reverted.** Flash (and
