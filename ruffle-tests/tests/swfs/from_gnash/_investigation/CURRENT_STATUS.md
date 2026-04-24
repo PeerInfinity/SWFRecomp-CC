@@ -1,8 +1,55 @@
 # Gnash Test Suite Status
 
-Last updated: 2026-04-24 (movieclip_destruction_test2 → 50/52 via onUnload-depth-shift + swapDepths gating on removed MCs; loop_test3 → PASS via per-depth placed_at_frame on swap + ratio-only MC survives_rewind; not yet in CI)
+Last updated: 2026-04-24 (loop_test8 → 37/38 via has_unload-gated MarkMCPendingRemoval in survives_rewind clear-and-replace path; movieclip_destruction_test2 → 50/52 via onUnload-depth-shift + swapDepths gating on removed MCs; loop_test3 → PASS via per-depth placed_at_frame on swap + ratio-only MC survives_rewind; not yet in CI)
 
 ### Latest fixes (2026-04-24, not yet in CI)
+
+- **loop/loop_test8 (misc-ming) — +3 lines (34/38 → 37/38 matching).**
+  Backward-rewind clear-and-replace path in `tagPlaceObject2` /
+  `tagPlaceObject2Ratio` (`SWFModernRuntime/src/libswf/tag.c`) now calls
+  `actionMarkMCPendingRemoval` on the existing named MC before clearing
+  it, so the old MC persists in the "removed depth zone" for one frame
+  and remains resolvable by name (`typeof(mc5) == 'movieclip'`). The
+  call is gated on `has_unload` (clip-event UNLOAD bit 0x4, accumulated
+  clip actions, AS-level `onUnload` property, or any child sprite with
+  an UNLOAD handler), mirroring the existing gate in
+  `ng_on_remove_object`. Without the gate, MCs that should disappear
+  immediately (e.g. `loop_test5/movieClip3`, which has only a CONSTRUCT
+  clip action) would incorrectly persist; loop_test5 verified to still
+  pass. The remaining failing line on loop_test8 is the trailing
+  `_level0.mc5unloaded` trace, which requires the deferred clip-event
+  UNLOAD mechanism (the loop_test7 blocker — clip-event UNLOAD must be
+  queued via `is_unload=true` to fire after `totals()`).
+  Mirrors Ruffle's `remove_child` → `should_delay_removal` path
+  (`core/src/display_object/container.rs:330-360`) called from
+  run_goto's survives_rewind=false branch
+  (`core/src/display_object/movie_clip.rs:1685-1694`). No regressions
+  on a 37-test AVM1 rewind/unload/placement battery
+  (goto_rewind1/2/3, execution_order1/2/3, goto_execution_order/2,
+  goto_both_ways1/2, rewind_depth, unload, unload_clip_event,
+  unload_nested_child, unloadmovie, mcl_unloadclip,
+  depth_replacement_audio_unloading, textsnapshot_available_text,
+  clip_events, on_construct, register_and_init_order,
+  movieclip_state_values, movieclip_library_state_values,
+  bad_placeobject_clipaction, movieclip_in_removed_button,
+  button_children, attach_movie, set_interval,
+  movieclip_depth_methods, movieclip_get_instance_at_depth,
+  movieclip_name_from_timeline, conflicting_instance_names,
+  default_names, access_unnamed_shape, named_shapes,
+  place_and_lookup, placeobject_occupied_depth — 36/37 pass +
+  1 ruffle_matched), an 18-test misc-ming recently-fixed battery
+  (loop_test2/3/5/8/9, instanceNameTest, attachMovieTest,
+  DefineEditTextTest, DefineEditTextVariableNameTest2,
+  static_vs_dynamic1/2, displaylist_depths_test11,
+  place_and_remove_object_test, get_frame_number_test, shape_test,
+  test8-v5/v6, new_child_in_unload_test — 17/18 pass, only loop_test8
+  still output_mismatch at 37/38), the 4-test Shumway
+  duplicateMovieClip suite (4/4), 4-test misc-swfc battery
+  (stackscope/edittext_test1/submoviegetvar pass,
+  movieclip_destruction_test2 unchanged at 52/56), and a 31-test
+  AVM1 broad battery covering super/this/string/object/text/loadvars
+  (30/31 pass, loadvariables_method failure pre-existing in CI).
+
 
 - **movieclip_destruction_test2 (misc-swfc) — +9 lines (41/56 → 50/56 matching).**
   Three-part fix to make removed-but-still-referenced MCs match Flash's

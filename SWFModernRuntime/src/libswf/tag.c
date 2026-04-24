@@ -3621,6 +3621,52 @@ void tagPlaceObject2(SWFAppContext* app_context, size_t depth, size_t char_id, u
 			{
 				if (display_list[depth].placed_at_frame > catch_up_target)
 				{
+					// Mark the existing MC pending-removal so it persists in the
+					// removed-depth zone for one frame — Flash semantics: after
+					// backward goto replaces an MC at a depth, an old MC with
+					// an UNLOAD handler (clip-event UNLOAD or AS-level
+					// onUnload) is still referenceable by name (typeof returns
+					// 'movieclip') until next frame's finalize. Mirrors
+					// Ruffle's `remove_child` → `should_delay_removal` path
+					// called from run_goto's survives_rewind=false branch.
+					// Gating on has_unload (mirrors ng_on_remove_object) avoids
+					// preserving MCs that should disappear immediately — see
+					// gnash misc-ming loop_test5 where movieClip3 has only
+					// CONSTRUCT (no UNLOAD) and must be undefined after rewind.
+					if (existing_is_mc && display_list[depth].instance_name != NULL)
+					{
+						extern int has_child_unload_handler(DisplayObject* dl, size_t dl_max);
+						extern int actionMCHasOnUnloadProperty(const char* name, int swf_depth);
+						extern void actionMarkMCPendingRemoval(SWFAppContext*, const char*, int);
+						int _swr_has_unload = 0;
+						for (size_t _ca = 0; _ca < display_list[depth].clip_action_count; _ca++) {
+							if (display_list[depth].clip_actions[_ca].event_flags & 0x4) {
+								_swr_has_unload = 1; break;
+							}
+						}
+						if (!_swr_has_unload) {
+							for (size_t _ca = 0; _ca < display_list[depth].accumulated_clip_action_count; _ca++) {
+								if (display_list[depth].accumulated_clip_actions[_ca].event_flags & 0x4) {
+									_swr_has_unload = 1; break;
+								}
+							}
+						}
+						if (!_swr_has_unload) {
+							_swr_has_unload = actionMCHasOnUnloadProperty(
+								display_list[depth].instance_name, (int)depth);
+						}
+						if (!_swr_has_unload && display_list[depth].sprite_display_list != NULL &&
+						    display_list[depth].sprite_max_depth > 0) {
+							_swr_has_unload = has_child_unload_handler(
+								display_list[depth].sprite_display_list,
+								display_list[depth].sprite_max_depth);
+						}
+						if (_swr_has_unload) {
+							actionMarkMCPendingRemoval(app_context,
+							                           display_list[depth].instance_name,
+							                           (int)depth);
+						}
+					}
 					if (display_list[depth].sprite_display_list != NULL)
 					{
 						FREE(display_list[depth].sprite_display_list);
@@ -3961,6 +4007,52 @@ void tagPlaceObject2Ratio(SWFAppContext* app_context, size_t depth, size_t char_
 			{
 				if (display_list[depth].placed_at_frame > catch_up_target)
 				{
+					// Mark the existing MC pending-removal so it persists in the
+					// removed-depth zone for one frame — Flash semantics: after
+					// backward goto replaces an MC at a depth (different ratio),
+					// an old MC with an UNLOAD handler (clip-event UNLOAD or
+					// AS-level onUnload) is still referenceable by name (typeof
+					// returns 'movieclip') until next frame's finalize. Mirrors
+					// Ruffle's `remove_child` → `should_delay_removal` path
+					// called from run_goto's survives_rewind=false branch.
+					// Gating on has_unload (mirrors ng_on_remove_object) avoids
+					// preserving MCs that should disappear immediately — see
+					// gnash misc-ming loop_test5 where movieClip3 has only
+					// CONSTRUCT (no UNLOAD) and must be undefined after rewind.
+					if (existing_is_mc && display_list[depth].instance_name != NULL)
+					{
+						extern int has_child_unload_handler(DisplayObject* dl, size_t dl_max);
+						extern int actionMCHasOnUnloadProperty(const char* name, int swf_depth);
+						extern void actionMarkMCPendingRemoval(SWFAppContext*, const char*, int);
+						int _swr_has_unload = 0;
+						for (size_t _ca = 0; _ca < display_list[depth].clip_action_count; _ca++) {
+							if (display_list[depth].clip_actions[_ca].event_flags & 0x4) {
+								_swr_has_unload = 1; break;
+							}
+						}
+						if (!_swr_has_unload) {
+							for (size_t _ca = 0; _ca < display_list[depth].accumulated_clip_action_count; _ca++) {
+								if (display_list[depth].accumulated_clip_actions[_ca].event_flags & 0x4) {
+									_swr_has_unload = 1; break;
+								}
+							}
+						}
+						if (!_swr_has_unload) {
+							_swr_has_unload = actionMCHasOnUnloadProperty(
+								display_list[depth].instance_name, (int)depth);
+						}
+						if (!_swr_has_unload && display_list[depth].sprite_display_list != NULL &&
+						    display_list[depth].sprite_max_depth > 0) {
+							_swr_has_unload = has_child_unload_handler(
+								display_list[depth].sprite_display_list,
+								display_list[depth].sprite_max_depth);
+						}
+						if (_swr_has_unload) {
+							actionMarkMCPendingRemoval(app_context,
+							                           display_list[depth].instance_name,
+							                           (int)depth);
+						}
+					}
 					if (display_list[depth].sprite_display_list != NULL)
 					{
 						FREE(display_list[depth].sprite_display_list);
