@@ -3578,14 +3578,19 @@ void tagPlaceObject2(SWFAppContext* app_context, size_t depth, size_t char_id, u
 		extern size_t catch_up_target;
 		if (catch_up_backward && display_list[depth].char_id != 0)
 		{
-			// Ruffle survives_rewind for MovieClip: ratio_equals. tagPlaceObject2
-			// (non-Ratio variant) implies ratio == 0, so survival requires the
-			// existing entry also to have ratio 0.
-			int survives = (display_list[depth].char_id == char_id)
-			               && (display_list[depth].ratio == 0);
+			// Ruffle survives_rewind: for MovieClip, only ratio_equals is
+			// required (id differences are OK — a swapDepths-moved MC at a
+			// depth re-placed by a timeline tag keeps its identity). For other
+			// types (shapes, buttons, etc.) id must also match. See
+			// ruffle/core/src/display_object/movie_clip.rs survives_rewind.
+			// tagPlaceObject2 (non-Ratio variant) implies ratio == 0.
+			int existing_is_mc = (display_list[depth].sprite_display_list != NULL);
+			int survives = (display_list[depth].ratio == 0)
+			               && (existing_is_mc
+			                   || display_list[depth].char_id == char_id);
 			if (survives)
 			{
-				// Same character + ratio: treat as modify, preserve sprite state.
+				// Survives rewind: treat as modify, preserve sprite state.
 				// This preserves instance_name (Ruffle: apply_place_object does
 				// not update name on existing children). Discard any pending
 				// instance name (set by a preceding tagSetInstanceName) BEFORE
@@ -3600,7 +3605,9 @@ void tagPlaceObject2(SWFAppContext* app_context, size_t depth, size_t char_id, u
 				display_list[depth].placed_at_frame = current_frame;
 				display_list[depth].place_gen = g_place_gen;
 				init_cx_fields(&display_list[depth]);
-				ng_on_place_object2(app_context, depth, char_id);
+				// Pass existing char_id so ng_on_place_object2 doesn't try to
+				// treat this as a different-character placement.
+				ng_on_place_object2(app_context, depth, display_list[depth].char_id);
 				display_list[depth].sprite_needs_init = 0;
 				return;
 			}
@@ -3925,9 +3932,13 @@ void tagPlaceObject2Ratio(SWFAppContext* app_context, size_t depth, size_t char_
 		extern size_t catch_up_target;
 		if (catch_up_backward && display_list[depth].char_id != 0)
 		{
-			// Ruffle survives_rewind for MovieClip: ratio_equals.
-			int survives = (display_list[depth].char_id == char_id)
-			               && (display_list[depth].ratio == ratio);
+			// Ruffle survives_rewind: for MovieClip, only ratio_equals is
+			// required; other types additionally need id_equals. See the
+			// matching comment in tagPlaceObject2 above.
+			int existing_is_mc = (display_list[depth].sprite_display_list != NULL);
+			int survives = (display_list[depth].ratio == ratio)
+			               && (existing_is_mc
+			                   || display_list[depth].char_id == char_id);
 			if (survives)
 			{
 				// Preserve instance_name — clear pending before ng_on_place_object2
@@ -3942,7 +3953,7 @@ void tagPlaceObject2Ratio(SWFAppContext* app_context, size_t depth, size_t char_
 				display_list[depth].placed_at_frame = current_frame;
 				display_list[depth].place_gen = g_place_gen;
 				init_cx_fields(&display_list[depth]);
-				ng_on_place_object2(app_context, depth, char_id);
+				ng_on_place_object2(app_context, depth, display_list[depth].char_id);
 				display_list[depth].sprite_needs_init = 0;
 				return;
 			}
@@ -4958,14 +4969,20 @@ void tagSetInstanceName(SWFAppContext* app_context, size_t depth, const char* na
 		return;
 	}
 #ifdef NO_GRAPHICS
-	// Backward catch-up replay: an existing entry with placed_at_frame > current
-	// means we're seeing a sprite preserved by ng_display_clear_after (surviving
-	// rewind). Don't rename it here — Ruffle's apply_place_object does not update
-	// name on existing children. Pend the name for tagPlaceObject2 to consume
-	// only if it takes the full-replacement path (different char_id).
+	// Backward catch-up replay: an existing entry at this depth was preserved
+	// by ng_display_clear_after (surviving rewind). Don't rename it in-place —
+	// Ruffle's apply_place_object does not update name on existing children.
+	// Pend the name for tagPlaceObject2 to consume only if it takes the
+	// full-replacement path (different char_id). Applies to both entries
+	// whose placed_at_frame is ahead of the replay cursor (stale pre-rewind
+	// state) and entries whose depth_swapped flag is set (post-swap entries
+	// whose placed_at_frame now stays pinned to the depth per
+	// ng_swapDisplayDepths / ng_updateDisplayDepth).
 	{
 		extern int catch_up_backward;
-		if (catch_up_backward && display_list[depth].placed_at_frame > current_frame)
+		if (catch_up_backward &&
+		    (display_list[depth].placed_at_frame > current_frame
+		     || display_list[depth].depth_swapped))
 		{
 			g_pending_instance_name = name;
 			return;

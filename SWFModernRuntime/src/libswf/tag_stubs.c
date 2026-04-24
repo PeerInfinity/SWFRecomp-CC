@@ -2515,10 +2515,26 @@ void ng_updateDisplayDepth(const char* name, int new_as_depth)
 
 	if (display_list[new_swf_depth].char_id != 0)
 	{
-		// Target depth occupied: swap entries and update the other MC's depth
+		// Target depth occupied: swap entries and update the other MC's depth.
+		// placed_at_frame / place_gen track the *depth's* last PlaceObject2
+		// tag, not the MC's identity — Ruffle's AVM1 survives_rewind matches
+		// the MC currently at a depth against final_placements.get(depth),
+		// which is independent of which MC originally landed there. So these
+		// two fields stay bound to the depth slot during swap; only the
+		// MC-identity state (char_id, sprite_display_list, instance_name,
+		// transforms, etc.) moves. Without this, rewind misidentifies which
+		// depth was "freshly placed after target" (e.g. loop_test3).
+		size_t paf_old = display_list[old_depth].placed_at_frame;
+		size_t paf_new = display_list[new_swf_depth].placed_at_frame;
+		size_t pg_old  = display_list[old_depth].place_gen;
+		size_t pg_new  = display_list[new_swf_depth].place_gen;
 		DisplayObject tmp = display_list[old_depth];
 		display_list[old_depth] = display_list[new_swf_depth];
 		display_list[new_swf_depth] = tmp;
+		display_list[old_depth].placed_at_frame     = paf_old;
+		display_list[new_swf_depth].placed_at_frame = paf_new;
+		display_list[old_depth].place_gen           = pg_old;
+		display_list[new_swf_depth].place_gen       = pg_new;
 		// Mark both as swapped so timeline modifies are ignored
 		display_list[old_depth].depth_swapped = 1;
 		display_list[new_swf_depth].depth_swapped = 1;
@@ -2542,9 +2558,16 @@ void ng_updateDisplayDepth(const char* name, int new_as_depth)
 	}
 	else
 	{
-		// Target depth empty: move entry and clear old slot
+		// Target depth empty: move entry and clear old slot.
+		// The destination had no prior PlaceObject2 tag; treat the move as
+		// happening at the current frame so that rewind to any earlier
+		// target removes this depth (no final_placement at it).
+		extern size_t current_frame;
+		extern size_t g_place_gen;
 		display_list[new_swf_depth] = display_list[old_depth];
-		display_list[new_swf_depth].depth_swapped = 1;
+		display_list[new_swf_depth].placed_at_frame = current_frame;
+		display_list[new_swf_depth].place_gen       = g_place_gen;
+		display_list[new_swf_depth].depth_swapped   = 1;
 		memset(&display_list[old_depth], 0, sizeof(DisplayObject));
 	}
 
@@ -2568,10 +2591,20 @@ void ng_swapDisplayDepths(const char* name1, const char* name2)
 	}
 	if (d1 != SIZE_MAX && d2 != SIZE_MAX)
 	{
-		// Swap the entire display entries (including their transform_ids etc.)
+		// Swap the entire display entries (including their transform_ids etc.).
+		// placed_at_frame / place_gen stay pinned to the depth — see the
+		// matching comment in ng_updateDisplayDepth above.
+		size_t paf_d1 = display_list[d1].placed_at_frame;
+		size_t paf_d2 = display_list[d2].placed_at_frame;
+		size_t pg_d1  = display_list[d1].place_gen;
+		size_t pg_d2  = display_list[d2].place_gen;
 		DisplayObject tmp = display_list[d1];
 		display_list[d1] = display_list[d2];
 		display_list[d2] = tmp;
+		display_list[d1].placed_at_frame = paf_d1;
+		display_list[d2].placed_at_frame = paf_d2;
+		display_list[d1].place_gen       = pg_d1;
+		display_list[d2].place_gen       = pg_d2;
 		// Mark both as swapped so timeline modifies are ignored
 		display_list[d1].depth_swapped = 1;
 		display_list[d2].depth_swapped = 1;

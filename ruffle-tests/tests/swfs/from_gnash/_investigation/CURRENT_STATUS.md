@@ -1,8 +1,79 @@
 # Gnash Test Suite Status
 
-Last updated: 2026-04-24 (new_child_in_unload_test → PASS via cascading dynamic-child unload; not yet in CI)
+Last updated: 2026-04-24 (loop_test3 → PASS via per-depth placed_at_frame on swap + ratio-only MC survives_rewind; not yet in CI)
 
 ### Latest fixes (2026-04-24, not yet in CI)
+
+- **loop/loop_test3 (misc-ming) → PASS (+1).** Three-part fix so a
+  `swapDepths`-then-backward-`gotoAndStop` correctly preserves the MC
+  that now occupies the target frame's depth slot and destroys the one
+  that doesn't, matching Ruffle's AVM1 `survives_rewind`
+  (`core/src/display_object/movie_clip.rs:1812`, MovieClip branch =
+  `ratio_equals` only):
+  1. `ng_swapDisplayDepths` / `ng_updateDisplayDepth`
+     (`SWFModernRuntime/src/libswf/tag_stubs.c`) now keep
+     `placed_at_frame` / `place_gen` pinned to the depth slot on swap
+     instead of moving them along with the struct. These two fields
+     track *which PlaceObject2 tag put something at this depth*, not
+     the MC's identity — so after `mc1.swapDepths(mc2)` the depth
+     that originally received mc1 in frame 1 still reports
+     `placed_at_frame = 1` even though mc2's struct now lives there.
+     The empty-target branch of `ng_updateDisplayDepth` sets the
+     destination slot's `placed_at_frame` to `current_frame` (the
+     move isn't a tag placement — rewind should clear it).
+  2. `tagPlaceObject2` / `tagPlaceObject2Ratio`
+     (`SWFModernRuntime/src/libswf/tag.c`) backward catch-up
+     `survives` check now mirrors Ruffle's MovieClip branch:
+     `existing_is_mc = (sprite_display_list != NULL) ⇒ ratio_equals
+     alone`. Non-MC types (shapes, buttons, text, bitmaps) still
+     require `id_equals`. When an MC survives, `ng_on_place_object2`
+     is called with the EXISTING `char_id` instead of the tag's, so
+     we don't accidentally reinitialize the preserved MC as the new
+     character.
+  3. `tagSetInstanceName` (`SWFModernRuntime/src/libswf/tag.c`) now
+     pends the name whenever `catch_up_backward && (placed_at_frame
+     > current_frame || depth_swapped)` — without the `depth_swapped`
+     arm, `tagSetInstanceName(d, "movieClip1")` at target-frame
+     replay would rename the swapped-in mc2 struct to "movieClip1",
+     destroying both MCs' names. With the per-depth placed_at_frame
+     fix alone, swapped entries no longer have
+     `placed_at_frame > current_frame` and the existing gate missed
+     them.
+  The test does: frame 1 places mc1 at d=3, frame 2 places mc2 at d=4
+  and swaps, frame 3 `gotoAndStop(2)` + checks. Expected: mc2 survives
+  at d=3 (ratio-matches final_placement at that depth), mc1 at d=4 is
+  destroyed (no final_placement). Also flips **loop/loop_test2** from
+  failing (6/15) to passing (+1 effective). No regressions on a
+  20-test AVM1 rewind/unload battery (`goto_rewind1/2/3`,
+  `execution_order1/2/3`, `goto_execution_order/2`, `goto_both_ways1/2`,
+  `rewind_depth`, `unload`, `unloadmovie`, `unload_clip_event`,
+  `unload_nested_child`, `mcl_unloadclip`,
+  `depth_replacement_audio_unloading`, `textsnapshot_available_text`),
+  a 24-test AVM1 placement/name battery (`conflicting_instance_names`,
+  `default_names`, `named_shapes`, `access_unnamed_shape`,
+  `movieclip_depth_methods`, `movieclip_get_instance_at_depth`,
+  `movieclip_name_from_timeline`, `place_and_lookup`,
+  `bad_placeobject_clipaction`, `clip_events`, `register_and_init_order`,
+  `movieclip_state_values`, `movieclip_library_state_values`,
+  `on_construct`, `register_class_return_value`, `init_object_order`,
+  `init_object_invalid`, `movieclip_init_object`, `attach_movie`,
+  `attach_movie_stop`, `empty_movieclip_can_attach_movies`,
+  `button_children`, `movieclip_in_removed_button`,
+  `placeobject_occupied_depth` — 23 pass + 1 ruffle_matched), the
+  4-test Shumway duplicateMovieClip suite (`dontremove`,
+  `duplicateMovieClip`, `samedepth`, `name-coercion`), a 20-test
+  misc-ming recent-fixes battery (`loop_test3/4/5/9`,
+  `displaylist_depths_test11`, `place_and_remove_object_test`,
+  `static_vs_dynamic1/2`, `shape_test`, `attachMovieTest`,
+  `get_frame_number_test`, `instanceNameTest`, `DefineEditTextTest`,
+  `DefineEditTextVariableNameTest2`, `new_child_in_unload_test`,
+  `timeline_var_test`, `reverse_execute_PlaceObject2_test1/2`,
+  `action_execution_order_test8-v5/v6`), or the 3 misc-swfc passing
+  tests (`edittext_test1`, `stackscope`, `submoviegetvar`). Line
+  counts on 6 near-passing swap/placement-adjacent failing tests
+  (`duplicate_movie_clip_test/2`, `consecutive_goto_frame_test`,
+  `goto_frame_test`, `displaylist_depths_test2/3`) unchanged within
+  ±1 line (no substantive regression).
 
 - **new_child_in_unload_test (misc-ming) → PASS (+1).** Cascading unload
   for dynamic children of timeline-removed MCs. `tagRemoveObject2` now calls

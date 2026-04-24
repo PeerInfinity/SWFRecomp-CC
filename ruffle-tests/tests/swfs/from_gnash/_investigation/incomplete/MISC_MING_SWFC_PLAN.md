@@ -376,6 +376,8 @@ Display list depth transformations, clip_depth, swap_depths, level vs timeline d
 
 `while` / `for` / `do-while` opcode handling. `loop_test9` at 73% and `loop_test3` at 69% are attack points. `loop_test10` at 3.6% suggests a feature not implemented yet (probably `for-in` or iterator-style).
 
+- **loop/loop_test3 (misc-ming) → PASS (+1, 2026-04-24).** Three-part fix to make `swapDepths`-then-backward-`gotoAndStop` preserve the MC at the surviving depth and destroy the other — matches Ruffle's AVM1 `survives_rewind` MovieClip branch (ratio_equals only). See the full write-up in `../CURRENT_STATUS.md` "Latest fixes (2026-04-24)". As a bonus, also flipped **loop/loop_test2** from failing to passing.
+
 - **loop_test5 (misc-ming) → PASS (2026-04-22).** After the survives-rewind
   landing boosted it from 13/24 to 21/24, the remaining diff was
   `typeof(movieClip1) == 'movieclip'` returning undefined after the rewind
