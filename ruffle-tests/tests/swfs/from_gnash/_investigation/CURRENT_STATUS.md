@@ -1,8 +1,41 @@
 # Gnash Test Suite Status
 
-Last updated: 2026-04-23 (post-DefineEditTextVariableNameTest2 PASS via string primitive auto-boxing; not yet in CI)
+Last updated: 2026-04-23 (post-DefineEditTextVariableNameTest2 PASS via string primitive auto-boxing + FSCommand:quit handling for literal-URL GetURL; not yet in CI)
 
 ### Latest fixes (2026-04-23, not yet in CI)
+
+- **shumway fuzz/81004241… and fuzz/2f4f46bf… → PASS (+2).** Two-part
+  fix for FSCommand:quit in SWFs that use the literal-URL form of
+  GetURL:
+  1. `actionGetURL(url, target)` in
+     `SWFModernRuntime/src/actionmodern/action.c` (the literal-URL
+     entry point, as opposed to `actionGetURL2` which reads from the
+     stack) did not handle the `FSCommand:` prefix at all. It now
+     does, mirroring the handling already present in `actionGetURL2`:
+     `FSCommand:quit` sets `quit_swf = 1` and in headless builds
+     `FSCommand:capture` calls `headless_on_fscommand_capture()`.
+  2. The main tick loop in `SWFModernRuntime/src/libswf/swf_core.c`
+     only checked `quit_swf` in the past-last-frame branch. SWFs
+     that FSCommand:quit from a non-last frame but still rely on the
+     recompiler-emitted end-of-movie loopback (`manual_next_frame=1,
+     next_frame=0`) kept looping forever. New top-of-tick check
+     mirrors the past-last-frame conditions (no pending events,
+     enter-frame handlers, timers, sounds, netstreams, or clip
+     enter-frame handlers) — **but intentionally does NOT require
+     `!hasPlayingSprites()`**, because the fuzz SWFs have sprites
+     with no AS `stop()` that would otherwise keep the player alive
+     indefinitely. Timers/sounds/etc. still drain naturally after
+     quit (verified via `set_interval` which relies on that
+     drain). No regressions on a 24-test AVM1 battery
+     (unload/unloadmovie/unload_clip_event/unload_nested_child/
+     goto_frame/goto_label/goto_rewind1/2/3/on_construct/
+     register_class_return_value/register_and_init_order/
+     clip_events/button_children/init_object_order/
+     swf5_to_6_cross_call/swf6_to_5_cross_call/swf5_no_closure/
+     attach_movie/movieclip_init_object/native_objects_swf7/8/
+     set_interval/textsnapshot_available_text) or on the 6-test
+     Shumway avm1 duplicateMovieClip + haxe/flocons1 + moviecliploader
+     battery.
 
 - **DefineEditTextVariableNameTest2 (misc-ming) → PASS (+1).** Extended
   primitive auto-boxing in `actionGetMember` (action.c) to STRING values.

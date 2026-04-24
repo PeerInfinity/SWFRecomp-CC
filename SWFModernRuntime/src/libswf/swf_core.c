@@ -807,6 +807,25 @@ void swfStart(SWFAppContext* app_context)
 			if (g_execution_halted) break;
 		}
 
+		// FSCommand:quit was called in a prior tick — exit as soon as nothing
+		// is still asking to run. Without this, SWFs that FSCommand:quit from
+		// a non-last frame but still have the natural end-of-movie loopback
+		// (manual_next_frame=1, next_frame=0) would restart frame 0 and loop
+		// forever. Same conditions as the past-last-frame branch below, but we
+		// also bypass `hasPlayingSprites`: once `quit_swf` is set, sprites that
+		// loop forever (no AS stop()) must not keep the player alive — that's
+		// the pattern that makes the fuzz `81004241…` test loop indefinitely.
+		{
+			extern int hasPlayingSounds(void);
+			extern int hasActiveNetStreams(void);
+			if (quit_swf && !(g_events && g_event_pos < g_event_count)
+			    && !actionHasEnterFrameHandlers()
+			    && !hasActiveTimers()
+			    && !hasPlayingSounds()
+			    && !hasActiveNetStreams()
+			    && !hasClipEnterFrameHandlers()) break;
+		}
+
 		// Process deferred unloadMovie state (MC properties change on next frame)
 		extern void actionProcessDeferredUnloads(void);
 		actionProcessDeferredUnloads();

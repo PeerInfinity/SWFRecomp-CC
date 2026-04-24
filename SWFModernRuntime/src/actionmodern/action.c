@@ -25532,6 +25532,22 @@ static void parseAndSetFlashVars(SWFAppContext* app_context, char* url, MovieCli
  */
 void actionGetURL(SWFAppContext* app_context, const char* url, const char* target)
 {
+	// Handle FSCommand: protocol (e.g. GetURL "FSCommand:quit", "")
+	if (url != NULL && strncasecmp(url, "FSCommand:", 10) == 0) {
+		const char* cmd = url + 10;
+		if (strcasecmp(cmd, "quit") == 0) {
+			extern int quit_swf;
+			quit_swf = 1;
+		}
+#ifdef HEADLESS_GRAPHICS
+		else if (strcasecmp(cmd, "capture") == 0) {
+			extern void headless_on_fscommand_capture(void);
+			headless_on_fscommand_capture();
+		}
+#endif
+		return;
+	}
+
 	// Handle _level targets: loadMovie/unloadMovie into levels
 	if (target != NULL && strncmp(target, "_level", 6) == 0) {
 		int level_num = atoi(target + 6);
