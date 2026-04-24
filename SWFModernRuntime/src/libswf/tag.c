@@ -4404,15 +4404,24 @@ void tagRemoveObject2(SWFAppContext* app_context, size_t depth)
 		}
 		// Fire CLIP_EVENT_UNLOAD for children first (recursive, depth-first)
 #ifdef NO_GRAPHICS
+		MovieClip* _remove_parent_mc = NULL;
+		if (display_list[depth].instance_name != NULL)
+			_remove_parent_mc = actionFindOrCreateMovieClip(app_context, display_list[depth].instance_name, &root_movieclip);
 		if (display_list[depth].sprite_display_list != NULL && display_list[depth].sprite_max_depth > 0)
 		{
-			MovieClip* parent_mc = NULL;
-			if (display_list[depth].instance_name != NULL)
-				parent_mc = actionFindOrCreateMovieClip(app_context, display_list[depth].instance_name, &root_movieclip);
 			fire_recursive_child_unloads(app_context,
 				display_list[depth].sprite_display_list, display_list[depth].sprite_max_depth,
-				parent_mc ? parent_mc : &root_movieclip);
+				_remove_parent_mc ? _remove_parent_mc : &root_movieclip);
 		}
+		// Queue AS-level onUnload on dynamic children (createEmptyMovieClip /
+		// duplicateMovieClip) that live in child_mc_cache, not the sprite display
+		// list. Queue BEFORE the parent's own UNLOAD clip actions fire, so children
+		// created during that handler don't pick up onUnload firing (Flash
+		// observation: dynamic child created inside parent's UNLOAD handler does
+		// not get its onUnload triggered — see gnash new_child_in_unload_test
+		// case1).
+		if (_remove_parent_mc != NULL)
+			actionQueueDynamicChildUnloads(_remove_parent_mc);
 #endif
 		// Dispatch current onUnload clip actions before clearing
 		if (display_list[depth].clip_action_count > 0)

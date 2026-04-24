@@ -63,6 +63,65 @@ These are one or two small fixes away from passing. Tackle these first for broad
 
 For each, run `--diff --verbose` and cluster the diff lines by type. Many will resolve with a single targeted fix that's shared across a handful of near-passing tests.
 
+### new_child_in_unload_test (misc-ming) — cascading unload for dynamic children (2026-04-24, not yet in CI)
+
+- **new_child_in_unload_test (misc-ming) → PASS (+1).** Two-part cascading-unload
+  fix in `SWFModernRuntime/src/actionmodern/action.c` and
+  `SWFModernRuntime/src/libswf/tag.c`:
+  1. `tagRemoveObject2` now calls a new `actionQueueDynamicChildUnloads(parent_mc)`
+     helper after `fire_recursive_child_unloads` but before the parent's own
+     `CLIP_EVENT_UNLOAD` clip actions fire. The helper wraps the existing
+     static `queueChildOnUnloads`, which walks `child_mc_cache` for children
+     whose `parent == parent_mc` and queues their AS-level `onUnload`
+     handlers (drained at `tagShowFrame` via `actionFirePendingUnloads`).
+     This handles dynamic children created via `createEmptyMovieClip` /
+     `duplicateMovieClip`, which live in `child_mc_cache` rather than the
+     parent sprite's `display_list` and were previously missed when a
+     timeline `RemoveObject2` fired. Queueing happens BEFORE the parent's
+     own UNLOAD clip action runs, matching Flash's observed "dynamic child
+     created inside parent's UNLOAD handler does NOT get its onUnload
+     triggered" behavior (gnash test case1) — the newly created child
+     doesn't exist yet at queue time. Children that existed before the
+     removal (case2) do fire their onUnload.
+  2. `actionFinalizePendingRemovals` now cascades `depth = INT_MIN`
+     invalidation to dynamic children of just-finalized MCs. After the
+     existing pending-removal loop sets the parent's `depth = INT_MIN`, an
+     iterate-until-no-change second pass marks any live MC whose
+     `parent->depth == INT_MIN` as dead. This ensures grandchildren are
+     reached too and mirrors Ruffle/Flash semantics that a dynamic child
+     dies with its parent.
+  Combined effect on the test:
+  - static_mc1 removed (frame 3): its UNLOAD clip action creates dyn1
+    (child with onUnload set in the same clip action). Queue-before-own-
+    UNLOAD means dyn1's onUnload never enqueues. ✓
+  - static_mc2 removed (frame 3): dyn2 already existed with onUnload;
+    queue-before-own-UNLOAD enqueues it. `_root.dyn2testvar = 'executed'`
+    drains at tagShowFrame of frame 3. ✓
+  - Frame 4 start: `actionFinalizePendingRemovals` sets static_mc1 and
+    static_mc2 to `INT_MIN`, then cascades to dyn1 and dyn2. ✓
+  - Frame 4 checks: `typeof(_root.dyn1Ref) == 'movieclip'` (MOVIECLIP
+    pointer preserved), `_root.dyn1Ref.valueof() == null` (dyn1 now
+    INT_MIN, picks up the 2026-04-24 dead-MC-valueOf fix), and
+    `_root.dyn2testvar == 'executed'`. All pass.
+  No regressions on a 28-test AVM1 lifecycle battery (unload,
+  unloadmovie, unload_clip_event, unload_nested_child, mcl_unloadclip,
+  goto_rewind1/2/3, execution_order1/2/3, goto_execution_order,
+  goto_execution_order2, clip_events, attach_movie, attach_movie_stop,
+  bad_placeobject_clipaction, movieclip_in_removed_button, on_construct,
+  register_and_init_order, init_object_order, register_class_return_value,
+  movieclip_state_values, movieclip_library_state_values, set_interval,
+  swf5_to_6_cross_call, swf6_to_5_cross_call, swf5_no_closure — 28/28
+  effective pass), a 14-test misc-ming recently-fixed battery
+  (instanceNameTest, attachMovieTest, DefineEditTextTest, loop_test5,
+  loop_test9, static_vs_dynamic1, static_vs_dynamic2,
+  displaylist_depths_test11, place_and_remove_object_test,
+  get_frame_number_test, shape_test, DefineEditTextVariableNameTest2,
+  action_execution_order_test8-v5/v6 — 14/14 pass), a 4-test misc-swfc
+  battery (stackscope still passes; movieclip_destruction_test2/4 and
+  soft_reference_test1 still fail on pre-existing unrelated issues), and
+  the 4-test Shumway duplicateMovieClip suite (dontremove,
+  duplicateMovieClip, samedepth, name-coercion — 4/4 pass).
+
 ### movieclip_destruction_test2 (misc-swfc) — dead MC valueOf returns null (2026-04-24, not yet in CI)
 
 - **movieclip_destruction_test2 (misc-swfc) — partial (+4 lines, 37/56 → 41/56 match).**

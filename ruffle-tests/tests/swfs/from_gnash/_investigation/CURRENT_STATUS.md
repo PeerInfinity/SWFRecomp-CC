@@ -1,8 +1,29 @@
 # Gnash Test Suite Status
 
-Last updated: 2026-04-24 (LoadVars-v6/v7/v8 → ruffle_matched via [type Object] coercion + XML.load non-XML false; not yet in CI)
+Last updated: 2026-04-24 (new_child_in_unload_test → PASS via cascading dynamic-child unload; not yet in CI)
 
 ### Latest fixes (2026-04-24, not yet in CI)
+
+- **new_child_in_unload_test (misc-ming) → PASS (+1).** Cascading unload
+  for dynamic children of timeline-removed MCs. `tagRemoveObject2` now calls
+  a new `actionQueueDynamicChildUnloads(parent_mc)` helper (wrapping
+  the existing static `queueChildOnUnloads`) between `fire_recursive_child_unloads`
+  and the parent's own `CLIP_EVENT_UNLOAD` clip actions, so AS-level
+  `onUnload` handlers on dynamic children created via `createEmptyMovieClip`
+  / `duplicateMovieClip` (which live in `child_mc_cache`, not the parent
+  sprite's `display_list`) are queued and fire at the next `tagShowFrame`.
+  Queue-BEFORE-own-UNLOAD ordering matches Flash's observed behavior that
+  a dynamic child created inside the parent's UNLOAD handler does NOT get
+  its onUnload triggered (case1: dyn1 in the test source). Children that
+  existed before the removal (case2: dyn2) do fire. Second part:
+  `actionFinalizePendingRemovals` now cascades `depth = INT_MIN`
+  invalidation to dynamic children of just-finalized MCs (iterate until
+  no-change so grandchildren are reached), so `dyn1Ref.valueof() == null`
+  picks up the dead-MC-valueOf path at frame 4. No regressions on a
+  28-test AVM1 lifecycle battery, a 14-test misc-ming recent-fixes battery,
+  the 4-test Shumway duplicateMovieClip suite, or the misc-swfc
+  destruction tests (pre-existing failures unchanged; stackscope still
+  passes).
 
 - **LoadVars-v6/v7/v8 (actionscript.all) → ruffle_matched (+3 effective).** Two-part fix in `SWFModernRuntime/src/actionmodern/action.c` pushed all three LoadVars-vN tests from `output_mismatch` (146/152 matched) to `ruffle_matched` — our diffs are now a proper subset of Ruffle's diffs against Flash's `output.txt`.
   1. `objectCallToString` now signals `*found = 1` when the `toString` property exists in the prototype chain but is not callable (e.g. `obj.toString = undefined` or `obj.toString = 5`). This propagates through `convertString`'s OBJECT branch so user-shadowed non-callable toString coerces to `"[type Object]"` via the `found && non-string` path, matching Ruffle's `Value::coerce_to_string` (`core/src/avm1/value.rs:319-334` — `call_method("toString")` returns non-string → `[type Object]`). Fixes the `o.toString = undefined; lv2.toString()` line expecting `a=%5Btype%20Object%5D` instead of `a=%5Bobject%20Object%5D`. +2 lines per LoadVars-vN test.

@@ -131,6 +131,11 @@ int actionMCHasOnUnloadProperty(const char* name, int swf_depth);
 void actionFireOnUnload(SWFAppContext* app_context, const char* instance_name, int swf_depth);
 // Fire all pending deferred onUnload handlers (queued by removeMovieClip); call from tagShowFrame
 void actionFirePendingUnloads(SWFAppContext* app_context);
+// Queue AS-level onUnload handlers on dynamic children of a MovieClip being removed.
+// Handles clones + createEmptyMovieClip children that live in child_mc_cache (not the
+// parent sprite's display_list). Called by tagRemoveObject2 before the parent's own
+// UNLOAD clip actions fire so only pre-existing dynamic children enqueue.
+void actionQueueDynamicChildUnloads(MovieClip* parent_mc);
 // Fire all pending deferred onLoadInit handlers (queued by MCL loadClip); call from tagShowFrame
 void actionFirePendingLoadInits(SWFAppContext* app_context);
 // ImportAssets: load an imported SWF's init function in the current context

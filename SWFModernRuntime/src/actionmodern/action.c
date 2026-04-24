@@ -18658,6 +18658,13 @@ int actionMCHasOnUnloadProperty(const char* name, int swf_depth)
 
 // Finalize pending removals: invalidate MCs that were marked for removal in a previous frame.
 // Called once per frame from the frame loop to clean up MCs after one frame of persistence.
+//
+// Cascades invalidation to dynamic children (createEmptyMovieClip/duplicateMovieClip)
+// of finalized MCs. Timeline children are handled separately by tagRemoveObject2's
+// fire_recursive_child_unloads, but dynamic children live in child_mc_cache with
+// parent pointers and aren't touched by that path. Without cascading, refs such as
+// `_root.dyn1Ref.valueof()` return the live MC path instead of null after
+// `removeMovieClip`-like semantics (see gnash misc-ming new_child_in_unload_test).
 void actionFinalizePendingRemovals(SWFAppContext* app_context)
 {
 	(void)app_context;
@@ -18669,6 +18676,36 @@ void actionFinalizePendingRemovals(SWFAppContext* app_context)
 			child_mc_cache[i]->depth = INT_MIN;  // Mark as dead so name lookups skip it
 		}
 	}
+	// Cascade: any live MC whose parent is now dead (depth == INT_MIN) must also
+	// be invalidated. Iterate until no further changes so grandchildren are reached.
+	int changed;
+	do {
+		changed = 0;
+		for (int i = 0; i < child_mc_count; i++) {
+			MovieClip* ch = child_mc_cache[i];
+			if (ch == NULL) continue;
+			if (ch->depth == INT_MIN) continue;
+			if (ch->parent == NULL) continue;
+			if (ch->parent->depth != INT_MIN) continue;
+			ch->avm1_removed = 1;
+			ch->dynamic_props = NULL;
+			ch->ng_textfield_idx = -1;
+			ch->depth = INT_MIN;
+			changed = 1;
+		}
+	} while (changed);
+}
+
+// Queue AS-level onUnload handlers on dynamic children of parent_mc.
+// Called by tagRemoveObject2 so that children created via createEmptyMovieClip /
+// duplicateMovieClip (which live in child_mc_cache rather than the parent sprite's
+// display_list) still fire their user-set onUnload handlers when the parent is
+// removed. Queued handlers drain at tagShowFrame via actionFirePendingUnloads.
+static void queueChildOnUnloads(MovieClip* parent_mc);
+void actionQueueDynamicChildUnloads(MovieClip* parent_mc)
+{
+	if (parent_mc == NULL) return;
+	queueChildOnUnloads(parent_mc);
 }
 
 // Fire the AS-set onUnload handler on a MovieClip being removed from the display list.
