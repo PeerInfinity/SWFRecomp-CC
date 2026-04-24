@@ -12618,6 +12618,14 @@ static ActionVar objectCallToString(SWFAppContext* app_context, ActionVar* obj_v
 		}
 	}
 
+	// Property `toString` exists in the chain but isn't callable (e.g., user did
+	// `obj.toString = undefined` or `obj.toString = 5`). Matches Ruffle's
+	// Value::coerce_to_string (value.rs:319): object.call_method("toString", ...)
+	// returns non-string → `[type Object]`. Signal "found" so convertString's
+	// "found && non-string" branch emits `[type Object]` rather than falling
+	// through to the "no toString" branch that emits `[object Object]`.
+	if (found != NULL && toString_prop != NULL) *found = 1;
+
 	ActionVar undef = {0};
 	undef.type = ACTION_STACK_VALUE_UNDEFINED;
 	return undef;
@@ -16429,6 +16437,11 @@ static ActionVar builtin_xml_load(SWFAppContext* app_context, ActionVar* args, u
 	ActionVar ret = {0}; ret.type = ACTION_STACK_VALUE_BOOLEAN;
 	if (this_obj == NULL) { ret.data.numeric_value = 0; return ret; }
 	ASObject* doc = (ASObject*) this_obj;
+
+	// Ruffle: XML.prototype.load returns false when `this` is not an XML native.
+	// core/src/avm1/globals/xml.rs:414 — `if let NativeObject::Xml(_) = this.native()`.
+	// The LoadVars test reassigns `x.load = XML.prototype.load` and expects false.
+	if (doc->native_type != NATIVE_XML) { ret.data.numeric_value = 0; return ret; }
 
 	// Get URL argument
 	char url_utf8[512];
