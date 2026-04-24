@@ -20720,31 +20720,26 @@ static void tf_condense_white(TFRunTable* table, int swf_version) {
 static void ng_syncVarToTextFields(SWFAppContext* app_context, const char* var_name, u32 var_name_len, ActionVar* value)
 {
 	(void)app_context;
-	// Convert value to UTF-16 string for setting text
+	// Early-skip undefined: Flash doesn't overwrite bound textfields when
+	// the variable is cleared to undefined.
+	if (value->type == ACTION_STACK_VALUE_UNDEFINED ||
+	    value->type == ACTION_STACK_VALUE_HOLE)
+		return;
+
+	// Convert value to UTF-16 string for setting text. For non-STRING types
+	// that require a coercion with potential side effects (OBJECT invokes
+	// toString, ARRAY invokes elementwise toString, etc.), defer the
+	// coercion until we've found at least one MC bound to this variable —
+	// otherwise a bare `someVar = obj` on a variable with no bound
+	// textfield would trigger user toString traces (regresses avm1/add2,
+	// mcl_loadclip, swf4_actions_coercion_order, etc.).
 	const uint16_t* text_u16 = NULL;
 	u32 text_len = 0;
+	int coerced = 0;
 	if (value->type == ACTION_STACK_VALUE_STRING) {
 		text_u16 = varGetU16Ptr(value);
 		text_len = value->str_size;
-	} else if (value->type == ACTION_STACK_VALUE_UNDEFINED ||
-	           value->type == ACTION_STACK_VALUE_HOLE) {
-		return;  // undefined — don't sync
-	} else {
-		// F32/F64/BOOLEAN/NULL/MOVIECLIP/OBJECT/ARRAY/FUNCTION:
-		// coerce to string via varToStringBuf (matches Ruffle's
-		// notify_property_change → value.coerce_to_string in
-		// avm1/object/stage_object.rs). OBJECT path invokes
-		// custom toString — required for DefineEditTextVariableNameTest2
-		// where `edit_text_var = new Object()` must sync
-		// `dtext4.text = '[object Object]'` (or the user-supplied
-		// Object.prototype.toString result).
-		char _sv_buf[512];
-		int n = varToStringBuf(app_context, value, _sv_buf, sizeof(_sv_buf));
-		if (n > 0) {
-			u32 _sv_u16_len;
-			text_u16 = utf8_to_u16(app_context, _sv_buf, (u32)n, &_sv_u16_len);
-			text_len = _sv_u16_len;
-		}
+		coerced = 1;
 	}
 
 	for (int i = 0; i < child_mc_count; i++) {
@@ -20765,6 +20760,21 @@ static void ng_syncVarToTextFields(SWFAppContext* app_context, const char* var_n
 		// Compare (case-insensitive for SWF<=6)
 		int match = (g_swf_version < 7) ? (strcasecmp(bound, var_name) == 0) : (strcmp(bound, var_name) == 0);
 		if (match) {
+			// Lazily coerce non-STRING values — only when a bound MC
+			// is found, so user toString/valueOf side effects fire
+			// at most once (matches Ruffle's
+			// notify_property_change → value.coerce_to_string path,
+			// which runs inside the bindings-loop branch too).
+			if (!coerced) {
+				char _sv_buf[512];
+				int n = varToStringBuf(app_context, value, _sv_buf, sizeof(_sv_buf));
+				if (n > 0) {
+					u32 _sv_u16_len;
+					text_u16 = utf8_to_u16(app_context, _sv_buf, (u32)n, &_sv_u16_len);
+					text_len = _sv_u16_len;
+				}
+				coerced = 1;
+			}
 			// Check if this is an HTML text field
 			u16 tf_flags = ng_getTextFieldFlags(mc->ng_textfield_idx);
 			int is_html = (tf_flags & 0x0040) != 0;
