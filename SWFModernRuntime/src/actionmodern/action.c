@@ -59182,11 +59182,15 @@ static ActionVar builtin_selection_setFocus(SWFAppContext* app_context, ActionVa
 	if (arg->type == ACTION_STACK_VALUE_MOVIECLIP) {
 		new_mc = (MovieClip*)(uintptr_t)arg->data.numeric_value;
 	} else if (arg->type == ACTION_STACK_VALUE_STRING) {
-		// Resolve string path to MC
+		// Resolve string path to MC. Mirror Ruffle's resolve_target_display_object
+		// (core/src/avm1/globals/selection.rs:140) which resolves relative to the
+		// caller's target_clip — bare names like "mc" should find children of the
+		// current context, not just absolute _root/_level0 paths.
 		char path_buf[320];
 		if (arg->str_size > 0) {
 			u16_to_utf8((const uint16_t*)(uintptr_t)arg->data.numeric_value, arg->str_size, path_buf, sizeof(path_buf));
 			new_mc = getMovieClipByTarget(path_buf);
+			if (new_mc == NULL) new_mc = getMovieClipByRelativeName(path_buf);
 		}
 	}
 	if (new_mc == NULL) return ret;

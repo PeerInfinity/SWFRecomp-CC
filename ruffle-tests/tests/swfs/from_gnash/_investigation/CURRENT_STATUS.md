@@ -1,8 +1,35 @@
 # Gnash Test Suite Status
 
-Last updated: 2026-04-24 (loop_test8 → 37/38 via has_unload-gated MarkMCPendingRemoval in survives_rewind clear-and-replace path; movieclip_destruction_test2 → 50/52 via onUnload-depth-shift + swapDepths gating on removed MCs; loop_test3 → PASS via per-depth placed_at_frame on swap + ratio-only MC survives_rewind; not yet in CI)
+Last updated: 2026-04-24 (Selection-v6/v7/v8 → ruffle_matched via `Selection.setFocus(string)` relative-name fallback; loop_test8 → 37/38 via has_unload-gated MarkMCPendingRemoval in survives_rewind clear-and-replace path; movieclip_destruction_test2 → 50/52 via onUnload-depth-shift + swapDepths gating on removed MCs; loop_test3 → PASS via per-depth placed_at_frame on swap + ratio-only MC survives_rewind; not yet in CI)
 
 ### Latest fixes (2026-04-24, not yet in CI)
+
+- **Selection-v6 / Selection-v7 / Selection-v8 (actionscript.all) → ruffle_matched (+3 effective).**
+  `builtin_selection_setFocus` (`SWFModernRuntime/src/actionmodern/action.c`)
+  now falls back to `getMovieClipByRelativeName` when `getMovieClipByTarget`
+  returns NULL on a STRING argument — mirrors Ruffle's
+  `resolve_target_display_object(start_clip, *focus, false)` in
+  `core/src/avm1/globals/selection.rs:140`, which resolves relative to the
+  caller's target clip. Previously `Selection.setFocus("mc")` returned
+  `false` because `getMovieClipByTarget` only handles absolute `_root` /
+  `_level0` / `/…` paths, while the gnash Selection test expects bare-name
+  resolution against the current target. This fixed the one line
+  (`Selection.as:121` — `setFocus("mc")` returns `true` like Flash/Ruffle)
+  where our diff against Flash's `output.txt` was a superset of Ruffle's
+  diff, so the remaining Selection output_mismatch lines (setSelection
+  single-arg and 3-arg no-op divergence — Flash treats odd-count as no-op,
+  Ruffle/we treat as normal set) now promote all three Selection-vN tests
+  to `ruffle_matched` via the existing subset-of-Ruffle promotion. The
+  `"tx"` relative lookup at `Selection.as:102` returns `NULL` (tx is an
+  undefined variable, not a child MC), so the setFocus("tx") Flash-match at
+  that line is preserved. No regressions on the AVM1 `selection` test
+  (453/455 PASS unchanged) or a 15-test AVM1 battery covering
+  selection/button_children/clip_events/attach_movie/on_construct/
+  register_and_init_order/init_object_order/movieclip_state_values/
+  goto_rewind1/2/3/unload/unload_clip_event/stage_object_properties/
+  movieclip_get_instance_at_depth — 15/15 pass.
+
+### Earlier fixes on 2026-04-24 (not yet in CI)
 
 - **loop/loop_test8 (misc-ming) — +3 lines (34/38 → 37/38 matching).**
   Backward-rewind clear-and-replace path in `tagPlaceObject2` /
