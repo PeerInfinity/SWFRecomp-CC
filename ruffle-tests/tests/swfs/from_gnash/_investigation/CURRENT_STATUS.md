@@ -1,8 +1,27 @@
 # Gnash Test Suite Status
 
-Last updated: 2026-04-24 (event_handler_scope_test → PASS via fresh local activation + base_clip switch in actionDispatchEnterFrameHandlers; Selection-v6/v7/v8 → ruffle_matched via `Selection.setFocus(string)` relative-name fallback; loop_test8 → 37/38 via has_unload-gated MarkMCPendingRemoval in survives_rewind clear-and-replace path; movieclip_destruction_test2 → 50/52 via onUnload-depth-shift + swapDepths gating on removed MCs; loop_test3 → PASS via per-depth placed_at_frame on swap + ratio-only MC survives_rewind; not yet in CI)
+Last updated: 2026-04-24 (ResolveEventsTest → PASS via __resolve hook on MovieClip method dispatch; event_handler_scope_test → PASS via fresh local activation + base_clip switch in actionDispatchEnterFrameHandlers; Selection-v6/v7/v8 → ruffle_matched via `Selection.setFocus(string)` relative-name fallback; loop_test8 → 37/38 via has_unload-gated MarkMCPendingRemoval in survives_rewind clear-and-replace path; movieclip_destruction_test2 → 50/52 via onUnload-depth-shift + swapDepths gating on removed MCs; loop_test3 → PASS via per-depth placed_at_frame on swap + ratio-only MC survives_rewind; not yet in CI)
 
 ### Latest fixes (2026-04-24, not yet in CI)
+
+- **ResolveEventsTest (misc-ming) → PASS (+1).** `actionCallMethod`
+  (`SWFModernRuntime/src/actionmodern/action.c`) now invokes the
+  `__resolve` hook when a method lookup on a MovieClip receiver fails,
+  mirroring the existing OBJECT path. Lookup walks `mc->dynamic_props`
+  (+ `__proto__` chain), then `MovieClip.prototype`. The hook is
+  invoked with `this = mc` (MOVIECLIP type — set on a fresh local
+  activation and via `g_event_this_mc` for type-2 functions),
+  captured WITH scopes restored, version switched via
+  `switchToFunctionVersion`, and `base_clip` set per SWF6+ closure
+  rules. If `__resolve` returns a function, it is invoked with the
+  original call args and `this = mc`; otherwise the resolved value
+  is discarded and `undefined` is pushed. Test pattern:
+  `mc1.__resolve = function(a){ resolveevents.push(a); }; mc1.func()`
+  → 'func' captured into resolveevents (and same for onEnterFrame /
+  onRollOver). No regressions on a 23-test AVM1 lifecycle/MC-method
+  battery, a 19-test misc-ming recently-fixed battery, or a 4-test
+  misc-swfc spot-check (line counts unchanged on the pre-existing
+  failures button_test1 and movieclip_destruction_test2).
 
 - **event_handler_scope_test (misc-ming) → PASS (+1).**
   `actionDispatchEnterFrameHandlers` (`SWFModernRuntime/src/actionmodern/action.c`)

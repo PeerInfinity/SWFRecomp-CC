@@ -463,11 +463,46 @@ Text field property coverage; may overlap AVM1's `TEXTFIELD_PLAN`.
 ### Cluster: events / input
 
 - `event_handler_scope_test` (62.5%)
-- `ResolveEventsTest` (53.3%)
+- `ResolveEventsTest` — **PASS** (2026-04-24, see "ResolveEventsTest — __resolve hook on MovieClip" below)
 - `DragDropTest` (40.0%)
 - `key_event_test` (13.6%)
 - `ButtonEventsTest` (2.4%)
 - `mouse_drag_test` (50.0%) — misc-swfc
+
+### ResolveEventsTest — __resolve hook on MovieClip (2026-04-24, not yet in CI)
+
+- **ResolveEventsTest (misc-ming) → PASS (+1).** `actionCallMethod`
+  in `SWFModernRuntime/src/actionmodern/action.c` now invokes the
+  `__resolve` hook when a method lookup on a MovieClip receiver fails,
+  mirroring the existing OBJECT-path fallback. Lookup walks
+  `mc->dynamic_props` (and its `__proto__` chain) first, then
+  MovieClip.prototype. The hook is invoked with `this = mc`
+  (MOVIECLIP type — set on a fresh local activation and via
+  `g_event_this_mc` for type-2 functions), the function's captured
+  WITH scopes restored, version switched via `switchToFunctionVersion`,
+  and base_clip set per SWF6+ closure rules. If `__resolve` returns a
+  function, that function is invoked with the original args and
+  `this = mc`; otherwise the result is discarded and `undefined` is
+  pushed. The test sets `mc1.__resolve = function(a){ resolveevents.push(a); }`
+  and calls `mc1.func()`, `mc1.onEnterFrame()`, `mc1.onRollOver()` —
+  __resolve receives 'func', 'onEnterFrame', 'onRollOver' for
+  unresolved member access. No regressions on a 23-test AVM1
+  lifecycle/MC-method battery (object_resolve, this_scoping,
+  mutable_this, clip_events, on_construct, register_and_init_order,
+  set_interval, attach_movie, attach_movie_stop, button_children,
+  movieclip_state_values, swf5_to_6_cross_call, swf5_no_closure,
+  movieclip_in_removed_button, goto_rewind1/2/3,
+  execution_order1/2/3, unload, unload_clip_event,
+  unload_nested_child — 23/23 PASS), a 19-test misc-ming
+  recently-fixed battery (DefineEditTextTest,
+  DefineEditTextVariableNameTest2, loop_test2/3/5/9,
+  instanceNameTest, attachMovieTest, static_vs_dynamic1/2,
+  displaylist_depths_test11, place_and_remove_object_test,
+  get_frame_number_test, shape_test, event_handler_scope_test,
+  action_execution_order_test8-v5/v6, new_child_in_unload_test,
+  ResolveEventsTest — 19/19 PASS), or a misc-swfc spot-check
+  (stackscope, edittext_test1, button_test1,
+  movieclip_destruction_test2 — line counts unchanged from pre-fix).
 
 ### Cluster: misc-swfc remainder
 

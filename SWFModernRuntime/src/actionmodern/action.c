@@ -58071,6 +58071,180 @@ void actionCallMethod(SWFAppContext* app_context, char* str_buffer)
 						pushVar(app_context, &result);
 						return;
 			}
+			// Method not found on MC — try __resolve hook (mirrors OBJECT path).
+			// Walks mc->dynamic_props + __proto__ chain, then MovieClip.prototype.
+			// Invokes __resolve with this=mc using the same scope/version setup as
+			// the regular MC user-method dispatch above.
+			{
+				ASFunction* resolve_func = NULL;
+				if (mc != NULL && mc->dynamic_props != NULL)
+					resolve_func = findResolveMethod(app_context, (ASObject*)mc->dynamic_props);
+				if (resolve_func == NULL) {
+					initMovieClipPrototype(app_context);
+					ASObject* mc_proto = getMovieClipPrototype(g_swf_version);
+					if (mc_proto != NULL)
+						resolve_func = findResolveMethod(app_context, mc_proto);
+				}
+				if (resolve_func != NULL)
+				{
+					ASFunction* func = resolve_func;
+
+					// Build the single string-name argument
+					ActionVar name_arg = {0};
+					u32 _resname_u16len = 0;
+					uint16_t* _resname_u16 = utf8_to_u16(app_context, method_name, method_name_len, &_resname_u16len);
+					name_arg.type = ACTION_STACK_VALUE_STRING;
+					name_arg.str_size = _resname_u16len;
+					name_arg.data.numeric_value = (u64)(uintptr_t)_resname_u16;
+
+					// Local scope with this=mc (mirrors the non-__resolve user-method path)
+					ASObject* mc_method_scope = allocObject(app_context, 4);
+					retainObject(mc_method_scope);
+					ActionVar this_var = {0};
+					this_var.type = ACTION_STACK_VALUE_MOVIECLIP;
+					this_var.data.numeric_value = (u64) mc;
+					setProperty(app_context, mc_method_scope, "this", 4, &this_var);
+
+					u8 mc_captured_r = func->captured_scope_count;
+					for (u8 ci = 0; ci < mc_captured_r; ci++) {
+						if (scope_depth < MAX_SCOPE_DEPTH) {
+							scope_is_with[scope_depth] = func->captured_scope_is_with[ci];
+							scope_mc[scope_depth] = func->captured_scope_mc[ci];
+							scope_chain[scope_depth++] = func->captured_scope[ci];
+						}
+					}
+					if (scope_depth < MAX_SCOPE_DEPTH) {
+						scope_is_with[scope_depth] = 0;
+						scope_mc[scope_depth] = NULL;
+						scope_chain[scope_depth++] = mc_method_scope;
+					}
+
+					ASFunction* prev_exec_r = g_current_executing_func;
+					g_current_executing_func = func;
+					g_call_depth++;
+
+					int _resmcm_saved_ver = 0; ASObject* _resmcm_saved_global = NULL; int _resmcm_saved_midx = 0;
+					switchToFunctionVersion(func, &_resmcm_saved_ver, &_resmcm_saved_global, &_resmcm_saved_midx);
+
+					MovieClip* saved_cm_context_r = g_current_context;
+					DisplayObject* saved_cm_sprite_r = g_current_sprite_obj;
+					if (g_swf_version >= 6 && func->base_clip != NULL)
+					{
+						MovieClip* _bc = reResolveDeadBaseClip(app_context, (MovieClip*)func->base_clip);
+						if (_bc->depth != INT_MIN)
+							actionSetCurrentContext(_bc);
+						else
+							actionSetCurrentContext(mc);
+						g_current_sprite_obj = NULL;
+					}
+					else if (g_swf_version < 6 && mc != NULL)
+					{
+						actionSetCurrentContext(mc);
+						g_current_sprite_obj = NULL;
+					}
+
+					ActionVar resolve_result = {0};
+					resolve_result.type = ACTION_STACK_VALUE_UNDEFINED;
+					if (func->function_type == 1 && func->simple_func != NULL) {
+						pushVar(app_context, &name_arg);
+						resolve_result = ((ActionVar(*)(SWFAppContext*))func->simple_func)(app_context);
+					} else if (func->advanced_func != NULL) {
+						MovieClip* saved_event_this_cm = g_event_this_mc;
+						g_event_this_mc = mc;
+						resolve_result = func->advanced_func(app_context, &name_arg, 1, NULL, NULL);
+						g_event_this_mc = saved_event_this_cm;
+					}
+
+					g_call_depth--;
+					g_current_executing_func = prev_exec_r;
+					restoreFunctionVersion(_resmcm_saved_ver, _resmcm_saved_global, _resmcm_saved_midx);
+					actionSetCurrentContext(saved_cm_context_r);
+					g_current_sprite_obj = saved_cm_sprite_r;
+
+					for (u8 ci = 0; ci < mc_captured_r + 1; ci++) {
+						if (scope_depth > 0) scope_depth--;
+					}
+					releaseObject(app_context, mc_method_scope);
+
+					if (resolve_result.type == ACTION_STACK_VALUE_FUNCTION)
+					{
+						// __resolve returned a callable — invoke it with this=mc and original args
+						ASFunction* rf = (ASFunction*)(uintptr_t)resolve_result.data.numeric_value;
+						if (rf != NULL && (rf->simple_func != NULL || rf->advanced_func != NULL))
+						{
+							ASObject* rf_scope = allocObject(app_context, 4);
+							retainObject(rf_scope);
+							ActionVar tv = {0};
+							tv.type = ACTION_STACK_VALUE_MOVIECLIP;
+							tv.data.numeric_value = (u64) mc;
+							setProperty(app_context, rf_scope, "this", 4, &tv);
+
+							u8 rf_captured = rf->captured_scope_count;
+							for (u8 ci = 0; ci < rf_captured; ci++) {
+								if (scope_depth < MAX_SCOPE_DEPTH) {
+									scope_is_with[scope_depth] = rf->captured_scope_is_with[ci];
+									scope_mc[scope_depth] = rf->captured_scope_mc[ci];
+									scope_chain[scope_depth++] = rf->captured_scope[ci];
+								}
+							}
+							if (scope_depth < MAX_SCOPE_DEPTH) {
+								scope_is_with[scope_depth] = 0;
+								scope_mc[scope_depth] = NULL;
+								scope_chain[scope_depth++] = rf_scope;
+							}
+
+							int _rf_saved_ver = 0; ASObject* _rf_saved_global = NULL; int _rf_saved_midx = 0;
+							switchToFunctionVersion(rf, &_rf_saved_ver, &_rf_saved_global, &_rf_saved_midx);
+
+							MovieClip* saved_ctx = g_current_context;
+							DisplayObject* saved_sprite = g_current_sprite_obj;
+							if (g_swf_version >= 6 && rf->base_clip != NULL) {
+								MovieClip* _bc = reResolveDeadBaseClip(app_context, (MovieClip*)rf->base_clip);
+								if (_bc->depth != INT_MIN) actionSetCurrentContext(_bc);
+								else actionSetCurrentContext(mc);
+								g_current_sprite_obj = NULL;
+							} else if (g_swf_version < 6 && mc != NULL) {
+								actionSetCurrentContext(mc);
+								g_current_sprite_obj = NULL;
+							}
+
+							ActionVar call_result = {0};
+							call_result.type = ACTION_STACK_VALUE_UNDEFINED;
+							g_call_depth++;
+							if (rf->function_type == 1 && rf->simple_func != NULL) {
+								for (u32 i = 0; i < num_args; i++)
+									pushVar(app_context, &args[i]);
+								for (u32 i = num_args; i < rf->param_count; i++)
+									PUSH(ACTION_STACK_VALUE_UNDEFINED, 0);
+								if (args != NULL) FREE(args);
+								call_result = ((ActionVar(*)(SWFAppContext*))rf->simple_func)(app_context);
+							} else if (rf->advanced_func != NULL) {
+								MovieClip* saved_event_this_cm2 = g_event_this_mc;
+								g_event_this_mc = mc;
+								call_result = rf->advanced_func(app_context, args, num_args, NULL, NULL);
+								g_event_this_mc = saved_event_this_cm2;
+								if (args != NULL) FREE(args);
+							}
+							g_call_depth--;
+
+							restoreFunctionVersion(_rf_saved_ver, _rf_saved_global, _rf_saved_midx);
+							actionSetCurrentContext(saved_ctx);
+							g_current_sprite_obj = saved_sprite;
+							for (u8 ci = 0; ci < rf_captured + 1; ci++) {
+								if (scope_depth > 0) scope_depth--;
+							}
+							releaseObject(app_context, rf_scope);
+
+							pushVar(app_context, &call_result);
+							return;
+						}
+					}
+					// __resolve invoked but returned non-function: push undefined and return.
+					if (args != NULL) FREE(args);
+					pushUndefined(app_context);
+					return;
+				}
+			}
 			// Unknown method on MovieClip — push undefined.
 			if (args != NULL) FREE(args);
 			pushUndefined(app_context);
