@@ -19,9 +19,46 @@ blockers:
   - reason: "Phase 3 only: 7 zero-output tests blocked on DoInitAction-for-unplaced-library-exports; see complete/DEJAGNU_FRAMEWORK_PLAN.md. Phases 1 and 2 are actionable and cover ~76 of the ~83 failing tests."
 -->
 
-Covers **misc-ming.all** (74 failing / 102 total) and **misc-swfc.all** (11 failing / 16 total). Both suites use the inlined-Dejagnu harness described in `complete/DEJAGNU_FRAMEWORK_PLAN.md`.
+Covers **misc-ming.all** and **misc-swfc.all**. Both suites use the inlined-Dejagnu harness described in `complete/DEJAGNU_FRAMEWORK_PLAN.md`.
 
-Status (CI at 82a6ea07): **Phase 3 blocked for ~7 tests; Phases 1–2 actionable and cover the remaining ~76 tests.**
+Status (CI at 205a9a77 — 2026-04-25 run): **misc-ming.all 52/102 effective (51.0%); misc-swfc.all 8/16 effective (50.0%). Phase 1 substantially complete — all the listed near-passing tests have landed. Phase 2 partially complete; remaining items are documented blockers (deferred CLIP_EVENT_UNLOAD, CloneSprite depth-bias unification, tagImportCharacter dictionary, mouse/key input drivers) or multi-issue tests that need fresh investigation. Phase 3 (zero-output) still blocked.**
+
+## Remaining failures by category (CI 205a9a77, 2026-04-25)
+
+### misc-ming.all (50 failing / 102 total)
+
+**Documented blockers (≥80% match — single fix would land but blocked):**
+- `loop/loop_test8` (97.4%, 37/38) — blocked on deferred CLIP_EVENT_UNLOAD (loop_test7 blocker; one trailing `mc5unloaded` line).
+- `RollOverOutTest` (80%, 4/5) — needs mouse input driver (verifier doesn't drive input).
+
+**Multi-issue / blocked clusters:**
+- `matrix_test` (84%) — multi-issue (negative-_yscale matrix, getBounds-after-rotate, sin(90°) FP residuals).
+- `displaylist_depths_test/2/3/8/9`, `DepthLimitsTest`, `duplicate_movie_clip_test/2` — all blocked on CloneSprite depth-bias unification ("CloneSprite depth-bias trade-off (open)" below).
+- `attachImported`, `attachMovieLoopingTest`, `loop_test10`, `loadMovieTest`, `Version4Loader` (zero-output) — blocked on tagImportCharacter dictionary / library-export DoInitAction.
+- `action_order/action_execution_order_test2/3/5/11`, `loop_test6`, `ActionOrderTest3/4/5`, `goto_frame_test`, `consecutive_goto_frame_test`, `place_and_remove_object_insane_test` — same loop_test7 deferred-onUnload / DoAction-queue blocker.
+- `loop_test7`, `loop_test`, `replace_sprites1test`, `replace_buttons1test`, `replace_shapes1test`, `frame_label_test`, `action_execution_order_test6` — same family (deferred queue or zero-output DoInitAction).
+- `register_class/RegisterClassTest3/4/registerClassTest/registerClassTest2` — combine registerClass with attachMovie / frame scripting; complex multi-issue.
+
+**Input-driven (need verifier mouse/key driver — out of scope):**
+- `ButtonEventsTest`, `ButtonPropertiesTest`, `key_event_test`, `DragDropTest`, `RollOverOutTest`.
+
+**Untackled / undocumented (potentially attackable in future sessions):**
+- `DefineEditTextVariableNameTest` (68.1%) — duplicated checks past line 340 suggest frame-loop replay.
+- `DefineTextTest` (68.8%) — float precision (288.05 vs 288.0499...) plus mouse-driven assertions.
+- `DrawingApiTest` (46.2%), `EmbeddedFontTest` (57.5%) — graphics/text precision.
+- `NetStream-SquareTest` (39.8%) — netstream timing.
+- `masks_test` (16.0%), `opcode_guard_test` (16.7%) — pending-removal MC visibility / typeof.
+- `BeginBitmapFill` (zero-output) — Phase 3 DoInitAction blocker.
+
+### misc-swfc.all (8 failing / 16 total)
+
+- `movieclip_destruction_test2` (92.9%, 52/56) — last 2 lines blocked: explicit `mc2.onUnload()` invocation produces no trace output (well-documented blocker; see "movieclip_destruction_test2 — onUnload depth shift + swapDepths gating" below).
+- `sound` (100% match-rate but actual has 5 trailing lines) — blocked on sound-position timing; expected output literally truncates mid-test because Flash never reaches `__END_OF_TEST__` when waiting for sound.
+- `swf4opcode` (63.2%) — SWF4 path-syntax semantics (`/mc1.x`, `/mc1:_x`, bare `mc1`) and SWF4 NOT opcode on -0; not yet documented.
+- `mouse_drag_test` (50%), `button_test1` (25.8%) — input-driven.
+- `soft_reference_test1` (31.1%) — soft/weak references on dynamic MCs.
+- `movieclip_destruction_test4` (20%) — many issues, related to test2 family.
+- `opcode_guard_test2` (runtime_error) — needs separate triage.
 
 ## Key finding: the blocker is not universal
 
@@ -63,7 +100,7 @@ These are one or two small fixes away from passing. Tackle these first for broad
 
 For each, run `--diff --verbose` and cluster the diff lines by type. Many will resolve with a single targeted fix that's shared across a handful of near-passing tests.
 
-### new_child_in_unload_test (misc-ming) — cascading unload for dynamic children (2026-04-24, not yet in CI)
+### new_child_in_unload_test (misc-ming) — cascading unload for dynamic children (2026-04-24, in CI at 205a9a77)
 
 - **new_child_in_unload_test (misc-ming) → PASS (+1).** Two-part cascading-unload
   fix in `SWFModernRuntime/src/actionmodern/action.c` and
@@ -122,7 +159,7 @@ For each, run `--diff --verbose` and cluster the diff lines by type. Many will r
   the 4-test Shumway duplicateMovieClip suite (dontremove,
   duplicateMovieClip, samedepth, name-coercion — 4/4 pass).
 
-### movieclip_destruction_test2 (misc-swfc) — onUnload depth shift + swapDepths gating (2026-04-24, not yet in CI)
+### movieclip_destruction_test2 (misc-swfc) — onUnload depth shift + swapDepths gating (2026-04-24, in CI at 205a9a77)
 
 - **movieclip_destruction_test2 (misc-swfc) — partial (+11 more lines, 41/56 → 50/56 match; 11/13 line diffs fixed).** Three-part fix in `SWFModernRuntime/src/actionmodern/action.c` and `SWFModernRuntime/src/libswf/tag_stubs.c`:
   1. `actionFireOnUnload` now sets `mc->avm1_removed = 1` and shifts `mc->depth = -(swf_depth) - 1 - 16384` BEFORE invoking the AS-level handler — so `getDepth()` inside the handler returns the post-removal "removed depth zone" value, matching Flash's "already shifted inside unload handler" semantics (test lines 88-89: `mc2.getDepth() == -16387` and `this.getDepth() == -16387` inside `mc2.onUnload`). The `actionMarkMCPendingRemoval` and `actionInvalidateCachedMovieClip` helpers were updated to accept the already-shifted depth in their name+depth lookups (matching against `as_depth`, `swf_depth`, OR `shifted_depth`) and skip the redundant depth re-shift. The `ng_on_remove_object` order was also swapped: determine `has_unload` (including the AS-level `actionMCHasOnUnloadProperty` check) BEFORE the depth shift, since the property lookup uses `as_depth` and would miss after the shift.
@@ -131,7 +168,7 @@ For each, run `--diff --verbose` and cluster the diff lines by type. Many will r
   Two failing lines remain (line 156, 157: `mc2UnlaodedCount == 2` after explicit `mc2.onUnload()` call). The user-method dispatch IS invoking the function on the pending-removal MC (debug-confirmed: `INVOKING func=... type=1 on mc='mc2'`), but the function body produces no trace output despite running through ~8 `actionBaseClipRemoved` checks (all returning 0). Likely a deeper issue with how the inner `_root.check_equals` calls behave when invoked from a user-method-dispatched function on a pending-removal MC. Not a regression — these lines were also failing pre-fix.
   No regressions on a 24-test AVM1 lifecycle battery (unload/unload_clip_event/unload_nested_child/unloadmovie/mcl_unloadclip/clip_events/goto_rewind1/2/3/execution_order1/2/3/on_construct/register_and_init_order/movieclip_state_values/movieclip_library_state_values/set_interval/movieclip_in_removed_button/bad_placeobject_clipaction/goto_execution_order/2/swf5_to_6_cross_call/swf6_to_5_cross_call/attach_movie — 24/24 effective pass), 16-test misc-ming recently-fixed battery (loop_test3/5/9, instanceNameTest, attachMovieTest, DefineEditTextTest, DefineEditTextVariableNameTest2, static_vs_dynamic1/2, displaylist_depths_test11, place_and_remove_object_test, get_frame_number_test, shape_test, action_execution_order_test8-v5/v6, new_child_in_unload_test — 16/16 pass), or the Shumway duplicateMovieClip suite (4/4 pass).
 
-### movieclip_destruction_test2 (misc-swfc) — dead MC valueOf returns null (2026-04-24, not yet in CI)
+### movieclip_destruction_test2 (misc-swfc) — dead MC valueOf returns null (2026-04-24, in CI at 205a9a77)
 
 - **movieclip_destruction_test2 (misc-swfc) — partial (+4 lines, 37/56 → 41/56 match).**
   `builtin_object_valueOf` in `SWFModernRuntime/src/actionmodern/action.c` now returns
@@ -207,15 +244,15 @@ For each, run `--diff --verbose` and cluster the diff lines by type. Many will r
   AS-level handler needs to the queued payload itself (copy the
   handler + any bindings at queue time, don't rely on live MC state).
 
-### instanceNameTest — empty-name preservation (2026-04-22, not yet in CI)
+### instanceNameTest — empty-name preservation (2026-04-22, in CI at 205a9a77)
 
 - **instanceNameTest (misc-ming) → PASS (+1).** SWF's `PlaceObject2` distinguishes "name is present but empty" (HasName bit set, name=`""`) from "no name at all" (HasName bit unset). Ming's `SWFDisplayItem_setName(it, "")` produces the former, and Flash preserves that as `this._target == "/"` (not `/instanceN`). The recompiler's emission sites used `!instance_name_str.empty()` to decide whether to emit `tagSetInstanceName`, which collapses "empty name" and "no name" into the same branch — so the empty-named MC fell through to the runtime's auto-naming path and got `instance2`, shifting every subsequent auto-index by one. Fix: seven emission sites in `SWFRecomp/src/swf.cpp` (four in `tag_main`, three in `sprite_definitions`) now gate on `has_name` — which reflects the PlaceObject2 HasName flag — so an explicit empty name produces `tagSetInstanceName(app_context, depth, "")`. The runtime's `tagSetInstanceName` already stores the empty string as a non-NULL pointer, so `ng_on_place_object2` sees `g_pending_instance_name != NULL` and skips auto-naming. No regressions on an 18-test AVM1 placement/name-resolution battery (`access_unnamed_shape`, `conflicting_instance_names`, `default_names`, `named_shapes`, `movieclip_depth_methods`, `movieclip_get_instance_at_depth`, `movieclip_name_from_timeline`, `place_and_lookup`, `bad_placeobject_clipaction`, `clip_events`, `register_and_init_order`, `goto_rewind3`, `execution_order3`, `goto_execution_order2`, `movieclip_in_removed_button`, `unload`, `on_construct`, `movieclip_state_values`) or a cross-check of previously-landed misc-ming fixes (`displaylist_depths_test11`, `place_and_remove_object_test`, `attachMovieTest`, `shape_test`, `get_frame_number_test`, `loop_test5`, `loop_test9`, `static_vs_dynamic2`) or the Shumway duplicateMovieClip suite.
 
-### Sound.position default after attachSound (2026-04-22, not yet in CI)
+### Sound.position default after attachSound (2026-04-22, in CI at 205a9a77)
 
 - **sound (misc-swfc) — partial (+1 line, position==0 check now passes).** `builtin_sound_attachSound` now sets `__loaded__ = true` on the Sound object, mirroring Ruffle's `attach_sound` which calls `sound.load_sound(...)` + `sound.set_position(0)` (`core/src/avm1/globals/sound.rs:395-404`). Without this, `snd.position` returned `undefined` between `attachSound()` and `start()` because the property getter required `__loaded__` to be set (otherwise it fell through to the "own property or undefined" path). With the flag set, the getter reaches `soundGetElapsedForObject(obj)` which returns 0 for inactive sounds. The test still fails overall because it depends on timing-based `gotoAndPlay(8)` logic where we're reaching frame 8 too early (likely an `elapsed_ms` accumulation divergence from gnash), but the `check_equals(snd.position, 0)` assertion now passes. No regressions on the 10-test AVM1 sound suite (`sound`, `sound_duration_position_props`, `sound_id3`, `sound_id3_prop`, `sound_load_start`, `sound_multiple_load`, `sound_props_swf5`, `sound_props_swf6`, `sound_start_load`, `register_class_with_sound`).
 
-### Empty-DL-slot RemoveObject2 fallback (2026-04-22, not yet in CI)
+### Empty-DL-slot RemoveObject2 fallback (2026-04-22, in CI at 205a9a77)
 
 - **static_vs_dynamic2 (misc-ming) → PASS (+1).** Added
   `actionInvalidateMCAtASDepth` helper in
@@ -234,7 +271,7 @@ For each, run `--diff --verbose` and cluster the diff lines by type. Many will r
   without clearing var_map, `typeof(dup)` still returned `'movieclip'`.
   No regressions on a 47-test AVM1 battery.
 
-### Backward-goto dynamic-depth preservation (2026-04-22, not yet in CI)
+### Backward-goto dynamic-depth preservation (2026-04-22, in CI at 205a9a77)
 
 - **loop/loop_test9 (misc-ming) → PASS (+1).** Added dynamic-range gate to
   `ng_display_clear_after` in `SWFModernRuntime/src/libswf/tag.c`: the loop
@@ -279,7 +316,7 @@ For each, run `--diff --verbose` and cluster the diff lines by type. Many will r
     ordering issue (movieClip3 at depth 3 placed frame 5 is cleared;
     movieClip1 replacement's _root name resolution may be the issue).
 
-### survives_rewind via clone_depth_table (2026-04-23, not yet in CI)
+### survives_rewind via clone_depth_table (2026-04-23, in CI at 205a9a77)
 
 - **static_vs_dynamic1 (misc-ming) → PASS (+1).** `actionRewindCleanup` in
   `SWFModernRuntime/src/actionmodern/action.c` now looks up the clone's
@@ -375,7 +412,7 @@ Failures at 10-80% match, grouped by apparent feature cluster. The cluster shape
 
 Deferred-DoAction / sprite-init execution order. Similar to the AVM1 `execution_order*` fixes in `avm1/_investigation/complete/SESSION_NOTES.md`. The long tail (ActionOrderTest3 at 5.7%, ActionOrderTest4 at 7.4%) likely combines multiple ordering bugs.
 
-- **action_execution_order_test8-v5/v6 (misc-ming) → PASS (+2, 2026-04-23, not yet in CI).** Tightened the Phase 3 filter in `process_sprite_needs_init` (tag.c) from `placed_at_frame >= target_frame` to `placed_at_frame == target_frame`. The `>=` semantics was wrong under nested gotos: when frame 2's DoAction calls `gotoAndPlay(4)` from inside the outer goto's Phase 2 (target=2), `ng_executeGotoCatchUp` for the inner goto runs frames 3–4 immediately and places mc1 at frame 4. With `>=`, the outer Phase 3 (filter `>= 2`) then fires mc1 before the inner goto's Phase 2 runs the target frame's root script — producing mc1's `_root.gotoAndStop(6)` trace *before* the expected "root frame 4" / `typeof(_root.x)=='undefined'` lines. `==` restricts Phase 3 to sprites placed at exactly the goto's own target, leaving mc1 to fire during the inner goto's Phase 3 (target=4). No regressions on a 54-test AVM1 execution-order/rewind/clip-event battery, the Gnash action_order cluster (7 pre-existing failures unchanged — line counts identical), the Shumway duplicateMovieClip suite, or a 12-test misc-ming battery (`displaylist_depths_test11`, `place_and_remove_object_test`, `loop_test5/9`, `static_vs_dynamic1/2`, `shape_test`, `attachMovieTest`, `get_frame_number_test`, `instanceNameTest`, `test8-v5/v6`).
+- **action_execution_order_test8-v5/v6 (misc-ming) → PASS (+2, 2026-04-23, in CI at 205a9a77).** Tightened the Phase 3 filter in `process_sprite_needs_init` (tag.c) from `placed_at_frame >= target_frame` to `placed_at_frame == target_frame`. The `>=` semantics was wrong under nested gotos: when frame 2's DoAction calls `gotoAndPlay(4)` from inside the outer goto's Phase 2 (target=2), `ng_executeGotoCatchUp` for the inner goto runs frames 3–4 immediately and places mc1 at frame 4. With `>=`, the outer Phase 3 (filter `>= 2`) then fires mc1 before the inner goto's Phase 2 runs the target frame's root script — producing mc1's `_root.gotoAndStop(6)` trace *before* the expected "root frame 4" / `typeof(_root.x)=='undefined'` lines. `==` restricts Phase 3 to sprites placed at exactly the goto's own target, leaving mc1 to fire during the inner goto's Phase 3 (target=4). No regressions on a 54-test AVM1 execution-order/rewind/clip-event battery, the Gnash action_order cluster (7 pre-existing failures unchanged — line counts identical), the Shumway duplicateMovieClip suite, or a 12-test misc-ming battery (`displaylist_depths_test11`, `place_and_remove_object_test`, `loop_test5/9`, `static_vs_dynamic1/2`, `shape_test`, `attachMovieTest`, `get_frame_number_test`, `instanceNameTest`, `test8-v5/v6`).
 
 ### Cluster: `displaylist_depths/*` (6 tests, 13-80%)
 
@@ -385,7 +422,7 @@ Display list depth transformations, clip_depth, swap_depths, level vs timeline d
 
 `while` / `for` / `do-while` opcode handling. `loop_test9` at 73% and `loop_test3` at 69% are attack points. `loop_test10` at 3.6% suggests a feature not implemented yet (probably `for-in` or iterator-style).
 
-- **loop/loop_test8 (misc-ming) — partial (+3 lines, 34/38 → 37/38, 2026-04-24, not yet in CI).** Backward-rewind clear-and-replace path in `tagPlaceObject2` / `tagPlaceObject2Ratio` (`SWFModernRuntime/src/libswf/tag.c`) now calls `actionMarkMCPendingRemoval` on the existing named MC before clearing it, so the old MC persists in the "removed depth zone" for one frame and remains resolvable by name (`typeof(mc5) == 'movieclip'`). Gated on `has_unload` (clip-event UNLOAD bit 0x4, accumulated clip actions, AS-level `onUnload` property, or any child sprite with an UNLOAD handler), mirroring `ng_on_remove_object`'s gate; without the gate, MCs that should disappear immediately (e.g. `loop_test5/movieClip3`, only CONSTRUCT) would incorrectly persist. Mirrors Ruffle's `remove_child` → `should_delay_removal` (`core/src/display_object/container.rs:330-360`) called from run_goto's survives_rewind=false branch (`core/src/display_object/movie_clip.rs:1685-1694`). The remaining failing line is the trailing `_level0.mc5unloaded` trace, which requires the deferred clip-event UNLOAD mechanism (the loop_test7 blocker — clip-event UNLOAD must be queued via `is_unload=true` to fire after `totals()`). No regressions on a 37-test AVM1 rewind/unload/placement battery, 18-test misc-ming recently-fixed battery, Shumway duplicateMovieClip suite, misc-swfc tests, or 31-test AVM1 broad battery covering super/this/string/object/text/loadvars.
+- **loop/loop_test8 (misc-ming) — partial (+3 lines, 34/38 → 37/38, 2026-04-24, in CI at 205a9a77).** Backward-rewind clear-and-replace path in `tagPlaceObject2` / `tagPlaceObject2Ratio` (`SWFModernRuntime/src/libswf/tag.c`) now calls `actionMarkMCPendingRemoval` on the existing named MC before clearing it, so the old MC persists in the "removed depth zone" for one frame and remains resolvable by name (`typeof(mc5) == 'movieclip'`). Gated on `has_unload` (clip-event UNLOAD bit 0x4, accumulated clip actions, AS-level `onUnload` property, or any child sprite with an UNLOAD handler), mirroring `ng_on_remove_object`'s gate; without the gate, MCs that should disappear immediately (e.g. `loop_test5/movieClip3`, only CONSTRUCT) would incorrectly persist. Mirrors Ruffle's `remove_child` → `should_delay_removal` (`core/src/display_object/container.rs:330-360`) called from run_goto's survives_rewind=false branch (`core/src/display_object/movie_clip.rs:1685-1694`). The remaining failing line is the trailing `_level0.mc5unloaded` trace, which requires the deferred clip-event UNLOAD mechanism (the loop_test7 blocker — clip-event UNLOAD must be queued via `is_unload=true` to fire after `totals()`). No regressions on a 37-test AVM1 rewind/unload/placement battery, 18-test misc-ming recently-fixed battery, Shumway duplicateMovieClip suite, misc-swfc tests, or 31-test AVM1 broad battery covering super/this/string/object/text/loadvars.
 
 - **loop/loop_test3 (misc-ming) → PASS (+1, 2026-04-24).** Three-part fix to make `swapDepths`-then-backward-`gotoAndStop` preserve the MC at the surviving depth and destroy the other — matches Ruffle's AVM1 `survives_rewind` MovieClip branch (ratio_equals only). See the full write-up in `../CURRENT_STATUS.md` "Latest fixes (2026-04-24)". As a bonus, also flipped **loop/loop_test2** from failing to passing.
 
@@ -436,7 +473,7 @@ Also `movieclip_destruction_test2` (73.2%) from misc-swfc.
 - `edittext_test1` (76.6% — near-passing).
 Text field property coverage; may overlap AVM1's `TEXTFIELD_PLAN`.
 
-- **DefineEditTextVariableNameTest2 (misc-ming) — partial (+7 lines, 28/36 → 35/36, 2026-04-23 not yet in CI).**
+- **DefineEditTextVariableNameTest2 (misc-ming) — partial (+7 lines, 28/36 → 35/36, 2026-04-23, in CI at 205a9a77).**
   `ng_syncVarToTextFields` in `SWFModernRuntime/src/actionmodern/action.c` was
   skipping OBJECT/ARRAY/FUNCTION values with a "no side effects" comment, so
   `edit_text_var = new Object()` never propagated to bound textfields — the
@@ -469,7 +506,7 @@ Text field property coverage; may overlap AVM1's `TEXTFIELD_PLAN`.
 - `ButtonEventsTest` (2.4%)
 - `mouse_drag_test` (50.0%) — misc-swfc
 
-### ResolveEventsTest — __resolve hook on MovieClip (2026-04-24, not yet in CI)
+### ResolveEventsTest — __resolve hook on MovieClip (2026-04-24, in CI at 205a9a77)
 
 - **ResolveEventsTest (misc-ming) → PASS (+1).** `actionCallMethod`
   in `SWFModernRuntime/src/actionmodern/action.c` now invokes the
@@ -612,7 +649,7 @@ the diff-reading work.
   `288.05`) plus mouse-input-driven assertions (`_global.clicks == 2` got
   `15`). Mouse-input portion is `RollOverOutTest`-class blocker (no input
   driver in our runner).
-- **`event_handler_scope_test` (misc-ming) → PASS (+1, 2026-04-24, not yet in CI).**
+- **`event_handler_scope_test` (misc-ming) → PASS (+1, 2026-04-24, in CI at 205a9a77).**
   `actionDispatchEnterFrameHandlers` (`SWFModernRuntime/src/actionmodern/action.c`)
   now pushes a fresh local activation `ASObject` and switches `g_current_context`
   to `func->base_clip` for the child-MC type 1 (`DefineFunction`) dispatch path,

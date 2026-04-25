@@ -1,8 +1,18 @@
 # Gnash Test Suite Status
 
-Last updated: 2026-04-24 (ResolveEventsTest → PASS via __resolve hook on MovieClip method dispatch; event_handler_scope_test → PASS via fresh local activation + base_clip switch in actionDispatchEnterFrameHandlers; Selection-v6/v7/v8 → ruffle_matched via `Selection.setFocus(string)` relative-name fallback; loop_test8 → 37/38 via has_unload-gated MarkMCPendingRemoval in survives_rewind clear-and-replace path; movieclip_destruction_test2 → 50/52 via onUnload-depth-shift + swapDepths gating on removed MCs; loop_test3 → PASS via per-depth placed_at_frame on swap + ratio-only MC survives_rewind; not yet in CI)
+Last updated: 2026-04-24 (CI snapshot at 205a9a77 includes all recent fixes through ResolveEventsTest / event_handler_scope_test / Selection-vN / LoadVars-vN / loop_test2/3/4/5/9 / static_vs_dynamic1/2 / displaylist_depths_test11 / DefineEditTextVariableNameTest2 / movieclip_destruction_test2 (52/56) / loop_test8 (37/38) / new_child_in_unload_test / instanceNameTest / attachMovieTest / shape_test / get_frame_number_test / place_and_remove_object_test / DefineEditTextTest / timeline_var_test / reverse_execute_PlaceObject2_test1/2 / action_execution_order_test8-v5/v6 / stackscope / submoviegetvar / edittext_test1.)
 
-### Latest fixes (2026-04-24, not yet in CI)
+### CI snapshot (commit 205a9a77, run 2026-04-25)
+
+| Suite | Effective pass | Total | Rate |
+|-------|----------------|-------|------|
+| actionscript.all | 168 | 190 | 88.4% |
+| misc-ming.all | 52 | 102 | 51.0% |
+| misc-mtasc.all | 8 | 9 | 88.9% |
+| misc-swfc.all | 8 | 16 | 50.0% |
+| misc-swfmill.all | 16 | 18 | 88.9% |
+
+### Latest fixes (2026-04-24, in CI at 205a9a77)
 
 - **ResolveEventsTest (misc-ming) → PASS (+1).** `actionCallMethod`
   (`SWFModernRuntime/src/actionmodern/action.c`) now invokes the
@@ -66,7 +76,7 @@ Last updated: 2026-04-24 (ResolveEventsTest → PASS via __resolve hook on Movie
   goto_rewind1/2/3/unload/unload_clip_event/stage_object_properties/
   movieclip_get_instance_at_depth — 15/15 pass.
 
-### Earlier fixes on 2026-04-24 (not yet in CI)
+### Earlier fixes on 2026-04-24 (in CI at 205a9a77)
 
 - **loop/loop_test8 (misc-ming) — +3 lines (34/38 → 37/38 matching).**
   Backward-rewind clear-and-replace path in `tagPlaceObject2` /
@@ -261,7 +271,7 @@ Last updated: 2026-04-24 (ResolveEventsTest → PASS via __resolve hook on Movie
 
 - **movieclip_destruction_test2 (misc-swfc) — partial (+4 lines, 37/56 → 41/56 match).** `builtin_object_valueOf` now returns `ACTION_STACK_VALUE_NULL` when the MovieClip receiver has been invalidated (`g_event_this_mc->depth == INT_MIN`). Previously returned a MOVIECLIP value pointing to the dead MC, which coerced to `""` — test expected `"null"` (Flash semantics: `typeof(mcRef) == 'undefined'` but `mcRef.valueOf() == null` after removeMovieClip). Scoped to the `this_obj == NULL && g_event_this_mc != NULL` path for method-style MC receivers. Also improves `misc-ming/new_child_in_unload_test` by 3 lines (same `dyn1Ref.valueof() == null` pattern, though that test still fails on a separate cascading-unload issue). No regressions on a 5-test AVM1 unload battery, 14-test valueOf-exercising battery, or the 13 misc-ming tests passing at CI snapshot. See `incomplete/MISC_MING_SWFC_PLAN.md` "dead MC valueOf returns null".
 
-### Latest fixes (2026-04-23, not yet in CI)
+### Latest fixes (2026-04-23, in CI at 205a9a77)
 
 - **shumway fuzz/81004241… and fuzz/2f4f46bf… → PASS (+2).** Two-part
   fix for FSCommand:quit in SWFs that use the literal-URL form of
@@ -413,7 +423,7 @@ Last updated: 2026-04-24 (ResolveEventsTest → PASS via __resolve hook on Movie
   `text_format_rounding_swf7/8`, `text_format_font_max_length`,
   `text_format_display`, `text_format_get_text_extent_undefined_width`).
 
-### Latest fixes (2026-04-22, not yet in CI)
+### Latest fixes (2026-04-22, in CI at 205a9a77)
 - **instanceNameTest (misc-ming) → PASS (+1).** SWF's PlaceObject2
   `HasName` flag distinguishes "name present but empty" (`setName("")`)
   from "no name at all", and Flash preserves that distinction (empty
@@ -507,7 +517,7 @@ Last updated: 2026-04-24 (ResolveEventsTest → PASS via __resolve hook on Movie
   swf6_to_5_cross_call, textsnapshot_available_text) and Shumway
   duplicateMovieClip/dontremove/duplicateMovieClip/samedepth/name-coercion.
 
-### Latest fixes (2026-04-22, not yet in CI)
+### Latest fixes (2026-04-22, in CI at 205a9a77)
 - **static_vs_dynamic2 (misc-ming) → PASS (+1).** Two-part fix for
   `RemoveObject2` targeting a depth whose display-list slot is empty
   because a swap moved the original occupant to a different SWF depth.
@@ -634,7 +644,7 @@ Last updated: 2026-04-24 (ResolveEventsTest → PASS via __resolve hook on Movie
     `actionASSetPropFlags_func2`; (b) honour `PROPERTY_FLAG_WRITABLE`
     in WITH-scope assignment.
 
-### Latest fixes (2026-04-17, not yet in CI)
+### Latest fixes (2026-04-17, in CI at 205a9a77)
 - **ASnative-v5/v6/v7/v8 → ruffle_matched (+4).** Three-part fix in `SWFModernRuntime/src/actionmodern/`:
   (1) ASnative class 103 (Date) dispatcher in `date.c` wired to existing Date prototype methods via Ruffle's index scheme (0-20 local, 128-143 UTC, 256 constructor, 257 Date.UTC); index 256 returns a bare ASFunction with `prototype_obj = NULL` so `new f()` produces a plain object (matches Ruffle `FunctionObject::table_native`).
   (2) ASnative class 200 (Math) remap table — Flash's order (0=abs, 1=min, 2=max, 3=sin, 4=cos, 5=atan2, ...) differs from internal `g_math_funcs[]` registration order.
@@ -655,7 +665,7 @@ Last updated: 2026-04-24 (ResolveEventsTest → PASS via __resolve hook on Movie
   **Color-v6 → PASS** (+1 test). Number-v6: 8→4 failures.
 - **`coerce_to_object_monkeypatch` avm1 regression fix** (998e879a, post-CI) — narrow fix to avoid regressing the avm1 coerce_to_object_monkeypatch test from the primitive auto-boxing work.
 
-### Latest fixes (2026-04-15, not yet in CI)
+### Latest fixes (2026-04-15, in CI at 205a9a77)
 - **TextFormat-v5/v6 → PASS (+2).** Three fixes to TextFormat in
   `SWFModernRuntime/src/actionmodern/action.c`: (1) `tfCoerceAlign` is now
   case-insensitive and normalizes to canonical lowercase (`"Left"` → `"left"`,
@@ -709,18 +719,18 @@ Last updated: 2026-04-24 (ResolveEventsTest → PASS via __resolve hook on Movie
 ### Latest fixes (2026-04-13, confirmed in CI at 83d3748a)
 - **Inheritance-v5 SWF5 version gates** — Four gates applied in `action.c`: (1) `actionExtends` skips `__constructor__` in SWF5 (gnash comment: "SWF5 or below don't set __constructor__"); (2) `actionGetVariable` "super" fallback gated on SWF ≥ 6 so SWF5 function bodies see super as undefined; (3) `actionCallFunction("super")` handler gated on SWF ≥ 6 so `super()` in SWF5 becomes an undefined-variable no-op; (4) `Function.prototype.apply`/`.call` marked `flash_flags=0x0080` (hidden in SWF5 per Gnash test source comment "Function.apply was introduced in SWF6"). **Impact:** Inheritance-v5 line-match 100/114 → 114/114 (all expected lines match); only residual diff is the 1 extra egg/chicken line. Added to `ignored_tests.txt` → passing via filtered results. See `complete/INHERITANCE_SEGFAULT_PLAN.md` Fix 3.
 
-### Latest fixes (2026-04-13, session 2 — not yet in CI)
+### Latest fixes (2026-04-13, session 2 — in CI at 205a9a77)
 - **Inheritance-v6/v7/v8 accepted as Ruffle-matching** — Investigation into the remaining v6/v7/v8 super-chain diffs revealed that all 4 Inheritance tests carry `known_failure = true` in upstream Ruffle with `output.ruffle.txt` files documenting their divergent output. Verified locally that our diffs against Flash's `output.txt` are a proper subset of Ruffle's diffs against the same file for every version (v5: 1⊆17, v6: 9⊆16, v7: 5⊆10, v8: 5⊆10). The super-chain lines (`"undefinedFFC"` v7/v8, `"A.B.B"`/`"FAAC"`/`"FFFC"` v6) are Flash-only dynamic base class semantics that Ruffle does not replicate. Added v6/v7/v8 to `ignored_tests.txt` alongside v5, documented in `ACCEPTED_DIFFS.md` Category 1b. `INHERITANCE_SEGFAULT_PLAN.md` moved to `complete/`. **Impact:** filtered pass rate 95/184 → 95/181 = 52.5%. **Broader finding:** 84 of our 95 Gnash failures are tests Ruffle itself cannot pass; 11 are tests Ruffle passes. See `incomplete/RUFFLE_KNOWN_FAILURE_HANDLING_PLAN.md`.
 
-### Latest fixes (2026-04-12, not yet in CI)
+### Latest fixes (2026-04-12, in CI at 205a9a77)
 - **TextSnapshot method stubs (arg-count gated)** — Added dedicated builtins for `hitTestTextNearPos` (2-3 args → number, else undefined), `getSelected` (2 args → boolean, else undefined), `getSelectedText` (0-1 args → string, else undefined). `getCount` gates on arg_count==0 and on `native_type == NATIVE_TEXTSNAPSHOT` (no native → undefined). **Impact:** TextSnapshot-v6/v7/v8 improved from 128/167 to ~156/167 lines each. Note: a prior pass also made `getText` and `getCount` fall through to empty string / 0 for empty native TextSnapshots, which matched Gnash's `getText(...)=="string"` expectations but broke the avm1 suite's `textsnapshot_available_text` test — that fall-through was reverted in d7xxxx to match Ruffle's Value::Undefined semantics.
 
-### Latest fixes (2026-04-10, not yet in CI)
+### Latest fixes (2026-04-10, in CI at 205a9a77)
 - **Error constructor raw message storage** — `new Error(new Object())` now stores the Object reference as `.message` instead of coercing to string. `Error.prototype.toString` returns the raw message value (any type). **+4 tests: Error-v5, Error-v6, Error-v7, Error-v8 → PASS.**
 - **delete-v8 now PASS** — confirmed locally, previous fixes (dot-path resolution, non-existent returns false, global_object check) pushed it over.
 - **parseInt object toString coercion** — `parseInt(obj)` now calls `toString()` on object/array/function arguments instead of returning NaN. **+2 lines per toString_valueOf test** (v6/v7/v8).
 
-### Latest fixes (2026-04-09, not yet in CI)
+### Latest fixes (2026-04-09, in CI at 205a9a77)
 - **Delete dot-path resolution** — `actionDelete2("o.b")` and `actionDelete` with dot-path property names now resolve the path: split on last dot, look up container, delete final property. The `actionDelete` fallback is SWF5/6 only (SWF7+ uses strict property names). **+14 lines across delete-v5/v6/v7/v8** (delete-v5: 43→47/60, delete-v6: 41→45/60, delete-v7: 46→49/60, delete-v8: 47→50/60).
 - **Color-v6 now PASS** — confirmed locally, was already 161/165 in CI; recent fixes pushed it over.
 - **NetStream connected-construction property installation** — `new NetStream(nc)` where nc is a connected NetConnection now installs `currentFps` as an own property on `NetStream.prototype`. In Flash, the NetStream constructor lazily registers native data properties when first constructed with a connected NC. Detected via `__proto__ == NetConnection.prototype` + `isConnected == true` check. **+3 tests: NetStream-v6, NetStream-v7, NetStream-v8 → PASS.**
