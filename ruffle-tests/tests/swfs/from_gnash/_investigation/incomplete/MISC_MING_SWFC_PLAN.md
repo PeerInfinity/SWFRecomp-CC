@@ -44,23 +44,17 @@ Status (CI at 205a9a77 — 2026-04-25 run): **misc-ming.all 52/102 effective (51
 **Button / drag / key clusters (NOT actually input-driver-blocked — verifier does drive input):**
 - `ButtonEventsTest`, `ButtonPropertiesTest`, `key_event_test`, `DragDropTest`, `RollOverOutTest`. **See `incomplete/BUTTON_INFRASTRUCTURE_PLAN.md`** — distinct sub-issues per test (typeof, prototype enum order, button-internal children, _droptarget, mask+hitTest, key listener phase progression).
 
-**Untackled / undocumented (potentially attackable in future sessions):**
-- `DefineEditTextVariableNameTest` (68.1%) — duplicated checks past line 340 suggest frame-loop replay.
-- `DefineTextTest` (68.8%) — float precision (288.05 vs 288.0499...) plus mouse-driven assertions.
-- `DrawingApiTest` (46.2%), `EmbeddedFontTest` (57.5%) — graphics/text precision.
-- `NetStream-SquareTest` (39.8%) — netstream timing.
-- `masks_test` (16.0%), `opcode_guard_test` (16.7%) — pending-removal MC visibility / typeof.
+**Single-test residuals (combined triage):** `matrix_test`, `DefineTextTest`, `DefineEditTextVariableNameTest`, `EmbeddedFontTest`, `DrawingApiTest`, `NetStream-SquareTest`, `loop/loop_test`, `loop/loop_test10`, `replace_sprites1test`, `opcode_guard_test`, `masks_test`, `duplicate_movie_clip_test`. **See `incomplete/REMAINING_TAIL_TRIAGE.md`** — one-page Match / Symptom / Hypothesis / Scope per test; entries graduate to standalone plans when active work begins.
+
 - `BeginBitmapFill` (single-line content mismatch — `mc9._width` returns 804 vs 150). **See `incomplete/ZERO_OUTPUT_TRIAGE_PLAN.md` Phase 5.**
 
 ### misc-swfc.all (8 failing / 16 total)
 
 - `movieclip_destruction_test2` (92.9%, 52/56) — last 2 lines blocked: explicit `mc2.onUnload()` invocation produces no trace output (well-documented blocker; see "movieclip_destruction_test2 — onUnload depth shift + swapDepths gating" below).
 - `sound` (100% match-rate but actual has 5 trailing lines) — blocked on sound-position timing; expected output literally truncates mid-test because Flash never reaches `__END_OF_TEST__` when waiting for sound.
-- `swf4opcode` (63.2%) — SWF4 path-syntax semantics (`/mc1.x`, `/mc1:_x`, bare `mc1`) and SWF4 NOT opcode on -0; not yet documented.
+- `swf4opcode` (63.2%), `soft_reference_test1` (31.1%), `movieclip_destruction_test4` (20%) — see `incomplete/REMAINING_TAIL_TRIAGE.md`.
 - `button_test1` (25.8%) — button-internal child sprite resolution. **See `incomplete/BUTTON_INFRASTRUCTURE_PLAN.md` Phase 2.**
-- `mouse_drag_test` (50%) — Dejagnu `xcheck()` zero-arg or no-text variant handling on the empty `PASSED:`/`FAILED:` lines. Needs separate triage.
-- `soft_reference_test1` (31.1%) — soft/weak references on dynamic MCs.
-- `movieclip_destruction_test4` (20%) — many issues, related to test2 family.
+- `mouse_drag_test` (50%) — Dejagnu `xcheck()` zero-arg variant handling. **See `incomplete/BUTTON_INFRASTRUCTURE_PLAN.md`** open question 1.
 - `opcode_guard_test2` (runtime_error) — needs separate triage.
 
 ## Key finding: the blocker is not universal
