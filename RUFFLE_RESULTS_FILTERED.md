@@ -3,9 +3,9 @@
 *Tests on the [ignored list](ruffle-tests/ignored_tests.txt) are excluded.*  
 *See [RUFFLE_RESULTS.md](RUFFLE_RESULTS.md) for unfiltered results.*
 
-**Commit:** `205a9a775a86`  
-**Date:** 2026-04-25 03:31 UTC  
-**Total duration:** 1h49m37s
+**Commit:** `afd969190057`  
+**Date:** 2026-04-25 03:55 UTC  
+**Total duration:** 6m59s
 
 ## Results by Suite
 
@@ -83,56 +83,56 @@ Tests verified against Flash's actual output (`output.flash.txt`).
 
 - **Pass:** 596/600 (99.3%)
 - **Ignored:** 41 tests
-- **Duration:** 51m30s across 30 shards
+- **Duration:** 3m05s across 30 shards
 - **Lines:** 94,915/95,093 matching (99.8%)
-- **Avg test duration:** 4.7s — slowest: `register_class_swf6` (18.3s)
+- **Avg test duration:** 0.2s — slowest: `array_sort_random` (14.0s)
 
 ### from_gnash/actionscript.all
 
 - **Pass:** 113/190 (59.5%)
-- **Duration:** 11m05s across 30 shards
+- **Duration:** 1m11s across 30 shards
 - **Lines:** 14,754/16,957 matching (87.0%)
-- **Avg test duration:** 3.4s — slowest: `TextFieldHTML-v5` (17.8s)
+- **Avg test duration:** 0.3s — slowest: `ASnative-v6` (4.4s)
 
 ### from_gnash/misc-ming.all
 
 - **Pass:** 42/102 (41.2%)
-- **Duration:** 22m34s across 30 shards
+- **Duration:** 1m15s across 30 shards
 - **Lines:** 2,324/4,541 matching (51.2%)
-- **Avg test duration:** 13.2s — slowest: `matrix_test` (20.8s)
+- **Avg test duration:** 0.7s — slowest: `ButtonEventsTest` (18.1s)
 
 ### from_gnash/misc-mtasc.all
 
 - **Pass:** 7/9 (77.8%)
-- **Duration:** 1m41s across 30 shards
+- **Duration:** 17s across 30 shards
 - **Lines:** 205/231 matching (88.7%)
-- **Avg test duration:** 11.2s — slowest: `TextFieldTest` (17.4s)
+- **Avg test duration:** 1.8s — slowest: `TextFieldTest` (14.1s)
 
 ### from_gnash/misc-swfc.all
 
 - **Pass:** 5/16 (31.2%)
-- **Duration:** 3m45s across 30 shards
+- **Duration:** 18s across 30 shards
 - **Lines:** 250/499 matching (50.1%)
-- **Avg test duration:** 14.0s — slowest: `action_execution_order_test10` (16.9s)
+- **Avg test duration:** 1.1s — slowest: `action_execution_order_test10` (14.5s)
 
 ### from_gnash/misc-swfmill.all
 
 - **Pass:** 15/18 (83.3%)
-- **Duration:** 4m52s across 30 shards
+- **Duration:** 17s across 30 shards
 - **Lines:** 47/51 matching (92.2%)
-- **Avg test duration:** 16.2s — slowest: `afunc_dict` (17.4s)
+- **Avg test duration:** 0.9s — slowest: `afunc_dict` (13.4s)
 
 ### from_shumway
 
 - **Pass:** 63/92 (68.5%)
-- **Duration:** 12m29s across 30 shards
+- **Duration:** 24s across 30 shards
 - **Lines:** 662/1,276 matching (51.9%)
-- **Avg test duration:** 8.1s — slowest: `fuzz/f5398dd73a3a38472dda7422831414d087af37bee1bb3119071526a55da8d09b` (17.9s)
+- **Avg test duration:** 0.2s — slowest: `add` (0.8s)
 
 ### from_shumway/avm1
 
 - **Pass:** 45/45 (100%)
 - **Ignored:** 2 tests
-- **Duration:** 1m36s across 30 shards
+- **Duration:** 12s across 30 shards
 - **Lines:** 480/480 matching (100%)
-- **Avg test duration:** 1.7s — slowest: `text-bind` (17.4s)
+- **Avg test duration:** 0.2s — slowest: `array` (0.9s)
