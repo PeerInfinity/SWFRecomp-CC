@@ -52077,22 +52077,22 @@ void actionCallMethod(SWFAppContext* app_context, char* str_buffer)
 			// Try callArrayMethod to see if it handles this method
 			// Known built-in methods: toString, join, push, pop, shift, unshift, reverse,
 			// concat, slice, splice, sort, sortOn, hasOwnProperty, valueOf, addProperty
-			if ((method_name_len == 8 && strncmp(method_name, "toString", 8) == 0) ||
-			    (method_name_len == 4 && strncmp(method_name, "join", 4) == 0) ||
-			    (method_name_len == 4 && strncmp(method_name, "push", 4) == 0) ||
-			    (method_name_len == 3 && strncmp(method_name, "pop", 3) == 0) ||
-			    (method_name_len == 5 && strncmp(method_name, "shift", 5) == 0) ||
-			    (method_name_len == 7 && strncmp(method_name, "unshift", 7) == 0) ||
-			    (method_name_len == 7 && strncmp(method_name, "reverse", 7) == 0) ||
-			    (method_name_len == 6 && strncmp(method_name, "concat", 6) == 0) ||
-			    (method_name_len == 5 && strncmp(method_name, "slice", 5) == 0) ||
-			    (method_name_len == 6 && strncmp(method_name, "splice", 6) == 0) ||
-			    (method_name_len == 4 && strncmp(method_name, "sort", 4) == 0) ||
-			    (method_name_len == 6 && strncmp(method_name, "sortOn", 6) == 0) ||
-			    (method_name_len == 7 && strncmp(method_name, "valueOf", 7) == 0) ||
-			    (method_name_len == 11 && strncmp(method_name, "addProperty", 11) == 0) ||
-			    (method_name_len == 14 && strncmp(method_name, "hasOwnProperty", 14) == 0) ||
-			    (method_name_len == 10 && strncmp(method_name, "instanceof", 10) == 0)) {
+			if ((method_name_len == 8 && strncasecmp(method_name, "toString", 8) == 0) ||
+			    (method_name_len == 4 && strncasecmp(method_name, "join", 4) == 0) ||
+			    (method_name_len == 4 && strncasecmp(method_name, "push", 4) == 0) ||
+			    (method_name_len == 3 && strncasecmp(method_name, "pop", 3) == 0) ||
+			    (method_name_len == 5 && strncasecmp(method_name, "shift", 5) == 0) ||
+			    (method_name_len == 7 && strncasecmp(method_name, "unshift", 7) == 0) ||
+			    (method_name_len == 7 && strncasecmp(method_name, "reverse", 7) == 0) ||
+			    (method_name_len == 6 && strncasecmp(method_name, "concat", 6) == 0) ||
+			    (method_name_len == 5 && strncasecmp(method_name, "slice", 5) == 0) ||
+			    (method_name_len == 6 && strncasecmp(method_name, "splice", 6) == 0) ||
+			    (method_name_len == 4 && strncasecmp(method_name, "sort", 4) == 0) ||
+			    (method_name_len == 6 && strncasecmp(method_name, "sortOn", 6) == 0) ||
+			    (method_name_len == 7 && strncasecmp(method_name, "valueOf", 7) == 0) ||
+			    (method_name_len == 11 && strncasecmp(method_name, "addProperty", 11) == 0) ||
+			    (method_name_len == 14 && strncasecmp(method_name, "hasOwnProperty", 14) == 0) ||
+			    (method_name_len == 10 && strncasecmp(method_name, "instanceof", 10) == 0)) {
 				is_builtin_method = 1;
 			}
 			// Also check arr->props prototype chain for user-defined methods
@@ -52644,7 +52644,7 @@ void actionCallMethod(SWFAppContext* app_context, char* str_buffer)
 		}
 
 		// Handle addProperty as built-in method
-		if (method_name_len == 11 && strncmp(method_name, "addProperty", 11) == 0)
+		if (method_name_len == 11 && strncasecmp(method_name, "addProperty", 11) == 0)
 		{
 			u64 result = 0; // boolean false
 			if (num_args >= 3 && (args[0].type == ACTION_STACK_VALUE_STRING ||
@@ -52728,7 +52728,7 @@ void actionCallMethod(SWFAppContext* app_context, char* str_buffer)
 			ActionVar* len_prop = getProperty(obj, "length", 6);
 			int obj_len = (len_prop != NULL) ? (int)varToDoubleSimple(len_prop) : 0;
 
-			if (method_name_len == 5 && strncmp(method_name, "shift", 5) == 0) {
+			if (method_name_len == 5 && strncasecmp(method_name, "shift", 5) == 0) {
 				if (obj_len <= 0) {
 					pushUndefined(app_context);
 				} else {
@@ -52754,7 +52754,7 @@ void actionCallMethod(SWFAppContext* app_context, char* str_buffer)
 				if (args != NULL) FREE(args);
 				return;
 			}
-			if (method_name_len == 4 && strncmp(method_name, "join", 4) == 0) {
+			if (method_name_len == 4 && strncasecmp(method_name, "join", 4) == 0) {
 				// Join indexed properties with separator
 				const char* sep = ",";
 				char sep_buf[64];
@@ -52797,7 +52797,7 @@ void actionCallMethod(SWFAppContext* app_context, char* str_buffer)
 				if (args != NULL) FREE(args);
 				return;
 			}
-			if (method_name_len == 8 && strncmp(method_name, "toString", 8) == 0) {
+			if (method_name_len == 8 && strncasecmp(method_name, "toString", 8) == 0) {
 				// toString = join(",")
 				u32 buf_cap = 256;
 				char* buf = (char*) HALLOC(buf_cap);
@@ -53228,7 +53228,7 @@ void actionCallMethod(SWFAppContext* app_context, char* str_buffer)
 		}
 
 		// Check addProperty BEFORE callArrayMethod (args will be freed by callArrayMethod path)
-		if (method_name_len == 11 && strncmp(method_name, "addProperty", 11) == 0)
+		if (method_name_len == 11 && strncasecmp(method_name, "addProperty", 11) == 0)
 		{
 			u64 result = 0; // boolean false
 			if (num_args >= 3 && (args[0].type == ACTION_STACK_VALUE_STRING ||
@@ -53302,7 +53302,7 @@ void actionCallMethod(SWFAppContext* app_context, char* str_buffer)
 		}
 
 		// Array.valueOf() — return the array itself (before prototype check to preserve type)
-		if (method_name_len == 7 && strncmp(method_name, "valueOf", 7) == 0) {
+		if (method_name_len == 7 && strncasecmp(method_name, "valueOf", 7) == 0) {
 			if (args != NULL) FREE(args);
 			pushVar(app_context, &obj_var);
 			return;
@@ -53449,7 +53449,7 @@ void actionCallMethod(SWFAppContext* app_context, char* str_buffer)
 		if (args != NULL) FREE(args);
 
 		// Array.valueOf() returns the array itself
-		if (method_name_len == 7 && strncmp(method_name, "valueOf", 7) == 0)
+		if (method_name_len == 7 && strncasecmp(method_name, "valueOf", 7) == 0)
 		{
 			pushVar(app_context, &obj_var);
 		}
@@ -53740,7 +53740,7 @@ void actionCallMethod(SWFAppContext* app_context, char* str_buffer)
 			}
 		}
 
-		if (method_name_len == 4 && strncmp(method_name, "call", 4) == 0)
+		if (method_name_len == 4 && strncasecmp(method_name, "call", 4) == 0)
 		{
 			// Function.call(thisArg, arg1, arg2, ...)
 			// String.prototype stub dispatch via Function.prototype.call:
@@ -54013,7 +54013,7 @@ void actionCallMethod(SWFAppContext* app_context, char* str_buffer)
 			return;
 		}
 
-		if (method_name_len == 5 && strncmp(method_name, "apply", 5) == 0)
+		if (method_name_len == 5 && strncasecmp(method_name, "apply", 5) == 0)
 		{
 			// Function.apply(thisArg, argsArray)
 			// String.prototype stub dispatch via Function.prototype.apply, mirror
@@ -54381,7 +54381,7 @@ void actionCallMethod(SWFAppContext* app_context, char* str_buffer)
 			return;
 		}
 
-		if (method_name_len == 14 && strncmp(method_name, "hasOwnProperty", 14) == 0)
+		if (method_name_len == 14 && strncasecmp(method_name, "hasOwnProperty", 14) == 0)
 		{
 			// Functions have virtual own properties: constructor, prototype, __proto__
 			// These are not stored in own_props but hasOwnProperty should return true for them.
@@ -54421,7 +54421,7 @@ void actionCallMethod(SWFAppContext* app_context, char* str_buffer)
 			return;
 		}
 
-		if (method_name_len == 8 && strncmp(method_name, "toString", 8) == 0)
+		if (method_name_len == 8 && strncasecmp(method_name, "toString", 8) == 0)
 		{
 			if (args != NULL) FREE(args);
 			// Check if toString was overridden on this function's own_props
@@ -54456,7 +54456,7 @@ void actionCallMethod(SWFAppContext* app_context, char* str_buffer)
 			result.data.numeric_value = (u64) u16_type_Function;
 			pushVar(app_context, &result);
 		}
-		else if (method_name_len == 7 && strncmp(method_name, "valueOf", 7) == 0)
+		else if (method_name_len == 7 && strncasecmp(method_name, "valueOf", 7) == 0)
 		{
 			if (args != NULL) FREE(args);
 			// Function.valueOf() returns the function itself
@@ -54612,7 +54612,7 @@ void actionCallMethod(SWFAppContext* app_context, char* str_buffer)
 		MovieClip* mc = (MovieClip*) obj_var.data.numeric_value;
 
 		if (method_name_len == 11 &&
-			(strncmp(method_name, "gotoAndStop", 11) == 0 || strncmp(method_name, "gotoAndPlay", 11) == 0))
+			(strncasecmp(method_name, "gotoAndStop", 11) == 0 || strncasecmp(method_name, "gotoAndPlay", 11) == 0))
 		{
 			int is_play = (method_name[7] == 'P');
 			if (num_args >= 1)
@@ -54727,7 +54727,7 @@ void actionCallMethod(SWFAppContext* app_context, char* str_buffer)
 			pushUndefined(app_context);
 			return;
 		}
-		else if (method_name_len == 9 && strncmp(method_name, "prevFrame", 9) == 0)
+		else if (method_name_len == 9 && strncasecmp(method_name, "prevFrame", 9) == 0)
 		{
 #ifdef NO_GRAPHICS
 			if (mc) {
@@ -54766,7 +54766,7 @@ void actionCallMethod(SWFAppContext* app_context, char* str_buffer)
 			pushUndefined(app_context);
 			return;
 		}
-		else if (method_name_len == 9 && strncmp(method_name, "nextFrame", 9) == 0)
+		else if (method_name_len == 9 && strncasecmp(method_name, "nextFrame", 9) == 0)
 		{
 #ifdef NO_GRAPHICS
 			if (mc) {
@@ -54800,7 +54800,7 @@ void actionCallMethod(SWFAppContext* app_context, char* str_buffer)
 			pushUndefined(app_context);
 			return;
 		}
-		else if (method_name_len == 4 && strncmp(method_name, "play", 4) == 0)
+		else if (method_name_len == 4 && strncasecmp(method_name, "play", 4) == 0)
 		{
 #ifdef NO_GRAPHICS
 			// Try clip-specific play first
@@ -54820,7 +54820,7 @@ void actionCallMethod(SWFAppContext* app_context, char* str_buffer)
 			pushUndefined(app_context);
 			return;
 		}
-		else if (method_name_len == 4 && strncmp(method_name, "stop", 4) == 0)
+		else if (method_name_len == 4 && strncasecmp(method_name, "stop", 4) == 0)
 		{
 #ifdef NO_GRAPHICS
 			// Try clip-specific stop first
@@ -54840,7 +54840,7 @@ void actionCallMethod(SWFAppContext* app_context, char* str_buffer)
 			pushUndefined(app_context);
 			return;
 		}
-		else if (method_name_len == 15 && strncmp(method_name, "removeTextField", 15) == 0)
+		else if (method_name_len == 15 && strncasecmp(method_name, "removeTextField", 15) == 0)
 		{
 			// removeTextField(): remove a dynamically-created text field
 #ifdef NO_GRAPHICS
@@ -54860,7 +54860,7 @@ void actionCallMethod(SWFAppContext* app_context, char* str_buffer)
 			pushUndefined(app_context);
 			return;
 		}
-		else if (method_name_len == 15 && strncmp(method_name, "createTextField", 15) == 0)
+		else if (method_name_len == 15 && strncasecmp(method_name, "createTextField", 15) == 0)
 		{
 			// createTextField(instanceName, depth, x, y, width, height)
 			// Creates a new dynamic text field as a child of this movie clip
@@ -55068,7 +55068,7 @@ void actionCallMethod(SWFAppContext* app_context, char* str_buffer)
 #endif
 			return;
 		}
-		else if (method_name_len == 11 && strncmp(method_name, "attachMovie", 11) == 0)
+		else if (method_name_len == 11 && strncasecmp(method_name, "attachMovie", 11) == 0)
 		{
 			// attachMovie(linkageId, newName, depth [, initObject])
 			// Instantiates an exported library symbol as a child clip
@@ -55234,7 +55234,7 @@ void actionCallMethod(SWFAppContext* app_context, char* str_buffer)
 #endif
 			return;
 		}
-		else if (method_name_len == 12 && strncmp(method_name, "attachBitmap", 12) == 0)
+		else if (method_name_len == 12 && strncasecmp(method_name, "attachBitmap", 12) == 0)
 		{
 			// attachBitmap(bitmapData, depth [, pixelSnapping, smoothing])
 			// Attaches a BitmapData to the MC. Sets MC width/height from bitmap dimensions.
@@ -55260,7 +55260,7 @@ void actionCallMethod(SWFAppContext* app_context, char* str_buffer)
 			pushUndefined(app_context);
 			return;
 		}
-		else if (method_name_len == 20 && strncmp(method_name, "createEmptyMovieClip", 20) == 0)
+		else if (method_name_len == 20 && strncasecmp(method_name, "createEmptyMovieClip", 20) == 0)
 		{
 			// createEmptyMovieClip was introduced in SWF6. In SWF5 the method
 			// is hidden and a call resolves to undefined — no clip created.
@@ -55339,7 +55339,7 @@ void actionCallMethod(SWFAppContext* app_context, char* str_buffer)
 			}
 			return;
 		}
-		else if (method_name_len == 18 && strncmp(method_name, "duplicateMovieClip", 18) == 0)
+		else if (method_name_len == 18 && strncasecmp(method_name, "duplicateMovieClip", 18) == 0)
 		{
 			// duplicateMovieClip(target, depth [, initObject])
 			// Clones this MC to a new name/depth, optionally applying initObject properties.
@@ -55435,7 +55435,7 @@ void actionCallMethod(SWFAppContext* app_context, char* str_buffer)
 #endif
 			return;
 		}
-		else if (method_name_len == 13 && strncmp(method_name, "setTextFormat", 13) == 0)
+		else if (method_name_len == 13 && strncasecmp(method_name, "setTextFormat", 13) == 0)
 		{
 			// setTextFormat(fmt) / setTextFormat(begin, fmt) / setTextFormat(begin, end, fmt)
 			// In Flash, setTextFormat does NOT change the textColor property
@@ -55719,7 +55719,7 @@ void actionCallMethod(SWFAppContext* app_context, char* str_buffer)
 			pushUndefined(app_context);
 			return;
 		}
-		else if (method_name_len == 16 && strncmp(method_name, "setNewTextFormat", 16) == 0)
+		else if (method_name_len == 16 && strncasecmp(method_name, "setNewTextFormat", 16) == 0)
 		{
 #ifdef NO_GRAPHICS
 			// setNewTextFormat(fmt): set the default format for newly-typed text
@@ -55825,7 +55825,7 @@ void actionCallMethod(SWFAppContext* app_context, char* str_buffer)
 #endif
 			return;
 		}
-		else if (method_name_len == 13 && strncmp(method_name, "getTextFormat", 13) == 0)
+		else if (method_name_len == 13 && strncasecmp(method_name, "getTextFormat", 13) == 0)
 		{
 #ifdef NO_GRAPHICS
 			int tf_idx = mc->ng_textfield_idx;
@@ -55980,7 +55980,7 @@ void actionCallMethod(SWFAppContext* app_context, char* str_buffer)
 #endif
 			return;
 		}
-		else if (method_name_len == 16 && strncmp(method_name, "getNewTextFormat", 16) == 0)
+		else if (method_name_len == 16 && strncasecmp(method_name, "getNewTextFormat", 16) == 0)
 		{
 #ifdef NO_GRAPHICS
 			int tf_idx = mc->ng_textfield_idx;
@@ -56027,7 +56027,7 @@ void actionCallMethod(SWFAppContext* app_context, char* str_buffer)
 #endif
 			return;
 		}
-		else if (method_name_len == 10 && strncmp(method_name, "replaceSel", 10) == 0)
+		else if (method_name_len == 10 && strncasecmp(method_name, "replaceSel", 10) == 0)
 		{
 #ifdef NO_GRAPHICS
 			// replaceSel(newText): replace selected text range [begin, end) with newText.
@@ -56132,28 +56132,28 @@ void actionCallMethod(SWFAppContext* app_context, char* str_buffer)
 			pushUndefined(app_context);
 			return;
 		}
-		else if (method_name_len == 13 && strncmp(method_name, "getSWFVersion", 13) == 0)
+		else if (method_name_len == 13 && strncasecmp(method_name, "getSWFVersion", 13) == 0)
 		{
 			if (args != NULL) FREE(args);
 			double v = mc->load_failed ? -1.0 : mc->loaded_image_width > 0 ? -1.0 : (mc->swf_version ? (double)mc->swf_version : (double)g_swf_version);
 			PUSH(ACTION_STACK_VALUE_F64, VAL(u64, &v));
 			return;
 		}
-		else if (method_name_len == 14 && strncmp(method_name, "getBytesLoaded", 14) == 0)
+		else if (method_name_len == 14 && strncasecmp(method_name, "getBytesLoaded", 14) == 0)
 		{
 			if (args != NULL) FREE(args);
 			double v = mc->unloaded ? 0.0 : (mc->load_failed ? 0.0 : (double)mc->byte_size);
 			PUSH(ACTION_STACK_VALUE_F64, VAL(u64, &v));
 			return;
 		}
-		else if (method_name_len == 13 && strncmp(method_name, "getBytesTotal", 13) == 0)
+		else if (method_name_len == 13 && strncasecmp(method_name, "getBytesTotal", 13) == 0)
 		{
 			if (args != NULL) FREE(args);
 			double v = mc->unloaded ? 0.0 : (mc->load_failed ? -1.0 : (double)mc->byte_size);
 			PUSH(ACTION_STACK_VALUE_F64, VAL(u64, &v));
 			return;
 		}
-		else if (method_name_len == 8 && strncmp(method_name, "getDepth", 8) == 0)
+		else if (method_name_len == 8 && strncasecmp(method_name, "getDepth", 8) == 0)
 		{
 			// Return the ActionScript depth of this clip
 			if (args != NULL) FREE(args);
@@ -56173,7 +56173,7 @@ void actionCallMethod(SWFAppContext* app_context, char* str_buffer)
 			PUSH(ACTION_STACK_VALUE_F64, VAL(u64, &v));
 			return;
 		}
-		else if (method_name_len == 19 && strncmp(method_name, "getNextHighestDepth", 19) == 0)
+		else if (method_name_len == 19 && strncasecmp(method_name, "getNextHighestDepth", 19) == 0)
 		{
 			// Return the next available depth for this clip's children
 			// = max(children's depths) + 1, or 0 if all children are at negative depths
@@ -56188,7 +56188,7 @@ void actionCallMethod(SWFAppContext* app_context, char* str_buffer)
 			PUSH(ACTION_STACK_VALUE_F64, VAL(u64, &v));
 			return;
 		}
-		else if (method_name_len == 15 && strncmp(method_name, "getTextSnapshot", 15) == 0)
+		else if (method_name_len == 15 && strncasecmp(method_name, "getTextSnapshot", 15) == 0)
 		{
 			// Flash semantics: getTextSnapshot() invokes _global.TextSnapshot as
 			// a constructor with the MovieClip as the first argument.  If the user
@@ -56379,7 +56379,7 @@ void actionCallMethod(SWFAppContext* app_context, char* str_buffer)
 				return;
 			}
 		}
-		else if (method_name_len == 10 && strncmp(method_name, "swapDepths", 10) == 0)
+		else if (method_name_len == 10 && strncasecmp(method_name, "swapDepths", 10) == 0)
 		{
 			// swapDepths(numericDepth) — move clip to new depth
 			// swapDepths(clipRef) — exchange depths with another clip
@@ -56528,7 +56528,7 @@ void actionCallMethod(SWFAppContext* app_context, char* str_buffer)
 			pushUndefined(app_context);
 			return;
 		}
-		else if (method_name_len == 18 && strncmp(method_name, "getInstanceAtDepth", 18) == 0)
+		else if (method_name_len == 18 && strncasecmp(method_name, "getInstanceAtDepth", 18) == 0)
 		{
 			// Return the MovieClip at the given depth, or the parent MC for non-MC objects,
 			// or undefined if no object at that depth.
@@ -56592,8 +56592,8 @@ void actionCallMethod(SWFAppContext* app_context, char* str_buffer)
 #endif
 			return;
 		}
-		else if ((method_name_len == 9 && strncmp(method_name, "getBounds", 9) == 0) ||
-		         (method_name_len == 7 && strncmp(method_name, "getRect", 7) == 0))
+		else if ((method_name_len == 9 && strncasecmp(method_name, "getBounds", 9) == 0) ||
+		         (method_name_len == 7 && strncasecmp(method_name, "getRect", 7) == 0))
 		{
 			// getBounds(targetCoordSpace) / getRect(targetCoordSpace)
 			// Returns {xMin, yMin, xMax, yMax} in the target's coordinate space.
@@ -56956,7 +56956,7 @@ void actionCallMethod(SWFAppContext* app_context, char* str_buffer)
 			PUSH(ACTION_STACK_VALUE_OBJECT, (u64)bounds);
 			return;
 		}
-		else if (method_name_len == 7 && strncmp(method_name, "hitTest", 7) == 0)
+		else if (method_name_len == 7 && strncasecmp(method_name, "hitTest", 7) == 0)
 		{
 			// hitTest — two forms:
 			//   hitTest(x, y [, shapeFlag]) — point-in-bounding-box (shapeFlag ignored, always BB)
@@ -57330,7 +57330,7 @@ void actionCallMethod(SWFAppContext* app_context, char* str_buffer)
 			pushUndefined(app_context);
 			return;
 		}
-		else if (method_name_len == 6 && strncmp(method_name, "moveTo", 6) == 0)
+		else if (method_name_len == 6 && strncasecmp(method_name, "moveTo", 6) == 0)
 		{
 			// moveTo(x, y) — set pen position, record command
 			if (num_args >= 2 && mc != NULL) {
@@ -57345,7 +57345,7 @@ void actionCallMethod(SWFAppContext* app_context, char* str_buffer)
 			pushUndefined(app_context);
 			return;
 		}
-		else if (method_name_len == 6 && strncmp(method_name, "lineTo", 6) == 0)
+		else if (method_name_len == 6 && strncasecmp(method_name, "lineTo", 6) == 0)
 		{
 			// lineTo(x, y) — draw line segment, record command
 			if (num_args >= 2 && mc != NULL) {
@@ -57360,7 +57360,7 @@ void actionCallMethod(SWFAppContext* app_context, char* str_buffer)
 			pushUndefined(app_context);
 			return;
 		}
-		else if (method_name_len == 7 && strncmp(method_name, "curveTo", 7) == 0)
+		else if (method_name_len == 7 && strncasecmp(method_name, "curveTo", 7) == 0)
 		{
 			// curveTo(cx, cy, ax, ay) — quadratic Bezier curve
 			if (num_args >= 4 && mc != NULL) {
@@ -57378,7 +57378,7 @@ void actionCallMethod(SWFAppContext* app_context, char* str_buffer)
 			pushUndefined(app_context);
 			return;
 		}
-		else if (method_name_len == 9 && strncmp(method_name, "beginFill", 9) == 0)
+		else if (method_name_len == 9 && strncasecmp(method_name, "beginFill", 9) == 0)
 		{
 			// beginFill(rgb [, alpha]) — start solid fill
 			if (mc != NULL) {
@@ -57403,7 +57403,7 @@ void actionCallMethod(SWFAppContext* app_context, char* str_buffer)
 			pushUndefined(app_context);
 			return;
 		}
-		else if (method_name_len == 17 && strncmp(method_name, "beginGradientFill", 17) == 0)
+		else if (method_name_len == 17 && strncasecmp(method_name, "beginGradientFill", 17) == 0)
 		{
 			// beginGradientFill(fillType, colors, alphas, ratios, matrix [, spreadMode [, interpolationMode [, focalPointRatio]]])
 			if (mc != NULL && num_args >= 5) {
@@ -57578,7 +57578,7 @@ void actionCallMethod(SWFAppContext* app_context, char* str_buffer)
 			pushUndefined(app_context);
 			return;
 		}
-		else if (method_name_len == 7 && strncmp(method_name, "endFill", 7) == 0)
+		else if (method_name_len == 7 && strncasecmp(method_name, "endFill", 7) == 0)
 		{
 			// endFill() — finalize current path
 			if (mc != NULL && mc->drawing_state != NULL) {
@@ -57591,7 +57591,7 @@ void actionCallMethod(SWFAppContext* app_context, char* str_buffer)
 			pushUndefined(app_context);
 			return;
 		}
-		else if (method_name_len == 9 && strncmp(method_name, "lineStyle", 9) == 0)
+		else if (method_name_len == 9 && strncasecmp(method_name, "lineStyle", 9) == 0)
 		{
 			// lineStyle([thickness [, rgb [, alpha]]]) — set line style
 			if (mc != NULL) {
@@ -57620,7 +57620,7 @@ void actionCallMethod(SWFAppContext* app_context, char* str_buffer)
 			pushUndefined(app_context);
 			return;
 		}
-		else if (method_name_len == 17 && strncmp(method_name, "lineGradientStyle", 17) == 0)
+		else if (method_name_len == 17 && strncasecmp(method_name, "lineGradientStyle", 17) == 0)
 		{
 			// lineGradientStyle(fillType, colors, alphas, ratios, matrix [, spreadMode [, interpolationMode [, focalPointRatio]]])
 			// Same arg format as beginGradientFill, but applies to strokes
@@ -57741,7 +57741,7 @@ void actionCallMethod(SWFAppContext* app_context, char* str_buffer)
 			pushUndefined(app_context);
 			return;
 		}
-		else if (method_name_len == 5 && strncmp(method_name, "clear", 5) == 0 && mc != NULL)
+		else if (method_name_len == 5 && strncasecmp(method_name, "clear", 5) == 0 && mc != NULL)
 		{
 			// clear() — clear all drawing data
 			drawingClear(mc);
@@ -57749,7 +57749,7 @@ void actionCallMethod(SWFAppContext* app_context, char* str_buffer)
 			pushUndefined(app_context);
 			return;
 		}
-		else if (method_name_len == 13 && strncmp(method_name, "localToGlobal", 13) == 0)
+		else if (method_name_len == 13 && strncasecmp(method_name, "localToGlobal", 13) == 0)
 		{
 			// localToGlobal(pt): transform pt.x/pt.y from this MC's local coords to stage coords
 			if (num_args < 1 || args[0].type != ACTION_STACK_VALUE_OBJECT) {
@@ -57811,7 +57811,7 @@ void actionCallMethod(SWFAppContext* app_context, char* str_buffer)
 			pushUndefined(app_context);
 			return;
 		}
-		else if (method_name_len == 13 && strncmp(method_name, "globalToLocal", 13) == 0)
+		else if (method_name_len == 13 && strncasecmp(method_name, "globalToLocal", 13) == 0)
 		{
 			// globalToLocal(pt): transform pt.x/pt.y from stage coords to this MC's local coords
 			if (num_args < 1 || args[0].type != ACTION_STACK_VALUE_OBJECT) {
@@ -57884,7 +57884,7 @@ void actionCallMethod(SWFAppContext* app_context, char* str_buffer)
 			pushUndefined(app_context);
 			return;
 		}
-		else if (method_name_len == 9 && strncmp(method_name, "startDrag", 9) == 0)
+		else if (method_name_len == 9 && strncasecmp(method_name, "startDrag", 9) == 0)
 		{
 			// mc.startDrag([lockCenter [, l, t, r, b]]) — start drag on mc.
 			// Mirrors actionStartDrag but with mc as the receiver instead of a
@@ -57923,7 +57923,7 @@ void actionCallMethod(SWFAppContext* app_context, char* str_buffer)
 			pushUndefined(app_context);
 			return;
 		}
-		else if (method_name_len == 8 && strncmp(method_name, "stopDrag", 8) == 0)
+		else if (method_name_len == 8 && strncasecmp(method_name, "stopDrag", 8) == 0)
 		{
 			// mc.stopDrag() — end the current drag (also accessible as the
 			// standalone ActionEndDrag). Use the existing actionEndDrag logic.
@@ -57932,7 +57932,7 @@ void actionCallMethod(SWFAppContext* app_context, char* str_buffer)
 			pushUndefined(app_context);
 			return;
 		}
-		else if (method_name_len == 7 && strncmp(method_name, "setMask", 7) == 0)
+		else if (method_name_len == 7 && strncasecmp(method_name, "setMask", 7) == 0)
 		{
 			// setMask(mask) — set a display object as this clip's mask
 			// No args → undefined. null/undefined arg → remove mask, return true.
@@ -58013,7 +58013,7 @@ void actionCallMethod(SWFAppContext* app_context, char* str_buffer)
 			PUSH(ACTION_STACK_VALUE_BOOLEAN, (mask_mc != NULL) ? 1 : 0);
 			return;
 		}
-		else if (method_name_len == 15 && strncmp(method_name, "removeMovieClip", 15) == 0)
+		else if (method_name_len == 15 && strncasecmp(method_name, "removeMovieClip", 15) == 0)
 		{
 			if (args != NULL) FREE(args);
 #ifdef NO_GRAPHICS
@@ -58071,7 +58071,7 @@ void actionCallMethod(SWFAppContext* app_context, char* str_buffer)
 			pushUndefined(app_context);
 			return;
 		}
-		else if (method_name_len == 9 && strncmp(method_name, "loadMovie", 9) == 0)
+		else if (method_name_len == 9 && strncasecmp(method_name, "loadMovie", 9) == 0)
 		{
 			// mc.loadMovie(url) — load a pre-compiled child SWF into this clip
 			if (num_args >= 1 && args[0].type == ACTION_STACK_VALUE_STRING) {
@@ -58124,7 +58124,7 @@ void actionCallMethod(SWFAppContext* app_context, char* str_buffer)
 			pushUndefined(app_context);
 			return;
 		}
-		else if (method_name_len == 11 && strncmp(method_name, "unloadMovie", 11) == 0)
+		else if (method_name_len == 11 && strncasecmp(method_name, "unloadMovie", 11) == 0)
 		{
 			// mc.unloadMovie() — unload content and fire onUnload
 			if (mc != NULL && mc->dynamic_props != NULL) {
@@ -58143,7 +58143,7 @@ void actionCallMethod(SWFAppContext* app_context, char* str_buffer)
 			pushUndefined(app_context);
 			return;
 		}
-		else if (method_name_len == 14 && strncmp(method_name, "hasOwnProperty", 14) == 0)
+		else if (method_name_len == 14 && strncasecmp(method_name, "hasOwnProperty", 14) == 0)
 		{
 			// hasOwnProperty(name): check if MC has the named property directly
 			int _hop_result = 0;
@@ -58185,7 +58185,7 @@ void actionCallMethod(SWFAppContext* app_context, char* str_buffer)
 			pushVar(app_context, &_hop_ret);
 			return;
 		}
-		else if (method_name_len == 5 && strncmp(method_name, "watch", 5) == 0)
+		else if (method_name_len == 5 && strncasecmp(method_name, "watch", 5) == 0)
 		{
 			// mc.watch(prop, fn [, userData]) — register a property watcher on MovieClip
 			ActionVar _w_ret = {0};
@@ -58232,7 +58232,7 @@ void actionCallMethod(SWFAppContext* app_context, char* str_buffer)
 			pushVar(app_context, &_w_ret);
 			return;
 		}
-		else if (method_name_len == 7 && strncmp(method_name, "unwatch", 7) == 0)
+		else if (method_name_len == 7 && strncasecmp(method_name, "unwatch", 7) == 0)
 		{
 			// mc.unwatch(prop) — remove a property watcher from MovieClip
 			ActionVar _uw_ret = {0};
@@ -58263,7 +58263,7 @@ void actionCallMethod(SWFAppContext* app_context, char* str_buffer)
 			pushVar(app_context, &_uw_ret);
 			return;
 		}
-		else if (method_name_len == 11 && strncmp(method_name, "addProperty", 11) == 0)
+		else if (method_name_len == 11 && strncasecmp(method_name, "addProperty", 11) == 0)
 		{
 			// addProperty(name, getter, setter) on MovieClip — install virtual getter/setter on dynamic_props
 			u64 result = 0; // boolean false
@@ -58671,7 +58671,7 @@ void actionCallMethod(SWFAppContext* app_context, char* str_buffer)
 	         obj_var.type == ACTION_STACK_VALUE_BOOLEAN)
 	{
 		// Number/Boolean primitive - handle toString() and valueOf()
-		if (method_name_len == 8 && strncmp(method_name, "toString", 8) == 0)
+		if (method_name_len == 8 && strncasecmp(method_name, "toString", 8) == 0)
 		{
 			if (obj_var.type == ACTION_STACK_VALUE_BOOLEAN)
 			{
@@ -58769,7 +58769,7 @@ void actionCallMethod(SWFAppContext* app_context, char* str_buffer)
 				}
 			}
 		}
-		else if (method_name_len == 7 && strncmp(method_name, "valueOf", 7) == 0)
+		else if (method_name_len == 7 && strncasecmp(method_name, "valueOf", 7) == 0)
 		{
 			if (args != NULL) FREE(args);
 			pushVar(app_context, &obj_var);
