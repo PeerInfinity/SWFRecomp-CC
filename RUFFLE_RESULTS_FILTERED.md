@@ -3,8 +3,8 @@
 *Tests on the [ignored list](ruffle-tests/ignored_tests.txt) are excluded.*  
 *See [RUFFLE_RESULTS.md](RUFFLE_RESULTS.md) for unfiltered results.*
 
-**Commit:** `a815e18bbb66`  
-**Date:** 2026-04-25 16:17 UTC  
+**Commit:** `8365e99266c8`  
+**Date:** 2026-04-25 17:43 UTC  
 **Total duration:** 4m44s
 
 ## Results by Suite
@@ -83,21 +83,21 @@ Tests verified against Flash's actual output (`output.flash.txt`).
 
 - **Pass:** 596/600 (99.3%)
 - **Ignored:** 41 tests
-- **Duration:** 2m37s across 30 shards
+- **Duration:** 2m39s across 30 shards
 - **Lines:** 94,915/95,093 matching (99.8%)
-- **Avg test duration:** 0.2s — slowest: `edittext_newline_stripping` (6.6s)
+- **Avg test duration:** 0.2s — slowest: `edittext_newline_stripping` (5.9s)
 
 ### from_gnash/actionscript.all
 
 - **Pass:** 113/190 (59.5%)
-- **Duration:** 52s across 30 shards
+- **Duration:** 51s across 30 shards
 - **Lines:** 14,754/16,957 matching (87.0%)
-- **Avg test duration:** 0.2s — slowest: `BitmapData-v8` (0.4s)
+- **Avg test duration:** 0.2s — slowest: `String-v8` (0.6s)
 
 ### from_gnash/misc-ming.all
 
 - **Pass:** 42/102 (41.2%)
-- **Duration:** 34s across 30 shards
+- **Duration:** 33s across 30 shards
 - **Lines:** 2,324/4,541 matching (51.2%)
 - **Avg test duration:** 0.3s — slowest: `matrix_test` (4.5s)
 
@@ -113,21 +113,21 @@ Tests verified against Flash's actual output (`output.flash.txt`).
 - **Pass:** 5/16 (31.2%)
 - **Duration:** 4s across 30 shards
 - **Lines:** 250/499 matching (50.1%)
-- **Avg test duration:** 0.2s — slowest: `sound` (0.2s)
+- **Avg test duration:** 0.2s — slowest: `action_execution_order_test10` (0.2s)
 
 ### from_gnash/misc-swfmill.all
 
 - **Pass:** 15/18 (83.3%)
 - **Duration:** 4s across 30 shards
 - **Lines:** 47/51 matching (92.2%)
-- **Avg test duration:** 0.2s — slowest: `dict_override` (0.2s)
+- **Avg test duration:** 0.2s — slowest: `func_dict` (0.4s)
 
 ### from_shumway
 
 - **Pass:** 63/92 (68.5%)
-- **Duration:** 21s across 30 shards
+- **Duration:** 22s across 30 shards
 - **Lines:** 662/1,276 matching (51.9%)
-- **Avg test duration:** 0.2s — slowest: `fuzz/5d828b99311b51073db245c0c3468e9f12d9cc8226ecbf00916cb725c02528cd` (0.3s)
+- **Avg test duration:** 0.2s — slowest: `fuzz/07580c34e05cda7bd4c976c459f0a667ca3c2602110e34186bca676f311e84da` (0.6s)
 
 ### from_shumway/avm1
 
