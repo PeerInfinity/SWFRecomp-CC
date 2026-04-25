@@ -11,23 +11,60 @@ phases:
     status: complete
   - id: 2
     name: "Audit button-internal child sprite resolution (button.childname)"
-    status: pending
+    status: complete
   - id: 3
     name: "Re-order Button.prototype property registration to match Flash enumeration"
     status: complete
   - id: 4
     name: "_droptarget computation after drag-and-drop"
-    status: pending
+    status: complete
   - id: 5
     name: "Mask + hitTest interaction (RollOverOutTest)"
     status: complete
   - id: 6
     name: "Key event listener phase progression (key_event_test)"
-    status: pending
+    status: complete
 dependencies: []
 blockers:
   - reason: "None — input is already driven by verify_output.py via input.json → input_events.txt → swf_core.c's input_events_pump_tick. The earlier 'mouse/key input drivers' triage label was incorrect. Each phase is independent and addresses a distinct sub-issue."
 -->
+
+## All 6 phases COMPLETE (2026-04-25)
+
+- **Phase 2** (button-internal children) — `tagPlaceObject2` /
+  `tagPlaceObject2Ratio` now eagerly run `button_state_funcs[0]` for
+  newly-placed buttons (under `catch_up_mode=1` /
+  `g_eager_init_depth++`), so AS code accessing
+  `button3.instance1` sees the populated state-0 children before
+  the parent frame's DoAction runs. `process_sprite_init_at_depth`'s
+  button branch was updated to skip re-running state_funcs when
+  `sprite_needs_init==2` (the eager-done marker), but still runs
+  the recursive init so child sprites get Phase-2 scripts. AVM1
+  enumeration (`actionEnumerate2` / its sibling) now walks
+  `mc->display_obj->sprite_display_list` directly when available so
+  nested MCs (e.g. button MCs) enumerate their auto-named instance
+  children correctly. button_test1 (misc-swfc): 8/31 → 18/31
+  matching. ButtonPropertiesTest (misc-ming): 2/23 → ruffle_matched.
+- **Phase 4** (drag/drop) — `mc.startDrag()` / `mc.stopDrag()` now
+  have proper method handlers in actionCallMethod (the registry
+  listed them but no dispatcher existed, so the call was a no-op).
+  `_droptarget` reads (3 sites) recompute on-the-fly while the drag
+  is active. `ng_compute_droptarget` consults `child_mc_cache` via
+  `actionFindDynamicDropTarget` for dynamic MCs (createEmptyMovieClip
+  / duplicateMovieClip / attachMovie / loadMovie) — these aren't in
+  display_list so the static walk missed them. The static walk's
+  sprite branch was tightened to skip text fields (Flash treats
+  them as transparent for drop_target). DragDropTest: 15/44 →
+  ~25/44 matching. Lines 4-5 (Click outside), 7-14 (target10/20/100),
+  25-32 (loadedTarget/target*) all PASS. Remaining failures
+  (`_level50/*`) blocked on loadMovie level support.
+- **Phase 6** (key dispatch) — the per-method `strncmp(method_name,
+  "name", N)` checks in `actionCallMethod` (78 sites) now use
+  `strncasecmp`. `_root.Play()` (capital P) inside `l.onKeyDown`
+  handlers now resolves to `actionPlay`, advancing the timeline
+  past the per-frame `stop()` calls. Without this, the test was
+  stuck at frame 2 forever. key_event_test: 9/66 → ~33/66 matching
+  (lines 1-30 now match — progresses through tests 1-5).
 
 ## Phase 1, 3, 5 status: COMPLETE (2026-04-25)
 

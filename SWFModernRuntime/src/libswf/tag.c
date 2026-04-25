@@ -2847,6 +2847,24 @@ static int find_drop_target_in_dl(DisplayObject* dl, size_t dl_max,
 		float sx = transform_data[entry->transform_id][0];
 		float sy = transform_data[entry->transform_id][5];
 
+		// If this entry has an associated AS-level MC with as_set_flags
+		// (e.g. Dejagnu._y = 100), apply that delta to the entry's stage
+		// position so AS-modified positions take effect for drop_target
+		// hit-testing.
+		if (entry->instance_name != NULL) {
+			extern MovieClip* actionFindMovieClipByName(const char* name);
+			MovieClip* _entry_mc = actionFindMovieClipByName(entry->instance_name);
+			if (_entry_mc != NULL && _entry_mc->display_obj == (void*)entry) {
+				if (_entry_mc->as_set_flags & 1) {
+					// Override x with AS-set value (in pixels → twips)
+					entry_stage_x = parent_stage_x + (float)_entry_mc->x * 20.0f;
+				}
+				if (_entry_mc->as_set_flags & 2) {
+					entry_stage_y = parent_stage_y + (float)_entry_mc->y * 20.0f;
+				}
+			}
+		}
+
 		int hit = 0;
 
 		if (ch->type == CHAR_TYPE_SHAPE || ch->type == CHAR_TYPE_MORPH_SHAPE)
@@ -2866,15 +2884,23 @@ static int find_drop_target_in_dl(DisplayObject* dl, size_t dl_max,
 		}
 		else if (ch->type == CHAR_TYPE_SPRITE)
 		{
-			// Sprite: test SHAPE coverage only (skip text fields), so large
-			// sprites with text fields (e.g. Dejagnu trace) don't absorb drops.
+			// Sprite: test against the sprite's content AABB (includes both
+			// shape and text-field children). text_blocks_clicks expects
+			// /texts (a sprite containing a text field) to be a drop target.
 			if (entry->sprite_display_list != NULL && entry->sprite_max_depth > 0)
 			{
-				hit = find_drop_target_shape_hit_recursive(entry->sprite_display_list,
-				    entry->sprite_max_depth,
-				    (double)sx, 0.0, 0.0, (double)sy,
-				    (double)entry_stage_x, (double)entry_stage_y,
-				    (double)mouse_x, (double)mouse_y);
+				float lxmin, lxmax, lymin, lymax;
+				if (sprite_content_bounds_twips(entry->sprite_display_list,
+				        entry->sprite_max_depth, &lxmin, &lxmax, &lymin, &lymax))
+				{
+					float x0 = entry_stage_x + sx * lxmin;
+					float x1 = entry_stage_x + sx * lxmax;
+					float y0 = entry_stage_y + sy * lymin;
+					float y1 = entry_stage_y + sy * lymax;
+					if (x0 > x1) { float t = x0; x0 = x1; x1 = t; }
+					if (y0 > y1) { float t = y0; y0 = y1; y1 = t; }
+					hit = (mouse_x >= x0 && mouse_x <= x1 && mouse_y >= y0 && mouse_y <= y1);
+				}
 			}
 		}
 
@@ -2921,18 +2947,21 @@ int ng_compute_droptarget(float stage_x_twips, float stage_y_twips,
 {
 	if (out_size == 0) return 0;
 	out_path[0] = '\0';
-	// First check dynamic MCs (createEmptyMovieClip / duplicateMovieClip /
-	// attachMovie) — they aren't in display_list, but Flash treats them as
-	// valid drop targets via their drawing-API geometry. Walked in
-	// reverse-depth order to mirror Flash's front-to-back hit-testing.
+	// Check static display_list first (timeline-placed clips). Flash treats
+	// these as taking precedence for drop_target when both static and
+	// dynamic clips overlap at the test point — e.g. text_blocks_clicks
+	// expects "/texts" (static) instead of "/click_mc" (dynamic).
+	if (find_drop_target_in_dl(display_list, max_depth,
+	    0.0f, 0.0f, stage_x_twips, stage_y_twips,
+	    skip_name, "", out_path, out_size))
+		return 1;
+	// Fall back to dynamic MCs (createEmptyMovieClip / duplicateMovieClip /
+	// attachMovie) — they aren't in display_list, so the static walk above
+	// can't find them. DragDropTest's target10/target20/etc. land here.
 	extern int actionFindDynamicDropTarget(float stage_x_twips, float stage_y_twips,
 	    const char* skip_name, char* out_path, size_t out_size);
-	if (actionFindDynamicDropTarget(stage_x_twips, stage_y_twips,
-	    skip_name, out_path, out_size))
-		return 1;
-	return find_drop_target_in_dl(display_list, max_depth,
-	    0.0f, 0.0f, stage_x_twips, stage_y_twips,
-	    skip_name, "", out_path, out_size);
+	return actionFindDynamicDropTarget(stage_x_twips, stage_y_twips,
+	    skip_name, out_path, out_size);
 }
 
 // ---------------------------------------------------------------------------
