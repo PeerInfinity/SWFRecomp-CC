@@ -29,7 +29,7 @@ Status (CI at 205a9a77 — 2026-04-25 run): **misc-ming.all 52/102 effective (51
 
 **Documented blockers (≥80% match — single fix would land but blocked):**
 - `loop/loop_test8` (97.4%, 37/38) — blocked on deferred CLIP_EVENT_UNLOAD (loop_test7 blocker; one trailing `mc5unloaded` line).
-- `RollOverOutTest` (80%, 4/5) — needs mouse input driver (verifier doesn't drive input).
+- `RollOverOutTest` (80%, 4/5) — `maskee.hitTest(80, 280, true)` shape-flag hitTest doesn't honor "ignore mask occlusion" Flash semantics. **See `incomplete/BUTTON_INFRASTRUCTURE_PLAN.md` Phase 5.**
 
 **Multi-issue / blocked clusters:**
 - `matrix_test` (84%) — multi-issue (negative-_yscale matrix, getBounds-after-rotate, sin(90°) FP residuals).
@@ -40,8 +40,8 @@ Status (CI at 205a9a77 — 2026-04-25 run): **misc-ming.all 52/102 effective (51
 - `loop_test`, `replace_sprites1test`, `replace_buttons1test`, `replace_shapes1test`, `frame_label_test`, `action_execution_order_test6` — same family (deferred queue or zero-output DoInitAction).
 - `register_class/RegisterClassTest3/4/registerClassTest/registerClassTest2` — combine registerClass with attachMovie / frame scripting; complex multi-issue.
 
-**Input-driven (need verifier mouse/key driver — out of scope):**
-- `ButtonEventsTest`, `ButtonPropertiesTest`, `key_event_test`, `DragDropTest`, `RollOverOutTest`.
+**Button / drag / key clusters (NOT actually input-driver-blocked — verifier does drive input):**
+- `ButtonEventsTest`, `ButtonPropertiesTest`, `key_event_test`, `DragDropTest`, `RollOverOutTest`. **See `incomplete/BUTTON_INFRASTRUCTURE_PLAN.md`** — distinct sub-issues per test (typeof, prototype enum order, button-internal children, _droptarget, mask+hitTest, key listener phase progression).
 
 **Untackled / undocumented (potentially attackable in future sessions):**
 - `DefineEditTextVariableNameTest` (68.1%) — duplicated checks past line 340 suggest frame-loop replay.
@@ -56,7 +56,8 @@ Status (CI at 205a9a77 — 2026-04-25 run): **misc-ming.all 52/102 effective (51
 - `movieclip_destruction_test2` (92.9%, 52/56) — last 2 lines blocked: explicit `mc2.onUnload()` invocation produces no trace output (well-documented blocker; see "movieclip_destruction_test2 — onUnload depth shift + swapDepths gating" below).
 - `sound` (100% match-rate but actual has 5 trailing lines) — blocked on sound-position timing; expected output literally truncates mid-test because Flash never reaches `__END_OF_TEST__` when waiting for sound.
 - `swf4opcode` (63.2%) — SWF4 path-syntax semantics (`/mc1.x`, `/mc1:_x`, bare `mc1`) and SWF4 NOT opcode on -0; not yet documented.
-- `mouse_drag_test` (50%), `button_test1` (25.8%) — input-driven.
+- `button_test1` (25.8%) — button-internal child sprite resolution. **See `incomplete/BUTTON_INFRASTRUCTURE_PLAN.md` Phase 2.**
+- `mouse_drag_test` (50%) — Dejagnu `xcheck()` zero-arg or no-text variant handling on the empty `PASSED:`/`FAILED:` lines. Needs separate triage.
 - `soft_reference_test1` (31.1%) — soft/weak references on dynamic MCs.
 - `movieclip_destruction_test4` (20%) — many issues, related to test2 family.
 - `opcode_guard_test2` (runtime_error) — needs separate triage.
