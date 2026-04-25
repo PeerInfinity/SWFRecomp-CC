@@ -1,9 +1,9 @@
 {
   "metadata": {
-    "old_timestamp": "2026-04-24T23:19:44.062060+00:00",
-    "old_git_sha": "652864e27b1eabd1fd4a044c68893ed6f67ce126",
-    "new_timestamp": "2026-04-25T00:12:48.132239+00:00",
-    "new_git_sha": "67c780cca1f6df2b0cae638e4b726892a310d88f",
+    "old_timestamp": "2026-04-25T00:12:48.132239+00:00",
+    "old_git_sha": "67c780cca1f6df2b0cae638e4b726892a310d88f",
+    "new_timestamp": "2026-04-25T01:45:01.671814+00:00",
+    "new_git_sha": "3a9cd203baf68352b04f8d2b53dc0d90b4a0cf19",
     "partial": false,
     "same_commit": false
   },
@@ -13,21 +13,70 @@
     "old_effective_pass": 50,
     "old_total": 102,
     "old_pass_rate": 39.2,
-    "new_pass": 40,
+    "new_pass": 41,
     "new_ruffle_matched": 10,
-    "new_effective_pass": 50,
+    "new_effective_pass": 51,
     "new_total": 102,
-    "new_pass_rate": 39.2,
+    "new_pass_rate": 40.2,
     "old_mismatched_lines": 2229,
-    "new_mismatched_lines": 2229,
+    "new_mismatched_lines": 2221,
     "increased_mismatches": 0,
-    "decreased_mismatches": 0,
-    "newly_passing": 0,
+    "decreased_mismatches": 8,
+    "newly_passing": 1,
     "newly_failing": 0,
-    "status_changed": 0,
-    "unchanged": 102,
+    "status_changed": 1,
+    "unchanged": 99,
     "added": 0,
     "removed": 0
   },
-  "changes": []
+  "changes": [
+    {
+      "test": "DrawingApiTest",
+      "change_type": "changed",
+      "old_status": "output_mismatch",
+      "new_status": "output_mismatch",
+      "old_lines": {
+        "actual_lines": 93,
+        "expected_lines": 93,
+        "matching_lines": 43
+      },
+      "new_lines": {
+        "actual_lines": 95,
+        "expected_lines": 93,
+        "matching_lines": 43
+      }
+    },
+    {
+      "test": "ResolveEventsTest",
+      "change_type": "changed",
+      "old_status": "output_mismatch",
+      "new_status": "output_mismatch",
+      "old_lines": {
+        "actual_lines": 15,
+        "expected_lines": 15,
+        "matching_lines": 8
+      },
+      "new_lines": {
+        "actual_lines": 15,
+        "expected_lines": 15,
+        "matching_lines": 11
+      }
+    },
+    {
+      "test": "event_handler_scope_test",
+      "change_type": "changed",
+      "old_status": "output_mismatch",
+      "new_status": "pass",
+      "old_lines": {
+        "actual_lines": 16,
+        "expected_lines": 16,
+        "matching_lines": 11
+      },
+      "new_lines": {
+        "actual_lines": 16,
+        "expected_lines": 16,
+        "matching_lines": 16
+      }
+    }
+  ]
 }
