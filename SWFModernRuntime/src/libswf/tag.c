@@ -538,6 +538,12 @@ static void process_sprite_init_at_depth(SWFAppContext* app_context, MovieClip* 
 		}
 		else if (ch->type == CHAR_TYPE_BUTTON && ch->button_state_funcs != NULL)
 		{
+			// sprite_needs_init==2 means tagPlaceObject2 already ran state_funcs[0]
+			// eagerly. Just do the recursion here so child sprites get Phase-2
+			// scripts. sprite_needs_init==1 is the legacy path where state_funcs
+			// hasn't run yet (e.g. after RemoveObject/replace patterns).
+			int already_eager = (obj->sprite_needs_init == 2);
+
 			// Pre-create the button MC while still in the parent's display_list context
 			MovieClip* button_mc = NULL;
 			if (obj->instance_name != NULL)
@@ -556,23 +562,26 @@ static void process_sprite_init_at_depth(SWFAppContext* app_context, MovieClip* 
 			max_depth             = obj->sprite_max_depth;
 			display_list_capacity = obj->sprite_dl_capacity;
 
-			// Run up-state (button_state_funcs[0]) to place button's children.
-			// Phase 7b: briefly set g_current_context to button_mc so that
-			// tagPlaceObject2's MC pre-create (and any CLIP_LOAD queueing
-			// for button children) uses button_mc as the parent. Without
-			// this, button children (e.g. instance1) get parented to the
-			// button's own parent (root), breaking _parent chain
-			// (movieclip_in_removed_button canary).
-			MovieClip* saved_ctx_btn = g_current_context;
-			if (button_mc) actionSetCurrentContext(button_mc);
-			ch->button_state_funcs[0](app_context);
-			actionSetCurrentContext(saved_ctx_btn);
+			if (!already_eager)
+			{
+				// Run up-state (button_state_funcs[0]) to place button's children.
+				// Phase 7b: briefly set g_current_context to button_mc so that
+				// tagPlaceObject2's MC pre-create (and any CLIP_LOAD queueing
+				// for button children) uses button_mc as the parent. Without
+				// this, button children (e.g. instance1) get parented to the
+				// button's own parent (root), breaking _parent chain
+				// (movieclip_in_removed_button canary).
+				MovieClip* saved_ctx_btn = g_current_context;
+				if (button_mc) actionSetCurrentContext(button_mc);
+				ch->button_state_funcs[0](app_context);
+				actionSetCurrentContext(saved_ctx_btn);
 
-			// Sync back to obj BEFORE recursive init so that child scripts
-			// accessing parent_mc->display_obj see up-to-date sprite_max_depth.
-			obj->sprite_display_list  = display_list;
-			obj->sprite_max_depth     = max_depth;
-			obj->sprite_dl_capacity   = display_list_capacity;
+				// Sync back to obj BEFORE recursive init so that child scripts
+				// accessing parent_mc->display_obj see up-to-date sprite_max_depth.
+				obj->sprite_display_list  = display_list;
+				obj->sprite_max_depth     = max_depth;
+				obj->sprite_dl_capacity   = display_list_capacity;
+			}
 
 			// Recursively initialize sprites placed by the up-state func,
 			// using button_mc as their parent.
@@ -3952,6 +3961,57 @@ void tagPlaceObject2(SWFAppContext* app_context, size_t depth, size_t char_id, u
 				saved_dl[depth].sprite_current_frame = (sp_ch->sprite_frame_count > 0) ? (1 % sp_ch->sprite_frame_count) : 0;
 			}
 		}
+		else if (dictionary[char_id].type == CHAR_TYPE_BUTTON)
+		{
+			// Buttons need eager init so AS code accessing button.childName
+			// (e.g. button3.instance1) sees the populated state-0 children
+			// before the parent frame's DoAction runs. State funcs only emit
+			// tagPlaceObject2 calls (no scripts), so this is safe under
+			// catch_up_mode=1 — nested sprite placements still defer their
+			// own Phase-2 scripts via the sprite eager-init path above.
+			Character* btn_ch = &dictionary[char_id];
+			if (btn_ch->button_state_funcs != NULL && btn_ch->button_state_funcs[0] != NULL)
+			{
+				display_list[depth].sprite_needs_init = 2; // mark: state_0 done, recurse later
+				// Pre-create the button MC with the correct parent so child
+				// placements inside state_funcs see button_mc as g_current_context
+				// and their _parent chain resolves correctly.
+				MovieClip* parent_for_btn = g_current_context ? g_current_context : &root_movieclip;
+				MovieClip* button_mc = NULL;
+				if (display_list[depth].instance_name != NULL) {
+					button_mc = actionFindOrCreateMovieClip(app_context,
+						display_list[depth].instance_name, parent_for_btn);
+					if (button_mc) {
+						button_mc->is_button_mc = 1;
+						button_mc->display_obj = (void*)&display_list[depth];
+					}
+				}
+
+				DisplayObject* saved_dl = display_list;
+				size_t saved_max = max_depth;
+				size_t saved_cap = display_list_capacity;
+				display_list = saved_dl[depth].sprite_display_list;
+				max_depth = saved_dl[depth].sprite_max_depth;
+				display_list_capacity = saved_dl[depth].sprite_dl_capacity;
+
+				int saved_catch_up = catch_up_mode;
+				catch_up_mode = 1;
+				g_eager_init_depth++;
+				MovieClip* saved_ctx_btn = g_current_context;
+				if (button_mc) actionSetCurrentContext(button_mc);
+				btn_ch->button_state_funcs[0](app_context);
+				actionSetCurrentContext(saved_ctx_btn);
+				g_eager_init_depth--;
+				catch_up_mode = saved_catch_up;
+
+				saved_dl[depth].sprite_display_list = display_list;
+				saved_dl[depth].sprite_max_depth = max_depth;
+				saved_dl[depth].sprite_dl_capacity = display_list_capacity;
+				display_list = saved_dl;
+				max_depth = saved_max;
+				display_list_capacity = saved_cap;
+			}
+		}
 	}
 
 	// Drain INIT → CONSTRUCT → REGISTER_CTOR at the outermost placement.
@@ -4252,6 +4312,57 @@ void tagPlaceObject2Ratio(SWFAppContext* app_context, size_t depth, size_t char_
 				max_depth = saved_max;
 				display_list_capacity = saved_cap;
 				saved_dl[depth].sprite_current_frame = (sp_ch->sprite_frame_count > 0) ? (1 % sp_ch->sprite_frame_count) : 0;
+			}
+		}
+		else if (dictionary[char_id].type == CHAR_TYPE_BUTTON)
+		{
+			// Buttons need eager init so AS code accessing button.childName
+			// (e.g. button3.instance1) sees the populated state-0 children
+			// before the parent frame's DoAction runs. State funcs only emit
+			// tagPlaceObject2 calls (no scripts), so this is safe under
+			// catch_up_mode=1 — nested sprite placements still defer their
+			// own Phase-2 scripts via the sprite eager-init path above.
+			Character* btn_ch = &dictionary[char_id];
+			if (btn_ch->button_state_funcs != NULL && btn_ch->button_state_funcs[0] != NULL)
+			{
+				display_list[depth].sprite_needs_init = 2; // mark: state_0 done, recurse later
+				// Pre-create the button MC with the correct parent so child
+				// placements inside state_funcs see button_mc as g_current_context
+				// and their _parent chain resolves correctly.
+				MovieClip* parent_for_btn = g_current_context ? g_current_context : &root_movieclip;
+				MovieClip* button_mc = NULL;
+				if (display_list[depth].instance_name != NULL) {
+					button_mc = actionFindOrCreateMovieClip(app_context,
+						display_list[depth].instance_name, parent_for_btn);
+					if (button_mc) {
+						button_mc->is_button_mc = 1;
+						button_mc->display_obj = (void*)&display_list[depth];
+					}
+				}
+
+				DisplayObject* saved_dl = display_list;
+				size_t saved_max = max_depth;
+				size_t saved_cap = display_list_capacity;
+				display_list = saved_dl[depth].sprite_display_list;
+				max_depth = saved_dl[depth].sprite_max_depth;
+				display_list_capacity = saved_dl[depth].sprite_dl_capacity;
+
+				int saved_catch_up = catch_up_mode;
+				catch_up_mode = 1;
+				g_eager_init_depth++;
+				MovieClip* saved_ctx_btn = g_current_context;
+				if (button_mc) actionSetCurrentContext(button_mc);
+				btn_ch->button_state_funcs[0](app_context);
+				actionSetCurrentContext(saved_ctx_btn);
+				g_eager_init_depth--;
+				catch_up_mode = saved_catch_up;
+
+				saved_dl[depth].sprite_display_list = display_list;
+				saved_dl[depth].sprite_max_depth = max_depth;
+				saved_dl[depth].sprite_dl_capacity = display_list_capacity;
+				display_list = saved_dl;
+				max_depth = saved_max;
+				display_list_capacity = saved_cap;
 			}
 		}
 	}

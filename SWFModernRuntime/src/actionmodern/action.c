@@ -24309,8 +24309,25 @@ void actionEnumerate(SWFAppContext* app_context, char* str_buffer)
 #ifdef NO_GRAPHICS
 	if (mc != NULL)
 	{
-		const char* parent_name = (mc == &root_movieclip) ? NULL : mc->name;
-		ng_enumerateChildren(parent_name, enum_child_callback, app_context);
+		// Prefer mc->display_obj walk so nested MCs (e.g. button MCs whose
+		// display_obj points into a parent's sprite_display_list, not the
+		// root display_list) enumerate correctly.
+		if (mc == &root_movieclip) {
+			ng_enumerateChildren(NULL, enum_child_callback, app_context);
+		} else if (mc->display_obj != NULL) {
+			DisplayObject* _enum_dobj = (DisplayObject*)mc->display_obj;
+			if (_enum_dobj->sprite_display_list != NULL) {
+				for (size_t _ed = 1; _ed <= _enum_dobj->sprite_max_depth; _ed++) {
+					DisplayObject* _ec = &_enum_dobj->sprite_display_list[_ed];
+					if (_ec->char_id == 0) continue;
+					if (_ec->instance_name != NULL && _ec->instance_name[0] != '\0')
+						enum_child_callback(_ec->instance_name,
+							(u32)strlen(_ec->instance_name), app_context);
+				}
+			}
+		} else {
+			ng_enumerateChildren(mc->name, enum_child_callback, app_context);
+		}
 	}
 #endif
 }
@@ -35825,8 +35842,26 @@ void actionEnumerate2(SWFAppContext* app_context, char* str_buffer)
 			// Enumerate child MovieClip instance names first (pushed early = popped late)
 #ifdef NO_GRAPHICS
 			{
-				const char* parent_name = (mc == &root_movieclip) ? NULL : mc->name;
-				ng_enumerateChildren(parent_name, enum_child_callback, app_context);
+				// Prefer mc->display_obj walk so nested MCs (e.g. button MCs whose
+				// display_obj points into a parent's sprite_display_list, not the
+				// root display_list) enumerate correctly. Fall back to root-name
+				// lookup if display_obj isn't set (legacy path).
+				if (mc == &root_movieclip) {
+					ng_enumerateChildren(NULL, enum_child_callback, app_context);
+				} else if (mc->display_obj != NULL) {
+					DisplayObject* _enum_dobj = (DisplayObject*)mc->display_obj;
+					if (_enum_dobj->sprite_display_list != NULL) {
+						for (size_t _ed = 1; _ed <= _enum_dobj->sprite_max_depth; _ed++) {
+							DisplayObject* _ec = &_enum_dobj->sprite_display_list[_ed];
+							if (_ec->char_id == 0) continue;
+							if (_ec->instance_name != NULL && _ec->instance_name[0] != '\0')
+								enum_child_callback(_ec->instance_name,
+									(u32)strlen(_ec->instance_name), app_context);
+						}
+					}
+				} else {
+					ng_enumerateChildren(mc->name, enum_child_callback, app_context);
+				}
 			}
 #endif
 
