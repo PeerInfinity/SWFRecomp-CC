@@ -33,7 +33,7 @@ Status (CI at 205a9a77 — 2026-04-25 run): **misc-ming.all 52/102 effective (51
 
 **Multi-issue / blocked clusters:**
 - `matrix_test` (84%) — multi-issue (negative-_yscale matrix, getBounds-after-rotate, sin(90°) FP residuals).
-- `displaylist_depths_test/2/3/8/9`, `DepthLimitsTest`, `duplicate_movie_clip_test/2` — all blocked on CloneSprite depth-bias unification ("CloneSprite depth-bias trade-off (open)" below).
+- `displaylist_depths_test/2/3/8/9`, `DepthLimitsTest`, `duplicate_movie_clip_test/2` — all blocked on CloneSprite depth-bias unification. **See `incomplete/CLONESPRITE_DEPTH_BIAS_PLAN.md`** (and the legacy "CloneSprite depth-bias trade-off (open)" section below).
 - `attachImported`, `attachMovieLoopingTest`, `loop_test10`, `loadMovieTest`, `Version4Loader` (zero-output) — blocked on tagImportCharacter dictionary / library-export DoInitAction.
 - `action_order/action_execution_order_test2/3/5/11`, `loop_test6/7/8`, `ActionOrderTest3/4/5` — deferred CLIP_EVENT_UNLOAD + onUnload queue blocker. **See `incomplete/DEFERRED_CLIP_UNLOAD_PLAN.md`.**
 - `goto_frame_test`, `consecutive_goto_frame_test`, `place_and_remove_object_insane_test` — adjacent goto+placement+removal sequencing; may overlap deferred-unload cluster but each has unique diff.
