@@ -34,7 +34,8 @@ Status (CI at 205a9a77 — 2026-04-25 run): **misc-ming.all 52/102 effective (51
 **Multi-issue / blocked clusters:**
 - `matrix_test` (84%) — multi-issue (negative-_yscale matrix, getBounds-after-rotate, sin(90°) FP residuals).
 - `displaylist_depths_test/2/3/8/9`, `DepthLimitsTest`, `duplicate_movie_clip_test/2` — all blocked on CloneSprite depth-bias unification. **See `incomplete/CLONESPRITE_DEPTH_BIAS_PLAN.md`** (and the legacy "CloneSprite depth-bias trade-off (open)" section below).
-- `attachImported`, `attachMovieLoopingTest`, `loop_test10`, `loadMovieTest`, `Version4Loader` (zero-output) — blocked on tagImportCharacter dictionary / library-export DoInitAction.
+- `attachImported`, `attachMovieLoopingTest`, `loop_test10`, `loadMovieTest` — blocked on tagImportCharacter dictionary work (separate; multi-issue).
+- `Version4Loader`, `frame_label_test`, `replace_buttons1test`, `replace_shapes1test`, `BeginBitmapFill`, `loading/LoadVarsTest`, `opcode_guard_test2` — previously labeled "zero-output / DoInitAction-for-library-exports" but **none have DoInitAction tags** and most do produce output. **See `incomplete/ZERO_OUTPUT_TRIAGE_PLAN.md`** — 6 distinct narrow fixes (verifier empty-data-file, button CONSTRUCT gating, child SWF loader, frame label, bitmap _width, depth math). `submoviegetvar` and `action_execution_order_test6` already pass/ruffle_matched locally — will flip on next CI run.
 - `action_order/action_execution_order_test2/3/5/11`, `loop_test6/7/8`, `ActionOrderTest3/4/5` — deferred CLIP_EVENT_UNLOAD + onUnload queue blocker. **See `incomplete/DEFERRED_CLIP_UNLOAD_PLAN.md`.**
 - `goto_frame_test`, `consecutive_goto_frame_test`, `place_and_remove_object_insane_test` — adjacent goto+placement+removal sequencing; may overlap deferred-unload cluster but each has unique diff.
 - `loop_test`, `replace_sprites1test`, `replace_buttons1test`, `replace_shapes1test`, `frame_label_test`, `action_execution_order_test6` — same family (deferred queue or zero-output DoInitAction).
@@ -49,7 +50,7 @@ Status (CI at 205a9a77 — 2026-04-25 run): **misc-ming.all 52/102 effective (51
 - `DrawingApiTest` (46.2%), `EmbeddedFontTest` (57.5%) — graphics/text precision.
 - `NetStream-SquareTest` (39.8%) — netstream timing.
 - `masks_test` (16.0%), `opcode_guard_test` (16.7%) — pending-removal MC visibility / typeof.
-- `BeginBitmapFill` (zero-output) — Phase 3 DoInitAction blocker.
+- `BeginBitmapFill` (single-line content mismatch — `mc9._width` returns 804 vs 150). **See `incomplete/ZERO_OUTPUT_TRIAGE_PLAN.md` Phase 5.**
 
 ### misc-swfc.all (8 failing / 16 total)
 
@@ -553,25 +554,26 @@ Text field property coverage; may overlap AVM1's `TEXTFIELD_PLAN`.
 - `movieclip_destruction_test4` (20.0%)
 - `opcode_guard_test2` — runtime_error (investigate separately)
 
-## Phase 3 — Blocked zero-output tests (7 tests)
+## Phase 3 — "Zero-output" tests (revised)
 
-These produce 0 lines of output. They are the tests that *actually* match the DoInitAction blocker description in `complete/DEJAGNU_FRAMEWORK_PLAN.md`:
+The original Phase 3 framing — that 7+ tests are blocked on DoInitAction
+running for unplaced library exports — turned out to be wrong. Direct
+SWF tag inspection shows **none** of the listed tests have any
+DoInitAction tags. Most of them DO produce output; the CI snapshot's
+`matching_lines: 0` was misread as "zero output." See
+`incomplete/ZERO_OUTPUT_TRIAGE_PLAN.md` for per-test triage:
 
-| Test | Suite | Expected | Status |
-|------|-------|----------|--------|
-| BeginBitmapFill | misc-ming | 1 | output_mismatch |
-| Version4Loader | misc-ming | 11 | output_mismatch |
-| frame_label_test | misc-ming | 17 | output_mismatch |
-| action_order/action_execution_order_test6 | misc-ming | 24 | output_mismatch |
-| replace_buttons1test | misc-ming | 24 | output_mismatch |
-| replace_shapes1test | misc-ming | 26 | output_mismatch |
-| submoviegetvar | misc-swfc | 4 | output_mismatch |
-| loading/LoadVarsTest | misc-ming | — | compile_fail |
-| opcode_guard_test2 | misc-swfc | — | runtime_error |
-
-Fix requires the architectural change described in the DEJAGNU_FRAMEWORK_PLAN: run DoInitAction for *all* library exports at SWF load time, not just for placed sprites. This is noted as Phase 3 blocked.
-
-`LoadVarsTest` compile_fail and `opcode_guard_test2` runtime_error need separate triage — they may not be Dejagnu-blocker related.
+| Test | Real cause |
+|------|------------|
+| BeginBitmapFill | Single-line content mismatch (`_width` 804 vs 150). |
+| Version4Loader | Child SWF (Version5Loaded.swf) doesn't load. |
+| frame_label_test | True zero-output — DoAction emits no traces (assertion functions undefined? script bails?). |
+| replace_buttons1test | Ordering — extra `onClipConstruct` traces emitted before checks (CONSTRUCT clip event firing on Buttons; Flash doesn't). |
+| replace_shapes1test | Same ordering as replace_buttons1test. |
+| action_execution_order_test6 | Already `ruffle_matched` locally; flips on next CI. |
+| submoviegetvar | Already `pass` locally; flips on next CI. |
+| loading/LoadVarsTest (compile_fail) | Verifier `data_registry.c` emits invalid C for empty sidecar (`{ , 0x00 }`). 1-line fix. |
+| opcode_guard_test2 (runtime_error → output_mismatch) | testvar off-by-one + getDepth on -32969 clone. May overlap CloneSprite depth-bias plan. |
 
 ## Suggested order of operations
 
