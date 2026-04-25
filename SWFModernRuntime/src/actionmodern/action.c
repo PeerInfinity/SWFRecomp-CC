@@ -57055,10 +57055,44 @@ void actionCallMethod(SWFAppContext* app_context, char* str_buffer)
 								       dly >= mc->draw_ymin && dly <= mc->draw_ymax);
 							}
 						}
-						// Note: hitTest(x, y, true) does shape-level testing on the
-						// target's own geometry — Flash ignores mask occlusion in this
-						// path. Mask gating belongs to renderer / clip-vs-clip hitTest,
-						// not point-shape hitTest.
+						// setMask masking: if MC has a mask, point must also hit mask
+						// shape. Mirrors Ruffle's masker gate at
+						// `core/src/display_object/movie_clip.rs:2594-2598`. Tests both
+						// the mask's sprite_display_list (static shapes) AND its
+						// drawing API geometry (runtime-drawn masks). Without the
+						// drawing-API check, drawing-only masks always reject the
+						// point, breaking maskee.hitTest in RollOverOutTest.
+						if (hit && mc != NULL && mc->mask_mc != NULL) {
+							MovieClip* _hmask = (MovieClip*)mc->mask_mc;
+							int mask_hit = 0;
+							// Test mask's static display-list shapes
+							DisplayObject* _hmdobj = _hmask->display_obj ? (DisplayObject*)_hmask->display_obj : NULL;
+							if (_hmdobj != NULL && _hmdobj->sprite_display_list != NULL && _hmdobj->sprite_max_depth > 0) {
+								double _hmwa=1, _hmwb=0, _hmwc=0, _hmwd=1, _hmwtx=0, _hmwty=0;
+								getConcatMatrixForMC(_hmask, &_hmwa, &_hmwb, &_hmwc, &_hmwd, &_hmwtx, &_hmwty);
+								_hmwtx *= 20.0; _hmwty *= 20.0;
+								if (ng_hitTestShapeFromDL(_hmdobj->sprite_display_list, _hmdobj->sprite_max_depth,
+										_hmwa, _hmwb, _hmwc, _hmwd, _hmwtx, _hmwty, ptx, pty))
+									mask_hit = 1;
+							}
+							// Test mask's drawing-API geometry (bounds-based fallback)
+							if (!mask_hit && _hmask->draw_has_bounds) {
+								double _hmwa=1, _hmwb=0, _hmwc=0, _hmwd=1, _hmwtx=0, _hmwty=0;
+								getConcatMatrixForMC(_hmask, &_hmwa, &_hmwb, &_hmwc, &_hmwd, &_hmwtx, &_hmwty);
+								double _mddet = _hmwa*_hmwd - _hmwb*_hmwc;
+								if (_mddet != 0.0) {
+									double _mdinv = 1.0 / _mddet;
+									double _mdpx = ptx / 20.0, _mdpy = pty / 20.0;
+									double _mdsx = _mdpx - _hmwtx, _mdsy = _mdpy - _hmwty;
+									double _mdlx = (_hmwd*_mdsx - _hmwc*_mdsy) * _mdinv;
+									double _mdly = (-_hmwb*_mdsx + _hmwa*_mdsy) * _mdinv;
+									if (_mdlx >= _hmask->draw_xmin && _mdlx <= _hmask->draw_xmax &&
+									    _mdly >= _hmask->draw_ymin && _mdly <= _hmask->draw_ymax)
+										mask_hit = 1;
+								}
+							}
+							if (!mask_hit) hit = 0;
+						}
 					}
 
 					PUSH(ACTION_STACK_VALUE_BOOLEAN, hit ? 1 : 0);
