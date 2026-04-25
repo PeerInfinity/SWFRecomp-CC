@@ -1,8 +1,25 @@
 # Gnash Test Suite Status
 
-Last updated: 2026-04-24 (Selection-v6/v7/v8 → ruffle_matched via `Selection.setFocus(string)` relative-name fallback; loop_test8 → 37/38 via has_unload-gated MarkMCPendingRemoval in survives_rewind clear-and-replace path; movieclip_destruction_test2 → 50/52 via onUnload-depth-shift + swapDepths gating on removed MCs; loop_test3 → PASS via per-depth placed_at_frame on swap + ratio-only MC survives_rewind; not yet in CI)
+Last updated: 2026-04-24 (event_handler_scope_test → PASS via fresh local activation + base_clip switch in actionDispatchEnterFrameHandlers; Selection-v6/v7/v8 → ruffle_matched via `Selection.setFocus(string)` relative-name fallback; loop_test8 → 37/38 via has_unload-gated MarkMCPendingRemoval in survives_rewind clear-and-replace path; movieclip_destruction_test2 → 50/52 via onUnload-depth-shift + swapDepths gating on removed MCs; loop_test3 → PASS via per-depth placed_at_frame on swap + ratio-only MC survives_rewind; not yet in CI)
 
 ### Latest fixes (2026-04-24, not yet in CI)
+
+- **event_handler_scope_test (misc-ming) → PASS (+1).**
+  `actionDispatchEnterFrameHandlers` (`SWFModernRuntime/src/actionmodern/action.c`)
+  now pushes a fresh local activation `ASObject` and switches `g_current_context`
+  to `func->base_clip` (for both type 1 and type 2 functions, and for both the
+  child-MC and root-MC dispatch branches), matching `actionCallMethod` /
+  `runStoredFunctionCallback`. Without these, plain assignments inside
+  `mc.onEnterFrame = function(){ scope_test = 3; var scope_test = 4; }` fell
+  through `actionSetVariable`'s "tellTarget non-root context" branch onto
+  `mc.dynamic_props` (because `g_current_context` was still set to the
+  receiver `mc` rather than the function's defining clip), and
+  `actionDefineLocal` similarly leaked `var scope_test = 4` onto
+  `mc.dynamic_props` (no local activation). The fix isolates locals into the
+  activation and routes plain assignments to the function's base clip /
+  globals as Flash does. No regressions on a 28-test AVM1 lifecycle/event
+  battery, 24-test AVM1 broader battery, or 17-test misc-ming
+  recently-fixed battery (all 100% effective pass).
 
 - **Selection-v6 / Selection-v7 / Selection-v8 (actionscript.all) → ruffle_matched (+3 effective).**
   `builtin_selection_setFocus` (`SWFModernRuntime/src/actionmodern/action.c`)
