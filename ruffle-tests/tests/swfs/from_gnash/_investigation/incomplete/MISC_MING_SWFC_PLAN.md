@@ -39,7 +39,7 @@ Status (CI at 205a9a77 — 2026-04-25 run): **misc-ming.all 52/102 effective (51
 - `action_order/action_execution_order_test2/3/5/11`, `loop_test6/7/8`, `ActionOrderTest3/4/5` — deferred CLIP_EVENT_UNLOAD + onUnload queue blocker. **See `incomplete/DEFERRED_CLIP_UNLOAD_PLAN.md`.**
 - `goto_frame_test`, `consecutive_goto_frame_test`, `place_and_remove_object_insane_test` — adjacent goto+placement+removal sequencing; may overlap deferred-unload cluster but each has unique diff.
 - `loop_test`, `replace_sprites1test`, `replace_buttons1test`, `replace_shapes1test`, `frame_label_test`, `action_execution_order_test6` — same family (deferred queue or zero-output DoInitAction).
-- `register_class/RegisterClassTest3/4/registerClassTest/registerClassTest2` — combine registerClass with attachMovie / frame scripting; complex multi-issue.
+- `register_class/RegisterClassTest3/4/registerClassTest/registerClassTest2` — registerClass lifecycle edges (prototype.onLoad, constructor proto-chain fallthrough, frame-timing precision, construct/load/unload cycling). **See `incomplete/REGISTERCLASS_LIFECYCLE_PLAN.md`** — 5 phases. Phase 1 is +1 line / potential full PASS for registerClassTest.
 
 **Button / drag / key clusters (NOT actually input-driver-blocked — verifier does drive input):**
 - `ButtonEventsTest`, `ButtonPropertiesTest`, `key_event_test`, `DragDropTest`, `RollOverOutTest`. **See `incomplete/BUTTON_INFRASTRUCTURE_PLAN.md`** — distinct sub-issues per test (typeof, prototype enum order, button-internal children, _droptarget, mask+hitTest, key listener phase progression).
