@@ -28986,11 +28986,15 @@ static void initLoadVarsPrototype(SWFAppContext* app_context, ASFunction* ctor)
 	addStubMethodToProto(app_context, ctor->prototype_obj, "addRequestHeader", 16, mflags);
 }
 
-// Button.prototype: getDepth + boolean props + READ_ONLY undefined accessors
+// Button.prototype: on* event placeholders + boolean props + getDepth + READ_ONLY undefined accessors
+// Insertion order is reversed for enum (LIFO), so this matches Flash's
+// for..in order: tabIndex, blendMode, cacheAsBitmap, filters, scale9Grid,
+// getDepth, enabled, useHandCursor, onKeyUp, onKeyDown, onSetFocus,
+// onKillFocus, onReleaseOutside, onRelease, onPress, onRollOut, onRollOver.
 static void initButtonPrototype(SWFAppContext* app_context, ASFunction* ctor)
 {
 	if (ctor->prototype_obj != NULL) return;
-	ctor->prototype_obj = allocObject(app_context, 10);
+	ctor->prototype_obj = allocObject(app_context, 20);
 	retainObject(ctor->prototype_obj);
 	// constructor first (enumerated last in LIFO)
 	ActionVar ctor_var = {0};
@@ -28999,17 +29003,27 @@ static void initButtonPrototype(SWFAppContext* app_context, ASFunction* ctor)
 	setPropertyWithFlags(app_context, ctor->prototype_obj, "constructor", 11, &ctor_var, PROPERTY_FLAGS_DONTENUM);
 	// __proto__ → Object.prototype (enumerated before constructor in LIFO)
 	setObjectProto(app_context, ctor->prototype_obj);
-	// Button proto methods are NOT DONT_ENUM
-	addStubMethodToProto(app_context, ctor->prototype_obj, "getDepth", 8, PROPERTY_FLAGS_DEFAULT);
+	ActionVar undef_val = {0};
+	undef_val.type = ACTION_STACK_VALUE_UNDEFINED;
+	// on* event-handler placeholders (enumerable undefined). Insertion is reverse
+	// of enum order — onRollOver added first so it enumerates last.
+	setProperty(app_context, ctor->prototype_obj, "onRollOver", 10, &undef_val);
+	setProperty(app_context, ctor->prototype_obj, "onRollOut", 9, &undef_val);
+	setProperty(app_context, ctor->prototype_obj, "onPress", 7, &undef_val);
+	setProperty(app_context, ctor->prototype_obj, "onRelease", 9, &undef_val);
+	setProperty(app_context, ctor->prototype_obj, "onReleaseOutside", 16, &undef_val);
+	setProperty(app_context, ctor->prototype_obj, "onSetFocus", 10, &undef_val);
+	setProperty(app_context, ctor->prototype_obj, "onKeyDown", 9, &undef_val);
+	setProperty(app_context, ctor->prototype_obj, "onKeyUp", 7, &undef_val);
 	// Boolean properties (enumerable, writable)
 	ActionVar bv = {0};
 	bv.type = ACTION_STACK_VALUE_BOOLEAN;
 	bv.data.numeric_value = 1; // true
 	setProperty(app_context, ctor->prototype_obj, "useHandCursor", 13, &bv);
 	setProperty(app_context, ctor->prototype_obj, "enabled", 7, &bv);
+	// getDepth method (NOT DONT_ENUM)
+	addStubMethodToProto(app_context, ctor->prototype_obj, "getDepth", 8, PROPERTY_FLAGS_DEFAULT);
 	// READ_ONLY undefined accessors
-	ActionVar undef_val = {0};
-	undef_val.type = ACTION_STACK_VALUE_UNDEFINED;
 	setPropertyWithFlags(app_context, ctor->prototype_obj, "scale9Grid", 10, &undef_val, PROPERTY_FLAG_ENUMERABLE); // READ_ONLY
 	setPropertyWithFlags(app_context, ctor->prototype_obj, "filters", 7, &undef_val, PROPERTY_FLAG_ENUMERABLE);
 	setPropertyWithFlags(app_context, ctor->prototype_obj, "cacheAsBitmap", 13, &undef_val, PROPERTY_FLAG_ENUMERABLE);
@@ -41746,6 +41760,23 @@ void actionGetMember(SWFAppContext* app_context)
 				MovieClip* _early_mc = findOrCreateMovieClip(app_context, _early_name, mc);
 				if (_early_mc != NULL) {
 					_early_mc->depth = (int)_early_depth - 16384;
+					// Mark as button MC if dictionary char is a Button — typeof needs this
+					{
+						extern Character* dictionary;
+						size_t _ecid_btn = 0;
+						if (mc->display_obj != NULL) {
+							DisplayObject* _pdobj_btn = (DisplayObject*)mc->display_obj;
+							if (_pdobj_btn->sprite_display_list != NULL && _early_depth <= _pdobj_btn->sprite_max_depth)
+								_ecid_btn = _pdobj_btn->sprite_display_list[_early_depth].char_id;
+						}
+						if (_ecid_btn == 0 && (mc == &root_movieclip || mc->name[0] == '\0')) {
+							extern DisplayObject* display_list;
+							_ecid_btn = display_list[_early_depth].char_id;
+						}
+						if (_ecid_btn > 0 && _ecid_btn < INITIAL_DICTIONARY_CAPACITY &&
+						    dictionary[_ecid_btn].type == CHAR_TYPE_BUTTON)
+							_early_mc->is_button_mc = 1;
+					}
 					// Sync display_obj
 					if (mc->display_obj != NULL) {
 						DisplayObject* _pdobj = (DisplayObject*)mc->display_obj;
@@ -42227,6 +42258,18 @@ void actionGetMember(SWFAppContext* app_context)
 				if (child_mc != NULL) {
 					if (!child_mc->depth_swapped)
 						child_mc->depth = (int)child_depth - 16384;
+					// Mark as button MC if dictionary char is a Button — typeof needs this
+					{
+						extern Character* dictionary;
+						DisplayObject* _pdobj_btn2 = (DisplayObject*)mc->display_obj;
+						if (_pdobj_btn2 != NULL && _pdobj_btn2->sprite_display_list != NULL &&
+						    child_depth <= _pdobj_btn2->sprite_max_depth) {
+							size_t _cid_btn2 = _pdobj_btn2->sprite_display_list[child_depth].char_id;
+							if (_cid_btn2 > 0 && _cid_btn2 < INITIAL_DICTIONARY_CAPACITY &&
+							    dictionary[_cid_btn2].type == CHAR_TYPE_BUTTON)
+								child_mc->is_button_mc = 1;
+						}
+					}
 					// Link to display list entry so nested child lookups work
 					if (mc->display_obj != NULL) {
 						DisplayObject* parent_dobj = (DisplayObject*)mc->display_obj;
@@ -42268,6 +42311,15 @@ void actionGetMember(SWFAppContext* app_context)
 				}
 				MovieClip* child_mc = findOrCreateMovieClip(app_context, child_name_buf, mc);
 				if (child_mc != NULL) {
+					// Mark as button MC if dictionary char is a Button — typeof needs this
+					{
+						extern Character* dictionary;
+						extern DisplayObject* display_list;
+						size_t _cid_btn3 = display_list[child_depth].char_id;
+						if (_cid_btn3 > 0 && _cid_btn3 < INITIAL_DICTIONARY_CAPACITY &&
+						    dictionary[_cid_btn3].type == CHAR_TYPE_BUTTON)
+							child_mc->is_button_mc = 1;
+					}
 					PUSH(ACTION_STACK_VALUE_MOVIECLIP, (u64)child_mc);
 					return;
 				}
@@ -56883,6 +56935,13 @@ void actionCallMethod(SWFAppContext* app_context, char* str_buffer)
 					double ptx = rra * ptx_local + rrc * pty_local + rrtx;
 					double pty = rrb * ptx_local + rrd * pty_local + rrty;
 
+					// AVM hitTest skips masks (Ruffle: AVM_HIT_TEST contains SKIP_MASK).
+					// A clip used as a mask returns false from hitTest(x, y, ...).
+					if (mc != NULL && mc->is_mask) {
+						PUSH(ACTION_STACK_VALUE_BOOLEAN, 0);
+						return;
+					}
+
 					// Check bounding box first (fast reject)
 					int hit = (ptx >= gxmin && ptx <= gxmax && pty >= gymin && pty <= gymax);
 
@@ -56952,6 +57011,12 @@ void actionCallMethod(SWFAppContext* app_context, char* str_buffer)
 									// Test against actual drawing path triangles (in twips)
 									double ltx = dlx * 20.0, lty = dly * 20.0;
 									DrawingState* _hds = (DrawingState*)mc->drawing_state;
+									// If the drawing has un-finalized commands (no endFill called),
+									// path_count is 0 — fall back to bounds-only hit since the
+									// commands haven't been triangulated. We already passed the
+									// per-MC draw_xmin/xmax check above.
+									if (_hds->path_count == 0 && _hds->cmd_count > 0)
+										hit = 1;
 									for (u32 _hdp = 0; _hdp < _hds->path_count && !hit; _hdp++) {
 										DrawPath* _hdpath = &_hds->paths[_hdp];
 										// Test fill triangles
@@ -56990,19 +57055,10 @@ void actionCallMethod(SWFAppContext* app_context, char* str_buffer)
 								       dly >= mc->draw_ymin && dly <= mc->draw_ymax);
 							}
 						}
-						// setMask masking: if MC has a mask, point must also hit mask shape
-						if (hit && mc != NULL && mc->mask_mc != NULL) {
-							MovieClip* _hmask = (MovieClip*)mc->mask_mc;
-							DisplayObject* _hmdobj = _hmask->display_obj ? (DisplayObject*)_hmask->display_obj : NULL;
-							if (_hmdobj != NULL && _hmdobj->sprite_display_list != NULL && _hmdobj->sprite_max_depth > 0) {
-								double _hmwa=1, _hmwb=0, _hmwc=0, _hmwd=1, _hmwtx=0, _hmwty=0;
-								getConcatMatrixForMC(_hmask, &_hmwa, &_hmwb, &_hmwc, &_hmwd, &_hmwtx, &_hmwty);
-								_hmwtx *= 20.0; _hmwty *= 20.0;
-								if (!ng_hitTestShapeFromDL(_hmdobj->sprite_display_list, _hmdobj->sprite_max_depth,
-										_hmwa, _hmwb, _hmwc, _hmwd, _hmwtx, _hmwty, ptx, pty))
-									hit = 0;
-							}
-						}
+						// Note: hitTest(x, y, true) does shape-level testing on the
+						// target's own geometry — Flash ignores mask occlusion in this
+						// path. Mask gating belongs to renderer / clip-vs-clip hitTest,
+						// not point-shape hitTest.
 					}
 
 					PUSH(ACTION_STACK_VALUE_BOOLEAN, hit ? 1 : 0);

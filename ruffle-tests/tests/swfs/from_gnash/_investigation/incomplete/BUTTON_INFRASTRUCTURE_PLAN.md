@@ -4,23 +4,23 @@
 
 <!-- PLAN_META
 id: BUTTON_INFRASTRUCTURE
-status: pending
+status: in_progress
 phases:
   - id: 1
     name: "Mark nested-child Button MCs with is_button_mc=1 (typeof fix)"
-    status: pending
+    status: complete
   - id: 2
     name: "Audit button-internal child sprite resolution (button.childname)"
     status: pending
   - id: 3
     name: "Re-order Button.prototype property registration to match Flash enumeration"
-    status: pending
+    status: complete
   - id: 4
     name: "_droptarget computation after drag-and-drop"
     status: pending
   - id: 5
     name: "Mask + hitTest interaction (RollOverOutTest)"
-    status: pending
+    status: complete
   - id: 6
     name: "Key event listener phase progression (key_event_test)"
     status: pending
@@ -28,6 +28,30 @@ dependencies: []
 blockers:
   - reason: "None — input is already driven by verify_output.py via input.json → input_events.txt → swf_core.c's input_events_pump_tick. The earlier 'mouse/key input drivers' triage label was incorrect. Each phase is independent and addresses a distinct sub-issue."
 -->
+
+## Phase 1, 3, 5 status: COMPLETE (2026-04-25)
+
+- **Phase 1** — `actionGetMember` MOVIECLIP path (action.c:41746) and the
+  two `findOrCreateMovieClip` nested-child sites at action.c:42243 / 42286
+  now set `is_button_mc=1` when the dictionary char is `CHAR_TYPE_BUTTON`.
+  ButtonEventsTest line 1 (`typeof(square1.button) == 'object'`) now PASSES.
+- **Phase 3** — `initButtonPrototype` (action.c:28990) reordered. Insertion
+  order now (LIFO enum yields reverse): onRollOver, onRollOut, onPress,
+  onRelease, onReleaseOutside, onSetFocus, onKeyDown, onKeyUp,
+  useHandCursor, enabled, getDepth, scale9Grid, filters, cacheAsBitmap,
+  blendMode, tabIndex. Note: onKillFocus was NOT in the test's expected
+  enumeration (8 on* names total, not 9). ButtonEventsTest lines 5-20 now
+  match (Button.prototype enum order).
+- **Phase 5** — `actionMCHitTest` for `hitTest(x, y, true)` now
+  (a) early-returns false when `mc->is_mask` is set (matches Ruffle
+  AVM_HIT_TEST + SKIP_MASK gate at `core/src/display_object/movie_clip.rs:2586`),
+  (b) falls back to bounds-only hit when drawing API has unfinalized
+  commands (`cmd_count > 0 && path_count == 0` — drawing API doesn't
+  triangulate until endFill / next beginFill / clear). The previous
+  setMask-via-mask_mc gate (which checked the mask's sprite_display_list
+  only, missing drawing API geometry) was removed — Ruffle gates the
+  masker via `SKIP_INVISIBLE` not `SKIP_MASK`, so dynamic-drawn masks
+  aren't rejected by the masker gate. RollOverOutTest now PASSES (5/5).
 
 ## Correction to prior triage
 
