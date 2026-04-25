@@ -741,6 +741,40 @@ int has_child_unload_handler(DisplayObject* dl, size_t dl_max)
 	return 0;
 }
 
+// Compute has_unload for an entry: returns 1 if any of clip_actions /
+// accumulated_clip_actions / AS-level onUnload / recursive child unloads is
+// present. Used by ng_on_remove_object inline (CloneSprite paths) and by
+// tagRemoveObject2's deferred path.
+int ng_compute_has_unload(size_t depth)
+{
+	if (depth > max_depth || display_list[depth].char_id == 0) return 0;
+	if (display_list[depth].instance_name == NULL) return 0;
+	int has_unload = 0;
+	for (size_t ca = 0; ca < display_list[depth].clip_action_count; ca++) {
+		if (display_list[depth].clip_actions[ca].event_flags & 0x4) {
+			has_unload = 1;
+			break;
+		}
+	}
+	if (!has_unload) {
+		for (size_t ca = 0; ca < display_list[depth].accumulated_clip_action_count; ca++) {
+			if (display_list[depth].accumulated_clip_actions[ca].event_flags & 0x4) {
+				has_unload = 1;
+				break;
+			}
+		}
+	}
+	if (!has_unload) {
+		has_unload = actionMCHasOnUnloadProperty(display_list[depth].instance_name, (int)depth);
+	}
+	if (!has_unload && display_list[depth].sprite_display_list != NULL &&
+	    display_list[depth].sprite_max_depth > 0) {
+		has_unload = has_child_unload_handler(display_list[depth].sprite_display_list,
+		                                      display_list[depth].sprite_max_depth);
+	}
+	return has_unload;
+}
+
 void ng_on_remove_object(SWFAppContext* app_context, size_t depth)
 {
 	if (depth > max_depth || display_list[depth].char_id == 0) return;
@@ -748,36 +782,8 @@ void ng_on_remove_object(SWFAppContext* app_context, size_t depth)
 		// Determine has_unload BEFORE firing the AS-level handler — the handler
 		// shifts the MC's depth, which would invalidate name+depth lookups in
 		// actionMCHasOnUnloadProperty if we did the check after.
-		int has_unload = 0;
-		// Check clip_actions for UNLOAD event
-		for (size_t ca = 0; ca < display_list[depth].clip_action_count; ca++) {
-			if (display_list[depth].clip_actions[ca].event_flags & 0x4) {
-				has_unload = 1;
-				break;
-			}
-		}
-		// Check accumulated clip_actions too (from prior replace)
-		if (!has_unload) {
-			for (size_t ca = 0; ca < display_list[depth].accumulated_clip_action_count; ca++) {
-				if (display_list[depth].accumulated_clip_actions[ca].event_flags & 0x4) {
-					has_unload = 1;
-					break;
-				}
-			}
-		}
-		// Check AS-level onUnload property
-		if (!has_unload) {
-			has_unload = actionMCHasOnUnloadProperty(display_list[depth].instance_name, (int)depth);
-		}
-		// Check children of this sprite for UNLOAD handlers (recursive)
-		if (!has_unload && display_list[depth].sprite_display_list != NULL &&
-		    display_list[depth].sprite_max_depth > 0) {
-			has_unload = has_child_unload_handler(display_list[depth].sprite_display_list,
-			                                      display_list[depth].sprite_max_depth);
-		}
-		// Fire AS-set onUnload handler (shifts depth to the "removed depth zone"
-		// before invocation so getDepth() inside the handler returns the shifted
-		// value, matching Flash semantics).
+		int has_unload = ng_compute_has_unload(depth);
+		// Fire AS-set onUnload handler (now queues — fires at next ShowFrame).
 		actionFireOnUnload(app_context, display_list[depth].instance_name, (int)depth);
 		if (has_unload) {
 			actionMarkMCPendingRemoval(app_context, display_list[depth].instance_name, (int)depth);
@@ -786,6 +792,7 @@ void ng_on_remove_object(SWFAppContext* app_context, size_t depth)
 		}
 	}
 }
+
 
 // ---------------------------------------------------------------------------
 // Sprite control helpers (use g_current_sprite_obj set by exec_sprite_frame)

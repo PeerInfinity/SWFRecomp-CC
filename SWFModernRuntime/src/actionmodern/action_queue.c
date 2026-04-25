@@ -148,6 +148,61 @@ void actionDrainActionQueueFiltered(SWFAppContext* app_context,
 	aq_drain(app_context, &f);
 }
 
+// Drain ONLOAD + SCRIPT entries together in FIFO order (used at the
+// recompiler-emitted SHOW_FRAME drain site). Preserves the relative
+// queue-time order between RemoveObject2-queued unload handlers and
+// recompiler-queued DoAction scripts so that their trace output appears
+// in the order Flash's ActionQueue model produces. Drain predicate:
+//   (kind == AQ_KIND_ONLOAD || kind == AQ_KIND_SCRIPT) AND any is_unload.
+//
+// After the last unload entry dispatches (no more is_unload entries remain),
+// run_pending_finalize() fires so MC Mark/Invalidate happens BEFORE any
+// subsequent SCRIPT entry — matching Flash's "MC is removed by the time
+// the next-tag DoAction reads its properties" semantics.
+extern void run_pending_finalize(SWFAppContext* app_context);
+
+void actionDrainOnloadAndScript(SWFAppContext* app_context)
+{
+	for (;;) {
+		int best = -1;
+		int best_pri = -1;
+		for (size_t i = 0; i < g_aq_count; i++) {
+			ActionQueueEntry* e = &g_aq[i];
+			if (e->kind != AQ_KIND_ONLOAD && e->kind != AQ_KIND_SCRIPT) continue;
+			int pri = (int)e->priority;
+			if (pri > best_pri) {
+				best_pri = pri;
+				best = (int)i;
+			}
+		}
+		if (best < 0) break;
+		ActionQueueEntry entry = g_aq[best];
+		if ((size_t)best + 1 < g_aq_count) {
+			memmove(&g_aq[best], &g_aq[best + 1],
+			        (g_aq_count - (size_t)best - 1) * sizeof(*g_aq));
+		}
+		g_aq_count--;
+		if (!entry.is_unload && entry.clip) {
+			if (entry.clip->avm1_removed || entry.clip->pending_removal) {
+				continue;
+			}
+		}
+		entry.fn(app_context, entry.user);
+		// After dispatching an UNLOAD, if no more unload entries remain in the
+		// queue, fire pending Mark/Invalidate so the next SCRIPT sees the
+		// MC's pending_removal/avm1_removed flags.
+		if (entry.is_unload) {
+			int has_more_unload = 0;
+			for (size_t i = 0; i < g_aq_count; i++) {
+				if (g_aq[i].is_unload) { has_more_unload = 1; break; }
+			}
+			if (!has_more_unload) {
+				run_pending_finalize(app_context);
+			}
+		}
+	}
+}
+
 void actionDrainActionQueueByKind(SWFAppContext* app_context,
                                   ActionQueueKind kind_filter)
 {

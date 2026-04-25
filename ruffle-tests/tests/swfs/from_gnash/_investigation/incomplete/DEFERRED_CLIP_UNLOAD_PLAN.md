@@ -4,27 +4,53 @@
 
 <!-- PLAN_META
 id: DEFERRED_CLIP_UNLOAD
-status: pending
+status: in_progress
 phases:
   - id: 1
     name: "Snapshot MC state at queue time (audit)"
-    status: pending
+    status: completed
   - id: 2
     name: "Queue tag-level CLIP_EVENT_UNLOAD + accumulated_clip_actions"
-    status: pending
+    status: completed
   - id: 3
     name: "Queue AS-level onUnload via existing queueOnUnload"
-    status: pending
+    status: completed
   - id: 4
     name: "Move clear_display_entry / pending-removal / invalidation to a post-drain finalize"
-    status: pending
+    status: completed
   - id: 5
     name: "Verify ordering on the AVM1 regression battery"
-    status: pending
+    status: completed
 dependencies: []
 blockers:
-  - reason: "None — the action queue infrastructure (AQ_KIND_ONLOAD with is_unload=1, actionFirePendingUnloads) is already in place. queueOnUnload is already used from removeMovieClip and attachMovie unload paths. The remaining work is routing tagRemoveObject2's two inline unload sites through the queue, plus moving clear_display_entry to a post-drain step."
+  - reason: "Partial: 2 of 10 target tests now pass (loop_test7, action_execution_order_test3). The other 8 (loop_test6/8, action_execution_order_test2/5/11, ActionOrderTest3/4/5) have remaining ordering issues — typically inter-tag UNLOAD vs DoAction queue ordering that the recompiler emits don't quite match Flash's tag-stream order."
 -->
+
+## Status update (2026-04-25, in_progress)
+
+Phases 1-5 implemented. Net impact:
+- AVM1 regression battery: 19/19 PASS (no regressions).
+- Misc-ming recently-fixed battery: 20/20 PASS (no regressions).
+- Misc-swfc battery: 4/4 PASS (movieclip_destruction_test2 unchanged at 50/52).
+- Target tests: loop_test7 PASS (RUFFLE_MATCHED), action_execution_order_test3 PASS.
+- Remaining 8 target tests still MISMATCH (no regressions to SEGFAULT or worse).
+
+Implementation summary:
+- `actionQueueClipActionUnload` queues recompiler-emitted clip-action UNLOAD callbacks via `AQ_KIND_ONLOAD` with `is_unload=1`. Used by `tagRemoveObject2`/`tagRemoveObject` and `fire_recursive_child_unloads`.
+- `actionFireOnUnload` now enqueues a `PendingTimelineUnload` payload via `aq_dispatch_timeline_unload` instead of firing inline. The dispatcher shifts depth + sets `avm1_removed=1` BEFORE invoking the handler so `getDepth()` inside `onUnload` returns the post-shift value (Flash semantics).
+- `actionMarkMCPendingRemovalDirect` / `actionInvalidateCachedMovieClipDirect` take an MC pointer directly (no name+depth lookup), used by `run_pending_finalize`.
+- `queue_pending_finalize_mc(mc, swf_depth, depth)` records (mc, swf_depth, depth) for post-drain Mark + clear. tagRemoveObject2 only queues finalize when has_unload (AS-level handler or clip-event UNLOAD); otherwise it Invalidates inline.
+- `actionDrainOnloadAndScript` drains AQ_KIND_ONLOAD + AQ_KIND_SCRIPT in FIFO order (preserves queue-time order between RemoveObject2 and DoAction). Calls `run_pending_finalize` after the LAST UNLOAD entry pops so Mark fires before any subsequent SCRIPT entry sees the MC's clip.depth.
+- `tagFlushPendingEnterFrame` calls `run_pending_finalize_mark_only` (Mark without clear) so ENTER_FRAME for the new frame skips MCs being removed in this frame's tag stream.
+- `actionDispatchEnterFrameHandlers` / `dispatch_enterframe_clip_actions` walk parent chain to skip MCs whose ancestor is Marked.
+- `aq_dispatch_mc_onload` skips dispatch if the captured MC is invalidated (defensive; prevents segfault in resolveSlashPathToMC).
+- Recompiler: `tagRemoveObject2` is buffered to SHOW_FRAME emit ONLY if depth had clip_actions AND the next tag is a same-depth PlaceObject2/3 (lookahead heuristic). Otherwise emitted inline. SHOW_FRAME no longer flushes buffered_removes (just clears tracking). Recompiler emits `actionDrainOnloadAndScript` instead of `actionDrainActionQueueByKind(AQ_KIND_SCRIPT)` at SHOW_FRAME emit.
+
+Remaining work for the other 8 target tests:
+- loop_test6/8: trailing UNLOAD trace ordering issues. loop_test8 is still 37/38 (1-line off).
+- action_execution_order_test2/5/11, ActionOrderTest3/4/5: inter-tag UNLOAD vs accumulated_clip_actions ordering issues. These tests have complex remove+place patterns that the current Mark/Invalidate mechanism doesn't fully replicate (e.g., depth_clip_actions tracking for the SAME depth across multiple frames, with intermediate replaces).
+
+Files touched: `SWFModernRuntime/{include/actionmodern/action.h,include/actionmodern/action_queue.h,src/actionmodern/action.c,src/actionmodern/action_queue.c,src/libswf/tag.c,src/libswf/tag_stubs.c}`, `SWFRecomp/src/swf.cpp`.
 
 ## Problem statement
 

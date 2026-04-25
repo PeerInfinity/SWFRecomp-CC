@@ -85,6 +85,13 @@ void actionDrainActionQueueFiltered(SWFAppContext* app_context,
 void actionDrainActionQueueByKind(SWFAppContext* app_context,
                                   ActionQueueKind kind_filter);
 
+// Drain AQ_KIND_ONLOAD + AQ_KIND_SCRIPT entries together in FIFO order.
+// Used at the recompiler-emitted SHOW_FRAME drain site so RemoveObject2-queued
+// unload handlers and DoAction scripts fire in queue-time order — preserving
+// the Flash ActionQueue ordering for tag streams that interleave RemoveObject2
+// and DoAction. (See DEFERRED_CLIP_UNLOAD_PLAN.)
+void actionDrainOnloadAndScript(SWFAppContext* app_context);
+
 // Pop the highest-priority entry of `kind_filter` whose user payload
 // satisfies `pred(user, ctx)`, returning the user pointer (caller owns
 // lifetime). Returns NULL when no matching entries remain. Unlike

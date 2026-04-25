@@ -1668,11 +1668,29 @@ void dispatch_enterframe_clip_actions(SWFAppContext* app_context,
 
 		if (obj->clip_action_count == 0) continue;
 
-		// Set correct MC context for the clip action
+		// Set correct MC context for the clip action. Skip if the MC or any
+		// ancestor is Marked (queued for removal by tag-stream tagRemoveObject2)
+		// so ENTER_FRAME doesn't fire for clips being removed in this frame —
+		// see DEFERRED_CLIP_UNLOAD_PLAN, avm1/clip_events.
 		MovieClip* saved_ctx = g_current_context;
+		MovieClip* event_mc = NULL;
 		if (obj->instance_name != NULL) {
-			MovieClip* mc = actionFindOrCreateMovieClip(app_context, obj->instance_name, parent_mc);
-			if (mc) actionSetCurrentContext(mc);
+			event_mc = actionFindOrCreateMovieClip(app_context, obj->instance_name, parent_mc);
+			if (event_mc) {
+				int _ef_skip = 0;
+				for (MovieClip* p = event_mc; p != NULL; p = p->parent) {
+					if (p->avm1_removed || p->pending_removal) { _ef_skip = 1; break; }
+				}
+				if (_ef_skip) continue;
+				actionSetCurrentContext(event_mc);
+			}
+		} else {
+			// Anonymous obj: skip if parent_mc is Marked (covers the case where
+			// the parent was queued for removal but the anonymous child wasn't
+			// directly named).
+			for (MovieClip* p = parent_mc; p != NULL; p = p->parent) {
+				if (p->avm1_removed || p->pending_removal) { goto _ef_skip_obj; }
+			}
 		}
 		for (size_t a = 0; a < obj->clip_action_count; a++)
 		{
@@ -1681,6 +1699,8 @@ void dispatch_enterframe_clip_actions(SWFAppContext* app_context,
 			}
 		}
 		actionSetCurrentContext(saved_ctx);
+		continue;
+	_ef_skip_obj:;
 	}
 }
 
@@ -1709,6 +1729,17 @@ void tagFlushPendingEnterFrame(SWFAppContext* app_context)
 {
 	if (!g_enterframe_flush_pending) return;
 	g_enterframe_flush_pending = 0;
+
+#ifdef NO_GRAPHICS
+	// Mark (but don't clear display_list) any MCs queued for finalize, so
+	// ENTER_FRAME skips MCs being removed by tag-stream tagRemoveObject2 in
+	// this frame. The clear (which frees sprite_display_list and would dangle
+	// other MCs' display_obj pointers) is deferred to actionDrainOnloadAndScript
+	// after queued onLoad handlers drain. Matches Flash's behavior:
+	// avm1/clip_events expects no onEnterFrame after RemoveObject2.
+	extern void run_pending_finalize_mark_only(SWFAppContext* app_context);
+	run_pending_finalize_mark_only(app_context);
+#endif
 
 	// Set enterframe_eligible for all initialized sprites (recursive into buttons)
 	set_enterframe_eligible_recursive(display_list, max_depth);
@@ -2173,6 +2204,8 @@ void tagShowFrame(SWFAppContext* app_context)
 
 	// --- Fire deferred onUnload handlers from removeMovieClip ---
 	// These are queued mid-script and fire between frames, matching Flash behavior.
+	// actionFirePendingUnloads also runs run_pending_finalize internally so the
+	// destructive cleanup happens immediately after the handlers drain.
 	actionFirePendingUnloads(app_context);
 
 	// --- Run initial frame 0 with scripts for newly placed sprites/buttons ---
@@ -4316,6 +4349,76 @@ void tagReplaceObject2RatioWithClipActions(SWFAppContext* app_context, size_t de
 	display_list[depth].accumulated_clip_action_count = old_clip_action_count;
 }
 
+// --- Deferred destructive cleanup for tagRemoveObject2 (has_unload only) ---
+// Phase 4 of DEFERRED_CLIP_UNLOAD_PLAN. For MCs WITH unload handlers, defer:
+//   - Mark (sets pending_removal=1 on the MC, shifts depth)
+//   - clear_display_entry (clears display_list slot, frees sprite_display_list)
+// to post-drain finalize so:
+//   - same-frame DoAction-after-RemoveObject2 sees typeof(mc) == 'movieclip'
+//     (loop_test7 lines 123-124 — pending_removal stays 0 until drain).
+//   - typeof / _root.mc lookups via display_list iteration still find the MC
+//     by name (instance_name stays populated until finalize).
+// For MCs WITHOUT unload handlers, both run inline (no handler to wait for).
+#ifdef NO_GRAPHICS
+#define NG_PENDING_FINALIZE_CAP 256
+typedef struct {
+	MovieClip* mc;
+	size_t depth;
+	int swf_depth;
+} PendingFinalizeEntry;
+static PendingFinalizeEntry ng_pending_finalize_entries[NG_PENDING_FINALIZE_CAP];
+static int ng_pending_finalize_count = 0;
+
+extern void actionMarkMCPendingRemovalDirect(MovieClip* mc, int swf_depth);
+static void clear_display_entry(SWFAppContext* app_context, size_t depth);
+
+void queue_pending_finalize_mc(MovieClip* mc, int swf_depth, size_t depth)
+{
+	if (mc == NULL) return;
+	if (ng_pending_finalize_count >= NG_PENDING_FINALIZE_CAP) return;
+	for (int i = 0; i < ng_pending_finalize_count; i++) {
+		if (ng_pending_finalize_entries[i].mc == mc) return;
+	}
+	ng_pending_finalize_entries[ng_pending_finalize_count].mc = mc;
+	ng_pending_finalize_entries[ng_pending_finalize_count].swf_depth = swf_depth;
+	ng_pending_finalize_entries[ng_pending_finalize_count].depth = depth;
+	ng_pending_finalize_count++;
+}
+
+// Mark-only: sets pending_removal/avm1_removed on queued MCs but does NOT
+// clear display_list[depth]. Used by tagFlushPendingEnterFrame so ENTER_FRAME
+// skips MCs being removed in this frame, while leaving display_list intact for
+// queued onLoad handlers (whose display_obj may point into a parent's
+// sprite_display_list that would otherwise be freed by clear_display_entry).
+// Does NOT consume the queue — entries stay so run_pending_finalize can do
+// the full cleanup later.
+void run_pending_finalize_mark_only(SWFAppContext* app_context)
+{
+	(void)app_context;
+	for (int i = 0; i < ng_pending_finalize_count; i++) {
+		PendingFinalizeEntry* e = &ng_pending_finalize_entries[i];
+		actionMarkMCPendingRemovalDirect(e->mc, e->swf_depth);
+	}
+}
+
+void run_pending_finalize(SWFAppContext* app_context)
+{
+	int n = ng_pending_finalize_count;
+	ng_pending_finalize_count = 0;
+	for (int i = 0; i < n; i++) {
+		PendingFinalizeEntry* e = &ng_pending_finalize_entries[i];
+		actionMarkMCPendingRemovalDirect(e->mc, e->swf_depth);
+		if (e->depth <= max_depth) clear_display_entry(app_context, e->depth);
+	}
+}
+#else
+void queue_pending_finalize_mc(MovieClip* mc, int swf_depth, size_t depth) {
+	(void)mc; (void)swf_depth; (void)depth;
+}
+void run_pending_finalize_mark_only(SWFAppContext* app_context) { (void)app_context; }
+void run_pending_finalize(SWFAppContext* app_context) { (void)app_context; }
+#endif
+
 static void clear_display_entry(SWFAppContext* app_context, size_t depth)
 {
 	if (display_list[depth].instance_name_owned && display_list[depth].instance_name != NULL)
@@ -4370,21 +4473,20 @@ static void fire_recursive_child_unloads(SWFAppContext* app_context,
 				child_mc ? child_mc : parent_mc);
 		}
 
-		// Fire this child's CLIP_EVENT_UNLOAD
+		// Queue this child's CLIP_EVENT_UNLOAD (deferred — fires at next ShowFrame
+		// drain in actionFirePendingUnloads, alongside AS-level onUnload handlers).
+		// Resolves the MC at queue time so g_current_context can be restored at
+		// dispatch time.
 		if (obj->clip_action_count > 0)
 		{
-			MovieClip* saved_ctx = g_current_context;
+			MovieClip* child_mc = NULL;
 			if (obj->instance_name != NULL)
-			{
-				MovieClip* mc = actionFindOrCreateMovieClip(app_context, obj->instance_name, parent_mc);
-				if (mc) actionSetCurrentContext(mc);
-			}
+				child_mc = actionFindOrCreateMovieClip(app_context, obj->instance_name, parent_mc);
 			for (size_t a = 0; a < obj->clip_action_count; a++)
 			{
 				if (obj->clip_actions[a].event_flags & CLIP_EVENT_UNLOAD)
-					obj->clip_actions[a].action(app_context);
+					actionQueueClipActionUnload(obj->clip_actions[a].action, child_mc);
 			}
-			actionSetCurrentContext(saved_ctx);
 		}
 
 		// Invalidate child MC so it won't fire onEnterFrame after parent removal.
@@ -4420,30 +4522,56 @@ void tagRemoveObject(SWFAppContext* app_context, size_t depth)
 			if (has_unload_cu) return;
 		}
 #endif
-		// Fire accumulated clip actions (from prior Remove+Replace cycle) first
+		// Queue accumulated clip actions (from prior Remove+Replace cycle) first.
+		// Snapshot the action_fn pointer (recompiler-emitted static code) so
+		// dropping the accumulated_clip_actions array reference is safe.
+#ifdef NO_GRAPHICS
+		MovieClip* _ro_parent_mc1 = NULL;
+		if (display_list[depth].instance_name != NULL)
+			_ro_parent_mc1 = actionFindOrCreateMovieClip(app_context, display_list[depth].instance_name, &root_movieclip);
+#else
+		MovieClip* _ro_parent_mc1 = NULL;
+#endif
 		if (display_list[depth].accumulated_clip_action_count > 0)
 		{
 			for (size_t a = 0; a < display_list[depth].accumulated_clip_action_count; a++)
 			{
 				if (display_list[depth].accumulated_clip_actions[a].event_flags & CLIP_EVENT_UNLOAD)
-					display_list[depth].accumulated_clip_actions[a].action(app_context);
+					actionQueueClipActionUnload(display_list[depth].accumulated_clip_actions[a].action, _ro_parent_mc1);
 			}
-			display_list[depth].accumulated_clip_actions = NULL;
-			display_list[depth].accumulated_clip_action_count = 0;
 		}
-		// Dispatch onUnload clip actions before clearing
+		// Queue current onUnload clip actions
 		if (display_list[depth].clip_action_count > 0)
 		{
 			for (size_t a = 0; a < display_list[depth].clip_action_count; a++)
 			{
 				if (display_list[depth].clip_actions[a].event_flags & CLIP_EVENT_UNLOAD)
-					display_list[depth].clip_actions[a].action(app_context);
+					actionQueueClipActionUnload(display_list[depth].clip_actions[a].action, _ro_parent_mc1);
 			}
 		}
 #ifdef NO_GRAPHICS
-		ng_on_remove_object(app_context, depth);
-#endif
+		// See tagRemoveObject2 for the rationale.
+		int _ro1_has_unload = 0;
+		MovieClip* _ro1_mc = _ro_parent_mc1;
+		if (display_list[depth].instance_name != NULL) {
+			extern int ng_compute_has_unload(size_t depth);
+			_ro1_has_unload = ng_compute_has_unload(depth);
+			if (_ro1_has_unload) {
+				actionFireOnUnload(app_context, display_list[depth].instance_name, (int)depth);
+			}
+		}
+		if (_ro1_has_unload && _ro1_mc != NULL) {
+			extern void queue_pending_finalize_mc(MovieClip*, int, size_t);
+			queue_pending_finalize_mc(_ro1_mc, (int)depth, depth);
+		} else {
+			if (display_list[depth].instance_name != NULL) {
+				actionInvalidateCachedMovieClip(app_context, display_list[depth].instance_name, (int)depth);
+			}
+			clear_display_entry(app_context, depth);
+		}
+#else
 		clear_display_entry(app_context, depth);
+#endif
 	}
 #if !defined(NO_GRAPHICS) && !defined(HEADLESS_GRAPHICS)
 	(void)app_context;
@@ -4494,22 +4622,24 @@ void tagRemoveObject2(SWFAppContext* app_context, size_t depth)
 			if (has_unload_cu) return;
 		}
 #endif
-		// Fire accumulated clip actions (from prior Remove+Replace cycle) first
+#ifdef NO_GRAPHICS
+		MovieClip* _remove_parent_mc = NULL;
+		if (display_list[depth].instance_name != NULL)
+			_remove_parent_mc = actionFindOrCreateMovieClip(app_context, display_list[depth].instance_name, &root_movieclip);
+#else
+		MovieClip* _remove_parent_mc = NULL;
+#endif
+		// Queue accumulated clip actions (from prior Remove+Replace cycle) first.
 		if (display_list[depth].accumulated_clip_action_count > 0)
 		{
 			for (size_t a = 0; a < display_list[depth].accumulated_clip_action_count; a++)
 			{
 				if (display_list[depth].accumulated_clip_actions[a].event_flags & CLIP_EVENT_UNLOAD)
-					display_list[depth].accumulated_clip_actions[a].action(app_context);
+					actionQueueClipActionUnload(display_list[depth].accumulated_clip_actions[a].action, _remove_parent_mc);
 			}
-			display_list[depth].accumulated_clip_actions = NULL;
-			display_list[depth].accumulated_clip_action_count = 0;
 		}
-		// Fire CLIP_EVENT_UNLOAD for children first (recursive, depth-first)
+		// Queue CLIP_EVENT_UNLOAD for children first (recursive, depth-first)
 #ifdef NO_GRAPHICS
-		MovieClip* _remove_parent_mc = NULL;
-		if (display_list[depth].instance_name != NULL)
-			_remove_parent_mc = actionFindOrCreateMovieClip(app_context, display_list[depth].instance_name, &root_movieclip);
 		if (display_list[depth].sprite_display_list != NULL && display_list[depth].sprite_max_depth > 0)
 		{
 			fire_recursive_child_unloads(app_context,
@@ -4526,26 +4656,49 @@ void tagRemoveObject2(SWFAppContext* app_context, size_t depth)
 		if (_remove_parent_mc != NULL)
 			actionQueueDynamicChildUnloads(_remove_parent_mc);
 #endif
-		// Dispatch current onUnload clip actions before clearing
+		// Queue current onUnload clip actions
 		if (display_list[depth].clip_action_count > 0)
 		{
-			MovieClip* saved_ctx = g_current_context;
-			if (display_list[depth].instance_name != NULL)
-			{
-				MovieClip* mc = actionFindOrCreateMovieClip(app_context, display_list[depth].instance_name, &root_movieclip);
-				if (mc) actionSetCurrentContext(mc);
-			}
 			for (size_t a = 0; a < display_list[depth].clip_action_count; a++)
 			{
 				if (display_list[depth].clip_actions[a].event_flags & CLIP_EVENT_UNLOAD)
-					display_list[depth].clip_actions[a].action(app_context);
+					actionQueueClipActionUnload(display_list[depth].clip_actions[a].action, _remove_parent_mc);
 			}
-			actionSetCurrentContext(saved_ctx);
 		}
 #ifdef NO_GRAPHICS
-		ng_on_remove_object(app_context, depth);
-#endif
+		// Compute has_unload to decide finalization path:
+		//  - has_unload=1: queue AS-level handler (lookup at queue time);
+		//    defer Mark to post-drain finalize so the MC stays !pending_removal
+		//    for same-frame DoAction lookups (loop_test7 lines 123-124, typeof
+		//    returns 'movieclip' after RemoveObject2 in same-frame DoAction).
+		//  - has_unload=0: no handler to defer — Invalidate inline so the MC is
+		//    immediately gone (matches Flash for handler-less removals).
+		// clear_display_entry runs inline in both cases to avoid dangling
+		// sprite_display_list pointers in queued onLoad handlers from other MCs.
+		int _ro2_has_unload = 0;
+		MovieClip* _ro2_mc = NULL;
+		if (display_list[depth].instance_name != NULL) {
+			extern int ng_compute_has_unload(size_t depth);
+			_ro2_has_unload = ng_compute_has_unload(depth);
+			_ro2_mc = _remove_parent_mc;
+			if (_ro2_has_unload) {
+				actionFireOnUnload(app_context, display_list[depth].instance_name, (int)depth);
+			}
+		}
+		if (_ro2_has_unload && _ro2_mc != NULL) {
+			// Defer Mark + clear_display_entry to post-drain finalize.
+			extern void queue_pending_finalize_mc(MovieClip*, int, size_t);
+			queue_pending_finalize_mc(_ro2_mc, (int)depth, depth);
+		} else {
+			// No handler — Invalidate + clear inline.
+			if (display_list[depth].instance_name != NULL) {
+				actionInvalidateCachedMovieClip(app_context, display_list[depth].instance_name, (int)depth);
+			}
+			clear_display_entry(app_context, depth);
+		}
+#else
 		clear_display_entry(app_context, depth);
+#endif
 	}
 #ifdef NO_GRAPHICS
 	else

@@ -127,10 +127,15 @@ void actionMarkMCPendingRemoval(SWFAppContext* app_context, const char* name, in
 void actionFinalizePendingRemovals(SWFAppContext* app_context);
 // Check if a named MC at given depth has an AS-level onUnload property
 int actionMCHasOnUnloadProperty(const char* name, int swf_depth);
-// Fire the AS-set onUnload handler on a MovieClip being removed (call BEFORE Invalidate)
+// Enqueue the AS-set onUnload handler on a MovieClip being removed (deferred — fires at next ShowFrame drain).
+// Lookup happens at queue time so the (func, mc) pair is captured. The depth shift (mc->depth = -(swf_depth)-1-16384)
+// and avm1_removed=1 happen at drain time inside the dispatcher so same-frame typeof(mc) returns 'movieclip' until ShowFrame.
 void actionFireOnUnload(SWFAppContext* app_context, const char* instance_name, int swf_depth);
 // Fire all pending deferred onUnload handlers (queued by removeMovieClip); call from tagShowFrame
 void actionFirePendingUnloads(SWFAppContext* app_context);
+// Enqueue a tag-level CLIP_EVENT_UNLOAD clip-action callback. The action fn pointer is recompiler-emitted
+// static code; mc is captured for g_current_context restore at drain time.
+void actionQueueClipActionUnload(void (*fn)(SWFAppContext*), MovieClip* mc);
 // Queue AS-level onUnload handlers on dynamic children of a MovieClip being removed.
 // Handles clones + createEmptyMovieClip children that live in child_mc_cache (not the
 // parent sprite's display_list). Called by tagRemoveObject2 before the parent's own

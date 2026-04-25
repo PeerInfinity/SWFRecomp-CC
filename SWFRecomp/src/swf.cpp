@@ -551,7 +551,12 @@ namespace SWFRecomp
 			// Phase 4/5 CLIP_INIT/CONSTRUCT/REGISTER_CTOR entries stay on their
 			// original drain timeline (outermost tagPlaceObject2 / tagShowFrame
 			// safety drain).
-			context.tag_main << "\t" << "if (!catch_up_mode || g_tag_skip_mode) actionDrainActionQueueByKind(app_context, AQ_KIND_SCRIPT);" << endl;
+			// Drain DoAction scripts AND queued unload handlers together in
+			// FIFO order. The interleaved order matches Flash's ActionQueue
+			// model: a tag-stream-order RemoveObject2 followed by DoAction
+			// fires unload first; a DoAction followed by RemoveObject2 fires
+			// the script first. (See DEFERRED_CLIP_UNLOAD_PLAN.)
+			context.tag_main << "\t" << "if (!catch_up_mode || g_tag_skip_mode) actionDrainOnloadAndScript(app_context);" << endl;
 			last_queued_script = next_script_i;
 
 			if (next_frame_i == 1)
@@ -808,7 +813,12 @@ namespace SWFRecomp
 				// Phase 6: drain queued root DoAction scripts before the frame
 				// footer (quit_swf / next_frame scheduling). Kind-filtered so
 				// Phase 4/5 entries remain owned by their own drain sites.
-				context.tag_main << "\t" << "if (!catch_up_mode || g_tag_skip_mode) actionDrainActionQueueByKind(app_context, AQ_KIND_SCRIPT);" << endl;
+				// Drain DoAction scripts AND queued unload handlers together in
+			// FIFO order. The interleaved order matches Flash's ActionQueue
+			// model: a tag-stream-order RemoveObject2 followed by DoAction
+			// fires unload first; a DoAction followed by RemoveObject2 fires
+			// the script first. (See DEFERRED_CLIP_UNLOAD_PLAN.)
+			context.tag_main << "\t" << "if (!catch_up_mode || g_tag_skip_mode) actionDrainOnloadAndScript(app_context);" << endl;
 				last_queued_script = next_script_i;
 
 				if (next_frame_i == 1)
@@ -862,7 +872,12 @@ namespace SWFRecomp
 				// CLIP_INIT / CONSTRUCT / REGISTER_CTOR entries continue to
 				// drain at the outermost tagPlaceObject2 / tagShowFrame safety
 				// drain — preserving the Phase 5 ordering contract.
-				context.tag_main << "\t" << "if (!catch_up_mode || g_tag_skip_mode) actionDrainActionQueueByKind(app_context, AQ_KIND_SCRIPT);" << endl;
+				// Drain DoAction scripts AND queued unload handlers together in
+			// FIFO order. The interleaved order matches Flash's ActionQueue
+			// model: a tag-stream-order RemoveObject2 followed by DoAction
+			// fires unload first; a DoAction followed by RemoveObject2 fires
+			// the script first. (See DEFERRED_CLIP_UNLOAD_PLAN.)
+			context.tag_main << "\t" << "if (!catch_up_mode || g_tag_skip_mode) actionDrainOnloadAndScript(app_context);" << endl;
 				last_queued_script = next_script_i;
 
 				context.tag_main << "\t" << "tagShowFrame(app_context);" << endl;
@@ -3837,17 +3852,35 @@ namespace SWFRecomp
 
 				u16 depth = (u16) tag.fields[0].value;
 
-				// If this depth had clip_actions from a prior placement, buffer
-				// the removal. A subsequent PlaceObject2 at the same depth in
-				// this frame will emit tagReplaceObject2RatioWithClipActions
-				// instead of separate remove+place (so UNLOAD clip events are
-				// accumulated, not fired prematurely).
-				if (depth_clip_actions.count(depth))
-				{
-					buffered_removes.insert(depth);
+				// If this depth had clip_actions from a prior placement AND the
+				// next tag is a same-depth PlaceObject2 (replace pattern), buffer
+				// so tagReplaceObject2RatioWithClipActions can accumulate old
+				// clip actions. Otherwise emit inline so the runtime queues the
+				// UNLOAD at the correct tag-stream position (drain in queue-time
+				// FIFO order matches Flash's ActionQueue model — DEFERRED_CLIP_UNLOAD_PLAN).
+				bool should_buffer = false;
+				if (depth_clip_actions.count(depth)) {
+					// Peek next tag header. After parseFields, cur_pos points to the next
+					// tag's header start (assuming this tag had no extra bytes — UI16 fields).
+					char* peek_pos = cur_pos;
+					u16 next_code_and_len = *((u16*)peek_pos);
+					TagType next_code = (TagType)((next_code_and_len >> 6) & 0x3FF);
+					if (next_code == SWF_TAG_PLACE_OBJECT_2 || next_code == SWF_TAG_PLACE_OBJECT_3) {
+						u32 next_len_short = next_code_and_len & 0b111111;
+						char* next_data = peek_pos + 2;
+						if (next_len_short == 0x3F) {
+							next_data += 4;
+						}
+						// PlaceObject2/3: 1 byte flags, then 2 bytes depth (LE).
+						// Read just to compare depth — no broader parsing.
+						u16 next_depth = *((u16*)(next_data + 1));
+						if (next_depth == depth) should_buffer = true;
+					}
 				}
-				else
-				{
+
+				if (should_buffer) {
+					buffered_removes.insert(depth);
+				} else {
 					context.tag_main << "\t" << "tagRemoveObject2(app_context, " << to_string(depth) << ");" << endl;
 				}
 

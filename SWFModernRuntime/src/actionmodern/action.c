@@ -18614,6 +18614,42 @@ void actionInvalidateMCAtASDepth(SWFAppContext* app_context, int as_depth)
 	}
 }
 
+// Mark an MC pointer directly for deferred removal — used by run_pending_finalize
+// where the (mc, swf_depth) was captured at queue time. Bypasses the name+depth
+// lookup that the public actionMarkMCPendingRemoval needs (the display_list slot
+// has typically been cleared inline by tagRemoveObject2 by drain time).
+void actionMarkMCPendingRemovalDirect(MovieClip* mc, int swf_depth)
+{
+	if (mc == NULL) return;
+	int shifted_depth = -(int)swf_depth - 1 - 16384;
+	mc->avm1_removed = 1;
+	if (mc->depth != shifted_depth) mc->depth = shifted_depth;
+	mc->pending_removal = 1;
+	mc->display_obj = NULL;
+}
+
+// Invalidate an MC pointer directly. See actionMarkMCPendingRemovalDirect for rationale.
+void actionInvalidateCachedMovieClipDirect(SWFAppContext* app_context, MovieClip* mc)
+{
+	if (mc == NULL) return;
+	if (g_focused_mc != NULL) {
+		int _ifc = (g_focused_mc == mc);
+		if (!_ifc) {
+			MovieClip* _ifp = g_focused_mc->parent;
+			while (_ifp != NULL) {
+				if (_ifp == mc) { _ifc = 1; break; }
+				_ifp = _ifp->parent;
+			}
+		}
+		if (_ifc)
+			selection_do_focus_change(app_context, g_focused_mc, NULL);
+	}
+	mc->avm1_removed = 1;
+	mc->dynamic_props = NULL;
+	mc->ng_textfield_idx = -1;
+	mc->depth = INT_MIN;
+}
+
 // Mark a MovieClip for deferred removal: transform its depth to the "removed" zone
 // (depth = -(internal_depth) - 1 - 16384) and set pending_removal flag.
 // The MC persists for one more frame so scripts can still access it.
@@ -18723,12 +18759,45 @@ void actionQueueDynamicChildUnloads(MovieClip* parent_mc)
 	queueChildOnUnloads(parent_mc);
 }
 
-// Fire the AS-set onUnload handler on a MovieClip being removed from the display list.
-// Called by ng_on_remove_object (tag_stubs.c) BEFORE actionMarkMCPendingRemoval,
-// so that dynamic_props is still intact when we look up the handler.
-// This is SYNCHRONOUS — used for timeline clips removed by tagRemoveObject2.
+// --- Deferred AS-level onUnload for timeline-removed clips ---
+// Captures (func, mc, swf_depth) at queue time. At drain time, shifts the MC's
+// depth to the removed-depth zone and sets avm1_removed=1 BEFORE invoking, so
+// getDepth() inside onUnload returns -(swf_depth)-1-16384 (Flash semantics).
+//
+// Deferring avm1_removed=1 to drain time (rather than queue time) preserves
+// Flash semantics inside same-frame DoAction: a `typeof(mc)` check after
+// RemoveObject2 in tag order still returns 'movieclip' until ShowFrame drains.
+// See loop_test7 lines 123-124.
+typedef struct {
+	ASFunction* func;
+	MovieClip* mc;
+	int swf_depth;
+} PendingTimelineUnload;
+
+static void aq_dispatch_timeline_unload(SWFAppContext* app_context, void* user)
+{
+	PendingTimelineUnload* pu = (PendingTimelineUnload*) user;
+	if (pu == NULL) return;
+	if (!g_execution_halted && pu->mc != NULL && pu->func != NULL) {
+		// Shift depth + flag avm1_removed BEFORE invocation. Flash semantics:
+		// getDepth() inside the unload handler returns the post-shift value.
+		pu->mc->avm1_removed = 1;
+		pu->mc->depth = -(int)pu->swf_depth - 1 - 16384;
+
+		MovieClip* saved_context = g_current_context;
+		actionSetCurrentContext(pu->mc);
+		invokeSpecialFunction(app_context, pu->func, NULL);
+		actionSetCurrentContext(saved_context);
+	}
+	free(pu);
+}
+
+// Enqueue the AS-set onUnload handler for a timeline-removed MC. Resolution
+// happens at queue time (capturing func+mc) but the handler doesn't fire until
+// the next ShowFrame's actionFirePendingUnloads.
 void actionFireOnUnload(SWFAppContext* app_context, const char* instance_name, int swf_depth)
 {
+	(void)app_context;
 	if (instance_name == NULL || instance_name[0] == '\0') return;
 	if (g_execution_halted) return;
 
@@ -18754,18 +18823,13 @@ void actionFireOnUnload(SWFAppContext* app_context, const char* instance_name, i
 	ASFunction* func = (ASFunction*) handler->data.numeric_value;
 	if (func == NULL) return;
 
-	// Shift depth to the post-removal "removed depth zone" BEFORE firing the
-	// handler, so getDepth() inside onUnload returns -(swf_depth)-1-16384.
-	// Matches Flash's "already shifted inside unload handler" semantics
-	// (gnash misc-swfc movieclip_destruction_test2 lines 88-89).
-	target_mc->avm1_removed = 1;
-	target_mc->depth = -(int)swf_depth - 1 - 16384;
-
-	// Set context to the MC and invoke the handler with no arguments
-	MovieClip* saved_context = g_current_context;
-	actionSetCurrentContext(target_mc);
-	invokeSpecialFunction(app_context, func, NULL);
-	actionSetCurrentContext(saved_context);
+	PendingTimelineUnload* pu = (PendingTimelineUnload*) malloc(sizeof(PendingTimelineUnload));
+	if (pu == NULL) return;
+	pu->func = func;
+	pu->mc = target_mc;
+	pu->swf_depth = swf_depth;
+	actionQueueCallback(NULL, aq_dispatch_timeline_unload, (void*)pu,
+	                    AQ_PRIORITY_NORMAL, NULL, /*is_unload=*/1);
 }
 
 // --- Deferred unloadMovie state ---
@@ -19055,6 +19119,37 @@ static void queueOnUnload(ASFunction* func, MovieClip* mc)
 	                    AQ_PRIORITY_NORMAL, NULL, /*is_unload=*/1);
 }
 
+// --- Tag-level CLIP_EVENT_UNLOAD clip-action queue ---
+// tagRemoveObject2 / tagRemoveObject / fire_recursive_child_unloads queue
+// recompiler-emitted CLIP_EVENT_UNLOAD callbacks here. They drain at ShowFrame
+// via actionFirePendingUnloads alongside AS-level onUnload handlers, so the
+// inter-tag ordering A → RemoveObject2(mc) → B fires as A → B → mc unload.
+typedef struct { void (*fn)(SWFAppContext*); MovieClip* mc; } PendingClipAction;
+
+static void aq_dispatch_clip_action(SWFAppContext* app_context, void* user)
+{
+	PendingClipAction* pca = (PendingClipAction*) user;
+	if (pca == NULL) return;
+	if (!g_execution_halted && pca->fn != NULL) {
+		MovieClip* saved = g_current_context;
+		if (pca->mc != NULL) actionSetCurrentContext(pca->mc);
+		pca->fn(app_context);
+		actionSetCurrentContext(saved);
+	}
+	free(pca);
+}
+
+void actionQueueClipActionUnload(void (*fn)(SWFAppContext*), MovieClip* mc)
+{
+	if (fn == NULL) return;
+	PendingClipAction* pca = (PendingClipAction*) malloc(sizeof(PendingClipAction));
+	if (pca == NULL) return;
+	pca->fn = fn;
+	pca->mc = mc;
+	actionQueueCallback(NULL, aq_dispatch_clip_action, (void*)pca,
+	                    AQ_PRIORITY_NORMAL, NULL, /*is_unload=*/1);
+}
+
 // Recursively queue onUnload handlers for children of a removed MovieClip.
 // When a parent MC is removed, all its children are also removed and their
 // onUnload handlers should fire. Children are NOT marked as removed here
@@ -19089,6 +19184,11 @@ static void queueChildOnUnloads(MovieClip* parent_mc)
 void actionFirePendingUnloads(SWFAppContext* app_context)
 {
 	actionDrainActionQueueFiltered(app_context, /*is_unload_filter=*/1);
+	// Run the post-drain finalize step (Mark + clear_display_entry) in the same
+	// call so clip.depth lookups and Mark side-effects are visible to the
+	// immediately-following DoAction script drain.
+	extern void run_pending_finalize(SWFAppContext* app_context);
+	run_pending_finalize(app_context);
 }
 
 #ifdef NO_GRAPHICS
@@ -26961,6 +27061,16 @@ void actionDispatchEnterFrameHandlers(SWFAppContext* app_context)
 		MovieClip* mc = child_mc_cache[i];
 		if (mc == NULL || mc->dynamic_props == NULL) continue;
 		if (mc->is_button_mc) continue;  // buttons don't fire onEnterFrame
+		// Skip Marked MCs and any descendants of Marked MCs (queued for removal
+		// by RemoveObject2 in this frame — see DEFERRED_CLIP_UNLOAD_PLAN).
+		// Flash doesn't fire onEnterFrame on MCs being removed in this frame.
+		{
+			int _ef_skip = 0;
+			for (MovieClip* p = mc; p != NULL; p = p->parent) {
+				if (p->avm1_removed || p->pending_removal) { _ef_skip = 1; break; }
+			}
+			if (_ef_skip) continue;
+		}
 		// Skip MCs placed in the current frame's process_sprite_needs_init
 		if (g_enterframe_new_mc_start >= 0 && i >= g_enterframe_new_mc_start) continue;
 		// Skip sprite-backed MCs whose enterframe_eligible flag is not set.
@@ -27262,7 +27372,13 @@ void actionDispatchMCOnLoad(SWFAppContext* app_context, MovieClip* mc)
 static void aq_dispatch_mc_onload(SWFAppContext* app_context, void* user)
 {
 	MovieClip* mc = (MovieClip*) user;
-	if (mc != NULL) actionDispatchMCOnLoad(app_context, mc);
+	if (mc == NULL) return;
+	// Skip if MC was invalidated between queue time and drain time.
+	// Avoids dispatching the onLoad handler against an MC whose display_obj
+	// has gone stale (e.g. parent removal freed its enclosing sprite_display_list
+	// during ShowFrame's run_pending_finalize before the onLoad drain).
+	if (mc->avm1_removed || mc->pending_removal || mc->depth == INT_MIN) return;
+	actionDispatchMCOnLoad(app_context, mc);
 }
 
 void actionQueueMCOnLoad(MovieClip* mc)
