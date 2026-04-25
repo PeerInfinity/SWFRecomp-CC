@@ -1,41 +1,27 @@
 # Ruffle Test Results Diff
 
-**Previous:** `8365e99266c8` (2026-04-25T17:43:33.331128+00:00)
-**Current:** `017e71a9c308` (2026-04-25T20:11:52.750316+00:00)
+**Previous:** `017e71a9c308` (2026-04-25T20:11:52.750316+00:00)
+**Current:** `cabc1000eec7` (2026-04-25T21:14:13.680597+00:00)
 
 ## Summary
 
 | Metric | Previous | Current | Delta |
 |--------|----------|---------|-------|
-| Passing | 42 | 43 | +1 |
+| Passing | 43 | 44 | +1 |
 | Total | 102 | 102 | 0 |
-| Pass rate | 41.2% | 42.2% | +1.0% |
-| Mismatched lines | 2217 | 2209 | -8 |
-|   Decreased | | | -23 |
-|   Increased | | | +15 |
+| Pass rate | 42.2% | 43.1% | +0.9% |
+| Mismatched lines | 2209 | 2184 | -25 |
+|   Decreased | | | -25 |
 
 ## Newly Passing (1)
 
 | Test | Previous Status | Lines (prev) | Lines (now) |
 |------|----------------|--------------|-------------|
-| `action_order/action_execution_order_test3` | output_mismatch | 1/4 | 4/4 |
+| `RollOverOutTest` | output_mismatch | 4/5 | 5/5 |
 
-## Status Changed (1)
-
-| Test | Previous | Current | Lines (prev) | Lines (now) |
-|------|----------|---------|--------------|-------------|
-| `loop/loop_test7` | output_mismatch | ruffle_matched | 11/15 | 14/15 |
-
-## Line Count Changed (9)
+## Line Count Changed (2)
 
 | Test | Status | Lines (prev) | Lines (now) | Diff |
 |------|--------|--------------|-------------|------|
-| `register_class/RegisterClassTest4` | output_mismatch | 8/42 | 17/42 | -9 |
-| `loop/loop_test6` | output_mismatch | 6/23 | 9/23 | -3 |
-| `action_order/action_execution_order_test4` | ruffle_matched | 18/26 | 20/26 | -2 |
-| `loop/loop_test10` | output_mismatch | 1/28 | 3/28 | -2 |
-| `action_order/ActionOrderTest3` | output_mismatch | 5/62 | 6/62 | -1 |
-| `opcode_guard_test` | output_mismatch | 3/18 | 3/18 | 0 |
-| `action_order/ActionOrderTest4` | output_mismatch | 10/64 | 7/64 | +3 |
-| `action_order/ActionOrderTest5` | output_mismatch | 9/51 | 6/51 | +3 |
-| `register_class/registerClassTest2` | output_mismatch | 9/44 | 0/44 | +9 |
+| `DrawingApiTest` | output_mismatch | 43/93 | 64/93 | -21 |
+| `ButtonEventsTest` | output_mismatch | 16/679 | 19/679 | -3 |
