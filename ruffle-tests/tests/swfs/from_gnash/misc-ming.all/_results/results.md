@@ -1,10 +1,10 @@
 # Ruffle Test Results (Unfiltered)
 
-**Date**: 2026-04-25 03:55 UTC
+**Date**: 2026-04-25 16:17 UTC
 
-**Git SHA**: `afd9691900`
+**Git SHA**: `a815e18bbb`
 
-**Run Duration**: 1m 15s
+**Run Duration**: 0m 34s
 
 ## Summary
 
@@ -32,11 +32,11 @@
 
 | # | Test | Lines | Duration | Notes |
 |---|------|-------|----------|-------|
-| 1 | `DefineEditTextTest` | 153 | 8.5s |  |
+| 1 | `DefineEditTextTest` | 153 | 0.7s |  |
 | 2 | `DefineEditTextVariableNameTest2` | 39 | 0.2s |  |
 | 3 | `PlaceObject2Test` | 9 | 0.2s |  |
 | 4 | `ResolveEventsTest` | 15 | 0.2s |  |
-| 5 | `VarAndCharClashTest` | 13 | 0.1s |  |
+| 5 | `VarAndCharClashTest` | 13 | 0.2s |  |
 | 6 | `Video-EmbedSquareTest` | 2 | 0.2s |  |
 | 7 | `action_order/action_execution_order_test1` | 10 | 0.2s |  |
 | 8 | `action_order/action_execution_order_test7` | 7 | 0.2s |  |
@@ -52,24 +52,24 @@
 | 18 | `displaylist_depths/displaylist_depths_test7` | 14 | 0.2s |  |
 | 19 | `event_handler_scope_test` | 16 | 0.2s |  |
 | 20 | `getTimer_test` | 8 | 0.2s |  |
-| 21 | `get_frame_number_test` | 31 | 0.4s |  |
-| 22 | `instanceNameTest` | 5 | 0.1s |  |
-| 23 | `loop/loop_test2` | 15 | 0.1s |  |
-| 24 | `loop/loop_test3` | 16 | 0.2s |  |
+| 21 | `get_frame_number_test` | 31 | 0.3s |  |
+| 22 | `instanceNameTest` | 5 | 0.2s |  |
+| 23 | `loop/loop_test2` | 15 | 0.2s |  |
+| 24 | `loop/loop_test3` | 16 | 0.1s |  |
 | 25 | `loop/loop_test4` | 22 | 0.2s |  |
 | 26 | `loop/loop_test5` | 24 | 0.2s |  |
 | 27 | `loop/loop_test9` | 15 | 0.2s |  |
 | 28 | `loop/simple_loop_test` | 0 | 0.2s |  |
 | 29 | `masks_test2` | 10 | 0.2s |  |
 | 30 | `morph_test1` | 0 | 0.2s |  |
-| 31 | `move_object_test` | 11 | 0.1s |  |
-| 32 | `multi_doactions_and_goto_frame_test` | 6 | 0.1s |  |
-| 33 | `new_child_in_unload_test` | 11 | 0.1s |  |
-| 34 | `place_and_remove_object_test` | 13 | 0.2s |  |
+| 31 | `move_object_test` | 11 | 0.2s |  |
+| 32 | `multi_doactions_and_goto_frame_test` | 6 | 0.2s |  |
+| 33 | `new_child_in_unload_test` | 11 | 0.2s |  |
+| 34 | `place_and_remove_object_test` | 13 | 0.1s |  |
 | 35 | `reverse_execute_PlaceObject2_test1` | 8 | 0.2s |  |
 | 36 | `reverse_execute_PlaceObject2_test2` | 10 | 0.2s |  |
 | 37 | `runtime_vm_stack_test` | 9 | 0.2s |  |
-| 38 | `shape_test` | 21 | 0.3s |  |
+| 38 | `shape_test` | 21 | 0.2s |  |
 | 39 | `static_vs_dynamic1` | 17 | 0.2s |  |
 | 40 | `static_vs_dynamic2` | 18 | 0.2s |  |
 | 41 | `timeline_var_test` | 11 | 0.2s |  |
@@ -87,10 +87,10 @@
 | 4 | `attachExtImported` | 1 | 1 | 0.3s |  |
 | 5 | `callFunction_test` | 5 | 11 | 0.2s |  |
 | 6 | `init_action/InitActionTest` | 17 | 17 | 0.2s |  |
-| 7 | `init_action/InitActionTest2` | 30 | 30 | 0.2s |  |
+| 7 | `init_action/InitActionTest2` | 30 | 30 | 0.3s |  |
 | 8 | `path_format_test` | 27 | 28 | 0.3s |  |
 | 9 | `place_object_test` | 14 | 14 | 0.2s |  |
-| 10 | `place_object_test2` | 16 | 23 | 0.2s |  |
+| 10 | `place_object_test2` | 16 | 23 | 0.1s |  |
 
 ## Near-Passing Tests
 
