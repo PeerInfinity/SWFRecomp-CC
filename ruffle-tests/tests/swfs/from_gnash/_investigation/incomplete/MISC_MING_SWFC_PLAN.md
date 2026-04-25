@@ -518,3 +518,93 @@ Fix requires the architectural change described in the DEJAGNU_FRAMEWORK_PLAN: r
 1. Which of the 76 producing-output tests carry `known_failure=true`? For any where our diffs ⊆ Ruffle's, we qualify for `ruffle_matched` promotion without runtime fixes. Worth checking each near-passing test's test.toml first.
 2. Is the "produces zero output" test list stable across CI runs, or does the DoInitAction blocker intermittently affect more tests? If unstable, the blocker may be timing-sensitive rather than categorical.
 3. For cluster fixes, should each cluster get a separate sub-plan doc, or is this aggregate plan adequate? (Probably aggregate for now; split off if one cluster grows substantially.)
+
+## Session investigation log (2026-04-24, post-CI snapshot)
+
+This session ran baselines against all near-passing failures and confirmed which
+local-only fixes (post-CI) are still passing. The grouping below is for the
+NEXT session: each cluster summarizes the apparent root cause so we don't redo
+the diff-reading work.
+
+### Confirmed PASS locally (already in committed code, awaits next CI)
+
+`loop/loop_test2`, `loop/loop_test3`, `loop/loop_test4`, `loop/loop_test5`,
+`reverse_execute_PlaceObject2_test1`, `reverse_execute_PlaceObject2_test2`,
+`timeline_var_test`. These will flip in CI without further work.
+
+### Investigated this session, blocker identified — do not attack until blocker lands
+
+- **`action_order/action_execution_order_test2/3` and `loop/loop_test6`** — same
+  root cause as the documented `loop/loop_test7` blocker: AS-level `onUnload`
+  and tag-level `CLIP_EVENT_UNLOAD` from `RemoveObject2` fire inline during
+  tag processing, but Flash queues them so a same-frame DoAction (which is
+  also queued) fires first. test3's diff is exactly:
+  `onUnloadRed1+onUnloadRed2+as_in_DoAction3+` instead of expected
+  `as_in_DoAction3+onUnloadRed1+onUnloadRed2+`. test2's diff is a
+  PlaceObject2-vs-DoAction sibling case (placement onLoad ordering across
+  depths). All three share the deferred-onUnload work described in
+  CURRENT_STATUS "loop_test7 — deferred CLIP_EVENT_UNLOAD clip actions".
+- **`displaylist_depths_test`, `DepthLimitsTest`, `displaylist_depths_test2/3/8/9`,
+  `duplicate_movie_clip_test2` (lines 16-18)** — all blocked on the
+  CloneSprite depth-bias unification described above ("CloneSprite depth-bias
+  trade-off (open)"). Visible symptoms: `parseInt(dynamicmcN._width/10)` returns
+  the raw `_width` instead of a small int (suggests we've placed the clone at
+  a wildly wrong depth where its `_width` reads zero/sentinel), `getDepth()`
+  on extreme-depth clones returns biased instead of unbiased values, and
+  `swapDepths(<-16384)` doesn't no-op as expected.
+- **`attachImported`, `attachExtImported`** — `actionImportAssets` /
+  `tagImportCharacter` ARE wired in the recompiler+runtime
+  (`SWFRecomp/src/swf.cpp:3946-3975`,
+  `SWFModernRuntime/src/actionmodern/action.c:26380` for the runtime side,
+  `SWFModernRuntime/src/libswf/ng_shared.c:784` for the dictionary copy), but
+  the imported character (`redsquare`, char_id 2 in attachImported) ends up
+  missing at attachMovie time. Need to confirm that the verifier
+  (`ruffle-tests/verify_output.py`) actually compiles the child
+  `attachMovieTest.swf` AND that the child's `tagRegisterExport(...,
+  "redsquare", ...)` runs before the parent's `tagImportCharacter` lookup.
+  The child SWF is present in the test dir but I didn't trace whether its
+  init function fires.
+
+### Investigated this session, multi-issue (not single fix)
+
+- **`matrix_test`** (84%) — already documented as multi-issue.
+- **`attachMovieLoopingTest`** (70.7%) — `redsquare._height` returns `604`
+  instead of `60.1`; later `Math.round` checks return integers like `2`
+  where expected `25`. Looks like a numeric type or scaling bug specific to
+  the imported character, possibly related to the same Import path as
+  `attachImported`.
+- **`DefineTextTest`** (68.8%) — float precision (`288.049987792969` vs
+  `288.05`) plus mouse-input-driven assertions (`_global.clicks == 2` got
+  `15`). Mouse-input portion is `RollOverOutTest`-class blocker (no input
+  driver in our runner).
+- **`event_handler_scope_test`** (68.8%) — `_root.scope_test` reads empty
+  string instead of `3` from inside an `onClipEvent(enterFrame)` handler.
+  Scope-chain bug: the handler's variable lookup isn't reaching `_root`
+  for assignment. Limited blast radius — could be a quick fix if someone
+  wants to dig in.
+- **`DefineEditTextVariableNameTest`** (68.1%) — every check from
+  `mc4.uninitalized_text_var == 'string'` (line 340) onward is duplicated
+  in our output. Earlier checks fire once; later checks fire twice. Looks
+  like a frame loops back and re-runs a sub-range of the timeline. The
+  v2 version of this test (DefineEditTextVariableNameTest2) already
+  PASSES, so the bug is specific to v1's frame structure (more frames).
+- **`place_and_remove_object_insane_test`** (68.2%),
+  **`consecutive_goto_frame_test`** (25%), **`goto_frame_test`** (26.7%) —
+  all involve goto+placement+removal sequences where MC identity is
+  preserved/lost incorrectly. Each has a unique diff but the root
+  appears to be sprite frame-script execution order on goto crossing
+  removed-then-replaced depth slots. Related to `loop_test4`/`loop_test8`
+  but distinct from the survives_rewind cluster already addressed.
+
+### misc-swfmill (not in this plan but checked)
+
+- **`jump_to_prev_block`** — recompiler architectural limit: bytecode
+  `BranchAlways byteOffset=-56` jumps backward across DoAction tag
+  boundaries (each DoAction → its own C function). Recompiler emits a
+  bare `return;` for the backward jump (`script_2.c`). Unfixable without
+  representing each frame's DoActions as a single execution unit, which
+  is a substantial refactor.
+- **`tags_after_last_showframe`** — DoInitAction order vs post-ShowFrame
+  DoAction order. Expected `a1-i1-a2-a3-1`; got `i1-a1-a2-a3-1` plus
+  infinite loop (single-frame SWF with tags after the only ShowFrame
+  loops indefinitely instead of stopping). Two distinct bugs.
