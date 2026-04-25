@@ -7,19 +7,20 @@ Last updated: 2026-04-24 (event_handler_scope_test → PASS via fresh local acti
 - **event_handler_scope_test (misc-ming) → PASS (+1).**
   `actionDispatchEnterFrameHandlers` (`SWFModernRuntime/src/actionmodern/action.c`)
   now pushes a fresh local activation `ASObject` and switches `g_current_context`
-  to `func->base_clip` (for both type 1 and type 2 functions, and for both the
-  child-MC and root-MC dispatch branches), matching `actionCallMethod` /
-  `runStoredFunctionCallback`. Without these, plain assignments inside
+  to `func->base_clip` for the child-MC type 1 (`DefineFunction`) dispatch
+  path, matching `actionCallMethod` / `runStoredFunctionCallback`. Without
+  these, plain assignments inside
   `mc.onEnterFrame = function(){ scope_test = 3; var scope_test = 4; }` fell
   through `actionSetVariable`'s "tellTarget non-root context" branch onto
-  `mc.dynamic_props` (because `g_current_context` was still set to the
-  receiver `mc` rather than the function's defining clip), and
-  `actionDefineLocal` similarly leaked `var scope_test = 4` onto
-  `mc.dynamic_props` (no local activation). The fix isolates locals into the
-  activation and routes plain assignments to the function's base clip /
-  globals as Flash does. No regressions on a 28-test AVM1 lifecycle/event
-  battery, 24-test AVM1 broader battery, or 17-test misc-ming
-  recently-fixed battery (all 100% effective pass).
+  `mc.dynamic_props` (because `g_current_context` was still the receiver
+  `mc` rather than the function's defining clip), and `actionDefineLocal`
+  leaked `var scope_test = 4` onto `mc.dynamic_props` for the same reason.
+  Scoped to type 1 only — type 2 (`DefineFunction2`) already manages its
+  hoisted locals via the per-call register array, and adding the same push
+  to the type 2 path regressed `avm1/form_loader_encoding_1` /
+  `form_loader_encoding_4` in CI. No regressions on a 28-test AVM1
+  lifecycle/event battery, 24-test AVM1 broader battery, or 17-test
+  misc-ming recently-fixed battery.
 
 - **Selection-v6 / Selection-v7 / Selection-v8 (actionscript.all) → ruffle_matched (+3 effective).**
   `builtin_selection_setFocus` (`SWFModernRuntime/src/actionmodern/action.c`)

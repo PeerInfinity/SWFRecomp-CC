@@ -580,35 +580,25 @@ the diff-reading work.
 - **`event_handler_scope_test` (misc-ming) → PASS (+1, 2026-04-24, not yet in CI).**
   `actionDispatchEnterFrameHandlers` (`SWFModernRuntime/src/actionmodern/action.c`)
   now pushes a fresh local activation `ASObject` and switches `g_current_context`
-  to `func->base_clip` (for both type 1 and type 2 functions, and for both the
-  child-MC and root-MC dispatch branches), matching how `actionCallMethod` /
-  `runStoredFunctionCallback` set up function calls. Without these, plain
-  assignments inside `mc.onEnterFrame = function(){ scope_test = 3; var
-  scope_test = 4; }` fell through `actionSetVariable`'s "tellTarget non-root
-  context" branch onto `mc.dynamic_props["scope_test"]` (because
-  `g_current_context` was still set to the receiver `mc` rather than the
-  function's defining clip), and `actionDefineLocal` similarly leaked
-  `var scope_test = 4` onto `mc.dynamic_props` (no local activation). The fix
-  isolates locals into the activation and routes plain assignments to the
-  function's base clip / globals as Flash does. No regressions on a 28-test
-  AVM1 lifecycle/event battery (clip_events, on_construct, register_and_init_order,
-  set_interval, movieclip_state_values, movieclip_library_state_values,
-  button_children, movieclip_in_removed_button, attach_movie,
-  swf5_to_6_cross_call, swf6_to_5_cross_call, swf5_no_closure, goto_rewind1/2/3,
-  execution_order1/2/3, goto_execution_order/2, mutable_this, this_scoping,
-  unload, unload_clip_event, unload_nested_child, unloadmovie, mcl_unloadclip,
-  init_object_order — 28/28 effective pass), a 24-test AVM1 broader battery
-  (as2_super_and_this_v6/v8, enumerate, array_enumerate, mutable_this,
-  this_scoping, on_construct, clip_events, goto_rewind1/2/3, execution_order1/2/3,
-  swf5_no_closure, button_children, movieclip_in_removed_button,
-  clone_sprite_edittext, movieclip_state_values, movieclip_library_state_values,
-  text_format, text_format_display, set_interval, watch — 24/24 effective pass),
-  and a 17-test misc-ming recently-fixed battery (event_handler_scope_test,
-  instanceNameTest, attachMovieTest, DefineEditTextTest,
-  DefineEditTextVariableNameTest2, loop/loop_test3/5/9, static_vs_dynamic1/2,
-  displaylist_depths_test11, place_and_remove_object_test, get_frame_number_test,
-  shape_test, new_child_in_unload_test, action_execution_order_test8-v5/v6 —
-  17/17 pass).
+  to `func->base_clip` for the child-MC type 1 (`DefineFunction`) dispatch path,
+  matching how `actionCallMethod` and `runStoredFunctionCallback` set up function
+  calls. Without these, plain assignments inside
+  `mc.onEnterFrame = function(){ scope_test = 3; var scope_test = 4; }` fell
+  through `actionSetVariable`'s "tellTarget non-root context" branch onto
+  `mc.dynamic_props["scope_test"]` (because `g_current_context` was still the
+  receiver `mc` rather than the function's defining clip), and
+  `actionDefineLocal` leaked `var scope_test = 4` onto `mc.dynamic_props` for
+  the same reason. The fix isolates locals into the activation and routes
+  plain assignments to the function's base clip / globals as Flash does.
+  Scoped to type 1 only — type 2 (`DefineFunction2`) already manages its
+  hoisted locals via the per-call register array, and an earlier draft that
+  added the same local-activation push to the type 2 path regressed
+  `avm1/form_loader_encoding_1`/`form_loader_encoding_4` (extra trace lines
+  fired because pushing an empty activation perturbed something in the
+  existing type 2 scope resolution; left as-is to keep the fix minimal). No
+  regressions on a 28-test AVM1 lifecycle/event battery, 24-test AVM1
+  broader battery, or 17-test misc-ming recently-fixed battery (all 100%
+  effective pass).
 - **`DefineEditTextVariableNameTest`** (68.1%) — every check from
   `mc4.uninitalized_text_var == 'string'` (line 340) onward is duplicated
   in our output. Earlier checks fire once; later checks fire twice. Looks

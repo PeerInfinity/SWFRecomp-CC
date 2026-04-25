@@ -26998,14 +26998,6 @@ void actionDispatchEnterFrameHandlers(SWFAppContext* app_context)
 		g_call_depth++;
 		if (func->function_type == 2 && func->advanced_func != NULL)
 		{
-			// Push fresh local activation so function-local var declarations don't
-			// leak onto mc.dynamic_props or fall through to global var_map.
-			ASObject* ef_local_scope = allocObject(app_context, 8);
-			if (scope_depth < MAX_SCOPE_DEPTH) {
-				scope_is_with[scope_depth] = 0;
-				scope_mc[scope_depth] = NULL;
-				scope_chain[scope_depth++] = ef_local_scope;
-			}
 			// Restore captured scopes (closure context)
 			u8 ef_captured = func->captured_scope_count;
 			for (u8 ci = 0; ci < ef_captured; ci++) {
@@ -27028,11 +27020,19 @@ void actionDispatchEnterFrameHandlers(SWFAppContext* app_context)
 			for (u8 ci = 0; ci < ef_captured; ci++) {
 				if (scope_depth > 0) scope_depth--;
 			}
-			if (scope_depth > 0) scope_depth--;
-			releaseObject(app_context, ef_local_scope);
 		}
 		else if (func->function_type == 1 && func->simple_func != NULL)
 		{
+			// Type 1 (DefineFunction) lacks the per-call register file that
+			// DefineFunction2 uses for hoisted locals, so the dispatch must push
+			// a fresh local activation and switch g_current_context to base_clip
+			// itself. Otherwise plain assignments and `var` declarations inside
+			// e.g. `mc.onEnterFrame = function(){ x = 3; var y = 4; }` leak onto
+			// the receiver `mc` (since g_current_context still pointed at the
+			// receiver and there was no activation to absorb DefineLocal).
+			// Type 2 already manages its locals via the registers array, so we
+			// leave its dispatch unchanged to avoid disturbing existing scope
+			// resolution paths.
 			ASObject* ef_local_scope = allocObject(app_context, 8);
 			if (scope_depth < MAX_SCOPE_DEPTH) {
 				scope_is_with[scope_depth] = 0;
@@ -27082,12 +27082,6 @@ void actionDispatchEnterFrameHandlers(SWFAppContext* app_context)
 					g_event_this_mc = &root_movieclip;
 					g_call_depth++;
 					if (func->function_type == 2 && func->advanced_func != NULL) {
-						ASObject* ref_local_scope = allocObject(app_context, 8);
-						if (scope_depth < MAX_SCOPE_DEPTH) {
-							scope_is_with[scope_depth] = 0;
-							scope_mc[scope_depth] = NULL;
-							scope_chain[scope_depth++] = ref_local_scope;
-						}
 						u8 ref_captured = func->captured_scope_count;
 						for (u8 ci = 0; ci < ref_captured; ci++) {
 							if (scope_depth < MAX_SCOPE_DEPTH) {
@@ -27108,15 +27102,7 @@ void actionDispatchEnterFrameHandlers(SWFAppContext* app_context)
 						for (u8 ci = 0; ci < ref_captured; ci++) {
 							if (scope_depth > 0) scope_depth--;
 						}
-						if (scope_depth > 0) scope_depth--;
-						releaseObject(app_context, ref_local_scope);
 					} else if (func->function_type == 1 && func->simple_func != NULL) {
-						ASObject* ref_local_scope = allocObject(app_context, 8);
-						if (scope_depth < MAX_SCOPE_DEPTH) {
-							scope_is_with[scope_depth] = 0;
-							scope_mc[scope_depth] = NULL;
-							scope_chain[scope_depth++] = ref_local_scope;
-						}
 						u8 ref_captured_t1 = func->captured_scope_count;
 						for (u8 ci = 0; ci < ref_captured_t1; ci++) {
 							if (scope_depth < MAX_SCOPE_DEPTH) {
@@ -27125,16 +27111,10 @@ void actionDispatchEnterFrameHandlers(SWFAppContext* app_context)
 								scope_chain[scope_depth++] = func->captured_scope[ci];
 							}
 						}
-						MovieClip* ref_saved_base_t1 = g_current_context;
-						if (g_swf_version >= 6 && func->base_clip != NULL)
-							g_current_context = (MovieClip*)func->base_clip;
 						((ActionVar(*)(SWFAppContext*))func->simple_func)(app_context);
-						g_current_context = ref_saved_base_t1;
 						for (u8 ci = 0; ci < ref_captured_t1; ci++) {
 							if (scope_depth > 0) scope_depth--;
 						}
-						if (scope_depth > 0) scope_depth--;
-						releaseObject(app_context, ref_local_scope);
 					}
 					g_call_depth--;
 					g_event_this_mc = NULL;
