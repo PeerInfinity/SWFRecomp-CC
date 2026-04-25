@@ -25616,6 +25616,131 @@ void actionStopSounds(SWFAppContext* app_context)
 	#endif
 }
 
+// Iterate child_mc_cache to find a dynamic MC whose drawing-API geometry
+// covers the given stage point. Used by ng_compute_droptarget as a
+// supplement to the display_list walk — dynamic MCs (createEmptyMovieClip
+// / duplicateMovieClip / attachMovie) are not in display_list but should
+// be valid drop targets via their drawing bounds.
+//
+// Builds the path string for the highest-depth matching MC. Walks each
+// candidate's parent chain to construct a slash-path (e.g. "/target10",
+// "/loadedTarget/target20"), matching the Flash _droptarget format.
+int actionFindDynamicDropTarget(float stage_x_twips, float stage_y_twips,
+    const char* skip_name, char* out_path, size_t out_size)
+{
+#ifdef NO_GRAPHICS
+	if (out_size == 0) return 0;
+	out_path[0] = '\0';
+
+	// Skip-name basename for filtering the dragged clip itself.
+	const char* skip_base = NULL;
+	if (skip_name && skip_name[0]) {
+		const char* dot = strrchr(skip_name, '.');
+		skip_base = dot ? dot + 1 : skip_name;
+	}
+
+	double test_px = (double)stage_x_twips / 20.0;
+	double test_py = (double)stage_y_twips / 20.0;
+
+	// Find the candidate with the highest depth whose drawing bounds (in
+	// world-space pixels via getConcatMatrixForMC) cover the test point.
+	MovieClip* best = NULL;
+	int best_depth = INT_MIN;
+	for (int i = 0; i < child_mc_count; i++) {
+		MovieClip* ch = child_mc_cache[i];
+		if (ch == NULL) continue;
+		if (ch->depth == INT_MIN) continue; // dead
+		if (ch->avm1_removed || ch->pending_removal) continue;
+		if (skip_base && ch->name[0] && strcmp(ch->name, skip_base) == 0) continue;
+		if (!ch->draw_has_bounds) continue;
+		// Compute world matrix for ch
+		double wa=1, wb=0, wc=0, wd=1, wtx=0, wty=0;
+		getConcatMatrixForMC(ch, &wa, &wb, &wc, &wd, &wtx, &wty);
+		// Inverse-transform stage point to ch's local pixel space
+		double det = wa*wd - wb*wc;
+		if (det == 0.0) continue;
+		double inv = 1.0 / det;
+		double sx = test_px - wtx;
+		double sy = test_py - wty;
+		double lx = ( wd*sx - wc*sy) * inv;
+		double ly = (-wb*sx + wa*sy) * inv;
+		// Check drawing bounds
+		if (lx < ch->draw_xmin || lx > ch->draw_xmax) continue;
+		if (ly < ch->draw_ymin || ly > ch->draw_ymax) continue;
+		// Take the front-most (highest-depth) hit
+		if (ch->depth > best_depth) {
+			best = ch;
+			best_depth = ch->depth;
+		}
+	}
+
+	if (best == NULL) return 0;
+
+	// Build slash path from parent chain. Levels (e.g. _level50) are absolute
+	// roots — emit "_level50/..." instead of "/...".
+	const char* path_segs[16];
+	int seg_count = 0;
+	MovieClip* cur = best;
+	int hit_level_root = 0;
+	const char* level_root_name = NULL;
+	while (cur != NULL && seg_count < 16) {
+		if (cur->name[0] != '\0') {
+			// Detect _levelN root
+			if (strncmp(cur->name, "_level", 6) == 0 && cur->parent == NULL) {
+				level_root_name = cur->name;
+				hit_level_root = 1;
+				break;
+			}
+			path_segs[seg_count++] = cur->name;
+		}
+		if (cur->parent == NULL || cur->parent == &root_movieclip)
+			break;
+		cur = cur->parent;
+	}
+
+	// Emit reversed: from outer to inner.
+	size_t pos = 0;
+	if (hit_level_root && level_root_name) {
+		int n = snprintf(out_path + pos, out_size - pos, "%s", level_root_name);
+		if (n < 0 || (size_t)n >= out_size - pos) return 1;
+		pos += (size_t)n;
+	}
+	for (int i = seg_count - 1; i >= 0; i--) {
+		int n = snprintf(out_path + pos, out_size - pos, "/%s", path_segs[i]);
+		if (n < 0 || (size_t)n >= out_size - pos) return 1;
+		pos += (size_t)n;
+	}
+	return 1;
+#else
+	(void)stage_x_twips; (void)stage_y_twips; (void)skip_name;
+	(void)out_path; (void)out_size;
+	return 0;
+#endif
+}
+
+// Recompute mc->droptarget on-the-fly if mc is currently being dragged.
+// _droptarget reflects the live drop target while a drag is active; without
+// this, the cached value from actionEndDrag goes stale (and is empty during
+// an in-progress startDrag-without-endDrag pattern).
+static void actionRefreshDropTargetIfDragged(MovieClip* mc)
+{
+#ifdef NO_GRAPHICS
+	if (mc == NULL || !is_dragging) return;
+	if (g_drag_target_name[0] == '\0') return;
+	// Match by name (g_drag_target_name may be a path like "_level0.draggable50";
+	// the basename is what mc->name carries).
+	const char* base = strrchr(g_drag_target_name, '.');
+	base = base ? base + 1 : g_drag_target_name;
+	if (mc->name[0] == '\0' || strcmp(mc->name, base) != 0) return;
+	extern int ng_compute_droptarget(float stage_x_twips, float stage_y_twips,
+	    const char* skip_name, char* out_path, size_t out_size);
+	ng_compute_droptarget(g_drag_virt_x, g_drag_virt_y,
+	    g_drag_target_name, mc->droptarget, sizeof(mc->droptarget));
+#else
+	(void)mc;
+#endif
+}
+
 // ============================================================================
 // FlashVars helper: strips query string from URL, parses key=value pairs,
 // sets them as variables on the target MovieClip
@@ -33252,7 +33377,7 @@ check_special_vars:
 			if (strcasecmp(var_name, "_name") == 0) { PUSH_STR(mc->name, strlen(mc->name)); return; }
 			if (strcasecmp(var_name, "_target") == 0) { PUSH_STR(mc->target, strlen(mc->target)); return; }
 			if (strcasecmp(var_name, "_url") == 0) { PUSH_STR(mc->url, strlen(mc->url)); return; }
-			if (strcasecmp(var_name, "_droptarget") == 0) { PUSH_STR(mc->droptarget, strlen(mc->droptarget)); return; }
+			if (strcasecmp(var_name, "_droptarget") == 0) { actionRefreshDropTargetIfDragged(mc); PUSH_STR(mc->droptarget, strlen(mc->droptarget)); return; }
 			if (strcasecmp(var_name, "_quality") == 0) { PUSH_STR(mc->quality, strlen(mc->quality)); return; }
 			if (strcasecmp(var_name, "_focusrect") == 0) {
 				// Bare _focusrect resolves to root MC (stage focus rect)
@@ -34608,6 +34733,7 @@ void actionGetProperty(SWFAppContext* app_context)
 			is_string = 1;
 			break;
 		case 14: // _droptarget
+			actionRefreshDropTargetIfDragged(mc);
 			str_value = mc ? mc->droptarget : "";
 			is_string = 1;
 			break;
@@ -41945,7 +42071,7 @@ void actionGetMember(SWFAppContext* app_context)
 			if (strcasecmp(prop_name, "_name") == 0) { PUSH_STR(mc->name, strlen(mc->name)); return; }
 			if (strcasecmp(prop_name, "_target") == 0) { PUSH_STR(mc->target, strlen(mc->target)); return; }
 			if (strcasecmp(prop_name, "_url") == 0) { PUSH_STR(mc->url, strlen(mc->url)); return; }
-			if (strcasecmp(prop_name, "_droptarget") == 0) { PUSH_STR(mc->droptarget, strlen(mc->droptarget)); return; }
+			if (strcasecmp(prop_name, "_droptarget") == 0) { actionRefreshDropTargetIfDragged(mc); PUSH_STR(mc->droptarget, strlen(mc->droptarget)); return; }
 			if (strcasecmp(prop_name, "_quality") == 0) { PUSH_STR(mc->quality, strlen(mc->quality)); return; }
 			if (strcasecmp(prop_name, "_xmouse") == 0) {
 #ifdef NO_GRAPHICS
@@ -57755,6 +57881,54 @@ void actionCallMethod(SWFAppContext* app_context, char* str_buffer)
 				}
 			}
 #endif
+			pushUndefined(app_context);
+			return;
+		}
+		else if (method_name_len == 9 && strncmp(method_name, "startDrag", 9) == 0)
+		{
+			// mc.startDrag([lockCenter [, l, t, r, b]]) — start drag on mc.
+			// Mirrors actionStartDrag but with mc as the receiver instead of a
+			// stack-popped target name.
+			int lock_flag = 0;
+			int has_constraint = 0;
+			float x1_d = 0, y1_d = 0, x2_d = 0, y2_d = 0;
+			if (num_args >= 1) lock_flag = (int)varToDouble(&args[0]) != 0;
+			if (num_args >= 5) {
+				has_constraint = 1;
+				x1_d = (float)varToDouble(&args[1]);
+				y1_d = (float)varToDouble(&args[2]);
+				x2_d = (float)varToDouble(&args[3]);
+				y2_d = (float)varToDouble(&args[4]);
+			}
+			if (args != NULL) FREE(args);
+
+			if (mc != NULL) {
+				// Clear any existing drag
+				if (is_dragging && dragged_target) {
+					free(dragged_target);
+					dragged_target = NULL;
+				}
+				is_dragging = 1;
+				size_t nlen = strlen(mc->name);
+				dragged_target = (char*)malloc(nlen + 1);
+				if (dragged_target) strcpy(dragged_target, mc->name);
+#ifdef NO_GRAPHICS
+				g_drag_virt_x = app_context->mouse.stage_x;
+				g_drag_virt_y = app_context->mouse.stage_y;
+				snprintf(g_drag_target_name, sizeof(g_drag_target_name), "%s", mc->name);
+#endif
+			}
+			(void)lock_flag; (void)has_constraint;
+			(void)x1_d; (void)y1_d; (void)x2_d; (void)y2_d;
+			pushUndefined(app_context);
+			return;
+		}
+		else if (method_name_len == 8 && strncmp(method_name, "stopDrag", 8) == 0)
+		{
+			// mc.stopDrag() — end the current drag (also accessible as the
+			// standalone ActionEndDrag). Use the existing actionEndDrag logic.
+			if (args != NULL) FREE(args);
+			actionEndDrag(app_context);
 			pushUndefined(app_context);
 			return;
 		}

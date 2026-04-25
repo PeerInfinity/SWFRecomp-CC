@@ -2767,6 +2767,60 @@ int sprite_content_bounds_twips(DisplayObject* dl, size_t dl_max,
 // Unnamed objects: absorb the hit and return parent_path.
 // parent_stage_x/y: stage origin of the parent (twips), so entry stage origin =
 //   parent_stage + transform_data[entry.transform_id][12/13].
+// Recursive shape-only hit test for drop_target purposes. Excludes text fields
+// (which Flash treats as transparent for drop_target hit testing) and walks
+// nested sprites looking for actual shape coverage.
+static int find_drop_target_shape_hit_recursive(DisplayObject* dl, size_t dl_max,
+    double pa, double pb, double pc, double pd, double ptx, double pty,
+    double test_x, double test_y)
+{
+	extern int ng_hitTestShapeChar_public(size_t char_id, u16 ratio,
+	    double ma, double mb, double mc_m, double md, double mtx, double mty,
+	    double test_x, double test_y);
+	(void)ng_hitTestShapeChar_public;
+	for (size_t i = 1; i <= dl_max; i++) {
+		DisplayObject* child = &dl[i];
+		if (child->char_id == 0) continue;
+		Character* cch = &dictionary[child->char_id];
+		// Compose parent matrix with this child's transform
+		u32 ctid = child->transform_id;
+		double ca = (double)transform_data[ctid][0];
+		double cb = (double)transform_data[ctid][1];
+		double cc = (double)transform_data[ctid][4];
+		double cd = (double)transform_data[ctid][5];
+		double ctx_v = (double)transform_data[ctid][12];
+		double cty_v = (double)transform_data[ctid][13];
+		double na = pa*ca + pc*cb, nb = pb*ca + pd*cb;
+		double nc = pa*cc + pc*cd, nd = pb*cc + pd*cd;
+		double nntx = pa*ctx_v + pc*cty_v + ptx;
+		double nnty = pb*ctx_v + pd*cty_v + pty;
+		if (cch->type == CHAR_TYPE_SHAPE || cch->type == CHAR_TYPE_MORPH_SHAPE) {
+			s32 cxmin, cxmax, cymin, cymax;
+			if (!ng_getCharBounds(child->char_id, &cxmin, &cxmax, &cymin, &cymax)) continue;
+			// Inverse-transform to local space and test bounds
+			double det = na*nd - nb*nc;
+			if (det == 0.0) continue;
+			double inv = 1.0 / det;
+			double sx = test_x - nntx;
+			double sy = test_y - nnty;
+			double lx = ( nd*sx - nc*sy) * inv;
+			double ly = (-nb*sx + na*sy) * inv;
+			if (lx >= (double)cxmin && lx <= (double)cxmax &&
+			    ly >= (double)cymin && ly <= (double)cymax)
+				return 1;
+		} else if (cch->type == CHAR_TYPE_SPRITE) {
+			if (child->sprite_display_list != NULL && child->sprite_max_depth > 0) {
+				if (find_drop_target_shape_hit_recursive(child->sprite_display_list,
+				    child->sprite_max_depth, na, nb, nc, nd, nntx, nnty, test_x, test_y))
+					return 1;
+			}
+		}
+		// Skip text fields and other non-shape types (Flash treats them as
+		// transparent for drop_target purposes).
+	}
+	return 0;
+}
+
 static int find_drop_target_in_dl(DisplayObject* dl, size_t dl_max,
     float parent_stage_x, float parent_stage_y,
     float mouse_x, float mouse_y,
@@ -2793,12 +2847,11 @@ static int find_drop_target_in_dl(DisplayObject* dl, size_t dl_max,
 		float sx = transform_data[entry->transform_id][0];
 		float sy = transform_data[entry->transform_id][5];
 
-		// Compute AABB in stage twips
-		float aabb_xmin, aabb_xmax, aabb_ymin, aabb_ymax;
-		int has_aabb = 0;
+		int hit = 0;
 
 		if (ch->type == CHAR_TYPE_SHAPE || ch->type == CHAR_TYPE_MORPH_SHAPE)
 		{
+			// Shape: AABB is a tight enough approximation for drop-target testing.
 			s32 cxmin, cxmax, cymin, cymax;
 			if (ng_getCharBounds(entry->char_id, &cxmin, &cxmax, &cymin, &cymax))
 			{
@@ -2808,37 +2861,24 @@ static int find_drop_target_in_dl(DisplayObject* dl, size_t dl_max,
 				float y1 = entry_stage_y + sy * (float)cymax;
 				if (x0 > x1) { float t = x0; x0 = x1; x1 = t; }
 				if (y0 > y1) { float t = y0; y0 = y1; y1 = t; }
-				aabb_xmin = x0; aabb_xmax = x1;
-				aabb_ymin = y0; aabb_ymax = y1;
-				has_aabb = 1;
+				hit = (mouse_x >= x0 && mouse_x <= x1 && mouse_y >= y0 && mouse_y <= y1);
 			}
 		}
 		else if (ch->type == CHAR_TYPE_SPRITE)
 		{
+			// Sprite: test SHAPE coverage only (skip text fields), so large
+			// sprites with text fields (e.g. Dejagnu trace) don't absorb drops.
 			if (entry->sprite_display_list != NULL && entry->sprite_max_depth > 0)
 			{
-				float lxmin, lxmax, lymin, lymax;
-				if (sprite_content_bounds_twips(entry->sprite_display_list,
-				        entry->sprite_max_depth, &lxmin, &lxmax, &lymin, &lymax))
-				{
-					float x0 = entry_stage_x + sx * lxmin;
-					float x1 = entry_stage_x + sx * lxmax;
-					float y0 = entry_stage_y + sy * lymin;
-					float y1 = entry_stage_y + sy * lymax;
-					if (x0 > x1) { float t = x0; x0 = x1; x1 = t; }
-					if (y0 > y1) { float t = y0; y0 = y1; y1 = t; }
-					aabb_xmin = x0; aabb_xmax = x1;
-					aabb_ymin = y0; aabb_ymax = y1;
-					has_aabb = 1;
-				}
+				hit = find_drop_target_shape_hit_recursive(entry->sprite_display_list,
+				    entry->sprite_max_depth,
+				    (double)sx, 0.0, 0.0, (double)sy,
+				    (double)entry_stage_x, (double)entry_stage_y,
+				    (double)mouse_x, (double)mouse_y);
 			}
 		}
 
-		if (!has_aabb) continue;
-
-		// Point-in-AABB test
-		if (mouse_x < aabb_xmin || mouse_x > aabb_xmax ||
-		    mouse_y < aabb_ymin || mouse_y > aabb_ymax) continue;
+		if (!hit) continue;
 
 		// Hit!
 		if (entry->instance_name != NULL)
@@ -2881,6 +2921,15 @@ int ng_compute_droptarget(float stage_x_twips, float stage_y_twips,
 {
 	if (out_size == 0) return 0;
 	out_path[0] = '\0';
+	// First check dynamic MCs (createEmptyMovieClip / duplicateMovieClip /
+	// attachMovie) — they aren't in display_list, but Flash treats them as
+	// valid drop targets via their drawing-API geometry. Walked in
+	// reverse-depth order to mirror Flash's front-to-back hit-testing.
+	extern int actionFindDynamicDropTarget(float stage_x_twips, float stage_y_twips,
+	    const char* skip_name, char* out_path, size_t out_size);
+	if (actionFindDynamicDropTarget(stage_x_twips, stage_y_twips,
+	    skip_name, out_path, out_size))
+		return 1;
 	return find_drop_target_in_dl(display_list, max_depth,
 	    0.0f, 0.0f, stage_x_twips, stage_y_twips,
 	    skip_name, "", out_path, out_size);
