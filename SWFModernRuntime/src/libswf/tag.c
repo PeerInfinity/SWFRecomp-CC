@@ -250,7 +250,7 @@ extern MovieClip* g_current_context;
 extern void actionSetCurrentContext(MovieClip* mc);
 
 // Execute a sprite frame function with correct MC context and g_current_sprite_obj.
-static void exec_sprite_frame(SWFAppContext* app_context, DisplayObject* obj, frame_func f)
+void exec_sprite_frame(SWFAppContext* app_context, DisplayObject* obj, frame_func f)
 {
 	DisplayObject* saved = g_current_sprite_obj;
 	g_current_sprite_obj = obj;
@@ -505,7 +505,19 @@ static void process_sprite_init_at_depth(SWFAppContext* app_context, MovieClip* 
 
 			// Advance frame counter so advance_sprite_frames picks up at frame 1.
 			// For 0-frame sprites (no ShowFrame in definition), keep at frame 0.
-			obj->sprite_current_frame = (ch->sprite_frame_count > 0) ? (1 % ch->sprite_frame_count) : 0;
+			// Only set when sni=1 (regular non-eager init): frame_0 just ran inline
+			// and the counter wasn't initialized elsewhere. For sni=2/3 (eager init
+			// path) the eager init already set sprite_current_frame; a subsequent
+			// gotoAndStop/Play on the sprite (before this deferred init pass)
+			// would have updated it — clobbering it back to 1 here makes the
+			// next advance_sprite_frames re-execute the wrong frame and skip the
+			// goto target's natural successor (goto_frame_test mc_red:
+			// mc_red.gotoAndStop(3) sets sprite_current_frame=2; without this
+			// guard, deferred init reset to 1 → next tick re-runs frame 1 and
+			// only reaches frame 3 one tick later, but by then script_9 has
+			// already tested asOrder and the missing "7+" trace fails).
+			if (!was_eager_catchup && !was_eager_normal)
+				obj->sprite_current_frame = (ch->sprite_frame_count > 0) ? (1 % ch->sprite_frame_count) : 0;
 
 			// Recursively initialize any children placed by the frame function
 			process_sprite_needs_init(app_context, child_mc);

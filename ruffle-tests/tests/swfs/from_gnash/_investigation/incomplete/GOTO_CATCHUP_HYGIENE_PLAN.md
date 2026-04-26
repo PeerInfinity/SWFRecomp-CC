@@ -31,8 +31,83 @@ phases:
 | Test | Pre-fix | Current | Δ |
 |------|---------|---------|---|
 | place_and_remove_object_insane_test | 15/22 | 17/22 | +2 |
-| goto_frame_test | 4/15 | 14/15 | +10 |
+| goto_frame_test | 4/15 | **PASS** | +11 |
 | consecutive_goto_frame_test | 3/12 | 4/12 | +1 |
+
+### 2026-04-26 fix (Phase 4 partial) — sprite gotoAndStop frame counter + deferred-init reset (goto_frame_test → PASS)
+
+**Three-part fix.**
+
+1. `ng_gotoFrameByMC` (`SWFModernRuntime/src/libswf/tag_stubs.c`)
+   now invokes sprite frame funcs via `exec_sprite_frame` (made
+   non-static in `tag.c`) instead of calling them directly. This sets
+   `g_current_sprite_obj` / `g_current_context` / `base_clip` for the
+   inline call. Without this, sprite scripts queued by the goto's
+   target frame func via `actionQueueSpriteScript` captured a NULL
+   `ctx_sprite_obj`, and a subsequent `play()` inside them no-op'd
+   (`ng_playCurrentSprite` returns early when the context is NULL) —
+   so `mc_red` never resumed playing after `gotoAndStop(3)` →
+   `play()` and never advanced to its frame 3 to fire the "+7"
+   trace.
+2. `ng_gotoFrameByMC` now sets `obj->sprite_current_frame =
+   (frame + 1) % fc` instead of `frame`. Our model (matching
+   `process_sprite_init_at_depth` line 508 and the natural-advance
+   `(frame + 1) % fc` increment) treats `sprite_current_frame` as
+   the **next** frame to execute, not the just-executed one. Setting
+   it to `frame` (the just-executed target) caused the next
+   advance_sprite_frames to re-execute the target frame, queuing its
+   DoAction a second time before reaching target+1.
+3. `process_sprite_init_at_depth` (`tag.c`) no longer resets
+   `sprite_current_frame` to 1 when `was_eager_catchup` or
+   `was_eager_normal` is set. The eager init in `tagPlaceObject2`
+   already initialized that counter; a subsequent
+   `gotoAndStop(target)` may have updated it to `target+1`. Resetting
+   to 1 in the deferred-init pass clobbered the goto and made
+   advance_sprite_frames re-execute frame 1 → 2 → 3 over multiple
+   ticks instead of going straight to target+1 — the missing "+7"
+   trace in `goto_frame_test` lagged one tick behind script_9's
+   `asOrder` check.
+
+**Why this was needed.** `goto_frame_test` mc_red:
+`mc_red.gotoAndStop(3)` from script_3 must move mc_red to its frame
+3; `script_4` (frame_3 DoAction) calls `play()`. Then a tick later,
+mc_red advances to frame 4 → `script_5` fires (`asOrder += "7+"; stop()`).
+By the time `script_9` (root frame_5) tests
+`asOrder == '0+1+2+3+4+5+6+7+'`, the "+7" must be present. All three
+of the bugs above conspired to break this: (1) `play()` no-op'd, (2)
+even with `play()` working, the wrong sprite_current_frame caused a
+re-execute of frame 3 (queueing the wrong script), (3) deferred init
+reset stomped the counter back to 1.
+
+**Verification.**
+- `goto_frame_test` → PASS (12/15 → full pass).
+- 38-test AVM1 goto/rewind/unload/lifecycle battery: 38/38 effective
+  (goto_rewind1/2/3, execution_order1/2/3, goto_execution_order/2,
+  goto_both_ways1/2, rewind_depth, goto_frame, goto_frame2,
+  goto_label, goto_methods, unload, unloadmovie, unload_clip_event,
+  unload_nested_child, mcl_unloadclip, depth_replacement_audio_unloading,
+  clip_events, on_construct, register_and_init_order, button_children,
+  button_order, movieclip_in_removed_button, bad_placeobject_clipaction,
+  movieclip_state_values, movieclip_library_state_values, set_interval,
+  attach_movie, init_object_order, swf5_to_6_cross_call, swf5_no_closure,
+  as2_super_and_this_v6/v8, extends_chain).
+- 23-test gnash misc-ming guardrail (loop/loop_test2-5,7-9 +
+  simple_loop_test, static_vs_dynamic1/2, displaylist_depths_test11,
+  place_and_remove_object_test, new_child_in_unload_test,
+  event_handler_scope_test, action_execution_order_test8-v5/v6,
+  instanceNameTest, attachMovieTest, DefineEditTextTest, shape_test,
+  get_frame_number_test, reverse_execute_PlaceObject2_test1/2): 23/23
+  effective.
+- 4-test Shumway duplicateMovieClip suite: 4/4.
+- consecutive_goto_frame_test (4/12) and
+  place_and_remove_object_insane_test (17/22) unchanged at baseline.
+
+**Remaining diff for `consecutive_goto_frame_test` (4/12).** The
+remaining 8 lines are root↔sprite drain ordering issues — root
+frame N+1's DoAction fires before mc_red frame N's deferred DoAction,
+making `mc_red.x` reads see the root-set value instead of mc_red's.
+Phase 6 territory (sprite drain ordering relative to deferred root
+goto target scripts).
 
 ### 2026-04-26 fix — Phase 2/3: forward catch-up own-clip-action UNLOAD (+10 lines on goto_frame_test)
 

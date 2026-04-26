@@ -892,6 +892,14 @@ int ng_gotoFrameByMC(SWFAppContext* app_context, MovieClip* mc, u16 frame, int p
 			display_list_capacity = obj->sprite_dl_capacity;
 		}
 
+		// Execute sprite frame funcs via exec_sprite_frame so g_current_sprite_obj /
+		// g_current_context / base_clip are set correctly. Without this, sprite
+		// scripts queued by these frames (e.g. via actionQueueSpriteScript) capture
+		// a NULL ctx_sprite_obj, and a subsequent play() inside them no-ops because
+		// ng_playCurrentSprite has no current sprite. Required for goto_frame_test
+		// (script_4's `play()` after mc_red.gotoAndStop(3) must set mc_red playing
+		// so the sprite advances to frame 3 and fires script_5 → "7+" trace).
+		extern void exec_sprite_frame(SWFAppContext*, DisplayObject*, frame_func);
 		size_t current = obj->sprite_current_frame;
 		if (frame > current)
 		{
@@ -899,7 +907,7 @@ int ng_gotoFrameByMC(SWFAppContext* app_context, MovieClip* mc, u16 frame, int p
 			for (size_t f = current + 1; f <= frame; f++)
 			{
 				if (f < fc && ch->sprite_frame_funcs[f] != NULL)
-					ch->sprite_frame_funcs[f](app_context);
+					exec_sprite_frame(app_context, obj, ch->sprite_frame_funcs[f]);
 			}
 		}
 		else if (frame < current)
@@ -919,7 +927,7 @@ int ng_gotoFrameByMC(SWFAppContext* app_context, MovieClip* mc, u16 frame, int p
 			for (size_t f = 0; f <= frame; f++)
 			{
 				if (f < fc && ch->sprite_frame_funcs[f] != NULL)
-					ch->sprite_frame_funcs[f](app_context);
+					exec_sprite_frame(app_context, obj, ch->sprite_frame_funcs[f]);
 			}
 		}
 		else
@@ -933,7 +941,7 @@ int ng_gotoFrameByMC(SWFAppContext* app_context, MovieClip* mc, u16 frame, int p
 			extern size_t g_place_gen;
 			g_place_gen++;
 			if (frame < fc && ch->sprite_frame_funcs[frame] != NULL)
-				ch->sprite_frame_funcs[frame](app_context);
+				exec_sprite_frame(app_context, obj, ch->sprite_frame_funcs[frame]);
 		}
 
 		obj->sprite_display_list = display_list;
@@ -945,7 +953,17 @@ int ng_gotoFrameByMC(SWFAppContext* app_context, MovieClip* mc, u16 frame, int p
 		display_list_capacity = saved_cap;
 	}
 
-	obj->sprite_current_frame = frame;
+	// sprite_current_frame is the NEXT frame to execute (matches the post-init
+	// convention at process_sprite_init_at_depth and the natural-advance loop's
+	// `(frame + 1) % fc` increment). After executing the target frame inline,
+	// the next play-driven advance should start at target+1. Without this, a
+	// subsequent play() would re-execute the already-shown target frame and
+	// stall progress for one tick — see goto_frame_test, where mc_red was at
+	// the last frame after gotoAndStop and the missing "+1" caused the
+	// natural-advance to re-fire sprite_4_frame_2 (queueing script_4 a second
+	// time, asOrder += "3+") before reaching sprite_4_frame_3 (script_5,
+	// "7+") only one tick too late.
+	obj->sprite_current_frame = (fc > 0) ? ((frame + 1) % fc) : 0;
 	obj->sprite_manual_next_frame = 0;
 	obj->sprite_is_playing = play ? 1 : 0;
 	mc->currentframe = (int)frame + 1;  // 1-indexed
