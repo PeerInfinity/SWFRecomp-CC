@@ -916,6 +916,10 @@ def generate_child_movie_file(child_swf_name, child_recomp_dir, build_dir, swf_f
     lines.append("#include <stackvalue.h>")
     lines.append("#include <variables.h>")
     lines.append("#include <actionmodern/action.h>")
+    # Phase A side table type (SpriteFrameScriptEntry) is referenced by
+    # the child's tagMain.c emission (renamed per-prefix). The include
+    # is stripped from child sources; the wrapper has to provide it.
+    lines.append("#include <sprite_frame_scripts.h>")
     lines.append("")
 
     # Forward declarations for all strings and functions
@@ -1057,6 +1061,20 @@ def generate_child_movie_file(child_swf_name, child_recomp_dir, build_dir, swf_f
         # Rename frame_label_data and frame_label_count
         modified = re.sub(r'\bframe_label_data\b', f'{prefix}_frame_label_data', modified)
         modified = re.sub(r'\bframe_label_count\b', f'{prefix}_frame_label_count', modified)
+        # Rename Phase A side table (sprite_frame_scripts) per-prefix so
+        # parent and child don't collide on the global symbol. The runtime
+        # accessor only consults the most-recently-registered table; the
+        # child's tagInit call to tagInitSpriteFrameScripts is stripped
+        # below so the parent's registration survives. Session A's table
+        # is dead code anyway — future phases that consume it for child
+        # sprites will need a different registration model (per-MovieEntry
+        # accessor, or a list of tables).
+        modified = re.sub(r'\bsprite_frame_scripts_data\b', f'{prefix}_sprite_frame_scripts_data', modified)
+        modified = re.sub(r'\bsprite_frame_scripts_data_count\b', f'{prefix}_sprite_frame_scripts_data_count', modified)
+        # Strip the child's tagInitSpriteFrameScripts call so it doesn't
+        # overwrite the parent's registration. Match the recompiler
+        # emission shape: a single line with a leading tab.
+        modified = re.sub(r'\n\s*tagInitSpriteFrameScripts\([^)]*\)\s*;\s*\n', '\n', modified)
         # Rename tagInit
         modified = modified.replace('void tagInit(', f'void {prefix}_tagInit(')
         # Rename initVarArray call's MAX_STRING_ID (with string_id offset)
