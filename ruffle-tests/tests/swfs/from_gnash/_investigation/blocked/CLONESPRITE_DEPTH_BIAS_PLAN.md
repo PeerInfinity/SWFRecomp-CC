@@ -4,23 +4,23 @@
 
 <!-- PLAN_META
 id: CLONESPRITE_DEPTH_BIAS
-status: pending
+status: blocked
 phases:
   - id: 1
     name: "Recompiler pattern-match: strip Push(16384) Add prefix from CloneSprite"
-    status: pending
+    status: completed_partial
   - id: 2
     name: "Runtime: drop the (depth >= 16384) heuristic; treat depth uniformly as AS depth"
-    status: pending
+    status: blocked
   - id: 3
     name: "Audit identity checks for residual depth==-16384 / depth>=16384 conflations"
-    status: pending
+    status: not_needed
   - id: 4
     name: "Verify on the displaylist_depths cluster + textsnapshot guardrail"
-    status: pending
+    status: completed
 dependencies: []
 blockers:
-  - reason: "None — the recompiler is a 3-opcode-lookahead pattern match; runtime change is a 2-line edit. Risk lives in the regression battery (confirming no other site reads clone_mc->depth as SWF-biased)."
+  - reason: "Phase 2 (drop runtime heuristic + uniform AS depth) cannot land without invasive runtime work. Stripping the bias for *packed* Pushes (where Ming combines the 16384 with other values into a multi-value Push opcode) shifts AS depths into 1..16383 — these collide with display_list slots that are reserved for static (timeline-placed) MCs. Attempts to gate slot allocation by `instance_name_owned` (clone vs static) inadvertently broke the textsnapshot_available_text guardrail. Phase 1 is therefore restricted to the *single-value* Push(16384) case — which yields modest gains on the displaylist_depths_test (+8) and DepthLimitsTest (+2) without regressing any guardrail. The packed-Push variant requires separating display_list slot allocation from depth-keyed lookup (e.g., walking display_list by name without relying on slot-at-AS-depth conflation) before it can land safely."
 -->
 
 ## Problem statement
@@ -49,6 +49,68 @@ AS depths: `Push(-2001) Push(16384) Add` produces `14383`, which is
 `< 16384`, so the heuristic mistakes it for an unbiased push and stores
 the wrong AS depth. Test expectation: `clone.getDepth() == -2001`.
 We return `14383`.
+
+## Status (2026-04-25 session)
+
+**Implemented (single-value Push only):** Phase 1's recompiler strip lands in
+`SWFRecomp/src/action/action.cpp` for the case where `Push(int 16384)` is its
+own opcode (`length == 5`, type=I32, value=16384) immediately followed by
+`Add{,2}` and `CloneSprite`, with no jump-target labels at the Add or
+CloneSprite. Push payload, Add, and CloneSprite all pass the
+`labels.count(...) == 0` guard. Affected sites in the test SWFs are recompiled
+with the bias removed; the runtime then receives raw AS depth, which the
+existing legacy heuristic `(depth >= 16384) ? (depth - 16384) : depth` keeps
+unchanged (no-op for AS depths < 16384), so the runtime path is functionally
+identical to the pre-strip era.
+
+**Measured impact (matching_lines vs. baseline):**
+
+| Test | Baseline | After strip | Δ |
+|------|----------|-------------|---|
+| displaylist_depths/displaylist_depths_test | 84/111 | 92/111 | **+8** |
+| DepthLimitsTest | 13/20 | 15/20 | **+2** |
+| static_vs_dynamic1 / 2 | PASS | PASS | unchanged |
+| textsnapshot_available_text | 20/20 | 20/20 | unchanged |
+| clone_sprite_edittext / _dynamic | PASS | PASS | unchanged |
+| from_shumway/avm1/duplicateMovieClip/* | PASS | PASS | unchanged |
+| loop_test3 / 5 / 9, attachMovieTest, place_and_remove_object_test, displaylist_depths_test11 | PASS | PASS | unchanged |
+| displaylist_depths_test2/3/8/9, duplicate_movie_clip_test/2 | unchanged | unchanged | 0 |
+
+The tests in the "unchanged 0" row use *packed* Pushes (Ming bundles the
+16384 with other values into a single Push opcode of length > 5), which the
+single-value strip deliberately skips.
+
+**Why packed-Push cannot land yet (the blocker):**
+
+Extending detection to multi-value Pushes does match more sites — the trailing
+`int 16384` value is still uniquely a SWF-bias artifact — but stripping it
+shifts the resulting AS depth into `1..16383`. Today's runtime treats
+`target_swf_depth = (size_t)depth` as the display_list slot index, and
+display_list slots `1..N` are occupied by static (timeline-placed) MCs.
+Replacing those slots with clone metadata destroys the static MCs and
+regresses every test that depends on them (static_vs_dynamic1 was the
+canonical breakage seen in this session).
+
+A proposed runtime gate — skip slot allocation when the existing entry's
+`instance_name_owned == 0` (i.e., a static MC that owns its name from SWF
+data, not strdup) — preserved static MCs but inadvertently regressed
+textsnapshot_available_text in a way I could not isolate without deeper
+trace work. The interaction between the slot copy
+(`display_list[target] = display_list[src]`) and `actionFindOrCreateMovieClip`'s
+name-keyed lookup makes this fragile to gate naively.
+
+**Remaining work to unlock packed-Push strip (out of scope this session):**
+
+1. Decouple clone identity from display_list slot index — clones at AS depth
+   N should be tracked by name + clone_depth_table only, with display_list
+   used purely for SWF-keyed timeline state. This is the Ruffle architecture
+   (separate static vs dynamic display layers).
+2. Or: expand display_list to a sparse map keyed by SWF depth = AS + 16384,
+   so AS depth N's slot lives at index 16384+N (won't collide with static
+   1..16383). Cost: ~150 bytes × 16384 ≈ 2.4 MB max; loop bounds (max_depth)
+   would need careful handling to avoid scanning the empty 1..16383 gap.
+3. Or: keep single-value strip only, accept the partial impact, and revisit
+   when the broader display_list refactor lands.
 
 ## Affected tests (CI 205a9a77, 2026-04-25)
 

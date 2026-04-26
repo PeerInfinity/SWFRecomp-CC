@@ -263,6 +263,10 @@ namespace SWFRecomp
 		std::set<char*> emitted_labels;
 		// Track dead code after unconditional jumps (for ConstantPool skip)
 		bool in_dead_code = false;
+		// Ming CloneSprite SWF-bias strip: when a `Push(int 16384) Add{,2} CloneSprite`
+		// triplet is detected, skip emitting the bias Push and the subsequent Add,
+		// so the runtime sees raw AS depth uniformly.
+		bool skip_next_add_for_clone_bias = false;
 		
 		// Lambda to check if any label beyond current position hasn't been emitted yet
 		auto hasUnvisitedLabelsAhead = [&]() -> bool {
@@ -436,9 +440,15 @@ namespace SWFRecomp
 
 				case SWF_ACTION_ADD:
 				{
+					if (skip_next_add_for_clone_bias)
+					{
+						out_script << "\t" << "// Add  [Ming CloneSprite bias — stripped]" << endl;
+						skip_next_add_for_clone_bias = false;
+						break;
+					}
 					out_script << "\t" << "// Add" << endl
 							   << "\t" << "actionAdd(app_context);" << endl;
-					
+
 					break;
 				}
 				
@@ -956,6 +966,12 @@ namespace SWFRecomp
 
 				case SWF_ACTION_ADD2:
 				{
+					if (skip_next_add_for_clone_bias)
+					{
+						out_script << "\t" << "// Add2  [Ming CloneSprite bias — stripped]" << endl;
+						skip_next_add_for_clone_bias = false;
+						break;
+					}
 					declareEmptyString(context, 17);
 
 					out_script << "\t" << "// Add2 (Type-Aware Addition)" << endl
@@ -1818,7 +1834,37 @@ namespace SWFRecomp
 				{
 					u64 push_value;
 					size_t push_length = 0;
-					
+
+					// Ming SWF-bias strip: detect a single-value `Push(int 16384)` Push
+					// followed by Add{,2} + CloneSprite. Ming emits this prefix to bias
+					// raw AS depths into SWF depth space; stripping it hands the runtime
+					// the unbiased AS depth, matching the method-form
+					// `mc.duplicateMovieClip(name, depth)` contract.
+					// Limited to single-value Push to avoid stripping cases where Ming
+					// packs the bias literal with other values (which would shift small
+					// AS depths into a range that conflicts with timeline display_list
+					// slots — see CLONESPRITE_DEPTH_BIAS_PLAN.md). The literal `+ 16384`
+					// is uniquely a SWF-bias artifact (no AS source adds 16384 to a
+					// depth), so this is structurally safe for non-Ming SWFs.
+					if (length == 5
+						&& (u8) action_buffer[0] == ACTION_STACK_VALUE_I32
+						&& VAL(s32, &action_buffer[1]) == 16384)
+					{
+						u8 next_op = (u8) action_buffer[5];
+						u8 next_next_op = (u8) action_buffer[6];
+						bool is_add = (next_op == SWF_ACTION_ADD || next_op == SWF_ACTION_ADD2);
+						bool is_clone = (next_next_op == SWF_ACTION_CLONE_SPRITE);
+						bool no_label_at_add = (labels.count(action_buffer + 5) == 0);
+						bool no_label_at_clone = (labels.count(action_buffer + 6) == 0);
+						if (is_add && is_clone && no_label_at_add && no_label_at_clone)
+						{
+							out_script << "\t" << "// Push (integer: 16384)  [Ming CloneSprite bias — stripped]" << endl;
+							action_buffer += length;
+							skip_next_add_for_clone_bias = true;
+							break;
+						}
+					}
+
 					while (push_length < length)
 					{
 						ActionStackValueType push_type = (ActionStackValueType) action_buffer[push_length];
