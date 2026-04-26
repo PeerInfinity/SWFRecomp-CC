@@ -1,10 +1,10 @@
 # Ruffle Test Results (Filtered)
 
-**Date**: 2026-04-26 16:25 UTC
+**Date**: 2026-04-26 17:16 UTC
 
-**Git SHA**: `c17c37e2be`
+**Git SHA**: `711b835dd1`
 
-**Run Duration**: 0m 4s
+**Run Duration**: 0m 5s
 
 **Filtered**: 0 tests ignored out of 18 available
 
@@ -42,10 +42,10 @@
 | 7 | `func_dict` | 3 | 0.2s |  |
 | 8 | `initaction_in_definesprite` | 2 | 0.2s |  |
 | 9 | `jump_after_end` | 3 | 0.2s |  |
-| 10 | `missing_bitmap` | 0 | 0.1s |  |
+| 10 | `missing_bitmap` | 0 | 0.2s |  |
 | 11 | `mixed-bytecode-as2` | 1 | 0.2s |  |
 | 12 | `trace-as2/root_onload` | 4 | 0.2s |  |
-| 13 | `trace-as2/shortstack` | 2 | 0.1s |  |
+| 13 | `trace-as2/shortstack` | 2 | 0.2s |  |
 | 14 | `trace-as2/super` | 8 | 0.2s |  |
 | 15 | `trace-as2/this` | 8 | 0.2s |  |
 
