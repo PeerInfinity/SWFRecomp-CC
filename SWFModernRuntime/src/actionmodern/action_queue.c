@@ -22,6 +22,15 @@ static ActionQueueEntry* g_aq = NULL;
 static size_t g_aq_count = 0;
 static size_t g_aq_cap = 0;
 
+// Drain-suppress depth (Path A foundation for GOTO_FIFO_UNIFICATION).
+// Counter, not flag — see action_queue.h's docstring on
+// actionDrainSuppressEnter for rationale.
+static int g_drain_suppress_depth = 0;
+
+void actionDrainSuppressEnter(void) { g_drain_suppress_depth++; }
+void actionDrainSuppressLeave(void) { g_drain_suppress_depth--; }
+int  actionDrainSuppressed(void)    { return g_drain_suppress_depth; }
+
 static int aq_grow(size_t needed)
 {
 	if (needed <= g_aq_cap) return 1;
@@ -163,6 +172,12 @@ extern void run_pending_finalize(SWFAppContext* app_context);
 
 void actionDrainOnloadAndScript(SWFAppContext* app_context)
 {
+	// Path A: when an outer drain is in progress (e.g. ng_executeGotoCatchUp
+	// runs funcs[target] inline to queue its DoAction), suppress the nested
+	// recompiler-emitted SHOW_FRAME drain so the outer drain picks up the
+	// new entries in FIFO order.
+	if (g_drain_suppress_depth > 0) return;
+
 	for (;;) {
 		int best = -1;
 		int best_pri = -1;

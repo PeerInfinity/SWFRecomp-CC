@@ -178,3 +178,26 @@ void actionGotoCatchupEnter(void);
 void actionGotoCatchupLeave(void);
 void actionDeferredSpriteInitEnter(void);
 void actionDeferredSpriteInitLeave(void);
+
+// Drain-suppress primitive (Path A foundation for GOTO_FIFO_UNIFICATION).
+// While the suppress depth is > 0, actionDrainOnloadAndScript early-returns —
+// queue calls inside the bracketed region still run, but the recompiler-emitted
+// SHOW_FRAME drain is no-op'd so an outer drain that's already in progress can
+// pick up the new entries in FIFO order.
+//
+// Use a counter (not a flag) so reentrant goto-catch-up calls don't have an
+// inner Leave clear suppression set up by an outer Enter. The expected pattern:
+//
+//     actionDrainSuppressEnter();
+//     funcs[target](app_context);   // queue calls run, drain calls no-op
+//     actionDrainSuppressLeave();
+//
+// Contract: only actionDrainOnloadAndScript honors the suppress. The kind /
+// filtered drains keep firing because their callers are not nested under the
+// SHOW_FRAME drain.
+//
+// Invariant: depth must return to 0 by the start of every tick. swf_core.c /
+// swf_headless.c assert this in debug builds.
+void actionDrainSuppressEnter(void);
+void actionDrainSuppressLeave(void);
+int actionDrainSuppressed(void);

@@ -840,6 +840,18 @@ void swfStart(SWFAppContext* app_context)
 		extern void actionProcessDeferredUnloads(void);
 		actionProcessDeferredUnloads();
 
+		// Drain-suppress invariant: depth must be 0 at every tick boundary.
+		// A leak indicates a missing actionDrainSuppressLeave somewhere; catch
+		// it here at the next tick instead of letting it silently corrupt later
+		// drain behavior.
+#ifndef NDEBUG
+		if (actionDrainSuppressed()) {
+			fprintf(stderr, "drain-suppress depth leaked across tick: %d\n",
+			        actionDrainSuppressed());
+			abort();
+		}
+#endif
+
 		// Reset per-tick edge flags
 		app_context->mouse.moved = 0;
 		app_context->mouse.clicked = 0;

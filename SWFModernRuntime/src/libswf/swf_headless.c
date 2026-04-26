@@ -16,6 +16,7 @@
 #endif
 #include <tag.h>
 #include <action.h>
+#include <action_queue.h>
 #include <variables.h>
 #include <utils.h>
 #include <heap.h>
@@ -870,6 +871,15 @@ void swfStart(SWFAppContext* app_context)
 		// Process deferred unloadMovie state (MC properties change on next frame)
 		extern void actionProcessDeferredUnloads(void);
 		actionProcessDeferredUnloads();
+
+		// Drain-suppress invariant — see swf_core.c for rationale.
+#ifndef NDEBUG
+		if (actionDrainSuppressed()) {
+			fprintf(stderr, "drain-suppress depth leaked across tick: %d\n",
+			        actionDrainSuppressed());
+			abort();
+		}
+#endif
 
 		// Reset per-tick edge flags
 		app_context->mouse.moved = 0;
