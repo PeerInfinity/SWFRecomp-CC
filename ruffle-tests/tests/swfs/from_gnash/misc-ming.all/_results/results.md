@@ -1,10 +1,10 @@
 # Ruffle Test Results (Unfiltered)
 
-**Date**: 2026-04-26 17:16 UTC
+**Date**: 2026-04-26 17:59 UTC
 
-**Git SHA**: `711b835dd1`
+**Git SHA**: `f8e833043b`
 
-**Run Duration**: 0m 38s
+**Run Duration**: 1m 12s
 
 ## Summary
 
@@ -32,20 +32,20 @@
 
 | # | Test | Lines | Duration | Notes |
 |---|------|-------|----------|-------|
-| 1 | `DefineEditTextTest` | 153 | 0.6s |  |
-| 2 | `DefineEditTextVariableNameTest2` | 39 | 0.4s |  |
+| 1 | `DefineEditTextTest` | 153 | 0.7s |  |
+| 2 | `DefineEditTextVariableNameTest2` | 39 | 0.3s |  |
 | 3 | `PlaceObject2Test` | 9 | 0.2s |  |
-| 4 | `ResolveEventsTest` | 15 | 0.3s |  |
-| 5 | `RollOverOutTest` | 5 | 0.3s |  |
-| 6 | `VarAndCharClashTest` | 13 | 0.2s |  |
-| 7 | `Video-EmbedSquareTest` | 2 | 0.2s |  |
+| 4 | `ResolveEventsTest` | 15 | 0.2s |  |
+| 5 | `RollOverOutTest` | 5 | 0.2s |  |
+| 6 | `VarAndCharClashTest` | 13 | 1.6s |  |
+| 7 | `Video-EmbedSquareTest` | 2 | 16.0s |  |
 | 8 | `action_order/action_execution_order_test1` | 10 | 0.2s |  |
 | 9 | `action_order/action_execution_order_test3` | 4 | 0.2s |  |
 | 10 | `action_order/action_execution_order_test7` | 7 | 0.2s |  |
 | 11 | `action_order/action_execution_order_test8-v5` | 11 | 0.2s |  |
 | 12 | `action_order/action_execution_order_test8-v6` | 11 | 0.2s |  |
-| 13 | `action_order/action_execution_order_test9` | 4 | 0.2s |  |
-| 14 | `attachMovieTest` | 12 | 0.3s |  |
+| 13 | `action_order/action_execution_order_test9` | 4 | 0.1s |  |
+| 14 | `attachMovieTest` | 12 | 0.2s |  |
 | 15 | `displaylist_depths/displaylist_depths_test10` | 10 | 0.2s |  |
 | 16 | `displaylist_depths/displaylist_depths_test11` | 15 | 0.2s |  |
 | 17 | `displaylist_depths/displaylist_depths_test4` | 26 | 0.2s |  |
@@ -53,27 +53,27 @@
 | 19 | `displaylist_depths/displaylist_depths_test6` | 13 | 0.2s |  |
 | 20 | `displaylist_depths/displaylist_depths_test7` | 14 | 0.2s |  |
 | 21 | `event_handler_scope_test` | 16 | 0.2s |  |
-| 22 | `getTimer_test` | 8 | 0.3s |  |
+| 22 | `getTimer_test` | 8 | 0.2s |  |
 | 23 | `get_frame_number_test` | 31 | 0.4s |  |
 | 24 | `goto_frame_test` | 15 | 0.2s |  |
 | 25 | `instanceNameTest` | 5 | 0.2s |  |
 | 26 | `loop/loop_test2` | 15 | 0.2s |  |
 | 27 | `loop/loop_test3` | 16 | 0.2s |  |
-| 28 | `loop/loop_test4` | 22 | 0.3s |  |
-| 29 | `loop/loop_test5` | 24 | 0.3s |  |
-| 30 | `loop/loop_test8` | 38 | 0.3s |  |
-| 31 | `loop/loop_test9` | 15 | 0.2s |  |
-| 32 | `loop/simple_loop_test` | 0 | 0.2s |  |
-| 33 | `masks_test2` | 10 | 0.2s |  |
-| 34 | `morph_test1` | 0 | 0.2s |  |
+| 28 | `loop/loop_test4` | 22 | 0.2s |  |
+| 29 | `loop/loop_test5` | 24 | 0.2s |  |
+| 30 | `loop/loop_test8` | 38 | 0.2s |  |
+| 31 | `loop/loop_test9` | 15 | 0.1s |  |
+| 32 | `loop/simple_loop_test` | 0 | 0.1s |  |
+| 33 | `masks_test2` | 10 | 0.1s |  |
+| 34 | `morph_test1` | 0 | 0.1s |  |
 | 35 | `move_object_test` | 11 | 0.2s |  |
 | 36 | `multi_doactions_and_goto_frame_test` | 6 | 0.2s |  |
 | 37 | `new_child_in_unload_test` | 11 | 0.2s |  |
 | 38 | `place_and_remove_object_test` | 13 | 0.2s |  |
-| 39 | `reverse_execute_PlaceObject2_test1` | 8 | 0.2s |  |
-| 40 | `reverse_execute_PlaceObject2_test2` | 10 | 0.2s |  |
-| 41 | `runtime_vm_stack_test` | 9 | 0.3s |  |
-| 42 | `shape_test` | 21 | 0.3s |  |
+| 39 | `reverse_execute_PlaceObject2_test1` | 8 | 0.6s |  |
+| 40 | `reverse_execute_PlaceObject2_test2` | 10 | 0.5s |  |
+| 41 | `runtime_vm_stack_test` | 9 | 0.2s |  |
+| 42 | `shape_test` | 21 | 0.2s |  |
 | 43 | `static_vs_dynamic1` | 17 | 0.2s |  |
 | 44 | `static_vs_dynamic2` | 18 | 0.2s |  |
 | 45 | `timeline_var_test` | 11 | 0.2s |  |
@@ -87,14 +87,14 @@
 |---|------|-----------|--------------|----------|-------|
 | 1 | `ButtonPropertiesTest` | 20 | 20 | 0.2s |  |
 | 2 | `KeyEventOrder` | 20 | 23 | 0.2s |  |
-| 3 | `action_order/action_execution_order_test4` | 6 | 26 | 0.3s |  |
-| 4 | `action_order/action_execution_order_test6` | 5 | 21 | 0.3s |  |
-| 5 | `attachExtImported` | 1 | 1 | 0.3s |  |
-| 6 | `callFunction_test` | 5 | 11 | 0.3s |  |
-| 7 | `init_action/InitActionTest` | 17 | 17 | 0.3s |  |
+| 3 | `action_order/action_execution_order_test4` | 6 | 26 | 0.2s |  |
+| 4 | `action_order/action_execution_order_test6` | 5 | 21 | 0.2s |  |
+| 5 | `attachExtImported` | 1 | 1 | 0.2s |  |
+| 6 | `callFunction_test` | 5 | 11 | 0.2s |  |
+| 7 | `init_action/InitActionTest` | 17 | 17 | 0.2s |  |
 | 8 | `init_action/InitActionTest2` | 30 | 30 | 0.3s |  |
-| 9 | `loop/loop_test7` | 1 | 8 | 0.2s |  |
-| 10 | `path_format_test` | 27 | 28 | 0.4s |  |
+| 9 | `loop/loop_test7` | 1 | 8 | 0.1s |  |
+| 10 | `path_format_test` | 27 | 28 | 0.3s |  |
 | 11 | `place_object_test` | 14 | 14 | 0.2s |  |
 | 12 | `place_object_test2` | 16 | 23 | 0.2s |  |
 
