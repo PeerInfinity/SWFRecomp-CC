@@ -4,7 +4,7 @@
 
 <!-- PLAN_META
 id: GOTO_CATCHUP_HYGIENE
-status: in_progress
+status: blocked
 phases:
   - id: 1
     name: "Goto-induced RemoveObject2: clear name resolution (var_map / dynamic_props / display lookup)"
@@ -23,11 +23,38 @@ phases:
     status: done
   - id: 6
     name: "Sprite scripts trailing after totals — drain ordering / single-FIFO root+sprite gotos"
-    status: pending
+    status: blocked
   - id: 7
     name: "transformed_by_script preservation across natural loop wrap-back (place_and_remove_object_insane_test)"
-    status: pending
+    status: blocked
 -->
+
+## Blocker summary (2026-04-26, moved to blocked/)
+
+`goto_frame_test` reached **PASS** (15/15) via Phases 1–5; the remaining
+two plan tests (`consecutive_goto_frame_test` 4/12,
+`place_and_remove_object_insane_test` 17/22) need substantial
+architectural changes that warrant their own plans:
+
+- **Phase 6** — `consecutive_goto_frame_test` requires unifying the
+  root-`g_deferred_goto_queue` and sprite-`AQ_KIND_SCRIPT` queues into a
+  single FIFO so that root↔sprite frame DoActions interleave the way
+  Ruffle's single `context.action_queue` produces them. The change
+  inverts deferred-goto ordering for tests that currently rely on
+  "all-siblings-then-target" sequencing, with broad regression risk
+  across the AVM1 goto/rewind battery and misc-ming guardrail.
+- **Phase 7** — `place_and_remove_object_insane_test` requires adding a
+  `transformed_by_script` flag to `DisplayObject` and reworking natural
+  backward wrap-back to keep iter N's display-list state across the
+  wrap (Ruffle's `run_goto(implicit, run_display_actions=false)` model).
+  Sizable change with broad regression risk; explicitly recommended as
+  a separate plan rather than folded into this one.
+
+Both blockers are described in detail in the "2026-04-26 analysis —
+remaining blockers" section below. Phases 1–5 are the productive
+deliverables of this plan. Re-pickup means starting fresh on Phase 6 or
+Phase 7 (likely as their own plan files) with the cited regression
+batteries gated.
 
 ## Status (2026-04-26)
 
