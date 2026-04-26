@@ -205,6 +205,12 @@ namespace SWFRecomp
 
 		std::stringstream sprite_definitions;
 		std::stringstream sprite_forward_decls;
+		// Accumulates SpriteFrameScriptEntry initializers — one per
+		// sprite-DoAction-script emission. Phase A of GOTO_FIFO_UNIFICATION
+		// incremental plan: side table feeding actionGetSpriteFrameScript().
+		// Dead until later phases consume it.
+		std::stringstream sprite_frame_scripts_table;
+		size_t sprite_frame_scripts_count = 0;
 
 		u8* jpeg_tables;
 		size_t jpeg_tables_size;

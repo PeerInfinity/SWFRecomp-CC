@@ -25,20 +25,18 @@ GOTO_CATCHUP_HYGIENE_PLAN (blocked/)
    │ Phases 1-5 landed; Phase 6 split out as its own plan.
    ↓
    ├──► GOTO_FIFO_UNIFICATION_PLAN (blocked/)
-   │       │ status: blocked (re-blocked 2026-04-26b)
-   │       │ blocked_by: scope. Path A resolved (drain-suppress primitive),
-   │       │             but Phase 4 (recompiler gate simplification) is now
-   │       │             known to be REQUIRED atomically with Phases 1+2+3,
-   │       │             not "cleanup later" as the original plan claimed.
-   │       │             See plan's "Updated finding 2026-04-26b" section
-   │       │             for sync-fire cascade trace proving Phase 1 alone
-   │       │             (and 1+2+3) regress consecutive_goto_frame_test
-   │       │             from 4/12 to <4/12.
-   │       │ uses: DRAIN_SUPPRESS_PRIMITIVE accessors (Phase 2)
-   │       │ target test: consecutive_goto_frame_test (4/12 baseline)
-   │       │ guardrail risk: loop_test*, goto_rewind*, unload-family,
-   │       │                 register_and_init_order, execution_order2/3
-   │       └──► (none yet — Path B is the next code change in this chain)
+   │       │ status: blocked — kept as architectural reference only.
+   │       │ Atomic-commit framing was untractable; reframed as the
+   │       │ incremental plan below.
+   │       ↓ reframed by
+   │       GOTO_FIFO_UNIFICATION_INCREMENTAL_PLAN (incomplete/)
+   │           │ status: pending — Phase A is the next code change
+   │           │ uses: DRAIN_SUPPRESS_PRIMITIVE accessors (Phase E)
+   │           │ structure: 8 sessions; A/B/C/G/H zero-risk infrastructure,
+   │           │            D/E/F flag-gated behavior changes
+   │           │ target test: consecutive_goto_frame_test (4/12 → 12/12 once F lands)
+   │           │ guardrail risk: concentrated in D, E, F — see plan for
+   │           │                 the per-phase predicted regressions
    │
    └──► TRANSFORMED_BY_SCRIPT_WRAP_BACK_PLAN (incomplete/)
            │ status: pending
@@ -57,7 +55,7 @@ DRAIN_SUPPRESS_PRIMITIVE_PLAN (complete/, commit d1cd1d1f)
 
 | If you land… | …it unblocks… |
 |--------------|---------------|
-| GOTO_FIFO_UNIFICATION Phases 1+2+3 atomic | the trailing diff on `consecutive_goto_frame_test`, plus likely shifts on the `loop_test*` cluster (predecessor plan's recently-fixed battery) |
+| GOTO_FIFO_UNIFICATION_INCREMENTAL Phase F (after A-E build up) | the trailing diff on `consecutive_goto_frame_test`, plus likely shifts on the `loop_test*` cluster (predecessor plan's recently-fixed battery) |
 | TRANSFORMED_BY_SCRIPT_WRAP_BACK | `place_and_remove_object_insane_test` (the other Phase 6→Phase 7 split) |
 | Both above | retiring `GOTO_CATCHUP_HYGIENE_PLAN` from `blocked/` to `complete/` |
 

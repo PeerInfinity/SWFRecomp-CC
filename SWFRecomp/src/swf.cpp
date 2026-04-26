@@ -442,6 +442,7 @@ namespace SWFRecomp
 
 		context.tag_main << "#include <recomp.h>" << endl << endl
 				 << "#include <out.h>" << endl
+				 << "#include <sprite_frame_scripts.h>" << endl
 				 << "#include \"draws.h\"" << endl
 				 << "#include \"script_decls.h\"" << endl << endl
 				 << "void frame_" << to_string(next_frame_i) << "(SWFAppContext* app_context)" << endl
@@ -625,8 +626,36 @@ namespace SWFRecomp
 							 << endl;
 		}
 
+		// Phase A of GOTO_FIFO_UNIFICATION incremental plan: emit the
+		// (sprite_char_id, frame_idx) → script_func* side table. Dead
+		// until later phases consume it via actionGetSpriteFrameScript().
+		// Sentinel-terminated; the count is also stored explicitly so the
+		// runtime accessor can iterate without scanning for the sentinel.
+		if (sprite_frame_scripts_count > 0)
+		{
+			context.tag_main << "SpriteFrameScriptEntry sprite_frame_scripts_data[] =" << endl
+							 << "{" << endl
+							 << sprite_frame_scripts_table.str()
+							 << "\t{ 0, 0, NULL }" << endl
+							 << "};" << endl
+							 << "size_t sprite_frame_scripts_data_count = "
+							 << to_string(sprite_frame_scripts_count) << ";" << endl
+							 << endl;
+		}
+		else
+		{
+			context.tag_main << "SpriteFrameScriptEntry sprite_frame_scripts_data[] = { { 0, 0, NULL } };" << endl
+							 << "size_t sprite_frame_scripts_data_count = 0;" << endl
+							 << endl;
+		}
+
 		context.tag_main << "void tagInit(SWFAppContext* app_context)" << endl
 						 << "{";
+		// Phase A of GOTO_FIFO_UNIFICATION incremental plan: register the
+		// side table with the runtime so actionGetSpriteFrameScript() can
+		// look up scripts. Done first so any later tagInit-time code can
+		// rely on the accessor.
+		context.tag_main << endl << "\ttagInitSpriteFrameScripts(sprite_frame_scripts_data, sprite_frame_scripts_data_count);";
 		// Emit tag definitions (sprites, exports, bitmaps, etc.)
 		context.tag_main << tag_init.str();
 		// Initialize variable array BEFORE DoInitAction scripts so they can use
@@ -4997,6 +5026,20 @@ namespace SWFRecomp
 							sprite_definitions
 								<< "\t" << "else if (!catch_up_mode && actionScriptOnlyMode() && actionDeferredSpriteInitActive()) "
 								<< script_name << "(app_context);" << endl;
+
+							// Phase A of GOTO_FIFO_UNIFICATION incremental
+							// plan: record (sprite_char_id, frame_idx) →
+							// script_func mapping into a side table. Dead
+							// until later phases consume it via
+							// actionGetSpriteFrameScript(). sprite_frame_i
+							// has been incremented past the current frame
+							// at the open-frame-func site, so the current
+							// frame is sprite_frame_i - 1.
+							sprite_frame_scripts_table
+								<< "\t{ " << to_string(sprite_id) << ", "
+								<< to_string(sprite_frame_i - 1) << ", "
+								<< script_name << " }," << endl;
+							sprite_frame_scripts_count += 1;
 
 							break;
 						}

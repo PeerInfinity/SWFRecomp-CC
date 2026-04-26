@@ -1,5 +1,14 @@
 # Goto FIFO Unification Plan (Phase 6 of GOTO_CATCHUP_HYGIENE)
 
+> **Reframed 2026-04-26b** — This plan's atomic-commit framing was
+> untractable. Implementation work now lives in
+> `incomplete/GOTO_FIFO_UNIFICATION_INCREMENTAL_PLAN.md`, which ships
+> the same target in 8 sessions (zero-risk infrastructure → flag-gated
+> opt-in → cleanup) instead of one atomic commit. **This document
+> stays as the architectural reference** (problem statement, FIFO-order
+> trace, related docs). Don't try to implement this plan directly —
+> follow the incremental plan, which references this one for context.
+
 <!-- TESTS: consecutive_goto_frame_test -->
 
 <!-- PLAN_META
