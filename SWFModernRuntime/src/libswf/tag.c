@@ -2215,7 +2215,17 @@ void tagShowFrame(SWFAppContext* app_context)
 	// These are queued mid-script and fire between frames, matching Flash behavior.
 	// actionFirePendingUnloads also runs run_pending_finalize internally so the
 	// destructive cleanup happens immediately after the handlers drain.
-	actionFirePendingUnloads(app_context);
+	//
+	// Skip during catch_up_mode: tagShowFrame is invoked for each replayed frame
+	// inside ng_executeGotoCatchUp. UNLOAD callbacks queued during the rewind
+	// (e.g. tagPlaceObject2 displacing an MC with CLIP_EVENT_UNLOAD) must defer
+	// to the outer actionDrainOnloadAndScript so they interleave with the
+	// remaining queued root-level scripts (loop_test8 trailing mc5unloaded must
+	// land after totals(), not in the middle of the post-goto check_equals
+	// batch). run_pending_finalize is similarly deferred to keep instance_name
+	// resolvable until the calling script completes.
+	if (!catch_up_mode)
+		actionFirePendingUnloads(app_context);
 
 	// --- Run initial frame 0 with scripts for newly placed sprites/buttons ---
 	// sprite_needs_init=1 is set by ng_on_place_object2 when a sprite or button is placed.
@@ -3638,6 +3648,16 @@ static void queue_clip_load_events(SWFAppContext* app_context, size_t depth)
 }
 #endif
 
+// Forward decl: defined later in this file. Used by the backward-rewind
+// clear-and-replace path in tagPlaceObject2 / tagPlaceObject2Ratio so a
+// displaced sprite's CLIP_EVENT_UNLOAD callbacks (and recursive child
+// unloads) get queued before pending-removal Mark — matches the
+// tagRemoveObject2 path. See loop_test8 trailing mc5unloaded trace.
+#ifdef NO_GRAPHICS
+static void fire_recursive_child_unloads(SWFAppContext* app_context,
+	DisplayObject* dl, size_t dl_max, MovieClip* parent_mc);
+#endif
+
 void tagPlaceObject2(SWFAppContext* app_context, size_t depth, size_t char_id, u32 transform_id, u32 cxform_id, u16 clip_depth)
 {
 #ifdef NO_GRAPHICS
@@ -3782,6 +3802,30 @@ void tagPlaceObject2(SWFAppContext* app_context, size_t depth, size_t char_id, u
 								display_list[depth].sprite_max_depth);
 						}
 						if (_swr_has_unload) {
+							// Queue clip-action UNLOAD callbacks (and recursive
+							// child unloads) BEFORE marking pending so they
+							// drain via actionFirePendingUnloads — matches the
+							// tagRemoveObject2 path. Without this, a backward
+							// goto that displaces an MC with a CLIP_EVENT_UNLOAD
+							// handler (loop_test8 mc5) drops the trailing
+							// unload trace entirely.
+							MovieClip* _swr_mc_for_q = actionFindOrCreateMovieClip(
+								app_context, display_list[depth].instance_name, &root_movieclip);
+							for (size_t _ca = 0; _ca < display_list[depth].accumulated_clip_action_count; _ca++) {
+								if (display_list[depth].accumulated_clip_actions[_ca].event_flags & 0x4)
+									actionQueueClipActionUnload(display_list[depth].accumulated_clip_actions[_ca].action, _swr_mc_for_q);
+							}
+							if (display_list[depth].sprite_display_list != NULL &&
+							    display_list[depth].sprite_max_depth > 0) {
+								fire_recursive_child_unloads(app_context,
+									display_list[depth].sprite_display_list,
+									display_list[depth].sprite_max_depth,
+									_swr_mc_for_q ? _swr_mc_for_q : &root_movieclip);
+							}
+							for (size_t _ca = 0; _ca < display_list[depth].clip_action_count; _ca++) {
+								if (display_list[depth].clip_actions[_ca].event_flags & 0x4)
+									actionQueueClipActionUnload(display_list[depth].clip_actions[_ca].action, _swr_mc_for_q);
+							}
 							actionMarkMCPendingRemoval(app_context,
 							                           display_list[depth].instance_name,
 							                           (int)depth);
@@ -4219,6 +4263,28 @@ void tagPlaceObject2Ratio(SWFAppContext* app_context, size_t depth, size_t char_
 								display_list[depth].sprite_max_depth);
 						}
 						if (_swr_has_unload) {
+							// Queue clip-action UNLOAD callbacks (+ recursive
+							// child unloads) BEFORE marking pending so they
+							// drain via actionFirePendingUnloads — matches the
+							// tagRemoveObject2 path. See loop_test8 (mc5
+							// CLIP_EVENT_UNLOAD trace after totals()).
+							MovieClip* _swr_mc_for_q = actionFindOrCreateMovieClip(
+								app_context, display_list[depth].instance_name, &root_movieclip);
+							for (size_t _ca = 0; _ca < display_list[depth].accumulated_clip_action_count; _ca++) {
+								if (display_list[depth].accumulated_clip_actions[_ca].event_flags & 0x4)
+									actionQueueClipActionUnload(display_list[depth].accumulated_clip_actions[_ca].action, _swr_mc_for_q);
+							}
+							if (display_list[depth].sprite_display_list != NULL &&
+							    display_list[depth].sprite_max_depth > 0) {
+								fire_recursive_child_unloads(app_context,
+									display_list[depth].sprite_display_list,
+									display_list[depth].sprite_max_depth,
+									_swr_mc_for_q ? _swr_mc_for_q : &root_movieclip);
+							}
+							for (size_t _ca = 0; _ca < display_list[depth].clip_action_count; _ca++) {
+								if (display_list[depth].clip_actions[_ca].event_flags & 0x4)
+									actionQueueClipActionUnload(display_list[depth].clip_actions[_ca].action, _swr_mc_for_q);
+							}
 							actionMarkMCPendingRemoval(app_context,
 							                           display_list[depth].instance_name,
 							                           (int)depth);

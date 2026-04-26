@@ -12,7 +12,35 @@ Last updated: 2026-04-24 (CI snapshot at 205a9a77 includes all recent fixes thro
 | misc-swfc.all | 8 | 16 | 50.0% |
 | misc-swfmill.all | 16 | 18 | 88.9% |
 
-### Latest fixes (2026-04-24, in CI at 205a9a77)
+### Latest fixes (2026-04-25, pending CI)
+
+- **loop_test8 (misc-ming) → PASS (+1, 37/38 → 38/38).** Two-part fix in
+  `SWFModernRuntime/src/libswf/tag.c` for the trailing `_level0.mc5unloaded`
+  trace:
+  1. `tagPlaceObject2` / `tagPlaceObject2Ratio` backward-rewind
+     clear-and-replace path now queues clip-action UNLOAD callbacks
+     (current + accumulated + recursive child unloads via
+     `actionQueueClipActionUnload` / `fire_recursive_child_unloads`) BEFORE
+     calling `actionMarkMCPendingRemoval`. Previously only the Mark ran,
+     dropping the CLIP_EVENT_UNLOAD trace entirely when a backward goto
+     replaced an MC with a different ratio (loop_test8 frame 6
+     `gotoAndStop(3)` replaces mc5 ratio=0.003 with mc3 ratio=0.001 —
+     `survives_rewind=false`).
+  2. `tagShowFrame` now skips `actionFirePendingUnloads` when
+     `catch_up_mode` is set. Without this gate, UNLOAD callbacks queued
+     during the rewind (each replayed frame calls tagShowFrame internally)
+     drained immediately at the next replayed frame instead of deferring
+     to the outer `actionDrainOnloadAndScript` — landing in the middle of
+     post-goto `check_equals` scripts instead of after `totals()`.
+  Forward-declared `fire_recursive_child_unloads` since it's defined
+  later in tag.c. Verified: 27-test AVM1 lifecycle/goto battery (27/27),
+  22-test misc-ming recently-fixed battery (22/22 effective, only
+  pre-existing loop_test6 fails), 4-test misc-swfc battery
+  (movieclip_destruction_test2 unchanged at 50/52), 4-test Shumway
+  duplicateMovieClip suite (4/4), 13-test wider AVM1 placement battery
+  (13/13 effective).
+
+### Earlier fixes (2026-04-24, in CI at 205a9a77)
 
 - **ResolveEventsTest (misc-ming) → PASS (+1).** `actionCallMethod`
   (`SWFModernRuntime/src/actionmodern/action.c`) now invokes the

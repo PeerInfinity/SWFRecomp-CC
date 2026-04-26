@@ -23,17 +23,42 @@ phases:
     status: completed
 dependencies: []
 blockers:
-  - reason: "Partial: 2 of 10 target tests now pass (loop_test7, action_execution_order_test3). The other 8 (loop_test6/8, action_execution_order_test2/5/11, ActionOrderTest3/4/5) have remaining ordering issues — typically inter-tag UNLOAD vs DoAction queue ordering that the recompiler emits don't quite match Flash's tag-stream order."
+  - reason: "Partial: 3 of 10 target tests now pass (loop_test7 ruffle_matched, action_execution_order_test3 PASS, loop_test8 PASS). The other 7 (loop_test6, action_execution_order_test2/5/11, ActionOrderTest3/4/5) have remaining ordering issues — sprite frame action ordering across multiple MCs (test2/11), and inter-tag UNLOAD vs DoAction queue ordering that the recompiler emits don't quite match Flash's tag-stream order (ActionOrderTest3/4/5)."
 -->
 
 ## Status update (2026-04-25, in_progress)
 
 Phases 1-5 implemented. Net impact:
-- AVM1 regression battery: 19/19 PASS (no regressions).
-- Misc-ming recently-fixed battery: 20/20 PASS (no regressions).
+- AVM1 regression battery: 27/27 PASS (no regressions).
+- Misc-ming recently-fixed battery: 22/23 effective pass (loop_test6 unchanged
+  pre-existing failure).
 - Misc-swfc battery: 4/4 PASS (movieclip_destruction_test2 unchanged at 50/52).
-- Target tests: loop_test7 PASS (RUFFLE_MATCHED), action_execution_order_test3 PASS.
-- Remaining 8 target tests still MISMATCH (no regressions to SEGFAULT or worse).
+- Shumway duplicateMovieClip: 4/4 PASS.
+- Target tests (3 of 10 effectively passing):
+  - loop_test7 RUFFLE_MATCHED (14/15)
+  - loop_test8 PASS (38/38) ← new in this session
+  - action_execution_order_test3 PASS
+- Remaining 7 target tests still MISMATCH (no regressions to SEGFAULT or worse).
+
+### 2026-04-25 — loop_test8 trailing mc5unloaded fixed
+
+Two-part fix in `SWFModernRuntime/src/libswf/tag.c`:
+
+1. `tagPlaceObject2` / `tagPlaceObject2Ratio` backward-rewind clear-and-replace
+   path now queues clip-action UNLOAD callbacks (current + accumulated +
+   recursive child unloads) BEFORE marking the displaced MC pending-removal.
+   Previously only `actionMarkMCPendingRemoval` ran, dropping the
+   CLIP_EVENT_UNLOAD trace entirely. Mirrors the existing `tagRemoveObject2`
+   path (lines 4863-4900). See `loop_test8` trailing `_level0.mc5unloaded`
+   (frame 6 gotoAndStop(3) replaces mc5 with mc3 — different ratio, so mc5
+   doesn't survive_rewind and its UNLOAD must fire after totals()).
+
+2. `tagShowFrame` now skips `actionFirePendingUnloads` when `catch_up_mode`
+   is set. Without this gate, UNLOAD callbacks queued during the rewind
+   (each replayed frame calls tagShowFrame internally) drain immediately
+   on the next replayed frame instead of deferring to the outer
+   `actionDrainOnloadAndScript` — landing in the middle of post-goto
+   check_equals scripts instead of after totals().
 
 Implementation summary:
 - `actionQueueClipActionUnload` queues recompiler-emitted clip-action UNLOAD callbacks via `AQ_KIND_ONLOAD` with `is_unload=1`. Used by `tagRemoveObject2`/`tagRemoveObject` and `fire_recursive_child_unloads`.
