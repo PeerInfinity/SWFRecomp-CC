@@ -1,10 +1,10 @@
 # Ruffle Test Results (Unfiltered)
 
-**Date**: 2026-04-26 00:02 UTC
+**Date**: 2026-04-26 01:47 UTC
 
-**Git SHA**: `37819c2d41`
+**Git SHA**: `5e68e30951`
 
-**Run Duration**: 0m 57s
+**Run Duration**: 1m 25s
 
 ## Summary
 
@@ -38,7 +38,7 @@
 | 5 | `AsBroadcaster-v5` | 11 | 0.2s |  |
 | 6 | `BitmapData-v5` | 7 | 0.2s |  |
 | 7 | `BitmapData-v6` | 7 | 0.2s |  |
-| 8 | `BitmapData-v7` | 7 | 0.3s |  |
+| 8 | `BitmapData-v7` | 7 | 0.2s |  |
 | 9 | `Boolean-v5` | 38 | 0.2s |  |
 | 10 | `Boolean-v6` | 38 | 0.2s |  |
 | 11 | `Boolean-v7` | 38 | 0.2s |  |
@@ -53,7 +53,7 @@
 | 20 | `ColorTransform-v7` | 7 | 0.2s |  |
 | 21 | `ColorTransform-v8` | 55 | 0.2s |  |
 | 22 | `ContextMenu-v5` | 7 | 0.2s |  |
-| 23 | `ContextMenu-v6` | 7 | 0.2s |  |
+| 23 | `ContextMenu-v6` | 7 | 0.6s |  |
 | 24 | `Error-v5` | 28 | 0.2s |  |
 | 25 | `Error-v6` | 31 | 0.2s |  |
 | 26 | `Error-v7` | 31 | 0.2s |  |
@@ -88,14 +88,14 @@
 | 55 | `Point-v6` | 7 | 0.2s |  |
 | 56 | `Point-v7` | 7 | 0.2s |  |
 | 57 | `Point-v8` | 193 | 0.2s |  |
-| 58 | `Random-v5` | 30 | 0.3s |  |
+| 58 | `Random-v5` | 30 | 0.2s |  |
 | 59 | `Random-v6` | 30 | 0.2s |  |
-| 60 | `Random-v7` | 30 | 0.3s |  |
-| 61 | `Random-v8` | 30 | 0.3s |  |
-| 62 | `Rectangle-v5` | 7 | 0.2s |  |
-| 63 | `Rectangle-v6` | 7 | 0.2s |  |
-| 64 | `Rectangle-v7` | 7 | 0.2s |  |
-| 65 | `Selection-v5` | 21 | 0.2s |  |
+| 60 | `Random-v7` | 30 | 0.2s |  |
+| 61 | `Random-v8` | 30 | 0.2s |  |
+| 62 | `Rectangle-v5` | 7 | 0.4s |  |
+| 63 | `Rectangle-v6` | 7 | 0.5s |  |
+| 64 | `Rectangle-v7` | 7 | 0.6s |  |
+| 65 | `Selection-v5` | 21 | 1.6s |  |
 | 66 | `Stage-v5` | 38 | 0.2s |  |
 | 67 | `System-v5` | 67 | 0.2s |  |
 | 68 | `System-v6` | 100 | 0.2s |  |
@@ -110,7 +110,7 @@
 | 77 | `TextSnapshot-v5` | 7 | 0.2s |  |
 | 78 | `TextSnapshot-v6` | 173 | 0.2s |  |
 | 79 | `TextSnapshot-v7` | 173 | 0.2s |  |
-| 80 | `TextSnapshot-v8` | 173 | 0.2s |  |
+| 80 | `TextSnapshot-v8` | 173 | 0.3s |  |
 | 81 | `Transform-v5` | 7 | 0.2s |  |
 | 82 | `Transform-v6` | 7 | 0.2s |  |
 | 83 | `Transform-v7` | 7 | 0.2s |  |
@@ -132,13 +132,13 @@
 | 99 | `delete-v6` | 60 | 0.2s |  |
 | 100 | `delete-v7` | 60 | 0.2s |  |
 | 101 | `delete-v8` | 60 | 0.2s |  |
-| 102 | `enumerate-v5` | 6 | 0.3s |  |
-| 103 | `enumerate-v6` | 49 | 0.3s |  |
+| 102 | `enumerate-v5` | 6 | 0.2s |  |
+| 103 | `enumerate-v6` | 49 | 0.2s |  |
 | 104 | `enumerate-v7` | 49 | 0.2s |  |
 | 105 | `enumerate-v8` | 49 | 0.2s |  |
 | 106 | `flash-v5` | 10 | 0.2s |  |
 | 107 | `flash-v6` | 10 | 0.2s |  |
-| 108 | `flash-v7` | 10 | 0.5s |  |
+| 108 | `flash-v7` | 10 | 0.2s |  |
 | 109 | `swap-v5` | 7 | 0.2s |  |
 | 110 | `swap-v6` | 7 | 0.2s |  |
 | 111 | `swap-v7` | 7 | 0.2s |  |
@@ -151,7 +151,7 @@
 
 | # | Test | Our diffs | Ruffle diffs | Duration | Notes |
 |---|------|-----------|--------------|----------|-------|
-| 1 | `ASnative-v5` | 35 | 35 | 0.3s |  |
+| 1 | `ASnative-v5` | 35 | 35 | 0.2s |  |
 | 2 | `ASnative-v6` | 40 | 40 | 0.2s |  |
 | 3 | `ASnative-v7` | 40 | 40 | 0.2s |  |
 | 4 | `ASnative-v8` | 40 | 40 | 0.2s |  |
@@ -161,13 +161,13 @@
 | 8 | `Camera-v8` | 57 | 57 | 0.2s |  |
 | 9 | `ExternalInterface-v8` | 4 | 4 | 0.2s |  |
 | 10 | `Inheritance-v5` | 1 | 17 | 0.2s |  |
-| 11 | `Inheritance-v6` | 9 | 16 | 0.3s |  |
-| 12 | `Inheritance-v7` | 5 | 10 | 0.3s |  |
-| 13 | `Inheritance-v8` | 5 | 10 | 0.3s |  |
-| 14 | `LoadVars-v6` | 6 | 21 | 0.3s |  |
+| 11 | `Inheritance-v6` | 9 | 16 | 0.2s |  |
+| 12 | `Inheritance-v7` | 5 | 10 | 0.2s |  |
+| 13 | `Inheritance-v8` | 5 | 10 | 0.2s |  |
+| 14 | `LoadVars-v6` | 6 | 21 | 0.2s |  |
 | 15 | `LoadVars-v7` | 6 | 21 | 0.2s |  |
 | 16 | `LoadVars-v8` | 6 | 21 | 0.2s |  |
-| 17 | `Math-v5` | 5 | 5 | 0.3s |  |
+| 17 | `Math-v5` | 5 | 5 | 0.2s |  |
 | 18 | `Math-v6` | 5 | 5 | 0.2s |  |
 | 19 | `Math-v7` | 5 | 5 | 0.2s |  |
 | 20 | `Math-v8` | 5 | 5 | 0.2s |  |
@@ -180,27 +180,27 @@
 | 27 | `MovieClipLoader-v7` | 118 | 118 | 0.2s |  |
 | 28 | `MovieClipLoader-v8` | 118 | 118 | 0.2s |  |
 | 29 | `Rectangle-v8` | 21 | 21 | 0.2s |  |
-| 30 | `Selection-v6` | 7 | 13 | 0.2s |  |
-| 31 | `Selection-v7` | 7 | 13 | 0.2s |  |
-| 32 | `Selection-v8` | 7 | 13 | 0.2s |  |
-| 33 | `Sound-v5` | 27 | 27 | 0.4s |  |
-| 34 | `Sound-v6` | 30 | 51 | 0.4s |  |
-| 35 | `Sound-v7` | 28 | 51 | 0.3s |  |
+| 30 | `Selection-v6` | 7 | 13 | 4.2s |  |
+| 31 | `Selection-v7` | 7 | 13 | 3.9s |  |
+| 32 | `Selection-v8` | 7 | 13 | 1.1s |  |
+| 33 | `Sound-v5` | 27 | 27 | 17.0s |  |
+| 34 | `Sound-v6` | 30 | 51 | 4.2s |  |
+| 35 | `Sound-v7` | 28 | 51 | 0.4s |  |
 | 36 | `Sound-v8` | 28 | 51 | 0.3s |  |
-| 37 | `String-v5` | 19 | 21 | 0.2s |  |
-| 38 | `String-v6` | 10 | 10 | 0.2s |  |
-| 39 | `String-v7` | 10 | 10 | 0.2s |  |
-| 40 | `String-v8` | 10 | 10 | 0.3s |  |
+| 37 | `String-v5` | 19 | 21 | 0.3s |  |
+| 38 | `String-v6` | 10 | 10 | 0.3s |  |
+| 39 | `String-v7` | 10 | 10 | 0.3s |  |
+| 40 | `String-v8` | 10 | 10 | 0.2s |  |
 | 41 | `TextField-v5` | 3 | 3 | 0.2s |  |
 | 42 | `case-v7` | 54 | 54 | 0.2s |  |
 | 43 | `case-v8` | 54 | 54 | 0.2s |  |
-| 44 | `ops-v8` | 7 | 11 | 0.6s |  |
+| 44 | `ops-v8` | 7 | 11 | 0.2s |  |
 | 45 | `targetPath-v6` | 17 | 17 | 0.2s |  |
 | 46 | `targetPath-v7` | 17 | 17 | 0.2s |  |
 | 47 | `targetPath-v8` | 17 | 17 | 0.2s |  |
 | 48 | `toString_valueOf-v5` | 34 | 34 | 0.2s |  |
 | 49 | `toString_valueOf-v6` | 5 | 5 | 0.2s |  |
-| 50 | `toString_valueOf-v7` | 5 | 5 | 0.2s |  |
+| 50 | `toString_valueOf-v7` | 5 | 5 | 0.3s |  |
 | 51 | `toString_valueOf-v8` | 5 | 5 | 0.2s |  |
 | 52 | `with-v5` | 42 | 42 | 0.2s |  |
 | 53 | `with-v6` | 91 | 91 | 0.2s |  |
