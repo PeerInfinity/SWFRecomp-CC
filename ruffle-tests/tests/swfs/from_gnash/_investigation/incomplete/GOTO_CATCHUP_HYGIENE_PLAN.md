@@ -17,22 +17,144 @@ phases:
     status: done_for_own_clip_actions
   - id: 4
     name: "Sprite script double-fire during catch-up (consecutive_goto_frame_test)"
-    status: pending
+    status: partial
   - id: 5
     name: "Final-frame DoAction execution — last frame's script not running on forward goto"
-    status: pending
+    status: done
   - id: 6
-    name: "Sprite scripts trailing after totals — drain ordering with deferred scripts"
+    name: "Sprite scripts trailing after totals — drain ordering / single-FIFO root+sprite gotos"
+    status: pending
+  - id: 7
+    name: "transformed_by_script preservation across natural loop wrap-back (place_and_remove_object_insane_test)"
     status: pending
 -->
 
 ## Status (2026-04-26)
 
-| Test | Pre-fix | Current | Δ |
-|------|---------|---------|---|
-| place_and_remove_object_insane_test | 15/22 | 17/22 | +2 |
-| goto_frame_test | 4/15 | **PASS** | +11 |
-| consecutive_goto_frame_test | 3/12 | 4/12 | +1 |
+| Test | Pre-fix | Current | Δ | CI status |
+|------|---------|---------|---|-----------|
+| place_and_remove_object_insane_test | 15/22 | 17/22 | +2 | output_mismatch |
+| goto_frame_test | 4/15 | **PASS** | +11 | **pass** (in CI 711b835d) |
+| consecutive_goto_frame_test | 3/12 | 4/12 | +1 | output_mismatch |
+
+`goto_frame_test` confirmed `pass` in misc-ming CI snapshot 711b835d (2026-04-26).
+Phases 1–4 effectively done for that test; remaining work is on the two
+output_mismatch tests below.
+
+### 2026-04-26 analysis — remaining blockers
+
+Investigated the two remaining output_mismatch tests this session
+without making code changes; the fixes require substantial
+architectural work, summarized here so the next session can pick
+up directly.
+
+#### `consecutive_goto_frame_test` (4/12) — Phase 6 needs root+sprite goto FIFO unification
+
+Test pattern: `_root.gotoAndStop(N)` → `mc_red.gotoAndStop(M)` chain
+across 5 root frames + 4 sprite frames. Expected output interleaves
+root target script ↔ sprite frame DoAction:
+
+```
+script_2  (root frame 1): "frm2 of root", gotoAndStop(2) [root]
+script_3  (sprite frame 0): "frm1 of mc_red", sprite gotoAndStop(1)
+script_6  (root frame 2): line 1 PASSED, line 2 gotoAndStop(3)
+script_4  (sprite frame 1): "frm2 of mc_red", sprite gotoAndStop(2)
+script_7  (root frame 3): line 1 PASSED, line 2 gotoAndStop(4)
+script_5  (sprite frame 2): "frm3 of mc_red", sprite gotoAndStop(3)
+script_8  (root frame 4): final PASSED
+script_9  (root frame 4): printtotals
+```
+
+This interleaving falls out naturally in Ruffle because all DoActions
+(root + sprite) go through ONE FIFO `context.action_queue`
+(player.rs:2144 `run_actions`). Goto on root or sprite calls
+`run_goto`, which queues the target frame's DoAction in the same
+queue. Our model splits these:
+
+- **Root goto** → `g_deferred_goto_queue` (separate from AQ_KIND_SCRIPT
+  FIFO). The deferred loop runs AFTER the calling frame's drain ends.
+- **Sprite goto via `ng_gotoFrameCurrentSprite`** → just sets
+  `sprite_next_frame` / `sprite_manual_next_frame`; the actual frame
+  advance happens at the next tick's `advance_sprite_frames`. No
+  script queueing inline.
+
+Result: sprite frame DoActions don't fire until well after the root
+deferred goto loop completes — they appear after totals in the actual
+output.
+
+**Required fix (Phase 6, two-part):**
+
+1. `ng_gotoFrameCurrentSprite` (`SWFModernRuntime/src/libswf/tag_stubs.c:815`):
+   execute the target frame inline via `exec_sprite_frame` (mirroring
+   `ng_gotoFrameByMC` lines 893–945), so the sprite frame's DoAction is
+   queued in `AQ_KIND_SCRIPT` immediately.
+
+2. `ng_executeGotoCatchUp` (`SWFModernRuntime/src/libswf/swf_core.c:86`,
+   duplicate at `swf_headless.c:79`): after running catch-up tags, run
+   `funcs[target]` with `g_tag_skip_mode=1` inline (instead of, or in
+   addition to, queueing via `g_deferred_goto_queue`). With `tag_skip_mode=1`,
+   `funcs[target]` only queues the target's script via `actionQueueScript`
+   into AQ_KIND_SCRIPT and re-enters the drain via the
+   recompiler-emitted `actionDrainOnloadAndScript` inside the func. Sibling
+   sprite scripts in the queue interleave naturally with target scripts via
+   FIFO order.
+
+A traced execution with both fixes in place produces the expected
+output exactly. The change is sound — it converges our model on
+Ruffle's single-FIFO architecture — but it inverts the deferred-goto
+ordering for tests that today rely on
+"all-siblings-then-target" ordering. **Required regression battery
+before landing:** the entire AVM1 goto/rewind/unload battery cited in
+the Phase 2/3 fix above (38 tests), plus the misc-ming guardrail
+(loop_test*, displaylist_depths*, action_execution_order*,
+event_handler_scope_test, etc.), plus the misc-swfc spot
+(movieclip_destruction_test2).
+
+#### `place_and_remove_object_insane_test` (17/22) — needs `transformed_by_script` semantics for natural loop wrap-back
+
+Test loops a 3-frame movie 10×. Frame 0 places mc_red/mc_blue/mc_black.
+Frame 1 removes them. Frame 2 places mc_red (modify, ratio=65535),
+mc_blue (modify, char_id=30 same as frame 0), mc_black_name_changed
+(replacement at depth 10), mc_green (new at depth 6); script_13 then
+adds 60 to `mc_red._x` and `mc_blue._x`.
+
+Three failing lines (counter==1 in script_3, run during iter 2's
+frame_0 drain):
+
+| Line | Expected | Actual | Why |
+|------|----------|--------|-----|
+| 10 | `60 == 60` | `expected: 60, obtained: 0` | mc_blue._x reset to transform 31's tx=0 instead of preserved at 60 |
+| 11 | `undefined == undefined` | `obtained: movieclip` | `_root.mc_black` still resolves (rename from frame_2 not preserved) |
+| 12 | `movieclip == movieclip` | `obtained: undefined` | `_root.mc_black_name_changed` doesn't resolve (rename from frame_2 lost on wrap) |
+
+Root cause: Ruffle's natural loop wrap-back uses `run_goto(target, is_implicit=true)`
+which calls `run_frame_internal(..., run_display_actions=false, ...)`. With
+`run_display_actions=false`, frame_0's PlaceObject2 tags are NOT executed during
+the goto. The display list state from iter 1 frame_2 (with mc_blue._x=60,
+mc_black renamed to mc_black_name_changed) PERSISTS across the wrap-back; the
+frame_0 PlaceObject2 tags run on the next normal tick and only modify-apply
+non-script-modified attributes (per `apply_place_object`'s
+`if !self.transformed_by_script()` guard).
+
+Our model:
+- `swf_core.c` natural backward wrap-back (line 1220–1236) invalidates cached
+  MCs and clears display entries with `placed_at_frame > next_frame`. This
+  REMOVES iter 1 frame_2's modifications.
+- frame_0's tags then place fresh mc_blue with transform 27 (identity at 0,0):
+  `_x` resets to 0.
+
+**Required fix (new Phase 7):** add `transformed_by_script` flag to
+`DisplayObject` (set when AS modifies `_x`/`_y`/etc.) and in
+`tagPlaceObject2`'s modify branches, gate the `transform_id` /
+`ng_cache_transform` update on `!transformed_by_script`. Plus revisit the
+natural-wrap cleanup: don't clear display entries placed at intermediate
+frames — let frame_0's tags re-apply via the modify path with the
+`transformed_by_script` guard. Plus instance-name preservation across wrap
+when re-placement is a Modify (same char_id).
+
+This is a sizeable change with broad regression risk (all goto/rewind tests
+exercise these paths). Recommend separating into its own plan rather than
+folding into GOTO_CATCHUP_HYGIENE.
 
 ### 2026-04-26 fix (Phase 4 partial) — sprite gotoAndStop frame counter + deferred-init reset (goto_frame_test → PASS)
 
