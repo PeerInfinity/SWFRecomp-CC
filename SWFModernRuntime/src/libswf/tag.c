@@ -4850,31 +4850,87 @@ void tagRemoveObject2(SWFAppContext* app_context, size_t depth)
 
 		// During catch_up_mode (ng_executeGotoTagsOnly from nextFrame/gotoAndStop),
 		// defer removal of entries with UNLOAD handlers. The calling script hasn't
-		// finished yet, so UNLOAD must not fire inline. The main loop's catch-up
-		// will re-process the target frame with catch_up_mode=0, firing UNLOAD
-		// at the correct time (after the calling script completes).
+		// finished yet, so UNLOAD must not fire inline.
+		//
+		// Forward catch-up (catch_up_mode && !catch_up_backward): queue clip-action
+		// UNLOAD callbacks via actionQueueClipActionUnloadDeferred (kind=SCRIPT,
+		// is_unload=0) so they ride the same SCRIPT FIFO drain as the calling
+		// script, landing after the remaining queued root scripts. Then move the
+		// MC into the removed-depth zone via actionMarkMCPendingRemoval (depth
+		// shift + detach) and clear the display_list slot so subsequent
+		// PlaceObject2 at the same depth (e.g., the next frame placing a fresh
+		// MC over the removed slot) doesn't stomp the pending entry. Mirrors
+		// loop_test8's backward-rewind clear-and-replace path in tagPlaceObject2.
+		// Required for goto_frame_test (forward gotoAndPlay past Place+Remove of
+		// mc1 then Place+Remove of mc2 at the same depth — both must end up in
+		// the removed-zone with their UNLOAD handlers firing before the target
+		// frame's DoAction).
+		//
+		// Backward catch-up (catch_up_backward=1) with placed_at_frame > target:
+		// keep the original early-return. The tagPlaceObject2 backward path
+		// handles its own MarkMCPendingRemoval for replaced entries; here the
+		// entry is just stale state that ng_display_cleanup_unplaced_after will
+		// clear later.
 		if (catch_up_mode)
 		{
-			int has_unload_cu = 0;
+			int has_own_unload_cu = 0;
 			for (size_t a = 0; a < display_list[depth].clip_action_count; a++) {
 				if (display_list[depth].clip_actions[a].event_flags & CLIP_EVENT_UNLOAD) {
-					has_unload_cu = 1; break;
+					has_own_unload_cu = 1; break;
 				}
 			}
-			if (!has_unload_cu) {
+			if (!has_own_unload_cu) {
 				for (size_t a = 0; a < display_list[depth].accumulated_clip_action_count; a++) {
 					if (display_list[depth].accumulated_clip_actions[a].event_flags & CLIP_EVENT_UNLOAD) {
-						has_unload_cu = 1; break;
+						has_own_unload_cu = 1; break;
 					}
 				}
 			}
-			if (!has_unload_cu && display_list[depth].sprite_display_list != NULL &&
+			int has_child_unload_cu = 0;
+			if (display_list[depth].sprite_display_list != NULL &&
 			    display_list[depth].sprite_max_depth > 0) {
 				extern int has_child_unload_handler(DisplayObject* dl, size_t dl_max);
-				has_unload_cu = has_child_unload_handler(display_list[depth].sprite_display_list,
-				                                         display_list[depth].sprite_max_depth);
+				has_child_unload_cu = has_child_unload_handler(display_list[depth].sprite_display_list,
+				                                               display_list[depth].sprite_max_depth);
 			}
-			if (has_unload_cu) return;
+			// Forward catch-up with own clip-action UNLOAD: queue the UNLOAD
+			// callbacks deferred (kind=SCRIPT, ride the FIFO drain) and move
+			// the MC into the removed-depth zone via actionMarkMCPendingRemoval.
+			// Clear the display_list slot so a subsequent PlaceObject2 at the
+			// same depth (next frame in the catch-up) places fresh instead of
+			// stomping the still-live entry. Required for goto_frame_test
+			// (Place+Remove of mc1, then Place+Remove of mc2 at the same depth
+			// during forward catch-up — both must end up in the removed-zone
+			// with their UNLOAD handlers firing before the target frame's
+			// DoAction). Skipped for backward catch-up (handled by
+			// tagPlaceObject2's clear-and-replace path) and for child-only
+			// unloads (the deferred-goto re-run of the target frame with
+			// catch_up_mode=0 fires the child unload via the normal path —
+			// see avm1/unload_nested_child).
+			if (has_own_unload_cu)
+			{
+				if (catch_up_backward) return;
+				if (display_list[depth].instance_name != NULL) {
+					MovieClip* _ro2_cu_mc = actionFindOrCreateMovieClip(
+						app_context, display_list[depth].instance_name, &root_movieclip);
+					for (size_t a = 0; a < display_list[depth].accumulated_clip_action_count; a++) {
+						if (display_list[depth].accumulated_clip_actions[a].event_flags & CLIP_EVENT_UNLOAD)
+							actionQueueClipActionUnloadDeferred(
+								display_list[depth].accumulated_clip_actions[a].action, _ro2_cu_mc);
+					}
+					for (size_t a = 0; a < display_list[depth].clip_action_count; a++) {
+						if (display_list[depth].clip_actions[a].event_flags & CLIP_EVENT_UNLOAD)
+							actionQueueClipActionUnloadDeferred(
+								display_list[depth].clip_actions[a].action, _ro2_cu_mc);
+					}
+					actionMarkMCPendingRemoval(app_context,
+					                           display_list[depth].instance_name,
+					                           (int)depth);
+				}
+				clear_display_entry(app_context, depth);
+				return;
+			}
+			if (has_child_unload_cu) return;
 		}
 #endif
 #ifdef NO_GRAPHICS

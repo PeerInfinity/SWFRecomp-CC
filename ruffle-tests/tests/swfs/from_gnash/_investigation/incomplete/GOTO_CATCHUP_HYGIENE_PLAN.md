@@ -11,10 +11,10 @@ phases:
     status: partial
   - id: 2
     name: "Catch-up unload event dispatch — fire unload events on MCs removed during catch-up replay"
-    status: pending
+    status: done_for_own_clip_actions
   - id: 3
     name: "Removed-zone depth arithmetic for goto-induced unloads (-16485 vs -16284)"
-    status: pending
+    status: done_for_own_clip_actions
   - id: 4
     name: "Sprite script double-fire during catch-up (consecutive_goto_frame_test)"
     status: pending
@@ -26,13 +26,104 @@ phases:
     status: pending
 -->
 
-## Status (2026-04-25)
+## Status (2026-04-26)
 
 | Test | Pre-fix | Current | Δ |
 |------|---------|---------|---|
 | place_and_remove_object_insane_test | 15/22 | 17/22 | +2 |
-| goto_frame_test | 4/15 | 4/15 | 0 |
+| goto_frame_test | 4/15 | 14/15 | +10 |
 | consecutive_goto_frame_test | 3/12 | 4/12 | +1 |
+
+### 2026-04-26 fix — Phase 2/3: forward catch-up own-clip-action UNLOAD (+10 lines on goto_frame_test)
+
+**Change.** `tagRemoveObject2` (`SWFModernRuntime/src/libswf/tag.c`)
+catch_up_mode branch: when the entry being removed has its own
+clip-action UNLOAD bit set (own `clip_actions` or `accumulated_clip_actions`,
+NOT just nested children), and the catch-up is forward (`!catch_up_backward`):
+1. Queue the UNLOAD callbacks via `actionQueueClipActionUnloadDeferred`
+   (kind=SCRIPT, is_unload=0) so they ride the same FIFO drain as the
+   calling script and land BEFORE the deferred goto target frame's
+   script (mirrors loop_test8's backward-rewind clear-and-replace path).
+2. Call `actionMarkMCPendingRemoval` to move the MC into the
+   removed-depth zone (`-(swf_depth) - 1 - 16384`) and detach `display_obj`.
+3. `clear_display_entry` so a subsequent PlaceObject2 at the same depth
+   in a later catch-up frame places fresh instead of stomping the live
+   entry.
+
+Backward catch-up path (`catch_up_backward=1`) keeps the original
+early-return — `tagPlaceObject2`'s clear-and-replace path already handles
+backward replacements via `actionMarkMCPendingRemoval`. Child-only
+unload (the depth has no own clip-action UNLOAD but a nested sprite
+does) ALSO keeps the early-return: the deferred-goto re-run of the
+target frame with `catch_up_mode=0` fires the child unload via the
+normal flow (`fire_recursive_child_unloads`). This split is required to
+keep `avm1/unload_nested_child` passing — naively clearing the slot
+during catch-up makes the deferred-goto rerun of the target frame see
+an empty depth and the nested child UNLOAD handler (`clip_action_2 →
+trace("unload")`) is lost.
+
+**Why this was needed.** `goto_frame_test`:
+- frame_6 / script_10: `gotoFrame2(_currentframe + 5)` → forward goto
+  past frames 7-10 (which Place mc1, Remove mc1, Place mc2 at the same
+  depth, Remove mc2 — both with clip-action UNLOAD).
+- Pre-fix: catch_up_mode + has_unload returned early → mc1 stayed at
+  depth 100, frame 9's PlaceObject2 stomped mc1, frame 10's Remove
+  early-returned, mc2 left at unshifted depth -16284 (= 100 - 16384).
+  `mc1.getDepth()` returned `''` (not found), `mc2.getDepth()` returned
+  -16284. `_level0.mc1 unloaded` / `_level0.mc2 unloaded` traces never
+  fired.
+- Post-fix: catch-up's frame 8 marks mc1 pending (depth → -16485),
+  queues clip_action_13 deferred, clears slot. Frame 9 places mc2
+  fresh. Frame 10 marks mc2 pending (depth → -16485), queues
+  clip_action_14 deferred, clears slot. After script_10 returns,
+  script_11 (`mc1._target`) and script_12 (`mc2._target`) find both
+  MCs alive in the pending zone. Action queue drains
+  clip_action_13/14 → `_level0.mc1 unloaded` / `_level0.mc2 unloaded`.
+  Then deferred-goto loop runs frame 11's scripts: `mc1.getDepth()`
+  returns -16485, `mc2.getDepth()` returns -16485, all post-unload
+  asserts pass.
+
+**Verification.**
+- 21-test AVM1 goto+unload guardrail: 21/21 PASS (goto_rewind1/2/3,
+  execution_order1/2/3, goto_execution_order/2, goto_both_ways1/2,
+  rewind_depth, goto_frame, goto_frame2, goto_label, goto_methods,
+  unload, unloadmovie, unload_clip_event, unload_nested_child,
+  mcl_unloadclip, depth_replacement_audio_unloading).
+- 17-test AVM1 broader battery (clip_events, on_construct,
+  register_and_init_order, button_children, button_order,
+  movieclip_in_removed_button, bad_placeobject_clipaction,
+  movieclip_state_values, movieclip_library_state_values,
+  set_interval, attach_movie, init_object_order, swf5_to_6_cross_call,
+  swf5_no_closure, as2_super_and_this_v6/v8, extends_chain): 17/17
+  effective.
+- 11-test gnash misc-ming guardrail (loop/loop_test2/3/5/8/9,
+  static_vs_dynamic1/2, displaylist_depths/displaylist_depths_test11,
+  place_and_remove_object_test, new_child_in_unload_test,
+  event_handler_scope_test): 11/11 PASS.
+- 8-test loop suite (simple_loop_test, loop_test2-5, 7-9): 8/8
+  effective (loop_test7 RUFFLE_MATCHED).
+- 4-test misc-swfc spot (movieclip_destruction_test2 unchanged at
+  52/56, stackscope/submoviegetvar/edittext_test1 PASS).
+- 4-test Shumway duplicateMovieClip suite: 4/4.
+- 5 already-failing misc-ming tests (DefineEditTextVariableNameTest,
+  attachMovieLoopingTest, loop/loop_test, loop/loop_test10,
+  loop/loop_test6): line counts unchanged from pre-fix baseline.
+
+**Remaining diff for `goto_frame_test` (1 line).** Line 4 — expected
+`_root.asOrder == '0+1+2+3+4+5+6+7+'`, ours has `'0+1+2+3+4+5+6+'`.
+Missing the `7+` append, which comes from `sprite_4_frame_3 /
+script_5` (`asOrder += '7+'; Stop()`). sprite_4 is `mc_red`, started
+at depth 4 in frame_1. Various scripts call
+`mc_red.gotoAndStop/Play(...)` to navigate it. The `7+` should fire
+when sprite_4 lands on its frame_3 (last frame). Not investigated this
+session — likely Phase 4 (sprite-frame fire timing during root
+catch-up) territory.
+
+**Remaining diffs for the other two plan tests:** unchanged at
+baseline. consecutive_goto_frame_test (4/12) needs Phase 4 (sprite
+double-fire) + Phase 6 (drain ordering); place_and_remove_object_insane_test
+(17/22) has 3 lines diff that look like cross-loop value-capture
+issues, not directly addressed by this fix.
 
 ### 2026-04-25 fix #2 — eager-init sni=3 distinguishes "scripts queued" (Phase 4 partial)
 
