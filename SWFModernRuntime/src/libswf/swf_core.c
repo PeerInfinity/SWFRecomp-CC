@@ -18,6 +18,7 @@
 #include <tag.h>
 #include <action.h>
 #include <action_queue.h>
+#include <sprite_frame_scripts.h>
 #include <variables.h>
 #include <utils.h>
 #include <heap.h>
@@ -1200,6 +1201,14 @@ void swfStart(SWFAppContext* app_context)
 			if (g_after_tick_handler)
 				g_after_tick_handler(app_context, (int)tick_count);
 		}
+
+		// Phase B (GOTO_FIFO_UNIFICATION_INCREMENTAL): drop any deferred
+		// sprite-script entries accumulated during this tick. Phase B is
+		// infrastructure only — nothing dispatches the queue. Clearing
+		// here prevents stale entries from leaking across ticks. Phase C
+		// will replace this no-op clear with FIFO dispatch when
+		// g_unify_sprite_drain is set.
+		actionResetPendingSpriteScriptQueue();
 
 		// Advance to next frame
 		// IMPORTANT: Process manual_next_frame BEFORE checking is_playing

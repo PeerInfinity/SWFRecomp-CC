@@ -13,6 +13,7 @@
 #include <stdlib.h>
 #include <limits.h>
 #include <actionmodern/action_queue.h>
+#include <actionmodern/sprite_frame_scripts.h>
 
 // ---------------------------------------------------------------------------
 // Global display state — defined here in NO_GRAPHICS (swf.c provides in GRAPHICS)
@@ -825,6 +826,16 @@ void ng_gotoFrameCurrentSprite(u16 frame)
 	obj->sprite_manual_next_frame = 1;
 	obj->sprite_next_frame = frame;
 	obj->sprite_is_playing = 0;
+
+	// Phase B (GOTO_FIFO_UNIFICATION_INCREMENTAL): record the resolved
+	// target-frame script onto the deferred sprite-script queue. Nothing
+	// drains it yet — Phase C wires drain into actionDrainOnloadAndScript
+	// behind g_unify_sprite_drain. fn may be NULL when no DoAction exists
+	// at this (char_id, frame); the entry is still recorded for sequencing.
+	{
+		SpriteFrameScriptFn fn = actionGetSpriteFrameScript(obj->char_id, frame);
+		actionQueuePendingSpriteScript(obj->char_id, frame, fn);
+	}
 }
 
 size_t ng_getSpriteFrameCount(void)

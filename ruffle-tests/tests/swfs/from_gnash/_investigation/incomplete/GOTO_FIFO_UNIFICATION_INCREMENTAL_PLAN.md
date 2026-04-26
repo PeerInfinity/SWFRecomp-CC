@@ -11,7 +11,7 @@ phases:
     status: complete
   - id: B
     name: "ng_gotoFrameCurrentSprite records target into a deferred-script-queue (no dispatch)"
-    status: pending
+    status: complete
   - id: C
     name: "Drain hook for deferred-script-queue, gated behind g_unify_sprite_drain (default 0)"
     status: pending
@@ -94,28 +94,67 @@ preserved (sprite 1 has 2 DoActions in frame 0); the accessor returns
 the first match — later phases will refine if multi-DoAction-per-frame
 ordering matters.
 
-### Phase B — Record sprite goto target into a deferred-script queue
+### Phase B — Record sprite goto target into a deferred-script queue — COMPLETE 2026-04-26
 
-**Scope.** Add a small runtime queue (`g_pending_sprite_script_queue` or
-similar — separate from `g_aq` and `g_deferred_goto_queue`).
-`ng_gotoFrameCurrentSprite` looks up the target script via Phase A's
-accessor and pushes onto this queue. **Nothing dispatches it yet.**
+**Scope.** Added a bounded-array runtime queue
+(`g_pending` in `sprite_frame_scripts.c`,
+`MAX_PENDING_SPRITE_SCRIPTS=16` — separate from `g_aq` and
+`g_deferred_goto_queue`). `ng_gotoFrameCurrentSprite` resolves the
+target script via Phase A's `actionGetSpriteFrameScript` and pushes
+onto this queue via `actionQueuePendingSpriteScript`. **Nothing
+dispatches it yet.**
 
-**Files.**
-- `SWFModernRuntime/src/libswf/tag_stubs.c` (`ng_gotoFrameCurrentSprite`)
-- New runtime queue (alongside or in `actionmodern/action_queue.c`)
+**Files changed.**
+- `SWFModernRuntime/include/actionmodern/sprite_frame_scripts.h`:
+  added `PendingSpriteScriptEntry`,
+  `actionQueuePendingSpriteScript`,
+  `actionPendingSpriteScriptCount`,
+  `actionPendingSpriteScriptAt`,
+  `actionResetPendingSpriteScriptQueue`.
+- `SWFModernRuntime/src/actionmodern/sprite_frame_scripts.c`:
+  fixed-array queue (cap 16), drop-on-overflow.
+- `SWFModernRuntime/src/libswf/tag_stubs.c`:
+  added `#include <actionmodern/sprite_frame_scripts.h>` and the
+  queue push at the bottom of `ng_gotoFrameCurrentSprite` (after
+  the existing frame clamp + state mutations).
+- `SWFModernRuntime/src/libswf/swf_core.c`:
+  added `#include <sprite_frame_scripts.h>` and
+  `actionResetPendingSpriteScriptQueue()` call once per tick (after
+  the after-tick hook). Phase B no-drain — clearing prevents stale
+  entries from leaking across ticks. Phase C will replace the no-op
+  reset with FIFO dispatch when `g_unify_sprite_drain` is set.
 
 **Behavior delta.** None visible. The script is queued but never
 dispatched, so the existing `sprite_manual_next_frame=1` path still
 drives sprite advancement.
 
-**Verification.** Same guardrail as A. Add an internal assert that the
-deferred-script queue is empty at end of frame (since nothing drains
-it yet — anything left over is a leak).
+**Verification.** `consecutive_goto_frame_test` unchanged at 0/12
+baseline (3 matching lines as before). 30+ guardrail tests pass:
+AVM1 goto/rewind (15/15: goto_rewind1/2/3, execution_order1/2/3,
+goto_execution_order/2, goto_both_ways1/2, rewind_depth, goto_frame,
+goto_frame2, goto_label, goto_methods); AVM1 unload/init (11/11:
+unload, unloadmovie, unload_clip_event, unload_nested_child,
+mcl_unloadclip, clip_events, on_construct, register_and_init_order,
+init_object_order, set_interval, movieclip_state_values); AVM1 misc
+(4/4: depth_replacement_audio_unloading, textsnapshot_available_text,
+movieclip_in_removed_button, conflicting_instance_names);
+misc-ming.all loop battery (6/6 pass on the in-guardrail subset
+loop_test2/3/5/8/9/simple_loop_test) plus pre-existing pre-Phase-B
+status preserved on out-of-guardrail loops (loop_test, loop_test6,
+loop_test10 still output_mismatch; loop_test4 pass; loop_test7
+ruffle_matched); misc-ming.all flat (9/9 in-guardrail —
+DefineEditTextTest, DefineEditTextVariableNameTest2,
+ResolveEventsTest, attachMovieTest, event_handler_scope_test,
+instanceNameTest, new_child_in_unload_test, static_vs_dynamic1/2);
+misc-swfc battery (3/3 in-guardrail: stackscope, submoviegetvar,
+edittext_test1; movieclip_destruction_test2 unchanged at
+output_mismatch baseline 50/52); Shumway duplicateMovieClip suite
+(4/4: duplicateMovieClip, samedepth, name-coercion, dontremove).
 
-**Risk.** Zero functionally. Risk of memory leak if queue grows
-unboundedly without drain — bounded with a small fixed-size array
-(MAX_PENDING_SPRITE_SCRIPTS=16) + drop-on-overflow with a debug log.
+**Risk.** Zero functionally — confirmed. Queue is bounded
+(MAX_PENDING_SPRITE_SCRIPTS=16) with silent drop-on-overflow;
+end-of-tick reset prevents cross-tick leaks. Phase B does not modify
+`swf_headless.c` — Phase H mirrors there.
 
 ### Phase C — Drain hook gated behind a runtime flag
 
