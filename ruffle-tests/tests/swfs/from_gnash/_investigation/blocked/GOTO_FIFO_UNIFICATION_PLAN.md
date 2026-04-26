@@ -4,7 +4,7 @@
 
 <!-- PLAN_META
 id: GOTO_FIFO_UNIFICATION
-status: pending
+status: blocked
 phases:
   - id: 1
     name: "ng_gotoFrameCurrentSprite: queue target sprite frame inline (mirror ng_gotoFrameByMC)"
@@ -26,6 +26,8 @@ phases:
     status: pending
 dependencies:
   - "Predecessor plan: GOTO_CATCHUP_HYGIENE_PLAN.md (in blocked/) — Phases 1–5 are landed, this plan picks up Phase 6"
+blocker:
+  - "Multi-session architectural rework: 8-12 hour estimate per plan, requires full CI regression battery to validate, and Phase 1 in isolation introduces measurable regressions (see Status Notes 2026-04-26)."
 -->
 
 ## Problem statement
@@ -359,3 +361,122 @@ old ordering is already at odds with the spec.
 | `blocked/GOTO_CATCHUP_HYGIENE_PLAN.md` | Predecessor plan; Phases 1–5 landed (goto_frame_test PASS). This plan is its Phase 6 split out. |
 | `incomplete/DEFERRED_CLIP_UNLOAD_PLAN.md` | The `actionQueueClipActionUnloadDeferred` helper added for loop_test8 rides `AQ_KIND_SCRIPT` and is sensitive to drain timing changes here — verify the loop_test8 PASS is preserved. |
 | `incomplete/TRANSFORMED_BY_SCRIPT_WRAP_BACK_PLAN.md` | Parallel sibling plan for `place_and_remove_object_insane_test` (the other GOTO_CATCHUP_HYGIENE blocker, Phase 7). Independent code paths but share catch-up machinery; spot-check at the end. |
+
+## Status notes (2026-04-26)
+
+### Detailed test trace analysis
+
+`consecutive_goto_frame_test` baseline confirmed at 4/12 matching lines. The
+test pattern (with all string IDs decoded from `script_defs.c`):
+
+- **Root frame 1 → script_2**: `note("frm2 of root - gotoAndStop(3)")` →
+  `mc_red.x = "as_in_frm2_of_root"` → `actionGotoFrame(2)` (defers root goto).
+- **Root frame 2 → script_6**: `check_equals(mc_red.x, "as_in_frm1_of_mc_red")` →
+  `note("frm3 of root - gotoAndStop(4)")` → `mc_red.x = "as_in_frm3_of_root"` →
+  `actionGotoFrame(3)`. **No `mc_red.gotoAndStop` call** — root scripts only
+  drive root advances.
+- **Root frame 3 → script_7**: `check_equals(mc_red.x, "as_in_frm2_of_mc_red")` →
+  same pattern, `actionGotoFrame(4)`.
+- **Root frame 4 → script_8 + script_9**: final assertion + totals.
+- **Sprite frame 0 → script_3**: `note("frm1 of mc_red - gotoAndStop(2)")` →
+  `mc_red.x = "as_in_frm1_of_mc_red"` → `actionGotoFrame(1)` (sprite self-goto).
+- **Sprite frame 1 → script_4**: ditto with frame 2 / `as_in_frm2_of_mc_red`.
+- **Sprite frame 2 → script_5**: ditto with frame 3 / `as_in_frm3_of_mc_red`.
+
+The test relies on each root frame's `check_equals` reading the **previous
+sprite-frame's write** to `mc_red.x`. So the required interleave per frame is:
+root script first (assertion + note), then sprite script (note + write next
+sentinel).
+
+### Required FIFO order (verified via trace simulation)
+
+Under Phases 1+2+3 unified, frame_1's drain produces this dispatch order:
+
+```
+script_2 → queues script_6 (Phase 2: actionGotoFrame queues into AQ_KIND_SCRIPT)
+script_3 → queues script_4 (Phase 1: ng_gotoFrameCurrentSprite inline-fires sprite_4_frame_1)
+script_6 (assertion PASSED reads mc_red.x set by script_3) → queues script_7
+script_4 (sets mc_red.x = "as_in_frm2_of_mc_red") → queues script_5
+script_7 (assertion PASSED reads mc_red.x set by script_4) → queues script_8 + script_9
+script_5 (sets mc_red.x = "as_in_frm3_of_mc_red") → no queue (sprite_4_frame_3 empty)
+script_8 (assertion PASSED reads mc_red.x set by script_5)
+script_9 (totals: 3/3)
+```
+
+This produces the expected 12-line output exactly.
+
+### Why Phase 1 in isolation regresses the test
+
+If only Phase 1 lands (sprite goto inline) without Phase 2 (root goto target
+into AQ_KIND_SCRIPT), the drain order in frame_1 becomes:
+
+```
+script_2 → defers root goto via g_deferred_goto_queue (UNCHANGED — Phase 2 not landed)
+script_3 → queues script_4 (Phase 1)
+script_4 → queues script_5 (Phase 1, recursive)
+script_5 → no queue
+```
+
+Drain finishes with `mc_red.x = "as_in_frm3_of_mc_red"` (script_5's write). Then
+the deferred-goto loop runs `funcs[2]` in scripts-only mode: `script_6` runs
+`check_equals("as_in_frm3_of_mc_red", "as_in_frm1_of_mc_red")` → **FAILED**.
+Currently this assertion PASSES (4/12 baseline includes the first PASSED line)
+because script_4/5 don't fire until *after* the deferred-goto loop, leaving
+`mc_red.x = "as_in_frm1_of_mc_red"` (script_3's write) at script_6 time.
+
+So Phase 1 must land together with Phase 2 — they cannot be staged independently.
+
+### Re-entry hazard for naive Phase 2
+
+If `ng_executeGotoCatchUp` simply runs `funcs[target](app_context)` with
+`g_tag_skip_mode=1` inline (the plan's literal phase-2 description), the
+recompiler-emitted `actionDrainOnloadAndScript` *inside* `funcs[target]`
+fires a nested drain. That nested drain pulls already-queued sprite scripts
+(e.g., script_3) ahead of the outer drain's expected FIFO position, breaking
+the interleave.
+
+The fix requires a new "queue-only mode" — either a runtime flag like
+`g_skip_drain_outer` that makes `actionDrainOnloadAndScript` a no-op when
+set (cleaner; no recompiler change), or a recompiler emission change so
+`funcs[target]` only emits the queue calls and skips the drain. The plan's
+Phase 4 alludes to this via "simplify the recompiler gate" but does not
+explicitly call out the no-op-drain mechanism.
+
+### Why blocked, not in-progress
+
+This is a **fundamentally architectural change** to the frame-drain dispatch
+model. Beyond the surface-level edits, it requires:
+
+1. New no-drain-recursive primitive (above) — design + integration
+2. Phase 1 + Phase 2 + Phase 3 land **as a single atomic change** (Phase 1
+   alone regresses the test; Phase 2 alone doesn't queue sprite scripts in
+   time; Phase 3 cleanup gates loop-exit conditions on the new model)
+3. swf_headless.c parity (Phase 5) in lockstep
+4. Recompiler regeneration for any sprite-DoAction emission changes (Phase 4)
+5. Full CI regression battery — many tests in the predecessor plan's
+   recently-fixed list rely on the current "all-deferred-then-sprites" ordering
+   and may need targeted compensation
+
+The plan estimates 8-12 hours weighted toward Phase 6 regression triage. CI
+roundtrip per change is ~30 min, and I expect 3-5 iterations to stabilize
+the misc-ming `loop_test*` cluster + AVM1 `goto_rewind*` family. This
+exceeds a single working session's budget and the local-run-only rule means
+I cannot pre-screen most of the regressions.
+
+### Recommendation for next session
+
+Plan moved to `blocked/` to avoid blocking other work. To resume:
+
+1. Implement the runtime no-op-drain flag (`g_skip_drain_outer` in
+   `action_queue.c`'s `actionDrainOnloadAndScript`) — small isolated change,
+   no test impact alone.
+2. Implement Phases 1 + 2 + 3 as a **single commit** with the small AVM1
+   guardrail battery (`goto_rewind1/2/3`, `goto_frame`, `goto_methods`,
+   `execution_order2/3`, `register_and_init_order`, `unload`,
+   `unload_clip_event`) verified locally.
+3. Push to CI; expect failures in misc-ming `loop_test*` and `unload`-family
+   tests; iterate via the deferred-clip-unload pathway and the
+   `actionQueueClipActionUnloadDeferred` ordering from the predecessor plan's
+   2026-04-25 fix.
+4. Phase 4 (recompiler gate simplification) and Phase 5 (headless parity) are
+   cleanup once the runtime is stable.
