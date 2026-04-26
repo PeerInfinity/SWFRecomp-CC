@@ -424,9 +424,18 @@ static void process_sprite_init_at_depth(SWFAppContext* app_context, MovieClip* 
 				return;
 			}
 
-			// sprite_needs_init == 2: Phase 1 (placement) ran eagerly; run Phase 2
-			// (scripts only) now. sprite_needs_init == 1: normal deferred path.
-			int was_eager = (obj->sprite_needs_init == 2);
+			// sprite_needs_init values:
+			//   1: regular non-eager path (legacy). Run frame_0 normally.
+			//   2: eager init under goto catchup (scripts suppressed). Re-run
+			//      frame_0 in script_only_mode so the sprite's DoAction gate
+			//      g2 fires the scripts inline.
+			//   3: eager init normal flow (scripts queued via gate g1).
+			//      Skip frame_0 entirely — the queued scripts will fire on
+			//      their own; re-running would double-fire (consecutive_goto_frame_test
+			//      sprite_4: script_3 prints "frm1 of mc_red - gotoAndStop(2)"
+			//      twice without this gate).
+			int was_eager_catchup = (obj->sprite_needs_init == 2);
+			int was_eager_normal = (obj->sprite_needs_init == 3);
 			obj->sprite_needs_init = 0;
 
 			// Track root DL for inline catch-up (only on outermost sprite init)
@@ -472,17 +481,19 @@ static void process_sprite_init_at_depth(SWFAppContext* app_context, MovieClip* 
 				g_settarget_explicit_root = 0;
 				g_settarget_invalid = 0;
 				g_settarget_none = 0;
-				if (was_eager)
+				if (was_eager_catchup)
 				{
 					// Phase 2: run scripts only; placement tags are no-ops via g_script_only_mode.
 					g_script_only_mode = 1;
 					ch->sprite_frame_funcs[0](app_context);
 					g_script_only_mode = 0;
 				}
-				else
+				else if (!was_eager_normal)
 				{
+					// sni == 1: regular non-eager init. Run frame_0 normally.
 					ch->sprite_frame_funcs[0](app_context);
 				}
+				// was_eager_normal: skip frame_0 — queued scripts handle it.
 				g_settarget_explicit_root = saved_settarget;
 				g_settarget_invalid = saved_invalid2;
 				g_settarget_none = saved_none2;
@@ -4037,7 +4048,17 @@ void tagPlaceObject2(SWFAppContext* app_context, size_t depth, size_t char_id, u
 			Character* sp_ch = &dictionary[char_id];
 			if (sp_ch->sprite_frame_funcs != NULL && sp_ch->sprite_frame_funcs[0] != NULL)
 			{
-				display_list[depth].sprite_needs_init = 2; // mark: frame_0 done, scripts deferred
+				// sni distinguishes Phase 2 behavior:
+				//   2 = eager init suppressed scripts (under goto catchup, recompiler
+				//       gate g1 false). Phase 2 must re-run frame_0 in script_only_mode
+				//       to fire scripts inline (gate g2 true).
+				//   3 = eager init queued scripts via the SHOW_FRAME drain path
+				//       (recompiler gate g1 true, normal flow). Phase 2 must NOT
+				//       re-run frame_0 — queued scripts will fire on their own;
+				//       re-running would double-fire.
+				// consecutive_goto_frame_test sprite_4 motivates the split.
+				extern int actionGotoCatchupActive(void);
+				display_list[depth].sprite_needs_init = actionGotoCatchupActive() ? 2 : 3;
 				DisplayObject* saved_dl = display_list;
 				size_t saved_max = max_depth;
 				size_t saved_cap = display_list_capacity;
@@ -4403,7 +4424,17 @@ void tagPlaceObject2Ratio(SWFAppContext* app_context, size_t depth, size_t char_
 			Character* sp_ch = &dictionary[char_id];
 			if (sp_ch->sprite_frame_funcs != NULL && sp_ch->sprite_frame_funcs[0] != NULL)
 			{
-				display_list[depth].sprite_needs_init = 2; // mark: frame_0 done, scripts deferred
+				// sni distinguishes Phase 2 behavior:
+				//   2 = eager init suppressed scripts (under goto catchup, recompiler
+				//       gate g1 false). Phase 2 must re-run frame_0 in script_only_mode
+				//       to fire scripts inline (gate g2 true).
+				//   3 = eager init queued scripts via the SHOW_FRAME drain path
+				//       (recompiler gate g1 true, normal flow). Phase 2 must NOT
+				//       re-run frame_0 — queued scripts will fire on their own;
+				//       re-running would double-fire.
+				// consecutive_goto_frame_test sprite_4 motivates the split.
+				extern int actionGotoCatchupActive(void);
+				display_list[depth].sprite_needs_init = actionGotoCatchupActive() ? 2 : 3;
 				DisplayObject* saved_dl = display_list;
 				size_t saved_max = max_depth;
 				size_t saved_cap = display_list_capacity;

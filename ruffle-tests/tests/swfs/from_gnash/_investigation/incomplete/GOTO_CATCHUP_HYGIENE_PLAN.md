@@ -32,7 +32,63 @@ phases:
 |------|---------|---------|---|
 | place_and_remove_object_insane_test | 15/22 | 17/22 | +2 |
 | goto_frame_test | 4/15 | 4/15 | 0 |
-| consecutive_goto_frame_test | 3/12 | 3/12 | 0 |
+| consecutive_goto_frame_test | 3/12 | 4/12 | +1 |
+
+### 2026-04-25 fix #2 — eager-init sni=3 distinguishes "scripts queued" (Phase 4 partial)
+
+**Change.** `SWFModernRuntime/src/libswf/tag.c`:
+1. `tagPlaceObject2` / `tagPlaceObject2Ratio` sprite eager-init path: set
+   `sprite_needs_init` based on `actionGotoCatchupActive()`:
+   - `2` (under goto catchup): the recompiler-emitted gate `g1` was false,
+     so the sprite's DoAction wasn't queued. Phase 2 must re-run `frame_0`
+     in `script_only_mode` to fire scripts inline (gate `g2`).
+   - `3` (normal flow): `g1` was true and the script was queued, will fire
+     via the SHOW_FRAME drain. Phase 2 must NOT re-run `frame_0`.
+2. `process_sprite_init_at_depth` Phase 2: split `was_eager` into
+   `was_eager_catchup` (sni==2, run frame_0 in script_only_mode) and
+   `was_eager_normal` (sni==3, skip frame_0 — already queued).
+
+**Why this was needed.** Pre-fix, the eager init at frame_1's
+`tagPlaceObject2` set `sni=2` regardless of context. The recompiler-emitted
+gate `g1 = (!cu || tsm || (eager && !catchup)) && !som` queued
+`script_3` because `eager && !catchup` was true. Then Phase 2 (in
+`ng_run_deferred_sprite_init_before` after script_2's `gotoFrame(2)`
+deferred-script processing) re-ran `sprite_4_frame_0` in
+`script_only_mode=1` + `deferred_sprite_init_active=1`, which fired
+gate `g2` and ran `script_3` *again* inline. Result: "frm1 of mc_red -
+gotoAndStop(2)" printed twice. The new sni=3 marker tells Phase 2 the
+script is already in the queue.
+
+**Verification.**
+- 43-test AVM1 goto/rewind/unload/lifecycle battery: 43/43 effective pass.
+- 20-test misc-ming guardrail (loop_test2-9, simple_loop_test,
+  static_vs_dynamic1/2, place_and_remove_object_test,
+  new_child_in_unload_test, event_handler_scope_test, instanceNameTest,
+  attachMovieTest, DefineEditTextTest/2, shape_test,
+  get_frame_number_test, reverse_execute_PlaceObject2_test1/2): 20/20.
+- 4-test Shumway duplicateMovieClip suite: 4/4.
+- 18-test AVM1 OOP/super/event/init/selection battery (as2_super_*,
+  extends_chain, swf5_no_closure, execution_order2, goto_rewind3,
+  movieclip_in_removed_button, clip_events, button_children, button_order,
+  on_construct, init_object_order, register_class_return_value, selection,
+  goto_frame, set_interval, stage_object_properties): 18/18.
+- 18-test misc-swfc.all full suite: no changes vs prior baseline.
+- 8 already-failing misc-ming tests (same set as fix #1): line counts
+  unchanged.
+
+**Remaining diff for `consecutive_goto_frame_test` (8 lines).**
+Without the double-fire, the next divergence is around line 5-9. Looking
+at expected vs actual:
+- expected line 5: `frm2 of mc_red - gotoAndStop(3)` (sprite_4 frame 1 fires).
+- expected line 6: `PASSED: as_in_frm2_of_mc_red == as_in_frm2_of_mc_red`
+  (script_7 reads `mc_red.x`).
+- actual line 5: `FAILED: expected: as_in_frm2_of_mc_red, obtained: as_in_frm3_of_root`.
+After the double-fire fix, sprite_4 still doesn't advance to frame 1
+to fire `script_4` ("frm2 of mc_red"). Instead `script_7` (root frame 3)
+runs and reads `mc_red.x = "as_in_frm3_of_root"` (set by script_6 at root
+frame 2). This is Phase 6 (drain ordering — sprite scripts must fire
+between root frame deferred drains) and/or sprite-level goto handling
+during root catch-up. Out of scope for this fix.
 
 ### 2026-04-25 fix — natural backward wrap-back cleanup (Phase 1, partial)
 
