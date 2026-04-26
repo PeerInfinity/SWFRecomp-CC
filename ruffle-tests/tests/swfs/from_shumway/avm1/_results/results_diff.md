@@ -1,26 +1,26 @@
 # Ruffle Test Results Diff
 
-**Previous:** `8ec3f4779e37` (2026-04-26T20:52:13.121953+00:00)
-**Current:** `1f111219fa91` (2026-04-26T22:53:16.462630+00:00)
+**Previous:** `1f111219fa91` (2026-04-26T22:53:16.462630+00:00)
+**Current:** `ffd6f66ead1f` (2026-04-26T23:03:07.605407+00:00)
 
 ## Summary
 
 | Metric | Previous | Current | Delta |
 |--------|----------|---------|-------|
-| Passing | 45 | 44 | -1 |
+| Passing | 44 | 45 | +1 |
 | Total | 47 | 47 | 0 |
-| Pass rate | 95.7% | 93.6% | -2.1% |
-| Mismatched lines | 8 | 2 | -6 |
-|   Decreased | | | -6 |
+| Pass rate | 93.6% | 95.7% | +2.1% |
+| Mismatched lines | 2 | 8 | +6 |
+|   Increased | | | +6 |
 
-## Newly Failing (1)
+## Newly Passing (1)
 
-| Test | New Status | Lines (prev) | Lines (now) |
-|------|-----------|--------------|-------------|
-| `levels` | compile_fail | 9/9 | - |
+| Test | Previous Status | Lines (prev) | Lines (now) |
+|------|----------------|--------------|-------------|
+| `levels` | compile_fail | - | 9/9 |
 
 ## Status Changed (1)
 
 | Test | Previous | Current | Lines (prev) | Lines (now) |
 |------|----------|---------|--------------|-------------|
-| `moviecliploader` | output_mismatch | compile_fail | 1/7 | - |
+| `moviecliploader` | compile_fail | output_mismatch | - | 1/7 |

@@ -1,29 +1,29 @@
 {
   "metadata": {
-    "old_timestamp": "2026-04-26T20:52:13.142497+00:00",
-    "old_git_sha": "8ec3f4779e37bb3d6b034b7d5332460de9ab4c7d",
-    "new_timestamp": "2026-04-26T22:53:16.481073+00:00",
-    "new_git_sha": "1f111219fa91001c62a5b518122e7e5b1029e459",
+    "old_timestamp": "2026-04-26T22:53:16.481073+00:00",
+    "old_git_sha": "1f111219fa91001c62a5b518122e7e5b1029e459",
+    "new_timestamp": "2026-04-26T23:03:07.628255+00:00",
+    "new_git_sha": "ffd6f66ead1f4bc2822446cfbce686894a430f41",
     "partial": false,
     "same_commit": false
   },
   "summary": {
     "old_pass": 46,
-    "old_ruffle_matched": 12,
-    "old_effective_pass": 58,
+    "old_ruffle_matched": 11,
+    "old_effective_pass": 57,
     "old_total": 102,
     "old_pass_rate": 45.1,
     "new_pass": 46,
-    "new_ruffle_matched": 11,
-    "new_effective_pass": 57,
+    "new_ruffle_matched": 12,
+    "new_effective_pass": 58,
     "new_total": 102,
     "new_pass_rate": 45.1,
-    "old_mismatched_lines": 2073,
-    "new_mismatched_lines": 1968,
-    "increased_mismatches": 0,
-    "decreased_mismatches": 105,
-    "newly_passing": 0,
-    "newly_failing": 1,
+    "old_mismatched_lines": 1968,
+    "new_mismatched_lines": 2073,
+    "increased_mismatches": 105,
+    "decreased_mismatches": 0,
+    "newly_passing": 1,
+    "newly_failing": 0,
     "status_changed": 5,
     "unchanged": 97,
     "added": 0,
@@ -33,62 +33,62 @@
     {
       "test": "DragDropTest",
       "change_type": "changed",
-      "old_status": "output_mismatch",
-      "new_status": "compile_fail",
-      "old_lines": {
+      "old_status": "compile_fail",
+      "new_status": "output_mismatch",
+      "old_lines": null,
+      "new_lines": {
         "actual_lines": 45,
         "expected_lines": 44,
         "matching_lines": 27
-      },
-      "new_lines": null
+      }
     },
     {
       "test": "Version4Loader",
       "change_type": "changed",
-      "old_status": "output_mismatch",
-      "new_status": "compile_fail",
-      "old_lines": {
+      "old_status": "compile_fail",
+      "new_status": "output_mismatch",
+      "old_lines": null,
+      "new_lines": {
         "actual_lines": 0,
         "expected_lines": 11,
         "matching_lines": 0
-      },
-      "new_lines": null
+      }
     },
     {
       "test": "attachExtImported",
       "change_type": "changed",
-      "old_status": "ruffle_matched",
-      "new_status": "compile_fail",
-      "old_lines": {
+      "old_status": "compile_fail",
+      "new_status": "ruffle_matched",
+      "old_lines": null,
+      "new_lines": {
         "actual_lines": 2,
         "expected_lines": 2,
         "matching_lines": 1
-      },
-      "new_lines": null
+      }
     },
     {
       "test": "attachImported",
       "change_type": "changed",
-      "old_status": "output_mismatch",
-      "new_status": "compile_fail",
-      "old_lines": {
+      "old_status": "compile_fail",
+      "new_status": "output_mismatch",
+      "old_lines": null,
+      "new_lines": {
         "actual_lines": 2,
         "expected_lines": 2,
         "matching_lines": 1
-      },
-      "new_lines": null
+      }
     },
     {
       "test": "loading/loadMovieTest",
       "change_type": "changed",
-      "old_status": "output_mismatch",
-      "new_status": "compile_fail",
-      "old_lines": {
+      "old_status": "compile_fail",
+      "new_status": "output_mismatch",
+      "old_lines": null,
+      "new_lines": {
         "actual_lines": 5,
         "expected_lines": 80,
         "matching_lines": 5
-      },
-      "new_lines": null
+      }
     }
   ]
 }

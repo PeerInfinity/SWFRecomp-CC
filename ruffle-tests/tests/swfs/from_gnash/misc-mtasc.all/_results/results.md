@@ -1,10 +1,10 @@
 # Ruffle Test Results (Unfiltered)
 
-**Date**: 2026-04-26 22:53 UTC
+**Date**: 2026-04-26 23:03 UTC
 
-**Git SHA**: `1f111219fa`
+**Git SHA**: `ffd6f66ead`
 
-**Run Duration**: 0m 2s
+**Run Duration**: 0m 4s
 
 ## Summary
 
@@ -15,15 +15,15 @@
 | Ruffle-matched | 1 (diffs ⊆ Ruffle's against Flash) |
 | Effective pass | **8** (88.9%) |
 | Failing | 1 |
-| Total expected lines | 163 |
-| Matching lines | 162 (99.4%) |
-| Mismatched lines | 1 |
+| Total expected lines | 231 |
+| Matching lines | 205 (88.7%) |
+| Mismatched lines | 26 |
 
 ### Failure Breakdown
 
 | Category | Count | % of Failures |
 |----------|-------|---------------|
-| Compile Fail | 1 | 100.0% |
+| Output Mismatch | 1 | 100.0% |
 
 ## Passing Tests
 
@@ -32,9 +32,9 @@
 | # | Test | Lines | Duration | Notes |
 |---|------|-------|----------|-------|
 | 1 | `enum` | 19 | 0.2s |  |
-| 2 | `exception` | 35 | 0.2s |  |
+| 2 | `exception` | 35 | 0.1s |  |
 | 3 | `function_test` | 26 | 0.2s |  |
-| 4 | `hello` | 8 | 0.2s |  |
+| 4 | `hello` | 8 | 0.1s |  |
 | 5 | `implementsOpTest` | 28 | 0.2s |  |
 | 6 | `inheritance` | 22 | 0.2s |  |
 | 7 | `super_test1` | 17 | 0.2s |  |
@@ -51,9 +51,11 @@
 
 Tests with output mismatch but >= 50% line match rate (low-hanging fruit).
 
-**0 tests** within reach
+**1 tests** within reach
 
-No tests above 50% match threshold.
+| # | Test | Match Rate | Matching | Total | Diff Lines | Notes |
+|---|------|------------|----------|-------|------------|-------|
+| 1 | `levels` | 63.2% | 43 | 68 | 25 |  |
 
 ## Segfaults
 
@@ -69,6 +71,8 @@ No timeouts.
 
 ## All Output Mismatches
 
-**0 tests** with output mismatch, sorted by match rate (best first)
+**1 tests** with output mismatch, sorted by match rate (best first)
 
-No output mismatches.
+| # | Test | Match Rate | Matching/Total | Actual | Expected | Notes |
+|---|------|------------|----------------|--------|----------|-------|
+| 1 | `levels` | 63.2% | 43/68 | 68 | 68 |  |
