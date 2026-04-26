@@ -1,10 +1,10 @@
 # Ruffle Test Results (Filtered)
 
-**Date**: 2026-04-26 01:47 UTC
+**Date**: 2026-04-26 02:17 UTC
 
-**Git SHA**: `5e68e30951`
+**Git SHA**: `8e02f3d3f0`
 
-**Run Duration**: 1m 25s
+**Run Duration**: 3m 24s
 
 **Filtered**: 0 tests ignored out of 190 available
 
@@ -36,11 +36,11 @@
 | 1 | `Accessibility-v5` | 15 | 0.2s |  |
 | 2 | `Accessibility-v6` | 19 | 0.2s |  |
 | 3 | `Accessibility-v7` | 19 | 0.2s |  |
-| 4 | `Accessibility-v8` | 19 | 0.2s |  |
+| 4 | `Accessibility-v8` | 19 | 0.3s |  |
 | 5 | `AsBroadcaster-v5` | 11 | 0.2s |  |
 | 6 | `BitmapData-v5` | 7 | 0.2s |  |
 | 7 | `BitmapData-v6` | 7 | 0.2s |  |
-| 8 | `BitmapData-v7` | 7 | 0.2s |  |
+| 8 | `BitmapData-v7` | 7 | 0.3s |  |
 | 9 | `Boolean-v5` | 38 | 0.2s |  |
 | 10 | `Boolean-v6` | 38 | 0.2s |  |
 | 11 | `Boolean-v7` | 38 | 0.2s |  |
@@ -50,22 +50,22 @@
 | 15 | `Color-v6` | 171 | 0.2s |  |
 | 16 | `Color-v7` | 161 | 0.2s |  |
 | 17 | `Color-v8` | 161 | 0.2s |  |
-| 18 | `ColorTransform-v5` | 7 | 0.2s |  |
+| 18 | `ColorTransform-v5` | 7 | 0.4s |  |
 | 19 | `ColorTransform-v6` | 7 | 0.2s |  |
 | 20 | `ColorTransform-v7` | 7 | 0.2s |  |
 | 21 | `ColorTransform-v8` | 55 | 0.2s |  |
 | 22 | `ContextMenu-v5` | 7 | 0.2s |  |
-| 23 | `ContextMenu-v6` | 7 | 0.6s |  |
-| 24 | `Error-v5` | 28 | 0.2s |  |
-| 25 | `Error-v6` | 31 | 0.2s |  |
-| 26 | `Error-v7` | 31 | 0.2s |  |
-| 27 | `Error-v8` | 31 | 0.2s |  |
-| 28 | `ExternalInterface-v5` | 7 | 0.2s |  |
-| 29 | `Key-v5` | 51 | 0.2s |  |
-| 30 | `Key-v6` | 55 | 0.2s |  |
-| 31 | `Key-v7` | 55 | 0.2s |  |
-| 32 | `Key-v8` | 55 | 0.2s |  |
-| 33 | `LoadVars-v5` | 8 | 0.2s |  |
+| 23 | `ContextMenu-v6` | 7 | 0.2s |  |
+| 24 | `Error-v5` | 28 | 2.3s |  |
+| 25 | `Error-v6` | 31 | 2.4s |  |
+| 26 | `Error-v7` | 31 | 1.9s |  |
+| 27 | `Error-v8` | 31 | 1.3s |  |
+| 28 | `ExternalInterface-v5` | 7 | 1.9s |  |
+| 29 | `Key-v5` | 51 | 2.7s |  |
+| 30 | `Key-v6` | 55 | 2.7s |  |
+| 31 | `Key-v7` | 55 | 2.4s |  |
+| 32 | `Key-v8` | 55 | 1.3s |  |
+| 33 | `LoadVars-v5` | 8 | 1.9s |  |
 | 34 | `LocalConnection-v5` | 7 | 0.2s |  |
 | 35 | `LocalConnection-v6` | 58 | 0.2s |  |
 | 36 | `LocalConnection-v7` | 58 | 0.2s |  |
@@ -90,19 +90,19 @@
 | 55 | `Point-v6` | 7 | 0.2s |  |
 | 56 | `Point-v7` | 7 | 0.2s |  |
 | 57 | `Point-v8` | 193 | 0.2s |  |
-| 58 | `Random-v5` | 30 | 0.2s |  |
+| 58 | `Random-v5` | 30 | 0.3s |  |
 | 59 | `Random-v6` | 30 | 0.2s |  |
-| 60 | `Random-v7` | 30 | 0.2s |  |
-| 61 | `Random-v8` | 30 | 0.2s |  |
-| 62 | `Rectangle-v5` | 7 | 0.4s |  |
-| 63 | `Rectangle-v6` | 7 | 0.5s |  |
-| 64 | `Rectangle-v7` | 7 | 0.6s |  |
-| 65 | `Selection-v5` | 21 | 1.6s |  |
+| 60 | `Random-v7` | 30 | 0.3s |  |
+| 61 | `Random-v8` | 30 | 0.3s |  |
+| 62 | `Rectangle-v5` | 7 | 0.2s |  |
+| 63 | `Rectangle-v6` | 7 | 0.2s |  |
+| 64 | `Rectangle-v7` | 7 | 0.2s |  |
+| 65 | `Selection-v5` | 21 | 0.2s |  |
 | 66 | `Stage-v5` | 38 | 0.2s |  |
-| 67 | `System-v5` | 67 | 0.2s |  |
-| 68 | `System-v6` | 100 | 0.2s |  |
-| 69 | `System-v7` | 101 | 0.2s |  |
-| 70 | `System-v8` | 101 | 0.2s |  |
+| 67 | `System-v5` | 67 | 3.1s |  |
+| 68 | `System-v6` | 100 | 3.9s |  |
+| 69 | `System-v7` | 101 | 4.0s |  |
+| 70 | `System-v8` | 101 | 1.3s |  |
 | 71 | `TextFieldHTML-v5` | 6 | 0.2s |  |
 | 72 | `TextFieldHTML-v6` | 37 | 0.2s |  |
 | 73 | `TextFieldHTML-v7` | 37 | 0.2s |  |
@@ -110,22 +110,22 @@
 | 75 | `TextFormat-v5` | 128 | 0.2s |  |
 | 76 | `TextFormat-v6` | 128 | 0.2s |  |
 | 77 | `TextSnapshot-v5` | 7 | 0.2s |  |
-| 78 | `TextSnapshot-v6` | 173 | 0.2s |  |
+| 78 | `TextSnapshot-v6` | 173 | 0.3s |  |
 | 79 | `TextSnapshot-v7` | 173 | 0.2s |  |
-| 80 | `TextSnapshot-v8` | 173 | 0.3s |  |
+| 80 | `TextSnapshot-v8` | 173 | 0.2s |  |
 | 81 | `Transform-v5` | 7 | 0.2s |  |
-| 82 | `Transform-v6` | 7 | 0.2s |  |
-| 83 | `Transform-v7` | 7 | 0.2s |  |
-| 84 | `Try-v5` | 20 | 0.2s |  |
-| 85 | `Try-v6` | 20 | 0.2s |  |
-| 86 | `Try-v7` | 20 | 0.2s |  |
-| 87 | `Try-v8` | 20 | 0.2s |  |
-| 88 | `Video-v5` | 7 | 0.2s |  |
-| 89 | `Video-v6` | 85 | 0.2s |  |
-| 90 | `Video-v7` | 85 | 0.2s |  |
-| 91 | `Video-v8` | 85 | 0.2s |  |
-| 92 | `XMLSocket-v5` | 35 | 0.2s |  |
-| 93 | `XMLSocket-v6` | 35 | 0.2s |  |
+| 82 | `Transform-v6` | 7 | 1.9s |  |
+| 83 | `Transform-v7` | 7 | 1.5s |  |
+| 84 | `Try-v5` | 20 | 2.7s |  |
+| 85 | `Try-v6` | 20 | 0.6s |  |
+| 86 | `Try-v7` | 20 | 2.4s |  |
+| 87 | `Try-v8` | 20 | 1.3s |  |
+| 88 | `Video-v5` | 7 | 2.0s |  |
+| 89 | `Video-v6` | 85 | 3.5s |  |
+| 90 | `Video-v7` | 85 | 3.0s |  |
+| 91 | `Video-v8` | 85 | 1.4s |  |
+| 92 | `XMLSocket-v5` | 35 | 2.5s |  |
+| 93 | `XMLSocket-v6` | 35 | 2.5s |  |
 | 94 | `XMLSocket-v7` | 35 | 0.2s |  |
 | 95 | `XMLSocket-v8` | 35 | 0.2s |  |
 | 96 | `argstest-v5` | 4 | 0.2s |  |
@@ -134,18 +134,18 @@
 | 99 | `delete-v6` | 60 | 0.2s |  |
 | 100 | `delete-v7` | 60 | 0.2s |  |
 | 101 | `delete-v8` | 60 | 0.2s |  |
-| 102 | `enumerate-v5` | 6 | 0.2s |  |
-| 103 | `enumerate-v6` | 49 | 0.2s |  |
-| 104 | `enumerate-v7` | 49 | 0.2s |  |
-| 105 | `enumerate-v8` | 49 | 0.2s |  |
-| 106 | `flash-v5` | 10 | 0.2s |  |
-| 107 | `flash-v6` | 10 | 0.2s |  |
+| 102 | `enumerate-v5` | 6 | 1.9s |  |
+| 103 | `enumerate-v6` | 49 | 3.0s |  |
+| 104 | `enumerate-v7` | 49 | 2.5s |  |
+| 105 | `enumerate-v8` | 49 | 1.3s |  |
+| 106 | `flash-v5` | 10 | 1.9s |  |
+| 107 | `flash-v6` | 10 | 1.9s |  |
 | 108 | `flash-v7` | 10 | 0.2s |  |
-| 109 | `swap-v5` | 7 | 0.2s |  |
+| 109 | `swap-v5` | 7 | 0.3s |  |
 | 110 | `swap-v6` | 7 | 0.2s |  |
 | 111 | `swap-v7` | 7 | 0.2s |  |
 | 112 | `swap-v8` | 7 | 0.2s |  |
-| 113 | `targetPath-v5` | 12 | 0.2s |  |
+| 113 | `targetPath-v5` | 12 | 0.3s |  |
 
 ## Ruffle-Matched Tests
 
@@ -161,39 +161,39 @@
 | 6 | `Camera-v6` | 57 | 57 | 0.2s |  |
 | 7 | `Camera-v7` | 57 | 57 | 0.2s |  |
 | 8 | `Camera-v8` | 57 | 57 | 0.2s |  |
-| 9 | `ExternalInterface-v8` | 4 | 4 | 0.2s |  |
+| 9 | `ExternalInterface-v8` | 4 | 4 | 4.5s |  |
 | 10 | `Inheritance-v5` | 1 | 17 | 0.2s |  |
 | 11 | `Inheritance-v6` | 9 | 16 | 0.2s |  |
 | 12 | `Inheritance-v7` | 5 | 10 | 0.2s |  |
 | 13 | `Inheritance-v8` | 5 | 10 | 0.2s |  |
-| 14 | `LoadVars-v6` | 6 | 21 | 0.2s |  |
-| 15 | `LoadVars-v7` | 6 | 21 | 0.2s |  |
-| 16 | `LoadVars-v8` | 6 | 21 | 0.2s |  |
-| 17 | `Math-v5` | 5 | 5 | 0.2s |  |
+| 14 | `LoadVars-v6` | 6 | 21 | 0.3s |  |
+| 15 | `LoadVars-v7` | 6 | 21 | 0.3s |  |
+| 16 | `LoadVars-v8` | 6 | 21 | 0.3s |  |
+| 17 | `Math-v5` | 5 | 5 | 0.3s |  |
 | 18 | `Math-v6` | 5 | 5 | 0.2s |  |
 | 19 | `Math-v7` | 5 | 5 | 0.2s |  |
 | 20 | `Math-v8` | 5 | 5 | 0.2s |  |
 | 21 | `Matrix-v6` | 29 | 71 | 0.2s |  |
-| 22 | `Matrix-v7` | 28 | 70 | 0.2s |  |
+| 22 | `Matrix-v7` | 28 | 70 | 0.3s |  |
 | 23 | `Matrix-v8` | 28 | 70 | 0.2s |  |
 | 24 | `Microphone-v6` | 31 | 31 | 0.2s |  |
 | 25 | `Microphone-v7` | 31 | 31 | 0.2s |  |
 | 26 | `Microphone-v8` | 31 | 31 | 0.2s |  |
 | 27 | `MovieClipLoader-v7` | 118 | 118 | 0.2s |  |
 | 28 | `MovieClipLoader-v8` | 118 | 118 | 0.2s |  |
-| 29 | `Rectangle-v8` | 21 | 21 | 0.2s |  |
-| 30 | `Selection-v6` | 7 | 13 | 4.2s |  |
-| 31 | `Selection-v7` | 7 | 13 | 3.9s |  |
-| 32 | `Selection-v8` | 7 | 13 | 1.1s |  |
-| 33 | `Sound-v5` | 27 | 27 | 17.0s |  |
-| 34 | `Sound-v6` | 30 | 51 | 4.2s |  |
+| 29 | `Rectangle-v8` | 21 | 21 | 0.3s |  |
+| 30 | `Selection-v6` | 7 | 13 | 0.2s |  |
+| 31 | `Selection-v7` | 7 | 13 | 0.2s |  |
+| 32 | `Selection-v8` | 7 | 13 | 0.2s |  |
+| 33 | `Sound-v5` | 27 | 27 | 0.4s |  |
+| 34 | `Sound-v6` | 30 | 51 | 0.4s |  |
 | 35 | `Sound-v7` | 28 | 51 | 0.4s |  |
-| 36 | `Sound-v8` | 28 | 51 | 0.3s |  |
+| 36 | `Sound-v8` | 28 | 51 | 0.4s |  |
 | 37 | `String-v5` | 19 | 21 | 0.3s |  |
 | 38 | `String-v6` | 10 | 10 | 0.3s |  |
 | 39 | `String-v7` | 10 | 10 | 0.3s |  |
-| 40 | `String-v8` | 10 | 10 | 0.2s |  |
-| 41 | `TextField-v5` | 3 | 3 | 0.2s |  |
+| 40 | `String-v8` | 10 | 10 | 16.4s |  |
+| 41 | `TextField-v5` | 3 | 3 | 1.9s |  |
 | 42 | `case-v7` | 54 | 54 | 0.2s |  |
 | 43 | `case-v8` | 54 | 54 | 0.2s |  |
 | 44 | `ops-v8` | 7 | 11 | 0.2s |  |
@@ -202,12 +202,12 @@
 | 47 | `targetPath-v8` | 17 | 17 | 0.2s |  |
 | 48 | `toString_valueOf-v5` | 34 | 34 | 0.2s |  |
 | 49 | `toString_valueOf-v6` | 5 | 5 | 0.2s |  |
-| 50 | `toString_valueOf-v7` | 5 | 5 | 0.3s |  |
-| 51 | `toString_valueOf-v8` | 5 | 5 | 0.2s |  |
-| 52 | `with-v5` | 42 | 42 | 0.2s |  |
-| 53 | `with-v6` | 91 | 91 | 0.2s |  |
-| 54 | `with-v7` | 91 | 91 | 0.2s |  |
-| 55 | `with-v8` | 91 | 91 | 0.2s |  |
+| 50 | `toString_valueOf-v7` | 5 | 5 | 5.6s |  |
+| 51 | `toString_valueOf-v8` | 5 | 5 | 1.4s |  |
+| 52 | `with-v5` | 42 | 42 | 3.6s |  |
+| 53 | `with-v6` | 91 | 91 | 4.6s |  |
+| 54 | `with-v7` | 91 | 91 | 4.3s |  |
+| 55 | `with-v8` | 91 | 91 | 1.6s |  |
 
 ## Near-Passing Tests
 

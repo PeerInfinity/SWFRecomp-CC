@@ -3,9 +3,9 @@
 *Tests on the [ignored list](ruffle-tests/ignored_tests.txt) are excluded.*  
 *See [RUFFLE_RESULTS.md](RUFFLE_RESULTS.md) for unfiltered results.*
 
-**Commit:** `5e68e309518f`  
-**Date:** 2026-04-26 01:47 UTC  
-**Total duration:** 8m57s
+**Commit:** `8e02f3d3f007`  
+**Date:** 2026-04-26 02:17 UTC  
+**Total duration:** 26m17s
 
 ## Results by Suite
 
@@ -29,13 +29,13 @@
 |-------|--------:|---------:|---------:|
 | avm1 | 94,915 | 95,093 | 99.8% |
 | from_gnash/actionscript.all | 14,757 | 16,957 | 87.0% |
-| from_gnash/misc-ming.all | 2,432 | 4,541 | 53.6% |
+| from_gnash/misc-ming.all | 2,428 | 4,541 | 53.5% |
 | from_gnash/misc-mtasc.all | 205 | 231 | 88.7% |
 | from_gnash/misc-swfc.all | 262 | 499 | 52.5% |
 | from_gnash/misc-swfmill.all | 47 | 51 | 92.2% |
 | from_shumway | 662 | 1,276 | 51.9% |
 | from_shumway/avm1 | 480 | 480 | 100% |
-| **Total** | **113,760** | **119,128** | **95.5%** |
+| **Total** | **113,756** | **119,128** | **95.5%** |
 
 ## Failure Breakdown
 
@@ -58,7 +58,6 @@ Tests with `output_mismatch` status but ≥80% of expected lines matching.
 | Suite | Test | Match Rate |
 |-------|------|----------:|
 | from_gnash/misc-swfc.all | sound | 100% |
-| from_gnash/misc-ming.all | loop/loop_test8 | 97% |
 | from_gnash/actionscript.all | Number-v5 | 95% |
 | from_gnash/misc-swfc.all | movieclip_destruction_test2 | 93% |
 | from_gnash/actionscript.all | array-v5 | 91% |
@@ -85,56 +84,56 @@ Tests verified against Flash's actual output (`output.flash.txt`).
 
 - **Pass:** 596/600 (99.3%)
 - **Ignored:** 41 tests
-- **Duration:** 5m02s across 30 shards
+- **Duration:** 11m22s across 30 shards
 - **Lines:** 94,915/95,093 matching (99.8%)
-- **Avg test duration:** 0.4s — slowest: `movieclip_begin_gradient_fill` (14.9s)
+- **Avg test duration:** 1.0s — slowest: `stage_object_properties_swf6` (19.4s)
 
 ### from_gnash/actionscript.all
 
 - **Pass:** 113/190 (59.5%)
-- **Duration:** 1m24s across 30 shards
+- **Duration:** 3m24s across 30 shards
 - **Lines:** 14,757/16,957 matching (87.0%)
-- **Avg test duration:** 0.4s — slowest: `Sound-v5` (17.0s)
+- **Avg test duration:** 1.0s — slowest: `String-v8` (16.4s)
 
 ### from_gnash/misc-ming.all
 
 - **Pass:** 44/102 (43.1%)
-- **Duration:** 1m05s across 30 shards
-- **Lines:** 2,432/4,541 matching (53.6%)
-- **Avg test duration:** 0.6s — slowest: `loop/loop_test10` (14.9s)
+- **Duration:** 4m23s across 30 shards
+- **Lines:** 2,428/4,541 matching (53.5%)
+- **Avg test duration:** 2.5s — slowest: `action_order/ActionOrderTest4` (20.4s)
 
 ### from_gnash/misc-mtasc.all
 
 - **Pass:** 7/9 (77.8%)
-- **Duration:** 2s across 30 shards
+- **Duration:** 7s across 30 shards
 - **Lines:** 205/231 matching (88.7%)
-- **Avg test duration:** 0.2s — slowest: `levels` (0.2s)
+- **Avg test duration:** 0.7s — slowest: `implementsOpTest` (2.1s)
 
 ### from_gnash/misc-swfc.all
 
 - **Pass:** 5/16 (31.2%)
-- **Duration:** 4s across 30 shards
+- **Duration:** 43s across 30 shards
 - **Lines:** 262/499 matching (52.5%)
-- **Avg test duration:** 0.2s — slowest: `movieclip_destruction_test1` (0.2s)
+- **Avg test duration:** 2.6s — slowest: `movieclip_destruction_test4` (19.3s)
 
 ### from_gnash/misc-swfmill.all
 
 - **Pass:** 15/18 (83.3%)
-- **Duration:** 5s across 30 shards
+- **Duration:** 56s across 30 shards
 - **Lines:** 47/51 matching (92.2%)
-- **Avg test duration:** 0.2s — slowest: `zeroframe_definesprite` (1.0s)
+- **Avg test duration:** 3.0s — slowest: `dict_override` (17.8s)
 
 ### from_shumway
 
 - **Pass:** 63/92 (68.5%)
-- **Duration:** 1m03s across 30 shards
+- **Duration:** 4m45s across 30 shards
 - **Lines:** 662/1,276 matching (51.9%)
-- **Avg test duration:** 0.6s — slowest: `fuzz/0cde3acaa5116dac19bf73b0b76556223ad9328a367e04ec9cab733bc6765d82` (14.9s)
+- **Avg test duration:** 3.0s — slowest: `fuzz/42f71d860e22e456a9bd61c2d9e8c8da9536152b879a131dd7a400ff61a4a3e3` (19.4s)
 
 ### from_shumway/avm1
 
 - **Pass:** 45/45 (100%)
 - **Ignored:** 2 tests
-- **Duration:** 11s across 30 shards
+- **Duration:** 35s across 30 shards
 - **Lines:** 480/480 matching (100%)
-- **Avg test duration:** 0.2s — slowest: `setinterval` (0.8s)
+- **Avg test duration:** 0.7s — slowest: `label` (17.9s)
