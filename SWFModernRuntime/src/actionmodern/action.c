@@ -19150,6 +19150,27 @@ void actionQueueClipActionUnload(void (*fn)(SWFAppContext*), MovieClip* mc)
 	                    AQ_PRIORITY_NORMAL, NULL, /*is_unload=*/1);
 }
 
+// Same as actionQueueClipActionUnload but queues with kind=SCRIPT (is_unload=0).
+// Used by the backward-rewind clear-and-replace path in tagPlaceObject2 /
+// tagPlaceObject2Ratio: the clip-event UNLOAD needs to fire AFTER the calling
+// gotoAndStop/Play script and the remaining queued root scripts (loop_test8
+// trailing mc5unloaded after totals()). Queueing with is_unload=1 would let
+// tagShowFrame's actionFirePendingUnloads drain it during the goto rewind
+// itself — too early. Queueing as SCRIPT lets it ride the same FIFO drain
+// (actionDrainOnloadAndScript) that the calling script came from, landing
+// after all already-queued scripts.
+void actionQueueClipActionUnloadDeferred(void (*fn)(SWFAppContext*), MovieClip* mc)
+{
+	if (fn == NULL) return;
+	PendingClipAction* pca = (PendingClipAction*) malloc(sizeof(PendingClipAction));
+	if (pca == NULL) return;
+	pca->fn = fn;
+	pca->mc = mc;
+	actionQueueCallbackEx(NULL, aq_dispatch_clip_action, (void*)pca,
+	                      AQ_PRIORITY_NORMAL, NULL, /*is_unload=*/0,
+	                      AQ_KIND_SCRIPT);
+}
+
 // Recursively queue onUnload handlers for children of a removed MovieClip.
 // When a parent MC is removed, all its children are also removed and their
 // onUnload handlers should fire. Children are NOT marked as removed here

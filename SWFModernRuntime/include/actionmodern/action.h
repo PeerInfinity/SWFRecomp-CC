@@ -136,6 +136,12 @@ void actionFirePendingUnloads(SWFAppContext* app_context);
 // Enqueue a tag-level CLIP_EVENT_UNLOAD clip-action callback. The action fn pointer is recompiler-emitted
 // static code; mc is captured for g_current_context restore at drain time.
 void actionQueueClipActionUnload(void (*fn)(SWFAppContext*), MovieClip* mc);
+// Same payload as actionQueueClipActionUnload, but queued with kind=SCRIPT
+// (is_unload=0) so it doesn't drain via actionFirePendingUnloads during a
+// goto rewind's nested tagShowFrame. Used by the tagPlaceObject2 backward-
+// rewind clear-and-replace path so the displaced MC's UNLOAD trace lands
+// after the calling script (loop_test8 trailing mc5unloaded after totals()).
+void actionQueueClipActionUnloadDeferred(void (*fn)(SWFAppContext*), MovieClip* mc);
 // Queue AS-level onUnload handlers on dynamic children of a MovieClip being removed.
 // Handles clones + createEmptyMovieClip children that live in child_mc_cache (not the
 // parent sprite's display_list). Called by tagRemoveObject2 before the parent's own

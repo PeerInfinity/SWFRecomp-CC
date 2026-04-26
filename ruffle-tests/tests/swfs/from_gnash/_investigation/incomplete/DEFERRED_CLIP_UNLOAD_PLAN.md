@@ -42,23 +42,37 @@ Phases 1-5 implemented. Net impact:
 
 ### 2026-04-25 — loop_test8 trailing mc5unloaded fixed
 
-Two-part fix in `SWFModernRuntime/src/libswf/tag.c`:
+Two-part fix:
 
-1. `tagPlaceObject2` / `tagPlaceObject2Ratio` backward-rewind clear-and-replace
-   path now queues clip-action UNLOAD callbacks (current + accumulated +
-   recursive child unloads) BEFORE marking the displaced MC pending-removal.
-   Previously only `actionMarkMCPendingRemoval` ran, dropping the
-   CLIP_EVENT_UNLOAD trace entirely. Mirrors the existing `tagRemoveObject2`
-   path (lines 4863-4900). See `loop_test8` trailing `_level0.mc5unloaded`
-   (frame 6 gotoAndStop(3) replaces mc5 with mc3 — different ratio, so mc5
-   doesn't survive_rewind and its UNLOAD must fire after totals()).
+1. New `actionQueueClipActionUnloadDeferred` helper in
+   `SWFModernRuntime/src/actionmodern/action.c` queues a clip-action UNLOAD
+   callback as `kind=SCRIPT, is_unload=0` (instead of the existing
+   `actionQueueClipActionUnload`'s `kind=ONLOAD, is_unload=1`). This makes
+   the entry invisible to `actionFirePendingUnloads` (which filters
+   `is_unload=1`) so the nested `tagShowFrame` inside
+   `ng_executeGotoCatchUp`'s per-frame replay doesn't drain it mid-rewind.
+   The entry rides the outer `actionDrainOnloadAndScript` FIFO instead,
+   landing after the calling gotoAndStop/Play script and remaining queued
+   root scripts.
 
-2. `tagShowFrame` now skips `actionFirePendingUnloads` when `catch_up_mode`
-   is set. Without this gate, UNLOAD callbacks queued during the rewind
-   (each replayed frame calls tagShowFrame internally) drain immediately
-   on the next replayed frame instead of deferring to the outer
-   `actionDrainOnloadAndScript` — landing in the middle of post-goto
-   check_equals scripts instead of after totals().
+2. `tagPlaceObject2` / `tagPlaceObject2Ratio`
+   (`SWFModernRuntime/src/libswf/tag.c`) backward-rewind clear-and-replace
+   path now calls `actionQueueClipActionUnloadDeferred` for the displaced
+   MC's clip-action UNLOAD bits (current + accumulated) BEFORE
+   `actionMarkMCPendingRemoval`. Previously only the Mark ran, dropping
+   the CLIP_EVENT_UNLOAD trace entirely. Recursive child unloads are
+   intentionally not fired here (would need a similar "deferred" variant;
+   loop_test8's mc5 has no nested children needing UNLOAD).
+
+A first attempt added an `if (!catch_up_mode)` gate around
+`actionFirePendingUnloads` in `tagShowFrame` to suppress the mid-rewind
+drain, but that regressed `reverse_execute_PlaceObject2_test2`
+(10/10 → 5/10) because run_pending_finalize stopped firing during the
+rewind, leaving display_list[depth] populated and causing the rewind's
+tagPlaceObject2 to incorrectly survives_rewind the still-populated entry
+instead of fresh-placing it (so the second-cycle onLoad never fired).
+The Deferred variant approach avoids this by leaving the existing
+unload drain timing intact.
 
 Implementation summary:
 - `actionQueueClipActionUnload` queues recompiler-emitted clip-action UNLOAD callbacks via `AQ_KIND_ONLOAD` with `is_unload=1`. Used by `tagRemoveObject2`/`tagRemoveObject` and `fire_recursive_child_unloads`.
