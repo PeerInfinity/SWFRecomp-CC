@@ -4,7 +4,7 @@
 
 <!-- PLAN_META
 id: GOTO_FIFO_UNIFICATION
-status: blocked
+status: pending
 phases:
   - id: 1
     name: "ng_gotoFrameCurrentSprite: queue target sprite frame inline (mirror ng_gotoFrameByMC)"
@@ -26,8 +26,9 @@ phases:
     status: pending
 dependencies:
   - "Predecessor plan: GOTO_CATCHUP_HYGIENE_PLAN.md (in blocked/) — Phases 1–5 are landed, this plan picks up Phase 6"
-blocker:
-  - "Multi-session architectural rework: 8-12 hour estimate per plan, requires full CI regression battery to validate, and Phase 1 in isolation introduces measurable regressions (see Status Notes 2026-04-26)."
+  - "Foundation: DRAIN_SUPPRESS_PRIMITIVE_PLAN.md (complete/, commit d1cd1d1f) — provides actionDrainSuppressEnter/Leave used by Phase 2"
+prior_blocker_resolved:
+  - "2026-04-26: Path A (drain-suppress primitive) landed at commit d1cd1d1f, resolving the nested-drain re-entry hazard. Path B (Phases 1+2+3 atomic) is now unblocked."
 -->
 
 ## Problem statement

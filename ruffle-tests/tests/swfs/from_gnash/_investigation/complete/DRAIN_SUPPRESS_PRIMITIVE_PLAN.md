@@ -4,23 +4,43 @@
 
 <!-- PLAN_META
 id: DRAIN_SUPPRESS_PRIMITIVE
-status: pending
+status: complete
+landed_commit: d1cd1d1f
 phases:
   - id: 1
     name: "Add g_drain_suppress_depth counter + accessors in action_queue.c/.h"
-    status: pending
+    status: complete
   - id: 2
     name: "Make actionDrainOnloadAndScript early-return when depth > 0"
-    status: pending
+    status: complete
   - id: 3
     name: "Debug assert: depth == 0 at tick boundaries (start of frame loop iteration)"
-    status: pending
+    status: complete
   - id: 4
     name: "CI no-regression check"
-    status: pending
+    status: complete
 related:
-  - "GOTO_FIFO_UNIFICATION_PLAN.md (blocked/) — Path B will set the depth around ng_executeGotoCatchUp's inline funcs[target] call"
+  - "GOTO_FIFO_UNIFICATION_PLAN.md (incomplete/) — Path B uses these accessors to wrap ng_executeGotoCatchUp's inline funcs[target] call"
 -->
+
+## Status: Complete (2026-04-26, commit d1cd1d1f)
+
+CI run [24965640017](https://github.com/PeerInfinity/SWFRecomp-CC/actions/runs/24965640017)
+confirmed zero deltas across all 8 suites (avm1, from_gnash×5, from_shumway×2):
+
+| Suite | Pass rate (before / after) |
+|-------|----------------------------|
+| avm1 | 597/641 (93.1%) → 597/641 (93.1%) |
+| from_gnash/actionscript.all | 113/190 (59.5%) → 113/190 (59.5%) |
+| from_gnash/misc-ming.all | 46/102 (45.1%) → 46/102 (45.1%) |
+| from_gnash/misc-mtasc.all | 7/9 (77.8%) → 7/9 (77.8%) |
+| from_gnash/misc-swfc.all | 5/16 (31.2%) → 5/16 (31.2%) |
+| from_gnash/misc-swfmill.all | 15/18 (83.3%) → 15/18 (83.3%) |
+| from_shumway | 64/92 (69.6%) → 64/92 (69.6%) |
+| from_shumway/avm1 | 45/47 (95.7%) → 45/47 (95.7%) |
+
+The early-return branch is currently dead code — no call site sets the depth.
+Path B (`GOTO_FIFO_UNIFICATION_PLAN.md`) will be the first consumer.
 
 ## Why
 
