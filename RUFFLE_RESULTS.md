@@ -2,9 +2,9 @@
 
 *See [RUFFLE_RESULTS_FILTERED.md](RUFFLE_RESULTS_FILTERED.md) for results with ignored tests excluded.*
 
-**Commit:** `ffd6f66ead1f`  
-**Date:** 2026-04-26 23:03 UTC  
-**Total duration:** 7m02s
+**Commit:** `9527b780dd3e`  
+**Date:** 2026-04-26 23:34 UTC  
+**Total duration:** 18m18s
 
 ## Results by Suite
 
@@ -76,24 +76,9 @@ Tests with `output_mismatch` status but ≥80% of expected lines matching.
 
 ## Changes Since Last Run
 
-| Suite | Newly Passing | Newly Failing | Lines Improved | Lines Regressed |
-|-------|-------------:|-------------:|--------------:|----------------:|
-| avm1 | 52 | - | - | 11 |
-| from_gnash/actionscript.all | 168 | - | - | 2200 |
-| from_gnash/misc-ming.all | 1 | - | - | 105 |
-| from_gnash/misc-mtasc.all | - | - | - | 25 |
-| from_shumway | 1 | - | - | 6 |
-| from_shumway/avm1 | 1 | - | - | 6 |
+*No changes since last run.*
 
-**avm1 — newly passing:** `cross_movie_root`, `depth_replacement_audio_unloading`, `do_init_action_child`, `focusrect_property_swf5`, `focusrect_property_swf6`, `focusrect_property_swf7`, `global_swf5_6_7_8_9`, `global_swf6_7_8`, `hittest_winding_rule`, `instanceof_coercions`, `interface_implements_op`, `issue_2870`, `loadmovie`, `loadmovie_flashvars`, `loadmovie_method`, `loadmovie_registerclass`, `loadmovie_replace_root`, `loadmovie_var_persistence`, `loadmovienum`, `loadmovienum_cross_version_prototype`, `lock_root`, `mcl_events_swf_version`, `mcl_getprogress`, `mcl_loadclip`, `mcl_loadclip_properties`, `mcl_loadclip_replace_root`, `mcl_unloadclip`, `movieclip_blend_mode_property`, `movieclip_invalid_get_bounds_1`, `movieclip_invalid_get_bounds_2`, `movieclip_invalid_get_bounds_3`, `movieclip_invalid_get_bounds_4`, `movieclip_invalid_get_bounds_5`, `movieclip_invalid_get_bounds_6`, `movieclip_invalid_get_bounds_7`, `movieclip_invalid_get_bounds_8`, `movieclip_lockroot`, `movieclip_state_values`, `moviecliploader_flashvars`, `register_class`, `register_class_swf6`, `register_class_with_sound`, `resolve_different_root`, `string_paths_eval2`, `swf5_to_6_cross_call`, `swf5_xml_event_handler_context`, `swf6_to_5_cross_call`, `unloadmovie`, `unloadmovie_method`, `unloadmovienum`
-
-**from_gnash/actionscript.all — newly passing:** `Accessibility-v5`, `Accessibility-v6`, `Accessibility-v7`, `Accessibility-v8`, `AsBroadcaster-v5`, `BitmapData-v5`, `BitmapData-v6`, `BitmapData-v7`, `Boolean-v5`, `Boolean-v6`, `Boolean-v7`, `Boolean-v8`, `Camera-v5`, `Color-v5`, `Color-v6`, `Color-v7`, `Color-v8`, `ColorTransform-v5`, `ColorTransform-v6`, `ColorTransform-v7`, `ColorTransform-v8`, `ContextMenu-v5`, `ContextMenu-v6`, `Error-v5`, `Error-v6`, `Error-v7`, `Error-v8`, `ExternalInterface-v5`, `Key-v5`, `Key-v6`, `Key-v7`, `Key-v8`, `LoadVars-v5`, `LocalConnection-v5`, `LocalConnection-v6`, `LocalConnection-v7`, `LocalConnection-v8`, `Matrix-v5`, `Microphone-v5`, `Mouse-v5`, `Mouse-v6`, `Mouse-v7`, `Mouse-v8`, `MovieClipLoader-v5`, `MovieClipLoader-v6`, `NetConnection-v5`, `NetStream-v5`, `NetStream-v6`, `NetStream-v7`, `NetStream-v8`, `Number-v6`, `Number-v7`, `Number-v8`, `Point-v5`, `Point-v6`, `Point-v7`, `Point-v8`, `Random-v5`, `Random-v6`, `Random-v7`, `Random-v8`, `Rectangle-v5`, `Rectangle-v6`, `Rectangle-v7`, `Selection-v5`, `Stage-v5`, `System-v5`, `System-v6`, `System-v7`, `System-v8`, `TextFieldHTML-v5`, `TextFieldHTML-v6`, `TextFieldHTML-v7`, `TextFieldHTML-v8`, `TextFormat-v5`, `TextFormat-v6`, `TextSnapshot-v5`, `TextSnapshot-v6`, `TextSnapshot-v7`, `TextSnapshot-v8`, `Transform-v5`, `Transform-v6`, `Transform-v7`, `Try-v5`, `Try-v6`, `Try-v7`, `Try-v8`, `Video-v5`, `Video-v6`, `Video-v7`, `Video-v8`, `XMLSocket-v5`, `XMLSocket-v6`, `XMLSocket-v7`, `XMLSocket-v8`, `argstest-v5`, `case-v5`, `delete-v5`, `delete-v6`, `delete-v7`, `delete-v8`, `enumerate-v5`, `enumerate-v6`, `enumerate-v7`, `enumerate-v8`, `flash-v5`, `flash-v6`, `flash-v7`, `swap-v5`, `swap-v6`, `swap-v7`, `swap-v8`, `targetPath-v5`
-
-**from_shumway — newly passing:** `avm1/levels`
-
-**from_shumway/avm1 — newly passing:** `levels`
-
-*Comparing `1f111219fa91` → `ffd6f66ead1f`*
+*Comparing `ffd6f66ead1f` → `9527b780dd3e`*
 
 ## Flash-Spec Results
 
@@ -108,55 +93,55 @@ Tests verified against Flash's actual output (`output.flash.txt`).
 ### avm1
 
 - **Pass:** 597/641 (93.1%)
-- **Duration:** 3m38s across 30 shards
+- **Duration:** 8m27s across 30 shards
 - **Lines:** 105,851/114,749 matching (92.2%)
-- **Avg test duration:** 0.3s — slowest: `movieclip_invalid_get_bounds_6` (24.8s)
+- **Avg test duration:** 0.7s — slowest: `movieclip_invalid_get_bounds_6` (20.9s)
 
 ### from_gnash/actionscript.all
 
 - **Pass:** 113/190 (59.5%)
-- **Duration:** 2m00s across 30 shards
+- **Duration:** 4m02s across 30 shards
 - **Lines:** 14,757/16,957 matching (87.0%)
-- **Avg test duration:** 0.6s — slowest: `Transform-v6` (1.3s)
+- **Avg test duration:** 1.2s — slowest: `Sound-v7` (17.7s)
 
 ### from_gnash/misc-ming.all
 
 - **Pass:** 46/102 (45.1%)
-- **Duration:** 38s across 30 shards
+- **Duration:** 2m49s across 30 shards
 - **Lines:** 2,468/4,541 matching (54.3%)
-- **Avg test duration:** 0.3s — slowest: `matrix_test` (4.2s)
+- **Avg test duration:** 1.6s — slowest: `DefineEditTextTest` (22.0s)
 
 ### from_gnash/misc-mtasc.all
 
 - **Pass:** 7/9 (77.8%)
-- **Duration:** 4s across 30 shards
+- **Duration:** 20s across 30 shards
 - **Lines:** 205/231 matching (88.7%)
-- **Avg test duration:** 0.4s — slowest: `levels` (2.2s)
+- **Avg test duration:** 2.2s — slowest: `TextFieldTest` (14.4s)
 
 ### from_gnash/misc-swfc.all
 
 - **Pass:** 5/16 (31.2%)
-- **Duration:** 4s across 30 shards
+- **Duration:** 23s across 30 shards
 - **Lines:** 262/499 matching (52.5%)
-- **Avg test duration:** 0.2s — slowest: `mouse_drag_test` (0.5s)
+- **Avg test duration:** 1.4s — slowest: `action_execution_order_test10` (14.6s)
 
 ### from_gnash/misc-swfmill.all
 
 - **Pass:** 15/18 (83.3%)
-- **Duration:** 4s across 30 shards
+- **Duration:** 22s across 30 shards
 - **Lines:** 47/51 matching (92.2%)
-- **Avg test duration:** 0.2s — slowest: `func_dict` (0.2s)
+- **Avg test duration:** 1.2s — slowest: `afunc_dict` (13.7s)
 
 ### from_shumway
 
 - **Pass:** 64/92 (69.6%)
-- **Duration:** 22s across 30 shards
+- **Duration:** 1m29s across 30 shards
 - **Lines:** 663/1,276 matching (52.0%)
-- **Avg test duration:** 0.2s — slowest: `avm1/lookup` (0.4s)
+- **Avg test duration:** 0.9s — slowest: `fuzz/33c31f96f8d026037b9024c497870471636f0c31dccb624be67775662b37b096` (14.2s)
 
 ### from_shumway/avm1
 
 - **Pass:** 45/47 (95.7%)
-- **Duration:** 11s across 30 shards
+- **Duration:** 24s across 30 shards
 - **Lines:** 483/491 matching (98.4%)
-- **Avg test duration:** 0.2s — slowest: `levels` (0.6s)
+- **Avg test duration:** 0.4s — slowest: `array` (0.9s)

@@ -1,16 +1,16 @@
 {
   "metadata": {
-    "old_timestamp": "2026-04-26T22:53:16.481073+00:00",
-    "old_git_sha": "1f111219fa91001c62a5b518122e7e5b1029e459",
-    "new_timestamp": "2026-04-26T23:03:07.628255+00:00",
-    "new_git_sha": "ffd6f66ead1f4bc2822446cfbce686894a430f41",
+    "old_timestamp": "2026-04-26T23:03:07.628255+00:00",
+    "old_git_sha": "ffd6f66ead1f4bc2822446cfbce686894a430f41",
+    "new_timestamp": "2026-04-26T23:34:49.167260+00:00",
+    "new_git_sha": "9527b780dd3e94ea36ce6ddefc677c71f296a251",
     "partial": false,
     "same_commit": false
   },
   "summary": {
     "old_pass": 46,
-    "old_ruffle_matched": 11,
-    "old_effective_pass": 57,
+    "old_ruffle_matched": 12,
+    "old_effective_pass": 58,
     "old_total": 102,
     "old_pass_rate": 45.1,
     "new_pass": 46,
@@ -18,77 +18,16 @@
     "new_effective_pass": 58,
     "new_total": 102,
     "new_pass_rate": 45.1,
-    "old_mismatched_lines": 1968,
+    "old_mismatched_lines": 2073,
     "new_mismatched_lines": 2073,
-    "increased_mismatches": 105,
+    "increased_mismatches": 0,
     "decreased_mismatches": 0,
-    "newly_passing": 1,
+    "newly_passing": 0,
     "newly_failing": 0,
-    "status_changed": 5,
-    "unchanged": 97,
+    "status_changed": 0,
+    "unchanged": 102,
     "added": 0,
     "removed": 0
   },
-  "changes": [
-    {
-      "test": "DragDropTest",
-      "change_type": "changed",
-      "old_status": "compile_fail",
-      "new_status": "output_mismatch",
-      "old_lines": null,
-      "new_lines": {
-        "actual_lines": 45,
-        "expected_lines": 44,
-        "matching_lines": 27
-      }
-    },
-    {
-      "test": "Version4Loader",
-      "change_type": "changed",
-      "old_status": "compile_fail",
-      "new_status": "output_mismatch",
-      "old_lines": null,
-      "new_lines": {
-        "actual_lines": 0,
-        "expected_lines": 11,
-        "matching_lines": 0
-      }
-    },
-    {
-      "test": "attachExtImported",
-      "change_type": "changed",
-      "old_status": "compile_fail",
-      "new_status": "ruffle_matched",
-      "old_lines": null,
-      "new_lines": {
-        "actual_lines": 2,
-        "expected_lines": 2,
-        "matching_lines": 1
-      }
-    },
-    {
-      "test": "attachImported",
-      "change_type": "changed",
-      "old_status": "compile_fail",
-      "new_status": "output_mismatch",
-      "old_lines": null,
-      "new_lines": {
-        "actual_lines": 2,
-        "expected_lines": 2,
-        "matching_lines": 1
-      }
-    },
-    {
-      "test": "loading/loadMovieTest",
-      "change_type": "changed",
-      "old_status": "compile_fail",
-      "new_status": "output_mismatch",
-      "old_lines": null,
-      "new_lines": {
-        "actual_lines": 5,
-        "expected_lines": 80,
-        "matching_lines": 5
-      }
-    }
-  ]
+  "changes": []
 }
