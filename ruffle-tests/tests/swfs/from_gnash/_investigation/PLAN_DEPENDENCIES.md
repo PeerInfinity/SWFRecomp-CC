@@ -24,9 +24,16 @@ This is the largest active chain — the one we're working through now.
 GOTO_CATCHUP_HYGIENE_PLAN (blocked/)
    │ Phases 1-5 landed; Phase 6 split out as its own plan.
    ↓
-   ├──► GOTO_FIFO_UNIFICATION_PLAN (incomplete/)
-   │       │ status: pending
-   │       │ blocked_by: nothing (was Path A; resolved 2026-04-26)
+   ├──► GOTO_FIFO_UNIFICATION_PLAN (blocked/)
+   │       │ status: blocked (re-blocked 2026-04-26b)
+   │       │ blocked_by: scope. Path A resolved (drain-suppress primitive),
+   │       │             but Phase 4 (recompiler gate simplification) is now
+   │       │             known to be REQUIRED atomically with Phases 1+2+3,
+   │       │             not "cleanup later" as the original plan claimed.
+   │       │             See plan's "Updated finding 2026-04-26b" section
+   │       │             for sync-fire cascade trace proving Phase 1 alone
+   │       │             (and 1+2+3) regress consecutive_goto_frame_test
+   │       │             from 4/12 to <4/12.
    │       │ uses: DRAIN_SUPPRESS_PRIMITIVE accessors (Phase 2)
    │       │ target test: consecutive_goto_frame_test (4/12 baseline)
    │       │ guardrail risk: loop_test*, goto_rewind*, unload-family,

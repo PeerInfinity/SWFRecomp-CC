@@ -4,7 +4,7 @@
 
 <!-- PLAN_META
 id: GOTO_FIFO_UNIFICATION
-status: pending
+status: blocked
 phases:
   - id: 1
     name: "ng_gotoFrameCurrentSprite: queue target sprite frame inline (mirror ng_gotoFrameByMC)"
@@ -29,6 +29,8 @@ dependencies:
   - "Foundation: DRAIN_SUPPRESS_PRIMITIVE_PLAN.md (complete/, commit d1cd1d1f) — provides actionDrainSuppressEnter/Leave used by Phase 2"
 prior_blocker_resolved:
   - "2026-04-26: Path A (drain-suppress primitive) landed at commit d1cd1d1f, resolving the nested-drain re-entry hazard. Path B (Phases 1+2+3 atomic) is now unblocked."
+new_blocker_2026-04-26b:
+  - "Phase 4 is REQUIRED atomically with 1+2+3, NOT cleanup. See Status notes section ‘Updated finding 2026-04-26b’ — sprite-script sync-fire cascade through gate g2 makes Phase 1 alone (and Phase 1+2+3) regress the test from 4/12 to <4/12. Phase 4 (gate simplification) is the only mechanism to break the cascade."
 -->
 
 ## Problem statement
@@ -482,3 +484,128 @@ Plan moved to `blocked/` to avoid blocking other work. To resume:
    2026-04-25 fix.
 4. Phase 4 (recompiler gate simplification) and Phase 5 (headless parity) are
    cleanup once the runtime is stable.
+
+## Updated finding 2026-04-26b — Phase 4 is required, not cleanup
+
+### Detailed dispatch trace under Phases 1+2+3 alone (no Phase 4)
+
+Re-tracing `consecutive_goto_frame_test` frame_1 dispatch under the
+"Phase 1+2+3 single commit, Phase 4 deferred" plan recommendation
+exposes a **sync-fire cascade** that breaks the test more than baseline.
+
+The cascade:
+
+1. `script_2` runs (popped from root_frame_0 drain).
+2. `script_2` calls `actionGotoFrame(2)` → `ng_executeGotoCatchUp` (Phase 2):
+   - Catch-up tags replay frames 1..2 with `catch_up_mode=1` (`tag_skip_mode=0`).
+     During catch-up, the gate at `swf.cpp:4985-4988` evaluates
+     `(!1 || 0 || (eager && !1)) && !script_only_mode = 0 && ... = 0`,
+     so sprite_4_frame_0's `actionQueueSpriteScript(script_3)` is **suppressed**.
+     `script_3` is NOT in the queue at this point.
+   - Phase 2 then runs deferred sprite init via `process_sprite_init_at_depth`:
+     `g_script_only_mode=1`, calls `sprite_4_frame_0(app_context)`.
+     Inside, `actionQueueSpriteScript(script_3)` evaluates with
+     `catch_up_mode=0, tag_skip_mode=0, script_only_mode=1, deferred_sprite_init=1`:
+     - Gate g1: `(1 || 0 || ...) && !1 = 0` (suppressed by `&& !script_only_mode`).
+     - Gate g2: `1 && 1 && 1 = 1` → **SYNC-FIRES `script_3`**.
+   - Inside `script_3`:
+     - Sets `mc_red.x = "as_in_frm1_of_mc_red"`.
+     - Calls `actionGotoFrame(1)` → `ng_gotoFrameCurrentSprite(1)` (Phase 1):
+       inline-fires `sprite_4_frame_1`. But we're still inside
+       `process_sprite_init_at_depth`'s frame_0 call where
+       `g_script_only_mode=1`, so sprite_4_frame_1's
+       `actionQueueSpriteScript(script_4)` again hits gate g2 →
+       **SYNC-FIRES `script_4`** (cascade).
+     - script_4 sets `mc_red.x = "as_in_frm2_of_mc_red"`, calls
+       `actionGotoFrame(2)` → inline-fires sprite_4_frame_2 → **SYNC-FIRES script_5**.
+     - script_5 sets `mc_red.x = "as_in_frm3_of_mc_red"`, calls
+       `actionGotoFrame(3)` → inline-fires sprite_4_frame_3 (empty).
+     - Cascade unwinds back to script_3 → returns.
+   - `process_sprite_init_at_depth` returns.
+   - Phase 2 then runs `funcs[2]` with `g_tag_skip_mode=1` + drain-suppress →
+     queues `script_6`. Queue: `[script_6]`.
+3. `script_2` finishes.
+4. Outer drain pops `script_6`.
+5. `script_6` runs:
+   - `check_equals(mc_red.x, "as_in_frm1_of_mc_red")` → **FAIL**
+     (`mc_red.x` is `"as_in_frm3_of_mc_red"` from the sync-fire cascade).
+
+**Result: 0 PASS lines.** Worse than the 4/12 baseline (which has 1 PASS).
+
+### Why Phase 4 is the only mechanism that breaks the cascade
+
+For the test to pass, `script_3` must drain in FIFO order **between** the
+Phase 2 funcs[target] queue site and the `script_6` drain site. That
+requires `script_3` to be **queued** (by `process_sprite_init_at_depth`'s
+frame_0 call), not sync-fired.
+
+The only way for sprite_4_frame_0's `actionQueueSpriteScript(script_3)`
+to queue rather than sync-fire under `script_only_mode=1` is to remove
+gate g2's sync-fire branch (Phase 4 simplification):
+
+```c
+if (!catch_up_mode || g_tag_skip_mode)
+  actionQueueSpriteScript(app_context, script_name);
+```
+
+Under this gate, `script_3` queues (catch_up_mode=0 → gate fires regardless
+of script_only_mode). Then drain order becomes correct (`script_3`,
+`script_6`, `script_4`, `script_7`, `script_5`, `script_8`, `script_9`),
+matching the plan's "Required FIFO order" simulation.
+
+### Why Phase 1 alone or Phase 1+2 alone also regress
+
+Phase 1 alone, baseline: `script_3`'s `actionGotoFrame(1)` calls
+`ng_gotoFrameCurrentSprite(1)`, which under existing code just sets
+`sprite_manual_next_frame=1` (next-tick advance). Sprite frame_1's
+DoAction (`script_4`) doesn't fire until next tick — long after
+`script_6` reads `mc_red.x`. So baseline preserves the first PASS line.
+
+Under Phase 1, `ng_gotoFrameCurrentSprite(1)` inline-fires sprite_4_frame_1
+under `script_only_mode=1` → gate g2 → sync-fires `script_4`. Cascade.
+Result: 0 PASS lines. **Phase 1 alone regresses the test from 4/12 to <4/12.**
+
+### Re-entry implications for ng_gotoFrameCurrentSprite Phase 1
+
+Even with Phase 4 in place, Phase 1's inline-fire requires display-list
+swapping if called from a context where `display_list != obj->sprite_display_list`
+(e.g., when `aq_dispatch_sprite_script` drains a queued sprite script at
+root level — display_list is root's at that point, but `g_current_sprite_obj`
+is the sprite). Phase 1 must mirror `ng_gotoFrameByMC`'s display-list
+save/swap/restore pattern, not just a bare frame-func call.
+
+### Updated implementation order
+
+1. **Phase 4 first** (recompiler gate simplification at `swf.cpp:4985-4999`).
+   This is the smallest atomic change that flips sprite-script dispatch
+   from sync-fire to queue. May regress tests that rely on sync-fire
+   ordering (deferred sprite init Phase 2 path), so verify against
+   `register_and_init_order`, `goto_rewind1/2/3`, `clip_events`,
+   `unload_clip_event` before continuing.
+2. **Phase 1** (ng_gotoFrameCurrentSprite inline-fire with display-list swap).
+3. **Phase 2** (ng_executeGotoCatchUp inline funcs[target] + drain-suppress,
+   no g_deferred_goto_queue push).
+4. **Phase 3** (retire g_deferred_goto_queue + outer drain loop).
+5. **Phase 5** (swf_headless.c parity).
+
+Each phase needs guardrail verification before stacking the next.
+
+### Why still blocked
+
+The combined scope (recompiler change + 4 runtime changes + headless parity
++ regression triage) consistently exceeds a single working session, even
+with the drain-suppress primitive in place. Phase 4 alone has substantial
+regression surface (every sprite DoAction queue site changes semantics
+under `script_only_mode`), and the local-only verification rule means
+each iteration needs a CI roundtrip (~30 min) to confirm no broad
+regressions.
+
+The plan stays in **blocked/** until either:
+(a) An owner has 2-3 sessions of focused budget to land Phases 4+1+2+3+5
+    incrementally with CI guardrail per step.
+(b) A simpler intermediate approach is identified — e.g., a minimal
+    Phase 1 variant that only inline-fires when called from a context
+    where `script_only_mode=0` (i.e., from a queued sprite script via
+    `aq_dispatch_sprite_script`), leaving the sync-fired script_3 path
+    untouched. That would partially address the test without the full
+    architectural change.
