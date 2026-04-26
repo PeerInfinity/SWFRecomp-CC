@@ -1207,6 +1207,34 @@ void swfStart(SWFAppContext* app_context)
 		}
 		else if (manual_next_frame)
 		{
+#ifdef NO_GRAPHICS
+			// Natural backward wrap (e.g. last frame loops back to frame 0):
+			// invalidate cached MCs and clear display entries that were placed
+			// at frames > target. Mirrors Ruffle's wrap-as-implicit-goto
+			// behavior where the rewind cleans up stale later-frame state so
+			// that names placed only at later frames don't bleed into the
+			// next loop's frame 0. Goto-from-action cases go through
+			// ng_executeGotoCatchUp, which handles its own cleanup; this
+			// branch only runs for the recompiler-emitted natural wrap-back
+			// at the end of the last frame (goto_from_action == 0).
+			if (!goto_from_action && next_frame < current_frame)
+			{
+				extern void actionInvalidateCachedMovieClip(SWFAppContext*, const char*, int);
+				for (size_t d = 1; d <= max_depth && d < 16384; d++)
+				{
+					if (display_list[d].char_id != 0 &&
+					    display_list[d].placed_at_frame > next_frame &&
+					    display_list[d].instance_name != NULL)
+					{
+						actionInvalidateCachedMovieClip(app_context,
+						    display_list[d].instance_name, (int)d);
+					}
+				}
+				ng_display_clear_after(app_context, next_frame);
+				extern void ng_display_cleanup_unplaced_after(SWFAppContext*, size_t);
+				ng_display_cleanup_unplaced_after(app_context, next_frame);
+			}
+#endif
 			current_frame = next_frame;
 			manual_next_frame = 0;
 			root_movieclip.currentframe = (int)current_frame + 1;  // Keep 1-indexed _currentframe in sync

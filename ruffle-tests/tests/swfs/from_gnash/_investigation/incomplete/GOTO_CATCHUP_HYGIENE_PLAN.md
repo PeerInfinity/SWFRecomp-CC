@@ -4,11 +4,11 @@
 
 <!-- PLAN_META
 id: GOTO_CATCHUP_HYGIENE
-status: pending
+status: in_progress
 phases:
   - id: 1
     name: "Goto-induced RemoveObject2: clear name resolution (var_map / dynamic_props / display lookup)"
-    status: pending
+    status: partial
   - id: 2
     name: "Catch-up unload event dispatch — fire unload events on MCs removed during catch-up replay"
     status: pending
@@ -25,6 +25,60 @@ phases:
     name: "Sprite scripts trailing after totals — drain ordering with deferred scripts"
     status: pending
 -->
+
+## Status (2026-04-25)
+
+| Test | Pre-fix | Current | Δ |
+|------|---------|---------|---|
+| place_and_remove_object_insane_test | 15/22 | 17/22 | +2 |
+| goto_frame_test | 4/15 | 4/15 | 0 |
+| consecutive_goto_frame_test | 3/12 | 3/12 | 0 |
+
+### 2026-04-25 fix — natural backward wrap-back cleanup (Phase 1, partial)
+
+**Change.** `SWFModernRuntime/src/libswf/swf_core.c` natural advance
+branch: when `manual_next_frame=1` and `next_frame < current_frame`
+(end-of-movie loopback to an earlier frame), invalidate cached
+MovieClips and clear display entries whose `placed_at_frame > target`,
+mirroring Ruffle's wrap-as-implicit-goto cleanup. Gated on
+`!goto_from_action` so this only handles the recompiler-emitted natural
+wrap (goto-from-action paths already go through `ng_executeGotoCatchUp`
+which has its own `ng_display_clear_after`/`ng_display_cleanup_unplaced_after`
+calls).
+
+**Why this was needed.** `place_and_remove_object_insane_test` is a
+3-frame movie that loops 10× (30 ticks). Frame 2 places `mc_green` at
+depth 4. Frame 0 places `mc_red`/`mc_blue`/`mc_black` at other depths,
+never touching depth 4. Without the wrap-back cleanup, depth 4's
+`mc_green` entry persisted across the loop boundary, so
+`_root.mc_green` resolved to the stale MC instead of `undefined`.
+
+**Verification.**
+- 43-test AVM1 goto/rewind/unload/lifecycle/placement battery: 43/43 pass.
+- 20-test misc-ming.all guardrail (loop_test2-9, simple_loop_test,
+  static_vs_dynamic1/2, place_and_remove_object_test,
+  new_child_in_unload_test, event_handler_scope_test, instanceNameTest,
+  attachMovieTest, DefineEditTextTest/2, shape_test,
+  get_frame_number_test, reverse_execute_PlaceObject2_test1/2): 20/20
+  pass.
+- 4-test Shumway duplicateMovieClip suite (duplicateMovieClip,
+  samedepth, name-coercion, dontremove): 4/4 pass.
+- 8-test actionscript.all Selection/LoadVars-vN spot: 8/8 effective pass.
+- Other plan target tests (goto_frame_test, consecutive_goto_frame_test)
+  unchanged at baseline (their failures are not from natural wrap; they
+  exercise explicit gotoFrame2 calls).
+- 8 already-failing misc-ming tests (DefineEditTextVariableNameTest,
+  attachImported, attachMovieLoopingTest, loop/loop_test10,
+  loop/loop_test6) line counts unchanged from pre-fix baseline.
+
+**Remaining diff for `place_and_remove_object_insane_test` (3 lines).**
+Lines 10-12 of the diff: `60 == 60` got `60 == 0`,
+`undefined == undefined` got `undefined == movieclip`,
+`movieclip == movieclip` got `movieclip == undefined`. These look like
+order-of-evaluation issues across the 10 loops — likely a stale value
+captured into a variable on one iteration that doesn't get updated on
+the next, OR a different timing issue not related to wrap-back cleanup.
+Not investigated further this session.
 
 ## Problem statement
 
