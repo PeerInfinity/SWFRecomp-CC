@@ -1,15 +1,26 @@
 # Ruffle Test Results Diff
 
-**Previous:** `d1cd1d1fac32` (2026-04-26T20:06:24.502827+00:00)
-**Current:** `8ec3f4779e37` (2026-04-26T20:52:13.125630+00:00)
+**Previous:** `8ec3f4779e37` (2026-04-26T20:52:13.125630+00:00)
+**Current:** `1f111219fa91` (2026-04-26T22:53:16.466266+00:00)
 
 ## Summary
 
 | Metric | Previous | Current | Delta |
 |--------|----------|---------|-------|
-| Passing | 64 | 64 | 0 |
+| Passing | 64 | 63 | -1 |
 | Total | 92 | 92 | 0 |
-| Pass rate | 69.6% | 69.6% | 0% |
-| Mismatched lines | 613 | 613 | 0 |
+| Pass rate | 69.6% | 68.5% | -1.1% |
+| Mismatched lines | 613 | 607 | -6 |
+|   Decreased | | | -6 |
 
-No changes detected.
+## Newly Failing (1)
+
+| Test | New Status | Lines (prev) | Lines (now) |
+|------|-----------|--------------|-------------|
+| `avm1/levels` | compile_fail | 9/9 | - |
+
+## Status Changed (1)
+
+| Test | Previous | Current | Lines (prev) | Lines (now) |
+|------|----------|---------|--------------|-------------|
+| `avm1/moviecliploader` | output_mismatch | compile_fail | 1/7 | - |

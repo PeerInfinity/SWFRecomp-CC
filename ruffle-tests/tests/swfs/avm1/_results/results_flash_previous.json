@@ -1,8 +1,8 @@
 {
   "metadata": {
-    "timestamp": "2026-04-26T20:06:29.279719+00:00",
-    "git_sha": "d1cd1d1fac3259a38b44e395f9c8f0879fe6f8fb",
-    "duration_seconds": 4.31,
+    "timestamp": "2026-04-26T20:52:17.650304+00:00",
+    "git_sha": "8ec3f4779e37bb3d6b034b7d5332460de9ab4c7d",
+    "duration_seconds": 4.29,
     "total_available": 3
   },
   "total": 3,
@@ -20,7 +20,7 @@
       "test": "global_instance_decls",
       "phases": {
         "recomp": 0.0,
-        "compile": 1.575,
+        "compile": 1.572,
         "run": 0.028
       },
       "num_frames": 1,
@@ -39,8 +39,8 @@
       "test": "global_proto_decls",
       "phases": {
         "recomp": 0.0,
-        "compile": 1.28,
-        "run": 0.039
+        "compile": 1.287,
+        "run": 0.028
       },
       "num_frames": 1,
       "lines": {
@@ -58,7 +58,7 @@
       "test": "global_proto_decls_delete",
       "phases": {
         "recomp": 0.0,
-        "compile": 1.154,
+        "compile": 1.142,
         "run": 0.018
       },
       "num_frames": 1,
@@ -67,7 +67,7 @@
         "expected_lines": 874,
         "matching_lines": 338
       },
-      "duration": 1.18,
+      "duration": 1.17,
       "status": "output_mismatch",
       "detail": "2029 line(s) differ (actual=2367, expected=874)",
       "actual_output": "... (326 lines before) ...\n  UNKNOWN, DONT_DELETE\n  __proto__, DONT_DELETE\n  constructor, DONT_DELETE\nTesting _global.System.setClipboard\nTesting _global.System.security.PolicyFileResolver\n  prototype, DONT_DELETE\nTesting _global.System.security.PolicyFileResolver.prototype\nTesting _global.System.security.sandboxType\nTesting _global.System.security.escapeDomain\nTesting _global.System.security.chooseLocalSwfPath\nTesting _global.System.security.loadPolicyFile\nTesting _global.System.security.allowInsecureDomain\nTesting _global.System.security.allowDomain\nTesting _global.System.security.__constructor__\n  prototype, DONT_DELETE\nTesting _global.System.security.__constructor__.prototype\n  toLocaleString, DONT_DELETE\n  isPropertyEnumerable, DONT_DELETE\n  isPrototypeOf, DONT_DELETE\n  hasOwnProperty, DONT_DELETE\n  toString, DONT_DELETE\n  valueOf, DONT_DELETE\n  addProperty, DONT_DELETE\n  unwatch, DONT_DELETE\n  watch, DONT_DELETE\n  constructor, DONT_DELETE\nTesting _global.System.security\n  toLocaleString, DONT_DELETE\n  isPropertyEnumerable, DONT_DELETE\n  isPrototypeOf, DONT_DELETE\n  hasOwnProperty, DONT_DELETE\n  toString, DONT_DELETE\n  valueOf, DONT_DELETE\n  addProperty, DONT_DELETE\n  unwatch, DONT_DELETE\n  watch, DONT_DELETE\n  __proto__, DONT_DELETE\nTesting _global.System.useCodepage\nTesting _global.System.exactSettings\nTesting _global.System.showSettings\n  toLocaleString, DONT_DELETE\n  isPropertyEnumerable, DONT_DELETE\n  isPrototypeOf, DONT_DELETE\n  hasOwnProperty, DONT_DELETE\n  toString, DONT_DELETE\n  valueOf, DONT_DELETE\n  addProperty, DONT_DELETE\n  unwatch, DONT_DELETE\n  watch, DONT_DELETE\nTesting _global.System.Product\n... (1991 lines after) ...",

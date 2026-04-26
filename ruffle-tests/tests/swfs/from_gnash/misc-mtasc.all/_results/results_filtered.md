@@ -1,10 +1,10 @@
 # Ruffle Test Results (Filtered)
 
-**Date**: 2026-04-26 20:52 UTC
+**Date**: 2026-04-26 22:53 UTC
 
-**Git SHA**: `8ec3f4779e`
+**Git SHA**: `1f111219fa`
 
-**Run Duration**: 0m 27s
+**Run Duration**: 0m 2s
 
 **Filtered**: 0 tests ignored out of 9 available
 
@@ -17,15 +17,15 @@
 | Ruffle-matched | 1 (diffs ⊆ Ruffle's against Flash) |
 | Effective pass | **8** (88.9%) |
 | Failing | 1 |
-| Total expected lines | 231 |
-| Matching lines | 205 (88.7%) |
-| Mismatched lines | 26 |
+| Total expected lines | 163 |
+| Matching lines | 162 (99.4%) |
+| Mismatched lines | 1 |
 
 ### Failure Breakdown
 
 | Category | Count | % of Failures |
 |----------|-------|---------------|
-| Output Mismatch | 1 | 100.0% |
+| Compile Fail | 1 | 100.0% |
 
 ## Passing Tests
 
@@ -33,13 +33,13 @@
 
 | # | Test | Lines | Duration | Notes |
 |---|------|-------|----------|-------|
-| 1 | `enum` | 19 | 1.6s |  |
-| 2 | `exception` | 35 | 0.1s |  |
+| 1 | `enum` | 19 | 0.2s |  |
+| 2 | `exception` | 35 | 0.2s |  |
 | 3 | `function_test` | 26 | 0.2s |  |
-| 4 | `hello` | 8 | 0.1s |  |
+| 4 | `hello` | 8 | 0.2s |  |
 | 5 | `implementsOpTest` | 28 | 0.2s |  |
-| 6 | `inheritance` | 22 | 1.7s |  |
-| 7 | `super_test1` | 17 | 0.1s |  |
+| 6 | `inheritance` | 22 | 0.2s |  |
+| 7 | `super_test1` | 17 | 0.2s |  |
 
 ## Ruffle-Matched Tests
 
@@ -47,17 +47,15 @@
 
 | # | Test | Our diffs | Ruffle diffs | Duration | Notes |
 |---|------|-----------|--------------|----------|-------|
-| 1 | `TextFieldTest` | 1 | 1 | 18.8s |  |
+| 1 | `TextFieldTest` | 1 | 1 | 0.2s |  |
 
 ## Near-Passing Tests
 
 Tests with output mismatch but >= 50% line match rate (low-hanging fruit).
 
-**1 tests** within reach
+**0 tests** within reach
 
-| # | Test | Match Rate | Matching | Total | Diff Lines | Notes |
-|---|------|------------|----------|-------|------------|-------|
-| 1 | `levels` | 63.2% | 43 | 68 | 25 |  |
+No tests above 50% match threshold.
 
 ## Segfaults
 
@@ -73,8 +71,6 @@ No timeouts.
 
 ## All Output Mismatches
 
-**1 tests** with output mismatch, sorted by match rate (best first)
+**0 tests** with output mismatch, sorted by match rate (best first)
 
-| # | Test | Match Rate | Matching/Total | Actual | Expected | Notes |
-|---|------|------------|----------------|--------|----------|-------|
-| 1 | `levels` | 63.2% | 43/68 | 68 | 68 |  |
+No output mismatches.
