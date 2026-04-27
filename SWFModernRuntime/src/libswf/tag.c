@@ -3193,6 +3193,129 @@ void dispatch_clip_event_release(SWFAppContext* app_context)
 	dispatch_clip_event_release_dl(app_context,
 		display_list, max_depth, &root_movieclip);
 }
+
+// ---------------------------------------------------------------------------
+// CLIP_EVENT_ROLL_OVER / ROLL_OUT / DRAG_OVER / DRAG_OUT dispatch
+// ---------------------------------------------------------------------------
+// Hit-test based: fired on placements when the mouse transitions across their
+// hit area boundary. ROLL_* gates on button-up; DRAG_* gates on button-down.
+
+static void dispatch_clip_event_roll_dl(SWFAppContext* app_context,
+    DisplayObject* dl, size_t dl_max_depth,
+    double ma, double mb, double mc_m, double md, double mtx, double mty,
+    float mouse_x, float mouse_y, int btn_down, MovieClip* parent_mc)
+{
+	extern int ng_hitTestShapeFromDL(DisplayObject* dl, size_t dl_max,
+	    double ma, double mb, double mc_m, double md, double mtx, double mty,
+	    double test_x, double test_y);
+
+	const uint32_t roll_drag_mask = CLIP_EVENT_ROLL_OVER | CLIP_EVENT_ROLL_OUT
+	                              | CLIP_EVENT_DRAG_OVER | CLIP_EVENT_DRAG_OUT;
+
+	for (size_t i = 1; i <= dl_max_depth; i++)
+	{
+		DisplayObject* obj = &dl[i];
+		if (obj->char_id == 0) continue;
+
+		// Compose parent transform with this entry's transform (drag-aware,
+		// matches dispatch_clip_event_press_dl).
+		u32 tid = obj->transform_id;
+		double ca = (double)transform_data[tid][0];
+		double cb = (double)transform_data[tid][1];
+		double cc = (double)transform_data[tid][4];
+		double cd = (double)transform_data[tid][5];
+		double ctx_v = (double)transform_data[tid][12];
+		double cty_v = (double)transform_data[tid][13];
+		if (g_drag_target_name[0] != '\0' && obj->instance_name &&
+		    strcmp(obj->instance_name, g_drag_target_name) == 0)
+		{
+			ctx_v = (double)g_drag_virt_x;
+			cty_v = (double)g_drag_virt_y;
+		}
+		double na = ma*ca + mc_m*cb, nb = mb*ca + md*cb;
+		double nc = ma*cc + mc_m*cd, nd = mb*cc + md*cd;
+		double ntx = ma*ctx_v + mc_m*cty_v + mtx;
+		double nty = mb*ctx_v + md*cty_v + mty;
+
+		// Check if this placement has any roll/drag clip actions.
+		int has_roll_clip = 0;
+		if (obj->clip_action_count > 0)
+		{
+			for (size_t a = 0; a < obj->clip_action_count; a++)
+			{
+				if (obj->clip_actions[a].event_flags & roll_drag_mask) {
+					has_roll_clip = 1;
+					break;
+				}
+			}
+		}
+
+		if (has_roll_clip)
+		{
+			int hit = 0;
+			if (obj->sprite_display_list != NULL && obj->sprite_max_depth > 0) {
+				hit = ng_hitTestShapeFromDL(obj->sprite_display_list, obj->sprite_max_depth,
+					na, nb, nc, nd, ntx, nty, (double)mouse_x, (double)mouse_y);
+			}
+
+			int was_inside = obj->clip_mouse_inside;
+			int now_inside = hit;
+
+			if (was_inside != now_inside)
+			{
+				obj->clip_mouse_inside = (u8)now_inside;
+				uint32_t fire_flag = 0;
+				if (now_inside) {
+					// Mouse entered: ROLL_OVER if button up, DRAG_OVER if button down
+					fire_flag = btn_down ? CLIP_EVENT_DRAG_OVER : CLIP_EVENT_ROLL_OVER;
+				} else {
+					// Mouse left: ROLL_OUT if button up, DRAG_OUT if button down
+					fire_flag = btn_down ? CLIP_EVENT_DRAG_OUT : CLIP_EVENT_ROLL_OUT;
+				}
+
+				MovieClip* saved_ctx = g_current_context;
+				if (obj->instance_name) {
+					MovieClip* mc = actionFindOrCreateMovieClip(app_context,
+					    obj->instance_name, parent_mc);
+					if (mc) actionSetCurrentContext(mc);
+				}
+				for (size_t a = 0; a < obj->clip_action_count; a++) {
+					if (obj->clip_actions[a].event_flags & fire_flag)
+						obj->clip_actions[a].action(app_context);
+				}
+				actionSetCurrentContext(saved_ctx);
+			}
+		}
+
+		// Recurse into nested sprite display lists regardless of whether this
+		// entry has roll clip actions itself — children may have their own.
+		if (obj->sprite_display_list != NULL && obj->sprite_max_depth > 0) {
+			MovieClip* child_mc = parent_mc;
+			if (obj->instance_name) {
+				MovieClip* mc = actionFindOrCreateMovieClip(app_context,
+				    obj->instance_name, parent_mc);
+				if (mc) child_mc = mc;
+			}
+			dispatch_clip_event_roll_dl(app_context,
+				obj->sprite_display_list, obj->sprite_max_depth,
+				na, nb, nc, nd, ntx, nty,
+				mouse_x, mouse_y, btn_down, child_mc);
+		}
+	}
+}
+
+void dispatch_clip_event_roll(SWFAppContext* app_context)
+{
+	float mx = app_context->mouse.stage_x;  // twips
+	float my = app_context->mouse.stage_y;  // twips
+	int btn_down = app_context->mouse.button_down;
+
+	dispatch_clip_event_roll_dl(app_context,
+		display_list, max_depth,
+		1.0, 0.0, 0.0, 1.0, 0.0, 0.0,
+		mx, my, btn_down, &root_movieclip);
+}
+
 // ---------------------------------------------------------------------------
 // Generic clip event flag dispatch (MOUSE_DOWN/UP/MOVE, KEY_DOWN/UP)
 // ---------------------------------------------------------------------------

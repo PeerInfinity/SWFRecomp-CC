@@ -25,6 +25,9 @@ void dispatch_clip_event_press(SWFAppContext* app_context);
 // Dispatch CLIP_EVENT_RELEASE for sprites that had PRESS fired (clip_mc_pressed=1).
 // Called from swf_core.c on EV_MOUSE_UP_LEFT.
 void dispatch_clip_event_release(SWFAppContext* app_context);
+// Dispatch CLIP_EVENT_ROLL_OVER/ROLL_OUT/DRAG_OVER/DRAG_OUT on hit-area transitions.
+// Called from swf_core.c on EV_MOUSE_MOVE (and EV_MOUSE_DOWN/UP for button-state edges).
+void dispatch_clip_event_roll(SWFAppContext* app_context);
 // Dispatch a generic clip event flag (CLIP_EVENT_MOUSE_DOWN/UP/MOVE, KEY_DOWN/UP)
 // to ALL clips in the display list (global events, no hit-test).
 void dispatch_clip_event_flag(SWFAppContext* app_context, uint32_t flag);

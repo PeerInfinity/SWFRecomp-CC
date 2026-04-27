@@ -4,21 +4,49 @@
 
 <!-- PLAN_META
 id: LOADMOVIETEST
-status: pending
+status: complete
 phases:
   - id: 1
     name: "Implement CLIP_EVENT_ROLL_OVER / CLIP_EVENT_ROLL_OUT clip-event dispatch"
-    status: pending
+    status: complete
   - id: 2
     name: "Implement CLIP_EVENT_DRAG_OVER / CLIP_EVENT_DRAG_OUT (related, similar machinery)"
-    status: pending
+    status: complete
   - id: 3
     name: "Verify loadMovie cross-target semantics (target:_level0.cont.coverart, /cont/coverart)"
-    status: pending
+    status: complete
   - id: 4
     name: "Address other line-by-line gaps once the test progresses past frame 5"
-    status: pending
+    status: complete
 -->
+
+## 2026-04-27 session — RESOLVED
+
+`loading/loadMovieTest` is now **RUFFLE_MATCHED** (effective pass).
+
+Implementation: added a `dispatch_clip_event_roll()` dispatcher in
+`SWFModernRuntime/src/libswf/tag.c` that walks the display list,
+hit-tests each placement carrying ROLL/DRAG clip actions against the
+current mouse position, and fires the appropriate clip-action handler
+on the `clip_mouse_inside` transition. Button-state at the time of
+the move decides ROLL_OVER/OUT (button up) vs DRAG_OVER/OUT (button
+down). Wired into `swf_core.c`'s EV_MOUSE_MOVE / EV_MOUSE_DOWN_LEFT /
+EV_MOUSE_UP_LEFT handlers (the down/up calls catch the ROLL↔DRAG
+state-flip on edge events). Per-DisplayObject `clip_mouse_inside` u8
+added next to `clip_mc_pressed`.
+
+Result: 80/80 lines match `output.ruffle.txt` (the only diff vs
+`output.txt` is trailing whitespace on FAILED lines — Ruffle keeps
+the trailing space, `output.txt` strips it). All Phase 3/4 line gaps
+turned out to be already-implemented mechanics that were dormant
+because the test never progressed past line 5 — once ROLL_OVER fired
+and installed `coverart.onMouseDown`, every subsequent line dropped
+into place.
+
+Guardrails (all PASS):
+- `clip_events`, `bad_placeobject_clipaction`, `movieclip_in_removed_button`
+- `button_children`, `goto_rewind1/2/3`, `on_construct`
+- `unload`, `unload_clip_event`, `movieclip_state_values`, `issue_1104`
 
 ## Problem statement
 

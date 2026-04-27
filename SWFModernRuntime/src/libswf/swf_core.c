@@ -452,6 +452,8 @@ static void input_events_deliver(SWFAppContext* app_context, InputEvent* ev)
         }
         // Dispatch onClipEvent(mouseMove) to all clips
         dispatch_clip_event_flag(app_context, CLIP_EVENT_MOUSE_MOVE);
+        // Dispatch onClipEvent(rollOver/rollOut/dragOver/dragOut) on hit-area transitions
+        dispatch_clip_event_roll(app_context);
         // Broadcast Mouse.onMouseMove to Mouse listeners
         actionDispatchMouseMove(app_context);
         // Ruffle skips hover re-evaluation when mouse didn't move and
@@ -496,6 +498,8 @@ static void input_events_deliver(SWFAppContext* app_context, InputEvent* ev)
         // Run per-event button state machine (processes OverUpToOverDown = press)
         ng_update_button_states(app_context);
         dispatch_clip_event_press(app_context);
+        // Re-evaluate roll/drag transitions: button-down may convert ROLL→DRAG state
+        dispatch_clip_event_roll(app_context);
         // Dispatch AS2 onPress to dynamic MCs
         actionDispatchMCPress(app_context);
         // Left mouse down always resets focus highlight (all SWF versions)
@@ -520,6 +524,8 @@ static void input_events_deliver(SWFAppContext* app_context, InputEvent* ev)
         // Run per-event button state machine (processes OverDownToOverUp = release)
         ng_update_button_states(app_context);
         dispatch_clip_event_release(app_context);
+        // Re-evaluate roll/drag transitions: button-up may convert DRAG→ROLL state
+        dispatch_clip_event_roll(app_context);
         // Dispatch AS2 onRelease/onReleaseOutside to dynamic MCs
         actionDispatchMCRelease(app_context);
         // Mouse up (left) resets focus highlight (SWF<9 only)

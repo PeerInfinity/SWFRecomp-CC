@@ -167,6 +167,7 @@ typedef struct DisplayObject
 	size_t place_gen;       // monotonic generation counter for same-frame detection
 	// Clip event interaction state
 	u8 clip_mc_pressed;     // 1 if CLIP_EVENT_PRESS was fired for this clip (awaiting RELEASE/RELEASE_OUTSIDE)
+	u8 clip_mouse_inside;   // 1 if mouse is currently inside this clip's hit area (for ROLL_OVER/ROLL_OUT/DRAG_OVER/DRAG_OUT transitions)
 	u8 enterframe_eligible; // 1 if AS2 onEnterFrame should fire this tick (set by init/advance, cleared after dispatch)
 	u8 constructor_invoked; // 1 if registered class constructor was already invoked during eager init
 	u8 sprite_initialized;  // 0=not init, 1=init'd this tick, 2=init'd on previous tick (for per-tick EnterFrame gating)
