@@ -1,4 +1,12 @@
 #include <sprite_frame_scripts.h>
+#include <actionmodern/action_queue.h>
+#include <libswf/swf.h>
+
+// Sprite context globals captured at push time. Defined elsewhere; we
+// only read them here.
+extern MovieClip* g_current_context;
+extern DisplayObject* g_current_sprite_obj;
+extern MovieClip* actionGetBaseClip(void);
 
 static SpriteFrameScriptEntry* g_table = NULL;
 static size_t g_count = 0;
@@ -36,6 +44,12 @@ int actionQueuePendingSpriteScript(size_t char_id, size_t frame_idx,
 	g_pending[g_pending_count].fn = fn;
 	g_pending[g_pending_count].char_id = char_id;
 	g_pending[g_pending_count].frame_idx = frame_idx;
+	// Capture sprite context at push time so Phase C's drain hook can
+	// dispatch the script under the sprite that issued the goto, rather
+	// than whatever context is active at outer-drain time (root level).
+	g_pending[g_pending_count].ctx_mc = (void*)g_current_context;
+	g_pending[g_pending_count].ctx_base = (void*)actionGetBaseClip();
+	g_pending[g_pending_count].ctx_sprite_obj = (void*)g_current_sprite_obj;
 	g_pending_count++;
 	return 1;
 }
@@ -49,3 +63,18 @@ const PendingSpriteScriptEntry* actionPendingSpriteScriptAt(size_t i)
 }
 
 void actionResetPendingSpriteScriptQueue(void) { g_pending_count = 0; }
+
+size_t actionFlushPendingSpriteScriptsToScriptQueue(SWFAppContext* app_context)
+{
+	size_t flushed = 0;
+	for (size_t i = 0; i < g_pending_count; i++) {
+		PendingSpriteScriptEntry* e = &g_pending[i];
+		if (e->fn == NULL) continue;
+		actionQueueSpriteScriptCaptured(app_context, e->fn,
+		                                 e->ctx_mc, e->ctx_base,
+		                                 e->ctx_sprite_obj);
+		flushed++;
+	}
+	g_pending_count = 0;
+	return flushed;
+}

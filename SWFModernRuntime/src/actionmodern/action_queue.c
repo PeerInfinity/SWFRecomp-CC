@@ -1,4 +1,5 @@
 #include <actionmodern/action_queue.h>
+#include <sprite_frame_scripts.h>
 
 #include <stdlib.h>
 #include <string.h>
@@ -30,6 +31,11 @@ static int g_drain_suppress_depth = 0;
 void actionDrainSuppressEnter(void) { g_drain_suppress_depth++; }
 void actionDrainSuppressLeave(void) { g_drain_suppress_depth--; }
 int  actionDrainSuppressed(void)    { return g_drain_suppress_depth; }
+
+// Phase C (GOTO_FIFO_UNIFICATION_INCREMENTAL): see header doc. Default 0.
+static int g_unify_sprite_drain_flag = 0;
+void actionSetUnifySpriteDrain(int v) { g_unify_sprite_drain_flag = v ? 1 : 0; }
+int  actionUnifySpriteDrain(void)     { return g_unify_sprite_drain_flag; }
 
 static int aq_grow(size_t needed)
 {
@@ -179,6 +185,17 @@ void actionDrainOnloadAndScript(SWFAppContext* app_context)
 	if (g_drain_suppress_depth > 0) return;
 
 	for (;;) {
+		// Phase C (GOTO_FIFO_UNIFICATION_INCREMENTAL): when the unify flag is
+		// set, transfer any pending deferred sprite-script entries (queued via
+		// ng_gotoFrameCurrentSprite during script execution) into the
+		// AQ_KIND_SCRIPT bucket so they FIFO-interleave with the rest of this
+		// drain's pops. Per-iteration flush picks up entries queued by scripts
+		// that just dispatched. Default-off: with g_unify_sprite_drain=0 the
+		// pending queue stays untouched and is cleaned up at end of tick.
+		if (g_unify_sprite_drain_flag) {
+			actionFlushPendingSpriteScriptsToScriptQueue(app_context);
+		}
+
 		int best = -1;
 		int best_pri = -1;
 		for (size_t i = 0; i < g_aq_count; i++) {
@@ -413,20 +430,32 @@ static void aq_dispatch_sprite_script(SWFAppContext* app_context, void* user)
 	free(p);
 }
 
-void actionQueueSpriteScript(SWFAppContext* app_context,
-                              void (*fn)(SWFAppContext*))
+void actionQueueSpriteScriptCaptured(SWFAppContext* app_context,
+                                      void (*fn)(SWFAppContext*),
+                                      void* ctx_mc,
+                                      void* ctx_base,
+                                      void* ctx_sprite_obj)
 {
 	if (!fn) return;
 	PendingSpriteScript* p = (PendingSpriteScript*)malloc(sizeof(*p));
 	if (!p) return;
 	p->fn = fn;
+	p->ctx_mc = (MovieClip*)ctx_mc;
+	p->ctx_base = (MovieClip*)ctx_base;
+	p->ctx_sprite_obj = (DisplayObject*)ctx_sprite_obj;
+	actionQueueCallbackEx(app_context, aq_dispatch_sprite_script, p,
+	                      AQ_PRIORITY_NORMAL, NULL, 0, AQ_KIND_SCRIPT);
+}
+
+void actionQueueSpriteScript(SWFAppContext* app_context,
+                              void (*fn)(SWFAppContext*))
+{
 	// Capture at queue time. During Phase 1 eager init, g_current_context is
 	// the sprite whose frame_0 is executing; exec_sprite_frame sets it via
 	// actionSetCurrentContext + actionSetBaseClip; g_current_sprite_obj tracks
 	// the DisplayObject.
-	p->ctx_mc = g_current_context;
-	p->ctx_base = actionGetBaseClip();
-	p->ctx_sprite_obj = g_current_sprite_obj;
-	actionQueueCallbackEx(app_context, aq_dispatch_sprite_script, p,
-	                      AQ_PRIORITY_NORMAL, NULL, 0, AQ_KIND_SCRIPT);
+	actionQueueSpriteScriptCaptured(app_context, fn,
+	                                 (void*)g_current_context,
+	                                 (void*)actionGetBaseClip(),
+	                                 (void*)g_current_sprite_obj);
 }

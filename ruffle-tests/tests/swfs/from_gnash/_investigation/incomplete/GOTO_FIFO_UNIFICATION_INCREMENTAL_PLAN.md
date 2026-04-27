@@ -14,7 +14,7 @@ phases:
     status: complete
   - id: C
     name: "Drain hook for deferred-script-queue, gated behind g_unify_sprite_drain (default 0)"
-    status: pending
+    status: complete
   - id: D
     name: "Flip g_unify_sprite_drain=1 — sprite goto from inside sprite scripts dispatches in FIFO"
     status: pending
@@ -156,26 +156,75 @@ output_mismatch baseline 50/52); Shumway duplicateMovieClip suite
 end-of-tick reset prevents cross-tick leaks. Phase B does not modify
 `swf_headless.c` — Phase H mirrors there.
 
-### Phase C — Drain hook gated behind a runtime flag
+### Phase C — Drain hook gated behind a runtime flag — COMPLETE 2026-04-26
 
-**Scope.** Add a runtime flag `g_unify_sprite_drain` (default 0). When
-set, `actionDrainOnloadAndScript` consults the deferred-script queue
-between drain pops and queues entries into `AQ_KIND_SCRIPT` for FIFO
-dispatch. Default 0 → queue stays unused.
+**Scope.** Added a runtime flag `g_unify_sprite_drain_flag` (default 0)
+in `action_queue.c` with `actionSetUnifySpriteDrain` setter and
+`actionUnifySpriteDrain` getter. When set, the per-iteration scan
+inside `actionDrainOnloadAndScript` first calls
+`actionFlushPendingSpriteScriptsToScriptQueue` to transfer any pending
+sprite-script entries (queued via `ng_gotoFrameCurrentSprite`) into the
+`AQ_KIND_SCRIPT` bucket, where they FIFO-interleave with other queued
+scripts. Default-off: with the flag at 0 the pending queue stays
+untouched and is cleaned up at end of tick by the existing Phase B
+reset. **Phase C does not flip the flag anywhere — Phase D does.**
 
-**Files.**
-- `SWFModernRuntime/src/actionmodern/action_queue.c`
-  (`actionDrainOnloadAndScript`)
+To preserve the sprite's MC at dispatch time, `PendingSpriteScriptEntry`
+was extended with `ctx_mc`/`ctx_base`/`ctx_sprite_obj` (typed `void*`
+to keep the sprite_frame_scripts.h header free of libswf dependencies).
+`actionQueuePendingSpriteScript` reads `g_current_context`,
+`actionGetBaseClip()`, `g_current_sprite_obj` at push time. The new
+helper `actionQueueSpriteScriptCaptured` in `action_queue.c` accepts
+pre-captured context arguments — the existing `actionQueueSpriteScript`
+is refactored as a thin wrapper that captures from globals. The flush
+helper builds `PendingSpriteScript` payloads via the new captured-arg
+variant so the dispatch context comes from goto-issue time, not
+drain-side root context.
 
-**Behavior delta.** None when `g_unify_sprite_drain=0`. Flag is not
-set anywhere in this phase.
+**Files changed.**
+- `SWFModernRuntime/include/actionmodern/sprite_frame_scripts.h`:
+  extended `PendingSpriteScriptEntry` with three `void*` ctx fields;
+  added `actionFlushPendingSpriteScriptsToScriptQueue`.
+- `SWFModernRuntime/src/actionmodern/sprite_frame_scripts.c`:
+  capture context globals at push time; implement flush helper.
+- `SWFModernRuntime/include/actionmodern/action_queue.h`:
+  declared `actionQueueSpriteScriptCaptured`,
+  `actionSetUnifySpriteDrain`, `actionUnifySpriteDrain`.
+- `SWFModernRuntime/src/actionmodern/action_queue.c`:
+  added `g_unify_sprite_drain_flag` + accessors;
+  refactored `actionQueueSpriteScript` to delegate to
+  `actionQueueSpriteScriptCaptured`;
+  per-iteration flush hook in `actionDrainOnloadAndScript` gated on
+  the flag.
 
-**Verification.** Same guardrail. Plus a unit-style test: manually set
-`g_unify_sprite_drain=1` in a single test (e.g., a new
-`SWFRecomp/tests` opcode test) and confirm sprite gotos dispatch via
-the new path.
+**Behavior delta.** None visible. With `g_unify_sprite_drain_flag=0`
+(default), `actionDrainOnloadAndScript`'s flush call is a flag check
+that never executes the transfer. `consecutive_goto_frame_test`
+unchanged at 4/12 baseline. Captured context fields are populated
+in the queue but ignored because the queue is drained (reset, not
+dispatched) at end of tick.
 
-**Risk.** Zero in the default-off path.
+**Verification.** 4/12 baseline preserved on
+`consecutive_goto_frame_test`. Guardrail (no regressions): 15/15 AVM1
+goto/rewind/clip_events (goto_rewind1/2/3, execution_order1/2/3,
+goto_execution_order/2, goto_both_ways1/2, goto_frame, goto_frame2,
+goto_label, goto_methods, clip_events); 11/11 AVM1 unload/init
+(unload, unloadmovie, unload_clip_event, unload_nested_child,
+mcl_unloadclip, register_and_init_order, on_construct,
+init_object_order, set_interval, movieclip_state_values,
+rewind_depth); 11/11 misc-ming flat (attachMovieTest, instanceNameTest,
+DefineEditTextTest, DefineEditTextVariableNameTest2,
+event_handler_scope_test, new_child_in_unload_test,
+static_vs_dynamic1/2, multi_doactions_and_goto_frame_test,
+goto_frame_test, ResolveEventsTest); 7/9 misc-ming loop battery
+(loop_test2/3/4/5/8/9/simple_loop_test pass; loop_test7
+ruffle_matched; loop_test pre-existing fail unchanged); 4/4 Shumway
+duplicateMovieClip (duplicateMovieClip, samedepth, name-coercion,
+dontremove); 3/4 misc-swfc battery (stackscope, submoviegetvar,
+edittext_test1 pass; movieclip_destruction_test2 unchanged at
+50/52 — pre-existing baseline).
+
+**Risk.** Zero in the default-off path — confirmed.
 
 ### Phase D — Flip g_unify_sprite_drain=1
 

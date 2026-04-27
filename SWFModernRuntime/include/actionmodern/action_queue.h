@@ -138,6 +138,36 @@ void actionQueueScript(SWFAppContext* app_context,
 void actionQueueSpriteScript(SWFAppContext* app_context,
                               void (*fn)(SWFAppContext*));
 
+// Phase C (GOTO_FIFO_UNIFICATION_INCREMENTAL): same as actionQueueSpriteScript
+// but takes the sprite context as explicit arguments instead of capturing
+// from globals. Used by the deferred sprite-script flush path
+// (actionFlushPendingSpriteScriptsToScriptQueue) which captures context at
+// goto-issue time and replays it at drain-side queue-up.
+//   ctx_mc          — MovieClip* the script should fire under (g_current_context)
+//   ctx_base        — MovieClip* base_clip for closure scoping
+//   ctx_sprite_obj  — DisplayObject* of the sprite (for g_current_sprite_obj)
+// Pointers are typed as void* so callers in non-libswf headers don't need
+// to pull in <libswf/swf.h>. NULL ctx_mc is allowed but will leave the
+// active context unchanged at dispatch.
+void actionQueueSpriteScriptCaptured(SWFAppContext* app_context,
+                                      void (*fn)(SWFAppContext*),
+                                      void* ctx_mc,
+                                      void* ctx_base,
+                                      void* ctx_sprite_obj);
+
+// Phase C (GOTO_FIFO_UNIFICATION_INCREMENTAL): runtime flag controlling
+// whether actionDrainOnloadAndScript consults the deferred sprite-script
+// queue (g_pending in sprite_frame_scripts.c) and transfers entries into
+// AQ_KIND_SCRIPT before each scan iteration. Default 0; Phase D flips
+// this to 1 globally (or version-gated to SWF6+) once the unified-FIFO
+// behavior is validated.
+//
+// Per-iteration flush guarantees that sprite goto issued from inside a
+// drained script is picked up by the same drain — the new entry lands in
+// AQ_KIND_SCRIPT and the next loop iteration's scan finds it.
+void actionSetUnifySpriteDrain(int v);
+int  actionUnifySpriteDrain(void);
+
 // Phase 7b: gate accessors used by recompiler-emitted sprite DoAction
 // queue calls. The gate fires `actionQueueScript` when any of:
 //   - normal root tag stream (!catch_up_mode)
