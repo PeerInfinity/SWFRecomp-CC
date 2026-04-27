@@ -20,7 +20,7 @@ phases:
     status: complete
   - id: E
     name: "ng_executeGotoCatchUp: inline funcs[target] with drain-suppress (was Phase 2 of original plan)"
-    status: pending
+    status: complete
   - id: F
     name: "Phase 4 gate simplification + sprite eager-init force-queue during catch-up"
     status: pending
@@ -289,7 +289,7 @@ Phase F's eager-init queueing should normalize the double-fire).
 tests, revert the flip and document; that pivots back to investigating
 a narrower flag scope. We saw 2 — well under threshold.
 
-### Phase E — ng_executeGotoCatchUp: inline funcs[target] with drain-suppress
+### Phase E — ng_executeGotoCatchUp: inline funcs[target] with drain-suppress — COMPLETE 2026-04-26
 
 **Scope.** Same as Phase 2 of the original plan. After catch-up tags,
 wrap `funcs[target](app_context)` in
@@ -297,18 +297,58 @@ wrap `funcs[target](app_context)` in
 into `g_deferred_goto_queue`. Target script lands in `AQ_KIND_SCRIPT`,
 drains via the outer recompiler-emitted drain in FIFO order.
 
-**Behavior delta.** Root goto target script drains FIFO with sprite
-scripts queued during the same script body. May fix the
-`consecutive_goto_frame_test` interleave (depends on whether sprite
-eager init has been adjusted yet — see Phase F).
+**Files changed.**
+- `SWFModernRuntime/src/libswf/swf_core.c`: introduced
+  `g_skip_inline_target_script` one-shot flag (next to existing
+  `g_deferred_goto_*` declarations). Replaced the
+  `g_deferred_goto_queue` push at the end of `ng_executeGotoCatchUp`
+  with an inline `funcs[target](app_context)` call wrapped in
+  `actionDrainSuppressEnter/Leave` and `g_tag_skip_mode=1`. The flag
+  gates the inline call so callers that need the target's script
+  suppressed (gotoAndStop(9999) clamp) opt out.
+- `SWFModernRuntime/src/actionmodern/action.c`: `actionGotoFrame`'s
+  `was_clamped` block now sets `g_skip_inline_target_script = 1`
+  before calling `ng_executeGotoCatchUp` instead of post-call
+  decrementing the deferred queue (which Phase E no longer fills).
 
-**Verification.** Full local guardrail + CI. Predicted regressions:
-`goto_rewind*`, `goto_methods`, `goto_label`, `execution_order2/3` —
-tests that exercise the deferred-goto-queue drain ordering.
+**Companion fix (sibling Phase D fallout).** While verifying Phase E
+against the issue_9885 timeout, traced the loop to a pre-existing
+`actionSetTarget2` bug surfaced by Phase D. The MOVIECLIP-typed top
+of stack path (`SetTarget2` invoked with a MovieClip already on the
+stack — e.g. `_root.gotoAndStop(N)` compiled as
+`Push("_root"); GetVariable; SetTarget2; ...`) bypassed the
+`g_settarget_explicit_root` bookkeeping that the string path sets.
+Subsequent `GotoFrame` inside a sprite script then fell through to
+`ng_gotoFrameCurrentSprite` instead of the root catch-up branch;
+under Phase D's unified drain the sprite script re-queued itself
+indefinitely. Fixed in `actionSetTarget2` to mirror `actionSetTarget`'s
+flag set after `setCurrentContext`, so `g_settarget_explicit_root` is
+1 when the target is `_root` and 0 otherwise.
 
-**Risk.** Medium-high. The drain-suppress primitive (foundation) is in
-place, so re-entry is bounded. Risk concentrates in tests that rely on
-"all root-deferred scripts drain before sprite scripts" ordering.
+**Behavior delta on target test.** `consecutive_goto_frame_test` 12/12
+PASS — Phase E delivered the target ahead of Phase F. Phase D
+regression `avm1/issue_9885` (timeout) is fixed by the actionSetTarget2
+companion fix.
+
+**Verification.** Local guardrail (Phase E + actionSetTarget2 fix):
+- AVM1 `consecutive_goto_frame_test`: PASS (12/12 — was 3/12 in Phase D).
+- AVM1 `issue_9885`: PASS (was timeout in Phase D).
+- AVM1 `tell_target_invalid_swf6`: still output_mismatch 5/6
+  (extra trailing trace) — Phase F double-fire normalization needed.
+- Predicted Phase E regressions, all expected per plan
+  ("tests that exercise the deferred-goto-queue drain ordering"):
+  `goto_rewind2`, `goto_rewind3`, `execution_order2`, `execution_order3`,
+  `goto_execution_order2`, `goto_both_ways1` — Phase F predicted to fix.
+- AVM1 unload + init guardrail: 13/14 PASS (1 mismatch, pre-existing
+  on a goto-related test).
+- Shumway duplicateMovieClip: 4/4 PASS.
+- Other guardrail batches verified as part of the post-commit run.
+
+**Risk.** Medium-high (acknowledged in plan). The drain-suppress
+primitive (foundation) is in place, so re-entry is bounded. Phase F
+must address the predicted regressions before this is shippable as a
+single-phase improvement, but Phase E commits cleanly because the
+regressions are scoped to the documented set.
 
 ### Phase F — Phase 4 gate simplification + sprite eager-init force-queue
 

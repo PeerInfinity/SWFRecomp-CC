@@ -25219,21 +25219,17 @@ void actionGotoFrame(SWFAppContext* app_context, u16 frame)
 
 #ifdef NO_GRAPHICS
 	goto_from_action = 1;
-	// Execute tags-only catch-up inline (PlaceObject, etc.) so that properties
-	// like clip._x reflect the new frame's state. Scripts are deferred until
-	// after the calling script finishes.
+	// Phase E (GOTO_FIFO_UNIFICATION_INCREMENTAL): ng_executeGotoCatchUp now
+	// inlines funcs[target] in scripts-only mode at the end of the call.
+	// Ruffle: "gotoAndStop(9999) displays the final frame, but actions don't run!"
+	// — set the one-shot skip flag so the inline target call is skipped when
+	// the requested frame was clamped past the last frame.
+	if (was_clamped) {
+		extern int g_skip_inline_target_script;
+		g_skip_inline_target_script = 1;
+	}
 	extern void ng_executeGotoCatchUp(SWFAppContext* app_context);
 	ng_executeGotoCatchUp(app_context);
-	// Ruffle: "gotoAndStop(9999) displays the final frame, but actions don't run!"
-	// When the requested frame was beyond the last frame, suppress the deferred script.
-	if (was_clamped) {
-		extern int g_deferred_goto_script;
-		extern int g_deferred_goto_queue_count;
-		g_deferred_goto_script = 0;
-		// Remove the last queue entry (the one just added by ng_executeGotoCatchUp)
-		if (g_deferred_goto_queue_count > 0)
-			g_deferred_goto_queue_count--;
-	}
 #endif
 }
 
@@ -34558,14 +34554,34 @@ void actionSetTarget2(SWFAppContext* app_context)
 	{
 		MovieClip* mc = (MovieClip*) VAL(u64, &STACK_TOP_VALUE);
 		POP();
-		if (mc != NULL && mc->depth != INT_MIN)
+		MovieClip* picked;
+		if (mc != NULL && mc->depth != INT_MIN) {
 			setCurrentContext(mc);
-		else {
+			picked = mc;
+		} else {
 			// NULL or removed MovieClip → reset to base clip
 			MovieClip* base = g_base_clip ? g_base_clip : &root_movieclip;
 			if (base->depth == INT_MIN) base = &root_movieclip;
 			setCurrentContext(base);
+			picked = base;
 		}
+#ifdef NO_GRAPHICS
+		// Mirror actionSetTarget's bookkeeping so subsequent GotoFrame /
+		// Play / Stop pick the correct branch. Without this, SetTarget2(_root)
+		// where the stack already holds the MOVIECLIP-typed _root reference
+		// (e.g. `_root.gotoAndStop(N)` inside a sprite script via the
+		// PushString/GetVariable/SetTarget2 idiom) leaves
+		// g_settarget_explicit_root=0, so actionGotoFrame falls through to
+		// ng_gotoFrameCurrentSprite on the calling sprite — which under
+		// Phase D's unified drain re-queues the sprite's frame_0 script
+		// indefinitely (issue_9885).
+		extern int g_settarget_explicit_root;
+		extern int g_settarget_invalid;
+		extern int g_settarget_none;
+		g_settarget_explicit_root = (picked == &root_movieclip) ? 1 : 0;
+		g_settarget_invalid = 0;
+		g_settarget_none = 0;
+#endif
 		return;
 	}
 
