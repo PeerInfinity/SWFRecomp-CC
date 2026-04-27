@@ -17,7 +17,7 @@ phases:
     status: complete
   - id: D
     name: "Flip g_unify_sprite_drain=1 — sprite goto from inside sprite scripts dispatches in FIFO"
-    status: pending
+    status: complete
   - id: E
     name: "ng_executeGotoCatchUp: inline funcs[target] with drain-suppress (was Phase 2 of original plan)"
     status: pending
@@ -226,27 +226,51 @@ edittext_test1 pass; movieclip_destruction_test2 unchanged at
 
 **Risk.** Zero in the default-off path — confirmed.
 
-### Phase D — Flip g_unify_sprite_drain=1
+### Phase D — Flip g_unify_sprite_drain=1 — COMPLETE 2026-04-26
 
-**Scope.** Set `g_unify_sprite_drain=1` globally (or version-gate to
-SWF6+ if regressions concentrate in SWF5). This activates the unified
-sprite-script dispatch path.
+**Scope.** Set `g_unify_sprite_drain=1` globally by changing the
+default of `g_unify_sprite_drain_flag` in
+`SWFModernRuntime/src/actionmodern/action_queue.c` from 0 to 1.
+`actionSetUnifySpriteDrain` is the public setter but is never called
+externally, so flipping the default is the cleanest activation path.
 
-**Behavior delta.** Sprite gotos from inside sprite scripts now
-dispatch the next sprite frame's script via FIFO. Likely fixes a
-subset of `consecutive_goto_frame_test`'s failing lines (the trailing
-sprite-DoAction-after-totals symptom). Likely regresses tests that
-relied on the deferred-to-next-tick ordering — predicted regressions:
-`loop_test*` cluster, `goto_rewind1/2/3`, `clip_events`,
-`register_and_init_order`.
+**Behavior delta on target test.** `consecutive_goto_frame_test`
+shifted from 4 matching lines to 3 — the queueing now fires
+sprite scripts in sequence (`frm1/frm2/frm3 of mc_red`
+gotoAndStop traces appear adjacent at the start) but they cluster
+*before* root re-entry, so the expected interleaved
+`PASSED ... frm3 of root ...` ordering still doesn't match. As
+predicted in the plan, Phase D alone is insufficient — Phases E and F
+must land for the test to reach 12/12.
 
-**Verification.** Full local guardrail (15-20 tests). Push to CI;
-expect 1-3 iterations to triage regressions.
+**Verification.** No guardrail regressions. Tested:
+- AVM1 goto/rewind: 15/15 PASS (`goto_rewind1/2/3`,
+  `execution_order1/2/3`, `goto_execution_order/2`,
+  `goto_both_ways1/2`, `rewind_depth`, `goto_frame`, `goto_frame2`,
+  `goto_label`, `goto_methods`).
+- AVM1 unload + init: 12/12 PASS (`unload`, `unloadmovie`,
+  `unload_clip_event`, `unload_nested_child`, `mcl_unloadclip`,
+  `depth_replacement_audio_unloading`, `clip_events`, `on_construct`,
+  `register_and_init_order`, `init_object_order`, `set_interval`,
+  `movieclip_state_values`).
+- misc-ming loop battery: 7 PASS + 1 ruffle_matched + 3 pre-existing
+  output_mismatch (`loop_test`, `loop_test6`, `loop_test10` —
+  unchanged from Phase B/C baseline).
+- misc-ming flat: 17/17 PASS (`DefineEditTextTest`,
+  `DefineEditTextVariableNameTest2`, `ResolveEventsTest`,
+  `attachMovieTest`, `event_handler_scope_test`, `instanceNameTest`,
+  `new_child_in_unload_test`, `static_vs_dynamic1/2`,
+  `displaylist_depths_test11`, `place_and_remove_object_test`,
+  `shape_test`, `get_frame_number_test`,
+  `action_execution_order_test8-v5/v6`,
+  `reverse_execute_PlaceObject2_test1/2`).
+- Shumway duplicateMovieClip: 4/4 PASS.
+- misc-swfc: 3 PASS + `movieclip_destruction_test2` unchanged at 50/52.
 
-**Risk.** High — first behavior change. Mitigation: version-gate to
-SWF6+ if SWF5 regressions are unmanageable.
+**Risk.** High — first behavior change. Cleared local guardrail; CI
+roundtrip should confirm no regressions outside the local guardrail.
 
-**Stop criterion.** If regressions exceed, say, 5 unrelated tests,
+**Stop criterion.** If regressions exceed ~5 unrelated tests,
 revert the flip and document; that pivots back to investigating a
 narrower flag scope.
 

@@ -32,8 +32,11 @@ void actionDrainSuppressEnter(void) { g_drain_suppress_depth++; }
 void actionDrainSuppressLeave(void) { g_drain_suppress_depth--; }
 int  actionDrainSuppressed(void)    { return g_drain_suppress_depth; }
 
-// Phase C (GOTO_FIFO_UNIFICATION_INCREMENTAL): see header doc. Default 0.
-static int g_unify_sprite_drain_flag = 0;
+// Phase D (GOTO_FIFO_UNIFICATION_INCREMENTAL): default flipped from 0 → 1.
+// Activates the unified sprite-script dispatch path: gotos issued from inside
+// sprite frame scripts FIFO-interleave with the surrounding drain instead of
+// firing on the next tick.
+static int g_unify_sprite_drain_flag = 1;
 void actionSetUnifySpriteDrain(int v) { g_unify_sprite_drain_flag = v ? 1 : 0; }
 int  actionUnifySpriteDrain(void)     { return g_unify_sprite_drain_flag; }
 
