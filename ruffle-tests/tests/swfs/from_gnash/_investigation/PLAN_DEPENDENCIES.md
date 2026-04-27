@@ -25,9 +25,9 @@ GOTO_CATCHUP_HYGIENE_PLAN (blocked/)
    │ Phases 1-5 landed; Phase 6 split out as its own plan.
    ↓
    ├──► GOTO_FIFO_UNIFICATION_PLAN (blocked/)
-   │       │ status: blocked — kept as architectural reference only.
+   │       │ status: superseded — kept as architectural reference only.
    │       │ Atomic-commit framing was untractable; reframed as the
-   │       │ incremental plan below.
+   │       │ incremental plan below, which is now complete.
    │       ↓ reframed by
    │       GOTO_FIFO_UNIFICATION_INCREMENTAL_PLAN (complete/)
    │           │ status: complete — Phases A-H all landed.
