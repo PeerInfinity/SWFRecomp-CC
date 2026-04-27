@@ -1,83 +1,80 @@
 # Ruffle Test Results (Unfiltered)
 
-**Date**: 2026-04-27 00:35 UTC
+**Date**: 2026-04-27 01:54 UTC
 
-**Git SHA**: `d6808409a8`
+**Git SHA**: `df6df0c005`
 
-**Run Duration**: 0m 34s
+**Run Duration**: 22m 56s
 
 ## Summary
 
 | Metric | Value |
 |--------|-------|
 | Total tests | 102 |
-| Passing | **46** (45.1%) |
+| Passing | **43** (42.2%) |
 | Ruffle-matched | 12 (diffs ⊆ Ruffle's against Flash) |
-| Effective pass | **58** (56.9%) |
-| Failing | 44 |
+| Effective pass | **55** (53.9%) |
+| Failing | 47 |
 | Total expected lines | 4541 |
-| Matching lines | 2467 (54.3%) |
-| Mismatched lines | 2074 |
+| Matching lines | 2460 (54.2%) |
+| Mismatched lines | 2081 |
 
 ### Failure Breakdown
 
 | Category | Count | % of Failures |
 |----------|-------|---------------|
-| Output Mismatch | 43 | 97.7% |
-| Compile Fail | 1 | 2.3% |
+| Output Mismatch | 46 | 97.9% |
+| Compile Fail | 1 | 2.1% |
 
 ## Passing Tests
 
-**46 tests passing**
+**43 tests passing**
 
 | # | Test | Lines | Duration | Notes |
 |---|------|-------|----------|-------|
-| 1 | `DefineEditTextTest` | 153 | 0.7s |  |
-| 2 | `DefineEditTextVariableNameTest2` | 39 | 0.3s |  |
-| 3 | `PlaceObject2Test` | 9 | 0.2s |  |
-| 4 | `ResolveEventsTest` | 15 | 0.2s |  |
-| 5 | `RollOverOutTest` | 5 | 0.2s |  |
+| 1 | `DefineEditTextTest` | 153 | 17.1s |  |
+| 2 | `DefineEditTextVariableNameTest2` | 39 | 17.0s |  |
+| 3 | `PlaceObject2Test` | 9 | 16.9s |  |
+| 4 | `ResolveEventsTest` | 15 | 0.6s |  |
+| 5 | `RollOverOutTest` | 5 | 17.0s |  |
 | 6 | `VarAndCharClashTest` | 13 | 0.5s |  |
-| 7 | `Video-EmbedSquareTest` | 2 | 0.1s |  |
-| 8 | `action_order/action_execution_order_test1` | 10 | 0.2s |  |
-| 9 | `action_order/action_execution_order_test3` | 4 | 0.2s |  |
-| 10 | `action_order/action_execution_order_test7` | 7 | 0.2s |  |
-| 11 | `action_order/action_execution_order_test8-v5` | 11 | 0.2s |  |
-| 12 | `action_order/action_execution_order_test8-v6` | 11 | 0.2s |  |
-| 13 | `action_order/action_execution_order_test9` | 4 | 0.2s |  |
-| 14 | `attachMovieTest` | 12 | 0.2s |  |
-| 15 | `displaylist_depths/displaylist_depths_test10` | 10 | 0.2s |  |
-| 16 | `displaylist_depths/displaylist_depths_test11` | 15 | 0.2s |  |
-| 17 | `displaylist_depths/displaylist_depths_test4` | 26 | 0.2s |  |
-| 18 | `displaylist_depths/displaylist_depths_test5` | 25 | 0.2s |  |
-| 19 | `displaylist_depths/displaylist_depths_test6` | 13 | 0.2s |  |
-| 20 | `displaylist_depths/displaylist_depths_test7` | 14 | 0.2s |  |
-| 21 | `event_handler_scope_test` | 16 | 0.2s |  |
-| 22 | `getTimer_test` | 8 | 0.2s |  |
-| 23 | `get_frame_number_test` | 31 | 0.3s |  |
-| 24 | `goto_frame_test` | 15 | 0.2s |  |
-| 25 | `instanceNameTest` | 5 | 0.2s |  |
-| 26 | `loop/loop_test2` | 15 | 0.1s |  |
-| 27 | `loop/loop_test3` | 16 | 0.1s |  |
-| 28 | `loop/loop_test4` | 22 | 0.2s |  |
-| 29 | `loop/loop_test5` | 24 | 0.2s |  |
-| 30 | `loop/loop_test8` | 38 | 0.3s |  |
-| 31 | `loop/loop_test9` | 15 | 0.2s |  |
-| 32 | `loop/simple_loop_test` | 0 | 0.2s |  |
-| 33 | `masks_test2` | 10 | 0.2s |  |
-| 34 | `morph_test1` | 0 | 0.1s |  |
-| 35 | `move_object_test` | 11 | 0.2s |  |
-| 36 | `multi_doactions_and_goto_frame_test` | 6 | 0.2s |  |
-| 37 | `new_child_in_unload_test` | 11 | 0.2s |  |
-| 38 | `place_and_remove_object_test` | 13 | 0.2s |  |
-| 39 | `reverse_execute_PlaceObject2_test1` | 8 | 0.2s |  |
-| 40 | `reverse_execute_PlaceObject2_test2` | 10 | 0.2s |  |
-| 41 | `runtime_vm_stack_test` | 9 | 0.2s |  |
-| 42 | `shape_test` | 21 | 0.3s |  |
-| 43 | `static_vs_dynamic1` | 17 | 0.2s |  |
-| 44 | `static_vs_dynamic2` | 18 | 0.2s |  |
-| 45 | `timeline_var_test` | 11 | 0.2s |  |
-| 46 | `unload_movieclip_test1` | 6 | 0.2s |  |
+| 7 | `Video-EmbedSquareTest` | 2 | 17.7s |  |
+| 8 | `action_order/action_execution_order_test1` | 10 | 16.5s |  |
+| 9 | `action_order/action_execution_order_test3` | 4 | 17.0s |  |
+| 10 | `action_order/action_execution_order_test9` | 4 | 16.6s |  |
+| 11 | `attachMovieTest` | 12 | 17.1s |  |
+| 12 | `consecutive_goto_frame_test` | 12 | 17.1s |  |
+| 13 | `displaylist_depths/displaylist_depths_test10` | 10 | 16.4s |  |
+| 14 | `displaylist_depths/displaylist_depths_test11` | 15 | 16.7s |  |
+| 15 | `displaylist_depths/displaylist_depths_test4` | 26 | 17.0s |  |
+| 16 | `displaylist_depths/displaylist_depths_test5` | 25 | 0.4s |  |
+| 17 | `displaylist_depths/displaylist_depths_test6` | 13 | 0.4s |  |
+| 18 | `displaylist_depths/displaylist_depths_test7` | 14 | 0.4s |  |
+| 19 | `event_handler_scope_test` | 16 | 17.1s |  |
+| 20 | `getTimer_test` | 8 | 17.7s |  |
+| 21 | `get_frame_number_test` | 31 | 17.4s |  |
+| 22 | `goto_frame_test` | 15 | 17.2s |  |
+| 23 | `instanceNameTest` | 5 | 0.5s |  |
+| 24 | `loop/loop_test2` | 15 | 16.4s |  |
+| 25 | `loop/loop_test3` | 16 | 16.3s |  |
+| 26 | `loop/loop_test4` | 22 | 16.3s |  |
+| 27 | `loop/loop_test5` | 24 | 0.5s |  |
+| 28 | `loop/loop_test8` | 38 | 17.1s |  |
+| 29 | `loop/loop_test9` | 15 | 13.4s |  |
+| 30 | `loop/simple_loop_test` | 0 | 13.7s |  |
+| 31 | `masks_test2` | 10 | 16.2s |  |
+| 32 | `morph_test1` | 0 | 16.5s |  |
+| 33 | `move_object_test` | 11 | 17.0s |  |
+| 34 | `multi_doactions_and_goto_frame_test` | 6 | 16.8s |  |
+| 35 | `new_child_in_unload_test` | 11 | 16.7s |  |
+| 36 | `place_and_remove_object_test` | 13 | 16.8s |  |
+| 37 | `reverse_execute_PlaceObject2_test1` | 8 | 17.8s |  |
+| 38 | `reverse_execute_PlaceObject2_test2` | 10 | 17.8s |  |
+| 39 | `runtime_vm_stack_test` | 9 | 17.1s |  |
+| 40 | `shape_test` | 21 | 17.2s |  |
+| 41 | `static_vs_dynamic1` | 17 | 16.9s |  |
+| 42 | `static_vs_dynamic2` | 18 | 16.5s |  |
+| 43 | `unload_movieclip_test1` | 6 | 16.5s |  |
 
 ## Ruffle-Matched Tests
 
@@ -85,24 +82,24 @@
 
 | # | Test | Our diffs | Ruffle diffs | Duration | Notes |
 |---|------|-----------|--------------|----------|-------|
-| 1 | `ButtonPropertiesTest` | 20 | 20 | 0.2s |  |
-| 2 | `KeyEventOrder` | 20 | 23 | 0.2s |  |
-| 3 | `action_order/action_execution_order_test4` | 6 | 26 | 0.2s |  |
-| 4 | `action_order/action_execution_order_test6` | 5 | 21 | 0.2s |  |
-| 5 | `attachExtImported` | 1 | 1 | 0.3s |  |
-| 6 | `callFunction_test` | 5 | 11 | 0.2s |  |
-| 7 | `init_action/InitActionTest` | 17 | 17 | 0.2s |  |
-| 8 | `init_action/InitActionTest2` | 30 | 30 | 0.3s |  |
-| 9 | `loop/loop_test7` | 1 | 8 | 0.2s |  |
-| 10 | `path_format_test` | 27 | 28 | 0.4s |  |
-| 11 | `place_object_test` | 14 | 14 | 0.2s |  |
-| 12 | `place_object_test2` | 16 | 23 | 0.2s |  |
+| 1 | `ButtonPropertiesTest` | 20 | 20 | 16.4s |  |
+| 2 | `KeyEventOrder` | 20 | 23 | 16.5s |  |
+| 3 | `action_order/action_execution_order_test4` | 6 | 26 | 0.6s |  |
+| 4 | `action_order/action_execution_order_test6` | 12 | 21 | 17.1s |  |
+| 5 | `attachExtImported` | 1 | 1 | 16.5s |  |
+| 6 | `callFunction_test` | 5 | 11 | 17.2s |  |
+| 7 | `init_action/InitActionTest` | 17 | 17 | 16.3s |  |
+| 8 | `init_action/InitActionTest2` | 30 | 30 | 16.4s |  |
+| 9 | `loop/loop_test7` | 1 | 8 | 0.5s |  |
+| 10 | `path_format_test` | 27 | 28 | 16.5s |  |
+| 11 | `place_object_test` | 14 | 14 | 16.9s |  |
+| 12 | `place_object_test2` | 16 | 23 | 16.7s |  |
 
 ## Near-Passing Tests
 
 Tests with output mismatch but >= 50% line match rate (low-hanging fruit).
 
-**14 tests** within reach
+**15 tests** within reach
 
 | # | Test | Match Rate | Matching | Total | Diff Lines | Notes |
 |---|------|------------|----------|-------|------------|-------|
@@ -117,9 +114,10 @@ Tests with output mismatch but >= 50% line match rate (low-hanging fruit).
 | 9 | `DefineEditTextVariableNameTest` | 60.5% | 49 | 81 | 32 |  |
 | 10 | `DragDropTest` | 60.0% | 27 | 45 | 18 |  |
 | 11 | `EmbeddedFontTest` | 57.5% | 50 | 87 | 37 |  |
-| 12 | `attachImported` | 50.0% | 1 | 2 | 1 |  |
-| 13 | `displaylist_depths/displaylist_depths_test3` | 50.0% | 16 | 32 | 16 |  |
-| 14 | `displaylist_depths/displaylist_depths_test8` | 50.0% | 8 | 16 | 8 |  |
+| 12 | `timeline_var_test` | 54.5% | 6 | 11 | 5 |  |
+| 13 | `attachImported` | 50.0% | 1 | 2 | 1 |  |
+| 14 | `displaylist_depths/displaylist_depths_test3` | 50.0% | 16 | 32 | 16 |  |
+| 15 | `displaylist_depths/displaylist_depths_test8` | 50.0% | 8 | 16 | 8 |  |
 
 ## Segfaults
 
@@ -135,7 +133,7 @@ No timeouts.
 
 ## All Output Mismatches
 
-**43 tests** with output mismatch, sorted by match rate (best first)
+**46 tests** with output mismatch, sorted by match rate (best first)
 
 | # | Test | Match Rate | Matching/Total | Actual | Expected | Notes |
 |---|------|------------|----------------|--------|----------|-------|
@@ -150,35 +148,38 @@ No timeouts.
 | 9 | `DefineEditTextVariableNameTest` | 60.5% | 49/81 | 81 | 72 |  |
 | 10 | `DragDropTest` | 60.0% | 27/45 | 45 | 44 |  |
 | 11 | `EmbeddedFontTest` | 57.5% | 50/87 | 87 | 87 |  |
-| 12 | `attachImported` | 50.0% | 1/2 | 2 | 2 |  |
-| 13 | `displaylist_depths/displaylist_depths_test3` | 50.0% | 16/32 | 29 | 32 |  |
-| 14 | `displaylist_depths/displaylist_depths_test8` | 50.0% | 8/16 | 16 | 15 |  |
-| 15 | `displaylist_depths/displaylist_depths_test2` | 48.4% | 15/31 | 28 | 31 |  |
-| 16 | `opcode_guard_test` | 47.6% | 10/21 | 21 | 18 |  |
-| 17 | `action_order/action_execution_order_test5` | 42.6% | 26/61 | 61 | 35 |  |
-| 18 | `action_order/action_execution_order_test11` | 40.6% | 13/32 | 32 | 32 |  |
-| 19 | `register_class/RegisterClassTest4` | 40.5% | 17/42 | 39 | 42 |  |
-| 20 | `action_order/action_execution_order_test2` | 40.0% | 2/5 | 5 | 5 |  |
-| 21 | `NetStream-SquareTest` | 39.8% | 86/216 | 201 | 216 |  |
-| 22 | `key_event_test` | 38.8% | 33/85 | 85 | 66 |  |
-| 23 | `loop/loop_test6` | 37.5% | 9/24 | 24 | 23 |  |
-| 24 | `consecutive_goto_frame_test` | 25.0% | 3/12 | 12 | 12 |  |
-| 25 | `loop/loop_test` | 23.8% | 5/21 | 21 | 21 |  |
-| 26 | `replace_sprites1test` | 20.8% | 5/24 | 24 | 21 |  |
-| 27 | `masks_test` | 16.0% | 28/175 | 28 | 175 |  |
-| 28 | `register_class/RegisterClassTest3` | 14.3% | 2/14 | 14 | 12 |  |
-| 29 | `displaylist_depths/displaylist_depths_test9` | 13.0% | 3/23 | 21 | 23 |  |
-| 30 | `loop/loop_test10` | 10.7% | 3/28 | 23 | 28 |  |
-| 31 | `action_order/ActionOrderTest5` | 9.8% | 6/61 | 61 | 51 |  |
-| 32 | `action_order/ActionOrderTest4` | 9.5% | 7/74 | 74 | 64 |  |
-| 33 | `duplicate_movie_clip_test` | 9.1% | 3/33 | 30 | 33 |  |
-| 34 | `action_order/ActionOrderTest3` | 8.0% | 6/75 | 75 | 62 |  |
-| 35 | `ButtonEventsTest` | 6.9% | 47/679 | 81 | 679 |  |
-| 36 | `loading/loadMovieTest` | 6.2% | 5/80 | 5 | 80 |  |
-| 37 | `register_class/registerClassTest` | 3.9% | 2/51 | 50 | 51 |  |
-| 38 | `BeginBitmapFill` | 0.0% | 0/1 | 1 | 1 |  |
-| 39 | `Version4Loader` | 0.0% | 0/11 | 0 | 11 |  |
-| 40 | `frame_label_test` | 0.0% | 0/17 | 0 | 17 |  |
-| 41 | `register_class/registerClassTest2` | 0.0% | 0/44 | 42 | 44 |  |
-| 42 | `replace_buttons1test` | 0.0% | 0/24 | 24 | 18 |  |
-| 43 | `replace_shapes1test` | 0.0% | 0/32 | 32 | 23 |  |
+| 12 | `timeline_var_test` | 54.5% | 6/11 | 10 | 11 |  |
+| 13 | `attachImported` | 50.0% | 1/2 | 2 | 2 |  |
+| 14 | `displaylist_depths/displaylist_depths_test3` | 50.0% | 16/32 | 29 | 32 |  |
+| 15 | `displaylist_depths/displaylist_depths_test8` | 50.0% | 8/16 | 16 | 15 |  |
+| 16 | `displaylist_depths/displaylist_depths_test2` | 48.4% | 15/31 | 28 | 31 |  |
+| 17 | `opcode_guard_test` | 47.6% | 10/21 | 21 | 18 |  |
+| 18 | `action_order/action_execution_order_test8-v5` | 45.5% | 5/11 | 8 | 11 |  |
+| 19 | `action_order/action_execution_order_test8-v6` | 45.5% | 5/11 | 8 | 11 |  |
+| 20 | `action_order/action_execution_order_test5` | 42.6% | 26/61 | 61 | 35 |  |
+| 21 | `action_order/action_execution_order_test11` | 40.6% | 13/32 | 32 | 32 |  |
+| 22 | `register_class/RegisterClassTest4` | 40.5% | 17/42 | 39 | 42 |  |
+| 23 | `action_order/action_execution_order_test2` | 40.0% | 2/5 | 5 | 5 |  |
+| 24 | `NetStream-SquareTest` | 39.8% | 86/216 | 201 | 216 |  |
+| 25 | `key_event_test` | 38.8% | 33/85 | 85 | 66 |  |
+| 26 | `loop/loop_test6` | 37.5% | 9/24 | 24 | 23 |  |
+| 27 | `action_order/ActionOrderTest5` | 35.3% | 18/51 | 51 | 51 |  |
+| 28 | `loop/loop_test` | 23.8% | 5/21 | 21 | 21 |  |
+| 29 | `replace_sprites1test` | 20.8% | 5/24 | 24 | 21 |  |
+| 30 | `masks_test` | 16.0% | 28/175 | 28 | 175 |  |
+| 31 | `action_order/action_execution_order_test7` | 14.3% | 1/7 | 6 | 7 |  |
+| 32 | `register_class/RegisterClassTest3` | 14.3% | 2/14 | 14 | 12 |  |
+| 33 | `action_order/ActionOrderTest4` | 14.1% | 9/64 | 64 | 64 |  |
+| 34 | `displaylist_depths/displaylist_depths_test9` | 13.0% | 3/23 | 21 | 23 |  |
+| 35 | `loop/loop_test10` | 10.7% | 3/28 | 23 | 28 |  |
+| 36 | `action_order/ActionOrderTest3` | 9.2% | 6/65 | 65 | 62 |  |
+| 37 | `duplicate_movie_clip_test` | 9.1% | 3/33 | 30 | 33 |  |
+| 38 | `ButtonEventsTest` | 6.9% | 47/679 | 81 | 679 |  |
+| 39 | `loading/loadMovieTest` | 6.2% | 5/80 | 5 | 80 |  |
+| 40 | `register_class/registerClassTest` | 3.9% | 2/51 | 50 | 51 |  |
+| 41 | `BeginBitmapFill` | 0.0% | 0/1 | 1 | 1 |  |
+| 42 | `Version4Loader` | 0.0% | 0/11 | 0 | 11 |  |
+| 43 | `frame_label_test` | 0.0% | 0/17 | 0 | 17 |  |
+| 44 | `register_class/registerClassTest2` | 0.0% | 0/44 | 42 | 44 |  |
+| 45 | `replace_buttons1test` | 0.0% | 0/24 | 24 | 18 |  |
+| 46 | `replace_shapes1test` | 0.0% | 0/32 | 32 | 23 |  |
