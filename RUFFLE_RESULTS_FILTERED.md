@@ -3,9 +3,9 @@
 *Tests on the [ignored list](ruffle-tests/ignored_tests.txt) are excluded.*  
 *See [RUFFLE_RESULTS.md](RUFFLE_RESULTS.md) for unfiltered results.*
 
-**Commit:** `4b7c1fe00eab`  
-**Date:** 2026-04-27 20:37 UTC  
-**Total duration:** 1h53m57s
+**Commit:** `8bc86c4f0511`  
+**Date:** 2026-04-27 21:36 UTC  
+**Total duration:** 2h20m45s
 
 ## Results by Suite
 
@@ -29,13 +29,13 @@
 |-------|--------:|---------:|---------:|
 | avm1 | 94,915 | 95,093 | 99.8% |
 | from_gnash/actionscript.all | 14,757 | 16,957 | 87.0% |
-| from_gnash/misc-ming.all | 2,503 | 4,541 | 55.1% |
+| from_gnash/misc-ming.all | 2,569 | 4,541 | 56.6% |
 | from_gnash/misc-mtasc.all | 205 | 231 | 88.7% |
 | from_gnash/misc-swfc.all | 262 | 499 | 52.5% |
 | from_gnash/misc-swfmill.all | 47 | 51 | 92.2% |
 | from_shumway | 663 | 1,276 | 52.0% |
 | from_shumway/avm1 | 480 | 480 | 100% |
-| **Total** | **113,832** | **119,128** | **95.6%** |
+| **Total** | **113,898** | **119,128** | **95.6%** |
 
 ## Failure Breakdown
 
@@ -43,13 +43,13 @@
 |-------|--------------:|-----------------:|----------------:|
 | avm1 | - | - | 4 |
 | from_gnash/actionscript.all | - | 22 | 55 |
-| from_gnash/misc-ming.all | 1 | 39 | 12 |
+| from_gnash/misc-ming.all | 1 | 38 | 13 |
 | from_gnash/misc-mtasc.all | - | 1 | 1 |
 | from_gnash/misc-swfc.all | - | 8 | 3 |
 | from_gnash/misc-swfmill.all | - | 2 | 1 |
 | from_shumway | - | 26 | 2 |
 | from_shumway/avm1 | - | - | - |
-| **Total** | **1** | **98** | **78** |
+| **Total** | **1** | **97** | **79** |
 
 ## Near-Passing Tests (≥80% line match)
 
@@ -84,56 +84,56 @@ Tests verified against Flash's actual output (`output.flash.txt`).
 
 - **Pass:** 596/600 (99.3%)
 - **Ignored:** 41 tests
-- **Duration:** 54m23s across 30 shards
+- **Duration:** 1h03m38s across 30 shards
 - **Lines:** 94,915/95,093 matching (99.8%)
-- **Avg test duration:** 5.0s — slowest: `edittext_password_copy` (21.5s)
+- **Avg test duration:** 5.9s — slowest: `movieclip_invalid_get_bounds_6` (28.0s)
 
 ### from_gnash/actionscript.all
 
 - **Pass:** 113/190 (59.5%)
-- **Duration:** 11m32s across 30 shards
+- **Duration:** 21m38s across 30 shards
 - **Lines:** 14,757/16,957 matching (87.0%)
-- **Avg test duration:** 3.6s — slowest: `XMLSocket-v7` (18.6s)
+- **Avg test duration:** 6.8s — slowest: `String-v8` (33.8s)
 
 ### from_gnash/misc-ming.all
 
 - **Pass:** 50/102 (49.0%)
-- **Duration:** 23m02s across 30 shards
-- **Lines:** 2,503/4,541 matching (55.1%)
-- **Avg test duration:** 13.5s — slowest: `matrix_test` (20.8s)
+- **Duration:** 27m59s across 30 shards
+- **Lines:** 2,569/4,541 matching (56.6%)
+- **Avg test duration:** 16.4s — slowest: `matrix_test` (103.4s)
 
 ### from_gnash/misc-mtasc.all
 
 - **Pass:** 7/9 (77.8%)
-- **Duration:** 1m43s across 30 shards
+- **Duration:** 1m53s across 30 shards
 - **Lines:** 205/231 matching (88.7%)
-- **Avg test duration:** 11.4s — slowest: `exception` (18.3s)
+- **Avg test duration:** 12.5s — slowest: `TextFieldTest` (19.1s)
 
 ### from_gnash/misc-swfc.all
 
 - **Pass:** 5/16 (31.2%)
-- **Duration:** 3m57s across 30 shards
+- **Duration:** 4m17s across 30 shards
 - **Lines:** 262/499 matching (52.5%)
-- **Avg test duration:** 14.8s — slowest: `edittext_test1` (18.0s)
+- **Avg test duration:** 16.0s — slowest: `edittext_test1` (19.5s)
 
 ### from_gnash/misc-swfmill.all
 
 - **Pass:** 15/18 (83.3%)
-- **Duration:** 5m03s across 30 shards
+- **Duration:** 5m11s across 30 shards
 - **Lines:** 47/51 matching (92.2%)
-- **Avg test duration:** 16.8s — slowest: `dict_callframe` (18.1s)
+- **Avg test duration:** 17.2s — slowest: `func_dict` (19.3s)
 
 ### from_shumway
 
 - **Pass:** 64/92 (69.6%)
-- **Duration:** 12m36s across 30 shards
+- **Duration:** 13m56s across 30 shards
 - **Lines:** 663/1,276 matching (52.0%)
-- **Avg test duration:** 8.2s — slowest: `fuzz/b480790b84c3a62fe6fa3486d26fd23988a5acd038261c04349ad4368107e6ca` (19.1s)
+- **Avg test duration:** 9.0s — slowest: `fuzz/cf67270dbe5367af59f1bf029f413b8b7b0fb7000cbd0ee534d369087d20601b` (20.0s)
 
 ### from_shumway/avm1
 
 - **Pass:** 45/45 (100%)
 - **Ignored:** 2 tests
-- **Duration:** 1m39s across 30 shards
+- **Duration:** 2m10s across 30 shards
 - **Lines:** 480/480 matching (100%)
-- **Avg test duration:** 1.8s — slowest: `label` (17.0s)
+- **Avg test duration:** 2.4s — slowest: `text-bind` (18.4s)
