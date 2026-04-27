@@ -108,6 +108,54 @@ guardrail must keep the 14 passing AVM1 registerClass tests green —
 `register_and_init_order` (the long test), `clip_constructors`,
 `movieclip_init_object`, `do_init_action_child`, etc.
 
+### 2026-04-27 investigation: dispatch already wired, but trace lost
+
+`actionQueueMCOnLoad(child_mc)` is already called for timeline-placed
+RegisterClass sprites at `tag.c:570-571` (no code change needed there).
+`actionDispatchMCOnLoad` runs for square2 in registerClassTest, finds
+`prototype.onLoad` via `getPropertyWithPrototype` (type=13 FUNCTION),
+and invokes `simple_func`. Body runs (we know because line 4 expected
+`_root.onLoadCalled.length == 1` PASSES — i.e. `_root.onLoadCalled.push(this)`
+inside the handler ran). But the `note(this+'.onLoad called')` trace
+never appears in the output.
+
+The body is:
+```js
+CustomClass.prototype.onLoad = function() {
+  note(this+'.onLoad called');           // <— trace lost
+  _root.onLoadCalled.push(this);          // <— this ran
+};
+```
+
+`this` inside the handler is correctly the MC (we know because `push(this)`
+ended up storing a reference whose toString resolves to `_level0.square2`).
+So the failure is *not* `this`. Two hypotheses, neither verified yet:
+
+1. **`note` lookup fails silently.** The handler is type 1 (DefineFunction
+   with no registers / preload flags). `actionDispatchMCOnLoad`'s type-1
+   branch invokes `simple_func` directly without pushing a local activation
+   ASObject onto `scope_chain` and without restoring `func->captured_scope[]`.
+   For a closure-captured `note` reference (mtasc/Ming may compile `note(...)`
+   as a free-variable lookup that walks captured scopes), the captured
+   `_root.note` binding goes missing.
+2. **Trace timing race vs. close-of-output.** Less likely — `_root.note`
+   uses `_root.xtrace` + `trace`, both of which feed stdout, and other
+   `note` calls *do* show up in this same test (the `s == 'onLoad,onRollOver,'`
+   line at 27, etc., is a check_equals which goes through note/fail path).
+
+Hypothesis 1 is the one to pursue. The fix is to mirror the type-1 setup
+that `actionCallFunction` does: allocate a fresh local activation, push it
+onto `scope_chain` (with `scope_is_with[i] = 0`, `scope_mc[i] = mc`),
+restore `func->captured_scope_count` captured WITH scopes, push `this`
+onto `g_this_stack`, and tear it all down on return. The shape is identical
+to `actionInvokeRegisteredClassConstructor`'s type-1 branch
+(`registered_class.c:263-311`) — that path is known to work.
+
+After Phase 1 is shipped, expect:
+- `registerClassTest`: 2/51 → ~40+/51 (the missing line 3 plus the
+  cascading off-by-one diffs collapse).
+- Other tests largely unaffected (Phase 1 is timeline-RC-specific).
+
 ## Phase 2 — `mc.constructor` proto-chain fallthrough
 
 **Problem.** registerClassTest2 line 7:
