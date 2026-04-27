@@ -40,6 +40,11 @@ void ng_registerMovieTransformData(u8 movie_id, float (*td)[16]) {
 		g_movie_transform_data[movie_id] = td;
 }
 
+float (*ng_getMovieTransformData(u8 movie_id))[16] {
+	if (movie_id >= MAX_MOVIE_TRANSFORM_ENTRIES) return NULL;
+	return g_movie_transform_data[movie_id];
+}
+
 #if defined(NO_GRAPHICS) || defined(HEADLESS_GRAPHICS)
 // NO_GRAPHICS / HEADLESS: extern data arrays from generated code
 extern float transform_data[][16];
@@ -2734,10 +2739,23 @@ int sprite_content_bounds_twips(DisplayObject* dl, size_t dl_max,
 		if (child->char_id == 0) continue;
 		Character* ch = &dictionary[child->char_id];
 
+#if defined(NO_GRAPHICS) || defined(HEADLESS_GRAPHICS)
+		// Use cached place_* values from the DisplayObject — these were
+		// captured at PlaceObject2 time using whichever transform_data
+		// table was active (parent's or imported child's). Indexing into
+		// the global transform_data[] here would silently use the parent's
+		// table even for imported child sprites whose transform_ids index
+		// into the child's table.
+		float tx = child->place_tx;
+		float ty = child->place_ty;
+		float sx = child->place_a;
+		float sy = child->place_d;
+#else
 		float tx = transform_data[child->transform_id][12];
 		float ty = transform_data[child->transform_id][13];
 		float sx = transform_data[child->transform_id][0];
 		float sy = transform_data[child->transform_id][5];
+#endif
 
 		if (ch->type == CHAR_TYPE_SHAPE || ch->type == CHAR_TYPE_MORPH_SHAPE ||
 		    ch->type == CHAR_TYPE_TEXT)

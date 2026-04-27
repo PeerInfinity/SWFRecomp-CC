@@ -21847,12 +21847,16 @@ static int mcGetOriginalBounds(MovieClip* mc, double* out_nat_w, double* out_nat
 
 	// For sprites/shapes, use display entry bounds (these are unscaled by AS xscale/yscale)
 	size_t entry_idx;
+	int has_entry = 1;
 	if (mc == &root_movieclip) {
 		entry_idx = (size_t)-1;
 	} else {
 		entry_idx = ng_findDisplayEntryIdx(mc->name);
+		if (entry_idx == (size_t)-1) has_entry = 0;
 	}
-	int has_static = ng_getDisplayEntryBounds(entry_idx, &gxmin, &gxmax, &gymin, &gymax);
+	int has_static = has_entry
+		? ng_getDisplayEntryBounds(entry_idx, &gxmin, &gxmax, &gymin, &gymax)
+		: 0;
 
 	// Union with Drawing API bounds if present
 	if (mc->draw_has_bounds) {
@@ -21878,8 +21882,11 @@ static int mcGetOriginalBounds(MovieClip* mc, double* out_nat_w, double* out_nat
 
 	// Fallback: use stored width/height (set by ng_attachMovie for dynamically attached clips)
 	if (mc->width > 0.0f || mc->height > 0.0f) {
-		*out_nat_w = (double)mc->width;
-		*out_nat_h = (double)mc->height;
+		// Re-round to twips to recover an exact double from the float storage —
+		// otherwise a 1202-twip / 20-pixel bounds round-trips through float as
+		// 60.0999984741... instead of 60.1.
+		*out_nat_w = round((double)mc->width * 20.0) / 20.0;
+		*out_nat_h = round((double)mc->height * 20.0) / 20.0;
 		return 1;
 	}
 
@@ -21941,8 +21948,12 @@ static void mcGetEffectiveSize(MovieClip* mc, double* eff_w, double* eff_h)
 	double abs_sw = fabs(scaled_w);
 	double abs_sh = fabs(scaled_h);
 	if (rot == 0.0) {
-		*eff_w = abs_sw;
-		*eff_h = abs_sh;
+		// Round to twips: float storage of xscale/yscale (loaded back to double
+		// here) introduces ~1e-7 residue when set via _height = N. Flash's
+		// coords are twip-precise, so collapsing to twips removes the artifact
+		// without losing real precision. Matches the rotation branch below.
+		*eff_w = round(abs_sw * 20.0) / 20.0;
+		*eff_h = round(abs_sh * 20.0) / 20.0;
 	} else {
 		double rot_rad = rot * 3.14159265358979323846 / 180.0;
 		double c = fabs(cos(rot_rad));
@@ -26666,6 +26677,50 @@ void actionImportAssets(SWFAppContext* app_context, const char* url)
 		g_active_transform_data = entry->transform_data_ptr;
 
 	entry->init_func(app_context);
+
+	// Also run the child's frame_0 to register character definitions
+	// (tagDefineShape, ng_record_char_path, tagDefineButton, etc.) that the
+	// recompiler emits inside the main timeline's frame_0 rather than tagInit.
+	// Without these, attachMovie of an imported sprite finds the sprite but
+	// has no bounds for its child shapes, giving 0 _width/_height.
+	//
+	// Swap display_list to a throwaway buffer so the child's frame_0
+	// tagPlaceObject2 calls don't mutate the parent's root display list.
+	// catch_up_mode=1 suppresses actionDrainOnloadAndScript for the child's
+	// frame_0 (which would otherwise drain scripts intended for later frames).
+	if (entry->frame_count > 0 && entry->frame_funcs != NULL
+	    && entry->frame_funcs[0] != NULL) {
+		extern DisplayObject* display_list;
+		extern size_t max_depth;
+		extern size_t display_list_capacity;
+		extern int catch_up_mode;
+		extern int g_tag_skip_mode;
+		extern int quit_swf;
+		DisplayObject* _saved_dl = display_list;
+		size_t _saved_max = max_depth;
+		size_t _saved_cap = display_list_capacity;
+		int _saved_catch = catch_up_mode;
+		int _saved_tag_skip = g_tag_skip_mode;
+		int _saved_quit = quit_swf;
+		size_t scratch_cap = 64;
+		DisplayObject* scratch_dl = (DisplayObject*) calloc(scratch_cap, sizeof(DisplayObject));
+		if (scratch_dl != NULL) {
+			display_list = scratch_dl;
+			max_depth = 0;
+			display_list_capacity = scratch_cap;
+			catch_up_mode = 1;
+			g_tag_skip_mode = 1;  // skip placements + show_frame
+			quit_swf = 0;
+			entry->frame_funcs[0](app_context);
+			g_tag_skip_mode = _saved_tag_skip;
+			catch_up_mode = _saved_catch;
+			quit_swf = _saved_quit;
+			display_list = _saved_dl;
+			max_depth = _saved_max;
+			display_list_capacity = _saved_cap;
+			free(scratch_dl);
+		}
+	}
 
 	g_active_transform_data = _saved_td;
 	g_swf_version = _saved_ver;

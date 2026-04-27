@@ -785,7 +785,7 @@ void tagImportCharacter(SWFAppContext* app_context, size_t local_char_id, const 
 {
 	(void)app_context;
 	size_t exported_char_id = ng_lookupExport(export_name);
-	if (exported_char_id == 0) return;
+	if (exported_char_id == (size_t)-1 || exported_char_id == 0) return;
 	if (local_char_id >= dictionary_capacity || exported_char_id >= dictionary_capacity)
 		return;
 	dictionary[local_char_id] = dictionary[exported_char_id];
@@ -804,6 +804,26 @@ void tagImportCharacter(SWFAppContext* app_context, size_t local_char_id, const 
 			g_char_movie_id_capacity = new_cap;
 		}
 		g_char_movie_id[local_char_id] = g_char_movie_id[exported_char_id];
+	}
+	// Register the imported symbol as an export in the importing movie's
+	// namespace so attachMovie / ng_lookupExportForMovie can find it.
+	// Without this, the symbol is only registered under the source child
+	// movie's id, and per-movie attachMovie lookup from the parent fails.
+	u8 src_version = 0;
+	for (size_t i = 0; i < ng_exported_symbol_count; i++) {
+		if (ng_exported_symbols[i].char_id == exported_char_id
+		    && strcasecmp(ng_exported_symbols[i].name, export_name) == 0) {
+			src_version = ng_exported_symbols[i].swf_version;
+			break;
+		}
+	}
+	if (ng_exported_symbol_count < MAX_EXPORTED_SYMBOLS) {
+		strncpy(ng_exported_symbols[ng_exported_symbol_count].name, export_name, 127);
+		ng_exported_symbols[ng_exported_symbol_count].name[127] = '\0';
+		ng_exported_symbols[ng_exported_symbol_count].char_id = local_char_id;
+		ng_exported_symbols[ng_exported_symbol_count].swf_version = src_version;
+		ng_exported_symbols[ng_exported_symbol_count].movie_id = g_current_movie_id;
+		ng_exported_symbol_count++;
 	}
 }
 

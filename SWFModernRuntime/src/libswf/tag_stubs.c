@@ -452,6 +452,23 @@ MovieClip* ng_attachMovie(SWFAppContext* app_context, size_t char_id, const char
 		int _am_saved_tag_skip = g_tag_skip_mode;
 		g_tag_skip_mode = 0;
 		catch_up_mode = 1;
+		// If this character was imported from a child SWF, switch
+		// g_active_transform_data to the child's transform_data so that
+		// tagPlaceObject2 calls inside funcs[0] cache transforms from the
+		// correct table. Without this, the child's frame_0 indexes into
+		// the parent's transform_data and produces wrong _width/_height
+		// (key tests: from_gnash misc-ming.all/attachImported,
+		// attachMovieLoopingTest).
+		extern u8* g_char_movie_id;
+		extern size_t g_char_movie_id_capacity;
+		extern float (*g_active_transform_data)[16];
+		extern float (*ng_getMovieTransformData(u8 movie_id))[16];
+		float (*_am_saved_active_td)[16] = g_active_transform_data;
+		if (g_char_movie_id != NULL && char_id < g_char_movie_id_capacity
+		    && g_char_movie_id[char_id] != 0) {
+			float (*child_td)[16] = ng_getMovieTransformData(g_char_movie_id[char_id]);
+			if (child_td != NULL) g_active_transform_data = child_td;
+		}
 		// Phase 7b fix: suppress sprite DoAction queueing for nested Phase 1
 		// eager inits that run inside funcs[0]. Without this, a child sprite's
 		// frame_0 Phase 1 eager (catch_up=1, eager=1, gotoCatchup=0) hits the
@@ -464,6 +481,7 @@ MovieClip* ng_attachMovie(SWFAppContext* app_context, size_t char_id, const char
 		actionGotoCatchupEnter();
 		funcs[0](app_context);
 		actionGotoCatchupLeave();
+		g_active_transform_data = _am_saved_active_td;
 		catch_up_mode = saved_catch_up;
 		g_tag_skip_mode = _am_saved_tag_skip;
 
