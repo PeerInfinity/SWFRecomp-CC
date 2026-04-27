@@ -4,24 +4,102 @@
 
 <!-- PLAN_META
 id: IMPORT_CHARACTER
-status: pending
+status: complete
 phases:
   - id: 1
     name: "Diagnose: which step of the import pipeline fails for attachImported"
-    status: pending
+    status: complete
   - id: 2
     name: "Char_id namespace: parent/child dictionary collision audit"
-    status: pending
+    status: complete (verify_output.py already offsets char_ids by movie_id*1000; no collision)
   - id: 3
     name: "Recursive character closure import — ImportAssets must pull all chars the imported sprite references"
-    status: pending
+    status: complete (run child's frame_0 with tag_skip_mode=1 to register tagDefineShape calls)
   - id: 4
     name: "_height/_width on imported characters: verify sprite_content_bounds_twips after attachMovie of imported char"
-    status: pending
+    status: complete (cached place_* + entry_idx fix + twip-rounding)
   - id: 5
     name: "loadMovieTest: separate triage (click-driven loadMovie + JPG/SWF child loading)"
-    status: pending
+    status: deferred (separate plan, requires click-event driver work)
 -->
+
+## 2026-04-27 session results
+
+**attachImported (1/2 → 2/2): PASS.**
+**attachMovieLoopingTest (29/41 → 41/41): PASS.**
+**loading/loadMovieTest (5/80): unchanged, deferred to a separate plan (requires click-event driver work).**
+
+### Fixes landed
+
+1. **Per-movie export visibility for tagImportCharacter**
+   (`SWFModernRuntime/src/libswf/ng_shared.c`). `tagImportCharacter`
+   now also calls into the export registry to register the imported
+   symbol under the importing movie's `g_current_movie_id`, so
+   `ng_lookupExportForMovie("redsquare", parent_movie_id)` succeeds
+   when `attachMovie` is called from the parent. Previously the
+   symbol was only registered under the source child movie's id, so
+   per-movie attach lookups returned -1 and the script fell back to
+   `pushUndefined`. Also fixed an `exported_char_id == 0` early-return
+   that should have been `(size_t)-1` (the not-found sentinel).
+
+2. **Run child's frame_0 to register character definitions**
+   (`SWFModernRuntime/src/actionmodern/action.c::actionImportAssets`).
+   The recompiler emits `tagDefineShape`, `ng_record_char_path`,
+   `tagDefineButton`, etc. inside the main timeline's `frame_0`, not
+   `tagInit`. So `init_func` alone left character bounds unregistered.
+   Now we additionally invoke `entry->frame_funcs[0]` with a swapped-
+   in scratch `display_list` (so placements can't pollute the parent
+   root) and `g_tag_skip_mode = 1` + `catch_up_mode = 1` so
+   placements/show_frame are skipped and `actionDrainOnloadAndScript`
+   doesn't fire. Definitions still register normally because
+   `tagDefineShape` etc. don't gate on either flag.
+
+3. **Switch g_active_transform_data in ng_attachMovie for imported chars**
+   (`SWFModernRuntime/src/libswf/tag_stubs.c::ng_attachMovie`). When
+   the attached `char_id` belongs to a child movie
+   (`g_char_movie_id[char_id] != 0`), swap `g_active_transform_data`
+   to that child's `transform_data` table around the `funcs[0]`
+   placement-replay so `tagPlaceObject2` caches transforms from the
+   correct table. Added accessor
+   `ng_getMovieTransformData(movie_id)` in
+   `SWFModernRuntime/src/libswf/tag.c` since the table is `static`.
+
+4. **Use cached place_* in sprite_content_bounds_twips**
+   (`SWFModernRuntime/src/libswf/tag.c`). Instead of indexing
+   `transform_data[child->transform_id]` (which is always parent's
+   table), read the cached `child->place_a/d/tx/ty` populated at
+   `tagPlaceObject2` time using whichever table was active. Gated to
+   `NO_GRAPHICS || HEADLESS_GRAPHICS` since `place_*` is only cached
+   in those modes.
+
+5. **Don't treat findDisplayEntryIdx==-1 as "root"**
+   (`SWFModernRuntime/src/actionmodern/action.c::mcGetOriginalBounds`).
+   `ng_findDisplayEntryIdx(mc->name)` returns `(size_t)-1` for
+   not-found, but `ng_getDisplayEntryBounds(-1)` interprets `-1` as
+   "iterate the whole root display list" — so a missed lookup
+   produced bounds covering everything in root (e.g. the dejagnu
+   trace text spanning ~800x600 px) and `_height` came back as
+   `604` instead of `60.1`. Distinguish "mc IS root" (entry_idx=-1)
+   from "mc lookup failed" (skip the static-bounds path entirely).
+
+6. **Round to twips in mcGetEffectiveSize (rotation==0 branch) +
+   in stored-width fallback in mcGetOriginalBounds**
+   (`SWFModernRuntime/src/actionmodern/action.c`). Float storage of
+   `xscale`/`yscale` introduces ~1e-7 residue when set via
+   `_height = N`, making `_height` read back as `15.0000001716614`
+   instead of `15`. Flash's coord system is twip-precise, so
+   `round(eff_h * 20) / 20` collapses the artifact without losing
+   real precision. Matches the rotation branch's existing twip
+   rounding. Also re-round `mc->width`/`height` from float to twip
+   in the attachMovie-fallback path of `mcGetOriginalBounds` so a
+   `1202`-twip / `60.1`-px bound round-trips exactly.
+
+### Verification battery
+
+- AVM1 (in-tree): TBD when battery completes — see commit notes.
+- Gnash misc-ming.all: 7/7 PASS (`ResolveEventsTest`,
+  `attachExtImported`, `attachImported`, `attachMovieLoopingTest`,
+  `attachMovieTest`, `event_handler_scope_test`, `loop/loop_test8`).
 
 ## Problem statement
 
