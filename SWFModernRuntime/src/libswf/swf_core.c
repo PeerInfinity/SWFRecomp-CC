@@ -203,12 +203,30 @@ void ng_executeGotoCatchUp(SWFAppContext* app_context)
 	g_skip_inline_target_script = 0;  // one-shot
 	if (!skip_inline && target < g_frame_count && funcs[target])
 	{
+		// Phase F (GOTO_FIFO_UNIFICATION_INCREMENTAL): wrap the inline target
+		// script call with deferred sprite init so eager-init scripts queue
+		// alongside the target frame's root script in proper FIFO order.
+		//   Phase 1: sprites placed BEFORE target → queue first.
+		//   Phase 2 (target script): queues "root <target>" via gate.
+		//   Phase 3: sprites placed ON or AFTER target → queue last.
+		// All entries land in AQ_KIND_SCRIPT and the outer (caller) drain
+		// processes them in FIFO order. The drain-suppress wrap on the target
+		// script call is preserved so funcs[target]'s own SHOW_FRAME drain
+		// (if any) doesn't pre-drain entries the caller still owns.
+		extern void ng_run_deferred_sprite_init_before(SWFAppContext*, size_t);
+		extern void ng_run_deferred_sprite_init_on_or_after(SWFAppContext*, size_t);
+		extern int g_defer_sprite_init;
+		int saved_defer_phase_f = g_defer_sprite_init;
+		g_defer_sprite_init = 0;
+		ng_run_deferred_sprite_init_before(app_context, target);
 		int saved_tag_skip_phase_e = g_tag_skip_mode;
 		g_tag_skip_mode = 1;
 		actionDrainSuppressEnter();
 		funcs[target](app_context);
 		actionDrainSuppressLeave();
 		g_tag_skip_mode = saved_tag_skip_phase_e;
+		ng_run_deferred_sprite_init_on_or_after(app_context, target);
+		g_defer_sprite_init = saved_defer_phase_f;
 	}
 }
 

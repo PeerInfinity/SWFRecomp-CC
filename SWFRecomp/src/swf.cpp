@@ -5010,22 +5010,25 @@ namespace SWFRecomp
 							// binds the sprite's MC context at queue time so
 							// drains in root context still run scripts in the
 							// sprite's context.
+							// Phase F (GOTO_FIFO_UNIFICATION_INCREMENTAL): unify
+							// sprite-script queuing under one path. Queue when:
+							//   - normal flow (!catch_up_mode), or
+							//   - target-frame scripts-only replay (g_tag_skip_mode), or
+							//   - Phase 1 eager init outside goto catch-up
+							//     (actionEagerInitActive() && !actionGotoCatchupActive()), or
+							//   - Phase 2 deferred re-run for a sprite that was
+							//     eager-initialized under goto catch-up
+							//     (actionScriptOnlyMode() && actionDeferredSpriteInitActive()).
+							// The Phase 2 case used to sync-fire script_N(app_context)
+							// directly via an ELSE branch, but that ran scripts before
+							// the calling drain could interleave the target frame's
+							// root DoAction. Queuing instead lets the outer FIFO drain
+							// preserve "root target then sprite eager-init" ordering.
 							sprite_definitions
-								<< "\t" << "if ((!catch_up_mode || g_tag_skip_mode || "
-								<< "(actionEagerInitActive() && !actionGotoCatchupActive())) "
-								<< "&& !actionScriptOnlyMode()) "
+								<< "\t" << "if (!catch_up_mode || g_tag_skip_mode || "
+								<< "(actionEagerInitActive() && !actionGotoCatchupActive()) || "
+								<< "(actionScriptOnlyMode() && actionDeferredSpriteInitActive())) "
 								<< "actionQueueSpriteScript(app_context, " << script_name << ");" << endl;
-							// Sync-fire path requires !catch_up_mode. A nested
-							// ng_attachMovie (triggered from inside the outer
-							// deferred dispatcher's pai->func call) sets
-							// catch_up_mode=1 for the inner sprite's funcs[0]
-							// but inherits scriptOnly=1 + deferred=1 from the
-							// outer state. Without the !catch_up_mode guard,
-							// the inner script fires here AND again later when
-							// its own PAI drains.
-							sprite_definitions
-								<< "\t" << "else if (!catch_up_mode && actionScriptOnlyMode() && actionDeferredSpriteInitActive()) "
-								<< script_name << "(app_context);" << endl;
 
 							// Phase A of GOTO_FIFO_UNIFICATION incremental
 							// plan: record (sprite_char_id, frame_idx) →

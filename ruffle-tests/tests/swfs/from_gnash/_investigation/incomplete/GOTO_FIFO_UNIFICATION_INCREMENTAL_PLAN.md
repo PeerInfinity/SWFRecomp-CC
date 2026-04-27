@@ -23,7 +23,7 @@ phases:
     status: complete
   - id: F
     name: "Phase 4 gate simplification + sprite eager-init force-queue during catch-up"
-    status: pending
+    status: complete
   - id: G
     name: "Retire g_deferred_goto_queue + outer drain loop (was Phase 3 of original plan)"
     status: pending
@@ -350,38 +350,114 @@ must address the predicted regressions before this is shippable as a
 single-phase improvement, but Phase E commits cleanly because the
 regressions are scoped to the documented set.
 
-### Phase F — Phase 4 gate simplification + sprite eager-init force-queue
+### Phase F — Phase 4 gate simplification + sprite eager-init force-queue — COMPLETE 2026-04-26
 
-**Scope.** Two coupled changes:
+**Scope.** Two coupled changes (different from the original plan's
+literal `g_tag_skip_mode=1` proposal — that approach would short-circuit
+inner placements via `tagPlaceObject2`'s `if (g_tag_skip_mode) return;`
+guard). The shipped form:
 
-1. Recompiler gate at `swf.cpp:4985-4999` simplifies to:
+1. Recompiler gate at `swf.cpp:5013-5031` rewrites the AND-with-ELSE
+   construct to a single OR with four queue-triggering signals:
    ```c
-   if (!catch_up_mode || g_tag_skip_mode)
+   if (!catch_up_mode || g_tag_skip_mode ||
+       (actionEagerInitActive() && !actionGotoCatchupActive()) ||
+       (actionScriptOnlyMode() && actionDeferredSpriteInitActive()))
        actionQueueSpriteScript(app_context, script_name);
    ```
-   Removes gate g2's `script_only_mode + deferred_sprite_init` sync-fire
-   path.
-2. Sprite eager init in `tagPlaceObject2` (and friends) sets
-   `g_tag_skip_mode=1` for the duration of `sprite_X_frame_0(app_context)`
-   call — so the gate fires QUEUE during catch-up replay (lands script_3
-   in queue at the right FIFO position).
+   The pre-Phase-F gate guarded with `&& !actionScriptOnlyMode()` and
+   relied on a separate ELSE branch (`else if (!catch_up_mode &&
+   actionScriptOnlyMode() && actionDeferredSpriteInitActive())
+   script_name(app_context);`) for sync-fire. Phase F merges those into
+   one queue-only path: the Phase-2 deferred re-run now QUEUES via the
+   `actionScriptOnlyMode() && actionDeferredSpriteInitActive()`
+   disjunct, so sprite scripts FIFO-interleave with the target frame's
+   root DoAction at the outer drain instead of firing synchronously.
+2. `ng_executeGotoCatchUp` (`SWFModernRuntime/src/libswf/swf_core.c`)
+   wraps Phase E's inline `funcs[target]` call with explicit phase 1/3
+   sprite init invocations:
+   ```c
+   ng_run_deferred_sprite_init_before(app_context, target);
+   /* Phase E: g_tag_skip_mode=1 + drain-suppress + funcs[target] */
+   ng_run_deferred_sprite_init_on_or_after(app_context, target);
+   ```
+   These were previously called only from the
+   `g_deferred_goto_queue/_script` outer-drain loop in `swf_core.c:1110-
+   1153` — that loop went dead after Phase E removed the queue push, so
+   sprite eager-init scripts queued under goto catch-up never fired.
+   Phase F restores the 3-phase ordering (Phase 1 sprites BEFORE target
+   queue first, target script queues mid, Phase 3 sprites AT/AFTER
+   target queue last) inline in `ng_executeGotoCatchUp`. The outer drain
+   loop is now functionally redundant — Phase G retires it.
+   `g_defer_sprite_init` is locally cleared/restored around the wrap so
+   Phase 1/3 calls can actually iterate.
 
-**Behavior delta.** Sprite scripts that currently sync-fire from
-`process_sprite_init_at_depth`'s Phase 2 path now queue. Trace order
-shifts on init-order tests. Combined with Phase E, this should land
-`consecutive_goto_frame_test` at 12/12 (the target).
+**Behavior delta on target test.** `consecutive_goto_frame_test` 12/12
+PASS preserved (Phase E delivered this; Phase F doesn't regress it).
+Phase E's predicted regressions are all fixed:
 
-**Verification.** Full local guardrail. Predicted regressions:
-`register_and_init_order`, `on_construct`, `init_object_order`,
-`clip_events`, `execution_order2/3`, `goto_execution_order/2`. CI
-roundtrip mandatory.
+| Test | Phase E | Phase F |
+|------|---------|---------|
+| `execution_order2` | 3/7 | PASS (7/7) |
+| `execution_order3` | 2/4 | PASS (4/4) |
+| `goto_rewind2` | 2/3 | PASS (3/3) |
+| `goto_rewind3` | 1/2 | PASS (2/2) |
+| `goto_execution_order2` | 0/2 | PASS (2/2) |
+| `goto_both_ways1` | 1/3 | PASS (3/3) |
 
-**Risk.** High. This is the original plan's "atomic" risk concentrated
-into one session, but with the Phase A-E infrastructure already in
-place so the only new variable is the gate change.
+**Verification.** Local guardrail (Phase F):
+- AVM1 36-test guardrail (goto/rewind/unload/init-order/clip-events/
+  goto_execution_order/conflicting_instance_names/movieclip_in_removed_button/
+  button_order/textsnapshot_available_text/bad_placeobject_clipaction/
+  tell_target_invalid* + issue_9885 + issue_1104): 35/36. Only
+  unchanged failure: `tell_target_invalid_swf6` (5/6 — pre-existing
+  Phase D fallout, NOT a new regression; same trailing-line shape it
+  had after Phase D's flip).
+- AVM1 sanity: 9/9 (add, add2, arguments, array_concat,
+  as1_constructor_v6, as2_oop, attach_movie, as2_super_and_this_v6,
+  as_broadcaster).
+- AVM1 super/closure: 12/12 (swf5_to_6_cross_call, swf5_no_closure,
+  as2_super_and_this_v6/v8, extends_chain, goto_rewind1/2/3,
+  execution_order2/3, as2_oop, add).
+- Misc-ming flat: 14/14 (static_vs_dynamic1/2,
+  place_and_remove_object_test, new_child_in_unload_test,
+  event_handler_scope_test, instanceNameTest, attachMovieTest,
+  DefineEditTextTest, DefineEditTextVariableNameTest2, shape_test,
+  get_frame_number_test, reverse_execute_PlaceObject2_test1/2,
+  ResolveEventsTest).
+- Misc-ming loop: 7 PASS + 1 ruffle_matched + 3 pre-existing
+  output_mismatch (loop_test/loop_test6/loop_test10 — same as
+  baseline).
+- Misc-ming displaylist_depths: 6/9 (same as baseline:
+  displaylist_depths_test/test2/test3 pre-existing fail).
+- Misc-ming action_order: action_execution_order_test8-v5 + v6 PASS
+  (regained — these had stale-artifact false-fail until fresh
+  recompile).
+- Misc-ming consecutive_goto_frame_test, multi_doactions_and_goto_frame_test,
+  goto_frame_test: 3/3 PASS.
+- Misc-swfc: 3 PASS + button_test1/movieclip_destruction_test2 at
+  pre-existing baselines (50/52 unchanged on destruction_test2).
+- Shumway duplicateMovieClip: 4/4 (duplicateMovieClip, samedepth,
+  name-coercion, dontremove).
 
-**Stop criterion.** If guardrail regressions exceed ~5 tests with
-unclear fix paths, revert and treat as a separate plan.
+**Risk.** Bounded — within stop-criterion threshold of "~5 unrelated
+tests with unclear fix paths". Single unchanged Phase D fallout
+(`tell_target_invalid_swf6`).
+
+**Note on the `g_tag_skip_mode=1` rewrite.** The plan's original
+literal proposal was to set `g_tag_skip_mode=1` around
+`sprite_X_frame_0(app_context)` in tagPlaceObject2's eager-init block.
+Investigation showed `tagPlaceObject2`'s `if (g_tag_skip_mode) return;`
+guard at line 3667 would short-circuit inner sprite placements (the
+sprite's own children would never get placed under `g_tag_skip_mode=1`).
+The shipped form preserves the eager-init wrapper as-is and instead
+extends the recompiler gate to recognize the
+`(actionScriptOnlyMode() && actionDeferredSpriteInitActive())`
+combination — Phase 2 deferred re-run brackets that combination via
+`ng_run_deferred_sprite_init_impl`'s existing
+`actionDeferredSpriteInitEnter`. This achieves the same end (sprite
+scripts queue during goto catch-up at the right FIFO position) without
+breaking placements.
 
 ### Phase G — Retire g_deferred_goto_queue + outer drain loop
 
