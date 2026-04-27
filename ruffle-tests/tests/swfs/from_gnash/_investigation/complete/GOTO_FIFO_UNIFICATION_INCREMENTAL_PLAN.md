@@ -26,10 +26,10 @@ phases:
     status: complete
   - id: G
     name: "Retire g_deferred_goto_queue + outer drain loop (was Phase 3 of original plan)"
-    status: pending
+    status: complete
   - id: H
     name: "swf_headless.c parity (was Phase 5 of original plan)"
-    status: pending
+    status: complete
 dependencies:
   - "Reframes: GOTO_FIFO_UNIFICATION_PLAN.md (blocked/) — same problem, atomic-commit framing was untractable. The original plan stays as the architectural reference (problem statement, FIFO-order trace, related docs). This plan is the shippable rollout."
   - "Foundation: DRAIN_SUPPRESS_PRIMITIVE_PLAN.md (complete/, commit d1cd1d1f) — used by Phase E."
@@ -549,34 +549,96 @@ Verified: AVM1 23-test critical-path battery 23/23 (incl. all 4 attach
 tests + tell_target_invalid_swf6 + 12 goto/init tests), misc-ming
 flat 17/17, loop battery at baseline, Shumway duplicateMovieClip 4/4.
 
-### Phase G — Retire g_deferred_goto_queue + outer drain loop
+### Phase G — Retire g_deferred_goto_queue + outer drain loop — COMPLETE 2026-04-27
 
-**Scope.** Same as Phase 3 of the original plan. Remove the
-`g_deferred_goto_queue` array, the count, the
-`g_deferred_goto_script` flag, and the manual while loop in
-`swf_core.c:1090-1134`. Loop-exit conditions update from
-`g_deferred_goto_queue_count > 0` to "any AQ_KIND_SCRIPT pending"
-checks.
+**Scope.** Same as Phase 3 of the original plan. Removed the
+`g_deferred_goto_queue` array, the count
+(`g_deferred_goto_queue_count`), the trailing-target tracker
+(`g_deferred_goto_target`), the `g_deferred_goto_script` flag, and the
+`MAX_DEFERRED_GOTO_QUEUE` macro from `swf_core.c`. Replaced the
+3-phase deferred goto drain loop in `swf_core.c:1124-1173` with a
+short comment explaining the retirement. Phase E moved every push site
+inline into `ng_executeGotoCatchUp` and Phase F restored the surrounding
+sprite Phase 1/3 init calls there, so the outer drain block had been
+dead code since Phase E. Loop-exit conditions did not need updating —
+the `g_deferred_goto_queue_count > 0` term only existed inside the
+retired drain loop itself; the `for(;;)` retry around catch-up still
+keys off `goto_from_action && manual_next_frame`, which
+`ng_executeGotoTagsOnly` continues to set when a deferred script
+triggers another goto.
 
-**Behavior delta.** None functionally if Phase E worked (the queue is
-already empty in the unified-FIFO path).
+**Behavior delta.** None functionally — confirmed.
 
-**Verification.** Same guardrail; should be neutral.
+**Verification.** Local guardrail (Phase G):
+- AVM1 30-test goto/rewind/unload/init guardrail (`goto_rewind1/2/3`,
+  `execution_order1/2/3`, `goto_execution_order/2`,
+  `goto_both_ways1/2`, `rewind_depth`, `goto_frame`, `goto_frame2`,
+  `goto_label`, `goto_methods`, `unload`, `unloadmovie`,
+  `unload_clip_event`, `unload_nested_child`, `mcl_unloadclip`,
+  `depth_replacement_audio_unloading`, `clip_events`, `on_construct`,
+  `register_and_init_order`, `init_object_order`, `set_interval`,
+  `movieclip_state_values`, `tell_target_invalid_swf6`, `issue_9885`,
+  `issue_1104`): 30/30 PASS.
+- Misc-ming 27-test battery (loop_test/2/3/5/7/8/9, simple_loop_test,
+  static_vs_dynamic1/2, displaylist_depths_test11,
+  place_and_remove_object_test, new_child_in_unload_test,
+  event_handler_scope_test, instanceNameTest, attachMovieTest,
+  DefineEditTextTest, DefineEditTextVariableNameTest2, shape_test,
+  get_frame_number_test, reverse_execute_PlaceObject2_test1/2,
+  action_execution_order_test8-v5/v6, consecutive_goto_frame_test,
+  multi_doactions_and_goto_frame_test, goto_frame_test):
+  25 PASS + 1 ruffle_matched (loop_test7) + 1 unchanged
+  output_mismatch (loop_test — pre-existing baseline failure noted in
+  Phase F).
+- Misc-swfc 4-test battery (stackscope, submoviegetvar, edittext_test1
+  pass; movieclip_destruction_test2 unchanged at 50/52 — pre-existing
+  baseline).
+- Shumway duplicateMovieClip 4/4 PASS.
 
-**Risk.** Low — pure cleanup.
+**Risk.** Low — pure cleanup, confirmed.
 
-### Phase H — swf_headless.c parity
+### Phase H — swf_headless.c parity — COMPLETE 2026-04-27
 
-**Scope.** Apply Phase E + G changes to `swf_headless.c`'s mirror of
-`ng_executeGotoCatchUp` + outer drain loop.
+**Scope.** Applied Phase E + F + G changes to `swf_headless.c`'s
+mirror of `ng_executeGotoCatchUp` and the per-tick outer drain loop:
 
-**Behavior delta.** None unless `--headless` mode is in use.
+1. Retired the `g_deferred_goto_queue`/`_count`/`_script`/`_target`
+   declarations and the `MAX_DEFERRED_GOTO_QUEUE` macro in the file
+   header. Added the Phase E `g_skip_inline_target_script` one-shot
+   flag (declaration mirrors `swf_core.c`).
+2. Replaced the trailing queue push at the end of the original
+   `ng_executeGotoCatchUp` with the Phase E inline `funcs[target]`
+   call wrapped in `actionDrainSuppressEnter/Leave` and
+   `g_tag_skip_mode=1`, plus the Phase F surrounding
+   `ng_run_deferred_sprite_init_before/_on_or_after` calls and
+   `g_defer_sprite_init` save/restore. Also added the
+   `actionGotoCatchupEnter/Leave` brackets around the catch-up replay
+   loop (Phase 7b machinery) which were already present in
+   `swf_core.c`.
+3. Removed the outer 3-phase drain `while` loop from the per-tick
+   `for(;;)` retry, replacing it with the same short retirement
+   comment used in `swf_core.c`.
+4. Mirrored the Phase E goto-retry-limit safety guard (`int
+   goto_retry_limit = 16; if (--goto_retry_limit <= 0) break;`) added
+   to the per-tick outer `for(;;)` retry — `swf_headless.c` had been
+   missing this.
 
-**Verification.** Run `python3 ruffle-tests/run_image_tests.py` if Dawn
-+ lavapipe set up locally; otherwise rely on CI's headless image-test
-suite.
+**Behavior delta.** None unless `--headless` mode is in use, in which
+case it now matches NO_GRAPHICS (`swf_core.c`) goto FIFO semantics.
 
-**Risk.** Low — symmetric with E + G.
+**Verification.** `swf_headless.c` compiles cleanly standalone with
+the same flags `verify_output.py` uses
+(`-DNO_GRAPHICS -DHEADLESS_GRAPHICS -DUSE_WEBGPU -DNDEBUG
+-D_GNU_SOURCE -O2 -std=c17`) — confirmed via standalone `gcc -c` build
+in /tmp. No-op for NO_GRAPHICS tests (the file is not linked).
+Headless image tests cannot be executed locally on this WSL2
+environment (Dawn/lavapipe linker fails — pre-existing, reproduces
+unchanged on master with Phase H reverted), so headless behavior
+verification relies on CI's headless image-test suite per the plan's
+documented fallback.
+
+**Risk.** Low — symmetric with E + F + G; Phase H is a literal port of
+those changes to a sibling file with no behavior gates.
 
 ## Required-pass guardrail (any session that flips behavior)
 

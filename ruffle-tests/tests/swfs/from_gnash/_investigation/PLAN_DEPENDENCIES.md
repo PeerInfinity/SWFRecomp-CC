@@ -29,14 +29,12 @@ GOTO_CATCHUP_HYGIENE_PLAN (blocked/)
    │       │ Atomic-commit framing was untractable; reframed as the
    │       │ incremental plan below.
    │       ↓ reframed by
-   │       GOTO_FIFO_UNIFICATION_INCREMENTAL_PLAN (incomplete/)
-   │           │ status: pending — Phase A is the next code change
+   │       GOTO_FIFO_UNIFICATION_INCREMENTAL_PLAN (complete/)
+   │           │ status: complete — Phases A-H all landed.
    │           │ uses: DRAIN_SUPPRESS_PRIMITIVE accessors (Phase E)
    │           │ structure: 8 sessions; A/B/C/G/H zero-risk infrastructure,
    │           │            D/E/F flag-gated behavior changes
-   │           │ target test: consecutive_goto_frame_test (4/12 → 12/12 once F lands)
-   │           │ guardrail risk: concentrated in D, E, F — see plan for
-   │           │                 the per-phase predicted regressions
+   │           │ target test: consecutive_goto_frame_test (4/12 → 12/12 from Phase E)
    │
    └──► TRANSFORMED_BY_SCRIPT_WRAP_BACK_PLAN (incomplete/)
            │ status: pending
@@ -55,7 +53,7 @@ DRAIN_SUPPRESS_PRIMITIVE_PLAN (complete/, commit d1cd1d1f)
 
 | If you land… | …it unblocks… |
 |--------------|---------------|
-| GOTO_FIFO_UNIFICATION_INCREMENTAL Phase F (after A-E build up) | the trailing diff on `consecutive_goto_frame_test`, plus likely shifts on the `loop_test*` cluster (predecessor plan's recently-fixed battery) |
+| GOTO_FIFO_UNIFICATION_INCREMENTAL (Phases A-H complete) | landed `consecutive_goto_frame_test` 12/12 from Phase E; Phase G+H were pure cleanup with no further test deltas. |
 | TRANSFORMED_BY_SCRIPT_WRAP_BACK | `place_and_remove_object_insane_test` (the other Phase 6→Phase 7 split) |
 | Both above | retiring `GOTO_CATCHUP_HYGIENE_PLAN` from `blocked/` to `complete/` |
 

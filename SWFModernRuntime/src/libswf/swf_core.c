@@ -75,11 +75,12 @@ int catch_up_backward = 0;    // 1 if current catch-up is a backward goto
 size_t catch_up_target = 0;   // target frame for backward goto protection
 int g_deferred_goto_play = 0; // Set when gotoAndPlay targets root from inside a sprite
 int g_deferred_root_goto = 0; // Set when GotoFrame targets root from inside a sprite — skip re-running current frame
-int g_deferred_goto_script = 0;     // count of deferred scripts queued
-size_t g_deferred_goto_target = 0;  // target frame whose script is deferred (last entry)
-#define MAX_DEFERRED_GOTO_QUEUE 16
-size_t g_deferred_goto_queue[MAX_DEFERRED_GOTO_QUEUE];
-int g_deferred_goto_queue_count = 0;
+// Phase G (GOTO_FIFO_UNIFICATION_INCREMENTAL): retired g_deferred_goto_queue,
+// g_deferred_goto_queue_count, g_deferred_goto_script, g_deferred_goto_target,
+// and the MAX_DEFERRED_GOTO_QUEUE-sized backing array. Phase E removed all push
+// sites (the inline target script call now runs at the end of
+// ng_executeGotoCatchUp), so the outer drain loop in the per-tick retry was
+// dead code from Phase E onward.
 int g_tag_skip_mode = 0;            // 1 = tag functions are no-ops (scripts-only re-run)
 // Phase E (GOTO_FIFO_UNIFICATION_INCREMENTAL): one-shot flag set by callers
 // of ng_executeGotoCatchUp that need the inline target-frame script call to be
@@ -1120,56 +1121,15 @@ void swfStart(SWFAppContext* app_context)
 			// to the normal advance logic below.
 		}
 
-		// Run deferred goto scripts with Ruffle-compatible 3-phase ordering:
-		//   Phase 1: Sprites placed BEFORE target frame → init before target DoAction
-		//   Phase 2: Target frame DoAction runs
-		//   Phase 3: Sprites placed ON/AFTER target frame → init after target DoAction
-		// Multiple gotos in the same script queue multiple deferred entries.
-		while (g_deferred_goto_queue_count > 0 || g_deferred_goto_script)
-		{
-			// Copy queue locally since executing deferred scripts may trigger more gotos
-			size_t local_queue[MAX_DEFERRED_GOTO_QUEUE];
-			int local_count = g_deferred_goto_queue_count;
-			for (int qi = 0; qi < local_count; qi++)
-				local_queue[qi] = g_deferred_goto_queue[qi];
-			g_deferred_goto_queue_count = 0;
-			g_deferred_goto_script = 0;
-
-			extern int g_defer_sprite_init;
-			extern void ng_run_deferred_sprite_init_before(SWFAppContext* app_context, size_t target_frame);
-			extern void ng_run_deferred_sprite_init_on_or_after(SWFAppContext* app_context, size_t target_frame);
-			extern void ng_fire_deferred_constructors(SWFAppContext* app_context);
-
-			for (int qi = 0; qi < local_count; qi++)
-			{
-				size_t target = local_queue[qi];
-
-				// Phase 0: Fire registered class constructors for ALL pending sprites
-				// before any Phase 2 scripts run. Flash fires all constructors first,
-				// then processes frame scripts in a separate pass.
-				g_defer_sprite_init = 0;
-				ng_fire_deferred_constructors(app_context);
-
-				// Phase 1: Init sprites placed in intermediate frames (before target)
-				ng_run_deferred_sprite_init_before(app_context, target);
-
-				// Phase 2: Run the target frame's script
-				if (target < g_frame_count && funcs[target])
-				{
-					// Run the target frame function in "scripts-only" mode:
-					// g_tag_skip_mode=1 causes tag functions to return immediately,
-					// while catch_up_mode=0 allows script calls to execute.
-					g_tag_skip_mode = 1;
-					funcs[target](app_context);
-					g_tag_skip_mode = 0;
-					// If the script triggered another goto, it will be added
-					// to the queue and processed in the next iteration.
-				}
-
-				// Phase 3: Init sprites placed on the target frame (after target DoAction)
-				ng_run_deferred_sprite_init_on_or_after(app_context, target);
-			}
-		}
+		// Phase G (GOTO_FIFO_UNIFICATION_INCREMENTAL): the outer 3-phase deferred
+		// goto drain that used to live here was retired. Phase E moved the
+		// target-frame script call inline into ng_executeGotoCatchUp wrapped in
+		// drain-suppress, and Phase F added the surrounding
+		// ng_run_deferred_sprite_init_before/_on_or_after calls there. Sprite
+		// scripts and the target's root script all land in AQ_KIND_SCRIPT and
+		// drain in FIFO order via the recompiler-emitted SHOW_FRAME drain. The
+		// per-tick retry below still reruns catch-up if a deferred script
+		// triggered ng_executeGotoTagsOnly.
 
 		// If deferred scripts triggered a new goto (via ng_executeGotoTagsOnly),
 		// retry the catch-up loop to process it within this tick.
