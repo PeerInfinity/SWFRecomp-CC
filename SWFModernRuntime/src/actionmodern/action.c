@@ -27596,20 +27596,125 @@ void actionDispatchMCOnLoad(SWFAppContext* app_context, MovieClip* mc)
 
 	MovieClip* saved_ctx = g_current_context;
 	actionSetCurrentContext(mc);
+	MovieClip* saved_event_this = g_event_this_mc;
 	g_event_this_mc = mc;
-	if (func->function_type == 2 && func->advanced_func != NULL)
+
+	if (func->function_type == 1 && func->simple_func != NULL)
 	{
+		// Type 1: simple function — mirror actionInvokeRegisteredClassConstructor's
+		// type-1 setup so closure-captured free variables (e.g. `note` referenced
+		// from MyClass.prototype.onLoad) resolve via the function's captured WITH
+		// scopes. Without this, mtasc-compiled bodies that look up free names
+		// through the captured scope chain miss them and trace silently fails.
+		ASObject* local_scope = allocObject(app_context, 8);
+		if (scope_depth < MAX_SCOPE_DEPTH)
+		{
+			scope_is_with[scope_depth] = 0;
+			scope_mc[scope_depth] = NULL;
+			scope_chain[scope_depth++] = local_scope;
+		}
+		u32 captured_count = func->captured_scope_count;
+		for (u32 i = 0; i < captured_count && scope_depth < MAX_SCOPE_DEPTH; i++)
+		{
+			scope_is_with[scope_depth] = 1;
+			scope_mc[scope_depth] = (MovieClip*) func->captured_scope_mc[i];
+			scope_chain[scope_depth++] = (ASObject*) func->captured_scope[i];
+		}
+		MovieClip* saved_base = NULL;
+		if (g_swf_version >= 6 && func->base_clip != NULL)
+		{
+			saved_base = g_current_context;
+			actionSetCurrentContext(func->base_clip);
+		}
+		u32 saved_this_depth = g_this_depth;
+		if (g_this_depth < MAX_THIS_DEPTH)
+		{
+			g_this_stack[g_this_depth].type = ACTION_STACK_VALUE_MOVIECLIP;
+			g_this_stack[g_this_depth].str_size = 0;
+			g_this_stack[g_this_depth].data.numeric_value = (u64) mc;
+			g_this_depth++;
+		}
+		ActionVar this_var;
+		this_var.type = ACTION_STACK_VALUE_MOVIECLIP;
+		this_var.str_size = 0;
+		this_var.data.numeric_value = (u64) mc;
+		setVariableByName("this", &this_var);
+		g_call_depth++;
+		((ActionVar(*)(SWFAppContext*))func->simple_func)(app_context);
+		g_call_depth--;
+		g_this_depth = saved_this_depth;
+		if (saved_base != NULL)
+			actionSetCurrentContext(saved_base);
+		for (u32 i = 0; i < captured_count && scope_depth > 0; i++)
+			scope_depth--;
+		if (scope_depth > 0) scope_depth--;
+		releaseObject(app_context, local_scope);
+	}
+	else if (func->function_type == 2 && func->advanced_func != NULL)
+	{
+		// Type 2: advanced function with registers. Restore captured scope
+		// chain entries (closure support), push 'this' = mc onto g_this_stack
+		// (subject to preload_this/suppress_this flags), and switch to base_clip
+		// for SWF6+. Mirrors actionInvokeRegisteredClassConstructor's type-2 setup.
 		ActionVar* regs = NULL;
 		if (func->register_count > 0)
 			regs = (ActionVar*) HCALLOC(func->register_count, sizeof(ActionVar));
+
+		ASObject* local_scope = allocObject(app_context, 4);
+		u32 saved_this_depth = g_this_depth;
+		{
+			u16 f2flags = func->flags;
+			int preload_this  = (f2flags & 0x0001);
+			int suppress_this = (f2flags & 0x0002);
+			if (!preload_this && !suppress_this)
+			{
+				if (g_this_depth < MAX_THIS_DEPTH)
+				{
+					g_this_stack[g_this_depth].type = ACTION_STACK_VALUE_MOVIECLIP;
+					g_this_stack[g_this_depth].str_size = 0;
+					g_this_stack[g_this_depth].data.numeric_value = (u64) mc;
+					g_this_depth++;
+				}
+				ActionVar this_var = {0};
+				this_var.type = ACTION_STACK_VALUE_MOVIECLIP;
+				this_var.data.numeric_value = (u64) mc;
+				setProperty(app_context, local_scope, "this", 4, &this_var);
+			}
+		}
+		u8 captured = func->captured_scope_count;
+		for (u8 ci = 0; ci < captured && scope_depth < MAX_SCOPE_DEPTH; ci++)
+		{
+			scope_is_with[scope_depth] = func->captured_scope_is_with[ci];
+			scope_mc[scope_depth] = func->captured_scope_mc[ci];
+			scope_chain[scope_depth++] = func->captured_scope[ci];
+		}
+		if (scope_depth < MAX_SCOPE_DEPTH)
+		{
+			scope_is_with[scope_depth] = 0;
+			scope_mc[scope_depth] = NULL;
+			scope_chain[scope_depth++] = local_scope;
+		}
+		MovieClip* saved_base = NULL;
+		if (g_swf_version >= 6 && func->base_clip != NULL)
+		{
+			saved_base = g_current_context;
+			actionSetCurrentContext(func->base_clip);
+		}
+		g_call_depth++;
 		func->advanced_func(app_context, NULL, 0, regs, NULL);
+		g_call_depth--;
+		g_this_depth = saved_this_depth;
+		if (saved_base != NULL)
+			actionSetCurrentContext(saved_base);
+		for (u8 ci = 0; ci < captured + 1; ci++)
+		{
+			if (scope_depth > 0) scope_depth--;
+		}
+		releaseObject(app_context, local_scope);
 		if (regs != NULL) FREE(regs);
 	}
-	else if (func->function_type == 1 && func->simple_func != NULL)
-	{
-		((ActionVar(*)(SWFAppContext*))func->simple_func)(app_context);
-	}
-	g_event_this_mc = NULL;
+
+	g_event_this_mc = saved_event_this;
 	actionSetCurrentContext(saved_ctx);
 }
 
