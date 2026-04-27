@@ -44,7 +44,7 @@ def build_investigation_index(inv_dir: Path = None) -> tuple[dict[str, list[tupl
     """Parse investigation docs for <!-- TESTS: ... --> comments.
 
     Scans _investigation/, _investigation/complete/, _investigation/incomplete/,
-    and _investigation/blocked/ for .md files
+    _investigation/blocked/, and _investigation/superseded/ for .md files
     (excluding EXCLUDED_DOCS), parses the TESTS comment from each,
     and builds a reverse index from test names to document numbers.
 
@@ -72,7 +72,7 @@ def build_investigation_index(inv_dir: Path = None) -> tuple[dict[str, list[tupl
         rel = f"{inv_rel}/{p.name}"
         candidates.append((p.name, rel, p))
 
-    for subdir_name in ("complete", "incomplete", "blocked"):
+    for subdir_name in ("complete", "incomplete", "blocked", "superseded"):
         subdir = inv_dir / subdir_name
         if subdir.is_dir():
             for p in subdir.glob("*.md"):

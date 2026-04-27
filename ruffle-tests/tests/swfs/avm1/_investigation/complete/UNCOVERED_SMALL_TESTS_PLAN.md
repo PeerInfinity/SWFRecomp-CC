@@ -1,11 +1,11 @@
 # Uncovered Small/Miscellaneous Tests Catalog
 <!-- TESTS: define_local_with_paths, device_font_spacing, gettextextent, get_bytes_total, geturl, issue_2030, issue_2084, issue_3169, resolve_different_root, root_global_parent, root_onload, sandbox_type_remote, string_paths_keyevents, string_paths_timer, displacementmapfilter_mappoint_throw_error, localconnection -->
 
-Last updated: 2026-04-07
+Last updated: 2026-04-27
 
-## Status: 16/19 PASS — 0 actionable, 3 blocked (all in ignored_tests.txt)
+## Status: 16/19 PASS — COMPLETE (0 actionable remaining)
 
-All actionable fixes have been implemented. The remaining 3 tests are blocked on external infrastructure (child SWF HTTP loading, navigator trace logging, child SWF cross-movie communication). All 3 are in `ignored_tests.txt` and do not affect the filtered pass rate.
+All actionable fixes have been implemented (moved to `complete/` 2026-04-27, originally landed by 2026-04-07). The remaining 3 tests (`geturl`, `sandbox_type_remote`, `localconnection`) are infrastructure-blocked — they live in `ignored_tests.txt` and don't affect the filtered pass rate. `localconnection` has its own plan (`blocked/LOCALCONNECTION_PLAN.md`) tracking the child-SWF-fixture work needed to reach Phase 5 there.
 
 ---
 

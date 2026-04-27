@@ -158,7 +158,7 @@ Failing tests: localconnection
 
 Description: Needs LocalConnection class for inter-SWF communication. Constructor, connect(), send(), close(), domain property.
 
-Investigation docs: [LOCALCONNECTION_PLAN.md](ruffle-tests/tests/swfs/avm1/_investigation/incomplete/LOCALCONNECTION_PLAN.md), [UNCOVERED_SMALL_TESTS_PLAN.md](ruffle-tests/tests/swfs/avm1/_investigation/blocked/UNCOVERED_SMALL_TESTS_PLAN.md)
+Investigation docs: [LOCALCONNECTION_PLAN.md](ruffle-tests/tests/swfs/avm1/_investigation/blocked/LOCALCONNECTION_PLAN.md), [UNCOVERED_SMALL_TESTS_PLAN.md](ruffle-tests/tests/swfs/avm1/_investigation/complete/UNCOVERED_SMALL_TESTS_PLAN.md)
 
 ---
 
@@ -208,7 +208,7 @@ Failing tests: sandbox_type_remote
 
 Description: System.security.sandboxType returns different values per sandbox mode. Would need per-test sandbox configuration.
 
-Investigation docs: [UNCOVERED_SMALL_TESTS_PLAN.md](ruffle-tests/tests/swfs/avm1/_investigation/blocked/UNCOVERED_SMALL_TESTS_PLAN.md)
+Investigation docs: [UNCOVERED_SMALL_TESTS_PLAN.md](ruffle-tests/tests/swfs/avm1/_investigation/complete/UNCOVERED_SMALL_TESTS_PLAN.md)
 
 ---
 
@@ -218,7 +218,7 @@ Failing tests: geturl
 
 Description: Various uncategorized tests: getBytesLoaded/getBytesTotal, getURL action, TextFormat.getTextExtent, device font spacing, localToGlobal/globalToLocal, toString/valueOf coercion, Array.sort edge cases.
 
-Investigation docs: [UNCOVERED_SMALL_TESTS_PLAN.md](ruffle-tests/tests/swfs/avm1/_investigation/blocked/UNCOVERED_SMALL_TESTS_PLAN.md)
+Investigation docs: [UNCOVERED_SMALL_TESTS_PLAN.md](ruffle-tests/tests/swfs/avm1/_investigation/complete/UNCOVERED_SMALL_TESTS_PLAN.md)
 
 ---
 
