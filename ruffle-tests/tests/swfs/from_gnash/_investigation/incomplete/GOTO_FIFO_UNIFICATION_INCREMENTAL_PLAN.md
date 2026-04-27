@@ -524,6 +524,31 @@ After both follow-ups: AVM1 44-test guardrail 44/44, misc-ming flat
 ruffle_matched + 3 unchanged output_mismatch),
 `tell_target_invalid_swf6` recovered to PASS.
 
+**Follow-up fix 3 — `!catch_up_mode` constraint on attach sync-fire.**
+The first follow-up's gate ELSE
+(`actionAttachInitActive() && actionScriptOnlyMode() && actionDeferredSpriteInitActive()`)
+fired sync-fire even under `catch_up_mode=1`. Phase E's pre-Phase-F gate
+had explicit `!catch_up_mode` on the sync-fire ELSE
+(`!catch_up_mode && actionScriptOnlyMode() && actionDeferredSpriteInitActive()`),
+so attach Phase 2 paths under catch-up silently dropped. My follow-up
+restored sync-fire universally — which broke
+`removed_clip_halts_script` (15/15 → 3/15) by sync-firing an extra
+"clip 3" trace during a goto catch-up that re-entered the attach Phase 2
+machinery.
+
+The fix adds `!catch_up_mode &&` to the sync-fire ELSE so it matches
+Phase E's "fire only outside catch-up" behavior:
+
+```c
+else if (!catch_up_mode && actionAttachInitActive() &&
+    actionScriptOnlyMode() && actionDeferredSpriteInitActive())
+    script_name(app_context);
+```
+
+Verified: AVM1 23-test critical-path battery 23/23 (incl. all 4 attach
+tests + tell_target_invalid_swf6 + 12 goto/init tests), misc-ming
+flat 17/17, loop battery at baseline, Shumway duplicateMovieClip 4/4.
+
 ### Phase G — Retire g_deferred_goto_queue + outer drain loop
 
 **Scope.** Same as Phase 3 of the original plan. Remove the

@@ -5040,7 +5040,7 @@ namespace SWFRecomp
 								<< "(actionScriptOnlyMode() && actionDeferredSpriteInitActive()))) "
 								<< "actionQueueSpriteScript(app_context, " << script_name << ");" << endl;
 							sprite_definitions
-								<< "\t" << "else if (actionAttachInitActive() && actionScriptOnlyMode() && actionDeferredSpriteInitActive()) "
+								<< "\t" << "else if (!catch_up_mode && actionAttachInitActive() && actionScriptOnlyMode() && actionDeferredSpriteInitActive()) "
 								<< script_name << "(app_context);" << endl;
 
 							// Phase A of GOTO_FIFO_UNIFICATION incremental
