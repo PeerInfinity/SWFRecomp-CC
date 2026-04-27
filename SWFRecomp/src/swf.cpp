@@ -5016,19 +5016,32 @@ namespace SWFRecomp
 							//   - target-frame scripts-only replay (g_tag_skip_mode), or
 							//   - Phase 1 eager init outside goto catch-up
 							//     (actionEagerInitActive() && !actionGotoCatchupActive()), or
-							//   - Phase 2 deferred re-run for a sprite that was
+							//   - goto Phase 2 deferred re-run for a sprite that was
 							//     eager-initialized under goto catch-up
-							//     (actionScriptOnlyMode() && actionDeferredSpriteInitActive()).
-							// The Phase 2 case used to sync-fire script_N(app_context)
-							// directly via an ELSE branch, but that ran scripts before
-							// the calling drain could interleave the target frame's
-							// root DoAction. Queuing instead lets the outer FIFO drain
-							// preserve "root target then sprite eager-init" ordering.
+							//     (actionScriptOnlyMode() && actionDeferredSpriteInitActive()
+							//     && !actionAttachInitActive()).
+							// The goto Phase 2 case used to sync-fire script_N
+							// directly via an ELSE branch, but that ran scripts
+							// before the calling drain could interleave the target
+							// frame's root DoAction. Queuing lets the outer FIFO
+							// drain preserve "root target then sprite eager-init"
+							// ordering.
+							//
+							// Sync-fire is preserved for the runtime-attach Phase 2
+							// re-run path (actionAttachInitActive — see
+							// tag_stubs.c's aq_dispatch_pending_attach_init). attach
+							// init's own ordering is set by the PAI dispatcher and
+							// must not be perturbed by FIFO; default_names,
+							// attach_movie, and removed_target_clip_scope rely on
+							// sync-fire here.
 							sprite_definitions
-								<< "\t" << "if (!catch_up_mode || g_tag_skip_mode || "
+								<< "\t" << "if (!actionAttachInitActive() && (!catch_up_mode || g_tag_skip_mode || "
 								<< "(actionEagerInitActive() && !actionGotoCatchupActive()) || "
-								<< "(actionScriptOnlyMode() && actionDeferredSpriteInitActive())) "
+								<< "(actionScriptOnlyMode() && actionDeferredSpriteInitActive()))) "
 								<< "actionQueueSpriteScript(app_context, " << script_name << ");" << endl;
+							sprite_definitions
+								<< "\t" << "else if (actionAttachInitActive() && actionScriptOnlyMode() && actionDeferredSpriteInitActive()) "
+								<< script_name << "(app_context);" << endl;
 
 							// Phase A of GOTO_FIFO_UNIFICATION incremental
 							// plan: record (sprite_char_id, frame_idx) →

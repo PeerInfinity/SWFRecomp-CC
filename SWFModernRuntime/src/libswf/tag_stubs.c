@@ -258,9 +258,11 @@ static void aq_dispatch_pending_attach_init(SWFAppContext* app_context, void* us
 	{
 		extern void ng_set_script_only_mode(int mode);
 		ng_set_script_only_mode(1);
+		actionAttachInitEnter();
 		actionDeferredSpriteInitEnter();
 		pai->func(app_context);
 		actionDeferredSpriteInitLeave();
+		actionAttachInitLeave();
 		ng_set_script_only_mode(0);
 	}
 
@@ -274,11 +276,15 @@ static void aq_dispatch_pending_attach_init(SWFAppContext* app_context, void* us
 	// (which reorders them ahead of the parent's PAI — bug in default_names).
 	// Now that ng_attachMovie suppresses that queueing via goto-catchup, the
 	// children must fire through this path instead.
+	// Phase F: also bracket with AttachInit so the recompiler gate routes
+	// these to the sync-fire branch (not the goto Phase 2 queue branch).
 	{
 		extern void process_sprite_needs_init_public(SWFAppContext* app_context, MovieClip* parent_mc);
+		actionAttachInitEnter();
 		actionDeferredSpriteInitEnter();
 		process_sprite_needs_init_public(app_context, mc);
 		actionDeferredSpriteInitLeave();
+		actionAttachInitLeave();
 	}
 
 	// Persist updated display list state back to the MC's display obj

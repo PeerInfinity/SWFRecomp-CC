@@ -459,6 +459,71 @@ combination — Phase 2 deferred re-run brackets that combination via
 scripts queue during goto catch-up at the right FIFO position) without
 breaking placements.
 
+**Follow-up fix 1 — `actionAttachInitActive`.** The first Phase F gate
+`((actionScriptOnlyMode() && actionDeferredSpriteInitActive()))`
+collapsed two distinct deferred-init paths into one queue branch:
+
+- goto Phase 2 deferred init (set by
+  `ng_run_deferred_sprite_init_impl`) — must QUEUE so sprite scripts
+  FIFO-interleave with the inline target-frame DoAction.
+- runtime-attach Phase 2 deferred init (set by
+  `aq_dispatch_pending_attach_init` in `tag_stubs.c:259-282`) — must
+  SYNC-FIRE to preserve the PAI dispatch ordering. (Comment on line
+  273-276 explicitly documents the `default_names` regression that was
+  originally fixed by adding the sync-fire ELSE to this path.)
+
+Both paths share the same flag set
+(`actionScriptOnlyMode + actionDeferredSpriteInitActive`), so the gate
+couldn't tell them apart. Phase F's first iteration broke the attach
+sync-fire and regressed `attach_movie` 59→55, `default_names` 52→42,
+and `removed_target_clip_scope` 35→8 in the CI run.
+
+The fix adds a separate `actionAttachInitActive()` flag whose
+`Enter/Leave` brackets are used only by
+`aq_dispatch_pending_attach_init`. The recompiler gate now keys off it:
+
+```c
+if (!actionAttachInitActive() && (!catch_up_mode || g_tag_skip_mode ||
+    (actionEagerInitActive() && !actionGotoCatchupActive()) ||
+    (actionScriptOnlyMode() && actionDeferredSpriteInitActive())))
+    actionQueueSpriteScript(app_context, script_name);
+else if (actionAttachInitActive() && actionScriptOnlyMode() &&
+    actionDeferredSpriteInitActive())
+    script_name(app_context);
+```
+
+`!actionAttachInitActive()` prefixes the entire queue branch so attach
+init never queues, restoring the previous sync-fire path. After this
+fix all three CI regressions are recovered.
+
+**Follow-up fix 2 — `advance_sprite_frames` double-queue.** Phase B
+queues sprite-script entries via `actionQueuePendingSpriteScript`
+inside `ng_gotoFrameCurrentSprite`; Phase D's flip
+(`g_unify_sprite_drain_flag=1`) made these flush into AQ_KIND_SCRIPT
+on every drain. But `advance_sprite_frames`' manual-goto branch in
+`tag.c` (forward and backward goto loops) ALSO calls
+`sprite_frame_funcs[target](app_context)` with `catch_up_mode=0` — and
+under `catch_up_mode=0` the recompiler-emitted gate still queues.
+Result: post-Phase-D every sprite goto via `GotoFrame`/`GotoFrame2`
+double-queued the target script. `tell_target_invalid_swf6` showed it
+clearly (5/5 → 5/6 since Phase D — extra trailing trace). Other tests
+masked it because one of the two fires landed before output diff
+boundaries.
+
+The fix forces `catch_up_mode = 1` for the entire
+`advance_sprite_frames` manual-goto loop (both forward and backward
+branches). Tags still execute (placement happens), but the gate's
+`!catch_up_mode` term doesn't fire, so the target script is queued
+exactly once — by Phase B's pending sprite-script queue. Backward
+goto needed a parallel `int saved_bw_cm` save/restore since that
+branch had previously been a passive inheritor of the caller's
+`catch_up_mode`.
+
+After both follow-ups: AVM1 44-test guardrail 44/44, misc-ming flat
+17/17, misc-ming loop battery preserved at baseline (7 PASS + 1
+ruffle_matched + 3 unchanged output_mismatch),
+`tell_target_invalid_swf6` recovered to PASS.
+
 ### Phase G — Retire g_deferred_goto_queue + outer drain loop
 
 **Scope.** Same as Phase 3 of the original plan. Remove the

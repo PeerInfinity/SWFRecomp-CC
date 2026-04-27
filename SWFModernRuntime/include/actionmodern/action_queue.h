@@ -209,6 +209,18 @@ void actionGotoCatchupLeave(void);
 void actionDeferredSpriteInitEnter(void);
 void actionDeferredSpriteInitLeave(void);
 
+// Phase F (GOTO_FIFO_UNIFICATION_INCREMENTAL): runtime-attach Phase 2
+// re-run path (aq_dispatch_pending_attach_init) brackets its
+// pai->func + process_sprite_needs_init_public calls with these so the
+// recompiler-emitted gate can distinguish attachMovie's deferred init
+// (which must sync-fire to preserve PAI ordering) from goto's Phase 2
+// deferred init (which must queue to FIFO-interleave with target script).
+// Both paths set actionScriptOnlyMode=1 and actionDeferredSpriteInitActive=1,
+// so the attach-init flag is needed to disambiguate.
+int actionAttachInitActive(void);
+void actionAttachInitEnter(void);
+void actionAttachInitLeave(void);
+
 // Drain-suppress primitive (Path A foundation for GOTO_FIFO_UNIFICATION).
 // While the suppress depth is > 0, actionDrainOnloadAndScript early-returns —
 // queue calls inside the bracketed region still run, but the recompiler-emitted

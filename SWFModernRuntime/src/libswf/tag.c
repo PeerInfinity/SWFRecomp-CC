@@ -202,6 +202,18 @@ int actionDeferredSpriteInitActive(void) { return g_deferred_sprite_init_active;
 void actionDeferredSpriteInitEnter(void) { g_deferred_sprite_init_active++; }
 void actionDeferredSpriteInitLeave(void) { g_deferred_sprite_init_active--; }
 
+// Phase F: distinguishes attachMovie's deferred init (sync-fire required to
+// preserve PAI ordering — see tag_stubs.c:267-282 comment for default_names
+// background) from goto's Phase 2 deferred init (queue required to
+// FIFO-interleave with target script). Both share the
+// `actionScriptOnlyMode + actionDeferredSpriteInitActive` brackets, so this
+// counter is what the recompiler gate actually keys off of when choosing
+// between queue and sync-fire.
+int g_attach_init_active = 0;
+int actionAttachInitActive(void) { return g_attach_init_active; }
+void actionAttachInitEnter(void) { g_attach_init_active++; }
+void actionAttachInitLeave(void) { g_attach_init_active--; }
+
 // Wrappers called by tag_stubs.c runtime-attach paths (ng_attachMovie,
 // ng_cloneSprite, ng_duplicateMovieClip) around their Phase 1 frame_0
 // invocations. g_eager_init_depth stays file-local to tag.c; tag_stubs.c
@@ -731,12 +743,19 @@ void advance_sprite_frames(SWFAppContext* app_context)
 					}
 					max_depth = 0;
 
-					// Re-execute frames 0..target
+					// Re-execute frames 0..target. Force catch_up_mode=1 so
+					// the recompiler-emitted gate doesn't double-queue the
+					// target frame's DoAction — Phase B+ already queued it
+					// via `ng_gotoFrameCurrentSprite`'s pending sprite-script
+					// queue (flushed under actionUnifySpriteDrain).
+					int saved_bw_cm = catch_up_mode;
+					catch_up_mode = 1;
 					for (size_t f = 0; f <= target; f++)
 					{
 						if (f < ch->sprite_frame_count && ch->sprite_frame_funcs[f] != NULL)
 							CALL_FRAME(app_context, obj, ch->sprite_frame_funcs[f]);
 					}
+					catch_up_mode = saved_bw_cm;
 
 					// Recurse nested sprites (set parent context for correct child MC creation)
 					{
@@ -764,9 +783,15 @@ void advance_sprite_frames(SWFAppContext* app_context)
 				}
 				else
 				{
-					// Jumping forward: execute frames frame+1..target
-					// Intermediate frames run in catch_up_mode (tags only, scripts skipped).
-					// Only the target frame runs scripts (matching Flash/Ruffle goto semantics).
+					// Jumping forward: execute frames frame+1..target with
+					// catch_up_mode=1 throughout (tags only, scripts NOT
+					// queued via the gate). Pre-Phase-D the target frame ran
+					// with catch_up_mode=0 so the gate queued its DoAction;
+					// post-Phase-D `ng_gotoFrameCurrentSprite` already queued
+					// the target's script via Phase B's pending sprite-script
+					// queue (flushed to AQ_KIND_SCRIPT under
+					// actionUnifySpriteDrain), so a second queue here would
+					// cause a double-fire (key test: tell_target_invalid_swf6).
 					DisplayObject* saved_dl = display_list;
 					size_t saved_max = max_depth;
 					size_t saved_cap = display_list_capacity;
@@ -776,9 +801,9 @@ void advance_sprite_frames(SWFAppContext* app_context)
 					display_list_capacity = obj->sprite_dl_capacity;
 
 					int saved_cm = catch_up_mode;
+					catch_up_mode = 1;
 					for (size_t f = frame + 1; f <= target; f++)
 					{
-						catch_up_mode = (f < target) ? 1 : 0;
 						if (f < ch->sprite_frame_count && ch->sprite_frame_funcs[f] != NULL)
 							CALL_FRAME(app_context, obj, ch->sprite_frame_funcs[f]);
 					}
