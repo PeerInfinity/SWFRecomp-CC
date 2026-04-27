@@ -231,6 +231,12 @@ void actionSetupRegisteredClassPrototype(SWFAppContext* app_context, const char*
 		ctor_inst_var.str_size = 0;
 		ctor_inst_var.data.numeric_value = (u64) ctor_func;
 		setPropertyWithFlags(app_context, obj, "__constructor__", 15, &ctor_inst_var, PROPERTY_FLAGS_DONTENUM);
+		// SWF<7 also installs `constructor` on the MC's own props.
+		// Mirrors Ruffle's FunctionObject::define_constructor_props
+		// (core/src/avm1/function.rs:679-697), which sets `__constructor__`
+		// always but `constructor` only when activation.swf_version() < 7.
+		if (g_swf_version < 7)
+			setPropertyWithFlags(app_context, obj, "constructor", 11, &ctor_inst_var, PROPERTY_FLAGS_DONTENUM);
 	}
 }
 

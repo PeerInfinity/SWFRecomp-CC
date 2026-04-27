@@ -12942,6 +12942,18 @@ static void initMovieClipPrototype(SWFAppContext* app_context)
 	// Set __proto__ to Object.prototype
 	setObjectProto(app_context, proto);
 
+	// MovieClip.prototype.constructor = MovieClip (DONT_ENUM).
+	// Mirrors Ruffle's FunctionObject::build wiring (function.rs:483-489) for
+	// every system class, used so that registered-class MCs whose prototype
+	// is `new MovieClip()` resolve `instance.constructor` up through
+	// MovieClip.prototype to MovieClip itself.
+	{
+		ActionVar mcc_var = {0};
+		mcc_var.type = ACTION_STACK_VALUE_FUNCTION;
+		mcc_var.data.numeric_value = (u64)&g_movieclip_constructor;
+		setPropertyWithFlags(app_context, proto, "constructor", 11, &mcc_var, PROPERTY_FLAG_WRITABLE);
+	}
+
 	// Method stub names (DontEnum functions on MovieClip.prototype)
 	static const struct { const char* name; u32 len; } mc_methods[MC_METHOD_COUNT] = {
 		{"attachMovie", 11},
