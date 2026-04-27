@@ -25,7 +25,7 @@ phases:
     name: "Regression battery (goto/rewind/wrap-back, plus place_and_remove tests)"
     status: pending
 dependencies:
-  - "Independent of GOTO_FIFO_UNIFICATION_PLAN.md (Phase 6); both are spin-offs of the now-blocked GOTO_CATCHUP_HYGIENE_PLAN.md"
+  - "Independent of GOTO_FIFO_UNIFICATION_PLAN.md (Phase 6, shipped via complete/GOTO_FIFO_UNIFICATION_INCREMENTAL_PLAN.md); both are spin-offs of the now-superseded GOTO_CATCHUP_HYGIENE_PLAN.md"
 -->
 
 ## Problem statement
@@ -412,8 +412,8 @@ the change. Other tests exercise these arms partially.
 
 | Doc | Relationship |
 |-----|--------------|
-| `blocked/GOTO_CATCHUP_HYGIENE_PLAN.md` | Predecessor plan. This is its Phase 7 split out. |
-| `incomplete/GOTO_FIFO_UNIFICATION_PLAN.md` | Sibling spin-off (Phase 6). Independent code paths but shared catch-up machinery; spot-check no cross-regression. |
+| `superseded/GOTO_CATCHUP_HYGIENE_PLAN.md` | Predecessor plan. This is its Phase 7 split out. |
+| `complete/GOTO_FIFO_UNIFICATION_INCREMENTAL_PLAN.md` | Sibling spin-off (Phase 6, shipped via the incremental rewrite). Independent code paths but shared catch-up machinery; spot-check no cross-regression. |
 | Existing `cx_overridden` (Color setRGB / setTransform path) | Phase 2/3 pattern is identical; `transformed_by_script` is the matrix-side equivalent. |
 | Existing `depth_swapped` (`tagPlaceObject2` modify guard) | Phase 3's new guard sits alongside this; they compose. |
 | `ACCEPTED_DIFFS.md` (avm1) | If after Phases 1-6 some pre-existing test's behavior is now divergent from Flash for documented reasons, document there. |

@@ -193,7 +193,7 @@ Add the WRITABLE check in actionSetVariable's WITH-scope branch.
 
 ## Related
 
-- `blocked/WITH_AUTOBOXING_PLAN.md` — shelved predecessor; identified
+- `superseded/WITH_AUTOBOXING_PLAN.md` — shelved predecessor; identified
   this as a secondary blocker.
 - `SETTARGET_OBJECT_PATH_PLAN.md` — primary sibling plan for with-v6/v7/v8.
   Both likely need to land to get `ruffle_matched`.

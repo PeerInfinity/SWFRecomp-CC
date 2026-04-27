@@ -371,10 +371,10 @@ old ordering is already at odds with the spec.
 
 | Doc | Relationship |
 |-----|--------------|
-| `blocked/GOTO_CATCHUP_HYGIENE_PLAN.md` | Predecessor plan; Phases 1–5 landed (goto_frame_test PASS). This plan is its Phase 6 split out. |
+| `superseded/GOTO_CATCHUP_HYGIENE_PLAN.md` | Predecessor plan; Phases 1–5 landed (goto_frame_test PASS). This plan is its Phase 6 split out. |
 | `incomplete/DEFERRED_CLIP_UNLOAD_PLAN.md` | The `actionQueueClipActionUnloadDeferred` helper added for loop_test8 rides `AQ_KIND_SCRIPT` and is sensitive to drain timing changes here — verify the loop_test8 PASS is preserved. |
 | `incomplete/TRANSFORMED_BY_SCRIPT_WRAP_BACK_PLAN.md` | Parallel sibling plan for `place_and_remove_object_insane_test` (the other GOTO_CATCHUP_HYGIENE blocker, Phase 7). Independent code paths but share catch-up machinery; spot-check at the end. |
-| `incomplete/DRAIN_SUPPRESS_PRIMITIVE_PLAN.md` | Path A foundation: adds `actionDrainSuppressEnter/Leave` accessors gating `actionDrainOnloadAndScript`. Phase B's `ng_executeGotoCatchUp` will wrap its inline `funcs[target]` call with the Enter/Leave pair to avoid the nested-drain re-entry hazard called out in Status Notes below. Land before resuming this plan. |
+| `complete/DRAIN_SUPPRESS_PRIMITIVE_PLAN.md` | Path A foundation: adds `actionDrainSuppressEnter/Leave` accessors gating `actionDrainOnloadAndScript`. Phase B's `ng_executeGotoCatchUp` will wrap its inline `funcs[target]` call with the Enter/Leave pair to avoid the nested-drain re-entry hazard called out in Status Notes below. Land before resuming this plan. |
 
 ## Status notes (2026-04-26)
 

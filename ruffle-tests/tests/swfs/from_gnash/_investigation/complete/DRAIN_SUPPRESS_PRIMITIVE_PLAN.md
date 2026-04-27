@@ -20,7 +20,7 @@ phases:
     name: "CI no-regression check"
     status: complete
 related:
-  - "GOTO_FIFO_UNIFICATION_PLAN.md (incomplete/) — Path B uses these accessors to wrap ng_executeGotoCatchUp's inline funcs[target] call"
+  - "GOTO_FIFO_UNIFICATION_PLAN.md (superseded/) — Path B uses these accessors to wrap ng_executeGotoCatchUp's inline funcs[target] call. Shipped via complete/GOTO_FIFO_UNIFICATION_INCREMENTAL_PLAN.md."
 -->
 
 ## Status: Complete (2026-04-26, commit d1cd1d1f)

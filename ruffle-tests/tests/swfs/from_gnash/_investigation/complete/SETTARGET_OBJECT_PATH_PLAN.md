@@ -253,7 +253,7 @@ since the fallback lives inside `actionSetTarget`).
   `ruffle_matched` status is computed.
 - `complete/DEJAGNU_FRAMEWORK_PLAN.md` — setTarget redirect pattern used
   by these tests to keep check() callable.
-- `blocked/WITH_AUTOBOXING_PLAN.md` — shelved predecessor; identified
+- `superseded/WITH_AUTOBOXING_PLAN.md` — shelved predecessor; identified
   this plan as the dominant remaining blocker for with-v6/v7/v8.
 - `ASSETPROPFLAGS_WITH_READONLY_PLAN.md` — secondary with-v6/v7/v8
   blocker (2 lines per test); may need to land alongside this one to

@@ -660,7 +660,7 @@ Last updated: 2026-04-24 (CI snapshot at 205a9a77 includes all recent fixes thro
   `FAILED _target==` lines per test. See `complete/SETTARGET_OBJECT_PATH_PLAN.md`.
 
 ### Plan rescoping (2026-04-21, no test deltas)
-- **`WITH_AUTOBOXING_PLAN.md` shelved** (moved incomplete/ → blocked/).
+- **`WITH_AUTOBOXING_PLAN.md` shelved** (moved incomplete/ → blocked/, then 2026-04-27 to superseded/).
   with-v5 already `ruffle_matched`; v6/v7/v8 failures are *not*
   primitive-auto-boxing. The diffs targeted by the plan's
   `Number.prototype.checkpoint`/`String.prototype.checkpoint` assertions
@@ -817,7 +817,7 @@ Last updated: 2026-04-24 (CI snapshot at 205a9a77 includes all recent fixes thro
 | `incomplete/ARRAY_V5_PLAN.md` | array-v5 investigation (450/560 = 80.4%) |
 | `complete/SETTARGET_OBJECT_PATH_PLAN.md` | Extended setTarget to resolve dotted/colon object paths via property lookup (primary with-v6/v7/v8 blocker) — landed 2026-04-21 |
 | `complete/ASSETPROPFLAGS_WITH_READONLY_PLAN.md` | ASSetPropFlags MOVIECLIP handling + WRITABLE check in WITH assignment (secondary with-v6/v7/v8 blocker) — landed 73983b0e |
-| `blocked/WITH_AUTOBOXING_PLAN.md` | Shelved — primitive auto-boxing effectively works; see plan for actual remaining root causes |
+| `superseded/WITH_AUTOBOXING_PLAN.md` | Shelved — primitive auto-boxing effectively works; see plan for actual remaining root causes |
 | `complete/INHERITANCE_SEGFAULT_PLAN.md` | All 4 Inheritance tests pass filtered (v5 via SWF5 gates, v6/v7/v8 via Ruffle-matching acceptance) |
 | `complete/RUFFLE_KNOWN_FAILURE_HANDLING_PLAN.md` | Phase 3 landed: `verify_output.py` auto-promotes `known_failure`+`output.ruffle.txt` tests to `ruffle_matched` when our diffs ⊆ Ruffle's diffs against Flash |
 | `blocked/MISC_SWFMILL_PLAN.md` | 3 remaining misc-swfmill failures (architectural) |

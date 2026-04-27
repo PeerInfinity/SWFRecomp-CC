@@ -1,10 +1,17 @@
 # Goto Catch-Up Hygiene Plan
 
+> **Superseded 2026-04-27** — Phases 1–5 landed in this plan. Phase 6
+> shipped via `complete/GOTO_FIFO_UNIFICATION_INCREMENTAL_PLAN.md`
+> (Phases A–H all complete by 2026-04-27). Phase 7 lives in
+> `incomplete/TRANSFORMED_BY_SCRIPT_WRAP_BACK_PLAN.md`. This document
+> stays as the architectural reference for Phases 1–5 and the
+> Phase 6/7 hand-off rationale.
+
 <!-- TESTS: goto_frame_test, consecutive_goto_frame_test, place_and_remove_object_insane_test -->
 
 <!-- PLAN_META
 id: GOTO_CATCHUP_HYGIENE
-status: blocked
+status: superseded
 phases:
   - id: 1
     name: "Goto-induced RemoveObject2: clear name resolution (var_map / dynamic_props / display lookup)"

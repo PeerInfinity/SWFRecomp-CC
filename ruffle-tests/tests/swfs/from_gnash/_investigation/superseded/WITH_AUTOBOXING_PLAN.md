@@ -1,9 +1,13 @@
 # With Auto-Boxing Plan — Reassessed
 <!-- TESTS: with-v5, with-v6, with-v7, with-v8 -->
 
-Last updated: 2026-04-21
-Status: BLOCKED (moved from incomplete) — primitive auto-boxing is already
-effectively working; the remaining diffs are driven by unrelated features.
+Last updated: 2026-04-27
+Status: SUPERSEDED (moved incomplete/ → blocked/ 2026-04-21,
+blocked/ → superseded/ 2026-04-27) — primitive auto-boxing is already
+effectively working; remaining diffs are driven by unrelated features
+that have their own plans (`complete/SETTARGET_OBJECT_PATH_PLAN.md`,
+`complete/ASSETPROPFLAGS_WITH_READONLY_PLAN.md`). Kept as the
+architectural reference for the reassessment notes below.
 
 ---
 

@@ -708,7 +708,7 @@ rather than a tangled atomic.
 
 | Doc | Relationship |
 |-----|--------------|
-| `blocked/GOTO_FIFO_UNIFICATION_PLAN.md` | Architectural reference. Don't implement it directly — implement THIS plan, which preserves its FIFO-order analysis but ships in shippable units. |
+| `superseded/GOTO_FIFO_UNIFICATION_PLAN.md` | Architectural reference. Don't implement it directly — implement THIS plan, which preserves its FIFO-order analysis but ships in shippable units. |
 | `complete/DRAIN_SUPPRESS_PRIMITIVE_PLAN.md` | Foundation for Phase E's drain-suppress wrap. |
 | `incomplete/DEFERRED_CLIP_UNLOAD_PLAN.md` | Sensitive to Phase D/E/F drain-timing changes. Cross-check after each behavior phase. |
 | `incomplete/TRANSFORMED_BY_SCRIPT_WRAP_BACK_PLAN.md` | Independent code paths but shares catch-up machinery. Spot-check during Phase E. |

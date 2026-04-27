@@ -4,12 +4,14 @@ Index of which plans block, foundation, or follow which others. Plans that
 stand alone (no upstream/downstream relationships beyond their own test set)
 aren't listed — they live in their bucket and can be worked independently.
 
-**Last updated:** 2026-04-26
+**Last updated:** 2026-04-27
 
 ## How to read this
 
 - **Bucket:** `incomplete/` (active), `blocked/` (waiting on upstream),
-  `complete/` (landed).
+  `complete/` (landed), `superseded/` (kept as architectural reference; the
+  problem was solved by another plan, or the work it described turned out
+  to already be effectively done elsewhere).
 - **Foundation of:** plans that depend on this one's primitives or fixes.
 - **Blocked by:** what must land before this plan can move to `incomplete/`
   or finish.
@@ -21,10 +23,11 @@ aren't listed — they live in their bucket and can be worked independently.
 This is the largest active chain — the one we're working through now.
 
 ```
-GOTO_CATCHUP_HYGIENE_PLAN (blocked/)
-   │ Phases 1-5 landed; Phase 6 split out as its own plan.
+GOTO_CATCHUP_HYGIENE_PLAN (superseded/)
+   │ Phases 1-5 landed; Phase 6 split out as its own plan (now complete
+   │ via the FIFO incremental rewrite below).
    ↓
-   ├──► GOTO_FIFO_UNIFICATION_PLAN (blocked/)
+   ├──► GOTO_FIFO_UNIFICATION_PLAN (superseded/)
    │       │ status: superseded — kept as architectural reference only.
    │       │ Atomic-commit framing was untractable; reframed as the
    │       │ incremental plan below, which is now complete.
@@ -55,7 +58,6 @@ DRAIN_SUPPRESS_PRIMITIVE_PLAN (complete/, commit d1cd1d1f)
 |--------------|---------------|
 | GOTO_FIFO_UNIFICATION_INCREMENTAL (Phases A-H complete) | landed `consecutive_goto_frame_test` 12/12 from Phase E; Phase G+H were pure cleanup with no further test deltas. |
 | TRANSFORMED_BY_SCRIPT_WRAP_BACK | `place_and_remove_object_insane_test` (the other Phase 6→Phase 7 split) |
-| Both above | retiring `GOTO_CATCHUP_HYGIENE_PLAN` from `blocked/` to `complete/` |
 
 ## Other dependency relationships
 
@@ -101,11 +103,13 @@ DRAIN_SUPPRESS_PRIMITIVE_PLAN (complete/, commit d1cd1d1f)
   regex; MTASC can't compile regex literals. Archived rather than deleted.
 - **Foundation of:** none.
 
-### WITH_AUTOBOXING_PLAN (blocked/)
+### WITH_AUTOBOXING_PLAN (superseded/)
 
-- **Blocked by:** Reassessed 2026-04-21 — primitive auto-boxing already
-  works. Remaining `with-v5/6/7/8` diffs are driven by unrelated features.
-  Plan parked until the unrelated features are identified.
+- **Status:** Reassessed 2026-04-21 — primitive auto-boxing already works;
+  remaining `with-v5/6/7/8` diffs are driven by unrelated features
+  (`SETTARGET_OBJECT_PATH_PLAN` + `ASSETPROPFLAGS_WITH_READONLY_PLAN`,
+  both in `complete/`). Kept as architectural reference for the
+  reassessment notes.
 - **Foundation of:** none.
 
 ### REGISTERCLASS_LIFECYCLE_PLAN (incomplete/)
