@@ -17129,10 +17129,16 @@ static MovieClip* resolveFlashPathToMC(SWFAppContext* app_context, const char* p
 	const char* p = path;
 	u32 remaining = path_len;
 
-	// Leading '/' means start from root
+	// Leading '/' means start from root.
+	// "Root" here is the level root that hosts the running script — for the
+	// main movie that's `&root_movieclip` (level 0), but for SWFs loaded into
+	// other levels (e.g. _level99) "/" resolves within that level's tree, not
+	// _level0. Walk start_mc's parent chain to its topmost ancestor.
 	if (p[0] == '/') {
+		MovieClip* lev = start_mc;
+		while (lev != NULL && lev->parent != NULL) lev = lev->parent;
 		extern MovieClip root_movieclip;
-		mc = &root_movieclip;
+		mc = (lev != NULL) ? lev : &root_movieclip;
 		is_slash_path = 1;
 		p++; remaining--;
 		if (remaining == 0) return mc;
@@ -17548,12 +17554,44 @@ static MovieClip* getOrCreateLevel(SWFAppContext* app_context, int level_num) {
     snprintf(mc->target, sizeof(mc->target), "_level%d", level_num);
     strncpy(mc->original_target, mc->target, sizeof(mc->original_target));
     mc->depth = level_num - 16384;
+    // HCALLOC zeros ng_textfield_idx, but `0` means "static textfield #0",
+    // making MC_IS_TEXTFIELD evaluate true. Mark as not-a-textfield.
+    mc->ng_textfield_idx = -1;
     g_levels[level_num] = mc;
     // Register in child_mc_cache so lookups find it
     if (child_mc_count < MAX_CHILD_MOVIECLIPS) {
         child_mc_cache[child_mc_count++] = mc;
     }
     return mc;
+}
+
+// Flash semantics: level roots (mc loaded into _levelN, including _root) have
+// an empty `_name` even though `mc->name` holds "_levelN" for toString/path
+// use. If a script (or MCL replace) has overridden the level MC's name to
+// something other than the synthetic "_levelN", we honor the override and
+// return that name instead.
+static int isLevelRootMC(MovieClip* mc) {
+    if (mc == NULL) return 0;
+    int is_level = 0;
+    if (mc == &root_movieclip) is_level = 1;
+    else {
+        for (int i = 1; i < MAX_LEVELS; i++) {
+            if (g_levels[i] == mc) { is_level = 1; break; }
+        }
+    }
+    if (!is_level) return 0;
+    // Empty name: level root with default state → empty `_name`.
+    if (mc->name[0] == '\0') return 1;
+    // Matches the synthetic "_levelN" name we stamp in getOrCreateLevel /
+    // root_movieclip's static init? If yes, treat as level-default → empty.
+    // Otherwise (e.g. MCL replace stamped a real name), honor the override.
+    if (strncmp(mc->name, "_level", 6) == 0) {
+        for (size_t i = 6; mc->name[i] != '\0'; i++) {
+            if (mc->name[i] < '0' || mc->name[i] > '9') return 0;
+        }
+        return 1;
+    }
+    return 0;
 }
 
 static uint16_t* strip_html_tags_u16(SWFAppContext* app_context, const uint16_t* src, u32 src_len, u32* out_len);
@@ -32449,6 +32487,7 @@ void actionGetVariable(SWFAppContext* app_context)
 			}
 			else if (mc_found == 2)  // _name
 			{
+				if (isLevelRootMC(scope_mc[i])) { PUSH_STR("", 0); return; }
 				PUSH_STR(scope_mc[i]->name, strlen(scope_mc[i]->name));
 				return;
 			}
@@ -32526,6 +32565,7 @@ void actionGetVariable(SWFAppContext* app_context)
 			}
 			else if (mc_found == 2)  // _name
 			{
+				if (isLevelRootMC(g_current_context)) { PUSH_STR("", 0); return; }
 				PUSH_STR(g_current_context->name, strlen(g_current_context->name));
 				return;
 			}
@@ -33446,7 +33486,11 @@ check_special_vars:
 			if (strcasecmp(var_name, "_currentframe") == 0) { float v = (float)mc->currentframe; PUSH(ACTION_STACK_VALUE_F32, VAL(u32, &v)); return; }
 			if (strcasecmp(var_name, "_totalframes") == 0) { float v = mc->load_failed ? 0.0f : (float)mc->totalframes; PUSH(ACTION_STACK_VALUE_F32, VAL(u32, &v)); return; }
 			if (strcasecmp(var_name, "_framesloaded") == 0) { float v = mc->load_failed ? -1.0f : (float)mc->framesloaded; PUSH(ACTION_STACK_VALUE_F32, VAL(u32, &v)); return; }
-			if (strcasecmp(var_name, "_name") == 0) { PUSH_STR(mc->name, strlen(mc->name)); return; }
+			if (strcasecmp(var_name, "_name") == 0) {
+				if (isLevelRootMC(mc)) { PUSH_STR("", 0); return; }
+				PUSH_STR(mc->name, strlen(mc->name));
+				return;
+			}
 			if (strcasecmp(var_name, "_target") == 0) { PUSH_STR(mc->target, strlen(mc->target)); return; }
 			if (strcasecmp(var_name, "_url") == 0) { PUSH_STR(mc->url, strlen(mc->url)); return; }
 			if (strcasecmp(var_name, "_droptarget") == 0) { actionRefreshDropTargetIfDragged(mc); PUSH_STR(mc->droptarget, strlen(mc->droptarget)); return; }
@@ -42160,7 +42204,11 @@ void actionGetMember(SWFAppContext* app_context)
 			if (strcasecmp(prop_name, "_currentframe") == 0) { float v = mc->unloaded ? 0.0f : (float)mc->currentframe; PUSH(ACTION_STACK_VALUE_F32, VAL(u32, &v)); return; }
 			if (strcasecmp(prop_name, "_totalframes") == 0) { float v = mc->unloaded ? 0.0f : (mc->load_failed ? 0.0f : (float)mc->totalframes); PUSH(ACTION_STACK_VALUE_F32, VAL(u32, &v)); return; }
 			if (strcasecmp(prop_name, "_framesloaded") == 0) { float v = mc->unloaded ? 0.0f : (mc->load_failed ? -1.0f : (float)mc->framesloaded); PUSH(ACTION_STACK_VALUE_F32, VAL(u32, &v)); return; }
-			if (strcasecmp(prop_name, "_name") == 0) { PUSH_STR(mc->name, strlen(mc->name)); return; }
+			if (strcasecmp(prop_name, "_name") == 0) {
+				if (isLevelRootMC(mc)) { PUSH_STR("", 0); return; }
+				PUSH_STR(mc->name, strlen(mc->name));
+				return;
+			}
 			if (strcasecmp(prop_name, "_target") == 0) { PUSH_STR(mc->target, strlen(mc->target)); return; }
 			if (strcasecmp(prop_name, "_url") == 0) { PUSH_STR(mc->url, strlen(mc->url)); return; }
 			if (strcasecmp(prop_name, "_droptarget") == 0) { actionRefreshDropTargetIfDragged(mc); PUSH_STR(mc->droptarget, strlen(mc->droptarget)); return; }
