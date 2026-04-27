@@ -270,9 +270,24 @@ must land for the test to reach 12/12.
 **Risk.** High — first behavior change. Cleared local guardrail; CI
 roundtrip should confirm no regressions outside the local guardrail.
 
-**Stop criterion.** If regressions exceed ~5 unrelated tests,
-revert the flip and document; that pivots back to investigating a
-narrower flag scope.
+**CI regressions (2 — under stop threshold).** CI run 24971025400
+caught two AVM1 regressions that the local guardrail didn't touch:
+
+| Test | Prev | Now | Notes |
+|------|------|-----|-------|
+| `avm1/issue_9885` | PASS (2/2) | timeout | Sprite goto inside `tellTarget`; runtime now hangs >10s. Likely a re-queue loop in the unified drain (sprite-frame script gets re-flushed each iteration). |
+| `avm1/tell_target_invalid_swf6` | PASS (5/5) | output_mismatch (5/6) | Extra trailing `This should only be reached in SWF6 and below` line — the SWF6-only frame's script fires twice instead of once under unified drain. |
+
+Both reproduce locally only after wiping the cached `RecompiledScripts`
+/ `RecompiledTags` directories — the earlier "PASS" of these tests
+during the local guardrail used stale Phase-C-built artifacts. Both
+are accepted as Phase D fallout to be addressed in Phase E/F (Phase E's
+catch-up inline + drain-suppress wrap should defang the re-queue loop;
+Phase F's eager-init queueing should normalize the double-fire).
+
+**Stop criterion (not triggered).** If regressions exceed ~5 unrelated
+tests, revert the flip and document; that pivots back to investigating
+a narrower flag scope. We saw 2 — well under threshold.
 
 ### Phase E — ng_executeGotoCatchUp: inline funcs[target] with drain-suppress
 
