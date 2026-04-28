@@ -1088,7 +1088,8 @@ void swfStart(SWFAppContext* app_context)
 		// already handled the transition; treating this as natural-wrap would
 		// re-run funcs[target] inline, double-firing target frame's scripts.
 		if (manual_next_frame && !goto_from_action && next_frame < current_frame
-		    && current_frame + 1 == g_frame_count)
+		    && current_frame + 1 == g_frame_count
+		    && !g_force_quit)
 		{
 			// Only fire when there are display-list entries placed at frames
 			// after the wrap target. The catch-up's inline funcs[target]
@@ -1100,6 +1101,14 @@ void swfStart(SWFAppContext* app_context)
 			// place_and_remove_object_insane_test) and apply
 			// transformed_by_script preservation. Tests without such entries
 			// don't need the catch-up replay.
+			//
+			// Also skip when FSCommand:quit was issued during this frame —
+			// the SWF asked to terminate, so re-running funcs[target] inline
+			// just duplicates the most recent script's trace
+			// (shumway/fuzz/81004241… queues FSCommand:quit on its last
+			// frame which then emits the natural-wrap; the outer loop's
+			// g_force_quit check terminates the next tick, so the inline
+			// catch-up's funcs[target] only adds spurious trace output).
 			extern DisplayObject* display_list;
 			extern size_t max_depth;
 			int has_stale = 0;
