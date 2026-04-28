@@ -20,11 +20,100 @@ phases:
     status: pending
   - id: 5
     name: "Multi-clip onLoad / frame0 ordering (registerClassTest2 frame interleave)"
-    status: pending
+    status: mostly_complete
 dependencies: []
 blockers:
   - reason: "None — Object.registerClass infrastructure is already complete (AVM1 REGISTERCLASS_PLAN.md, 14/15 AVM1 tests pass). The Gnash misc-ming tests exercise edges the AVM1 tests don't cover: prototype.onLoad firing, constructor proto-chain fallthrough, frame-timing precision, and remove+replace cycling. Each phase is a narrow extension to the existing infrastructure."
 -->
+
+## 2026-04-27 session (later) — Phase 5 mostly landed; registerClassTest now PASS
+
+**registerClassTest: 50/51 → 51/51 PASS.** Three small fixes to land the
+last failing line (`typeof(clip2.lineTo) == 'undefined'`) and the prior
+`'enabled,onRollOver,'` for-in lines:
+
+1. `MovieClip.prototype.enabled` is now installed as
+   `DONT_ENUM` (`SWFModernRuntime/src/actionmodern/action.c`
+   `initMovieClipPrototype` — drops the `if (... "enabled") continue;`
+   exception so the existing DontEnum sweep covers `enabled` too).
+   Mirrors Ruffle (`core/src/avm1/globals/movie_clip.rs:67`
+   `value(true; DONT_ENUM)`). Button.prototype.enabled stays enumerable
+   separately (`initButtonPrototype` is unchanged), so
+   `button_properties_special_cases` continues to find `enabled` via
+   `'enabled' in button` (which iterates the Button prototype).
+2. `actionGetMember` MOVIECLIP branch
+   (`SWFModernRuntime/src/actionmodern/action.c`) now walks the
+   user-set `mc.dynamic_props.__proto__` chain via
+   `getPropertyWithPrototype`, and SUPPRESSES the implicit
+   `MovieClip.prototype` fallback when dynamic_props had an explicit
+   `__proto__`. Without this, a registered class whose prototype chain
+   bypasses `MovieClip.prototype` (e.g.
+   `CustomClass.prototype = new Object()`) still incorrectly resolved
+   `clip.lineTo`/etc. via the implicit fallback. New `_mc_explicit_proto`
+   flag tracks the dynamic_props.__proto__ presence and gates the
+   fallback. attachMovie of a non-button non-registered MC sets
+   `dynamic_props.__proto__ = MovieClip.prototype` already, so regular
+   MCs continue to inherit MC methods through the explicit chain.
+3. `actionCallMethod` MOVIECLIP user-method dispatch
+   (`SWFModernRuntime/src/actionmodern/action.c`) gained the same
+   `_mcm_explicit_proto` gate — when dynamic_props had explicit
+   `__proto__`, the secondary `getPropertyWithPrototype(mc_proto, ...)`
+   fallback to MovieClip.prototype is skipped. (The built-in MC method
+   handlers — gotoAndStop/getDepth/etc. — remain ungated; this is the
+   single residual line in registerClassTest2 below.)
+
+**registerClassTest2: 0/44 → 41/44 matching.** Two recompiler changes
+plus one runtime change to defer SWF top-level DoInitAction execution
+into the frame body where it appears in the SWF stream:
+
+4. `SWFRecomp/src/swf.cpp` `SWF_TAG_DO_INIT_ACTION` (top-level) now
+   emits `tagDoInitActionGuarded(app_context, sprite_id, script_X)`
+   inline into the current `frame_N` function body, gated on
+   `(!catch_up_mode || g_tag_skip_mode)`, instead of into
+   `tag_init_scripts` (which ran at startup before any frame). Mirrors
+   Ruffle's `do_init_action`
+   (`core/src/display_object/movie_clip.rs:603-647`) which executes the
+   InitAction synchronously when the tag stream encounters it. This
+   makes mc3's InitAction in registerClassTest2 fire AFTER dejagnu's
+   frame 1 setup (so `_root.note('mc3.initactions')` and
+   `_root.check_equals(clip3.__proto__, ...)` see the dejagnu helpers
+   instead of failing silently).
+5. `SWFRecomp/src/swf.cpp` `SWF_TAG_IMPORT_ASSETS` /
+   `SWF_TAG_IMPORT_ASSETS_2` (top-level) similarly moved from
+   `tag_init_scripts` to inline-in-frame-body. Required to preserve
+   the relative stream order between DoInitAction and ImportAssets in
+   `do_init_action_child/child.swf` — without this, the child's own
+   DoInitAction fires AFTER the imported assets' DoInitActions
+   (regressing do_init_action_child).
+6. `SWFModernRuntime/src/libswf/tag.c` `g_init_action_done` guard is
+   now keyed by `(g_current_movie_id, char_id)` instead of just
+   `char_id`, so parent and child SWFs sharing a `char_id=1` for their
+   DoInitAction sprites don't shadow each other. Was a latent bug only
+   exposed once DoInitAction moved into frame bodies (where the inline
+   `tagDoInitActionGuarded` call actually runs the guard, vs the prior
+   `script_X(app_context)` direct call which bypassed it).
+
+- `register_class/registerClassTest`: 50/51 → 51/51 PASS.
+- `register_class/registerClassTest2`: 0/44 → 41/44 matching.
+  Three lines remain: `clip2.getDepth() == undefined` (built-in
+  MC.getDepth handler in `actionCallMethod` doesn't honor the
+  `_mcm_explicit_proto` skip — handler fires before user-method
+  dispatch), and the swap of `clipevs.onLoad` / `clip3.onLoad` ordering
+  (Flash queues onLoad in PlaceObject2-then-attachMovie order;
+  ours queues attachMovie's clip3.onLoad before clipevs.onLoad because
+  DoInitAction now runs before the PlaceObject2 of clipevs in the
+  frame body).
+- `do_init_action_child` (AVM1): preserved at PASS.
+- `register_and_init_order` (AVM1): preserved at 233/233 PASS.
+
+**Open: clip2.getDepth() == undefined and onLoad ordering.** The
+remaining 3 lines on registerClassTest2 require either (a) gating
+ALL ~30 built-in MC method handlers in `actionCallMethod` on
+`_mcm_explicit_proto` (high blast radius, defer to a follow-up
+session), or (b) changing the LOAD-event queueing order (also broad
+risk). Phase 5 is therefore "mostly_complete": frame0 ordering is
+now correct (frame0 actions appear in the right block), only the LOAD
+events are out of order.
 
 ## 2026-04-27 session — Phases 1 & 2 landed
 

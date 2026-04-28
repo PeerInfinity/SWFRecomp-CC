@@ -13091,10 +13091,13 @@ static void initMovieClipPrototype(SWFAppContext* app_context)
 		}
 	}
 
-	// Mark all methods and __proto__ as DontEnum (but NOT enabled — it's enumerable)
+	// Mark all methods and __proto__ as DontEnum, including `enabled`. Ruffle's
+	// MovieClip.prototype.enabled is `value(true; DONT_ENUM)`
+	// (core/src/avm1/globals/movie_clip.rs:67); a regular MC's `for-in` should
+	// not yield `enabled`. Button.prototype.enabled remains enumerable
+	// separately (initButtonStubPrototype above).
 	for (u32 i = 0; i < proto->num_used; i++)
 	{
-		if (strcmp(proto->properties[i].name, "enabled") == 0) continue;
 		proto->properties[i].flags &= ~PROPERTY_FLAG_ENUMERABLE;
 	}
 
@@ -43174,10 +43177,24 @@ void actionGetMember(SWFAppContext* app_context)
 			return;
 		}
 
-		// Check dynamic_props (user-defined properties set via SetMember)
+		// Check dynamic_props (user-defined properties set via SetMember).
+		// When dynamic_props has an explicit __proto__ (e.g. set by
+		// Object.registerClass), walk the explicit prototype chain instead of
+		// just doing a raw lookup — and remember that we did so, so the
+		// MovieClip.prototype fallback below is suppressed. This matches
+		// Ruffle: a registered class whose prototype chain doesn't reach
+		// MovieClip.prototype (e.g. CustomClass.prototype = new Object()) does
+		// not inherit MovieClip methods.
+		int _mc_explicit_proto = 0;
 		if (mc != NULL && mc->dynamic_props != NULL)
 		{
-			ActionVar* dp = getProperty((ASObject*)mc->dynamic_props, prop_name, prop_name_len);
+			ASObject* dp_obj = (ASObject*)mc->dynamic_props;
+			ActionVar* dp_proto = getProperty(dp_obj, "__proto__", 9);
+			if (dp_proto != NULL && dp_proto->type == ACTION_STACK_VALUE_OBJECT)
+				_mc_explicit_proto = 1;
+			ActionVar* dp = _mc_explicit_proto
+				? getPropertyWithPrototype(dp_obj, prop_name, prop_name_len)
+				: getProperty(dp_obj, prop_name, prop_name_len);
 			if (dp != NULL)
 			{
 				pushVar(app_context, dp);
@@ -43229,7 +43246,13 @@ void actionGetMember(SWFAppContext* app_context)
 			return;
 		}
 
-		// Fall back to MovieClip.prototype chain
+		// Fall back to MovieClip.prototype chain — only when dynamic_props
+		// did NOT have an explicit __proto__. If it did, the
+		// getPropertyWithPrototype walk above already covered the user's chain
+		// and a MovieClip.prototype fallback would incorrectly resolve
+		// MovieClip methods on registered-class MCs whose prototype chain
+		// deliberately bypasses MovieClip.
+		if (!_mc_explicit_proto)
 		{
 			int mc_ver = (mc != NULL && mc->swf_version) ? mc->swf_version : g_swf_version;
 			ASObject* mc_proto = getMovieClipPrototype(mc_ver);
@@ -58595,9 +58618,20 @@ void actionCallMethod(SWFAppContext* app_context, char* str_buffer)
 		}
 		else
 		{
-			// Check if user-defined method exists on dynamic_props
+			// Check if user-defined method exists on dynamic_props.
+			// Track whether dynamic_props has an explicit __proto__ — if so, the
+			// getPropertyWithPrototype walk below already covered the user's
+			// chain (which may or may not include MovieClip.prototype) and we
+			// must NOT additionally fall back to MovieClip.prototype. A
+			// registered class whose prototype chain bypasses MovieClip
+			// (e.g. theClass2.prototype = new Object()) does not inherit
+			// MovieClip methods like getDepth, swapDepths, etc.
 			ASFunction* _mc_user_func = NULL;
+			int _mcm_explicit_proto = 0;
 			if (mc != NULL && mc->dynamic_props != NULL) {
+				ActionVar* dp_proto = getProperty((ASObject*)mc->dynamic_props, "__proto__", 9);
+				if (dp_proto != NULL && dp_proto->type == ACTION_STACK_VALUE_OBJECT)
+					_mcm_explicit_proto = 1;
 				ActionVar* method_var = getPropertyWithPrototype((ASObject*)mc->dynamic_props, method_name, method_name_len);
 				if (method_var != NULL && method_var->type == ACTION_STACK_VALUE_FUNCTION) {
 					_mc_user_func = (ASFunction*) method_var->data.numeric_value;
@@ -58610,7 +58644,8 @@ void actionCallMethod(SWFAppContext* app_context, char* str_buffer)
 			// most recently registered one, which is wrong for MC.valueOf() /
 			// MC.toString() — those should resolve to MovieClip.prototype.{valueOf,
 			// toString} = Object.prototype.{valueOf, toString}.
-			if (_mc_user_func == NULL) {
+			// Skipped when dynamic_props had explicit __proto__ (registered class).
+			if (_mc_user_func == NULL && !_mcm_explicit_proto) {
 				initMovieClipPrototype(app_context);
 				ASObject* mc_proto = getMovieClipPrototype(g_swf_version);
 				if (mc_proto != NULL) {
