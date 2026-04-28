@@ -4,26 +4,84 @@
 
 <!-- PLAN_META
 id: CLIP_EVENT_ROUND_DISPATCH
-status: pending
+status: implemented
 phases:
   - id: 1
     name: "Audit drain sites; identify per-placement vs. frame-level"
-    status: pending
+    status: completed
   - id: 2
     name: "Remove per-placement drain in tagPlaceObject2-family"
-    status: pending
+    status: completed
   - id: 3
     name: "Move INIT/CONSTRUCT/REGISTER_CTOR drain to frame-level, before DoAction drain"
-    status: pending
+    status: completed
   - id: 4
     name: "Recompiler emission update"
-    status: pending
+    status: completed
   - id: 5
     name: "Regression battery"
-    status: pending
+    status: completed
 dependencies: []
 parent_plan: "complete/DEFERRED_CLIP_UNLOAD_PLAN.md (§1)"
 -->
+
+## Implementation status (2026-04-28)
+
+All 5 phases implemented and verified.
+
+### Files changed
+- `SWFModernRuntime/include/actionmodern/action_queue.h` — declared
+  `actionDrainAllInPriorityOrder`.
+- `SWFModernRuntime/src/actionmodern/action_queue.c` — implemented
+  `actionDrainAllInPriorityOrder` as INIT → CONSTRUCT → REGISTER_CTOR →
+  ONLOAD+SCRIPT (delegating ONLOAD+SCRIPT to existing
+  `actionDrainOnloadAndScript` so suppress-depth, sprite-script flush,
+  natural-wrap cleanup, run_pending_finalize semantics are preserved).
+- `SWFModernRuntime/src/libswf/tag.c` — removed per-placement drain blocks
+  inside `tagPlaceObject2` (formerly 4370-4374) and `tagPlaceObject2Ratio`
+  (formerly 4757-4761). `tagPlaceObject2WithClipActions` /
+  `tagPlaceObject2RatioWithClipActions` / `tagPlaceObject3` delegate so no
+  separate change needed. `tagShowFrame` safety drain (2271-2277) kept
+  as backstop for catch-up paths where the recompiler-emitted drain is
+  skipped.
+- `SWFRecomp/src/swf.cpp` — replaced `actionDrainOnloadAndScript` with
+  `actionDrainAllInPriorityOrder` at all three emit sites (lines 601, 904,
+  963).
+
+### Test delta vs. CI baseline (commit 205a9a77)
+
+| Test | Before | After | Note |
+|------|--------|-------|------|
+| loop/loop_test6 (misc-ming) | 10/23 mismatch | 12/23 mismatch | Frame-1 INIT/CTOR round dispatch fixed (lines 1-4 now match `mc1.INIT → mc2.INIT → mc1.CTOR → mc2.CTOR`). Remaining 11 lines blocked on `INTER_TAG_UNLOAD_PLAN` (frame-2 goto rewind tail). |
+
+### Regression battery results (29 + 19 + 4 + 4 = 56 tests)
+
+- AVM1 wide battery (29): 28 pass + 1 ruffle_matched = 29/29 effective.
+  Tests: `clip_events`, `register_and_init_order` (233/233 ordering test
+  unaffected), `on_construct`, `init_object_order`, `bad_placeobject_clipaction`,
+  `movieclip_in_removed_button`, `goto_rewind1/2/3`, `execution_order1/2/3`,
+  `goto_execution_order/2`, `unload`, `unload_clip_event`,
+  `unload_nested_child`, `unloadmovie`, `attach_movie`, `set_interval`,
+  `button_children`, `movieclip_state_values`,
+  `movieclip_library_state_values`, `swf5_to_6_cross_call`, `swf5_no_closure`,
+  `conflicting_instance_names`, `movieclip_get_instance_at_depth`,
+  `movieclip_depth_methods`, `movieclip_name_from_timeline`.
+- misc-ming recently-fixed (19): 18 PASS, loop_test6 only mismatch (target).
+- misc-swfc (4): edittext_test1 / stackscope / submoviegetvar PASS;
+  movieclip_destruction_test2 unchanged at 52/56 (no regression).
+- Shumway duplicateMovieClip suite (4): 4/4 PASS.
+
+No regressions. `register_and_init_order` (233-line ordering canonical)
+remained green — confirming the priority drain order matches the test's
+expectations.
+
+### Status
+
+This plan is implemented in full. loop_test6's full pass requires
+`INTER_TAG_UNLOAD_PLAN` (frame-2 goto rewind tail). The plan stays in
+`incomplete/` because the target test is not fully passing; it can be
+moved to `complete/` once `INTER_TAG_UNLOAD_PLAN` lands and loop_test6
+flips to PASS.
 
 ## Problem statement
 

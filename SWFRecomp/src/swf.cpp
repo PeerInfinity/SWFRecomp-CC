@@ -589,16 +589,11 @@ namespace SWFRecomp
 			flushFrameInitPrologue(context);
 			// Flush pending ENTER_FRAME dispatch (after RemoveObject, before DoAction)
 			context.tag_main << "\t" << "tagFlushPendingEnterFrame(app_context);" << endl;
-			// Phase 6: drain queued root DoAction scripts. Kind-filtered so
-			// Phase 4/5 CLIP_INIT/CONSTRUCT/REGISTER_CTOR entries stay on their
-			// original drain timeline (outermost tagPlaceObject2 / tagShowFrame
-			// safety drain).
-			// Drain DoAction scripts AND queued unload handlers together in
-			// FIFO order. The interleaved order matches Flash's ActionQueue
-			// model: a tag-stream-order RemoveObject2 followed by DoAction
-			// fires unload first; a DoAction followed by RemoveObject2 fires
-			// the script first. (See DEFERRED_CLIP_UNLOAD_PLAN.)
-			context.tag_main << "\t" << "if (!catch_up_mode || g_tag_skip_mode) actionDrainOnloadAndScript(app_context);" << endl;
+			// Frame-level priority drain (CLIP_EVENT_ROUND_DISPATCH):
+			// CLIP_INIT → CLIP_CONSTRUCT → REGISTER_CTOR → ONLOAD+SCRIPT FIFO.
+			// Unload handlers + DoAction scripts FIFO-interleave at NORMAL,
+			// matching Flash ActionQueue tag-stream-order semantics.
+			context.tag_main << "\t" << "if (!catch_up_mode || g_tag_skip_mode) actionDrainAllInPriorityOrder(app_context);" << endl;
 			last_queued_script = next_script_i;
 
 			if (next_frame_i == 1)
@@ -893,15 +888,10 @@ namespace SWFRecomp
 				flushFrameInitPrologue(context);
 				// Flush pending ENTER_FRAME dispatch (after RemoveObject, before DoAction)
 				context.tag_main << "\t" << "tagFlushPendingEnterFrame(app_context);" << endl;
-				// Phase 6: drain queued root DoAction scripts before the frame
-				// footer (quit_swf / next_frame scheduling). Kind-filtered so
-				// Phase 4/5 entries remain owned by their own drain sites.
-				// Drain DoAction scripts AND queued unload handlers together in
-			// FIFO order. The interleaved order matches Flash's ActionQueue
-			// model: a tag-stream-order RemoveObject2 followed by DoAction
-			// fires unload first; a DoAction followed by RemoveObject2 fires
-			// the script first. (See DEFERRED_CLIP_UNLOAD_PLAN.)
-			context.tag_main << "\t" << "if (!catch_up_mode || g_tag_skip_mode) actionDrainOnloadAndScript(app_context);" << endl;
+				// Frame-level priority drain (CLIP_EVENT_ROUND_DISPATCH):
+				// CLIP_INIT → CLIP_CONSTRUCT → REGISTER_CTOR → ONLOAD+SCRIPT FIFO.
+				// Unload handlers + DoAction scripts FIFO-interleave at NORMAL.
+				context.tag_main << "\t" << "if (!catch_up_mode || g_tag_skip_mode) actionDrainAllInPriorityOrder(app_context);" << endl;
 				last_queued_script = next_script_i;
 
 				if (next_frame_i == 1)
@@ -950,17 +940,13 @@ namespace SWFRecomp
 
 				// Flush pending ENTER_FRAME dispatch (after RemoveObject, before DoAction)
 				context.tag_main << "\t" << "tagFlushPendingEnterFrame(app_context);" << endl;
-				// Phase 6: drain queued root DoAction scripts at the ShowFrame
-				// boundary. Kind-filtered (AQ_KIND_SCRIPT only) so Phase 4/5
-				// CLIP_INIT / CONSTRUCT / REGISTER_CTOR entries continue to
-				// drain at the outermost tagPlaceObject2 / tagShowFrame safety
-				// drain — preserving the Phase 5 ordering contract.
-				// Drain DoAction scripts AND queued unload handlers together in
-			// FIFO order. The interleaved order matches Flash's ActionQueue
-			// model: a tag-stream-order RemoveObject2 followed by DoAction
-			// fires unload first; a DoAction followed by RemoveObject2 fires
-			// the script first. (See DEFERRED_CLIP_UNLOAD_PLAN.)
-			context.tag_main << "\t" << "if (!catch_up_mode || g_tag_skip_mode) actionDrainOnloadAndScript(app_context);" << endl;
+				// Frame-level priority drain (CLIP_EVENT_ROUND_DISPATCH):
+				// CLIP_INIT → CLIP_CONSTRUCT → REGISTER_CTOR → ONLOAD+SCRIPT FIFO.
+				// Replaces the per-placement drain inside tagPlaceObject2/Ratio
+				// so multi-sprite frames batch INIT/CTOR rounds. tagShowFrame's
+				// safety drain remains as a backstop for catch-up paths where
+				// this drain is skipped.
+				context.tag_main << "\t" << "if (!catch_up_mode || g_tag_skip_mode) actionDrainAllInPriorityOrder(app_context);" << endl;
 				last_queued_script = next_script_i;
 
 				context.tag_main << "\t" << "tagShowFrame(app_context);" << endl;

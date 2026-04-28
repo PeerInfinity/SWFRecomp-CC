@@ -4362,16 +4362,13 @@ void tagPlaceObject2(SWFAppContext* app_context, size_t depth, size_t char_id, u
 		}
 	}
 
-	// Drain INIT → CONSTRUCT → REGISTER_CTOR at the outermost placement.
-	// Under catch_up_mode=1 (nested eager init, or goto catch-up where the
-	// outermost tagPlaceObject2 itself runs under catch_up_mode=1) we skip
-	// draining here; the enclosing !catch_up_mode placement or the
-	// tagShowFrame safety drain will pick up our queued entries.
-	if (!catch_up_mode) {
-		actionDrainActionQueueByKind(app_context, AQ_KIND_CLIP_INIT);
-		actionDrainActionQueueByKind(app_context, AQ_KIND_CLIP_CONSTRUCT);
-		actionDrainActionQueueByKind(app_context, AQ_KIND_REGISTER_CTOR);
-	}
+	// CLIP_EVENT_ROUND_DISPATCH: per-placement drain removed. INIT / CONSTRUCT
+	// / REGISTER_CTOR entries accumulate across all placements in the frame
+	// and drain in priority order at the recompiler-emitted SHOW_FRAME drain
+	// (actionDrainAllInPriorityOrder), or the tagShowFrame safety drain in
+	// catch-up paths. This makes multi-sprite placement fire INIT round
+	// before CONSTRUCT round (mc1.INIT → mc2.INIT → mc1.CTOR → mc2.CTOR),
+	// matching Ruffle ActionQueue priority drain.
 
 #else
 	(void)app_context;
@@ -4752,13 +4749,8 @@ void tagPlaceObject2Ratio(SWFAppContext* app_context, size_t depth, size_t char_
 		}
 	}
 
-	// Drain INIT → CONSTRUCT → REGISTER_CTOR at the outermost placement.
-	// See tagPlaceObject2 for the rationale.
-	if (!catch_up_mode) {
-		actionDrainActionQueueByKind(app_context, AQ_KIND_CLIP_INIT);
-		actionDrainActionQueueByKind(app_context, AQ_KIND_CLIP_CONSTRUCT);
-		actionDrainActionQueueByKind(app_context, AQ_KIND_REGISTER_CTOR);
-	}
+	// CLIP_EVENT_ROUND_DISPATCH: per-placement drain removed. See
+	// tagPlaceObject2 for the rationale.
 
 #else
 	(void)app_context;
