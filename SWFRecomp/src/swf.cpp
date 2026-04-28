@@ -436,6 +436,41 @@ namespace SWFRecomp
 		}
 	}
 	
+	void SWF::writeFrameInitMarker(Context& context)
+	{
+		// Emit a unique placeholder marker that flushFrameInitPrologue
+		// will later replace with the buffered DoInitAction / ImportAssets
+		// calls for this frame. The id increments per-frame so different
+		// frames' markers don't collide in tag_main's accumulating string.
+		context.tag_main << "/*__SWFRECOMP_PROLOGUE_" << current_frame_marker_id << "__*/" << endl;
+		frame_init_emitted = false;
+	}
+
+	void SWF::flushFrameInitPrologue(Context& context)
+	{
+		// Replace the most recently written placeholder marker in
+		// context.tag_main with the accumulated init prologue body. If no
+		// marker is found (e.g. helper called twice for the same frame),
+		// silently no-op. Resets the buffer and bumps the marker id so
+		// subsequent frames get a unique placeholder.
+		if (frame_init_emitted) {
+			return;
+		}
+		std::string s = context.tag_main.str();
+		std::string marker = "/*__SWFRECOMP_PROLOGUE_" + to_string(current_frame_marker_id) + "__*/";
+		size_t pos = s.find(marker);
+		if (pos != std::string::npos) {
+			std::string replacement = current_frame_init_actions.str();
+			s.replace(pos, marker.length(), replacement);
+			context.tag_main.str(s);
+			context.tag_main.seekp(0, std::ios::end);
+		}
+		current_frame_init_actions.str("");
+		current_frame_init_actions.clear();
+		frame_init_emitted = true;
+		current_frame_marker_id += 1;
+	}
+
 	void SWF::parseAllTags(Context& context)
 	{
 		SWFTag tag;
@@ -447,6 +482,7 @@ namespace SWFRecomp
 				 << "#include \"script_decls.h\"" << endl << endl
 				 << "void frame_" << to_string(next_frame_i) << "(SWFAppContext* app_context)" << endl
 				 << "{" << endl;
+		writeFrameInitMarker(context);
 		next_frame_i += 1;
 		
 		context.out_script_header = ofstream(context.output_scripts_folder + "out.h", ios_base::out);
@@ -546,6 +582,11 @@ namespace SWFRecomp
 		// If we exited the tag loop early (cur_pos past end), close the current frame function
 		if (tag.code != 0)
 		{
+			// Flush the per-frame init prologue placeholder before any
+			// trailing frame-body emissions, so a frame whose tag stream
+			// was truncated still gets its DoInitActions emitted in
+			// the right place.
+			flushFrameInitPrologue(context);
 			// Flush pending ENTER_FRAME dispatch (after RemoveObject, before DoAction)
 			context.tag_main << "\t" << "tagFlushPendingEnterFrame(app_context);" << endl;
 			// Phase 6: drain queued root DoAction scripts. Kind-filtered so
@@ -658,13 +699,16 @@ namespace SWFRecomp
 		context.tag_main << endl << "\ttagInitSpriteFrameScripts(sprite_frame_scripts_data, sprite_frame_scripts_data_count);";
 		// Emit tag definitions (sprites, exports, bitmaps, etc.)
 		context.tag_main << tag_init.str();
-		// Initialize variable array BEFORE DoInitAction scripts so they can use
-		// string ID-based variables (DefineLocal, GetVariable)
+		// Initialize variable array.
+		// Top-level DoInitAction / ImportAssets are now emitted into the
+		// per-frame init prologue (frame_N body), not tagInit, so
+		// tag_init_scripts is unused for those. The buffer remains in the
+		// SWF class as a no-op slot; if a future caller routes script
+		// calls through it, they'll still land here.
 		if (action.next_str_i > 0)
 		{
 			context.tag_main << endl << "\tinitVarArray(MAX_STRING_ID);";
 		}
-		// Emit DoInitAction script calls (after initVarArray)
 		context.tag_main << tag_init_scripts.str() << endl
 						 << "}";
 		
@@ -825,18 +869,28 @@ namespace SWFRecomp
 	{
 		if (another_frame && tag.code != SWF_TAG_END_TAG)
 		{
+			// Replace the previous frame's prologue placeholder with its
+			// accumulated DoInitAction / ImportAssets calls before
+			// closing the frame, then drop a fresh placeholder for the
+			// new frame.
+			flushFrameInitPrologue(context);
 			context.tag_main << "}" << endl << endl
 							 << "void frame_" << to_string(next_frame_i) << "(SWFAppContext* app_context)" << endl
 							 << "{" << endl;
+			writeFrameInitMarker(context);
 			next_frame_i += 1;
-			
+
 			another_frame = false;
 		}
-		
+
 		switch (tag.code)
 		{
 			case SWF_TAG_END_TAG:
 			{
+				// Flush the per-frame init prologue placeholder before any
+				// of the END_TAG epilogue body emissions so the
+				// DoInitActions land at the top of the final frame.
+				flushFrameInitPrologue(context);
 				// Flush pending ENTER_FRAME dispatch (after RemoveObject, before DoAction)
 				context.tag_main << "\t" << "tagFlushPendingEnterFrame(app_context);" << endl;
 				// Phase 6: drain queued root DoAction scripts before the frame
@@ -2636,20 +2690,17 @@ namespace SWFRecomp
 
 				out_script << "}";
 
-				(void)init_sprite_id;
-				// Emit call in tagInit (runs once at startup, after initVarArray).
-				// Note: this is NOT the same as Ruffle/Flash, which fires
-				// DoInitAction when the tag stream encounters it during normal
-				// frame playback. We hoist it to startup because many AVM1
-				// tests (register_and_init_order, on_construct,
-				// resolve_different_root) depend on registered classes being
-				// available BEFORE the first PlaceObject2 of that frame. The
-				// SWF tag stream order has DoInitAction AFTER PlaceObject2 in
-				// these tests, but Flash defers constructor invocation until
-				// after all DoInitActions in the frame have run — equivalent
-				// to running DoInitAction first. The startup-hoist approach
-				// is the simplest way to model this.
-				tag_init_scripts << endl << "\t" << func_name << "(app_context);";
+				// Buffer the call into the current-frame prologue so it
+				// emits at the top of frame_N's body, before any same-frame
+				// PlaceObject2/DoAction. Mirrors Ruffle's preload pass.
+				// Gated on (!catch_up_mode || g_tag_skip_mode) and dispatched
+				// via tagDoInitActionGuarded so the per-character once-only
+				// guard short-circuits during script-only target replay.
+				current_frame_init_actions
+					<< "\tif (!catch_up_mode || g_tag_skip_mode) "
+					<< "tagDoInitActionGuarded(app_context, "
+					<< to_string(init_sprite_id) << ", " << func_name << ");"
+					<< endl;
 
 
 
@@ -4043,11 +4094,22 @@ namespace SWFRecomp
 					cur_pos += name.length() + 1;
 					imports.push_back({char_id, name});
 				}
-				// Emit runtime call to load and remap imported symbols
-				tag_init_scripts << endl << "\tactionImportAssets(app_context, \"" << import_url << "\");";
+				// Buffer into the current-frame prologue so imports
+				// resolve at the top of frame_N's body, in stream order
+				// with DoInitAction (required by do_init_action_child).
+				// Gated on (!catch_up_mode || g_tag_skip_mode); the
+				// runtime side is responsible for idempotency under
+				// script-only replay.
+				current_frame_init_actions
+					<< "\tif (!catch_up_mode || g_tag_skip_mode) "
+					<< "actionImportAssets(app_context, \"" << import_url << "\");"
+					<< endl;
 				for (auto& imp : imports) {
-					tag_init_scripts << endl << "\ttagImportCharacter(app_context, "
-						<< imp.char_id << ", \"" << imp.name << "\");";
+					current_frame_init_actions
+						<< "\tif (!catch_up_mode || g_tag_skip_mode) "
+						<< "tagImportCharacter(app_context, "
+						<< imp.char_id << ", \"" << imp.name << "\");"
+						<< endl;
 				}
 				break;
 			}

@@ -24,8 +24,12 @@ namespace SWFRecomp
 		context.output_tags_folder += '/';
 		context.output_scripts_folder += '/';
 		
-		context.tag_main = ofstream(string("") + context.output_tags_folder + "tagMain.c", ios_base::out);
-		
+		// tag_main is an in-memory stringstream during parsing so the
+		// per-frame init prologue placeholder can be replaced on the fly.
+		// It is flushed to tagMain.c at the end of recompile().
+		context.tag_main.str("");
+		context.tag_main.clear();
+
 		context.constants = ofstream(string("") + context.output_tags_folder + "constants.c", ios_base::out);
 		
 		context.constants_header = ofstream(string("") + context.output_tags_folder + "constants.h", ios_base::out);
@@ -53,7 +57,12 @@ namespace SWFRecomp
 			fprintf(stderr, "Caught unknown exception in parseAllTags\n");
 		}
 
-		context.tag_main.close();
+		// Flush the accumulated tag_main buffer to tagMain.c.
+		{
+			ofstream tag_main_file(string("") + context.output_tags_folder + "tagMain.c", ios_base::out);
+			tag_main_file << context.tag_main.str();
+			tag_main_file.close();
+		}
 		context.constants.close();
 		context.constants_header.close();
 		context.out_draws.close();

@@ -4,24 +4,45 @@
 
 <!-- PLAN_META
 id: DOINITACTION_PER_FRAME_PROLOGUE
-status: pending
+status: complete
 phases:
   - id: 1
     name: "Per-frame init prologue buffer in recompiler"
-    status: pending
+    status: complete
   - id: 2
     name: "(movie_id, char_id) keying in tagDoInitActionGuarded"
-    status: pending
+    status: complete
   - id: 3
     name: "Catch-up / script-only replay gating + actionImportAssets idempotency"
-    status: pending
+    status: complete
   - id: 4
     name: "Regression sweep + retire tag_init_scripts buffer"
-    status: pending
+    status: complete
 dependencies: []
-blockers:
-  - reason: "None — research is complete (see DOINITACTION_TIMING_FINDINGS.md). Implementation is a recompiler-side restructure of how top-level DoInitAction and ImportAssets emit. The runtime-side guard extension (movie_id, char_id) is a one-line widening that the prior reverted attempt already validated."
+blockers: []
 -->
+
+## Result (2026-04-27)
+
+- **registerClassTest2**: 0/44 → 41/44 matching lines (`output_mismatch` → mostly-passing). The remaining 3 mismatched lines are independent of frame-init ordering (`clip2.getDepth() == undefined` MC built-in handler gating, theClass3 onLoad ordering between clipevs/clip3) — tracked in `REGISTERCLASS_LIFECYCLE_PLAN.md`.
+- **register_and_init_order** 231/231 preserved.
+- **on_construct** 25/25 preserved.
+- **resolve_different_root** 2/2 preserved.
+- **do_init_action_child** preserved (Phase 2 `(movie_id, char_id)` guard).
+- **doactionorder/symbolclass** 4/4 preserved.
+
+Implementation:
+- `SWFRecomp/include/swf.hpp`: added `current_frame_init_actions`, `current_frame_marker_id`, `frame_init_emitted`, plus `writeFrameInitMarker` / `flushFrameInitPrologue` declarations.
+- `SWFRecomp/include/context.hpp`: changed `tag_main` from `ofstream` to `stringstream` so the per-frame prologue placeholder marker can be replaced after parsing each frame.
+- `SWFRecomp/src/recompilation.cpp`: dump `context.tag_main.str()` to `tagMain.c` at the end.
+- `SWFRecomp/src/swf.cpp`:
+  - `parseAllTags()` writes `/*__SWFRECOMP_PROLOGUE_<id>__*/` placeholder after each `frame_N` open brace.
+  - `interpretTag()` `another_frame` block + `END_TAG` + truncation fallback all call `flushFrameInitPrologue` to replace the placeholder with the buffered prologue.
+  - `SWF_TAG_DO_INIT_ACTION` (top-level) emits `if (!catch_up_mode || g_tag_skip_mode) tagDoInitActionGuarded(...)` into `current_frame_init_actions` instead of `tag_init_scripts`.
+  - `SWF_TAG_IMPORT_ASSETS` / `IMPORT_ASSETS_2` emit `actionImportAssets` and `tagImportCharacter` into `current_frame_init_actions`.
+- `SWFModernRuntime/src/libswf/tag.c`: `tagDoInitActionGuarded` widened to 2D `g_init_action_done[MAX_INIT_ACTION_MOVIES][MAX_INIT_ACTION_CHARS]` keyed on `g_current_movie_id` so parent and child SWFs sharing `char_id` don't shadow each other.
+
+`tag_init_scripts` is now unused for top-level DoInitAction / ImportAssets but retained as an empty buffer for safety; its emission line in `tagInit()` is a no-op.
 
 ## Background
 

@@ -168,6 +168,16 @@ namespace SWFRecomp
 		std::stringstream tag_init;
 		std::stringstream tag_init_scripts;  // DoInitAction calls (emitted after initVarArray)
 
+		// Per-frame init prologue buffer: top-level DoInitAction /
+		// ImportAssets calls accumulated for the current frame, replacing a
+		// placeholder marker at frame open. This places them at the top of
+		// frame_N's body (before that frame's PlaceObject*/RemoveObject*/
+		// DoAction emissions), matching Ruffle's preload pass timing.
+		// See _investigation/DOINITACTION_PER_FRAME_PROLOGUE_PLAN.md.
+		std::stringstream current_frame_init_actions;
+		size_t current_frame_marker_id = 0;
+		bool frame_init_emitted = false;
+
 		std::stringstream shape_data;
 		size_t current_tri;
 		std::stringstream transform_data;
@@ -260,6 +270,13 @@ namespace SWFRecomp
 		void parseMatrix(MATRIX& matrix_out);
 		void parseAllTags(Context& context);
 		void interpretTag(Context& context, SWFTag& tag);
+		// Per-frame init prologue helpers. writeFrameInitMarker emits a
+		// unique placeholder into context.tag_main at the top of the
+		// current frame body. flushFrameInitPrologue replaces that
+		// placeholder with the accumulated DoInitAction / ImportAssets
+		// calls (from current_frame_init_actions), then resets the buffer.
+		void writeFrameInitMarker(Context& context);
+		void flushFrameInitPrologue(Context& context);
 		void recompileMatrix(MATRIX matrix, std::stringstream& out);
 		FillStyle* parseFillStyles(u16 fill_style_count);
 		FillStyle* parseMorphFillStyles(u16 fill_style_count);

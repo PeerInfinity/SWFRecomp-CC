@@ -5254,16 +5254,23 @@ void tagDefineSpriteEx(SWFAppContext* app_context, size_t char_id, frame_func* f
 	}
 }
 
-// DoInitAction once-per-character guard (for DoInitAction inside DefineSprite)
+// DoInitAction once-per-character guard. Keyed on (g_current_movie_id,
+// char_id) so parent and child SWFs that share the same char_id space
+// (e.g. char_id=1 for both parent's and child's DoInitAction sprite)
+// don't shadow each other. Used by both the per-frame init prologue
+// (top-level DoInitAction) and the sprite-internal DoInitAction emission.
+#define MAX_INIT_ACTION_MOVIES 8
 #define MAX_INIT_ACTION_CHARS 512
-static u8 g_init_action_done[MAX_INIT_ACTION_CHARS];
+static u8 g_init_action_done[MAX_INIT_ACTION_MOVIES][MAX_INIT_ACTION_CHARS];
 
 void tagDoInitActionGuarded(SWFAppContext* app_context, size_t char_id, frame_func action)
 {
-	if (char_id < MAX_INIT_ACTION_CHARS && g_init_action_done[char_id])
+	u8 movie = g_current_movie_id;
+	if (movie >= MAX_INIT_ACTION_MOVIES) movie = 0;
+	if (char_id < MAX_INIT_ACTION_CHARS && g_init_action_done[movie][char_id])
 		return;
 	if (char_id < MAX_INIT_ACTION_CHARS)
-		g_init_action_done[char_id] = 1;
+		g_init_action_done[movie][char_id] = 1;
 	action(app_context);
 }
 

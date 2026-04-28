@@ -7,6 +7,7 @@
 using std::string;
 using std::ofstream;
 using std::ostream;
+using std::stringstream;
 
 namespace SWFRecomp
 {
@@ -16,7 +17,12 @@ namespace SWFRecomp
 		string output_tags_folder;
 		string output_scripts_folder;
 
-		ofstream tag_main;
+		// tag_main is buffered in memory (stringstream) rather than written
+		// directly to disk so the per-frame init prologue placeholder can
+		// be replaced once each frame's DoInitAction / ImportAssets calls
+		// are known. recompile() flushes the buffer to tagMain.c at the end
+		// of parseAllTags.
+		std::stringstream tag_main;
 		ofstream constants;
 		ofstream constants_header;
 		ofstream out_script_header;
