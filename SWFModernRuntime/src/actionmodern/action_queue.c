@@ -270,26 +270,6 @@ void actionDrainActionQueueByKind(SWFAppContext* app_context,
 	aq_drain(app_context, &f);
 }
 
-void actionDrainAllInPriorityOrder(SWFAppContext* app_context)
-{
-	// Honor drain-suppress like actionDrainOnloadAndScript: when an outer
-	// drain owns the queue (e.g. ng_executeGotoCatchUp's funcs[target] inline
-	// call), nested SHOW_FRAME drains are no-op'd so outer FIFO ordering is
-	// preserved. INIT/CTOR/REGISTER_CTOR queued under suppression sit until
-	// the outer drain (or post-catchup tagShowFrame safety / swf_core.c
-	// post-drain) picks them up.
-	if (g_drain_suppress_depth > 0) return;
-
-	// Priority order matches Ruffle pop_action (core/src/context.rs:527-532):
-	// INITIALIZE > CONSTRUCT > NORMAL. REGISTER_CTOR sequenced after
-	// CONSTRUCT per existing semantics (registerClass constructors fire
-	// after clip-event CONSTRUCTs). ONLOAD+SCRIPT FIFO-interleaves at NORMAL.
-	actionDrainActionQueueByKind(app_context, AQ_KIND_CLIP_INIT);
-	actionDrainActionQueueByKind(app_context, AQ_KIND_CLIP_CONSTRUCT);
-	actionDrainActionQueueByKind(app_context, AQ_KIND_REGISTER_CTOR);
-	actionDrainOnloadAndScript(app_context);
-}
-
 void* actionQueuePopMatching(ActionQueueKind kind_filter,
                              int (*pred)(void* user, void* ctx),
                              void* ctx)
