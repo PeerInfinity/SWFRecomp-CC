@@ -1,10 +1,31 @@
 # MovieClip-Source BitmapData.draw Plan
 <!-- TESTS: BitmapData-v8 (30+ lines), bitmap_data_draw_cliprect, potentially others -->
 
-Last updated: 2026-04-19
-Status: PARTIAL — rasterizer, WITH-scope drawing dispatch, setMask stencil,
-and ColorTransform now wired. BitmapData-v8 is `ruffle_matched` (filtered
-pass). 6 literal-line diffs remain, concentrated in overlap/boundary pixels.
+Last updated: 2026-04-28
+Status: COMPLETE — rasterizer, WITH-scope drawing dispatch, setMask stencil,
+and ColorTransform are wired. BitmapData-v8 is `ruffle_matched` (effective
+pass — 409/417 lines, ours_diff 8 ⊆ ruffle_diff 13). bitmap_data_draw_cliprect
+(avm1) is PASS. The 8 remaining literal-line diffs are sub-pixel boundary
+pixels in the gradient/overlap blocks of BitmapData-v8 (lines 571–572, 588–591),
+explicitly accepted as low-ROI rasterizer top-left rule edge cases (see
+"Remaining diffs" section below). Side-effect improvement: DrawingApiTest
+(misc-ming) 20/93 → 64/93 over the course of the work.
+
+## 2026-04-28 status check
+
+- BitmapData-v8 (gnash actionscript.all): `ruffle_matched`, 409/417,
+  ours_diff=8, ruffle_diff=13 — stable since CI snapshot at 205a9a77.
+- bitmap_data_draw_cliprect (avm1): PASS, 13/13 — no regression.
+- DrawingApiTest (misc-ming): output_mismatch, 64/93 (improved from 43/93
+  reported in 2026-04-19 Session 2 notes — likely from later WITH-scope and
+  scope-related fixes).
+- masks_test (misc-ming): output_mismatch, 28/175 (unchanged from
+  2026-04-19 numbers).
+
+All required features per the "What's wired vs not" table below remain ✅.
+The plan's "Tests and Acceptance" criteria (BitmapData-v8 ~30 line
+improvement, bitmap_data_draw_cliprect no regression) are met. Moving to
+complete/.
 
 ## 2026-04-19 progress
 
