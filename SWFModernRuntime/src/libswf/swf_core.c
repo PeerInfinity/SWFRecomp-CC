@@ -72,6 +72,10 @@ DataFileEntry* findDataFile(const char* filename) {
 int catch_up_mode = 0;
 int goto_from_action = 0;
 int catch_up_backward = 0;    // 1 if current catch-up is a backward goto
+// Phase 4 (TRANSFORMED_BY_SCRIPT_WRAP_BACK): set to 1 when a natural backward
+// wrap triggers catch-up, signaling actionDrainOnloadAndScript to clean up
+// unsurvivors before scripts run. Cleared on first drain.
+int g_natural_wrap_cleanup_pending = 0;
 size_t catch_up_target = 0;   // target frame for backward goto protection
 int g_deferred_goto_play = 0; // Set when gotoAndPlay targets root from inside a sprite
 int g_deferred_root_goto = 0; // Set when GotoFrame targets root from inside a sprite — skip re-running current frame
@@ -1062,6 +1066,33 @@ void swfStart(SWFAppContext* app_context)
 		for (;;)
 		{
 		if (--goto_retry_limit <= 0) break;
+		// Phase 4 (TRANSFORMED_BY_SCRIPT_WRAP_BACK): treat the recompiler-emitted
+		// natural backward wrap (`manual_next_frame=1; next_frame=0` at end of last
+		// frame, with no script-initiated goto) as an implicit goto so the existing
+		// catch-up path runs. In Ruffle, run_frame_internal converts the past-end
+		// wrap into `run_goto(1, is_implicit=true)` (NextFrame::First branch in
+		// movie_clip.rs:1303), which aggregates final-frame placements via
+		// survives_rewind and applies them through apply_place_object — preserving
+		// matrix-by-script entries and removing entries with no matching final
+		// placement. Routing natural-wrap through goto-style catch-up gives us the
+		// same semantics: tagPlaceObject2's catch_up_backward survives branch is
+		// gated on transformed_by_script (Phase 3), and ng_display_cleanup_unplaced_after
+		// removes stale entries (e.g. an MC placed only on the final frame when
+		// frame 0 doesn't re-place it). Key test: place_and_remove_object_insane_test.
+		// Only fire when current_frame is at the LAST timeline frame — this is
+		// the recompiler-emitted end-of-movie wrap-back. If a script already
+		// performed a goto earlier in the frame (e.g. dontremove's script_2
+		// GotoFrame(1)), current_frame was reset to the goto target (1), not
+		// the last frame (2). The recompiler emits its natural-wrap
+		// unconditionally at end of last frame, but ng_executeGotoCatchUp has
+		// already handled the transition; treating this as natural-wrap would
+		// re-run funcs[target] inline, double-firing target frame's scripts.
+		if (manual_next_frame && !goto_from_action && next_frame < current_frame
+		    && current_frame + 1 == g_frame_count)
+		{
+			goto_from_action = 1;
+			g_natural_wrap_cleanup_pending = 1;
+		}
 		// Goto catch-up: when an action (GotoFrame, GoToLabel, etc.) triggered
 		// a goto, process intermediate frame tags inline to match Flash's behavior.
 		// Flash processes PlaceObject/RemoveObject for intermediate frames within

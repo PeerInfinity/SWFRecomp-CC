@@ -163,6 +163,8 @@ typedef struct DisplayObject
 	// Timeline tracking
 	u8 sprite_needs_init;   // 1 if frame_0 needs to run this tick (NO_GRAPHICS)
 	u8 depth_swapped;       // 1 if moved here by swapDepths (skip timeline modifies)
+	u8 transformed_by_script; // 1 if AS-level setter wrote a transform attribute (matrix), Ruffle DisplayObjectFlags::TRANSFORMED_BY_SCRIPT
+	u8 name_overridden;     // 1 if instance name was overridden (script _name= or modify-branch rename)
 	size_t placed_at_frame; // frame index when this object was placed
 	size_t place_gen;       // monotonic generation counter for same-frame detection
 	// Clip event interaction state

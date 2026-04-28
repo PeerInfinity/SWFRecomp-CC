@@ -58,6 +58,16 @@ static void initArrayPrototypeMethods(SWFAppContext* app_context);
 
 u32 start_time;
 
+// Mark a MovieClip's display object as transformed by script. Mirrors Ruffle's
+// DisplayObjectFlags::TRANSFORMED_BY_SCRIPT — set by AS-level matrix/visibility
+// setters so subsequent timeline PlaceObject2 modify operations don't overwrite
+// script-applied transforms across natural frame wrap-back.
+static inline void markTransformedByScript(MovieClip* mc)
+{
+	if (mc != NULL && mc->display_obj != NULL)
+		((DisplayObject*)mc->display_obj)->transformed_by_script = 1;
+}
+
 // ECMAScript ToInt32 conversion (used for array length)
 static int32_t ecmaToInt32(double d)
 {
@@ -7428,6 +7438,7 @@ static ActionVar transformMatrixSetter(SWFAppContext* app_context, ActionVar* ar
 	mc->yscale = (float)(ys * 100.0);
 	mc->rotation = normalizeRotation((float)rot_deg);
 	mc->as_set_flags |= (1|2|4|8|16);
+	markTransformedByScript(mc);
 #endif
 	return undef;
 }
@@ -19346,7 +19357,19 @@ void actionRewindCleanup(SWFAppContext* app_context)
 			child_mc_cache[i] = NULL;
 		} else {
 			// Timeline MC — reset depth from display list position
-			// (undoes any swapDepths that happened before the rewind)
+			// (undoes any swapDepths that happened before the rewind).
+			// Skip MCs that were already invalidated (avm1_removed) or marked
+			// dead (depth=INT_MIN). When a depth was Removed and then re-Placed
+			// with the same instance_name, ng_findDisplayEntryByName matches
+			// the new entry, but the old (invalidated) cache entry must stay
+			// dead — otherwise findOrCreateMovieClip's first-match returns the
+			// stale MC and AS reads see its old _x. Surfaces in
+			// place_and_remove_object_insane_test where iter 1 frame 1 removes
+			// mc_red (cache invalidated) and frame 2 re-places (creates a new
+			// cache entry); without this guard, the wrap-back catch-up's
+			// actionRewindCleanup resurrects the dead entry.
+			if (ch->avm1_removed || ch->depth == INT_MIN)
+				continue;
 			ch->depth = (int)dl_depth - 16384;
 			ch->depth_swapped = 0;
 		}
@@ -22053,6 +22076,7 @@ static void mcSetEffectiveWidth(SWFAppContext* app_context, MovieClip* mc, doubl
 		mc->xscale = 0.0f;
 		mc->yscale = 0.0f;
 		mc->as_set_flags |= 4 | 8;
+		markTransformedByScript(mc);
 		return;
 	}
 	double prev_sx = (double)mc->xscale / 100.0;  // unit scale
@@ -22080,6 +22104,7 @@ static void mcSetEffectiveWidth(SWFAppContext* app_context, MovieClip* mc, doubl
 	mc->xscale = (float)(new_sx * 100.0);
 	mc->yscale = (float)(new_sy * 100.0);
 	mc->as_set_flags |= 4 | 8;  // mark both as AS-set
+	markTransformedByScript(mc);
 #else
 	(void)app_context;
 	mc->width = (float)v;
@@ -22106,6 +22131,7 @@ static void mcSetEffectiveHeight(SWFAppContext* app_context, MovieClip* mc, doub
 		mc->xscale = 0.0f;
 		mc->yscale = 0.0f;
 		mc->as_set_flags |= 4 | 8;
+		markTransformedByScript(mc);
 		return;
 	}
 	double prev_sx = (double)mc->xscale / 100.0;  // unit scale
@@ -22133,6 +22159,7 @@ static void mcSetEffectiveHeight(SWFAppContext* app_context, MovieClip* mc, doub
 	mc->xscale = (float)(new_sx * 100.0);
 	mc->yscale = (float)(new_sy * 100.0);
 	mc->as_set_flags |= 4 | 8;  // mark both as AS-set
+	markTransformedByScript(mc);
 #else
 	(void)app_context;
 	mc->height = (float)v;
@@ -39165,6 +39192,7 @@ void actionSetMember(SWFAppContext* app_context)
 				if (strcasecmp(prop_name, "_x") == 0) {
 					if (dval_invalid) return;
 					mc->as_set_flags |= 1;
+					markTransformedByScript(mc);
 					// Flash stores positions in twips (1/20 pixel), truncating fractional twips
 					mc->x = (float)(floor(dval * 20.0) / 20.0); return;
 				}
@@ -39172,6 +39200,7 @@ void actionSetMember(SWFAppContext* app_context)
 					if (dval_invalid) return;
 
 					mc->as_set_flags |= 2;
+					markTransformedByScript(mc);
 
 					mc->y = (float)(floor(dval * 20.0) / 20.0); return;
 				}
@@ -39179,6 +39208,7 @@ void actionSetMember(SWFAppContext* app_context)
 					if (dval_invalid) return;
 
 					mc->as_set_flags |= 4;
+					markTransformedByScript(mc);
 
 					mc->xscale = fval; return;
 				}
@@ -39186,6 +39216,7 @@ void actionSetMember(SWFAppContext* app_context)
 					if (dval_invalid) return;
 
 					mc->as_set_flags |= 8;
+					markTransformedByScript(mc);
 
 					mc->yscale = fval; return;
 				}
@@ -39193,6 +39224,7 @@ void actionSetMember(SWFAppContext* app_context)
 					if (dval_invalid) return;
 
 					mc->as_set_flags |= 16;
+					markTransformedByScript(mc);
 
 					mc->rotation = normalizeRotation(fval); return;
 				}
@@ -39264,11 +39296,12 @@ void actionSetMember(SWFAppContext* app_context)
 						if (mc->visible && !new_vis && g_focused_mc == mc)
 							selection_do_focus_change(app_context, mc, NULL);
 						mc->visible = new_vis;
+						markTransformedByScript(mc);
 					}
 					return;
 				}
-				if (strcasecmp(prop_name, "_width") == 0) { mcSetEffectiveWidth(app_context, mc, dval); return; }
-				if (strcasecmp(prop_name, "_height") == 0) { mcSetEffectiveHeight(app_context, mc, dval); return; }
+				if (strcasecmp(prop_name, "_width") == 0) { mcSetEffectiveWidth(app_context, mc, dval); markTransformedByScript(mc); return; }
+				if (strcasecmp(prop_name, "_height") == 0) { mcSetEffectiveHeight(app_context, mc, dval); markTransformedByScript(mc); return; }
 				if (strcasecmp(prop_name, "_quality") == 0)
 				{
 					char buf[16];
@@ -40188,6 +40221,7 @@ void actionSetMember(SWFAppContext* app_context)
 							getLocalCTRaw(src_mc, &sra, &sga, &sba, &saa, &srb, &sgb, &sbb, &sab);
 							setLocalCTRaw(mc, sra, sga, sba, saa, srb, sgb, sbb, sab);
 #endif
+							markTransformedByScript(mc);
 						}
 					}
 				}
@@ -45412,24 +45446,28 @@ void actionSetProperty(SWFAppContext* app_context)
 #ifdef NO_GRAPHICS
 			mc->as_set_flags |= 1;
 #endif
+			markTransformedByScript(mc);
 			break;
 		case 1:  // _y
 			mc->y = num_value;
 #ifdef NO_GRAPHICS
 			mc->as_set_flags |= 2;
 #endif
+			markTransformedByScript(mc);
 			break;
 		case 2:  // _xscale
 			mc->xscale = num_value;
 #ifdef NO_GRAPHICS
 			mc->as_set_flags |= 4;
 #endif
+			markTransformedByScript(mc);
 			break;
 		case 3:  // _yscale
 			mc->yscale = num_value;
 #ifdef NO_GRAPHICS
 			mc->as_set_flags |= 8;
 #endif
+			markTransformedByScript(mc);
 			break;
 		case 6:  // _alpha
 			// Quantize through 8.8 fixed-point like Flash's color transform
@@ -45440,19 +45478,23 @@ void actionSetProperty(SWFAppContext* app_context)
 			if (mc->visible && !new_vis && g_focused_mc == mc)
 				selection_do_focus_change(app_context, mc, NULL);
 			mc->visible = new_vis;
+			markTransformedByScript(mc);
 			break;
 		}
 		case 8:  // _width
 			mcSetEffectiveWidth(app_context, mc, (double)num_value);
+			markTransformedByScript(mc);
 			break;
 		case 9:  // _height
 			mcSetEffectiveHeight(app_context, mc, (double)num_value);
+			markTransformedByScript(mc);
 			break;
 		case 10: // _rotation
 			mc->rotation = normalizeRotation(num_value);
 #ifdef NO_GRAPHICS
 			mc->as_set_flags |= 16;
 #endif
+			markTransformedByScript(mc);
 			break;
 		case 13: // _name
 			if (value_var.type == ACTION_STACK_VALUE_STRING) {
@@ -46005,30 +46047,35 @@ static int setMCBuiltinProperty(SWFAppContext* app_context, MovieClip* mc, const
 #ifdef NO_GRAPHICS
 		mc->as_set_flags |= 1;
 #endif
+		markTransformedByScript(mc);
 		mc->x = fval; return 1;
 	}
 	if (strcasecmp(name, "_y") == 0) {
 #ifdef NO_GRAPHICS
 		mc->as_set_flags |= 2;
 #endif
+		markTransformedByScript(mc);
 		mc->y = fval; return 1;
 	}
 	if (strcasecmp(name, "_xscale") == 0) {
 #ifdef NO_GRAPHICS
 		mc->as_set_flags |= 4;
 #endif
+		markTransformedByScript(mc);
 		mc->xscale = fval; return 1;
 	}
 	if (strcasecmp(name, "_yscale") == 0) {
 #ifdef NO_GRAPHICS
 		mc->as_set_flags |= 8;
 #endif
+		markTransformedByScript(mc);
 		mc->yscale = fval; return 1;
 	}
 	if (strcasecmp(name, "_rotation") == 0) {
 #ifdef NO_GRAPHICS
 		mc->as_set_flags |= 16;
 #endif
+		markTransformedByScript(mc);
 		mc->rotation = normalizeRotation(fval); return 1;
 	}
 	if (strcasecmp(name, "_alpha") == 0) {
@@ -46041,10 +46088,11 @@ static int setMCBuiltinProperty(SWFAppContext* app_context, MovieClip* mc, const
 		if (mc->visible && !new_vis && g_focused_mc == mc)
 			selection_do_focus_change(app_context, mc, NULL);
 		mc->visible = new_vis;
+		markTransformedByScript(mc);
 		return 1;
 	}
-	if (strcasecmp(name, "_width") == 0) { mcSetEffectiveWidth(app_context, mc, (double)fval); return 1; }
-	if (strcasecmp(name, "_height") == 0) { mcSetEffectiveHeight(app_context, mc, (double)fval); return 1; }
+	if (strcasecmp(name, "_width") == 0) { mcSetEffectiveWidth(app_context, mc, (double)fval); markTransformedByScript(mc); return 1; }
+	if (strcasecmp(name, "_height") == 0) { mcSetEffectiveHeight(app_context, mc, (double)fval); markTransformedByScript(mc); return 1; }
 	return 0;
 }
 

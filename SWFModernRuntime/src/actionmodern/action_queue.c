@@ -179,6 +179,10 @@ void actionDrainActionQueueFiltered(SWFAppContext* app_context,
 // the next-tag DoAction reads its properties" semantics.
 extern void run_pending_finalize(SWFAppContext* app_context);
 
+extern int g_natural_wrap_cleanup_pending;
+extern int catch_up_backward;
+extern size_t catch_up_target;
+
 void actionDrainOnloadAndScript(SWFAppContext* app_context)
 {
 	// Path A: when an outer drain is in progress (e.g. ng_executeGotoCatchUp
@@ -186,6 +190,23 @@ void actionDrainOnloadAndScript(SWFAppContext* app_context)
 	// recompiler-emitted SHOW_FRAME drain so the outer drain picks up the
 	// new entries in FIFO order.
 	if (g_drain_suppress_depth > 0) return;
+
+	// Phase 4 (TRANSFORMED_BY_SCRIPT_WRAP_BACK): when a natural backward wrap
+	// triggered the catch-up (g_natural_wrap_cleanup_pending=1), clean up
+	// unsurvivors BEFORE scripts run. Otherwise AS lookups like
+	// `_root.mc_green` resolve to a placed-at-later-frame entry that should
+	// have been removed by the implicit goto's survives_rewind. Mirrors
+	// Ruffle's run_goto remove_child(unsurvivor) ordering: the unsurvivor
+	// list is computed from goto_commands aggregation BEFORE running target's
+	// run_frame_internal. We approximate by running target's tags (which
+	// updates placed_at_frame for survivors) BEFORE the drain, then doing
+	// the cleanup here. One-shot: cleared after first drain so later drains
+	// (e.g. timer callbacks within the same frame) don't re-run cleanup.
+	if (g_natural_wrap_cleanup_pending && catch_up_backward) {
+		g_natural_wrap_cleanup_pending = 0;
+		extern void ng_display_cleanup_unplaced_after(SWFAppContext*, size_t);
+		ng_display_cleanup_unplaced_after(app_context, catch_up_target);
+	}
 
 	for (;;) {
 		// Phase C (GOTO_FIFO_UNIFICATION_INCREMENTAL): when the unify flag is

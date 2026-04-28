@@ -4,29 +4,119 @@
 
 <!-- PLAN_META
 id: TRANSFORMED_BY_SCRIPT_WRAP_BACK
-status: pending
+status: complete
 phases:
   - id: 1
     name: "Add transformed_by_script flag to DisplayObject"
-    status: pending
+    status: complete
   - id: 2
-    name: "Set the flag from AS property setters (_x, _y, _xscale, _yscale, _rotation, _alpha, _visible, color transforms)"
-    status: pending
+    name: "Set the flag from AS property setters (_x, _y, _xscale, _yscale, _rotation, _alpha, _visible, _width, _height, transform.matrix)"
+    status: complete
   - id: 3
-    name: "Gate transform/cxform application in tagPlaceObject2 modify branch on !transformed_by_script"
-    status: pending
+    name: "Gate transform/cxform application in tagPlaceObject2 catch_up_backward survives branch on !transformed_by_script"
+    status: complete
   - id: 4
-    name: "Preserve display-list state across natural backward wrap-back (replace clear_after with implicit-goto semantics)"
-    status: pending
+    name: "Route end-of-movie natural wrap-back through goto-style catch-up (Ruffle's run_goto(1, is_implicit=true))"
+    status: complete
   - id: 5
-    name: "Preserve renamed-by-modify instance names across wrap-back"
-    status: pending
+    name: "Preserve renamed-by-modify instance names across wrap-back (handled by existing g_pending_instance_name discard in catch-up survives branch)"
+    status: complete
   - id: 6
     name: "Regression battery (goto/rewind/wrap-back, plus place_and_remove tests)"
-    status: pending
+    status: complete
 dependencies:
   - "Independent of GOTO_FIFO_UNIFICATION_PLAN.md (Phase 6, shipped via complete/GOTO_FIFO_UNIFICATION_INCREMENTAL_PLAN.md); both are spin-offs of the now-superseded GOTO_CATCHUP_HYGIENE_PLAN.md"
 -->
+
+## Implementation summary (shipped)
+
+`place_and_remove_object_insane_test` 17/22 → **22/22 (PASS)**.
+
+**Key changes:**
+
+1. **`DisplayObject.transformed_by_script` + `name_overridden` flags** in
+   `swf.h:165-166`. The flag is set by the new
+   `markTransformedByScript()` helper at the top of `action.c` whenever
+   AS code writes a transform attribute (matrix component or
+   `_visible`).
+2. **Wired into all major property setter sites** in `action.c`:
+   - `setMatrixProperty` (`mc.transform.matrix = ...`).
+   - `mcSetEffectiveWidth` / `mcSetEffectiveHeight`.
+   - `actionSetMember` for `_x` / `_y` / `_xscale` / `_yscale` /
+     `_rotation` / `_visible` / `_width` / `_height` / `transform`.
+   - `setMCBuiltinProperty` (initObject path).
+   - `actionSetProperty` (opcode dispatch by property index).
+3. **Phase 3 gate** in `tagPlaceObject2`'s catch_up_backward survives
+   branch (`tag.c:3917+`): skip `transform_id`/`cxform_id`/`init_cx_fields`
+   updates when `transformed_by_script || cx_overridden`. Mirrors
+   Ruffle's `apply_place_object`'s `if !self.transformed_by_script()`
+   gate (`core/src/display_object.rs:2494`).
+4. **Phase 4 dispatch** in `swf_core.c`'s catch-up retry loop: when
+   `manual_next_frame && !goto_from_action && next_frame < current_frame
+   && current_frame + 1 == g_frame_count`, set `goto_from_action = 1`
+   and `g_natural_wrap_cleanup_pending = 1` to route the
+   recompiler-emitted end-of-movie wrap through the existing backward
+   catch-up path. The `current_frame + 1 == g_frame_count` guard avoids
+   firing when an in-frame script-driven goto already advanced
+   `current_frame` away from the last frame (e.g.
+   from_shumway/avm1/duplicateMovieClip/dontremove's `script_2`
+   `GotoFrame(1)`).
+5. **Two-step ordering** of unsurvivor cleanup vs. target frame
+   scripts. `actionDrainOnloadAndScript` calls
+   `ng_display_cleanup_unplaced_after(catch_up_target)` once at the
+   start when `g_natural_wrap_cleanup_pending` is set, BEFORE scripts
+   drain, so AS lookups like `_root.mc_green` see the cleaned-up
+   display list. Mirrors Ruffle's `run_goto` order: `remove_child` for
+   unsurvivors runs BEFORE `apply_place_object` and target frame's
+   `run_frame_internal`.
+6. **`actionRewindCleanup` skip-dead-MC fix** in
+   `action.c:19367+`: timeline-MC cache entries that were already
+   `avm1_removed` or `depth == INT_MIN` (e.g. invalidated by a prior
+   `RemoveObject2`) are no longer resurrected by the depth reset.
+   Without this guard, `findOrCreateMovieClip`'s first-match returns
+   the stale (script-modified) MC instead of the freshly-placed one,
+   producing wrong `_x` reads after `mc.depth` was reset to a valid
+   value during catch-up.
+7. **`tagPlaceObject2` !survives stale-replace branch** in
+   `tag.c:3955+` extended to fire on
+   `(catch_up_mode || g_natural_wrap_cleanup_pending) &&
+   placed_at_frame > current_frame`. When a non-surviving entry
+   (different char_id or different ratio) was placed at a later
+   frame, the catch-up replay must clear it (and invalidate the
+   cached MC if no UNLOAD handler) so frame 0's PlaceObject2 takes
+   the fresh-placement path and resets the MC's `_x`/`_y` to the
+   transform-derived values.
+8. **`ng_display_cleanup_unplaced_after`** in `tag.c:6071+` now
+   invalidates the cached MovieClip via
+   `actionInvalidateCachedMovieClip()` in addition to clearing the
+   display-list slot. Mirrors the equivalent invalidation in
+   Ruffle's `remove_child`.
+
+**Regression battery (all pass):**
+
+- AVM1 goto/rewind/lifecycle: 33-test battery
+  (goto_rewind1/2/3, execution_order1/2/3, goto_execution_order/2,
+  goto_both_ways1/2, rewind_depth, goto_frame, goto_frame2,
+  goto_label, goto_methods, conflicting_instance_names, default_names,
+  movieclip_name_from_timeline, place_and_lookup, clip_events,
+  on_construct, attach_movie, init_object_order,
+  register_and_init_order, movieclip_state_values,
+  movieclip_library_state_values, set_interval, unload,
+  unload_clip_event, unload_nested_child, unloadmovie, mcl_unloadclip,
+  button_children) — **33/33 effective**.
+- Misc-ming: loop_test/loop_test2/3/4/5/7/8/9 (8/8 effective);
+  place_and_remove_object_test, place_and_remove_object_insane_test
+  (now 22/22), instanceNameTest, attachMovieTest, ResolveEventsTest,
+  reverse_execute_PlaceObject2_test1/2, DefineEditTextTest,
+  DefineEditTextVariableNameTest2, static_vs_dynamic1/2, shape_test,
+  get_frame_number_test, new_child_in_unload_test,
+  event_handler_scope_test (15/15 pass).
+- Misc-swfc: stackscope, submoviegetvar, edittext_test1 pass;
+  movieclip_destruction_test2 unchanged at 50/52 (pre-existing
+  failure, see complete/MOVIECLIP_DESTRUCTION_TEST2 work).
+- Shumway duplicateMovieClip: dontremove, samedepth, name-coercion
+  (3/3).
+- AVM1 broader: super/this/string/object/text battery — 14/14.
 
 ## Problem statement
 

@@ -3923,14 +3923,23 @@ void tagPlaceObject2(SWFAppContext* app_context, size_t depth, size_t char_id, u
 				// ng_on_place_object2 — otherwise it would consume the pending
 				// name and overwrite the preserved instance_name.
 				g_pending_instance_name = NULL;
-				display_list[depth].transform_id = transform_id;
-				ng_cache_transform(&display_list[depth], transform_id);
-				display_list[depth].cxform_id = cxform_id;
-				display_list[depth].has_cxform = (cxform_id != 0) ? 1 : 0;
+				// Mirror Ruffle apply_place_object's `if !self.transformed_by_script()`
+				// gate: when an AS setter has written a transform attribute (matrix),
+				// the timeline modify must NOT overwrite it. Used by natural-wrap
+				// catch-up to preserve script-applied _x/_y/_xscale/etc across loop.
+				if (!display_list[depth].transformed_by_script) {
+					display_list[depth].transform_id = transform_id;
+					ng_cache_transform(&display_list[depth], transform_id);
+				}
+				if (!display_list[depth].cx_overridden && !display_list[depth].transformed_by_script) {
+					display_list[depth].cxform_id = cxform_id;
+					display_list[depth].has_cxform = (cxform_id != 0) ? 1 : 0;
+				}
 				if (clip_depth != 0) display_list[depth].clip_depth = clip_depth;
 				display_list[depth].placed_at_frame = current_frame;
 				display_list[depth].place_gen = g_place_gen;
-				init_cx_fields(&display_list[depth]);
+				if (!display_list[depth].cx_overridden && !display_list[depth].transformed_by_script)
+					init_cx_fields(&display_list[depth]);
 				// Pass existing char_id so ng_on_place_object2 doesn't try to
 				// treat this as a different-character placement.
 				ng_on_place_object2(app_context, depth, display_list[depth].char_id);
@@ -3943,7 +3952,16 @@ void tagPlaceObject2(SWFAppContext* app_context, size_t depth, size_t char_id, u
 			//   from [0, target] must win: clear and full replace.
 			// - Else (placed in [0, target] by an earlier catch-up replay), skip this
 			//   placement — the later frame in [0, target] will re-establish it.
-			if (catch_up_mode && display_list[depth].placed_at_frame > current_frame)
+			// Also fires when natural-wrap triggered the catch-up
+			// (g_natural_wrap_cleanup_pending) and catch_up_mode=0: target frame
+			// of natural-wrap-driven backward catch-up must replace non-survivors.
+			// Surfaces in place_and_remove_object_insane_test where mc_red
+			// (ratio=65535) doesn't survive frame 0's ratio=0 PlaceObject2 and must
+			// be reset to transform 25's tx=0. Limited to natural-wrap to avoid
+			// regressing goto_from_action backward catch-ups (e.g. dontremove)
+			// that rely on the original `catch_up_mode`-only gate.
+			extern int g_natural_wrap_cleanup_pending;
+			if ((catch_up_mode || g_natural_wrap_cleanup_pending) && display_list[depth].placed_at_frame > current_frame)
 			{
 				if (display_list[depth].placed_at_frame > catch_up_target)
 				{
@@ -4013,6 +4031,20 @@ void tagPlaceObject2(SWFAppContext* app_context, size_t depth, size_t char_id, u
 							actionMarkMCPendingRemoval(app_context,
 							                           display_list[depth].instance_name,
 							                           (int)depth);
+						}
+						else if (display_list[depth].instance_name != NULL)
+						{
+							// No unload handler — the MC won't be marked pending,
+							// but the cached MovieClip would survive with its
+							// stale (script-modified) x/y/etc. Invalidate it so
+							// the next AS lookup creates a fresh MC with
+							// transform-derived position. Surfaces in
+							// place_and_remove_object_insane_test where mc_red
+							// has script-set _x=60 and ratio=65535; iter 2 frame 0's
+							// non-survives ratio mismatch must reset the visual
+							// state to transform 25's identity tx=0.
+							extern void actionInvalidateCachedMovieClip(SWFAppContext*, const char*, int);
+							actionInvalidateCachedMovieClip(app_context, display_list[depth].instance_name, (int)depth);
 						}
 					}
 					if (display_list[depth].sprite_display_list != NULL)
@@ -4473,6 +4505,20 @@ void tagPlaceObject2Ratio(SWFAppContext* app_context, size_t depth, size_t char_
 							actionMarkMCPendingRemoval(app_context,
 							                           display_list[depth].instance_name,
 							                           (int)depth);
+						}
+						else if (display_list[depth].instance_name != NULL)
+						{
+							// No unload handler — the MC won't be marked pending,
+							// but the cached MovieClip would survive with its
+							// stale (script-modified) x/y/etc. Invalidate it so
+							// the next AS lookup creates a fresh MC with
+							// transform-derived position. Surfaces in
+							// place_and_remove_object_insane_test where mc_red
+							// has script-set _x=60 and ratio=65535; iter 2 frame 0's
+							// non-survives ratio mismatch must reset the visual
+							// state to transform 25's identity tx=0.
+							extern void actionInvalidateCachedMovieClip(SWFAppContext*, const char*, int);
+							actionInvalidateCachedMovieClip(app_context, display_list[depth].instance_name, (int)depth);
 						}
 					}
 					if (display_list[depth].sprite_display_list != NULL)
@@ -6070,13 +6116,19 @@ void ng_display_clear_after(SWFAppContext* app_context, size_t target_frame)
 // test effectively failed.
 void ng_display_cleanup_unplaced_after(SWFAppContext* app_context, size_t target_frame)
 {
-	(void)app_context;
 	for (size_t i = 1; i <= max_depth; i++)
 	{
 		if (i >= 16384) break;
 		if (display_list[i].char_id != 0 &&
 		    display_list[i].placed_at_frame > target_frame)
 		{
+			// Invalidate the cached MovieClip so AS lookups (e.g.
+			// `_root.mc_name`) no longer resolve. Mirrors Ruffle's
+			// remove_child cleanup of unsurviving children during run_goto.
+			if (display_list[i].instance_name != NULL) {
+				extern void actionInvalidateCachedMovieClip(SWFAppContext*, const char*, int);
+				actionInvalidateCachedMovieClip(app_context, display_list[i].instance_name, (int)i);
+			}
 			if (display_list[i].sprite_display_list != NULL)
 			{
 				FREE(display_list[i].sprite_display_list);
