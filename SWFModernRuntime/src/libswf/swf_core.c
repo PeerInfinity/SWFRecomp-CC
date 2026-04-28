@@ -1090,8 +1090,30 @@ void swfStart(SWFAppContext* app_context)
 		if (manual_next_frame && !goto_from_action && next_frame < current_frame
 		    && current_frame + 1 == g_frame_count)
 		{
-			goto_from_action = 1;
-			g_natural_wrap_cleanup_pending = 1;
+			// Only fire when there are display-list entries placed at frames
+			// after the wrap target. The catch-up's inline funcs[target]
+			// re-runs target frame's DoAction scripts, which double-fires
+			// trace-only iterations like avm1/looping where the trace-per-
+			// frame model expects exactly one trace per natural tick. Stale
+			// entries are the load-bearing signal: we need the catch-up to
+			// remove unsurvivors (mc_green at depth 4 in
+			// place_and_remove_object_insane_test) and apply
+			// transformed_by_script preservation. Tests without such entries
+			// don't need the catch-up replay.
+			extern DisplayObject* display_list;
+			extern size_t max_depth;
+			int has_stale = 0;
+			for (size_t d = 1; d <= max_depth && d < 16384; d++) {
+				if (display_list[d].char_id != 0
+				    && display_list[d].placed_at_frame > next_frame) {
+					has_stale = 1;
+					break;
+				}
+			}
+			if (has_stale) {
+				goto_from_action = 1;
+				g_natural_wrap_cleanup_pending = 1;
+			}
 		}
 		// Goto catch-up: when an action (GotoFrame, GoToLabel, etc.) triggered
 		// a goto, process intermediate frame tags inline to match Flash's behavior.
