@@ -57,6 +57,26 @@ ImportAssets inline + the `(movie_id, char_id)` guard rework).
 Phase 5 (registerClassTest2 frame interleave) is therefore deferred to
 a follow-up session that can do the per-frame ordering correctly.
 
+**2026-04-27 follow-up: research + plan written.** A separate
+research-only investigation confirmed Flash's actual timing model and
+the corresponding Ruffle implementation. The fix is a per-frame init
+prologue buffer in the recompiler (emit DoInitAction + ImportAssets
+at the START of `frame_N()` body, before any same-frame PlaceObject2
+/ DoAction). This satisfies both Group A (`registerClassTest2`) and
+Group B (`register_and_init_order`, `on_construct`,
+`resolve_different_root`, `from_shumway/.../symbolclass`)
+simultaneously.
+
+- Findings: `_investigation/DOINITACTION_TIMING_FINDINGS.md`
+- Implementation plan:
+  `_investigation/incomplete/DOINITACTION_PER_FRAME_PROLOGUE_PLAN.md`
+
+When that plan lands, expect `registerClassTest2` to recover to
+≥41/44, leaving only the `clip2.getDepth() == undefined` MC built-in
+handler gating and the `clipevs.onLoad` / `clip3.onLoad` ordering
+issues (both unrelated to frame-init timing and tracked in this doc's
+"Open" section above).
+
 ### Landed (kept after revert)
 
 **registerClassTest: 50/51 → 51/51 PASS.** Three small fixes to land the
