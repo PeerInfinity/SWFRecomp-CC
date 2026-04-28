@@ -2,9 +2,9 @@
 
 *See [RUFFLE_RESULTS_FILTERED.md](RUFFLE_RESULTS_FILTERED.md) for results with ignored tests excluded.*
 
-**Commit:** `73845094388e`  
-**Date:** 2026-04-28 21:20 UTC  
-**Total duration:** 2h18m19s
+**Commit:** `c3c00fa49c52`  
+**Date:** 2026-04-28 21:42 UTC  
+**Total duration:** 6m52s
 
 ## Results by Suite
 
@@ -26,13 +26,13 @@
 |-------|--------:|---------:|---------:|
 | avm1 | 105,852 | 114,749 | 92.2% |
 | from_gnash/actionscript.all | 14,763 | 16,957 | 87.1% |
-| from_gnash/misc-ming.all | 2,666 | 4,541 | 58.7% |
+| from_gnash/misc-ming.all | 2,683 | 4,541 | 59.1% |
 | from_gnash/misc-mtasc.all | 211 | 231 | 91.3% |
 | from_gnash/misc-swfc.all | 281 | 499 | 56.3% |
 | from_gnash/misc-swfmill.all | 48 | 51 | 94.1% |
 | from_shumway | 663 | 1,276 | 52.0% |
 | from_shumway/avm1 | 483 | 491 | 98.4% |
-| **Total** | **124,967** | **138,795** | **90.0%** |
+| **Total** | **124,984** | **138,795** | **90.0%** |
 
 ## Failure Breakdown
 
@@ -79,10 +79,9 @@ Tests with `output_mismatch` status but ≥80% of expected lines matching.
 
 | Suite | Newly Passing | Newly Failing | Lines Improved | Lines Regressed |
 |-------|-------------:|-------------:|--------------:|----------------:|
-| avm1 | - | - | 8 | - |
-| from_gnash/misc-ming.all | - | - | 5 | 22 |
+| from_gnash/misc-ming.all | - | - | 22 | 5 |
 
-*Comparing `3c8bd2266cd6` → `73845094388e`*
+*Comparing `73845094388e` → `c3c00fa49c52`*
 
 ## Flash-Spec Results
 
@@ -97,55 +96,55 @@ Tests verified against Flash's actual output (`output.flash.txt`).
 ### avm1
 
 - **Pass:** 597/641 (93.1%)
-- **Duration:** 1h01m35s across 30 shards
+- **Duration:** 3m23s across 30 shards
 - **Lines:** 105,852/114,749 matching (92.2%)
-- **Avg test duration:** 5.7s — slowest: `netstream_play_flv_screen` (34.7s)
+- **Avg test duration:** 0.3s — slowest: `xml_reparenting` (15.8s)
 
 ### from_gnash/actionscript.all
 
 - **Pass:** 113/190 (59.5%)
-- **Duration:** 21m06s across 30 shards
+- **Duration:** 1m10s across 30 shards
 - **Lines:** 14,763/16,957 matching (87.1%)
-- **Avg test duration:** 6.6s — slowest: `String-v8` (35.2s)
+- **Avg test duration:** 0.3s — slowest: `toString_valueOf-v7` (4.9s)
 
 ### from_gnash/misc-ming.all
 
 - **Pass:** 53/102 (52.0%)
-- **Duration:** 28m12s across 30 shards
-- **Lines:** 2,666/4,541 matching (58.7%)
-- **Avg test duration:** 16.5s — slowest: `matrix_test` (96.9s)
+- **Duration:** 1m18s across 30 shards
+- **Lines:** 2,683/4,541 matching (59.1%)
+- **Avg test duration:** 0.7s — slowest: `static_vs_dynamic2` (15.7s)
 
 ### from_gnash/misc-mtasc.all
 
 - **Pass:** 7/9 (77.8%)
-- **Duration:** 1m53s across 30 shards
+- **Duration:** 2s across 30 shards
 - **Lines:** 211/231 matching (91.3%)
-- **Avg test duration:** 12.6s — slowest: `enum` (19.2s)
+- **Avg test duration:** 0.2s — slowest: `levels` (0.2s)
 
 ### from_gnash/misc-swfc.all
 
 - **Pass:** 5/16 (31.2%)
-- **Duration:** 4m14s across 30 shards
+- **Duration:** 4s across 30 shards
 - **Lines:** 281/499 matching (56.3%)
-- **Avg test duration:** 15.9s — slowest: `swf4opcode` (19.7s)
+- **Avg test duration:** 0.2s — slowest: `action_execution_order_test10` (0.2s)
 
 ### from_gnash/misc-swfmill.all
 
 - **Pass:** 15/18 (83.3%)
-- **Duration:** 5m11s across 30 shards
+- **Duration:** 4s across 30 shards
 - **Lines:** 48/51 matching (94.1%)
-- **Avg test duration:** 17.2s — slowest: `initaction_in_definesprite` (18.5s)
+- **Avg test duration:** 0.1s — slowest: `afunc_dict` (0.2s)
 
 ### from_shumway
 
 - **Pass:** 64/92 (69.6%)
-- **Duration:** 14m01s across 30 shards
+- **Duration:** 39s across 30 shards
 - **Lines:** 663/1,276 matching (52.0%)
-- **Avg test duration:** 9.1s — slowest: `fuzz/356bf4ddf127739c3a1e3ea06b5cee9261dfc55a5ea4755013927647455e7c77` (20.8s)
+- **Avg test duration:** 0.4s — slowest: `timeline/timeline_as2_3` (14.4s)
 
 ### from_shumway/avm1
 
 - **Pass:** 45/47 (95.7%)
-- **Duration:** 2m03s across 30 shards
+- **Duration:** 11s across 30 shards
 - **Lines:** 483/491 matching (98.4%)
-- **Avg test duration:** 2.6s — slowest: `hitarea` (18.2s)
+- **Avg test duration:** 0.2s — slowest: `xml/xmlstring` (1.0s)
