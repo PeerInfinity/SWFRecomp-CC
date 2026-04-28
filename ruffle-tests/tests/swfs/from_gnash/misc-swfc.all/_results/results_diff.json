@@ -1,9 +1,9 @@
 {
   "metadata": {
-    "old_timestamp": "2026-04-28T00:50:50.867645+00:00",
-    "old_git_sha": "fccb7008abfa2621967e9b27094364319d2628d0",
-    "new_timestamp": "2026-04-28T01:13:38.593659+00:00",
-    "new_git_sha": "ccf8ac97313d1a8e168d80639267fcb0b488129e",
+    "old_timestamp": "2026-04-28T01:13:38.593659+00:00",
+    "old_git_sha": "ccf8ac97313d1a8e168d80639267fcb0b488129e",
+    "new_timestamp": "2026-04-28T02:14:37.135116+00:00",
+    "new_git_sha": "abf1b163b420639f5922fbe3c44c7609cc49c4a9",
     "partial": false,
     "same_commit": false
   },
@@ -14,20 +14,69 @@
     "old_total": 16,
     "old_pass_rate": 31.2,
     "new_pass": 5,
-    "new_ruffle_matched": 3,
-    "new_effective_pass": 8,
+    "new_ruffle_matched": 2,
+    "new_effective_pass": 7,
     "new_total": 16,
     "new_pass_rate": 31.2,
     "old_mismatched_lines": 237,
-    "new_mismatched_lines": 237,
+    "new_mismatched_lines": 216,
     "increased_mismatches": 0,
-    "decreased_mismatches": 0,
+    "decreased_mismatches": 21,
     "newly_passing": 0,
-    "newly_failing": 0,
-    "status_changed": 0,
-    "unchanged": 16,
+    "newly_failing": 1,
+    "status_changed": 1,
+    "unchanged": 13,
     "added": 0,
     "removed": 0
   },
-  "changes": []
+  "changes": [
+    {
+      "test": "action_execution_order_test10",
+      "change_type": "changed",
+      "old_status": "ruffle_matched",
+      "new_status": "output_mismatch",
+      "old_lines": {
+        "actual_lines": 10,
+        "expected_lines": 16,
+        "matching_lines": 2
+      },
+      "new_lines": {
+        "actual_lines": 17,
+        "expected_lines": 16,
+        "matching_lines": 6
+      }
+    },
+    {
+      "test": "movieclip_destruction_test1",
+      "change_type": "changed",
+      "old_status": "ruffle_matched",
+      "new_status": "ruffle_matched",
+      "old_lines": {
+        "actual_lines": 36,
+        "expected_lines": 52,
+        "matching_lines": 0
+      },
+      "new_lines": {
+        "actual_lines": 50,
+        "expected_lines": 52,
+        "matching_lines": 9
+      }
+    },
+    {
+      "test": "registerclass_test3",
+      "change_type": "changed",
+      "old_status": "ruffle_matched",
+      "new_status": "ruffle_matched",
+      "old_lines": {
+        "actual_lines": 27,
+        "expected_lines": 27,
+        "matching_lines": 7
+      },
+      "new_lines": {
+        "actual_lines": 27,
+        "expected_lines": 27,
+        "matching_lines": 15
+      }
+    }
+  ]
 }

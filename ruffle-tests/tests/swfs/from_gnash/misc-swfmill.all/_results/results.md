@@ -1,10 +1,10 @@
 # Ruffle Test Results (Unfiltered)
 
-**Date**: 2026-04-28 01:13 UTC
+**Date**: 2026-04-28 02:14 UTC
 
-**Git SHA**: `ccf8ac9731`
+**Git SHA**: `abf1b163b4`
 
-**Run Duration**: 0m 8s
+**Run Duration**: 5m 1s
 
 ## Summary
 
@@ -16,8 +16,8 @@
 | Effective pass | **16** (88.9%) |
 | Failing | 2 |
 | Total expected lines | 51 |
-| Matching lines | 47 (92.2%) |
-| Mismatched lines | 4 |
+| Matching lines | 48 (94.1%) |
+| Mismatched lines | 3 |
 
 ### Failure Breakdown
 
@@ -31,21 +31,21 @@
 
 | # | Test | Lines | Duration | Notes |
 |---|------|-------|----------|-------|
-| 1 | `afunc_dict` | 2 | 0.4s |  |
-| 2 | `background` | 0 | 0.4s |  |
-| 3 | `dict_callframe` | 3 | 0.3s |  |
-| 4 | `dict_cross` | 3 | 0.4s |  |
-| 5 | `dict_event` | 5 | 0.3s |  |
-| 6 | `dict_override` | 2 | 0.4s |  |
-| 7 | `func_dict` | 3 | 0.4s |  |
-| 8 | `initaction_in_definesprite` | 2 | 0.4s |  |
-| 9 | `jump_after_end` | 3 | 0.4s |  |
-| 10 | `missing_bitmap` | 0 | 0.4s |  |
-| 11 | `mixed-bytecode-as2` | 1 | 0.4s |  |
-| 12 | `trace-as2/root_onload` | 4 | 0.4s |  |
-| 13 | `trace-as2/shortstack` | 2 | 0.4s |  |
-| 14 | `trace-as2/super` | 8 | 0.3s |  |
-| 15 | `trace-as2/this` | 8 | 0.4s |  |
+| 1 | `afunc_dict` | 2 | 16.1s |  |
+| 2 | `background` | 0 | 16.3s |  |
+| 3 | `dict_callframe` | 3 | 16.9s |  |
+| 4 | `dict_cross` | 3 | 16.1s |  |
+| 5 | `dict_event` | 5 | 16.6s |  |
+| 6 | `dict_override` | 2 | 16.4s |  |
+| 7 | `func_dict` | 3 | 17.4s |  |
+| 8 | `initaction_in_definesprite` | 2 | 16.8s |  |
+| 9 | `jump_after_end` | 3 | 17.0s |  |
+| 10 | `missing_bitmap` | 0 | 16.4s |  |
+| 11 | `mixed-bytecode-as2` | 1 | 16.7s |  |
+| 12 | `trace-as2/root_onload` | 4 | 16.0s |  |
+| 13 | `trace-as2/shortstack` | 2 | 16.7s |  |
+| 14 | `trace-as2/super` | 8 | 17.1s |  |
+| 15 | `trace-as2/this` | 8 | 17.4s |  |
 
 ## Ruffle-Matched Tests
 
@@ -53,7 +53,7 @@
 
 | # | Test | Our diffs | Ruffle diffs | Duration | Notes |
 |---|------|-----------|--------------|----------|-------|
-| 1 | `zeroframe_definesprite` | 2 | 2 | 0.4s |  |
+| 1 | `zeroframe_definesprite` | 2 | 2 | 17.1s |  |
 
 ## Near-Passing Tests
 
@@ -81,5 +81,5 @@ No timeouts.
 
 | # | Test | Match Rate | Matching/Total | Actual | Expected | Notes |
 |---|------|------------|----------------|--------|----------|-------|
-| 1 | `jump_to_prev_block` | 0.0% | 0/1 | 1 | 1 |  |
-| 2 | `tags_after_last_showframe` | 0.0% | 0/15 | 15 | 1 |  |
+| 1 | `tags_after_last_showframe` | 6.7% | 1/15 | 15 | 1 |  |
+| 2 | `jump_to_prev_block` | 0.0% | 0/1 | 1 | 1 |  |
