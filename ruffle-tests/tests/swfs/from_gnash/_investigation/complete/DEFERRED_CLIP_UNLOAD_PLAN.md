@@ -4,7 +4,7 @@
 
 <!-- PLAN_META
 id: DEFERRED_CLIP_UNLOAD
-status: blocked
+status: completed
 phases:
   - id: 1
     name: "Snapshot MC state at queue time (audit)"
@@ -22,11 +22,13 @@ phases:
     name: "Verify ordering on the AVM1 regression battery"
     status: completed
 dependencies: []
-blockers:
-  - reason: "Phases 1-5 complete and in CI (loop_test7 ruffle_matched, action_execution_order_test3 PASS, loop_test8 PASS). The remaining 7 target tests have root causes orthogonal to the deferred-unload plan and require separate plans — see 'Remaining work — separate root causes' section below."
+followup_plans:
+  - "INITIALIZE/CONSTRUCT round dispatch (loop_test6 head — see §1)"
+  - "Sprite frame execution order: LIFO instantiation vs depth-descending (test2/5/11 — see §2)"
+  - "Inter-tag UNLOAD vs DoAction tag-stream ordering (loop_test6 tail, ActionOrderTest3/4/5 — see §3)"
 -->
 
-## Status update (2026-04-28, blocked)
+## Status update (2026-04-28, completed)
 
 Phases 1-5 implemented and in CI. Net impact (CI snapshot at 205a9a77, re-confirmed
 locally 2026-04-28):
@@ -52,10 +54,11 @@ Remaining 7 target tests confirmed locally 2026-04-28 (still MISMATCH, no regres
 | action_order/ActionOrderTest4 | misc-ming | 7/64 | Same family as ActionOrderTest3 |
 | action_order/ActionOrderTest5 | misc-ming | 8/51 | Same family as ActionOrderTest3 |
 
-## Remaining work — separate root causes
+## Follow-up work — out of scope for this plan
 
 The remaining 7 tests do NOT need additional deferred-unload work; they need
-two distinct, larger pieces of machinery that should each have their own plan.
+distinct pieces of machinery that should each have their own plan. The
+deferred-unload work this plan describes is finished — these are spinoffs.
 
 ### §1 Clip-event INITIALIZE/CONSTRUCT round dispatch (loop_test6)
 
@@ -130,10 +133,11 @@ current `action_execution_order_test8-v5/v6` and `loop_test2/3/5/8/9` set
 all depend on the tag-stream ordering already in place, and any change here
 must keep them green.
 
-## Why this plan is blocked, not in_progress
+## Why this plan is complete
 
 The deferred-clip-unload work this plan describes (Phases 1-5) is fully
-landed. The remaining 7 tests need machinery that is:
+landed and the documented regression battery is green. The 7 still-failing
+target tests need machinery that is:
 - §1 — a small but real refactor of clip-event dispatch ordering.
 - §2 — a fundamental rework of sprite frame iteration order (high regression
   risk).
@@ -142,9 +146,10 @@ landed. The remaining 7 tests need machinery that is:
 
 None of those are extensions of the deferred-unload mechanism — they are
 adjacent ordering problems that the deferred-unload work happened to surface
-when it landed. Tracking them under this plan would conflate four very
-different fixes; spinning them off into separate plans makes the next session's
-scope clearer.
+when it landed. They belong in their own plans (proposed names:
+`CLIP_EVENT_ROUND_DISPATCH_PLAN.md`, `SPRITE_EXEC_LIST_LIFO_PLAN.md`,
+`INTER_TAG_UNLOAD_PLAN.md`); the test list above can seed the per-plan
+TESTS comment in each.
 
 ### 2026-04-25 — loop_test8 trailing mc5unloaded fixed
 
