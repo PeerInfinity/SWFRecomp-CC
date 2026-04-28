@@ -2255,9 +2255,18 @@ void tagShowFrame(SWFAppContext* app_context)
 	// In the common case the queue is empty and these calls are no-ops — the
 	// in-function drain already covered them. Drain in priority order
 	// (INIT → CONSTRUCT → REGISTER_CTOR) to preserve the pre-Phase-5 ordering.
-	actionDrainActionQueueByKind(app_context, AQ_KIND_CLIP_INIT);
-	actionDrainActionQueueByKind(app_context, AQ_KIND_CLIP_CONSTRUCT);
-	actionDrainActionQueueByKind(app_context, AQ_KIND_REGISTER_CTOR);
+	//
+	// During goto catch-up (g_goto_catchup_active > 0) we do NOT drain here:
+	// queued entries for placements that are subsequently removed in a later
+	// catch-up frame must stay queued so the post-catch-up drain in
+	// ng_executeGotoCatchUp can skip them via the aq_drain
+	// clip->avm1_removed filter. Mirrors Ruffle's run_goto goto_commands
+	// aggregation (RegisterClassTest3).
+	if (!g_goto_catchup_active) {
+		actionDrainActionQueueByKind(app_context, AQ_KIND_CLIP_INIT);
+		actionDrainActionQueueByKind(app_context, AQ_KIND_CLIP_CONSTRUCT);
+		actionDrainActionQueueByKind(app_context, AQ_KIND_REGISTER_CTOR);
+	}
 	// Phase 7b: sprite CLIP_EVENT_LOAD now rides on AQ_KIND_SCRIPT, drained
 	// at the recompiler-emitted pre-tagShowFrame SHOW_FRAME drain alongside
 	// sprite DoAction. The post-process_sprite_needs_init safety drain below

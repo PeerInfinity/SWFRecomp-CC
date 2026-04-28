@@ -177,6 +177,17 @@ void ng_executeGotoCatchUp(SWFAppContext* app_context)
 	(void)saved_defer_sprite;
 	current_frame = target;
 
+	// Drain CLIP_INIT/CLIP_CONSTRUCT/REGISTER_CTOR queued during catch-up.
+	// tagShowFrame's safety drain skipped these while g_goto_catchup_active>0.
+	// aq_drain's clip->avm1_removed filter skips entries whose MC was
+	// invalidated by a RemoveObject in a later catch-up frame — mirrors
+	// Ruffle's run_goto goto_commands aggregation where place+remove pairs
+	// in the same goto cancel out without firing the constructor.
+	// Key test: register_class/RegisterClassTest3.
+	actionDrainActionQueueByKind(app_context, AQ_KIND_CLIP_INIT);
+	actionDrainActionQueueByKind(app_context, AQ_KIND_CLIP_CONSTRUCT);
+	actionDrainActionQueueByKind(app_context, AQ_KIND_REGISTER_CTOR);
+
 	// Restore sprite DL if we swapped
 	if (swapped)
 		ng_restoreFromRootDL(saved_sprite_dl, saved_sprite_max, saved_sprite_cap);

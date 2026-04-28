@@ -14,7 +14,7 @@ phases:
     status: complete
   - id: 3
     name: "Constructor frame-timing — defer until placement frame, not eager at PlaceObject2"
-    status: pending
+    status: complete
   - id: 4
     name: "Construct/load/unload cycle ordering on remove+replace (RegisterClassTest4)"
     status: pending
@@ -84,7 +84,74 @@ fallback even though clip2.__proto__ is CustomClass.prototype with
 __proto__=Object.prototype — a separate display-object-method-fallback
 issue, NOT the proto chain we just fixed).
 
-## 2026-04-27 session — Phase 3 investigation (deferred)
+## 2026-04-27 session — Phase 3 landed (RegisterClassTest3 2/12 → 11/12)
+
+**Approach taken (different from the original tentative-flag plan):**
+The aq_drain in `action_queue.c:140-143` already filters entries whose
+`clip->avm1_removed` is set. The bug was that `tagShowFrame`'s safety
+drain at `tag.c:2258-2260` fires the queued `AQ_KIND_CLIP_INIT` /
+`AQ_KIND_CLIP_CONSTRUCT` / `AQ_KIND_REGISTER_CTOR` entries at the END
+of every frame's `tagShowFrame` — including catch-up frames. So during
+`gotoAndStop(3)`'s catch-up of frame 2, mc2's queued INIT and CTOR
+fired before frame 3's `RemoveObject(mc2)` could mark the MC as
+removed.
+
+**Two-line fix (commits to land):**
+1. `SWFModernRuntime/src/libswf/tag.c` — gate the safety drain on
+   `!g_goto_catchup_active` so queued entries persist across the
+   entire catch-up sequence rather than draining per intermediate
+   frame.
+2. `SWFModernRuntime/src/libswf/swf_core.c` — in
+   `ng_executeGotoCatchUp`, after `actionGotoCatchupLeave()` and
+   `catch_up_mode = 0`, explicitly drain CLIP_INIT → CLIP_CONSTRUCT
+   → REGISTER_CTOR. Entries whose MC was invalidated by a catch-up
+   `RemoveObject` (which calls `actionInvalidateCachedMovieClip` →
+   `mc->avm1_removed = 1`) are skipped by the existing aq_drain
+   filter — Ruffle-equivalent to its `run_goto` `goto_commands`
+   aggregation pass.
+
+**RegisterClassTest3 result:** 2/12 → 11/12 (+9 lines).
+Only remaining failure: line 10 `c == 1` — the constructor body's
+`c += 1` doesn't update `_root.c` (pre-existing scope chain issue
+with `_global.ctor` defined inside DoInitAction; predates Phase 3
+fix). Trace `'Object ID 2 is constructed'` fires correctly at the
+right time, only the `c` increment misses. This is a separate
+constructor-variable-scoping issue, not lifecycle.
+
+**No regressions on:**
+- 14 AVM1 register/init/clip-event/goto tests (register_and_init_order
+  233/233, register_class_return_value, on_construct,
+  clip_constructors, movieclip_init_object, do_init_action_child,
+  attach_movie, attach_movie_stop, clip_events, init_object_order,
+  goto_execution_order, goto_execution_order2, execution_order2,
+  execution_order3).
+- 21 AVM1 goto/lifecycle/super tests (goto_rewind1/2/3,
+  goto_both_ways1/2, goto_frame, goto_frame2, goto_label, goto_methods,
+  unload, unload_clip_event, unload_nested_child,
+  movieclip_state_values, button_children, set_interval,
+  swf5_to_6_cross_call, swf5_no_closure, as2_super_and_this_v6/v8,
+  extends_chain, as2_super_via_manual_prototype).
+- 21 misc-ming tests (attachMovieTest, instanceNameTest, loop_test3/5/8/9,
+  DefineEditTextTest, ResolveEventsTest, event_handler_scope_test,
+  new_child_in_unload_test, static_vs_dynamic1/2,
+  displaylist_depths_test11, place_and_remove_object_test,
+  get_frame_number_test, shape_test, action_execution_order_test8-v5/v6,
+  DefineEditTextVariableNameTest2, reverse_execute_PlaceObject2_test1/2).
+- 13 AVM1 register/constructor (register_class_return_value,
+  register_globals_across_frames, register_underflow, export_assets,
+  empty_movieclip_can_attach_movies, register_class_with_sound,
+  bad_placeobject_clipaction, movieclip_in_removed_button,
+  array_constructor, constructor_function, as1_constructor_v6/v7,
+  movieclip_library_state_values).
+- 4 misc-swfc tests (movieclip_destruction_test2 unchanged at 50/52,
+  stackscope, submoviegetvar, edittext_test1).
+- 3 misc-swfmill tests (initaction_in_definesprite, dict_event,
+  dict_override).
+- 4 actionscript.all (Selection-v6/v7/v8, LoadVars-v6 — all
+  ruffle_matched).
+- 1 Shumway test (doubleAndRegister).
+
+## 2026-04-27 session — Phase 3 investigation (deferred — superseded above)
 
 `RegisterClassTest3` (SWF8, 12 lines, currently 2/12) tests
 constructor-firing precision under forward gotos. Test pattern:
