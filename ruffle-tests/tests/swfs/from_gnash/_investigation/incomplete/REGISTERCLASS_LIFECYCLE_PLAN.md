@@ -4,14 +4,14 @@
 
 <!-- PLAN_META
 id: REGISTERCLASS_LIFECYCLE
-status: pending
+status: in_progress
 phases:
   - id: 1
     name: "prototype.onLoad firing for registered-class MCs (registerClassTest)"
-    status: pending
+    status: complete
   - id: 2
     name: "constructor proto-chain fallthrough to MovieClip when prototype.constructor is unset"
-    status: pending
+    status: complete
   - id: 3
     name: "Constructor frame-timing — defer until placement frame, not eager at PlaceObject2"
     status: pending
@@ -25,6 +25,146 @@ dependencies: []
 blockers:
   - reason: "None — Object.registerClass infrastructure is already complete (AVM1 REGISTERCLASS_PLAN.md, 14/15 AVM1 tests pass). The Gnash misc-ming tests exercise edges the AVM1 tests don't cover: prototype.onLoad firing, constructor proto-chain fallthrough, frame-timing precision, and remove+replace cycling. Each phase is a narrow extension to the existing infrastructure."
 -->
+
+## 2026-04-27 session — Phases 1 & 2 landed
+
+**Phase 1 (commit 7311f226):** `actionDispatchMCOnLoad` now mirrors
+`actionInvokeRegisteredClassConstructor`'s type-1/type-2 setup —
+pushes a fresh local activation, restores captured WITH scopes, pushes
+`this=mc` onto `g_this_stack` (subject to preload_this/suppress_this
+flags), and switches `base_clip` for SWF6+ closures. Without this,
+prototype.onLoad bodies compiled by mtasc lost their closure-captured
+free variables (`note(...)` traces silently dropped) and `this`
+resolved to the function's defining context (root) instead of the
+receiver MC.
+
+- `register_class/registerClassTest` (SWF6): 2/51 → 43/51 matching.
+- `register_class/registerClassTest2` (SWF7): 0/44 → ~14/44 matching
+  (theClass1 proto onLoad now traces with the right `this`).
+
+**Phase 2 (commit e2c6dc27):** Two narrow additions for the
+constructor proto-chain:
+1. `actionSetupRegisteredClassPrototype` (registered_class.c) installs
+   `constructor` (DontEnum) on the MC's own props when
+   `g_swf_version < 7`. Mirrors Ruffle's `define_constructor_props`
+   (function.rs:679-697).
+2. `initMovieClipPrototype` (action.c) sets
+   `MovieClip.prototype.constructor = MovieClip` (DontEnum, writable).
+   Mirrors `FunctionObject::build` (function.rs:483-489) — required so
+   that MCs whose proto is `new MovieClip()` (registerClassTest2
+   theClass1) resolve `instance.constructor` up to MovieClip.
+
+- `register_class/registerClassTest`: 43/51 → 48/51 matching.
+- `register_class/registerClassTest2`: clip1.constructor==MovieClip
+  line now PASSES; remaining diff reduces to leading `clip3.frame0
+  actions` ordering (Phase 5) and missing `mc3.initactions`
+  (DoInitAction ordering — see Phase 5 / Phase 4 sub-issue 4b).
+
+No regressions on:
+- 12 AVM1 register_class+super tests (register_and_init_order 233/233,
+  register_class_return_value, on_construct, clip_constructors,
+  movieclip_init_object, attach_movie, do_init_action_child,
+  clip_events, init_object_order, as2_super_and_this_v6/v8,
+  extends_chain).
+- 13 AVM1 lifecycle/super/proto tests (unload, unload_clip_event,
+  goto_rewind1/2/3, execution_order2/3, movieclip_state_values,
+  button_children, set_interval, swf5_to_6_cross_call,
+  as2_super_via_manual_prototype, do_init_action_child).
+- 6 constructor/proto tests (super_edge_cases, swf5_no_closure,
+  as1_constructor_v6/v7, array_constructor, constructor_function).
+- 7 misc-ming tests (loop_test3/5/8, instanceNameTest,
+  attachMovieTest, ResolveEventsTest, event_handler_scope_test).
+- 4 misc-swfc tests (movieclip_destruction_test2 unchanged at 52/56,
+  stackscope, submoviegetvar, edittext_test1).
+
+**registerClassTest residual (3 lines):** `s == 'onRollOver,'` for
+clip1 and clip3 (for-in still includes `enabled`); `typeof(clip2.lineTo)
+== 'undefined'` (lineTo resolves through some MovieClip.prototype
+fallback even though clip2.__proto__ is CustomClass.prototype with
+__proto__=Object.prototype — a separate display-object-method-fallback
+issue, NOT the proto chain we just fixed).
+
+## 2026-04-27 session — Phase 3 investigation (deferred)
+
+`RegisterClassTest3` (SWF8, 12 lines, currently 2/12) tests
+constructor-firing precision under forward gotos. Test pattern:
+
+```
+frame 1: gotoAndStop(3)
+frame 2: PlaceObject2(mc2 char_id=2) + InitAction (onInitialize trace)
+frame 3: RemoveObject(mc2) + DoAction (frame 3 trace + assertions)
+frame 5: assertions check c==1 i==1 (set later by mc2a placement)
+```
+
+Expected: during frame 1→3 forward catch-up, the PlaceObject2 of mc2
+followed by RemoveObject of mc2 means **the constructor and init
+action MUST NOT fire**. Then `gotoAndPlay(5)` from frame 3 catches up
+frame 4's `PlaceObject2(mc2 → "mc2a")`; mc2a survives to frame 5 so
+the constructor and init action DO fire.
+
+Current behavior: the constructor and init action fire eagerly during
+frame 2's PlaceObject2 inside the catch-up window — incrementing `c`
+and `i`. They fire AGAIN during the second catch-up. Net result:
+`c=0/i=2` after first goto (test expects `c=0/i=0`).
+
+Ruffle fix mechanism (`core/src/display_object/movie_clip.rs:1546-1695`
+`run_goto`): forward gotos pre-aggregate place+remove tags into a
+`goto_commands: HashMap<Depth, &PlaceObject>` map keyed by depth. A
+RemoveObject during catch-up strips the corresponding entry from
+`goto_commands`. Only entries that survive (i.e. depths whose final
+state is "placed") get executed via `run_goto_command`, which is what
+fires the constructor.
+
+Our impl (`SWFModernRuntime/src/libswf/swf_core.c:93+`
+`ng_executeGotoCatchUp`) processes recompiled frame functions
+sequentially per-frame. There's no aggregation pass — the constructor
+fires inline at the PlaceObject2 call site in `tagPlaceObject2` /
+`process_sprite_needs_init`.
+
+**Implementation options:**
+
+1. **Defer constructor + InitAction to post-catch-up** — during
+   `catch_up_mode` forward catch-up, queue the
+   `actionInvokeRegisteredClassConstructor` and
+   `actionInvokeRegisteredClassInitAction` calls (with the MC pointer)
+   into a deferred list. After the catch-up loop completes, drain the
+   list and skip entries whose MC has `avm1_removed`/`pending_removal`
+   set or `display_obj==NULL`.
+
+   Pros: minimal surface change, mirrors the existing
+   "deferred onload" / "deferred unload" patterns.
+   Cons: must verify that the queued constructor still has the right
+   `g_swf_version`, `g_current_context`, etc when drained later
+   (probably needs a small struct snapshot).
+
+2. **Pre-scan tag stream** — would require introspecting recompiled
+   tag functions, which we can't do (they're already C code, not SWF
+   bytes).
+
+3. **Mark MC as "tentatively placed" then commit at end of catch-up**
+   — set a `tentative_placement` flag on the MC during forward
+   catch-up's PlaceObject2; constructor doesn't fire while this flag
+   is set. After catch-up, walk the display list: for each MC with the
+   flag, fire the constructor and clear the flag. RemoveObject during
+   catch-up just removes the flagged MC without ever firing.
+
+   Pros: cleanest match to Ruffle's `goto_commands`. The tentative
+   flag is a single bit on `DisplayObject`.
+   Cons: must also gate InitAction on the same flag, and Phase 4's
+   load-event timing likely needs the same treatment.
+
+Recommended: option 3 (tentative-placement flag). Estimated 3-5 hours
+plus regression sweep — high cross-test risk because every forward
+goto goes through this path. Required-pass guardrails:
+`register_and_init_order` (233/233), `goto_execution_order`,
+`goto_execution_order2`, `execution_order3`, `consecutive_goto_frame_test`.
+
+**Why deferred to a follow-up session:** unlike Phases 1 & 2 (each a
+~50 line targeted fix), Phase 3 touches the tagPlaceObject2 hot path
+and the catch-up driver, with broad blast radius. Better to land it
+on a fresh session with a dedicated regression sweep.
+
+
 
 ## Background
 
