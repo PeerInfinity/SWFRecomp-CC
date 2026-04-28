@@ -2256,15 +2256,23 @@ void tagShowFrame(SWFAppContext* app_context)
 	// in-function drain already covered them. Drain in priority order
 	// (INIT → CONSTRUCT → REGISTER_CTOR) to preserve the pre-Phase-5 ordering.
 	//
-	// During goto catch-up (g_goto_catchup_active > 0) we do NOT drain here:
-	// queued entries for placements that are subsequently removed in a later
-	// catch-up frame must stay queued so the post-catch-up drain in
-	// ng_executeGotoCatchUp can skip them via the aq_drain
+	// During goto catch-up (g_goto_catchup_active > 0) we defer CLIP_INIT
+	// and REGISTER_CTOR: queued entries for placements that are subsequently
+	// removed in a later catch-up frame must stay queued so the post-catch-up
+	// drain in ng_executeGotoCatchUp can skip them via the aq_drain
 	// clip->avm1_removed filter. Mirrors Ruffle's run_goto goto_commands
 	// aggregation (RegisterClassTest3).
+	//
+	// CLIP_CONSTRUCT (clip-event handler — distinct from REGISTER_CTOR's
+	// registered-class constructor) fires chronologically per Flash semantics
+	// (action_execution_order_test6 expects all three CONSTRUCTs in the
+	// catch-up window to fire even though every placement is later removed).
+	// So drain CLIP_CONSTRUCT every frame, including catch-up.
 	if (!g_goto_catchup_active) {
 		actionDrainActionQueueByKind(app_context, AQ_KIND_CLIP_INIT);
-		actionDrainActionQueueByKind(app_context, AQ_KIND_CLIP_CONSTRUCT);
+	}
+	actionDrainActionQueueByKind(app_context, AQ_KIND_CLIP_CONSTRUCT);
+	if (!g_goto_catchup_active) {
 		actionDrainActionQueueByKind(app_context, AQ_KIND_REGISTER_CTOR);
 	}
 	// Phase 7b: sprite CLIP_EVENT_LOAD now rides on AQ_KIND_SCRIPT, drained

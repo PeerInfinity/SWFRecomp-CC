@@ -96,16 +96,21 @@ of every frame's `tagShowFrame` — including catch-up frames. So during
 fired before frame 3's `RemoveObject(mc2)` could mark the MC as
 removed.
 
-**Two-line fix (commits to land):**
-1. `SWFModernRuntime/src/libswf/tag.c` — gate the safety drain on
+**Two-line fix:**
+1. `SWFModernRuntime/src/libswf/tag.c` — gate the safety drain for
+   `AQ_KIND_CLIP_INIT` and `AQ_KIND_REGISTER_CTOR` on
    `!g_goto_catchup_active` so queued entries persist across the
    entire catch-up sequence rather than draining per intermediate
-   frame.
+   frame. `AQ_KIND_CLIP_CONSTRUCT` (clip-event handler — distinct
+   from REGISTER_CTOR's registered-class constructor) continues to
+   drain chronologically every frame; per `action_execution_order_test6`,
+   Flash fires CONSTRUCT clip events for ALL placements in the
+   catch-up window even when subsequently removed.
 2. `SWFModernRuntime/src/libswf/swf_core.c` — in
    `ng_executeGotoCatchUp`, after `actionGotoCatchupLeave()` and
-   `catch_up_mode = 0`, explicitly drain CLIP_INIT → CLIP_CONSTRUCT
-   → REGISTER_CTOR. Entries whose MC was invalidated by a catch-up
-   `RemoveObject` (which calls `actionInvalidateCachedMovieClip` →
+   `catch_up_mode = 0`, explicitly drain CLIP_INIT then REGISTER_CTOR.
+   Entries whose MC was invalidated by a catch-up `RemoveObject`
+   (which calls `actionInvalidateCachedMovieClip` →
    `mc->avm1_removed = 1`) are skipped by the existing aq_drain
    filter — Ruffle-equivalent to its `run_goto` `goto_commands`
    aggregation pass.
