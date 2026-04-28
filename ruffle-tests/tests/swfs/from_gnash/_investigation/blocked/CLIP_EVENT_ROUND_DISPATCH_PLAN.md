@@ -4,26 +4,120 @@
 
 <!-- PLAN_META
 id: CLIP_EVENT_ROUND_DISPATCH
-status: pending
+status: blocked
 phases:
   - id: 1
     name: "Audit drain sites; identify per-placement vs. frame-level"
-    status: pending
+    status: completed
   - id: 2
     name: "Remove per-placement drain in tagPlaceObject2-family"
-    status: pending
+    status: completed
   - id: 3
     name: "Move INIT/CONSTRUCT/REGISTER_CTOR drain to frame-level, before DoAction drain"
-    status: pending
+    status: completed
   - id: 4
     name: "Recompiler emission update"
-    status: pending
+    status: completed
   - id: 5
     name: "Regression battery"
-    status: pending
+    status: blocked
 dependencies: []
 parent_plan: "complete/DEFERRED_CLIP_UNLOAD_PLAN.md (§1)"
 -->
+
+## Blocker (2026-04-28, attempt reverted at d52c4d75)
+
+The straightforward Option A implementation (commit 73845094) was
+implemented in full and pushed to CI; per-suite diff vs CI baseline
+3c8bd226 → 73845094 showed +13 matching lines on 4 tests but **−22
+matching lines on 4 misc-ming tests**, the largest being
+`register_class/RegisterClassTest4` 17/42 → 2/42 (-15 lines). Net
+delta: +9 mismatched lines overall (avm1 -8 / misc-ming +17). Reverted
+in d52c4d75.
+
+### Test impact summary (CI 3c8bd226 → 73845094)
+
+Gains:
+- `avm1/global_instance_decls`: 15/758 → 23/758 (+8)
+- `misc-ming/loop/loop_test6`: 10/23 → 12/23 (+2, target test)
+- `misc-ming/init_action/InitActionTest`: 9/17 → 11/17 (+2)
+- `misc-ming/action_order/ActionOrderTest4`: 7/64 → 8/64 (+1)
+
+Regressions:
+- `misc-ming/register_class/RegisterClassTest4`: 17/42 → 2/42 (**-15**)
+- `misc-ming/place_object_test2`: 4/19 → 0/19 (-4)
+- `misc-ming/loop/loop_test10`: 3/28 → 1/28 (-2)
+- `misc-ming/action_order/ActionOrderTest3`: 6/62 → 5/62 (-1)
+
+### Root cause of regressions
+
+The plan moved `REGISTER_CTOR` drain from per-placement (synchronous
+inside `tagPlaceObject2` at sprite-advance time) to frame-end (in the
+recompiler-emitted `actionDrainAllInPriorityOrder` of the next root
+frame). `register_class/RegisterClassTest4` (and similar tests with
+sprites that loop and re-place registered classes) is sensitive to
+this timing shift:
+
+- The test has a 2-frame inner sprite `mc3` that places mc1 (registered
+  as `Bug`) at its frame 2, with the root timeline doing
+  `gotoAndPlay(1)` 5 times. Expected `_global.ctorcalls == 3` —
+  Flash's "survives_rewind" / preserve-across-loop semantics mean only
+  3 of the 5+ loop iterations re-place mc1 (and re-fire `Bug ctor`).
+- Pre-fix: `Bug ctor: N` fires synchronously inside
+  `advance_sprite_frames` → `mc3.frame_1` → `tagPlaceObject2(mc1)`.
+- Post-fix: `Bug ctor: N` queued, drains at next funcs[i] call's
+  `actionDrainAllInPriorityOrder`. **But on subsequent iterations the
+  queue accumulates 2+ REGISTER_CTOR entries between drains** (one
+  from this tick's advance, one from somewhere else — investigation
+  incomplete) → ctor fires too many times, reaching 8 total instead
+  of 3.
+
+The simple gate `actionGotoCatchupActive()` added during investigation
+did NOT fix this (the regression happens in the non-catchup path —
+gotoAndPlay-from-script triggers the older inline catchup loop in
+`swf_core.c:1133-1202` which does its own `funcs[target]` call without
+drain-suppress).
+
+### Tension this exposes
+
+- `loop_test6` (target) needs **CLIP_INIT round dispatch BEFORE DoAction
+  scripts** in the same frame.
+- `RegisterClassTest4` (regression) needs **REGISTER_CTOR firing INSIDE
+  `advance_sprite_frames` per-placement** so subsequent ticks see the
+  correct constructed state without the second-tick drain re-firing
+  pending entries.
+
+These two requirements are not satisfied by a single drain location.
+A working fix likely needs:
+1. Keep round dispatch for **CLIP_INIT / CLIP_CONSTRUCT** at frame-end
+   (these are clip-event handlers fired at placement, FIFO across
+   placements).
+2. Restore per-placement drain for **REGISTER_CTOR** (registered-class
+   constructor, fires inside `tagPlaceObject2`'s sprite-advance
+   path, synchronous).
+
+i.e. split AQ_KIND_CLIP_INIT/CONSTRUCT (frame-level) from
+AQ_KIND_REGISTER_CTOR (per-placement). The plan's current design treats
+all three uniformly via priority order, which doesn't match the
+existing code's behavior for REGISTER_CTOR.
+
+### Suggested next steps
+
+- Revisit Phase 2: keep per-placement drain for REGISTER_CTOR only
+  (drain `AQ_KIND_REGISTER_CTOR` inside `tagPlaceObject2` /
+  `tagPlaceObject2Ratio` after queueing CLIP_INIT/CLIP_CONSTRUCT but
+  BEFORE returning).
+- Phase 3: `actionDrainAllInPriorityOrder` drains only CLIP_INIT and
+  CLIP_CONSTRUCT (plus ONLOAD+SCRIPT), not REGISTER_CTOR.
+- Re-run regression battery focused on RegisterClassTest3 / 4 / 5 /
+  registerclassTest, place_object_test2, loop_test10, and
+  ActionOrderTest3.
+
+Alternative: investigate the "queue accumulates 2+ REGISTER_CTOR
+entries between drains" specifically — if that's caused by an
+unintended re-queue (e.g. a placement tag firing twice during goto
+catch-up), fixing the root cause would let the priority-drain design
+work as originally specified.
 
 ## Problem statement
 
