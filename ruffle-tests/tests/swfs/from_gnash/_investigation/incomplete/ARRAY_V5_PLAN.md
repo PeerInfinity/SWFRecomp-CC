@@ -1,9 +1,9 @@
 # array-v5 Investigation Plan
 <!-- TESTS: array-v5 -->
 
-Last updated: 2026-04-18 (session 2)
+Last updated: 2026-04-28
 
-## Status: IN PROGRESS — ~504/560 lines match (~90%), ~56 remaining failures
+## Status: IN PROGRESS — 519/560 lines match (~92.7%), 41 remaining failures
 
 **Note on variance:** Sort output is non-deterministic (Math.random-driven
 comparators), so the raw pass count fluctuates by ~4 lines between runs
@@ -38,6 +38,8 @@ The `array-v5` test exercises extensive Array operations (560 expected lines). C
 | 2026-04-18 (CI baseline) | 490/560 (87.5%) | CI at 3d326df7 settled on 490/560 rather than the 494 claimed by the 2026-04-16 session; treating 490 as the true pre-session number. |
 | 2026-04-18 (session) | 499/560 (89.1%) | +9: `g_call_this_type` was only being set when Array.prototype methods were invoked via `Function.prototype.call`/`.apply`. Direct method dispatch on an OBJECT receiver (`o.shift = Array.prototype.shift; o.shift()`) left `g_call_this_type == 0`, so `builtin_array_method`'s object-this branch never fired and the generic object was not mutated. Fix: save/set `g_call_this_type = ACTION_STACK_VALUE_OBJECT` around the OBJECT-receiver `advanced_func` call in `actionCallMethod` (line ~50568). Unblocks array-method-on-object dispatch for lines 514–543 — several now fully match, the rest still diverge on Flash's specific enumeration-order semantics (e.g. `traceProps(o)` after shift shows `0,shift,length,7,6,4,3,2,1,` vs expected `4,3,2,1,0,shift,length,7,6,5,`). No regressions across 16 avm1 array/method tests (`array_call_method`, `array_concat`, `array_sort`, `mutable_this`, `this_scoping`, etc.) or 10 object/super tests. |
 | 2026-04-18 (session 2) | ~504/560 (~90%) | +5 stable passes over the previous peak across three small fixes: (1) `actionSetMember` ARRAY branch now early-returns when `prop_name_len == 0`, so `c[''] = 2` no longer grows length or stores at index 0 (Flash silently discards the empty-string key). Fixes `c.length == 0` and `typeof(c['']) == 'undefined'` (lines 153–154). (2) `actionGetMember` ARRAY branch now uses `getPropertyWithPrototype` instead of `getProperty` on the HOLE/missing-element fallback, so Array.prototype inherited entries are found via the `__proto__` chain. Fixes `Array.prototype[3] = 3; new Array()[3] == 3` and related (lines 151/152). Also added `prop_name_len > 0` guard to the numeric-index path so empty-string reads don't parse as index 0. (3) `actionNewObject` for `new Array()` / `new Array(n)` / `new Array(a,b,c)` now calls `initArrayProto` to set `arr->props->__proto__ = g_array_proto_legacy/modern`. Previously only the `[]` literal path and ASnative(252,0) set up the prototype chain, so `new Array()` was missing `instanceof Array` and `.constructor == Array` checks (lines 253/254). No regressions across 29 avm1 tests (array_call_method, array_concat, array_sort, array_sort_random, array_slice, array_splice, array_properties, array_prototyping, array_trivial, array_length, array_enumerate, array_constructor, init_array_invalid, global_array, mutable_this, this_scoping, coerce_to_object_monkeypatch, object_resolve, extends_chain, as2_super_and_this_v6/v8, register_class_return_value, textsnapshot_available_text, enumerate, global_is_bare, string_coercion, parse_int, typeof, action_to_integer). |
+| 2026-04-25 (CI) | 512/560 (91.4%) | +8 cumulative across unrelated fixes since 2026-04-18, baseline for next pass. |
+| 2026-04-28 (session) | 519/560 (92.7%) | +7: four small Array-method fixes — (1) `Array.prototype.reverse` now densifies HOLEs to UNDEFINED in place (matches Flash, not Ruffle). Fixes line 176 (`count == 6` after `sparse.reverse()` so for-in enumerates all six indices). (2) `Array.prototype.splice` now also densifies the *returned* deleted-array's HOLEs to UNDEFINED, mirroring the existing in-place densification on the receiver. Fixes line 252 (`spliced.count == 1` for a hole-only spliced segment). (3) `Array.prototype.slice` now coerces its `start`/`end` args via `tsArgToDouble_ctx` so objects with `valueOf` are honored (matches Flash). Fixes line 196 (`concatted.slice(zero, two).toString() == "0,1"` where `zero`/`two` are valueOf-implementing objects). (4) `Array.prototype.sort` `n<=1` early-return now respects the `RETURNINDEXEDARRAY` flag (bit 8): n==0 → `[]`, n==1 → `[0]`. Fixes lines 334, 336 (sort of singleton with RETURNINDEXEDARRAY returns `"0"`, not the original element string). Side effect: array `join` in SWF<7 now stringifies `UNDEFINED` elements as empty string (same as `HOLE`), matching Flash's `String(undefined) === ""` semantics — required so post-densify `sparse.toString()` still produces `"5,,,,,"` not `"5,undefined,undefined,…"`. No regressions across the 14-test AVM1 array battery (array_sort, array_concat, array_splice, array_slice, array_call_method, array_constructor, array_enumerate, array_length, array_properties, array_prototyping, array_sort_random, array_trivial, init_array_invalid, global_array — 14/14) or a 14-test broader battery (mutable_this, this_scoping, object_resolve, enumerate, string_coercion, parse_int, typeof, action_to_integer, as2_super_and_this_v6/v8, extends_chain, register_class_return_value, textsnapshot_available_text, movieclip_state_values — 14/14). |
 
 ## Completed Fixes
 
@@ -237,14 +239,45 @@ Two separate Array constructors exist (`g_array_constructor` from `actionGetVari
 5. **Category H deeper investigation** — The `t[2] = "om"` failure on plain objects with numeric properties needs investigation separate from __resolve.
 6. **Category E residual (11 lines)** — Refine Flash-compatible semantics of `Array.prototype.{shift,unshift,splice,reverse,sort}` when applied to a generic object (`this != ASArray`). Current impl reads `length`, materialises a temp ASArray via `objectToTempArray` (which fills missing indices with UNDEFINED), mutates, then writes back via `syncArrayToObject`. Flash seems to preserve "holes" (missing indices are not materialised) and computes the new `length` based on densely-populated indices rather than the original `length`. Needs to track which indices actually existed before mutation and skip writing undefined into absent slots.
 
+### 19. Array.reverse densifies HOLEs (2026-04-28)
+`callArrayMethod` `reverse` now converts any HOLE entry to UNDEFINED after the
+in-place reverse loop, and tracks the index keys via `arrayTrackKey`. Matches
+Flash (and the Gnash test expectation), diverges from Ruffle which preserves
+holes. Fixes line 176 (`count == 6` after reverse on `sparse[5]=5`).
+
+### 20. Array.splice deleted-return densifies HOLEs (2026-04-28)
+The "deleted" array returned by `splice` now densifies its HOLEs to UNDEFINED
+the same way the receiver array already does. Fixes line 252
+(`spliced = ary.splice(3, 1, 3); for (var i in spliced) count++; count == 1`).
+
+### 21. Array.slice coerces args via valueOf (2026-04-28)
+`slice` now uses `tsArgToDouble_ctx` instead of `varToDoubleSimple` for its
+`start` and `end` arguments. Objects implementing `valueOf` (e.g. the test's
+`zero`/`two` wrappers) are now honored as numeric indices. Fixes line 196
+(`concatted.slice(zero, two).toString() == "0,1"`).
+
+### 22. Array.sort RETURNINDEXEDARRAY for n<=1 (2026-04-28)
+The `n <= 1` early-return path in `sort` now builds and returns an index
+array (`[]` for empty, `[0]` for singleton) when the `RETURNINDEXEDARRAY`
+flag (bit 8) is set, instead of unconditionally returning the receiver.
+Fixes lines 334, 336 (singleton arrays sorted with RETURNINDEXEDARRAY return
+`"0"`, not the element string).
+
+### 23. Array.join stringifies UNDEFINED as "" in SWF<7 (2026-04-28)
+`join` now treats `UNDEFINED` elements the same as `HOLE`: empty string in
+SWF<7, `"undefined"` in SWF7+. Matches Flash's `String(undefined) === ""`
+semantics in pre-7 SWFs and is required for the densified-reverse / densified-
+splice paths to still produce `"5,,,,,"` rather than
+`"5,undefined,undefined,…"` when joining post-densify.
+
 ## Test Details
 
 | Metric | Value |
 |--------|-------|
 | Expected output | 560 lines |
-| Current matching | 499 lines (89.1%) |
-| Remaining failures | 61 lines |
-| Compilation time | ~72 seconds |
+| Current matching | 519 lines (92.7%) |
+| Remaining failures | 41 lines |
+| Compilation time | ~75 seconds |
 | Script size | 70,731 lines (script_2.c) |
 | SWF version | 5 |
 | num_frames | 30 |

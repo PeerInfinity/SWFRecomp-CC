@@ -50370,6 +50370,20 @@ static int callArrayMethod(SWFAppContext* app_context,
 			arr->elements[i] = arr->elements[arr->length - 1 - i];
 			arr->elements[arr->length - 1 - i] = tmp;
 		}
+		// Flash: reverse densifies the array — convert HOLEs to UNDEFINED
+		// so for-in enumerates all indices (matches Flash, not Ruffle).
+		for (u32 i = 0; i < arr->length; i++)
+		{
+			if (arr->elements[i].type == ACTION_STACK_VALUE_HOLE)
+			{
+				arr->elements[i].type = ACTION_STACK_VALUE_UNDEFINED;
+				arr->elements[i].data.numeric_value = 0;
+				arr->elements[i].str_size = 0;
+				char _idx_buf[12];
+				int _idx_len = snprintf(_idx_buf, sizeof(_idx_buf), "%u", i);
+				arrayTrackKey(arr, _idx_buf, (u32)_idx_len);
+			}
+		}
 		PUSH(ACTION_STACK_VALUE_ARRAY, (u64) arr);
 		return 1;
 	}
@@ -50419,10 +50433,10 @@ static int callArrayMethod(SWFAppContext* app_context,
 			if (elem == NULL) {
 				// Empty string — just skip (append nothing)
 			}
-			// HOLE (unset slot from new Array(n) or delete):
-			// SWF7+: joins as "undefined" (Flash/Ruffle behavior)
-			// SWF5/6: joins as "" (empty string, since String(undefined)="" in SWF5/6)
-			else if (elem->type == ACTION_STACK_VALUE_HOLE) {
+			// HOLE (unset slot from new Array(n) or delete) and UNDEFINED:
+			// SWF7+: join as "undefined" (Flash/Ruffle behavior)
+			// SWF5/6: join as "" (empty string, since String(undefined)="" in SWF5/6)
+			else if (elem->type == ACTION_STACK_VALUE_HOLE || elem->type == ACTION_STACK_VALUE_UNDEFINED) {
 				if (g_swf_version >= 7) {
 					char elem_str[16];
 					int elen = varToStringBuf(app_context, elem, elem_str, sizeof(elem_str));
@@ -50557,10 +50571,10 @@ static int callArrayMethod(SWFAppContext* app_context,
 		int start = 0;
 		int end = (int) arr->length;
 
-		if (num_args > 0) start = (int) varToDoubleSimple(&args[0]);
+		if (num_args > 0) start = (int) tsArgToDouble_ctx(app_context, &args[0]);
 		if (num_args > 1 && args[1].type != ACTION_STACK_VALUE_UNDEFINED)
 		{
-			double d = varToDoubleSimple(&args[1]);
+			double d = tsArgToDouble_ctx(app_context, &args[1]);
 			if (!isnan(d)) end = (int) d;
 		}
 
@@ -50625,6 +50639,20 @@ static int callArrayMethod(SWFAppContext* app_context,
 		for (int i = 0; i < delete_count; i++)
 		{
 			setArrayElement(app_context, deleted, deleted->length, &arr->elements[start + i]);
+		}
+		// Flash: the returned (deleted) array is densified — HOLEs become UNDEFINED
+		// and are enumerable in for-in (matches Flash, not Ruffle).
+		for (u32 i = 0; i < deleted->length; i++)
+		{
+			if (deleted->elements[i].type == ACTION_STACK_VALUE_HOLE)
+			{
+				deleted->elements[i].type = ACTION_STACK_VALUE_UNDEFINED;
+				deleted->elements[i].data.numeric_value = 0;
+				deleted->elements[i].str_size = 0;
+				char _idx_buf[12];
+				int _idx_len = snprintf(_idx_buf, sizeof(_idx_buf), "%u", i);
+				arrayTrackKey(deleted, _idx_buf, (u32)_idx_len);
+			}
 		}
 
 		// Number of elements to insert
@@ -50820,6 +50848,22 @@ static int callArrayMethod(SWFAppContext* app_context,
 		u32 n = arr->length;
 		if (n <= 1)
 		{
+			// RETURNINDEXEDARRAY: still return an index array even for trivial inputs.
+			// n==0 → []; n==1 → [0].
+			if (flags & 8)
+			{
+				ASArray* _idx_arr = allocArray(app_context, n > 0 ? n : 4);
+				for (u32 _ii = 0; _ii < n; _ii++)
+				{
+					double _di = (double) _ii;
+					ActionVar _iv = {0};
+					_iv.type = ACTION_STACK_VALUE_F64;
+					VAL(double, &_iv.data.numeric_value) = _di;
+					setArrayElement(app_context, _idx_arr, _idx_arr->length, &_iv);
+				}
+				PUSH(ACTION_STACK_VALUE_ARRAY, (u64) _idx_arr);
+				return 1;
+			}
 			PUSH(ACTION_STACK_VALUE_ARRAY, (u64) arr);
 			return 1;
 		}
