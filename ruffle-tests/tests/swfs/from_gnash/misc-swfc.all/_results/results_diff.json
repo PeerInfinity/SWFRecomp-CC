@@ -1,29 +1,29 @@
 {
   "metadata": {
-    "old_timestamp": "2026-04-28T01:13:38.593659+00:00",
-    "old_git_sha": "ccf8ac97313d1a8e168d80639267fcb0b488129e",
-    "new_timestamp": "2026-04-28T02:14:37.135116+00:00",
-    "new_git_sha": "abf1b163b420639f5922fbe3c44c7609cc49c4a9",
+    "old_timestamp": "2026-04-28T02:14:37.135116+00:00",
+    "old_git_sha": "abf1b163b420639f5922fbe3c44c7609cc49c4a9",
+    "new_timestamp": "2026-04-28T02:27:50.460440+00:00",
+    "new_git_sha": "c958a5b628efba749f87dee146f984fe5c0f1f19",
     "partial": false,
     "same_commit": false
   },
   "summary": {
     "old_pass": 5,
-    "old_ruffle_matched": 3,
-    "old_effective_pass": 8,
+    "old_ruffle_matched": 2,
+    "old_effective_pass": 7,
     "old_total": 16,
     "old_pass_rate": 31.2,
     "new_pass": 5,
-    "new_ruffle_matched": 2,
-    "new_effective_pass": 7,
+    "new_ruffle_matched": 3,
+    "new_effective_pass": 8,
     "new_total": 16,
     "new_pass_rate": 31.2,
-    "old_mismatched_lines": 237,
-    "new_mismatched_lines": 216,
-    "increased_mismatches": 0,
-    "decreased_mismatches": 21,
-    "newly_passing": 0,
-    "newly_failing": 1,
+    "old_mismatched_lines": 216,
+    "new_mismatched_lines": 237,
+    "increased_mismatches": 21,
+    "decreased_mismatches": 0,
+    "newly_passing": 1,
+    "newly_failing": 0,
     "status_changed": 1,
     "unchanged": 13,
     "added": 0,
@@ -33,17 +33,17 @@
     {
       "test": "action_execution_order_test10",
       "change_type": "changed",
-      "old_status": "ruffle_matched",
-      "new_status": "output_mismatch",
+      "old_status": "output_mismatch",
+      "new_status": "ruffle_matched",
       "old_lines": {
-        "actual_lines": 10,
-        "expected_lines": 16,
-        "matching_lines": 2
-      },
-      "new_lines": {
         "actual_lines": 17,
         "expected_lines": 16,
         "matching_lines": 6
+      },
+      "new_lines": {
+        "actual_lines": 10,
+        "expected_lines": 16,
+        "matching_lines": 2
       }
     },
     {
@@ -52,14 +52,14 @@
       "old_status": "ruffle_matched",
       "new_status": "ruffle_matched",
       "old_lines": {
-        "actual_lines": 36,
-        "expected_lines": 52,
-        "matching_lines": 0
-      },
-      "new_lines": {
         "actual_lines": 50,
         "expected_lines": 52,
         "matching_lines": 9
+      },
+      "new_lines": {
+        "actual_lines": 36,
+        "expected_lines": 52,
+        "matching_lines": 0
       }
     },
     {
@@ -70,12 +70,12 @@
       "old_lines": {
         "actual_lines": 27,
         "expected_lines": 27,
-        "matching_lines": 7
+        "matching_lines": 15
       },
       "new_lines": {
         "actual_lines": 27,
         "expected_lines": 27,
-        "matching_lines": 15
+        "matching_lines": 7
       }
     }
   ]
