@@ -1,28 +1,29 @@
 # Ruffle Test Results Diff
 
-**Previous:** `c958a5b628ef` (2026-04-28T02:27:50.455533+00:00)
-**Current:** `cdc61ecbd34e` (2026-04-28T04:21:17.258708+00:00)
+**Previous:** `cdc61ecbd34e` (2026-04-28T04:21:17.258708+00:00)
+**Current:** `431a14a0d250` (2026-04-28T17:26:50.581103+00:00)
 
 ## Summary
 
 | Metric | Previous | Current | Delta |
 |--------|----------|---------|-------|
-| Passing | 51 | 52 | +1 |
+| Passing | 52 | 54 | +2 |
 | Total | 102 | 102 | 0 |
-| Pass rate | 50.0% | 51.0% | +1.0% |
-| Mismatched lines | 1913 | 1863 | -50 |
-|   Decreased | | | -50 |
+| Pass rate | 51.0% | 52.9% | +1.9% |
+| Mismatched lines | 1863 | 1842 | -21 |
+|   Decreased | | | -22 |
+|   Increased | | | +1 |
 
-## Newly Passing (1)
+## Newly Passing (2)
 
 | Test | Previous Status | Lines (prev) | Lines (now) |
 |------|----------------|--------------|-------------|
-| `register_class/RegisterClassTest3` | output_mismatch | 11/12 | 12/12 |
+| `loop/loop_test` | output_mismatch | 5/21 | 21/21 |
+| `place_and_remove_object_insane_test` | output_mismatch | 17/22 | 22/22 |
 
-## Line Count Changed (3)
+## Line Count Changed (2)
 
 | Test | Status | Lines (prev) | Lines (now) | Diff |
 |------|--------|--------------|-------------|------|
-| `register_class/registerClassTest2` | output_mismatch | 0/44 | 35/44 | -35 |
-| `init_action/InitActionTest` | ruffle_matched | 0/17 | 9/17 | -9 |
-| `init_action/InitActionTest2` | ruffle_matched | 0/29 | 5/29 | -5 |
+| `displaylist_depths/displaylist_depths_test3` | output_mismatch | 16/32 | 17/32 | -1 |
+| `displaylist_depths/displaylist_depths_test8` | output_mismatch | 8/15 | 7/15 | +1 |
