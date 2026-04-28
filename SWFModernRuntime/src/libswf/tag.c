@@ -5254,28 +5254,16 @@ void tagDefineSpriteEx(SWFAppContext* app_context, size_t char_id, frame_func* f
 	}
 }
 
-// DoInitAction once-per-character guard (for DoInitAction inside DefineSprite,
-// and SWF top-level DoInitAction emitted inline in frame_N bodies).
-// Keyed by (movie_id, char_id) so that parent and child SWFs sharing a char_id
-// don't shadow each other. movie_id 0 = main SWF, others = loaded child SWFs.
+// DoInitAction once-per-character guard (for DoInitAction inside DefineSprite)
 #define MAX_INIT_ACTION_CHARS 512
-#define MAX_INIT_ACTION_MOVIES 16
-static u8 g_init_action_done[MAX_INIT_ACTION_MOVIES][MAX_INIT_ACTION_CHARS];
+static u8 g_init_action_done[MAX_INIT_ACTION_CHARS];
 
 void tagDoInitActionGuarded(SWFAppContext* app_context, size_t char_id, frame_func action)
 {
-	extern u8 g_current_movie_id;
-	u8 mid = g_current_movie_id;
-	if (mid >= MAX_INIT_ACTION_MOVIES) {
-		// Out-of-range movie id: fall back to the legacy (movie 0) slot.
-		// Worst case: same char_id collisions across deeply-nested loads,
-		// which already weren't handled before this fix.
-		mid = 0;
-	}
-	if (char_id < MAX_INIT_ACTION_CHARS && g_init_action_done[mid][char_id])
+	if (char_id < MAX_INIT_ACTION_CHARS && g_init_action_done[char_id])
 		return;
 	if (char_id < MAX_INIT_ACTION_CHARS)
-		g_init_action_done[mid][char_id] = 1;
+		g_init_action_done[char_id] = 1;
 	action(app_context);
 }
 

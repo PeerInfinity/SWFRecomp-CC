@@ -2636,18 +2636,20 @@ namespace SWFRecomp
 
 				out_script << "}";
 
-				// Emit synchronous, once-per-character call inline at the
-				// tag's SWF position (in the current frame_N body). Runs the
-				// first time the SWF reaches this point — which mirrors
-				// Ruffle/Flash, where DoInitAction fires when the tag stream
-				// encounters it during normal frame playback (not at startup).
-				// Tests like registerClassTest2 rely on _root.note /
-				// _root.check_equals being defined by an earlier-frame's
-				// dejagnu setup before the InitAction body executes.
-				// Skip during catch-up replay (script-only catch-up still
-				// emits the call to honor `g_tag_skip_mode` semantics).
-				context.tag_main << "\t" << "if (!catch_up_mode || g_tag_skip_mode) tagDoInitActionGuarded(app_context, "
-								 << to_string(init_sprite_id) << ", " << func_name << ");" << endl;
+				(void)init_sprite_id;
+				// Emit call in tagInit (runs once at startup, after initVarArray).
+				// Note: this is NOT the same as Ruffle/Flash, which fires
+				// DoInitAction when the tag stream encounters it during normal
+				// frame playback. We hoist it to startup because many AVM1
+				// tests (register_and_init_order, on_construct,
+				// resolve_different_root) depend on registered classes being
+				// available BEFORE the first PlaceObject2 of that frame. The
+				// SWF tag stream order has DoInitAction AFTER PlaceObject2 in
+				// these tests, but Flash defers constructor invocation until
+				// after all DoInitActions in the frame have run — equivalent
+				// to running DoInitAction first. The startup-hoist approach
+				// is the simplest way to model this.
+				tag_init_scripts << endl << "\t" << func_name << "(app_context);";
 
 
 
@@ -4041,19 +4043,11 @@ namespace SWFRecomp
 					cur_pos += name.length() + 1;
 					imports.push_back({char_id, name});
 				}
-				// Emit runtime call to load and remap imported symbols inline
-				// at this tag's SWF position (in the current frame_N body).
-				// Pairs with the DoInitAction emission above — both must stay in
-				// stream order to preserve relative ordering. SWFs like
-				// `do_init_action_child/child.swf` have DoInitAction BEFORE
-				// ImportAssets in the stream; the child's own InitAction must run
-				// before the imported assets' InitActions.
-				// Skipped during catch-up replay.
-				context.tag_main << "\t" << "if (!catch_up_mode || g_tag_skip_mode) actionImportAssets(app_context, \""
-								 << import_url << "\");" << endl;
+				// Emit runtime call to load and remap imported symbols
+				tag_init_scripts << endl << "\tactionImportAssets(app_context, \"" << import_url << "\");";
 				for (auto& imp : imports) {
-					context.tag_main << "\t" << "if (!catch_up_mode || g_tag_skip_mode) tagImportCharacter(app_context, "
-									 << imp.char_id << ", \"" << imp.name << "\");" << endl;
+					tag_init_scripts << endl << "\ttagImportCharacter(app_context, "
+						<< imp.char_id << ", \"" << imp.name << "\");";
 				}
 				break;
 			}

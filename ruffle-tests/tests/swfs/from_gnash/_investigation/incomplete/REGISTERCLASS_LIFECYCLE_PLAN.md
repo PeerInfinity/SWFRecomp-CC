@@ -20,13 +20,44 @@ phases:
     status: pending
   - id: 5
     name: "Multi-clip onLoad / frame0 ordering (registerClassTest2 frame interleave)"
-    status: mostly_complete
+    status: deferred
 dependencies: []
 blockers:
   - reason: "None — Object.registerClass infrastructure is already complete (AVM1 REGISTERCLASS_PLAN.md, 14/15 AVM1 tests pass). The Gnash misc-ming tests exercise edges the AVM1 tests don't cover: prototype.onLoad firing, constructor proto-chain fallthrough, frame-timing precision, and remove+replace cycling. Each phase is a narrow extension to the existing infrastructure."
 -->
 
-## 2026-04-27 session (later) — Phase 5 mostly landed; registerClassTest now PASS
+## 2026-04-27 session (later) — Phase 5 partially landed; registerClassTest now PASS
+
+### Reverted: SWF top-level DoInitAction inline emission
+
+I tried emitting top-level DoInitAction inline in `frame_N` bodies
+(matching Ruffle's stream-order processing). It moved
+`registerClassTest2` from 0/44 to 41/44 matching by letting mc3's
+InitAction fire AFTER dejagnu's frame 1 setup, but the CI revealed
+catastrophic regressions on tests that depend on registered classes
+being available BEFORE the first PlaceObject2 of that frame:
+
+- `register_and_init_order` (AVM1): 231/231 → 41/231 (-190 lines)
+- `on_construct` (AVM1): 25/25 → 11/25
+- `resolve_different_root` (AVM1): 2/2 → 0/2
+- `from_shumway/avm1/doactionorder/symbolclass`: 4/4 → 0/4
+
+These tests have a SWF tag stream like
+`PlaceObject2(custom_clip char_id=2) → DoInitAction(2)`, and rely on
+Flash's "DoInitAction-before-PlaceObject2" semantics: the constructor
+of a registered class fires when PlaceObject2 places the MC, which
+means the class must already be registered. Hoisting all top-level
+DoInitAction back to startup (the prior behavior) is the simplest
+approximation. Per-frame inline emission would need to also reorder
+DoInitAction BEFORE PlaceObject2 within the same frame — out of scope
+for this session.
+
+The DoInitAction inline change is now reverted (along with the
+ImportAssets inline + the `(movie_id, char_id)` guard rework).
+Phase 5 (registerClassTest2 frame interleave) is therefore deferred to
+a follow-up session that can do the per-frame ordering correctly.
+
+### Landed (kept after revert)
 
 **registerClassTest: 50/51 → 51/51 PASS.** Three small fixes to land the
 last failing line (`typeof(clip2.lineTo) == 'undefined'`) and the prior
