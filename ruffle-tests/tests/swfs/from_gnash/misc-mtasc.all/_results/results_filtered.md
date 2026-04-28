@@ -1,8 +1,8 @@
 # Ruffle Test Results (Filtered)
 
-**Date**: 2026-04-28 00:50 UTC
+**Date**: 2026-04-28 01:13 UTC
 
-**Git SHA**: `fccb7008ab`
+**Git SHA**: `ccf8ac9731`
 
 **Run Duration**: 0m 4s
 
@@ -33,7 +33,7 @@
 | 4 | `hello` | 8 | 0.3s |  |
 | 5 | `implementsOpTest` | 28 | 0.4s |  |
 | 6 | `inheritance` | 22 | 0.4s |  |
-| 7 | `super_test1` | 17 | 0.3s |  |
+| 7 | `super_test1` | 17 | 0.4s |  |
 
 ## Ruffle-Matched Tests
 
@@ -42,7 +42,7 @@
 | # | Test | Our diffs | Ruffle diffs | Duration | Notes |
 |---|------|-----------|--------------|----------|-------|
 | 1 | `TextFieldTest` | 1 | 1 | 0.4s |  |
-| 2 | `levels` | 19 | 21 | 0.4s |  |
+| 2 | `levels` | 19 | 21 | 0.5s |  |
 
 ## Near-Passing Tests
 

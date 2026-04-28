@@ -1,8 +1,8 @@
 # Ruffle Test Results (Unfiltered)
 
-**Date**: 2026-04-28 00:50 UTC
+**Date**: 2026-04-28 01:13 UTC
 
-**Git SHA**: `fccb7008ab`
+**Git SHA**: `ccf8ac9731`
 
 **Run Duration**: 0m 20s
 
@@ -45,9 +45,9 @@
 | 12 | `externalinterface` | 4 | 0.4s |  |
 | 13 | `filters` | 149 | 0.4s |  |
 | 14 | `haxe/flocons1` | 2 | 0.4s |  |
-| 15 | `haxe/flocons2` | 3 | 0.3s |  |
-| 16 | `label` | 4 | 0.3s |  |
-| 17 | `levels` | 9 | 0.5s |  |
+| 15 | `haxe/flocons2` | 3 | 0.4s |  |
+| 16 | `label` | 4 | 0.4s |  |
+| 17 | `levels` | 9 | 0.4s |  |
 | 18 | `loadevent` | 9 | 0.4s |  |
 | 19 | `loadvariables/loadvariables` | 7 | 0.4s |  |
 | 20 | `loadvariables/loadvars` | 2 | 0.4s |  |
@@ -55,24 +55,24 @@
 | 22 | `mouse-transparency` | 1 | 0.4s |  |
 | 23 | `nativeinheritance` | 6 | 0.3s |  |
 | 24 | `nested-button` | 1 | 0.3s |  |
-| 25 | `operations` | 13 | 0.3s |  |
-| 26 | `property-paths/property-paths-6` | 6 | 0.3s |  |
+| 25 | `operations` | 13 | 0.4s |  |
+| 26 | `property-paths/property-paths-6` | 6 | 0.4s |  |
 | 27 | `property-paths/property-paths-7` | 7 | 0.4s |  |
 | 28 | `propertycase/propertycase` | 7 | 0.4s |  |
-| 29 | `propertycase/propertycase-preserving-6` | 2 | 0.4s |  |
-| 30 | `propertycase/propertycase-preserving-7` | 5 | 0.2s |  |
+| 29 | `propertycase/propertycase-preserving-6` | 2 | 0.3s |  |
+| 30 | `propertycase/propertycase-preserving-7` | 5 | 0.1s |  |
 | 31 | `rollover` | 4 | 0.4s |  |
 | 32 | `scope` | 14 | 0.4s |  |
 | 33 | `setinterval` | 20 | 0.4s |  |
 | 34 | `settimeout` | 17 | 0.4s |  |
-| 35 | `super` | 11 | 0.6s |  |
+| 35 | `super` | 11 | 0.4s |  |
 | 36 | `target` | 18 | 0.4s |  |
-| 37 | `text-bind` | 0 | 0.3s |  |
+| 37 | `text-bind` | 0 | 0.4s |  |
 | 38 | `textfield/textfield-html` | 4 | 0.4s |  |
 | 39 | `textfield/textfield-text-setters` | 8 | 0.4s |  |
 | 40 | `undefined/undefined-swf6` | 39 | 0.4s |  |
 | 41 | `undefined/undefined-swf7` | 39 | 0.4s |  |
-| 42 | `watch` | 2 | 0.8s |  |
+| 42 | `watch` | 2 | 0.4s |  |
 | 43 | `xml/xmlbuild` | 1 | 0.4s |  |
 | 44 | `xml/xmlload` | 4 | 0.3s |  |
 | 45 | `xml/xmlstring` | 9 | 0.4s |  |
@@ -83,7 +83,7 @@
 
 | # | Test | Our diffs | Ruffle diffs | Duration | Notes |
 |---|------|-----------|--------------|----------|-------|
-| 1 | `hitarea` | 2 | 2 | 0.3s |  |
+| 1 | `hitarea` | 2 | 2 | 0.4s |  |
 
 ## Near-Passing Tests
 

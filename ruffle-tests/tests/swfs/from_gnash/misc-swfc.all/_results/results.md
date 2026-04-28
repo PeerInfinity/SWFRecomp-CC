@@ -1,8 +1,8 @@
 # Ruffle Test Results (Unfiltered)
 
-**Date**: 2026-04-28 00:50 UTC
+**Date**: 2026-04-28 01:13 UTC
 
-**Git SHA**: `fccb7008ab`
+**Git SHA**: `ccf8ac9731`
 
 **Run Duration**: 0m 7s
 
@@ -31,10 +31,10 @@
 
 | # | Test | Lines | Duration | Notes |
 |---|------|-------|----------|-------|
-| 1 | `edittext_test1` | 47 | 0.3s |  |
+| 1 | `edittext_test1` | 47 | 0.4s |  |
 | 2 | `gotoFrameLabelAsFunction` | 6 | 0.4s |  |
 | 3 | `hello` | 4 | 0.3s |  |
-| 4 | `stackscope` | 11 | 0.3s |  |
+| 4 | `stackscope` | 11 | 0.4s |  |
 | 5 | `submoviegetvar` | 4 | 0.4s |  |
 
 ## Ruffle-Matched Tests
