@@ -4,7 +4,7 @@
 
 <!-- PLAN_META
 id: DEFERRED_CLIP_UNLOAD
-status: in_progress
+status: blocked
 phases:
   - id: 1
     name: "Snapshot MC state at queue time (audit)"
@@ -23,12 +23,13 @@ phases:
     status: completed
 dependencies: []
 blockers:
-  - reason: "Partial: 3 of 10 target tests now pass (loop_test7 ruffle_matched, action_execution_order_test3 PASS, loop_test8 PASS). The other 7 (loop_test6, action_execution_order_test2/5/11, ActionOrderTest3/4/5) have remaining ordering issues — sprite frame action ordering across multiple MCs (test2/11), and inter-tag UNLOAD vs DoAction queue ordering that the recompiler emits don't quite match Flash's tag-stream order (ActionOrderTest3/4/5)."
+  - reason: "Phases 1-5 complete and in CI (loop_test7 ruffle_matched, action_execution_order_test3 PASS, loop_test8 PASS). The remaining 7 target tests have root causes orthogonal to the deferred-unload plan and require separate plans — see 'Remaining work — separate root causes' section below."
 -->
 
-## Status update (2026-04-25, in_progress)
+## Status update (2026-04-28, blocked)
 
-Phases 1-5 implemented. Net impact:
+Phases 1-5 implemented and in CI. Net impact (CI snapshot at 205a9a77, re-confirmed
+locally 2026-04-28):
 - AVM1 regression battery: 27/27 PASS (no regressions).
 - Misc-ming recently-fixed battery: 22/23 effective pass (loop_test6 unchanged
   pre-existing failure).
@@ -36,9 +37,114 @@ Phases 1-5 implemented. Net impact:
 - Shumway duplicateMovieClip: 4/4 PASS.
 - Target tests (3 of 10 effectively passing):
   - loop_test7 RUFFLE_MATCHED (14/15)
-  - loop_test8 PASS (38/38) ← new in this session
+  - loop_test8 PASS (38/38)
   - action_execution_order_test3 PASS
-- Remaining 7 target tests still MISMATCH (no regressions to SEGFAULT or worse).
+
+Remaining 7 target tests confirmed locally 2026-04-28 (still MISMATCH, no regressions):
+
+| Test | Suite | Match | Lines | Notes |
+|------|-------|-------|-------|-------|
+| loop/loop_test6 | misc-ming | 10/23 | DoAction/UNLOAD interleave; clip-event INITIALIZE/CONSTRUCT round ordering across sibling MCs (see "Remaining work" §1) |
+| action_execution_order_test2 | misc-ming | 2/5 | Reverse-instantiation-order vs depth-descending (see §2) |
+| action_execution_order_test5 | misc-ming | 26/35 | Same family as test2 |
+| action_execution_order_test11 | misc-ming | 13/32 | Same family as test2 |
+| action_order/ActionOrderTest3 | misc-ming | 6/62 | Inter-tag UNLOAD vs DoAction queue order; UNLOAD doesn't observe pre-removal int state (see §3) |
+| action_order/ActionOrderTest4 | misc-ming | 7/64 | Same family as ActionOrderTest3 |
+| action_order/ActionOrderTest5 | misc-ming | 8/51 | Same family as ActionOrderTest3 |
+
+## Remaining work — separate root causes
+
+The remaining 7 tests do NOT need additional deferred-unload work; they need
+two distinct, larger pieces of machinery that should each have their own plan.
+
+### §1 Clip-event INITIALIZE/CONSTRUCT round dispatch (loop_test6)
+
+**Symptom (loop_test6 head):**
+```
+expected: movieClip1 initialized | movieClip2 initialized | movieClip1 constructed | movieClip2 constructed
+actual:   movieClip1 initialized | movieClip1 constructed   | movieClip2 initialized | movieClip2 constructed
+```
+
+We fire `INITIALIZE` then `CONSTRUCT` per-sprite (depth-first) at placement
+time. Ruffle/Flash fires INITIALIZE for **all** new sprites in the frame
+first, then CONSTRUCT for all of them. Fixing this means walking the new
+placements in two passes and dispatching INITIALIZE for the whole batch
+before any CONSTRUCT runs (rather than the current per-sprite serial dispatch
+inside `tagPlaceObject2*`'s `fire_eager_constructors`).
+
+A second loop_test6 issue (movieClip1 still alive when expected
+`typeof=='undefined'` at line 16) is the inter-tag UNLOAD ordering failure
+covered in §3.
+
+### §2 Sprite frame execution order: LIFO instantiation, not depth-descending (test2/5/11)
+
+**Symptom (action_execution_order_test2):**
+```
+expected: depth11+depth12+depth10+depth9+depth13+   (reverse-placement order: mc_red3, mc_red2, mc_red1)
+actual:   depth12+depth11+depth10+depth9+depth13+   (depth-descending: 12, 11, 10)
+```
+
+`advance_sprite_frames` (`SWFModernRuntime/src/libswf/tag.c:671`) walks
+`display_list` from `max_depth` down to 0. The expected order is
+**reverse-instantiation order** (most-recently-placed first) which matches
+Ruffle's `clip_exec_list` — a LIFO linked list pushed at `add_to_exec_list`
+(`core/src/avm1/runtime.rs:519-525`) and traversed forward in `Avm1::run_frame`
+(`runtime.rs:489-505`).
+
+Fix shape: introduce a per-MovieClip `clip_exec_list` (linked list of child
+sprites in placement order), push at the head on placement, traverse forward
+in `advance_sprite_frames`. Risk is high — the depth-descending iteration is
+load-bearing for several other suites; the AVM1 regression battery would need
+to be rerun against the change.
+
+### §3 Inter-tag UNLOAD vs DoAction tag-stream ordering (loop_test6 second half, ActionOrderTest3/4/5)
+
+**Symptom (ActionOrderTest3 head, expected vs actual):**
+```
+expected:   onEnterFrame | Frame 2 actions: undefined | ctor: 0 | static unload: undefined | dynamic load: 0 | onEnterFrame | Frame 3 actions: undefined | Frame 2 actions: undefined | onEnterFrame | Frame 3 actions: 0 | Frame 2 actions: 0 | ctor: 1 | static unload: 0 | dynamic unload: 0 | dynamic load: 1 | …
+actual:     onEnterFrame | Frame 2 actions: undefined | ctor: 0 | onEnterFrame | static unload: undefined | dynamic load: 0 | Frame 3 actions: undefined | onEnterFrame | Frame 2 actions: undefined | ctor: 1 | onEnterFrame | static unload: undefined | dynamic load: 1 | …
+```
+
+Two distinct issues here:
+1. **`static unload: undefined` instead of `static unload: 0`** — by the time
+   the unload handler runs, the static counter has already been re-zeroed
+   (handler reads `undefined` instead of `0`). This is the recompiler's
+   `tagRemoveObject2` lookahead heuristic deciding wrongly: when a frame
+   contains `[DoAction A, RemoveObject2(mc1), PlaceObject2(mc2 at same depth), DoAction B]`,
+   we currently emit the RemoveObject2 inline (so its UNLOAD fires before B),
+   then re-Place. The expected interleave is `A → B → mc1.UNLOAD →
+   mc2.LOAD/CONSTRUCT`. Fix: route ALL same-depth Remove+Replace through
+   the buffered `actionDrainOnloadAndScript` path at SHOW_FRAME emit, not
+   the lookahead heuristic that decides per-pair.
+2. **`dynamic unload` lines missing entirely** — when a dynamically-attached
+   MC is replaced by a fresh attach in the next frame, the AS-level onUnload
+   handler isn't getting queued. Need to verify
+   `actionFireOnUnload`/`queue_pending_finalize_mc` is reached for the
+   `attachMovie`-replacement code path (already mentioned in
+   `actionInvokeRegisteredClassConstructor`'s replacement flow but possibly
+   not for the simple attachMovie-with-existing-name case).
+
+Fixing either of these is a multi-hour effort that should be its own plan
+(`INTER_TAG_UNLOAD_PLAN.md`, say) with its own regression battery — the
+current `action_execution_order_test8-v5/v6` and `loop_test2/3/5/8/9` set
+all depend on the tag-stream ordering already in place, and any change here
+must keep them green.
+
+## Why this plan is blocked, not in_progress
+
+The deferred-clip-unload work this plan describes (Phases 1-5) is fully
+landed. The remaining 7 tests need machinery that is:
+- §1 — a small but real refactor of clip-event dispatch ordering.
+- §2 — a fundamental rework of sprite frame iteration order (high regression
+  risk).
+- §3 — a reshape of how the recompiler emits Remove+Replace tag pairs and
+  how attachMovie-replacement queues onUnload.
+
+None of those are extensions of the deferred-unload mechanism — they are
+adjacent ordering problems that the deferred-unload work happened to surface
+when it landed. Tracking them under this plan would conflate four very
+different fixes; spinning them off into separate plans makes the next session's
+scope clearer.
 
 ### 2026-04-25 — loop_test8 trailing mc5unloaded fixed
 
