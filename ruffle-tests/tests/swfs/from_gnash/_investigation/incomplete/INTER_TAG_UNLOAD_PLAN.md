@@ -26,7 +26,36 @@ dependencies:
 parent_plan: "complete/DEFERRED_CLIP_UNLOAD_PLAN.md (§3)"
 -->
 
-## Status (2026-04-28)
+## Status (2026-04-28, post-Approach A attempt)
+
+- **Phase 2 Approach A — TRIED AND REVERTED (commit 4d97fa92).**
+  Implemented exactly as the plan sketched: queue clip-action UNLOAD,
+  recursive child UNLOAD, AS-level onUnload (deferred-finalize) for
+  every non-empty depth at sprite-internal `frame == 0 && max_depth > 0`
+  loop-back. CI showed:
+  - **`register_class/RegisterClassTest4` regressed -14 lines** (17/42 →
+    3/42). The test fires `unload _level0.mc.Segments c: N` events, but
+    Approach A queues them at the wrong lifecycle point relative to the
+    `Bug ctor: N` line and inserts spurious `2 undefined` / `1 undefined`
+    rows — same family of ordering miss as ActionOrderTest5.
+  - **Plan-target tests (Test3/4/5, loop_test6) all unchanged** in CI
+    matched-line counts. The silent-clear path is genuinely not where
+    mc3 loops back in those tests — debug logging during the attempt
+    confirmed mc3's `sprite_current_frame` is always `1` at the silent
+    clear, never `0`. Root `gotoAndPlay(2)` routes through
+    `ng_executeGotoCatchUp`, whose backward path takes the
+    `survives_rewind` branch in `tagPlaceObject2` and preserves mc3 with
+    the existing frame counter — so the natural-advance loop-back never
+    fires for mc3.
+  - **Loop_test2/3/4/5/8, reverse_execute_PlaceObject2_*, all the avm1
+    UNLOAD/clip_events/goto/register_and_init_order tests** stayed
+    100% PASS (no regression on the named "must-not-regress" set).
+  - Net: -14 lines, 0 gain → reverted.
+
+  Lesson: the plan's premise ("silent clear at advance_sprite_frames is
+  where mc3 loops back") is wrong for this test family. mc3's
+  per-iteration "loop-back" is actually buried inside the root-goto
+  catch-up machinery, not the natural sprite advance.
 
 - **Phase 1 — DROPPED.** Was a misdiagnosis. Without buffering the
   deferred-drain sequence already produces `ctor:NEW → UNLOAD:OLD →
@@ -45,8 +74,18 @@ parent_plan: "complete/DEFERRED_CLIP_UNLOAD_PLAN.md (§3)"
   fires UNLOAD with deferred-finalize timing.
 
 - **Phase 2 + Phase 4 — STILL PENDING and merge into a single fix.**
-  See "Path forward" below. ActionOrderTest3 still 6/62 lines
-  (no progress this session).
+  Approach A was tried this session and reverted (see top status block).
+  Next attempt needs to find where mc3 actually transitions back to
+  `sprite_current_frame == 0` between iterations — which is NOT
+  `advance_sprite_frames`'s loop-back branch. Likely candidates: somewhere
+  inside `ng_executeGotoCatchUp`'s backward replay (between the catch-up
+  loop and the inline target-script call), or the eager-init re-run
+  during catch-up's tagPlaceObject2 survives path. Instrument
+  `sprite_current_frame` mutations on the `mc` instance during a single
+  ActionOrderTest3 run to pinpoint.
+
+  ActionOrderTest3 still 6/62 lines (no progress this session — including
+  Approach A which left it unchanged).
 
 ## Affected tests (CI 6ea78421)
 
