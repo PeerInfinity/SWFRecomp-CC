@@ -22617,7 +22617,9 @@ static inline double parseStringToNumber(const char* str)
 	// Flash equality coercion parses hex "0x" prefixes with signed 32-bit semantics:
 	// "0xFF0000" → 16711680, but "0xFF000000" → (int32_t)0xFF000000 = -16777216.
 	// Handle hex before strtod to avoid C99 hex float parsing differences.
-	if (p[0] == '0' && (p[1] == 'x' || p[1] == 'X'))
+	// SWF5 and earlier do not parse hex/octal in == coercion (Number-v5 expects
+	// "0xFF0000" != 0xFF0000); only SWF6+ does.
+	if (g_swf_version >= 6 && p[0] == '0' && (p[1] == 'x' || p[1] == 'X'))
 	{
 		const char* hex_start = p + 2;
 		char* hex_end;
@@ -22632,9 +22634,12 @@ static inline double parseStringToNumber(const char* str)
 		int neg = (str != (const char*)p) && (p[-1] == '-');
 		return neg ? -result : result;
 	}
+	// SWF5 must reject "0x..." strings entirely (strtod parses them as hex floats in C99+).
+	if (g_swf_version < 6 && p[0] == '0' && (p[1] == 'x' || p[1] == 'X'))
+		return NAN;
 	// Flash equality coercion also parses octal (leading zero + all octal digits).
 	// "07700000000" → octal 1056964608, "077000000000" → octal 8455716864.
-	if (p[0] == '0' && p[1] >= '0' && p[1] <= '7')
+	if (g_swf_version >= 6 && p[0] == '0' && p[1] >= '0' && p[1] <= '7')
 	{
 		int all_octal = 1;
 		for (const char* op = p + 1; *op; op++) {

@@ -68,6 +68,36 @@ toString_valueOf failures involve MovieClip + string coercion (`y == _level0.mc1
 and implicit toString dispatch from `+` operator — separate issue from
 this valueOf dispatch path.
 
+## 2026-04-29 session (SWF5 hex/octal coercion in `==`)
+
+`parseStringToNumber` (`SWFModernRuntime/src/actionmodern/action.c`) — the
+helper used by `actionEquals2` for String↔Number coercion — was
+unconditionally parsing `"0x..."` (hex) and `"0NNN"` (octal) string
+prefixes regardless of SWF version. Number-v5 line 312-313 expects
+`"0xFF0000" != 0xFF0000` and `"0XFF0000" != 0xFF0000` (PASSED) — i.e. SWF5
+should NOT parse hex prefixes during equality coercion. SWF6+ does parse
+them (Number-v6 line 305-308 expects `==` PASSED for the same strings).
+Fix: gate both hex and octal parsing on `g_swf_version >= 6`, and add an
+explicit "SWF<6: reject 0x... entirely" branch so C99 `strtod` doesn't
+sneak hex parsing back in. Mirrors the existing `g_swf_version >= 6` gates
+in `convertFloat` and `stringVarToDouble`.
+
+- Number-v5: 234/244 → 236/244 matching (10 fails → 8 fails, +2 lines).
+- Number-v6/v7/v8 unchanged (still PASS at 239/239, 237/237, 237/237).
+- Boolean-v5..v8 unchanged (PASS).
+- 13-test misc-ming recently-fixed battery (DefineEditTextTest,
+  ResolveEventsTest, attachMovieTest, displaylist_depths_test11,
+  instanceNameTest, loop_test2/3/4/5, place_and_remove_object_test,
+  shape_test, static_vs_dynamic1/2 — 13/13 PASS).
+- 17-test actionscript.all coercion battery (Math/Global/array/case/
+  String/toString_valueOf vN — all status preserved: 4 PASS pre-existing
+  for Number-v6/7/8, 13 RM/MISMATCH unchanged).
+
+Remaining 8 Number-v5 fails are SWF5-specific built-in visibility quirks
+(constructor properties hidden until ASSetPropFlags) and `0+o` Object→NaN
+coercion tradeoff with Color-v5 (see "SWF<6: non-array objects/functions
+still convert to 0.0" comment in convertFloat).
+
 ## 2026-04-15 session 2 (primitive auto-boxing + convertFloat FUNCTION valueOf)
 
 Two fixes in `SWFModernRuntime/src/actionmodern/action.c`:
