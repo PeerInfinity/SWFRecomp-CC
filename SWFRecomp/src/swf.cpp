@@ -598,7 +598,7 @@ namespace SWFRecomp
 			// model: a tag-stream-order RemoveObject2 followed by DoAction
 			// fires unload first; a DoAction followed by RemoveObject2 fires
 			// the script first. (See DEFERRED_CLIP_UNLOAD_PLAN.)
-			context.tag_main << "\t" << "if (!catch_up_mode || g_tag_skip_mode) actionDrainOnloadAndScript(app_context);" << endl;
+			context.tag_main << "\t" << "if (!catch_up_mode || g_tag_skip_mode) actionDrainAllInPriorityOrder(app_context);" << endl;
 			last_queued_script = next_script_i;
 
 			if (next_frame_i == 1)
@@ -901,7 +901,7 @@ namespace SWFRecomp
 			// model: a tag-stream-order RemoveObject2 followed by DoAction
 			// fires unload first; a DoAction followed by RemoveObject2 fires
 			// the script first. (See DEFERRED_CLIP_UNLOAD_PLAN.)
-			context.tag_main << "\t" << "if (!catch_up_mode || g_tag_skip_mode) actionDrainOnloadAndScript(app_context);" << endl;
+			context.tag_main << "\t" << "if (!catch_up_mode || g_tag_skip_mode) actionDrainAllInPriorityOrder(app_context);" << endl;
 				last_queued_script = next_script_i;
 
 				if (next_frame_i == 1)
@@ -960,7 +960,7 @@ namespace SWFRecomp
 			// model: a tag-stream-order RemoveObject2 followed by DoAction
 			// fires unload first; a DoAction followed by RemoveObject2 fires
 			// the script first. (See DEFERRED_CLIP_UNLOAD_PLAN.)
-			context.tag_main << "\t" << "if (!catch_up_mode || g_tag_skip_mode) actionDrainOnloadAndScript(app_context);" << endl;
+			context.tag_main << "\t" << "if (!catch_up_mode || g_tag_skip_mode) actionDrainAllInPriorityOrder(app_context);" << endl;
 				last_queued_script = next_script_i;
 
 				context.tag_main << "\t" << "tagShowFrame(app_context);" << endl;

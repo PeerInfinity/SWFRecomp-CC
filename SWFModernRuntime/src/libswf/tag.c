@@ -4364,16 +4364,13 @@ void tagPlaceObject2(SWFAppContext* app_context, size_t depth, size_t char_id, u
 		}
 	}
 
-	// Drain INIT → CONSTRUCT → REGISTER_CTOR at the outermost placement.
-	// Under catch_up_mode=1 (nested eager init, or goto catch-up where the
-	// outermost tagPlaceObject2 itself runs under catch_up_mode=1) we skip
-	// draining here; the enclosing !catch_up_mode placement or the
-	// tagShowFrame safety drain will pick up our queued entries.
-	if (!catch_up_mode) {
-		actionDrainActionQueueByKind(app_context, AQ_KIND_CLIP_INIT);
-		actionDrainActionQueueByKind(app_context, AQ_KIND_CLIP_CONSTRUCT);
-		actionDrainActionQueueByKind(app_context, AQ_KIND_REGISTER_CTOR);
-	}
+	// Phase 2 of CLIP_EVENT_ROUND_DISPATCH: per-placement drain removed in
+	// favor of a frame-end priority drain (actionDrainAllInPriorityOrder)
+	// emitted by the recompiler. INIT/CONSTRUCT/REGISTER_CTOR queue here and
+	// drain in priority rounds at frame end so cross-sprite ordering matches
+	// Flash/Ruffle's batch model (every INIT first, then every CONSTRUCT,
+	// then every REGISTER_CTOR), instead of the per-sprite serial pattern
+	// the per-placement drain produced.
 
 #else
 	(void)app_context;
@@ -4754,13 +4751,8 @@ void tagPlaceObject2Ratio(SWFAppContext* app_context, size_t depth, size_t char_
 		}
 	}
 
-	// Drain INIT → CONSTRUCT → REGISTER_CTOR at the outermost placement.
+	// Phase 2 of CLIP_EVENT_ROUND_DISPATCH: per-placement drain removed.
 	// See tagPlaceObject2 for the rationale.
-	if (!catch_up_mode) {
-		actionDrainActionQueueByKind(app_context, AQ_KIND_CLIP_INIT);
-		actionDrainActionQueueByKind(app_context, AQ_KIND_CLIP_CONSTRUCT);
-		actionDrainActionQueueByKind(app_context, AQ_KIND_REGISTER_CTOR);
-	}
 
 #else
 	(void)app_context;

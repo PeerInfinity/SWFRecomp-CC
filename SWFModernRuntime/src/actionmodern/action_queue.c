@@ -16,8 +16,12 @@ typedef struct {
 	MovieClip* clip;
 	ActionQueuePriority priority;
 	int is_unload;
+	int queued_in_catchup;  // captured catch_up_mode at queue time
 	ActionQueueKind kind;
 } ActionQueueEntry;
+
+// Read from libswf — global goto-catchup flag set during ng_executeGotoCatchUp.
+extern int catch_up_mode;
 
 static ActionQueueEntry* g_aq = NULL;
 static size_t g_aq_count = 0;
@@ -71,6 +75,7 @@ void actionQueueCallbackEx(SWFAppContext* app_context,
 	e->clip = clip;
 	e->priority = priority;
 	e->is_unload = is_unload ? 1 : 0;
+	e->queued_in_catchup = catch_up_mode ? 1 : 0;
 	e->kind = kind;
 }
 
@@ -137,7 +142,18 @@ static void aq_drain(SWFAppContext* app_context, const DrainFilter* f)
 
 		// is_unload gating: skip if clip was removed before this entry ran,
 		// unless this entry is itself an unload event.
-		if (!entry.is_unload && entry.clip) {
+		// CLIP_INIT/CLIP_CONSTRUCT/REGISTER_CTOR queued during natural play
+		// (not catch_up_mode) fire chronologically — their placement was real,
+		// and Flash semantics fire INIT/CTOR even if the clip is unloaded
+		// later in the same drain window. Catch-up-queued entries keep the
+		// existing skip filter so goto_commands aggregation (place+remove in
+		// same goto sweep) remains canceled.
+		int fires_chronologically =
+			(entry.kind == AQ_KIND_CLIP_INIT
+			 || entry.kind == AQ_KIND_CLIP_CONSTRUCT
+			 || entry.kind == AQ_KIND_REGISTER_CTOR)
+			&& !entry.queued_in_catchup;
+		if (!entry.is_unload && entry.clip && !fires_chronologically) {
 			if (entry.clip->avm1_removed || entry.clip->pending_removal) {
 				continue;
 			}
@@ -182,6 +198,20 @@ extern void run_pending_finalize(SWFAppContext* app_context);
 extern int g_natural_wrap_cleanup_pending;
 extern int catch_up_backward;
 extern size_t catch_up_target;
+
+// Phase 3 of CLIP_EVENT_ROUND_DISPATCH: unified frame-end priority drain.
+// Drains INIT → CONSTRUCT → REGISTER_CTOR rounds, then ONLOAD+SCRIPT in
+// FIFO. Mirrors Ruffle's Player::run_actions priority pop loop.
+// Honors g_drain_suppress_depth so nested drains under an outer drain
+// (ng_executeGotoCatchUp's inline target script call) are no-op'd.
+void actionDrainAllInPriorityOrder(SWFAppContext* app_context)
+{
+	if (g_drain_suppress_depth > 0) return;
+	actionDrainActionQueueByKind(app_context, AQ_KIND_CLIP_INIT);
+	actionDrainActionQueueByKind(app_context, AQ_KIND_CLIP_CONSTRUCT);
+	actionDrainActionQueueByKind(app_context, AQ_KIND_REGISTER_CTOR);
+	actionDrainOnloadAndScript(app_context);
+}
 
 void actionDrainOnloadAndScript(SWFAppContext* app_context)
 {

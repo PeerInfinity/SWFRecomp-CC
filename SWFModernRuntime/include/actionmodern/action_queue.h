@@ -92,6 +92,14 @@ void actionDrainActionQueueByKind(SWFAppContext* app_context,
 // and DoAction. (See DEFERRED_CLIP_UNLOAD_PLAN.)
 void actionDrainOnloadAndScript(SWFAppContext* app_context);
 
+// Phase 3 of CLIP_EVENT_ROUND_DISPATCH: unified frame-end priority drain.
+// Drains AQ_KIND_CLIP_INIT → AQ_KIND_CLIP_CONSTRUCT → AQ_KIND_REGISTER_CTOR
+// in priority rounds, then ONLOAD+SCRIPT via actionDrainOnloadAndScript.
+// Mirrors Ruffle's Player::run_actions priority pop loop. Used at the
+// recompiler-emitted SHOW_FRAME drain site (replacing actionDrainOnloadAndScript)
+// so cross-sprite INIT/CONSTRUCT/REG_CTOR ordering matches Flash batch model.
+void actionDrainAllInPriorityOrder(SWFAppContext* app_context);
+
 // Pop the highest-priority entry of `kind_filter` whose user payload
 // satisfies `pred(user, ctx)`, returning the user pointer (caller owns
 // lifetime). Returns NULL when no matching entries remain. Unlike
