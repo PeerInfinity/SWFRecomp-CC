@@ -4,17 +4,17 @@
 
 <!-- PLAN_META
 id: INTER_TAG_UNLOAD
-status: pending
+status: blocked
 phases:
   - id: 1
     name: "Buffer sprite-level RemoveObject2 (recompiler symmetry)"
-    status: pending
+    status: blocked
   - id: 2
     name: "Fire UNLOAD on sprite loop-back display-list clear"
     status: pending
   - id: 3
     name: "Audit `this`/`this.c` access in deferred clip-action UNLOAD"
-    status: pending
+    status: blocked
   - id: 4
     name: "Queue dynamic onUnload for sprite-internal replacements"
     status: pending
@@ -25,6 +25,94 @@ dependencies:
   - "complete/DEFERRED_CLIP_UNLOAD_PLAN.md"
 parent_plan: "complete/DEFERRED_CLIP_UNLOAD_PLAN.md (§3)"
 -->
+
+## Status (2026-04-28 session)
+
+Investigated Phase 1 and Phase 3. Both phases hit blockers that need
+follow-up runtime work before they can land. ActionOrderTest3 still at
+6/62 — no progress this session, but no regressions either.
+
+**Phase 1 attempt (reverted).** Symmetric sprite-level lookahead +
+buffering implemented in `SWFRecomp/src/swf.cpp` (per-sprite
+`sprite_depth_clip_actions` / `sprite_buffered_removes` trackers, end-of-
+sprite-frame flush, file-scope `ClipAction[]` pool emission via
+`extern` decls in `sprite_forward_decls`). Recompiler emits
+`tagReplaceObject2RatioWithClipActions` correctly — verified in generated
+`tagMain.c`. Compile succeeds; AVM1 lifecycle battery still 8/8 PASS;
+gnash misc-ming recently-fixed battery (loop_test2/5/8, instanceNameTest,
+attachMovieTest, event_handler_scope_test, ResolveEventsTest,
+new_child_in_unload_test) all PASS unchanged.
+
+**But the test got slightly worse: 6/62 → 4/62.** The runtime function
+`tagReplaceObject2RatioWithClipActions`
+(`SWFModernRuntime/src/libswf/tag.c:4781`) defers OLD's UNLOAD via
+`accumulated_clip_actions`, which fires when NEW is later removed. That's
+the wrong semantics for ActionOrderTest3: the test expects OLD's
+clip-action UNLOAD to fire DURING this frame's drain, between NEW's
+CONSTRUCT and NEW's LOAD. Without buffering, the deferred-drain order
+already produces the right relative sequence (CONSTRUCT, then UNLOAD via
+`tagRemoveObject2`'s queue, then LOAD via place's queue) — just with the
+"this.c == undefined" Phase 3 issue. With buffering, the UNLOAD lines
+disappear entirely until NEW is removed (which never happens in this
+test pattern).
+
+**To unblock Phase 1**, modify `tagReplaceObject2RatioWithClipActions`
+to queue OLD's CLIP_EVENT_UNLOAD via `actionQueueClipActionUnload`
+(matching the backward-rewind path at `tag.c:4010-4036`) BEFORE marking
+the OLD MC for pending removal — so OLD's UNLOAD rides the same
+end-of-frame drain as NEW's LOAD. Then preserve `accumulated_clip_actions`
+only for the deferred-finalize path (NEXT remove). Validate against
+`avm1/unload` (the only AVM1 test using Replace today, currently 38/38
+PASS).
+
+**Phase 3 attempt (reverted).** Plan suggested
+`g_event_this_mc = pca->mc` in `aq_dispatch_clip_action`. This had no
+effect — the recompiled `clip_action_5` resolves `this` via
+`actionGetVariable("this")`, which falls through `g_this_stack` →
+`g_base_clip` → `g_current_context` → `&root_movieclip`. The dispatcher
+already sets `g_current_context = pca->mc` via `actionSetCurrentContext`,
+so `this` already resolves to `pca->mc`.
+
+**The real Phase 3 blocker is upstream.** Debug printfs added to
+`aq_dispatch_clip_action` showed:
+```
+mc=0x...A name=Segments parent=0x...mc3 props=(nil)
+mc=0x...B name=Segments parent=0x...mc3 props=(nil)
+mc=0x...C name=Segments parent=0x...mc3 props=(nil)
+```
+Each iteration's `pca->mc` is a DIFFERENT MC pointer with `dynamic_props=NULL`.
+`pca->mc` is set at queue time in `tagRemoveObject2` (`tag.c:5172-5174`):
+```c
+_remove_parent_mc = actionFindOrCreateMovieClip(app_context,
+    display_list[depth].instance_name, &root_movieclip);
+```
+Since "Segments" is parented to `mc3` (sprite), not root, the lookup
+fails to find the actual cached MC (which has `dynamic_props["c"] = N`)
+and CREATES a fresh MC with no props. Tried changing the parent hint
+to `g_current_context` (which IS mc3 at this point) — still got fresh
+MCs each iteration. Hypothesis: the cached "Segments" MC under mc3 is
+being finalized (`actionInvalidateCachedMovieClip` → `depth=INT_MIN,
+dynamic_props=NULL`) between iterations, so the lookup loop's
+`depth != INT_MIN` filter skips it.
+
+**To unblock Phase 3**, audit when the cached "Segments" MC under
+`mc3` gets finalized. Likely candidates: the new Place's
+`g_skip_pending_removal_mc` path, sprite frame transitions clearing
+display list entries, or the implicit replace at `mc3.frame_0` (no
+explicit Remove before Place — but the existing entry from the prior
+loop iteration's frame_1 needs to go somewhere). Once the cache
+preserves the OLD MC long enough for the deferred UNLOAD to read
+`this.c`, Phase 3 itself is a no-op (the lookup fix is sufficient).
+
+## Affected behavior summary
+
+| Issue | Where | Fix scope |
+|-------|-------|-----------|
+| Recompiler emits inline sprite RemoveObject2 (no buffering) | `swf.cpp:5008-5019` | DONE+REVERTED — recompiler ready; needs runtime change to `tagReplaceObject2RatioWithClipActions` |
+| `tagReplaceObject2RatioWithClipActions` doesn't queue OLD's UNLOAD inline | `tag.c:4781-4840` | Add UNLOAD queue calls before mark, mirroring backward-rewind path at `tag.c:4010-4036` |
+| `_remove_parent_mc` lookup uses root parent for sprite-internal removals | `tag.c:5172-5174` | Use `g_current_context` as parent hint, AND prevent OLD MC's premature finalization |
+| Cached sprite-internal MC's `dynamic_props` is NULL at deferred-UNLOAD fire time | upstream of `aq_dispatch_clip_action` | Investigate `actionInvalidateCachedMovieClip` callers during sprite frame transitions |
+
 
 ## Problem statement
 
