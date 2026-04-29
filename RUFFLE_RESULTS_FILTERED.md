@@ -3,9 +3,9 @@
 *Tests on the [ignored list](ruffle-tests/ignored_tests.txt) are excluded.*  
 *See [RUFFLE_RESULTS.md](RUFFLE_RESULTS.md) for unfiltered results.*
 
-**Commit:** `c3c00fa49c52`  
-**Date:** 2026-04-28 21:42 UTC  
-**Total duration:** 6m52s
+**Commit:** `ba7ade354b50`  
+**Date:** 2026-04-29 01:13 UTC  
+**Total duration:** 5m53s
 
 ## Results by Suite
 
@@ -85,30 +85,30 @@ Tests verified against Flash's actual output (`output.flash.txt`).
 
 - **Pass:** 596/600 (99.3%)
 - **Ignored:** 41 tests
-- **Duration:** 3m23s across 30 shards
+- **Duration:** 3m30s across 30 shards
 - **Lines:** 94,915/95,093 matching (99.8%)
-- **Avg test duration:** 0.2s — slowest: `xml_reparenting` (15.8s)
+- **Avg test duration:** 0.3s — slowest: `edittext_newline_stripping` (6.3s)
 
 ### from_gnash/actionscript.all
 
 - **Pass:** 113/190 (59.5%)
-- **Duration:** 1m10s across 30 shards
+- **Duration:** 58s across 30 shards
 - **Lines:** 14,763/16,957 matching (87.1%)
-- **Avg test duration:** 0.3s — slowest: `toString_valueOf-v7` (4.9s)
+- **Avg test duration:** 0.2s — slowest: `BitmapData-v8` (0.4s)
 
 ### from_gnash/misc-ming.all
 
 - **Pass:** 53/102 (52.0%)
-- **Duration:** 1m18s across 30 shards
+- **Duration:** 37s across 30 shards
 - **Lines:** 2,683/4,541 matching (59.1%)
-- **Avg test duration:** 0.7s — slowest: `static_vs_dynamic2` (15.7s)
+- **Avg test duration:** 0.3s — slowest: `matrix_test` (4.2s)
 
 ### from_gnash/misc-mtasc.all
 
 - **Pass:** 7/9 (77.8%)
 - **Duration:** 2s across 30 shards
 - **Lines:** 211/231 matching (91.3%)
-- **Avg test duration:** 0.2s — slowest: `levels` (0.2s)
+- **Avg test duration:** 0.2s — slowest: `levels` (0.3s)
 
 ### from_gnash/misc-swfc.all
 
@@ -120,21 +120,21 @@ Tests verified against Flash's actual output (`output.flash.txt`).
 ### from_gnash/misc-swfmill.all
 
 - **Pass:** 15/18 (83.3%)
-- **Duration:** 4s across 30 shards
+- **Duration:** 5s across 30 shards
 - **Lines:** 48/51 matching (94.1%)
-- **Avg test duration:** 0.1s — slowest: `afunc_dict` (0.2s)
+- **Avg test duration:** 0.2s — slowest: `trace-as2/shortstack` (0.4s)
 
 ### from_shumway
 
 - **Pass:** 64/92 (69.6%)
-- **Duration:** 39s across 30 shards
+- **Duration:** 25s across 30 shards
 - **Lines:** 663/1,276 matching (52.0%)
-- **Avg test duration:** 0.4s — slowest: `timeline/timeline_as2_3` (14.4s)
+- **Avg test duration:** 0.2s — slowest: `timeline/timeline_as2_5` (0.5s)
 
 ### from_shumway/avm1
 
 - **Pass:** 45/45 (100%)
 - **Ignored:** 2 tests
-- **Duration:** 11s across 30 shards
+- **Duration:** 12s across 30 shards
 - **Lines:** 480/480 matching (100%)
-- **Avg test duration:** 0.2s — slowest: `xml/xmlstring` (1.0s)
+- **Avg test duration:** 0.2s — slowest: `depth` (0.3s)
