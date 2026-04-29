@@ -3,9 +3,9 @@
 *Tests on the [ignored list](ruffle-tests/ignored_tests.txt) are excluded.*  
 *See [RUFFLE_RESULTS.md](RUFFLE_RESULTS.md) for unfiltered results.*
 
-**Commit:** `b4f29e734582`  
-**Date:** 2026-04-29 04:15 UTC  
-**Total duration:** 7m35s
+**Commit:** `35a60f362db8`  
+**Date:** 2026-04-29 17:26 UTC  
+**Total duration:** 4m54s
 
 ## Results by Suite
 
@@ -85,23 +85,23 @@ Tests verified against Flash's actual output (`output.flash.txt`).
 
 - **Pass:** 596/600 (99.3%)
 - **Ignored:** 41 tests
-- **Duration:** 3m37s across 30 shards
+- **Duration:** 2m37s across 30 shards
 - **Lines:** 94,915/95,093 matching (99.8%)
-- **Avg test duration:** 0.3s — slowest: `placeobject_occupied_depth` (14.8s)
+- **Avg test duration:** 0.2s — slowest: `edittext_newline_stripping` (6.2s)
 
 ### from_gnash/actionscript.all
 
 - **Pass:** 113/190 (59.5%)
-- **Duration:** 1m04s across 30 shards
+- **Duration:** 57s across 30 shards
 - **Lines:** 14,763/16,957 matching (87.1%)
-- **Avg test duration:** 0.3s — slowest: `TextFormat-v5` (4.2s)
+- **Avg test duration:** 0.2s — slowest: `Global-v7` (1.3s)
 
 ### from_gnash/misc-ming.all
 
 - **Pass:** 53/102 (52.0%)
-- **Duration:** 1m26s across 30 shards
+- **Duration:** 35s across 30 shards
 - **Lines:** 2,683/4,541 matching (59.1%)
-- **Avg test duration:** 0.8s — slowest: `masks_test` (24.2s)
+- **Avg test duration:** 0.3s — slowest: `matrix_test` (4.4s)
 
 ### from_gnash/misc-mtasc.all
 
@@ -122,19 +122,19 @@ Tests verified against Flash's actual output (`output.flash.txt`).
 - **Pass:** 15/18 (83.3%)
 - **Duration:** 4s across 30 shards
 - **Lines:** 48/51 matching (94.1%)
-- **Avg test duration:** 0.2s — slowest: `tags_after_last_showframe` (0.2s)
+- **Avg test duration:** 0.2s — slowest: `func_dict` (0.6s)
 
 ### from_shumway
 
 - **Pass:** 64/92 (69.6%)
-- **Duration:** 1m06s across 30 shards
+- **Duration:** 24s across 30 shards
 - **Lines:** 663/1,276 matching (52.0%)
-- **Avg test duration:** 0.7s — slowest: `fuzz/5d828b99311b51073db245c0c3468e9f12d9cc8226ecbf00916cb725c02528cd` (15.8s)
+- **Avg test duration:** 0.2s — slowest: `avm1/loadvariables/loadvariables` (0.7s)
 
 ### from_shumway/avm1
 
 - **Pass:** 45/45 (100%)
 - **Ignored:** 2 tests
-- **Duration:** 11s across 30 shards
+- **Duration:** 10s across 30 shards
 - **Lines:** 480/480 matching (100%)
-- **Avg test duration:** 0.2s — slowest: `target` (0.7s)
+- **Avg test duration:** 0.2s — slowest: `depth` (0.3s)

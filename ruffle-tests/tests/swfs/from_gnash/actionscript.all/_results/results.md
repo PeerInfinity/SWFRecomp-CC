@@ -1,10 +1,10 @@
 # Ruffle Test Results (Unfiltered)
 
-**Date**: 2026-04-29 04:15 UTC
+**Date**: 2026-04-29 17:26 UTC
 
-**Git SHA**: `b4f29e7345`
+**Git SHA**: `35a60f362d`
 
-**Run Duration**: 1m 4s
+**Run Duration**: 0m 57s
 
 ## Summary
 
@@ -44,8 +44,8 @@
 | 11 | `Boolean-v7` | 38 | 0.2s |  |
 | 12 | `Boolean-v8` | 38 | 0.2s |  |
 | 13 | `Camera-v5` | 7 | 0.2s |  |
-| 14 | `Color-v5` | 140 | 0.6s |  |
-| 15 | `Color-v6` | 171 | 0.4s |  |
+| 14 | `Color-v5` | 140 | 0.2s |  |
+| 15 | `Color-v6` | 171 | 0.2s |  |
 | 16 | `Color-v7` | 161 | 0.2s |  |
 | 17 | `Color-v8` | 161 | 0.2s |  |
 | 18 | `ColorTransform-v5` | 7 | 0.2s |  |
@@ -88,8 +88,8 @@
 | 55 | `Point-v6` | 7 | 0.2s |  |
 | 56 | `Point-v7` | 7 | 0.2s |  |
 | 57 | `Point-v8` | 193 | 0.2s |  |
-| 58 | `Random-v5` | 30 | 0.3s |  |
-| 59 | `Random-v6` | 30 | 0.3s |  |
+| 58 | `Random-v5` | 30 | 0.2s |  |
+| 59 | `Random-v6` | 30 | 0.2s |  |
 | 60 | `Random-v7` | 30 | 0.2s |  |
 | 61 | `Random-v8` | 30 | 0.2s |  |
 | 62 | `Rectangle-v5` | 7 | 0.2s |  |
@@ -101,18 +101,18 @@
 | 68 | `System-v6` | 100 | 0.2s |  |
 | 69 | `System-v7` | 101 | 0.2s |  |
 | 70 | `System-v8` | 101 | 0.2s |  |
-| 71 | `TextFieldHTML-v5` | 6 | 1.4s |  |
-| 72 | `TextFieldHTML-v6` | 37 | 1.9s |  |
-| 73 | `TextFieldHTML-v7` | 37 | 1.6s |  |
-| 74 | `TextFieldHTML-v8` | 37 | 1.3s |  |
-| 75 | `TextFormat-v5` | 128 | 4.2s |  |
-| 76 | `TextFormat-v6` | 128 | 0.5s |  |
+| 71 | `TextFieldHTML-v5` | 6 | 0.2s |  |
+| 72 | `TextFieldHTML-v6` | 37 | 0.2s |  |
+| 73 | `TextFieldHTML-v7` | 37 | 0.2s |  |
+| 74 | `TextFieldHTML-v8` | 37 | 0.2s |  |
+| 75 | `TextFormat-v5` | 128 | 0.2s |  |
+| 76 | `TextFormat-v6` | 128 | 0.2s |  |
 | 77 | `TextSnapshot-v5` | 7 | 0.2s |  |
 | 78 | `TextSnapshot-v6` | 173 | 0.2s |  |
 | 79 | `TextSnapshot-v7` | 173 | 0.2s |  |
 | 80 | `TextSnapshot-v8` | 173 | 0.2s |  |
 | 81 | `Transform-v5` | 7 | 0.2s |  |
-| 82 | `Transform-v6` | 7 | 0.3s |  |
+| 82 | `Transform-v6` | 7 | 0.2s |  |
 | 83 | `Transform-v7` | 7 | 0.2s |  |
 | 84 | `Try-v5` | 20 | 0.2s |  |
 | 85 | `Try-v6` | 20 | 0.2s |  |
@@ -151,15 +151,15 @@
 
 | # | Test | Our diffs | Ruffle diffs | Duration | Notes |
 |---|------|-----------|--------------|----------|-------|
-| 1 | `ASnative-v5` | 35 | 35 | 0.3s |  |
+| 1 | `ASnative-v5` | 35 | 35 | 0.2s |  |
 | 2 | `ASnative-v6` | 40 | 40 | 0.2s |  |
 | 3 | `ASnative-v7` | 40 | 40 | 0.2s |  |
 | 4 | `ASnative-v8` | 40 | 40 | 0.2s |  |
 | 5 | `BitmapData-v8` | 8 | 13 | 0.4s |  |
 | 6 | `Camera-v6` | 57 | 57 | 0.2s |  |
 | 7 | `Camera-v7` | 57 | 57 | 0.2s |  |
-| 8 | `Camera-v8` | 57 | 57 | 0.5s |  |
-| 9 | `ExternalInterface-v8` | 4 | 4 | 0.2s |  |
+| 8 | `Camera-v8` | 57 | 57 | 0.2s |  |
+| 9 | `ExternalInterface-v8` | 4 | 4 | 0.9s |  |
 | 10 | `Inheritance-v5` | 1 | 17 | 0.2s |  |
 | 11 | `Inheritance-v6` | 9 | 16 | 0.2s |  |
 | 12 | `Inheritance-v7` | 5 | 10 | 0.2s |  |
@@ -167,10 +167,10 @@
 | 14 | `LoadVars-v6` | 6 | 21 | 0.2s |  |
 | 15 | `LoadVars-v7` | 6 | 21 | 0.2s |  |
 | 16 | `LoadVars-v8` | 6 | 21 | 0.2s |  |
-| 17 | `Math-v5` | 5 | 5 | 0.3s |  |
-| 18 | `Math-v6` | 5 | 5 | 0.3s |  |
+| 17 | `Math-v5` | 5 | 5 | 0.2s |  |
+| 18 | `Math-v6` | 5 | 5 | 0.2s |  |
 | 19 | `Math-v7` | 5 | 5 | 0.2s |  |
-| 20 | `Math-v8` | 5 | 5 | 0.3s |  |
+| 20 | `Math-v8` | 5 | 5 | 0.2s |  |
 | 21 | `Matrix-v6` | 29 | 71 | 0.2s |  |
 | 22 | `Matrix-v7` | 28 | 70 | 0.2s |  |
 | 23 | `Matrix-v8` | 28 | 70 | 0.2s |  |
@@ -183,13 +183,13 @@
 | 30 | `Selection-v6` | 7 | 13 | 0.2s |  |
 | 31 | `Selection-v7` | 7 | 13 | 0.2s |  |
 | 32 | `Selection-v8` | 7 | 13 | 0.2s |  |
-| 33 | `Sound-v5` | 27 | 27 | 0.3s |  |
-| 34 | `Sound-v6` | 30 | 51 | 0.3s |  |
-| 35 | `Sound-v7` | 28 | 51 | 0.4s |  |
-| 36 | `Sound-v8` | 28 | 51 | 0.4s |  |
-| 37 | `String-v5` | 19 | 21 | 0.3s |  |
-| 38 | `String-v6` | 10 | 10 | 0.3s |  |
-| 39 | `String-v7` | 10 | 10 | 0.3s |  |
+| 33 | `Sound-v5` | 27 | 27 | 0.4s |  |
+| 34 | `Sound-v6` | 30 | 51 | 0.4s |  |
+| 35 | `Sound-v7` | 28 | 51 | 0.3s |  |
+| 36 | `Sound-v8` | 28 | 51 | 0.3s |  |
+| 37 | `String-v5` | 19 | 21 | 0.2s |  |
+| 38 | `String-v6` | 10 | 10 | 0.2s |  |
+| 39 | `String-v7` | 10 | 10 | 0.2s |  |
 | 40 | `String-v8` | 10 | 10 | 0.3s |  |
 | 41 | `TextField-v5` | 3 | 3 | 0.2s |  |
 | 42 | `case-v7` | 54 | 54 | 0.2s |  |
