@@ -562,8 +562,10 @@ static void process_sprite_init_at_depth(SWFAppContext* app_context, MovieClip* 
 				extern const char* ng_lookupExportName(size_t char_id);
 				extern void actionInvokeRegisteredClassConstructor(SWFAppContext* app_context, const char* export_name, MovieClip* mc);
 				const char* _rc_export = ng_lookupExportName(obj->char_id);
-				if (!obj->constructor_invoked && _rc_export != NULL && child_mc != NULL)
+				if (!obj->constructor_invoked && _rc_export != NULL && child_mc != NULL) {
 					actionInvokeRegisteredClassConstructor(app_context, _rc_export, child_mc);
+					obj->constructor_invoked = 1;
+				}
 				// Queue AS-level onLoad for timeline-placed RegisterClass sprites.
 				// onLoad (prototype method) fires after constructor + process_sprite_needs_init
 				// completes, dispatched from tagShowFrame via actionFlushPendingOnLoads.

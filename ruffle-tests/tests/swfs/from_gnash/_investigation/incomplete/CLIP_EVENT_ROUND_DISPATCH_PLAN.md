@@ -4,29 +4,29 @@
 
 <!-- PLAN_META
 id: CLIP_EVENT_ROUND_DISPATCH
-status: pending
+status: blocked
 phases:
   - id: 1
     name: "Audit drain sites; identify per-placement vs. frame-level"
     status: completed
   - id: 5
     name: "Pre-fix synchronous REGISTER_CTOR re-fire (process_sprite_init_at_depth)"
-    status: pending
+    status: completed
   - id: 6
     name: "Pre-fix CLIP_INIT/CONSTRUCT chronological-fire gate (aq_drain)"
-    status: pending
+    status: blocked
   - id: 2
     name: "Remove per-placement drain in tagPlaceObject2-family"
-    status: pending
+    status: blocked
   - id: 3
     name: "Add frame-level priority drain helper (actionDrainAllInPriorityOrder)"
-    status: pending
+    status: blocked
   - id: 4
     name: "Recompiler emission update (3 sites in swf.cpp)"
-    status: pending
+    status: blocked
   - id: 8
     name: "Regression battery"
-    status: pending
+    status: blocked
 dependencies: []
 parent_plan: "complete/DEFERRED_CLIP_UNLOAD_PLAN.md (§1)"
 -->
@@ -61,6 +61,17 @@ pub fn pop_action(&mut self) -> Option<QueuedAction<'gc>> {
   lines on 4 misc-ming tests** — biggest hit was
   `register_class/RegisterClassTest4` 17/42 → 2/42. Reverted in
   d52c4d75.
+- **2026-04-28 follow-up session**: Phase 5 landed standalone (verified
+  9/9 AVM1 lifecycle battery + register_class 4/4 baselines unchanged).
+  Phase 6 attempted standalone but breaks
+  `register_class/RegisterClassTest3` (12/12 PASS → 9/12 mismatch) — the
+  goto_commands aggregation case (mc2 placed-and-removed in same goto
+  sweep should NOT fire CLIP_INIT, but Phase 6's gate change drops the
+  filter that was implementing this aggregation in our code). The
+  earlier "Both fixes verified locally" claim must have used a different
+  baseline — Phase 6 is fundamentally incompatible with our current
+  goto-aggregation mechanism. See "Phase 6 blocker" below for next
+  steps. Phases 2-4 remain blocked on Phase 6.
 - **Investigation (2026-04-28)**: traced both regression mechanisms with
   AQ/QRC/DRC/INIT/CTOR/TRACE printf instrumentation in `aq_drain`,
   `aq_dispatch_clip_init`, `aq_dispatch_clip_construct`,
@@ -268,6 +279,57 @@ Verify in isolation: AVM1 `clip_events`, `bad_placeobject_clipaction`,
 gnash misc-ming `loop/loop_test10`, `action_order/ActionOrderTest3`,
 `action_order/action_execution_order_test5/6`. All should remain green
 or unchanged. Phase 5 + Phase 6 are independent — either order works.
+
+### Phase 6 blocker (2026-04-28)
+
+The plan claimed Phase 6 was a "standalone safe fix" with no observable
+effect under the current per-placement-drain behavior. Local verification
+disproves this: Phase 6 breaks `register_class/RegisterClassTest3`
+(12/12 PASS → 9/12 mismatch).
+
+The test pattern: gotoAndStop(3) from frame 1 visits frame 2 (which
+places mc2 with INIT clipaction + REGISTER_CTOR) then frame 3 (which
+removes mc2). Flash's goto_commands aggregation cancels this place
++remove pair so neither INIT nor CTOR fires. In our runtime, the
+catch-up replays each frame's tags individually: tagPlaceObject2 queues
+CLIP_INIT for mc2, then RemoveObject2 marks mc2 with `avm1_removed=1`
+(via `actionInvalidateCachedMovieClip`). At drain time, the existing
+`!entry.is_unload && entry.clip->avm1_removed` skip filter is what
+*implements* the goto-aggregation cancellation in our model.
+
+Phase 6 removes that filter for CLIP_INIT/CONSTRUCT entries — so mc2's
+CLIP_INIT now fires during catch-up, producing a stray `onInitialize`
+trace and an off-by-one `i++` increment that breaks subsequent
+`check_equals i == 0` and `check_equals i == 1` assertions.
+
+**The conflict:** Phase 6's intent (loop_test10's re-placement after
+unload should fire INIT chronologically) and the goto-aggregation case
+(RegisterClassTest3's place+remove in same goto should NOT fire INIT)
+both arrive at the queue with `entry.clip->avm1_removed == 1`. The
+existing skip filter conflates them.
+
+**Possible discriminators (future work):**
+
+1. **Stamp `placed_at_frame` on the queue entry at queue time.** At
+   drain time, compare with `display_list[depth].placed_at_frame`. If
+   the slot was re-placed (newer `placed_at_frame`), fire (it's a fresh
+   placement). If `display_list[depth].char_id == 0` (slot cleared
+   entirely by RemoveObject2), skip (goto-aggregation OR natural unload
+   without re-place). Requires adding a `placed_at_frame` (and a
+   `depth`) field to `ActionQueueEntry`.
+2. **Stamp queue-time `catch_up_mode` on the entry.** Apply the
+   existing skip filter only to entries queued during catch-up
+   (goto-aggregation candidates); apply chronological-fire only to
+   entries queued during natural play. Smaller change but doesn't
+   handle the case of a clip placed normally and then unloaded inside
+   the same drain window via natural-play tags.
+3. **Pre-aggregate goto commands in our catch-up driver** the way
+   Ruffle's `run_goto` does — compute survivors *before* replaying tags,
+   so non-survivor placements never get queued. Largest scope; reuses
+   the existing skip filter for the natural-play unload case only.
+
+Approach 1 is the smallest behavior-equivalent change. Approach 3 is
+architecturally closer to Ruffle. Either unblocks Phases 2-4.
 
 ### Phase 2 — Remove per-placement drain — UNCHANGED
 
