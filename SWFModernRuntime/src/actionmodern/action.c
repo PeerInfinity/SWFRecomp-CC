@@ -23062,12 +23062,16 @@ ActionStackValueType convertFloat(SWFAppContext* app_context)
 			//   arrays with Array.prototype.valueOf = Object.prototype.valueOf
 			//   return `this` from valueOf, hit the Object→NaN branch, and
 			//   `1/array` becomes NaN — gnash toString_valueOf-v5 line 469).
-			// SWF<6: non-array objects/functions still convert to 0.0
-			//   (prior CURRENT_STATUS.md "SWF6+ NaN threshold" change keeps
-			//   Color-v5, etc. green; tightening to <5 risks regressions).
+			// SWF5+ plain Objects: NaN (matches Ruffle's primitive_as_number
+			//   Object→0 gate at swf_version<5, Number-v5 lines 84/177:
+			//   `0+(new Object())` and `ToNumber(new Object())` should be NaN).
+			// SWF<6 Functions: still convert to 0.0 (Flash quirk — `2+Number`
+			//   in SWF5 is 2, not NaN; Number-v5 line 87).
 			// SWF6+: objects convert to NaN
 			double temp;
 			if (g_swf_version < 6 && STACK_TOP_TYPE == ACTION_STACK_VALUE_ARRAY)
+				temp = NAN;
+			else if (g_swf_version >= 5 && STACK_TOP_TYPE == ACTION_STACK_VALUE_OBJECT)
 				temp = NAN;
 			else
 				temp = (g_swf_version < 6) ? 0.0 : NAN;

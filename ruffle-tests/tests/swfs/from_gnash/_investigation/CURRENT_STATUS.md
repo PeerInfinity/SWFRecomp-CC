@@ -1,6 +1,6 @@
 # Gnash Test Suite Status
 
-Last updated: 2026-04-24 (CI snapshot at 205a9a77 includes all recent fixes through ResolveEventsTest / event_handler_scope_test / Selection-vN / LoadVars-vN / loop_test2/3/4/5/9 / static_vs_dynamic1/2 / displaylist_depths_test11 / DefineEditTextVariableNameTest2 / movieclip_destruction_test2 (52/56) / loop_test8 (37/38) / new_child_in_unload_test / instanceNameTest / attachMovieTest / shape_test / get_frame_number_test / place_and_remove_object_test / DefineEditTextTest / timeline_var_test / reverse_execute_PlaceObject2_test1/2 / action_execution_order_test8-v5/v6 / stackscope / submoviegetvar / edittext_test1.)
+Last updated: 2026-04-29 (CI snapshot at 205a9a77 includes all recent fixes through ResolveEventsTest / event_handler_scope_test / Selection-vN / LoadVars-vN / loop_test2/3/4/5/9 / static_vs_dynamic1/2 / displaylist_depths_test11 / DefineEditTextVariableNameTest2 / movieclip_destruction_test2 (52/56) / loop_test8 (37/38) / new_child_in_unload_test / instanceNameTest / attachMovieTest / shape_test / get_frame_number_test / place_and_remove_object_test / DefineEditTextTest / timeline_var_test / reverse_execute_PlaceObject2_test1/2 / action_execution_order_test8-v5/v6 / stackscope / submoviegetvar / edittext_test1.)
 
 ### CI snapshot (commit 205a9a77, run 2026-04-25)
 
@@ -12,7 +12,26 @@ Last updated: 2026-04-24 (CI snapshot at 205a9a77 includes all recent fixes thro
 | misc-swfc.all | 8 | 16 | 50.0% |
 | misc-swfmill.all | 16 | 18 | 88.9% |
 
-### Latest fixes (2026-04-25, pending CI)
+### Latest fixes (2026-04-29, pending CI)
+
+- **Number-v5 (actionscript.all) → ruffle_matched (+1 effective).** `convertFloat`
+  in `SWFModernRuntime/src/actionmodern/action.c` now coerces plain OBJECTs to
+  NaN in SWF5+ when the valueOf-fallback is hit (i.e., `Object.prototype.valueOf`
+  returned `this`), matching Ruffle's `primitive_as_number` gate
+  (`core/src/avm1/value.rs:157` — `Value::Object(_) if swf_version() < 5 => 0.0`,
+  otherwise NaN). FUNCTION receivers still fall through to the SWF<6 → 0.0 path
+  to preserve the Flash quirk that `2 + Number` is `2`, not NaN (Number.as:231,
+  PASSED in Flash, FAILED in Ruffle — we keep matching Flash here while Ruffle
+  diverges). Net effect on Number-v5: the two `0+(new Object())` /
+  `ToNumber(new Object())` lines (84/177 — gnash test source Number.as:225/442)
+  now match Flash, and the remaining 6 functional diffs (Number.prototype/valueOf/
+  toString/__proto__ visibility in SWF5) are all in Ruffle's diff set, so the
+  test promotes to `ruffle_matched` via subset-of-Ruffle. No regressions on a
+  17-test gnash primitives battery (Boolean-v5/v6, Color-v5/v6/v7/v8,
+  Inheritance-v5/v6, Number-v5/v6/v7/v8, array-v5, toString_valueOf-v5/v6/v7/v8 —
+  4 PASS unchanged + 7 ruffle_matched + Number-v5 newly ruffle_matched).
+
+### Earlier fixes (2026-04-25, pending CI)
 
 - **loop_test8 (misc-ming) → PASS (+1, 37/38 → 38/38).** Two-part fix for
   the trailing `_level0.mc5unloaded` trace:
