@@ -21,7 +21,40 @@ blockers:
 
 Covers **misc-ming.all** and **misc-swfc.all**. Both suites use the inlined-Dejagnu harness described in `complete/DEJAGNU_FRAMEWORK_PLAN.md`.
 
-Status (CI at 205a9a77 — 2026-04-25 run): **misc-ming.all 52/102 effective (51.0%); misc-swfc.all 8/16 effective (50.0%). Phase 1 substantially complete — all the listed near-passing tests have landed. Phase 2 partially complete; remaining items are documented blockers (deferred CLIP_EVENT_UNLOAD, CloneSprite depth-bias unification, tagImportCharacter dictionary, mouse/key input drivers) or multi-issue tests that need fresh investigation. Phase 3 (zero-output) still blocked.**
+Status (CI at f7f8fbe6 — 2026-04-29 run): **misc-ming.all 67/102 effective (65.7%); misc-swfc.all 8/16 effective (50.0%).** Phase 1 substantially complete — all the listed near-passing tests have landed. Phase 2 partially complete; remaining items are documented blockers (deferred CLIP_EVENT_UNLOAD, CloneSprite depth-bias unification, tagImportCharacter dictionary, mouse/key input drivers) or multi-issue tests that need fresh investigation. Phase 3 (zero-output) still blocked.
+
+### Latest fix (2026-04-29, pending CI)
+
+- **timeline_var_test (misc-ming) → PASS (+1, 54.5% → 100%).** Added a
+  tick-boundary clear of `g_defer_sprite_init` in
+  `SWFModernRuntime/src/libswf/swf_core.c` (right after the per-tick
+  edge-flag reset, before `actionFinalizePendingRemovals`).
+  `ng_executeGotoCatchUp` intentionally leaves the flag set (its
+  in-function comment: "Do NOT restore g_defer_sprite_init here — keep
+  it set so that the calling frame's tagShowFrame ... also defers
+  sprite init"). The sprite-init-context call sites at action.c
+  24758/25250/55081/55122/55160 already clear the flag inline so the
+  next tick starts clean, but the regular-frame-script call sites
+  (`actionGotoFrame` opcode 0x81 at 25323; label goto at 25414) had no
+  inline clear — a leak from `gotoAndPlay`/`gotoAndStop` in a frame
+  DoAction persisted into subsequent ticks, suppressing
+  `process_sprite_needs_init` for sprites placed in those later frames
+  (`sprite_initialized` stayed at 0 → onEnterFrame clip-actions never
+  dispatched). The tick-boundary clear is the safer point: it lets the
+  calling frame's own tagShowFrame keep deferring (the flag's intended
+  scope per Phase F's `ng_run_deferred_sprite_init_*` orchestration)
+  while preventing leakage into the next tick. An earlier draft cleared
+  the flag inline at action.c:25323/25414 but regressed loop_test3 /
+  loop_test9 — within the calling tick, the flag is load-bearing for
+  catch-up sprite-init ordering. timeline_var_test exhibits the leak:
+  frame 4's `gotoAndPlay(2)` loops back through frames 2-3, then on
+  frame 5 mc1 is placed with an ENTERFRAME clip-action; without the
+  clear, frame 5's tagShowFrame skipped mc1's init, so the expected
+  'onEnterFrame' trace and 'setTarget' array push went missing.
+  Verified locally with caches cleared: 24-test AVM1 lifecycle/goto
+  battery (24/24), 18-test misc-ming recently-fixed battery (18/18),
+  6-test misc-swfc spot-check (6/6 effective), plus the 5 sibling
+  loop_test{2,3,4,5,9} cases.
 
 ## Remaining failures by category (CI 205a9a77, 2026-04-25)
 

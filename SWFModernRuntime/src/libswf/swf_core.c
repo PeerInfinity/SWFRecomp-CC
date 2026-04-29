@@ -919,6 +919,19 @@ void swfStart(SWFAppContext* app_context)
 		app_context->mouse.released = 0;
 		app_context->keys.last_key_down = -1;
 
+		// Clear g_defer_sprite_init at tick boundary. ng_executeGotoCatchUp
+		// intentionally leaves it set so the calling frame's tagShowFrame
+		// continues to defer sprite init for the rest of THAT tick. Without
+		// a tick-boundary clear, a leak from a regular-frame-script
+		// gotoAndPlay/gotoAndStop persists into subsequent frames, where it
+		// suppresses process_sprite_needs_init for newly-placed sprites
+		// (sprite_initialized stays 0 → onEnterFrame clip-actions never
+		// dispatch). The sprite-init context call sites at action.c
+		// 24758/25250/55081/55122/55160 already clear it inline; this
+		// covers the regular-frame-script gotos that exit the action
+		// handler with the flag still set. Key test: misc-ming/timeline_var_test.
+		{ extern int g_defer_sprite_init; g_defer_sprite_init = 0; }
+
 		// Finalize MCs that were marked for pending removal in the previous frame.
 		// They persisted for one frame (scripts could still access them); now invalidate.
 		actionFinalizePendingRemovals(app_context);
