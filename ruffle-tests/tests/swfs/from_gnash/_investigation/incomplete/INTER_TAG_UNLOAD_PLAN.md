@@ -26,6 +26,116 @@ dependencies:
 parent_plan: "complete/DEFERRED_CLIP_UNLOAD_PLAN.md (§3)"
 -->
 
+## Status (2026-04-29, post `run_pending_finalize` cross-context attempt)
+
+- **Attempted: gate `run_pending_finalize`'s `clear_display_entry` call
+  on slot-name == MC-name match. Reverted (no commit).**
+  Diagnosis was correct but the resulting trade-off was the same family
+  as Approach A — net regression on the matching-line metric.
+
+  The actual reset site for mc3's `sprite_current_frame` (the user's
+  open question this session) is **not** in `advance_sprite_frames` or
+  the eager-init re-run paths the plan listed as candidates. Instead:
+
+  1. Instrumented every `sprite_current_frame` write in `tag.c`, plus
+     `tagPlaceObject2`'s entry state, plus `ng_display_clear_after` /
+     `ng_display_cleanup_unplaced_after`. Output to `/tmp/mc_frame.log`.
+  2. The log showed mc3 hits `tagPlaceObject2` line 4212 (FRESH
+     placement path) on every gotoAndPlay(2) iteration with
+     `existing_char=0 existing_dl=(nil) existing_name=(null)` — i.e.,
+     mc3's slot was already wiped by the time the catch-up replay
+     reached `tagPlaceObject2`. But `existing_paf=1 existing_pg=N`
+     (placed_at_frame and place_gen survive). That field-preservation
+     pattern uniquely matches `clear_display_entry` (in tag.c around
+     line 4995) — it zeros char_id / instance_name / sprite_display_list
+     but doesn't touch placed_at_frame / place_gen.
+  3. Tracing `clear_display_entry` callers: it's invoked by
+     `run_pending_finalize` (tag.c:4977) for every queued
+     `PendingFinalizeEntry`. The queue is populated by sprite-internal
+     `tagRemoveObject2` calls (tag.c:5320) with the **current
+     display_list's `depth`** stored as a plain `size_t`.
+  4. When `sprite_2_frame_1` (inside mc3) calls `tagRemoveObject2(1)`,
+     `display_list` is mc3's `sprite_display_list`, and `depth=1`
+     refers to mc3's "Segments" slot. `queue_pending_finalize_mc(_ro2_mc,
+     1, 1)` queues that depth.
+  5. Later, when `actionDrainOnloadAndScript` finishes draining unload
+     entries, `run_pending_finalize` fires (`action_queue.c:286`).
+     `display_list` is now ROOT. The queued `e->depth=1` is interpreted
+     as **root depth 1** — which is mc3 itself. `clear_display_entry`
+     wipes mc3's slot, frees mc3's `sprite_display_list` (containing
+     mc1!), and orphans the children. That is why mc3 had to be
+     freshly re-placed every iteration (and why eager-init's
+     `(1 % count) = 1` write reset `sprite_current_frame` to 1 each
+     time).
+
+- **Attempted fix and outcome.** Gated the `clear_display_entry` in
+  `run_pending_finalize` with a name-match check:
+  ```c
+  if (e->depth <= max_depth
+      && e->mc != NULL
+      && e->mc->name[0] != '\0'
+      && display_list[e->depth].instance_name != NULL
+      && strcmp(display_list[e->depth].instance_name, e->mc->name) == 0)
+  {
+      clear_display_entry(app_context, e->depth);
+  }
+  ```
+  Result (matching-line metric, local baseline; CI numbers may differ
+  but trend is the same):
+  - Test3: 7 → 8 (+1)
+  - Test4: 7 → 8 (+1)
+  - Test5: 8 → 9 (+1)
+  - loop_test6: 5 → 5 (0)
+  - **RegisterClassTest4: 22 → 9 (-13)**
+  - All AVM1 lifecycle (`unload`, `unload_clip_event`,
+    `unload_nested_child`, `clip_events`, `goto_rewind*`,
+    `goto_frame*`, `set_interval`, `bad_placeobject_clipaction`,
+    `button_order`, `issue_1104`, `movieclip_in_removed_button`,
+    `on_construct`, `register_and_init_order`) — all 100% PASS.
+  - misc-ming `loop_test2/4/5/8`,
+    `reverse_execute_PlaceObject2_test1/2` — all 100% PASS.
+
+  Net: -10 matching lines. Same trade family as Approach A (which was
+  -14 with 0 gain). Reverted under the user's standing instruction.
+
+- **Why the fix regresses RegisterClassTest4 internally.** Functionally
+  the test's own dejagnu count went **up** with the fix (11 → 15
+  PASSED of 16 internal checks). The verify_output `matching_lines`
+  metric is harsh on early misalignment: a single missing trace line
+  early in the output (here, a missing `dynamic load: 0`) shifts every
+  subsequent matched line into the "differs" bucket. So while the
+  diagnosis is right, the fix exposes a downstream gap (suppressing
+  the wrong-context clear leaves mc3's old "Segments" mc1 in place,
+  which then collides with the next iteration's `sprite_2_frame_0`
+  attempting to place mc2 at the same depth — `Warning: Failed to
+  place object at depth 1.` warnings appear in test wind-down). The
+  ordering-cascade of missing/extra trace lines (`dynamic load`,
+  `static unload: 0` vs. `static unload: undefined`,
+  `dynamic unload: N` vs. `N-1`) means the per-line diff dives even
+  while the dejagnu pass count rises.
+
+- **Path forward (next attempt).** The cross-context `run_pending_finalize`
+  bug is real and the fix direction is right, but it needs to be paired
+  with the original Phase 2 (silent-clear UNLOAD queueing): once mc3
+  is preserved across iterations, mc3's natural advance now reaches
+  `sprite_current_frame == 0` and the silent-clear branch fires for
+  real. Approach A's UNLOAD queueing must land at that newly-active
+  silent-clear site, **and** the dejagnu-pass-vs-matching-lines tension
+  on RegisterClassTest4 needs to be resolved (likely by also making
+  the `Bug ctor: N` / `dynamic load: N` / `static unload: N-1`
+  ordering match Flash's drain order at the silent-clear site, not
+  just queueing UNLOADs). Likely needs a careful look at Ruffle's
+  `MovieClip::run_goto` rewind path for the same test pattern to
+  understand the expected drain ordering.
+
+- **Architectural fix worth considering separately:**
+  `queue_pending_finalize_mc` should remember the display_list pointer
+  (or a parent-MC handle) at queue time, not just a bare `depth`.
+  Then `run_pending_finalize` can either swap to that context before
+  clearing, or skip the clear if the original context is gone. The
+  name-match heuristic worked for the bad case but was too coarse —
+  it suppresses clears that ought to happen in same-context cases too.
+
 ## Status (2026-04-28, post-Approach A attempt)
 
 - **Phase 2 Approach A — TRIED AND REVERTED (commit 4d97fa92).**
