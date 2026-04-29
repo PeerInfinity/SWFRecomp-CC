@@ -26,6 +26,88 @@ dependencies:
 parent_plan: "complete/DEFERRED_CLIP_UNLOAD_PLAN.md (§3)"
 -->
 
+## Status (2026-04-29, post architectural-fix attempt)
+
+- **Attempted: capture parent context in `PendingFinalizeEntry` and
+  re-derive the slot at drain time. Combined with Phase 2 Approach A
+  (silent-clear UNLOAD queueing) on top. Both reverted.**
+
+  The architectural fix added `DisplayObject* parent_slot` to
+  `PendingFinalizeEntry` (= `g_current_sprite_obj` at queue time).
+  `run_pending_finalize` resolved the slot via
+  `parent_slot->sprite_display_list[depth]` and validated by
+  `instance_name` match with `mc->name` before calling a refactored
+  `clear_display_entry_at(slot)`. This correctly clears the
+  sprite-internal slot rather than root depth=1.
+
+  **Local measurements (matching-line metric, no commit pushed):**
+
+  | Test | Baseline | Arch fix only | Arch + Phase 2 |
+  |------|----------|---------------|----------------|
+  | ActionOrderTest3 | 6/62 | **7/62 (+1)** | 7/62 (+1) |
+  | ActionOrderTest4 | 7/64 | **8/64 (+1)** | **9/64 (+2)** |
+  | ActionOrderTest5 | 8/51 | 8/51 (0) | 8/51 (0) |
+  | loop_test6 | 12/23 | 12/23 (0) | 12/23 (0) |
+  | RegisterClassTest4 | 17/42 | **6/42 (-11)** | **3/42 (-14)** |
+
+  Plan-target gain: +2 lines (arch only) or +3 (arch+phase2).
+  RegisterClassTest4 regression: -11 (arch only) or -14 (arch+phase2).
+  Net: -9 (arch only) or -11 (arch+phase2). Both worse than baseline.
+
+  **AVM1 lifecycle, sprite-loop, and reverse_execute batteries all PASS
+  100%** under both arch-only and arch+phase2 — the architectural fix
+  is correctness-preserving for those tests. No "Failed to place at
+  depth N" warnings appeared in those tests' output either.
+
+  **Why the architectural fix regresses RegisterClassTest4 (separate
+  issue from cross-context bug).** Without the fix, the cross-context
+  `run_pending_finalize` was wiping mc3's slot from root display_list
+  every iteration, so mc3 was destroyed and re-placed fresh each loop.
+  Each iteration's "Segments" cached MC was likewise fresh. With the
+  fix, mc3 is preserved (correct) → cached "Segments" MC under mc3 is
+  reused across iterations → NEW Bug ctor overwrites the OLD MC's
+  `c=N-1` with `c=N` before the OLD's deferred `onUnload` reads it →
+  `unload _level0.mc.Segments c: N` instead of expected `c: N-1`.
+
+  RCT4's expected output shows `Bug ctor: 1` then `unload c: 0` (OLD
+  unload sees OLD c=0 even though NEW ctor has set c=1 already). Flash
+  must distinguish OLD and NEW MCs. Our impl uses one cached MC per
+  (name, parent) pair — when the architectural fix exposes this
+  caching divergence, RCT4's UNLOAD c values shift from N-1 → N and
+  many "FAILED:" lines cascade.
+
+  Phase 2 (silent-clear UNLOAD queueing in `advance_sprite_frames`)
+  doesn't help RCT4 because RCT4's mc3 is gotoAndPlay'd from root, not
+  naturally looped — the silent-clear fires for mc3's children but the
+  cached MC reuse problem is upstream of the UNLOAD timing.
+
+- **Path forward.** Per user instruction: "If RegisterClassTest4
+  regresses with no plan-target gain in matching-lines, revert and
+  stop — that's the third repetition of the same trade and the answer
+  is somewhere else." Plan-target gain exists (+2/+3), but the trade
+  family is the same: every fix that suppresses or redirects the
+  cross-context clear breaks RCT4's cached-MC `c` values.
+
+  Real path forward = decouple the OLD-mc-instance-during-UNLOAD from
+  the NEW-mc-placement so they don't share the same cached
+  `MovieClip*`. Possibilities:
+  1. Set `mc->pending_finalize=1` (NEW field) at
+     `queue_pending_finalize_mc`, and have `findOrCreateMovieClip`
+     skip pending_finalize MCs when called from a placement path
+     (analogous to existing `g_skip_pending_removal_mc` gate). NEW
+     placement at same name+depth gets a FRESH MC; OLD's queued
+     `onUnload` still finds the OLD MC by depth shift.
+  2. Snapshot the unload-relevant `dynamic_props` at
+     `actionFireOnUnload` queue time so the deferred handler reads
+     captured state instead of the live MC's.
+  3. Revisit whether `tagRemoveObject2`'s `_remove_parent_mc` lookup
+     should use `g_current_context` (the actual sprite parent) instead
+     of `&root_movieclip` — possibly fixes cross-context indirectly.
+
+  Option 1 is the smallest, most targeted change. Try that next
+  session, paired with the architectural fix from this attempt (so
+  both land together, no separate revert needed).
+
 ## Status (2026-04-29, post `run_pending_finalize` cross-context attempt)
 
 - **Attempted: gate `run_pending_finalize`'s `clear_display_entry` call
