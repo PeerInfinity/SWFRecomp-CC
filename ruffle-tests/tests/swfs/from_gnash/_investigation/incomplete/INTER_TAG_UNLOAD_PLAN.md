@@ -11,7 +11,7 @@ phases:
     status: dropped
   - id: 2
     name: "Fire UNLOAD on sprite loop-back display-list clear"
-    status: partial
+    status: pending
   - id: 3
     name: "Audit `this`/`this.c` access in deferred clip-action UNLOAD"
     status: dropped
@@ -26,69 +26,7 @@ dependencies:
 parent_plan: "complete/DEFERRED_CLIP_UNLOAD_PLAN.md (§3)"
 -->
 
-## Status (2026-04-28, post-Approach A)
-
-**Approach A landed.** `advance_sprite_frames` now queues UNLOAD lifecycle
-(clip-action UNLOAD, recursive child UNLOAD, AS-level onUnload via
-deferred-finalize) for non-empty depths at sprite-internal frame=0
-loop-back. Gains and losses, per individual-test regression battery:
-
-| Test | Before | After | Δ |
-|------|--------|-------|---|
-| action_order/ActionOrderTest3 | 6/62 | 6/62 | 0 |
-| action_order/ActionOrderTest4 | 7/64 | 9/64 | +2 |
-| action_order/ActionOrderTest5 | 7/51 | 3/51 | -4 |
-| loop/loop_test6 | 12/23 | 12/23 | 0 |
-
-Net: -2 lines on plan targets. Approach A fires UNLOAD events that
-weren't firing before (visible as new `dynamic unload: …` lines in
-Test4), but the global lifecycle ordering still doesn't match expected.
-
-**ActionOrderTest3/loop_test6 unchanged because the silent loop-back
-clear isn't the right code path for them.** mc3 in those tests never
-hits `advance_sprite_frames`'s `frame == 0 && max_depth > 0` branch:
-the root timeline does `gotoAndPlay(2)` which routes through
-`ng_executeGotoCatchUp`, and during catch-up `tagPlaceObject2(d=1,
-char=mc3)` takes the `survives_rewind` branch and preserves mc3 with
-`sprite_current_frame` unchanged — confirmed via debug log showing mc3
-always at `frame=1` at the silent-clear check, never `frame=0`. Whatever
-clears/recreates mc3's children across iterations happens elsewhere
-(eager-init re-run? root catch-up cleanup?). Future work: instrument
-sprite_current_frame mutations across the full goto path to find where
-the per-iteration reset actually happens, then patch the right site.
-
-**Regression battery (REQUIRED guards) all clean:**
-- avm1/{unload, unload_clip_event, unload_nested_child, clip_events,
-  on_construct, register_and_init_order, goto_rewind1/2/3, set_interval,
-  goto_frame, goto_frame2, goto_label}: 100% PASS unchanged.
-- misc-ming/{loop_test2, loop_test4, loop_test5, loop_test8,
-  reverse_execute_PlaceObject2_test1/2}: 100% PASS unchanged.
-- misc-ming/loop_test3 was already failing (not a regression).
-- avm1/{bad_placeobject_clipaction, button_order, issue_1104,
-  movieclip_in_removed_button}: 100% PASS unchanged.
-
-Plan threshold ("fall back to Approach B if loop_test2/3/4/5 regress")
-not breached — none of those regress. Net plan-target loss is small
-enough to ship as-is rather than rewrite under Approach B.
-
-## Phase 2 follow-up (next session)
-
-The remaining work is on a different code path, not on the silent-clear
-inside `advance_sprite_frames`. Specifically: in ActionOrderTest3/loop_test6,
-mc3 sits at `sprite_current_frame=1` indefinitely while the test repeatedly
-goto-and-plays the root, so mc3.frame_0 never re-executes via the natural
-loop and the cached "Segments" MC's mc1 ctor (which sets `this.c`) never
-gets the loop-back UNLOAD that the expected output requires. Find where
-mc3 should advance to frame 0 between iterations and route that path
-through Approach A's UNLOAD queueing.
-
-ActionOrderTest5's regression (-4 lines) is an ordering issue: Approach
-A queues `dynamic unload` events at a different lifecycle point than
-the test expects. Whether to fix it within Approach A (timing of
-`actionFireOnUnload` + `queue_pending_finalize_mc` calls) or accept
-the -4 lines is a follow-up call.
-
-## Original status (pre-Approach A)
+## Status (2026-04-28)
 
 - **Phase 1 — DROPPED.** Was a misdiagnosis. Without buffering the
   deferred-drain sequence already produces `ctor:NEW → UNLOAD:OLD →

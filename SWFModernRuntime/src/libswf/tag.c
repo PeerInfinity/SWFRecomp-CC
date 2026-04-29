@@ -243,11 +243,6 @@ static int g_sprite_init_filter_active = 0;
 static int g_sprite_init_before_target = 0;
 static size_t g_sprite_init_target_frame = 0;
 
-// Forward declaration for sprite loop-back UNLOAD wiring (Phase 2 of
-// INTER_TAG_UNLOAD_PLAN); definition is below alongside tagRemoveObject2.
-static void fire_recursive_child_unloads(SWFAppContext* app_context,
-	DisplayObject* dl, size_t dl_max, MovieClip* parent_mc);
-
 // Phase 7a forward declarations (definitions after queue_register_ctor).
 // Phase 7b: parent_mc is captured at queue time (g_current_context during
 // the parent sprite's Phase 1 eager init) so the dispatcher can do the
@@ -874,77 +869,17 @@ void advance_sprite_frames(SWFAppContext* app_context)
 		max_depth = obj->sprite_max_depth;
 		display_list_capacity = obj->sprite_dl_capacity;
 
-		// When looping back to frame 0, fire UNLOAD lifecycle for non-surviving
-		// children before clearing the display list. Approach A: unconditionally
-		// queue UNLOAD for any non-empty depth (mirrors tagRemoveObject2's
-		// queueing). Mismatches Ruffle's `survives_rewind` only when the same
-		// char is re-placed at the same depth in frame_0 — Ruffle would survive,
-		// we'd over-fire UNLOAD. See INTER_TAG_UNLOAD_PLAN.md.
+		// When looping back to frame 0, reset the display list (Flash behavior)
 		if (frame == 0 && max_depth > 0)
 		{
-#ifdef NO_GRAPHICS
-			extern MovieClip root_movieclip;
-			MovieClip* sprite_parent = (g_current_context != NULL) ? g_current_context : &root_movieclip;
-			MovieClip* sprite_mc = NULL;
-			if (obj->instance_name != NULL)
-				sprite_mc = actionFindOrCreateMovieClip(app_context, obj->instance_name, sprite_parent);
-			if (sprite_mc == NULL) sprite_mc = sprite_parent;
-
-			extern int ng_compute_has_unload(size_t depth);
-			extern void queue_pending_finalize_mc(MovieClip*, int, size_t);
-#endif
 			for (size_t j = 1; j <= max_depth; ++j)
 			{
-				DisplayObject* entry = &display_list[j];
-				if (entry->char_id == 0) continue;
-#ifdef NO_GRAPHICS
-				if (entry->instance_name == NULL) {
-					// No name → no AS-level handler, no cached MC. Just clear.
-					if (entry->sprite_display_list != NULL) {
-						FREE(entry->sprite_display_list);
-						entry->sprite_display_list = NULL;
-					}
-					entry->char_id = 0;
-					continue;
-				}
-
-				MovieClip* child_mc = actionFindOrCreateMovieClip(
-					app_context, entry->instance_name, sprite_mc);
-
-				// Queue accumulated + current clip-action UNLOAD.
-				for (size_t a = 0; a < entry->accumulated_clip_action_count; a++) {
-					if (entry->accumulated_clip_actions[a].event_flags & CLIP_EVENT_UNLOAD)
-						actionQueueClipActionUnload(entry->accumulated_clip_actions[a].action, child_mc);
-				}
-				for (size_t a = 0; a < entry->clip_action_count; a++) {
-					if (entry->clip_actions[a].event_flags & CLIP_EVENT_UNLOAD)
-						actionQueueClipActionUnload(entry->clip_actions[a].action, child_mc);
-				}
-
-				// Recursive child unloads (nested sprites).
-				if (entry->sprite_display_list != NULL && entry->sprite_max_depth > 0) {
-					fire_recursive_child_unloads(app_context,
-						entry->sprite_display_list, entry->sprite_max_depth,
-						child_mc ? child_mc : sprite_mc);
-				}
-
-				// AS-level onUnload via deferred-finalize so the cached MC's
-				// dynamic_props stays alive until drain.
-				int has_unload = ng_compute_has_unload(j);
-				if (has_unload) {
-					actionFireOnUnload(app_context, entry->instance_name, (int)j);
-					if (child_mc != NULL)
-						queue_pending_finalize_mc(child_mc, (int)j, j);
-				} else {
-					actionInvalidateCachedMovieClip(app_context, entry->instance_name, (int)j);
-				}
-#endif
-				if (entry->sprite_display_list != NULL)
+				if (display_list[j].sprite_display_list != NULL)
 				{
-					FREE(entry->sprite_display_list);
-					entry->sprite_display_list = NULL;
+					FREE(display_list[j].sprite_display_list);
+					display_list[j].sprite_display_list = NULL;
 				}
-				entry->char_id = 0;
+				display_list[j].char_id = 0;
 			}
 			max_depth = 0;
 		}
