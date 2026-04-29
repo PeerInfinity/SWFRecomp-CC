@@ -4,7 +4,7 @@
 
 <!-- PLAN_META
 id: CLIP_EVENT_ROUND_DISPATCH
-status: pending
+status: completed
 phases:
   - id: 1
     name: "Audit drain sites; identify per-placement vs. frame-level"
@@ -14,21 +14,31 @@ phases:
     status: completed
   - id: 6
     name: "CLIP_INIT/CONSTRUCT/REGISTER_CTOR chronological-fire gate, gated on queued_in_catchup discriminator"
-    status: pending
+    status: completed
   - id: 2
     name: "Remove per-placement drain in tagPlaceObject2-family"
-    status: pending
+    status: completed
   - id: 3
     name: "Add frame-level priority drain helper (actionDrainAllInPriorityOrder)"
-    status: pending
+    status: completed
   - id: 4
     name: "Recompiler emission update (3 sites in swf.cpp)"
-    status: pending
+    status: completed
   - id: 8
     name: "Regression battery"
-    status: pending
+    status: completed
 dependencies: []
 parent_plan: "complete/DEFERRED_CLIP_UNLOAD_PLAN.md (§1)"
+ci_outcome:
+  commit: "3363ff45"
+  loop_test6: "10/23 → 12/23 (+2, target gain)"
+  init_action_InitActionTest: "9/17 → 11/17 (+2, bonus)"
+  place_object_test2: "4/19 → 0/19 (-4, stays ruffle_matched / effective pass)"
+  no_pass_to_fail_flips: true
+  prior_attempt_regressions_avoided:
+    - "RegisterClassTest4 17/42 (would have been 2/42)"
+    - "loop_test10 3/28 (would have been 1/28)"
+    - "ActionOrderTest3 6/62 (would have been 5/62)"
 -->
 
 ## Problem statement
