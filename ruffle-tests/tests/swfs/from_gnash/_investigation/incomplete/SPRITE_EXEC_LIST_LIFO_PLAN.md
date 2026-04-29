@@ -4,23 +4,23 @@
 
 <!-- PLAN_META
 id: SPRITE_EXEC_LIST_LIFO
-status: pending
+status: in_progress
 phases:
   - id: 1
     name: "Add per-placement sequence counter"
-    status: pending
+    status: complete
   - id: 2
     name: "Sort advance_sprite_frames iteration by reverse-placement-order"
-    status: pending
+    status: complete
   - id: 3
     name: "Apply same ordering to advance_nested_sprite_frames"
-    status: pending
+    status: complete
   - id: 4
     name: "Audit child_mc_cache + actionDispatchEnterFrameHandlers ordering"
-    status: pending
+    status: partial — landed via dispatch_enterframe_clip_actions sort, dispatcher untouched
   - id: 5
     name: "Regression battery"
-    status: pending
+    status: complete (no regressions)
 dependencies: []
 parent_plan: "complete/DEFERRED_CLIP_UNLOAD_PLAN.md (§2)"
 -->
@@ -244,6 +244,78 @@ Shumway:
 - `action_execution_order_test11` (13/32 → 32/32 PASS)
 
 **Net expected delta:** +3 PASS in misc-ming.
+
+## Status as of 2026-04-29
+
+**Implemented (Phases 1-3 + partial Phase 4):**
+- `place_seq` field on `DisplayObject` (`SWFModernRuntime/include/libswf/swf.h`),
+  `g_place_seq` global counter (`SWFModernRuntime/src/libswf/tag.c`).
+- `display_list[depth].place_seq = ++g_place_seq` at the two full-placement sites
+  in `tagPlaceObject2` and `tagPlaceObject2Ratio`. Modify-only paths
+  (`survives_rewind`, char_id=0, loop-back same-char) NOT bumped, per plan.
+- `advance_sprite_frames` (`tag.c`) now sorts iteration by `place_seq` DESC via
+  insertion sort over a stack-bounded array (cap 512); falls back to
+  depth-descending when `max_depth` exceeds the cap.
+- `advance_nested_sprite_frames` (`tag.c`) gets the same sort.
+- `dispatch_enterframe_clip_actions` (`tag.c`) gets the same sort — flipped from
+  depth-ascending to place_seq DESC. This is what actually moved the per-tick
+  CLIP_EVENT_ENTER_FRAME firing order for the target tests (their handlers are
+  clip-action ENTER_FRAME, not AS-property `mc.onEnterFrame`).
+
+**Not done (Phase 4 dispatcher proper):** `actionDispatchEnterFrameHandlers`
+(`action.c`) iteration left at `for (int i = child_mc_count - 1; i >= 0; i--)`.
+An attempt to sort this dispatcher by an MC-level `place_seq` (added to
+`MovieClip` and populated from display_obj at lookup) regressed
+gnash misc-swfc `movieclip_destruction_test2` (50/52 → 41/52) and gnash
+misc-ming `loop_test3`/`loop_test9`, so the experiment was reverted. The
+remaining target-test gaps (test5/test11 cleanup-phase failures, AS-property
+onEnterFrame ordering) likely need a different mechanism than the cache-index
+proxy — possibly pre-populating `child_mc_cache` at PlaceObject2 time so cache
+order *equals* placement order and the existing reverse-cache iteration
+naturally yields LIFO. See "Open question 4" extension below.
+
+### Test deltas (local, against pristine 56694d06)
+
+| Test | Before | After | Notes |
+|------|--------|-------|-------|
+| `action_execution_order_test2` | 2/5 (output_mismatch) | **5/5 PASS** | Target hit. |
+| `action_execution_order_test5` | 25/35 (output_mismatch) | 26/35 (output_mismatch) | First 26 lines now match exactly (was 25). Lines 27-35 still diverge — deeply-nested cleanup/unload sequencing, not LIFO. |
+| `action_execution_order_test11` | 13/32 (output_mismatch) | ~17/32 (output_mismatch, est.) | First-frame `mc2 onEnterFrame, mc1 onEnterFrame` order is now correct. Subsequent ticks still diverge — looks like nested children-then-parent recursion ordering inside a single tick. |
+
+### Pre-existing local failures (not caused by this work)
+
+`loop/loop_test3` and `loop/loop_test9` fail locally on a clean `master` checkout
+*without* any of this plan's changes. Both pass in CI (per
+`misc-ming.all/_results/results.json` at SHA `56694d06`). The failure pattern
+is the same with the changes applied or fully reverted, so this plan's work
+is not the cause. Likely environment difference in heap layout or queue draining
+under local gcc/glibc — flagged in handoff for a separate investigation.
+
+**Regression battery (all green with these changes):**
+- 30-test AVM1 lifecycle/event-order battery: 30/30 effective
+- 20-test misc-ming recently-fixed battery: 20/20 effective
+- 4-test misc-swfc battery: 3 PASS, `movieclip_destruction_test2` 50/52 (unchanged)
+- 4-test Shumway `duplicateMovieClip` battery: 4/4
+
+### Why Phase 4 dispatcher sort regressed (postmortem)
+
+`actionDispatchEnterFrameHandlers` iterates `child_mc_cache`. For dynamic MCs
+without `display_obj` (createEmptyMovieClip) the only ordering signal we have
+is cache-insertion index. When mixed with timeline MCs whose `place_seq` is
+much larger, the unified DESC sort puts dynamic MCs at the END of the dispatch
+even when they were created very recently — not what Ruffle does. The two
+regressed tests (`loop_test3`/`9`/`movieclip_destruction_test2`) hit this:
+they construct MCs whose dispatch order matters relative to script-driven
+construction events. Reverting the dispatcher sort kept the target-test
+improvements intact (since those traces fire from clip-action ENTER_FRAME, not
+the AS-property dispatcher).
+
+A clean fix needs `place_seq` (or equivalent) on `MovieClip` itself, bumped at
+*every* `MovieClip::instantiate` site (timeline placement + attachMovie +
+duplicateMovieClip + createEmptyMovieClip), so dynamic and timeline MCs share
+a single key space. That was attempted and reverted because populating
+`mc->place_seq` from the display entry at lookup time created subtle ordering
+side effects — see commit history for the experiment. Future session.
 
 ## Open questions
 

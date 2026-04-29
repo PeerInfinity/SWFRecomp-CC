@@ -81,6 +81,16 @@ size_t g_char_movie_id_capacity = 0;
 // Used by tagPlaceObject2 in all build modes.
 size_t g_place_gen = 0;
 
+// Monotonically increasing counter bumped at every full PlaceObject2 placement.
+// Mirrors Ruffle's clip_exec_list LIFO order: largest place_seq = most-recently
+// instantiated. Used by advance_sprite_frames / advance_nested_sprite_frames /
+// dispatch_enterframe_clip_actions to dispatch frame functions and ENTER_FRAME
+// clip events in reverse-instantiation order rather than depth-descending order.
+// NOT bumped on modify-only paths (survives_rewind, char_id=0 PlaceObject2,
+// loop-back same-char modify) — those preserve identity, including ordering.
+// NOT bumped by swapDepths — depth changes, instantiation order is preserved.
+size_t g_place_seq = 0;
+
 #ifdef NO_GRAPHICS
 // Tracks the currently-executing sprite's DisplayObject.
 // Set by advance_sprite_frames before each sprite frame function call.
@@ -676,9 +686,50 @@ void advance_sprite_frames(SWFAppContext* app_context)
 	if (catch_up_mode) return;
 #endif
 
-	for (size_t i = max_depth + 1; i > 0; --i)
+	// Iterate in reverse-instantiation order (largest place_seq first), mirroring
+	// Ruffle's clip_exec_list LIFO traversal in core/src/avm1/runtime.rs (push at
+	// head, traverse forward). For SWFs that place sprites in non-monotonic depth
+	// order this differs from depth-descending, and Flash dispatches by
+	// instantiation order. Insertion sort over a small stack array; fall back to
+	// depth-descending if max_depth exceeds the stack cap.
+	#define ASF_SORT_CAP 512
+	size_t sorted_depths[ASF_SORT_CAP];
+	size_t sorted_seq[ASF_SORT_CAP];
+	size_t n_sorted = 0;
+	int use_sorted = (max_depth < ASF_SORT_CAP);
+	if (use_sorted) {
+		for (size_t d = 1; d <= max_depth; d++) {
+			if (display_list[d].char_id == 0) continue;
+			sorted_depths[n_sorted] = d;
+			sorted_seq[n_sorted] = display_list[d].place_seq;
+			n_sorted++;
+		}
+		for (size_t k = 1; k < n_sorted; k++) {
+			size_t key_d = sorted_depths[k];
+			size_t key_s = sorted_seq[k];
+			long b = (long)k - 1;
+			while (b >= 0 && sorted_seq[b] < key_s) {
+				sorted_depths[b+1] = sorted_depths[b];
+				sorted_seq[b+1] = sorted_seq[b];
+				b--;
+			}
+			sorted_depths[b+1] = key_d;
+			sorted_seq[b+1] = key_s;
+		}
+	}
+
+	size_t iter_n = use_sorted ? n_sorted : (max_depth + 1);
+	for (size_t iter = 0; iter < iter_n; iter++)
 	{
-		DisplayObject* obj = &display_list[i - 1];
+		size_t cur_depth;
+		if (use_sorted) {
+			cur_depth = sorted_depths[iter];
+		} else {
+			// Fallback: depth-descending (max_depth..1)
+			cur_depth = max_depth - iter;
+			if (cur_depth == 0) continue;
+		}
+		DisplayObject* obj = &display_list[cur_depth];
 		if (obj->char_id == 0) continue;
 		Character* ch = &dictionary[obj->char_id];
 
@@ -964,9 +1015,45 @@ void advance_nested_sprite_frames(SWFAppContext* app_context)
 	if (catch_up_mode) return;
 #endif
 
-	for (size_t i = max_depth + 1; i > 0; --i)
+	// Reverse-instantiation order (place_seq DESC) — same Ruffle clip_exec_list
+	// LIFO semantics as advance_sprite_frames.
+	#define ANSF_SORT_CAP 512
+	size_t sorted_depths[ANSF_SORT_CAP];
+	size_t sorted_seq[ANSF_SORT_CAP];
+	size_t n_sorted = 0;
+	int use_sorted = (max_depth < ANSF_SORT_CAP);
+	if (use_sorted) {
+		for (size_t d = 1; d <= max_depth; d++) {
+			if (display_list[d].char_id == 0) continue;
+			sorted_depths[n_sorted] = d;
+			sorted_seq[n_sorted] = display_list[d].place_seq;
+			n_sorted++;
+		}
+		for (size_t k = 1; k < n_sorted; k++) {
+			size_t key_d = sorted_depths[k];
+			size_t key_s = sorted_seq[k];
+			long b = (long)k - 1;
+			while (b >= 0 && sorted_seq[b] < key_s) {
+				sorted_depths[b+1] = sorted_depths[b];
+				sorted_seq[b+1] = sorted_seq[b];
+				b--;
+			}
+			sorted_depths[b+1] = key_d;
+			sorted_seq[b+1] = key_s;
+		}
+	}
+
+	size_t iter_n = use_sorted ? n_sorted : (max_depth + 1);
+	for (size_t iter = 0; iter < iter_n; iter++)
 	{
-		DisplayObject* obj = &display_list[i - 1];
+		size_t cur_depth;
+		if (use_sorted) {
+			cur_depth = sorted_depths[iter];
+		} else {
+			cur_depth = max_depth - iter;
+			if (cur_depth == 0) continue;
+		}
+		DisplayObject* obj = &display_list[cur_depth];
 		if (obj->char_id == 0) continue;
 		Character* ch = &dictionary[obj->char_id];
 		if (ch->type != CHAR_TYPE_SPRITE) continue;
@@ -1712,8 +1799,40 @@ void upgrade_sprite_initialized(DisplayObject* dl, size_t dl_max)
 void dispatch_enterframe_clip_actions(SWFAppContext* app_context,
 	DisplayObject* dl, size_t dl_max, MovieClip* parent_mc)
 {
-	for (size_t i = 0; i <= dl_max; ++i)
+	// Iterate in reverse-instantiation order (place_seq DESC) so clip-event
+	// ENTER_FRAME fires most-recently-placed first, mirroring Ruffle's
+	// clip_exec_list LIFO traversal. Stack-bounded sort with depth-ascending
+	// fallback if dl_max exceeds the cap.
+	#define DEC_SORT_CAP 512
+	size_t dec_depths[DEC_SORT_CAP];
+	size_t dec_seq[DEC_SORT_CAP];
+	size_t dec_n = 0;
+	int dec_use_sorted = (dl_max < DEC_SORT_CAP);
+	if (dec_use_sorted) {
+		for (size_t d = 0; d <= dl_max; d++) {
+			if (dl[d].char_id == 0) continue;
+			dec_depths[dec_n] = d;
+			dec_seq[dec_n] = dl[d].place_seq;
+			dec_n++;
+		}
+		for (size_t k = 1; k < dec_n; k++) {
+			size_t key_d = dec_depths[k];
+			size_t key_s = dec_seq[k];
+			long b = (long)k - 1;
+			while (b >= 0 && dec_seq[b] < key_s) {
+				dec_depths[b+1] = dec_depths[b];
+				dec_seq[b+1] = dec_seq[b];
+				b--;
+			}
+			dec_depths[b+1] = key_d;
+			dec_seq[b+1] = key_s;
+		}
+	}
+
+	size_t dec_iter_n = dec_use_sorted ? dec_n : (dl_max + 1);
+	for (size_t dec_iter = 0; dec_iter < dec_iter_n; dec_iter++)
 	{
+		size_t i = dec_use_sorted ? dec_depths[dec_iter] : dec_iter;
 		DisplayObject* obj = &dl[i];
 		if (obj->char_id == 0) continue;
 		// Skip sprites not yet fully initialized (init'd this tick = 1, or not init'd = 0)
@@ -4207,6 +4326,7 @@ void tagPlaceObject2(SWFAppContext* app_context, size_t depth, size_t char_id, u
 	display_list[depth].sprite_needs_init = 0;
 	display_list[depth].placed_at_frame = current_frame;
 	display_list[depth].place_gen = g_place_gen;
+	display_list[depth].place_seq = ++g_place_seq;
 	display_list[depth].constructor_invoked = 0;
 	init_cx_fields(&display_list[depth]);
 
@@ -4607,6 +4727,7 @@ void tagPlaceObject2Ratio(SWFAppContext* app_context, size_t depth, size_t char_
 	display_list[depth].sprite_needs_init = 0;
 	display_list[depth].placed_at_frame = current_frame;
 	display_list[depth].place_gen = g_place_gen;
+	display_list[depth].place_seq = ++g_place_seq;
 	display_list[depth].constructor_invoked = 0;
 	init_cx_fields(&display_list[depth]);
 

@@ -167,6 +167,10 @@ typedef struct DisplayObject
 	u8 name_overridden;     // 1 if instance name was overridden (script _name= or modify-branch rename)
 	size_t placed_at_frame; // frame index when this object was placed
 	size_t place_gen;       // monotonic generation counter for same-frame detection
+	size_t place_seq;       // monotonic per-placement counter (NOT per-frame).
+	                        // Reverse order = most-recently-placed first =
+	                        // reverse-instantiation iteration order
+	                        // (Ruffle's clip_exec_list LIFO equivalent).
 	// Clip event interaction state
 	u8 clip_mc_pressed;     // 1 if CLIP_EVENT_PRESS was fired for this clip (awaiting RELEASE/RELEASE_OUTSIDE)
 	u8 clip_mouse_inside;   // 1 if mouse is currently inside this clip's hit area (for ROLL_OVER/ROLL_OUT/DRAG_OVER/DRAG_OUT transitions)
