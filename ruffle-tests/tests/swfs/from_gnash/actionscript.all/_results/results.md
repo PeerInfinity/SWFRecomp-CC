@@ -1,10 +1,10 @@
 # Ruffle Test Results (Unfiltered)
 
-**Date**: 2026-04-29 17:26 UTC
+**Date**: 2026-04-29 18:02 UTC
 
-**Git SHA**: `35a60f362d`
+**Git SHA**: `56694d06aa`
 
-**Run Duration**: 0m 57s
+**Run Duration**: 0m 55s
 
 ## Summary
 
@@ -79,8 +79,8 @@
 | 46 | `NetConnection-v5` | 7 | 0.2s |  |
 | 47 | `NetStream-v5` | 6 | 0.2s |  |
 | 48 | `NetStream-v6` | 80 | 0.2s |  |
-| 49 | `NetStream-v7` | 80 | 0.2s |  |
-| 50 | `NetStream-v8` | 80 | 0.2s |  |
+| 49 | `NetStream-v7` | 80 | 0.6s |  |
+| 50 | `NetStream-v8` | 80 | 0.4s |  |
 | 51 | `Number-v6` | 239 | 0.2s |  |
 | 52 | `Number-v7` | 237 | 0.2s |  |
 | 53 | `Number-v8` | 237 | 0.2s |  |
@@ -159,7 +159,7 @@
 | 6 | `Camera-v6` | 57 | 57 | 0.2s |  |
 | 7 | `Camera-v7` | 57 | 57 | 0.2s |  |
 | 8 | `Camera-v8` | 57 | 57 | 0.2s |  |
-| 9 | `ExternalInterface-v8` | 4 | 4 | 0.9s |  |
+| 9 | `ExternalInterface-v8` | 4 | 4 | 0.2s |  |
 | 10 | `Inheritance-v5` | 1 | 17 | 0.2s |  |
 | 11 | `Inheritance-v6` | 9 | 16 | 0.2s |  |
 | 12 | `Inheritance-v7` | 5 | 10 | 0.2s |  |
@@ -167,7 +167,7 @@
 | 14 | `LoadVars-v6` | 6 | 21 | 0.2s |  |
 | 15 | `LoadVars-v7` | 6 | 21 | 0.2s |  |
 | 16 | `LoadVars-v8` | 6 | 21 | 0.2s |  |
-| 17 | `Math-v5` | 5 | 5 | 0.2s |  |
+| 17 | `Math-v5` | 5 | 5 | 0.3s |  |
 | 18 | `Math-v6` | 5 | 5 | 0.2s |  |
 | 19 | `Math-v7` | 5 | 5 | 0.2s |  |
 | 20 | `Math-v8` | 5 | 5 | 0.2s |  |
@@ -183,9 +183,9 @@
 | 30 | `Selection-v6` | 7 | 13 | 0.2s |  |
 | 31 | `Selection-v7` | 7 | 13 | 0.2s |  |
 | 32 | `Selection-v8` | 7 | 13 | 0.2s |  |
-| 33 | `Sound-v5` | 27 | 27 | 0.4s |  |
-| 34 | `Sound-v6` | 30 | 51 | 0.4s |  |
-| 35 | `Sound-v7` | 28 | 51 | 0.3s |  |
+| 33 | `Sound-v5` | 27 | 27 | 0.3s |  |
+| 34 | `Sound-v6` | 30 | 51 | 0.3s |  |
+| 35 | `Sound-v7` | 28 | 51 | 0.4s |  |
 | 36 | `Sound-v8` | 28 | 51 | 0.3s |  |
 | 37 | `String-v5` | 19 | 21 | 0.2s |  |
 | 38 | `String-v6` | 10 | 10 | 0.2s |  |
