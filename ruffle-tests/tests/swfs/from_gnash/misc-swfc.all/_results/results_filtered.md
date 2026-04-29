@@ -1,10 +1,10 @@
 # Ruffle Test Results (Filtered)
 
-**Date**: 2026-04-29 02:35 UTC
+**Date**: 2026-04-29 02:57 UTC
 
-**Git SHA**: `f803ea69e6`
+**Git SHA**: `38f6ae1470`
 
-**Run Duration**: 0m 41s
+**Run Duration**: 0m 4s
 
 **Filtered**: 0 tests ignored out of 16 available
 
@@ -33,10 +33,10 @@
 
 | # | Test | Lines | Duration | Notes |
 |---|------|-------|----------|-------|
-| 1 | `edittext_test1` | 47 | 0.2s |  |
+| 1 | `edittext_test1` | 47 | 0.1s |  |
 | 2 | `gotoFrameLabelAsFunction` | 6 | 0.2s |  |
 | 3 | `hello` | 4 | 0.1s |  |
-| 4 | `stackscope` | 11 | 1.4s |  |
+| 4 | `stackscope` | 11 | 0.2s |  |
 | 5 | `submoviegetvar` | 4 | 0.2s |  |
 
 ## Ruffle-Matched Tests
