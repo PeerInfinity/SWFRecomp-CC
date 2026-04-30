@@ -1,10 +1,10 @@
 # Ruffle Test Results (Filtered)
 
-**Date**: 2026-04-30 21:13 UTC
+**Date**: 2026-04-30 21:28 UTC
 
-**Git SHA**: `1e535046f0`
+**Git SHA**: `19cc9a8d78`
 
-**Run Duration**: 0m 38s
+**Run Duration**: 0m 37s
 
 **Filtered**: 0 tests ignored out of 102 available
 
@@ -14,9 +14,9 @@
 |--------|-------|
 | Total tests | 102 |
 | Passing | **59** (57.8%) |
-| Ruffle-matched | 13 (diffs ⊆ Ruffle's against Flash) |
-| Effective pass | **72** (70.6%) |
-| Failing | 30 |
+| Ruffle-matched | 14 (diffs ⊆ Ruffle's against Flash) |
+| Effective pass | **73** (71.6%) |
+| Failing | 29 |
 | Total expected lines | 4577 |
 | Matching lines | 2796 (61.1%) |
 | Mismatched lines | 1781 |
@@ -25,7 +25,7 @@
 
 | Category | Count | % of Failures |
 |----------|-------|---------------|
-| Output Mismatch | 30 | 100.0% |
+| Output Mismatch | 29 | 100.0% |
 
 ## Passing Tests
 
@@ -35,12 +35,12 @@
 |---|------|-------|----------|-------|
 | 1 | `BeginBitmapFill` | 1 | 0.2s |  |
 | 2 | `DefineEditTextTest` | 153 | 0.7s |  |
-| 3 | `DefineEditTextVariableNameTest2` | 39 | 0.6s |  |
+| 3 | `DefineEditTextVariableNameTest2` | 39 | 0.3s |  |
 | 4 | `DepthLimitsTest` | 20 | 0.2s |  |
 | 5 | `PlaceObject2Test` | 9 | 0.2s |  |
-| 6 | `ResolveEventsTest` | 15 | 0.2s |  |
+| 6 | `ResolveEventsTest` | 15 | 0.3s |  |
 | 7 | `RollOverOutTest` | 5 | 0.2s |  |
-| 8 | `VarAndCharClashTest` | 13 | 0.2s |  |
+| 8 | `VarAndCharClashTest` | 13 | 0.1s |  |
 | 9 | `Video-EmbedSquareTest` | 2 | 0.2s |  |
 | 10 | `action_order/action_execution_order_test1` | 10 | 0.2s |  |
 | 11 | `action_order/action_execution_order_test2` | 5 | 0.2s |  |
@@ -50,7 +50,7 @@
 | 15 | `action_order/action_execution_order_test8-v6` | 11 | 0.2s |  |
 | 16 | `action_order/action_execution_order_test9` | 4 | 0.2s |  |
 | 17 | `attachExtImported` | 2 | 0.3s |  |
-| 18 | `attachImported` | 2 | 0.2s |  |
+| 18 | `attachImported` | 2 | 0.3s |  |
 | 19 | `attachMovieLoopingTest` | 41 | 0.2s |  |
 | 20 | `attachMovieTest` | 12 | 0.2s |  |
 | 21 | `consecutive_goto_frame_test` | 12 | 0.2s |  |
@@ -62,14 +62,14 @@
 | 27 | `displaylist_depths/displaylist_depths_test7` | 14 | 0.2s |  |
 | 28 | `event_handler_scope_test` | 16 | 0.2s |  |
 | 29 | `getTimer_test` | 8 | 0.2s |  |
-| 30 | `get_frame_number_test` | 31 | 0.4s |  |
+| 30 | `get_frame_number_test` | 31 | 0.3s |  |
 | 31 | `goto_frame_test` | 15 | 0.2s |  |
 | 32 | `instanceNameTest` | 5 | 0.2s |  |
 | 33 | `loop/loop_test` | 21 | 0.2s |  |
 | 34 | `loop/loop_test2` | 15 | 0.2s |  |
 | 35 | `loop/loop_test3` | 16 | 0.2s |  |
-| 36 | `loop/loop_test4` | 22 | 0.2s |  |
-| 37 | `loop/loop_test5` | 24 | 0.2s |  |
+| 36 | `loop/loop_test4` | 22 | 0.3s |  |
+| 37 | `loop/loop_test5` | 24 | 0.3s |  |
 | 38 | `loop/loop_test8` | 38 | 0.3s |  |
 | 39 | `loop/loop_test9` | 15 | 0.2s |  |
 | 40 | `loop/simple_loop_test` | 0 | 0.2s |  |
@@ -95,14 +95,14 @@
 
 ## Ruffle-Matched Tests
 
-**13 tests promoted** — our diffs against Flash's `output.txt` are a proper subset of Ruffle's diffs against the same file (i.e. we are at least as good as Ruffle on every line of these tests). Each carries `known_failure = true` upstream with a sidecar `output.ruffle.txt`.
+**14 tests promoted** — our diffs against Flash's `output.txt` are a proper subset of Ruffle's diffs against the same file (i.e. we are at least as good as Ruffle on every line of these tests). Each carries `known_failure = true` upstream with a sidecar `output.ruffle.txt`.
 
 | # | Test | Our diffs | Ruffle diffs | Duration | Notes |
 |---|------|-----------|--------------|----------|-------|
 | 1 | `ButtonPropertiesTest` | 20 | 20 | 0.2s |  |
 | 2 | `DefineTextTest` | 4 | 4 | 0.2s |  |
 | 3 | `KeyEventOrder` | 20 | 23 | 0.2s |  |
-| 4 | `action_order/action_execution_order_test4` | 7 | 26 | 0.3s |  |
+| 4 | `action_order/action_execution_order_test4` | 7 | 26 | 0.4s |  |
 | 5 | `action_order/action_execution_order_test6` | 5 | 21 | 0.3s |  |
 | 6 | `callFunction_test` | 5 | 11 | 0.3s |  |
 | 7 | `init_action/InitActionTest` | 6 | 17 | 0.2s |  |
@@ -111,7 +111,8 @@
 | 10 | `loop/loop_test7` | 1 | 8 | 0.2s |  |
 | 11 | `path_format_test` | 27 | 28 | 0.4s |  |
 | 12 | `place_object_test` | 14 | 14 | 0.2s |  |
-| 13 | `replace_buttons1test` | 3 | 3 | 0.2s |  |
+| 13 | `place_object_test2` | 20 | 23 | 0.2s |  |
+| 14 | `replace_buttons1test` | 3 | 3 | 0.2s |  |
 
 ## Near-Passing Tests
 
@@ -148,7 +149,7 @@ No timeouts.
 
 ## All Output Mismatches
 
-**30 tests** with output mismatch, sorted by match rate (best first)
+**29 tests** with output mismatch, sorted by match rate (best first)
 
 | # | Test | Match Rate | Matching/Total | Actual | Expected | Notes |
 |---|------|------------|----------------|--------|----------|-------|
@@ -181,4 +182,3 @@ No timeouts.
 | 27 | `ButtonEventsTest` | 6.9% | 47/679 | 81 | 679 |  |
 | 28 | `Version4Loader` | 0.0% | 0/11 | 0 | 11 |  |
 | 29 | `frame_label_test` | 0.0% | 0/17 | 0 | 17 |  |
-| 30 | `place_object_test2` | 0.0% | 0/26 | 26 | 19 |  |
