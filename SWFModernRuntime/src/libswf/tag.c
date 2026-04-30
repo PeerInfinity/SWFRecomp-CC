@@ -4341,6 +4341,19 @@ void tagPlaceObject2(SWFAppContext* app_context, size_t depth, size_t char_id, u
 		return;
 	}
 
+	// Cross-frame non-sprite REPLACE detection: existing entry from a prior
+	// frame is being replaced with a different non-sprite character (sprite
+	// case is handled above and returns early). Per Ruffle apply_place_object
+	// (display_object.rs:2536-2539), name / clip_depth / clip_actions are
+	// purposely omitted on subsequent PlaceObject tags — only matrix, cxform,
+	// ratio update. For shapes, replace_with hot-swaps the graphic data
+	// (we update char_id below) but the AS-visible name binding is preserved.
+	// Targets misc-ming/replace_shapes1test where the frame-3 REPLACE supplies
+	// a new name "static2"; the existing "static1" binding must remain and
+	// "static2" must NOT be registered.
+	int is_cross_frame_replace = display_list[depth].char_id != 0
+	                              && display_list[depth].place_gen != g_place_gen;
+
 	display_list[depth].char_id = char_id;
 	display_list[depth].transform_id = transform_id;
 #ifdef NO_GRAPHICS
@@ -4362,22 +4375,30 @@ void tagPlaceObject2(SWFAppContext* app_context, size_t depth, size_t char_id, u
 	display_list[depth].child_transform_data = NULL;
 	if (g_char_movie_id != NULL && char_id < g_char_movie_id_capacity && g_char_movie_id[char_id] != 0)
 		display_list[depth].child_transform_data = g_movie_transform_data[g_char_movie_id[char_id]];
-	// Free old instance name if we own it
-	if (display_list[depth].instance_name_owned && display_list[depth].instance_name != NULL)
-	{
-		free(display_list[depth].instance_name);
-	}
-	// Consume pending instance name from tagSetInstanceName (called before PlaceObject)
-	if (g_pending_instance_name != NULL) {
-		display_list[depth].instance_name = (char*)g_pending_instance_name;
-		display_list[depth].instance_name_owned = 0;
+	if (is_cross_frame_replace) {
+		// REPLACE preserves existing instance_name and clip_actions; discard
+		// any pending values so they don't leak to the next placement.
 		g_pending_instance_name = NULL;
+		g_pending_clip_actions = NULL;
+		g_pending_clip_action_count = 0;
 	} else {
-		display_list[depth].instance_name = NULL;
-		display_list[depth].instance_name_owned = 0;
+		// Free old instance name if we own it
+		if (display_list[depth].instance_name_owned && display_list[depth].instance_name != NULL)
+		{
+			free(display_list[depth].instance_name);
+		}
+		// Consume pending instance name from tagSetInstanceName (called before PlaceObject)
+		if (g_pending_instance_name != NULL) {
+			display_list[depth].instance_name = (char*)g_pending_instance_name;
+			display_list[depth].instance_name_owned = 0;
+			g_pending_instance_name = NULL;
+		} else {
+			display_list[depth].instance_name = NULL;
+			display_list[depth].instance_name_owned = 0;
+		}
+		display_list[depth].clip_actions = NULL;
+		display_list[depth].clip_action_count = 0;
 	}
-	display_list[depth].clip_actions = NULL;
-	display_list[depth].clip_action_count = 0;
 	display_list[depth].filter_type = 0;
 	display_list[depth].depth_swapped = 0;
 	// Restore persistent button state if the same character is being re-placed
@@ -4782,6 +4803,11 @@ void tagPlaceObject2Ratio(SWFAppContext* app_context, size_t depth, size_t char_
 	}
 #endif
 
+	// Cross-frame non-sprite REPLACE detection — see tagPlaceObject2 for
+	// rationale. Sprite-sprite case is handled above and returns early.
+	int is_cross_frame_replace_ratio = display_list[depth].char_id != 0
+	                                    && display_list[depth].place_gen != g_place_gen;
+
 	display_list[depth].char_id = char_id;
 	display_list[depth].transform_id = transform_id;
 #ifdef NO_GRAPHICS
@@ -4803,17 +4829,25 @@ void tagPlaceObject2Ratio(SWFAppContext* app_context, size_t depth, size_t char_
 	display_list[depth].child_transform_data = NULL;
 	if (g_char_movie_id != NULL && char_id < g_char_movie_id_capacity && g_char_movie_id[char_id] != 0)
 		display_list[depth].child_transform_data = g_movie_transform_data[g_char_movie_id[char_id]];
-	// Consume pending instance name from tagSetInstanceName (called before PlaceObject)
-	if (g_pending_instance_name != NULL) {
-		display_list[depth].instance_name = (char*)g_pending_instance_name;
-		display_list[depth].instance_name_owned = 0;
+	if (is_cross_frame_replace_ratio) {
+		// REPLACE preserves existing instance_name and clip_actions; discard
+		// any pending values so they don't leak to the next placement.
 		g_pending_instance_name = NULL;
+		g_pending_clip_actions = NULL;
+		g_pending_clip_action_count = 0;
 	} else {
-		display_list[depth].instance_name = NULL;
-		display_list[depth].instance_name_owned = 0;
+		// Consume pending instance name from tagSetInstanceName (called before PlaceObject)
+		if (g_pending_instance_name != NULL) {
+			display_list[depth].instance_name = (char*)g_pending_instance_name;
+			display_list[depth].instance_name_owned = 0;
+			g_pending_instance_name = NULL;
+		} else {
+			display_list[depth].instance_name = NULL;
+			display_list[depth].instance_name_owned = 0;
+		}
+		display_list[depth].clip_actions = NULL;
+		display_list[depth].clip_action_count = 0;
 	}
-	display_list[depth].clip_actions = NULL;
-	display_list[depth].clip_action_count = 0;
 	display_list[depth].filter_type = 0;
 	display_list[depth].depth_swapped = 0;
 	// Restore persistent button state if the same character is being re-placed
@@ -4847,10 +4881,13 @@ void tagPlaceObject2Ratio(SWFAppContext* app_context, size_t depth, size_t char_
 
 	// Consume pending clip actions (set by WithClipActions variants).
 	// Reset immediately so nested tagPlaceObject2 calls during eager init
-	// don't inherit the parent's clip actions.
+	// don't inherit the parent's clip actions. Skip on cross-frame REPLACE
+	// (cleared above) — the existing clip_actions are preserved.
 	if (g_pending_clip_actions != NULL) {
-		display_list[depth].clip_actions = g_pending_clip_actions;
-		display_list[depth].clip_action_count = g_pending_clip_action_count;
+		if (!is_cross_frame_replace_ratio) {
+			display_list[depth].clip_actions = g_pending_clip_actions;
+			display_list[depth].clip_action_count = g_pending_clip_action_count;
+		}
 		g_pending_clip_actions = NULL;
 		g_pending_clip_action_count = 0;
 	}
@@ -6026,7 +6063,7 @@ void tagSetInstanceName(SWFAppContext* app_context, size_t depth, const char* na
 			return;
 		}
 	}
-	// Cross-frame REPLACE preservation: when an existing sprite at this depth
+	// Cross-frame REPLACE preservation: when an existing entry at this depth
 	// was placed by a previous frame, the upcoming PlaceObject2 is a REPLACE
 	// (move=1, has_character=1). Per Ruffle apply_place_object, name is
 	// "Purposely omitted" — REPLACE/MODIFY tags do not update the name of an
@@ -6036,10 +6073,12 @@ void tagSetInstanceName(SWFAppContext* app_context, size_t depth, const char* na
 	// consume it. Skip when an UNLOAD-handler Remove was just deferred at this
 	// depth (the entry's char_id is stale post-Remove; treat as pre-place
 	// pending name like the empty-depth branch above).
+	// Applies to both sprites (existing handling) and non-sprite chars
+	// (shapes/text/buttons) — the latter is exercised by misc-ming
+	// replace_shapes1test where a frame-3 shape REPLACE supplies a new name.
 	extern int ng_depth_has_pending_finalize(size_t);
 	if (display_list[depth].char_id != 0
 	    && display_list[depth].place_gen != g_place_gen
-	    && display_list[depth].sprite_display_list != NULL
 	    && !ng_depth_has_pending_finalize(depth))
 	{
 		g_pending_instance_name = name;
