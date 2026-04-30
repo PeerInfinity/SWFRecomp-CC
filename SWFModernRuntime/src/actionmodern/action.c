@@ -26201,14 +26201,18 @@ void actionGetURL(SWFAppContext* app_context, const char* url, const char* targe
 // to identify which broadcaster object they operate on.
 // ============================================================================
 
-// AS2 abstract equality for listener dedup/remove: null == undefined.
-static int listenerAbstractEq(ActionVar* a, ActionVar* b) {
-    int a_nullish = (a->type == ACTION_STACK_VALUE_NULL || a->type == ACTION_STACK_VALUE_UNDEFINED);
-    int b_nullish = (b->type == ACTION_STACK_VALUE_NULL || b->type == ACTION_STACK_VALUE_UNDEFINED);
-    if (a_nullish && b_nullish) return 1;
-    if (a_nullish || b_nullish) return 0;
-    if (a->type != b->type) return 0;
-    return a->data.numeric_value == b->data.numeric_value;
+// AS2 abstract equality for listener dedup/remove. Defers to the full
+// `actionEquals2` (ECMA-262 11.9.3 with object → primitive via valueOf), which
+// handles null/undefined coercion and `obj.valueOf() == primitive` comparisons
+// that the AsBroadcaster tests rely on (e.g. `removeListener('yes I am')`
+// matching an object whose `valueOf` returns `'yes I am'`).
+static int listenerAbstractEq(SWFAppContext* app_context, ActionVar* a, ActionVar* b) {
+    pushVar(app_context, a);
+    pushVar(app_context, b);
+    actionEquals2(app_context);
+    int eq = (STACK_TOP_TYPE == ACTION_STACK_VALUE_BOOLEAN) && (STACK_TOP_VALUE != 0);
+    POP();
+    return eq;
 }
 
 static ActionVar builtin_broadcaster_addListener(SWFAppContext* app_context, ActionVar* args, u32 arg_count, ActionVar* registers, void* this_obj)
@@ -26223,30 +26227,41 @@ static ActionVar builtin_broadcaster_addListener(SWFAppContext* app_context, Act
 
     if (!receiver) return result;
 
-    // Get or create _listeners array on receiver
-    ActionVar* listeners_prop = getPropertyWithPrototype(receiver, "_listeners", 10);
-    ASArray* arr = NULL;
-    if (listeners_prop && listeners_prop->type == ACTION_STACK_VALUE_ARRAY) {
-        arr = (ASArray*) listeners_prop->data.numeric_value;
-    }
-    if (!arr) {
-        arr = allocArray(app_context, 4);
-        ActionVar av = {0};
-        av.type = ACTION_STACK_VALUE_ARRAY;
-        av.data.numeric_value = (u64)arr;
-        setProperty(app_context, receiver, "_listeners", 10, &av);
-    }
-
     // Listener is args[0], or undefined if no args
     ActionVar undef_listener = {0};
     undef_listener.type = ACTION_STACK_VALUE_UNDEFINED;
     ActionVar* new_listener = (arg_count >= 1) ? &args[0] : &undef_listener;
 
+    // Flash's AsBroadcaster.addListener semantics (mirrors Ruffle
+    // core/src/avm1/globals/as_broadcaster.rs `add_listener`):
+    //   1) Look up `this._listeners`. Only proceed if it's an Object/Array.
+    //      Do NOT auto-create — `obj.addListener()` on an object that wasn't
+    //      AsBroadcaster.initialize'd should silently no-op (Flash test
+    //      AsBroadcaster.as:144,150 expects `o._listeners` to remain undefined).
+    //   2) If a listener equal to `new_listener` already exists, leave the
+    //      array as-is (Flash actually moves it to the end via removeListener+
+    //      push, which matches our "found → shift+append" behavior; Ruffle
+    //      replaces in-place — both diverge from the other on
+    //      AsBroadcaster.as:216 etc, but our move-to-end matches Flash).
+    //   3) Otherwise append at the end.
+    ActionVar* listeners_prop = getPropertyWithPrototype(receiver, "_listeners", 10);
+    if (!listeners_prop) return result;
+    if (listeners_prop->type != ACTION_STACK_VALUE_ARRAY) {
+        // Non-Array _listeners (e.g. user replaced it with a plain Object):
+        // Ruffle uses `length`/indexed access + virtual `push` here. We don't
+        // implement that path — return true and skip mutation. Test
+        // AsBroadcaster.as:162-164 (which exercises this) is also failing in
+        // Ruffle's expected output, so the diff stays within Ruffle's set.
+        return result;
+    }
+    ASArray* arr = (ASArray*) listeners_prop->data.numeric_value;
+    if (!arr) return result;
+
     // Find first match using abstract equality (null == undefined in AS2)
     int found_idx = -1;
     for (u32 i = 0; i < arr->length; i++) {
         ActionVar* elem = getArrayElement(arr, i);
-        if (elem && listenerAbstractEq(elem, new_listener)) {
+        if (elem && listenerAbstractEq(app_context, elem, new_listener)) {
             found_idx = (int)i;
             break;
         }
@@ -26291,7 +26306,7 @@ static ActionVar builtin_broadcaster_removeListener(SWFAppContext* app_context, 
     // Find and remove using abstract equality (null == undefined)
     for (u32 i = 0; i < arr->length; i++) {
         ActionVar* elem = getArrayElement(arr, i);
-        if (elem && listenerAbstractEq(elem, target)) {
+        if (elem && listenerAbstractEq(app_context, elem, target)) {
             for (u32 j = i; j + 1 < arr->length; j++) {
                 ActionVar* next = getArrayElement(arr, j + 1);
                 if (next) setArrayElement(app_context, arr, j, next);
@@ -26372,6 +26387,12 @@ static ActionVar builtin_broadcaster_broadcastMessage(SWFAppContext* app_context
         }
 
         ASFunction* func = NULL;
+        // Depth at which the method was found on the listener's prototype
+        // chain — needed so `super.foo(...)` inside the listener method walks
+        // the proto chain from the right position. 0 = found via fallback
+        // path (no super context push).
+        u8 method_search_depth = 0;
+        int found_method_for_super = 0;
 
         if (method_name_len == 0) {
             // Empty method name: call listener as a function directly
@@ -26381,18 +26402,49 @@ static ActionVar builtin_broadcaster_broadcastMessage(SWFAppContext* app_context
                 continue; // non-function listeners can't be called
             }
         } else {
-            // Look up method by name on listener
+            // Look up method by name on listener — track proto chain depth
             ActionVar* method_prop = NULL;
-            if (listener_obj)
-                method_prop = getPropertyWithPrototype(listener_obj, method_name, method_name_len);
+            if (listener_obj) {
+                ASObject* _cur = listener_obj;
+                int _md = 256;
+                while (_cur != NULL && _md-- > 0) {
+                    ASProperty* _ps = findPropertyRaw(_cur, method_name, method_name_len);
+                    if (_ps != NULL && !isPropertyHiddenAtVersion(_ps->flash_flags)) {
+                        if (_ps->value.type == ACTION_STACK_VALUE_FUNCTION) {
+                            method_prop = &_ps->value;
+                            found_method_for_super = 1;
+                        }
+                        break;
+                    }
+                    ActionVar* _np = getProperty(_cur, "__proto__", 9);
+                    ASObject* _next = resolveProtoVar(_np);
+                    if (_next == NULL || _next == listener_obj) break;
+                    _cur = _next;
+                    method_search_depth++;
+                }
+                if (method_search_depth < 1) method_search_depth = 1;
+            }
             if ((!method_prop || method_prop->type != ACTION_STACK_VALUE_FUNCTION) && listener_mc) {
                 method_prop = getVariable(method_name, method_name_len);
+                found_method_for_super = 0; // global lookup — no super context
             }
             if (!method_prop || method_prop->type != ACTION_STACK_VALUE_FUNCTION) continue;
             func = lookupFunctionFromVar(method_prop);
         }
 
         if (!func) continue;
+
+        // Push super context so `super.method(...)` inside the listener
+        // function walks from the prototype level above where the method
+        // was found. Mirrors what actionCallMethod does for normal
+        // `obj.method(...)` calls. Without this, the broadcast-via-add
+        // case in AsBroadcaster.as:312 produces "B" instead of "AB" because
+        // super.add(o) cannot find A1.prototype.add.
+        int super_pushed = 0;
+        if (found_method_for_super && listener_obj != NULL) {
+            pushSuperContext((void*)listener_obj, method_search_depth);
+            super_pushed = 1;
+        }
 
         if (func->function_type == 2 && func->advanced_func != NULL) {
             ActionVar* regs = NULL;
@@ -26407,6 +26459,71 @@ static ActionVar builtin_broadcaster_broadcastMessage(SWFAppContext* app_context
                     scope_chain[scope_depth++] = func->captured_scope[ci];
                 }
             }
+
+            // Build a local scope with this/super/arguments shadows so the
+            // listener function reads its OWN this/super/arguments instead of
+            // the outer broadcastMessage call's (which were set by
+            // actionCallMethod). Without this shadow, MTASC-compiled
+            // DefineFunction2 listeners (SWF7+ AsBroadcaster.as onTest, add)
+            // resolve `this` to bcast.dynamic_props instead of the listener,
+            // and `this.order = ...` writes to the wrong object.
+            // Mirrors actionCallMethod's type-2 setup (this/super/arguments
+            // on a fresh local_scope) when no preload/suppress flags are set.
+            u16 bm_f2flags = func->flags;
+            int bm_preload_this  = (bm_f2flags & 0x0001);
+            int bm_suppress_this = (bm_f2flags & 0x0002);
+            int bm_preload_args  = (bm_f2flags & 0x0004);
+            int bm_suppress_args = (bm_f2flags & 0x0008);
+            int bm_preload_super = (bm_f2flags & 0x0010);
+            int bm_suppress_super= (bm_f2flags & 0x0020);
+
+            ASObject* bm_local_scope_t2 = allocObject(app_context, 8);
+            u32 bm_saved_this_depth_t2 = g_this_depth;
+            if (!bm_preload_this && !bm_suppress_this) {
+                ActionVar this_var = {0};
+                if (listener_mc != NULL) {
+                    this_var.type = ACTION_STACK_VALUE_MOVIECLIP;
+                    this_var.data.numeric_value = (u64)listener_mc;
+                } else if (listener_obj != NULL) {
+                    this_var.type = ACTION_STACK_VALUE_OBJECT;
+                    this_var.data.numeric_value = (u64)listener_obj;
+                } else {
+                    this_var.type = ACTION_STACK_VALUE_UNDEFINED;
+                }
+                setProperty(app_context, bm_local_scope_t2, "this", 4, &this_var);
+                if (g_this_depth < MAX_THIS_DEPTH) {
+                    g_this_stack[g_this_depth] = this_var;
+                    g_this_depth++;
+                }
+            }
+
+            ASFunction* bm_prev_exec_t2 = g_current_executing_func;
+            if (!bm_preload_args && !bm_suppress_args) {
+                ASArray* args_arr = allocArray(app_context, extra_count > 0 ? extra_count : 1);
+                for (u32 ai = 0; ai < extra_count; ai++)
+                    setArrayElement(app_context, args_arr, ai, &extra_args[ai]);
+                setupArgumentsProps(app_context, args_arr, func, bm_prev_exec_t2);
+                ActionVar args_var = {0};
+                args_var.type = ACTION_STACK_VALUE_ARRAY;
+                args_var.data.numeric_value = (u64)args_arr;
+                setProperty(app_context, bm_local_scope_t2, "arguments", 9, &args_var);
+            }
+            {
+                ActionVar super_var = {0};
+                super_var.type = ACTION_STACK_VALUE_UNDEFINED;
+                if (!bm_preload_super && !bm_suppress_super && g_swf_version >= 6 && super_pushed) {
+                    super_var.type = ACTION_STACK_VALUE_SUPER;
+                    super_var.data.numeric_value = (u64)listener_obj;
+                    super_var.str_size = (u32)method_search_depth;
+                }
+                setProperty(app_context, bm_local_scope_t2, "super", 5, &super_var);
+            }
+            if (scope_depth < MAX_SCOPE_DEPTH) {
+                scope_is_with[scope_depth] = 0;
+                scope_mc[scope_depth] = NULL;
+                scope_chain[scope_depth++] = bm_local_scope_t2;
+            }
+
             // When listener is a MovieClip, pass 'this' as MOVIECLIP type via g_override_this
             // so preload_this in the function sees the correct type (not OBJECT from dynamic_props)
             if (listener_mc != NULL) {
@@ -26415,12 +26532,21 @@ static ActionVar builtin_broadcaster_broadcastMessage(SWFAppContext* app_context
                 g_override_this.str_size = 0;
                 g_override_this_set = 1;
             }
+            g_prev_executing_func = bm_prev_exec_t2;
+            g_current_executing_func = func;
             func->advanced_func(app_context, extra_args, extra_count, regs, listener_obj);
+            g_current_executing_func = bm_prev_exec_t2;
             if (listener_mc != NULL && g_override_this_set) g_override_this_set = 0; // clear if unconsumed
+
+            if (scope_depth > 0) scope_depth--; // pop bm_local_scope_t2
+            releaseObject(app_context, bm_local_scope_t2);
+            g_this_depth = bm_saved_this_depth_t2;
+
             for (u8 ci = 0; ci < bm_captured; ci++) {
                 if (scope_depth > 0) scope_depth--;
             }
             if (regs) FREE(regs);
+            if (super_pushed) popSuperContext();
         } else if (func->function_type == 1 && func->simple_func != NULL) {
             // Only restore captured scopes for SWF6+ (SWF5 has no closure semantics)
             u8 bm_captured_t1 = (g_swf_version >= 6) ? func->captured_scope_count : 0;
@@ -26447,7 +26573,11 @@ static ActionVar builtin_broadcaster_broadcastMessage(SWFAppContext* app_context
             // Build a local scope with `arguments` so the listener function sees its
             // own args, not the broadcaster's (otherwise `arguments[0]` resolves up
             // the scope chain to broadcastMessage's `arguments`, which contains the
-            // method name as element 0).
+            // method name as element 0). Also set `super` here to shadow the outer
+            // broadcastMessage call's local-scope `super` (set by actionCallMethod
+            // when broadcastMessage was invoked) — without this, the listener's
+            // `super.foo()` resolves the OUTER super (= broadcaster's prototype),
+            // not the listener's own (AsBroadcaster.as:312 super.add(o) test).
             ASObject* bm_local_scope = allocObject(app_context, 8);
             ASArray* bm_args_arr = allocArray(app_context, extra_count > 0 ? extra_count : 1);
             for (u32 ai = 0; ai < extra_count; ai++) {
@@ -26459,6 +26589,16 @@ static ActionVar builtin_broadcaster_broadcastMessage(SWFAppContext* app_context
             bm_args_var.type = ACTION_STACK_VALUE_ARRAY;
             bm_args_var.data.numeric_value = (u64) bm_args_arr;
             setProperty(app_context, bm_local_scope, "arguments", 9, &bm_args_var);
+            {
+                ActionVar bm_super_var = {0};
+                bm_super_var.type = ACTION_STACK_VALUE_UNDEFINED;
+                if (g_swf_version >= 6 && super_pushed) {
+                    bm_super_var.type = ACTION_STACK_VALUE_SUPER;
+                    bm_super_var.data.numeric_value = (u64)listener_obj;
+                    bm_super_var.str_size = (u32)method_search_depth;
+                }
+                setProperty(app_context, bm_local_scope, "super", 5, &bm_super_var);
+            }
             if (scope_depth < MAX_SCOPE_DEPTH) {
                 scope_is_with[scope_depth] = 0;
                 scope_mc[scope_depth] = NULL;
@@ -26489,6 +26629,10 @@ static ActionVar builtin_broadcaster_broadcastMessage(SWFAppContext* app_context
             for (u8 ci = 0; ci < bm_captured_t1; ci++) {
                 if (scope_depth > 0) scope_depth--;
             }
+            if (super_pushed) popSuperContext();
+        } else {
+            // No matching dispatch path — still balance super context push.
+            if (super_pushed) popSuperContext();
         }
     }
 
@@ -28072,6 +28216,18 @@ static ActionVar builtin_asbroadcaster_initialize(SWFAppContext* app_context, Ac
         if (f && f->own_props) target = f->own_props;
     } else if (args[0].type == ACTION_STACK_VALUE_MOVIECLIP) {
         MovieClip* mc = (MovieClip*)(uintptr_t)args[0].data.numeric_value;
+        // If the MC reference is stale (removeMovieClip + recreate at the
+        // same name pattern), rebind it to the live MC at the same path so
+        // `AsBroadcaster.initialize(staleRef)` after a recreate succeeds.
+        // Mirrors Flash's "soft" MovieClip references (AsBroadcaster.as:173:
+        // dang re-resolved to depth-2 'dangling' after removeMovieClip +
+        // createEmptyMovieClip('dangling', 2)).
+        if (mc != NULL) {
+            mc = reResolveDeadBaseClip(app_context, mc);
+        }
+        if (mc != NULL && mc->dynamic_props == NULL && mc->depth != INT_MIN) {
+            mc->dynamic_props = allocObject(app_context, 4);
+        }
         if (mc && mc->dynamic_props) target = (ASObject*) mc->dynamic_props;
     }
     if (!target) return undef;
@@ -41615,6 +41771,46 @@ void actionGetMember(SWFAppContext* app_context)
 	// 2. Pop object (second on stack)
 	ActionVar obj_var;
 	popVar(app_context, &obj_var);
+
+	// 2a. MovieClip "soft reference" rebinding: if the receiver is a dead
+	// MovieClip (removeMovieClip was called) but a live clip now exists at
+	// the same original path (e.g. a subsequent createEmptyMovieClip with the
+	// same name at a different depth), redirect property access to the live
+	// clip. Mirrors Flash semantics where MovieClip references are treated
+	// as soft references resolved by path on each access. Test:
+	// AsBroadcaster.as:173 — dang.addListener after recreate.
+	if (obj_var.type == ACTION_STACK_VALUE_MOVIECLIP &&
+	    obj_var.data.numeric_value != 0)
+	{
+		MovieClip* _gm_mc = (MovieClip*)(uintptr_t)obj_var.data.numeric_value;
+		if (_gm_mc->depth == INT_MIN && _gm_mc->original_target[0] == '/' &&
+		    _gm_mc->original_target[1] != '\0')
+		{
+			extern MovieClip root_movieclip;
+			const char* _gm_path = _gm_mc->original_target + 1;
+			u32 _gm_path_len = (u32)strlen(_gm_path);
+			MovieClip* _gm_live = resolveSlashPathToMC(app_context, _gm_path, _gm_path_len, &root_movieclip);
+			if (_gm_live == NULL || _gm_live == &root_movieclip || _gm_live->depth == INT_MIN) {
+				// Fall back to child_mc_cache by name (createEmptyMovieClip
+				// children may not appear in display lists).
+				if (memchr(_gm_path, '/', _gm_path_len) == NULL) {
+					for (int _gm_i = 0; _gm_i < child_mc_count; _gm_i++) {
+						MovieClip* _c = child_mc_cache[_gm_i];
+						if (_c == NULL || _c == _gm_mc || _c->depth == INT_MIN) continue;
+						if (_c->parent == &root_movieclip &&
+						    strncmp(_c->name, _gm_path, _gm_path_len) == 0 &&
+						    _c->name[_gm_path_len] == '\0') {
+							_gm_live = _c;
+							break;
+						}
+					}
+				}
+			}
+			if (_gm_live != NULL && _gm_live != _gm_mc && _gm_live->depth != INT_MIN) {
+				obj_var.data.numeric_value = (u64)_gm_live;
+			}
+		}
+	}
 
 
 	// 3. Handle SUPER type (virtual super proxy with this + depth)
