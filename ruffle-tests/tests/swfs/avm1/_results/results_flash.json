@@ -1,8 +1,8 @@
 {
   "metadata": {
-    "timestamp": "2026-04-30T19:11:32.075211+00:00",
-    "git_sha": "d26475209e73972da89ea8bf8357cf3596acd95b",
-    "duration_seconds": 4.6,
+    "timestamp": "2026-04-30T19:48:09.598061+00:00",
+    "git_sha": "f62d59c41f0265ead32a6eff20b1398a48a05019",
+    "duration_seconds": 4.34,
     "total_available": 3
   },
   "total": 3,
@@ -20,8 +20,8 @@
       "test": "global_instance_decls",
       "phases": {
         "recomp": 0.0,
-        "compile": 2.207,
-        "run": 0.023
+        "compile": 1.574,
+        "run": 0.035
       },
       "num_frames": 1,
       "lines": {
@@ -29,7 +29,7 @@
         "expected_lines": 853,
         "matching_lines": 455
       },
-      "duration": 2.23,
+      "duration": 1.61,
       "status": "output_mismatch",
       "detail": "398 line(s) differ (actual=796, expected=853)",
       "actual_output": "... (433 lines before) ...\n  clone, DONT_ENUM, type=[function]\n_global.flash.filters.BitmapFilter, instance=[[object Object]], type=[object]\n  __proto__, own, type=[object]\n  __constructor__, own, type=[function]\n  clone, DONT_ENUM, type=[function]\n_global.flash.display.BitmapData, instance=[undefined], type=[undefined]\n_global.flash.display.BitmapData, instance=[undefined], type=[undefined]\n_global.flash.display.BitmapData, instance=[[object Object]], type=[object]\n  __proto__, own, type=[object]\n  width, DONT_ENUM, READ_ONLY, type=[number]\n  height, DONT_ENUM, READ_ONLY, type=[number]\n  rectangle, DONT_ENUM, READ_ONLY, type=[object]\n  transparent, DONT_ENUM, READ_ONLY, type=[boolean]\n  getPixel, DONT_ENUM, type=[function]\n  setPixel, DONT_ENUM, type=[function]\n  fillRect, DONT_ENUM, type=[function]\n  copyPixels, DONT_ENUM, type=[function]\n  applyFilter, DONT_ENUM, type=[function]\n  scroll, DONT_ENUM, type=[function]\n  threshold, DONT_ENUM, type=[function]\n  draw, DONT_ENUM, type=[function]\n  pixelDissolve, DONT_ENUM, type=[function]\n  getPixel32, DONT_ENUM, type=[function]\n  setPixel32, DONT_ENUM, type=[function]\n  floodFill, DONT_ENUM, type=[function]\n  getColorBoundsRect, DONT_ENUM, type=[function]\n  perlinNoise, DONT_ENUM, type=[function]\n  colorTransform, DONT_ENUM, type=[function]\n  hitTest, DONT_ENUM, type=[function]\n  paletteMap, DONT_ENUM, type=[function]\n  merge, DONT_ENUM, type=[function]\n  noise, DONT_ENUM, type=[function]\n  copyChannel, DONT_ENUM, type=[function]\n  clone, DONT_ENUM, type=[function]\n  dispose, DONT_ENUM, type=[function]\n  generateFilterRect, DONT_ENUM, type=[function]\n  compare, DONT_ENUM, type=[function]\n_global.flash.display.BitmapData, instance=[undefined], type=[undefined]\n_global.flash.text.TextRenderer, instance=[[object Object]], type=[object]\n  __proto__, own, type=[object]\n  __constructor__, own, type=[function]\n_global.System.security.PolicyFileResolver, instance=[[object Object]], type=[object]\n  __proto__, own, type=[object]\n  __constructor__, own, type=[function]\n  resolve, DONT_ENUM, type=[function]\n_global.System.security.__constructor__, instance=[[object Object]], type=[object]\n  __proto__, own, type=[object]\n  __constructor__, own, type=[function]\n_global.System.Product, instance=[[object Object]], type=[object]\n  __proto__, own, READ_ONLY, DONT_DELETE, type=[object]\n... (313 lines after) ...",
@@ -39,8 +39,8 @@
       "test": "global_proto_decls",
       "phases": {
         "recomp": 0.0,
-        "compile": 1.146,
-        "run": 0.022
+        "compile": 1.306,
+        "run": 0.028
       },
       "num_frames": 1,
       "lines": {
@@ -48,7 +48,7 @@
         "expected_lines": 3714,
         "matching_lines": 1421
       },
-      "duration": 1.18,
+      "duration": 1.34,
       "status": "output_mismatch",
       "detail": "2350 line(s) differ (actual=3771, expected=3714)",
       "actual_output": "... (516 lines before) ...\nTesting _global.System\n  privateBytes, own, READ_ONLY, type=[number]\n  IME, own, type=[object]\n  setClipboard, own, type=[function]\n  security, own, type=[object]\n  useCodepage, own, type=[boolean]\n  exactSettings, own, type=[boolean]\n  showSettings, own, type=[function]\n  Product, own, type=[function]\n  capabilities, own, type=[object]\n  __proto__, own, type=[object]\n  constructor, own, type=[function]\nTesting _global.System.privateBytes\nTesting _global.System.IME\n  _listeners, own, DONT_ENUM, READ_ONLY, type=[object]\n  removeListener, own, DONT_ENUM, READ_ONLY, type=[function]\n  addListener, own, DONT_ENUM, READ_ONLY, type=[function]\n  broadcastMessage, own, DONT_ENUM, READ_ONLY, type=[function]\n  doConversion, own, DONT_ENUM, READ_ONLY, type=[function]\n  setCompositionString, own, DONT_ENUM, READ_ONLY, type=[function]\n  setConversionMode, own, DONT_ENUM, READ_ONLY, type=[function]\n  getConversionMode, own, DONT_ENUM, READ_ONLY, type=[function]\n  setEnabled, own, DONT_ENUM, READ_ONLY, type=[function]\n  getEnabled, own, DONT_ENUM, READ_ONLY, type=[function]\n  ALPHANUMERIC_FULL, own, DONT_ENUM, READ_ONLY, type=[string]\n  ALPHANUMERIC_HALF, own, DONT_ENUM, READ_ONLY, type=[string]\n  CHINESE, own, DONT_ENUM, READ_ONLY, type=[string]\n  JAPANESE_HIRAGANA, own, DONT_ENUM, READ_ONLY, type=[string]\n  JAPANESE_KATAKANA_FULL, own, DONT_ENUM, READ_ONLY, type=[string]\n  JAPANESE_KATAKANA_HALF, own, DONT_ENUM, READ_ONLY, type=[string]\n  KOREAN, own, DONT_ENUM, READ_ONLY, type=[string]\n  UNKNOWN, own, DONT_ENUM, READ_ONLY, type=[string]\n  __proto__, own, READ_ONLY, type=[object]\n  constructor, own, READ_ONLY, type=[function]\nTesting _global.System.IME._listeners\nTesting _global.System.IME.removeListener\n  prototype, own, DONT_ENUM, type=[object]\n  __proto__, own, type=[object]\n  constructor, own, type=[function]\nTesting _global.System.IME.removeListener.prototype\n  __proto__, own, type=[object]\n  constructor, own, type=[function]\nTesting _global.System.IME.addListener\n  prototype, own, DONT_ENUM, type=[object]\n  __proto__, own, type=[object]\n  constructor, own, type=[function]\nTesting _global.System.IME.addListener.prototype\n  __proto__, own, type=[object]\n  constructor, own, type=[function]\nTesting _global.System.IME.broadcastMessage\n... (3205 lines after) ...",
@@ -58,8 +58,8 @@
       "test": "global_proto_decls_delete",
       "phases": {
         "recomp": 0.0,
-        "compile": 1.002,
-        "run": 0.015
+        "compile": 1.162,
+        "run": 0.018
       },
       "num_frames": 1,
       "lines": {
@@ -67,7 +67,7 @@
         "expected_lines": 874,
         "matching_lines": 338
       },
-      "duration": 1.02,
+      "duration": 1.19,
       "status": "output_mismatch",
       "detail": "2030 line(s) differ (actual=2368, expected=874)",
       "actual_output": "... (326 lines before) ...\n  UNKNOWN, DONT_DELETE\n  __proto__, DONT_DELETE\n  constructor, DONT_DELETE\nTesting _global.System.setClipboard\nTesting _global.System.security.PolicyFileResolver\n  prototype, DONT_DELETE\nTesting _global.System.security.PolicyFileResolver.prototype\nTesting _global.System.security.sandboxType\nTesting _global.System.security.escapeDomain\nTesting _global.System.security.chooseLocalSwfPath\nTesting _global.System.security.loadPolicyFile\nTesting _global.System.security.allowInsecureDomain\nTesting _global.System.security.allowDomain\nTesting _global.System.security.__constructor__\n  prototype, DONT_DELETE\nTesting _global.System.security.__constructor__.prototype\n  toLocaleString, DONT_DELETE\n  isPropertyEnumerable, DONT_DELETE\n  isPrototypeOf, DONT_DELETE\n  hasOwnProperty, DONT_DELETE\n  toString, DONT_DELETE\n  valueOf, DONT_DELETE\n  addProperty, DONT_DELETE\n  unwatch, DONT_DELETE\n  watch, DONT_DELETE\n  constructor, DONT_DELETE\nTesting _global.System.security\n  toLocaleString, DONT_DELETE\n  isPropertyEnumerable, DONT_DELETE\n  isPrototypeOf, DONT_DELETE\n  hasOwnProperty, DONT_DELETE\n  toString, DONT_DELETE\n  valueOf, DONT_DELETE\n  addProperty, DONT_DELETE\n  unwatch, DONT_DELETE\n  watch, DONT_DELETE\n  __proto__, DONT_DELETE\nTesting _global.System.useCodepage\nTesting _global.System.exactSettings\nTesting _global.System.showSettings\n  toLocaleString, DONT_DELETE\n  isPropertyEnumerable, DONT_DELETE\n  isPrototypeOf, DONT_DELETE\n  hasOwnProperty, DONT_DELETE\n  toString, DONT_DELETE\n  valueOf, DONT_DELETE\n  addProperty, DONT_DELETE\n  unwatch, DONT_DELETE\n  watch, DONT_DELETE\nTesting _global.System.Product\n... (1992 lines after) ...",
