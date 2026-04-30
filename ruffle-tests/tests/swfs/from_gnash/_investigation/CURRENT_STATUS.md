@@ -14,6 +14,50 @@ Last updated: 2026-04-29 (CI snapshot at 205a9a77 includes all recent fixes thro
 
 ### Latest fixes (2026-04-29, pending CI)
 
+- **HitTest-v6 / HitTest-v7 / HitTest-v8 (actionscript.all) → ruffle_matched (+3 effective).**
+  Three-part fix to the AVM1 `MovieClip.hitTest` implementation in
+  `SWFModernRuntime/src/actionmodern/action.c`:
+  1. **`mcGetOriginalBounds` for root.** Removed the `if (mc != &root_movieclip)`
+     gate around the dynamic-children fallback (was added in de8b5c0b for an
+     unrelated fix). Without it, `_root._width` on a movie whose only children
+     come from `createEmptyMovieClip`/`attachMovie` returned `nat_w = 0`, which
+     made `mcSetEffectiveWidth(root, N)` zero out both `xscale` and `yscale`
+     via the empty-clip branch — and `_xscale = 100;` only restores xscale, so
+     yscale stayed 0 and silently degenerated every subsequent `hitTest` world
+     matrix to `d=0` (lines 38–40 / 45–48 / 73–76 of HitTest expected the
+     post-`a._y = 100` translation to propagate, but the collapsed yscale in
+     `getConcatMatrixForMC` zeroed out the y component). Mirrors Ruffle's
+     `bounds(BoundsMode::Script)` which recurses through children regardless of
+     whether the receiver is the root.
+  2. **Winding-number test for un-finalized drawing paths.** New
+     `drawingCmdWindingHitTest` walks the live `DrawCmd` list (no `endFill`
+     yet, so `path_count == 0`) and computes a winding number using
+     half-open y intervals — mirrors Ruffle's `winding_number_line`
+     (`render/src/shape_utils.rs:976`) and its NonZero rule. Replaces the
+     prior over-approximation `path_count == 0 && cmd_count > 0 → hit = 1`
+     which always reported a hit anywhere in the per-MC bounds, so corners
+     and exterior-of-polygon points (lines 11/14, 37, 65–68) reported true
+     even though Flash/Ruffle return false there.
+  3. **Round matrix → twips for hit test.** Both the test point's root-space
+     transform and the world-AABB corner transforms in `COMPUTE_GLOBAL_AABB`
+     now `round(...)` the resulting twip values, mirroring Ruffle's
+     `round_to_i32` in `Matrix * Point<Twips>` / `Matrix * Rectangle<Twips>`
+     (`render/src/matrix.rs:208,229`). Without this, `_xscale = 0.5;
+     b.hitTest(151, 250, false)` computes the test point at twip 15.1 vs
+     gxmax = 15.0 (out), while Ruffle rounds 15.1 → 15 (in). Line 83.
+  Net effect: each test goes from 12–17 line diffs to a diff that is a
+  subset of Ruffle's 7-line diff against gnash, promoting all three to
+  ruffle_matched. Verified on a 44-test AVM1 lifecycle/hit-test battery
+  (44/44 — no regressions across `hittest_lockroot`, `hittest_morph`,
+  `hittest_winding_rule`, `movieclip_hittest`, `bitmap_data_hittest`,
+  `movieclip_setmask`, `selection`, `goto_*`, `unload`, etc.), a 17-test
+  AVM1 transform/bounds battery (17/17 — `as_transformed_flag`,
+  `color_transform`, `matrix`, `transform`, `edittext_width_height`,
+  `movieclip_invalid_get_bounds_1..8`, etc.), a 37-test gnash actionscript
+  primitives + HitTest battery (36/37 effective — only pre-existing
+  `array-v5` failure unchanged), and a 15-test misc-ming recently-fixed
+  battery (15/15).
+
 - **Number-v5 (actionscript.all) → ruffle_matched (+1 effective).** `convertFloat`
   in `SWFModernRuntime/src/actionmodern/action.c` now coerces plain OBJECTs to
   NaN in SWF5+ when the valueOf-fallback is hit (i.e., `Object.prototype.valueOf`

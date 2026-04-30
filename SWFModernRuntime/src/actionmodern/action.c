@@ -21434,6 +21434,78 @@ static void drawingAddCmd(DrawingState* ds, u8 type, float x, float y, float cx,
 	c->cx = cx; c->cy = cy;
 }
 
+// Winding-number contribution from a single line segment (begin → end) for
+// test point (tx, ty). Mirrors Ruffle's `winding_number_line` in
+// `render/src/shape_utils.rs:976` — half-open y interval (inclusive start,
+// exclusive end) so vertex-incident points aren't double-counted, and the
+// perp-dot side test uses ≥ for downward / ≤ for upward to keep corner
+// hits consistent with Flash's "exclude bottom-right corner" behavior.
+static int drawingWindingLine(double tx, double ty,
+	double bx, double by, double ex, double ey)
+{
+	double d0x = tx - bx, d0y = ty - by;
+	double d1x = ex - bx, d1y = ey - by;
+	if (by <= ty && ty < ey) {
+		if (d1x * d0y >= d1y * d0x) return 1;
+	}
+	if (ey <= ty && ty < by) {
+		if (d1x * d0y <= d1y * d0x) return -1;
+	}
+	return 0;
+}
+
+// Winding number test on a command list (un-triangulated). Test point in
+// pixels (matches DrawCmd coords). Bezier curves are flattened with the
+// same adaptive segment count used by drawingFinalizePath. Returns true if
+// winding is non-zero (NonZero fill rule, Flash's drawing-API default).
+static int drawingCmdWindingHitTest(const DrawingState* ds,
+	double tx_px, double ty_px)
+{
+	if (ds == NULL || ds->cmd_count == 0) return 0;
+	double cx = 0.0, cy = 0.0;
+	double fsx = 0.0, fsy = 0.0;
+	int has_start = 0;
+	int winding = 0;
+	for (u32 i = 0; i < ds->cmd_count; i++) {
+		const DrawCmd* c = &ds->cmds[i];
+		if (c->type == 0) {
+			cx = c->x; cy = c->y;
+			fsx = cx; fsy = cy;
+			has_start = 1;
+		} else if (c->type == 1) {
+			if (!has_start) { fsx = cx; fsy = cy; has_start = 1; }
+			winding += drawingWindingLine(tx_px, ty_px, cx, cy, c->x, c->y);
+			cx = c->x; cy = c->y;
+		} else if (c->type == 2) {
+			if (!has_start) { fsx = cx; fsy = cy; has_start = 1; }
+			double sx = cx, sy = cy;
+			double mx = (sx + (double)c->x) * 0.5;
+			double my = (sy + (double)c->y) * 0.5;
+			double dx = (double)c->cx - mx, dy = (double)c->cy - my;
+			double flatness = dx*dx + dy*dy;
+			int segs;
+			if (flatness < 0.25) segs = 1;
+			else if (flatness < 4.0) segs = 4;
+			else if (flatness < 25.0) segs = 8;
+			else segs = 16;
+			double prev_x = sx, prev_y = sy;
+			for (int s = 1; s <= segs; s++) {
+				double t = (double)s / (double)segs;
+				double u = 1.0 - t;
+				double px = u*u*sx + 2*u*t*(double)c->cx + t*t*(double)c->x;
+				double py = u*u*sy + 2*u*t*(double)c->cy + t*t*(double)c->y;
+				winding += drawingWindingLine(tx_px, ty_px, prev_x, prev_y, px, py);
+				prev_x = px; prev_y = py;
+			}
+			cx = c->x; cy = c->y;
+		}
+	}
+	if (has_start && (cx != fsx || cy != fsy)) {
+		winding += drawingWindingLine(tx_px, ty_px, cx, cy, fsx, fsy);
+	}
+	return winding != 0;
+}
+
 static void drawingUpdateBounds(MovieClip* mc, float x, float y)
 {
 	if (!mc->draw_has_bounds) {
@@ -21967,12 +22039,12 @@ static int mcGetOriginalBounds(MovieClip* mc, double* out_nat_w, double* out_nat
 	}
 
 	// Fallback: compute bounds from dynamically-attached children (via child_mc_cache).
-	// This handles MCs whose children were added via attachMovie — not in the static
-	// display list but trackable through the parent pointer.
-	// Guard: only for MCs that actually have dynamically-attached children
-	// (parent is set during attachMovie). Skip MCs where display_obj lookup didn't find
-	// them in the static display list — those are already handled above.
-	if (mc != &root_movieclip) {
+	// This handles MCs whose children were added via attachMovie or
+	// createEmptyMovieClip — not in the static display list but trackable
+	// through the parent pointer. Includes root, so e.g. setting `_width`
+	// on root with only script-created children scales correctly instead
+	// of zeroing both xscale and yscale.
+	{
 		double cxmin = 1e30, cxmax = -1e30, cymin = 1e30, cymax = -1e30;
 		int found_child = 0;
 		for (int ci = 0; ci < child_mc_count; ci++) {
@@ -57422,8 +57494,9 @@ void actionCallMethod(SWFAppContext* app_context, char* str_buffer)
 						}; \
 						for (int _hci = 0; _hci < 4; _hci++) { \
 							double _hpx = _hcorners[_hci][0], _hpy = _hcorners[_hci][1]; \
-							double _hox = _hwa*_hpx + _hwc*_hpy + _hwtx; \
-							double _hoy = _hwb*_hpx + _hwd*_hpy + _hwty; \
+							/* Round to integer twips per Ruffle's `Matrix * Point<Twips>` */ \
+							double _hox = round(_hwa*_hpx + _hwc*_hpy + _hwtx); \
+							double _hoy = round(_hwb*_hpx + _hwd*_hpy + _hwty); \
 							if (_hci == 0) { out_xmin=out_xmax=_hox; out_ymin=out_ymax=_hoy; } \
 							else { if (_hox<out_xmin) out_xmin=_hox; if (_hox>out_xmax) out_xmax=_hox; \
 								   if (_hoy<out_ymin) out_ymin=_hoy; if (_hoy>out_ymax) out_ymax=_hoy; } \
@@ -57463,7 +57536,12 @@ void actionCallMethod(SWFAppContext* app_context, char* str_buffer)
 					}
 
 					// Convert test point from root-local to global (stage) space (twips)
-					// Apply _root's AS-set transform
+					// Apply _root's AS-set transform. Round to integer twips to mirror
+					// Ruffle's `Matrix * Point<Twips>` (`render/src/matrix.rs:208` —
+					// `round_to_i32`) so corner / boundary cases match. Without this
+					// rounding, a test like `b.hitTest(151, 250, false)` after
+					// `_xscale = 0.5` (0.005 unit) computes ptx = 15.1 vs gxmax = 15.0
+					// and reports out-of-bounds — Ruffle rounds to 15 and reports hit.
 					double ptx_local = tx * 20.0;
 					double pty_local = ty * 20.0;
 					double rxs = (double)root_movieclip.xscale / 100.0;
@@ -57474,8 +57552,8 @@ void actionCallMethod(SWFAppContext* app_context, char* str_buffer)
 					double rrc = -rsin * rys, rrd = rcos * rys;
 					double rrtx = (double)root_movieclip.x * 20.0;
 					double rrty = (double)root_movieclip.y * 20.0;
-					double ptx = rra * ptx_local + rrc * pty_local + rrtx;
-					double pty = rrb * ptx_local + rrd * pty_local + rrty;
+					double ptx = round(rra * ptx_local + rrc * pty_local + rrtx);
+					double pty = round(rrb * ptx_local + rrd * pty_local + rrty);
 
 					// AVM hitTest skips masks (Ruffle: AVM_HIT_TEST contains SKIP_MASK).
 					// A clip used as a mask returns false from hitTest(x, y, ...).
@@ -57553,12 +57631,17 @@ void actionCallMethod(SWFAppContext* app_context, char* str_buffer)
 									// Test against actual drawing path triangles (in twips)
 									double ltx = dlx * 20.0, lty = dly * 20.0;
 									DrawingState* _hds = (DrawingState*)mc->drawing_state;
-									// If the drawing has un-finalized commands (no endFill called),
-									// path_count is 0 — fall back to bounds-only hit since the
-									// commands haven't been triangulated. We already passed the
-									// per-MC draw_xmin/xmax check above.
-									if (_hds->path_count == 0 && _hds->cmd_count > 0)
-										hit = 1;
+									// Un-finalized commands (no endFill called yet) — do a
+									// winding-number test directly on the cmd list. Mirrors
+									// Ruffle's `Drawing::hit_test` over `current_fill`
+									// (`core/src/drawing.rs:359`) and gives proper corner
+									// behavior (Flash excludes bottom-right corner via the
+									// half-open y interval), which the previous "any cmds →
+									// hit" fallback over-approximated.
+									if (_hds->path_count == 0 && _hds->cmd_count > 0) {
+										if (drawingCmdWindingHitTest(_hds, dlx, dly))
+											hit = 1;
+									}
 									for (u32 _hdp = 0; _hdp < _hds->path_count && !hit; _hdp++) {
 										DrawPath* _hdpath = &_hds->paths[_hdp];
 										// Test fill triangles
