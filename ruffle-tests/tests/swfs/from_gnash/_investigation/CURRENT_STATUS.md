@@ -1,6 +1,6 @@
 # Gnash Test Suite Status
 
-Last updated: 2026-04-29 (CI snapshot at 205a9a77 includes all recent fixes through ResolveEventsTest / event_handler_scope_test / Selection-vN / LoadVars-vN / loop_test2/3/4/5/9 / static_vs_dynamic1/2 / displaylist_depths_test11 / DefineEditTextVariableNameTest2 / movieclip_destruction_test2 (52/56) / loop_test8 (37/38) / new_child_in_unload_test / instanceNameTest / attachMovieTest / shape_test / get_frame_number_test / place_and_remove_object_test / DefineEditTextTest / timeline_var_test / reverse_execute_PlaceObject2_test1/2 / action_execution_order_test8-v5/v6 / stackscope / submoviegetvar / edittext_test1.)
+Last updated: 2026-04-30 (CI snapshot at 205a9a77 includes all recent fixes through ResolveEventsTest / event_handler_scope_test / Selection-vN / LoadVars-vN / loop_test2/3/4/5/9 / static_vs_dynamic1/2 / displaylist_depths_test11 / DefineEditTextVariableNameTest2 / movieclip_destruction_test2 (52/56) / loop_test8 (37/38) / new_child_in_unload_test / instanceNameTest / attachMovieTest / shape_test / get_frame_number_test / place_and_remove_object_test / DefineEditTextTest / timeline_var_test / reverse_execute_PlaceObject2_test1/2 / action_execution_order_test8-v5/v6 / stackscope / submoviegetvar / edittext_test1. Local fixes pending CI: replace_sprites1test, case-v6.)
 
 ### CI snapshot (commit 205a9a77, run 2026-04-25)
 
@@ -12,7 +12,55 @@ Last updated: 2026-04-29 (CI snapshot at 205a9a77 includes all recent fixes thro
 | misc-swfc.all | 8 | 16 | 50.0% |
 | misc-swfmill.all | 16 | 18 | 88.9% |
 
-### Latest fixes (2026-04-29, pending CI)
+### Latest fixes (2026-04-30, pending CI)
+
+- **`case-v6` (actionscript.all) → PASS (+1).** Two-part fix in
+  `SWFModernRuntime/src/actionmodern/action.c` for the residual SWF6
+  blockers documented in `incomplete/GNASH_FEATURE_PLAN.md` §16.
+  1. **Slash-path `SetProperty`/`GetProperty` (Issue A).**
+     `actionSetProperty` and `actionGetProperty` now route absolute
+     slash-path targets (e.g. `/_ROOT/MC0/`) through
+     `resolveSlashPathToMC` when `getMovieClipByTarget` /
+     `getMovieClipByRelativeName` both fail. `resolveSlashPathToMC`
+     itself switched from `strcmp` to `swf_name_match` for `_root` /
+     `_level0` special-name matching and for `instance_name` matching
+     across both the `cur_sprite_dl` walk and the `display_obj`
+     fallback path, so SWF<=6 case-insensitive lookup works inside
+     slash-path traversal. Trailing `/` and `_ROOT` (uppercase) →
+     `_root` resolution were already structurally supported but gated
+     behind exact-case checks. Required by case.as:62-71's inline-asm
+     `setproperty` of `mC0._X = 100` via `/_ROOT/MC0/`.
+  2. **Case-insensitive `createEmptyMovieClip` variable rebind
+     (Issue B).** The method-form `createEmptyMovieClip` path inside
+     `actionCallMethod` now mirrors the function-form
+     `actionCallFunction` path: skip
+     `setProperty(parent.dynamic_props, name, ...)` if `getProperty`
+     finds an existing case-insensitive match (SWF<=6 via
+     `prop_name_match`), and skip `setVariableByName` for root MCs if
+     `var_map` already has a case-insensitive entry (folded via ASCII
+     `[A-Z]→[a-z]` to mirror `setVariableByName`/`getVariableByName`'s
+     SWF<=6 key-fold). Required by case.as:96-170 — Flash creates MC2
+     on the display list at depth 7 but leaves `_root.clip` /
+     `_root.CLIP` bound to MC1 at depth 6 because both names collide
+     case-insensitively in SWF6's name table.
+  Verified: 8-test AVM1 path battery (movieclip_state_values,
+  path_string, slash_syntax, string_paths_basic, swf5_no_closure,
+  target_path, tell_target_invalid, tell_target_invalid_swf6 — 8/8
+  PASS), 7-test AVM1 createEmptyMovieClip / instance-name battery
+  (conflicting_instance_names, create_empty_movie_clip,
+  default_names, init_object_order, movieclip_depth_methods,
+  movieclip_get_instance_at_depth, movieclip_init_object — 7/7 PASS),
+  14-test gnash actionscript.all primitives battery (Boolean-v5/v6,
+  Color-v5..v8, Inheritance-v5/v6, Number-v5..v8, toString_valueOf-v5/v6
+  — 9 PASS + 5 RM = 14/14 effective), 11-test gnash mixed battery
+  (Inheritance-v5/v6, MovieClip-v5 unchanged mismatch, Selection-v6
+  RM, Stage-v5, case-v5 unchanged mismatch, case-v7, case-v8,
+  targetPath-v6/v7/v8 RM — 4 PASS + 6 RM + 1 pre-existing mismatch),
+  and 5-test misc-ming recently-fixed battery (DefineEditTextTest,
+  attachMovieTest, instanceNameTest, loop/loop_test3, loop/loop_test5
+  — 5/5 PASS).
+
+### Earlier fixes (2026-04-29, pending CI)
 
 - **`replace_sprites1test` (misc-ming) → PASS (+1).** Two-part fix in
   `SWFModernRuntime/src/libswf/tag.c` for the AVM1 PlaceObject2/3 REPLACE

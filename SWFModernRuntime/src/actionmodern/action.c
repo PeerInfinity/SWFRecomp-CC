@@ -16967,8 +16967,9 @@ static MovieClip* resolveSlashPathToMC(SWFAppContext* app_context, const char* p
 			memcpy(seg_buf, path + seg_start, copy_len);
 			seg_buf[copy_len] = '\0';
 
-			// Special names
-			if (strcmp(seg_buf, "_root") == 0 || strcmp(seg_buf, "_level0") == 0) {
+			// Special names — match case-insensitively in SWF<=6 via swf_name_match
+			// (e.g. gnash case-v6's `/_ROOT/MC0/` slash-path SetProperty target).
+			if (swf_name_match(seg_buf, "_root") || swf_name_match(seg_buf, "_level0")) {
 				mc = &root_movieclip;
 #ifdef NO_GRAPHICS
 				cur_sprite_dl = display_list;
@@ -16983,7 +16984,7 @@ static MovieClip* resolveSlashPathToMC(SWFAppContext* app_context, const char* p
 					for (size_t _cd = 1; _cd <= cur_sprite_max; _cd++) {
 						DisplayObject* _ch = &cur_sprite_dl[_cd];
 						if (_ch->char_id == 0) continue;
-						if (_ch->instance_name != NULL && strcmp(_ch->instance_name, seg_buf) == 0) {
+						if (_ch->instance_name != NULL && swf_name_match(_ch->instance_name, seg_buf)) {
 							child_depth = _cd;
 							found_entry = _ch;
 							break;
@@ -16997,7 +16998,7 @@ static MovieClip* resolveSlashPathToMC(SWFAppContext* app_context, const char* p
 						for (size_t _cd = 1; _cd <= parent_dobj->sprite_max_depth; _cd++) {
 							DisplayObject* _ch = &parent_dobj->sprite_display_list[_cd];
 							if (_ch->char_id == 0) continue;
-							if (_ch->instance_name != NULL && strcmp(_ch->instance_name, seg_buf) == 0) {
+							if (_ch->instance_name != NULL && swf_name_match(_ch->instance_name, seg_buf)) {
 								child_depth = _cd;
 								found_entry = _ch;
 								break;
@@ -35415,6 +35416,11 @@ void actionGetProperty(SWFAppContext* app_context)
 	// Get the MovieClip object (try absolute first, then relative)
 	MovieClip* mc = getMovieClipByTarget(target);
 	if (!mc) mc = getMovieClipByRelativeName(target);
+	// SWF<=6 slash-path form (e.g. inline-asm GetProperty target "/_ROOT/MC0/")
+	// — `getMovieClipByTarget` only handles dot paths.
+	if (!mc && target[0] == '/' && target[1] != '\0') {
+		mc = resolveSlashPathToMC(app_context, target + 1, (u32)strlen(target + 1), &root_movieclip);
+	}
 
 	// If target not found, push undefined (matches Flash/Ruffle)
 	if (mc == NULL) {
@@ -45961,6 +45967,13 @@ void actionSetProperty(SWFAppContext* app_context)
 	// 5. Get the MovieClip object (try absolute first, then relative)
 	MovieClip* mc = getMovieClipByTarget(target);
 	if (!mc) mc = getMovieClipByRelativeName(target);
+	// SWF<=6 slash-path form (e.g. inline-asm SetProperty target "/_ROOT/MC0/").
+	// `getMovieClipByTarget` only handles dot paths and bare `_root`/`_level0`;
+	// route slash paths to `resolveSlashPathToMC` (case-insensitive in SWF<=6
+	// via swf_name_match). Required by gnash case-v6 case.as:62-71.
+	if (!mc && target[0] == '/' && target[1] != '\0') {
+		mc = resolveSlashPathToMC(app_context, target + 1, (u32)strlen(target + 1), &root_movieclip);
+	}
 	if (!mc) return; // Invalid target
 
 	// 5. Set property value based on index
@@ -56227,7 +56240,13 @@ void actionCallMethod(SWFAppContext* app_context, char* str_buffer)
 				strncpy(child->url, mc->url[0] ? mc->url : root_movieclip.url, sizeof(child->url) - 1);
 				child->url[sizeof(child->url) - 1] = 0;   
 
-				// Register child on parent MC's dynamic_props so mc.childName works via GetMember
+				// Register child on parent MC's dynamic_props so mc.childName works via GetMember.
+				// Mirrors the function-form path above: don't overwrite an existing
+				// own property with the same name (case-insensitively in SWF<=6 via
+				// getProperty's prop_name_match). Pre-existing bindings shadow the
+				// new child on name resolution. Required by gnash case-v6 lines
+				// 162-166: createEmptyMovieClip("CLIP", 7) after createEmptyMovieClip
+				// ("clip", 6) must NOT rebind `_root.clip`/`_root.CLIP` to the new MC.
 				if (mc->dynamic_props == NULL) {
 					mc->dynamic_props = (void*) allocObject(app_context, 8);
 					retainObject((ASObject*) mc->dynamic_props);
@@ -56235,9 +56254,42 @@ void actionCallMethod(SWFAppContext* app_context, char* str_buffer)
 				ActionVar mc_var = {0};
 				mc_var.type = ACTION_STACK_VALUE_MOVIECLIP;
 				mc_var.data.numeric_value = (u64)child;
-				setProperty(app_context, (ASObject*) mc->dynamic_props, inst_name, strlen(inst_name), &mc_var);
-				// Also set on global scope for GetVariable access
-				setVariableByName(inst_name, &mc_var);
+				u32 _mcemc_inst_len = (u32)strlen(inst_name);
+				ActionVar* _mcemc_existing = getProperty((ASObject*) mc->dynamic_props, inst_name, _mcemc_inst_len);
+				int _mcemc_has_existing = (_mcemc_existing != NULL &&
+					_mcemc_existing->type != ACTION_STACK_VALUE_UNDEFINED);
+				if (!_mcemc_has_existing) {
+					setProperty(app_context, (ASObject*) mc->dynamic_props, inst_name, _mcemc_inst_len, &mc_var);
+				}
+				// Root-level global var_map shadow only when no existing variable.
+				// var_map keys are ASCII-folded to lowercase in SWF<=6 (mirrors
+				// `setVariableByName` / `getVariableByName`), so the lookup
+				// must fold too to detect case-insensitive collisions.
+				if (mc == &root_movieclip) {
+					extern hashmap* var_map;
+					ActionVar* _mcemc_gvar = NULL;
+					int _mcemc_has_gvar = 0;
+					char _mcemc_folded[512];
+					const char* _mcemc_lookup_key = inst_name;
+					if (g_swf_version <= 6 && _mcemc_inst_len < sizeof(_mcemc_folded)) {
+						for (u32 _fi = 0; _fi < _mcemc_inst_len; _fi++) {
+							char _fc = inst_name[_fi];
+							_mcemc_folded[_fi] = (_fc >= 'A' && _fc <= 'Z') ? (_fc + 32) : _fc;
+						}
+						_mcemc_folded[_mcemc_inst_len] = '\0';
+						_mcemc_lookup_key = _mcemc_folded;
+					}
+					if (var_map != NULL && hashmap_get(var_map, _mcemc_lookup_key, _mcemc_inst_len, (uintptr_t*)&_mcemc_gvar)) {
+						_mcemc_has_gvar = (_mcemc_gvar != NULL &&
+							!(_mcemc_gvar->type == ACTION_STACK_VALUE_STRING &&
+							  _mcemc_gvar->str_size == 0 &&
+							  _mcemc_gvar->data.string_data.heap_ptr == NULL) &&
+							_mcemc_gvar->type != ACTION_STACK_VALUE_UNDEFINED);
+					}
+					if (!_mcemc_has_gvar) {
+						setVariableByName(inst_name, &mc_var);
+					}
+				}
 
 				// Find free slot or append in child_mc_cache
 				{

@@ -1,6 +1,6 @@
 # Gnash Failing Tests by Feature Category (Umbrella Plan)
-<!-- TESTS: AsBroadcaster-v6, AsBroadcaster-v7, AsBroadcaster-v8, ContextMenu-v7, ContextMenu-v8, ExternalInterface-v6, ExternalInterface-v7, Global-v6, Global-v7, Global-v8, HitTest-v6, HitTest-v7, HitTest-v8, Instance-v5, Instance-v6, Instance-v7, Instance-v8, Matrix-v7, Matrix-v8, MovieClip-v5, Number-v5, Number-v6, Number-v7, Number-v8, Sound-v6, Sound-v7, Sound-v8, TextFormat-v5, TextFormat-v6, TextFormat-v7, case-v6 -->
-<!-- PASSING (removed from TESTS): Point-v8 (ruffle_matched, 2026-04-14), TextSnapshot-v6/v7/v8 (pass), delete-v5..v8 (pass), enumerate-v6..v8 (pass), Camera-v6/v7/v8 (ruffle_matched), Microphone-v6/v7/v8 (ruffle_matched), Sound-v5 (ruffle_matched), targetPath-v6/v7/v8 (ruffle_matched), System-v5/v6/v7/v8 (pass, 2026-04-14 session 3), case-v7/v8 (pass, 2026-04-30 session — onConstruct fix) -->
+<!-- TESTS: AsBroadcaster-v6, AsBroadcaster-v7, AsBroadcaster-v8, ContextMenu-v7, ContextMenu-v8, ExternalInterface-v6, ExternalInterface-v7, Global-v6, Global-v7, Global-v8, HitTest-v6, HitTest-v7, HitTest-v8, Instance-v5, Instance-v6, Instance-v7, Instance-v8, Matrix-v7, Matrix-v8, MovieClip-v5, Number-v5, Number-v6, Number-v7, Number-v8, Sound-v6, Sound-v7, Sound-v8, TextFormat-v5, TextFormat-v6, TextFormat-v7 -->
+<!-- PASSING (removed from TESTS): Point-v8 (ruffle_matched, 2026-04-14), TextSnapshot-v6/v7/v8 (pass), delete-v5..v8 (pass), enumerate-v6..v8 (pass), Camera-v6/v7/v8 (ruffle_matched), Microphone-v6/v7/v8 (ruffle_matched), Sound-v5 (ruffle_matched), targetPath-v6/v7/v8 (ruffle_matched), System-v5/v6/v7/v8 (pass, 2026-04-14 session 3), case-v7/v8 (pass, 2026-04-30 session — onConstruct fix), case-v6 (pass, 2026-04-30 session — slash-path SetProperty + case-insensitive createEmptyMovieClip rebind) -->
 <!-- SPLIT OUT TO DEDICATED PLANS (2026-04-17):
   - ASnative-v5/v6/v7/v8 → ASNATIVE_CLASSES_PLAN.md
   - String-v5/v6/v7/v8 → STRING_REGEX_PLAN.md
@@ -622,79 +622,57 @@ Failing tests: toString_valueOf-v5 (59.9%), toString_valueOf-v6 (76.1%), toStrin
 
 ---
 
-## 16. Case/Switch Statement (est. 1 test remaining — case-v5, case-v6)
+## 16. Case/Switch Statement (est. 1 test remaining — case-v5)
 
-**Status (2026-04-30):**
+**Status (2026-04-30, Issue A + B fixes pending CI):**
 - `case-v7` / `case-v8` → PASS (commit `603d663c`, "Fire MovieClip.prototype.onConstruct on createEmptyMovieClip"). The "switch/case" framing was misleading — the actual blocker was that `MovieClip.prototype.onConstruct` was never invoked, so the whole `mcRef[]` array stayed empty and the cascade of follow-up checks failed. Mirroring Ruffle commit `0473281942` ("avm1: Add support for MovieClip.onConstruct handler") fixed v7/v8.
-- `case-v6` → still output_mismatch (65/73 matching, was 18/73). Two distinct residual issues, both SWF6-specific:
-
-### case-v6 Issue A: legacy `SetProperty` bytecode through a slash-path target
-
-Test source uses inline ASM (case.as:62-71):
-
-```actionscript
-asm{
-     push "/_ROOT/MC0/"   ; uppercase, trailing slash
-     push 0.0             ; property index 0 = _X
-     push 100
-     setproperty
-};
-check_equals(mC0._X, 100);  // FAILS: gets 0
-check_equals(mC0._x, 100);  // FAILS: gets 0
-```
-
-`SetProperty` op is either failing path resolution
-(case-insensitive `_ROOT` → `_root`, `MC0` → `mC0`, trailing slash
-handling) or rejecting it without setting the property.
-
-**Fix complexity:** Medium — touches the `SetProperty` path resolver in
-`actionSetProperty` (or the legacy property-index dispatch) to accept
-uppercase + trailing-slash + property-index combinations. SWF6-only —
-SWF7+ uses dot paths and case-sensitive lookup.
-
-### case-v6 Issue B: SWF6 case-insensitive variable rebind on createEmptyMovieClip
-
-Test source (case.as:96-170):
-
-```actionscript
-_root.createEmptyMovieClip("clip", 6);  // MC1 at depth 6
-_root.createEmptyMovieClip("CLIP", 7);  // MC2 at depth 7
-check(clip == CLIP);                     // PASS — case-insensitive lookup
-
-_root.createEmptyMovieClip("CLIP2", 8);  // MC3 at depth 8
-_root.createEmptyMovieClip("clip2", 9);  // MC4 at depth 9
-
-check_equals(clip.getDepth(), 6);        // FAIL: gets 7
-check_equals(CLIP.getDepth(), 6);        // FAIL: gets 7
-check_equals(CLIP2.getDepth(), 8);       // FAIL: gets 9
-check_equals(clip2.getDepth(), 8);       // FAIL: gets 9
-```
-
-Flash/Ruffle SWF6 semantics: both MC1 (depth 6, name "clip") and MC2
-(depth 7, name "CLIP") exist on the display list, but `_root["clip"]`
-and `_root["CLIP"]` BOTH resolve to MC1 (depth 6). The second
-`createEmptyMovieClip` call detects that "CLIP" already exists
-case-insensitively as "clip" and refuses to rebind the variable —
-it creates the new MC at depth 7 but leaves `_root.clip` pointing at
-MC1. Same pattern for CLIP2/clip2.
-
-Our impl creates MC2 and rebinds `_root["CLIP"]` (and case-insensitively
-`_root["clip"]`) to MC2, so depth lookups return 7/9 instead of 6/8.
-
-**Fix complexity:** Medium-High — `builtin_mc_create_empty_movie_clip`
-needs an SWF6-only branch that does case-insensitive `findPropertyRaw`
-on the parent's `dynamic_props` and skips the property assignment +
-`setVariableByName` if a collision is found. Verify this doesn't break
-other SWF6 createEmptyMovieClip tests (especially attachMovie /
-duplicateMovieClip which share the dynamic_props plumbing).
+- `case-v6` → **PASS** (Issue A + Issue B fixed locally, pending CI).
+  - **Issue A (slash-path SetProperty):** `actionSetProperty` /
+    `actionGetProperty` now route absolute slash-path targets
+    (`/_ROOT/MC0/`) through `resolveSlashPathToMC` when
+    `getMovieClipByTarget` / `getMovieClipByRelativeName` fail.
+    `resolveSlashPathToMC` switched from `strcmp` to `swf_name_match`
+    for `_root` / `_level0` special-name matching and for
+    `instance_name` matching across both `cur_sprite_dl` and the
+    `display_obj` fallback path, so SWF<=6 case-insensitive lookup
+    works for slash-path traversal. Trailing slash already supported.
+    Required by gnash case-v6 case.as:62-71 (inline-asm SetProperty
+    of `mC0._X = 100` via `/_ROOT/MC0/`).
+  - **Issue B (case-insensitive createEmptyMovieClip rebind):** the
+    method-form `createEmptyMovieClip` path in `actionCallMethod`
+    now mirrors the function-form `actionCallFunction` path: skip
+    `setProperty(parent.dynamic_props, name, ...)` if `getProperty`
+    finds an existing case-insensitive match (SWF<=6 via
+    `prop_name_match`), and skip `setVariableByName` for root MCs
+    if `var_map` already has a case-insensitive entry (folded via
+    ASCII `[A-Z]→[a-z]` to mirror `setVariableByName`'s key-fold).
+    Required by gnash case-v6 case.as:96-170 (`_root.createEmptyMovieClip
+    ("clip", 6)` then `_root.createEmptyMovieClip("CLIP", 7)` — Flash
+    creates MC2 on the display list at depth 7 but leaves `_root.clip`
+    / `_root.CLIP` bound to MC1 at depth 6).
+  - Verified: 8-test AVM1 path battery (movieclip_state_values,
+    path_string, slash_syntax, string_paths_basic, swf5_no_closure,
+    target_path, tell_target_invalid, tell_target_invalid_swf6 — 8/8
+    PASS), 7-test AVM1 createEmptyMovieClip / instance-name battery
+    (conflicting_instance_names, create_empty_movie_clip,
+    default_names, init_object_order, movieclip_depth_methods,
+    movieclip_get_instance_at_depth, movieclip_init_object — 7/7
+    PASS), 14-test gnash actionscript.all primitives battery
+    (Boolean-v5/v6, Color-v5..v8, Inheritance-v5/v6, Number-v5..v8,
+    toString_valueOf-v5/v6 — 9 PASS + 5 RM = 14/14 effective), 11-test
+    gnash mixed battery (Inheritance-v5/v6 RM, MovieClip-v5 unchanged
+    mismatch, Selection-v6 RM, Stage-v5, case-v5 unchanged mismatch,
+    case-v7, case-v8, targetPath-v6/v7/v8 RM — 4 PASS + 6 RM + 1
+    pre-existing mismatch), and 5-test misc-ming recently-fixed
+    battery (DefineEditTextTest, attachMovieTest, instanceNameTest,
+    loop/loop_test3, loop/loop_test5 — 5/5 PASS).
 
 ### case-v5 (separate)
 
 `case-v5` ~7 diff lines — likely strict-vs-abstract equality in switch.
 Different root cause from v6/v7/v8.
 
-**Combined impact:** v7/v8 already PASS; v5 + v6 fixes would yield 2
-more tests.
+**Combined impact:** v6/v7/v8 PASS; v5 fix would yield 1 more test.
 
 ---
 
