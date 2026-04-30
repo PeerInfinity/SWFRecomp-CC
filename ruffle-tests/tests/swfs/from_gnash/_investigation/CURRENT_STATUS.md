@@ -1,6 +1,16 @@
 # Gnash Test Suite Status
 
-Last updated: 2026-04-30 (CI snapshot at 205a9a77 includes all recent fixes through ResolveEventsTest / event_handler_scope_test / Selection-vN / LoadVars-vN / loop_test2/3/4/5/9 / static_vs_dynamic1/2 / displaylist_depths_test11 / DefineEditTextVariableNameTest2 / movieclip_destruction_test2 (52/56) / loop_test8 (37/38) / new_child_in_unload_test / instanceNameTest / attachMovieTest / shape_test / get_frame_number_test / place_and_remove_object_test / DefineEditTextTest / timeline_var_test / reverse_execute_PlaceObject2_test1/2 / action_execution_order_test8-v5/v6 / stackscope / submoviegetvar / edittext_test1. Local fixes pending CI: replace_sprites1test, case-v6.)
+Last updated: 2026-04-30 (CI snapshot at 61229899 includes case-v6, ExternalInterface-v6/v7, DepthLimitsTest fixes from this session, plus replace_sprites1test from 2026-04-29.)
+
+### CI snapshot (commit 61229899, run 2026-04-30)
+
+| Suite | Pass | RM | Effective | Total | Rate |
+|-------|------|----|-----------|-------|------|
+| actionscript.all | 118 | 60 | 178 | 190 | 93.7% |
+| misc-ming.all | 58 | 13 | 71 | 102 | 69.6% |
+| misc-mtasc.all | 7 | 2 | 9 | 9 | 100.0% |
+| misc-swfc.all | 5 | 3 | 8 | 16 | 50.0% |
+| misc-swfmill.all | 15 | 1 | 16 | 18 | 88.9% |
 
 ### CI snapshot (commit 205a9a77, run 2026-04-25)
 
@@ -13,6 +23,34 @@ Last updated: 2026-04-30 (CI snapshot at 205a9a77 includes all recent fixes thro
 | misc-swfmill.all | 16 | 18 | 88.9% |
 
 ### Latest fixes (2026-04-30, pending CI)
+
+- **`DepthLimitsTest` (misc-ming) → PASS (+1).** AVM1
+  `duplicateMovieClip` rejects out-of-range depths (valid AS-depth range
+  is [-16384, 2130690044]). Two changes in
+  `SWFModernRuntime/src/actionmodern/action.c`:
+  1. **Method-form path** (`mc.duplicateMovieClip(name, depth)` inside
+     `actionCallMethod`): reject `depth < -16384 || depth > 2130690044`
+     directly, push `undefined`, and return. Method-form receives the
+     raw AS-depth so the bounds are unbiased.
+  2. **Function-form path** (`actionCloneSprite`): reject `depth_int <
+     -16384`. The recompiler heuristically strips the SWF +16384 bias
+     for I32 pushes (see `action.cpp:1849-1865`), so small AS-depths
+     arrive unbiased while large positive depths typically arrive
+     biased (≥ 0). The lower-bound check fires only on the unbiased
+     path. The upper bound is already enforced by `ng_cloneSprite`'s
+     `if (depth > 2130706428)` guard, which catches biased dup5
+     (AS-depth 2130690045 → 2130706429). Together this catches the
+     two test patterns: function-form `duplicateMovieClip('original',
+     'dup3', -16385)` (bias-stripped, depth_int = -16385) and
+     `duplicateMovieClip('original', 'dup5', 2130690045)` (bias-kept,
+     depth_int = 2130706429). Mirrors gnash test source
+     `misc-ming/DepthLimitsTest.c:148-187`. Verified: DepthLimitsTest
+     14/17 → 17/17 PASS. 9-test AVM1 regression battery
+     (duplicate_movie_clip, duplicate_movie_clip_drawing,
+     clone_sprite_edittext{,_dynamic}, clone_sprite_types,
+     attach_movie, create_empty_movie_clip, movieclip_depth_methods,
+     movieclip_get_instance_at_depth — 9/9 PASS), 4-test Shumway
+     duplicateMovieClip suite (4/4 PASS).
 
 - **`ExternalInterface-v6` / `ExternalInterface-v7` (actionscript.all) → PASS (+2).**
   All `ExternalInterface` internal methods (`_argumentsToAS`, `_arrayToAS`,

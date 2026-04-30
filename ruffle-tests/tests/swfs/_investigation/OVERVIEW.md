@@ -2,7 +2,7 @@
 
 Cross-suite summary of all Ruffle-derived test suites. Each suite has its own `_investigation/` directory with detailed status docs.
 
-Last updated: 2026-04-21 (CI run at 7155a774, ruffle-test-results 41667cc4)
+Last updated: 2026-04-30 (CI run at 61229899, ruffle-test-results 76443b91)
 
 ## Suite Summary
 
@@ -10,15 +10,21 @@ Last updated: 2026-04-21 (CI run at 7155a774, ruffle-test-results 41667cc4)
 
 | Suite | Tests | Pass | RM | Effective | Effective Rate | Filtered Rate | Notes |
 |-------|-------|------|----|-----------| ---------------|---------------|-------|
-| [avm1](../avm1/_investigation/CURRENT_STATUS.md) | 641 | 597 | 9 | 606 | 94.5% | **100.0%** (600/600) | 41 ignored. **Zero filtered failures.** Unchanged vs 2026-04-18; one test reclassified pass→RM. |
-| [from_gnash/actionscript.all](../from_gnash/_investigation/CURRENT_STATUS.md) | 190 | 110 | 49 | 159 | **83.7%** | — | +26 effective since 2026-04-18. Mostly from String-vN ruffle-match, with-v6/v7/v8 fixes, and primitive auto-boxing. |
-| [from_gnash/misc-mtasc.all](../from_gnash/_investigation/CURRENT_STATUS.md) | 9 | 7 | 1 | 8 | **88.9%** | — | 1 remaining failure (`levels` — multi-level SWF loading). |
+| [avm1](../avm1/_investigation/CURRENT_STATUS.md) | 642 | 598 | 9 | 607 | 94.5% | **100.0%** (601/601) | 41 ignored. **Zero filtered failures.** |
+| [from_gnash/actionscript.all](../from_gnash/_investigation/CURRENT_STATUS.md) | 190 | 118 | 60 | 178 | **93.7%** | — | +19 effective since 2026-04-21. case-v5/v6/v7/v8 PASS, ExternalInterface-v6/v7 PASS this session. |
+| [from_gnash/misc-mtasc.all](../from_gnash/_investigation/CURRENT_STATUS.md) | 9 | 7 | 2 | 9 | **100.0%** | — | All effective pass. |
 | [from_gnash/misc-swfmill.all](../from_gnash/_investigation/CURRENT_STATUS.md) | 18 | 15 | 1 | 16 | **88.9%** | — | 2 remaining (`jump_to_prev_block`, `tags_after_last_showframe`). |
-| [from_gnash/misc-ming.all](../from_gnash/_investigation/CURRENT_STATUS.md) | 102 | 19 | 11 | 30 | 29.4% | — | Blocked: inlined Dejagnu DoInitAction. |
-| [from_gnash/misc-swfc.all](../from_gnash/_investigation/CURRENT_STATUS.md) | 16 | 3 | 3 | 6 | 37.5% | — | Blocked: inlined Dejagnu DoInitAction. |
+| [from_gnash/misc-ming.all](../from_gnash/_investigation/CURRENT_STATUS.md) | 102 | 58 | 13 | 71 | **69.6%** | — | +41 effective since 2026-04-21. Major progress on placement, clip-event, replace-sprite, and depth-bound semantics. DepthLimitsTest PASS this session. |
+| [from_gnash/misc-swfc.all](../from_gnash/_investigation/CURRENT_STATUS.md) | 16 | 5 | 3 | 8 | 50.0% | — | +2 effective since 2026-04-21. |
 | [from_shumway](../from_shumway/_investigation/CURRENT_STATUS.md) (flat) | 92 | 61 | 1 | 62 | 67.4% | — | Grew 47→92 (now includes avm1/ + fuzz/ + timeline/ sub-trees). |
 | [from_shumway/avm1](../from_shumway/_investigation/CURRENT_STATUS.md) | 47 | 45 | 1 | 46 | **97.9%** | **100.0%** (45/45) | 2 ignored. Only `moviecliploader` remains (MCL one-tick deferral). |
 | **SWFRecomp/tests** (old suite) | 158+59 | all trace pass | — | — | **100%** | — | Hand-written opcode tests. CI only. |
+
+## Progress Since 2026-04-30
+
+- **case-v6 (Gnash actionscript.all) → PASS** (commits 6476ad2f, c42eb4d6, d2647520). Two SWF6-specific fixes: (a) slash-path `SetProperty`/`GetProperty` now route through `resolveSlashPathToMC` (with `swf_name_match` for `_root`/`_level0`) so `/_ROOT/MC0/` resolves case-insensitively in SWF<=6; (b) method-form `createEmptyMovieClip` skips rebinding `parent.dynamic_props[name]` and (root-only) `var_map[name]` when an existing entry references a LIVE MovieClip whose current `name` still matches the key (case-insensitive) — covers both `clip`/`CLIP` (case-collision) and `mc1`/`mc1` at different depths (same-name collision), while leaving renamed-MC stale entries available for rebinding (soft_reference_test1.sc:107-147 line 147 also flips PASSED).
+- **ExternalInterface-v6 / ExternalInterface-v7 (Gnash actionscript.all) → PASS** (commit f62d59c4). All EI internal methods (`_argumentsToAS`, `_arrayToAS`, `_callIn`, `_escapeXML`, `_initJS`, `_jsQuoteString`, `_objectToAS`, `_toAS`, `_toJS`, `_toXML`, `_unescapeXML`, etc.) plus `addCallback` and `available` now marked with `flash_flags = 0x1000` — visible to `hasOwnProperty` but hidden from `getProperty` in SWF<=7 (SWF6 mask 0x7500 / SWF7 mask 0x7000 both include 0x1000; SWF8 mask 0x6000 does NOT). Only `EI.call` keeps `flash_flags=0` (visible in all versions, matching `Function.prototype.call` inheritance).
+- **DepthLimitsTest (Gnash misc-ming) → PASS** (commit 61229899). `duplicateMovieClip` rejects out-of-range AS-depths (valid range [-16384, 2130690044]). Two checks: method-form rejects unbiased depth outside that range directly; function-form `actionCloneSprite` rejects `depth_int < -16384` (the recompiler bias-strip heuristic leaves small AS-depths unbiased while large positive depths arrive biased — biased depths are always ≥ 0 so the lower-bound check fires only on the unbiased path). Upper bound was already enforced by `ng_cloneSprite`'s biased-form guard.
 
 ## Progress Since 2026-04-18
 
