@@ -1,16 +1,16 @@
 {
   "metadata": {
-    "old_timestamp": "2026-04-30T17:38:36.347529+00:00",
-    "old_git_sha": "6476ad2f24bf933d54ec49bebf325d73f57b0e47",
-    "new_timestamp": "2026-04-30T18:25:57.303359+00:00",
-    "new_git_sha": "c42eb4d68255e91fb8b0c05903f8ab61fcc18733",
+    "old_timestamp": "2026-04-30T18:25:57.303359+00:00",
+    "old_git_sha": "c42eb4d68255e91fb8b0c05903f8ab61fcc18733",
+    "new_timestamp": "2026-04-30T19:11:27.040178+00:00",
+    "new_git_sha": "d26475209e73972da89ea8bf8357cf3596acd95b",
     "partial": false,
     "same_commit": false
   },
   "summary": {
     "old_pass": 57,
-    "old_ruffle_matched": 12,
-    "old_effective_pass": 69,
+    "old_ruffle_matched": 13,
+    "old_effective_pass": 70,
     "old_total": 102,
     "old_pass_rate": 55.9,
     "new_pass": 57,
@@ -18,65 +18,16 @@
     "new_effective_pass": 70,
     "new_total": 102,
     "new_pass_rate": 55.9,
-    "old_mismatched_lines": 1813,
+    "old_mismatched_lines": 1801,
     "new_mismatched_lines": 1801,
     "increased_mismatches": 0,
-    "decreased_mismatches": 12,
-    "newly_passing": 1,
+    "decreased_mismatches": 0,
+    "newly_passing": 0,
     "newly_failing": 0,
-    "status_changed": 1,
-    "unchanged": 99,
+    "status_changed": 0,
+    "unchanged": 102,
     "added": 0,
     "removed": 0
   },
-  "changes": [
-    {
-      "test": "DrawingApiTest",
-      "change_type": "changed",
-      "old_status": "output_mismatch",
-      "new_status": "output_mismatch",
-      "old_lines": {
-        "actual_lines": 144,
-        "expected_lines": 93,
-        "matching_lines": 65
-      },
-      "new_lines": {
-        "actual_lines": 95,
-        "expected_lines": 93,
-        "matching_lines": 66
-      }
-    },
-    {
-      "test": "key_event_test",
-      "change_type": "changed",
-      "old_status": "output_mismatch",
-      "new_status": "output_mismatch",
-      "old_lines": {
-        "actual_lines": 68,
-        "expected_lines": 66,
-        "matching_lines": 27
-      },
-      "new_lines": {
-        "actual_lines": 85,
-        "expected_lines": 66,
-        "matching_lines": 27
-      }
-    },
-    {
-      "test": "loading/loadMovieTest",
-      "change_type": "changed",
-      "old_status": "output_mismatch",
-      "new_status": "ruffle_matched",
-      "old_lines": {
-        "actual_lines": 80,
-        "expected_lines": 80,
-        "matching_lines": 60
-      },
-      "new_lines": {
-        "actual_lines": 80,
-        "expected_lines": 80,
-        "matching_lines": 71
-      }
-    }
-  ]
+  "changes": []
 }
