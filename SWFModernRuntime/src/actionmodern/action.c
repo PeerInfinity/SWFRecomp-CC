@@ -26242,17 +26242,25 @@ static ActionVar builtin_broadcaster_addListener(SWFAppContext* app_context, Act
     undef_listener.type = ACTION_STACK_VALUE_UNDEFINED;
     ActionVar* new_listener = (arg_count >= 1) ? &args[0] : &undef_listener;
 
-    // Dedup using abstract equality (null == undefined in AS2)
+    // Find first match using abstract equality (null == undefined in AS2)
+    int found_idx = -1;
     for (u32 i = 0; i < arr->length; i++) {
         ActionVar* elem = getArrayElement(arr, i);
         if (elem && listenerAbstractEq(elem, new_listener)) {
-            // Match found — replace entry (e.g. undefined→null) and return
-            setArrayElement(app_context, arr, i, new_listener);
-            return result;
+            found_idx = (int)i;
+            break;
         }
     }
 
-    // Not found — append
+    if (found_idx >= 0) {
+        // Re-adding existing listener: remove first occurrence and append to end.
+        // Flash semantics — the listener is moved to the last position.
+        for (u32 j = (u32)found_idx; j + 1 < arr->length; j++) {
+            ActionVar* next = getArrayElement(arr, j + 1);
+            if (next) setArrayElement(app_context, arr, j, next);
+        }
+        arr->length--;
+    }
     setArrayElement(app_context, arr, arr->length, new_listener);
     return result;
 }
@@ -26326,14 +26334,13 @@ static ActionVar builtin_broadcaster_broadcastMessage(SWFAppContext* app_context
     // Get the _listeners array
     ActionVar* listeners_prop = getPropertyWithPrototype(receiver, "_listeners", 10);
     if (!listeners_prop || listeners_prop->type != ACTION_STACK_VALUE_ARRAY) {
-        // Return true even if no _listeners (event name was valid)
-        ActionVar r = {0}; r.type = ACTION_STACK_VALUE_BOOLEAN; VAL(u64, &r.data.numeric_value) = 1;
-        return r;
+        // No (or non-array) _listeners — return undefined (Flash behavior).
+        return undef;
     }
     ASArray* arr = (ASArray*)(uintptr_t)listeners_prop->data.numeric_value;
     if (!arr || arr->length == 0) {
-        ActionVar r = {0}; r.type = ACTION_STACK_VALUE_BOOLEAN; VAL(u64, &r.data.numeric_value) = 1;
-        return r;
+        // Empty listener list — return undefined (Flash behavior).
+        return undef;
     }
 
     // Extra args to pass to the method (args[1..])
@@ -26436,9 +26443,48 @@ static ActionVar builtin_broadcaster_broadcastMessage(SWFAppContext* app_context
                 }
                 g_this_depth++;
             }
-            for (u32 j = 0; j < extra_count; j++)
+
+            // Build a local scope with `arguments` so the listener function sees its
+            // own args, not the broadcaster's (otherwise `arguments[0]` resolves up
+            // the scope chain to broadcastMessage's `arguments`, which contains the
+            // method name as element 0).
+            ASObject* bm_local_scope = allocObject(app_context, 8);
+            ASArray* bm_args_arr = allocArray(app_context, extra_count > 0 ? extra_count : 1);
+            for (u32 ai = 0; ai < extra_count; ai++) {
+                setArrayElement(app_context, bm_args_arr, ai, &extra_args[ai]);
+            }
+            ASFunction* bm_prev_exec = g_current_executing_func;
+            setupArgumentsProps(app_context, bm_args_arr, func, bm_prev_exec);
+            ActionVar bm_args_var = {0};
+            bm_args_var.type = ACTION_STACK_VALUE_ARRAY;
+            bm_args_var.data.numeric_value = (u64) bm_args_arr;
+            setProperty(app_context, bm_local_scope, "arguments", 9, &bm_args_var);
+            if (scope_depth < MAX_SCOPE_DEPTH) {
+                scope_is_with[scope_depth] = 0;
+                scope_mc[scope_depth] = NULL;
+                scope_chain[scope_depth++] = bm_local_scope;
+            }
+
+            // Push args onto stack in forward order (caller pushes args[0] first,
+            // function pops args[N-1] first via its reverse-pop param binding).
+            for (u32 j = 0; j < extra_count; j++) {
                 pushVar(app_context, &extra_args[j]);
+            }
+            // Pad with undefined if the listener has named params beyond extra_count
+            // (generated code always pops exactly param_count values from the stack).
+            for (u32 j = extra_count; j < func->param_count; j++) {
+                PUSH(ACTION_STACK_VALUE_UNDEFINED, 0);
+            }
+
+            g_prev_executing_func = bm_prev_exec;
+            g_current_executing_func = func;
             ((ActionVar(*)(SWFAppContext*))func->simple_func)(app_context);
+            g_current_executing_func = bm_prev_exec;
+
+            // Pop local scope
+            if (scope_depth > 0) scope_depth--;
+            releaseObject(app_context, bm_local_scope);
+
             g_this_depth = saved_this_depth_bm_t1;
             for (u8 ci = 0; ci < bm_captured_t1; ci++) {
                 if (scope_depth > 0) scope_depth--;
