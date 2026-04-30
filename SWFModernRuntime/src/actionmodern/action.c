@@ -40994,7 +40994,7 @@ void actionSetMember(SWFAppContext* app_context)
 					setPropertyWithFlags(app_context, (ASObject*) mc->dynamic_props,
 						"tabIndex", 8, &value_var, PROPERTY_FLAGS_DONTENUM);
 					extern MovieClip root_movieclip;
-					if (mc == &root_movieclip) setVariableByName(prop_name, &value_var);
+					if (mc == &root_movieclip) setGlobalVariableByName(prop_name, &value_var);
 					return;
 				}
 				// Text fields and buttons: fall through to normal (enumerable) storage
@@ -41021,7 +41021,7 @@ void actionSetMember(SWFAppContext* app_context)
 			// Child MC properties must NOT leak into global scope.
 			extern MovieClip root_movieclip;
 			if (mc == &root_movieclip) {
-				setVariableByName(prop_name, &value_var);
+				setGlobalVariableByName(prop_name, &value_var);
 #ifdef NO_GRAPHICS
 				// Also sync to any textfields bound to this simple variable name
 				// (e.g., textfield.variable = "textVar1" and user writes `_root.textVar1 = X`).

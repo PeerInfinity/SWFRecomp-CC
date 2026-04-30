@@ -1,6 +1,6 @@
 # Gnash Test Suite Status
 
-Last updated: 2026-04-30 (CI snapshot at 61229899 includes case-v6, ExternalInterface-v6/v7, DepthLimitsTest fixes from this session, plus replace_sprites1test from 2026-04-29.)
+Last updated: 2026-04-30 (CI snapshot at 61229899 includes case-v6, ExternalInterface-v6/v7, DepthLimitsTest fixes from this session, plus replace_sprites1test from 2026-04-29. movieclip_destruction_test2 fix from this session pending CI.)
 
 ### CI snapshot (commit 61229899, run 2026-04-30)
 
@@ -23,6 +23,41 @@ Last updated: 2026-04-30 (CI snapshot at 61229899 includes case-v6, ExternalInte
 | misc-swfmill.all | 16 | 18 | 88.9% |
 
 ### Latest fixes (2026-04-30, pending CI)
+
+- **`movieclip_destruction_test2` (misc-swfc) → PASS (+1).** Cross-cutting
+  fix: `actionSetMember` on the root MovieClip now propagates writes to
+  `var_map` via a new `setGlobalVariableByName` helper that bypasses the
+  local-scope short-circuit in `setVariableByName`. Previously,
+  `_root.foo = X` from inside any function dispatched through
+  `actionCallMethod`'s MOVIECLIP user-method path (which pushes a local
+  scope holding `this`) routed the var_map sync into the local scope:
+  `setVariableByName` saw a current local scope and called
+  `setVariableOnLocalScope`, which unconditionally created a new property
+  on the local scope, leaving `var_map[foo]` stale. Subsequent reads of
+  `foo` (without the `_root.` prefix) returned the pre-call value.
+  Reproduced by `mc.onUnload()` invoked manually on a pending-removal MC:
+  `_root.mc2UnlaodedCount++` updated `root.dynamic_props` (visible to
+  `_root.mc2UnlaodedCount`) but not `var_map` (visible to bare
+  `mc2UnlaodedCount`). Auto-fired unloads were unaffected because
+  `aq_dispatch_timeline_unload` calls the handler via
+  `invokeSpecialFunction`, which does not push a local scope for type-1
+  functions. The fix preserves `setVariableByName`'s parameter-binding
+  semantics for `"this"` and other DefineFunction parameter sites — only
+  the root-MC sync inside `actionSetMember` switches to the bypass
+  helper. Verified: `unload`, `path_string`,
+  `conflicting_instance_names`, `create_empty_movie_clip`,
+  `register_class_return_value`, `register_and_init_order`,
+  `init_object_order`, `extends_chain`, `as2_super_and_this_v8`,
+  `swf5_no_closure`, `swf5_to_6_cross_call`, `execution_order2`,
+  `execution_order3`, `set_interval`, `closure_scope`,
+  `set_variable_scope`, `local_to_global`,
+  `string_paths_variable_scopes`, `get_variable_in_scope`,
+  `define_local`, `define_local_with_paths`, `constructor_function`,
+  `define_function2`, `swf4_function_calls`, `funky_function_calls`,
+  `function_base_clip`, `function_as_function`,
+  `infinite_recursion_function_in_setter`, `watch`, `watch_textfield`,
+  `watch_virtual_property_proto`, `add_property`, `on_construct`,
+  `register_class` — 33/33 PASS, no regressions.
 
 - **`DepthLimitsTest` (misc-ming) → PASS (+1).** AVM1
   `duplicateMovieClip` rejects out-of-range depths (valid AS-depth range

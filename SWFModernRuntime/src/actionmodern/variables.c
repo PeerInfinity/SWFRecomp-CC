@@ -198,15 +198,11 @@ bool hasVariable(char* var_name, size_t key_size)
 	return hashmap_get(var_map, lookup_key, key_size, (uintptr_t*) &var);
 }
 
-void setVariableByName(const char* var_name, ActionVar* value)
+// Update var_map entry directly, bypassing the local-scope short-circuit.
+// Used by callers (e.g. actionSetMember on root MC) that want to keep
+// var_map in sync with root.dynamic_props regardless of caller context.
+void setGlobalVariableByName(const char* var_name, ActionVar* value)
 {
-	// If inside a function scope, define on local scope (not global)
-	// This prevents DefineFunction parameter binding from leaking to root scope
-	extern bool setVariableOnLocalScope(const char* var_name, ActionVar* value);
-	if (setVariableOnLocalScope(var_name, value)) {
-		return;
-	}
-
 	size_t key_size = strlen(var_name);
 	ActionVar* var = getVariable((char*)var_name, key_size);
 
@@ -225,6 +221,18 @@ void setVariableByName(const char* var_name, ActionVar* value)
 	var->type = value->type;
 	var->str_size = value->str_size;
 	var->data = value->data;
+}
+
+void setVariableByName(const char* var_name, ActionVar* value)
+{
+	// If inside a function scope, define on local scope (not global)
+	// This prevents DefineFunction parameter binding from leaking to root scope
+	extern bool setVariableOnLocalScope(const char* var_name, ActionVar* value);
+	if (setVariableOnLocalScope(var_name, value)) {
+		return;
+	}
+
+	setGlobalVariableByName(var_name, value);
 }
 
 void setVariableWithValue(ActionVar* var, char* stack, u32 sp)

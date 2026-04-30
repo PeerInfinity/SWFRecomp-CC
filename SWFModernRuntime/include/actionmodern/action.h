@@ -230,6 +230,7 @@ void popVar(SWFAppContext* app_context, ActionVar* var);
 void peekVar(SWFAppContext* app_context, ActionVar* var);
 void peekSecondVar(SWFAppContext* app_context, ActionVar* var);
 void setVariableByName(const char* var_name, ActionVar* value);
+void setGlobalVariableByName(const char* var_name, ActionVar* value);
 
 void actionPrevFrame(SWFAppContext* app_context);
 void actionToggleQuality(SWFAppContext* app_context);
