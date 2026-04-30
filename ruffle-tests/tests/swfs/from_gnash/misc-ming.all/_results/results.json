@@ -1,8 +1,8 @@
 {
   "metadata": {
-    "timestamp": "2026-04-30T04:00:01.332465+00:00",
-    "git_sha": "341dd598dc94909c3e0925d1793167e76cec2e3d",
-    "duration_seconds": 81.03,
+    "timestamp": "2026-04-30T04:26:28.887535+00:00",
+    "git_sha": "63fcb28a8bc488a08b9d41bd50958e6e6e8546b0",
+    "duration_seconds": 85.66,
     "total_available": 102,
     "shards": 30,
     "expected_shards": 30
@@ -22,7 +22,7 @@
       "test": "BeginBitmapFill",
       "phases": {
         "recomp": 0.0,
-        "compile": 0.224,
+        "compile": 0.225,
         "run": 0.003
       },
       "num_frames": 30,
@@ -38,7 +38,7 @@
       "test": "ButtonEventsTest",
       "phases": {
         "recomp": 0.0,
-        "compile": 0.464,
+        "compile": 0.458,
         "run": 0.005
       },
       "num_frames": 30,
@@ -47,7 +47,7 @@
         "expected_lines": 679,
         "matching_lines": 47
       },
-      "duration": 0.48,
+      "duration": 0.47,
       "status": "output_mismatch",
       "detail": "632 line(s) differ (actual=81, expected=679)",
       "actual_output": "PASSED: typeof(square1.button)  ==  'object' [ButtonEventsTest.c:480]\nFAILED: square1.button instanceOf Button [ButtonEventsTest.c:481] \nPASSED: typeof(square1.button.useHandCursor)  ==  'boolean' [ButtonEventsTest.c:482]\nPASSED: square1.button.useHandCursor  ==  true [ButtonEventsTest.c:483]\ntabIndex\nblendMode\ncacheAsBitmap\nfilters\nscale9Grid\ngetDepth\nenabled\nuseHandCursor\nonKeyUp\nonKeyDown\nonSetFocus\nonReleaseOutside\nonRelease\nonPress\nonRollOut\nonRollOver\ninstance6\ninstance5\ntabIndex\nblendMode\ncacheAsBitmap\nfilters\nscale9Grid\ngetDepth\nenabled\nuseHandCursor\nonKeyUp\nonKeyDown\nonSetFocus\nonReleaseOutside\nonRelease\nonPress\nonRollOut\nonRollOver\ninstance6\ninstance5\nPASSED: typeof(_root.buttonChild)  ==  'object' [ButtonEventsTest.c:563]\nPASSED: _root.buttonChild instanceof Array [ButtonEventsTest.c:564]\nFAILED: expected: 2 obtained: 0 [ButtonEventsTest.c:565] \nFAILED: expected: 'object' obtained: undefined [ButtonEventsTest.c:568] \nFAILED: expected: '_level0.square1.button.instance5' obtained:  [ButtonEventsTest.c:569] \nFAILED: expected: 1 obtained:  [ButtonEventsTest.c:570] \nFAILED: expected: 0 obtained:  [ButtonEventsTest.c:571] \nFAILED: expected: 'object' obtained: undefined [ButtonEventsTest.c:574] \nFAILED: expected: '_level0.square1.button.instance6' obtained:  [ButtonEventsTest.c:575] \nFAILED: expected: 1 obtained:  [ButtonEventsTest.c:576] \n... (31 lines after) ...",
@@ -76,7 +76,7 @@
       "test": "DefineEditTextTest",
       "phases": {
         "recomp": 0.0,
-        "compile": 0.687,
+        "compile": 0.686,
         "run": 0.004
       },
       "num_frames": 30,
@@ -92,8 +92,8 @@
       "test": "DefineEditTextVariableNameTest",
       "phases": {
         "recomp": 0.0,
-        "compile": 0.619,
-        "run": 0.007
+        "compile": 0.485,
+        "run": 0.006
       },
       "num_frames": 30,
       "lines": {
@@ -101,7 +101,7 @@
         "expected_lines": 72,
         "matching_lines": 49
       },
-      "duration": 0.63,
+      "duration": 0.5,
       "status": "output_mismatch",
       "detail": "32 line(s) differ (actual=81, expected=72)",
       "actual_output": "... (44 lines before) ...\nPASSED: _root.varName2bis  ==  '' [DefineEditTextVariableNameTest.c:205]\nPASSED: mc2.textfield._x  ==  150 [DefineEditTextVariableNameTest.c:206]\nPASSED: typeof(mc4.textfield)  ==  'object' [DefineEditTextVariableNameTest.c:332]\nPASSED: typeof(mc4.uninitalized_text_var)  ==  'undefined' [DefineEditTextVariableNameTest.c:333]\nPASSED: typeof(mc4.uninitalized_text_var)  ==  'undefined' [DefineEditTextVariableNameTest.c:336]\nFAILED: expected: 'string' obtained: undefined [DefineEditTextVariableNameTest.c:340] \nFAILED: expected: 'string' obtained: undefined [DefineEditTextVariableNameTest.c:340] \nFAILED: expected: 100 obtained:  [DefineEditTextVariableNameTest.c:341] \nFAILED: expected: 100 obtained:  [DefineEditTextVariableNameTest.c:341] \nPASSED: typeof(mc5.textfield)  ==  'object' [DefineEditTextVariableNameTest.c:352]\nPASSED: typeof(mc5.text_var5)  ==  'undefined' [DefineEditTextVariableNameTest.c:353]\nPASSED: typeof(mc5.text_var5)  ==  'undefined' [DefineEditTextVariableNameTest.c:357]\nFAILED: expected: 'new_text' obtained:  [DefineEditTextVariableNameTest.c:361] \nFAILED: expected: 'new_text' obtained:  [DefineEditTextVariableNameTest.c:361] \nFAILED: expected: 'change back' obtained: new_text [DefineEditTextVariableNameTest.c:363] \nFAILED: expected: 'change back' obtained: new_text [DefineEditTextVariableNameTest.c:363] \nPASSED: typeof(mc6.textfield)  ==  'object' [DefineEditTextVariableNameTest.c:378]\nFAILED: expected: 'string' obtained: undefined [DefineEditTextVariableNameTest.c:379] \nFAILED: expected: 'string' obtained: undefined [DefineEditTextVariableNameTest.c:379] \nPASSED: typeof(mc6.text_var6)  ==  'undefined' [DefineEditTextVariableNameTest.c:382]\nPASSED: mc6.textfield.text  ==  'initial_text' [DefineEditTextVariableNameTest.c:383]\nFAILED: expected: 'new_text' obtained:  [DefineEditTextVariableNameTest.c:387] \nFAILED: expected: 'new_text' obtained:  [DefineEditTextVariableNameTest.c:387] \nFAILED: expected: 'change back' obtained: new_text [DefineEditTextVariableNameTest.c:389] \nFAILED: expected: 'change back' obtained: new_text [DefineEditTextVariableNameTest.c:389] \nPASSED: typeof(mc7.textfield)  ==  'object' [DefineEditTextVariableNameTest.c:400]\nFAILED: expected: 'string' obtained: undefined [DefineEditTextVariableNameTest.c:401] \nFAILED: expected: 'string' obtained: undefined [DefineEditTextVariableNameTest.c:401] \nFAILED: expected: 'initial_text' obtained:  [DefineEditTextVariableNameTest.c:405] \nFAILED: expected: 'initial_text' obtained:  [DefineEditTextVariableNameTest.c:405] \nPASSED: mc7.textfield.text  ==  'new_text' [DefineEditTextVariableNameTest.c:406]\n#passed: 57\n#passed: 57\n#failed: 9\n#failed: 9\n#total tests run: 66\n#total tests run: 66",
@@ -111,7 +111,7 @@
       "test": "DefineEditTextVariableNameTest2",
       "phases": {
         "recomp": 0.0,
-        "compile": 0.381,
+        "compile": 0.249,
         "run": 0.003
       },
       "num_frames": 30,
@@ -120,14 +120,14 @@
         "expected_lines": 39,
         "matching_lines": 39
       },
-      "duration": 0.39,
+      "duration": 0.25,
       "status": "pass"
     },
     {
       "test": "DefineTextTest",
       "phases": {
         "recomp": 0.0,
-        "compile": 0.233,
+        "compile": 0.159,
         "run": 0.003
       },
       "num_frames": 30,
@@ -136,7 +136,7 @@
         "expected_lines": 16,
         "matching_lines": 12
       },
-      "duration": 0.24,
+      "duration": 0.16,
       "ruffle_diff_count": 4,
       "ours_diff_count": 4,
       "status": "ruffle_matched",
@@ -146,7 +146,7 @@
       "test": "DepthLimitsTest",
       "phases": {
         "recomp": 0.0,
-        "compile": 0.351,
+        "compile": 0.229,
         "run": 0.003
       },
       "num_frames": 30,
@@ -155,7 +155,7 @@
         "expected_lines": 20,
         "matching_lines": 15
       },
-      "duration": 0.36,
+      "duration": 0.23,
       "status": "output_mismatch",
       "detail": "5 line(s) differ (actual=20, expected=20)",
       "actual_output": "... (6 lines before) ...\nPASSED: d  ==  undefined [DepthLimitsTest.c:141]\nPASSED: d  ==  -1 [DepthLimitsTest.c:150]\nPASSED: d  ==  -1 [DepthLimitsTest.c:154]\nPASSED: d  ==  -16384 [DepthLimitsTest.c:158]\nPASSED: d  ==  -16384 [DepthLimitsTest.c:162]\nFAILED: expected: undefined obtained: -16385 [DepthLimitsTest.c:166] \nFAILED: expected: undefined obtained: -16385 [DepthLimitsTest.c:170] \nPASSED: d  ==  2130690044 [DepthLimitsTest.c:174]\nPASSED: d  ==  2130690044 [DepthLimitsTest.c:178]\nPASSED: d  ==  undefined [DepthLimitsTest.c:182]\nFAILED: expected: undefined obtained: 2130690045 [DepthLimitsTest.c:186] \n#passed: 14\n#failed: 3\n#total tests run: 17",
@@ -165,7 +165,7 @@
       "test": "DragDropTest",
       "phases": {
         "recomp": 0.0,
-        "compile": 0.208,
+        "compile": 0.2,
         "run": 0.007
       },
       "num_frames": 50,
@@ -174,7 +174,7 @@
         "expected_lines": 44,
         "matching_lines": 27
       },
-      "duration": 0.22,
+      "duration": 0.21,
       "status": "output_mismatch",
       "detail": "18 line(s) differ (actual=45, expected=44)",
       "actual_output": "... (10 lines before) ...\nPASSED: eval(_root.draggable50._droptarget) == _level0.target20 [./DragDropTest.as:226]\n4. Click on the FIRST BLUE circle.\nPASSED: _root.draggable50._droptarget == \"/target100\" [./DragDropTest.as:236]\nPASSED: eval(_root.draggable50._droptarget) == _level0.target100 [./DragDropTest.as:237]\n5. Click on the SECOND RED circle.\nFAILED: expected: \"_level50/target10\" obtained:  [./DragDropTest.as:247]\nFAILED: expected: _level50.target10 obtained:  [./DragDropTest.as:248]\n6. Click on the SECOND GREEN circle.\nFAILED: expected: \"_level50/target20\" obtained:  [./DragDropTest.as:258]\nFAILED: expected: _level50.target20 obtained:  [./DragDropTest.as:259]\n7. Click on the SECOND BLUE circle.\nFAILED: expected: \"_level50/target100\" obtained:  [./DragDropTest.as:269]\nFAILED: expected: _level50.target100 obtained:  [./DragDropTest.as:270]\n8. Click on the THIRD RED circle.\nPASSED: _root.draggable50._droptarget == \"/loadedTarget/target10\" [./DragDropTest.as:280]\nPASSED: eval(_root.draggable50._droptarget) == _level0.loadedTarget.target10 [./DragDropTest.as:281]\n9. Click on the THIRD GREEN circle.\nPASSED: _root.draggable50._droptarget == \"/loadedTarget/target20\" [./DragDropTest.as:291]\nPASSED: eval(_root.draggable50._droptarget) == _level0.loadedTarget.target20 [./DragDropTest.as:292]\n10. Click on the THIRD BLUE circle.\nPASSED: _root.draggable50._droptarget == \"/loadedTarget/target100\" [./DragDropTest.as:302]\nPASSED: eval(_root.draggable50._droptarget) == _level0.loadedTarget.target100 [./DragDropTest.as:303]\n11. Click on the SECOND GREEN circle.\nTarget not found: Target=\"null\" Base=\"_level0\"\nPASSED: _root.tf._x == 0 [./DragDropTest.as:323]\nPASSED: _root.tf._y == 100 [./DragDropTest.as:324]\nPASSED: _root.draggable50._droptarget == \"/loadedTarget/target100\" [./DragDropTest.as:330]\nFAILED: _root.tf._x != 0 [./DragDropTest.as:331]\nFAILED: _root.tf._y != 100 [./DragDropTest.as:332]\n12. Click ANYWHERE OUT of the THIRD BLUE circle (on another circle makes a better test)\nPASSED: _root.draggable50._droptarget == \"/loadedTarget/target100\" [./DragDropTest.as:342]\nEND OF TEST\n#passed: 18\n#failed: 8\n#total tests run: 26",
@@ -184,8 +184,8 @@
       "test": "DrawingApiTest",
       "phases": {
         "recomp": 0.0,
-        "compile": 0.185,
-        "run": 0.01
+        "compile": 0.174,
+        "run": 0.009
       },
       "num_frames": 30,
       "lines": {
@@ -193,7 +193,7 @@
         "expected_lines": 93,
         "matching_lines": 66
       },
-      "duration": 0.2,
+      "duration": 0.19,
       "status": "output_mismatch",
       "detail": "29 line(s) differ (actual=95, expected=93)",
       "actual_output": "[ debug-22403-05c7ba106]\nSWF\n\nPASSED: getBounds() returns 6710886.35,6710886.35 6710886.35,6710886.35 after clear\nFAILED: expected: \"6710886.35,6710886.35 6710886.35,6710886.35\" obtained: 100,100 100,100 [./DrawingApiTest.as:84]\nFAILED: expected: \"80,80 220,220\" obtained: 100,100 200,200 [./DrawingApiTest.as:89]\nFAILED: expected: \"80,80 220,220\" obtained: 100,100 220,200 [./DrawingApiTest.as:96]\nFAILED: expected: \"80,80 280,220\" obtained: 100,100 280,200 [./DrawingApiTest.as:101]\nFAILED: expected: \"80,80 280,220\" obtained: 100,100 280,200 [./DrawingApiTest.as:108]\nFAILED: expected: \"80,80 280,255\" obtained: 100,100 280,250 [./DrawingApiTest.as:113]\nFAILED: expected: \"80,80 410,260\" obtained: 100,100 400,250 [./DrawingApiTest.as:120]\nPASSED: ! hitTest(376, 180, true) [./DrawingApiTest.as:125]\nFAILED: hitTest(376, 139, true) [./DrawingApiTest.as:126]\nFAILED: expected: \"80,80 410,260\" obtained: 100,100 400,250 [./DrawingApiTest.as:129]\nFAILED: expected: \"60,80 410,260\" obtained: 80,100 400,250 [./DrawingApiTest.as:140]\nFAILED: expected: \"48,80 410,260\" obtained: 50,100 400,250 [./DrawingApiTest.as:149]\nFAILED: expected: \"18,80 410,260\" obtained: 20,100 400,250 [./DrawingApiTest.as:154]\nFAILED: expected: \"18,80 410,260\" obtained: 20,100 400,250 [./DrawingApiTest.as:172]\nFAILED: expected: \"18,80 410,260\" obtained: 20,100 400,250 [./DrawingApiTest.as:201]\nFAILED: expected: \"219,141 277,169\" obtained: 223,145 273,165 [./DrawingApiTest.as:224]\nFAILED: expected: 'function' obtained: undefined [./DrawingApiTest.as:226]\nFAILED: zshape.hitTest(223, 145, true) [./DrawingApiTest.as:227]\nPASSED: zshape.hitTest((223+10), (145+0), true) [./DrawingApiTest.as:228]\nPASSED: zshape.hitTest((223+20), (145+5), true) [./DrawingApiTest.as:229]\nFAILED: zshape.hitTest((223+25), (145+20), true) [./DrawingApiTest.as:230]\nFAILED: zshape.hitTest(273, 165, true) [./DrawingApiTest.as:231]\nFAILED: x.hitTest(126, 168, true) [./DrawingApiTest.as:256]\nFAILED: x.hitTest(112, 158, true) [./DrawingApiTest.as:257]\nFAILED: x.hitTest(122, 157, true) [./DrawingApiTest.as:261]\nPASSED: ! x.hitTest(120, 155, true) [./DrawingApiTest.as:263]\nFAILED: x.hitTest(120, 155, false) [./DrawingApiTest.as:264]\nPASSED: ! x.hitTest(116, 177, true) [./DrawingApiTest.as:265]\nFAILED: x.hitTest(116, 177, false) [./DrawingApiTest.as:266]\nPASSED: inv3.hitTest((8*4), 100 + (18*4), true) [./DrawingApiTest.as:364]\nFAILED: !inv3.hitTest((4*4), 100 + (10*4), true) [./DrawingApiTest.as:365]\nPASSED: inv3.hitTest((4*4), 100 + (10*4), false) [./DrawingApiTest.as:366]\nPASSED: inv3.hitTest((20*4), 100 + (18*4), true) [./DrawingApiTest.as:368]\nPASSED: !inv3.hitTest((24*4), 100 + (10*4), true) [./DrawingApiTest.as:369]\nPASSED: inv3.hitTest((24*4), 100 + (10*4), false) [./DrawingApiTest.as:370]\nFAILED: ! inv4.hitTest(100 + (15*4), 100 + (15*4), true) [./DrawingApiTest.as:398]\nPASSED: inv4.hitTest(100 + (11*4), 100 + (11*4), true) [./DrawingApiTest.as:401]\nPASSED: inv4.hitTest(100 + (11*4), 100 + (14*4), true) [./DrawingApiTest.as:402]\nPASSED: inv4.hitTest(100 + (11*4), 100 + (19*4), true) [./DrawingApiTest.as:403]\nPASSED: inv4.hitTest(100 + (14*4), 100 + (19*4), true) [./DrawingApiTest.as:404]\nPASSED: inv4.hitTest(100 + (19*4), 100 + (19*4), true) [./DrawingApiTest.as:405]\nPASSED: inv4.hitTest(100 + (19*4), 100 + (14*4), true) [./DrawingApiTest.as:406]\nPASSED: inv4.hitTest(100 + (19*4), 100 + (11*4), true) [./DrawingApiTest.as:407]\nPASSED: inv4.hitTest(100 + (14*4), 100 + (11*4), true) [./DrawingApiTest.as:408]\nPASSED: ! inv5.hitTest(150 + (15*4), 100 + (15*4), true) [./DrawingApiTest.as:437]\nPASSED: inv5.hitTest(150 + (11*4), 100 + (11*4), true) [./DrawingApiTest.as:440]\n... (45 lines after) ...",
@@ -203,8 +203,8 @@
       "test": "EmbeddedFontTest",
       "phases": {
         "recomp": 0.0,
-        "compile": 0.457,
-        "run": 0.004
+        "compile": 0.444,
+        "run": 0.003
       },
       "num_frames": 30,
       "lines": {
@@ -212,7 +212,7 @@
         "expected_lines": 87,
         "matching_lines": 51
       },
-      "duration": 0.47,
+      "duration": 0.45,
       "status": "output_mismatch",
       "detail": "36 line(s) differ (actual=87, expected=87)",
       "actual_output": "PASSED: tf1._width  ==  84 [EmbeddedFontTest.c:225]\nPASSED: tf1._height  ==  20 [EmbeddedFontTest.c:226]\nPASSED: tf1._x  ==  48 [EmbeddedFontTest.c:227]\nPASSED: tf1._y  ==  28 [EmbeddedFontTest.c:228]\nPASSED: tf1.textHeight  ==  23 [EmbeddedFontTest.c:229]\n43\nFAILED: tf1.textWidth >= 44 && tf1.textWidth <= 48 [EmbeddedFontTest.c:232] \nPASSED: tf2._width  ==  84 [EmbeddedFontTest.c:234]\nPASSED: tf2._height  ==  20 [EmbeddedFontTest.c:235]\nPASSED: tf2._x  ==  48 [EmbeddedFontTest.c:236]\nPASSED: tf2._y  ==  58 [EmbeddedFontTest.c:237]\nPASSED: tf2.textHeight  ==  23 [EmbeddedFontTest.c:238]\n72\nFAILED: tf2.textWidth >= 76 && tf2.textWidth <= 80 [EmbeddedFontTest.c:241] \nPASSED: tf3._width  ==  1344 [EmbeddedFontTest.c:243]\nPASSED: tf3._height  ==  20 [EmbeddedFontTest.c:244]\nFAILED: expected: 18 obtained: 48 [EmbeddedFontTest.c:245] \nPASSED: tf3._y  ==  88 [EmbeddedFontTest.c:246]\nPASSED: tf3.textHeight  ==  23 [EmbeddedFontTest.c:247]\n214\nFAILED: tf3.textWidth >= 225 && tf3.textWidth <= 235 [EmbeddedFontTest.c:250] \nPASSED: tf4._width  ==  1344 [EmbeddedFontTest.c:252]\nPASSED: tf4._height  ==  20 [EmbeddedFontTest.c:253]\nFAILED: expected: 18 obtained: 48 [EmbeddedFontTest.c:254] \nPASSED: tf4._y  ==  118 [EmbeddedFontTest.c:255]\nPASSED: tf4.textHeight  ==  23 [EmbeddedFontTest.c:256]\n144\nFAILED: tf4.textWidth >= 153 && tf4.textWidth <= 159 [EmbeddedFontTest.c:259] \nPASSED: tf5._width  ==  1344 [EmbeddedFontTest.c:261]\nPASSED: tf5._height  ==  20 [EmbeddedFontTest.c:262]\nFAILED: expected: 18 obtained: 48 [EmbeddedFontTest.c:263] \nPASSED: tf5._y  ==  148 [EmbeddedFontTest.c:264]\nPASSED: tf5.textHeight  ==  23 [EmbeddedFontTest.c:265]\n172\nFAILED: tf5.textWidth >= 183 && tf5.textWidth <= 189 [EmbeddedFontTest.c:268] \nPASSED: tf6._width  ==  1344 [EmbeddedFontTest.c:270]\nPASSED: tf6._height  ==  20 [EmbeddedFontTest.c:271]\nFAILED: expected: 18 obtained: 48 [EmbeddedFontTest.c:272] \nPASSED: tf6._y  ==  178 [EmbeddedFontTest.c:273]\nPASSED: tf6.textHeight  ==  23 [EmbeddedFontTest.c:274]\n181\nFAILED: tf6.textWidth >= 189 && tf6.textWidth <= 199 [EmbeddedFontTest.c:277] \nPASSED: tf7._width  ==  1344 [EmbeddedFontTest.c:279]\nPASSED: tf7._height  ==  20 [EmbeddedFontTest.c:280]\nFAILED: expected: 18 obtained: 48 [EmbeddedFontTest.c:281] \nPASSED: tf7._y  ==  208 [EmbeddedFontTest.c:282]\nPASSED: tf7.textHeight  ==  23 [EmbeddedFontTest.c:283]\n229\nFAILED: tf7.textWidth >= 240 && tf7.textWidth <= 254 [EmbeddedFontTest.c:286] \nPASSED: tf8._width  ==  672 [EmbeddedFontTest.c:288]\n... (37 lines after) ...",
@@ -222,7 +222,7 @@
       "test": "KeyEventOrder",
       "phases": {
         "recomp": 0.0,
-        "compile": 0.21,
+        "compile": 0.208,
         "run": 0.003
       },
       "num_frames": 30,
@@ -231,7 +231,7 @@
         "expected_lines": 26,
         "matching_lines": 6
       },
-      "duration": 0.22,
+      "duration": 0.21,
       "ruffle_diff_count": 23,
       "ours_diff_count": 20,
       "status": "ruffle_matched",
@@ -241,8 +241,8 @@
       "test": "NetStream-SquareTest",
       "phases": {
         "recomp": 0.0,
-        "compile": 0.703,
-        "run": 0.007
+        "compile": 0.771,
+        "run": 0.008
       },
       "num_frames": 100,
       "lines": {
@@ -250,7 +250,7 @@
         "expected_lines": 216,
         "matching_lines": 86
       },
-      "duration": 0.72,
+      "duration": 0.79,
       "status": "output_mismatch",
       "detail": "130 line(s) differ (actual=201, expected=216)",
       "actual_output": "... (1 lines before) ...\nPASSED: newly created NetConnection is not connected\nPASSED: NetConnection is connected after .connect(null)\nPASSED: true\nPASSED: true\nPASSED: undefined == undefined\nFAILED: expected: number , obtained: undefined\nFAILED: expected: number , obtained: string\nPASSED: NetStream.prototype.hasOwnProperty('currentFps') [NetStream-SquareTest.c:223]\nFAILED: NetStream.prototype.hasOwnProperty('bufferLength') [NetStream-SquareTest.c:224] \nFAILED: NetStream.prototype.hasOwnProperty('bufferTime') [NetStream-SquareTest.c:225] \nFAILED: NetStream.prototype.hasOwnProperty('liveDelay') [NetStream-SquareTest.c:226] \nFAILED: NetStream.prototype.hasOwnProperty('time') [NetStream-SquareTest.c:227] \nFAILED: NetStream.prototype.hasOwnProperty('bytesLoaded') [NetStream-SquareTest.c:228] \nFAILED: NetStream.prototype.hasOwnProperty('bytesTotal') [NetStream-SquareTest.c:229] \nPASSED: s1.getVolume()  ==  100 [NetStream-SquareTest.c:241]\nPASSED: s1.getVolume()  ==  1000 [NetStream-SquareTest.c:245]\nPASSED: s2.getVolume()  ==  1000 [NetStream-SquareTest.c:250]\nPASSED: s2.getVolume()  ==  5 [NetStream-SquareTest.c:256]\nPASSED: s1.getVolume()  ==  5 [NetStream-SquareTest.c:257]\nPASSED: s2.getVolume()  ==  80 [NetStream-SquareTest.c:259]\nPASSED: s1.getVolume()  ==  80 [NetStream-SquareTest.c:260]\nPASSED: s2.getVolume()  ==  -20 [NetStream-SquareTest.c:263]\nPASSED: s1.getVolume()  ==  -20 [NetStream-SquareTest.c:264]\nFAILED: expected: 'undefined' obtained: number [NetStream-SquareTest.c:269] \nFAILED: expected: 'undefined' obtained: number [NetStream-SquareTest.c:270] \nFAILED: expected: 'undefined' obtained: number [NetStream-SquareTest.c:273] \nFAILED: expected: 'undefined' obtained: number [NetStream-SquareTest.c:274] \nFAILED: expected: 100 obtained: 50 [NetStream-SquareTest.c:277] \nFAILED: expected: 100 obtained: 50 [NetStream-SquareTest.c:278] \nPASSED: s2.getVolume()  ==  80 [NetStream-SquareTest.c:280]\nPASSED: s1.getVolume()  ==  80 [NetStream-SquareTest.c:281]\nPASSED: s2.getVolume()  ==  100 [NetStream-SquareTest.c:287]\nPASSED: s1.getVolume()  ==  100 [NetStream-SquareTest.c:288]\nPASSED: s2.getVolume()  ==  80 [NetStream-SquareTest.c:290]\nPASSED: s1.getVolume()  ==  80 [NetStream-SquareTest.c:291]\nPASSED: Video.prototype.hasOwnProperty('attachVideo') [NetStream-SquareTest.c:312]\nFAILED: Video.prototype.hasOwnProperty('smoothing') [NetStream-SquareTest.c:313] \nFAILED: Video.prototype.hasOwnProperty('deblocking') [NetStream-SquareTest.c:314] \nPASSED: Video.prototype.hasOwnProperty('clear') [NetStream-SquareTest.c:315]\nFAILED: Video.prototype.hasOwnProperty('height') [NetStream-SquareTest.c:316] \nFAILED: Video.prototype.hasOwnProperty('width') [NetStream-SquareTest.c:317] \nFAILED: expected: 0 obtained: undefined [NetStream-SquareTest.c:318] \nFAILED: expected: 0 obtained: undefined [NetStream-SquareTest.c:319] \nFAILED: expected: 0 obtained: undefined [NetStream-SquareTest.c:320] \nFAILED: expected: 0 obtained: undefined [NetStream-SquareTest.c:321] \nFAILED: expected: 0 obtained: undefined [NetStream-SquareTest.c:327] \nFAILED: expected: 0 obtained: undefined [NetStream-SquareTest.c:328] \nFAILED: expected: 0 obtained: undefined [NetStream-SquareTest.c:329] \nFAILED: expected: 0 obtained: undefined [NetStream-SquareTest.c:330] \nFAILED: expected: 'number' obtained: undefined [NetStream-SquareTest.c:333] \n... (150 lines after) ...",
@@ -260,8 +260,8 @@
       "test": "PlaceObject2Test",
       "phases": {
         "recomp": 0.0,
-        "compile": 0.191,
-        "run": 0.016
+        "compile": 0.21,
+        "run": 0.015
       },
       "num_frames": 30,
       "lines": {
@@ -269,14 +269,14 @@
         "expected_lines": 9,
         "matching_lines": 9
       },
-      "duration": 0.21,
+      "duration": 0.23,
       "status": "pass"
     },
     {
       "test": "ResolveEventsTest",
       "phases": {
         "recomp": 0.0,
-        "compile": 0.246,
+        "compile": 0.27,
         "run": 0.003
       },
       "num_frames": 30,
@@ -285,14 +285,14 @@
         "expected_lines": 15,
         "matching_lines": 15
       },
-      "duration": 0.25,
+      "duration": 0.28,
       "status": "pass"
     },
     {
       "test": "RollOverOutTest",
       "phases": {
         "recomp": 0.0,
-        "compile": 0.228,
+        "compile": 0.251,
         "run": 0.003
       },
       "num_frames": 30,
@@ -301,14 +301,14 @@
         "expected_lines": 5,
         "matching_lines": 5
       },
-      "duration": 0.23,
+      "duration": 0.26,
       "status": "pass"
     },
     {
       "test": "VarAndCharClashTest",
       "phases": {
         "recomp": 0.0,
-        "compile": 0.181,
+        "compile": 0.178,
         "run": 0.003
       },
       "num_frames": 30,
@@ -317,14 +317,14 @@
         "expected_lines": 13,
         "matching_lines": 13
       },
-      "duration": 0.19,
+      "duration": 0.18,
       "status": "pass"
     },
     {
       "test": "Version4Loader",
       "phases": {
         "recomp": 0.0,
-        "compile": 0.227,
+        "compile": 0.224,
         "run": 0.003
       },
       "num_frames": 30,
@@ -343,7 +343,7 @@
       "test": "Video-EmbedSquareTest",
       "phases": {
         "recomp": 0.0,
-        "compile": 0.199,
+        "compile": 0.195,
         "run": 0.002
       },
       "num_frames": 20,
@@ -359,64 +359,64 @@
       "test": "action_order/ActionOrderTest3",
       "phases": {
         "recomp": 0.0,
-        "compile": 0.285,
+        "compile": 0.281,
         "run": 0.004
       },
       "num_frames": 30,
       "lines": {
-        "actual_lines": 63,
+        "actual_lines": 75,
         "expected_lines": 62,
-        "matching_lines": 7
+        "matching_lines": 6
       },
       "duration": 0.29,
       "status": "output_mismatch",
-      "detail": "56 line(s) differ (actual=63, expected=62)",
-      "actual_output": "onEnterFrame\nFrame 2 actions: undefined\nonEnterFrame\nstatic unload: undefined\nFrame 3 actions: undefined\nonEnterFrame\nonEnterFrame\nFrame 2 actions: undefined\nonEnterFrame\nstatic unload: undefined\nFrame 3 actions: undefined\nonEnterFrame\nonEnterFrame\nFrame 2 actions: undefined\nonEnterFrame\nstatic unload: undefined\nFrame 3 actions: undefined\nonEnterFrame\nonEnterFrame\nFrame 2 actions: undefined\nonEnterFrame\nstatic unload: undefined\nFrame 3 actions: undefined\nonEnterFrame\nonEnterFrame\nFrame 2 actions: undefined\nonEnterFrame\nstatic unload: undefined\nFrame 3 actions: undefined\nonEnterFrame\nonEnterFrame\nFrame 2 actions: undefined\nonEnterFrame\nstatic unload: undefined\nFrame 3 actions: undefined\nFAILED: expected: 23 obtained: 18 [ActionOrderTest3.c:174] \nPASSED: _global.arr[0]  ==  'Frame 2 actions: undefined' [ActionOrderTest3.c:175]\nFAILED: expected: 'ctor: 0' obtained: static unload: undefined [ActionOrderTest3.c:176] \nFAILED: expected: 'static unload: undefined' obtained: Frame 3 actions: undefined [ActionOrderTest3.c:177] \nFAILED: expected: 'dynamic load: 0' obtained: Frame 2 actions: undefined [ActionOrderTest3.c:178] \nFAILED: expected: 'Frame 3 actions: undefined' obtained: static unload: undefined [ActionOrderTest3.c:179] \nFAILED: expected: 'Frame 2 actions: undefined' obtained: Frame 3 actions: undefined [ActionOrderTest3.c:180] \nFAILED: expected: 'Frame 3 actions: 0' obtained: Frame 2 actions: undefined [ActionOrderTest3.c:181] \nFAILED: expected: 'Frame 2 actions: 0' obtained: static unload: undefined [ActionOrderTest3.c:182] \nFAILED: expected: 'ctor: 1' obtained: Frame 3 actions: undefined [ActionOrderTest3.c:183] \nFAILED: expected: 'static unload: 0' obtained: Frame 2 actions: undefined [ActionOrderTest3.c:184] \nFAILED: expected: 'dynamic unload: 0' obtained: static unload: undefined [ActionOrderTest3.c:185] \nFAILED: expected: 'dynamic load: 1' obtained: Frame 3 actions: undefined [ActionOrderTest3.c:186] \nFAILED: expected: 'Frame 3 actions: 0' obtained: Frame 2 actions: undefined [ActionOrderTest3.c:187] \nFAILED: expected: 'Frame 2 actions: 0' obtained: static unload: undefined [ActionOrderTest3.c:188] \n... (13 lines after) ...",
+      "detail": "69 line(s) differ (actual=75, expected=62)",
+      "actual_output": "onEnterFrame\nFrame 2 actions: undefined\nctor: 0\nonEnterFrame\nstatic unload: undefined\ndynamic load: 0\nFrame 3 actions: undefined\nonEnterFrame\nonEnterFrame\nFrame 2 actions: undefined\nctor: 1\nonEnterFrame\nstatic unload: undefined\ndynamic load: 1\nFrame 3 actions: undefined\nonEnterFrame\nonEnterFrame\nFrame 2 actions: undefined\nctor: 2\nonEnterFrame\nstatic unload: undefined\ndynamic load: 2\nFrame 3 actions: undefined\nonEnterFrame\nonEnterFrame\nFrame 2 actions: undefined\nctor: 3\nonEnterFrame\nstatic unload: undefined\ndynamic load: 3\nFrame 3 actions: undefined\nonEnterFrame\nonEnterFrame\nFrame 2 actions: undefined\nctor: 4\nonEnterFrame\nstatic unload: undefined\ndynamic load: 4\nFrame 3 actions: undefined\nonEnterFrame\nonEnterFrame\nFrame 2 actions: undefined\nctor: 5\nonEnterFrame\nstatic unload: undefined\ndynamic load: 5\nFrame 3 actions: undefined\nFAILED: expected: 23 obtained: 30 [ActionOrderTest3.c:174] \nPASSED: _global.arr[0]  ==  'Frame 2 actions: undefined' [ActionOrderTest3.c:175]\nPASSED: _global.arr[1]  ==  'ctor: 0' [ActionOrderTest3.c:176]\n... (25 lines after) ...",
       "expected_output": "onEnterFrame\nFrame 2 actions: undefined\nctor: 0\nstatic unload: undefined\ndynamic load: 0\nonEnterFrame\nFrame 3 actions: undefined\nFrame 2 actions: undefined\nonEnterFrame\nFrame 3 actions: 0\nFrame 2 actions: 0\nctor: 1\nstatic unload: 0\ndynamic unload: 0\ndynamic load: 1\nonEnterFrame\nFrame 3 actions: 0\nFrame 2 actions: 0\nonEnterFrame\nFrame 3 actions: 1\nFrame 2 actions: 1\nctor: 2\nstatic unload: 1\ndynamic unload: 1\ndynamic load: 2\nonEnterFrame\nFrame 3 actions: 1\nFrame 2 actions: 1\nonEnterFrame\nFrame 3 actions: 2\nPASSED: _global.arr.length  ==  23 [ActionOrderTest3.c:174]\nPASSED: _global.arr[0]  ==  'Frame 2 actions: undefined' [ActionOrderTest3.c:175]\nPASSED: _global.arr[1]  ==  'ctor: 0' [ActionOrderTest3.c:176]\nPASSED: _global.arr[2]  ==  'static unload: undefined' [ActionOrderTest3.c:177]\nPASSED: _global.arr[3]  ==  'dynamic load: 0' [ActionOrderTest3.c:178]\nPASSED: _global.arr[4]  ==  'Frame 3 actions: undefined' [ActionOrderTest3.c:179]\nPASSED: _global.arr[5]  ==  'Frame 2 actions: undefined' [ActionOrderTest3.c:180]\nPASSED: _global.arr[6]  ==  'Frame 3 actions: 0' [ActionOrderTest3.c:181]\nPASSED: _global.arr[7]  ==  'Frame 2 actions: 0' [ActionOrderTest3.c:182]\nPASSED: _global.arr[8]  ==  'ctor: 1' [ActionOrderTest3.c:183]\nPASSED: _global.arr[9]  ==  'static unload: 0' [ActionOrderTest3.c:184]\nPASSED: _global.arr[10]  ==  'dynamic unload: 0' [ActionOrderTest3.c:185]\nPASSED: _global.arr[11]  ==  'dynamic load: 1' [ActionOrderTest3.c:186]\nPASSED: _global.arr[12]  ==  'Frame 3 actions: 0' [ActionOrderTest3.c:187]\nPASSED: _global.arr[13]  ==  'Frame 2 actions: 0' [ActionOrderTest3.c:188]\nPASSED: _global.arr[14]  ==  'Frame 3 actions: 1' [ActionOrderTest3.c:189]\nPASSED: _global.arr[15]  ==  'Frame 2 actions: 1' [ActionOrderTest3.c:190]\nPASSED: _global.arr[16]  ==  'ctor: 2' [ActionOrderTest3.c:191]\nPASSED: _global.arr[17]  ==  'static unload: 1' [ActionOrderTest3.c:192]\nPASSED: _global.arr[18]  ==  'dynamic unload: 1' [ActionOrderTest3.c:193]\n... (12 lines after) ..."
     },
     {
       "test": "action_order/ActionOrderTest4",
       "phases": {
         "recomp": 0.0,
-        "compile": 0.226,
+        "compile": 0.224,
         "run": 0.004
       },
       "num_frames": 30,
       "lines": {
-        "actual_lines": 70,
+        "actual_lines": 74,
         "expected_lines": 64,
         "matching_lines": 7
       },
       "duration": 0.23,
       "status": "output_mismatch",
-      "detail": "63 line(s) differ (actual=70, expected=64)",
-      "actual_output": "onEnterFrame\nFrame 2 actions: undefined\nstatic load: undefined\nctor: 0\nonEnterFrame\nstatic load: 0\ndynamic load: 0\nFrame 3 actions: 0\nonEnterFrame\nonEnterFrame\nFrame 2 actions: 0\nonEnterFrame\nstatic load: 0\nFrame 3 actions: 0\nonEnterFrame\nonEnterFrame\nFrame 2 actions: 0\nonEnterFrame\ndynamic unload: 0\nFrame 3 actions: undefined\nonEnterFrame\nonEnterFrame\nstatic load: undefined\nFrame 2 actions: undefined\nctor: 1\nonEnterFrame\nstatic load: 1\ndynamic load: 1\nFrame 3 actions: 1\nonEnterFrame\nonEnterFrame\nFrame 2 actions: 1\nonEnterFrame\nstatic load: 1\nFrame 3 actions: 1\nonEnterFrame\nonEnterFrame\nFrame 2 actions: 1\nonEnterFrame\ndynamic unload: 1\nFrame 3 actions: undefined\nPASSED: _global.arr.length  ==  24 [ActionOrderTest4.c:175]\nPASSED: _global.arr[0]  ==  'Frame 2 actions: undefined' [ActionOrderTest4.c:176]\nPASSED: _global.arr[1]  ==  'static load: undefined' [ActionOrderTest4.c:177]\nPASSED: _global.arr[2]  ==  'ctor: 0' [ActionOrderTest4.c:178]\nPASSED: _global.arr[3]  ==  'static load: 0' [ActionOrderTest4.c:179]\nPASSED: _global.arr[4]  ==  'dynamic load: 0' [ActionOrderTest4.c:180]\nPASSED: _global.arr[5]  ==  'Frame 3 actions: 0' [ActionOrderTest4.c:181]\nPASSED: _global.arr[6]  ==  'Frame 2 actions: 0' [ActionOrderTest4.c:182]\nFAILED: expected: 'Frame 3 actions: 0' obtained: static load: 0 [ActionOrderTest4.c:183] \n... (20 lines after) ...",
+      "detail": "67 line(s) differ (actual=74, expected=64)",
+      "actual_output": "onEnterFrame\nFrame 2 actions: undefined\nstatic load: undefined\nctor: 0\nonEnterFrame\nstatic load: 0\ndynamic load: 0\nFrame 3 actions: 0\nonEnterFrame\nonEnterFrame\nFrame 2 actions: 0\nonEnterFrame\nstatic load: 0\nFrame 3 actions: 0\nonEnterFrame\nonEnterFrame\nFrame 2 actions: 0\nctor: 1\nonEnterFrame\ndynamic unload: 1\nstatic load: 1\nFrame 3 actions: undefined\nonEnterFrame\nonEnterFrame\nstatic load: undefined\nFrame 2 actions: undefined\nctor: 2\nonEnterFrame\nstatic load: 2\ndynamic load: 2\nFrame 3 actions: 2\nonEnterFrame\nonEnterFrame\nFrame 2 actions: 2\nonEnterFrame\nstatic load: 2\nFrame 3 actions: 2\nonEnterFrame\nonEnterFrame\nFrame 2 actions: 2\nctor: 3\nonEnterFrame\ndynamic unload: 3\nstatic load: 3\nFrame 3 actions: undefined\nFAILED: expected: 24 obtained: 28 [ActionOrderTest4.c:175] \nPASSED: _global.arr[0]  ==  'Frame 2 actions: undefined' [ActionOrderTest4.c:176]\nPASSED: _global.arr[1]  ==  'static load: undefined' [ActionOrderTest4.c:177]\nPASSED: _global.arr[2]  ==  'ctor: 0' [ActionOrderTest4.c:178]\nPASSED: _global.arr[3]  ==  'static load: 0' [ActionOrderTest4.c:179]\n... (24 lines after) ...",
       "expected_output": "onEnterFrame\nFrame 2 actions: undefined\nstatic load: undefined\nctor: 0\nstatic load: 0\ndynamic load: 0\nonEnterFrame\nFrame 3 actions: 0\nFrame 2 actions: 0\nonEnterFrame\nFrame 3 actions: 0\nFrame 2 actions: 0\nctor: 1\ndynamic unload: 0\nstatic load: 1\ndynamic load: 1\nonEnterFrame\nFrame 3 actions: 0\nFrame 2 actions: 0\nonEnterFrame\nFrame 3 actions: 1\nFrame 2 actions: 1\nctor: 2\ndynamic unload: 1\nstatic load: 2\ndynamic load: 2\nonEnterFrame\nFrame 3 actions: 1\nFrame 2 actions: 1\nonEnterFrame\nFrame 3 actions: 2\nPASSED: _global.arr.length  ==  24 [ActionOrderTest4.c:175]\nPASSED: _global.arr[0]  ==  'Frame 2 actions: undefined' [ActionOrderTest4.c:176]\nPASSED: _global.arr[1]  ==  'static load: undefined' [ActionOrderTest4.c:177]\nPASSED: _global.arr[2]  ==  'ctor: 0' [ActionOrderTest4.c:178]\nPASSED: _global.arr[3]  ==  'static load: 0' [ActionOrderTest4.c:179]\nPASSED: _global.arr[4]  ==  'dynamic load: 0' [ActionOrderTest4.c:180]\nPASSED: _global.arr[5]  ==  'Frame 3 actions: 0' [ActionOrderTest4.c:181]\nPASSED: _global.arr[6]  ==  'Frame 2 actions: 0' [ActionOrderTest4.c:182]\nPASSED: _global.arr[7]  ==  'Frame 3 actions: 0' [ActionOrderTest4.c:183]\nPASSED: _global.arr[8]  ==  'Frame 2 actions: 0' [ActionOrderTest4.c:184]\nPASSED: _global.arr[9]  ==  'ctor: 1' [ActionOrderTest4.c:185]\nPASSED: _global.arr[10]  ==  'dynamic unload: 0' [ActionOrderTest4.c:186]\nPASSED: _global.arr[11]  ==  'static load: 1' [ActionOrderTest4.c:187]\nPASSED: _global.arr[12]  ==  'dynamic load: 1' [ActionOrderTest4.c:188]\nPASSED: _global.arr[13]  ==  'Frame 3 actions: 0' [ActionOrderTest4.c:189]\nPASSED: _global.arr[14]  ==  'Frame 2 actions: 0' [ActionOrderTest4.c:190]\nPASSED: _global.arr[15]  ==  'Frame 3 actions: 1' [ActionOrderTest4.c:191]\nPASSED: _global.arr[16]  ==  'Frame 2 actions: 1' [ActionOrderTest4.c:192]\nPASSED: _global.arr[17]  ==  'ctor: 2' [ActionOrderTest4.c:193]\n... (14 lines after) ..."
     },
     {
       "test": "action_order/ActionOrderTest5",
       "phases": {
         "recomp": 0.0,
-        "compile": 0.21,
+        "compile": 0.204,
         "run": 0.004
       },
       "num_frames": 30,
       "lines": {
-        "actual_lines": 59,
+        "actual_lines": 61,
         "expected_lines": 51,
         "matching_lines": 8
       },
-      "duration": 0.22,
+      "duration": 0.21,
       "status": "output_mismatch",
-      "detail": "51 line(s) differ (actual=59, expected=51)",
-      "actual_output": "onEnterFrame\nFrame 2 actions: undefined\nctor: 0\nonEnterFrame\ndynamic load: 0\nFrame 3 actions: 0\nonEnterFrame\nonEnterFrame\nFrame 2 actions: 0\nonEnterFrame\nFrame 3 actions: 0\nonEnterFrame\nonEnterFrame\nFrame 2 actions: 0\nonEnterFrame\ndynamic unload: 0\nFrame 3 actions: undefined\nonEnterFrame\nonEnterFrame\nFrame 2 actions: undefined\nctor: 1\nonEnterFrame\ndynamic load: 1\nFrame 3 actions: 1\nonEnterFrame\nonEnterFrame\nFrame 2 actions: 1\nonEnterFrame\nFrame 3 actions: 1\nonEnterFrame\nonEnterFrame\nFrame 2 actions: 1\nonEnterFrame\ndynamic unload: 1\nFrame 3 actions: undefined\nFAILED: expected: 20 obtained: 18 [ActionOrderTest5.c:167] \nPASSED: _global.arr[0]  ==  'Frame 2 actions: undefined' [ActionOrderTest5.c:168]\nPASSED: _global.arr[1]  ==  'ctor: 0' [ActionOrderTest5.c:169]\nFAILED: expected: 'Frame 3 actions: 0' obtained: dynamic load: 0 [ActionOrderTest5.c:170] \nFAILED: expected: 'dynamic load: 0' obtained: Frame 3 actions: 0 [ActionOrderTest5.c:171] \nPASSED: _global.arr[4]  ==  'Frame 2 actions: 0' [ActionOrderTest5.c:172]\nPASSED: _global.arr[5]  ==  'Frame 3 actions: 0' [ActionOrderTest5.c:173]\nPASSED: _global.arr[6]  ==  'Frame 2 actions: 0' [ActionOrderTest5.c:174]\nFAILED: expected: 'ctor: 1' obtained: dynamic unload: 0 [ActionOrderTest5.c:175] \nFAILED: expected: 'dynamic unload: 0' obtained: Frame 3 actions: undefined [ActionOrderTest5.c:176] \nFAILED: expected: 'Frame 3 actions: 0' obtained: Frame 2 actions: undefined [ActionOrderTest5.c:177] \nFAILED: expected: 'Frame 2 actions: 0' obtained: dynamic load: 1 [ActionOrderTest5.c:178] \nPASSED: _global.arr[12]  ==  'Frame 3 actions: 1' [ActionOrderTest5.c:179]\nPASSED: _global.arr[13]  ==  'Frame 2 actions: 1' [ActionOrderTest5.c:180]\nFAILED: expected: 'ctor: 2' obtained: Frame 3 actions: 1 [ActionOrderTest5.c:181] \n... (9 lines after) ...",
+      "detail": "53 line(s) differ (actual=61, expected=51)",
+      "actual_output": "onEnterFrame\nFrame 2 actions: undefined\nctor: 0\nonEnterFrame\ndynamic load: 0\nFrame 3 actions: 0\nonEnterFrame\nonEnterFrame\nFrame 2 actions: 0\nonEnterFrame\nFrame 3 actions: 0\nonEnterFrame\nonEnterFrame\nFrame 2 actions: 0\nctor: 1\nonEnterFrame\ndynamic unload: 1\nFrame 3 actions: undefined\nonEnterFrame\nonEnterFrame\nFrame 2 actions: undefined\nctor: 2\nonEnterFrame\ndynamic load: 2\nFrame 3 actions: 2\nonEnterFrame\nonEnterFrame\nFrame 2 actions: 2\nonEnterFrame\nFrame 3 actions: 2\nonEnterFrame\nonEnterFrame\nFrame 2 actions: 2\nctor: 3\nonEnterFrame\ndynamic unload: 3\nFrame 3 actions: undefined\nPASSED: _global.arr.length  ==  20 [ActionOrderTest5.c:167]\nPASSED: _global.arr[0]  ==  'Frame 2 actions: undefined' [ActionOrderTest5.c:168]\nPASSED: _global.arr[1]  ==  'ctor: 0' [ActionOrderTest5.c:169]\nFAILED: expected: 'Frame 3 actions: 0' obtained: dynamic load: 0 [ActionOrderTest5.c:170] \nFAILED: expected: 'dynamic load: 0' obtained: Frame 3 actions: 0 [ActionOrderTest5.c:171] \nPASSED: _global.arr[4]  ==  'Frame 2 actions: 0' [ActionOrderTest5.c:172]\nPASSED: _global.arr[5]  ==  'Frame 3 actions: 0' [ActionOrderTest5.c:173]\nPASSED: _global.arr[6]  ==  'Frame 2 actions: 0' [ActionOrderTest5.c:174]\nPASSED: _global.arr[7]  ==  'ctor: 1' [ActionOrderTest5.c:175]\nFAILED: expected: 'dynamic unload: 0' obtained: dynamic unload: 1 [ActionOrderTest5.c:176] \nFAILED: expected: 'Frame 3 actions: 0' obtained: Frame 3 actions: undefined [ActionOrderTest5.c:177] \nFAILED: expected: 'Frame 2 actions: 0' obtained: ctor: 2 [ActionOrderTest5.c:178] \nFAILED: expected: 'Frame 3 actions: 1' obtained: dynamic load: 2 [ActionOrderTest5.c:179] \n... (11 lines after) ...",
       "expected_output": "onEnterFrame\nFrame 2 actions: undefined\nctor: 0\nonEnterFrame\nFrame 3 actions: 0\ndynamic load: 0\nFrame 2 actions: 0\nonEnterFrame\nFrame 3 actions: 0\nFrame 2 actions: 0\nctor: 1\ndynamic unload: 0\nonEnterFrame\nFrame 3 actions: 0\ndynamic load: 1\nFrame 2 actions: 0\nonEnterFrame\nFrame 3 actions: 1\nFrame 2 actions: 1\nctor: 2\ndynamic unload: 1\nonEnterFrame\nFrame 3 actions: 1\ndynamic load: 2\nFrame 2 actions: 1\nonEnterFrame\nFrame 3 actions: 2\nPASSED: _global.arr.length  ==  20 [ActionOrderTest5.c:167]\nPASSED: _global.arr[0]  ==  'Frame 2 actions: undefined' [ActionOrderTest5.c:168]\nPASSED: _global.arr[1]  ==  'ctor: 0' [ActionOrderTest5.c:169]\nPASSED: _global.arr[2]  ==  'Frame 3 actions: 0' [ActionOrderTest5.c:170]\nPASSED: _global.arr[3]  ==  'dynamic load: 0' [ActionOrderTest5.c:171]\nPASSED: _global.arr[4]  ==  'Frame 2 actions: 0' [ActionOrderTest5.c:172]\nPASSED: _global.arr[5]  ==  'Frame 3 actions: 0' [ActionOrderTest5.c:173]\nPASSED: _global.arr[6]  ==  'Frame 2 actions: 0' [ActionOrderTest5.c:174]\nPASSED: _global.arr[7]  ==  'ctor: 1' [ActionOrderTest5.c:175]\nPASSED: _global.arr[8]  ==  'dynamic unload: 0' [ActionOrderTest5.c:176]\nPASSED: _global.arr[9]  ==  'Frame 3 actions: 0' [ActionOrderTest5.c:177]\nPASSED: _global.arr[11]  ==  'Frame 2 actions: 0' [ActionOrderTest5.c:178]\nPASSED: _global.arr[12]  ==  'Frame 3 actions: 1' [ActionOrderTest5.c:179]\nPASSED: _global.arr[13]  ==  'Frame 2 actions: 1' [ActionOrderTest5.c:180]\nPASSED: _global.arr[14]  ==  'ctor: 2' [ActionOrderTest5.c:181]\nPASSED: _global.arr[15]  ==  'dynamic unload: 1' [ActionOrderTest5.c:182]\nPASSED: _global.arr[16]  ==  'Frame 3 actions: 1' [ActionOrderTest5.c:183]\nPASSED: _global.arr[17]  ==  'dynamic load: 2' [ActionOrderTest5.c:184]\nPASSED: _global.arr[18]  ==  'Frame 2 actions: 1' [ActionOrderTest5.c:185]\nPASSED: _global.arr[19]  ==  'Frame 3 actions: 2' [ActionOrderTest5.c:186]\nPASSED: _global.arr.toString()  ==  'Frame 2 actions: undefined,ctor: 0,Frame 3 actions: 0,dynamic load: 0,Frame 2 actions: 0,Frame 3 actions: 0,Frame 2 actions: 0,ctor: 1,dynamic unload: 0,Frame 3 actions: 0,dynamic load: 1,Frame 2 actions: 0,Frame 3 actions: 1,Frame 2 actions: 1,ctor: 2,dynamic unload: 1,Frame 3 actions: 1,dynamic load: 2,Frame 2 actions: 1,Frame 3 actions: 2' [ActionOrderTest5.c:188]\n#passed: 21\n#failed: 0\n... (1 lines after) ..."
     },
     {
       "test": "action_order/action_execution_order_test1",
       "phases": {
         "recomp": 0.0,
-        "compile": 0.167,
+        "compile": 0.163,
         "run": 0.003
       },
       "num_frames": 30,
@@ -432,7 +432,7 @@
       "test": "action_order/action_execution_order_test11",
       "phases": {
         "recomp": 0.0,
-        "compile": 0.208,
+        "compile": 0.201,
         "run": 0.003
       },
       "num_frames": 30,
@@ -451,8 +451,8 @@
       "test": "action_order/action_execution_order_test2",
       "phases": {
         "recomp": 0.0,
-        "compile": 0.183,
-        "run": 0.004
+        "compile": 0.219,
+        "run": 0.003
       },
       "num_frames": 30,
       "lines": {
@@ -460,15 +460,15 @@
         "expected_lines": 5,
         "matching_lines": 5
       },
-      "duration": 0.19,
+      "duration": 0.23,
       "status": "pass"
     },
     {
       "test": "action_order/action_execution_order_test3",
       "phases": {
         "recomp": 0.0,
-        "compile": 0.177,
-        "run": 0.004
+        "compile": 0.219,
+        "run": 0.003
       },
       "num_frames": 30,
       "lines": {
@@ -476,15 +476,15 @@
         "expected_lines": 4,
         "matching_lines": 4
       },
-      "duration": 0.18,
+      "duration": 0.23,
       "status": "pass"
     },
     {
       "test": "action_order/action_execution_order_test4",
       "phases": {
         "recomp": 0.0,
-        "compile": 0.219,
-        "run": 0.004
+        "compile": 0.277,
+        "run": 0.003
       },
       "num_frames": 30,
       "lines": {
@@ -492,7 +492,7 @@
         "expected_lines": 26,
         "matching_lines": 19
       },
-      "duration": 0.23,
+      "duration": 0.28,
       "ruffle_diff_count": 26,
       "ours_diff_count": 7,
       "status": "ruffle_matched",
@@ -502,8 +502,8 @@
       "test": "action_order/action_execution_order_test5",
       "phases": {
         "recomp": 0.0,
-        "compile": 0.208,
-        "run": 0.006
+        "compile": 0.261,
+        "run": 0.004
       },
       "num_frames": 30,
       "lines": {
@@ -511,7 +511,7 @@
         "expected_lines": 35,
         "matching_lines": 26
       },
-      "duration": 0.22,
+      "duration": 0.27,
       "status": "output_mismatch",
       "detail": "27 line(s) differ (actual=53, expected=35)",
       "actual_output": "... (21 lines before) ...\nmc1211 onEnterFrame called\nmc121 onEnterFrame called\nmc12 onEnterFrame called\nmc11 onEnterFrame called\nmc1 onEnterFrame called\nmc121 onLoad called\nmc1211 onLoad called\nmc12 onInitialize called\nFAILED: expected: _level0.mc1.mc12 , obtained: _level0.mc1.mc12\nFAILED: expected: [object Object] , obtained: \nFAILED: expected: [object Object] , obtained: \nFAILED: expected: [object Object] , obtained: \nFAILED: expected: [object Object] , obtained: \nmc12 onConstruct called\nFAILED: expected: _level0.mc1.mc12 , obtained: _level0.mc1.mc12\nFAILED: expected: [object Object] , obtained: \nFAILED: expected: [object Object] , obtained: \nFAILED: expected: [object Object] , obtained: \nFAILED: expected: [object Object] , obtained: \nmc11 onLoad called\nmc12 onLoad called\nmc121 onLoad called\nmc1211 onLoad called\nmc1211 onUnload called\nmc121 onUnload called\nmc12 onUnload called\nmc11 onUnload called\nmc1 onUnload called\nFAILED: expected: '1+2+3+4+5+6+7+8+9+10+11+12+13+14+15+' obtained: 1+2+3+4+5+6+7+8+9+10+4+5+2+3+4+5+11+12+13+14+15+ [action_execution_order_test5.c:253] \n#passed: 13\n#failed: 11\n#total tests run: 24",
@@ -521,7 +521,7 @@
       "test": "action_order/action_execution_order_test6",
       "phases": {
         "recomp": 0.0,
-        "compile": 0.252,
+        "compile": 0.25,
         "run": 0.003
       },
       "num_frames": 30,
@@ -540,8 +540,8 @@
       "test": "action_order/action_execution_order_test7",
       "phases": {
         "recomp": 0.0,
-        "compile": 0.193,
-        "run": 0.003
+        "compile": 0.189,
+        "run": 0.002
       },
       "num_frames": 30,
       "lines": {
@@ -549,14 +549,14 @@
         "expected_lines": 7,
         "matching_lines": 7
       },
-      "duration": 0.2,
+      "duration": 0.19,
       "status": "pass"
     },
     {
       "test": "action_order/action_execution_order_test8-v5",
       "phases": {
         "recomp": 0.0,
-        "compile": 0.219,
+        "compile": 0.216,
         "run": 0.003
       },
       "num_frames": 30,
@@ -565,14 +565,14 @@
         "expected_lines": 11,
         "matching_lines": 11
       },
-      "duration": 0.23,
+      "duration": 0.22,
       "status": "pass"
     },
     {
       "test": "action_order/action_execution_order_test8-v6",
       "phases": {
         "recomp": 0.0,
-        "compile": 0.191,
+        "compile": 0.187,
         "run": 0.003
       },
       "num_frames": 30,
@@ -581,14 +581,14 @@
         "expected_lines": 11,
         "matching_lines": 11
       },
-      "duration": 0.2,
+      "duration": 0.19,
       "status": "pass"
     },
     {
       "test": "action_order/action_execution_order_test9",
       "phases": {
         "recomp": 0.0,
-        "compile": 0.218,
+        "compile": 0.195,
         "run": 0.003
       },
       "num_frames": 30,
@@ -597,14 +597,14 @@
         "expected_lines": 4,
         "matching_lines": 4
       },
-      "duration": 0.22,
+      "duration": 0.2,
       "status": "pass"
     },
     {
       "test": "attachExtImported",
       "phases": {
         "recomp": 0.0,
-        "compile": 0.306,
+        "compile": 0.292,
         "run": 0.003
       },
       "num_frames": 30,
@@ -613,14 +613,14 @@
         "expected_lines": 2,
         "matching_lines": 2
       },
-      "duration": 0.31,
+      "duration": 0.3,
       "status": "pass"
     },
     {
       "test": "attachImported",
       "phases": {
         "recomp": 0.0,
-        "compile": 0.252,
+        "compile": 0.238,
         "run": 0.003
       },
       "num_frames": 30,
@@ -629,14 +629,14 @@
         "expected_lines": 2,
         "matching_lines": 2
       },
-      "duration": 0.26,
+      "duration": 0.24,
       "status": "pass"
     },
     {
       "test": "attachMovieLoopingTest",
       "phases": {
         "recomp": 0.0,
-        "compile": 0.203,
+        "compile": 0.188,
         "run": 0.003
       },
       "num_frames": 30,
@@ -645,14 +645,14 @@
         "expected_lines": 41,
         "matching_lines": 41
       },
-      "duration": 0.21,
+      "duration": 0.19,
       "status": "pass"
     },
     {
       "test": "attachMovieTest",
       "phases": {
         "recomp": 0.0,
-        "compile": 0.238,
+        "compile": 0.23,
         "run": 0.003
       },
       "num_frames": 30,
@@ -668,7 +668,7 @@
       "test": "callFunction_test",
       "phases": {
         "recomp": 0.0,
-        "compile": 0.254,
+        "compile": 0.242,
         "run": 0.003
       },
       "num_frames": 30,
@@ -677,7 +677,7 @@
         "expected_lines": 11,
         "matching_lines": 6
       },
-      "duration": 0.26,
+      "duration": 0.25,
       "ruffle_diff_count": 11,
       "ours_diff_count": 5,
       "status": "ruffle_matched",
@@ -687,8 +687,8 @@
       "test": "consecutive_goto_frame_test",
       "phases": {
         "recomp": 0.0,
-        "compile": 0.207,
-        "run": 0.003
+        "compile": 0.195,
+        "run": 0.002
       },
       "num_frames": 30,
       "lines": {
@@ -696,15 +696,15 @@
         "expected_lines": 12,
         "matching_lines": 12
       },
-      "duration": 0.21,
+      "duration": 0.2,
       "status": "pass"
     },
     {
       "test": "displaylist_depths/displaylist_depths_test",
       "phases": {
         "recomp": 0.0,
-        "compile": 0.617,
-        "run": 0.008
+        "compile": 0.567,
+        "run": 0.007
       },
       "num_frames": 30,
       "lines": {
@@ -712,7 +712,7 @@
         "expected_lines": 111,
         "matching_lines": 99
       },
-      "duration": 0.63,
+      "duration": 0.58,
       "status": "output_mismatch",
       "detail": "12 line(s) differ (actual=111, expected=111)",
       "actual_output": "... (38 lines before) ...\nPASSED: typeof(dynamicmc2130690045_dup)  ==  'movieclip' [displaylist_depths_test.c:223]\nPASSED: dynamicmc2130690045_dup.getDepth()  ==  2007 [displaylist_depths_test.c:224]\nPASSED: typeof(staticmc0_dup_fake)  ==  'undefined' [displaylist_depths_test.c:225]\nPASSED: typeof(staticmc0_dup)  ==  'movieclip' [displaylist_depths_test.c:226]\nPASSED: staticmc0_dup.getDepth()  ==  -2008 [displaylist_depths_test.c:227]\nFAILED: expected: staticmc._width obtained: 0 [displaylist_depths_test.c:232] \nFAILED: expected: 7 obtained: 0 [displaylist_depths_test.c:233] \nPASSED: typeof(staticmc.child)  ==  'movieclip' [displaylist_depths_test.c:234]\nFAILED: expected: 'movieclip' obtained: undefined [displaylist_depths_test.c:235] \nPASSED: dynamicmc_dup._width  ==  dynamicmc._width [displaylist_depths_test.c:238]\nPASSED: parseInt(dynamicmc_dup._width/10)  ==  6 [displaylist_depths_test.c:239]\nPASSED: typeof(dynamicmc.child)  ==  'movieclip' [displaylist_depths_test.c:240]\nPASSED: typeof(dynamicmc_dup.child)  ==  'undefined' [displaylist_depths_test.c:241]\nPASSED: dynamicmc_2000_dup._width  ==  dynamicmc_2000._width [displaylist_depths_test.c:243]\nPASSED: parseInt(dynamicmc_2000_dup._width/10)  ==  6 [displaylist_depths_test.c:244]\nPASSED: typeof(dynamicmc_2000.child)  ==  'movieclip' [displaylist_depths_test.c:245]\nPASSED: typeof(dynamicmc_2000_dup.child)  ==  'undefined' [displaylist_depths_test.c:246]\nPASSED: dynamicmc_30000_dup._width  ==  dynamicmc_30000._width [displaylist_depths_test.c:248]\nPASSED: parseInt(dynamicmc_30000_dup._width/10)  ==  6 [displaylist_depths_test.c:249]\nPASSED: typeof(dynamicmc_30000.child)  ==  'movieclip' [displaylist_depths_test.c:250]\nPASSED: typeof(dynamicmc_30000_dup.child)  ==  'undefined' [displaylist_depths_test.c:251]\nPASSED: dynamicmc0_dup._width  ==  dynamicmc0._width [displaylist_depths_test.c:254]\nPASSED: parseInt(dynamicmc0_dup._width/10)  ==  6 [displaylist_depths_test.c:255]\nPASSED: typeof(dynamicmc0.child)  ==  'movieclip' [displaylist_depths_test.c:256]\nPASSED: typeof(dynamicmc0_dup.child)  ==  'undefined' [displaylist_depths_test.c:257]\nPASSED: dynamicmc1048575_dup._width  ==  dynamicmc1048575._width [displaylist_depths_test.c:260]\nPASSED: parseInt(dynamicmc1048575_dup._width/10)  ==  6 [displaylist_depths_test.c:261]\nPASSED: typeof(dynamicmc1048575.child)  ==  'movieclip' [displaylist_depths_test.c:262]\nPASSED: typeof(dynamicmc1048575_dup.child)  ==  'undefined' [displaylist_depths_test.c:263]\nPASSED: dynamicmc1048576_dup._width  ==  dynamicmc1048576._width [displaylist_depths_test.c:265]\nPASSED: parseInt(dynamicmc1048576._width/10)  ==  6 [displaylist_depths_test.c:266]\nPASSED: typeof(dynamicmc1048576.child)  ==  'movieclip' [displaylist_depths_test.c:267]\nPASSED: typeof(dynamicmc1048576_dup.child)  ==  'undefined' [displaylist_depths_test.c:268]\nPASSED: dynamicmc2130690045_dup._width  ==  dynamicmc2130690045._width [displaylist_depths_test.c:270]\nPASSED: parseInt(dynamicmc2130690045._width/10)  ==  6 [displaylist_depths_test.c:271]\nPASSED: typeof(dynamicmc2130690045.child)  ==  'movieclip' [displaylist_depths_test.c:272]\nPASSED: typeof(dynamicmc2130690045_dup.child)  ==  'undefined' [displaylist_depths_test.c:273]\nPASSED: staticmc0_dup._width  ==  staticmc0._width [displaylist_depths_test.c:276]\nFAILED: expected: 7 obtained: 0 [displaylist_depths_test.c:277] \nPASSED: typeof(staticmc0.child)  ==  'movieclip' [displaylist_depths_test.c:278]\nFAILED: expected: 'movieclip' obtained: undefined [displaylist_depths_test.c:279] \nPASSED: typeof(staticmc)  ==  'movieclip' [displaylist_depths_test.c:305]\nPASSED: typeof(dynamicmc)  ==  'undefined' [displaylist_depths_test.c:306]\nPASSED: typeof(dynamicmc_2000)  ==  'movieclip' [displaylist_depths_test.c:307]\nPASSED: typeof(dynamicmc_30000)  ==  'movieclip' [displaylist_depths_test.c:308]\nPASSED: typeof(dynamicmc0)  ==  'undefined' [displaylist_depths_test.c:309]\nPASSED: typeof(dynamicmc1048575)  ==  'undefined' [displaylist_depths_test.c:310]\nFAILED: expected: 'movieclip' obtained: undefined [displaylist_depths_test.c:311] \nPASSED: typeof(dynamicmc2130690045)  ==  'movieclip' [displaylist_depths_test.c:312]\nPASSED: typeof(staticmc0)  ==  'movieclip' [displaylist_depths_test.c:313]\n... (23 lines after) ...",
@@ -722,7 +722,7 @@
       "test": "displaylist_depths/displaylist_depths_test10",
       "phases": {
         "recomp": 0.0,
-        "compile": 0.204,
+        "compile": 0.187,
         "run": 0.003
       },
       "num_frames": 30,
@@ -731,14 +731,14 @@
         "expected_lines": 10,
         "matching_lines": 10
       },
-      "duration": 0.21,
+      "duration": 0.19,
       "status": "pass"
     },
     {
       "test": "displaylist_depths/displaylist_depths_test11",
       "phases": {
         "recomp": 0.0,
-        "compile": 0.204,
+        "compile": 0.183,
         "run": 0.003
       },
       "num_frames": 30,
@@ -747,15 +747,15 @@
         "expected_lines": 15,
         "matching_lines": 15
       },
-      "duration": 0.21,
+      "duration": 0.19,
       "status": "pass"
     },
     {
       "test": "displaylist_depths/displaylist_depths_test2",
       "phases": {
         "recomp": 0.0,
-        "compile": 0.212,
-        "run": 0.005
+        "compile": 0.19,
+        "run": 0.006
       },
       "num_frames": 30,
       "lines": {
@@ -763,7 +763,7 @@
         "expected_lines": 31,
         "matching_lines": 15
       },
-      "duration": 0.22,
+      "duration": 0.2,
       "status": "output_mismatch",
       "detail": "16 line(s) differ (actual=28, expected=31)",
       "actual_output": "... (10 lines before) ...\nPASSED: -16381 == -16381\nPASSED: 10 == 10\nPASSED: guess == guess\nPASSED: guess == guess\nright after gotoAndStop()\nFAILED: expected: undefined , obtained: string\nPASSED: guess == guess\nPASSED: 10 == 10\nPASSED: movieclip == movieclip\nPASSED: movieclip == movieclip\nFAILED: expected: -16381 , obtained: 10\nPASSED: 50 == 50\nFAILED: expected: 2 , obtained: 1\n#passed: 17\n#failed: 3\n#total tests run: 20\nPASSED: 50 == 50\nFAILED: expected: -16381 , obtained: 10",
@@ -773,7 +773,7 @@
       "test": "displaylist_depths/displaylist_depths_test3",
       "phases": {
         "recomp": 0.0,
-        "compile": 0.21,
+        "compile": 0.189,
         "run": 0.006
       },
       "num_frames": 30,
@@ -782,7 +782,7 @@
         "expected_lines": 32,
         "matching_lines": 17
       },
-      "duration": 0.22,
+      "duration": 0.2,
       "status": "output_mismatch",
       "detail": "15 line(s) differ (actual=29, expected=32)",
       "actual_output": "... (10 lines before) ...\nPASSED: -16381 == -16381\nPASSED: -10 == -10\nPASSED: guess == guess\nPASSED: guess == guess\nPASSED: undefined == undefined\nPASSED: undefined == undefined\nPASSED: movieclip == movieclip\nFAILED: expected: 50 , obtained: undefined\nFAILED: expected: _level0.static3 , obtained: _level0.static3\nPASSED: movieclip == movieclip\nPASSED: undefined == undefined\nPASSED: -16381 == -16381\nPASSED: 50 == 50\nFAILED: expected: 2 , obtained: 1\n#passed: 19\n#failed: 3\n#total tests run: 22\nPASSED: 50 == 50\nPASSED: -16381 == -16381",
@@ -792,7 +792,7 @@
       "test": "displaylist_depths/displaylist_depths_test4",
       "phases": {
         "recomp": 0.0,
-        "compile": 0.194,
+        "compile": 0.188,
         "run": 0.003
       },
       "num_frames": 30,
@@ -801,14 +801,14 @@
         "expected_lines": 26,
         "matching_lines": 26
       },
-      "duration": 0.2,
+      "duration": 0.19,
       "status": "pass"
     },
     {
       "test": "displaylist_depths/displaylist_depths_test5",
       "phases": {
         "recomp": 0.0,
-        "compile": 0.189,
+        "compile": 0.184,
         "run": 0.003
       },
       "num_frames": 30,
@@ -824,7 +824,7 @@
       "test": "displaylist_depths/displaylist_depths_test6",
       "phases": {
         "recomp": 0.0,
-        "compile": 0.189,
+        "compile": 0.188,
         "run": 0.003
       },
       "num_frames": 30,
@@ -833,14 +833,14 @@
         "expected_lines": 13,
         "matching_lines": 13
       },
-      "duration": 0.2,
+      "duration": 0.19,
       "status": "pass"
     },
     {
       "test": "displaylist_depths/displaylist_depths_test7",
       "phases": {
         "recomp": 0.0,
-        "compile": 0.187,
+        "compile": 0.188,
         "run": 0.003
       },
       "num_frames": 30,
@@ -856,7 +856,7 @@
       "test": "displaylist_depths/displaylist_depths_test8",
       "phases": {
         "recomp": 0.0,
-        "compile": 0.188,
+        "compile": 0.197,
         "run": 0.003
       },
       "num_frames": 30,
@@ -865,7 +865,7 @@
         "expected_lines": 15,
         "matching_lines": 7
       },
-      "duration": 0.19,
+      "duration": 0.2,
       "status": "output_mismatch",
       "detail": "9 line(s) differ (actual=16, expected=15)",
       "actual_output": "PASSED: -16381 == -16381\nPASSED: 202 == 202\nFAILED: expected: 10 , obtained: 50\nPASSED: -16381 == -16381\nPASSED: guess == guess\nFAILED: expected: 10 , obtained: 50\nPASSED: 202 == 202\nPASSED: -16381 == -16381\nPASSED: -16381 == -16381\nPASSED: -16381 == -16381\nFAILED: expected: 204 , obtained: 202\n#passed: 8\n#failed: 3\n#total tests run: 11\nFAILED: expected: 10 , obtained: 50\nPASSED: -16381 == -16381",
@@ -875,7 +875,7 @@
       "test": "displaylist_depths/displaylist_depths_test9",
       "phases": {
         "recomp": 0.0,
-        "compile": 0.243,
+        "compile": 0.252,
         "run": 0.003
       },
       "num_frames": 30,
@@ -884,7 +884,7 @@
         "expected_lines": 23,
         "matching_lines": 3
       },
-      "duration": 0.25,
+      "duration": 0.26,
       "status": "output_mismatch",
       "detail": "20 line(s) differ (actual=21, expected=23)",
       "actual_output": "_level0.static4 constructed\nPASSED: static3.getDepth()  ==  -16381 [displaylist_depths_test9.c:118]\nPASSED: static4.getDepth()  ==  -16380 [displaylist_depths_test9.c:124]\nPASSED: dup0.getDepth()  ==  -16380 [displaylist_depths_test9.c:126]\nPASSED: dup0.getDepth()  ==  -16380 [displaylist_depths_test9.c:130]\nPASSED: dup1.getDepth()  ==  -10 [displaylist_depths_test9.c:132]\nPASSED: -20 == -20\nPASSED: -30 == -30\nFAILED: expected: 'undefined' obtained: movieclip [displaylist_depths_test9.c:151] \nPASSED: typeof(dup0)  ==  'movieclip' [displaylist_depths_test9.c:152]\nFAILED: expected: 2 obtained: 1 [displaylist_depths_test9.c:153] \nPASSED: typeof(static3)  ==  'movieclip' [displaylist_depths_test9.c:155]\nPASSED: typeof(static4)  ==  'movieclip' [displaylist_depths_test9.c:156]\nPASSED: typeof(dup0)  ==  'undefined' [displaylist_depths_test9.c:157]\nFAILED: expected: 3 obtained: 1 [displaylist_depths_test9.c:158] \nPASSED: typeof(dup1)  ==  'undefined' [displaylist_depths_test9.c:159]\nPASSED: typeof(dup2)  ==  'undefined' [displaylist_depths_test9.c:160]\nPASSED: typeof(dup3)  ==  'undefined' [displaylist_depths_test9.c:161]\n#passed: 14\n#failed: 3\n#total tests run: 17",
@@ -894,7 +894,7 @@
       "test": "duplicate_movie_clip_test",
       "phases": {
         "recomp": 0.0,
-        "compile": 0.277,
+        "compile": 0.286,
         "run": 0.003
       },
       "num_frames": 30,
@@ -903,7 +903,7 @@
         "expected_lines": 33,
         "matching_lines": 3
       },
-      "duration": 0.28,
+      "duration": 0.29,
       "status": "output_mismatch",
       "detail": "30 line(s) differ (actual=30, expected=33)",
       "actual_output": "onClipLoad triggered\nonClipLoad triggered\nonClipEnterFrame triggered\nPASSED: mc1.prop1  ==  10 [duplicate_movie_clip_test.c:105]\nPASSED: typeof(mc1.onLoad)  ==  'function' [duplicate_movie_clip_test.c:106]\nPASSED: mc1.getDepth()  ==  -16374 [duplicate_movie_clip_test.c:107]\nPASSED: dup1.prop1  ==  undefined [duplicate_movie_clip_test.c:109]\nPASSED: typeof(dup1.onLoad)  ==  'undefined' [duplicate_movie_clip_test.c:111]\nPASSED: dup1.getDepth()  ==  1 [duplicate_movie_clip_test.c:112]\nPASSED: typeof(mc2.onLoad)  ==  'function' [duplicate_movie_clip_test.c:114]\nPASSED: typeof(mc2.onEnterFrame)  ==  'undefined' [duplicate_movie_clip_test.c:116]\nPASSED: typeof(dup2.onLoad)  ==  'undefined' [duplicate_movie_clip_test.c:118]\nPASSED: _root.x1  ==  2 [duplicate_movie_clip_test.c:119]\nFAILED: expected: 2 obtained: 1 [duplicate_movie_clip_test.c:120] \nonClipUnload triggered\nPASSED: typeof(button)  ==  'object' [duplicate_movie_clip_test.c:139]\n_level0.button\nFAILED: expected: 'object' obtained: undefined [duplicate_movie_clip_test.c:149] \nFAILED: expected: '_level0.buttdup' obtained:  [duplicate_movie_clip_test.c:150] \nPASSED: _root.buttdup  ==  d [duplicate_movie_clip_test.c:151]\nPASSED: _root.buttdup.x  ==  undefined [duplicate_movie_clip_test.c:154]\nundefined\nPASSED: typeof(d2)  ==  'undefined' [duplicate_movie_clip_test.c:166]\nPASSED: typeof(_root.objdup)  ==  'undefined' [duplicate_movie_clip_test.c:167]\nPASSED: _root.x1  ==  2 [duplicate_movie_clip_test.c:171]\nFAILED: expected: 3 obtained: 1 [duplicate_movie_clip_test.c:172] \nFAILED: expected: 2 obtained: 1 [duplicate_movie_clip_test.c:173] \n#passed: 16\n#failed: 5\n#total tests run: 21",
@@ -913,7 +913,7 @@
       "test": "duplicate_movie_clip_test2",
       "phases": {
         "recomp": 0.0,
-        "compile": 0.223,
+        "compile": 0.261,
         "run": 0.003
       },
       "num_frames": 30,
@@ -922,7 +922,7 @@
         "expected_lines": 21,
         "matching_lines": 13
       },
-      "duration": 0.23,
+      "duration": 0.27,
       "status": "output_mismatch",
       "detail": "8 line(s) differ (actual=21, expected=21)",
       "actual_output": "FAILED: expected: movieclip , obtained: undefined\nFAILED: expected: movieclip , obtained: undefined\nFAILED: expected: movieclip , obtained: undefined\nPASSED: undefined == undefined\nPASSED: undefined == undefined\nPASSED: typeof(dup1)  ==  'movieclip' [duplicate_movie_clip_test2.c:116]\nPASSED: typeof(dup1)  ==  'undefined' [duplicate_movie_clip_test2.c:118]\nPASSED: typeof(dup2)  ==  'movieclip' [duplicate_movie_clip_test2.c:121]\nPASSED: typeof(dup2)  ==  'undefined' [duplicate_movie_clip_test2.c:123]\nPASSED: typeof(dup3)  ==  'movieclip' [duplicate_movie_clip_test2.c:126]\nPASSED: typeof(dup3)  ==  'undefined' [duplicate_movie_clip_test2.c:128]\nPASSED: typeof(dup4)  ==  'movieclip' [duplicate_movie_clip_test2.c:131]\nPASSED: typeof(dup4)  ==  'undefined' [duplicate_movie_clip_test2.c:133]\nPASSED: typeof(dup5)  ==  'movieclip' [duplicate_movie_clip_test2.c:136]\nPASSED: typeof(dup5)  ==  'undefined' [duplicate_movie_clip_test2.c:138]\nFAILED: expected: 'undefined' obtained: movieclip [duplicate_movie_clip_test2.c:142] \nFAILED: expected: 'undefined' obtained: movieclip [duplicate_movie_clip_test2.c:146] \nFAILED: expected: 'undefined' obtained: movieclip [duplicate_movie_clip_test2.c:150] \n#passed: 12\n#failed: 6\n#total tests run: 18",
@@ -932,8 +932,8 @@
       "test": "event_handler_scope_test",
       "phases": {
         "recomp": 0.0,
-        "compile": 0.18,
-        "run": 0.002
+        "compile": 0.209,
+        "run": 0.003
       },
       "num_frames": 30,
       "lines": {
@@ -941,14 +941,14 @@
         "expected_lines": 16,
         "matching_lines": 16
       },
-      "duration": 0.19,
+      "duration": 0.21,
       "status": "pass"
     },
     {
       "test": "frame_label_test",
       "phases": {
         "recomp": 0.0,
-        "compile": 0.238,
+        "compile": 0.278,
         "run": 0.002
       },
       "num_frames": 30,
@@ -957,7 +957,7 @@
         "expected_lines": 17,
         "matching_lines": 0
       },
-      "duration": 0.24,
+      "duration": 0.28,
       "status": "output_mismatch",
       "detail": "17 line(s) differ (actual=0, expected=17)",
       "actual_output": "",
@@ -967,7 +967,7 @@
       "test": "getTimer_test",
       "phases": {
         "recomp": 0.0,
-        "compile": 0.21,
+        "compile": 0.209,
         "run": 0.006
       },
       "num_frames": 30,
@@ -983,7 +983,7 @@
       "test": "get_frame_number_test",
       "phases": {
         "recomp": 0.0,
-        "compile": 0.351,
+        "compile": 0.357,
         "run": 0.003
       },
       "num_frames": 30,
@@ -992,14 +992,14 @@
         "expected_lines": 31,
         "matching_lines": 31
       },
-      "duration": 0.36,
+      "duration": 0.37,
       "status": "pass"
     },
     {
       "test": "goto_frame_test",
       "phases": {
         "recomp": 0.0,
-        "compile": 0.233,
+        "compile": 0.242,
         "run": 0.003
       },
       "num_frames": 30,
@@ -1008,14 +1008,14 @@
         "expected_lines": 15,
         "matching_lines": 15
       },
-      "duration": 0.24,
+      "duration": 0.25,
       "status": "pass"
     },
     {
       "test": "init_action/InitActionTest",
       "phases": {
         "recomp": 0.0,
-        "compile": 0.235,
+        "compile": 0.224,
         "run": 0.003
       },
       "num_frames": 30,
@@ -1024,7 +1024,7 @@
         "expected_lines": 17,
         "matching_lines": 11
       },
-      "duration": 0.24,
+      "duration": 0.23,
       "ruffle_diff_count": 17,
       "ours_diff_count": 6,
       "status": "ruffle_matched",
@@ -1034,7 +1034,7 @@
       "test": "init_action/InitActionTest2",
       "phases": {
         "recomp": 0.0,
-        "compile": 0.295,
+        "compile": 0.275,
         "run": 0.003
       },
       "num_frames": 30,
@@ -1043,7 +1043,7 @@
         "expected_lines": 29,
         "matching_lines": 5
       },
-      "duration": 0.3,
+      "duration": 0.28,
       "ruffle_diff_count": 30,
       "ours_diff_count": 24,
       "status": "ruffle_matched",
@@ -1053,7 +1053,7 @@
       "test": "instanceNameTest",
       "phases": {
         "recomp": 0.0,
-        "compile": 0.198,
+        "compile": 0.186,
         "run": 0.002
       },
       "num_frames": 30,
@@ -1062,15 +1062,15 @@
         "expected_lines": 5,
         "matching_lines": 5
       },
-      "duration": 0.2,
+      "duration": 0.19,
       "status": "pass"
     },
     {
       "test": "key_event_test",
       "phases": {
         "recomp": 0.0,
-        "compile": 0.224,
-        "run": 0.004
+        "compile": 0.216,
+        "run": 0.005
       },
       "num_frames": 100,
       "lines": {
@@ -1078,7 +1078,7 @@
         "expected_lines": 66,
         "matching_lines": 27
       },
-      "duration": 0.23,
+      "duration": 0.22,
       "status": "output_mismatch",
       "detail": "58 line(s) differ (actual=85, expected=66)",
       "actual_output": "... (2 lines before) ...\nPASSED: undefined == undefined\nPASSED: undefined == undefined\n1. Press a single key to continue the test\nl.onKeyDown\nl.onKeyUp\nFAILED: expected: 1 , obtained: 0\nFAILED: expected: 1 , obtained: 0\nPASSED: number == number\n2. Press a single key to continue the test\nl.onKeyDown\nl.onKeyUp\nFAILED: expected: 2 , obtained: 0\nFAILED: expected: 2 , obtained: 0\nPASSED: object == object\n3. Press a single key to continue the test\nobj1.onKeyDown\nFAILED: expected: 2 , obtained: 0\nFAILED: expected: 2 , obtained: 0\n4. Press a single key to continue the test\nlistenerClip2.onClipKeyDown\n4. Press a single key to continue the test\nlistenerClip2.onClipKeyDown\nPASSED: _root.test2  ==  2 [key_event_test.c:162]\n5. Press a single key to continue the test\ndynamic_mc.onKeyDown triggered\nPASSED: _level0.dynamic_mc == _level0.dynamic_mc\nPASSED: 11 == 11\n5. Press a single key to continue the test\nlistenerClip2.onClipKeyDown\ndynamic_mc.onKeyDown triggered\nPASSED: _level0.dynamic_mc == _level0.dynamic_mc\nFAILED: expected: 13 , obtained: 14\n6. Press a single key to continue the test\nPASSED: _root.test4  ==  0 [key_event_test.c:214]\nlistenerClip2.onClipKeyDown\ndynamic_mc.onKeyDown triggered\nPASSED: _level0.dynamic_mc == _level0.dynamic_mc\nFAILED: expected: 13 , obtained: 16\nobj2.onKeyDown triggered\nPASSED: _root.test4  ==  1 [key_event_test.c:236]\nlistenerClip2.onClipKeyDown\nls3.onClipKeyDown\nls1.onClipKeyDown\nls2.onClipKeyDown\ndynamic_mc.onKeyDown triggered\nPASSED: _level0.dynamic_mc == _level0.dynamic_mc\nFAILED: expected: 13 , obtained: 20\nobj2.onKeyDown triggered\n8. Press a single key to continue the test\nlistenerClip2.onClipKeyDown\n... (33 lines after) ...",
@@ -1088,8 +1088,8 @@
       "test": "loading/LoadVarsTest",
       "phases": {
         "recomp": 0.0,
-        "compile": 0.335,
-        "run": 0.002
+        "compile": 0.324,
+        "run": 0.003
       },
       "num_frames": 30,
       "lines": {
@@ -1097,7 +1097,7 @@
         "expected_lines": 36,
         "matching_lines": 31
       },
-      "duration": 0.34,
+      "duration": 0.33,
       "status": "output_mismatch",
       "detail": "5 line(s) differ (actual=36, expected=36)",
       "actual_output": "... (20 lines before) ...\nPASSED: decodeCalled  ==  0 [LoadVarsTest.c:204]\nPASSED: decodeString  ==  '' [LoadVarsTest.c:205]\nPASSED: l.loaded  ==  undefined [LoadVarsTest.c:209]\nPASSED: e  ==  true [LoadVarsTest.c:215]\nPASSED: loadString  ==  '4: onLoad called with boolean argument true' [LoadVarsTest.c:220]\nFAILED: expected: 1 obtained: 0 [LoadVarsTest.c:225] \nFAILED: expected: 'decode%20called%20with%20string%20argument%20v2%5Fvar1%3Dval1%26v2%5Fvar2%3Dval2%26%0A' obtained:  [LoadVarsTest.c:229] \nPASSED: l.loaded  ==  undefined [LoadVarsTest.c:238]\nPASSED: e  ==  true [LoadVarsTest.c:244]\nonData called\nPASSED: escape(dataString)  ==  '5%3A%20onData%20called%20with%20undefined%20argument%20undefined' [LoadVarsTest.c:251]\nPASSED: l.loaded  ==  false [LoadVarsTest.c:252]\nFAILED: expected: 1 obtained: 0 [LoadVarsTest.c:256] \n#passed: 26\n#failed: 3\n#total tests run: 29",
@@ -1107,8 +1107,8 @@
       "test": "loading/loadMovieTest",
       "phases": {
         "recomp": 0.0,
-        "compile": 0.259,
-        "run": 0.004
+        "compile": 0.342,
+        "run": 0.005
       },
       "num_frames": 30,
       "lines": {
@@ -1116,7 +1116,7 @@
         "expected_lines": 80,
         "matching_lines": 71
       },
-      "duration": 0.27,
+      "duration": 0.35,
       "ruffle_diff_count": 9,
       "ours_diff_count": 9,
       "status": "ruffle_matched",
@@ -1126,8 +1126,8 @@
       "test": "loop/loop_test",
       "phases": {
         "recomp": 0.0,
-        "compile": 0.21,
-        "run": 0.039
+        "compile": 0.212,
+        "run": 0.041
       },
       "num_frames": 30,
       "lines": {
@@ -1135,33 +1135,33 @@
         "expected_lines": 21,
         "matching_lines": 21
       },
-      "duration": 0.25,
+      "duration": 0.26,
       "status": "pass"
     },
     {
       "test": "loop/loop_test10",
       "phases": {
         "recomp": 0.0,
-        "compile": 0.254,
+        "compile": 0.251,
         "run": 0.003
       },
       "num_frames": 30,
       "lines": {
-        "actual_lines": 22,
+        "actual_lines": 23,
         "expected_lines": 28,
-        "matching_lines": 1
+        "matching_lines": 3
       },
       "duration": 0.26,
       "status": "output_mismatch",
-      "detail": "27 line(s) differ (actual=22, expected=28)",
-      "actual_output": "_level0.mc1 initialized\n_level0.mc1 unloaded\n_level0.mc3 initialized\nFAILED: expected: 2 obtained: 1 [loop_test10.c:221] \nFAILED: expected: 2 obtained: 0 [loop_test10.c:222] \nPASSED: mc3Initialized  ==  1 [loop_test10.c:223]\nFAILED: expected: 2 obtained: 1 [loop_test10.c:224] \nFAILED: expected: 2 obtained: 0 [loop_test10.c:225] \nPASSED: mc3Unloaded  ==  0 [loop_test10.c:226]\nFAILED: expected: '0+1+2+3+4+5+1+2+3+5+' obtained: 0+1+3+4+ [loop_test10.c:228] \nFAILED: expected: /instance3 , obtained: /instance2\nFAILED: expected: /instance3/instance4 , obtained: /instance2/instance3\nFAILED: expected: /instance3 , obtained: /instance2\nFAILED: expected: /instance3/instance5 , obtained: /instance2/instance4\nFAILED: expected: /instance6 , obtained: /instance5\nFAILED: expected: /instance6/instance7 , obtained: /instance5/instance6\nFAILED: expected: /instance6 , obtained: /instance5\nFAILED: expected: /instance6/instance7 , obtained: /instance5/instance6\nFAILED: expected: /instance9 , obtained: /instance8\n#passed: 2\n#failed: 14\n#total tests run: 16",
+      "detail": "25 line(s) differ (actual=23, expected=28)",
+      "actual_output": "_level0.mc1 initialized\n_level0.mc2 initialized\n_level0.mc2 unloaded\n_level0.mc3 initialized\nFAILED: expected: 2 obtained: 1 [loop_test10.c:221] \nFAILED: expected: 2 obtained: 1 [loop_test10.c:222] \nPASSED: mc3Initialized  ==  1 [loop_test10.c:223]\nFAILED: expected: 2 obtained: 1 [loop_test10.c:224] \nFAILED: expected: 2 obtained: 0 [loop_test10.c:225] \nPASSED: mc3Unloaded  ==  0 [loop_test10.c:226]\nFAILED: expected: '0+1+2+3+4+5+1+2+3+5+' obtained: 0+1+2+3+4+ [loop_test10.c:228] \nFAILED: expected: /instance3 , obtained: /instance2\nFAILED: expected: /instance3/instance4 , obtained: /instance2/instance3\nFAILED: expected: /instance3 , obtained: /instance2\nFAILED: expected: /instance3/instance5 , obtained: /instance2/instance4\nFAILED: expected: /instance6 , obtained: /instance5\nFAILED: expected: /instance6/instance7 , obtained: /instance5/instance6\nFAILED: expected: /instance6 , obtained: /instance5\nFAILED: expected: /instance6/instance7 , obtained: /instance5/instance6\nFAILED: expected: /instance9 , obtained: /instance8\n#passed: 2\n#failed: 14\n#total tests run: 16",
       "expected_output": "_level0.mc1 initialized\n_level0.mc2 initialized\n_level0.mc1 unloaded\n_level0.mc3 initialized\n_level0.mc2 unloaded\n_level0.mc1 initialized\n_level0.mc2 initialized\n_level0.mc1 unloaded\n_level0.mc2 unloaded\nPASSED: mc1Initialized  ==  2 [loop_test10.c:221]\nPASSED: mc2Initialized  ==  2 [loop_test10.c:222]\nPASSED: mc3Initialized  ==  1 [loop_test10.c:223]\nPASSED: mc1Unloaded  ==  2 [loop_test10.c:224]\nPASSED: mc2Unloaded  ==  2 [loop_test10.c:225]\nPASSED: mc3Unloaded  ==  0 [loop_test10.c:226]\nPASSED: asOrder  ==  '0+1+2+3+4+5+1+2+3+5+' [loop_test10.c:228]\nPASSED: /instance3 == /instance3\nPASSED: /instance3/instance4 == /instance3/instance4\nPASSED: /instance3 == /instance3\nPASSED: /instance3/instance5 == /instance3/instance5\nPASSED: /instance6 == /instance6\nPASSED: /instance6/instance7 == /instance6/instance7\nPASSED: /instance6 == /instance6\nPASSED: /instance6/instance7 == /instance6/instance7\nPASSED: /instance9 == /instance9\n#passed: 16\n#failed: 0\n#total tests run: 16"
     },
     {
       "test": "loop/loop_test2",
       "phases": {
         "recomp": 0.0,
-        "compile": 0.201,
+        "compile": 0.2,
         "run": 0.003
       },
       "num_frames": 30,
@@ -1177,7 +1177,7 @@
       "test": "loop/loop_test3",
       "phases": {
         "recomp": 0.0,
-        "compile": 0.45,
+        "compile": 0.148,
         "run": 0.003
       },
       "num_frames": 30,
@@ -1186,14 +1186,14 @@
         "expected_lines": 16,
         "matching_lines": 16
       },
-      "duration": 0.46,
+      "duration": 0.15,
       "status": "pass"
     },
     {
       "test": "loop/loop_test4",
       "phases": {
         "recomp": 0.0,
-        "compile": 0.701,
+        "compile": 0.189,
         "run": 0.003
       },
       "num_frames": 30,
@@ -1202,15 +1202,15 @@
         "expected_lines": 22,
         "matching_lines": 22
       },
-      "duration": 0.71,
+      "duration": 0.19,
       "status": "pass"
     },
     {
       "test": "loop/loop_test5",
       "phases": {
         "recomp": 0.0,
-        "compile": 0.247,
-        "run": 0.003
+        "compile": 0.192,
+        "run": 0.002
       },
       "num_frames": 30,
       "lines": {
@@ -1218,14 +1218,14 @@
         "expected_lines": 24,
         "matching_lines": 24
       },
-      "duration": 0.25,
+      "duration": 0.2,
       "status": "pass"
     },
     {
       "test": "loop/loop_test6",
       "phases": {
         "recomp": 0.0,
-        "compile": 0.257,
+        "compile": 0.248,
         "run": 0.003
       },
       "num_frames": 30,
@@ -1234,7 +1234,7 @@
         "expected_lines": 23,
         "matching_lines": 12
       },
-      "duration": 0.26,
+      "duration": 0.25,
       "status": "output_mismatch",
       "detail": "12 line(s) differ (actual=24, expected=23)",
       "actual_output": "... (6 lines before) ...\nPASSED: typeof(movieClip2)  ==  'movieclip' [loop_test6.c:140]\nPASSED: _root.mc1Constructed  ==  1 [loop_test6.c:141]\nPASSED: typeof(movieClip1)  ==  'undefined' [loop_test6.c:147]\nPASSED: _root.mc1Constructed  ==  1 [loop_test6.c:148]\n_level0.movieClip2 unloaded\n_level0.movieClip1 constructed\n_level0.movieClip2 constructed\n_level0.movieClip1 initialized\n_level0.movieClip2 initialized\nFAILED: expected: 'undefined' obtained: movieclip [loop_test6.c:157] \nPASSED: typeof(movieClip2)  ==  'movieclip' [loop_test6.c:158]\nFAILED: expected: 1 obtained: 2 [loop_test6.c:163] \nFAILED: expected: 1 obtained: 2 [loop_test6.c:164] \nPASSED: _root.mc2Constructed  ==  2 [loop_test6.c:166]\nPASSED: _root.mc2Initialized  ==  2 [loop_test6.c:167]\n#passed: 9\n#failed: 3\n#total tests run: 12",
@@ -1263,7 +1263,7 @@
       "test": "loop/loop_test8",
       "phases": {
         "recomp": 0.0,
-        "compile": 0.336,
+        "compile": 0.322,
         "run": 0.003
       },
       "num_frames": 30,
@@ -1272,15 +1272,15 @@
         "expected_lines": 38,
         "matching_lines": 38
       },
-      "duration": 0.34,
+      "duration": 0.33,
       "status": "pass"
     },
     {
       "test": "loop/loop_test9",
       "phases": {
         "recomp": 0.0,
-        "compile": 0.203,
-        "run": 0.009
+        "compile": 0.187,
+        "run": 0.01
       },
       "num_frames": 30,
       "lines": {
@@ -1288,14 +1288,14 @@
         "expected_lines": 15,
         "matching_lines": 15
       },
-      "duration": 0.21,
+      "duration": 0.2,
       "status": "pass"
     },
     {
       "test": "loop/simple_loop_test",
       "phases": {
         "recomp": 0.0,
-        "compile": 0.207,
+        "compile": 0.191,
         "run": 0.001
       },
       "num_frames": 30,
@@ -1304,15 +1304,15 @@
         "expected_lines": 0,
         "matching_lines": 0
       },
-      "duration": 0.21,
+      "duration": 0.19,
       "status": "pass"
     },
     {
       "test": "masks_test",
       "phases": {
         "recomp": 0.0,
-        "compile": 0.768,
-        "run": 0.003
+        "compile": 0.719,
+        "run": 0.004
       },
       "num_frames": 100,
       "lines": {
@@ -1320,7 +1320,7 @@
         "expected_lines": 175,
         "matching_lines": 28
       },
-      "duration": 0.78,
+      "duration": 0.73,
       "status": "output_mismatch",
       "detail": "147 line(s) differ (actual=28, expected=175)",
       "actual_output": "... (23 lines before) ...\nPASSED: dynamicmc5.hitTest(240, 310, true) [masks_test.c:200]\nPASSED: dynamicmc5.hitTest(280, 350, true) [masks_test.c:201]\nPlaced staticmc2 (red), staticmc3 (yellow), staticmc4 (green), staticmc5 (cyan) DisplayObjects\nPlaced dynamicmc2 (blue), dynamicmc3 (violet), dynamicmc4 (dark green), dynamicmc5 (light blue) DisplayObjects\n - Press any key to continue -",
@@ -1330,7 +1330,7 @@
       "test": "masks_test2",
       "phases": {
         "recomp": 0.0,
-        "compile": 0.202,
+        "compile": 0.222,
         "run": 0.003
       },
       "num_frames": 30,
@@ -1339,14 +1339,14 @@
         "expected_lines": 10,
         "matching_lines": 10
       },
-      "duration": 0.21,
+      "duration": 0.23,
       "status": "pass"
     },
     {
       "test": "matrix_test",
       "phases": {
         "recomp": 0.0,
-        "compile": 4.129,
+        "compile": 4.521,
         "run": 0.03
       },
       "num_frames": 100,
@@ -1355,7 +1355,7 @@
         "expected_lines": 1086,
         "matching_lines": 918
       },
-      "duration": 4.21,
+      "duration": 4.6,
       "status": "output_mismatch",
       "detail": "168 line(s) differ (actual=1086, expected=1086)",
       "actual_output": "... (53 lines before) ...\nPASSED: Math.round(staticmc._xscale)  ==  447 [matrix_test.c:220]\nPASSED: Math.round(staticmc._yscale)  ==  300 [matrix_test.c:221]\nPASSED: Math.round(staticmc._rotation*1000)  ==  18435 [matrix_test.c:222]\nPASSED: printBounds(staticmc.getBounds())  ==  '-30.05,-30.05 30.05,30.05' [matrix_test.c:223]\nPASSED: printBounds(staticmc.getBounds(_root))  ==  '-141.25,193.75 241.25,406.25' [matrix_test.c:224]\nFAILED: expected: 382.5 obtained: 312 [matrix_test.c:225] \nFAILED: expected: 212.5 obtained: 256.05 [matrix_test.c:226] \nPASSED: staticmc.hitTest(-141, 194, false) [matrix_test.c:231]\nPASSED: staticmc.hitTest(241, 194, false) [matrix_test.c:232]\nPASSED: staticmc.hitTest(-141, 406, false) [matrix_test.c:233]\nPASSED: staticmc.hitTest(241, 406, false) [matrix_test.c:234]\nPASSED: !staticmc.hitTest(-142, 300, false) [matrix_test.c:236]\nPASSED: !staticmc.hitTest(242, 300, false) [matrix_test.c:237]\nPASSED: !staticmc.hitTest(50, 193, false) [matrix_test.c:238]\nPASSED: !staticmc.hitTest(50, 407, false) [matrix_test.c:239]\nPASSED: staticmc._x  ==  50 [matrix_test.c:245]\nPASSED: staticmc._y  ==  300 [matrix_test.c:246]\nPASSED: Math.round(staticmc._xscale)  ==  447 [matrix_test.c:247]\nPASSED: Math.round(staticmc._yscale)  ==  300 [matrix_test.c:248]\nPASSED: Math.round(staticmc._rotation*1000)  ==  18435 [matrix_test.c:249]\nPASSED: printBounds(staticmc.getBounds())  ==  '-30.05,-30.05 30.05,30.05' [matrix_test.c:250]\nPASSED: printBounds(staticmc.getBounds(_root))  ==  '-141.25,193.75 241.25,406.25' [matrix_test.c:251]\nFAILED: expected: 382.5 obtained: 312 [matrix_test.c:252] \nFAILED: expected: 212.5 obtained: 256.05 [matrix_test.c:253] \nPASSED: staticmc.hitTest(-141, 194, false) [matrix_test.c:258]\nPASSED: staticmc.hitTest(241, 194, false) [matrix_test.c:259]\nPASSED: staticmc.hitTest(-141, 406, false) [matrix_test.c:260]\nPASSED: staticmc.hitTest(241, 406, false) [matrix_test.c:261]\nPASSED: !staticmc.hitTest(-142, 300, false) [matrix_test.c:263]\nPASSED: !staticmc.hitTest(242, 300, false) [matrix_test.c:264]\nPASSED: !staticmc.hitTest(50, 193, false) [matrix_test.c:265]\nPASSED: !staticmc.hitTest(50, 407, false) [matrix_test.c:266]\nPASSED: staticmc._x  ==  50 [matrix_test.c:272]\nPASSED: staticmc._y  ==  300 [matrix_test.c:273]\nPASSED: Math.round(staticmc._xscale)  ==  200 [matrix_test.c:274]\nPASSED: Math.round(staticmc._yscale)  ==  300 [matrix_test.c:275]\nPASSED: staticmc._rotation  ==  45 [matrix_test.c:276]\nPASSED: printBounds(staticmc.getBounds())  ==  '-30.05,-30.05 30.05,30.05' [matrix_test.c:277]\nPASSED: printBounds(staticmc.getBounds(_root))  ==  '-56.25,193.75 156.25,406.25' [matrix_test.c:278]\nPASSED: staticmc._width  ==  212.5 [matrix_test.c:279]\nPASSED: staticmc._height  ==  212.5 [matrix_test.c:280]\nPASSED: staticmc.hitTest(-56, 194, false) [matrix_test.c:285]\nPASSED: staticmc.hitTest(156, 194, false) [matrix_test.c:286]\nPASSED: staticmc.hitTest(-56, 406, false) [matrix_test.c:287]\nPASSED: staticmc.hitTest(156, 406, false) [matrix_test.c:288]\nPASSED: !staticmc.hitTest(-57, 300, false) [matrix_test.c:290]\nPASSED: !staticmc.hitTest(157, 300, false) [matrix_test.c:291]\nPASSED: !staticmc.hitTest(50, 193, false) [matrix_test.c:292]\nPASSED: !staticmc.hitTest(50, 407, false) [matrix_test.c:293]\nPASSED: staticmc._x  ==  50 [matrix_test.c:300]\n... (983 lines after) ...",
@@ -1365,8 +1365,8 @@
       "test": "morph_test1",
       "phases": {
         "recomp": 0.0,
-        "compile": 0.2,
-        "run": 0.002
+        "compile": 0.216,
+        "run": 0.003
       },
       "num_frames": 30,
       "lines": {
@@ -1374,15 +1374,15 @@
         "expected_lines": 0,
         "matching_lines": 0
       },
-      "duration": 0.21,
+      "duration": 0.22,
       "status": "pass"
     },
     {
       "test": "move_object_test",
       "phases": {
         "recomp": 0.0,
-        "compile": 0.173,
-        "run": 0.002
+        "compile": 0.198,
+        "run": 0.003
       },
       "num_frames": 30,
       "lines": {
@@ -1390,14 +1390,14 @@
         "expected_lines": 11,
         "matching_lines": 11
       },
-      "duration": 0.18,
+      "duration": 0.2,
       "status": "pass"
     },
     {
       "test": "multi_doactions_and_goto_frame_test",
       "phases": {
         "recomp": 0.0,
-        "compile": 0.175,
+        "compile": 0.197,
         "run": 0.002
       },
       "num_frames": 30,
@@ -1406,15 +1406,15 @@
         "expected_lines": 6,
         "matching_lines": 6
       },
-      "duration": 0.18,
+      "duration": 0.2,
       "status": "pass"
     },
     {
       "test": "new_child_in_unload_test",
       "phases": {
         "recomp": 0.0,
-        "compile": 0.189,
-        "run": 0.002
+        "compile": 0.202,
+        "run": 0.003
       },
       "num_frames": 30,
       "lines": {
@@ -1422,14 +1422,14 @@
         "expected_lines": 11,
         "matching_lines": 11
       },
-      "duration": 0.19,
+      "duration": 0.21,
       "status": "pass"
     },
     {
       "test": "opcode_guard_test",
       "phases": {
         "recomp": 0.0,
-        "compile": 0.212,
+        "compile": 0.227,
         "run": 0.003
       },
       "num_frames": 30,
@@ -1438,7 +1438,7 @@
         "expected_lines": 18,
         "matching_lines": 10
       },
-      "duration": 0.22,
+      "duration": 0.23,
       "status": "output_mismatch",
       "detail": "11 line(s) differ (actual=21, expected=18)",
       "actual_output": "... (5 lines before) ...\nPASSED: undefined == undefined\nPASSED: testvar1  ==  'executed' [opcode_guard_test.c:122]\nPASSED: testvar2  ==  'executed' [opcode_guard_test.c:123]\nPASSED: testvar3  ==  'executed' [opcode_guard_test.c:124]\nmc2 EnterFrame called\nFAILED: false\nTarget not found: Target=\"non-exist-target\" Base=\"_level0\"\nPASSED: undefined == undefined\nFAILED: expected: / , obtained: undefined\nPASSED: 9 == 9\nPASSED: 9 == 9\nPASSED: 100 == 100\nFAILED: Tests run 12 (expected 11) [undefined]\n#passed: 10\n#failed: 3\n#total tests run: 13",
@@ -1448,7 +1448,7 @@
       "test": "path_format_test",
       "phases": {
         "recomp": 0.0,
-        "compile": 0.352,
+        "compile": 0.376,
         "run": 0.003
       },
       "num_frames": 30,
@@ -1457,7 +1457,7 @@
         "expected_lines": 27,
         "matching_lines": 0
       },
-      "duration": 0.36,
+      "duration": 0.38,
       "ruffle_diff_count": 28,
       "ours_diff_count": 27,
       "status": "ruffle_matched",
@@ -1467,7 +1467,7 @@
       "test": "place_and_remove_object_insane_test",
       "phases": {
         "recomp": 0.0,
-        "compile": 0.218,
+        "compile": 0.242,
         "run": 0.003
       },
       "num_frames": 30,
@@ -1476,14 +1476,14 @@
         "expected_lines": 22,
         "matching_lines": 22
       },
-      "duration": 0.22,
+      "duration": 0.25,
       "status": "pass"
     },
     {
       "test": "place_and_remove_object_test",
       "phases": {
         "recomp": 0.0,
-        "compile": 0.197,
+        "compile": 0.213,
         "run": 0.003
       },
       "num_frames": 30,
@@ -1492,14 +1492,14 @@
         "expected_lines": 13,
         "matching_lines": 13
       },
-      "duration": 0.2,
+      "duration": 0.22,
       "status": "pass"
     },
     {
       "test": "place_object_test",
       "phases": {
         "recomp": 0.0,
-        "compile": 0.224,
+        "compile": 0.228,
         "run": 0.003
       },
       "num_frames": 30,
@@ -1518,7 +1518,7 @@
       "test": "place_object_test2",
       "phases": {
         "recomp": 0.0,
-        "compile": 0.221,
+        "compile": 0.235,
         "run": 0.003
       },
       "num_frames": 30,
@@ -1527,7 +1527,7 @@
         "expected_lines": 19,
         "matching_lines": 0
       },
-      "duration": 0.23,
+      "duration": 0.24,
       "ruffle_diff_count": 23,
       "ours_diff_count": 20,
       "status": "ruffle_matched",
@@ -1537,7 +1537,7 @@
       "test": "register_class/RegisterClassTest3",
       "phases": {
         "recomp": 0.0,
-        "compile": 0.234,
+        "compile": 15.453,
         "run": 0.002
       },
       "num_frames": 30,
@@ -1546,33 +1546,33 @@
         "expected_lines": 12,
         "matching_lines": 12
       },
-      "duration": 0.24,
+      "duration": 15.46,
       "status": "pass"
     },
     {
       "test": "register_class/RegisterClassTest4",
       "phases": {
         "recomp": 0.0,
-        "compile": 0.263,
+        "compile": 16.819,
         "run": 0.003
       },
       "num_frames": 30,
       "lines": {
-        "actual_lines": 37,
+        "actual_lines": 39,
         "expected_lines": 42,
-        "matching_lines": 7
+        "matching_lines": 17
       },
-      "duration": 0.27,
+      "duration": 16.82,
       "status": "output_mismatch",
-      "detail": "35 line(s) differ (actual=37, expected=42)",
-      "actual_output": "1 undefined\nBug ctor: 0\nload _level0.mc.Segments c: 0\n2 0\n1 0\n2 0\n1 0\nunload _level0.mc.Segments c: 0\n2 undefined\n1 undefined\nBug ctor: 1\nload _level0.mc.Segments c: 1\n2 1\n1 1\n2 1\n1 1\nunload _level0.mc.Segments c: 1\n2 undefined\nPASSED: _global.real.length  ==  12 [RegisterClassTest4.c:152]\nFAILED: expected: 'undefined,0,0,0,0,0,0,1,1,1,1,2' obtained: undefined,0,0,0,0,undefined,undefined,1,1,1,1,undefined [RegisterClassTest4.c:154] \nPASSED: _global.fns.length  ==  12 [RegisterClassTest4.c:156]\nPASSED: _global.fns[0]  ==  'undefined' [RegisterClassTest4.c:157]\nPASSED: _global.fns[1]  ==  'function' [RegisterClassTest4.c:158]\nPASSED: _global.fns[2]  ==  'function' [RegisterClassTest4.c:159]\nPASSED: _global.fns[3]  ==  'function' [RegisterClassTest4.c:160]\nPASSED: _global.fns[4]  ==  'function' [RegisterClassTest4.c:161]\nFAILED: expected: 'function' obtained: undefined [RegisterClassTest4.c:162] \nFAILED: expected: 'function' obtained: undefined [RegisterClassTest4.c:163] \nPASSED: _global.fns[7]  ==  'function' [RegisterClassTest4.c:164]\nPASSED: _global.fns[8]  ==  'function' [RegisterClassTest4.c:165]\nPASSED: _global.fns[9]  ==  'function' [RegisterClassTest4.c:166]\nPASSED: _global.fns[10]  ==  'function' [RegisterClassTest4.c:167]\nFAILED: expected: 'function' obtained: undefined [RegisterClassTest4.c:168] \nFAILED: expected: 3 obtained: 2 [RegisterClassTest4.c:170] \n#passed: 11\n#failed: 5\n#total tests run: 16",
+      "detail": "25 line(s) differ (actual=39, expected=42)",
+      "actual_output": "1 undefined\nBug ctor: 0\nload _level0.mc.Segments c: 0\n2 0\n1 0\n2 0\n1 0\nBug ctor: 1\nunload _level0.mc.Segments c: 1\n2 undefined\n1 undefined\nBug ctor: 2\nload _level0.mc.Segments c: 2\n2 2\n1 2\n2 2\n1 2\nBug ctor: 3\nunload _level0.mc.Segments c: 3\n2 undefined\nPASSED: _global.real.length  ==  12 [RegisterClassTest4.c:152]\nFAILED: expected: 'undefined,0,0,0,0,0,0,1,1,1,1,2' obtained: undefined,0,0,0,0,undefined,undefined,2,2,2,2,undefined [RegisterClassTest4.c:154] \nPASSED: _global.fns.length  ==  12 [RegisterClassTest4.c:156]\nPASSED: _global.fns[0]  ==  'undefined' [RegisterClassTest4.c:157]\nPASSED: _global.fns[1]  ==  'function' [RegisterClassTest4.c:158]\nPASSED: _global.fns[2]  ==  'function' [RegisterClassTest4.c:159]\nPASSED: _global.fns[3]  ==  'function' [RegisterClassTest4.c:160]\nPASSED: _global.fns[4]  ==  'function' [RegisterClassTest4.c:161]\nFAILED: expected: 'function' obtained: undefined [RegisterClassTest4.c:162] \nFAILED: expected: 'function' obtained: undefined [RegisterClassTest4.c:163] \nPASSED: _global.fns[7]  ==  'function' [RegisterClassTest4.c:164]\nPASSED: _global.fns[8]  ==  'function' [RegisterClassTest4.c:165]\nPASSED: _global.fns[9]  ==  'function' [RegisterClassTest4.c:166]\nPASSED: _global.fns[10]  ==  'function' [RegisterClassTest4.c:167]\nFAILED: expected: 'function' obtained: undefined [RegisterClassTest4.c:168] \nFAILED: expected: 3 obtained: 4 [RegisterClassTest4.c:170] \n#passed: 11\n#failed: 5\n#total tests run: 16",
       "expected_output": "1 undefined\nBug ctor: 0\n2 0\nload _level0.mc.Segments c: 0\n1 0\n2 0\n1 0\nBug ctor: 1\nunload _level0.mc.Segments c: 0\n2 0\nload _level0.mc.Segments c: 1\n1 0\n2 1\n1 1\nBug ctor: 2\nunload _level0.mc.Segments c: 1\n2 1\nload _level0.mc.Segments c: 2\n1 1\n2 2\nPASSED: _global.real.length  ==  12 [RegisterClassTest4.c:152]\nPASSED: _global.real.toString()  ==  'undefined,0,0,0,0,0,0,1,1,1,1,2' [RegisterClassTest4.c:154]\nPASSED: _global.fns.length  ==  12 [RegisterClassTest4.c:156]\nPASSED: _global.fns[0]  ==  'undefined' [RegisterClassTest4.c:157]\nPASSED: _global.fns[1]  ==  'function' [RegisterClassTest4.c:158]\nPASSED: _global.fns[2]  ==  'function' [RegisterClassTest4.c:159]\nPASSED: _global.fns[3]  ==  'function' [RegisterClassTest4.c:160]\nPASSED: _global.fns[4]  ==  'function' [RegisterClassTest4.c:161]\nPASSED: _global.fns[5]  ==  'function' [RegisterClassTest4.c:162]\nPASSED: _global.fns[6]  ==  'function' [RegisterClassTest4.c:163]\nPASSED: _global.fns[7]  ==  'function' [RegisterClassTest4.c:164]\nPASSED: _global.fns[8]  ==  'function' [RegisterClassTest4.c:165]\nPASSED: _global.fns[9]  ==  'function' [RegisterClassTest4.c:166]\nPASSED: _global.fns[10]  ==  'function' [RegisterClassTest4.c:167]\nPASSED: _global.fns[11]  ==  'function' [RegisterClassTest4.c:168]\nPASSED: _global.ctorcalls  ==  3 [RegisterClassTest4.c:170]\nBug ctor: 3\nunload _level0.mc.Segments c: 2\n#passed: 16\n#failed: 0\n#total tests run: 16\nload _level0.mc.Segments c: 3"
     },
     {
       "test": "register_class/registerClassTest",
       "phases": {
         "recomp": 0.0,
-        "compile": 0.366,
+        "compile": 17.731,
         "run": 0.003
       },
       "num_frames": 30,
@@ -1581,14 +1581,14 @@
         "expected_lines": 51,
         "matching_lines": 51
       },
-      "duration": 0.37,
+      "duration": 17.74,
       "status": "pass"
     },
     {
       "test": "register_class/registerClassTest2",
       "phases": {
         "recomp": 0.0,
-        "compile": 0.224,
+        "compile": 0.284,
         "run": 0.003
       },
       "num_frames": 30,
@@ -1597,7 +1597,7 @@
         "expected_lines": 44,
         "matching_lines": 35
       },
-      "duration": 0.23,
+      "duration": 0.29,
       "status": "output_mismatch",
       "detail": "9 line(s) differ (actual=44, expected=44)",
       "actual_output": "... (9 lines before) ...\nPASSED: clip2.x  ==  600 [registerClassTest2.c:147]\nPASSED: clip1._x  ==  0 [registerClassTest2.c:148]\nPASSED: clip2._x  ==  200 [registerClassTest2.c:149]\nPASSED: typeof(MovieClip.prototype.getDepth)  ==  'function' [registerClassTest2.c:150]\nPASSED: clip1.getDepth()  ==  10 [registerClassTest2.c:151]\nFAILED: expected: undefined obtained: 20 [registerClassTest2.c:153] \ntheClass1 proto onLoad (_level0.clip1)\nmc3.initactions\nPASSED: [object Object] == [object Object]\nmc3.onClipInitialize\nPASSED: movieclip == movieclip\nPASSED: [object Object] == [object Object]\nmc3.onClipConstruct\nPASSED: movieclip == movieclip\nPASSED: true\nPASSED: [object Object] == [object Object]\n_level0.clip3.onLoad (theClass3 proto)\nPASSED: _root.theClass1onLoadCalls.length  ==  1 [registerClassTest2.c:173]\nPASSED: _root.theClass1onLoadCalls[0]  ==  _level0.clip1 [registerClassTest2.c:174]\n_level0.clipevs.frame0 actions\n_level0.noclipevs.frame0 actions\n_level0.clip3.frame0 actions\n_level0.clipevs.onLoad (theClass3 proto)\n_level0.noclipevs.onLoad (theClass3 proto)\nPASSED: _root.theClass3onLoadCalls.length  ==  3 [registerClassTest2.c:212]\nFAILED: expected: _level0.clipevs obtained: _level0.clip3 [registerClassTest2.c:213] \nFAILED: expected: _level0.clip3 obtained: _level0.clipevs [registerClassTest2.c:215] \nPASSED: _root.theClass3onLoadCalls[2]  ==  _level0.noclipevs [registerClassTest2.c:216]\nPASSED: _root.mc3frame0.length  ==  3 [registerClassTest2.c:218]\nPASSED: _root.mc3frame0[0]  ==  _level0.clipevs [registerClassTest2.c:219]\nPASSED: _root.mc3frame0[1]  ==  _level0.noclipevs [registerClassTest2.c:220]\nPASSED: _root.mc3frame0[2]  ==  _level0.clip3 [registerClassTest2.c:221]\n#passed: 28\n#failed: 3\n#total tests run: 31",
@@ -1607,7 +1607,7 @@
       "test": "replace_buttons1test",
       "phases": {
         "recomp": 0.0,
-        "compile": 0.173,
+        "compile": 0.225,
         "run": 0.003
       },
       "num_frames": 30,
@@ -1616,7 +1616,7 @@
         "expected_lines": 18,
         "matching_lines": 6
       },
-      "duration": 0.18,
+      "duration": 0.23,
       "status": "output_mismatch",
       "detail": "12 line(s) differ (actual=18, expected=18)",
       "actual_output": "PASSED: typeof(static1)  ==  'object' [replace_buttons1test.c:166]\nPASSED: static1._target  ==  '/static1' [replace_buttons1test.c:167]\nPASSED: static1.name  ==  'static1' [replace_buttons1test.c:168]\nFAILED: expected: 'undefined' obtained: object [replace_buttons1test.c:192] \nFAILED: expected: 'object' obtained: undefined [replace_buttons1test.c:193] \nFAILED: expected: '/static1' obtained: undefined [replace_buttons1test.c:194] \nFAILED: expected: 'static1' obtained: undefined [replace_buttons1test.c:195] \nFAILED: expected: 130 obtained: undefined [replace_buttons1test.c:196] \nFAILED: expected: 'undefined' obtained: object [replace_buttons1test.c:199] \nPASSED: undefined == undefined\nFAILED: expected: object , obtained: undefined\nPASSED: undefined == undefined\n#passed: 5\n#failed: 7\n#total tests run: 12\nFAILED: expected: 'object' obtained: undefined [replace_buttons1test.c:166] \nFAILED: expected: '/static1' obtained: undefined [replace_buttons1test.c:167] \nFAILED: expected: 'static1' obtained: undefined [replace_buttons1test.c:168] ",
@@ -1626,7 +1626,7 @@
       "test": "replace_shapes1test",
       "phases": {
         "recomp": 0.0,
-        "compile": 0.177,
+        "compile": 0.235,
         "run": 0.003
       },
       "num_frames": 30,
@@ -1635,7 +1635,7 @@
         "expected_lines": 23,
         "matching_lines": 17
       },
-      "duration": 0.18,
+      "duration": 0.24,
       "status": "output_mismatch",
       "detail": "6 line(s) differ (actual=23, expected=23)",
       "actual_output": "... (1 lines before) ...\nPASSED: static1  ==  _root [replace_shapes1test.c:154]\nPASSED: static1.name  ==  'static1' [replace_shapes1test.c:155]\nPASSED: _root.name  ==  'static1' [replace_shapes1test.c:156]\nPASSED: static1.name  ==  'static1' [replace_shapes1test.c:160]\nPASSED: static1._target  ==  '/' [replace_shapes1test.c:162]\nFAILED: expected: 'movieclip' obtained: undefined [replace_shapes1test.c:185] \nFAILED: expected: _root obtained:  [replace_shapes1test.c:186] \nFAILED: expected: 'static1' obtained:  [replace_shapes1test.c:187] \nPASSED: _root.name  ==  'static1' [replace_shapes1test.c:188]\nFAILED: expected: 'undefined' obtained: movieclip [replace_shapes1test.c:191] \nPASSED: undefined == undefined\nPASSED: movieclip == movieclip\nPASSED: static1 == static1\n#passed: 10\n#failed: 4\n#total tests run: 14\nPASSED: typeof(static1)  ==  'movieclip' [replace_shapes1test.c:153]\nPASSED: static1  ==  _root [replace_shapes1test.c:154]\nPASSED: static1.name  ==  'static1' [replace_shapes1test.c:155]\nPASSED: _root.name  ==  'static1' [replace_shapes1test.c:156]\nPASSED: static1.name  ==  'static1' [replace_shapes1test.c:160]\nPASSED: static1._target  ==  '/' [replace_shapes1test.c:162]",
@@ -1645,7 +1645,7 @@
       "test": "replace_sprites1test",
       "phases": {
         "recomp": 0.0,
-        "compile": 0.223,
+        "compile": 0.234,
         "run": 0.003
       },
       "num_frames": 30,
@@ -1654,14 +1654,14 @@
         "expected_lines": 21,
         "matching_lines": 21
       },
-      "duration": 0.23,
+      "duration": 0.24,
       "status": "pass"
     },
     {
       "test": "reverse_execute_PlaceObject2_test1",
       "phases": {
         "recomp": 0.0,
-        "compile": 0.187,
+        "compile": 0.193,
         "run": 0.003
       },
       "num_frames": 30,
@@ -1670,14 +1670,14 @@
         "expected_lines": 8,
         "matching_lines": 8
       },
-      "duration": 0.19,
+      "duration": 0.2,
       "status": "pass"
     },
     {
       "test": "reverse_execute_PlaceObject2_test2",
       "phases": {
         "recomp": 0.0,
-        "compile": 0.21,
+        "compile": 0.213,
         "run": 0.003
       },
       "num_frames": 30,
@@ -1693,8 +1693,8 @@
       "test": "runtime_vm_stack_test",
       "phases": {
         "recomp": 0.0,
-        "compile": 0.219,
-        "run": 0.003
+        "compile": 0.181,
+        "run": 0.002
       },
       "num_frames": 30,
       "lines": {
@@ -1702,15 +1702,15 @@
         "expected_lines": 9,
         "matching_lines": 9
       },
-      "duration": 0.23,
+      "duration": 0.19,
       "status": "pass"
     },
     {
       "test": "shape_test",
       "phases": {
         "recomp": 0.0,
-        "compile": 0.282,
-        "run": 0.003
+        "compile": 0.232,
+        "run": 0.002
       },
       "num_frames": 30,
       "lines": {
@@ -1718,15 +1718,15 @@
         "expected_lines": 21,
         "matching_lines": 21
       },
-      "duration": 0.29,
+      "duration": 0.24,
       "status": "pass"
     },
     {
       "test": "static_vs_dynamic1",
       "phases": {
         "recomp": 0.0,
-        "compile": 0.186,
-        "run": 0.006
+        "compile": 0.15,
+        "run": 0.004
       },
       "num_frames": 30,
       "lines": {
@@ -1734,15 +1734,15 @@
         "expected_lines": 17,
         "matching_lines": 17
       },
-      "duration": 0.2,
+      "duration": 0.16,
       "status": "pass"
     },
     {
       "test": "static_vs_dynamic2",
       "phases": {
         "recomp": 0.0,
-        "compile": 15.045,
-        "run": 0.005
+        "compile": 0.173,
+        "run": 0.006
       },
       "num_frames": 30,
       "lines": {
@@ -1750,15 +1750,15 @@
         "expected_lines": 18,
         "matching_lines": 18
       },
-      "duration": 15.05,
+      "duration": 0.18,
       "status": "pass"
     },
     {
       "test": "timeline_var_test",
       "phases": {
         "recomp": 0.0,
-        "compile": 14.678,
-        "run": 0.002
+        "compile": 0.161,
+        "run": 0.003
       },
       "num_frames": 8,
       "lines": {
@@ -1766,15 +1766,15 @@
         "expected_lines": 11,
         "matching_lines": 11
       },
-      "duration": 14.68,
+      "duration": 0.17,
       "status": "pass"
     },
     {
       "test": "unload_movieclip_test1",
       "phases": {
         "recomp": 0.0,
-        "compile": 14.509,
-        "run": 0.002
+        "compile": 0.153,
+        "run": 0.003
       },
       "num_frames": 30,
       "lines": {
@@ -1782,7 +1782,7 @@
         "expected_lines": 6,
         "matching_lines": 6
       },
-      "duration": 14.51,
+      "duration": 0.16,
       "status": "pass"
     }
   ]

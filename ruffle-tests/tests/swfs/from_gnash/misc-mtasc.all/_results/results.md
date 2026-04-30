@@ -1,8 +1,8 @@
 # Ruffle Test Results (Unfiltered)
 
-**Date**: 2026-04-30 04:00 UTC
+**Date**: 2026-04-30 04:26 UTC
 
-**Git SHA**: `341dd598dc`
+**Git SHA**: `63fcb28a8b`
 
 **Run Duration**: 0m 2s
 
@@ -29,7 +29,7 @@
 | 2 | `exception` | 35 | 0.2s |  |
 | 3 | `function_test` | 26 | 0.2s |  |
 | 4 | `hello` | 8 | 0.2s |  |
-| 5 | `implementsOpTest` | 28 | 0.2s |  |
+| 5 | `implementsOpTest` | 28 | 0.1s |  |
 | 6 | `inheritance` | 22 | 0.2s |  |
 | 7 | `super_test1` | 17 | 0.2s |  |
 
