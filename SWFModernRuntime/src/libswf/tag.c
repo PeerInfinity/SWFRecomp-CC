@@ -4282,12 +4282,19 @@ void tagPlaceObject2(SWFAppContext* app_context, size_t depth, size_t char_id, u
 	// ("_level0.static2 onClipConstruct (replace)") and `static1` becomes undefined
 	// because the depth's instance_name is overwritten. Companion to commit 8b6a0e34's
 	// non-sprite gating in queue_clip_*_events.
+	// Skip when an UNLOAD-handler Remove was just deferred at this depth this frame
+	// (display_list still holds the pre-Remove char_id but the user explicitly
+	// removed the MC — this is a Remove+Place sequence, not a pure REPLACE tag).
+	// Required for misc-ming/register_class/RegisterClassTest4 (sprite_2 frame_1:
+	// RemoveObject2(d=1) + PlaceObject2(d=1, char_id=1) — the second Bug ctor must
+	// fire on the fresh placement).
 	if (display_list[depth].char_id != 0
 	    && display_list[depth].char_id != char_id
 	    && display_list[depth].place_gen != g_place_gen
 	    && display_list[depth].sprite_display_list != NULL
 	    && char_id < dictionary_capacity
-	    && dictionary[char_id].type == CHAR_TYPE_SPRITE)
+	    && dictionary[char_id].type == CHAR_TYPE_SPRITE
+	    && !ng_depth_has_pending_finalize(depth))
 	{
 		if (!display_list[depth].transformed_by_script) {
 			display_list[depth].transform_id = transform_id;
@@ -4750,7 +4757,8 @@ void tagPlaceObject2Ratio(SWFAppContext* app_context, size_t depth, size_t char_
 	    && display_list[depth].place_gen != g_place_gen
 	    && display_list[depth].sprite_display_list != NULL
 	    && char_id < dictionary_capacity
-	    && dictionary[char_id].type == CHAR_TYPE_SPRITE)
+	    && dictionary[char_id].type == CHAR_TYPE_SPRITE
+	    && !ng_depth_has_pending_finalize(depth))
 	{
 		if (!display_list[depth].transformed_by_script) {
 			display_list[depth].transform_id = transform_id;
@@ -5080,6 +5088,19 @@ static int ng_pending_finalize_count = 0;
 
 extern void actionMarkMCPendingRemovalDirect(MovieClip* mc, int swf_depth);
 static void clear_display_entry(SWFAppContext* app_context, size_t depth);
+
+// True iff a pending finalize is queued for this depth — i.e. tagRemoveObject2
+// just deferred cleanup of an MC at this depth (with an UNLOAD handler) earlier
+// in the current frame's tag stream. The display_list[depth] entry still holds
+// the pre-Remove char_id at this point, so callers that want to distinguish a
+// pure REPLACE tag from an in-progress Remove+Place sequence must check this.
+int ng_depth_has_pending_finalize(size_t depth)
+{
+	for (int i = 0; i < ng_pending_finalize_count; i++) {
+		if (ng_pending_finalize_entries[i].depth == depth) return 1;
+	}
+	return 0;
+}
 
 void queue_pending_finalize_mc(MovieClip* mc, int swf_depth, size_t depth)
 {
@@ -6012,10 +6033,14 @@ void tagSetInstanceName(SWFAppContext* app_context, size_t depth, const char* na
 	// existing child. Stash as pending; tagPlaceObject2's REPLACE-preservation
 	// path will discard it (matching Ruffle), while the rare full-replacement
 	// fallback (different placement that doesn't trigger that path) can still
-	// consume it.
+	// consume it. Skip when an UNLOAD-handler Remove was just deferred at this
+	// depth (the entry's char_id is stale post-Remove; treat as pre-place
+	// pending name like the empty-depth branch above).
+	extern int ng_depth_has_pending_finalize(size_t);
 	if (display_list[depth].char_id != 0
 	    && display_list[depth].place_gen != g_place_gen
-	    && display_list[depth].sprite_display_list != NULL)
+	    && display_list[depth].sprite_display_list != NULL
+	    && !ng_depth_has_pending_finalize(depth))
 	{
 		g_pending_instance_name = name;
 		return;
