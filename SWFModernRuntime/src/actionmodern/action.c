@@ -16984,7 +16984,7 @@ static MovieClip* resolveSlashPathToMC(SWFAppContext* app_context, const char* p
 					for (size_t _cd = 1; _cd <= cur_sprite_max; _cd++) {
 						DisplayObject* _ch = &cur_sprite_dl[_cd];
 						if (_ch->char_id == 0) continue;
-						if (_ch->instance_name != NULL && swf_name_match(_ch->instance_name, seg_buf)) {
+						if (_ch->instance_name != NULL && strcmp(_ch->instance_name, seg_buf) == 0) {
 							child_depth = _cd;
 							found_entry = _ch;
 							break;
@@ -16998,7 +16998,7 @@ static MovieClip* resolveSlashPathToMC(SWFAppContext* app_context, const char* p
 						for (size_t _cd = 1; _cd <= parent_dobj->sprite_max_depth; _cd++) {
 							DisplayObject* _ch = &parent_dobj->sprite_display_list[_cd];
 							if (_ch->char_id == 0) continue;
-							if (_ch->instance_name != NULL && swf_name_match(_ch->instance_name, seg_buf)) {
+							if (_ch->instance_name != NULL && strcmp(_ch->instance_name, seg_buf) == 0) {
 								child_depth = _cd;
 								found_entry = _ch;
 								break;
@@ -56242,11 +56242,16 @@ void actionCallMethod(SWFAppContext* app_context, char* str_buffer)
 
 				// Register child on parent MC's dynamic_props so mc.childName works via GetMember.
 				// Mirrors the function-form path above: don't overwrite an existing
-				// own property with the same name (case-insensitively in SWF<=6 via
-				// getProperty's prop_name_match). Pre-existing bindings shadow the
-				// new child on name resolution. Required by gnash case-v6 lines
-				// 162-166: createEmptyMovieClip("CLIP", 7) after createEmptyMovieClip
-				// ("clip", 6) must NOT rebind `_root.clip`/`_root.CLIP` to the new MC.
+				// own property whose name case-insensitively matches in SWF<=6
+				// (via getProperty's prop_name_match), but ONLY when the existing
+				// entry references a LIVE MovieClip with a different exact name
+				// — i.e., a true case-collision like case-v6's `clip`/`CLIP` pair.
+				// If the existing entry was just cleared by the depth-conflict
+				// loop above (set to UNDEFINED) or points to a dead MC
+				// (depth == INT_MIN), allow the rebind. Required by gnash case-v6
+				// case.as:96-170 (don't rebind `_root.clip` when `CLIP` is added)
+				// while preserving misc-ming/loadMovieTest's repeated
+				// `this.createEmptyMovieClip('tc', 8)` rebind semantics.
 				if (mc->dynamic_props == NULL) {
 					mc->dynamic_props = (void*) allocObject(app_context, 8);
 					retainObject((ASObject*) mc->dynamic_props);
@@ -56255,16 +56260,31 @@ void actionCallMethod(SWFAppContext* app_context, char* str_buffer)
 				mc_var.type = ACTION_STACK_VALUE_MOVIECLIP;
 				mc_var.data.numeric_value = (u64)child;
 				u32 _mcemc_inst_len = (u32)strlen(inst_name);
-				ActionVar* _mcemc_existing = getProperty((ASObject*) mc->dynamic_props, inst_name, _mcemc_inst_len);
-				int _mcemc_has_existing = (_mcemc_existing != NULL &&
-					_mcemc_existing->type != ACTION_STACK_VALUE_UNDEFINED);
+				ASProperty* _mcemc_existing_prop = findPropertyRaw((ASObject*) mc->dynamic_props, inst_name, _mcemc_inst_len);
+				int _mcemc_has_existing = 0;
+				if (_mcemc_existing_prop != NULL &&
+				    _mcemc_existing_prop->value.type != ACTION_STACK_VALUE_UNDEFINED) {
+					// Treat as case-collision only when: (a) existing entry is a
+					// MOVIECLIP, (b) the existing exact-cased name differs from
+					// the new name, and (c) the existing MC is live (depth != INT_MIN).
+					if (_mcemc_existing_prop->value.type == ACTION_STACK_VALUE_MOVIECLIP) {
+						MovieClip* _mcemc_old = (MovieClip*)(uintptr_t)_mcemc_existing_prop->value.data.numeric_value;
+						int _mcemc_name_eq = (_mcemc_existing_prop->name_length == _mcemc_inst_len &&
+							strncmp(_mcemc_existing_prop->name, inst_name, _mcemc_inst_len) == 0);
+						if (!_mcemc_name_eq && _mcemc_old != NULL && _mcemc_old->depth != INT_MIN) {
+							_mcemc_has_existing = 1;
+						}
+					}
+				}
 				if (!_mcemc_has_existing) {
 					setProperty(app_context, (ASObject*) mc->dynamic_props, inst_name, _mcemc_inst_len, &mc_var);
 				}
-				// Root-level global var_map shadow only when no existing variable.
-				// var_map keys are ASCII-folded to lowercase in SWF<=6 (mirrors
-				// `setVariableByName` / `getVariableByName`), so the lookup
-				// must fold too to detect case-insensitive collisions.
+				// Also set on global scope for GetVariable access. Skip only at root
+				// when the global var_map already holds a LIVE MC under a
+				// case-insensitively-matching key (case-v6 protection); for
+				// non-root receivers and dead-MC entries, always rebind so
+				// repeated `this.createEmptyMovieClip(name, depth)` still
+				// updates the global slot.
 				if (mc == &root_movieclip) {
 					extern hashmap* var_map;
 					ActionVar* _mcemc_gvar = NULL;
@@ -56280,15 +56300,17 @@ void actionCallMethod(SWFAppContext* app_context, char* str_buffer)
 						_mcemc_lookup_key = _mcemc_folded;
 					}
 					if (var_map != NULL && hashmap_get(var_map, _mcemc_lookup_key, _mcemc_inst_len, (uintptr_t*)&_mcemc_gvar)) {
-						_mcemc_has_gvar = (_mcemc_gvar != NULL &&
-							!(_mcemc_gvar->type == ACTION_STACK_VALUE_STRING &&
-							  _mcemc_gvar->str_size == 0 &&
-							  _mcemc_gvar->data.string_data.heap_ptr == NULL) &&
-							_mcemc_gvar->type != ACTION_STACK_VALUE_UNDEFINED);
+						if (_mcemc_gvar != NULL && _mcemc_gvar->type == ACTION_STACK_VALUE_MOVIECLIP) {
+							MovieClip* _mcemc_gmc = (MovieClip*)(uintptr_t)_mcemc_gvar->data.numeric_value;
+							if (_mcemc_gmc != NULL && _mcemc_gmc->depth != INT_MIN)
+								_mcemc_has_gvar = 1;
+						}
 					}
 					if (!_mcemc_has_gvar) {
 						setVariableByName(inst_name, &mc_var);
 					}
+				} else {
+					setVariableByName(inst_name, &mc_var);
 				}
 
 				// Find free slot or append in child_mc_cache

@@ -23,42 +23,57 @@ Last updated: 2026-04-30 (CI snapshot at 205a9a77 includes all recent fixes thro
      `resolveSlashPathToMC` when `getMovieClipByTarget` /
      `getMovieClipByRelativeName` both fail. `resolveSlashPathToMC`
      itself switched from `strcmp` to `swf_name_match` for `_root` /
-     `_level0` special-name matching and for `instance_name` matching
-     across both the `cur_sprite_dl` walk and the `display_obj`
-     fallback path, so SWF<=6 case-insensitive lookup works inside
-     slash-path traversal. Trailing `/` and `_ROOT` (uppercase) →
-     `_root` resolution were already structurally supported but gated
-     behind exact-case checks. Required by case.as:62-71's inline-asm
+     `_level0` special-name matching, so SWF<=6 case-insensitive
+     lookup of the special-name segment works inside slash-path
+     traversal. (The display-list/instance-name lookups in the same
+     function are left at `strcmp` to avoid surprising other callers;
+     the dynamic_props fallback already uses `getProperty` which is
+     case-insensitive in SWF<=6 via `prop_name_match`.) Trailing `/`
+     was already supported. Required by case.as:62-71's inline-asm
      `setproperty` of `mC0._X = 100` via `/_ROOT/MC0/`.
   2. **Case-insensitive `createEmptyMovieClip` variable rebind
      (Issue B).** The method-form `createEmptyMovieClip` path inside
-     `actionCallMethod` now mirrors the function-form
-     `actionCallFunction` path: skip
-     `setProperty(parent.dynamic_props, name, ...)` if `getProperty`
-     finds an existing case-insensitive match (SWF<=6 via
-     `prop_name_match`), and skip `setVariableByName` for root MCs if
-     `var_map` already has a case-insensitive entry (folded via ASCII
-     `[A-Z]→[a-z]` to mirror `setVariableByName`/`getVariableByName`'s
-     SWF<=6 key-fold). Required by case.as:96-170 — Flash creates MC2
-     on the display list at depth 7 but leaves `_root.clip` /
-     `_root.CLIP` bound to MC1 at depth 6 because both names collide
-     case-insensitively in SWF6's name table.
+     `actionCallMethod` now skips `setProperty(parent.dynamic_props,
+     name, ...)` and (for root receivers) `setVariableByName(name,
+     ...)` only when the existing entry references a LIVE MovieClip
+     under a *different exact-cased name* — i.e., a true SWF6
+     case-collision like `clip` vs `CLIP`. Entries cleared to
+     UNDEFINED by the depth-conflict loop, dead MC pointers
+     (`depth == INT_MIN`), and same-exact-name rebinds all still
+     overwrite normally. For non-root receivers `setVariableByName`
+     remains unconditional, matching the prior behavior that
+     misc-ming/loadMovieTest's `coverart.createEmptyMovieClip('tc',
+     8)` relies on (`_root.check(tc instanceof MovieClip)`). The
+     dynamic_props lookup uses `findPropertyRaw` so it can read the
+     existing entry's exact-cased name (not just the value), and the
+     var_map lookup folds the lookup key with ASCII `[A-Z]→[a-z]` to
+     mirror `setVariableByName`/`getVariableByName`'s SWF<=6 fold.
+     Required by case.as:96-170 — Flash creates MC2 on the display
+     list at depth 7 but leaves `_root.clip` / `_root.CLIP` bound to
+     MC1 at depth 6 because both names collide case-insensitively in
+     SWF6's name table.
   Verified: 8-test AVM1 path battery (movieclip_state_values,
   path_string, slash_syntax, string_paths_basic, swf5_no_closure,
   target_path, tell_target_invalid, tell_target_invalid_swf6 — 8/8
-  PASS), 7-test AVM1 createEmptyMovieClip / instance-name battery
-  (conflicting_instance_names, create_empty_movie_clip,
-  default_names, init_object_order, movieclip_depth_methods,
-  movieclip_get_instance_at_depth, movieclip_init_object — 7/7 PASS),
-  14-test gnash actionscript.all primitives battery (Boolean-v5/v6,
-  Color-v5..v8, Inheritance-v5/v6, Number-v5..v8, toString_valueOf-v5/v6
-  — 9 PASS + 5 RM = 14/14 effective), 11-test gnash mixed battery
+  PASS), 9-test AVM1 createEmptyMovieClip / instance-name battery
+  (attach_movie, conflicting_instance_names, create_empty_movie_clip,
+  init_object_order, movieclip_init_object, movieclip_state_values,
+  path_string, slash_syntax, target_path — 9/9 PASS), 14-test gnash
+  actionscript.all primitives battery (Boolean-v5/v6, Color-v5..v8,
+  Inheritance-v5/v6, Number-v5..v8, toString_valueOf-v5/v6 — 9 PASS
+  + 5 RM = 14/14 effective), 11-test gnash mixed battery
   (Inheritance-v5/v6, MovieClip-v5 unchanged mismatch, Selection-v6
   RM, Stage-v5, case-v5 unchanged mismatch, case-v7, case-v8,
   targetPath-v6/v7/v8 RM — 4 PASS + 6 RM + 1 pre-existing mismatch),
-  and 5-test misc-ming recently-fixed battery (DefineEditTextTest,
-  attachMovieTest, instanceNameTest, loop/loop_test3, loop/loop_test5
-  — 5/5 PASS).
+  4-test case-vN battery (case-v5 unchanged mismatch, case-v6/v7/v8
+  PASS), and 7-test misc-ming battery covering the regression case
+  (DefineEditTextTest, attachMovieTest, instanceNameTest,
+  loading/loadMovieTest, loop/loop_test3, loop/loop_test5,
+  replace_sprites1test — 6 PASS + 1 RM = 7/7 effective; the
+  `loadMovieTest` ruffle_matched is the regression target — its
+  inner `coverart.createEmptyMovieClip('tc', 8)` call still rebinds
+  `tc` globally because `tc_mc` from prior calls is dead post
+  depth-conflict cleanup).
 
 ### Earlier fixes (2026-04-29, pending CI)
 
