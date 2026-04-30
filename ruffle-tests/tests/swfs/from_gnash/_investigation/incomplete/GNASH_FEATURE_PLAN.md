@@ -1,6 +1,6 @@
 # Gnash Failing Tests by Feature Category (Umbrella Plan)
 <!-- TESTS: AsBroadcaster-v6, AsBroadcaster-v7, AsBroadcaster-v8, ContextMenu-v7, ContextMenu-v8, ExternalInterface-v6, ExternalInterface-v7, Global-v6, Global-v7, Global-v8, HitTest-v6, HitTest-v7, HitTest-v8, Instance-v5, Instance-v6, Instance-v7, Instance-v8, Matrix-v7, Matrix-v8, MovieClip-v5, Number-v5, Number-v6, Number-v7, Number-v8, Sound-v6, Sound-v7, Sound-v8, TextFormat-v5, TextFormat-v6, TextFormat-v7, case-v6 -->
-<!-- PASSING (removed from TESTS): Point-v8 (ruffle_matched, 2026-04-14), TextSnapshot-v6/v7/v8 (pass), delete-v5..v8 (pass), enumerate-v6..v8 (pass), Camera-v6/v7/v8 (ruffle_matched), Microphone-v6/v7/v8 (ruffle_matched), Sound-v5 (ruffle_matched), case-v7/v8 (ruffle_matched), targetPath-v6/v7/v8 (ruffle_matched), System-v5/v6/v7/v8 (pass, 2026-04-14 session 3) -->
+<!-- PASSING (removed from TESTS): Point-v8 (ruffle_matched, 2026-04-14), TextSnapshot-v6/v7/v8 (pass), delete-v5..v8 (pass), enumerate-v6..v8 (pass), Camera-v6/v7/v8 (ruffle_matched), Microphone-v6/v7/v8 (ruffle_matched), Sound-v5 (ruffle_matched), targetPath-v6/v7/v8 (ruffle_matched), System-v5/v6/v7/v8 (pass, 2026-04-14 session 3), case-v7/v8 (pass, 2026-04-30 session — onConstruct fix) -->
 <!-- SPLIT OUT TO DEDICATED PLANS (2026-04-17):
   - ASnative-v5/v6/v7/v8 → ASNATIVE_CLASSES_PLAN.md
   - String-v5/v6/v7/v8 → STRING_REGEX_PLAN.md
@@ -622,17 +622,79 @@ Failing tests: toString_valueOf-v5 (59.9%), toString_valueOf-v6 (76.1%), toStrin
 
 ---
 
-## 16. Case/Switch Statement (est. 4 tests)
+## 16. Case/Switch Statement (est. 1 test remaining — case-v5, case-v6)
 
-Failing tests: case-v5 (82.1%), case-v6 (24.7%), case-v7/v8 (19.4%)
+**Status (2026-04-30):**
+- `case-v7` / `case-v8` → PASS (commit `603d663c`, "Fire MovieClip.prototype.onConstruct on createEmptyMovieClip"). The "switch/case" framing was misleading — the actual blocker was that `MovieClip.prototype.onConstruct` was never invoked, so the whole `mcRef[]` array stayed empty and the cascade of follow-up checks failed. Mirroring Ruffle commit `0473281942` ("avm1: Add support for MovieClip.onConstruct handler") fixed v7/v8.
+- `case-v6` → still output_mismatch (65/73 matching, was 18/73). Two distinct residual issues, both SWF6-specific:
 
-v5 has 7 diff lines; v6/v7/v8 have 50+ diff lines. v5 is close — likely strict equality vs abstract equality in switch. v6+ have severe issues (possibly related to the `with` block duplicate label fix or scope chain).
+### case-v6 Issue A: legacy `SetProperty` bytecode through a slash-path target
 
-**Root cause**: Switch/case statement comparison semantics; v6+ tests exercise more complex patterns.
+Test source uses inline ASM (case.as:62-71):
 
-**Fix complexity**: Low for v5, Medium for v6+.
+```actionscript
+asm{
+     push "/_ROOT/MC0/"   ; uppercase, trailing slash
+     push 0.0             ; property index 0 = _X
+     push 100
+     setproperty
+};
+check_equals(mC0._X, 100);  // FAILS: gets 0
+check_equals(mC0._x, 100);  // FAILS: gets 0
+```
 
-**Impact**: 4 tests.
+`SetProperty` op is either failing path resolution
+(case-insensitive `_ROOT` → `_root`, `MC0` → `mC0`, trailing slash
+handling) or rejecting it without setting the property.
+
+**Fix complexity:** Medium — touches the `SetProperty` path resolver in
+`actionSetProperty` (or the legacy property-index dispatch) to accept
+uppercase + trailing-slash + property-index combinations. SWF6-only —
+SWF7+ uses dot paths and case-sensitive lookup.
+
+### case-v6 Issue B: SWF6 case-insensitive variable rebind on createEmptyMovieClip
+
+Test source (case.as:96-170):
+
+```actionscript
+_root.createEmptyMovieClip("clip", 6);  // MC1 at depth 6
+_root.createEmptyMovieClip("CLIP", 7);  // MC2 at depth 7
+check(clip == CLIP);                     // PASS — case-insensitive lookup
+
+_root.createEmptyMovieClip("CLIP2", 8);  // MC3 at depth 8
+_root.createEmptyMovieClip("clip2", 9);  // MC4 at depth 9
+
+check_equals(clip.getDepth(), 6);        // FAIL: gets 7
+check_equals(CLIP.getDepth(), 6);        // FAIL: gets 7
+check_equals(CLIP2.getDepth(), 8);       // FAIL: gets 9
+check_equals(clip2.getDepth(), 8);       // FAIL: gets 9
+```
+
+Flash/Ruffle SWF6 semantics: both MC1 (depth 6, name "clip") and MC2
+(depth 7, name "CLIP") exist on the display list, but `_root["clip"]`
+and `_root["CLIP"]` BOTH resolve to MC1 (depth 6). The second
+`createEmptyMovieClip` call detects that "CLIP" already exists
+case-insensitively as "clip" and refuses to rebind the variable —
+it creates the new MC at depth 7 but leaves `_root.clip` pointing at
+MC1. Same pattern for CLIP2/clip2.
+
+Our impl creates MC2 and rebinds `_root["CLIP"]` (and case-insensitively
+`_root["clip"]`) to MC2, so depth lookups return 7/9 instead of 6/8.
+
+**Fix complexity:** Medium-High — `builtin_mc_create_empty_movie_clip`
+needs an SWF6-only branch that does case-insensitive `findPropertyRaw`
+on the parent's `dynamic_props` and skips the property assignment +
+`setVariableByName` if a collision is found. Verify this doesn't break
+other SWF6 createEmptyMovieClip tests (especially attachMovie /
+duplicateMovieClip which share the dynamic_props plumbing).
+
+### case-v5 (separate)
+
+`case-v5` ~7 diff lines — likely strict-vs-abstract equality in switch.
+Different root cause from v6/v7/v8.
+
+**Combined impact:** v7/v8 already PASS; v5 + v6 fixes would yield 2
+more tests.
 
 ---
 
