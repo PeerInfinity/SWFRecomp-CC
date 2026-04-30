@@ -1,9 +1,9 @@
 {
   "metadata": {
-    "old_timestamp": "2026-04-29T23:30:32.290922+00:00",
-    "old_git_sha": "4dc2f4775e1d801545e143d2d24bc57691b97a33",
-    "new_timestamp": "2026-04-30T01:48:22.983769+00:00",
-    "new_git_sha": "edb600595ba5cc81a50504405f0de876d4c30603",
+    "old_timestamp": "2026-04-30T01:48:22.983769+00:00",
+    "old_git_sha": "edb600595ba5cc81a50504405f0de876d4c30603",
+    "new_timestamp": "2026-04-30T02:11:03.660275+00:00",
+    "new_git_sha": "8b6a0e34e098a8a5c7fc5cfc49023b88531a620d",
     "partial": false,
     "same_commit": false
   },
@@ -18,32 +18,60 @@
     "new_effective_pass": 68,
     "new_total": 102,
     "new_pass_rate": 53.9,
-    "old_mismatched_lines": 1847,
-    "new_mismatched_lines": 1845,
-    "increased_mismatches": 0,
-    "decreased_mismatches": 2,
+    "old_mismatched_lines": 1845,
+    "new_mismatched_lines": 1827,
+    "increased_mismatches": 5,
+    "decreased_mismatches": 23,
     "newly_passing": 0,
     "newly_failing": 0,
-    "status_changed": 0,
-    "unchanged": 101,
+    "status_changed": 1,
+    "unchanged": 99,
     "added": 0,
     "removed": 0
   },
   "changes": [
     {
-      "test": "DrawingApiTest",
+      "test": "loading/LoadVarsTest",
+      "change_type": "changed",
+      "old_status": "compile_fail",
+      "new_status": "output_mismatch",
+      "old_lines": null,
+      "new_lines": {
+        "actual_lines": 36,
+        "expected_lines": 36,
+        "matching_lines": 31
+      }
+    },
+    {
+      "test": "replace_buttons1test",
       "change_type": "changed",
       "old_status": "output_mismatch",
       "new_status": "output_mismatch",
       "old_lines": {
-        "actual_lines": 95,
-        "expected_lines": 93,
-        "matching_lines": 64
+        "actual_lines": 24,
+        "expected_lines": 18,
+        "matching_lines": 0
       },
       "new_lines": {
-        "actual_lines": 95,
-        "expected_lines": 93,
-        "matching_lines": 66
+        "actual_lines": 18,
+        "expected_lines": 18,
+        "matching_lines": 6
+      }
+    },
+    {
+      "test": "replace_shapes1test",
+      "change_type": "changed",
+      "old_status": "output_mismatch",
+      "new_status": "output_mismatch",
+      "old_lines": {
+        "actual_lines": 32,
+        "expected_lines": 23,
+        "matching_lines": 0
+      },
+      "new_lines": {
+        "actual_lines": 23,
+        "expected_lines": 23,
+        "matching_lines": 17
       }
     }
   ]
