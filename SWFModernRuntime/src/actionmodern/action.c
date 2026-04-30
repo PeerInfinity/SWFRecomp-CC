@@ -56242,16 +56242,22 @@ void actionCallMethod(SWFAppContext* app_context, char* str_buffer)
 
 				// Register child on parent MC's dynamic_props so mc.childName works via GetMember.
 				// Mirrors the function-form path above: don't overwrite an existing
-				// own property whose name case-insensitively matches in SWF<=6
-				// (via getProperty's prop_name_match), but ONLY when the existing
-				// entry references a LIVE MovieClip with a different exact name
-				// — i.e., a true case-collision like case-v6's `clip`/`CLIP` pair.
-				// If the existing entry was just cleared by the depth-conflict
-				// loop above (set to UNDEFINED) or points to a dead MC
-				// (depth == INT_MIN), allow the rebind. Required by gnash case-v6
-				// case.as:96-170 (don't rebind `_root.clip` when `CLIP` is added)
-				// while preserving misc-ming/loadMovieTest's repeated
-				// `this.createEmptyMovieClip('tc', 8)` rebind semantics.
+				// own property whose name case-insensitively matches (SWF<=6 via
+				// `findPropertyRaw`'s prop_name_match) when that property
+				// references a LIVE MovieClip — i.e., the original name binding
+				// shadows the new MC on name resolution. Covers two patterns:
+				//   - case-v6 case.as:96-170: createEmptyMovieClip("clip", 6)
+				//     then ("CLIP", 7) — `_root.clip`/`_root.CLIP` stay bound
+				//     to MC1 (depth 6) because case-insensitive collision in
+				//     SWF6's name table.
+				//   - misc-swfc/soft_reference_test1.sc:143-147:
+				//     `_root.createEmptyMovieClip("mc1", 50)` then ("mc1", 51)
+				//     — `_root.mc1` stays bound to the depth-50 MC (same
+				//     pattern, exact-name match).
+				// Entries cleared to UNDEFINED by the depth-conflict loop above
+				// (loadMovieTest's repeated `this.createEmptyMovieClip('tc',
+				// 8)` at the same depth) and dead-MC pointers
+				// (`depth == INT_MIN`) both fall through and overwrite normally.
 				if (mc->dynamic_props == NULL) {
 					mc->dynamic_props = (void*) allocObject(app_context, 8);
 					retainObject((ASObject*) mc->dynamic_props);
@@ -56263,17 +56269,17 @@ void actionCallMethod(SWFAppContext* app_context, char* str_buffer)
 				ASProperty* _mcemc_existing_prop = findPropertyRaw((ASObject*) mc->dynamic_props, inst_name, _mcemc_inst_len);
 				int _mcemc_has_existing = 0;
 				if (_mcemc_existing_prop != NULL &&
-				    _mcemc_existing_prop->value.type != ACTION_STACK_VALUE_UNDEFINED) {
-					// Treat as case-collision only when: (a) existing entry is a
-					// MOVIECLIP, (b) the existing exact-cased name differs from
-					// the new name, and (c) the existing MC is live (depth != INT_MIN).
-					if (_mcemc_existing_prop->value.type == ACTION_STACK_VALUE_MOVIECLIP) {
-						MovieClip* _mcemc_old = (MovieClip*)(uintptr_t)_mcemc_existing_prop->value.data.numeric_value;
-						int _mcemc_name_eq = (_mcemc_existing_prop->name_length == _mcemc_inst_len &&
-							strncmp(_mcemc_existing_prop->name, inst_name, _mcemc_inst_len) == 0);
-						if (!_mcemc_name_eq && _mcemc_old != NULL && _mcemc_old->depth != INT_MIN) {
-							_mcemc_has_existing = 1;
-						}
+				    _mcemc_existing_prop->value.type == ACTION_STACK_VALUE_MOVIECLIP) {
+					MovieClip* _mcemc_old = (MovieClip*)(uintptr_t)_mcemc_existing_prop->value.data.numeric_value;
+					if (_mcemc_old != NULL && _mcemc_old->depth != INT_MIN &&
+					    swf_name_match(_mcemc_old->name, _mcemc_existing_prop->name)) {
+						// Existing entry is "authoritative": the MC's current
+						// name still matches the dynamic_props key. After
+						// `mc._name = "other"` the entry becomes stale (key
+						// stays "old_name" but mc->name is now "other") and
+						// must not block a fresh rebind under the original
+						// key — see misc-swfc/soft_reference_test1.sc:107-147.
+						_mcemc_has_existing = 1;
 					}
 				}
 				if (!_mcemc_has_existing) {
@@ -56302,7 +56308,14 @@ void actionCallMethod(SWFAppContext* app_context, char* str_buffer)
 					if (var_map != NULL && hashmap_get(var_map, _mcemc_lookup_key, _mcemc_inst_len, (uintptr_t*)&_mcemc_gvar)) {
 						if (_mcemc_gvar != NULL && _mcemc_gvar->type == ACTION_STACK_VALUE_MOVIECLIP) {
 							MovieClip* _mcemc_gmc = (MovieClip*)(uintptr_t)_mcemc_gvar->data.numeric_value;
-							if (_mcemc_gmc != NULL && _mcemc_gmc->depth != INT_MIN)
+							// Same authoritative check as dynamic_props: only treat
+							// as collision when the MC's name still matches the
+							// hashmap key (case-insensitively in SWF<=6 via
+							// swf_name_match). Renamed MCs (`mc._name = "other"`)
+							// leave a stale var_map entry that must not block
+							// rebinds.
+							if (_mcemc_gmc != NULL && _mcemc_gmc->depth != INT_MIN &&
+							    swf_name_match(_mcemc_gmc->name, _mcemc_lookup_key))
 								_mcemc_has_gvar = 1;
 						}
 					}

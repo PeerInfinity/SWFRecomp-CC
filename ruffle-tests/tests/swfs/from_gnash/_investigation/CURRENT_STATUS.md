@@ -35,23 +35,38 @@ Last updated: 2026-04-30 (CI snapshot at 205a9a77 includes all recent fixes thro
      (Issue B).** The method-form `createEmptyMovieClip` path inside
      `actionCallMethod` now skips `setProperty(parent.dynamic_props,
      name, ...)` and (for root receivers) `setVariableByName(name,
-     ...)` only when the existing entry references a LIVE MovieClip
-     under a *different exact-cased name* — i.e., a true SWF6
-     case-collision like `clip` vs `CLIP`. Entries cleared to
-     UNDEFINED by the depth-conflict loop, dead MC pointers
-     (`depth == INT_MIN`), and same-exact-name rebinds all still
-     overwrite normally. For non-root receivers `setVariableByName`
-     remains unconditional, matching the prior behavior that
-     misc-ming/loadMovieTest's `coverart.createEmptyMovieClip('tc',
-     8)` relies on (`_root.check(tc instanceof MovieClip)`). The
-     dynamic_props lookup uses `findPropertyRaw` so it can read the
-     existing entry's exact-cased name (not just the value), and the
-     var_map lookup folds the lookup key with ASCII `[A-Z]→[a-z]` to
-     mirror `setVariableByName`/`getVariableByName`'s SWF<=6 fold.
-     Required by case.as:96-170 — Flash creates MC2 on the display
-     list at depth 7 but leaves `_root.clip` / `_root.CLIP` bound to
-     MC1 at depth 6 because both names collide case-insensitively in
-     SWF6's name table.
+     ...)` when the existing entry references a LIVE MovieClip
+     **and** that MC's current `name` still matches the
+     dynamic_props key / var_map key (case-insensitively in SWF<=6
+     via `swf_name_match`). The "authoritative" check —
+     `swf_name_match(existing_mc->name, entry_name)` — distinguishes
+     three patterns:
+       - case-v6 case.as:96-170: `_root.createEmptyMovieClip("clip",
+         6)` then `_root.createEmptyMovieClip("CLIP", 7)`. The
+         existing `_root.clip` entry's MC is named "clip" (matches
+         key) → authoritative → skip rebind, `_root.clip` /
+         `_root.CLIP` stay bound to MC1 at depth 6.
+       - misc-swfc/soft_reference_test1.sc:107-147: createEmpty(mc1,
+         30) → `mc._name = "mc2"` → createEmpty(mc1, 50). The
+         existing `_root.mc1` entry's MC is now named "mc2" (does
+         NOT match key "mc1") → stale → allow rebind, `_root.mc1`
+         updates to the depth-50 MC. Verified by line 147's
+         `check_equals(mc1.getDepth(), 50)` flipping from FAILED to
+         PASSED.
+       - misc-ming/loadMovieTest: `this.createEmptyMovieClip('tc',
+         8)` repeatedly. Depth-conflict loop sets
+         `dynamic_props["tc"]` to UNDEFINED before the new MC is
+         created → existing entry isn't a MOVIECLIP → fall through
+         and overwrite. Dead-MC pointers (`depth == INT_MIN`) also
+         fall through. For non-root receivers `setVariableByName`
+         remains unconditional, matching the prior behavior that
+         loadMovieTest's `_root.check(tc instanceof MovieClip)`
+         relies on.
+     The dynamic_props lookup uses `findPropertyRaw` so it can read
+     the existing entry's exact-cased key (not just the value), and
+     the var_map lookup folds the lookup key with ASCII
+     `[A-Z]→[a-z]` to mirror `setVariableByName` /
+     `getVariableByName`'s SWF<=6 fold.
   Verified: 8-test AVM1 path battery (movieclip_state_values,
   path_string, slash_syntax, string_paths_basic, swf5_no_closure,
   target_path, tell_target_invalid, tell_target_invalid_swf6 — 8/8
