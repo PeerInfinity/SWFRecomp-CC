@@ -30843,36 +30843,84 @@ static void initFlashPackage(SWFAppContext* app_context)
 		//             _callIn, call, addCallback, available,
 		//             _useSetReturnValueHack, _jsQuoteString, _unescapeXML, _escapeXML,
 		//             _callOut, _evalJS, _addCallback, _objectID, _initJS
-		EI_STUB("_initJS", 7);
-		EI_STUB("_objectID", 9);
-		EI_STUB("_addCallback", 12);
-		EI_STUB("_evalJS", 7);
-		EI_STUB("_callOut", 8);
-		EI_METHOD(g_ei_escapeXML_func, "_escapeXML", 10, actionEI_escapeXML);
-		EI_METHOD(g_ei_unescapeXML_func, "_unescapeXML", 12, actionEI_unescapeXML);
-		EI_METHOD(g_ei_jsQuoteString_func, "_jsQuoteString", 14, actionEI_jsQuoteString);
-		EI_STUB("_useSetReturnValueHack", 22);
-		// available
+		// All EI internal methods (and `available` / `addCallback`) are SWF8+ for
+		// `typeof` purposes (gnash ExternalInterface-v6/v7/v8 ./ExternalInterface.as
+		// :65-89 gates on `OUTPUT_VERSION < 8`). Mark them with
+		// flash_flags = 0x1000 so they are still own properties (hasOwnProperty
+		// returns true — required by ./ExternalInterface.as:41-58) but hidden
+		// from GetMember reads in SWF<=7 (FLASH_HIDE_MASK for SWF6=0x7500 and
+		// SWF7=0x7000 both include 0x1000; SWF8=0x6000 does NOT).
+		const u8 ei_v7_flags = 0; // not enumerable / writable / configurable, no version-hide
+		(void)ei_v7_flags; // suppress unused warning when not used below
+		// Override macros to apply v7-only flag handling for non-`call` entries
+		#undef EI_METHOD
+		#undef EI_STUB
+		#define EI_METHOD_V7(gvar, namestr, namelen, impl_func) \
+			memset(&gvar, 0, sizeof(ASFunction)); \
+			strncpy(gvar.name, namestr, 255); \
+			gvar.function_type = 2; \
+			gvar.advanced_func = (Function2Ptr)impl_func; \
+			{ ActionVar _fv = {0}; _fv.type = ACTION_STACK_VALUE_FUNCTION; \
+			  VAL(u64, &_fv.data.numeric_value) = (u64)&gvar; \
+			  setPropertyWithFlags(app_context, fc_ExternalInterface.own_props, namestr, namelen, &_fv, ei_flags); \
+			  { ASProperty* _p = findPropertyRaw(fc_ExternalInterface.own_props, namestr, namelen); \
+			    if (_p) _p->flash_flags = 0x1000; } }
+		#define EI_STUB_V7(namestr, namelen) \
+			{ if (g_proto_stub_func_count < MAX_PROTO_STUB_FUNCS) { \
+			  ASFunction* _sf = &g_proto_stub_funcs[g_proto_stub_func_count++]; \
+			  memset(_sf, 0, sizeof(ASFunction)); strncpy(_sf->name, namestr, 255); \
+			  _sf->function_type = 2; _sf->advanced_func = (Function2Ptr)builtin_stub_method; \
+			  ActionVar _fv = {0}; _fv.type = ACTION_STACK_VALUE_FUNCTION; \
+			  VAL(u64, &_fv.data.numeric_value) = (u64)_sf; \
+			  setPropertyWithFlags(app_context, fc_ExternalInterface.own_props, namestr, namelen, &_fv, ei_flags); \
+			  { ASProperty* _p = findPropertyRaw(fc_ExternalInterface.own_props, namestr, namelen); \
+			    if (_p) _p->flash_flags = 0x1000; } } }
+		// `call` is the one method visible in SWF6 (typeof returns 'function')
+		#define EI_METHOD_ALL(gvar, namestr, namelen, impl_func) \
+			memset(&gvar, 0, sizeof(ASFunction)); \
+			strncpy(gvar.name, namestr, 255); \
+			gvar.function_type = 2; \
+			gvar.advanced_func = (Function2Ptr)impl_func; \
+			{ ActionVar _fv = {0}; _fv.type = ACTION_STACK_VALUE_FUNCTION; \
+			  VAL(u64, &_fv.data.numeric_value) = (u64)&gvar; \
+			  setPropertyWithFlags(app_context, fc_ExternalInterface.own_props, namestr, namelen, &_fv, ei_flags); }
+
+		EI_STUB_V7("_initJS", 7);
+		EI_STUB_V7("_objectID", 9);
+		EI_STUB_V7("_addCallback", 12);
+		EI_STUB_V7("_evalJS", 7);
+		EI_STUB_V7("_callOut", 8);
+		EI_METHOD_V7(g_ei_escapeXML_func, "_escapeXML", 10, actionEI_escapeXML);
+		EI_METHOD_V7(g_ei_unescapeXML_func, "_unescapeXML", 12, actionEI_unescapeXML);
+		EI_METHOD_V7(g_ei_jsQuoteString_func, "_jsQuoteString", 14, actionEI_jsQuoteString);
+		EI_STUB_V7("_useSetReturnValueHack", 22);
+		// available — boolean, hidden in SWF<=6
 		{
 			ActionVar av_bool = {0};
 			av_bool.type = ACTION_STACK_VALUE_BOOLEAN;
 			av_bool.data.numeric_value = (g_external_call_handler != NULL) ? 1 : 0;
 			setPropertyWithFlags(app_context, fc_ExternalInterface.own_props, "available", 9, &av_bool, ei_flags);
+			ASProperty* _p = findPropertyRaw(fc_ExternalInterface.own_props, "available", 9);
+			if (_p) _p->flash_flags = 0x1000;
 		}
-		EI_METHOD(g_ei_addCallback_func, "addCallback", 11, actionEI_addCallback);
-		EI_METHOD(g_ei_call_func, "call", 4, actionEI_call);
-		EI_STUB("_callIn", 7);
-		EI_METHOD(g_ei_arrayToXML_func, "_arrayToXML", 11, actionEI_arrayToXML);
-		EI_METHOD(g_ei_argumentsToXML_func, "_argumentsToXML", 15, actionEI_argumentsToXML);
-		EI_METHOD(g_ei_objectToXML_func, "_objectToXML", 12, actionEI_objectToXML);
-		EI_METHOD(g_ei_toXML_func, "_toXML", 6, actionEI_toXML);
-		EI_METHOD(g_ei_objectToAS_func, "_objectToAS", 11, actionEI_objectToAS);
-		EI_METHOD(g_ei_arrayToAS_func, "_arrayToAS", 10, actionEI_arrayToAS);
-		EI_METHOD(g_ei_toAS_func, "_toAS", 5, actionEI_toAS);
-		EI_METHOD(g_ei_argumentsToAS_func, "_argumentsToAS", 14, actionEI_argumentsToAS);
-		EI_STUB("_arrayToJS", 10);
-		EI_STUB("_objectToJS", 11);
-		EI_STUB("_toJS", 5);
+		EI_METHOD_V7(g_ei_addCallback_func, "addCallback", 11, actionEI_addCallback);
+		EI_METHOD_ALL(g_ei_call_func, "call", 4, actionEI_call);
+		EI_STUB_V7("_callIn", 7);
+		EI_METHOD_V7(g_ei_arrayToXML_func, "_arrayToXML", 11, actionEI_arrayToXML);
+		EI_METHOD_V7(g_ei_argumentsToXML_func, "_argumentsToXML", 15, actionEI_argumentsToXML);
+		EI_METHOD_V7(g_ei_objectToXML_func, "_objectToXML", 12, actionEI_objectToXML);
+		EI_METHOD_V7(g_ei_toXML_func, "_toXML", 6, actionEI_toXML);
+		EI_METHOD_V7(g_ei_objectToAS_func, "_objectToAS", 11, actionEI_objectToAS);
+		EI_METHOD_V7(g_ei_arrayToAS_func, "_arrayToAS", 10, actionEI_arrayToAS);
+		EI_METHOD_V7(g_ei_toAS_func, "_toAS", 5, actionEI_toAS);
+		EI_METHOD_V7(g_ei_argumentsToAS_func, "_argumentsToAS", 14, actionEI_argumentsToAS);
+		EI_STUB_V7("_arrayToJS", 10);
+		EI_STUB_V7("_objectToJS", 11);
+		EI_STUB_V7("_toJS", 5);
+
+		#undef EI_METHOD_V7
+		#undef EI_STUB_V7
+		#undef EI_METHOD_ALL
 
 		#undef EI_METHOD
 		#undef EI_STUB

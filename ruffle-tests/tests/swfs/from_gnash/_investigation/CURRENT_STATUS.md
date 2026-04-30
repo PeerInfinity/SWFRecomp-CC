@@ -14,6 +14,31 @@ Last updated: 2026-04-30 (CI snapshot at 205a9a77 includes all recent fixes thro
 
 ### Latest fixes (2026-04-30, pending CI)
 
+- **`ExternalInterface-v6` / `ExternalInterface-v7` (actionscript.all) → PASS (+2).**
+  All `ExternalInterface` internal methods (`_argumentsToAS`, `_arrayToAS`,
+  `_callIn`, `_escapeXML`, `_initJS`, `_jsQuoteString`, `_objectToAS`,
+  `_toAS`, `_toJS`, `_toXML`, `_unescapeXML`, etc.) plus `addCallback`
+  and `available` are now marked with `flash_flags = 0x1000` in
+  `SWFModernRuntime/src/actionmodern/action.c` (the
+  `MAKE_STUB_CTOR(fc_ExternalInterface, ...)` block in `ensureGlobalInit`).
+  The `FLASH_HIDE_MASK` for SWF6 (0x7500) and SWF7 (0x7000) both include
+  bit 0x1000 → properties are hidden from `getProperty` (so
+  `typeof(EI._method)` returns `'undefined'`) but remain in `own_props`
+  (so `EI.hasOwnProperty('_method')` still returns `true`). SWF8 mask
+  (0x6000) does NOT include 0x1000 → properties become visible. Only
+  `EI.call` keeps `flash_flags=0` (visible in all SWF versions, matching
+  the gnash test's `check_equals(typeof(EI.call), 'function')` regardless
+  of `OUTPUT_VERSION`). Mirrors gnash test source
+  `actionscript.all/ExternalInterface.as:65-89` (`#if OUTPUT_VERSION < 8`
+  → all internals undefined, `#else` → all functions/boolean). Verified:
+  3-test ExternalInterface battery (v6/v7 PASS, v8 still RM unchanged),
+  7-test AVM1 ExternalInterface battery (external_interface,
+  external_interface_escapexml, external_interface_jsquotestring,
+  external_interface_toas_basic, external_interface_toxml_array,
+  external_interface_toxml_basic, external_interface_unescapexml — 7/7
+  PASS), 7-test gnash adjacent battery (case-v6, Color-v6, Number-v6,
+  System-v5/v6/v7/v8 — 7/7 PASS).
+
 - **`case-v6` (actionscript.all) → PASS (+1).** Two-part fix in
   `SWFModernRuntime/src/actionmodern/action.c` for the residual SWF6
   blockers documented in `incomplete/GNASH_FEATURE_PLAN.md` §16.
