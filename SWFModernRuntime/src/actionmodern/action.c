@@ -24186,6 +24186,21 @@ static int enum_varmap_callback(const void *key, size_t ksize, uintptr_t value, 
 	if (var->type == ACTION_STACK_VALUE_STRING && var->str_size == 0 &&
 	    var->data.string_data.heap_ptr == NULL) return 0;
 	if (isPropertyEnumerated(*st->head, (const char*)key, (u32)ksize)) return 0;
+	// Respect DONTENUM flag set on root.dynamic_props mirror entry. SetMember
+	// on root MC syncs the value to var_map but does not propagate flags;
+	// for-in over _root must still hide DONTENUM properties (e.g. tabIndex).
+	extern MovieClip root_movieclip;
+	if (root_movieclip.dynamic_props != NULL) {
+		ASObject* _rdp = (ASObject*) root_movieclip.dynamic_props;
+		for (u32 _vi = 0; _vi < _rdp->num_used; _vi++) {
+			if (_rdp->properties[_vi].name_length == (u32)ksize &&
+			    memcmp(_rdp->properties[_vi].name, key, ksize) == 0) {
+				if (!(_rdp->properties[_vi].flags & PROPERTY_FLAG_ENUMERABLE))
+					return 0;
+				break;
+			}
+		}
+	}
 	addEnumeratedName(st->head, (const char*)key, (u32)ksize);
 	SWFAppContext* app_context = st->ctx;
 	PUSH_STR((char*)key, (u32)ksize);
