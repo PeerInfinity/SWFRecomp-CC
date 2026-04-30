@@ -28031,6 +28031,226 @@ void actionDispatchMCOnLoad(SWFAppContext* app_context, MovieClip* mc)
 	actionSetCurrentContext(saved_ctx);
 }
 
+// Dispatch MovieClip.prototype.onConstruct on `mc` (mirrors Ruffle's
+// `MovieClip::call_on_construct_handler` from `core/src/display_object/movie_clip.rs`,
+// upstream commit 0473281942 "avm1: Add support for MovieClip.onConstruct handler").
+//
+// Looks up `onConstruct` via the MC's `dynamic_props` __proto__ chain (which
+// reaches `MovieClip.prototype` for any normally-instantiated clip) and calls
+// it as a method with `this = mc` and zero args. NOT a fallback to global vars
+// — Ruffle's implementation uses `object.call_method("onConstruct", &[], …)`
+// which only walks the prototype chain.
+//
+// Called from `createEmptyMovieClip` immediately after the new clip is
+// registered. Powers gnash `case-v6/-v7/-v8` and avm1 `movieclip_onconstruct`.
+static void actionDispatchMCOnConstruct(SWFAppContext* app_context, MovieClip* mc)
+{
+	if (mc == NULL || mc->depth == INT_MIN) return;
+
+	ASFunction* func = NULL;
+	if (mc->dynamic_props != NULL)
+	{
+		ASObject* rp = (ASObject*) mc->dynamic_props;
+		ActionVar* oc = getPropertyWithPrototype(rp, "onConstruct", 11);
+		if (oc != NULL && oc->type == ACTION_STACK_VALUE_FUNCTION)
+			func = (ASFunction*) oc->data.numeric_value;
+	}
+	// Fall back to MovieClip.prototype directly when the MC has no
+	// dynamic_props yet (typical for createEmptyMovieClip — the slot is
+	// allocated lazily on the first dynamic property write). Mirrors
+	// Ruffle's `object.call_method("onConstruct", ...)` which walks the
+	// __proto__ chain regardless of own-property state.
+	if (func == NULL)
+	{
+		int mc_ver = mc->swf_version ? mc->swf_version : g_swf_version;
+		ASObject* mc_proto = getMovieClipPrototype(mc_ver);
+		if (mc_proto != NULL)
+		{
+			ActionVar* oc = getPropertyWithPrototype(mc_proto, "onConstruct", 11);
+			if (oc != NULL && oc->type == ACTION_STACK_VALUE_FUNCTION)
+				func = (ASFunction*) oc->data.numeric_value;
+		}
+	}
+	if (func == NULL) return;
+
+	// Install a local try/catch so that throws inside onConstruct are caught
+	// by the runtime (printed as `Warning: Uncaught exception, ...`) and do
+	// NOT propagate to the calling script. Mirrors Ruffle's
+	// `Avm1::handle_error(&mut activation, e)` in `call_on_construct_handler`.
+	// Without this, `throw "x"` inside onConstruct would unwind through
+	// createEmptyMovieClip's caller and land in their try/catch — flipping
+	// `Caught: other error` (Flash/Ruffle) to `Caught: x` for movieclip_onconstruct.
+	u32 _ocs_sp = SP;
+	u32 _ocs_sc = scope_depth;
+	u32 _ocs_th = g_this_depth;
+	int _ocs_ed = g_exception_state.depth;
+	int _ocs_threw = 0;
+	if (_ocs_ed < MAX_EXCEPTION_DEPTH)
+	{
+		g_exception_state.frames[_ocs_ed].saved_scope_depth = scope_depth;
+		g_exception_state.frames[_ocs_ed].has_jmp_buf = 1;
+		if (setjmp(g_exception_state.frames[_ocs_ed].handler) != 0)
+		{
+			// Exception caught: log warning, clear pending state, restore.
+			ActionVar exc = g_exception_state.exception_value;
+			printf("Warning: Uncaught exception, ");
+			if (exc.type == ACTION_STACK_VALUE_STRING) {
+				const uint16_t* u16 = varGetU16Ptr(&exc);
+				char _ocs_buf[512];
+				if (u16 && exc.str_size > 0)
+					u16_to_utf8(u16, exc.str_size, _ocs_buf, sizeof(_ocs_buf));
+				else
+					_ocs_buf[0] = '\0';
+				printf("%s", _ocs_buf);
+			} else if (exc.type == ACTION_STACK_VALUE_F64) {
+				double v; memcpy(&v, &exc.data.numeric_value, sizeof(double));
+				printf("%g", v);
+			} else if (exc.type == ACTION_STACK_VALUE_F32) {
+				float v; memcpy(&v, &exc.data.numeric_value, sizeof(float));
+				printf("%g", v);
+			} else {
+				printf("(type %d)", exc.type);
+			}
+			printf("\n");
+			g_exception_state.exception_thrown = false;
+			g_exception_state.depth = _ocs_ed;
+			scope_depth = _ocs_sc;
+			g_this_depth = _ocs_th;
+			SP = _ocs_sp;
+			_ocs_threw = 1;
+		}
+		else
+		{
+			g_exception_state.depth = _ocs_ed + 1;
+		}
+	}
+	if (_ocs_threw) return;
+
+	MovieClip* saved_ctx = g_current_context;
+	actionSetCurrentContext(mc);
+	MovieClip* saved_event_this = g_event_this_mc;
+	g_event_this_mc = mc;
+
+	if (func->function_type == 1 && func->simple_func != NULL)
+	{
+		// Type 1: matches actionDispatchMCOnLoad's type-1 setup so closure-
+		// captured WITH scopes (e.g. `note` referenced by mtasc-compiled
+		// onConstruct bodies) resolve via the function's saved scope chain.
+		ASObject* local_scope = allocObject(app_context, 8);
+		if (scope_depth < MAX_SCOPE_DEPTH)
+		{
+			scope_is_with[scope_depth] = 0;
+			scope_mc[scope_depth] = NULL;
+			scope_chain[scope_depth++] = local_scope;
+		}
+		u32 captured_count = func->captured_scope_count;
+		for (u32 i = 0; i < captured_count && scope_depth < MAX_SCOPE_DEPTH; i++)
+		{
+			scope_is_with[scope_depth] = 1;
+			scope_mc[scope_depth] = (MovieClip*) func->captured_scope_mc[i];
+			scope_chain[scope_depth++] = (ASObject*) func->captured_scope[i];
+		}
+		MovieClip* saved_base = NULL;
+		if (g_swf_version >= 6 && func->base_clip != NULL)
+		{
+			saved_base = g_current_context;
+			actionSetCurrentContext(func->base_clip);
+		}
+		u32 saved_this_depth = g_this_depth;
+		if (g_this_depth < MAX_THIS_DEPTH)
+		{
+			g_this_stack[g_this_depth].type = ACTION_STACK_VALUE_MOVIECLIP;
+			g_this_stack[g_this_depth].str_size = 0;
+			g_this_stack[g_this_depth].data.numeric_value = (u64) mc;
+			g_this_depth++;
+		}
+		ActionVar this_var;
+		this_var.type = ACTION_STACK_VALUE_MOVIECLIP;
+		this_var.str_size = 0;
+		this_var.data.numeric_value = (u64) mc;
+		setVariableByName("this", &this_var);
+		g_call_depth++;
+		((ActionVar(*)(SWFAppContext*))func->simple_func)(app_context);
+		g_call_depth--;
+		g_this_depth = saved_this_depth;
+		if (saved_base != NULL)
+			actionSetCurrentContext(saved_base);
+		for (u32 i = 0; i < captured_count && scope_depth > 0; i++)
+			scope_depth--;
+		if (scope_depth > 0) scope_depth--;
+		releaseObject(app_context, local_scope);
+	}
+	else if (func->function_type == 2 && func->advanced_func != NULL)
+	{
+		ActionVar* regs = NULL;
+		if (func->register_count > 0)
+			regs = (ActionVar*) HCALLOC(func->register_count, sizeof(ActionVar));
+
+		ASObject* local_scope = allocObject(app_context, 4);
+		u32 saved_this_depth = g_this_depth;
+		{
+			u16 f2flags = func->flags;
+			int preload_this  = (f2flags & 0x0001);
+			int suppress_this = (f2flags & 0x0002);
+			if (!preload_this && !suppress_this)
+			{
+				if (g_this_depth < MAX_THIS_DEPTH)
+				{
+					g_this_stack[g_this_depth].type = ACTION_STACK_VALUE_MOVIECLIP;
+					g_this_stack[g_this_depth].str_size = 0;
+					g_this_stack[g_this_depth].data.numeric_value = (u64) mc;
+					g_this_depth++;
+				}
+				ActionVar this_var = {0};
+				this_var.type = ACTION_STACK_VALUE_MOVIECLIP;
+				this_var.data.numeric_value = (u64) mc;
+				setProperty(app_context, local_scope, "this", 4, &this_var);
+			}
+		}
+		u8 captured = func->captured_scope_count;
+		for (u8 ci = 0; ci < captured && scope_depth < MAX_SCOPE_DEPTH; ci++)
+		{
+			scope_is_with[scope_depth] = func->captured_scope_is_with[ci];
+			scope_mc[scope_depth] = func->captured_scope_mc[ci];
+			scope_chain[scope_depth++] = func->captured_scope[ci];
+		}
+		if (scope_depth < MAX_SCOPE_DEPTH)
+		{
+			scope_is_with[scope_depth] = 0;
+			scope_mc[scope_depth] = NULL;
+			scope_chain[scope_depth++] = local_scope;
+		}
+		MovieClip* saved_base = NULL;
+		if (g_swf_version >= 6 && func->base_clip != NULL)
+		{
+			saved_base = g_current_context;
+			actionSetCurrentContext(func->base_clip);
+		}
+		g_call_depth++;
+		func->advanced_func(app_context, NULL, 0, regs, NULL);
+		g_call_depth--;
+		g_this_depth = saved_this_depth;
+		if (saved_base != NULL)
+			actionSetCurrentContext(saved_base);
+		for (u8 ci = 0; ci < captured + 1; ci++)
+		{
+			if (scope_depth > 0) scope_depth--;
+		}
+		releaseObject(app_context, local_scope);
+		if (regs != NULL) FREE(regs);
+	}
+
+	g_event_this_mc = saved_event_this;
+	actionSetCurrentContext(saved_ctx);
+
+	// Pop the onConstruct exception frame (no throw — clear handler).
+	if (g_exception_state.depth > 0 && g_exception_state.depth - 1 == _ocs_ed)
+	{
+		g_exception_state.frames[_ocs_ed].has_jmp_buf = 0;
+		g_exception_state.depth = _ocs_ed;
+	}
+}
+
 // Pending onLoad queue for dynamically-attached MCs.
 // onLoad is queued during attachMovie/createEmptyMovieClip but fires after
 // the current script finishes (deferred dispatch).
@@ -48953,6 +49173,10 @@ void actionCallFunction(SWFAppContext* app_context, char* str_buffer)
 				child_mc_cache[child_mc_count++] = child;
 			}
 
+			// Fire MovieClip.prototype.onConstruct on the new clip (mirrors
+			// Ruffle's `call_on_construct_handler`, upstream commit 0473281942).
+			actionDispatchMCOnConstruct(app_context, child);
+
 			if (args != NULL) FREE(args);
 			PUSH(ACTION_STACK_VALUE_MOVIECLIP, (u64)child);
 		} else {
@@ -56024,6 +56248,12 @@ void actionCallMethod(SWFAppContext* app_context, char* str_buffer)
 					if (_sl >= 0) child_mc_cache[_sl] = child;
 					else if (child_mc_count < MAX_CHILD_MOVIECLIPS) child_mc_cache[child_mc_count++] = child;
 				}
+
+				// Fire MovieClip.prototype.onConstruct on the new clip (mirrors
+				// Ruffle's `call_on_construct_handler`, upstream commit
+				// 0473281942). Required by gnash case-v6/-v7/-v8 and avm1
+				// movieclip_onconstruct.
+				actionDispatchMCOnConstruct(app_context, child);
 
 				// Return the created MovieClip
 				if (args != NULL) FREE(args);
