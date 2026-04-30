@@ -46255,6 +46255,19 @@ void actionCloneSprite(SWFAppContext* app_context)
 	#else
 	{
 		int depth_int = ecmaToInt32(VAL(double, &depth.data.numeric_value));
+		// AVM1 valid AS-depth range is [-16384, 2130690044]. The recompiler
+		// strips the SWF +16384 bias for small I32 pushes, so for low AS
+		// depths the value reaching `actionCloneSprite` is unbiased; large
+		// positive depths typically arrive in biased form (≥ 0). Reject
+		// unbiased AS-depths < -16384 — biased depths are always ≥ 0 so
+		// this only fires on the unbiased path. The upper bound is already
+		// enforced by `ng_cloneSprite`'s `if (depth > 2130706428)` guard
+		// (which catches biased dup5 = AS-depth 2130690045 → 2130706429).
+		// Required by gnash misc-ming/DepthLimitsTest.c:166-170 (AS-depth
+		// -16385 must be rejected — function-form `duplicateMovieClip`).
+		if (depth_int < -16384) {
+			return;
+		}
 		// AVM1 stack naming is inverted from the SWF spec naming:
 		//   source ActionVar (2nd pop) = new clone name (e.g., "clip1")
 		//   target ActionVar (3rd pop) = existing clip to clone from (src MC or path string)
@@ -56456,6 +56469,15 @@ void actionCallMethod(SWFAppContext* app_context, char* str_buffer)
 					_dmc_depth_dbl = varToDouble(&args[1]);
 				}
 				int depth_val = ecmaToInt32(_dmc_depth_dbl);
+
+				// AVM1 valid depth range is [-16384, 2130690044]. Out-of-range
+				// `duplicateMovieClip(target, depth)` is a no-op (gnash
+				// misc-ming/DepthLimitsTest.c:166-186) — return undefined.
+				if (depth_val < -16384 || depth_val > 2130690044) {
+					if (args != NULL) FREE(args);
+					pushUndefined(app_context);
+					return;
+				}
 
 				// Use ng_duplicateMovieClip: stores at SWF depth (depth+16384), no variable registration
 				MovieClip* clone_mc = ng_duplicateMovieClip(app_context, mc->name, tgt_name, depth_val);
