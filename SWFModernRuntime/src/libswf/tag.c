@@ -4803,11 +4803,6 @@ void tagPlaceObject2Ratio(SWFAppContext* app_context, size_t depth, size_t char_
 	}
 #endif
 
-	// Cross-frame non-sprite REPLACE detection — see tagPlaceObject2 for
-	// rationale. Sprite-sprite case is handled above and returns early.
-	int is_cross_frame_replace_ratio = display_list[depth].char_id != 0
-	                                    && display_list[depth].place_gen != g_place_gen;
-
 	display_list[depth].char_id = char_id;
 	display_list[depth].transform_id = transform_id;
 #ifdef NO_GRAPHICS
@@ -4829,25 +4824,17 @@ void tagPlaceObject2Ratio(SWFAppContext* app_context, size_t depth, size_t char_
 	display_list[depth].child_transform_data = NULL;
 	if (g_char_movie_id != NULL && char_id < g_char_movie_id_capacity && g_char_movie_id[char_id] != 0)
 		display_list[depth].child_transform_data = g_movie_transform_data[g_char_movie_id[char_id]];
-	if (is_cross_frame_replace_ratio) {
-		// REPLACE preserves existing instance_name and clip_actions; discard
-		// any pending values so they don't leak to the next placement.
+	// Consume pending instance name from tagSetInstanceName (called before PlaceObject)
+	if (g_pending_instance_name != NULL) {
+		display_list[depth].instance_name = (char*)g_pending_instance_name;
+		display_list[depth].instance_name_owned = 0;
 		g_pending_instance_name = NULL;
-		g_pending_clip_actions = NULL;
-		g_pending_clip_action_count = 0;
 	} else {
-		// Consume pending instance name from tagSetInstanceName (called before PlaceObject)
-		if (g_pending_instance_name != NULL) {
-			display_list[depth].instance_name = (char*)g_pending_instance_name;
-			display_list[depth].instance_name_owned = 0;
-			g_pending_instance_name = NULL;
-		} else {
-			display_list[depth].instance_name = NULL;
-			display_list[depth].instance_name_owned = 0;
-		}
-		display_list[depth].clip_actions = NULL;
-		display_list[depth].clip_action_count = 0;
+		display_list[depth].instance_name = NULL;
+		display_list[depth].instance_name_owned = 0;
 	}
+	display_list[depth].clip_actions = NULL;
+	display_list[depth].clip_action_count = 0;
 	display_list[depth].filter_type = 0;
 	display_list[depth].depth_swapped = 0;
 	// Restore persistent button state if the same character is being re-placed
@@ -4881,13 +4868,10 @@ void tagPlaceObject2Ratio(SWFAppContext* app_context, size_t depth, size_t char_
 
 	// Consume pending clip actions (set by WithClipActions variants).
 	// Reset immediately so nested tagPlaceObject2 calls during eager init
-	// don't inherit the parent's clip actions. Skip on cross-frame REPLACE
-	// (cleared above) — the existing clip_actions are preserved.
+	// don't inherit the parent's clip actions.
 	if (g_pending_clip_actions != NULL) {
-		if (!is_cross_frame_replace_ratio) {
-			display_list[depth].clip_actions = g_pending_clip_actions;
-			display_list[depth].clip_action_count = g_pending_clip_action_count;
-		}
+		display_list[depth].clip_actions = g_pending_clip_actions;
+		display_list[depth].clip_action_count = g_pending_clip_action_count;
 		g_pending_clip_actions = NULL;
 		g_pending_clip_action_count = 0;
 	}
