@@ -50,11 +50,21 @@ Each `_results/` directory contains: `results.json`, `results.md`, `results_filt
 cd SWFRecomp/build && cmake .. && make -j$(nproc) && cd ../..
 ```
 
-### Download test SWFs (once per machine)
+### Download / refresh test SWFs (run at the start of each session)
+
+The script does a fresh sparse-checkout from `ruffle-rs/ruffle` (master) every
+time, so running it picks up any new or updated upstream tests. Always run all
+three categories so every suite stays in sync with upstream.
 
 ```bash
-cd ruffle-tests && bash download_tests.sh && cd ..
+bash ruffle-tests/download_tests.sh avm1 from_shumway from_gnash
 ```
+
+The test SWFs and `output.txt` files are `.gitignored` — the download is fast
+(sparse checkout, blob:none filter) and overwrites only the test fixtures, not
+the in-tree investigation docs / `_results/` / `output.ruffle.txt`. Add
+`--clean` if you want to drop locally-orphaned test directories before the
+re-download.
 
 ### Run a single test locally
 
