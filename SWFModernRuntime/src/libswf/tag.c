@@ -3729,6 +3729,13 @@ static void queue_clip_init_events(SWFAppContext* app_context, size_t depth)
 {
 	if (display_list[depth].clip_action_count == 0) return;
 	if (display_list[depth].instance_name == NULL) return;
+	// Only sprites (MovieClip instances) fire INITIALIZE/CONSTRUCT/LOAD
+	// clip events. Buttons have their own event model (mouse + KeyPress);
+	// shapes / morph shapes / text have no clip event model in AVM1.
+	{
+		size_t _cid = display_list[depth].char_id;
+		if (_cid == 0 || dictionary[_cid].type != CHAR_TYPE_SPRITE) return;
+	}
 	MovieClip* _parent_mc = g_current_context ? g_current_context : &root_movieclip;
 	MovieClip* _mc = actionFindOrCreateMovieClip(
 		app_context, display_list[depth].instance_name, _parent_mc);
@@ -3784,6 +3791,11 @@ static void queue_clip_construct_events(SWFAppContext* app_context, size_t depth
 {
 	if (display_list[depth].clip_action_count == 0) return;
 	if (display_list[depth].instance_name == NULL) return;
+	// Only sprites fire INITIALIZE/CONSTRUCT/LOAD clip events.
+	{
+		size_t _cid = display_list[depth].char_id;
+		if (_cid == 0 || dictionary[_cid].type != CHAR_TYPE_SPRITE) return;
+	}
 	// Skip enqueueing entirely when there is no CONSTRUCT handler on this
 	// entry — avoids dispatch-time work (and a spurious setupPrototype) for
 	// entries that only carry non-CONSTRUCT clip events.
@@ -3923,6 +3935,11 @@ static void queue_clip_load_events(SWFAppContext* app_context, size_t depth)
 	(void)app_context;
 	if (display_list[depth].clip_action_count == 0) return;
 	if (display_list[depth].instance_name == NULL) return;
+	// Only sprites fire INITIALIZE/CONSTRUCT/LOAD clip events.
+	{
+		size_t _cid = display_list[depth].char_id;
+		if (_cid == 0 || dictionary[_cid].type != CHAR_TYPE_SPRITE) return;
+	}
 	// Bail early when there's no LOAD handler on this entry — avoids a
 	// spurious queue entry for sprites that only carry
 	// INITIALIZE/CONSTRUCT/UNLOAD/etc.

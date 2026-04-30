@@ -1221,8 +1221,11 @@ def generate_data_registry(data_files, build_dir):
         var_name = "data_" + re.sub(r'[^a-zA-Z0-9]', '_', df.name)
         var_names.append((var_name, df.name, len(content)))
         # Emit as a C byte array to handle any content safely
-        hex_bytes = ", ".join(f"0x{b:02x}" for b in content)
-        lines.append(f"static const char {var_name}[] = {{ {hex_bytes}, 0x00 }};")
+        if content:
+            hex_bytes = ", ".join(f"0x{b:02x}" for b in content)
+            lines.append(f"static const char {var_name}[] = {{ {hex_bytes}, 0x00 }};")
+        else:
+            lines.append(f"static const char {var_name}[] = {{ 0x00 }};")
     lines.append("")
 
     lines.append("static DataFileEntry g_data_files[] = {")

@@ -14,6 +14,34 @@ Last updated: 2026-04-29 (CI snapshot at 205a9a77 includes all recent fixes thro
 
 ### Latest fixes (2026-04-29, pending CI)
 
+- **Clip CONSTRUCT/INITIALIZE/LOAD events now sprite-only (Flash semantics).**
+  `queue_clip_init_events`, `queue_clip_construct_events`, and
+  `queue_clip_load_events` in `SWFModernRuntime/src/libswf/tag.c` now bail
+  out early unless `dictionary[char_id].type == CHAR_TYPE_SPRITE`. Previously
+  these events fired for any character with attached `clip_actions`, including
+  buttons and shapes. Mirrors Ruffle's `Avm1Button::propagate_clip_event`
+  (`core/src/display_object/avm1_button.rs:417-433`) which only handles mouse
+  + KeyPress, and the absence of clip-event dispatch on shape/morph-shape/text
+  display objects. Targets `replace_buttons1test` / `replace_shapes1test`
+  (misc-ming, ZERO_OUTPUT_TRIAGE Phase 2): both produced 3+ extra leading
+  `_level0.staticN onClipConstruct` / `PASSED: movieclip == movieclip` /
+  `_root.depth3Constructed set to N` lines per replacement. Effect:
+  replace_buttons1test 0/22 matching → 5/22 matching (extra-leading gone, 7
+  later FAILs remain — separate name-resolution-after-replace issue);
+  replace_shapes1test similar (10 matching, 4 later FAILs remain). 21-test
+  AVM1 button/clip-event/goto-rewind/unload guardrail battery: 21/21 PASS,
+  no regressions. 12-test misc-ming lifecycle battery: 10/12 (only the two
+  target tests still fail, as expected).
+
+- **Verifier: empty data files now generate valid C (ZERO_OUTPUT_TRIAGE Phase 1).**
+  `generate_data_registry` in `ruffle-tests/verify_output.py` emitted
+  `static const char data_empty_txt[] = { , 0x00 };` (leading-comma C syntax
+  error) when a sidecar data file like `empty.txt` was zero-bytes; gcc
+  errored `data_registry.c:5:40: error: expected expression before ','`.
+  Now emits `{ 0x00 }` for the empty case. Effect: `loading/LoadVarsTest`
+  flips from `compile_fail` to `output_mismatch` (26/29 lines match — 3
+  remaining FAILs are LoadVars `decode()`-callback bugs, separate work).
+
 - **HitTest-v6 / HitTest-v7 / HitTest-v8 (actionscript.all) → ruffle_matched (+3 effective).**
   Three-part fix to the AVM1 `MovieClip.hitTest` implementation in
   `SWFModernRuntime/src/actionmodern/action.c`:
