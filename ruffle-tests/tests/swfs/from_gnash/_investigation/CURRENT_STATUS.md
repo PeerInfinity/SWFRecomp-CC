@@ -14,6 +14,42 @@ Last updated: 2026-04-29 (CI snapshot at 205a9a77 includes all recent fixes thro
 
 ### Latest fixes (2026-04-29, pending CI)
 
+- **`replace_sprites1test` (misc-ming) → PASS (+1).** Two-part fix in
+  `SWFModernRuntime/src/libswf/tag.c` for the AVM1 PlaceObject2/3 REPLACE
+  pattern (move=1 + has_character=1) where an existing sprite at a depth is
+  replaced by a *different* sprite character ID. Mirrors Ruffle's
+  `PlaceObjectAction::Replace` path
+  (`core/src/display_object/movie_clip.rs:4341-4357`):
+  `child.replace_with(context, id)` is a no-op for MovieClip (default impl in
+  `display_object.rs:2543-2546`), and `apply_place_object`
+  (`display_object.rs:2492-2540`) updates only matrix / cxform / ratio —
+  `name`, `clip_depth`, and `clip_actions` are explicitly excluded
+  ("Purposely omitted properties: name, clip_depth, clip_actions"). No fresh
+  CONSTRUCT/INIT/LOAD events fire because no fresh instantiation occurs.
+  1. **`tagPlaceObject2` / `tagPlaceObject2Ratio`** now detect the cross-frame
+     sprite-by-sprite REPLACE pattern (`existing.char_id != 0` && different
+     `char_id` && `place_gen != current` && existing has `sprite_display_list`
+     && new `dictionary[char_id].type == CHAR_TYPE_SPRITE`) and treat it as a
+     modify: update `transform_id` / `cxform_id` / `ratio` only (gated on
+     `transformed_by_script` and `cx_overridden` like the survives-rewind
+     paths), discard pending `instance_name` / `clip_actions`, and call
+     `ng_on_place_object2(...)` with the *existing* `char_id` so display-state
+     sync stays consistent.
+  2. **`tagSetInstanceName`** now stashes the name as `g_pending_instance_name`
+     (instead of renaming in-place) when the existing entry at this depth was
+     placed by a previous frame and is a sprite. The companion
+     `tagPlaceObject2*` REPLACE-preservation path discards the pending name
+     (matching Ruffle's "name omitted on subsequent PlaceObject"), while the
+     rare full-replacement fallback can still consume it.
+  Without these, frame-2's `tagSetInstanceName(3, "static2")` renamed depth 3
+  in-place from "static1"→"static2", and `tagPlaceObject2WithClipActions`
+  fully replaced the sprite — firing static2's `onClipConstruct (replace)`
+  handler and breaking all subsequent `static1.*` lookups. Bundles into
+  ZERO_OUTPUT_TRIAGE Phase 2 (companion to commit 8b6a0e34's non-sprite
+  CONSTRUCT/INIT/LOAD gating). Verified: 35-test AVM1
+  clip-event/lifecycle/rewind/unload/placement guardrail battery (35/35
+  effective — 34 PASS + 1 ruffle_matched, no regressions).
+
 - **Clip CONSTRUCT/INITIALIZE/LOAD events now sprite-only (Flash semantics).**
   `queue_clip_init_events`, `queue_clip_construct_events`, and
   `queue_clip_load_events` in `SWFModernRuntime/src/libswf/tag.c` now bail

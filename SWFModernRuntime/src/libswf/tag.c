@@ -4265,6 +4265,53 @@ void tagPlaceObject2(SWFAppContext* app_context, size_t depth, size_t char_id, u
 		return;
 	}
 
+#ifdef NO_GRAPHICS
+	// Cross-frame sprite-by-sprite REPLACE preservation. When the existing depth holds
+	// a sprite placed by a previous frame, and a different sprite char_id is being
+	// placed by the current frame's PlaceObject2/3 with move=1+has_character=1, Flash/
+	// Ruffle preserve the existing sprite's identity. Mirrors Ruffle's
+	// PlaceObjectAction::Replace path: child.replace_with() is a noop for MovieClip
+	// (display_object/movie_clip.rs default impl), and apply_place_object updates only
+	// matrix/cxform/ratio — name, clip_depth, and clip_actions are explicitly excluded
+	// (display_object.rs:2536-2539 "Purposely omitted properties: name, clip_depth,
+	// clip_actions"). No CONSTRUCT/INIT/LOAD events fire because no fresh
+	// instantiation occurs.
+	// Targets misc-ming/replace_sprites1test where frame-2 PlaceObject2 (move=1)
+	// replaces static1 (sprite cid=2) at depth 3 with a different sprite (cid=4) +
+	// CONSTRUCT clip-action. Without this gate the new sprite's CONSTRUCT fires
+	// ("_level0.static2 onClipConstruct (replace)") and `static1` becomes undefined
+	// because the depth's instance_name is overwritten. Companion to commit 8b6a0e34's
+	// non-sprite gating in queue_clip_*_events.
+	if (display_list[depth].char_id != 0
+	    && display_list[depth].char_id != char_id
+	    && display_list[depth].place_gen != g_place_gen
+	    && display_list[depth].sprite_display_list != NULL
+	    && char_id < dictionary_capacity
+	    && dictionary[char_id].type == CHAR_TYPE_SPRITE)
+	{
+		if (!display_list[depth].transformed_by_script) {
+			display_list[depth].transform_id = transform_id;
+			ng_cache_transform(&display_list[depth], transform_id);
+		}
+		if (!display_list[depth].cx_overridden && !display_list[depth].transformed_by_script) {
+			display_list[depth].cxform_id = cxform_id;
+			display_list[depth].has_cxform = (cxform_id != 0) ? 1 : 0;
+			init_cx_fields(&display_list[depth]);
+		}
+		display_list[depth].placed_at_frame = current_frame;
+		display_list[depth].place_gen = g_place_gen;
+		// Discard pending instance_name / clip_actions set by the caller — the
+		// REPLACE tag's name/clip_actions are ignored (Ruffle apply_place_object).
+		g_pending_instance_name = NULL;
+		g_pending_clip_actions = NULL;
+		g_pending_clip_action_count = 0;
+		ng_on_place_object2(app_context, depth, display_list[depth].char_id);
+		display_list[depth].sprite_needs_init = 0;
+		if (depth > max_depth) max_depth = depth;
+		return;
+	}
+#endif
+
 	// Within-same-frame placement conflict handling
 	if (display_list[depth].char_id != 0 && display_list[depth].place_gen == g_place_gen)
 	{
@@ -4692,6 +4739,40 @@ void tagPlaceObject2Ratio(SWFAppContext* app_context, size_t depth, size_t char_
 		display_list[depth].ratio = ratio;
 		return;
 	}
+
+#ifdef NO_GRAPHICS
+	// Cross-frame sprite-by-sprite REPLACE preservation — see tagPlaceObject2 above
+	// for rationale (Ruffle PlaceObjectAction::Replace; replace_with is noop for
+	// MovieClip; apply_place_object updates only matrix/cxform/ratio).
+	if (char_id != 0
+	    && display_list[depth].char_id != 0
+	    && display_list[depth].char_id != char_id
+	    && display_list[depth].place_gen != g_place_gen
+	    && display_list[depth].sprite_display_list != NULL
+	    && char_id < dictionary_capacity
+	    && dictionary[char_id].type == CHAR_TYPE_SPRITE)
+	{
+		if (!display_list[depth].transformed_by_script) {
+			display_list[depth].transform_id = transform_id;
+			ng_cache_transform(&display_list[depth], transform_id);
+		}
+		if (!display_list[depth].cx_overridden && !display_list[depth].transformed_by_script) {
+			display_list[depth].cxform_id = cxform_id;
+			display_list[depth].has_cxform = (cxform_id != 0) ? 1 : 0;
+			init_cx_fields(&display_list[depth]);
+		}
+		display_list[depth].ratio = ratio;
+		display_list[depth].placed_at_frame = current_frame;
+		display_list[depth].place_gen = g_place_gen;
+		g_pending_instance_name = NULL;
+		g_pending_clip_actions = NULL;
+		g_pending_clip_action_count = 0;
+		ng_on_place_object2(app_context, depth, display_list[depth].char_id);
+		display_list[depth].sprite_needs_init = 0;
+		if (depth > max_depth) max_depth = depth;
+		return;
+	}
+#endif
 
 	display_list[depth].char_id = char_id;
 	display_list[depth].transform_id = transform_id;
@@ -5923,6 +6004,21 @@ void tagSetInstanceName(SWFAppContext* app_context, size_t depth, const char* na
 			g_pending_instance_name = name;
 			return;
 		}
+	}
+	// Cross-frame REPLACE preservation: when an existing sprite at this depth
+	// was placed by a previous frame, the upcoming PlaceObject2 is a REPLACE
+	// (move=1, has_character=1). Per Ruffle apply_place_object, name is
+	// "Purposely omitted" — REPLACE/MODIFY tags do not update the name of an
+	// existing child. Stash as pending; tagPlaceObject2's REPLACE-preservation
+	// path will discard it (matching Ruffle), while the rare full-replacement
+	// fallback (different placement that doesn't trigger that path) can still
+	// consume it.
+	if (display_list[depth].char_id != 0
+	    && display_list[depth].place_gen != g_place_gen
+	    && display_list[depth].sprite_display_list != NULL)
+	{
+		g_pending_instance_name = name;
+		return;
 	}
 #endif
 	if (depth <= max_depth)

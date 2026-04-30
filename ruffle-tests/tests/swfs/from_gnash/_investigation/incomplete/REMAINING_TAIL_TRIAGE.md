@@ -224,32 +224,16 @@ multiple narrow bugs.
 **Scope.** 3-5 hours; **may warrant standalone plan once symptoms
 are confirmed**.
 
-### replace_sprites1test (23.8%, 5/21)
+### ~~replace_sprites1test~~ — **RESOLVED 2026-04-29 (PASS)**
 
-**Symptom.**
-
-```
-+ 6  _level0.static2 onClipConstruct (replace)   ← extra trace, not in expected
-+ 7  PASSED: movieclip == movieclip
-+ 8  _root.depth3Constructed set to 2
-- 6  PASSED: typeof(static1) == 'movieclip'      ← expected continues with assertions
-```
-
-Extra `onClipConstruct (replace)` trace fires when a sprite at
-depth N is replaced with another sprite at the same depth. Same
-family as `replace_buttons1test` and `replace_shapes1test` (in
-`ZERO_OUTPUT_TRIAGE_PLAN.md` Phase 2 — "buttons don't fire CONSTRUCT")
-but for sprites: **on REPLACE (vs fresh placement), CONSTRUCT
-shouldn't fire** because the depth's existing sprite carries over.
-
-**Hypothesis.** ZERO_OUTPUT_TRIAGE Phase 2 currently scopes the
-gate to Buttons. The fix should expand to: any
-`tagPlaceObject2`/`tagPlaceObject3` at a depth that already holds
-a same-family display object should suppress CONSTRUCT — not just
-Buttons.
-
-**Scope.** Bundle into ZERO_OUTPUT_TRIAGE Phase 2 (1-2 hours
-combined). Move this entry into that plan when work begins.
+Cross-frame sprite-by-sprite REPLACE (PlaceObject2/3 with move=1 +
+has_character=1) now preserves the existing sprite's identity in
+`tagPlaceObject2` / `tagPlaceObject2Ratio` (matches Ruffle
+`PlaceObjectAction::Replace` where `replace_with` is no-op for MovieClip
+and `apply_place_object` excludes name/clip_depth/clip_actions).
+`tagSetInstanceName` stashes as pending instead of renaming in-place when
+the depth holds a sprite from a previous frame. See `CURRENT_STATUS.md`
+"Latest fixes" for details.
 
 ### opcode_guard_test (16.7%, 3/18)
 
