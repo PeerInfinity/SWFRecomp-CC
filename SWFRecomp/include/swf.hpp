@@ -4,6 +4,7 @@
 #include <sstream>
 #include <string>
 #include <set>
+#include <map>
 #include <unordered_map>
 #include <vector>
 
@@ -254,6 +255,16 @@ namespace SWFRecomp
 		// Buffered RemoveObject2 calls in the current frame (for remove+replace detection).
 		// Key: depth. Value: true if buffered.
 		std::set<u16> buffered_removes;
+
+		// Cross-DoAction backward-jump support: maps the absolute SWF address of
+		// each DoAction body's first byte to the script function name we emitted
+		// for that DoAction. Consulted by parseActions when a JUMP/IF target
+		// would otherwise be `return;` (negative target_offset crossing the
+		// current DoAction's body) — see action.cpp JUMP/IF handlers for the
+		// corresponding `script_N(); return;` emission. Populated as each
+		// DoAction is recompiled, so DoAction k can target any earlier
+		// DoAction j (j < k).
+		std::map<char*, std::string> doaction_script_map;
 
 		SWFAction action;
 

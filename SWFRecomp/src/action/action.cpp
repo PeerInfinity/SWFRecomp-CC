@@ -2069,7 +2069,24 @@ namespace SWFRecomp
 
 					out_script << "\t" << "// Jump" << endl;
 					if (target_offset < 0)
+					{
+						// Cross-tag backward jump: if the absolute SWF target lands
+						// on the body-start of an earlier DoAction, replay it as a
+						// function call (Flash semantics: reader.seek runs from the
+						// target position until the next END byte, which for a
+						// body-start target is the END of that DoAction's body).
+						std::string prev_script;
+						if (parse_depth == 1 && abs_swf_buffer_start_ptr != nullptr && doaction_script_map_ptr != nullptr)
+						{
+							char* target_swf_ptr = abs_swf_buffer_start_ptr + target_offset;
+							auto it = doaction_script_map_ptr->find(target_swf_ptr);
+							if (it != doaction_script_map_ptr->end())
+								prev_script = it->second;
+						}
+						if (!prev_script.empty())
+							out_script << "\t" << prev_script << "(app_context);" << endl;
 						out_script << "\t" << "return;" << endl;
+					}
 					else
 						out_script << "\t" << "goto label_" << label_prefix << to_string(target_offset) << ";" << endl;
 					in_dead_code = true;  // Code after unconditional jump is dead until next label
@@ -2088,7 +2105,19 @@ namespace SWFRecomp
 							   << "\t" << "if (evaluateCondition(app_context))" << endl
 							   << "\t" << "{" << endl;
 					if (target_offset < 0)
+					{
+						std::string prev_script;
+						if (parse_depth == 1 && abs_swf_buffer_start_ptr != nullptr && doaction_script_map_ptr != nullptr)
+						{
+							char* target_swf_ptr = abs_swf_buffer_start_ptr + target_offset;
+							auto it = doaction_script_map_ptr->find(target_swf_ptr);
+							if (it != doaction_script_map_ptr->end())
+								prev_script = it->second;
+						}
+						if (!prev_script.empty())
+							out_script << "\t" << "\t" << prev_script << "(app_context);" << endl;
 						out_script << "\t" << "\t" << "return;" << endl;
+					}
 					else
 						out_script << "\t" << "\t" << "goto label_" << label_prefix << to_string(target_offset) << ";" << endl;
 					out_script << "\t" << "}" << endl;

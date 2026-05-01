@@ -2654,7 +2654,20 @@ namespace SWFRecomp
 					memcpy(temp_buffer, tag_body_start, body_len);
 					temp_buffer[body_len] = 0x00; // Ensure END_OF_ACTIONS marker
 					char* temp_ptr = temp_buffer;
+					// Wire up cross-DoAction backward-jump support: a BranchAlways/If
+					// with a negative offset that crosses this DoAction's body
+					// boundary lands at an absolute SWF position. If that position
+					// matches the body-start of an earlier DoAction we've already
+					// compiled, emit `script_N(); return;` instead of plain return.
+					action.abs_swf_buffer_start_ptr = tag_body_start;
+					action.doaction_script_map_ptr = &doaction_script_map;
 					action.parseActions(context, temp_ptr, out_script);
+					action.abs_swf_buffer_start_ptr = nullptr;
+					action.doaction_script_map_ptr = nullptr;
+					// Register this DoAction's body→script mapping AFTER parsing,
+					// so a self-referential backward jump within this DoAction
+					// keeps using the in-buffer goto path (handled by labels).
+					doaction_script_map[tag_body_start] = "script_" + to_string(root_script_id);
 					free(temp_buffer);
 					cur_pos = tag_body_start + body_len;
 				}
@@ -5070,7 +5083,17 @@ namespace SWFRecomp
 
 							next_script_i += 1;
 
+							// Cross-DoAction backward-jump support (see main DoAction
+							// case for explanation). cur_pos is already the absolute
+							// SWF body-start pointer for this DoAction, so it doubles
+							// as action_buffer_start.
+							char* sprite_doaction_body_start = cur_pos;
+							action.abs_swf_buffer_start_ptr = sprite_doaction_body_start;
+							action.doaction_script_map_ptr = &doaction_script_map;
 							action.parseActions(context, cur_pos, sprite_out_script);
+							action.abs_swf_buffer_start_ptr = nullptr;
+							action.doaction_script_map_ptr = nullptr;
+							doaction_script_map[sprite_doaction_body_start] = script_name;
 
 							sprite_out_script << "}";
 

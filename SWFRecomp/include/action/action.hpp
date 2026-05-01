@@ -132,6 +132,16 @@ namespace SWFRecomp
 		size_t with_counter;  // Counter for unique WITH block label prefixes
 		std::string label_prefix;  // Label prefix for current parseActions scope (e.g., "W3_")
 
+		// Cross-DoAction jump support. When a JUMP/IF in DoAction k targets the
+		// absolute SWF position of an earlier DoAction's body start (negative
+		// target_offset), emit a call to that DoAction's script function instead
+		// of `return;`. Mirrors Flash's reader.seek-into-prior-bytes semantics
+		// for the jump_to_prev_block test (Gnash misc-swfmill suite).
+		// Set by the DoAction case in swf.cpp before each parseActions call;
+		// only consulted at parse_depth==1 (top-level body, not nested).
+		char* abs_swf_buffer_start_ptr = nullptr;
+		std::map<char*, std::string>* doaction_script_map_ptr = nullptr;
+
 		SWFAction();
 
 		void parseActions(Context& context, char*& action_buffer, ostream& out_script);
