@@ -109,7 +109,13 @@ alongside image comparisons.
 
 ### Full test suites (use CI only)
 
-**IMPORTANT: Do NOT run full test suites locally.** Use CI workflows instead:
+**IMPORTANT: Do NOT run full test suites locally.** Use CI workflows instead.
+
+**Time budget for local testing: 10 minutes max.** The full CI pipeline (commit → push → trigger → watch → merge results) takes about 10 minutes end-to-end. If you find yourself running tests manually for longer than that to verify a change, stop and run the pipeline instead — it's the same wall-clock cost and covers every suite.
+
+**Running the pipeline:** Follow `.claude/pipeline-handoff.md`. It walks through commit, push, `gh workflow run ruffle-tests.yml`, `gh run watch`, merging `ruffle-test-results`, and diffing the per-suite `_results/results_diff.md` files for regressions. Use it whenever a task ends (finished, blocked, or paused with progress).
+
+Manual workflow dispatch (if not using the handoff):
 
 1. Commit your changes to master
 2. Go to GitHub Actions → "Ruffle AVM1 Tests" → "Run workflow"
