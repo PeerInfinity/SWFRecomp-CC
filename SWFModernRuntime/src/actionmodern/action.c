@@ -29648,10 +29648,22 @@ static ActionVar builtin_loadvars_toString(SWFAppContext* app_context, ActionVar
 		if (!(p->flags & PROPERTY_FLAG_ENUMERABLE)) continue;
 		if (isPropertyHiddenAtVersion(p->flash_flags)) continue;
 
+		// addProperty-defined virtual properties: invoke the getter with
+		// this = lv. If the getter throws, longjmp propagates out via
+		// g_exception_state — the caller's try/catch handles it (no need
+		// to clean up out_buf locally; HALLOC entries are tracked).
+		ActionVar value_var;
+		if (p->getter != NULL) {
+			value_var = invokePropertyGetter(app_context,
+				(ASFunction*) p->getter, (void*) lv);
+		} else {
+			value_var = p->value;
+		}
+
 		// Coerce value to string (calls valueOf / toString on objects).
 		char val_buf[2048];
 		int val_len = 0;
-		pushVar(app_context, &p->value);
+		pushVar(app_context, &value_var);
 		char _tmp[17];
 		convertString(app_context, _tmp);
 		{
