@@ -22940,12 +22940,13 @@ static double stringVarToDouble(ActionVar* v)
 		if (end == s) return NAN;
 		result = neg ? -result : result;
 	}
-	// SWF5+: any trailing content (including whitespace) → NaN
-	// SWF4: skip trailing whitespace, non-whitespace → NaN
+	// SWF5+: any trailing content (including whitespace) → NaN.
+	// SWF4: lenient parse — accept partial leading number, ignore trailing
+	// content. Mirrors Ruffle's `parse_float_impl(strict=false)` used by SWF<5
+	// `as_bool` (core/src/avm1/value.rs:953). Required by misc-swfc/swf4opcode
+	// `!neg` checks where `neg = !'2/'` must coerce '2/' to 2 (truthy) so
+	// `!neg` is true.
 	if (g_swf_version >= 5) {
-		if (*end != '\0') return NAN;
-	} else {
-		while (*end == ' ' || *end == '\t' || *end == '\n' || *end == '\r') end++;
 		if (*end != '\0') return NAN;
 	}
 	return result;
@@ -46383,13 +46384,21 @@ void actionSetProperty(SWFAppContext* app_context)
 	if (!mc) return; // Invalid target
 
 	// 5. Set property value based on index
-	// Convert value to float for numeric properties
+	// Convert value to float for numeric properties.
+	// For numeric properties (0-10, 12), undefined, null, and non-finite values
+	// must be a no-op — mirrors Ruffle's property_coerce_to_number
+	// (core/src/avm1/object/stage_object.rs:661).
 	float num_value = 0.0f;
+	int numeric_no_op = 0;
+	int is_numeric_prop = ((prop_index >= 0 && prop_index <= 10) || prop_index == 12);
 
 	if (value_var.type == ACTION_STACK_VALUE_F32) {
 		num_value = VAL(float, &value_var.data.numeric_value);
+		if (is_numeric_prop && !isfinite(num_value)) numeric_no_op = 1;
 	} else if (value_var.type == ACTION_STACK_VALUE_F64) {
-		num_value = (float) VAL(double, &value_var.data.numeric_value);
+		double dv = VAL(double, &value_var.data.numeric_value);
+		num_value = (float) dv;
+		if (is_numeric_prop && !isfinite(dv)) numeric_no_op = 1;
 	} else if (value_var.type == ACTION_STACK_VALUE_BOOLEAN) {
 		num_value = value_var.data.numeric_value ? 1.0f : 0.0f;
 	} else if (value_var.type == ACTION_STACK_VALUE_STRING) {
@@ -46399,8 +46408,24 @@ void actionSetProperty(SWFAppContext* app_context)
 			u16_to_utf8(_u16, value_var.str_size, _sp_val_buf, sizeof(_sp_val_buf));
 		else
 			_sp_val_buf[0] = '\0';
-		num_value = (float) atof(_sp_val_buf);
+		if (is_numeric_prop) {
+			// Strict parse: unparseable / empty string → NaN → no-op.
+			char* _ep;
+			double _d = strtod(_sp_val_buf, &_ep);
+			if (_ep == _sp_val_buf || !isfinite(_d)) {
+				numeric_no_op = 1;
+			} else {
+				num_value = (float) _d;
+			}
+		} else {
+			num_value = (float) atof(_sp_val_buf);
+		}
+	} else if (value_var.type == ACTION_STACK_VALUE_UNDEFINED ||
+	           value_var.type == ACTION_STACK_VALUE_NULL) {
+		if (is_numeric_prop) numeric_no_op = 1;
 	}
+
+	if (numeric_no_op) return;
 
 	switch (prop_index) {
 		case 0:  // _x
