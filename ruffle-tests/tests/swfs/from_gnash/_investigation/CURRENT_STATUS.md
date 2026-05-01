@@ -22,6 +22,28 @@ Last updated: 2026-04-30 (CI snapshot at 61229899 includes case-v6, ExternalInte
 | misc-swfc.all | 8 | 16 | 50.0% |
 | misc-swfmill.all | 16 | 18 | 88.9% |
 
+### Latest fixes (2026-05-01, pending CI)
+
+- **`tags_after_last_showframe` (misc-swfmill) → PASS (+1).** Recompiler
+  fix in `SWFRecomp/src/swf.cpp` END_TAG handler: when the SWF has tags
+  after the last `ShowFrame`, the recompiler opens a new `frame_N` to
+  hold them but no `ShowFrame` ever closes it (`another_frame == false`
+  at END_TAG). Previously this dangling frame was treated like a normal
+  frame and looped back to `frame_0`, so the trailing DoActions
+  re-executed on every iteration (30 lines instead of 1 — 1 expected
+  line + 29 cumulative-string repetitions). Fix: emit `quit_swf = 1`
+  in the dangling frame instead of `next_frame = 0; manual_next_frame
+  = 1`. Mirrors Flash/Ruffle, which run trailing tags only on initial
+  play. Single-frame check `next_frame_i == 1` is preserved; new
+  `!another_frame` clause covers the dangling case (any
+  `next_frame_i`). Regression battery: 14-test goto/execution-order
+  AVM1 (14/14), 17-test AVM1 lifecycle/scope (17/17), 14-test
+  misc-swfmill (12 PASS + 1 RM + 1 pre-existing MISMATCH for
+  `jump_to_prev_block`), 10-test Shumway flat (10/10), 9-test
+  misc-ming AVM1 (9 PASS + 2 pre-existing failures `ButtonEventsTest`,
+  `action_order` directory recomp_fail), 4-test Shumway avm1 spot
+  check (4/4), 3-test Shumway timeline (3/3).
+
 ### Latest fixes (2026-04-30, pending CI)
 
 - **`movieclip_destruction_test2` (misc-swfc) → PASS (+1).** Cross-cutting

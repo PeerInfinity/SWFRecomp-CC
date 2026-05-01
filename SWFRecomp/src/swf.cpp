@@ -601,7 +601,10 @@ namespace SWFRecomp
 			context.tag_main << "\t" << "if (!catch_up_mode || g_tag_skip_mode) actionDrainAllInPriorityOrder(app_context);" << endl;
 			last_queued_script = next_script_i;
 
-			if (next_frame_i == 1)
+			// See END_TAG handler below for rationale: a frame opened by trailing
+			// tags after the last ShowFrame (`another_frame == false`) should not
+			// loop, otherwise its DoActions re-fire on each iteration.
+			if (next_frame_i == 1 || !another_frame)
 			{
 				context.tag_main << "\t" << "quit_swf = 1;" << endl;
 			}
@@ -904,7 +907,13 @@ namespace SWFRecomp
 			context.tag_main << "\t" << "if (!catch_up_mode || g_tag_skip_mode) actionDrainAllInPriorityOrder(app_context);" << endl;
 				last_queued_script = next_script_i;
 
-				if (next_frame_i == 1)
+				// `another_frame == false` at END_TAG means the SWF has trailing
+				// tags after the last ShowFrame: the recompiler opened frame_N to
+				// hold them but no ShowFrame ever closed it. Treat this dangling
+				// frame as one-shot — run it once and stop, so the trailing tags
+				// don't re-execute on each loop back. Mirrors Flash/Ruffle, which
+				// run trailing tags only on initial play.
+				if (next_frame_i == 1 || !another_frame)
 				{
 					context.tag_main << "\t" << "quit_swf = 1;" << endl;
 				}
@@ -917,12 +926,12 @@ namespace SWFRecomp
 									 << "\t\t" << "manual_next_frame = 1;" << endl
 									 << "\t" << "}" << endl;
 				}
-				
+
 				context.tag_main << "}";
-				
+
 				break;
 			}
-			
+
 			case SWF_TAG_FRAME_LABEL:
 			{
 				// Parse null-terminated label string
