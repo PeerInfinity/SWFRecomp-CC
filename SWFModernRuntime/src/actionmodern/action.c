@@ -72,7 +72,13 @@ static inline void markTransformedByScript(MovieClip* mc)
 static int32_t ecmaToInt32(double d)
 {
 	if (isnan(d) || isinf(d) || d == 0.0) return 0;
-	double n = fmod(d, 4294967296.0);
+	// ECMA ToInteger: truncate toward zero before mod 2^32. Without this,
+	// small negatives like -0.99999999999999 hit FP precision limits when
+	// fmod-then-add wraps them around (4294967296 + -0.99999...e-15 rounds
+	// to 4294967295, making the result -1 instead of 0).
+	double posInt = trunc(d);
+	if (posInt == 0.0) return 0;
+	double n = fmod(posInt, 4294967296.0);
 	if (n < 0) n += 4294967296.0;
 	if (n >= 2147483648.0) n -= 4294967296.0;
 	return (int32_t) n;
@@ -4312,6 +4318,40 @@ static ActionVar actionASSetPropFlags_func2(SWFAppContext* app_context, ActionVa
 		for (u32 i = 0; i < obj->num_used; i++) {
 			obj->properties[i].flags = (obj->properties[i].flags | ecma_set) & ~ecma_clear;
 			obj->properties[i].flash_flags = (u16)((obj->properties[i].flash_flags & ~clear_flags) | set_flags);
+		}
+	} else if (args[1].type == ACTION_STACK_VALUE_ARRAY) {
+		// Array of property names — apply flags to each named property.
+		// Plain (non-array) objects passed as prop_names are ignored entirely
+		// (Flash treats non-array objects as invalid input, matching gnash
+		// Global.as test expectations for ASSetPropFlags(o, {c:2}, 1)).
+		ASArray* arr = (ASArray*)(u64)args[1].data.numeric_value;
+		if (arr != NULL) {
+			char _spf_elem_buf[512];
+			for (u32 ai = 0; ai < arr->length; ai++) {
+				ActionVar* el = getArrayElement(arr, ai);
+				if (el == NULL) continue;
+				const char* name_str = NULL;
+				u32 name_len = 0;
+				if (el->type == ACTION_STACK_VALUE_STRING) {
+					const uint16_t* el_u16 = varGetU16Ptr(el);
+					int n = u16_to_utf8(el_u16, el->str_size, _spf_elem_buf, sizeof(_spf_elem_buf));
+					_spf_elem_buf[n] = '\0';
+					name_str = _spf_elem_buf;
+					name_len = (u32)n;
+				} else if (el->type == ACTION_STACK_VALUE_F32 || el->type == ACTION_STACK_VALUE_F64 || el->type == ACTION_STACK_VALUE_BOOLEAN) {
+					int n = varToStringBuf(app_context, el, _spf_elem_buf, sizeof(_spf_elem_buf));
+					if (n > 0) { name_str = _spf_elem_buf; name_len = (u32)n; }
+				}
+				if (name_str != NULL && name_len > 0) {
+					for (u32 i = 0; i < obj->num_used; i++) {
+						if (obj->properties[i].name_length == name_len && strncmp(obj->properties[i].name, name_str, name_len) == 0) {
+							obj->properties[i].flags = (obj->properties[i].flags | ecma_set) & ~ecma_clear;
+							obj->properties[i].flash_flags = (u16)((obj->properties[i].flash_flags & ~clear_flags) | set_flags);
+							break;
+						}
+					}
+				}
+			}
 		}
 	} else {
 		char _spf_name_buf[512];
@@ -22868,21 +22908,51 @@ ActionStackValueType convertFloat(SWFAppContext* app_context)
 				double temp;
 				int parsed = 0;
 				if (g_swf_version >= 6) {
-				// SWF6+ supports hex (0x) and octal (0) prefix in string-to-number
-				const char* s = str;
-				int neg = 0;
-				while (*s == ' ' || *s == '\t' || *s == '\n' || *s == '\r') s++;
-				if (*s == '-') { neg = 1; s++; }
-				else if (*s == '+') { s++; }
-				if (s[0] == '0' && (s[1] == 'x' || s[1] == 'X'))
+				// SWF6+ supports hex (0x) and octal (0) prefix in string-to-number,
+				// but only when the string (after an optional leading +/- sign)
+				// starts with the prefix. Leading whitespace disables both
+				// (so "   0123" parses as decimal 123, not octal 83). Mirrors
+				// Ruffle's `guess_radix`. Required by gnash Global.as:466.
+				const char* gp = str;
+				if (*gp == '+' || *gp == '-') gp++;
+				if (gp[0] == '0' && (gp[1] == 'x' || gp[1] == 'X'))
 				{
-					long val = strtol(s, &end, 16);
-					if (end != s) { temp = neg ? -(double)val : (double)val; parsed = 1; }
+					// Flash hex parsing has a known quirk: it always skips
+					// the first two characters of the ORIGINAL string, not
+					// after the sign. So "-0x10" → "x10" → NaN, but
+					// "0x-10" → "-10" → -16, and "0X+10" → "+10" → 16.
+					// Required by gnash Global.as:473/478/479.
+					const char* hex_start = str + 2;
+					if (*hex_start == '\0') {
+						temp = NAN; parsed = 1;
+					} else {
+						long val = strtol(hex_start, &end, 16);
+						if (end == hex_start || *end != '\0') {
+							temp = NAN;
+						} else {
+							// Signed 32-bit interpretation
+							temp = (double)(int32_t)(uint32_t)val;
+						}
+						parsed = 1;
+					}
 				}
-				else if (s[0] == '0' && s[1] >= '0' && s[1] <= '7')
+				else if (gp[0] == '0' && gp[1] >= '0' && gp[1] <= '7')
 				{
-					long val = strtol(s, &end, 8);
-					if (end != s) { temp = neg ? -(double)val : (double)val; parsed = 1; }
+					// Only treat as octal if ALL remaining chars are octal digits.
+					// "01238" contains '8' (non-octal) → falls through to decimal
+					// parse → 1238. Required by gnash Global.as:469.
+					int all_octal = 1;
+					for (const char* op = gp + 1; *op; op++) {
+						if (*op < '0' || *op > '7') { all_octal = 0; break; }
+					}
+					if (all_octal) {
+						long val = strtol(str, &end, 8);
+						if (end != str) {
+							if (*end != '\0') { temp = NAN; }
+							else { temp = (double)val; }
+							parsed = 1;
+						}
+					}
 				}
 				}
 				if (!parsed)
@@ -22919,19 +22989,20 @@ ActionStackValueType convertFloat(SWFAppContext* app_context)
 					else
 						temp = NAN;
 				}
-				// If there are trailing non-whitespace characters, it's NaN
-				// Exception: SWF < 5 uses parseFloat semantics (accepts partial parses)
+				// SWF5+ strict mode (matches Ruffle's `parse_float_impl(strict=true)`):
+				// any non-NUL trailing content — including whitespace — invalidates
+				// the parse. Required by gnash Global.as:486-492 (e.g. `int("-6.1     ")`
+				// must return 0, not -6; `int("7 ")` must return 0).
+				// SWF4 uses parseFloat semantics (accepts partial parses).
 				else if (!parsed)
 				{
 					if (EFFECTIVE_SWF_VERSION() >= 5) {
-					while (*end == ' ' || *end == '\t' || *end == '\n' || *end == '\r') end++;
 					if (*end != '\0') temp = NAN;
 					}
 				}
 				else
 				{
-					// parsed via hex/octal — check trailing chars
-					while (*end == ' ' || *end == '\t' || *end == '\n' || *end == '\r') end++;
+					// parsed via hex/octal — same strict trailing rule.
 					if (*end != '\0') temp = NAN;
 				}
 				STACK_TOP_TYPE = ACTION_STACK_VALUE_F64;
