@@ -33753,24 +33753,28 @@ check_special_vars:
 		}
 
 		// Check built-in global constants
-		if (var_name_len == 3 && strncmp(var_name, "NaN", 3) == 0)
+		// SWF<=6 does case-insensitive variable resolution; SWF>=7 is case-sensitive.
+		#define _CMP_BUILTIN_NAME(_buf, _lit, _len) \
+			(g_swf_version <= 6 ? (strncasecmp((_buf), (_lit), (_len)) == 0) \
+			                    : (strncmp    ((_buf), (_lit), (_len)) == 0))
+		if (var_name_len == 3 && _CMP_BUILTIN_NAME(var_name, "NaN", 3))
 		{
 			double nan_val = NAN;
 			PUSH(ACTION_STACK_VALUE_F64, VAL(u64, &nan_val));
 			return;
 		}
-		else if (var_name_len == 8 && strncmp(var_name, "Infinity", 8) == 0)
+		else if (var_name_len == 8 && _CMP_BUILTIN_NAME(var_name, "Infinity", 8))
 		{
 			double inf_val = INFINITY;
 			PUSH(ACTION_STACK_VALUE_F64, VAL(u64, &inf_val));
 			return;
 		}
-		else if (var_name_len == 9 && strncmp(var_name, "undefined", 9) == 0)
+		else if (var_name_len == 9 && _CMP_BUILTIN_NAME(var_name, "undefined", 9))
 		{
 			PUSH(ACTION_STACK_VALUE_UNDEFINED, 0);
 			return;
 		}
-		else if (var_name_len == 4 && strncmp(var_name, "null", 4) == 0)
+		else if (var_name_len == 4 && _CMP_BUILTIN_NAME(var_name, "null", 4))
 		{
 			PUSH(ACTION_STACK_VALUE_NULL, 0);
 			return;
@@ -33783,7 +33787,7 @@ check_special_vars:
 			PUSH(ACTION_STACK_VALUE_NULL, 0);
 			return;
 		}
-		else if (var_name_len == 7 && strncmp(var_name, "_global", 7) == 0)
+		else if (var_name_len == 7 && _CMP_BUILTIN_NAME(var_name, "_global", 7))
 		{
 			// SWF5 and below: _global is not a recognized variable
 			if (g_swf_version < 6) {
@@ -33796,7 +33800,7 @@ check_special_vars:
 			PUSH(ACTION_STACK_VALUE_OBJECT, (u64)active_global);
 			return;
 		}
-		else if (var_name_len == 5 && strncmp(var_name, "Array", 5) == 0)
+		else if (var_name_len == 5 && _CMP_BUILTIN_NAME(var_name, "Array", 5))
 		{
 			// Return the built-in Array constructor as a function (file-scope static)
 			if (!g_array_constructor_static_init)
@@ -33837,7 +33841,7 @@ check_special_vars:
 			PUSH(ACTION_STACK_VALUE_FUNCTION, (u64)&g_array_constructor_static);
 			return;
 		}
-		else if (var_name_len == 6 && strncmp(var_name, "Object", 6) == 0)
+		else if (var_name_len == 6 && _CMP_BUILTIN_NAME(var_name, "Object", 6))
 		{
 			// Return the built-in Object constructor as a function
 			static ASFunction g_object_constructor;
@@ -33881,7 +33885,7 @@ check_special_vars:
 			PUSH(ACTION_STACK_VALUE_FUNCTION, (u64)&g_object_constructor);
 			return;
 		}
-		else if (var_name_len == 9 && strncmp(var_name, "MovieClip", 9) == 0)
+		else if (var_name_len == 9 && _CMP_BUILTIN_NAME(var_name, "MovieClip", 9))
 		{
 			// Return the version-appropriate MovieClip constructor
 			initMovieClipPrototype(app_context);
@@ -33889,20 +33893,20 @@ check_special_vars:
 			PUSH(ACTION_STACK_VALUE_FUNCTION, (u64)mc_ctor);
 			return;
 		}
-		else if (var_name_len == 9 && strncmp(var_name, "TextField", 9) == 0)
+		else if (var_name_len == 9 && _CMP_BUILTIN_NAME(var_name, "TextField", 9))
 		{
 			// Return the built-in TextField constructor as a function
 			initTextFieldPrototype(app_context);
 			PUSH(ACTION_STACK_VALUE_FUNCTION, (u64)&g_textfield_constructor);
 			return;
 		}
-		else if (var_name_len == 10 && strncmp(var_name, "TextFormat", 10) == 0)
+		else if (var_name_len == 10 && _CMP_BUILTIN_NAME(var_name, "TextFormat", 10))
 		{
 			initTextFormatPrototype(app_context);
 			PUSH(ACTION_STACK_VALUE_FUNCTION, (u64)&g_textformat_constructor);
 			return;
 		}
-		else if (var_name_len == 6 && strncmp(var_name, "String", 6) == 0)
+		else if (var_name_len == 6 && _CMP_BUILTIN_NAME(var_name, "String", 6))
 		{
 			// Return the built-in String constructor as a function
 			static ASFunction g_string_constructor;
@@ -34021,7 +34025,7 @@ check_special_vars:
 			PUSH(ACTION_STACK_VALUE_FUNCTION, (u64)&g_string_constructor);
 			return;
 		}
-		else if (var_name_len == 6 && strncmp(var_name, "Number", 6) == 0)
+		else if (var_name_len == 6 && _CMP_BUILTIN_NAME(var_name, "Number", 6))
 		{
 			// Return the built-in Number constructor as a function
 			static ASFunction g_number_constructor;
@@ -34100,7 +34104,7 @@ check_special_vars:
 			PUSH(ACTION_STACK_VALUE_FUNCTION, (u64)&g_number_constructor);
 			return;
 		}
-		else if (var_name_len == 7 && strncmp(var_name, "Boolean", 7) == 0)
+		else if (var_name_len == 7 && _CMP_BUILTIN_NAME(var_name, "Boolean", 7))
 		{
 			// Return the built-in Boolean constructor as a function
 			static ASFunction g_boolean_constructor;
@@ -34143,17 +34147,17 @@ check_special_vars:
 			PUSH(ACTION_STACK_VALUE_FUNCTION, (u64)&g_boolean_constructor);
 			return;
 		}
-		else if (var_name_len == 5 && strncmp(var_name, "isNaN", 5) == 0)
+		else if (var_name_len == 5 && _CMP_BUILTIN_NAME(var_name, "isNaN", 5))
 		{
 			PUSH(ACTION_STACK_VALUE_FUNCTION, (u64)actionMathGetIsNaN());
 			return;
 		}
-		else if (var_name_len == 8 && strncmp(var_name, "isFinite", 8) == 0)
+		else if (var_name_len == 8 && _CMP_BUILTIN_NAME(var_name, "isFinite", 8))
 		{
 			PUSH(ACTION_STACK_VALUE_FUNCTION, (u64)actionMathGetIsFinite());
 			return;
 		}
-		else if (var_name_len == 5 && strncmp(var_name, "Error", 5) == 0)
+		else if (var_name_len == 5 && _CMP_BUILTIN_NAME(var_name, "Error", 5))
 		{
 			// Return the built-in Error constructor as a function
 			static ASFunction g_error_constructor;
@@ -34198,31 +34202,31 @@ check_special_vars:
 			PUSH(ACTION_STACK_VALUE_FUNCTION, (u64)&g_error_constructor);
 			return;
 		}
-		else if (var_name_len == 3 && strncmp(var_name, "XML", 3) == 0)
+		else if (var_name_len == 3 && _CMP_BUILTIN_NAME(var_name, "XML", 3))
 		{
 			initXMLPrototype(app_context);
 			PUSH(ACTION_STACK_VALUE_FUNCTION, (u64)&g_xml_constructor);
 			return;
 		}
-		else if (var_name_len == 7 && strncmp(var_name, "XMLNode", 7) == 0)
+		else if (var_name_len == 7 && _CMP_BUILTIN_NAME(var_name, "XMLNode", 7))
 		{
 			initXMLPrototype(app_context);
 			PUSH(ACTION_STACK_VALUE_FUNCTION, (u64)&g_xmlnode_constructor);
 			return;
 		}
-		else if (var_name_len == 4 && strncmp(var_name, "Math", 4) == 0)
+		else if (var_name_len == 4 && _CMP_BUILTIN_NAME(var_name, "Math", 4))
 		{
 			// Return the built-in Math object (singleton, not a constructor)
 			PUSH(ACTION_STACK_VALUE_OBJECT, (u64)actionMathGetObject(app_context));
 			return;
 		}
-				else if (var_name_len == 6 && strncmp(var_name, "System", 6) == 0)
+				else if (var_name_len == 6 && _CMP_BUILTIN_NAME(var_name, "System", 6))
 		{
 			initSystemObject(app_context);
 			PUSH(ACTION_STACK_VALUE_OBJECT, (u64)g_system_object);
 			return;
 		}
-		else if (var_name_len == 13 && strncmp(var_name, "Accessibility", 13) == 0)
+		else if (var_name_len == 13 && _CMP_BUILTIN_NAME(var_name, "Accessibility", 13))
 		{
 			ensureAccessibilityMethods(app_context);
 			if (g_accessibility_obj != NULL) {
@@ -34450,6 +34454,7 @@ check_special_vars:
 	// Push variable value to stack
 	PUSH_VAR(var);
 	#undef VAR_NOT_FOUND
+	#undef _CMP_BUILTIN_NAME
 }
 
 void actionSetVariable(SWFAppContext* app_context)
