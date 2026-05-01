@@ -6430,6 +6430,19 @@ static ActionVar invokePropertyGetter(SWFAppContext* app_context, ASFunction* fu
 		return undef;
 	}
 
+	// Build the "this" var passed to getter: receiver object as ActionVar.
+	// Pushed onto g_this_stack so getVariable("this") inside the getter body
+	// returns the receiver (matches Ruffle's [Getter] execution: this = receiver).
+	ActionVar this_var = {0};
+	this_var.type = ACTION_STACK_VALUE_OBJECT;
+	this_var.data.numeric_value = (u64) this_obj;
+	u32 saved_this_depth = g_this_depth;
+	if (g_this_depth < MAX_THIS_DEPTH)
+	{
+		g_this_stack[g_this_depth] = this_var;
+		g_this_depth++;
+	}
+
 	ActionVar result;
 	if (func->function_type == 2)
 	{
@@ -6450,6 +6463,10 @@ static ActionVar invokePropertyGetter(SWFAppContext* app_context, ASFunction* fu
 		}
 
 		ASObject* local_scope = allocObject(app_context, 8);
+		// Bind "this" by name on the local scope so getVariableByName("this")
+		// resolves to the receiver inside the getter body (matches the
+		// actionCallFunction type-2 setup).
+		setProperty(app_context, local_scope, "this", 4, &this_var);
 		if (scope_depth < MAX_SCOPE_DEPTH)
 		{
 			scope_is_with[scope_depth] = 0;
@@ -6487,6 +6504,18 @@ static ActionVar invokePropertyGetter(SWFAppContext* app_context, ASFunction* fu
 			}
 		}
 
+		// Push a local scope and bind "this" — type-1 getter bodies that
+		// reference "this" by name (e.g. `function () { return this.x; }`)
+		// resolve through the scope chain.
+		ASObject* local_scope = allocObject(app_context, 8);
+		setProperty(app_context, local_scope, "this", 4, &this_var);
+		if (scope_depth < MAX_SCOPE_DEPTH)
+		{
+			scope_is_with[scope_depth] = 0;
+			scope_mc[scope_depth] = NULL;
+			scope_chain[scope_depth++] = local_scope;
+		}
+
 		MovieClip* saved_context = g_current_context;
 		if (g_swf_version >= 6 && func->base_clip != NULL)
 			g_current_context = (MovieClip*)func->base_clip;
@@ -6494,12 +6523,14 @@ static ActionVar invokePropertyGetter(SWFAppContext* app_context, ASFunction* fu
 		result = ((ActionVar(*)(SWFAppContext*))func->simple_func)(app_context);
 
 		g_current_context = saved_context;
-		for (u32 ci = 0; ci < captured_count; ci++)
+		for (u32 ci = 0; ci < captured_count + 1; ci++)
 		{
 			if (scope_depth > 0) scope_depth--;
 		}
+		releaseObject(app_context, local_scope);
 	}
 
+	g_this_depth = saved_this_depth;
 	g_special_depth--;
 	return result;
 }
@@ -6793,13 +6824,39 @@ static void invokePropertySetter(SWFAppContext* app_context, ASFunction* func, v
 		return;
 	}
 
+	// Build the "this" var passed to setter: receiver object as ActionVar.
+	// Same g_this_stack push as invokePropertyGetter so getVariable("this")
+	// inside the setter body returns the receiver.
+	ActionVar this_var = {0};
+	this_var.type = ACTION_STACK_VALUE_OBJECT;
+	this_var.data.numeric_value = (u64) this_obj;
+	u32 saved_this_depth = g_this_depth;
+	if (g_this_depth < MAX_THIS_DEPTH)
+	{
+		g_this_stack[g_this_depth] = this_var;
+		g_this_depth++;
+	}
+
 	if (func->function_type == 2)
 	{
 		ActionVar* registers = NULL;
 		if (func->register_count > 0)
 			registers = (ActionVar*) HCALLOC(func->register_count, sizeof(ActionVar));
 
+		// Restore captured scopes (closure context)
+		u32 captured_count = func->captured_scope_count;
+		for (u32 ci = 0; ci < captured_count; ci++)
+		{
+			if (scope_depth < MAX_SCOPE_DEPTH)
+			{
+				scope_is_with[scope_depth] = func->captured_scope_is_with[ci];
+				scope_mc[scope_depth] = (MovieClip*)func->captured_scope_mc[ci];
+				scope_chain[scope_depth++] = (ASObject*)func->captured_scope[ci];
+			}
+		}
+
 		ASObject* local_scope = allocObject(app_context, 8);
+		setProperty(app_context, local_scope, "this", 4, &this_var);
 		if (scope_depth < MAX_SCOPE_DEPTH)
 		{
 			scope_is_with[scope_depth] = 0;
@@ -6807,19 +6864,60 @@ static void invokePropertySetter(SWFAppContext* app_context, ASFunction* func, v
 			scope_chain[scope_depth++] = local_scope;
 		}
 
+		MovieClip* saved_context = g_current_context;
+		if (g_swf_version >= 6 && func->base_clip != NULL)
+			g_current_context = (MovieClip*)func->base_clip;
+
 		func->advanced_func(app_context, value, 1, registers, this_obj);
 
-		if (scope_depth > 0) scope_depth--;
+		g_current_context = saved_context;
+		for (u32 ci = 0; ci < captured_count + 1; ci++)
+		{
+			if (scope_depth > 0) scope_depth--;
+		}
 		releaseObject(app_context, local_scope);
 		if (registers != NULL) FREE(registers);
 	}
 	else if (func->function_type == 1 && func->simple_func != NULL)
 	{
+		// Restore captured scopes
+		u32 captured_count = func->captured_scope_count;
+		for (u32 ci = 0; ci < captured_count; ci++)
+		{
+			if (scope_depth < MAX_SCOPE_DEPTH)
+			{
+				scope_is_with[scope_depth] = func->captured_scope_is_with[ci];
+				scope_mc[scope_depth] = (MovieClip*)func->captured_scope_mc[ci];
+				scope_chain[scope_depth++] = (ASObject*)func->captured_scope[ci];
+			}
+		}
+
+		ASObject* local_scope = allocObject(app_context, 8);
+		setProperty(app_context, local_scope, "this", 4, &this_var);
+		if (scope_depth < MAX_SCOPE_DEPTH)
+		{
+			scope_is_with[scope_depth] = 0;
+			scope_mc[scope_depth] = NULL;
+			scope_chain[scope_depth++] = local_scope;
+		}
+
+		MovieClip* saved_context = g_current_context;
+		if (g_swf_version >= 6 && func->base_clip != NULL)
+			g_current_context = (MovieClip*)func->base_clip;
+
 		// Type 1 (DefineFunction): push value onto stack, call function
 		if (value != NULL) pushVar(app_context, value);
 		((ActionVar(*)(SWFAppContext*))func->simple_func)(app_context);
+
+		g_current_context = saved_context;
+		for (u32 ci = 0; ci < captured_count + 1; ci++)
+		{
+			if (scope_depth > 0) scope_depth--;
+		}
+		releaseObject(app_context, local_scope);
 	}
 
+	g_this_depth = saved_this_depth;
 	g_special_depth--;
 }
 
@@ -39519,32 +39617,48 @@ void actionSetMember(SWFAppContext* app_context)
 					}
 				}
 			}
-			// Check prototype chain for addProperty setter before creating own property
+			// Resolve setter target. Mirrors Ruffle Object::set:
+			//   1. has_own_property (visibility-blind): if obj has any own
+			//      property of this name, only invoke its own virtual setter
+			//      (if any). A hidden own data property does NOT cause a proto
+			//      walk — setProperty below will overwrite it and clear flags.
+			//   2. Otherwise walk the proto chain looking for a *visible*
+			//      virtual setter (allow_swf_version filter); hidden virtual
+			//      entries are walked past, not treated as terminators.
 			{
 				ASProperty* setter_prop = NULL;
-				u8 setter_search_depth = 0;
+				u8 setter_search_depth = 1;
+				ASProperty* _own = findPropertyRaw(obj, prop_name, prop_name_len);
+				if (_own != NULL)
 				{
-					ASObject* _cur = obj;
+					// Own property — only its own virtual setter participates.
+					// Non-virtual own (data) falls through to setProperty even
+					// if the property is currently hidden (set_local clears
+					// the version mask, matching Ruffle).
+					if (_own->getter != NULL || _own->setter != NULL) {
+						setter_prop = _own;
+					}
+				}
+				else
+				{
+					ActionVar* _np = getProperty(obj, "__proto__", 9);
+					ASObject* _cur = resolveProtoVar(_np);
 					int _md = 256;
 					while (_cur != NULL && _md-- > 0) {
 						ASProperty* _ps = findPropertyRaw(_cur, prop_name, prop_name_len);
-						if (_ps != NULL) {
-							if (!isPropertyHiddenAtVersion(_ps->flash_flags)) {
-								if (_ps->getter != NULL || _ps->setter != NULL) {
-									setter_prop = _ps;
-								}
-							}
-							break; // stop traversal (found or hidden)
+						if (_ps != NULL && !isPropertyHiddenAtVersion(_ps->flash_flags)
+						    && (_ps->getter != NULL || _ps->setter != NULL)) {
+							setter_prop = _ps;
+							break;
 						}
-						ActionVar* _np = getProperty(_cur, "__proto__", 9);
-						ASObject* _next = resolveProtoVar(_np);
+						ActionVar* _np2 = getProperty(_cur, "__proto__", 9);
+						ASObject* _next = resolveProtoVar(_np2);
 						if (_next == NULL) break;
 						if (_next == obj) break;
 						_cur = _next;
 						setter_search_depth++;
 					}
 				}
-				if (setter_search_depth < 1) setter_search_depth = 1;
 				if (setter_prop != NULL)
 				{
 					// Virtual property (addProperty): has getter and/or setter
@@ -42361,7 +42475,10 @@ void actionGetMember(SWFAppContext* app_context)
 		}
 
 		// Look up property with prototype chain support (returns ASProperty* for getter check)
-		// Also track search depth for super context in getter invocations
+		// Also track search depth for super context in getter invocations.
+		// Properties hidden by ASSetPropFlags at the current SWF version are
+		// treated as not present at that level — the walk continues up the
+		// __proto__ chain (matches Ruffle search_prototype + allow_swf_version).
 		ASProperty* prop_struct = NULL;
 		u8 prop_search_depth = 0;
 		{
@@ -42369,10 +42486,7 @@ void actionGetMember(SWFAppContext* app_context)
 			int _md = 256;
 			while (_cur != NULL && _md-- > 0) {
 				ASProperty* _ps = findPropertyRaw(_cur, prop_name, prop_name_len);
-				if (_ps != NULL) {
-					if (isPropertyHiddenAtVersion(_ps->flash_flags)) {
-						break;  // Property hidden by ASSetPropFlags — stop traversal
-					}
+				if (_ps != NULL && !isPropertyHiddenAtVersion(_ps->flash_flags)) {
 					prop_struct = _ps;
 					break;
 				}
