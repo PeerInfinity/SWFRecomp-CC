@@ -3998,13 +3998,21 @@ void tagPlaceObject2(SWFAppContext* app_context, size_t depth, size_t char_id, u
 	{
 		// Skip timeline modify on clips moved by swapDepths
 		if (display_list[depth].depth_swapped) return;
-		// Skip timeline modify on clips whose color transform was set by script
-		// (e.g. Color.setTransform). In Flash, once script touches a display object's
-		// color transform, subsequent PlaceObject2 modify operations are ignored
-		// entirely — both the matrix and the color transform are preserved.
+		// Mirror Ruffle apply_place_object: gate matrix/cxform updates independently
+		// on the per-attribute script-override flags.
+		// - transformed_by_script: AS setter wrote a transform attribute (matrix) →
+		//   static modify must NOT overwrite it (e.g. displaylist_depths_test8:
+		//   AS sets `_y += 2` in frame 2, frame 4's moveTo(50,200) PlaceObject2
+		//   modify must be ignored).
+		// - cx_overridden: Color.setTransform wrote a color transform → modify must
+		//   NOT overwrite the cxform (and per Flash, also leaves the matrix alone
+		//   when the cxform was script-set). When BOTH are clean, this is a normal
+		//   timeline modify.
 		if (display_list[depth].cx_overridden) return;
 		// Modify operation (HasCharacter=0): update transform/cxform only, preserve identity.
-		display_list[depth].transform_id = transform_id;
+		if (!display_list[depth].transformed_by_script) {
+			display_list[depth].transform_id = transform_id;
+		}
 		display_list[depth].cxform_id = cxform_id;
 		display_list[depth].has_cxform = (cxform_id != 0) ? 1 : 0;
 		if (clip_depth != 0) display_list[depth].clip_depth = clip_depth;
@@ -4014,7 +4022,12 @@ void tagPlaceObject2(SWFAppContext* app_context, size_t depth, size_t char_id, u
 		init_cx_fields(&display_list[depth]);
 		if (depth > max_depth) max_depth = depth;
 #ifdef NO_GRAPHICS
-		ng_cache_transform(&display_list[depth], transform_id);
+		// Skip caching the new transform when it was rejected above so the
+		// cached x/y/xscale/yscale on the DisplayObject continue to reflect the
+		// AS-set values.
+		if (!display_list[depth].transformed_by_script) {
+			ng_cache_transform(&display_list[depth], transform_id);
+		}
 		// Re-init cxform via ng_on_place_object2 (handles ng_init_cxform_from_data internally).
 		// Pass actual char_id so type detection works.
 		// Preserve sprite_needs_init if already set (sprite awaiting Phase 2 init from

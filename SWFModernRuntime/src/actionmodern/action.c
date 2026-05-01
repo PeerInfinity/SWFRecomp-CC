@@ -29752,7 +29752,11 @@ static ActionVar builtin_loadvars_default_onData(SWFAppContext* app_context, Act
 
 	int success = (arg_count >= 1 && args[0].type == ACTION_STACK_VALUE_STRING);
 	if (success) {
-		builtin_loadvars_decode(app_context, args, 1, NULL, this_obj);
+		// Look up decode via the prototype chain so user overrides on the
+		// instance (l.decode = myFunc) are honored. Falls through to
+		// LoadVars.prototype.decode (= builtin_loadvars_decode) if not
+		// overridden.
+		fireLoadVarsCallback(app_context, lv, "decode", 6, &args[0], 1);
 		ActionVar lt = {0}; lt.type = ACTION_STACK_VALUE_BOOLEAN; lt.data.numeric_value = 1;
 		setProperty(app_context, lv, "loaded", 6, &lt);
 	} else {
