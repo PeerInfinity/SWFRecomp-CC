@@ -1,6 +1,34 @@
 # Current Ruffle Test Status
 
-Last updated: 2026-04-21 (CI run at 7155a774, ruffle-test-results 41667cc4)
+Last updated: 2026-05-01 (CI run at 7155a774, ruffle-test-results 41667cc4; bitmap_filters fix pending CI)
+
+## Latest fixes (2026-05-01, pending CI)
+
+- **`bitmap_filters` PASS (548/548).** Two changes: (1) timeline filter
+  reconstruction (`actionGetMember` on `mc.filters` → FilterListData path
+  in action.c around line 43670+) reorders properties to match Flash's
+  enumeration order: `BevelFilter` from `..., blurX, blurY, strength,
+  quality, type, knockout` to `..., quality, strength, knockout, blurX,
+  blurY, type`; `DropShadowFilter` from `..., blurX, blurY, strength,
+  quality, inner, knockout, hideObject` to `..., quality, inner,
+  knockout, blurX, blurY, strength, hideObject`; `GlowFilter` and
+  `GradientGlow/GradientBevel` analogous. The fallback `ftype != 0`
+  path (line 43964+) was already in the right order; only the multi-
+  filter `FilterListData` block needed reordering. (2) `verify_output.py`
+  now honors `[approximations.number_patterns]` in test.toml, mirroring
+  Ruffle's framework: each regex's capture groups are compared as
+  floats with the configured `epsilon`, then the matched substring is
+  stripped and the remainder must match exactly. Closes the residual
+  4 angle-precision diffs (default `BevelFilter().angle == 45` vs
+  Flash's `44.9999999772279` from deg→rad→deg roundtrip — a
+  Flash-vs-Ruffle difference documented in `RUFFLE_VS_FLASH_DIFFERENCES.md`)
+  using the test's own `number_patterns = ["angle=([\\d.]+)"]` +
+  `epsilon = 0.001` config. Removed from `ignored_tests.txt`. Verified:
+  9-test approximation/array battery (math_swf6/7/8, bitmap_filters,
+  bitmap_data, bitmap_data_colortransform, depth_replacement_audio_unloading,
+  shumway/avm1/filters, plus 9 unrelated AVM1 tests including
+  array_constructor, watch, action_to_integer, parse_int, typeof,
+  enumerate, array_sort, string_coercion, watch_textfield — all PASS).
 
 ## Quick Summary
 

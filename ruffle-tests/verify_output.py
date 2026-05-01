@@ -561,26 +561,79 @@ def get_epsilon(test_dir):
     """Parse [approximations] epsilon from test.toml, default 0 (exact match)."""
     toml_path = test_dir / "test.toml"
     if toml_path.exists():
-        text = toml_path.read_text()
-        m = re.search(r"epsilon\s*=\s*([0-9.]+)", text)
-        if m:
-            return float(m.group(1))
+        try:
+            import tomllib
+            with open(toml_path, "rb") as f:
+                data = tomllib.load(f)
+            approx = data.get("approximations", {})
+            eps = approx.get("epsilon", 0.0)
+            return float(eps)
+        except Exception:
+            text = toml_path.read_text()
+            m = re.search(r"epsilon\s*=\s*([0-9.eE+-]+)", text)
+            if m:
+                return float(m.group(1))
     return 0.0
 
 
-def _lines_approx_equal(actual_line, expected_line, epsilon):
-    """Check if two lines are approximately equal (for numeric values)."""
+def get_number_patterns(test_dir):
+    """Parse [approximations] number_patterns from test.toml. Returns a list of
+    compiled regex objects, or empty list if none. Each regex's capture groups
+    (excluding group 0) are compared as floats with epsilon tolerance."""
+    toml_path = test_dir / "test.toml"
+    if not toml_path.exists():
+        return []
+    try:
+        import tomllib
+        with open(toml_path, "rb") as f:
+            data = tomllib.load(f)
+        approx = data.get("approximations", {})
+        patterns = approx.get("number_patterns", [])
+        return [re.compile(p) for p in patterns]
+    except Exception:
+        return []
+
+
+def _lines_approx_equal(actual_line, expected_line, epsilon, number_patterns=None):
+    """Check if two lines are approximately equal (for numeric values).
+    If `number_patterns` is provided, also try matching each regex against
+    both lines and comparing capture-group values numerically (matches
+    Ruffle's test framework behavior for [approximations.number_patterns])."""
     if actual_line == expected_line:
         return True
     if epsilon <= 0:
         return False
-    # Try to parse both as numbers and compare with epsilon
+    # Try to parse both as a single number and compare with epsilon
     try:
         a = float(actual_line)
         e = float(expected_line)
         return abs(a - e) <= epsilon
     except (ValueError, OverflowError):
-        return False
+        pass
+    # Try regex-based numeric comparison via [approximations.number_patterns]
+    if number_patterns:
+        for pattern in number_patterns:
+            am = pattern.search(actual_line)
+            em = pattern.search(expected_line)
+            if am is None or em is None:
+                continue
+            if len(am.groups()) != len(em.groups()):
+                continue
+            try:
+                groups_match = all(
+                    abs(float(av) - float(ev)) <= epsilon
+                    for av, ev in zip(am.groups(), em.groups())
+                )
+            except (ValueError, OverflowError, TypeError):
+                continue
+            if not groups_match:
+                continue
+            # Strip all matches of this pattern from both lines, then compare remainders
+            stripped_a = pattern.sub("", actual_line)
+            stripped_e = pattern.sub("", expected_line)
+            if stripped_a == stripped_e:
+                return True
+    return False
 
 
 def filter_output(raw_output):
@@ -1942,7 +1995,7 @@ def run_binary(build_dir, event_file=None, extra_env=None):
         return None, -1, ""
 
 
-def _diff_indices(actual, expected, epsilon=0.0):
+def _diff_indices(actual, expected, epsilon=0.0, number_patterns=None):
     """Return the set of 0-based line indices where `actual` differs from
     `expected` after the same whitespace-stripping compare_output does.
     Used by the Ruffle-subset-match check to compare diff-sets line-wise."""
@@ -1960,18 +2013,19 @@ def _diff_indices(actual, expected, epsilon=0.0):
             actual_lines[i] if i < len(actual_lines) else "<missing>",
             expected_lines[i] if i < len(expected_lines) else "<missing>",
             epsilon,
+            number_patterns,
         )
     }
 
 
-def ruffle_subset_match(our_actual, flash_expected, ruffle_actual, epsilon=0.0):
+def ruffle_subset_match(our_actual, flash_expected, ruffle_actual, epsilon=0.0, number_patterns=None):
     """Return True if our diffs against Flash's `output.txt` are a subset of
     Ruffle's diffs against the same file. The subset is taken over line
     indices, so at every line where we disagree with Flash, Ruffle also
     disagrees with Flash — i.e., we are no worse than Ruffle on this test.
     An empty our-diff set (we match Flash exactly) also qualifies."""
-    our = _diff_indices(our_actual, flash_expected, epsilon)
-    ruffle = _diff_indices(ruffle_actual, flash_expected, epsilon)
+    our = _diff_indices(our_actual, flash_expected, epsilon, number_patterns)
+    ruffle = _diff_indices(ruffle_actual, flash_expected, epsilon, number_patterns)
     return our.issubset(ruffle), len(our), len(ruffle)
 
 
@@ -1990,7 +2044,7 @@ def _test_is_known_failure(test_dir):
     return bool(data.get("known_failure"))
 
 
-def compare_output(actual, expected, epsilon=0.0):
+def compare_output(actual, expected, epsilon=0.0, number_patterns=None):
     """Compare filtered actual output with expected output.
     Returns (match, diff_summary, stats_dict)."""
     actual_lines = actual.split("\n")
@@ -2012,6 +2066,7 @@ def compare_output(actual, expected, epsilon=0.0):
             actual_lines[i] if i < len(actual_lines) else "<missing>",
             expected_lines[i] if i < len(expected_lines) else "<missing>",
             epsilon,
+            number_patterns,
         )
     )
     line_stats = {
@@ -2029,7 +2084,7 @@ def compare_output(actual, expected, epsilon=0.0):
     for i in range(min(max_lines, 20)):
         a = actual_lines[i] if i < len(actual_lines) else "<missing>"
         e = expected_lines[i] if i < len(expected_lines) else "<missing>"
-        if not _lines_approx_equal(a, e, epsilon):
+        if not _lines_approx_equal(a, e, epsilon, number_patterns):
             mismatches += 1
             if mismatches <= 3:
                 diff.append(f"  line {i+1}: got {a!r}, expected {e!r}")
@@ -2041,7 +2096,7 @@ def compare_output(actual, expected, epsilon=0.0):
     return False, summary, line_stats
 
 
-def format_diff(actual, expected, context=3, epsilon=0.0):
+def format_diff(actual, expected, context=3, epsilon=0.0, number_patterns=None):
     """Generate a unified-diff-style view showing mismatches with context."""
     actual_lines = actual.split("\n")
     expected_lines = expected.split("\n")
@@ -2055,7 +2110,7 @@ def format_diff(actual, expected, context=3, epsilon=0.0):
         a = actual_lines[i] if i < len(actual_lines) else None
         e = expected_lines[i] if i < len(expected_lines) else None
 
-        if _lines_approx_equal(a if a is not None else "", e if e is not None else "", epsilon):
+        if _lines_approx_equal(a if a is not None else "", e if e is not None else "", epsilon, number_patterns):
             if in_context:
                 skipped += 1
                 if skipped <= context:
@@ -2476,6 +2531,7 @@ def main():
       try:
         test_dir = TESTS_DIR / name
         epsilon = get_epsilon(test_dir)
+        number_patterns = get_number_patterns(test_dir)
         if args.verbose:
             print(f"[{i+1}/{len(tests)}] {name}...", end=" ", flush=True)
 
@@ -2621,12 +2677,12 @@ def main():
                 if raw_output and raw_output.strip():
                     crash_actual = filter_output(raw_output)
                     crash_expected = (test_dir / expected_filename).read_text(encoding="utf-8", errors="replace").replace("\r\n", "\n").rstrip("\n")
-                    crash_match, crash_diff, crash_line_stats = compare_output(crash_actual, crash_expected, epsilon)
+                    crash_match, crash_diff, crash_line_stats = compare_output(crash_actual, crash_expected, epsilon, number_patterns)
                     entry["lines"] = crash_line_stats
                     if crash_match:
                         entry["detail"] += " (output matches)"
                     if args.diff:
-                        fail_diffs[name] = format_diff(crash_actual, crash_expected, epsilon=epsilon)
+                        fail_diffs[name] = format_diff(crash_actual, crash_expected, epsilon=epsilon, number_patterns=number_patterns)
                 test_results.append(entry)
                 if args.verbose:
                     line_info = ""
@@ -2699,7 +2755,7 @@ def main():
             args.save_actual = None  # only save once
         expected = (test_dir / expected_filename).read_text(encoding="utf-8", errors="replace").replace("\r\n", "\n").rstrip("\n")
 
-        match, diff_summary, line_stats = compare_output(actual, expected, epsilon)
+        match, diff_summary, line_stats = compare_output(actual, expected, epsilon, number_patterns)
         entry["lines"] = line_stats
         entry["duration"] = round(time.monotonic() - test_start, 2)
 
@@ -2739,7 +2795,7 @@ def main():
                         .rstrip("\n")
                     )
                     is_subset, ours, theirs = ruffle_subset_match(
-                        actual, expected, ruffle_actual, epsilon)
+                        actual, expected, ruffle_actual, epsilon, number_patterns)
                     if is_subset:
                         ruffle_matched = True
                         entry["ruffle_diff_count"] = theirs
@@ -2762,7 +2818,7 @@ def main():
                 fail_list.append(name)
                 fail_details[name] = diff_summary
                 if args.diff:
-                    fail_diffs[name] = format_diff(actual, expected, epsilon=epsilon)
+                    fail_diffs[name] = format_diff(actual, expected, epsilon=epsilon, number_patterns=number_patterns)
                 entry["status"] = "output_mismatch"
                 entry["detail"] = diff_summary.split("\n")[0]  # first line only
                 actual_snip, expected_snip = snippet_around_mismatch(actual, expected)

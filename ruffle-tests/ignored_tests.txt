@@ -50,7 +50,7 @@ file_reference_upload_success
 # --- Bitmap data operations ---
 # These tests require pixel-level bitmap manipulation not available in trace mode.
 # (bitmap_data_pixeldissolve removed — now passing)
-bitmap_filters
+# (bitmap_filters removed — now passing via filter property reorder + verifier number_patterns)
 
 # --- SharedObject persistence (multi-run test format) ---
 # These tests use output1.txt/output2.txt for two separate runs. Our test runner

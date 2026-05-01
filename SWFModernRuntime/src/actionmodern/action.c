@@ -43688,6 +43688,8 @@ void actionGetMember(SWFAppContext* app_context)
 							v = makeF64((double)fe->quality); setProperty(app_context, fobj, "quality", 7, &v);
 						} else if (fe->type == 2) {
 							// DropShadowFilter
+							// Property order matches Flash enum: distance, angle, color, alpha,
+							// quality, inner, knockout, blurX, blurY, strength, hideObject.
 							double angle_deg = fe->angle * 180.0 / 3.14159265358979323846;
 							int inner_f = (fe->flags >> 2) & 1;
 							int knockout_f = (fe->flags >> 1) & 1;
@@ -43696,30 +43698,36 @@ void actionGetMember(SWFAppContext* app_context)
 							uint32_t color = ((uint32_t)(fe->color_r*255+0.5)<<16)|((uint32_t)(fe->color_g*255+0.5)<<8)|(uint32_t)(fe->color_b*255+0.5);
 							v = makeF64((double)color); setProperty(app_context, fobj, "color", 5, &v);
 							v = makeF64(fe->color_a); setProperty(app_context, fobj, "alpha", 5, &v);
-							v = makeF64(fe->blur_x); setProperty(app_context, fobj, "blurX", 5, &v);
-							v = makeF64(fe->blur_y); setProperty(app_context, fobj, "blurY", 5, &v);
-							v = makeF64(fe->strength); setProperty(app_context, fobj, "strength", 8, &v);
 							v = makeF64((double)fe->quality); setProperty(app_context, fobj, "quality", 7, &v);
 							v.type = ACTION_STACK_VALUE_BOOLEAN;
 							v.data.numeric_value = inner_f; setProperty(app_context, fobj, "inner", 5, &v);
 							v.data.numeric_value = knockout_f; setProperty(app_context, fobj, "knockout", 8, &v);
+							v = makeF64(fe->blur_x); setProperty(app_context, fobj, "blurX", 5, &v);
+							v = makeF64(fe->blur_y); setProperty(app_context, fobj, "blurY", 5, &v);
+							v = makeF64(fe->strength); setProperty(app_context, fobj, "strength", 8, &v);
+							v.type = ACTION_STACK_VALUE_BOOLEAN;
 							v.data.numeric_value = 0; setProperty(app_context, fobj, "hideObject", 10, &v);
 						} else if (fe->type == 3) {
 							// GlowFilter
+							// Property order matches Flash enum: color, alpha, quality, inner,
+							// knockout, blurX, blurY, strength.
 							int inner_f = (fe->flags >> 2) & 1;
 							int knockout_f = (fe->flags >> 1) & 1;
 							uint32_t color = ((uint32_t)(fe->color_r*255+0.5)<<16)|((uint32_t)(fe->color_g*255+0.5)<<8)|(uint32_t)(fe->color_b*255+0.5);
 							v = makeF64((double)color); setProperty(app_context, fobj, "color", 5, &v);
 							v = makeF64(fe->color_a); setProperty(app_context, fobj, "alpha", 5, &v);
-							v = makeF64(fe->blur_x); setProperty(app_context, fobj, "blurX", 5, &v);
-							v = makeF64(fe->blur_y); setProperty(app_context, fobj, "blurY", 5, &v);
-							v = makeF64(fe->strength); setProperty(app_context, fobj, "strength", 8, &v);
 							v = makeF64((double)fe->quality); setProperty(app_context, fobj, "quality", 7, &v);
 							v.type = ACTION_STACK_VALUE_BOOLEAN;
 							v.data.numeric_value = inner_f; setProperty(app_context, fobj, "inner", 5, &v);
 							v.data.numeric_value = knockout_f; setProperty(app_context, fobj, "knockout", 8, &v);
+							v = makeF64(fe->blur_x); setProperty(app_context, fobj, "blurX", 5, &v);
+							v = makeF64(fe->blur_y); setProperty(app_context, fobj, "blurY", 5, &v);
+							v = makeF64(fe->strength); setProperty(app_context, fobj, "strength", 8, &v);
 						} else if (fe->type == 4) {
 							// BevelFilter
+							// Property order matches Flash enum: distance, angle, highlightColor,
+							// highlightAlpha, shadowColor, shadowAlpha, quality, strength,
+							// knockout, blurX, blurY, type.
 							double angle_deg = fe->angle * 180.0 / 3.14159265358979323846;
 							int inner_f = (fe->flags >> 3) & 1;
 							int knockout_f = (fe->flags >> 2) & 1;
@@ -43732,17 +43740,17 @@ void actionGetMember(SWFAppContext* app_context)
 							uint32_t sc = ((uint32_t)(fe->color_r*255+0.5)<<16)|((uint32_t)(fe->color_g*255+0.5)<<8)|(uint32_t)(fe->color_b*255+0.5);
 							v = makeF64((double)sc); setProperty(app_context, fobj, "shadowColor", 11, &v);
 							v = makeF64(fe->color_a); setProperty(app_context, fobj, "shadowAlpha", 11, &v);
+							v = makeF64((double)fe->quality); setProperty(app_context, fobj, "quality", 7, &v);
+							v = makeF64(fe->strength); setProperty(app_context, fobj, "strength", 8, &v);
+							v.type = ACTION_STACK_VALUE_BOOLEAN;
+							v.data.numeric_value = knockout_f; setProperty(app_context, fobj, "knockout", 8, &v);
 							v = makeF64(fe->blur_x); setProperty(app_context, fobj, "blurX", 5, &v);
 							v = makeF64(fe->blur_y); setProperty(app_context, fobj, "blurY", 5, &v);
-							v = makeF64(fe->strength); setProperty(app_context, fobj, "strength", 8, &v);
-							v = makeF64((double)fe->quality); setProperty(app_context, fobj, "quality", 7, &v);
 							const char* type_str = on_top ? "full" : (inner_f ? "inner" : "outer");
 							u32 u16len; uint16_t* u16p = utf8_to_u16(app_context, type_str, strlen(type_str), &u16len);
 							v.type = ACTION_STACK_VALUE_STRING; v.str_size = u16len;
 							v.data.string_data.heap_ptr = u16p;
 							setProperty(app_context, fobj, "type", 4, &v);
-							v.type = ACTION_STACK_VALUE_BOOLEAN;
-							v.data.numeric_value = knockout_f; setProperty(app_context, fobj, "knockout", 8, &v);
 						} else if (fe->type == 6) {
 							// ColorMatrixFilter
 							ASArray* marr = allocArray(app_context, 20);
@@ -43778,6 +43786,8 @@ void actionGetMember(SWFAppContext* app_context)
 							v = makeF64(fe->conv_color_a / 255.0); setProperty(app_context, fobj, "alpha", 5, &v);
 						} else if (fe->type == 7 || fe->type == 8) {
 							// GradientGlow / GradientBevel
+							// Property order matches Flash enum: distance, angle, colors, alphas,
+							// ratios, blurX, blurY, quality, strength, knockout, type.
 							double angle_deg = fe->angle * 180.0 / 3.14159265358979323846;
 							v = makeF64(fe->distance); setProperty(app_context, fobj, "distance", 8, &v);
 							v = makeF64(angle_deg); setProperty(app_context, fobj, "angle", 5, &v);
@@ -43801,8 +43811,8 @@ void actionGetMember(SWFAppContext* app_context)
 							setProperty(app_context, fobj, "ratios", 6, &v);
 							v = makeF64(fe->blur_x); setProperty(app_context, fobj, "blurX", 5, &v);
 							v = makeF64(fe->blur_y); setProperty(app_context, fobj, "blurY", 5, &v);
-							v = makeF64(fe->strength); setProperty(app_context, fobj, "strength", 8, &v);
 							v = makeF64((double)fe->quality); setProperty(app_context, fobj, "quality", 7, &v);
+							v = makeF64(fe->strength); setProperty(app_context, fobj, "strength", 8, &v);
 							int inner_f = (fe->flags >> 2) & 1;
 							int knockout_f = (fe->flags >> 1) & 1;
 							int on_top_f = fe->flags & 1;

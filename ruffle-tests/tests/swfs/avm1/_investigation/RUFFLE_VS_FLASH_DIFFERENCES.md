@@ -102,7 +102,7 @@ This difference manifests when comparing BMP characters above U+D800 with supple
 
 ## Filter Angle Property Precision
 
-**Test:** `bitmap_filters` (544/548, 4 lines differ)
+**Test:** `bitmap_filters` — now PASS via verifier `number_patterns` support
 
 Ruffle stores filter angles internally as f64 radians. The default angle (45°) goes through a deg→rad→deg round-trip that produces `44.9999999772279` instead of `45`. Our implementation stores angles directly as degrees (Flash-correct behavior), so `new BevelFilter().angle` returns exactly `45`.
 
@@ -113,7 +113,7 @@ The 4 differing lines are default constructor angles for BevelFilter, DropShadow
 + distance=4, angle=45, highlightColor=16777215, ...
 ```
 
-**Decision:** Accept 4-line diff. Our exact angle values match Flash Player. The Ruffle-compat deg→rad→deg round-trip code has been reverted.
+**Decision:** Implemented `[approximations.number_patterns]` support in `verify_output.py` so the test's own `number_patterns = ["angle=([\\d.]+)"]` + `epsilon = 0.001` config matches Ruffle's framework behavior. Each capture group is compared as a float with epsilon tolerance, and the rest of the line must match exactly. The 4 angle-only diffs now pass within tolerance, while still catching any structural differences. Companion fix: filter object property order in the timeline-reconstruction path (`actionGetMember "filters"` → FilterListData) was reordered to match Flash's enumeration order (e.g., BevelFilter: `..., quality, strength, knockout, blurX, blurY, type` instead of `..., blurX, blurY, strength, quality, type, knockout`). Test now PASS at 548/548.
 
 ## Object.prototype Methods ENUMERABLE by Default
 
