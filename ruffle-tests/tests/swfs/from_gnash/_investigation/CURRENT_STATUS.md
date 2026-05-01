@@ -1159,7 +1159,7 @@ Last updated: 2026-05-01 (CI snapshot at 25231855425 / ruffle-test-results 59aed
 | `superseded/WITH_AUTOBOXING_PLAN.md` | Shelved — primitive auto-boxing effectively works; see plan for actual remaining root causes |
 | `complete/INHERITANCE_SEGFAULT_PLAN.md` | All 4 Inheritance tests pass filtered (v5 via SWF5 gates, v6/v7/v8 via Ruffle-matching acceptance) |
 | `complete/RUFFLE_KNOWN_FAILURE_HANDLING_PLAN.md` | Phase 3 landed: `verify_output.py` auto-promotes `known_failure`+`output.ruffle.txt` tests to `ruffle_matched` when our diffs ⊆ Ruffle's diffs against Flash |
-| `blocked/MISC_SWFMILL_PLAN.md` | 3 remaining misc-swfmill failures (architectural) |
+| `incomplete/MISC_SWFMILL_PLAN.md` | 5/6 fixed; only `jump_to_prev_block` remains, with a concrete consecutive-DoAction concatenation plan |
 | `complete/DEJAGNU_FRAMEWORK_PLAN.md` | Dejagnu harness setup + misc-ming/misc-swfc blocker |
 | `complete/TRY_FINALLY_PLAN.md` | Try-v6/v7/v8 OOM crash (FIXED) |
 | `BLOCKER_SUMMARY.md` | Active and resolved blockers |

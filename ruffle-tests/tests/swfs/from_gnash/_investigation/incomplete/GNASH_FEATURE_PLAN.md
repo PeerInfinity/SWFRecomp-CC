@@ -381,7 +381,7 @@ valid for unresolved categories.
 - Categories 1, 2, 6: → `ACCEPTED_DIFFS.md` (ignored, our output is correct)
 - Categories 3, 4, 5, 7: → `incomplete/GNASH_NEAR_PASSING_PLAN.md`
 - Category 14: → `complete/TRY_FINALLY_PLAN.md` (FIXED)
-- Category 17: → `blocked/MISC_SWFMILL_PLAN.md`
+- Category 17: → `incomplete/MISC_SWFMILL_PLAN.md`
 
 **Original stats (2026-03-19):**
 - **Total tests**: 204 (190 actionscript.all + 14 misc-swfmill.all)

@@ -39,20 +39,22 @@ See `ARRAY_V5_PLAN.md` for full analysis.
 
 ### Blocker 5: Recompiler Edge Cases (misc-swfmill tests)
 
-**Impact**: 6 misc-swfmill tests
+**Impact**: 6 misc-swfmill tests — 5 RESOLVED as of 2026-05-01, 1 remaining (`jump_to_prev_block`).
 
-| Test | Issue | Complexity |
-|------|-------|------------|
-| zeroframe_definesprite | Corrupted clip action parsing (PlaceObject2 overrun) | Medium |
-| dict_event | ConstantPool not persisting across DoAction blocks | Medium |
-| initaction_in_definesprite | DoInitAction inside DefineSprite not parsed | Medium-Hard |
-| tags_after_last_showframe | Post-ShowFrame tag execution + InitAction ordering | Hard |
-| jump_after_end | Jump past END_OF_ACTIONS byte not handled | Hard |
-| jump_to_prev_block | Cross-DoAction-block backward jump not supported | Very Hard |
+| Test | Issue | Complexity | Status |
+|------|-------|------------|--------|
+| zeroframe_definesprite | Corrupted clip action parsing (PlaceObject2 overrun) | Medium | RESOLVED (commit 1f45d1a7) |
+| dict_event | ConstantPool not persisting across DoAction blocks | Medium | RESOLVED (ActionQueue rework) |
+| initaction_in_definesprite | DoInitAction inside DefineSprite not parsed | Medium-Hard | RESOLVED (commit 1f45d1a7) |
+| tags_after_last_showframe | Post-ShowFrame tag dangling-frame loop | Hard | RESOLVED (commit 9020f664) |
+| jump_after_end | Jump past END_OF_ACTIONS byte not handled | Hard | RESOLVED (commit 1f45d1a7) |
+| jump_to_prev_block | Cross-DoAction-block backward jump not supported | Medium | ACTIVE — fix plan available |
 
 **Root cause**: Various recompiler edge cases for uncommon bytecode patterns. Each is independent.
 
-See `MISC_SWFMILL_PLAN.md` for detailed root cause analysis of all 6.
+`jump_to_prev_block` is no longer blocked-architecturally — `incomplete/MISC_SWFMILL_PLAN.md` describes the consecutive-DoAction concatenation fix (estimated 30–60 lines in `swf.cpp`, low-to-medium effort). The historical "Very Hard" classification predates the END-past-labels handling that landed for `jump_after_end`, which provides most of the infrastructure needed.
+
+See `incomplete/MISC_SWFMILL_PLAN.md` for detailed root cause analysis of all 6.
 
 ---
 

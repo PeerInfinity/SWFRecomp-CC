@@ -417,25 +417,23 @@ in depth.
 
 **Scope.** 2-3 hours of triage. Single-test, not blocking anything.
 
-### misc-swfmill.all/jump_to_prev_block, tags_after_last_showframe
+### misc-swfmill.all/jump_to_prev_block
 
-**Both blocked architecturally:**
+**Status updated 2026-05-01.** `tags_after_last_showframe` was
+fixed in commit 9020f664 (recompiler END_TAG handler emits
+`quit_swf=1` instead of looping the dangling frame). Only
+`jump_to_prev_block` remains in this suite.
 
 - `jump_to_prev_block`: bytecode `BranchAlways byteOffset=-56` jumps
   backward across DoAction tag boundaries. Recompiler emits a bare
   `return;` for the backward jump because each DoAction → its own
-  C function. **Unfixable without representing each frame's
-  DoActions as a single execution unit** (substantial refactor).
-- `tags_after_last_showframe`: DoInitAction order vs post-ShowFrame
-  DoAction order. Expected `a1-i1-a2-a3-1`; got `i1-a1-a2-a3-1`
-  plus infinite loop on a single-frame SWF with tags after the
-  only ShowFrame. Two distinct bugs, related to
-  `ZERO_OUTPUT_TRIAGE_PLAN.md` Phase 5 (last-frame DoAction
-  emission).
-
-**Recommendation.** Move both to `blocked/MISC_SWFMILL_PLAN.md`
-(already exists per earlier docs). Do not investigate in this
-session.
+  C function. **Has a concrete fix plan now** — concatenate
+  consecutive `DoAction` tags within a frame into a single
+  bytecode buffer for recompilation, then the existing
+  cross-buffer label/goto logic handles the back-jump naturally.
+  See `incomplete/MISC_SWFMILL_PLAN.md` for the implementation
+  steps and risks (estimated 30–60 lines in `swf.cpp`,
+  low-to-medium effort).
 
 ---
 

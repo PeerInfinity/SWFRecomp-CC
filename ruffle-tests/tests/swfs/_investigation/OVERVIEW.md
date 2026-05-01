@@ -13,7 +13,7 @@ Last updated: 2026-05-01 (CI run at 25231855425, ruffle-test-results 59aedf5a)
 | [avm1](../avm1/_investigation/CURRENT_STATUS.md) | 643 | 600 | 9 | 609 | 94.7% | **100.0%** (603/603) | 42 ignored. **Zero filtered failures.** loadvars_tostring + bitmap_filters PASS this session. |
 | [from_gnash/actionscript.all](../from_gnash/_investigation/CURRENT_STATUS.md) | 190 | 122 | 63 | 185 | **97.4%** | — | +7 effective since 2026-04-30 (Instance-v5/v6/v7/v8, Global-v6, GetMember/SetMember hidden own-prop walk). 5 raw failures remain (ContextMenu-v7/v8, MovieClip-v5, TextFormat-v7, array-v5). |
 | [from_gnash/misc-mtasc.all](../from_gnash/_investigation/CURRENT_STATUS.md) | 9 | 7 | 2 | 9 | **100.0%** | — | All effective pass. |
-| [from_gnash/misc-swfmill.all](../from_gnash/_investigation/CURRENT_STATUS.md) | 18 | 16 | 1 | 17 | **94.4%** | — | 1 remaining (`jump_to_prev_block` — cross-DoAction backward jump, architectural blocker). tags_after_last_showframe PASS this session. |
+| [from_gnash/misc-swfmill.all](../from_gnash/_investigation/CURRENT_STATUS.md) | 18 | 16 | 1 | 17 | **94.4%** | — | 1 remaining (`jump_to_prev_block` — cross-DoAction backward jump; concrete fix plan in `incomplete/MISC_SWFMILL_PLAN.md`). tags_after_last_showframe PASS this session. |
 | [from_gnash/misc-ming.all](../from_gnash/_investigation/CURRENT_STATUS.md) | 102 | 61 | 14 | 75 | **73.5%** | — | +4 effective since 2026-04-30. |
 | [from_gnash/misc-swfc.all](../from_gnash/_investigation/CURRENT_STATUS.md) | 16 | 6 | 3 | 9 | 56.2% | — | +1 effective (movieclip_destruction_test2 PASS). |
 | [from_shumway](../from_shumway/_investigation/CURRENT_STATUS.md) (flat) | 92 | 65 | 2 | 67 | 72.8% | — | +5 effective since 2026-04-30. |
@@ -125,7 +125,7 @@ AVM1 filtered suite is at 100%; remaining actionable work is in the Gnash and Sh
 
 1. **Gnash actionscript.all near-passing** — 22+ tests with <=18 line diffs. `global_proto_decls*` enumeration/ordering, `Number-v5..v8` float-to-string rounding, `Selection-v6/7/8`, `ExternalInterface-v8`. See `from_gnash/_investigation/incomplete/GNASH_NEAR_PASSING_PLAN.md`.
 2. **Gnash `misc-mtasc/levels`** — only 1 failure in that sub-suite; needs multi-level SWF loading (`_level5`, `_level87`, `_level99`). See `LEVELS_PLAN.md`.
-3. **Gnash `misc-swfmill`** — 2 remaining timeline-tag-order failures (`tags_after_last_showframe`, `jump_to_prev_block`). ActionQueue rework may have moved these; needs re-verification.
+3. **Gnash `misc-swfmill`** — 1 remaining failure (`jump_to_prev_block`, cross-DoAction backward jump). `tags_after_last_showframe` was fixed this session. See `incomplete/MISC_SWFMILL_PLAN.md` for the consecutive-DoAction concatenation fix plan.
 4. **Shumway `avm1/moviecliploader`** — sole remaining filtered failure. One-tick MCL deferral exposes latent getBounds / chained setInterval bugs. See `from_shumway/_investigation/incomplete/SHUMWAY_AVM1_SUBTREES_PLAN.md` Part B.
 5. **Shumway `fuzz/*`** — 27 fuzzer-generated SWFs failing in the flat suite. Useful as an edge-case discovery source for runtime/recompiler.
 6. **AVM1 image tests** — 14/31 strict pass, 10/31 tolerance. Remaining need Drawing API anti-aliasing, text layout, dynamic masks, or external media loading. Tracked in `IMAGE_COMPARISON_TESTS.md`.
