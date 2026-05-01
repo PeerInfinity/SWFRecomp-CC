@@ -46623,7 +46623,10 @@ void actionCloneSprite(SWFAppContext* app_context)
 		// (which catches biased dup5 = AS-depth 2130690045 → 2130706429).
 		// Required by gnash misc-ming/DepthLimitsTest.c:166-170 (AS-depth
 		// -16385 must be rejected — function-form `duplicateMovieClip`).
-		if (depth_int < -16384) {
+		// Upper bound: biased range top is 2130706428 (= 2130690044 + 16384);
+		// avm1/duplicate_movie_clip pushes 2130706429 (one past) and expects
+		// `clip3` to come back undefined. Mirrors `ng_cloneSprite`'s old guard.
+		if (depth_int < -16384 || depth_int > 2130706428) {
 			return;
 		}
 		// AVM1 stack naming is inverted from the SWF spec naming:
@@ -46633,15 +46636,116 @@ void actionCloneSprite(SWFAppContext* app_context)
 		// Strip path prefix from new name
 		if (strncmp(new_name, "_root.", 6) == 0) new_name += 6;
 		else if (strncmp(new_name, "_level0.", 8) == 0) new_name += 8;
-		if (_clone_target_mc != NULL) {
-			// Source clip already resolved as MovieClip
-			ng_cloneSpriteFromMC(app_context, _clone_target_mc, new_name, depth_int);
+
+		// Resolve source — direct MC peek first, then path resolution.
+		// Paths like `_root.mc1.mc11`, `/_root/mc1/mc11`, `mc11` (relative
+		// to caller's context) all route through resolveObjectPathToMC.
+		MovieClip* resolved_src = _clone_target_mc;
+		if (resolved_src == NULL && target_name[0] != '\0') {
+			MovieClip* start = g_current_context ? g_current_context : &root_movieclip;
+			resolved_src = resolveObjectPathToMC(app_context, target_name,
+			                                     (u32)strlen(target_name), start, 1);
+		}
+
+		// Flash's function-form CloneSprite refuses cross-timeline duplication:
+		// source.parent must equal the caller's execution context. The gnash
+		// duplicate_movie_clip_test2 cases verify this — `duplicateMovieClip(mc2, ...)`
+		// from inside mc1 fails because mc2.parent==root != caller (mc1), and
+		// `duplicateMovieClip(_root.mc1.mc11, ...)` from root fails because
+		// mc11.parent==mc1 != caller (root). Cannot duplicate the root either.
+		MovieClip* caller_ctx = g_current_context ? g_current_context : &root_movieclip;
+		if (resolved_src == NULL || resolved_src == &root_movieclip ||
+		    resolved_src->parent == NULL || resolved_src->parent != caller_ctx) {
+			return;
+		}
+
+		// resolveObjectPathToMC's actionGetMember fallback may create orphan
+		// child MCs in child_mc_cache for unknown names (e.g. `mc2` from
+		// inside mc1 where mc2 isn't actually a child of mc1). The orphan
+		// has parent==caller but no real placement. Reject sources that
+		// aren't reachable from the caller via either:
+		//   - the caller's display list (timeline-placed children), or
+		//   - the caller's dynamic_props (script-created children:
+		//     createEmptyMovieClip / createTextField / attachMovie).
+		// _clone_target_mc (a direct MOVIECLIP on the stack) bypasses this
+		// check — the bytecode pushed an explicit reference, no resolution.
+		// We can't rely on resolved_src->display_obj alone — ng_cloneSprite
+		// nulls the source's display_obj after each clone (TextSnapshot
+		// "text moves to clone" semantics), so a second clone of the same
+		// source would otherwise be rejected.
+		int reachable_via_dl = 0;
+		int reachable_via_dp = 0;
+		int has_explicit_target = (_clone_target_mc != NULL);
+
+		if (!has_explicit_target) {
+			DisplayObject* caller_dl = NULL;
+			size_t caller_max = 0;
+			if (caller_ctx == &root_movieclip) {
+				caller_dl = display_list;
+				caller_max = max_depth;
+			} else if (caller_ctx->display_obj != NULL) {
+				DisplayObject* dobj = (DisplayObject*)caller_ctx->display_obj;
+				caller_dl = dobj->sprite_display_list;
+				caller_max = dobj->sprite_max_depth;
+			}
+			if (caller_dl != NULL) {
+				size_t src_name_len = strlen(resolved_src->name);
+				for (size_t d = 1; d <= caller_max; d++) {
+					DisplayObject* obj = &caller_dl[d];
+					if (obj->char_id == 0 || obj->instance_name == NULL) continue;
+					if (strlen(obj->instance_name) == src_name_len &&
+					    strcmp(obj->instance_name, resolved_src->name) == 0) {
+						reachable_via_dl = 1;
+						break;
+					}
+				}
+			}
+			if (!reachable_via_dl && caller_ctx->dynamic_props != NULL) {
+				ASObject* dp = (ASObject*) caller_ctx->dynamic_props;
+				ASProperty* p = findPropertyRaw(dp, resolved_src->name,
+				                                (u32)strlen(resolved_src->name));
+				if (p != NULL && p->value.type == ACTION_STACK_VALUE_MOVIECLIP &&
+				    (MovieClip*)(uintptr_t)p->value.data.numeric_value == resolved_src) {
+					reachable_via_dp = 1;
+				}
+			}
+		}
+
+		if (!has_explicit_target && !reachable_via_dl && !reachable_via_dp) {
+			return;
+		}
+
+		// Pick the clone primitive: ng_cloneSprite for timeline-placed sources
+		// (it runs the source's frame_0 to populate the clone's display list,
+		// which onClipEnterFrame and other timeline-driven semantics depend on);
+		// ng_cloneSpriteFromMC for script-created MCs without a display entry.
+		MovieClip* clone_mc = NULL;
+		if (reachable_via_dl || (has_explicit_target && resolved_src->display_obj != NULL)) {
+			clone_mc = ng_cloneSprite(app_context, resolved_src->name,
+			                          new_name, depth_int);
 		} else {
-			// Source is a string path — look up in ng_display
-			const char* src_path = target_name;
-			if (strncmp(src_path, "_root.", 6) == 0) src_path += 6;
-			else if (strncmp(src_path, "_level0.", 8) == 0) src_path += 8;
-			ng_cloneSprite(app_context, src_path, new_name, depth_int);
+			clone_mc = ng_cloneSpriteFromMC(app_context, resolved_src,
+			                                new_name, depth_int);
+		}
+
+		// ng_cloneSpriteFromMC's setVariableByName(new_name, clone) lands in
+		// root's var_map, but actionGetVariable enforces scope isolation: a
+		// live child MC (g_current_context != root, depth != INT_MIN) bypasses
+		// the global var_map. So when the caller is a child clip (e.g. mc1's
+		// clip script), the clone must also be registered on the caller's
+		// own dynamic_props so `typeof(dupName)` resolves from inside mc1.
+		// For root callers the var_map registration alone already works.
+		if (clone_mc != NULL && caller_ctx != &root_movieclip) {
+			if (caller_ctx->dynamic_props == NULL) {
+				caller_ctx->dynamic_props = (void*) allocObject(app_context, 32);
+				retainObject((ASObject*) caller_ctx->dynamic_props);
+			}
+			ASObject* dp = (ASObject*) caller_ctx->dynamic_props;
+			ActionVar mc_var = {0};
+			mc_var.type = ACTION_STACK_VALUE_MOVIECLIP;
+			mc_var.data.numeric_value = (u64)(uintptr_t) clone_mc;
+			setProperty(app_context, dp, new_name,
+			            (u32)strlen(new_name), &mc_var);
 		}
 	}
 	#endif
