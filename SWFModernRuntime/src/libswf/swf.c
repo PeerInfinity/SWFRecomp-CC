@@ -179,6 +179,14 @@ void swfStart(SWFAppContext* app_context)
 	g_frame_funcs = app_context->frame_funcs;
 	g_frame_count = app_context->frame_count;
 
+	{
+		extern MovieClip root_movieclip;
+		if (app_context->frame_count > 0) {
+			root_movieclip.totalframes = (int)app_context->frame_count;
+			root_movieclip.framesloaded = (int)app_context->frame_count;
+		}
+	}
+
 	initTime(app_context);
 	initMap();
 

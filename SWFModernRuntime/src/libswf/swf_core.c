@@ -72,6 +72,15 @@ DataFileEntry* findDataFile(const char* filename) {
 int catch_up_mode = 0;
 int goto_from_action = 0;
 int catch_up_backward = 0;    // 1 if current catch-up is a backward goto
+// Set by ng_executeGotoCatchUp when it inlines the target frame's script during
+// the caller frame's body. Cleared in the main loop after funcs[current_frame]
+// returns. The recompiler emits a wrap-back at the end of the LAST frame's body
+// (next_frame=0; manual_next_frame=1) to loop the timeline; that wrap-back
+// fires unconditionally and overrides a goto+play that the script issued
+// earlier in the same frame. We use this flag to undo the wrap-back's effect
+// on manual_next_frame so the natural advance moves to current_frame+1
+// (gotoAndPlay) or stays put (gotoAndStop). Key test: from_shumway/timeline/timeline_as2_1.
+int g_goto_inlined_in_caller_frame = 0;
 // Phase 4 (TRANSFORMED_BY_SCRIPT_WRAP_BACK): set to 1 when a natural backward
 // wrap triggers catch-up, signaling actionDrainOnloadAndScript to clean up
 // unsurvivors before scripts run. Cleared on first drain.
@@ -244,6 +253,12 @@ void ng_executeGotoCatchUp(SWFAppContext* app_context)
 		g_tag_skip_mode = saved_tag_skip_phase_e;
 		ng_run_deferred_sprite_init_on_or_after(app_context, target);
 		g_defer_sprite_init = saved_defer_phase_f;
+		// Signal to the main loop that we inlined the target script while the
+		// caller frame was running. The recompiler-emitted wrap-back at the end
+		// of the LAST frame (next_frame=0; manual_next_frame=1) would otherwise
+		// override the natural advance and loop the timeline back to frame 0
+		// even though the script just gotoAndPlay'd to a specific target.
+		g_goto_inlined_in_caller_frame = 1;
 	}
 }
 
@@ -800,6 +815,11 @@ void swfStart(SWFAppContext* app_context)
 	extern MovieClip root_movieclip;
 	root_movieclip.display_obj = ng_get_root_display_obj();
 
+	if (app_context->frame_count > 0) {
+		root_movieclip.totalframes = (int)app_context->frame_count;
+		root_movieclip.framesloaded = (int)app_context->frame_count;
+	}
+
 #ifdef SWF_URL
 	strncpy(root_movieclip.url, SWF_URL, sizeof(root_movieclip.url) - 1);
 	root_movieclip.url[sizeof(root_movieclip.url) - 1] = '\0';
@@ -972,6 +992,17 @@ void swfStart(SWFAppContext* app_context)
 				else if (funcs[current_frame])
 				{
 					funcs[current_frame](app_context);
+					// If a goto inside the script inlined the target frame's body
+					// AND the recompiler-emitted last-frame wrap-back (next_frame=0,
+					// manual_next_frame=1) fired afterward, undo the wrap-back so
+					// the natural advance moves to current_frame+1 (gotoAndPlay)
+					// or stays in place (gotoAndStop). Without this, gotoAndPlay
+					// from inside the last frame's script would loop back to 0.
+					if (g_goto_inlined_in_caller_frame)
+					{
+						g_goto_inlined_in_caller_frame = 0;
+						manual_next_frame = 0;
+					}
 				}
 				else
 				{
