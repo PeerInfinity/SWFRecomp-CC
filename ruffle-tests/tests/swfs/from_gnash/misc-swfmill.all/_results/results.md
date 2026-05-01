@@ -1,20 +1,20 @@
 # Ruffle Test Results (Unfiltered)
 
-**Date**: 2026-05-01 18:13 UTC
+**Date**: 2026-05-01 19:04 UTC
 
-**Git SHA**: `faf492a5eb`
+**Git SHA**: `9020f66409`
 
-**Run Duration**: 5m 10s
+**Run Duration**: 0m 5s
 
 ## Summary
 
 | Metric | Value |
 |--------|-------|
 | Total tests | 18 |
-| Passing | **15** (83.3%) |
+| Passing | **16** (88.9%) |
 | Ruffle-matched | 1 (diffs ⊆ Ruffle's against Flash) |
-| Effective pass | **16** (88.9%) |
-| Failing | 2 |
+| Effective pass | **17** (94.4%) |
+| Failing | 1 |
 | Total expected lines | 51 |
 | Matching lines | 48 (94.1%) |
 | Mismatched lines | 3 |
@@ -23,29 +23,30 @@
 
 | Category | Count | % of Failures |
 |----------|-------|---------------|
-| Output Mismatch | 2 | 100.0% |
+| Output Mismatch | 1 | 100.0% |
 
 ## Passing Tests
 
-**15 tests passing**
+**16 tests passing**
 
 | # | Test | Lines | Duration | Notes |
 |---|------|-------|----------|-------|
-| 1 | `afunc_dict` | 2 | 17.0s |  |
-| 2 | `background` | 0 | 16.9s |  |
-| 3 | `dict_callframe` | 3 | 16.9s |  |
-| 4 | `dict_cross` | 3 | 17.0s |  |
-| 5 | `dict_event` | 5 | 16.9s |  |
-| 6 | `dict_override` | 2 | 17.5s |  |
-| 7 | `func_dict` | 3 | 18.1s |  |
-| 8 | `initaction_in_definesprite` | 2 | 18.1s |  |
-| 9 | `jump_after_end` | 3 | 17.0s |  |
-| 10 | `missing_bitmap` | 0 | 19.0s |  |
-| 11 | `mixed-bytecode-as2` | 1 | 16.7s |  |
-| 12 | `trace-as2/root_onload` | 4 | 18.0s |  |
-| 13 | `trace-as2/shortstack` | 2 | 17.0s |  |
-| 14 | `trace-as2/super` | 8 | 17.4s |  |
-| 15 | `trace-as2/this` | 8 | 13.4s |  |
+| 1 | `afunc_dict` | 2 | 0.1s |  |
+| 2 | `background` | 0 | 0.2s |  |
+| 3 | `dict_callframe` | 3 | 0.1s |  |
+| 4 | `dict_cross` | 3 | 0.1s |  |
+| 5 | `dict_event` | 5 | 0.6s |  |
+| 6 | `dict_override` | 2 | 0.2s |  |
+| 7 | `func_dict` | 3 | 0.1s |  |
+| 8 | `initaction_in_definesprite` | 2 | 0.2s |  |
+| 9 | `jump_after_end` | 3 | 0.2s |  |
+| 10 | `missing_bitmap` | 0 | 0.1s |  |
+| 11 | `mixed-bytecode-as2` | 1 | 0.2s |  |
+| 12 | `tags_after_last_showframe` | 1 | 0.2s |  |
+| 13 | `trace-as2/root_onload` | 4 | 0.1s |  |
+| 14 | `trace-as2/shortstack` | 2 | 0.1s |  |
+| 15 | `trace-as2/super` | 8 | 0.2s |  |
+| 16 | `trace-as2/this` | 8 | 0.1s |  |
 
 ## Ruffle-Matched Tests
 
@@ -53,7 +54,7 @@
 
 | # | Test | Our diffs | Ruffle diffs | Duration | Notes |
 |---|------|-----------|--------------|----------|-------|
-| 1 | `zeroframe_definesprite` | 2 | 2 | 16.6s |  |
+| 1 | `zeroframe_definesprite` | 2 | 2 | 0.5s |  |
 
 ## Near-Passing Tests
 
@@ -77,9 +78,8 @@ No timeouts.
 
 ## All Output Mismatches
 
-**2 tests** with output mismatch, sorted by match rate (best first)
+**1 tests** with output mismatch, sorted by match rate (best first)
 
 | # | Test | Match Rate | Matching/Total | Actual | Expected | Notes |
 |---|------|------------|----------------|--------|----------|-------|
-| 1 | `tags_after_last_showframe` | 6.7% | 1/15 | 15 | 1 |  |
-| 2 | `jump_to_prev_block` | 0.0% | 0/1 | 1 | 1 |  |
+| 1 | `jump_to_prev_block` | 0.0% | 0/1 | 1 | 1 |  |
