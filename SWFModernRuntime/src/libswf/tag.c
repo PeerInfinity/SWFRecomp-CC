@@ -5212,6 +5212,12 @@ static void clear_display_entry(SWFAppContext* app_context, size_t depth)
 	display_list[depth].clip_action_count = 0;
 	display_list[depth].accumulated_clip_actions = NULL;
 	display_list[depth].accumulated_clip_action_count = 0;
+	// Reset per-MC script-override flags. When the MC at this depth is removed,
+	// its identity is gone — a subsequent fresh PlaceObject2 at the same depth
+	// places a new MC that hasn't been touched by AS yet (matrix_test
+	// remove+re-add+setMatrix sequence).
+	display_list[depth].transformed_by_script = 0;
+	display_list[depth].cx_overridden = 0;
 }
 
 // Recursively fire CLIP_EVENT_UNLOAD for children of a display object.
