@@ -1,6 +1,6 @@
 # Shumway Test Suite Status
 
-Last updated: 2026-04-21 (CI run at 7155a774)
+Last updated: 2026-05-01 (CI run at 25231855425)
 
 ## Quick Summary
 
@@ -9,10 +9,10 @@ Last updated: 2026-04-21 (CI run at 7155a774)
 | Metric | Value |
 |--------|-------|
 | Total tests | 92 |
-| Passing | **61** (66.3%) |
-| Ruffle-matched | 1 |
-| Effective pass | **62** (67.4%) |
-| Failing | 30 |
+| Passing | **65** (70.7%) |
+| Ruffle-matched | 2 |
+| Effective pass | **67** (72.8%) |
+| Failing | 25 |
 
 **Breakdown by sub-tree** (flat suite recurses into subdirs):
 
@@ -20,12 +20,14 @@ Last updated: 2026-04-21 (CI run at 7155a774)
 |----------|-------|------|----|------|
 | Flat root (no subdir) | 10 | 10 | 0 | 0 |
 | `avm1/` | 47 | 45 | 1 | 1 (`moviecliploader`) |
-| `fuzz/` | 30 | 3 | 0 | 27 |
-| `timeline/` | 5 | 3 | 0 | 2 (`timeline_as2_1`, `timeline_as2_5`) |
+| `fuzz/` | 30 | 5 | 1 | 24 |
+| `timeline/` | 5 | 5 | 0 | 0 |
 
 **Flat root is still 100% passing**: all 10 remaining tests (add, avm1timeline1, avm1timeline2, button3, doubleAndRegister, fscommand1, gradientTransform, invalidClipDepth, movieinfo1, targetPath1) pass.
 
-**Remaining failing clusters** come from `fuzz/` (27 fail — fuzzer-generated SWFs, useful as an edge-case source for the runtime/recompiler), `avm1/` sub-tree (1 fail — see below), and `timeline/` (2 fail).
+**`timeline/` is now 100% passing** (5/5) — `timeline_as2_1` and `timeline_as2_5` flipped to PASS since the previous snapshot, picked up via the cross-cutting fixes (Instance-v* native ctor, Global-v6 case-insensitive lookup, GetMember/SetMember hidden own-prop walk, ecmaToInt32 trunc, ASSetPropFlags array, convertFloat strict mode).
+
+**Remaining failing clusters** come from `fuzz/` (24 fail — fuzzer-generated SWFs, useful as an edge-case source for the runtime/recompiler) and `avm1/` sub-tree (1 fail — see below).
 
 ### AVM1 subdirectory (`from_shumway/avm1/`)
 

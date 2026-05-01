@@ -1,8 +1,27 @@
 # Current Ruffle Test Status
 
-Last updated: 2026-05-01 (CI run at 7155a774, ruffle-test-results 41667cc4; bitmap_filters fix pending CI)
+Last updated: 2026-05-01 (CI run at 25231855425, ruffle-test-results 59aedf5a; loadvars_tostring + bitmap_filters confirmed in CI)
 
-## Latest fixes (2026-05-01, pending CI)
+## Latest fixes (2026-05-01, in CI at 25231855425)
+
+- **`loadvars_tostring` PASS (5/5).** `builtin_loadvars_toString`
+  iterated own_props and serialized `p->value` directly, ignoring
+  addProperty-defined virtual properties. For an entry registered via
+  `lv.addProperty(name, getter, setter)`, `p->value` is the placeholder
+  undefined while the live value comes from invoking the getter; the
+  old code yielded `name=undefined`. Fix: when `p->getter` is
+  non-NULL, call `invokePropertyGetter(lv)` and serialize the returned
+  value; otherwise keep using `p->value`. Throws inside the getter
+  still longjmp through to the bytecode-level try/catch via
+  `g_exception_state` (matches the test's `Caught: some error` path);
+  self-recursive getters (`return this.k` on a `k` virtual prop) hit
+  `MAX_SPECIAL_DEPTH` and return `undefined`, matching Ruffle.
+  Verified: 22-test AVM1 LoadVars/addProperty/watch/external_interface/
+  closure/goto/unload regression battery (22/22), plus 3 pre-existing
+  accepted failures (`load_vars`, `loadvariables_method`,
+  `watch_virtual_property` — all on `ignored_tests.txt`) unchanged.
+  Brings filtered AVM1 to 603/603 effective (100%) — zero filtered
+  failures across the suite.
 
 - **`bitmap_filters` PASS (548/548).** Two changes: (1) timeline filter
   reconstruction (`actionGetMember` on `mc.filters` → FilterListData path
@@ -32,8 +51,8 @@ Last updated: 2026-05-01 (CI run at 7155a774, ruffle-test-results 41667cc4; bitm
 
 ## Quick Summary
 
-- **Pass rate (CI, latest)**: 597/641 (93.1%) raw, **606/641 (94.5%) effective** (raw + 9 ruffle_matched), **600/600 (100.0%) filtered** — zero filtered failures.
-- **Test count**: 641 (unchanged). 41 tests in `ignored_tests.txt` (accepted diffs / Ruffle-vs-Flash / Ruffle known_failure).
+- **Pass rate (CI, latest)**: 600/643 (93.3%) raw, **609/643 (94.7%) effective** (raw + 9 ruffle_matched), **603/603 (100.0%) filtered** — zero filtered failures.
+- **Test count**: 643 (+2 from upstream sync). 42 tests in `ignored_tests.txt` (accepted diffs / Ruffle-vs-Flash / Ruffle known_failure).
 - **Image test baseline**: 14/31 strict image match, 10/31 tolerance pass.
 - **Main failure types** (raw, all in ignored list): output_mismatch (35), runtime_error/segfault/timeout (0), compile_fail (0).
 - **Filtered effective pass: 100%.** No actionable AVM1 failures remain.

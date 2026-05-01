@@ -1,6 +1,16 @@
 # Gnash Test Suite Status
 
-Last updated: 2026-04-30 (CI snapshot at 61229899 includes case-v6, ExternalInterface-v6/v7, DepthLimitsTest fixes from this session, plus replace_sprites1test from 2026-04-29. movieclip_destruction_test2 fix from this session pending CI.)
+Last updated: 2026-05-01 (CI snapshot at 25231855425 / ruffle-test-results 59aedf5a. All 2026-04-30 + 2026-05-01 fixes now confirmed in CI: case-v6, ExternalInterface-v6/v7, DepthLimitsTest, replace_sprites1test, movieclip_destruction_test2, tags_after_last_showframe, plus Instance-v5/v6/v7/v8 and Global-v6 from this session.)
+
+### CI snapshot (commit 48a97e0b, run 25231855425, 2026-05-01)
+
+| Suite | Pass | RM | Effective | Total | Rate |
+|-------|------|----|-----------|-------|------|
+| actionscript.all | 122 | 63 | 185 | 190 | 97.4% |
+| misc-ming.all | 61 | 14 | 75 | 102 | 73.5% |
+| misc-mtasc.all | 7 | 2 | 9 | 9 | 100.0% |
+| misc-swfc.all | 6 | 3 | 9 | 16 | 56.2% |
+| misc-swfmill.all | 16 | 1 | 17 | 18 | 94.4% |
 
 ### CI snapshot (commit 61229899, run 2026-04-30)
 
@@ -22,7 +32,11 @@ Last updated: 2026-04-30 (CI snapshot at 61229899 includes case-v6, ExternalInte
 | misc-swfc.all | 8 | 16 | 50.0% |
 | misc-swfmill.all | 16 | 18 | 88.9% |
 
-### Latest fixes (2026-05-01, pending CI)
+### Latest fixes (2026-05-01, in CI at 25231855425)
+
+- **Instance-v5 / Instance-v6 / Instance-v7 / Instance-v8 (actionscript.all) → effective +4 (commit faf492a5).** Three changes: (a) `new` on native non-constructor C functions (e.g. `new Math()`, `new Date.UTC()`) creates an empty object with `__proto__ = ctor.prototype` instead of crashing; (b) `Object.prototype` mutation protection — `Object.prototype.x = y` writes are silently dropped in SWF<=5 (matches Flash); (c) non-object prototype propagation: when `Foo.prototype` is set to a non-object value, `new Foo()` falls back to `Object.prototype`.
+
+- **Global-v6 (actionscript.all) → effective +1 (commit 600dc2c1).** `actionGetVariable` now folds the lookup name to lowercase before hitting the built-in registry in SWF<=6, so `Math.max` / `MATH.MAX` / `mAtH.mAx` all resolve to the same builtin (matches SWF<=6 case-insensitive variable resolution).
 
 - **`tags_after_last_showframe` (misc-swfmill) → PASS (+1).** Recompiler
   fix in `SWFRecomp/src/swf.cpp` END_TAG handler: when the SWF has tags
@@ -44,7 +58,7 @@ Last updated: 2026-04-30 (CI snapshot at 61229899 includes case-v6, ExternalInte
   `action_order` directory recomp_fail), 4-test Shumway avm1 spot
   check (4/4), 3-test Shumway timeline (3/3).
 
-### Latest fixes (2026-04-30, pending CI)
+### Latest fixes (2026-04-30, in CI at 25231855425)
 
 - **`movieclip_destruction_test2` (misc-swfc) → PASS (+1).** Cross-cutting
   fix: `actionSetMember` on the root MovieClip now propagates writes to
