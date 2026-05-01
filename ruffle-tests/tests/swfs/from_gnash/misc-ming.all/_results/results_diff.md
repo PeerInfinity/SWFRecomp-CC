@@ -1,15 +1,28 @@
 # Ruffle Test Results Diff
 
-**Previous:** `e6170c519572` (2026-05-01T00:38:12.320419+00:00)
-**Current:** `88cfa5ac2662` (2026-05-01T01:42:54.131329+00:00)
+**Previous:** `88cfa5ac2662` (2026-05-01T01:42:54.131329+00:00)
+**Current:** `ae319d2d373f` (2026-05-01T02:30:33.205209+00:00)
 
 ## Summary
 
 | Metric | Previous | Current | Delta |
 |--------|----------|---------|-------|
-| Passing | 59 | 59 | 0 |
+| Passing | 59 | 61 | +2 |
 | Total | 102 | 102 | 0 |
-| Pass rate | 57.8% | 57.8% | 0% |
-| Mismatched lines | 1772 | 1772 | 0 |
+| Pass rate | 57.8% | 59.8% | +2.0% |
+| Mismatched lines | 1772 | 1774 | +2 |
+|   Decreased | | | -10 |
+|   Increased | | | +12 |
 
-No changes detected.
+## Newly Passing (2)
+
+| Test | Previous Status | Lines (prev) | Lines (now) |
+|------|----------------|--------------|-------------|
+| `displaylist_depths/displaylist_depths_test8` | output_mismatch | 10/15 | 15/15 |
+| `loading/LoadVarsTest` | output_mismatch | 31/36 | 36/36 |
+
+## Line Count Changed (1)
+
+| Test | Status | Lines (prev) | Lines (now) | Diff |
+|------|--------|--------------|-------------|------|
+| `matrix_test` | output_mismatch | 918/1086 | 906/1086 | +12 |
