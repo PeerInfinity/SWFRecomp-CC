@@ -1,10 +1,10 @@
 # Ruffle Test Results (Filtered)
 
-**Date**: 2026-05-01 00:38 UTC
+**Date**: 2026-05-01 01:42 UTC
 
-**Git SHA**: `e6170c5195`
+**Git SHA**: `88cfa5ac26`
 
-**Run Duration**: 0m 55s
+**Run Duration**: 2m 11s
 
 **Filtered**: 2 tests ignored out of 47 available
 
@@ -25,51 +25,51 @@
 
 | # | Test | Lines | Duration | Notes |
 |---|------|-------|----------|-------|
-| 1 | `array` | 7 | 1.0s |  |
-| 2 | `bitmapdata/getPixel` | 2 | 0.8s |  |
-| 3 | `bitmapdata/loadBitmap` | 3 | 0.4s |  |
-| 4 | `callee` | 2 | 0.4s |  |
-| 5 | `depth` | 6 | 1.2s |  |
-| 6 | `doactionorder/doactionorder` | 7 | 1.2s |  |
-| 7 | `doactionorder/symbolclass` | 4 | 1.1s |  |
-| 8 | `duplicateMovieClip/dontremove` | 6 | 1.1s |  |
-| 9 | `duplicateMovieClip/duplicateMovieClip` | 4 | 1.0s |  |
-| 10 | `duplicateMovieClip/name-coercion` | 3 | 0.9s |  |
-| 11 | `duplicateMovieClip/samedepth` | 6 | 0.3s |  |
-| 12 | `externalinterface` | 4 | 0.3s |  |
-| 13 | `filters` | 149 | 0.3s |  |
-| 14 | `haxe/flocons1` | 2 | 0.3s |  |
-| 15 | `haxe/flocons2` | 3 | 0.3s |  |
-| 16 | `label` | 4 | 17.7s |  |
-| 17 | `levels` | 9 | 1.0s |  |
-| 18 | `loadevent` | 9 | 1.3s |  |
-| 19 | `loadvariables/loadvariables` | 7 | 1.0s |  |
-| 20 | `loadvariables/loadvars` | 2 | 0.4s |  |
-| 21 | `lookup` | 3 | 0.3s |  |
-| 22 | `mouse-transparency` | 1 | 1.1s |  |
-| 23 | `nativeinheritance` | 6 | 1.0s |  |
-| 24 | `nested-button` | 1 | 0.9s |  |
-| 25 | `operations` | 13 | 0.9s |  |
+| 1 | `array` | 7 | 0.5s |  |
+| 2 | `bitmapdata/getPixel` | 2 | 0.5s |  |
+| 3 | `bitmapdata/loadBitmap` | 3 | 1.1s |  |
+| 4 | `callee` | 2 | 1.1s |  |
+| 5 | `depth` | 6 | 0.6s |  |
+| 6 | `doactionorder/doactionorder` | 7 | 0.5s |  |
+| 7 | `doactionorder/symbolclass` | 4 | 0.5s |  |
+| 8 | `duplicateMovieClip/dontremove` | 6 | 17.1s |  |
+| 9 | `duplicateMovieClip/duplicateMovieClip` | 4 | 0.5s |  |
+| 10 | `duplicateMovieClip/name-coercion` | 3 | 0.5s |  |
+| 11 | `duplicateMovieClip/samedepth` | 6 | 1.1s |  |
+| 12 | `externalinterface` | 4 | 1.0s |  |
+| 13 | `filters` | 149 | 1.4s |  |
+| 14 | `haxe/flocons1` | 2 | 0.9s |  |
+| 15 | `haxe/flocons2` | 3 | 0.7s |  |
+| 16 | `label` | 4 | 17.6s |  |
+| 17 | `levels` | 9 | 0.5s |  |
+| 18 | `loadevent` | 9 | 0.5s |  |
+| 19 | `loadvariables/loadvariables` | 7 | 0.5s |  |
+| 20 | `loadvariables/loadvars` | 2 | 1.1s |  |
+| 21 | `lookup` | 3 | 1.1s |  |
+| 22 | `mouse-transparency` | 1 | 0.5s |  |
+| 23 | `nativeinheritance` | 6 | 0.4s |  |
+| 24 | `nested-button` | 1 | 13.8s |  |
+| 25 | `operations` | 13 | 1.0s |  |
 | 26 | `property-paths/property-paths-6` | 6 | 0.9s |  |
-| 27 | `property-paths/property-paths-7` | 7 | 0.9s |  |
-| 28 | `propertycase/propertycase` | 7 | 1.0s |  |
+| 27 | `property-paths/property-paths-7` | 7 | 0.5s |  |
+| 28 | `propertycase/propertycase` | 7 | 0.4s |  |
 | 29 | `propertycase/propertycase-preserving-6` | 2 | 1.0s |  |
 | 30 | `propertycase/propertycase-preserving-7` | 5 | 0.3s |  |
-| 31 | `rollover` | 4 | 0.3s |  |
-| 32 | `scope` | 14 | 0.3s |  |
-| 33 | `setinterval` | 20 | 0.4s |  |
-| 34 | `settimeout` | 17 | 0.3s |  |
-| 35 | `super` | 11 | 0.4s |  |
-| 36 | `target` | 18 | 0.3s |  |
-| 37 | `text-bind` | 0 | 0.4s |  |
+| 31 | `rollover` | 4 | 17.8s |  |
+| 32 | `scope` | 14 | 1.1s |  |
+| 33 | `setinterval` | 20 | 0.9s |  |
+| 34 | `settimeout` | 17 | 0.8s |  |
+| 35 | `super` | 11 | 1.1s |  |
+| 36 | `target` | 18 | 1.0s |  |
+| 37 | `text-bind` | 0 | 15.8s |  |
 | 38 | `textfield/textfield-html` | 4 | 1.1s |  |
-| 39 | `textfield/textfield-text-setters` | 8 | 0.3s |  |
-| 40 | `undefined/undefined-swf6` | 39 | 0.9s |  |
+| 39 | `textfield/textfield-text-setters` | 8 | 0.8s |  |
+| 40 | `undefined/undefined-swf6` | 39 | 0.5s |  |
 | 41 | `undefined/undefined-swf7` | 39 | 0.9s |  |
 | 42 | `watch` | 2 | 1.0s |  |
 | 43 | `xml/xmlbuild` | 1 | 1.0s |  |
-| 44 | `xml/xmlload` | 4 | 1.2s |  |
-| 45 | `xml/xmlstring` | 9 | 1.0s |  |
+| 44 | `xml/xmlload` | 4 | 1.1s |  |
+| 45 | `xml/xmlstring` | 9 | 0.5s |  |
 
 ## Near-Passing Tests
 
