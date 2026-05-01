@@ -815,11 +815,6 @@ void swfStart(SWFAppContext* app_context)
 	extern MovieClip root_movieclip;
 	root_movieclip.display_obj = ng_get_root_display_obj();
 
-	if (app_context->frame_count > 0) {
-		root_movieclip.totalframes = (int)app_context->frame_count;
-		root_movieclip.framesloaded = (int)app_context->frame_count;
-	}
-
 #ifdef SWF_URL
 	strncpy(root_movieclip.url, SWF_URL, sizeof(root_movieclip.url) - 1);
 	root_movieclip.url[sizeof(root_movieclip.url) - 1] = '\0';
@@ -993,15 +988,25 @@ void swfStart(SWFAppContext* app_context)
 				{
 					funcs[current_frame](app_context);
 					// If a goto inside the script inlined the target frame's body
-					// AND the recompiler-emitted last-frame wrap-back (next_frame=0,
-					// manual_next_frame=1) fired afterward, undo the wrap-back so
-					// the natural advance moves to current_frame+1 (gotoAndPlay)
-					// or stays in place (gotoAndStop). Without this, gotoAndPlay
-					// from inside the last frame's script would loop back to 0.
+					// AND the recompiler-emitted last-frame wrap-back fired
+					// afterward (signature: next_frame=0; manual_next_frame=1),
+					// undo the wrap-back so the natural advance moves to
+					// current_frame+1 (gotoAndPlay) or stays in place
+					// (gotoAndStop). Without this, gotoAndPlay from inside the
+					// last frame's script would loop back to 0.
+					//
+					// Skip the undo if g_deferred_root_goto is set — that signal
+					// comes from ng_executeGotoTagsOnly (e.g.,
+					// test.gotoAndStop("/:N") with a force_root path), which
+					// relies on manual_next_frame=1 + next_frame=target staying
+					// set so the main loop processes the deferred goto on the
+					// next iteration. (Key test: avm1/goto_frame_number.)
 					if (g_goto_inlined_in_caller_frame)
 					{
 						g_goto_inlined_in_caller_frame = 0;
-						manual_next_frame = 0;
+						if (manual_next_frame && next_frame == 0 && !g_deferred_root_goto) {
+							manual_next_frame = 0;
+						}
 					}
 				}
 				else

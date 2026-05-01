@@ -856,11 +856,6 @@ void swfStart(SWFAppContext* app_context)
 	extern MovieClip root_movieclip;
 	root_movieclip.display_obj = ng_get_root_display_obj();
 
-	if (app_context->frame_count > 0) {
-		root_movieclip.totalframes = (int)app_context->frame_count;
-		root_movieclip.framesloaded = (int)app_context->frame_count;
-	}
-
 #ifdef SWF_URL
 	strncpy(root_movieclip.url, SWF_URL, sizeof(root_movieclip.url) - 1);
 	root_movieclip.url[sizeof(root_movieclip.url) - 1] = '\0';
@@ -973,12 +968,17 @@ void swfStart(SWFAppContext* app_context)
 				{
 					funcs[current_frame](app_context);
 					// See swf_core.c: undo the recompiler-emitted last-frame
-					// wrap-back when a goto inlined the target during this frame.
+					// wrap-back when a goto inlined the target during this
+					// frame. Skip if g_deferred_root_goto is pending (a
+					// different goto path that needs manual_next_frame
+					// preserved).
 					extern int g_goto_inlined_in_caller_frame;
 					if (g_goto_inlined_in_caller_frame)
 					{
 						g_goto_inlined_in_caller_frame = 0;
-						manual_next_frame = 0;
+						if (manual_next_frame && next_frame == 0 && !g_deferred_root_goto) {
+							manual_next_frame = 0;
+						}
 					}
 				}
 				else

@@ -16693,10 +16693,11 @@ MovieClip root_movieclip = {
 	.currentframe = 1,
 #ifdef SWF_FRAME_COUNT
 	.totalframes = SWF_FRAME_COUNT,
+	.framesloaded = SWF_FRAME_COUNT,  // All frames loaded for embedded SWFs
 #else
 	.totalframes = 1,
+	.framesloaded = 1,
 #endif
-	.framesloaded = 1,  // All frames loaded in NO_GRAPHICS mode
 	.name = "",       // _root._name is empty string in Flash
 	.target = "/",    // _root._target is "/" (slash-path format)
 	.droptarget = "",  // No drag/drop in NO_GRAPHICS mode
