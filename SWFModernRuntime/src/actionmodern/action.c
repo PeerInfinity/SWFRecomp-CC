@@ -33880,6 +33880,19 @@ check_special_vars:
 					setProperty(app_context, g_object_constructor.prototype_obj, "constructor", 11, &_cv);
 				}
 
+				// Mark Object.prototype as permanently read-only so
+				// `Object.prototype = X` is silently ignored (Flash quirk).
+				// PERM_READONLY survives ASSetPropFlags. The actual prototype
+				// is read from prototype_obj via the FUNCTION+"prototype" path
+				// in actionGetMember; we only place an UNDEFINED sentinel here
+				// so the WRITABLE check in actionSetMember rejects writes.
+				// Required by gnash actionscript.all/Instance-v5/v6/v7/v8.
+				{
+					ActionVar _uv = {0}; _uv.type = ACTION_STACK_VALUE_UNDEFINED;
+					setPropertyWithFlags(app_context, g_object_constructor.own_props,
+						"prototype", 9, &_uv, PROPERTY_FLAG_PERM_READONLY);
+				}
+
 				g_object_constructor_init = 1;
 			}
 			PUSH(ACTION_STACK_VALUE_FUNCTION, (u64)&g_object_constructor);
@@ -44284,10 +44297,52 @@ void actionNewObject(SWFAppContext* app_context)
 			}
 			else
 			{
-				// Primitive (number, string, boolean) → wrap in object
+				// Primitive (number, string, boolean) → wrap in object.
+				// If the corresponding type constructor's prototype has been
+				// replaced with a non-object (e.g. `String.prototype = 8`),
+				// propagate that value as the wrapper's __proto__ verbatim and
+				// skip installing own valueOf/toString — so `s == undefined`
+				// (Flash quirk; gnash actionscript.all/Instance-v5/v6/v7/v8).
+				const char* _type_ctor_name = NULL;
+				u32 _type_ctor_len = 0;
+				if (arg->type == ACTION_STACK_VALUE_STRING) {
+					_type_ctor_name = "String"; _type_ctor_len = 6;
+				} else if (arg->type == ACTION_STACK_VALUE_F32 ||
+				           arg->type == ACTION_STACK_VALUE_F64) {
+					_type_ctor_name = "Number"; _type_ctor_len = 6;
+				} else if (arg->type == ACTION_STACK_VALUE_BOOLEAN) {
+					_type_ctor_name = "Boolean"; _type_ctor_len = 7;
+				}
+				ActionVar* _ow_stored_proto = NULL;
+				ActionVar _ow_stored_copy = {0};
+				if (_type_ctor_name != NULL) {
+					// Use actionGetVariable to find the type ctor — same path
+					// that `String.prototype = X` modifies. lookupFunctionByName
+					// misses lazy-init constructors like g_string_constructor.
+					PUSH_STR(_type_ctor_name, _type_ctor_len);
+					actionGetVariable(app_context);
+					ActionVar _tcv;
+					popVar(app_context, &_tcv);
+					if (_tcv.type == ACTION_STACK_VALUE_FUNCTION) {
+						ASFunction* _tcf = (ASFunction*) _tcv.data.numeric_value;
+						if (_tcf != NULL && _tcf->prototype_obj == NULL && _tcf->own_props != NULL) {
+							ActionVar* _sp = getProperty(_tcf->own_props, "prototype", 9);
+							if (_sp != NULL && _sp->type != ACTION_STACK_VALUE_UNDEFINED &&
+							    _sp->type != ACTION_STACK_VALUE_OBJECT) {
+								_ow_stored_copy = *_sp;
+								_ow_stored_proto = &_ow_stored_copy;
+							}
+						}
+					}
+				}
+
 				// typeof returns "object" but trace still shows primitive value
 				ASObject* wrapper = allocObject(app_context, 8);
-				setObjectProto(app_context, wrapper);
+				if (_ow_stored_proto != NULL) {
+					setProperty(app_context, wrapper, "__proto__", 9, _ow_stored_proto);
+				} else {
+					setObjectProto(app_context, wrapper);
+				}
 
 				// Store the primitive value for valueOf/toString
 				ActionVar prim_val;
@@ -44316,15 +44371,21 @@ void actionNewObject(SWFAppContext* app_context)
 					g_wrapper_funcs_init = 1;
 				}
 
-				ActionVar vo_val = {0};
-				vo_val.type = ACTION_STACK_VALUE_FUNCTION;
-				VAL(u64, &vo_val.data.numeric_value) = (u64) &g_wrapper_valueOf_func;
-				setProperty(app_context, wrapper, "valueOf", 7, &vo_val);
+				// Skip own valueOf/toString when the type ctor's prototype was
+				// replaced with a non-object — Flash routes lookups through
+				// __proto__ which won't resolve, so `s.valueOf()` is undefined
+				// and `s == undefined` succeeds.
+				if (_ow_stored_proto == NULL) {
+					ActionVar vo_val = {0};
+					vo_val.type = ACTION_STACK_VALUE_FUNCTION;
+					VAL(u64, &vo_val.data.numeric_value) = (u64) &g_wrapper_valueOf_func;
+					setProperty(app_context, wrapper, "valueOf", 7, &vo_val);
 
-				ActionVar ts_val = {0};
-				ts_val.type = ACTION_STACK_VALUE_FUNCTION;
-				VAL(u64, &ts_val.data.numeric_value) = (u64) &g_prim_wrapper_toString_func;
-				setProperty(app_context, wrapper, "toString", 8, &ts_val);
+					ActionVar ts_val = {0};
+					ts_val.type = ACTION_STACK_VALUE_FUNCTION;
+					VAL(u64, &ts_val.data.numeric_value) = (u64) &g_prim_wrapper_toString_func;
+					setProperty(app_context, wrapper, "toString", 8, &ts_val);
+				}
 
 				new_obj = wrapper;
 				PUSH(ACTION_STACK_VALUE_OBJECT, (u64) new_obj);
@@ -44396,16 +44457,30 @@ void actionNewObject(SWFAppContext* app_context)
 		if (STACK_TOP_TYPE == ACTION_STACK_VALUE_FUNCTION)
 		{
 			ASFunction* ctor = (ASFunction*) STACK_TOP_VALUE;
-			if (ctor->prototype_obj == NULL)
+			// If user assigned a non-object value to String.prototype
+			// (`String.prototype = 8`), propagate it to s.__proto__ verbatim
+			// (Flash quirk; required by gnash actionscript.all/Instance-v*).
+			ActionVar* _stored_sp = NULL;
+			if (ctor->prototype_obj == NULL && ctor->own_props != NULL)
+				_stored_sp = getProperty(ctor->own_props, "prototype", 9);
+			if (_stored_sp != NULL && _stored_sp->type != ACTION_STACK_VALUE_UNDEFINED &&
+			    _stored_sp->type != ACTION_STACK_VALUE_OBJECT)
 			{
-				ctor->prototype_obj = allocObject(app_context, 4);
-				retainObject(ctor->prototype_obj);
-				setObjectProto(app_context, ctor->prototype_obj);
+				setProperty(app_context, str_obj, "__proto__", 9, _stored_sp);
 			}
-			ActionVar proto_var = {0};
-			proto_var.type = ACTION_STACK_VALUE_OBJECT;
-			proto_var.data.numeric_value = (u64) ctor->prototype_obj;
-			setProperty(app_context, str_obj, "__proto__", 9, &proto_var);
+			else
+			{
+				if (ctor->prototype_obj == NULL)
+				{
+					ctor->prototype_obj = allocObject(app_context, 4);
+					retainObject(ctor->prototype_obj);
+					setObjectProto(app_context, ctor->prototype_obj);
+				}
+				ActionVar proto_var = {0};
+				proto_var.type = ACTION_STACK_VALUE_OBJECT;
+				proto_var.data.numeric_value = (u64) ctor->prototype_obj;
+				setProperty(app_context, str_obj, "__proto__", 9, &proto_var);
+			}
 		}
 		else
 		{
@@ -45110,20 +45185,33 @@ void actionNewObject(SWFAppContext* app_context)
 			}
 
 			// Set __proto__ to constructor's prototype (for prototype chain inheritance)
-			// Lazily create prototype if it doesn't exist yet
-			if (ctor_func->prototype_obj == NULL)
+			// Lazily create prototype if it doesn't exist yet.
+			// If the user assigned a non-object value to f.prototype (e.g.
+			// `Cl.prototype = 8`), prototype_obj is NULL but own_props["prototype"]
+			// holds the literal value — propagate it to obj.__proto__ verbatim
+			// (Flash quirk; required by gnash actionscript.all/Instance-v5/v6/v7/v8).
+			ActionVar* _stored_proto = NULL;
+			if (ctor_func->prototype_obj == NULL && ctor_func->own_props != NULL)
+				_stored_proto = getProperty(ctor_func->own_props, "prototype", 9);
+			if (_stored_proto != NULL && _stored_proto->type != ACTION_STACK_VALUE_UNDEFINED &&
+			    _stored_proto->type != ACTION_STACK_VALUE_OBJECT)
 			{
-				ctor_func->prototype_obj = allocObject(app_context, 4);
-				retainObject(ctor_func->prototype_obj);
-				setObjectProto(app_context, ctor_func->prototype_obj);
-				// Set constructor property pointing back to the function
-				ActionVar ctor_var;
-				ctor_var.type = ACTION_STACK_VALUE_FUNCTION;
-				ctor_var.str_size = 0;
-				ctor_var.data.numeric_value = (u64) ctor_func;
-				setProperty(app_context, ctor_func->prototype_obj, "constructor", 11, &ctor_var);
+				setProperty(app_context, obj, "__proto__", 9, _stored_proto);
 			}
+			else
 			{
+				if (ctor_func->prototype_obj == NULL)
+				{
+					ctor_func->prototype_obj = allocObject(app_context, 4);
+					retainObject(ctor_func->prototype_obj);
+					setObjectProto(app_context, ctor_func->prototype_obj);
+					// Set constructor property pointing back to the function
+					ActionVar ctor_var;
+					ctor_var.type = ACTION_STACK_VALUE_FUNCTION;
+					ctor_var.str_size = 0;
+					ctor_var.data.numeric_value = (u64) ctor_func;
+					setProperty(app_context, ctor_func->prototype_obj, "constructor", 11, &ctor_var);
+				}
 				ActionVar proto_var;
 				proto_var.type = ACTION_STACK_VALUE_OBJECT;
 				proto_var.str_size = 0;
@@ -46038,6 +46126,44 @@ void actionNewMethod(SWFAppContext* app_context)
 		// User-defined constructor function from object property
 		// Create new object for 'this' context
 		ASObject* new_obj_inst = allocObject(app_context, 8);
+
+		// Native non-constructor C functions (Math.cos, Mouse.hide, Date.UTC, etc.)
+		// have `no_lazy_prototype=1` set by setupNativeFuncOwnProps and no
+		// prototype_obj. `new` on these creates a bare object with NO __proto__
+		// chain (Flash AVM1 quirk). Constructor is still set per SWF version
+		// rules; the function is invoked with the bare object as `this`.
+		// Required by gnash actionscript.all/Instance-v5/v6/v7/v8.
+		bool _native_non_ctor = (user_ctor_func->no_lazy_prototype != 0 &&
+		                          user_ctor_func->prototype_obj == NULL);
+
+		if (_native_non_ctor)
+		{
+			ActionVar ctor_inst_v = {0};
+			ctor_inst_v.type = ACTION_STACK_VALUE_FUNCTION;
+			ctor_inst_v.data.numeric_value = (u64) user_ctor_func;
+			if (g_swf_version < 7) {
+				setProperty(app_context, new_obj_inst, "constructor", 11, &ctor_inst_v);
+			}
+			if (g_swf_version >= 6) {
+				setPropertyWithFlags(app_context, new_obj_inst, "__constructor__", 15, &ctor_inst_v, PROPERTY_FLAGS_DONTENUM);
+			}
+
+			ActionVar _nnc_ret = {0};
+			if (user_ctor_func->advanced_func != NULL) {
+				ActionVar* _nnc_regs = NULL;
+				if (user_ctor_func->register_count > 0)
+					_nnc_regs = (ActionVar*) HCALLOC(user_ctor_func->register_count, sizeof(ActionVar));
+				_nnc_ret = user_ctor_func->advanced_func(app_context, args, num_args, _nnc_regs, new_obj_inst);
+				if (_nnc_regs != NULL) FREE(_nnc_regs);
+			} else if (user_ctor_func->simple_func != NULL) {
+				for (u32 i = 0; i < num_args; i++)
+					pushVar(app_context, &args[i]);
+				_nnc_ret = ((ActionVar(*)(SWFAppContext*))user_ctor_func->simple_func)(app_context);
+			}
+			(void)_nnc_ret;
+			PUSH(ACTION_STACK_VALUE_OBJECT, (u64) new_obj_inst);
+			return;
+		}
 
 		// Set native_type for native-backed classes (flash.* filters and global stubs)
 		if (ctor_name != NULL) {

@@ -859,6 +859,9 @@ void initDatePrototype(SWFAppContext* app_context) {
 		g_date_utc_func.function_type = 2;
 		g_date_utc_func.param_count = 0;
 		g_date_utc_func.advanced_func = (Function2Ptr)builtin_date_UTC;
+		// Mark as native non-constructor: `new Date.UTC()` produces a bare
+		// object with no __proto__ (Flash AVM1 quirk). See actionNewMethod.
+		g_date_utc_func.no_lazy_prototype = 1;
 		registerNativeFunction(&g_date_utc_func);
 
 		ActionVar utc_fv = {0};
