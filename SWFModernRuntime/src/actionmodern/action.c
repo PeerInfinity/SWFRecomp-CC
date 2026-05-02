@@ -56380,8 +56380,13 @@ void actionCallMethod(SWFAppContext* app_context, char* str_buffer)
 		// when theClass2.prototype = {} (no `new MovieClip()`).
 		// addProperty/hasOwnProperty/etc. on Object.prototype are explicitly
 		// preserved below.
+		// Skip the check for TextFields and Buttons: their __proto__ chain
+		// is TextField.prototype/Button.prototype (which don't include
+		// MovieClip.prototype) but they share the MOVIECLIP dispatch path
+		// for builtins like getDepth, getBounds, etc.
 		int _mcm_chain_bypasses_mc = 0;
-		if (mc != NULL && mc->dynamic_props != NULL) {
+		if (mc != NULL && mc->dynamic_props != NULL
+		    && !MC_IS_TEXTFIELD(mc) && !mc->is_button_mc) {
 			ActionVar* _mcm_dp_proto = getProperty((ASObject*)mc->dynamic_props, "__proto__", 9);
 			if (_mcm_dp_proto != NULL && _mcm_dp_proto->type == ACTION_STACK_VALUE_OBJECT) {
 				initMovieClipPrototype(app_context);
