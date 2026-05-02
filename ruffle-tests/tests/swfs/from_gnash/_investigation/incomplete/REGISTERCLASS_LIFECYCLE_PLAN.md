@@ -166,6 +166,46 @@ risk). Phase 5 is therefore "mostly_complete": frame0 ordering is
 now correct (frame0 actions appear in the right block), only the LOAD
 events are out of order.
 
+### 2026-05-01 session — failed attempt at (a), with diagnosis
+
+Tried adding a top-level proto-chain walk at the start of the MOVIECLIP
+arm of `actionCallMethod`: if `dynamic_props.__proto__` chain doesn't
+reach `MovieClip.prototype`, `goto` directly to the user-defined
+dispatch label in the final `else`. This flipped `registerClassTest2`
+to RUFFLE_MATCHED but **regressed `movieclip_get_instance_at_depth`
+and `watch_textfield`** (TextField MCs lost access to `getDepth`).
+
+Root cause: in our impl (matching Flash convention verified by Gnash
+TextField-v6 line 67 `TextField.prototype.__proto__ == Object.prototype`),
+`TextField.prototype.__proto__` is `Object.prototype`, **not**
+`MovieClip.prototype`. So a TextField MC's chain is
+`tf.dynamic_props → TextField.prototype → Object.prototype` — no
+`MovieClip.prototype` anywhere — yet TextField MCs are still display
+objects and `getDepth` etc. must work. A naive chain walk can't
+distinguish TextField (builtins should work) from a registerClass'd
+MC with a non-MC-extending prototype (builtins should be hidden).
+
+Possible directions for the next attempt:
+1. **Per-MC flag set by `Object.registerClass`** — e.g.
+   `mc->registered_class_overrides_builtins`, set when the registered
+   class's prototype chain doesn't reach `MovieClip.prototype` at
+   registration time. Avoids re-walking the chain on every method call
+   and naturally excludes TextField/Button/Video MCs (which never go
+   through `Object.registerClass`).
+2. **Native-proto allowlist** — chain walk that reaches
+   `MovieClip.prototype` OR `TextField.prototype` OR `Button.prototype`
+   OR `Video.prototype` enables builtins. Simpler but couples the
+   gate to every native subclass we support.
+3. **Constructor-marker check** — `dynamic_props.__proto__` whose
+   `constructor` resolves to a function flagged as "user-registered"
+   (set by `Object.registerClass`) → skip builtins.
+
+Approach 1 is probably cheapest. The flag should be set by
+`actionInvokeRegisteredClassConstructor` (or `Object.registerClass`'s
+prototype-chain-walk) and consumed by all ~30 builtin handlers via a
+single early `if (mc->registered_class_overrides_builtins) goto
+_mc_user_method_dispatch;` near the top of the MOVIECLIP arm.
+
 ## 2026-04-27 session — Phases 1 & 2 landed
 
 **Phase 1 (commit 7311f226):** `actionDispatchMCOnLoad` now mirrors

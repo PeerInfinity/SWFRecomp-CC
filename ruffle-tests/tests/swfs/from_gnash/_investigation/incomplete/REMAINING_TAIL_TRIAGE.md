@@ -335,32 +335,43 @@ Likely a deeper issue with stack/scope state during dispatch.
 CURRENT_STATUS.md — do not re-document.** Cross-reference here
 for completeness.
 
-### swf4opcode (63.2%, 74/117)
+### swf4opcode (94.9%, 111/117)
 
-**Symptom (from earlier diff).** Multiple SWF4-specific path-syntax
-failures:
+**Symptom (from latest diff, 2026-05-01).** 6 remaining FAIL lines,
+all in the `/mc1:_PROPNAME` colon-path tests in the middle of frame
+3:
 
-- `/mc1.x` (slash + dot syntax) returns empty; expected
-  `100`.
-- `/mc1:_xscale` (slash + colon syntax) expected `undefined`,
-  got `100` (treats `_xscale` as the colon-suffix variable
-  name when SWF4 sees it as a property reference).
-- Bare `mc1` (no slash) expected `undefined`, got `_level0.mc1`
-  (SWF4 path resolution treats unprefixed name as variable, not
-  child clip).
-- `!neg` where `neg = -0`: expected PASSED, got FAILED — SWF4
-  NOT opcode on `-0` produces wrong result.
+- `/mc1:_xscale == undefined` — got `100`
+- `/mc1:_yscale == undefined` — got `100`
+- `/mc1:_alpha == undefined` — got `100`
+- `/mc1:_visible == undefined` — got `1`
 
-**Hypothesis.** SWF4 has a different path-resolution syntax than
-SWF5+ — it uses `:varname` for variables and `/path/path:varname`
-for fully-qualified paths. Our runtime uses SWF5+ resolution
-universally. The fix is to gate path syntax on `g_swf_version <= 4`.
+(Plus 2 line-count diffs.) Note the asymmetry verified locally:
+**`/mc1:_x`, `/mc1:_y`, `/mc1:_rotation` already PASS** (return
+undefined as expected). The earlier "`/mc1.x` returns empty" /
+"bare `mc1` resolves wrong" / "`!neg`" symptoms have all been fixed
+in prior sessions; only the four properties above remain.
 
-**Scope.** 4-6 hours: implement SWF4 path syntax handler in
-`actionGetVariable` / `actionGetMember`. Touches the well-trodden
-path-resolution code, requires careful guardrail testing.
-**Promote to standalone plan when work begins** — sufficiently
-self-contained.
+**Hypothesis.** In SWF4, `/path:varname` looks up `varname` as a
+**variable** in the path's scope, not as a special MC property —
+so `_xscale` / `_yscale` / `_alpha` / `_visible` aren't found and
+return undefined. Our `actionGetVariable` slash-colon resolver
+finds `mc1` correctly, then calls `actionGetMember` for
+`_xscale`, which dispatches to the special-property handler and
+returns `mc->xscale` (100). The `_x` / `_y` / `_rotation` cases
+likely succeed via a different code path (worth investigating —
+maybe the resolver fails to find mc1 at the time of those tests
+because of placement-order timing, falling through to the
+variable-lookup branch that returns undefined).
+
+**Scope.** Likely 1-3 hours rather than 4-6 — narrowed to
+"colon-path final segment must use variable-lookup, not
+special-property dispatch, in SWF4." Investigate why `_x` /
+`_y` / `_rotation` already work — that path is the model the
+others should follow. Touches `actionGetVariable`'s slash-colon
+arm in `SWFModernRuntime/src/actionmodern/action.c` (the
+`actionGetMember(prop_name)` call after `target_mc != NULL &&
+prop_len > 0`). **Promote to standalone plan when work begins.**
 
 ### soft_reference_test1 (31.1%, 14/45)
 
