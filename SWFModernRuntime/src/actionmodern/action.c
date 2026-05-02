@@ -13049,14 +13049,113 @@ void initTime(SWFAppContext* app_context)
 // Display Control Operations
 // ==================================================================
 
+// Coerce an ActionVar to f64 via ECMA ToNumber semantics:
+// - NUMBER/BOOLEAN: direct conversion
+// - STRING: strtod (unparseable → NaN)
+// - OBJECT/ARRAY: invoke valueOf via convertFloat (may run script)
+// - UNDEFINED/NULL/other: returns NaN
+// Returns the coerced f64 (which may be NaN, +/-Infinity, or finite).
+// The input ActionVar is not modified; the stack is left as it was.
+static double coerceVarToNumber(SWFAppContext* app_context, ActionVar* value)
+{
+	if (value->type == ACTION_STACK_VALUE_F64)
+		return VAL(double, &value->data.numeric_value);
+	if (value->type == ACTION_STACK_VALUE_F32)
+		return (double) VAL(float, &value->data.numeric_value);
+	if (value->type == ACTION_STACK_VALUE_BOOLEAN)
+		return value->data.numeric_value ? 1.0 : 0.0;
+	if (value->type == ACTION_STACK_VALUE_STRING) {
+		const uint16_t* u16 = varGetU16Ptr(value);
+		if (u16 == NULL || value->str_size == 0) return NAN;
+		char buf[256];
+		u16_to_utf8(u16, value->str_size, buf, sizeof(buf));
+		char* endptr;
+		double d = strtod(buf, &endptr);
+		if (endptr == buf) return NAN;
+		return d;
+	}
+	if (value->type == ACTION_STACK_VALUE_OBJECT || value->type == ACTION_STACK_VALUE_ARRAY) {
+		PUSH(value->type, value->data.numeric_value);
+		STACK_TOP_N = value->str_size;
+		convertFloat(app_context);
+		double d;
+		if (STACK_TOP_TYPE == ACTION_STACK_VALUE_F64) d = VAL(double, &STACK_TOP_VALUE);
+		else if (STACK_TOP_TYPE == ACTION_STACK_VALUE_F32) d = (double) VAL(float, &STACK_TOP_VALUE);
+		else d = NAN;
+		POP();
+		return d;
+	}
+	return NAN;
+}
+
+// Ruffle-compatible property_coerce_to_number for MC numeric setters
+// (_x, _y, _xscale, _yscale, _rotation, _alpha, _width, _height, _visible).
+// Mirrors core/src/avm1/object/stage_object.rs:property_coerce_to_number.
+//
+// Returns 1 with *out_d set to a finite double if the value is a valid number;
+// returns 0 (no-op) if the value is undefined, null, NaN, or +/-Infinity.
+static int propertyCoerceToNumber(SWFAppContext* app_context, ActionVar* value, double* out_d)
+{
+	if (value->type == ACTION_STACK_VALUE_UNDEFINED || value->type == ACTION_STACK_VALUE_NULL)
+		return 0;
+	double d = coerceVarToNumber(app_context, value);
+	if (!isfinite(d)) return 0;
+	*out_d = d;
+	return 1;
+}
+
+// Ruffle's `clamp_to_i32` (avm1/clamp.rs): in-range float → cast to i32 (trunc);
+// NaN / +/-Infinity / out-of-range → INT32_MIN.
+static int32_t clampToI32(double d)
+{
+	if (d >= (double)INT32_MIN && d <= (double)INT32_MAX) return (int32_t) d;
+	return INT32_MIN;
+}
+
+// Normalize a quality string (case-insensitive) to its canonical uppercase form.
+// Returns 1 and writes the canonical form (NUL-terminated) into out_buf on success;
+// returns 0 (and leaves out_buf untouched) for invalid quality values.
+// Valid inputs: "low", "medium", "high", "best", "8x8", "8x8linear", "16x16", "16x16linear".
+static int normalizeQualityValue(const char* in, int in_len, char* out_buf, int out_buf_size)
+{
+	struct { const char* in; const char* out; } table[] = {
+		{ "low",         "LOW" },
+		{ "medium",      "MEDIUM" },
+		{ "high",        "HIGH" },
+		{ "best",        "BEST" },
+		{ "8x8",         "8X8" },
+		{ "8x8linear",   "8X8LINEAR" },
+		{ "16x16",       "16X16" },
+		{ "16x16linear", "16X16LINEAR" },
+	};
+	for (size_t i = 0; i < sizeof(table)/sizeof(table[0]); ++i) {
+		int tlen = (int)strlen(table[i].in);
+		if (in_len == tlen && strncasecmp(in, table[i].in, tlen) == 0) {
+			int olen = (int)strlen(table[i].out);
+			if (olen + 1 > out_buf_size) return 0;
+			memcpy(out_buf, table[i].out, olen);
+			out_buf[olen] = '\0';
+			return 1;
+		}
+	}
+	return 0;
+}
+
 void actionToggleQuality(SWFAppContext* app_context)
 {
-	// In NO_GRAPHICS mode, this is a no-op
-	// In full graphics mode, this would toggle between high and low quality rendering
-	// affecting anti-aliasing, smoothing, etc.
+	// AVM1 ToggleQuality opcode: cycles between LOW and HIGH/BEST on the stage.
+	// Mirrors Ruffle: HIGH/BEST -> LOW, LOW/MEDIUM -> HIGH (no bitmap downsampling
+	// tracking here yet, so MEDIUM/LOW always go to HIGH).
+	extern MovieClip root_movieclip;
+	MovieClip* mc = &root_movieclip;
+	if (strcasecmp(mc->quality, "HIGH") == 0 || strcasecmp(mc->quality, "BEST") == 0) {
+		strcpy(mc->quality, "LOW");
+	} else {
+		strcpy(mc->quality, "HIGH");
+	}
 
 	#ifdef DEBUG
-	printf("[ActionToggleQuality] Toggled render quality\n");
+	printf("[ActionToggleQuality] Toggled render quality to %s\n", mc->quality);
 	#endif
 }
 
@@ -13218,12 +13317,15 @@ static void initMovieClipPrototype(SWFAppContext* app_context)
 	};
 
 	memset(g_mc_method_funcs, 0, sizeof(g_mc_method_funcs));
-	// Names of MovieClip.prototype methods introduced in SWF6+. Match Ruffle's
-	// `core/src/avm1/globals/movie_clip.rs` VERSION_6 tags. These get
-	// flash_flags=0x0080 so SWF5 resolution hides them (gnash test:
-	// `typeof(createEmptyMovieClip) == "undefined"` in SWF5).
+	// Names of MovieClip.prototype methods with version gating. Match Ruffle's
+	// `core/src/avm1/globals/movie_clip.rs` VERSION_N tags.
+	// SWF6+ (flash_flags=0x0080 → hidden in SWF5):
 	static const char* mc_swf6_methods[] = {
 		"createEmptyMovieClip", "getDepth", "setMask", NULL
+	};
+	// SWF7+ (flash_flags=0x0400 → hidden in SWF5 and SWF6, visible in SWF7+):
+	static const char* mc_swf7_methods[] = {
+		"getNextHighestDepth", "getInstanceAtDepth", NULL
 	};
 	for (int i = 0; i < MC_METHOD_COUNT; i++)
 	{
@@ -13239,11 +13341,18 @@ static void initMovieClipPrototype(SWFAppContext* app_context)
 		func_val.data.numeric_value = (u64) &g_mc_method_funcs[i];
 		setProperty(app_context, proto, mc_methods[i].name, mc_methods[i].len, &func_val);
 
-		// Mark SWF6+ methods as hidden under SWF5 via flash_flags=0x0080.
+		// Apply version gating via flash_flags.
 		for (int vi = 0; mc_swf6_methods[vi] != NULL; vi++) {
 			if (strcmp(mc_methods[i].name, mc_swf6_methods[vi]) == 0) {
 				if (proto->num_used > 0)
 					proto->properties[proto->num_used - 1].flash_flags = 0x0080;
+				break;
+			}
+		}
+		for (int vi = 0; mc_swf7_methods[vi] != NULL; vi++) {
+			if (strcmp(mc_methods[i].name, mc_swf7_methods[vi]) == 0) {
+				if (proto->num_used > 0)
+					proto->properties[proto->num_used - 1].flash_flags = 0x0400;
 				break;
 			}
 		}
@@ -13270,24 +13379,20 @@ static void initMovieClipPrototype(SWFAppContext* app_context)
 	// hasOwnProperty) ignores flash_flags visibility so they show up in
 	// SWF5 for-in tests.
 	{
-		// Drawing API methods — install as stub functions
-		static ASFunction mc_extra_fns[15];
-		static const char* extra_names[15] = {
-			"attachAudio", "beginFill", "beginGradientFill", "beginBitmapFill",
-			"moveTo", "lineTo", "curveTo", "lineStyle", "lineGradientStyle",
-			"endFill", "clear", "attachBitmap", "getRect",
-			"getInstanceAtDepth", "swapDepths",
-		};
-		(void)extra_names; // silence if no-op
+		// Drawing API methods — install as stub functions.
 		// attachAudio, beginFill, beginGradientFill, beginBitmapFill, moveTo,
 		// lineTo, curveTo, lineStyle, lineGradientStyle, endFill, clear,
-		// attachBitmap, getRect — the 13 drawing-API / new method stubs.
-		static const char* draw_names[13] = {
+		// attachBitmap, getRect, attachVideo, beginMeshFill — drawing-API /
+		// new method stubs. Gnash MovieClip-v5 expects all of these on
+		// MovieClip.prototype regardless of SWF version (hasOwnProperty checks).
+		static ASFunction mc_extra_fns[15];
+		static const char* draw_names[15] = {
 			"attachAudio", "beginFill", "beginGradientFill", "beginBitmapFill",
 			"moveTo", "lineTo", "curveTo", "lineStyle", "lineGradientStyle",
 			"endFill", "clear", "attachBitmap", "getRect",
+			"attachVideo", "beginMeshFill",
 		};
-		for (int i = 0; i < 13; i++) {
+		for (int i = 0; i < 15; i++) {
 			memset(&mc_extra_fns[i], 0, sizeof(ASFunction));
 			strncpy(mc_extra_fns[i].name, draw_names[i], 255);
 			mc_extra_fns[i].function_type = 2;
@@ -13308,12 +13413,12 @@ static void initMovieClipPrototype(SWFAppContext* app_context)
 		// prototype as enumerable-but-undefined own properties).
 		ActionVar undef_val = {0};
 		undef_val.type = ACTION_STACK_VALUE_UNDEFINED;
-		static const char* extra_props[9] = {
+		static const char* extra_props[10] = {
 			"blendMode", "cacheAsBitmap", "filters", "opaqueBackground",
 			"scale9Grid", "scrollRect", "tabIndex", "useHandCursor",
-			"_lockroot",
+			"_lockroot", "forceSmoothing",
 		};
-		for (int i = 0; i < 9; i++) {
+		for (int i = 0; i < 10; i++) {
 			if (!hasPropertyRaw(proto, extra_props[i], (u32)strlen(extra_props[i]))) {
 				setProperty(app_context, proto, extra_props[i],
 					(u32)strlen(extra_props[i]), &undef_val);
@@ -33487,7 +33592,7 @@ void actionGetVariable(SWFAppContext* app_context)
 				PUSH_STR(scope_mc[i]->target, strlen(scope_mc[i]->target));
 				return;
 			}
-			else if (var_name_len == 9 && strncmp(var_name, "transform", 9) == 0)
+			else if (g_swf_version >= 8 && var_name_len == 9 && strncmp(var_name, "transform", 9) == 0)
 			{
 				ASObject* tobj = createTransformObject(app_context, scope_mc[i]);
 				PUSH(ACTION_STACK_VALUE_OBJECT, (u64)tobj);
@@ -33845,8 +33950,9 @@ check_special_vars:
 		}
 
 		// "transform" — built-in MovieClip property for the current clip context
-		// (scope_mc[i] is only set inside WITH blocks; root-frame scripts need this path)
-		if (var_name_len == 9 && strncmp(var_name, "transform", 9) == 0)
+		// (scope_mc[i] is only set inside WITH blocks; root-frame scripts need this path).
+		// SWF8+ only — `transform` (flash.geom.Transform) was introduced in SWF8.
+		if (g_swf_version >= 8 && var_name_len == 9 && strncmp(var_name, "transform", 9) == 0)
 		{
 			extern MovieClip root_movieclip;
 			MovieClip* mc = (g_current_context != NULL) ? g_current_context : &root_movieclip;
@@ -34503,6 +34609,8 @@ check_special_vars:
 			if (strcasecmp(var_name, "_url") == 0) { PUSH_STR(mc->url, strlen(mc->url)); return; }
 			if (strcasecmp(var_name, "_droptarget") == 0) { actionRefreshDropTargetIfDragged(mc); PUSH_STR(mc->droptarget, strlen(mc->droptarget)); return; }
 			if (strcasecmp(var_name, "_quality") == 0) { PUSH_STR(mc->quality, strlen(mc->quality)); return; }
+			if (strcasecmp(var_name, "_soundbuftime") == 0) { float v = mc->soundbuftime; PUSH(ACTION_STACK_VALUE_F32, VAL(u32, &v)); return; }
+			if (strcasecmp(var_name, "_highquality") == 0) { float v = mc->highquality; PUSH(ACTION_STACK_VALUE_F32, VAL(u32, &v)); return; }
 			if (strcasecmp(var_name, "_focusrect") == 0) {
 				// Bare _focusrect resolves to root MC (stage focus rect)
 				// SWF5: return Number 1/0. SWF6+: return Boolean true/false.
@@ -34837,55 +34945,78 @@ void actionSetVariable(SWFAppContext* app_context)
 		MovieClip* mc = &root_movieclip;
 		ActionVar value_var;
 		peekVar(app_context, &value_var);
-		double dval = varToDouble(&value_var);
-		float fval = (float)dval;
 		int handled = 0;
-		if (strcasecmp(var_name, "_x") == 0) { mc->x = fval; handled = 1; }
-		else if (strcasecmp(var_name, "_y") == 0) { mc->y = fval; handled = 1; }
-		else if (strcasecmp(var_name, "_xscale") == 0) { mc->xscale = fval;
+		// Lazily resolve numeric value via property_coerce_to_number when a numeric
+		// MC property handler is dispatched. num_ok=0 means undefined/null/NaN/Inf
+		// → no-op. Mirrors Ruffle stage_object.rs:property_coerce_to_number.
+		double dval = NAN;
+		float fval = 0.0f;
+		int num_resolved = 0, num_ok = 0;
+		#define RESOLVE_NUM_PROP() do { \
+			if (!num_resolved) { \
+				num_resolved = 1; \
+				num_ok = propertyCoerceToNumber(app_context, &value_var, &dval); \
+				if (num_ok) fval = (float) dval; \
+			} \
+		} while (0)
+		if (strcasecmp(var_name, "_x") == 0) { RESOLVE_NUM_PROP(); if (num_ok) mc->x = fval; handled = 1; }
+		else if (strcasecmp(var_name, "_y") == 0) { RESOLVE_NUM_PROP(); if (num_ok) mc->y = fval; handled = 1; }
+		else if (strcasecmp(var_name, "_xscale") == 0) { RESOLVE_NUM_PROP(); if (num_ok) { mc->xscale = fval;
 #ifdef NO_GRAPHICS
 			mc->as_set_flags |= 4;
 #endif
-			handled = 1; }
-		else if (strcasecmp(var_name, "_yscale") == 0) { mc->yscale = fval;
+			} handled = 1; }
+		else if (strcasecmp(var_name, "_yscale") == 0) { RESOLVE_NUM_PROP(); if (num_ok) { mc->yscale = fval;
 #ifdef NO_GRAPHICS
 			mc->as_set_flags |= 8;
 #endif
-			handled = 1; }
-		else if (strcasecmp(var_name, "_rotation") == 0) { mc->rotation = normalizeRotation(fval);
+			} handled = 1; }
+		else if (strcasecmp(var_name, "_rotation") == 0) { RESOLVE_NUM_PROP(); if (num_ok) { mc->rotation = normalizeRotation(fval);
 #ifdef NO_GRAPHICS
 			mc->as_set_flags |= 16;
 #endif
-			handled = 1; }
+			} handled = 1; }
 		else if (strcasecmp(var_name, "_alpha") == 0) {
-			// Quantize through 8.8 fixed-point like Flash's color transform
-			mc->alpha = (float)((double)(int16_t)roundf(fval * 256.0f / 100.0f) * 100.0 / 256.0);
-			mc->cx_aa = (float)quantifyColorMult(dval);  // Sync MC color transform (uses integer truncation like setTransform)
+			RESOLVE_NUM_PROP();
+			if (num_ok) {
+				// Quantize through 8.8 fixed-point like Flash's color transform
+				mc->alpha = (float)((double)(int16_t)roundf(fval * 256.0f / 100.0f) * 100.0 / 256.0);
+				mc->cx_aa = (float)quantifyColorMult(dval);  // Sync MC color transform (uses integer truncation like setTransform)
 #ifdef NO_GRAPHICS
-			// Sync with display list cx_aa so Color.getTransform() reads the updated value
-			{
-				extern size_t ng_findDisplayEntryByName(const char* name);
-				size_t _dep = ng_findDisplayEntryByName(mc->name);
-				if (_dep != SIZE_MAX)
-					ng_setCTAlpha(_dep, (double)mc->cx_aa);
-			}
+				// Sync with display list cx_aa so Color.getTransform() reads the updated value
+				{
+					extern size_t ng_findDisplayEntryByName(const char* name);
+					size_t _dep = ng_findDisplayEntryByName(mc->name);
+					if (_dep != SIZE_MAX)
+						ng_setCTAlpha(_dep, (double)mc->cx_aa);
+				}
 #endif
+			}
 			handled = 1;
 		}
 		else if (strcasecmp(var_name, "_visible") == 0) {
-			int new_vis = (fval != 0.0f) ? 1 : 0;
-			if (mc->visible && !new_vis && g_focused_mc == mc)
-				selection_do_focus_change(app_context, mc, NULL);
-			mc->visible = new_vis;
+			RESOLVE_NUM_PROP();
+			if (num_ok) {
+				int new_vis = (fval != 0.0f) ? 1 : 0;
+				if (mc->visible && !new_vis && g_focused_mc == mc)
+					selection_do_focus_change(app_context, mc, NULL);
+				mc->visible = new_vis;
+			}
 			handled = 1;
 		}
-		else if (strcasecmp(var_name, "_width") == 0) { mcSetEffectiveWidth(app_context, mc, dval); handled = 1; }
-		else if (strcasecmp(var_name, "_height") == 0) { mcSetEffectiveHeight(app_context, mc, dval); handled = 1; }
+		else if (strcasecmp(var_name, "_width") == 0) { RESOLVE_NUM_PROP(); if (num_ok) mcSetEffectiveWidth(app_context, mc, dval); handled = 1; }
+		else if (strcasecmp(var_name, "_height") == 0) { RESOLVE_NUM_PROP(); if (num_ok) mcSetEffectiveHeight(app_context, mc, dval); handled = 1; }
 		else if (strcasecmp(var_name, "_quality") == 0)
 		{
-			char buf[16];
+			char buf[32];
 			int len = varToStringBuf(app_context, &value_var, buf, sizeof(buf));
-			if (len > 0) { memcpy(mc->quality, buf, len); mc->quality[len] = '\0'; }
+			if (len > 0) {
+				char canon[16];
+				if (normalizeQualityValue(buf, len, canon, sizeof(canon))) {
+					strcpy(mc->quality, canon);
+				}
+				// Invalid quality strings are silently ignored (Flash behavior).
+			}
 			handled = 1;
 		}
 		else if (strcasecmp(var_name, "_highquality") == 0) { mc->highquality = fval; handled = 1; }
@@ -34911,7 +35042,13 @@ void actionSetVariable(SWFAppContext* app_context)
 			}
 			handled = 1;
 		}
-		else if (strcasecmp(var_name, "_soundbuftime") == 0) { mc->soundbuftime = fval; handled = 1; }
+		else if (strcasecmp(var_name, "_soundbuftime") == 0) {
+			// Ruffle: coerce to f64 (calls valueOf for objects, parses strings).
+			// NaN → no-op (e.g. {} without valueOf, "string"). Otherwise clamp to i32.
+			double sb_d = coerceVarToNumber(app_context, &value_var);
+			if (!isnan(sb_d)) mc->soundbuftime = (float) clampToI32(sb_d);
+			handled = 1;
+		}
 		if (handled)
 		{
 			POP_2();
@@ -40187,9 +40324,15 @@ void actionSetMember(SWFAppContext* app_context)
 				if (strcasecmp(prop_name, "_height") == 0) { mcSetEffectiveHeight(app_context, mc, dval); markTransformedByScript(mc); return; }
 				if (strcasecmp(prop_name, "_quality") == 0)
 				{
-					char buf[16];
+					char buf[32];
 					int len = varToStringBuf(app_context, &value_var, buf, sizeof(buf));
-					if (len > 0) { memcpy(mc->quality, buf, len); mc->quality[len] = '\0'; }
+					if (len > 0) {
+						char canon[16];
+						if (normalizeQualityValue(buf, len, canon, sizeof(canon))) {
+							strcpy(mc->quality, canon);
+						}
+						// Invalid quality strings are silently ignored (Flash behavior).
+					}
 					return;
 				}
 				if (strcasecmp(prop_name, "_highquality") == 0) { mc->highquality = fval; return; }
@@ -40241,7 +40384,13 @@ void actionSetMember(SWFAppContext* app_context)
 					}
 					return;
 				}
-				if (strcasecmp(prop_name, "_soundbuftime") == 0) { mc->soundbuftime = fval; return; }
+				if (strcasecmp(prop_name, "_soundbuftime") == 0) {
+					// Ruffle: coerce to f64 (valueOf for objects, parse for strings).
+					// NaN → no-op. Otherwise clamp to i32.
+					double sb_d = coerceVarToNumber(app_context, &value_var);
+					if (!isnan(sb_d)) mc->soundbuftime = (float) clampToI32(sb_d);
+					return;
+				}
 				if (strcasecmp(prop_name, "_lockroot") == 0) {
 					// Coerce to boolean: non-zero numbers, non-empty strings, objects → true
 					if (value_var.type == ACTION_STACK_VALUE_BOOLEAN) {
@@ -44137,7 +44286,10 @@ void actionGetMember(SWFAppContext* app_context)
 			PUSH(ACTION_STACK_VALUE_ARRAY, (u64)arr);
 			return;
 		}
-		if (mc != NULL && prop_name_len == 9 && strncmp(prop_name, "transform", 9) == 0)
+		// `transform` was introduced in SWF8 (flash.geom.Transform). In SWF<8,
+		// `mc.transform` falls through to dynamic_props / prototype lookup
+		// (which yields undefined for unset values).
+		if (mc != NULL && g_swf_version >= 8 && prop_name_len == 9 && strncmp(prop_name, "transform", 9) == 0)
 		{
 			ASObject* transform = createTransformObject(app_context, mc);
 			PUSH(ACTION_STACK_VALUE_OBJECT, (u64)transform);
@@ -49722,9 +49874,16 @@ void actionCallFunction(SWFAppContext* app_context, char* str_buffer)
 				child_mc_cache[child_mc_count++] = child;
 			}
 
-			// Return MovieClip reference (Flash returns the MC, not a string path)
+			// Function-form createTextField returns the MC in SWF8+, undefined
+			// in earlier versions (the textfield is still created either way).
+			// Mirrors Flash's free-function form behavior — the method-form
+			// `mc.createTextField` returns the MC in all versions.
 			if (args != NULL) FREE(args);
-			PUSH(ACTION_STACK_VALUE_MOVIECLIP, (u64)child);
+			if (g_swf_version >= 8) {
+				PUSH(ACTION_STACK_VALUE_MOVIECLIP, (u64)child);
+			} else {
+				pushUndefined(app_context);
+			}
 		} else {
 			if (args != NULL) FREE(args);
 			pushUndefined(app_context);
@@ -57839,10 +57998,11 @@ void actionCallMethod(SWFAppContext* app_context, char* str_buffer)
 			PUSH(ACTION_STACK_VALUE_F64, VAL(u64, &v));
 			return;
 		}
-		else if (method_name_len == 19 && strncasecmp(method_name, "getNextHighestDepth", 19) == 0)
+		else if (g_swf_version >= 7 && method_name_len == 19 && strncasecmp(method_name, "getNextHighestDepth", 19) == 0)
 		{
-			// Return the next available depth for this clip's children
-			// = max(children's depths) + 1, or 0 if all children are at negative depths
+			// SWF7+ only (Ruffle: VERSION_7). In SWF<=6 the prototype lookup returns
+			// undefined and calling undefined() yields undefined.
+			// Returns max(children depths) + 1, or 0 if no children at non-negative depths.
 			if (args != NULL) FREE(args);
 			int _max_d = -1;
 			for (int _i = 0; _i < child_mc_count; _i++) {
@@ -58194,9 +58354,11 @@ void actionCallMethod(SWFAppContext* app_context, char* str_buffer)
 			pushUndefined(app_context);
 			return;
 		}
-		else if (method_name_len == 18 && strncasecmp(method_name, "getInstanceAtDepth", 18) == 0)
+		else if (g_swf_version >= 7 && method_name_len == 18 && strncasecmp(method_name, "getInstanceAtDepth", 18) == 0)
 		{
-			// Return the MovieClip at the given depth, or the parent MC for non-MC objects,
+			// SWF7+ only (Ruffle: VERSION_7). In SWF<=6 the prototype lookup returns
+			// undefined and calling undefined() yields undefined.
+			// Returns the MovieClip at the given depth, or the parent MC for non-MC objects,
 			// or undefined if no object at that depth.
 #ifdef NO_GRAPHICS
 			if (num_args == 0 || args[0].type == ACTION_STACK_VALUE_UNDEFINED ||
