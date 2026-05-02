@@ -59827,6 +59827,12 @@ void actionCallMethod(SWFAppContext* app_context, char* str_buffer)
 				size_t nlen = strlen(mc->name);
 				dragged_target = (char*)malloc(nlen + 1);
 				if (dragged_target) strcpy(dragged_target, mc->name);
+				// Ruffle's update_drag calls set_x/set_y each tick on the dragged
+				// clip, which sets transformed_by_script=1 even when the mouse hasn't
+				// moved. We don't run update_drag in headless mode, so set the flag
+				// directly here to suppress timeline PlaceObject MOVE updates on the
+				// dragged clip (and persist post-stopDrag — Flash semantics).
+				markTransformedByScript(mc);
 #ifdef NO_GRAPHICS
 				g_drag_virt_x = app_context->mouse.stage_x;
 				g_drag_virt_y = app_context->mouse.stage_y;
@@ -60799,6 +60805,15 @@ void actionStartDrag(SWFAppContext* app_context)
 		size_t len = strlen(target_name);
 		dragged_target = (char*) malloc(len + 1);
 		if (dragged_target) strcpy(dragged_target, target_name);
+
+		// Mark the dragged clip's transform as script-controlled so timeline
+		// PlaceObject MOVE tags no-op on it (Flash semantics, persists past
+		// stopDrag). Mirrors method-form mc.startDrag() above; Ruffle gets
+		// this side-effect via update_drag → set_x/set_y, which we don't run
+		// in headless mode.
+		MovieClip* drag_mc = getMovieClipByTarget(target_name);
+		if (!drag_mc) drag_mc = getMovieClipByRelativeName(target_name);
+		if (drag_mc) markTransformedByScript(drag_mc);
 	} else {
 		dragged_target = NULL;
 	}

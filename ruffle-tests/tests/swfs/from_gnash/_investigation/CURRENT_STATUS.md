@@ -1,8 +1,37 @@
 # Gnash Test Suite Status
 
-Last updated: 2026-05-02 (`swf4opcode` (misc-swfc.all) promoted to ruffle_matched via SWF4 `convertFloat` MovieClip→0.0 fix. CI snapshot below from 2026-05-01.)
+Last updated: 2026-05-02 (`mouse_drag_test` (misc-swfc.all) PASS via startDrag→transformed_by_script flag. CI snapshot below from 2026-05-01.)
 
 ### Latest fixes (2026-05-02, NOT yet in CI)
+
+- **`mouse_drag_test` (misc-swfc.all) → PASS (+1).** Calling `startDrag`
+  on a MovieClip now sets `display_obj->transformed_by_script = 1` on
+  the dragged clip, mirroring Ruffle's behavior where the per-tick
+  `update_drag` calls `set_x`/`set_y` (which set the flag) even when
+  the mouse hasn't moved. We don't run an `update_drag` analog in
+  headless mode, so the flag is set directly at startDrag time. Once
+  set, subsequent timeline `PlaceObject` MOVE tags no-op on the
+  dragged clip's matrix (per `apply_place_object`'s
+  `if !transformed_by_script` guard in `tag.c`), and the flag persists
+  past `stopDrag` — matching Flash semantics where a clip that has
+  been dragged stays "transform-locked" for the rest of its lifetime.
+  Applied to both the function-form `actionStartDrag` (resolves
+  target name → MC via `getMovieClipByTarget` /
+  `getMovieClipByRelativeName`) and the method-form
+  `mc.startDrag(...)` path. Fixes the four `check(mc1._x != 200/300)`
+  / `check(mc1._y != 200/300)` lines in `mouse_drag_test.sc:57-67`
+  where prior behavior left `mc1._x == 200` after a `.jump` MOVE
+  during an active drag. Regression battery: 5-test AVM1 drag
+  (drag_drop, drag_over_from_outside, drag_over_without_startdrag,
+  edittext_drag_select, mouse_hover_events_while_dragging — 5/5
+  PASS), 18-test transform/timeline (movieclip_setmask, goto_rewind1/2/3,
+  execution_order1/2/3/4, tell_target_invalid{,_swf6},
+  mouse_hover_events_while_dragging, drag_drop,
+  drag_over_from_outside, drag_over_without_startdrag,
+  movieclip_default_state, movieclip_get_instance_at_depth,
+  movieclip_state_values, swf5_no_closure — 18/18 PASS), Gnash
+  `DragDropTest` unchanged (was already failing on level50 droptarget
+  paths, output identical pre/post-fix).
 
 - **`swf4opcode` (misc-swfc.all) → ruffle_matched (+1).** SWF4
   `convertFloat` for `ACTION_STACK_VALUE_MOVIECLIP` returned NaN
