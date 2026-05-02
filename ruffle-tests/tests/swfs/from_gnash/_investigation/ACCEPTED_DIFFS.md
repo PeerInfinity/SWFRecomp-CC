@@ -230,6 +230,42 @@ moves to `complete/` as of 2026-04-13.
 
 ---
 
+## Category 2: Interactive / Wall-Clock Timing Tests
+
+### sound (misc-swfc.all) — interactive Flash session trace, no sound-position simulation
+
+**Source:** `gnash/testsuite/misc-swfc.all/sound.sc`. The test loads an
+audio file, calls `snd.start(0,0)`, then enters a frame-6 loop that calls
+`gotoandPlay(5)` while `snd.position + 100 < snd.duration` and only falls
+through to frame 8 (`totals(2); snd.stop();`) once the sound has nearly
+finished playing.
+
+**Expected output (output.txt):** truncates at line 7 (`PASSED: snd.position == 0`).
+The expected output is a partial trace from an interactive Flash session
+where the player kept running the loop indefinitely waiting for sound
+playback. The `totals(2)` summary lines are absent because Flash never
+reached frame 8 in the captured trace.
+
+**Our behavior:** without an audio backend `snd.duration` and `snd.position`
+both stay at 0, so `0 + 100 < 0` is immediately false and the loop exits
+to frame 8 on the first pass. We then emit:
+
+```
+Total tests run: 1 typeof expected: number
+FAILED: TOTAL tests run: 1, expected: 2 [ [sound.sc:61]]
+#passed: 1
+#failed: 1
+__END_OF_TEST__
+```
+
+**Decision:** Accept. Matching expected fully would require non-deterministic
+wall-clock sound-position simulation (an audio backend that returns
+realistic position values to AS over time). Test has no `output.ruffle.txt`
+or `known_failure = true`, so it cannot promote to `ruffle_matched`. Added
+to `from_gnash/misc-swfc.all/ignored_tests.txt`.
+
+---
+
 ## Summary Table
 
 | Test | Diff Lines | Root Cause | Our Behavior | Spec |
@@ -250,3 +286,4 @@ moves to `complete/` as of 2026-04-13.
 | ~~Error-v6~~ | ~~4~~ | ~~RESOLVED~~ | NOW PASS | Fixed 2026-04-10 |
 | ~~Error-v7~~ | ~~4~~ | ~~RESOLVED~~ | NOW PASS | Fixed 2026-04-10 |
 | ~~Error-v8~~ | ~~4~~ | ~~RESOLVED~~ | NOW PASS | Fixed 2026-04-10 |
+| sound (misc-swfc) | 5 | Interactive Flash session trace; expected output truncates mid-test waiting for sound playback. We have no audio backend, so the frame-6 loop exits immediately. | No audio simulation; test design assumes wall-clock playback | gnash/testsuite/misc-swfc.all/sound.sc |

@@ -127,6 +127,9 @@ ruffle-tests/tests/swfs/from_gnash/misc-swfmill.all/*/
 !ruffle-tests/tests/swfs/from_gnash/actionscript.all/
 ruffle-tests/tests/swfs/from_gnash/actionscript.all/*/
 !ruffle-tests/tests/swfs/from_gnash/actionscript.all/_results/
+!ruffle-tests/tests/swfs/from_gnash/misc-swfc.all/
+ruffle-tests/tests/swfs/from_gnash/misc-swfc.all/*/
+!ruffle-tests/tests/swfs/from_gnash/misc-swfc.all/_results/
 
 # Transient result files (not committed)
 ruffle-tests/tests/swfs/**/_results/results_current.json

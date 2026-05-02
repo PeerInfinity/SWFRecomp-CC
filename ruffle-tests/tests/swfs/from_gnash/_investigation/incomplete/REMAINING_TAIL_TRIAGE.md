@@ -1,6 +1,14 @@
 # Remaining Tail Triage
 
-<!-- TESTS: matrix_test, DefineTextTest, DefineEditTextVariableNameTest, EmbeddedFontTest, DrawingApiTest, NetStream-SquareTest, loop/loop_test, loop/loop_test10, replace_sprites1test, opcode_guard_test, masks_test, duplicate_movie_clip_test, swf4opcode, soft_reference_test1, movieclip_destruction_test4 -->
+<!-- TESTS: matrix_test, DefineEditTextVariableNameTest, EmbeddedFontTest, DrawingApiTest, NetStream-SquareTest, loop/loop_test10, opcode_guard_test, masks_test, duplicate_movie_clip_test, soft_reference_test1, movieclip_destruction_test4 -->
+
+<!-- Resolved 2026-05-02:
+  - loop/loop_test → PASS (was 5/21; fixed in cluster work)
+  - DefineTextTest → ruffle_matched (was 11/16; fixed in cluster work)
+  - swf4opcode → ruffle_matched (Group B fixed via SWF4 MovieClip→0.0 coerce)
+  - replace_sprites1test → PASS (resolved 2026-04-29)
+  - sound → ignored_tests.txt (interactive timing accepted) -->
+
 
 <!-- PLAN_META
 id: REMAINING_TAIL_TRIAGE
@@ -85,23 +93,13 @@ each is its own narrow geometry / FP edge.
 6-9 hours total. **Promote to standalone plan when work begins** —
 it's already big enough to warrant its own document.
 
-### DefineTextTest (68.8%, 11/16)
+### ~~DefineTextTest~~ — promoted to `ruffle_matched` (2026-05-02 result snapshot)
 
-**Symptom.** Per `MISC_MING_SWFC_PLAN.md`: `288.05` expected,
-`288.049987792969` obtained (FP precision residue, single→double
-round-trip somewhere). Plus `_global.clicks == 2` got `15` —
-mouse-click counter mismatch (input-driven assertion in a test
-without `input.json`).
-
-**Hypothesis.** FP residue is a `(float)` round-trip in text width
-calculation — same family as `attachMovieLoopingTest`'s
-`15.0000001716614` (see `IMPORT_CHARACTER_PLAN.md` Phase 4). The
-`clicks == 2 vs 15` part is masks_test-style: test reads keyboard /
-mouse without an `input.json`, so the counter ends up wrong.
-
-**Scope.** 1-2 hours for the FP fix. The mouse part is wedged
-unless we add an input.json synthesizer (out of scope for this
-doc — would need its own plan).
+Status now `ruffle_matched` 12/16. Our remaining diff is a subset of
+Ruffle's diff against expected, so the test counts toward effective
+pass. Full PASS still requires the FP precision and mouse-click
+issues described originally; deferred until those root causes have a
+home.
 
 ### DefineEditTextVariableNameTest (68.1%, 49/72)
 
@@ -154,37 +152,10 @@ test exercises specific timing semantics.
 **Scope.** 4-6 hours of timing investigation. **Promote to standalone
 plan when work begins.**
 
-### loop/loop_test (23.8%, 5/21)
+### ~~loop/loop_test~~ — RESOLVED to PASS (2026-05-02 result snapshot)
 
-**Symptom (from earlier diff):**
-
-```
-- 3  PASSED: 47616 == 47616         ← interleave order
-+ 3  PASSED: -16381 == -16381
-- 4  PASSED: -16381 == -16381
-+ 4  PASSED: 47616 == 47616
-- 5  PASSED: -16381 == -16381
-+ 5  FAILED: expected: -16381 , obtained: 47616
-...
-- 13  PASSED: 1 == 1
-+ 13  FAILED: expected: 1 , obtained: 4
-```
-
-Test pushes both biased (`47616 = 31232 + 16384`) and unbiased
-(`-16381 = -16384 + 3`) depths and tests interleaved frame
-execution with two MCs at those depths.
-
-**Hypothesis.** Likely the same `CLONESPRITE_DEPTH_BIAS` trade-off
-("CloneSprite depth-bias trade-off (open)") manifesting through a
-different execution path. Once `CLONESPRITE_DEPTH_BIAS_PLAN`
-Phase 1 (recompiler bias-strip) lands, the `47616 / -16381`
-arithmetic stops matching either expectation cleanly — but the
-*ordering* might recover. The `1 == 1 / 1 vs 4` line suggests a
-counter that increments more times than expected, separate from
-depth.
-
-**Scope.** Re-run after CLONESPRITE_DEPTH_BIAS lands; if still
-failing, 2-3 hours of further investigation.
+Now PASS 21/21. Cluster fixes recovered the depth-bias /
+interleave behavior described in the original entry.
 
 ### loop/loop_test10 (10.7%, 3/28)
 
@@ -235,45 +206,42 @@ and `apply_place_object` excludes name/clip_depth/clip_actions).
 the depth holds a sprite from a previous frame. See `CURRENT_STATUS.md`
 "Latest fixes" for details.
 
-### opcode_guard_test (55.6%, 10/18 — re-baselined 2026-05-02)
+### opcode_guard_test (55.6%, 10/18 — bug 2 fixed 2026-05-02)
 
-**Symptom (current diff).** Output diverges starting at the post-`mc2 EnterFrame called`
-block. After `setTarget('non-exist-target')` followed by AS that reads
-`current_target = _target` and `_root.check_equals(current_target, undefined)`,
-expected emits `PASSED: undefined == undefined` then `PASSED: / == /`.
-Our actual emits an extra `FAILED: false` line first, then the runtime
-warning `Target not found: Target="non-exist-target" Base="_level0"`,
-then `PASSED: undefined == undefined`, then `FAILED: expected: / , obtained: undefined`.
-We end with #passed: 10 / #failed: 3 / #total: 13 (vs expected 11/0/11).
+**Status update 2026-05-02.** Bug 2 fixed: bare `GetVariable("_target")`
+no longer gated on `g_settarget_invalid`. Now correctly returns `/` (root
+target) after a failed SetTarget, matching Ruffle and the gnash test
+comment "getVariable will ascend to _root!" Verified `_target == '/'`
+line now PASSES. Six other tell_target/SetTarget-touching avm1 tests
+(tell_target, tell_target_invalid, tell_target_invalid_swf6,
+property_invalid_base_clip, path_string, swf4_actions_coercion_order)
+still PASS — no regressions.
 
-**Cannot promote to `ruffle_matched`.** Our diff is **not a subset of
-Ruffle's** `output.ruffle.txt` (which itself diverges from `output.txt`
-on different lines — Ruffle emits `Target not found: …` then `PASSED: undefined == undefined`
-without the leading `FAILED: false`, and reports #passed: 8 / #failed: 3).
-Our extra `FAILED: false` and the `_target == /` line both fall outside
-Ruffle's diff set, so the subset check rejects promotion. Stderr also
-shows two `heap_alloc() called before heap_init()` / `Failed to allocate
-property name` warnings during the run — likely a separate issue, but
-worth checking whether they correlate with the missed-property cases.
+**Test still fails because of bug 1 + line-shift effect.**
+Our diff after the fix:
+```
+FAILED: false                                        ← extra (mc2 enterframe xcheck)
+Target not found: Target="non-exist-target" Base="_level0"  ← Ruffle has this too
+... rest matches expected after the shift ...
+```
 
-**Hypothesis.** Two distinct bugs stacked:
-1. The leading `FAILED: false` is from the asm block
-   (`push 'current_target' ; push '' ; push 11 ; getproperty ; setvariable`)
-   — `getproperty` of `_target` (index 11) on `''` is producing `false`
-   and the result is being traced rather than just stored. Or the
-   `actionSetTarget("non-exist-target")` failure path emits `FAILED: false`
-   somewhere.
-2. The `_target == '/'` check: after a failed SetTarget, reading `_target`
-   should still return `'/'` (the root path) — Ruffle does this. We return
-   `undefined` instead, which suggests our `g_settarget_invalid` /
-   `g_settarget_none` flags also gate the `_target` getter, when they
-   should only gate MC method calls and goto/play/stop dispatches.
+Cannot promote to `ruffle_matched` because Ruffle's expected output
+shifts up by one line (Ruffle is missing `mc1 Load called`), so
+Ruffle's diff against expected doesn't include line 10 where our
+spurious `FAILED: false` appears. Strict line-index subset fails.
 
-**Scope.** 1–3 hours independently of GOTO_CATCHUP_HYGIENE — the bugs
-are in the SetTarget invalid-target handling for `_target` reads, not
-post-removal name resolution. The earlier hypothesis ("pending-removal
-MC visibility") was wrong: the test's failures are around an invalid
-SetTarget, not around a removed MC.
+**Bug 1 (remaining).** Inside mc2's ENTERFRAME clip event:
+`_root.note('mc2 EnterFrame called'); _root.gotoAndPlay(8); _root.xcheck(false);`.
+The test expects `xcheck(false)` to NOT execute after `gotoAndPlay(8)`,
+but our impl runs it (producing `FAILED: false`). In Flash, gotoAndPlay
+is normally queued (rest of script runs), so this might require Flash-
+specific clip-event abort semantics. Ruffle also doesn't emit the
+`FAILED: false` line, so they handle this somehow. Deferred — likely
+needs investigation into ENTERFRAME early-abort-after-goto semantics.
+
+**Scope (remaining).** 2–4 hours to investigate clip-event abort behavior
++ possibly suppress `Target not found:` info message for gnash compatibility,
+or accept the divergence into ACCEPTED_DIFFS.md.
 
 ### masks_test (16.0%, 28/175)
 
@@ -319,28 +287,17 @@ fully or partially.
 
 ## Entries — misc-swfc.all
 
-### sound (100% match-rate, 7/7) — output_mismatch via trailing extras
+### ~~sound~~ — RESOLVED via ignored_tests.txt (2026-05-02)
 
-**Symptom.** Expected output ends at line 7 (`PASSED: snd.position
-== 0`). Our actual continues for 5 more lines (`Total tests run:
-1`, `FAILED: TOTAL tests run: 1, expected: 2`, `#passed: 1`,
-`#failed: 1`, `__END_OF_TEST__`). The expected output literally
-truncates mid-test — Flash never reaches `__END_OF_TEST__` because
-it's waiting for sound playback.
-
-**Hypothesis.** Sound timing divergence: our impl reaches `gotoAndPlay(8)`
-too early (before sound finishes), then runs the totals. Flash's
-sound-position tracking is keeping the test in a wait state.
-
-**Scope.** Documented elsewhere as blocker. Two paths:
-(a) Implement sound-position tracking that matches Flash's wall-clock
-behavior. (b) Document as `ACCEPTED_DIFFS.md` since the expected
-output is itself incomplete (Flash never finishes the test).
-
-**Recommendation.** Path (b) — add to gnash ACCEPTED_DIFFS or to
-`ignored_tests.txt`. The test's expected output is a partial
-trace from an interactive Flash session; matching it fully would
-require non-deterministic timing simulation.
+Added to `from_gnash/misc-swfc.all/ignored_tests.txt` (Path (b)).
+Documented in `from_gnash/_investigation/ACCEPTED_DIFFS.md` under
+"Category 2: Interactive / Wall-Clock Timing Tests" — the expected
+output truncates mid-test where Flash's frame-6 loop kept running
+gotoAndPlay(5) waiting for sound playback. Without an audio backend
+that returns realistic position values over time, we exit the loop
+on the first pass and emit trailing totals lines. No
+output.ruffle.txt / known_failure flag, so ruffle_matched promotion
+isn't possible.
 
 ### movieclip_destruction_test2 (92.9%, 52/56)
 
@@ -496,10 +453,10 @@ fixed in commit 9020f664 (recompiler END_TAG handler emits
 If picking work from this doc with no other context, the cheapest
 wins:
 
-1. **`replace_sprites1test`** (1-2 hours, bundles into ZERO_OUTPUT_TRIAGE Phase 2) — expand the CONSTRUCT gate from buttons-only to "any same-family replace."
-2. **`sound`** (1 hour) — accept the divergence; add to `ignored_tests.txt` / `ACCEPTED_DIFFS.md`. The expected output is incomplete from an interactive Flash session; matching it fully would require timing simulation.
-3. **`opcode_guard_test`, `movieclip_destruction_test4`, `soft_reference_test1`, `duplicate_movie_clip_test`, `loop/loop_test`** — re-baseline after the relevant cluster plans (`GOTO_CATCHUP_HYGIENE`, `CLONESPRITE_DEPTH_BIAS`) land. Each may recover for free.
-4. **`swf4opcode`** (4-6 hours, standalone-worthy) — SWF4 path syntax. Self-contained; no overlap with other plans.
+1. ~~**`replace_sprites1test`**~~ — RESOLVED 2026-04-29 (PASS).
+2. ~~**`sound`**~~ — RESOLVED 2026-05-02 via ignored_tests.txt (Path (b)).
+3. **`opcode_guard_test` (bug 2 fixed 2026-05-02; bug 1 deferred), `movieclip_destruction_test4`, `soft_reference_test1`, `duplicate_movie_clip_test`** — re-baseline after the relevant cluster plans (`GOTO_CATCHUP_HYGIENE`, `CLONESPRITE_DEPTH_BIAS`) land. Each may recover for free.
+4. ~~**`swf4opcode`**~~ — promoted to ruffle_matched 2026-05-02 (Group A defer).
 5. **`matrix_test`** (6-9 hours, standalone-worthy) — three independent geometry / FP issues; promote to its own plan when work begins.
 6. **`NetStream-SquareTest`** (4-6 hours, standalone-worthy) — netstream timing.
 7. **`masks_test`** (verifier change required) — needs synthetic keypress mechanism. Promote to standalone plan; this is verifier scope.
@@ -507,7 +464,7 @@ wins:
 Then (after the cluster plans land and recovery is measured):
 
 8. `loop/loop_test10`, `EmbeddedFontTest`, `DrawingApiTest`,
-   `DefineTextTest`, `DefineEditTextVariableNameTest`, `levels` —
+   `DefineEditTextVariableNameTest`, `levels` —
    triage individually.
 
 Skip:

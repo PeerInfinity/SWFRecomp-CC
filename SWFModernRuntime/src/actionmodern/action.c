@@ -34585,9 +34585,13 @@ check_special_vars:
 		if (var_name_len > 0 && var_name[0] == '_')
 		{
 #ifdef NO_GRAPHICS
-			// When tellTarget failed, MC builtin property accesses return undefined
+			// When tellTarget failed, MC builtin property accesses return undefined,
+			// EXCEPT _target — bare GetVariable("_target") ascends through scope to
+			// root (per gnash opcode_guard_test: "getVariable will ascend to _root!").
+			// Ruffle: target_clip_or_root() falls back to root for variable lookups
+			// when target_clip is None, so _target reads root's "/" path.
 			extern int g_settarget_invalid;
-			if (g_settarget_invalid) {
+			if (g_settarget_invalid && strcasecmp(var_name, "_target") != 0) {
 				PUSH(ACTION_STACK_VALUE_UNDEFINED, 0);
 				return;
 			}

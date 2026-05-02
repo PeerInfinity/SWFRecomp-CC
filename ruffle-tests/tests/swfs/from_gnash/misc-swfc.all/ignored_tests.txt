@@ -1,0 +1,17 @@
+# Gnash misc-swfc.all tests with permanent unfixable diffs.
+#
+# Add tests here only if:
+#   - They have permanently unfixable diffs
+#   - AND they do NOT qualify for ruffle_matched promotion
+#     (no known_failure / no output.ruffle.txt sidecar)
+#
+# See from_gnash/_investigation/ACCEPTED_DIFFS.md for explanations.
+
+# sound — interactive Flash session timing trace; requires sound-position
+# wall-clock simulation we don't implement. Expected output truncates at line 7
+# (PASSED: snd.position == 0) — Flash's loop in frame 6 runs gotoAndPlay(5)
+# until snd.position+100 < snd.duration becomes false. Without audio playback
+# our snd.position stays at 0, so we exit the loop immediately and reach the
+# totals(2) call, producing extra trailing lines. See REMAINING_TAIL_TRIAGE
+# Path (b) recommendation.
+sound
