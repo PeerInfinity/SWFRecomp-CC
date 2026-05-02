@@ -235,22 +235,45 @@ and `apply_place_object` excludes name/clip_depth/clip_actions).
 the depth holds a sprite from a previous frame. See `CURRENT_STATUS.md`
 "Latest fixes" for details.
 
-### opcode_guard_test (16.7%, 3/18)
+### opcode_guard_test (55.6%, 10/18 — re-baselined 2026-05-02)
 
-**Symptom (from earlier diff):** `typeof()` returns `'movieclip'`
-when expected `'undefined'` for an MC that was just removed —
-post-removal name resolution stays alive. Plus repeated
-`mc1 EnterFrame called` / `FAILED: false` lines after the MC
-should be dead, suggesting onEnterFrame keeps firing on a removed
-MC.
+**Symptom (current diff).** Output diverges starting at the post-`mc2 EnterFrame called`
+block. After `setTarget('non-exist-target')` followed by AS that reads
+`current_target = _target` and `_root.check_equals(current_target, undefined)`,
+expected emits `PASSED: undefined == undefined` then `PASSED: / == /`.
+Our actual emits an extra `FAILED: false` line first, then the runtime
+warning `Target not found: Target="non-exist-target" Base="_level0"`,
+then `PASSED: undefined == undefined`, then `FAILED: expected: / , obtained: undefined`.
+We end with #passed: 10 / #failed: 3 / #total: 13 (vs expected 11/0/11).
 
-**Hypothesis.** Same family as the **pending-removal MC
-visibility** issue documented in
-`GOTO_CATCHUP_HYGIENE_PLAN.md` Phase 1 (stale name resolution
-after RemoveObject2). May resolve as a free benefit of that plan.
+**Cannot promote to `ruffle_matched`.** Our diff is **not a subset of
+Ruffle's** `output.ruffle.txt` (which itself diverges from `output.txt`
+on different lines — Ruffle emits `Target not found: …` then `PASSED: undefined == undefined`
+without the leading `FAILED: false`, and reports #passed: 8 / #failed: 3).
+Our extra `FAILED: false` and the `_target == /` line both fall outside
+Ruffle's diff set, so the subset check rejects promotion. Stderr also
+shows two `heap_alloc() called before heap_init()` / `Failed to allocate
+property name` warnings during the run — likely a separate issue, but
+worth checking whether they correlate with the missed-property cases.
 
-**Scope.** 0-2 hours after GOTO_CATCHUP_HYGIENE Phase 1 lands.
-Re-baseline first.
+**Hypothesis.** Two distinct bugs stacked:
+1. The leading `FAILED: false` is from the asm block
+   (`push 'current_target' ; push '' ; push 11 ; getproperty ; setvariable`)
+   — `getproperty` of `_target` (index 11) on `''` is producing `false`
+   and the result is being traced rather than just stored. Or the
+   `actionSetTarget("non-exist-target")` failure path emits `FAILED: false`
+   somewhere.
+2. The `_target == '/'` check: after a failed SetTarget, reading `_target`
+   should still return `'/'` (the root path) — Ruffle does this. We return
+   `undefined` instead, which suggests our `g_settarget_invalid` /
+   `g_settarget_none` flags also gate the `_target` getter, when they
+   should only gate MC method calls and goto/play/stop dispatches.
+
+**Scope.** 1–3 hours independently of GOTO_CATCHUP_HYGIENE — the bugs
+are in the SetTarget invalid-target handling for `_target` reads, not
+post-removal name resolution. The earlier hypothesis ("pending-removal
+MC visibility") was wrong: the test's failures are around an invalid
+SetTarget, not around a removed MC.
 
 ### masks_test (16.0%, 28/175)
 

@@ -8,10 +8,10 @@ status: pending
 phases:
   - id: 1
     name: "Verifier: empty data-file array generates invalid C (LoadVarsTest compile_fail)"
-    status: pending
+    status: completed
   - id: 2
     name: "Gate clip CONSTRUCT/LOAD events out of buttons (replace_buttons1test, replace_shapes1test)"
-    status: pending
+    status: completed
   - id: 3
     name: "Version4Loader: child SWF loadMovie of Version5Loaded.swf"
     status: pending
@@ -58,28 +58,30 @@ DEJAGNU_FRAMEWORK_PLAN's "Remaining Blocker" section should be marked
 inaccurate (the misc-ming/misc-swfc tests aren't blocked on that
 mechanism).
 
-## Current status of the "zero-output" tests (CI 205a9a77 → local 2026-04-25)
+## Current status of the "zero-output" tests (CI 205a9a77 → local 2026-05-02)
 
 The CI snapshot's `matching_lines: 0` was misread as "zero output." Many
 of these tests **do produce output** — just none of it matches expected.
-And several have flipped to passing or ruffle_matched since the snapshot:
+Five of the nine listed tests now PASS or RM locally:
 
 | Test | Suite | actual / expected / match | Real status |
 |------|-------|--------------------------|--------------|
 | `BeginBitmapFill` | misc-ming | 1 / 1 / 0 | Single-line content mismatch — `mc9._width` returns 804, expected 150. Not zero-output. |
 | `Version4Loader` | misc-ming | 0 / 11 / 0 | **TRUE zero output.** Child SWF `Version5Loaded.swf` doesn't run. |
 | `frame_label_test` | misc-ming | 0 / 17 / 0 | **TRUE zero output.** Frame-label-driven `_root.x1` etc. variables never get set. |
-| `replace_buttons1test` | misc-ming | 24 / 18 / 0 | Ordering bug — extra `_level0.static1 onClipConstruct` traces emitted before checks. |
-| `replace_shapes1test` | misc-ming | 32 / 23 / 0 | Same ordering bug. |
+| `replace_buttons1test` | misc-ming | (was 24 / 18 / 0) | **NOW `ruffle_matched` locally** (2026-05-02 verification). Will flip in next CI run. |
+| `replace_shapes1test` | misc-ming | (was 32 / 23 / 0) | **NOW PASS locally** (2026-05-02 verification). Will flip in next CI run. |
 | `action_execution_order_test6` | misc-ming | (was 0/24) | **NOW `ruffle_matched` locally.** Ordering progress since CI; will flip in next CI run. |
 | `submoviegetvar` | misc-swfc | (was 0/4) | **NOW PASS locally.** Will flip in next CI run. |
-| `loading/LoadVarsTest` | misc-ming | compile_fail | Verifier bug — empty `empty.txt` generates `{ , 0x00 }` (invalid C) in `data_registry.c`. |
+| `loading/LoadVarsTest` | misc-ming | (was compile_fail) | **NOW PASS locally** (2026-05-02 verification). Phase 1 fix already in `verify_output.py:1280-1281` (verified). Will flip in next CI run. |
 | `opcode_guard_test2` | misc-swfc | (was runtime_error) | Now `output_mismatch`, 11/20 passing. testvar off-by-one + dynamic-clone getDepth issue. |
 
-**Estimated impact:** Phase 1 unblocks 1 test (LoadVarsTest); Phase 2
-unblocks 2 tests (replace_buttons1test, replace_shapes1test); Phases
-3–6 each unblock 1 test. Plus 2 tests (`action_execution_order_test6`,
-`submoviegetvar`) flip on the next CI run with no extra work.
+**Phases 1, 2, and the two free flips have all landed locally.** Remaining
+actionable phases:
+- Phase 3 (Version4Loader child SWF loadMovie),
+- Phase 4 (frame_label_test slash-colon GoToLabel arg parsing),
+- Phase 5 (BeginBitmapFill `_width` getter on bitmap-fill MCs),
+- Phase 6 (opcode_guard_test2 testvar off-by-one + getDepth).
 
 ## Phase 1 — Verifier: empty data-file array generates invalid C
 

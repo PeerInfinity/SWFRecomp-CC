@@ -2,7 +2,7 @@
 
 Cross-suite summary of all Ruffle-derived test suites. Each suite has its own `_investigation/` directory with detailed status docs.
 
-Last updated: 2026-05-02 (`mouse_drag_test` (Gnash misc-swfc.all) PASS via marking dragged MC as `transformed_by_script` so timeline PlaceObject MOVE tags no-op on the dragged clip. CI snapshot below from run 25260113699.)
+Last updated: 2026-05-02 (table refreshed against latest local results post-run 25260814244 — misc-swfc.all now 11/16 effective with mouse_drag_test + swf4opcode landed; misc-swfmill.all now 18/18 with jump_to_prev_block landed; avm1 upstream sync added 4 tests, 647 total).
 
 ## Suite Summary
 
@@ -10,12 +10,12 @@ Last updated: 2026-05-02 (`mouse_drag_test` (Gnash misc-swfc.all) PASS via marki
 
 | Suite | Tests | Pass | RM | Effective | Effective Rate | Filtered Rate | Notes |
 |-------|-------|------|----|-----------| ---------------|---------------|-------|
-| [avm1](../avm1/_investigation/CURRENT_STATUS.md) | 643 | 600 | 9 | 609 | 94.7% | **100.0%** (603/603) | 42 ignored. **Zero filtered failures.** loadvars_tostring + bitmap_filters PASS this session. |
-| [from_gnash/actionscript.all](../from_gnash/_investigation/CURRENT_STATUS.md) | 190 | 122 | 63 | 185 | **97.4%** | — | +7 effective since 2026-04-30 (Instance-v5/v6/v7/v8, Global-v6, GetMember/SetMember hidden own-prop walk). 5 raw failures remain (ContextMenu-v7/v8, MovieClip-v5, TextFormat-v7, array-v5). |
+| [avm1](../avm1/_investigation/CURRENT_STATUS.md) | 647 | 600 | 9 | 609 | 94.1% | **100.0%** (603/603) | 42 ignored. **Zero filtered failures.** loadvars_tostring + bitmap_filters PASS. Total bumped 643→647 by upstream sync (4 new tests; classification pending). |
+| [from_gnash/actionscript.all](../from_gnash/_investigation/CURRENT_STATUS.md) | 190 | 124 | 61 | 185 | **97.4%** | — | +7 effective since 2026-04-30 (Instance-v5/v6/v7/v8, Global-v6, GetMember/SetMember hidden own-prop walk). 5 raw failures remain (Global-v6/v7/v8 — three flip pass→ruffle_matched locally and will reclassify next CI; array-v5 sort/Array-method-on-Object semantics; TextFormat-v7 font metric precision). |
 | [from_gnash/misc-mtasc.all](../from_gnash/_investigation/CURRENT_STATUS.md) | 9 | 7 | 2 | 9 | **100.0%** | — | All effective pass. |
-| [from_gnash/misc-swfmill.all](../from_gnash/_investigation/CURRENT_STATUS.md) | 18 | 16 | 1 | 17 | **94.4%** | — | 1 remaining (`jump_to_prev_block` — cross-DoAction backward jump; concrete fix plan in `incomplete/MISC_SWFMILL_PLAN.md`). tags_after_last_showframe PASS this session. |
+| [from_gnash/misc-swfmill.all](../from_gnash/_investigation/CURRENT_STATUS.md) | 18 | 17 | 1 | 18 | **100.0%** | — | All effective pass. `jump_to_prev_block` (cross-DoAction backward jump) and `tags_after_last_showframe` both landed; plan moved to `complete/MISC_SWFMILL_PLAN.md`. |
 | [from_gnash/misc-ming.all](../from_gnash/_investigation/CURRENT_STATUS.md) | 102 | 62 | 16 | 78 | **76.5%** | — | +1 effective this session (registerClassTest2 → ruffle_matched via MC builtin gating). |
-| [from_gnash/misc-swfc.all](../from_gnash/_investigation/CURRENT_STATUS.md) | 16 | 6 | 3 | 9 | 56.2% | — | +1 effective (movieclip_destruction_test2 PASS). |
+| [from_gnash/misc-swfc.all](../from_gnash/_investigation/CURRENT_STATUS.md) | 16 | 7 | 4 | 11 | 68.8% | — | +2 effective since prior snapshot (mouse_drag_test PASS via startDrag→transformed_by_script; swf4opcode → ruffle_matched via SWF<5 MovieClip→f64 coercion). |
 | [from_shumway](../from_shumway/_investigation/CURRENT_STATUS.md) (flat) | 92 | 65 | 2 | 67 | 72.8% | — | +5 effective since 2026-04-30. |
 | [from_shumway/avm1](../from_shumway/_investigation/CURRENT_STATUS.md) | 47 | 45 | 1 | 46 | **97.9%** | **100.0%** (45/45) | 2 ignored. Only `moviecliploader` remains (MCL one-tick deferral). |
 | **SWFRecomp/tests** (old suite) | 158+59 | all trace pass | — | — | **100%** | — | Hand-written opcode tests. CI only. |
