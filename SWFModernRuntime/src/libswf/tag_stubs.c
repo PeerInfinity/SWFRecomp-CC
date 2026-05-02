@@ -160,8 +160,10 @@ static DisplayObject* ng_entry_to_obj(size_t entry_idx)
 	size_t parent_depth = entry_idx >> 20;
 	size_t child_depth  = entry_idx & 0xFFFFF;
 	if (parent_depth == 0) {
-		// Root level
-		if (child_depth < 1 || child_depth > max_depth) return NULL;
+		// Root level. Depth 0 is a valid root-level placement (Ming
+		// SWFDisplayItem_setDepth(it, 0)); the char_id check below guards
+		// against unused slots.
+		if (child_depth > max_depth) return NULL;
 		if (display_list[child_depth].char_id == 0) return NULL;
 		return &display_list[child_depth];
 	} else {
@@ -1423,8 +1425,10 @@ int ng_getDisplayEntryBounds(size_t entry_idx,
 		size_t child_d  = entry_idx & 0xFFFFF;
 		if (parent_d == 0)
 		{
-			// Root-depth sprite: iterate its sprite_display_list
-			if (child_d < 1 || child_d > max_depth || display_list[child_d].char_id == 0) { g_bounds_recursion_depth--; return 0; }
+			// Root-depth sprite: iterate its sprite_display_list. Depth 0 is a
+			// valid root-level placement (Ming SWFDisplayItem_setDepth(it, 0));
+			// the char_id check guards against unused slots.
+			if (child_d > max_depth || display_list[child_d].char_id == 0) { g_bounds_recursion_depth--; return 0; }
 			if (display_list[child_d].sprite_display_list == NULL) { g_bounds_recursion_depth--; return 0; }
 			dl     = display_list[child_d].sprite_display_list;
 			dl_max = display_list[child_d].sprite_max_depth;
@@ -2824,6 +2828,20 @@ MovieClip* ng_cloneSprite(SWFAppContext* app_context, const char* source_name,
 		clone_mc->draw_xmax = src_mc->draw_xmax;
 		clone_mc->draw_ymin = src_mc->draw_ymin;
 		clone_mc->draw_ymax = src_mc->draw_ymax;
+		// For static-sprite clones (no drawing API bounds), capture the source's
+		// bounds so the clone's _width/_height fall through to the
+		// mc->width/height fallback in mcGetOriginalBounds. The clone's
+		// display_list entry is skipped when target_swf_depth >= 1024
+		// (INITIAL_DISPLAYLIST_CAPACITY guard), so without this the dup
+		// returns 0 for _width/_height. Dynamic clones with drawing API
+		// bounds already have draw_xmin/xmax/ymin/ymax copied above.
+		if (!clone_mc->draw_has_bounds && src_depth != SIZE_MAX) {
+			float bxmin, bxmax, bymin, bymax;
+			if (ng_getDisplayEntryBounds(src_depth, &bxmin, &bxmax, &bymin, &bymax)) {
+				clone_mc->width = bxmax - bxmin;
+				clone_mc->height = bymax - bymin;
+			}
+		}
 		// Inherit the source's TextSnapshot stale flag BEFORE marking the
 		// source itself. In Ruffle, clone_sprite via instantiate_by_id
 		// produces an instance whose TextSnapshot availability mirrors its
