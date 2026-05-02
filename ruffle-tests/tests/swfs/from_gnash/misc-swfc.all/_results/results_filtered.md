@@ -1,10 +1,10 @@
 # Ruffle Test Results (Filtered)
 
-**Date**: 2026-05-01 23:05 UTC
+**Date**: 2026-05-02 00:51 UTC
 
-**Git SHA**: `2e50fd7e45`
+**Git SHA**: `ccdd3b9d93`
 
-**Run Duration**: 4m 10s
+**Run Duration**: 3m 49s
 
 **Filtered**: 0 tests ignored out of 16 available
 
@@ -18,8 +18,8 @@
 | Effective pass | **9** (56.2%) |
 | Failing | 7 |
 | Total expected lines | 499 |
-| Matching lines | 308 (61.7%) |
-| Mismatched lines | 191 |
+| Matching lines | 331 (66.3%) |
+| Mismatched lines | 168 |
 
 ### Failure Breakdown
 
@@ -33,12 +33,12 @@
 
 | # | Test | Lines | Duration | Notes |
 |---|------|-------|----------|-------|
-| 1 | `edittext_test1` | 47 | 16.6s |  |
-| 2 | `gotoFrameLabelAsFunction` | 6 | 17.6s |  |
-| 3 | `hello` | 4 | 17.5s |  |
-| 4 | `movieclip_destruction_test2` | 56 | 0.2s |  |
-| 5 | `stackscope` | 11 | 17.0s |  |
-| 6 | `submoviegetvar` | 4 | 18.6s |  |
+| 1 | `edittext_test1` | 47 | 16.4s |  |
+| 2 | `gotoFrameLabelAsFunction` | 6 | 13.5s |  |
+| 3 | `hello` | 4 | 16.9s |  |
+| 4 | `movieclip_destruction_test2` | 56 | 0.3s |  |
+| 5 | `stackscope` | 11 | 13.2s |  |
+| 6 | `submoviegetvar` | 4 | 13.8s |  |
 
 ## Ruffle-Matched Tests
 
@@ -46,9 +46,9 @@
 
 | # | Test | Our diffs | Ruffle diffs | Duration | Notes |
 |---|------|-----------|--------------|----------|-------|
-| 1 | `action_execution_order_test10` | 12 | 14 | 18.2s |  |
-| 2 | `movieclip_destruction_test1` | 43 | 52 | 19.3s |  |
-| 3 | `registerclass_test3` | 12 | 20 | 18.0s |  |
+| 1 | `action_execution_order_test10` | 12 | 14 | 17.6s |  |
+| 2 | `movieclip_destruction_test1` | 43 | 52 | 17.1s |  |
+| 3 | `registerclass_test3` | 12 | 20 | 16.5s |  |
 
 ## Near-Passing Tests
 
@@ -58,7 +58,7 @@ Tests with output mismatch but >= 50% line match rate (low-hanging fruit).
 
 | # | Test | Match Rate | Matching | Total | Diff Lines | Notes |
 |---|------|------------|----------|-------|------------|-------|
-| 1 | `swf4opcode` | 75.2% | 88 | 117 | 29 |  |
+| 1 | `swf4opcode` | 94.9% | 111 | 117 | 6 |  |
 | 2 | `sound` | 58.3% | 7 | 12 | 5 |  |
 | 3 | `button_test1` | 58.1% | 18 | 31 | 13 |  |
 | 4 | `soft_reference_test1` | 51.1% | 23 | 45 | 22 |  |
@@ -82,7 +82,7 @@ No timeouts.
 
 | # | Test | Match Rate | Matching/Total | Actual | Expected | Notes |
 |---|------|------------|----------------|--------|----------|-------|
-| 1 | `swf4opcode` | 75.2% | 88/117 | 117 | 117 |  |
+| 1 | `swf4opcode` | 94.9% | 111/117 | 117 | 117 |  |
 | 2 | `sound` | 58.3% | 7/12 | 12 | 7 |  |
 | 3 | `button_test1` | 58.1% | 18/31 | 20 | 31 |  |
 | 4 | `soft_reference_test1` | 51.1% | 23/45 | 45 | 45 |  |
