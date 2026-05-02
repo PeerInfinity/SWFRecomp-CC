@@ -364,6 +364,35 @@ undefined coerce to 0.0 → equal → PASSED.
 returns 0.0 in SWF<5 (was hardcoded NaN in all versions).
 SWF>=5 still returns NaN, matching the Object case.
 
+**Group A path to full PASS (deferred, ~1-3 hours).** In SWF4,
+`/path:varname` looks up `varname` as a **variable** in the
+path's scope, not as a special MC property — so `_xscale` /
+`_yscale` / `_alpha` / `_visible` should return undefined,
+not the MC's xscale/yscale/alpha/visible. Our
+`actionGetVariable` slash-colon resolver finds `mc1` correctly,
+then calls `actionGetMember` for `_xscale`, which dispatches to
+the special-property handler and returns `mc->xscale` (100).
+Note `_x`, `_y`, and `_rotation` already PASS — they likely
+succeed via a different code path; investigate that path and
+use it as the model for the remaining four properties (gate
+the special-property dispatch on a flag indicating "this came
+from a SWF4 `path:varname` lookup, not a regular GetMember").
+
+**Bytecode trivia (worth knowing for related SWF4 tests).**
+swfc emits asymmetric bytecode for slash-paths used as
+expressions:
+- `mc1` → `Push("mc1") + GetVariable`
+- `/mc1` → `Push("/mc1")` only (no GetVariable — the literal
+  slash-path is left on the stack as a string)
+- `/:mc1` → `Push("/:mc1") + GetVariable`
+
+This is why line 364 (`/mc1 == undefined`) "accidentally"
+PASSED even before the convertFloat fix: the literal string
+`/mc1` parses to 0.0 in SWF4 numeric coercion (no leading
+digit), undefined parses to 0.0, 0 == 0 → true. Knowing this
+prevents wasted time on `/mc1`-style cases that aren't actually
+exercising GetVariable.
+
 ### soft_reference_test1 (31.1%, 14/45)
 
 **Symptom (from earlier diff).** Multiple `FAILED:` lines on
