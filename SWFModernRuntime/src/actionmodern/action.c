@@ -2039,7 +2039,38 @@ static ActionVar builtin_sound_start(SWFAppContext* app_context, ActionVar* args
 
 // (setObjectProto is declared in action_internal.h)
 
-// ContextMenu.copy() — creates a new ContextMenu with copied builtInItems
+// ContextMenuItem.copy() — creates a copy of the menu item by copying the 5
+// instance-level properties (caption, onSelect, separatorBefore, enabled,
+// visible). Forward-declared so ContextMenu.copy() can use it for customItems
+// elements that are instanceof ContextMenuItem.
+static ActionVar builtin_contextmenuitem_copy(SWFAppContext* app_context, ActionVar* args, u32 arg_count, ActionVar* registers, void* this_obj);
+
+// True when `obj` has ContextMenuItem.prototype on its __proto__ chain.
+static int isContextMenuItemInstance(ASObject* obj)
+{
+	extern ASFunction g_stub_ctors[];
+	if (obj == NULL || g_stub_ctors[5].prototype_obj == NULL) return 0;
+	ASObject* p = obj;
+	for (int i = 0; i < 64; i++) {
+		ActionVar* pv = getProperty(p, "__proto__", 9);
+		if (pv == NULL || pv->type != ACTION_STACK_VALUE_OBJECT || pv->data.numeric_value == 0) return 0;
+		ASObject* parent = (ASObject*)(uintptr_t)pv->data.numeric_value;
+		if (parent == g_stub_ctors[5].prototype_obj) return 1;
+		if (parent == p) return 0;
+		p = parent;
+	}
+	return 0;
+}
+
+// ContextMenu.copy() — clone a ContextMenu (or ContextMenu-shaped) instance.
+// Always sets the three instance properties (onSelect / builtInItems /
+// customItems) on the new object so that hasOwnProperty(...) returns true
+// regardless of which properties exist on the source. builtInItems is copied
+// by reference (Flash semantics — see ContextMenu.as:195-197). customItems is
+// rebuilt as a fresh Array, with elements deep-copied via
+// ContextMenuItem.copy() only when they are instanceof ContextMenuItem
+// (otherwise the slot becomes undefined; if the source customItems isn't an
+// Array at all, the result is an empty Array).
 static ActionVar builtin_contextmenu_copy(SWFAppContext* app_context, ActionVar* args, u32 arg_count, ActionVar* registers, void* this_obj)
 {
 	(void)args; (void)arg_count; (void)registers;
@@ -2059,45 +2090,59 @@ static ActionVar builtin_contextmenu_copy(SWFAppContext* app_context, ActionVar*
 		setProperty(app_context, new_cm, "__proto__", 9, &pv);
 	}
 
-	// Copy builtInItems
-	ActionVar* bi_var = getProperty(cm, "builtInItems", 12);
-	if (bi_var != NULL && bi_var->type == ACTION_STACK_VALUE_OBJECT) {
-		ASObject* old_bi = (ASObject*)bi_var->data.numeric_value;
-		ASObject* new_bi = allocObject(app_context, 10);
-		retainObject(new_bi);
-		setObjectProto(app_context, new_bi);
-		// Copy all properties from old builtInItems
-		for (u32 i = 0; i < old_bi->num_used; i++) {
-			if (old_bi->properties[i].name_length > 0) {
-				setProperty(app_context, new_bi, old_bi->properties[i].name,
-				            old_bi->properties[i].name_length, &old_bi->properties[i].value);
-			}
-		}
-		ActionVar bv = {0};
-		bv.type = ACTION_STACK_VALUE_OBJECT;
-		bv.data.numeric_value = (u64)new_bi;
-		setProperty(app_context, new_cm, "builtInItems", 12, &bv);
+	// onSelect: always present on copy. Use source's value if it has the
+	// property (any type), else undefined.
+	{
+		ActionVar* os_var = getProperty(cm, "onSelect", 8);
+		ActionVar v = {0};
+		v.type = ACTION_STACK_VALUE_UNDEFINED;
+		if (os_var != NULL) v = *os_var;
+		setProperty(app_context, new_cm, "onSelect", 8, &v);
 	}
 
-	// Copy customItems (shallow copy of array)
-	ActionVar* ci_var = getProperty(cm, "customItems", 11);
-	if (ci_var != NULL && ci_var->type == ACTION_STACK_VALUE_ARRAY) {
-		ASArray* old_ca = (ASArray*)ci_var->data.numeric_value;
-		ASArray* new_ca = allocArray(app_context, old_ca->length > 0 ? old_ca->length : 4);
-		new_ca->length = old_ca->length;
-		for (u32 i = 0; i < old_ca->length; i++) {
-			new_ca->elements[i] = old_ca->elements[i];
+	// builtInItems: always present on copy. Copy the value verbatim so
+	// objects share a reference with the source (test: mutating o.g after
+	// the copy must be visible through ff.builtInItems.g).
+	{
+		ActionVar* bi_var = getProperty(cm, "builtInItems", 12);
+		ActionVar v = {0};
+		v.type = ACTION_STACK_VALUE_UNDEFINED;
+		if (bi_var != NULL) v = *bi_var;
+		setProperty(app_context, new_cm, "builtInItems", 12, &v);
+	}
+
+	// customItems: always present on copy as an Array. If the source's
+	// customItems is an Array, clone it but only deep-copy elements that
+	// are instanceof ContextMenuItem (other element types become
+	// undefined). Otherwise, fresh empty Array.
+	{
+		ActionVar* ci_var = getProperty(cm, "customItems", 11);
+		ASArray* new_ca;
+		if (ci_var != NULL && ci_var->type == ACTION_STACK_VALUE_ARRAY) {
+			ASArray* old_ca = (ASArray*)ci_var->data.numeric_value;
+			u32 cap = old_ca->length > 0 ? old_ca->length : 4;
+			new_ca = allocArray(app_context, cap);
+			new_ca->length = old_ca->length;
+			for (u32 i = 0; i < old_ca->length; i++) {
+				ActionVar e = old_ca->elements[i];
+				ActionVar copied = {0};
+				copied.type = ACTION_STACK_VALUE_UNDEFINED;
+				if (e.type == ACTION_STACK_VALUE_OBJECT && e.data.numeric_value != 0) {
+					ASObject* eo = (ASObject*)(uintptr_t)e.data.numeric_value;
+					if (isContextMenuItemInstance(eo)) {
+						copied = builtin_contextmenuitem_copy(app_context, NULL, 0, NULL, eo);
+					}
+				}
+				new_ca->elements[i] = copied;
+			}
+		} else {
+			new_ca = allocArray(app_context, 4);
+			new_ca->length = 0;
 		}
 		ActionVar cv = {0};
 		cv.type = ACTION_STACK_VALUE_ARRAY;
 		cv.data.numeric_value = (u64)new_ca;
 		setProperty(app_context, new_cm, "customItems", 11, &cv);
-	}
-
-	// Copy onSelect
-	ActionVar* os_var = getProperty(cm, "onSelect", 8);
-	if (os_var != NULL) {
-		setProperty(app_context, new_cm, "onSelect", 8, os_var);
 	}
 
 	ret.type = ACTION_STACK_VALUE_OBJECT;
@@ -2132,6 +2177,42 @@ static ActionVar builtin_contextmenuitem_copy(SWFAppContext* app_context, Action
 	}
 	ret.type = ACTION_STACK_VALUE_OBJECT;
 	ret.data.numeric_value = (u64)new_cmi;
+	return ret;
+}
+
+// ContextMenu.hideBuiltInItems() — sets `this.builtInItems` to a fresh object
+// whose 8 known boolean properties (save/zoom/quality/play/loop/rewind/
+// forward_back/print) are all `false`. Works on any receiver, not just real
+// ContextMenu instances (gnash test: `e = {}; e.f = ContextMenu.prototype.
+// hideBuiltInItems; e.f();` must populate `e.builtInItems`).
+static ActionVar builtin_contextmenu_hideBuiltInItems(SWFAppContext* app_context, ActionVar* args, u32 arg_count, ActionVar* registers, void* this_obj)
+{
+	(void)args; (void)arg_count; (void)registers;
+	ActionVar ret = {0};
+	ret.type = ACTION_STACK_VALUE_UNDEFINED;
+	ASObject* recv = (ASObject*)this_obj;
+	if (recv == NULL) return ret;
+
+	ASObject* builtin = allocObject(app_context, 10);
+	retainObject(builtin);
+	setObjectProto(app_context, builtin);
+	ActionVar bf = {0};
+	bf.type = ACTION_STACK_VALUE_BOOLEAN;
+	bf.data.numeric_value = 0;
+	// LIFO insertion → enum order: save, zoom, quality, play, loop, rewind, forward_back, print
+	setProperty(app_context, builtin, "print", 5, &bf);
+	setProperty(app_context, builtin, "forward_back", 12, &bf);
+	setProperty(app_context, builtin, "rewind", 6, &bf);
+	setProperty(app_context, builtin, "loop", 4, &bf);
+	setProperty(app_context, builtin, "play", 4, &bf);
+	setProperty(app_context, builtin, "quality", 7, &bf);
+	setProperty(app_context, builtin, "zoom", 4, &bf);
+	setProperty(app_context, builtin, "save", 4, &bf);
+
+	ActionVar bv = {0};
+	bv.type = ACTION_STACK_VALUE_OBJECT;
+	bv.data.numeric_value = (u64)builtin;
+	setProperty(app_context, recv, "builtInItems", 12, &bv);
 	return ret;
 }
 
@@ -29491,7 +29572,17 @@ static void initContextMenuPrototype(SWFAppContext* app_context, ASFunction* cto
 	fv.type = ACTION_STACK_VALUE_FUNCTION;
 	fv.data.numeric_value = (u64) &g_cm_copy_func;
 	setPropertyWithFlags(app_context, ctor->prototype_obj, "copy", 4, &fv, mflags);
-	addStubMethodToProto(app_context, ctor->prototype_obj, "hideBuiltInItems", 16, mflags);
+	// Real hideBuiltInItems() implementation
+	memset(&g_cm_hideBuiltIn_func, 0, sizeof(ASFunction));
+	strncpy(g_cm_hideBuiltIn_func.name, "hideBuiltInItems", 255);
+	g_cm_hideBuiltIn_func.function_type = 2;
+	g_cm_hideBuiltIn_func.advanced_func = (Function2Ptr) builtin_contextmenu_hideBuiltInItems;
+	setupNativeFuncOwnProps(app_context, &g_cm_hideBuiltIn_func);
+	if (function_count < MAX_FUNCTIONS) function_registry[function_count++] = &g_cm_hideBuiltIn_func;
+	ActionVar hv = {0};
+	hv.type = ACTION_STACK_VALUE_FUNCTION;
+	hv.data.numeric_value = (u64) &g_cm_hideBuiltIn_func;
+	setPropertyWithFlags(app_context, ctor->prototype_obj, "hideBuiltInItems", 16, &hv, mflags);
 }
 
 // ContextMenuItem.prototype: copy
@@ -29520,7 +29611,6 @@ static void initContextMenuItemPrototype(SWFAppContext* app_context, ASFunction*
 	fv.type = ACTION_STACK_VALUE_FUNCTION;
 	fv.data.numeric_value = (u64) &g_cmi_copy_func;
 	setPropertyWithFlags(app_context, ctor->prototype_obj, "copy", 4, &fv, mflags);
-	addStubMethodToProto(app_context, ctor->prototype_obj, "copy", 4, mflags);
 }
 
 // LoadVars.decode(queryString): parse URL-encoded string into own properties
@@ -45429,9 +45519,16 @@ void actionNewObject(SWFAppContext* app_context)
 				bv.data.numeric_value = (u64)builtin;
 				// Expected enum order: customItems,builtInItems,onSelect
 				// LIFO: insert onSelect, builtInItems, customItems
-				ActionVar uv = {0};
-				uv.type = ACTION_STACK_VALUE_UNDEFINED;
-				setProperty(app_context, cm_obj, "onSelect", 8, &uv);
+				// onSelect: first constructor arg (any type) or undefined.
+				// gnash test ContextMenu.as:294-306 expects
+				// `new ContextMenu(callback).onSelect == callback`.
+				ActionVar os_var = {0};
+				if (num_args > 0) {
+					os_var = args[0];
+				} else {
+					os_var.type = ACTION_STACK_VALUE_UNDEFINED;
+				}
+				setProperty(app_context, cm_obj, "onSelect", 8, &os_var);
 				setProperty(app_context, cm_obj, "builtInItems", 12, &bv);
 				// customItems: empty array
 				ASArray* custom = allocArray(app_context, 4);
