@@ -206,6 +206,44 @@ prototype-chain-walk) and consumed by all ~30 builtin handlers via a
 single early `if (mc->registered_class_overrides_builtins) goto
 _mc_user_method_dispatch;` near the top of the MOVIECLIP arm.
 
+## 2026-05-02 session — getDepth gating landed (registerClassTest2 → ruffle_matched)
+
+Implemented a hybrid of approach 2 (native-proto allowlist) and approach
+1 (early skip): at the top of the MOVIECLIP arm of `actionCallMethod`,
+walk `dynamic_props.__proto__` looking for any of `g_mc_ctor_legacy /
+modern / default`'s prototype objects. If none found AND mc is not a
+TextField (`!MC_IS_TEXTFIELD(mc)`) AND not a button (`!mc->is_button_mc`),
+`goto _mc_user_dispatch` past the entire builtin chain, into the
+existing user-method dispatch label. Object.prototype-inherited names
+(`addProperty`, `hasOwnProperty`, `isPrototypeOf`,
+`isPropertyEnumerable`, `toString`, `valueOf`, `watch`, `unwatch`) are
+explicitly preserved through the existing builtin path so they keep
+working on registered-class MCs whose chain bypasses
+MovieClip.prototype.
+
+The TextField/Button exclusion is the load-bearing piece: see the
+2026-05-01 diagnosis above — TextField/Button MCs share the MOVIECLIP
+dispatch path but their `__proto__` chain ends at Object.prototype, not
+MovieClip.prototype, so the naive chain check fires on them too and
+breaks 32 EditText + 3 TextFieldHTML + 1 DefineEditTextTest. Re-running
+this fix in CI without the exclusion reproduced the exact regression
+matrix predicted by the prior session's diagnosis.
+
+Net effect:
+- `register_class/registerClassTest2`: `output_mismatch` (35/44) →
+  `ruffle_matched` (36/44). Line 153 (`clip2.getDepth() == undefined`)
+  now PASSES. Residual 8-line diff is the `clipevs.onLoad /
+  clip3.onLoad` ordering — a subset of Ruffle's diff against Flash, so
+  the test promotes.
+- All TextField/Button regressions from the 2026-05-01 attempt are
+  avoided. No new regressions across any suite.
+- Phase 5 frame interleave (clipevs/clip3 onLoad ordering) remains the
+  only blocker to a full PASS on registerClassTest2.
+
+Commits: `802674fd` (initial fix) + `3c67568f` (TextField/Button
+exclusion follow-up; required because the initial commit broke 36
+TextField-class tests).
+
 ## 2026-04-27 session — Phases 1 & 2 landed
 
 **Phase 1 (commit 7311f226):** `actionDispatchMCOnLoad` now mirrors

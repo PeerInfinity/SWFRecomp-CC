@@ -2,7 +2,7 @@
 
 Cross-suite summary of all Ruffle-derived test suites. Each suite has its own `_investigation/` directory with detailed status docs.
 
-Last updated: 2026-05-02 (`swf4opcode` (Gnash misc-swfc.all) promoted to ruffle_matched via SWF4 MovieClip→0.0 numeric coercion fix; not yet in CI. CI snapshot below from 2026-05-01 / run 25231855425.)
+Last updated: 2026-05-02 (`registerClassTest2` (Gnash misc-ming.all) promoted to ruffle_matched via MC builtin gating on MovieClip.prototype membership, with TextField/Button exclusions. CI snapshot below from run 25260113699.)
 
 ## Suite Summary
 
@@ -14,7 +14,7 @@ Last updated: 2026-05-02 (`swf4opcode` (Gnash misc-swfc.all) promoted to ruffle_
 | [from_gnash/actionscript.all](../from_gnash/_investigation/CURRENT_STATUS.md) | 190 | 122 | 63 | 185 | **97.4%** | — | +7 effective since 2026-04-30 (Instance-v5/v6/v7/v8, Global-v6, GetMember/SetMember hidden own-prop walk). 5 raw failures remain (ContextMenu-v7/v8, MovieClip-v5, TextFormat-v7, array-v5). |
 | [from_gnash/misc-mtasc.all](../from_gnash/_investigation/CURRENT_STATUS.md) | 9 | 7 | 2 | 9 | **100.0%** | — | All effective pass. |
 | [from_gnash/misc-swfmill.all](../from_gnash/_investigation/CURRENT_STATUS.md) | 18 | 16 | 1 | 17 | **94.4%** | — | 1 remaining (`jump_to_prev_block` — cross-DoAction backward jump; concrete fix plan in `incomplete/MISC_SWFMILL_PLAN.md`). tags_after_last_showframe PASS this session. |
-| [from_gnash/misc-ming.all](../from_gnash/_investigation/CURRENT_STATUS.md) | 102 | 61 | 14 | 75 | **73.5%** | — | +4 effective since 2026-04-30. |
+| [from_gnash/misc-ming.all](../from_gnash/_investigation/CURRENT_STATUS.md) | 102 | 62 | 16 | 78 | **76.5%** | — | +1 effective this session (registerClassTest2 → ruffle_matched via MC builtin gating). |
 | [from_gnash/misc-swfc.all](../from_gnash/_investigation/CURRENT_STATUS.md) | 16 | 6 | 3 | 9 | 56.2% | — | +1 effective (movieclip_destruction_test2 PASS). |
 | [from_shumway](../from_shumway/_investigation/CURRENT_STATUS.md) (flat) | 92 | 65 | 2 | 67 | 72.8% | — | +5 effective since 2026-04-30. |
 | [from_shumway/avm1](../from_shumway/_investigation/CURRENT_STATUS.md) | 47 | 45 | 1 | 46 | **97.9%** | **100.0%** (45/45) | 2 ignored. Only `moviecliploader` remains (MCL one-tick deferral). |
@@ -22,6 +22,7 @@ Last updated: 2026-05-02 (`swf4opcode` (Gnash misc-swfc.all) promoted to ruffle_
 
 ## Progress Since 2026-05-02
 
+- **registerClassTest2 (Gnash misc-ming.all) → ruffle_matched** (commits 802674fd + 3c67568f). When `Object.registerClass` replaces an MC's `__proto__` chain to a class whose prototype does NOT extend MovieClip (e.g. `theClass2.prototype = {}` instead of `new MovieClip()`), MC-specific builtins like `getDepth()` should resolve to undefined — they're inherited from `MovieClip.prototype` which is no longer in the chain. Fix: at the top of the MOVIECLIP arm of `actionCallMethod`, walk `dynamic_props.__proto__` looking for any `MovieClip.prototype` variant (legacy/modern/default); if not found AND mc is not a TextField/Button, `goto _mc_user_dispatch` past the entire builtin chain. Object.prototype-inherited names (`addProperty`, `hasOwnProperty`, etc.) are explicitly preserved through the existing path. The TextField/Button exclusion is load-bearing — without it, 32 EditText + 3 TextFieldHTML + 1 DefineEditTextTest regress because TextField/Button MCs share the MOVIECLIP dispatch path but their `__proto__` chain ends at `Object.prototype`, not `MovieClip.prototype`. Reproduced in CI run 25259793074, fixed in 25260113699. Line 153 (`clip2.getDepth() == undefined`) now PASSES; residual 8-line diff (clipevs/clip3 onLoad ordering) is a subset of Ruffle's diff against Flash. See `from_gnash/_investigation/incomplete/REGISTERCLASS_LIFECYCLE_PLAN.md` "2026-05-02 session" section.
 - **swf4opcode (Gnash misc-swfc.all) → ruffle_matched.** SWF4 `Equals` (action 0x0e) coerces both operands to f64 via `convertFloat`. Our `convertFloat` for `ACTION_STACK_VALUE_MOVIECLIP` returned NaN unconditionally; should return 0.0 in SWF<5 (matching Ruffle's `coerce_to_f64` for `Value::MovieClip`, which goes through `Value::Object(...) → primitive_as_number`, gating Object→0.0 on `swf_version < 5`). Group B (lines 363/365: bare `mc1` and `/:mc1` compared with undefined) now passes — both MC and undefined coerce to 0.0 → equal. Group A (lines 74/82/90/98: `/mc1:_PROPNAME` colon-path) still fails but is a subset of Ruffle's diff against Flash, so the test promotes to ruffle_matched (full PASS would require fixing SWF4 colon-var-vs-property semantics).
 
 ## Progress Since 2026-05-01
