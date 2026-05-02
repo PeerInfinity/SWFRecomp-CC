@@ -34588,8 +34588,8 @@ check_special_vars:
 #endif
 			extern MovieClip root_movieclip;
 			MovieClip* mc = &root_movieclip;
-			if (strcasecmp(var_name, "_x") == 0) { float v = mc->x; PUSH(ACTION_STACK_VALUE_F32, VAL(u32, &v)); return; }
-			if (strcasecmp(var_name, "_y") == 0) { float v = mc->y; PUSH(ACTION_STACK_VALUE_F32, VAL(u32, &v)); return; }
+			if (strcasecmp(var_name, "_x") == 0) { double v = round((double)mc->x * 20.0) / 20.0; PUSH(ACTION_STACK_VALUE_F64, VAL(u64, &v)); return; }
+			if (strcasecmp(var_name, "_y") == 0) { double v = round((double)mc->y * 20.0) / 20.0; PUSH(ACTION_STACK_VALUE_F64, VAL(u64, &v)); return; }
 			if (strcasecmp(var_name, "_xscale") == 0) { float v = mc->xscale; PUSH(ACTION_STACK_VALUE_F32, VAL(u32, &v)); return; }
 			if (strcasecmp(var_name, "_yscale") == 0) { float v = mc->yscale; PUSH(ACTION_STACK_VALUE_F32, VAL(u32, &v)); return; }
 			if (strcasecmp(var_name, "_rotation") == 0) { float v = mc->rotation; PUSH(ACTION_STACK_VALUE_F32, VAL(u32, &v)); return; }
@@ -35954,8 +35954,8 @@ void actionGetProperty(SWFAppContext* app_context)
 				}
 			}
 #endif
-			value = mc ? mc->x : 0.0f;
-			break;
+			{ double _dx = mc ? round((double)mc->x * 20.0) / 20.0 : 0.0;
+			  PUSH(ACTION_STACK_VALUE_F64, VAL(u64, &_dx)); return; }
 		case 1:  // _y
 #ifdef NO_GRAPHICS
 			if (mc) syncTransformIfNeeded(mc);
@@ -35970,8 +35970,8 @@ void actionGetProperty(SWFAppContext* app_context)
 				}
 			}
 #endif
-			value = mc ? mc->y : 0.0f;
-			break;
+			{ double _dy = mc ? round((double)mc->y * 20.0) / 20.0 : 0.0;
+			  PUSH(ACTION_STACK_VALUE_F64, VAL(u64, &_dy)); return; }
 		case 2:  // _xscale
 #ifdef NO_GRAPHICS
 			if (mc) syncTransformIfNeeded(mc);
@@ -43364,12 +43364,13 @@ void actionGetMember(SWFAppContext* app_context)
 					}
 				}
 #endif
-				// TextFields: return twip-snapped value as F64 for full precision
-				if (MC_IS_TEXTFIELD(mc)) {
+				// AS-set or fallback: snap stored float to twips and return as F64
+				// for full precision (e.g. `_x = 0.09` stores 0.05f ≈ 0.05000000074
+				// in float; snap recovers exact 0.05 in double).
+				{
 					double dx = round((double)mc->x * 20.0) / 20.0;
 					PUSH(ACTION_STACK_VALUE_F64, VAL(u64, &dx)); return;
-				}
-				float v = mc->x; PUSH(ACTION_STACK_VALUE_F32, VAL(u32, &v)); return; }
+				} }
 			if (strcasecmp(prop_name, "_y") == 0) {
 #ifdef NO_GRAPHICS
 				syncTransformIfNeeded(mc);
@@ -43403,11 +43404,12 @@ void actionGetMember(SWFAppContext* app_context)
 					}
 				}
 #endif
-				if (MC_IS_TEXTFIELD(mc)) {
+				// AS-set or fallback: snap stored float to twips and return as F64
+				// for full precision (mirrors `_x` path above).
+				{
 					double dy = round((double)mc->y * 20.0) / 20.0;
 					PUSH(ACTION_STACK_VALUE_F64, VAL(u64, &dy)); return;
-				}
-				float v = mc->y; PUSH(ACTION_STACK_VALUE_F32, VAL(u32, &v)); return; }
+				} }
 			if (strcasecmp(prop_name, "_xscale") == 0) {
 #ifdef NO_GRAPHICS
 				syncTransformIfNeeded(mc);
@@ -43863,7 +43865,21 @@ void actionGetMember(SWFAppContext* app_context)
 		}
 		if (mc != NULL && prop_name_len == 7 && strncmp(prop_name, "enabled", 7) == 0)
 		{
-			// enabled defaults to true
+			// `enabled` defaults to true, but `mc.__proto__.enabled = X` (i.e.
+			// writing to the prototype) must be observable on `mc.enabled`.
+			// Walk the version-appropriate MovieClip.prototype chain first;
+			// only fall back to the boolean-true default when nothing was found.
+			int _mc_ver_e = (mc->swf_version) ? mc->swf_version : g_swf_version;
+			ASObject* _mc_proto_e = getMovieClipPrototype(_mc_ver_e);
+			if (_mc_proto_e != NULL)
+			{
+				ActionVar* _e_prop = getPropertyWithPrototype(_mc_proto_e, "enabled", 7);
+				if (_e_prop != NULL)
+				{
+					pushVar(app_context, _e_prop);
+					return;
+				}
+			}
 			PUSH(ACTION_STACK_VALUE_BOOLEAN, 1ULL);
 			return;
 		}
@@ -47370,8 +47386,8 @@ static int getMCBuiltinProperty(MovieClip* mc, const char* name, u32 name_len, A
 	result->str_size = 0;
 	result->data.numeric_value = 0;
 
-	if (strcasecmp(name, "_x") == 0) { float v = mc->x; result->type = ACTION_STACK_VALUE_F32; memcpy(&result->data.numeric_value, &v, 4); return 1; }
-	if (strcasecmp(name, "_y") == 0) { float v = mc->y; result->type = ACTION_STACK_VALUE_F32; memcpy(&result->data.numeric_value, &v, 4); return 1; }
+	if (strcasecmp(name, "_x") == 0) { double v = round((double)mc->x * 20.0) / 20.0; result->type = ACTION_STACK_VALUE_F64; memcpy(&result->data.numeric_value, &v, 8); return 1; }
+	if (strcasecmp(name, "_y") == 0) { double v = round((double)mc->y * 20.0) / 20.0; result->type = ACTION_STACK_VALUE_F64; memcpy(&result->data.numeric_value, &v, 8); return 1; }
 	if (strcasecmp(name, "_xscale") == 0) { float v = mc->xscale; result->type = ACTION_STACK_VALUE_F32; memcpy(&result->data.numeric_value, &v, 4); return 1; }
 	if (strcasecmp(name, "_yscale") == 0) { float v = mc->yscale; result->type = ACTION_STACK_VALUE_F32; memcpy(&result->data.numeric_value, &v, 4); return 1; }
 	if (strcasecmp(name, "_rotation") == 0) { float v = mc->rotation; result->type = ACTION_STACK_VALUE_F32; memcpy(&result->data.numeric_value, &v, 4); return 1; }
