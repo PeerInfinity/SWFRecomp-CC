@@ -56369,6 +56369,55 @@ void actionCallMethod(SWFAppContext* app_context, char* str_buffer)
 	{
 		MovieClip* mc = (MovieClip*) obj_var.data.numeric_value;
 
+		// If mc has been Object.registerClass'd to a class whose prototype
+		// chain bypasses MovieClip.prototype, MC-specific builtins (getDepth,
+		// gotoAndStop, etc.) are not reachable via inheritance and should
+		// resolve to undefined. Walk dynamic_props.__proto__ chain looking
+		// for MovieClip.prototype; if not found, route directly to the
+		// user-method dispatch path (which falls back to function_registry
+		// stubs that have no body → returns undefined). Test:
+		// register_class/registerClassTest2 — clip2.getDepth() == undefined
+		// when theClass2.prototype = {} (no `new MovieClip()`).
+		// addProperty/hasOwnProperty/etc. on Object.prototype are explicitly
+		// preserved below.
+		int _mcm_chain_bypasses_mc = 0;
+		if (mc != NULL && mc->dynamic_props != NULL) {
+			ActionVar* _mcm_dp_proto = getProperty((ASObject*)mc->dynamic_props, "__proto__", 9);
+			if (_mcm_dp_proto != NULL && _mcm_dp_proto->type == ACTION_STACK_VALUE_OBJECT) {
+				initMovieClipPrototype(app_context);
+				ASObject* _mcp_legacy = (g_mc_ctor_legacy != NULL) ? g_mc_ctor_legacy->prototype_obj : NULL;
+				ASObject* _mcp_modern = (g_mc_ctor_modern != NULL) ? g_mc_ctor_modern->prototype_obj : NULL;
+				ASObject* _mcp_default = g_movieclip_constructor.prototype_obj;
+				ASObject* _mcm_cur = (ASObject*)(uintptr_t)_mcm_dp_proto->data.numeric_value;
+				int _mcm_found = 0;
+				for (int _mcm_hops = 0; _mcm_hops < 16 && _mcm_cur != NULL; _mcm_hops++) {
+					if (_mcm_cur == _mcp_legacy || _mcm_cur == _mcp_modern || _mcm_cur == _mcp_default) {
+						_mcm_found = 1; break;
+					}
+					ActionVar* _mcm_np = getProperty(_mcm_cur, "__proto__", 9);
+					if (_mcm_np == NULL || _mcm_np->type != ACTION_STACK_VALUE_OBJECT) break;
+					_mcm_cur = (ASObject*)(uintptr_t)_mcm_np->data.numeric_value;
+				}
+				if (!_mcm_found) _mcm_chain_bypasses_mc = 1;
+			}
+		}
+		// Explicitly preserve Object.prototype-inherited methods so they keep
+		// working on registered-class MCs whose chain bypasses MovieClip.prototype.
+		// addProperty has its own MC handler below; the others fall through to
+		// generic OBJECT dispatch via user-method walk.
+		if (_mcm_chain_bypasses_mc) {
+			int _mcm_is_object_method = 0;
+			if (method_name_len == 11 && strncasecmp(method_name, "addProperty", 11) == 0) _mcm_is_object_method = 1;
+			else if (method_name_len == 14 && strncasecmp(method_name, "hasOwnProperty", 14) == 0) _mcm_is_object_method = 1;
+			else if (method_name_len == 13 && strncasecmp(method_name, "isPrototypeOf", 13) == 0) _mcm_is_object_method = 1;
+			else if (method_name_len == 19 && strncasecmp(method_name, "isPropertyEnumerable", 19) == 0) _mcm_is_object_method = 1;
+			else if (method_name_len == 8 && strncasecmp(method_name, "toString", 8) == 0) _mcm_is_object_method = 1;
+			else if (method_name_len == 7 && strncasecmp(method_name, "valueOf", 7) == 0) _mcm_is_object_method = 1;
+			else if (method_name_len == 5 && strncasecmp(method_name, "watch", 5) == 0) _mcm_is_object_method = 1;
+			else if (method_name_len == 7 && strncasecmp(method_name, "unwatch", 7) == 0) _mcm_is_object_method = 1;
+			if (!_mcm_is_object_method) goto _mc_user_dispatch;
+		}
+
 		if (method_name_len == 11 &&
 			(strncasecmp(method_name, "gotoAndStop", 11) == 0 || strncasecmp(method_name, "gotoAndPlay", 11) == 0))
 		{
@@ -60199,6 +60248,7 @@ void actionCallMethod(SWFAppContext* app_context, char* str_buffer)
 		}
 		else
 		{
+_mc_user_dispatch: ;
 			// Check if user-defined method exists on dynamic_props.
 			// Track whether dynamic_props has an explicit __proto__ — if so, the
 			// getPropertyWithPrototype walk below already covered the user's
