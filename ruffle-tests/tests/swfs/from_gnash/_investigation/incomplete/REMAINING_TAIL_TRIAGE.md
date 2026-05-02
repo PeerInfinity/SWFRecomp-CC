@@ -337,41 +337,82 @@ for completeness.
 
 ### swf4opcode (94.9%, 111/117)
 
-**Symptom (from latest diff, 2026-05-01).** 6 remaining FAIL lines,
-all in the `/mc1:_PROPNAME` colon-path tests in the middle of frame
-3:
+**Symptom (verified 2026-05-02).** 6 remaining FAIL lines in two
+groups:
 
+Group A — `/mc1:_PROPNAME` colon-path tests in frame 3:
 - `/mc1:_xscale == undefined` — got `100`
 - `/mc1:_yscale == undefined` — got `100`
 - `/mc1:_alpha == undefined` — got `100`
 - `/mc1:_visible == undefined` — got `1`
 
-(Plus 2 line-count diffs.) Note the asymmetry verified locally:
-**`/mc1:_x`, `/mc1:_y`, `/mc1:_rotation` already PASS** (return
-undefined as expected). The earlier "`/mc1.x` returns empty" /
-"bare `mc1` resolves wrong" / "`!neg`" symptoms have all been fixed
-in prior sessions; only the four properties above remain.
+Group B — bare-name lookup at end of frame 3:
+- `mc1 == undefined` — got `_level0.mc1`
+- `/:mc1 == undefined` — got `_level0.mc1`
 
-**Hypothesis.** In SWF4, `/path:varname` looks up `varname` as a
-**variable** in the path's scope, not as a special MC property —
-so `_xscale` / `_yscale` / `_alpha` / `_visible` aren't found and
-return undefined. Our `actionGetVariable` slash-colon resolver
-finds `mc1` correctly, then calls `actionGetMember` for
-`_xscale`, which dispatches to the special-property handler and
-returns `mc->xscale` (100). The `_x` / `_y` / `_rotation` cases
-likely succeed via a different code path (worth investigating —
-maybe the resolver fails to find mc1 at the time of those tests
-because of placement-order timing, falling through to the
-variable-lookup branch that returns undefined).
+Note the asymmetry on Group A: **`/mc1:_x`, `/mc1:_y`,
+`/mc1:_rotation` already PASS** (return undefined as expected).
+A prior version of this entry said the bare-name symptoms were
+fixed; that was incorrect — Group B is still failing.
 
-**Scope.** Likely 1-3 hours rather than 4-6 — narrowed to
-"colon-path final segment must use variable-lookup, not
-special-property dispatch, in SWF4." Investigate why `_x` /
-`_y` / `_rotation` already work — that path is the model the
-others should follow. Touches `actionGetVariable`'s slash-colon
-arm in `SWFModernRuntime/src/actionmodern/action.c` (the
-`actionGetMember(prop_name)` call after `target_mc != NULL &&
-prop_len > 0`). **Promote to standalone plan when work begins.**
+**Path to ruffle_matched (cheaper than full PASS).** Comparing
+our diff against `output.ruffle.txt`:
+
+- Ruffle's diff against Flash: lines 46, 47, 65, 73, 74, 81, 82,
+  89, 90, 97, 98, 105, 113 (13 lines).
+- Our diff against Flash: lines 74, 82, 90, 98, 114, 116 (6
+  lines).
+- Group A (74/82/90/98) is a subset of Ruffle's diff — fine.
+- **Group B (114/116) is NOT in Ruffle's diff** — Ruffle's
+  expected output literally has `PASSED: mc1 == undefined` and
+  `PASSED: /:mc1 == undefined` on those lines.
+
+Therefore: **fix only Group B → `ruffle_matched`** (no need to
+solve Group A's Flash-specific colon-var semantics). Full PASS
+still requires both groups.
+
+**Group A hypothesis.** In SWF4, `/path:varname` looks up
+`varname` as a **variable** in the path's scope, not as a special
+MC property — so `_xscale` / `_yscale` / `_alpha` / `_visible`
+aren't found and return undefined. Our `actionGetVariable`
+slash-colon resolver finds `mc1` correctly, then calls
+`actionGetMember` for `_xscale`, which dispatches to the
+special-property handler and returns `mc->xscale` (100). The
+`_x` / `_y` / `_rotation` cases likely succeed via a different
+code path — investigate why and use that as the model.
+
+**Group B hypothesis (UNRESOLVED).** In SWF4, bare `mc1` at
+root context returns the MC via the display-list-by-name fallback
+in `actionGetVariable` (action.c around line 34468+, outside the
+SWF≥5 gate). Flash and Ruffle both return undefined for this.
+Tracing Ruffle's `Activation::resolve` → `Scope::resolve` →
+`script_object::has_property` → `has_display_object_property`
+appears to return the child by name too — so the asymmetry isn't
+explained by Ruffle's source alone. Possibilities to check next
+session:
+
+1. **swfc may emit different SWF4 bytecode for `mc1` than
+   `Push("mc1") + GetVariable`.** Decode `test.swf` with `ffdec`
+   and compare the bytecode for the `check_equals(mc1, ...)`,
+   `check_equals(/mc1, ...)`, `check_equals(/:mc1, ...)` calls
+   — if `mc1` becomes a Push-string-then-something-else (e.g.
+   GetVariable wrapped in a tellTarget-restoring block), the
+   behavior diverges from a plain bare-name lookup.
+2. **`check_equals` may itself be a swfc-emitted sprite that
+   tellTarget's away from root**, scoping the lookup outside the
+   root display list.
+3. **AVM1 SWF4 `abstract_eq` quirk on (MovieClip, Undefined).**
+   Verify our `actionEquals2` matches Ruffle's SWF4 path
+   (calls `to_primitive_num` on both sides). Unlikely the cause
+   — `MovieClip.to_primitive_num` returns the MC, not undefined
+   — but worth confirming.
+
+**Scope.** Group B alone is likely 1-3 hours of bytecode-level
+investigation (start with `ffdec`); Group A is another 1-3 hours.
+Touches `actionGetVariable` in
+`SWFModernRuntime/src/actionmodern/action.c` (the slash-colon
+arm and the SWF4 bare-name display-list fallback at ~34468).
+**Promote to standalone plan when work begins.**
 
 ### soft_reference_test1 (31.1%, 14/45)
 
