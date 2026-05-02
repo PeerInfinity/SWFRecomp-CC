@@ -122,7 +122,7 @@ real causes by cluster.
 | key_event_test | misc-ming | 9/66 (13.6%) | Key listener phase progression (multiple keyDown/keyUp without test continuation) |
 | DragDropTest | misc-ming | 15/44 (34.1%) | `_droptarget` computation after drag |
 | RollOverOutTest | misc-ming | 4/5 (80.0%) | `maskee.hitTest(80, 280, true)` returns false instead of true (mask + hitTest) |
-| mouse_drag_test | misc-swfc | 6/12 (50.0%) | Likely Dejagnu xcheck handling on no-arg `check()` calls inside `tellTarget` (lines 5-8 of the diff are empty `PASSED:` lines) |
+| mouse_drag_test | misc-swfc | 6/12 (50.0%) | ~~Likely Dejagnu xcheck handling on no-arg `check()` calls inside `tellTarget` (lines 5-8 of the diff are empty `PASSED:` lines)~~ — **misdiagnosis.** Actual root cause (resolved 2026-05-02, commit 531d6bfa): timeline `PlaceObject` MOVE tags were overwriting the matrix of a clip mid-drag, so `check(mc1._x != 200)` saw `mc1._x == 200` after `.jump`. Fix: `startDrag` sets `transformed_by_script=1` on the dragged MC (mirroring Ruffle's `update_drag` → `set_x`/`set_y` side effect, which we don't run in headless mode). The "empty PASSED:" lines were `check(expr)` formatting where `expr` is the captured raw text — they only render with their text once both sides match. |
 
 **Estimated impact:** the cleanest cluster (Phase 1, typeof + nested-child)
 is a 2-line fix that resolves 1 line on ButtonEventsTest. Phase 3
@@ -435,11 +435,21 @@ code mapping fix, or a deeper dispatch issue.
 
 ## Open questions
 
-1. **mouse_drag_test cluster.** Lines 5–8 are `PASSED: ` (empty
+1. ~~**mouse_drag_test cluster.** Lines 5–8 are `PASSED: ` (empty
    assertion text) in expected, `FAILED: ` (empty) in actual. These
    look like Dejagnu `xcheck()` calls (zero-arg or no-text variants)
    that PASS when the underlying condition fails. Not in this plan;
-   needs separate triage.
+   needs separate triage.~~ — **Resolved 2026-05-02 (commit 531d6bfa).**
+   Misdiagnosis: not a Dejagnu issue. The lines are `check(mc1._x != 200)`
+   etc. — Dejagnu's `check(cond)` formatter outputs an empty trailing
+   text when `cond` evaluates to false (because no comparand text was
+   passed). Once we set `transformed_by_script=1` on the dragged MC at
+   startDrag time (so timeline `PlaceObject` MOVE no-ops on it), the
+   conditions become true, the formatter renders the captured expression
+   text, and both `PASSED: mc1._x != 200` lines match. Lesson: empty
+   `PASSED:` / `FAILED:` text in a Dejagnu diff is a signal about the
+   *condition*, not about the *check function*. Look for a `check(expr)`
+   (single-arg) call in the test source where `expr` is a comparison.
 2. **`Button` *class* vs `is_button_mc` flag.** The runtime currently
    has both a Button *constructor* (registered via
    `g_ctors[i]` mechanism) and a per-MC `is_button_mc` flag. Verify

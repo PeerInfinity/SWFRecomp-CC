@@ -87,7 +87,7 @@ Status (CI at f7f8fbe6 — 2026-04-29 run): **misc-ming.all 67/102 effective (65
 - `sound` (100% match-rate but actual has 5 trailing lines) — blocked on sound-position timing; expected output literally truncates mid-test because Flash never reaches `__END_OF_TEST__` when waiting for sound.
 - `swf4opcode` (63.2%), `soft_reference_test1` (31.1%), `movieclip_destruction_test4` (20%) — see `incomplete/REMAINING_TAIL_TRIAGE.md`.
 - `button_test1` (25.8%) — button-internal child sprite resolution. **See `incomplete/BUTTON_INFRASTRUCTURE_PLAN.md` Phase 2.**
-- `mouse_drag_test` (50%) — Dejagnu `xcheck()` zero-arg variant handling. **See `incomplete/BUTTON_INFRASTRUCTURE_PLAN.md`** open question 1.
+- ~~`mouse_drag_test` (50%)~~ — **PASS as of 2026-05-02** (commit 531d6bfa). Root cause was NOT Dejagnu `xcheck` zero-arg handling as previously predicted in `complete/BUTTON_INFRASTRUCTURE_PLAN.md`; actual fix was `startDrag` setting `transformed_by_script=1` on the dragged MC so subsequent timeline `PlaceObject` MOVE tags no-op (Ruffle gets the same effect via `update_drag` → `set_x`/`set_y`, which we don't run in headless mode). The "empty PASSED:" lines in the prior diff were `check(mc1._x != 200)` whose printf format collapses when both sides match — once the matrix lock works, those lines render with their captured expression text.
 - `opcode_guard_test2` (runtime_error) — needs separate triage.
 
 ## Key finding: the blocker is not universal
@@ -534,7 +534,7 @@ Text field property coverage; may overlap AVM1's `TEXTFIELD_PLAN`.
 - `DragDropTest` (40.0%)
 - `key_event_test` (13.6%)
 - `ButtonEventsTest` (2.4%)
-- `mouse_drag_test` (50.0%) — misc-swfc
+- ~~`mouse_drag_test` (50.0%) — misc-swfc~~ — **PASS** (2026-05-02, commit 531d6bfa, see entry under misc-swfc.all above)
 
 ### ResolveEventsTest — __resolve hook on MovieClip (2026-04-24, in CI at 205a9a77)
 
