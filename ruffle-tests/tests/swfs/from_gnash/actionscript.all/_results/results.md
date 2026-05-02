@@ -1,10 +1,10 @@
 # Ruffle Test Results (Unfiltered)
 
-**Date**: 2026-05-02 02:23 UTC
+**Date**: 2026-05-02 03:07 UTC
 
-**Git SHA**: `8e7fae4eae`
+**Git SHA**: `6364db8fd5`
 
-**Run Duration**: 0m 52s
+**Run Duration**: 0m 58s
 
 ## Summary
 
@@ -34,11 +34,11 @@
 | 1 | `Accessibility-v5` | 15 | 0.2s |  |
 | 2 | `Accessibility-v6` | 19 | 0.2s |  |
 | 3 | `Accessibility-v7` | 19 | 0.2s |  |
-| 4 | `Accessibility-v8` | 19 | 0.3s |  |
+| 4 | `Accessibility-v8` | 19 | 0.2s |  |
 | 5 | `AsBroadcaster-v5` | 11 | 0.2s |  |
 | 6 | `BitmapData-v5` | 7 | 0.2s |  |
 | 7 | `BitmapData-v6` | 7 | 0.2s |  |
-| 8 | `BitmapData-v7` | 7 | 0.2s |  |
+| 8 | `BitmapData-v7` | 7 | 0.3s |  |
 | 9 | `Boolean-v5` | 38 | 0.2s |  |
 | 10 | `Boolean-v6` | 38 | 0.2s |  |
 | 11 | `Boolean-v7` | 38 | 0.2s |  |
@@ -56,7 +56,7 @@
 | 23 | `ContextMenu-v6` | 7 | 0.2s |  |
 | 24 | `Error-v5` | 28 | 0.2s |  |
 | 25 | `Error-v6` | 31 | 0.2s |  |
-| 26 | `Error-v7` | 31 | 0.2s |  |
+| 26 | `Error-v7` | 31 | 0.3s |  |
 | 27 | `Error-v8` | 31 | 0.2s |  |
 | 28 | `ExternalInterface-v5` | 7 | 0.2s |  |
 | 29 | `ExternalInterface-v6` | 55 | 0.2s |  |
@@ -94,7 +94,7 @@
 | 61 | `Point-v6` | 7 | 0.2s |  |
 | 62 | `Point-v7` | 7 | 0.2s |  |
 | 63 | `Point-v8` | 193 | 0.2s |  |
-| 64 | `Random-v5` | 30 | 0.2s |  |
+| 64 | `Random-v5` | 30 | 0.3s |  |
 | 65 | `Random-v6` | 30 | 0.2s |  |
 | 66 | `Random-v7` | 30 | 0.3s |  |
 | 67 | `Random-v8` | 30 | 0.2s |  |
@@ -106,7 +106,7 @@
 | 73 | `System-v5` | 67 | 0.2s |  |
 | 74 | `System-v6` | 100 | 0.2s |  |
 | 75 | `System-v7` | 101 | 0.2s |  |
-| 76 | `System-v8` | 101 | 0.3s |  |
+| 76 | `System-v8` | 101 | 0.2s |  |
 | 77 | `TextFieldHTML-v5` | 6 | 0.2s |  |
 | 78 | `TextFieldHTML-v6` | 37 | 0.2s |  |
 | 79 | `TextFieldHTML-v7` | 37 | 0.2s |  |
@@ -114,20 +114,20 @@
 | 81 | `TextFormat-v5` | 128 | 0.2s |  |
 | 82 | `TextFormat-v6` | 128 | 0.2s |  |
 | 83 | `TextSnapshot-v5` | 7 | 0.2s |  |
-| 84 | `TextSnapshot-v6` | 173 | 0.2s |  |
-| 85 | `TextSnapshot-v7` | 173 | 0.2s |  |
-| 86 | `TextSnapshot-v8` | 173 | 0.2s |  |
+| 84 | `TextSnapshot-v6` | 173 | 0.3s |  |
+| 85 | `TextSnapshot-v7` | 173 | 0.3s |  |
+| 86 | `TextSnapshot-v8` | 173 | 0.3s |  |
 | 87 | `Transform-v5` | 7 | 0.2s |  |
-| 88 | `Transform-v6` | 7 | 0.2s |  |
+| 88 | `Transform-v6` | 7 | 0.3s |  |
 | 89 | `Transform-v7` | 7 | 0.2s |  |
 | 90 | `Try-v5` | 20 | 0.2s |  |
 | 91 | `Try-v6` | 20 | 0.2s |  |
 | 92 | `Try-v7` | 20 | 0.2s |  |
 | 93 | `Try-v8` | 20 | 0.2s |  |
-| 94 | `Video-v5` | 7 | 0.2s |  |
-| 95 | `Video-v6` | 85 | 0.2s |  |
-| 96 | `Video-v7` | 85 | 0.2s |  |
-| 97 | `Video-v8` | 85 | 0.2s |  |
+| 94 | `Video-v5` | 7 | 0.3s |  |
+| 95 | `Video-v6` | 85 | 0.3s |  |
+| 96 | `Video-v7` | 85 | 0.3s |  |
+| 97 | `Video-v8` | 85 | 0.3s |  |
 | 98 | `XMLSocket-v5` | 35 | 0.2s |  |
 | 99 | `XMLSocket-v6` | 35 | 0.2s |  |
 | 100 | `XMLSocket-v7` | 35 | 0.2s |  |
@@ -160,7 +160,7 @@
 
 | # | Test | Our diffs | Ruffle diffs | Duration | Notes |
 |---|------|-----------|--------------|----------|-------|
-| 1 | `ASnative-v5` | 35 | 35 | 0.2s |  |
+| 1 | `ASnative-v5` | 35 | 35 | 0.3s |  |
 | 2 | `ASnative-v6` | 40 | 40 | 0.2s |  |
 | 3 | `ASnative-v7` | 40 | 40 | 0.2s |  |
 | 4 | `ASnative-v8` | 40 | 40 | 0.2s |  |
@@ -179,14 +179,14 @@
 | 17 | `Inheritance-v6` | 9 | 16 | 0.2s |  |
 | 18 | `Inheritance-v7` | 5 | 10 | 0.2s |  |
 | 19 | `Inheritance-v8` | 5 | 10 | 0.2s |  |
-| 20 | `LoadVars-v6` | 6 | 8 | 0.2s |  |
-| 21 | `LoadVars-v7` | 6 | 8 | 0.2s |  |
-| 22 | `LoadVars-v8` | 6 | 8 | 0.2s |  |
+| 20 | `LoadVars-v6` | 6 | 8 | 0.3s |  |
+| 21 | `LoadVars-v7` | 6 | 8 | 0.3s |  |
+| 22 | `LoadVars-v8` | 6 | 8 | 0.3s |  |
 | 23 | `Math-v5` | 5 | 5 | 0.3s |  |
 | 24 | `Math-v6` | 5 | 5 | 0.2s |  |
-| 25 | `Math-v7` | 5 | 5 | 0.2s |  |
-| 26 | `Math-v8` | 5 | 5 | 0.2s |  |
-| 27 | `Matrix-v6` | 29 | 71 | 0.2s |  |
+| 25 | `Math-v7` | 5 | 5 | 0.3s |  |
+| 26 | `Math-v8` | 5 | 5 | 0.3s |  |
+| 27 | `Matrix-v6` | 29 | 71 | 0.3s |  |
 | 28 | `Matrix-v7` | 28 | 70 | 0.2s |  |
 | 29 | `Matrix-v8` | 28 | 70 | 0.2s |  |
 | 30 | `Microphone-v6` | 31 | 31 | 0.2s |  |
@@ -199,13 +199,13 @@
 | 37 | `Selection-v6` | 7 | 13 | 0.2s |  |
 | 38 | `Selection-v7` | 7 | 13 | 0.2s |  |
 | 39 | `Selection-v8` | 7 | 13 | 0.2s |  |
-| 40 | `Sound-v5` | 27 | 27 | 0.3s |  |
-| 41 | `Sound-v6` | 30 | 51 | 0.3s |  |
+| 40 | `Sound-v5` | 27 | 27 | 0.4s |  |
+| 41 | `Sound-v6` | 30 | 51 | 0.4s |  |
 | 42 | `Sound-v7` | 28 | 51 | 0.4s |  |
-| 43 | `Sound-v8` | 28 | 51 | 0.3s |  |
+| 43 | `Sound-v8` | 28 | 51 | 0.4s |  |
 | 44 | `String-v5` | 19 | 21 | 0.3s |  |
-| 45 | `String-v6` | 10 | 10 | 0.2s |  |
-| 46 | `String-v7` | 10 | 10 | 0.2s |  |
+| 45 | `String-v6` | 10 | 10 | 0.3s |  |
+| 46 | `String-v7` | 10 | 10 | 0.3s |  |
 | 47 | `String-v8` | 10 | 10 | 0.3s |  |
 | 48 | `TextField-v5` | 3 | 3 | 0.2s |  |
 | 49 | `ops-v8` | 7 | 11 | 0.2s |  |
@@ -214,9 +214,9 @@
 | 52 | `targetPath-v8` | 17 | 17 | 0.2s |  |
 | 53 | `toString_valueOf-v5` | 34 | 34 | 0.2s |  |
 | 54 | `toString_valueOf-v6` | 5 | 5 | 0.2s |  |
-| 55 | `toString_valueOf-v7` | 5 | 5 | 0.2s |  |
+| 55 | `toString_valueOf-v7` | 5 | 5 | 0.3s |  |
 | 56 | `toString_valueOf-v8` | 5 | 5 | 0.2s |  |
-| 57 | `with-v5` | 42 | 42 | 0.2s |  |
+| 57 | `with-v5` | 42 | 42 | 0.3s |  |
 | 58 | `with-v6` | 91 | 91 | 0.2s |  |
 | 59 | `with-v7` | 91 | 91 | 0.2s |  |
 | 60 | `with-v8` | 91 | 91 | 0.2s |  |
