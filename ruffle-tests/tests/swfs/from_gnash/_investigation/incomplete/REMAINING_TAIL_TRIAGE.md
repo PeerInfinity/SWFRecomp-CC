@@ -335,84 +335,34 @@ Likely a deeper issue with stack/scope state during dispatch.
 CURRENT_STATUS.md — do not re-document.** Cross-reference here
 for completeness.
 
-### swf4opcode (94.9%, 111/117)
+### swf4opcode → **ruffle_matched (2026-05-02)**
 
-**Symptom (verified 2026-05-02).** 6 remaining FAIL lines in two
-groups:
+Group B (lines 114 / 116: bare `mc1` and `/:mc1` compared with
+`undefined`) is now PASSED. Test promoted from MISMATCH to
+ruffle_matched: our 4-line residual diff (Group A: lines
+74/82/90/98 — `/mc1:_xscale`/`/mc1:_yscale`/`/mc1:_alpha`/`/mc1:_visible`)
+is a subset of Ruffle's 13-line diff against Flash, so no further
+work is needed for ruffle_matched status. Full PASS still
+requires fixing Group A (SWF4 `/path:varname` should look up
+`varname` as a variable on the path scope, not as a special MC
+property).
 
-Group A — `/mc1:_PROPNAME` colon-path tests in frame 3:
-- `/mc1:_xscale == undefined` — got `100`
-- `/mc1:_yscale == undefined` — got `100`
-- `/mc1:_alpha == undefined` — got `100`
-- `/mc1:_visible == undefined` — got `1`
+**Root cause of Group B.** Bytecode for line 363 is
+`Push("mc1") + GetVariable`; for line 365 it is
+`Push("/:mc1") + GetVariable`. Both correctly resolve to the
+child MovieClip `mc1` via display-list lookup (matching Ruffle's
+`has_display_object_property` → `child_by_name`). The test
+"passes" in Ruffle not because GetVariable returns undefined,
+but because **SWF4 `Equals` (action 0x0e) coerces both operands
+to f64**, and Ruffle's `coerce_to_f64` for `Value::MovieClip`
+goes through `Value::Object(...) → to_primitive_num → primitive_as_number`,
+which returns 0.0 for Object-typed values when `swf_version < 5`
+(see `core/src/avm1/value.rs::primitive_as_number`). Both MC and
+undefined coerce to 0.0 → equal → PASSED.
 
-Group B — bare-name lookup at end of frame 3:
-- `mc1 == undefined` — got `_level0.mc1`
-- `/:mc1 == undefined` — got `_level0.mc1`
-
-Note the asymmetry on Group A: **`/mc1:_x`, `/mc1:_y`,
-`/mc1:_rotation` already PASS** (return undefined as expected).
-A prior version of this entry said the bare-name symptoms were
-fixed; that was incorrect — Group B is still failing.
-
-**Path to ruffle_matched (cheaper than full PASS).** Comparing
-our diff against `output.ruffle.txt`:
-
-- Ruffle's diff against Flash: lines 46, 47, 65, 73, 74, 81, 82,
-  89, 90, 97, 98, 105, 113 (13 lines).
-- Our diff against Flash: lines 74, 82, 90, 98, 114, 116 (6
-  lines).
-- Group A (74/82/90/98) is a subset of Ruffle's diff — fine.
-- **Group B (114/116) is NOT in Ruffle's diff** — Ruffle's
-  expected output literally has `PASSED: mc1 == undefined` and
-  `PASSED: /:mc1 == undefined` on those lines.
-
-Therefore: **fix only Group B → `ruffle_matched`** (no need to
-solve Group A's Flash-specific colon-var semantics). Full PASS
-still requires both groups.
-
-**Group A hypothesis.** In SWF4, `/path:varname` looks up
-`varname` as a **variable** in the path's scope, not as a special
-MC property — so `_xscale` / `_yscale` / `_alpha` / `_visible`
-aren't found and return undefined. Our `actionGetVariable`
-slash-colon resolver finds `mc1` correctly, then calls
-`actionGetMember` for `_xscale`, which dispatches to the
-special-property handler and returns `mc->xscale` (100). The
-`_x` / `_y` / `_rotation` cases likely succeed via a different
-code path — investigate why and use that as the model.
-
-**Group B hypothesis (UNRESOLVED).** In SWF4, bare `mc1` at
-root context returns the MC via the display-list-by-name fallback
-in `actionGetVariable` (action.c around line 34468+, outside the
-SWF≥5 gate). Flash and Ruffle both return undefined for this.
-Tracing Ruffle's `Activation::resolve` → `Scope::resolve` →
-`script_object::has_property` → `has_display_object_property`
-appears to return the child by name too — so the asymmetry isn't
-explained by Ruffle's source alone. Possibilities to check next
-session:
-
-1. **swfc may emit different SWF4 bytecode for `mc1` than
-   `Push("mc1") + GetVariable`.** Decode `test.swf` with `ffdec`
-   and compare the bytecode for the `check_equals(mc1, ...)`,
-   `check_equals(/mc1, ...)`, `check_equals(/:mc1, ...)` calls
-   — if `mc1` becomes a Push-string-then-something-else (e.g.
-   GetVariable wrapped in a tellTarget-restoring block), the
-   behavior diverges from a plain bare-name lookup.
-2. **`check_equals` may itself be a swfc-emitted sprite that
-   tellTarget's away from root**, scoping the lookup outside the
-   root display list.
-3. **AVM1 SWF4 `abstract_eq` quirk on (MovieClip, Undefined).**
-   Verify our `actionEquals2` matches Ruffle's SWF4 path
-   (calls `to_primitive_num` on both sides). Unlikely the cause
-   — `MovieClip.to_primitive_num` returns the MC, not undefined
-   — but worth confirming.
-
-**Scope.** Group B alone is likely 1-3 hours of bytecode-level
-investigation (start with `ffdec`); Group A is another 1-3 hours.
-Touches `actionGetVariable` in
-`SWFModernRuntime/src/actionmodern/action.c` (the slash-colon
-arm and the SWF4 bare-name display-list fallback at ~34468).
-**Promote to standalone plan when work begins.**
+**Fix.** `convertFloat` for `ACTION_STACK_VALUE_MOVIECLIP` now
+returns 0.0 in SWF<5 (was hardcoded NaN in all versions).
+SWF>=5 still returns NaN, matching the Object case.
 
 ### soft_reference_test1 (31.1%, 14/45)
 

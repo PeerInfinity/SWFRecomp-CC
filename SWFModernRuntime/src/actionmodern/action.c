@@ -23341,9 +23341,15 @@ ActionStackValueType convertFloat(SWFAppContext* app_context)
 
 		case ACTION_STACK_VALUE_MOVIECLIP:
 		{
-			// MovieClips convert to NaN in all SWF versions
-			// (their toString returns the target path like "_level0" which is non-numeric)
-			double temp = NAN;
+			// MovieClips coerce to their underlying object then go through
+			// `to_primitive_num` (which skips valueOf for display objects) and
+			// `primitive_as_number`. The latter returns 0.0 for Object-typed
+			// values in SWF<5, NaN otherwise. Mirrors Ruffle
+			// `core/src/avm1/value.rs::coerce_to_f64` for `Value::MovieClip`.
+			// Required by gnash misc-swfc swf4opcode lines 363/365 (`mc1`
+			// and `/:mc1` compared with undefined via SWF4 Equals: both
+			// coerce to 0.0 → equal → PASSED).
+			double temp = (g_swf_version < 5) ? 0.0 : NAN;
 			STACK_TOP_TYPE = ACTION_STACK_VALUE_F64;
 			VAL(u64, &STACK_TOP_VALUE) = VAL(u64, &temp);
 			return ACTION_STACK_VALUE_F64;

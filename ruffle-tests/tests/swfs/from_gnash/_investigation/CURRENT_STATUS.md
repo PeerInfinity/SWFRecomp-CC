@@ -1,6 +1,25 @@
 # Gnash Test Suite Status
 
-Last updated: 2026-05-01 (CI snapshot at 25231855425 / ruffle-test-results 59aedf5a. All 2026-04-30 + 2026-05-01 fixes now confirmed in CI: case-v6, ExternalInterface-v6/v7, DepthLimitsTest, replace_sprites1test, movieclip_destruction_test2, tags_after_last_showframe, plus Instance-v5/v6/v7/v8 and Global-v6 from this session.)
+Last updated: 2026-05-02 (`swf4opcode` (misc-swfc.all) promoted to ruffle_matched via SWF4 `convertFloat` MovieClip→0.0 fix. CI snapshot below from 2026-05-01.)
+
+### Latest fixes (2026-05-02, NOT yet in CI)
+
+- **`swf4opcode` (misc-swfc.all) → ruffle_matched (+1).** SWF4
+  `convertFloat` for `ACTION_STACK_VALUE_MOVIECLIP` returned NaN
+  unconditionally; should return 0.0 in SWF<5 (matching Ruffle's
+  `coerce_to_f64` → `Value::Object(...) → primitive_as_number`,
+  which gates Object→0.0 on `swf_version < 5`). Fixes lines 363
+  / 365 of the test (`mc1 == undefined` and `/:mc1 == undefined`):
+  bytecode is `Push(name) + GetVariable` returning the child MC,
+  then SWF4 `Equals` (action 0x0e) coerces both MC and undefined
+  to 0.0 → equal → PASSED. Group A (lines 74/82/90/98 —
+  `/mc1:_xscale` etc.) still fails but is a subset of Ruffle's
+  diff against Flash, so the test promotes to ruffle_matched.
+  Verified against 7 SWF4/equals AVM1 tests
+  (add_swf4/divide_swf4/equals/equals2_swf5/equals_swf4/equals_swf4_alt/equals_swf5
+  — 7/7 PASS) and 9 SWF5/path-related AVM1 tests
+  (swf5_no_closure/swf5_to_6_cross_call/funky_function_calls/function_base_clip/path_string/target_path/string_paths_variable_scopes/movieclip_default_state/movieclip_get_instance_at_depth
+  — 9/9 PASS), no regressions.
 
 ### CI snapshot (commit 48a97e0b, run 25231855425, 2026-05-01)
 
