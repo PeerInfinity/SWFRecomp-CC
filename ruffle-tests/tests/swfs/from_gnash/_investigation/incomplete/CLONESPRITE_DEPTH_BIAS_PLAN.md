@@ -162,6 +162,88 @@ the survives_rewind check rather than the timeline-reset branch.
 These remain pending as multi-session work. Phase 2b is the only piece
 that landed cleanly without CI dependency.
 
+## 2026-05-04 session — Phase 2a attempted, landed, reverted
+
+**Phase 2a attempt: implemented in commit `29d67477`, reverted in
+`29a1fc36` after CI run `25267566834` showed −4 effective passing tests
+in misc-ming.all and a net −19 matching lines.**
+
+The recompiler change extended the bias strip to packed Pushes
+(pre-scan the Push payload, locate the last value, strip the trailing
+`I32(16384) Add CloneSprite` if it matches). The implementation itself
+worked — `duplicate_movie_clip_test` improved from 3/33 → 6/33 lines
+because clones at AS depth 1 and 2 were finally being created at the
+right depth. But the predicted slot-collision regressions showed up
+exactly where the plan said they would:
+
+| Test | Pre | Post 2a | Δ |
+|------|-----|---------|---|
+| static_vs_dynamic1 | 17/17 PASS | 4/17 fail | −13 |
+| static_vs_dynamic2 | 18/18 PASS | 11/18 fail | −7 |
+| DepthLimitsTest | 20/20 PASS | 16/20 fail | −4 |
+| duplicate_movie_clip_test2 | 21/21 PASS | 18/21 fail | −3 |
+| duplicate_movie_clip_test | 3/33 fail | 6/33 fail | +3 |
+
+The pattern is consistent with the slot-collision blocker: when the
+strip hands the runtime AS depths `1`/`2` for clones, `target_swf_depth`
+in `ng_cloneSprite` is `1`/`2` — exactly where the static MCs live in
+`display_list`. The clone's `display_list[target]` write evicts the
+static, and downstream `typeof(static_mc) == 'movieclip'` checks see
+`undefined` instead.
+
+**Why local verification missed the regression.** `verify_output.py`
+rebuilds `RecompiledScripts/` per test, but if a test had previously
+been recompiled (in this case, by an earlier session before the new
+recompiler binary was built), the rebuild can pick up cached state
+that still carries the old emission pattern. The single-test smoke
+check ran fine, but only because the static_vs_dynamic guardrails
+weren't actually being recompiled with the new strip. Forcing
+`rm -rf RecompiledScripts RecompiledTags` first reproduces the CI
+failure deterministically. **Lesson: when validating recompiler
+changes, always `rm -rf RecompiledScripts RecompiledTags` for the
+guardrail tests before running.** A `verify_output.py --clean` flag
+would help; alternatively the runner could timestamp-check the
+recompiler binary.
+
+**Why the partial fix isn't shippable.** The +3 lines on
+duplicate_movie_clip_test do not offset the −22 lines across the
+four guardrails. Phase 2a is structurally correct but unsafe to
+land without Phase 2c (raise slot cap + bias the slot index by
++16384) bundled together. Running them in separate commits creates
+the intermediate broken state we hit in CI.
+
+**Status of phase 2a:** *implemented and known to work, but reverted
+pending Phase 2c.* The recompiler patch from `29d67477` can be
+re-applied verbatim once Phase 2c lands. Diff is preserved at:
+`git show 29d67477 -- SWFRecomp/src/action/action.cpp`.
+
+**Updated next steps:**
+
+1. **Phase 2c first**, alone: raise `INITIAL_DISPLAYLIST_CAPACITY`
+   from 1024 to (e.g.) 32768 — or introduce a separate clone slot
+   region. Change `ng_cloneSprite`/`ng_cloneSpriteFromMC` to compute
+   `target_swf_depth = (size_t)(depth + 16384)` ONLY when the runtime
+   stack value already represents an AS depth. Today, the runtime
+   sees biased values (e.g. SWF depth 16385 from `Push(1) Push(16384)
+   Add` packed pattern), so adding +16384 again would put the slot
+   at 32769 — but that's exactly the same place the unbiased AS
+   depth `1` would land if Phase 2a were also active. So 2c on its
+   own is a no-op (still receives biased values, still skipped by
+   the cap guard) and verifying it requires re-applying 2a in the
+   same commit.
+
+2. Therefore **Phase 2a + Phase 2c must land in a single commit.**
+   The "verify each sub-phase independently" guidance from the
+   2026-05-03 update assumed the sub-phases had observable effects
+   on their own; they don't (2a alone breaks things, 2c alone is
+   inert).
+
+3. Once 2a + 2c land together, run the misc-ming guardrail suite
+   first locally (with forced `rm -rf RecompiledScripts/`), then push
+   for full-suite CI verification. Phase 2d is the iterative
+   fix-as-they-surface stage for swap/remove interactions exposed by
+   2c.
+
 ## 2026-05-03 update — option 2 (raise slot cap) prototyped + reverted
 
 **TL;DR.** Tried raising `INITIAL_DISPLAYLIST_CAPACITY`-equivalent cap in
