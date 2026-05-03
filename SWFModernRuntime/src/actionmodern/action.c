@@ -19611,28 +19611,58 @@ void actionRewindCleanup(SWFAppContext* app_context)
 	extern MovieClip root_movieclip;
 	extern size_t ng_findDisplayEntryByName(const char* name);
 
+	extern int ng_clone_get_swf_depth(const char* name);
+
 	for (int i = 0; i < child_mc_count; i++) {
 		MovieClip* ch = child_mc_cache[i];
 		if (ch == NULL) continue;
 		if (ch->parent != &root_movieclip) continue;
 
-		// Check if this MC has a display list entry (timeline-placed)
+		// Phase 2b (CLONESPRITE_DEPTH_BIAS): branch on "is this a clone?"
+		// FIRST, then on display-entry presence. The clone-depth table is
+		// the authoritative "is this a CloneSprite/duplicateMovieClip clone"
+		// signal — don't infer it from "no display entry", which becomes
+		// false once the slot cap (Phase 2c) is raised and clones land in
+		// display_list. Pre-Phase-2c clones still have no display entry, so
+		// this branch order is equivalent today; the change is forward-
+		// compatible.
+		int clone_swf = ng_clone_get_swf_depth(ch->name);
 		size_t dl_depth = ng_findDisplayEntryByName(ch->name);
-		if (dl_depth == SIZE_MAX) {
-			// No display list entry — this is a dynamically created MC.
-			// CloneSprite/duplicateMovieClip clones at SWF depth >=
-			// AVM_DEPTH_BIAS (16384) survive backward goto per Ruffle's
-			// survives_rewind rule (core/src/display_object/movie_clip.rs).
-			// Look up the registered SWF depth via the clone-depth table
-			// rather than trusting `ch->depth`: the stored depth can be
-			// either AS depth (biased path) or SWF depth (unbiased path),
-			// and the sign/magnitude isn't a reliable signal. The table
-			// always holds the raw SWF depth produced by the bytecode.
-			extern int ng_clone_get_swf_depth(const char* name);
-			int clone_swf = ng_clone_get_swf_depth(ch->name);
+
+		if (clone_swf != INT_MIN) {
+			// Clone branch — survives_rewind check (Ruffle rule:
+			// SWF depth >= AVM_DEPTH_BIAS (16384) survives backward goto,
+			// core/src/display_object/movie_clip.rs).
 			if (clone_swf >= 16384) {
 				continue;
 			}
+			// AS-depth-range clone (clone_swf < 16384) — does not survive.
+			// Fall through to clear from dynamic_props / var_map / cache.
+		} else if (dl_depth != SIZE_MAX) {
+			// Timeline-placed MC with a display entry — reset depth from
+			// display list position (undoes any swapDepths that happened
+			// before the rewind). Skip MCs that were already invalidated
+			// (avm1_removed) or marked dead (depth=INT_MIN). When a depth
+			// was Removed and then re-Placed with the same instance_name,
+			// ng_findDisplayEntryByName matches the new entry, but the old
+			// (invalidated) cache entry must stay dead — otherwise
+			// findOrCreateMovieClip's first-match returns the stale MC
+			// and AS reads see its old _x. Surfaces in
+			// place_and_remove_object_insane_test where iter 1 frame 1
+			// removes mc_red (cache invalidated) and frame 2 re-places
+			// (creates a new cache entry); without this guard, the
+			// wrap-back catch-up's actionRewindCleanup resurrects the
+			// dead entry.
+			if (ch->avm1_removed || ch->depth == INT_MIN)
+				continue;
+			ch->depth = (int)dl_depth - 16384;
+			ch->depth_swapped = 0;
+			continue;
+		}
+		// Falls through here for: (a) AS-depth-range clones, or
+		// (b) non-clone MCs with no display entry (orphan / removed).
+		// Both want the destroy-from-cache logic below.
+		{
 			// Remove from parent's dynamic_props.
 			if (root_movieclip.dynamic_props != NULL) {
 				// Only overwrite the dynamic_props entry if it currently
@@ -19681,23 +19711,6 @@ void actionRewindCleanup(SWFAppContext* app_context)
 			}
 			ch->depth = INT_MIN;
 			child_mc_cache[i] = NULL;
-		} else {
-			// Timeline MC — reset depth from display list position
-			// (undoes any swapDepths that happened before the rewind).
-			// Skip MCs that were already invalidated (avm1_removed) or marked
-			// dead (depth=INT_MIN). When a depth was Removed and then re-Placed
-			// with the same instance_name, ng_findDisplayEntryByName matches
-			// the new entry, but the old (invalidated) cache entry must stay
-			// dead — otherwise findOrCreateMovieClip's first-match returns the
-			// stale MC and AS reads see its old _x. Surfaces in
-			// place_and_remove_object_insane_test where iter 1 frame 1 removes
-			// mc_red (cache invalidated) and frame 2 re-places (creates a new
-			// cache entry); without this guard, the wrap-back catch-up's
-			// actionRewindCleanup resurrects the dead entry.
-			if (ch->avm1_removed || ch->depth == INT_MIN)
-				continue;
-			ch->depth = (int)dl_depth - 16384;
-			ch->depth_swapped = 0;
 		}
 	}
 }

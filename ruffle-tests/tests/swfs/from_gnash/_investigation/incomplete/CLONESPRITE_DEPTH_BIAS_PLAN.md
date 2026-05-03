@@ -14,7 +14,7 @@ phases:
     status: pending
   - id: 2b
     name: "Runtime branching audit: actionRewindCleanup/tagRemoveObject2/swap branch on `is clone` (clone_depth_table presence) instead of `has display entry`"
-    status: pending
+    status: completed
   - id: 2c
     name: "Runtime: raise clone slot cap so high-depth clones land in display_list (enables CONSTRUCT/ENTERFRAME/UNLOAD dispatch on dups)"
     status: pending
@@ -120,6 +120,47 @@ name-keyed lookup makes this fragile to gate naively.
    would need careful handling to avoid scanning the empty 1..16383 gap.
 3. Or: keep single-value strip only, accept the partial impact, and revisit
    when the broader display_list refactor lands.
+
+## 2026-05-02 session — Phase 2b landed (rewind branching refactor)
+
+**Phase 2b complete.** `actionRewindCleanup` in
+`SWFModernRuntime/src/actionmodern/action.c:19609+` now branches on
+`ng_clone_get_swf_depth(name) != INT_MIN` (clone-depth-table presence)
+*before* checking display-list presence. Behavior is equivalent today
+because pre-Phase-2c clones still have no display entry, so the new
+condition selects the same branch for every input the function sees.
+The change is forward-compatible: once Phase 2c raises the slot cap and
+clones land in display_list, the rewind code still routes them through
+the survives_rewind check rather than the timeline-reset branch.
+
+**Verified locally:**
+- AVM1 guardrail (19 tests): `goto_rewind1/2/3`, `clone_sprite_edittext{,_dynamic}`,
+  `clone_sprite_types`, `duplicate_movie_clip{,_drawing}`, `create_empty_movie_clip`,
+  `attach_movie`, `textsnapshot_available_text`, `movieclip_setmask`,
+  `execution_order1/2/3`, `movieclip_default_state`,
+  `movieclip_get_instance_at_depth`, `movieclip_state_values`,
+  `swf5_no_closure` — 19/19 PASS.
+- Gnash misc-ming guardrail (12 tests): `static_vs_dynamic1/2`,
+  `loop/loop_test3/5/9`, `attachMovieTest`, `place_and_remove_object_test`,
+  `displaylist_depths/displaylist_depths_test{8,11}`, `DepthLimitsTest`,
+  `duplicate_movie_clip_test2`, `displaylist_depths/displaylist_depths_test`
+  — 12/12 effective pass (11 PASS + 1 RM).
+- Target tests (`displaylist_depths_test{2,3,9}`, `duplicate_movie_clip_test`):
+  unchanged from baseline (still failing — Phase 2c is the load-bearing
+  piece for these flips).
+
+**What's still required to flip the target tests:**
+- **Phase 2a** (recompiler packed-Push strip) — feeds AS depth (1, 2, …)
+  to the runtime instead of biased SWF depth (16385, 16386, …).
+- **Phase 2c** (raise display_list slot cap) — gives clones their own
+  display_list slot at SWF depth `as_depth + 16384`, so CONSTRUCT,
+  ENTERFRAME, UNLOAD events dispatch on them. Needed because every
+  failing target line is an event the clone never received.
+- **Phase 2d** verification + one-by-one fixes for swap/remove
+  interactions exposed when both 2a and 2c are in.
+
+These remain pending as multi-session work. Phase 2b is the only piece
+that landed cleanly without CI dependency.
 
 ## 2026-05-03 update — option 2 (raise slot cap) prototyped + reverted
 
