@@ -1,10 +1,10 @@
 # Ruffle Test Results (Unfiltered)
 
-**Date**: 2026-05-03 02:24 UTC
+**Date**: 2026-05-03 02:32 UTC
 
-**Git SHA**: `29d67477d8`
+**Git SHA**: `edf29886f6`
 
-**Run Duration**: 1m 8s
+**Run Duration**: 0m 54s
 
 ## Summary
 
@@ -38,17 +38,17 @@
 | 5 | `AsBroadcaster-v5` | 11 | 0.2s |  |
 | 6 | `BitmapData-v5` | 7 | 0.2s |  |
 | 7 | `BitmapData-v6` | 7 | 0.2s |  |
-| 8 | `BitmapData-v7` | 7 | 0.7s |  |
-| 9 | `Boolean-v5` | 38 | 0.8s |  |
-| 10 | `Boolean-v6` | 38 | 0.7s |  |
-| 11 | `Boolean-v7` | 38 | 0.6s |  |
-| 12 | `Boolean-v8` | 38 | 0.4s |  |
-| 13 | `Camera-v5` | 7 | 0.7s |  |
+| 8 | `BitmapData-v7` | 7 | 0.2s |  |
+| 9 | `Boolean-v5` | 38 | 0.2s |  |
+| 10 | `Boolean-v6` | 38 | 0.2s |  |
+| 11 | `Boolean-v7` | 38 | 0.2s |  |
+| 12 | `Boolean-v8` | 38 | 0.2s |  |
+| 13 | `Camera-v5` | 7 | 0.2s |  |
 | 14 | `Color-v5` | 140 | 0.2s |  |
 | 15 | `Color-v6` | 171 | 0.2s |  |
 | 16 | `Color-v7` | 161 | 0.2s |  |
 | 17 | `Color-v8` | 161 | 0.2s |  |
-| 18 | `ColorTransform-v5` | 7 | 0.2s |  |
+| 18 | `ColorTransform-v5` | 7 | 0.3s |  |
 | 19 | `ColorTransform-v6` | 7 | 0.2s |  |
 | 20 | `ColorTransform-v7` | 7 | 0.2s |  |
 | 21 | `ColorTransform-v8` | 55 | 0.2s |  |
@@ -96,13 +96,13 @@
 | 63 | `Point-v6` | 7 | 0.2s |  |
 | 64 | `Point-v7` | 7 | 0.2s |  |
 | 65 | `Point-v8` | 193 | 0.2s |  |
-| 66 | `Random-v5` | 30 | 0.2s |  |
-| 67 | `Random-v6` | 30 | 0.2s |  |
-| 68 | `Random-v7` | 30 | 2.5s |  |
-| 69 | `Random-v8` | 30 | 1.2s |  |
-| 70 | `Rectangle-v5` | 7 | 1.7s |  |
-| 71 | `Rectangle-v6` | 7 | 0.5s |  |
-| 72 | `Rectangle-v7` | 7 | 1.6s |  |
+| 66 | `Random-v5` | 30 | 0.3s |  |
+| 67 | `Random-v6` | 30 | 0.3s |  |
+| 68 | `Random-v7` | 30 | 0.2s |  |
+| 69 | `Random-v8` | 30 | 0.2s |  |
+| 70 | `Rectangle-v5` | 7 | 0.2s |  |
+| 71 | `Rectangle-v6` | 7 | 0.2s |  |
+| 72 | `Rectangle-v7` | 7 | 0.2s |  |
 | 73 | `Selection-v5` | 21 | 0.2s |  |
 | 74 | `Stage-v5` | 38 | 0.2s |  |
 | 75 | `System-v5` | 67 | 0.2s |  |
@@ -137,7 +137,7 @@
 | 104 | `argstest-v5` | 4 | 0.2s |  |
 | 105 | `case-v5` | 39 | 0.2s |  |
 | 106 | `case-v6` | 73 | 0.2s |  |
-| 107 | `case-v7` | 67 | 0.6s |  |
+| 107 | `case-v7` | 67 | 0.2s |  |
 | 108 | `case-v8` | 67 | 0.2s |  |
 | 109 | `delete-v5` | 60 | 0.2s |  |
 | 110 | `delete-v6` | 60 | 0.2s |  |
@@ -162,14 +162,14 @@
 
 | # | Test | Our diffs | Ruffle diffs | Duration | Notes |
 |---|------|-----------|--------------|----------|-------|
-| 1 | `ASnative-v5` | 35 | 35 | 0.3s |  |
+| 1 | `ASnative-v5` | 35 | 35 | 0.2s |  |
 | 2 | `ASnative-v6` | 40 | 40 | 0.2s |  |
 | 3 | `ASnative-v7` | 40 | 40 | 0.2s |  |
 | 4 | `ASnative-v8` | 40 | 40 | 0.2s |  |
 | 5 | `AsBroadcaster-v6` | 7 | 13 | 0.2s |  |
 | 6 | `AsBroadcaster-v7` | 7 | 13 | 0.2s |  |
 | 7 | `AsBroadcaster-v8` | 7 | 13 | 0.2s |  |
-| 8 | `BitmapData-v8` | 8 | 13 | 0.8s |  |
+| 8 | `BitmapData-v8` | 8 | 13 | 0.4s |  |
 | 9 | `Camera-v6` | 57 | 57 | 0.2s |  |
 | 10 | `Camera-v7` | 57 | 57 | 0.2s |  |
 | 11 | `Camera-v8` | 57 | 57 | 0.2s |  |
@@ -181,10 +181,10 @@
 | 17 | `Inheritance-v6` | 9 | 16 | 0.2s |  |
 | 18 | `Inheritance-v7` | 5 | 10 | 0.2s |  |
 | 19 | `Inheritance-v8` | 5 | 10 | 0.2s |  |
-| 20 | `LoadVars-v6` | 6 | 8 | 0.3s |  |
+| 20 | `LoadVars-v6` | 6 | 8 | 0.2s |  |
 | 21 | `LoadVars-v7` | 6 | 8 | 0.2s |  |
 | 22 | `LoadVars-v8` | 6 | 8 | 0.2s |  |
-| 23 | `Math-v5` | 5 | 5 | 0.3s |  |
+| 23 | `Math-v5` | 5 | 5 | 0.2s |  |
 | 24 | `Math-v6` | 5 | 5 | 0.2s |  |
 | 25 | `Math-v7` | 5 | 5 | 0.2s |  |
 | 26 | `Math-v8` | 5 | 5 | 0.2s |  |
@@ -198,7 +198,7 @@
 | 34 | `MovieClipLoader-v7` | 118 | 118 | 0.2s |  |
 | 35 | `MovieClipLoader-v8` | 118 | 118 | 0.2s |  |
 | 36 | `Number-v5` | 8 | 13 | 0.2s |  |
-| 37 | `Rectangle-v8` | 21 | 21 | 6.1s |  |
+| 37 | `Rectangle-v8` | 21 | 21 | 0.2s |  |
 | 38 | `Selection-v6` | 7 | 13 | 0.2s |  |
 | 39 | `Selection-v7` | 7 | 13 | 0.2s |  |
 | 40 | `Selection-v8` | 7 | 13 | 0.2s |  |
@@ -206,8 +206,8 @@
 | 42 | `Sound-v6` | 30 | 51 | 0.3s |  |
 | 43 | `Sound-v7` | 28 | 51 | 0.4s |  |
 | 44 | `Sound-v8` | 28 | 51 | 0.3s |  |
-| 45 | `String-v5` | 19 | 21 | 0.3s |  |
-| 46 | `String-v6` | 10 | 10 | 0.3s |  |
+| 45 | `String-v5` | 19 | 21 | 0.2s |  |
+| 46 | `String-v6` | 10 | 10 | 0.2s |  |
 | 47 | `String-v7` | 10 | 10 | 0.2s |  |
 | 48 | `String-v8` | 10 | 10 | 0.3s |  |
 | 49 | `TextField-v5` | 3 | 3 | 0.2s |  |
