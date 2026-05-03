@@ -4,7 +4,7 @@
 
 <!-- PLAN_META
 id: CLONESPRITE_DEPTH_BIAS
-status: incomplete
+status: complete
 phases:
   - id: 1
     name: "Recompiler pattern-match: strip single-value Push(16384) Add prefix from CloneSprite"
@@ -264,6 +264,87 @@ relative to clip-event handlers, and the pre-existing
 `displaylist_depths_test{2,3}`. None of these block the depth-bias
 infrastructure; they're the next layer of work that becomes addressable
 now that the depth-bias plumbing is in place.
+
+## 2026-05-03 session — closing-out + clip-event-dispatch dead end
+
+**Status confirmed.** Local re-run of the four still-failing target
+tests (`displaylist_depths/displaylist_depths_test{2,3,9}`,
+`duplicate_movie_clip_test`) reproduces the CI snapshot. The four
+already-passing target tests (`displaylist_depths_test`, `_test8`,
+`DepthLimitsTest`, `duplicate_movie_clip_test2`) stay green. No
+shifts since 2026-05-02.
+
+**Failure shape across the four still-failing tests.** All four diffs
+are dominated by missing clip-event lines (`onClipConstruct`,
+`onClipEnterFrame`, `onClipUnload` and their AS counterparts), not
+depth-bias errors:
+
+- `displaylist_depths_test2/3`: missing `_level0.static3
+  onClipConstruct` and `_root.depth3Constructed set to 2` on the
+  `gotoAndStop(4)` re-placement. CONSTRUCT clip-event handler does not
+  fire when a removed static MC is re-placed by a backward goto.
+- `displaylist_depths_test9`: missing `_level0.dup0 constructed` (dup
+  of static4 should inherit `SWFACTION_CONSTRUCT`) and the second
+  `_level0.static4 constructed` on `gotoAndStop(5)` re-placement.
+  `mc4Constructed` ends at 1 instead of 2/3.
+- `duplicate_movie_clip_test`: dup2 (clone of mc2 carrying LOAD /
+  ENTER_FRAME / UNLOAD clip events) fires LOAD but not ENTER_FRAME or
+  UNLOAD. `_root.x2` ends at 1 instead of 3, `_root.x3` at 1 instead
+  of 2.
+
+The shared root cause is that **clones inherit clip_actions
+structurally but our runtime explicitly clears them on the clone's
+display_list slot** (`tag_stubs.c:2815-2816, 3050-3051`):
+
+```c
+display_list[target_swf_depth].clip_actions = NULL;
+display_list[target_swf_depth].clip_action_count = 0;
+```
+
+LOAD is rescued via `ng_queue_pending_load` (LIFO queue drained at
+tagShowFrame), but ENTER_FRAME and UNLOAD have no parallel rescue —
+they are dispatched by walking display_list slots, and the clone's
+slot has no clip_actions to walk.
+
+**Tried fix: share clip_actions pointer with source (revert clears).**
+Removed the two pairs of clear lines so clones inherit the source's
+`clip_actions` pointer (static recompiler-emitted data, never
+freed per-instance). Result: massive ENTER_FRAME firing regression —
+the clone fires ENTER_FRAME continuously and never stops. Diff went
+from 14 PASS / 30 expected lines to 35+ extra `onClipEnterFrame
+triggered` lines past the expected EOF. Reverted.
+
+**Why sharing alone isn't enough.** Two interacting issues:
+
+1. **`sprite_initialized` lifecycle isn't applied to clones.** Source
+   mc2's `sprite_initialized` is `0` at clone time (DoAction runs
+   before `process_sprite_needs_init`), so the slot copy gives the
+   clone `sprite_initialized=0`. The dispatch gates on
+   `sprite_initialized >= 2`, so the clone never qualifies — except
+   that with shared clip_actions and no eviction logic, the clone
+   eventually fires forever once it gets bumped.
+2. **Clone removal doesn't clear the slot's clip_actions.** When
+   `dup2.removeMovieClip()` runs, the slot's `char_id` is cleared but
+   not the clip_actions pointer (which now points to mc2's static
+   actions). dispatch_enterframe_clip_actions walks the slot, finds
+   non-zero clip_action_count, and re-fires.
+
+The right fix likely involves giving clones their own per-instance
+clip_actions copy AND applying the full sprite-init lifecycle
+(`sprite_needs_init=1` → `sprite_initialized=1` → upgrade to 2 next
+tick → dispatch). That's a significant runtime refactor — the kind
+of thing that wants its own plan and its own CI cycle.
+
+**Verdict on this plan.** The CloneSprite depth-bias unification is
+*structurally complete*: Ming-style negative AS depths are correctly
+unbiased at the recompiler level, the runtime branches on clone-table
+presence rather than display-list presence, and Phase 2c gives clones
+real display_list slots without breaking static MCs. CI verified zero
+regressions across all 8 suites. The remaining four target-test
+failures are downstream of clone clip-event dispatch — a separate
+concern that should be tracked in its own plan once someone takes it
+on. Marking this plan **complete** and moving to `complete/`. Followup
+plan stub: `CLONE_CLIP_EVENT_DISPATCH_PLAN.md` (not yet written).
 
 ## 2026-05-04 session — Phase 2a attempted, landed, reverted
 
