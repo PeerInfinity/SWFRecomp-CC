@@ -9,6 +9,32 @@
   - replace_sprites1test → PASS (resolved 2026-04-29)
   - sound → ignored_tests.txt (interactive timing accepted) -->
 
+<!-- Re-baselined 2026-05-02:
+  - movieclip_destruction_test2 → PASS 56/56 (was documented blocker
+    at 52/56; picked up the 2026-04-30 fix in CURRENT_STATUS,
+    `setGlobalVariableByName` for root SetMember). Removed from
+    "Skip" list and Entries section.
+  - matrix_test 912/1086 → 918/1086 (84.0% → 84.5%)
+  - soft_reference_test1 14/45 → 23/45 (31.1% → 51.1%)
+  - DrawingApiTest 43/93 → 66/93 (46.2% → 71.0%)
+  - EmbeddedFontTest 50/87 → 51/87 (57.5% → 58.6%)
+-->
+
+<!-- Investigated 2026-05-02 (no fix landed):
+  - duplicate_movie_clip_test (3/33 → still 3/33). Confirmed primary
+    bug: dups inherit clip events but ENTERFRAME/UNLOAD don't fire
+    because ng_cloneSprite skips the display_list slot when
+    target_swf_depth >= INITIAL_DISPLAYLIST_CAPACITY (1024). The test
+    pushes biased depths (16385/16386 = AS depth 1/2 + 16384), so the
+    dup never lands in display_list[]. Tried sharing clip_actions
+    pointer in the small-depth branch — verified no regressions across
+    a 24-test battery (10 avm1 clone/attach tests, 7 misc-ming
+    loop/depth tests, 5 misc-swfc clone-related tests, 2 misc-ming
+    duplicate_movie_clip_* siblings) but no test improvement either,
+    since the test under investigation doesn't hit that branch.
+    Reverted. Real fix requires the depth-bias unification work
+    documented in `blocked/CLONESPRITE_DEPTH_BIAS_PLAN.md` (Phase 2). -->
+
 
 <!-- PLAN_META
 id: REMAINING_TAIL_TRIAGE
@@ -24,17 +50,22 @@ blockers:
 This document collects all remaining `misc-ming.all` and `misc-swfc.all`
 failing tests **not** covered by one of the seven cluster plans:
 
-| Cluster plan | Tests covered |
-|--------------|---------------|
-| `DEFERRED_CLIP_UNLOAD_PLAN.md` | loop_test6/7/8, action_execution_order_test2/3/5/11, ActionOrderTest3/4/5 |
-| `CLONESPRITE_DEPTH_BIAS_PLAN.md` | displaylist_depths_test/2/3/8/9, DepthLimitsTest, duplicate_movie_clip_test/2 |
-| `BUTTON_INFRASTRUCTURE_PLAN.md` | RollOverOutTest, ButtonEventsTest, ButtonPropertiesTest, key_event_test, DragDropTest, button_test1, mouse_drag_test |
-| `ZERO_OUTPUT_TRIAGE_PLAN.md` | BeginBitmapFill, Version4Loader, frame_label_test, replace_buttons1test, replace_shapes1test, LoadVarsTest, opcode_guard_test2 |
-| `REGISTERCLASS_LIFECYCLE_PLAN.md` | registerClassTest, registerClassTest2, RegisterClassTest3, RegisterClassTest4 |
-| `GOTO_CATCHUP_HYGIENE_PLAN.md` | goto_frame_test, consecutive_goto_frame_test, place_and_remove_object_insane_test |
-| `IMPORT_CHARACTER_PLAN.md` | attachImported, attachMovieLoopingTest, loadMovieTest |
+| Cluster plan | Status | Tests covered |
+|--------------|--------|---------------|
+| `complete/DEFERRED_CLIP_UNLOAD_PLAN.md` | complete | loop_test6/7/8, action_execution_order_test2/3/5/11, ActionOrderTest3/4/5 |
+| `blocked/CLONESPRITE_DEPTH_BIAS_PLAN.md` | **blocked** (Phase 2 needs invasive runtime work) | displaylist_depths_test/2/3/8/9, DepthLimitsTest, duplicate_movie_clip_test/2 |
+| `complete/BUTTON_INFRASTRUCTURE_PLAN.md` | complete | RollOverOutTest, ButtonEventsTest, ButtonPropertiesTest, key_event_test, DragDropTest, button_test1, mouse_drag_test |
+| `incomplete/ZERO_OUTPUT_TRIAGE_PLAN.md` | incomplete | BeginBitmapFill, Version4Loader, frame_label_test, replace_buttons1test, replace_shapes1test, LoadVarsTest, opcode_guard_test2 |
+| `incomplete/REGISTERCLASS_LIFECYCLE_PLAN.md` | incomplete | registerClassTest, registerClassTest2, RegisterClassTest3, RegisterClassTest4 |
+| `superseded/GOTO_CATCHUP_HYGIENE_PLAN.md` | **superseded** (Phases 1–5 landed; Phase 6 → `complete/GOTO_FIFO_UNIFICATION_INCREMENTAL_PLAN.md`; Phase 7 → `incomplete/TRANSFORMED_BY_SCRIPT_WRAP_BACK_PLAN.md`) | goto_frame_test, consecutive_goto_frame_test, place_and_remove_object_insane_test |
+| `complete/IMPORT_CHARACTER_PLAN.md` | complete | attachImported, attachMovieLoopingTest, loadMovieTest |
 
-Everything else lives here.
+Everything else lives here. **Note 2026-05-02:** entries that were
+originally deferred "pending GOTO_CATCHUP_HYGIENE / CLONESPRITE_DEPTH_BIAS"
+no longer have a free-recovery path — those plans are superseded /
+blocked. Treat the deferred entries (opcode_guard_test bug 1,
+soft_reference_test1, duplicate_movie_clip_test, movieclip_destruction_test4)
+as standalone work needing their own root-cause investigation.
 
 ## Promotion convention
 
@@ -77,7 +108,7 @@ A few entries share enough DNA to be worth attacking together:
 
 ## Entries — misc-ming.all
 
-### matrix_test (84.0%, 912/1086) — multi-issue
+### matrix_test (84.5%, 918/1086) — multi-issue
 
 **Symptom.** Three independent issues per `MISC_MING_SWFC_PLAN.md`:
 
@@ -120,7 +151,7 @@ nested goto).
 **Scope.** 2-3 hours of investigation; may resolve as a free
 benefit of GOTO_CATCHUP_HYGIENE Phase 4 landing.
 
-### EmbeddedFontTest (57.5%, 50/87) and DrawingApiTest (46.2%, 43/93)
+### EmbeddedFontTest (58.6%, 51/87) and DrawingApiTest (71.0%, 66/93)
 
 **Symptom (combined cluster).** Both fail on rendered-geometry
 assertions — text glyph widths, drawing-API curve coordinates,
@@ -270,18 +301,42 @@ or add a CLI flag that injects a default keypress at frame N.
 **Promote to standalone plan when work begins** (verifier change
 is its own concern).
 
-### duplicate_movie_clip_test (9.1%, 3/33)
+### duplicate_movie_clip_test (9.1%, 3/33) — **blocked by CLONESPRITE_DEPTH_BIAS**
 
-**Symptom.** Multi-issue per `MISC_MING_SWFC_PLAN.md`. Most failures
-likely overlap `CLONESPRITE_DEPTH_BIAS` (negative AS depth handling)
-but `_test2` is partially-fixable through that plan; `_test1` has
-deeper issues including nested `duplicateMovieClip` paths.
+**Symptom.** Multi-issue. Confirmed root cause for primary failure
+(2026-05-02):
 
-**Hypothesis.** Re-baseline after `CLONESPRITE_DEPTH_BIAS` Phase 1
-lands; expect significant recovery, then narrow remaining issues.
+- `_root.x2 == 2` expected, got 1. Frame-2 `duplicateMovieClip('mc2',
+  'dup2', 2)` should produce a dup that fires `onClipEnterFrame`. We
+  fire `onClipLoad` (via `ng_queue_pending_load`) and `onClipUnload`
+  (clip event with the source's array), but ENTERFRAME never fires
+  for the dup. Direct cause: `ng_cloneSprite` skips the display_list
+  slot when `target_swf_depth >= INITIAL_DISPLAYLIST_CAPACITY` (1024).
+  The bytecode pushes `depth = 16385/16386` (AS depth 1/2 + 16384
+  bias), so the dup never enters `display_list[]`. Without a slot,
+  `dispatch_enterframe_clip_actions` (which iterates `display_list`)
+  has nothing to dispatch.
+- Also missing: button duplication (`button.dupl(...)` returns
+  undefined) and downstream counter checks at lines 172-173.
 
-**Scope.** Defer until CLONESPRITE_DEPTH_BIAS lands. May resolve
-fully or partially.
+**Hypothesis.** The depth-bias issue is exactly what
+`blocked/CLONESPRITE_DEPTH_BIAS_PLAN.md` Phase 2 was meant to fix.
+Phase 2 is blocked because stripping the +16384 bias for *packed*
+Pushes shifts AS depths into 1..16383, colliding with timeline-placed
+slots. Until that conflict is resolved (e.g., by separating
+display_list slot allocation from depth-keyed lookup), `dup2` cannot
+land in `display_list[]` and ENTERFRAME cannot fire.
+
+**Investigated 2026-05-02.** Tried sharing the source's
+`clip_actions` pointer in the small-depth branch — verified it
+wouldn't regress 24 related tests (avm1 clone/attach, misc-ming
+loop/depth, misc-swfc clone-related). But no test improved either,
+since `duplicate_movie_clip_test` doesn't hit the small-depth branch.
+Reverted; documenting here so the next session doesn't re-run the
+same investigation.
+
+**Scope.** Defer until CLONESPRITE_DEPTH_BIAS Phase 2 unblocks.
+Button-duplication issue is a separate sub-investigation.
 
 ---
 
@@ -299,21 +354,12 @@ on the first pass and emit trailing totals lines. No
 output.ruffle.txt / known_failure flag, so ruffle_matched promotion
 isn't possible.
 
-### movieclip_destruction_test2 (92.9%, 52/56)
+### ~~movieclip_destruction_test2~~ — RESOLVED to PASS (re-baseline 2026-05-02)
 
-**Symptom.** 2 lines remain failing: explicit `mc2.onUnload()`
-invocation produces no trace output. Documented blocker in
-`CURRENT_STATUS.md` "movieclip_destruction_test2 — onUnload depth
-shift + swapDepths gating" section.
-
-**Hypothesis.** Documented: function is invoked (debug-confirmed)
-but inner `_root.check_equals` calls produce no trace when invoked
-from a user-method-dispatched function on a pending-removal MC.
-Likely a deeper issue with stack/scope state during dispatch.
-
-**Scope.** 3-5 hours of dispatch investigation. **Already in
-CURRENT_STATUS.md — do not re-document.** Cross-reference here
-for completeness.
+Now PASS 56/56 (was 52/56 with 2 deferred lines). Likely picked up the
+fix from `CURRENT_STATUS.md` 2026-04-30 entry (`actionSetMember` on
+root now propagates writes to `var_map` via `setGlobalVariableByName`).
+No further work needed; entry retained here only as a history marker.
 
 ### swf4opcode → **ruffle_matched (2026-05-02)**
 
@@ -373,7 +419,7 @@ digit), undefined parses to 0.0, 0 == 0 → true. Knowing this
 prevents wasted time on `/mc1`-style cases that aren't actually
 exercising GetVariable.
 
-### soft_reference_test1 (31.1%, 14/45)
+### soft_reference_test1 (51.1%, 23/45)
 
 **Symptom (from earlier diff).** Multiple `FAILED:` lines on
 `xcheck`-style assertions plus `mcRef.getDepth()` returns empty
@@ -455,7 +501,7 @@ wins:
 
 1. ~~**`replace_sprites1test`**~~ — RESOLVED 2026-04-29 (PASS).
 2. ~~**`sound`**~~ — RESOLVED 2026-05-02 via ignored_tests.txt (Path (b)).
-3. **`opcode_guard_test` (bug 2 fixed 2026-05-02; bug 1 deferred), `movieclip_destruction_test4`, `soft_reference_test1`, `duplicate_movie_clip_test`** — re-baseline after the relevant cluster plans (`GOTO_CATCHUP_HYGIENE`, `CLONESPRITE_DEPTH_BIAS`) land. Each may recover for free.
+3. **`opcode_guard_test`** (bug 2 fixed 2026-05-02; bug 1 deferred — needs ENTERFRAME-script-after-gotoAndPlay abort semantics, no longer waiting on cluster recovery).
 4. ~~**`swf4opcode`**~~ — promoted to ruffle_matched 2026-05-02 (Group A defer).
 5. **`matrix_test`** (6-9 hours, standalone-worthy) — three independent geometry / FP issues; promote to its own plan when work begins.
 6. **`NetStream-SquareTest`** (4-6 hours, standalone-worthy) — netstream timing.
@@ -467,10 +513,16 @@ Then (after the cluster plans land and recovery is measured):
    `DefineEditTextVariableNameTest`, `levels` —
    triage individually.
 
-Skip:
+Blocked / skip (originally "re-baseline after cluster plans land",
+but those plans are now blocked/superseded — see cluster table):
 
-- `movieclip_destruction_test2` (already documented blocker —
-  do not re-investigate without a new hypothesis).
+- `duplicate_movie_clip_test` — blocked by
+  `blocked/CLONESPRITE_DEPTH_BIAS_PLAN.md` Phase 2 (root cause
+  confirmed 2026-05-02; see entry for details).
+- `movieclip_destruction_test4`, `soft_reference_test1` — both depend
+  on goto-catchup hygiene + display-list lifecycle work that no longer
+  has a parent plan; treat as standalone if revisited.
+- ~~`movieclip_destruction_test2`~~ — now PASS 56/56 (re-baselined 2026-05-02).
 - `jump_to_prev_block`, `tags_after_last_showframe` (architectural
   blockers; move to `blocked/`).
 
