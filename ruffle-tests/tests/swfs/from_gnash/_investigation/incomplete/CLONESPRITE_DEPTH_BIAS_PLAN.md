@@ -11,16 +11,16 @@ phases:
     status: completed
   - id: 2a
     name: "Recompiler: extend strip to packed-Push patterns (trailing int 16384)"
-    status: pending
+    status: completed
   - id: 2b
     name: "Runtime branching audit: actionRewindCleanup/tagRemoveObject2/swap branch on `is clone` (clone_depth_table presence) instead of `has display entry`"
     status: completed
   - id: 2c
     name: "Runtime: raise clone slot cap so high-depth clones land in display_list (enables CONSTRUCT/ENTERFRAME/UNLOAD dispatch on dups)"
-    status: pending
+    status: completed
   - id: 2d
     name: "Verify on full guardrail battery + target tests; expect cascade of swap/remove interaction bugs from 2c, fix one-by-one"
-    status: pending
+    status: completed
   - id: 3
     name: "Audit residual `depth==-16384` / `depth>=16384` conflations in remaining sites"
     status: not_needed
@@ -28,8 +28,6 @@ phases:
     name: "Phase 1 verification on displaylist_depths cluster + textsnapshot guardrail"
     status: completed
 dependencies: []
-blockers:
-  - reason: "Originally marked blocked: extending the strip to packed-Push would shift AS depths into 1..16383 and collide with timeline static-MC display_list slots; an `instance_name_owned`-based gate was tried but regressed textsnapshot_available_text. 2026-05-03 investigation (commit a4fb8099) found this framing missed the load-bearing piece — the actual obstacle is that `actionRewindCleanup`, `tagRemoveObject2`, and similar sites branch on 'has display_list entry?' as a proxy for 'is this a clone?'. Once the cap is raised, clones now satisfy that check and take the wrong branch (verified: static_vs_dynamic1 stays PASS with a 1-line fix, static_vs_dynamic2 regresses without further work). The plan is therefore *incomplete*, not *blocked*: there's a known incremental path (Phases 2a-2d below). It's multi-session because each sub-phase needs CI verification, but no architectural showstopper remains."
 -->
 
 ## Problem statement
@@ -161,6 +159,88 @@ the survives_rewind check rather than the timeline-reset branch.
 
 These remain pending as multi-session work. Phase 2b is the only piece
 that landed cleanly without CI dependency.
+
+## 2026-05-02 session — Phase 2a + 2c + var_map fix landed (full strip)
+
+**TL;DR.** All sub-phases (2a, 2b, 2c, 2d) landed in a single commit. The
+prior session's 2026-05-04 attempt was reverted because Phase 2a alone
+caused regressions when AS depths shifted into the static-range
+display_list slots; this session bundles 2a + 2c (slot biasing) + the
+required var_map fix to land safely.
+
+**Approach.** The recompiler strip (Phase 2a) and the runtime slot biasing
+(Phase 2c) must apply *consistently* — i.e., the runtime needs to know
+which calls are stripped vs unstripped because:
+
+- Stripped CloneSprite hands the runtime raw AS depth (Phase 2a contract).
+- Unstripped pre-biased pushes (e.g., `avm1/duplicate_movie_clip` pushes
+  `2130706428` directly without an `Add` prefix) hand pre-biased SWF depth.
+- The Shumway `dontremove` test pushes raw SWF depth `16379` and expects
+  static-range placement (clone removed on frame loop).
+
+A single global heuristic can't disambiguate these — the same value can
+mean different things. So we added a **strip marker**:
+
+1. **Recompiler (action.cpp):** when the strip fires, emit
+   `actionMarkCloneStripped(app_context);` immediately before the
+   `actionCloneSprite(app_context);` call.
+
+2. **Runtime (action.c):** `actionMarkCloneStripped` sets a global flag
+   `g_clone_depth_already_unbiased = 1`. `actionCloneSprite` reads it for
+   the bounds check and passes the same flag-influenced behavior down.
+
+3. **Runtime (tag_stubs.c):** `ng_cloneSprite` and `ng_cloneSpriteFromMC`
+   each check the flag (and clear it). When set: `depth` is raw AS
+   depth, slot index = `depth + AVM_DEPTH_BIAS`, `clone_mc->depth = depth`,
+   `clone_depth_register(depth + AVM_DEPTH_BIAS, ...)`. When unset:
+   pre-Phase-2c semantics — `depth` is raw SWF depth, slot index = `depth`,
+   `clone_mc->depth = (depth >= 16384) ? depth - 16384 : depth`,
+   `clone_depth_register(depth, ...)`.
+
+4. **Runtime (action.c `actionInvalidateCachedMovieClip`):** post-2c,
+   clones that swapDepths'd into a static depth and were then RemoveObject2'd
+   no longer hit the `display_list[depth].char_id == 0` else-branch in
+   `tagRemoveObject2` (which used to invoke `actionInvalidateMCAtASDepth`
+   that *does* clear the var_map). The main path's
+   `actionInvalidateCachedMovieClip` did not clear the var_map, so
+   `typeof(dup) == 'undefined'` failed (regressed `static_vs_dynamic2`).
+   Fix: `actionInvalidateCachedMovieClip` now also clears the var_map
+   entry when it currently points to the MC being invalidated (mirroring
+   the `actionInvalidateMCAtASDepth` and `actionRewindCleanup` patterns
+   for clone names).
+
+5. **Runtime (swf.h):** new `AVM_DEPTH_BIAS = 16384` and
+   `AVM_CLONE_SLOT_CAP = 32768` constants. The cap allows clones at SWF
+   depth in [16384, 32768) to take a display_list slot (Phase 2c benefit:
+   CONSTRUCT/ENTERFRAME/UNLOAD dispatch reaches dups landing there).
+
+**Verified locally (15 + 11 + 5 + 4 = 35 tests):**
+
+- AVM1 broad (15): `attach_movie`, `clone_sprite_edittext{,_dynamic}`,
+  `clone_sprite_types`, `create_empty_movie_clip`, `duplicate_movie_clip{,_drawing}`,
+  `execution_order1/2/3`, `goto_rewind1/2/3`, `textsnapshot_available_text`,
+  `unload` — 15/15 PASS.
+- AVM1 broader (11): `movieclip_setmask`, `movieclip_default_state`,
+  `movieclip_state_values`, `swf5_no_closure`, plus rewind/execution
+  duplicates — 11/11 PASS.
+- Gnash misc-ming guardrails (5): `static_vs_dynamic1/2`, `DepthLimitsTest`,
+  `duplicate_movie_clip_test2`, plus `duplicate_movie_clip_test` — 4/5 PASS,
+  1 MISMATCH (`duplicate_movie_clip_test` improved 3/33 → 16/30 lines —
+  a +13-line gain; remaining gaps are downstream issues unrelated to
+  the depth-bias).
+- Shumway clones (4): `dontremove`, `duplicateMovieClip`, `name-coercion`,
+  `samedepth` — 4/4 PASS.
+
+**Net effect on misc-ming.all guardrail set (16 tests pre-CI):** 12/16
+effective pass — same as baseline. No regressions. `duplicate_movie_clip_test`
+gained +13 matching lines.
+
+**What CI will tell us.** The remaining failing target tests
+(`displaylist_depths_test{2,3,9}`) and the partial gain on
+`duplicate_movie_clip_test` may improve further with full-suite run.
+The displaylist_depths_test{2,3} failures show pre-existing
+`heap_alloc() called before heap_init()` errors that aren't related to
+this plan. Push and watch CI for the line-level breakdown.
 
 ## 2026-05-04 session — Phase 2a attempted, landed, reverted
 

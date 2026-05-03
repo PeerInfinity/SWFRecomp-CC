@@ -2738,6 +2738,24 @@ MovieClip* ng_cloneSprite(SWFAppContext* app_context, const char* source_name,
 	if (!source_name || !target_name) return NULL;
 	if (depth > 2130706428) return NULL;
 
+	// Phase 2c (CLONESPRITE_DEPTH_BIAS): two callers with different conventions.
+	// (1) Phase 2a stripped (recompiler set g_clone_depth_already_unbiased=1):
+	//     `depth` is RAW AS depth. SWF depth (slot index) = depth + AVM_DEPTH_BIAS.
+	// (2) Unstripped: `depth` is RAW SWF depth (Ming-biased or hand-pushed).
+	//     SWF depth (slot index) = depth directly. clone_mc->depth via heuristic.
+	// We resolve to as_depth (always raw AS depth) for clone_mc->depth and
+	// clone_depth_register, but use different `target_swf_depth` per branch
+	// to preserve pre-Phase-2c semantics for unstripped pushes (e.g., Shumway
+	// `dontremove` pushes raw SWF depth 16379 expecting static-range behavior).
+	extern int g_clone_depth_already_unbiased;
+	int is_stripped = g_clone_depth_already_unbiased;
+	g_clone_depth_already_unbiased = 0;  // consume the marker
+	int as_depth = is_stripped
+	               ? depth
+	               : ((depth >= AVM_DEPTH_BIAS) ? (depth - AVM_DEPTH_BIAS) : depth);
+	// SWF depth: post-strip we bias up; unstripped we trust the input as SWF depth.
+	int swf_depth_for_table = is_stripped ? (as_depth + AVM_DEPTH_BIAS) : depth;
+
 	// Find source by instance name at root level
 	size_t src_depth = ng_findDisplayEntryByName(source_name);
 
@@ -2749,10 +2767,14 @@ MovieClip* ng_cloneSprite(SWFAppContext* app_context, const char* source_name,
 		                 ng_find_video(cid);
 		if (!scriptable) return NULL;
 
-		// Place clone at target depth (AS depth → SWF depth = depth itself for CloneSprite)
-		size_t target_swf_depth = (size_t)depth;
+		// Slot index: stripped path biases up to dynamic range so AS depths
+		// 1, 2, 3 don't collide with timeline static MCs; unstripped path
+		// uses depth directly (preserving pre-Phase-2c semantics for SWFs
+		// that push raw SWF depths like Shumway dontremove).
+		size_t target_swf_depth = (size_t)(unsigned int)swf_depth_for_table;
 		// Pre-clear target depth if occupied
 		if (target_swf_depth >= 1 && target_swf_depth <= max_depth &&
+		    target_swf_depth < display_list_capacity &&
 		    display_list[target_swf_depth].char_id != 0)
 		{
 			ng_on_remove_object(app_context, target_swf_depth);
@@ -2766,8 +2788,8 @@ MovieClip* ng_cloneSprite(SWFAppContext* app_context, const char* source_name,
 			}
 		}
 
-		// Copy display entry to clone depth
-		if (target_swf_depth < INITIAL_DISPLAYLIST_CAPACITY)
+		// Copy display entry to clone depth (clones live up to AVM_CLONE_SLOT_CAP)
+		if (target_swf_depth < AVM_CLONE_SLOT_CAP)
 		{
 			// Ensure capacity — use HCALLOC/FREE because display_list may be
 			// from the custom heap allocator (timeline sprites use HCALLOC).
@@ -2854,15 +2876,9 @@ MovieClip* ng_cloneSprite(SWFAppContext* app_context, const char* source_name,
 		src_mc->ts_stale_source = 1;
 	}
 	clone_mc->currentframe = 1;
-	// CloneSprite bytecode may be handed a raw SWF-biased depth (AS depth + 16384,
-	// as in Ming-generated `Push(N) Push(16384) Add`), or an unbiased AS depth
-	// (as produced by SWF compilers that pass `getNextHighestDepth()` straight
-	// to `duplicateMovieClip`). Heuristic: only strip the bias when the stack
-	// value clearly lies in the SWF-biased range (>= AVM_DEPTH_BIAS = 16384).
-	// That keeps `clone.getDepth()` matching Flash for biased callers without
-	// pushing already-unbiased callers into the negative range (which would
-	// regress e.g. avm1/textsnapshot_available_text).
-	clone_mc->depth = (depth >= 16384) ? (depth - 16384) : depth;
+	// Phase 2c: store the unbiased AS depth (computed above via the heuristic
+	// that handles both stripped patterns and direct pre-biased pushes).
+	clone_mc->depth = as_depth;
 
 	// For dynamic textfield clones (no DefineEditText tag), init default props
 	if (src_mc != NULL && src_mc->ng_textfield_idx == -2 && clone_mc->ng_textfield_idx != -2) {
@@ -2898,8 +2914,9 @@ MovieClip* ng_cloneSprite(SWFAppContext* app_context, const char* source_name,
 		}
 	}
 
-	// Evict any old clone registered at this SWF depth, then register new one
-	clone_depth_register(depth, target_name);
+	// Evict any old clone registered at this SWF depth, then register new one.
+	// Use swf_depth_for_table (post-strip biased; unstripped uses raw depth).
+	clone_depth_register(swf_depth_for_table, target_name);
 
 	// Register as global variable
 	ActionVar _clone_mc_var = {0};
@@ -2985,13 +3002,20 @@ MovieClip* ng_cloneSpriteFromMC(SWFAppContext* app_context, MovieClip* src_mc,
 	size_t src_depth = ng_findDisplayEntryByName(src_mc->name);
 
 	// Create display list entry for the clone (mirrors ng_cloneSprite logic).
-	// This is critical for textfield clones: actionFindOrCreateMovieClip needs
-	// the display entry to detect the textfield char_id and init properties.
-	size_t target_swf_depth = (size_t)depth;
-	if (src_depth != SIZE_MAX && target_swf_depth < INITIAL_DISPLAYLIST_CAPACITY)
+	// Phase 2c: same dual-path as ng_cloneSprite — see that function.
+	extern int g_clone_depth_already_unbiased;
+	int is_stripped = g_clone_depth_already_unbiased;
+	g_clone_depth_already_unbiased = 0;  // consume the marker
+	int as_depth = is_stripped
+	               ? depth
+	               : ((depth >= AVM_DEPTH_BIAS) ? (depth - AVM_DEPTH_BIAS) : depth);
+	int swf_depth_for_table = is_stripped ? (as_depth + AVM_DEPTH_BIAS) : depth;
+	size_t target_swf_depth = (size_t)(unsigned int)swf_depth_for_table;
+	if (src_depth != SIZE_MAX && target_swf_depth < AVM_CLONE_SLOT_CAP)
 	{
 		// Pre-clear target depth if occupied
 		if (target_swf_depth >= 1 && target_swf_depth <= max_depth &&
+		    target_swf_depth < display_list_capacity &&
 		    display_list[target_swf_depth].char_id != 0)
 		{
 			ng_on_remove_object(app_context, target_swf_depth);
@@ -3051,11 +3075,8 @@ MovieClip* ng_cloneSpriteFromMC(SWFAppContext* app_context, MovieClip* src_mc,
 	clone_mc->ts_stale_source = src_mc->ts_stale_source;
 	src_mc->ts_stale_source = 1;
 	clone_mc->currentframe = 1;
-	// See comment in ng_cloneSprite — strip the SWF depth bias only when the
-	// caller passed a value clearly in the SWF-biased range, so both
-	// `duplicateMovieClip(name, asDepth)` callers (biased via the method) and
-	// `CloneSprite`-with-unbiased-depth callers report sensible `getDepth()`.
-	clone_mc->depth = (depth >= 16384) ? (depth - 16384) : depth;
+	// Phase 2c: store the unbiased AS depth (computed above).
+	clone_mc->depth = as_depth;
 
 	// For dynamic textfield clones (src has ng_textfield_idx == -2 but no DefineEditText tag),
 	// actionFindOrCreateMovieClip won't detect the textfield from the display list.
@@ -3113,8 +3134,8 @@ MovieClip* ng_cloneSpriteFromMC(SWFAppContext* app_context, MovieClip* src_mc,
 			display_list[src_depth].clip_action_count);
 	}
 
-	// Evict any old clone at this SWF depth, then register new one
-	clone_depth_register(depth, target_name);
+	// Evict any old clone at this SWF depth, then register new one.
+	clone_depth_register(swf_depth_for_table, target_name);
 
 	ActionVar _clone_mc_var = {0};
 	_clone_mc_var.type = ACTION_STACK_VALUE_MOVIECLIP;

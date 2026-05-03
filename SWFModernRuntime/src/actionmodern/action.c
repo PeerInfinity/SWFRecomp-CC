@@ -18948,6 +18948,31 @@ void actionInvalidateCachedMovieClip(SWFAppContext* app_context, const char* nam
 			child_mc_cache[i]->avm1_removed = 1;
 			child_mc_cache[i]->dynamic_props = NULL;
 			child_mc_cache[i]->ng_textfield_idx = -1;
+			// Phase 2c (CLONESPRITE_DEPTH_BIAS): if the MC was a CloneSprite/
+			// duplicateMovieClip clone, its name has an explicit MOVIECLIP entry
+			// in the global var_map (set by setVariableByName at clone time).
+			// Without clearing it, `typeof(name)` after RemoveObject2 still
+			// returns 'movieclip' from the stale var_map entry instead of
+			// 'undefined'. Mirrors what actionInvalidateMCAtASDepth does for
+			// the empty-DL-slot path. Only clears when the var_map currently
+			// resolves to THIS MC pointer — timeline MCs lazy-init to empty
+			// strings, not MOVIECLIP, so this is a no-op for them.
+			if (child_mc_cache[i]->name[0] != '\0') {
+				extern bool hasVariable(char* var_name, size_t key_size);
+				extern ActionVar* getVariable(char* var_name, size_t key_size);
+				size_t _nl = strlen(child_mc_cache[i]->name);
+				if (hasVariable(child_mc_cache[i]->name, _nl)) {
+					ActionVar* existing = getVariable(child_mc_cache[i]->name, _nl);
+					if (existing != NULL
+					    && existing->type == ACTION_STACK_VALUE_MOVIECLIP
+					    && (MovieClip*)(uintptr_t)existing->data.numeric_value == child_mc_cache[i])
+					{
+						ActionVar undef = {0};
+						undef.type = ACTION_STACK_VALUE_UNDEFINED;
+						setVariableByName(child_mc_cache[i]->name, &undef);
+					}
+				}
+			}
 			child_mc_cache[i]->depth = INT_MIN;  // Mark as dead
 			break;
 		}
@@ -22678,6 +22703,13 @@ int g_settarget_none = 0;
 int g_settarget_context_changed = 0;
 // Saves the natural g_current_context before SetTarget changed it.
 MovieClip* g_settarget_saved_context = NULL;
+// Phase 2c (CLONESPRITE_DEPTH_BIAS): set to 1 by the recompiler when it
+// stripped the `Push(16384) Add` SWF-bias prefix preceding a CloneSprite.
+// Tells `actionCloneSprite` to interpret the popped depth as raw AS depth
+// (skipping the legacy `>= 16384` heuristic which would otherwise mistake
+// large valid AS depths like `2130690044` for pre-biased values). Cleared
+// after each `actionCloneSprite` invocation. Set via `actionMarkCloneStripped()`.
+int g_clone_depth_already_unbiased = 0;
 #endif
 
 // Get the current execution context
@@ -46871,6 +46903,17 @@ void actionSetProperty(SWFAppContext* app_context)
  * SWF version: 4+
  * Opcode: 0x24
  */
+// Phase 2c marker: recompiler emits this immediately before actionCloneSprite
+// when it stripped the `Push(16384) Add` SWF-bias prefix. The flag tells
+// actionCloneSprite the depth is raw AS depth (no heuristic needed).
+void actionMarkCloneStripped(SWFAppContext* app_context)
+{
+	(void)app_context;
+#ifdef NO_GRAPHICS
+	g_clone_depth_already_unbiased = 1;
+#endif
+}
+
 void actionCloneSprite(SWFAppContext* app_context)
 {
 	// Stack layout: [target_name] [source_name] [depth] <- sp
@@ -46926,20 +46969,19 @@ void actionCloneSprite(SWFAppContext* app_context)
 	#else
 	{
 		int depth_int = ecmaToInt32(VAL(double, &depth.data.numeric_value));
-		// AVM1 valid AS-depth range is [-16384, 2130690044]. The recompiler
-		// strips the SWF +16384 bias for small I32 pushes, so for low AS
-		// depths the value reaching `actionCloneSprite` is unbiased; large
-		// positive depths typically arrive in biased form (≥ 0). Reject
-		// unbiased AS-depths < -16384 — biased depths are always ≥ 0 so
-		// this only fires on the unbiased path. The upper bound is already
-		// enforced by `ng_cloneSprite`'s `if (depth > 2130706428)` guard
-		// (which catches biased dup5 = AS-depth 2130690045 → 2130706429).
-		// Required by gnash misc-ming/DepthLimitsTest.c:166-170 (AS-depth
-		// -16385 must be rejected — function-form `duplicateMovieClip`).
-		// Upper bound: biased range top is 2130706428 (= 2130690044 + 16384);
-		// avm1/duplicate_movie_clip pushes 2130706429 (one past) and expects
-		// `clip3` to come back undefined. Mirrors `ng_cloneSprite`'s old guard.
-		if (depth_int < -16384 || depth_int > 2130706428) {
+		// AVM1 valid AS-depth range is [-16384, 2130690044]. Validate against
+		// the resolved AS depth — Phase 2a stripped callers (g_clone_depth_already_unbiased=1)
+		// hand us raw AS depth; unstripped callers hand pre-biased SWF depth
+		// or raw negatives. Apply the appropriate transform for bounds-check.
+		// Note: the flag is consumed (cleared) by ng_cloneSprite/ng_cloneSpriteFromMC
+		// itself, NOT here — the runtime functions need to read it to choose
+		// between the raw-AS-depth path (Phase 2c slot biasing) and the legacy
+		// raw-SWF-depth path (target_swf_depth = depth, heuristic for clone.depth).
+		int _check_as = g_clone_depth_already_unbiased
+		                ? depth_int
+		                : ((depth_int >= 16384) ? (depth_int - 16384) : depth_int);
+		if (_check_as < -16384 || _check_as > 2130690044) {
+			g_clone_depth_already_unbiased = 0;  // consume the marker
 			return;
 		}
 		// AVM1 stack naming is inverted from the SWF spec naming:

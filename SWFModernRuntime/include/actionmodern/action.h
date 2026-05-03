@@ -282,6 +282,7 @@ void actionDeclareLocal(SWFAppContext* app_context);
 void actionGetProperty(SWFAppContext* app_context);
 void actionSetProperty(SWFAppContext* app_context);
 void actionCloneSprite(SWFAppContext* app_context);
+void actionMarkCloneStripped(SWFAppContext* app_context);
 void actionRemoveSprite(SWFAppContext* app_context);
 void actionSetTarget(SWFAppContext* app_context, const char* target_name);
 

@@ -39,6 +39,13 @@ typedef enum
 
 #define INITIAL_DICTIONARY_CAPACITY 8192  // Increased to support per-movie char_id offsetting (1000 per child SWF)
 #define INITIAL_DISPLAYLIST_CAPACITY 1024
+// AVM1 SWF-depth bias: AS depth + AVM_DEPTH_BIAS = SWF depth (display_list slot index).
+// Clones live in slots [AVM_DEPTH_BIAS, AVM_CLONE_SLOT_CAP); the cap is the upper
+// bound on display_list slots reachable by CloneSprite/duplicateMovieClip. Beyond
+// the cap, the runtime falls back to the child_mc_cache / clone_depth_table only
+// (skip-DL path).
+#define AVM_DEPTH_BIAS 16384
+#define AVM_CLONE_SLOT_CAP 32768
 
 // Clip event flag bits (SWF spec)
 #define CLIP_EVENT_LOAD         0x00001
