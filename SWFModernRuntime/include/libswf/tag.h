@@ -434,4 +434,8 @@ void ng_try_reclaim_auto_instance_name(const char* auto_name);
 void ng_fire_pending_loads(SWFAppContext* app_context);
 // Fire deferred init scripts for attachMovie clips (called from tagShowFrame)
 void ng_fire_pending_attach_inits(SWFAppContext* app_context);
+// Queue INIT/CONSTRUCT/LOAD clip events for a placement or clone (mirrors tagPlaceObject2).
+void ng_queue_placement_clip_events(SWFAppContext* app_context, size_t depth);
+// Queue UNLOAD clip-action callbacks for a slot (mirrors tagRemoveObject2).
+void ng_queue_slot_unload_events(SWFAppContext* app_context, size_t depth, MovieClip* mc);
 #endif

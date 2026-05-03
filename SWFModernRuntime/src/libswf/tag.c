@@ -3980,6 +3980,44 @@ static void queue_clip_load_events(SWFAppContext* app_context, size_t depth)
 		                      AQ_KIND_SCRIPT);
 	}
 }
+
+// Public wrapper: queue INIT / CONSTRUCT clip events for a clone (drains
+// inline because the clone is created mid-DoAction and Ruffle's
+// post_instantiation runs them synchronously — subsequent script lines must
+// observe the side effects). LOAD is handled separately by the caller via
+// ng_queue_pending_load so high-depth clones (no slot) and slot clones
+// share the same drain order, matching pre-CLONE_CLIP_EVENT_DISPATCH
+// behavior for tests that rely on insertion-order LOAD interleave
+// (avm1/duplicate_movie_clip).
+void ng_queue_placement_clip_events(SWFAppContext* app_context, size_t depth)
+{
+	queue_clip_init_events(app_context, depth);
+	queue_clip_construct_events(app_context, depth);
+	actionDrainActionQueueByKind(app_context, AQ_KIND_CLIP_INIT);
+	actionDrainActionQueueByKind(app_context, AQ_KIND_CLIP_CONSTRUCT);
+}
+
+// Public wrapper: queue UNLOAD clip-action callbacks for a slot, mirroring
+// the tagRemoveObject2 path. Used by AS-side removeMovieClip / actionRemoveSprite
+// on clones so clip-action UNLOAD fires the same as a tag-stream RemoveObject2
+// would. Caller is responsible for clearing the display_list slot afterward.
+void ng_queue_slot_unload_events(SWFAppContext* app_context, size_t depth, MovieClip* mc)
+{
+	if (depth > max_depth) return;
+	if (display_list[depth].clip_action_count == 0 &&
+	    display_list[depth].accumulated_clip_action_count == 0) return;
+	(void)app_context;
+	for (size_t a = 0; a < display_list[depth].accumulated_clip_action_count; a++) {
+		if (display_list[depth].accumulated_clip_actions[a].event_flags & CLIP_EVENT_UNLOAD)
+			actionQueueClipActionUnload(
+				display_list[depth].accumulated_clip_actions[a].action, mc);
+	}
+	for (size_t a = 0; a < display_list[depth].clip_action_count; a++) {
+		if (display_list[depth].clip_actions[a].event_flags & CLIP_EVENT_UNLOAD)
+			actionQueueClipActionUnload(
+				display_list[depth].clip_actions[a].action, mc);
+	}
+}
 #endif
 
 void tagPlaceObject2(SWFAppContext* app_context, size_t depth, size_t char_id, u32 transform_id, u32 cxform_id, u16 clip_depth)
@@ -4061,8 +4099,15 @@ void tagPlaceObject2(SWFAppContext* app_context, size_t depth, size_t char_id, u
 			// types (shapes, buttons, etc.) id must also match. See
 			// ruffle/core/src/display_object/movie_clip.rs survives_rewind.
 			// tagPlaceObject2 (non-Ratio variant) implies ratio == 0.
+			// CLONE_CLIP_EVENT_DISPATCH Phase 6: AVM1 clones (CloneSprite /
+			// duplicateMovieClip targets) never survive rewind — Ruffle's
+			// `avm1_clone_target.is_some()` returns false from
+			// survives_rewind so the clone is removed and the static MC
+			// is freshly re-placed (re-firing CONSTRUCT etc).
 			int existing_is_mc = (display_list[depth].sprite_display_list != NULL);
+			int is_clone_replaced = display_list[depth].clone_replaced;
 			int survives = (display_list[depth].ratio == 0)
+			               && !is_clone_replaced
 			               && (existing_is_mc
 			                   || display_list[depth].char_id == char_id);
 			if (survives)
@@ -4112,9 +4157,16 @@ void tagPlaceObject2(SWFAppContext* app_context, size_t depth, size_t char_id, u
 			// regressing goto_from_action backward catch-ups (e.g. dontremove)
 			// that rely on the original `catch_up_mode`-only gate.
 			extern int g_natural_wrap_cleanup_pending;
-			if ((catch_up_mode || g_natural_wrap_cleanup_pending) && display_list[depth].placed_at_frame > current_frame)
+			// Phase 6: clone-replaced slots always need clear+replace during
+			// backward catch-up (the old clone is going away, the static MC
+			// is freshly placed and must re-fire CONSTRUCT). Without this
+			// extra gate, clones placed at the same frame as the catch-up's
+			// current frame (placed_at_frame == current_frame) would hit the
+			// `else { return; }` skip path below.
+			if ((catch_up_mode || g_natural_wrap_cleanup_pending) &&
+			    (display_list[depth].placed_at_frame > current_frame || is_clone_replaced))
 			{
-				if (display_list[depth].placed_at_frame > catch_up_target)
+				if (display_list[depth].placed_at_frame > catch_up_target || is_clone_replaced)
 				{
 					// Mark the existing MC pending-removal so it persists in the
 					// removed-depth zone for one frame — Flash semantics: after
@@ -4645,9 +4697,12 @@ void tagPlaceObject2Ratio(SWFAppContext* app_context, size_t depth, size_t char_
 		{
 			// Ruffle survives_rewind: for MovieClip, only ratio_equals is
 			// required; other types additionally need id_equals. See the
-			// matching comment in tagPlaceObject2 above.
+			// matching comment in tagPlaceObject2 above. Phase 6: clones
+			// (clone_replaced=1) never survive — see tagPlaceObject2.
 			int existing_is_mc = (display_list[depth].sprite_display_list != NULL);
+			int is_clone_replaced = display_list[depth].clone_replaced;
 			int survives = (display_list[depth].ratio == ratio)
+			               && !is_clone_replaced
 			               && (existing_is_mc
 			                   || display_list[depth].char_id == char_id);
 			if (survives)
@@ -5218,6 +5273,7 @@ static void clear_display_entry(SWFAppContext* app_context, size_t depth)
 	// remove+re-add+setMatrix sequence).
 	display_list[depth].transformed_by_script = 0;
 	display_list[depth].cx_overridden = 0;
+	display_list[depth].clone_replaced = 0;
 }
 
 // Recursively fire CLIP_EVENT_UNLOAD for children of a display object.

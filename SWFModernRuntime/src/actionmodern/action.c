@@ -47240,6 +47240,11 @@ void actionRemoveSprite(SWFAppContext* app_context)
 				size_t _rs_dl = ng_findDisplayEntryByName(_rs_mc->name);
 				if (_rs_dl != SIZE_MAX) {
 					extern DisplayObject* display_list;
+					// CLONE_CLIP_EVENT_DISPATCH Phase 5: queue clip-action
+					// UNLOAD for the slot before clearing it (so dispatch
+					// doesn't keep firing and the UNLOAD handler still runs).
+					extern void ng_queue_slot_unload_events(SWFAppContext*, size_t, MovieClip*);
+					ng_queue_slot_unload_events(app_context, _rs_dl, _rs_mc);
 					memset(&display_list[_rs_dl], 0, sizeof(DisplayObject));
 				}
 			}
@@ -60025,6 +60030,23 @@ void actionCallMethod(SWFAppContext* app_context, char* str_buffer)
 				}
 				// Recursively queue onUnload handlers for children
 				queueChildOnUnloads(mc);
+				// CLONE_CLIP_EVENT_DISPATCH Phase 5: queue clip-action UNLOAD
+				// for the clone's display_list slot, then clear the slot so
+				// dispatch_enterframe doesn't keep firing on the removed
+				// clone. Look up by name (same pattern as actionRemoveSprite).
+				{
+					extern size_t ng_findDisplayEntryByName(const char* name);
+					size_t _rmc_dl = (mc->name && mc->name[0]) ? ng_findDisplayEntryByName(mc->name) : SIZE_MAX;
+					if (_rmc_dl != SIZE_MAX) {
+						extern void ng_queue_slot_unload_events(SWFAppContext*, size_t, MovieClip*);
+						ng_queue_slot_unload_events(app_context, _rmc_dl, mc);
+						if (display_list[_rmc_dl].instance_name_owned &&
+						    display_list[_rmc_dl].instance_name != NULL) {
+							free(display_list[_rmc_dl].instance_name);
+						}
+						memset(&display_list[_rmc_dl], 0, sizeof(DisplayObject));
+					}
+				}
 				// Clear the variable from parent's dynamic_props
 				MovieClip* _rmc_parent = mc->parent ? mc->parent : &root_movieclip;
 				if (_rmc_parent->dynamic_props != NULL && mc->name[0]) {

@@ -2812,13 +2812,39 @@ MovieClip* ng_cloneSprite(SWFAppContext* app_context, const char* source_name,
 			display_list[target_swf_depth].sprite_max_depth = 0;
 			display_list[target_swf_depth].sprite_dl_capacity = 0;
 			display_list[target_swf_depth].sprite_needs_init = 0;
-			display_list[target_swf_depth].clip_actions = NULL;
-			display_list[target_swf_depth].clip_action_count = 0;
+			// CLONE_CLIP_EVENT_DISPATCH Phase 2: inherit the source's clip_actions
+			// pointer (it's recompiler-emitted static data, never freed
+			// per-instance). Phase 5 ensures the slot is cleared on
+			// removeMovieClip / actionRemoveSprite so dispatch doesn't
+			// re-fire forever.
+			// (clip_actions / clip_action_count come along via the slot copy.)
+			// CLONE_CLIP_EVENT_DISPATCH Phase 3: mark the slot as fully
+			// initialized (>=2) so dispatch_enterframe_clip_actions picks it
+			// up next tick. The manual frame_0 runner below populates
+			// sprite_display_list children, so we don't go through
+			// process_sprite_needs_init (which would double-fire frame_0).
+			display_list[target_swf_depth].sprite_initialized = 2;
+			display_list[target_swf_depth].enterframe_eligible = 0;
+			display_list[target_swf_depth].constructor_invoked = 0;
+			// CLONE_CLIP_EVENT_DISPATCH Phase 6: mark slot as clone-replaced
+			// so backward goto's survives_rewind returns false and freshly
+			// re-places the original static MC (re-firing CONSTRUCT).
+			display_list[target_swf_depth].clone_replaced = 1;
 			if (target_swf_depth > max_depth) max_depth = target_swf_depth;
 		}
 
+		// CLONE_CLIP_EVENT_DISPATCH Phase 4: drain INIT/CONSTRUCT inline
+		// for the clone slot (when one exists). LOAD is queued separately
+		// below via ng_queue_pending_load so out-of-cap clones (no slot)
+		// and in-cap clones share insertion order in a single queue —
+		// avm1/duplicate_movie_clip mixes both and expects FIFO LOAD order.
+		if (target_swf_depth < AVM_CLONE_SLOT_CAP &&
+		    display_list[target_swf_depth].clip_action_count > 0)
+		{
+			ng_queue_placement_clip_events(app_context, target_swf_depth);
+		}
+
 		// CloneSprite fires onLoad for the clone (unlike duplicateMovieClip).
-		// Clone depths are often too large for display_list[], so use pending queue.
 		if (display_list[src_depth].clip_action_count > 0)
 		{
 			ng_queue_pending_load(target_name,
@@ -3047,8 +3073,13 @@ MovieClip* ng_cloneSpriteFromMC(SWFAppContext* app_context, MovieClip* src_mc,
 		display_list[target_swf_depth].sprite_max_depth = 0;
 		display_list[target_swf_depth].sprite_dl_capacity = 0;
 		display_list[target_swf_depth].sprite_needs_init = 0;
-		display_list[target_swf_depth].clip_actions = NULL;
-		display_list[target_swf_depth].clip_action_count = 0;
+		// CLONE_CLIP_EVENT_DISPATCH Phase 2/3: inherit clip_actions and mark
+		// slot fully initialized — see ng_cloneSprite for rationale.
+		display_list[target_swf_depth].sprite_initialized = 2;
+		display_list[target_swf_depth].enterframe_eligible = 0;
+		display_list[target_swf_depth].constructor_invoked = 0;
+		// CLONE_CLIP_EVENT_DISPATCH Phase 6: see ng_cloneSprite for rationale.
+		display_list[target_swf_depth].clone_replaced = 1;
 		if (target_swf_depth > max_depth) max_depth = target_swf_depth;
 	}
 
@@ -3126,7 +3157,14 @@ MovieClip* ng_cloneSpriteFromMC(SWFAppContext* app_context, MovieClip* src_mc,
 		clone_mc->visible = 1;
 	}
 
-	// CloneSprite fires onLoad for the clone — look up source's clip_actions by name
+	// CLONE_CLIP_EVENT_DISPATCH Phase 4: drain INIT/CONSTRUCT inline for the
+	// clone slot. LOAD goes through the existing pending-load queue for
+	// FIFO ordering with out-of-cap clones (see ng_cloneSprite).
+	if (src_depth != SIZE_MAX && target_swf_depth < AVM_CLONE_SLOT_CAP &&
+	    display_list[target_swf_depth].clip_action_count > 0)
+	{
+		ng_queue_placement_clip_events(app_context, target_swf_depth);
+	}
 	if (src_depth != SIZE_MAX && display_list[src_depth].clip_action_count > 0)
 	{
 		ng_queue_pending_load(target_name,

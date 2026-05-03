@@ -8,22 +8,22 @@ status: incomplete
 phases:
   - id: 1
     name: "Audit: trace existing clone paths vs Ruffle's instantiate_by_id + replace_at_depth + post_instantiation pipeline"
-    status: pending
+    status: completed
   - id: 2
     name: "Inherit clip_actions on clone slot (share static pointer with source)"
-    status: pending
+    status: completed
   - id: 3
     name: "Drive cloned slot through the standard sprite_needs_init lifecycle so sprite_initialized reaches >= 2 next tick"
-    status: pending
+    status: completed
   - id: 4
     name: "Queue CLIP_INIT / CLIP_CONSTRUCT / CLIP_LOAD on the clone via the existing queue_clip_*_events helpers (instead of bespoke ng_queue_pending_load)"
-    status: pending
+    status: completed
   - id: 5
     name: "Clear the clone's slot clip_actions on removeMovieClip / RemoveObject2 so dispatch_enterframe doesn't re-fire forever"
-    status: pending
+    status: completed
   - id: 6
     name: "Backward goto: re-fire CONSTRUCT for static MCs re-placed during catch-up rewind (displaylist_depths_test2/3/9)"
-    status: pending
+    status: partial — clone-replaced slots fixed (test9 now PASS); test2/3 still fail on a separate swapDepths-rewind issue (depth_swapped block re-uses MC instead of fresh-placing)
   - id: 7
     name: "Verify on full guardrail battery + target tests; expect cascade of unload-ordering / register_class regressions, fix one-by-one"
     status: pending
@@ -429,12 +429,58 @@ battery breaks. Budget: 1-2 sessions for the iterative cycle.
 
 ## Affected tests (target gains)
 
-| Test | Suite | Current | After Phases 2-5 (estimate) | After Phase 6 |
-|------|-------|---------|------------------------------|----------------|
-| `duplicate_movie_clip_test` | misc-ming | 3/33 (9.1%) | ~28/33 (PASS likely) | unchanged |
-| `displaylist_depths/displaylist_depths_test9` | misc-ming | 3/23 (13.0%) | ~12/23 (dup0 CONSTRUCT) | ~21/23 (rewind) |
-| `displaylist_depths/displaylist_depths_test2` | misc-ming | 15/31 (48.4%) | unchanged | ~30/31 (rewind only) |
-| `displaylist_depths/displaylist_depths_test3` | misc-ming | 17/32 (53.1%) | unchanged | ~31/32 (rewind only) |
+| Test | Suite | Before | After Phases 2-5 | After Phase 6 |
+|------|-------|--------|------------------|----------------|
+| `duplicate_movie_clip_test` | misc-ming | 3/33 | RUFFLE_MATCHED (effective pass) | unchanged |
+| `displaylist_depths/displaylist_depths_test9` | misc-ming | 3/23 | ~20/23 (dup0 CONSTRUCT done) | **PASS (23/23)** |
+| `displaylist_depths/displaylist_depths_test2` | misc-ming | 15/31 | unchanged | unchanged — blocked on swapDepths-rewind issue (depth_swapped block) |
+| `displaylist_depths/displaylist_depths_test3` | misc-ming | 17/32 | unchanged | unchanged — same blocker as test2 |
+
+## Status (2026-05-03 implementation session)
+
+Phases 1-5 + Phase 6 (clone-replaced sub-issue) implemented:
+
+**`duplicate_movie_clip_test`**: 3/33 → RUFFLE_MATCHED (effective pass).
+**`displaylist_depths/displaylist_depths_test9`**: 3/23 → PASS (23/23).
+
+**Implementation summary:**
+- `tag_stubs.c::ng_cloneSprite` / `ng_cloneSpriteFromMC`: removed
+  `clip_actions = NULL` clearing (Phase 2); set `sprite_initialized = 2`
+  directly on clone slot since manual frame_0 already populates children
+  (Phase 3 — Option B); set new `clone_replaced = 1` flag (Phase 6);
+  call `ng_queue_placement_clip_events` for in-cap clones (Phase 4).
+  Kept `ng_queue_pending_load` for LOAD ordering (insertion-order queue
+  shared between in-cap and out-of-cap clones — `avm1/duplicate_movie_clip`
+  mixes both depth ranges).
+- `tag.c::ng_queue_placement_clip_events` (new public helper): queues +
+  drains INIT and CONSTRUCT inline (synchronous behavior matching Ruffle's
+  `post_instantiation`).
+- `tag.c::ng_queue_slot_unload_events` (new public helper): queues UNLOAD
+  callbacks for a slot. Used by AS removeMovieClip path.
+- `action.c::actionRemoveSprite` and the `removeMovieClip` MC method:
+  call `ng_queue_slot_unload_events` and clear the display_list slot
+  before marking the MC removed (Phase 5).
+- `swf.h::DisplayObject`: new `clone_replaced` u8 field — Ruffle's
+  `avm1_clone_target.is_some()` analog.
+- `tag.c::tagPlaceObject2` / `tagPlaceObject2Ratio`: survives_rewind check
+  returns false when `clone_replaced=1`; non-survives branch also clears
+  on `clone_replaced` (Phase 6).
+- `tag.c::clear_display_entry`: resets `clone_replaced`.
+
+**Remaining blocker (test2/3):** these fail on a *separate* swapDepths-rewind
+issue, not the clone clip-event dispatch path. The flow is:
+1. PlaceObject2 places `static3` at depth 3 with CONSTRUCT clip event.
+2. `static3.swapDepths(10)` moves it to depth 10. Slot 3 becomes empty.
+3. `gotoAndStop(4)` rewinds. Frame 4's PlaceObject2 for static3 at depth 3
+   replays.
+4. `tagPlaceObject2`'s "depth_swapped re-place" block (tag.c:4271+) finds
+   the MC at depth 10 (depth_swapped=1), re-uses it at depth 3 with
+   `sprite_needs_init = 0` (suppressing CONSTRUCT). Per Ruffle, this
+   should freshly place a *new* MC at depth 3 (re-firing CONSTRUCT) and
+   leave the depth-10 MC alone.
+5. The fix is risky: changing the depth_swapped block to allow fresh
+   placement would likely regress other swapDepths tests. Defer to a
+   focused swapDepths-rewind plan.
 
 Bonus expected gains in adjacent tests where clip-event dispatch on clones
 was incidentally exercised: TBD per Phase 7 audit.

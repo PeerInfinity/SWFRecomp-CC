@@ -184,6 +184,9 @@ typedef struct DisplayObject
 	u8 enterframe_eligible; // 1 if AS2 onEnterFrame should fire this tick (set by init/advance, cleared after dispatch)
 	u8 constructor_invoked; // 1 if registered class constructor was already invoked during eager init
 	u8 sprite_initialized;  // 0=not init, 1=init'd this tick, 2=init'd on previous tick (for per-tick EnterFrame gating)
+	u8 clone_replaced;      // 1 if slot was overwritten by an AS clone (CloneSprite / duplicateMovieClip).
+	                        // Mirrors Ruffle's `avm1_clone_target.is_some()` — survives_rewind returns false
+	                        // so backward goto removes the clone and freshly re-places the static MC.
 	// Cached transform values (populated at placement time for correct bounds on child SWFs)
 	float place_a, place_b, place_c, place_d, place_tx, place_ty;
 	// Child movie transform data override (set during placement when g_active_transform_data != NULL)
