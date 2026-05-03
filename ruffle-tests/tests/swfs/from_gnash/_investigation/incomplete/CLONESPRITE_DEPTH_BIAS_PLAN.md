@@ -232,15 +232,38 @@ mean different things. So we added a **strip marker**:
   `samedepth` — 4/4 PASS.
 
 **Net effect on misc-ming.all guardrail set (16 tests pre-CI):** 12/16
-effective pass — same as baseline. No regressions. `duplicate_movie_clip_test`
-gained +13 matching lines.
+effective pass — same as baseline. No regressions.
 
-**What CI will tell us.** The remaining failing target tests
-(`displaylist_depths_test{2,3,9}`) and the partial gain on
-`duplicate_movie_clip_test` may improve further with full-suite run.
-The displaylist_depths_test{2,3} failures show pre-existing
-`heap_alloc() called before heap_init()` errors that aren't related to
-this plan. Push and watch CI for the line-level breakdown.
+**Post-CI verdict (run 25269609961, commit 06991d472ec7).** Every suite
+shows **zero diff** in pass counts and matching-line totals vs baseline:
+
+| Suite | Pass | Total | Pass rate | Δ |
+|-------|------|-------|-----------|---|
+| AVM1 | 600 | 647 | 92.7% | 0 |
+| Gnash actionscript.all | 124 | 190 | 65.3% | 0 |
+| Gnash misc-ming.all | 62 | 102 | 60.8% | 0 |
+| Gnash misc-mtasc.all | 7 | 9 | 77.8% | 0 |
+| Gnash misc-swfc.all | 7 | 16 | 43.8% | 0 |
+| Gnash misc-swfmill.all | 17 | 18 | 94.4% | 0 |
+| Shumway flat | 65 | 92 | 70.7% | 0 |
+| Shumway avm1 | 45 | 47 | 95.7% | 0 |
+
+The infrastructure landed safely (no regressions across all 8 suites)
+but didn't produce measurable line-level gains. The visible "+13 matching
+lines" I claimed locally for `duplicate_movie_clip_test` was misleading
+— the per-test stat stays at 3 matching/33 expected because the diff
+walks line-by-line and once an alignment shifts (which our extra PASSED
+outputs cause), every subsequent line counts as a mismatch. Same story
+for `displaylist_depths_test{2,3,9}`.
+
+**What's still pending (next session).** The pieces that stop the target
+tests from flipping are downstream of Phase 2a/2c — clone
+CONSTRUCT/ENTERFRAME/UNLOAD dispatch, line-ordering of trace output
+relative to clip-event handlers, and the pre-existing
+`heap_alloc() called before heap_init()` errors in
+`displaylist_depths_test{2,3}`. None of these block the depth-bias
+infrastructure; they're the next layer of work that becomes addressable
+now that the depth-bias plumbing is in place.
 
 ## 2026-05-04 session — Phase 2a attempted, landed, reverted
 
