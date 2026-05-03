@@ -11,7 +11,7 @@ phases:
     status: completed
   - id: 2a
     name: "Recompiler: extend strip to packed-Push patterns (trailing int 16384)"
-    status: completed
+    status: pending
   - id: 2b
     name: "Runtime branching audit: actionRewindCleanup/tagRemoveObject2/swap branch on `is clone` (clone_depth_table presence) instead of `has display entry`"
     status: completed
@@ -29,7 +29,7 @@ phases:
     status: completed
 dependencies: []
 blockers:
-  - reason: "Originally marked blocked: extending the strip to packed-Push would shift AS depths into 1..16383 and collide with timeline static-MC display_list slots. 2026-05-03 investigation (commit a4fb8099) found the load-bearing piece is that `actionRewindCleanup`, `tagRemoveObject2`, etc. branch on 'has display_list entry?' as a proxy for 'is this a clone?'. Phase 2b (rewind branch refactor) and Phase 2a (packed-Push strip) have now both landed cleanly without the predicted regressions — the existing runtime guard `if (target_swf_depth < INITIAL_DISPLAYLIST_CAPACITY)` (cap 1024) skips the slot copy for high-depth clones (≥1024) and high-AS-depth-only-but-low-target shifts (e.g. AS depth 14383 from `Push(-2001) Push(16384) Add` heuristic) so the strip didn't collide with statics in practice. Phases 2c/2d remain pending: 2c (raise slot cap) gives clones their own display_list slot at SWF depth `as_depth + 16384` so CONSTRUCT/ENTERFRAME/UNLOAD events fire on dups; 2d fixes swap/remove interactions that surface once cap is raised. These are still multi-session work."
+  - reason: "Originally marked blocked: extending the strip to packed-Push would shift AS depths into 1..16383 and collide with timeline static-MC display_list slots; an `instance_name_owned`-based gate was tried but regressed textsnapshot_available_text. 2026-05-03 investigation (commit a4fb8099) found this framing missed the load-bearing piece — the actual obstacle is that `actionRewindCleanup`, `tagRemoveObject2`, and similar sites branch on 'has display_list entry?' as a proxy for 'is this a clone?'. Once the cap is raised, clones now satisfy that check and take the wrong branch (verified: static_vs_dynamic1 stays PASS with a 1-line fix, static_vs_dynamic2 regresses without further work). The plan is therefore *incomplete*, not *blocked*: there's a known incremental path (Phases 2a-2d below). It's multi-session because each sub-phase needs CI verification, but no architectural showstopper remains."
 -->
 
 ## Problem statement
@@ -161,75 +161,6 @@ the survives_rewind check rather than the timeline-reset branch.
 
 These remain pending as multi-session work. Phase 2b is the only piece
 that landed cleanly without CI dependency.
-
-## 2026-05-04 session — Phase 2a landed (packed-Push strip)
-
-**Phase 2a complete.** `SWFRecomp/src/action/action.cpp` (case `SWF_ACTION_PUSH`)
-now extends the bias strip to packed Pushes: when the LAST value of a
-multi-value Push opcode is `I32(16384)` and the next two opcodes are
-`Add{,2}` + `CloneSprite` (with no labels at the Add or CloneSprite),
-the trailing 5 bytes are excluded from C emission while earlier packed
-values are emitted normally. The Add is then skipped via
-`skip_next_add_for_clone_bias` (existing mechanism), and CloneSprite
-consumes the unbiased AS depth. A pre-scan walks all push value types
-to locate the last value's start offset before applying the strip.
-
-**Local verification (battery of 44 tests, 0 regressions):**
-- AVM1 broad regression (23 tests): goto_rewind1/2/3, swf5_no_closure,
-  swf5_to_6_cross_call, movieclip_setmask, execution_order1/2/3,
-  movieclip_default_state, movieclip_get_instance_at_depth, set_interval,
-  watch{,_textfield}, on_construct, register_class, register_and_init_order,
-  init_object_order, infinite_recursion_function_in_setter, path_string,
-  function_base_clip, closure_scope, tell_target_invalid — 23/23 PASS.
-- AVM1 clone-specific (8 tests): textsnapshot_available_text,
-  clone_sprite_edittext{,_dynamic}, clone_sprite_types,
-  duplicate_movie_clip{,_drawing}, create_empty_movie_clip,
-  attach_movie — 8/8 PASS.
-- Misc-ming guardrails (13 tests): static_vs_dynamic1/2,
-  loop/loop_test{,3,5,9}, attachMovieTest, place_and_remove_object_test,
-  displaylist_depths/displaylist_depths_test{,8,11}, DepthLimitsTest,
-  duplicate_movie_clip_test2 — 13/13 effective pass (12 PASS + 1 RM).
-- Shumway avm1 dups (4 tests): duplicateMovieClip/{dontremove,
-  duplicateMovieClip,samedepth,name-coercion} — 4/4 PASS.
-
-**Why predicted regressions didn't happen.** The plan's earlier blocker
-analysis assumed the strip would shift AS depths into 1..16383 and
-collide with static MCs at display_list[1..N]. In practice, the runtime
-already gates the slot copy with `if (target_swf_depth < INITIAL_DISPLAYLIST_CAPACITY)`
-(cap = 1024 in `swf.h`), so:
-- AS depths 1..1023 from packed-Push strip would still copy into
-  display_list slots 1..1023 — but the misc-ming tests in scope
-  (`duplicate_movie_clip_test`) target depths 1, 2, 3 specifically;
-  static MCs at those depths get overwritten by the clone's display
-  entry as expected. (No collision because the test creates clones
-  AFTER the static frame's setup.)
-- AS depths ≥ 1024 from packed-Push strip skip the slot copy entirely
-  (existing guard), so they only land in `clone_depth_table` and
-  `var_map` — same as pre-strip behavior.
-- Negative AS depths (e.g. -2001 from Ming's `Push(-2001) Push(16384) Add`)
-  produce `(size_t)-2001 = SIZE_MAX - 2000`, which fails the
-  `< INITIAL_DISPLAYLIST_CAPACITY` guard, so the slot copy is skipped
-  same as before.
-
-**Measured impact on target tests (Phase 2a alone):**
-
-| Test | Pre-2a | Post-2a | Δ | Notes |
-|------|--------|---------|---|-------|
-| displaylist_depths_test | 104/111 (RM) | RM (≥104) | 0+ | already RM |
-| displaylist_depths_test2 | 15/31 | 15/31 | 0 | uses `mc.duplicateMovieClip` method-form, not CloneSprite — unaffected by Phase 2a |
-| displaylist_depths_test3 | 17/32 | 17/32 | 0 | same as test2 |
-| displaylist_depths_test9 | 3/23 | 3/23 | 0 | uses CloneSprite via single-value strip (already in place) — Phase 2c needed for CONSTRUCT events |
-| duplicate_movie_clip_test | 3/33 | ~14/33 | +11 | the only test with packed-Push CloneSprite pattern; clones now created at correct AS depths but downstream events still missing (Phase 2c) |
-
-**What's still required to flip the remaining target tests:**
-- **Phase 2c** (raise display_list slot cap) — gives clones their own
-  display_list slot at SWF depth `as_depth + 16384`, so CONSTRUCT,
-  ENTERFRAME, UNLOAD events dispatch on them.
-- **Phase 2d** verification + one-by-one fixes for swap/remove
-  interactions exposed when 2c lands.
-- For test2/test3 (mc.duplicateMovieClip method-form), the issue is
-  unrelated to depth-bias — these tests need separate investigation
-  into onClipConstruct firing on replaced static MCs.
 
 ## 2026-05-03 update — option 2 (raise slot cap) prototyped + reverted
 
