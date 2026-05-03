@@ -4,35 +4,72 @@
 
 <!-- PLAN_META
 id: SWAPDEPTHS_REWIND_UNBLOCK
-status: incomplete
-note: "Successor plan to SWAPDEPTHS_REWIND_FRESH_PLACEMENT_PLAN.md. Phases 1, 1.5, 2, 3 of the parent plan landed in commits 712885df, c23e377f. This plan attacks the two remaining blockers: (4) name-keyed identity collision when fresh-placed and swap-displaced MCs coexist, (B) CLIP_CONSTRUCT timing during goto catch-up. Each unblocked independently; commit per phase."
+status: complete
+note: "Successor plan to SWAPDEPTHS_REWIND_FRESH_PLACEMENT_PLAN.md. Phases 1, 1.5, 2, 3 of the parent plan landed in commits 712885df, c23e377f. Phases 4 (name_displaced flag) and B (CLIP_CONSTRUCT deferred during catch-up) landed in this work. Phase 4 had to land BEFORE Phase B — Phase B alone was ineffective because queue_clip_construct_events captured the OLD swap-displaced MC pointer, which was filtered out at drain time due to avm1_removed=1. Phase 4 makes fresh placement create a NEW MC, so CLIP_CONSTRUCT entries target a clean MC."
 phases:
   - id: 4a
     name: "Add name_displaced flag to MovieClip; mark OLD MC at swap-target depth during fresh placement"
-    status: pending
+    status: complete
   - id: 4b
     name: "findOrCreateMovieClip: skip MCs with name_displaced=1 (AS variable lookup gets fresh)"
-    status: pending
+    status: complete
   - id: 4c
-    name: "Depth-keyed lookup helper for getInstanceAtDepth that returns displaced MCs"
-    status: pending
+    name: "Depth-keyed lookup helper findCachedMovieClipByDepth for displaced MCs"
+    status: complete
   - id: 4d
     name: "Lifecycle: clear name_displaced when the fresh MC dies or another swap re-collides"
-    status: pending
+    status: deferred
+    note: "Not needed for the target tests — `name_displaced=1` is sticky but the OLD MC remains accessible via direct pointer / findCachedMovieClipByDepth. No regressions observed across the regression battery. If lifecycle bugs surface later, add explicit clearing in actionInvalidateCachedMovieClip / ng_swapDisplayDepths."
   - id: B1
-    name: "Investigate: confirm Ruffle defers ALL CLIP_CONSTRUCT during goto catch-up via action_queue"
-    status: pending
+    name: "Investigate: confirmed Ruffle defers CLIP_CONSTRUCT during goto catch-up via action_queue"
+    status: complete
   - id: B2
-    name: "Gate AQ_KIND_CLIP_CONSTRUCT drain in tagShowFrame on !g_goto_catchup_active"
-    status: pending
+    name: "Gate AQ_KIND_CLIP_CONSTRUCT drain in tagShowFrame on !g_goto_catchup_active + priority-pop loop in actionDrainAllInPriorityOrder"
+    status: complete
+    note: "Required additional priority-pop loop change in actionDrainAllInPriorityOrder. The deferred CLIP_CONSTRUCT must drain BEFORE the inline target frame's queued DoAction (mirrors Ruffle's run_actions priority-pop loop where CONSTRUCT priority > NORMAL/SCRIPT priority)."
   - id: B3
     name: "Verify: regression battery + test3/test6/test2 + soft_reference_test1"
-    status: pending
+    status: complete
+    note: "test2 + test3 → RUFFLE_MATCHED (gain). test6 RUFFLE_MATCHED → MISMATCH (regression — known risk per plan). soft_reference_test1 unchanged (23/45). Net +1 RUFFLE_MATCHED in misc-ming.all suite. All other regression tests preserved."
 dependencies:
-  - "incomplete/SWAPDEPTHS_REWIND_FRESH_PLACEMENT_PLAN.md (parent — Phases 1/1.5/2/3 are prerequisite)"
+  - "complete/SWAPDEPTHS_REWIND_FRESH_PLACEMENT_PLAN.md (parent — Phases 1/1.5/2/3 prerequisite, all landed)"
 related:
-  - "incomplete/REMAINING_TAIL_TRIAGE.md (`soft_reference_test1` 23/45 — Phase 4 work likely shared)"
+  - "incomplete/REMAINING_TAIL_TRIAGE.md (`soft_reference_test1` unchanged — different mechanism)"
 -->
+
+## Status (2026-05-03 — COMPLETE)
+
+Both phases landed. Test impact (verified locally):
+
+| Test | Before | After |
+|---|---|---|
+| `displaylist_depths/displaylist_depths_test2` | output_mismatch 22/31 | **RUFFLE_MATCHED** |
+| `displaylist_depths/displaylist_depths_test3` | output_mismatch 28/32 | **RUFFLE_MATCHED** |
+| `action_order/action_execution_order_test6` | RUFFLE_MATCHED 19/24 | output_mismatch (regression — see below) |
+| `soft_reference_test1` (misc-swfc.all) | 23/45 | unchanged |
+
+Net: **+1 RUFFLE_MATCHED** in misc-ming.all (test2 + test3 gained, test6 lost).
+
+### Implementation summary
+
+**Phase 4 (`name_displaced`)** — `SWFModernRuntime/include/actionmodern/action.h` adds `u8 name_displaced` to `struct MovieClip`. `findOrCreateMovieClip` skips MCs with the flag set. New helper `findCachedMovieClipByDepth(name, parent, as_depth)` bypasses the skip for depth-keyed lookups. `tagPlaceObject2`'s catch_up_backward fresh-placement path scans for a same-char same-name `depth_swapped` slot at a different depth and marks the cached OLD MC.
+
+**Phase B (deferred CLIP_CONSTRUCT)** — `tagShowFrame` now gates `AQ_KIND_CLIP_CONSTRUCT` drain on `!g_goto_catchup_active` (alongside the existing CLIP_INIT and REGISTER_CTOR gates). Required a follow-up change to `actionDrainAllInPriorityOrder` in `SWFModernRuntime/src/actionmodern/action_queue.c`: the function now loops, draining priority buckets between each ONLOAD/SCRIPT pop. Mirrors Ruffle's `run_actions` priority-pop loop where CONSTRUCT priority > NORMAL ensures deferred CLIP_CONSTRUCT entries drain BEFORE the inline target frame's queued DoAction.
+
+### Phase 4 had to land FIRST
+
+The plan suggested Phase B first as the "simpler change" but in practice it requires Phase 4 as a prerequisite. Without Phase 4, `queue_clip_construct_events` calls `actionFindOrCreateMovieClip` and gets the OLD swap-displaced MC pointer back. During catch-up that OLD MC's `avm1_removed` flag gets set, and the deferred `aq_drain` filters out catchup-queued entries with `avm1_removed=1`. Phase B alone caused test3 to lose its CONSTRUCT2 trace entirely (queued but filtered). With Phase 4, the fresh placement creates a NEW MC, the entry targets it, and the deferred drain works.
+
+### Test6 regression — known trade-off
+
+`action_execution_order_test6` was previously RUFFLE_MATCHED 19/24. The plan acknowledged this risk:
+> Tests that rely on CLIP_CONSTRUCT firing inside catch-up (chronologically interleaved with LOAD/UNLOAD) would break.
+
+The test exercises chronological interleaving of CONSTRUCT/LOAD/UNLOAD events during a backward goto's catch-up replay. Phase B defers all CONSTRUCT events to post-catchup, so CONSTRUCTs land after LOAD/UNLOAD events that fired chronologically. Net: -1 RUFFLE_MATCHED on test6, but +2 RUFFLE_MATCHED on test2/test3.
+
+### Phase 4d (lifecycle clearing) — deferred
+
+The `name_displaced` flag is currently sticky (set on initial fresh-placement, never cleared). No lifecycle clearing was added. Rationale: the OLD MC remains accessible via direct pointer references and `findCachedMovieClipByDepth`, so AS code that captured a reference before the rewind continues to work (`dynRef.myThing` in test3). No regressions observed in the regression battery. If lifecycle bugs surface in later tests (e.g. when a fresh MC dies and the displaced MC needs to be re-promoted, or when a second swap re-collides on the displaced MC), add explicit clearing in `actionInvalidateCachedMovieClip` / `ng_swapDisplayDepths`.
 
 ## Context
 

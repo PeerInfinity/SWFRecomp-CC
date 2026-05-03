@@ -2385,15 +2385,20 @@ void tagShowFrame(SWFAppContext* app_context)
 	// aggregation (RegisterClassTest3).
 	//
 	// CLIP_CONSTRUCT (clip-event handler — distinct from REGISTER_CTOR's
-	// registered-class constructor) fires chronologically per Flash semantics
-	// (action_execution_order_test6 expects all three CONSTRUCTs in the
-	// catch-up window to fire even though every placement is later removed).
-	// So drain CLIP_CONSTRUCT every frame, including catch-up.
+	// registered-class constructor) is also deferred during goto catch-up
+	// (SWAPDEPTHS_REWIND_UNBLOCK Phase B). Mirrors Ruffle's action_queue
+	// model where MovieClip::run_goto queues CLIP_CONSTRUCT events and
+	// Player::run_actions drains them after the calling AS script returns.
+	// The deferred entries drain at the next non-catch-up tagShowFrame
+	// (the calling frame's outer ShowFrame, after the calling script returns).
+	// Requires Phase 4 (name_displaced flag): without it, queue_clip_construct_events
+	// targets the OLD swap-displaced MC, which gets avm1_removed=1 during
+	// catch-up and the deferred entry is filtered out at drain time. With
+	// Phase 4, the fresh placement creates a new MC and the entry targets it.
+	// Key tests: displaylist_depths/displaylist_depths_test{2,3}.
 	if (!g_goto_catchup_active) {
 		actionDrainActionQueueByKind(app_context, AQ_KIND_CLIP_INIT);
-	}
-	actionDrainActionQueueByKind(app_context, AQ_KIND_CLIP_CONSTRUCT);
-	if (!g_goto_catchup_active) {
+		actionDrainActionQueueByKind(app_context, AQ_KIND_CLIP_CONSTRUCT);
 		actionDrainActionQueueByKind(app_context, AQ_KIND_REGISTER_CTOR);
 	}
 	// Phase 7b: sprite CLIP_EVENT_LOAD now rides on AQ_KIND_SCRIPT, drained
@@ -4276,6 +4281,39 @@ void tagPlaceObject2(SWFAppContext* app_context, size_t depth, size_t char_id, u
 		// depth is left to ng_display_clear_after / cleanup_unplaced_after to
 		// destroy or preserve based on dynamic-vs-static-zone rules. Fresh
 		// placement also queues CONSTRUCT clip events on the new instance.
+		//
+		// SWAPDEPTHS_REWIND_UNBLOCK Phase 4: when a fresh placement happens at a
+		// depth where the same character was moved (via swapDepths) to a
+		// different depth, the OLD MC's cache entry (still alive at the
+		// swap-target depth) shadows AS variable lookups for the name. Mark the
+		// OLD MC's cache entry as `name_displaced` so findOrCreateMovieClip
+		// skips it for AS name lookups; the fresh placement's
+		// findOrCreateMovieClip then creates a new MC. Direct pointer access
+		// via saved AS references still resolves to the OLD MC (path-based
+		// equality from Phase 1.5 makes them comparable), and
+		// MovieClip.getInstanceAtDepth(N) uses findCachedMovieClipByDepth which
+		// bypasses the displaced-skip.
+		if (catch_up_backward && char_id != 0 && g_pending_instance_name != NULL) {
+			extern MovieClip* findCachedMovieClipByDepth(const char*, MovieClip*, int);
+			extern void actionMarkMCNameDisplaced(MovieClip*);
+			for (size_t _sd = 1; _sd <= max_depth; _sd++) {
+				if (_sd == depth) continue;
+				if (display_list[_sd].char_id == char_id
+				    && display_list[_sd].depth_swapped
+				    && display_list[_sd].instance_name != NULL
+				    && strcmp(display_list[_sd].instance_name,
+				             g_pending_instance_name) == 0)
+				{
+					int as_depth = (int)_sd - 16384;
+					MovieClip* old_mc = findCachedMovieClipByDepth(
+						g_pending_instance_name,
+						g_current_context ? g_current_context : &root_movieclip,
+						as_depth);
+					if (old_mc != NULL) actionMarkMCNameDisplaced(old_mc);
+					break;
+				}
+			}
+		}
 	}
 #endif
 

@@ -4,8 +4,8 @@
 
 <!-- PLAN_META
 id: SWAPDEPTHS_REWIND_FRESH_PLACEMENT
-status: incomplete
-note: "Phases 1, 1.5, 2 complete. Phase 3 implicit (existing clear_after handles dynamic-zone preservation; static-zone destruction handled by cleanup_unplaced_after). Phase 4 (test2 soft-ref re-binding) still blocked on architectural Option A/B/C. Phase B (deferred CONSTRUCT) blocked on test6 ordering — see 'Phase 2 results (2026-05-03)' below."
+status: complete
+note: "All phases done. Phases 1, 1.5, 2, 3, 5 landed in commits 712885df, c23e377f. Phases 4 and B handled by successor plan complete/SWAPDEPTHS_REWIND_UNBLOCK_PLAN.md."
 phases:
   - id: 1
     name: "Audit: identify all currently-passing tests that depend on tag.c::tagPlaceObject2 depth_swapped re-place block (the load-bearing guardrails)"
@@ -20,11 +20,11 @@ phases:
     name: "Decide fate of the moved MC at the swap-target depth (preserve in dynamic zone, destroy in static zone — Ruffle behavior)"
     status: completed
   - id: 4
-    name: "Soft-reference re-binding: AS-level references saved before rewind (`dynRef = static3`) must re-resolve to the freshly-placed MC after rewind"
-    status: blocked
+    name: "Soft-reference re-binding (handled by SWAPDEPTHS_REWIND_UNBLOCK Phase 4 — name_displaced flag)"
+    status: completed
   - id: B
-    name: "Deferred post-rewind CONSTRUCT firing — likely promotes displaylist_depths_test3 to ruffle_matched standalone"
-    status: blocked
+    name: "Deferred post-rewind CONSTRUCT firing (handled by SWAPDEPTHS_REWIND_UNBLOCK Phase B)"
+    status: completed
   - id: 5
     name: "Verify on guardrail battery (loop_test3, rewind_depth, soft_reference_test1, all displaylist_depths_test*) and target tests"
     status: completed

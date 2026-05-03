@@ -199,18 +199,123 @@ extern int g_natural_wrap_cleanup_pending;
 extern int catch_up_backward;
 extern size_t catch_up_target;
 
+static int aq_drain_one_onload_or_script(SWFAppContext* app_context);
+
 // Phase 3 of CLIP_EVENT_ROUND_DISPATCH: unified frame-end priority drain.
 // Drains INIT → CONSTRUCT → REGISTER_CTOR rounds, then ONLOAD+SCRIPT in
 // FIFO. Mirrors Ruffle's Player::run_actions priority pop loop.
 // Honors g_drain_suppress_depth so nested drains under an outer drain
 // (ng_executeGotoCatchUp's inline target script call) are no-op'd.
+//
+// Loops until all queues are empty. SCRIPT execution can queue more
+// CLIP_INIT/CLIP_CONSTRUCT/REGISTER_CTOR entries (e.g. via gotoAndStop's
+// goto catch-up replaying placement tags); those higher-priority entries
+// must drain BEFORE any subsequent SCRIPT entry queued in the same round.
+// Mirrors Ruffle's run_actions priority-pop loop semantics.
+// Key test: displaylist_depths/displaylist_depths_test3 (the gotoAndStop's
+// deferred CLIP_CONSTRUCT must fire between the calling script and the
+// inline target frame's queued DoAction).
 void actionDrainAllInPriorityOrder(SWFAppContext* app_context)
 {
 	if (g_drain_suppress_depth > 0) return;
-	actionDrainActionQueueByKind(app_context, AQ_KIND_CLIP_INIT);
-	actionDrainActionQueueByKind(app_context, AQ_KIND_CLIP_CONSTRUCT);
-	actionDrainActionQueueByKind(app_context, AQ_KIND_REGISTER_CTOR);
-	actionDrainOnloadAndScript(app_context);
+	// Phase 4 (TRANSFORMED_BY_SCRIPT_WRAP_BACK): preserved from the
+	// original actionDrainOnloadAndScript path. Run unsurvivor cleanup
+	// before scripts run on natural-wrap catch-up.
+	if (g_natural_wrap_cleanup_pending && catch_up_backward) {
+		g_natural_wrap_cleanup_pending = 0;
+		extern void ng_display_cleanup_unplaced_after(SWFAppContext*, size_t);
+		ng_display_cleanup_unplaced_after(app_context, catch_up_target);
+	}
+	for (;;) {
+		int had_work = 0;
+		for (size_t i = 0; i < g_aq_count; i++) {
+			ActionQueueKind k = g_aq[i].kind;
+			if (k == AQ_KIND_CLIP_INIT || k == AQ_KIND_CLIP_CONSTRUCT
+			    || k == AQ_KIND_REGISTER_CTOR) {
+				had_work = 1;
+				break;
+			}
+		}
+		if (had_work) {
+			actionDrainActionQueueByKind(app_context, AQ_KIND_CLIP_INIT);
+			actionDrainActionQueueByKind(app_context, AQ_KIND_CLIP_CONSTRUCT);
+			actionDrainActionQueueByKind(app_context, AQ_KIND_REGISTER_CTOR);
+		}
+		// Flush deferred sprite scripts before checking for ONLOAD/SCRIPT
+		// entries — Phase D unification: gotos issued from sprite frame
+		// scripts queue into the deferred list and become visible only
+		// after this flush.
+		if (g_unify_sprite_drain_flag) {
+			actionFlushPendingSpriteScriptsToScriptQueue(app_context);
+		}
+		// Pop a single ONLOAD/SCRIPT entry, then loop back so any new
+		// CLIP_INIT/CLIP_CONSTRUCT/REGISTER_CTOR entries that the SCRIPT
+		// queued get drained before the next SCRIPT entry.
+		int found_script = 0;
+		for (size_t i = 0; i < g_aq_count; i++) {
+			ActionQueueKind k = g_aq[i].kind;
+			if (k == AQ_KIND_ONLOAD || k == AQ_KIND_SCRIPT) {
+				found_script = 1;
+				break;
+			}
+		}
+		if (!found_script) {
+			if (!had_work) break;
+			else continue;
+		}
+		aq_drain_one_onload_or_script(app_context);
+	}
+}
+
+// Pop and dispatch a single ONLOAD/SCRIPT entry (highest priority, FIFO).
+// Returns 1 if an entry was dispatched (or skipped due to avm1_removed),
+// 0 if no matching entries remain. Used by actionDrainAllInPriorityOrder
+// to interleave priority-bucket drains between SCRIPT pops.
+static int aq_drain_one_onload_or_script(SWFAppContext* app_context)
+{
+	int best = -1;
+	int best_pri = -1;
+	for (size_t i = 0; i < g_aq_count; i++) {
+		ActionQueueEntry* e = &g_aq[i];
+		if (e->kind != AQ_KIND_ONLOAD && e->kind != AQ_KIND_SCRIPT) continue;
+		int pri = (int)e->priority;
+		if (pri > best_pri) {
+			best_pri = pri;
+			best = (int)i;
+		}
+	}
+	if (best < 0) return 0;
+	ActionQueueEntry entry = g_aq[best];
+	if ((size_t)best + 1 < g_aq_count) {
+		memmove(&g_aq[best], &g_aq[best + 1],
+		        (g_aq_count - (size_t)best - 1) * sizeof(*g_aq));
+	}
+	g_aq_count--;
+	if (!entry.is_unload && entry.clip) {
+		if (entry.clip->avm1_removed || entry.clip->pending_removal) {
+			return 1;
+		}
+	}
+	entry.fn(app_context, entry.user);
+	if (entry.is_unload) {
+		int has_more_unload = 0;
+		for (size_t i = 0; i < g_aq_count; i++) {
+			if (g_aq[i].is_unload) { has_more_unload = 1; break; }
+		}
+		if (!has_more_unload) {
+			run_pending_finalize(app_context);
+		}
+	}
+	return 1;
+}
+
+void actionDrainOnloadAndScriptOne(SWFAppContext* app_context)
+{
+	if (g_drain_suppress_depth > 0) return;
+	if (g_unify_sprite_drain_flag) {
+		actionFlushPendingSpriteScriptsToScriptQueue(app_context);
+	}
+	aq_drain_one_onload_or_script(app_context);
 }
 
 void actionDrainOnloadAndScript(SWFAppContext* app_context)

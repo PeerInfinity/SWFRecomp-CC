@@ -18060,10 +18060,14 @@ static MovieClip* findOrCreateMovieClip(SWFAppContext* app_context, const char* 
 	// Check cache first (case-insensitive for SWF<=6 via swf_name_match)
 	// When g_skip_pending_removal_mc is set (during tagReplaceObject2), skip MCs
 	// with pending_removal so a fresh MC is created for the new display entry.
+	// SWAPDEPTHS_REWIND_UNBLOCK Phase 4: skip MCs with name_displaced set —
+	// these are swap-displaced OLD MCs that have been shadowed by a fresh
+	// placement during a backward goto; AS name lookups must get the fresh MC.
 	extern int g_skip_pending_removal_mc;
 	for (int i = 0; i < child_mc_count; i++) {
 		if (child_mc_cache[i] != NULL &&
 		    child_mc_cache[i]->depth != INT_MIN &&
+		    !child_mc_cache[i]->name_displaced &&
 		    !(g_skip_pending_removal_mc && child_mc_cache[i]->pending_removal) &&
 		    swf_name_match(child_mc_cache[i]->name, instance_name) &&
 		    child_mc_cache[i]->parent == parent) {
@@ -18757,6 +18761,31 @@ static MovieClip* findOrCreateMovieClip(SWFAppContext* app_context, const char* 
 // Public wrapper for findOrCreateMovieClip (callable from tag_stubs.c and generated code)
 MovieClip* actionFindOrCreateMovieClip(SWFAppContext* app_context, const char* instance_name, MovieClip* parent) {
 	return findOrCreateMovieClip(app_context, instance_name, parent);
+}
+
+// SWAPDEPTHS_REWIND_UNBLOCK Phase 4: find a cached MovieClip by current depth,
+// bypassing the name_displaced skip used by findOrCreateMovieClip. Returns the
+// displaced OLD MC at its swap-target depth (so MovieClip.getInstanceAtDepth(N)
+// continues to work for swap-displaced MCs even after a fresh placement of the
+// same name has shadowed them).
+MovieClip* findCachedMovieClipByDepth(const char* name, MovieClip* parent, int as_depth) {
+	for (int i = 0; i < child_mc_count; i++) {
+		MovieClip* ch = child_mc_cache[i];
+		if (ch == NULL || ch->depth == INT_MIN) continue;
+		if (ch->parent != parent) continue;
+		if (ch->depth != as_depth) continue;
+		if (name != NULL && !swf_name_match(ch->name, name)) continue;
+		return ch;
+	}
+	return NULL;
+}
+
+void actionMarkMCNameDisplaced(MovieClip* mc) {
+	if (mc != NULL) mc->name_displaced = 1;
+}
+
+void actionClearMCNameDisplaced(MovieClip* mc) {
+	if (mc != NULL) mc->name_displaced = 0;
 }
 
 void actionInitDynTextFieldClone(SWFAppContext* app_context, MovieClip* mc) {

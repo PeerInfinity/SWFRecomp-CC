@@ -49,6 +49,7 @@ struct MovieClip {
 	u8 load_failed;        // 1 if loadMovie was called but the URL was not found (_framesloaded/-1, getBytesTotal/-1, getSWFVersion/-1)
 	u8 pending_removal;    // 1 if MC was removed from display list but persists for one more frame (depth transformed)
 	u8 avm1_removed;       // 1 if MC was removed from display list (halts script execution)
+	u8 name_displaced;     // SWAPDEPTHS_REWIND_UNBLOCK Phase 4: 1 if a fresh placement during a backward goto created a new MC at this MC's tag-defined depth while this MC was at a swap-target depth. Skip in findOrCreateMovieClip name lookups so AS variable resolution gets the fresh MC; direct pointer access (saved refs, getInstanceAtDepth) still works.
 	u32 byte_size;         // getBytesLoaded/getBytesTotal value (0 = dynamic/attached clip)
 	u16 swf_version;       // SWF version of the movie loaded into this MC (for getSWFVersion)
 	void* display_obj;     // Pointer to this MC's DisplayObject entry (for direct child lookup without global display_list)

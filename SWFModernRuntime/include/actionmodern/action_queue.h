@@ -92,6 +92,12 @@ void actionDrainActionQueueByKind(SWFAppContext* app_context,
 // and DoAction. (See DEFERRED_CLIP_UNLOAD_PLAN.)
 void actionDrainOnloadAndScript(SWFAppContext* app_context);
 
+// SWAPDEPTHS_REWIND_UNBLOCK Phase B: pop and dispatch a single
+// ONLOAD/SCRIPT entry. Used by actionDrainAllInPriorityOrder to drain
+// priority buckets (CLIP_INIT/CONSTRUCT/REGISTER_CTOR) between each
+// SCRIPT pop, mirroring Ruffle's run_actions priority-pop loop.
+void actionDrainOnloadAndScriptOne(SWFAppContext* app_context);
+
 // Phase 3 of CLIP_EVENT_ROUND_DISPATCH: unified frame-end priority drain.
 // Drains AQ_KIND_CLIP_INIT → AQ_KIND_CLIP_CONSTRUCT → AQ_KIND_REGISTER_CTOR
 // in priority rounds, then ONLOAD+SCRIPT via actionDrainOnloadAndScript.
