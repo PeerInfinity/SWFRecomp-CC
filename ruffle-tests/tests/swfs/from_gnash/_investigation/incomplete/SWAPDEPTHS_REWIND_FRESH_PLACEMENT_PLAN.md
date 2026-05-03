@@ -608,3 +608,12 @@ For test3 specifically, expected output has CONSTRUCT trace at lines 16-18 — b
 ### Final status
 
 Phases 1, 1.5, 2, 3, 5: COMPLETE. Phases 4 and B: BLOCKED on architectural changes. Plan stays in `incomplete/` since work is not fully done. Net gain this phase: +7 lines on test2, +11 lines on test3, no regressions.
+
+### Unblock plan
+
+`SWAPDEPTHS_REWIND_UNBLOCK_PLAN.md` (in `incomplete/`) expands Phases 4 and B into actionable implementation plans:
+
+- **Phase 4** (test2): Option C — add `name_displaced` flag to MovieClip; mark OLD MC at swap-target depth during fresh placement; skip in `findOrCreateMovieClip`. Adds depth-keyed lookup helper for `getInstanceAtDepth` access to displaced MCs. Estimated 2-4 sessions, single-PR scope.
+- **Phase B** (test3): Confirmed via Ruffle source (`Player::run_actions`, `ActionQueue`, `MovieClip::run_goto::instantiate_child`) that Ruffle defers ALL CLIP_CONSTRUCT during goto via the action queue. Implementation: gate `AQ_KIND_CLIP_CONSTRUCT` drain in `tagShowFrame` on `!g_goto_catchup_active`. Single-line change + audit + verify. Estimated 2-3 sessions.
+
+Both phases independent and can land separately; Phase B is lower-risk and recommended first.
