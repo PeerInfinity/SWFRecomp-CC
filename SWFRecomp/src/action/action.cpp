@@ -1834,18 +1834,17 @@ namespace SWFRecomp
 				{
 					u64 push_value;
 					size_t push_length = 0;
+					size_t push_emit_limit = length;
+					bool packed_bias_stripped = false;
 
 					// Ming SWF-bias strip: detect a single-value `Push(int 16384)` Push
 					// followed by Add{,2} + CloneSprite. Ming emits this prefix to bias
 					// raw AS depths into SWF depth space; stripping it hands the runtime
 					// the unbiased AS depth, matching the method-form
 					// `mc.duplicateMovieClip(name, depth)` contract.
-					// Limited to single-value Push to avoid stripping cases where Ming
-					// packs the bias literal with other values (which would shift small
-					// AS depths into a range that conflicts with timeline display_list
-					// slots — see CLONESPRITE_DEPTH_BIAS_PLAN.md). The literal `+ 16384`
-					// is uniquely a SWF-bias artifact (no AS source adds 16384 to a
-					// depth), so this is structurally safe for non-Ming SWFs.
+					// The literal `+ 16384` is uniquely a SWF-bias artifact (no AS
+					// source adds 16384 to a depth), so this is structurally safe
+					// for non-Ming SWFs.
 					if (length == 5
 						&& (u8) action_buffer[0] == ACTION_STACK_VALUE_I32
 						&& VAL(s32, &action_buffer[1]) == 16384)
@@ -1865,7 +1864,70 @@ namespace SWFRecomp
 						}
 					}
 
-					while (push_length < length)
+					// Packed-Push variant: when the LAST value of a multi-value Push
+					// is I32(16384) and the next two opcodes are Add{,2} + CloneSprite,
+					// strip just that trailing literal from the C emission. The earlier
+					// packed values are still emitted; the runtime stack ends up with
+					// raw AS depth at top instead of (AS depth + 16384). Then the Add
+					// opcode is skipped (skip_next_add_for_clone_bias) so CloneSprite
+					// consumes the unbiased value. Same constant-folding rationale as
+					// the single-value strip above; see CLONESPRITE_DEPTH_BIAS_PLAN.md
+					// (Phase 2a).
+					if (length > 5)
+					{
+						size_t scan_pos = 0;
+						size_t last_value_start = 0;
+						bool scan_ok = true;
+						while (scan_pos < length && scan_ok)
+						{
+							last_value_start = scan_pos;
+							u8 vt = (u8) action_buffer[scan_pos];
+							scan_pos += 1;
+							switch (vt)
+							{
+								case ACTION_STACK_VALUE_STRING:
+								{
+									size_t i = scan_pos;
+									while (i < length && action_buffer[i] != 0) i++;
+									if (i >= length) { scan_ok = false; break; }
+									scan_pos = i + 1;
+									break;
+								}
+								case ACTION_STACK_VALUE_F32:       scan_pos += 4; break;
+								case ACTION_STACK_VALUE_F64:       scan_pos += 8; break;
+								case ACTION_STACK_VALUE_I32:       scan_pos += 4; break;
+								case ACTION_STACK_VALUE_REGISTER:  scan_pos += 1; break;
+								case ACTION_STACK_VALUE_NULL:      break;
+								case ACTION_STACK_VALUE_UNDEFINED: break;
+								case ACTION_STACK_VALUE_BOOLEAN:   scan_pos += 1; break;
+								case 8:                            scan_pos += 1; break;
+								case 9:                            scan_pos += 2; break;
+								default:                           scan_ok = false; break;
+							}
+							if (scan_pos > length) scan_ok = false;
+						}
+
+						if (scan_ok && last_value_start > 0
+							&& last_value_start + 5 == length
+							&& (u8) action_buffer[last_value_start] == ACTION_STACK_VALUE_I32
+							&& VAL(s32, &action_buffer[last_value_start + 1]) == 16384)
+						{
+							u8 next_op = (u8) action_buffer[length];
+							u8 next_next_op = (u8) action_buffer[length + 1];
+							bool is_add = (next_op == SWF_ACTION_ADD || next_op == SWF_ACTION_ADD2);
+							bool is_clone = (next_next_op == SWF_ACTION_CLONE_SPRITE);
+							bool no_label_at_add = (labels.count(action_buffer + length) == 0);
+							bool no_label_at_clone = (labels.count(action_buffer + length + 1) == 0);
+							if (is_add && is_clone && no_label_at_add && no_label_at_clone)
+							{
+								push_emit_limit = last_value_start;
+								packed_bias_stripped = true;
+								skip_next_add_for_clone_bias = true;
+							}
+						}
+					}
+
+					while (push_length < push_emit_limit)
 					{
 						ActionStackValueType push_type = (ActionStackValueType) action_buffer[push_length];
 						push_length += 1;
@@ -2056,9 +2118,16 @@ namespace SWFRecomp
 							}
 						}
 					}
-					
+
+					if (packed_bias_stripped)
+					{
+						out_script << "\t" << "// Push (integer: 16384)  [Ming CloneSprite bias — stripped from packed Push]" << endl;
+						// Account for the trailing 5 bytes (1 type + 4 I32) skipped by the strip
+						push_length = length;
+					}
+
 					action_buffer += push_length;
-					
+
 					break;
 				}
 				
