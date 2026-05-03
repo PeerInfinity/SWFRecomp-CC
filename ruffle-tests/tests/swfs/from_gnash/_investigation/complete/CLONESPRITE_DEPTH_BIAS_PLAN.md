@@ -342,9 +342,8 @@ presence rather than display-list presence, and Phase 2c gives clones
 real display_list slots without breaking static MCs. CI verified zero
 regressions across all 8 suites. The remaining four target-test
 failures are downstream of clone clip-event dispatch — a separate
-concern that should be tracked in its own plan once someone takes it
-on. Marking this plan **complete** and moving to `complete/`. Followup
-plan stub: `CLONE_CLIP_EVENT_DISPATCH_PLAN.md` (not yet written).
+concern tracked in `incomplete/CLONE_CLIP_EVENT_DISPATCH_PLAN.md`.
+Marking this plan **complete** and moving to `complete/`.
 
 ## 2026-05-04 session — Phase 2a attempted, landed, reverted
 
