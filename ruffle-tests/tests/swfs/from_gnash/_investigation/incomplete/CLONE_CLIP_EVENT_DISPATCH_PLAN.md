@@ -479,8 +479,9 @@ issue, not the clone clip-event dispatch path. The flow is:
    should freshly place a *new* MC at depth 3 (re-firing CONSTRUCT) and
    leave the depth-10 MC alone.
 5. The fix is risky: changing the depth_swapped block to allow fresh
-   placement would likely regress other swapDepths tests. Defer to a
-   focused swapDepths-rewind plan.
+   placement would likely regress other swapDepths tests (notably
+   `avm1/rewind_depth` which depends on the re-use semantic). Tracked
+   separately in `incomplete/SWAPDEPTHS_REWIND_FRESH_PLACEMENT_PLAN.md`.
 
 Bonus expected gains in adjacent tests where clip-event dispatch on clones
 was incidentally exercised: TBD per Phase 7 audit.
