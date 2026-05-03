@@ -4,23 +4,24 @@
 
 <!-- PLAN_META
 id: SWAPDEPTHS_REWIND_FRESH_PLACEMENT
-status: incomplete
+status: blocked
+blocker: "Architectural — findOrCreateMovieClip is keyed by (name, parent), so two display-list slots with the same instance_name must alias to the same MovieClip*. Test2/3 expectations require two distinct MovieClips with name='static3' at different depths. See Phase 1 Audit Findings (2026-05-03) below."
 phases:
   - id: 1
     name: "Audit: identify all currently-passing tests that depend on tag.c::tagPlaceObject2 depth_swapped re-place block (the load-bearing guardrails)"
-    status: pending
+    status: completed
   - id: 2
     name: "Replace the re-use semantic with fresh placement: empty target slot + non-empty depth_swapped source elsewhere → freshly place new MC at the target depth (CONSTRUCT fires)"
-    status: pending
+    status: blocked
   - id: 3
     name: "Decide fate of the moved MC at the swap-target depth (preserve in dynamic zone, destroy in static zone — Ruffle behavior)"
-    status: pending
+    status: blocked
   - id: 4
     name: "Soft-reference re-binding: AS-level references saved before rewind (`dynRef = static3`) must re-resolve to the freshly-placed MC after rewind"
-    status: pending
+    status: blocked
   - id: 5
     name: "Verify on guardrail battery (loop_test3, rewind_depth, soft_reference_test1, all displaylist_depths_test*) and target tests"
-    status: pending
+    status: blocked
 dependencies:
   - "complete/CLONESPRITE_DEPTH_BIAS_PLAN.md (depth-bias unification — prerequisite for clean swapDepths semantics)"
   - "complete/(none yet, see CURRENT_STATUS) loop_test3 backward-rewind survives_rewind work (commit d4ea78fc — established the placed_at_frame-pinned-to-depth contract this plan extends)"
@@ -389,3 +390,82 @@ broader test set than necessary.
 | `complete/(commit d4ea78fc)` "loop_test3 backward-rewind survives_rewind" | Established the placed_at_frame-pinned-to-depth contract Phase 3 will extend. |
 | Ruffle source: `core/src/display_object/movie_clip.rs::run_goto` | Reference implementation — fresh placement at depth, with separate destroy-or-preserve logic for the moved MC. |
 | Ruffle source: `core/src/display_object/movie_clip.rs::survives_rewind` | The MovieClip override (`avm1_clone_target.is_none()`) Phase 6 of the parent plan already mirrors. |
+
+---
+
+## Phase 1 Audit Findings (2026-05-03)
+
+### Guardrail tests run locally (all PASS)
+
+| Test | Suite | Result | Pattern |
+|------|-------|--------|---------|
+| `rewind_depth` | avm1 | PASS 30/30 | swap to dynamic depth + rewind; `getInstanceAtDepth(swap_target) === getInstanceAtDepth(orig_depth)` (StrictEquals **true**) |
+| `goto_rewind1`, `goto_rewind2`, `goto_rewind3` | avm1 | PASS | Backward goto without swapDepths interaction |
+| `movieclip_depth_methods` | avm1 | PASS 98/98 | depth queries, no rewind |
+| `movieclip_get_instance_at_depth` | avm1 | PASS 28/28 | depth queries, no rewind |
+| `placeobject_occupied_depth` | avm1 | PASS 6/6 | re-place at occupied depth |
+| `depth_replacement_audio_unloading` | avm1 | PASS 3/3 | unrelated audio path |
+| `loop/loop_test2`, `loop_test3` | misc-ming | PASS | swap-within-tag-stream-depth + backward goto (handled by `survives_rewind`, NOT depth_swapped block) |
+| `static_vs_dynamic1`, `static_vs_dynamic2` | misc-ming | PASS | swap to dynamic, no rewind interaction |
+| `displaylist_depths_test{,8,9,10,11}` | misc-ming | PASS / RM | various depth swap patterns; none assert distinct-MC-after-rewind |
+| `duplicate_movie_clip_test{,2}` | misc-ming | PASS / RM | clone path (covered by CLONE_CLIP_EVENT_DISPATCH) |
+| `displaylist_depths_test2` | misc-ming | **MISMATCH 15/31** (target) | swap to dynamic depth (10) + rewind, expects FRESH MC at original depth + OLD MC preserved at swap target |
+| `displaylist_depths_test3` | misc-ming | **MISMATCH 17/32** (target) | same as test2, but swap to static depth (-10) + rewind |
+| `soft_reference_test1` | misc-swfc | MISMATCH 23/45 | name-rebinding via `_name` reassignment + remove/recreate cycle |
+
+### Architectural blocker: name-keyed MovieClip identity
+
+The `depth_swapped` re-use block at `tag.c:4271-4304` is **load-bearing** for `rewind_depth` because of how our system models MovieClip identity:
+
+1. `findOrCreateMovieClip(name, parent)` is the single source of truth for "MC pointer for a given name+parent". Stored in `child_mc_cache` (action.c:18919-18980).
+2. `getInstanceAtDepth(depth)` first scans `child_mc_cache` by depth, then falls back to `display_list[depth].instance_name` → `findOrCreateMovieClip(name, parent)` (action.c:58530-58555). Side-effect: it **mutates** `_sprite_mc->depth = _target_depth` after every lookup (line 58540).
+3. After our depth_swapped block fires, both `display_list[orig_depth]` and `display_list[swap_target_depth]` carry the same `instance_name = "static3"`. Successive `getInstanceAtDepth()` calls oscillate the MC's `depth` field but always return the **same** `MovieClip*`. That's how `rewind_depth`'s `Clips are equal: true` assertion holds: both lookups return the same pointer, which `StrictEquals` true.
+
+`displaylist_depths_test2` requires the **opposite** invariant:
+- `static3` (variable lookup) must resolve to a **fresh MC** with `myThing == undefined`, `getDepth() == -16381`, `_x == 50`.
+- `dynRef` (saved before goto) must keep pointing at the **OLD MC** with `myThing == 'guess'`, `getDepth() == 10`.
+- `getInstanceAtDepth(-16381)` and `getInstanceAtDepth(10)` must return the two distinct MCs.
+- CONSTRUCT clip event must fire on the fresh placement (`depth3Constructed == 2`).
+
+This is **structurally incompatible** with single-instance-per-(name,parent) caching. To support test2/3 we would need one of:
+
+- **Option A: Depth-keyed identity.** Change `findOrCreateMovieClip` (and every caller) to use `(name, parent, depth)` as the cache key. Two MCs with the same name at different depths become distinct objects. **Risk:** breaks `getInstanceAtDepth`'s mutation of `depth` (line 58540) and breaks every existing caller that assumes name uniqueness. Scope: ~50+ call sites across action.c (50K LOC), tag.c, swf_core.c.
+- **Option B: Per-display-list-slot MC pointer.** Store `MovieClip*` directly on `DisplayObject` (display_list slot) rather than re-resolving by name. Two slots can hold distinct pointers even with the same `instance_name`. **Risk:** name resolution logic (`actionGetVariable`, scope walks, `_root.foo` paths) needs new "find by name across all DL slots" logic with depth-ordering tiebreak.
+- **Option C: "Displaced" flag.** Add `MovieClip.is_displaced` flag. When the depth_swapped block fires, mark the OLD MC as displaced (excluded from `findOrCreateMovieClip`) and create a NEW MC at the original depth. dynRef holds direct pointer (still works). `getInstanceAtDepth(swap_target)` would need to find the displaced MC via display_list[swap_target_swfdepth].instance_name + a displaced-MC scan. **Risk:** complex new code path; rewind_depth's `Clips are equal: true` becomes false (regression), which we'd need to re-engineer.
+
+None of these options is single-session work. Each represents a substantial refactor with cross-cutting test risk.
+
+### Why `rewind_depth` and `displaylist_depths_test2` are structurally opposed
+
+- `rewind_depth`: explicit AS assertion `getInstanceAtDepth(2) === getInstanceAtDepth(-16383)` → **must alias** (one MC, two slots).
+- `displaylist_depths_test2`: explicit AS assertions `static3.myThing === undefined` AND `dynRef.myThing === 'guess'` → **must be distinct** (two MCs).
+
+Ruffle handles both because its display tree models DisplayObjects as Gc-cell identities owned by display-list slots; name lookup walks the display list at resolution time and ties broken by lowest-depth-wins. Our system collapses identity at the cache layer.
+
+### `soft_reference_test1` is a *related but distinct* problem
+
+This test exercises name-rebinding under `_name` reassignment + removeMovieClip/recreate cycles. Failures (`mcRef.getDepth()` returns empty string instead of "30") suggest our `mcRef` MOVIECLIP value loses validity when the MC is renamed. This is a **separate** code path from rewind, but shares the broader theme of "MC identity vs. AS variable binding". Phase 4 of the original plan mentioned this overlap; the fix likely shares Option B/C.
+
+### Distinguishing signal Ruffle uses for re-use vs fresh-place
+
+Re-reading Ruffle `MovieClip::run_goto` (`core/src/display_object/movie_clip.rs`):
+- Walks tag stream from frame 0 forward.
+- For each `PlaceObject2(char_id, depth)`: looks up `child_at_depth(depth)`.
+- If empty → **freshly instantiate** the character (new identity, fires CONSTRUCT).
+- If occupied with same `char_id` → calls `replace_with` which is a no-op for MovieClip → preserves identity.
+- The "what happens to the swapped-away MC" is governed by `survives_rewind` per-instance; for MovieClip the override returns `avm1_clone_target.is_none()` (clones don't survive; non-clones do unless explicitly removed). Static-zone MCs without a covering PlaceObject2 in the rewind range are destroyed via `remove_child`.
+
+Ruffle's logic does **not** consider "is the same char_id alive at a different depth?" — that's our depth_swapped re-use heuristic, which has no Ruffle counterpart. Our heuristic was a workaround for the name-keyed-identity limitation, not a model of Ruffle behavior. To match Ruffle we need to remove the heuristic AND fix the underlying identity model — and rewind_depth's "Clips are equal: true" only happens to pass because of our heuristic, not because Ruffle aliases two depths.
+
+Investigation: a quick check of what Ruffle actually outputs for rewind_depth would clarify whether our `Clips are equal: true` is a Ruffle-original assertion or whether Ruffle's expected output already says `false` and we're matching by accident. The `output.txt` is from Ruffle's own runner so it should reflect Ruffle behavior. **Hypothesis (untested):** Ruffle's `rewind_depth` test instead asserts `getInstanceAtDepth(-16383) === <originally-saved reference>` rather than the cross-depth comparison I assumed. Re-reading bytecode confirmed it's the cross-depth comparison. Ruffle must therefore also be aliasing, or `getInstanceAtDepth(2)` returns the swap-target MC and `getInstanceAtDepth(-16383)` returns... the same swap-target MC if the rewind doesn't fresh-place when the same character is alive elsewhere. **This is itself a contradiction with Ruffle's run_goto** that needs deeper inspection. Possible answer: Ruffle's `run_goto` short-circuits when the character is alive elsewhere via the `find_existing_child` path, and only fresh-places when the character is gone. **This would mean the depth_swapped re-use block is correct for Ruffle's behavior, and `displaylist_depths_test2/3` are testing a *Gnash*-specific (Flash Player) behavior that Ruffle does not implement.**
+
+If true, test2/test3 may belong in `RUFFLE_VS_FLASH_DIFFERENCES.md` rather than being fixable. Verifying this would require running Ruffle on test2's SWF locally and comparing its actual output to ours and to the gnash-expected output. Out of scope for this audit.
+
+### Conclusion
+
+**Action:** Mark plan blocked. The proposed implementation in Phases 2-4 is architecturally too risky for incremental fixes — would require either a multi-session refactor of MovieClip identity (Options A/B/C above) or first verifying whether Ruffle even implements the test2/3 expected behavior (in which case the tests would move to `RUFFLE_VS_FLASH_DIFFERENCES.md` and the plan becomes obsolete).
+
+**Recommended next step (separate task):**
+1. Build Ruffle locally and run it against `displaylist_depths_test2.swf` + `displaylist_depths_test3.swf` to capture its actual trace output.
+2. If Ruffle output matches the gnash-expected output: implement Option A/B/C in a follow-up plan.
+3. If Ruffle output diverges from gnash-expected (matching ours instead): document in `RUFFLE_VS_FLASH_DIFFERENCES.md` and close this plan as won't-fix.
