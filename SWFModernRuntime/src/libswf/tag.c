@@ -4264,44 +4264,18 @@ void tagPlaceObject2(SWFAppContext* app_context, size_t depth, size_t char_id, u
 				}
 			}
 		}
-		// During backward catch-up, if this depth is empty but a depth_swapped entry
-		// with the same char_id exists elsewhere, the character was moved by swapDepths.
-		// Treat as re-placing the same character (update transform, suppress re-init)
-		// to avoid creating a duplicate MovieClip.
-		if (catch_up_backward && display_list[depth].char_id == 0 && char_id != 0)
-		{
-			for (size_t _sd = 1; _sd <= max_depth; _sd++) {
-				if (_sd == depth) continue;
-				if (display_list[_sd].char_id == char_id && display_list[_sd].depth_swapped) {
-					// Found the swapped entry — place a fresh entry at this depth
-					// but suppress sprite init (the MC already exists in cache).
-					display_list[depth].char_id = char_id;
-					display_list[depth].transform_id = transform_id;
-					ng_cache_transform(&display_list[depth], transform_id);
-					display_list[depth].cxform_id = cxform_id;
-					display_list[depth].has_cxform = (cxform_id != 0) ? 1 : 0;
-					display_list[depth].clip_depth = clip_depth;
-					display_list[depth].ratio = 0;
-					display_list[depth].blend_mode = 0;
-					display_list[depth].sprite_display_list = NULL;
-					display_list[depth].sprite_max_depth = 0;
-					display_list[depth].sprite_dl_capacity = 0;
-					display_list[depth].sprite_current_frame = 0;
-					display_list[depth].sprite_is_playing = 1;
-					display_list[depth].sprite_manual_next_frame = 0;
-					display_list[depth].sprite_next_frame = 0;
-					display_list[depth].sprite_needs_init = 0;  // suppress re-init
-					display_list[depth].placed_at_frame = current_frame;
-					display_list[depth].place_gen = g_place_gen;
-					display_list[depth].depth_swapped = 0;
-					init_cx_fields(&display_list[depth]);
-					if (depth > max_depth) max_depth = depth;
-					ng_on_place_object2(app_context, depth, char_id);
-					display_list[depth].sprite_needs_init = 0;  // ensure no init
-					return;
-				}
-			}
-		}
+		// SWAPDEPTHS_REWIND_FRESH_PLACEMENT Phase 2: previously, if this depth was
+		// empty but a depth_swapped entry with the same char_id existed elsewhere
+		// (the character was moved by swapDepths), we re-used that MC in place to
+		// avoid creating a duplicate. That re-use semantic was a workaround for
+		// pointer-equality of MovieClip values — Phase 1.5 introduced path-based
+		// MovieClip equality (Ruffle Value::PartialEq), so the workaround is no
+		// longer needed. Falling through to fresh placement matches Ruffle's
+		// run_goto behavior: the rewind tag stream freshly instantiates the
+		// character at its tag-defined depth, the moved MC at the swap-target
+		// depth is left to ng_display_clear_after / cleanup_unplaced_after to
+		// destroy or preserve based on dynamic-vs-static-zone rules. Fresh
+		// placement also queues CONSTRUCT clip events on the new instance.
 	}
 #endif
 

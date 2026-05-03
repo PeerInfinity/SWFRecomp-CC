@@ -5,7 +5,7 @@
 <!-- PLAN_META
 id: SWAPDEPTHS_REWIND_FRESH_PLACEMENT
 status: incomplete
-note: "Phase 1 + Phase 1.5 (path-eq) complete. Phases 2, 3, B unblocked. Phase 4 (test2 soft-ref re-binding) still blocked on architectural Option A/B/C. See 'Followup investigation (2026-05-03 evening)' below."
+note: "Phases 1, 1.5, 2 complete. Phase 3 implicit (existing clear_after handles dynamic-zone preservation; static-zone destruction handled by cleanup_unplaced_after). Phase 4 (test2 soft-ref re-binding) still blocked on architectural Option A/B/C. Phase B (deferred CONSTRUCT) blocked on test6 ordering — see 'Phase 2 results (2026-05-03)' below."
 phases:
   - id: 1
     name: "Audit: identify all currently-passing tests that depend on tag.c::tagPlaceObject2 depth_swapped re-place block (the load-bearing guardrails)"
@@ -15,19 +15,19 @@ phases:
     status: completed
   - id: 2
     name: "Replace the re-use semantic with fresh placement: empty target slot + non-empty depth_swapped source elsewhere → freshly place new MC at the target depth (CONSTRUCT fires)"
-    status: pending
+    status: completed
   - id: 3
     name: "Decide fate of the moved MC at the swap-target depth (preserve in dynamic zone, destroy in static zone — Ruffle behavior)"
-    status: pending
+    status: completed
   - id: 4
     name: "Soft-reference re-binding: AS-level references saved before rewind (`dynRef = static3`) must re-resolve to the freshly-placed MC after rewind"
     status: blocked
   - id: B
     name: "Deferred post-rewind CONSTRUCT firing — likely promotes displaylist_depths_test3 to ruffle_matched standalone"
-    status: pending
+    status: blocked
   - id: 5
     name: "Verify on guardrail battery (loop_test3, rewind_depth, soft_reference_test1, all displaylist_depths_test*) and target tests"
-    status: pending
+    status: completed
 dependencies:
   - "complete/CLONESPRITE_DEPTH_BIAS_PLAN.md (depth-bias unification — prerequisite for clean swapDepths semantics)"
   - "complete/(none yet, see CURRENT_STATUS) loop_test3 backward-rewind survives_rewind work (commit d4ea78fc — established the placed_at_frame-pinned-to-depth contract this plan extends)"
@@ -550,3 +550,61 @@ Move plan back to `incomplete/` with revised phases:
 - Phase B (NEW, READY): Deferred post-rewind CONSTRUCT firing — likely promotes test3 to ruffle_matched standalone
 
 Phases 2, 3, B can land independently as small commits. Phase 4 still requires architectural work.
+
+---
+
+## Phase 2 results (2026-05-03)
+
+### Implementation
+
+`SWFModernRuntime/src/libswf/tag.c` — removed the depth_swapped re-use block at lines 4271-4304. The block was a workaround for pointer-equality of MovieClip values; Phase 1.5 (path-based MovieClip equality) made it unnecessary. Falling through to standard fresh placement now mirrors Ruffle's `run_goto`: the rewind tag stream freshly instantiates the character at its tag-defined depth, and `ng_display_clear_after` / `ng_display_cleanup_unplaced_after` handle the moved MC at the swap-target depth (Phase 3 — preserved in dynamic zone, destroyed in static zone with `actionInvalidateCachedMovieClip`).
+
+### Test impact
+
+| Test | Before | After | Δ |
+|------|--------|-------|---|
+| `displaylist_depths_test2` (swap to dynamic) | 15/31 | 22/31 | +7 |
+| `displaylist_depths_test3` (swap to static) | 17/32 | 28/32 | +11 |
+| `loop/loop_test6` | 12/23 | 12/23 | 0 (no regression) |
+| `loop/loop_test10` | 3/28 | 3/28 | 0 (no regression) |
+
+Verified guardrail battery (47 tests across avm1/misc-ming): 25 AVM1 PASS, 19/22 misc-ming pass/ruffle_matched (3 unrelated failures: gotoFrame2Test timeout new test; loop_test6/loop_test10 unchanged from CI baseline).
+
+### Phase 3 — implicit (already handled)
+
+The "fate of moved MC" semantics described in Phase 3 are already implemented by existing infrastructure:
+
+- **Dynamic-zone target (test2 swap to AS depth 10):** `ng_display_clear_after` has `if (i >= 16384) break;` so dynamic-range entries are NOT cleared during catch-up. The OLD MC at SWF depth 16394 stays alive with its dynamic_props intact. `dynRef.myThing == 'guess'` works correctly.
+- **Static-zone target (test3 swap to AS depth -10):** `ng_display_clear_after` clears static-range entries with `placed_at_frame > target_frame`, except sprite-bearing ones (preserved via `continue`). After catch-up replay, `ng_display_cleanup_unplaced_after` invalidates surviving entries' cached MCs via `actionInvalidateCachedMovieClip`. `getInstanceAtDepth(-10) == undefined` works correctly.
+
+### Phase 4 — still blocked (test2 only)
+
+For `displaylist_depths_test2` to fully pass, the AS variable lookup `static3` must resolve to the FRESH MC at depth -16381 instead of the OLD MC preserved at depth 10. Both MCs are named "static3" with the same parent (`_root`). Our `findOrCreateMovieClip(name, parent)` cache returns the first match, which is the OLD MC. This is the architectural identity blocker (Option A/B/C in the original plan).
+
+Phase 2 didn't unblock this — it improved test2 only on the static3-now-undefined cases (the OLD MC cache path returns `myThing='guess'` which is wrong; expected is undefined for the fresh MC). The remaining 9-line gap to test2 PASS is all in the soft-reference re-binding category.
+
+### Phase B — incompatible with action_execution_order_test6
+
+Investigated deferring CLIP_CONSTRUCT firing during backward goto catch-up so it lands AFTER the calling script (matching Ruffle's actual output for test3). This would promote test3 to `ruffle_matched`.
+
+**Blocker:** `action_execution_order_test6` (gnash misc-ming) explicitly expects CONSTRUCT clip events to fire CHRONOLOGICALLY during backward goto catch-up, interleaved with LOAD events from the same catch-up. Source comment:
+
+```
+* At frame5 go backward to frame4:
+*   mc1.Construct
+*   mc2.Construct
+*   mc1.Load
+*     actions in 1st frame of mc1
+*   mc2.Load 
+*     actions in 1st frame of mc2
+```
+
+Deferring CLIP_CONSTRUCT past the calling script would break this ordering. The actual Flash semantics appear to involve per-AS-statement yield points (CONSTRUCT drains between AS statements within the calling script), which is a significant runtime refactor.
+
+For test3 specifically, expected output has CONSTRUCT trace at lines 16-18 — between line 15 (typeof check, first AS statement after gotoAndStop) and line 19 (typeof(dynRef.myThing), second AS statement). This requires inter-statement event drain, beyond simple post-script deferral.
+
+**Disposition:** Phase B requires a bytecode-level event yield mechanism. Not feasible as a small commit. Status changed to BLOCKED.
+
+### Final status
+
+Phases 1, 1.5, 2, 3, 5: COMPLETE. Phases 4 and B: BLOCKED on architectural changes. Plan stays in `incomplete/` since work is not fully done. Net gain this phase: +7 lines on test2, +11 lines on test3, no regressions.
