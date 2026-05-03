@@ -33,7 +33,7 @@
     duplicate_movie_clip_* siblings) but no test improvement either,
     since the test under investigation doesn't hit that branch.
     Reverted. Real fix requires the depth-bias unification work
-    documented in `blocked/CLONESPRITE_DEPTH_BIAS_PLAN.md` (Phase 2). -->
+    documented in `incomplete/CLONESPRITE_DEPTH_BIAS_PLAN.md` (Phase 2). -->
 
 
 <!-- PLAN_META
@@ -53,19 +53,22 @@ failing tests **not** covered by one of the seven cluster plans:
 | Cluster plan | Status | Tests covered |
 |--------------|--------|---------------|
 | `complete/DEFERRED_CLIP_UNLOAD_PLAN.md` | complete | loop_test6/7/8, action_execution_order_test2/3/5/11, ActionOrderTest3/4/5 |
-| `blocked/CLONESPRITE_DEPTH_BIAS_PLAN.md` | **blocked** (Phase 2 needs invasive runtime work) | displaylist_depths_test/2/3/8/9, DepthLimitsTest, duplicate_movie_clip_test/2 |
+| `incomplete/CLONESPRITE_DEPTH_BIAS_PLAN.md` | incomplete (Phase 1 shipped; Phase 2 split into 2a-2d, multi-session) | displaylist_depths_test/2/3/8/9, DepthLimitsTest, duplicate_movie_clip_test/2 |
 | `complete/BUTTON_INFRASTRUCTURE_PLAN.md` | complete | RollOverOutTest, ButtonEventsTest, ButtonPropertiesTest, key_event_test, DragDropTest, button_test1, mouse_drag_test |
 | `incomplete/ZERO_OUTPUT_TRIAGE_PLAN.md` | incomplete | BeginBitmapFill, Version4Loader, frame_label_test, replace_buttons1test, replace_shapes1test, LoadVarsTest, opcode_guard_test2 |
 | `incomplete/REGISTERCLASS_LIFECYCLE_PLAN.md` | incomplete | registerClassTest, registerClassTest2, RegisterClassTest3, RegisterClassTest4 |
 | `superseded/GOTO_CATCHUP_HYGIENE_PLAN.md` | **superseded** (Phases 1–5 landed; Phase 6 → `complete/GOTO_FIFO_UNIFICATION_INCREMENTAL_PLAN.md`; Phase 7 → `incomplete/TRANSFORMED_BY_SCRIPT_WRAP_BACK_PLAN.md`) | goto_frame_test, consecutive_goto_frame_test, place_and_remove_object_insane_test |
 | `complete/IMPORT_CHARACTER_PLAN.md` | complete | attachImported, attachMovieLoopingTest, loadMovieTest |
 
-Everything else lives here. **Note 2026-05-02:** entries that were
+Everything else lives here. **Note 2026-05-03:** entries that were
 originally deferred "pending GOTO_CATCHUP_HYGIENE / CLONESPRITE_DEPTH_BIAS"
-no longer have a free-recovery path — those plans are superseded /
-blocked. Treat the deferred entries (opcode_guard_test bug 1,
+no longer have a passive free-recovery path. GOTO_CATCHUP_HYGIENE is
+superseded (its remaining work moved to other plans). CLONESPRITE_DEPTH_BIAS
+is now `incomplete` again with a documented Phase 2 split (2a recompiler,
+2b runtime branching audit, 2c slot cap raise, 2d verify) — pickable but
+multi-session. The deferred entries (opcode_guard_test bug 1,
 soft_reference_test1, duplicate_movie_clip_test, movieclip_destruction_test4)
-as standalone work needing their own root-cause investigation.
+either depend on Phase 2 landing or need their own root-cause investigation.
 
 ## Promotion convention
 
@@ -320,7 +323,7 @@ is its own concern).
   undefined) and downstream counter checks at lines 172-173.
 
 **Hypothesis.** The depth-bias issue is exactly what
-`blocked/CLONESPRITE_DEPTH_BIAS_PLAN.md` Phase 2 was meant to fix.
+`incomplete/CLONESPRITE_DEPTH_BIAS_PLAN.md` Phase 2 was meant to fix.
 Phase 2 is blocked because stripping the +16384 bias for *packed*
 Pushes shifts AS depths into 1..16383, colliding with timeline-placed
 slots. Until that conflict is resolved (e.g., by separating
@@ -517,7 +520,7 @@ Blocked / skip (originally "re-baseline after cluster plans land",
 but those plans are now blocked/superseded — see cluster table):
 
 - `duplicate_movie_clip_test` — blocked by
-  `blocked/CLONESPRITE_DEPTH_BIAS_PLAN.md` Phase 2 (root cause
+  `incomplete/CLONESPRITE_DEPTH_BIAS_PLAN.md` Phase 2 (root cause
   confirmed 2026-05-02; see entry for details).
 - `movieclip_destruction_test4`, `soft_reference_test1` — both depend
   on goto-catchup hygiene + display-list lifecycle work that no longer

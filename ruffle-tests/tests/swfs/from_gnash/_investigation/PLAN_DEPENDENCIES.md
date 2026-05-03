@@ -71,14 +71,20 @@ DRAIN_SUPPRESS_PRIMITIVE_PLAN (complete/, commit d1cd1d1f)
   Remaining diffs are inter-tag UNLOAD vs DoAction ordering that the
   recompiler emits.
 
-### CLONESPRITE_DEPTH_BIAS_PLAN (blocked/)
+### CLONESPRITE_DEPTH_BIAS_PLAN (incomplete/)
 
-- **Blocked by:** invasive runtime work to separate display_list slot
-  allocation from depth-keyed lookup. Phase 1 partial (single-value
-  Push(16384) handled); Phase 2 (drop runtime heuristic + uniform AS depth)
-  blocked because stripping the bias for *packed* Pushes shifts AS depths
-  into 1..16383 and collides with reserved static-MC slots.
-- **Foundation of:** none — terminal in its own subtree.
+- **Status (2026-05-03):** promoted back to `incomplete/`. Phase 1
+  (single-value Push(16384) strip) shipped; Phase 2 split into 2a
+  (recompiler packed-Push strip), 2b (runtime branching audit:
+  `actionRewindCleanup`/`tagRemoveObject2`/swap should branch on
+  clone_depth_table presence, not display_list presence), 2c (raise
+  clone slot cap so high-depth dups land in display_list), 2d (verify).
+  No architectural showstopper — multi-session because each sub-phase
+  needs CI verification. Original "blocked by static-MC slot collision"
+  framing missed the load-bearing branching audit.
+- **Foundation of:** several `REMAINING_TAIL_TRIAGE` entries
+  (`duplicate_movie_clip_test`, partial `movieclip_destruction_test4`)
+  depend on Phase 2 landing for the clip-event-on-dup behavior.
 
 ### MISC_SWFMILL_PLAN (blocked/)
 

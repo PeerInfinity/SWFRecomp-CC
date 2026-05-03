@@ -4,23 +4,32 @@
 
 <!-- PLAN_META
 id: CLONESPRITE_DEPTH_BIAS
-status: blocked
+status: incomplete
 phases:
   - id: 1
-    name: "Recompiler pattern-match: strip Push(16384) Add prefix from CloneSprite"
-    status: completed_partial
-  - id: 2
-    name: "Runtime: drop the (depth >= 16384) heuristic; treat depth uniformly as AS depth"
-    status: blocked
+    name: "Recompiler pattern-match: strip single-value Push(16384) Add prefix from CloneSprite"
+    status: completed
+  - id: 2a
+    name: "Recompiler: extend strip to packed-Push patterns (trailing int 16384)"
+    status: pending
+  - id: 2b
+    name: "Runtime branching audit: actionRewindCleanup/tagRemoveObject2/swap branch on `is clone` (clone_depth_table presence) instead of `has display entry`"
+    status: pending
+  - id: 2c
+    name: "Runtime: raise clone slot cap so high-depth clones land in display_list (enables CONSTRUCT/ENTERFRAME/UNLOAD dispatch on dups)"
+    status: pending
+  - id: 2d
+    name: "Verify on full guardrail battery + target tests; expect cascade of swap/remove interaction bugs from 2c, fix one-by-one"
+    status: pending
   - id: 3
-    name: "Audit identity checks for residual depth==-16384 / depth>=16384 conflations"
+    name: "Audit residual `depth==-16384` / `depth>=16384` conflations in remaining sites"
     status: not_needed
   - id: 4
-    name: "Verify on the displaylist_depths cluster + textsnapshot guardrail"
+    name: "Phase 1 verification on displaylist_depths cluster + textsnapshot guardrail"
     status: completed
 dependencies: []
 blockers:
-  - reason: "Phase 2 (drop runtime heuristic + uniform AS depth) cannot land without invasive runtime work. Stripping the bias for *packed* Pushes (where Ming combines the 16384 with other values into a multi-value Push opcode) shifts AS depths into 1..16383 — these collide with display_list slots that are reserved for static (timeline-placed) MCs. Attempts to gate slot allocation by `instance_name_owned` (clone vs static) inadvertently broke the textsnapshot_available_text guardrail. Phase 1 is therefore restricted to the *single-value* Push(16384) case — which yields modest gains on the displaylist_depths_test (+8) and DepthLimitsTest (+2) without regressing any guardrail. The packed-Push variant requires separating display_list slot allocation from depth-keyed lookup (e.g., walking display_list by name without relying on slot-at-AS-depth conflation) before it can land safely."
+  - reason: "Originally marked blocked: extending the strip to packed-Push would shift AS depths into 1..16383 and collide with timeline static-MC display_list slots; an `instance_name_owned`-based gate was tried but regressed textsnapshot_available_text. 2026-05-03 investigation (commit a4fb8099) found this framing missed the load-bearing piece — the actual obstacle is that `actionRewindCleanup`, `tagRemoveObject2`, and similar sites branch on 'has display_list entry?' as a proxy for 'is this a clone?'. Once the cap is raised, clones now satisfy that check and take the wrong branch (verified: static_vs_dynamic1 stays PASS with a 1-line fix, static_vs_dynamic2 regresses without further work). The plan is therefore *incomplete*, not *blocked*: there's a known incremental path (Phases 2a-2d below). It's multi-session because each sub-phase needs CI verification, but no architectural showstopper remains."
 -->
 
 ## Problem statement
