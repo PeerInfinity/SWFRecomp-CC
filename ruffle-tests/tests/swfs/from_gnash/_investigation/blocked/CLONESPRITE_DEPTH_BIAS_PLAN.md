@@ -112,6 +112,67 @@ name-keyed lookup makes this fragile to gate naively.
 3. Or: keep single-value strip only, accept the partial impact, and revisit
    when the broader display_list refactor lands.
 
+## 2026-05-03 update — option 2 (raise slot cap) prototyped + reverted
+
+**TL;DR.** Tried raising `INITIAL_DISPLAYLIST_CAPACITY`-equivalent cap in
+`ng_cloneSprite` (let the dup land at SWF depth `as_depth + 16384` instead
+of being skipped). Restored MC1's display-list slot for the clone, but
+broke `actionRewindCleanup`, `tagRemoveObject2`, and `swapDepths` because
+they branch on "is there a display_list entry?" as a proxy for "is this
+a clone?". With the cap raised, clones now satisfy that check and take
+the wrong branch.
+
+Net result: 1 guardrail recovered (`static_vs_dynamic1` PASS → still PASS),
+1 guardrail broken (`static_vs_dynamic2` PASS → MISMATCH), the target
+test (`duplicate_movie_clip_test`) didn't improve. Target test still
+needs the recompiler-side packed-Push strip to feed AS depth (1, 2)
+instead of biased SWF depth (16385, 16386), but doing that without first
+fixing the rewind/remove branching is futile.
+
+**Sites that need the "is a clone" branch (not "has display entry"):**
+
+| Site | File | Current logic | Required fix |
+|------|------|---------------|--------------|
+| `actionRewindCleanup` | `action.c:19614+` | Branches on `dl_depth == SIZE_MAX` (no entry → dynamic branch / survives_rewind check) | Branch on `ng_clone_get_swf_depth(name) != INT_MIN` instead — clone path always goes through survives_rewind regardless of display_list presence |
+| `tagRemoveObject2` | `tag.c:5351+` | Removes display entry; doesn't update var_map for clones (relied on clone never being in display_list) | After clearing entry, also evict from `clone_depth_table` and var_map if it's a clone |
+| `ng_swapDisplayDepths` | `tag_stubs.c:2656+` | Walks display_list to find both names; if either is missing, no-op | OK as-is once both clones are in display_list, but need to ensure `clone_depth_table` updates SWF depth post-swap (already does via `ng_clone_update_swf_depth` in `swapDepths` method handler at `action.c:56106+`) |
+| `actionInvalidateCachedMovieClip` | `action.c:18537+` | Already correct (compares against as_depth, swf_depth, shifted_depth) | None |
+| `actionMarkMCPendingRemoval` | `action.c` | Same shape as above | None |
+
+**Suggested incremental approach for the next attempt:**
+
+1. **Phase 2a (recompiler):** detect packed-Push patterns where the trailing
+   value is `int 16384` followed by `Add{,2}` + `CloneSprite`, strip just
+   that trailing value (keep the rest of the packed Push). Pattern:
+   - `ActionPush <values...> <int 16384>` length > 5
+   - Next op: `Add{,2}`
+   - Op after: `CloneSprite`
+   Pre-scan to find last value's offset and type; if it's `I32(16384)`,
+   gate emission of the last value. Estimated ~60 lines in `action.cpp`'s
+   `SWF_ACTION_PUSH` case, alongside the existing single-value strip.
+
+2. **Phase 2b (runtime, branching fix):** in `actionRewindCleanup`, change
+   the branch condition from "display entry exists" to "this MC is not a
+   clone (`ng_clone_get_swf_depth == INT_MIN`)". This is safe to land
+   independently — pre-strip, clones still don't have display entries, so
+   the new condition is equivalent for those cases. Verify on the existing
+   guardrail battery before touching slot allocation.
+
+3. **Phase 2c (runtime, slot cap):** raise the slot cap so high-depth
+   clones land in display_list. Define `AVM_CLONE_SLOT_CAP` (e.g. 65536).
+   Verify guardrails again; expect `static_vs_dynamic2`-style failures
+   from `tagRemoveObject2` / `swapDepths` interactions and fix those
+   one-by-one.
+
+4. **Phase 2d (verification):** run the target battery and confirm flips.
+
+**Why I'm pausing here.** Each sub-phase needs independent verification
+on the full guardrail battery. CI takes ~10 min per round; local
+single-test verification is fast but doesn't catch interactions across
+the suite. This is multi-session work, not single-session. The investigation
+was useful for narrowing scope — the runtime branching audit (Phase 2b)
+is the load-bearing piece that the existing plan missed.
+
 ## Affected tests (CI 205a9a77, 2026-04-25)
 
 | Test | Suite | Match | Notes |
