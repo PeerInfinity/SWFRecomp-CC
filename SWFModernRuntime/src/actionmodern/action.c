@@ -37591,6 +37591,22 @@ void actionBitURShift(SWFAppContext* app_context)
 	PUSH(ACTION_STACK_VALUE_F64, VAL(u64, &result));
 }
 
+// Path-based MovieClip equality, matching Ruffle's `Value::PartialEq` for
+// `Value::MovieClip(a) == Value::MovieClip(b)` → `a.path() == b.path()`
+// (core/src/avm1/value.rs). Two distinct MovieClip pointers with the same
+// path (name + parent chain) compare equal — needed for tests like
+// rewind_depth ("Clips are equal: true" across two depth-aliased instances)
+// and soft-reference tests where dynRef and a freshly-placed name-mate
+// must compare equal even though they're different instances.
+static int mc_path_equal(MovieClip* a, MovieClip* b) {
+	if (a == b) return 1;
+	if (a == NULL || b == NULL) return 0;
+	const char* ap = (a->depth == INT_MIN) ? a->original_target : a->target;
+	const char* bp = (b->depth == INT_MIN) ? b->original_target : b->target;
+	if (ap == NULL || bp == NULL) return 0;
+	return strcmp(ap, bp) == 0;
+}
+
 void actionStrictEquals(SWFAppContext* app_context)
 {
 	// Pop first argument (no type conversion - strict equality!)
@@ -37629,6 +37645,14 @@ void actionStrictEquals(SWFAppContext* app_context)
 				const uint16_t* sa = varGetU16Ptr(&a);
 				const uint16_t* sb = varGetU16Ptr(&b);
 				result = (u16_cmp(sa, a.str_size, sb, b.str_size) == 0) ? 1.0f : 0.0f;
+				break;
+			}
+
+			case ACTION_STACK_VALUE_MOVIECLIP:
+			{
+				MovieClip* ma = (MovieClip*) a.data.numeric_value;
+				MovieClip* mb = (MovieClip*) b.data.numeric_value;
+				result = mc_path_equal(ma, mb) ? 1.0f : 0.0f;
 				break;
 			}
 
@@ -37799,6 +37823,15 @@ void actionEquals2(SWFAppContext* app_context)
 			{
 				// undefined == undefined is true
 				result = 1.0f;
+				break;
+			}
+
+			case ACTION_STACK_VALUE_MOVIECLIP:
+			{
+				// Path-based equality (Ruffle Value::PartialEq for MovieClip)
+				MovieClip* ma = (MovieClip*) a.data.numeric_value;
+				MovieClip* mb = (MovieClip*) b.data.numeric_value;
+				result = mc_path_equal(ma, mb) ? 1.0f : 0.0f;
 				break;
 			}
 

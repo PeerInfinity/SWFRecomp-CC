@@ -4,24 +4,30 @@
 
 <!-- PLAN_META
 id: SWAPDEPTHS_REWIND_FRESH_PLACEMENT
-status: blocked
-blocker: "Architectural — findOrCreateMovieClip is keyed by (name, parent), so two display-list slots with the same instance_name must alias to the same MovieClip*. Test2/3 expectations require two distinct MovieClips with name='static3' at different depths. See Phase 1 Audit Findings (2026-05-03) below."
+status: incomplete
+note: "Phase 1 + Phase 1.5 (path-eq) complete. Phases 2, 3, B unblocked. Phase 4 (test2 soft-ref re-binding) still blocked on architectural Option A/B/C. See 'Followup investigation (2026-05-03 evening)' below."
 phases:
   - id: 1
     name: "Audit: identify all currently-passing tests that depend on tag.c::tagPlaceObject2 depth_swapped re-place block (the load-bearing guardrails)"
     status: completed
+  - id: 1.5
+    name: "Path-based MOVIECLIP equality (Ruffle Value::PartialEq mirror) — unblocks fresh-placement work"
+    status: completed
   - id: 2
     name: "Replace the re-use semantic with fresh placement: empty target slot + non-empty depth_swapped source elsewhere → freshly place new MC at the target depth (CONSTRUCT fires)"
-    status: blocked
+    status: pending
   - id: 3
     name: "Decide fate of the moved MC at the swap-target depth (preserve in dynamic zone, destroy in static zone — Ruffle behavior)"
-    status: blocked
+    status: pending
   - id: 4
     name: "Soft-reference re-binding: AS-level references saved before rewind (`dynRef = static3`) must re-resolve to the freshly-placed MC after rewind"
     status: blocked
+  - id: B
+    name: "Deferred post-rewind CONSTRUCT firing — likely promotes displaylist_depths_test3 to ruffle_matched standalone"
+    status: pending
   - id: 5
     name: "Verify on guardrail battery (loop_test3, rewind_depth, soft_reference_test1, all displaylist_depths_test*) and target tests"
-    status: blocked
+    status: pending
 dependencies:
   - "complete/CLONESPRITE_DEPTH_BIAS_PLAN.md (depth-bias unification — prerequisite for clean swapDepths semantics)"
   - "complete/(none yet, see CURRENT_STATUS) loop_test3 backward-rewind survives_rewind work (commit d4ea78fc — established the placed_at_frame-pinned-to-depth contract this plan extends)"
@@ -469,3 +475,78 @@ If true, test2/test3 may belong in `RUFFLE_VS_FLASH_DIFFERENCES.md` rather than 
 1. Build Ruffle locally and run it against `displaylist_depths_test2.swf` + `displaylist_depths_test3.swf` to capture its actual trace output.
 2. If Ruffle output matches the gnash-expected output: implement Option A/B/C in a follow-up plan.
 3. If Ruffle output diverges from gnash-expected (matching ours instead): document in `RUFFLE_VS_FLASH_DIFFERENCES.md` and close this plan as won't-fix.
+
+---
+
+## Followup investigation (2026-05-03 evening)
+
+### Pre-captured Ruffle output exists (`output.ruffle.txt`)
+
+Both tests already ship `output.ruffle.txt` alongside `output.txt`. No need to build Ruffle locally. Comparing:
+
+**`displaylist_depths_test2`** (swap to dynamic depth 10): Ruffle's actual output has 19/21 internal assertions PASS (`#passed: 19, #failed: 1`). The single failure is `depth3Constructed == 2` (Ruffle reports 1) — Ruffle defers the post-rewind CONSTRUCT to the next frame, so the trace lines `_level0.static3 onClipConstruct` and `_root.depth3Constructed set to 2` appear AFTER `totals()`. All other test2 assertions (`static3.myThing == undefined`, `static3.getDepth() == -16381`, `dynRef.myThing == 'guess'`, `dynRef.getDepth() == 10`) pass in Ruffle. The test does test real Ruffle behavior — it is **not** a `RUFFLE_VS_FLASH_DIFFERENCES.md` candidate.
+
+**`displaylist_depths_test3`** (swap to static depth -10): same shape. Ruffle's actual output has 21/22 assertions PASS, fails the same `depth3Constructed == 2` line for the same deferred-CONSTRUCT reason. All `dynRef === static3`, `dynRef._x == 50`, `getInstanceAtDepth(-16381) == movieclip`, `getInstanceAtDepth(-10) == undefined` assertions pass.
+
+### Resolution of the rewind_depth puzzle: Ruffle compares MovieClip values **by path**, not pointer
+
+Ruffle source `core/src/avm1/value.rs:117-130`:
+
+```rust
+impl PartialEq for Value<'_> {
+    fn eq(&self, other: &Self) -> bool {
+        match (self, other) {
+            ...
+            (Value::Object(a), Value::Object(b)) => Object::ptr_eq(*a, *b),
+            (Value::MovieClip(a), Value::MovieClip(b)) => a.path() == b.path(),
+            ...
+        }
+    }
+}
+```
+
+`Value::Object` uses pointer equality, but `Value::MovieClip` uses **path equality** (full dot-path like `_level0.static3`). This is what makes:
+- `rewind_depth`'s `Clips are equal: true` work — both `getInstanceAtDepth(2)` and `getInstanceAtDepth(-16383)` return MCs with path `_level0.timeline_child` (different MovieClip instances, but same name).
+- `displaylist_depths_test3`'s `dynRef === static3` work — dynRef points at the OLD (renamed-displaced) MC and static3 resolves to the NEW MC, both with path `_level0.static3`.
+
+Our system was using pointer equality for MOVIECLIP, which is **wrong** for AVM1.
+
+### Implementation: path-based MOVIECLIP equality
+
+`actionStrictEquals` and `actionEquals2` in `action.c` updated to compare `MovieClip*->target` (slash notation, dead MCs use `original_target`) when both operands are MOVIECLIP. Helper `mc_path_equal` mirrors Ruffle's `a.path() == b.path()`.
+
+Regression battery (52 tests across avm1, gnash misc-ming, gnash actionscript): **all PASS**. No regressions.
+
+### What path equality unlocks
+
+For `displaylist_depths_test3` (swap to static depth):
+- Was: `matched=17/32 (status=output_mismatch)` — `dynRef === static3` failed on pointer mismatch.
+- After path eq: `matched=21/32` (4-line gain). Status remains `output_mismatch` because we still don't fire the deferred CONSTRUCT trace lines after `totals()` (Ruffle does), so our 3 trailing-missing lines aren't a subset of Ruffle's 1 trailing-missing line. Phase B work (deferred CONSTRUCT) would close this gap and likely promote to `ruffle_matched`.
+
+For `displaylist_depths_test2` (swap to dynamic depth):
+- No change. Test2's failures (`static3.myThing == undefined`, `static3.getDepth() == -16381`) require `static3` variable lookup to resolve to a fresh MC distinct from the swap-moved one. Path equality doesn't fix the *resolution*, only the *comparison*. Test2 still needs the architectural Option A/B/C work.
+
+For `soft_reference_test1`:
+- No change. The failures (`mcRef.getDepth()` returns `""` empty string) are about MOVIECLIP→string coercion of dead/renamed MCs, not about MC equality. Different code path.
+
+### Revised blocker statement
+
+The original blocker (architectural identity refactor) still applies for **test2** and the broader Option B/C work. But:
+
+1. The `rewind_depth` aliasing requirement was a **misdiagnosis** — it doesn't require shared pointers, only equal paths. Path equality is now in place, so the depth_swapped re-place block is no longer load-bearing for that test.
+2. **Phase 2 of the original plan (replace re-use with fresh placement) is now safe to attempt** — `rewind_depth` would still pass via path equality of two distinct MovieClip instances both named `timeline_child`. Plan should be re-opened for Phase 2 once a session is allocated to it.
+3. **Phase B (deferred CONSTRUCT after totals())** is a separate, independently-implementable task that would promote `displaylist_depths_test3` to `ruffle_matched`.
+4. **Test2 still requires Option A/B/C** for the architectural multi-MC-per-name support — that's the only remaining hard blocker.
+
+### Unblock recommendation
+
+Move plan back to `incomplete/` with revised phases:
+
+- Phase 1: COMPLETE (audit + path-eq investigation)
+- Phase 1.5 (NEW, COMPLETE): Path-based MOVIECLIP equality
+- Phase 2 (READY): Replace depth_swapped re-use with fresh placement (formerly blocked, now unblocked by path eq)
+- Phase 3 (READY): Fate of moved MC (per Ruffle semantics)
+- Phase 4 (BLOCKED on Option A/B/C): Soft-reference re-binding for test2
+- Phase B (NEW, READY): Deferred post-rewind CONSTRUCT firing — likely promotes test3 to ruffle_matched standalone
+
+Phases 2, 3, B can land independently as small commits. Phase 4 still requires architectural work.

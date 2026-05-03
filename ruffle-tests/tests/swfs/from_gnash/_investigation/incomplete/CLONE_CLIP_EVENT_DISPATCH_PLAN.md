@@ -481,9 +481,10 @@ issue, not the clone clip-event dispatch path. The flow is:
 5. The fix is risky: changing the depth_swapped block to allow fresh
    placement would likely regress other swapDepths tests (notably
    `avm1/rewind_depth` which depends on the re-use semantic). Tracked
-   separately in `blocked/SWAPDEPTHS_REWIND_FRESH_PLACEMENT_PLAN.md`
-   (blocked 2026-05-03 on architectural name-keyed MovieClip identity —
-   see plan's Phase 1 Audit Findings).
+   separately in `incomplete/SWAPDEPTHS_REWIND_FRESH_PLACEMENT_PLAN.md`
+   (Phase 1 + 1.5 complete 2026-05-03; Phases 2, 3, B unblocked by
+   path-based MovieClip equality; Phase 4 still blocked on architectural
+   name-keyed MovieClip identity).
 
 Bonus expected gains in adjacent tests where clip-event dispatch on clones
 was incidentally exercised: TBD per Phase 7 audit.
