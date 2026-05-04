@@ -22582,8 +22582,11 @@ static int mcGetOriginalBounds(MovieClip* mc, double* out_nat_w, double* out_nat
 	}
 
 	if (has_static) {
-		*out_nat_w = (double)(gxmax - gxmin);
-		*out_nat_h = (double)(gymax - gymin);
+		// Re-round to twips to recover exact pixel value from float bounds —
+		// otherwise a 1202-twip / 60.1-pixel bounds round-trips through float as
+		// 60.0999984741... and propagates precision loss into _width/_height.
+		*out_nat_w = round((double)(gxmax - gxmin) * 20.0) / 20.0;
+		*out_nat_h = round((double)(gymax - gymin) * 20.0) / 20.0;
 		return 1;
 	}
 
@@ -22645,6 +22648,39 @@ static void mcGetEffectiveSize(MovieClip* mc, double* eff_w, double* eff_h)
 #else
 	nat_w = (double)mc->width;
 	nat_h = (double)mc->height;
+#endif
+
+#ifdef NO_GRAPHICS
+	// When the MC's transform comes from the timeline (no AS-set scale/rotation),
+	// use the actual matrix from transform_data — which preserves skew that
+	// xscale/yscale/rotation lose under decomposition. Round each transformed
+	// corner to twips before taking max-min (matches Ruffle's Matrix * Rectangle).
+	if (!(mc->as_set_flags & (4|8|16))) {
+		double a, b, c, d, tx, ty;
+		getLocalMatrixForMC(mc, &a, &b, &c, &d, &tx, &ty);
+		(void)tx; (void)ty;
+		double w_twips = nat_w * 20.0;
+		double h_twips = nat_h * 20.0;
+		// Corners of (0,0)-(w,h) box transformed by (a, b, c, d) (translation-invariant).
+		double cx[4] = { 0.0,
+			round(a * w_twips),
+			round(c * h_twips),
+			round(a * w_twips + c * h_twips) };
+		double cy[4] = { 0.0,
+			round(b * w_twips),
+			round(d * h_twips),
+			round(b * w_twips + d * h_twips) };
+		double max_x = cx[0], min_x = cx[0], max_y = cy[0], min_y = cy[0];
+		for (int i = 1; i < 4; i++) {
+			if (cx[i] > max_x) max_x = cx[i];
+			if (cx[i] < min_x) min_x = cx[i];
+			if (cy[i] > max_y) max_y = cy[i];
+			if (cy[i] < min_y) min_y = cy[i];
+		}
+		*eff_w = (max_x - min_x) / 20.0;
+		*eff_h = (max_y - min_y) / 20.0;
+		return;
+	}
 #endif
 
 	double scaled_w = nat_w * mc->xscale / 100.0;
