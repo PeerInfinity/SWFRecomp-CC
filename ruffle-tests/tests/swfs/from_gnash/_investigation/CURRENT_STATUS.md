@@ -2,6 +2,10 @@
 
 Last updated: 2026-05-02 (`mouse_drag_test` (misc-swfc.all) PASS via startDrag→transformed_by_script flag. CI snapshot below from 2026-05-01.)
 
+### Latest fixes (2026-05-04, NOT yet in CI)
+
+- **Global-v6 (actionscript.all) → ruffle_matched (+1).** **Global-v7 (actionscript.all) → PASS (+1).** **Global-v8 (actionscript.all) → PASS (+1).** Implemented `ASSetNative(target, major, props, minor=0)` (was a noop). Splits `props` (post-`toString`) on `,`, strips an optional leading version-flag digit (`'1'`/`'6'`/`'7'`/`'8'`/`'9'`/`"10"`), and binds each non-empty name on `target` to `ASnative(major, minor + position)`. Cross-cutting fix to `convertString` ARRAY case: now consults `objectCallToString` (own-prop-only on `arr->props`) before falling back to `Array.prototype.join(",")` so a user-set `a.toString = function () { ... }` actually fires (required by Gnash's `ASSetNative(o, 200, a, 10)` test). Global-v6 still has unrelated `xcheck_equals` failures around `ASsetPropFlags`-invisible-inherited-setter behaviour (lines 263/264/266/283/284/286), so it lands as ruffle_matched not full pass; v7/v8 don't exercise those paths and pass cleanly. AVM1 `assetnative_ids` (formerly 6-line diff) also flips PASS as a side-effect.
+
 ### Latest fixes (2026-05-02, NOT yet in CI)
 
 - **`mouse_drag_test` (misc-swfc.all) → PASS (+1).** Calling `startDrag`

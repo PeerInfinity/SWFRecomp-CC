@@ -2,7 +2,7 @@
 
 Cross-suite summary of all Ruffle-derived test suites. Each suite has its own `_investigation/` directory with detailed status docs.
 
-Last updated: 2026-05-02 (table refreshed against latest local results post-run 25260814244 — misc-swfc.all now 11/16 effective with mouse_drag_test + swf4opcode landed; misc-swfmill.all now 18/18 with jump_to_prev_block landed; avm1 upstream sync added 4 tests, 647 total).
+Last updated: 2026-05-04 (ASSetNative implementation: Global-v6/v7/v8 (Gnash actionscript.all) → effective pass; assetnative_ids (AVM1) → PASS).
 
 ## Suite Summary
 
@@ -11,7 +11,7 @@ Last updated: 2026-05-02 (table refreshed against latest local results post-run 
 | Suite | Tests | Pass | RM | Effective | Effective Rate | Filtered Rate | Notes |
 |-------|-------|------|----|-----------| ---------------|---------------|-------|
 | [avm1](../avm1/_investigation/CURRENT_STATUS.md) | 647 | 600 | 9 | 609 | 94.1% | **100.0%** (603/603) | 42 ignored. **Zero filtered failures.** loadvars_tostring + bitmap_filters PASS. Total bumped 643→647 by upstream sync (4 new tests; classification pending). |
-| [from_gnash/actionscript.all](../from_gnash/_investigation/CURRENT_STATUS.md) | 190 | 124 | 61 | 185 | **97.4%** | — | +7 effective since 2026-04-30 (Instance-v5/v6/v7/v8, Global-v6, GetMember/SetMember hidden own-prop walk). 5 raw failures remain (Global-v6/v7/v8 — three flip pass→ruffle_matched locally and will reclassify next CI; array-v5 sort/Array-method-on-Object semantics; TextFormat-v7 font metric precision). |
+| [from_gnash/actionscript.all](../from_gnash/_investigation/CURRENT_STATUS.md) | 190 | 124 | 61 | 185 | **97.4%** | — | +3 effective post-2026-05-02 via ASSetNative implementation (Global-v7/v8 → PASS, Global-v6 → ruffle_matched). 2 raw failures remain (array-v5 sort/Array-method-on-Object semantics; TextFormat-v7 font metric precision). |
 | [from_gnash/misc-mtasc.all](../from_gnash/_investigation/CURRENT_STATUS.md) | 9 | 7 | 2 | 9 | **100.0%** | — | All effective pass. |
 | [from_gnash/misc-swfmill.all](../from_gnash/_investigation/CURRENT_STATUS.md) | 18 | 17 | 1 | 18 | **100.0%** | — | All effective pass. `jump_to_prev_block` (cross-DoAction backward jump) and `tags_after_last_showframe` both landed; plan moved to `complete/MISC_SWFMILL_PLAN.md`. |
 | [from_gnash/misc-ming.all](../from_gnash/_investigation/CURRENT_STATUS.md) | 102 | 62 | 16 | 78 | **76.5%** | — | +1 effective this session (registerClassTest2 → ruffle_matched via MC builtin gating). |
@@ -19,6 +19,10 @@ Last updated: 2026-05-02 (table refreshed against latest local results post-run 
 | [from_shumway](../from_shumway/_investigation/CURRENT_STATUS.md) (flat) | 92 | 65 | 2 | 67 | 72.8% | — | +5 effective since 2026-04-30. |
 | [from_shumway/avm1](../from_shumway/_investigation/CURRENT_STATUS.md) | 47 | 45 | 1 | 46 | **97.9%** | **100.0%** (45/45) | 2 ignored. Only `moviecliploader` remains (MCL one-tick deferral). |
 | **SWFRecomp/tests** (old suite) | 158+59 | all trace pass | — | — | **100%** | — | Hand-written opcode tests. CI only. |
+
+## Progress Since 2026-05-04
+
+- **ASSetNative implementation → Global-v6/v7/v8 (Gnash actionscript.all) effective pass + assetnative_ids (AVM1) PASS.** `ASSetNative` was previously a noop (`builtin_noop_func`); now `builtin_assetnative` parses the comma-separated `props` argument (after `toString` coercion via `convertString`), strips an optional leading version-flag digit (`'1'`, `'6'`, `'7'`, `'8'`, `'9'`, or `"10"`), and for each non-empty name binds the result of `ASnative(major, minor + i)` on the target object (via `setProperty`). Position counter `i` increments per comma — matching gnash's `Global_as.cpp::global_assetnative` (which only handles `6/7/8/9`) plus the Flash-specific `1`/`10` prefixes exercised by `avm1/assetnative` and `avm1/assetnativeaccessor` under SWF 7. `minor` (4th arg, default 0) and `major` (2nd arg) are coerced via `convertFloat` so a `valueOf` exception unwinds through the bytecode-level try/catch. Empty names are skipped but still consume an index slot. Cross-cutting fix on the side: `convertString` for `ACTION_STACK_VALUE_ARRAY` now consults `objectCallToString` first (own-prop-only lookup on `arr->props`) before falling back to the existing `Array.prototype.join(",")` behaviour — required by Gnash's `ASSetNative(o, 200, a, 10)` with `a.toString = function() { return "o, j"; }`. The `assetnative_ids` AVM1 test (formerly 6-line diff, in `ignored_tests.txt`) now PASSES; the broader `assetnative` / `assetnativeaccessor*` tests still diverge on Flash's per-property-existence version-flag interaction (different undefined-vs-function decision when proto chain has the same name) and on the unimplemented `ASSetNativeAccessor` dispatcher. Regression battery: 19-test AVM1 array/watch suite (19/19 PASS), 11-test Gnash actionscript.all Inheritance/ExternalInterface/ASnative battery (11/11 effective pass), Math/Number-vN (8/8 effective pass), Color-v6 / ColorTransform-v8 / TextFieldHTML-v6 / Inheritance-v5/v6/v7/v8 / Selection-v6/v7/v8 unchanged.
 
 ## Progress Since 2026-05-02
 

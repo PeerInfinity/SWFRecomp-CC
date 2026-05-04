@@ -4243,6 +4243,9 @@ static ActionVar builtin_noop_func(SWFAppContext* app_context, ActionVar* args, 
 	ActionVar r = {0}; r.type = ACTION_STACK_VALUE_UNDEFINED; return r;
 }
 
+// Forward declaration — definition lives next to builtin_asnative below.
+static ActionVar builtin_assetnative(SWFAppContext* app_context, ActionVar* args, u32 arg_count, ActionVar* registers, void* this_obj);
+
 // (builtin_setTimeout_impl / builtin_setInterval_impl / builtin_clearInterval_impl
 //  moved to timer.c; see actionmodern/actiontimer.h)
 
@@ -4313,7 +4316,7 @@ static void init_global_funcs(void)
 		// initTimerFunctions() (called lazily via the accessors above) builds their ASFunctions.
 		{&g_asconstructor_func, "ASconstructor", (Function2Ptr)builtin_noop_func},
 		{&g_enableDebugConsole_func, "enableDebugConsole", (Function2Ptr)builtin_noop_func},
-		{&g_ASSetNative_func, "ASSetNative", (Function2Ptr)builtin_noop_func},
+		{&g_ASSetNative_func, "ASSetNative", (Function2Ptr)builtin_assetnative},
 		{&g_ASSetNativeAccessor_func, "ASSetNativeAccessor", (Function2Ptr)builtin_noop_func},
 		{&g_remoteLSOUsage_ctor, "RemoteLSOUsage", (Function2Ptr)builtin_noop_func},
 		{&g_assetCache_ctor, "AssetCache", (Function2Ptr)builtin_noop_func},
@@ -5920,6 +5923,149 @@ static ActionVar builtin_asnative(SWFAppContext* app_context, ActionVar* args, u
 		}
 		return undef;
 	}
+
+	return undef;
+}
+
+// ASSetNative(target, major, props, minor=0)
+//
+// Parses `props` (a comma-separated string after toString coercion) and binds
+// each non-empty name on `target` to the native function returned by
+// ASnative(major, minor + position). Position increments per comma encountered,
+// including for empty names. Names may carry a leading version-flag digit
+// (one of '1','6','7','8','9' or "10") which is stripped from the property
+// name; the digit is otherwise ignored. Mirrors gnash's
+// `Global_as.cpp::global_assetnative` plus the Flash-specific '1'/'10' prefix
+// handling exercised by avm1/assetnative_ids and from_gnash Global-v6/v7/v8.
+static ActionVar builtin_assetnative(SWFAppContext* app_context, ActionVar* args, u32 arg_count, ActionVar* registers, void* this_obj)
+{
+	(void)registers; (void)this_obj;
+	ActionVar undef = {0};
+	undef.type = ACTION_STACK_VALUE_UNDEFINED;
+	if (arg_count < 3) return undef;
+
+	// Resolve target: must be an ASObject (OBJECT or ARRAY share that struct
+	// for property storage; FUNCTION is also a property-bearing native object
+	// in SWF<=6 enumeration, but we restrict to OBJECT/ARRAY here to match
+	// gnash's `toObject` behaviour).
+	ASObject* target = NULL;
+	if (args[0].type == ACTION_STACK_VALUE_OBJECT) {
+		target = (ASObject*)args[0].data.numeric_value;
+	} else if (args[0].type == ACTION_STACK_VALUE_ARRAY) {
+		// Arrays use a different struct; ASSetNative against arrays isn't
+		// observed in our tests, so just fail silently.
+		return undef;
+	}
+	if (target == NULL) return undef;
+
+	// Coerce major via valueOf. May throw via setjmp; the longjmp unwinds
+	// through actionCallFunction's catch frame.
+	pushVar(app_context, &args[1]);
+	convertFloat(app_context);
+	double major_d = 0.0;
+	if (STACK_TOP_TYPE == ACTION_STACK_VALUE_F64) major_d = VAL(double, &STACK_TOP_VALUE);
+	else if (STACK_TOP_TYPE == ACTION_STACK_VALUE_F32) major_d = (double)VAL(float, &STACK_TOP_VALUE);
+	POP();
+	if (isnan(major_d)) return undef;
+	int32_t major = ecmaToInt32(major_d);
+	if (major < 0) return undef;
+
+	// Coerce minor via valueOf. Default 0 when arg absent. May throw.
+	int32_t minor = 0;
+	if (arg_count >= 4) {
+		pushVar(app_context, &args[3]);
+		convertFloat(app_context);
+		double minor_d = 0.0;
+		if (STACK_TOP_TYPE == ACTION_STACK_VALUE_F64) minor_d = VAL(double, &STACK_TOP_VALUE);
+		else if (STACK_TOP_TYPE == ACTION_STACK_VALUE_F32) minor_d = (double)VAL(float, &STACK_TOP_VALUE);
+		POP();
+		if (isnan(minor_d)) minor_d = 0.0;
+		minor = ecmaToInt32(minor_d);
+	}
+
+	// Coerce props via toString. The arg may be an array or object whose
+	// toString produces the comma-separated name list.
+	pushVar(app_context, &args[2]);
+	convertString(app_context, NULL);
+	const uint16_t* props_u16 = (const uint16_t*)STACK_TOP_VALUE;
+	u32 props_len = STACK_TOP_N;
+
+	// Walk the UTF-16 string splitting on ','. All semantically meaningful
+	// characters here (digits, ASCII letters, comma, space) are < 128 so
+	// direct uint16_t comparison is safe.
+	u32 i = 0;
+	u32 pos = 0;
+	while (pos <= props_len) {
+		u32 comma = pos;
+		while (comma < props_len && props_u16[comma] != ',') comma++;
+
+		// Strip leading version-flag digit. Recognised prefixes: '1', '6',
+		// '7', '8', '9', and the two-character "10". Other leading characters
+		// (including '0', '2'..'5', whitespace, letters) are left alone. The
+		// digit (when recognised) is also a SWF-version requirement: when
+		// the current SWF version is below it, the function is replaced
+		// with undefined but the (digit-stripped) property name is still
+		// installed — this matches Flash behaviour exercised by avm1's
+		// assetnative test under SWF 7 (`8h`/`9i`/`10j` install as
+		// `h`/`i`/`j` with value undefined).
+		u32 name_start = pos;
+		int min_swf_version = 0;  // 0 = no version gate
+		if (name_start < comma) {
+			uint16_t c0 = props_u16[name_start];
+			if (c0 == '1' && name_start + 1 < comma && props_u16[name_start + 1] == '0') {
+				name_start += 2;
+				min_swf_version = 10;
+			} else if (c0 == '1') {
+				name_start += 1;
+				min_swf_version = 1;
+			} else if (c0 == '6' || c0 == '7' || c0 == '8' || c0 == '9') {
+				name_start += 1;
+				min_swf_version = (int)(c0 - '0');
+			}
+		}
+		u32 name_len = comma - name_start;
+
+		if (name_len > 0) {
+			ActionVar fn_val;
+			if (min_swf_version > 0 && g_swf_version < min_swf_version) {
+				// Version-gated: install as undefined.
+				fn_val.type = ACTION_STACK_VALUE_UNDEFINED;
+				fn_val.str_size = 0;
+				fn_val.data.numeric_value = 0;
+			} else {
+				// Look up native function via the existing ASnative dispatcher.
+				ActionVar callee_args[2];
+				callee_args[0].type = ACTION_STACK_VALUE_F64;
+				callee_args[0].str_size = 0;
+				VAL(double, &callee_args[0].data.numeric_value) = (double)major;
+				callee_args[1].type = ACTION_STACK_VALUE_F64;
+				callee_args[1].str_size = 0;
+				VAL(double, &callee_args[1].data.numeric_value) = (double)(minor + (int32_t)i);
+				fn_val = builtin_asnative(app_context, callee_args, 2, NULL, NULL);
+			}
+
+			// Convert the name slice to a fresh ASCII C-string for setProperty.
+			// Property names in this codebase are stored as char* (UTF-8); for
+			// ASCII chars (the only case that matters for ASSetNative tests)
+			// the conversion is direct.
+			char name_buf[256];
+			int n = (int)name_len;
+			if (n > (int)sizeof(name_buf) - 1) n = (int)sizeof(name_buf) - 1;
+			for (int k = 0; k < n; k++) {
+				uint16_t u = props_u16[name_start + k];
+				name_buf[k] = (u < 0x80) ? (char)u : '?';
+			}
+			name_buf[n] = '\0';
+
+			setProperty(app_context, target, name_buf, (u32)n, &fn_val);
+		}
+
+		if (comma >= props_len) break;
+		pos = comma + 1;
+		i++;
+	}
+
+	POP();  // drop coerced props string
 
 	return undef;
 }
@@ -22940,9 +23086,25 @@ ActionStackValueType convertString(SWFAppContext* app_context, char* var_str)
 		case ACTION_STACK_VALUE_ARRAY:
 		{
 			ASArray* arr = (ASArray*) VAL(u64, &STACK_TOP_VALUE);
-			if (arr != NULL && arr->length > 0)
+			// First check for a user-defined toString on the array itself
+			// (stored on arr->props). objectCallToString already does this
+			// own-prop-only lookup for ACTION_STACK_VALUE_ARRAY and falls
+			// through with found=0 when there's no user override.
+			ActionVar _arr_obj_var;
+			_arr_obj_var.type = ACTION_STACK_VALUE_ARRAY;
+			_arr_obj_var.data.numeric_value = STACK_TOP_VALUE;
+			int _arr_ts_found = 0;
+			ActionVar _arr_ts = objectCallToString(app_context, &_arr_obj_var, &_arr_ts_found);
+			if (_arr_ts_found && _arr_ts.type == ACTION_STACK_VALUE_STRING)
 			{
-				// Join elements with commas (Flash Array.toString behavior)
+				STACK_TOP_TYPE = ACTION_STACK_VALUE_STRING;
+				VAL(u64, &STACK_TOP_VALUE) = _arr_ts.data.numeric_value;
+				STACK_TOP_N = _arr_ts.str_size;
+			}
+			else if (arr != NULL && arr->length > 0)
+			{
+				// No user toString override — join elements with commas
+				// (Flash Array.toString default behavior).
 				ActionVar comma_arg = {0};
 				comma_arg.type = ACTION_STACK_VALUE_STRING;
 				comma_arg.str_size = 1;

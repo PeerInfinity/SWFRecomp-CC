@@ -1,6 +1,10 @@
 # Current Ruffle Test Status
 
-Last updated: 2026-05-01 (CI run at 25231855425, ruffle-test-results 59aedf5a; loadvars_tostring + bitmap_filters confirmed in CI)
+Last updated: 2026-05-04 (ASSetNative implementation: assetnative_ids → PASS, plus side-effect Global-v6/v7/v8 wins in Gnash)
+
+## Latest fixes (2026-05-04, NOT yet in CI)
+
+- **`assetnative_ids` PASS (10/10).** Recent upstream sync added 4 `assetnative*` tests; this one flipped from 6-line-diff to PASS once `ASSetNative` was implemented (was a noop). The implementation parses comma-separated names with optional version-flag digit prefix stripping (`1`/`6`/`7`/`8`/`9`/`10`) and binds `ASnative(major, minor + position)` on the target. Empty-name slots still consume an index (matches `ASSetNative(d, 103, ",getTime3", 15)` → getTime3 = ASnative(103, 16) = `getTime`). `valueOf` errors on the `minor` arg propagate through the existing setjmp/longjmp try/catch. The other three new tests (`assetnative`, `assetnativeaccessor`, `assetnativeaccessor_ids`) still fail — they exercise Flash's per-property-existence version-flag interaction (different undefined-vs-function decision based on whether the target already has the name in scope) and `ASSetNativeAccessor` (still a noop; sets up `addProperty` getter/setter pairs from consecutive `ASnative` indices). See Gnash `CURRENT_STATUS.md` for the broader fix description.
 
 ## Latest fixes (2026-05-01, in CI at 25231855425)
 
