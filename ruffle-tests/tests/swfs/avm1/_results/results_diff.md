@@ -1,32 +1,26 @@
 # Ruffle Test Results Diff
 
-**Previous:** `9e3e903e0754` (2026-05-04T04:30:00.698884+00:00)
-**Current:** `9b69244f51f3` (2026-05-04T04:45:43.168628+00:00)
+**Previous:** `9b69244f51f3` (2026-05-04T04:45:43.168628+00:00)
+**Current:** `cf88749e4c09` (2026-05-04T17:52:17.180731+00:00)
 
 ## Summary
 
 | Metric | Previous | Current | Delta |
 |--------|----------|---------|-------|
-| Passing | 586 | 600 | +14 |
+| Passing | 600 | 601 | +1 |
 | Total | 647 | 647 | 0 |
-| Pass rate | 90.6% | 92.7% | +2.1% |
-| Mismatched lines | 8966 | 8966 | 0 |
+| Pass rate | 92.7% | 92.9% | +0.2% |
+| Mismatched lines | 8966 | 8942 | -24 |
+|   Decreased | | | -24 |
 
-## Newly Passing (14)
+## Newly Passing (1)
 
 | Test | Previous Status | Lines (prev) | Lines (now) |
 |------|----------------|--------------|-------------|
-| `bitmap_filters` | compile_fail | - | 548/548 |
-| `do_init_action_child` | compile_fail | - | 12/12 |
-| `global_swf6_7_8` | compile_fail | - | 15/15 |
-| `instanceof_coercions` | compile_fail | - | 88/88 |
-| `interface_implements_op` | compile_fail | - | 47/47 |
-| `loadmovie_registerclass` | compile_fail | - | 30/30 |
-| `loadmovie_replace_root` | compile_fail | - | 5/5 |
-| `loadmovienum_cross_version_prototype` | compile_fail | - | 9/9 |
-| `mcl_loadclip_properties` | compile_fail | - | 6/6 |
-| `mcl_loadclip_replace_root` | compile_fail | - | 1/1 |
-| `movieclip_blend_mode_property` | compile_fail | - | 35/35 |
-| `register_class` | compile_fail | - | 66/66 |
-| `register_class_swf6` | compile_fail | - | 37/37 |
-| `register_class_with_sound` | compile_fail | - | 11/11 |
+| `assetnative_ids` | output_mismatch | 4/10 | 10/10 |
+
+## Line Count Changed (1)
+
+| Test | Status | Lines (prev) | Lines (now) | Diff |
+|------|--------|--------------|-------------|------|
+| `assetnative` | output_mismatch | 54/81 | 72/81 | -18 |

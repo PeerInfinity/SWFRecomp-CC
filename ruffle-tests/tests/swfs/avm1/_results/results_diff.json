@@ -1,201 +1,65 @@
 {
   "metadata": {
-    "old_timestamp": "2026-05-04T04:30:00.698884+00:00",
-    "old_git_sha": "9e3e903e0754dcb67fca8ca7f8b6afdcc7e6b454",
-    "new_timestamp": "2026-05-04T04:45:43.168628+00:00",
-    "new_git_sha": "9b69244f51f35b04b24947fd59d2fd8bf2e62bc4",
+    "old_timestamp": "2026-05-04T04:45:43.168628+00:00",
+    "old_git_sha": "9b69244f51f35b04b24947fd59d2fd8bf2e62bc4",
+    "new_timestamp": "2026-05-04T17:52:17.180731+00:00",
+    "new_git_sha": "cf88749e4c097be677c4d700afbf9e0aca4aeb0b",
     "partial": false,
     "same_commit": false
   },
   "summary": {
-    "old_pass": 586,
+    "old_pass": 600,
     "old_ruffle_matched": 9,
-    "old_effective_pass": 595,
+    "old_effective_pass": 609,
     "old_total": 647,
-    "old_pass_rate": 90.6,
-    "new_pass": 600,
+    "old_pass_rate": 92.7,
+    "new_pass": 601,
     "new_ruffle_matched": 9,
-    "new_effective_pass": 609,
+    "new_effective_pass": 610,
     "new_total": 647,
-    "new_pass_rate": 92.7,
+    "new_pass_rate": 92.9,
     "old_mismatched_lines": 8966,
-    "new_mismatched_lines": 8966,
+    "new_mismatched_lines": 8942,
     "increased_mismatches": 0,
-    "decreased_mismatches": 0,
-    "newly_passing": 14,
+    "decreased_mismatches": 24,
+    "newly_passing": 1,
     "newly_failing": 0,
-    "status_changed": 14,
-    "unchanged": 633,
+    "status_changed": 1,
+    "unchanged": 645,
     "added": 0,
     "removed": 0
   },
   "changes": [
     {
-      "test": "bitmap_filters",
+      "test": "assetnative",
       "change_type": "changed",
-      "old_status": "compile_fail",
-      "new_status": "pass",
-      "old_lines": null,
+      "old_status": "output_mismatch",
+      "new_status": "output_mismatch",
+      "old_lines": {
+        "actual_lines": 81,
+        "expected_lines": 81,
+        "matching_lines": 54
+      },
       "new_lines": {
-        "actual_lines": 548,
-        "expected_lines": 548,
-        "matching_lines": 548
+        "actual_lines": 81,
+        "expected_lines": 81,
+        "matching_lines": 72
       }
     },
     {
-      "test": "do_init_action_child",
+      "test": "assetnative_ids",
       "change_type": "changed",
-      "old_status": "compile_fail",
+      "old_status": "output_mismatch",
       "new_status": "pass",
-      "old_lines": null,
+      "old_lines": {
+        "actual_lines": 8,
+        "expected_lines": 10,
+        "matching_lines": 4
+      },
       "new_lines": {
-        "actual_lines": 12,
-        "expected_lines": 12,
-        "matching_lines": 12
-      }
-    },
-    {
-      "test": "global_swf6_7_8",
-      "change_type": "changed",
-      "old_status": "compile_fail",
-      "new_status": "pass",
-      "old_lines": null,
-      "new_lines": {
-        "actual_lines": 15,
-        "expected_lines": 15,
-        "matching_lines": 15
-      }
-    },
-    {
-      "test": "instanceof_coercions",
-      "change_type": "changed",
-      "old_status": "compile_fail",
-      "new_status": "pass",
-      "old_lines": null,
-      "new_lines": {
-        "actual_lines": 88,
-        "expected_lines": 88,
-        "matching_lines": 88
-      }
-    },
-    {
-      "test": "interface_implements_op",
-      "change_type": "changed",
-      "old_status": "compile_fail",
-      "new_status": "pass",
-      "old_lines": null,
-      "new_lines": {
-        "actual_lines": 47,
-        "expected_lines": 47,
-        "matching_lines": 47
-      }
-    },
-    {
-      "test": "loadmovie_registerclass",
-      "change_type": "changed",
-      "old_status": "compile_fail",
-      "new_status": "pass",
-      "old_lines": null,
-      "new_lines": {
-        "actual_lines": 30,
-        "expected_lines": 30,
-        "matching_lines": 30
-      }
-    },
-    {
-      "test": "loadmovie_replace_root",
-      "change_type": "changed",
-      "old_status": "compile_fail",
-      "new_status": "pass",
-      "old_lines": null,
-      "new_lines": {
-        "actual_lines": 5,
-        "expected_lines": 5,
-        "matching_lines": 5
-      }
-    },
-    {
-      "test": "loadmovienum_cross_version_prototype",
-      "change_type": "changed",
-      "old_status": "compile_fail",
-      "new_status": "pass",
-      "old_lines": null,
-      "new_lines": {
-        "actual_lines": 9,
-        "expected_lines": 9,
-        "matching_lines": 9
-      }
-    },
-    {
-      "test": "mcl_loadclip_properties",
-      "change_type": "changed",
-      "old_status": "compile_fail",
-      "new_status": "pass",
-      "old_lines": null,
-      "new_lines": {
-        "actual_lines": 6,
-        "expected_lines": 6,
-        "matching_lines": 6
-      }
-    },
-    {
-      "test": "mcl_loadclip_replace_root",
-      "change_type": "changed",
-      "old_status": "compile_fail",
-      "new_status": "pass",
-      "old_lines": null,
-      "new_lines": {
-        "actual_lines": 1,
-        "expected_lines": 1,
-        "matching_lines": 1
-      }
-    },
-    {
-      "test": "movieclip_blend_mode_property",
-      "change_type": "changed",
-      "old_status": "compile_fail",
-      "new_status": "pass",
-      "old_lines": null,
-      "new_lines": {
-        "actual_lines": 35,
-        "expected_lines": 35,
-        "matching_lines": 35
-      }
-    },
-    {
-      "test": "register_class",
-      "change_type": "changed",
-      "old_status": "compile_fail",
-      "new_status": "pass",
-      "old_lines": null,
-      "new_lines": {
-        "actual_lines": 66,
-        "expected_lines": 66,
-        "matching_lines": 66
-      }
-    },
-    {
-      "test": "register_class_swf6",
-      "change_type": "changed",
-      "old_status": "compile_fail",
-      "new_status": "pass",
-      "old_lines": null,
-      "new_lines": {
-        "actual_lines": 37,
-        "expected_lines": 37,
-        "matching_lines": 37
-      }
-    },
-    {
-      "test": "register_class_with_sound",
-      "change_type": "changed",
-      "old_status": "compile_fail",
-      "new_status": "pass",
-      "old_lines": null,
-      "new_lines": {
-        "actual_lines": 11,
-        "expected_lines": 11,
-        "matching_lines": 11
+        "actual_lines": 10,
+        "expected_lines": 10,
+        "matching_lines": 10
       }
     }
   ]
