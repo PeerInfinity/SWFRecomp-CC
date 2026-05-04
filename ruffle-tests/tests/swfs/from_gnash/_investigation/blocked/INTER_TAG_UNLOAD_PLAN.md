@@ -4,27 +4,146 @@
 
 <!-- PLAN_META
 id: INTER_TAG_UNLOAD
-status: pending
+status: blocked
 phases:
   - id: 1
     name: "Buffer sprite-level RemoveObject2 (recompiler symmetry)"
     status: dropped
   - id: 2
     name: "Fire UNLOAD on sprite loop-back display-list clear"
-    status: pending
+    status: blocked
   - id: 3
     name: "Audit `this`/`this.c` access in deferred clip-action UNLOAD"
     status: dropped
   - id: 4
     name: "Queue dynamic onUnload for sprite-internal replacements"
-    status: pending
+    status: blocked
   - id: 5
     name: "Regression battery"
-    status: pending
+    status: blocked
 dependencies:
   - "complete/DEFERRED_CLIP_UNLOAD_PLAN.md"
 parent_plan: "complete/DEFERRED_CLIP_UNLOAD_PLAN.md (§3)"
 -->
+
+## Status (2026-05-03 — Option 1 + arch fix attempted, reverted; PLAN BLOCKED)
+
+- **Attempted: Option 1 (pending_finalize MC isolation flag) + architectural
+  fix (capture parent_obj in PendingFinalizeEntry, swap display_list at
+  drain time).** This was the path the 2026-04-29 entry below recommended
+  for the next session: "Option 1 is the smallest, most targeted change.
+  Try that next session, paired with the architectural fix from this
+  attempt (so both land together, no separate revert needed)."
+
+  Implementation:
+  - Added `u8 pending_finalize` to MovieClip (action.h).
+  - `queue_pending_finalize_mc` sets `mc->pending_finalize=1` and captures
+    `g_current_sprite_obj` in a new `parent_obj` field on
+    `PendingFinalizeEntry`.
+  - `findOrCreateMovieClip` skips MCs with `pending_finalize` set
+    (analogous to the existing `name_displaced` skip).
+  - `run_pending_finalize` swaps to `parent_obj->sprite_display_list`
+    before `clear_display_entry`, validates slot identity by
+    `instance_name == mc->name`, then swaps back. Clears
+    `mc->pending_finalize=0` after the clear.
+
+  **Local measurements (matching-line metric):**
+
+  | Test | Baseline | Option 1 + arch fix | Δ |
+  |------|----------|---------------------|---|
+  | ActionOrderTest3 | 6/62 | 7/62 | +1 |
+  | ActionOrderTest4 | 7/64 | 8/64 | +1 |
+  | ActionOrderTest5 | 8/51 | 8/51 | 0 |
+  | loop_test6 | 11/23 | 11/23 | 0 |
+  | RegisterClassTest4 | 17/42 | **6/42** | **-11** |
+
+  Plan-target gain: +2 lines. RegisterClassTest4 regression: -11. Net: -9.
+
+  **Identical trade-family to the 2026-04-29 arch-only attempt.** Reverted
+  per user's standing instruction: "If RegisterClassTest4 regresses with no
+  plan-target gain in matching-lines, revert and stop — that's the third
+  repetition of the same trade and the answer is somewhere else."
+
+- **Why Option 1 didn't fix RCT4 as predicted.** The 2026-04-29 entry
+  hypothesized that Option 1 would fix RCT4 by giving NEW placements a
+  fresh MC. Detailed analysis of this attempt's output shows Option 1's
+  premise doesn't hold for the failing scenario:
+
+  In RCT4 (and similarly in ActionOrderTest3), OLD mc1 is **never queued
+  by `queue_pending_finalize_mc`** during the sprite loop-back path —
+  the silent-clear at `tag.c:872-885` (`advance_sprite_frames` `frame == 0
+  && max_depth > 0`) zeros `char_id` directly without queueing UNLOAD.
+  So `mc->pending_finalize` is never set on OLD mc1. NEW placement's
+  `findOrCreateMovieClip("Segments", mc3)` returns OLD mc1's pointer
+  unchanged. NEW Bug ctor sets `c=N` on OLD's ASObject, overwriting
+  `c=N-1` before OLD's deferred onUnload reads it.
+
+  The architectural fix correctly fires the deferred onUnload now (we
+  see `dynamic unload: N` lines in the output that were absent before),
+  but the values are off by one — confirming OLD and NEW share the same
+  cached MovieClip pointer.
+
+  Option 1 only kicks in when `queue_pending_finalize_mc` runs. The
+  scenarios that DO call it (`tagRemoveObject2` with has_unload, and
+  `tagReplaceObject2RatioWithClipActions`'s _ro1 path) are not what's
+  exercised at sprite loop-back in these tests — confirmed by the lack
+  of fresh-MC behavior in the actual output.
+
+- **Why the path forward listed below also won't help in isolation.**
+  - **Phase 2 Approach A (queue UNLOAD at silent-clear)** would activate
+    Option 1's pending_finalize path, but adds new failure modes —
+    queues UNLOAD for MCs that Ruffle's `survives_rewind` would have
+    preserved. The 2026-04-28 attempt of A regressed RCT4 by -14 lines
+    on its own. The 2026-04-29 architecturally-fixed Approach A made it
+    -14 again. No combination of A + Option 1 has been demonstrated to
+    not regress.
+  - **Option 2 (snapshot dynamic_props at queue time)** would require
+    deep-copy semantics on ASObject and would still leak the deepcopy
+    on functions / nested objects.
+  - **Option 3 (use g_current_context as parent in tagRemoveObject2's
+    _remove_parent_mc lookup)** is unrelated to this loop-back scenario
+    — it only affects the sprite-internal `tagRemoveObject2` path which
+    fires during the `mc3.frame_1 RemoveObject(mc2)` step, not the
+    silent-clear at frame_0 wrap. The cached-MC reuse happens at the
+    NEXT iteration's `mc3.frame_1 PlaceObject(mc1)`, which doesn't go
+    through tagRemoveObject2 at all.
+
+- **Real path forward (not yet attempted).** The plan-target tests
+  (ActionOrderTest3/4/5, loop_test6) and the regression-vulnerable
+  RegisterClassTest4 share a fundamental conflict: they all run mc3 as a
+  multi-iteration sprite loop, but the **per-(name, parent) MovieClip
+  cache** assigns ONE pointer to "Segments" under mc3 for the entire
+  test, so NEW Bug ctor and OLD onUnload always race on the same
+  ASObject. To fix this conflict cleanly, we need either:
+
+  1. **Per-placement MC identity.** Each PlaceObject2 that places a
+     fresh char_id at a non-empty slot must allocate a NEW MovieClip
+     (NEW pointer, NEW dynamic_props), AND the displaced OLD pointer
+     must be reachable until its deferred onUnload drains. This means
+     either (a) a multi-MC-per-(name,parent) cache (LIFO stack indexed
+     by some place-gen counter), or (b) a "shadow MC" allocated only
+     when Mark+queue happens. Both are large changes that touch
+     `findOrCreateMovieClip`'s primary contract.
+
+  2. **Snapshot `c` (and onUnload's full closure capture) at OLD's
+     UNLOAD-queue time.** Avoids changing MC identity but requires
+     queueing the AS-level handler with a frozen snapshot of `this.c`
+     so the post-NEW-ctor read goes against the snapshot, not the live
+     MC.
+
+  3. **Replicate Ruffle's `run_goto` rewind path verbatim.** Build a
+     `final_placements` table at recompile time, iterate sprite
+     children at goto-rewind, call `remove_child` (full UNLOAD
+     lifecycle) for non-survivors. This is Approach B from the plan
+     below — 6-8 hours per the original estimate but addresses the
+     root cause structurally rather than via the queue-and-isolate
+     game.
+
+  None of these have been attempted. All three are likely larger than
+  the original plan scoped. Recommend documenting them as separate
+  plans before next session, and **moving this plan to blocked/** so
+  the next attempt starts from a clean problem statement rather than
+  building on the now-disproven Option 1 hypothesis.
 
 ## Status (2026-04-29, post architectural-fix attempt)
 
