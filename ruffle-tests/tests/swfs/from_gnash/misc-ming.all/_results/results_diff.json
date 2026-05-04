@@ -1,29 +1,29 @@
 {
   "metadata": {
-    "old_timestamp": "2026-05-04T02:42:45.583127+00:00",
-    "old_git_sha": "c955f1046396a430f980e97005ffd26e9492dffe",
-    "new_timestamp": "2026-05-04T04:30:00.726793+00:00",
-    "new_git_sha": "9e3e903e0754dcb67fca8ca7f8b6afdcc7e6b454",
+    "old_timestamp": "2026-05-04T04:30:00.726793+00:00",
+    "old_git_sha": "9e3e903e0754dcb67fca8ca7f8b6afdcc7e6b454",
+    "new_timestamp": "2026-05-04T04:45:43.204476+00:00",
+    "new_git_sha": "9b69244f51f35b04b24947fd59d2fd8bf2e62bc4",
     "partial": false,
     "same_commit": false
   },
   "summary": {
-    "old_pass": 63,
-    "old_ruffle_matched": 18,
-    "old_effective_pass": 81,
+    "old_pass": 61,
+    "old_ruffle_matched": 17,
+    "old_effective_pass": 78,
     "old_total": 102,
-    "old_pass_rate": 61.8,
-    "new_pass": 61,
-    "new_ruffle_matched": 17,
-    "new_effective_pass": 78,
+    "old_pass_rate": 59.8,
+    "new_pass": 63,
+    "new_ruffle_matched": 18,
+    "new_effective_pass": 81,
     "new_total": 102,
-    "new_pass_rate": 59.8,
-    "old_mismatched_lines": 1718,
-    "new_mismatched_lines": 1709,
-    "increased_mismatches": 0,
-    "decreased_mismatches": 9,
-    "newly_passing": 0,
-    "newly_failing": 3,
+    "new_pass_rate": 61.8,
+    "old_mismatched_lines": 1709,
+    "new_mismatched_lines": 1718,
+    "increased_mismatches": 9,
+    "decreased_mismatches": 0,
+    "newly_passing": 3,
+    "newly_failing": 0,
     "status_changed": 3,
     "unchanged": 99,
     "added": 0,
@@ -33,38 +33,38 @@
     {
       "test": "attachExtImported",
       "change_type": "changed",
-      "old_status": "pass",
-      "new_status": "compile_fail",
-      "old_lines": {
+      "old_status": "compile_fail",
+      "new_status": "pass",
+      "old_lines": null,
+      "new_lines": {
         "actual_lines": 2,
         "expected_lines": 2,
         "matching_lines": 2
-      },
-      "new_lines": null
+      }
     },
     {
       "test": "attachImported",
       "change_type": "changed",
-      "old_status": "pass",
-      "new_status": "compile_fail",
-      "old_lines": {
+      "old_status": "compile_fail",
+      "new_status": "pass",
+      "old_lines": null,
+      "new_lines": {
         "actual_lines": 2,
         "expected_lines": 2,
         "matching_lines": 2
-      },
-      "new_lines": null
+      }
     },
     {
       "test": "loading/loadMovieTest",
       "change_type": "changed",
-      "old_status": "ruffle_matched",
-      "new_status": "compile_fail",
-      "old_lines": {
+      "old_status": "compile_fail",
+      "new_status": "ruffle_matched",
+      "old_lines": null,
+      "new_lines": {
         "actual_lines": 80,
         "expected_lines": 80,
         "matching_lines": 71
-      },
-      "new_lines": null
+      }
     }
   ]
 }

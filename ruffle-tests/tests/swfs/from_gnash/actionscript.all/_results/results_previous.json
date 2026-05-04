@@ -1,3260 +1,2112 @@
 {
   "metadata": {
-    "timestamp": "2026-05-04T02:42:45.573472+00:00",
-    "git_sha": "c955f1046396a430f980e97005ffd26e9492dffe",
-    "duration_seconds": 486.29,
+    "timestamp": "2026-05-04T04:30:00.720772+00:00",
+    "git_sha": "9e3e903e0754dcb67fca8ca7f8b6afdcc7e6b454",
+    "duration_seconds": 1305.73,
     "total_available": 190,
     "shards": 30,
     "expected_shards": 30
   },
   "total": 190,
-  "pass": 124,
-  "ruffle_matched": 61,
-  "fail": 5,
-  "pass_rate": 65.3,
-  "effective_pass": 185,
-  "effective_pass_rate": 97.4,
+  "pass": 0,
+  "ruffle_matched": 0,
+  "fail": 190,
+  "pass_rate": 0.0,
+  "effective_pass": 0,
+  "effective_pass_rate": 0.0,
   "breakdown": {
-    "output_mismatch": 5
+    "compile_fail": 190
   },
   "tests": [
     {
       "test": "ASnative-v5",
       "phases": {
         "recomp": 0.0,
-        "compile": 0.293,
-        "run": 0.007
+        "compile": 22.752
       },
       "num_frames": 30,
-      "lines": {
-        "actual_lines": 107,
-        "expected_lines": 107,
-        "matching_lines": 72
-      },
-      "duration": 0.3,
-      "ruffle_diff_count": 35,
-      "ours_diff_count": 35,
-      "status": "ruffle_matched",
-      "detail": "diffs 35 \u2286 ruffle 35"
+      "status": "compile_fail",
+      "detail": "collect2: error: ld returned 1 exit status",
+      "duration": 22.75
     },
     {
       "test": "ASnative-v6",
       "phases": {
         "recomp": 0.0,
-        "compile": 0.21,
-        "run": 0.009
+        "compile": 5.675
       },
       "num_frames": 30,
-      "lines": {
-        "actual_lines": 110,
-        "expected_lines": 110,
-        "matching_lines": 70
-      },
-      "duration": 0.22,
-      "ruffle_diff_count": 40,
-      "ours_diff_count": 40,
-      "status": "ruffle_matched",
-      "detail": "diffs 40 \u2286 ruffle 40"
+      "status": "compile_fail",
+      "detail": "collect2: error: ld returned 1 exit status",
+      "duration": 5.67
     },
     {
       "test": "ASnative-v7",
       "phases": {
         "recomp": 0.0,
-        "compile": 0.207,
-        "run": 0.005
+        "compile": 5.346
       },
       "num_frames": 30,
-      "lines": {
-        "actual_lines": 110,
-        "expected_lines": 110,
-        "matching_lines": 70
-      },
-      "duration": 0.22,
-      "ruffle_diff_count": 40,
-      "ours_diff_count": 40,
-      "status": "ruffle_matched",
-      "detail": "diffs 40 \u2286 ruffle 40"
+      "status": "compile_fail",
+      "detail": "collect2: error: ld returned 1 exit status",
+      "duration": 5.35
     },
     {
       "test": "ASnative-v8",
       "phases": {
         "recomp": 0.0,
-        "compile": 0.204,
-        "run": 0.006
+        "compile": 1.321
       },
       "num_frames": 30,
-      "lines": {
-        "actual_lines": 110,
-        "expected_lines": 110,
-        "matching_lines": 70
-      },
-      "duration": 0.22,
-      "ruffle_diff_count": 40,
-      "ours_diff_count": 40,
-      "status": "ruffle_matched",
-      "detail": "diffs 40 \u2286 ruffle 40"
+      "status": "compile_fail",
+      "detail": "collect2: error: ld returned 1 exit status",
+      "duration": 1.32
     },
     {
       "test": "Accessibility-v5",
       "phases": {
         "recomp": 0.0,
-        "compile": 0.197,
-        "run": 0.003
+        "compile": 1.928
       },
       "num_frames": 30,
-      "lines": {
-        "actual_lines": 15,
-        "expected_lines": 15,
-        "matching_lines": 15
-      },
-      "duration": 0.2,
-      "status": "pass"
+      "status": "compile_fail",
+      "detail": "collect2: error: ld returned 1 exit status",
+      "duration": 1.93
     },
     {
       "test": "Accessibility-v6",
       "phases": {
         "recomp": 0.0,
-        "compile": 0.199,
-        "run": 0.003
+        "compile": 1.998
       },
       "num_frames": 30,
-      "lines": {
-        "actual_lines": 19,
-        "expected_lines": 19,
-        "matching_lines": 19
-      },
-      "duration": 0.21,
-      "status": "pass"
+      "status": "compile_fail",
+      "detail": "collect2: error: ld returned 1 exit status",
+      "duration": 2.0
     },
     {
       "test": "Accessibility-v7",
       "phases": {
         "recomp": 0.0,
-        "compile": 0.199,
-        "run": 0.003
+        "compile": 1.645
       },
       "num_frames": 30,
-      "lines": {
-        "actual_lines": 19,
-        "expected_lines": 19,
-        "matching_lines": 19
-      },
-      "duration": 0.21,
-      "status": "pass"
+      "status": "compile_fail",
+      "detail": "collect2: error: ld returned 1 exit status",
+      "duration": 1.65
     },
     {
       "test": "Accessibility-v8",
       "phases": {
         "recomp": 0.0,
-        "compile": 0.23,
-        "run": 0.003
+        "compile": 19.408
       },
       "num_frames": 30,
-      "lines": {
-        "actual_lines": 19,
-        "expected_lines": 19,
-        "matching_lines": 19
-      },
-      "duration": 0.24,
-      "status": "pass"
+      "status": "compile_fail",
+      "detail": "collect2: error: ld returned 1 exit status",
+      "duration": 19.41
     },
     {
       "test": "AsBroadcaster-v5",
       "phases": {
         "recomp": 0.0,
-        "compile": 0.21,
-        "run": 0.003
+        "compile": 1.752
       },
       "num_frames": 30,
-      "lines": {
-        "actual_lines": 11,
-        "expected_lines": 11,
-        "matching_lines": 11
-      },
-      "duration": 0.22,
-      "status": "pass"
+      "status": "compile_fail",
+      "detail": "collect2: error: ld returned 1 exit status",
+      "duration": 1.75
     },
     {
       "test": "AsBroadcaster-v6",
       "phases": {
         "recomp": 0.0,
-        "compile": 0.221,
-        "run": 0.006
+        "compile": 4.841
       },
       "num_frames": 30,
-      "lines": {
-        "actual_lines": 121,
-        "expected_lines": 121,
-        "matching_lines": 114
-      },
-      "duration": 0.23,
-      "ruffle_diff_count": 13,
-      "ours_diff_count": 7,
-      "status": "ruffle_matched",
-      "detail": "diffs 7 \u2286 ruffle 13"
+      "status": "compile_fail",
+      "detail": "collect2: error: ld returned 1 exit status",
+      "duration": 4.84
     },
     {
       "test": "AsBroadcaster-v7",
       "phases": {
         "recomp": 0.0,
-        "compile": 0.219,
-        "run": 0.005
+        "compile": 4.495
       },
       "num_frames": 30,
-      "lines": {
-        "actual_lines": 121,
-        "expected_lines": 121,
-        "matching_lines": 114
-      },
-      "duration": 0.23,
-      "ruffle_diff_count": 13,
-      "ours_diff_count": 7,
-      "status": "ruffle_matched",
-      "detail": "diffs 7 \u2286 ruffle 13"
+      "status": "compile_fail",
+      "detail": "collect2: error: ld returned 1 exit status",
+      "duration": 4.5
     },
     {
       "test": "AsBroadcaster-v8",
       "phases": {
         "recomp": 0.0,
-        "compile": 0.22,
-        "run": 0.005
+        "compile": 1.299
       },
       "num_frames": 30,
-      "lines": {
-        "actual_lines": 121,
-        "expected_lines": 121,
-        "matching_lines": 114
-      },
-      "duration": 0.23,
-      "ruffle_diff_count": 13,
-      "ours_diff_count": 7,
-      "status": "ruffle_matched",
-      "detail": "diffs 7 \u2286 ruffle 13"
+      "status": "compile_fail",
+      "detail": "collect2: error: ld returned 1 exit status",
+      "duration": 1.3
     },
     {
       "test": "BitmapData-v5",
       "phases": {
         "recomp": 0.0,
-        "compile": 0.211,
-        "run": 0.003
+        "compile": 1.701
       },
       "num_frames": 30,
-      "lines": {
-        "actual_lines": 7,
-        "expected_lines": 7,
-        "matching_lines": 7
-      },
-      "duration": 0.22,
-      "status": "pass"
+      "status": "compile_fail",
+      "detail": "collect2: error: ld returned 1 exit status",
+      "duration": 1.7
     },
     {
       "test": "BitmapData-v6",
       "phases": {
         "recomp": 0.0,
-        "compile": 0.208,
-        "run": 0.003
+        "compile": 0.51
       },
       "num_frames": 30,
-      "lines": {
-        "actual_lines": 7,
-        "expected_lines": 7,
-        "matching_lines": 7
-      },
-      "duration": 0.21,
-      "status": "pass"
+      "status": "compile_fail",
+      "detail": "collect2: error: ld returned 1 exit status",
+      "duration": 0.51
     },
     {
       "test": "BitmapData-v7",
       "phases": {
         "recomp": 0.0,
-        "compile": 1.323,
-        "run": 0.003
+        "compile": 18.798
       },
       "num_frames": 30,
-      "lines": {
-        "actual_lines": 7,
-        "expected_lines": 7,
-        "matching_lines": 7
-      },
-      "duration": 1.33,
-      "status": "pass"
+      "status": "compile_fail",
+      "detail": "collect2: error: ld returned 1 exit status",
+      "duration": 18.8
     },
     {
       "test": "BitmapData-v8",
       "phases": {
         "recomp": 0.0,
-        "compile": 22.649,
-        "run": 0.142
+        "compile": 23.565
       },
       "num_frames": 30,
-      "lines": {
-        "actual_lines": 417,
-        "expected_lines": 417,
-        "matching_lines": 409
-      },
-      "duration": 22.8,
-      "ruffle_diff_count": 13,
-      "ours_diff_count": 8,
-      "status": "ruffle_matched",
-      "detail": "diffs 8 \u2286 ruffle 13"
+      "status": "compile_fail",
+      "detail": "collect2: error: ld returned 1 exit status",
+      "duration": 23.57
     },
     {
       "test": "Boolean-v5",
       "phases": {
         "recomp": 0.0,
-        "compile": 2.195,
-        "run": 0.004
+        "compile": 2.139
       },
       "num_frames": 30,
-      "lines": {
-        "actual_lines": 38,
-        "expected_lines": 38,
-        "matching_lines": 38
-      },
-      "duration": 2.2,
-      "status": "pass"
+      "status": "compile_fail",
+      "detail": "collect2: error: ld returned 1 exit status",
+      "duration": 2.14
     },
     {
       "test": "Boolean-v6",
       "phases": {
         "recomp": 0.0,
-        "compile": 1.647,
-        "run": 0.004
+        "compile": 1.581
       },
       "num_frames": 30,
-      "lines": {
-        "actual_lines": 38,
-        "expected_lines": 38,
-        "matching_lines": 38
-      },
-      "duration": 1.65,
-      "status": "pass"
+      "status": "compile_fail",
+      "detail": "collect2: error: ld returned 1 exit status",
+      "duration": 1.58
     },
     {
       "test": "Boolean-v7",
       "phases": {
         "recomp": 0.0,
-        "compile": 2.235,
-        "run": 0.003
+        "compile": 2.168
       },
       "num_frames": 30,
-      "lines": {
-        "actual_lines": 38,
-        "expected_lines": 38,
-        "matching_lines": 38
-      },
-      "duration": 2.24,
-      "status": "pass"
+      "status": "compile_fail",
+      "detail": "collect2: error: ld returned 1 exit status",
+      "duration": 2.17
     },
     {
       "test": "Boolean-v8",
       "phases": {
         "recomp": 0.0,
-        "compile": 1.129,
-        "run": 0.003
+        "compile": 1.035
       },
       "num_frames": 30,
-      "lines": {
-        "actual_lines": 38,
-        "expected_lines": 38,
-        "matching_lines": 38
-      },
-      "duration": 1.14,
-      "status": "pass"
+      "status": "compile_fail",
+      "detail": "collect2: error: ld returned 1 exit status",
+      "duration": 1.04
     },
     {
       "test": "Camera-v5",
       "phases": {
         "recomp": 0.0,
-        "compile": 1.125,
-        "run": 0.003
+        "compile": 1.59
       },
       "num_frames": 30,
-      "lines": {
-        "actual_lines": 7,
-        "expected_lines": 7,
-        "matching_lines": 7
-      },
-      "duration": 1.13,
-      "status": "pass"
+      "status": "compile_fail",
+      "detail": "collect2: error: ld returned 1 exit status",
+      "duration": 1.59
     },
     {
       "test": "Camera-v6",
       "phases": {
         "recomp": 0.0,
-        "compile": 0.208,
-        "run": 0.005
+        "compile": 18.867
       },
       "num_frames": 30,
-      "lines": {
-        "actual_lines": 90,
-        "expected_lines": 90,
-        "matching_lines": 33
-      },
-      "duration": 0.22,
-      "ruffle_diff_count": 57,
-      "ours_diff_count": 57,
-      "status": "ruffle_matched",
-      "detail": "diffs 57 \u2286 ruffle 57"
+      "status": "compile_fail",
+      "detail": "collect2: error: ld returned 1 exit status",
+      "duration": 18.87
     },
     {
       "test": "Camera-v7",
       "phases": {
         "recomp": 0.0,
-        "compile": 0.233,
-        "run": 0.005
+        "compile": 3.396
       },
       "num_frames": 30,
-      "lines": {
-        "actual_lines": 90,
-        "expected_lines": 90,
-        "matching_lines": 33
-      },
-      "duration": 0.24,
-      "ruffle_diff_count": 57,
-      "ours_diff_count": 57,
-      "status": "ruffle_matched",
-      "detail": "diffs 57 \u2286 ruffle 57"
+      "status": "compile_fail",
+      "detail": "collect2: error: ld returned 1 exit status",
+      "duration": 3.4
     },
     {
       "test": "Camera-v8",
       "phases": {
         "recomp": 0.0,
-        "compile": 0.201,
-        "run": 0.005
+        "compile": 1.165
       },
       "num_frames": 30,
-      "lines": {
-        "actual_lines": 90,
-        "expected_lines": 90,
-        "matching_lines": 33
-      },
-      "duration": 0.21,
-      "ruffle_diff_count": 57,
-      "ours_diff_count": 57,
-      "status": "ruffle_matched",
-      "detail": "diffs 57 \u2286 ruffle 57"
+      "status": "compile_fail",
+      "detail": "collect2: error: ld returned 1 exit status",
+      "duration": 1.17
     },
     {
       "test": "Color-v5",
       "phases": {
         "recomp": 0.0,
-        "compile": 0.204,
-        "run": 0.006
+        "compile": 5.046
       },
       "num_frames": 30,
-      "lines": {
-        "actual_lines": 140,
-        "expected_lines": 140,
-        "matching_lines": 140
-      },
-      "duration": 0.21,
-      "status": "pass"
+      "status": "compile_fail",
+      "detail": "collect2: error: ld returned 1 exit status",
+      "duration": 5.05
     },
     {
       "test": "Color-v6",
       "phases": {
         "recomp": 0.0,
-        "compile": 0.207,
-        "run": 0.007
+        "compile": 5.974
       },
       "num_frames": 30,
-      "lines": {
-        "actual_lines": 171,
-        "expected_lines": 171,
-        "matching_lines": 171
-      },
-      "duration": 0.22,
-      "status": "pass"
+      "status": "compile_fail",
+      "detail": "collect2: error: ld returned 1 exit status",
+      "duration": 5.97
     },
     {
       "test": "Color-v7",
       "phases": {
         "recomp": 0.0,
-        "compile": 0.205,
-        "run": 0.005
+        "compile": 5.763
       },
       "num_frames": 30,
-      "lines": {
-        "actual_lines": 161,
-        "expected_lines": 161,
-        "matching_lines": 161
-      },
-      "duration": 0.21,
-      "status": "pass"
+      "status": "compile_fail",
+      "detail": "collect2: error: ld returned 1 exit status",
+      "duration": 5.76
     },
     {
       "test": "Color-v8",
       "phases": {
         "recomp": 0.0,
-        "compile": 0.207,
-        "run": 0.005
+        "compile": 1.155
       },
       "num_frames": 30,
-      "lines": {
-        "actual_lines": 161,
-        "expected_lines": 161,
-        "matching_lines": 161
-      },
-      "duration": 0.22,
-      "status": "pass"
+      "status": "compile_fail",
+      "detail": "collect2: error: ld returned 1 exit status",
+      "duration": 1.16
     },
     {
       "test": "ColorTransform-v5",
       "phases": {
         "recomp": 0.0,
-        "compile": 1.276,
-        "run": 0.003
+        "compile": 19.806
       },
       "num_frames": 30,
-      "lines": {
-        "actual_lines": 7,
-        "expected_lines": 7,
-        "matching_lines": 7
-      },
-      "duration": 1.28,
-      "status": "pass"
+      "status": "compile_fail",
+      "detail": "collect2: error: ld returned 1 exit status",
+      "duration": 19.81
     },
     {
       "test": "ColorTransform-v6",
       "phases": {
         "recomp": 0.0,
-        "compile": 0.551,
-        "run": 0.003
+        "compile": 0.622
       },
       "num_frames": 30,
-      "lines": {
-        "actual_lines": 7,
-        "expected_lines": 7,
-        "matching_lines": 7
-      },
-      "duration": 0.56,
-      "status": "pass"
+      "status": "compile_fail",
+      "detail": "collect2: error: ld returned 1 exit status",
+      "duration": 0.62
     },
     {
       "test": "ColorTransform-v7",
       "phases": {
         "recomp": 0.0,
-        "compile": 1.306,
-        "run": 0.003
+        "compile": 1.321
       },
       "num_frames": 30,
-      "lines": {
-        "actual_lines": 7,
-        "expected_lines": 7,
-        "matching_lines": 7
-      },
-      "duration": 1.31,
-      "status": "pass"
+      "status": "compile_fail",
+      "detail": "collect2: error: ld returned 1 exit status",
+      "duration": 1.32
     },
     {
       "test": "ColorTransform-v8",
       "phases": {
         "recomp": 0.0,
-        "compile": 2.838,
-        "run": 0.004
+        "compile": 3.287
       },
       "num_frames": 30,
-      "lines": {
-        "actual_lines": 55,
-        "expected_lines": 55,
-        "matching_lines": 55
-      },
-      "duration": 2.85,
-      "status": "pass"
+      "status": "compile_fail",
+      "detail": "collect2: error: ld returned 1 exit status",
+      "duration": 3.29
     },
     {
       "test": "ContextMenu-v5",
       "phases": {
         "recomp": 0.0,
-        "compile": 1.133,
-        "run": 0.003
+        "compile": 1.687
       },
       "num_frames": 30,
-      "lines": {
-        "actual_lines": 7,
-        "expected_lines": 7,
-        "matching_lines": 7
-      },
-      "duration": 1.14,
-      "status": "pass"
+      "status": "compile_fail",
+      "detail": "collect2: error: ld returned 1 exit status",
+      "duration": 1.69
     },
     {
       "test": "ContextMenu-v6",
       "phases": {
         "recomp": 0.0,
-        "compile": 0.545,
-        "run": 0.003
+        "compile": 0.578
       },
       "num_frames": 30,
-      "lines": {
-        "actual_lines": 7,
-        "expected_lines": 7,
-        "matching_lines": 7
-      },
-      "duration": 0.55,
-      "status": "pass"
+      "status": "compile_fail",
+      "detail": "collect2: error: ld returned 1 exit status",
+      "duration": 0.58
     },
     {
       "test": "ContextMenu-v7",
       "phases": {
         "recomp": 0.0,
-        "compile": 4.358,
-        "run": 0.005
+        "compile": 5.091
       },
       "num_frames": 30,
-      "lines": {
-        "actual_lines": 131,
-        "expected_lines": 131,
-        "matching_lines": 131
-      },
-      "duration": 4.37,
-      "status": "pass"
+      "status": "compile_fail",
+      "detail": "collect2: error: ld returned 1 exit status",
+      "duration": 5.09
     },
     {
       "test": "ContextMenu-v8",
       "phases": {
         "recomp": 0.0,
-        "compile": 4.535,
-        "run": 0.005
+        "compile": 22.608
       },
       "num_frames": 30,
-      "lines": {
-        "actual_lines": 131,
-        "expected_lines": 131,
-        "matching_lines": 131
-      },
-      "duration": 4.54,
-      "status": "pass"
+      "status": "compile_fail",
+      "detail": "collect2: error: ld returned 1 exit status",
+      "duration": 22.61
     },
     {
       "test": "Error-v5",
       "phases": {
         "recomp": 0.0,
-        "compile": 2.124,
-        "run": 0.004
+        "compile": 2.054
       },
       "num_frames": 30,
-      "lines": {
-        "actual_lines": 28,
-        "expected_lines": 28,
-        "matching_lines": 28
-      },
-      "duration": 2.13,
-      "status": "pass"
+      "status": "compile_fail",
+      "detail": "collect2: error: ld returned 1 exit status",
+      "duration": 2.05
     },
     {
       "test": "Error-v6",
       "phases": {
         "recomp": 0.0,
-        "compile": 2.188,
-        "run": 0.004
+        "compile": 2.123
       },
       "num_frames": 30,
-      "lines": {
-        "actual_lines": 31,
-        "expected_lines": 31,
-        "matching_lines": 31
-      },
-      "duration": 2.19,
-      "status": "pass"
+      "status": "compile_fail",
+      "detail": "collect2: error: ld returned 1 exit status",
+      "duration": 2.12
     },
     {
       "test": "Error-v7",
       "phases": {
         "recomp": 0.0,
-        "compile": 1.814,
-        "run": 0.004
+        "compile": 1.744
       },
       "num_frames": 30,
-      "lines": {
-        "actual_lines": 31,
-        "expected_lines": 31,
-        "matching_lines": 31
-      },
-      "duration": 1.82,
-      "status": "pass"
+      "status": "compile_fail",
+      "detail": "collect2: error: ld returned 1 exit status",
+      "duration": 1.74
     },
     {
       "test": "Error-v8",
       "phases": {
         "recomp": 0.0,
-        "compile": 1.165,
-        "run": 0.004
+        "compile": 1.027
       },
       "num_frames": 30,
-      "lines": {
-        "actual_lines": 31,
-        "expected_lines": 31,
-        "matching_lines": 31
-      },
-      "duration": 1.17,
-      "status": "pass"
+      "status": "compile_fail",
+      "detail": "collect2: error: ld returned 1 exit status",
+      "duration": 1.03
     },
     {
       "test": "ExternalInterface-v5",
       "phases": {
         "recomp": 0.0,
-        "compile": 1.705,
-        "run": 0.004
+        "compile": 1.61
       },
       "num_frames": 30,
-      "lines": {
-        "actual_lines": 7,
-        "expected_lines": 7,
-        "matching_lines": 7
-      },
-      "duration": 1.71,
-      "status": "pass"
+      "status": "compile_fail",
+      "detail": "collect2: error: ld returned 1 exit status",
+      "duration": 1.61
     },
     {
       "test": "ExternalInterface-v6",
       "phases": {
         "recomp": 0.0,
-        "compile": 2.655,
-        "run": 0.005
+        "compile": 2.631
       },
       "num_frames": 30,
-      "lines": {
-        "actual_lines": 55,
-        "expected_lines": 55,
-        "matching_lines": 55
-      },
-      "duration": 2.66,
-      "status": "pass"
+      "status": "compile_fail",
+      "detail": "collect2: error: ld returned 1 exit status",
+      "duration": 2.63
     },
     {
       "test": "ExternalInterface-v7",
       "phases": {
         "recomp": 0.0,
-        "compile": 2.695,
-        "run": 0.004
+        "compile": 19.218
       },
       "num_frames": 30,
-      "lines": {
-        "actual_lines": 55,
-        "expected_lines": 55,
-        "matching_lines": 55
-      },
-      "duration": 2.7,
-      "status": "pass"
+      "status": "compile_fail",
+      "detail": "collect2: error: ld returned 1 exit status",
+      "duration": 19.22
     },
     {
       "test": "ExternalInterface-v8",
       "phases": {
         "recomp": 0.0,
-        "compile": 4.61,
-        "run": 0.005
+        "compile": 4.367
       },
       "num_frames": 30,
-      "lines": {
-        "actual_lines": 118,
-        "expected_lines": 118,
-        "matching_lines": 114
-      },
-      "duration": 4.62,
-      "ruffle_diff_count": 4,
-      "ours_diff_count": 4,
-      "status": "ruffle_matched",
-      "detail": "diffs 4 \u2286 ruffle 4"
+      "status": "compile_fail",
+      "detail": "collect2: error: ld returned 1 exit status",
+      "duration": 4.37
     },
     {
       "test": "Global-v6",
       "phases": {
         "recomp": 0.0,
-        "compile": 7.869,
-        "run": 0.007
+        "compile": 7.813
       },
       "num_frames": 30,
-      "lines": {
-        "actual_lines": 209,
-        "expected_lines": 210,
-        "matching_lines": 196
-      },
-      "duration": 7.88,
-      "status": "output_mismatch",
-      "detail": "14 line(s) differ (actual=209, expected=210)",
-      "actual_output": "... (102 lines before) ...\nPASSED: a.s == 9 [./Global.as:255]\nPASSED: a.m == 2 [./Global.as:256]\nPASSED: a.m == 9 [./Global.as:258]\nPASSED: delete a.m [./Global.as:259]\nPASSED: a.m == 99 [./Global.as:261]\nFAILED: expected: 10 obtained: 9 [./Global.as:263]\nFAILED: expected: 99 obtained: 100 [./Global.as:264]\nFAILED: expected: 10 obtained: 9 [./Global.as:266]\nPASSED: a.m == 1 [./Global.as:271]\nPASSED: a.m == 9 [./Global.as:273]\nPASSED: a.s == 9 [./Global.as:275]\nFAILED: expected: 9 obtained: 2 [./Global.as:276]\nPASSED: a.m == 2 [./Global.as:278]\nPASSED: delete a.m [./Global.as:279]\nPASSED: a.m == 99 [./Global.as:281]\nFAILED: expected: 10 obtained: 9 [./Global.as:283]\nFAILED: expected: 99 obtained: 100 [./Global.as:284]\nFAILED: expected: 10 obtained: 9 [./Global.as:286]\nPASSED: a.m == 1 [./Global.as:291]\nPASSED: a.m == 9 [./Global.as:293]\nPASSED: a.s == 9 [./Global.as:295]\nPASSED: a.m == 2 [./Global.as:296]\nPASSED: a.m == 2 [./Global.as:298]\nPASSED: delete a.m [./Global.as:299]\nPASSED: a.m == 99 [./Global.as:301]\nPASSED: a.s == 9 [./Global.as:303]\nPASSED: a.s2 == 100 [./Global.as:304]\nPASSED: a.m == 100 [./Global.as:305]\nPASSED: a.m == 9 [./Global.as:307]\nPASSED: tmp.length == 0 [./Global.as:342]\nPASSED: tmp.length == 3 [./Global.as:349]\nPASSED: typeof(ret) == 'undefined' [./Global.as:354]\nPASSED: tmp.length == 2 [./Global.as:357]\nPASSED: tmp[0] == 'a' [./Global.as:359]\nPASSED: tmp[1] == 'c' [./Global.as:360]\nPASSED: typeof(ret) == 'undefined' [./Global.as:366]\nPASSED: tmp.length == 2 [./Global.as:369]\nPASSED: tmp[0] == 'a' [./Global.as:371]\nPASSED: tmp[1] == 'c' [./Global.as:372]\nPASSED: typeof(ret) == 'undefined' [./Global.as:381]\nPASSED: tmp.length == 2 [./Global.as:384]\nPASSED: tmp[0] == 'a' [./Global.as:386]\nPASSED: tmp[1] == 'c' [./Global.as:387]\nPASSED: typeof(ret) == 'undefined' [./Global.as:393]\nPASSED: tmp.length == 2 [./Global.as:396]\nPASSED: typeof(ret) == 'undefined' [./Global.as:402]\nPASSED: tmp.length == 0 [./Global.as:405]\nPASSED: tmp.length == 2 [./Global.as:412]\nPASSED: tmp.length == 2 [./Global.as:416]\nPASSED: int(undefined) == 0 [./Global.as:422]\n... (57 lines after) ...",
-      "expected_output": "... (102 lines before) ...\nPASSED: a.s == 9 [./Global.as:255]\nPASSED: a.m == 2 [./Global.as:256]\nPASSED: a.m == 9 [./Global.as:258]\nPASSED: delete a.m [./Global.as:259]\nPASSED: a.m == 99 [./Global.as:261]\nPASSED: a.s == 10 [./Global.as:263]\nPASSED: a.m == 99 [./Global.as:264]\nPASSED: a.m == 10 [./Global.as:266]\nPASSED: a.m == 1 [./Global.as:271]\nPASSED: a.m == 9 [./Global.as:273]\nPASSED: a.s == 9 [./Global.as:275]\nPASSED: a.m == 9 [./Global.as:276]\nPASSED: a.m == 2 [./Global.as:278]\nPASSED: delete a.m [./Global.as:279]\nPASSED: a.m == 99 [./Global.as:281]\nPASSED: a.s == 10 [./Global.as:283]\nPASSED: a.m == 99 [./Global.as:284]\nPASSED: a.m == 10 [./Global.as:286]\nPASSED: a.m == 1 [./Global.as:291]\nPASSED: a.m == 9 [./Global.as:293]\nPASSED: a.s == 9 [./Global.as:295]\nPASSED: a.m == 2 [./Global.as:296]\nPASSED: a.m == 2 [./Global.as:298]\nPASSED: delete a.m [./Global.as:299]\nPASSED: a.m == 99 [./Global.as:301]\nPASSED: a.s == 9 [./Global.as:303]\nPASSED: a.s2 == 100 [./Global.as:304]\nPASSED: a.m == 100 [./Global.as:305]\nPASSED: a.m == 9 [./Global.as:307]\nPASSED: tmp.length == 0 [./Global.as:342]\nPASSED: tmp.length == 3 [./Global.as:349]\nPASSED: typeof(ret) == 'undefined' [./Global.as:354]\nPASSED: tmp.length == 2 [./Global.as:357]\nPASSED: tmp[0] == 'a' [./Global.as:359]\nPASSED: tmp[1] == 'c' [./Global.as:360]\nPASSED: typeof(ret) == 'undefined' [./Global.as:366]\nPASSED: tmp.length == 2 [./Global.as:369]\nPASSED: tmp[0] == 'a' [./Global.as:371]\nPASSED: tmp[1] == 'c' [./Global.as:372]\nPASSED: typeof(ret) == 'undefined' [./Global.as:381]\nPASSED: tmp.length == 2 [./Global.as:384]\nPASSED: tmp[0] == 'a' [./Global.as:386]\nPASSED: tmp[1] == 'c' [./Global.as:387]\nPASSED: typeof(ret) == 'undefined' [./Global.as:393]\nPASSED: tmp.length == 2 [./Global.as:396]\nPASSED: typeof(ret) == 'undefined' [./Global.as:402]\nPASSED: tmp.length == 0 [./Global.as:405]\nPASSED: tmp.length == 2 [./Global.as:412]\nPASSED: tmp.length == 2 [./Global.as:416]\nPASSED: int(undefined) == 0 [./Global.as:422]\n... (58 lines after) ..."
+      "status": "compile_fail",
+      "detail": "collect2: error: ld returned 1 exit status",
+      "duration": 7.81
     },
     {
       "test": "Global-v7",
       "phases": {
         "recomp": 0.0,
-        "compile": 6.94,
-        "run": 0.006
+        "compile": 6.757
       },
       "num_frames": 30,
-      "lines": {
-        "actual_lines": 181,
-        "expected_lines": 182,
-        "matching_lines": 175
-      },
-      "duration": 6.95,
-      "status": "output_mismatch",
-      "detail": "7 line(s) differ (actual=181, expected=182)",
-      "actual_output": "... (170 lines before) ...\nPASSED: int(\"7 \") == 0 [./Global.as:489]\nPASSED: int(\"0x10 \") == 0 [./Global.as:490]\nPASSED: int(\"0x10.8\") == 0 [./Global.as:491]\nPASSED: int(\"0123.6 \") == 0 [./Global.as:492]\nPASSED: int(\"0x-7.8 \") == 0 [./Global.as:493]\nFAILED: expected: \" t, 7i,u,z, e, w,q,\" obtained:  [./Global.as:504]\nFAILED: expected: \" j,o,\" obtained:  [./Global.as:516]\nFAILED: expected: \"l,j,k,\" obtained:  [./Global.as:525]\n#passed: 172\n#failed: 3\n#total tests run: 175",
-      "expected_output": "... (170 lines before) ...\nPASSED: int(\"7 \") == 0 [./Global.as:489]\nPASSED: int(\"0x10 \") == 0 [./Global.as:490]\nPASSED: int(\"0x10.8\") == 0 [./Global.as:491]\nPASSED: int(\"0123.6 \") == 0 [./Global.as:492]\nPASSED: int(\"0x-7.8 \") == 0 [./Global.as:493]\nPASSED: r == \" t, 7i,u,z, e, w,q,\" [./Global.as:504]\ntoString called\nPASSED: r == \" j,o,\" [./Global.as:516]\nPASSED: r == \"l,j,k,\" [./Global.as:525]\n#passed: 175\n#failed: 0\n#total tests run: 175"
+      "status": "compile_fail",
+      "detail": "collect2: error: ld returned 1 exit status",
+      "duration": 6.76
     },
     {
       "test": "Global-v8",
       "phases": {
         "recomp": 0.0,
-        "compile": 6.463,
-        "run": 0.008
+        "compile": 6.275
       },
       "num_frames": 30,
-      "lines": {
-        "actual_lines": 168,
-        "expected_lines": 169,
-        "matching_lines": 162
-      },
-      "duration": 6.47,
-      "status": "output_mismatch",
-      "detail": "7 line(s) differ (actual=168, expected=169)",
-      "actual_output": "... (157 lines before) ...\nPASSED: int(\"7 \") == 0 [./Global.as:489]\nPASSED: int(\"0x10 \") == 0 [./Global.as:490]\nPASSED: int(\"0x10.8\") == 0 [./Global.as:491]\nPASSED: int(\"0123.6 \") == 0 [./Global.as:492]\nPASSED: int(\"0x-7.8 \") == 0 [./Global.as:493]\nFAILED: expected: \" t, 7i,u,z, e, w,q,\" obtained:  [./Global.as:504]\nFAILED: expected: \" j,o,\" obtained:  [./Global.as:516]\nFAILED: expected: \"l,j,k,\" obtained:  [./Global.as:525]\n#passed: 159\n#failed: 3\n#total tests run: 162",
-      "expected_output": "... (157 lines before) ...\nPASSED: int(\"7 \") == 0 [./Global.as:489]\nPASSED: int(\"0x10 \") == 0 [./Global.as:490]\nPASSED: int(\"0x10.8\") == 0 [./Global.as:491]\nPASSED: int(\"0123.6 \") == 0 [./Global.as:492]\nPASSED: int(\"0x-7.8 \") == 0 [./Global.as:493]\nPASSED: r == \" t, 7i,u,z, e, w,q,\" [./Global.as:504]\ntoString called\nPASSED: r == \" j,o,\" [./Global.as:516]\nPASSED: r == \"l,j,k,\" [./Global.as:525]\n#passed: 162\n#failed: 0\n#total tests run: 162"
+      "status": "compile_fail",
+      "detail": "collect2: error: ld returned 1 exit status",
+      "duration": 6.28
     },
     {
       "test": "HitTest-v6",
       "phases": {
         "recomp": 0.0,
-        "compile": 4.718,
-        "run": 0.005
+        "compile": 4.571
       },
       "num_frames": 30,
-      "lines": {
-        "actual_lines": 88,
-        "expected_lines": 88,
-        "matching_lines": 80
-      },
-      "duration": 4.73,
-      "ruffle_diff_count": 8,
-      "ours_diff_count": 8,
-      "status": "ruffle_matched",
-      "detail": "diffs 8 \u2286 ruffle 8"
+      "status": "compile_fail",
+      "detail": "collect2: error: ld returned 1 exit status",
+      "duration": 4.57
     },
     {
       "test": "HitTest-v7",
       "phases": {
         "recomp": 0.0,
-        "compile": 4.453,
-        "run": 0.004
+        "compile": 4.124
       },
       "num_frames": 30,
-      "lines": {
-        "actual_lines": 88,
-        "expected_lines": 88,
-        "matching_lines": 80
-      },
-      "duration": 4.46,
-      "ruffle_diff_count": 8,
-      "ours_diff_count": 8,
-      "status": "ruffle_matched",
-      "detail": "diffs 8 \u2286 ruffle 8"
+      "status": "compile_fail",
+      "detail": "collect2: error: ld returned 1 exit status",
+      "duration": 4.12
     },
     {
       "test": "HitTest-v8",
       "phases": {
         "recomp": 0.0,
-        "compile": 0.207,
-        "run": 0.004
+        "compile": 21.911
       },
       "num_frames": 30,
-      "lines": {
-        "actual_lines": 88,
-        "expected_lines": 88,
-        "matching_lines": 79
-      },
-      "duration": 0.21,
-      "ruffle_diff_count": 9,
-      "ours_diff_count": 9,
-      "status": "ruffle_matched",
-      "detail": "diffs 9 \u2286 ruffle 9"
+      "status": "compile_fail",
+      "detail": "collect2: error: ld returned 1 exit status",
+      "duration": 21.91
     },
     {
       "test": "Inheritance-v5",
       "phases": {
         "recomp": 0.0,
-        "compile": 0.199,
-        "run": 0.006
+        "compile": 4.666
       },
       "num_frames": 30,
-      "lines": {
-        "actual_lines": 115,
-        "expected_lines": 114,
-        "matching_lines": 114
-      },
-      "duration": 0.21,
-      "ruffle_diff_count": 17,
-      "ours_diff_count": 1,
-      "status": "ruffle_matched",
-      "detail": "diffs 1 \u2286 ruffle 17"
+      "status": "compile_fail",
+      "detail": "collect2: error: ld returned 1 exit status",
+      "duration": 4.67
     },
     {
       "test": "Inheritance-v6",
       "phases": {
         "recomp": 0.0,
-        "compile": 0.202,
-        "run": 0.007
+        "compile": 6.623
       },
       "num_frames": 30,
-      "lines": {
-        "actual_lines": 182,
-        "expected_lines": 181,
-        "matching_lines": 173
-      },
-      "duration": 0.21,
-      "ruffle_diff_count": 16,
-      "ours_diff_count": 9,
-      "status": "ruffle_matched",
-      "detail": "diffs 9 \u2286 ruffle 16"
+      "status": "compile_fail",
+      "detail": "collect2: error: ld returned 1 exit status",
+      "duration": 6.62
     },
     {
       "test": "Inheritance-v7",
       "phases": {
         "recomp": 0.0,
-        "compile": 0.204,
-        "run": 0.006
+        "compile": 6.77
       },
       "num_frames": 30,
-      "lines": {
-        "actual_lines": 182,
-        "expected_lines": 181,
-        "matching_lines": 177
-      },
-      "duration": 0.21,
-      "ruffle_diff_count": 10,
-      "ours_diff_count": 5,
-      "status": "ruffle_matched",
-      "detail": "diffs 5 \u2286 ruffle 10"
+      "status": "compile_fail",
+      "detail": "collect2: error: ld returned 1 exit status",
+      "duration": 6.77
     },
     {
       "test": "Inheritance-v8",
       "phases": {
         "recomp": 0.0,
-        "compile": 0.204,
-        "run": 0.006
+        "compile": 1.827
       },
       "num_frames": 30,
-      "lines": {
-        "actual_lines": 182,
-        "expected_lines": 181,
-        "matching_lines": 177
-      },
-      "duration": 0.21,
-      "ruffle_diff_count": 10,
-      "ours_diff_count": 5,
-      "status": "ruffle_matched",
-      "detail": "diffs 5 \u2286 ruffle 10"
+      "status": "compile_fail",
+      "detail": "collect2: error: ld returned 1 exit status",
+      "duration": 1.83
     },
     {
       "test": "Instance-v5",
       "phases": {
         "recomp": 0.0,
-        "compile": 0.196,
-        "run": 0.004
+        "compile": 2.753
       },
       "num_frames": 30,
-      "lines": {
-        "actual_lines": 52,
-        "expected_lines": 52,
-        "matching_lines": 52
-      },
-      "duration": 0.2,
-      "status": "pass"
+      "status": "compile_fail",
+      "detail": "collect2: error: ld returned 1 exit status",
+      "duration": 2.75
     },
     {
       "test": "Instance-v6",
       "phases": {
         "recomp": 0.0,
-        "compile": 0.195,
-        "run": 0.004
+        "compile": 1.504
       },
       "num_frames": 30,
-      "lines": {
-        "actual_lines": 52,
-        "expected_lines": 52,
-        "matching_lines": 52
-      },
-      "duration": 0.2,
-      "status": "pass"
+      "status": "compile_fail",
+      "detail": "collect2: error: ld returned 1 exit status",
+      "duration": 1.5
     },
     {
       "test": "Instance-v7",
       "phases": {
         "recomp": 0.0,
-        "compile": 2.712,
-        "run": 0.004
+        "compile": 15.213
       },
       "num_frames": 30,
-      "lines": {
-        "actual_lines": 52,
-        "expected_lines": 52,
-        "matching_lines": 52
-      },
-      "duration": 2.72,
-      "status": "pass"
+      "status": "compile_fail",
+      "detail": "collect2: error: ld returned 1 exit status",
+      "duration": 15.21
     },
     {
       "test": "Instance-v8",
       "phases": {
         "recomp": 0.0,
-        "compile": 1.222,
-        "run": 0.004
+        "compile": 0.834
       },
       "num_frames": 30,
-      "lines": {
-        "actual_lines": 52,
-        "expected_lines": 52,
-        "matching_lines": 52
-      },
-      "duration": 1.23,
-      "status": "pass"
+      "status": "compile_fail",
+      "detail": "collect2: error: ld returned 1 exit status",
+      "duration": 0.83
     },
     {
       "test": "Key-v5",
       "phases": {
         "recomp": 0.0,
-        "compile": 2.609,
-        "run": 0.004
+        "compile": 1.891
       },
       "num_frames": 30,
-      "lines": {
-        "actual_lines": 51,
-        "expected_lines": 51,
-        "matching_lines": 51
-      },
-      "duration": 2.62,
-      "status": "pass"
+      "status": "compile_fail",
+      "detail": "collect2: error: ld returned 1 exit status",
+      "duration": 1.89
     },
     {
       "test": "Key-v6",
       "phases": {
         "recomp": 0.0,
-        "compile": 2.728,
-        "run": 0.004
+        "compile": 1.979
       },
       "num_frames": 30,
-      "lines": {
-        "actual_lines": 55,
-        "expected_lines": 55,
-        "matching_lines": 55
-      },
-      "duration": 2.74,
-      "status": "pass"
+      "status": "compile_fail",
+      "detail": "collect2: error: ld returned 1 exit status",
+      "duration": 1.98
     },
     {
       "test": "Key-v7",
       "phases": {
         "recomp": 0.0,
-        "compile": 2.301,
-        "run": 0.004
+        "compile": 1.659
       },
       "num_frames": 30,
-      "lines": {
-        "actual_lines": 55,
-        "expected_lines": 55,
-        "matching_lines": 55
-      },
-      "duration": 2.31,
-      "status": "pass"
+      "status": "compile_fail",
+      "detail": "collect2: error: ld returned 1 exit status",
+      "duration": 1.66
     },
     {
       "test": "Key-v8",
       "phases": {
         "recomp": 0.0,
-        "compile": 1.24,
-        "run": 0.004
+        "compile": 0.799
       },
       "num_frames": 30,
-      "lines": {
-        "actual_lines": 55,
-        "expected_lines": 55,
-        "matching_lines": 55
-      },
-      "duration": 1.25,
-      "status": "pass"
+      "status": "compile_fail",
+      "detail": "collect2: error: ld returned 1 exit status",
+      "duration": 0.8
     },
     {
       "test": "LoadVars-v5",
       "phases": {
         "recomp": 0.0,
-        "compile": 19.18,
-        "run": 0.003
+        "compile": 14.593
       },
       "num_frames": 30,
-      "lines": {
-        "actual_lines": 8,
-        "expected_lines": 8,
-        "matching_lines": 8
-      },
-      "duration": 19.19,
-      "status": "pass"
+      "status": "compile_fail",
+      "detail": "collect2: error: ld returned 1 exit status",
+      "duration": 14.59
     },
     {
       "test": "LoadVars-v6",
       "phases": {
         "recomp": 0.0,
-        "compile": 0.228,
-        "run": 0.006
+        "compile": 22.631
       },
       "num_frames": 30,
-      "lines": {
-        "actual_lines": 148,
-        "expected_lines": 152,
-        "matching_lines": 146
-      },
-      "duration": 0.24,
-      "ruffle_diff_count": 8,
-      "ours_diff_count": 6,
-      "status": "ruffle_matched",
-      "detail": "diffs 6 \u2286 ruffle 8"
+      "status": "compile_fail",
+      "detail": "collect2: error: ld returned 1 exit status",
+      "duration": 22.63
     },
     {
       "test": "LoadVars-v7",
       "phases": {
         "recomp": 0.0,
-        "compile": 0.21,
-        "run": 0.006
+        "compile": 5.076
       },
       "num_frames": 30,
-      "lines": {
-        "actual_lines": 148,
-        "expected_lines": 152,
-        "matching_lines": 146
-      },
-      "duration": 0.22,
-      "ruffle_diff_count": 8,
-      "ours_diff_count": 6,
-      "status": "ruffle_matched",
-      "detail": "diffs 6 \u2286 ruffle 8"
+      "status": "compile_fail",
+      "detail": "collect2: error: ld returned 1 exit status",
+      "duration": 5.08
     },
     {
       "test": "LoadVars-v8",
       "phases": {
         "recomp": 0.0,
-        "compile": 0.21,
-        "run": 0.005
+        "compile": 2.129
       },
       "num_frames": 30,
-      "lines": {
-        "actual_lines": 148,
-        "expected_lines": 152,
-        "matching_lines": 146
-      },
-      "duration": 0.22,
-      "ruffle_diff_count": 8,
-      "ours_diff_count": 6,
-      "status": "ruffle_matched",
-      "detail": "diffs 6 \u2286 ruffle 8"
+      "status": "compile_fail",
+      "detail": "collect2: error: ld returned 1 exit status",
+      "duration": 2.13
     },
     {
       "test": "LocalConnection-v5",
       "phases": {
         "recomp": 0.0,
-        "compile": 0.196,
-        "run": 0.003
+        "compile": 18.829
       },
       "num_frames": 30,
-      "lines": {
-        "actual_lines": 7,
-        "expected_lines": 7,
-        "matching_lines": 7
-      },
-      "duration": 0.2,
-      "status": "pass"
+      "status": "compile_fail",
+      "detail": "collect2: error: ld returned 1 exit status",
+      "duration": 18.83
     },
     {
       "test": "LocalConnection-v6",
       "phases": {
         "recomp": 0.0,
-        "compile": 0.198,
-        "run": 0.004
+        "compile": 3.02
       },
       "num_frames": 30,
-      "lines": {
-        "actual_lines": 58,
-        "expected_lines": 58,
-        "matching_lines": 58
-      },
-      "duration": 0.21,
-      "status": "pass"
+      "status": "compile_fail",
+      "detail": "collect2: error: ld returned 1 exit status",
+      "duration": 3.02
     },
     {
       "test": "LocalConnection-v7",
       "phases": {
         "recomp": 0.0,
-        "compile": 0.2,
-        "run": 0.004
+        "compile": 2.686
       },
       "num_frames": 30,
-      "lines": {
-        "actual_lines": 58,
-        "expected_lines": 58,
-        "matching_lines": 58
-      },
-      "duration": 0.21,
-      "status": "pass"
+      "status": "compile_fail",
+      "detail": "collect2: error: ld returned 1 exit status",
+      "duration": 2.69
     },
     {
       "test": "LocalConnection-v8",
       "phases": {
         "recomp": 0.0,
-        "compile": 0.197,
-        "run": 0.004
+        "compile": 1.313
       },
       "num_frames": 30,
-      "lines": {
-        "actual_lines": 58,
-        "expected_lines": 58,
-        "matching_lines": 58
-      },
-      "duration": 0.2,
-      "status": "pass"
+      "status": "compile_fail",
+      "detail": "collect2: error: ld returned 1 exit status",
+      "duration": 1.31
     },
     {
       "test": "Math-v5",
       "phases": {
         "recomp": 0.0,
-        "compile": 0.23,
-        "run": 0.009
+        "compile": 30.425
       },
       "num_frames": 30,
-      "lines": {
-        "actual_lines": 278,
-        "expected_lines": 278,
-        "matching_lines": 273
-      },
-      "duration": 0.24,
-      "ruffle_diff_count": 5,
-      "ours_diff_count": 5,
-      "status": "ruffle_matched",
-      "detail": "diffs 5 \u2286 ruffle 5"
+      "status": "compile_fail",
+      "detail": "collect2: error: ld returned 1 exit status",
+      "duration": 30.43
     },
     {
       "test": "Math-v6",
       "phases": {
         "recomp": 0.0,
-        "compile": 0.219,
-        "run": 0.01
+        "compile": 0.622
       },
       "num_frames": 30,
-      "lines": {
-        "actual_lines": 278,
-        "expected_lines": 278,
-        "matching_lines": 273
-      },
-      "duration": 0.23,
-      "ruffle_diff_count": 5,
-      "ours_diff_count": 5,
-      "status": "ruffle_matched",
-      "detail": "diffs 5 \u2286 ruffle 5"
+      "status": "compile_fail",
+      "detail": "collect2: error: ld returned 1 exit status",
+      "duration": 0.62
     },
     {
       "test": "Math-v7",
       "phases": {
         "recomp": 0.0,
-        "compile": 0.226,
-        "run": 0.008
+        "compile": 13.747
       },
       "num_frames": 30,
-      "lines": {
-        "actual_lines": 287,
-        "expected_lines": 287,
-        "matching_lines": 282
-      },
-      "duration": 0.24,
-      "ruffle_diff_count": 5,
-      "ours_diff_count": 5,
-      "status": "ruffle_matched",
-      "detail": "diffs 5 \u2286 ruffle 5"
+      "status": "compile_fail",
+      "detail": "collect2: error: ld returned 1 exit status",
+      "duration": 13.75
     },
     {
       "test": "Math-v8",
       "phases": {
         "recomp": 0.0,
-        "compile": 0.226,
-        "run": 0.008
+        "compile": 1.206
       },
       "num_frames": 30,
-      "lines": {
-        "actual_lines": 287,
-        "expected_lines": 287,
-        "matching_lines": 282
-      },
-      "duration": 0.24,
-      "ruffle_diff_count": 5,
-      "ours_diff_count": 5,
-      "status": "ruffle_matched",
-      "detail": "diffs 5 \u2286 ruffle 5"
+      "status": "compile_fail",
+      "detail": "collect2: error: ld returned 1 exit status",
+      "duration": 1.21
     },
     {
       "test": "Matrix-v5",
       "phases": {
         "recomp": 0.0,
-        "compile": 0.204,
-        "run": 0.003
+        "compile": 1.618
       },
       "num_frames": 30,
-      "lines": {
-        "actual_lines": 7,
-        "expected_lines": 7,
-        "matching_lines": 7
-      },
-      "duration": 0.21,
-      "status": "pass"
+      "status": "compile_fail",
+      "detail": "collect2: error: ld returned 1 exit status",
+      "duration": 1.62
     },
     {
       "test": "Matrix-v6",
       "phases": {
         "recomp": 0.0,
-        "compile": 0.216,
-        "run": 0.008
+        "compile": 6.979
       },
       "num_frames": 30,
-      "lines": {
-        "actual_lines": 168,
-        "expected_lines": 168,
-        "matching_lines": 139
-      },
-      "duration": 0.23,
-      "ruffle_diff_count": 71,
-      "ours_diff_count": 29,
-      "status": "ruffle_matched",
-      "detail": "diffs 29 \u2286 ruffle 71"
+      "status": "compile_fail",
+      "detail": "collect2: error: ld returned 1 exit status",
+      "duration": 6.98
     },
     {
       "test": "Matrix-v7",
       "phases": {
         "recomp": 0.0,
-        "compile": 0.216,
-        "run": 0.006
+        "compile": 24.436
       },
       "num_frames": 30,
-      "lines": {
-        "actual_lines": 168,
-        "expected_lines": 168,
-        "matching_lines": 140
-      },
-      "duration": 0.23,
-      "ruffle_diff_count": 70,
-      "ours_diff_count": 28,
-      "status": "ruffle_matched",
-      "detail": "diffs 28 \u2286 ruffle 70"
+      "status": "compile_fail",
+      "detail": "collect2: error: ld returned 1 exit status",
+      "duration": 24.44
     },
     {
       "test": "Matrix-v8",
       "phases": {
         "recomp": 0.0,
-        "compile": 0.205,
-        "run": 0.007
+        "compile": 1.296
       },
       "num_frames": 30,
-      "lines": {
-        "actual_lines": 168,
-        "expected_lines": 168,
-        "matching_lines": 140
-      },
-      "duration": 0.22,
-      "ruffle_diff_count": 70,
-      "ours_diff_count": 28,
-      "status": "ruffle_matched",
-      "detail": "diffs 28 \u2286 ruffle 70"
+      "status": "compile_fail",
+      "detail": "collect2: error: ld returned 1 exit status",
+      "duration": 1.3
     },
     {
       "test": "Microphone-v5",
       "phases": {
         "recomp": 0.0,
-        "compile": 0.195,
-        "run": 0.003
+        "compile": 1.755
       },
       "num_frames": 30,
-      "lines": {
-        "actual_lines": 6,
-        "expected_lines": 6,
-        "matching_lines": 6
-      },
-      "duration": 0.2,
-      "status": "pass"
+      "status": "compile_fail",
+      "detail": "collect2: error: ld returned 1 exit status",
+      "duration": 1.76
     },
     {
       "test": "Microphone-v6",
       "phases": {
         "recomp": 0.0,
-        "compile": 0.198,
-        "run": 0.005
+        "compile": 3.3
       },
       "num_frames": 30,
-      "lines": {
-        "actual_lines": 79,
-        "expected_lines": 79,
-        "matching_lines": 48
-      },
-      "duration": 0.21,
-      "ruffle_diff_count": 31,
-      "ours_diff_count": 31,
-      "status": "ruffle_matched",
-      "detail": "diffs 31 \u2286 ruffle 31"
+      "status": "compile_fail",
+      "detail": "collect2: error: ld returned 1 exit status",
+      "duration": 3.3
     },
     {
       "test": "Microphone-v7",
       "phases": {
         "recomp": 0.0,
-        "compile": 0.201,
-        "run": 0.004
+        "compile": 2.868
       },
       "num_frames": 30,
-      "lines": {
-        "actual_lines": 79,
-        "expected_lines": 79,
-        "matching_lines": 48
-      },
-      "duration": 0.21,
-      "ruffle_diff_count": 31,
-      "ours_diff_count": 31,
-      "status": "ruffle_matched",
-      "detail": "diffs 31 \u2286 ruffle 31"
+      "status": "compile_fail",
+      "detail": "collect2: error: ld returned 1 exit status",
+      "duration": 2.87
     },
     {
       "test": "Microphone-v8",
       "phases": {
         "recomp": 0.0,
-        "compile": 0.2,
-        "run": 0.004
+        "compile": 1.188
       },
       "num_frames": 30,
-      "lines": {
-        "actual_lines": 79,
-        "expected_lines": 79,
-        "matching_lines": 48
-      },
-      "duration": 0.21,
-      "ruffle_diff_count": 31,
-      "ours_diff_count": 31,
-      "status": "ruffle_matched",
-      "detail": "diffs 31 \u2286 ruffle 31"
+      "status": "compile_fail",
+      "detail": "collect2: error: ld returned 1 exit status",
+      "duration": 1.19
     },
     {
       "test": "Mouse-v5",
       "phases": {
         "recomp": 0.0,
-        "compile": 1.958,
-        "run": 0.004
+        "compile": 18.649
       },
       "num_frames": 30,
-      "lines": {
-        "actual_lines": 13,
-        "expected_lines": 13,
-        "matching_lines": 13
-      },
-      "duration": 1.97,
-      "status": "pass"
+      "status": "compile_fail",
+      "detail": "collect2: error: ld returned 1 exit status",
+      "duration": 18.65
     },
     {
       "test": "Mouse-v6",
       "phases": {
         "recomp": 0.0,
-        "compile": 2.114,
-        "run": 0.004
+        "compile": 1.831
       },
       "num_frames": 30,
-      "lines": {
-        "actual_lines": 21,
-        "expected_lines": 21,
-        "matching_lines": 21
-      },
-      "duration": 2.12,
-      "status": "pass"
+      "status": "compile_fail",
+      "detail": "collect2: error: ld returned 1 exit status",
+      "duration": 1.83
     },
     {
       "test": "Mouse-v7",
       "phases": {
         "recomp": 0.0,
-        "compile": 1.728,
-        "run": 0.003
+        "compile": 1.474
       },
       "num_frames": 30,
-      "lines": {
-        "actual_lines": 21,
-        "expected_lines": 21,
-        "matching_lines": 21
-      },
-      "duration": 1.73,
-      "status": "pass"
+      "status": "compile_fail",
+      "detail": "collect2: error: ld returned 1 exit status",
+      "duration": 1.47
     },
     {
       "test": "Mouse-v8",
       "phases": {
         "recomp": 0.0,
-        "compile": 1.284,
-        "run": 0.003
+        "compile": 1.049
       },
       "num_frames": 30,
-      "lines": {
-        "actual_lines": 21,
-        "expected_lines": 21,
-        "matching_lines": 21
-      },
-      "duration": 1.29,
-      "status": "pass"
+      "status": "compile_fail",
+      "detail": "collect2: error: ld returned 1 exit status",
+      "duration": 1.05
     },
     {
       "test": "MovieClip-v5",
       "phases": {
         "recomp": 0.0,
-        "compile": 30.497,
-        "run": 0.012
+        "compile": 30.34
       },
       "num_frames": 30,
-      "lines": {
-        "actual_lines": 350,
-        "expected_lines": 363,
-        "matching_lines": 315
-      },
-      "duration": 30.51,
-      "ruffle_diff_count": 226,
-      "ours_diff_count": 48,
-      "status": "ruffle_matched",
-      "detail": "diffs 48 \u2286 ruffle 226"
+      "status": "compile_fail",
+      "detail": "collect2: error: ld returned 1 exit status",
+      "duration": 30.34
     },
     {
       "test": "MovieClipLoader-v5",
       "phases": {
         "recomp": 0.0,
-        "compile": 1.849,
-        "run": 0.003
+        "compile": 1.572
       },
       "num_frames": 30,
-      "lines": {
-        "actual_lines": 6,
-        "expected_lines": 6,
-        "matching_lines": 6
-      },
-      "duration": 1.86,
-      "status": "pass"
+      "status": "compile_fail",
+      "detail": "collect2: error: ld returned 1 exit status",
+      "duration": 1.57
     },
     {
       "test": "MovieClipLoader-v6",
       "phases": {
         "recomp": 0.0,
-        "compile": 15.171,
-        "run": 0.002
+        "compile": 18.638
       },
       "num_frames": 30,
-      "lines": {
-        "actual_lines": 6,
-        "expected_lines": 6,
-        "matching_lines": 6
-      },
-      "duration": 15.18,
-      "status": "pass"
+      "status": "compile_fail",
+      "detail": "collect2: error: ld returned 1 exit status",
+      "duration": 18.64
     },
     {
       "test": "MovieClipLoader-v7",
       "phases": {
         "recomp": 0.0,
-        "compile": 2.966,
-        "run": 0.003
+        "compile": 3.682
       },
       "num_frames": 30,
-      "lines": {
-        "actual_lines": 47,
-        "expected_lines": 165,
-        "matching_lines": 47
-      },
-      "duration": 2.97,
-      "ruffle_diff_count": 118,
-      "ours_diff_count": 118,
-      "status": "ruffle_matched",
-      "detail": "diffs 118 \u2286 ruffle 118"
+      "status": "compile_fail",
+      "detail": "collect2: error: ld returned 1 exit status",
+      "duration": 3.68
     },
     {
       "test": "MovieClipLoader-v8",
       "phases": {
         "recomp": 0.0,
-        "compile": 1.82,
-        "run": 0.003
+        "compile": 2.291
       },
       "num_frames": 30,
-      "lines": {
-        "actual_lines": 47,
-        "expected_lines": 165,
-        "matching_lines": 47
-      },
-      "duration": 1.83,
-      "ruffle_diff_count": 118,
-      "ours_diff_count": 118,
-      "status": "ruffle_matched",
-      "detail": "diffs 118 \u2286 ruffle 118"
+      "status": "compile_fail",
+      "detail": "collect2: error: ld returned 1 exit status",
+      "duration": 2.29
     },
     {
       "test": "NetConnection-v5",
       "phases": {
         "recomp": 0.0,
-        "compile": 1.145,
-        "run": 0.003
+        "compile": 18.249
       },
       "num_frames": 30,
-      "lines": {
-        "actual_lines": 7,
-        "expected_lines": 7,
-        "matching_lines": 7
-      },
-      "duration": 1.15,
-      "status": "pass"
+      "status": "compile_fail",
+      "detail": "collect2: error: ld returned 1 exit status",
+      "duration": 18.25
     },
     {
       "test": "NetStream-v5",
       "phases": {
         "recomp": 0.0,
-        "compile": 1.346,
-        "run": 0.002
+        "compile": 1.679
       },
       "num_frames": 30,
-      "lines": {
-        "actual_lines": 6,
-        "expected_lines": 6,
-        "matching_lines": 6
-      },
-      "duration": 1.35,
-      "status": "pass"
+      "status": "compile_fail",
+      "detail": "collect2: error: ld returned 1 exit status",
+      "duration": 1.68
     },
     {
       "test": "NetStream-v6",
       "phases": {
         "recomp": 0.0,
-        "compile": 2.784,
-        "run": 0.004
+        "compile": 3.289
       },
       "num_frames": 30,
-      "lines": {
-        "actual_lines": 80,
-        "expected_lines": 80,
-        "matching_lines": 80
-      },
-      "duration": 2.79,
-      "status": "pass"
+      "status": "compile_fail",
+      "detail": "collect2: error: ld returned 1 exit status",
+      "duration": 3.29
     },
     {
       "test": "NetStream-v7",
       "phases": {
         "recomp": 0.0,
-        "compile": 0.206,
-        "run": 0.004
+        "compile": 20.699
       },
       "num_frames": 30,
-      "lines": {
-        "actual_lines": 80,
-        "expected_lines": 80,
-        "matching_lines": 80
-      },
-      "duration": 0.21,
-      "status": "pass"
+      "status": "compile_fail",
+      "detail": "collect2: error: ld returned 1 exit status",
+      "duration": 20.7
     },
     {
       "test": "NetStream-v8",
       "phases": {
         "recomp": 0.0,
-        "compile": 0.203,
-        "run": 0.004
+        "compile": 1.36
       },
       "num_frames": 30,
-      "lines": {
-        "actual_lines": 80,
-        "expected_lines": 80,
-        "matching_lines": 80
-      },
-      "duration": 0.21,
-      "status": "pass"
+      "status": "compile_fail",
+      "detail": "collect2: error: ld returned 1 exit status",
+      "duration": 1.36
     },
     {
       "test": "Number-v5",
       "phases": {
         "recomp": 0.0,
-        "compile": 0.21,
-        "run": 0.008
+        "compile": 9.074
       },
       "num_frames": 30,
-      "lines": {
-        "actual_lines": 244,
-        "expected_lines": 244,
-        "matching_lines": 236
-      },
-      "duration": 0.22,
-      "ruffle_diff_count": 13,
-      "ours_diff_count": 8,
-      "status": "ruffle_matched",
-      "detail": "diffs 8 \u2286 ruffle 13"
+      "status": "compile_fail",
+      "detail": "collect2: error: ld returned 1 exit status",
+      "duration": 9.07
     },
     {
       "test": "Number-v6",
       "phases": {
         "recomp": 0.0,
-        "compile": 0.209,
-        "run": 0.008
+        "compile": 8.822
       },
       "num_frames": 30,
-      "lines": {
-        "actual_lines": 239,
-        "expected_lines": 239,
-        "matching_lines": 239
-      },
-      "duration": 0.22,
-      "status": "pass"
+      "status": "compile_fail",
+      "detail": "collect2: error: ld returned 1 exit status",
+      "duration": 8.82
     },
     {
       "test": "Number-v7",
       "phases": {
         "recomp": 0.0,
-        "compile": 0.209,
-        "run": 0.007
+        "compile": 8.756
       },
       "num_frames": 30,
-      "lines": {
-        "actual_lines": 237,
-        "expected_lines": 237,
-        "matching_lines": 237
-      },
-      "duration": 0.22,
-      "status": "pass"
+      "status": "compile_fail",
+      "detail": "collect2: error: ld returned 1 exit status",
+      "duration": 8.76
     },
     {
       "test": "Number-v8",
       "phases": {
         "recomp": 0.0,
-        "compile": 0.211,
-        "run": 0.007
+        "compile": 1.416
       },
       "num_frames": 30,
-      "lines": {
-        "actual_lines": 237,
-        "expected_lines": 237,
-        "matching_lines": 237
-      },
-      "duration": 0.22,
-      "status": "pass"
+      "status": "compile_fail",
+      "detail": "collect2: error: ld returned 1 exit status",
+      "duration": 1.42
     },
     {
       "test": "Point-v5",
       "phases": {
         "recomp": 0.0,
-        "compile": 1.405,
-        "run": 0.003
+        "compile": 18.412
       },
       "num_frames": 30,
-      "lines": {
-        "actual_lines": 7,
-        "expected_lines": 7,
-        "matching_lines": 7
-      },
-      "duration": 1.41,
-      "status": "pass"
+      "status": "compile_fail",
+      "detail": "collect2: error: ld returned 1 exit status",
+      "duration": 18.41
     },
     {
       "test": "Point-v6",
       "phases": {
         "recomp": 0.0,
-        "compile": 0.554,
-        "run": 0.003
+        "compile": 0.581
       },
       "num_frames": 30,
-      "lines": {
-        "actual_lines": 7,
-        "expected_lines": 7,
-        "matching_lines": 7
-      },
-      "duration": 0.56,
-      "status": "pass"
+      "status": "compile_fail",
+      "detail": "collect2: error: ld returned 1 exit status",
+      "duration": 0.58
     },
     {
       "test": "Point-v7",
       "phases": {
         "recomp": 0.0,
-        "compile": 1.438,
-        "run": 0.003
+        "compile": 1.461
       },
       "num_frames": 30,
-      "lines": {
-        "actual_lines": 7,
-        "expected_lines": 7,
-        "matching_lines": 7
-      },
-      "duration": 1.44,
-      "status": "pass"
+      "status": "compile_fail",
+      "detail": "collect2: error: ld returned 1 exit status",
+      "duration": 1.46
     },
     {
       "test": "Point-v8",
       "phases": {
         "recomp": 0.0,
-        "compile": 7.694,
-        "run": 0.007
+        "compile": 7.602
       },
       "num_frames": 30,
-      "lines": {
-        "actual_lines": 193,
-        "expected_lines": 193,
-        "matching_lines": 193
-      },
-      "duration": 7.7,
-      "status": "pass"
+      "status": "compile_fail",
+      "detail": "collect2: error: ld returned 1 exit status",
+      "duration": 7.6
     },
     {
       "test": "Random-v5",
       "phases": {
         "recomp": 0.0,
-        "compile": 2.377,
-        "run": 0.051
+        "compile": 2.275
       },
       "num_frames": 30,
-      "lines": {
-        "actual_lines": 30,
-        "expected_lines": 30,
-        "matching_lines": 30
-      },
-      "duration": 2.43,
-      "status": "pass"
+      "status": "compile_fail",
+      "detail": "collect2: error: ld returned 1 exit status",
+      "duration": 2.28
     },
     {
       "test": "Random-v6",
       "phases": {
         "recomp": 0.0,
-        "compile": 0.572,
-        "run": 0.051
+        "compile": 0.556
       },
       "num_frames": 30,
-      "lines": {
-        "actual_lines": 30,
-        "expected_lines": 30,
-        "matching_lines": 30
-      },
-      "duration": 0.63,
-      "status": "pass"
+      "status": "compile_fail",
+      "detail": "collect2: error: ld returned 1 exit status",
+      "duration": 0.56
     },
     {
       "test": "Random-v7",
       "phases": {
         "recomp": 0.0,
-        "compile": 2.154,
-        "run": 0.022
+        "compile": 19.066
       },
       "num_frames": 30,
-      "lines": {
-        "actual_lines": 30,
-        "expected_lines": 30,
-        "matching_lines": 30
-      },
-      "duration": 2.18,
-      "status": "pass"
+      "status": "compile_fail",
+      "detail": "collect2: error: ld returned 1 exit status",
+      "duration": 19.07
     },
     {
       "test": "Random-v8",
       "phases": {
         "recomp": 0.0,
-        "compile": 1.097,
-        "run": 0.022
+        "compile": 1.023
       },
       "num_frames": 30,
-      "lines": {
-        "actual_lines": 30,
-        "expected_lines": 30,
-        "matching_lines": 30
-      },
-      "duration": 1.12,
-      "status": "pass"
+      "status": "compile_fail",
+      "detail": "collect2: error: ld returned 1 exit status",
+      "duration": 1.02
     },
     {
       "test": "Rectangle-v5",
       "phases": {
         "recomp": 0.0,
-        "compile": 1.218,
-        "run": 0.003
+        "compile": 1.574
       },
       "num_frames": 30,
-      "lines": {
-        "actual_lines": 7,
-        "expected_lines": 7,
-        "matching_lines": 7
-      },
-      "duration": 1.22,
-      "status": "pass"
+      "status": "compile_fail",
+      "detail": "collect2: error: ld returned 1 exit status",
+      "duration": 1.57
     },
     {
       "test": "Rectangle-v6",
       "phases": {
         "recomp": 0.0,
-        "compile": 0.487,
-        "run": 0.003
+        "compile": 0.559
       },
       "num_frames": 30,
-      "lines": {
-        "actual_lines": 7,
-        "expected_lines": 7,
-        "matching_lines": 7
-      },
-      "duration": 0.49,
-      "status": "pass"
+      "status": "compile_fail",
+      "detail": "collect2: error: ld returned 1 exit status",
+      "duration": 0.56
     },
     {
       "test": "Rectangle-v7",
       "phases": {
         "recomp": 0.0,
-        "compile": 1.285,
-        "run": 0.003
+        "compile": 1.176
       },
       "num_frames": 30,
-      "lines": {
-        "actual_lines": 7,
-        "expected_lines": 7,
-        "matching_lines": 7
-      },
-      "duration": 1.29,
-      "status": "pass"
+      "status": "compile_fail",
+      "detail": "collect2: error: ld returned 1 exit status",
+      "duration": 1.18
     },
     {
       "test": "Rectangle-v8",
       "phases": {
         "recomp": 0.0,
-        "compile": 5.934,
-        "run": 0.006
+        "compile": 6.33
       },
       "num_frames": 30,
-      "lines": {
-        "actual_lines": 166,
-        "expected_lines": 166,
-        "matching_lines": 145
-      },
-      "duration": 5.94,
-      "ruffle_diff_count": 21,
-      "ours_diff_count": 21,
-      "status": "ruffle_matched",
-      "detail": "diffs 21 \u2286 ruffle 21"
+      "status": "compile_fail",
+      "detail": "collect2: error: ld returned 1 exit status",
+      "duration": 6.33
     },
     {
       "test": "Selection-v5",
       "phases": {
         "recomp": 0.0,
-        "compile": 2.022,
-        "run": 0.003
+        "compile": 18.842
       },
       "num_frames": 30,
-      "lines": {
-        "actual_lines": 21,
-        "expected_lines": 21,
-        "matching_lines": 21
-      },
-      "duration": 2.03,
-      "status": "pass"
+      "status": "compile_fail",
+      "detail": "collect2: error: ld returned 1 exit status",
+      "duration": 18.84
     },
     {
       "test": "Selection-v6",
       "phases": {
         "recomp": 0.0,
-        "compile": 5.097,
-        "run": 0.006
+        "compile": 5.214
       },
       "num_frames": 30,
-      "lines": {
-        "actual_lines": 125,
-        "expected_lines": 125,
-        "matching_lines": 118
-      },
-      "duration": 5.11,
-      "ruffle_diff_count": 13,
-      "ours_diff_count": 7,
-      "status": "ruffle_matched",
-      "detail": "diffs 7 \u2286 ruffle 13"
+      "status": "compile_fail",
+      "detail": "collect2: error: ld returned 1 exit status",
+      "duration": 5.21
     },
     {
       "test": "Selection-v7",
       "phases": {
         "recomp": 0.0,
-        "compile": 4.732,
-        "run": 0.005
+        "compile": 4.68
       },
       "num_frames": 30,
-      "lines": {
-        "actual_lines": 125,
-        "expected_lines": 125,
-        "matching_lines": 118
-      },
-      "duration": 4.74,
-      "ruffle_diff_count": 13,
-      "ours_diff_count": 7,
-      "status": "ruffle_matched",
-      "detail": "diffs 7 \u2286 ruffle 13"
+      "status": "compile_fail",
+      "detail": "collect2: error: ld returned 1 exit status",
+      "duration": 4.68
     },
     {
       "test": "Selection-v8",
       "phases": {
         "recomp": 0.0,
-        "compile": 1.25,
-        "run": 0.006
+        "compile": 1.097
       },
       "num_frames": 30,
-      "lines": {
-        "actual_lines": 125,
-        "expected_lines": 125,
-        "matching_lines": 118
-      },
-      "duration": 1.26,
-      "ruffle_diff_count": 13,
-      "ours_diff_count": 7,
-      "status": "ruffle_matched",
-      "detail": "diffs 7 \u2286 ruffle 13"
+      "status": "compile_fail",
+      "detail": "collect2: error: ld returned 1 exit status",
+      "duration": 1.1
     },
     {
       "test": "Sound-v5",
       "phases": {
         "recomp": 0.0,
-        "compile": 21.978,
-        "run": 0.006
+        "compile": 21.355
       },
       "num_frames": 50,
-      "lines": {
-        "actual_lines": 100,
-        "expected_lines": 100,
-        "matching_lines": 73
-      },
-      "duration": 21.99,
-      "ruffle_diff_count": 27,
-      "ours_diff_count": 27,
-      "status": "ruffle_matched",
-      "detail": "diffs 27 \u2286 ruffle 27"
+      "status": "compile_fail",
+      "detail": "collect2: error: ld returned 1 exit status",
+      "duration": 21.36
     },
     {
       "test": "Sound-v6",
       "phases": {
         "recomp": 0.0,
-        "compile": 5.074,
-        "run": 0.006
+        "compile": 4.856
       },
       "num_frames": 50,
-      "lines": {
-        "actual_lines": 121,
-        "expected_lines": 121,
-        "matching_lines": 91
-      },
-      "duration": 5.08,
-      "ruffle_diff_count": 51,
-      "ours_diff_count": 30,
-      "status": "ruffle_matched",
-      "detail": "diffs 30 \u2286 ruffle 51"
+      "status": "compile_fail",
+      "detail": "collect2: error: ld returned 1 exit status",
+      "duration": 4.86
     },
     {
       "test": "Sound-v7",
       "phases": {
         "recomp": 0.0,
-        "compile": 22.392,
-        "run": 0.005
+        "compile": 21.243
       },
       "num_frames": 50,
-      "lines": {
-        "actual_lines": 121,
-        "expected_lines": 121,
-        "matching_lines": 93
-      },
-      "duration": 22.4,
-      "ruffle_diff_count": 51,
-      "ours_diff_count": 28,
-      "status": "ruffle_matched",
-      "detail": "diffs 28 \u2286 ruffle 51"
+      "status": "compile_fail",
+      "detail": "collect2: error: ld returned 1 exit status",
+      "duration": 21.24
     },
     {
       "test": "Sound-v8",
       "phases": {
         "recomp": 0.0,
-        "compile": 1.654,
-        "run": 0.005
+        "compile": 1.38
       },
       "num_frames": 50,
-      "lines": {
-        "actual_lines": 121,
-        "expected_lines": 121,
-        "matching_lines": 93
-      },
-      "duration": 1.66,
-      "ruffle_diff_count": 51,
-      "ours_diff_count": 28,
-      "status": "ruffle_matched",
-      "detail": "diffs 28 \u2286 ruffle 51"
+      "status": "compile_fail",
+      "detail": "collect2: error: ld returned 1 exit status",
+      "duration": 1.38
     },
     {
       "test": "Stage-v5",
       "phases": {
         "recomp": 0.0,
-        "compile": 2.294,
-        "run": 0.004
+        "compile": 18.637
       },
       "num_frames": 30,
-      "lines": {
-        "actual_lines": 38,
-        "expected_lines": 38,
-        "matching_lines": 38
-      },
-      "duration": 2.3,
-      "status": "pass"
+      "status": "compile_fail",
+      "detail": "collect2: error: ld returned 1 exit status",
+      "duration": 18.64
     },
     {
       "test": "String-v5",
       "phases": {
         "recomp": 0.0,
-        "compile": 15.382,
-        "run": 0.019
+        "compile": 14.745
       },
       "num_frames": 30,
-      "lines": {
-        "actual_lines": 358,
-        "expected_lines": 358,
-        "matching_lines": 339
-      },
-      "duration": 15.41,
-      "ruffle_diff_count": 21,
-      "ours_diff_count": 19,
-      "status": "ruffle_matched",
-      "detail": "diffs 19 \u2286 ruffle 21"
+      "status": "compile_fail",
+      "detail": "collect2: error: ld returned 1 exit status",
+      "duration": 14.75
     },
     {
       "test": "String-v6",
       "phases": {
         "recomp": 0.0,
-        "compile": 16.349,
-        "run": 0.019
+        "compile": 15.544
       },
       "num_frames": 30,
-      "lines": {
-        "actual_lines": 377,
-        "expected_lines": 377,
-        "matching_lines": 367
-      },
-      "duration": 16.37,
-      "ruffle_diff_count": 10,
-      "ours_diff_count": 10,
-      "status": "ruffle_matched",
-      "detail": "diffs 10 \u2286 ruffle 10"
+      "status": "compile_fail",
+      "detail": "collect2: error: ld returned 1 exit status",
+      "duration": 15.54
     },
     {
       "test": "String-v7",
       "phases": {
         "recomp": 0.0,
-        "compile": 15.933,
-        "run": 0.013
+        "compile": 15.29
       },
       "num_frames": 30,
-      "lines": {
-        "actual_lines": 377,
-        "expected_lines": 377,
-        "matching_lines": 367
-      },
-      "duration": 15.95,
-      "ruffle_diff_count": 10,
-      "ours_diff_count": 10,
-      "status": "ruffle_matched",
-      "detail": "diffs 10 \u2286 ruffle 10"
+      "status": "compile_fail",
+      "detail": "collect2: error: ld returned 1 exit status",
+      "duration": 15.29
     },
     {
       "test": "String-v8",
       "phases": {
         "recomp": 0.0,
-        "compile": 16.473,
-        "run": 0.013
+        "compile": 35.798
       },
       "num_frames": 30,
-      "lines": {
-        "actual_lines": 377,
-        "expected_lines": 377,
-        "matching_lines": 367
-      },
-      "duration": 16.49,
-      "ruffle_diff_count": 10,
-      "ours_diff_count": 10,
-      "status": "ruffle_matched",
-      "detail": "diffs 10 \u2286 ruffle 10"
+      "status": "compile_fail",
+      "detail": "collect2: error: ld returned 1 exit status",
+      "duration": 35.8
     },
     {
       "test": "System-v5",
       "phases": {
         "recomp": 0.0,
-        "compile": 3.071,
-        "run": 0.004
+        "compile": 3.17
       },
       "num_frames": 30,
-      "lines": {
-        "actual_lines": 67,
-        "expected_lines": 67,
-        "matching_lines": 67
-      },
-      "duration": 3.08,
-      "status": "pass"
+      "status": "compile_fail",
+      "detail": "collect2: error: ld returned 1 exit status",
+      "duration": 3.17
     },
     {
       "test": "System-v6",
       "phases": {
         "recomp": 0.0,
-        "compile": 3.931,
-        "run": 0.005
+        "compile": 3.98
       },
       "num_frames": 30,
-      "lines": {
-        "actual_lines": 100,
-        "expected_lines": 100,
-        "matching_lines": 100
-      },
-      "duration": 3.94,
-      "status": "pass"
+      "status": "compile_fail",
+      "detail": "collect2: error: ld returned 1 exit status",
+      "duration": 3.98
     },
     {
       "test": "System-v7",
       "phases": {
         "recomp": 0.0,
-        "compile": 4.02,
-        "run": 0.004
+        "compile": 4.073
       },
       "num_frames": 30,
-      "lines": {
-        "actual_lines": 101,
-        "expected_lines": 101,
-        "matching_lines": 101
-      },
-      "duration": 4.03,
-      "status": "pass"
+      "status": "compile_fail",
+      "detail": "collect2: error: ld returned 1 exit status",
+      "duration": 4.07
     },
     {
       "test": "System-v8",
       "phases": {
         "recomp": 0.0,
-        "compile": 1.332,
-        "run": 0.004
+        "compile": 1.112
       },
       "num_frames": 30,
-      "lines": {
-        "actual_lines": 101,
-        "expected_lines": 101,
-        "matching_lines": 101
-      },
-      "duration": 1.34,
-      "status": "pass"
+      "status": "compile_fail",
+      "detail": "collect2: error: ld returned 1 exit status",
+      "duration": 1.11
     },
     {
       "test": "TextField-v5",
       "phases": {
         "recomp": 0.0,
-        "compile": 1.952,
-        "run": 0.003
+        "compile": 1.757
       },
       "num_frames": 30,
-      "lines": {
-        "actual_lines": 12,
-        "expected_lines": 12,
-        "matching_lines": 9
-      },
-      "duration": 1.96,
-      "ruffle_diff_count": 3,
-      "ours_diff_count": 3,
-      "status": "ruffle_matched",
-      "detail": "diffs 3 \u2286 ruffle 3"
+      "status": "compile_fail",
+      "detail": "collect2: error: ld returned 1 exit status",
+      "duration": 1.76
     },
     {
       "test": "TextFieldHTML-v5",
       "phases": {
         "recomp": 0.0,
-        "compile": 0.203,
-        "run": 0.003
+        "compile": 19.065
       },
       "num_frames": 30,
-      "lines": {
-        "actual_lines": 6,
-        "expected_lines": 6,
-        "matching_lines": 6
-      },
-      "duration": 0.21,
-      "status": "pass"
+      "status": "compile_fail",
+      "detail": "collect2: error: ld returned 1 exit status",
+      "duration": 19.07
     },
     {
       "test": "TextFieldHTML-v6",
       "phases": {
         "recomp": 0.0,
-        "compile": 0.196,
-        "run": 0.004
+        "compile": 2.528
       },
       "num_frames": 30,
-      "lines": {
-        "actual_lines": 37,
-        "expected_lines": 37,
-        "matching_lines": 37
-      },
-      "duration": 0.2,
-      "status": "pass"
+      "status": "compile_fail",
+      "detail": "collect2: error: ld returned 1 exit status",
+      "duration": 2.53
     },
     {
       "test": "TextFieldHTML-v7",
       "phases": {
         "recomp": 0.0,
-        "compile": 0.197,
-        "run": 0.003
+        "compile": 2.16
       },
       "num_frames": 30,
-      "lines": {
-        "actual_lines": 37,
-        "expected_lines": 37,
-        "matching_lines": 37
-      },
-      "duration": 0.2,
-      "status": "pass"
+      "status": "compile_fail",
+      "detail": "collect2: error: ld returned 1 exit status",
+      "duration": 2.16
     },
     {
       "test": "TextFieldHTML-v8",
       "phases": {
         "recomp": 0.0,
-        "compile": 0.197,
-        "run": 0.003
+        "compile": 1.347
       },
       "num_frames": 30,
-      "lines": {
-        "actual_lines": 37,
-        "expected_lines": 37,
-        "matching_lines": 37
-      },
-      "duration": 0.2,
-      "status": "pass"
+      "status": "compile_fail",
+      "detail": "collect2: error: ld returned 1 exit status",
+      "duration": 1.35
     },
     {
       "test": "TextFormat-v5",
       "phases": {
         "recomp": 0.0,
-        "compile": 0.202,
-        "run": 0.005
+        "compile": 5.032
       },
       "num_frames": 30,
-      "lines": {
-        "actual_lines": 128,
-        "expected_lines": 128,
-        "matching_lines": 128
-      },
-      "duration": 0.21,
-      "status": "pass"
+      "status": "compile_fail",
+      "detail": "collect2: error: ld returned 1 exit status",
+      "duration": 5.03
     },
     {
       "test": "TextFormat-v6",
       "phases": {
         "recomp": 0.0,
-        "compile": 0.202,
-        "run": 0.005
+        "compile": 0.608
       },
       "num_frames": 30,
-      "lines": {
-        "actual_lines": 128,
-        "expected_lines": 128,
-        "matching_lines": 128
-      },
-      "duration": 0.21,
-      "status": "pass"
+      "status": "compile_fail",
+      "detail": "collect2: error: ld returned 1 exit status",
+      "duration": 0.61
     },
     {
       "test": "TextFormat-v7",
       "phases": {
         "recomp": 0.0,
-        "compile": 0.224,
-        "run": 0.006
+        "compile": 23.266
       },
       "num_frames": 30,
-      "lines": {
-        "actual_lines": 174,
-        "expected_lines": 174,
-        "matching_lines": 132
-      },
-      "duration": 0.23,
-      "status": "output_mismatch",
-      "detail": "42 line(s) differ (actual=174, expected=174)",
-      "actual_output": "... (126 lines before) ...\nPASSED: te.hasOwnProperty(\"descent\") [./TextFormat.as:329]\nPASSED: te.hasOwnProperty(\"textFieldWidth\") [./TextFormat.as:330]\nPASSED: te.hasOwnProperty(\"textFieldHeight\") [./TextFormat.as:331]\nPASSED: te.hasOwnProperty(\"width\") [./TextFormat.as:332]\nPASSED: te.hasOwnProperty(\"height\") [./TextFormat.as:333]\nFAILED: expected: 37 obtained: 32.95 [./TextFormat.as:335]\nFAILED: expected: 33 obtained: 28.95 [./TextFormat.as:336]\nFAILED: expected: 11 obtained: 12.828 [./TextFormat.as:340]\nFAILED: expected: 17 obtained: 20.344 [./TextFormat.as:347]\nFAILED: expected: 2 obtained: 3.516 [./TextFormat.as:348]\nFAILED: expected: 8 obtained: 6.7 [./TextFormat.as:352]\nFAILED: expected: 16 obtained: 13.4 [./TextFormat.as:354]\nFAILED: expected: 24 obtained: 20.1 [./TextFormat.as:356]\nFAILED: expected: 17 obtained: 69.376 [./TextFormat.as:362]\nFAILED: expected: tf2.getTextExtent(\"He\").textFieldWidth obtained: 10 [./TextFormat.as:376]\nFAILED: expected: 27 obtained: 65.376 [./TextFormat.as:377]\nFAILED: expected: 10 obtained: 13.8 [./TextFormat.as:380]\nFAILED: expected: 33 obtained: 9.8 [./TextFormat.as:385]\nFAILED: expected: 17 obtained: 102.064 [./TextFormat.as:391]\nFAILED: expected: 2 obtained: 3.516 [./TextFormat.as:392]\nFAILED: expected: 5 obtained: 12.85 [./TextFormat.as:397]\nFAILED: expected: 11 obtained: 12.828 [./TextFormat.as:401]\nFAILED: expected: 33 obtained: 8.85 [./TextFormat.as:408]\nFAILED: expected: 30 obtained: 32.95 [./TextFormat.as:413]\nFAILED: expected: 25 obtained: 28.95 [./TextFormat.as:414]\nFAILED: expected: 152 obtained: 147.096 [./TextFormat.as:418]\nFAILED: expected: 30 obtained: 33.25 [./TextFormat.as:422]\nFAILED: expected: 26 obtained: 29.25 [./TextFormat.as:427]\nFAILED: expected: 111 obtained: 98.064 [./TextFormat.as:428]\nFAILED: expected: 12 obtained: 11.25 [./TextFormat.as:432]\nFAILED: expected: 11 obtained: 12.828 [./TextFormat.as:436]\nFAILED: expected: 17 obtained: 20.344 [./TextFormat.as:439]\nFAILED: expected: 2 obtained: 3.516 [./TextFormat.as:440]\nFAILED: expected: 20 obtained: 19 [./TextFormat.as:447]\nFAILED: expected: 11 obtained: 13 [./TextFormat.as:448]\nFAILED: expected: 17 obtained: 20.344 [./TextFormat.as:450]\nFAILED: expected: 2 obtained: 3.516 [./TextFormat.as:451]\nFAILED: expected: 24 obtained: 21.55 [./TextFormat.as:458]\nFAILED: expected: 11 obtained: 12.828 [./TextFormat.as:462]\nFAILED: expected: 17 obtained: 20.344 [./TextFormat.as:465]\nFAILED: expected: 2 obtained: 3.516 [./TextFormat.as:466]\nFAILED: expected: 27 obtained: 31 [./TextFormat.as:474]\nFAILED: expected: 36 obtained: 33 [./TextFormat.as:475]\nFAILED: expected: 18 obtained: 21.38 [./TextFormat.as:477]\nFAILED: expected: 4 obtained: 5.86 [./TextFormat.as:478]\n#passed: 128\n#failed: 40\n#total tests run: 168",
-      "expected_output": "... (126 lines before) ...\nPASSED: te.hasOwnProperty(\"descent\") [./TextFormat.as:329]\nPASSED: te.hasOwnProperty(\"textFieldWidth\") [./TextFormat.as:330]\nPASSED: te.hasOwnProperty(\"textFieldHeight\") [./TextFormat.as:331]\nPASSED: te.hasOwnProperty(\"width\") [./TextFormat.as:332]\nPASSED: te.hasOwnProperty(\"height\") [./TextFormat.as:333]\nPASSED: te.textFieldWidth == 37 [./TextFormat.as:335]\nPASSED: te.width == 33 [./TextFormat.as:336]\nPASSED: te.ascent == 11 [./TextFormat.as:340]\nPASSED: te.textFieldHeight == 17 [./TextFormat.as:347]\nPASSED: te.descent == 2 [./TextFormat.as:348]\nPASSED: te.width == 8 [./TextFormat.as:352]\nPASSED: te.width == 16 [./TextFormat.as:354]\nPASSED: te.width == 24 [./TextFormat.as:356]\nPASSED: te.textFieldHeight == 17 [./TextFormat.as:362]\nPASSED: wrappingPoint == tf2.getTextExtent(\"He\").textFieldWidth [./TextFormat.as:376]\nPASSED: tf2.getTextExtent(\"Hello\", wrappingPoint).height == 27 [./TextFormat.as:377]\nPASSED: te.textFieldWidth == 10 [./TextFormat.as:380]\nPASSED: te.width == 33 [./TextFormat.as:385]\nPASSED: te.textFieldHeight == 17 [./TextFormat.as:391]\nPASSED: te.descent == 2 [./TextFormat.as:392]\nPASSED: te.textFieldWidth == 5 [./TextFormat.as:397]\nPASSED: te.ascent == 11 [./TextFormat.as:401]\nPASSED: te.width == 33 [./TextFormat.as:408]\nPASSED: te.textFieldWidth == 30 [./TextFormat.as:413]\nPASSED: te.width == 25 [./TextFormat.as:414]\nPASSED: te.height == 152 [./TextFormat.as:418]\nPASSED: te.textFieldWidth == 30 [./TextFormat.as:422]\nPASSED: te.width == 26 [./TextFormat.as:427]\nPASSED: te.height == 111 [./TextFormat.as:428]\nPASSED: te.textFieldWidth == 12 [./TextFormat.as:432]\nPASSED: te.ascent == 11 [./TextFormat.as:436]\nPASSED: te.textFieldHeight == 17 [./TextFormat.as:439]\nPASSED: te.descent == 2 [./TextFormat.as:440]\nPASSED: Math.round(te.textFieldWidth) == 20 [./TextFormat.as:447]\nPASSED: Math.round(te.ascent) == 11 [./TextFormat.as:448]\nPASSED: te.textFieldHeight == 17 [./TextFormat.as:450]\nPASSED: te.descent == 2 [./TextFormat.as:451]\nPASSED: te.textFieldWidth == 24 [./TextFormat.as:458]\nPASSED: te.ascent == 11 [./TextFormat.as:462]\nPASSED: te.textFieldHeight == 17 [./TextFormat.as:465]\nPASSED: te.descent == 2 [./TextFormat.as:466]\nPASSED: Math.round(te.textFieldHeight) == 27 [./TextFormat.as:474]\nPASSED: Math.round(te.textFieldWidth) == 36 [./TextFormat.as:475]\nPASSED: te.ascent == 18 [./TextFormat.as:477]\nPASSED: te.descent == 4 [./TextFormat.as:478]\n#passed: 168\n#failed: 0\n#total tests run: 168"
+      "status": "compile_fail",
+      "detail": "collect2: error: ld returned 1 exit status",
+      "duration": 23.27
     },
     {
       "test": "TextSnapshot-v5",
       "phases": {
         "recomp": 0.0,
-        "compile": 0.203,
-        "run": 0.003
+        "compile": 1.569
       },
       "num_frames": 30,
-      "lines": {
-        "actual_lines": 7,
-        "expected_lines": 7,
-        "matching_lines": 7
-      },
-      "duration": 0.21,
-      "status": "pass"
+      "status": "compile_fail",
+      "detail": "collect2: error: ld returned 1 exit status",
+      "duration": 1.57
     },
     {
       "test": "TextSnapshot-v6",
       "phases": {
         "recomp": 0.0,
-        "compile": 0.213,
-        "run": 0.007
+        "compile": 7.238
       },
       "num_frames": 30,
-      "lines": {
-        "actual_lines": 173,
-        "expected_lines": 173,
-        "matching_lines": 173
-      },
-      "duration": 0.22,
-      "status": "pass"
+      "status": "compile_fail",
+      "detail": "collect2: error: ld returned 1 exit status",
+      "duration": 7.24
     },
     {
       "test": "TextSnapshot-v7",
       "phases": {
         "recomp": 0.0,
-        "compile": 0.214,
-        "run": 0.006
+        "compile": 6.839
       },
       "num_frames": 30,
-      "lines": {
-        "actual_lines": 173,
-        "expected_lines": 173,
-        "matching_lines": 173
-      },
-      "duration": 0.22,
-      "status": "pass"
+      "status": "compile_fail",
+      "detail": "collect2: error: ld returned 1 exit status",
+      "duration": 6.84
     },
     {
       "test": "TextSnapshot-v8",
       "phases": {
         "recomp": 0.0,
-        "compile": 0.211,
-        "run": 0.006
+        "compile": 1.114
       },
       "num_frames": 30,
-      "lines": {
-        "actual_lines": 173,
-        "expected_lines": 173,
-        "matching_lines": 173
-      },
-      "duration": 0.22,
-      "status": "pass"
+      "status": "compile_fail",
+      "detail": "collect2: error: ld returned 1 exit status",
+      "duration": 1.11
     },
     {
       "test": "Transform-v5",
       "phases": {
         "recomp": 0.0,
-        "compile": 0.2,
-        "run": 0.003
+        "compile": 1.548
       },
       "num_frames": 30,
-      "lines": {
-        "actual_lines": 7,
-        "expected_lines": 7,
-        "matching_lines": 7
-      },
-      "duration": 0.21,
-      "status": "pass"
+      "status": "compile_fail",
+      "detail": "collect2: error: ld returned 1 exit status",
+      "duration": 1.55
     },
     {
       "test": "Transform-v6",
       "phases": {
         "recomp": 0.0,
-        "compile": 1.347,
-        "run": 0.003
+        "compile": 19.523
       },
       "num_frames": 30,
-      "lines": {
-        "actual_lines": 7,
-        "expected_lines": 7,
-        "matching_lines": 7
-      },
-      "duration": 1.35,
-      "status": "pass"
+      "status": "compile_fail",
+      "detail": "collect2: error: ld returned 1 exit status",
+      "duration": 19.52
     },
     {
       "test": "Transform-v7",
       "phases": {
         "recomp": 0.0,
-        "compile": 1.478,
-        "run": 0.003
+        "compile": 1.246
       },
       "num_frames": 30,
-      "lines": {
-        "actual_lines": 7,
-        "expected_lines": 7,
-        "matching_lines": 7
-      },
-      "duration": 1.48,
-      "status": "pass"
+      "status": "compile_fail",
+      "detail": "collect2: error: ld returned 1 exit status",
+      "duration": 1.25
     },
     {
       "test": "Try-v5",
       "phases": {
         "recomp": 0.0,
-        "compile": 2.895,
-        "run": 0.004
+        "compile": 2.729
       },
       "num_frames": 30,
-      "lines": {
-        "actual_lines": 20,
-        "expected_lines": 20,
-        "matching_lines": 20
-      },
-      "duration": 2.9,
-      "status": "pass"
+      "status": "compile_fail",
+      "detail": "collect2: error: ld returned 1 exit status",
+      "duration": 2.73
     },
     {
       "test": "Try-v6",
       "phases": {
         "recomp": 0.0,
-        "compile": 0.585,
-        "run": 0.004
+        "compile": 0.558
       },
       "num_frames": 30,
-      "lines": {
-        "actual_lines": 20,
-        "expected_lines": 20,
-        "matching_lines": 20
-      },
-      "duration": 0.59,
-      "status": "pass"
+      "status": "compile_fail",
+      "detail": "collect2: error: ld returned 1 exit status",
+      "duration": 0.56
     },
     {
       "test": "Try-v7",
       "phases": {
         "recomp": 0.0,
-        "compile": 2.54,
-        "run": 0.004
+        "compile": 2.342
       },
       "num_frames": 30,
-      "lines": {
-        "actual_lines": 20,
-        "expected_lines": 20,
-        "matching_lines": 20
-      },
-      "duration": 2.55,
-      "status": "pass"
+      "status": "compile_fail",
+      "detail": "collect2: error: ld returned 1 exit status",
+      "duration": 2.34
     },
     {
       "test": "Try-v8",
       "phases": {
         "recomp": 0.0,
-        "compile": 1.312,
-        "run": 0.003
+        "compile": 1.095
       },
       "num_frames": 30,
-      "lines": {
-        "actual_lines": 20,
-        "expected_lines": 20,
-        "matching_lines": 20
-      },
-      "duration": 1.32,
-      "status": "pass"
+      "status": "compile_fail",
+      "detail": "collect2: error: ld returned 1 exit status",
+      "duration": 1.09
     },
     {
       "test": "Video-v5",
       "phases": {
         "recomp": 0.0,
-        "compile": 0.217,
-        "run": 0.003
+        "compile": 19.333
       },
       "num_frames": 30,
-      "lines": {
-        "actual_lines": 7,
-        "expected_lines": 7,
-        "matching_lines": 7
-      },
-      "duration": 0.22,
-      "status": "pass"
+      "status": "compile_fail",
+      "detail": "collect2: error: ld returned 1 exit status",
+      "duration": 19.33
     },
     {
       "test": "Video-v6",
       "phases": {
         "recomp": 0.0,
-        "compile": 0.212,
-        "run": 0.007
+        "compile": 3.575
       },
       "num_frames": 30,
-      "lines": {
-        "actual_lines": 85,
-        "expected_lines": 85,
-        "matching_lines": 85
-      },
-      "duration": 0.22,
-      "status": "pass"
+      "status": "compile_fail",
+      "detail": "collect2: error: ld returned 1 exit status",
+      "duration": 3.58
     },
     {
       "test": "Video-v7",
       "phases": {
         "recomp": 0.0,
-        "compile": 0.212,
-        "run": 0.004
+        "compile": 3.248
       },
       "num_frames": 30,
-      "lines": {
-        "actual_lines": 85,
-        "expected_lines": 85,
-        "matching_lines": 85
-      },
-      "duration": 0.22,
-      "status": "pass"
+      "status": "compile_fail",
+      "detail": "collect2: error: ld returned 1 exit status",
+      "duration": 3.25
     },
     {
       "test": "Video-v8",
       "phases": {
         "recomp": 0.0,
-        "compile": 0.214,
-        "run": 0.004
+        "compile": 1.414
       },
       "num_frames": 30,
-      "lines": {
-        "actual_lines": 85,
-        "expected_lines": 85,
-        "matching_lines": 85
-      },
-      "duration": 0.22,
-      "status": "pass"
+      "status": "compile_fail",
+      "detail": "collect2: error: ld returned 1 exit status",
+      "duration": 1.41
     },
     {
       "test": "XMLSocket-v5",
       "phases": {
         "recomp": 0.0,
-        "compile": 0.199,
-        "run": 0.004
+        "compile": 19.637
       },
       "num_frames": 30,
-      "lines": {
-        "actual_lines": 35,
-        "expected_lines": 35,
-        "matching_lines": 35
-      },
-      "duration": 0.21,
-      "status": "pass"
+      "status": "compile_fail",
+      "detail": "collect2: error: ld returned 1 exit status",
+      "duration": 19.64
     },
     {
       "test": "XMLSocket-v6",
       "phases": {
         "recomp": 0.0,
-        "compile": 0.197,
-        "run": 0.004
+        "compile": 2.51
       },
       "num_frames": 30,
-      "lines": {
-        "actual_lines": 35,
-        "expected_lines": 35,
-        "matching_lines": 35
-      },
-      "duration": 0.2,
-      "status": "pass"
+      "status": "compile_fail",
+      "detail": "collect2: error: ld returned 1 exit status",
+      "duration": 2.51
     },
     {
       "test": "XMLSocket-v7",
       "phases": {
         "recomp": 0.0,
-        "compile": 0.171,
-        "run": 0.003
+        "compile": 20.565
       },
       "num_frames": 30,
-      "lines": {
-        "actual_lines": 35,
-        "expected_lines": 35,
-        "matching_lines": 35
-      },
-      "duration": 0.18,
-      "status": "pass"
+      "status": "compile_fail",
+      "detail": "collect2: error: ld returned 1 exit status",
+      "duration": 20.57
     },
     {
       "test": "XMLSocket-v8",
       "phases": {
         "recomp": 0.0,
-        "compile": 0.171,
-        "run": 0.003
+        "compile": 1.533
       },
       "num_frames": 30,
-      "lines": {
-        "actual_lines": 35,
-        "expected_lines": 35,
-        "matching_lines": 35
-      },
-      "duration": 0.18,
-      "status": "pass"
+      "status": "compile_fail",
+      "detail": "collect2: error: ld returned 1 exit status",
+      "duration": 1.53
     },
     {
       "test": "argstest-v5",
       "phases": {
         "recomp": 0.0,
-        "compile": 0.165,
-        "run": 0.002
+        "compile": 2.142
       },
       "num_frames": 30,
-      "lines": {
-        "actual_lines": 4,
-        "expected_lines": 4,
-        "matching_lines": 4
-      },
-      "duration": 0.17,
-      "status": "pass"
+      "status": "compile_fail",
+      "detail": "collect2: error: ld returned 1 exit status",
+      "duration": 2.14
     },
     {
       "test": "array-v5",
       "phases": {
         "recomp": 0.0,
-        "compile": 0.196,
-        "run": 0.019
+        "compile": 28.725
       },
       "num_frames": 30,
-      "lines": {
-        "actual_lines": 560,
-        "expected_lines": 560,
-        "matching_lines": 517
-      },
-      "duration": 0.22,
-      "status": "output_mismatch",
-      "detail": "43 line(s) differ (actual=560, expected=560)",
-      "actual_output": "... (92 lines before) ...\nPASSED: gaparray[12] == undefined [./array.as:231]\nPASSED: gaparray[13] == undefined [./array.as:232]\nPASSED: gaparray[14] == undefined [./array.as:233]\nPASSED: gaparray[15] == '16' [./array.as:235]\nPASSED: gaparray[16] == '4' [./array.as:236]\nFAILED: expected: '3' obtained: 2 [./array.as:260]\nPASSED: tmp[0] == '15' [./array.as:261]\nPASSED: tmp[1] == '16' [./array.as:262]\nFAILED: expected: '4' obtained:  [./array.as:263]\nPASSED: trysortarray.toString() == \"But,Different,alphabet,capitalization\" [./array.as:293]\nPASSED: trysortarray.toString() == \"But,alphabet,Different,capitalization\" [./array.as:295]\nPASSED: typeof(testCmpThis) == 'undefined' [./array.as:296]\nPASSED: testCmpCalls == 7 [./array.as:297]\nPASSED: trysortarray.toString() == \"But,alphabet,Different,capitalization\" [./array.as:301]\nPASSED: trysortarray.toString() == \"alphabet,Different,capitalization,But\" [./array.as:305]\nPASSED: trysortarray.toString() == \"alphabet,Different,capitalization,But\" [./array.as:309]\nPASSED: trysortarray.toString() == \"alphabet,Different,capitalization,But\" [./array.as:313]\nPASSED: trysortarray.length == 0 [./array.as:317]\nPASSED: trysortarray.toString() == \"1,2,3,4\" [./array.as:321]\nPASSED: trysortarray.length == 4 [./array.as:322]\nFAILED: expected: 4 obtained: 0 [./array.as:324]\nFAILED: expected: \"2,3,4,1\" obtained:  [./array.as:325]\nPASSED: indexedarray.length == 7 [./array.as:336]\nPASSED: firstRandom != secondRandom [./array.as:344]\nPASSED: typeof(c) == \"object\" [./array.as:351]\nPASSED: c[0] == \"zero\" [./array.as:356]\nPASSED: c[1] == \"one\" [./array.as:357]\nPASSED: c[1.1] == \"one point one\" [./array.as:358]\nPASSED: c[1.9] == undefined [./array.as:359]\nPASSED: c[-3] == \"minus three\" [./array.as:360]\nPASSED: c[-3.7] == undefined [./array.as:361]\nPASSED: c[0] == \"zero\" [./array.as:364]\nPASSED: c[1] == \"one\" [./array.as:365]\nPASSED: c[0] == undefined [./array.as:370]\nPASSED: c[1] == undefined [./array.as:371]\nPASSED: c[2] == undefined [./array.as:372]\nPASSED: c[3] == undefined [./array.as:373]\nPASSED: c[1.1] == \"one point one\" [./array.as:374]\nPASSED: c[-2147483649] == \"too low\" [./array.as:375]\nPASSED: c[int(-2147483649)] == undefined [./array.as:377]\nPASSED: c[-2147483649] == \"too low\" [./array.as:380]\nPASSED: c[2147483649] == \"too high\" [./array.as:381]\nPASSED: c[1] == undefined [./array.as:382]\nPASSED: c[2] == undefined [./array.as:383]\nPASSED: c[3] == undefined [./array.as:384]\nPASSED: c.length == -2147483646 [./array.as:386]\nPASSED: str == \"2147483649: too high; -2147483649: too low; -2147483648: lowest int; -3: minus three; 1.1: one point one; \" [./array.as:394]\nPASSED: c[0] == \"zero\" [./array.as:400]\nPASSED: c[1] == \"one\" [./array.as:401]\nPASSED: c[0] == \"zero\" [./array.as:405]\n... (418 lines after) ...",
-      "expected_output": "... (92 lines before) ...\nPASSED: gaparray[12] == undefined [./array.as:231]\nPASSED: gaparray[13] == undefined [./array.as:232]\nPASSED: gaparray[14] == undefined [./array.as:233]\nPASSED: gaparray[15] == '16' [./array.as:235]\nPASSED: gaparray[16] == '4' [./array.as:236]\nPASSED: tmp.length == '3' [./array.as:260]\nPASSED: tmp[0] == '15' [./array.as:261]\nPASSED: tmp[1] == '16' [./array.as:262]\nPASSED: tmp[2] == '4' [./array.as:263]\nPASSED: trysortarray.toString() == \"But,Different,alphabet,capitalization\" [./array.as:293]\nPASSED: trysortarray.toString() == \"But,alphabet,Different,capitalization\" [./array.as:295]\nPASSED: typeof(testCmpThis) == 'undefined' [./array.as:296]\nPASSED: testCmpCalls == 7 [./array.as:297]\nPASSED: trysortarray.toString() == \"But,alphabet,Different,capitalization\" [./array.as:301]\nPASSED: trysortarray.toString() == \"alphabet,Different,capitalization,But\" [./array.as:305]\nPASSED: trysortarray.toString() == \"alphabet,Different,capitalization,But\" [./array.as:309]\nPASSED: trysortarray.toString() == \"alphabet,Different,capitalization,But\" [./array.as:313]\nPASSED: trysortarray.length == 0 [./array.as:317]\nPASSED: trysortarray.toString() == \"1,2,3,4\" [./array.as:321]\nPASSED: trysortarray.length == 4 [./array.as:322]\nPASSED: trysortarray.length == 4 [./array.as:324]\nPASSED: trysortarray.toString() == \"2,3,4,1\" [./array.as:325]\nPASSED: indexedarray.length == 7 [./array.as:336]\nPASSED: firstRandom != secondRandom [./array.as:344]\nPASSED: typeof(c) == \"object\" [./array.as:351]\nPASSED: c[0] == \"zero\" [./array.as:356]\nPASSED: c[1] == \"one\" [./array.as:357]\nPASSED: c[1.1] == \"one point one\" [./array.as:358]\nPASSED: c[1.9] == undefined [./array.as:359]\nPASSED: c[-3] == \"minus three\" [./array.as:360]\nPASSED: c[-3.7] == undefined [./array.as:361]\nPASSED: c[0] == \"zero\" [./array.as:364]\nPASSED: c[1] == \"one\" [./array.as:365]\nPASSED: c[0] == undefined [./array.as:370]\nPASSED: c[1] == undefined [./array.as:371]\nPASSED: c[2] == undefined [./array.as:372]\nPASSED: c[3] == undefined [./array.as:373]\nPASSED: c[1.1] == \"one point one\" [./array.as:374]\nPASSED: c[-2147483649] == \"too low\" [./array.as:375]\nPASSED: c[int(-2147483649)] == undefined [./array.as:377]\nPASSED: c[-2147483649] == \"too low\" [./array.as:380]\nPASSED: c[2147483649] == \"too high\" [./array.as:381]\nPASSED: c[1] == undefined [./array.as:382]\nPASSED: c[2] == undefined [./array.as:383]\nPASSED: c[3] == undefined [./array.as:384]\nPASSED: c.length == -2147483646 [./array.as:386]\nPASSED: str == \"2147483649: too high; -2147483649: too low; -2147483648: lowest int; -3: minus three; 1.1: one point one; \" [./array.as:394]\nPASSED: c[0] == \"zero\" [./array.as:400]\nPASSED: c[1] == \"one\" [./array.as:401]\nPASSED: c[0] == \"zero\" [./array.as:405]\n... (418 lines after) ..."
+      "status": "compile_fail",
+      "detail": "collect2: error: ld returned 1 exit status",
+      "duration": 28.73
     },
     {
       "test": "case-v5",
       "phases": {
         "recomp": 0.0,
-        "compile": 0.163,
-        "run": 0.003
+        "compile": 2.627
       },
       "num_frames": 30,
-      "lines": {
-        "actual_lines": 39,
-        "expected_lines": 39,
-        "matching_lines": 39
-      },
-      "duration": 0.17,
-      "status": "pass"
+      "status": "compile_fail",
+      "detail": "collect2: error: ld returned 1 exit status",
+      "duration": 2.63
     },
     {
       "test": "case-v6",
       "phases": {
         "recomp": 0.0,
-        "compile": 0.166,
-        "run": 0.004
+        "compile": 3.613
       },
       "num_frames": 30,
-      "lines": {
-        "actual_lines": 73,
-        "expected_lines": 73,
-        "matching_lines": 73
-      },
-      "duration": 0.17,
-      "status": "pass"
+      "status": "compile_fail",
+      "detail": "collect2: error: ld returned 1 exit status",
+      "duration": 3.61
     },
     {
       "test": "case-v7",
       "phases": {
         "recomp": 0.0,
-        "compile": 3.279,
-        "run": 0.004
+        "compile": 19.83
       },
       "num_frames": 30,
-      "lines": {
-        "actual_lines": 67,
-        "expected_lines": 67,
-        "matching_lines": 67
-      },
-      "duration": 3.29,
-      "status": "pass"
+      "status": "compile_fail",
+      "detail": "collect2: error: ld returned 1 exit status",
+      "duration": 19.83
     },
     {
       "test": "case-v8",
       "phases": {
         "recomp": 0.0,
-        "compile": 1.356,
-        "run": 0.004
+        "compile": 1.407
       },
       "num_frames": 30,
-      "lines": {
-        "actual_lines": 67,
-        "expected_lines": 67,
-        "matching_lines": 67
-      },
-      "duration": 1.36,
-      "status": "pass"
+      "status": "compile_fail",
+      "detail": "collect2: error: ld returned 1 exit status",
+      "duration": 1.41
     },
     {
       "test": "delete-v5",
       "phases": {
         "recomp": 0.0,
-        "compile": 2.834,
-        "run": 0.004
+        "compile": 2.873
       },
       "num_frames": 30,
-      "lines": {
-        "actual_lines": 60,
-        "expected_lines": 60,
-        "matching_lines": 60
-      },
-      "duration": 2.84,
-      "status": "pass"
+      "status": "compile_fail",
+      "detail": "collect2: error: ld returned 1 exit status",
+      "duration": 2.87
     },
     {
       "test": "delete-v6",
       "phases": {
         "recomp": 0.0,
-        "compile": 2.308,
-        "run": 0.004
+        "compile": 2.338
       },
       "num_frames": 30,
-      "lines": {
-        "actual_lines": 60,
-        "expected_lines": 60,
-        "matching_lines": 60
-      },
-      "duration": 2.32,
-      "status": "pass"
+      "status": "compile_fail",
+      "detail": "collect2: error: ld returned 1 exit status",
+      "duration": 2.34
     },
     {
       "test": "delete-v7",
       "phases": {
         "recomp": 0.0,
-        "compile": 2.519,
-        "run": 0.004
+        "compile": 2.471
       },
       "num_frames": 30,
-      "lines": {
-        "actual_lines": 60,
-        "expected_lines": 60,
-        "matching_lines": 60
-      },
-      "duration": 2.53,
-      "status": "pass"
+      "status": "compile_fail",
+      "detail": "collect2: error: ld returned 1 exit status",
+      "duration": 2.47
     },
     {
       "test": "delete-v8",
       "phases": {
         "recomp": 0.0,
-        "compile": 1.442,
-        "run": 0.004
+        "compile": 1.472
       },
       "num_frames": 30,
-      "lines": {
-        "actual_lines": 60,
-        "expected_lines": 60,
-        "matching_lines": 60
-      },
-      "duration": 1.45,
-      "status": "pass"
+      "status": "compile_fail",
+      "detail": "collect2: error: ld returned 1 exit status",
+      "duration": 1.47
     },
     {
       "test": "enumerate-v5",
       "phases": {
         "recomp": 0.0,
-        "compile": 1.802,
-        "run": 0.003
+        "compile": 19.41
       },
       "num_frames": 30,
-      "lines": {
-        "actual_lines": 6,
-        "expected_lines": 6,
-        "matching_lines": 6
-      },
-      "duration": 1.81,
-      "status": "pass"
+      "status": "compile_fail",
+      "detail": "collect2: error: ld returned 1 exit status",
+      "duration": 19.41
     },
     {
       "test": "enumerate-v6",
       "phases": {
         "recomp": 0.0,
-        "compile": 2.792,
-        "run": 0.005
+        "compile": 2.816
       },
       "num_frames": 30,
-      "lines": {
-        "actual_lines": 49,
-        "expected_lines": 49,
-        "matching_lines": 49
-      },
-      "duration": 2.8,
-      "status": "pass"
+      "status": "compile_fail",
+      "detail": "collect2: error: ld returned 1 exit status",
+      "duration": 2.82
     },
     {
       "test": "enumerate-v7",
       "phases": {
         "recomp": 0.0,
-        "compile": 2.657,
-        "run": 0.008
+        "compile": 2.44
       },
       "num_frames": 30,
-      "lines": {
-        "actual_lines": 49,
-        "expected_lines": 49,
-        "matching_lines": 49
-      },
-      "duration": 2.67,
-      "status": "pass"
+      "status": "compile_fail",
+      "detail": "collect2: error: ld returned 1 exit status",
+      "duration": 2.44
     },
     {
       "test": "enumerate-v8",
       "phases": {
         "recomp": 0.0,
-        "compile": 1.358,
-        "run": 0.004
+        "compile": 1.085
       },
       "num_frames": 30,
-      "lines": {
-        "actual_lines": 49,
-        "expected_lines": 49,
-        "matching_lines": 49
-      },
-      "duration": 1.37,
-      "status": "pass"
+      "status": "compile_fail",
+      "detail": "collect2: error: ld returned 1 exit status",
+      "duration": 1.09
     },
     {
       "test": "flash-v5",
       "phases": {
         "recomp": 0.0,
-        "compile": 1.912,
-        "run": 0.003
+        "compile": 1.673
       },
       "num_frames": 30,
-      "lines": {
-        "actual_lines": 10,
-        "expected_lines": 10,
-        "matching_lines": 10
-      },
-      "duration": 1.92,
-      "status": "pass"
+      "status": "compile_fail",
+      "detail": "collect2: error: ld returned 1 exit status",
+      "duration": 1.67
     },
     {
       "test": "flash-v6",
       "phases": {
         "recomp": 0.0,
-        "compile": 1.889,
-        "run": 0.003
+        "compile": 1.649
       },
       "num_frames": 30,
-      "lines": {
-        "actual_lines": 10,
-        "expected_lines": 10,
-        "matching_lines": 10
-      },
-      "duration": 1.9,
-      "status": "pass"
+      "status": "compile_fail",
+      "detail": "collect2: error: ld returned 1 exit status",
+      "duration": 1.65
     },
     {
       "test": "flash-v7",
       "phases": {
         "recomp": 0.0,
-        "compile": 1.917,
-        "run": 0.003
+        "compile": 18.577
       },
       "num_frames": 30,
-      "lines": {
-        "actual_lines": 10,
-        "expected_lines": 10,
-        "matching_lines": 10
-      },
-      "duration": 1.92,
-      "status": "pass"
+      "status": "compile_fail",
+      "detail": "collect2: error: ld returned 1 exit status",
+      "duration": 18.58
     },
     {
       "test": "ops-v8",
       "phases": {
         "recomp": 0.0,
-        "compile": 9.159,
-        "run": 0.007
+        "compile": 9.018
       },
       "num_frames": 30,
-      "lines": {
-        "actual_lines": 262,
-        "expected_lines": 262,
-        "matching_lines": 255
-      },
-      "duration": 9.17,
-      "ruffle_diff_count": 11,
-      "ours_diff_count": 7,
-      "status": "ruffle_matched",
-      "detail": "diffs 7 \u2286 ruffle 11"
+      "status": "compile_fail",
+      "detail": "collect2: error: ld returned 1 exit status",
+      "duration": 9.02
     },
     {
       "test": "swap-v5",
       "phases": {
         "recomp": 0.0,
-        "compile": 1.681,
-        "run": 0.003
+        "compile": 1.713
       },
       "num_frames": 30,
-      "lines": {
-        "actual_lines": 7,
-        "expected_lines": 7,
-        "matching_lines": 7
-      },
-      "duration": 1.69,
-      "status": "pass"
+      "status": "compile_fail",
+      "detail": "collect2: error: ld returned 1 exit status",
+      "duration": 1.71
     },
     {
       "test": "swap-v6",
       "phases": {
         "recomp": 0.0,
-        "compile": 0.554,
-        "run": 0.003
+        "compile": 0.582
       },
       "num_frames": 30,
-      "lines": {
-        "actual_lines": 7,
-        "expected_lines": 7,
-        "matching_lines": 7
-      },
-      "duration": 0.56,
-      "status": "pass"
+      "status": "compile_fail",
+      "detail": "collect2: error: ld returned 1 exit status",
+      "duration": 0.58
     },
     {
       "test": "swap-v7",
       "phases": {
         "recomp": 0.0,
-        "compile": 1.434,
-        "run": 0.003
+        "compile": 1.434
       },
       "num_frames": 30,
-      "lines": {
-        "actual_lines": 7,
-        "expected_lines": 7,
-        "matching_lines": 7
-      },
-      "duration": 1.44,
-      "status": "pass"
+      "status": "compile_fail",
+      "detail": "collect2: error: ld returned 1 exit status",
+      "duration": 1.43
     },
     {
       "test": "swap-v8",
       "phases": {
         "recomp": 0.0,
-        "compile": 1.238,
-        "run": 0.003
+        "compile": 1.25
       },
       "num_frames": 30,
-      "lines": {
-        "actual_lines": 7,
-        "expected_lines": 7,
-        "matching_lines": 7
-      },
-      "duration": 1.24,
-      "status": "pass"
+      "status": "compile_fail",
+      "detail": "collect2: error: ld returned 1 exit status",
+      "duration": 1.25
     },
     {
       "test": "targetPath-v5",
       "phases": {
         "recomp": 0.0,
-        "compile": 1.93,
-        "run": 0.003
+        "compile": 18.394
       },
       "num_frames": 30,
-      "lines": {
-        "actual_lines": 12,
-        "expected_lines": 12,
-        "matching_lines": 12
-      },
-      "duration": 1.94,
-      "status": "pass"
+      "status": "compile_fail",
+      "detail": "collect2: error: ld returned 1 exit status",
+      "duration": 18.39
     },
     {
       "test": "targetPath-v6",
       "phases": {
         "recomp": 0.0,
-        "compile": 2.118,
-        "run": 0.003
+        "compile": 2.115
       },
       "num_frames": 30,
-      "lines": {
-        "actual_lines": 26,
-        "expected_lines": 23,
-        "matching_lines": 9
-      },
-      "duration": 2.12,
-      "ruffle_diff_count": 17,
-      "ours_diff_count": 17,
-      "status": "ruffle_matched",
-      "detail": "diffs 17 \u2286 ruffle 17"
+      "status": "compile_fail",
+      "detail": "collect2: error: ld returned 1 exit status",
+      "duration": 2.12
     },
     {
       "test": "targetPath-v7",
       "phases": {
         "recomp": 0.0,
-        "compile": 1.774,
-        "run": 0.003
+        "compile": 1.738
       },
       "num_frames": 30,
-      "lines": {
-        "actual_lines": 26,
-        "expected_lines": 23,
-        "matching_lines": 9
-      },
-      "duration": 1.78,
-      "ruffle_diff_count": 17,
-      "ours_diff_count": 17,
-      "status": "ruffle_matched",
-      "detail": "diffs 17 \u2286 ruffle 17"
+      "status": "compile_fail",
+      "detail": "collect2: error: ld returned 1 exit status",
+      "duration": 1.74
     },
     {
       "test": "targetPath-v8",
       "phases": {
         "recomp": 0.0,
-        "compile": 1.285,
-        "run": 0.003
+        "compile": 1.279
       },
       "num_frames": 30,
-      "lines": {
-        "actual_lines": 26,
-        "expected_lines": 23,
-        "matching_lines": 9
-      },
-      "duration": 1.29,
-      "ruffle_diff_count": 17,
-      "ours_diff_count": 17,
-      "status": "ruffle_matched",
-      "detail": "diffs 17 \u2286 ruffle 17"
+      "status": "compile_fail",
+      "detail": "collect2: error: ld returned 1 exit status",
+      "duration": 1.28
     },
     {
       "test": "toString_valueOf-v5",
       "phases": {
         "recomp": 0.0,
-        "compile": 4.849,
-        "run": 0.008
+        "compile": 4.76
       },
       "num_frames": 30,
-      "lines": {
-        "actual_lines": 137,
-        "expected_lines": 137,
-        "matching_lines": 103
-      },
-      "duration": 4.86,
-      "ruffle_diff_count": 34,
-      "ours_diff_count": 34,
-      "status": "ruffle_matched",
-      "detail": "diffs 34 \u2286 ruffle 34"
+      "status": "compile_fail",
+      "detail": "collect2: error: ld returned 1 exit status",
+      "duration": 4.76
     },
     {
       "test": "toString_valueOf-v6",
       "phases": {
         "recomp": 0.0,
-        "compile": 5.451,
-        "run": 0.007
+        "compile": 5.164
       },
       "num_frames": 30,
-      "lines": {
-        "actual_lines": 155,
-        "expected_lines": 155,
-        "matching_lines": 150
-      },
-      "duration": 5.46,
-      "ruffle_diff_count": 5,
-      "ours_diff_count": 5,
-      "status": "ruffle_matched",
-      "detail": "diffs 5 \u2286 ruffle 5"
+      "status": "compile_fail",
+      "detail": "collect2: error: ld returned 1 exit status",
+      "duration": 5.16
     },
     {
       "test": "toString_valueOf-v7",
       "phases": {
         "recomp": 0.0,
-        "compile": 5.753,
-        "run": 0.006
+        "compile": 22.768
       },
       "num_frames": 30,
-      "lines": {
-        "actual_lines": 155,
-        "expected_lines": 155,
-        "matching_lines": 150
-      },
-      "duration": 5.76,
-      "ruffle_diff_count": 5,
-      "ours_diff_count": 5,
-      "status": "ruffle_matched",
-      "detail": "diffs 5 \u2286 ruffle 5"
+      "status": "compile_fail",
+      "detail": "collect2: error: ld returned 1 exit status",
+      "duration": 22.77
     },
     {
       "test": "toString_valueOf-v8",
       "phases": {
         "recomp": 0.0,
-        "compile": 1.423,
-        "run": 0.006
+        "compile": 1.472
       },
       "num_frames": 30,
-      "lines": {
-        "actual_lines": 155,
-        "expected_lines": 155,
-        "matching_lines": 150
-      },
-      "duration": 1.43,
-      "ruffle_diff_count": 5,
-      "ours_diff_count": 5,
-      "status": "ruffle_matched",
-      "detail": "diffs 5 \u2286 ruffle 5"
+      "status": "compile_fail",
+      "detail": "collect2: error: ld returned 1 exit status",
+      "duration": 1.47
     },
     {
       "test": "with-v5",
       "phases": {
         "recomp": 0.0,
-        "compile": 3.56,
-        "run": 0.005
+        "compile": 3.637
       },
       "num_frames": 30,
-      "lines": {
-        "actual_lines": 63,
-        "expected_lines": 49,
-        "matching_lines": 21
-      },
-      "duration": 3.57,
-      "ruffle_diff_count": 42,
-      "ours_diff_count": 42,
-      "status": "ruffle_matched",
-      "detail": "diffs 42 \u2286 ruffle 42"
+      "status": "compile_fail",
+      "detail": "collect2: error: ld returned 1 exit status",
+      "duration": 3.64
     },
     {
       "test": "with-v6",
       "phases": {
         "recomp": 0.0,
-        "compile": 4.733,
-        "run": 0.006
+        "compile": 4.757
       },
       "num_frames": 30,
-      "lines": {
-        "actual_lines": 114,
-        "expected_lines": 107,
-        "matching_lines": 23
-      },
-      "duration": 4.74,
-      "ruffle_diff_count": 91,
-      "ours_diff_count": 91,
-      "status": "ruffle_matched",
-      "detail": "diffs 91 \u2286 ruffle 91"
+      "status": "compile_fail",
+      "detail": "collect2: error: ld returned 1 exit status",
+      "duration": 4.76
     },
     {
       "test": "with-v7",
       "phases": {
         "recomp": 0.0,
-        "compile": 4.405,
-        "run": 0.005
+        "compile": 4.312
       },
       "num_frames": 30,
-      "lines": {
-        "actual_lines": 114,
-        "expected_lines": 107,
-        "matching_lines": 23
-      },
-      "duration": 4.41,
-      "ruffle_diff_count": 91,
-      "ours_diff_count": 91,
-      "status": "ruffle_matched",
-      "detail": "diffs 91 \u2286 ruffle 91"
+      "status": "compile_fail",
+      "detail": "collect2: error: ld returned 1 exit status",
+      "duration": 4.31
     },
     {
       "test": "with-v8",
       "phases": {
         "recomp": 0.0,
-        "compile": 1.617,
-        "run": 0.005
+        "compile": 1.625
       },
       "num_frames": 30,
-      "lines": {
-        "actual_lines": 114,
-        "expected_lines": 107,
-        "matching_lines": 23
-      },
-      "duration": 1.63,
-      "ruffle_diff_count": 91,
-      "ours_diff_count": 91,
-      "status": "ruffle_matched",
-      "detail": "diffs 91 \u2286 ruffle 91"
+      "status": "compile_fail",
+      "detail": "collect2: error: ld returned 1 exit status",
+      "duration": 1.63
     }
   ]
 }
