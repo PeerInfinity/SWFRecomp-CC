@@ -5298,9 +5298,14 @@ namespace SWFRecomp
 				size_t total_placements = 0;
 				for (auto& v : sprite_placements_per_frame) total_placements += v.size();
 
+				// Use file-scope static linkage so parent + child SWFs in the
+				// same compile unit (multi-SWF tests) don't collide on
+				// sprite_<id>_placements / _frame_starts. tagSetSpritePlacements
+				// captures the array pointers at tagInit time so internal
+				// linkage is fine.
 				if (total_placements > 0)
 				{
-					sprite_definitions << "FramePlacement " << sp << "_placements[] =" << endl
+					sprite_definitions << "static FramePlacement " << sp << "_placements[] =" << endl
 									   << "{" << endl;
 					for (size_t fi = 0; fi < sprite_frame_i; ++fi)
 					{
@@ -5320,10 +5325,10 @@ namespace SWFRecomp
 				else
 				{
 					// Empty sentinel so the symbol always exists.
-					sprite_definitions << "FramePlacement " << sp << "_placements[1] = { { 0, 0, 0, 0, 0 } };" << endl;
+					sprite_definitions << "static FramePlacement " << sp << "_placements[1] = { { 0, 0, 0, 0, 0 } };" << endl;
 				}
 
-				sprite_definitions << "u16 " << sp << "_frame_starts[] = {" << endl;
+				sprite_definitions << "static u16 " << sp << "_frame_starts[] = {" << endl;
 				size_t cumulative = 0;
 				for (size_t fi = 0; fi < sprite_frame_i; ++fi)
 				{
