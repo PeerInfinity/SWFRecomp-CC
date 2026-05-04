@@ -20,6 +20,13 @@
   - EmbeddedFontTest 50/87 → 51/87 (57.5% → 58.6%)
 -->
 
+<!-- Resolved 2026-05-04:
+  - soft_reference_test1 → ruffle_matched 44/45. _name setter now
+    syncs parent.dynamic_props and (root only) var_map on rename,
+    matching Ruffle's MovieClip::set_name binding-replacement
+    semantics. -->
+
+
 <!-- Investigated 2026-05-02 (no fix landed):
   - duplicate_movie_clip_test (3/33 → still 3/33). Confirmed primary
     bug: dups inherit clip events but ENTERFRAME/UNLOAD don't fire
@@ -422,27 +429,32 @@ digit), undefined parses to 0.0, 0 == 0 → true. Knowing this
 prevents wasted time on `/mc1`-style cases that aren't actually
 exercising GetVariable.
 
-### soft_reference_test1 (51.1%, 23/45)
+### ~~soft_reference_test1~~ — promoted to `ruffle_matched` (2026-05-04)
 
-**Symptom (from earlier diff).** Multiple `FAILED:` lines on
-`xcheck`-style assertions plus `mcRef.getDepth()` returns empty
-after createEmptyMovieClip + various property checks:
-
-```
-PASSED:                   ← expected (xcheck)
-FAILED:                   ← actual (something passed when it shouldn't)
-...
-FAILED: mcRef.getDepth(): expected: "30" obtained: ""
-```
-
-**Hypothesis.** Tests "soft references" — MovieClip references
-that should remain valid across various lifecycle events (rewind,
-swapDepths, etc.). Our impl returns empty for `getDepth()` when
-the MC is in a transitional state. Likely overlaps
-`CLONESPRITE_DEPTH_BIAS` and `GOTO_CATCHUP_HYGIENE` Phase 1.
-
-**Scope.** Re-baseline after both adjacent plans land; remaining
-issues likely 2-3 hours.
+Now `ruffle_matched` 44/45 (97.8%). Root cause was NOT depth-bias /
+goto-catchup-related as previously hypothesized — it was the `_name`
+setter not propagating the rename to `parent.dynamic_props` and
+`var_map`. After `mc._name = "newname"`, the stale `oldname` entry
+still resolved to the MC and `_level0.newname` returned undefined,
+breaking the test's "soft reference" semantics on the very first
+assertion (`typeof(mc) == 'undefined'` after rename → expected PASS,
+got FAIL because `mc` still resolved). Fix: in the `_name` setter
+(`actionSetMember` MOVIECLIP path, `action.c:40711`), after updating
+`mc->name`, sync `mc->parent->dynamic_props` (set new key → MC,
+clear old key → undefined) and (only when `mc->parent ==
+&root_movieclip`) `var_map` (with SWF<=6 lowercase folding). Only
+fires when the existing entry is authoritative — references THIS MC
+under a key matching the MC's old name — to avoid clobbering
+case-collision entries (case-v6 path) or unrelated rebinds. Mirrors
+Ruffle's `MovieClip::set_name`, which removes the old name binding
+on the parent's stage-object scope and installs the new one. Final
+remaining diff is line 164 (`mcRef == _level0.mc1` after
+removeMovieClip + recreate at different depth) — same residual as
+Ruffle's diff against expected, so the test promotes to
+ruffle_matched. Verified: 24-test AVM1 lifecycle/clone/register
+battery (24/24), 13-test gnash actionscript.all subset (13/13
+effective), 4-test misc-swfc spot-check (4/4 effective),
+`opcode_guard_test` and `DepthLimitsTest` unchanged.
 
 ### movieclip_destruction_test4 (20.0%, 8/40)
 

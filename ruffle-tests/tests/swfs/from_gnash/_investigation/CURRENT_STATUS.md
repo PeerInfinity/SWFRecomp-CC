@@ -1,8 +1,27 @@
 # Gnash Test Suite Status
 
-Last updated: 2026-05-02 (`mouse_drag_test` (misc-swfc.all) PASS via startDrag→transformed_by_script flag. CI snapshot below from 2026-05-01.)
+Last updated: 2026-05-04 (`soft_reference_test1` (misc-swfc.all) → ruffle_matched. CI snapshot below from 2026-05-01.)
 
 ### Latest fixes (2026-05-04, NOT yet in CI)
+
+- **`soft_reference_test1` (misc-swfc.all) → ruffle_matched (+1, was MISMATCH 23/45 → 44/45).** Root cause was the `_name`
+  setter not propagating renames to `parent.dynamic_props` and `var_map`. `createEmptyMovieClip("mc", 10)` registers
+  `var_map["mc"]` (root only) and `parent.dynamic_props["mc"]` pointing at the new MC; subsequent `mc._name = "changed"`
+  updated `mc->name` and `display_list[d].instance_name` (via `ng_renameDisplayEntry`) but left both bindings stale. The
+  test's first assertion (`typeof(mc) == 'undefined'` after rename — frame 3 line 50) then failed because `mc` resolved to
+  the now-renamed MC instead of falling through to undefined; nine subsequent assertions failed for the same reason
+  (`mc == undefined`, `_level0.changed` lookups, etc.). Fix: in `actionSetMember` MOVIECLIP path at `action.c:40711`,
+  after updating `mc->name`/`mc->target` and calling `ng_renameDisplayEntry`, sync `mc->parent->dynamic_props` (set
+  new key → MC, clear old key → undefined) and (only when `mc->parent == &root_movieclip`) `var_map` (with SWF<=6
+  lowercase folding via the existing `setGlobalVariableByName` helper). The sync only fires when the existing entry is
+  authoritative — references THIS MC under a key matching the MC's old name — to avoid clobbering case-collision
+  entries (case-v6 path: `_root.clip` vs `_root.CLIP`) or unrelated rebinds. Mirrors Ruffle's `MovieClip::set_name`,
+  which removes the old name binding on the parent's stage-object scope and installs the new one. Final residual diff
+  is line 164 (`mcRef == _level0.mc1` after `removeMovieClip` + recreate at a different depth — Ruffle also fails
+  this), so the test promotes via subset-match to ruffle_matched. Verified: 24-test AVM1 lifecycle/clone/register
+  battery (24/24 PASS), 13-test gnash actionscript.all subset including case-v6 / Color-v6 / NetStream-v6/v7 /
+  Inheritance-v5..v7 / Selection-v6/7/8 (12/13 effective; 1 missing dir is verifier path bug not a fix regression),
+  4-test misc-swfc spot-check (4/4 effective), `opcode_guard_test` and `DepthLimitsTest` unchanged.
 
 - **Global-v6 (actionscript.all) → ruffle_matched (+1).** **Global-v7 (actionscript.all) → PASS (+1).** **Global-v8 (actionscript.all) → PASS (+1).** Implemented `ASSetNative(target, major, props, minor=0)` (was a noop). Splits `props` (post-`toString`) on `,`, strips an optional leading version-flag digit (`'1'`/`'6'`/`'7'`/`'8'`/`'9'`/`"10"`), and binds each non-empty name on `target` to `ASnative(major, minor + position)`. Cross-cutting fix to `convertString` ARRAY case: now consults `objectCallToString` (own-prop-only on `arr->props`) before falling back to `Array.prototype.join(",")` so a user-set `a.toString = function () { ... }` actually fires (required by Gnash's `ASSetNative(o, 200, a, 10)` test). Global-v6 still has unrelated `xcheck_equals` failures around `ASsetPropFlags`-invisible-inherited-setter behaviour (lines 263/264/266/283/284/286), so it lands as ruffle_matched not full pass; v7/v8 don't exercise those paths and pass cleanly. AVM1 `assetnative_ids` (formerly 6-line diff) also flips PASS as a side-effect.
 

@@ -40714,6 +40714,9 @@ void actionSetMember(SWFAppContext* app_context)
 					int len = varToStringBuf(app_context, &value_var, new_name, sizeof(new_name));
 					if (len > 0)
 					{
+						char old_name[256];
+						strncpy(old_name, mc->name, sizeof(old_name) - 1);
+						old_name[sizeof(old_name) - 1] = '\0';
 #ifdef NO_GRAPHICS
 						extern void ng_renameDisplayEntry(const char* old_name, const char* new_name);
 						ng_renameDisplayEntry(mc->name, new_name);
@@ -40728,6 +40731,77 @@ void actionSetMember(SWFAppContext* app_context)
 								snprintf(mc->target, sizeof(mc->target), "%s/%s", mc->parent->target, new_name);
 							else
 								snprintf(mc->target, sizeof(mc->target), "/%s", new_name);
+						}
+						// Sync parent.dynamic_props and (root only) var_map for the
+						// rename. Without this, after `mc._name = "newname"` the
+						// stale "oldname" entry still resolves to the MC, breaking
+						// soft-reference semantics: gnash misc-swfc/soft_reference_test1
+						// expects `typeof(oldname) == 'undefined'` and
+						// `_level0.newname` to resolve. Mirrors Ruffle's
+						// MovieClip::set_name which removes the old binding and
+						// installs the new one on the parent's stage object scope.
+						// Only fires if the existing entry references THIS MC and
+						// the MC's old name still matches the entry key — preserves
+						// pre-existing entries and avoids spurious clears when a
+						// timeline child shares the lookup name (e.g. case-v6 path).
+						if (old_name[0] != '\0' && strcmp(old_name, new_name) != 0)
+						{
+							u32 old_len = (u32)strlen(old_name);
+							u32 new_len = (u32)strlen(new_name);
+							ActionVar mc_var = {0};
+							mc_var.type = ACTION_STACK_VALUE_MOVIECLIP;
+							mc_var.data.numeric_value = (u64)mc;
+							ActionVar undef = {0};
+							undef.type = ACTION_STACK_VALUE_UNDEFINED;
+							// Update parent.dynamic_props
+							if (mc->parent != NULL && mc->parent->dynamic_props != NULL)
+							{
+								ASObject* dprops = (ASObject*)mc->parent->dynamic_props;
+								ASProperty* old_prop = findPropertyRaw(dprops, old_name, old_len);
+								if (old_prop != NULL &&
+								    old_prop->value.type == ACTION_STACK_VALUE_MOVIECLIP &&
+								    (MovieClip*)(uintptr_t)old_prop->value.data.numeric_value == mc)
+								{
+									setProperty(app_context, dprops, new_name, new_len, &mc_var);
+									setProperty(app_context, dprops, old_name, old_len, &undef);
+								}
+							}
+							// Update var_map (root MCs only — root timeline vars live here)
+							if (mc->parent == &root_movieclip)
+							{
+								extern hashmap* var_map;
+								if (var_map != NULL)
+								{
+									ActionVar* old_gvar = NULL;
+									char old_lookup[256];
+									char new_lookup[256];
+									const char* old_key = old_name;
+									const char* new_key = new_name;
+									if (g_swf_version <= 6 && old_len < sizeof(old_lookup) && new_len < sizeof(new_lookup))
+									{
+										for (u32 _fi = 0; _fi < old_len; _fi++) {
+											char _fc = old_name[_fi];
+											old_lookup[_fi] = (_fc >= 'A' && _fc <= 'Z') ? (_fc + 32) : _fc;
+										}
+										old_lookup[old_len] = '\0';
+										old_key = old_lookup;
+										for (u32 _fi = 0; _fi < new_len; _fi++) {
+											char _fc = new_name[_fi];
+											new_lookup[_fi] = (_fc >= 'A' && _fc <= 'Z') ? (_fc + 32) : _fc;
+										}
+										new_lookup[new_len] = '\0';
+										new_key = new_lookup;
+									}
+									if (hashmap_get(var_map, old_key, old_len, (uintptr_t*)&old_gvar) &&
+									    old_gvar != NULL &&
+									    old_gvar->type == ACTION_STACK_VALUE_MOVIECLIP &&
+									    (MovieClip*)(uintptr_t)old_gvar->data.numeric_value == mc)
+									{
+										setGlobalVariableByName(new_key, &mc_var);
+										setGlobalVariableByName(old_key, &undef);
+									}
+								}
+							}
 						}
 					}
 					return;
