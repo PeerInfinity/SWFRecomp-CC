@@ -6026,12 +6026,45 @@ static ActionVar builtin_assetnative(SWFAppContext* app_context, ActionVar* args
 		u32 name_len = comma - name_start;
 
 		if (name_len > 0) {
+			// Convert the name slice to a fresh ASCII C-string for the
+			// property lookup and store. Property names in this codebase are
+			// stored as char* (UTF-8); for ASCII chars (the only case that
+			// matters for ASSetNative tests) the conversion is direct.
+			char name_buf[256];
+			int n = (int)name_len;
+			if (n > (int)sizeof(name_buf) - 1) n = (int)sizeof(name_buf) - 1;
+			for (int k = 0; k < n; k++) {
+				uint16_t u = props_u16[name_start + k];
+				name_buf[k] = (u < 0x80) ? (char)u : '?';
+			}
+			name_buf[n] = '\0';
+
 			ActionVar fn_val;
+			// Version-gating semantics (verified against avm1/assetnative
+			// under SWF 7 with `8h`/`9i`/`10j` and an empty/populated/
+			// proto-only `o`):
+			//
+			//   own exists + version-gated   → overwrite with function
+			//   own exists + version-met     → overwrite with function
+			//   own absent + version-gated + inherited only → install with INHERITED value
+			//   own absent + version-gated + nothing inherited → install undefined
+			//   own absent + version-met     → install function
+			int do_install_value = 0;
+			ActionVar value_to_install = {0};
 			if (min_swf_version > 0 && g_swf_version < min_swf_version) {
-				// Version-gated: install as undefined.
-				fn_val.type = ACTION_STACK_VALUE_UNDEFINED;
-				fn_val.str_size = 0;
-				fn_val.data.numeric_value = 0;
+				ActionVar* own_existing = getProperty(target, name_buf, (u32)n);
+				if (own_existing == NULL) {
+					ActionVar* inherited = getPropertyWithPrototype(target, name_buf, (u32)n);
+					if (inherited == NULL) {
+						value_to_install.type = ACTION_STACK_VALUE_UNDEFINED;
+					} else {
+						value_to_install = *inherited;
+					}
+					do_install_value = 1;
+				}
+			}
+			if (do_install_value) {
+				fn_val = value_to_install;
 			} else {
 				// Look up native function via the existing ASnative dispatcher.
 				ActionVar callee_args[2];
@@ -6043,19 +6076,6 @@ static ActionVar builtin_assetnative(SWFAppContext* app_context, ActionVar* args
 				VAL(double, &callee_args[1].data.numeric_value) = (double)(minor + (int32_t)i);
 				fn_val = builtin_asnative(app_context, callee_args, 2, NULL, NULL);
 			}
-
-			// Convert the name slice to a fresh ASCII C-string for setProperty.
-			// Property names in this codebase are stored as char* (UTF-8); for
-			// ASCII chars (the only case that matters for ASSetNative tests)
-			// the conversion is direct.
-			char name_buf[256];
-			int n = (int)name_len;
-			if (n > (int)sizeof(name_buf) - 1) n = (int)sizeof(name_buf) - 1;
-			for (int k = 0; k < n; k++) {
-				uint16_t u = props_u16[name_start + k];
-				name_buf[k] = (u < 0x80) ? (char)u : '?';
-			}
-			name_buf[n] = '\0';
 
 			setProperty(app_context, target, name_buf, (u32)n, &fn_val);
 		}
