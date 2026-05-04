@@ -1,10 +1,10 @@
 # Ruffle Test Results (Unfiltered)
 
-**Date**: 2026-05-04 22:25 UTC
+**Date**: 2026-05-04 23:50 UTC
 
-**Git SHA**: `bb30b842bc`
+**Git SHA**: `3a0a423d4e`
 
-**Run Duration**: 5m 0s
+**Run Duration**: 5m 8s
 
 ## Summary
 
@@ -25,23 +25,23 @@
 
 | # | Test | Lines | Duration | Notes |
 |---|------|-------|----------|-------|
-| 1 | `afunc_dict` | 2 | 16.7s |  |
-| 2 | `background` | 0 | 16.9s |  |
-| 3 | `dict_callframe` | 3 | 16.7s |  |
-| 4 | `dict_cross` | 3 | 17.1s |  |
-| 5 | `dict_event` | 5 | 17.0s |  |
-| 6 | `dict_override` | 2 | 16.6s |  |
-| 7 | `func_dict` | 3 | 16.8s |  |
-| 8 | `initaction_in_definesprite` | 2 | 16.7s |  |
-| 9 | `jump_after_end` | 3 | 13.5s |  |
-| 10 | `jump_to_prev_block` | 1 | 17.3s |  |
-| 11 | `missing_bitmap` | 0 | 17.0s |  |
-| 12 | `mixed-bytecode-as2` | 1 | 17.0s |  |
-| 13 | `tags_after_last_showframe` | 1 | 16.7s |  |
-| 14 | `trace-as2/root_onload` | 4 | 15.4s |  |
-| 15 | `trace-as2/shortstack` | 2 | 17.3s |  |
-| 16 | `trace-as2/super` | 8 | 16.6s |  |
-| 17 | `trace-as2/this` | 8 | 17.0s |  |
+| 1 | `afunc_dict` | 2 | 16.8s |  |
+| 2 | `background` | 0 | 17.0s |  |
+| 3 | `dict_callframe` | 3 | 16.8s |  |
+| 4 | `dict_cross` | 3 | 16.8s |  |
+| 5 | `dict_event` | 5 | 16.6s |  |
+| 6 | `dict_override` | 2 | 17.5s |  |
+| 7 | `func_dict` | 3 | 17.3s |  |
+| 8 | `initaction_in_definesprite` | 2 | 16.8s |  |
+| 9 | `jump_after_end` | 3 | 17.9s |  |
+| 10 | `jump_to_prev_block` | 1 | 17.2s |  |
+| 11 | `missing_bitmap` | 0 | 18.2s |  |
+| 12 | `mixed-bytecode-as2` | 1 | 17.8s |  |
+| 13 | `tags_after_last_showframe` | 1 | 16.9s |  |
+| 14 | `trace-as2/root_onload` | 4 | 16.9s |  |
+| 15 | `trace-as2/shortstack` | 2 | 17.4s |  |
+| 16 | `trace-as2/super` | 8 | 17.3s |  |
+| 17 | `trace-as2/this` | 8 | 13.7s |  |
 
 ## Ruffle-Matched Tests
 
@@ -49,7 +49,7 @@
 
 | # | Test | Our diffs | Ruffle diffs | Duration | Notes |
 |---|------|-----------|--------------|----------|-------|
-| 1 | `zeroframe_definesprite` | 2 | 2 | 16.9s |  |
+| 1 | `zeroframe_definesprite` | 2 | 2 | 17.8s |  |
 
 ## Near-Passing Tests
 

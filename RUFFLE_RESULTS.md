@@ -2,9 +2,9 @@
 
 *See [RUFFLE_RESULTS_FILTERED.md](RUFFLE_RESULTS_FILTERED.md) for results with ignored tests excluded.*
 
-**Commit:** `bb30b842bc66`  
-**Date:** 2026-05-04 22:25 UTC  
-**Total duration:** 1h53m28s
+**Commit:** `3a0a423d4ec7`  
+**Date:** 2026-05-04 23:50 UTC  
+**Total duration:** 1h54m29s
 
 ## Results by Suite
 
@@ -28,11 +28,11 @@
 | from_gnash/actionscript.all | 15,370 | 16,957 | 90.6% |
 | from_gnash/misc-ming.all | 2,902 | 4,577 | 63.4% |
 | from_gnash/misc-mtasc.all | 211 | 231 | 91.3% |
-| from_gnash/misc-swfc.all | 358 | 499 | 71.7% |
+| from_gnash/misc-swfc.all | 360 | 499 | 72.1% |
 | from_gnash/misc-swfmill.all | 49 | 51 | 96.1% |
 | from_shumway | 666 | 1,276 | 52.2% |
 | from_shumway/avm1 | 483 | 491 | 98.4% |
-| **Total** | **126,073** | **139,049** | **90.7%** |
+| **Total** | **126,075** | **139,049** | **90.7%** |
 
 ## Failure Breakdown
 
@@ -68,9 +68,9 @@ Tests with `output_mismatch` status but ≥80% of expected lines matching.
 
 | Suite | Newly Passing | Newly Failing | Lines Improved | Lines Regressed |
 |-------|-------------:|-------------:|--------------:|----------------:|
-| from_gnash/misc-ming.all | - | - | 12 | - |
+| from_gnash/misc-swfc.all | - | - | 2 | - |
 
-*Comparing `e6c98db88ed1` → `bb30b842bc66`*
+*Comparing `bb30b842bc66` → `3a0a423d4ec7`*
 
 ## Flash-Spec Results
 
@@ -85,55 +85,55 @@ Tests verified against Flash's actual output (`output.flash.txt`).
 ### avm1
 
 - **Pass:** 602/647 (93.0%)
-- **Duration:** 54m02s across 30 shards
+- **Duration:** 54m03s across 30 shards
 - **Lines:** 106,034/114,967 matching (92.2%)
-- **Avg test duration:** 5.0s — slowest: `register_class_swf6` (20.9s)
+- **Avg test duration:** 5.0s — slowest: `edittext_margins` (20.2s)
 
 ### from_gnash/actionscript.all
 
 - **Pass:** 126/190 (66.3%)
-- **Duration:** 11m24s across 30 shards
+- **Duration:** 11m40s across 30 shards
 - **Lines:** 15,370/16,957 matching (90.6%)
-- **Avg test duration:** 3.5s — slowest: `TextFormat-v7` (17.8s)
+- **Avg test duration:** 3.6s — slowest: `Math-v5` (18.2s)
 
 ### from_gnash/misc-ming.all
 
 - **Pass:** 63/102 (61.8%)
-- **Duration:** 23m05s across 30 shards
+- **Duration:** 23m19s across 30 shards
 - **Lines:** 2,902/4,577 matching (63.4%)
-- **Avg test duration:** 13.5s — slowest: `matrix_test` (21.6s)
+- **Avg test duration:** 13.7s — slowest: `matrix_test` (21.3s)
 
 ### from_gnash/misc-mtasc.all
 
 - **Pass:** 7/9 (77.8%)
-- **Duration:** 1m59s across 30 shards
+- **Duration:** 2m01s across 30 shards
 - **Lines:** 211/231 matching (91.3%)
-- **Avg test duration:** 13.2s — slowest: `function_test` (17.3s)
+- **Avg test duration:** 13.4s — slowest: `implementsOpTest` (17.6s)
 
 ### from_gnash/misc-swfc.all
 
 - **Pass:** 7/16 (43.8%)
-- **Duration:** 3m54s across 30 shards
-- **Lines:** 358/499 matching (71.7%)
-- **Avg test duration:** 14.6s — slowest: `gotoFrameLabelAsFunction` (17.8s)
+- **Duration:** 4m02s across 30 shards
+- **Lines:** 360/499 matching (72.1%)
+- **Avg test duration:** 15.1s — slowest: `registerclass_test3` (17.8s)
 
 ### from_gnash/misc-swfmill.all
 
 - **Pass:** 17/18 (94.4%)
-- **Duration:** 5m00s across 30 shards
+- **Duration:** 5m07s across 30 shards
 - **Lines:** 49/51 matching (96.1%)
-- **Avg test duration:** 16.6s — slowest: `trace-as2/shortstack` (17.3s)
+- **Avg test duration:** 17.0s — slowest: `missing_bitmap` (18.2s)
 
 ### from_shumway
 
 - **Pass:** 65/92 (70.7%)
-- **Duration:** 12m39s across 30 shards
+- **Duration:** 12m49s across 30 shards
 - **Lines:** 666/1,276 matching (52.2%)
-- **Avg test duration:** 8.2s — slowest: `fuzz/7318344161196391b369e91217937687ebc437e42fdcc10c4c456bde55e0db61` (17.8s)
+- **Avg test duration:** 8.3s — slowest: `fuzz/0cde3acaa5116dac19bf73b0b76556223ad9328a367e04ec9cab733bc6765d82` (18.1s)
 
 ### from_shumway/avm1
 
 - **Pass:** 45/47 (95.7%)
-- **Duration:** 1m22s across 30 shards
+- **Duration:** 1m24s across 30 shards
 - **Lines:** 483/491 matching (98.4%)
-- **Avg test duration:** 1.7s — slowest: `text-bind` (17.9s)
+- **Avg test duration:** 1.7s — slowest: `label` (18.2s)
