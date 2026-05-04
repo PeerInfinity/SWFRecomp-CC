@@ -1,8 +1,8 @@
 # Ruffle Test Results (Filtered)
 
-**Date**: 2026-05-04 21:15 UTC
+**Date**: 2026-05-04 22:25 UTC
 
-**Git SHA**: `e6c98db88e`
+**Git SHA**: `bb30b842bc`
 
 **Run Duration**: 1m 22s
 
@@ -32,7 +32,7 @@
 | 5 | `depth` | 6 | 0.4s |  |
 | 6 | `doactionorder/doactionorder` | 7 | 0.3s |  |
 | 7 | `doactionorder/symbolclass` | 4 | 0.3s |  |
-| 8 | `duplicateMovieClip/dontremove` | 6 | 16.8s |  |
+| 8 | `duplicateMovieClip/dontremove` | 6 | 17.6s |  |
 | 9 | `duplicateMovieClip/duplicateMovieClip` | 4 | 0.3s |  |
 | 10 | `duplicateMovieClip/name-coercion` | 3 | 0.3s |  |
 | 11 | `duplicateMovieClip/samedepth` | 6 | 0.3s |  |
@@ -40,10 +40,10 @@
 | 13 | `filters` | 149 | 0.3s |  |
 | 14 | `haxe/flocons1` | 2 | 0.3s |  |
 | 15 | `haxe/flocons2` | 3 | 0.3s |  |
-| 16 | `label` | 4 | 17.5s |  |
+| 16 | `label` | 4 | 13.6s |  |
 | 17 | `levels` | 9 | 0.3s |  |
-| 18 | `loadevent` | 9 | 0.2s |  |
-| 19 | `loadvariables/loadvariables` | 7 | 0.2s |  |
+| 18 | `loadevent` | 9 | 0.3s |  |
+| 19 | `loadvariables/loadvariables` | 7 | 0.3s |  |
 | 20 | `loadvariables/loadvars` | 2 | 0.3s |  |
 | 21 | `lookup` | 3 | 0.3s |  |
 | 22 | `mouse-transparency` | 1 | 0.3s |  |
@@ -58,10 +58,10 @@
 | 31 | `rollover` | 4 | 0.3s |  |
 | 32 | `scope` | 14 | 0.3s |  |
 | 33 | `setinterval` | 20 | 0.3s |  |
-| 34 | `settimeout` | 17 | 0.2s |  |
+| 34 | `settimeout` | 17 | 0.3s |  |
 | 35 | `super` | 11 | 0.3s |  |
 | 36 | `target` | 18 | 0.3s |  |
-| 37 | `text-bind` | 0 | 16.9s |  |
+| 37 | `text-bind` | 0 | 17.9s |  |
 | 38 | `textfield/textfield-html` | 4 | 0.3s |  |
 | 39 | `textfield/textfield-text-setters` | 8 | 0.3s |  |
 | 40 | `undefined/undefined-swf6` | 39 | 0.3s |  |
