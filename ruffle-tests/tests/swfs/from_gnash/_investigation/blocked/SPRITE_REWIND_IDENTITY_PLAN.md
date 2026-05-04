@@ -4,24 +4,136 @@
 
 <!-- PLAN_META
 id: SPRITE_REWIND_IDENTITY
-status: pending
+status: blocked
 phases:
   - id: 1
     name: "Recompiler emits per-sprite per-frame placements table"
-    status: pending
+    status: complete
   - id: 2
     name: "Runtime: replace silent-clear with survives_rewind iteration"
-    status: pending
+    status: blocked
   - id: 3
     name: "Runtime: per-placement MC identity for non-survivors"
-    status: pending
+    status: blocked
   - id: 4
     name: "Regression battery"
-    status: pending
+    status: dropped
 dependencies:
   - "blocked/INTER_TAG_UNLOAD_PLAN.md"
 parent_plan: "blocked/INTER_TAG_UNLOAD_PLAN.md"
 -->
+
+## Status (2026-05-03 — Phase 1 landed, Phase 2 reverted, plan blocked)
+
+- **Phase 1 LANDED.** Recompiler now emits per-sprite per-frame
+  placement metadata (`FramePlacement[]` + `frame_starts[]`) and the
+  runtime registers them via `tagSetSpritePlacements` / exposes
+  `ng_sprite_frame_placements`. Behavior-neutral on plan-target tests
+  and the AVM1 sprite/loop regression battery (15+7 tests PASS).
+  Commit `6c988120`.
+
+- **Phase 2 REVERTED.** Replaced the natural-wrap silent-clear at
+  `tag.c:advance_sprite_frames` with a survives_rewind iteration
+  driven by Phase 1's metadata. Non-survivors got the full UNLOAD
+  lifecycle (queue clip-action UNLOADs, fire AS-level onUnload, queue
+  MC for pending finalize). Used Ruffle-faithful survives_rewind
+  (MovieClip → ratio_equals only).
+
+  **Local measurements (matching-line metric, with --recompile to
+  force fresh metadata emission):**
+
+  | Test | Baseline | Phase 1 + 2 | Δ |
+  |------|----------|-------------|---|
+  | ActionOrderTest3 | 6/62 | 6/62 | 0 |
+  | ActionOrderTest4 | 7/64 | **10/64** | **+3** |
+  | ActionOrderTest5 | 8/51 | 8/51 | 0 |
+  | loop_test6 | 11/23 | 11/23 | 0 |
+  | RegisterClassTest4 | 17/42 | **7/42** | **-10** |
+
+  AVM1 sprite/lifecycle battery (15 tests) and gnash sprite-loop
+  battery (7 tests) all still PASS — Phase 2 is correctness-preserving
+  for those.
+
+  **Same trade family as the four prior INTER_TAG_UNLOAD attempts.**
+  Net -7. Plan-target gain (+3) is offset by RCT4 regression (-10).
+  Reverted under user's standing instruction: "If RegisterClassTest4
+  regresses with no plan-target gain in matching-lines, STOP — that's
+  the user's standing instruction from prior attempts."
+
+  Phase 2 commit reverted (`66e4d474`); Phase 3 (pending_finalize MC
+  isolation) was implemented in a working tree but never committed —
+  RCT4 went 17 → 6 with the architectural fix (parent_obj swap in
+  `run_pending_finalize`) and 17 → 7 without it. Both worse than
+  Phase 1+2 alone, so Phase 3 was dropped before commit.
+
+- **Why Phase 2's structural fix didn't escape the trade family:**
+  RegisterClassTest4 uses `gotoAndPlay(1)` from root (or sprite-targeted
+  goto), routed through `manual_next_frame` and `ng_executeGotoCatchUp`,
+  NOT through `advance_sprite_frames`'s natural-wrap path. Phase 2's
+  queue point only fires for natural-wrap, so Phase 3's pending_finalize
+  skip never gets exercised on RCT4's failing scenario — the
+  cross-context bug in `run_pending_finalize` (clearing root
+  display_list[depth] when the entry was queued from a sprite context)
+  still bites. The +3 gain on Test4 is real (its sprite_2 naturally
+  wraps and Phase 2 correctly fires UNLOAD on the differing-char
+  placement), but it's undone by RCT4's regression in the queue +
+  drain interleaving.
+
+  RCT4's actual output post-Phase-2 shows UNLOAD firing at the wrong
+  time: the expected sequence is `Bug ctor: N+1` THEN `unload Segments
+  c: N`, but our output produces `unload Segments c: N` BEFORE
+  `Bug ctor: N+1`. Methods invoked between the unload and next ctor
+  return `undefined` (Segments lookups via name fail because the
+  pending entry is in flight). The Phase 1 metadata correctly
+  identifies non-survivors but the queue → drain ordering doesn't
+  match Flash's lifecycle for the gotoAndPlay-driven case.
+
+- **Real path forward (not yet attempted):**
+  1. **Apply survives_rewind to ALL three rewind paths.** Phase 2 only
+     replaced the natural-wrap silent-clear at `tag.c:924-936`. Two
+     other silent-clears exist:
+     (a) `advance_sprite_frames` manual-backward-goto path
+     (`tag.c:793-801`) — fires when `mc.gotoAndPlay(N)` with `N <=
+     current_frame`. RCT4 uses this path.
+     (b) Root goto catch-up (`ng_executeGotoCatchUp`) — fires for
+     `_root.gotoAndPlay`. Already partially handles via
+     `survives_rewind` in tagPlaceObject2 backward-rewind path
+     (`tag.c:4099-4149`), but doesn't queue UNLOAD.
+
+     Without (a), RCT4's mc3 wrap doesn't queue OLD MCs → fresh-MC
+     skip never activates → cached MC reuse → off-by-one `c` values
+     → -10 lines. Phase 2 needs to cover (a) AND (b) before Phase 3's
+     skip becomes effective.
+
+  2. **Match the queue → drain timing to Flash's lifecycle.** The +3
+     Test4 gain confirms the queue mechanism works for some cases.
+     The RCT4 regression suggests the drain happens at a different
+     position in the frame than Flash expects. This may need study
+     of Ruffle's deferred-removal sequencing (`should_delay_removal`,
+     run_intervals, etc.) and queue priority adjustments
+     (AQ_PRIORITY_*).
+
+  3. **Drop the deferred-onUnload path entirely for natural wrap;
+     only fire clip-action UNLOAD inline.** Many of these tests' tail
+     output is dominated by `static unload: N` (clip-action) lines,
+     not `dynamic unload: N` (AS-level). If we fire clip-action
+     UNLOAD synchronously (queue inline at the survives_rewind point)
+     and skip AS-level onUnload entirely for natural wrap, the
+     RCT4-style cross-context bug doesn't trigger because no MC gets
+     queued for finalize.
+
+     Trade-off: tests that DO depend on AS-level onUnload at natural
+     wrap (ActionOrderTest3 line "dynamic unload: N") would still
+     miss those lines. But the lines they currently produce post-
+     Phase-2 are missing anyway (ActionOrderTest3 stayed 6/62 with
+     full Phase 2). So this might not lose anything and would gain
+     RCT4 back.
+
+- **Recommendation.** Move this plan to `blocked/`. The Phase 1
+  metadata is genuinely useful infrastructure for any of the three
+  paths above; keep it landed. Next session should pick one of the
+  three path-forward options and scope it as a fresh plan.
+
 
 ## Background
 
