@@ -677,6 +677,10 @@ void ng_set_script_only_mode(int mode)
 // performed by advance_nested_sprite_frames() after the root frame script.
 int g_advance_defer_nested = 0;
 
+// Forward decl: full definition lower in this file. Referenced by the
+// SPRITE_REWIND_IDENTITY survives_rewind path inside advance_sprite_frames.
+static void clear_display_entry(SWFAppContext* app_context, size_t depth);
+
 // Iterates the current global display_list for sprites and advances their
 // timelines.  After executing each sprite's frame function (while globals are
 // swapped to the sprite's list), recurse to advance any nested sprites.
@@ -920,19 +924,137 @@ void advance_sprite_frames(SWFAppContext* app_context)
 		max_depth = obj->sprite_max_depth;
 		display_list_capacity = obj->sprite_dl_capacity;
 
-		// When looping back to frame 0, reset the display list (Flash behavior)
+		// When looping back to frame 0, run a survives_rewind iteration
+		// (mirrors Ruffle's MovieClip::run_goto rewind path). Each existing
+		// child either survives (frame 0 will modify it) or doesn't survive
+		// (queue UNLOAD lifecycle and clear the slot). Falls back to the
+		// legacy silent-clear when no per-sprite placement metadata is
+		// available (e.g. sprite from a child SWF that wasn't recompiled
+		// with Phase 1 metadata emission).
 		if (frame == 0 && max_depth > 0)
 		{
-			for (size_t j = 1; j <= max_depth; ++j)
+			u16 final_count = 0;
+			const FramePlacement* final_placements =
+				ng_sprite_frame_placements((u16)obj->char_id, 0, &final_count);
+
+			if (final_placements == NULL)
 			{
-				if (display_list[j].sprite_display_list != NULL)
+				// Legacy silent-clear fallback.
+				for (size_t j = 1; j <= max_depth; ++j)
 				{
-					FREE(display_list[j].sprite_display_list);
-					display_list[j].sprite_display_list = NULL;
+					if (display_list[j].sprite_display_list != NULL)
+					{
+						FREE(display_list[j].sprite_display_list);
+						display_list[j].sprite_display_list = NULL;
+					}
+					display_list[j].char_id = 0;
 				}
-				display_list[j].char_id = 0;
+				max_depth = 0;
 			}
-			max_depth = 0;
+			else
+			{
+#ifdef NO_GRAPHICS
+				// Resolve this sprite's MovieClip context so we can look up
+				// per-child MCs by name. Children are placed inside this
+				// sprite's display list, so their parent in the cache is the
+				// sprite_mc.
+				extern MovieClip root_movieclip;
+				MovieClip* parent_for_lookup = (g_current_context != NULL) ? g_current_context : &root_movieclip;
+				MovieClip* sprite_mc = NULL;
+				if (obj->instance_name != NULL)
+					sprite_mc = actionFindOrCreateMovieClip(app_context, obj->instance_name, parent_for_lookup);
+#endif
+
+				for (size_t j = 1; j <= max_depth; ++j)
+				{
+					DisplayObject* entry = &display_list[j];
+					if (entry->char_id == 0) continue;
+
+					// Find the final placement at this depth in frame 0.
+					// Last placement wins; an explicit RemoveObject clears.
+					const FramePlacement* final = NULL;
+					for (u16 i = 0; i < final_count; i++)
+					{
+						if (final_placements[i].depth != (u16)j) continue;
+						if (final_placements[i].is_remove) {
+							final = NULL;
+						} else {
+							final = &final_placements[i];
+						}
+					}
+
+					int survives = 0;
+					if (final != NULL && !entry->clone_replaced)
+					{
+						int existing_is_mc = (entry->sprite_display_list != NULL);
+						int char_ok = (final->char_id == 0)
+						           || existing_is_mc
+						           || (final->char_id == (u16)entry->char_id);
+						int ratio_ok = (final->ratio == entry->ratio);
+						survives = char_ok && ratio_ok;
+					}
+
+					if (survives) continue;
+
+#ifdef NO_GRAPHICS
+					// Non-survivor: queue clip-action UNLOADs (accumulated +
+					// current), fire AS-level onUnload, and queue MC for
+					// pending finalize so the entry's onUnload reads the
+					// correct MC identity. Mirrors tagRemoveObject2's
+					// no-graphics path.
+					MovieClip* child_mc = NULL;
+					if (entry->instance_name != NULL && sprite_mc != NULL)
+						child_mc = actionFindOrCreateMovieClip(app_context, entry->instance_name, sprite_mc);
+
+					if (entry->accumulated_clip_action_count > 0)
+					{
+						for (size_t a = 0; a < entry->accumulated_clip_action_count; a++)
+							if (entry->accumulated_clip_actions[a].event_flags & CLIP_EVENT_UNLOAD)
+								actionQueueClipActionUnload(entry->accumulated_clip_actions[a].action, child_mc);
+					}
+					if (entry->clip_action_count > 0)
+					{
+						for (size_t a = 0; a < entry->clip_action_count; a++)
+							if (entry->clip_actions[a].event_flags & CLIP_EVENT_UNLOAD)
+								actionQueueClipActionUnload(entry->clip_actions[a].action, child_mc);
+					}
+
+					int has_unload = 0;
+					if (entry->instance_name != NULL)
+					{
+						extern int ng_compute_has_unload(size_t depth);
+						has_unload = ng_compute_has_unload(j);
+						if (has_unload)
+							actionFireOnUnload(app_context, entry->instance_name, (int)j);
+					}
+
+					if (has_unload && child_mc != NULL)
+					{
+						queue_pending_finalize_mc(child_mc, (int)j, j);
+					}
+					else
+					{
+						if (entry->instance_name != NULL)
+							actionInvalidateCachedMovieClip(app_context, entry->instance_name, (int)j);
+						clear_display_entry(app_context, j);
+					}
+#else
+					// Graphics build: silent clear (no UNLOAD lifecycle).
+					if (entry->sprite_display_list != NULL)
+					{
+						FREE(entry->sprite_display_list);
+						entry->sprite_display_list = NULL;
+					}
+					entry->char_id = 0;
+#endif
+				}
+
+				// Recompute max_depth after non-survivors were cleared.
+				size_t new_max = 0;
+				for (size_t j = 1; j <= max_depth; ++j)
+					if (display_list[j].char_id != 0) new_max = j;
+				max_depth = new_max;
+			}
 		}
 
 		// Execute current frame function
