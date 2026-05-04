@@ -204,6 +204,27 @@ typedef struct {
 void tagSetSpriteLabels(size_t char_id, FrameLabelEntry* labels, size_t count);
 // Find a frame label in a sprite's label table. Returns 0-based frame or -1 if not found.
 int ng_findSpriteLabelFrame(size_t char_id, const char* label);
+
+// Per-sprite per-frame placement metadata. One entry per PlaceObject2/3 (and
+// RemoveObject/2) inside the sprite's frame body. Used by the runtime to
+// compute survives_rewind on sprite loop-back, mirroring Ruffle's run_goto.
+typedef struct {
+	u16 depth;
+	u16 char_id;       // 0 means "Modify" (PlaceObject2 with no character)
+	u16 ratio;
+	u8  is_remove;     // 1 for RemoveObject/RemoveObject2 entries; 0 for places
+	u8  has_clip_actions;
+} FramePlacement;
+
+// Register per-sprite per-frame placement table. frame_starts has length
+// frame_count+1 (cumulative offsets into placements; final entry = total).
+void tagSetSpritePlacements(u16 sprite_id, FramePlacement* placements,
+                            u16* frame_starts, u16 frame_count);
+
+// Lookup helper: returns pointer to first placement of frame `frame` for
+// sprite `sprite_id`, and writes the count to *out_count. Returns NULL and
+// sets *out_count = 0 if no table is registered or the frame is out of range.
+const FramePlacement* ng_sprite_frame_placements(u16 sprite_id, u16 frame, u16* out_count);
 // Navigate a MovieClip's sprite to a given 0-based frame.
 // Returns 1 if sprite found and navigated, 0 if not found.
 int ng_gotoFrameByMC(SWFAppContext* app_context, MovieClip* mc, u16 frame, int play);

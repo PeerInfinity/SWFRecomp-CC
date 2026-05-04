@@ -5707,6 +5707,46 @@ int ng_findSpriteLabelFrame(size_t char_id, const char* label)
 	return -1;
 }
 
+// Per-sprite per-frame placement table storage (for survives_rewind).
+#define MAX_SPRITE_PLACEMENT_ENTRIES 256
+static struct {
+	u16 sprite_id;
+	FramePlacement* placements;
+	u16* frame_starts;
+	u16 frame_count;
+} sprite_placement_store[MAX_SPRITE_PLACEMENT_ENTRIES];
+static size_t sprite_placement_store_count = 0;
+
+void tagSetSpritePlacements(u16 sprite_id, FramePlacement* placements,
+                            u16* frame_starts, u16 frame_count)
+{
+	if (sprite_placement_store_count >= MAX_SPRITE_PLACEMENT_ENTRIES) return;
+	sprite_placement_store[sprite_placement_store_count].sprite_id = sprite_id;
+	sprite_placement_store[sprite_placement_store_count].placements = placements;
+	sprite_placement_store[sprite_placement_store_count].frame_starts = frame_starts;
+	sprite_placement_store[sprite_placement_store_count].frame_count = frame_count;
+	sprite_placement_store_count++;
+}
+
+const FramePlacement* ng_sprite_frame_placements(u16 sprite_id, u16 frame, u16* out_count)
+{
+	if (out_count) *out_count = 0;
+	for (size_t i = 0; i < sprite_placement_store_count; i++)
+	{
+		if (sprite_placement_store[i].sprite_id == sprite_id)
+		{
+			if (frame >= sprite_placement_store[i].frame_count) return NULL;
+			u16* fs = sprite_placement_store[i].frame_starts;
+			FramePlacement* p = sprite_placement_store[i].placements;
+			u16 start = fs[frame];
+			u16 end = fs[frame + 1];
+			if (out_count) *out_count = (u16)(end - start);
+			return &p[start];
+		}
+	}
+	return NULL;
+}
+
 void tagDefineButton(SWFAppContext* app_context, size_t char_id, frame_func* state_funcs, size_t hit_char_id, u32 hit_transform_id, ButtonAction* actions, size_t action_count)
 {
 	(void)app_context;

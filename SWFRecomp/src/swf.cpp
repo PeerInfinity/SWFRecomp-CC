@@ -4243,6 +4243,20 @@ namespace SWFRecomp
 				std::unordered_map<std::string, size_t> sprite_labels;
 				bool sprite_another_frame = false;
 
+				// Per-frame placement metadata for SPRITE_REWIND_IDENTITY.
+				// Each entry tracks a PlaceObject2/3, PlaceObject, or RemoveObject
+				// inside this sprite's frame body. Indexed by frame_idx; emitted
+				// as a flat FramePlacement[] + frame_starts[] cumulative offsets
+				// after sprite tag walk completes.
+				struct LocalFramePlacement {
+					u16 depth;
+					u16 char_id;
+					u16 ratio;
+					u8 is_remove;
+					u8 has_clip_actions;
+				};
+				std::vector<std::vector<LocalFramePlacement>> sprite_placements_per_frame;
+
 				sprite_definitions << "void " << sp << "_frame_" << to_string(sprite_frame_i)
 								   << "(SWFAppContext* app_context)" << endl
 								   << "{" << endl;
@@ -4383,6 +4397,13 @@ namespace SWFRecomp
 											   << to_string(char_id) << ", "
 											   << to_string(transform_id) << ", "
 											   << to_string(cxform_id) << ", 0);" << endl;
+
+							{
+								size_t fi = sprite_frame_i - 1;
+								while (sprite_placements_per_frame.size() <= fi)
+									sprite_placements_per_frame.push_back({});
+								sprite_placements_per_frame[fi].push_back({depth, char_id, (u16)0, (u8)0, (u8)0});
+							}
 
 							break;
 						}
@@ -5009,6 +5030,20 @@ namespace SWFRecomp
 								}
 							}
 
+							{
+								size_t fi = sprite_frame_i - 1;
+								while (sprite_placements_per_frame.size() <= fi)
+									sprite_placements_per_frame.push_back({});
+								// has_character==0 emits char_id=0 (treated as "Modify"); ratio_val==0 if !has_ratio.
+								sprite_placements_per_frame[fi].push_back({
+									depth,
+									has_character ? char_id : (u16)0,
+									has_ratio ? ratio_val : (u16)0,
+									(u8)0,
+									(u8)(clip_action_count > 0 ? 1 : 0)
+								});
+							}
+
 							break;
 						}
 
@@ -5024,6 +5059,14 @@ namespace SWFRecomp
 
 							sprite_definitions << "\t" << "tagRemoveObject(app_context, " << to_string(depth) << ");" << endl;
 
+							{
+								size_t fi = sprite_frame_i - 1;
+								while (sprite_placements_per_frame.size() <= fi)
+									sprite_placements_per_frame.push_back({});
+								sprite_placements_per_frame[fi].push_back({depth, (u16)0, (u16)0, (u8)1, (u8)0});
+								(void)char_id;
+							}
+
 							break;
 						}
 
@@ -5036,6 +5079,13 @@ namespace SWFRecomp
 							u16 depth = (u16) sub_tag.fields[0].value;
 
 							sprite_definitions << "\t" << "tagRemoveObject2(app_context, " << to_string(depth) << ");" << endl;
+
+							{
+								size_t fi = sprite_frame_i - 1;
+								while (sprite_placements_per_frame.size() <= fi)
+									sprite_placements_per_frame.push_back({});
+								sprite_placements_per_frame[fi].push_back({depth, (u16)0, (u16)0, (u8)1, (u8)0});
+							}
 
 							break;
 						}
@@ -5234,6 +5284,60 @@ namespace SWFRecomp
 					sprite_definitions << "\t" << sp << "_frame_" << to_string(i) << "," << endl;
 				}
 				sprite_definitions << "};" << endl << endl;
+
+				// SPRITE_REWIND_IDENTITY Phase 1: emit per-sprite per-frame
+				// placement metadata (FramePlacement[] flat + frame_starts[]
+				// cumulative offsets). The runtime uses this at sprite
+				// loop-back to compute survives_rewind for each existing
+				// display_list entry, mirroring Ruffle's run_goto. Pad
+				// per-frame vector to sprite_frame_i so frame_starts has
+				// length sprite_frame_i + 1 (sentinel = total count).
+				while (sprite_placements_per_frame.size() < sprite_frame_i)
+					sprite_placements_per_frame.push_back({});
+
+				size_t total_placements = 0;
+				for (auto& v : sprite_placements_per_frame) total_placements += v.size();
+
+				if (total_placements > 0)
+				{
+					sprite_definitions << "FramePlacement " << sp << "_placements[] =" << endl
+									   << "{" << endl;
+					for (size_t fi = 0; fi < sprite_frame_i; ++fi)
+					{
+						for (auto& p : sprite_placements_per_frame[fi])
+						{
+							sprite_definitions << "\t{ "
+								<< to_string(p.depth) << ", "
+								<< to_string(p.char_id) << ", "
+								<< to_string(p.ratio) << ", "
+								<< to_string((u32)p.is_remove) << ", "
+								<< to_string((u32)p.has_clip_actions) << " }, // frame "
+								<< to_string(fi) << endl;
+						}
+					}
+					sprite_definitions << "};" << endl;
+				}
+				else
+				{
+					// Empty sentinel so the symbol always exists.
+					sprite_definitions << "FramePlacement " << sp << "_placements[1] = { { 0, 0, 0, 0, 0 } };" << endl;
+				}
+
+				sprite_definitions << "u16 " << sp << "_frame_starts[] = {" << endl;
+				size_t cumulative = 0;
+				for (size_t fi = 0; fi < sprite_frame_i; ++fi)
+				{
+					sprite_definitions << "\t" << to_string(cumulative) << "," << endl;
+					cumulative += sprite_placements_per_frame[fi].size();
+				}
+				sprite_definitions << "\t" << to_string(cumulative) << endl;  // sentinel = total
+				sprite_definitions << "};" << endl << endl;
+
+				tag_init << endl << "\ttagSetSpritePlacements("
+						 << to_string(sprite_id) << ", "
+						 << sp << "_placements, "
+						 << sp << "_frame_starts, "
+						 << to_string(sprite_frame_i) << ");";
 
 				// Generate per-sprite frame label table and registration call
 				if (!sprite_labels.empty())
