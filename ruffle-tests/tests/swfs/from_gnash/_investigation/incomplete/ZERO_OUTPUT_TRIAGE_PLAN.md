@@ -17,7 +17,7 @@ phases:
     status: pending
   - id: 4
     name: "frame_label_test: nested-sprite frame label resolution"
-    status: pending
+    status: partial
   - id: 5
     name: "BeginBitmapFill: _width=804 instead of 150 on a bitmap-filled MC"
     status: pending
@@ -199,51 +199,102 @@ child SWF must not be running.
 **Risk.** Medium. May require version-handshake work in the child SWF
 loader, or just a verifier dependency-discovery fix.
 
-## Phase 4 — frame_label_test: nested-sprite frame label resolution
+## Phase 4 — frame_label_test: target-path GotoFrame2 + nested-sprite navigation (PARTIAL — 2026-05-04)
 
-**Problem.** Expected output:
+**Status (2026-05-04).** Partial fix landed. Test now produces 11/14 raw
+PASSED lines (line-level matching 12/17 = 70.6%) instead of zero output.
+Promotes from "TRUE zero output" to "non-zero progress with 3 known
+remaining failures + timeline-loop noise."
 
-```
-PASSED: _root.x1 == 'mc11_frame4'
-PASSED: _root.x2 == 'mc11_frame5'
-PASSED: _root.x3 == 'mc11_frame6'
-PASSED: _root.x7 == 'mc1_frame7'
-...
-```
+**Root cause #1 (FIXED).** The test's `gotoAndPlay('/mc1/mc11/:frame4')`
+encodes as `Push("/mc1/mc11/:frame4") + GotoFrame2(play=1)`. Our
+`actionGotoFrame2` STRING branch was stripping the colon-path and applying
+the resulting frame number to the **root timeline**, not to the target
+sprite. With `:5` (numeric), this clamped to root's last frame (frame 3
+of a 4-frame timeline) and triggered `was_clamped → g_skip_inline_target_script
+→ ng_executeGotoCatchUp clears goto/manual_next_frame without inlining
+the target script`, so the assertion frame's scripts never queued. Net
+effect: zero output despite all 14 assertion DoActions being recompiled.
 
-We produce zero output. The test has 3 DefineSprites and 18 DoActions.
-The pattern `mc11_frame4` suggests a frame label inside sprite `mc11` at
-frame 4. The DoAction sets `_root.x1 = mc11._currentlabel` (or similar
-frame-label introspection) at specific timeline points.
+Fix: extended the STRING branch in `actionGotoFrame2`
+(`SWFModernRuntime/src/actionmodern/action.c`) to mirror `actionCall`'s
+target-path resolution. When a `target:frame` path is present, it now
+resolves the target via `resolveSlashPathToMC`; if the target is a
+sprite, the frame is resolved against the target sprite's frame labels
+(via `ng_findSpriteLabelFrame`) and navigation is applied via
+`ng_gotoFrameByMC` instead of perturbing the root timeline.
 
-If frame label introspection on nested sprites is broken — or if the
-sprites' `gotoAndPlay`/`gotoAndStop` calls don't navigate to the label
-frames — `_root.x1` etc. would never get set, so `Dejagnu.check_equals`
-on undefined values produces no PASSED/FAILED trace.
+**Root cause #2 (FIXED).** `ng_gotoFrameByMC` looked up the target MC via
+`ng_findDisplayEntryByName(mc->name)`, which only searches the root
+display list. For nested MCs (e.g., `mc11` inside `mc1`) the search
+returned `SIZE_MAX` and we fell through to the dynamic-MC short-path
+(updates `currentframe` but skips frame scripts). The sprite's frame
+DoAction (where `_root.x1 = 'mc11_frame4'` lives) never ran.
 
-Wait, the expected output DOES include PASSED traces, so the assertions
-DO run in expected. Our zero output means the **assertions never run**,
-which suggests the inlined Dejagnu functions weren't defined when the
-DoAction tried to call them. OR the script throws an error and bails.
+Fix: when the name search misses, fall back to `mc->display_obj` (set
+during `tagPlaceObject2` for any nested sprite) before declaring the
+MC dynamic-only. `SWFModernRuntime/src/libswf/tag_stubs.c
+ng_gotoFrameByMC`.
 
-**Investigation steps:**
+**Root cause #3 (FIXED).** SWF<7 case-insensitive label matching:
+sprite `mc1` has both `small_first`@frame8 and `Small_first`@frame9.
+Looking up `Small_first` should return the FIRST defined under that
+case-insensitive key (= `small_first`@8) per Flash<7 semantics. Our
+`ng_findSpriteLabelFrame` did exact match first then case-insensitive
+fallback — picked `Small_first`@9 instead. Fix: in SWF<=6, do a single
+case-insensitive scan that returns the LOWEST frame index among
+matches. SWF7+ keeps exact-only matching. `SWFModernRuntime/src/libswf/tag.c
+ng_findSpriteLabelFrame`.
 
-1. Strip `--diff` to see actual stdout in full:
-   ```bash
-   python3 ruffle-tests/verify_output.py --tests-dir=... --test=frame_label_test 2>&1 | head -50
-   ```
-2. Check stderr for runtime errors (e.g., the heap_alloc warning from
-   BeginBitmapFill).
-3. If no errors, add a `printf` in `actionTrace` to confirm any traces
-   are firing at all — script may be silently completing without
-   reaching the assertion functions.
-4. If the inlined Dejagnu functions aren't being defined, look at the
-   recompiler emission for the defining DoAction (likely `script_0` —
-   it should `actionDefineFunction` for `check_equals`, etc.). Confirm
-   that script runs at frame 0.
+**Remaining (deferred):**
 
-**Risk.** Medium-high. May surface a recompiler ordering bug or a
-runtime function-table issue affecting only this test's structure.
+- **`SetVariable` at root scope vs `SetMember _root.x` storage divergence
+  (3 failing assertion lines).** After `CALLFRAME('/:1')` calls
+  root-frame-1's `script_0` (which uses `SetVariable("x1", 0)` etc.),
+  `var_map["x1"]=0` but `root.dynamic_props["x1"]='mc11_frame4'` (set
+  earlier by mc11's frame-script's `SetMember(_root, "x1", ...)`).
+  `_root.x1` reads via `actionGetMember` → `dynamic_props` → still
+  `'mc11_frame4'` → assertion FAIL. The existing `actionSetMember` on
+  root MC already syncs `dynamic_props → var_map` (commit a few weeks
+  back); the missing direction is `setVariableByName` at root scope →
+  `dynamic_props`. Adding this propagation in `setGlobalVariableByName`
+  is a one-line addition but risks affecting many tests that bare-set
+  global variables (e.g., `_global` proxies, Dejagnu's internal state).
+  Deferred until someone can survey the regression risk.
+
+- **Timeline-loop noise (153 actual lines vs 17 expected).** Test main
+  timeline has no `stop()` at frame 0; only frame 3's `script_34`
+  contains `_root.totals(); stop()`. Each natural-play loop re-enters
+  frame 2's `script_18` which re-issues `actionPlay()` calls (resetting
+  is_playing=1) before reaching frame 3's stop again. With
+  `num_frames=30` we loop the timeline ~7× and emit assertion sets
+  every cycle. Even if cycle 1's assertions all matched, the line-count
+  mismatch alone would fail the test. Suspect that `actionPlay()` from
+  inside a queued-then-drained DoAction shouldn't override an
+  earlier-this-tick `stop()`, but verifying this is a multi-test
+  investigation.
+
+**Files touched (this fix):**
+- `SWFModernRuntime/src/actionmodern/action.c` — `actionGotoFrame2`
+  STRING branch: added target-path resolution mirroring `actionCall`
+  (lines around 26310–26370).
+- `SWFModernRuntime/src/libswf/tag_stubs.c` — `ng_gotoFrameByMC`
+  fallback to `mc->display_obj` when the root display-list name search
+  misses.
+- `SWFModernRuntime/src/libswf/tag.c` — `ng_findSpriteLabelFrame` SWF<=6
+  branch: case-insensitive scan picking lowest-frame ties.
+
+**Sanity battery (verified no regressions):**
+- 25 AVM1 goto/call/case tests (goto_frame, goto_frame2, goto_label,
+  goto_methods, goto_advance1/2, goto_both_ways1/2, button_goto,
+  goto_execution_order/2, define_function_case_sensitive, goto_rewind3,
+  execution_order2/3, tell_target/_invalid/_invalid_swf6, path_string,
+  property_invalid_base_clip, swf4_actions_coercion_order,
+  goto_frame_number, action_to_integer, call, set_interval): 25/25 pass.
+- 19 misc-ming.all goto/loop/action-order tests: 14 pass + 1
+  ruffle_matched (= effective 15) — unchanged from baseline.
+- 8 misc-swfc.all clone/destroy tests: 5 pass + 2 ruffle_matched — only
+  `button_test1` still fails (known blocker, unrelated).
 
 ## Phase 5 — BeginBitmapFill: _width returns 804 instead of 150
 

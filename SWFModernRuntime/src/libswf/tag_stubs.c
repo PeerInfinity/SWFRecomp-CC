@@ -882,19 +882,33 @@ int ng_gotoFrameByMC(SWFAppContext* app_context, MovieClip* mc, u16 frame, int p
 	if (!mc || mc == &root_movieclip) return 0;
 	if (!mc->name || mc->name[0] == '\0') return 0;
 
+	DisplayObject* obj = NULL;
 	size_t depth = ng_findDisplayEntryByName(mc->name);
 	if (depth == SIZE_MAX)
 	{
-		// Dynamically created MCs (createEmptyMovieClip) aren't in the display list.
-		// For these, just update currentframe and play state — they have no frame scripts.
-		u16 clamped = frame;
-		if (mc->totalframes > 0 && clamped >= (u16)mc->totalframes)
-			clamped = (u16)(mc->totalframes - 1);
-		mc->currentframe = (int)clamped + 1;  // 1-indexed
-		return 1;
+		// Not in root display list — could be (a) a nested sprite (e.g. mc11
+		// inside mc1) addressed by slash-path, or (b) a dynamically created
+		// MC (createEmptyMovieClip) with no display entry. For (a) the MC's
+		// display_obj points at the DisplayObject in its parent's
+		// sprite_display_list; for (b) display_obj is NULL.
+		if (mc->display_obj != NULL)
+		{
+			obj = (DisplayObject*)mc->display_obj;
+		}
+		else
+		{
+			// Dynamic MC: just update currentframe and play state.
+			u16 clamped = frame;
+			if (mc->totalframes > 0 && clamped >= (u16)mc->totalframes)
+				clamped = (u16)(mc->totalframes - 1);
+			mc->currentframe = (int)clamped + 1;  // 1-indexed
+			return 1;
+		}
 	}
-
-	DisplayObject* obj = &display_list[depth];
+	else
+	{
+		obj = &display_list[depth];
+	}
 	if (obj->char_id == 0) return 0;
 	Character* ch = &dictionary[obj->char_id];
 	if (ch->type != CHAR_TYPE_SPRITE) return 0;

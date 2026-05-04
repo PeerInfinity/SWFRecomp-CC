@@ -5682,6 +5682,7 @@ void tagSetSpriteLabels(size_t char_id, FrameLabelEntry* labels, size_t count)
 
 int ng_findSpriteLabelFrame(size_t char_id, const char* label)
 {
+	extern int g_swf_version;
 	if (!label) return -1;
 	for (size_t i = 0; i < sprite_label_store_count; i++)
 	{
@@ -5689,16 +5690,30 @@ int ng_findSpriteLabelFrame(size_t char_id, const char* label)
 		{
 			FrameLabelEntry* entries = sprite_label_store[i].labels;
 			size_t count = sprite_label_store[i].count;
-			// Exact match first
+			// SWF<=6: case-insensitive throughout, with LOWEST frame index winning
+			// case-insensitive ties (mirrors Flash<=6 where the first label registered
+			// for a given case-insensitive key wins). This matters for sprites that
+			// define labels differing only by case at different frames — e.g.
+			// "small_first"@8 vs "Small_first"@9: looking up "Small_first" should
+			// return 8, not 9. Key test: misc-ming/frame_label_test.
+			if (g_swf_version <= 6)
+			{
+				int best_frame = -1;
+				for (size_t j = 0; j < count; j++)
+				{
+					if (entries[j].label && strcasecmp(entries[j].label, label) == 0)
+					{
+						int f = (int)entries[j].frame;
+						if (best_frame < 0 || f < best_frame)
+							best_frame = f;
+					}
+				}
+				return best_frame;
+			}
+			// SWF7+: exact match first, no case-insensitive fallback
 			for (size_t j = 0; j < count; j++)
 			{
 				if (entries[j].label && strcmp(entries[j].label, label) == 0)
-					return (int)entries[j].frame;
-			}
-			// Case-insensitive fallback (ASCII only, like Flash)
-			for (size_t j = 0; j < count; j++)
-			{
-				if (entries[j].label && strcasecmp(entries[j].label, label) == 0)
 					return (int)entries[j].frame;
 			}
 			return -1;

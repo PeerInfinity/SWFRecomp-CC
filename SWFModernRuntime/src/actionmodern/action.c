@@ -26296,10 +26296,67 @@ void actionGotoFrame2(SWFAppContext* app_context, u8 play_flag, u16 scene_bias)
 		// Parse target path if present (format: "target:frame" or "/target:frame")
 		const char* frame_part = frame_str;
 		const char* colon = strchr(frame_str, ':');
+		const char* target = NULL;
+		static char gf2_target_buffer[256];
 
 		if (colon != NULL) {
+			size_t target_len = (size_t)(colon - frame_str);
+			if (target_len > 0 && target_len < sizeof(gf2_target_buffer)) {
+				memcpy(gf2_target_buffer, frame_str, target_len);
+				gf2_target_buffer[target_len] = '\0';
+				target = gf2_target_buffer;
+			}
 			frame_part = colon + 1;
 		}
+
+#ifdef NO_GRAPHICS
+		// Target path support: resolve "/path/:frame" or "path:frame" to a sprite
+		// MovieClip and navigate that sprite. Mirrors actionCall's target-path
+		// handling. Without this, the path was silently stripped and the frame
+		// applied to the root timeline (often clamping out-of-range, breaking
+		// the natural play flow). Key test: misc-ming/frame_label_test
+		// (gotoAndPlay('/mc1/mc11/:frame4')).
+		if (target != NULL) {
+			extern Character* dictionary;
+			extern int ng_findSpriteLabelFrame(size_t char_id, const char* label);
+			MovieClip* start_mc_for_resolve = (target[0] == '/') ? &root_movieclip : (g_current_context ? g_current_context : &root_movieclip);
+			MovieClip* target_mc = resolveSlashPathToMC(app_context, target, (u32)strlen(target), start_mc_for_resolve);
+			if (target_mc != NULL && target_mc != &root_movieclip &&
+			    target_mc->depth != INT_MIN && target_mc->display_obj != NULL) {
+				DisplayObject* dobj = (DisplayObject*)target_mc->display_obj;
+				if (dobj->char_id > 0) {
+					Character* ch = &dictionary[dobj->char_id];
+					if (ch->type == CHAR_TYPE_SPRITE && ch->sprite_frame_funcs != NULL) {
+						// Resolve frame_part: numeric or label (within target sprite's labels)
+						char* endptr_t;
+						long parsed_t = strtol(frame_part, &endptr_t, 10);
+						s32 target_frame_1based = -1;
+						if (endptr_t != frame_part && *endptr_t == '\0') {
+							target_frame_1based = (s32)parsed_t;
+						} else {
+							int label_frame = ng_findSpriteLabelFrame(dobj->char_id, frame_part);
+							if (label_frame >= 0)
+								target_frame_1based = label_frame + 1; // 0-based -> 1-based
+						}
+						if (target_frame_1based >= 1) {
+							s32 fb = target_frame_1based - 1 + (s32)scene_bias;
+							if (fb >= 0 && (size_t)fb < ch->sprite_frame_count) {
+								ng_gotoFrameByMC(app_context, target_mc, (u16)fb, play_flag);
+							}
+						}
+						// Frame not resolved or out of range: no-op (matches Flash)
+						return;
+					}
+				}
+			} else if (target_mc == &root_movieclip) {
+				// Path resolved to root — fall through and apply to root timeline
+				// using existing logic below.
+			} else {
+				// Target not found: no-op
+				return;
+			}
+		}
+#endif
 
 		// Check if frame_part is numeric
 		char* endptr;
