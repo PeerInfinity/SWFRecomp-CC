@@ -4,7 +4,7 @@
 
 <!-- PLAN_META
 id: CLONE_CLIP_EVENT_DISPATCH
-status: incomplete
+status: complete
 phases:
   - id: 1
     name: "Audit: trace existing clone paths vs Ruffle's instantiate_by_id + replace_at_depth + post_instantiation pipeline"
@@ -23,14 +23,16 @@ phases:
     status: completed
   - id: 6
     name: "Backward goto: re-fire CONSTRUCT for static MCs re-placed during catch-up rewind (displaylist_depths_test2/3/9)"
-    status: partial — clone-replaced slots fixed (test9 now PASS); test2/3 still fail on a separate swapDepths-rewind issue (depth_swapped block re-uses MC instead of fresh-placing)
+    status: completed — clone-replaced slots fixed here (test9 PASS); test2/3 swapDepths-rewind sub-issue resolved by sibling SWAPDEPTHS_REWIND_FRESH_PLACEMENT and SWAPDEPTHS_REWIND_UNBLOCK plans (both now in complete/), bringing test2/test3 to RUFFLE_MATCHED (effective pass).
   - id: 7
     name: "Verify on full guardrail battery + target tests; expect cascade of unload-ordering / register_class regressions, fix one-by-one"
-    status: pending
+    status: completed — verified via CI (commit 48a97e0b, run 25231855425) and follow-up swapDepths CIs; all 4 target tests at effective pass with no regressions in adjacent batteries.
 dependencies:
   - "complete/CLONESPRITE_DEPTH_BIAS_PLAN.md (Phase 2c giving clones a real display_list slot is the prerequisite for ENTER_FRAME / UNLOAD dispatch)"
   - "complete/DEFERRED_CLIP_UNLOAD_PLAN.md (UNLOAD queue infrastructure)"
   - "complete/CLIP_EVENT_ROUND_DISPATCH_PLAN.md (INIT/CONSTRUCT round dispatch infrastructure)"
+  - "complete/SWAPDEPTHS_REWIND_FRESH_PLACEMENT_PLAN.md (resolved test2/3 swapDepths-rewind blocker spun out from this plan's Phase 6)"
+  - "complete/SWAPDEPTHS_REWIND_UNBLOCK_PLAN.md (resolved test2/3 swapDepths-rewind blocker spun out from this plan's Phase 6)"
 parent_plan: "complete/CLONESPRITE_DEPTH_BIAS_PLAN.md (this is the explicit follow-up — depth-bias unblocked clone slots, this plan fills in the dispatch)"
 -->
 
@@ -429,12 +431,15 @@ battery breaks. Budget: 1-2 sessions for the iterative cycle.
 
 ## Affected tests (target gains)
 
-| Test | Suite | Before | After Phases 2-5 | After Phase 6 |
-|------|-------|--------|------------------|----------------|
-| `duplicate_movie_clip_test` | misc-ming | 3/33 | RUFFLE_MATCHED (effective pass) | unchanged |
+| Test | Suite | Before | After Phases 2-5 | After Phase 6 (final) |
+|------|-------|--------|------------------|------------------------|
+| `duplicate_movie_clip_test` | misc-ming | 3/33 | RUFFLE_MATCHED (29/33, effective pass) | unchanged |
 | `displaylist_depths/displaylist_depths_test9` | misc-ming | 3/23 | ~20/23 (dup0 CONSTRUCT done) | **PASS (23/23)** |
-| `displaylist_depths/displaylist_depths_test2` | misc-ming | 15/31 | unchanged | unchanged — blocked on swapDepths-rewind issue (depth_swapped block) |
-| `displaylist_depths/displaylist_depths_test3` | misc-ming | 17/32 | unchanged | unchanged — same blocker as test2 |
+| `displaylist_depths/displaylist_depths_test2` | misc-ming | 15/31 | unchanged | RUFFLE_MATCHED (17/31, effective pass) — swapDepths-rewind sibling plan resolved blocker |
+| `displaylist_depths/displaylist_depths_test3` | misc-ming | 17/32 | unchanged | RUFFLE_MATCHED (19/32, effective pass) — same sibling plan |
+
+All 4 target tests confirmed at effective pass via local re-run on
+2026-05-03 (verify_output.py with up-to-date master).
 
 ## Status (2026-05-03 implementation session)
 
