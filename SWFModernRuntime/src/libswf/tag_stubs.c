@@ -1199,7 +1199,7 @@ size_t ng_findChildEntryDepth(const char* parent_name, const char* child_name)
 	{
 		DisplayObject* child = &parent_obj->sprite_display_list[d];
 		if (child->char_id == 0) continue;
-		if (child->instance_name != NULL && strcmp(child->instance_name, child_name) == 0)
+		if (child->instance_name != NULL && swf_name_match(child->instance_name, child_name))
 			return d;
 	}
 	return SIZE_MAX;

@@ -22526,12 +22526,59 @@ static int mcGetOriginalBounds(MovieClip* mc, double* out_nat_w, double* out_nat
 		return 1;
 	}
 
-	// For buttons, use hit shape bounds
+	// For buttons, union the bounds of the currently-displayed children in the
+	// button's sprite_display_list. Flash uses the union of visible state
+	// records (UP at construction time) rather than the HIT shape bounds.
 	if (mc->is_button_mc) {
 		extern Character* dictionary;
 		DisplayObject* btn_dobj = (DisplayObject*)mc->display_obj;
-		if (btn_dobj != NULL) {
-			size_t cid = btn_dobj->char_id;
+		if (btn_dobj != NULL && btn_dobj->sprite_display_list != NULL) {
+			s32 bxmin = INT32_MAX, bxmax = INT32_MIN;
+			s32 bymin = INT32_MAX, bymax = INT32_MIN;
+			int found = 0;
+			for (size_t d = 1; d <= btn_dobj->sprite_max_depth; d++) {
+				DisplayObject* ch = &btn_dobj->sprite_display_list[d];
+				if (ch->char_id == 0) continue;
+				s32 cxmin, cxmax, cymin, cymax;
+				if (!ng_getCharBounds(ch->char_id, &cxmin, &cxmax, &cymin, &cymax)) continue;
+				// Apply the placement matrix (twips * matrix → twips).
+				extern float transform_data[][16];
+				float a = transform_data[ch->transform_id][0];
+				float b = transform_data[ch->transform_id][1];
+				float c = transform_data[ch->transform_id][4];
+				float d_ = transform_data[ch->transform_id][5];
+				float tx = transform_data[ch->transform_id][12];
+				float ty = transform_data[ch->transform_id][13];
+				s32 corners_x[4] = {
+					(s32)(a * cxmin + c * cymin + tx),
+					(s32)(a * cxmax + c * cymin + tx),
+					(s32)(a * cxmin + c * cymax + tx),
+					(s32)(a * cxmax + c * cymax + tx)
+				};
+				s32 corners_y[4] = {
+					(s32)(b * cxmin + d_ * cymin + ty),
+					(s32)(b * cxmax + d_ * cymin + ty),
+					(s32)(b * cxmin + d_ * cymax + ty),
+					(s32)(b * cxmax + d_ * cymax + ty)
+				};
+				for (int k = 0; k < 4; k++) {
+					if (corners_x[k] < bxmin) bxmin = corners_x[k];
+					if (corners_x[k] > bxmax) bxmax = corners_x[k];
+					if (corners_y[k] < bymin) bymin = corners_y[k];
+					if (corners_y[k] > bymax) bymax = corners_y[k];
+				}
+				found = 1;
+			}
+			if (found) {
+				*out_nat_w = (double)(bxmax - bxmin) / 20.0;
+				*out_nat_h = (double)(bymax - bymin) / 20.0;
+				return 1;
+			}
+		}
+		// Fallback: hit shape bounds
+		DisplayObject* btn_dobj_fb = (DisplayObject*)mc->display_obj;
+		if (btn_dobj_fb != NULL) {
+			size_t cid = btn_dobj_fb->char_id;
 			if (cid > 0 && dictionary[cid].type == CHAR_TYPE_BUTTON) {
 				size_t hit_cid = dictionary[cid].button_hit_char_id;
 				s32 hxmin, hxmax, hymin, hymax;
@@ -43712,7 +43759,7 @@ void actionGetMember(SWFAppContext* app_context)
 					for (size_t _ecd = 1; _ecd <= _pdobj->sprite_max_depth; _ecd++) {
 						DisplayObject* _ech = &_pdobj->sprite_display_list[_ecd];
 						if (_ech->char_id == 0) continue;
-						if (_ech->instance_name != NULL && strcmp(_ech->instance_name, _early_name) == 0) {
+						if (_ech->instance_name != NULL && swf_name_match(_ech->instance_name, _early_name)) {
 							_early_depth = _ecd;
 							break;
 						}
@@ -44213,7 +44260,7 @@ void actionGetMember(SWFAppContext* app_context)
 					for (size_t _cd = 1; _cd <= parent_dobj->sprite_max_depth; _cd++) {
 						DisplayObject* _ch = &parent_dobj->sprite_display_list[_cd];
 						if (_ch->char_id == 0) continue;
-						if (_ch->instance_name != NULL && strcmp(_ch->instance_name, child_name_buf) == 0) {
+						if (_ch->instance_name != NULL && swf_name_match(_ch->instance_name, child_name_buf)) {
 							child_depth = _cd;
 							break;
 						}
