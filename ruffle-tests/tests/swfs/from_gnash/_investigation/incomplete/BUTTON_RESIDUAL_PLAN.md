@@ -8,20 +8,98 @@ status: pending
 phases:
   - id: 1
     name: "ButtonEventsTest residual lines"
-    status: pending
+    status: partial
   - id: 2
     name: "key_event_test progression past frame 5"
-    status: pending
+    status: deferred
   - id: 3
     name: "DragDropTest _level50 droptarget"
-    status: pending
+    status: deferred
   - id: 4
     name: "button_test1 remaining mismatches"
-    status: pending
+    status: complete
 dependencies: []
 blockers: []
 parent_plan: "complete/BUTTON_INFRASTRUCTURE_PLAN.md"
 -->
+
+## Session progress (2026-05-05)
+
+- **Phase 4 — `button_test1` (misc-swfc.all) → PASS (+1, 20/31 → 31/31).** Two
+  changes in `SWFModernRuntime/src/libswf/tag.c` `ng_update_button_states_in_dl`
+  (the headless button hit-test/state machine):
+  1. Recurse into sprites in the display list. Previously the loop only
+     descended into nested *buttons*; nothing walked into a sprite to look for
+     buttons inside it. button_test1's structure is `button3 → buttonContainer
+     (sprite) → button1 + button2`, so the inner buttons never received
+     hit-test or press dispatch even though `button3.instance1.button1` etc.
+     resolved as movieclips. Mirrors Ruffle's `mouse_pick_avm1` which walks
+     the render list for interactive children before falling back to the
+     button's own `hit_area`.
+  2. Replace `hit_test_shape` (triangle-mesh hit) with `ng_hitTestShapeChar`
+     for resolved button hit shapes. In NO_GRAPHICS mode shapes carry only
+     path data (`ng_record_char_path`) — `shape_offset/size = 0/0` — so the
+     triangle-based test always returned 0. `ng_hitTestShapeChar` understands
+     path-based hit testing and is what the rest of the runtime uses for
+     `hitTest`. Made it non-static and added a public extern in
+     `tag.c`. Also extended `resolve_hit_shape` to return the resolved char
+     id (and accept morph shapes).
+  3. The first inner-button hit consumes `*found_hover` so the outer button
+     does not also press. Matches Ruffle's "first interactive child wins"
+     semantics, and is exactly what button_test1's expected output requires
+     (`green box`/`red box` only — never `button3` from the outer button's
+     handler).
+
+- **Phase 1 partial — `ButtonEventsTest` line 2 (`square1.button instanceOf
+  Button`) fixed.** `instanceOfCoercing`'s MOVIECLIP arm fell back to
+  `MovieClip.prototype` when a button MC had no `dynamic_props.__proto__`. In
+  Flash/Ruffle, buttons are their own type with chain `Button.prototype →
+  Object.prototype`, NOT a subclass of MovieClip — so the walk never hit
+  `Button.prototype`. Fix: when the receiver is `is_button_mc`, fall back to
+  `g_stub_ctors[1].prototype_obj` (lazy-init via `initButtonPrototype`) before
+  the `MovieClip.prototype` fallback. Files:
+  `SWFModernRuntime/src/actionmodern/action.c` `instanceOfCoercing`. Verified:
+  9/9 prototype/instanceof regression suite (`as2_super_and_this_v6/v8`,
+  `extends_chain`, `register_class_return_value`, `register_and_init_order`,
+  `on_construct`, `function_as_function`, `add_property`, `watch`), 14/14
+  AVM1 button + 4/4 drag tests, gnash `ButtonPropertiesTest` and
+  `RollOverOutTest` still effective, `Inheritance-v5..v8` all
+  ruffle_matched. `attachMovie`-installed button MCs were already correct via
+  the `__proto__` setup at line 50855-50869 of `action.c`; this fix covers
+  timeline-placed button MCs whose `dynamic_props` is created without an
+  explicit `__proto__`.
+
+  ButtonEventsTest is still `output_mismatch` overall. The remaining failures
+  are deeper architectural issues outside the scope of "narrow residual fix":
+  - Lines 43-51: `_root.buttonChild[10/12]` array entries undefined. The
+    test's button-child sprites have frame-0 actions that populate
+    `_root.buttonChild[getDepth()+16383] = {nam, exe, uld}`. Either the
+    sprites' frame scripts aren't running, or `getDepth()` doesn't return
+    the expected `-16373/-16371` for button-state child sprites.
+  - Line 53: `_level0.square1.button.instance6.getDepth()` returns -16372
+    expected -16371 (off-by-1 on button child sprite depth).
+  - Lines 59+: long divergence — test progression flow forks into
+    `PASSED: / == /` (likely OnLoad/onConstruct firing on the wrong clip)
+    rather than the expected per-frame state-machine traces.
+
+  These need a dedicated session and likely rope in the
+  CONSTRUCT_PARAMETER_REPLAY_PLAN-style sprite-init lifecycle work for
+  button-state child sprites.
+
+- **Phase 2 deferred — `key_event_test`.** Past line 30, failures are listener
+  ordering / `removeListener` semantics: dynamic_mc.onKeyDown is fired before
+  `listenerClip2.onClipKeyDown` (we have it after), and the `'0+ls3+ls2+ls1+...'`
+  vs `'0+ls3+ls1+ls2+ls3+ls1+ls2+...'` divergence at line 57/63 indicates we
+  have duplicate listener firings. Multi-faceted Key.addListener / clip-event
+  KEY_DOWN interleaving rework — defer.
+
+- **Phase 3 deferred — `DragDropTest`.** Levels are loading correctly (the
+  later `loadedTarget/*` cluster, lines 25-32, all pass). The failures are all
+  `_level50/*` `_droptarget` lines: when the dragger is over a target inside
+  `_level50`, `_droptarget` is empty rather than `_level50/target10`. The
+  `find_drop_target_in_dl` walk in `tag.c` doesn't include level MCs in its
+  iteration. This isn't blocked on level-loading itself (LEVELS_PLAN landed)
+  but on extending `_droptarget` resolution to walk all levels. Defer.
 
 ## Background
 

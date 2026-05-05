@@ -37544,9 +37544,21 @@ static int instanceOfCoercing(SWFAppContext* app_context, ActionVar* obj_var, Ac
 			if (dp && dp->type == ACTION_STACK_VALUE_OBJECT)
 				mc_proto = (ASObject*) dp->data.numeric_value;
 		}
+		// Fallback: button-backed MCs walk Button.prototype, regular MCs walk
+		// MovieClip.prototype. In Flash, Button is its own type with chain
+		// Button.prototype → Object.prototype, not a subclass of MovieClip.
 		if (mc_proto == NULL) {
-			extern ASFunction g_movieclip_constructor;
-			mc_proto = g_movieclip_constructor.prototype_obj;
+			if (mc != NULL && mc->is_button_mc) {
+				extern ASFunction g_stub_ctors[];
+				ASFunction* btn_ctor = &g_stub_ctors[1]; // Button is index 1
+				if (btn_ctor->prototype_obj == NULL)
+					initButtonPrototype(app_context, btn_ctor);
+				mc_proto = btn_ctor->prototype_obj;
+			}
+			if (mc_proto == NULL) {
+				extern ASFunction g_movieclip_constructor;
+				mc_proto = g_movieclip_constructor.prototype_obj;
+			}
 		}
 		int depth = 0;
 		while (mc_proto != NULL && depth < 100) {

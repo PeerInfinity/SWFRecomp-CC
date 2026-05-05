@@ -1528,19 +1528,27 @@ void tagSetBackgroundColor(u8 red, u8 green, u8 blue)
 #endif
 }
 
-// Resolve a button's hit-test character ID to a shape, following through
-// nested buttons (e.g. button 6 whose hit char is button 5 → shape 4).
-static Character* resolve_hit_shape(size_t hit_char_id, u32* out_hit_transform_id, int depth)
+// Resolve a button's hit-test character ID to a shape or morph shape, following
+// through nested buttons (e.g. button 6 whose hit char is button 5 → shape 4).
+// Returns the resolved character (SHAPE or MORPH_SHAPE), or NULL if none.
+// out_hit_char_id receives the resolved character's char_id (for ng_hitTestShapeChar).
+static Character* resolve_hit_shape(size_t hit_char_id, u32* out_hit_transform_id,
+                                    size_t* out_hit_char_id, int depth)
 {
 	if (depth > 4) return NULL;  // guard against loops
 	if (hit_char_id >= dictionary_capacity) return NULL;
 	Character* hit_ch = &dictionary[hit_char_id];
-	if (hit_ch->type == CHAR_TYPE_SHAPE) return hit_ch;
+	if (hit_ch->type == CHAR_TYPE_SHAPE || hit_ch->type == CHAR_TYPE_MORPH_SHAPE)
+	{
+		if (out_hit_char_id) *out_hit_char_id = hit_char_id;
+		return hit_ch;
+	}
 	if (hit_ch->type == CHAR_TYPE_BUTTON)
 	{
 		// Follow through to the nested button's hit shape
 		*out_hit_transform_id = hit_ch->button_hit_transform_id;
-		return resolve_hit_shape(hit_ch->button_hit_char_id, out_hit_transform_id, depth + 1);
+		return resolve_hit_shape(hit_ch->button_hit_char_id, out_hit_transform_id,
+		                        out_hit_char_id, depth + 1);
 	}
 	return NULL;
 }
@@ -1568,6 +1576,30 @@ static void ng_update_button_states_in_dl(SWFAppContext* app_context,
 		if (obj->char_id == 0) continue;
 
 		Character* ch = &dictionary[obj->char_id];
+
+		// Sprites may contain nested buttons. Recurse into the sprite's
+		// display list to find them. Mirrors Ruffle's mouse_pick_avm1 which
+		// walks the render list looking for interactive children.
+		if (ch->type == CHAR_TYPE_SPRITE)
+		{
+			if (obj->sprite_display_list != NULL && obj->sprite_max_depth > 0)
+			{
+				const float* place_xf = (const float*)(app_context->transform_data) + obj->transform_id * 16;
+				float child_parent_xf[16];
+				hit_test_mat4_multiply(child_parent_xf, parent_xf, place_xf);
+
+				MovieClip* sprite_mc = NULL;
+				if (obj->instance_name != NULL)
+					sprite_mc = actionFindOrCreateMovieClip(app_context, obj->instance_name, parent_mc);
+
+				ng_update_button_states_in_dl(app_context,
+					obj->sprite_display_list, obj->sprite_max_depth,
+					child_parent_xf, sprite_mc ? sprite_mc : parent_mc,
+					found_hover);
+			}
+			continue;
+		}
+
 		if (ch->type != CHAR_TYPE_BUTTON) continue;
 
 		// Recurse into this button's child display list FIRST (children are
@@ -1609,7 +1641,10 @@ static void ng_update_button_states_in_dl(SWFAppContext* app_context,
 		{
 			// Resolve hit-test shape (follows through nested buttons)
 			u32 resolved_hit_xf_id = ch->button_hit_transform_id;
-			Character* hit_ch = resolve_hit_shape(ch->button_hit_char_id, &resolved_hit_xf_id, 0);
+			size_t resolved_hit_char_id = ch->button_hit_char_id;
+			Character* hit_ch = resolve_hit_shape(ch->button_hit_char_id,
+			                                      &resolved_hit_xf_id,
+			                                      &resolved_hit_char_id, 0);
 			if (hit_ch != NULL)
 			{
 				// Compose: parent_xf * placement * hit-record transform
@@ -1619,11 +1654,22 @@ static void ng_update_button_states_in_dl(SWFAppContext* app_context,
 				hit_test_mat4_multiply(temp, parent_xf, place_xf);
 				hit_test_mat4_multiply(composed, temp, hit_xf);
 
-				int hit = hit_test_shape(app_context->shape_data,
-					hit_ch->shape_offset, hit_ch->size,
-					composed,
-					app_context->mouse.stage_x,
-					app_context->mouse.stage_y);
+				// Use char-aware hit testing: in NO_GRAPHICS mode, shapes carry
+				// path data (not triangulated geometry), so we must call into
+				// ng_hitTestShapeChar which understands path data + bounds.
+				extern int ng_hitTestShapeChar(size_t char_id, u16 ratio,
+				    double ma, double mb, double mc_m, double md, double mtx, double mty,
+				    double test_x, double test_y);
+				double ma  = (double)composed[0];
+				double mb  = (double)composed[1];
+				double mc_m = (double)composed[4];
+				double md  = (double)composed[5];
+				double mtx = (double)composed[12];
+				double mty = (double)composed[13];
+				int hit = ng_hitTestShapeChar(resolved_hit_char_id, obj->ratio,
+					ma, mb, mc_m, md, mtx, mty,
+					(double)app_context->mouse.stage_x,
+					(double)app_context->mouse.stage_y);
 
 				if (hit)
 				{

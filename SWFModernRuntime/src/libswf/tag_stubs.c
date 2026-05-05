@@ -2289,7 +2289,7 @@ extern float morph_end_shape_data[][2];
 // ma..mty is the child's accumulated world matrix (mapping local twips → test space).
 // ratio: morph ratio (0=start, 65535=end). Ignored for non-morph shapes.
 // Returns 1 if hit, 0 if miss.
-static int ng_hitTestShapeChar(size_t char_id, u16 ratio,
+int ng_hitTestShapeChar(size_t char_id, u16 ratio,
     double ma, double mb, double mc_m, double md, double mtx, double mty,
     double test_x, double test_y)
 {
