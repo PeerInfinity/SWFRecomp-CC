@@ -299,89 +299,80 @@ reshaping.
 Status: `27/44 (61%)`. Lines 1-15 PASS, 16-23 FAIL on `_level50/*`,
 24-32 PASS (`/loadedTarget/*` works), 34-41 FAIL on later tests.
 
-**Root cause.** `ng_compute_droptarget` in `tag.c` walks two location
-sets:
+### Investigation (2026-05-05 session)
 
-1. `display_list` (root timeline) via `find_drop_target_in_dl`.
-2. Dynamic MCs (createEmptyMovieClip / duplicateMovieClip / attachMovie)
-   via `actionFindDynamicDropTarget`.
+Initial hypothesis was that `ng_compute_droptarget` doesn't walk
+`g_levels[1..127]`. Verified: a sketched walk produces no hits because
+**`g_levels[50]->display_obj == NULL`** at drop-target compute time.
+Level loads via `loadMovieNum(url, 50)` create the level MC in
+`getOrCreateLevel`, but the level's `display_obj` is never wired to a
+DisplayObject with a sprite_display_list. The `_did_swap` block in
+`actionFirePendingDirectLoads` (action.c:19871) is gated on
+`dobj != NULL && dobj->sprite_display_list != NULL`, so for fresh levels
+the swap never fires and the loaded SWF's tagPlaceObject2 calls land in
+the *root* `display_list`. (This is why level loads "work" for variable
+access — `g_levels[50]->dynamic_props` is populated correctly via the
+loaded SWF's createEmptyMovieClip path — but the *display list* never
+exists at the level boundary.)
 
-It does NOT iterate `g_levels[1..MAX_LEVELS]`. So when `loadMovieNum(url,
-50)` loads a SWF into level 50, the contents of `_level50.target10`,
-`_level50.target20`, etc. are present in `g_levels[50]->display_obj`'s
-display list but never searched by droptarget computation.
+Adding a `g_levels[]` walk is the wrong shape. The actual mechanism in
+play is `actionFindDynamicDropTarget` (action.c:26860), which already
+*does* support level paths via the `hit_level_root` walk at
+action.c:26921. Tracing in this session shows it correctly enumerates
+all three `target10` candidates (root, _level50, loadedTarget) with
+`draw_has_bounds=1`. So the level50 children ARE seen by the dynamic
+walker.
 
-The "loadedTarget" cluster works because that's `loadedTarget.loadMovie(...)`
-— it loads into a NAMED sprite at `_root.loadedTarget`, which IS in
-`display_list` and is reached by the existing static walk.
+The bug is in the **world-matrix lookup** for level-rooted MCs:
 
-**Path format.** Test expects `_level50/target10` — a `_levelN/path`
-prefix, distinct from `/path` for level 0. Ruffle's `MovieClip::path()`
-returns this format for level-rooted clips. Our `mcToDotBasePath`
-already handles `_levelN` for level roots; we need to apply the same
-formatting to drop-target paths from level walks.
+- Root's `target10`: parent=root, world matrix `tx=0 ty=0`. local point
+  matches (50, 50) → bounds (30,30,70,70) hit. ✓
+- loadedTarget's `target10`: parent=loadedTarget, world matrix tx=200
+  (loadedTarget is positioned at x=200 in root). local=(-150, 50) at
+  the same world coord → out of bounds. ✓ (correct miss)
+- `_level50`'s `target10`: parent=g_levels[50], world matrix… **never
+  fires HIT in the dragger's input range.** Either `getConcatMatrixForMC`
+  for a level-rooted MC returns identity (so it competes at the same
+  world position as root's target10 and loses the depth tiebreak), or
+  it returns something with the level's offset baked in but the dragger
+  position doesn't intersect.
 
-### 3a — Walk levels in `ng_compute_droptarget`
+The test's input.json drives the dragger to specific coordinates that —
+under Flash semantics — overlap each container in turn (root, level50,
+loadedTarget). For the root and loadedTarget phases we get the right
+hit; for the level50 phase we see *no* hit at all (`_droptarget = ""`),
+suggesting the world matrix puts level50's target10 somewhere the
+dragger never reaches.
 
-Add a third location set: iterate `g_levels[1..MAX_LEVELS]`, and for each
-non-NULL level, call a level-aware variant of
-`find_drop_target_in_dl` that produces paths starting with `_levelN/`
-instead of `/`. The level's `display_obj` carries its own display list
-(populated when `actionFirePendingDirectLoads` runs the level's frame_0
-during the next-tick async load).
+### 3a — Trace `getConcatMatrixForMC` for level-rooted MCs
 
-Skeleton:
+Diagnostic step: at the start of `actionFindDynamicDropTarget`, log the
+dragger's stage coords and ALL candidate world matrices for the level50
+children specifically. Cross-reference against:
 
-```c
-int ng_compute_droptarget(...)
-{
-    // Existing: static root display_list walk (paths "/x")
-    if (find_drop_target_in_dl(display_list, max_depth, ..., out_path, out_size))
-        return 1;
-    // Existing: dynamic MCs
-    if (actionFindDynamicDropTarget(...))
-        return 1;
-    // NEW: walk levels 1..N
-    extern MovieClip* g_levels[];
-    for (int lv = 1; lv < MAX_LEVELS; lv++) {
-        MovieClip* lmc = g_levels[lv];
-        if (lmc == NULL || lmc->display_obj == NULL) continue;
-        DisplayObject* lvl_dl = ((DisplayObject*)lmc->display_obj)->sprite_display_list;
-        size_t lvl_max = ((DisplayObject*)lmc->display_obj)->sprite_max_depth;
-        if (lvl_dl == NULL) continue;
-        char level_prefix[16];
-        snprintf(level_prefix, sizeof(level_prefix), "_level%d", lv);
-        if (find_drop_target_in_dl(lvl_dl, lvl_max,
-            0.0f, 0.0f, stage_x_twips, stage_y_twips,
-            skip_name, level_prefix, out_path, out_size))
-            return 1;
-    }
-    return 0;
-}
-```
+- The expected x/y where the test SWF places target10/target20/target100
+  inside `_level50` (in the loaded SWF's frame 1; readable from
+  `DragDropTestLoaded.swf` via ffdec).
+- Ruffle's level positioning: by default a `_levelN` root has world
+  matrix identity (no offset).
 
-The 5th argument to `find_drop_target_in_dl` is `parent_path` — the path
-prefix to prepend. Pass `"_level50"` instead of the empty string used by
-the root walk. The function already concatenates `parent_path + "/" + child_name`
-internally.
+If the world matrix returns identity but the test still expects a hit at
+the dragger's stage coords, then the test's drag positions must be
+designed to land *inside* level50's target10 at its declared coords —
+which means our world matrix is correct but our stage coords are wrong.
 
-### 3b — Verify path format for level-rooted clips
+**Estimated effort.** 4-6 hours (was 1-2): we need to validate three
+moving parts (world matrix, level placement, dragger stage coord) before
+landing a fix. Recommend pairing with someone who's worked on
+`getConcatMatrixForMC` previously.
 
-Run the test after 3a and check the actual emitted path. Two formats to
-disambiguate:
-- `_level50/target10` (no leading slash, `_levelN` is the root prefix)
-- `/_level50/target10` (with leading slash treating `_level50` as root child)
+### 3b — Path format (subordinate to 3a)
 
-The test expects the first form. If `find_drop_target_in_dl` emits
-`/<parent_path>/...`, strip the leading `/` for level paths, OR change the
-helper to optionally not prepend `/` when `parent_path` starts with `_`.
-
-### 3c — Don't return level matches when the dragged clip itself is in a level
-
-Edge case: if the dragged clip is in `_level50` and overlaps with another
-clip in `_level50`, the `skip_name` filter must work for level-rooted
-clips. Add a level-aware skip check: `_level50/draggable50` should be
-skipped just like `/draggable50` would be on the root walk.
+Once 3a lands hits at the right coords, check the emitted path. The
+existing `actionFindDynamicDropTarget` at action.c:26921 walks the parent
+chain looking for `_levelN` ancestors and emits `_levelN/segs…` already.
+Verify it produces `_level50/target10` for the level50 case (no leading
+slash, no extra `/` between `_level50` and `target10`).
 
 ### Phase 3 verification battery
 
@@ -390,11 +381,20 @@ skipped just like `/draggable50` would be on the root walk.
   (4 tests, must stay PASS).
 - Gnash misc-swfc: `mouse_drag_test` (must stay PASS).
 - Gnash misc-mtasc: `levels` (effective pass; verify level loading still
-  works post-droptarget walk).
+  works post-fix).
 
-**Estimated effort.** 1-2 hours: 3a is mechanical (~30 min), 3b is a
-quick run-and-tweak, 3c is conditional. Should land 6-8 lines on
-DragDropTest (lines 16-23).
+**Expected line gain.** 8 lines on DragDropTest (16-23) on success.
+Note: lines 34-41 are downstream (post-`unloadMovieNum(50)`) and
+probably need a separate level-cleanup fix.
+
+### Why `g_levels[]` walk doesn't help
+
+The hypothesis "iterate g_levels[]" implicitly assumed level content
+lives in a separate display list. It doesn't — fresh levels have
+`display_obj == NULL`, so loaded SWF tags place into root's display
+list. Adding the walk produces zero hits because there's nothing to
+walk into. Don't replace the dynamic-MC walk path; *fix* the
+world-matrix path within it.
 
 ## Phase 4 — `button_test1` — COMPLETE
 
@@ -402,12 +402,17 @@ Done in 2026-05-05 session. See "Session findings" above.
 
 ## Investigation order recommendation
 
-1. **Phase 3 first.** Smallest scope, mechanical fix in one file, +6-8
-   lines. Low regression risk (verified 4-test AVM1 drag battery and
-   mouse_drag_test sit on top of `ng_compute_droptarget`).
-2. **Phase 1a second.** 2-4 hour investigation, potential +9 lines plus
-   unblocks 1c. The diagnostic step (printf in `script_2` and write
-   site) is cheap and concrete.
+(Revised 2026-05-05 after Phase 3 deeper trace.)
+
+1. **Phase 1a first.** 2-4 hour investigation, potential +9 lines plus
+   unblocks 1c. The diagnostic step (printf at `actionSetMember` for
+   key=`buttonChild` and the script_2 entry point) is cheap and
+   concrete.
+2. **Phase 3 second.** Larger scope than first thought (4-6 hours);
+   needs world-matrix tracing for level-rooted MCs. Initial sketch
+   ("walk g_levels[]") doesn't apply — `g_levels[N]->display_obj` is
+   NULL after load, so there's nothing to walk into. The fix is in
+   `getConcatMatrixForMC` (or its caller) for level-rooted MCs.
 3. **Phase 2 last.** Largest scope (broadcaster restructuring). Deferring
    doesn't block anything else — key_event_test has been at 50% for
    multiple CIs and isn't on any user-facing path.
@@ -441,7 +446,7 @@ to an architectural plan.
 
 - Phase 1: 4-8 hours (1a investigation + fix, 1c follow-up).
 - Phase 2: 4-6 hours.
-- Phase 3: 1-2 hours.
+- Phase 3: 4-6 hours (revised after deeper trace; was 1-2).
 - Phase 4: COMPLETE.
 
 ## Related docs
