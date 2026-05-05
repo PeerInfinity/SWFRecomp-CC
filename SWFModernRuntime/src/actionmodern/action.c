@@ -633,6 +633,13 @@ void actionSetTimeoutJmp(void* jmp_buf_ptr)
 	}
 }
 u32 g_call_depth = 0;
+// >0 while inside an AS2 MC event handler dispatched via mc_call_as2_handler_ng
+// (input-pump mouse events, focus events, deferred onChanged, etc. — all fire
+// AFTER the per-tick funcs[current_frame] returned). Read by actionNextFrame /
+// actionGotoFrame to run inline catch-up so the new frame's DoAction executes
+// before the next event in the same tick. Mirrors Ruffle's synchronous
+// MovieClip.nextFrame / gotoFrame semantics. Key test: ButtonEventsTest.
+int g_inside_event_handler = 0;
 static int g_child_swf_init = 0;  // >0 during child SWF init (MCL/loadMovie); scopes funcs to MC
 extern u8 g_current_movie_id;    // Defined in tag_stubs.c — tracks which movie is currently initializing
 static int g_use_new_invalid_bounds = 0;  // Ruffle: one-way flag, flips to 1 when getBounds/getRect called from SWF>=8
@@ -25836,6 +25843,38 @@ void actionNextFrame(SWFAppContext* app_context)
 			extern void ng_executeGotoCatchUp(SWFAppContext* app_context);
 			ng_executeGotoCatchUp(app_context);
 			{ extern int g_defer_sprite_init; g_defer_sprite_init = 0; }
+		}
+		return;
+	}
+	// Ruffle's MovieClip.nextFrame() / gotoFrame() advance synchronously when
+	// called from an event-handler context (input pump fires AFTER the
+	// per-tick frame script returned). Without inline catch-up, the new
+	// frame's DoAction would run on the NEXT tick — by which time later
+	// events in the same tick have already been delivered, wrecking
+	// line-by-line trace alignment. Mirrors actionGotoFrame's existing
+	// inline-catch-up at the root timeline level. ng_isInsideSprite() is
+	// false here because mc_call_as2_handler_ng doesn't set
+	// g_current_sprite_obj. Key test: ButtonEventsTest.
+	if (g_inside_event_handler && !ng_isInsideSprite()) {
+		extern int goto_from_action;
+		extern size_t g_frame_count;
+		size_t target = current_frame + 1;
+		if (target < g_frame_count) {
+			goto_from_action = 1;
+			next_frame = target;
+			manual_next_frame = 1;
+			root_movieclip.currentframe = target + 1;
+			extern void ng_executeGotoCatchUp(SWFAppContext* app_context);
+			ng_executeGotoCatchUp(app_context);
+			{ extern int g_defer_sprite_init; g_defer_sprite_init = 0; }
+			// Inline target script ran wrapped in actionDrainSuppressEnter,
+			// which queued its DoAction entries into AQ_KIND_SCRIPT but
+			// suppressed the recompiler-emitted SHOW_FRAME drain. Inside a
+			// frame script, the caller's outer SHOW_FRAME drain picks them
+			// up — but here the caller is an event handler with no such
+			// drain. Drain explicitly so the target frame's note() / asserts
+			// fire before control returns to the input pump.
+			actionDrainOnloadAndScript(app_context);
 		}
 		return;
 	}
@@ -62060,6 +62099,11 @@ static void mc_call_as2_handler_ng(SWFAppContext* app_context, MovieClip* mc,
 		g_this_depth++;
 	}
 
+	// Mark "inside AS2 MC event handler" so a bare actionNextFrame /
+	// actionGotoFrame opcode inside the handler runs inline catch-up
+	// (Ruffle synchronous-goto semantics).
+	g_inside_event_handler++;
+
 	if (func->function_type == 2)
 	{
 		ActionVar* registers = NULL;
@@ -62132,6 +62176,7 @@ static void mc_call_as2_handler_ng(SWFAppContext* app_context, MovieClip* mc,
 		}
 	}
 
+	g_inside_event_handler--;
 	g_this_depth = saved_this_depth_mc;
 }
 
