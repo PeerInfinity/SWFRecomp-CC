@@ -66,7 +66,7 @@ Five of the nine listed tests now PASS or RM locally:
 
 | Test | Suite | actual / expected / match | Real status |
 |------|-------|--------------------------|--------------|
-| `BeginBitmapFill` | misc-ming | 1 / 1 / 0 | Single-line content mismatch — `mc9._width` returns 804, expected 150. Not zero-output. |
+| `BeginBitmapFill` | misc-ming | 1 / 1 / 1 | **NOW PASS** (CI baseline at 7afe70f8). `mc9._width` returns 150 as expected. Phase 5 no longer needed. |
 | `Version4Loader` | misc-ming | 0 / 11 / 0 | **TRUE zero output.** Child SWF `Version5Loaded.swf` doesn't run. |
 | `frame_label_test` | misc-ming | 0 / 17 / 0 | **TRUE zero output.** Frame-label-driven `_root.x1` etc. variables never get set. |
 | `replace_buttons1test` | misc-ming | (was 24 / 18 / 0) | **NOW `ruffle_matched` locally** (2026-05-02 verification). Will flip in next CI run. |
@@ -76,12 +76,47 @@ Five of the nine listed tests now PASS or RM locally:
 | `loading/LoadVarsTest` | misc-ming | (was compile_fail) | **NOW PASS locally** (2026-05-02 verification). Phase 1 fix already in `verify_output.py:1280-1281` (verified). Will flip in next CI run. |
 | `opcode_guard_test2` | misc-swfc | (was runtime_error) | Now `output_mismatch`, 11/20 passing. testvar off-by-one + dynamic-clone getDepth issue. |
 
-**Phases 1, 2, and the two free flips have all landed locally.** Remaining
-actionable phases:
-- Phase 3 (Version4Loader child SWF loadMovie),
-- Phase 4 (frame_label_test slash-colon GoToLabel arg parsing),
-- Phase 5 (BeginBitmapFill `_width` getter on bitmap-fill MCs),
+**Phases 1, 2, 4, and the two free flips have all landed.** `BeginBitmapFill`
+flipped to PASS in a later CI baseline (Phase 5 no longer needed —
+`mc9._width` now returns 150 as expected). Remaining actionable phases:
+- Phase 3 (Version4Loader child SWF loadMovie — true blocker, see below),
 - Phase 6 (opcode_guard_test2 testvar off-by-one + getDepth).
+
+### Phase 3 update (2026-05-04 investigation)
+
+Confirmed `Version4Loader` is still 0/11. Root cause traced: the test SWF
+calls `loadMovieNum("Version5Loaded.swf", 4)` (encoded as
+`Push str + StringAdd + GetURL2(method=NONE, target=0, vars=0)`). Our
+runtime path is `actionGetURL2` → `actionGetURL` (delegates for `_level<N>`
+target) → `getOrCreateLevel` + `findMovieEntry` → enqueue
+`PendingDirectLoad{is_level=1}`. The pending queue is drained at end of
+tick by `actionFirePendingDirectLoads` (action.c ~19533), which runs
+`entry->init_func` + `entry->frame_funcs[0]` for the loaded child.
+
+**Blocker.** `actionFirePendingDirectLoads` only runs frame 0 of the
+child SWF. The Dejagnu setup is in frame 0 (defines the `xtrace_win`
+prototype + check functions); the actual test assertions are in frame 1
+(the `_root.note('[ debug-...]')` + `check_equals(typeof(unescape), ...)`
+lines). For the child to advance past frame 0, the level MC needs to be
+wired into the per-tick `advance_sprite_frames` mechanism — same
+multi-frame child advance issue documented in
+`from_shumway/_investigation/incomplete/SHUMWAY_AVM1_SUBTREES_PLAN.md`
+Part C (for MCL `entry->frame_funcs[1..N-1]`).
+
+The level MC currently has `display_obj=NULL` initially; the swap-to-
+sprite-display-list path in `actionFirePendingDirectLoads` is a no-op
+because of that. A fix would need to: (a) allocate a `DisplayObject` for
+the level MC, (b) populate `sprite_frame_funcs` / `sprite_frame_count` /
+`sprite_is_playing=1` so `advance_sprite_frames` ticks frames 1..N-1, or
+(c) take a synthetic-root approach similar to how `_level0` (root SWF)
+runs.
+
+**Risk.** Same risk pattern as the Shumway moviecliploader Part B
+attempt (commits `1a1bf852` / revert `59533be3`): deferring/extending
+multi-tick lifecycle exposes latent use-after-free in `getBounds` and
+`setInterval` chained-from-onLoadComplete timing. Recommend coupling
+this fix with the Shumway Part C investigation rather than landing
+standalone.
 
 ## Phase 1 — Verifier: empty data-file array generates invalid C
 
@@ -319,38 +354,14 @@ its own private action layer.
 - 8 misc-swfc.all clone/destroy tests: 5 pass + 2 ruffle_matched — only
   `button_test1` still fails (known blocker, unrelated).
 
-## Phase 5 — BeginBitmapFill: _width returns 804 instead of 150
+## Phase 5 — BeginBitmapFill: _width returns 804 instead of 150 (RESOLVED)
 
-**Problem.** Single-line test. Expected:
-
-```
-PASSED: _root.mc9._width == 150
-```
-
-We get:
-
-```
-FAILED: expected: 150 obtained: 804 [BeginBitmapFill.c:222]
-```
-
-`mc9._width` should return 150 (the bitmap fill's logical width) and
-returns 804 instead. 804 is 150 * 5.36 — close to 150 + some scaling, but
-not a simple ratio. More likely 804 is the bitmap's **native pixel
-size in twips/20** (a 4020-twip bitmap = 201px ≠ 150 either, so the
-math isn't obvious without inspecting the SWF's BeginBitmapFill matrix).
-
-**Investigation steps:**
-
-1. Decompile or inspect the SWF's DefineShape with BeginBitmapFill —
-   what's the bitmap, what's the bitmap matrix, what shape is mc9?
-2. Compare with our `_width` getter for MCs containing bitmap fills.
-   Does it walk the shape geometry (correct: 150) or take the bitmap's
-   raw dimensions (incorrect: 804)?
-3. Cross-reference: AVM1 has `bitmap_data_*` tests but no exact match
-   for "MC width with bitmap fill." Test may expose a single edge case.
-
-**Risk.** Low. Confined to `mcGetEffectiveSize` / `_width` getter and
-its handling of `BeginBitmapFill` as a fill style.
+**Status (2026-05-04).** The test now PASSES in the CI baseline at
+`7afe70f8`. `mc9._width` returns 150 as expected. No work needed —
+`mcGetEffectiveSize` / `_width` getter already walks the drawing-API
+geometry correctly via `drawingUpdateBounds`, which records corner
+points from `moveTo`/`lineTo` calls. The 804 value seen in earlier
+snapshots no longer reproduces.
 
 There's also a stderr warning during this test:
 
