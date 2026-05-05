@@ -1866,6 +1866,7 @@ void dispatch_enterframe_clip_actions(SWFAppContext* app_context,
 		// so ENTER_FRAME doesn't fire for clips being removed in this frame —
 		// see DEFERRED_CLIP_UNLOAD_PLAN, avm1/clip_events.
 		MovieClip* saved_ctx = g_current_context;
+		MovieClip* saved_base = actionGetBaseClip();
 		MovieClip* event_mc = NULL;
 		if (obj->instance_name != NULL) {
 			event_mc = actionFindOrCreateMovieClip(app_context, obj->instance_name, parent_mc);
@@ -1876,6 +1877,11 @@ void dispatch_enterframe_clip_actions(SWFAppContext* app_context,
 				}
 				if (_ef_skip) continue;
 				actionSetCurrentContext(event_mc);
+				// Set base_clip so actionBaseClipRemoved() detects removal during
+				// gotoAndPlay catch-up that removes this clip (e.g. opcode_guard_test
+				// mc2 EnterFrame: gotoAndPlay(8) removes mc2 mid-handler — Ruffle
+				// aborts the rest of the handler via the same base-clip check).
+				actionSetBaseClip(event_mc);
 			}
 		} else {
 			// Anonymous obj: skip if parent_mc is Marked (covers the case where
@@ -1892,6 +1898,7 @@ void dispatch_enterframe_clip_actions(SWFAppContext* app_context,
 			}
 		}
 		actionSetCurrentContext(saved_ctx);
+		actionSetBaseClip(saved_base);
 		continue;
 	_ef_skip_obj:;
 	}
