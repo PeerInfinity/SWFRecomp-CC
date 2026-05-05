@@ -23,7 +23,7 @@ phases:
     status: complete
   - id: 1c3
     name: "Event ordering: SWFBUTTON_* fires before frame advance"
-    status: pending
+    status: partial
   - id: 2
     name: "key_event_test progression past frame 5"
     status: deferred
@@ -38,14 +38,14 @@ blockers: []
 parent_plan: "complete/BUTTON_INFRASTRUCTURE_PLAN.md"
 -->
 
-Last updated: 2026-05-05 (Phase 1c sub-fixes 1c1+1c2 landed locally; 1c3 still open).
+Last updated: 2026-05-05 (Phase 1c3 partial: button-mode-MC catch landed; synchronous nextFrame() blocker remaining).
 
 ## Summary status (CI at `aaa502d1`)
 
 | Test | Suite | Lines | Status | Phase |
 |------|-------|-------|--------|-------|
 | `button_test1` | misc-swfc.all | **31/31 PASS** | complete | 4 |
-| `ButtonEventsTest` | misc-ming.all | 58/679 (1c1+1c2 fixed prereqs but blocked by 1c3 ordering) | partial | 1 |
+| `ButtonEventsTest` | misc-ming.all | 62/679 (1c3 partial: button-mode catch landed, sync nextFrame remaining) | partial | 1 |
 | `key_event_test` | misc-ming.all | 33/66 (50%) | deferred | 2 |
 | `DragDropTest` | misc-ming.all | 27/44 (61%) | deferred | 3 |
 
@@ -283,38 +283,94 @@ After this fix, square1 has `bounds=(39.95, 29.95, 80.05, 70.05)`,
 `actionDispatchMCMouseMove` fires `square1.onRollOut` correctly, and
 the handler invokes `nextFrame()` advancing the timeline to frame 3.
 
-#### 1c3 — Event ordering: SWFBUTTON_* fires before frame advance (PENDING)
+#### 1c3 — Event ordering: SWFBUTTON_* fires before frame advance (PARTIAL)
 
-**Observed (post-1c1+1c2).** Test still at 58/679 matching. Trace shows
-the test now executes through frames 3+, even reaching `2. Press (and
-keep pressed)…` (frame 4). But output still diverges at line 59 because
-SWFBUTTON_MOUSEOVER fires on the FIRST MM(60,60) when `testno=0`, taking
-the else-branch and emitting `FAILED: Unexpectedly got
-SWFBUTTON_MOUSEOVER event (testno:0)`. Ruffle's expected output skips this
-line entirely — by the time MOUSEOVER fires, `testno` is already 1.
+**Original observation.** Test at 58/679 matching. SWFBUTTON_MOUSEOVER
+fired on the FIRST MM(60,60) when `testno=0`, emitting
+`FAILED: Unexpectedly got SWFBUTTON_MOUSEOVER event (testno:0)`. Ruffle's
+expected output skips this entirely.
 
-**Hypothesis.** Ruffle's event delivery model coalesces or delays
-SWFBUTTON_* dispatch until after frame-advance scripts run, so that the
-sub-test 0 → frame 3 transition completes before any "real" mouse event
-is delivered to the button. Our impl delivers each MM event immediately
-to `ng_update_button_states_in_dl`, firing SWFBUTTON_MOUSEOVER before
-square1.onRollOut has a chance to advance the frame.
+**Root cause (identified 2026-05-05).** Ruffle's `mouse_pick_avm1` for a
+MovieClip returns the MC itself (not its children) when the MC is in
+*button mode* — i.e. has any of the BUTTON_EVENT_METHODS handlers
+(onRollOver/onRollOut/onPress/onRelease/onReleaseOutside/onDragOver/
+onDragOut). See `core/src/display_object/movie_clip.rs:2912-2918`. RollOver
+events go to that MC, and the inner button never receives them. Square1
+in ButtonEventsTest has `onRollOut` defined in frame 2, so it's
+button-mode; Ruffle dispatches RollOver to square1 (which has no
+onRollOver handler — silent), and the inner button stays in UP state.
 
-**Recommended approach.** Compare event-vs-frame ordering with Ruffle's
-`tests/run.rs` event playback. Ruffle may queue the first frame-advance
-side-effect (nextFrame) and re-run frame scripts before continuing event
-delivery. Specifically the sequence for input
-`[Wait, Wait, Wait, MM(60,60), MM(0,0), MM(60,60), MD(60,60), MU(60,60),
-…]` should produce zero output between the frame 2 hitTest line and
-the frame 3 "1. Roll over…" note.
+Our impl previously walked into sprites unconditionally inside
+`ng_update_button_states_in_dl`, firing SWFBUTTON_MOUSEOVER on the inner
+button regardless of whether the parent sprite was button-mode. And
+`actionDispatchMCMouseMove` dispatched onRollOver/onRollOut to *every*
+MC whose AABB contained the mouse, including button-mode descendants
+already shadowed by their parent.
 
-**Estimated effort.** 4-6 hours: needs Ruffle source inspection of the
-input-replay tick model + event-deferral logic.
+**Fix landed.** Two-part change:
 
-**Expected line gain.** If 1c3 lands, ButtonEventsTest could jump from
-58/679 to ~150-200/679 (subtests 1-3 worth of correct output), with
-remaining failures from buttonChild assertion mismatches that Ruffle
-also fails (Flash UB).
+1. `SWFModernRuntime/src/actionmodern/action.c` — added
+   `actionMCHasButtonHandlers()` (own-property check for the 7 button-event
+   method names) and `actionMCMouseInsidePick()` (mouse-inside-AABB check).
+
+2. `SWFModernRuntime/src/libswf/tag.c` `ng_update_button_states_in_dl` —
+   before recursing into a sprite child, if the sprite's MC is button-mode
+   AND the mouse is inside its AABB AND no hover has been claimed yet,
+   set `*found_hover = 1` and skip recursion (mirrors Ruffle's
+   "topmost button-mode MC catches mouse").
+
+3. `actionDispatchMCMouseMove` — added `mc_has_button_mode_ancestor_with_mouse()`
+   helper and skips MCs whose ancestor is button-mode AND catching the
+   mouse. Prevents inner `square1.button.onRollOver` from firing while
+   the parent square1 is the catching object.
+
+After this fix, ButtonEventsTest no longer emits `FAILED: Unexpectedly got
+SWFBUTTON_MOUSEOVER event (testno:0)` (verified: zero `Unexpectedly got
+SWFBUTTON` lines in actual output). Test progresses through testno=1, 2, 3,
+4 logic. Matching went 61 → 62 (small increase because subsequent line
+content still diverges for a different reason — see below).
+
+**Remaining blocker: synchronous nextFrame() inside event handlers.**
+
+In Ruffle, `MovieClip.nextFrame()` (and `gotoFrame`) advance the timeline
+*synchronously* and run the new frame's DoAction immediately. So when
+square1.onRollOut runs `_root.testno++; nextFrame();`, frame 3's DoAction
+runs INLINE during MM(0,0) processing — printing
+`1. Roll over the red square.` before the next event (third MM(60,60)) is
+processed.
+
+Our impl's `actionNextFrame` (at `action.c:25817`) just sets
+`next_frame = current_frame + 1; manual_next_frame = 1` and returns. The
+actual frame transition runs in the next tick's frame-loop iteration. By
+that time, all 12 MM/MD/MU events in tick 4 have already been delivered
+to `ng_update_button_states` — so SWFBUTTON_MOUSEOVER's `testno==1`
+checks fire BEFORE frame 3's note prints. The note ends up on actual line
+~110, expected line 59.
+
+There IS an inline catch-up branch in `actionNextFrame` for the
+`ng_isInsideSpriteInit() && g_settarget_explicit_root` case
+(`action.c:25825-25841`), but not for the general "called from MC event
+handler in main timeline context" case.
+
+**Recommended next step.** Extend `actionNextFrame` (and `actionGotoFrame`)
+to run an inline catch-up when called from inside an event-handler context
+on the main timeline. Hooks:
+- `g_inside_event_handler` flag set/cleared around mc_call_as2_handler_ng
+  invocations (or use the existing `g_call_depth`).
+- When set, `actionNextFrame` runs `ng_executeGotoCatchUp` directly
+  (similar to the SetTarget("_root") path) so the new frame's DoAction
+  runs before returning to the caller.
+
+**Estimated effort.** 3-5 hours: synchronous goto behavior touches the
+frame-loop state machine; need to ensure no double-execution of the new
+frame's DoAction (catch-up path + frame-loop path).
+
+**Expected line gain.** If synchronous nextFrame lands, ButtonEventsTest
+should jump significantly (~150-300/679) — the testno=1, 2, 3, 4 logic
+would all see the correct frame state and print at the right offsets,
+making line-by-line match align.
+
+#### Original investigation steps (kept for reference)
 
 #### Original investigation steps (kept for reference)
 

@@ -1592,6 +1592,28 @@ static void ng_update_button_states_in_dl(SWFAppContext* app_context,
 				if (obj->instance_name != NULL)
 					sprite_mc = actionFindOrCreateMovieClip(app_context, obj->instance_name, parent_mc);
 
+				// Ruffle's mouse_pick_avm1 returns the topmost button-mode MC
+				// when its hit area contains the mouse. If this sprite is
+				// button-mode (has onRollOver/onRollOut/onPress/etc.) and the
+				// mouse is inside its bounds, treat it as the catching
+				// interactive object: claim the hover and skip recursion so
+				// inner buttons do NOT fire SWFBUTTON_*. AS-level handlers on
+				// the parent sprite are dispatched separately by
+				// actionDispatchMCMouseMove.
+				extern int actionMCHasButtonHandlers(MovieClip* mc);
+				extern int actionMCMouseInsidePick(MovieClip* mc, float mx, float my);
+				if (sprite_mc != NULL && !*found_hover &&
+				    actionMCHasButtonHandlers(sprite_mc))
+				{
+					float mx_px = app_context->mouse.stage_x / 20.0f;
+					float my_px = app_context->mouse.stage_y / 20.0f;
+					if (actionMCMouseInsidePick(sprite_mc, mx_px, my_px))
+					{
+						*found_hover = 1;
+						continue;
+					}
+				}
+
 				ng_update_button_states_in_dl(app_context,
 					obj->sprite_display_list, obj->sprite_max_depth,
 					child_parent_xf, sprite_mc ? sprite_mc : parent_mc,

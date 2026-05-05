@@ -62188,6 +62188,54 @@ void actionDispatchMCRelease(SWFAppContext* app_context)
 	}
 }
 
+// Whether this MC has any of Ruffle's BUTTON_EVENT_METHODS as own dynamic
+// properties: onPress, onRelease, onReleaseOutside, onRollOut, onRollOver,
+// onDragOut, onDragOver. Used by ng_update_button_states to detect when a
+// sprite should "catch" mouse events as a button-mode interactive object,
+// preventing inner buttons from firing SWFBUTTON_*.
+int actionMCHasButtonHandlers(MovieClip* mc)
+{
+	if (mc == NULL || mc->dynamic_props == NULL) return 0;
+	static const char* handlers[] = {
+		"onPress", "onRelease", "onReleaseOutside",
+		"onRollOut", "onRollOver", "onDragOut", "onDragOver", NULL
+	};
+	static const int lens[] = {7, 9, 16, 9, 10, 9, 10};
+	for (int i = 0; handlers[i]; i++) {
+		ActionVar* h = getProperty((ASObject*)mc->dynamic_props,
+			handlers[i], lens[i]);
+		if (h != NULL) return 1;
+	}
+	return 0;
+}
+
+// Whether the mouse (in pixel coords) is inside the MC's pixel AABB.
+// Used by ng_update_button_states to decide whether a button-mode sprite
+// catches the current hover.
+int actionMCMouseInsidePick(MovieClip* mc, float mx, float my)
+{
+	float x1, y1, x2, y2;
+	if (!mc_get_pixel_aabb_ng(mc, &x1, &y1, &x2, &y2)) return 0;
+	return (mx >= x1 && mx <= x2 && my >= y1 && my <= y2);
+}
+
+// Whether any ancestor of this MC is button-mode AND its hit area contains
+// the mouse. When true, that ancestor "catches" mouse events as a unit
+// (mirroring Ruffle's mouse_pick_avm1 returning the topmost button-mode MC),
+// so this descendant should NOT fire its own onRollOver/onRollOut.
+static int mc_has_button_mode_ancestor_with_mouse(MovieClip* mc, float mx, float my)
+{
+	if (mc == NULL) return 0;
+	extern MovieClip root_movieclip;
+	MovieClip* p = mc->parent;
+	while (p != NULL && p != &root_movieclip) {
+		if (actionMCHasButtonHandlers(p) && actionMCMouseInsidePick(p, mx, my))
+			return 1;
+		p = p->parent;
+	}
+	return 0;
+}
+
 // Dispatch AS2 onRollOver/onRollOut/onDragOver/onDragOut on mouse-move.
 // Called from swf_core.c on EV_MOUSE_MOVE (after updating mouse state).
 void actionDispatchMCMouseMove(SWFAppContext* app_context)
@@ -62206,6 +62254,12 @@ void actionDispatchMCMouseMove(SWFAppContext* app_context)
 		if (!mc_get_pixel_aabb_ng(mc, &x1, &y1, &x2, &y2)) {
 			continue;
 		}
+
+		// Skip this MC if a button-mode ancestor is currently catching the
+		// mouse (Ruffle's mouse_pick_avm1 returns the topmost button-mode MC,
+		// so descendants never receive RollOver/RollOut).
+		if (mc_has_button_mode_ancestor_with_mouse(mc, mx, my))
+			continue;
 
 		int was_inside = mc->mc_mouse_inside;
 		int now_inside = (mx >= x1 && mx <= x2 && my >= y1 && my <= y2);
