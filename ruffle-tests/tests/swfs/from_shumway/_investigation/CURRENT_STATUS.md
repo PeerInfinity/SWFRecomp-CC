@@ -1,6 +1,10 @@
 # Shumway Test Suite Status
 
-Last updated: 2026-05-01 (CI run at 25231855425)
+Last updated: 2026-05-04 (Shumway fuzz `this._currentframe` fix — 5+ fuzz tests flip via syncing `mc->currentframe` to `obj->sprite_current_frame+1` during natural advance in `advance_sprite_frames`)
+
+## Latest fixes (2026-05-04, NOT yet in CI)
+
+- **Fuzz `this._currentframe` tests → 5+ PASS.** `from_shumway/fuzz/c8b8069c…`, `ac93c8c9…`, `07580c34…`, `2f4f46bf…`, `81004241…` (all the previously-built fuzz tests with `this._currentframe` traces from inside sprite frame scripts) now PASS. Root cause: in `advance_sprite_frames` (`SWFModernRuntime/src/libswf/tag.c`), only `obj->sprite_current_frame` (DisplayObject, 0-indexed) was incremented per natural advance — `mc->currentframe` (MovieClip, 1-indexed, the value `_currentframe` exposes to ActionScript) was set to 1 at MC creation and never updated outside goto paths (`ng_setSpriteFrame` / `ng_gotoFrameByMC`) and the root-frame updates emitted by the recompiler. So a script like `trace(this._currentframe)` running from inside a sprite frame func always returned 1 instead of the actual frame number. Fix: just before `CALL_FRAME(...)` at line ~941 (natural advance only), resolve the sprite's MC via `actionFindMovieClipByName(obj->instance_name)` and set `smc->currentframe = (int)frame + 1`. Mirrors `swf_core.c`'s update of `root_movieclip.currentframe` before each root frame func. Manual-nav catch-up paths (lines 814/866 within `advance_sprite_frames`, and `ng_setSpriteFrame`) are intentionally NOT touched — they already set `mc->currentframe` to the target value before catch-up so all catch-up frames see the target value (matching Flash). The remaining 22 numeric-output fuzz tests in `from_shumway/fuzz/*` likely also use this pattern (numeric-only output suggests the same `trace(this._currentframe)` template); expect more flips on the next CI run as they're rebuilt. Regression battery: 22/22 AVM1 lifecycle, 17/17 AVM1 scope, 14/14 misc-ming timeline, 14/14 AVM1 timeline, 6/6 AVM1 sprite-state, 5/5 gnash actionscript.all effective — no regressions.
 
 ## Quick Summary
 

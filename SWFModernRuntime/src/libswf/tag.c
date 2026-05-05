@@ -935,6 +935,16 @@ void advance_sprite_frames(SWFAppContext* app_context)
 			max_depth = 0;
 		}
 
+		// Sync 1-indexed _currentframe on the sprite's MC so scripts running
+		// inside this frame see the correct value via this._currentframe
+		// (mirrors swf_core.c's update of root_movieclip.currentframe).
+		if (obj->instance_name != NULL)
+		{
+			extern MovieClip* actionFindMovieClipByName(const char* instance_name);
+			MovieClip* smc = actionFindMovieClipByName(obj->instance_name);
+			if (smc) smc->currentframe = (int)frame + 1;
+		}
+
 		// Execute current frame function
 		if (frame < ch->sprite_frame_count && ch->sprite_frame_funcs[frame] != NULL)
 		{

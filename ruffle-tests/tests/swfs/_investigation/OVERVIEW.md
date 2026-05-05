@@ -2,7 +2,7 @@
 
 Cross-suite summary of all Ruffle-derived test suites. Each suite has its own `_investigation/` directory with detailed status docs.
 
-Last updated: 2026-05-04 (`frame_label_test` (Gnash misc-ming.all) → PASS via `actionCall` isolated-drain in CALL_FRAME_FUNC; `soft_reference_test1` and ASSetNative earlier in day).
+Last updated: 2026-05-04 (Shumway fuzz `this._currentframe` fix: 5+ fuzz tests → PASS via syncing `mc->currentframe` to `obj->sprite_current_frame+1` during natural advance in `advance_sprite_frames`).
 
 ## Suite Summary
 
@@ -21,6 +21,8 @@ Last updated: 2026-05-04 (`frame_label_test` (Gnash misc-ming.all) → PASS via 
 | **SWFRecomp/tests** (old suite) | 158+59 | all trace pass | — | — | **100%** | — | Hand-written opcode tests. CI only. |
 
 ## Progress Since 2026-05-04
+
+- **Shumway fuzz timeline tests `this._currentframe` (+5 effective).** `c8b8069c…`, `ac93c8c9…`, `07580c34…`, `2f4f46bf…`, `81004241…` (all `from_shumway/fuzz/`) → PASS. Root cause: `mc->currentframe` was never updated during natural sprite advance in `advance_sprite_frames`. The C runtime tracks two parallel frame counters: `obj->sprite_current_frame` (DisplayObject, 0-indexed, advances each tick) and `mc->currentframe` (MovieClip, 1-indexed, exposed to ActionScript via `_currentframe`). Only `obj->sprite_current_frame` was incremented per frame; `mc->currentframe` was set to 1 at MC creation and only updated by `ng_setSpriteFrame`/`ng_gotoFrameByMC` (goto paths) and by the recompiler-emitted root-frame updates. So `this._currentframe` from inside any sprite frame script returned 1 always (initial value) instead of the executing frame number. Fix in `SWFModernRuntime/src/libswf/tag.c` `advance_sprite_frames`: just before `CALL_FRAME(...)` at line ~941 (natural advance), look up the sprite's MC by `obj->instance_name` and set `smc->currentframe = (int)frame + 1`. Mirrors `swf_core.c`'s update of `root_movieclip.currentframe` before each root frame func. Manual nav (gotoAndPlay/gotoAndStop catch-up) intentionally not affected — those paths already set `mc->currentframe` to the target value before the catch-up loop. Bumps Shumway flat from 67/92 → 72/92 (+5 effective). Verified: 22-test AVM1 lifecycle (22/22), 17-test AVM1 lifecycle/scope (17/17), 6-test sprite state (6/6), 14-test misc-ming goto/loop/timeline (14/14), 14-test AVM1 timeline (14/14), 5-test gnash actionscript.all spot-check (5/5 effective). The 27 numeric-output fuzz tests in `from_shumway/fuzz/*` likely all use this pattern; expect more flips on next CI run.
 
 - **`frame_label_test` (Gnash misc-ming.all) → PASS (+1, was 12/17 + 153 lines of timeline-loop noise).** `actionCall`'s
   `CALL_FRAME_FUNC` was invoking the called frame's recompiler-emitted `actionDrainOnloadAndScript` while the outer
