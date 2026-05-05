@@ -4245,6 +4245,7 @@ static ActionVar builtin_noop_func(SWFAppContext* app_context, ActionVar* args, 
 
 // Forward declaration — definition lives next to builtin_asnative below.
 static ActionVar builtin_assetnative(SWFAppContext* app_context, ActionVar* args, u32 arg_count, ActionVar* registers, void* this_obj);
+static ActionVar builtin_assetnativeaccessor(SWFAppContext* app_context, ActionVar* args, u32 arg_count, ActionVar* registers, void* this_obj);
 
 // (builtin_setTimeout_impl / builtin_setInterval_impl / builtin_clearInterval_impl
 //  moved to timer.c; see actionmodern/actiontimer.h)
@@ -4317,7 +4318,7 @@ static void init_global_funcs(void)
 		{&g_asconstructor_func, "ASconstructor", (Function2Ptr)builtin_noop_func},
 		{&g_enableDebugConsole_func, "enableDebugConsole", (Function2Ptr)builtin_noop_func},
 		{&g_ASSetNative_func, "ASSetNative", (Function2Ptr)builtin_assetnative},
-		{&g_ASSetNativeAccessor_func, "ASSetNativeAccessor", (Function2Ptr)builtin_noop_func},
+		{&g_ASSetNativeAccessor_func, "ASSetNativeAccessor", (Function2Ptr)builtin_assetnativeaccessor},
 		{&g_remoteLSOUsage_ctor, "RemoteLSOUsage", (Function2Ptr)builtin_noop_func},
 		{&g_assetCache_ctor, "AssetCache", (Function2Ptr)builtin_noop_func},
 		{&g_asSetupError_ctor, "AsSetupError", (Function2Ptr)builtin_noop_func},
@@ -5732,6 +5733,104 @@ static ActionVar builtin_asnative_array_ctor(SWFAppContext* app_context, ActionV
 static ASFunction g_asnative_252_ctor;
 static int g_asnative_252_init = 0;
 
+// ============================================================================
+// ConvolutionFilter ASnative dispatch (class 1109)
+// ============================================================================
+// Used by playerglobals' ASSetNativeAccessor to wire up the 9 ConvolutionFilter
+// virtual properties (matrixX/matrixY/matrix/divisor/bias/preserveAlpha/clamp/
+// color/alpha) onto ConvolutionFilter.prototype. Each property is a getter/
+// setter pair indexed at minor=1: getter = 1 + 2*pos, setter = 2 + 2*pos.
+//
+// Each ASnative function reads/writes a plain own property on the receiver
+// (this_obj). The filter constructor stores plain own properties for these
+// names, so getter = read own, setter = write own.
+//
+// macroexpansion: 9 props × 2 (getter/setter) = 18 small wrapper functions.
+#define CONV_GETTER(suffix, propname, propname_len) \
+	static ActionVar conv_get_##suffix(SWFAppContext* a, ActionVar* args, u32 ac, \
+	                                    ActionVar* r, void* this_obj) { \
+		(void)a; (void)args; (void)ac; (void)r; \
+		ActionVar undef = {0}; undef.type = ACTION_STACK_VALUE_UNDEFINED; \
+		if (!this_obj) return undef; \
+		ActionVar* p = getProperty((ASObject*)this_obj, propname, propname_len); \
+		return p ? *p : undef; \
+	}
+#define CONV_SETTER(suffix, propname, propname_len) \
+	static ActionVar conv_set_##suffix(SWFAppContext* a, ActionVar* args, u32 ac, \
+	                                    ActionVar* r, void* this_obj) { \
+		(void)r; \
+		ActionVar undef = {0}; undef.type = ACTION_STACK_VALUE_UNDEFINED; \
+		if (!this_obj || ac == 0) return undef; \
+		setProperty(a, (ASObject*)this_obj, propname, propname_len, &args[0]); \
+		return undef; \
+	}
+CONV_GETTER(matrixX,       "matrixX",        7)
+CONV_SETTER(matrixX,       "matrixX",        7)
+CONV_GETTER(matrixY,       "matrixY",        7)
+CONV_SETTER(matrixY,       "matrixY",        7)
+CONV_GETTER(matrix,        "matrix",         6)
+CONV_SETTER(matrix,        "matrix",         6)
+CONV_GETTER(divisor,       "divisor",        7)
+CONV_SETTER(divisor,       "divisor",        7)
+CONV_GETTER(bias,          "bias",           4)
+CONV_SETTER(bias,          "bias",           4)
+CONV_GETTER(preserveAlpha, "preserveAlpha", 13)
+CONV_SETTER(preserveAlpha, "preserveAlpha", 13)
+CONV_GETTER(clamp,         "clamp",          5)
+CONV_SETTER(clamp,         "clamp",          5)
+CONV_GETTER(color,         "color",          5)
+CONV_SETTER(color,         "color",          5)
+CONV_GETTER(alpha,         "alpha",          5)
+CONV_SETTER(alpha,         "alpha",          5)
+#undef CONV_GETTER
+#undef CONV_SETTER
+
+// ASnative(1109, idx) layout. minor=1 base in playerglobals:
+//   idx  1: matrixX getter      idx  2: matrixX setter
+//   idx  3: matrixY getter      idx  4: matrixY setter
+//   idx  5: matrix getter       idx  6: matrix setter
+//   idx  7: divisor getter      idx  8: divisor setter
+//   idx  9: bias getter         idx 10: bias setter
+//   idx 11: preserveAlpha get   idx 12: preserveAlpha set
+//   idx 13: clamp getter        idx 14: clamp setter
+//   idx 15: color getter        idx 16: color setter
+//   idx 17: alpha getter        idx 18: alpha setter
+static ASFunction g_conv_filter_natives[19];  // index 0 unused; 1..18 populated
+static int g_conv_filter_natives_init = 0;
+static void init_conv_filter_natives(void)
+{
+	if (g_conv_filter_natives_init) return;
+	struct { int idx; const char* name; Function2Ptr impl; } entries[18] = {
+		{ 1, "matrixX_get",       (Function2Ptr)conv_get_matrixX},
+		{ 2, "matrixX_set",       (Function2Ptr)conv_set_matrixX},
+		{ 3, "matrixY_get",       (Function2Ptr)conv_get_matrixY},
+		{ 4, "matrixY_set",       (Function2Ptr)conv_set_matrixY},
+		{ 5, "matrix_get",        (Function2Ptr)conv_get_matrix},
+		{ 6, "matrix_set",        (Function2Ptr)conv_set_matrix},
+		{ 7, "divisor_get",       (Function2Ptr)conv_get_divisor},
+		{ 8, "divisor_set",       (Function2Ptr)conv_set_divisor},
+		{ 9, "bias_get",          (Function2Ptr)conv_get_bias},
+		{10, "bias_set",          (Function2Ptr)conv_set_bias},
+		{11, "preserveAlpha_get", (Function2Ptr)conv_get_preserveAlpha},
+		{12, "preserveAlpha_set", (Function2Ptr)conv_set_preserveAlpha},
+		{13, "clamp_get",         (Function2Ptr)conv_get_clamp},
+		{14, "clamp_set",         (Function2Ptr)conv_set_clamp},
+		{15, "color_get",         (Function2Ptr)conv_get_color},
+		{16, "color_set",         (Function2Ptr)conv_set_color},
+		{17, "alpha_get",         (Function2Ptr)conv_get_alpha},
+		{18, "alpha_set",         (Function2Ptr)conv_set_alpha},
+	};
+	for (int i = 0; i < 18; i++) {
+		ASFunction* fn = &g_conv_filter_natives[entries[i].idx];
+		memset(fn, 0, sizeof(*fn));
+		strncpy(fn->name, entries[i].name, 255);
+		fn->function_type = 2;
+		fn->advanced_func = entries[i].impl;
+		fn->no_lazy_prototype = 1;
+	}
+	g_conv_filter_natives_init = 1;
+}
+
 // ASnative(class_id, method_index) — returns a native method by numeric address.
 // Handles class 2 (ASNew), class 101 (Object.prototype), class 100 (global functions), class 200 (Math), class 252 (Array).
 static ActionVar builtin_asnative(SWFAppContext* app_context, ActionVar* args, u32 arg_count, ActionVar* registers, void* this_obj)
@@ -5924,6 +6023,18 @@ static ActionVar builtin_asnative(SWFAppContext* app_context, ActionVar* args, u
 		return undef;
 	}
 
+	// Class 1109: ConvolutionFilter — 9 properties × (getter, setter) at minor=1
+	if (class_id == 1109) {
+		init_conv_filter_natives();
+		if (method_index >= 1 && method_index <= 18) {
+			ActionVar result = {0};
+			result.type = ACTION_STACK_VALUE_FUNCTION;
+			VAL(u64, &result.data.numeric_value) = (u64)&g_conv_filter_natives[method_index];
+			return result;
+		}
+		return undef;
+	}
+
 	return undef;
 }
 
@@ -6078,6 +6189,163 @@ static ActionVar builtin_assetnative(SWFAppContext* app_context, ActionVar* args
 			}
 
 			setProperty(app_context, target, name_buf, (u32)n, &fn_val);
+		}
+
+		if (comma >= props_len) break;
+		pos = comma + 1;
+		i++;
+	}
+
+	POP();  // drop coerced props string
+
+	return undef;
+}
+
+// Forward decl — definition lives near the geom prototypes (~line 10236).
+static void setAddProperty(SWFAppContext* app_context, ASObject* obj, const char* name, u32 nlen,
+                           ASFunction* getter, ASFunction* setter);
+
+// ASSetNativeAccessor(target, major, props, minor=0)
+//
+// Same shape as ASSetNative, but binds each non-empty position as an
+// addProperty getter/setter pair instead of a plain function value:
+//   getter = ASnative(major, minor + 2*pos)
+//   setter = ASnative(major, minor + 2*pos + 1)
+//
+// Version-gating differs from ASSetNative: when the prefix's minimum SWF
+// version isn't met, the property is installed as a plain own value
+// (overwriting any existing own) — value is the property looked up via the
+// proto chain (skipping own), or undefined if not found. ASSetNative installs
+// the function regardless of own existence; the accessor variant always falls
+// back to a plain value when version-gated.
+static ActionVar builtin_assetnativeaccessor(SWFAppContext* app_context, ActionVar* args, u32 arg_count, ActionVar* registers, void* this_obj)
+{
+	(void)registers; (void)this_obj;
+	ActionVar undef = {0};
+	undef.type = ACTION_STACK_VALUE_UNDEFINED;
+	if (arg_count < 3) return undef;
+
+	ASObject* target = NULL;
+	if (args[0].type == ACTION_STACK_VALUE_OBJECT) {
+		target = (ASObject*)args[0].data.numeric_value;
+	} else if (args[0].type == ACTION_STACK_VALUE_ARRAY) {
+		return undef;
+	}
+	if (target == NULL) return undef;
+
+	pushVar(app_context, &args[1]);
+	convertFloat(app_context);
+	double major_d = 0.0;
+	if (STACK_TOP_TYPE == ACTION_STACK_VALUE_F64) major_d = VAL(double, &STACK_TOP_VALUE);
+	else if (STACK_TOP_TYPE == ACTION_STACK_VALUE_F32) major_d = (double)VAL(float, &STACK_TOP_VALUE);
+	POP();
+	if (isnan(major_d)) return undef;
+	int32_t major = ecmaToInt32(major_d);
+	if (major < 0) return undef;
+
+	int32_t minor = 0;
+	if (arg_count >= 4) {
+		pushVar(app_context, &args[3]);
+		convertFloat(app_context);
+		double minor_d = 0.0;
+		if (STACK_TOP_TYPE == ACTION_STACK_VALUE_F64) minor_d = VAL(double, &STACK_TOP_VALUE);
+		else if (STACK_TOP_TYPE == ACTION_STACK_VALUE_F32) minor_d = (double)VAL(float, &STACK_TOP_VALUE);
+		POP();
+		if (isnan(minor_d)) minor_d = 0.0;
+		minor = ecmaToInt32(minor_d);
+	}
+
+	pushVar(app_context, &args[2]);
+	convertString(app_context, NULL);
+	const uint16_t* props_u16 = (const uint16_t*)STACK_TOP_VALUE;
+	u32 props_len = STACK_TOP_N;
+
+	u32 i = 0;
+	u32 pos = 0;
+	while (pos <= props_len) {
+		u32 comma = pos;
+		while (comma < props_len && props_u16[comma] != ',') comma++;
+
+		// Same version-flag prefix stripping as ASSetNative.
+		u32 name_start = pos;
+		int min_swf_version = 0;
+		if (name_start < comma) {
+			uint16_t c0 = props_u16[name_start];
+			if (c0 == '1' && name_start + 1 < comma && props_u16[name_start + 1] == '0') {
+				name_start += 2;
+				min_swf_version = 10;
+			} else if (c0 == '1') {
+				name_start += 1;
+				min_swf_version = 1;
+			} else if (c0 == '6' || c0 == '7' || c0 == '8' || c0 == '9') {
+				name_start += 1;
+				min_swf_version = (int)(c0 - '0');
+			}
+		}
+		u32 name_len = comma - name_start;
+
+		if (name_len > 0) {
+			char name_buf[256];
+			int n = (int)name_len;
+			if (n > (int)sizeof(name_buf) - 1) n = (int)sizeof(name_buf) - 1;
+			for (int k = 0; k < n; k++) {
+				uint16_t u = props_u16[name_start + k];
+				name_buf[k] = (u < 0x80) ? (char)u : '?';
+			}
+			name_buf[n] = '\0';
+
+			int version_gated = (min_swf_version > 0 && g_swf_version < min_swf_version);
+			if (version_gated) {
+				// Install plain value: walk proto chain (skipping own) to find
+				// inherited value, or undefined if not present.
+				ActionVar value_to_install = {0};
+				value_to_install.type = ACTION_STACK_VALUE_UNDEFINED;
+				ActionVar* proto_var = getProperty(target, "__proto__", 9);
+				ASObject* proto = (proto_var != NULL && proto_var->type == ACTION_STACK_VALUE_OBJECT)
+					? (ASObject*)proto_var->data.numeric_value : NULL;
+				if (proto != NULL) {
+					ActionVar* inherited = getPropertyWithPrototype(proto, name_buf, (u32)n);
+					if (inherited != NULL) value_to_install = *inherited;
+				}
+				// Clear any existing virtual getter/setter on the own property
+				// so plain reads return the new value.
+				ASProperty* existing = NULL;
+				for (u32 ip = 0; ip < target->num_used; ip++) {
+					if (target->properties[ip].name_length == (u32)n &&
+					    strncmp(target->properties[ip].name, name_buf, (u32)n) == 0) {
+						existing = &target->properties[ip];
+						break;
+					}
+				}
+				if (existing != NULL) {
+					existing->getter = NULL;
+					existing->setter = NULL;
+				}
+				setProperty(app_context, target, name_buf, (u32)n, &value_to_install);
+			} else {
+				// Version-met (or no gate): install addProperty getter/setter.
+				ActionVar getter_args[2];
+				getter_args[0].type = ACTION_STACK_VALUE_F64;
+				getter_args[0].str_size = 0;
+				VAL(double, &getter_args[0].data.numeric_value) = (double)major;
+				getter_args[1].type = ACTION_STACK_VALUE_F64;
+				getter_args[1].str_size = 0;
+				VAL(double, &getter_args[1].data.numeric_value) = (double)(minor + (int32_t)(2 * i));
+				ActionVar getter_val = builtin_asnative(app_context, getter_args, 2, NULL, NULL);
+
+				ActionVar setter_args[2];
+				setter_args[0] = getter_args[0];
+				setter_args[1].type = ACTION_STACK_VALUE_F64;
+				setter_args[1].str_size = 0;
+				VAL(double, &setter_args[1].data.numeric_value) = (double)(minor + (int32_t)(2 * i) + 1);
+				ActionVar setter_val = builtin_asnative(app_context, setter_args, 2, NULL, NULL);
+
+				ASFunction* getter_fn = (getter_val.type == ACTION_STACK_VALUE_FUNCTION)
+					? (ASFunction*)getter_val.data.numeric_value : NULL;
+				ASFunction* setter_fn = (setter_val.type == ACTION_STACK_VALUE_FUNCTION)
+					? (ASFunction*)setter_val.data.numeric_value : NULL;
+				setAddProperty(app_context, target, name_buf, (u32)n, getter_fn, setter_fn);
+			}
 		}
 
 		if (comma >= props_len) break;

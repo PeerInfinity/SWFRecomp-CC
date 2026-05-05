@@ -4,20 +4,53 @@
 
 <!-- PLAN_META
 id: ASSETNATIVEACCESSOR
-status: pending
+status: complete
 phases:
   - id: 1
     name: "Implement ASSetNativeAccessor builtin (paired ASnative getter/setter binding)"
-    status: pending
+    status: complete
   - id: 2
     name: "ConvolutionFilter (class 1109) ASnative dispatch table"
-    status: pending
+    status: complete
   - id: 3
     name: "Verification battery"
-    status: pending
+    status: complete
 dependencies: []
 blockers: []
 -->
+
+## Resolution (2026-05-05)
+
+Both target tests PASS:
+
+- `assetnativeaccessor` — PASS
+- `assetnativeaccessor_ids` — PASS (21/21)
+
+Implementation in `SWFModernRuntime/src/actionmodern/action.c`:
+
+- **Phase 1** — `builtin_assetnativeaccessor` mirrors `builtin_assetnative`'s
+  comma-split / version-flag-prefix logic. The binding step differs: when the
+  prefix's minimum SWF version is met (or there's no prefix gate), bind via
+  `setAddProperty(target, name, getter_fn, setter_fn)` where
+  getter = ASnative(major, minor + 2*pos) and
+  setter = ASnative(major, minor + 2*pos + 1). When version-gated, install a
+  plain own value (overwriting any existing own + clearing prior virtual
+  getter/setter): the value is the result of walking the `__proto__` chain
+  starting from `target.__proto__` (skipping own), or `undefined` if not
+  found. This matches Ruffle/Flash test expectations across all four
+  per-version sub-cases (own absent + proto absent, own absent + proto
+  present, own present + proto absent, own present + proto present).
+- **Phase 2** — Class 1109 (ConvolutionFilter) wired into `builtin_asnative`'s
+  switch with 18 indices (1..18 = 9 properties × {get, set}). Each accessor is
+  a thin wrapper over `getProperty`/`setProperty` on `this_obj` for the
+  matching property name (`matrixX`, `matrixY`, `matrix`, `divisor`, `bias`,
+  `preserveAlpha`, `clamp`, `color`, `alpha`). The constructor stores these
+  as plain own properties, so the getter/setter pair is just a property
+  read/write on the receiver.
+- **Phase 3** — Verified battery: assetnative, assetnative_ids, asnative,
+  asnew, add_property, watch, watch_textfield, bitmap_filters,
+  bitmapdata_applyfilter_colormatrix, displacementmapfilter_mappoint_throw_error
+  all PASS (10/10).
 
 ## Problem
 

@@ -1,6 +1,6 @@
 # Current Ruffle Test Status
 
-Last updated: 2026-05-05 (CI run `c5994ec1`: 2026-05-04 ASSetNative fixes landed; 2 NEW filtered failures from upstream-added `assetnativeaccessor*` tests).
+Last updated: 2026-05-05 (post-CI `c5994ec1`: ASSetNativeAccessor + ConvolutionFilter ASnative dispatch landed; the 2 remaining filtered failures are now PASS locally).
 
 ## Latest CI snapshot (commit `c5994ec1`, 2026-05-05)
 
@@ -18,7 +18,7 @@ The 2 filtered failures are `assetnativeaccessor` and `assetnativeaccessor_ids` 
 
 - **`assetnative_ids` PASS (10/10) and `assetnative` PASS (81/81).** Recent upstream sync added 4 `assetnative*` tests; both non-accessor variants now PASS after `ASSetNative` was implemented (was a noop) plus the version-gating refinement. The implementation parses comma-separated names with optional version-flag digit prefix stripping (`1`/`6`/`7`/`8`/`9`/`10`) and binds `ASnative(major, minor + position)` on the target. Empty-name slots still consume an index (matches `ASSetNative(d, 103, ",getTime3", 15)` → getTime3 = ASnative(103, 16) = `getTime`). `valueOf` errors on the `minor` arg propagate through the existing setjmp/longjmp try/catch. Version-gating handles three sub-cases from `assetnative` under SWF 7: own exists → overwrite with function; own absent + inherited → install with inherited value; own absent + nothing inherited → install undefined.
 
-- **`assetnativeaccessor` and `assetnativeaccessor_ids` STILL FAIL** — these are the 2 new filtered failures. They need `ASSetNativeAccessor` implementation (still a noop; sets up `addProperty` getter/setter pairs from consecutive `ASnative` indices: getter = `minor + 2*position`, setter = `minor + 2*position + 1`) plus class 1109 (ConvolutionFilter) `ASnative` dispatch. Tracked in `incomplete/ASSETNATIVEACCESSOR_PLAN.md`.
+- **`assetnativeaccessor` and `assetnativeaccessor_ids` PASS (post-CI 2026-05-05).** `ASSetNativeAccessor` builtin and ConvolutionFilter (class 1109) `ASnative` dispatch implemented. Comma-split + version-flag-prefix logic mirrors `ASSetNative`; the binding step uses `setAddProperty(target, name, getter, setter)` for version-met cases (with getter = ASnative(major, minor + 2*pos), setter = ASnative(major, minor + 2*pos + 1)). Version-gated cases install a plain own value derived from the proto chain (skipping own), overwriting any existing own. Class 1109 dispatch maps minor 1..18 → {matrixX, matrixY, matrix, divisor, bias, preserveAlpha, clamp, color, alpha} × {get, set}; each accessor reads/writes the corresponding property name on `this_obj`. Plan moved to `complete/ASSETNATIVEACCESSOR_PLAN.md`.
 
 ## Latest fixes (2026-05-01, in CI at 25231855425)
 
@@ -201,12 +201,11 @@ The 2 filtered failures are `assetnativeaccessor` and `assetnativeaccessor_ids` 
 
 No crashes or segfaults remain. All previous crashes have been fixed.
 
-## Remaining Filtered Failures: 2
+## Remaining Filtered Failures: 0 (post-2026-05-05 fix)
 
-- `assetnativeaccessor` — needs `ASSetNativeAccessor` implementation (sets up `addProperty` getter/setter pairs from consecutive `ASnative` indices: getter = `minor + 2*position`, setter = `minor + 2*position + 1`) + class 1109 (ConvolutionFilter) `ASnative` dispatch.
-- `assetnativeaccessor_ids` — same root cause.
-
-Plan: `incomplete/ASSETNATIVEACCESSOR_PLAN.md`. Alternative: add to `ignored_tests.txt` to restore 100% filtered rate while implementation is deferred.
+The two `assetnativeaccessor*` tests (the only filtered failures at CI
+`c5994ec1`) now PASS locally. Once merged via the next CI run, the AVM1
+filtered effective pass rate returns to 100%.
 
 The 34 other raw fails not in the filtered set are in `ignored_tests.txt` (accepted diffs documented in `ACCEPTED_DIFFS.md` / `RUFFLE_VS_FLASH_DIFFERENCES.md` / `RUFFLE_COMPAT_TWEAKS.md` / `FLASH_BUGS_REPLICATED.md`).
 
@@ -261,6 +260,7 @@ All previously near-passing tests (146 tracked through the pipeline) are now ful
 | DRAG_DROP_PLAN | 4/4 |
 | LOADVARIABLES_PLAN | 3/4 (remaining: log_fetch infra) |
 | ASNATIVE_ASNEW_PLAN | 34/34 + 34/34 |
+| ASSETNATIVEACCESSOR_PLAN | assetnativeaccessor + assetnativeaccessor_ids PASS |
 | BUTTON_PLAN | 14/14 |
 | SWF_VERSION_SEMANTICS_PLAN | 5/5 |
 | THIS_BINDING_PLAN | 5/5 |
