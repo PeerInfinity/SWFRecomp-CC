@@ -23,7 +23,10 @@ phases:
     status: complete
   - id: 1c3
     name: "Event ordering: SWFBUTTON_* fires before frame advance"
-    status: partial
+    status: complete
+  - id: 1d
+    name: "for-in on inner button MC returns zero (Button.prototype enum)"
+    status: pending
   - id: 2
     name: "key_event_test progression past frame 5"
     status: deferred
@@ -38,14 +41,14 @@ blockers: []
 parent_plan: "complete/BUTTON_INFRASTRUCTURE_PLAN.md"
 -->
 
-Last updated: 2026-05-05 (Phase 1c3 partial: button-mode-MC catch landed; synchronous nextFrame() blocker remaining).
+Last updated: 2026-05-05 (Phase 1c3 complete: synchronous nextFrame() in AS2 event handlers landed at commit 08e560fe; new Phase 1d opened for for-in enum on inner button MC).
 
-## Summary status (CI at `aaa502d1`)
+## Summary status (CI at `08e560fe`)
 
 | Test | Suite | Lines | Status | Phase |
 |------|-------|-------|--------|-------|
 | `button_test1` | misc-swfc.all | **31/31 PASS** | complete | 4 |
-| `ButtonEventsTest` | misc-ming.all | 62/679 (1c3 partial: button-mode catch landed, sync nextFrame remaining) | partial | 1 |
+| `ButtonEventsTest` | misc-ming.all | 61/679 (1c3 complete; alignment now correct, +1 mismatched line vs. 62 because incidental drift-matches lost — for-in enum gap is the next blocker) | partial | 1 |
 | `key_event_test` | misc-ming.all | 33/66 (50%) | deferred | 2 |
 | `DragDropTest` | misc-ming.all | 27/44 (61%) | deferred | 3 |
 
@@ -330,45 +333,46 @@ SWFBUTTON` lines in actual output). Test progresses through testno=1, 2, 3,
 4 logic. Matching went 61 → 62 (small increase because subsequent line
 content still diverges for a different reason — see below).
 
-**Remaining blocker: synchronous nextFrame() inside event handlers.**
+**Synchronous nextFrame() inside event handlers (LANDED at 08e560fe).**
 
-In Ruffle, `MovieClip.nextFrame()` (and `gotoFrame`) advance the timeline
-*synchronously* and run the new frame's DoAction immediately. So when
-square1.onRollOut runs `_root.testno++; nextFrame();`, frame 3's DoAction
-runs INLINE during MM(0,0) processing — printing
-`1. Roll over the red square.` before the next event (third MM(60,60)) is
-processed.
+`g_inside_event_handler` counter, incremented around
+`mc_call_as2_handler_ng` invocations (input-pump dispatch path for
+mouse/focus/onChanged events). When set, `actionNextFrame` at the root
+timeline runs `ng_executeGotoCatchUp` inline AND drains the queued
+`AQ_KIND_SCRIPT` entries via `actionDrainOnloadAndScript` — the catch-up
+wraps `funcs[target]` in drain-suppress; without an outer frame script
+caller's drain to pick them up, the target frame's DoAction would queue
+but never fire until the next tick.
 
-Our impl's `actionNextFrame` (at `action.c:25817`) just sets
-`next_frame = current_frame + 1; manual_next_frame = 1` and returns. The
-actual frame transition runs in the next tick's frame-loop iteration. By
-that time, all 12 MM/MD/MU events in tick 4 have already been delivered
-to `ng_update_button_states` — so SWFBUTTON_MOUSEOVER's `testno==1`
-checks fire BEFORE frame 3's note prints. The note ends up on actual line
-~110, expected line 59.
+`actionGotoFrame` at root already runs inline catch-up unconditionally,
+so it didn't need a parallel branch.
 
-There IS an inline catch-up branch in `actionNextFrame` for the
-`ng_isInsideSpriteInit() && g_settarget_explicit_root` case
-(`action.c:25825-25841`), but not for the general "called from MC event
-handler in main timeline context" case.
+After the fix, frame 3's `1. Roll over the red square.` note appears at
+expected line 59 (was at line ~110 prior). Subsequent state notes
+(`2. Press...`, `3. Depress...`, etc.) also align. Match count went
+62 → 61 (-1) because incidental drift-matches were lost — strict
+positional matching can regress when actual lines shift toward their
+correct positions while a separate gap (Phase 1d, for-in enum) keeps
+the rest of the output offset by ~19 lines per state. CI verified no
+regressions in any other suite.
 
-**Recommended next step.** Extend `actionNextFrame` (and `actionGotoFrame`)
-to run an inline catch-up when called from inside an event-handler context
-on the main timeline. Hooks:
-- `g_inside_event_handler` flag set/cleared around mc_call_as2_handler_ng
-  invocations (or use the existing `g_call_depth`).
-- When set, `actionNextFrame` runs `ng_executeGotoCatchUp` directly
-  (similar to the SetTarget("_root") path) so the new frame's DoAction
-  runs before returning to the caller.
+**Phase 1d (next blocker): for-in enumeration on the inner button MC
+returns zero items.** The test does `for (var i in _level0.square1.button)
+trace(i)` (script_2 actionEnumerate2 at the str_136="button" GetMember).
+Expected enum output is 19 lines per state: tabIndex, blendMode,
+cacheAsBitmap, filters, scale9Grid, getDepth, enabled, useHandCursor,
+onKeyUp, onKeyDown, onSetFocus, onReleaseOutside, onRelease, onPress,
+onRollOut, onRollOver, instance7, instance5, instance6 (Button.prototype
+properties + dynamic children). Our impl produces zero. The Button.prototype
+is initialized in `initButtonPrototype` (action.c:31016) with all 17
+expected properties, so the bug is either:
+- `_level0.square1.button` doesn't resolve to the inner button MC, or
+- enumeration on a button MC doesn't walk the prototype chain, or
+- the for-in's iteration variable type/storage doesn't accept the
+  enumerated values (e.g., the loop terminates immediately).
 
-**Estimated effort.** 3-5 hours: synchronous goto behavior touches the
-frame-loop state machine; need to ensure no double-execution of the new
-frame's DoAction (catch-up path + frame-loop path).
-
-**Expected line gain.** If synchronous nextFrame lands, ButtonEventsTest
-should jump significantly (~150-300/679) — the testno=1, 2, 3, 4 logic
-would all see the correct frame state and print at the right offsets,
-making line-by-line match align.
+Estimated effort: 2-3 hours. Expected line gain: ~150-300/679 once
+both 1d and 1c3 lands together.
 
 #### Original investigation steps (kept for reference)
 
