@@ -1,8 +1,27 @@
 # Gnash Test Suite Status
 
-Last updated: 2026-05-04 (`soft_reference_test1` (misc-swfc.all) → ruffle_matched. CI snapshot below from 2026-05-01.)
+Last updated: 2026-05-04 (`frame_label_test` (misc-ming.all) → PASS via actionCall isolated drain. CI snapshot below from 2026-05-01.)
 
 ### Latest fixes (2026-05-04, NOT yet in CI)
+
+- **`frame_label_test` (misc-ming.all) → PASS (+1, was 12/17 with 153 lines of timeline-loop noise → 17/17 PASS).** Final
+  bug behind both the `_root.x1==0` assertion failures and the timeline looping was that `actionCall`'s
+  `CALL_FRAME_FUNC` invoked the called frame's recompiler-emitted `actionDrainOnloadAndScript` while the parent frame's
+  drain was still in progress. The inner drain processed the parent's pending queue entries — running the
+  `_root.x1==0` checks **before** the called frame's `script_0` (`x1=0; x2=0; ...`), and running the parent's `script_34`
+  (`_root.totals(); stop()`) inside `actionCall`'s `is_playing` save/restore window so the `stop()` was overwritten on
+  call return. Net effect: assertion checks ran against pre-call values (x1/x2/x3 still `mc11_frame4`/...), and
+  `is_playing` stayed true so the timeline kept looping. Fix: snapshot `g_aq_count` at the start of `CALL_FRAME_FUNC`,
+  bracket the called frame with `actionDrainSuppressEnter`/`Leave`, then drain only entries with index ≥ snapshot via a
+  new `actionDrainOnloadScriptAbove(app_context, floor)` helper. Mirrors Ruffle's per-call action stack: each `call()`
+  runs its own private action layer, leaving the outer drain's pending queue intact for FIFO continuation. Files:
+  `SWFModernRuntime/include/actionmodern/action_queue.h`, `SWFModernRuntime/src/actionmodern/action_queue.c`,
+  `SWFModernRuntime/src/actionmodern/action.c`. Verified: 25-test AVM1 call/scope/super/goto battery (call,
+  closure_scope, set_variable_scope, goto_methods, local_to_global, string_paths_variable_scopes,
+  get_variable_in_scope, function_as_function, function_base_clip, funky_function_calls, swf4_function_calls, watch,
+  watch_textfield, on_construct, as2_super_and_this_v6/v8, swf5_to_6_cross_call, execution_order2/3, goto_rewind1/3,
+  set_interval, tell_target, path_string, target_path — 25/25 PASS), 14 misc-ming.all goto/loop/action-order tests
+  (10 PASS + 2 ruffle_matched + 2 pre-existing `ActionOrderTest3/4` failures unchanged from CI baseline).
 
 - **`soft_reference_test1` (misc-swfc.all) → ruffle_matched (+1, was MISMATCH 23/45 → 44/45).** Root cause was the `_name`
   setter not propagating renames to `parent.dynamic_props` and `var_map`. `createEmptyMovieClip("mc", 10)` registers

@@ -2,7 +2,7 @@
 
 Cross-suite summary of all Ruffle-derived test suites. Each suite has its own `_investigation/` directory with detailed status docs.
 
-Last updated: 2026-05-04 (`soft_reference_test1` (Gnash misc-swfc.all) → ruffle_matched via `_name` setter binding propagation; ASSetNative implementation earlier in day).
+Last updated: 2026-05-04 (`frame_label_test` (Gnash misc-ming.all) → PASS via `actionCall` isolated-drain in CALL_FRAME_FUNC; `soft_reference_test1` and ASSetNative earlier in day).
 
 ## Suite Summary
 
@@ -21,6 +21,21 @@ Last updated: 2026-05-04 (`soft_reference_test1` (Gnash misc-swfc.all) → ruffl
 | **SWFRecomp/tests** (old suite) | 158+59 | all trace pass | — | — | **100%** | — | Hand-written opcode tests. CI only. |
 
 ## Progress Since 2026-05-04
+
+- **`frame_label_test` (Gnash misc-ming.all) → PASS (+1, was 12/17 + 153 lines of timeline-loop noise).** `actionCall`'s
+  `CALL_FRAME_FUNC` was invoking the called frame's recompiler-emitted `actionDrainOnloadAndScript` while the outer
+  frame's drain was in progress, so the inner drain consumed the parent's pending queue entries — running
+  `script_31`/`32`/`33` (`_root.x1==0` checks) **before** the called frame's `script_0` (`x1=0; ...`), and running
+  `script_34` (`_root.totals(); stop()`) inside the call's `is_playing` save/restore window so the `stop()` was
+  overwritten on call return. The assertions then read the pre-call values and `is_playing` stayed true, looping the
+  timeline ~9× and emitting the assertion set on each cycle. Fix: snapshot `g_aq_count` at `CALL_FRAME_FUNC` entry,
+  bracket the frame call with `actionDrainSuppressEnter`/`Leave`, then drain only entries with index ≥ snapshot via a
+  new `actionDrainOnloadScriptAbove(floor)` helper — outer pending entries stay in the queue for the outer drain to
+  process in FIFO order. Mirrors Ruffle's per-call action stack: each `call()` runs its own private action layer.
+  Files: `SWFModernRuntime/include/actionmodern/action_queue.h`, `src/actionmodern/action_queue.c`,
+  `src/actionmodern/action.c`. Bumps Gnash misc-ming.all from 78/102 → 79/102 effective. No regressions on a 25-test
+  AVM1 call/scope/super battery or a 14-test misc-ming goto/loop/action-order battery (`ActionOrderTest3/4` already
+  failing in CI baseline, unchanged).
 
 - **`soft_reference_test1` (Gnash misc-swfc.all) → ruffle_matched (+1).** The `_name` setter (`actionSetMember` MOVIECLIP path in `action.c`) now syncs the rename to `parent.dynamic_props` (new key → MC, old key → undefined) and, when `mc->parent == &root_movieclip`, to `var_map` (with SWF<=6 lowercase folding via `setGlobalVariableByName`). Without this propagation, after `mc._name = "changed"` the stale `var_map["mc"]` and `parent.dynamic_props["mc"]` entries still resolved to the MC, breaking the test's "soft reference" semantics: `typeof(mc) == 'undefined'` returned false on the very first assertion (line 50), cascading into 20 follow-on failures. Mirrors Ruffle's `MovieClip::set_name`, which removes the old name binding on the parent's stage-object scope and installs the new one. The sync only fires when the existing binding is authoritative (entry references THIS MC under a key matching the MC's old name) to preserve case-collision entries from `case-v6` (`_root.clip` / `_root.CLIP`). Final residual diff is line 164 (`mcRef == _level0.mc1` after `removeMovieClip` + recreate at a different depth — Ruffle also fails this), so the test promotes via subset-match to ruffle_matched. Brings misc-swfc.all from 11/16 → 12/16 effective (68.8% → 75.0%).
 

@@ -98,6 +98,16 @@ void actionDrainOnloadAndScript(SWFAppContext* app_context);
 // SCRIPT pop, mirroring Ruffle's run_actions priority-pop loop.
 void actionDrainOnloadAndScriptOne(SWFAppContext* app_context);
 
+// Returns the current number of entries in the action queue. Used as a
+// snapshot value for actionDrainOnloadScriptAbove.
+size_t actionAQCount(void);
+
+// Drain ONLOAD + SCRIPT entries whose queue index is >= `floor`. Used by
+// actionCall to isolate a called frame's drain from the outer drain's
+// pending entries. Without this isolation, calling a frame from inside an
+// outer drain would leak the outer's pending scripts into the inner drain.
+void actionDrainOnloadScriptAbove(SWFAppContext* app_context, size_t floor);
+
 // Phase 3 of CLIP_EVENT_ROUND_DISPATCH: unified frame-end priority drain.
 // Drains AQ_KIND_CLIP_INIT → AQ_KIND_CLIP_CONSTRUCT → AQ_KIND_REGISTER_CTOR
 // in priority rounds, then ONLOAD+SCRIPT via actionDrainOnloadAndScript.

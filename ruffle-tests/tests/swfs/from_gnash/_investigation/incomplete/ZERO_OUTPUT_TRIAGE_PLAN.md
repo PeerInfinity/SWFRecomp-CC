@@ -17,7 +17,7 @@ phases:
     status: pending
   - id: 4
     name: "frame_label_test: nested-sprite frame label resolution"
-    status: partial
+    status: completed
   - id: 5
     name: "BeginBitmapFill: _width=804 instead of 150 on a bitmap-filled MC"
     status: pending
@@ -199,12 +199,13 @@ child SWF must not be running.
 **Risk.** Medium. May require version-handshake work in the child SWF
 loader, or just a verifier dependency-discovery fix.
 
-## Phase 4 — frame_label_test: target-path GotoFrame2 + nested-sprite navigation (PARTIAL — 2026-05-04)
+## Phase 4 — frame_label_test: target-path GotoFrame2 + nested-sprite navigation (PASS — 2026-05-04)
 
-**Status (2026-05-04).** Partial fix landed. Test now produces 11/14 raw
-PASSED lines (line-level matching 12/17 = 70.6%) instead of zero output.
-Promotes from "TRUE zero output" to "non-zero progress with 3 known
-remaining failures + timeline-loop noise."
+**Status (2026-05-04, second pass).** Now PASSES 17/17. Three earlier
+fixes (described below) brought the test from zero output to 12/17
+matching with timeline-loop noise; the final fix isolates `actionCall`'s
+drain from the outer drain so `CALLFRAME('/:1')`'s `actionStop()` and
+the parent frame's pending check_equals scripts no longer reorder.
 
 **Root cause #1 (FIXED).** The test's `gotoAndPlay('/mc1/mc11/:frame4')`
 encodes as `Push("/mc1/mc11/:frame4") + GotoFrame2(play=1)`. Our
@@ -246,35 +247,57 @@ case-insensitive scan that returns the LOWEST frame index among
 matches. SWF7+ keeps exact-only matching. `SWFModernRuntime/src/libswf/tag.c
 ng_findSpriteLabelFrame`.
 
-**Remaining (deferred):**
+**Root cause #4 (FIXED — landed 2026-05-04 second pass).**
+Both prior open issues collapsed into a single bug: `actionCall`'s
+`CALL_FRAME_FUNC` was invoking the called frame's recompiler-emitted
+`actionDrainOnloadAndScript` while the parent frame's drain was still
+in progress. The inner drain happily processed the parent's pending
+queue entries — running `script_31`/`32`/`33` (the `_root.x1==0`
+checks) **before** the called frame's `script_0` (which sets
+`x1=0; x2=0; ...`), and running `script_34` (`_root.totals(); stop()`)
+inside the call's `is_playing` save/restore window so the `stop()`
+got overwritten on call return. Net effect: the assertion checks ran
+against the pre-call values (so x1/x2/x3 still said `mc11_frame4`/...),
+and `is_playing` stayed true so the timeline kept looping (7+ cycles).
 
-- **`SetVariable` at root scope vs `SetMember _root.x` storage divergence
-  (3 failing assertion lines).** After `CALLFRAME('/:1')` calls
-  root-frame-1's `script_0` (which uses `SetVariable("x1", 0)` etc.),
-  `var_map["x1"]=0` but `root.dynamic_props["x1"]='mc11_frame4'` (set
-  earlier by mc11's frame-script's `SetMember(_root, "x1", ...)`).
-  `_root.x1` reads via `actionGetMember` → `dynamic_props` → still
-  `'mc11_frame4'` → assertion FAIL. The existing `actionSetMember` on
-  root MC already syncs `dynamic_props → var_map` (commit a few weeks
-  back); the missing direction is `setVariableByName` at root scope →
-  `dynamic_props`. Adding this propagation in `setGlobalVariableByName`
-  is a one-line addition but risks affecting many tests that bare-set
-  global variables (e.g., `_global` proxies, Dejagnu's internal state).
-  Deferred until someone can survey the regression risk.
+The fix isolates the called frame's drain from the outer queue:
 
-- **Timeline-loop noise (153 actual lines vs 17 expected).** Test main
-  timeline has no `stop()` at frame 0; only frame 3's `script_34`
-  contains `_root.totals(); stop()`. Each natural-play loop re-enters
-  frame 2's `script_18` which re-issues `actionPlay()` calls (resetting
-  is_playing=1) before reaching frame 3's stop again. With
-  `num_frames=30` we loop the timeline ~7× and emit assertion sets
-  every cycle. Even if cycle 1's assertions all matched, the line-count
-  mismatch alone would fail the test. Suspect that `actionPlay()` from
-  inside a queued-then-drained DoAction shouldn't override an
-  earlier-this-tick `stop()`, but verifying this is a multi-test
-  investigation.
+1. `CALL_FRAME_FUNC` snapshots `g_aq_count` before invoking the frame.
+2. Brackets the frame call with `actionDrainSuppressEnter()` /
+   `actionDrainSuppressLeave()` so the frame's inline
+   `actionDrainOnloadAndScript` no-ops.
+3. After the frame returns, calls a new `actionDrainOnloadScriptAbove`
+   helper that drains only entries with index ≥ snapshot — i.e.
+   only the entries the called frame itself queued. Outer pending
+   entries stay in the queue for the outer drain loop to process
+   in correct FIFO order.
 
-**Files touched (this fix):**
+This mirrors Ruffle's per-call action stack, where each `call()` runs
+its own private action layer.
+
+**Files touched (final fix):**
+- `SWFModernRuntime/include/actionmodern/action_queue.h` — declared
+  `actionAQCount` and `actionDrainOnloadScriptAbove`.
+- `SWFModernRuntime/src/actionmodern/action_queue.c` — implemented
+  the new helpers.
+- `SWFModernRuntime/src/actionmodern/action.c` — replaced the
+  `actionDrainActionQueueByKind(SCRIPT)` trailing call in
+  `CALL_FRAME_FUNC` with the snapshot+suppress+above pattern.
+
+**Sanity battery (verified no regressions, second pass):**
+- 25 AVM1 call/scope/super/goto tests (call, closure_scope,
+  set_variable_scope, goto_methods, local_to_global,
+  string_paths_variable_scopes, get_variable_in_scope,
+  function_as_function, function_base_clip, funky_function_calls,
+  swf4_function_calls, watch, watch_textfield, on_construct,
+  as2_super_and_this_v6/v8, swf5_to_6_cross_call, execution_order2/3,
+  goto_rewind1/3, set_interval, tell_target, path_string, target_path):
+  25/25 PASS.
+- 14 misc-ming.all goto/loop/action-order tests: 10 PASS + 2
+  ruffle_matched + 2 pre-existing failures (`ActionOrderTest3/4`)
+  unchanged from CI baseline.
+
+**Files touched (first-pass partial fix):**
 - `SWFModernRuntime/src/actionmodern/action.c` — `actionGotoFrame2`
   STRING branch: added target-path resolution mirroring `actionCall`
   (lines around 26310–26370).
@@ -284,7 +307,7 @@ ng_findSpriteLabelFrame`.
 - `SWFModernRuntime/src/libswf/tag.c` — `ng_findSpriteLabelFrame` SWF<=6
   branch: case-insensitive scan picking lowest-frame ties.
 
-**Sanity battery (verified no regressions):**
+**Sanity battery (verified no regressions, first pass):**
 - 25 AVM1 goto/call/case tests (goto_frame, goto_frame2, goto_label,
   goto_methods, goto_advance1/2, goto_both_ways1/2, button_goto,
   goto_execution_order/2, define_function_case_sensitive, goto_rewind3,

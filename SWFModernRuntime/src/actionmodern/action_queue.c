@@ -318,6 +318,64 @@ void actionDrainOnloadAndScriptOne(SWFAppContext* app_context)
 	aq_drain_one_onload_or_script(app_context);
 }
 
+// Returns the current number of entries in the action queue. Used as a
+// snapshot value for actionDrainOnloadScriptAbove (see below).
+size_t actionAQCount(void)
+{
+	return g_aq_count;
+}
+
+// Drain ONLOAD + SCRIPT entries whose queue index is >= `floor`. Used by
+// actionCall's CALL_FRAME_FUNC to drain only the entries newly queued by the
+// invoked frame's tags, leaving the outer drain's pre-existing pending entries
+// untouched. Without this isolation, the inner frame's actionDrainOnloadAndScript
+// would leak into the outer queue and process scripts out of order — e.g.
+// frame_label_test's `call('/:1')` would re-fire the parent frame's check_equals
+// scripts before the called frame's variable-reset script ran. Mirrors Ruffle's
+// per-call action stack semantics where each call() pushes/pops a private
+// action layer.
+void actionDrainOnloadScriptAbove(SWFAppContext* app_context, size_t floor)
+{
+	for (;;) {
+		if (g_unify_sprite_drain_flag) {
+			actionFlushPendingSpriteScriptsToScriptQueue(app_context);
+		}
+		int best = -1;
+		int best_pri = -1;
+		for (size_t i = floor; i < g_aq_count; i++) {
+			ActionQueueEntry* e = &g_aq[i];
+			if (e->kind != AQ_KIND_ONLOAD && e->kind != AQ_KIND_SCRIPT) continue;
+			int pri = (int)e->priority;
+			if (pri > best_pri) {
+				best_pri = pri;
+				best = (int)i;
+			}
+		}
+		if (best < 0) break;
+		ActionQueueEntry entry = g_aq[best];
+		if ((size_t)best + 1 < g_aq_count) {
+			memmove(&g_aq[best], &g_aq[best + 1],
+			        (g_aq_count - (size_t)best - 1) * sizeof(*g_aq));
+		}
+		g_aq_count--;
+		if (!entry.is_unload && entry.clip) {
+			if (entry.clip->avm1_removed || entry.clip->pending_removal) {
+				continue;
+			}
+		}
+		entry.fn(app_context, entry.user);
+		if (entry.is_unload) {
+			int has_more_unload = 0;
+			for (size_t i = 0; i < g_aq_count; i++) {
+				if (g_aq[i].is_unload) { has_more_unload = 1; break; }
+			}
+			if (!has_more_unload) {
+				run_pending_finalize(app_context);
+			}
+		}
+	}
+}
+
 void actionDrainOnloadAndScript(SWFAppContext* app_context)
 {
 	// Path A: when an outer drain is in progress (e.g. ng_executeGotoCatchUp

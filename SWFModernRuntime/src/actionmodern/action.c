@@ -38877,23 +38877,29 @@ int actionCall(SWFAppContext* app_context)
 		MovieClip* _saved_ctx = g_current_context; \
 		int _saved_stcc = g_settarget_context_changed; \
 		MovieClip* _saved_stsc = g_settarget_saved_context; \
+		size_t _saved_aq_floor = actionAQCount(); \
 		quit_swf = 0; \
 		g_in_action_call = 1; \
 		g_tag_skip_mode = 1; \
 		g_settarget_context_changed = 0; \
 		g_settarget_saved_context = NULL; \
 		if ((ctx_mc) != NULL) setCurrentContext((MovieClip*)(ctx_mc)); \
-		(funcs)[(idx)](app_context); \
-		/* Phase 7b: sprite frame functions queue their DoAction into       \
-		 * AQ_KIND_SCRIPT instead of calling script_N() inline (pre-7b).    \
-		 * Sprite frames have no self-emitted drain — only root frames      \
-		 * emit actionDrainActionQueueByKind. call() invoking a sprite      \
-		 * frame therefore leaves the script in the queue, and it fires    \
-		 * later via an unrelated drain, reordering output. Drain here so  \
-		 * the called frame's scripts fire inline. (Root frames self-drain,\
-		 * so this is a no-op for them.) Key test: avm1/call.              \
+		/* Suppress the recompiler-emitted drain inside the called frame so   \
+		 * it cannot leak into the outer drain's pending queue. The called    \
+		 * frame's queued scripts are drained explicitly below, with a floor  \
+		 * that excludes pre-existing entries. Without this, frame_label_test \
+		 * `call('/:1')` re-fires the parent frame's check_equals scripts     \
+		 * before the called frame's variable-reset script runs.              \
 		 */ \
-		actionDrainActionQueueByKind(app_context, AQ_KIND_SCRIPT); \
+		actionDrainSuppressEnter(); \
+		(funcs)[(idx)](app_context); \
+		actionDrainSuppressLeave(); \
+		/* Drain only entries the called frame queued (index >= snapshot),    \
+		 * leaving outer-drain pending entries intact for the outer loop to   \
+		 * process in FIFO order. Mirrors Ruffle's per-call action stack —    \
+		 * each call() runs its own action layer in isolation.                \
+		 */ \
+		actionDrainOnloadScriptAbove(app_context, _saved_aq_floor); \
 		quit_swf = _saved_quit; \
 		next_frame = _saved_nf; \
 		manual_next_frame = _saved_man; \
