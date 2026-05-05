@@ -31,6 +31,12 @@ blockers:
 
 ## All 6 phases COMPLETE (2026-04-25)
 
+> **Residual work (2026-05-05):** 4 of the 7 listed tests still fail in CI at
+> `c5994ec1`: `ButtonEventsTest`, `key_event_test`, `DragDropTest`,
+> `button_test1`. Each has a narrow follow-up issue not covered by the 6
+> architectural phases of this plan. Tracked in
+> `incomplete/BUTTON_RESIDUAL_PLAN.md`.
+
 - **Phase 2** (button-internal children) — `tagPlaceObject2` /
   `tagPlaceObject2Ratio` now eagerly run `button_state_funcs[0]` for
   newly-placed buttons (under `catch_up_mode=1` /

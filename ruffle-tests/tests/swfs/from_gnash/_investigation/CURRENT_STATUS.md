@@ -1,8 +1,20 @@
 # Gnash Test Suite Status
 
-Last updated: 2026-05-04 (`frame_label_test` (misc-ming.all) → PASS via actionCall isolated drain. CI snapshot below from 2026-05-01.)
+Last updated: 2026-05-05 (CI snapshot at `c5994ec1` — 2026-05-04 fixes landed: frame_label_test PASS, soft_reference_test1 RM, Global-v6/v7/v8.)
 
-### Latest fixes (2026-05-04, NOT yet in CI)
+### CI snapshot (commit `c5994ec1`, 2026-05-05)
+
+| Suite | Pass | RM | Effective | Total | Rate |
+|-------|------|----|-----------|-------|------|
+| actionscript.all | 126 | 62 | 188 | 190 | **98.9%** |
+| misc-ming.all | 64 | 18 | 82 | 102 | 80.4% |
+| misc-mtasc.all | 7 | 2 | 9 | 9 | 100.0% |
+| misc-swfc.all | 7 | 5 | 12 | 16 | 75.0% |
+| misc-swfmill.all | 17 | 1 | 18 | 18 | 100.0% |
+
+Net change vs. `48a97e0b` snapshot: actionscript.all +3 effective (Global-v6/v7/v8 promoted via ASSetNative), misc-ming.all +7 effective (frame_label_test PASS + other recent fixes), misc-swfc.all +0 (soft_reference_test1 RM was already counted local-only), misc-swfmill.all +1 effective.
+
+### Latest fixes (2026-05-04, in CI at `c5994ec1`)
 
 - **`frame_label_test` (misc-ming.all) → PASS (+1, was 12/17 with 153 lines of timeline-loop noise → 17/17 PASS).** Final
   bug behind both the `_root.x1==0` assertion failures and the timeline looping was that `actionCall`'s

@@ -1,8 +1,8 @@
 # Shumway Test Suite Status
 
-Last updated: 2026-05-04 (Shumway fuzz `this._currentframe` fix — 5+ fuzz tests flip via syncing `mc->currentframe` to `obj->sprite_current_frame+1` during natural advance in `advance_sprite_frames`)
+Last updated: 2026-05-05 (CI snapshot at `c5994ec1` — fuzz `_currentframe` fix landed: flat suite 67/92 → 71/92 effective.)
 
-## Latest fixes (2026-05-04, NOT yet in CI)
+## Latest fixes (2026-05-04, in CI at `c5994ec1`)
 
 - **Fuzz `this._currentframe` tests → 5+ PASS.** `from_shumway/fuzz/c8b8069c…`, `ac93c8c9…`, `07580c34…`, `2f4f46bf…`, `81004241…` (all the previously-built fuzz tests with `this._currentframe` traces from inside sprite frame scripts) now PASS. Root cause: in `advance_sprite_frames` (`SWFModernRuntime/src/libswf/tag.c`), only `obj->sprite_current_frame` (DisplayObject, 0-indexed) was incremented per natural advance — `mc->currentframe` (MovieClip, 1-indexed, the value `_currentframe` exposes to ActionScript) was set to 1 at MC creation and never updated outside goto paths (`ng_setSpriteFrame` / `ng_gotoFrameByMC`) and the root-frame updates emitted by the recompiler. So a script like `trace(this._currentframe)` running from inside a sprite frame func always returned 1 instead of the actual frame number. Fix: just before `CALL_FRAME(...)` at line ~941 (natural advance only), resolve the sprite's MC via `actionFindMovieClipByName(obj->instance_name)` and set `smc->currentframe = (int)frame + 1`. Mirrors `swf_core.c`'s update of `root_movieclip.currentframe` before each root frame func. Manual-nav catch-up paths (lines 814/866 within `advance_sprite_frames`, and `ng_setSpriteFrame`) are intentionally NOT touched — they already set `mc->currentframe` to the target value before catch-up so all catch-up frames see the target value (matching Flash). The remaining 22 numeric-output fuzz tests in `from_shumway/fuzz/*` likely also use this pattern (numeric-only output suggests the same `trace(this._currentframe)` template); expect more flips on the next CI run as they're rebuilt. Regression battery: 22/22 AVM1 lifecycle, 17/17 AVM1 scope, 14/14 misc-ming timeline, 14/14 AVM1 timeline, 6/6 AVM1 sprite-state, 5/5 gnash actionscript.all effective — no regressions.
 
@@ -13,18 +13,18 @@ Last updated: 2026-05-04 (Shumway fuzz `this._currentframe` fix — 5+ fuzz test
 | Metric | Value |
 |--------|-------|
 | Total tests | 92 |
-| Passing | **65** (70.7%) |
-| Ruffle-matched | 2 |
-| Effective pass | **67** (72.8%) |
-| Failing | 25 |
+| Passing | **68** (73.9%) |
+| Ruffle-matched | 3 |
+| Effective pass | **71** (77.2%) |
+| Failing | 21 |
 
-**Breakdown by sub-tree** (flat suite recurses into subdirs):
+**Breakdown by sub-tree** (flat suite recurses into subdirs, CI `c5994ec1`):
 
 | Sub-tree | Total | Pass | RM | Fail |
 |----------|-------|------|----|------|
 | Flat root (no subdir) | 10 | 10 | 0 | 0 |
 | `avm1/` | 47 | 45 | 1 | 1 (`moviecliploader`) |
-| `fuzz/` | 30 | 5 | 1 | 24 |
+| `fuzz/` | 30 | 8 | 2 | 20 |
 | `timeline/` | 5 | 5 | 0 | 0 |
 
 **Flat root is still 100% passing**: all 10 remaining tests (add, avm1timeline1, avm1timeline2, button3, doubleAndRegister, fscommand1, gradientTransform, invalidClipDepth, movieinfo1, targetPath1) pass.

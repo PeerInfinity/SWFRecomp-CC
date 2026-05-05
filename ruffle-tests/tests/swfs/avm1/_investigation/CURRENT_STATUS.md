@@ -1,10 +1,24 @@
 # Current Ruffle Test Status
 
-Last updated: 2026-05-04 (ASSetNative implementation: assetnative_ids → PASS, plus side-effect Global-v6/v7/v8 wins in Gnash)
+Last updated: 2026-05-05 (CI run `c5994ec1`: 2026-05-04 ASSetNative fixes landed; 2 NEW filtered failures from upstream-added `assetnativeaccessor*` tests).
 
-## Latest fixes (2026-05-04, NOT yet in CI)
+## Latest CI snapshot (commit `c5994ec1`, 2026-05-05)
 
-- **`assetnative_ids` PASS (10/10) and `assetnative` PASS (81/81).** Recent upstream sync added 4 `assetnative*` tests; both non-accessor variants now PASS after `ASSetNative` was implemented (was a noop) plus the version-gating refinement. The implementation parses comma-separated names with optional version-flag digit prefix stripping (`1`/`6`/`7`/`8`/`9`/`10`) and binds `ASnative(major, minor + position)` on the target. Empty-name slots still consume an index (matches `ASSetNative(d, 103, ",getTime3", 15)` → getTime3 = ASnative(103, 16) = `getTime`). `valueOf` errors on the `minor` arg propagate through the existing setjmp/longjmp try/catch. Version-gating handles three sub-cases from `assetnative` under SWF 7: own exists → overwrite with function; own absent + inherited → install with inherited value; own absent + nothing inherited → install undefined. The two `assetnativeaccessor*` tests still fail — they need `ASSetNativeAccessor` implementation (still a noop; sets up `addProperty` getter/setter pairs from consecutive `ASnative` indices: getter = `minor + 2*position`, setter = `minor + 2*position + 1`) plus class 1109 (ConvolutionFilter) `ASnative` dispatch. See Gnash `CURRENT_STATUS.md` for the broader fix description.
+| Metric | Raw | Filtered |
+|--------|-----|----------|
+| Total | 647 | 607 |
+| Pass | 602 | 601 |
+| Ruffle-matched | 9 | 4 |
+| Effective pass | 611 (94.4%) | 605 (99.7%) |
+| Fail | 36 | 2 |
+
+The 2 filtered failures are `assetnativeaccessor` and `assetnativeaccessor_ids` (upstream-added — see "Latest fixes" below).
+
+## Latest fixes (in CI at `c5994ec1`, landed 2026-05-04 sessions)
+
+- **`assetnative_ids` PASS (10/10) and `assetnative` PASS (81/81).** Recent upstream sync added 4 `assetnative*` tests; both non-accessor variants now PASS after `ASSetNative` was implemented (was a noop) plus the version-gating refinement. The implementation parses comma-separated names with optional version-flag digit prefix stripping (`1`/`6`/`7`/`8`/`9`/`10`) and binds `ASnative(major, minor + position)` on the target. Empty-name slots still consume an index (matches `ASSetNative(d, 103, ",getTime3", 15)` → getTime3 = ASnative(103, 16) = `getTime`). `valueOf` errors on the `minor` arg propagate through the existing setjmp/longjmp try/catch. Version-gating handles three sub-cases from `assetnative` under SWF 7: own exists → overwrite with function; own absent + inherited → install with inherited value; own absent + nothing inherited → install undefined.
+
+- **`assetnativeaccessor` and `assetnativeaccessor_ids` STILL FAIL** — these are the 2 new filtered failures. They need `ASSetNativeAccessor` implementation (still a noop; sets up `addProperty` getter/setter pairs from consecutive `ASnative` indices: getter = `minor + 2*position`, setter = `minor + 2*position + 1`) plus class 1109 (ConvolutionFilter) `ASnative` dispatch. Tracked in `incomplete/ASSETNATIVEACCESSOR_PLAN.md`.
 
 ## Latest fixes (2026-05-01, in CI at 25231855425)
 
@@ -55,12 +69,12 @@ Last updated: 2026-05-04 (ASSetNative implementation: assetnative_ids → PASS, 
 
 ## Quick Summary
 
-- **Pass rate (CI, latest)**: 600/643 (93.3%) raw, **609/643 (94.7%) effective** (raw + 9 ruffle_matched), **603/603 (100.0%) filtered** — zero filtered failures.
-- **Test count**: 643 (+2 from upstream sync). 42 tests in `ignored_tests.txt` (accepted diffs / Ruffle-vs-Flash / Ruffle known_failure).
+- **Pass rate (CI `c5994ec1`)**: 602/647 (93.0%) raw, **611/647 (94.4%) effective** (raw + 9 ruffle_matched), **605/607 (99.7%) filtered** — 2 filtered failures (`assetnativeaccessor*`, upstream-added).
+- **Test count**: 647 (+4 from latest upstream sync, including 4 `assetnative*` tests). 40 tests in `ignored_tests.txt` (accepted diffs / Ruffle-vs-Flash / Ruffle known_failure).
 - **Image test baseline**: 14/31 strict image match, 10/31 tolerance pass.
-- **Main failure types** (raw, all in ignored list): output_mismatch (35), runtime_error/segfault/timeout (0), compile_fail (0).
-- **Filtered effective pass: 100%.** No actionable AVM1 failures remain.
-- **Change from 2026-04-18 snapshot:** unchanged at the effective level; one test reclassified pass→ruffle_matched.
+- **Main failure types** (raw): output_mismatch (36), runtime_error/segfault/timeout (0), compile_fail (0).
+- **Filtered effective pass: 99.7%.** Two actionable failures: `assetnativeaccessor` + `assetnativeaccessor_ids` (need ASSetNativeAccessor + ConvolutionFilter dispatch).
+- **Change from 2026-05-04 doc snapshot:** +2 effective passes from `assetnative*` (non-accessor variants); −2 filtered passes from new `assetnativeaccessor*` tests. Net effective +2.
 - **Latest fixes (2026-04-18, this session)**:
   - **`bitmap_data_thorough/threshold` PASS** — opaque BMD `getPixel32` returns raw stored pixel (no un-premul); `mask` arg defaults to `0xFFFFFFFF` only when missing (undefined coerces to 0).
   - **`bitmap_data_thorough/noise` PASS** — `high` arg defaults to `0xFF` only when missing (undefined → 0); alpha-channel RNG only fires for transparent BMDs; seed/low/high coerced via `doubleToUint32` so NaN/Infinity → 0 (ECMA ToInt32).
@@ -187,9 +201,14 @@ Last updated: 2026-05-04 (ASSetNative implementation: assetnative_ids → PASS, 
 
 No crashes or segfaults remain. All previous crashes have been fixed.
 
-## Remaining Filtered Failures: 0
+## Remaining Filtered Failures: 2
 
-All filtered tests pass effectively. The 41 raw fails not in the filtered set are in `ignored_tests.txt` (accepted diffs documented in `ACCEPTED_DIFFS.md` / `RUFFLE_VS_FLASH_DIFFERENCES.md` / `RUFFLE_COMPAT_TWEAKS.md` / `FLASH_BUGS_REPLICATED.md`).
+- `assetnativeaccessor` — needs `ASSetNativeAccessor` implementation (sets up `addProperty` getter/setter pairs from consecutive `ASnative` indices: getter = `minor + 2*position`, setter = `minor + 2*position + 1`) + class 1109 (ConvolutionFilter) `ASnative` dispatch.
+- `assetnativeaccessor_ids` — same root cause.
+
+Plan: `incomplete/ASSETNATIVEACCESSOR_PLAN.md`. Alternative: add to `ignored_tests.txt` to restore 100% filtered rate while implementation is deferred.
+
+The 34 other raw fails not in the filtered set are in `ignored_tests.txt` (accepted diffs documented in `ACCEPTED_DIFFS.md` / `RUFFLE_VS_FLASH_DIFFERENCES.md` / `RUFFLE_COMPAT_TWEAKS.md` / `FLASH_BUGS_REPLICATED.md`).
 
 ### `bitmap_data_thorough/*` final status (20 sub-tests, all effectively pass)
 

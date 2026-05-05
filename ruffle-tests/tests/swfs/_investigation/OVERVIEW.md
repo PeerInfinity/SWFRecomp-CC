@@ -2,7 +2,7 @@
 
 Cross-suite summary of all Ruffle-derived test suites. Each suite has its own `_investigation/` directory with detailed status docs.
 
-Last updated: 2026-05-04 (Shumway fuzz `this._currentframe` fix: 5+ fuzz tests → PASS via syncing `mc->currentframe` to `obj->sprite_current_frame+1` during natural advance in `advance_sprite_frames`).
+Last updated: 2026-05-05 (CI run `c5994ec1` — 2026-05-04 fixes landed in CI: frame_label_test PASS, soft_reference_test1 RM, Global-v6/v7/v8, ASSetNative, _currentframe sync for fuzz tests; ~13 effective passes since 2026-05-04 snapshot).
 
 ## Suite Summary
 
@@ -10,15 +10,29 @@ Last updated: 2026-05-04 (Shumway fuzz `this._currentframe` fix: 5+ fuzz tests �
 
 | Suite | Tests | Pass | RM | Effective | Effective Rate | Filtered Rate | Notes |
 |-------|-------|------|----|-----------| ---------------|---------------|-------|
-| [avm1](../avm1/_investigation/CURRENT_STATUS.md) | 647 | 600 | 9 | 609 | 94.1% | **100.0%** (603/603) | 42 ignored. **Zero filtered failures.** loadvars_tostring + bitmap_filters PASS. Total bumped 643→647 by upstream sync (4 new tests; classification pending). |
-| [from_gnash/actionscript.all](../from_gnash/_investigation/CURRENT_STATUS.md) | 190 | 124 | 61 | 185 | **97.4%** | — | +3 effective post-2026-05-02 via ASSetNative implementation (Global-v7/v8 → PASS, Global-v6 → ruffle_matched). 2 raw failures remain (array-v5 sort/Array-method-on-Object semantics; TextFormat-v7 font metric precision). |
+| [avm1](../avm1/_investigation/CURRENT_STATUS.md) | 647 | 602 | 9 | 611 | 94.4% | **99.7%** (605/607) | 40 ignored. 2 NEW filtered failures: `assetnativeaccessor`, `assetnativeaccessor_ids` (upstream-added; need ASSetNativeAccessor + ConvolutionFilter ASnative dispatch — see `ASSETNATIVEACCESSOR_PLAN.md`). |
+| [from_gnash/actionscript.all](../from_gnash/_investigation/CURRENT_STATUS.md) | 190 | 126 | 62 | 188 | **98.9%** | — | +3 effective in this CI: Global-v6/v7/v8 promoted via ASSetNative landing. 2 raw failures remain: `array-v5` (sort/Array-method-on-Object semantics) and `TextFormat-v7` (font metric precision). |
 | [from_gnash/misc-mtasc.all](../from_gnash/_investigation/CURRENT_STATUS.md) | 9 | 7 | 2 | 9 | **100.0%** | — | All effective pass. |
 | [from_gnash/misc-swfmill.all](../from_gnash/_investigation/CURRENT_STATUS.md) | 18 | 17 | 1 | 18 | **100.0%** | — | All effective pass. `jump_to_prev_block` (cross-DoAction backward jump) and `tags_after_last_showframe` both landed; plan moved to `complete/MISC_SWFMILL_PLAN.md`. |
-| [from_gnash/misc-ming.all](../from_gnash/_investigation/CURRENT_STATUS.md) | 102 | 62 | 16 | 78 | **76.5%** | — | +1 effective this session (registerClassTest2 → ruffle_matched via MC builtin gating). |
-| [from_gnash/misc-swfc.all](../from_gnash/_investigation/CURRENT_STATUS.md) | 16 | 7 | 5 | 12 | 75.0% | — | +3 effective since prior snapshot (mouse_drag_test PASS via startDrag→transformed_by_script; swf4opcode → ruffle_matched via SWF<5 MovieClip→f64 coercion; soft_reference_test1 → ruffle_matched via _name setter syncing parent.dynamic_props + var_map). |
-| [from_shumway](../from_shumway/_investigation/CURRENT_STATUS.md) (flat) | 92 | 65 | 2 | 67 | 72.8% | — | +5 effective since 2026-04-30. |
+| [from_gnash/misc-ming.all](../from_gnash/_investigation/CURRENT_STATUS.md) | 102 | 64 | 18 | 82 | **80.4%** | — | +4 effective: `frame_label_test` PASS (actionCall isolated drain); plus other recent fixes. |
+| [from_gnash/misc-swfc.all](../from_gnash/_investigation/CURRENT_STATUS.md) | 16 | 7 | 5 | 12 | 75.0% | — | Unchanged this CI; soft_reference_test1 → ruffle_matched landed in 2026-05-04 fix already counted in prior snapshot. |
+| [from_shumway](../from_shumway/_investigation/CURRENT_STATUS.md) (flat) | 92 | 68 | 3 | 71 | 77.2% | — | +4 effective: 5 fuzz tests with `this._currentframe` traces flipped via `mc->currentframe` natural-advance sync. 20 fuzz tests still fail; `avm1/moviecliploader` is the only non-fuzz failure. |
 | [from_shumway/avm1](../from_shumway/_investigation/CURRENT_STATUS.md) | 47 | 45 | 1 | 46 | **97.9%** | **100.0%** (45/45) | 2 ignored. Only `moviecliploader` remains (MCL one-tick deferral). |
 | **SWFRecomp/tests** (old suite) | 158+59 | all trace pass | — | — | **100%** | — | Hand-written opcode tests. CI only. |
+
+## Progress Since 2026-05-05 (CI snapshot at `c5994ec1`)
+
+The 2026-05-04 fixes that were "NOT yet in CI" in the last snapshot landed in this CI run:
+
+- **frame_label_test (Gnash misc-ming.all) → PASS** via `actionCall`'s isolated drain (snapshot+suppress+above pattern in `CALL_FRAME_FUNC`). See "Progress Since 2026-05-04" below for full details.
+- **soft_reference_test1 (Gnash misc-swfc.all) → ruffle_matched** via `_name` setter syncing `parent.dynamic_props` + `var_map`.
+- **Global-v6 (Gnash actionscript.all) → ruffle_matched, Global-v7/v8 → PASS** via `ASSetNative` implementation (was a noop).
+- **`assetnative` + `assetnative_ids` (AVM1) → PASS** as side-effect of ASSetNative.
+- **5 Shumway fuzz tests with `this._currentframe` traces → PASS** via natural-advance `mc->currentframe` sync in `advance_sprite_frames`.
+
+### New filtered failures (AVM1)
+
+Upstream sync added `assetnativeaccessor` and `assetnativeaccessor_ids` tests; both currently fail. They need `ASSetNativeAccessor` implementation + ConvolutionFilter (class 1109) `ASnative` dispatch. Documented in `avm1/_investigation/incomplete/ASSETNATIVEACCESSOR_PLAN.md`. Filtered rate temporarily dipped from 100% → 99.7% pending fix or ignore-list addition.
 
 ## Progress Since 2026-05-04
 

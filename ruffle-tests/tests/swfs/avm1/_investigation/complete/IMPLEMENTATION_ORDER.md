@@ -1,4 +1,9 @@
-# Recommended Implementation Order for Incomplete Plans
+# Recommended Implementation Order for Incomplete Plans (HISTORICAL)
+
+Moved to `complete/` on 2026-05-05. Most items below are now DONE; the AVM1
+filtered suite is at 99.7% (only `assetnativeaccessor*` remain, tracked in a
+new dedicated plan). This doc is preserved for historical context — for
+current incomplete plans, see `incomplete/` directly.
 
 Last updated: 2026-03-30
 

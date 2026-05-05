@@ -20,7 +20,7 @@ phases:
     status: completed
   - id: 5
     name: "BeginBitmapFill: _width=804 instead of 150 on a bitmap-filled MC"
-    status: pending
+    status: completed
   - id: 6
     name: "opcode_guard_test2: testvar off-by-one + getDepth on -32969 clone"
     status: pending
@@ -407,14 +407,22 @@ issue likely overlaps CloneSprite plan.
 
 ## Phases that no longer need work
 
-- **`action_execution_order_test6`** — already `ruffle_matched` locally
-  via subset-of-Ruffle promotion. Will flip in the next CI run. No
-  code change needed.
-- **`submoviegetvar`** — already `pass` locally. Will flip in the next
-  CI run. No code change needed.
+- **`submoviegetvar`** — RESOLVED (now PASS in CI at `c5994ec1`). Removed
+  from the "blocker" list.
 
-These should be removed from the "blocker" list in
-`MISC_MING_SWFC_PLAN.md` once the next CI snapshot confirms.
+## Predictions that didn't pan out
+
+- **`action_execution_order_test6`** — predicted in earlier session to
+  flip to `ruffle_matched` via subset-of-Ruffle promotion. CI snapshot
+  at `c5994ec1` (2026-05-05) shows it still fails as `output_mismatch`.
+  Either the local-vs-CI Ruffle expectation differs, or
+  `RUFFLE_KNOWN_FAILURE_HANDLING` doesn't auto-promote it for some
+  reason. Needs re-investigation: run locally with `--diff --verbose`,
+  inspect `output.ruffle.txt` (if present), confirm whether our diff
+  is actually a strict subset of Ruffle's. Likely candidate root
+  causes: (a) Ruffle promotion gate requires `known_failure=true` in
+  test.toml that's missing here; (b) our diff has even one extra line
+  outside Ruffle's diff set.
 
 ## Verification battery
 
