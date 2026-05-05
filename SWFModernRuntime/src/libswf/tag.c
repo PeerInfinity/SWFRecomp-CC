@@ -5842,6 +5842,18 @@ void tagDefineButton(SWFAppContext* app_context, size_t char_id, frame_func* sta
 #endif
 }
 
+// Public accessor: returns the hit-shape character ID for a button character,
+// or 0 if char_id is not a button. Used by mc_get_pixel_aabb_ng so a sprite
+// whose only child is a button (with no shape bounds of its own) can derive
+// an AABB from the button's hit shape — required for onRollOver/onRollOut
+// dispatch on the wrapping sprite (e.g. ButtonEventsTest's `_root.square1`).
+size_t ng_getButtonHitCharId(size_t char_id)
+{
+	if (char_id >= dictionary_capacity) return 0;
+	if (dictionary[char_id].type != CHAR_TYPE_BUTTON) return 0;
+	return dictionary[char_id].button_hit_char_id;
+}
+
 // Convert a Flash key code to the SWF button condition key code.
 // Button conditions use their own mapping for special keys (1-19) and
 // ASCII for printable characters (32+). Letters are lowercase in conditions.

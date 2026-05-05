@@ -5584,7 +5584,18 @@ namespace SWFRecomp
 					if (flags & 0x01) up_records.push_back(rec);
 					if (flags & 0x02) over_records.push_back(rec);
 					if (flags & 0x04) down_records.push_back(rec);
-					if (flags & 0x08) { hit_char_id = char_id; hit_matrix = matrix; }
+					if (flags & 0x08) {
+						// Prefer SHAPE/MORPH_SHAPE hit records over sprite/button
+						// records — only update hit_char_id if this char is a
+						// known shape, OR if we haven't seen any shape yet.
+						bool is_shape = context.shape_char_ids.count(char_id) > 0;
+						bool prev_is_shape = (hit_char_id >= 0 &&
+							context.shape_char_ids.count((u16)hit_char_id) > 0);
+						if (is_shape || !prev_is_shape) {
+							hit_char_id = char_id;
+							hit_matrix = matrix;
+						}
+					}
 				}
 
 				// Fallback: empty states fall back to up
@@ -6529,6 +6540,10 @@ namespace SWFRecomp
 					shape_bounds_xmax = (s32) shape_tag.fields[3].value;
 					shape_bounds_ymin = (s32) shape_tag.fields[4].value;
 					shape_bounds_ymax = (s32) shape_tag.fields[5].value;
+
+					// Track this char_id as a shape (SHAPE or MORPH_SHAPE) so
+					// DefineButton2 can prefer shape hit records over sprite ones.
+					context.shape_char_ids.insert(shape_id);
 
 					if (shape_is_v4)
 					{

@@ -12,6 +12,18 @@ phases:
   - id: 1a
     name: "ButtonEventsTest buttonChild population (bias 16383)"
     status: complete
+  - id: 1c
+    name: "ButtonEventsTest test progression past line 58"
+    status: partial
+  - id: 1c1
+    name: "Recompiler: prefer SHAPE hit record over SPRITE"
+    status: complete
+  - id: 1c2
+    name: "Bounds: sprites with button-only children get AABB from hit shape"
+    status: complete
+  - id: 1c3
+    name: "Event ordering: SWFBUTTON_* fires before frame advance"
+    status: pending
   - id: 2
     name: "key_event_test progression past frame 5"
     status: deferred
@@ -26,14 +38,14 @@ blockers: []
 parent_plan: "complete/BUTTON_INFRASTRUCTURE_PLAN.md"
 -->
 
-Last updated: 2026-05-05 (post-pipeline run `25393090111`).
+Last updated: 2026-05-05 (Phase 1c sub-fixes 1c1+1c2 landed locally; 1c3 still open).
 
-## Summary status (CI at `91999a7c`)
+## Summary status (CI at `aaa502d1`)
 
 | Test | Suite | Lines | Status | Phase |
 |------|-------|-------|--------|-------|
 | `button_test1` | misc-swfc.all | **31/31 PASS** | complete | 4 |
-| `ButtonEventsTest` | misc-ming.all | 58/679 (was 48; +10 in this session) | partial (1a complete, 1c open) | 1 |
+| `ButtonEventsTest` | misc-ming.all | 58/679 (1c1+1c2 fixed prereqs but blocked by 1c3 ordering) | partial | 1 |
 | `key_event_test` | misc-ming.all | 33/66 (50%) | deferred | 2 |
 | `DragDropTest` | misc-ming.all | 27/44 (61%) | deferred | 3 |
 
@@ -217,7 +229,7 @@ we used bias 16384 universally, which explains both:
 
 Phase 1a's bias fix lands all of these together. Line 53 now PASSES.
 
-### 1c — Test progression divergence (lines 59+)
+### 1c — Test progression divergence (lines 59+) — partial (2 of 3 sub-fixes landed 2026-05-05)
 
 After line 58 PASSES (`hitTest(60, 60, true)`), the test enters the
 mouse-event-driven phase: `input.json` has 38 events (14 MouseMove + 9
@@ -225,16 +237,92 @@ MouseDown + 9 MouseUp + 6 Wait), and the test expects 15 sequential
 sub-tests gated by `_root.testno` (1, 2, 3, …, 15). Each sub-test fires
 on a specific button event (RollOver/RollOut/Press/Release).
 
-**Observed.** Lines 59-81 of our output show repeated `PASSED: / == /`
-lines — the SWFBUTTON_MOUSEOVER handler's `_target == '/'` checks fire
-many times, suggesting our button state machine fires MOUSEOVER repeatedly
-without advancing `testno`. Eventually output stops at line 81 (~62
-spurious PASSED lines + the original 19 prefix lines that matched).
+#### 1c1 — Recompiler: prefer SHAPE hit record over SPRITE (COMPLETE)
 
-**Subordinate to 1a.** Until buttonChild populates correctly, the test
-cannot proceed past frame 2 in any meaningful way — `testno` advancement
-is gated on the buttonChild assertions passing. So 1c is downstream of 1a
-and cannot be diagnosed in isolation. Re-evaluate after 1a lands.
+**Root cause.** The Ming-generated SWF for ButtonEventsTest emits four
+HIT records on the button: `sh1a` (small 5×5 shape), `sh1` (40×40 shape),
+`ermc` (sprite at depth 10, all states including HIT), and `ermc` (sprite
+at depth 11, HIT only). The recompiler at `SWFRecomp/src/swf.cpp:5587`
+unconditionally overwrote `hit_char_id` with the LAST HIT record
+encountered — picking the depth-11 ermc sprite. Since `ermc` is a sprite
+with no graphics (just a script), `resolve_hit_shape` in
+`SWFModernRuntime/src/libswf/tag.c` returned NULL, so
+`ng_update_button_states_in_dl` never fired any button transitions. The
+button's hit-test always returned 0, no SWFBUTTON_* actions fired, and
+the test couldn't progress.
+
+**Fix.** Track shape char IDs in the recompiler context as `DefineShape*`
+/ `DefineMorphShape*` tags are processed (`SWFRecomp/include/context.hpp`
+`shape_char_ids` set), then in the button parse loop only update
+`hit_char_id` if the new char is a known shape OR if no shape has been
+seen yet. Files: `SWFRecomp/include/context.hpp`, `SWFRecomp/src/swf.cpp`
+(swf.cpp:5587 + interpretShape shape_id tracking).
+
+After this fix, the button correctly hit-tests and SWFBUTTON_*
+actions fire on transitions.
+
+#### 1c2 — Bounds: sprites with button-only children get AABB from hit shape (COMPLETE)
+
+**Root cause.** With 1c1 applied, button transitions fire — but
+`_root.square1.onRollOut` (the handler that advances testno and
+nextFrame()s to frame 3) still didn't fire. Trace showed
+`mc_get_pixel_aabb_ng(square1)` returned `has_bounds=0`, so
+`actionDispatchMCMouseMove` skipped square1. The sprite's content is the
+button character; `ng_getCharBoundsForRatio(button_char_id, ...)` returns
+0 because button characters don't register shape bounds. With no fallback,
+square1's AABB came out empty.
+
+**Fix.** In `mc_get_pixel_aabb_ng` at the children-walk fallback, when
+`ng_getCharBoundsForRatio` fails for a child, look up the button's hit
+shape via a new `ng_getButtonHitCharId(char_id)` accessor and use the hit
+shape's bounds instead. Files: `SWFModernRuntime/src/libswf/tag.c` (new
+`ng_getButtonHitCharId`), `SWFModernRuntime/src/actionmodern/action.c`
+`mc_get_pixel_aabb_ng` fallback.
+
+After this fix, square1 has `bounds=(39.95, 29.95, 80.05, 70.05)`,
+`actionDispatchMCMouseMove` fires `square1.onRollOut` correctly, and
+the handler invokes `nextFrame()` advancing the timeline to frame 3.
+
+#### 1c3 — Event ordering: SWFBUTTON_* fires before frame advance (PENDING)
+
+**Observed (post-1c1+1c2).** Test still at 58/679 matching. Trace shows
+the test now executes through frames 3+, even reaching `2. Press (and
+keep pressed)…` (frame 4). But output still diverges at line 59 because
+SWFBUTTON_MOUSEOVER fires on the FIRST MM(60,60) when `testno=0`, taking
+the else-branch and emitting `FAILED: Unexpectedly got
+SWFBUTTON_MOUSEOVER event (testno:0)`. Ruffle's expected output skips this
+line entirely — by the time MOUSEOVER fires, `testno` is already 1.
+
+**Hypothesis.** Ruffle's event delivery model coalesces or delays
+SWFBUTTON_* dispatch until after frame-advance scripts run, so that the
+sub-test 0 → frame 3 transition completes before any "real" mouse event
+is delivered to the button. Our impl delivers each MM event immediately
+to `ng_update_button_states_in_dl`, firing SWFBUTTON_MOUSEOVER before
+square1.onRollOut has a chance to advance the frame.
+
+**Recommended approach.** Compare event-vs-frame ordering with Ruffle's
+`tests/run.rs` event playback. Ruffle may queue the first frame-advance
+side-effect (nextFrame) and re-run frame scripts before continuing event
+delivery. Specifically the sequence for input
+`[Wait, Wait, Wait, MM(60,60), MM(0,0), MM(60,60), MD(60,60), MU(60,60),
+…]` should produce zero output between the frame 2 hitTest line and
+the frame 3 "1. Roll over…" note.
+
+**Estimated effort.** 4-6 hours: needs Ruffle source inspection of the
+input-replay tick model + event-deferral logic.
+
+**Expected line gain.** If 1c3 lands, ButtonEventsTest could jump from
+58/679 to ~150-200/679 (subtests 1-3 worth of correct output), with
+remaining failures from buttonChild assertion mismatches that Ruffle
+also fails (Flash UB).
+
+#### Original investigation steps (kept for reference)
+
+Initial trace approach was: log every SWFBUTTON_* dispatch and AS-level
+handler call. That trace immediately revealed the recompiler bug (1c1):
+`[BTN_HIT] btn_hit_char_id=12 hit_ch=(nil)` — char 12 was a sprite, not
+a shape. Manually re-running SWFRecomp confirmed `tagDefineButton(...,
+hit_char_id=12)` before the fix, `hit_char_id=13` after.
 
 ### Phase 1 verification battery
 

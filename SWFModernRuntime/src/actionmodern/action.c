@@ -61929,10 +61929,20 @@ static int mc_get_pixel_aabb_ng(MovieClip* mc, float* x1, float* y1, float* x2, 
 	if (dobj != NULL && dobj->sprite_display_list != NULL) {
 		DisplayObject* sdl = dobj->sprite_display_list;
 		size_t sdl_max = dobj->sprite_max_depth;
+		extern size_t ng_getButtonHitCharId(size_t char_id);
 		for (size_t d = 1; d <= sdl_max; d++) {
 			if (sdl[d].char_id == 0) continue;
 			s32 cxmin, cxmax, cymin, cymax;
-			if (!ng_getCharBoundsForRatio(sdl[d].char_id, sdl[d].ratio, &cxmin, &cxmax, &cymin, &cymax)) continue;
+			if (!ng_getCharBoundsForRatio(sdl[d].char_id, sdl[d].ratio, &cxmin, &cxmax, &cymin, &cymax)) {
+				// Fallback for button characters (which have no shape bounds of
+				// their own): use their hit shape's bounds. Required so that
+				// sprites containing buttons (with no other graphics) get a
+				// non-empty AABB for onRollOver/onRollOut dispatch.
+				size_t hit_cid = ng_getButtonHitCharId(sdl[d].char_id);
+				if (hit_cid == 0 ||
+				    !ng_getCharBoundsForRatio(hit_cid, 0, &cxmin, &cxmax, &cymin, &cymax))
+					continue;
+			}
 			// Character bounds are in twips; convert to pixels for the local coordinate space
 			float child_xmin = (float)cxmin / 20.0f;
 			float child_xmax = (float)cxmax / 20.0f;

@@ -2,6 +2,7 @@
 
 #include <fstream>
 #include <cstdint>
+#include <set>
 #include <sstream>
 
 using std::string;
@@ -42,6 +43,13 @@ namespace SWFRecomp
 
 		// SWF version (needed for string encoding: SWF<6 uses Latin-1/Win-1252)
 		uint8_t swf_version;
+
+		// Char IDs of DefineShape / DefineMorphShape definitions seen so far.
+		// Used by DefineButton2 to prefer SHAPE-typed hit records over sprite/
+		// button hit records (Ming sometimes adds non-shape characters with
+		// HIT flag — those have no graphics so resolve_hit_shape returns NULL
+		// and the button stops responding to hover/press transitions).
+		std::set<uint16_t> shape_char_ids;
 
 		Context() : inside_function2(false), function2_register_count(0), in_function_body(false), swf_version(0) {}
 	};
