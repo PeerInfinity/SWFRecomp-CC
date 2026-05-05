@@ -17839,7 +17839,10 @@ static MovieClip* resolveSlashPathToMC(SWFAppContext* app_context, const char* p
 						child_mc = findOrCreateMovieClip(app_context, seg_buf, &root_movieclip);
 				}
 				if (child_mc == NULL) return NULL;
-				child_mc->depth = (int)child_depth - 16384;
+				// Button-state child sprites use bias 16383 (Flash quirk).
+				// See findOrCreateMovieClip site for full rationale.
+				int as_bias_pr = (mc != NULL && mc->is_button_mc) ? 16383 : 16384;
+				child_mc->depth = (int)child_depth - as_bias_pr;
 				// Fix parent to actual parent MC (exec_sprite_frame may have registered under root)
 				child_mc->parent = mc;
 				// Link MC to display list entry so actionGetMember can find nested children
@@ -18710,8 +18713,18 @@ static MovieClip* findOrCreateMovieClip(SWFAppContext* app_context, const char* 
 			}
 		}
 		if (depth != SIZE_MAX) {
-			// Sync ActionScript depth: SWF depth - 16384
-			mc->depth = (int)depth - 16384;
+			// Sync ActionScript depth: SWF depth - 16384.
+			// Flash quirk: button-state child sprites use bias 16383 (one
+			// less than normal). Test ButtonEventsTest line 579 expects
+			// `instance6.getDepth() == -16371` for an ermc placed at SWF
+			// depth 12 in a button — i.e., 12 - 16383 = -16371. Without
+			// this adjustment the populator script that writes
+			// `_root.buttonChild[getDepth()+16383]` ends up at index 11
+			// instead of 12, leaving the test's `buttonChild[12]` checks
+			// undefined. Detect the case via parent->is_button_mc.
+			int as_bias = 16384;
+			if (parent != NULL && parent->is_button_mc) as_bias = 16383;
+			mc->depth = (int)depth - as_bias;
 			// Set byte_size from sprite's DefineSprite tag data size (for getBytesLoaded/Total)
 			if (is_new && mc->byte_size == 0) {
 				extern DisplayObject* display_list;
@@ -44584,8 +44597,11 @@ void actionGetMember(SWFAppContext* app_context)
 				// If depth was changed by swapDepths, don't overwrite from display list
 				MovieClip* child_mc = findOrCreateMovieClip(app_context, child_name_buf, mc);
 				if (child_mc != NULL) {
-					if (!child_mc->depth_swapped)
-						child_mc->depth = (int)child_depth - 16384;
+					if (!child_mc->depth_swapped) {
+						// Button-state child sprites use bias 16383 (Flash quirk).
+						int as_bias_nc = (mc != NULL && mc->is_button_mc) ? 16383 : 16384;
+						child_mc->depth = (int)child_depth - as_bias_nc;
+					}
 					// Mark as button MC if dictionary char is a Button — typeof needs this
 					{
 						extern Character* dictionary;
@@ -51159,6 +51175,11 @@ void actionCallFunction(SWFAppContext* app_context, char* str_buffer)
 		else if (_mc_nav_name_len == 9 && strncmp(_mc_nav_name, "nextFrame", 9) == 0) { _is_mc_nav = 5; }
 		else if (_mc_nav_name_len == 14 && strncmp(_mc_nav_name, "getBytesLoaded", 14) == 0) { _is_mc_nav = 6; }
 		else if (_mc_nav_name_len == 13 && strncmp(_mc_nav_name, "getBytesTotal", 13) == 0) { _is_mc_nav = 7; }
+		// getDepth() called as a bare function (not method) — operates on current context MC.
+		// MovieClip.prototype.getDepth is a type-1 stub (NULL simple_func) that would
+		// otherwise fall through to the "Built-in constructor as plain function" branch
+		// and push undefined. Mirrors actionCallMethod's MOVIECLIP getDepth dispatch.
+		else if (_mc_nav_name_len == 8 && strncmp(_mc_nav_name, "getDepth", 8) == 0) { _is_mc_nav = 8; }
 
 		if (_is_mc_nav)
 		{
@@ -51218,6 +51239,22 @@ void actionCallFunction(SWFAppContext* app_context, char* str_buffer)
 					if (args != NULL) FREE(args);
 					double v = _mc_target->unloaded ? 0.0 : (_mc_target->load_failed ? -1.0 : (double)_mc_target->byte_size);
 					PUSH(ACTION_STACK_VALUE_F64, VAL(u64, &v));
+					builtin_handled = 1;
+				} else if (_is_mc_nav == 8) {
+					// getDepth — return mc->depth as F64.
+					// Mirrors the actionCallMethod MOVIECLIP getDepth handler:
+					// nonscriptable shapes / shape aliases push undefined.
+					if (args != NULL) FREE(args);
+#ifdef NO_GRAPHICS
+					if (mc_is_nonscriptable_shape(_mc_target) || g_shape_alias_resolution) {
+						g_shape_alias_resolution = 0;
+						pushUndefined(app_context);
+					} else
+#endif
+					{
+						double v = (double)_mc_target->depth;
+						PUSH(ACTION_STACK_VALUE_F64, VAL(u64, &v));
+					}
 					builtin_handled = 1;
 				}
 				if (!builtin_handled) {
@@ -55891,37 +55928,51 @@ void actionCallMethod(SWFAppContext* app_context, char* str_buffer)
 			user_method_prop = getPropertyWithPrototype(arr->props, method_name, method_name_len);
 		}
 		if (user_method_prop != NULL && user_method_prop->type == ACTION_STACK_VALUE_FUNCTION) {
-			// User-defined method on array — invoke it with arr->props as 'this' (ASObject*)
+			// User-defined method on array — invoke with the ARRAY as 'this'.
+			// Flash semantics: `arr.method()` binds `this` to the array itself, so
+			// `for (var i in this)` iterates the array's indices (Array.prototype.realLength).
+			// arr->props is the addProperty/named-prop store, not the array's identity.
 			ASFunction* func = lookupFunctionFromVar(user_method_prop);
-			ASObject* this_obj_for_arr = arr->props;
 			if (func != NULL && func->function_type == 2 && func->advanced_func != NULL) {
-				pushSuperContext((void*)this_obj_for_arr, 1);
+				pushSuperContext((void*)arr, 1);
 				ASObject* local_scope = allocObject(app_context, 8);
 				if (scope_depth < MAX_SCOPE_DEPTH) {
 					scope_is_with[scope_depth] = 0;
 					scope_mc[scope_depth] = NULL;
 					scope_chain[scope_depth++] = local_scope;
 				}
+				ActionVar this_var = {0};
+				this_var.type = ACTION_STACK_VALUE_ARRAY;
+				this_var.data.numeric_value = (u64)arr;
+				if (g_this_depth < MAX_THIS_DEPTH) {
+					g_this_stack[g_this_depth++] = this_var;
+				}
+				setProperty(app_context, local_scope, "this", 4, &this_var);
 				g_call_depth++;
-				ActionVar result = func->advanced_func(app_context, args, num_args, NULL, (void*)this_obj_for_arr);
+				ActionVar result = func->advanced_func(app_context, args, num_args, NULL, (void*)arr);
 				g_call_depth--;
+				if (g_this_depth > 0) g_this_depth--;
 				if (scope_depth > 0) scope_depth--;
 				releaseObject(app_context, local_scope);
 				popSuperContext();
 				if (args != NULL) FREE(args);
 				pushVar(app_context, &result);
 			} else if (func != NULL && func->function_type == 1 && func->simple_func != NULL) {
-				pushSuperContext((void*)this_obj_for_arr, 1);
+				pushSuperContext((void*)arr, 1);
 				ActionVar this_var = {0};
-				this_var.type = ACTION_STACK_VALUE_OBJECT;
-				this_var.data.numeric_value = (u64)this_obj_for_arr;
+				this_var.type = ACTION_STACK_VALUE_ARRAY;
+				this_var.data.numeric_value = (u64)arr;
 				setVariableByName("this", &this_var);
+				if (g_this_depth < MAX_THIS_DEPTH) {
+					g_this_stack[g_this_depth++] = this_var;
+				}
 				for (u32 i = 0; i < num_args; i++)
 					pushVar(app_context, &args[i]);
 				if (args != NULL) FREE(args);
 				g_call_depth++;
 				ActionVar result = ((ActionVar(*)(SWFAppContext*))func->simple_func)(app_context);
 				g_call_depth--;
+				if (g_this_depth > 0) g_this_depth--;
 				popSuperContext();
 				pushVar(app_context, &result);
 			} else {
