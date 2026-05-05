@@ -9,6 +9,9 @@ phases:
   - id: 1
     name: "ButtonEventsTest residual lines"
     status: partial
+  - id: 1a
+    name: "ButtonEventsTest buttonChild population (bias 16383)"
+    status: complete
   - id: 2
     name: "key_event_test progression past frame 5"
     status: deferred
@@ -30,7 +33,7 @@ Last updated: 2026-05-05 (post-pipeline run `25393090111`).
 | Test | Suite | Lines | Status | Phase |
 |------|-------|-------|--------|-------|
 | `button_test1` | misc-swfc.all | **31/31 PASS** | complete | 4 |
-| `ButtonEventsTest` | misc-ming.all | 48/679 (~7%) | partial | 1 |
+| `ButtonEventsTest` | misc-ming.all | 58/679 (was 48; +10 in this session) | partial (1a complete, 1c open) | 1 |
 | `key_event_test` | misc-ming.all | 33/66 (50%) | deferred | 2 |
 | `DragDropTest` | misc-ming.all | 27/44 (61%) | deferred | 3 |
 
@@ -84,12 +87,43 @@ sub-phases below.
 ButtonEventsTest is a deep test: 679 expected lines exercising button child
 sprite lifecycle (load/unload across state transitions), getDepth bias
 quirks, button event dispatch, focus, key events, and unloadMovie. Our
-output is 81 lines (matches lines 1-10, then diverges and stops at line 81
-because the test rolls over silently after one assertion fails). To make
-progress we need to fix the *first* divergence cluster (lines 43-51) which
-unblocks the test's onward progression.
+output is 81 lines (matches lines 1-58 after Phase 1a, then diverges into
+test-progression noise and stops). To make progress we need to fix the
+test progression in Phase 1c (the next divergence cluster).
 
-### 1a — `_root.buttonChild` array population (lines 43-51, 9 lines)
+### 1a — `_root.buttonChild` array population (lines 43-51, 9 lines) — COMPLETE 2026-05-05
+
+**Resolved.** Root cause was depth-bias mismatch for button-state child
+sprites. Flash uses bias 16383 for these (one less than the standard
+`AVM_DEPTH_BIAS = 16384` Ruffle and we use everywhere else). The test's
+populator script at `for-in` time computes
+`buttonChild[getDepth() + 16383] = …` — with our bias-16384 the indices
+came out as `9, 11` instead of the expected `10, 12`, so every
+`buttonChild[10|12]` assertion failed.
+
+Fix: detect the case via `parent->is_button_mc` at three depth-set
+sites in `action.c` (`findOrCreateMovieClip`, `resolveSlashPathToMC`
+slash-path resolver, `actionGetMember` nested-child resolver) and
+apply bias 16383 there. Other MC creation paths keep bias 16384.
+
+Two pre-existing changes already in the working tree at session start
+also load-bear:
+- Bare-function `getDepth()` dispatch in `actionCallFunction` (mirrors
+  the `actionCallMethod` MOVIECLIP arm) — needed for the script_2
+  populator's `getDepth()` call inside the sprite's frame action,
+  which doesn't go through the method dispatch path.
+- `actionCallMethod` ARRAY user-method dispatch now binds `this` to
+  the array itself (was `arr->props`) — the test's
+  `Array.prototype.realLength` does `for (var i in this)` which needs
+  the array as `this` to enumerate numeric indices.
+
+Lines 43-53 of ButtonEventsTest now PASS. Total matching: 48 → 58
+(+10). Verified no regressions: 14 AVM1 button + 4 drag tests, gnash
+ButtonPropertiesTest/RollOverOutTest, 9 prototype/lifecycle, 11
+timeline, 10 array, 8 Inheritance/Global/case-v6 tests — 56/56 still
+PASS or effective.
+
+#### Original investigation steps (kept for reference)
 
 **Test mechanism.** A "events-reporting MC" (`ermc`, sprite char 12) is
 placed at depths 10, 11, 12, 13, 14 inside the button across different
@@ -172,26 +206,16 @@ regression sweep.
 **Expected line gain.** 9 lines (43-51) on success, plus possible
 unblocking of lines 52-81 if the test loop progresses further.
 
-### 1b — `getDepth()` off-by-1 for SWF-depth-12 button child (line 53, 1 line)
+### 1b — `getDepth()` off-by-1 for SWF-depth-12 button child (line 53, 1 line) — RESOLVED via 1a
 
-`_level0.square1.button.instance6.getDepth() == -16371` expected, our impl
-returns `-16372`. Ruffle ALSO returns `-16372` (line 89 of
-`output.ruffle.txt` is `FAILED: expected: -16371 obtained: -16372`). So
-this is a **Ruffle-vs-Flash difference**, not our bug.
+Initial reading of this as a "Ruffle-vs-Flash difference" was wrong.
+Flash uses bias 16383 for **all** button-state child sprites (both the
+ALL-states depth 10 child AND the UP-only depth 12 child). Ruffle and
+we used bias 16384 universally, which explains both:
+- `getDepth() == -16371` direct check (depth 12 child)
+- `buttonChild[10|12]` populator-derived check (depth 10 and 12 children)
 
-**Action.** Once 1a lands and unblocks the test progression: classify this
-under `RUFFLE_VS_FLASH_DIFFERENCES.md` (Flash returns `swf_depth - 16383`
-for a button-state UP-only child placed via `SWFButtonRecord`; Ruffle and
-ours return `swf_depth - 16384` consistently with the standard
-`AVM_DEPTH_BIAS = 16384`). The test promotes to ruffle_matched if 1a +
-1c land, since our ⊆ Ruffle's diffs at that point.
-
-**Note on asymmetry.** `_root.buttonChild[10]` (the ALL-states child at
-SWF-depth 10) — Ruffle's PASS confirms `getDepth = -16373 = 10 - 16383`
-for that child. So Flash uses bias 16383 for both; Ruffle's button-state
-child depths use bias 16384 for the depth-12 (UP-only) entry but 16383
-for the depth-10 (ALL-states) entry. That asymmetry is *Ruffle's* quirk —
-not something we need to replicate or fix.
+Phase 1a's bias fix lands all of these together. Line 53 now PASSES.
 
 ### 1c — Test progression divergence (lines 59+)
 
