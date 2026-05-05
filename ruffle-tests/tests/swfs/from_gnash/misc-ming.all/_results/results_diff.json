@@ -1,9 +1,9 @@
 {
   "metadata": {
-    "old_timestamp": "2026-05-04T22:25:31.497086+00:00",
-    "old_git_sha": "bb30b842bc6647caeb2c6676de0398ab9314be5f",
-    "new_timestamp": "2026-05-04T23:50:28.126415+00:00",
-    "new_git_sha": "3a0a423d4ec79ab261b92693f47a519d314608e4",
+    "old_timestamp": "2026-05-04T23:50:28.126415+00:00",
+    "old_git_sha": "3a0a423d4ec79ab261b92693f47a519d314608e4",
+    "new_timestamp": "2026-05-05T02:00:55.919954+00:00",
+    "new_git_sha": "e707c68962654a2c388ec1863ab68adb33ec906b",
     "partial": false,
     "same_commit": false
   },
@@ -13,21 +13,54 @@
     "old_effective_pass": 81,
     "old_total": 102,
     "old_pass_rate": 61.8,
-    "new_pass": 63,
+    "new_pass": 64,
     "new_ruffle_matched": 18,
-    "new_effective_pass": 81,
+    "new_effective_pass": 82,
     "new_total": 102,
-    "new_pass_rate": 61.8,
+    "new_pass_rate": 62.7,
     "old_mismatched_lines": 1675,
-    "new_mismatched_lines": 1675,
+    "new_mismatched_lines": 1670,
     "increased_mismatches": 0,
-    "decreased_mismatches": 0,
-    "newly_passing": 0,
+    "decreased_mismatches": 5,
+    "newly_passing": 1,
     "newly_failing": 0,
-    "status_changed": 0,
-    "unchanged": 102,
+    "status_changed": 1,
+    "unchanged": 100,
     "added": 0,
     "removed": 0
   },
-  "changes": []
+  "changes": [
+    {
+      "test": "frame_label_test",
+      "change_type": "changed",
+      "old_status": "output_mismatch",
+      "new_status": "pass",
+      "old_lines": {
+        "actual_lines": 153,
+        "expected_lines": 17,
+        "matching_lines": 12
+      },
+      "new_lines": {
+        "actual_lines": 17,
+        "expected_lines": 17,
+        "matching_lines": 17
+      }
+    },
+    {
+      "test": "path_format_test",
+      "change_type": "changed",
+      "old_status": "ruffle_matched",
+      "new_status": "ruffle_matched",
+      "old_lines": {
+        "actual_lines": 24,
+        "expected_lines": 27,
+        "matching_lines": 0
+      },
+      "new_lines": {
+        "actual_lines": 28,
+        "expected_lines": 27,
+        "matching_lines": 0
+      }
+    }
+  ]
 }
