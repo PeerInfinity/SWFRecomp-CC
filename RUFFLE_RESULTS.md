@@ -2,9 +2,9 @@
 
 *See [RUFFLE_RESULTS_FILTERED.md](RUFFLE_RESULTS_FILTERED.md) for results with ignored tests excluded.*
 
-**Commit:** `94cda9947684`  
-**Date:** 2026-05-06 03:29 UTC  
-**Total duration:** 57m58s
+**Commit:** `b91b7202e856`  
+**Date:** 2026-05-06 04:11 UTC  
+**Total duration:** 2h21m32s
 
 ## Results by Suite
 
@@ -26,13 +26,13 @@
 |-------|--------:|---------:|---------:|
 | avm1 | 106,093 | 114,983 | 92.3% |
 | from_gnash/actionscript.all | 15,370 | 16,957 | 90.6% |
-| from_gnash/misc-ming.all | 3,090 | 4,577 | 67.5% |
+| from_gnash/misc-ming.all | 3,093 | 4,577 | 67.6% |
 | from_gnash/misc-mtasc.all | 211 | 231 | 91.3% |
 | from_gnash/misc-swfc.all | 371 | 499 | 74.3% |
 | from_gnash/misc-swfmill.all | 49 | 51 | 96.1% |
 | from_shumway | 687 | 1,276 | 53.8% |
 | from_shumway/avm1 | 483 | 491 | 98.4% |
-| **Total** | **126,354** | **139,065** | **90.9%** |
+| **Total** | **126,357** | **139,065** | **90.9%** |
 
 ## Failure Breakdown
 
@@ -69,9 +69,9 @@ Tests with `output_mismatch` status but ≥80% of expected lines matching.
 
 | Suite | Newly Passing | Newly Failing | Lines Improved | Lines Regressed |
 |-------|-------------:|-------------:|--------------:|----------------:|
-| from_gnash/misc-ming.all | - | - | 11 | - |
+| from_gnash/misc-ming.all | - | - | 3 | - |
 
-*Comparing `10616e5ccdc1` → `94cda9947684`*
+*Comparing `94cda9947684` → `b91b7202e856`*
 
 ## Flash-Spec Results
 
@@ -86,55 +86,55 @@ Tests verified against Flash's actual output (`output.flash.txt`).
 ### avm1
 
 - **Pass:** 604/648 (93.2%)
-- **Duration:** 19m14s across 30 shards
+- **Duration:** 1h03m15s across 30 shards
 - **Lines:** 106,093/114,983 matching (92.3%)
-- **Avg test duration:** 1.7s — slowest: `netstream_play_flv_screen` (34.3s)
+- **Avg test duration:** 5.8s — slowest: `netstream_play_flv_screen` (34.5s)
 
 ### from_gnash/actionscript.all
 
 - **Pass:** 126/190 (66.3%)
-- **Duration:** 7m46s across 30 shards
+- **Duration:** 21m25s across 30 shards
 - **Lines:** 15,370/16,957 matching (90.6%)
-- **Avg test duration:** 2.4s — slowest: `array-v5` (26.8s)
+- **Avg test duration:** 6.7s — slowest: `String-v8` (34.1s)
 
 ### from_gnash/misc-ming.all
 
 - **Pass:** 64/102 (62.7%)
-- **Duration:** 17m43s across 30 shards
-- **Lines:** 3,090/4,577 matching (67.5%)
-- **Avg test duration:** 10.4s — slowest: `NetStream-SquareTest` (29.7s)
+- **Duration:** 28m52s across 30 shards
+- **Lines:** 3,093/4,577 matching (67.6%)
+- **Avg test duration:** 16.9s — slowest: `matrix_test` (97.8s)
 
 ### from_gnash/misc-mtasc.all
 
 - **Pass:** 7/9 (77.8%)
-- **Duration:** 27s across 30 shards
+- **Duration:** 2m16s across 30 shards
 - **Lines:** 211/231 matching (91.3%)
-- **Avg test duration:** 3.0s — slowest: `TextFieldTest` (18.7s)
+- **Avg test duration:** 15.1s — slowest: `inheritance` (19.9s)
 
 ### from_gnash/misc-swfc.all
 
 - **Pass:** 8/16 (50.0%)
-- **Duration:** 1m43s across 30 shards
+- **Duration:** 4m25s across 30 shards
 - **Lines:** 371/499 matching (74.3%)
-- **Avg test duration:** 6.4s — slowest: `opcode_guard_test2` (20.3s)
+- **Avg test duration:** 16.5s — slowest: `movieclip_destruction_test1` (20.4s)
 
 ### from_gnash/misc-swfmill.all
 
 - **Pass:** 17/18 (94.4%)
-- **Duration:** 2m47s across 30 shards
+- **Duration:** 5m23s across 30 shards
 - **Lines:** 49/51 matching (96.1%)
-- **Avg test duration:** 9.3s — slowest: `initaction_in_definesprite` (19.5s)
+- **Avg test duration:** 17.9s — slowest: `jump_to_prev_block` (19.1s)
 
 ### from_shumway
 
 - **Pass:** 68/92 (73.9%)
-- **Duration:** 7m24s across 30 shards
+- **Duration:** 14m06s across 30 shards
 - **Lines:** 687/1,276 matching (53.8%)
-- **Avg test duration:** 4.8s — slowest: `fuzz/42f71d860e22e456a9bd61c2d9e8c8da9536152b879a131dd7a400ff61a4a3e3` (20.0s)
+- **Avg test duration:** 9.1s — slowest: `fuzz/887c02ab98dbdd3ae22b2363b212dba005565738a572a2156e703dd3bf9b40af` (20.9s)
 
 ### from_shumway/avm1
 
 - **Pass:** 45/47 (95.7%)
-- **Duration:** 52s across 30 shards
+- **Duration:** 1m47s across 30 shards
 - **Lines:** 483/491 matching (98.4%)
-- **Avg test duration:** 1.0s — slowest: `hitarea` (18.8s)
+- **Avg test duration:** 2.2s — slowest: `label` (17.8s)
