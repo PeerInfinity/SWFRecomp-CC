@@ -1,7 +1,7 @@
 # Ruffle Test Results Diff
 
-**Previous:** `be5a2bd6f94d` (2026-05-06T22:20:21.258786+00:00)
-**Current:** `ad31c865e1b8` (2026-05-06T22:32:54.953427+00:00)
+**Previous:** `ad31c865e1b8` (2026-05-06T22:32:54.953427+00:00)
+**Current:** `c8f6452a8063` (2026-05-06T23:38:11.414647+00:00)
 
 ## Summary
 
@@ -12,4 +12,8 @@
 | Pass rate | 93.2% | 93.2% | 0% |
 | Mismatched lines | 8890 | 8890 | 0 |
 
-No changes detected.
+## Line Count Changed (1)
+
+| Test | Status | Lines (prev) | Lines (now) | Diff |
+|------|--------|--------------|-------------|------|
+| `removed_base_clip_tell_target` | output_mismatch | 0/2 | 0/2 | 0 |
