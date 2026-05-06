@@ -4,7 +4,7 @@
 
 <!-- PLAN_META
 id: BUTTON_RESIDUAL
-status: pending
+status: complete
 phases:
   - id: 1
     name: "ButtonEventsTest residual lines"
@@ -50,7 +50,7 @@ phases:
     status: complete
   - id: 2
     name: "key_event_test progression past frame 5"
-    status: deferred
+    status: complete
   - id: 3
     name: "DragDropTest _level50 droptarget"
     status: complete
@@ -62,14 +62,47 @@ blockers: []
 parent_plan: "complete/BUTTON_INFRASTRUCTURE_PLAN.md"
 -->
 
-Status note (2026-05-06 follow-up session): Local baseline reruns of all 4
-plan tests confirm CI snapshot — `ButtonEventsTest` ruffle_matched (676/679),
-`DragDropTest` ruffle_matched (33/44), `button_test1` PASS (31/31),
-`key_event_test` `output_mismatch` (33/66, Phase 2 deferred). No new
-implementation needed in this session — Phases 1, 3, 4 are all delivered;
-Phase 2 (broadcaster ordering / `Key.addListener` interleaving, 4-6 h scope)
-remains out-of-scope of this residual plan. Plan stays in `incomplete/`
-because Phase 2 is unfinished work.
+2026-05-06 (Phase 2 complete): `key_event_test` (misc-ming.all) promoted
+from `output_mismatch` (33/66) to `ruffle_matched` (66/66). Single-line
+fix in `tagRemoveObject2` early-return for backward catch-up. Root cause
+was the early-return preserving entries placed at or before
+`catch_up_target`, even when an intermediate frame's RemoveObject2
+should remove them during replay. Specifically: listenerClip1 is placed
+at recompiler frame 8 and removed at frame 9; when test 5's
+`gotoAndPlay(currentframe-1)` triggers backward catch-up to target=10
+(frame 11 → frame 11), the loop replays f=0..10 — frame 8 places
+listenerClip1, frame 9's `tagRemoveObject2(20)` early-returned
+because `placed_at_frame=8 <= catch_up_target=10`, leaving listenerClip1
+alive past its intended removal. The clip's spurious KEYDOWN handler
+then fired on every subsequent key event, advancing the timeline
+unexpectedly (test 5 currentframe=14 instead of 13) and cascading
+through tests 6-10. Fix: change the early-return condition from
+`placed_at_frame <= catch_up_target` to `placed_at_frame == current_frame`
+— preserving only the same-frame place+remove case. After the fix,
+RemoveObject2 properly takes effect during backward catch-up replay,
+matching Ruffle's `run_goto` semantics where intermediate
+RemoveObject2 tags un-establish entries that PlaceObject2 just
+re-asserted. Files: `SWFModernRuntime/src/libswf/tag.c`
+`tagRemoveObject2`. Verified: 10 AVM1 goto/loop/execution-order tests
+(goto_rewind1/2/3, goto_frame, goto_frame2, goto_label, goto_methods,
+execution_order2/3, goto_execution_order2 — 10/10 PASS); 14 AVM1
+button/clip-event/lifecycle tests (mouse_events,
+mouse_events_visible_enabled, button_v5/v6, button_children,
+button_order, button_keypress, button_goto, button_key_events,
+issue_9885, clip_events, unload, on_construct, register_class — 14/14
+PASS); 7 misc-ming.all tests (ButtonEventsTest, ButtonPropertiesTest,
+RollOverOutTest, DragDropTest, DepthLimitsTest, frame_label_test,
+key_event_test — 7/7 effective); 5 misc-swfc.all tests (button_test1,
+mouse_drag_test, movieclip_destruction_test2, soft_reference_test1,
+swf4opcode — 5/5 effective); 18 AVM1 drag/path/scope/super tests
+(drag_drop, drag_over_from_outside, drag_over_without_startdrag,
+mouse_hover_events_while_dragging, path_string, tell_target,
+tell_target_invalid{,_swf6}, target_path, set_interval, watch,
+watch_textfield, as2_super_and_this_v6/v8, swf5_to_6_cross_call,
+swf5_no_closure, closure_scope, set_variable_scope — 18/18 PASS); 10
+actionscript.all Inheritance/Global/Selection (10/10 effective). All
+4 phases of this residual plan are now complete — moved to
+`complete/`.
 
 Last updated: 2026-05-06 (Phase 3 complete: DragDropTest `_level50` droptarget
 promoted from `output_mismatch` (27/44) to `ruffle_matched`. Two narrow fixes:
@@ -130,7 +163,7 @@ section below for full diagnosis.
 |------|-------|-------|--------|-------|
 | `button_test1` | misc-swfc.all | **31/31 PASS** | complete | 4 |
 | `ButtonEventsTest` | misc-ming.all | **ruffle_matched** (1k complete: OUT_DOWN→effective OVER. Promoted from 237/679 line-aligned `output_mismatch` to full ruffle_matched effective pass.) | complete | 1 |
-| `key_event_test` | misc-ming.all | 33/66 (50%) | deferred | 2 |
+| `key_event_test` | misc-ming.all | **ruffle_matched** (Phase 2 complete: backward-catch-up tagRemoveObject2 early-return narrowed. Promoted from 33/66 `output_mismatch` to full ruffle_matched effective pass.) | complete | 2 |
 | `DragDropTest` | misc-ming.all | **ruffle_matched** (Phase 3 complete: level50 default scale + _levelN path resolver. Promoted from 27/44 `output_mismatch` to full ruffle_matched effective pass.) | complete | 3 |
 
 ## 2026-05-05 session findings
@@ -1140,9 +1173,102 @@ In addition to the parent plan's required-pass guardrail:
 - Gnash misc-ming `ButtonPropertiesTest`, `RollOverOutTest` (effective).
 - Gnash misc-swfc `mouse_drag_test`, `button_test1` — must stay PASS.
 
-## Phase 2 — `key_event_test` progression past frame 5
+## Phase 2 — `key_event_test` progression past frame 5 — COMPLETE 2026-05-06
 
-Status: `33/66 (50%)`. Lines 1-30 match (tests 1-5). Line 31+ diverge.
+**Resolved.** `key_event_test` promoted from `output_mismatch` (33/66)
+to `ruffle_matched` (66/66 effective). The original 4-6 h estimate
+turned out to be unnecessary — the diagnosis pointed at broadcaster
+ordering / listener interleaving, but the actual root cause was much
+narrower: a stale-but-active clip event handler on a removed
+DisplayObject, caused by a backward-catch-up early-return in
+`tagRemoveObject2`.
+
+### Root cause
+
+`listenerClip1` (depth 20, displays "listenerClip2.onClipKeyDown") is
+placed at recompiler `frame_8` and removed at `frame_9`
+(`SWFDisplayItem_remove(it)` between frames 9 and 10 of the source).
+Test 5's `dynamic_mc.onKeyDown` handler calls
+`_root.gotoAndPlay(_root._currentframe-1)` (and later `+1`) from
+source frame 12 (recompiler frame 11). The first call triggers
+backward catch-up to target=10 (0-based; source frame 11). The replay
+loop runs `f=0..10`:
+
+- `f=8`: `tagPlaceObject2(20, ...)` re-asserts `listenerClip1` with
+  `placed_at_frame=8`.
+- `f=9`: `tagRemoveObject2(20)` — early-returns because
+  `catch_up_backward=1 && placed_at_frame=8 <= catch_up_target=10`.
+  **Bug**: the entry stays alive instead of being removed.
+- `f=10`: empty.
+
+Post-replay, `listenerClip1` is still in `display_list[20]` with its
+KEYDOWN clip action intact. Every subsequent key press fires the
+stale `listenerClip2.onClipKeyDown` handler, which itself does
+`gotoAndPlay(currentframe+1)`, advancing the timeline by one extra
+frame per key press. That's why test 5's `_currentframe == 13`
+assertion failed with "obtained: 14" — `listenerClip2.onClipKeyDown`
+ran first (gotoing to 13), then `dynamic_mc.onKeyDown` ran
+(gotoing to 14). Cascaded across tests 6-10.
+
+### Fix
+
+`SWFModernRuntime/src/libswf/tag.c` `tagRemoveObject2` (single line):
+
+```c
+// Before:
+if (catch_up_backward && display_list[depth].placed_at_frame <= catch_up_target)
+    return;
+
+// After:
+if (catch_up_backward && display_list[depth].placed_at_frame == current_frame)
+    return;
+```
+
+The original condition was overly broad: it preserved any entry
+placed at or before target, but a RemoveObject2 in an intermediate
+replay frame should still take effect (the post-replay state should
+reflect what was there at target, including intermediate removes).
+The narrowed condition only preserves the unusual same-frame
+place+remove case where preserving is genuinely intended.
+
+### Why this is safe
+
+PlaceObject2 in the replay loop already handles re-assertion
+(matched check); a subsequent RemoveObject2 in a later replay frame
+should remove the entry. The previous early-return was masking
+intermediate removes for any entry placed before target, which
+matches no documented Ruffle / Flash behavior. Mirrors Ruffle's
+`run_goto`, where intermediate Remove tags un-establish entries
+PlaceObject2 just re-asserted.
+
+### Verification battery (all PASS)
+
+- AVM1 goto/loop/execution-order: goto_rewind1/2/3, goto_frame,
+  goto_frame2, goto_label, goto_methods, execution_order2/3,
+  goto_execution_order2 (10/10 PASS).
+- AVM1 button/clip-event/lifecycle: mouse_events,
+  mouse_events_visible_enabled, button_v5/v6, button_children,
+  button_order, button_keypress, button_goto, button_key_events,
+  issue_9885, clip_events, unload, on_construct, register_class
+  (14/14 PASS).
+- Gnash misc-ming.all: ButtonEventsTest, ButtonPropertiesTest,
+  RollOverOutTest, DragDropTest, DepthLimitsTest, frame_label_test,
+  key_event_test (7/7 effective).
+- Gnash misc-swfc.all: button_test1, mouse_drag_test,
+  movieclip_destruction_test2, soft_reference_test1, swf4opcode
+  (5/5 effective).
+- AVM1 drag/path/scope/super: drag_drop, drag_over_from_outside,
+  drag_over_without_startdrag, mouse_hover_events_while_dragging,
+  path_string, tell_target, tell_target_invalid{,_swf6},
+  target_path, set_interval, watch, watch_textfield,
+  as2_super_and_this_v6/v8, swf5_to_6_cross_call, swf5_no_closure,
+  closure_scope, set_variable_scope (18/18 PASS).
+- Gnash actionscript.all: Inheritance-v5..v8, Global-v6/v7/v8,
+  Selection-v6/v7/v8 (10/10 effective).
+
+### Original investigation notes (kept for reference)
+
+Status pre-fix: `33/66 (50%)`. Lines 1-30 match (tests 1-5). Line 31+ diverge.
 
 **Diff shape.** Looking at the diff output, the test runs frames 5-10 with
 KeyDown events triggering both clip-action handlers (`onClipKeyDown` on

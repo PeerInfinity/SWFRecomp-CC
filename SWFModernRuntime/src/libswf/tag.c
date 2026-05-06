@@ -5757,11 +5757,18 @@ void tagRemoveObject2(SWFAppContext* app_context, size_t depth)
 	if (depth <= max_depth && display_list[depth].char_id != 0)
 	{
 #ifdef NO_GRAPHICS
-		// During backward catch-up, protect entries placed at or before the target frame.
-		// They're part of the preserved state and will be re-established by replay.
+		// During backward catch-up, the replay loop runs frames 0..target. PlaceObject2
+		// at frame X re-asserts entries; RemoveObject2 at frame Y > X must take effect
+		// so the post-replay display list reflects target's actual state. Only protect
+		// when this exact frame's PlaceObject2 just ran (same-frame place+remove pair),
+		// in which case the remove was intended as a no-op cleanup of fresh placement.
+		// Required for from_gnash/misc-ming.all/key_event_test where listenerClip1 is
+		// placed at frame 8 and removed at frame 9; backward catch-up replays both,
+		// and the remove must apply (catch_up_target=10 > placed_at_frame=8).
 		extern int catch_up_backward;
 		extern size_t catch_up_target;
-		if (catch_up_backward && display_list[depth].placed_at_frame <= catch_up_target)
+		(void)catch_up_target;
+		if (catch_up_backward && display_list[depth].placed_at_frame == current_frame)
 			return;
 
 		// During catch_up_mode (ng_executeGotoTagsOnly from nextFrame/gotoAndStop),
