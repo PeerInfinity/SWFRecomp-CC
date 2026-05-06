@@ -195,6 +195,18 @@ static int g_eager_init_depth = 0;
 // Key test: avm1/issue_9885.
 static int g_button_state_change_depth = 0;
 
+// Snapshot of (depth → char_id) and (depth → instance_name) of a button's
+// children at the start of a state transition. tagPlaceObject2 consults this
+// snapshot when g_btn_state_active is set: if the new placement's
+// (depth, char_id) matches the old state's, treat as preserved (Ruffle's
+// set_state "child exists in both states" branch — no re-instantiation,
+// no frame_0 re-fire, instance_name kept). For new depths or different
+// char_id at preserved depths, the normal eager-init/queue path runs.
+#define BTN_STATE_SNAP_MAX 256
+static size_t g_btn_state_old_chars[BTN_STATE_SNAP_MAX];
+static char*  g_btn_state_old_names[BTN_STATE_SNAP_MAX];
+static int    g_btn_state_active = 0;
+
 int actionEagerInitActive(void) {
 	return g_eager_init_depth > 0 && g_button_state_change_depth == 0;
 }
@@ -1745,6 +1757,25 @@ static void ng_update_button_states_in_dl(SWFAppContext* app_context,
 				obj->sprite_max_depth = 0;
 			}
 
+			// Snapshot OLD (depth, char_id) and instance_name pairs so
+			// tagPlaceObject2's preservation check (gated on g_btn_state_active)
+			// can detect "same depth, same char_id as previous state" and skip
+			// the eager init / frame_0 script re-fire for those entries.
+			// Mirrors Ruffle's set_state child_by_depth(...).id() == record.id
+			// reuse path. ButtonEventsTest motivates: depth 10 (instance5) must
+			// persist across UP→OVER→DOWN transitions while depth 12 (UP-only)
+			// is removed and depth 13 (OVER-only) is freshly placed with its
+			// own frame_0 script firing.
+			memset(g_btn_state_old_chars, 0, sizeof(g_btn_state_old_chars));
+			memset(g_btn_state_old_names, 0, sizeof(g_btn_state_old_names));
+			size_t snap_max = obj->sprite_max_depth;
+			if (snap_max >= BTN_STATE_SNAP_MAX) snap_max = BTN_STATE_SNAP_MAX - 1;
+			for (size_t j = 1; j <= snap_max; j++)
+			{
+				g_btn_state_old_chars[j] = obj->sprite_display_list[j].char_id;
+				g_btn_state_old_names[j] = obj->sprite_display_list[j].instance_name;
+			}
+
 			// Clear existing children
 			for (size_t j = 1; j <= obj->sprite_max_depth; j++)
 			{
@@ -1757,7 +1788,13 @@ static void ng_update_button_states_in_dl(SWFAppContext* app_context,
 			}
 			obj->sprite_max_depth = 0;
 
-			// Run new state function to populate the display list
+			// Run new state function to populate the display list. Allow the
+			// recompiler-emitted sprite-DoAction gate to queue scripts as
+			// normal — the per-depth preservation check inside tagPlaceObject2
+			// suppresses re-firing for depths that didn't change. Without that,
+			// suppressing all scripts via g_button_state_change_depth would
+			// also skip new-depth placements (ButtonEventsTest depth 13/14)
+			// that legitimately need their frame_0 to run.
 			u8 effective_state = (new_state == 3) ? 0 : new_state; // outDown shows "up"
 			if (effective_state < 3 && ch->button_state_funcs[effective_state] != NULL)
 			{
@@ -1768,9 +1805,9 @@ static void ng_update_button_states_in_dl(SWFAppContext* app_context,
 				max_depth = obj->sprite_max_depth;
 				display_list_capacity = obj->sprite_dl_capacity;
 
-				g_button_state_change_depth++;
+				g_btn_state_active = 1;
 				ch->button_state_funcs[effective_state](app_context);
-				g_button_state_change_depth--;
+				g_btn_state_active = 0;
 
 				obj->sprite_display_list = display_list;
 				obj->sprite_max_depth = max_depth;
@@ -1778,6 +1815,13 @@ static void ng_update_button_states_in_dl(SWFAppContext* app_context,
 				display_list = saved_dl;
 				max_depth = saved_max;
 				display_list_capacity = saved_cap;
+
+				// Drain AQ_KIND_SCRIPT entries queued by the state's new
+				// child sprite frame_0 actions. Without this, the for-in
+				// trace inside ButtonEventsTest's ermc.frame_0 (script_2)
+				// would not fire until the next tagShowFrame, landing many
+				// input events later.
+				actionDrainOnloadAndScript(app_context);
 			}
 		}
 
@@ -4120,6 +4164,37 @@ void tagPlaceObject2(SWFAppContext* app_context, size_t depth, size_t char_id, u
 #ifdef NO_GRAPHICS
 	// In script_only_mode (Phase 2), placement is already done from Phase 1 — skip entirely.
 	if (g_script_only_mode) return;
+
+	// Button-state-change preservation: when ng_update_button_states_in_dl
+	// is re-running a state function and this (depth, char_id) matches the
+	// previous state's placement at the same depth, treat as a reuse — no
+	// re-instantiation, no eager init, no INIT/CONSTRUCT/LOAD re-fire, no
+	// frame_0 script re-fire. Mirrors Ruffle avm1_button.set_state's
+	// child_by_depth(...).id() == record.id branch. The state func cleared
+	// dl[depth].char_id but left dl[depth].instance_name intact, so the
+	// placement keeps its old name and the cached child MC stays bound.
+	// New depths or different char_id at preserved depths take the normal
+	// placement path below (eager init + script queue) so their frame_0
+	// fires (ButtonEventsTest depth 13/14 ermc placements).
+	if (g_btn_state_active && char_id != 0
+	    && depth < BTN_STATE_SNAP_MAX
+	    && g_btn_state_old_chars[depth] == char_id)
+	{
+		display_list[depth].char_id = char_id;
+		display_list[depth].transform_id = transform_id;
+		display_list[depth].cxform_id = cxform_id;
+		display_list[depth].has_cxform = (cxform_id != 0) ? 1 : 0;
+		if (clip_depth != 0) display_list[depth].clip_depth = clip_depth;
+		display_list[depth].placed_at_frame = current_frame;
+		if (depth > max_depth) max_depth = depth;
+		ng_cache_transform(&display_list[depth], transform_id);
+		init_cx_fields(&display_list[depth]);
+		display_list[depth].sprite_needs_init = 0;
+		// Discard any g_pending_instance_name set by a preceding
+		// tagSetInstanceName so it doesn't leak into the next placement.
+		g_pending_instance_name = NULL;
+		return;
+	}
 #endif
 
 	if (char_id == 0)

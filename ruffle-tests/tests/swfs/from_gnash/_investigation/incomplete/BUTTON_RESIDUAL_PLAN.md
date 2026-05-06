@@ -26,6 +26,9 @@ phases:
     status: complete
   - id: 1d
     name: "for-in on inner button MC returns zero (Button.prototype enum)"
+    status: partial
+  - id: 1e
+    name: "Transient enumeration of removed button-state children (instance6 missing)"
     status: pending
   - id: 2
     name: "key_event_test progression past frame 5"
@@ -41,14 +44,14 @@ blockers: []
 parent_plan: "complete/BUTTON_INFRASTRUCTURE_PLAN.md"
 -->
 
-Last updated: 2026-05-05 (Phase 1c3 complete: synchronous nextFrame() in AS2 event handlers landed at commit 08e560fe; new Phase 1d opened for for-in enum on inner button MC).
+Last updated: 2026-05-05 (Phase 1d partial: Ruffle-style button-state-change preservation landed — script_2 now fires per state transition, +18 matched lines (61→79). Remaining gap is Phase 1e: removed-state-child must persist through one tick so for-in includes it).
 
 ## Summary status (CI at `08e560fe`)
 
 | Test | Suite | Lines | Status | Phase |
 |------|-------|-------|--------|-------|
 | `button_test1` | misc-swfc.all | **31/31 PASS** | complete | 4 |
-| `ButtonEventsTest` | misc-ming.all | 61/679 (1c3 complete; alignment now correct, +1 mismatched line vs. 62 because incidental drift-matches lost — for-in enum gap is the next blocker) | partial | 1 |
+| `ButtonEventsTest` | misc-ming.all | 79/679 (1d partial: script_2 fires per state transition; remaining gap = Phase 1e transient-enum) | partial | 1 |
 | `key_event_test` | misc-ming.all | 33/66 (50%) | deferred | 2 |
 | `DragDropTest` | misc-ming.all | 27/44 (61%) | deferred | 3 |
 
@@ -356,23 +359,73 @@ correct positions while a separate gap (Phase 1d, for-in enum) keeps
 the rest of the output offset by ~19 lines per state. CI verified no
 regressions in any other suite.
 
-**Phase 1d (next blocker): for-in enumeration on the inner button MC
-returns zero items.** The test does `for (var i in _level0.square1.button)
-trace(i)` (script_2 actionEnumerate2 at the str_136="button" GetMember).
-Expected enum output is 19 lines per state: tabIndex, blendMode,
-cacheAsBitmap, filters, scale9Grid, getDepth, enabled, useHandCursor,
-onKeyUp, onKeyDown, onSetFocus, onReleaseOutside, onRelease, onPress,
-onRollOut, onRollOver, instance7, instance5, instance6 (Button.prototype
-properties + dynamic children). Our impl produces zero. The Button.prototype
-is initialized in `initButtonPrototype` (action.c:31016) with all 17
-expected properties, so the bug is either:
-- `_level0.square1.button` doesn't resolve to the inner button MC, or
-- enumeration on a button MC doesn't walk the prototype chain, or
-- the for-in's iteration variable type/storage doesn't accept the
-  enumerated values (e.g., the loop terminates immediately).
+**Phase 1d (PARTIAL — 2026-05-05): script_2 didn't fire on state transitions.**
 
-Estimated effort: 2-3 hours. Expected line gain: ~150-300/679 once
-both 1d and 1c3 lands together.
+Initial framing was wrong: the for-in *did* push 18 properties (8 dyn
++ 10 from Button.prototype + children) — the issue was that `script_2`
+(the for-in's host script, which is ermc's frame_0) only ran during
+initial UP-state placement. Subsequent button state transitions never
+re-fired it because `g_button_state_change_depth` (added for issue_9885
+to suppress double-firing of preserved children) gated `actionEagerInitActive()`,
+which gates the recompiler-emitted sprite-DoAction queue call. So
+sprite_12_frame_0 ran inside button state changes but its
+actionQueueSpriteScript gate evaluated false, and script_2 never queued.
+
+**Fix landed.** Implemented Ruffle's `set_state` "child exists in both
+states" preservation per-depth instead of suppressing scripts globally:
+
+1. `tag.c` `ng_update_button_states_in_dl` snapshots OLD (depth → char_id,
+   instance_name) before clearing dl. Sets `g_btn_state_active=1`,
+   removes the `g_button_state_change_depth++` (so scripts queue normally),
+   runs state func.
+
+2. `tag.c` `tagPlaceObject2` early gate: if `g_btn_state_active && char_id != 0
+   && g_btn_state_old_chars[depth] == char_id`, treat as preserved —
+   minimal placement (transform/cxform), keep instance_name (clear left
+   it intact), skip `ng_on_place_object2` and all queue_clip_*/eager init.
+   Mirrors Ruffle's `child_by_depth(depth).id() == record.id` reuse.
+
+3. After state func, drain `actionDrainOnloadAndScript` so the queued
+   script_2 fires synchronously inline rather than waiting for the next
+   tagShowFrame (would land many input events later).
+
+Result: ButtonEventsTest 61 → 79 line matches (+18). Verified zero
+regressions in: issue_9885 (PASS), 9 button + 4 drag + 13 prototype/lifecycle
++ 2 misc-swfc + 9 enum/prototype tests (all PASS or effective).
+
+### 1e — Transient enumeration of removed button-state children (PENDING)
+
+After Phase 1d, the remaining for-in shape per state mismatches by
+exactly 1 line: expected `instance7, instance5, instance6` (3 children),
+ours `instance7, instance5` (2). The missing entry is the
+just-removed previous-state ermc that Flash keeps enumerable for ONE
+tick before fully disposing. Each state's missing instance drives a
+~1-line offset that propagates through the rest of the trace.
+
+**Mechanism in Flash/Ruffle.** When a button transitions UP→OVER and
+depth 12's ermc (instance6) is removed, Ruffle's `remove_child`
+defers the actual destruction; the MC stays in the cache (and in
+for-in) until the next tick. Our impl clears the dl entry immediately
+in `ng_update_button_states_in_dl` and `enum_child_callback` only
+walks `display_obj->sprite_display_list`, so the removed MC isn't
+visible.
+
+**Fix sketch.** After state func runs, walk the snapshot: for each
+old depth NOT preserved (different char_id, or no current placement),
+mark the corresponding MC `pending_removal` AND track it in a
+small "transient enumeration" list keyed by parent_mc. Modify
+`actionEnumerate2`'s MOVIECLIP arm to consult that list after the
+display walk. Cleared at the start of the next state transition
+(transient lifetime = 1 transition).
+
+Alternative: don't clear the OLD dl entries that are NOT touched by
+new state. Walk old snapshot post-state-func; for entries with old
+char_id intact (state func didn't replace), they survive as dl
+entries (so for-in walks them naturally). On NEXT transition, clear
+them upfront. Cleaner, but bigger change to dl semantics.
+
+Estimated effort: 2-4 hours. Expected line gain: ~150-300/679
+(propagation from fixing per-state offset).
 
 #### Original investigation steps (kept for reference)
 
