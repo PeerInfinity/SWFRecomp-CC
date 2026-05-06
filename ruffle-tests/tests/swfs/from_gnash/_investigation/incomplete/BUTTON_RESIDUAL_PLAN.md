@@ -45,6 +45,9 @@ phases:
   - id: 1j
     name: "ButtonEventsTest realLength upstream divergence (vestigial PUSH in actionEnumerate ARRAY arm)"
     status: complete
+  - id: 1k
+    name: "OUT_DOWN effective state shows OVER (fixes buttonChild[13] off-by-one)"
+    status: complete
   - id: 2
     name: "key_event_test progression past frame 5"
     status: deferred
@@ -59,13 +62,21 @@ blockers: []
 parent_plan: "complete/BUTTON_INFRASTRUCTURE_PLAN.md"
 -->
 
-Last updated: 2026-05-06 (status review: local baseline ButtonEventsTest
-confirms 237/679 line-aligned, matching CI snapshot at `edba4166`. Phase
-1j is the last landed fix. Next-most-tractable narrow target identified:
-the `buttonChild[13].exe/.uld == 3 vs 4` off-by-one originally listed
-under 1f's "remaining gaps" — a missing OVER state transition during
-testno 5's Press/Release-Outside cycle. See Phase 1f section for refined
-investigation pointer.)
+Last updated: 2026-05-06 (Phase 1k complete: OUT_DOWN button state (3)
+now shows OVER children, not UP. Resolves the `buttonChild[13].exe/.uld
+== 3 vs 4` off-by-one identified at the 1f "remaining gaps" section.
+ButtonEventsTest promoted from `output_mismatch` (237/679 line-aligned)
+to `ruffle_matched` — full effective pass for misc-ming.all suite
+(+1 effective). Single-line change: `effective_state` for state 3 in
+`SWFModernRuntime/src/libswf/tag.c` `ng_update_button_states_in_dl`
+flipped from 0 (UP) to 1 (OVER), matching Ruffle's `avm1_button.rs`
+`event_dispatch` where `ClipEvent::DragOut → ButtonState::Over`.
+Mirrors Flash's "Push tracking" semantics where the button visually
+stays in OVER frame while tracking a press, even when the cursor exits
+the hit area. Mirror change at the second placement site (state-3
+fresh init at tag.c:2891). See Phase 1k section for full diagnosis
++ regression battery (48 tests across AVM1 button/lifecycle/enum
++ Gnash misc-ming/swfc/actionscript Inheritance, all PASS).)
 
 Previously (2026-05-06): Phase 1j complete: vestigial `PUSH(arr_var.type, ...)`
 in `actionEnumerate` ARRAY arm left the array on the stack across
@@ -95,7 +106,7 @@ section below for full diagnosis.
 | Test | Suite | Lines | Status | Phase |
 |------|-------|-------|--------|-------|
 | `button_test1` | misc-swfc.all | **31/31 PASS** | complete | 4 |
-| `ButtonEventsTest` | misc-ming.all | 237/679 line-aligned (1j complete: realLength upstream divergence fixed. Internal #passed 158→160, #failed 6→4. Remaining diff = downstream test progression past mid-test) | partial | 1 |
+| `ButtonEventsTest` | misc-ming.all | **ruffle_matched** (1k complete: OUT_DOWN→effective OVER. Promoted from 237/679 line-aligned `output_mismatch` to full ruffle_matched effective pass.) | complete | 1 |
 | `key_event_test` | misc-ming.all | 33/66 (50%) | deferred | 2 |
 | `DragDropTest` | misc-ming.all | 27/44 (61%) | deferred | 3 |
 
@@ -577,22 +588,13 @@ property access):**
   MC); local baseline 2026-05-06 confirms `printBounds(square1.getBounds())
   == '-0.05,-0.05 40.05,40.05'` PASSES at testno 5 (line 263).
 - **`buttonChild[13].exe == 3` (expected 4) and `[13].uld == 3`
-  (expected 4):** off-by-one in script_2 firings vs unload
-  firings for the OVER-only ermc. STILL PRESENT post-1j (verified
-  2026-05-06 local baseline: `FAILED: expected: 4 obtained: 3
-  [ButtonEventsTest.c:652]` and `:653]`). Symptom shape: expected
-  output around line 239 has *two* consecutive for-in dumps
-  (instance13/5/12 then instance14/5/13) bracketing the testno-5
-  Press/Release-Outside cycle, but our actual emits only one.
-  One UP→OVER (or OVER→OVER bounce) transition is being skipped
-  by `ng_update_button_states_in_dl`'s state machine. Likely
-  candidate: the OVER refire that Flash performs when the cursor
-  re-enters during a Release-Outside without a fresh roll-out
-  intermediate. Next investigation step: instrument
-  `ng_update_button_states_in_dl` to log every (old_state,
-  new_state, btn_dn) tuple across testno 5's input events and
-  compare to Ruffle's `core/src/display_object/avm1_button.rs`
-  `set_state` log.
+  (expected 4):** RESOLVED by Phase 1k. Root cause was OUT_DOWN
+  state 3 mapping to effective UP (0) instead of OVER (1) in
+  `ng_update_button_states_in_dl`. Flipping the mapping makes
+  the 2→3 DragOut transition place depth 13 (OVER-only ermc)
+  and the 3→0 ReleaseOutside transition unload it — adding the
+  missing exe/uld pair to depth 13. ButtonEventsTest promoted
+  to ruffle_matched.
 
 ### 1g — Transient property access on just-removed button-state children (COMPLETE 2026-05-05)
 
@@ -1014,6 +1016,89 @@ unused `ActionVar arr_var = *var;`).
   movieclip_destruction_test2 (3/3 PASS).
 - Gnash actionscript Inheritance v5/v6/v7/v8 + Global v6/v7/v8
   (7/7 effective PASS).
+
+### 1k — OUT_DOWN button state shows OVER children (COMPLETE 2026-05-06)
+
+**Resolved.** ButtonEventsTest promoted from `output_mismatch` (237/679
+line-aligned) to **`ruffle_matched`** — full effective pass on the
+misc-ming.all suite. This addresses the `buttonChild[13].exe == 4 vs 3`
+and `[13].uld == 4 vs 3` off-by-one originally listed under Phase 1f
+"remaining gaps."
+
+**Root cause.** Our button state machine has 4 internal states:
+0=UP, 1=OVER, 2=DOWN (over+pressed), 3=OUT_DOWN (outside+pressed,
+"tracking"). Flash-defined button records carry state masks for UP,
+OVER, DOWN, HIT — there is no native OUT_DOWN frame, so we map state 3
+to one of {0,1,2} for placement (`effective_state` at `tag.c:1855`).
+The previous mapping was `state 3 → effective 0 (UP)` (comment said
+"outDown shows up"), but Ruffle's `core/src/display_object/avm1_button.rs`
+`event_dispatch` shows the correct mapping: `ClipEvent::DragOut`
+(transition 2→3 in our model) sets `ButtonState::Over`, meaning the
+button visually stays in OVER state while tracking a press across a
+drag-out — Flash's "Push tracking" semantics.
+
+**Mechanism (testno-5 trace, ButtonEventsTest cycle 1).** Cycle 1
+(events 0-14) fires 8 state transitions on the inner button MC after
+`square1.onRollOut` deletes itself:
+
+| Event | Cursor | Pressed | Old | New | Effective old → new (pre-fix) | Effective old → new (post-fix) |
+|-------|--------|---------|-----|-----|-------------------------------|--------------------------------|
+| E5    | inside  | no  | 0 | 1 | UP→OVER     | UP→OVER     |
+| E6    | inside  | yes | 1 | 2 | OVER→DOWN   | OVER→DOWN   |
+| E7    | inside  | no  | 2 | 1 | DOWN→OVER   | DOWN→OVER   |
+| E8    | outside | no  | 1 | 0 | OVER→UP     | OVER→UP     |
+| E11   | inside  | no  | 0 | 1 | UP→OVER     | UP→OVER     |
+| E12   | inside  | yes | 1 | 2 | OVER→DOWN   | OVER→DOWN   |
+| E13   | outside | yes | 2 | 3 | DOWN→**UP**     | DOWN→**OVER**   |
+| E14   | outside | no  | 3 | 0 | **UP**→UP (no-op) | **OVER**→UP |
+
+The two changes at the bottom: pre-fix, E13 (DragOut) placed depth-12
+(UP-only) child and unloaded depth-14 (DOWN-only); E14 (ReleaseOutside)
+was effectively no-op since both 3 and 0 mapped to UP. Post-fix, E13
+places depth-13 (OVER-only) child and unloads depth-14, then E14 unloads
+depth-13 and places depth-12. Net: depth 13 gains one extra exe + one
+extra uld, exactly the off-by-one Flash expects.
+
+**Files touched.**
+
+- `SWFModernRuntime/src/libswf/tag.c` `ng_update_button_states_in_dl`
+  at `tag.c:1855`: changed `effective_state = (new_state == 3) ? 0 : new_state`
+  to `... ? 1 : new_state` with comment.
+- `SWFModernRuntime/src/libswf/tag.c` at `tag.c:2891` (button fresh-init
+  fallback site): mirror change for consistency.
+
+**Why this is safe (regression battery — all PASS):**
+
+- AVM1 button: `mouse_events`, `mouse_events_visible_enabled`,
+  `mouse_hover_events_while_dragging`, `button_keypress`,
+  `button_keypress_vs_press`, `button_keypress_vs_tab`,
+  `button_keypress_vs_textinput`, `button_v5`, `button_v6`,
+  `button_children`, `button_order`, `button_goto`,
+  `button_key_events`, `issue_9885`, `button_properties_special_cases`
+  (15/15).
+- AVM1 lifecycle/scope: `unload`, `register_class`,
+  `register_and_init_order`, `init_object_order`, `on_construct`,
+  `extends_chain`, `as2_super_and_this_v6/v8`,
+  `register_class_return_value`, `as2_super_via_manual_prototype`,
+  `closure_scope` (10/10).
+- AVM1 timeline / sprite-init / set_interval: `goto_rewind3`,
+  `execution_order2`, `execution_order3`, `set_interval` (4/4).
+- AVM1 enumeration + drag: `enumerate`, `array_enumerate`,
+  `prototype_enumerate`, `drag_drop`, `drag_over_from_outside`,
+  `drag_over_without_startdrag` (6/6).
+- AVM1 mouse / focus: `focus_mouse`, `focus_mouse_focusable`,
+  `focus_mouse_rollout`, `mouse_listeners`, `tab_ordering_events_mouse`
+  (5/5).
+- Gnash misc-ming: `ButtonPropertiesTest`, `RollOverOutTest` (2/2
+  effective).
+- Gnash misc-swfc: `mouse_drag_test`, `button_test1`,
+  `movieclip_destruction_test2` (3/3 PASS).
+- Gnash actionscript: `Inheritance-v5/v6/v7/v8` (4/4 ruffle_matched
+  effective).
+
+DragDropTest and key_event_test (Phases 2, 3) remain at their existing
+deferred line counts — neither regressed nor improved (expected, since
+their failures are in unrelated subsystems per the plan).
 
 ### Phase 1 verification battery
 

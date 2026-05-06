@@ -1851,7 +1851,15 @@ static void ng_update_button_states_in_dl(SWFAppContext* app_context,
 			// suppressing all scripts via g_button_state_change_depth would
 			// also skip new-depth placements (ButtonEventsTest depth 13/14)
 			// that legitimately need their frame_0 to run.
-			u8 effective_state = (new_state == 3) ? 0 : new_state; // outDown shows "up"
+			// state 3 (OUT_DOWN: outside-while-pressed/"tracking") shows OVER
+			// children visually — Flash's "Push tracking" semantics. While the
+			// button tracks a press, the OVER frame stays visible even when the
+			// cursor exits. Mirrors Ruffle `avm1_button.rs` event_dispatch
+			// where DragOut transitions to ButtonState::Over. Required by
+			// gnash misc-ming ButtonEventsTest's `buttonChild[13].exe/.uld == 4`
+			// counts (the OVER-only ermc gets one extra exe/uld pair from the
+			// 2→3 DragOut transition).
+			u8 effective_state = (new_state == 3) ? 1 : new_state;
 			if (effective_state < 3 && ch->button_state_funcs[effective_state] != NULL)
 			{
 				DisplayObject* saved_dl = display_list;
@@ -2887,7 +2895,7 @@ void tagShowFrame(SWFAppContext* app_context)
 				obj->sprite_max_depth = 0;
 
 				u8 state = obj->button_state;
-				u8 effective = (state == 3) ? 0 : state;
+				u8 effective = (state == 3) ? 1 : state; // OUT_DOWN shows OVER (see ng_update_button_states_in_dl)
 				if (effective < 3 && ch->button_state_funcs[effective] != NULL)
 				{
 					DisplayObject* saved_dl = display_list;
