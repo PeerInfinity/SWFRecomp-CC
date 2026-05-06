@@ -41,7 +41,7 @@ phases:
     status: complete
   - id: 1i
     name: "ButtonEventsTest instance-numbering drift (extra script_2 fires after preserved 3→0 transitions)"
-    status: investigated
+    status: complete
   - id: 2
     name: "key_event_test progression past frame 5"
     status: deferred
@@ -56,14 +56,23 @@ blockers: []
 parent_plan: "complete/BUTTON_INFRASTRUCTURE_PLAN.md"
 -->
 
-Last updated: 2026-05-05 (Phase 1h complete: bare `getBounds()` calls from inside button event handlers (e.g. SWFBUTTON_MOUSEOVER) now route to the MovieClip method on `g_current_context`. +7 lines (231→235) — 5 bounds checks across testno clusters now PASS, plus 2 downstream lines that were positionally aligned. Remaining gaps: instance numbering drift, exe off-by-one for instance7.
+Last updated: 2026-05-06 (Phase 1i complete: spurious `script_2` fires on
+preserved button-state children eliminated by extending the state-transition
+snapshot to capture the grandchild `sprite_display_list` pointer. Internal
+test pass count +2 (156→158), failed -2 (8→6); line-aligned count unchanged
+at 235/679 (early upstream `realLength()` divergence still present —
+separate issue). All 4 spurious fires across 2 OUT→UP transitions are
+gone; instance27-30 still blocked by the upstream divergence. See Phase 1i
+section below for full diagnosis.
+
+2026-05-05 (Phase 1h complete: bare `getBounds()` calls from inside button event handlers (e.g. SWFBUTTON_MOUSEOVER) now route to the MovieClip method on `g_current_context`. +7 lines (231→235) — 5 bounds checks across testno clusters now PASS, plus 2 downstream lines that were positionally aligned. Remaining gaps: instance numbering drift, exe off-by-one for instance7.
 
 ## Summary status (CI at `08e560fe`)
 
 | Test | Suite | Lines | Status | Phase |
 |------|-------|-------|--------|-------|
 | `button_test1` | misc-swfc.all | **31/31 PASS** | complete | 4 |
-| `ButtonEventsTest` | misc-ming.all | 235/679 (1h complete: bare-call MC method dispatch for getBounds/getRect. Remaining gaps = instance-numbering drift, exe off-by-one for instance7) | partial | 1 |
+| `ButtonEventsTest` | misc-ming.all | 235/679 line-aligned (1i complete: spurious script_2 fires on preserved button-state children eliminated. Internal #passed 156→158, #failed 8→6. Remaining gap = upstream `realLength()` divergence at expected line 79 blocking late testno alignment) | partial | 1 |
 | `key_event_test` | misc-ming.all | 33/66 (50%) | deferred | 2 |
 | `DragDropTest` | misc-ming.all | 27/44 (61%) | deferred | 3 |
 
@@ -679,7 +688,119 @@ this code path is bypassed entirely.
 - Gnash misc-swfc: mouse_drag_test, button_test1,
   movieclip_destruction_test2 (3/3 PASS).
 
-### 1i — Instance-numbering drift in ButtonEventsTest (INVESTIGATED, fix pending)
+### 1i — Instance-numbering drift in ButtonEventsTest (COMPLETE 2026-05-06)
+
+**Resolved.** ButtonEventsTest line-aligned: 235/679 (unchanged — see "Why
+the line-aligned count didn't move" below). Internal test pass count:
+156→158 PASSED (+2), 8→6 FAILED (-2). All 4 spurious `script_2` fires
+across 2 OUT→UP preserved-only state transitions are eliminated.
+
+**Root cause.** `ng_update_button_states_in_dl` at the start of every
+state transition runs a "Clear existing children" loop (`tag.c` ~1845)
+that frees `obj->sprite_display_list[j].sprite_display_list` (the
+grandchild display-list array) for every child. The Phase 1d preserved
+branch in `tagPlaceObject2` (`tag.c` ~4280) restores `char_id`,
+`transform_id`, etc. but does NOT re-allocate the grandchild
+`sprite_display_list`. On the next tick, `advance_sprite_frames` recurses
+into the button's children, finds the preserved sprite at depth N with
+`sprite_display_list == NULL`, hits the `just_allocated = 1` branch
+(`tag.c` ~795), and unconditionally calls `sprite_frame_funcs[0]`. For
+ermc (the events-reporting MC), that frame func is the recompiler-emitted
+`sprite_12_frame_0`, which calls `actionQueueSpriteScript(script_2)` —
+producing the spurious for-in trace and `_root.buttonChild[N].exe++`
+double-increment. The earlier hypothesis (stale `AQ_KIND_SCRIPT` queue
+entries leaking past their owning drain) was wrong; the leak is
+*upstream* of the queue, in the per-tick sprite advance.
+
+**Why only after OUT→UP (3→0) preserved-only transitions.** Within an
+input-event group (no Wait between events), state transitions fire
+back-to-back without an intervening `advance_sprite_frames` pass — so
+fresh-placement transitions also temporarily null `sprite_display_list`,
+but the next transition's clear loop frees the (just-allocated) old
+pointer cleanly before any spurious advance happens. Only when a
+preserved-only transition is the LAST transition before a tick boundary
+does `advance_sprite_frames` see the nulled pointers and re-init. In
+ButtonEventsTest's input sequence, that's the OUT→UP transition that
+ends each "press inside, drag outside, release outside" cycle.
+
+**Mechanism (one-paragraph mental model).** Snapshot extension. The
+clear loop captures the grandchild `sprite_display_list` pointer (and
+its `sprite_max_depth`/`sprite_dl_capacity`/`sprite_initialized`/
+`sprite_current_frame`/`sprite_is_playing` per depth) into the existing
+`g_btn_state_old_*` snapshot before nulling the dl entry. The clear
+loop no longer frees the grandchild pointer — the snapshot owns it
+until either (a) the preserved branch in `tagPlaceObject2` consumes
+it (re-attaching to the dl entry and nulling the snapshot slot), or
+(b) the post-state-func cleanup loop frees the unconsumed snapshot
+entries (depths the new state placed differently or didn't touch at
+all).
+
+**Files touched.**
+
+- `SWFModernRuntime/src/libswf/tag.c`:
+  - Snapshot globals (~`tag.c:206-220`): added
+    `g_btn_state_old_sprite_dl[]`, `g_btn_state_old_sprite_max[]`,
+    `g_btn_state_old_sprite_cap[]`, `g_btn_state_old_sprite_init[]`,
+    `g_btn_state_old_sprite_cf[]`, `g_btn_state_old_sprite_playing[]`.
+  - Snapshot capture loop (`ng_update_button_states_in_dl`,
+    ~`tag.c:1822`): capture grandchild dl + per-sprite advance state
+    per depth.
+  - Clear loop (~`tag.c:1845`): drop the FREE on grandchild
+    `sprite_display_list`; null the dl entry's pointer fields only.
+    Snapshot is now the authoritative owner.
+  - Post-state-func cleanup (after state func returns,
+    pre-transient-walk): free any snapshot grandchild pointers whose
+    depth was NOT consumed by the preserved branch (the preserved
+    branch nulls the snapshot slot when it consumes one).
+  - `tagPlaceObject2` preserved branch (~`tag.c:4296`): restore
+    grandchild `sprite_display_list` + per-sprite advance state from
+    snapshot; null the snapshot slot to mark consumed.
+
+**Why the line-aligned count didn't move.** The pre-fix actual output
+was 694 lines vs 622 lines post-fix — the 72-line reduction is the
+spurious for-in dumps being eliminated. Both pre- and post-fix have
+the same upstream divergence at expected line 79 (a separate
+`Array.prototype.realLength()` comparison-stringification issue —
+`_root.buttonChild.realLength()` is being stringified instead of
+called as a function — outside Phase 1i's scope). That early
+divergence shifts every later position. The fix corrects 2 specific
+internal assertions (`buttonChild[10].exe == 1` and
+`buttonChild[12].exe == 5` were FAILED with off-by-one counts pre-fix,
+both now PASS) but they fall at different positions vs expected after
+the spurious-dump removal, so the line-aligned `m/n` metric doesn't
+capture the gain. The internal `#passed` count went 156→158 (+2),
+`#failed` went 8→6 (-2).
+
+**Why instance27-30 didn't get allocated.** The auto-name counter
+reaches `instance27` both pre- and post-fix. The remaining 3
+instances (28-30) are blocked by an earlier-in-the-test divergence,
+not by the spurious script_2 fires. Likely the same `realLength`
+upstream issue; tracked separately.
+
+**Verification battery passed (no regressions):**
+
+- AVM1 lifecycle: unload, register_class, register_and_init_order,
+  init_object_order, on_construct, extends_chain,
+  as2_super_and_this_v6, as2_super_and_this_v8 (8/8 PASS).
+- AVM1 button: mouse_events, mouse_events_visible_enabled, button_v5,
+  button_v6, button_children, button_order, button_keypress,
+  button_goto, button_key_events, issue_9885 (10/10 PASS).
+- AVM1 enum + drag: enumerate, array_enumerate, new_object_enumerate,
+  prototype_enumerate, stage_object_enumerate, prototype_delete,
+  prototype_properties, movieclip_prototype_extension,
+  recursive_prototypes, drag_drop, drag_over_from_outside,
+  drag_over_without_startdrag, mouse_hover_events_while_dragging
+  (13/13 PASS).
+- Timeline / sprite-init: execution_order2, execution_order3,
+  goto_execution_order2, goto_rewind3 (4/4 PASS),
+  consecutive_goto_frame_test (1/1 PASS).
+- Gnash misc-ming: ButtonPropertiesTest, RollOverOutTest (2/2
+  effective).
+- Gnash misc-swfc: mouse_drag_test, button_test1,
+  movieclip_destruction_test2 (3/3 PASS).
+
+#### Original investigation steps (kept for reference)
+
 
 **Symptoms.** Beginning at testno=6, our auto-name allocator drifts
 behind Flash's: where Flash sees `instance15, instance5, instance14`

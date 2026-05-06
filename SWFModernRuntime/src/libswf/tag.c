@@ -205,6 +205,19 @@ static int g_button_state_change_depth = 0;
 #define BTN_STATE_SNAP_MAX 256
 static size_t g_btn_state_old_chars[BTN_STATE_SNAP_MAX];
 static char*  g_btn_state_old_names[BTN_STATE_SNAP_MAX]; // strdup'd, owned
+// Phase 1i: capture the inner sprite_display_list (grandchild array) and its
+// metadata per depth so the preserved branch in tagPlaceObject2 can restore
+// it. Without this, the clear-children loop nulls these fields and the next
+// advance_sprite_frames pass sees sprite_display_list==NULL → just_allocated
+// → frame_0 re-fires, producing spurious script_2 fires for preserved children
+// after preserved-only state transitions (OUTDOWN→UP). See BUTTON_RESIDUAL_PLAN
+// Phase 1i.
+static DisplayObject* g_btn_state_old_sprite_dl[BTN_STATE_SNAP_MAX];
+static size_t         g_btn_state_old_sprite_max[BTN_STATE_SNAP_MAX];
+static size_t         g_btn_state_old_sprite_cap[BTN_STATE_SNAP_MAX];
+static u8             g_btn_state_old_sprite_init[BTN_STATE_SNAP_MAX];
+static size_t         g_btn_state_old_sprite_cf[BTN_STATE_SNAP_MAX];
+static u8             g_btn_state_old_sprite_playing[BTN_STATE_SNAP_MAX];
 static int    g_btn_state_active = 0;
 
 // Phase 1e: transient enumeration of removed button-state children.
@@ -1790,6 +1803,12 @@ static void ng_update_button_states_in_dl(SWFAppContext* app_context,
 				}
 			}
 			memset(g_btn_state_old_chars, 0, sizeof(g_btn_state_old_chars));
+			memset(g_btn_state_old_sprite_dl, 0, sizeof(g_btn_state_old_sprite_dl));
+			memset(g_btn_state_old_sprite_max, 0, sizeof(g_btn_state_old_sprite_max));
+			memset(g_btn_state_old_sprite_cap, 0, sizeof(g_btn_state_old_sprite_cap));
+			memset(g_btn_state_old_sprite_init, 0, sizeof(g_btn_state_old_sprite_init));
+			memset(g_btn_state_old_sprite_cf, 0, sizeof(g_btn_state_old_sprite_cf));
+			memset(g_btn_state_old_sprite_playing, 0, sizeof(g_btn_state_old_sprite_playing));
 			size_t snap_max = obj->sprite_max_depth;
 			if (snap_max >= BTN_STATE_SNAP_MAX) snap_max = BTN_STATE_SNAP_MAX - 1;
 			for (size_t j = 1; j <= snap_max; j++)
@@ -1797,16 +1816,30 @@ static void ng_update_button_states_in_dl(SWFAppContext* app_context,
 				g_btn_state_old_chars[j] = obj->sprite_display_list[j].char_id;
 				const char* nm = obj->sprite_display_list[j].instance_name;
 				g_btn_state_old_names[j] = (nm != NULL) ? strdup(nm) : NULL;
+				// Phase 1i: capture grandchild display list + per-sprite advance
+				// state so the preserved branch can restore them and
+				// advance_sprite_frames doesn't treat the dl entry as
+				// just_allocated (which would re-fire frame_0).
+				g_btn_state_old_sprite_dl[j] = obj->sprite_display_list[j].sprite_display_list;
+				g_btn_state_old_sprite_max[j] = obj->sprite_display_list[j].sprite_max_depth;
+				g_btn_state_old_sprite_cap[j] = obj->sprite_display_list[j].sprite_dl_capacity;
+				g_btn_state_old_sprite_init[j] = obj->sprite_display_list[j].sprite_initialized;
+				g_btn_state_old_sprite_cf[j] = obj->sprite_display_list[j].sprite_current_frame;
+				g_btn_state_old_sprite_playing[j] = obj->sprite_display_list[j].sprite_is_playing;
 			}
 
-			// Clear existing children
+			// Clear existing children. Phase 1i: do NOT free the grandchild
+			// sprite_display_list pointers — they're owned by the snapshot
+			// (g_btn_state_old_sprite_dl) until the post-state-func cleanup
+			// frees the unpreserved ones. The preserved branch in
+			// tagPlaceObject2 restores from the snapshot, so dl[j] needs
+			// its sprite_display_list field NULLed here to avoid double-ownership;
+			// the snapshot is the authoritative pointer until restore.
 			for (size_t j = 1; j <= obj->sprite_max_depth; j++)
 			{
-				if (obj->sprite_display_list[j].sprite_display_list != NULL)
-				{
-					FREE(obj->sprite_display_list[j].sprite_display_list);
-					obj->sprite_display_list[j].sprite_display_list = NULL;
-				}
+				obj->sprite_display_list[j].sprite_display_list = NULL;
+				obj->sprite_display_list[j].sprite_max_depth = 0;
+				obj->sprite_display_list[j].sprite_dl_capacity = 0;
 				obj->sprite_display_list[j].char_id = 0;
 			}
 			obj->sprite_max_depth = 0;
@@ -1863,6 +1896,21 @@ static void ng_update_button_states_in_dl(SWFAppContext* app_context,
 				max_depth = saved_max;
 				display_list_capacity = saved_cap;
 
+				// Phase 1i: free any snapshot-owned grandchild sprite_display_list
+				// pointers whose depth was NOT preserved. The preserved branch
+				// in tagPlaceObject2 nulls g_btn_state_old_sprite_dl[depth] when
+				// it consumes the snapshot, so any non-null entries here are
+				// either (a) depths the new state didn't touch, or (b) depths
+				// the new state placed with a different character. Both cases
+				// require freeing the captured pointer (clear loop deferred the
+				// free to here so the preserved branch could restore it).
+				for (size_t j = 1; j < BTN_STATE_SNAP_MAX; j++) {
+					if (g_btn_state_old_sprite_dl[j] != NULL) {
+						FREE(g_btn_state_old_sprite_dl[j]);
+						g_btn_state_old_sprite_dl[j] = NULL;
+					}
+				}
+
 				// Phase 1e: build transient enumeration list from the
 				// snapshot. Depths whose old child wasn't preserved by
 				// the new state (different char_id or removed) remain
@@ -1891,6 +1939,7 @@ static void ng_update_button_states_in_dl(SWFAppContext* app_context,
 					if (g_btn_transient_count >= BTN_STATE_SNAP_MAX) break;
 					g_btn_transient_names[g_btn_transient_count++] =
 						strdup(g_btn_state_old_names[j]);
+
 
 					// Fire AS-level onUnload on the just-removed button-state
 					// child. Mirrors Ruffle's set_state → remove_child →
@@ -4291,6 +4340,21 @@ void tagPlaceObject2(SWFAppContext* app_context, size_t depth, size_t char_id, u
 		ng_cache_transform(&display_list[depth], transform_id);
 		init_cx_fields(&display_list[depth]);
 		display_list[depth].sprite_needs_init = 0;
+		// Phase 1i: restore the grandchild display list and per-sprite advance
+		// state from the snapshot. Without this, advance_sprite_frames sees
+		// sprite_display_list==NULL on the next pass, treats the entry as
+		// just_allocated, allocates a fresh array, and re-runs frame_0 —
+		// producing spurious script_2 fires for preserved button-state
+		// children after preserved-only state transitions (OUTDOWN→UP).
+		display_list[depth].sprite_display_list = g_btn_state_old_sprite_dl[depth];
+		display_list[depth].sprite_max_depth = g_btn_state_old_sprite_max[depth];
+		display_list[depth].sprite_dl_capacity = g_btn_state_old_sprite_cap[depth];
+		display_list[depth].sprite_initialized = g_btn_state_old_sprite_init[depth];
+		display_list[depth].sprite_current_frame = g_btn_state_old_sprite_cf[depth];
+		display_list[depth].sprite_is_playing = g_btn_state_old_sprite_playing[depth];
+		// Mark snapshot entry as consumed so the post-state-func cleanup
+		// doesn't double-free this pointer.
+		g_btn_state_old_sprite_dl[depth] = NULL;
 		// Discard any g_pending_instance_name set by a preceding
 		// tagSetInstanceName so it doesn't leak into the next placement.
 		g_pending_instance_name = NULL;
