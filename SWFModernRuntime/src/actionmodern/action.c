@@ -17741,7 +17741,38 @@ static MovieClip* resolveSlashPathToMC(SWFAppContext* app_context, const char* p
 				cur_sprite_dl = display_list;
 				cur_sprite_max = max_depth;
 #endif
+			} else if (seg_len > 6 && strncmp(seg_buf, "_level", 6) == 0) {
+				// "_levelN" (N > 0): resolve to g_levels[N]. Required for paths
+				// like `eval("_level50/target10")` that originate from
+				// _root.draggable50._droptarget after a drop on a level-loaded MC.
+				const char* after = seg_buf + 6;
+				int all_digits = 1;
+				for (const char* c = after; *c != '\0'; c++) {
+					if (*c < '0' || *c > '9') { all_digits = 0; break; }
+				}
+				if (all_digits) {
+					int level_num = atoi(after);
+					extern MovieClip* g_levels[MAX_LEVELS];
+					if (level_num > 0 && level_num < MAX_LEVELS && g_levels[level_num] != NULL) {
+						mc = g_levels[level_num];
+#ifdef NO_GRAPHICS
+						cur_sprite_dl = NULL;
+						cur_sprite_max = 0;
+						if (mc->display_obj != NULL) {
+							DisplayObject* dobj = (DisplayObject*)mc->display_obj;
+							if (dobj->sprite_display_list) {
+								cur_sprite_dl = dobj->sprite_display_list;
+								cur_sprite_max = dobj->sprite_max_depth;
+							}
+						}
+#endif
+						goto slash_path_segment_done;
+					}
+				}
+				// Not a valid _levelN — fall through to named-child resolution
+				goto slash_path_named_child;
 			} else {
+				slash_path_named_child:;
 #ifdef NO_GRAPHICS
 				// Search cur_sprite_dl first (tracks our position in display tree)
 				size_t child_depth = SIZE_MAX;
@@ -18009,7 +18040,28 @@ static MovieClip* resolveFlashPathToMC(SWFAppContext* app_context, const char* p
 		extern MovieClip root_movieclip;
 
 		// Resolve segment
-		if (first_element) {
+		// "_levelN" (N > 0) handler: resolve to g_levels[N]. Applies in both
+		// first_element and subsequent positions. Required for paths like
+		// `eval("_level50/target10")`.
+		int _resolved_level = 0;
+		if (seg_len > 6 && strncmp(seg_buf, "_level", 6) == 0) {
+			const char* after = seg_buf + 6;
+			int all_digits = 1;
+			for (const char* c = after; *c != '\0'; c++) {
+				if (*c < '0' || *c > '9') { all_digits = 0; break; }
+			}
+			if (all_digits) {
+				int level_num = atoi(after);
+				extern MovieClip* g_levels[MAX_LEVELS];
+				if (level_num > 0 && level_num < MAX_LEVELS && g_levels[level_num] != NULL) {
+					mc = g_levels[level_num];
+					_resolved_level = 1;
+				}
+			}
+		}
+		if (_resolved_level) {
+			first_element = 0;
+		} else if (first_element) {
 			if (strcmp(seg_buf, "_root") == 0 || strcmp(seg_buf, "_level0") == 0) {
 				mc = &root_movieclip;
 			} else if (strcmp(seg_buf, "this") == 0) {
@@ -18353,6 +18405,14 @@ static MovieClip* getOrCreateLevel(SWFAppContext* app_context, int level_num) {
     // HCALLOC zeros ng_textfield_idx, but `0` means "static textfield #0",
     // making MC_IS_TEXTFIELD evaluate true. Mark as not-a-textfield.
     mc->ng_textfield_idx = -1;
+    // Default identity transform: HCALLOC zeros xscale/yscale, which makes the
+    // level's local matrix have determinant 0 (since a=b=c=d=0). That zero
+    // determinant propagates to all level-rooted descendants via
+    // getConcatMatrixForMC, breaking world-coord drop-target hit tests for
+    // them (e.g. _level50.target10 is skipped in actionFindDynamicDropTarget
+    // because det==0). Set to 100% scale so the level acts as identity.
+    mc->xscale = 100;
+    mc->yscale = 100;
     g_levels[level_num] = mc;
     // Register in child_mc_cache so lookups find it
     if (child_mc_count < MAX_CHILD_MOVIECLIPS) {

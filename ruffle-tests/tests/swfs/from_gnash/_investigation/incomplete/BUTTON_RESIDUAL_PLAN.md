@@ -53,7 +53,7 @@ phases:
     status: deferred
   - id: 3
     name: "DragDropTest _level50 droptarget"
-    status: deferred
+    status: complete
   - id: 4
     name: "button_test1 remaining mismatches"
     status: complete
@@ -62,7 +62,21 @@ blockers: []
 parent_plan: "complete/BUTTON_INFRASTRUCTURE_PLAN.md"
 -->
 
-Last updated: 2026-05-06 (Phase 1k complete: OUT_DOWN button state (3)
+Last updated: 2026-05-06 (Phase 3 complete: DragDropTest `_level50` droptarget
+promoted from `output_mismatch` (27/44) to `ruffle_matched`. Two narrow fixes:
+(a) `getOrCreateLevel` now sets `xscale = yscale = 100` so the level MC's
+local matrix is identity — previously HCALLOC zeroed scale to 0, making
+det==0 and silently skipping all `_level50.targetN` candidates in
+`actionFindDynamicDropTarget`; (b) slash-path resolvers
+(`resolveSlashPathToMC`, `resolveFlashPathToMC`) now handle `_levelN`
+segments (N > 0) and resolve to `g_levels[N]` — required for
+`eval("_level50/target10")` paths to navigate into level descendants.
+Combined with Phase 1k (ButtonEventsTest), the misc-ming.all suite is
++2 effective passes today. Phase 2 (key_event_test, 33/66) remains
+deferred. See Phase 3 section for full diagnosis + 47-test regression
+battery.)
+
+Previously (2026-05-06): Phase 1k complete: OUT_DOWN button state (3)
 now shows OVER children, not UP. Resolves the `buttonChild[13].exe/.uld
 == 3 vs 4` off-by-one identified at the 1f "remaining gaps" section.
 ButtonEventsTest promoted from `output_mismatch` (237/679 line-aligned)
@@ -108,7 +122,7 @@ section below for full diagnosis.
 | `button_test1` | misc-swfc.all | **31/31 PASS** | complete | 4 |
 | `ButtonEventsTest` | misc-ming.all | **ruffle_matched** (1k complete: OUT_DOWN→effective OVER. Promoted from 237/679 line-aligned `output_mismatch` to full ruffle_matched effective pass.) | complete | 1 |
 | `key_event_test` | misc-ming.all | 33/66 (50%) | deferred | 2 |
-| `DragDropTest` | misc-ming.all | 27/44 (61%) | deferred | 3 |
+| `DragDropTest` | misc-ming.all | **ruffle_matched** (Phase 3 complete: level50 default scale + _levelN path resolver. Promoted from 27/44 `output_mismatch` to full ruffle_matched effective pass.) | complete | 3 |
 
 ## 2026-05-05 session findings
 
@@ -1182,10 +1196,85 @@ Flash's broadcaster timing across clip-events + AS-listeners + implicit
 MC listeners. Subject to retreat if the underlying broadcaster API needs
 reshaping.
 
-## Phase 3 — DragDropTest `_level50` droptarget
+## Phase 3 — DragDropTest `_level50` droptarget — COMPLETE 2026-05-06
 
-Status: `27/44 (61%)`. Lines 1-15 PASS, 16-23 FAIL on `_level50/*`,
-24-32 PASS (`/loadedTarget/*` works), 34-41 FAIL on later tests.
+**Resolved.** DragDropTest promoted from `output_mismatch` (27/44) to
+`ruffle_matched` — full effective pass on misc-ming.all. Two narrow fixes:
+
+### 3a — Default identity transform on `_levelN` MCs
+
+`getOrCreateLevel` (`action.c:18341`) HCALLOCs the level MC, leaving
+`xscale = yscale = 0`. This made `getLocalMatrixForMC` for the level
+return a matrix with `a=b=c=d=0` (det=0), which propagated to all
+level-rooted descendants via `getConcatMatrixForMC`. In
+`actionFindDynamicDropTarget`, the `det == 0.0` early-exit then
+silently skipped all `_level50.targetN` candidates, leaving
+`_droptarget = ""` for the second-cluster click positions in
+DragDropTest tests 5/6/7.
+
+**Fix.** Set `mc->xscale = mc->yscale = 100` in `getOrCreateLevel`
+so the level acts as identity. Required because the previous
+sub-phase 3a hypothesis (walk `g_levels[]`) was already partially
+correct — the cache contains the level descendants, but the world
+matrix path was broken.
+
+### 3b — `_levelN` (N > 0) handler in slash-path resolvers
+
+`resolveSlashPathToMC` and `resolveFlashPathToMC` only special-cased
+`_root` and `_level0`. For paths like `_level50/target10` (emitted by
+`actionFindDynamicDropTarget` after 3a's fix and read back by
+`eval(_root.draggable50._droptarget)`), the first segment `_level50`
+fell through to named-child resolution, didn't match anything, and
+the resolver returned NULL — surfacing as `obtained: _level50`
+(plain variable lookup) instead of `_level0.square1.button.instance7`.
+
+**Fix.** Both resolvers now detect `_levelN` segments (N > 0,
+all-digit suffix) and resolve them to `g_levels[N]`. Applies to
+both first-segment and subsequent-segment positions in
+`resolveFlashPathToMC` (since `eval()` calls it with
+`first_element=0`).
+
+**Files touched.**
+
+- `SWFModernRuntime/src/actionmodern/action.c` `getOrCreateLevel`
+  (~`action.c:18341`): default identity transform.
+- `SWFModernRuntime/src/actionmodern/action.c` `resolveSlashPathToMC`
+  (~`action.c:17738`): `_levelN` segment handler.
+- `SWFModernRuntime/src/actionmodern/action.c` `resolveFlashPathToMC`
+  (~`action.c:18011`): `_levelN` segment handler (both first and
+  subsequent positions).
+
+**Why this is safe (regression battery — all PASS):**
+
+- AVM1 button (15): mouse_events, mouse_events_visible_enabled,
+  mouse_hover_events_while_dragging, button_keypress (3 variants),
+  button_v5/v6, button_children, button_order, button_goto,
+  button_key_events, issue_9885, button_properties_special_cases.
+- AVM1 drag + path (9): drag_drop, drag_over_from_outside,
+  drag_over_without_startdrag, mouse_hover_events_while_dragging,
+  path_string, tell_target, tell_target_invalid (2 variants),
+  target_path.
+- AVM1 timeline / scope / enum (15): swf5_to_6_cross_call,
+  swf5_no_closure, as2_super_via_manual_prototype, goto_frame,
+  goto_frame2, goto_label, goto_methods, set_interval, goto_rewind3,
+  execution_order2/3, enumerate, array_enumerate,
+  prototype_enumerate, stage_object_enumerate.
+- AVM1 loadmovie (4 PASS, 1 pre-existing MISMATCH): loadmovie,
+  loadmovie_fail, loadmovie_flashvars, loadmovie_method, load_vars
+  (load_vars MISMATCH was already present pre-fix, not a regression).
+- Gnash misc-ming: ButtonEventsTest, ButtonPropertiesTest,
+  RollOverOutTest, DragDropTest (4/4 effective).
+- Gnash misc-swfc: mouse_drag_test, button_test1,
+  movieclip_destruction_test2 (3/3).
+- Gnash misc-mtasc: levels (1/1 effective).
+- Gnash actionscript: Inheritance-v5/v6/v7/v8, Global-v6/v7/v8 (7/7
+  effective).
+
+### Original investigation notes (kept for reference)
+
+Status pre-fix: `27/44 (61%)`. Lines 1-15 PASS, 16-23 FAIL on
+`_level50/*`, 24-32 PASS (`/loadedTarget/*` works), 34-41 FAIL on
+later tests.
 
 ### Investigation (2026-05-05 session)
 
