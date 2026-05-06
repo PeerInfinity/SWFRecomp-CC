@@ -39,6 +39,9 @@ phases:
   - id: 1h
     name: "Bare-call MC method dispatch (getBounds/getRect from button event handlers)"
     status: complete
+  - id: 1i
+    name: "ButtonEventsTest instance-numbering drift (extra script_2 fires after preserved 3→0 transitions)"
+    status: investigated
   - id: 2
     name: "key_event_test progression past frame 5"
     status: deferred
@@ -675,6 +678,87 @@ this code path is bypassed entirely.
   effective).
 - Gnash misc-swfc: mouse_drag_test, button_test1,
   movieclip_destruction_test2 (3/3 PASS).
+
+### 1i — Instance-numbering drift in ButtonEventsTest (INVESTIGATED, fix pending)
+
+**Symptoms.** Beginning at testno=6, our auto-name allocator drifts
+behind Flash's: where Flash sees `instance15, instance5, instance14`
+(testno=6's MOUSEOVER for-in), we produce `instance13, instance5`
+twice in succession — same name reused, no transient. The drift
+cascades through every later testno cluster, leaving instance27–30
+entirely absent from our output (Flash references them 7 times
+total).
+
+**Empirical findings (BET_DIAG instrumentation in
+`tag.c::ng_update_button_states_in_dl` + recompiler-emitted
+`script_2.c`):**
+
+- 24 button state transitions fire across the test's 38 input
+  events (`old=0..3 new=0..3` log lines).
+- Of these, 3 are "OUT→UP preserved-only" transitions
+  (`old=3 new=0` with btn_dn=0): every dl entry is preserved by
+  Phase 1d's `g_btn_state_active && old_chars[depth] == char_id`
+  branch, so the state func queues NO new scripts.
+- Yet `script_2` fires **27 times** — 4 more than the simple
+  model predicts (21 transition-driven + 2 initial = 23).
+- The extras cluster at exactly the OUT→UP boundaries: each
+  preserved-only transition is followed by 2 `script_2` fires
+  before the next state func places anything. So every preserved
+  transition yields 2 spurious for-ins, all producing the
+  current-state's live-children name list (no transient — the
+  transient list was already consumed by the prior transition's
+  drain).
+
+**Hypothesis.** Phase 1d's preserved branch correctly suppresses
+script queueing for the current placement, but some queue entries
+from a *prior* transition's state func remain in the
+`AQ_KIND_SCRIPT` queue past their owning transition's
+`actionDrainOnloadAndScript` call. They get drained during the
+preserved transition's drain (or during a subsequent
+`tagShowFrame` / mouse-event drain), generating extra `script_2`
+firings that re-iterate the for-in over the now-stale child list.
+This in turn leaves `g_btn_transient_*` empty (already consumed),
+producing the "2-entry for-in, no transient" pattern observed in
+actual output lines 282-302.
+
+**Why "instance-numbering drift" is misleading framing.** The
+auto-name counter is correct — each fresh ermc placement does
+allocate a new instance name (verified via `placeobj2-fresh
+char=12` log lines: 21 fresh state-driven + 2 initial = 23 fresh
+ermc placements, matches Flash's expected count). What's wrong
+is that we fire `script_2` *more* times than we have fresh
+placements, and each extra fire repeats the for-in for whichever
+ermc was most recently placed. The "drifted" names in the for-in
+output are just the same names re-traced.
+
+**Where to look for the fix.**
+
+1. `SWFModernRuntime/src/libswf/tag.c::ng_update_button_states_in_dl`
+   — `actionDrainOnloadAndScript` is called at the end of the
+   state-active block. Verify it drains *only* scripts queued by
+   the current state func — not leftovers from earlier transitions.
+2. `SWFModernRuntime/src/libswf/tag.c::tagShowFrame` and
+   `swf_core.c::dispatch_input_event` — these also drain. Check
+   whether they re-fire `script_2` from queue entries that should
+   have been consumed by an earlier transition.
+3. The recompiler-emitted `script_2.c` ends up in
+   `process_sprite_needs_init` (depth-12/13/14 fresh placement) AND
+   in the AQ_KIND_SCRIPT queue (via `actionQueueSpriteScript` from
+   inside the recompiler-emitted bytecode). Either path firing
+   redundantly would account for the extras.
+
+**Repro.** `BET_DIAG=1` env var, plus add `fprintf(stderr,
+"[BET][script_2] enter\n")` at the top of `script_2.c` (note that
+`rm -rf RecompiledScripts/` regenerates and discards the diag).
+Add `[BET][btn-trans]` log inside the state-transition gate at
+`tag.c:1929` and `[BET][placeobj2-fresh|preserved]` logs around
+the preserved branch at `tag.c:4280`. Sequential `nl`-numbered
+output makes the drift cluster visible at OUT→UP boundaries.
+
+**Estimated effort.** 4-8 hours: needs trace of the AQ_KIND_SCRIPT
+queue during the OUT→UP transition to identify what's leaking
+through. Higher-leverage than ButtonEventsTest's other remaining
+gaps (~exe off-by-one is a tighter scope).
 
 ### Phase 1 verification battery
 
