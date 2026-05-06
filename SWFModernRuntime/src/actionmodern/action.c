@@ -44719,6 +44719,39 @@ void actionGetMember(SWFAppContext* app_context)
 					return;
 				}
 			}
+
+			// Phase 1g: transient just-removed button-state children remain
+			// addressable for one tick after a state transition. Live display
+			// walks above will have missed them (the dl entry's char_id no
+			// longer matches the removed child's). Resolve via child_mc_cache
+			// when (a) `mc` is the most-recently-transitioned button, (b) the
+			// requested name matches a transient entry, and (c) a cached MC
+			// with this name exists with parent==mc. Allowing avm1_removed=1
+			// here is safe because the ng_isTransientButtonChildName gate
+			// scopes the relaxation to the active transient window only —
+			// other unload-sensitive paths (unload test, register_and_init_order,
+			// movieclip_destruction_test2) are unaffected.
+			if (mc != NULL && mc->display_obj != NULL &&
+			    ng_isTransientButtonChildName(mc->display_obj, prop_name, (size_t)prop_name_len))
+			{
+				char _tn_buf[64];
+				u32 _tn_len = prop_name_len < 63 ? prop_name_len : 63;
+				memcpy(_tn_buf, prop_name, _tn_len);
+				_tn_buf[_tn_len] = '\0';
+				for (int _ti = 0; _ti < child_mc_count; _ti++) {
+					MovieClip* _tc = child_mc_cache[_ti];
+					if (_tc == NULL) continue;
+					if (_tc->parent != mc) continue;
+					if (_tc->depth == INT_MIN) continue; // already finalized — gone
+					if (!swf_name_match(_tc->name, _tn_buf)) continue;
+					PUSH(ACTION_STACK_VALUE_MOVIECLIP, (u64)_tc);
+					if (getenv("BET_DIAG") != NULL) {
+						fprintf(stderr, "[BET] transient hit: %s.%s -> mc=%p depth=%d removed=%d\n",
+							mc->name, _tn_buf, (void*)_tc, _tc->depth, _tc->avm1_removed);
+					}
+					return;
+				}
+			}
 		}
 #endif
 

@@ -33,6 +33,9 @@ phases:
   - id: 1f
     name: "Transient onUnload dispatch + bias-16383 propagation"
     status: complete
+  - id: 1g
+    name: "Transient property access on just-removed button-state children"
+    status: complete
   - id: 2
     name: "key_event_test progression past frame 5"
     status: deferred
@@ -47,14 +50,14 @@ blockers: []
 parent_plan: "complete/BUTTON_INFRASTRUCTURE_PLAN.md"
 -->
 
-Last updated: 2026-05-05 (Phase 1f complete: transient onUnload dispatch landed alongside button-MC g_current_context propagation that fixed bias 16383 for *all* button-state child placements (was only the very first one). +11 lines (217→228). All `_root.buttonChild[N].uld` and `[N].exe` assertions now PASS. Remaining gaps: transient property access (`mc.instance6._name` after unload returns empty, expected 'instance6'), one off-by-one in `buttonChild[13].exe/uld` (3 vs expected 4), `square1.getBounds()` returning 0,0,0,0 after first state transition (separate bounds invalidation issue).
+Last updated: 2026-05-05 (Phase 1g complete: direct property access on transient just-removed button-state children. +3 lines (228→231): `typeof(instance6)`, `instance6._name`, `instance6.getDepth()` at testno==1 cluster. The test only checks transient access at this single cluster, so +3 is the full gain rather than the previously-estimated 9-15. Remaining gaps: bounds-after-state-change (`square1.getBounds()` returning 0,0,0,0), exe off-by-one for instance7.
 
 ## Summary status (CI at `08e560fe`)
 
 | Test | Suite | Lines | Status | Phase |
 |------|-------|-------|--------|-------|
 | `button_test1` | misc-swfc.all | **31/31 PASS** | complete | 4 |
-| `ButtonEventsTest` | misc-ming.all | 228/679 (1f complete: onUnload firing + bias-16383 fix; remaining gap = transient property access, bounds-after-state-change, exe off-by-one for instance7) | partial | 1 |
+| `ButtonEventsTest` | misc-ming.all | 231/679 (1g complete: transient property access. Remaining gaps = bounds-after-state-change, exe off-by-one for instance7) | partial | 1 |
 | `key_event_test` | misc-ming.all | 33/66 (50%) | deferred | 2 |
 | `DragDropTest` | misc-ming.all | 27/44 (61%) | deferred | 3 |
 
@@ -527,15 +530,9 @@ preserved-MC paths now PASS. Two coupled fixes:
    `myDepth = -(getDepth()+32769-16383)` formula needs exactly this
    value to reverse-compute back to the original SWF depth).
 
-**Remaining gaps in ButtonEventsTest (downstream):**
+**Remaining gaps in ButtonEventsTest (downstream — see 1g for transient
+property access):**
 
-- **Transient property access:** `mc.instance6._name` returns empty
-  (expected 'instance6') and `mc.instance6.getDepth()` returns
-  empty (expected `-16398`). After our impl shifts depth and sets
-  `avm1_removed=1`, the MC is removed from name-resolution paths.
-  Phase 1e covers for-in but not direct property access. Need to
-  thread the transient list into `getMember`/path-resolution for
-  the duration of the button's transient window.
 - **`square1.getBounds()` returns `0,0 0,0` after first state
   transition** (expected `-0.05,-0.05 40.05,40.05`). Likely
   `mc_get_pixel_aabb_ng` cache invalidation triggered by state
@@ -545,6 +542,78 @@ preserved-MC paths now PASS. Two coupled fixes:
   firings for the OVER-only ermc. Possibly a transition is missing
   from our state machine (e.g. an extra DOWN→OVER bounce that
   Flash counts and we don't).
+
+### 1g — Transient property access on just-removed button-state children (COMPLETE 2026-05-05)
+
+**Resolved.** ButtonEventsTest: 228/679 → 231/679 (+3). Test source
+(`ButtonEventsTest.c:238-240`) checks at testno==1:
+
+```as
+_root.check_equals(typeof(_level0.square1.button.instance6), 'movieclip');
+_root.check_equals(_level0.square1.button.instance6._name, 'instance6');
+_root.check_equals(_level0.square1.button.instance6.getDepth(), -16398);
+```
+
+After Phase 1f's onUnload dispatch shifts `instance6.depth` to `-16398`
+and sets `avm1_removed=1`, the MC stays alive in `child_mc_cache` but
+isn't reachable through `actionGetMember`'s normal child-name walks
+(those iterate the *live* `sprite_display_list[]`, where the dl entry's
+char_id no longer matches the removed child's). Phase 1e wired up
+for-in via `g_btn_transient_names[]`; Phase 1g extends the same window
+to direct property access.
+
+**Implementation.** Two changes:
+
+1. `SWFModernRuntime/include/libswf/tag.h` + `SWFModernRuntime/src/libswf/tag.c` —
+   added `ng_isTransientButtonChildName(button_dobj, name, name_len)`,
+   a direct-lookup companion to `ng_iterateTransientButtonChildren`.
+   Returns 1 iff the receiver is the most-recently-transitioned button
+   AND the name matches one of the transient entries.
+
+2. `SWFModernRuntime/src/actionmodern/action.c` `actionGetMember`
+   MOVIECLIP arm — after both display-list walks (display_obj-local
+   and root-level fallback) miss, gate on
+   `ng_isTransientButtonChildName(mc->display_obj, prop_name, ...)`.
+   On hit, walk `child_mc_cache[]` for an entry where `parent==mc`,
+   `depth!=INT_MIN`, and `swf_name_match(name, prop_name)`. The walk
+   intentionally allows `avm1_removed=1` (the relaxation we need),
+   but the gate scopes it to the active transient window only — other
+   unload-sensitive paths see no behavior change.
+
+**Why this is safe.** The `avm1_removed` allowlist is gated on three
+conjuncts: (a) `mc->display_obj == g_btn_transient_dobj` (only the
+transitioned button), (b) `prop_name` is in `g_btn_transient_names[]`
+(only just-removed names), (c) `_tc->parent == mc` (no
+cross-button/cross-parent resolution). After
+`actionFinalizePendingRemovals` runs at the next frame start,
+`depth==INT_MIN` shuts the window — the early-return at the start of
+the MOVIECLIP arm (`mc->depth == INT_MIN → undefined`) handles
+follow-up access on the receiver, and the cache walk's
+`depth==INT_MIN` skip handles follow-up on the resolved transient.
+
+**typeof works without a separate path.** `actionTypeof`'s MOVIECLIP
+case checks `mc->is_button_mc` (false for ermc sprite),
+`MC_IS_TEXTFIELD` (false), and `ng_findDisplayEntryByName` (returns
+SIZE_MAX for the removed name, so the "not a sprite at depth" override
+doesn't fire). Falls through to "movieclip". Verified against test's
+`typeof(...) == 'movieclip'` assertion.
+
+**Verification battery passed (no regressions):**
+
+- AVM1 lifecycle: unload, register_class, register_and_init_order,
+  init_object_order, on_construct, extends_chain,
+  as2_super_and_this_v6, as2_super_and_this_v8 (8/8 PASS).
+- AVM1 button: mouse_events, mouse_events_visible_enabled, button_v5,
+  button_v6, button_children, button_order, button_keypress,
+  button_goto, button_key_events, issue_9885 (10/10 PASS).
+- AVM1 enumeration: enumerate, array_enumerate, new_object_enumerate,
+  prototype_enumerate, stage_object_enumerate, prototype_delete,
+  prototype_properties, movieclip_prototype_extension,
+  recursive_prototypes (9/9 PASS).
+- Gnash misc-ming: ButtonPropertiesTest, RollOverOutTest (2/2
+  effective).
+- Gnash misc-swfc: mouse_drag_test, button_test1,
+  movieclip_destruction_test2 (3/3 PASS).
 
 ### Phase 1 verification battery
 

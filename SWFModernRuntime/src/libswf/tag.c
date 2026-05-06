@@ -6071,6 +6071,23 @@ void ng_iterateTransientButtonChildren(void* button_dobj,
 	}
 }
 
+// Phase 1g companion to ng_iterateTransientButtonChildren: direct lookup,
+// no callback. Used by actionGetMember to fall back to the transient list
+// after live display-list walks miss.
+int ng_isTransientButtonChildName(void* button_dobj, const char* name, size_t name_len)
+{
+	if (button_dobj == NULL || name == NULL || name_len == 0) return 0;
+	if ((DisplayObject*)button_dobj != g_btn_transient_dobj) return 0;
+	for (size_t i = 0; i < g_btn_transient_count; i++)
+	{
+		const char* n = g_btn_transient_names[i];
+		if (n == NULL) continue;
+		if (strlen(n) == name_len && strncmp(n, name, name_len) == 0)
+			return 1;
+	}
+	return 0;
+}
+
 // Convert a Flash key code to the SWF button condition key code.
 // Button conditions use their own mapping for special keys (1-19) and
 // ASCII for printable characters (32+). Letters are lowercase in conditions.
