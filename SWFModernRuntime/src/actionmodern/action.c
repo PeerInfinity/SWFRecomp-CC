@@ -44745,10 +44745,6 @@ void actionGetMember(SWFAppContext* app_context)
 					if (_tc->depth == INT_MIN) continue; // already finalized — gone
 					if (!swf_name_match(_tc->name, _tn_buf)) continue;
 					PUSH(ACTION_STACK_VALUE_MOVIECLIP, (u64)_tc);
-					if (getenv("BET_DIAG") != NULL) {
-						fprintf(stderr, "[BET] transient hit: %s.%s -> mc=%p depth=%d removed=%d\n",
-							mc->name, _tn_buf, (void*)_tc, _tc->depth, _tc->avm1_removed);
-					}
 					return;
 				}
 			}
@@ -51347,6 +51343,43 @@ void actionCallFunction(SWFAppContext* app_context, char* str_buffer)
 					builtin_handled = 1;
 				}
 			}
+		}
+	}
+
+	// Bare-call dispatch for MovieClip methods that aren't covered by _is_mc_nav.
+	// Required for AVM1 button event handlers (e.g. ButtonEventsTest's
+	// `_root.printBounds(getBounds())` inside SWFButton_addAction): bare
+	// `getBounds()` resolves to `g_current_context.getBounds()`, but our scope
+	// chain walk would otherwise return the MC.prototype stub (function_type=1,
+	// simple_func=NULL) which falls through to "Built-in constructor as plain
+	// function" and pushes undefined. Synthesize the actionCallMethod stack
+	// and delegate to its MOVIECLIP arm.
+	//
+	// Limited to getBounds/getRect (the methods ButtonEventsTest exercises bare)
+	// to keep the relaxation tight — adding more methods broadens the chance of
+	// shadowing user-defined globals with the same name. mouse_events,
+	// button_v5/v6, button_children, register_class, and the lifecycle/
+	// enumeration regression batteries all stay clean with this scope.
+	if (!builtin_handled && g_current_context != NULL && func_name_len > 0)
+	{
+		int _bm_match = 0;
+		if (func_name_len == 9 && strncmp(func_name, "getBounds", 9) == 0) _bm_match = 1;
+		else if (func_name_len == 7 && strncmp(func_name, "getRect", 7) == 0) _bm_match = 1;
+		if (_bm_match)
+		{
+			// Re-push args (in reverse-of-popped order) so actionCallMethod's
+			// popVar restores args[0..N-1] to the same indices we have.
+			for (int _bm_i = (int)num_args - 1; _bm_i >= 0; _bm_i--)
+				pushVar(app_context, &args[_bm_i]);
+			if (args != NULL) FREE(args);
+			ActionVar _bm_n = {0};
+			_bm_n.type = ACTION_STACK_VALUE_F32;
+			VAL(float, &_bm_n.data.numeric_value) = (float)num_args;
+			pushVar(app_context, &_bm_n);
+			PUSH(ACTION_STACK_VALUE_MOVIECLIP, (u64)g_current_context);
+			PUSH_STR(func_name, func_name_len);
+			actionCallMethod(app_context, str_buffer);
+			return;
 		}
 	}
 

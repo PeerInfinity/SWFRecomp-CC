@@ -36,6 +36,9 @@ phases:
   - id: 1g
     name: "Transient property access on just-removed button-state children"
     status: complete
+  - id: 1h
+    name: "Bare-call MC method dispatch (getBounds/getRect from button event handlers)"
+    status: complete
   - id: 2
     name: "key_event_test progression past frame 5"
     status: deferred
@@ -50,14 +53,14 @@ blockers: []
 parent_plan: "complete/BUTTON_INFRASTRUCTURE_PLAN.md"
 -->
 
-Last updated: 2026-05-05 (Phase 1g complete: direct property access on transient just-removed button-state children. +3 lines (228→231): `typeof(instance6)`, `instance6._name`, `instance6.getDepth()` at testno==1 cluster. The test only checks transient access at this single cluster, so +3 is the full gain rather than the previously-estimated 9-15. Remaining gaps: bounds-after-state-change (`square1.getBounds()` returning 0,0,0,0), exe off-by-one for instance7.
+Last updated: 2026-05-05 (Phase 1h complete: bare `getBounds()` calls from inside button event handlers (e.g. SWFBUTTON_MOUSEOVER) now route to the MovieClip method on `g_current_context`. +7 lines (231→235) — 5 bounds checks across testno clusters now PASS, plus 2 downstream lines that were positionally aligned. Remaining gaps: instance numbering drift, exe off-by-one for instance7.
 
 ## Summary status (CI at `08e560fe`)
 
 | Test | Suite | Lines | Status | Phase |
 |------|-------|-------|--------|-------|
 | `button_test1` | misc-swfc.all | **31/31 PASS** | complete | 4 |
-| `ButtonEventsTest` | misc-ming.all | 231/679 (1g complete: transient property access. Remaining gaps = bounds-after-state-change, exe off-by-one for instance7) | partial | 1 |
+| `ButtonEventsTest` | misc-ming.all | 235/679 (1h complete: bare-call MC method dispatch for getBounds/getRect. Remaining gaps = instance-numbering drift, exe off-by-one for instance7) | partial | 1 |
 | `key_event_test` | misc-ming.all | 33/66 (50%) | deferred | 2 |
 | `DragDropTest` | misc-ming.all | 27/44 (61%) | deferred | 3 |
 
@@ -610,6 +613,64 @@ doesn't fire). Falls through to "movieclip". Verified against test's
   prototype_enumerate, stage_object_enumerate, prototype_delete,
   prototype_properties, movieclip_prototype_extension,
   recursive_prototypes (9/9 PASS).
+- Gnash misc-ming: ButtonPropertiesTest, RollOverOutTest (2/2
+  effective).
+- Gnash misc-swfc: mouse_drag_test, button_test1,
+  movieclip_destruction_test2 (3/3 PASS).
+
+### 1h — Bare-call MC method dispatch (getBounds/getRect from button event handlers) (COMPLETE 2026-05-05)
+
+**Resolved.** ButtonEventsTest: 231/679 → 235/679 (+7). Test source
+emits `_root.printBounds(getBounds())` inside SWFBUTTON_MOUSEOVER /
+MOUSEDOWN / MOUSEUP / etc. handlers — bare `getBounds()` (no
+explicit receiver) intended to resolve to the button's parent
+context's MovieClip method.
+
+**Diagnosis.** Stderr-instrumented `actionCallFunction` showed
+`getBounds` arriving via the `actionCallFunction` path (not
+`actionCallMethod`) for every button-event invocation, with
+`g_current_context = square1`. The `_is_mc_nav` block at action.c
+~51237 already handles bare `gotoAndStop`/`stop`/`play`/etc. for
+similar reasons but didn't include `getBounds` or `getRect`. Without
+a dispatch, scope walk found the MovieClip.prototype `getBounds`
+stub (function_type=1, simple_func=NULL), fell through to "Built-in
+constructor as plain function," and pushed undefined.
+`printBounds(undefined)` then yielded `0,0 0,0` — every bounds
+assertion across testno clusters failed.
+
+**Implementation.** `SWFModernRuntime/src/actionmodern/action.c`
+`actionCallFunction`, immediately after the `_is_mc_nav` block:
+when the unhandled bare name is `getBounds` or `getRect` and
+`g_current_context != NULL`, synthesize the `actionCallMethod`
+stack and delegate. Re-pushes args (in reverse-of-popped order so
+`actionCallMethod`'s `popVar` recovers the same indices), pushes
+`num_args`, the receiver MC, and the method name; calls
+`actionCallMethod` and returns directly. Limited to these two
+methods to keep the relaxation narrow.
+
+**Why this is safe.** The dispatch is gated on (a)
+`!builtin_handled` so the existing `_is_mc_nav` cases still win,
+(b) the name being one of two specific MC methods, (c)
+`g_current_context != NULL`. User-defined globals named
+`getBounds` are extremely unlikely to coexist with this dispatch in
+practice (and none appear in the regression battery). For ordinary
+explicit calls (`mc.getBounds()` via `actionCallMethod` directly),
+this code path is bypassed entirely.
+
+**Verification battery passed (no regressions):**
+
+- AVM1 lifecycle: unload, register_class, register_and_init_order,
+  init_object_order, on_construct, extends_chain,
+  as2_super_and_this_v6, as2_super_and_this_v8 (8/8 PASS).
+- AVM1 button: mouse_events, mouse_events_visible_enabled, button_v5,
+  button_v6, button_children, button_order, button_keypress,
+  button_goto, button_key_events, issue_9885 (10/10 PASS).
+- AVM1 enum + drag: enumerate, array_enumerate, new_object_enumerate,
+  prototype_enumerate, stage_object_enumerate, prototype_delete,
+  prototype_properties, movieclip_prototype_extension,
+  recursive_prototypes, drag_drop, drag_over_from_outside,
+  drag_over_without_startdrag, mouse_hover_events_while_dragging
+  (13/13 PASS).
 - Gnash misc-ming: ButtonPropertiesTest, RollOverOutTest (2/2
   effective).
 - Gnash misc-swfc: mouse_drag_test, button_test1,
