@@ -62,6 +62,15 @@ blockers: []
 parent_plan: "complete/BUTTON_INFRASTRUCTURE_PLAN.md"
 -->
 
+Status note (2026-05-06 follow-up session): Local baseline reruns of all 4
+plan tests confirm CI snapshot — `ButtonEventsTest` ruffle_matched (676/679),
+`DragDropTest` ruffle_matched (33/44), `button_test1` PASS (31/31),
+`key_event_test` `output_mismatch` (33/66, Phase 2 deferred). No new
+implementation needed in this session — Phases 1, 3, 4 are all delivered;
+Phase 2 (broadcaster ordering / `Key.addListener` interleaving, 4-6 h scope)
+remains out-of-scope of this residual plan. Plan stays in `incomplete/`
+because Phase 2 is unfinished work.
+
 Last updated: 2026-05-06 (Phase 3 complete: DragDropTest `_level50` droptarget
 promoted from `output_mismatch` (27/44) to `ruffle_matched`. Two narrow fixes:
 (a) `getOrCreateLevel` now sets `xscale = yscale = 100` so the level MC's
