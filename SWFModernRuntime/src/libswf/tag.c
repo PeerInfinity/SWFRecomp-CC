@@ -1828,9 +1828,33 @@ static void ng_update_button_states_in_dl(SWFAppContext* app_context,
 				max_depth = obj->sprite_max_depth;
 				display_list_capacity = obj->sprite_dl_capacity;
 
+				// Set g_current_context to the button MC so that
+				// tagPlaceObject2's eager-init MC creation
+				// (actionFindOrCreateMovieClip in tag.c at the
+				// "_parent_for_mc" site) resolves parent = button_mc.
+				// Required for child sprites to get the correct
+				// parent->is_button_mc = 1 path in findOrCreateMovieClip,
+				// which applies bias 16383 (Flash quirk for button-state
+				// children). Without this, subsequent state-change
+				// placements at depths 13, 14 inherit g_current_context
+				// from outside (typically root), get bias 16384, and
+				// their getDepth() returns the wrong value — breaking
+				// ButtonEventsTest's `_root.buttonChild[N]` populator
+				// formula `myDepth = getDepth() + 16383`.
+				MovieClip* _btn_state_mc = (obj->instance_name != NULL)
+					? actionFindOrCreateMovieClip(app_context,
+						obj->instance_name, parent_mc)
+					: NULL;
+				MovieClip* _btn_saved_ctx = g_current_context;
+				if (_btn_state_mc != NULL)
+					actionSetCurrentContext(_btn_state_mc);
+
 				g_btn_state_active = 1;
 				ch->button_state_funcs[effective_state](app_context);
 				g_btn_state_active = 0;
+
+				if (_btn_state_mc != NULL)
+					actionSetCurrentContext(_btn_saved_ctx);
 
 				obj->sprite_display_list = display_list;
 				obj->sprite_max_depth = max_depth;
@@ -1867,6 +1891,30 @@ static void ng_update_button_states_in_dl(SWFAppContext* app_context,
 					if (g_btn_transient_count >= BTN_STATE_SNAP_MAX) break;
 					g_btn_transient_names[g_btn_transient_count++] =
 						strdup(g_btn_state_old_names[j]);
+
+					// Fire AS-level onUnload on the just-removed button-state
+					// child. Mirrors Ruffle's set_state → remove_child →
+					// avm1_unload path. ButtonEventsTest registers
+					// `this.onUnload = function() { _root.buttonChild[N].uld++; }`
+					// in script_2 — without this dispatch, uld stays 0.
+					//
+					// `+1` adjustment: actionFireOnUnload uses bias 16384 for
+					// both the cache lookup (`as_depth = swf_depth - 16384`)
+					// and the post-shift depth formula
+					// (`mc->depth = -(swf_depth) - 1 - 16384`). Button-state
+					// children use bias 16383 (Flash quirk — see Phase 1a in
+					// BUTTON_RESIDUAL_PLAN), so passing `j + 1` makes both
+					// formulas come out one less than the bias-16384 case:
+					// lookup matches our `mc->depth = j - 16383`, and post-
+					// shift `mc->depth = -j - 16386` is exactly the value
+					// the test's `myDepth = -(getDepth()+32769-16383)`
+					// formula needs to recover the original SWF depth.
+					{
+						extern void actionFireOnUnload(SWFAppContext*, const char*, int);
+						actionFireOnUnload(app_context,
+							g_btn_state_old_names[j],
+							(int)j + 1);
+					}
 				}
 
 				// Drain AQ_KIND_SCRIPT entries queued by the state's new

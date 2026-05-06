@@ -30,6 +30,9 @@ phases:
   - id: 1e
     name: "Transient enumeration of removed button-state children (instance6 missing)"
     status: complete
+  - id: 1f
+    name: "Transient onUnload dispatch + bias-16383 propagation"
+    status: complete
   - id: 2
     name: "key_event_test progression past frame 5"
     status: deferred
@@ -44,14 +47,14 @@ blockers: []
 parent_plan: "complete/BUTTON_INFRASTRUCTURE_PLAN.md"
 -->
 
-Last updated: 2026-05-05 (Phase 1e complete: transient enumeration of removed button-state children landed, +138 matched lines (79→217). For-in inside script_2 now correctly yields `liveChild1, liveChild2, removedChild`. Lines 1-78 align cleanly. Remaining mismatches are downstream issues — onUnload not firing for removed transient children (`buttonChild[N].uld` reads 0 not 2), exe count off-by-one, and instance numbering drift propagating through the rest of the trace).
+Last updated: 2026-05-05 (Phase 1f complete: transient onUnload dispatch landed alongside button-MC g_current_context propagation that fixed bias 16383 for *all* button-state child placements (was only the very first one). +11 lines (217→228). All `_root.buttonChild[N].uld` and `[N].exe` assertions now PASS. Remaining gaps: transient property access (`mc.instance6._name` after unload returns empty, expected 'instance6'), one off-by-one in `buttonChild[13].exe/uld` (3 vs expected 4), `square1.getBounds()` returning 0,0,0,0 after first state transition (separate bounds invalidation issue).
 
 ## Summary status (CI at `08e560fe`)
 
 | Test | Suite | Lines | Status | Phase |
 |------|-------|-------|--------|-------|
 | `button_test1` | misc-swfc.all | **31/31 PASS** | complete | 4 |
-| `ButtonEventsTest` | misc-ming.all | 217/679 (1e complete: transient enum of removed button-state children landed; remaining gap = onUnload not firing for transient children, exe off-by-one) | partial | 1 |
+| `ButtonEventsTest` | misc-ming.all | 228/679 (1f complete: onUnload firing + bias-16383 fix; remaining gap = transient property access, bounds-after-state-change, exe off-by-one for instance7) | partial | 1 |
 | `key_event_test` | misc-ming.all | 33/66 (50%) | deferred | 2 |
 | `DragDropTest` | misc-ming.all | 27/44 (61%) | deferred | 3 |
 
@@ -474,6 +477,74 @@ handler call. That trace immediately revealed the recompiler bug (1c1):
 `[BTN_HIT] btn_hit_char_id=12 hit_ch=(nil)` — char 12 was a sprite, not
 a shape. Manually re-running SWFRecomp confirmed `tagDefineButton(...,
 hit_char_id=12)` before the fix, `hit_char_id=13` after.
+
+### 1f — Transient onUnload dispatch + bias-16383 propagation (COMPLETE 2026-05-05)
+
+**Resolved.** ButtonEventsTest: 217/679 → 228/679 (+11). All
+`_root.buttonChild[N].uld` and `[N].exe` assertions on the
+preserved-MC paths now PASS. Two coupled fixes:
+
+1. **`SWFModernRuntime/src/libswf/tag.c` `ng_update_button_states_in_dl`:**
+   set `g_current_context = button_mc` before invoking
+   `button_state_funcs[effective_state]`. tagPlaceObject2's eager-init
+   MC creation site (the `_parent_for_mc = g_current_context` path
+   around tag.c:4799) had been receiving root (or whatever MC was
+   active before the input pump) as the parent for state-change
+   placements, which made `findOrCreateMovieClip` skip the
+   `parent->is_button_mc` branch and apply bias **16384** instead of
+   **16383** to all subsequent button-state child placements
+   (instance7, instance8, …). Only the very first placement (during
+   the button's eager init at tag.c:4886) had used the right context
+   because that block already set `g_current_context = button_mc`.
+
+   Symptom before fix: `instance7.getDepth()` returned `-16371`
+   (12-16383? no — 13-16384=-16371) instead of `-16370` (13-16383).
+   The script_2 populator's
+   `myDepth = getDepth() + 16383 = -16371 + 16383 = 12` (WRONG)
+   then overwrote `_root.buttonChild[12]`'s `nam` field with
+   `instance7`'s name. Every subsequent UP→OVER state transition's
+   ermc placement compounded the drift.
+
+   After fix: all button-state child placements use bias 16383,
+   so `getDepth()+16383 == swf_depth_in_button_dl`, and
+   `_root.buttonChild[N].nam` populates correctly:
+   `[10].nam = instance5`, `[12].nam = instance6`, `[13].nam = instance7`,
+   `[14].nam = instance8` (matches Flash exactly).
+
+2. **`SWFModernRuntime/src/libswf/tag.c` `ng_update_button_states_in_dl`:**
+   inside the post-state-func transient-walk loop, call
+   `actionFireOnUnload(app_context, old_name, swf_depth + 1)` for each
+   transient (depth, name) pair whose new char_id differs from old.
+
+   The `+1` adjustment compensates for `actionFireOnUnload`'s
+   hardcoded bias-16384 in both the cache lookup (`as_depth =
+   swf_depth - 16384`) and the post-shift formula
+   (`mc->depth = -(swf_depth) - 1 - 16384`). With bias 16383 in
+   placement, `mc->depth` is one greater than the bias-16384 case;
+   passing `swf_depth + 1` makes both formulas come out one less,
+   so the lookup hits and the post-shift `mc->depth = -swf_depth -
+   16386` matches Flash's expected value (the test's
+   `myDepth = -(getDepth()+32769-16383)` formula needs exactly this
+   value to reverse-compute back to the original SWF depth).
+
+**Remaining gaps in ButtonEventsTest (downstream):**
+
+- **Transient property access:** `mc.instance6._name` returns empty
+  (expected 'instance6') and `mc.instance6.getDepth()` returns
+  empty (expected `-16398`). After our impl shifts depth and sets
+  `avm1_removed=1`, the MC is removed from name-resolution paths.
+  Phase 1e covers for-in but not direct property access. Need to
+  thread the transient list into `getMember`/path-resolution for
+  the duration of the button's transient window.
+- **`square1.getBounds()` returns `0,0 0,0` after first state
+  transition** (expected `-0.05,-0.05 40.05,40.05`). Likely
+  `mc_get_pixel_aabb_ng` cache invalidation triggered by state
+  change; needs a refresh path.
+- **`buttonChild[13].exe == 3` (expected 4) and `[13].uld == 3`
+  (expected 4):** off-by-one in script_2 firings vs unload
+  firings for the OVER-only ermc. Possibly a transition is missing
+  from our state machine (e.g. an extra DOWN→OVER bounce that
+  Flash counts and we don't).
 
 ### Phase 1 verification battery
 
