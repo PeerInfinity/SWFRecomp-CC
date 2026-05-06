@@ -59,7 +59,15 @@ blockers: []
 parent_plan: "complete/BUTTON_INFRASTRUCTURE_PLAN.md"
 -->
 
-Last updated: 2026-05-06 (Phase 1j complete: vestigial `PUSH(arr_var.type, ...)`
+Last updated: 2026-05-06 (status review: local baseline ButtonEventsTest
+confirms 237/679 line-aligned, matching CI snapshot at `edba4166`. Phase
+1j is the last landed fix. Next-most-tractable narrow target identified:
+the `buttonChild[13].exe/.uld == 3 vs 4` off-by-one originally listed
+under 1f's "remaining gaps" — a missing OVER state transition during
+testno 5's Press/Release-Outside cycle. See Phase 1f section for refined
+investigation pointer.)
+
+Previously (2026-05-06): Phase 1j complete: vestigial `PUSH(arr_var.type, ...)`
 in `actionEnumerate` ARRAY arm left the array on the stack across
 `for (var i in arr)` enumerations from SWF5-style functions. Inside
 `Array.prototype.realLength`, this leaked the receiver array into the
@@ -564,14 +572,27 @@ preserved-MC paths now PASS. Two coupled fixes:
 property access):**
 
 - **`square1.getBounds()` returns `0,0 0,0` after first state
-  transition** (expected `-0.05,-0.05 40.05,40.05`). Likely
-  `mc_get_pixel_aabb_ng` cache invalidation triggered by state
-  change; needs a refresh path.
+  transition** (expected `-0.05,-0.05 40.05,40.05`). RESOLVED by
+  Phase 1h (bare-call dispatch routes `getBounds()` to the active
+  MC); local baseline 2026-05-06 confirms `printBounds(square1.getBounds())
+  == '-0.05,-0.05 40.05,40.05'` PASSES at testno 5 (line 263).
 - **`buttonChild[13].exe == 3` (expected 4) and `[13].uld == 3`
   (expected 4):** off-by-one in script_2 firings vs unload
-  firings for the OVER-only ermc. Possibly a transition is missing
-  from our state machine (e.g. an extra DOWN→OVER bounce that
-  Flash counts and we don't).
+  firings for the OVER-only ermc. STILL PRESENT post-1j (verified
+  2026-05-06 local baseline: `FAILED: expected: 4 obtained: 3
+  [ButtonEventsTest.c:652]` and `:653]`). Symptom shape: expected
+  output around line 239 has *two* consecutive for-in dumps
+  (instance13/5/12 then instance14/5/13) bracketing the testno-5
+  Press/Release-Outside cycle, but our actual emits only one.
+  One UP→OVER (or OVER→OVER bounce) transition is being skipped
+  by `ng_update_button_states_in_dl`'s state machine. Likely
+  candidate: the OVER refire that Flash performs when the cursor
+  re-enters during a Release-Outside without a fresh roll-out
+  intermediate. Next investigation step: instrument
+  `ng_update_button_states_in_dl` to log every (old_state,
+  new_state, btn_dn) tuple across testno 5's input events and
+  compare to Ruffle's `core/src/display_object/avm1_button.rs`
+  `set_state` log.
 
 ### 1g — Transient property access on just-removed button-state children (COMPLETE 2026-05-05)
 
