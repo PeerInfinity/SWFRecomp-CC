@@ -357,6 +357,10 @@ void actionRenameMovieClip(const char* old_name, const char* new_name);
 // Enumerate child instance names for a MovieClip (for for-in enumeration)
 // callback receives (name, name_len, user_data) for each child
 void ng_enumerateChildren(const char* parent_name, void (*callback)(const char* name, u32 name_len, void* user_data), void* user_data);
+// Phase 1e: yield names of children removed in the most recent button-state
+// transition. button_dobj is the button's DisplayObject; if it doesn't match
+// the most recent transitioned button, no callbacks fire.
+void ng_iterateTransientButtonChildren(void* button_dobj, void (*callback)(const char* name, u32 name_len, void* user_data), void* user_data);
 // Check if a tag-placed display entry at the given root depth is scriptable (sprite/button/textfield)
 int ng_isScriptableAtDepth(size_t depth);
 // Clone a tag-placed sprite to target_name at AS depth. Returns clone MC, or NULL if non-scriptable/not found.

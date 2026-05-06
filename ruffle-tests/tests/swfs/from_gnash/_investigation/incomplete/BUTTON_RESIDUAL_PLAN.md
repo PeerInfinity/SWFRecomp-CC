@@ -29,7 +29,7 @@ phases:
     status: partial
   - id: 1e
     name: "Transient enumeration of removed button-state children (instance6 missing)"
-    status: pending
+    status: complete
   - id: 2
     name: "key_event_test progression past frame 5"
     status: deferred
@@ -44,14 +44,14 @@ blockers: []
 parent_plan: "complete/BUTTON_INFRASTRUCTURE_PLAN.md"
 -->
 
-Last updated: 2026-05-05 (Phase 1d partial: Ruffle-style button-state-change preservation landed — script_2 now fires per state transition, +18 matched lines (61→79). Remaining gap is Phase 1e: removed-state-child must persist through one tick so for-in includes it).
+Last updated: 2026-05-05 (Phase 1e complete: transient enumeration of removed button-state children landed, +138 matched lines (79→217). For-in inside script_2 now correctly yields `liveChild1, liveChild2, removedChild`. Lines 1-78 align cleanly. Remaining mismatches are downstream issues — onUnload not firing for removed transient children (`buttonChild[N].uld` reads 0 not 2), exe count off-by-one, and instance numbering drift propagating through the rest of the trace).
 
 ## Summary status (CI at `08e560fe`)
 
 | Test | Suite | Lines | Status | Phase |
 |------|-------|-------|--------|-------|
 | `button_test1` | misc-swfc.all | **31/31 PASS** | complete | 4 |
-| `ButtonEventsTest` | misc-ming.all | 79/679 (1d partial: script_2 fires per state transition; remaining gap = Phase 1e transient-enum) | partial | 1 |
+| `ButtonEventsTest` | misc-ming.all | 217/679 (1e complete: transient enum of removed button-state children landed; remaining gap = onUnload not firing for transient children, exe off-by-one) | partial | 1 |
 | `key_event_test` | misc-ming.all | 33/66 (50%) | deferred | 2 |
 | `DragDropTest` | misc-ming.all | 27/44 (61%) | deferred | 3 |
 
@@ -393,39 +393,77 @@ Result: ButtonEventsTest 61 → 79 line matches (+18). Verified zero
 regressions in: issue_9885 (PASS), 9 button + 4 drag + 13 prototype/lifecycle
 + 2 misc-swfc + 9 enum/prototype tests (all PASS or effective).
 
-### 1e — Transient enumeration of removed button-state children (PENDING)
+### 1e — Transient enumeration of removed button-state children (COMPLETE 2026-05-05)
 
-After Phase 1d, the remaining for-in shape per state mismatches by
-exactly 1 line: expected `instance7, instance5, instance6` (3 children),
-ours `instance7, instance5` (2). The missing entry is the
-just-removed previous-state ermc that Flash keeps enumerable for ONE
-tick before fully disposing. Each state's missing instance drives a
-~1-line offset that propagates through the rest of the trace.
+**Resolved.** ButtonEventsTest now matches 217/679 lines (was 79/679,
++138). Lines 1-78 align cleanly through the first state transition's
+for-in (`instance7, instance5, instance6` — including the just-removed
+depth-12 ermc as the third entry).
 
-**Mechanism in Flash/Ruffle.** When a button transitions UP→OVER and
-depth 12's ermc (instance6) is removed, Ruffle's `remove_child`
-defers the actual destruction; the MC stays in the cache (and in
-for-in) until the next tick. Our impl clears the dl entry immediately
-in `ng_update_button_states_in_dl` and `enum_child_callback` only
-walks `display_obj->sprite_display_list`, so the removed MC isn't
-visible.
+**Implementation (Sketch A from prior plan).** Two changes:
 
-**Fix sketch.** After state func runs, walk the snapshot: for each
-old depth NOT preserved (different char_id, or no current placement),
-mark the corresponding MC `pending_removal` AND track it in a
-small "transient enumeration" list keyed by parent_mc. Modify
-`actionEnumerate2`'s MOVIECLIP arm to consult that list after the
-display walk. Cleared at the start of the next state transition
-(transient lifetime = 1 transition).
+1. `SWFModernRuntime/src/libswf/tag.c` — added `g_btn_transient_dobj`,
+   `g_btn_transient_names[256]`, `g_btn_transient_count` globals.
+   `ng_update_button_states_in_dl` now strdup's the snapshot names
+   (Phase 1d previously stored raw pointers — safe for unused storage,
+   but Phase 1e reads them, and tagPlaceObject2 may free the original
+   when an owned name is replaced at the same depth). After the state
+   func runs (and before `actionDrainOnloadAndScript`), walks the
+   snapshot: for each old depth whose new char_id differs (removed or
+   replaced), strdup's the old instance_name into `g_btn_transient_names`.
 
-Alternative: don't clear the OLD dl entries that are NOT touched by
-new state. Walk old snapshot post-state-func; for entries with old
-char_id intact (state func didn't replace), they survive as dl
-entries (so for-in walks them naturally). On NEXT transition, clear
-them upfront. Cleaner, but bigger change to dl semantics.
+2. `SWFModernRuntime/include/libswf/tag.h` + `tag.c` —
+   `ng_iterateTransientButtonChildren(button_dobj, cb, user)` public
+   accessor. Returns silently if the dobj doesn't match the most recent
+   transitioned button.
 
-Estimated effort: 2-4 hours. Expected line gain: ~150-300/679
-(propagation from fixing per-state offset).
+3. `SWFModernRuntime/src/actionmodern/action.c` `actionEnumerate2` —
+   MOVIECLIP arm now calls `ng_iterateTransientButtonChildren` BEFORE
+   the existing display walk (so transient names get pushed first →
+   popped LAST, yielding the expected `liveChild1, liveChild2,
+   removedChild` order in for-in iteration).
+
+**Why before the display walk.** Stack is LIFO. Display walk pushes
+in depth order (low to high) → pops in reverse depth order. To make
+the transient name pop last (after both live children), it must be
+pushed first. The expected for-in trace `instance7, instance5,
+instance6` corresponds to push order `instance6` (transient),
+`instance5` (depth 10), `instance7` (depth 12).
+
+**Remaining downstream gaps (not Phase 1e):**
+
+- `_root.buttonChild[N].uld` reads 0 instead of 2 — `onUnload` is not
+  firing for transient (just-removed) button-state children. The
+  populator's `this.onUnload = function() { ... }` is registered, but
+  our impl removes the dl entry immediately (with the strdup'd
+  transient list separate); we never invoke onUnload on the removed MC.
+  Need to dispatch onUnload during `ng_update_button_states_in_dl`
+  state-func wrap-up for each transient child.
+- `exe` counter off-by-one for some indices (e.g. 4 obtained vs 3
+  expected for instance6) — script_2 may be firing one extra time
+  somewhere (likely an artifact of the `actionDrainOnloadAndScript`
+  drain landing the queued script alongside an ng_executeGotoCatchUp
+  drain or similar). Needs trace at the script_2 entry point.
+- Instance numbering drift (e.g. `instance25` ours vs `instance29`
+  theirs) — auto-name counter is incrementing differently because
+  of the missing onUnload causing reclamation of slot numbers to
+  diverge from Flash's allocation pattern. Likely resolves once
+  onUnload dispatch lands.
+
+**Verification battery passed (no regressions):**
+
+- AVM1 enum/prototype: enumerate, array_enumerate, new_object_enumerate,
+  prototype_enumerate, stage_object_enumerate, prototype_delete,
+  prototype_properties, movieclip_prototype_extension,
+  recursive_prototypes (9 PASS).
+- AVM1 button: mouse_events, mouse_events_visible_enabled, button_v5,
+  button_v6, button_children, button_order, button_keypress,
+  button_goto, button_key_events, issue_9885 (10 PASS).
+- AVM1 lifecycle: unload, register_class, register_and_init_order,
+  init_object_order, on_construct, extends_chain, as2_super_and_this_v6,
+  as2_super_and_this_v8 (8 PASS).
+- Gnash misc-ming: ButtonPropertiesTest, RollOverOutTest (2 PASS).
+- Gnash misc-swfc: mouse_drag_test, button_test1 (2 PASS).
 
 #### Original investigation steps (kept for reference)
 

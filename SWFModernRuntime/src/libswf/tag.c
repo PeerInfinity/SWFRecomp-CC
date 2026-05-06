@@ -204,8 +204,20 @@ static int g_button_state_change_depth = 0;
 // char_id at preserved depths, the normal eager-init/queue path runs.
 #define BTN_STATE_SNAP_MAX 256
 static size_t g_btn_state_old_chars[BTN_STATE_SNAP_MAX];
-static char*  g_btn_state_old_names[BTN_STATE_SNAP_MAX];
+static char*  g_btn_state_old_names[BTN_STATE_SNAP_MAX]; // strdup'd, owned
 static int    g_btn_state_active = 0;
+
+// Phase 1e: transient enumeration of removed button-state children.
+// After a state transition, depths that had a child in the OLD state but
+// no longer match in the NEW state remain enumerable for one tick (mirrors
+// Ruffle's deferred destruction of removed children). Populated by
+// ng_update_button_states_in_dl after the state func runs from the
+// snapshot above; consumed by actionEnumerate2's MOVIECLIP arm via
+// ng_iterateTransientButtonChildren. Cleared and rebuilt at each
+// transition.
+static DisplayObject* g_btn_transient_dobj = NULL;
+static char*          g_btn_transient_names[BTN_STATE_SNAP_MAX]; // strdup'd, owned
+static size_t         g_btn_transient_count = 0;
 
 int actionEagerInitActive(void) {
 	return g_eager_init_depth > 0 && g_button_state_change_depth == 0;
@@ -1766,14 +1778,25 @@ static void ng_update_button_states_in_dl(SWFAppContext* app_context,
 			// persist across UP→OVER→DOWN transitions while depth 12 (UP-only)
 			// is removed and depth 13 (OVER-only) is freshly placed with its
 			// own frame_0 script firing.
+			// Free any names from a prior snapshot before overwriting
+			// (we own these strdup'd copies — the underlying dl entries
+			// may have been freed by intervening tagPlaceObject2 calls).
+			for (size_t j = 0; j < BTN_STATE_SNAP_MAX; j++)
+			{
+				if (g_btn_state_old_names[j] != NULL)
+				{
+					free(g_btn_state_old_names[j]);
+					g_btn_state_old_names[j] = NULL;
+				}
+			}
 			memset(g_btn_state_old_chars, 0, sizeof(g_btn_state_old_chars));
-			memset(g_btn_state_old_names, 0, sizeof(g_btn_state_old_names));
 			size_t snap_max = obj->sprite_max_depth;
 			if (snap_max >= BTN_STATE_SNAP_MAX) snap_max = BTN_STATE_SNAP_MAX - 1;
 			for (size_t j = 1; j <= snap_max; j++)
 			{
 				g_btn_state_old_chars[j] = obj->sprite_display_list[j].char_id;
-				g_btn_state_old_names[j] = obj->sprite_display_list[j].instance_name;
+				const char* nm = obj->sprite_display_list[j].instance_name;
+				g_btn_state_old_names[j] = (nm != NULL) ? strdup(nm) : NULL;
 			}
 
 			// Clear existing children
@@ -1815,6 +1838,36 @@ static void ng_update_button_states_in_dl(SWFAppContext* app_context,
 				display_list = saved_dl;
 				max_depth = saved_max;
 				display_list_capacity = saved_cap;
+
+				// Phase 1e: build transient enumeration list from the
+				// snapshot. Depths whose old child wasn't preserved by
+				// the new state (different char_id or removed) remain
+				// visible to for-in for one tick — mirrors Ruffle's
+				// deferred destruction of removed button-state children.
+				// Done BEFORE actionDrainOnloadAndScript so the for-in
+				// inside the just-queued script_2 already sees them.
+				for (size_t i = 0; i < g_btn_transient_count; i++)
+				{
+					if (g_btn_transient_names[i] != NULL)
+					{
+						free(g_btn_transient_names[i]);
+						g_btn_transient_names[i] = NULL;
+					}
+				}
+				g_btn_transient_count = 0;
+				g_btn_transient_dobj = obj;
+				for (size_t j = 1; j < BTN_STATE_SNAP_MAX; j++)
+				{
+					if (g_btn_state_old_chars[j] == 0) continue;
+					if (g_btn_state_old_names[j] == NULL) continue;
+					if (g_btn_state_old_names[j][0] == '\0') continue;
+					size_t new_char = (j <= obj->sprite_max_depth)
+						? obj->sprite_display_list[j].char_id : 0;
+					if (new_char == g_btn_state_old_chars[j]) continue; // preserved
+					if (g_btn_transient_count >= BTN_STATE_SNAP_MAX) break;
+					g_btn_transient_names[g_btn_transient_count++] =
+						strdup(g_btn_state_old_names[j]);
+				}
 
 				// Drain AQ_KIND_SCRIPT entries queued by the state's new
 				// child sprite frame_0 actions. Without this, the for-in
@@ -5949,6 +6002,25 @@ size_t ng_getButtonHitCharId(size_t char_id)
 	if (char_id >= dictionary_capacity) return 0;
 	if (dictionary[char_id].type != CHAR_TYPE_BUTTON) return 0;
 	return dictionary[char_id].button_hit_char_id;
+}
+
+// Phase 1e: yield instance names of children that were in the OLD state
+// of this button but are not at the same (depth, char_id) in the NEW state.
+// Caller passes the button's DisplayObject; if it doesn't match the most
+// recent transitioned button, no callbacks fire. Used by actionEnumerate2
+// to include just-removed button-state children in for-in for one tick
+// (matches Ruffle's deferred destruction).
+void ng_iterateTransientButtonChildren(void* button_dobj,
+	void (*cb)(const char* name, u32 name_len, void* user), void* user)
+{
+	if (button_dobj == NULL || cb == NULL) return;
+	if ((DisplayObject*)button_dobj != g_btn_transient_dobj) return;
+	for (size_t i = 0; i < g_btn_transient_count; i++)
+	{
+		const char* n = g_btn_transient_names[i];
+		if (n != NULL && n[0] != '\0')
+			cb(n, (u32)strlen(n), user);
+	}
 }
 
 // Convert a Flash key code to the SWF button condition key code.

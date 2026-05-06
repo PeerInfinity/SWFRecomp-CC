@@ -37993,6 +37993,18 @@ void actionEnumerate2(SWFAppContext* app_context, char* str_buffer)
 			// Enumerate child MovieClip instance names first (pushed early = popped late)
 #ifdef NO_GRAPHICS
 			{
+				// Phase 1e: push transient (just-removed previous-state) button
+				// children FIRST so LIFO yields them LAST in for-in order.
+				// Expected: live children, then transient children (e.g.
+				// ButtonEventsTest after RollOver: instance7, instance5,
+				// instance6 — instance6 is the transient depth-12 ermc from
+				// the prior UP state). Mirrors Ruffle's deferred destruction
+				// of removed button-state children for one tick.
+				if (mc->is_button_mc && mc->display_obj != NULL) {
+					ng_iterateTransientButtonChildren(mc->display_obj,
+						enum_child_callback, app_context);
+				}
+
 				// Prefer mc->display_obj walk so nested MCs (e.g. button MCs whose
 				// display_obj points into a parent's sprite_display_list, not the
 				// root display_list) enumerate correctly. Fall back to root-name
