@@ -42,6 +42,9 @@ phases:
   - id: 1i
     name: "ButtonEventsTest instance-numbering drift (extra script_2 fires after preserved 3→0 transitions)"
     status: complete
+  - id: 1j
+    name: "ButtonEventsTest realLength upstream divergence (vestigial PUSH in actionEnumerate ARRAY arm)"
+    status: complete
   - id: 2
     name: "key_event_test progression past frame 5"
     status: deferred
@@ -56,7 +59,19 @@ blockers: []
 parent_plan: "complete/BUTTON_INFRASTRUCTURE_PLAN.md"
 -->
 
-Last updated: 2026-05-06 (Phase 1i complete: spurious `script_2` fires on
+Last updated: 2026-05-06 (Phase 1j complete: vestigial `PUSH(arr_var.type, ...)`
+in `actionEnumerate` ARRAY arm left the array on the stack across
+`for (var i in arr)` enumerations from SWF5-style functions. Inside
+`Array.prototype.realLength`, this leaked the receiver array into the
+caller's argument stack, causing the literal `3` second arg to
+`check_equals(_root.buttonChild.realLength(), 3)` to be replaced by
+the array. Removed the vestigial PUSH (the surrounding code already
+enumerates inline; the PUSH was for an aborted "delegate to Enumerate2"
+approach). Internal #passed 158→160 (+2), #failed 6→4 (-2); line-aligned
+237/679 (+2). The remaining `key_event_test`/`DragDropTest` gaps are
+unrelated subsystems.
+
+2026-05-06 (Phase 1i complete: spurious `script_2` fires on
 preserved button-state children eliminated by extending the state-transition
 snapshot to capture the grandchild `sprite_display_list` pointer. Internal
 test pass count +2 (156→158), failed -2 (8→6); line-aligned count unchanged
@@ -72,7 +87,7 @@ section below for full diagnosis.
 | Test | Suite | Lines | Status | Phase |
 |------|-------|-------|--------|-------|
 | `button_test1` | misc-swfc.all | **31/31 PASS** | complete | 4 |
-| `ButtonEventsTest` | misc-ming.all | 235/679 line-aligned (1i complete: spurious script_2 fires on preserved button-state children eliminated. Internal #passed 156→158, #failed 8→6. Remaining gap = upstream `realLength()` divergence at expected line 79 blocking late testno alignment) | partial | 1 |
+| `ButtonEventsTest` | misc-ming.all | 237/679 line-aligned (1j complete: realLength upstream divergence fixed. Internal #passed 158→160, #failed 6→4. Remaining diff = downstream test progression past mid-test) | partial | 1 |
 | `key_event_test` | misc-ming.all | 33/66 (50%) | deferred | 2 |
 | `DragDropTest` | misc-ming.all | 27/44 (61%) | deferred | 3 |
 
@@ -880,6 +895,104 @@ output makes the drift cluster visible at OUT→UP boundaries.
 queue during the OUT→UP transition to identify what's leaking
 through. Higher-leverage than ButtonEventsTest's other remaining
 gaps (~exe off-by-one is a tighter scope).
+
+### 1j — `realLength` upstream divergence at expected line 79 (COMPLETE 2026-05-06)
+
+**Resolved.** ButtonEventsTest line-aligned: 235/679 → 237/679.
+Internal `#passed: 158→160 (+2)`, `#failed: 6→4 (-2)`. The
+divergence was on the simple-form `check_equals(_root.buttonChild.realLength(), N)`
+calls (expected lines 79, 115, etc.) where actual output showed
+`FAILED: expected: ,,,,,,,,,,[object Object],,[object Object],[object Object] , obtained: 3`
+— the literal `N` second arg of check_equals was being replaced by
+the receiver array.
+
+**Root cause.** Vestigial `PUSH(arr_var.type, arr_var.data.numeric_value)`
+at the top of `actionEnumerate`'s ARRAY arm
+(`SWFModernRuntime/src/actionmodern/action.c` ~line 25420). The
+surrounding code already enumerates the array inline (UNDEFINED
+terminator + numeric indices + arr->props names), and the comments
+admit the PUSH was vestigial from an aborted "delegate to
+Enumerate2" approach: `// Remove the value we just pushed and call
+enumerate2 manually / Actually, just push undefined terminator and
+enumerate the array inline`. The PUSH was supposed to be
+consumed by an `actionEnumerate2` call that never landed; the
+inline enumeration that replaced it doesn't pop the array, so the
+array entry persisted on the stack across the entire `for` loop
+and the function's return.
+
+**Mechanism.**
+`Array.prototype.realLength = function() { var c=0; for (var i in
+this) if (Number(i)==i) ++c; return c; }` — defined as
+`DefineFunction` (SWF5-style), so AS2's `for-in` lowers to the
+`Enumerate` opcode (not `Enumerate2`). When called as
+`buttonChild.realLength()`, the ARRAY arm of `actionCallMethod`
+binds `this` to the array and dispatches the simple_func.
+`Enumerate "this"` resolves to the array, takes the ARRAY branch,
+and pushes the array (vestigial) + UNDEFINED terminator + numeric
+indices. The loop consumes K+1 stack entries (one per index plus
+the terminator), but never the leading array. After the function
+returns its `c` value, the ARRAY arm pushes the result on top of
+the stranded array.
+
+The caller (`button_10_action_4` for SWFBUTTON_MOUSEOVER) had
+pushed `3` (the literal expected value) BEFORE the realLength
+call, then receiver/method-name and called CallMethod. Stack
+post-realLength (top→bottom): `[result=3, leftover=array,
+literal=3, ...]`. The next `_root.check_equals(realLen_result, 3)`
+CallMethod popped name/receiver/num_args=2, then args[0] = top =
+realLen result (3), args[1] = next = the leftover array. So
+check_equals received `obt=3, exp=array` — emitting `FAILED:
+expected: <array> , obtained: 3`.
+
+**Fix.** Removed the vestigial `PUSH(arr_var.type, ...)` line.
+The inline enumeration that follows is already correct (matches
+the standard Enumerate post-condition: pops the variable name,
+pushes UNDEFINED terminator + keys).
+
+**Why didn't this break anything else.** The bug only manifests
+when:
+1. A SWF5-style `for-in` (Enumerate, not Enumerate2) iterates an array.
+2. Code after the for-in implicitly relies on stack discipline being
+   preserved (e.g. the for-in is inside a function whose result feeds
+   another function call).
+
+Most AS2 code uses Enumerate2 (`DefineFunction2`/SWF6+), where this
+arm is never hit. Existing tests that use `for-in` on arrays via
+SWF5-style functions (Gnash test harness's
+`Array.prototype.realLength`/`isUndefined` patterns) showed the
+same bug but at lower-leverage call sites where the stranded array
+got harmlessly popped before causing visible damage.
+
+**Files touched.**
+`SWFModernRuntime/src/actionmodern/action.c` `actionEnumerate`
+ARRAY arm — removed 4 lines (the PUSH + two stale comments + the
+unused `ActionVar arr_var = *var;`).
+
+**Verification battery passed (no regressions):**
+
+- AVM1 lifecycle: unload, register_class, register_and_init_order,
+  init_object_order, on_construct, extends_chain,
+  as2_super_and_this_v6, as2_super_and_this_v8 (8/8 PASS).
+- AVM1 button: mouse_events, mouse_events_visible_enabled, button_v5,
+  button_v6, button_children, button_order, button_keypress,
+  button_goto, button_key_events, issue_9885 (10/10 PASS).
+- AVM1 enum + drag: enumerate, array_enumerate, new_object_enumerate,
+  prototype_enumerate, stage_object_enumerate, prototype_delete,
+  prototype_properties, movieclip_prototype_extension,
+  recursive_prototypes, drag_drop, drag_over_from_outside,
+  drag_over_without_startdrag, mouse_hover_events_while_dragging
+  (13/13 PASS).
+- Timeline / sprite-init: execution_order2, execution_order3,
+  goto_execution_order2, goto_rewind3 (4/4 PASS).
+- SWF5-specific: swf5_to_6_cross_call, swf5_no_closure,
+  as2_super_via_manual_prototype, set_interval, goto_frame,
+  goto_frame2, goto_label, goto_methods (8/8 PASS).
+- Gnash misc-ming: ButtonPropertiesTest, RollOverOutTest,
+  consecutive_goto_frame_test (3/3 effective PASS).
+- Gnash misc-swfc: mouse_drag_test, button_test1,
+  movieclip_destruction_test2 (3/3 PASS).
+- Gnash actionscript Inheritance v5/v6/v7/v8 + Global v6/v7/v8
+  (7/7 effective PASS).
 
 ### Phase 1 verification battery
 

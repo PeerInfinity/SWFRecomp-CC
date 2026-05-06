@@ -25414,12 +25414,8 @@ void actionEnumerate(SWFAppContext* app_context, char* str_buffer)
 	}
 	else if (var->type == ACTION_STACK_VALUE_ARRAY)
 	{
-		// Array via actionEnumerate — delegate to Enumerate2 logic
-		// Push the array back on stack and call actionEnumerate2
-		ActionVar arr_var = *var;
-		PUSH(arr_var.type, arr_var.data.numeric_value);
-		// Remove the value we just pushed and call enumerate2 manually
-		// Actually, just push undefined terminator and enumerate the array inline
+		// Inline enumeration: push UNDEFINED terminator, then numeric indices,
+		// then non-index property names (via arr->props).
 		ASArray* arr = (ASArray*) VAL(u64, &var->data.numeric_value);
 		PUSH(ACTION_STACK_VALUE_UNDEFINED, 0);
 		if (arr != NULL)
