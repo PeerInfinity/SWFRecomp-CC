@@ -8,13 +8,13 @@ status: pending
 phases:
   - id: 1
     name: "ButtonEventsTest residual lines"
-    status: partial
+    status: complete
   - id: 1a
     name: "ButtonEventsTest buttonChild population (bias 16383)"
     status: complete
   - id: 1c
     name: "ButtonEventsTest test progression past line 58"
-    status: partial
+    status: complete
   - id: 1c1
     name: "Recompiler: prefer SHAPE hit record over SPRITE"
     status: complete
@@ -26,7 +26,7 @@ phases:
     status: complete
   - id: 1d
     name: "for-in on inner button MC returns zero (Button.prototype enum)"
-    status: partial
+    status: complete
   - id: 1e
     name: "Transient enumeration of removed button-state children (instance6 missing)"
     status: complete
