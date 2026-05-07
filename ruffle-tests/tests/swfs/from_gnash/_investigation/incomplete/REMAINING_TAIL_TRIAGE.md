@@ -332,24 +332,41 @@ or add a CLI flag that injects a default keypress at frame N.
 **Promote to standalone plan when work begins** (verifier change
 is its own concern).
 
-### action_order/action_execution_order_test6 (0%, 0/24)
+### action_order/action_execution_order_test6 (0%, 0/24) — confirmed case (c) 2026-05-07
 
-**Symptom.** Zero output produced — actual is 20 lines, expected is 24, no
-common lines. Was originally tracked in `incomplete/ZERO_OUTPUT_TRIAGE_PLAN.md`,
-where the 2026-05-04 entry "Predictions that didn't pan out" notes this test
-was predicted to flip to `ruffle_matched` via subset-of-Ruffle promotion but
-the prediction did not pan out at CI snapshot `c5994ec1` — still
-`output_mismatch`, still 0/24 in CI `c8f6452a`.
+**Symptom.** Zero output produced (no common lines in CI). Predicted to flip
+to `ruffle_matched` via subset-of-Ruffle promotion in the 2026-05-04 entry
+of `ZERO_OUTPUT_TRIAGE_PLAN.md`, but the prediction did not pan out at CI
+`c5994ec1` / `c8f6452a` / `035950cf` — still `output_mismatch`, still 0/24.
 
-**Hypothesis.** Either (a) the local-vs-CI Ruffle expectation differs (the
-local prediction relied on `output.ruffle.txt` content that may not be in
-CI), (b) `RUFFLE_KNOWN_FAILURE_HANDLING` doesn't auto-promote it for some
-reason, or (c) the actual diff really is unrelated to Ruffle's diff.
+**Investigation (2026-05-07, local).** Test is `known_failure = true` in
+test.toml and ships `output.ruffle.txt` (12 lines) so promotion path is
+in place. Subset check fails because our diff includes line indices Ruffle
+matches:
 
-**Scope.** ~1 hour. Run locally with `--diff --verbose`, inspect
-`output.ruffle.txt` (if present), confirm whether our diff is actually a
-strict subset of Ruffle's. If it is, the gap is in promotion logic; if not,
-re-categorize as either deferred-clip-unload-family or its own root cause.
+- Expected line 0: `mc1 Construct called` — Ruffle matches; we have `mc1 Load called`.
+- Expected line 1: `mc2 Construct called` — Ruffle matches; we have `mc2 Load called`.
+
+Real bug confirmed: our impl fires `CLIP_EVENT_LOAD` for mc1 + mc2 BEFORE
+the `CLIP_EVENT_CONSTRUCT` of any of {mc1, mc2, mc3}. Expected order is
+all three Constructs first, then the Loads. The delayed construct firing
+also produces `mc3 Load/Unload` in the wrong section (lines 4-5 in our
+output vs lines 7-8 in expected for the first cycle). This is independent
+of Ruffle's bug (Ruffle's diff is missing `mc3 Construct` lines but has
+the Construct-before-Load ordering correct on mc1/mc2).
+
+**Hypothesis (case c).** Construct/Load ordering on initial frame placement
+when multiple sprites are placed in the same frame — likely a tagPlaceObject2
+eager-init / clip-event dispatch ordering issue. Construct should batch
+across all same-frame placements before any Load fires; we may be firing
+Load synchronously per-placement.
+
+**Scope.** Not a 1-hour fix. Construct/Load batching is shared infrastructure
+with broad regression risk. Compare Ruffle's `instantiate_child` →
+`run_frame_avm1` ordering vs our `tagPlaceObject2` Phase 1/Phase 2 init.
+Standalone plan worth writing if active work begins. Test cannot promote
+to `ruffle_matched` until our ordering is at least as correct as Ruffle's
+on lines 0-1.
 
 ### duplicate_movie_clip_test (9.1%, 3/33) — **blocked by CLONESPRITE_DEPTH_BIAS**
 

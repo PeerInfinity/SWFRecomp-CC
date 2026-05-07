@@ -413,16 +413,16 @@ issue likely overlaps CloneSprite plan.
 ## Predictions that didn't pan out
 
 - **`action_execution_order_test6`** — predicted in earlier session to
-  flip to `ruffle_matched` via subset-of-Ruffle promotion. CI snapshot
-  at `c5994ec1` (2026-05-05) shows it still fails as `output_mismatch`.
-  Either the local-vs-CI Ruffle expectation differs, or
-  `RUFFLE_KNOWN_FAILURE_HANDLING` doesn't auto-promote it for some
-  reason. Needs re-investigation: run locally with `--diff --verbose`,
-  inspect `output.ruffle.txt` (if present), confirm whether our diff
-  is actually a strict subset of Ruffle's. Likely candidate root
-  causes: (a) Ruffle promotion gate requires `known_failure=true` in
-  test.toml that's missing here; (b) our diff has even one extra line
-  outside Ruffle's diff set.
+  flip to `ruffle_matched` via subset-of-Ruffle promotion. Investigated
+  2026-05-07 (local): test has `known_failure = true` and ships
+  `output.ruffle.txt`, so promotion path is in place. Diagnosis is
+  candidate (b) **with a concrete root cause**: our Construct/Load
+  ordering on initial frame placement is wrong (we fire Load before
+  Construct for mc1/mc2), placing line indices 0 and 1 in our diff that
+  are NOT in Ruffle's diff. See `REMAINING_TAIL_TRIAGE.md` entry for
+  details. No longer just a triage prediction — it is a real ordering
+  bug that needs a clip-event Phase 1/Phase 2 ordering plan if active
+  work begins.
 
 ## Verification battery
 
