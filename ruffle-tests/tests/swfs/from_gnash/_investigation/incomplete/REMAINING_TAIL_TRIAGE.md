@@ -139,21 +139,24 @@ A few entries share enough DNA to be worth attacking together:
 
 ## Entries — misc-ming.all
 
-### matrix_test (87.4%, 949/1086) — multi-issue
+### matrix_test (87.4%, 949/1086) — promoted to `incomplete/MATRIX_TEST_SKEW_PLAN.md` (2026-05-07)
 
-**Symptom.** Three independent issues per `MISC_MING_SWFC_PLAN.md`:
+**Symptom.** Most failures cluster into two families with a shared root cause: (a)
+`transform.matrix.toString()` returning the wrong sign for `c` after a direct
+`mc.transform.matrix = ...` assignment, (b) `getBounds(_root)` axis-swapped or
+under-sized after the same script-set matrix. A third sub-issue, `sin(90°)`
+producing `6e-17`, is unrelated and tracked separately.
 
-- Negative `_yscale` matrix decomposition off (`d` field sign / value
-  mismatch).
-- `getBounds` after rotate-with-scale produces wrong bounds.
-- `sin(90°)` produces `6e-17` precision residue instead of clean `1`.
+**Hypothesis.** Confirmed against Ruffle source: we lack a `skew` field on
+`MovieClip`. Ruffle decomposes a directly-assigned matrix into `xscale`,
+`yscale`, `rotation`, AND `skew = atan2(-c,d) - atan2(b,a)`, then recomposes
+c/d via `cos(rot+skew)` / `sin(rot+skew)`. We round-trip through xscale/
+yscale/rotation only, losing skew, so signs flip and downstream geometry
+diverges.
 
-**Hypothesis.** None are runtime bugs in shared infrastructure;
-each is its own narrow geometry / FP edge.
-
-**Scope.** Each issue is 1-3 hours independently. Three issues =
-6-9 hours total. **Promote to standalone plan when work begins** —
-it's already big enough to warrant its own document.
+**Scope.** Promoted to standalone plan
+`incomplete/MATRIX_TEST_SKEW_PLAN.md` (2026-05-07) — 6 phases, 4-6 hour
+single-session budget, expected raw match delta 949 → ≥1080.
 
 ### ~~DefineTextTest~~ — promoted to `ruffle_matched` (2026-05-02 result snapshot)
 
