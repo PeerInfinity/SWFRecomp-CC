@@ -381,6 +381,7 @@ typedef struct {
 	jmp_buf handler;
 	int has_jmp_buf;
 	u32 saved_scope_depth;
+	u32 saved_sp;
 } ExceptionFrame;
 
 typedef struct {
@@ -48731,6 +48732,7 @@ void actionTryBegin(SWFAppContext* app_context)
 	}
 	g_exception_state.frames[g_exception_state.depth].has_jmp_buf = 0;
 	g_exception_state.frames[g_exception_state.depth].saved_scope_depth = scope_depth;
+	g_exception_state.frames[g_exception_state.depth].saved_sp = app_context->sp;
 	g_exception_state.depth++;
 }
 
@@ -48754,6 +48756,16 @@ void actionCatchEnter(SWFAppContext* app_context)
 		// for a function that threw) leave scope_depth incorrect. Restoring here
 		// prevents use-after-free when searching stale scope_chain entries.
 		scope_depth = g_exception_state.frames[idx].saved_scope_depth;
+		// Truncate the value stack to its size at try-begin if the try body
+		// net-pushed values that survived the throw (Ruffle commit 0fc689cce:
+		// `Vec::truncate(original_stack_size)`). Stack grows downward, so
+		// `sp < saved_sp` means the body left extra entries on the stack.
+		// If the body net-popped (`sp > saved_sp`), do nothing — popped
+		// values are gone for good.
+		u32 saved_sp = g_exception_state.frames[idx].saved_sp;
+		if (app_context->sp < saved_sp) {
+			app_context->sp = saved_sp;
+		}
 	}
 }
 

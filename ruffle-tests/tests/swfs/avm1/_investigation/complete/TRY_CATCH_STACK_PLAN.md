@@ -3,24 +3,48 @@
 
 <!-- PLAN_META
 id: TRY_CATCH_STACK
-status: pending
+status: complete
 phases:
   - id: 1
     name: "Reproduce locally and confirm diff"
-    status: pending
+    status: complete
   - id: 2
-    name: "Save SP at actionTryBegin, restore at actionCatchEnter"
-    status: pending
+    name: "Truncate (not restore) SP at actionCatchEnter"
+    status: complete
   - id: 3
     name: "Regression battery (all try/catch + exception tests)"
-    status: pending
+    status: complete
 dependencies: []
 blockers: []
 -->
 
 Last updated: 2026-05-06.
 
-## Status: PENDING — 14/16 (filtered fail)
+## Status: COMPLETE — 16/16 PASS
+
+Implementation: ExceptionFrame gained a `saved_sp` field, `actionTryBegin`
+snapshots `app_context->sp`, and `actionCatchEnter` truncates the value
+stack to that snapshot if (and only if) the try body net-pushed values
+that survived the throw.
+
+The critical detail is **truncate-only**: if the body net-popped
+(`sp > saved_sp` since the stack grows downward), do nothing — popped
+values are gone for good. This mirrors Ruffle commit `0fc689cce` exactly:
+`Vec::truncate(original_stack_size)` removes excess entries but never
+re-adds popped ones. Symmetric SP restore would have broken the test's
+"reverse" section, where the try body pops a value before throwing and
+the test asserts that value stays popped (line 14 = `2`, not `3`).
+
+Regression battery (all PASS):
+- `try_catch_finally` (118/118)
+- `try_finally_simple`
+- `displacementmapfilter_mappoint_throw_error` (13/13)
+- `loadvars_tostring`
+- `infinite_recursion_function_in_setter`
+- Plus stack-heavy AVM1 sanity: `array_constructor`, `array_sort`,
+  `enumerate`, `watch`, `watch_textfield`.
+
+## Original status: PENDING — 14/16 (filtered fail)
 
 First observed in CI at `ad31c865` (2026-05-06). The single new filtered
 failure on AVM1 once the `assetnativeaccessor*` tests landed.
@@ -124,6 +148,29 @@ void actionCatchEnter(SWFAppContext* app_context)
 
 We need to also restore SP (and OLDSP) here, using a value snapshotted in
 `actionTryBegin`.
+
+## Implementation note (post-mortem)
+
+The plan as originally written prescribed **restoring** SP to the snapshot
+unconditionally. That would have broken the test's third sub-section:
+
+```
+Push 1, 2, 3
+try { Pop; throw "error"; }   // body pops 3, then pushes+pops "error"
+catch (e) { trace("Caught " + e); PushDuplicate; Trace }
+trace("Outside catch block:");
+Trace
+```
+
+A symmetric restore puts SP back to 3 entries. The slot that previously
+held `3` either still has `3` (full snapshot) or contains a stale `"error"`
+from the body's intermediate push — neither is what the test expects
+(line 14 = `2`). The fix is the asymmetric **truncate**: only undo
+*excess* pushes, never reverse pops. Caught this by running the test
+against the originally-prescribed change and seeing line 14 regress;
+re-checked Ruffle's source (`activation.rs:2175` after commit
+`0fc689cce`) and it uses `Vec::truncate`, which has exactly the same
+asymmetric semantics.
 
 ## Plan
 
