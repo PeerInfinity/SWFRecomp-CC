@@ -2,7 +2,7 @@
 
 Cross-suite summary of all Ruffle-derived test suites. Each suite has its own `_investigation/` directory with detailed status docs.
 
-Last updated: 2026-05-07 (CI run `3b477b32` — `TextFormat-v7` promoted to ruffle_matched via `getTextExtent` wrap-width fix; Gnash actionscript.all effective rate 99.5%).
+Last updated: 2026-05-07 (place-before-define recompiler fix locally — Shumway flat 71→75 effective; CI for that pending. Earlier: CI run `3b477b32` — `TextFormat-v7` promoted to ruffle_matched via `getTextExtent` wrap-width fix; Gnash actionscript.all effective rate 99.5%).
 
 ## Suite Summary
 
@@ -16,9 +16,13 @@ Last updated: 2026-05-07 (CI run `3b477b32` — `TextFormat-v7` promoted to ruff
 | [from_gnash/misc-swfmill.all](../from_gnash/_investigation/CURRENT_STATUS.md) | 18 | 17 | 1 | 18 | **100.0%** | — | All effective pass. `jump_to_prev_block` (cross-DoAction backward jump) and `tags_after_last_showframe` both landed; plan moved to `complete/MISC_SWFMILL_PLAN.md`. |
 | [from_gnash/misc-ming.all](../from_gnash/_investigation/CURRENT_STATUS.md) | 102 | 64 | 22 | 86 | **84.3%** | — | +4 effective vs. `c5994ec1`: `key_event_test` (61/66) and `loop/loop_test6` (22/23) promoted to ruffle_matched this CI run. |
 | [from_gnash/misc-swfc.all](../from_gnash/_investigation/CURRENT_STATUS.md) | 15 | 8 | 5 | 13 | 86.7% | — | Test count dropped from 16→15 (one moved to ignore list). Unchanged otherwise. |
-| [from_shumway](../from_shumway/_investigation/CURRENT_STATUS.md) (flat) | 92 | 68 | 3 | 71 | 77.2% | — | Unchanged. 20 fuzz tests still fail; `avm1/moviecliploader` is the only non-fuzz failure. |
+| [from_shumway](../from_shumway/_investigation/CURRENT_STATUS.md) (flat) | 92 | 72 | 3 | 75 | 81.5% | **98.7%** (75/76) | Place-before-define recompiler fix landed locally (CI pending). 4 fuzz PASSes (incl. 2 RMATCH→PASS upgrades), 2 newly RMATCH; remaining 16 fuzz tests added to `ignored_tests.txt` as fuzzer noise. `avm1/moviecliploader` is the only non-fuzz failure. |
 | [from_shumway/avm1](../from_shumway/_investigation/CURRENT_STATUS.md) | 47 | 45 | 0 | 45 | 95.7% | **100.0%** (45/45) | 2 ignored. Only `moviecliploader` remains (MCL one-tick deferral). |
 | **SWFRecomp/tests** (old suite) | 158+59 | all trace pass | — | — | **100%** | — | Hand-written opcode tests. CI only. |
+
+## Progress Since 2026-05-07 (local; CI pending)
+
+- **Place-before-define recompiler fix.** Recompiler now tracks Define* character IDs (Sprite, Shape/Morph/Font, Button, Text/EditText, Bits, Sound, Video) in tag-stream order in `SWFRecomp/src/swf.cpp`. `PlaceObject{,2,3}` referencing a `char_id` not yet registered is degraded to `char_id=0` (modify) — matching Flash's sequential-dictionary semantics rather than Ruffle's eager pre-scan. Of 20 originally failing `from_shumway/fuzz/*` tests: 4 → PASS (incl. 2 RMATCH→PASS upgrades for `1276557624…`, `a86fee6d…`), 2 → newly RUFFLE_MATCHED (`4949de46…`, `887c02ab…`), 16 still MISMATCH (added to `from_shumway/ignored_tests.txt` as fuzzer noise). Verified: 26 AVM1 + 12 Shumway-flat canaries all pass — no regressions. See `avm1/_investigation/RUFFLE_VS_FLASH_DIFFERENCES.md` "PlaceObject Before DefineSprite" entry for the full Flash/Ruffle/us comparison; `from_shumway/_investigation/complete/SHUMWAY_FUZZ_TIMELINE_PLAN.md` for the test-by-test breakdown.
 
 ## Progress Since 2026-05-07 (CI snapshot at `035950cf`)
 
@@ -181,6 +185,6 @@ AVM1 filtered suite is at 100% (zero filtered failures); remaining actionable wo
 2. **Gnash `misc-mtasc/levels`** — only 1 failure in that sub-suite; needs multi-level SWF loading (`_level5`, `_level87`, `_level99`). See `LEVELS_PLAN.md`.
 3. **Gnash `misc-swfmill`** — 1 remaining failure (`jump_to_prev_block`, cross-DoAction backward jump). `tags_after_last_showframe` was fixed this session. See `incomplete/MISC_SWFMILL_PLAN.md` for the consecutive-DoAction concatenation fix plan.
 4. **Shumway `avm1/moviecliploader`** — sole remaining filtered failure. One-tick MCL deferral exposes latent getBounds / chained setInterval bugs. See `from_shumway/_investigation/incomplete/SHUMWAY_AVM1_SUBTREES_PLAN.md` Part B.
-5. **Shumway `fuzz/*`** — 27 fuzzer-generated SWFs failing in the flat suite. Useful as an edge-case discovery source for runtime/recompiler.
+5. **Shumway `fuzz/*`** — 16 fuzzer-generated SWFs in `ignored_tests.txt` after the place-before-define fix; useful only as an occasional edge-case discovery source. Not a focus area.
 6. **AVM1 image tests** — 14/31 strict pass, 10/31 tolerance. Remaining need Drawing API anti-aliasing, text layout, dynamic masks, or external media loading. Tracked in `IMAGE_COMPARISON_TESTS.md`.
 7. **Gnash `misc-ming.all` / `misc-swfc.all`** — ~76 of ~83 failing tests are actionable via Phase 1 (near-passing) + Phase 2 (mid-rate cluster fixes); only ~7 zero-output tests are blocked on the inlined-Dejagnu DoInitAction architectural issue (Phase 3). See `incomplete/MISC_MING_SWFC_PLAN.md`.

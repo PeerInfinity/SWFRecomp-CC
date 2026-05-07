@@ -3,6 +3,18 @@
 Historical session-by-session notes documenting changes, fixes, and investigations.
 For current test status, see `CURRENT_STATUS.md`.
 
+## Session notes (2026-05-07 — Shumway flat 71→75 effective, place-before-define recompiler fix)
+
+**`SWFRecomp/src/swf.cpp` + `SWFRecomp/include/swf.hpp`**: tag-stream-order character dictionary in the recompiler. New `SWF::defined_chars` set, populated at every `Define*` case as the recompiler walks tags in order (Sprite, Shape/Morph/Font via `interpretShape`, Button, Text/EditText, Bits/JPEG/Lossless, Sound, Video). Both root-timeline and sprite-internal `PlaceObject{,2,3}` cases check membership after parsing the `char_id`; if not yet registered, force `char_id=0` (and clear `has_character` on PO2/3). The runtime treats `char_id=0` as "modify-only" — a no-op when the depth is empty, which is the typical fuzz pattern of place-then-define-later.
+
+Why this matters: previously the recompiler emitted all `tagDefineSprite` calls into `tagInit` (runs once at startup), so every `PlaceObject` lookup succeeded regardless of tag-stream order. That matches Ruffle's eager pre-scan but disagrees with Flash, which builds the dictionary sequentially as tags are processed. For `from_shumway/fuzz/*` SWFs that reference a sprite before its `DefineSprite`, Flash places nothing (and the sprite's frame scripts never run) while we (and Ruffle) were placing the sprite eagerly and emitting the spurious sprite-frame traces.
+
+Of 20 originally failing fuzz tests: 4 → PASS (`4935e4ae…`, `b480790b…`, plus `1276557624…` and `a86fee6d…` upgraded RMATCH→PASS), 2 → newly RUFFLE_MATCHED (`4949de46…`, `887c02ab…`), 16 → still MISMATCH for unrelated fuzzer-noise reasons. The 16 stragglers added to `from_shumway/ignored_tests.txt`. Plan moved to `from_shumway/_investigation/complete/SHUMWAY_FUZZ_TIMELINE_PLAN.md`.
+
+First-iteration regression: tracking only `DefineSprite` broke `avm1/movieclip_in_removed_button` because that test's button references a Shape/Sprite combo and sprite-internal `PlaceObject2(shape_id)` was being forced to char_id=0. Fix: also track all the other `Define*` types. Final canary battery: 26 AVM1 + 12 Shumway-flat sample tests, all PASS; no regressions.
+
+Documented in `RUFFLE_VS_FLASH_DIFFERENCES.md` "PlaceObject Before DefineSprite". If a non-Sprite character type is ever found in a real (non-fuzz) place-before-define test, the existing tracking already covers it. Commits: `7875fb4a` (rename plan to `complete/`), `ba7a4725` (fix + docs).
+
 ## Session notes (2026-04-18 — 593→598 pass, 599→606 effective, **filtered → 100% (600/600)**)
 
 Five iterations cleared all 23 filtered failures from 2026-04-16. AVM1 filtered effective pass rate is now 100%; no actionable AVM1 failures remain.
