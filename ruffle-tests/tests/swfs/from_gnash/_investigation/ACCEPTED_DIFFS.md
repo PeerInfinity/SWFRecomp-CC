@@ -228,6 +228,71 @@ moves to `complete/` as of 2026-04-13.
 
 **Previously:** 2 diff lines per test. Error constructor coerced message to string (ECMA-262 §15.11.1), but Gnash expected raw storage. Now fixed: Error constructor stores raw argument value, matching Flash Player behavior. All 4 tests PASS. Removed from `ignored_tests.txt`.
 
+### opcode_guard_test (misc-ming.all) — Gnash silently swallows the failed-setTarget warning
+
+**Example diff (line indices into our 19-line output vs Flash's 18-line `output.txt`):**
+
+```
+       (lines 0–9 match Flash exactly)
+-  10  PASSED: undefined == undefined
++  10  Target not found: Target="non-exist-target" Base="_level0"
+-  11  PASSED: / == /
++  11  PASSED: undefined == undefined
+... (everything from index 10 onward shifts by +1)
+```
+
+**Source:** `gnash/testsuite/misc-ming.all/opcode_guard_test.c`. After
+several mc1/mc2 lifecycle assertions, the test does:
+
+```actionscript
+setTarget('non-exist-target');
+current_target = 0;
+asm { push 'current_target'; push ''; push 11; getproperty; setvariable; };
+_root.check_equals(current_target, undefined);   // PASSED
+_root.check_equals(_target, '/');                 // PASSED
+_root.check_equals(_root._currentframe, 9);       // PASSED
+gotoAndPlay(10);
+_root.check_equals(_root._currentframe, 9);       // PASSED (gotoFrame on invalid target is no-op)
+_root.check_equals(orignal_target_var, 100);     // PASSED
+setTarget('');
+```
+
+We pass every assertion (11/11). But Flash and Ruffle both emit a
+`Target not found: Target="non-exist-target" Base="_level0"` warning to
+trace output on the failed `setTarget`, while Gnash itself does not — so
+Gnash's recorded `output.txt` is missing that line. We match Flash/Ruffle
+and emit the warning, producing 19 lines vs Flash's 18.
+
+**Why the test cannot promote to `ruffle_matched`:** Ruffle ships an
+`output.ruffle.txt` that also contains the warning, but Ruffle additionally
+*fails* the mc1 Construct / Load / Unload event handler assertions — so its
+output is also 18 lines (extra warning line balanced by missing event
+lines). The verify_output.py subset_match check operates on raw line
+indices, so:
+
+- Our diff vs Flash: indices `{10, 11, 12, 14, 15, 16, 17, 18}` (the
+  warning at index 10 plus the trailing one-line shift).
+- Ruffle's diff vs Flash: indices `{2, 3, 4, 5, 6, 7, 8, 9, 15, 16}` (the
+  event-handler failures at the start, plus `#passed: 8` / `#failed: 3`
+  count divergence at the end).
+
+Our indices `{10, 11, 12, 14, 17, 18}` are not in Ruffle's diff set, so
+`our ⊄ ruffle` and the test stays as `output_mismatch`. Being *more*
+correct than Ruffle on the event-handler logic prevents the alignment
+needed for subset promotion.
+
+**Why we cannot suppress the warning:** AVM1 tests `tell_target_invalid`,
+`tell_target_invalid_swf6`, `tell_target`, `path_string`,
+`removed_base_clip_tell_target`, `swf4_actions_coercion_order`,
+`property_invalid_base_clip`, and `call` all assert this warning in their
+expected `output.txt`. Removing the `fputs("Target not found: ...")` at
+`SWFModernRuntime/src/actionmodern/action.c:48535` would regress them.
+
+**Decision:** Accept. Added to
+`from_gnash/misc-ming.all/ignored_tests.txt` so filtered results stop
+counting it as a failure. Test stays `known_failure = true` upstream. No
+implementation change.
+
 ---
 
 ## Category 2: Interactive / Wall-Clock Timing Tests
@@ -287,3 +352,4 @@ to `from_gnash/misc-swfc.all/ignored_tests.txt`.
 | ~~Error-v7~~ | ~~4~~ | ~~RESOLVED~~ | NOW PASS | Fixed 2026-04-10 |
 | ~~Error-v8~~ | ~~4~~ | ~~RESOLVED~~ | NOW PASS | Fixed 2026-04-10 |
 | sound (misc-swfc) | 5 | Interactive Flash session trace; expected output truncates mid-test waiting for sound playback. We have no audio backend, so the frame-6 loop exits immediately. | No audio simulation; test design assumes wall-clock playback | gnash/testsuite/misc-swfc.all/sound.sc |
+| opcode_guard_test (misc-ming) | 8 | Gnash's expected output omits the `Target not found` warning on a failed `setTarget`; we and Ruffle both emit it. We are MORE correct than Ruffle on the test's mc1 event-handler assertions, so the resulting line shift puts our diff indices outside Ruffle's diff set — the verify_output.py subset_match cannot promote us. | Match Flash/Ruffle (warning emitted); cannot suppress without breaking AVM1 tell_target_invalid / path_string etc. | Ruffle source `core/src/avm1/globals/movie_clip.rs` set_target trace |

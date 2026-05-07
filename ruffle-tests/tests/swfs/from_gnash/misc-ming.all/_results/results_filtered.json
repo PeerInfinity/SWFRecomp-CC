@@ -6,18 +6,18 @@
     "total_available": 102,
     "shards": 30,
     "expected_shards": 30,
-    "ignored_count": 0,
+    "ignored_count": 1,
     "filtered": true
   },
-  "total": 102,
+  "total": 101,
   "pass": 65,
   "ruffle_matched": 23,
-  "fail": 14,
-  "pass_rate": 63.7,
+  "fail": 13,
+  "pass_rate": 64.4,
   "effective_pass": 88,
-  "effective_pass_rate": 86.3,
+  "effective_pass_rate": 87.1,
   "breakdown": {
-    "output_mismatch": 14,
+    "output_mismatch": 13,
     "ruffle_matched": 23
   },
   "tests": [
@@ -1406,25 +1406,6 @@
       },
       "duration": 0.18,
       "status": "pass"
-    },
-    {
-      "test": "opcode_guard_test",
-      "phases": {
-        "recomp": 0.0,
-        "compile": 0.15,
-        "run": 0.003
-      },
-      "num_frames": 30,
-      "lines": {
-        "actual_lines": 19,
-        "expected_lines": 18,
-        "matching_lines": 11
-      },
-      "duration": 0.15,
-      "status": "output_mismatch",
-      "detail": "8 line(s) differ (actual=19, expected=18)",
-      "actual_output": "... (5 lines before) ...\nPASSED: undefined == undefined\nPASSED: testvar1  ==  'executed' [opcode_guard_test.c:122]\nPASSED: testvar2  ==  'executed' [opcode_guard_test.c:123]\nPASSED: testvar3  ==  'executed' [opcode_guard_test.c:124]\nmc2 EnterFrame called\nTarget not found: Target=\"non-exist-target\" Base=\"_level0\"\nPASSED: undefined == undefined\nPASSED: / == /\nPASSED: 9 == 9\nPASSED: 9 == 9\nPASSED: 100 == 100\n#passed: 11\n#failed: 0\n#total tests run: 11",
-      "expected_output": "... (5 lines before) ...\nPASSED: undefined == undefined\nPASSED: testvar1  ==  'executed' [opcode_guard_test.c:122]\nPASSED: testvar2  ==  'executed' [opcode_guard_test.c:123]\nPASSED: testvar3  ==  'executed' [opcode_guard_test.c:124]\nmc2 EnterFrame called\nPASSED: undefined == undefined\nPASSED: / == /\nPASSED: 9 == 9\nPASSED: 9 == 9\nPASSED: 100 == 100\n#passed: 11\n#failed: 0\n#total tests run: 11"
     },
     {
       "test": "path_format_test",

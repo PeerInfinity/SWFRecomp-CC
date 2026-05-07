@@ -6,26 +6,26 @@
 
 **Run Duration**: 0m 37s
 
-**Filtered**: 0 tests ignored out of 102 available
+**Filtered**: 1 tests ignored out of 102 available
 
 ## Summary
 
 | Metric | Value |
 |--------|-------|
-| Total tests | 102 |
-| Passing | **65** (63.7%) |
+| Total tests | 101 |
+| Passing | **65** (64.4%) |
 | Ruffle-matched | 23 (diffs ⊆ Ruffle's against Flash) |
-| Effective pass | **88** (86.3%) |
-| Failing | 14 |
-| Total expected lines | 4577 |
-| Matching lines | 3726 (81.4%) |
-| Mismatched lines | 851 |
+| Effective pass | **88** (87.1%) |
+| Failing | 13 |
+| Total expected lines | 4559 |
+| Matching lines | 3715 (81.5%) |
+| Mismatched lines | 844 |
 
 ### Failure Breakdown
 
 | Category | Count | % of Failures |
 |----------|-------|---------------|
-| Output Mismatch | 14 | 100.0% |
+| Output Mismatch | 13 | 100.0% |
 
 ## Passing Tests
 
@@ -133,15 +133,14 @@
 
 Tests with output mismatch but >= 50% line match rate (low-hanging fruit).
 
-**5 tests** within reach
+**4 tests** within reach
 
 | # | Test | Match Rate | Matching | Total | Diff Lines | Notes |
 |---|------|------------|----------|-------|------------|-------|
 | 1 | `DrawingApiTest` | 69.5% | 66 | 95 | 29 |  |
 | 2 | `DefineEditTextVariableNameTest` | 60.5% | 49 | 81 | 32 |  |
 | 3 | `EmbeddedFontTest` | 58.6% | 51 | 87 | 36 |  |
-| 4 | `opcode_guard_test` | 57.9% | 11 | 19 | 8 |  |
-| 5 | `action_order/action_execution_order_test11` | 53.1% | 17 | 32 | 15 |  |
+| 4 | `action_order/action_execution_order_test11` | 53.1% | 17 | 32 | 15 |  |
 
 ## Segfaults
 
@@ -157,21 +156,20 @@ No timeouts.
 
 ## All Output Mismatches
 
-**14 tests** with output mismatch, sorted by match rate (best first)
+**13 tests** with output mismatch, sorted by match rate (best first)
 
 | # | Test | Match Rate | Matching/Total | Actual | Expected | Notes |
 |---|------|------------|----------------|--------|----------|-------|
 | 1 | `DrawingApiTest` | 69.5% | 66/95 | 95 | 93 |  |
 | 2 | `DefineEditTextVariableNameTest` | 60.5% | 49/81 | 81 | 72 |  |
 | 3 | `EmbeddedFontTest` | 58.6% | 51/87 | 87 | 87 |  |
-| 4 | `opcode_guard_test` | 57.9% | 11/19 | 19 | 18 |  |
-| 5 | `action_order/action_execution_order_test11` | 53.1% | 17/32 | 32 | 32 |  |
-| 6 | `action_order/action_execution_order_test5` | 49.1% | 26/53 | 53 | 35 |  |
-| 7 | `register_class/RegisterClassTest4` | 40.5% | 17/42 | 39 | 42 |  |
-| 8 | `NetStream-SquareTest` | 39.8% | 86/216 | 201 | 216 |  |
-| 9 | `masks_test` | 16.0% | 28/175 | 28 | 175 |  |
-| 10 | `action_order/ActionOrderTest5` | 13.1% | 8/61 | 61 | 51 |  |
-| 11 | `loop/loop_test10` | 10.7% | 3/28 | 23 | 28 |  |
-| 12 | `action_order/ActionOrderTest4` | 9.5% | 7/74 | 74 | 64 |  |
-| 13 | `action_order/ActionOrderTest3` | 8.0% | 6/75 | 75 | 62 |  |
-| 14 | `action_order/action_execution_order_test6` | 0.0% | 0/24 | 20 | 24 |  |
+| 4 | `action_order/action_execution_order_test11` | 53.1% | 17/32 | 32 | 32 |  |
+| 5 | `action_order/action_execution_order_test5` | 49.1% | 26/53 | 53 | 35 |  |
+| 6 | `register_class/RegisterClassTest4` | 40.5% | 17/42 | 39 | 42 |  |
+| 7 | `NetStream-SquareTest` | 39.8% | 86/216 | 201 | 216 |  |
+| 8 | `masks_test` | 16.0% | 28/175 | 28 | 175 |  |
+| 9 | `action_order/ActionOrderTest5` | 13.1% | 8/61 | 61 | 51 |  |
+| 10 | `loop/loop_test10` | 10.7% | 3/28 | 23 | 28 |  |
+| 11 | `action_order/ActionOrderTest4` | 9.5% | 7/74 | 74 | 64 |  |
+| 12 | `action_order/ActionOrderTest3` | 8.0% | 6/75 | 75 | 62 |  |
+| 13 | `action_order/action_execution_order_test6` | 0.0% | 0/24 | 20 | 24 |  |

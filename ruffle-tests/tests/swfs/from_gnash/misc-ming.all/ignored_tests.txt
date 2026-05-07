@@ -1,0 +1,23 @@
+# Gnash misc-ming.all tests with permanent unfixable diffs.
+#
+# Add tests here only if:
+#   - They have permanently unfixable diffs
+#   - AND they do NOT qualify for ruffle_matched promotion
+#     (no known_failure / no output.ruffle.txt sidecar, OR
+#      our diff is not a subset of Ruffle's because we are MORE
+#      correct than Ruffle on the test logic, throwing off line
+#      alignment)
+#
+# See from_gnash/_investigation/ACCEPTED_DIFFS.md for explanations.
+
+# opcode_guard_test — Gnash's expected output omits the "Target not found"
+# warning that Flash / Ruffle (and we) emit on `setTarget('non-exist-target')`.
+# We get every assertion right (PASSED on all 11 checks) while Ruffle fails
+# the Construct / Load / Unload event handler assertions; so our trace has
+# 19 lines vs Flash's 18 (one extra warning line) and Ruffle's 18 (different
+# missing event lines balance the warning). Because we are MORE correct than
+# Ruffle, our diff-set against Flash is at different indices than Ruffle's
+# diff-set, so the verify_output.py subset_match cannot promote us. The test
+# is upstream `known_failure = true`. Cannot suppress the warning without
+# breaking AVM1 tell_target_invalid / path_string / tell_target / etc.
+opcode_guard_test
