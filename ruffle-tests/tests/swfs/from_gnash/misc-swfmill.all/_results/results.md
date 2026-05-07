@@ -1,10 +1,10 @@
 # Ruffle Test Results (Unfiltered)
 
-**Date**: 2026-05-07 01:35 UTC
+**Date**: 2026-05-07 02:46 UTC
 
-**Git SHA**: `035950cf18`
+**Git SHA**: `3b477b3240`
 
-**Run Duration**: 5m 4s
+**Run Duration**: 0m 4s
 
 ## Summary
 
@@ -25,23 +25,23 @@
 
 | # | Test | Lines | Duration | Notes |
 |---|------|-------|----------|-------|
-| 1 | `afunc_dict` | 2 | 16.7s |  |
-| 2 | `background` | 0 | 17.7s |  |
-| 3 | `dict_callframe` | 3 | 17.1s |  |
-| 4 | `dict_cross` | 3 | 17.2s |  |
-| 5 | `dict_event` | 5 | 17.1s |  |
-| 6 | `dict_override` | 2 | 17.3s |  |
-| 7 | `func_dict` | 3 | 16.7s |  |
-| 8 | `initaction_in_definesprite` | 2 | 17.5s |  |
-| 9 | `jump_after_end` | 3 | 17.0s |  |
-| 10 | `jump_to_prev_block` | 1 | 17.0s |  |
-| 11 | `missing_bitmap` | 0 | 17.7s |  |
-| 12 | `mixed-bytecode-as2` | 1 | 17.2s |  |
-| 13 | `tags_after_last_showframe` | 1 | 17.0s |  |
-| 14 | `trace-as2/root_onload` | 4 | 16.7s |  |
-| 15 | `trace-as2/shortstack` | 2 | 13.6s |  |
-| 16 | `trace-as2/super` | 8 | 17.3s |  |
-| 17 | `trace-as2/this` | 8 | 17.3s |  |
+| 1 | `afunc_dict` | 2 | 0.2s |  |
+| 2 | `background` | 0 | 0.2s |  |
+| 3 | `dict_callframe` | 3 | 0.2s |  |
+| 4 | `dict_cross` | 3 | 0.1s |  |
+| 5 | `dict_event` | 5 | 0.2s |  |
+| 6 | `dict_override` | 2 | 0.2s |  |
+| 7 | `func_dict` | 3 | 0.2s |  |
+| 8 | `initaction_in_definesprite` | 2 | 0.2s |  |
+| 9 | `jump_after_end` | 3 | 0.2s |  |
+| 10 | `jump_to_prev_block` | 1 | 0.2s |  |
+| 11 | `missing_bitmap` | 0 | 0.2s |  |
+| 12 | `mixed-bytecode-as2` | 1 | 0.1s |  |
+| 13 | `tags_after_last_showframe` | 1 | 0.3s |  |
+| 14 | `trace-as2/root_onload` | 4 | 0.1s |  |
+| 15 | `trace-as2/shortstack` | 2 | 0.2s |  |
+| 16 | `trace-as2/super` | 8 | 0.2s |  |
+| 17 | `trace-as2/this` | 8 | 0.2s |  |
 
 ## Ruffle-Matched Tests
 
@@ -49,7 +49,7 @@
 
 | # | Test | Our diffs | Ruffle diffs | Duration | Notes |
 |---|------|-----------|--------------|----------|-------|
-| 1 | `zeroframe_definesprite` | 2 | 2 | 15.2s |  |
+| 1 | `zeroframe_definesprite` | 2 | 2 | 0.2s |  |
 
 ## Near-Passing Tests
 
