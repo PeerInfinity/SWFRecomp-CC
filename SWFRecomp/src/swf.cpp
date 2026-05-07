@@ -4167,6 +4167,13 @@ namespace SWFRecomp
 					std::string name(cur_pos);
 					cur_pos += name.length() + 1;
 					imports.push_back({char_id, name});
+
+					// ImportAssets makes char_id available in the local
+					// dictionary at runtime (via tagImportCharacter). Treat
+					// it as a Define for place-before-define tracking so
+					// later root PlaceObject* tags referencing the imported
+					// char_id aren't degraded.
+					defined_chars.insert(char_id);
 				}
 				// Buffer into the current-frame prologue so imports
 				// resolve at the top of frame_N's body, in stream order
@@ -4367,13 +4374,18 @@ namespace SWFRecomp
 							u16 char_id = (u16) sub_tag.fields[0].value;
 							u16 depth = (u16) sub_tag.fields[1].value;
 
-							// Sprite-internal PlaceObject: same place-before-define
-							// rule as the root timeline. Char IDs defined later in
-							// the outer tag stream are not visible here.
-							if (char_id != 0 && !defined_chars.count(char_id))
-							{
-								char_id = 0;
-							}
+							// Note: place-before-define is intentionally NOT
+							// applied to sprite-internal PlaceObjects. Sprite
+							// placement happens at runtime, by which point
+							// any Define* tag later in the outer stream is
+							// already in the dictionary. Applying the check
+							// here regresses tests where a parent sprite is
+							// defined first and references siblings/children
+							// declared after it (e.g. AVM1
+							// `placeobject_occupied_depth`,
+							// `textsnapshot_available_text`, and Gnash
+							// Dejagnu-driven tests where the sprite places
+							// imported chars).
 
 							size_t transform_id = current_transform;
 							MATRIX matrix;
@@ -4548,13 +4560,11 @@ namespace SWFRecomp
 								char_id = (u16) sub_tag.fields[0].value;
 							}
 
-							// Sprite-internal PO2/3 place-before-define: same rule
-							// as the root timeline. See root PO2/3 site above.
-							if (has_character && char_id != 0 && !defined_chars.count(char_id))
-							{
-								has_character = false;
-								char_id = 0;
-							}
+							// Note: place-before-define is intentionally NOT
+							// applied to sprite-internal PO2/3. See the
+							// SWF_TAG_PLACE_OBJECT branch above for the
+							// rationale (sprite placement runs at instantiation
+							// time, after the full root dictionary is built).
 
 							size_t transform_id = current_transform;
 							if (has_matrix)

@@ -177,12 +177,16 @@ A SWF tag stream may contain a `PlaceObject{,2,3}` that references a character I
 - **Ruffle**: pre-scans the tag stream for `Define*` tags so the character dictionary is fully populated before timeline execution. The early `PlaceObject` succeeds and the sprite plays from frame 0.
 - **Our previous behavior**: matched Ruffle (the recompiler emitted all `tagDefineSprite` calls in `tagInit`, which runs before any frame).
 
-We now match Flash. The recompiler tracks the set of `DefineSprite`-registered character IDs in tag-stream order during compile time. When emitting a `tagPlaceObject{,2,3}` that references a `char_id` not yet in that set, the call's `char_id` is forced to 0, which the runtime treats as a "modify" — a benign no-op when the depth has no prior placement (the typical case for these fuzz SWFs).
+We now match Flash. The recompiler tracks the set of `Define*`-registered character IDs in tag-stream order during compile time. When emitting a *root-timeline* `tagPlaceObject{,2,3}` that references a `char_id` not yet in that set, the call's `char_id` is forced to 0, which the runtime treats as a "modify" — a benign no-op when the depth has no prior placement (the typical case for these fuzz SWFs).
 
-The change is in `SWFRecomp/src/swf.cpp` (root and sprite-internal `PLACE_OBJECT{,_2,_3}` cases) and `SWFRecomp/include/swf.hpp` (the new `defined_chars` set member).
+The change is in `SWFRecomp/src/swf.cpp` (root `PLACE_OBJECT{,_2,_3}` cases only) and `SWFRecomp/include/swf.hpp` (the new `defined_chars` set member).
+
+**Scope: root-timeline only.** The check is *not* applied to sprite-internal `PlaceObject` tags inside `DefineSprite`'s sub-tag handler. Those placements run at runtime when the sprite is instantiated, by which point the full root-level character dictionary has been built — so a sprite that internally places a sibling defined later in the root tag stream succeeds, matching Flash. Applying the check inline regressed AVM1 `placeobject_occupied_depth`, `textsnapshot_available_text` (both have `DefineSprite N` placing a sibling defined after `N` in the root stream), and the entire Gnash actionscript.all suite (Dejagnu's exported sprite places its child characters internally; the test SWFs import them via `ImportAssets` at root level, so `DefineSprite N` referencing imported chars `M`, `O` only works because the inner check is disabled).
+
+**ImportAssets registers char_ids.** The `IMPORT_ASSETS` / `IMPORT_ASSETS_2` handler now inserts each imported `char_id` into `defined_chars`. A subsequent root `PlaceObject{,2,3}` referencing one of those ids isn't degraded.
+
+**Tracked types.** `DefineSprite`, `DefineShape{,2,3,4}`, `DefineMorphShape{,2}`, `DefineFont{,2,3}`, `DefineButton{,2}`, `DefineText{,2}`, `DefineEditText`, `DefineBits` family, `DefineSound`, `DefineVideoStream`, plus `ImportAssets` imports.
 
 **Tests affected:** Of the 20 originally failing `from_shumway/fuzz/*` tests, 4 now PASS, 2 promoted from `MISMATCH` to `RUFFLE_MATCHED` (`4949de46…`, `887c02ab…`), 2 previously `RUFFLE_MATCHED` upgraded to PASS (`1276557624…`, `a86fee6d…`). The remaining 16 still fail — most because of unrelated fuzzer-generated state divergences. Those are listed in `from_shumway/ignored_tests.txt` with this rationale.
 
-**Decision:** Match Flash's sequential-dictionary semantics. The recompiler's pre-scan was a Ruffle-compat tweak; converting to "register on tag-stream encounter" is the spec-correct behavior.
-
-**Note:** This currently tracks only `DefineSprite`. Other character types (`DefineShape`, `DefineButton`, `DefineText`, etc.) follow different runtime registration paths and aren't yet involved in any place-before-define test we have. If future tests reveal place-before-define for those types, extend the `defined_chars` insertion sites in `swf.cpp` accordingly.
+**Decision:** Match Flash's sequential-dictionary semantics for root-timeline placement. Sprite-internal placement intentionally diverges from a literal "tag-stream-order dictionary" reading because Flash, Ruffle, and us all instantiate sprites at runtime — by which point the dictionary is complete.
