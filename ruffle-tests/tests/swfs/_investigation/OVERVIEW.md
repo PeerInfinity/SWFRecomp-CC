@@ -2,7 +2,7 @@
 
 Cross-suite summary of all Ruffle-derived test suites. Each suite has its own `_investigation/` directory with detailed status docs.
 
-Last updated: 2026-05-06 (CI run `c8f6452a` — `assetnativeaccessor*` PASS landed in CI; `key_event_test` + `loop/loop_test6` promoted to ruffle_matched in misc-ming.all; `try_catch_stack` is now AVM1's only filtered failure).
+Last updated: 2026-05-07 (CI run `035950cf` — `try_catch_stack` PASS via catch-entry stack truncate; AVM1 filtered effective pass back to 100%).
 
 ## Suite Summary
 
@@ -10,7 +10,7 @@ Last updated: 2026-05-06 (CI run `c8f6452a` — `assetnativeaccessor*` PASS land
 
 | Suite | Tests | Pass | RM | Effective | Effective Rate | Filtered Rate | Notes |
 |-------|-------|------|----|-----------| ---------------|---------------|-------|
-| [avm1](../avm1/_investigation/CURRENT_STATUS.md) | 648 | 604 | 9 | 613 | 94.6% | **99.8%** (607/608) | 40 ignored. `assetnativeaccessor*` now PASS (plan moved to `avm1/_investigation/complete/ASSETNATIVEACCESSOR_PLAN.md`). 1 filtered failure remains: `try_catch_stack` (14/16 — value-stack should be cleared on catch entry; see `avm1/_investigation/incomplete/TRY_CATCH_STACK_PLAN.md`). |
+| [avm1](../avm1/_investigation/CURRENT_STATUS.md) | 648 | 605 | 9 | 614 | 94.8% | **100.0%** (608/608) | 40 ignored. `try_catch_stack` PASS this CI via `actionCatchEnter` truncating the value stack to its try-begin SP (asymmetric — pops are not undone). Plan moved to `avm1/_investigation/complete/TRY_CATCH_STACK_PLAN.md`. Zero filtered failures. |
 | [from_gnash/actionscript.all](../from_gnash/_investigation/CURRENT_STATUS.md) | 190 | 126 | 62 | 188 | **98.9%** | — | Unchanged this CI. 2 raw failures remain: `array-v5` (sort/Array-method-on-Object semantics) and `TextFormat-v7` (font metric precision). |
 | [from_gnash/misc-mtasc.all](../from_gnash/_investigation/CURRENT_STATUS.md) | 9 | 7 | 2 | 9 | **100.0%** | — | All effective pass. |
 | [from_gnash/misc-swfmill.all](../from_gnash/_investigation/CURRENT_STATUS.md) | 18 | 17 | 1 | 18 | **100.0%** | — | All effective pass. `jump_to_prev_block` (cross-DoAction backward jump) and `tags_after_last_showframe` both landed; plan moved to `complete/MISC_SWFMILL_PLAN.md`. |
@@ -26,9 +26,9 @@ Last updated: 2026-05-06 (CI run `c8f6452a` — `assetnativeaccessor*` PASS land
 - **`key_event_test` (Gnash misc-ming.all) → ruffle_matched (61/66, was 33/66 → output_mismatch).** Phase 2 of the key-event work narrowed `tagRemoveObject2`'s backward-catch-up early-return.
 - **`loop/loop_test6` (Gnash misc-ming.all) → ruffle_matched (22/23, was 11/23 → output_mismatch).**
 
-### New filtered failure (AVM1)
+## Progress Since 2026-05-06 (CI snapshot at `c8f6452a`) — fixed
 
-`try_catch_stack` (14/16) — first observed in CI at `ad31c865`. Diff is on lines 2 and 4: our output says "The stack was preserved!" where Flash/Ruffle expects "The stack was not preserved!". The catch block reads a value off the value stack from before the throw; Flash clears the value stack on catch entry, we don't. New plan: `avm1/_investigation/incomplete/TRY_CATCH_STACK_PLAN.md`.
+- **`try_catch_stack` (AVM1) → PASS (16/16).** `actionCatchEnter` now truncates the value stack to its size at try-begin if the body net-pushed values that survived the throw — mirrors Ruffle commit `0fc689cce` (`Vec::truncate(original_stack_size)`). Truncate-only is load-bearing: symmetric SP restore would un-pop body-side pops, breaking the test's "in reverse" section. Plan in `avm1/_investigation/complete/TRY_CATCH_STACK_PLAN.md`.
 
 ## Progress Since 2026-05-05 (CI snapshot at `c5994ec1`)
 
@@ -171,7 +171,7 @@ Note: Boolean-v5/v6/v7/v8, Video-v6/v7/v8, Selection-v5, Stage-v5 were already p
 
 ## Where to Focus
 
-AVM1 filtered suite is at 99.8% (1 failure: `try_catch_stack`); remaining actionable work is in the Gnash and Shumway suites.
+AVM1 filtered suite is at 100% (zero filtered failures); remaining actionable work is in the Gnash and Shumway suites.
 
 1. **Gnash actionscript.all near-passing** — 22+ tests with <=18 line diffs. `global_proto_decls*` enumeration/ordering, `Number-v5..v8` float-to-string rounding, `Selection-v6/7/8`, `ExternalInterface-v8`. See `from_gnash/_investigation/incomplete/GNASH_NEAR_PASSING_PLAN.md`.
 2. **Gnash `misc-mtasc/levels`** — only 1 failure in that sub-suite; needs multi-level SWF loading (`_level5`, `_level87`, `_level99`). See `LEVELS_PLAN.md`.
