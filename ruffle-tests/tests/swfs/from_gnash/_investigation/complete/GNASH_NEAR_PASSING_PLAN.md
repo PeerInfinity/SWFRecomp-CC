@@ -3,14 +3,14 @@
 
 <!-- PLAN_META
 id: GNASH_NEAR_PASSING
-status: incomplete
+status: completed
 phases:
   - id: 1
     name: "Trivial fixes (NetStream, Transform)"
     status: completed
   - id: 2
     name: "htmlText setter and text clearing"
-    status: partial
+    status: completed
   - id: 3
     name: "Color/ColorTransform constructors"
     status: completed
@@ -25,16 +25,35 @@ phases:
     status: completed
   - id: 7
     name: "Selection replaceSel index tracking"
-    status: partial
+    status: completed
 dependencies: []
 blockers: []
 -->
 
-Last updated: 2026-04-18
+Last updated: 2026-05-06 (promoted to complete/ — every test in the TESTS list is now PASS or ruffle_matched in CI `c8f6452a`).
 
-## Status: 16/22 effective (11 PASS + 5 ruffle_matched), 6 remaining
+## Status: COMPLETE — 22/22 effective (14 PASS + 8 ruffle_matched)
 
-Out of 22 tests, 16 now effectively pass and 6 remain as `output_mismatch`:
+Per CI `c8f6452a` filtered results:
+
+- **PASS (14):** NetStream-v6/v7/v8, Transform-v6/v7, Color-v6, ColorTransform-v8, LocalConnection-v6/v7/v8, TextFieldHTML-v6/v7/v8 (htmlText stale-regen + malformed-attribute text-clear both landed since 2026-04-18).
+- **ruffle_matched (8):** TextField-v5 (9/12), ExternalInterface-v8 (114/118), Inheritance-v5/v6/v7/v8, Selection-v6/v7/v8 (118/125 — residuals are gnash-bug cases where our impl is more correct than Gnash's expected output, matched by Ruffle's diff against Flash).
+
+Per-test verification command:
+
+```bash
+python3 ruffle-tests/verify_output.py \
+  --tests-dir=ruffle-tests/tests/swfs/from_gnash/actionscript.all \
+  --test=NetStream-v6 --diff --verbose
+```
+
+(Substitute any of the 22 test names.)
+
+---
+
+## Original status (preserved for context, 2026-04-18)
+
+Out of 22 tests, 16 then-effectively passed and 6 remained as `output_mismatch`:
 
 **Now passing (11):** NetStream-v6/v7/v8, Transform-v6/v7, Color-v6,
 ColorTransform-v8, LocalConnection-v6/v7/v8, TextField-v5.

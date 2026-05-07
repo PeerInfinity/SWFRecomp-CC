@@ -1,11 +1,9 @@
 # Shumway avm1/ Remaining Failures — Fix Plan
-<!-- TESTS: doactionorder/doactionorder, moviecliploader, avm1/doactionorder/doactionorder, avm1/moviecliploader -->
+<!-- TESTS: moviecliploader, avm1/moviecliploader -->
 
-Two tests remaining in the `from_shumway/avm1/` sub-tree (both also surface in the flat `from_shumway/` suite). Both were punted as "larger/blocked" by the previous plan (`complete/SHUMWAY_AVM1_SUBTREES_PLAN.md` for the 12 fixed clusters).
+One test remaining in the `from_shumway/avm1/` sub-tree (also surfaces in the flat `from_shumway/` suite). Originally this plan tracked two — Part A (`doactionorder/doactionorder`) was resolved by Phase 6 of the ActionQueue rework (commit `a427f5fc`). Part A's content is preserved below as historical context. Active work is **Part B only** (moviecliploader, MCL one-tick deferral).
 
-This file is the concrete fix plan for those two, informed by Ruffle-source inspection, a full audit of our runtime/recompiler, and a scan of existing passing tests for regression risk.
-
-- **Part A** — `doactionorder/doactionorder` (3/7). FIFO queueing of DoAction across root and sprite tags.
+- ~~**Part A** — `doactionorder/doactionorder` (3/7). FIFO queueing of DoAction across root and sprite tags.~~ — **RESOLVED** via Phase 6 of `complete/ACTION_QUEUE_PLAN.md`. The approach this section originally proposed (A3) effectively became that plan.
 - **Part B** — `moviecliploader` (1/7). Deferring MovieClipLoader events one frame tick so they fire after the next frame's DoAction.
 
 Commands:
@@ -13,16 +11,18 @@ Commands:
 ```bash
 python3 ruffle-tests/verify_output.py \
   --tests-dir=ruffle-tests/tests/swfs/from_shumway \
-  --test=avm1/doactionorder/doactionorder --diff --verbose
-
-python3 ruffle-tests/verify_output.py \
-  --tests-dir=ruffle-tests/tests/swfs/from_shumway \
   --test=avm1/moviecliploader --diff --verbose
 ```
 
 ---
 
-## Part A — `doactionorder/doactionorder`
+## Part A — `doactionorder/doactionorder` (RESOLVED 2026-04-XX via ActionQueue Phase 6)
+
+The analysis below was the basis for the unified ActionQueue work; it landed
+via that plan and `doactionorder` now PASSES (7/7). Kept here for historical
+context and as background for anyone tracing the FIFO-DoAction lineage.
+
+### Diff (baseline 2026-04-17)
 
 ### Diff (baseline 2026-04-17)
 

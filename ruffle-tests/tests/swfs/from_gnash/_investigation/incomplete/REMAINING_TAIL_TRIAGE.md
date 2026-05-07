@@ -1,6 +1,6 @@
 # Remaining Tail Triage
 
-<!-- TESTS: matrix_test, DefineEditTextVariableNameTest, EmbeddedFontTest, DrawingApiTest, NetStream-SquareTest, loop/loop_test10, opcode_guard_test, masks_test, duplicate_movie_clip_test, soft_reference_test1, movieclip_destruction_test4 -->
+<!-- TESTS: matrix_test, DefineEditTextVariableNameTest, EmbeddedFontTest, DrawingApiTest, NetStream-SquareTest, loop/loop_test10, opcode_guard_test, masks_test, duplicate_movie_clip_test, soft_reference_test1, movieclip_destruction_test4, action_order/action_execution_order_test6 -->
 
 <!-- Resolved 2026-05-02:
   - loop/loop_test → PASS (was 5/21; fixed in cluster work)
@@ -25,6 +25,27 @@
     syncs parent.dynamic_props and (root only) var_map on rename,
     matching Ruffle's MovieClip::set_name binding-replacement
     semantics. -->
+
+
+<!-- Resolved 2026-05-06 (CI c8f6452a):
+  - key_event_test → ruffle_matched 61/66 (was 33/66). Phase 2 of
+    key-event work narrowed tagRemoveObject2's backward-catch-up
+    early-return.
+  - loop/loop_test6 → ruffle_matched 22/23 (was 11/23). Same root
+    cause as key_event_test.
+
+  Re-baselined open entries (CI c8f6452a):
+  - matrix_test 918/1086 → 949/1086 (84.5% → 87.4%)
+  - opcode_guard_test 10/18 → 11/18 (55.6% → 61.1%)
+  - DefineEditTextVariableNameTest 49/72 unchanged (68.1%)
+  - DrawingApiTest 66/93 unchanged (71.0%)
+  - EmbeddedFontTest 51/87 unchanged (58.6%)
+  - NetStream-SquareTest 86/216 unchanged (39.8%)
+  - loop/loop_test10 3/28 unchanged (10.7%)
+  - masks_test 28/175 unchanged (16.0%)
+  - duplicate_movie_clip_test 3/33 unchanged (9.1%)
+  - movieclip_destruction_test4 8/40 unchanged (20.0%)
+-->
 
 
 <!-- Investigated 2026-05-02 (no fix landed):
@@ -118,7 +139,7 @@ A few entries share enough DNA to be worth attacking together:
 
 ## Entries — misc-ming.all
 
-### matrix_test (84.5%, 918/1086) — multi-issue
+### matrix_test (87.4%, 949/1086) — multi-issue
 
 **Symptom.** Three independent issues per `MISC_MING_SWFC_PLAN.md`:
 
@@ -247,7 +268,7 @@ and `apply_place_object` excludes name/clip_depth/clip_actions).
 the depth holds a sprite from a previous frame. See `CURRENT_STATUS.md`
 "Latest fixes" for details.
 
-### opcode_guard_test (55.6%, 10/18 — bug 2 fixed 2026-05-02)
+### opcode_guard_test (61.1%, 11/18 — bug 2 fixed 2026-05-02)
 
 **Status update 2026-05-02.** Bug 2 fixed: bare `GetVariable("_target")`
 no longer gated on `g_settarget_invalid`. Now correctly returns `/` (root
@@ -310,6 +331,25 @@ an `input.json` for tests that detect a "Press any key" prompt,
 or add a CLI flag that injects a default keypress at frame N.
 **Promote to standalone plan when work begins** (verifier change
 is its own concern).
+
+### action_order/action_execution_order_test6 (0%, 0/24)
+
+**Symptom.** Zero output produced — actual is 20 lines, expected is 24, no
+common lines. Was originally tracked in `incomplete/ZERO_OUTPUT_TRIAGE_PLAN.md`,
+where the 2026-05-04 entry "Predictions that didn't pan out" notes this test
+was predicted to flip to `ruffle_matched` via subset-of-Ruffle promotion but
+the prediction did not pan out at CI snapshot `c5994ec1` — still
+`output_mismatch`, still 0/24 in CI `c8f6452a`.
+
+**Hypothesis.** Either (a) the local-vs-CI Ruffle expectation differs (the
+local prediction relied on `output.ruffle.txt` content that may not be in
+CI), (b) `RUFFLE_KNOWN_FAILURE_HANDLING` doesn't auto-promote it for some
+reason, or (c) the actual diff really is unrelated to Ruffle's diff.
+
+**Scope.** ~1 hour. Run locally with `--diff --verbose`, inspect
+`output.ruffle.txt` (if present), confirm whether our diff is actually a
+strict subset of Ruffle's. If it is, the gap is in promotion logic; if not,
+re-categorize as either deferred-clip-unload-family or its own root cause.
 
 ### duplicate_movie_clip_test (9.1%, 3/33) — **blocked by CLONESPRITE_DEPTH_BIAS**
 

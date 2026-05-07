@@ -1,18 +1,23 @@
 # Gnash Test Suite Status
 
-Last updated: 2026-05-05 (CI snapshot at `c5994ec1` — 2026-05-04 fixes landed: frame_label_test PASS, soft_reference_test1 RM, Global-v6/v7/v8.)
+Last updated: 2026-05-06 (CI snapshot at `c8f6452a` — `key_event_test` and `loop/loop_test6` promoted to ruffle_matched in misc-ming.all this run.)
 
-### CI snapshot (commit `c5994ec1`, 2026-05-05)
+### CI snapshot (commit `c8f6452a`, 2026-05-06)
 
 | Suite | Pass | RM | Effective | Total | Rate |
 |-------|------|----|-----------|-------|------|
 | actionscript.all | 126 | 62 | 188 | 190 | **98.9%** |
-| misc-ming.all | 64 | 18 | 82 | 102 | 80.4% |
+| misc-ming.all | 64 | 22 | 86 | 102 | **84.3%** |
 | misc-mtasc.all | 7 | 2 | 9 | 9 | 100.0% |
-| misc-swfc.all | 7 | 5 | 12 | 16 | 75.0% |
+| misc-swfc.all | 8 | 5 | 13 | 15 | **86.7%** |
 | misc-swfmill.all | 17 | 1 | 18 | 18 | 100.0% |
 
-Net change vs. `48a97e0b` snapshot: actionscript.all +3 effective (Global-v6/v7/v8 promoted via ASSetNative), misc-ming.all +7 effective (frame_label_test PASS + other recent fixes), misc-swfc.all +0 (soft_reference_test1 RM was already counted local-only), misc-swfmill.all +1 effective.
+Net change vs. `c5994ec1` snapshot: misc-ming.all +4 effective (`key_event_test` 33/66 → ruffle_matched 61/66; `loop/loop_test6` 11/23 → ruffle_matched 22/23), misc-swfc.all +1 effective and total dropped 16→15 (one test moved to ignore list).
+
+### Latest fixes (2026-05-06, in CI at `c8f6452a`)
+
+- **`key_event_test` (misc-ming.all) → ruffle_matched (61/66, was 33/66 → output_mismatch).** Phase 2 of the key-event work narrowed `tagRemoveObject2`'s backward-catch-up early-return so depth-shifted unload bookkeeping no longer suppresses key-event dispatch on the surviving children. See git log `c8f6452a` for the diff. The 5 residual lines are a strict subset of Ruffle's diff against Flash, so the test promotes to ruffle_matched.
+- **`loop/loop_test6` (misc-ming.all) → ruffle_matched (22/23, was 11/23 → output_mismatch).** Same root cause (key-event dispatch surviving the catch-up early-return); the single residual line is in Ruffle's diff against Flash.
 
 ### Latest fixes (2026-05-04, in CI at `c5994ec1`)
 

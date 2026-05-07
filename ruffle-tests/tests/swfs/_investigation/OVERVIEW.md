@@ -2,7 +2,7 @@
 
 Cross-suite summary of all Ruffle-derived test suites. Each suite has its own `_investigation/` directory with detailed status docs.
 
-Last updated: 2026-05-05 (CI run `c5994ec1` — 2026-05-04 fixes landed in CI: frame_label_test PASS, soft_reference_test1 RM, Global-v6/v7/v8, ASSetNative, _currentframe sync for fuzz tests; ~13 effective passes since 2026-05-04 snapshot).
+Last updated: 2026-05-06 (CI run `c8f6452a` — `assetnativeaccessor*` PASS landed in CI; `key_event_test` + `loop/loop_test6` promoted to ruffle_matched in misc-ming.all; `try_catch_stack` is now AVM1's only filtered failure).
 
 ## Suite Summary
 
@@ -10,15 +10,25 @@ Last updated: 2026-05-05 (CI run `c5994ec1` — 2026-05-04 fixes landed in CI: f
 
 | Suite | Tests | Pass | RM | Effective | Effective Rate | Filtered Rate | Notes |
 |-------|-------|------|----|-----------| ---------------|---------------|-------|
-| [avm1](../avm1/_investigation/CURRENT_STATUS.md) | 647 | 602 | 9 | 611 | 94.4% | **99.7%** (605/607) | 40 ignored. 2 NEW filtered failures: `assetnativeaccessor`, `assetnativeaccessor_ids` (upstream-added; need ASSetNativeAccessor + ConvolutionFilter ASnative dispatch — see `ASSETNATIVEACCESSOR_PLAN.md`). |
-| [from_gnash/actionscript.all](../from_gnash/_investigation/CURRENT_STATUS.md) | 190 | 126 | 62 | 188 | **98.9%** | — | +3 effective in this CI: Global-v6/v7/v8 promoted via ASSetNative landing. 2 raw failures remain: `array-v5` (sort/Array-method-on-Object semantics) and `TextFormat-v7` (font metric precision). |
+| [avm1](../avm1/_investigation/CURRENT_STATUS.md) | 648 | 604 | 9 | 613 | 94.6% | **99.8%** (607/608) | 40 ignored. `assetnativeaccessor*` now PASS (plan moved to `avm1/_investigation/complete/ASSETNATIVEACCESSOR_PLAN.md`). 1 filtered failure remains: `try_catch_stack` (14/16 — value-stack should be cleared on catch entry; see `avm1/_investigation/incomplete/TRY_CATCH_STACK_PLAN.md`). |
+| [from_gnash/actionscript.all](../from_gnash/_investigation/CURRENT_STATUS.md) | 190 | 126 | 62 | 188 | **98.9%** | — | Unchanged this CI. 2 raw failures remain: `array-v5` (sort/Array-method-on-Object semantics) and `TextFormat-v7` (font metric precision). |
 | [from_gnash/misc-mtasc.all](../from_gnash/_investigation/CURRENT_STATUS.md) | 9 | 7 | 2 | 9 | **100.0%** | — | All effective pass. |
 | [from_gnash/misc-swfmill.all](../from_gnash/_investigation/CURRENT_STATUS.md) | 18 | 17 | 1 | 18 | **100.0%** | — | All effective pass. `jump_to_prev_block` (cross-DoAction backward jump) and `tags_after_last_showframe` both landed; plan moved to `complete/MISC_SWFMILL_PLAN.md`. |
-| [from_gnash/misc-ming.all](../from_gnash/_investigation/CURRENT_STATUS.md) | 102 | 64 | 18 | 82 | **80.4%** | — | +4 effective: `frame_label_test` PASS (actionCall isolated drain); plus other recent fixes. |
-| [from_gnash/misc-swfc.all](../from_gnash/_investigation/CURRENT_STATUS.md) | 16 | 7 | 5 | 12 | 75.0% | — | Unchanged this CI; soft_reference_test1 → ruffle_matched landed in 2026-05-04 fix already counted in prior snapshot. |
-| [from_shumway](../from_shumway/_investigation/CURRENT_STATUS.md) (flat) | 92 | 68 | 3 | 71 | 77.2% | — | +4 effective: 5 fuzz tests with `this._currentframe` traces flipped via `mc->currentframe` natural-advance sync. 20 fuzz tests still fail; `avm1/moviecliploader` is the only non-fuzz failure. |
-| [from_shumway/avm1](../from_shumway/_investigation/CURRENT_STATUS.md) | 47 | 45 | 1 | 46 | **97.9%** | **100.0%** (45/45) | 2 ignored. Only `moviecliploader` remains (MCL one-tick deferral). |
+| [from_gnash/misc-ming.all](../from_gnash/_investigation/CURRENT_STATUS.md) | 102 | 64 | 22 | 86 | **84.3%** | — | +4 effective vs. `c5994ec1`: `key_event_test` (61/66) and `loop/loop_test6` (22/23) promoted to ruffle_matched this CI run. |
+| [from_gnash/misc-swfc.all](../from_gnash/_investigation/CURRENT_STATUS.md) | 15 | 8 | 5 | 13 | 86.7% | — | Test count dropped from 16→15 (one moved to ignore list). Unchanged otherwise. |
+| [from_shumway](../from_shumway/_investigation/CURRENT_STATUS.md) (flat) | 92 | 68 | 3 | 71 | 77.2% | — | Unchanged. 20 fuzz tests still fail; `avm1/moviecliploader` is the only non-fuzz failure. |
+| [from_shumway/avm1](../from_shumway/_investigation/CURRENT_STATUS.md) | 47 | 45 | 0 | 45 | 95.7% | **100.0%** (45/45) | 2 ignored. Only `moviecliploader` remains (MCL one-tick deferral). |
 | **SWFRecomp/tests** (old suite) | 158+59 | all trace pass | — | — | **100%** | — | Hand-written opcode tests. CI only. |
+
+## Progress Since 2026-05-06 (CI snapshot at `c8f6452a`)
+
+- **`assetnativeaccessor` + `assetnativeaccessor_ids` (AVM1) → PASS.** `ASSetNativeAccessor` builtin and ConvolutionFilter (class 1109) `ASnative` dispatch landed. Plan moved to `avm1/_investigation/complete/ASSETNATIVEACCESSOR_PLAN.md`.
+- **`key_event_test` (Gnash misc-ming.all) → ruffle_matched (61/66, was 33/66 → output_mismatch).** Phase 2 of the key-event work narrowed `tagRemoveObject2`'s backward-catch-up early-return.
+- **`loop/loop_test6` (Gnash misc-ming.all) → ruffle_matched (22/23, was 11/23 → output_mismatch).**
+
+### New filtered failure (AVM1)
+
+`try_catch_stack` (14/16) — first observed in CI at `ad31c865`. Diff is on lines 2 and 4: our output says "The stack was preserved!" where Flash/Ruffle expects "The stack was not preserved!". The catch block reads a value off the value stack from before the throw; Flash clears the value stack on catch entry, we don't. New plan: `avm1/_investigation/incomplete/TRY_CATCH_STACK_PLAN.md`.
 
 ## Progress Since 2026-05-05 (CI snapshot at `c5994ec1`)
 
@@ -29,10 +39,6 @@ The 2026-05-04 fixes that were "NOT yet in CI" in the last snapshot landed in th
 - **Global-v6 (Gnash actionscript.all) → ruffle_matched, Global-v7/v8 → PASS** via `ASSetNative` implementation (was a noop).
 - **`assetnative` + `assetnative_ids` (AVM1) → PASS** as side-effect of ASSetNative.
 - **5 Shumway fuzz tests with `this._currentframe` traces → PASS** via natural-advance `mc->currentframe` sync in `advance_sprite_frames`.
-
-### New filtered failures (AVM1)
-
-Upstream sync added `assetnativeaccessor` and `assetnativeaccessor_ids` tests; both currently fail. They need `ASSetNativeAccessor` implementation + ConvolutionFilter (class 1109) `ASnative` dispatch. Documented in `avm1/_investigation/incomplete/ASSETNATIVEACCESSOR_PLAN.md`. Filtered rate temporarily dipped from 100% → 99.7% pending fix or ignore-list addition.
 
 ## Progress Since 2026-05-04
 
@@ -165,7 +171,7 @@ Note: Boolean-v5/v6/v7/v8, Video-v6/v7/v8, Selection-v5, Stage-v5 were already p
 
 ## Where to Focus
 
-AVM1 filtered suite is at 100%; remaining actionable work is in the Gnash and Shumway suites.
+AVM1 filtered suite is at 99.8% (1 failure: `try_catch_stack`); remaining actionable work is in the Gnash and Shumway suites.
 
 1. **Gnash actionscript.all near-passing** — 22+ tests with <=18 line diffs. `global_proto_decls*` enumeration/ordering, `Number-v5..v8` float-to-string rounding, `Selection-v6/7/8`, `ExternalInterface-v8`. See `from_gnash/_investigation/incomplete/GNASH_NEAR_PASSING_PLAN.md`.
 2. **Gnash `misc-mtasc/levels`** — only 1 failure in that sub-suite; needs multi-level SWF loading (`_level5`, `_level87`, `_level99`). See `LEVELS_PLAN.md`.

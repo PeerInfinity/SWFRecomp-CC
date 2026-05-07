@@ -1,18 +1,29 @@
 # Current Ruffle Test Status
 
-Last updated: 2026-05-05 (post-CI `c5994ec1`: ASSetNativeAccessor + ConvolutionFilter ASnative dispatch landed; the 2 remaining filtered failures are now PASS locally).
+Last updated: 2026-05-06 (CI `c8f6452a`: `assetnativeaccessor*` PASS landed; 1 NEW filtered failure: `try_catch_stack`).
 
-## Latest CI snapshot (commit `c5994ec1`, 2026-05-05)
+## Latest CI snapshot (commit `c8f6452a`, 2026-05-06)
 
 | Metric | Raw | Filtered |
 |--------|-----|----------|
-| Total | 647 | 607 |
-| Pass | 602 | 601 |
+| Total | 648 | 608 |
+| Pass | 604 | 603 |
 | Ruffle-matched | 9 | 4 |
-| Effective pass | 611 (94.4%) | 605 (99.7%) |
-| Fail | 36 | 2 |
+| Effective pass | 613 (94.6%) | 607 (99.8%) |
+| Fail | 35 | 1 |
 
-The 2 filtered failures are `assetnativeaccessor` and `assetnativeaccessor_ids` (upstream-added — see "Latest fixes" below).
+The single filtered failure is `try_catch_stack` (14/16 — see "New filtered failure" below). The previous CI's `assetnativeaccessor` and `assetnativeaccessor_ids` filtered failures both now PASS.
+
+## New filtered failure: `try_catch_stack` (14/16)
+
+First observed in CI at `ad31c865` (2026-05-06). Diff is 2 lines (lines 2 and 4):
+
+```
+expected: "The stack was not preserved!"
+actual:   "The stack was preserved!"
+```
+
+The catch block reads a value off the value stack from before the throw — Flash clears the value stack on entry to the catch block; we don't. Plan: `incomplete/TRY_CATCH_STACK_PLAN.md`.
 
 ## Latest fixes (in CI at `c5994ec1`, landed 2026-05-04 sessions)
 
@@ -69,12 +80,12 @@ The 2 filtered failures are `assetnativeaccessor` and `assetnativeaccessor_ids` 
 
 ## Quick Summary
 
-- **Pass rate (CI `c5994ec1`)**: 602/647 (93.0%) raw, **611/647 (94.4%) effective** (raw + 9 ruffle_matched), **605/607 (99.7%) filtered** — 2 filtered failures (`assetnativeaccessor*`, upstream-added).
-- **Test count**: 647 (+4 from latest upstream sync, including 4 `assetnative*` tests). 40 tests in `ignored_tests.txt` (accepted diffs / Ruffle-vs-Flash / Ruffle known_failure).
+- **Pass rate (CI `c8f6452a`)**: 604/648 (93.2%) raw, **613/648 (94.6%) effective** (raw + 9 ruffle_matched), **607/608 (99.8%) filtered** — 1 filtered failure (`try_catch_stack`, 14/16).
+- **Test count**: 648 (+1 since 2026-05-05 — `try_catch_stack`). 40 tests in `ignored_tests.txt` (accepted diffs / Ruffle-vs-Flash / Ruffle known_failure).
 - **Image test baseline**: 14/31 strict image match, 10/31 tolerance pass.
-- **Main failure types** (raw): output_mismatch (36), runtime_error/segfault/timeout (0), compile_fail (0).
-- **Filtered effective pass: 99.7%.** Two actionable failures: `assetnativeaccessor` + `assetnativeaccessor_ids` (need ASSetNativeAccessor + ConvolutionFilter dispatch).
-- **Change from 2026-05-04 doc snapshot:** +2 effective passes from `assetnative*` (non-accessor variants); −2 filtered passes from new `assetnativeaccessor*` tests. Net effective +2.
+- **Main failure types** (raw): output_mismatch (35), runtime_error/segfault/timeout (0), compile_fail (0).
+- **Filtered effective pass: 99.8%.** One actionable failure: `try_catch_stack` (14/16, see plan above).
+- **Change from 2026-05-05 doc snapshot:** +2 effective passes from `assetnativeaccessor*` landing; +1 new test (`try_catch_stack`, fails). Net effective +2.
 - **Latest fixes (2026-04-18, this session)**:
   - **`bitmap_data_thorough/threshold` PASS** — opaque BMD `getPixel32` returns raw stored pixel (no un-premul); `mask` arg defaults to `0xFFFFFFFF` only when missing (undefined coerces to 0).
   - **`bitmap_data_thorough/noise` PASS** — `high` arg defaults to `0xFF` only when missing (undefined → 0); alpha-channel RNG only fires for transparent BMDs; seed/low/high coerced via `doubleToUint32` so NaN/Infinity → 0 (ECMA ToInt32).
@@ -201,11 +212,9 @@ The 2 filtered failures are `assetnativeaccessor` and `assetnativeaccessor_ids` 
 
 No crashes or segfaults remain. All previous crashes have been fixed.
 
-## Remaining Filtered Failures: 0 (post-2026-05-05 fix)
+## Remaining Filtered Failures: 1
 
-The two `assetnativeaccessor*` tests (the only filtered failures at CI
-`c5994ec1`) now PASS locally. Once merged via the next CI run, the AVM1
-filtered effective pass rate returns to 100%.
+`try_catch_stack` (14/16) — value stack should be cleared on entry to a `catch` block. See `incomplete/TRY_CATCH_STACK_PLAN.md`.
 
 The 34 other raw fails not in the filtered set are in `ignored_tests.txt` (accepted diffs documented in `ACCEPTED_DIFFS.md` / `RUFFLE_VS_FLASH_DIFFERENCES.md` / `RUFFLE_COMPAT_TWEAKS.md` / `FLASH_BUGS_REPLICATED.md`).
 
@@ -298,11 +307,11 @@ All previously near-passing tests (146 tracked through the pipeline) are now ful
 | DRAWING_API_RENDERING | 3 tests improved | Focal radial precision, edge anti-aliasing (see RENDERING_PIPELINE_COMPARISON.md) |
 | RUNTIME_SETMASK | **COMPLETE** | Moved to complete/ (masking infra done; image diff is Drawing API edge AA) |
 
-## Recommended Work Order (updated 2026-04-18)
+## Recommended Work Order (updated 2026-05-06)
 
-The AVM1 filtered suite is at 100% effective pass; there is no in-suite work
-remaining. Useful next targets are in *other* suites (line-level numbers from
-the same CI run):
+The AVM1 filtered suite is at 99.8% effective pass — one outstanding failure
+(`try_catch_stack`, plan in `incomplete/TRY_CATCH_STACK_PLAN.md`). Useful
+next targets are in *other* suites (line-level numbers from the same CI run):
 
 - **`from_gnash/actionscript.all`** (133/190 effective, 70.0%): near-passing
   candidates are Number-v5..v8 (gnash float-to-string rounding), Selection-v6/7/8
