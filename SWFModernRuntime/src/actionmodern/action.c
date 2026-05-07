@@ -59810,10 +59810,12 @@ void actionCallMethod(SWFAppContext* app_context, char* str_buffer)
 					bxmax_d = lxmax; bymax_d = lymax;
 				} else {
 					// Build double-precision world matrix for this MC.
-					// Tracks MC pointers in parallel with names so each chain step's
-					// local matrix can be sourced from getLocalMatrixForMC (which
-					// respects AS-modified xscale/yscale/rotation/skew). tx/ty from
-					// getLocalMatrixForMC is in pixels and gets scaled to twips here.
+					// Walks the display tree by name (handles arbitrary nesting depth),
+					// reading transform_data[tid] for each chain step's matrix. Tracks
+					// MC pointers in parallel so AS-modified scale/rotation/skew can
+					// override the timeline matrix via Ruffle-parity recomposition
+					// (cos(rot+skew)/sin(rot+skew) for c/d). Only fires the override
+					// when as_set_flags indicates an AS write.
 					#define COMPUTE_WORLD_MATRIX_DBL(the_mc, wa, wb, wc, wd, wtx, wty) do { \
 						wa = 1.0; wb = 0.0; wc = 0.0; wd = 1.0; wtx = 0.0; wty = 0.0; \
 						if (the_mc != &root_movieclip && the_mc->name[0] != '\0') { \
@@ -59834,9 +59836,28 @@ void actionCallMethod(SWFAppContext* app_context, char* str_buffer)
 										{ _wd = _d; break; } \
 								} \
 								if (_wd == SIZE_MAX) break; \
-								double _la, _lb, _lc, _ld, _ltx_px, _lty_px; \
-								getLocalMatrixForMC(_mcs[_wi], &_la, &_lb, &_lc, &_ld, &_ltx_px, &_lty_px); \
-								double _ltx = _ltx_px * 20.0, _lty = _lty_px * 20.0; \
+								u32 _tid = _wdl[_wd].transform_id; \
+								extern float transform_data[][16]; \
+								double _la = (double)transform_data[_tid][0], _lb = (double)transform_data[_tid][1]; \
+								double _lc = (double)transform_data[_tid][4], _ld = (double)transform_data[_tid][5]; \
+								double _ltx = (double)transform_data[_tid][12], _lty = (double)transform_data[_tid][13]; \
+								MovieClip* _step_mc = _mcs[_wi]; \
+								if (_step_mc != NULL && (_step_mc->as_set_flags & (4|8|16))) { \
+									double _xs = (double)_step_mc->xscale / 100.0; \
+									double _ys = (double)_step_mc->yscale / 100.0; \
+									double _rot = (double)_step_mc->rotation * 3.14159265358979323846 / 180.0; \
+									double _skew = (double)_step_mc->skew; \
+									double _crx = cos(_rot), _srx = sin(_rot); \
+									double _cry = cos(_rot + _skew), _sry = sin(_rot + _skew); \
+									if (fabs(_crx) < 1e-12) _crx = 0.0; \
+									if (fabs(_srx) < 1e-12) _srx = 0.0; \
+									if (fabs(_cry) < 1e-12) _cry = 0.0; \
+									if (fabs(_sry) < 1e-12) _sry = 0.0; \
+									_la = _xs * _crx; _lb = _xs * _srx; \
+									_lc = -(_ys * _sry); _ld = _ys * _cry; \
+								} \
+								if (_step_mc != NULL && (_step_mc->as_set_flags & 1)) _ltx = (double)_step_mc->x * 20.0; \
+								if (_step_mc != NULL && (_step_mc->as_set_flags & 2)) _lty = (double)_step_mc->y * 20.0; \
 								double _na = wa*_la + wc*_lb, _nb = wb*_la + wd*_lb; \
 								double _nc = wa*_lc + wc*_ld, _nd = wb*_lc + wd*_ld; \
 								double _ntx = wa*_ltx + wc*_lty + wtx; \
