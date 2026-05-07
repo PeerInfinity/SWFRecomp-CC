@@ -1,6 +1,63 @@
 # Gnash Test Suite Status
 
-Last updated: 2026-05-06 (CI snapshot at `c8f6452a` — `key_event_test` and `loop/loop_test6` promoted to ruffle_matched in misc-ming.all this run.)
+Last updated: 2026-05-07 (CI snapshot at `3b477b32` — `TextFormat-v7` promoted to ruffle_matched in actionscript.all via `getTextExtent` wrap-width fix.)
+
+### CI snapshot (commit `3b477b32`, 2026-05-07)
+
+| Suite | Pass | RM | Effective | Total | Rate |
+|-------|------|----|-----------|-------|------|
+| actionscript.all | 126 | 63 | 189 | 190 | **99.5%** |
+| misc-ming.all | 64 | 22 | 86 | 102 | **84.3%** |
+| misc-mtasc.all | 7 | 2 | 9 | 9 | 100.0% |
+| misc-swfc.all | 8 | 5 | 13 | 15 | **86.7%** |
+| misc-swfmill.all | 17 | 1 | 18 | 18 | 100.0% |
+
+Net change vs. `c8f6452a` snapshot: actionscript.all +1 effective (`TextFormat-v7` 132/174 → ruffle_matched 136/174). All other suites unchanged.
+
+### Latest fixes (2026-05-07, in CI at `3b477b32`)
+
+- **`TextFormat-v7` (actionscript.all) → ruffle_matched (136/174, was 132/174 → output_mismatch).**
+  `ng_getTextExtent` in `SWFModernRuntime/src/libswf/ng_shared.c` now returns
+  `textFieldWidth = wrap_width` when a wrap-width arg is provided (i.e.,
+  `getTextExtent(text, w)` with `w > 0`). Previously it always returned
+  `text_width_px + 4.0` (measured text width + gutter), which is correct for
+  the unwrapped case but wrong when wrapping is in play — Flash's `EditText`
+  with `AutoSize::Left + word_wrap=true` keeps the assigned width as the
+  textfield's width. The fix mirrors Ruffle's `text_format.rs::get_text_extent`,
+  which creates an `EditText` with `width.unwrap_or(0.0)` and
+  `set_word_wrap(width.is_some())`, then returns `temp_edittext.width()`. With
+  word_wrap=true the temp EditText's width stays at the assigned constraint;
+  with word_wrap=false AutoSize::Left expands to fit content. Confirmed by
+  Ruffle's AVM1 `gettextextent` test, whose expected output has
+  `textFieldWidth == 100` for `getTextExtent("Lorem ipsum...", 100)` regardless
+  of font size (12 vs 18). Without wrap, behavior unchanged.
+
+  The four wrap-width assertion lines in TextFormat.as (`textFieldWidth == 10`
+  at line 380 with wrap=10, `== 5` at 397 with wrap=5, `== 30` at 413 with
+  wrap=30, `== 30` at 422 with wrap=30) flipped from FAILED to PASSED, which
+  eliminated the only diff-set indices that were ours-but-not-Ruffle's.
+  Pre-fix: ours = 42 diffs, Ruffle = 40 diffs, ours \ ruffle = {142, 146, 149,
+  152}, ruffle \ ours = {24, 25}. Post-fix: ours = 38 diffs ⊂ ruffle's 40,
+  auto-promoting via `verify_output.py::ruffle_subset_match`. The remaining
+  ours-vs-expected diffs (font-metric precision: ascent 12.828 vs 11, descent
+  3.516 vs 2, etc.) are all in Ruffle's diff set against the same
+  `output.txt` — both are due to "dejafont" not being available so we both
+  fall back to a different device font. The test source comment explicitly
+  acknowledges this: "I don't know how to test this properly, as we can only
+  test device fonts here, and the pp uses a different font from Gnash."
+
+  Regression battery: AVM1 `gettextextent` (epsilon=30 tolerance, `with_default_font=true`)
+  and `text_format_get_text_extent_undefined_width` (`> 0` checks) both still
+  PASS. 8-test edittext battery (`edittext_default_format`, `_align`,
+  `_autosize`, `_drag_select`, `_text_height_leading`, `_default_format_empty`,
+  `_default_format_font_style`, `_font_size` — 8/8 PASS). Gnash actionscript.all
+  `TextFormat-v5/v6` PASS unchanged (their getTextExtent block is gated on
+  `OUTPUT_VERSION > 6`, so they don't exercise the wrap-width path). Gnash
+  misc-ming text battery (`DefineEditTextTest`, `DefineEditTextVariableNameTest`,
+  `DefineEditTextVariableNameTest2`, `DefineTextTest`, `EmbeddedFontTest`)
+  unchanged from baseline. Gnash misc-swfc `edittext_test1`, `button_test1`
+  unchanged PASS. AVM1 `clone_sprite_edittext`, `clone_sprite_edittext_dynamic`
+  unchanged PASS.
 
 ### CI snapshot (commit `c8f6452a`, 2026-05-06)
 

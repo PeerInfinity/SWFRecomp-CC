@@ -2,7 +2,7 @@
 
 Cross-suite summary of all Ruffle-derived test suites. Each suite has its own `_investigation/` directory with detailed status docs.
 
-Last updated: 2026-05-07 (CI run `035950cf` — `try_catch_stack` PASS via catch-entry stack truncate; AVM1 filtered effective pass back to 100%).
+Last updated: 2026-05-07 (CI run `3b477b32` — `TextFormat-v7` promoted to ruffle_matched via `getTextExtent` wrap-width fix; Gnash actionscript.all effective rate 99.5%).
 
 ## Suite Summary
 
@@ -11,7 +11,7 @@ Last updated: 2026-05-07 (CI run `035950cf` — `try_catch_stack` PASS via catch
 | Suite | Tests | Pass | RM | Effective | Effective Rate | Filtered Rate | Notes |
 |-------|-------|------|----|-----------| ---------------|---------------|-------|
 | [avm1](../avm1/_investigation/CURRENT_STATUS.md) | 648 | 605 | 9 | 614 | 94.8% | **100.0%** (608/608) | 40 ignored. `try_catch_stack` PASS this CI via `actionCatchEnter` truncating the value stack to its try-begin SP (asymmetric — pops are not undone). Plan moved to `avm1/_investigation/complete/TRY_CATCH_STACK_PLAN.md`. Zero filtered failures. |
-| [from_gnash/actionscript.all](../from_gnash/_investigation/CURRENT_STATUS.md) | 190 | 126 | 62 | 188 | **98.9%** | — | Unchanged this CI. 2 raw failures remain: `array-v5` (sort/Array-method-on-Object semantics) and `TextFormat-v7` (font metric precision). |
+| [from_gnash/actionscript.all](../from_gnash/_investigation/CURRENT_STATUS.md) | 190 | 126 | 63 | 189 | **99.5%** | — | `TextFormat-v7` promoted to ruffle_matched this CI: `getTextExtent(text, wrap_width)` now returns `textFieldWidth = wrap_width` when wrap is provided (was returning measured `text_width + 4`). Only `array-v5` remains as raw failure (sort/Array-method-on-Object semantics). |
 | [from_gnash/misc-mtasc.all](../from_gnash/_investigation/CURRENT_STATUS.md) | 9 | 7 | 2 | 9 | **100.0%** | — | All effective pass. |
 | [from_gnash/misc-swfmill.all](../from_gnash/_investigation/CURRENT_STATUS.md) | 18 | 17 | 1 | 18 | **100.0%** | — | All effective pass. `jump_to_prev_block` (cross-DoAction backward jump) and `tags_after_last_showframe` both landed; plan moved to `complete/MISC_SWFMILL_PLAN.md`. |
 | [from_gnash/misc-ming.all](../from_gnash/_investigation/CURRENT_STATUS.md) | 102 | 64 | 22 | 86 | **84.3%** | — | +4 effective vs. `c5994ec1`: `key_event_test` (61/66) and `loop/loop_test6` (22/23) promoted to ruffle_matched this CI run. |
@@ -19,6 +19,10 @@ Last updated: 2026-05-07 (CI run `035950cf` — `try_catch_stack` PASS via catch
 | [from_shumway](../from_shumway/_investigation/CURRENT_STATUS.md) (flat) | 92 | 68 | 3 | 71 | 77.2% | — | Unchanged. 20 fuzz tests still fail; `avm1/moviecliploader` is the only non-fuzz failure. |
 | [from_shumway/avm1](../from_shumway/_investigation/CURRENT_STATUS.md) | 47 | 45 | 0 | 45 | 95.7% | **100.0%** (45/45) | 2 ignored. Only `moviecliploader` remains (MCL one-tick deferral). |
 | **SWFRecomp/tests** (old suite) | 158+59 | all trace pass | — | — | **100%** | — | Hand-written opcode tests. CI only. |
+
+## Progress Since 2026-05-07 (CI snapshot at `035950cf`)
+
+- **`TextFormat-v7` (Gnash actionscript.all) → ruffle_matched (136/174, was 132/174 → output_mismatch).** `ng_getTextExtent` now returns `textFieldWidth = wrap_width` when a wrap width arg is provided, matching Flash's `EditText` with `AutoSize::Left + word_wrap=true` (which keeps the assigned width). Without wrap, behavior is unchanged: `tf_width = text_width + 4` gutter. Confirmed via Ruffle's source (`text_format.rs::get_text_extent`: creates EditText with `width.unwrap_or(0.0)` + `set_word_wrap(width.is_some())`, then returns `temp_edittext.width()`) and Ruffle's own AVM1 `gettextextent` test where `textFieldWidth` exactly equals the wrap width passed in. Fix is one line in `SWFModernRuntime/src/libswf/ng_shared.c`. Promotes the test because the 4 wrap-width assertion lines (`textFieldWidth == 10/5/30/30` at TextFormat.as:380/397/413/422) flip from FAILED to PASSED, eliminating the only diff-set lines that were ours-but-not-Ruffle's. Verified no regressions: AVM1 `gettextextent` and `text_format_get_text_extent_undefined_width` both still PASS (former has `epsilon = 30.0` tolerance plus `with_default_font = true`; latter only checks `> 0`); 8-test edittext battery (8/8 PASS); Gnash actionscript.all `TextFormat-v5/v6` unchanged PASS; misc-ming `DefineEditTextTest` / `DefineEditTextVariableNameTest2` / `DefineTextTest` / `EmbeddedFontTest` / `DefineEditTextVariableNameTest` all unchanged from baseline (the latter two were already failing — their pre-existing diffs do not touch the wrap-width path).
 
 ## Progress Since 2026-05-06 (CI snapshot at `c8f6452a`)
 
