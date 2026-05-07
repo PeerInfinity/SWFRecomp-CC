@@ -46086,19 +46086,6 @@ void actionNewObject(SWFAppContext* app_context)
 	}
 	else if (strcmp(ctor_name, "TextField") == 0)
 	{
-		// SWF6: `new TextField()` returns undefined. TextField isn't directly
-		// constructable in SWF6 — instances are only created via createTextField
-		// or timeline DefineEditText. Matches Flash and Ruffle (where the SWF6
-		// `empty_class` constructor produces a value whose typeof != "object" in
-		// the test). Key test: avm1/native_objects_swf6.
-		// SWF5 (TextField class doesn't exist) falls through to the ctor-not-found
-		// branch elsewhere; SWF7+ creates a real native TextField object below.
-		if (g_swf_version == 6)
-		{
-			PUSH(ACTION_STACK_VALUE_UNDEFINED, 0);
-			return;
-		}
-
 		// Handle TextField constructor — new TextField()
 		// Creates an empty object with __proto__ set to TextField.prototype
 		ASObject* tf_obj = allocObject(app_context, 4);

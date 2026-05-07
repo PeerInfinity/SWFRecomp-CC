@@ -79,6 +79,33 @@ are internally inconsistent: given the UTC offset and the local fields, the UTCH
 value shown is wrong. Our UTCHours=23 is mathematically correct. This appears to be a
 Ruffle test-generation bug affecting only the extreme negative boundary.
 
+### `native_objects_swf6` — `new TextField()` typeof check (1 diff line, line 56)
+
+**Diff:**
+```
+- new TextField(): non-object: non-object: undefined
++ new TextField(): native
+```
+
+The test `getNativeStatus(new TextField())` is expected to return `"non-object: undefined"`,
+implying that `new TextField()` returns `undefined` in SWF6. But two other tests assert the
+opposite:
+
+- `avm1/textfield_props_swf6` (PASS, no `known_failure`) — expects `var o = new TextField();`
+  to produce a real object that traces as `[object Object]` with `typeof o == "object"` and
+  enumerates 35 properties.
+- `from_gnash/actionscript.all/toString_valueOf-v6` — does `text1 = new TextField(); check(typeof(text1) == "object");`.
+
+Both Flash and Ruffle return a real object for `new TextField()` in SWF6 (per the other
+tests' expected output). The `native_objects_swf6` line 56 expectation is internally
+inconsistent with the rest of the AVM1 test corpus. Forcing `new TextField()` to undefined
+in SWF6 fixes line 56 but breaks `textfield_props_swf6` (210/210 → 77/210) and
+`toString_valueOf-v6` (ruffle_matched 150/155 → output_mismatch 141/155). The test is
+already marked `known_failure = true` and listed in `ruffle-tests/ignored_tests.txt`, so the
+1-line diff is harmless to the filtered pass rate. **Decision:** keep current behavior
+(`new TextField()` returns an object in all SWF versions where the class exists), accept the
+1-line diff in `native_objects_swf6`.
+
 ---
 
 ## Category 3: Flash Implementation Quirks We Do Not Replicate
