@@ -64,6 +64,25 @@
     documented in `incomplete/CLONESPRITE_DEPTH_BIAS_PLAN.md` (Phase 2). -->
 
 
+<!-- Investigated 2026-05-07 (no fix landed):
+  - action_order/action_execution_order_test5 (26/35 → PASS locally,
+    reverted before commit). Symptom: at root frame_3 (which removes
+    mc1) the natural advance of mc1's 2-frame timeline loops sprite_8
+    back to frame 0; advance_sprite_frames's loop-back silent-clear
+    drops the children, then frame_0 fresh-places mc11/mc12 firing a
+    second wave of init/construct/load events before the RemoveObject
+    fires. Tried the conservative half of SPRITE_REWIND_IDENTITY
+    (Phase 1 metadata + survives_rewind preservation in
+    advance_sprite_frames natural-wrap, no UNLOAD lifecycle for
+    non-survivors). Test passed locally; avm1 sprite/loop battery
+    (15/15) and gnash sprite-loop battery (7/7) unchanged. But
+    RegisterClassTest4 regressed by ~9 lines (8/42 vs baseline
+    17/42) — the documented STOP signal from
+    blocked/SPRITE_REWIND_IDENTITY_PLAN.md. Reverted. Real fix is
+    blocked on that plan's Phase 3 (pending_finalize MC isolation +
+    correct UNLOAD ordering for the gotoAndPlay-driven case). -->
+
+
 <!-- PLAN_META
 id: REMAINING_TAIL_TRIAGE
 status: pending

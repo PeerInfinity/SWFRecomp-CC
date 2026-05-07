@@ -3,6 +3,45 @@
 Historical session-by-session notes documenting changes, fixes, and investigations.
 For current test status, see `CURRENT_STATUS.md`.
 
+## Session notes (2026-05-07 — `native_objects_swf6` `new TextField()` triage, no-op outcome)
+
+Investigated `native_objects_swf6` (`output_mismatch` 114/115, single-line diff at line 56:
+`new TextField(): non-object: undefined` vs our `new TextField(): native`). The test is
+already `known_failure = true` and listed in `ruffle-tests/ignored_tests.txt`, so the diff
+doesn't affect filtered pass rate.
+
+Local fix: gated `new TextField()` in `actionNewObject` (action.c:46087) on
+`g_swf_version == 6` to push UNDEFINED instead of allocating a TextField object. Test
+passed locally; 16-test edittext / native_objects regression battery passed.
+
+CI surfaced two regressions the local battery missed:
+
+- `avm1/textfield_props_swf6` PASS 210/210 → output_mismatch 77/210. Test does
+  `var o = new TextField(); for (var p in o) trace(p);` and expects 35 enumerated
+  property names — needs a real object.
+- `from_gnash/actionscript.all/toString_valueOf-v6` ruffle_matched 150/155 →
+  output_mismatch 141/155. Asserts `text1 = new TextField(); check(typeof(text1) ==
+  "object")`.
+
+Both Flash and Ruffle return a real object for `new TextField()` in SWF6 (per these tests'
+expected output, neither marked `known_failure`). The `native_objects_swf6` line 56
+expectation contradicts the rest of the AVM1 test corpus; net effect of the fix was
++1 line / -132 lines.
+
+Reverted (`d11aa45a`). Added Category 2 entry to `avm1/_investigation/ACCEPTED_DIFFS.md`
+documenting the contradiction so future sessions don't re-attempt the same fix.
+`textfield_props_swf6` and `toString_valueOf-v6` are the canaries for any future
+TextField-constructor change in SWF6.
+
+Also briefly investigated `from_gnash/misc-ming.all/action_order/action_execution_order_test5`
+(26/35, sprite natural-wrap re-fires children's onLoad/init/construct). Tried the
+conservative half of the `SPRITE_REWIND_IDENTITY` plan (Phase 1 metadata + survives_rewind
+preservation in `advance_sprite_frames` natural-wrap, no UNLOAD lifecycle for non-survivors).
+Test passed locally; avm1 sprite/loop battery (15/15) and gnash sprite-loop battery (7/7)
+unchanged. But `RegisterClassTest4` regressed by ~9 lines (8/42 vs baseline 17/42) — the
+documented STOP signal from the `SPRITE_REWIND_IDENTITY_PLAN` ("If RegisterClassTest4
+regresses … STOP"). Reverted before commit. The test remains in `REMAINING_TAIL_TRIAGE.md`.
+
 ## Session notes (2026-05-07 — place-before-define narrowing after CI regression)
 
 **Initial fix landed in CI `873e520e`** (commits `7875fb4a` / `ba7a4725` / `5331ed4b`): tag-stream-order character dictionary in the recompiler. New `SWF::defined_chars` set, populated at every `Define*` case as the recompiler walks tags in order (Sprite, Shape/Morph/Font via `interpretShape`, Button, Text/EditText, Bits/JPEG/Lossless, Sound, Video). Both root-timeline and sprite-internal `PlaceObject{,2,3}` cases checked membership after parsing the `char_id`; if not yet registered, force `char_id=0` (and clear `has_character` on PO2/3). The runtime treats `char_id=0` as "modify-only" — a no-op when the depth is empty, which is the typical fuzz pattern of place-then-define-later.

@@ -20,6 +20,33 @@ Last updated: 2026-05-07 (CI run `8fdf3311` — place-before-define narrowing la
 | [from_shumway/avm1](../from_shumway/_investigation/CURRENT_STATUS.md) | 47 | 45 | 0 | 45 | 95.7% | **100.0%** (45/45) | 2 ignored. Only `moviecliploader` remains (MCL one-tick deferral). Unchanged this CI. |
 | **SWFRecomp/tests** (old suite) | 158+59 | all trace pass | — | — | **100%** | — | Hand-written opcode tests. CI only. |
 
+## Progress Since 2026-05-07 (CI runs `f3965a99` + `d11aa45a`) — net zero, two attempts reverted
+
+- **`native_objects_swf6` SWF6 `new TextField()` triage.** Tried gating
+  `actionNewObject` on `g_swf_version == 6` to push UNDEFINED so line 56
+  (`new TextField(): non-object: undefined`) would match. CI surfaced two
+  regressions the local 16-test battery missed: `avm1/textfield_props_swf6`
+  (PASS 210/210 → 77/210; expects `new TextField()` to be a real object
+  with 35 enumerable properties) and `from_gnash/actionscript.all/toString_valueOf-v6`
+  (ruffle_matched 150/155 → output_mismatch 141/155; asserts
+  `typeof(new TextField()) == "object"`). Both Flash and Ruffle return a
+  real object for `new TextField()` in SWF6 per these tests' expected
+  output (neither marked `known_failure`); the `native_objects_swf6` line
+  56 expectation is internally inconsistent with the rest of the AVM1
+  corpus. Reverted (`d11aa45a`); documented in
+  `avm1/_investigation/ACCEPTED_DIFFS.md` Category 2. The test stays in
+  `ignored_tests.txt` as `known_failure`, so the residual 1-line diff
+  doesn't affect the filtered pass rate.
+
+- **`from_gnash/misc-ming.all/action_order/action_execution_order_test5` triage.**
+  Tried the conservative half of `SPRITE_REWIND_IDENTITY` (Phase 1
+  metadata + survives_rewind preservation in `advance_sprite_frames`
+  natural-wrap, no UNLOAD lifecycle for non-survivors). Test went 26/35 →
+  PASS locally, avm1 sprite/loop battery (15/15) and gnash sprite-loop
+  battery (7/7) unchanged. But `RegisterClassTest4` regressed by ~9
+  lines (8/42 vs baseline 17/42) — the documented STOP signal from
+  `blocked/SPRITE_REWIND_IDENTITY_PLAN.md`. Reverted before commit.
+
 ## Progress Since 2026-05-07 (CI run `8fdf3311`) — place-before-define narrowing landed
 
 CI deltas vs broken CI `873e520e`: AVM1 +2, Gnash actionscript.all +189 effective, all other suites unchanged. Vs pre-place-before-define baseline `e0af5c2d`: only +4 Shumway flat fuzz PASSes survive (the intended gain). No regressions.
