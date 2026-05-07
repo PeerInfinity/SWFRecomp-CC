@@ -1,18 +1,22 @@
 # Gnash Test Suite Status
 
-Last updated: 2026-05-07 (CI `8fdf3311` — actionscript.all fully recovered to 189 effective via place-before-define narrowing. CI `873e520e` had collapsed it to 0 effective by degrading the imported `dejagnu`/`dejafont` chars in `Dejagnu.swf`-driven tests; the narrowing skips the check inside `DefineSprite` and registers `ImportAssets` char_ids, restoring all prior PASSes + RMATCHes including `TextFormat-v7`.)
+Last updated: 2026-05-07 (CI `a3912cf2` — `opcode_guard_test` (misc-ming.all) added to ignored list. misc-ming.all filtered effective: 88/101 (87.1%); raw effective unchanged at 88/102 (86.3%). Zero regressions. Previously CI `8fdf3311` recovered actionscript.all to 189 effective via place-before-define narrowing.)
 
-### CI snapshot (commit `8fdf3311`, 2026-05-07)
+### CI snapshot (commit `a3912cf2`, 2026-05-07)
 
-| Suite | Pass | RM | Effective | Total | Rate |
-|-------|------|----|-----------|-------|------|
-| actionscript.all | 126 | 63 | 189 | 190 | **99.5%** |
-| misc-ming.all | 64 | 22 | 86 | 102 | **84.3%** |
-| misc-mtasc.all | 7 | 2 | 9 | 9 | 100.0% |
-| misc-swfc.all | 8 | 5 | 13 | 15 | **86.7%** |
-| misc-swfmill.all | 17 | 1 | 18 | 18 | 100.0% |
+| Suite | Pass | RM | Effective | Total | Filtered Eff | Rate |
+|-------|------|----|-----------|-------|-------------|------|
+| actionscript.all | 126 | 63 | 189 | 190 | — | **99.5%** |
+| misc-ming.all | 65 | 23 | 88 | 102 | 88/101 | 86.3% raw / **87.1% filtered** |
+| misc-mtasc.all | 7 | 2 | 9 | 9 | — | 100.0% |
+| misc-swfc.all | 8 | 5 | 13 | 15 | — | **86.7%** |
+| misc-swfmill.all | 17 | 1 | 18 | 18 | — | 100.0% |
 
-Net change vs. `c8f6452a` snapshot: actionscript.all +1 effective (`TextFormat-v7` 132/174 → ruffle_matched 136/174). All other suites unchanged.
+Net change vs. `8fdf3311` snapshot: misc-ming.all picked up 1 ignored test (`opcode_guard_test`), so filtered effective rose 86/102 (84.3%) → 88/101 (87.1%). The OVERVIEW.md table for misc-ming.all in the prior snapshot under-reported raw effective by 2 (table said 64 PASS + 22 RM = 86, but `results.json` has consistently shown 65 PASS + 23 RM = 88 in both the `d11aa45a` previous CI and this CI). All other suites unchanged.
+
+### Latest fixes (2026-05-07, in CI at `a3912cf2`)
+
+- **`opcode_guard_test` (misc-ming.all) → ignored.** Test cannot promote to `ruffle_matched` because we are *more* correct than Ruffle on the mc1 Construct/Load/Unload event handler assertions, throwing off line alignment with Flash's expected output. We pass every assertion (11/11) and emit one extra `Target not found: Target="non-exist-target" Base="_level0"` warning that Gnash's `output.txt` omits but Flash and Ruffle both produce. Cannot suppress the warning without regressing 8+ AVM1 tests (`tell_target_invalid`, `path_string`, `tell_target`, `removed_base_clip_tell_target`, `swf4_actions_coercion_order`, `property_invalid_base_clip`, `call`, `tell_target_invalid_swf6`) that assert it. Documented in `from_gnash/_investigation/ACCEPTED_DIFFS.md` Category 1 (Gnash Implementation Bugs in Expected Output). New file `misc-ming.all/ignored_tests.txt` created; `.gitignore` updated to allowlist `misc-ming.all/` directory so the per-suite ignore list is tracked alongside `actionscript.all/` and `misc-swfc.all/`.
 
 ### Latest fixes (2026-05-07, in CI at `3b477b32`)
 

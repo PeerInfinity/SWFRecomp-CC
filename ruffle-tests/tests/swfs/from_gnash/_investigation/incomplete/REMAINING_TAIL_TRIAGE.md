@@ -1,6 +1,6 @@
 # Remaining Tail Triage
 
-<!-- TESTS: matrix_test, DefineEditTextVariableNameTest, EmbeddedFontTest, DrawingApiTest, NetStream-SquareTest, loop/loop_test10, opcode_guard_test, masks_test, duplicate_movie_clip_test, soft_reference_test1, movieclip_destruction_test4, action_order/action_execution_order_test6 -->
+<!-- TESTS: matrix_test, DefineEditTextVariableNameTest, EmbeddedFontTest, DrawingApiTest, NetStream-SquareTest, loop/loop_test10, masks_test, duplicate_movie_clip_test, soft_reference_test1, movieclip_destruction_test4, action_order/action_execution_order_test6 -->
 
 <!-- Resolved 2026-05-02:
   - loop/loop_test → PASS (was 5/21; fixed in cluster work)
@@ -45,6 +45,18 @@
   - masks_test 28/175 unchanged (16.0%)
   - duplicate_movie_clip_test 3/33 unchanged (9.1%)
   - movieclip_destruction_test4 8/40 unchanged (20.0%)
+-->
+
+<!-- Resolved 2026-05-07 (CI a3912cf2):
+  - opcode_guard_test → ignored. Bug 1 (spurious FAILED:false from mc2
+    ENTERFRAME after gotoAndPlay) had been fixed at some point between
+    2026-05-02 and 2026-05-07; current output passes all 11 assertions.
+    Only remaining diff is a single Target not found warning line that
+    Gnash's expected output omits but Flash and Ruffle both emit.
+    Cannot promote to ruffle_matched because being more correct than
+    Ruffle on the mc1 event handlers shifts our diff indices outside
+    Ruffle's diff set. Cannot suppress the warning without regressing
+    8+ AVM1 tests that assert it. See ACCEPTED_DIFFS.md Category 1.
 -->
 
 
@@ -290,42 +302,39 @@ and `apply_place_object` excludes name/clip_depth/clip_actions).
 the depth holds a sprite from a previous frame. See `CURRENT_STATUS.md`
 "Latest fixes" for details.
 
-### opcode_guard_test (61.1%, 11/18 — bug 2 fixed 2026-05-02)
+### opcode_guard_test — RESOLVED via ignore list (2026-05-07)
 
-**Status update 2026-05-02.** Bug 2 fixed: bare `GetVariable("_target")`
-no longer gated on `g_settarget_invalid`. Now correctly returns `/` (root
-target) after a failed SetTarget, matching Ruffle and the gnash test
-comment "getVariable will ascend to _root!" Verified `_target == '/'`
-line now PASSES. Six other tell_target/SetTarget-touching avm1 tests
-(tell_target, tell_target_invalid, tell_target_invalid_swf6,
-property_invalid_base_clip, path_string, swf4_actions_coercion_order)
-still PASS — no regressions.
+**Status update 2026-05-07.** Bug 1 (the spurious `FAILED: false` after
+`gotoAndPlay(8)` inside the mc2 ENTERFRAME clip event) was resolved
+sometime between 2026-05-02 and 2026-05-07 — current output passes all
+11 assertions cleanly (`#passed: 11 / #failed: 0 / #total tests run: 11`).
+The only remaining diff is the single `Target not found: ...` warning
+line at index 10, which causes the trailing 7 expected lines to all
+appear at the wrong index (line shift).
 
-**Test still fails because of bug 1 + line-shift effect.**
-Our diff after the fix:
-```
-FAILED: false                                        ← extra (mc2 enterframe xcheck)
-Target not found: Target="non-exist-target" Base="_level0"  ← Ruffle has this too
-... rest matches expected after the shift ...
-```
+**Why ruffle_matched promotion still fails.** Ruffle's
+`output.ruffle.txt` also contains the `Target not found` warning, but
+Ruffle additionally fails the mc1 Construct / Load / Unload event
+handler assertions, so Ruffle's diff-set against Flash's `output.txt`
+covers a *different* set of line indices (the early failures, not the
+trailing shift). Our diffs at indices `{10, 11, 12, 14, 15, 16, 17, 18}`
+are not a subset of Ruffle's `{2, 3, 4, 5, 6, 7, 8, 9, 15, 16}` — being
+*more* correct than Ruffle on the event handlers prevents the alignment
+needed for subset promotion.
 
-Cannot promote to `ruffle_matched` because Ruffle's expected output
-shifts up by one line (Ruffle is missing `mc1 Load called`), so
-Ruffle's diff against expected doesn't include line 10 where our
-spurious `FAILED: false` appears. Strict line-index subset fails.
+**Resolution.** Added to
+`from_gnash/misc-ming.all/ignored_tests.txt` so filtered effective
+counts no longer flag this as a failure. Cannot suppress the
+`Target not found` warning without regressing 8+ AVM1 tests
+(`tell_target_invalid`, `path_string`, `tell_target`,
+`removed_base_clip_tell_target`, `swf4_actions_coercion_order`,
+`property_invalid_base_clip`, `call`, `tell_target_invalid_swf6`)
+that assert it.
 
-**Bug 1 (remaining).** Inside mc2's ENTERFRAME clip event:
-`_root.note('mc2 EnterFrame called'); _root.gotoAndPlay(8); _root.xcheck(false);`.
-The test expects `xcheck(false)` to NOT execute after `gotoAndPlay(8)`,
-but our impl runs it (producing `FAILED: false`). In Flash, gotoAndPlay
-is normally queued (rest of script runs), so this might require Flash-
-specific clip-event abort semantics. Ruffle also doesn't emit the
-`FAILED: false` line, so they handle this somehow. Deferred — likely
-needs investigation into ENTERFRAME early-abort-after-goto semantics.
-
-**Scope (remaining).** 2–4 hours to investigate clip-event abort behavior
-+ possibly suppress `Target not found:` info message for gnash compatibility,
-or accept the divergence into ACCEPTED_DIFFS.md.
+**Reference.** See `from_gnash/_investigation/ACCEPTED_DIFFS.md`
+Category 1 entry "opcode_guard_test (misc-ming.all) — Gnash silently
+swallows the failed-setTarget warning" for the full diff-index
+analysis.
 
 ### masks_test (16.0%, 28/175)
 

@@ -77,7 +77,7 @@ Status (CI at f7f8fbe6 — 2026-04-29 run): **misc-ming.all 67/102 effective (65
 **Button / drag / key clusters (NOT actually input-driver-blocked — verifier does drive input):**
 - `ButtonEventsTest`, `ButtonPropertiesTest`, `key_event_test`, `DragDropTest`, `RollOverOutTest`. **See `complete/BUTTON_INFRASTRUCTURE_PLAN.md`** — distinct sub-issues per test (typeof, prototype enum order, button-internal children, _droptarget, mask+hitTest, key listener phase progression).
 
-**Single-test residuals (combined triage):** `matrix_test`, `DefineTextTest`, `DefineEditTextVariableNameTest`, `EmbeddedFontTest`, `DrawingApiTest`, `NetStream-SquareTest`, `loop/loop_test`, `loop/loop_test10`, `replace_sprites1test`, `opcode_guard_test`, `masks_test`, `duplicate_movie_clip_test`. **See `incomplete/REMAINING_TAIL_TRIAGE.md`** — one-page Match / Symptom / Hypothesis / Scope per test; entries graduate to standalone plans when active work begins.
+**Single-test residuals (combined triage):** `matrix_test`, `DefineTextTest`, `DefineEditTextVariableNameTest`, `EmbeddedFontTest`, `DrawingApiTest`, `NetStream-SquareTest`, `loop/loop_test`, `loop/loop_test10`, `replace_sprites1test`, `masks_test`, `duplicate_movie_clip_test`. **See `incomplete/REMAINING_TAIL_TRIAGE.md`** — one-page Match / Symptom / Hypothesis / Scope per test; entries graduate to standalone plans when active work begins. (`opcode_guard_test` was here previously; resolved 2026-05-07 via ignore list — see `ACCEPTED_DIFFS.md` Category 1.)
 
 - `BeginBitmapFill` (single-line content mismatch — `mc9._width` returns 804 vs 150). **See `incomplete/ZERO_OUTPUT_TRIAGE_PLAN.md` Phase 5.**
 
