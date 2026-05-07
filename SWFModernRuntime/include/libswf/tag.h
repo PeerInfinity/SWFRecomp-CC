@@ -322,6 +322,9 @@ int ng_getTransformId(size_t depth, u32* out_id);
 int ng_getTransformXY(size_t depth, float* out_x, float* out_y);
 int ng_getTransformXY_d(size_t depth, double* out_x, double* out_y);
 int ng_getTransformScaleRotation(size_t depth, float* out_xscale, float* out_yscale, float* out_rotation);
+// Decomposed scale/rotation/skew. Out_skew is in radians (Ruffle parity:
+// rotation = atan2(b,a), skew = atan2(-c,d) - rotation).
+int ng_getTransformScaleRotationSkew(size_t depth, float* out_xscale, float* out_yscale, float* out_rotation, float* out_skew);
 int ng_getColorTransform(const char* name, double* ra, double* ga, double* ba, double* aa,
                           double* rb, double* gb, double* bb, double* ab);
 int ng_setColorTransform(const char* name, double ra, double ga, double ba, double aa,

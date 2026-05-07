@@ -56,6 +56,10 @@ struct MovieClip {
 	u32 last_transform_id; // Last synced transform_id (for _x/_y from display list)
 	u8 as_set_flags;       // Bitmask: bit 0 = _x set by AS, bit 1 = _y set by AS
 	int ng_textfield_idx;  // index into ng_textfields, or -1 if not a textfield
+	// Cached skew (radians), preserved across _xscale/_yscale/_rotation setters (Ruffle parity).
+	// Decomposed from any direct `transform.matrix =` assignment or timeline PlaceObject2 matrix.
+	// 0 for the common rotation-only case.
+	float skew;
 	// Drawing API bounds tracking (updated by moveTo/lineTo calls)
 	float draw_xmin, draw_xmax, draw_ymin, draw_ymax;
 	int draw_has_bounds;   // 1 if any moveTo/lineTo was called

@@ -7679,13 +7679,17 @@ static void getLocalMatrixForMC(MovieClip* mc,
 		double xs = (double)mc->xscale / 100.0;
 		double ys = (double)mc->yscale / 100.0;
 		double rot = (double)mc->rotation * 3.14159265358979323846 / 180.0;
-		double cr = cos(rot), sr = sin(rot);
+		double skew = (double)mc->skew;
+		double cr_x = cos(rot), sr_x = sin(rot);
+		double cr_y = cos(rot + skew), sr_y = sin(rot + skew);
 		// Snap to exact 0/±1 at multiples of 90° — C's cos(M_PI/2)
 		// returns ~6.12e-17 which surfaces as `a=6.12323399573677e-17`
 		// in Matrix.toString. Flash uses exact 0 at 90° multiples.
-		if (fabs(cr) < 1e-12) cr = 0.0;
-		if (fabs(sr) < 1e-12) sr = 0.0;
-		ba = xs*cr; bb = xs*sr; bc = -(ys*sr); bd = ys*cr;
+		if (fabs(cr_x) < 1e-12) cr_x = 0.0;
+		if (fabs(sr_x) < 1e-12) sr_x = 0.0;
+		if (fabs(cr_y) < 1e-12) cr_y = 0.0;
+		if (fabs(sr_y) < 1e-12) sr_y = 0.0;
+		ba = xs*cr_x; bb = xs*sr_x; bc = -(ys*sr_y); bd = ys*cr_y;
 		btx = (double)mc->x; bty = (double)mc->y;
 	}
 	// Apply AS overrides for scale/rotation (bits 4|8|16) and translation (bits 1|2)
@@ -7693,10 +7697,14 @@ static void getLocalMatrixForMC(MovieClip* mc,
 		double xs = (double)mc->xscale / 100.0;
 		double ys = (double)mc->yscale / 100.0;
 		double rot = (double)mc->rotation * 3.14159265358979323846 / 180.0;
-		double cr = cos(rot), sr = sin(rot);
-		if (fabs(cr) < 1e-12) cr = 0.0;
-		if (fabs(sr) < 1e-12) sr = 0.0;
-		ba = xs*cr; bb = xs*sr; bc = -(ys*sr); bd = ys*cr;
+		double skew = (double)mc->skew;
+		double cr_x = cos(rot), sr_x = sin(rot);
+		double cr_y = cos(rot + skew), sr_y = sin(rot + skew);
+		if (fabs(cr_x) < 1e-12) cr_x = 0.0;
+		if (fabs(sr_x) < 1e-12) sr_x = 0.0;
+		if (fabs(cr_y) < 1e-12) cr_y = 0.0;
+		if (fabs(sr_y) < 1e-12) sr_y = 0.0;
+		ba = xs*cr_x; bb = xs*sr_x; bc = -(ys*sr_y); bd = ys*cr_y;
 	}
 	if (mc->as_set_flags & 1) btx = (double)mc->x;
 	if (mc->as_set_flags & 2) bty = (double)mc->y;
@@ -7719,8 +7727,10 @@ static void getLocalMatrixForMC_render(MovieClip* mc,
 		double xs = (double)mc->xscale / 100.0;
 		double ys = (double)mc->yscale / 100.0;
 		double rot = (double)mc->rotation * 3.14159265358979323846 / 180.0;
-		double cr = cos(rot), sr = sin(rot);
-		ba = (float)(xs*cr); bb = (float)(xs*sr); bc = (float)(-(ys*sr)); bd = (float)(ys*cr);
+		double skew = (double)mc->skew;
+		double cr_x = cos(rot), sr_x = sin(rot);
+		double cr_y = cos(rot + skew), sr_y = sin(rot + skew);
+		ba = (float)(xs*cr_x); bb = (float)(xs*sr_x); bc = (float)(-(ys*sr_y)); bd = (float)(ys*cr_y);
 		btx = (int32_t)rintf((float)mc->x * 20.0f);
 		bty = (int32_t)rintf((float)mc->y * 20.0f);
 	}
@@ -7728,8 +7738,10 @@ static void getLocalMatrixForMC_render(MovieClip* mc,
 		double xs = (double)mc->xscale / 100.0;
 		double ys = (double)mc->yscale / 100.0;
 		double rot = (double)mc->rotation * 3.14159265358979323846 / 180.0;
-		double cr = cos(rot), sr = sin(rot);
-		ba = (float)(xs*cr); bb = (float)(xs*sr); bc = (float)(-(ys*sr)); bd = (float)(ys*cr);
+		double skew = (double)mc->skew;
+		double cr_x = cos(rot), sr_x = sin(rot);
+		double cr_y = cos(rot + skew), sr_y = sin(rot + skew);
+		ba = (float)(xs*cr_x); bb = (float)(xs*sr_x); bc = (float)(-(ys*sr_y)); bd = (float)(ys*cr_y);
 	}
 	if (mc->as_set_flags & 1) btx = (int32_t)rintf((float)mc->x * 20.0f);
 	if (mc->as_set_flags & 2) bty = (int32_t)rintf((float)mc->y * 20.0f);
@@ -8092,12 +8104,14 @@ static ActionVar transformMatrixSetter(SWFAppContext* app_context, ActionVar* ar
 	if (isnan(tx)) tx = 0.0; if (isnan(ty)) ty = 0.0;
 	mc->x = (float)tx;
 	mc->y = (float)ty;
+	double rot_x = atan2(b, a);
+	double rot_y = atan2(-c, d);
 	double xs = sqrt(a*a + b*b);
 	double ys = sqrt(c*c + d*d);
-	double rot_deg = atan2(b, a) * 180.0 / 3.14159265358979323846;
 	mc->xscale = (float)(xs * 100.0);
 	mc->yscale = (float)(ys * 100.0);
-	mc->rotation = normalizeRotation((float)rot_deg);
+	mc->rotation = normalizeRotation((float)(rot_x * 180.0 / 3.14159265358979323846));
+	mc->skew = (float)(rot_y - rot_x);
 	mc->as_set_flags |= (1|2|4|8|16);
 	markTransformedByScript(mc);
 #endif
@@ -17492,6 +17506,7 @@ MovieClip root_movieclip = {
 #endif
 	.cx_ra = 100.0f, .cx_ga = 100.0f, .cx_ba = 100.0f, .cx_aa = 100.0f,
 	.cx_rb = 0.0f,   .cx_gb = 0.0f,   .cx_bb = 0.0f,   .cx_ab = 0.0f,
+	.skew = 0.0f,
 };
 
 // Forward declarations for child_mc_cache (defined later in the file)
@@ -18807,11 +18822,12 @@ static MovieClip* findOrCreateMovieClip(SWFAppContext* app_context, const char* 
 				mc->x = init_x;
 				mc->y = init_y;
 			}
-			float init_xs, init_ys, init_rot;
-			if (ng_getTransformScaleRotation(depth, &init_xs, &init_ys, &init_rot)) {
+			float init_xs, init_ys, init_rot, init_skew;
+			if (ng_getTransformScaleRotationSkew(depth, &init_xs, &init_ys, &init_rot, &init_skew)) {
 				mc->xscale = init_xs;
 				mc->yscale = init_ys;
 				mc->rotation = init_rot;
+				mc->skew = init_skew;
 			}
 			u32 tid;
 			if (ng_getTransformId(depth, &tid)) {
@@ -20324,11 +20340,12 @@ void actionRenameMovieClip(const char* old_name, const char* new_name)
 					}
 				}
 				if (!(mc->as_set_flags & (4|8|16))) {
-					float init_xs, init_ys, init_rot;
-					if (ng_getTransformScaleRotation(depth, &init_xs, &init_ys, &init_rot)) {
+					float init_xs, init_ys, init_rot, init_skew;
+					if (ng_getTransformScaleRotationSkew(depth, &init_xs, &init_ys, &init_rot, &init_skew)) {
 						mc->xscale = init_xs;
 						mc->yscale = init_ys;
 						mc->rotation = init_rot;
+						mc->skew = init_skew;
 					}
 				}
 				u32 tid;
@@ -22159,11 +22176,15 @@ static void syncTransformIfNeeded(MovieClip* mc) {
 		if (!(mc->as_set_flags & 1)) mc->x = tx;
 		if (!(mc->as_set_flags & 2)) mc->y = ty;
 	}
-	float xscale, yscale, rotation;
-	if (ng_getTransformScaleRotation(depth, &xscale, &yscale, &rotation)) {
+	float xscale, yscale, rotation, skew;
+	if (ng_getTransformScaleRotationSkew(depth, &xscale, &yscale, &rotation, &skew)) {
 		if (!(mc->as_set_flags & 4))  mc->xscale = xscale;
 		if (!(mc->as_set_flags & 8))  mc->yscale = yscale;
 		if (!(mc->as_set_flags & 16)) mc->rotation = normalizeRotation(rotation);
+		// Skew has no separate AS-set flag — only follow timeline if all of
+		// xscale/yscale/rotation are still timeline-driven (Ruffle parity:
+		// individual scale/rotation setters preserve the cached skew).
+		if (!(mc->as_set_flags & (4|8|16))) mc->skew = skew;
 	}
 	mc->last_transform_id = tid;
 }
@@ -42167,6 +42188,7 @@ void actionSetMember(SWFAppContext* app_context)
 							mc->x = src_mc->x; mc->y = src_mc->y;
 							mc->xscale = src_mc->xscale; mc->yscale = src_mc->yscale;
 							mc->rotation = src_mc->rotation;
+							mc->skew = src_mc->skew;
 #ifdef NO_GRAPHICS
 							mc->as_set_flags |= (1|2|4|8|16);
 							s16 sra, sga, sba, saa, srb, sgb, sbb, sab;
@@ -59787,15 +59809,21 @@ void actionCallMethod(SWFAppContext* app_context, char* str_buffer)
 					bxmin_d = lxmin; bymin_d = lymin;
 					bxmax_d = lxmax; bymax_d = lymax;
 				} else {
-					// Build double-precision world matrix for this MC
+					// Build double-precision world matrix for this MC.
+					// Tracks MC pointers in parallel with names so each chain step's
+					// local matrix can be sourced from getLocalMatrixForMC (which
+					// respects AS-modified xscale/yscale/rotation/skew). tx/ty from
+					// getLocalMatrixForMC is in pixels and gets scaled to twips here.
 					#define COMPUTE_WORLD_MATRIX_DBL(the_mc, wa, wb, wc, wd, wtx, wty) do { \
 						wa = 1.0; wb = 0.0; wc = 0.0; wd = 1.0; wtx = 0.0; wty = 0.0; \
 						if (the_mc != &root_movieclip && the_mc->name[0] != '\0') { \
-							const char* _names[16]; int _nlen = 0; \
-							for (MovieClip* _cur = the_mc; _cur && _cur != &root_movieclip && _nlen < 16; _cur = _cur->parent) \
-								_names[_nlen++] = _cur->name; \
+							const char* _names[16]; MovieClip* _mcs[16]; int _nlen = 0; \
+							for (MovieClip* _cur = the_mc; _cur && _cur != &root_movieclip && _nlen < 16; _cur = _cur->parent) { \
+								_names[_nlen] = _cur->name; _mcs[_nlen] = _cur; _nlen++; \
+							} \
 							for (int _i = 0; _i < _nlen/2; _i++) { \
-								const char* _tmp = _names[_i]; _names[_i] = _names[_nlen-1-_i]; _names[_nlen-1-_i] = _tmp; \
+								const char* _tmp_n = _names[_i]; _names[_i] = _names[_nlen-1-_i]; _names[_nlen-1-_i] = _tmp_n; \
+								MovieClip* _tmp_mc = _mcs[_i]; _mcs[_i] = _mcs[_nlen-1-_i]; _mcs[_nlen-1-_i] = _tmp_mc; \
 							} \
 							DisplayObject* _wdl = display_list; size_t _wmax = max_depth; \
 							for (int _wi = 0; _wi < _nlen; _wi++) { \
@@ -59806,11 +59834,9 @@ void actionCallMethod(SWFAppContext* app_context, char* str_buffer)
 										{ _wd = _d; break; } \
 								} \
 								if (_wd == SIZE_MAX) break; \
-								u32 _tid = _wdl[_wd].transform_id; \
-								extern float transform_data[][16]; \
-								double _la = (double)transform_data[_tid][0], _lb = (double)transform_data[_tid][1]; \
-								double _lc = (double)transform_data[_tid][4], _ld = (double)transform_data[_tid][5]; \
-								double _ltx = (double)transform_data[_tid][12], _lty = (double)transform_data[_tid][13]; \
+								double _la, _lb, _lc, _ld, _ltx_px, _lty_px; \
+								getLocalMatrixForMC(_mcs[_wi], &_la, &_lb, &_lc, &_ld, &_ltx_px, &_lty_px); \
+								double _ltx = _ltx_px * 20.0, _lty = _lty_px * 20.0; \
 								double _na = wa*_la + wc*_lb, _nb = wb*_la + wd*_lb; \
 								double _nc = wa*_lc + wc*_ld, _nd = wb*_lc + wd*_ld; \
 								double _ntx = wa*_ltx + wc*_lty + wtx; \

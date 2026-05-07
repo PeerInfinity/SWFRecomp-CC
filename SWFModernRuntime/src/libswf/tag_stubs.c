@@ -1258,6 +1258,23 @@ int ng_getTransformScaleRotation(size_t depth, float* out_xscale, float* out_ysc
 	return 1;
 }
 
+int ng_getTransformScaleRotationSkew(size_t depth, float* out_xscale, float* out_yscale, float* out_rotation, float* out_skew)
+{
+	if (depth > max_depth || display_list[depth].char_id == 0) return 0;
+	u32 tid = display_list[depth].transform_id;
+	float m00 = transform_data[tid][0];
+	float m10 = transform_data[tid][1];
+	float m01 = transform_data[tid][4];
+	float m11 = transform_data[tid][5];
+	float rot_x = atan2f(m10, m00);
+	float rot_y = atan2f(-m01, m11);
+	if (out_xscale)  *out_xscale  = sqrtf(m00*m00 + m10*m10) * 100.0f;
+	if (out_yscale)  *out_yscale  = sqrtf(m01*m01 + m11*m11) * 100.0f;
+	if (out_rotation) *out_rotation = rot_x * 180.0f / 3.14159265358979323846f;
+	if (out_skew)     *out_skew     = rot_y - rot_x;
+	return 1;
+}
+
 // ---------------------------------------------------------------------------
 // Matrix and color transform queries by entry_idx
 // ---------------------------------------------------------------------------

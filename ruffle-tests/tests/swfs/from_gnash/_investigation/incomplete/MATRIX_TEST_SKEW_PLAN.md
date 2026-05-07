@@ -4,35 +4,43 @@
 
 <!-- PLAN_META
 id: MATRIX_TEST_SKEW
-status: pending
+status: in_progress
 phases:
   - id: 1
     name: "Add `skew` field to MovieClip + initialize at all creation sites"
-    status: pending
+    status: completed
   - id: 2
     name: "transformMatrixSetter: decompose skew via atan2(-c,d) - atan2(b,a)"
-    status: pending
+    status: completed
   - id: 3
     name: "getLocalMatrixForMC + _render: use cos(rot+skew) / sin(rot+skew) for c/d"
-    status: pending
+    status: completed
   - id: 4
     name: "Audit _xscale / _yscale / _rotation setters to preserve skew"
-    status: pending
+    status: completed
   - id: 5
     name: "Audit getBounds / getRect / hitTest paths that consume the local matrix"
-    status: pending
+    status: completed
   - id: 6
     name: "Regression battery + rebaseline"
-    status: pending
+    status: in_progress
 dependencies: []
 blockers: []
 -->
 
-Last updated: 2026-05-07. Standalone plan promoted from `REMAINING_TAIL_TRIAGE.md` after root cause was confirmed against Ruffle source.
+Last updated: 2026-05-07 (after-fix). Skew tracking implemented; matrix_test went from 135 raw failures (948/1083 raw match) to **4 raw failures (1079/1083 raw match, 99.6%)**. Test does NOT auto-promote to `ruffle_matched` yet because line 225 (pre-existing `_width 382.5 vs 382.45` precision issue) is in our diff but not Ruffle's.
 
-## Status: pending — root cause identified, not yet implemented
+## Status: in_progress — implementation done, awaiting CI confirmation
 
-`matrix_test` (`from_gnash/misc-ming.all/matrix_test/`) is at **84.5% effective** (949/1086 expected lines per CI `8fdf3311`; 948/1083 in latest local run, modulo ~1-line drift from re-baselined #passed/#total counts). 135 raw failures.
+`matrix_test` (`from_gnash/misc-ming.all/matrix_test/`) was at **84.5% effective** (949/1086 expected lines per CI `8fdf3311`; 948/1083 in latest local run, modulo ~1-line drift from re-baselined #passed/#total counts). 135 raw failures pre-fix. Currently 4 raw failures local.
+
+### Post-fix residuals (4 lines)
+
+- **Line 225**: `staticmc._width == 382.5` (we output `382.45`). Pre-existing 1-twip rounding issue in `mcGetEffectiveSize` corner-rounding for skewed timeline matrices. Not in Ruffle's diff. **This is what blocks ruffle_subset_match.**
+- **Line 913**: `(a=1, b=0, c=0, d=1, ...)` (we output `c=8.74e-8, d=0.999999996`). Float-precision artifact from atan2f-stored skew (vs. atan2 in Ruffle). In Ruffle's diff (with smaller magnitudes ~1e-16).
+- **Lines 1845/1852**: Same float-precision issue with c-component near zero. In Ruffle's diff.
+
+The 913/1845/1852 issues are because `mc->skew` is stored as float and computed via atan2f — round-tripping introduces ~1e-7 errors when added to `mc->rotation` in cos/sin computations. Storing skew as double would tighten precision but is out of scope for this plan.
 
 Per-test verification command:
 
