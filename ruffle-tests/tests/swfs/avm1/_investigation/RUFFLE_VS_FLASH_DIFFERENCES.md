@@ -166,3 +166,23 @@ Same pattern for NetConnection (lines 90-92) and Video (lines 146-148).
 **Impact:** 9 diff lines (3 constructors × 3 lines each: value, typeof, own_props).
 
 **Decision:** Keep Flash-correct behavior (hidden in SWF5). Gnash tests `LocalConnection-v5`, `NetConnection-v5`, `Video-v5` confirm this is correct. Accept `globals_swf5` at 295/304 as a Ruffle-vs-Flash difference.
+
+## PlaceObject Before DefineSprite (Place-Before-Define)
+
+**Tests:** `from_shumway/fuzz/*` (cluster of fuzz-generated SWFs)
+
+A SWF tag stream may contain a `PlaceObject{,2,3}` that references a character ID whose `DefineSprite` only appears later in the tag stream. The three runtimes diverge on how to handle this:
+
+- **Flash Player**: builds the character dictionary sequentially as tags are processed. A `PlaceObject` referencing a not-yet-defined character is a failed placement — nothing is added to the display list, no sprite frame scripts run.
+- **Ruffle**: pre-scans the tag stream for `Define*` tags so the character dictionary is fully populated before timeline execution. The early `PlaceObject` succeeds and the sprite plays from frame 0.
+- **Our previous behavior**: matched Ruffle (the recompiler emitted all `tagDefineSprite` calls in `tagInit`, which runs before any frame).
+
+We now match Flash. The recompiler tracks the set of `DefineSprite`-registered character IDs in tag-stream order during compile time. When emitting a `tagPlaceObject{,2,3}` that references a `char_id` not yet in that set, the call's `char_id` is forced to 0, which the runtime treats as a "modify" — a benign no-op when the depth has no prior placement (the typical case for these fuzz SWFs).
+
+The change is in `SWFRecomp/src/swf.cpp` (root and sprite-internal `PLACE_OBJECT{,_2,_3}` cases) and `SWFRecomp/include/swf.hpp` (the new `defined_chars` set member).
+
+**Tests affected:** Of the 20 originally failing `from_shumway/fuzz/*` tests, 4 now PASS, 2 promoted from `MISMATCH` to `RUFFLE_MATCHED` (`4949de46…`, `887c02ab…`), 2 previously `RUFFLE_MATCHED` upgraded to PASS (`1276557624…`, `a86fee6d…`). The remaining 16 still fail — most because of unrelated fuzzer-generated state divergences. Those are listed in `from_shumway/ignored_tests.txt` with this rationale.
+
+**Decision:** Match Flash's sequential-dictionary semantics. The recompiler's pre-scan was a Ruffle-compat tweak; converting to "register on tag-stream encounter" is the spec-correct behavior.
+
+**Note:** This currently tracks only `DefineSprite`. Other character types (`DefineShape`, `DefineButton`, `DefineText`, etc.) follow different runtime registration paths and aren't yet involved in any place-before-define test we have. If future tests reveal place-before-define for those types, extend the `defined_chars` insertion sites in `swf.cpp` accordingly.

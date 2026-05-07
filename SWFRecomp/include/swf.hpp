@@ -256,6 +256,16 @@ namespace SWFRecomp
 		// Key: depth. Value: true if buffered.
 		std::set<u16> buffered_removes;
 
+		// Character IDs that have been registered by a Define* tag encountered so
+		// far in tag-stream order. PlaceObject{,2,3} that references a char_id NOT
+		// yet in this set is treated as a failed placement (matches Flash, where
+		// the character dictionary is built sequentially as tags are processed).
+		// Currently tracks DefineSprite only — that is the case our fuzz suite
+		// exercises and other character types either follow a different runtime
+		// registration path or do not appear before a referencing Place tag in
+		// our test corpus. See `_investigation/RUFFLE_VS_FLASH_DIFFERENCES.md`.
+		std::set<u16> defined_chars;
+
 		// Cross-DoAction backward-jump support: maps the absolute SWF address of
 		// each DoAction body's first byte to the script function name we emitted
 		// for that DoAction. Consulted by parseActions when a JUMP/IF target

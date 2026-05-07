@@ -997,7 +997,10 @@ namespace SWFRecomp
 				
 				u16 char_id = (u16) tag.fields[0].value;
 				new_length -= 2;
-				
+
+				// Register bitmap char_id for place-before-define tracking.
+				defined_chars.insert(char_id);
+
 				// stupid swf edge cases are stupid
 				if ((u8) cur_pos[0] == 0xFF &&
 					(u8) cur_pos[1] == 0xD9 &&
@@ -1089,6 +1092,9 @@ namespace SWFRecomp
 				u16 char_id = (u16) tag.fields[0].value;
 				new_length -= 2;
 
+				// Register bitmap char_id for place-before-define tracking.
+				defined_chars.insert(char_id);
+
 				// Strip erroneous EOI+SOI marker (FF D9 FF D8) if present
 				// Tag 21 is self-contained, so a leading FF D8 alone is the valid SOI
 				if ((u8) cur_pos[0] == 0xFF &&
@@ -1164,6 +1170,9 @@ namespace SWFRecomp
 
 				u16 char_id = (u16) tag.fields[0].value;
 				new_length -= 2;
+
+				// Register bitmap char_id for place-before-define tracking.
+				defined_chars.insert(char_id);
 
 				tag.clearFields();
 				tag.setFieldCount(1);
@@ -1313,6 +1322,9 @@ namespace SWFRecomp
 				u16 char_id = (u16) tag.fields[0].value;
 				tag_start_remaining -= 2;
 
+				// Register lossless bitmap char_id for place-before-define tracking.
+				defined_chars.insert(char_id);
+
 				tag.clearFields();
 				tag.setFieldCount(3);
 
@@ -1405,6 +1417,9 @@ namespace SWFRecomp
 				u16 char_id = (u16) tag.fields[0].value;
 				tag_start_remaining -= 2;
 
+				// Register lossless bitmap char_id for place-before-define tracking.
+				defined_chars.insert(char_id);
+
 				tag.clearFields();
 				tag.setFieldCount(3);
 
@@ -1495,6 +1510,9 @@ namespace SWFRecomp
 				u16 sound_id = (u16) tag.fields[0].value;
 				u8 flags = (u8) tag.fields[1].value;
 				u32 sample_count = (u32) tag.fields[2].value;
+
+				// Register sound char_id for place-before-define tracking.
+				defined_chars.insert(sound_id);
 
 				u8 format = (flags >> 4) & 0x0F;
 				u8 rate = (flags >> 2) & 0x03;
@@ -1683,6 +1701,9 @@ namespace SWFRecomp
 				tag.parseFields(cur_pos);
 
 				u16 font_id = (u16) tag.fields[0].value;
+
+				// Register font char_id for place-before-define tracking.
+				defined_chars.insert(font_id);
 
 				font_em_square[font_id] = (tag.code == SWF_TAG_DEFINE_FONT_3) ? 20480.0f : 1024.0f;
 
@@ -2107,6 +2128,9 @@ namespace SWFRecomp
 
 				u16 char_id = (u16) tag.fields[0].value;
 
+				// Register text char_id for place-before-define tracking.
+				defined_chars.insert(char_id);
+
 				tag.clearFields();
 				tag.setFieldCount(5);
 
@@ -2361,6 +2385,9 @@ namespace SWFRecomp
 				tag.parseFields(cur_pos);
 
 				u16 char_id = (u16) tag.fields[0].value;
+
+				// Register edit text char_id for place-before-define tracking.
+				defined_chars.insert(char_id);
 
 				// Bounds RECT
 				tag.clearFields();
@@ -2749,6 +2776,16 @@ namespace SWFRecomp
 				u16 char_id = (u16) tag.fields[0].value;
 				u16 depth = (u16) tag.fields[1].value;
 
+				// Place-before-define: PlaceObject (tag 4) referencing a char_id
+				// that has not yet been registered by an earlier DefineSprite.
+				// Flash treats this as a failed placement. Degrade to char_id=0
+				// so the runtime takes the "modify" path, which is a benign no-op
+				// when the depth has no prior placement (the typical fuzz case).
+				if (char_id != 0 && !defined_chars.count(char_id))
+				{
+					char_id = 0;
+				}
+
 				size_t transform_id = current_transform;
 				MATRIX matrix;
 				parseMatrix(matrix);
@@ -2911,19 +2948,34 @@ namespace SWFRecomp
 				}
 				
 				u16 char_id = 0;
-				
+
 				if (has_character)
 				{
 					tag.clearFields();
 					tag.setFieldCount(1);
-					
+
 					tag.configureNextField(SWF_FIELD_UI16);
-					
+
 					tag.parseFields(cur_pos);
-					
+
 					char_id = (u16) tag.fields[0].value;
 				}
-				
+
+				// Place-before-define: PO2/3 referencing a char_id whose
+				// DefineSprite has not been encountered yet in tag-stream order.
+				// Flash treats this as a failed placement (no character placed,
+				// no sprite frame scripts run). Degrade to a "modify" by clearing
+				// has_character and char_id; the runtime no-ops modify when the
+				// depth was previously empty, which is the fuzz pattern of
+				// place-then-define-later. Anything Ruffle eagerly placed in this
+				// situation is a Ruffle behavior we are intentionally not
+				// matching — see RUFFLE_VS_FLASH_DIFFERENCES.md.
+				if (has_character && char_id != 0 && !defined_chars.count(char_id))
+				{
+					has_character = false;
+					char_id = 0;
+				}
+
 				std::string transform_name = "transform_" + to_string(num_finished_tags);
 				
 				size_t transform_id = current_transform;
@@ -4193,6 +4245,10 @@ namespace SWFRecomp
 				tag.parseFields(tmp); // advances tmp, not cur_pos
 
 				u16 video_char_id = (u16) tag.fields[0].value;
+
+				// Register video char_id for place-before-define tracking.
+				defined_chars.insert(video_char_id);
+
 				tag_init << endl << "\ttagDefineVideoStream(app_context, " << to_string(video_char_id) << ");";
 
 				cur_pos += tag.length;
@@ -4212,6 +4268,11 @@ namespace SWFRecomp
 
 				u16 sprite_id = (u16) tag.fields[0].value;
 				u16 sprite_frame_count_declared = (u16) tag.fields[1].value;
+
+				// Mark this sprite_id as defined so any subsequent PlaceObject*
+				// referencing it succeeds. PlaceObject* tags that came earlier in
+				// the tag stream were already degraded to no-op modifies above.
+				defined_chars.insert(sprite_id);
 
 				std::string sp = "sprite_" + to_string(sprite_id);
 
@@ -4305,6 +4366,14 @@ namespace SWFRecomp
 
 							u16 char_id = (u16) sub_tag.fields[0].value;
 							u16 depth = (u16) sub_tag.fields[1].value;
+
+							// Sprite-internal PlaceObject: same place-before-define
+							// rule as the root timeline. Char IDs defined later in
+							// the outer tag stream are not visible here.
+							if (char_id != 0 && !defined_chars.count(char_id))
+							{
+								char_id = 0;
+							}
 
 							size_t transform_id = current_transform;
 							MATRIX matrix;
@@ -4477,6 +4546,14 @@ namespace SWFRecomp
 								sub_tag.configureNextField(SWF_FIELD_UI16);
 								sub_tag.parseFields(cur_pos);
 								char_id = (u16) sub_tag.fields[0].value;
+							}
+
+							// Sprite-internal PO2/3 place-before-define: same rule
+							// as the root timeline. See root PO2/3 site above.
+							if (has_character && char_id != 0 && !defined_chars.count(char_id))
+							{
+								has_character = false;
+								char_id = 0;
 							}
 
 							size_t transform_id = current_transform;
@@ -5390,6 +5467,9 @@ namespace SWFRecomp
 				tag.parseFields(cur_pos);
 
 				u16 button_id = (u16) tag.fields[0].value;
+
+				// Register button char_id for place-before-define tracking.
+				defined_chars.insert(button_id);
 
 				std::string bp = "button_" + to_string(button_id);
 
@@ -6544,6 +6624,9 @@ namespace SWFRecomp
 					// Track this char_id as a shape (SHAPE or MORPH_SHAPE) so
 					// DefineButton2 can prefer shape hit records over sprite ones.
 					context.shape_char_ids.insert(shape_id);
+
+					// Register shape/morph/font char_id for place-before-define tracking.
+					defined_chars.insert(shape_id);
 
 					if (shape_is_v4)
 					{
