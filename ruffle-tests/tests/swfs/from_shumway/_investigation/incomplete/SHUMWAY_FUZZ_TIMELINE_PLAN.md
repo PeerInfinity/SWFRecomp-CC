@@ -19,6 +19,58 @@ tests now PASS — see resolved-comment above. Of the original 27 fuzz tests
 in this plan, 7 PASS and 20 still fail (the `_currentframe` natural-advance
 sync resolved roughly the cluster that exercised `this._currentframe`).
 
+### 2026-05-08 investigation: shape of remaining 20
+
+Local re-run on the 8 simplest residuals (≤8 expected lines): all 3 zero-output
+tests PASS, `2f4f46bf` PASS, `1276557624` and `a86fee6d` ruffle_matched, `81004241`
+PASS, `07580c34` PASS — the only one in that band still failing is `b480790b`
+(5 expected / 26 actual). So the failures cluster at slightly higher-complexity
+SWFs.
+
+The failing 20 share a common SWF shape: **DefineSprite tags appear AFTER
+PlaceObject2 tags that reference them in the tag stream**. Flash/Shumway
+treat this as failed placement (chid undefined at PlaceObject time → no sprite
+animation), which is why expected outputs only contain root-frame traces.
+Both we and Ruffle DO place the sprite (recompiler scans all DefineSprite
+tags ahead of time), so we and Ruffle both produce extra sprite-frame traces.
+Ours and Ruffle's outputs share the first ~14 lines exactly, then diverge.
+
+For `b480790b`: ours is exactly 3 extra duplicate values vs Ruffle's output
+(an extra `1`, `2`, `3` interspersed in the late tail). Ruffle's output is
+also wrong vs expected, but it's recorded in `output.ruffle.txt`. Diff is
+**not** a strict subset of Ruffle's by line index, so subset-promotion fails.
+
+### Tests that cannot promote
+
+5 of the 20 lack both `known_failure = true` and `output.ruffle.txt`, so
+ruffle_matched promotion is structurally impossible without first running
+upstream Ruffle locally on each SWF and committing the output:
+
+- `0cde3aca…` (92/48 lines)
+- `438789f3…` (18/16 lines, **closest to passing**)
+- `b29624af…` (36/29 lines)
+- `e152812e…` (63/43 lines)
+- `f5398dd7…` (26/24 lines)
+
+Path forward for these: build/run Ruffle's `tests` binary against each SWF,
+capture stdout traces as `output.ruffle.txt`, and add `known_failure = true`
+to `test.toml`. Then they auto-promote if our output is no worse than Ruffle's.
+
+### Path-forward summary (revised)
+
+1. **Generate `output.ruffle.txt` for the 5 missing tests** (~30 min once
+   Ruffle's test runner is running locally) — likely flips at least 1-2
+   to ruffle_matched, since we and Ruffle produce nearly-identical wrong
+   output.
+2. The remaining 15 with `known_failure=true` + `output.ruffle.txt` need
+   our output to be a strict line-index subset of Ruffle's. Spot-check a
+   few — if our diff is just ±1-3 lines off Ruffle's, hunting that
+   divergence may unlock multiple at once. If our diff is structurally
+   different, accept-as-noise / move to ignore list per the worth-it bar
+   below.
+3. Path of last resort: add unexplained entries to a Shumway flat
+   `ignored_tests.txt` so they don't clutter filtered results.
+
 ## `fuzz/` sub-tree (20 still failing)
 
 Each `fuzz/<sha256>/` directory holds a single test.swf with a short expected output (1-6 lines of small integers). The directory names are SHA-256 hashes suggesting these are fuzzer-generated SWFs — likely Shumway's own fuzzer output preserved as regression cases.
