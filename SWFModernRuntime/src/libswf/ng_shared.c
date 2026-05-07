@@ -1794,7 +1794,10 @@ void ng_getTextExtent(u16 font_id, double font_size_px, const char* text, size_t
 	if (out_width) *out_width = text_width_px;
 	if (out_height) *out_height = text_height_px;
 	if (out_tf_height) *out_tf_height = text_height_px + 4.0;
-	if (out_tf_width) *out_tf_width = text_width_px + 4.0;
+	// When a wrap width is provided, textFieldWidth equals that constraint
+	// (Flash AutoSize::Left + word_wrap preserves the assigned width). Without
+	// wrap, AutoSize::Left expands to fit content + 4px gutter.
+	if (out_tf_width) *out_tf_width = has_wrap ? width_px : (text_width_px + 4.0);
 }
 
 int ng_getCharIndexAtPoint(int tf_idx, float local_x_px, float local_y_px,
