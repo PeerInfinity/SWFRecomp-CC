@@ -2,7 +2,7 @@
 
 Cross-suite summary of all Ruffle-derived test suites. Each suite has its own `_investigation/` directory with detailed status docs.
 
-Last updated: 2026-05-07 (place-before-define narrowing fix locally — restores all CI regressions; CI for that pending. Earlier CI `873e520e`: place-before-define caused Gnash actionscript.all 189→0 (Dejagnu) and -2 AVM1; all restored locally by skipping the inner-sprite check + registering ImportAssets char_ids).
+Last updated: 2026-05-07 (CI run `8fdf3311` — place-before-define narrowing landed: AVM1 +2 (`placeobject_occupied_depth`, `textsnapshot_available_text`), Gnash actionscript.all +189 effective (full Dejagnu recovery), Shumway flat +4 fuzz gain preserved. Net vs original `e0af5c2d` baseline: +4 Shumway PASSes, no regressions.).
 
 ## Suite Summary
 
@@ -10,40 +10,35 @@ Last updated: 2026-05-07 (place-before-define narrowing fix locally — restores
 
 | Suite | Tests | Pass | RM | Effective | Effective Rate | Filtered Rate | Notes |
 |-------|-------|------|----|-----------| ---------------|---------------|-------|
-| [avm1](../avm1/_investigation/CURRENT_STATUS.md) | 648 | 605 | 9 | 614 | 94.8% | **100.0%** (608/608) | Place-before-define narrowing fix locally restores `placeobject_occupied_depth` + `textsnapshot_available_text` to PASS; CI for that pending. |
-| [from_gnash/actionscript.all](../from_gnash/_investigation/CURRENT_STATUS.md) | 190 | 126 | 63 | 189 | **99.5%** | — | Place-before-define narrowing fix locally restores Dejagnu init (entire 189 effective restored); CI for that pending. CI run `873e520e` showed catastrophic 0/N collapse from the un-narrowed fix — Dejagnu's `xtrace_win` was degraded because sprite-internal PlaceObject of imported `dejagnu`/`dejafont` chars hit the place-before-define gate. Now skipped for sprite-internal tags + ImportAssets char_ids tracked. |
+| [avm1](../avm1/_investigation/CURRENT_STATUS.md) | 648 | 605 | 9 | 614 | 94.8% | **100.0%** (608/608) | 40 ignored. Zero filtered failures. `placeobject_occupied_depth` + `textsnapshot_available_text` recovered this CI via place-before-define narrowing. |
+| [from_gnash/actionscript.all](../from_gnash/_investigation/CURRENT_STATUS.md) | 190 | 126 | 63 | 189 | **99.5%** | — | Full Dejagnu recovery this CI: place-before-define narrowing skips the check inside `DefineSprite` and registers `ImportAssets` char_ids so the imported `dejagnu`/`dejafont` chars are no longer degraded. Only `array-v5` remains as raw failure (sort/Array-method-on-Object semantics). |
 | [from_gnash/misc-mtasc.all](../from_gnash/_investigation/CURRENT_STATUS.md) | 9 | 7 | 2 | 9 | **100.0%** | — | All effective pass. Unchanged this CI. |
 | [from_gnash/misc-swfmill.all](../from_gnash/_investigation/CURRENT_STATUS.md) | 18 | 17 | 1 | 18 | **100.0%** | — | All effective pass. Unchanged this CI. |
 | [from_gnash/misc-ming.all](../from_gnash/_investigation/CURRENT_STATUS.md) | 102 | 64 | 22 | 86 | **84.3%** | — | Unchanged this CI. |
 | [from_gnash/misc-swfc.all](../from_gnash/_investigation/CURRENT_STATUS.md) | 15 | 8 | 5 | 13 | 86.7% | — | Unchanged this CI. |
-| [from_shumway](../from_shumway/_investigation/CURRENT_STATUS.md) (flat) | 92 | 72 | 3 | 75 | 81.5% | **98.7%** (75/76) | Place-before-define gains landed in CI: 4 fuzz PASSes (incl. 2 RMATCH→PASS for `1276557624…`, `a86fee6d…`), 2 newly RMATCH (`4949de46…`, `887c02ab…`); 16 still MISMATCH (in `ignored_tests.txt` as fuzzer noise). `avm1/moviecliploader` is the only non-fuzz failure. |
+| [from_shumway](../from_shumway/_investigation/CURRENT_STATUS.md) (flat) | 92 | 72 | 3 | 75 | 81.5% | **98.7%** (75/76) | Place-before-define gain (+4 fuzz PASSes incl. 2 RMATCH→PASS for `1276557624…`, `a86fee6d…`; 2 newly RMATCH for `4949de46…`, `887c02ab…`) landed in CI `873e520e` and survived the narrowing in CI `8fdf3311` (fuzz tests have no inner-sprite PlaceObjects, so the inner-sprite skip didn't undo them). 16 still MISMATCH (in `ignored_tests.txt` as fuzzer noise). `avm1/moviecliploader` is the only non-fuzz failure. |
 | [from_shumway/avm1](../from_shumway/_investigation/CURRENT_STATUS.md) | 47 | 45 | 0 | 45 | 95.7% | **100.0%** (45/45) | 2 ignored. Only `moviecliploader` remains (MCL one-tick deferral). Unchanged this CI. |
 | **SWFRecomp/tests** (old suite) | 158+59 | all trace pass | — | — | **100%** | — | Hand-written opcode tests. CI only. |
 
-## Progress Since 2026-05-07 (local; CI pending) — place-before-define narrowing
+## Progress Since 2026-05-07 (CI run `8fdf3311`) — place-before-define narrowing landed
 
-The CI run `873e520e` exposed a much wider blast radius for the place-before-define fix than the pre-CI canaries (26 AVM1 + 12 Shumway flat) caught. Two unintended regressions:
+CI deltas vs broken CI `873e520e`: AVM1 +2, Gnash actionscript.all +189 effective, all other suites unchanged. Vs pre-place-before-define baseline `e0af5c2d`: only +4 Shumway flat fuzz PASSes survive (the intended gain). No regressions.
 
-1. **Gnash actionscript.all collapse 189 → 0 effective.** All Dejagnu-driven tests went 0/N. Root cause traced (`SWFRecomp/src/swf.cpp`): `delete-v5/test.swf` (and every other actionscript.all test) imports the `dejagnu` sprite + `dejafont` font from `Dejagnu.swf` via `ImportAssets`, which assigns local `char_id=2` (dejagnu) and `char_id=3` (dejafont). Then it `DefineSprite char_id=1` containing inner `PlaceObject2 char_id=2 / 3`. The recompiler's tag-stream `defined_chars` set didn't track `ImportAssets` registrations, AND it applied the place-before-define check inside `DefineSprite` even though sprite-internal placements run at runtime (long after the full root dictionary is built). Result: the `xtrace_win` EditText that Dejagnu uses for trace assertions never instantiated.
+The CI run `873e520e` exposed a much wider blast radius for the original place-before-define fix than the pre-CI canaries (26 AVM1 + 12 Shumway flat) caught. Two unintended regressions, both from the same root cause:
+
+1. **Gnash actionscript.all collapse 189 → 0 effective.** All Dejagnu-driven tests went 0/N. `delete-v5/test.swf` (and every other actionscript.all test) imports the `dejagnu` sprite + `dejafont` font from `Dejagnu.swf` via `ImportAssets`, which assigns local `char_id=2` (dejagnu) and `char_id=3` (dejafont). Then it `DefineSprite char_id=1` containing inner `PlaceObject2 char_id=2 / 3`. The recompiler's tag-stream `defined_chars` set didn't track `ImportAssets` registrations, AND it applied the place-before-define check inside `DefineSprite` even though sprite-internal placements run at runtime (long after the full root dictionary is built). Result: the `xtrace_win` EditText that Dejagnu uses for trace assertions never instantiated.
 
 2. **2 AVM1 PASSes regressed.** `placeobject_occupied_depth` (DefineSprite 1 places char_id=2 internally before DefineSprite 2 in root tag stream) and `textsnapshot_available_text` (DefineSprite 1 places char_ids 2/3/4 internally before their Define* tags). Same root cause as Dejagnu — sprite-internal place-before-define is overzealous because inner tags don't fire until runtime instantiation.
 
-**Fix landed locally** (`SWFRecomp/src/swf.cpp`, this session — pending CI):
+**Narrowing fix in `SWFRecomp/src/swf.cpp` (commit `8fdf3311`):**
 - Removed the place-before-define check at both sprite-internal sites (PlaceObject and PlaceObject2/3 inside `DefineSprite`'s sub-tag handler). Sprite placement runs at runtime; the check should only apply to root-timeline tags.
-- Added `defined_chars.insert(imp.char_id)` in the `ImportAssets`/`ImportAssets2` handler so root-level PlaceObject* of imported chars isn't degraded (defensive — covers Dejagnu and any other ImportAssets pattern).
-- Local verification: AVM1 25-test canary battery (25/25 PASS), Gnash actionscript.all 15-test cluster (6 PASS + 9 RMATCH = 15 effective), Shumway flat 6 fuzz tests (4 PASS + 2 RMATCH preserved), `placeobject_occupied_depth` and `textsnapshot_available_text` both flipped back to PASS, `array-v5` 0/560 → 517/560 (full Dejagnu init restored). No new regressions.
+- Added `defined_chars.insert(imp.char_id)` in the `ImportAssets`/`ImportAssets2` handler so root-level PlaceObject* of imported chars isn't degraded.
+- The +4 Shumway gain is preserved (fuzz tests have no inner-sprite PlaceObjects, so removing the inner-sprite check doesn't undo them).
 
-When this lands in CI, the suite table should restore to: AVM1 605 → 605 (or +X for any pre-existing local local-vs-CI fixes carried in master), Gnash actionscript.all 0 → 189 effective, Shumway flat 75 effective preserved.
-
-## Progress Since 2026-05-07 (CI run `873e520e`) — historical record
-
-For audit: the un-narrowed place-before-define fix in commits `7875fb4a` / `ba7a4725` / `5331ed4b` produced these CI deltas vs `e0af5c2d`:
-
-- **+4 Shumway flat fuzz PASSes** (intended) — `1276557624…`, `4935e4ae…`, `a86fee6d…`, `b480790b…`. Plus 2 RMATCH→PASS upgrades and 11 fuzz tests with reduced mismatched lines.
+For audit, the un-narrowed CI `873e520e` (commits `7875fb4a` / `ba7a4725` / `5331ed4b`) deltas vs `e0af5c2d`:
+- **+4 Shumway flat fuzz PASSes** — `1276557624…`, `4935e4ae…`, `a86fee6d…`, `b480790b…`. Plus 2 RMATCH→PASS upgrades and 11 fuzz tests with reduced mismatched lines.
 - **-189 effective Gnash actionscript.all** — 126 PASS + 63 RMATCH all collapsed to 0/N matching lines (Dejagnu init broken).
 - **-2 AVM1 PASS** — `placeobject_occupied_depth` (runtime_error), `textsnapshot_available_text` (13/20).
-
-The +4 Shumway gain is preserved by the narrowing fix (local verification confirms — fuzz tests have no inner-sprite PlaceObjects, so removing the inner-sprite check doesn't undo the gain).
 
 ## Progress Since 2026-05-07 (CI snapshot at `035950cf`)
 

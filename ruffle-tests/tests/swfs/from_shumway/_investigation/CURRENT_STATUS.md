@@ -1,10 +1,10 @@
 # Shumway Test Suite Status
 
-Last updated: 2026-05-06 (place-before-define recompiler fix locally; CI run pending — flat suite 71/92 → expected 75/92 effective; filtered fuzz failures drop from 20 to 0).
+Last updated: 2026-05-07 (place-before-define recompiler fix landed in CI `873e520e` and survived the narrowing in CI `8fdf3311`: flat suite 68 → 72 PASS (+4 fuzz), filtered fuzz failures drop from 20 to 0).
 
-## Latest fixes (2026-05-06)
+## Latest fixes (2026-05-06, in CI at `8fdf3311`)
 
-- **Place-before-define matches Flash, not Ruffle.** Recompiler now tracks `defined_chars` (DefineSprite, Shape, Button, Text, EditText, Bits, Font, Sound, Video) in tag-stream order. PlaceObject{,2,3} that references a char_id whose Define* tag hasn't been encountered yet is degraded to char_id=0 (modify), matching Flash's sequential-dictionary semantics. Fix in `SWFRecomp/src/swf.cpp` + `SWFRecomp/include/swf.hpp`. Documented in `avm1/_investigation/RUFFLE_VS_FLASH_DIFFERENCES.md`. Of 20 originally failing fuzz tests: 4 PASS (incl. 2 RMATCH→PASS upgrades), 2 newly RMATCH, 16 still MISMATCH (added to `from_shumway/ignored_tests.txt` as fuzz noise). No canary regressions across 26 AVM1 + 12 Shumway-flat sample tests. Plan moved to `complete/SHUMWAY_FUZZ_TIMELINE_PLAN.md`.
+- **Place-before-define matches Flash, not Ruffle.** Recompiler tracks `defined_chars` (DefineSprite, Shape, Button, Text, EditText, Bits, Font, Sound, Video, plus `ImportAssets`-imported chars) in tag-stream order. *Root-timeline* PlaceObject{,2,3} that references a char_id whose Define* tag hasn't been encountered yet is degraded to char_id=0 (modify), matching Flash's sequential-dictionary semantics. Sprite-internal PlaceObject is *not* gated (sprites instantiate at runtime, by which point the dictionary is complete). Fix in `SWFRecomp/src/swf.cpp` + `SWFRecomp/include/swf.hpp`. Documented in `avm1/_investigation/RUFFLE_VS_FLASH_DIFFERENCES.md`. Of 20 originally failing fuzz tests: 4 PASS (incl. 2 RMATCH→PASS upgrades for `1276557624…`, `a86fee6d…`), 2 newly RMATCH (`4949de46…`, `887c02ab…`), 16 still MISMATCH (added to `from_shumway/ignored_tests.txt` as fuzz noise). The narrowing fix in CI `8fdf3311` recovered Gnash actionscript.all (Dejagnu) and 2 AVM1 tests that the un-narrowed CI `873e520e` had regressed; the +4 Shumway gain is preserved (fuzz tests have no inner-sprite PlaceObjects). Plan in `complete/SHUMWAY_FUZZ_TIMELINE_PLAN.md`.
 
 ## Earlier fixes (2026-05-04, in CI at `c5994ec1`)
 
@@ -17,18 +17,19 @@ Last updated: 2026-05-06 (place-before-define recompiler fix locally; CI run pen
 | Metric | Value |
 |--------|-------|
 | Total tests | 92 |
-| Passing | **68** (73.9%) |
+| Passing | **72** (78.3%) |
 | Ruffle-matched | 3 |
-| Effective pass | **71** (77.2%) |
-| Failing | 21 |
+| Effective pass | **75** (81.5%) |
+| Filtered effective | **75/76 (98.7%)** (16 fuzz tests in `ignored_tests.txt`) |
+| Failing | 17 |
 
-**Breakdown by sub-tree** (flat suite recurses into subdirs, CI `c5994ec1`):
+**Breakdown by sub-tree** (flat suite recurses into subdirs, CI `8fdf3311`):
 
 | Sub-tree | Total | Pass | RM | Fail |
 |----------|-------|------|----|------|
 | Flat root (no subdir) | 10 | 10 | 0 | 0 |
 | `avm1/` | 47 | 45 | 1 | 1 (`moviecliploader`) |
-| `fuzz/` | 30 | 8 | 2 | 20 |
+| `fuzz/` | 30 | 12 | 2 | 16 (all in `ignored_tests.txt`) |
 | `timeline/` | 5 | 5 | 0 | 0 |
 
 **Flat root is still 100% passing**: all 10 remaining tests (add, avm1timeline1, avm1timeline2, button3, doubleAndRegister, fscommand1, gradientTransform, invalidClipDepth, movieinfo1, targetPath1) pass.

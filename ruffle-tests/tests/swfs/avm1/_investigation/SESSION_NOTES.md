@@ -3,17 +3,28 @@
 Historical session-by-session notes documenting changes, fixes, and investigations.
 For current test status, see `CURRENT_STATUS.md`.
 
-## Session notes (2026-05-07 — Shumway flat 71→75 effective, place-before-define recompiler fix)
+## Session notes (2026-05-07 — place-before-define narrowing after CI regression)
 
-**`SWFRecomp/src/swf.cpp` + `SWFRecomp/include/swf.hpp`**: tag-stream-order character dictionary in the recompiler. New `SWF::defined_chars` set, populated at every `Define*` case as the recompiler walks tags in order (Sprite, Shape/Morph/Font via `interpretShape`, Button, Text/EditText, Bits/JPEG/Lossless, Sound, Video). Both root-timeline and sprite-internal `PlaceObject{,2,3}` cases check membership after parsing the `char_id`; if not yet registered, force `char_id=0` (and clear `has_character` on PO2/3). The runtime treats `char_id=0` as "modify-only" — a no-op when the depth is empty, which is the typical fuzz pattern of place-then-define-later.
+**Initial fix landed in CI `873e520e`** (commits `7875fb4a` / `ba7a4725` / `5331ed4b`): tag-stream-order character dictionary in the recompiler. New `SWF::defined_chars` set, populated at every `Define*` case as the recompiler walks tags in order (Sprite, Shape/Morph/Font via `interpretShape`, Button, Text/EditText, Bits/JPEG/Lossless, Sound, Video). Both root-timeline and sprite-internal `PlaceObject{,2,3}` cases checked membership after parsing the `char_id`; if not yet registered, force `char_id=0` (and clear `has_character` on PO2/3). The runtime treats `char_id=0` as "modify-only" — a no-op when the depth is empty, which is the typical fuzz pattern of place-then-define-later.
 
-Why this matters: previously the recompiler emitted all `tagDefineSprite` calls into `tagInit` (runs once at startup), so every `PlaceObject` lookup succeeded regardless of tag-stream order. That matches Ruffle's eager pre-scan but disagrees with Flash, which builds the dictionary sequentially as tags are processed. For `from_shumway/fuzz/*` SWFs that reference a sprite before its `DefineSprite`, Flash places nothing (and the sprite's frame scripts never run) while we (and Ruffle) were placing the sprite eagerly and emitting the spurious sprite-frame traces.
+Why this matters: previously the recompiler emitted all `tagDefineSprite` calls into `tagInit` (runs once at startup), so every `PlaceObject` lookup succeeded regardless of tag-stream order. That matches Ruffle's eager pre-scan but disagrees with Flash, which builds the dictionary sequentially as tags are processed. For `from_shumway/fuzz/*` SWFs that reference a sprite before its `DefineSprite`, Flash places nothing (and the sprite's frame scripts never run) while we (and Ruffle) were placing the sprite eagerly and emitting the spurious sprite-frame traces. Local canary battery (26 AVM1 + 12 Shumway-flat) all passed before push, but the battery missed two patterns.
 
-Of 20 originally failing fuzz tests: 4 → PASS (`4935e4ae…`, `b480790b…`, plus `1276557624…` and `a86fee6d…` upgraded RMATCH→PASS), 2 → newly RUFFLE_MATCHED (`4949de46…`, `887c02ab…`), 16 → still MISMATCH for unrelated fuzzer-noise reasons. The 16 stragglers added to `from_shumway/ignored_tests.txt`. Plan moved to `from_shumway/_investigation/complete/SHUMWAY_FUZZ_TIMELINE_PLAN.md`.
+**CI `873e520e` regressions** (caught only at full-CI scale):
 
-First-iteration regression: tracking only `DefineSprite` broke `avm1/movieclip_in_removed_button` because that test's button references a Shape/Sprite combo and sprite-internal `PlaceObject2(shape_id)` was being forced to char_id=0. Fix: also track all the other `Define*` types. Final canary battery: 26 AVM1 + 12 Shumway-flat sample tests, all PASS; no regressions.
+1. **Gnash actionscript.all 189 → 0 effective.** `delete-v5/test.swf` and every other actionscript.all test imports the `dejagnu` sprite + `dejafont` font from `Dejagnu.swf` via `ImportAssets` (assigning local `char_id=2` and `char_id=3`). Then `DefineSprite char_id=1` contains inner `PlaceObject2 char_id=2/3`. The `defined_chars` set didn't track `ImportAssets` registrations, AND it applied the place-before-define check inside `DefineSprite` even though sprite-internal placements run at runtime. Result: Dejagnu's `xtrace_win` EditText never instantiated, and zero trace output landed for any of the 189 effective passes.
 
-Documented in `RUFFLE_VS_FLASH_DIFFERENCES.md` "PlaceObject Before DefineSprite". If a non-Sprite character type is ever found in a real (non-fuzz) place-before-define test, the existing tracking already covers it. Commits: `7875fb4a` (rename plan to `complete/`), `ba7a4725` (fix + docs).
+2. **2 AVM1 PASSes regressed.** `placeobject_occupied_depth` (DefineSprite 1 places char_id=2 internally before DefineSprite 2 in root tag stream) and `textsnapshot_available_text` (DefineSprite 1 places char_ids 2/3/4 internally before their Define* tags). Same root cause — sprite-internal place-before-define is overzealous because inner tags don't fire until runtime instantiation.
+
+**Narrowing fix landed in CI `8fdf3311`** (this session's commit): two changes to `SWFRecomp/src/swf.cpp`.
+
+- Removed the place-before-define check from both sprite-internal `PlaceObject` and `PlaceObject2/3` sites inside `DefineSprite`'s sub-tag handler. Sprite placement runs at runtime, by which point the full root dictionary has been built; the check should only apply to root-timeline tags.
+- Added `defined_chars.insert(imp.char_id)` in the `ImportAssets`/`ImportAssets2` handler so root-level `PlaceObject*` of imported chars isn't degraded.
+
+CI deltas vs `873e520e`: AVM1 +2 (both regressions PASS again), Gnash actionscript.all +189 effective (Dejagnu fully restored, including `array-v5` 0/560 → 517/560), Shumway flat unchanged at 72 PASS (+4 fuzz gain preserved — fuzz tests have no inner-sprite PlaceObjects). Net vs original `e0af5c2d` baseline: only +4 Shumway PASSes survive (the intended gain), no regressions.
+
+First-iteration regression caught locally: tracking only `DefineSprite` broke `avm1/movieclip_in_removed_button` because that test's button references a Shape/Sprite combo and sprite-internal `PlaceObject2(shape_id)` was being forced to char_id=0 — fixed by also tracking all the other `Define*` types.
+
+Documented in `RUFFLE_VS_FLASH_DIFFERENCES.md` "PlaceObject Before DefineSprite" with the root/sprite scope distinction and ImportAssets handling. Commits: `7875fb4a` / `ba7a4725` (initial fix), `8fdf3311` (narrowing).
 
 ## Session notes (2026-04-18 — 593→598 pass, 599→606 effective, **filtered → 100% (600/600)**)
 

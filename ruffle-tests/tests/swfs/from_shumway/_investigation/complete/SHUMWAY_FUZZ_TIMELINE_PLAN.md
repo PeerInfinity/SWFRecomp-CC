@@ -1,11 +1,14 @@
 # Shumway Flat: fuzz/ Failures Plan
 <!-- TESTS: fuzz/0cde3acaa5116dac19bf73b0b76556223ad9328a367e04ec9cab733bc6765d82, fuzz/33c31f96f8d026037b9024c497870471636f0c31dccb624be67775662b37b096, fuzz/356bf4ddf127739c3a1e3ea06b5cee9261dfc55a5ea4755013927647455e7c77, fuzz/42f71d860e22e456a9bd61c2d9e8c8da9536152b879a131dd7a400ff61a4a3e3, fuzz/438789f3e93da74855898cceed80e21291c6ab14cf36314a856c6f2716606a49, fuzz/4935e4aed5e63f07d9e6cc76e97d080f042b029a838630fb2b276b5da0affd26, fuzz/4949de464f5408bc3eaaa543d2e2346e01961965a6aa057dba9a6903fcf1c822, fuzz/5d828b99311b51073db245c0c3468e9f12d9cc8226ecbf00916cb725c02528cd, fuzz/65f0c0a49528b4350e0521d10c632e475a5670010f817d406246b9771a1c2121, fuzz/7318344161196391b369e91217937687ebc437e42fdcc10c4c456bde55e0db61, fuzz/887c02ab98dbdd3ae22b2363b212dba005565738a572a2156e703dd3bf9b40af, fuzz/ac649dcf28572cc8250759cc0f8571a4111361fb6923db34ff02901095cdc580, fuzz/b29624af5fa348d05b0772ca3b4552c45c90f4515a1ab901e3c754688e35be1b, fuzz/b480790b84c3a62fe6fa3486d26fd23988a5acd038261c04349ad4368107e6ca, fuzz/c24e6e559fd66b092283a3bdcd925792e8dd7ca55ce1c7729d44d5b315ad8f75, fuzz/cf67270dbe5367af59f1bf029f413b8b7b0fb7000cbd0ee534d369087d20601b, fuzz/e152812e2cfc0971237321dfadc37e3484631c355cb2e4b86344ff90bb89c75e, fuzz/e5b0ab65b5f16ff7117db5cb636de47c5132352253497256c2abcdec7e785897, fuzz/f40458686ee60b6b4bd4fe59188ccadc6aeb4094f38536977c11e02430143052, fuzz/f5398dd73a3a38472dda7422831414d087af37bee1bb3119071526a55da8d09b -->
 
-<!-- Resolved 2026-05-06 — place-before-define recompiler fix:
+<!-- Resolved 2026-05-07 — place-before-define recompiler fix landed in CI 8fdf3311:
   Tracking `defined_chars` (DefineSprite/Shape/Button/Text/EditText/Bits/Font/
-  Sound/Video) in tag-stream order in `SWFRecomp/src/swf.cpp`. PlaceObject{,2,3}
-  referencing a char_id not yet registered is degraded to char_id=0 (modify),
-  matching Flash. Of the 20 originally failing tests:
+  Sound/Video, plus ImportAssets-imported chars) in tag-stream order in
+  `SWFRecomp/src/swf.cpp`. *Root-timeline* PlaceObject{,2,3} referencing a
+  char_id not yet registered is degraded to char_id=0 (modify), matching Flash.
+  Sprite-internal PlaceObject is intentionally not gated (sprites instantiate
+  at runtime, after the full root dictionary is built). Of the 20 originally
+  failing tests:
     - 4 now PASS: 4935e4aed5e6, b480790b, plus 2 RMATCH→PASS upgrades
       (1276557624, a86fee6d).
     - 2 newly RUFFLE_MATCHED: 4949de46, 887c02ab.
@@ -15,7 +18,13 @@
       for different per-test reasons — unrelated tag-stream noise).
   Total still-failing fuzz tests after fix: 16. All 16 added to
   `from_shumway/ignored_tests.txt` per the worth-it bar in this plan.
-  See `RUFFLE_VS_FLASH_DIFFERENCES.md` "PlaceObject Before DefineSprite" entry.
+  Initial fix in CI 873e520e regressed Gnash actionscript.all (189→0 effective)
+  and 2 AVM1 tests due to over-broad sprite-internal check + missing
+  ImportAssets registration; narrowing fix in CI 8fdf3311 recovered both
+  while preserving the +4 fuzz gain (fuzz tests have no inner-sprite
+  PlaceObjects). See RUFFLE_VS_FLASH_DIFFERENCES.md "PlaceObject Before
+  DefineSprite" entry and avm1/_investigation/SESSION_NOTES.md
+  (2026-05-07 entry) for full rationale.
 -->
 
 <!-- Resolved 2026-05-04 (in CI at c5994ec1):

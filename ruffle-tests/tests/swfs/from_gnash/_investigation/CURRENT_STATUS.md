@@ -1,8 +1,8 @@
 # Gnash Test Suite Status
 
-Last updated: 2026-05-07 (CI snapshot at `3b477b32` — `TextFormat-v7` promoted to ruffle_matched in actionscript.all via `getTextExtent` wrap-width fix.)
+Last updated: 2026-05-07 (CI `8fdf3311` — actionscript.all fully recovered to 189 effective via place-before-define narrowing. CI `873e520e` had collapsed it to 0 effective by degrading the imported `dejagnu`/`dejafont` chars in `Dejagnu.swf`-driven tests; the narrowing skips the check inside `DefineSprite` and registers `ImportAssets` char_ids, restoring all prior PASSes + RMATCHes including `TextFormat-v7`.)
 
-### CI snapshot (commit `3b477b32`, 2026-05-07)
+### CI snapshot (commit `8fdf3311`, 2026-05-07)
 
 | Suite | Pass | RM | Effective | Total | Rate |
 |-------|------|----|-----------|-------|------|
