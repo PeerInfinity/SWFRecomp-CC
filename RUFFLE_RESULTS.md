@@ -2,9 +2,9 @@
 
 *See [RUFFLE_RESULTS_FILTERED.md](RUFFLE_RESULTS_FILTERED.md) for results with ignored tests excluded.*
 
-**Commit:** `d11aa45a7eb1`  
-**Date:** 2026-05-07 22:07 UTC  
-**Total duration:** 4m55s
+**Commit:** `a3912cf21e4e`  
+**Date:** 2026-05-07 23:14 UTC  
+**Total duration:** 8m05s
 
 ## Results by Suite
 
@@ -65,16 +65,9 @@ Tests with `output_mismatch` status but ≥80% of expected lines matching.
 
 ## Changes Since Last Run
 
-| Suite | Newly Passing | Newly Failing | Lines Improved | Lines Regressed |
-|-------|-------------:|-------------:|--------------:|----------------:|
-| avm1 | 1 | 1 | 133 | 1 |
-| from_gnash/actionscript.all | 1 | - | 9 | - |
+*No changes since last run.*
 
-**avm1 — newly passing:** `textfield_props_swf6`
-
-**avm1 — newly failing:** `native_objects_swf6`
-
-*Comparing `f3965a99f783` → `d11aa45a7eb1`*
+*Comparing `d11aa45a7eb1` → `a3912cf21e4e`*
 
 ## Flash-Spec Results
 
@@ -89,23 +82,23 @@ Tests verified against Flash's actual output (`output.flash.txt`).
 ### avm1
 
 - **Pass:** 605/648 (93.4%)
-- **Duration:** 2m42s across 30 shards
+- **Duration:** 3m49s across 30 shards
 - **Lines:** 106,095/114,983 matching (92.3%)
-- **Avg test duration:** 0.2s — slowest: `edittext_newline_stripping` (6.4s)
+- **Avg test duration:** 0.3s — slowest: `textfield_background_color` (23.2s)
 
 ### from_gnash/actionscript.all
 
 - **Pass:** 126/190 (66.3%)
-- **Duration:** 54s across 30 shards
+- **Duration:** 1m21s across 30 shards
 - **Lines:** 15,374/16,957 matching (90.7%)
-- **Avg test duration:** 0.2s — slowest: `Sound-v7` (0.4s)
+- **Avg test duration:** 0.4s — slowest: `enumerate-v5` (18.8s)
 
 ### from_gnash/misc-ming.all
 
 - **Pass:** 65/102 (63.7%)
-- **Duration:** 37s across 30 shards
+- **Duration:** 1m16s across 30 shards
 - **Lines:** 3,726/4,577 matching (81.4%)
-- **Avg test duration:** 0.3s — slowest: `matrix_test` (4.2s)
+- **Avg test duration:** 0.7s — slowest: `register_class/registerClassTest2` (20.4s)
 
 ### from_gnash/misc-mtasc.all
 
@@ -126,18 +119,18 @@ Tests verified against Flash's actual output (`output.flash.txt`).
 - **Pass:** 17/18 (94.4%)
 - **Duration:** 4s across 30 shards
 - **Lines:** 49/51 matching (96.1%)
-- **Avg test duration:** 0.2s — slowest: `dict_override` (0.2s)
+- **Avg test duration:** 0.2s — slowest: `dict_callframe` (0.2s)
 
 ### from_shumway
 
 - **Pass:** 72/92 (78.3%)
-- **Duration:** 22s across 30 shards
+- **Duration:** 1m17s across 30 shards
 - **Lines:** 876/1,276 matching (68.7%)
-- **Avg test duration:** 0.2s — slowest: `fuzz/42f71d860e22e456a9bd61c2d9e8c8da9536152b879a131dd7a400ff61a4a3e3` (0.3s)
+- **Avg test duration:** 0.8s — slowest: `fuzz/e5b0ab65b5f16ff7117db5cb636de47c5132352253497256c2abcdec7e785897` (19.4s)
 
 ### from_shumway/avm1
 
 - **Pass:** 45/47 (95.7%)
-- **Duration:** 10s across 30 shards
+- **Duration:** 11s across 30 shards
 - **Lines:** 483/491 matching (98.4%)
-- **Avg test duration:** 0.2s — slowest: `depth` (0.3s)
+- **Avg test duration:** 0.2s — slowest: `watch` (0.9s)

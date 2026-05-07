@@ -1,10 +1,10 @@
 # Ruffle Test Results (Unfiltered)
 
-**Date**: 2026-05-07 22:07 UTC
+**Date**: 2026-05-07 23:14 UTC
 
-**Git SHA**: `d11aa45a7e`
+**Git SHA**: `a3912cf21e`
 
-**Run Duration**: 0m 54s
+**Run Duration**: 1m 21s
 
 ## Summary
 
@@ -57,11 +57,11 @@
 | 24 | `ContextMenu-v7` | 131 | 0.2s |  |
 | 25 | `ContextMenu-v8` | 131 | 0.2s |  |
 | 26 | `Error-v5` | 28 | 0.2s |  |
-| 27 | `Error-v6` | 31 | 0.3s |  |
+| 27 | `Error-v6` | 31 | 0.2s |  |
 | 28 | `Error-v7` | 31 | 0.2s |  |
 | 29 | `Error-v8` | 31 | 0.2s |  |
-| 30 | `ExternalInterface-v5` | 7 | 0.3s |  |
-| 31 | `ExternalInterface-v6` | 55 | 0.3s |  |
+| 30 | `ExternalInterface-v5` | 7 | 0.2s |  |
+| 31 | `ExternalInterface-v6` | 55 | 0.2s |  |
 | 32 | `ExternalInterface-v7` | 55 | 0.2s |  |
 | 33 | `Global-v7` | 182 | 0.2s |  |
 | 34 | `Global-v8` | 169 | 0.2s |  |
@@ -93,7 +93,7 @@
 | 60 | `NetStream-v8` | 80 | 0.2s |  |
 | 61 | `Number-v6` | 239 | 0.2s |  |
 | 62 | `Number-v7` | 237 | 0.2s |  |
-| 63 | `Number-v8` | 237 | 0.2s |  |
+| 63 | `Number-v8` | 237 | 0.3s |  |
 | 64 | `Point-v5` | 7 | 0.2s |  |
 | 65 | `Point-v6` | 7 | 0.2s |  |
 | 66 | `Point-v7` | 7 | 0.2s |  |
@@ -105,7 +105,7 @@
 | 72 | `Rectangle-v5` | 7 | 0.2s |  |
 | 73 | `Rectangle-v6` | 7 | 0.2s |  |
 | 74 | `Rectangle-v7` | 7 | 0.2s |  |
-| 75 | `Selection-v5` | 21 | 0.3s |  |
+| 75 | `Selection-v5` | 21 | 0.2s |  |
 | 76 | `Stage-v5` | 38 | 0.2s |  |
 | 77 | `System-v5` | 67 | 0.2s |  |
 | 78 | `System-v6` | 100 | 0.2s |  |
@@ -120,7 +120,7 @@
 | 87 | `TextSnapshot-v5` | 7 | 0.2s |  |
 | 88 | `TextSnapshot-v6` | 173 | 0.2s |  |
 | 89 | `TextSnapshot-v7` | 173 | 0.2s |  |
-| 90 | `TextSnapshot-v8` | 173 | 0.2s |  |
+| 90 | `TextSnapshot-v8` | 173 | 0.3s |  |
 | 91 | `Transform-v5` | 7 | 0.2s |  |
 | 92 | `Transform-v6` | 7 | 0.2s |  |
 | 93 | `Transform-v7` | 7 | 0.2s |  |
@@ -145,13 +145,13 @@
 | 112 | `delete-v6` | 60 | 0.2s |  |
 | 113 | `delete-v7` | 60 | 0.2s |  |
 | 114 | `delete-v8` | 60 | 0.2s |  |
-| 115 | `enumerate-v5` | 6 | 0.2s |  |
-| 116 | `enumerate-v6` | 49 | 0.2s |  |
-| 117 | `enumerate-v7` | 49 | 0.2s |  |
-| 118 | `enumerate-v8` | 49 | 0.2s |  |
-| 119 | `flash-v5` | 10 | 0.2s |  |
-| 120 | `flash-v6` | 10 | 0.2s |  |
-| 121 | `flash-v7` | 10 | 0.2s |  |
+| 115 | `enumerate-v5` | 6 | 18.8s |  |
+| 116 | `enumerate-v6` | 49 | 2.8s |  |
+| 117 | `enumerate-v7` | 49 | 2.4s |  |
+| 118 | `enumerate-v8` | 49 | 1.2s |  |
+| 119 | `flash-v5` | 10 | 1.8s |  |
+| 120 | `flash-v6` | 10 | 1.7s |  |
+| 121 | `flash-v7` | 10 | 0.5s |  |
 | 122 | `swap-v5` | 7 | 0.2s |  |
 | 123 | `swap-v6` | 7 | 0.2s |  |
 | 124 | `swap-v7` | 7 | 0.2s |  |
@@ -187,7 +187,7 @@
 | 21 | `LoadVars-v6` | 6 | 8 | 0.2s |  |
 | 22 | `LoadVars-v7` | 6 | 8 | 0.2s |  |
 | 23 | `LoadVars-v8` | 6 | 8 | 0.2s |  |
-| 24 | `Math-v5` | 5 | 5 | 0.3s |  |
+| 24 | `Math-v5` | 5 | 5 | 0.2s |  |
 | 25 | `Math-v6` | 5 | 5 | 0.2s |  |
 | 26 | `Math-v7` | 5 | 5 | 0.2s |  |
 | 27 | `Math-v8` | 5 | 5 | 0.2s |  |
@@ -210,12 +210,12 @@
 | 44 | `Sound-v7` | 28 | 51 | 0.4s |  |
 | 45 | `Sound-v8` | 28 | 51 | 0.3s |  |
 | 46 | `String-v5` | 19 | 21 | 0.2s |  |
-| 47 | `String-v6` | 10 | 10 | 0.3s |  |
-| 48 | `String-v7` | 10 | 10 | 0.3s |  |
-| 49 | `String-v8` | 10 | 10 | 0.3s |  |
+| 47 | `String-v6` | 10 | 10 | 0.2s |  |
+| 48 | `String-v7` | 10 | 10 | 0.2s |  |
+| 49 | `String-v8` | 10 | 10 | 0.2s |  |
 | 50 | `TextField-v5` | 3 | 3 | 0.2s |  |
 | 51 | `TextFormat-v7` | 38 | 40 | 0.2s |  |
-| 52 | `ops-v8` | 7 | 11 | 0.2s |  |
+| 52 | `ops-v8` | 7 | 11 | 0.6s |  |
 | 53 | `targetPath-v6` | 17 | 17 | 0.2s |  |
 | 54 | `targetPath-v7` | 17 | 17 | 0.2s |  |
 | 55 | `targetPath-v8` | 17 | 17 | 0.2s |  |
