@@ -19895,6 +19895,150 @@ typedef struct {
 static PendingDirectLoad g_pending_direct_loads[MAX_PENDING_DIRECT_LOADS];
 int g_pending_direct_load_count = 0;
 
+// --- Per-tick level advancement ---
+// Level MCs (_level1..) loaded via loadMovieNum are not in the root display_list,
+// so advance_sprite_frames doesn't advance them. Track multi-frame level loads
+// here and run frame_funcs[1..N-1] one frame per main-loop tick, matching how
+// Ruffle/Flash drive a level's timeline as a separate playhead. Once
+// current_frame reaches frame_count (or unload happens, mc->depth==INT_MIN), the
+// entry is dropped.
+typedef struct {
+	MovieClip* mc;
+	MovieEntry* entry;
+	size_t current_frame;  // 0-indexed; next frame to run
+} LevelAdvanceEntry;
+#define MAX_LEVEL_ADVANCE 128
+static LevelAdvanceEntry g_level_advance[MAX_LEVEL_ADVANCE];
+static int g_level_advance_count = 0;
+
+void actionRegisterLevelAdvance(MovieClip* mc, MovieEntry* entry)
+{
+	if (mc == NULL || entry == NULL) return;
+	// Replace any existing entry for this MC (subsequent loadMovieNum into the
+	// same level should reset advancement to start from frame 1 of the new entry).
+	for (int i = 0; i < g_level_advance_count; i++) {
+		if (g_level_advance[i].mc == mc) {
+			g_level_advance[i].entry = entry;
+			g_level_advance[i].current_frame = 1;
+			return;
+		}
+	}
+	if (g_level_advance_count >= MAX_LEVEL_ADVANCE) return;
+	LevelAdvanceEntry* e = &g_level_advance[g_level_advance_count++];
+	e->mc = mc;
+	e->entry = entry;
+	e->current_frame = 1;
+}
+
+int hasPlayingLevels(void)
+{
+	for (int i = 0; i < g_level_advance_count; i++) {
+		LevelAdvanceEntry* e = &g_level_advance[i];
+		if (e->mc == NULL || e->entry == NULL) continue;
+		if (e->mc->depth == INT_MIN) continue;
+		if (e->mc->unloaded) continue;
+		if (e->current_frame < e->entry->frame_count) return 1;
+	}
+	return 0;
+}
+
+void actionAdvancePlayingLevels(SWFAppContext* app_context)
+{
+	if (g_level_advance_count == 0) return;
+	int write = 0;
+	for (int read = 0; read < g_level_advance_count; read++) {
+		LevelAdvanceEntry e = g_level_advance[read];
+		if (e.mc == NULL || e.entry == NULL) continue;
+		// Drop entries whose MC has been unloaded or destroyed.
+		if (e.mc->depth == INT_MIN || e.mc->unloaded) continue;
+		// Done playing this level — drop the entry.
+		if (e.current_frame >= e.entry->frame_count) continue;
+
+		frame_func fn = e.entry->frame_funcs[e.current_frame];
+		if (fn != NULL) {
+			// Switch to child SWF version + globals + level context for the frame call.
+			int _saved_ver = g_swf_version;
+			ASObject* _saved_global = global_object;
+			int _saved_child_init = g_child_swf_init;
+			u8 _saved_movie_id = g_current_movie_id;
+			MovieClip* _saved_ctx = g_current_context;
+			g_swf_version = e.entry->swf_version;
+			g_child_swf_init = 1;
+			g_current_movie_id = e.entry->movie_id;
+			ensureSecondaryGlobalInit(app_context, e.entry->swf_version);
+			if (versionGroup(g_swf_version) == 0 && g_global_legacy) global_object = g_global_legacy;
+			else if (versionGroup(g_swf_version) == 1 && g_global_modern) global_object = g_global_modern;
+			actionSetCurrentContext(e.mc);
+
+			// Swap display_list to the level MC's sprite display list so that
+			// PlaceObject2 / RemoveObject / clip event dispatch operate on the
+			// level's own children, not root's.
+			extern DisplayObject* display_list;
+			extern size_t max_depth;
+			extern size_t display_list_capacity;
+			DisplayObject* _saved_dl = NULL;
+			size_t _saved_max = 0, _saved_cap = 0;
+			int _did_swap = 0;
+			DisplayObject* dobj = e.mc->display_obj ? (DisplayObject*)e.mc->display_obj : NULL;
+			if (dobj != NULL && dobj->sprite_display_list != NULL) {
+				_saved_dl = display_list;
+				_saved_max = max_depth;
+				_saved_cap = display_list_capacity;
+				display_list = dobj->sprite_display_list;
+				max_depth = dobj->sprite_max_depth;
+				display_list_capacity = dobj->sprite_dl_capacity;
+				_did_swap = 1;
+			}
+			// Swap transform_data
+			float (*_saved_td)[16] = NULL;
+			{
+				extern float (*g_active_transform_data)[16];
+				if (e.entry->transform_data_ptr != NULL) {
+					_saved_td = g_active_transform_data;
+					g_active_transform_data = e.entry->transform_data_ptr;
+				}
+			}
+
+			extern int quit_swf;
+			extern int is_playing;
+			int _saved_quit = quit_swf;
+			int _saved_is_playing = is_playing;
+			quit_swf = 0;
+			is_playing = 1;
+			fn(app_context);
+			quit_swf = _saved_quit;
+			is_playing = _saved_is_playing;
+
+			if (_did_swap) {
+				if (dobj != NULL) {
+					dobj->sprite_display_list = display_list;
+					dobj->sprite_max_depth = max_depth;
+					dobj->sprite_dl_capacity = display_list_capacity;
+				}
+				display_list = _saved_dl;
+				max_depth = _saved_max;
+				display_list_capacity = _saved_cap;
+			}
+			if (_saved_td != NULL) {
+				extern float (*g_active_transform_data)[16];
+				g_active_transform_data = _saved_td;
+			}
+			actionSetCurrentContext(_saved_ctx);
+			g_swf_version = _saved_ver;
+			global_object = _saved_global;
+			g_child_swf_init = _saved_child_init;
+			g_current_movie_id = _saved_movie_id;
+		}
+		e.current_frame++;
+		// Update _currentframe property for AS visibility.
+		e.mc->currentframe = (int)e.current_frame;
+		if (e.current_frame < e.entry->frame_count) {
+			g_level_advance[write++] = e;
+		}
+	}
+	g_level_advance_count = write;
+}
+
 void actionFirePendingDirectLoads(SWFAppContext* app_context)
 {
 	int count = g_pending_direct_load_count;
@@ -20022,6 +20166,14 @@ void actionFirePendingDirectLoads(SWFAppContext* app_context)
 			quit_swf = 0;
 			entry->frame_funcs[0](app_context);
 			quit_swf = _saved_quit;
+		}
+		// Register multi-frame level loads for per-tick frame advancement.
+		// Level MCs are not in display_list, so advance_sprite_frames doesn't
+		// advance them. Without this, frames 1..N-1 never run and test logic
+		// on later frames is skipped (e.g. Version4Loader's dejagnu assertions
+		// in frame 1 of a multi-frame _levelN load).
+		if (loads[i].is_level && entry->frame_count > 1 && entry->frame_funcs != NULL) {
+			actionRegisterLevelAdvance(mc, entry);
 		}
 
 		g_current_sprite_obj = _saved_sprite_obj;

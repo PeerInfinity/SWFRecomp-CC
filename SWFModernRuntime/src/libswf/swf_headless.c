@@ -1002,11 +1002,15 @@ void swfStart(SWFAppContext* app_context)
 			// Past the last frame: keep dispatching per-tick AS handlers
 			// (onEnterFrame, sprite timelines, clip ENTER_FRAME events).
 			// Break if quit_swf and no remaining input events, handlers, or playing sprites.
-			if (quit_swf && !(g_events && g_event_pos < g_event_count)
-			    && !actionHasEnterFrameHandlers()
-			    && !hasPlayingSprites()
-			    && !hasActiveTimers()
-			    && !hasClipEnterFrameHandlers()) break;
+			{
+				extern int hasPlayingLevels(void);
+				if (quit_swf && !(g_events && g_event_pos < g_event_count)
+				    && !actionHasEnterFrameHandlers()
+				    && !hasPlayingSprites()
+				    && !hasActiveTimers()
+				    && !hasPlayingLevels()
+				    && !hasClipEnterFrameHandlers()) break;
+			}
 			{
 				extern int g_advance_defer_nested;
 				g_advance_defer_nested = 1;
@@ -1172,6 +1176,12 @@ void swfStart(SWFAppContext* app_context)
 				actionFirePendingDirectLoads(app_context);
 		}
 
+		// Advance multi-frame _levelN loads by one frame this tick.
+		{
+			extern void actionAdvancePlayingLevels(SWFAppContext*);
+			actionAdvancePlayingLevels(app_context);
+		}
+
 		// Flush pending onLoads queued during frame scripts (before timers)
 		actionFlushPendingOnLoads(app_context);
 
@@ -1254,6 +1264,7 @@ void swfStart(SWFAppContext* app_context)
 			if (g_events && g_event_pos < g_event_count) continue;
 			if (actionHasEnterFrameHandlers() || hasPlayingSprites() || hasClipEnterFrameHandlers()) continue;
 			if (g_pending_mcl_load_count > 0) continue;
+			{ extern int hasPlayingLevels(void); if (hasPlayingLevels()) continue; }
 			break;
 		}
 		else if (manual_next_frame)

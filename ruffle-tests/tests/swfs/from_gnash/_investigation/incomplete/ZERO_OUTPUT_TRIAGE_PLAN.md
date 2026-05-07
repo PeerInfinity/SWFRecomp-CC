@@ -14,7 +14,7 @@ phases:
     status: completed
   - id: 3
     name: "Version4Loader: child SWF loadMovie of Version5Loaded.swf"
-    status: pending
+    status: completed
   - id: 4
     name: "frame_label_test: nested-sprite frame label resolution"
     status: completed
@@ -67,7 +67,7 @@ Five of the nine listed tests now PASS or RM locally:
 | Test | Suite | actual / expected / match | Real status |
 |------|-------|--------------------------|--------------|
 | `BeginBitmapFill` | misc-ming | 1 / 1 / 1 | **NOW PASS** (CI baseline at 7afe70f8). `mc9._width` returns 150 as expected. Phase 5 no longer needed. |
-| `Version4Loader` | misc-ming | 0 / 11 / 0 | **TRUE zero output.** Child SWF `Version5Loaded.swf` doesn't run. |
+| `Version4Loader` | misc-ming | 11 / 11 / 11 | **NOW PASS locally** (2026-05-07 fix; per-tick level frame advancement). Will flip in next CI run. |
 | `frame_label_test` | misc-ming | 0 / 17 / 0 | **TRUE zero output.** Frame-label-driven `_root.x1` etc. variables never get set. |
 | `replace_buttons1test` | misc-ming | (was 24 / 18 / 0) | **NOW `ruffle_matched` locally** (2026-05-02 verification). Will flip in next CI run. |
 | `replace_shapes1test` | misc-ming | (was 32 / 23 / 0) | **NOW PASS locally** (2026-05-02 verification). Will flip in next CI run. |
@@ -206,33 +206,58 @@ Same for `CLIP_EVENT_LOAD` if it leaks the same way.
 button-on-load behavior. The `BUTTON_INFRASTRUCTURE_PLAN.md` has
 related work; this phase is an early step in that direction.
 
-## Phase 3 — Version4Loader: child SWF loadMovie
+## Phase 3 — Version4Loader: child SWF loadMovie (PASS — 2026-05-07)
 
-**Problem.** Version4Loader is a SWF that uses `loadMovie` to load
-`Version5Loaded.swf` (a child SWF compiled at version 5). The expected
-trace starts with the child SWF's debug header (`[ debug-22403-05c7ba106]`)
-and 9 PASSED lines from the child's assertions about builtin functions
-(`unescape`, `escape`, `isNaN`, etc.). We produce zero output — the
-child SWF must not be running.
+**Status.** Now PASSES 11/11.
 
-**Investigation steps:**
+**Root cause.** `actionGetURL`/`actionGetURL2` queued the loaded child
+SWF as a `PendingDirectLoad` and `actionFirePendingDirectLoads` ran the
+child's `init_func` and `frame_funcs[0]`, but no mechanism advanced
+frames 1..N-1 of a `_levelN` load. Level MCs are stored in `g_levels[]`
+not in the root `display_list[]`, so `advance_sprite_frames` never
+reached them. The Dejagnu test assertions (`PASSED:
+typeof(unescape) == "function"` etc.) live in frame 1 of
+`Version5Loaded.swf`, so they never ran — producing zero matching
+lines.
 
-1. Confirm the test SWF actually attempts `loadMovie("Version5Loaded.swf",
-   ...)`. The 1 DoAction tag is the only AS code; it must be the loadMovie
-   call.
-2. Check whether `Version5Loaded.swf` exists in the test directory:
-   ```bash
-   ls ruffle-tests/tests/swfs/from_gnash/misc-ming.all/Version4Loader/
-   ```
-3. Confirm `verify_output.py` includes child SWFs in the test build (it
-   does for `Dejagnu.swf` — same pattern). If not, that's the bug. If
-   yes, runtime `loadMovie` for SWF4-targeting-SWF5-child needs
-   investigation.
-4. Cross-reference with the AVM1 `loadmovie_*` tests and the Shumway
-   `haxe/flocons1` test which exercises similar cross-version loading.
+**Fix (`SWFModernRuntime/src/actionmodern/action.c`,
+`SWFModernRuntime/src/libswf/swf_core.c`,
+`SWFModernRuntime/src/libswf/swf_headless.c`).** Added a per-tick level
+advancement registry:
 
-**Risk.** Medium. May require version-handshake work in the child SWF
-loader, or just a verifier dependency-discovery fix.
+1. New `LevelAdvanceEntry { mc, entry, current_frame }` array
+   `g_level_advance[128]` in `action.c`. `actionRegisterLevelAdvance(mc,
+   entry)` is called from `actionFirePendingDirectLoads` for level loads
+   with `frame_count > 1`. `actionAdvancePlayingLevels(app_context)`
+   runs the level's `frame_funcs[current_frame]` on each tick (with
+   display_list / global / context save+restore), increments
+   `current_frame`, and drops the entry once `current_frame >=
+   frame_count`.
+2. `swf_core.c` and `swf_headless.c` call `actionAdvancePlayingLevels`
+   after `actionFirePendingDirectLoads` each tick, and
+   `hasPlayingLevels()` is added to the past-end-of-frames continuation
+   conditions so a single-frame parent (like `Version4Loader`'s)
+   doesn't break the loop before the level finishes its timeline.
+
+**Why the existing `unloadmovienum` (avm1) test isn't disturbed.** Its
+parent has 4 frames + `stop()`; the loop exits via the Root-stopped
+branch (which doesn't keep running for levels) before target.swf's
+frame 9 (`TEST FAILURE: I should be unloaded by now!`) is reached.
+
+**Verification.** AVM1 21-test loadMovie/MCL battery (`loadmovie`,
+`loadmovie_method`, `loadmovie_replace_root`, `loadmovienum`,
+`loadmovienum_cross_version_prototype`, `loadmovie_var_persistence`,
+`mcl_loadclip`, `mcl_loadclip_replace_root`, `unloadmovie`,
+`unloadmovie_method`, `unloadmovienum`, `loadmovie_fail`,
+`loadmovie_flashvars`, `loadmovie_registerclass`, `mcl_target_jpg`,
+`mcl_target_png`, `mcl_target_gif87a`, `mcl_target_gif89a`,
+`movieclip_state_values`, `depth_replacement_audio_unloading`,
+`netconnection_close`) — 21/21 PASS. AVM1 22-test extended battery
+(XML/MCL/EI/loadvariables/sound/closure/super/goto) — 21 PASS, 1
+pre-existing accepted failure (`loadvariables_method`, infrastructure:
+log_fetch). Gnash misc-mtasc.all `levels` unchanged ruffle_matched
+(49/68). Gnash misc-ming.all 9-test goto/loop/timeline battery — 9/9
+effective pass.
 
 ## Phase 4 — frame_label_test: target-path GotoFrame2 + nested-sprite navigation (PASS — 2026-05-04)
 

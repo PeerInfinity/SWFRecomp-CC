@@ -1043,12 +1043,14 @@ void swfStart(SWFAppContext* app_context)
 			{
 				extern int hasPlayingSounds(void);
 				extern int hasActiveNetStreams(void);
+				extern int hasPlayingLevels(void);
 				if (quit_swf && !(g_events && g_event_pos < g_event_count)
 				    && !actionHasEnterFrameHandlers()
 				    && !hasPlayingSprites()
 				    && !hasActiveTimers()
 				    && !hasPlayingSounds()
 				    && !hasActiveNetStreams()
+				    && !hasPlayingLevels()
 				    && !hasClipEnterFrameHandlers()) break;
 			}
 			{
@@ -1279,6 +1281,14 @@ void swfStart(SWFAppContext* app_context)
 				actionFirePendingDirectLoads(app_context);
 		}
 
+		// Advance multi-frame _levelN loads by one frame this tick. Levels are
+		// not in display_list, so advance_sprite_frames doesn't reach them — but
+		// their timelines still need to play after the initial loadMovieNum.
+		{
+			extern void actionAdvancePlayingLevels(SWFAppContext*);
+			actionAdvancePlayingLevels(app_context);
+		}
+
 		// Flush pending onLoads queued during frame scripts (before timers)
 		actionFlushPendingOnLoads(app_context);
 
@@ -1348,6 +1358,7 @@ void swfStart(SWFAppContext* app_context)
 			if (actionHasEnterFrameHandlers() || hasPlayingSprites() || hasClipEnterFrameHandlers()) continue;
 			if (g_pending_mcl_load_count > 0) continue;
 			if (g_pending_direct_load_count > 0) continue;
+			{ extern int hasPlayingLevels(void); if (hasPlayingLevels()) continue; }
 			{ extern int hasPlayingSounds(void); if (hasPlayingSounds()) continue; }
 			{ extern int hasActiveNetStreams(void); if (hasActiveNetStreams()) continue; }
 			break;
