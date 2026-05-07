@@ -23076,26 +23076,55 @@ static void mcGetEffectiveSize(MovieClip* mc, double* eff_w, double* eff_h)
 		double a, b, c, d, tx, ty;
 		getLocalMatrixForMC(mc, &a, &b, &c, &d, &tx, &ty);
 		(void)tx; (void)ty;
-		double w_twips = nat_w * 20.0;
-		double h_twips = nat_h * 20.0;
-		// Corners of (0,0)-(w,h) box transformed by (a, b, c, d) (translation-invariant).
-		double cx[4] = { 0.0,
-			round(a * w_twips),
-			round(c * h_twips),
-			round(a * w_twips + c * h_twips) };
-		double cy[4] = { 0.0,
-			round(b * w_twips),
-			round(d * h_twips),
-			round(b * w_twips + d * h_twips) };
-		double max_x = cx[0], min_x = cx[0], max_y = cy[0], min_y = cy[0];
-		for (int i = 1; i < 4; i++) {
-			if (cx[i] > max_x) max_x = cx[i];
-			if (cx[i] < min_x) min_x = cx[i];
-			if (cy[i] > max_y) max_y = cy[i];
-			if (cy[i] < min_y) min_y = cy[i];
+		// Use the actual local shape bounds (not (0, 0, W, H)) so the
+		// AABB rounding is symmetric around the shape's natural origin.
+		// With a non-centered box, per-component twip rounding can leak a
+		// 1-twip error into the extent under skewed matrices: e.g.
+		// (a+c)*W = 7649.45 → round 7649, but a centered shape gives
+		// max=3824.74 → 3825 and min=-3824.74 → -3825 → extent 7650 (matching
+		// getBounds(_root) parity).
+		double bxmin_t = 0.0, bymin_t = 0.0;
+		double bxmax_t = nat_w * 20.0, bymax_t = nat_h * 20.0;
+		if (!MC_IS_TEXTFIELD(mc) && !mc->is_button_mc && mc->loaded_image_width <= 0) {
+			size_t entry_idx;
+			int has_entry = 1;
+			if (mc == &root_movieclip) {
+				entry_idx = (size_t)-1;
+			} else {
+				entry_idx = ng_findDisplayEntryIdx(mc->name);
+				if (entry_idx == (size_t)-1) has_entry = 0;
+			}
+			if (has_entry) {
+				float gxmin, gxmax, gymin, gymax;
+				if (ng_getDisplayEntryBounds(entry_idx, &gxmin, &gxmax, &gymin, &gymax)) {
+					// Convert pixel float bounds to twip doubles.
+					bxmin_t = round((double)gxmin * 20.0);
+					bymin_t = round((double)gymin * 20.0);
+					bxmax_t = round((double)gxmax * 20.0);
+					bymax_t = round((double)gymax * 20.0);
+				}
+			}
 		}
-		*eff_w = (max_x - min_x) / 20.0;
-		*eff_h = (max_y - min_y) / 20.0;
+		// Transform 4 corners by (a, b, c, d), round only at min/max (translation-invariant).
+		double xs[4] = {
+			a*bxmin_t + c*bymin_t,
+			a*bxmax_t + c*bymin_t,
+			a*bxmin_t + c*bymax_t,
+			a*bxmax_t + c*bymax_t };
+		double ys[4] = {
+			b*bxmin_t + d*bymin_t,
+			b*bxmax_t + d*bymin_t,
+			b*bxmin_t + d*bymax_t,
+			b*bxmax_t + d*bymax_t };
+		double max_x = xs[0], min_x = xs[0], max_y = ys[0], min_y = ys[0];
+		for (int i = 1; i < 4; i++) {
+			if (xs[i] > max_x) max_x = xs[i];
+			if (xs[i] < min_x) min_x = xs[i];
+			if (ys[i] > max_y) max_y = ys[i];
+			if (ys[i] < min_y) min_y = ys[i];
+		}
+		*eff_w = (round(max_x) - round(min_x)) / 20.0;
+		*eff_h = (round(max_y) - round(min_y)) / 20.0;
 		return;
 	}
 #endif

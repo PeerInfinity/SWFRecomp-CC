@@ -23,14 +23,21 @@ phases:
     status: completed
   - id: 6
     name: "Regression battery + rebaseline"
-    status: in_progress
+    status: completed
+  - id: 7
+    name: "Fix line 225 _width 1-twip rounding artifact for ruffle_matched promotion"
+    status: completed
 dependencies: []
 blockers: []
 -->
 
-Last updated: 2026-05-07 (after-fix). Skew tracking implemented; matrix_test went from 135 raw failures (948/1083 raw match) to **4 raw failures (1079/1083 raw match, 99.6%)**. Test does NOT auto-promote to `ruffle_matched` yet because line 225 (pre-existing `_width 382.5 vs 382.45` precision issue) is in our diff but not Ruffle's.
+Last updated: 2026-05-07 (post-line-225 fix). Skew tracking implemented; matrix_test went from 135 raw failures (948/1083 raw match) to 3 raw failures (1080/1083 raw match, 99.7%) with line 225 also fixed locally → test now auto-promotes to **`ruffle_matched`** (verified locally via `verify_output.py::ruffle_subset_match`).
 
-## Status: in_progress — implementation done, awaiting CI confirmation
+## Status: complete pending CI confirmation
+
+`mcGetEffectiveSize` previously transformed a `(0, 0, W, H)` box and rounded each transformed corner to twips before taking max-min. Under skewed timeline matrices, asymmetric position around the origin made per-component twip rounding leak a 1-twip error into the extent (e.g. `(a+c)*W = 7649.45 → round 7649` while the centered-shape equivalent rounds symmetrically to ±3825 → extent 7650, matching `getBounds(_root)` parity).
+
+Fix: in the `as_set_flags == 0` (timeline-matrix) branch, look up the actual local shape bounds via `ng_findDisplayEntryIdx` + `ng_getDisplayEntryBounds`, then transform those four corners and round only the final min/max (matches the algorithm `getBounds` already uses). For text fields, buttons, and image-loaded MCs (where `ng_getDisplayEntryBounds` doesn't apply or would double-account), keep the previous `(0, 0, W, H)` fallback. `(action.c:23078-23123)`
 
 `matrix_test` (`from_gnash/misc-ming.all/matrix_test/`) was at **84.5% effective** (949/1086 expected lines per CI `8fdf3311`; 948/1083 in latest local run, modulo ~1-line drift from re-baselined #passed/#total counts). 135 raw failures pre-fix. Currently 4 raw failures local.
 
