@@ -44,6 +44,7 @@ python3 ruffle-tests/verify_output.py --test=TEST_NAME --diff --verbose
 - `emsdk_env.sh` is at `SWFRecomp-CC/emsdk/emsdk_env.sh`
 - Build scripts are under `SWFRecomp/scripts/`, NOT project root `scripts/`
 - If running locally, the Ruffle source repository is available at `~/CC/ruffle`
+- **Test determinism**: `Math.random` and `Date.getTime()` are seeded per-test via the `MOCK_DATE_TIME` macro that `verify_output.py` defines on every gcc invocation (default `981152406000` ms = 2001-02-03 04:05:06 NPT, matching Ruffle's `--deterministic` mode; per-test override via `mock_date_time` in `test.toml`). `math.c::GenerateRandomNumber` uses `MOCK_DATE_TIME * 1000` µs as the avmplus RNG seed. Two CI runs at the same SHA produce byte-identical results across all suites — if results "fluctuate," look for an actual bug, not RNG variance.
 - MTASC (ActionScript 2 compiler) is at `~/CC/mtasc/`. Binary: `~/CC/mtasc/bin/mtasc`. Requires `-cp ~/CC/mtasc/ocaml/mtasc/std` for the standard library. Example: `~/CC/mtasc/bin/mtasc -cp ~/CC/mtasc/ocaml/mtasc/std -main -header 200:150:30 Test.as -swf test.swf -version 8`
 
 ## Documenting Accepted Diffs and Ruffle/Flash Differences

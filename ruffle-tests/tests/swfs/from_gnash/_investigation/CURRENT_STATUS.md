@@ -1,8 +1,8 @@
 # Gnash Test Suite Status
 
-Last updated: 2026-05-08 (CI `f0d575ca` — `loop/loop_test10` (misc-ming.all) promoted to ruffle_matched via same-frame Remove+Place at root-depth fix; +1 effective on misc-ming.all. Other suites unchanged.)
+Last updated: 2026-05-08 (CI `068b46d8` — `array-v5` (actionscript.all) +8 lines via ASSetPropFlags ARRAY semantics + shift behavior fixes. Mismatched lines 1580 → 1572. Effective pass count unchanged. Back-to-back CI re-run at the same SHA produced byte-identical results across all suites — confirms full RNG/Date determinism via `MOCK_DATE_TIME`.)
 
-### CI snapshot (commit `f0d575ca`, 2026-05-08)
+### CI snapshot (commit `068b46d8`, 2026-05-08)
 
 | Suite | Pass | RM | Effective | Total | Filtered Eff | Rate |
 |-------|------|----|-----------|-------|-------------|------|
@@ -11,6 +11,19 @@ Last updated: 2026-05-08 (CI `f0d575ca` — `loop/loop_test10` (misc-ming.all) p
 | misc-mtasc.all | 7 | 2 | 9 | 9 | — | 100.0% |
 | misc-swfc.all | 8 | 5 | 13 | 15 | — | **86.7%** |
 | misc-swfmill.all | 17 | 1 | 18 | 18 | — | 100.0% |
+
+### Latest fixes (2026-05-08, in CI at `068b46d8` — back-to-back determinism check)
+
+- **`array-v5` (actionscript.all): 520/560 → 528/560 lines match (+8, -8 mismatched).** Three changes in `SWFModernRuntime/src/actionmodern/action.c`:
+  1. `actionSetMember` ARRAY index-write path now consults `arr->props["<idx>"]` and skips the write when `WRITABLE` is cleared (mirrors the existing `actionDelete` CONFIGURABLE check). Fixes `ASSetPropFlags(a, "0", 4, 0); a[0] = X` silent-ignore (lines 1447, 1465).
+  2. `Array.prototype.shift` resets ASSetPropFlags metadata on overwritten slots so subsequent userland writes succeed (Flash semantics: "flag was lost"), and preserves the deleted last element's value into `arr->props` when the slot is marked DontDelete (CONFIGURABLE cleared) — `a[length-1]` keeps its original value through the props fallback after length is decremented.
+  3. `syncArrayToObject` (the temp-array bridge for `Array.prototype.X.call(plainObj)`) gained an `update_length` parameter; `shift`/`pop`/`unshift` now skip the length update on plain Object, matching Ruffle's `if let NativeObject::Array(_) = this.native()` gate (`o.length == 6` after `o.shift()` on a fakeArray-shaped object).
+  
+  Test stays `output_mismatch` (still no path to `known_failure` promotion — it's a raw failure). Effective rate unchanged on actionscript.all suite, but mismatched-lines metric drops 1580 → 1572.
+
+- **CI back-to-back verified determinism.** Two CI runs at the same SHA (`25570298054` and `25571481603`, both at commit `068b46d8`) produced byte-identical results across all 8 suites — confirms `MOCK_DATE_TIME`-based RNG seeding works end-to-end (`verify_output.py:1538` passes `-DMOCK_DATE_TIME=<ms>LL`; `math.c::GenerateRandomNumber` uses it as the avmplus RNG seed). Stale "fluctuates by ~4 lines" disclaimer in `incomplete/ARRAY_V5_PLAN.md` removed.
+
+- **No regressions** across 16-test AVM1 array battery, 13-test Gnash actionscript.all battery (delete-v5..v8, enumerate-v6..v8, case-v5..v7, ASnative-v6, Boolean-v5, Number-v5 — 13/13 effective), AVM1 assetnative/loadvars_tostring/add_property/watch/object_resolve/coerce_to_object_monkeypatch/register_class_return_value (7/7 PASS).
 
 ### Latest fixes (2026-05-08, in CI at `f0d575ca`)
 
