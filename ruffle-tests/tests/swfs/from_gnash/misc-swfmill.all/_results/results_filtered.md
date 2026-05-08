@@ -1,10 +1,10 @@
 # Ruffle Test Results (Filtered)
 
-**Date**: 2026-05-08 03:11 UTC
+**Date**: 2026-05-08 04:45 UTC
 
-**Git SHA**: `b85626d2fc`
+**Git SHA**: `96a5d81e95`
 
-**Run Duration**: 0m 4s
+**Run Duration**: 0m 5s
 
 **Filtered**: 0 tests ignored out of 18 available
 
@@ -40,10 +40,10 @@
 | 11 | `missing_bitmap` | 0 | 0.2s |  |
 | 12 | `mixed-bytecode-as2` | 1 | 0.2s |  |
 | 13 | `tags_after_last_showframe` | 1 | 0.2s |  |
-| 14 | `trace-as2/root_onload` | 4 | 0.3s |  |
+| 14 | `trace-as2/root_onload` | 4 | 0.2s |  |
 | 15 | `trace-as2/shortstack` | 2 | 0.2s |  |
-| 16 | `trace-as2/super` | 8 | 0.1s |  |
-| 17 | `trace-as2/this` | 8 | 0.1s |  |
+| 16 | `trace-as2/super` | 8 | 0.2s |  |
+| 17 | `trace-as2/this` | 8 | 0.6s |  |
 
 ## Ruffle-Matched Tests
 

@@ -1,10 +1,10 @@
 # Ruffle Test Results (Filtered)
 
-**Date**: 2026-05-08 03:11 UTC
+**Date**: 2026-05-08 04:45 UTC
 
-**Git SHA**: `b85626d2fc`
+**Git SHA**: `96a5d81e95`
 
-**Run Duration**: 0m 36s
+**Run Duration**: 0m 37s
 
 **Filtered**: 1 tests ignored out of 102 available
 
@@ -14,18 +14,18 @@
 |--------|-------|
 | Total tests | 101 |
 | Passing | **65** (64.4%) |
-| Ruffle-matched | 23 (diffs ⊆ Ruffle's against Flash) |
-| Effective pass | **88** (87.1%) |
-| Failing | 13 |
+| Ruffle-matched | 24 (diffs ⊆ Ruffle's against Flash) |
+| Effective pass | **89** (88.1%) |
+| Failing | 12 |
 | Total expected lines | 4559 |
-| Matching lines | 3724 (81.7%) |
-| Mismatched lines | 835 |
+| Matching lines | 3718 (81.6%) |
+| Mismatched lines | 841 |
 
 ### Failure Breakdown
 
 | Category | Count | % of Failures |
 |----------|-------|---------------|
-| Output Mismatch | 13 | 100.0% |
+| Output Mismatch | 12 | 100.0% |
 
 ## Passing Tests
 
@@ -41,8 +41,8 @@
 | 6 | `ResolveEventsTest` | 15 | 0.3s |  |
 | 7 | `RollOverOutTest` | 5 | 0.2s |  |
 | 8 | `VarAndCharClashTest` | 13 | 0.2s |  |
-| 9 | `Version4Loader` | 11 | 0.2s |  |
-| 10 | `Video-EmbedSquareTest` | 2 | 0.2s |  |
+| 9 | `Version4Loader` | 11 | 0.3s |  |
+| 10 | `Video-EmbedSquareTest` | 2 | 0.3s |  |
 | 11 | `action_order/action_execution_order_test1` | 10 | 0.2s |  |
 | 12 | `action_order/action_execution_order_test2` | 5 | 0.2s |  |
 | 13 | `action_order/action_execution_order_test3` | 4 | 0.2s |  |
@@ -67,15 +67,15 @@
 | 32 | `event_handler_scope_test` | 16 | 0.2s |  |
 | 33 | `frame_label_test` | 17 | 0.3s |  |
 | 34 | `getTimer_test` | 8 | 0.2s |  |
-| 35 | `get_frame_number_test` | 31 | 0.3s |  |
-| 36 | `goto_frame_test` | 15 | 0.2s |  |
-| 37 | `instanceNameTest` | 5 | 0.1s |  |
+| 35 | `get_frame_number_test` | 31 | 0.4s |  |
+| 36 | `goto_frame_test` | 15 | 0.3s |  |
+| 37 | `instanceNameTest` | 5 | 0.2s |  |
 | 38 | `loading/LoadVarsTest` | 36 | 0.3s |  |
 | 39 | `loop/loop_test` | 21 | 0.3s |  |
 | 40 | `loop/loop_test2` | 15 | 0.2s |  |
 | 41 | `loop/loop_test3` | 16 | 0.2s |  |
-| 42 | `loop/loop_test4` | 22 | 0.3s |  |
-| 43 | `loop/loop_test5` | 24 | 0.3s |  |
+| 42 | `loop/loop_test4` | 22 | 0.2s |  |
+| 43 | `loop/loop_test5` | 24 | 0.2s |  |
 | 44 | `loop/loop_test8` | 38 | 0.3s |  |
 | 45 | `loop/loop_test9` | 15 | 0.2s |  |
 | 46 | `loop/simple_loop_test` | 0 | 0.2s |  |
@@ -93,7 +93,7 @@
 | 58 | `reverse_execute_PlaceObject2_test1` | 8 | 0.2s |  |
 | 59 | `reverse_execute_PlaceObject2_test2` | 10 | 0.2s |  |
 | 60 | `runtime_vm_stack_test` | 9 | 0.2s |  |
-| 61 | `shape_test` | 21 | 0.2s |  |
+| 61 | `shape_test` | 21 | 0.3s |  |
 | 62 | `static_vs_dynamic1` | 17 | 0.2s |  |
 | 63 | `static_vs_dynamic2` | 18 | 0.2s |  |
 | 64 | `timeline_var_test` | 11 | 0.2s |  |
@@ -101,7 +101,7 @@
 
 ## Ruffle-Matched Tests
 
-**23 tests promoted** — our diffs against Flash's `output.txt` are a proper subset of Ruffle's diffs against the same file (i.e. we are at least as good as Ruffle on every line of these tests). Each carries `known_failure = true` upstream with a sidecar `output.ruffle.txt`.
+**24 tests promoted** — our diffs against Flash's `output.txt` are a proper subset of Ruffle's diffs against the same file (i.e. we are at least as good as Ruffle on every line of these tests). Each carries `known_failure = true` upstream with a sidecar `output.ruffle.txt`.
 
 | # | Test | Our diffs | Ruffle diffs | Duration | Notes |
 |---|------|-----------|--------------|----------|-------|
@@ -117,17 +117,18 @@
 | 10 | `displaylist_depths/displaylist_depths_test3` | 13 | 13 | 0.2s |  |
 | 11 | `duplicate_movie_clip_test` | 4 | 4 | 0.3s |  |
 | 12 | `init_action/InitActionTest` | 6 | 17 | 0.2s |  |
-| 13 | `init_action/InitActionTest2` | 24 | 30 | 0.2s |  |
+| 13 | `init_action/InitActionTest2` | 24 | 30 | 0.3s |  |
 | 14 | `key_event_test` | 5 | 6 | 0.2s |  |
 | 15 | `loading/loadMovieTest` | 9 | 9 | 0.3s |  |
-| 16 | `loop/loop_test6` | 1 | 12 | 0.3s |  |
-| 17 | `loop/loop_test7` | 1 | 8 | 0.2s |  |
-| 18 | `matrix_test` | 5 | 9 | 4.3s |  |
-| 19 | `path_format_test` | 28 | 28 | 0.3s |  |
-| 20 | `place_object_test` | 14 | 14 | 0.2s |  |
-| 21 | `place_object_test2` | 20 | 23 | 0.2s |  |
-| 22 | `register_class/registerClassTest2` | 8 | 28 | 0.2s |  |
-| 23 | `replace_buttons1test` | 3 | 3 | 0.2s |  |
+| 16 | `loop/loop_test10` | 23 | 23 | 0.3s |  |
+| 17 | `loop/loop_test6` | 1 | 12 | 0.2s |  |
+| 18 | `loop/loop_test7` | 1 | 8 | 0.2s |  |
+| 19 | `matrix_test` | 5 | 9 | 4.2s |  |
+| 20 | `path_format_test` | 28 | 28 | 0.4s |  |
+| 21 | `place_object_test` | 14 | 14 | 0.2s |  |
+| 22 | `place_object_test2` | 20 | 23 | 0.2s |  |
+| 23 | `register_class/registerClassTest2` | 8 | 28 | 0.3s |  |
+| 24 | `replace_buttons1test` | 3 | 3 | 0.2s |  |
 
 ## Near-Passing Tests
 
@@ -156,7 +157,7 @@ No timeouts.
 
 ## All Output Mismatches
 
-**13 tests** with output mismatch, sorted by match rate (best first)
+**12 tests** with output mismatch, sorted by match rate (best first)
 
 | # | Test | Match Rate | Matching/Total | Actual | Expected | Notes |
 |---|------|------------|----------------|--------|----------|-------|
@@ -165,11 +166,10 @@ No timeouts.
 | 3 | `DefineEditTextVariableNameTest` | 60.5% | 49/81 | 81 | 72 |  |
 | 4 | `EmbeddedFontTest` | 58.6% | 51/87 | 87 | 87 |  |
 | 5 | `action_order/action_execution_order_test5` | 49.1% | 26/53 | 53 | 35 |  |
-| 6 | `register_class/RegisterClassTest4` | 40.5% | 17/42 | 39 | 42 |  |
-| 7 | `NetStream-SquareTest` | 39.8% | 86/216 | 201 | 216 |  |
-| 8 | `masks_test` | 16.0% | 28/175 | 28 | 175 |  |
-| 9 | `action_order/ActionOrderTest5` | 13.1% | 8/61 | 61 | 51 |  |
-| 10 | `loop/loop_test10` | 10.7% | 3/28 | 23 | 28 |  |
-| 11 | `action_order/ActionOrderTest4` | 9.5% | 7/74 | 74 | 64 |  |
-| 12 | `action_order/ActionOrderTest3` | 8.0% | 6/75 | 75 | 62 |  |
-| 13 | `action_order/action_execution_order_test6` | 0.0% | 0/24 | 20 | 24 |  |
+| 6 | `NetStream-SquareTest` | 39.8% | 86/216 | 201 | 216 |  |
+| 7 | `masks_test` | 16.0% | 28/175 | 28 | 175 |  |
+| 8 | `action_order/ActionOrderTest5` | 15.3% | 9/59 | 59 | 51 |  |
+| 9 | `register_class/RegisterClassTest4` | 11.5% | 6/52 | 52 | 42 |  |
+| 10 | `action_order/ActionOrderTest3` | 8.9% | 7/79 | 79 | 62 |  |
+| 11 | `action_order/ActionOrderTest4` | 8.1% | 8/99 | 99 | 64 |  |
+| 12 | `action_order/action_execution_order_test6` | 0.0% | 0/24 | 20 | 24 |  |
