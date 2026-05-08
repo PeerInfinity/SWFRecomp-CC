@@ -1,8 +1,15 @@
 # Shumway Test Suite Status
 
-Last updated: 2026-05-08 (CI `84a147bd` — conditional MCL one-tick deferral landed: `avm1/moviecliploader` 1/7 → 6/7 lines (+5; flat-suite mismatched 400 → 395, avm1-suite mismatched 8 → 3). Test stays output_mismatch on the trailing "loadee frame 2" line — Phase 2 of `actionFirePendingLoadInits` runs the loadee's `frame_funcs[0]` once but doesn't register the loadee MC for per-tick `advance_sprite_frames`. Effective pass count unchanged this CI.)
+Last updated: 2026-05-08 (Part C local — `avm1/moviecliploader` 6/7 → **PASS (7/7)**. After Phase 2 of `actionFirePendingLoadInits` runs the loadee's `frame_funcs[0]`, the loadee MC is now registered with `actionRegisterLevelAdvance` so `frame_funcs[1..N-1]` fire on subsequent ticks via the existing per-tick `actionAdvancePlayingLevels` path. Trailing `loadee frame 2` line now matches. Pending CI verification.)
 
-## Latest fixes (2026-05-08, in CI at `84a147bd`)
+## Latest fixes (2026-05-08, NOT yet in CI — Part C — child-SWF multi-frame advance)
+
+- **`avm1/moviecliploader` → PASS (7/7).** Implements `incomplete/SHUMWAY_AVM1_SUBTREES_PLAN.md` Part C with one change in `SWFModernRuntime/src/actionmodern/action.c::actionFirePendingLoadInits`: after Phase 2 runs `entry->frame_funcs[0]` in the target MC's context, call `actionRegisterLevelAdvance(target, entry)` when `entry->frame_count > 1`. Reuses the existing per-tick mechanism that loadMovieNum (level loads) uses — `actionAdvancePlayingLevels` is called from `swf_core.c` / `swf_headless.c` top-of-tick, swaps to the loadee's display_list + transform_data + SWF version, runs `frame_funcs[current_frame]`, increments `current_frame`, drops the entry once `current_frame >= frame_count`. The "Level" naming is historical — it's a generic per-tick advance for any (MC, entry) pair.
+  - **No double-advance with `advance_sprite_frames`.** The MCL target MC's `sprite_frame_funcs` either are NULL (createEmptyMovieClip) or point at the original placeholder character — never at the loadee's `frame_funcs`. `advance_sprite_frames` calls `ch->sprite_frame_funcs[frame]` (the placeholder), not the loaded entry's frame_funcs. So registering with `actionRegisterLevelAdvance` doesn't conflict and no frame fires twice.
+  - **Loop-keepalive already in place.** `hasPlayingLevels()` is already checked by both `swf_core.c:1062` and `swf_core.c:1388` to keep the main loop alive after the loader stops, so deferred loadee frames continue to fire on subsequent ticks even when the loader has called `stop()` (as `moviecliploader` does in frame 1).
+  - **Regression batteries (all green).** 26-test extended AVM1 MCL/loadMovie battery (loadmovie*, loadmovienum*, mcl_*, unloadmovie*, string_paths_eval2, moviecliploader_flashvars — 26/26 PASS). 4-test Gnash MovieClipLoader-v5..v8 battery (4/4 effective: 2 PASS + 2 RM, unchanged).
+
+## Earlier fixes (2026-05-08, in CI at `84a147bd`)
 
 - **`avm1/moviecliploader` → 1/7 → 6/7 lines (+5).** Implements `incomplete/SHUMWAY_AVM1_SUBTREES_PLAN.md` Part B with a refinement: defer MCL events to next tick only when `is_playing && (current_frame + 1 < g_frame_count)` (loader is playing AND has more frames coming) — else fire same-tick.
   - **Implementation.** `SWFModernRuntime/src/actionmodern/action.c` splits `g_pending_mcl_loads` into `_this_tick` and `_next_tick` arrays; `builtin_mcl_loadClip` decides bucket based on the conditional. New `actionPromotePendingMCLLoads()` moves `_next_tick` → `_this_tick` (FIFO preserved), called from the top-of-tick hook in `swf_core.c` / `swf_headless.c`. `actionFirePendingLoadInits` drains `_this_tick`. Same files add a "last-tick MCL drain" (promote+drain when `tick_count >= max_ticks` and `_next_tick` non-empty) and `g_pending_mcl_load_count > 0` checks in the past-last-frame and stopped-root exit guards. `tag.c` `tagShowFrame` calls `actionPromotePendingMCLLoads` before `actionFirePendingLoadInits` when `!is_playing` — covers the case where `stop()` runs in the same frame_func that called `loadClip`, since there's no "next frame's DoAction" to defer past.
@@ -26,18 +33,20 @@ Last updated: 2026-05-08 (CI `84a147bd` — conditional MCL one-tick deferral la
 | Metric | Value |
 |--------|-------|
 | Total tests | 92 |
-| Passing | **72** (78.3%) |
+| Passing | **73** (79.3%) |
 | Ruffle-matched | 3 |
-| Effective pass | **75** (81.5%) |
-| Filtered effective | **75/76 (98.7%)** (16 fuzz tests in `ignored_tests.txt`) |
-| Failing | 17 |
+| Effective pass | **76** (82.6%) |
+| Filtered effective | **76/76 (100.0%)** (16 fuzz tests in `ignored_tests.txt`) |
+| Failing | 16 |
 
-**Breakdown by sub-tree** (flat suite recurses into subdirs, CI `8fdf3311`):
+(Pending CI verification — local `avm1/moviecliploader` 6/7 → PASS.)
+
+**Breakdown by sub-tree** (flat suite recurses into subdirs, post Part C):
 
 | Sub-tree | Total | Pass | RM | Fail |
 |----------|-------|------|----|------|
 | Flat root (no subdir) | 10 | 10 | 0 | 0 |
-| `avm1/` | 47 | 45 | 1 | 1 (`moviecliploader`) |
+| `avm1/` | 47 | 46 | 1 | 0 |
 | `fuzz/` | 30 | 12 | 2 | 16 (all in `ignored_tests.txt`) |
 | `timeline/` | 5 | 5 | 0 | 0 |
 
@@ -52,20 +61,22 @@ Last updated: 2026-05-08 (CI `84a147bd` — conditional MCL one-tick deferral la
 | Metric | Value |
 |--------|-------|
 | Total tests | 47 |
-| Passing | **45** (95.7%) |
+| Passing | **46** (97.9%) |
 | Ruffle-matched | 1 |
-| Effective pass | **46** (97.9%) |
+| Effective pass | **47** (100.0%) |
 | Ignored | 2 |
 | **Filtered pass rate** | **45/45 (100.0%)** |
 | Failing (filtered) | 0 |
 
-The sole unfiltered fail is `moviecliploader` (1/7 — MCL one-tick deferral, tracked in `incomplete/SHUMWAY_AVM1_SUBTREES_PLAN.md` Part B). `doactionorder` now passes following Phase 6 of the ActionQueue rework.
+(Pending CI verification — local Part C landing brings `moviecliploader` to PASS.)
+
+`doactionorder` passed following Phase 6 of the ActionQueue rework. `moviecliploader` reached 6/7 via Part B's conditional MCL one-tick deferral and now reaches 7/7 via Part C (per-tick advance for the loadee MC after Phase 2). All `incomplete/SHUMWAY_AVM1_SUBTREES_PLAN.md` parts (A/B/C) are now resolved.
 
 **Per-category status:**
 
 | Category | Total | Pass | Fail |
 |----------|-------|------|------|
-| Flat (root-level tests) | 23 | 21 (+1 RM) | 1 (`moviecliploader`) |
+| Flat (root-level tests) | 23 | 22 (+1 RM) | 0 |
 | `bitmapdata/` | 2 | 2 | 0 |
 | `doactionorder/` | 2 | 2 | 0 |
 | `duplicateMovieClip/` | 4 | 4 | 0 |
@@ -108,14 +119,9 @@ The sole unfiltered fail is `moviecliploader` (1/7 — MCL one-tick deferral, tr
 
 ---
 
-## Still Failing (1 in `avm1/`, also at flat)
+## Still Failing (none in `avm1/`)
 
-See `incomplete/SHUMWAY_AVM1_SUBTREES_PLAN.md` for the fix plan.
-
-- `doactionorder/doactionorder` — **RESOLVED** by Phase 6 of the ActionQueue rework (commit `a427f5fc`, "Land Phase 6 of ActionQueue rework: inline root DoAction queueing"). Plan's Approach A3 effectively became the ACTION_QUEUE_PLAN, now complete (marked at commit `fe74d7aa`).
-- `moviecliploader` (1/7) — STILL FAILING. Part B landed briefly (commit `1a1bf852`) improving this to 6/7, but CI revealed 3 AVM1 regressions (`movieclip_invalid_get_bounds_1/2` heap corruption, `string_paths_eval2` timer shift). Reverted in `59533be3`. The one-tick deferral exposes pre-existing latent bugs in getBounds handling and test calibration for chained setInterval. See plan file for the three paths forward.
-
-Other previously-failing `avm1/` sub-tree tests (`duplicateMovieClip/*`, `doactionorder/doactionorder`) all now pass.
+All historical `avm1/` sub-tree failures now pass (`duplicateMovieClip/*`, `doactionorder/doactionorder`, `moviecliploader` — the latter via Part B + Part C of `incomplete/SHUMWAY_AVM1_SUBTREES_PLAN.md`).
 
 ---
 

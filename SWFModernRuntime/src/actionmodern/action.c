@@ -28760,6 +28760,15 @@ void actionFirePendingLoadInits(SWFAppContext* app_context)
                 && loads[i].entry->frame_funcs[0] != NULL) {
                 loads[i].entry->frame_funcs[0](app_context);
             }
+            // Register multi-frame MCL targets for per-tick frame advancement.
+            // Phase 2 only ran frame_funcs[0]; without this, frame_funcs[1..N-1]
+            // never run and the loadee's later frames are skipped (e.g. Shumway
+            // moviecliploader's "loadee frame 2" trace from frame_funcs[1]).
+            // Mirrors the level-load registration in actionFirePendingDirectLoads.
+            if (loads[i].target != NULL && loads[i].entry->frame_count > 1
+                && loads[i].entry->frame_funcs != NULL) {
+                actionRegisterLevelAdvance(loads[i].target, loads[i].entry);
+            }
 
             // Restore transform_data
             if (_p2_saved_td != NULL) {

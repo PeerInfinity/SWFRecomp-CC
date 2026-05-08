@@ -503,14 +503,16 @@ The only implementation that actually matches Ruffle's semantics is a unified FI
 6. Run the rest of the AVM1 canary set. Expect `stage_object_enumerate` to flip to pass.
 7. Commit. Trigger full CI. Verify no net regressions.
 
-### Part C (new) — child-SWF multi-frame advance
+### Part C (new) — child-SWF multi-frame advance — **LANDED 2026-05-08**
 
-Blocker for `from_shumway/avm1/moviecliploader` line 7 (`loadee frame 2`). After Phase 2 of `actionFirePendingLoadInits` runs `entry->init_func` + `entry->frame_funcs[0]` in the target MC's context, there's no mechanism for `entry->frame_funcs[1..N-1]` to run on subsequent ticks. The target MC needs its `sprite_frame_funcs` + `sprite_frame_count` bound to `entry`'s frame functions, and `sprite_is_playing` set, so `advance_sprite_frames` picks it up.
+`from_shumway/avm1/moviecliploader` 6/7 → **PASS (7/7)** locally.
 
-Rough sketch: in `actionFirePendingLoadInits` Phase 2, after running `frame_funcs[0]`, also set:
-- `target_mc->sprite_frame_funcs = entry->frame_funcs`
-- `target_mc->sprite_frame_count = entry->frame_count`
-- `target_mc->sprite_current_frame = 1` (next tick runs frame_funcs[1])
-- `target_mc->sprite_is_playing = 1`
+**Implementation.** One change in `SWFModernRuntime/src/actionmodern/action.c::actionFirePendingLoadInits` Phase 2: after running `entry->frame_funcs[0]` in the target MC's context, register the loadee for per-tick frame advancement via `actionRegisterLevelAdvance(target, entry)` when `entry->frame_count > 1`. Reuses the existing per-tick mechanism that loadMovieNum (level loads) uses — `actionAdvancePlayingLevels` is called from the swf_core.c / swf_headless.c top-of-tick path, swaps to the loadee's display_list + transform_data + SWF version, runs `frame_funcs[current_frame]`, increments `current_frame`, and drops the entry once `current_frame >= frame_count`. The function name says "level" but it's a generic per-tick advance for any MC + entry pair; loadMovieNum was simply its first caller.
 
-Or equivalently — pre-create a synthetic DisplayObject in parent's DL that points at `entry`'s frame functions. Verify against `loadmovie_replace_root` and `loadmovie_var_persistence` which work today without multi-frame advance because their tests don't poke at it.
+**No double-advance with `advance_sprite_frames`.** The MCL target MC was placed via `createEmptyMovieClip` (or pre-existing DefineSprite), so its `sprite_frame_funcs` either are NULL or point at the placeholder character — never at the loadee's `frame_funcs`. `advance_sprite_frames` calls `ch->sprite_frame_funcs[frame]` (the placeholder), not the loaded entry's frame_funcs. So registering with `actionRegisterLevelAdvance` doesn't conflict with `advance_sprite_frames` and no frame fires twice.
+
+**Loop-keepalive already in place.** `swf_core.c:1062` and `swf_core.c:1388` both already check `hasPlayingLevels()` to keep the main loop alive after the loader stops, so deferred loadee frames continue to fire on subsequent ticks even when the loader has called `stop()` (as `moviecliploader` does in frame 1).
+
+**Regression batteries (all green).** 26-test extended AVM1 MCL/loadMovie battery (loadmovie*, loadmovienum*, mcl_*, unloadmovie*, string_paths_eval2, moviecliploader_flashvars — 26/26 PASS). 4-test Gnash MovieClipLoader-v5..v8 battery (4/4 effective: 2 PASS + 2 RM, unchanged).
+
+**Followup**: full CI verification.
