@@ -2074,15 +2074,50 @@ void upgrade_sprite_initialized(DisplayObject* dl, size_t dl_max)
 	}
 }
 
-// Recursively dispatch CLIP_EVENT_ENTER_FRAME: children before parents.
-// Only fires for sprites with sprite_initialized >= 2 (init'd on a previous tick).
-void dispatch_enterframe_clip_actions(SWFAppContext* app_context,
+// Recursively gather all eligible CLIP_EVENT_ENTER_FRAME entries into a flat
+// list, with each entry's parent_mc tracked so dispatch can resolve names.
+// Stops gathering (returns early) if the cap is exceeded; caller falls back
+// to depth-recursive dispatch in that case.
+typedef struct {
+	DisplayObject* obj;
+	MovieClip* parent_mc;
+	size_t place_seq;
+} ClipEFEntry;
+
+static int gather_clip_ef_entries(SWFAppContext* app_context,
+	DisplayObject* dl, size_t dl_max, MovieClip* parent_mc,
+	ClipEFEntry* out, size_t* n, size_t cap)
+{
+	for (size_t i = 0; i <= dl_max; i++) {
+		DisplayObject* obj = &dl[i];
+		if (obj->char_id == 0) continue;
+		if (obj->sprite_initialized < 2) continue;
+		if (*n >= cap) return 0;
+		out[*n].obj = obj;
+		out[*n].parent_mc = parent_mc;
+		out[*n].place_seq = obj->place_seq;
+		(*n)++;
+		// Recurse into nested sprite children
+		if (obj->sprite_display_list != NULL && obj->sprite_max_depth > 0) {
+			MovieClip* child_mc = NULL;
+			if (obj->instance_name != NULL)
+				child_mc = actionFindOrCreateMovieClip(app_context, obj->instance_name, parent_mc);
+			if (!gather_clip_ef_entries(app_context,
+				obj->sprite_display_list, obj->sprite_max_depth,
+				child_mc ? child_mc : parent_mc, out, n, cap))
+				return 0;
+		}
+	}
+	return 1;
+}
+
+// Recursive (subtree-DFS) fallback used when gather overflows cap. Children
+// before parents within each subtree, with sibling iteration sorted by
+// place_seq DESC. Pre-flat-LIFO behavior; correct for single-subtree cases
+// but produces subtree-grouped order rather than global LIFO.
+static void dispatch_enterframe_clip_actions_recursive(SWFAppContext* app_context,
 	DisplayObject* dl, size_t dl_max, MovieClip* parent_mc)
 {
-	// Iterate in reverse-instantiation order (place_seq DESC) so clip-event
-	// ENTER_FRAME fires most-recently-placed first, mirroring Ruffle's
-	// clip_exec_list LIFO traversal. Stack-bounded sort with depth-ascending
-	// fallback if dl_max exceeds the cap.
 	#define DEC_SORT_CAP 512
 	size_t dec_depths[DEC_SORT_CAP];
 	size_t dec_seq[DEC_SORT_CAP];
@@ -2115,20 +2150,90 @@ void dispatch_enterframe_clip_actions(SWFAppContext* app_context,
 		size_t i = dec_use_sorted ? dec_depths[dec_iter] : dec_iter;
 		DisplayObject* obj = &dl[i];
 		if (obj->char_id == 0) continue;
-		// Skip sprites not yet fully initialized (init'd this tick = 1, or not init'd = 0)
 		if (obj->sprite_initialized < 2) continue;
 
-		// Recurse into sprite children first (depth-first, children before parents)
 		if (obj->sprite_display_list != NULL && obj->sprite_max_depth > 0)
 		{
 			MovieClip* child_mc = NULL;
 			if (obj->instance_name != NULL)
 				child_mc = actionFindOrCreateMovieClip(app_context, obj->instance_name, parent_mc);
-			dispatch_enterframe_clip_actions(app_context,
+			dispatch_enterframe_clip_actions_recursive(app_context,
 				obj->sprite_display_list, obj->sprite_max_depth,
 				child_mc ? child_mc : parent_mc);
 		}
 
+		if (obj->clip_action_count == 0) continue;
+
+		MovieClip* saved_ctx = g_current_context;
+		MovieClip* saved_base = actionGetBaseClip();
+		MovieClip* event_mc = NULL;
+		if (obj->instance_name != NULL) {
+			event_mc = actionFindOrCreateMovieClip(app_context, obj->instance_name, parent_mc);
+			if (event_mc) {
+				int _ef_skip = 0;
+				for (MovieClip* p = event_mc; p != NULL; p = p->parent) {
+					if (p->avm1_removed || p->pending_removal) { _ef_skip = 1; break; }
+				}
+				if (_ef_skip) continue;
+				actionSetCurrentContext(event_mc);
+				actionSetBaseClip(event_mc);
+			}
+		} else {
+			for (MovieClip* p = parent_mc; p != NULL; p = p->parent) {
+				if (p->avm1_removed || p->pending_removal) { goto _ef_skip_obj_r; }
+			}
+		}
+		for (size_t a = 0; a < obj->clip_action_count; a++)
+		{
+			if (obj->clip_actions[a].event_flags & CLIP_EVENT_ENTER_FRAME) {
+				obj->clip_actions[a].action(app_context);
+			}
+		}
+		actionSetCurrentContext(saved_ctx);
+		actionSetBaseClip(saved_base);
+		continue;
+	_ef_skip_obj_r:;
+	}
+}
+
+// Dispatch CLIP_EVENT_ENTER_FRAME in flat global LIFO order (place_seq DESC
+// across the entire display tree, not per-subtree). Mirrors Ruffle's
+// clip_exec_list which is a single global linked list traversed in reverse-
+// instantiation order — siblings and nested children of different parents
+// interleave naturally by placement time. Falls back to subtree-DFS recursion
+// when the gather cap is exceeded.
+//
+// Only fires for sprites with sprite_initialized >= 2 (init'd on a previous tick).
+void dispatch_enterframe_clip_actions(SWFAppContext* app_context,
+	DisplayObject* dl, size_t dl_max, MovieClip* parent_mc)
+{
+	#define CLIP_EF_FLAT_CAP 2048
+	ClipEFEntry entries[CLIP_EF_FLAT_CAP];
+	size_t n = 0;
+	if (!gather_clip_ef_entries(app_context, dl, dl_max, parent_mc,
+		entries, &n, CLIP_EF_FLAT_CAP))
+	{
+		// Overflow: fall back to per-subtree recursion (pre-flat-LIFO behavior).
+		dispatch_enterframe_clip_actions_recursive(app_context, dl, dl_max, parent_mc);
+		return;
+	}
+
+	// Insertion sort by place_seq DESC (most-recently-placed first).
+	for (size_t k = 1; k < n; k++) {
+		ClipEFEntry key = entries[k];
+		long b = (long)k - 1;
+		while (b >= 0 && entries[b].place_seq < key.place_seq) {
+			entries[b+1] = entries[b];
+			b--;
+		}
+		entries[b+1] = key;
+	}
+
+	for (size_t e = 0; e < n; e++) {
+		DisplayObject* obj = entries[e].obj;
+		MovieClip* entry_parent = entries[e].parent_mc;
+		if (obj->char_id == 0) continue;  // entry may have been removed mid-dispatch
+		if (obj->sprite_initialized < 2) continue;
 		if (obj->clip_action_count == 0) continue;
 
 		// Set correct MC context for the clip action. Skip if the MC or any
@@ -2139,7 +2244,7 @@ void dispatch_enterframe_clip_actions(SWFAppContext* app_context,
 		MovieClip* saved_base = actionGetBaseClip();
 		MovieClip* event_mc = NULL;
 		if (obj->instance_name != NULL) {
-			event_mc = actionFindOrCreateMovieClip(app_context, obj->instance_name, parent_mc);
+			event_mc = actionFindOrCreateMovieClip(app_context, obj->instance_name, entry_parent);
 			if (event_mc) {
 				int _ef_skip = 0;
 				for (MovieClip* p = event_mc; p != NULL; p = p->parent) {
@@ -2154,12 +2259,12 @@ void dispatch_enterframe_clip_actions(SWFAppContext* app_context,
 				actionSetBaseClip(event_mc);
 			}
 		} else {
-			// Anonymous obj: skip if parent_mc is Marked (covers the case where
-			// the parent was queued for removal but the anonymous child wasn't
-			// directly named).
-			for (MovieClip* p = parent_mc; p != NULL; p = p->parent) {
-				if (p->avm1_removed || p->pending_removal) { goto _ef_skip_obj; }
+			// Anonymous obj: skip if parent is Marked.
+			int _ef_skip = 0;
+			for (MovieClip* p = entry_parent; p != NULL; p = p->parent) {
+				if (p->avm1_removed || p->pending_removal) { _ef_skip = 1; break; }
 			}
+			if (_ef_skip) continue;
 		}
 		for (size_t a = 0; a < obj->clip_action_count; a++)
 		{
@@ -2169,8 +2274,6 @@ void dispatch_enterframe_clip_actions(SWFAppContext* app_context,
 		}
 		actionSetCurrentContext(saved_ctx);
 		actionSetBaseClip(saved_base);
-		continue;
-	_ef_skip_obj:;
 	}
 }
 

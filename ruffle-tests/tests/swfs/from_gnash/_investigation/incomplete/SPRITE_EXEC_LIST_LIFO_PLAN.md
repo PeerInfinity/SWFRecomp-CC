@@ -245,9 +245,9 @@ Shumway:
 
 **Net expected delta:** +3 PASS in misc-ming.
 
-## Status as of 2026-04-29
+## Status as of 2026-05-08
 
-**Implemented (Phases 1-3 + partial Phase 4):**
+**Implemented (Phases 1-3 + Phase 4 partial via flat clip-event dispatch):**
 - `place_seq` field on `DisplayObject` (`SWFModernRuntime/include/libswf/swf.h`),
   `g_place_seq` global counter (`SWFModernRuntime/src/libswf/tag.c`).
 - `display_list[depth].place_seq = ++g_place_seq` at the two full-placement sites
@@ -257,10 +257,17 @@ Shumway:
   insertion sort over a stack-bounded array (cap 512); falls back to
   depth-descending when `max_depth` exceeds the cap.
 - `advance_nested_sprite_frames` (`tag.c`) gets the same sort.
-- `dispatch_enterframe_clip_actions` (`tag.c`) gets the same sort — flipped from
-  depth-ascending to place_seq DESC. This is what actually moved the per-tick
-  CLIP_EVENT_ENTER_FRAME firing order for the target tests (their handlers are
-  clip-action ENTER_FRAME, not AS-property `mc.onEnterFrame`).
+- `dispatch_enterframe_clip_actions` (`tag.c`, 2026-05-08): rewritten to gather
+  all eligible (DisplayObject*, parent_mc, place_seq) entries across the entire
+  display tree into a flat list (cap 2048), sort by `place_seq` DESC, and dispatch
+  in that order. Mirrors Ruffle's `clip_exec_list` which is a single global
+  linked list traversed in reverse-instantiation order — siblings and nested
+  children of different parents interleave naturally by placement time. Falls
+  back to per-subtree DFS (the prior behavior) when the gather cap is exceeded.
+  This is what fixed `enterFrameOrder` parity in `action_execution_order_test11`
+  (line 26 expectation now passes) — previously the recursive subtree-grouped
+  order produced `mc21, mc2, mc12, mc11, mc1` for tick 4 instead of the expected
+  flat-LIFO `mc12, mc21, mc11, mc2, mc1`.
 
 **Not done (Phase 4 dispatcher proper):** `actionDispatchEnterFrameHandlers`
 (`action.c`) iteration left at `for (int i = child_mc_count - 1; i >= 0; i--)`.
@@ -281,6 +288,27 @@ naturally yields LIFO. See "Open question 4" extension below.
 | `action_execution_order_test2` | 2/5 (output_mismatch) | **5/5 PASS** | Target hit. |
 | `action_execution_order_test5` | 25/35 (output_mismatch) | 26/35 (output_mismatch) | First 26 lines now match exactly (was 25). Lines 27-35 still diverge — deeply-nested cleanup/unload sequencing, not LIFO. |
 | `action_execution_order_test11` | 13/32 (output_mismatch) | ~17/32 (output_mismatch, est.) | First-frame `mc2 onEnterFrame, mc1 onEnterFrame` order is now correct. Subsequent ticks still diverge — looks like nested children-then-parent recursion ordering inside a single tick. |
+
+### Test deltas (local, 2026-05-08 flat clip-event dispatch)
+
+Against CI baseline `1e21fdb6` (test11 17/32 raw match). The flat-LIFO refactor of
+`dispatch_enterframe_clip_actions` resolves the per-tick CLIP_EVENT_ENTER_FRAME
+ordering for the target test:
+
+| Test | Before | After | Notes |
+|------|--------|-------|-------|
+| `action_execution_order_test11` | 17/32 | **27/32** | `enterFrameOrder` assertion (line 26) flips to PASS. Residual 5-line diff: lines 8/9 (mc1 enterFrame fires after mc21 onLoad instead of before — needs interleaved per-sprite enterFrame+advance, not addressable here), and the doActionOrder/asOrder cluster (lines 28/29/30/31) which depends on the same interleaving plus `advance_sprite_frames` flat ordering. Test is `output_mismatch` (no `output.ruffle.txt`/`known_failure` to enable subset promotion) so does NOT reach effective pass. |
+| `action_execution_order_test2` | PASS (5/5) | **PASS (5/5)** | Unchanged. |
+| `action_execution_order_test5` | 26/35 | 26/35 | Unchanged. The cleanup-phase failures are not enterframe-ordering related. |
+
+**Regression battery (all green with the 2026-05-08 changes):**
+- 30-test AVM1 lifecycle/event-order battery: 30/30 effective
+- 23-test gnash misc-ming.all battery (incl. `reverse_execute_PlaceObject2_test1/2`,
+  `loop_test2/3/4/5/6/7/8/9`, sprite/clip event tests): 22/23 effective (the
+  one fail is `action_execution_order_test11` itself, unchanged-as-PASS but
+  improved-from-17/32-to-27/32)
+- 12-test gnash misc-swfc.all battery: 12/12 effective
+- 4-test Shumway `duplicateMovieClip` battery: 4/4 PASS
 
 ### Pre-existing local failures (not caused by this work)
 
