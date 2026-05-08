@@ -2,9 +2,9 @@
 
 *See [RUFFLE_RESULTS_FILTERED.md](RUFFLE_RESULTS_FILTERED.md) for results with ignored tests excluded.*
 
-**Commit:** `f8e172e96392`  
-**Date:** 2026-05-08 23:04 UTC  
-**Total duration:** 1h56m04s
+**Commit:** `d5b87d2c50be`  
+**Date:** 2026-05-08 23:50 UTC  
+**Total duration:** 1h57m40s
 
 ## Results by Suite
 
@@ -25,14 +25,14 @@
 | Suite | Matching | Expected | Accuracy |
 |-------|--------:|---------:|---------:|
 | avm1 | 106,095 | 114,983 | 92.3% |
-| from_gnash/actionscript.all | 15,392 | 16,957 | 90.8% |
+| from_gnash/actionscript.all | 15,393 | 16,957 | 90.8% |
 | from_gnash/misc-ming.all | 3,737 | 4,577 | 81.6% |
 | from_gnash/misc-mtasc.all | 211 | 231 | 91.3% |
 | from_gnash/misc-swfc.all | 388 | 499 | 77.8% |
 | from_gnash/misc-swfmill.all | 49 | 51 | 96.1% |
 | from_shumway | 882 | 1,276 | 69.1% |
 | from_shumway/avm1 | 489 | 491 | 99.6% |
-| **Total** | **127,243** | **139,065** | **91.5%** |
+| **Total** | **127,244** | **139,065** | **91.5%** |
 
 ## Failure Breakdown
 
@@ -68,9 +68,9 @@ Tests with `output_mismatch` status but ≥80% of expected lines matching.
 
 | Suite | Newly Passing | Newly Failing | Lines Improved | Lines Regressed |
 |-------|-------------:|-------------:|--------------:|----------------:|
-| from_gnash/actionscript.all | - | - | 7 | - |
+| from_gnash/actionscript.all | - | - | 1 | - |
 
-*Comparing `d1c3b9d560f2` → `f8e172e96392`*
+*Comparing `f8e172e96392` → `d5b87d2c50be`*
 
 ## Flash-Spec Results
 
@@ -85,55 +85,55 @@ Tests verified against Flash's actual output (`output.flash.txt`).
 ### avm1
 
 - **Pass:** 605/648 (93.4%)
-- **Duration:** 54m38s across 30 shards
+- **Duration:** 55m19s across 30 shards
 - **Lines:** 106,095/114,983 matching (92.3%)
-- **Avg test duration:** 5.0s — slowest: `timeout` (22.5s)
+- **Avg test duration:** 5.1s — slowest: `timeout` (23.4s)
 
 ### from_gnash/actionscript.all
 
 - **Pass:** 126/190 (66.3%)
-- **Duration:** 11m45s across 30 shards
-- **Lines:** 15,392/16,957 matching (90.8%)
-- **Avg test duration:** 3.7s — slowest: `NetStream-v7` (18.7s)
+- **Duration:** 11m57s across 30 shards
+- **Lines:** 15,393/16,957 matching (90.8%)
+- **Avg test duration:** 3.7s — slowest: `targetPath-v5` (19.0s)
 
 ### from_gnash/misc-ming.all
 
 - **Pass:** 65/102 (63.7%)
-- **Duration:** 23m54s across 30 shards
+- **Duration:** 24m13s across 30 shards
 - **Lines:** 3,737/4,577 matching (81.6%)
-- **Avg test duration:** 14.0s — slowest: `matrix_test` (20.4s)
+- **Avg test duration:** 14.2s — slowest: `matrix_test` (21.9s)
 
 ### from_gnash/misc-mtasc.all
 
 - **Pass:** 7/9 (77.8%)
-- **Duration:** 2m04s across 30 shards
+- **Duration:** 2m07s across 30 shards
 - **Lines:** 211/231 matching (91.3%)
-- **Avg test duration:** 13.8s — slowest: `enum` (18.3s)
+- **Avg test duration:** 14.1s — slowest: `hello` (18.7s)
 
 ### from_gnash/misc-swfc.all
 
 - **Pass:** 8/16 (50.0%)
-- **Duration:** 4m03s across 30 shards
+- **Duration:** 4m05s across 30 shards
 - **Lines:** 388/499 matching (77.8%)
-- **Avg test duration:** 15.2s — slowest: `movieclip_destruction_test1` (18.7s)
+- **Avg test duration:** 15.3s — slowest: `soft_reference_test1` (18.8s)
 
 ### from_gnash/misc-swfmill.all
 
 - **Pass:** 17/18 (94.4%)
-- **Duration:** 5m12s across 30 shards
+- **Duration:** 5m14s across 30 shards
 - **Lines:** 49/51 matching (96.1%)
-- **Avg test duration:** 17.3s — slowest: `trace-as2/shortstack` (18.5s)
+- **Avg test duration:** 17.4s — slowest: `dict_event` (18.6s)
 
 ### from_shumway
 
 - **Pass:** 73/92 (79.3%)
-- **Duration:** 13m00s across 30 shards
+- **Duration:** 13m16s across 30 shards
 - **Lines:** 882/1,276 matching (69.1%)
-- **Avg test duration:** 8.4s — slowest: `fuzz/0cde3acaa5116dac19bf73b0b76556223ad9328a367e04ec9cab733bc6765d82` (18.4s)
+- **Avg test duration:** 8.6s — slowest: `avm1/hitarea` (19.0s)
 
 ### from_shumway/avm1
 
 - **Pass:** 46/47 (97.9%)
-- **Duration:** 1m24s across 30 shards
+- **Duration:** 1m26s across 30 shards
 - **Lines:** 489/491 matching (99.6%)
-- **Avg test duration:** 1.7s — slowest: `label` (18.1s)
+- **Avg test duration:** 1.8s — slowest: `duplicateMovieClip/dontremove` (19.1s)
