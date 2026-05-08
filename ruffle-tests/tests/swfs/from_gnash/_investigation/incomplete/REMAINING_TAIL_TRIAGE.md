@@ -114,7 +114,7 @@ failing tests **not** covered by one of the seven cluster plans:
 | `complete/DEFERRED_CLIP_UNLOAD_PLAN.md` | complete | loop_test6/7/8, action_execution_order_test2/3/5/11, ActionOrderTest3/4/5 |
 | `incomplete/CLONESPRITE_DEPTH_BIAS_PLAN.md` | incomplete (Phase 1 shipped; Phase 2 split into 2a-2d, multi-session) | displaylist_depths_test/2/3/8/9, DepthLimitsTest, duplicate_movie_clip_test/2 |
 | `complete/BUTTON_INFRASTRUCTURE_PLAN.md` (+ `incomplete/BUTTON_RESIDUAL_PLAN.md`) | architectural phases complete; residual issues tracked in BUTTON_RESIDUAL_PLAN | parent: RollOverOutTest (PASS), ButtonPropertiesTest (PASS), mouse_drag_test (PASS); residual: ButtonEventsTest, key_event_test, DragDropTest, button_test1 |
-| `incomplete/ZERO_OUTPUT_TRIAGE_PLAN.md` | incomplete | BeginBitmapFill, Version4Loader, frame_label_test, replace_buttons1test, replace_shapes1test, LoadVarsTest, opcode_guard_test2 |
+| `complete/ZERO_OUTPUT_TRIAGE_PLAN.md` | incomplete | BeginBitmapFill, Version4Loader, frame_label_test, replace_buttons1test, replace_shapes1test, LoadVarsTest, opcode_guard_test2 |
 | `incomplete/REGISTERCLASS_LIFECYCLE_PLAN.md` | incomplete | registerClassTest, registerClassTest2, RegisterClassTest3, RegisterClassTest4 |
 | `superseded/GOTO_CATCHUP_HYGIENE_PLAN.md` | **superseded** (Phases 1–5 landed; Phase 6 → `complete/GOTO_FIFO_UNIFICATION_INCREMENTAL_PLAN.md`; Phase 7 → `incomplete/TRANSFORMED_BY_SCRIPT_WRAP_BACK_PLAN.md`) | goto_frame_test, consecutive_goto_frame_test, place_and_remove_object_insane_test |
 | `complete/IMPORT_CHARACTER_PLAN.md` | complete | attachImported, attachMovieLoopingTest, loadMovieTest |

@@ -68,7 +68,7 @@ Status (CI at f7f8fbe6 — 2026-04-29 run): **misc-ming.all 67/102 effective (65
 - `matrix_test` (84%) — multi-issue (negative-_yscale matrix, getBounds-after-rotate, sin(90°) FP residuals).
 - `displaylist_depths_test/2/3/8/9`, `DepthLimitsTest`, `duplicate_movie_clip_test/2` — all blocked on CloneSprite depth-bias unification. **See `complete/CLONESPRITE_DEPTH_BIAS_PLAN.md`** (and the legacy "CloneSprite depth-bias trade-off (open)" section below).
 - `attachImported`, `attachMovieLoopingTest` — **landed 2026-04-27** (`complete/IMPORT_CHARACTER_PLAN.md`). Both now PASS. `loadMovieTest` was deferred to Phase 5 of that plan; **see `complete/LOADMOVIETEST_PLAN.md`** for the split-out plan (root cause: CLIP_EVENT_ROLL_OVER / ROLL_OUT clip-event flags 0x2000 / 0x4000 are parsed by the recompiler and stored on `DisplayObject.clip_actions[]` but never dispatched at runtime — coverart's `onMouseDown` AS-property handler never gets installed, so all subsequent click traces are missing). `loop_test10` is independent (loop opcode handling, separate triage).
-- `Version4Loader`, `frame_label_test`, `replace_buttons1test`, `replace_shapes1test`, `BeginBitmapFill`, `loading/LoadVarsTest`, `opcode_guard_test2` — previously labeled "zero-output / DoInitAction-for-library-exports" but **none have DoInitAction tags** and most do produce output. **See `incomplete/ZERO_OUTPUT_TRIAGE_PLAN.md`** — 6 distinct narrow fixes (verifier empty-data-file, button CONSTRUCT gating, child SWF loader, frame label, bitmap _width, depth math). `submoviegetvar` and `action_execution_order_test6` already pass/ruffle_matched locally — will flip on next CI run.
+- `Version4Loader`, `frame_label_test`, `replace_buttons1test`, `replace_shapes1test`, `BeginBitmapFill`, `loading/LoadVarsTest`, `opcode_guard_test2` — previously labeled "zero-output / DoInitAction-for-library-exports" but **none have DoInitAction tags** and most do produce output. **See `complete/ZERO_OUTPUT_TRIAGE_PLAN.md`** — 6 distinct narrow fixes (verifier empty-data-file, button CONSTRUCT gating, child SWF loader, frame label, bitmap _width, depth math). `submoviegetvar` and `action_execution_order_test6` already pass/ruffle_matched locally — will flip on next CI run.
 - `action_order/action_execution_order_test2/3/5/11`, `loop_test6/7/8`, `ActionOrderTest3/4/5` — deferred CLIP_EVENT_UNLOAD + onUnload queue blocker. **See `complete/DEFERRED_CLIP_UNLOAD_PLAN.md`.**
 - `goto_frame_test`, `consecutive_goto_frame_test`, `place_and_remove_object_insane_test` — shared catch-up replay hygiene blocker (stale name resolution after goto-induced removal, missing unload events on goto, sprite script double-fire on nested goto, last-frame DoAction lost on forward goto). **See `superseded/GOTO_CATCHUP_HYGIENE_PLAN.md`** (Phases 1-5 landed there; Phase 6 shipped via `complete/GOTO_FIFO_UNIFICATION_INCREMENTAL_PLAN.md`; Phase 7 lives in `complete/TRANSFORMED_BY_SCRIPT_WRAP_BACK_PLAN.md`). `goto_frame_test` and `consecutive_goto_frame_test` now PASS; `place_and_remove_object_insane_test` is the remaining target via Phase 7.
 - `loop_test`, `replace_sprites1test`, `replace_buttons1test`, `replace_shapes1test`, `frame_label_test`, `action_execution_order_test6` — same family (deferred queue or zero-output DoInitAction).
@@ -79,7 +79,7 @@ Status (CI at f7f8fbe6 — 2026-04-29 run): **misc-ming.all 67/102 effective (65
 
 **Single-test residuals (combined triage):** `matrix_test`, `DefineTextTest`, `DefineEditTextVariableNameTest`, `EmbeddedFontTest`, `DrawingApiTest`, `NetStream-SquareTest`, `loop/loop_test`, `loop/loop_test10`, `replace_sprites1test`, `masks_test`, `duplicate_movie_clip_test`. **See `incomplete/REMAINING_TAIL_TRIAGE.md`** — one-page Match / Symptom / Hypothesis / Scope per test; entries graduate to standalone plans when active work begins. (`opcode_guard_test` was here previously; resolved 2026-05-07 via ignore list — see `ACCEPTED_DIFFS.md` Category 1.)
 
-- `BeginBitmapFill` (single-line content mismatch — `mc9._width` returns 804 vs 150). **See `incomplete/ZERO_OUTPUT_TRIAGE_PLAN.md` Phase 5.**
+- `BeginBitmapFill` (single-line content mismatch — `mc9._width` returns 804 vs 150). **See `complete/ZERO_OUTPUT_TRIAGE_PLAN.md` Phase 5.**
 
 ### misc-swfc.all (8 failing / 16 total)
 
@@ -88,7 +88,7 @@ Status (CI at f7f8fbe6 — 2026-04-29 run): **misc-ming.all 67/102 effective (65
 - `swf4opcode` (63.2%), `soft_reference_test1` (31.1%), `movieclip_destruction_test4` (20%) — see `incomplete/REMAINING_TAIL_TRIAGE.md`.
 - `button_test1` (25.8%) — button-internal child sprite resolution. **See `complete/BUTTON_INFRASTRUCTURE_PLAN.md` Phase 2.**
 - ~~`mouse_drag_test` (50%)~~ — **PASS as of 2026-05-02** (commit 531d6bfa). Root cause was NOT Dejagnu `xcheck` zero-arg handling as previously predicted in `complete/BUTTON_INFRASTRUCTURE_PLAN.md`; actual fix was `startDrag` setting `transformed_by_script=1` on the dragged MC so subsequent timeline `PlaceObject` MOVE tags no-op (Ruffle gets the same effect via `update_drag` → `set_x`/`set_y`, which we don't run in headless mode). The "empty PASSED:" lines in the prior diff were `check(mc1._x != 200)` whose printf format collapses when both sides match — once the matrix lock works, those lines render with their captured expression text.
-- `opcode_guard_test2` (runtime_error) — needs separate triage.
+- ~~`opcode_guard_test2`~~ — **`ruffle_matched` 2026-05-08** (CI `46d78af6`, was 2/24 output_mismatch → 19/24 ruffle_matched). AS-level `removeMovieClip()` on clips with onUnload now follows the deferred-removal pattern (shifted depth, `pending_removal=1`, `dynamic_props` and var_map bindings preserved for same-frame reads); cleanup of var_map / parent.dynamic_props deferred to `actionFinalizePendingRemovals`. Plus a var_map MOVIECLIP fallback in `actionSetTarget` so SetTarget('<dup-clone-name>') resolves AS-created clips. See `complete/ZERO_OUTPUT_TRIAGE_PLAN.md` Phase 6 for full notes.
 
 ## Key finding: the blocker is not universal
 
@@ -106,7 +106,7 @@ That's no longer accurate. At the 82a6ea07 CI snapshot, of the 85 combined failu
 | action_order/action_execution_order_test6 | misc-ming | output_mismatch | 0/24 |
 | loading/LoadVarsTest | misc-ming | compile_fail | — |
 | submoviegetvar | misc-swfc | output_mismatch | 0/4 |
-| opcode_guard_test2 | misc-swfc | runtime_error | — |
+| ~~opcode_guard_test2~~ | misc-swfc | **ruffle_matched (2026-05-08)** | 19/24 |
 
 The other ~76 tests produce *some* output — they're running, their Dejagnu check functions *are* being defined, and they're emitting PASSED/FAILED lines. The DoInitAction blocker either doesn't apply to them, or applies only partially. This changes the plan substantially.
 
@@ -579,7 +579,7 @@ Text field property coverage; may overlap AVM1's `TEXTFIELD_PLAN`.
 - `soft_reference_test1` (37.8%)
 - `button_test1` (25.8%)
 - `movieclip_destruction_test4` (20.0%)
-- `opcode_guard_test2` — runtime_error (investigate separately)
+- ~~`opcode_guard_test2`~~ — `ruffle_matched` 2026-05-08 (CI `46d78af6`)
 
 ## Phase 3 — "Zero-output" tests (revised)
 
@@ -588,7 +588,7 @@ running for unplaced library exports — turned out to be wrong. Direct
 SWF tag inspection shows **none** of the listed tests have any
 DoInitAction tags. Most of them DO produce output; the CI snapshot's
 `matching_lines: 0` was misread as "zero output." See
-`incomplete/ZERO_OUTPUT_TRIAGE_PLAN.md` for per-test triage:
+`complete/ZERO_OUTPUT_TRIAGE_PLAN.md` for per-test triage:
 
 | Test | Real cause |
 |------|------------|
@@ -600,7 +600,7 @@ DoInitAction tags. Most of them DO produce output; the CI snapshot's
 | action_execution_order_test6 | Already `ruffle_matched` locally; flips on next CI. |
 | submoviegetvar | Already `pass` locally; flips on next CI. |
 | loading/LoadVarsTest (compile_fail) | Verifier `data_registry.c` emits invalid C for empty sidecar (`{ , 0x00 }`). 1-line fix. |
-| opcode_guard_test2 (runtime_error → output_mismatch) | testvar off-by-one + getDepth on -32969 clone. May overlap CloneSprite depth-bias plan. |
+| ~~opcode_guard_test2~~ → ruffle_matched (2026-05-08, CI `46d78af6`) | AS-level removeMovieClip onUnload deferred path landed (mc.removeMovieClip and actionRemoveSprite now park onUnload-bearing clips at shifted depth instead of INT_MIN); var_map MOVIECLIP fallback in actionSetTarget for AS-created clones. |
 
 ## Suggested order of operations
 

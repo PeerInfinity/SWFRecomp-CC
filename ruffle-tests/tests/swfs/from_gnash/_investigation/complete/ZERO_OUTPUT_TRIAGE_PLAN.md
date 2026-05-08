@@ -4,7 +4,7 @@
 
 <!-- PLAN_META
 id: ZERO_OUTPUT_TRIAGE
-status: pending
+status: completed
 phases:
   - id: 1
     name: "Verifier: empty data-file array generates invalid C (LoadVarsTest compile_fail)"

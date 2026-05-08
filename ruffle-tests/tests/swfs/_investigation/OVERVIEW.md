@@ -2,7 +2,7 @@
 
 Cross-suite summary of all Ruffle-derived test suites. Each suite has its own `_investigation/` directory with detailed status docs.
 
-Last updated: 2026-05-07 (CI run `8fdf3311` — place-before-define narrowing landed: AVM1 +2 (`placeobject_occupied_depth`, `textsnapshot_available_text`), Gnash actionscript.all +189 effective (full Dejagnu recovery), Shumway flat +4 fuzz gain preserved. Net vs original `e0af5c2d` baseline: +4 Shumway PASSes, no regressions.).
+Last updated: 2026-05-08 (CI run `46d78af6` — AS-level `removeMovieClip` onUnload deferred path landed: misc-swfc.all `opcode_guard_test2` output_mismatch (2/24) → ruffle_matched (19/24); +1 effective. No regressions across other suites).
 
 Local edits since CI `d11aa45a`:
 - **`opcode_guard_test` (misc-ming.all) added to ignored list.** Test cannot promote to `ruffle_matched` because we are *more* correct than Ruffle on the mc1 Construct/Load/Unload event handler assertions, which throws off line alignment with Flash's expected output (we emit one extra `Target not found` warning that Gnash's `output.txt` omits, while Ruffle emits the same warning but balances the line count by missing the event-handler success lines we get right). Cannot suppress the warning without regressing 8+ AVM1 tests that assert it. Documented in `from_gnash/_investigation/ACCEPTED_DIFFS.md` Category 1. Misc-ming.all filtered effective: 86/102 (84.3%) → 88/101 (87.1%).
@@ -18,10 +18,19 @@ Local edits since CI `d11aa45a`:
 | [from_gnash/misc-mtasc.all](../from_gnash/_investigation/CURRENT_STATUS.md) | 9 | 7 | 2 | 9 | **100.0%** | — | All effective pass. Unchanged this CI. |
 | [from_gnash/misc-swfmill.all](../from_gnash/_investigation/CURRENT_STATUS.md) | 18 | 17 | 1 | 18 | **100.0%** | — | All effective pass. Unchanged this CI. |
 | [from_gnash/misc-ming.all](../from_gnash/_investigation/CURRENT_STATUS.md) | 102 | 65 | 23 | 88 | 86.3% | **87.1%** (88/101) | 1 ignored (`opcode_guard_test` — Gnash's expected output omits a `Target not found` warning we and Ruffle both emit; we are more correct than Ruffle on the test's event handlers, breaking subset-match alignment). The raw count was 65/23 in CI `d11aa45a` too — the prior snapshot's row had stale 64/22 numbers. |
-| [from_gnash/misc-swfc.all](../from_gnash/_investigation/CURRENT_STATUS.md) | 15 | 8 | 5 | 13 | 86.7% | — | Unchanged this CI. |
+| [from_gnash/misc-swfc.all](../from_gnash/_investigation/CURRENT_STATUS.md) | 16 | 8 | 6 | 14 | 87.5% | — | `opcode_guard_test2` promoted to ruffle_matched this CI: AS-level `removeMovieClip` on clips with `onUnload` now follows the deferred-removal pattern (shifted depth, dynamic_props/var_map preserved for same-frame reads). |
 | [from_shumway](../from_shumway/_investigation/CURRENT_STATUS.md) (flat) | 92 | 72 | 3 | 75 | 81.5% | **98.7%** (75/76) | Place-before-define gain (+4 fuzz PASSes incl. 2 RMATCH→PASS for `1276557624…`, `a86fee6d…`; 2 newly RMATCH for `4949de46…`, `887c02ab…`) landed in CI `873e520e` and survived the narrowing in CI `8fdf3311` (fuzz tests have no inner-sprite PlaceObjects, so the inner-sprite skip didn't undo them). 16 still MISMATCH (in `ignored_tests.txt` as fuzzer noise). `avm1/moviecliploader` is the only non-fuzz failure. |
 | [from_shumway/avm1](../from_shumway/_investigation/CURRENT_STATUS.md) | 47 | 45 | 0 | 45 | 95.7% | **100.0%** (45/45) | 2 ignored. Only `moviecliploader` remains (MCL one-tick deferral). Unchanged this CI. |
 | **SWFRecomp/tests** (old suite) | 158+59 | all trace pass | — | — | **100%** | — | Hand-written opcode tests. CI only. |
+
+## Progress Since 2026-05-07 (CI run `46d78af6`) — AS-level removeMovieClip onUnload deferred path
+
+- **`opcode_guard_test2` (misc-swfc.all) → `ruffle_matched`** (was 2/24 output_mismatch → 19/24, diffs `{4,7}` ⊆ Ruffle's `{12,13,18}`). +1 effective on misc-swfc.all (8/16 → 9/16; 8 PASS + 6 RM = 14 effective; -17 mismatched lines). Three fixes in `SWFModernRuntime/src/actionmodern/action.c`:
+  1. `actionSetTarget` var_map MOVIECLIP fallback. AS-created clips (`duplicateMovieClip` / `CloneSprite` / `createEmptyMovieClip`) register their clones in `var_map` (via `setVariableByName`) but not in the parent's `display_list` / `dynamic_props`, so `resolveSlashPathToMC` walks failed and `SetTarget('<name>')` fell through to "Target not found". Mirroring the existing GetMember var_map check (action.c ~44801) as the final fallback before the warning emission lets `setTarget('dup1')` / `setTarget('dup3')` resolve, matching Ruffle's stage-object lookup for AS-created MCs.
+  2. `actionRemoveSprite` + `mc.removeMovieClip()` deferred path for AS-level `onUnload`. Both sites previously set `mc->depth = INT_MIN` and cleared `var_map` / `parent.dynamic_props` immediately, regardless of `onUnload`. Mirroring the tag-level RemoveObject2 pattern (`actionMarkMCPendingRemoval`), a clip with `onUnload` now parks at shifted depth `-(swf_depth) - 1 - 16384` with `pending_removal=1`, keeps `dynamic_props` intact, and leaves `var_map` / `parent.dynamic_props` bindings alone for same-frame reads. The "no-onUnload" path is unchanged. Also extends the "removed-MC was the active SetTarget context" reset to fire when `g_base_clip` is NULL but `g_settarget_context_changed` is set, so subsequent variable reads in the now-dead clip's setTarget block fall back to root via `g_settarget_invalid` / `g_settarget_none`.
+  3. `actionFinalizePendingRemovals` cleanup of `var_map` / `parent.dynamic_props` for finalized deferred-removal MCs (only when bindings still reference the MC, to avoid clobbering same-name re-placements). Without this, the AVM1 `unload` test sees `_root.clip4` still resolving to a MOVIECLIP value with `depth=INT_MIN` instead of expected `undefined`.
+
+- **No regressions.** AVM1 `unload` and 43 other lifecycle/clone/unload/movieclip-state tests still pass. Other suites unchanged.
 
 ## Progress Since 2026-05-07 (CI runs `f3965a99` + `d11aa45a`) — net zero, two attempts reverted
 
