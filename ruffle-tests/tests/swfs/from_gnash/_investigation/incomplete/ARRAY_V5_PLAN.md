@@ -1,7 +1,55 @@
 # array-v5 Investigation Plan
 <!-- TESTS: array-v5 -->
 
-Last updated: 2026-05-08
+Last updated: 2026-05-08 (pending CI: shift DontDelete + sync HOLE skip + ARRAY __resolve)
+
+## Status: IN PROGRESS — 535/560 lines match locally (~95.5%), 25 remaining failures (CI baseline `068b46d8` was 528/560)
+
+### Latest fixes (2026-05-08, pending CI) — +7 lines
+
+1. **`Array.prototype.shift` honors DontDelete on target index (line 1416, +1).**
+   `callArrayMethod` shift's element-copy loop now skips the move when the
+   target index `i` has `PROPERTY_FLAG_CONFIGURABLE` cleared (DontDelete set
+   in ASSetPropFlags). The metadata-reset loop is also gated to only fire
+   on indices that were actually overwritten. Matches Flash semantics for
+   `ASSetPropFlags(a, "0", 7, 0); a.shift()` — index 0 stays `'zero'`
+   instead of being overwritten by the shifted-in `'one'`. Ruffle gets
+   the same line via WRITABLE-honoring `set_data`; we honor DontDelete
+   because Flash's `ASSetPropFlags(a, "0", 4, 0)` (ReadOnly only) DOES
+   allow shift to overwrite (test array.as:1444), and matching that
+   requires ignoring WRITABLE during shift.
+
+2. **`syncArrayToObject` skips HOLE writeback (line 1537, +1).**
+   The plain-Object dispatch bridge for `Array.prototype.X.call(obj)`
+   reads obj's indices into a temp ASArray via `objectToTempArray`;
+   missing keys land as HOLE. After the operation runs on the temp,
+   the writeback loop now skips entries with `type == HOLE` so we don't
+   create new properties on `obj` for indices that were never there.
+   Fixes the "extra `0,` at the front of `traceProps`" symptom on
+   `pop()` (test array.as:1537). Other plain-Object dispatch lines
+   (1577 splice, 1630/1636 sort) didn't change because their internal
+   densification converts HOLE → UNDEFINED before the writeback runs.
+
+3. **`actionGetMember` ARRAY branch fires `__resolve` on missing key
+   (lines 1653, 1654, 1665, 1669, 1671, +5).** Both the numeric-index
+   and non-index fallthrough paths now call `findResolveMethod` /
+   `invokeResolveFunction` on `arr->props` before returning undefined,
+   mirroring the existing OBJECT path. Fixes `t = []; t.__resolve =
+   function(a){...}; t[3]` returning `'resolved 3'` and the `rs == 1`
+   counter checks that follow it (sort, reverse, join all flow through).
+
+### Remaining failures snapshot (25 lines)
+
+Source line numbers: 260, 263, 324, 325, 950, 951, 1030, 1031, 1033,
+1035, 1244, 1259, 1264, 1273, 1275, 1513, 1524, 1550, 1559, 1577, 1630,
+1636, 1710, plus the trailing #passed / #failed counters. The bulk are
+sort/sortOn algorithm-dependent ordering (Category C in the list below)
+and Flash's plain-Object Array.prototype.X.call semantics (Category E).
+Fully closing the diff to subset of Ruffle's would also require fixing
+line 1710 (toString override on Array subclass via `X.prototype = new
+Array()`) and the for-in-over-sorted-sparse-array missing key (260/263).
+
+---
 
 ## Status: IN PROGRESS — 528/560 lines match (~94.3%), 32 remaining failures (CI `068b46d8`, confirmed deterministic across two back-to-back CI runs at the same SHA)
 

@@ -44397,7 +44397,17 @@ void actionGetMember(SWFAppContext* app_context)
 					if (pv != NULL)
 						pushVar(app_context, pv);
 					else
-						pushUndefined(app_context);
+					{
+						// Try __resolve hook (mirrors OBJECT path)
+						ASFunction* resolve_func = findResolveMethod(app_context, arr->props);
+						if (resolve_func != NULL)
+						{
+							ActionVar result = invokeResolveFunction(app_context, resolve_func, (void*)arr->props, prop_name, prop_name_len);
+							pushVar(app_context, &result);
+						}
+						else
+							pushUndefined(app_context);
+					}
 				}
 				else
 				{
@@ -44416,7 +44426,15 @@ void actionGetMember(SWFAppContext* app_context)
 					}
 					else
 					{
-						pushUndefined(app_context);
+						// Try __resolve hook (mirrors OBJECT path)
+						ASFunction* resolve_func = findResolveMethod(app_context, arr->props);
+						if (resolve_func != NULL)
+						{
+							ActionVar result = invokeResolveFunction(app_context, resolve_func, (void*)arr->props, prop_name, prop_name_len);
+							pushVar(app_context, &result);
+						}
+						else
+							pushUndefined(app_context);
 					}
 				}
 				else
@@ -53235,14 +53253,32 @@ static int callArrayMethod(SWFAppContext* app_context,
 		{
 			ActionVar first = arr->elements[0];
 			u32 old_len = arr->length;
+			// Flash shift skips the move when the TARGET index is
+			// DontDelete-protected (CONFIGURABLE cleared). ReadOnly /
+			// WRITABLE is NOT honored here — see array-v5 cases at
+			// array.as:1411 (DontDelete+ReadOnly: keep) vs 1444 (ReadOnly
+			// only: overwrite).
+			char _idx_buf_skip[16];
 			for (u32 i = 0; i < old_len - 1; i++)
 			{
-				arr->elements[i] = arr->elements[i + 1];
+				int target_dont_delete = 0;
+				if (arr->props != NULL)
+				{
+					int _idx_len = snprintf(_idx_buf_skip, sizeof(_idx_buf_skip), "%u", i);
+					if (_idx_len > 0)
+					{
+						ASProperty* ps = findPropertyRaw(arr->props, _idx_buf_skip, (u32)_idx_len);
+						if (ps != NULL && !(ps->flags & PROPERTY_FLAG_CONFIGURABLE))
+							target_dont_delete = 1;
+					}
+				}
+				if (!target_dont_delete)
+					arr->elements[i] = arr->elements[i + 1];
 			}
 			// Indices overwritten by the shift have their ASSetPropFlags
-			// metadata reset (Flash semantics: "flag was lost"). Without
-			// this, a subsequent userland write would still see WRITABLE
-			// cleared on arr->props and silently fail.
+			// metadata reset (Flash semantics: "flag was lost"). Skip
+			// indices we did NOT actually overwrite (DontDelete-protected),
+			// since those should keep their flags.
 			if (arr->props != NULL)
 			{
 				char _idx_buf[16];
@@ -53251,7 +53287,7 @@ static int callArrayMethod(SWFAppContext* app_context,
 					int _idx_len = snprintf(_idx_buf, sizeof(_idx_buf), "%u", i);
 					if (_idx_len <= 0) continue;
 					ASProperty* ps = findPropertyRaw(arr->props, _idx_buf, (u32)_idx_len);
-					if (ps != NULL)
+					if (ps != NULL && (ps->flags & PROPERTY_FLAG_CONFIGURABLE))
 					{
 						ps->flags = PROPERTY_FLAGS_DEFAULT;
 						ps->flash_flags = 0;
@@ -54378,8 +54414,14 @@ static ASArray* objectToTempArray(SWFAppContext* app_context, ASObject* obj, u32
 // unshift only set_length if `this` is a real Array).
 static void syncArrayToObject(SWFAppContext* app_context, ASArray* arr, ASObject* obj, u32 old_length, int update_length)
 {
-	// Write new elements
+	// Write new elements. Skip HOLE — those represent indices the temp
+	// array doesn't really have (typically because the source plain Object
+	// didn't have that key in the first place). Writing HOLE as
+	// undefined would create a brand-new property on `obj` and pollute
+	// for-in enumeration order (e.g. pop on a fakeArray would create
+	// obj["0"] from the missing slot read by objectToTempArray).
 	for (u32 i = 0; i < arr->length; i++) {
+		if (arr->elements[i].type == ACTION_STACK_VALUE_HOLE) continue;
 		char idx[16]; snprintf(idx, sizeof(idx), "%u", i);
 		setProperty(app_context, obj, idx, (u32)strlen(idx), &arr->elements[i]);
 	}
