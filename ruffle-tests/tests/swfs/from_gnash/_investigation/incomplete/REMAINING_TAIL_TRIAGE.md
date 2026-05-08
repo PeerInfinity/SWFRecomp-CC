@@ -125,6 +125,51 @@
     correct UNLOAD ordering for the gotoAndPlay-driven case). -->
 
 
+<!-- Investigated 2026-05-08 (CI 281f30b3, reverted in 4c61f111):
+  - action_order/action_execution_order_test6 — tried partial fix for
+    the LOAD-bypasses-filter bug. queue_clip_load_events in
+    SWFModernRuntime/src/libswf/tag.c was passing clip=NULL to
+    actionQueueCallbackEx, so aq_drain's avm1_removed/pending_removal
+    skip didn't apply to sprite CLIP_EVENT_LOAD entries — only
+    CONSTRUCT entries (which pass non-NULL clip) were filtered. Patched
+    queue_clip_load_events to look up the sprite's MC via
+    actionFindOrCreateMovieClip and pass it as `clip` during
+    catch_up_mode only (preserving natural-play "fire even if removed
+    mid-frame" semantics).
+
+    Local AVM1 + misc-ming + misc-swfc batteries (48 tests) showed no
+    regressions. Test6 cycle 1 LOAD events were correctly suppressed
+    (check_result '4+5+6+7+8+9+1+2+4+5+x+xx+' →
+    '6+7+9+1+2+4+5+x+xx+'), but the test stayed output_mismatch
+    because cycle 1's three UNLOAD events also need to be suppressed
+    AND cycle 2's LOAD/frame_0 interleave needs to be fixed
+    (we emit '1+2+4+5+x+xx', Ruffle expects '1+2+4+x+5+xx').
+
+    CI surfaced a regression the local battery missed:
+    `reverse_execute_PlaceObject2_test2` flipped from `pass 10/10` to
+    `ruffle_matched 7/10` (effective unchanged at 89/102 misc-ming
+    eff-pass count, but a true PASS was lost). This test places mc,
+    removes it during a backward goto rewind catchup, then re-places
+    with `survives_rewind=false` — both LOAD events are expected
+    (`_root.x1 == 'onLoad+onLoad+'`) but our fix suppressed the first
+    LOAD because the MC was pending_removal at drain time. Ruffle has
+    the same bug (suppresses one LOAD), which is why our diff dropped
+    into ruffle_matched-via-subset.
+
+    Decision: revert. The `catch_up_mode`-only gate isn't specific
+    enough — it correctly catches goto-aggregation cancellation but
+    also incorrectly suppresses LOADs from rewind-survives placements
+    where Flash fires both. Need a finer signal — e.g., differentiate
+    "placement cancelled by paired remove in same goto sweep" from
+    "placement followed by independent remove tag". The catch_up_mode
+    flag alone doesn't capture this distinction.
+
+    Real fix probably requires per-entry tracking of "this placement
+    was cancelled by a same-sweep RemoveObject", or moving the LOAD
+    queue/dispatch to a different point in the catchup pipeline.
+    Reopen if a future session has bandwidth for the broader rework. -->
+
+
 <!-- PLAN_META
 id: REMAINING_TAIL_TRIAGE
 status: pending
