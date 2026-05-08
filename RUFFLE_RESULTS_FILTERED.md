@@ -3,9 +3,9 @@
 *Tests on the [ignored list](ruffle-tests/ignored_tests.txt) are excluded.*  
 *See [RUFFLE_RESULTS.md](RUFFLE_RESULTS.md) for unfiltered results.*
 
-**Commit:** `068b46d80d1b`  
-**Date:** 2026-05-08 18:12 UTC  
-**Total duration:** 13m12s
+**Commit:** `f49490c3519b`  
+**Date:** 2026-05-08 19:22 UTC  
+**Total duration:** 4m57s
 
 ## Results by Suite
 
@@ -74,24 +74,24 @@ Tests verified against Flash's actual output (`output.flash.txt`).
 
 - **Pass:** 604/608 (99.3%)
 - **Ignored:** 40 tests
-- **Duration:** 5m37s across 30 shards
+- **Duration:** 2m42s across 30 shards
 - **Lines:** 95,697/95,875 matching (99.8%)
-- **Avg test duration:** 0.5s — slowest: `xml_reparenting` (20.7s)
+- **Avg test duration:** 0.2s — slowest: `edittext_newline_stripping` (6.5s)
 
 ### from_gnash/actionscript.all
 
 - **Pass:** 126/190 (66.3%)
-- **Duration:** 1m45s across 30 shards
+- **Duration:** 56s across 30 shards
 - **Lines:** 15,385/16,957 matching (90.7%)
-- **Avg test duration:** 0.5s — slowest: `ops-v8` (9.6s)
+- **Avg test duration:** 0.2s — slowest: `targetPath-v8` (1.4s)
 
 ### from_gnash/misc-ming.all
 
 - **Pass:** 65/101 (64.4%)
 - **Ignored:** 1 tests
-- **Duration:** 2m52s across 30 shards
+- **Duration:** 35s across 30 shards
 - **Lines:** 3,726/4,559 matching (81.7%)
-- **Avg test duration:** 1.6s — slowest: `shape_test` (20.1s)
+- **Avg test duration:** 0.3s — slowest: `matrix_test` (3.1s)
 
 ### from_gnash/misc-mtasc.all
 
@@ -106,27 +106,27 @@ Tests verified against Flash's actual output (`output.flash.txt`).
 - **Ignored:** 1 tests
 - **Duration:** 4s across 30 shards
 - **Lines:** 381/492 matching (77.4%)
-- **Avg test duration:** 0.2s — slowest: `edittext_test1` (0.2s)
+- **Avg test duration:** 0.2s — slowest: `movieclip_destruction_test1` (0.2s)
 
 ### from_gnash/misc-swfmill.all
 
 - **Pass:** 17/18 (94.4%)
 - **Duration:** 4s across 30 shards
 - **Lines:** 49/51 matching (96.1%)
-- **Avg test duration:** 0.2s — slowest: `dict_cross` (0.2s)
+- **Avg test duration:** 0.2s — slowest: `trace-as2/shortstack` (0.4s)
 
 ### from_shumway
 
 - **Pass:** 72/76 (94.7%)
 - **Ignored:** 16 tests
-- **Duration:** 2m33s across 30 shards
+- **Duration:** 22s across 30 shards
 - **Lines:** 615/637 matching (96.5%)
-- **Avg test duration:** 1.2s — slowest: `timeline/timeline_as2_4` (19.7s)
+- **Avg test duration:** 0.2s — slowest: `avm1/textfield/textfield-text-setters` (0.6s)
 
 ### from_shumway/avm1
 
 - **Pass:** 45/45 (100%)
 - **Ignored:** 2 tests
-- **Duration:** 13s across 30 shards
+- **Duration:** 11s across 30 shards
 - **Lines:** 480/480 matching (100%)
-- **Avg test duration:** 0.2s — slowest: `xml/xmlload` (1.1s)
+- **Avg test duration:** 0.2s — slowest: `property-paths/property-paths-6` (0.6s)

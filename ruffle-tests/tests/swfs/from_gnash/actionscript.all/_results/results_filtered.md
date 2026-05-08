@@ -1,10 +1,10 @@
 # Ruffle Test Results (Filtered)
 
-**Date**: 2026-05-08 18:12 UTC
+**Date**: 2026-05-08 19:22 UTC
 
-**Git SHA**: `068b46d80d`
+**Git SHA**: `f49490c351`
 
-**Run Duration**: 1m 46s
+**Run Duration**: 0m 56s
 
 **Filtered**: 0 tests ignored out of 190 available
 
@@ -100,8 +100,8 @@
 | 65 | `Point-v6` | 7 | 0.2s |  |
 | 66 | `Point-v7` | 7 | 0.2s |  |
 | 67 | `Point-v8` | 193 | 0.2s |  |
-| 68 | `Random-v5` | 30 | 0.3s |  |
-| 69 | `Random-v6` | 30 | 0.3s |  |
+| 68 | `Random-v5` | 30 | 0.2s |  |
+| 69 | `Random-v6` | 30 | 0.2s |  |
 | 70 | `Random-v7` | 30 | 0.2s |  |
 | 71 | `Random-v8` | 30 | 0.2s |  |
 | 72 | `Rectangle-v5` | 7 | 0.2s |  |
@@ -124,7 +124,7 @@
 | 89 | `TextSnapshot-v7` | 173 | 0.2s |  |
 | 90 | `TextSnapshot-v8` | 173 | 0.2s |  |
 | 91 | `Transform-v5` | 7 | 0.2s |  |
-| 92 | `Transform-v6` | 7 | 0.3s |  |
+| 92 | `Transform-v6` | 7 | 0.2s |  |
 | 93 | `Transform-v7` | 7 | 0.2s |  |
 | 94 | `Try-v5` | 20 | 0.2s |  |
 | 95 | `Try-v6` | 20 | 0.2s |  |
@@ -147,18 +147,18 @@
 | 112 | `delete-v6` | 60 | 0.2s |  |
 | 113 | `delete-v7` | 60 | 0.2s |  |
 | 114 | `delete-v8` | 60 | 0.2s |  |
-| 115 | `enumerate-v5` | 6 | 0.4s |  |
-| 116 | `enumerate-v6` | 49 | 0.4s |  |
-| 117 | `enumerate-v7` | 49 | 0.3s |  |
-| 118 | `enumerate-v8` | 49 | 0.3s |  |
-| 119 | `flash-v5` | 10 | 0.3s |  |
-| 120 | `flash-v6` | 10 | 0.3s |  |
-| 121 | `flash-v7` | 10 | 1.6s |  |
-| 122 | `swap-v5` | 7 | 1.9s |  |
-| 123 | `swap-v6` | 7 | 0.6s |  |
-| 124 | `swap-v7` | 7 | 1.5s |  |
-| 125 | `swap-v8` | 7 | 1.3s |  |
-| 126 | `targetPath-v5` | 12 | 1.9s |  |
+| 115 | `enumerate-v5` | 6 | 0.2s |  |
+| 116 | `enumerate-v6` | 49 | 0.2s |  |
+| 117 | `enumerate-v7` | 49 | 0.2s |  |
+| 118 | `enumerate-v8` | 49 | 0.2s |  |
+| 119 | `flash-v5` | 10 | 0.2s |  |
+| 120 | `flash-v6` | 10 | 0.2s |  |
+| 121 | `flash-v7` | 10 | 0.2s |  |
+| 122 | `swap-v5` | 7 | 0.2s |  |
+| 123 | `swap-v6` | 7 | 0.2s |  |
+| 124 | `swap-v7` | 7 | 0.2s |  |
+| 125 | `swap-v8` | 7 | 0.2s |  |
+| 126 | `targetPath-v5` | 12 | 0.2s |  |
 
 ## Ruffle-Matched Tests
 
@@ -208,27 +208,27 @@
 | 40 | `Selection-v7` | 7 | 13 | 0.2s |  |
 | 41 | `Selection-v8` | 7 | 13 | 0.2s |  |
 | 42 | `Sound-v5` | 27 | 27 | 0.4s |  |
-| 43 | `Sound-v6` | 30 | 51 | 0.3s |  |
+| 43 | `Sound-v6` | 30 | 51 | 0.4s |  |
 | 44 | `Sound-v7` | 28 | 51 | 0.4s |  |
 | 45 | `Sound-v8` | 28 | 51 | 0.3s |  |
-| 46 | `String-v5` | 19 | 21 | 0.2s |  |
-| 47 | `String-v6` | 10 | 10 | 0.2s |  |
-| 48 | `String-v7` | 10 | 10 | 0.2s |  |
+| 46 | `String-v5` | 19 | 21 | 0.3s |  |
+| 47 | `String-v6` | 10 | 10 | 0.3s |  |
+| 48 | `String-v7` | 10 | 10 | 0.3s |  |
 | 49 | `String-v8` | 10 | 10 | 0.3s |  |
 | 50 | `TextField-v5` | 3 | 3 | 0.2s |  |
 | 51 | `TextFormat-v7` | 38 | 40 | 0.2s |  |
-| 52 | `ops-v8` | 7 | 11 | 9.6s |  |
-| 53 | `targetPath-v6` | 17 | 17 | 2.1s |  |
-| 54 | `targetPath-v7` | 17 | 17 | 1.7s |  |
-| 55 | `targetPath-v8` | 17 | 17 | 1.2s |  |
-| 56 | `toString_valueOf-v5` | 34 | 34 | 4.8s |  |
-| 57 | `toString_valueOf-v6` | 5 | 5 | 5.2s |  |
-| 58 | `toString_valueOf-v7` | 5 | 5 | 6.0s |  |
-| 59 | `toString_valueOf-v8` | 5 | 5 | 1.5s |  |
-| 60 | `with-v5` | 42 | 42 | 3.6s |  |
-| 61 | `with-v6` | 91 | 91 | 5.0s |  |
-| 62 | `with-v7` | 91 | 91 | 4.5s |  |
-| 63 | `with-v8` | 91 | 91 | 1.6s |  |
+| 52 | `ops-v8` | 7 | 11 | 0.2s |  |
+| 53 | `targetPath-v6` | 17 | 17 | 0.2s |  |
+| 54 | `targetPath-v7` | 17 | 17 | 0.6s |  |
+| 55 | `targetPath-v8` | 17 | 17 | 1.4s |  |
+| 56 | `toString_valueOf-v5` | 34 | 34 | 0.5s |  |
+| 57 | `toString_valueOf-v6` | 5 | 5 | 0.9s |  |
+| 58 | `toString_valueOf-v7` | 5 | 5 | 0.2s |  |
+| 59 | `toString_valueOf-v8` | 5 | 5 | 0.2s |  |
+| 60 | `with-v5` | 42 | 42 | 0.2s |  |
+| 61 | `with-v6` | 91 | 91 | 0.2s |  |
+| 62 | `with-v7` | 91 | 91 | 0.2s |  |
+| 63 | `with-v8` | 91 | 91 | 0.2s |  |
 
 ## Near-Passing Tests
 
