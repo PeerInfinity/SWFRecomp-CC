@@ -1,8 +1,8 @@
 # Ruffle Test Results (Filtered)
 
-**Date**: 2026-05-08 04:45 UTC
+**Date**: 2026-05-08 05:05 UTC
 
-**Git SHA**: `96a5d81e95`
+**Git SHA**: `f0d575caa3`
 
 **Run Duration**: 0m 12s
 
@@ -31,7 +31,7 @@
 | 4 | `callee` | 2 | 0.2s |  |
 | 5 | `depth` | 6 | 0.3s |  |
 | 6 | `doactionorder/doactionorder` | 7 | 0.2s |  |
-| 7 | `doactionorder/symbolclass` | 4 | 0.2s |  |
+| 7 | `doactionorder/symbolclass` | 4 | 0.1s |  |
 | 8 | `duplicateMovieClip/dontremove` | 6 | 0.2s |  |
 | 9 | `duplicateMovieClip/duplicateMovieClip` | 4 | 0.2s |  |
 | 10 | `duplicateMovieClip/name-coercion` | 3 | 0.2s |  |
@@ -39,7 +39,7 @@
 | 12 | `externalinterface` | 4 | 0.2s |  |
 | 13 | `filters` | 149 | 0.2s |  |
 | 14 | `haxe/flocons1` | 2 | 0.2s |  |
-| 15 | `haxe/flocons2` | 3 | 0.1s |  |
+| 15 | `haxe/flocons2` | 3 | 0.2s |  |
 | 16 | `label` | 4 | 0.2s |  |
 | 17 | `levels` | 9 | 0.2s |  |
 | 18 | `loadevent` | 9 | 0.2s |  |
@@ -55,17 +55,17 @@
 | 28 | `propertycase/propertycase` | 7 | 0.2s |  |
 | 29 | `propertycase/propertycase-preserving-6` | 2 | 0.2s |  |
 | 30 | `propertycase/propertycase-preserving-7` | 5 | 0.1s |  |
-| 31 | `rollover` | 4 | 0.1s |  |
-| 32 | `scope` | 14 | 0.1s |  |
+| 31 | `rollover` | 4 | 0.2s |  |
+| 32 | `scope` | 14 | 0.2s |  |
 | 33 | `setinterval` | 20 | 0.2s |  |
 | 34 | `settimeout` | 17 | 0.2s |  |
-| 35 | `super` | 11 | 0.5s |  |
+| 35 | `super` | 11 | 0.2s |  |
 | 36 | `target` | 18 | 0.2s |  |
 | 37 | `text-bind` | 0 | 0.2s |  |
 | 38 | `textfield/textfield-html` | 4 | 0.2s |  |
 | 39 | `textfield/textfield-text-setters` | 8 | 0.2s |  |
 | 40 | `undefined/undefined-swf6` | 39 | 0.2s |  |
-| 41 | `undefined/undefined-swf7` | 39 | 0.3s |  |
+| 41 | `undefined/undefined-swf7` | 39 | 0.2s |  |
 | 42 | `watch` | 2 | 0.2s |  |
 | 43 | `xml/xmlbuild` | 1 | 0.2s |  |
 | 44 | `xml/xmlload` | 4 | 0.2s |  |

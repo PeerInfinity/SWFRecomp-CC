@@ -1,10 +1,10 @@
 # Ruffle Test Results (Filtered)
 
-**Date**: 2026-05-08 04:45 UTC
+**Date**: 2026-05-08 05:05 UTC
 
-**Git SHA**: `96a5d81e95`
+**Git SHA**: `f0d575caa3`
 
-**Run Duration**: 0m 28s
+**Run Duration**: 0m 26s
 
 **Filtered**: 16 tests ignored out of 92 available
 
@@ -44,9 +44,9 @@
 | 9 | `avm1/duplicateMovieClip/dontremove` | 6 | 0.2s |  |
 | 10 | `avm1/duplicateMovieClip/duplicateMovieClip` | 4 | 0.2s |  |
 | 11 | `avm1/duplicateMovieClip/name-coercion` | 3 | 0.2s |  |
-| 12 | `avm1/duplicateMovieClip/samedepth` | 6 | 0.2s |  |
-| 13 | `avm1/externalinterface` | 4 | 0.2s |  |
-| 14 | `avm1/filters` | 149 | 0.2s | [2](ruffle-tests/tests/swfs/from_shumway/_investigation/complete/SHUMWAY_AVM1_PLAN.md) |
+| 12 | `avm1/duplicateMovieClip/samedepth` | 6 | 0.1s |  |
+| 13 | `avm1/externalinterface` | 4 | 0.8s |  |
+| 14 | `avm1/filters` | 149 | 0.8s | [2](ruffle-tests/tests/swfs/from_shumway/_investigation/complete/SHUMWAY_AVM1_PLAN.md) |
 | 15 | `avm1/haxe/flocons1` | 2 | 0.2s |  |
 | 16 | `avm1/haxe/flocons2` | 3 | 0.2s |  |
 | 17 | `avm1/label` | 4 | 0.2s |  |
@@ -74,7 +74,7 @@
 | 39 | `avm1/textfield/textfield-html` | 4 | 0.2s |  |
 | 40 | `avm1/textfield/textfield-text-setters` | 8 | 0.2s |  |
 | 41 | `avm1/undefined/undefined-swf6` | 39 | 0.2s |  |
-| 42 | `avm1/undefined/undefined-swf7` | 39 | 0.1s |  |
+| 42 | `avm1/undefined/undefined-swf7` | 39 | 0.2s |  |
 | 43 | `avm1/watch` | 2 | 0.2s | [2](ruffle-tests/tests/swfs/from_shumway/_investigation/complete/SHUMWAY_AVM1_PLAN.md) |
 | 44 | `avm1/xml/xmlbuild` | 1 | 0.2s |  |
 | 45 | `avm1/xml/xmlload` | 4 | 0.2s |  |
@@ -83,12 +83,12 @@
 | 48 | `avm1timeline2` | 6 | 0.2s |  |
 | 49 | `button3` | 1 | 0.2s |  |
 | 50 | `doubleAndRegister` | 2 | 0.2s |  |
-| 51 | `fscommand1` | 1 | 0.1s |  |
+| 51 | `fscommand1` | 1 | 0.2s |  |
 | 52 | `fuzz/07580c34e05cda7bd4c976c459f0a667ca3c2602110e34186bca676f311e84da` | 6 | 0.2s |  |
 | 53 | `fuzz/0db0a01a92ae6ad0d2805dcfbac2ddf9a9689e77cd007924adfac57b543b1ed2` | 0 | 0.2s |  |
 | 54 | `fuzz/1276557624e197ee764676c0aa9cb8ee52156dc7269956ee9b3e131a6f7b6dd0` | 3 | 0.2s |  |
 | 55 | `fuzz/2f4f46bf21d6cd33a751b090ad97552e8cdd8f7a606e7f0796deba04abb2e229` | 1 | 0.2s |  |
-| 56 | `fuzz/4935e4aed5e63f07d9e6cc76e97d080f042b029a838630fb2b276b5da0affd26` | 7 | 0.2s | [4](ruffle-tests/tests/swfs/from_shumway/_investigation/complete/SHUMWAY_FUZZ_TIMELINE_PLAN.md) |
+| 56 | `fuzz/4935e4aed5e63f07d9e6cc76e97d080f042b029a838630fb2b276b5da0affd26` | 7 | 0.3s | [4](ruffle-tests/tests/swfs/from_shumway/_investigation/complete/SHUMWAY_FUZZ_TIMELINE_PLAN.md) |
 | 57 | `fuzz/6f3b6cbd618b5b816edbf27e14f631aef42da1a4bcc467fb1aa2951d6c85ee48` | 0 | 0.2s |  |
 | 58 | `fuzz/81004241e3a9278ee3c26c5d7d04a3677e7a28618dd0dd2ad041a98374a280f0` | 3 | 0.2s |  |
 | 59 | `fuzz/9cad44804736a4fbd806d349c97b81d33c3f09ed4d9278acc4ef5cfbab147f3c` | 0 | 0.2s |  |
@@ -113,7 +113,7 @@
 | # | Test | Our diffs | Ruffle diffs | Duration | Notes |
 |---|------|-----------|--------------|----------|-------|
 | 1 | `avm1/hitarea` | 2 | 2 | 0.2s | [2](ruffle-tests/tests/swfs/from_shumway/_investigation/complete/SHUMWAY_AVM1_PLAN.md) |
-| 2 | `fuzz/4949de464f5408bc3eaaa543d2e2346e01961965a6aa057dba9a6903fcf1c822` | 4 | 27 | 0.2s | [4](ruffle-tests/tests/swfs/from_shumway/_investigation/complete/SHUMWAY_FUZZ_TIMELINE_PLAN.md) |
+| 2 | `fuzz/4949de464f5408bc3eaaa543d2e2346e01961965a6aa057dba9a6903fcf1c822` | 4 | 27 | 0.3s | [4](ruffle-tests/tests/swfs/from_shumway/_investigation/complete/SHUMWAY_FUZZ_TIMELINE_PLAN.md) |
 | 3 | `fuzz/887c02ab98dbdd3ae22b2363b212dba005565738a572a2156e703dd3bf9b40af` | 20 | 38 | 0.3s | [4](ruffle-tests/tests/swfs/from_shumway/_investigation/complete/SHUMWAY_FUZZ_TIMELINE_PLAN.md) |
 
 ## Near-Passing Tests
