@@ -1,9 +1,9 @@
 {
   "metadata": {
-    "old_timestamp": "2026-05-08T20:08:00.860231+00:00",
-    "old_git_sha": "84a147bd4fec5dcb0ab211ede92ebcdc5ffd35f9",
-    "new_timestamp": "2026-05-08T20:48:43.597760+00:00",
-    "new_git_sha": "e0d150896c005cde82b11ad0eb6c24aa4c3648f4",
+    "old_timestamp": "2026-05-08T20:48:43.597760+00:00",
+    "old_git_sha": "e0d150896c005cde82b11ad0eb6c24aa4c3648f4",
+    "new_timestamp": "2026-05-08T21:50:24.955630+00:00",
+    "new_git_sha": "281f30b36bc1925472cb024973e6006d132a66dd",
     "partial": false,
     "same_commit": false
   },
@@ -13,21 +13,70 @@
     "old_effective_pass": 89,
     "old_total": 102,
     "old_pass_rate": 63.7,
-    "new_pass": 65,
-    "new_ruffle_matched": 24,
+    "new_pass": 64,
+    "new_ruffle_matched": 25,
     "new_effective_pass": 89,
     "new_total": 102,
-    "new_pass_rate": 63.7,
+    "new_pass_rate": 62.7,
     "old_mismatched_lines": 840,
-    "new_mismatched_lines": 840,
-    "increased_mismatches": 0,
+    "new_mismatched_lines": 843,
+    "increased_mismatches": 3,
     "decreased_mismatches": 0,
     "newly_passing": 0,
     "newly_failing": 0,
-    "status_changed": 0,
-    "unchanged": 102,
+    "status_changed": 1,
+    "unchanged": 99,
     "added": 0,
     "removed": 0
   },
-  "changes": []
+  "changes": [
+    {
+      "test": "action_order/action_execution_order_test5",
+      "change_type": "changed",
+      "old_status": "output_mismatch",
+      "new_status": "output_mismatch",
+      "old_lines": {
+        "actual_lines": 53,
+        "expected_lines": 35,
+        "matching_lines": 26
+      },
+      "new_lines": {
+        "actual_lines": 51,
+        "expected_lines": 35,
+        "matching_lines": 26
+      }
+    },
+    {
+      "test": "action_order/action_execution_order_test6",
+      "change_type": "changed",
+      "old_status": "output_mismatch",
+      "new_status": "output_mismatch",
+      "old_lines": {
+        "actual_lines": 20,
+        "expected_lines": 24,
+        "matching_lines": 0
+      },
+      "new_lines": {
+        "actual_lines": 16,
+        "expected_lines": 24,
+        "matching_lines": 0
+      }
+    },
+    {
+      "test": "reverse_execute_PlaceObject2_test2",
+      "change_type": "changed",
+      "old_status": "pass",
+      "new_status": "ruffle_matched",
+      "old_lines": {
+        "actual_lines": 10,
+        "expected_lines": 10,
+        "matching_lines": 10
+      },
+      "new_lines": {
+        "actual_lines": 10,
+        "expected_lines": 10,
+        "matching_lines": 7
+      }
+    }
+  ]
 }
