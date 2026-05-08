@@ -4360,6 +4360,7 @@ static ActionVar actionASSetPropFlags_func2(SWFAppContext* app_context, ActionVa
 	result.type = ACTION_STACK_VALUE_UNDEFINED;
 	if (num_args < 3) return result;
 	ASObject* obj = NULL;
+	ASArray* arr_target = NULL;  // non-NULL if args[0] is an array — enables auto-create of index metadata entries
 	if (args[0].type == ACTION_STACK_VALUE_OBJECT)
 		obj = (ASObject*)(u64)args[0].data.numeric_value;
 	else if (args[0].type == ACTION_STACK_VALUE_FUNCTION) {
@@ -4374,6 +4375,22 @@ static ActionVar actionASSetPropFlags_func2(SWFAppContext* app_context, ActionVa
 			if (mc->dynamic_props == NULL)
 				mc->dynamic_props = (void*) allocObject(app_context, 8);
 			obj = (ASObject*) mc->dynamic_props;
+		}
+	}
+	else if (args[0].type == ACTION_STACK_VALUE_ARRAY) {
+		// For arrays, ASSetPropFlags operates on arr->props (sparse-key sidecar).
+		// Indexed elements live in arr->elements, not arr->props, so the apply
+		// loop must auto-create metadata entries for index names — otherwise
+		// `ASSetPropFlags(c, "2", 7, 0)` is a no-op and `delete c[2]` succeeds
+		// regardless of the requested DontDelete flag.
+		ASArray* arr = (ASArray*)(u64)args[0].data.numeric_value;
+		if (arr != NULL) {
+			if (arr->props == NULL) {
+				arr->props = allocObject(app_context, 8);
+				retainObject(arr->props);
+			}
+			obj = arr->props;
+			arr_target = arr;
 		}
 	}
 	if (obj == NULL) return result;
@@ -4436,11 +4453,27 @@ static ActionVar actionASSetPropFlags_func2(SWFAppContext* app_context, ActionVa
 					if (n > 0) { name_str = _spf_elem_buf; name_len = (u32)n; }
 				}
 				if (name_str != NULL && name_len > 0) {
+					int found = 0;
 					for (u32 i = 0; i < obj->num_used; i++) {
 						if (obj->properties[i].name_length == name_len && strncmp(obj->properties[i].name, name_str, name_len) == 0) {
 							obj->properties[i].flags = (obj->properties[i].flags | ecma_set) & ~ecma_clear;
 							obj->properties[i].flash_flags = (u16)((obj->properties[i].flash_flags & ~clear_flags) | set_flags);
+							found = 1;
 							break;
+						}
+					}
+					if (!found && arr_target != NULL) {
+						// Auto-create metadata entry for array index. Value is a placeholder
+						// (UNDEFINED) — the actual element lives in arr->elements and takes
+						// precedence on read; arr->props["<idx>"] only carries flag metadata
+						// for actionDelete / length-truncation to consult.
+						ActionVar undef = {0};
+						undef.type = ACTION_STACK_VALUE_UNDEFINED;
+						setProperty(app_context, obj, name_str, name_len, &undef);
+						if (obj->num_used > 0) {
+							ASProperty* p = &obj->properties[obj->num_used - 1];
+							p->flags = (p->flags | ecma_set) & ~ecma_clear;
+							p->flash_flags = (u16)((p->flash_flags & ~clear_flags) | set_flags);
 						}
 					}
 				}
@@ -4470,11 +4503,25 @@ static ActionVar actionASSetPropFlags_func2(SWFAppContext* app_context, ActionVa
 				u32 tlen = (u32)(end - token);
 				while (tlen > 0 && (token[tlen-1] == ' ' || token[tlen-1] == '\t')) tlen--;
 				if (tlen > 0) {
+					int found = 0;
 					for (u32 i = 0; i < obj->num_used; i++) {
 						if (obj->properties[i].name_length == tlen && strncmp(obj->properties[i].name, token, tlen) == 0) {
 							obj->properties[i].flags = (obj->properties[i].flags | ecma_set) & ~ecma_clear;
 							obj->properties[i].flash_flags = (u16)((obj->properties[i].flash_flags & ~clear_flags) | set_flags);
+							found = 1;
 							break;
+						}
+					}
+					if (!found && arr_target != NULL) {
+						// Auto-create metadata entry for array index (see ARRAY-target
+						// branch in args[1] == ARRAY case above for rationale).
+						ActionVar undef = {0};
+						undef.type = ACTION_STACK_VALUE_UNDEFINED;
+						setProperty(app_context, obj, token, tlen, &undef);
+						if (obj->num_used > 0) {
+							ASProperty* p = &obj->properties[obj->num_used - 1];
+							p->flags = (p->flags | ecma_set) & ~ecma_clear;
+							p->flash_flags = (u16)((p->flash_flags & ~clear_flags) | set_flags);
 						}
 					}
 				}
@@ -41095,7 +41142,12 @@ void actionSetMember(SWFAppContext* app_context)
 				u32 new_len = (u32) ecmaToInt32(dval);
 
 				// Truncation: mark elements beyond new_len as HOLE
-				// Use signed comparison: negative new_len means clear ALL elements
+				// Use signed comparison: negative new_len means clear ALL elements.
+				// Indices marked DontDelete via ASSetPropFlags survive truncation:
+				// the value moves into arr->props so it remains readable through
+				// the props fallback once the index is past the new length.
+				// (Flash semantics — see array-v5 line 795 expectation that
+				// `c[2] == 30` after `c.length = 2` when `ASSetPropFlags(c, "2", 7, 0)`).
 				{
 					int32_t new_len_signed = (int32_t) new_len;
 					int32_t old_len_signed = (int32_t) arr->length;
@@ -41106,6 +41158,37 @@ void actionSetMember(SWFAppContext* app_context)
 						if (clear_to > arr->capacity) clear_to = arr->capacity;
 						for (u32 i = clear_from; i < clear_to; i++)
 						{
+							if (arr->props != NULL)
+							{
+								char _tr_idx[16];
+								int _tr_len = snprintf(_tr_idx, sizeof(_tr_idx), "%u", i);
+								if (_tr_len > 0)
+								{
+									ASProperty* ps = findPropertyRaw(arr->props, _tr_idx, (u32)_tr_len);
+									if (ps != NULL && !(ps->flags & PROPERTY_FLAG_CONFIGURABLE))
+									{
+										// Preserve the element value in arr->props so it
+										// remains accessible after the index is past length.
+										// Only copy when the existing props value is a
+										// placeholder (UNDEFINED) — don't clobber a real
+										// stored value.
+										if (ps->value.type == ACTION_STACK_VALUE_UNDEFINED &&
+										    arr->elements[i].type != ACTION_STACK_VALUE_HOLE)
+										{
+											ps->value = arr->elements[i];
+											if (ps->value.type == ACTION_STACK_VALUE_OBJECT)
+												retainObject((ASObject*)ps->value.data.numeric_value);
+											// String element data is heap-allocated; retain
+											// ownership by clearing owns_memory in the source
+											// so we don't double-free on later cleanup.
+											if (ps->value.type == ACTION_STACK_VALUE_STRING &&
+											    arr->elements[i].data.string_data.owns_memory)
+												arr->elements[i].data.string_data.owns_memory = 0;
+										}
+										continue;
+									}
+								}
+							}
 							arr->elements[i].type = ACTION_STACK_VALUE_HOLE;
 							arr->elements[i].data.numeric_value = 0;
 							arr->elements[i].str_size = 0;
