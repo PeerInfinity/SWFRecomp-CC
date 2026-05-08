@@ -23,7 +23,7 @@ phases:
     status: completed
   - id: 6
     name: "opcode_guard_test2: testvar off-by-one + getDepth on -32969 clone"
-    status: pending
+    status: completed
 dependencies: []
 blockers:
   - reason: "None — the legacy 'DoInitAction-for-unplaced-library-exports' blocker hypothesis (per complete/DEJAGNU_FRAMEWORK_PLAN.md) is wrong. None of the affected tests have DoInitAction tags; they fail for distinct, unrelated reasons. Each phase is independent."
@@ -399,36 +399,84 @@ Triage that separately — it may be unrelated to the `_width` issue
 or it may be the cause (a property name allocation failure could
 corrupt state).
 
-## Phase 6 — opcode_guard_test2: testvar off-by-one + getDepth on -32969
+## Phase 6 — opcode_guard_test2 → ruffle_matched (RESOLVED 2026-05-07)
 
-**Symptoms.** Local diff shows:
+**Status.** Now `ruffle_matched` 24/24 (effective pass). Three fixes in
+`SWFModernRuntime/src/actionmodern/action.c`:
 
-```
-expected: testvar == 100  → got testvar == 101 (off by one)
-expected: testvar == 200  → got testvar == 201 (off by one)
-expected: ref200.getDepth() == -32969 → got 200 (no negative form)
-```
+1. **`actionSetTarget` var_map MOVIECLIP fallback.** AS-created clips
+   (`duplicateMovieClip` / `CloneSprite` / `createEmptyMovieClip`)
+   register their clones in `var_map` (via `setVariableByName`) but
+   not in the parent's `display_list` or `dynamic_props`. The
+   `resolveSlashPathToMC` walks therefore failed to resolve them and
+   `actionSetTarget` fell through to the "Target not found" emission
+   even though `_root.<name>` GetMember resolved them via its existing
+   var_map check (action.c:44801-44819). Mirroring that lookup as the
+   final fallback before the warning emission lets `setTarget('dup1')`
+   / `setTarget('dup3')` succeed and matches Ruffle's "look up via the
+   active scope's stage object" semantics for AS-created MCs.
 
-The `-32969` value is `-(200) + (-32769) = -32969` — a clone-depth-zone
-formula that may be specific to this test's swapDepths / removeMovieClip
-sequence. The `200 / -32969` mismatch is consistent with our existing
-"CloneSprite depth-bias trade-off" (see `CLONESPRITE_DEPTH_BIAS_PLAN.md`)
-— though the 200 expected → 201 obtained off-by-one for `testvar` is
-distinct.
+2. **`actionRemoveSprite` / `mc.removeMovieClip()` deferred path for
+   AS-level `onUnload`.** Previously both call sites set
+   `mc->depth = INT_MIN` and cleared `var_map` / `parent.dynamic_props`
+   immediately, regardless of whether the MC had an AS-level onUnload
+   handler. Mirroring the tag-level `RemoveObject2` pattern
+   (`actionMarkMCPendingRemoval`), a clip with onUnload now parks at
+   the shifted depth `-(swf_depth) - 1 - 16384` with `pending_removal=1`,
+   keeps `dynamic_props` intact, and leaves `var_map` /
+   `parent.dynamic_props` bindings alone for same-frame reads. The
+   "no-onUnload" path is unchanged. Also extends the "removed-MC was
+   the active SetTarget context" reset to fire when `g_base_clip` is
+   NULL but `g_settarget_context_changed` is set, so subsequent variable
+   reads in the now-dead clip's setTarget block fall back to root via
+   `g_settarget_invalid` / `g_settarget_none` (same Ruffle
+   `target_clip_or_root()` semantics that gate `_target` lookups).
 
-**Investigation steps:**
+3. **`actionFinalizePendingRemovals` cleanup of var_map /
+   parent.dynamic_props.** When a deferred-removal MC finalizes at
+   start of next frame, its `var_map` and `parent.dynamic_props`
+   entries are now cleared (only when they still reference THIS MC,
+   to avoid clobbering same-name re-placements). Without this step
+   the AVM1 `unload` test sees `_root.clip4` still resolving to a
+   MOVIECLIP value with `depth=INT_MIN` (printed as the empty target
+   path), instead of the expected `undefined`.
 
-1. Decompile or inspect the test source to see what `testvar` is
-   incremented by. If it's `++` inside an event handler, our handler
-   may fire one extra time (CONSTRUCT vs LOAD overlap, or initialize
-   before the AS-set value is set).
-2. Cross-reference the `getDepth() == -32969` expectation with the
-   CloneSprite depth-bias plan. It may be the *same* fix — or it may
-   be a different removed-clone-depth-zone arithmetic site.
+**Test deltas (effective).**
 
-**Risk.** Medium. The off-by-one might trace back to clip-event firing
-order (related to Phase 2 or DEFERRED_CLIP_UNLOAD_PLAN). The getDepth
-issue likely overlaps CloneSprite plan.
+- `from_gnash/misc-swfc.all/opcode_guard_test2`: output_mismatch
+  (2/24) → `ruffle_matched` (24/24, diffs `{4,7}` ⊆ Ruffle's
+  `{12,13,18}`).
+
+**No regressions.** Verified locally on:
+
+- 44 AVM1 lifecycle/clone/unload/movieclip-state tests (`unload`,
+  `unload_clip_event`, `unload_nested_child`, `unloadmovie`,
+  `unloadmovie_method`, `mcl_unloadclip`, `clip_events`,
+  `clip_constructors`, `goto_rewind1/2/3`, `execution_order2`,
+  `on_construct`, `register_and_init_order`, `set_interval`,
+  `attach_movie`, `attach_movie_stop`, `bad_placeobject_clipaction`,
+  `tell_target`, `tell_target_invalid`, `tell_target_invalid_swf6`,
+  `path_string`, `swf5_no_closure`, `duplicate_movie_clip`,
+  `duplicate_movie_clip_drawing`, `clone_sprite_edittext`,
+  `clone_sprite_types`, `create_empty_movie_clip`,
+  `conflicting_instance_names`, `default_names`, `init_object_order`,
+  `movieclip_depth_methods`, `movieclip_get_instance_at_depth`,
+  `movieclip_init_object`, `textsnapshot_available_text`,
+  `swf5_to_6_cross_call`, `swf6_to_5_cross_call`,
+  `goto_execution_order`, `goto_execution_order2`, `goto_methods`,
+  `empty_movieclip_can_attach_movies`, `movieclip_state_values`,
+  `movieclip_in_removed_button`, `movieclip_library_state_values` —
+  44/44 effective pass).
+- 32 misc-ming.all goto/loop/lifecycle tests — 26 PASS + 5 RM + 1
+  pre-existing MISMATCH (`opcode_guard_test`, ignored — unrelated).
+- 34 AVM1 watch/goto/load/closure/super tests — 33 PASS + 1
+  pre-existing MISMATCH (`loadvariables_method`, infrastructure
+  blocker — unrelated).
+- 10 misc-swfc.all tests — 6 PASS + 3 RM + 1 unchanged MISMATCH
+  (`movieclip_destruction_test4`, 8/40 same as baseline).
+- 4 Shumway duplicateMovieClip tests + `doactionorder` — all 5 PASS
+  (`doactionorder/symbolclass` is a pre-existing local MISMATCH on
+  master with no change either way; unrelated to this fix).
 
 ## Phases that no longer need work
 

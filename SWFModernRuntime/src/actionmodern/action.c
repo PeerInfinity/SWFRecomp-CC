@@ -19696,10 +19696,46 @@ void actionFinalizePendingRemovals(SWFAppContext* app_context)
 	(void)app_context;
 	for (int i = 0; i < child_mc_count; i++) {
 		if (child_mc_cache[i] != NULL && child_mc_cache[i]->pending_removal) {
-			child_mc_cache[i]->dynamic_props = NULL;
-			child_mc_cache[i]->ng_textfield_idx = -1;
-			child_mc_cache[i]->pending_removal = 0;
-			child_mc_cache[i]->depth = INT_MIN;  // Mark as dead so name lookups skip it
+			MovieClip* _fpr_mc = child_mc_cache[i];
+			// AS-level removeMovieClip (actionRemoveSprite / mc.removeMovieClip)
+			// for onUnload-bearing clips parks them at a shifted depth + keeps
+			// var_map / parent.dynamic_props bindings intact so same-frame reads
+			// still resolve. At finalize (next frame) we clear those bindings so
+			// the AVM1 `unload` test sees `_root.clip4 == undefined` once the
+			// MC is fully gone. Skip the cleanup unless the bindings still point
+			// at THIS MC (a re-place of the same name in a later frame must not
+			// be clobbered).
+			if (_fpr_mc->name[0] != '\0') {
+				MovieClip* _fpr_parent = _fpr_mc->parent ? _fpr_mc->parent : &root_movieclip;
+				if (_fpr_parent->dynamic_props != NULL) {
+					ActionVar* _fpr_pv = getProperty((ASObject*)_fpr_parent->dynamic_props,
+					                                 _fpr_mc->name, strlen(_fpr_mc->name));
+					if (_fpr_pv != NULL
+					    && _fpr_pv->type == ACTION_STACK_VALUE_MOVIECLIP
+					    && (MovieClip*)(uintptr_t)_fpr_pv->data.numeric_value == _fpr_mc) {
+						deleteProperty(app_context, (ASObject*)_fpr_parent->dynamic_props,
+						               _fpr_mc->name, strlen(_fpr_mc->name));
+					}
+				}
+				if (_fpr_parent == &root_movieclip) {
+					extern bool hasVariable(char* var_name, size_t key_size);
+					extern ActionVar* getVariable(char* var_name, size_t key_size);
+					size_t _fpr_nl = strlen(_fpr_mc->name);
+					if (hasVariable(_fpr_mc->name, _fpr_nl)) {
+						ActionVar* _fpr_vv = getVariable(_fpr_mc->name, _fpr_nl);
+						if (_fpr_vv != NULL
+						    && _fpr_vv->type == ACTION_STACK_VALUE_MOVIECLIP
+						    && (MovieClip*)(uintptr_t)_fpr_vv->data.numeric_value == _fpr_mc) {
+							ActionVar _fpr_sentinel = {0};
+							setVariableByName(_fpr_mc->name, &_fpr_sentinel);
+						}
+					}
+				}
+			}
+			_fpr_mc->dynamic_props = NULL;
+			_fpr_mc->ng_textfield_idx = -1;
+			_fpr_mc->pending_removal = 0;
+			_fpr_mc->depth = INT_MIN;  // Mark as dead so name lookups skip it
 		}
 	}
 	// Cascade: any live MC whose parent is now dead (depth == INT_MIN) must also
@@ -48289,74 +48325,124 @@ void actionRemoveSprite(SWFAppContext* app_context)
 				if (_rs_clear_focus)
 					selection_do_focus_change(app_context, g_focused_mc, NULL);
 			}
-			// Queue AS-set onUnload handler for deferred firing at ShowFrame
+			// Detect AS-level onUnload handler — its presence flips us into the
+			// "deferred removal" mode used by tag-level RemoveObject2: the MC
+			// stays alive at a shifted (-(swf_depth)-1-16384) depth, dynamic_props
+			// stay intact, and var_map / parent.dynamic_props bindings are NOT
+			// cleared. Mirrors Flash semantics where same-frame post-removal
+			// reads of `_root.dup3` still see the MC as 'movieclip', and a
+			// `setTarget('dup3')` block can still read `dup3.testVar`.
+			int _rs_has_unload = 0;
+			ASFunction* _rs_unload_func = NULL;
 			if (_rs_mc->dynamic_props != NULL) {
 				ActionVar* _rs_handler = getProperty((ASObject*)_rs_mc->dynamic_props, "onUnload", 8);
 				if (_rs_handler != NULL && _rs_handler->type == ACTION_STACK_VALUE_FUNCTION) {
-					ASFunction* _rs_func = (ASFunction*) _rs_handler->data.numeric_value;
-					if (_rs_func != NULL)
-						queueOnUnload(_rs_func, _rs_mc);
+					_rs_unload_func = (ASFunction*) _rs_handler->data.numeric_value;
+					if (_rs_unload_func != NULL) _rs_has_unload = 1;
 				}
 			}
+			// Queue AS-set onUnload handler for deferred firing at ShowFrame
+			if (_rs_unload_func != NULL)
+				queueOnUnload(_rs_unload_func, _rs_mc);
 			// Recursively queue onUnload handlers for children
 			queueChildOnUnloads(_rs_mc);
-			// Clear from parent's dynamic_props
-			MovieClip* _rs_parent = _rs_mc->parent ? _rs_mc->parent : &root_movieclip;
-			if (_rs_parent->dynamic_props != NULL && _rs_mc->name[0]) {
-				deleteProperty(app_context, (ASObject*)_rs_parent->dynamic_props,
-				               _rs_mc->name, strlen(_rs_mc->name));
-			}
-			// Also clear from root-level variable table (set by createEmptyMovieClip)
-			// Use uninitialized sentinel (type=0/str_size=0/heap_ptr=NULL) so
-			// VAR_NOT_FOUND falls through to display list lookup for new MCs.
-			if (_rs_mc->name[0]) {
-				ActionVar _rs_sentinel = {0};
-				setVariableByName(_rs_mc->name, &_rs_sentinel);
-			}
-			// Mark as removed — keep dynamic_props intact until pending unload fires
-			_rs_mc->avm1_removed = 1;
-			_rs_mc->depth = INT_MIN;
-			// Also mark all descendant MCs as removed (children, grandchildren, etc.)
-			for (int _rs_j = 0; _rs_j < child_mc_count; _rs_j++) {
-				if (child_mc_cache[_rs_j] == _rs_mc) {
-					child_mc_cache[_rs_j] = NULL;
-				} else if (child_mc_cache[_rs_j] != NULL) {
-					// Check if this MC is a descendant of the removed MC
-					MovieClip* _rs_anc = child_mc_cache[_rs_j]->parent;
-					while (_rs_anc != NULL) {
-						if (_rs_anc == _rs_mc) {
-							child_mc_cache[_rs_j]->avm1_removed = 1;
-							child_mc_cache[_rs_j]->depth = INT_MIN;
-							child_mc_cache[_rs_j] = NULL;
-							break;
-						}
-						_rs_anc = _rs_anc->parent;
+
+			if (_rs_has_unload) {
+				// Deferred removal: shift depth into the removed-depth zone and
+				// keep dynamic_props / var_map bindings intact. The MC will be
+				// finalized at the start of the next frame by
+				// actionFinalizePendingRemovals (which observes pending_removal).
+				int _rs_swf_depth = _rs_mc->depth + 16384;
+				_rs_mc->avm1_removed = 1;
+				_rs_mc->pending_removal = 1;
+				_rs_mc->depth = -(int)_rs_swf_depth - 1 - 16384;
+				_rs_mc->display_obj = NULL;
+				// Clear display list entry so the timeline no longer re-references it.
+				// The MC object itself (and its dynamic_props) stays alive in the cache.
+				{
+					extern size_t ng_findDisplayEntryByName(const char* name);
+					size_t _rs_dl = ng_findDisplayEntryByName(_rs_mc->name);
+					if (_rs_dl != SIZE_MAX) {
+						extern DisplayObject* display_list;
+						extern void ng_queue_slot_unload_events(SWFAppContext*, size_t, MovieClip*);
+						ng_queue_slot_unload_events(app_context, _rs_dl, _rs_mc);
+						memset(&display_list[_rs_dl], 0, sizeof(DisplayObject));
 					}
 				}
-			}
-			// Clear display list entry so GetVariable doesn't re-find it
-			{
-				extern size_t ng_findDisplayEntryByName(const char* name);
-				size_t _rs_dl = ng_findDisplayEntryByName(_rs_mc->name);
-				if (_rs_dl != SIZE_MAX) {
-					extern DisplayObject* display_list;
-					// CLONE_CLIP_EVENT_DISPATCH Phase 5: queue clip-action
-					// UNLOAD for the slot before clearing it (so dispatch
-					// doesn't keep firing and the UNLOAD handler still runs).
-					extern void ng_queue_slot_unload_events(SWFAppContext*, size_t, MovieClip*);
-					ng_queue_slot_unload_events(app_context, _rs_dl, _rs_mc);
-					memset(&display_list[_rs_dl], 0, sizeof(DisplayObject));
+				// NOTE: do NOT reset g_current_context here when the removed MC is
+				// the active SetTarget context. Flash keeps the target valid for
+				// same-frame reads of the MC's properties (testVar lookup) — the
+				// MC's depth is shifted but dynamic_props are still reachable.
+			} else {
+				// Immediate removal: clear bindings and mark depth INT_MIN.
+				// Clear from parent's dynamic_props
+				MovieClip* _rs_parent = _rs_mc->parent ? _rs_mc->parent : &root_movieclip;
+				if (_rs_parent->dynamic_props != NULL && _rs_mc->name[0]) {
+					deleteProperty(app_context, (ASObject*)_rs_parent->dynamic_props,
+					               _rs_mc->name, strlen(_rs_mc->name));
 				}
-			}
-			// Reset context when removing the current context MC, but ONLY inside
-			// a sprite frame script (g_base_clip != NULL). When g_base_clip is NULL
-			// (e.g., onEnterFrame handler), keep the removed MC as context so
-			// GetVariable("this") returns the removed MC (empty string in Flash).
-			if (g_current_context == _rs_mc && g_base_clip != NULL) {
-				MovieClip* _fallback = (g_base_clip != _rs_mc) ? g_base_clip : &root_movieclip;
-				if (_fallback->avm1_removed || _fallback->depth == INT_MIN)
-					_fallback = &root_movieclip;
-				g_current_context = _fallback;
+				// Also clear from root-level variable table (set by createEmptyMovieClip)
+				// Use uninitialized sentinel (type=0/str_size=0/heap_ptr=NULL) so
+				// VAR_NOT_FOUND falls through to display list lookup for new MCs.
+				if (_rs_mc->name[0]) {
+					ActionVar _rs_sentinel = {0};
+					setVariableByName(_rs_mc->name, &_rs_sentinel);
+				}
+				// Mark as removed — keep dynamic_props intact until pending unload fires
+				_rs_mc->avm1_removed = 1;
+				_rs_mc->depth = INT_MIN;
+				// Also mark all descendant MCs as removed (children, grandchildren, etc.)
+				for (int _rs_j = 0; _rs_j < child_mc_count; _rs_j++) {
+					if (child_mc_cache[_rs_j] == _rs_mc) {
+						child_mc_cache[_rs_j] = NULL;
+					} else if (child_mc_cache[_rs_j] != NULL) {
+						// Check if this MC is a descendant of the removed MC
+						MovieClip* _rs_anc = child_mc_cache[_rs_j]->parent;
+						while (_rs_anc != NULL) {
+							if (_rs_anc == _rs_mc) {
+								child_mc_cache[_rs_j]->avm1_removed = 1;
+								child_mc_cache[_rs_j]->depth = INT_MIN;
+								child_mc_cache[_rs_j] = NULL;
+								break;
+							}
+							_rs_anc = _rs_anc->parent;
+						}
+					}
+				}
+				// Clear display list entry so GetVariable doesn't re-find it
+				{
+					extern size_t ng_findDisplayEntryByName(const char* name);
+					size_t _rs_dl = ng_findDisplayEntryByName(_rs_mc->name);
+					if (_rs_dl != SIZE_MAX) {
+						extern DisplayObject* display_list;
+						// CLONE_CLIP_EVENT_DISPATCH Phase 5: queue clip-action
+						// UNLOAD for the slot before clearing it (so dispatch
+						// doesn't keep firing and the UNLOAD handler still runs).
+						extern void ng_queue_slot_unload_events(SWFAppContext*, size_t, MovieClip*);
+						ng_queue_slot_unload_events(app_context, _rs_dl, _rs_mc);
+						memset(&display_list[_rs_dl], 0, sizeof(DisplayObject));
+					}
+				}
+				// Reset context when removing the current context MC, but ONLY inside
+				// a sprite frame script (g_base_clip != NULL). When g_base_clip is NULL
+				// (e.g., onEnterFrame handler), keep the removed MC as context so
+				// GetVariable("this") returns the removed MC (empty string in Flash).
+				// Also reset when SetTarget redirected context: same-frame reads of
+				// the dead clip's variables fall back to root via
+				// `g_settarget_invalid`/`g_settarget_none` (mirrors Ruffle's
+				// `target_clip_or_root()`).
+				if (g_current_context == _rs_mc) {
+					if (g_base_clip != NULL) {
+						MovieClip* _fallback = (g_base_clip != _rs_mc) ? g_base_clip : &root_movieclip;
+						if (_fallback->avm1_removed || _fallback->depth == INT_MIN)
+							_fallback = &root_movieclip;
+						g_current_context = _fallback;
+					} else if (g_settarget_context_changed) {
+						g_current_context = &root_movieclip;
+						g_settarget_invalid = 1;
+						g_settarget_none = 1;
+					}
+				}
 			}
 		}
 	}
@@ -48509,6 +48595,35 @@ void actionSetTarget(SWFAppContext* app_context, const char* target_name)
 #endif
 			return;
 		}
+
+#ifdef NO_GRAPHICS
+		// Final fallback: var_map lookup for MOVIECLIP entries.
+		// duplicateMovieClip / CloneSprite / createEmptyMovieClip register
+		// their clones in var_map (via setVariableByName) but not in the
+		// parent's display_list, so the prior resolveSlashPathToMC walks
+		// don't find them. _root.<name> GetMember consults var_map for
+		// non-underscore names — mirror that here so SetTarget('<name>')
+		// matches Ruffle's "look up via the active scope's stage object"
+		// semantics for AS-created MCs.
+		{
+			extern bool hasVariable(char* var_name, size_t key_size);
+			extern ActionVar* getVariable(char* var_name, size_t key_size);
+			size_t _st_nl = strlen(target_name);
+			if (hasVariable((char*)target_name, _st_nl)) {
+				ActionVar* _st_var = getVariable((char*)target_name, _st_nl);
+				if (_st_var != NULL && _st_var->type == ACTION_STACK_VALUE_MOVIECLIP) {
+					MovieClip* _st_vmc = (MovieClip*)(uintptr_t)_st_var->data.numeric_value;
+					if (_st_vmc != NULL && _st_vmc->depth != INT_MIN) {
+						setCurrentContext(_st_vmc);
+						g_settarget_explicit_root = (_st_vmc == &root_movieclip) ? 1 : 0;
+						g_settarget_invalid = 0;
+						g_settarget_none = 0;
+						return;
+					}
+				}
+			}
+		}
+#endif
 	}
 
 	// Target not found — set context to root and emit trace message.
@@ -61227,15 +61342,22 @@ void actionCallMethod(SWFAppContext* app_context, char* str_buffer)
 					if (_rmc_clear_focus)
 						selection_do_focus_change(app_context, g_focused_mc, NULL);
 				}
-				// Queue onUnload handler for deferred firing at ShowFrame (matches Flash behavior)
+				// Detect AS-level onUnload handler — see actionRemoveSprite for
+				// the same logic. Presence of onUnload triggers deferred removal:
+				// MC stays alive at shifted depth until next frame, dynamic_props
+				// and var_map bindings preserved for same-frame reads.
+				int _rmc_has_unload = 0;
+				ASFunction* _rmc_unload_func = NULL;
 				if (mc->dynamic_props != NULL) {
 					ActionVar* _rmc_handler = getProperty((ASObject*)mc->dynamic_props, "onUnload", 8);
 					if (_rmc_handler != NULL && _rmc_handler->type == ACTION_STACK_VALUE_FUNCTION) {
-						ASFunction* _rmc_func = (ASFunction*) _rmc_handler->data.numeric_value;
-						if (_rmc_func != NULL)
-							queueOnUnload(_rmc_func, mc);
+						_rmc_unload_func = (ASFunction*) _rmc_handler->data.numeric_value;
+						if (_rmc_unload_func != NULL) _rmc_has_unload = 1;
 					}
 				}
+				// Queue onUnload handler for deferred firing at ShowFrame (matches Flash behavior)
+				if (_rmc_unload_func != NULL)
+					queueOnUnload(_rmc_unload_func, mc);
 				// Recursively queue onUnload handlers for children
 				queueChildOnUnloads(mc);
 				// CLONE_CLIP_EVENT_DISPATCH Phase 5: queue clip-action UNLOAD
@@ -61255,25 +61377,34 @@ void actionCallMethod(SWFAppContext* app_context, char* str_buffer)
 						memset(&display_list[_rmc_dl], 0, sizeof(DisplayObject));
 					}
 				}
-				// Clear the variable from parent's dynamic_props
-				MovieClip* _rmc_parent = mc->parent ? mc->parent : &root_movieclip;
-				if (_rmc_parent->dynamic_props != NULL && mc->name[0]) {
-					deleteProperty(app_context, (ASObject*)_rmc_parent->dynamic_props,
-					               mc->name, strlen(mc->name));
-				}
-				// Also clear from root-level variable table (set by createEmptyMovieClip)
-				if (mc->name[0]) {
-					ActionVar _rmc_sentinel = {0};
-					setVariableByName(mc->name, &_rmc_sentinel);
-				}
-				// Mark as removed — keep dynamic_props intact until pending unload fires
-				mc->avm1_removed = 1;
-				mc->depth = INT_MIN;
-				// Remove from child_mc_cache
-				for (int _rmc_i = 0; _rmc_i < child_mc_count; _rmc_i++) {
-					if (child_mc_cache[_rmc_i] == mc) {
-						child_mc_cache[_rmc_i] = NULL;
-						break;
+
+				if (_rmc_has_unload) {
+					int _rmc_swf_depth = mc->depth + 16384;
+					mc->avm1_removed = 1;
+					mc->pending_removal = 1;
+					mc->depth = -(int)_rmc_swf_depth - 1 - 16384;
+					mc->display_obj = NULL;
+				} else {
+					// Clear the variable from parent's dynamic_props
+					MovieClip* _rmc_parent = mc->parent ? mc->parent : &root_movieclip;
+					if (_rmc_parent->dynamic_props != NULL && mc->name[0]) {
+						deleteProperty(app_context, (ASObject*)_rmc_parent->dynamic_props,
+						               mc->name, strlen(mc->name));
+					}
+					// Also clear from root-level variable table (set by createEmptyMovieClip)
+					if (mc->name[0]) {
+						ActionVar _rmc_sentinel = {0};
+						setVariableByName(mc->name, &_rmc_sentinel);
+					}
+					// Mark as removed — keep dynamic_props intact until pending unload fires
+					mc->avm1_removed = 1;
+					mc->depth = INT_MIN;
+					// Remove from child_mc_cache
+					for (int _rmc_i = 0; _rmc_i < child_mc_count; _rmc_i++) {
+						if (child_mc_cache[_rmc_i] == mc) {
+							child_mc_cache[_rmc_i] = NULL;
+							break;
+						}
 					}
 				}
 			}
