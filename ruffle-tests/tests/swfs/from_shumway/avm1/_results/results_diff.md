@@ -1,15 +1,20 @@
 # Ruffle Test Results Diff
 
-**Previous:** `0502d0ec1922` (2026-05-08T19:51:35.528181+00:00)
-**Current:** `84a147bd4fec` (2026-05-08T20:08:00.843702+00:00)
+**Previous:** `84a147bd4fec` (2026-05-08T20:08:00.843702+00:00)
+**Current:** `e0d150896c00` (2026-05-08T20:48:43.578085+00:00)
 
 ## Summary
 
 | Metric | Previous | Current | Delta |
 |--------|----------|---------|-------|
-| Passing | 45 | 45 | 0 |
+| Passing | 45 | 46 | +1 |
 | Total | 47 | 47 | 0 |
-| Pass rate | 95.7% | 95.7% | 0% |
-| Mismatched lines | 3 | 3 | 0 |
+| Pass rate | 95.7% | 97.9% | +2.2% |
+| Mismatched lines | 3 | 2 | -1 |
+|   Decreased | | | -1 |
 
-No changes detected.
+## Newly Passing (1)
+
+| Test | Previous Status | Lines (prev) | Lines (now) |
+|------|----------------|--------------|-------------|
+| `moviecliploader` | output_mismatch | 6/7 | 7/7 |
