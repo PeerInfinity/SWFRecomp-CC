@@ -1313,6 +1313,10 @@ void swfStart(SWFAppContext* app_context)
 			if (actionHasEnterFrameHandlers() || hasClipEnterFrameHandlers()) continue;
 			// Truly stopped — but continue if events remain
 			if (g_events && g_event_pos < g_event_count) continue;
+			// Pending MCL loads must drain before we exit (key test:
+			// avm1/string_paths_eval2 — root stops on frame 0 but a
+			// deferred loadClip is still in _next_tick).
+			if (g_pending_mcl_load_count > 0) continue;
 			break;
 		}
 	}

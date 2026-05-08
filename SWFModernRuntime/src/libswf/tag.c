@@ -2847,7 +2847,20 @@ void tagShowFrame(SWFAppContext* app_context)
 		// (e.g. children created via attachMovie inside onLoad).
 		actionFlushPendingOnLoads(app_context);
 
-		// Fire deferred onLoadInit handlers from MovieClipLoader.loadClip
+		// Fire deferred onLoadInit handlers from MovieClipLoader.loadClip.
+		// If the root has stopped (e.g. script called `stop()` at end of
+		// the frame_func that called loadClip), promote any deferred MCL
+		// loads from _next_tick into _this_tick first so the events fire
+		// same-tick — there's no "next frame's DoAction" to defer past
+		// when the loader isn't going to advance. Required by
+		// avm1/string_paths_eval2 (frame 0 calls loadClip + stop, then a
+		// setInterval-based timer fires after the listener; deferring to
+		// next tick pushes the timer's fire time past num_frames).
+		extern int is_playing;
+		extern void actionPromotePendingMCLLoads(SWFAppContext* app_context);
+		if (!is_playing) {
+			actionPromotePendingMCLLoads(app_context);
+		}
 		actionFirePendingLoadInits(app_context);
 
 		// Fallback: flush pending ENTER_FRAME if not already flushed by a

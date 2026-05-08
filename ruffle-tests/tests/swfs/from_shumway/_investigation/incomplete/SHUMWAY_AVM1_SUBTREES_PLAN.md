@@ -337,6 +337,48 @@ registered for per-tick frame advancement so `frame_funcs[1]`
 analogous to the `actionRegisterLevelAdvance` pattern that already
 exists for multi-frame `_levelN` loads. Not in scope for this plan.
 
+### Update 2026-05-08 (CI follow-up) — `string_paths_eval2` regression fix
+
+The first CI run with the conditional deferral landed a +5 line gain
+on `from_shumway/avm1/moviecliploader` (1/7 → 6/7) but introduced a
+PASS → output_mismatch regression on `avm1/string_paths_eval2` (7/7 →
+1/7). Root cause: `string_paths_eval2` has 3 root frames but the
+loader calls `stop()` at the end of frame 0 (after loadClip). Under
+the conditional rule (`is_playing && current_frame + 1 < g_frame_count`),
+loadClip on frame 0 deferred to `_next_tick`. The deferred drain on
+tick 2 (in `frame_1`'s `tagShowFrame`) fired the `onLoadComplete`
+listener correctly, which set up `setInterval(after_timer1, 300ms)`,
+but the 1-tick deferral pushed the timer's fire time past
+`num_frames=5` — so `after_timer1` (which traces lines 3-7) never ran.
+
+Two follow-up fixes resolve this without un-doing the moviecliploader gain:
+
+1. **`tag.c` `tagShowFrame` early promote-on-stop** — at the existing
+   `actionFirePendingLoadInits` call, check `is_playing` first; if the
+   loader has already stopped (script called `stop()` earlier in the
+   frame_func), call `actionPromotePendingMCLLoads` to move
+   `_next_tick` → `_this_tick` and drain everything same-tick. This
+   restores pre-deferral timing for tests where the loader stops
+   mid-frame after loadClip — there's no "next frame's DoAction" to
+   defer past when the loader isn't going to advance, so the deferral
+   serves no purpose.
+2. **`swf_core.c` / `swf_headless.c` stopped-root exit guard** — the
+   `else` branch (root stopped, no playing sprites/timers/handlers)
+   now also checks `g_pending_mcl_load_count > 0` (and
+   `g_pending_direct_load_count > 0` in `swf_core.c`) before
+   `break`ing. Without this, a tick where `stop()` ran in
+   frame_func but a deferred load is sitting in `_next_tick` would
+   exit the loop before the next-tick promote fires. This is a backstop
+   for cases where fix #1 doesn't fire (e.g. scripted `stop()` from a
+   non-frame-0 setting that bypasses tagShowFrame for some reason).
+
+**Verified.** 27-test extended MCL battery (25 originals + string_paths_eval2 +
+string_paths_reference_launder — 26/26 effective pass; the one failure
+is the pre-existing `string_paths_reference_launder` regression which
+is in `ignored_tests.txt`). 19-test AVM1 lifecycle/scope battery still
+19/19. 4-test Gnash MovieClipLoader-v5..v8 battery still 4/4 effective.
+moviecliploader still 6/7 (the +5 line gain preserved).
+
 ### Investigation 2026-05-08 — full one-tick deferral regresses chained-timer tests, REVERTED
 
 Implemented the two-bucket queue exactly as the plan describes (`g_pending_mcl_loads_next_tick` ↔ `g_pending_mcl_loads_this_tick`, `actionPromotePendingMCLLoads` at top-of-tick, `actionFirePendingLoadInits` drains `_this_tick`). Two additional fixes were needed for the deferral to even drain:
