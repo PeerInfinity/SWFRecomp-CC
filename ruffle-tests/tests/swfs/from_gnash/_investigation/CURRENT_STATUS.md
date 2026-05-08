@@ -1,6 +1,6 @@
 # Gnash Test Suite Status
 
-Last updated: 2026-05-08 (CI `068b46d8` — `array-v5` (actionscript.all) +8 lines via ASSetPropFlags ARRAY semantics + shift behavior fixes. Mismatched lines 1580 → 1572. Effective pass count unchanged. Back-to-back CI re-run at the same SHA produced byte-identical results across all suites — confirms full RNG/Date determinism via `MOCK_DATE_TIME`.)
+Last updated: 2026-05-08 (CI `d1c3b9d5` — net no change vs prior CI: investigated test6 LOAD-bypasses-filter root cause and tried a `catch_up_mode`-gated MC lookup in `queue_clip_load_events`; CI surfaced `reverse_execute_PlaceObject2_test2` regression (PASS → RM, effective unchanged), reverted. See "Investigated 2026-05-08" below for details.)
 
 ### CI snapshot (commit `068b46d8`, 2026-05-08)
 
@@ -11,6 +11,44 @@ Last updated: 2026-05-08 (CI `068b46d8` — `array-v5` (actionscript.all) +8 lin
 | misc-mtasc.all | 7 | 2 | 9 | 9 | — | 100.0% |
 | misc-swfc.all | 8 | 5 | 13 | 15 | — | **86.7%** |
 | misc-swfmill.all | 17 | 1 | 18 | 18 | — | 100.0% |
+
+### Investigated 2026-05-08 (CI `281f30b3`, reverted in `4c61f111`/`d1c3b9d5`)
+
+- **`action_order/action_execution_order_test6` LOAD-filter attempt — reverted.** Identified
+  that `queue_clip_load_events` in `SWFModernRuntime/src/libswf/tag.c` was passing
+  `clip=NULL` to `actionQueueCallbackEx`, so the `aq_drain` filter at
+  `action_queue.c:151-160` (skip on `avm1_removed`/`pending_removal`) couldn't apply
+  to sprite `CLIP_EVENT_LOAD` entries — only `CLIP_EVENT_CONSTRUCT` entries (which
+  pass non-NULL `clip`) got filtered. This is why test6's cycle 1 emitted LOADs
+  but not Constructs for cancelled placements during the gotoAndPlay 2→9 catchup.
+
+  Conservative fix tried: during `catch_up_mode` only, look up the sprite's MC via
+  `actionFindOrCreateMovieClip(...)` and pass it as `clip` so the existing
+  filter applies. Outside catchup, leave `clip=NULL` to preserve "fire even if
+  removed mid-frame" semantics for natural play.
+
+  Local verification: 22-test AVM1 lifecycle/event battery, 18-test
+  misc-ming.all loop/key/event battery, 8-test misc-swfc.all battery, 10-test
+  misc-ming.all action_order battery — all clean. Test6 cycle 1 LOAD events
+  correctly suppressed (`check_result '4+5+6+7+8+9+1+2+4+5+x+xx+'` →
+  `'6+7+9+1+2+4+5+x+xx+'`). Test stayed `output_mismatch` (cycle 1 UNLOADs and
+  cycle 2 LOAD/frame_0 interleave still need fixing).
+
+  CI surfaced regression the local battery missed:
+  `reverse_execute_PlaceObject2_test2` flipped from `pass 10/10` to
+  `ruffle_matched 7/10`. The test exercises a backward-rewind catchup that
+  re-places a sprite — both LOAD events should fire (`_root.x1 ==
+  'onLoad+onLoad+'`) but our fix suppressed the first LOAD because the MC was
+  `pending_removal` at drain time. Net effective unchanged on misc-ming.all
+  (89/102) but a true PASS was downgraded to RM (we now match Ruffle's
+  divergent behavior here instead of Flash's expected output).
+
+  Decision: revert. The `catch_up_mode`-only gate isn't specific enough — it
+  catches goto-aggregation cancellation correctly, but also catches
+  rewind-survives re-placements where Flash fires both LOADs. Need a finer
+  signal — e.g., per-entry tracking of "this placement was paired with a
+  same-sweep RemoveObject" — before this can land. Full notes in
+  `incomplete/REMAINING_TAIL_TRIAGE.md` under the test6 entry.
 
 ### Latest fixes (2026-05-08, in CI at `068b46d8` — back-to-back determinism check)
 
