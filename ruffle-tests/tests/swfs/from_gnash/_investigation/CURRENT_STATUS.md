@@ -1,8 +1,8 @@
 # Gnash Test Suite Status
 
-Last updated: 2026-05-08 (CI `d1c3b9d5` — net no change vs prior CI: investigated test6 LOAD-bypasses-filter root cause and tried a `catch_up_mode`-gated MC lookup in `queue_clip_load_events`; CI surfaced `reverse_execute_PlaceObject2_test2` regression (PASS → RM, effective unchanged), reverted. See "Investigated 2026-05-08" below for details.)
+Last updated: 2026-05-08 (CI `f8e172e9`, run `25583473693` — `array-v5` 528/560 → 535/560 (+7) via Array.prototype.shift DontDelete honoring + syncArrayToObject HOLE skip + ARRAY-branch `__resolve` hook. actionscript.all mismatched lines 1572 → 1565. Zero regressions.)
 
-### CI snapshot (commit `068b46d8`, 2026-05-08)
+### CI snapshot (commit `f8e172e9`, 2026-05-08)
 
 | Suite | Pass | RM | Effective | Total | Filtered Eff | Rate |
 |-------|------|----|-----------|-------|-------------|------|
@@ -11,6 +11,17 @@ Last updated: 2026-05-08 (CI `d1c3b9d5` — net no change vs prior CI: investiga
 | misc-mtasc.all | 7 | 2 | 9 | 9 | — | 100.0% |
 | misc-swfc.all | 8 | 5 | 13 | 15 | — | **86.7%** |
 | misc-swfmill.all | 17 | 1 | 18 | 18 | — | 100.0% |
+
+### Latest fixes (2026-05-08, in CI at `f8e172e9`)
+
+- **`array-v5` (actionscript.all): 528/560 → 535/560 lines match (+7, -7 mismatched).** Three changes in `SWFModernRuntime/src/actionmodern/action.c`:
+  1. **`Array.prototype.shift` honors DontDelete on the target index.** The element-copy loop (`arr->elements[i] = arr->elements[i + 1]`) and the metadata-reset loop are now both gated on `arr->props["<i>"]` having `PROPERTY_FLAG_CONFIGURABLE` set. Matches Flash for `ASSetPropFlags(a, "0", 7, 0); a.shift()` — `a[0]` keeps its protected `'zero'` value (line 1416). Note: WRITABLE/ReadOnly is intentionally NOT honored here. Flash test array.as:1444 (`ASSetPropFlags(a, "0", 4, 0)`, ReadOnly only) explicitly expects shift to overwrite, so honoring WRITABLE would regress lines 1451/1454/1471/1474. Ruffle DOES honor WRITABLE (its `set_data` checks `is_overwritable()`) and so it fails 1451/1454/1471/1474 — those lines are in Ruffle's diff against Flash, so we can match Flash without falling outside Ruffle's diff for those particular lines.
+  2. **`syncArrayToObject` skips HOLE-typed temp entries during writeback.** The plain-Object dispatch bridge for `Array.prototype.X.call(plainObj)` reads obj's indices into a temp ASArray via `objectToTempArray`; missing keys land as HOLE. Without skipping, the writeback loop creates spurious new properties on `obj` for indices that were never there (e.g. `pop` on a fakeArray creating `obj["0"]` from the missing slot). Skipping HOLEs fixes line 1537 (`traceProps(o)` after `o.pop()` no longer has a leading `0,`). Other plain-Object dispatch lines (1577 splice, 1630/1636 sort) didn't change because their internal HOLE→UNDEFINED densification runs before the writeback.
+  3. **`actionGetMember` ARRAY branch fires `__resolve` on missing key.** Both the numeric-index and non-index fallthrough paths now call `findResolveMethod` / `invokeResolveFunction` on `arr->props` before returning undefined, mirroring the existing OBJECT path. Fixes `t = []; t.__resolve = function(a){...}; t[3]` returning `'resolved 3'` (line 1653) plus the `rs == 1` counter checks at lines 1654, 1665, 1669, 1671 (sort, reverse, join all flow through).
+
+  Test stays `output_mismatch` — residual 25 lines are mostly sort/sortOn algorithm-dependent ordering (Category C in `incomplete/ARRAY_V5_PLAN.md`) and Flash's plain-Object Array.prototype.X.call insertion-order semantics (densify-vs-don't-delete divergence between pop, shift, splice). Promotion to `ruffle_matched` would also need the for-in-over-sorted-sparse-array key tracking (260/263) and the `X.prototype = new Array()` toString-override path (line 1710).
+
+- **No regressions** across all 8 suites. Verified locally on a 16-test AVM1 array battery, a 17-test AVM1 lifecycle/scope/super battery (`funky_function_calls`, `swf4_function_calls`, `closure_scope`, `set_variable_scope`, `on_construct`, `execution_order2/3`, `goto_rewind3`, `set_interval`, `tell_target`, `as2_super_and_this_v6/v8`, `extends_chain`, `register_class_return_value`, `movieclip_state_values`, `swf5_to_6_cross_call`, `swf5_no_closure`), a 21-test gnash actionscript.all battery (delete-v5..v8, enumerate-v6..v8, case-v5..v7, ASnative-v6, Boolean-v5, Number-v5/v6, Inheritance-v5/v6/v7, Global-v6/v7, toString_valueOf-v5/v6), and an 8-test misc-ming battery covering the addProperty/__resolve-adjacent paths.
 
 ### Investigated 2026-05-08 (CI `281f30b3`, reverted in `4c61f111`/`d1c3b9d5`)
 

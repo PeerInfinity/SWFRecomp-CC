@@ -2,7 +2,7 @@
 
 Cross-suite summary of all Ruffle-derived test suites. Each suite has its own `_investigation/` directory with detailed status docs.
 
-Last updated: 2026-05-08 (CI `e0d15089`, run `25578374215` — Part C: loadee per-tick advance landed. `from_shumway/avm1/moviecliploader` 6/7 → **PASS (7/7)**. Shumway flat suite filtered effective 75/76 → **76/76 (100%)**; avm1 sub-tree raw 45 → 46 PASS. After Phase 2 of `actionFirePendingLoadInits` runs the loadee's `frame_funcs[0]`, the loadee MC is now registered with `actionRegisterLevelAdvance` so `frame_funcs[1..N-1]` fire on subsequent ticks via the existing per-tick `actionAdvancePlayingLevels` path. Zero regressions across all 8 suites.)
+Last updated: 2026-05-08 (CI `f8e172e9`, run `25583473693` — `array-v5` 528/560 → **535/560** (+7) via Array.prototype.shift DontDelete honoring + syncArrayToObject HOLE skip + ARRAY-branch `__resolve` hook. `from_gnash/actionscript.all` mismatched lines 1572 → 1565. Zero regressions across all 8 suites.)
 
 ## Suite Summary
 
@@ -11,7 +11,7 @@ Last updated: 2026-05-08 (CI `e0d15089`, run `25578374215` — Part C: loadee pe
 | Suite | Tests | Pass | RM | Effective | Effective Rate | Filtered Rate | Notes |
 |-------|-------|------|----|-----------| ---------------|---------------|-------|
 | [avm1](../avm1/_investigation/CURRENT_STATUS.md) | 648 | 605 | 9 | 614 | 94.8% | **100.0%** (608/608) | 40 ignored. Zero filtered failures. `placeobject_occupied_depth` + `textsnapshot_available_text` recovered this CI via place-before-define narrowing. |
-| [from_gnash/actionscript.all](../from_gnash/_investigation/CURRENT_STATUS.md) | 190 | 126 | 63 | 189 | **99.5%** | — | Only `array-v5` remains as raw failure (528/560 lines this CI, +8 from ASSetPropFlags WRITABLE / shift flag-reset + DontDelete preservation / plain-Object length-skip). Full Dejagnu recovery in prior CI. |
+| [from_gnash/actionscript.all](../from_gnash/_investigation/CURRENT_STATUS.md) | 190 | 126 | 63 | 189 | **99.5%** | — | Only `array-v5` remains as raw failure (535/560 lines this CI, +7 from shift DontDelete honoring + syncArrayToObject HOLE-skip + ARRAY `__resolve`). Full Dejagnu recovery in prior CI. |
 | [from_gnash/misc-mtasc.all](../from_gnash/_investigation/CURRENT_STATUS.md) | 9 | 7 | 2 | 9 | **100.0%** | — | All effective pass. Unchanged this CI. |
 | [from_gnash/misc-swfmill.all](../from_gnash/_investigation/CURRENT_STATUS.md) | 18 | 17 | 1 | 18 | **100.0%** | — | All effective pass. Unchanged this CI. |
 | [from_gnash/misc-ming.all](../from_gnash/_investigation/CURRENT_STATUS.md) | 102 | 65 | 24 | 89 | 87.3% | **88.1%** (89/101) | 1 ignored (`opcode_guard_test`). `loop/loop_test10` promoted to ruffle_matched this CI via the same-frame Remove+Place fix (root timeline narrow). |
@@ -19,6 +19,15 @@ Last updated: 2026-05-08 (CI `e0d15089`, run `25578374215` — Part C: loadee pe
 | [from_shumway](../from_shumway/_investigation/CURRENT_STATUS.md) (flat) | 92 | 73 | 3 | 76 | 82.6% | **100.0%** (76/76) | `avm1/moviecliploader` 6/7 → **PASS** this CI via Part C (per-tick advance for the loadee MC after Phase 2 — `actionRegisterLevelAdvance` registration when `entry->frame_count > 1`). 16 fuzz tests still MISMATCH (in `ignored_tests.txt`). |
 | [from_shumway/avm1](../from_shumway/_investigation/CURRENT_STATUS.md) | 47 | 46 | 0 | 46 | 97.9% | **100.0%** (45/45) | 2 ignored. `moviecliploader` 6/7 → **PASS** this CI via Part C (loadee per-tick advance). |
 | **SWFRecomp/tests** (old suite) | 158+59 | all trace pass | — | — | **100%** | — | Hand-written opcode tests. CI only. |
+
+## Progress Since 2026-05-08 (CI `f8e172e9`, run `25583473693`) — `array-v5` shift / sync / __resolve
+
+- **`array-v5` (Gnash actionscript.all) → 528/560 → 535/560 (+7 lines, -7 mismatched).** Three fixes in `SWFModernRuntime/src/actionmodern/action.c`:
+  1. `callArrayMethod` shift now honors **DontDelete on the target index** (CONFIGURABLE-cleared in `arr->props`). Skips the element-copy and the metadata-reset for protected slots. Matches Flash for `ASSetPropFlags(a, "0", 7, 0); a.shift()` — `a[0]` stays `'zero'` (line 1416). Note: WRITABLE/ReadOnly is intentionally NOT honored here, because Flash `ASSetPropFlags(a, "0", 4, 0)` (ReadOnly only) DOES allow shift to overwrite (line 1444), and matching that requires ignoring WRITABLE during the shift's element move.
+  2. `syncArrayToObject` (the plain-Object dispatch bridge for `Array.prototype.X.call(plainObj)`) skips HOLE-typed temp entries during writeback so missing keys don't get materialized as new properties on the target. Stops `pop` from creating a spurious `"0"` property when `objectToTempArray` read missing keys as HOLE (line 1537).
+  3. `actionGetMember` ARRAY branch fires `findResolveMethod` / `invokeResolveFunction` on `arr->props` before returning undefined, mirroring the OBJECT path. Fixes `t = []; t.__resolve = function(a){...}; t[3]` returning `'resolved 3'` plus the four `rs == 1` counter checks that follow it (lines 1653, 1654, 1665, 1669, 1671).
+
+- **No regressions** across all 8 suites. AVM1 unchanged (605 / 614 effective, 100% filtered); other Gnash sub-suites unchanged; both Shumway sub-suites unchanged. Test stays `output_mismatch` (residual 25 lines are mostly sort/sortOn algorithm-dependent ordering and Flash's plain-Object Array.prototype.X.call insertion-order semantics) — not yet promotable to `ruffle_matched` because our diff still includes 14 lines outside Ruffle's diff set against expected.
 
 ## Progress Since 2026-05-08 (CI `e0d15089`, run `25578374215`) — Part C: loadee per-tick advance
 
