@@ -1,6 +1,6 @@
 # Remaining Tail Triage
 
-<!-- TESTS: matrix_test, DefineEditTextVariableNameTest, EmbeddedFontTest, DrawingApiTest, NetStream-SquareTest, loop/loop_test10, masks_test, duplicate_movie_clip_test, soft_reference_test1, movieclip_destruction_test4, action_order/action_execution_order_test6 -->
+<!-- TESTS: matrix_test, DefineEditTextVariableNameTest, EmbeddedFontTest, DrawingApiTest, NetStream-SquareTest, masks_test, duplicate_movie_clip_test, soft_reference_test1, movieclip_destruction_test4, action_order/action_execution_order_test6 -->
 
 <!-- Resolved 2026-05-02:
   - loop/loop_test → PASS (was 5/21; fixed in cluster work)
@@ -57,6 +57,36 @@
     Ruffle on the mc1 event handlers shifts our diff indices outside
     Ruffle's diff set. Cannot suppress the warning without regressing
     8+ AVM1 tests that assert it. See ACCEPTED_DIFFS.md Category 1.
+-->
+
+<!-- Resolved 2026-05-08:
+  - loop/loop_test10 → ruffle_matched (was 3/28 → 14/16 line match,
+    auto-promoted via subset of Ruffle's diff). Two paired fixes in
+    SWFModernRuntime/src/libswf/tag.c address the Same-frame
+    Remove+Place sequence at the same depth (frame 3: Remove(mc1) +
+    SetInstanceName("mc2") + Place(mc2) at depth 100):
+    1. tagSetInstanceName: when ng_depth_has_pending_finalize(depth) is
+       true, skip the rename path and stash as g_pending_instance_name.
+       Without this, the still-live mc1 entry (deferred for finalize
+       because of its UNLOAD handler) was renamed to "mc2" inline, so
+       its queued UNLOAD action traced "_level0.mc2 unloaded" instead
+       of "_level0.mc1 unloaded" and actionFindOrCreateMovieClip("mc2")
+       returned the dying mc1 pointer instead of creating a fresh
+       MovieClip for the new placement.
+    2. PendingFinalizeEntry now stores orig_char_id; run_pending_finalize
+       only calls clear_display_entry when the slot still has the
+       original char (or has been cleared by the placement path itself).
+       Without this, the deferred clear at end-of-frame would clobber
+       the freshly-placed mc2 entry, leaving display_list[100].char_id=0
+       so frame 4's tagRemoveObject2 was a no-op (mc2's UNLOAD never
+       fired, mc2Unloaded stayed at 0, asOrder dropped the trailing 5+).
+    Verified: 32-test AVM1 lifecycle/clone/register/replace battery,
+    18-test misc-ming.all near-passing battery, 13-test misc-swfc.all
+    spot-check, 9-test misc-ming.all loop battery, 12-test
+    misc-ming.all action_order battery — all unchanged. Promotion
+    plumbing: ours has diff {3, 12-21} ⊂ ruffle.txt's {6,7,9,10,12-20}
+    only on the trailing /instance lines, with line 3 ("mc1 unloaded"
+    pre-fix gap) now matching Ruffle exactly.
 -->
 
 
@@ -253,72 +283,37 @@ plan when work begins.**
 Now PASS 21/21. Cluster fixes recovered the depth-bias /
 interleave behavior described in the original entry.
 
-### loop/loop_test10 (10.7%, 3/28)
+### ~~loop/loop_test10~~ — promoted to `ruffle_matched` (2026-05-08)
 
-**Symptom (from earlier diff):**
+Was 3/28 → now 14/16 line match (auto-promoted via subset of Ruffle's
+diff). Root cause (Same-frame Remove+Place at same depth, frame 3:
+Remove(mc1) + SetInstanceName("mc2") + Place(mc2) at depth 100) fixed
+in two paired changes to `SWFModernRuntime/src/libswf/tag.c`:
 
-```
-- 2  _level0.mc2 initialized          ← expected MC lifecycle traces
-+ 2  FAILED: expected: 2 obtained: 1  ← we run assertions instead
-...
-- 8  _level0.mc1 unloaded
-+ 8  FAILED: expected: '0+1+2+3+4+5+1+2+3+5+' obtained: '0+1+'  ← asOrder severely truncated
-- 9  _level0.mc2 unloaded
-+ 9  FAILED: expected: /instance3 , obtained: /instance2  ← auto-naming off by one
-- 12 PASSED: mc3Initialized == 1
-+ 12 FAILED: expected: /instance3/instance5 , obtained: /instance2/instance4  ← auto-naming off by 1+2
-```
+1. `tagSetInstanceName` now skips the inline rename path when
+   `ng_depth_has_pending_finalize(depth)` is true and stashes the name
+   as `g_pending_instance_name` instead. Without this, the still-live
+   mc1 entry (deferred for finalize because of its UNLOAD clip event)
+   was renamed to "mc2" inline, causing its queued UNLOAD trace to
+   evaluate `this+' unloaded'` to `_level0.mc2 unloaded` (wrong
+   binding) and making `actionFindOrCreateMovieClip("mc2")` return the
+   dying mc1 pointer instead of creating a fresh MovieClip for the new
+   placement.
 
-Three distinct symptoms:
-1. MC initialized/unloaded traces missing (sprite init events not
-   firing).
-2. `asOrder` truncated to `'0+1+'` (frame DoActions stop early
-   after frame 1).
-3. Auto-naming off by 1-2: expected `instance3/4/5`, got
-   `instance2/3/4` — every auto-name is one less than expected.
+2. `PendingFinalizeEntry` now stores `orig_char_id` at queue time, and
+   `run_pending_finalize` only calls `clear_display_entry` when the
+   slot still has the original char (or already empty). Without this,
+   the deferred clear at end-of-frame clobbered the freshly-placed
+   mc2 entry, leaving `display_list[100].char_id == 0` so frame 4's
+   `tagRemoveObject2` was a no-op (mc2's UNLOAD never fired, asOrder
+   dropped the trailing `5+`, mc2Unloaded stayed at 0).
 
-**Hypothesis.** The auto-name offset suggests a stray
-`tagSetInstanceName(depth, "")` call or an explicit-named
-placement that we treat as auto-named (consuming one counter
-slot it shouldn't). The `asOrder` truncation suggests frame
-DoActions stop firing after frame 1.
-
-The plan note `MISC_MING_SWFC_PLAN.md` "loop_test10 at 3.6%
-suggests a feature not implemented yet (probably for-in or
-iterator-style)" was wrong — this isn't a missing feature, it's
-multiple narrow bugs.
-
-**Investigation update (2026-05-08, local re-investigation).**
-Confirmed the symptoms above against current `master` (still 3/28).
-Re-inspecting `loop_test10.c` clarifies the actual bugs and shows
-they're more interrelated than the original triage suggested:
-
-- `asOrder` literal symbol mapping (from the `INIT`/`UNLOAD` clip-action
-  bodies on each placement, source lines 162-208): mc1 INIT=`1+`,
-  mc2 INIT=`2+`, mc1 UNLOAD=`3+`, mc3 INIT=`4+`, mc2 UNLOAD=`5+`,
-  mc3 UNLOAD has no symbol (just notes the unload).
-- Expected `0+1+2+3+4+5+1+2+3+5+`. Decoding: setup, mc1.init (f2),
-  mc2.init (f3 place), mc1.unload (f3 remove), mc3.init (f4 place),
-  mc2.unload (f4 remove), then loop-back replay: mc1.init, mc2.init,
-  mc1.unload, mc2.unload (mc3 stays alive across loop, no re-init).
-- Our `0+1+2+3+4+` stops at `4+` (mc3 init). The MISSING `5+`
-  (mc2 UNLOAD at frame 4) is the same RemoveObject2+PlaceObject2-
-  same-depth-same-frame interaction, NOT a "DoActions stop early"
-  problem. The whole loop-back replay is also missing because
-  the replay doesn't fire INIT/UNLOAD events at all.
-- Auto-naming off by 1: every unnamed sprite gets `instanceN-1`
-  instead of `instanceN`. Constant offset across all three case-N
-  blocks in the test (case 1 `instance3` → got `instance2`,
-  case 2 `instance6` → got `instance5`, case 3 `instance9` → got
-  `instance8`). Suggests our counter starts 1 lower than Flash's,
-  not a per-block drift.
-
-**Scope.** 3-5 hours; **may warrant standalone plan once symptoms
-are confirmed**. Sub-bug (UNLOAD missing for RemoveObject2+
-PlaceObject2 same-depth) is likely the core issue and may have
-broader impact on other goto/loop tests; bears investigating in
-isolation first via a smaller reproducer (single frame, place A
-at depth N, replace with B at depth N — does A.UNLOAD fire?).
+Residual diffs (2 lines: `instance6` outer + `instance9` slot) are a
+strict subset of Ruffle's diff against expected — auto-naming offset
+is shared with Ruffle. Verified no regressions across 32-test AVM1
+lifecycle/clone/register/replace battery, 18-test misc-ming
+near-passing battery, 13-test misc-swfc spot-check, 9-test
+misc-ming loop battery, 12-test misc-ming action_order battery.
 
 ### ~~replace_sprites1test~~ — **RESOLVED 2026-04-29 (PASS)**
 
@@ -680,8 +675,8 @@ wins:
 
 Then (after the cluster plans land and recovery is measured):
 
-8. `loop/loop_test10`, `EmbeddedFontTest`, `DrawingApiTest`,
-   `DefineEditTextVariableNameTest`, `levels` —
+8. ~~`loop/loop_test10`~~ (resolved 2026-05-08), `EmbeddedFontTest`,
+   `DrawingApiTest`, `DefineEditTextVariableNameTest`, `levels` —
    triage individually.
 
 Blocked / skip (originally "re-baseline after cluster plans land",
