@@ -288,8 +288,37 @@ suggests a feature not implemented yet (probably for-in or
 iterator-style)" was wrong — this isn't a missing feature, it's
 multiple narrow bugs.
 
+**Investigation update (2026-05-08, local re-investigation).**
+Confirmed the symptoms above against current `master` (still 3/28).
+Re-inspecting `loop_test10.c` clarifies the actual bugs and shows
+they're more interrelated than the original triage suggested:
+
+- `asOrder` literal symbol mapping (from the `INIT`/`UNLOAD` clip-action
+  bodies on each placement, source lines 162-208): mc1 INIT=`1+`,
+  mc2 INIT=`2+`, mc1 UNLOAD=`3+`, mc3 INIT=`4+`, mc2 UNLOAD=`5+`,
+  mc3 UNLOAD has no symbol (just notes the unload).
+- Expected `0+1+2+3+4+5+1+2+3+5+`. Decoding: setup, mc1.init (f2),
+  mc2.init (f3 place), mc1.unload (f3 remove), mc3.init (f4 place),
+  mc2.unload (f4 remove), then loop-back replay: mc1.init, mc2.init,
+  mc1.unload, mc2.unload (mc3 stays alive across loop, no re-init).
+- Our `0+1+2+3+4+` stops at `4+` (mc3 init). The MISSING `5+`
+  (mc2 UNLOAD at frame 4) is the same RemoveObject2+PlaceObject2-
+  same-depth-same-frame interaction, NOT a "DoActions stop early"
+  problem. The whole loop-back replay is also missing because
+  the replay doesn't fire INIT/UNLOAD events at all.
+- Auto-naming off by 1: every unnamed sprite gets `instanceN-1`
+  instead of `instanceN`. Constant offset across all three case-N
+  blocks in the test (case 1 `instance3` → got `instance2`,
+  case 2 `instance6` → got `instance5`, case 3 `instance9` → got
+  `instance8`). Suggests our counter starts 1 lower than Flash's,
+  not a per-block drift.
+
 **Scope.** 3-5 hours; **may warrant standalone plan once symptoms
-are confirmed**.
+are confirmed**. Sub-bug (UNLOAD missing for RemoveObject2+
+PlaceObject2 same-depth) is likely the core issue and may have
+broader impact on other goto/loop tests; bears investigating in
+isolation first via a smaller reproducer (single frame, place A
+at depth N, replace with B at depth N — does A.UNLOAD fire?).
 
 ### ~~replace_sprites1test~~ — **RESOLVED 2026-04-29 (PASS)**
 
@@ -392,9 +421,48 @@ eager-init / clip-event dispatch ordering issue. Construct should batch
 across all same-frame placements before any Load fires; we may be firing
 Load synchronously per-placement.
 
+**Root cause confirmed (2026-05-08, local re-investigation).** The bug is
+NOT that LOAD fires synchronously per-placement — both LOAD (AQ_KIND_SCRIPT)
+and CONSTRUCT (AQ_KIND_CLIP_CONSTRUCT) are queued during the 2→9 forward
+catchup and don't drain mid-catchup (`g_goto_catchup_active` gates the
+`tagShowFrame` drain at `tag.c:2789`, and `ng_executeGotoCatchUp`'s
+post-catchup drain at `swf_core.c:202-203` only handles `AQ_KIND_CLIP_INIT`
+and `AQ_KIND_REGISTER_CTOR`, not CLIP_CONSTRUCT or SCRIPT). The actual
+issue is the `aq_drain` filter at `action_queue.c:151-160`: for entries
+queued during catchup (`queued_in_catchup=1`), if the clip is
+`avm1_removed` or `pending_removal` by drain time, the entry is **skipped**.
+Comment explicitly: "goto_commands aggregation (place+remove in same goto
+sweep) remains canceled."
+
+For test6's first cycle (gotoAndPlay 2→9), all three sprites are placed
+AND removed during the catchup (mc1/mc2 placed at frame 3 + removed at
+frame 5; mc3 placed at frame 6 + removed at frame 8). So all three CONSTRUCT
+entries get filtered out at drain time. The LOAD entries (AQ_KIND_SCRIPT)
+ALSO get the filter — but the test's expected output shows them firing.
+Empirically, our impl emits the LOADs (so the SCRIPT filter must not be
+catching them via the same path) while skipping the CONSTRUCTs. Likely
+LOAD events get `queued_in_catchup=0` somewhere they shouldn't, or the
+clip pointer for SCRIPT kind isn't set — needs deeper trace to confirm
+which side is "wrong" relative to the filter intent.
+
+Either way, Flash's actual semantics fire ALL events for ALL placements,
+even those cancelled in same-goto pairs. Ruffle adopts the cancellation
+model; that's why Ruffle's `output.ruffle.txt` for this test ALSO fails
+(only emits the second cycle's mc1/mc2 events from the inner backward
+goto, which is the only catchup where the placements survive).
+
 **Scope.** Not a 1-hour fix. Construct/Load batching is shared infrastructure
-with broad regression risk. Compare Ruffle's `instantiate_child` →
-`run_frame_avm1` ordering vs our `tagPlaceObject2` Phase 1/Phase 2 init.
+with broad regression risk. Two viable approaches, both invasive:
+(A) Make CLIP_CONSTRUCT and AQ_KIND_SCRIPT (LOAD) `fires_chronologically`
+    even when `queued_in_catchup=1` — would fire all events Flash-style.
+    Risk: regresses every test that depends on goto_commands aggregation
+    (RegisterClassTest3 explicitly relies on it, comment at
+    `tag.c:2770-2787`).
+(B) Compare Ruffle's `instantiate_child` → `run_frame_avm1` ordering vs
+    our `tagPlaceObject2` Phase 1/Phase 2 init to fix only the lines
+    0-1 ordering (so our diff becomes a subset of Ruffle's), enabling
+    `ruffle_matched` promotion without trying to match Flash exactly.
+
 Standalone plan worth writing if active work begins. Test cannot promote
 to `ruffle_matched` until our ordering is at least as correct as Ruffle's
 on lines 0-1.
