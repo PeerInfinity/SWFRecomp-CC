@@ -4360,19 +4360,6 @@ static void queue_clip_load_events(SWFAppContext* app_context, size_t depth)
 	}
 	if (!_has_load) return;
 
-	// During goto catchup, look up the MC at queue time so the AQ filter at
-	// action_queue.c can skip LOAD entries whose MC is removed by drain time
-	// (goto-aggregation: place+remove in the same catchup sweep cancels both).
-	// Outside catchup, leave clip=NULL to preserve "fire even if removed
-	// mid-frame" semantics for natural play (see action_execution_order_test6
-	// commentary in REMAINING_TAIL_TRIAGE.md).
-	MovieClip* filter_mc = NULL;
-	if (catch_up_mode && display_list[depth].instance_name != NULL) {
-		MovieClip* parent = g_current_context ? g_current_context : &root_movieclip;
-		filter_mc = actionFindOrCreateMovieClip(
-			app_context, display_list[depth].instance_name, parent);
-	}
-
 	for (size_t a = 0; a < display_list[depth].clip_action_count; a++) {
 		if (!(display_list[depth].clip_actions[a].event_flags & CLIP_EVENT_LOAD))
 			continue;
@@ -4393,13 +4380,11 @@ static void queue_clip_load_events(SWFAppContext* app_context, size_t depth)
 		// pcl->obj->instance_name before firing the handler — so the
 		// drain's per-entry dispatcher still does the correct MC
 		// context-switch even though the kind is SCRIPT.
-		// clip=filter_mc (set during catchup only): enables aq_drain's
-		// avm1_removed/pending_removal skip to cancel cycle-1 LOADs that
-		// were placed+removed in the same goto sweep, matching Ruffle's
-		// goto-aggregation behavior. Outside catchup, clip stays NULL so
-		// natural-play LOAD events fire even if the MC is removed mid-frame.
+		// clip=NULL: is_unload gating disabled — the sprite is either
+		// initialized (drain fires) or pre-removed with its clip_actions
+		// overwritten (no entry for that obj).
 		actionQueueCallbackEx(app_context, aq_dispatch_clip_load, (void*)pcl,
-		                      AQ_PRIORITY_NORMAL, /*clip=*/filter_mc, /*is_unload=*/0,
+		                      AQ_PRIORITY_NORMAL, /*clip=*/NULL, /*is_unload=*/0,
 		                      AQ_KIND_SCRIPT);
 	}
 }
