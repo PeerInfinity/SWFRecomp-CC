@@ -1,16 +1,24 @@
 # Gnash Test Suite Status
 
-Last updated: 2026-05-07 (CI `a3912cf2` — `opcode_guard_test` (misc-ming.all) added to ignored list. misc-ming.all filtered effective: 88/101 (87.1%); raw effective unchanged at 88/102 (86.3%). Zero regressions. Previously CI `8fdf3311` recovered actionscript.all to 189 effective via place-before-define narrowing.)
+Last updated: 2026-05-08 (CI `f0d575ca` — `loop/loop_test10` (misc-ming.all) promoted to ruffle_matched via same-frame Remove+Place at root-depth fix; +1 effective on misc-ming.all. Other suites unchanged.)
 
-### CI snapshot (commit `a3912cf2`, 2026-05-07)
+### CI snapshot (commit `f0d575ca`, 2026-05-08)
 
 | Suite | Pass | RM | Effective | Total | Filtered Eff | Rate |
 |-------|------|----|-----------|-------|-------------|------|
 | actionscript.all | 126 | 63 | 189 | 190 | — | **99.5%** |
-| misc-ming.all | 65 | 23 | 88 | 102 | 88/101 | 86.3% raw / **87.1% filtered** |
+| misc-ming.all | 65 | 24 | 89 | 102 | 89/101 | 87.3% raw / **88.1% filtered** |
 | misc-mtasc.all | 7 | 2 | 9 | 9 | — | 100.0% |
 | misc-swfc.all | 8 | 5 | 13 | 15 | — | **86.7%** |
 | misc-swfmill.all | 17 | 1 | 18 | 18 | — | 100.0% |
+
+### Latest fixes (2026-05-08, in CI at `f0d575ca`)
+
+- **`loop/loop_test10` (misc-ming.all) → ruffle_matched (5/28, was 3/28 output_mismatch).** Two paired fixes in `SWFModernRuntime/src/libswf/tag.c` for the same-frame Remove+Place at the same depth pattern (frame 3: `Remove(mc1)` + `SetInstanceName("mc2")` + `Place(mc2)` at depth 100):
+  1. `tagSetInstanceName` skips the inline rename path and stashes the name as `g_pending_instance_name` when `ng_depth_has_pending_finalize(depth)` is true AND the new name differs from `display_list[depth].instance_name`. Without this, the still-live mc1 entry (deferred for finalize because of its UNLOAD clip event) was renamed to "mc2" inline, so its queued UNLOAD trace evaluated `this+' unloaded'` to `_level0.mc2 unloaded` (wrong binding) and `actionFindOrCreateMovieClip("mc2")` returned the dying mc1 pointer instead of creating a fresh MC.
+  2. `PendingFinalizeEntry` now snapshots the queue-time `display_list` pointer + orig `instance_name`. `run_pending_finalize` only honors the slot-renamed skip when the live `display_list` array matches `queued_dl_array` AND the live name differs from orig. For sprite-internal pending entries, `display_list` (a global pointer) is swapped back to root by the time `run_pending_finalize` fires, so without the array-pointer guard the comparison was against the wrong slot in root's array — initially regressed `RegisterClassTest4` from 17/42 to 6/42 (commit `96a5d81e`); refined to 17/42 baseline in `f0d575ca` via the array-pointer gate.
+
+- **Verified no regressions** across 32-test AVM1 lifecycle/clone/register/replace battery, 28-test misc-ming.all near-passing battery (incl. all four register_class tests, all loop tests, key_event_test, DragDropTest, replace_*test), 13-test misc-swfc battery, 9-test misc-ming.all loop battery, 12-test misc-ming.all action_order battery. Three small +1 mismatched-line drifts on `action_order/ActionOrderTest3/4/5` are within noise (still output_mismatch — same status, same effective pass).
 
 Net change vs. `8fdf3311` snapshot: misc-ming.all picked up 1 ignored test (`opcode_guard_test`), so filtered effective rose 86/102 (84.3%) → 88/101 (87.1%). The OVERVIEW.md table for misc-ming.all in the prior snapshot under-reported raw effective by 2 (table said 64 PASS + 22 RM = 86, but `results.json` has consistently shown 65 PASS + 23 RM = 88 in both the `d11aa45a` previous CI and this CI). All other suites unchanged.
 
