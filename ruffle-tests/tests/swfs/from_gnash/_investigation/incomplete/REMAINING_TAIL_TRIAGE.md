@@ -462,6 +462,41 @@ Standalone plan worth writing if active work begins. Test cannot promote
 to `ruffle_matched` until our ordering is at least as correct as Ruffle's
 on lines 0-1.
 
+**Partial progress (2026-05-08, pending CI).** Root cause for "LOADs fire
+when CONSTRUCTs are filtered" identified and partially fixed. The aq_drain
+filter at `action_queue.c:151-160` checks `entry.clip` non-NULL before
+applying the avm1_removed/pending_removal skip. CONSTRUCT entries pass a
+non-NULL `clip`, so the filter applies. But `queue_clip_load_events` in
+`tag.c` was passing `clip=NULL` to `actionQueueCallbackEx`, so the filter
+was bypassed for sprite CLIP_EVENT_LOAD entries — comment claimed
+"is_unload gating disabled — the sprite is either initialized (drain fires)
+or pre-removed with its clip_actions overwritten (no entry for that obj)",
+but in goto-aggregation cases the entry remains in the queue at drain time.
+
+Fix in `SWFModernRuntime/src/libswf/tag.c::queue_clip_load_events`: during
+`catch_up_mode`, look up the sprite's MC via `actionFindOrCreateMovieClip`
+and pass it as the `clip` arg. Outside catchup, leave `clip=NULL` to
+preserve "fire even if removed mid-frame" semantics for natural play (no
+existing AVM1/Gnash test exercises an asymmetric place+remove mid-frame
+LOAD-skip pattern, but the conservative gate avoids speculative regressions).
+
+Test6 effect: cycle 1's three LOAD events (`mc1 Load`, `mc2 Load`,
+`mc3 Load`) are now suppressed (their MCs are pending_removal by drain
+time). Our `check_result` string went from `'4+5+6+7+8+9+1+2+4+5+x+xx+'`
+(12 events, 6 in cycle 1 of which 3 are LOADs) to `'6+7+9+1+2+4+5+x+xx+'`
+(9 events, 3 unloads in cycle 1). Test still does not promote: cycle 1's
+three UNLOAD events (codes 6, 7, 9) also need to be suppressed (Ruffle's
+expected has empty cycle 1), and cycle 2's LOAD/frame_0 interleave needs
+to be fixed (we emit `1+2+4+5+x+xx`, Ruffle expects `1+2+4+x+5+xx`).
+
+Regression batteries (no test status changes): 22-test AVM1 lifecycle/event
+battery (22/22 PASS), 18-test misc-ming.all loop/key/event battery
+(18/18 effective: 13 PASS + 5 RM), 8-test misc-swfc.all battery (8/8
+effective: 6 PASS + 2 RM), 10-test misc-ming.all action_order battery
+(4 PASS + 6 fail, status unchanged). test5 / test11 still
+output_mismatch with the same starting line of divergence as pre-fix
+(line 27 / line 8 respectively).
+
 ### duplicate_movie_clip_test (9.1%, 3/33) — **blocked by CLONESPRITE_DEPTH_BIAS**
 
 **Symptom.** Multi-issue. Confirmed root cause for primary failure
