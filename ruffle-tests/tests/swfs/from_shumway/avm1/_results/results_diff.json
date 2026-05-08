@@ -1,9 +1,9 @@
 {
   "metadata": {
-    "old_timestamp": "2026-05-08T19:22:26.216596+00:00",
-    "old_git_sha": "f49490c3519be87af1b25661a30c41a85d85a46d",
-    "new_timestamp": "2026-05-08T19:51:35.528181+00:00",
-    "new_git_sha": "0502d0ec19223643edbd387c37eae0fa837c7470",
+    "old_timestamp": "2026-05-08T19:51:35.528181+00:00",
+    "old_git_sha": "0502d0ec19223643edbd387c37eae0fa837c7470",
+    "new_timestamp": "2026-05-08T20:08:00.843702+00:00",
+    "new_git_sha": "84a147bd4fec5dcb0ab211ede92ebcdc5ffd35f9",
     "partial": false,
     "same_commit": false
   },
@@ -18,33 +18,16 @@
     "new_effective_pass": 46,
     "new_total": 47,
     "new_pass_rate": 95.7,
-    "old_mismatched_lines": 8,
+    "old_mismatched_lines": 3,
     "new_mismatched_lines": 3,
     "increased_mismatches": 0,
-    "decreased_mismatches": 5,
+    "decreased_mismatches": 0,
     "newly_passing": 0,
     "newly_failing": 0,
     "status_changed": 0,
-    "unchanged": 46,
+    "unchanged": 47,
     "added": 0,
     "removed": 0
   },
-  "changes": [
-    {
-      "test": "moviecliploader",
-      "change_type": "changed",
-      "old_status": "output_mismatch",
-      "new_status": "output_mismatch",
-      "old_lines": {
-        "actual_lines": 6,
-        "expected_lines": 7,
-        "matching_lines": 1
-      },
-      "new_lines": {
-        "actual_lines": 6,
-        "expected_lines": 7,
-        "matching_lines": 6
-      }
-    }
-  ]
+  "changes": []
 }
