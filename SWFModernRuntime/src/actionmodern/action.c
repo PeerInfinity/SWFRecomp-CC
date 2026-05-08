@@ -41246,6 +41246,16 @@ void actionSetMember(SWFAppContext* app_context)
 					}
 				}
 
+				// Check if this index is marked read-only via ASSetPropFlags
+				// (PROPERTY_FLAG_WRITABLE cleared in arr->props["<idx>"]).
+				// Match the actionDelete/length-truncation pattern.
+				if (arr->props != NULL && prop_name_len > 0)
+				{
+					ASProperty* ps = findPropertyRaw(arr->props, prop_name, prop_name_len);
+					if (ps != NULL && !(ps->flags & PROPERTY_FLAG_WRITABLE))
+						return;  // Read-only — silently ignore
+				}
+
 				// Store the value
 				if (is_standard_index)
 				{
@@ -53137,9 +53147,65 @@ static int callArrayMethod(SWFAppContext* app_context,
 		else
 		{
 			ActionVar first = arr->elements[0];
-			for (u32 i = 0; i < arr->length - 1; i++)
+			u32 old_len = arr->length;
+			for (u32 i = 0; i < old_len - 1; i++)
 			{
 				arr->elements[i] = arr->elements[i + 1];
+			}
+			// Indices overwritten by the shift have their ASSetPropFlags
+			// metadata reset (Flash semantics: "flag was lost"). Without
+			// this, a subsequent userland write would still see WRITABLE
+			// cleared on arr->props and silently fail.
+			if (arr->props != NULL)
+			{
+				char _idx_buf[16];
+				for (u32 i = 0; i < old_len - 1; i++)
+				{
+					int _idx_len = snprintf(_idx_buf, sizeof(_idx_buf), "%u", i);
+					if (_idx_len <= 0) continue;
+					ASProperty* ps = findPropertyRaw(arr->props, _idx_buf, (u32)_idx_len);
+					if (ps != NULL)
+					{
+						ps->flags = PROPERTY_FLAGS_DEFAULT;
+						ps->flash_flags = 0;
+					}
+				}
+			}
+			// "Delete" the last element. If arr->props marks index (old_len-1)
+			// with DontDelete (CONFIGURABLE cleared), preserve the original
+			// element value into arr->props so the props fallback in
+			// actionGetMember returns it after length truncation. Mirrors the
+			// length-truncation path in actionSetMember.
+			u32 last_idx = old_len - 1;
+			int preserved = 0;
+			if (arr->props != NULL)
+			{
+				char _idx_buf[16];
+				int _idx_len = snprintf(_idx_buf, sizeof(_idx_buf), "%u", last_idx);
+				if (_idx_len > 0)
+				{
+					ASProperty* ps = findPropertyRaw(arr->props, _idx_buf, (u32)_idx_len);
+					if (ps != NULL && !(ps->flags & PROPERTY_FLAG_CONFIGURABLE))
+					{
+						if (ps->value.type == ACTION_STACK_VALUE_UNDEFINED &&
+						    arr->elements[last_idx].type != ACTION_STACK_VALUE_HOLE)
+						{
+							ps->value = arr->elements[last_idx];
+							if (ps->value.type == ACTION_STACK_VALUE_OBJECT)
+								retainObject((ASObject*)ps->value.data.numeric_value);
+							if (ps->value.type == ACTION_STACK_VALUE_STRING &&
+							    arr->elements[last_idx].data.string_data.owns_memory)
+								arr->elements[last_idx].data.string_data.owns_memory = 0;
+						}
+						preserved = 1;
+					}
+				}
+			}
+			if (!preserved)
+			{
+				arr->elements[last_idx].type = ACTION_STACK_VALUE_HOLE;
+				arr->elements[last_idx].data.numeric_value = 0;
+				arr->elements[last_idx].str_size = 0;
 			}
 			arr->length--;
 			pushVar(app_context, &first);
@@ -54221,7 +54287,9 @@ static ASArray* objectToTempArray(SWFAppContext* app_context, ASObject* obj, u32
 }
 
 // Helper: sync a temporary ASArray back to an array-like ASObject.
-static void syncArrayToObject(SWFAppContext* app_context, ASArray* arr, ASObject* obj, u32 old_length)
+// When update_length is 0, leaves obj.length untouched (Ruffle's shift/pop/
+// unshift only set_length if `this` is a real Array).
+static void syncArrayToObject(SWFAppContext* app_context, ASArray* arr, ASObject* obj, u32 old_length, int update_length)
 {
 	// Write new elements
 	for (u32 i = 0; i < arr->length; i++) {
@@ -54233,12 +54301,13 @@ static void syncArrayToObject(SWFAppContext* app_context, ASArray* arr, ASObject
 		char idx[16]; snprintf(idx, sizeof(idx), "%u", i);
 		deleteProperty(app_context, obj, idx, (u32)strlen(idx));
 	}
-	// Update length
-	ActionVar lv = {0};
-	lv.type = ACTION_STACK_VALUE_F64;
-	double dl = (double)arr->length;
-	VAL(u64, &lv.data.numeric_value) = VAL(u64, &dl);
-	setProperty(app_context, obj, "length", 6, &lv);
+	if (update_length) {
+		ActionVar lv = {0};
+		lv.type = ACTION_STACK_VALUE_F64;
+		double dl = (double)arr->length;
+		VAL(u64, &lv.data.numeric_value) = VAL(u64, &dl);
+		setProperty(app_context, obj, "length", 6, &lv);
+	}
 }
 
 static ActionVar builtin_array_method(SWFAppContext* app_context, ActionVar* args, u32 arg_count, ActionVar* registers, void* this_obj)
@@ -54289,8 +54358,15 @@ static ActionVar builtin_array_method(SWFAppContext* app_context, ActionVar* arg
 			                  (method_name_len == 7 && strncmp(method_name, "reverse", 7) == 0) ||
 			                  (method_name_len == 4 && strncmp(method_name, "sort", 4) == 0) ||
 			                  (method_name_len == 6 && strncmp(method_name, "sortOn", 6) == 0);
-			if (is_mutating)
-				syncArrayToObject(app_context, temp, obj, old_length);
+			if (is_mutating) {
+				// shift/pop/unshift only update length on real Array `this`
+				// (Ruffle: gated on `if let NativeObject::Array(_)`). On a
+				// plain Object, length stays at its user-set value.
+				int skip_length = (method_name_len == 5 && strncmp(method_name, "shift", 5) == 0) ||
+				                  (method_name_len == 3 && strncmp(method_name, "pop", 3) == 0) ||
+				                  (method_name_len == 7 && strncmp(method_name, "unshift", 7) == 0);
+				syncArrayToObject(app_context, temp, obj, old_length, skip_length ? 0 : 1);
+			}
 			ActionVar result;
 			popVar(app_context, &result);
 			return result;
