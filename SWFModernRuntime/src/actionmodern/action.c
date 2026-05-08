@@ -28095,6 +28095,23 @@ static ASObject* g_stage_obj;
 // Deferred MCL event queue — fires at ShowFrame time
 // Events queue: onLoadStart, onLoadProgress, onLoadComplete fire in order,
 // then child init runs, then onLoadInit fires in LIFO order.
+//
+// Two-bucket model with CONDITIONAL deferral (matches Flash's "MCL events
+// fire after the loader's next-frame DoAction" semantics — see
+// SHUMWAY_AVM1_SUBTREES_PLAN.md Part B):
+//   - `_this_tick` is the fire side: actionFirePendingLoadInits drains here.
+//     loadClips land here when the loader is either on its last frame or
+//     stopped (no next-frame DoAction is coming to defer past), so the
+//     existing tagShowFrame drain fires them same-tick. Preserves the
+//     pre-deferral behaviour `loadmovie_fail` /
+//     `loadmovie_var_persistence` (chained-timer) tests rely on.
+//   - `_next_tick` is the deferred side: loadClips land here when the
+//     loader is playing AND has more frames coming.
+//     actionPromotePendingMCLLoads moves them to _this_tick at the top of
+//     the next tick, so events fire AFTER the next frame's DoAction has
+//     run. Required by from_shumway/avm1/moviecliploader.
+// The exported `g_pending_mcl_load_count` is the combined total of both
+// buckets (external exit-condition checks read it).
 #define MAX_PENDING_MCL_LOADS 16
 typedef struct {
     ASObject* mcl;       // MCL object that initiated the load
@@ -28104,8 +28121,11 @@ typedef struct {
     int is_swf_url;      // 1 if URL ends in .swf (affects error vs init behavior)
     char url[128];       // Requested URL (for _url update on failed loads)
 } PendingMCLLoad;
-static PendingMCLLoad g_pending_mcl_loads[MAX_PENDING_MCL_LOADS];
-int g_pending_mcl_load_count = 0;
+static PendingMCLLoad g_pending_mcl_loads_this_tick[MAX_PENDING_MCL_LOADS];
+int g_pending_mcl_load_count_this_tick = 0;
+static PendingMCLLoad g_pending_mcl_loads_next_tick[MAX_PENDING_MCL_LOADS];
+int g_pending_mcl_load_count_next_tick = 0;
+int g_pending_mcl_load_count = 0;  // sum of both buckets (for exit-condition checks)
 
 // Helper: create an ActionVar string from an ASCII C string
 static ActionVar makeStringVar(SWFAppContext* app_context, const char* str)
@@ -28299,21 +28319,51 @@ static ActionVar builtin_mcl_loadClip(SWFAppContext* app_context, ActionVar* arg
         setProperty(app_context, (ASObject*)target_mc->dynamic_props, "__mcl_bytes", 11, &sz);
     }
 
-    // Queue load for deferred event dispatch at ShowFrame
-    if (g_pending_mcl_load_count < MAX_PENDING_MCL_LOADS) {
-        g_pending_mcl_loads[g_pending_mcl_load_count].mcl = mcl;
-        g_pending_mcl_loads[g_pending_mcl_load_count].target = target_mc;
-        g_pending_mcl_loads[g_pending_mcl_load_count].entry = entry;
-        g_pending_mcl_loads[g_pending_mcl_load_count].file_size = file_size;
-        // Check if URL ends in .swf (affects onLoadError vs onLoadInit for missing files)
+    // Decide whether to defer MCL events to the next tick.
+    //
+    // Defer when the loader is playing AND has more root frames left to
+    // run — Flash fires MCL events AFTER the loader's next-frame DoAction
+    // (key test: from_shumway/avm1/moviecliploader, where "loader frame 2"
+    // must trace before "onLoadStart"). Otherwise (loader on last frame,
+    // stopped, or loadClip was called from a setTimeout firing past the
+    // last frame) fire same-tick via the existing tagShowFrame drain so
+    // tests with `num_frames=1` (e.g. `loadmovie_fail`) still see their
+    // events, and chained-timer patterns
+    // (`avm1/loadmovie_var_persistence`) don't run out of `num_ticks`.
+    extern int is_playing;
+    int defer_to_next_tick = is_playing && (current_frame + 1 < g_frame_count);
+
+    if (defer_to_next_tick && g_pending_mcl_load_count_next_tick < MAX_PENDING_MCL_LOADS) {
+        int slot = g_pending_mcl_load_count_next_tick;
+        g_pending_mcl_loads_next_tick[slot].mcl = mcl;
+        g_pending_mcl_loads_next_tick[slot].target = target_mc;
+        g_pending_mcl_loads_next_tick[slot].entry = entry;
+        g_pending_mcl_loads_next_tick[slot].file_size = file_size;
         {
             int url_len = (int)strlen(url_utf8);
-            g_pending_mcl_loads[g_pending_mcl_load_count].is_swf_url =
+            g_pending_mcl_loads_next_tick[slot].is_swf_url =
                 (url_len >= 4 && strcasecmp(url_utf8 + url_len - 4, ".swf") == 0) ? 1 : 0;
         }
-        snprintf(g_pending_mcl_loads[g_pending_mcl_load_count].url,
-                 sizeof(g_pending_mcl_loads[g_pending_mcl_load_count].url),
+        snprintf(g_pending_mcl_loads_next_tick[slot].url,
+                 sizeof(g_pending_mcl_loads_next_tick[slot].url),
                  "%s", url_utf8);
+        g_pending_mcl_load_count_next_tick++;
+        g_pending_mcl_load_count++;
+    } else if (g_pending_mcl_load_count_this_tick < MAX_PENDING_MCL_LOADS) {
+        int slot = g_pending_mcl_load_count_this_tick;
+        g_pending_mcl_loads_this_tick[slot].mcl = mcl;
+        g_pending_mcl_loads_this_tick[slot].target = target_mc;
+        g_pending_mcl_loads_this_tick[slot].entry = entry;
+        g_pending_mcl_loads_this_tick[slot].file_size = file_size;
+        {
+            int url_len = (int)strlen(url_utf8);
+            g_pending_mcl_loads_this_tick[slot].is_swf_url =
+                (url_len >= 4 && strcasecmp(url_utf8 + url_len - 4, ".swf") == 0) ? 1 : 0;
+        }
+        snprintf(g_pending_mcl_loads_this_tick[slot].url,
+                 sizeof(g_pending_mcl_loads_this_tick[slot].url),
+                 "%s", url_utf8);
+        g_pending_mcl_load_count_this_tick++;
         g_pending_mcl_load_count++;
     }
 
@@ -28516,17 +28566,45 @@ void actionImportAssets(SWFAppContext* app_context, const char* url)
 	g_current_movie_id = _saved_movie_id;
 }
 
+// Promote pending MCL loads from the _next_tick bucket into _this_tick. Called
+// from swf_core.c / swf_headless.c at the top of each frame tick (after
+// actionFinalizePendingRemovals, before sprite advance and root frame_func) so
+// that loads queued by the previous tick's loadClip drain at the END of THIS
+// tick — i.e. AFTER the loader's next-frame DoAction has already run.
+void actionPromotePendingMCLLoads(SWFAppContext* app_context)
+{
+    (void)app_context;
+    int n = g_pending_mcl_load_count_next_tick;
+    if (n == 0) return;
+    int avail = MAX_PENDING_MCL_LOADS - g_pending_mcl_load_count_this_tick;
+    if (n > avail) n = avail;
+    for (int i = 0; i < n; i++) {
+        g_pending_mcl_loads_this_tick[g_pending_mcl_load_count_this_tick + i] =
+            g_pending_mcl_loads_next_tick[i];
+    }
+    g_pending_mcl_load_count_this_tick += n;
+    // Shift any remaining _next_tick entries that didn't fit (FIFO preserved).
+    int remaining = g_pending_mcl_load_count_next_tick - n;
+    for (int i = 0; i < remaining; i++) {
+        g_pending_mcl_loads_next_tick[i] = g_pending_mcl_loads_next_tick[n + i];
+    }
+    g_pending_mcl_load_count_next_tick = remaining;
+    // Total count unchanged — entries just moved between buckets.
+}
+
 // 1. For each load (FIFO): fire onLoadStart, onLoadProgress, onLoadComplete
 // 2. For each load (FIFO): run child movie init+frame0
 // 3. For each load (LIFO): fire onLoadInit
 void actionFirePendingLoadInits(SWFAppContext* app_context)
 {
-    int count = g_pending_mcl_load_count;
+    int count = g_pending_mcl_load_count_this_tick;
     if (count == 0) return;
-    // Copy and reset (handlers may queue more loads)
+    // Copy and reset _this_tick (handlers may queue more loads into either
+    // bucket via chained loadClips).
     PendingMCLLoad loads[MAX_PENDING_MCL_LOADS];
-    for (int i = 0; i < count; i++) loads[i] = g_pending_mcl_loads[i];
-    g_pending_mcl_load_count = 0;
+    for (int i = 0; i < count; i++) loads[i] = g_pending_mcl_loads_this_tick[i];
+    g_pending_mcl_load_count_this_tick = 0;
+    g_pending_mcl_load_count -= count;
 
     // Pre-phase: Set child SWF URLs and versions on target MCs (before events fire, so mc._url is correct)
     for (int i = 0; i < count; i++) {

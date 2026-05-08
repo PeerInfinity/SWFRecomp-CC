@@ -270,6 +270,73 @@ Spot-checking their `output.txt`: **none** interleave a loader-MC's next-frame D
 6. Run the 25 MCL/loadMovie canaries locally — expect all still pass.
 7. Commit. Push. Trigger CI. Verify no net regressions.
 
+### Update 2026-05-08 — conditional deferral landed (gates on loader having more frames)
+
+After the failed uniform-deferral attempt below, a refinement gating the
+deferral on `is_playing && (current_frame + 1 < g_frame_count)` makes
+both target tests work side-by-side:
+
+- `from_shumway/avm1/moviecliploader`: 1/7 → 6/7 lines. The 2-frame loader
+  defers MCL events from tick 1 to tick 2's tagShowFrame, so the order
+  becomes `loading started, loader frame 2, onLoadStart, onLoadComplete,
+  loadee frame 1, onLoadInit`. Still missing `loadee frame 2` (a separate
+  Phase 2 bug — `actionFirePendingLoadInits` runs the loadee's
+  `frame_funcs[0]` once but doesn't wire the loadee MC into the per-tick
+  `advance_sprite_frames` walk that would call `frame_funcs[1]` next tick).
+  No ruffle_matched promotion: our diff `{line 7}` is not a subset of
+  Ruffle's `{line 2 missing, line 5 extra}`.
+- `avm1/loadmovie_var_persistence`: still PASS. 1-frame loader →
+  `should_defer = false` → enqueues into `_this_tick` → fires same-tick via
+  the existing tagShowFrame drain, exactly matching pre-deferral behaviour.
+
+**Implementation summary** (all in `SWFModernRuntime/`):
+
+- `src/actionmodern/action.c`:
+  - Split `g_pending_mcl_loads` into `g_pending_mcl_loads_this_tick` and
+    `g_pending_mcl_loads_next_tick` arrays with separate counts; the
+    public `g_pending_mcl_load_count` is the sum (for exit-condition
+    checks).
+  - `builtin_mcl_loadClip` decides bucket via
+    `is_playing && (current_frame + 1 < g_frame_count)` and writes to
+    the matching array.
+  - New `actionPromotePendingMCLLoads(app_context)` moves all
+    `_next_tick` entries into `_this_tick` (FIFO preserved).
+  - `actionFirePendingLoadInits` drains `_this_tick`.
+- `src/libswf/swf_core.c` and `src/libswf/swf_headless.c`:
+  - Call `actionPromotePendingMCLLoads` at top-of-tick (after
+    `actionFinalizePendingRemovals`).
+  - Updated the chained-drain loop to check `_this_tick` only.
+  - Added a "last-tick drain" (promote+drain when
+    `tick_count >= max_ticks` and `_next_tick` non-empty) so deferred
+    loads still fire if a test would otherwise exit before the next tick.
+  - Added `g_pending_mcl_load_count == 0` (and
+    `g_pending_direct_load_count == 0` in `swf_core.c`) to the
+    past-last-frame `quit_swf` exit-condition guard so a tick with
+    pending deferred MCL events doesn't break out before the safety-net
+    drain runs.
+
+**Regression batteries.** All green:
+
+- 25-test AVM1 MCL/loadMovie battery (loadmovie, loadmovienum, mcl_*,
+  unloadmovie* — 25/25 PASS, including loadmovie_var_persistence and
+  loadmovie_fail with `num_frames=1`).
+- 4-test Gnash actionscript.all `MovieClipLoader-v5..v8` battery (4/4
+  effective: 2 PASS + 2 ruffle_matched, unchanged).
+- 19-test AVM1 lifecycle/scope/timeline battery (on_construct,
+  execution_order2/3, goto_rewind3, as2_super_and_this_v6,
+  register_class_return_value, watch, movieclip_state_values/default_state,
+  swf5_to_6_cross_call, set_interval, clone_sprite_edittext, tell_target,
+  path_string, function_base_clip, goto_methods, movieclip_setmask,
+  textsnapshot_available_text, placeobject_occupied_depth — 19/19 PASS).
+
+**Followup.** `loadee frame 2` (line 7 of `moviecliploader` expected
+output) requires a separate fix: when `actionFirePendingLoadInits`
+Phase 2 runs `entry->frame_funcs[0]`, the target MC needs to be
+registered for per-tick frame advancement so `frame_funcs[1]`
+(`loadee frame 2`) fires on the next tick. Likely needs a path
+analogous to the `actionRegisterLevelAdvance` pattern that already
+exists for multi-frame `_levelN` loads. Not in scope for this plan.
+
 ### Investigation 2026-05-08 — full one-tick deferral regresses chained-timer tests, REVERTED
 
 Implemented the two-bucket queue exactly as the plan describes (`g_pending_mcl_loads_next_tick` ↔ `g_pending_mcl_loads_this_tick`, `actionPromotePendingMCLLoads` at top-of-tick, `actionFirePendingLoadInits` drains `_this_tick`). Two additional fixes were needed for the deferral to even drain:

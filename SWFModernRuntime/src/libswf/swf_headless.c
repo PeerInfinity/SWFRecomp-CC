@@ -819,7 +819,10 @@ void swfStart(SWFAppContext* app_context)
 
 	// MCL pending load dispatch (used after processTimers and in exit conditions)
 	extern void actionFirePendingLoadInits(SWFAppContext* app_context);
+	extern void actionPromotePendingMCLLoads(SWFAppContext* app_context);
 	extern int g_pending_mcl_load_count;
+	extern int g_pending_mcl_load_count_this_tick;
+	extern int g_pending_mcl_load_count_next_tick;
 
 	initTime(app_context);
 	initMap();
@@ -931,6 +934,12 @@ void swfStart(SWFAppContext* app_context)
 		// They persisted for one frame (scripts could still access them); now invalidate.
 		actionFinalizePendingRemovals(app_context);
 
+		// Promote pending MCL loads queued during the previous tick into the
+		// "fire this tick" bucket, so events drain AFTER the loader's
+		// next-frame DoAction has run (matches Flash semantics — see
+		// SHUMWAY_AVM1_SUBTREES_PLAN.md Part B).
+		actionPromotePendingMCLLoads(app_context);
+
 		// Frame-first: advance sprites and run frame scripts before delivering events.
 		// This ensures that listeners registered in frame scripts receive events from
 		// the same tick (matching Flash/Ruffle's frame-then-event execution order).
@@ -1009,7 +1018,8 @@ void swfStart(SWFAppContext* app_context)
 				    && !hasPlayingSprites()
 				    && !hasActiveTimers()
 				    && !hasPlayingLevels()
-				    && !hasClipEnterFrameHandlers()) break;
+				    && !hasClipEnterFrameHandlers()
+				    && g_pending_mcl_load_count == 0) break;
 			}
 			{
 				extern int g_advance_defer_nested;
@@ -1201,10 +1211,20 @@ void swfStart(SWFAppContext* app_context)
 		actionFlushPendingOnLoads(app_context);
 
 		// Dispatch any MCL loads queued by timer callbacks or chained from
-		// onLoadInit handlers.  Loop because each dispatch may queue more loads.
+		// onLoadInit handlers. Drains _this_tick only — _next_tick waits
+		// for the next tick's promote step.
 		{
 			int mcl_guard = 0;
-			while (g_pending_mcl_load_count > 0 && mcl_guard++ < 32)
+			while (g_pending_mcl_load_count_this_tick > 0 && mcl_guard++ < 32)
+				actionFirePendingLoadInits(app_context);
+		}
+
+		// Last-tick MCL drain: if this is the final iteration, promote any
+		// pending _next_tick loads and drain them before exiting.
+		if (tick_count >= max_ticks && g_pending_mcl_load_count_next_tick > 0) {
+			actionPromotePendingMCLLoads(app_context);
+			int mcl_guard = 0;
+			while (g_pending_mcl_load_count_this_tick > 0 && mcl_guard++ < 32)
 				actionFirePendingLoadInits(app_context);
 		}
 
