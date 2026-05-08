@@ -1,10 +1,14 @@
-# Shumway avm1/ Remaining Failures — Fix Plan
+# Shumway avm1/ Remaining Failures — Fix Plan (COMPLETE)
+
 <!-- TESTS: moviecliploader, avm1/moviecliploader -->
 
-One test remaining in the `from_shumway/avm1/` sub-tree (also surfaces in the flat `from_shumway/` suite). Originally this plan tracked two — Part A (`doactionorder/doactionorder`) was resolved by Phase 6 of the ActionQueue rework (commit `a427f5fc`). Part A's content is preserved below as historical context. Active work is **Part B only** (moviecliploader, MCL one-tick deferral).
+**Status: COMPLETE** — moved from `incomplete/` to `complete/` 2026-05-08 after Part C landed in CI run `25578374215`. All originally-tracked failures now PASS:
 
 - ~~**Part A** — `doactionorder/doactionorder` (3/7). FIFO queueing of DoAction across root and sprite tags.~~ — **RESOLVED** via Phase 6 of `complete/ACTION_QUEUE_PLAN.md`. The approach this section originally proposed (A3) effectively became that plan.
-- **Part B** — `moviecliploader` (1/7). Deferring MovieClipLoader events one frame tick so they fire after the next frame's DoAction.
+- ~~**Part B** — `moviecliploader` (1/7 → 6/7). Deferring MovieClipLoader events one frame tick so they fire after the next frame's DoAction.~~ — **LANDED** 2026-05-08 with conditional gating (`is_playing && current_frame + 1 < g_frame_count`).
+- ~~**Part C** — `moviecliploader` (6/7 → 7/7). Per-tick frame advancement for the loadee MC after Phase 2.~~ — **LANDED** 2026-05-08, CI run `25578374215`.
+
+All historical context preserved below.
 
 Commands:
 

@@ -2,7 +2,7 @@
 
 Cross-suite summary of all Ruffle-derived test suites. Each suite has its own `_investigation/` directory with detailed status docs.
 
-Last updated: 2026-05-08 (Part C local — `from_shumway/avm1/moviecliploader` 6/7 → **PASS (7/7)**. After Phase 2 of `actionFirePendingLoadInits` runs the loadee's `frame_funcs[0]`, the loadee MC is now registered with `actionRegisterLevelAdvance` so `frame_funcs[1..N-1]` fire on subsequent ticks via the existing per-tick `actionAdvancePlayingLevels` path. Trailing `loadee frame 2` line now matches. Pending CI verification — flat suite expected 75 → 76 effective, avm1 sub-tree 46 → 47 effective.)
+Last updated: 2026-05-08 (CI `e0d15089`, run `25578374215` — Part C: loadee per-tick advance landed. `from_shumway/avm1/moviecliploader` 6/7 → **PASS (7/7)**. Shumway flat suite filtered effective 75/76 → **76/76 (100%)**; avm1 sub-tree raw 45 → 46 PASS. After Phase 2 of `actionFirePendingLoadInits` runs the loadee's `frame_funcs[0]`, the loadee MC is now registered with `actionRegisterLevelAdvance` so `frame_funcs[1..N-1]` fire on subsequent ticks via the existing per-tick `actionAdvancePlayingLevels` path. Zero regressions across all 8 suites.)
 
 ## Suite Summary
 
@@ -16,13 +16,13 @@ Last updated: 2026-05-08 (Part C local — `from_shumway/avm1/moviecliploader` 6
 | [from_gnash/misc-swfmill.all](../from_gnash/_investigation/CURRENT_STATUS.md) | 18 | 17 | 1 | 18 | **100.0%** | — | All effective pass. Unchanged this CI. |
 | [from_gnash/misc-ming.all](../from_gnash/_investigation/CURRENT_STATUS.md) | 102 | 65 | 24 | 89 | 87.3% | **88.1%** (89/101) | 1 ignored (`opcode_guard_test`). `loop/loop_test10` promoted to ruffle_matched this CI via the same-frame Remove+Place fix (root timeline narrow). |
 | [from_gnash/misc-swfc.all](../from_gnash/_investigation/CURRENT_STATUS.md) | 16 | 8 | 6 | 14 | 87.5% | — | `opcode_guard_test2` promoted to ruffle_matched this CI: AS-level `removeMovieClip` on clips with `onUnload` now follows the deferred-removal pattern (shifted depth, dynamic_props/var_map preserved for same-frame reads). |
-| [from_shumway](../from_shumway/_investigation/CURRENT_STATUS.md) (flat) | 92 | 73 | 3 | 76 | 82.6% | **100.0%** (76/76) | `avm1/moviecliploader` 6/7 → **PASS** locally via Part C (per-tick advance for the loadee MC after Phase 2 — `actionRegisterLevelAdvance` registration when `entry->frame_count > 1`). 16 fuzz tests still MISMATCH (in `ignored_tests.txt`). Pending CI verification. |
-| [from_shumway/avm1](../from_shumway/_investigation/CURRENT_STATUS.md) | 47 | 46 | 0 | 46 | 97.9% | **100.0%** (45/45) | 2 ignored. `moviecliploader` 6/7 → **PASS** locally via Part C (loadee per-tick advance). Pending CI verification. |
+| [from_shumway](../from_shumway/_investigation/CURRENT_STATUS.md) (flat) | 92 | 73 | 3 | 76 | 82.6% | **100.0%** (76/76) | `avm1/moviecliploader` 6/7 → **PASS** this CI via Part C (per-tick advance for the loadee MC after Phase 2 — `actionRegisterLevelAdvance` registration when `entry->frame_count > 1`). 16 fuzz tests still MISMATCH (in `ignored_tests.txt`). |
+| [from_shumway/avm1](../from_shumway/_investigation/CURRENT_STATUS.md) | 47 | 46 | 0 | 46 | 97.9% | **100.0%** (45/45) | 2 ignored. `moviecliploader` 6/7 → **PASS** this CI via Part C (loadee per-tick advance). |
 | **SWFRecomp/tests** (old suite) | 158+59 | all trace pass | — | — | **100%** | — | Hand-written opcode tests. CI only. |
 
-## Progress Since 2026-05-08 (local, NOT yet in CI) — Part C: loadee per-tick advance
+## Progress Since 2026-05-08 (CI `e0d15089`, run `25578374215`) — Part C: loadee per-tick advance
 
-- **`from_shumway/avm1/moviecliploader` → 6/7 → PASS (7/7).** Implements `incomplete/SHUMWAY_AVM1_SUBTREES_PLAN.md` Part C with one change in `SWFModernRuntime/src/actionmodern/action.c::actionFirePendingLoadInits` Phase 2: after running `entry->frame_funcs[0]` in the target MC's context, register the loadee for per-tick frame advancement via `actionRegisterLevelAdvance(target, entry)` when `entry->frame_count > 1`. Reuses the existing per-tick mechanism that loadMovieNum (level loads) uses — `actionAdvancePlayingLevels` (called from `swf_core.c` / `swf_headless.c` top-of-tick) swaps to the loadee's display_list + transform_data + SWF version, runs `frame_funcs[current_frame]`, increments `current_frame`, drops the entry once `current_frame >= frame_count`. The "Level" naming is historical — it's a generic per-tick advance for any (MC, entry) pair; loadMovieNum was simply its first caller.
+- **`from_shumway/avm1/moviecliploader` → 6/7 → PASS (7/7).** Implements `complete/SHUMWAY_AVM1_SUBTREES_PLAN.md` Part C with one change in `SWFModernRuntime/src/actionmodern/action.c::actionFirePendingLoadInits` Phase 2: after running `entry->frame_funcs[0]` in the target MC's context, register the loadee for per-tick frame advancement via `actionRegisterLevelAdvance(target, entry)` when `entry->frame_count > 1`. Reuses the existing per-tick mechanism that loadMovieNum (level loads) uses — `actionAdvancePlayingLevels` (called from `swf_core.c` / `swf_headless.c` top-of-tick) swaps to the loadee's display_list + transform_data + SWF version, runs `frame_funcs[current_frame]`, increments `current_frame`, drops the entry once `current_frame >= frame_count`. The "Level" naming is historical — it's a generic per-tick advance for any (MC, entry) pair; loadMovieNum was simply its first caller.
 
 - **No double-advance with `advance_sprite_frames`.** The MCL target MC's `sprite_frame_funcs` either are NULL (createEmptyMovieClip) or point at the original placeholder character — never at the loadee's `frame_funcs`. `advance_sprite_frames` calls `ch->sprite_frame_funcs[frame]` (the placeholder), not the loaded entry's frame_funcs. So registering with `actionRegisterLevelAdvance` doesn't conflict and no frame fires twice.
 
@@ -30,7 +30,7 @@ Last updated: 2026-05-08 (Part C local — `from_shumway/avm1/moviecliploader` 6
 
 - **Regression batteries (all green).** 26-test extended AVM1 MCL/loadMovie battery (loadmovie*, loadmovienum*, mcl_*, unloadmovie*, string_paths_eval2, moviecliploader_flashvars — 26/26 PASS). 4-test Gnash MovieClipLoader-v5..v8 (4/4 effective: 2 PASS + 2 RM, unchanged). 21-test AVM1 lifecycle/scope/timeline battery (mcl_replace_root_swf7_to_swf{5,6}, on_construct, execution_order2/3, goto_rewind3, as2_super_and_this_v6, register_class_return_value, watch, movieclip_state_values/default_state, swf5_to_6_cross_call, set_interval, clone_sprite_edittext, tell_target, path_string, function_base_clip, goto_methods, movieclip_setmask, textsnapshot_available_text, placeobject_occupied_depth — 21/21 effective: 19 PASS + 2 RM).
 
-- **Combined effect (Part B + Part C).** Shumway flat suite: filtered effective 75/76 → **76/76 (100%)**, raw effective 75 → 76 (81.5% → 82.6%). Shumway avm1 sub-tree: raw effective 46 → 47 (97.9% → 100%). Filtered remains 45/45 (100%) since `moviecliploader` is in `from_shumway/avm1/ignored_tests.txt`.
+- **Combined effect (Part B + Part C).** Shumway flat suite: filtered effective 75/76 → **76/76 (100%)**, raw 72 → 73 PASS (78.3% → 79.3%). Shumway avm1 sub-tree: raw 45 → 46 PASS (95.7% → 97.9%). Filtered remains 45/45 (100%) since `moviecliploader` is in `from_shumway/avm1/ignored_tests.txt`. Zero regressions across all 7 other suites (avm1, gnash actionscript.all, misc-mtasc.all, misc-swfmill.all, misc-ming.all, misc-swfc.all, from_shumway/timeline) — all unchanged from previous CI.
 
 ## Progress Since 2026-05-08 (CI `0502d0ec` + `84a147bd`) — conditional MCL one-tick deferral
 
@@ -276,12 +276,11 @@ Note: Boolean-v5/v6/v7/v8, Video-v6/v7/v8, Selection-v5, Stage-v5 were already p
 
 ## Where to Focus
 
-AVM1 filtered suite is at 100% (zero filtered failures); remaining actionable work is in the Gnash and Shumway suites.
+AVM1 filtered suite is at 100% (zero filtered failures). Shumway flat suite reached 100% filtered effective (76/76) and the avm1 sub-tree reached 100% raw effective (47/47, 100% filtered) after Part C landed (CI run `25578374215`). Remaining actionable work is mostly in the Gnash suites.
 
 1. **Gnash actionscript.all near-passing** — 22+ tests with <=18 line diffs. `global_proto_decls*` enumeration/ordering, `Number-v5..v8` float-to-string rounding, `Selection-v6/7/8`, `ExternalInterface-v8`. See `from_gnash/_investigation/incomplete/GNASH_NEAR_PASSING_PLAN.md`.
 2. **Gnash `misc-mtasc/levels`** — only 1 failure in that sub-suite; needs multi-level SWF loading (`_level5`, `_level87`, `_level99`). See `LEVELS_PLAN.md`.
 3. **Gnash `misc-swfmill`** — 1 remaining failure (`jump_to_prev_block`, cross-DoAction backward jump). `tags_after_last_showframe` was fixed this session. See `incomplete/MISC_SWFMILL_PLAN.md` for the consecutive-DoAction concatenation fix plan.
-4. **Shumway `avm1/moviecliploader`** — sole remaining filtered failure. One-tick MCL deferral exposes latent getBounds / chained setInterval bugs. See `from_shumway/_investigation/incomplete/SHUMWAY_AVM1_SUBTREES_PLAN.md` Part B.
-5. **Shumway `fuzz/*`** — 16 fuzzer-generated SWFs in `ignored_tests.txt` after the place-before-define fix; useful only as an occasional edge-case discovery source. Not a focus area.
-6. **AVM1 image tests** — 14/31 strict pass, 10/31 tolerance. Remaining need Drawing API anti-aliasing, text layout, dynamic masks, or external media loading. Tracked in `IMAGE_COMPARISON_TESTS.md`.
-7. **Gnash `misc-ming.all` / `misc-swfc.all`** — ~76 of ~83 failing tests are actionable via Phase 1 (near-passing) + Phase 2 (mid-rate cluster fixes); only ~7 zero-output tests are blocked on the inlined-Dejagnu DoInitAction architectural issue (Phase 3). See `incomplete/MISC_MING_SWFC_PLAN.md`.
+4. **Shumway `fuzz/*`** — 16 fuzzer-generated SWFs in `ignored_tests.txt` after the place-before-define fix; useful only as an occasional edge-case discovery source. Not a focus area.
+5. **AVM1 image tests** — 14/31 strict pass, 10/31 tolerance. Remaining need Drawing API anti-aliasing, text layout, dynamic masks, or external media loading. Tracked in `IMAGE_COMPARISON_TESTS.md`.
+6. **Gnash `misc-ming.all` / `misc-swfc.all`** — ~76 of ~83 failing tests are actionable via Phase 1 (near-passing) + Phase 2 (mid-rate cluster fixes); only ~7 zero-output tests are blocked on the inlined-Dejagnu DoInitAction architectural issue (Phase 3). See `incomplete/MISC_MING_SWFC_PLAN.md`.
