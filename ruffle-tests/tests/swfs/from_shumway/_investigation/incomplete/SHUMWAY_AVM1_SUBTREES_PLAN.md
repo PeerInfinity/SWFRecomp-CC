@@ -270,6 +270,35 @@ Spot-checking their `output.txt`: **none** interleave a loader-MC's next-frame D
 6. Run the 25 MCL/loadMovie canaries locally — expect all still pass.
 7. Commit. Push. Trigger CI. Verify no net regressions.
 
+### Investigation 2026-05-08 — full one-tick deferral regresses chained-timer tests, REVERTED
+
+Implemented the two-bucket queue exactly as the plan describes (`g_pending_mcl_loads_next_tick` ↔ `g_pending_mcl_loads_this_tick`, `actionPromotePendingMCLLoads` at top-of-tick, `actionFirePendingLoadInits` drains `_this_tick`). Two additional fixes were needed for the deferral to even drain:
+
+- The `quit_swf` exit check in `swf_core.c`'s past-last-frame `else` branch (and the matching one in `swf_headless.c`) didn't include `g_pending_mcl_load_count > 0`, so a 1-frame loader (`quit_swf=1` set at end of frame 1) would `break` out before tick 2's promote+drain ever ran.
+- Tests with `num_frames=1` (e.g. `loadmovie_fail`) have only one tick to begin with, so a "last-tick" drain (promote+fire if `tick_count >= max_ticks` and `_next_tick` non-empty) was added to `swf_core.c` and `swf_headless.c` after the safety-net.
+
+**Local result** on the deferral attempt:
+
+- `from_shumway/avm1/moviecliploader`: 1/7 → 6/7 lines (+5). Order now `loading started, loader frame 2, onLoadStart, onLoadComplete, loadee frame 1, onLoadInit, <missing loadee frame 2>`. The trailing `loadee frame 2` is a separate bug — Phase 2 of `actionFirePendingLoadInits` only runs `entry->frame_funcs[0]` once; the loadee MC isn't wired into the per-tick `advance_sprite_frames` walk that would fire `frame_funcs[1]` next tick. **Even with the deferral correct, `moviecliploader` still won't reach 7/7 without separate loadee-timeline-advancement work.**
+
+- `avm1/loadmovie_var_persistence` REGRESSED from PASS (8/8) to MISMATCH (6/8). Test pattern is `frame 1: loadClip(clip1)` → `onLoadComplete listener: setTimeout(t1, 100)` → `t1: traces, loadClip(clip2)` → `clip2's onLoadComplete listener: setTimeout(t2, 100)` → `t2: traces`. With `num_ticks=6`, the deferral adds one tick per chain step; the cumulative `setTimeout(100ms) + 1-tick deferral` push pushes `t2` past tick 6. Lines 7-8 (from `t2`) never trace. Pre-fix produces all 8 lines because MCL events fire same-tick, so the chain only consumes ~5 ticks.
+
+- 24 of 25 MCL/loadMovie canaries still PASS post-deferral (the one regression is `loadmovie_var_persistence`).
+
+**Why this is harder than the plan suggested.** The plan's "spot-check" missed `loadmovie_var_persistence` because the test source isn't in the test directory (only the compiled `.swf` files), and the `output.txt` doesn't superficially look "interleave-sensitive." But the test's expected output (`Loading clip1.swf` → clip1 frame trace → listener trace via timer → `Loading clip2.swf` → clip2 frame trace → listener trace via timer) implicitly relies on:
+
+  (a) MCL events firing same-tick as `loadClip` (so `onLoadComplete` listener can schedule `setTimeout` early enough for `t1` to fire within `num_ticks`), AND
+  (b) Phase 2 (loadee `frame_funcs[0]`) firing AFTER Phase 1 (`onLoadComplete` listener) — actually our impl has the right order for THIS test's listener sequencing because the listener only schedules a timer (no traces) and Phase 2 is what traces "Set exampleVariable".
+
+So the constraints are mutually exclusive within a single uniform-deferral strategy:
+
+- **moviecliploader**: needs MCL events deferred by 1 tick so loader's frame 2 DoAction runs first.
+- **loadmovie_var_persistence**: needs MCL events same-tick so chained `setTimeout`-driven loadClips fit within `num_ticks=6`.
+
+**Possible refinement (not yet attempted).** Defer only when the loader has more frames left to play (`current_frame + 1 < g_frame_count`), else fire same-tick. This would preserve same-tick semantics for 1-frame loaders (loadmovie_var_persistence) while deferring for multi-frame (moviecliploader). Implementation: at `tagShowFrame`'s `actionFirePendingLoadInits` call, pass a flag indicating whether to drain everything or only previous-tick entries; or split the drain by load entry's enqueue-tick. Risk: tests with 2-frame roots that DON'T expect deferral would break. Needs more spot-checking before attempting.
+
+**Reverted.** All changes backed out via `git checkout`. State is back to baseline. Effective pass rate unchanged.
+
 ---
 
 ## Sequencing
