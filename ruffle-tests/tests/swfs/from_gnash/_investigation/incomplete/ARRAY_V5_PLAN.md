@@ -1,11 +1,50 @@
 # array-v5 Investigation Plan
 <!-- TESTS: array-v5 -->
 
-Last updated: 2026-05-08 (pending CI: shift DontDelete + sync HOLE skip + ARRAY __resolve)
+Last updated: 2026-05-08 (pending CI: shift DontDelete + sync HOLE skip + ARRAY __resolve + ARRAY-typed __proto__ chain follow)
 
-## Status: IN PROGRESS — 535/560 lines match locally (~95.5%), 25 remaining failures (CI baseline `068b46d8` was 528/560)
+## Status: IN PROGRESS — 536/560 lines match locally (~95.7%), 24 remaining failures (CI baseline `068b46d8` was 528/560; previous local 535/560)
 
-### Latest fixes (2026-05-08, pending CI) — +7 lines
+### Latest fix (2026-05-08, pending CI) — +1 line
+
+**`X.prototype = new Array(); o = new X(); o.push(...); o.pop()` now resolves
+inherited Array methods (line 1710, +1).** When a function's prototype is
+assigned a non-object value (here, an Array instance), `actionNewObject`
+stores it on the new instance's `__proto__` verbatim — the type tag stays
+`ACTION_STACK_VALUE_ARRAY`, not OBJECT. The OBJECT-receiver method-lookup
+loop in `actionCallMethod` (`SWFModernRuntime/src/actionmodern/action.c`)
+gated chain traversal on `_np->type != ACTION_STACK_VALUE_OBJECT` and broke
+the walk at the ARRAY-typed proto, so `push` / `pop` were never found and
+`o.pop()` returned undefined. Two paired changes:
+
+1. `resolveProtoVar` (`action.c`) now also handles `ACTION_STACK_VALUE_ARRAY`
+   by returning `arr->props` — the string-keyed property bag whose own
+   `__proto__` points at `Array.prototype`. This automatically fixes
+   `walkProtoChain`, `getPropertyWithPrototype`, and
+   `findPropertyStructWithPrototype` callers (super lookups,
+   `findResolveMethod`, `getPropertyWithPrototype` everywhere).
+2. The inline OBJECT-receiver method-lookup walk in `actionCallMethod`
+   (line ~56235) does the same ARRAY-aware step in line. The walk now
+   accepts both OBJECT and ARRAY-typed `__proto__`, treating ARRAY as
+   "switch over to `arr->props`" before the next iteration.
+
+After the fix, `o.push("Array data")` resolves `push` via
+`o → X.prototype (Array instance) → arr->props → Array.prototype`, mutates
+through the existing `objectToTempArray` / `callArrayMethod` /
+`syncArrayToObject` path (own props on `o` get `0="Array data"`,
+`length=1`), and `o.pop()` returns `"Array data"` via the same chain.
+Verified no regressions across a 31-test AVM1 array/lifecycle/super/scope
+battery (31/31 PASS) plus the 19-test follow-up battery covering
+`array_properties`, `array_prototyping`, `as2_super_and_this_v6/v8`,
+`closure_scope`, `coerce_to_object_monkeypatch`, `enumerate`,
+`function_as_function`, `funky_function_calls`, `object_resolve`,
+`on_construct`, `parse_int`, `register_and_init_order`,
+`register_class_return_value`, `set_variable_scope`, `string_coercion`,
+`string_paths_eval2`, `typeof` (19/19 PASS), 11-test gnash actionscript.all
+prototype-heavy battery (11/11 effective: 6 PASS + 5 RM), and 4-test
+Shumway `duplicateMovieClip` battery (4/4 PASS).
+
+### Earlier fixes (2026-05-08, pending CI) — +7 lines
 
 1. **`Array.prototype.shift` honors DontDelete on target index (line 1416, +1).**
    `callArrayMethod` shift's element-copy loop now skips the move when the
@@ -38,16 +77,18 @@ Last updated: 2026-05-08 (pending CI: shift DontDelete + sync HOLE skip + ARRAY 
    function(a){...}; t[3]` returning `'resolved 3'` and the `rs == 1`
    counter checks that follow it (sort, reverse, join all flow through).
 
-### Remaining failures snapshot (25 lines)
+### Remaining failures snapshot (24 lines)
 
 Source line numbers: 260, 263, 324, 325, 950, 951, 1030, 1031, 1033,
 1035, 1244, 1259, 1264, 1273, 1275, 1513, 1524, 1550, 1559, 1577, 1630,
-1636, 1710, plus the trailing #passed / #failed counters. The bulk are
+1636, plus the trailing #passed / #failed counters. The bulk are
 sort/sortOn algorithm-dependent ordering (Category C in the list below)
 and Flash's plain-Object Array.prototype.X.call semantics (Category E).
-Fully closing the diff to subset of Ruffle's would also require fixing
-line 1710 (toString override on Array subclass via `X.prototype = new
-Array()`) and the for-in-over-sorted-sparse-array missing key (260/263).
+Line 1710 (`X.prototype = new Array()` Array-subclass-via-non-Array-receiver
+chain) was fixed via the ARRAY-typed `__proto__` follow in
+`resolveProtoVar` + the inline `actionCallMethod` walk; the
+for-in-over-sorted-sparse-array missing key (260/263) is the last
+non-sort/non-fakeArray-semantics blocker for ruffle_subset_match.
 
 ---
 

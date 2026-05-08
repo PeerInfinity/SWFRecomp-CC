@@ -2,7 +2,7 @@
 
 Cross-suite summary of all Ruffle-derived test suites. Each suite has its own `_investigation/` directory with detailed status docs.
 
-Last updated: 2026-05-08 (CI `f8e172e9`, run `25583473693` — `array-v5` 528/560 → **535/560** (+7) via Array.prototype.shift DontDelete honoring + syncArrayToObject HOLE skip + ARRAY-branch `__resolve` hook. `from_gnash/actionscript.all` mismatched lines 1572 → 1565. Zero regressions across all 8 suites.)
+Last updated: 2026-05-08 (pending CI — `array-v5` 535/560 → **536/560** (+1) via ARRAY-typed `__proto__` chain follow in `resolveProtoVar` + inline `actionCallMethod` walk. `X.prototype = new Array()` user-class-extends-Array now resolves inherited methods (`o.push`/`o.pop` on a non-Array receiver). Prior CI baseline `f8e172e9`: `array-v5` 528/560 → 535/560 via Array.prototype.shift DontDelete honoring + syncArrayToObject HOLE skip + ARRAY-branch `__resolve` hook.)
 
 ## Suite Summary
 
@@ -19,6 +19,16 @@ Last updated: 2026-05-08 (CI `f8e172e9`, run `25583473693` — `array-v5` 528/56
 | [from_shumway](../from_shumway/_investigation/CURRENT_STATUS.md) (flat) | 92 | 73 | 3 | 76 | 82.6% | **100.0%** (76/76) | `avm1/moviecliploader` 6/7 → **PASS** this CI via Part C (per-tick advance for the loadee MC after Phase 2 — `actionRegisterLevelAdvance` registration when `entry->frame_count > 1`). 16 fuzz tests still MISMATCH (in `ignored_tests.txt`). |
 | [from_shumway/avm1](../from_shumway/_investigation/CURRENT_STATUS.md) | 47 | 46 | 0 | 46 | 97.9% | **100.0%** (45/45) | 2 ignored. `moviecliploader` 6/7 → **PASS** this CI via Part C (loadee per-tick advance). |
 | **SWFRecomp/tests** (old suite) | 158+59 | all trace pass | — | — | **100%** | — | Hand-written opcode tests. CI only. |
+
+## Progress Since 2026-05-08 (pending CI) — `array-v5` ARRAY-typed __proto__ chain follow
+
+- **`array-v5` (Gnash actionscript.all) → 535/560 → 536/560 (+1 line, -1 mismatched).** Two paired changes in `SWFModernRuntime/src/actionmodern/action.c`:
+  1. `resolveProtoVar` now also handles `ACTION_STACK_VALUE_ARRAY` by returning `arr->props` — the array's string-keyed property bag whose own `__proto__` points at `Array.prototype`. Used by `walkProtoChain`, `getPropertyWithPrototype`, and `findPropertyStructWithPrototype`.
+  2. The inline OBJECT-receiver method-lookup walk in `actionCallMethod` (line ~56235) does the same ARRAY-aware step inline — accepts both OBJECT and ARRAY-typed `__proto__`, switching to `arr->props` before continuing.
+
+- **Trigger.** `function X() {}; X.prototype = new Array(); o = new X(); o.push("Array data"); ret = o.pop();` (array.as line 1701-1710). When a function's prototype is assigned a non-object value (an Array instance), `actionNewObject` stores the ARRAY-typed value verbatim on the new instance's `__proto__`. The OBJECT-receiver method-lookup loop previously broke the chain walk at the ARRAY-typed proto, so `push`/`pop` were never resolved through `Array.prototype` and `o.pop()` returned undefined. Now resolves via `o → X.prototype (Array instance) → arr->props → Array.prototype` and the existing `objectToTempArray` / `callArrayMethod` / `syncArrayToObject` path mutates correctly.
+
+- **No regressions** across a 31-test AVM1 array/lifecycle/super/scope battery, 19-test follow-up battery (closure_scope, register_and_init_order, set_variable_scope, on_construct, register_class_return_value, parse_int, typeof, enumerate, function_as_function, coerce_to_object_monkeypatch, object_resolve, string_paths_eval2, string_coercion, etc.), 11-test gnash actionscript.all prototype-heavy battery (Boolean-v5, Inheritance-v5/v6/v7/v8, Number-v5, case-v6, delete-v5/v6, enumerate-v6/v7), and 4-test Shumway `duplicateMovieClip` battery — all 65 effective passes preserved.
 
 ## Progress Since 2026-05-08 (CI `f8e172e9`, run `25583473693`) — `array-v5` shift / sync / __resolve
 

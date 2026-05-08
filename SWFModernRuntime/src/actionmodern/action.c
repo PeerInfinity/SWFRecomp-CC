@@ -481,11 +481,17 @@ static ASObject* walkProtoChain(void* this_obj, u8 depth) {
 }
 
 // Resolve a __proto__ ActionVar to an ASObject* (returned as void*).
-// OBJECT → direct cast. SUPER → unwrap by walking this_ptr's proto chain.
+// OBJECT → direct cast. ARRAY → arr->props (the array's string-keyed property
+// bag, whose own __proto__ points at Array.prototype). SUPER → unwrap by
+// walking this_ptr's proto chain.
 void* resolveProtoVar(ActionVar* proto_var) {
 	if (proto_var == NULL || proto_var->data.numeric_value == 0) return NULL;
 	if (proto_var->type == ACTION_STACK_VALUE_OBJECT)
 		return (void*) proto_var->data.numeric_value;
+	if (proto_var->type == ACTION_STACK_VALUE_ARRAY) {
+		ASArray* arr = (ASArray*) proto_var->data.numeric_value;
+		return (arr != NULL) ? (void*) arr->props : NULL;
+	}
 	if (proto_var->type == ACTION_STACK_VALUE_SUPER)
 		return (void*) walkProtoChain((void*) proto_var->data.numeric_value, (u8) proto_var->str_size);
 	return NULL;
@@ -56236,10 +56242,16 @@ void actionCallMethod(SWFAppContext* app_context, char* str_buffer)
 				ActionVar* _mv = getProperty(_search, method_name, method_name_len);
 				if (_mv != NULL) { method_prop = _mv; break; }
 				ActionVar* _np = getProperty(_search, "__proto__", 9);
-				if (_np == NULL || _np->type != ACTION_STACK_VALUE_OBJECT || _np->data.numeric_value == 0) {
-					break;
+				if (_np == NULL || _np->data.numeric_value == 0) break;
+				ASObject* _next = NULL;
+				if (_np->type == ACTION_STACK_VALUE_OBJECT) {
+					_next = (ASObject*) _np->data.numeric_value;
+				} else if (_np->type == ACTION_STACK_VALUE_ARRAY) {
+					ASArray* _arr_proto = (ASArray*) _np->data.numeric_value;
+					_next = (_arr_proto != NULL) ? _arr_proto->props : NULL;
 				}
-				_search = (ASObject*) _np->data.numeric_value;
+				if (_next == NULL) break;
+				_search = _next;
 				if (_search == obj) break; // cycle
 				method_search_depth++;
 				_debug_steps++;

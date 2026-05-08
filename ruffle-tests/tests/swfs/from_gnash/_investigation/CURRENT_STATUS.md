@@ -1,6 +1,6 @@
 # Gnash Test Suite Status
 
-Last updated: 2026-05-08 (CI `f8e172e9`, run `25583473693` — `array-v5` 528/560 → 535/560 (+7) via Array.prototype.shift DontDelete honoring + syncArrayToObject HOLE skip + ARRAY-branch `__resolve` hook. actionscript.all mismatched lines 1572 → 1565. Zero regressions.)
+Last updated: 2026-05-08 (pending CI — `array-v5` 535/560 → 536/560 (+1) via ARRAY-typed `__proto__` chain follow in `resolveProtoVar` + inline `actionCallMethod` walk. Prior CI `f8e172e9`: `array-v5` 528/560 → 535/560 via shift DontDelete + syncArrayToObject HOLE skip + ARRAY `__resolve`.)
 
 ### CI snapshot (commit `f8e172e9`, 2026-05-08)
 
@@ -12,7 +12,17 @@ Last updated: 2026-05-08 (CI `f8e172e9`, run `25583473693` — `array-v5` 528/56
 | misc-swfc.all | 8 | 5 | 13 | 15 | — | **86.7%** |
 | misc-swfmill.all | 17 | 1 | 18 | 18 | — | 100.0% |
 
-### Latest fixes (2026-05-08, in CI at `f8e172e9`)
+### Latest fix (2026-05-08, pending CI)
+
+- **`array-v5` (actionscript.all): 535/560 → 536/560 lines match (+1, -1 mismatched).** Two paired changes in `SWFModernRuntime/src/actionmodern/action.c`:
+  1. `resolveProtoVar` now handles `ACTION_STACK_VALUE_ARRAY` by returning `arr->props` (the array's string-keyed property bag whose own `__proto__` points at `Array.prototype`). Used by `walkProtoChain`, `getPropertyWithPrototype`, and `findPropertyStructWithPrototype`.
+  2. The inline OBJECT-receiver method-lookup walk in `actionCallMethod` (line ~56235) does the same ARRAY-aware step inline.
+
+  Trigger pattern: `function X() {}; X.prototype = new Array(); o = new X(); o.push("Array data"); ret = o.pop();` (array.as line 1701-1710). When a function's prototype is a non-object value (here an Array instance), `actionNewObject` stores the ARRAY-typed value verbatim on the new instance's `__proto__`. The OBJECT-receiver method-lookup loop in `actionCallMethod` previously broke the chain walk at the ARRAY-typed proto, so `push`/`pop` were never resolved through `Array.prototype` and `o.pop()` returned undefined. After the fix, the walk follows `o → X.prototype (Array instance) → arr->props → Array.prototype`, and the existing `objectToTempArray` / `callArrayMethod` / `syncArrayToObject` path mutates correctly. Line 1710 (`ret == "Array data"`) flips to PASS.
+
+  No regressions across 31-test AVM1 array/lifecycle/super/scope battery, 19-test follow-up battery (closure_scope, register_and_init_order, set_variable_scope, on_construct, register_class_return_value, parse_int, typeof, enumerate, etc.), 11-test gnash actionscript.all prototype-heavy battery (Boolean-v5, Inheritance-v5/v6/v7/v8, Number-v5, case-v6, delete-v5/v6, enumerate-v6/v7), and 4-test Shumway `duplicateMovieClip` battery — all 65 effective passes preserved.
+
+### Earlier fixes (2026-05-08, in CI at `f8e172e9`)
 
 - **`array-v5` (actionscript.all): 528/560 → 535/560 lines match (+7, -7 mismatched).** Three changes in `SWFModernRuntime/src/actionmodern/action.c`:
   1. **`Array.prototype.shift` honors DontDelete on the target index.** The element-copy loop (`arr->elements[i] = arr->elements[i + 1]`) and the metadata-reset loop are now both gated on `arr->props["<i>"]` having `PROPERTY_FLAG_CONFIGURABLE` set. Matches Flash for `ASSetPropFlags(a, "0", 7, 0); a.shift()` — `a[0]` keeps its protected `'zero'` value (line 1416). Note: WRITABLE/ReadOnly is intentionally NOT honored here. Flash test array.as:1444 (`ASSetPropFlags(a, "0", 4, 0)`, ReadOnly only) explicitly expects shift to overwrite, so honoring WRITABLE would regress lines 1451/1454/1471/1474. Ruffle DOES honor WRITABLE (its `set_data` checks `is_overwritable()`) and so it fails 1451/1454/1471/1474 — those lines are in Ruffle's diff against Flash, so we can match Flash without falling outside Ruffle's diff for those particular lines.
