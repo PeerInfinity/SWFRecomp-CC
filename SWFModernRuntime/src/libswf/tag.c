@@ -5619,11 +5619,23 @@ typedef struct {
 	MovieClip* mc;
 	size_t depth;
 	int swf_depth;
-	// char_id of the display_list entry at queue time. Used by run_pending_finalize
-	// to detect whether a fresh tagPlaceObject2 at the same depth has overwritten
-	// the slot since this entry was queued — in that case, clear_display_entry
-	// must NOT fire (it would clobber the new placement's data).
+	// Snapshot of the display_list array + entry state at queue time. Used by
+	// run_pending_finalize to detect a same-frame Remove+Place sequence at the
+	// same depth that installed a *different* MC under a *different* name —
+	// in that case clear_display_entry must NOT fire (it would clobber the
+	// new placement's data, breaking the next-frame Remove's UNLOAD dispatch).
+	// We compare against the SAME display_list array we queued from
+	// (queued_dl_array): for sprite-internal pending entries, display_list is
+	// swapped back to root by run_pending_finalize time, so a naive comparison
+	// would mismatch with root's depth-N entry instead of the sprite's. When
+	// the saved pointer doesn't match the live display_list, we fall through
+	// to the original always-clear behavior.
+	// Required: misc-ming.all loop/loop_test10 (root-level Remove+Place under
+	// different names — skip clear). Regression-safe: misc-ming.all
+	// register_class/RegisterClassTest4 (sprite-internal — fall through).
+	void* queued_dl_array;
 	size_t orig_char_id;
+	char orig_instance_name[64];
 } PendingFinalizeEntry;
 static PendingFinalizeEntry ng_pending_finalize_entries[NG_PENDING_FINALIZE_CAP];
 static int ng_pending_finalize_count = 0;
@@ -5651,11 +5663,19 @@ void queue_pending_finalize_mc(MovieClip* mc, int swf_depth, size_t depth)
 	for (int i = 0; i < ng_pending_finalize_count; i++) {
 		if (ng_pending_finalize_entries[i].mc == mc) return;
 	}
-	ng_pending_finalize_entries[ng_pending_finalize_count].mc = mc;
-	ng_pending_finalize_entries[ng_pending_finalize_count].swf_depth = swf_depth;
-	ng_pending_finalize_entries[ng_pending_finalize_count].depth = depth;
-	ng_pending_finalize_entries[ng_pending_finalize_count].orig_char_id =
-		(depth <= max_depth) ? display_list[depth].char_id : 0;
+	PendingFinalizeEntry* slot =
+		&ng_pending_finalize_entries[ng_pending_finalize_count];
+	slot->mc = mc;
+	slot->swf_depth = swf_depth;
+	slot->depth = depth;
+	slot->queued_dl_array = (void*)display_list;
+	slot->orig_char_id = (depth <= max_depth) ? display_list[depth].char_id : 0;
+	slot->orig_instance_name[0] = '\0';
+	if (depth <= max_depth && display_list[depth].instance_name != NULL) {
+		strncpy(slot->orig_instance_name, display_list[depth].instance_name,
+		        sizeof(slot->orig_instance_name) - 1);
+		slot->orig_instance_name[sizeof(slot->orig_instance_name) - 1] = '\0';
+	}
 	ng_pending_finalize_count++;
 }
 
@@ -5682,18 +5702,36 @@ void run_pending_finalize(SWFAppContext* app_context)
 	for (int i = 0; i < n; i++) {
 		PendingFinalizeEntry* e = &ng_pending_finalize_entries[i];
 		actionMarkMCPendingRemovalDirect(e->mc, e->swf_depth);
-		// Skip clear_display_entry if a fresh tagPlaceObject2 has overwritten the
-		// slot with a different char (Same-frame Remove+Place sequence at the same
-		// depth — misc-ming loop_test10 frame 3/4 pattern). The fresh placement
-		// already supplied new char_id / clip_actions / instance_name; clearing
-		// here would clobber that data and prevent the next-frame Remove from
-		// firing the new MC's UNLOAD handler.
-		if (e->depth <= max_depth
-		    && (e->orig_char_id == 0
-		        || display_list[e->depth].char_id == 0
-		        || display_list[e->depth].char_id == e->orig_char_id))
+		// Skip clear_display_entry when the slot has been overwritten by a
+		// same-frame fresh placement under a *different* instance name (a
+		// distinct MovieClip — the new placement's data must survive into the
+		// next frame). When name matches the original, the inline rename path
+		// in tagSetInstanceName treated the new placement as a continuation of
+		// the dying entry, so clearing is the correct cleanup.
+		if (e->depth <= max_depth)
 		{
-			clear_display_entry(app_context, e->depth);
+			// Only honor the slot-renamed skip when the live display_list array
+			// is the same one we queued from. tag.c's display_list pointer is
+			// swapped to a sprite's local array during sprite frame execution
+			// (see exec_sprite_frame call sites) and back to root afterwards.
+			// Pending entries queued sprite-internally would otherwise compare
+			// orig_instance_name (captured against the sprite's array) to a
+			// completely different entry in root's array, mis-classifying the
+			// slot as "renamed" and clobbering a same-name same-frame Remove+
+			// Place pattern that does need clearing. Required to preserve
+			// misc-ming.all register_class/RegisterClassTest4.
+			int slot_renamed = 0;
+			if (e->queued_dl_array == (void*)display_list)
+			{
+				const char* cur_name = display_list[e->depth].instance_name;
+				if (e->orig_instance_name[0] != '\0' && cur_name != NULL
+				    && strcmp(cur_name, e->orig_instance_name) != 0)
+				{
+					slot_renamed = 1;
+				}
+			}
+			if (!slot_renamed)
+				clear_display_entry(app_context, e->depth);
 		}
 	}
 }
@@ -6680,21 +6718,29 @@ void tagSetInstanceName(SWFAppContext* app_context, size_t depth, const char* na
 		return;
 	}
 #ifdef NO_GRAPHICS
-	// Same-frame Remove+Place sequence at this depth: the prior tagRemoveObject2
-	// queued a deferred finalize for the existing MC (it has an UNLOAD handler).
-	// display_list[depth] still holds the pre-Remove entry until run_pending_finalize
-	// fires, but logically the slot is already "removed". Treat this as the
-	// empty-depth case: stash the name as pending so the upcoming tagPlaceObject2
-	// gives it to a fresh MC, and DON'T rename the about-to-be-unloaded MC —
-	// renaming it here makes its queued UNLOAD handler trace the wrong `this`
-	// (e.g. "_level0.mc2 unloaded" when we should report "mc1") and shadows the
-	// new name in actionFindOrCreateMovieClip, causing the new placement to
-	// reuse the dying MC pointer. Required for misc-ming loop_test10 where
-	// frame 3 does Remove(mc1) + SetInstanceName("mc2") + Place(mc2) at depth
-	// 100 — without this skip, mc1's UNLOAD fires with `this`=renamed-as-mc2.
+	// Same-frame Remove+Place sequence at this depth with a NAME CHANGE:
+	// the prior tagRemoveObject2 queued a deferred finalize for the existing
+	// MC (it has an UNLOAD handler). display_list[depth] still holds the
+	// pre-Remove entry until run_pending_finalize fires, but logically the
+	// slot is already "removed". When the new name differs from the old,
+	// treat this as the empty-depth case: stash the name as pending so the
+	// upcoming tagPlaceObject2 gives it to a fresh MC, and DON'T rename the
+	// about-to-be-unloaded MC — renaming it here makes its queued UNLOAD
+	// handler trace the wrong `this` (e.g. "_level0.mc2 unloaded" when we
+	// should report "mc1") and shadows the new name in
+	// actionFindOrCreateMovieClip, causing the new placement to reuse the
+	// dying MC pointer. Required for misc-ming loop_test10 frame 3
+	// (Remove(mc1) + SetInstanceName("mc2") + Place(mc2) at depth 100).
+	//
+	// When the names match (e.g. RegisterClassTest4's mc3 frame 2 where the
+	// remove+place pair both use "Segments"), the original rename path is a
+	// no-op so we don't need to skip it — and the existing event-ordering
+	// behavior must be preserved.
 	{
 		extern int ng_depth_has_pending_finalize(size_t);
-		if (ng_depth_has_pending_finalize(depth))
+		if (ng_depth_has_pending_finalize(depth)
+		    && (display_list[depth].instance_name == NULL
+		        || strcmp(display_list[depth].instance_name, name) != 0))
 		{
 			g_pending_instance_name = name;
 			return;
