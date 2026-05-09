@@ -32,7 +32,7 @@ void runSWF() {
 }
 #endif
 
-#ifdef NO_GRAPHICS
+#if defined(NO_GRAPHICS) || defined(OFFSCREEN_RENDER)
 void input_events_load(const char* path);
 #endif
 
@@ -87,7 +87,7 @@ int main(int argc, char* argv[]) {
 
 #ifndef __EMSCRIPTEN__
     printf("SWF Runtime Loaded (Native Build)\n\n");
-#ifdef NO_GRAPHICS
+#if defined(NO_GRAPHICS) || defined(OFFSCREEN_RENDER)
     if (argc > 1) {
         input_events_load(argv[1]);
     }

@@ -446,6 +446,14 @@ void tagMain(SWFAppContext* app_context)
 		// Drain any sprite SCRIPT entries queued during advance_*_sprite_frames
 		// that the recompiler-emitted in-frame drain didn't cover.
 		actionDrainActionQueueByKind(app_context, AQ_KIND_SCRIPT);
+
+		// Drive file-driven test input (KEY_DOWN, MOUSE_MOVE, etc.) AFTER
+		// frame scripts have set up their listeners. Mirrors swf_core.c's
+		// placement (around line 1109). No-op when no event file is loaded.
+		{
+			extern void input_events_pump_tick(SWFAppContext* app_context);
+			input_events_pump_tick(app_context);
+		}
 #endif
 		if (manual_next_frame)
 		{

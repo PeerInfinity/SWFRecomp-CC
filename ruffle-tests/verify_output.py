@@ -1401,6 +1401,7 @@ def compile_native(test_dir, num_frames, build_dir, mode="no-graphics", has_imag
         # Full graphics-mode runtime + offscreen Dawn rendering, native target.
         core_sources.append("src/libswf/swf.c")
         core_sources.append("src/libswf/graphics_stubs.c")
+        core_sources.append("src/libswf/input_events.c")
         core_sources.append("src/audio/audio.c")
         core_sources.append("src/audio/audio_output_web.c")  # native stub branch
         core_sources.append("src/rendering/render_webgpu.c")
