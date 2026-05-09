@@ -195,6 +195,8 @@ static int g_eager_init_depth = 0;
 // Key test: avm1/issue_9885.
 static int g_button_state_change_depth = 0;
 
+#endif // NO_GRAPHICS
+
 // Snapshot of (depth → char_id) and (depth → instance_name) of a button's
 // children at the start of a state transition. tagPlaceObject2 consults this
 // snapshot when g_btn_state_active is set: if the new placement's
@@ -202,6 +204,10 @@ static int g_button_state_change_depth = 0;
 // set_state "child exists in both states" branch — no re-instantiation,
 // no frame_0 re-fire, instance_name kept). For new depths or different
 // char_id at preserved depths, the normal eager-init/queue path runs.
+//
+// These symbols are referenced unconditionally by ng_update_button_states_in_dl
+// (button hover/state machine), so they must be visible in both NO_GRAPHICS
+// and graphics builds.
 #define BTN_STATE_SNAP_MAX 256
 static size_t g_btn_state_old_chars[BTN_STATE_SNAP_MAX];
 static char*  g_btn_state_old_names[BTN_STATE_SNAP_MAX]; // strdup'd, owned
@@ -231,6 +237,8 @@ static int    g_btn_state_active = 0;
 static DisplayObject* g_btn_transient_dobj = NULL;
 static char*          g_btn_transient_names[BTN_STATE_SNAP_MAX]; // strdup'd, owned
 static size_t         g_btn_transient_count = 0;
+
+#ifdef NO_GRAPHICS
 
 int actionEagerInitActive(void) {
 	return g_eager_init_depth > 0 && g_button_state_change_depth == 0;

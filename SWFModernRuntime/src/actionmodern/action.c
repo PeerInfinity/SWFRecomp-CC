@@ -17963,7 +17963,6 @@ static MovieClip* resolveSlashPathToMC(SWFAppContext* app_context, const char* p
 					cur_sprite_dl = NULL; cur_sprite_max = 0;
 				}
 				mc = child_mc;
-				slash_path_segment_done: (void)0;
 #else
 				// Graphics mode: search display list for child by instance name
 				{
@@ -18000,6 +17999,7 @@ static MovieClip* resolveSlashPathToMC(SWFAppContext* app_context, const char* p
 #endif
 			}
 		}
+		slash_path_segment_done:;
 
 		if (pos < path_len) pos++; // skip the '/' separator
 	}
@@ -23692,6 +23692,15 @@ static void setCurrentContext(MovieClip* mc) {
 	g_current_context = mc;
 }
 
+// Set to 1 when actionSetTarget changes g_current_context to a different MC.
+// Cleared when SetTarget("") resets context. Used by GetVariable("this") to
+// avoid returning the SetTarget context — "this" should be the natural clip.
+// Also save/restored by the unconditional CALL_FRAME_FUNC macro and read by
+// tag.c, so the definition is visible in both graphics and NO_GRAPHICS builds.
+int g_settarget_context_changed = 0;
+// Saves the natural g_current_context before SetTarget changed it.
+MovieClip* g_settarget_saved_context = NULL;
+
 #ifdef NO_GRAPHICS
 // Set when actionSetTarget() explicitly redirects to root ("_root" or "").
 // Allows actionGotoFrame() to distinguish "goto root" (deferred) vs
@@ -23706,12 +23715,6 @@ int g_settarget_invalid = 0;
 // SWF7+ SetTarget2(undefined) sets target to None — GotoFrame/Play/Stop become no-ops.
 // This is different from g_settarget_invalid where they target root.
 int g_settarget_none = 0;
-// Set to 1 when actionSetTarget changes g_current_context to a different MC.
-// Cleared when SetTarget("") resets context. Used by GetVariable("this") to
-// avoid returning the SetTarget context — "this" should be the natural clip.
-int g_settarget_context_changed = 0;
-// Saves the natural g_current_context before SetTarget changed it.
-MovieClip* g_settarget_saved_context = NULL;
 // Phase 2c (CLONESPRITE_DEPTH_BIAS): set to 1 by the recompiler when it
 // stripped the `Push(16384) Add` SWF-bias prefix preceding a CloneSprite.
 // Tells `actionCloneSprite` to interpret the popped depth as raw AS depth
