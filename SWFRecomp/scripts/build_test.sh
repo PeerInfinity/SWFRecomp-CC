@@ -174,6 +174,7 @@ if [ "$HEADLESS_FLAG" = true ]; then
     cp "${SWFMODERN_SRC}/libswf/swf_headless.c" "${BUILD_DIR}/"
     cp "${SWFMODERN_SRC}/libswf/tag.c" "${BUILD_DIR}/"
     cp "${SWFMODERN_SRC}/libswf/tag_stubs.c" "${BUILD_DIR}/"
+    cp "${SWFMODERN_SRC}/libswf/shape_hit_test.c" "${BUILD_DIR}/"
     cp "${SWFMODERN_SRC}/libswf/ng_shared.c" "${BUILD_DIR}/"
     cp "${SWFMODERN_SRC}/libswf/hit_test.c" "${BUILD_DIR}/"
     cp "${SWFMODERN_SRC}/rendering/render_webgpu.c" "${BUILD_DIR}/"
@@ -185,6 +186,7 @@ elif [ "$GRAPHICS_FLAG" = true ]; then
     cp "${SWFMODERN_SRC}/libswf/tag.c" "${BUILD_DIR}/"
     cp "${SWFMODERN_SRC}/libswf/ng_shared.c" "${BUILD_DIR}/"
     cp "${SWFMODERN_SRC}/libswf/hit_test.c" "${BUILD_DIR}/"
+    cp "${SWFMODERN_SRC}/libswf/shape_hit_test.c" "${BUILD_DIR}/"
     cp "${SWFMODERN_SRC}/libswf/graphics_stubs.c" "${BUILD_DIR}/"
     cp "${SWFMODERN_SRC}/rendering/render_webgpu.c" "${BUILD_DIR}/"
     cp "${SWFMODERN_SRC}/audio/audio.c" "${BUILD_DIR}/"
@@ -194,6 +196,7 @@ else
     cp "${SWFMODERN_SRC}/libswf/swf_core.c" "${BUILD_DIR}/"
     cp "${SWFMODERN_SRC}/libswf/tag.c" "${BUILD_DIR}/"
     cp "${SWFMODERN_SRC}/libswf/tag_stubs.c" "${BUILD_DIR}/"
+    cp "${SWFMODERN_SRC}/libswf/shape_hit_test.c" "${BUILD_DIR}/"
     cp "${SWFMODERN_SRC}/libswf/ng_shared.c" "${BUILD_DIR}/"
     cp "${SWFMODERN_SRC}/libswf/hit_test.c" "${BUILD_DIR}/"
 fi

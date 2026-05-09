@@ -62867,7 +62867,6 @@ bool actionWaitForFrame2(SWFAppContext* app_context)
 // for dynamically-created MovieClips whose bounds come from Drawing API calls.
 // ===========================================================================
 
-#ifdef NO_GRAPHICS
 
 // Compute pixel AABB for a dynamic MC using its drawing-API bounds.
 // Returns 1 if bounds are available, 0 if not.
@@ -62885,7 +62884,6 @@ static int mc_get_pixel_aabb_ng(MovieClip* mc, float* x1, float* y1, float* x2, 
 		bymax = mc->draw_ymax;
 	}
 
-#ifdef NO_GRAPHICS
 	// Text field bounds from DefineEditText tag data
 	if (!has_bounds && mc->ng_textfield_idx >= 0) {
 		extern void ng_getTextFieldBounds(int tf_idx, s32* xmin, s32* xmax, s32* ymin, s32* ymax);
@@ -62976,7 +62974,6 @@ static int mc_get_pixel_aabb_ng(MovieClip* mc, float* x1, float* y1, float* x2, 
 			}
 		}
 	}
-#endif
 
 	if (!has_bounds) return 0;
 
@@ -63018,6 +63015,8 @@ static int mc_get_track_as_menu_ng(MovieClip* mc)
 	}
 	return 0;
 }
+
+#ifdef NO_GRAPHICS // close un-gated mc_get_pixel_aabb_ng region; rest of NO_GRAPHICS section continues
 
 // Invoke a named AS2 event handler (onPress, onRelease, onDragOver, ...) stored
 // in mc->dynamic_props, with `this` bound to mc.
@@ -63186,6 +63185,8 @@ void actionDispatchMCRelease(SWFAppContext* app_context)
 	}
 }
 
+#endif // NO_GRAPHICS — un-gate actionMCHasButtonHandlers / actionMCMouseInsidePick below for graphics-mode button hover
+
 // Whether this MC has any of Ruffle's BUTTON_EVENT_METHODS as own dynamic
 // properties: onPress, onRelease, onReleaseOutside, onRollOut, onRollOver,
 // onDragOut, onDragOver. Used by ng_update_button_states to detect when a
@@ -63216,6 +63217,8 @@ int actionMCMouseInsidePick(MovieClip* mc, float mx, float my)
 	if (!mc_get_pixel_aabb_ng(mc, &x1, &y1, &x2, &y2)) return 0;
 	return (mx >= x1 && mx <= x2 && my >= y1 && my <= y2);
 }
+
+#ifdef NO_GRAPHICS
 
 // Whether any ancestor of this MC is button-mode AND its hit area contains
 // the mouse. When true, that ancestor "catches" mouse events as a unit

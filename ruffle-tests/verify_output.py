@@ -1386,6 +1386,7 @@ def compile_native(test_dir, num_frames, build_dir, headless=False, has_image_co
         "src/utils.c",
         "src/libswf/tag.c",
         "src/libswf/tag_stubs.c",
+        "src/libswf/shape_hit_test.c",
         "src/libswf/ng_shared.c",
         "src/libswf/hit_test.c",
         "src/memory/heap.c",
@@ -1708,6 +1709,7 @@ def compile_wasm(test_dir, num_frames, build_dir):
         "src/memory/heap.c",
         "src/libswf/swf_core.c",
         "src/libswf/tag_stubs.c",
+        "src/libswf/shape_hit_test.c",
     ]
     for src in core_sources:
         shutil.copy2(SWFMODERN / src, build_dir)
