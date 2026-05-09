@@ -7125,6 +7125,13 @@ void ng_display_clear_after(SWFAppContext* app_context, size_t target_frame)
 	}
 }
 
+#endif // NO_GRAPHICS — close of the block opened at line 6968. The
+       // post-catch-up cleanup below is referenced from action_queue.c via
+       // extern, so it must be visible to graphics builds too. The call
+       // site there is gated on `catch_up_backward && g_natural_wrap_cleanup_pending`,
+       // both 0 in graphics mode, so this function is inert at runtime —
+       // but the linker still needs the symbol.
+
 // Post-catch-up cleanup: clear any entries whose placed_at_frame is still
 // > target_frame. These are sprites preserved by ng_display_clear_after
 // that weren't re-placed (modified) during catch-up — their survives_rewind
@@ -7153,7 +7160,6 @@ void ng_display_cleanup_unplaced_after(SWFAppContext* app_context, size_t target
 		}
 	}
 }
-#endif // NO_GRAPHICS
 
 // Bitmap metadata registry (shared across all build modes)
 #define MAX_BITMAP_DEFS 128
