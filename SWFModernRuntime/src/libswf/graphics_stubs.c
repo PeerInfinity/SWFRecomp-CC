@@ -84,6 +84,7 @@ int ng_isInsideSpriteInit(void)            { return 0; }
 
 #include <swf.h>
 #include <tag.h>
+#include <action.h>  // full struct MovieClip needed by exec_sprite_frame body
 
 // Active transform data pointer. Real impl in tag.c (NO_GRAPHICS arm) swaps
 // to a child SWF's transform array. With NULL, ng_cache_transform() in tag.c
@@ -110,13 +111,59 @@ char g_ime_commit_text[_OR_IME_TEXT_BUF_SIZE];
 int g_ime_compose_pending = 0;
 int g_ime_commit_pending = 0;
 
-// Function stubs — minimum needed to link.
-// exec_sprite_frame: real impl swaps current_sprite_obj / context / settarget
-// state and calls f. The stub just calls f. Loses context-switch semantics —
-// many sprite tests will diverge. Phase 2.
-void exec_sprite_frame(SWFAppContext* app_context, DisplayObject* obj, frame_func f) {
-    (void)obj;
+// exec_sprite_frame: ported verbatim from tag.c (where it lives under
+// #ifdef NO_GRAPHICS). All globals it touches exist in graphics-native:
+// g_current_sprite_obj is in swf.c; g_current_context, actionGetBaseClip /
+// actionSetBaseClip / actionSetCurrentContext / actionFindMovieClipByName
+// are in action.c; g_settarget_* and g_active_transform_data are stubs
+// above. If tag.c's impl changes, mirror the change here. Phase 3 retires
+// this duplication along with HEADLESS_GRAPHICS.
+extern MovieClip* g_current_context;
+extern void actionSetCurrentContext(MovieClip* mc);
+extern MovieClip* actionGetBaseClip(void);
+extern void actionSetBaseClip(MovieClip* mc);
+extern int g_settarget_context_changed;
+extern MovieClip* g_settarget_saved_context;
+void exec_sprite_frame(SWFAppContext* app_context, DisplayObject* obj, frame_func f)
+{
+    DisplayObject* saved = g_current_sprite_obj;
+    g_current_sprite_obj = obj;
+
+    MovieClip* saved_ctx = g_current_context;
+    MovieClip* saved_base = actionGetBaseClip();
+    if (obj->instance_name != NULL)
+    {
+        extern MovieClip* actionFindMovieClipByName(const char* instance_name);
+        MovieClip* mc = actionFindMovieClipByName(obj->instance_name);
+        if (mc) { mc->display_obj = (void*)obj; actionSetCurrentContext(mc); actionSetBaseClip(mc); }
+    }
+
+    int saved_settarget = g_settarget_explicit_root;
+    int saved_invalid = g_settarget_invalid;
+    int saved_none = g_settarget_none;
+    int saved_ctx_changed = g_settarget_context_changed;
+    MovieClip* saved_ctx_save = g_settarget_saved_context;
+    g_settarget_explicit_root = 0;
+    g_settarget_invalid = 0;
+    g_settarget_none = 0;
+    g_settarget_context_changed = 0;
+    g_settarget_saved_context = NULL;
+
+    float (*saved_td)[16] = g_active_transform_data;
+    if (obj->child_transform_data != NULL)
+        g_active_transform_data = obj->child_transform_data;
+
     if (f) f(app_context);
+
+    g_active_transform_data = saved_td;
+    g_settarget_explicit_root = saved_settarget;
+    g_settarget_invalid = saved_invalid;
+    g_settarget_none = saved_none;
+    g_settarget_context_changed = saved_ctx_changed;
+    g_settarget_saved_context = saved_ctx_save;
+    actionSetCurrentContext(saved_ctx);
+    actionSetBaseClip(saved_base);
+    g_current_sprite_obj = saved;
 }
 
 // sprite_content_bounds_twips: returns 0 (no bounds). getBounds-on-sprite

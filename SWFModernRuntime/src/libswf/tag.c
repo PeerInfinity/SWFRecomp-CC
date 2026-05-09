@@ -696,7 +696,14 @@ static void process_sprite_init_at_depth(SWFAppContext* app_context, MovieClip* 
 }
 
 #else
-#define CALL_FRAME(app, obj, f) (f)(app)
+// Graphics builds (wasm and native): use exec_sprite_frame from graphics_stubs.c
+// so sprite frame_funcs run with the right MC context (saves/restores
+// g_current_sprite_obj, g_current_context, base_clip, settarget state, and
+// active transform_data). Previously this was a bare `(f)(app)` — sprite
+// scripts ran in the root's context, which broke any test exercising
+// SetTarget / sprite-relative variable lookup in sprite-emitted code.
+extern void exec_sprite_frame(SWFAppContext* app_context, DisplayObject* obj, frame_func f);
+#define CALL_FRAME(app, obj, f) exec_sprite_frame(app, obj, f)
 #endif
 
 // Public wrapper for process_sprite_needs_init (called from tag_stubs.c for
