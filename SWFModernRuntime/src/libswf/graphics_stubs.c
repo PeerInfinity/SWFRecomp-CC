@@ -59,4 +59,23 @@ int ng_getTextFieldIdx(size_t depth)
 	return -1;
 }
 
+// Sync text → variable. Real impl in action.c under #ifdef NO_GRAPHICS;
+// it walks dynamic_props for the "variable" binding and writes the text
+// to that AS variable, then propagates to any other textfields sharing
+// the same binding. Stubbed here for graphics builds — text fields edited
+// via the un-gated text-input path won't propagate to AS-bound variables
+// or to peer text fields. The edit itself is still visible via
+// `tf.text` property reads on the field that was typed into.
+struct SWFAppContext_;
+struct MovieClip_;
+struct ActionVar_;
+void ng_syncTextToVar(struct SWFAppContext_* app_context,
+                      struct MovieClip_* mc,
+                      struct ActionVar_* text_value)
+{
+	(void)app_context;
+	(void)mc;
+	(void)text_value;
+}
+
 #endif // USE_WEBGPU && !NO_GRAPHICS && !HEADLESS_GRAPHICS

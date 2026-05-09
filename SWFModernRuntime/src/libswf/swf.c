@@ -111,6 +111,7 @@ void tagMain(SWFAppContext* app_context)
 				memset(prev_keys_down, 0, sizeof(prev_keys_down));
 				prev_keys_initialized = 1;
 			}
+			int ctrl_held = (app_context->keys.down[17] != 0);
 			for (int code = 0; code < 256; code++) {
 				u8 cur = app_context->keys.down[code];
 				u8 prev = prev_keys_down[code];
@@ -124,6 +125,24 @@ void tagMain(SWFAppContext* app_context)
 						int shift_held = (app_context->keys.down[16] != 0);
 						actionAdvanceTabFocus(app_context, shift_held);
 					}
+					// Text-control shortcuts. Equivalent to swf_core.c's
+					// EV_TEXT_CONTROL events. Each handler internally checks
+					// for a focused textfield and no-ops otherwise.
+					if (ctrl_held) {
+						switch (code) {
+							case 65: actionTextControlSelectAll(app_context); break; // Ctrl+A
+							case 67: actionTextControlCopy(app_context);      break; // Ctrl+C
+							case 86: actionTextControlPaste(app_context);     break; // Ctrl+V
+							case 88: actionTextControlCut(app_context);       break; // Ctrl+X
+						}
+					} else {
+						switch (code) {
+							case 8:  actionTextControlBackspace(app_context); break; // Backspace
+							case 13: actionTextControlEnter(app_context);     break; // Enter
+							case 37: actionTextControlMoveLeft(app_context);  break; // Left arrow
+							case 39: actionTextControlMoveRight(app_context); break; // Right arrow
+						}
+					}
 				} else if (!cur && prev) {
 					app_context->keys.last_key_down = code;
 					app_context->keys.last_key_ascii = (code >= 32 && code <= 126) ? code : 0;
@@ -131,6 +150,28 @@ void tagMain(SWFAppContext* app_context)
 					actionDispatchKeyUp(app_context);
 				}
 				prev_keys_down[code] = cur;
+			}
+
+			// --- Text input (typed characters from emscripten keypress callback) ---
+			// Drain the ring buffer populated by render_webgpu.c's on_keypress.
+			extern int g_text_input_ring[];
+			extern int g_text_input_ring_head;
+			extern int g_text_input_ring_tail;
+			while (g_text_input_ring_tail != g_text_input_ring_head) {
+				int cp = g_text_input_ring[g_text_input_ring_tail];
+				g_text_input_ring_tail = (g_text_input_ring_tail + 1) % 64;
+				// Suppress text input for control characters that are also dispatched
+				// via the text-control shortcuts above (Backspace, Tab, Enter, Esc).
+				if (cp == 8 || cp == 9 || cp == 13 || cp == 27) continue;
+				if (ctrl_held) continue; // Ctrl+letter shortcuts shouldn't also type the letter
+				actionTextFieldInput(app_context, cp);
+			}
+
+			// --- Window focus lost ---
+			extern int g_window_focus_lost;
+			if (g_window_focus_lost) {
+				g_window_focus_lost = 0;
+				actionWindowFocusLost(app_context);
 			}
 
 			// --- Focus highlight tick ---

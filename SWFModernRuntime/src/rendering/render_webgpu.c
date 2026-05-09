@@ -488,6 +488,35 @@ static EM_BOOL on_key_up(int type, const EmscriptenKeyboardEvent* evt, void* ud)
 	}
 	return EM_TRUE;
 }
+
+// Text input: ring buffer of typed Unicode codepoints (from emscripten
+// keypress events, which fire AFTER dead-key composition and IME). Drained
+// per-frame by swf.c into actionTextFieldInput.
+#define TEXT_INPUT_RING_SIZE 64
+int g_text_input_ring[TEXT_INPUT_RING_SIZE];
+int g_text_input_ring_head = 0;  // write position (next free)
+int g_text_input_ring_tail = 0;  // read position (next to consume)
+
+static EM_BOOL on_keypress(int type, const EmscriptenKeyboardEvent* evt, void* ud) {
+	(void)type; (void)ud;
+	if (!g_mouse_app_context) return EM_TRUE;
+	int cp = evt->charCode ? evt->charCode : evt->which;
+	if (cp <= 0) return EM_TRUE;
+	int next = (g_text_input_ring_head + 1) % TEXT_INPUT_RING_SIZE;
+	if (next == g_text_input_ring_tail) return EM_TRUE;  // ring full — drop
+	g_text_input_ring[g_text_input_ring_head] = cp;
+	g_text_input_ring_head = next;
+	return EM_TRUE;
+}
+
+// Window-blur flag — set by on_blur, drained per-frame in swf.c.
+int g_window_focus_lost = 0;
+
+static EM_BOOL on_blur(int type, const EmscriptenFocusEvent* evt, void* ud) {
+	(void)type; (void)evt; (void)ud;
+	g_window_focus_lost = 1;
+	return EM_TRUE;
+}
 #endif
 
 // ---------------------------------------------------------------------------
@@ -644,6 +673,8 @@ void render_webgpu_init(SWFAppContext* app_context, WebGPURenderContext* ctx)
 	});
 	emscripten_set_keydown_callback("#canvas", NULL, 0, on_key_down);
 	emscripten_set_keyup_callback("#canvas", NULL, 0, on_key_up);
+	emscripten_set_keypress_callback("#canvas", NULL, 0, on_keypress);
+	emscripten_set_blur_callback(EMSCRIPTEN_EVENT_TARGET_WINDOW, NULL, 0, on_blur);
 #endif
 
 	// Mark renderer as ready only if critical objects were created
