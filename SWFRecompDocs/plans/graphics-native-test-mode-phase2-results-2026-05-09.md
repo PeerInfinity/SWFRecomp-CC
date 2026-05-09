@@ -1,0 +1,188 @@
+# Graphics-Native Test Mode — Phase 2 Results (2026-05-09)
+
+Phase 2 of `graphics-native-test-mode-plan.md` ran on 2026-05-09. The
+goal: drive the smoke set's `--mode=graphics` pass rate as close to the
+NO_GRAPHICS rate as possible, by porting/widening the frame-loop
+machinery that `swf_core.c` provides but `swf.c` historically did not.
+
+**Result: 2/9 → 7/9 on the smoke set.** The 5 tests that flipped to pass
+all blocked on structural backports listed in the plan; the 2 remaining
+failures are subtle semantic issues that need separate investigation.
+
+## Smoke set progression
+
+| Test | NO_GRAPHICS | `--mode=graphics-headless-legacy` | `--mode=graphics` Phase 1 | `--mode=graphics` Phase 2 |
+|---|---|---|---|---|
+| `add` | pass | pass | pass | pass |
+| `tell_target_invalid` | pass | pass | fail | fail (5/6 lines match) |
+| `clip_events` | pass | pass | fail | **pass** |
+| `edittext_default_format` | pass | pass | fail | **pass** |
+| `button_key_events` | pass | pass | fail | **pass** |
+| `goto_rewind3` | pass | pass | fail | **pass** |
+| `register_and_init_order` | pass | **FAIL** | fail | **pass** |
+| `unload` | pass | pass | fail | fail (timing semantics) |
+| `bitmap_data_colortransform` | pass | pass | pass | pass |
+
+`register_and_init_order` is interesting: it fails in legacy headless
+(known from the Phase 0 baseline) but now passes in `--mode=graphics`.
+The Phase 2 work happened to fix the underlying shared-code issue at the
+same time it fixed the graphics-native path.
+
+`tell_target_invalid` improved substantially from Phase 1's "first
+divergence on line 1" to Phase 2's "extra trace on line 6 out of 7" —
+just not all the way to passing.
+
+## Phase 2 commits (in order)
+
+| SHA | Title | Smoke effect |
+|---|---|---|
+| `8f1b2635` | Phase 2 (partial): port exec_sprite_frame for graphics builds | None alone |
+| `fcbcdc94` | Phase 2: backport sprite-init machinery via gate widening | +1 (`edittext_default_format`) |
+| `6d054b53` | Phase 2: port ng_executeGotoCatchUp / ng_executeGotoTagsOnly to swf.c | +2 (`goto_rewind3`, `register_and_init_order`) |
+| `76d4fbe2` | Phase 2: drive sprite advancement + enter_frame dispatch in swf.c main loop | +1 (`clip_events`) |
+| `1995c557` | Phase 2: extract input event pump into shared input_events.c | +1 (`button_key_events`) |
+
+## What changed
+
+### Bulk gate widening (`fcbcdc94`)
+
+The largest single change. All 59 `#ifdef NO_GRAPHICS` gates in `tag.c`
+and 158 in `action.c` widened to `#if defined(NO_GRAPHICS) || defined(OFFSCREEN_RENDER)`.
+The premise: NO_GRAPHICS arms hold the real frame-loop machinery, and
+graphics-native needs the same code paths.
+
+Supporting work for graphics-native to link and run:
+
+- `swf.c` got `MAX_FRAMES` drain-loop bound, `g_drag_*` definitions,
+  stubs for goto-catch-up state vars and functions (proper port came in
+  the next commit), and `g_current_sprite_obj` / `actionGetFocusRectInfo`
+  gated on `#ifndef OFFSCREEN_RENDER` so the real impls win in the new
+  mode.
+- `graphics_stubs.c` reorganized into "always-active" (catch-up state,
+  IME globals, etc.) and `#ifndef OFFSCREEN_RENDER` (no-op stubs that
+  duplicate the now-widened tag.c / action.c arms — wasm browser
+  graphics still needs these).
+- `tag.c::tagShowFrame`: in the `#else` arm under `#ifdef OFFSCREEN_RENDER`,
+  call `process_sprite_needs_init` BEFORE `advance_sprite_frames` so
+  newly-placed sprites have MovieClip entries when their frame_funcs first
+  run. Also fixed `CALL_FRAME` macro in the `!NO_GRAPHICS` arm to dispatch
+  through `exec_sprite_frame` so sprite frame_funcs in graphics builds
+  get the same MC context switching that NO_GRAPHICS gets.
+
+### Goto-catch-up port (`6d054b53`)
+
+`ng_executeGotoCatchUp` and `ng_executeGotoTagsOnly` ported from
+`swf_core.c` to `swf.c` (replacing no-op stubs from `fcbcdc94`). The gate
+widening made the supporting helpers (`ng_display_clear_after`,
+`ng_swapToRootDL`, `ng_run_deferred_sprite_init_*`, `actionRewindCleanup`,
+`actionDrainSuppressEnter|Leave`, `actionGotoCatchupEnter|Leave`)
+available in graphics-native, so the catch-up dance ported cleanly.
+
+### Sprite advancement + enter_frame dispatch (`76d4fbe2`)
+
+`swf_core.c`'s main loop calls `advance_sprite_frames` + sets
+`g_enterframe_flush_pending` + drains `AQ_KIND_SCRIPT` around each root
+frame_func invocation. `swf.c` was missing all of this — sprite
+frame_funcs past frame 0 never advanced (so recompiler-emitted sprite
+scripts past frame 0 silently never fired), and clip-event ENTER_FRAME
+never dispatched (`g_enterframe_flush_pending` stayed 0 so the
+recompiler-emitted `tagFlushPendingEnterFrame` calls were no-ops).
+
+Also added `actionFinalizePendingRemovals` at frame start so MCs marked
+for pending removal in the previous frame transition to finalized state.
+
+### Input event pump extraction (`1995c557`)
+
+Created `src/libswf/input_events.c` with the file-driven event pump
+(`input_events_load`, `input_events_pump_tick`, plus the event delivery
+switch — ~400 lines from `swf_core.c`). Phase 3 will retire the duplicate
+copies in `swf_core.c` and `swf_headless.c`; for Phase 2 the new file is
+only linked in `--mode=graphics`. `main.c` widened to call
+`input_events_load(argv[1])` in graphics-native too. `swf.c` calls
+`input_events_pump_tick` AFTER `frame_func` + sprite advancement +
+SCRIPT drain — initial placement before `frame_func` failed because key
+listeners hadn't been set up yet.
+
+## Remaining failures
+
+### `tell_target_invalid` (5/6 lines match)
+
+```
+Expected:                                 Actual:
+1: Target not found: ... Base="_level0.mc"  ✓
+2: /tellTarget('dummy') { gotoAndPlay(n); } ✓
+3: pass                                     ✓
+4: /tellTarget(undefined) { gotoAndStop(5); } ✓
+5: /tellTarget(undefined) { gotoAndPlay(n); } ✓
+6: pass                                     "This should only be reached in SWF6 and below"
+                                            "pass"
+```
+
+Diagnosis: `script_3` (sprite_3 frame 3) does
+`SetTarget2(undefined); gotoAndPlay(n); SetTarget(""); Stop()`. After
+`SetTarget("")` the targeted_sprite should reset to base_clip
+(sprite_3), so `Stop()` should stop sprite_3, preventing frame 4
+(`script_4` = "This should only be reached in SWF6 and below") from
+running. In `--mode=graphics`, the sprite advances to frame 4 anyway —
+likely a SetTarget/targeted_sprite interaction with the new
+context-switching path in graphics-native.
+
+### `unload` (timing semantics)
+
+```
+Expected at line 22: clip5 = _level0.clip5     (still alive)
+Actual at line 22:   clip5 = undefined         (finalized too early)
+```
+
+Diagnosis: clips with AS-level `onUnload` handlers vs clip-event UNLOAD
+have different finalization timing. The expected output shows clip5
+(shifted depth, has clip-event UNLOAD) survives one full frame after
+removal, then finalizes. But `actionFinalizePendingRemovals` in
+graphics-native finalizes it at the start of the very next frame.
+NO_GRAPHICS / legacy headless get this right via mechanisms not yet
+clear — likely a generation counter or a timing condition that gates the
+finalize against something other than `pending_removal == 1`.
+
+## Lessons for Phase 2 strategy
+
+1. **Bulk gate widening was the right call.** Trying to widen one gate
+   at a time would have surfaced cascading symbol issues with no clear
+   stopping point. Widening all `#ifdef NO_GRAPHICS` gates at once let
+   the link errors guide the supporting fixes (graphics_stubs.c
+   reorganization, swf.c globals).
+
+2. **The OR-widening pattern (`#if defined(NO_GRAPHICS) || defined(OFFSCREEN_RENDER)`)
+   is risk-free for existing modes.** OR adds an alternative; existing
+   NO_GRAPHICS / HEADLESS builds already satisfy `defined(NO_GRAPHICS)`
+   and take exactly the same code path as before. Verified across the
+   smoke set after each commit.
+
+3. **swf.c's main loop needed structural additions, not just symbol
+   ports.** `advance_sprite_frames`, `g_enterframe_flush_pending`,
+   `actionFinalizePendingRemovals`, `input_events_pump_tick` — none of
+   these are called from anywhere in the recompiled output. They have to
+   be invoked explicitly from the frame-loop body. Each is a one-line
+   call but at the right point; misplacement (input pump before
+   frame_func) silently breaks the test.
+
+4. **The diagnostic value of `--mode=graphics-headless-legacy` was
+   moderate.** It told us `register_and_init_order` was a shared-code
+   bug (now incidentally fixed by Phase 2 work), but for the rest it
+   confirmed what we already knew: the failures were specific to
+   `swf.c`'s frame loop. Phase 3's retirement of the legacy mode
+   shouldn't lose much diagnostic capability.
+
+## Cumulative line-count change
+
+| File | Change |
+|---|---|
+| `SWFModernRuntime/src/libswf/swf.c` | +250 lines (frame-loop integration + goto port + g_drag_*) |
+| `SWFModernRuntime/src/libswf/tag.c` | +30 lines net (mostly gate widening) |
+| `SWFModernRuntime/src/actionmodern/action.c` | +160 lines net (gate widening) |
+| `SWFModernRuntime/src/libswf/graphics_stubs.c` | net ~zero (reorganization) |
+| `SWFModernRuntime/src/libswf/input_events.c` | new, +382 lines (extracted from swf_core.c copy) |
+| `ruffle-tests/verify_output.py` | +1 line |
+| `SWFRecomp/wasm_wrappers/main.c` | +1 line |
+
+Net: ~+800 lines of code changed, mostly mechanical gate-widening that
+inverts to deletion in Phase 3 when `swf_headless.c` is retired.
