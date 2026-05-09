@@ -39,15 +39,154 @@ char g_drag_target_name[256] = "";
 int catch_up_mode = 0;
 int g_tag_skip_mode = 0;
 
-// Goto-catch-up state — full impls in swf_core.c (NO_GRAPHICS) and
-// swf_headless.c (HEADLESS). graphics-native (OFFSCREEN_RENDER) currently
-// stubs these as zero-init globals + no-op functions: GotoFrame inside
-// sprite scripts won't trigger catch-up. Phase 2 backport candidate.
+// Goto-catch-up state and executors — ported from swf_core.c. Phase 3
+// retires this duplication along with HEADLESS_GRAPHICS.
 int goto_from_action = 0;
 int g_deferred_root_goto = 0;
 int g_skip_inline_target_script = 0;
-void ng_executeGotoCatchUp(SWFAppContext* app_context) { (void)app_context; }
-void ng_executeGotoTagsOnly(SWFAppContext* app_context) { (void)app_context; }
+int g_goto_inlined_in_caller_frame = 0;
+
+extern void ng_display_clear_after(SWFAppContext* app_context, size_t target_frame);
+extern void ng_display_cleanup_unplaced_after(SWFAppContext* app_context, size_t target_frame);
+extern void actionRewindCleanup(SWFAppContext* app_context);
+// actionDrainActionQueueByKind comes from action_queue.h below
+extern void actionDrainSuppressEnter(void);
+extern void actionDrainSuppressLeave(void);
+extern void actionGotoCatchupEnter(void);
+extern void actionGotoCatchupLeave(void);
+extern int  ng_swapToRootDL(DisplayObject** saved_dl, size_t* saved_max, size_t* saved_cap);
+extern void ng_restoreFromRootDL(DisplayObject* saved_dl, size_t saved_max, size_t saved_cap);
+extern void ng_run_deferred_sprite_init_before(SWFAppContext*, size_t);
+extern void ng_run_deferred_sprite_init_on_or_after(SWFAppContext*, size_t);
+extern int g_defer_sprite_init;
+extern size_t g_place_gen;
+extern int catch_up_backward;
+extern size_t catch_up_target;
+#include <actionmodern/action_queue.h>
+
+void ng_executeGotoCatchUp(SWFAppContext* app_context)
+{
+	if (!goto_from_action || !manual_next_frame) return;
+
+	DisplayObject* saved_sprite_dl = NULL;
+	size_t saved_sprite_max = 0, saved_sprite_cap = 0;
+	int swapped = ng_swapToRootDL(&saved_sprite_dl, &saved_sprite_max, &saved_sprite_cap);
+
+	g_place_gen++;
+
+	frame_func* funcs = g_frame_funcs;
+	size_t original_frame = current_frame;
+	size_t target = next_frame;
+
+	ng_display_clear_after(app_context, target);
+
+	int saved_tag_skip = g_tag_skip_mode;
+	int saved_defer_sprite = g_defer_sprite_init;
+	g_tag_skip_mode = 0;
+	g_defer_sprite_init = 1;
+	catch_up_mode = 1;
+	actionGotoCatchupEnter();
+	if (target <= original_frame)
+	{
+		actionRewindCleanup(app_context);
+		catch_up_backward = 1;
+		catch_up_target = target;
+		for (size_t f = 0; f <= target && f < g_frame_count; f++)
+		{
+			current_frame = f;
+			if (funcs[f]) funcs[f](app_context);
+		}
+		catch_up_backward = 0;
+		ng_display_cleanup_unplaced_after(app_context, target);
+	}
+	else
+	{
+		for (size_t f = original_frame + 1; f <= target && f < g_frame_count; f++)
+		{
+			current_frame = f;
+			if (funcs[f]) funcs[f](app_context);
+		}
+	}
+	actionGotoCatchupLeave();
+	catch_up_mode = 0;
+	g_tag_skip_mode = saved_tag_skip;
+	(void)saved_defer_sprite;
+	current_frame = target;
+
+	actionDrainActionQueueByKind(app_context, AQ_KIND_CLIP_INIT);
+	actionDrainActionQueueByKind(app_context, AQ_KIND_REGISTER_CTOR);
+
+	if (swapped)
+		ng_restoreFromRootDL(saved_sprite_dl, saved_sprite_max, saved_sprite_cap);
+
+	goto_from_action = 0;
+	manual_next_frame = 0;
+
+	int skip_inline = g_skip_inline_target_script;
+	g_skip_inline_target_script = 0;
+	if (!skip_inline && target < g_frame_count && funcs[target])
+	{
+		int saved_defer_phase_f = g_defer_sprite_init;
+		g_defer_sprite_init = 0;
+		ng_run_deferred_sprite_init_before(app_context, target);
+		int saved_tag_skip_phase_e = g_tag_skip_mode;
+		g_tag_skip_mode = 1;
+		actionDrainSuppressEnter();
+		funcs[target](app_context);
+		actionDrainSuppressLeave();
+		g_tag_skip_mode = saved_tag_skip_phase_e;
+		ng_run_deferred_sprite_init_on_or_after(app_context, target);
+		g_defer_sprite_init = saved_defer_phase_f;
+		g_goto_inlined_in_caller_frame = 1;
+	}
+}
+
+void ng_executeGotoTagsOnly(SWFAppContext* app_context)
+{
+	if (!goto_from_action || !manual_next_frame) return;
+
+	g_place_gen++;
+
+	frame_func* funcs = g_frame_funcs;
+	size_t original_frame = current_frame;
+	size_t target = next_frame;
+
+	ng_display_clear_after(app_context, target);
+
+	int saved_tag_skip = g_tag_skip_mode;
+	int saved_defer_sprite = g_defer_sprite_init;
+	g_tag_skip_mode = 0;
+	g_defer_sprite_init = 1;
+	catch_up_mode = 1;
+	if (target <= original_frame)
+	{
+		actionRewindCleanup(app_context);
+		catch_up_backward = 1;
+		catch_up_target = target;
+		for (size_t f = 0; f <= target && f < g_frame_count; f++)
+		{
+			current_frame = f;
+			if (funcs[f]) funcs[f](app_context);
+		}
+		catch_up_backward = 0;
+		ng_display_cleanup_unplaced_after(app_context, target);
+	}
+	else
+	{
+		for (size_t f = original_frame + 1; f <= target && f < g_frame_count; f++)
+		{
+			current_frame = f;
+			if (funcs[f]) funcs[f](app_context);
+		}
+	}
+	catch_up_mode = 0;
+	g_tag_skip_mode = saved_tag_skip;
+	g_defer_sprite_init = saved_defer_sprite;
+
+	current_frame = original_frame;
+
+	g_deferred_root_goto = 1;
+}
 
 Character* dictionary = NULL;
 
