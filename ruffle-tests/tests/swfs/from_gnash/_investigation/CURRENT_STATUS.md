@@ -1,18 +1,32 @@
 # Gnash Test Suite Status
 
-Last updated: 2026-05-08 (pending CI — `array-v5` 535/560 → 536/560 (+1) via ARRAY-typed `__proto__` chain follow in `resolveProtoVar` + inline `actionCallMethod` walk. Prior CI `f8e172e9`: `array-v5` 528/560 → 535/560 via shift DontDelete + syncArrayToObject HOLE skip + ARRAY `__resolve`.)
+Last updated: 2026-05-08 (pending CI — `DrawingApiTest` 66/93 → 80/93 line match via Drawing-API `getBounds()` rewrite: `moveTo` no longer folds the pen into bounds, `lineTo`/`curveTo` always fold endpoints in, and stroked segments expand by FULL line thickness on each side (Flash semantics). Also fixed `lineStyle()` thickness coercion to handle Object-with-`valueOf`. Test stays `output_mismatch` — residual 13 diff lines are all hitTest precision issues unrelated to bounds.)
 
-### CI snapshot (commit `f8e172e9`, 2026-05-08)
+### CI snapshot (commit `f8e172e9`, 2026-05-08; misc-swfc.all also reflects intervening commit `5a7e9032` which added `RegisterClassTest4` to ignore list)
 
 | Suite | Pass | RM | Effective | Total | Filtered Eff | Rate |
 |-------|------|----|-----------|-------|-------------|------|
 | actionscript.all | 126 | 63 | 189 | 190 | — | **99.5%** |
 | misc-ming.all | 65 | 24 | 89 | 102 | 89/101 | 87.3% raw / **88.1% filtered** |
 | misc-mtasc.all | 7 | 2 | 9 | 9 | — | 100.0% |
-| misc-swfc.all | 8 | 5 | 13 | 15 | — | **86.7%** |
+| misc-swfc.all | 8 | 6 | 14 | 16 | — | **87.5%** |
 | misc-swfmill.all | 17 | 1 | 18 | 18 | — | 100.0% |
 
 ### Latest fix (2026-05-08, pending CI)
+
+- **`DrawingApiTest` (misc-ming.all): 66/93 → 80/93 lines match (+14, -14 mismatched).** Three paired changes in `SWFModernRuntime/src/actionmodern/action.c`:
+
+  1. **`moveTo` no longer folds the pen into bounds.** Previously each `moveTo(x, y)` called `drawingUpdateBounds(mc, x, y)` so an empty MC with only a `moveTo` reported `(x,y,x,y)` instead of Flash's `(MAX_TWIPS,MAX_TWIPS,MAX_TWIPS,MAX_TWIPS)` sentinel (≈ `6710886.35,...` in pixels). Fix: drop the bounds update from both `moveTo` dispatch sites (the WITH-scope forwarder around line 50423 and the method-dispatch handler around line 60935). Test line 84 (`bnd == "6710886.35,..."` after `moveTo(100,100)`) flips to PASS.
+
+  2. **`lineTo` / `curveTo` always fold endpoints into bounds, and expand by FULL line thickness when stroked.** Empirically Flash's `getBounds` for a stroked drawing extends each axis by the full `lineStyle` thickness (not the geometric half-thickness Ruffle uses): a `lineStyle(20)` line from (100,100) to (200,200) reports `(80,80) (220,220)` per the test source comment "line is 20 pixels thick". Fix: `lineTo`/`curveTo` now expand at BOTH the previous pen position and the new endpoint(s) by the current segment's `line_w` (full thickness); when `has_line == 0` the expansion is 0 but the points are still folded in (so fills without strokes still produce correct bounds — covers `beginFill; lineTo(100,100); ...; endFill;` with implicit `(0,0)` start). Both endpoints are re-expanded with each new segment's thickness, even when the start was already folded by a prior segment with a different thickness — this matches Flash's overestimate (e.g. `lineStyle(5)+lineTo(200,250) → lineStyle(10)+lineTo(400,200)` correctly extends y_max from 255 to 260 because the new segment's start (200,250) gets ±10 expansion).
+
+  3. **`lineStyle` thickness coercion uses `varToDoubleSWF`.** Test source has `thick = {valueOf: () => 20}; lineStyle(thick, red, 100);` — `varToDouble` returns 0 for OBJECT type (no `valueOf` invocation), so `line_w` was 0 and bounds didn't expand even after the fix above. Switched all three `lineStyle` arg coercions in both dispatch sites to `varToDoubleSWF(app_context, &args[i], g_swf_version)`, which calls `objectCallValueOf` for OBJECT-typed args.
+
+  Test stays `output_mismatch` — all 14 remaining diff lines are hitTest precision issues (`zshape.hitTest` returning undefined, `inv4.hitTest` / `inv8.hitTest` boolean drift, etc.) plus 2 trailing extra "delete onEnterFrame returned false" lines. No path to `ruffle_matched` promotion: our 20 diff indices are entirely disjoint from Ruffle's 14 diff indices (Ruffle gets the bounds wrong but the hitTests right; we now get the bounds right but still fail the hitTests). Promoting would require fixing the drawing-API hitTest precision, which is independent shape-rasterization work.
+
+  Verified: `matrix_test` (1081/1086 ruffle_matched, unchanged), `duplicate_movie_clip_drawing` (was MISMATCH `0,0` → PASS — the fill-without-stroke case fixed by change #2), `mask_with_drawing`, `movieclip_default_state`, `movieclip_getbounds`, `movieclip_state_values`, `hittest_morph` all PASS unchanged. `movieclip_hittest_shapeflag` still MISMATCH (unrelated pre-existing hitTest issue). `ButtonEventsTest` (676/679 ruffle_matched) and `NetStream-SquareTest` (86/216 output_mismatch) unchanged.
+
+### Earlier fix (2026-05-08, pending CI)
 
 - **`array-v5` (actionscript.all): 535/560 → 536/560 lines match (+1, -1 mismatched).** Two paired changes in `SWFModernRuntime/src/actionmodern/action.c`:
   1. `resolveProtoVar` now handles `ACTION_STACK_VALUE_ARRAY` by returning `arr->props` (the array's string-keyed property bag whose own `__proto__` points at `Array.prototype`). Used by `walkProtoChain`, `getPropertyWithPrototype`, and `findPropertyStructWithPrototype`.

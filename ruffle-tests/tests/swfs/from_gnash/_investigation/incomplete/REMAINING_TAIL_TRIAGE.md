@@ -7,6 +7,31 @@
   - soft_reference_test1 → ruffle_matched 2026-05-04 (_name setter syncs parent.dynamic_props + var_map)
 -->
 
+<!-- Partial improvement 2026-05-08 (pending CI):
+  - DrawingApiTest 66/93 → 80/93 line match. Drawing-API getBounds() bug fixed:
+    * moveTo no longer folds the pen into bounds (Flash returns the
+      6710886.35 sentinel for a clip with only moveTo).
+    * lineTo / curveTo expand by FULL line thickness on each side
+      (Flash semantics — Ruffle uses geometric half-thickness; the test
+      source explicitly expects "line is 20 pixels thick" → ±20 expansion
+      for lineStyle(20)). Both endpoints get expansion with the current
+      segment's thickness, even when start was already in bounds.
+    * lineStyle thickness coercion uses varToDoubleSWF (handles
+      Object-with-valueOf — the test sets `thick = {valueOf:()=>20}`).
+    Test stays output_mismatch — residual 13 diff lines + 2 extra
+    trailing lines are all hitTest precision issues (zshape.hitTest
+    undefined, inv4/inv8/e.hitTest boolean drift). Cannot promote to
+    ruffle_matched: our 20 diffs are entirely disjoint from Ruffle's
+    14 diffs (Ruffle gets bounds wrong but hitTests right; we now
+    get bounds right but still fail the hitTests). Promotion would
+    require independent shape-rasterization / hitTest work (not in
+    this entry's scope). Verified no regressions in matrix_test,
+    duplicate_movie_clip_drawing (which actually flipped to PASS via
+    the fill-without-stroke case), mask_with_drawing, hittest_morph,
+    movieclip_getbounds, movieclip_state_values, ButtonEventsTest,
+    NetStream-SquareTest.
+-->
+
 <!-- Resolved 2026-05-02:
   - loop/loop_test → PASS (was 5/21; fixed in cluster work)
   - DefineTextTest → ruffle_matched (was 11/16; fixed in cluster work)
@@ -296,9 +321,18 @@ nested goto).
 **Scope.** 2-3 hours of investigation; may resolve as a free
 benefit of GOTO_CATCHUP_HYGIENE Phase 4 landing.
 
-### EmbeddedFontTest (58.6%, 51/87) and DrawingApiTest (71.0%, 66/93)
+### EmbeddedFontTest (58.6%, 51/87) and DrawingApiTest (86.0%, 80/93)
 
-**Symptom (combined cluster).** Both fail on rendered-geometry
+**DrawingApiTest update 2026-05-08 (pending CI).** Bounds-related
+failures fixed (66/93 → 80/93). Remaining 13 diff lines + 2 trailing
+lines are all hitTest precision (zshape.hitTest undefined, inv4/inv8
+boolean drift, e.hitTest false-positive at corner). Our diffs are
+entirely disjoint from Ruffle's diff set (Ruffle now ahead on bounds,
+behind on hitTests; mirror of our state pre-fix), so no
+ruffle_matched promotion is possible without shape-rasterization /
+hitTest work. See latest entry in `CURRENT_STATUS.md`.
+
+**Symptom (combined cluster, original).** Both fail on rendered-geometry
 assertions — text glyph widths, drawing-API curve coordinates,
 font advance values. Specific lines vary.
 

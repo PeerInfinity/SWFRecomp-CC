@@ -50424,7 +50424,6 @@ void actionCallFunction(SWFAppContext* app_context, char* str_buffer)
 				if (num_args >= 2) {
 					float x = (float)varToDouble(&args[0]);
 					float y = (float)varToDouble(&args[1]);
-					drawingUpdateBounds(_with_mc, x, y);
 					DrawingState* ds = getOrCreateDrawingState(_with_mc);
 					drawingAddCmd(ds, 0, x, y, 0, 0);
 					ds->pen_x = x; ds->pen_y = y; ds->pen_set = 1;
@@ -50433,8 +50432,18 @@ void actionCallFunction(SWFAppContext* app_context, char* str_buffer)
 				if (num_args >= 2) {
 					float x = (float)varToDouble(&args[0]);
 					float y = (float)varToDouble(&args[1]);
-					drawingUpdateBounds(_with_mc, x, y);
 					DrawingState* ds = getOrCreateDrawingState(_with_mc);
+					// Always fold endpoints into bounds (covers fills); when a line
+					// style is active, expand by the FULL line thickness on each side
+					// (Flash semantics — not half) at both endpoints with the current
+					// segment's thickness.
+					float h = ds->has_line ? ds->line_w : 0.0f;
+					if (ds->pen_set) {
+						drawingUpdateBounds(_with_mc, ds->pen_x - h, ds->pen_y - h);
+						drawingUpdateBounds(_with_mc, ds->pen_x + h, ds->pen_y + h);
+					}
+					drawingUpdateBounds(_with_mc, x - h, y - h);
+					drawingUpdateBounds(_with_mc, x + h, y + h);
 					drawingAddCmd(ds, 1, x, y, 0, 0);
 					ds->pen_x = x; ds->pen_y = y; ds->pen_set = 1;
 				}
@@ -50444,9 +50453,16 @@ void actionCallFunction(SWFAppContext* app_context, char* str_buffer)
 					float cy = (float)varToDouble(&args[1]);
 					float ax = (float)varToDouble(&args[2]);
 					float ay = (float)varToDouble(&args[3]);
-					drawingUpdateBounds(_with_mc, cx, cy);
-					drawingUpdateBounds(_with_mc, ax, ay);
 					DrawingState* ds = getOrCreateDrawingState(_with_mc);
+					float h = ds->has_line ? ds->line_w : 0.0f;
+					if (ds->pen_set) {
+						drawingUpdateBounds(_with_mc, ds->pen_x - h, ds->pen_y - h);
+						drawingUpdateBounds(_with_mc, ds->pen_x + h, ds->pen_y + h);
+					}
+					drawingUpdateBounds(_with_mc, cx - h, cy - h);
+					drawingUpdateBounds(_with_mc, cx + h, cy + h);
+					drawingUpdateBounds(_with_mc, ax - h, ay - h);
+					drawingUpdateBounds(_with_mc, ax + h, ay + h);
 					drawingAddCmd(ds, 2, ax, ay, cx, cy);
 					ds->pen_x = ax; ds->pen_y = ay; ds->pen_set = 1;
 				}
@@ -50455,11 +50471,13 @@ void actionCallFunction(SWFAppContext* app_context, char* str_buffer)
 				if (num_args == 0) {
 					ds->has_line = 0; ds->line_w = 0;
 				} else {
-					float thickness = (float)varToDouble(&args[0]);
-					u32 rgb = (num_args >= 2) ? (u32)varToDouble(&args[1]) : 0;
+					// Use varToDoubleSWF so an Object with `valueOf()` (e.g. `thick = {valueOf:()=>20}`)
+					// coerces to its numeric value rather than 0.
+					float thickness = (float)varToDoubleSWF(app_context, &args[0], g_swf_version);
+					u32 rgb = (num_args >= 2) ? (u32)varToDoubleSWF(app_context, &args[1], g_swf_version) : 0;
 					float alpha = 1.0f;
 					if (num_args >= 3) {
-						alpha = (float)varToDouble(&args[2]) / 100.0f;
+						alpha = (float)varToDoubleSWF(app_context, &args[2], g_swf_version) / 100.0f;
 						if (alpha < 0) alpha = 0; if (alpha > 1) alpha = 1;
 					}
 					ds->line_w = thickness;
@@ -60934,11 +60952,11 @@ void actionCallMethod(SWFAppContext* app_context, char* str_buffer)
 		}
 		else if (method_name_len == 6 && strncasecmp(method_name, "moveTo", 6) == 0)
 		{
-			// moveTo(x, y) — set pen position, record command
+			// moveTo(x, y) — set pen position, record command (no bounds update;
+			// Flash returns the empty-bounds sentinel for clips with only moveTo).
 			if (num_args >= 2 && mc != NULL) {
 				float x = (float)varToDouble(&args[0]);
 				float y = (float)varToDouble(&args[1]);
-				drawingUpdateBounds(mc, x, y);
 				DrawingState* ds = getOrCreateDrawingState(mc);
 				drawingAddCmd(ds, 0, x, y, 0, 0); // MOVE_TO
 				ds->pen_x = x; ds->pen_y = y; ds->pen_set = 1;
@@ -60949,12 +60967,20 @@ void actionCallMethod(SWFAppContext* app_context, char* str_buffer)
 		}
 		else if (method_name_len == 6 && strncasecmp(method_name, "lineTo", 6) == 0)
 		{
-			// lineTo(x, y) — draw line segment, record command
+			// lineTo(x, y) — draw line segment, record command.
+			// Always fold endpoints into bounds (covers fills); when a line style is active,
+			// expand by the FULL line thickness on each side (Flash semantics, not half).
 			if (num_args >= 2 && mc != NULL) {
 				float x = (float)varToDouble(&args[0]);
 				float y = (float)varToDouble(&args[1]);
-				drawingUpdateBounds(mc, x, y);
 				DrawingState* ds = getOrCreateDrawingState(mc);
+				float h = ds->has_line ? ds->line_w : 0.0f;
+				if (ds->pen_set) {
+					drawingUpdateBounds(mc, ds->pen_x - h, ds->pen_y - h);
+					drawingUpdateBounds(mc, ds->pen_x + h, ds->pen_y + h);
+				}
+				drawingUpdateBounds(mc, x - h, y - h);
+				drawingUpdateBounds(mc, x + h, y + h);
 				drawingAddCmd(ds, 1, x, y, 0, 0); // LINE_TO
 				ds->pen_x = x; ds->pen_y = y; ds->pen_set = 1;
 			}
@@ -60964,15 +60990,23 @@ void actionCallMethod(SWFAppContext* app_context, char* str_buffer)
 		}
 		else if (method_name_len == 7 && strncasecmp(method_name, "curveTo", 7) == 0)
 		{
-			// curveTo(cx, cy, ax, ay) — quadratic Bezier curve
+			// curveTo(cx, cy, ax, ay) — quadratic Bezier curve.
+			// Conservative bounds: expand at start, control, and anchor by full line thickness when stroked.
 			if (num_args >= 4 && mc != NULL) {
 				float cx = (float)varToDouble(&args[0]);
 				float cy = (float)varToDouble(&args[1]);
 				float ax = (float)varToDouble(&args[2]);
 				float ay = (float)varToDouble(&args[3]);
-				drawingUpdateBounds(mc, cx, cy);
-				drawingUpdateBounds(mc, ax, ay);
 				DrawingState* ds = getOrCreateDrawingState(mc);
+				float h = ds->has_line ? ds->line_w : 0.0f;
+				if (ds->pen_set) {
+					drawingUpdateBounds(mc, ds->pen_x - h, ds->pen_y - h);
+					drawingUpdateBounds(mc, ds->pen_x + h, ds->pen_y + h);
+				}
+				drawingUpdateBounds(mc, cx - h, cy - h);
+				drawingUpdateBounds(mc, cx + h, cy + h);
+				drawingUpdateBounds(mc, ax - h, ay - h);
+				drawingUpdateBounds(mc, ax + h, ay + h);
 				drawingAddCmd(ds, 2, ax, ay, cx, cy); // CURVE_TO
 				ds->pen_x = ax; ds->pen_y = ay; ds->pen_set = 1;
 			}
@@ -61202,12 +61236,14 @@ void actionCallMethod(SWFAppContext* app_context, char* str_buffer)
 					// No args: clear line style
 					ds->has_line = 0; ds->line_w = 0;
 				} else {
-					float thickness = (float)varToDouble(&args[0]);
+					// Use varToDoubleSWF so an Object with `valueOf()` coerces to its
+					// numeric value rather than 0.
+					float thickness = (float)varToDoubleSWF(app_context, &args[0], g_swf_version);
 					u32 rgb = 0;
 					float alpha = 1.0f;
-					if (num_args >= 2) rgb = (u32)varToDouble(&args[1]);
+					if (num_args >= 2) rgb = (u32)varToDoubleSWF(app_context, &args[1], g_swf_version);
 					if (num_args >= 3) {
-						alpha = (float)varToDouble(&args[2]) / 100.0f;
+						alpha = (float)varToDoubleSWF(app_context, &args[2], g_swf_version) / 100.0f;
 						if (alpha < 0) alpha = 0; if (alpha > 1) alpha = 1;
 					}
 					ds->line_w = thickness;
