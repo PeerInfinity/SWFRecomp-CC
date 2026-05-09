@@ -4,7 +4,7 @@
 
 <!-- PLAN_META
 id: REGISTERCLASS_LIFECYCLE
-status: in_progress
+status: blocked
 phases:
   - id: 1
     name: "prototype.onLoad firing for registered-class MCs (registerClassTest)"
@@ -17,14 +17,123 @@ phases:
     status: complete
   - id: 4
     name: "Construct/load/unload cycle ordering on remove+replace (RegisterClassTest4)"
-    status: pending
+    status: blocked
   - id: 5
     name: "Multi-clip onLoad / frame0 ordering (registerClassTest2 frame interleave)"
-    status: deferred
+    status: complete_partial
 dependencies: []
 blockers:
-  - reason: "None — Object.registerClass infrastructure is already complete (AVM1 REGISTERCLASS_PLAN.md, 14/15 AVM1 tests pass). The Gnash misc-ming tests exercise edges the AVM1 tests don't cover: prototype.onLoad firing, constructor proto-chain fallthrough, frame-timing precision, and remove+replace cycling. Each phase is a narrow extension to the existing infrastructure."
+  - reason: "Phase 4 (RegisterClassTest4) requires deferring the registered-class onLoad past the parent's DoAction (currently flushed in the sprite's own tagShowFrame), and fixing per-cycle counter loss + an extra constructor invocation. Multi-axis ordering work with high regression risk across the broader sprite-init path; needs a dedicated session. See 2026-05-08 status note."
 -->
+
+## 2026-05-08 session — status reconciled; Phase 4 documented as blocker
+
+**CI snapshot of the four target tests (commit `f8e172e9`, 2026-05-08):**
+
+| Test | Status | Match |
+|------|--------|-------|
+| `register_class/registerClassTest` | **PASS** | 51/51 |
+| `register_class/registerClassTest2` | **ruffle_matched** | 36/44 |
+| `register_class/RegisterClassTest3` | **PASS** | 12/12 |
+| `register_class/RegisterClassTest4` | output_mismatch | 17/42 |
+
+Phases 1, 2, 3 are fully complete. Phase 5 is effectively complete
+(registerClassTest2 promotes via ruffle_matched). Only Phase 4
+(RegisterClassTest4) remains — and it carries enough cross-suite risk
+that this plan is being moved to `blocked/` rather than churned on in
+isolation.
+
+### Phase 3 closure — `c == 1` line now passes
+
+The 2026-04-27 entry below noted RegisterClassTest3 stuck at 11/12
+because `c += 1` inside the constructor failed to update `_root.c`.
+Subsequent unrelated work on `_global` / scope chain — likely the
+`actionDefineLocal` / `actionSetVariable` GCC -O2 memory-barrier fix
+(see `MEMORY.md::Critical Bug Fixes`) and the SWF6+ closure base_clip
+work — closed that gap. RegisterClassTest3 now PASS 12/12. No
+change to this plan was needed; the fix landed elsewhere.
+
+### Phase 4 (RegisterClassTest4) — current diff
+
+Baseline 17/42 lines match. Three failure clusters, all visible in the
+17/42 diff:
+
+1. **onLoad fires before the parent's DoAction (lines 3↔4 swap).**
+   ```
+   - 3  2 0                               (expected: root frame 2 DoAction)
+   - 4  load _level0.mc.Segments c: 0     (expected: onLoad fires AFTER)
+   + 3  load _level0.mc.Segments c: 0     (actual: we fire onLoad first)
+   + 4  2 0                               (actual: then DoAction)
+   ```
+   When mc3 advances to frame 2 it places mc1 (a registered-class
+   sprite). Our `process_sprite_needs_init` queues the onLoad via
+   `actionQueueMCOnLoad`, and `tagShowFrame` flushes the queue at
+   end-of-frame via `actionFlushPendingOnLoads` (`tag.c:2848`). But
+   that tagShowFrame is mc3's OWN frame-2 tagShowFrame — which fires
+   inside the root's frame-2 tag stream, BEFORE the root's DoAction.
+   Flash defers the registered-class onLoad past the root's DoAction
+   (it's a "tick-final" event, not a "sprite-final" event).
+
+   Fix shape: route registered-class onLoads through a separate queue
+   that drains at root tagShowFrame end (or after `g_deferred_*`
+   resolution) instead of the per-sprite drain. Risk: every other test
+   that exercises sprite-internal onLoads (loop_test*, attach_movie,
+   movieclip-loader paths) shares the same drain site.
+
+2. **Per-cycle counter loss — `_global.real[5,6,11] == undefined`.**
+   The `real.push(_level0.mc.Segments.c)` lines that should record
+   `0` (mid-cycle) and `2` (end of cycle 5) instead push undefined.
+   This is the post-rewind window where mc3 has been gotoAndPlay(1)'d
+   but the registered-class lookup of `_level0.mc.Segments.c` resolves
+   the wrong MC (a stale or about-to-be-replaced one whose own props
+   were already cleared). Likely connected to (1) — once load timing
+   stabilises, the .c value seen at push time should align.
+
+3. **Off-by-one ctorcalls and missing trailing `unload+load`.**
+   Expected `ctorcalls == 3`, actual 4 (one extra constructor fires).
+   Expected output ends with `Bug ctor: 3 / unload c: 2 / #passed:16
+   / #failed:0 / #total:16 / load c: 3` (the final unload+load
+   happens AFTER the dejagnu summary print). Our implementation drops
+   that trailing `Bug ctor: 3` and the corresponding load — and
+   somewhere along the way invokes the constructor an extra time
+   during the loop, inflating ctorcalls.
+
+### Why we're moving the plan to `blocked/`
+
+- Issue (1) is structural: the existing
+  `actionFlushPendingOnLoads` site sits in tagShowFrame and is shared
+  by every sprite path. Splitting registered-class onLoads from the
+  generic sprite onLoad queue is a narrow but invasive change with
+  large cross-suite blast radius (loop_test*, action_order/*, all
+  attachMovie/duplicateMovieClip variants).
+- Issue (2) cannot be diagnosed cleanly until (1) is fixed — the
+  observed undefined values may simply be a downstream symptom of
+  the wrong MC pointer being resolved at push time.
+- Issue (3) likely resolves with (1)+(2) once cycle ordering settles.
+- Even Ruffle diverges from Flash on this test (the upstream
+  `output.ruffle.txt` runs the cycle indefinitely past the expected
+  termination, see lines 43-75 of that file). So this is genuinely
+  Flash-quirky territory; fix work needs careful comparison against
+  Flash's actual semantics, not Ruffle's behavior.
+- Plan author estimated 4+ hours and "high cross-test risk" for
+  Phase 4. Given the rest of the plan is shipped and effective, the
+  remaining work is best left for a session that can dedicate a full
+  regression sweep to it — and should probably interlock with
+  `INTER_TAG_UNLOAD_PLAN.md` / `SPRITE_REWIND_IDENTITY_PLAN.md` (both
+  in `blocked/`) which touch the same sprite-rewind territory.
+
+### Required-pass guardrail (when Phase 4 is attempted)
+
+The list in `## Verification battery` at the end of this doc is the
+load-bearing battery. Add specifically:
+
+- AVM1 `register_and_init_order` (233/233) — most fragile.
+- Gnash misc-ming `attachMovieTest`, `init_object_order`,
+  `loop_test3/5/6/8/9`, `clip_events`, `bad_placeobject_clipaction`,
+  `movieclip_in_removed_button`.
+- Gnash misc-swfc `movieclip_destruction_test2` (currently 50/52
+  output_mismatch — a Phase 4 fix that touches sprite-rewind ordering
+  could legitimately move it up OR down).
 
 ## 2026-04-27 session (later) — Phase 5 partially landed; registerClassTest now PASS
 
