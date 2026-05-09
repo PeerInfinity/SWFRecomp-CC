@@ -18520,7 +18520,6 @@ static int isLevelRootMC(MovieClip* mc) {
 }
 
 static uint16_t* strip_html_tags_u16(SWFAppContext* app_context, const uint16_t* src, u32 src_len, u32* out_len);
-#ifdef NO_GRAPHICS
 static int recomputeMaxScroll(SWFAppContext* app_context, MovieClip* mc);
 static int getLetterSpacingTwips(MovieClip* mc);
 static void setDeviceFontModeForMC(MovieClip* mc);
@@ -18559,7 +18558,7 @@ static int tf_parse_html(TFRunTable* table, const char* html, u32 html_len,
                          const TFRun* defaults, int condense_white, int swf_version, int is_multiline);
 static char* tf_serialize_html(TFRunTable* table, int is_multiline);
 static void tf_get_plain_text(TFRunTable* table, char* out_buf, u32 out_buf_size, int is_multiline);
-#endif
+static TFRun* tf_find_run_at_index(TFRunTable* table, u32 char_idx);
 
 #ifdef NO_GRAPHICS
 // Find a display entry by name, first in root display list, then in parent sprite.
@@ -63016,7 +63015,7 @@ static int mc_get_track_as_menu_ng(MovieClip* mc)
 	return 0;
 }
 
-#ifdef NO_GRAPHICS // close un-gated mc_get_pixel_aabb_ng region; rest of NO_GRAPHICS section continues
+// (was: #ifdef NO_GRAPHICS — also un-gated for AS2 mouse dispatch)
 
 // Invoke a named AS2 event handler (onPress, onRelease, onDragOver, ...) stored
 // in mc->dynamic_props, with `this` bound to mc.
@@ -63185,7 +63184,7 @@ void actionDispatchMCRelease(SWFAppContext* app_context)
 	}
 }
 
-#endif // NO_GRAPHICS — un-gate actionMCHasButtonHandlers / actionMCMouseInsidePick below for graphics-mode button hover
+// (was: #endif — see above)
 
 // Whether this MC has any of Ruffle's BUTTON_EVENT_METHODS as own dynamic
 // properties: onPress, onRelease, onReleaseOutside, onRollOut, onRollOver,
@@ -63218,7 +63217,7 @@ int actionMCMouseInsidePick(MovieClip* mc, float mx, float my)
 	return (mx >= x1 && mx <= x2 && my >= y1 && my <= y2);
 }
 
-#ifdef NO_GRAPHICS
+// (was: #ifdef NO_GRAPHICS — un-gated to expose AS2 mouse dispatch / focus / text-field handling in graphics builds)
 
 // Whether any ancestor of this MC is button-mode AND its hit area contains
 // the mouse. When true, that ancestor "catches" mouse events as a unit
@@ -64227,6 +64226,11 @@ void actionUpdateHighlightState(void)
 
 // Get focus rect bounds (world-space AABB in twips) if a focus rect should be drawn.
 // Returns 1 if the focus rect should be drawn, 0 otherwise.
+// Gated NO_GRAPHICS-only: the body uses getDisplayEntryIdxForMC,
+// ng_getDisplayEntryBounds, and getConcatMatrixForMC, all of which depend
+// on tag_stubs.c helpers that aren't in the graphics build. swf.c provides
+// a stub returning 0 for graphics mode.
+#ifdef NO_GRAPHICS
 int actionGetFocusRectInfo(FocusRectInfo* out)
 {
 	if (g_focused_mc == NULL) return 0;
@@ -64279,6 +64283,7 @@ int actionGetFocusRectInfo(FocusRectInfo* out)
 	out->h = (float)((pymax - pymin) * 20.0);
 	return 1;
 }
+#endif // NO_GRAPHICS — actionGetFocusRectInfo (stub in swf.c for graphics)
 
 // ---------------------------------------------------------------------------
 // Virtual hover tracking (Tab focus → mouse handoff)
@@ -65667,7 +65672,7 @@ void actionTextFieldInput(SWFAppContext* app_context, int codepoint)
 	mc_call_as2_handler_ng(app_context, g_focused_mc, "onChanged", 9, NULL, 0);
 }
 
-#endif // NO_GRAPHICS (AS2 MC event dispatch, text field handling)
+// (was: #endif — see comment above for the open)
 
 // ==================================================================
 // Timer system — implementation in timer.c

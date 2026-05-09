@@ -612,7 +612,6 @@ typedef struct FocusRectInfo {
 // Get focus rect bounds if one should be drawn. Returns 1 if should draw, 0 if not.
 int actionGetFocusRectInfo(FocusRectInfo* out);
 
-#ifdef NO_GRAPHICS
 // AS2 MC event dispatch — called from swf_core.c on mouse events.
 // Iterates child_mc_cache, checks hit area, and calls onPress/onDragOver etc.
 void actionDispatchMCPress(SWFAppContext* app_context);
@@ -660,4 +659,3 @@ void actionTextControlMoveLeft(SWFAppContext* app_context);
 void actionTextControlEnter(SWFAppContext* app_context);
 void actionTextControlBackspace(SWFAppContext* app_context);
 void actionTextFieldInput(SWFAppContext* app_context, int codepoint);
-#endif

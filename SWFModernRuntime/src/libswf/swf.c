@@ -62,6 +62,37 @@ void tagMain(SWFAppContext* app_context)
 		app_context->oldSP = 0;
 
 		current_frame = next_frame;
+
+		// AS2 mouse-event dispatch — fires onPress/onRelease/onRollOver/onRollOut
+		// /onDragOver/onDragOut/onMouseMove/onMouseDown/onMouseUp on dynamic MCs.
+		// In NO_GRAPHICS mode swf_core.c dispatches these per event; here we
+		// dispatch per frame based on the flags set by render_webgpu.c's mouse
+		// callbacks. Must run BEFORE clearing clicked/released and BEFORE the
+		// frame func, so the per-frame transitions are visible.
+		{
+			static float prev_stage_x = 0.0f;
+			static float prev_stage_y = 0.0f;
+			static int   prev_initialized = 0;
+			float mx = app_context->mouse.stage_x;
+			float my = app_context->mouse.stage_y;
+			int moved = !prev_initialized || (mx != prev_stage_x) || (my != prev_stage_y);
+			prev_stage_x = mx;
+			prev_stage_y = my;
+			prev_initialized = 1;
+			if (moved) {
+				actionDispatchMCMouseMove(app_context);
+				actionDispatchMCMouseMoveGlobal(app_context);
+			}
+			if (app_context->mouse.clicked) {
+				actionDispatchMCMouseDown(app_context);
+				actionDispatchMCPress(app_context);
+			}
+			if (app_context->mouse.released) {
+				actionDispatchMCMouseUp(app_context);
+				actionDispatchMCRelease(app_context);
+			}
+		}
+
 		app_context->mouse.clicked = 0;
 		app_context->mouse.released = 0;
 		if (current_frame < g_frame_count && frame_funcs[current_frame] != NULL)
@@ -240,10 +271,12 @@ size_t ng_findDisplayEntryByName(const char* name) {
 	return result;
 }
 
-// Focus rect stub — full implementation lives in action.c under #ifdef NO_GRAPHICS
+// Focus rect stub — full implementation lives in action.c under #ifdef NO_GRAPHICS.
+// Real impl depends on getDisplayEntryIdxForMC / ng_getDisplayEntryBounds /
+// getConcatMatrixForMC, which are tag_stubs.c-side and not available in graphics.
 int actionGetFocusRectInfo(FocusRectInfo* out) {
 	(void)out;
-	return 0; // Never draw focus rect in graphics mode (for now)
+	return 0;
 }
 
 // Default findMovieEntry stub when no child movies are linked
