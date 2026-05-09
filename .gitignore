@@ -138,3 +138,9 @@ ruffle-tests/tests/swfs/from_gnash/misc-ming.all/*/
 ruffle-tests/tests/swfs/**/_results/results_current.json
 ruffle-tests/tests/swfs/**/_results/results_previous.json
 .claude/scheduled_tasks.lock
+
+# Local-only SWF batch artifacts (build_swf_batch.sh / clean_swf_batch.sh)
+docs/examples/local_batch/
+SWFRecomp/tests/local_batch/
+local_swf_batch/*.swf
+local_swf_batch/*.SWF

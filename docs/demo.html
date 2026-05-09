@@ -470,8 +470,8 @@
         // --- Test demo mode ---
         document.getElementById('test-section').style.display = 'block';
 
-        // Determine if graphics test
-        const isGraphics = testId.startsWith('graphics/');
+        // Determine if graphics test (local_batch demos are also WebGPU-rendered)
+        const isGraphics = testId.startsWith('graphics/') || testId.startsWith('local_batch/');
         const baseName = testId.includes('/') ? testId.split('/').pop() : testId;
         const testDir = 'examples/' + testId + '/';
 

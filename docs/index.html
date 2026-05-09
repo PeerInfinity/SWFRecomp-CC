@@ -374,6 +374,7 @@
 
             <!-- Demo cards -->
             <section class="demo-section" id="demo-section" style="display:none;">
+                <div id="local-batch-demos"></div>
                 <div id="graphics-demos"></div>
                 <div id="trace-demos"></div>
             </section>
@@ -446,6 +447,10 @@
             }
             statsHtml += '<div class="stat"><span class="stat-value">' + traceCount + '</span><span class="stat-label">trace demos</span></div>';
             statsHtml += '<div class="stat"><span class="stat-value">' + graphicsCount + '</span><span class="stat-label">graphics demos</span></div>';
+            var localBatchCount = tests.filter(function(t) { return t.type === 'local_batch'; }).length;
+            if (localBatchCount > 0) {
+                statsHtml += '<div class="stat"><span class="stat-value">' + localBatchCount + '</span><span class="stat-label">local batch demos</span></div>';
+            }
             statsBar.innerHTML = statsHtml;
             statsBar.style.display = 'flex';
 
@@ -538,16 +543,32 @@
         function renderDemoCards(tests) {
             var graphics = tests.filter(function(t) { return t.type === 'graphics'; });
             var trace = tests.filter(function(t) { return t.type === 'trace'; });
+            var localBatch = tests.filter(function(t) { return t.type === 'local_batch'; });
 
             // Apply filters
-            if (currentFilter === 'trace') graphics = [];
-            if (currentFilter === 'graphics') trace = [];
+            if (currentFilter === 'trace') { graphics = []; localBatch = []; }
+            if (currentFilter === 'graphics') { trace = []; localBatch = []; }
+            if (currentFilter === 'local_batch') { graphics = []; trace = []; }
 
             if (searchQuery) {
                 var q = searchQuery;
                 graphics = graphics.filter(function(t) { return matchesSearch(t, q); });
                 trace = trace.filter(function(t) { return matchesSearch(t, q); });
+                localBatch = localBatch.filter(function(t) { return matchesSearch(t, q); });
             }
+
+            var lbHtml = '';
+            if (localBatch.length > 0) {
+                lbHtml += '<h2 class="collapsible-header open" onclick="toggleSection(\'lb\')" id="lb-toggle" style="color: #FF8F00; border-bottom: 2px solid #FF8F00;">';
+                lbHtml += '<span class="arrow">&#9654;</span> Local Batch <span style="color:#999;font-size:0.6em;font-weight:400;margin-left:8px;">' + localBatch.length + ' demos</span></h2>';
+                lbHtml += '<div class="collapsible-body open" id="lb-body">';
+                lbHtml += '<p style="margin-bottom: 15px; color: #b0b0b0;">SWFs added locally via <code>build_swf_batch.sh</code>. Not part of the live demo on the project site.</p>';
+                lbHtml += '<div class="demo-grid">';
+                localBatch.forEach(function(t) { lbHtml += renderCard(t); });
+                lbHtml += '</div></div>';
+            }
+            var lbContainer = document.getElementById('local-batch-demos');
+            if (lbContainer) lbContainer.innerHTML = lbHtml;
 
             var gfxHtml = '';
             if (graphics.length > 0) {
@@ -574,14 +595,17 @@
             document.getElementById('trace-demos').innerHTML = traceHtml;
 
             document.getElementById('demo-section').style.display =
-                (graphics.length > 0 || trace.length > 0) ? 'block' : 'none';
+                (graphics.length > 0 || trace.length > 0 || localBatch.length > 0) ? 'block' : 'none';
         }
 
         function renderCard(t) {
-            var isGfx = t.type === 'graphics';
+            var isGfx = t.type === 'graphics' || t.type === 'local_batch';
             var cls = isGfx ? 'demo-card graphics' : 'demo-card';
             var badge = isGfx ? '<span class="card-badge">WebGPU</span>' : '';
-            var desc = t.description || (isGfx ? 'WebGPU-rendered Flash graphics demo.' : 'Flash SWF trace demo.');
+            var defaultDesc = t.type === 'local_batch'
+                ? 'Local batch SWF (WebGPU build).'
+                : (isGfx ? 'WebGPU-rendered Flash graphics demo.' : 'Flash SWF trace demo.');
+            var desc = t.description || defaultDesc;
             var demoUrl = 'demo.html?test=' + t.id;
             var compareUrl = demoUrl + '&compare=true';
             var linkCls = isGfx ? 'card-link primary graphics' : 'card-link primary';
