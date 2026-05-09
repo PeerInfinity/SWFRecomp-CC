@@ -359,36 +359,10 @@ void swfStart(SWFAppContext* app_context)
 	free(display_list);
 }
 
-// ---------------------------------------------------------------------------
-// Stubs for functions declared in tag.h that action.c/tag.c call in all modes.
-// Full implementations live in tag_stubs.c (NO_GRAPHICS/HEADLESS builds).
-// ---------------------------------------------------------------------------
-
-// tag.c stubs: called from tagPlaceObject2/tagRemoveObject shared code
-void ng_on_place_object2(SWFAppContext* app_context, size_t depth, size_t char_id) {
-	(void)app_context; (void)depth; (void)char_id;
-}
-
-void ng_on_remove_object(SWFAppContext* app_context, size_t depth) {
-	(void)app_context; (void)depth;
-}
-
-size_t ng_findDisplayEntryByName(const char* name) {
-	size_t result = SIZE_MAX;
-	for (size_t d = 0; d <= max_depth; d++) {
-		if (display_list[d].char_id == 0) continue;
-		if (display_list[d].instance_name == NULL) continue;
-		if (swf_name_match(display_list[d].instance_name, name)) {
-			if (result == SIZE_MAX || d < result)
-				result = d;
-		}
-	}
-	return result;
-}
-
 // Focus rect stub — full implementation lives in action.c under #ifdef NO_GRAPHICS.
-// Real impl depends on getDisplayEntryIdxForMC / ng_getDisplayEntryBounds /
-// getConcatMatrixForMC, which are tag_stubs.c-side and not available in graphics.
+// Real impl depends on getDisplayEntryIdxForMC / getConcatMatrixForMC, which
+// are still NO_GRAPHICS-only in action.c. Once those are un-gated this stub
+// can be removed and the real actionGetFocusRectInfo will link.
 int actionGetFocusRectInfo(FocusRectInfo* out) {
 	(void)out;
 	return 0;
@@ -397,6 +371,14 @@ int actionGetFocusRectInfo(FocusRectInfo* out) {
 // Default findMovieEntry stub when no child movies are linked
 #ifndef HAS_CHILD_MOVIES
 MovieEntry* findMovieEntry(const char* filename) {
+	(void)filename;
+	return NULL;
+}
+#endif
+
+// Default findDataFile stub when no data files are linked
+#ifndef HAS_DATA_FILES
+DataFileEntry* findDataFile(const char* filename) {
 	(void)filename;
 	return NULL;
 }

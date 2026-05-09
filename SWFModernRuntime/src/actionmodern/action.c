@@ -7701,7 +7701,7 @@ static int varToStringBufFull(SWFAppContext* app_context, ActionVar* v, char* bu
 // Transform helper functions (NO_GRAPHICS only) and getter/setter implementations
 // ============================================================================
 
-#ifdef NO_GRAPHICS
+// (was: #ifdef NO_GRAPHICS — un-gated for getDisplayEntryIdxForMC and friends)
 // Root MovieClip CT globals (root has no ng_display entry)
 static double g_root_cx_ra = 100.0, g_root_cx_ga = 100.0;
 static double g_root_cx_ba = 100.0, g_root_cx_aa = 100.0;
@@ -8108,7 +8108,7 @@ static ASObject* makeCTObject(SWFAppContext* app_context,
 	v = makeF64((double)ab);         setProperty(app_context, obj, "alphaOffset",     11, &v);
 	return obj;
 }
-#endif // NO_GRAPHICS
+// (was: #endif)
 
 static ActionVar transformMatrixGetter(SWFAppContext* app_context, ActionVar* args, u32 arg_count, ActionVar* registers, void* this_obj)
 {
@@ -20657,7 +20657,7 @@ void actionRenameMovieClip(const char* old_name, const char* new_name)
 }
 #endif
 
-#ifdef NO_GRAPHICS
+// (was: #ifdef NO_GRAPHICS — un-gated for textfield helpers used by tag_stubs.c when compiled in graphics)
 // ==================================================================
 // TextField Variable Binding
 // ==================================================================
@@ -22519,7 +22519,7 @@ static void syncTransformIfNeeded(MovieClip* mc) {
 	}
 	mc->last_transform_id = tid;
 }
-#endif
+// (was: #endif)
 
 // Helper: is this MC a textfield (static or dynamically created)?
 // Static textfields have ng_textfield_idx >= 0 (index into metadata table).

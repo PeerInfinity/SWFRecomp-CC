@@ -260,7 +260,7 @@ int ng_getDisplayEntryFilterData(size_t idx, u8* type, float* blur_x, float* blu
 extern DisplayObject* g_current_sprite_obj;
 
 // NO_GRAPHICS helpers for sprite timeline control from action.c
-#ifdef NO_GRAPHICS
+// (was: #ifdef NO_GRAPHICS — un-gated so tag_stubs.c symbols are declared in graphics builds)
 // Advance sprite timelines (replaces old ng_advanceSprites; called by swf_core.c)
 void advance_sprite_frames(SWFAppContext* app_context);
 // Advance only nested sprites within root-level sprites (deferred recursion).
@@ -383,7 +383,7 @@ MovieClip* ng_duplicateMovieClip(SWFAppContext* app_context, const char* source_
 // Defined in tag.c (NO_GRAPHICS builds only). NULL = use main SWF's transform_data.
 extern float (*g_active_transform_data)[16];
 
-#endif // NO_GRAPHICS (temporarily close for shared declarations below)
+// (was: #endif — see comment above)
 
 // --- Shared ng_* declarations (from ng_shared.c, always compiled) ---
 // Register a child movie's transform data for sprite frame execution.
@@ -399,7 +399,7 @@ void ng_record_char_path(size_t char_id, size_t path_offset, size_t path_size);
 // Record interleaved morph path data (for interpolated hit testing)
 void ng_record_morph_path(size_t char_id, size_t path_offset, size_t path_size);
 
-#ifdef NO_GRAPHICS // reopen for remaining NO_GRAPHICS-only declarations
+// (was: #ifdef NO_GRAPHICS — un-gated; same reason as above)
 // Shape-accurate point-in-shape test for a display list.
 // Walks the display list recursively; for leaf shapes, tests the test point against triangles.
 // ma..mty is the accumulated parent matrix (twips space).
@@ -472,4 +472,4 @@ void ng_fire_pending_attach_inits(SWFAppContext* app_context);
 void ng_queue_placement_clip_events(SWFAppContext* app_context, size_t depth);
 // Queue UNLOAD clip-action callbacks for a slot (mirrors tagRemoveObject2).
 void ng_queue_slot_unload_events(SWFAppContext* app_context, size_t depth, MovieClip* mc);
-#endif
+// (was: #endif — see comment above)

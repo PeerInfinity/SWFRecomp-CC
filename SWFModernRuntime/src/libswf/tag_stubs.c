@@ -1,4 +1,10 @@
-#if defined(NO_GRAPHICS) || defined(HEADLESS_GRAPHICS)
+// Compiled in NO_GRAPHICS, HEADLESS_GRAPHICS, AND graphics builds — most
+// of the helpers here (display-list inspection, depth queries, sprite
+// frame helpers, transform/cxform getters/setters) are graphics-friendly
+// and useful for the un-gated AS2 dispatch / focus / textfield code in
+// action.c. The few sections that genuinely depend on NO_GRAPHICS-only
+// data structures (the global display_list/dictionary backing storage,
+// frame-loop catch-up, sprite-init-depth tracking) are wrapped inline.
 
 #include <tag.h>
 #include <swf.h>
@@ -18,9 +24,11 @@
 // ---------------------------------------------------------------------------
 // Global display state — defined here in NO_GRAPHICS (swf.c provides in GRAPHICS)
 // ---------------------------------------------------------------------------
+#if defined(NO_GRAPHICS) || defined(HEADLESS_GRAPHICS)
 Character* dictionary = NULL;
 DisplayObject* display_list = NULL;
 size_t max_depth = 0;
+#endif
 
 // ---------------------------------------------------------------------------
 // Access generated data arrays (from draws.c / tagMain.c, linked per-test)
@@ -2550,9 +2558,10 @@ MovieClip* ng_duplicateMovieClip(SWFAppContext* app_context, const char* source_
 // No-op stubs for functions not needed in NO_GRAPHICS mode
 // ---------------------------------------------------------------------------
 
-#ifndef HEADLESS_GRAPHICS
-// In HEADLESS_GRAPHICS mode, tag.c provides real implementations that call
-// the renderer. These stubs are only needed in pure NO_GRAPHICS mode.
+#if defined(NO_GRAPHICS) && !defined(HEADLESS_GRAPHICS)
+// In HEADLESS_GRAPHICS and pure-graphics modes, tag.c provides real
+// implementations that call the renderer. These stubs are only needed in
+// pure NO_GRAPHICS (no renderer at all).
 void defineBitmap(size_t offset, size_t size, u32 width, u32 height, u16 char_id)
 {
 	// Register metadata so BitmapData.loadBitmap can resolve dimensions/offsets
@@ -2565,6 +2574,10 @@ void finalizeBitmaps(void)
 }
 #endif
 
+// Sound tag stubs — real implementations live in audio.c for graphics
+// builds. tag_stubs.c provides no-ops only when audio.c isn't linked
+// (NO_GRAPHICS / HEADLESS without audio).
+#if defined(NO_GRAPHICS) || defined(HEADLESS_GRAPHICS)
 void tagDefineSound(SWFAppContext* app_context, u16 sound_id,
 	u8 format, u8 rate, u8 sample_size, u8 stereo,
 	u32 sample_count, const u8* data, size_t data_size)
@@ -2600,11 +2613,10 @@ void tagStopAllSounds(SWFAppContext* app_context)
 {
 	(void)app_context;
 }
+#endif // sound stubs
 
 void tagScriptLimits(u16 max_recursion, u16 timeout)
 {
 	(void)timeout;
 	g_max_call_depth = max_recursion;
 }
-
-#endif // NO_GRAPHICS || HEADLESS_GRAPHICS

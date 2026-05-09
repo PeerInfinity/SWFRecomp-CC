@@ -47,35 +47,5 @@ int g_settarget_none = 0;
 void ng_bumpSpriteInitDepth(void) {}
 void ng_unbumpSpriteInitDepth(void) {}
 
-// Look up the textfield index for a display-list depth. Real impl is in
-// tag_stubs.c (NO_GRAPHICS-only). actionMouseClickFocus uses this to find
-// SWF-authored text fields that haven't been touched by AS yet. Returning
-// -1 means "not a textfield"; the click-focus path then only finds text
-// fields that are already in child_mc_cache, which covers AS-created
-// fields and any SWF-authored field that scripts have already accessed.
-int ng_getTextFieldIdx(size_t depth)
-{
-	(void)depth;
-	return -1;
-}
-
-// Sync text → variable. Real impl in action.c under #ifdef NO_GRAPHICS;
-// it walks dynamic_props for the "variable" binding and writes the text
-// to that AS variable, then propagates to any other textfields sharing
-// the same binding. Stubbed here for graphics builds — text fields edited
-// via the un-gated text-input path won't propagate to AS-bound variables
-// or to peer text fields. The edit itself is still visible via
-// `tf.text` property reads on the field that was typed into.
-struct SWFAppContext_;
-struct MovieClip_;
-struct ActionVar_;
-void ng_syncTextToVar(struct SWFAppContext_* app_context,
-                      struct MovieClip_* mc,
-                      struct ActionVar_* text_value)
-{
-	(void)app_context;
-	(void)mc;
-	(void)text_value;
-}
 
 #endif // USE_WEBGPU && !NO_GRAPHICS && !HEADLESS_GRAPHICS
