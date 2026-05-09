@@ -141,6 +141,7 @@ ruffle-tests/tests/swfs/**/_results/results_previous.json
 
 # Local-only SWF batch artifacts (build_swf_batch.sh / clean_swf_batch.sh)
 docs/examples/local_batch/
+docs/local_catalog.json
 SWFRecomp/tests/local_batch/
 local_swf_batch/*.swf
 local_swf_batch/*.SWF

@@ -416,13 +416,21 @@
         var currentFilter = 'all';
         var searchQuery = '';
 
-        // Fetch catalog.json and opcode-index.json in parallel
+        // Fetch catalog.json (upstream-tracked: trace + graphics tests),
+        // local_catalog.json (gitignored: local-batch tests, may 404), and
+        // opcode-index.json in parallel. Local-batch entries get merged
+        // into the catalog.tests array if local_catalog.json is present.
         Promise.all([
             fetch('catalog.json').then(function(r) { return r.ok ? r.json() : null; }),
+            fetch('local_catalog.json').then(function(r) { return r.ok ? r.json() : null; }).catch(function() { return null; }),
             fetch('opcode-index.json').then(function(r) { return r.ok ? r.json() : null; })
         ]).then(function(results) {
             catalog = results[0];
-            opcodeIndex = results[1];
+            var localCatalog = results[1];
+            opcodeIndex = results[2];
+            if (catalog && localCatalog && Array.isArray(localCatalog.tests)) {
+                catalog.tests = (catalog.tests || []).concat(localCatalog.tests);
+            }
             document.getElementById('loading').style.display = 'none';
             renderPage();
         }).catch(function(err) {

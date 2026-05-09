@@ -198,10 +198,12 @@ PY_EOF
 done
 
 # ---------------------------------------------------------------
-# Regenerate the index + catalog so the new entries show up.
+# Generate docs/local_catalog.json (separate from the upstream-tracked
+# catalog.json so the local build process doesn't dirty the live demo
+# catalog). docs/index.html fetches both files and merges them.
 # ---------------------------------------------------------------
-echo "Regenerating examples index..."
-"${SCRIPT_DIR}/generate_examples_index.sh" "${DOCS_DIR}"
+echo "Generating local_catalog.json..."
+python3 "${SCRIPT_DIR}/generate_local_catalog.py" "${DOCS_DIR}"
 
 echo ""
 echo "========================================="

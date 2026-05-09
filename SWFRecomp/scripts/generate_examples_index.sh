@@ -32,7 +32,10 @@ fi
 # Discover trace examples (top-level directories with .demo_type = "trace" or no .demo_type)
 TRACE_EXAMPLES=()
 GRAPHICS_EXAMPLES=()
-LOCAL_BATCH_EXAMPLES=()
+# Note: examples/local_batch/ is intentionally skipped — local-batch builds
+# write their own docs/local_catalog.json (see generate_local_catalog.py)
+# so this script can produce a catalog.json identical to the pre-local-batch
+# state regardless of what's in the local_batch directory.
 
 for example_dir in "${EXAMPLES_DIR}"/*/; do
     [ -d "$example_dir" ] || continue
@@ -47,12 +50,8 @@ for example_dir in "${EXAMPLES_DIR}"/*/; do
             GRAPHICS_EXAMPLES+=("$gfx_name")
         done
     elif [ "$example_name" = "local_batch" ]; then
-        # Scan local-batch subdirectories (populated by build_swf_batch.sh)
-        for batch_dir in "${example_dir}"/*/; do
-            [ -d "$batch_dir" ] || continue
-            batch_name=$(basename "$batch_dir")
-            LOCAL_BATCH_EXAMPLES+=("$batch_name")
-        done
+        # Skip — handled by generate_local_catalog.py
+        continue
     else
         # Read demo type from marker file
         demo_type="trace"
@@ -77,19 +76,15 @@ if [ ${#GRAPHICS_EXAMPLES[@]} -gt 0 ]; then
     IFS=$'\n' GRAPHICS_EXAMPLES=($(sort <<<"${GRAPHICS_EXAMPLES[*]}"))
     unset IFS
 fi
-if [ ${#LOCAL_BATCH_EXAMPLES[@]} -gt 0 ]; then
-    IFS=$'\n' LOCAL_BATCH_EXAMPLES=($(sort <<<"${LOCAL_BATCH_EXAMPLES[*]}"))
-    unset IFS
-fi
 
-TOTAL_EXAMPLES=$(( ${#TRACE_EXAMPLES[@]} + ${#GRAPHICS_EXAMPLES[@]} + ${#LOCAL_BATCH_EXAMPLES[@]} ))
+TOTAL_EXAMPLES=$(( ${#TRACE_EXAMPLES[@]} + ${#GRAPHICS_EXAMPLES[@]} ))
 
 if [ $TOTAL_EXAMPLES -eq 0 ]; then
     echo "No examples found in $EXAMPLES_DIR"
     exit 0
 fi
 
-echo "Found ${#TRACE_EXAMPLES[@]} trace examples, ${#GRAPHICS_EXAMPLES[@]} graphics examples, and ${#LOCAL_BATCH_EXAMPLES[@]} local-batch examples"
+echo "Found ${#TRACE_EXAMPLES[@]} trace examples and ${#GRAPHICS_EXAMPLES[@]} graphics examples"
 
 HAS_GRAPHICS=false
 if [ ${#GRAPHICS_EXAMPLES[@]} -gt 0 ]; then
@@ -326,26 +321,20 @@ for example in "${GRAPHICS_EXAMPLES[@]}"; do
     GRAPHICS_LIST+="${example},"
 done
 
-LOCAL_BATCH_LIST=""
-for example in "${LOCAL_BATCH_EXAMPLES[@]}"; do
-    LOCAL_BATCH_LIST+="${example},"
-done
-
 EXCLUDE_LIST=""
 for exclude_entry in "${EXCLUDE_TESTS[@]}"; do
     EXCLUDE_LIST+="${exclude_entry}|"
 done
 
-python3 - "$EXAMPLES_DIR" "$TRACE_LIST" "$GRAPHICS_LIST" "$LOCAL_BATCH_LIST" "$EXCLUDE_LIST" "$CATALOG_FILE" <<'PYEOF'
+python3 - "$EXAMPLES_DIR" "$TRACE_LIST" "$GRAPHICS_LIST" "$EXCLUDE_LIST" "$CATALOG_FILE" <<'PYEOF'
 import json, sys, os
 from datetime import datetime, timezone
 
 examples_dir = sys.argv[1]
 trace_names = [t for t in sys.argv[2].rstrip(',').split(',') if t]
 graphics_names = [g for g in sys.argv[3].rstrip(',').split(',') if g]
-local_batch_names = [l for l in sys.argv[4].rstrip(',').split(',') if l]
-exclude_raw = [e for e in sys.argv[5].rstrip('|').split('|') if e]
-catalog_file = sys.argv[6]
+exclude_raw = [e for e in sys.argv[4].rstrip('|').split('|') if e]
+catalog_file = sys.argv[5]
 
 tests = []
 
@@ -388,36 +377,6 @@ for name in graphics_names:
         "name": name,
         "type": "graphics",
         "path": f"examples/graphics/{name}",
-        "has_swf": os.path.exists(os.path.join(test_dir, "test.swf")),
-    }
-
-    for f in os.listdir(test_dir):
-        if f.endswith('.js') and not f.startswith('.'):
-            entry["js_file"] = f
-        elif f.endswith('.wasm'):
-            entry["wasm_file"] = f
-
-    info_path = os.path.join(test_dir, "test_info.json")
-    if os.path.exists(info_path):
-        with open(info_path) as f:
-            info = json.load(f)
-        meta = info.get("metadata", {})
-        entry["description"] = meta.get("description", "")
-        entry["swf_version"] = meta.get("swf_version")
-        entry["fully_implemented"] = meta.get("fully_implemented", False)
-        opcodes = info.get("opcodes", {})
-        entry["opcodes_tested"] = opcodes.get("tested", [])
-        entry["opcodes_supporting"] = opcodes.get("supporting", [])
-
-    tests.append(entry)
-
-for name in local_batch_names:
-    test_dir = os.path.join(examples_dir, "local_batch", name)
-    entry = {
-        "id": f"local_batch/{name}",
-        "name": name,
-        "type": "local_batch",
-        "path": f"examples/local_batch/{name}",
         "has_swf": os.path.exists(os.path.join(test_dir, "test.swf")),
     }
 

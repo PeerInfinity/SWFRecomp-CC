@@ -1,5 +1,14 @@
 #!/bin/bash
-# Remove everything build_swf_batch.sh produced and regenerate the index.
+# Remove everything build_swf_batch.sh produced.
+#
+# Cleans:
+#   - SWFRecomp/tests/local_batch/        (test scratch dirs)
+#   - docs/examples/local_batch/          (deployed WASM artifacts)
+#   - docs/local_catalog.json             (gitignored local catalog)
+#
+# Does NOT touch:
+#   - docs/catalog.json                   (the upstream catalog is left alone)
+#   - local_swf_batch/                    (source SWFs)
 #
 # Usage: ./scripts/clean_swf_batch.sh
 
@@ -14,6 +23,7 @@ EXAMPLES_DIR="${DOCS_DIR}/examples"
 BATCH_NAMESPACE="local_batch"
 TESTS_BATCH_ROOT="${SWFRECOMP_ROOT}/tests/${BATCH_NAMESPACE}"
 DEPLOY_BATCH_ROOT="${EXAMPLES_DIR}/${BATCH_NAMESPACE}"
+LOCAL_CATALOG="${DOCS_DIR}/local_catalog.json"
 
 REMOVED=0
 
@@ -29,17 +39,18 @@ if [ -d "${DEPLOY_BATCH_ROOT}" ]; then
     REMOVED=1
 fi
 
+if [ -f "${LOCAL_CATALOG}" ]; then
+    echo "Removing local catalog:    ${LOCAL_CATALOG}"
+    rm -f "${LOCAL_CATALOG}"
+    REMOVED=1
+fi
+
 if [ ${REMOVED} -eq 0 ]; then
     echo "Nothing to clean — no local_batch artifacts found."
     exit 0
 fi
 
-# Regenerate the index + catalog so the page no longer references the batch.
-if [ -d "${EXAMPLES_DIR}" ] && [ -x "${SCRIPT_DIR}/generate_examples_index.sh" ]; then
-    echo "Regenerating examples index..."
-    "${SCRIPT_DIR}/generate_examples_index.sh" "${DOCS_DIR}"
-fi
-
 echo ""
 echo "✅ Local-batch artifacts removed."
 echo "   Source files in ${REPO_ROOT}/local_swf_batch/ were left alone."
+echo "   docs/catalog.json was not touched."
