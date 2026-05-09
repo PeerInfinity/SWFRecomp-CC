@@ -6,10 +6,19 @@
 # can all be removed by clean_swf_batch.sh.
 #
 # Usage:
-#   ./scripts/build_swf_batch.sh [swf_dir]
+#   ./scripts/build_swf_batch.sh [swf_dir] [--skip-existing]
 #
 # Defaults:
 #   swf_dir = <repo_root>/local_swf_batch/
+#
+# Modes:
+#   default        — every SWF in swf_dir is rebuilt from scratch each run.
+#                    SWFs from previous runs that are no longer in swf_dir
+#                    stay deployed. New SWFs get added.
+#   --skip-existing  — SWFs whose deploy dir already has a built WASM are
+#                    left alone (no recompile, no rebuild, no overwrite).
+#                    Only new SWFs get processed. Useful for incremental
+#                    additions to an existing batch.
 #
 # Each *.swf in swf_dir becomes a test under SWFRecomp/tests/local_batch/<name>/
 # and gets deployed to docs/examples/local_batch/<name>/. Ruffle comparison is
@@ -21,7 +30,24 @@ SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 SWFRECOMP_ROOT="$(cd "${SCRIPT_DIR}/.." && pwd)"
 REPO_ROOT="$(cd "${SWFRECOMP_ROOT}/.." && pwd)"
 
-SWF_DIR=${1:-"${REPO_ROOT}/local_swf_batch"}
+# Parse args: first non-flag is swf_dir; flags can appear in any position.
+SKIP_EXISTING=0
+SWF_DIR=""
+for arg in "$@"; do
+    case "$arg" in
+        --skip-existing) SKIP_EXISTING=1 ;;
+        --*) echo "Error: unknown flag: $arg"; exit 1 ;;
+        *)
+            if [ -z "$SWF_DIR" ]; then
+                SWF_DIR="$arg"
+            else
+                echo "Error: unexpected argument: $arg (swf_dir already set to $SWF_DIR)"
+                exit 1
+            fi
+            ;;
+    esac
+done
+SWF_DIR=${SWF_DIR:-"${REPO_ROOT}/local_swf_batch"}
 DOCS_DIR="${REPO_ROOT}/docs"
 EXAMPLES_DIR="${DOCS_DIR}/examples"
 BATCH_NAMESPACE="local_batch"
@@ -63,12 +89,16 @@ fi
 echo "Found ${#SWF_FILES[@]} SWF file(s) in ${SWF_DIR}"
 echo "  Test scratch: ${TESTS_BATCH_ROOT}"
 echo "  Deploy dir:   ${DEPLOY_BATCH_ROOT}"
+if [ "$SKIP_EXISTING" = 1 ]; then
+    echo "  Mode:         --skip-existing (existing builds left alone)"
+fi
 echo ""
 
 mkdir -p "${TESTS_BATCH_ROOT}"
 
 SUCCESS=0
 FAIL=0
+SKIPPED=0
 FAILED_NAMES=()
 GRAPHICS_BUILD_TIMEOUT=180
 
@@ -84,6 +114,15 @@ for swf_path in "${SWF_FILES[@]}"; do
 
     test_dir="${TESTS_BATCH_ROOT}/${test_name}"
     rel_test_name="${BATCH_NAMESPACE}/${test_name}"
+    deploy_dir="${DEPLOY_BATCH_ROOT}/${test_name}"
+
+    # --skip-existing: leave already-built deployments alone. Detect "built"
+    # by the presence of a .wasm file in the deploy dir.
+    if [ "$SKIP_EXISTING" = 1 ] && compgen -G "${deploy_dir}/*.wasm" > /dev/null; then
+        echo "Skipping ${swf_basename}: already deployed at ${deploy_dir}"
+        SKIPPED=$((SKIPPED + 1))
+        continue
+    fi
 
     echo "========================================="
     echo "Processing: ${swf_basename}  ->  ${rel_test_name}"
@@ -168,8 +207,9 @@ echo ""
 echo "========================================="
 echo "Local-batch build summary"
 echo "========================================="
-echo "  Built:  ${SUCCESS}"
-echo "  Failed: ${FAIL}"
+echo "  Built:   ${SUCCESS}"
+echo "  Skipped: ${SKIPPED}"
+echo "  Failed:  ${FAIL}"
 if [ ${FAIL} -gt 0 ]; then
     echo "  Failures:"
     for f in "${FAILED_NAMES[@]}"; do
