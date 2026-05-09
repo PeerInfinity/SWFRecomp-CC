@@ -47,4 +47,16 @@ int g_settarget_none = 0;
 void ng_bumpSpriteInitDepth(void) {}
 void ng_unbumpSpriteInitDepth(void) {}
 
+// Look up the textfield index for a display-list depth. Real impl is in
+// tag_stubs.c (NO_GRAPHICS-only). actionMouseClickFocus uses this to find
+// SWF-authored text fields that haven't been touched by AS yet. Returning
+// -1 means "not a textfield"; the click-focus path then only finds text
+// fields that are already in child_mc_cache, which covers AS-created
+// fields and any SWF-authored field that scripts have already accessed.
+int ng_getTextFieldIdx(size_t depth)
+{
+	(void)depth;
+	return -1;
+}
+
 #endif // USE_WEBGPU && !NO_GRAPHICS && !HEADLESS_GRAPHICS

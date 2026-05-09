@@ -1,6 +1,7 @@
 #if !defined(NO_GRAPHICS) && !defined(HEADLESS_GRAPHICS)
 
 #include <stdlib.h>
+#include <string.h>
 #include <swf.h>
 #include <tag.h>
 #include <action.h>
@@ -63,34 +64,77 @@ void tagMain(SWFAppContext* app_context)
 
 		current_frame = next_frame;
 
-		// AS2 mouse-event dispatch — fires onPress/onRelease/onRollOver/onRollOut
-		// /onDragOver/onDragOut/onMouseMove/onMouseDown/onMouseUp on dynamic MCs.
+		// Per-frame AS2 input dispatch.
 		// In NO_GRAPHICS mode swf_core.c dispatches these per event; here we
-		// dispatch per frame based on the flags set by render_webgpu.c's mouse
-		// callbacks. Must run BEFORE clearing clicked/released and BEFORE the
-		// frame func, so the per-frame transitions are visible.
+		// dispatch per frame based on the flags + state set by render_webgpu.c's
+		// callbacks. Runs BEFORE clearing the per-frame flags and BEFORE the
+		// frame func so the transitions are visible to user scripts.
 		{
+			// --- Mouse ---
 			static float prev_stage_x = 0.0f;
 			static float prev_stage_y = 0.0f;
-			static int   prev_initialized = 0;
+			static int   prev_mouse_initialized = 0;
 			float mx = app_context->mouse.stage_x;
 			float my = app_context->mouse.stage_y;
-			int moved = !prev_initialized || (mx != prev_stage_x) || (my != prev_stage_y);
+			int moved = !prev_mouse_initialized || (mx != prev_stage_x) || (my != prev_stage_y);
 			prev_stage_x = mx;
 			prev_stage_y = my;
-			prev_initialized = 1;
+			prev_mouse_initialized = 1;
 			if (moved) {
+				actionEndVirtualHoverOnMouse(app_context);
 				actionDispatchMCMouseMove(app_context);
 				actionDispatchMCMouseMoveGlobal(app_context);
+				actionResetHighlightForEvent(0); // 0=mouse_move
 			}
 			if (app_context->mouse.clicked) {
-				actionDispatchMCMouseDown(app_context);
-				actionDispatchMCPress(app_context);
+				actionDispatchMouseDown(app_context);       // Mouse listener broadcast
+				actionDispatchMCMouseDown(app_context);      // Per-MC AS2 dispatch
+				actionMouseClickFocus(app_context);          // Focus acquisition
+				actionDispatchMCPress(app_context);          // onPress
+				actionResetHighlightForEvent(1);             // 1=left_down
+				actionClearVirtualHover();
 			}
 			if (app_context->mouse.released) {
-				actionDispatchMCMouseUp(app_context);
-				actionDispatchMCRelease(app_context);
+				actionDispatchMouseUp(app_context);          // Mouse listener broadcast
+				actionDispatchMCMouseUp(app_context);        // Per-MC AS2 dispatch
+				actionDispatchMCRelease(app_context);        // onRelease/onReleaseOutside
+				actionResetHighlightForEvent(2);             // 2=left_up
 			}
+
+			// --- Keyboard ---
+			// Detect key down/up transitions by comparing current keys.down[] to
+			// the previous frame's snapshot. Each transition fires the focused-MC
+			// dispatcher AND the global Key listener broadcast.
+			static u8 prev_keys_down[256];
+			static int prev_keys_initialized = 0;
+			if (!prev_keys_initialized) {
+				memset(prev_keys_down, 0, sizeof(prev_keys_down));
+				prev_keys_initialized = 1;
+			}
+			for (int code = 0; code < 256; code++) {
+				u8 cur = app_context->keys.down[code];
+				u8 prev = prev_keys_down[code];
+				if (cur && !prev) {
+					app_context->keys.last_key_down = code;
+					app_context->keys.last_key_ascii = (code >= 32 && code <= 126) ? code : 0;
+					actionDispatchKeyDownToFocused(app_context, code);
+					actionDispatchKeyDown(app_context);
+					actionDispatchKeyPressToFocused(app_context, code);
+					if (code == 9) { // Tab
+						int shift_held = (app_context->keys.down[16] != 0);
+						actionAdvanceTabFocus(app_context, shift_held);
+					}
+				} else if (!cur && prev) {
+					app_context->keys.last_key_down = code;
+					app_context->keys.last_key_ascii = (code >= 32 && code <= 126) ? code : 0;
+					actionDispatchKeyUpToFocused(app_context, code);
+					actionDispatchKeyUp(app_context);
+				}
+				prev_keys_down[code] = cur;
+			}
+
+			// --- Focus highlight tick ---
+			actionUpdateHighlightState();
 		}
 
 		app_context->mouse.clicked = 0;
