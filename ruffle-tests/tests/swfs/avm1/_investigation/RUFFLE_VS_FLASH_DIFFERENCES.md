@@ -190,3 +190,19 @@ The change is in `SWFRecomp/src/swf.cpp` (root `PLACE_OBJECT{,_2,_3}` cases only
 **Tests affected:** Of the 20 originally failing `from_shumway/fuzz/*` tests, 4 now PASS, 2 promoted from `MISMATCH` to `RUFFLE_MATCHED` (`4949de46…`, `887c02ab…`), 2 previously `RUFFLE_MATCHED` upgraded to PASS (`1276557624…`, `a86fee6d…`). The remaining 16 still fail — most because of unrelated fuzzer-generated state divergences. Those are listed in `from_shumway/ignored_tests.txt` with this rationale.
 
 **Decision:** Match Flash's sequential-dictionary semantics for root-timeline placement. Sprite-internal placement intentionally diverges from a literal "tag-stream-order dictionary" reading because Flash, Ruffle, and us all instantiate sprites at runtime — by which point the dictionary is complete.
+
+## Drawing-API `getBounds` Stroke Expansion: Full Thickness vs Geometric Half
+
+**Tests:** `from_gnash/misc-ming.all/DrawingApiTest`, `from_gnash/misc-ming.all/matrix_test`
+
+For `mc.lineStyle(thickness, ...)` followed by `mc.lineTo(...)` / `mc.curveTo(...)`, Flash's `getBounds()` expands the rendered shape's bounding box by the **full** stroke `thickness` on each side, not the geometrically correct half-thickness. A line from `(100,100)` to `(200,200)` with `lineStyle(20)` reports bounds `(80,80) (220,220)` (±20 expansion), not `(90,90) (210,210)` (±10).
+
+The DrawingApiTest source comment for line 89 — `check_equals(bnd, "80,80 220,220"); // line is 20 pixels thick..` — directly asserts this, treating the thickness as if it were the diameter rather than the geometric width.
+
+**Ruffle uses geometric half-thickness.** `core/src/drawing.rs::stretch_bounds` computes `radius = stroke_width / 2` and encompasses `(point ± radius)`, which gives `(90,90) (210,210)` for the same input. Ruffle's `output.ruffle.txt` for DrawingApiTest line 89 shows `obtained: 90,90 210,210` — Ruffle is geometrically correct but doesn't match Flash's overestimate.
+
+**Decision:** Match Flash. Our `actionCallFunction` (WITH-scope) and `actionCallMethod` (method-dispatch) `lineTo`/`curveTo` paths fold both endpoints with `h = ds->line_w` (full thickness) when `ds->has_line` is true. The same logic applies to every new segment — the start point is re-expanded with the *current* segment's thickness even when it was already in bounds from a prior segment with a different thickness, matching Flash's accumulating overestimate.
+
+**Side-effect on `moveTo`:** Flash also doesn't fold the pen position into bounds when only `moveTo` has been called — `getBounds()` returns the empty-bounds sentinel `134217727/20 = 6710886.35` until a `lineTo`/`curveTo` actually draws something. Our impl previously folded `moveTo` into bounds (returning `(x,y,x,y)` for a single `moveTo`); now both endpoints fold-in moves to `lineTo`/`curveTo` instead.
+
+**Impact:** DrawingApiTest goes from 66/93 → 80/93 line match (closes all bounds-related diffs). Test stays `output_mismatch` because the residual 13 diffs are all hitTest precision failures (zshape.hitTest undefined, inv4/inv8 boolean drift) which Ruffle gets right and we now don't — our diffs are entirely disjoint from Ruffle's diff set, so no `ruffle_matched` promotion. matrix_test (already `ruffle_matched 1081/1086`) is unaffected.
