@@ -264,9 +264,11 @@ if [ "$TARGET" == "wasm" ]; then
     cd "${BUILD_DIR}"
 
     # Build exported functions list
-    EXPORTED_FUNCS='["_main","_runSWF","_audio_fill_buffer"]'
+    # ng_ime_compose_set / ng_ime_commit_set are called from JS-side
+    # composition listeners registered by ng_register_ime_listeners.
+    EXPORTED_FUNCS='["_main","_runSWF","_audio_fill_buffer","_ng_ime_compose_set","_ng_ime_commit_set"]'
     if [ "$DISPLAY_BRIDGE" = true ]; then
-        EXPORTED_FUNCS='["_main","_runSWF","_audio_fill_buffer","_getDisplayListJSON","_setObjectTransform"]'
+        EXPORTED_FUNCS='["_main","_runSWF","_audio_fill_buffer","_getDisplayListJSON","_setObjectTransform","_ng_ime_compose_set","_ng_ime_commit_set"]'
     fi
 
     if [ "$GRAPHICS_FLAG" = true ]; then

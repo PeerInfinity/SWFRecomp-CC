@@ -85,6 +85,10 @@ void tagMain(SWFAppContext* app_context)
 				actionDispatchMCMouseMove(app_context);
 				actionDispatchMCMouseMoveGlobal(app_context);
 				actionResetHighlightForEvent(0); // 0=mouse_move
+				// Extend textfield drag selection if mouse is moved while button
+				// is held (matches swf_core.c EV_MOUSE_MOVE behavior).
+				if (app_context->mouse.button_down)
+					actionTextFieldDragSelect(app_context);
 			}
 			if (app_context->mouse.clicked) {
 				actionDispatchMouseDown(app_context);       // Mouse listener broadcast
@@ -95,6 +99,7 @@ void tagMain(SWFAppContext* app_context)
 				actionClearVirtualHover();
 			}
 			if (app_context->mouse.released) {
+				actionTextFieldDragEnd(app_context);         // Finalize drag selection
 				actionDispatchMouseUp(app_context);          // Mouse listener broadcast
 				actionDispatchMCMouseUp(app_context);        // Per-MC AS2 dispatch
 				actionDispatchMCRelease(app_context);        // onRelease/onReleaseOutside
@@ -174,8 +179,33 @@ void tagMain(SWFAppContext* app_context)
 				actionWindowFocusLost(app_context);
 			}
 
+			// --- IME compose / commit ---
+			// Driven by JS listeners in render_webgpu.c (compositionupdate /
+			// compositionend on the canvas). The compose call places the
+			// composing text in the focused field with caret at the end;
+			// the commit call finalizes it.
+			extern char g_ime_compose_text[];
+			extern char g_ime_commit_text[];
+			extern int  g_ime_compose_pending;
+			extern int  g_ime_commit_pending;
+			if (g_ime_compose_pending) {
+				g_ime_compose_pending = 0;
+				int len = (int)strlen(g_ime_compose_text);
+				actionTextFieldImeCompose(app_context, g_ime_compose_text, len, len);
+			}
+			if (g_ime_commit_pending) {
+				g_ime_commit_pending = 0;
+				actionTextFieldImeCommit(app_context, g_ime_commit_text);
+			}
+
 			// --- Focus highlight tick ---
 			actionUpdateHighlightState();
+
+			// --- Deferred roll-event flush ---
+			// AS2 handlers fired above (e.g. Selection.setFocus from a Key
+			// listener) can queue rollOver/rollOut events; drain them so they
+			// fire before the next frame's events.
+			actionFlushDeferredRollEvents(app_context);
 		}
 
 		app_context->mouse.clicked = 0;

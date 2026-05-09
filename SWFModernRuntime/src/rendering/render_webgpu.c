@@ -517,6 +517,58 @@ static EM_BOOL on_blur(int type, const EmscriptenFocusEvent* evt, void* ud) {
 	g_window_focus_lost = 1;
 	return EM_TRUE;
 }
+
+// IME (composition) state — emscripten has no native compositionstart/end
+// callback, so we register listeners via EM_JS and bridge into these
+// globals. swf.c drains them per-frame and dispatches actionTextFieldImeCompose
+// / actionTextFieldImeCommit.
+//
+// During composition: g_ime_compose_text holds the current composition string.
+// On compositionupdate: g_ime_compose_pending=1, swf.c calls Compose with text
+//   and the caret position (set to end of text).
+// On compositionend: g_ime_commit_pending=1, swf.c calls Commit with the
+//   final text. Also clears any pending compose state.
+#define IME_TEXT_BUF_SIZE 256
+char g_ime_compose_text[IME_TEXT_BUF_SIZE];
+char g_ime_commit_text[IME_TEXT_BUF_SIZE];
+int  g_ime_compose_pending = 0;
+int  g_ime_commit_pending  = 0;
+
+EM_JS(void, ng_register_ime_listeners, (), {
+	var c = document.getElementById('canvas');
+	if (!c) return;
+	c.addEventListener('compositionstart', function(e) {
+		// Mark composition active — swf.c will start sending Compose calls.
+		Module._ng_ime_compose_set('');
+	});
+	c.addEventListener('compositionupdate', function(e) {
+		Module._ng_ime_compose_set(e.data || '');
+	});
+	c.addEventListener('compositionend', function(e) {
+		Module._ng_ime_commit_set(e.data || '');
+	});
+});
+
+// Called from JS via EM_ASM_INT-style bridging. Simple ASCII-truncation
+// for the buffer; non-ASCII codepoints in compose text get UTF-8-encoded
+// by the JS engine, which we accept as-is (the runtime decodes UTF-8).
+EMSCRIPTEN_KEEPALIVE
+void ng_ime_compose_set(const char* text) {
+	if (!text) text = "";
+	size_t n = 0;
+	while (text[n] && n < IME_TEXT_BUF_SIZE - 1) { g_ime_compose_text[n] = text[n]; n++; }
+	g_ime_compose_text[n] = '\0';
+	g_ime_compose_pending = 1;
+}
+
+EMSCRIPTEN_KEEPALIVE
+void ng_ime_commit_set(const char* text) {
+	if (!text) text = "";
+	size_t n = 0;
+	while (text[n] && n < IME_TEXT_BUF_SIZE - 1) { g_ime_commit_text[n] = text[n]; n++; }
+	g_ime_commit_text[n] = '\0';
+	g_ime_commit_pending = 1;
+}
 #endif
 
 // ---------------------------------------------------------------------------
@@ -675,6 +727,7 @@ void render_webgpu_init(SWFAppContext* app_context, WebGPURenderContext* ctx)
 	emscripten_set_keyup_callback("#canvas", NULL, 0, on_key_up);
 	emscripten_set_keypress_callback("#canvas", NULL, 0, on_keypress);
 	emscripten_set_blur_callback(EMSCRIPTEN_EVENT_TARGET_WINDOW, NULL, 0, on_blur);
+	ng_register_ime_listeners();
 #endif
 
 	// Mark renderer as ready only if critical objects were created
