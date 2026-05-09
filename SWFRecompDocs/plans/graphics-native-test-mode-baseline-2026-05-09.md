@@ -14,17 +14,17 @@ clip events / sprite init, EditText, buttons, goto-rewind display-list
 preservation, registerClass / OOP, MovieClip unload semantics, and
 image-comparison rendering.
 
-| Test | NO_GRAPHICS | `--headless` (post-fix) | Notes |
-|---|---|---|---|
-| `add` | pass | pass | trivial trace, sanity check |
-| `tell_target_invalid` | pass | pass | failed-SetTarget semantics |
-| `clip_events` | pass | pass | clip_action LOAD / ENTER_FRAME |
-| `edittext_default_format` | pass | pass | was a regression in 2026-03-18 baseline; fixed |
-| `button_key_events` | pass | pass | was a regression in 2026-03-18 baseline; fixed |
-| `goto_rewind3` | pass | pass | backward-goto display-list protection |
-| `register_and_init_order` | pass | **FAIL** | output_mismatch starting around line 153 |
-| `unload` | pass | pass | pending-removal / depth shift |
-| `bitmap_data_colortransform` | pass | pass | image_comparison; renderer path |
+| Test | NO_GRAPHICS | `--mode=graphics-headless-legacy` (post-fix) | `--mode=graphics` (Phase 1 stubs) | Notes |
+|---|---|---|---|---|
+| `add` | pass | pass | **pass** | trivial trace, sanity check |
+| `tell_target_invalid` | pass | pass | fail | output_mismatch — failed-SetTarget semantics |
+| `clip_events` | pass | pass | fail | output_mismatch on frame 1 |
+| `edittext_default_format` | pass | pass | fail | output_mismatch — text format read fails |
+| `button_key_events` | pass | pass | fail | output_mismatch |
+| `goto_rewind3` | pass | pass | fail | output_mismatch on gotoAndPlay |
+| `register_and_init_order` | pass | **FAIL** | fail | output_mismatch — fails in both headless and graphics-native (shared-code bug) |
+| `unload` | pass | pass | fail | output_mismatch — clip4/clip5 references |
+| `bitmap_data_colortransform` | pass | pass | **pass** | image_comparison; pure renderer path |
 
 **Single regression: `register_and_init_order`.** This is the test to
 watch when bisecting Phase 2 failures. If `--mode=graphics` *also* fails
@@ -67,17 +67,31 @@ recent un-gating commits (`af09e11d`, `7ef76589`, `73164afc`) appear to
 have closed those gaps; the smoke set's two former-regressions
 (`edittext_default_format`, `button_key_events`) both pass now.
 
-## Use during Phase 1
+## Phase 1 results (2026-05-09)
 
-After `--mode=graphics` is wired up, re-run the same 9 tests under the new
-mode. Expected pass rates:
+`--mode=graphics` wired up and run on the smoke set. **2/9 pass** (`add`,
+`bitmap_data_colortransform`). The 7 failures are all `output_mismatch` —
+none are compile-fails or timeouts, which means the runtime is functioning
+end-to-end. The remaining gap is semantic.
 
-- 8/9 if `swf.c`'s frame loop has roughly the same semantics as
-  `swf_headless.c` for these specific scenarios.
-- Lower if the goto/sprite/event handling in `swf.c` is more divergent
-  than expected — most likely candidates to fail are `tell_target_invalid`,
-  `clip_events`, `goto_rewind3`, `unload` (all exercise display-list
-  semantics that `swf.c` may handle differently from `swf_headless.c`).
+Bisection signal vs `--mode=graphics-headless-legacy`:
 
-The single `register_and_init_order` regression in `--headless` is the
-diagnostic case described above.
+- `register_and_init_order`: fails in both modes → **shared-code bug**
+  (likely the no-op `ng_queue_placement_clip_events` Phase 1 stub means
+  attachMovie/sprite-placement clip events don't fire, breaking
+  registerClass init ordering).
+- `tell_target_invalid`, `clip_events`, `edittext_default_format`,
+  `button_key_events`, `goto_rewind3`, `unload`: pass in headless, fail in
+  graphics-native → bug specifically in `swf.c`'s frame loop or in the
+  Phase 1 stubs in `graphics_stubs.c`. These are the Phase 2 backlog.
+
+Most likely root causes from the Phase 1 stub set:
+
+| Stub | Likely test impact |
+|---|---|
+| `exec_sprite_frame` (no context-switch) | `tell_target_invalid`, `clip_events`, sprite-script tests |
+| `ng_queue_placement_clip_events` (no-op) | `clip_events`, `register_and_init_order` |
+| `process_sprite_needs_init_public` (no-op) | sprite init tests |
+| `g_active_transform_data = NULL` | nothing in single-SWF tests |
+| `swf.c` lacks goto catch-up | `goto_rewind3`, `tell_target_invalid` |
+| `swf.c` lacks pending-removal finalize | `unload` |
