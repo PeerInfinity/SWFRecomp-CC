@@ -1,6 +1,9 @@
 # Inter-Tag UNLOAD Ordering Plan (sprite-internal Remove+Replace, sprite loop-back)
 
-<!-- TESTS: action_order/ActionOrderTest3, action_order/ActionOrderTest4, action_order/ActionOrderTest5, loop/loop_test6 -->
+<!-- TESTS: action_order/ActionOrderTest3, action_order/ActionOrderTest4, action_order/ActionOrderTest5 -->
+<!-- PROMOTED (removed from TESTS):
+  - loop/loop_test6 → ruffle_matched 2026-05-06 (CI c8f6452a; tagRemoveObject2 backward-catch-up early-return narrowed for key-event dispatch)
+-->
 
 <!-- PLAN_META
 id: INTER_TAG_UNLOAD

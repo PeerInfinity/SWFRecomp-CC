@@ -1,8 +1,13 @@
 # String Regex Support Plan
 <!-- TESTS: String-v5, String-v6, String-v7, String-v8 -->
 
-Last updated: 2026-04-21
-Status: DEFERRED — no current test needs regex. Archived from incomplete/.
+Last updated: 2026-05-08
+Status: COMPLETE/DEFERRED — all four `String-vN` tests are now `ruffle_matched`
+(effective pass) per `from_gnash/actionscript.all/_results/results.json`. Native
+regex support was not implemented — the non-regex String-wrapper-dispatch fix
+(commit d05bbd56) was sufficient because the AVM1 corpus contains zero regex
+usage. Plan moved from `blocked/` to `complete/` 2026-05-08; the rationale
+below remains valid as a historical record.
 
 ---
 

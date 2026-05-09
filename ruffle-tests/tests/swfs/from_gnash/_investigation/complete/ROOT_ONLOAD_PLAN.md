@@ -1,10 +1,20 @@
-# trace-as2/root_onload Plan (gnash/misc-swfmill) — BLOCKED
+# trace-as2/root_onload Plan (gnash/misc-swfmill) — RESOLVED
 <!-- TESTS: trace-as2/root_onload -->
 
 Test: `ruffle-tests/tests/swfs/from_gnash/misc-swfmill.all/trace-as2/root_onload/`
-Status: `output_mismatch`, 2/4 (50%). Test has `known_failure = true` with `output.ruffle.txt` sidecar.
+Status: **PASS (4/4)** as of 2026-05-08 CI per
+`from_gnash/misc-swfmill.all/_results/results.json`.
 
-## Status (2026-04-19)
+## Status (2026-05-08): RESOLVED via ActionQueue rework
+
+The architectural blocker called out below — implementing Ruffle's priority-based
+ActionQueue — landed via `from_shumway/_investigation/complete/ACTION_QUEUE_PLAN.md`
+(Phases 0–8). With the unified queue in place, INITIALIZE/CONSTRUCT drain before
+normal DoAction, sprite Phase 2 init fires in the right order, and
+`trace-as2/root_onload` produces the expected `CC.`, `C.`, `R.`, `L.` sequence.
+Plan moved from `blocked/` to `complete/` 2026-05-08.
+
+## Original status (2026-04-19, retained for context)
 
 **BLOCKED** — fixing requires implementing Ruffle's priority-based ActionQueue. The
 isolated runtime change to make sprite Phase 2 init fire before the parent script

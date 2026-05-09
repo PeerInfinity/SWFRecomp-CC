@@ -1,6 +1,9 @@
 # Sprite Rewind Identity Plan (per-sprite final_placements + MC isolation)
 
-<!-- TESTS: action_order/ActionOrderTest3, action_order/ActionOrderTest4, action_order/ActionOrderTest5, loop/loop_test6, register_class/RegisterClassTest4 -->
+<!-- TESTS: action_order/ActionOrderTest3, action_order/ActionOrderTest4, action_order/ActionOrderTest5, register_class/RegisterClassTest4 -->
+<!-- PROMOTED (removed from TESTS):
+  - loop/loop_test6 → ruffle_matched 2026-05-06 (CI c8f6452a; resolved by separate fix in INTER_TAG_UNLOAD area)
+-->
 
 <!-- PLAN_META
 id: SPRITE_REWIND_IDENTITY

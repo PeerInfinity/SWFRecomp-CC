@@ -32,9 +32,9 @@ blockers:
     reason: "Pixel-level shape hit testing limitations (device fonts, curve/stroke precision)"
 -->
 
-Last updated: 2026-03-30
+Last updated: 2026-05-08 (status headline corrected — table already showed 16 PASS)
 
-## Status: BLOCKED — 15/17 PASS (remaining need vector-path hit testing or device font outlines)
+## Status: BLOCKED — 16/17 PASS (only `movieclip_hittest_shapeflag` remains, listed in `ruffle-tests/ignored_tests.txt` as an accepted diff per `ACCEPTED_DIFFS.md` Category 8 — pixel-level shape hit-testing limited by Noto Sans glyph outlines vs Flash device fonts, morph boundary precision, and Drawing API stroke tessellation)
 
 ---
 
