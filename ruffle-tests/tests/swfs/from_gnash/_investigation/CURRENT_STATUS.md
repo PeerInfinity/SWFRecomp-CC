@@ -33,6 +33,36 @@ Last updated: 2026-05-08 (pending CI — `array-v5` 535/560 → 536/560 (+1) via
 
 - **No regressions** across all 8 suites. Verified locally on a 16-test AVM1 array battery, a 17-test AVM1 lifecycle/scope/super battery (`funky_function_calls`, `swf4_function_calls`, `closure_scope`, `set_variable_scope`, `on_construct`, `execution_order2/3`, `goto_rewind3`, `set_interval`, `tell_target`, `as2_super_and_this_v6/v8`, `extends_chain`, `register_class_return_value`, `movieclip_state_values`, `swf5_to_6_cross_call`, `swf5_no_closure`), a 21-test gnash actionscript.all battery (delete-v5..v8, enumerate-v6..v8, case-v5..v7, ASnative-v6, Boolean-v5, Number-v5/v6, Inheritance-v5/v6/v7, Global-v6/v7, toString_valueOf-v5/v6), and an 8-test misc-ming battery covering the addProperty/__resolve-adjacent paths.
 
+### Investigated 2026-05-08 (no fix attempted — `ButtonEventsTest` trailing-whitespace trap)
+
+- **`ButtonEventsTest` (misc-ming.all) trailing-whitespace diff — not a tractable PASS target.**
+  Status `ruffle_matched 676/679` on 3 ours-only diff lines (vs Ruffle's 642 diffs against
+  Flash). On first inspection this looks like a 3-line gap to full PASS, but the diff is
+  trailing-whitespace on `PASSED:  == ` (the Dejagnu `check_equals(_name, '')` output where
+  both operands stringify to `""`).
+
+  **Mechanism.** Test source: `_root.check_equals(_name, '');` (after `setTarget('/')` so
+  `_name` returns the empty root name). Inlined AS-level `check_equals(obt, exp, msg)` with
+  `obt == exp` and `msg == undefined` falls through to `_root.runtest.pass(obt + " == " + exp)`,
+  which traces `"PASSED: " + why`. With both operands empty: `"" + " == " + "" = " == "` (4
+  chars), then `"PASSED: " + " == " = "PASSED:  == "` (12 chars, trailing space). Our Add2
+  and trace are correct — Ruffle's `output.ruffle.txt` for this test also has trailing
+  whitespace on the analogous lines. Only Gnash's expected `output.txt` (the only file
+  without trailing whitespace anywhere) lacks it, suggesting Gnash's testsuite capture
+  strips trailing whitespace before writing `output.txt`.
+
+  **Why we won't fix.** Stripping trailing whitespace from `actionTrace` output would break
+  AVM1 tests that have intentional trailing whitespace in their expected output —
+  `function_base_clip`, `logical_ops_swf4`, `mcl_target_jpg`, `focusrect_property_swf6`,
+  `primitive_type_globals`, etc. all ship `output.txt` files with at least one trailing-
+  space line. The 3 ButtonEventsTest lines are already inside Ruffle's diff set, so the
+  test is `ruffle_matched` and counted as effective pass — promoting to PASS isn't
+  worth regressing the AVM1 100% filtered rate.
+
+  **Decision.** Leave as `ruffle_matched`. No code change. Future sessions seeing
+  ButtonEventsTest at 99.6% line match should skip — the residual is structural to how
+  the Gnash testsuite writes `output.txt`, not a bug in our trace.
+
 ### Investigated 2026-05-08 (CI `281f30b3`, reverted in `4c61f111`/`d1c3b9d5`)
 
 - **`action_order/action_execution_order_test6` LOAD-filter attempt — reverted.** Identified
