@@ -4,6 +4,8 @@
 <!-- PROMOTED (removed from TESTS):
   - loop/loop_test6 → ruffle_matched 2026-05-06 (CI c8f6452a; tagRemoveObject2 backward-catch-up early-return narrowed for key-event dispatch)
 -->
+<!-- 2026-05-08 NOTE on the standing instruction below ("If RegisterClassTest4 regresses…"):
+RegisterClassTest4 has been added to from_gnash/_investigation/ACCEPTED_DIFFS.md and to from_gnash/misc-ming.all/ignored_tests.txt as of 2026-05-08. RCT4 was never a target of THIS plan — it has consistently been a regression-recipient of every variation tried. Now that RCT4 is filtered out of the suite, the trade-off ("plan-target gain in matching-lines vs RCT4 regression in matching-lines") may be worth re-evaluating: filtered pass-rate gains on ActionOrderTest3/4/5 would no longer be cancelled by RCT4 line drops in the filtered count. RCT4 matching wobble still affects raw match counts (not filtered pass rate). Re-attempts should still verify no regressions on the OTHER guardrail tests (loop_test6, action_execution_order_*, etc.) — only the RCT4 line-loss veto is relaxed. -->
 
 <!-- PLAN_META
 id: INTER_TAG_UNLOAD

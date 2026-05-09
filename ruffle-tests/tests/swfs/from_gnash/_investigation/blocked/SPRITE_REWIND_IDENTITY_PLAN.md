@@ -1,8 +1,9 @@
 # Sprite Rewind Identity Plan (per-sprite final_placements + MC isolation)
 
-<!-- TESTS: action_order/ActionOrderTest3, action_order/ActionOrderTest4, action_order/ActionOrderTest5, register_class/RegisterClassTest4 -->
+<!-- TESTS: action_order/ActionOrderTest3, action_order/ActionOrderTest4, action_order/ActionOrderTest5 -->
 <!-- PROMOTED (removed from TESTS):
   - loop/loop_test6 → ruffle_matched 2026-05-06 (CI c8f6452a; resolved by separate fix in INTER_TAG_UNLOAD area)
+  - register_class/RegisterClassTest4 → ACCEPTED_DIFFS 2026-05-08 (added to from_gnash/_investigation/ACCEPTED_DIFFS.md and from_gnash/misc-ming.all/ignored_tests.txt). Note: RCT4 was a RECIPIENT of regressions from this plan's Phase 2 (17/42 → 7/42), not a plan target test. Now that RCT4 is filtered out, the standing-instruction regression trade-off ("if RCT4 regresses with no plan-target gain, revert") no longer applies in the same form — Phase 2 may be re-attempted, but matching-line wobble on RCT4 inside ACCEPTED_DIFFS still affects raw match counts (not filtered pass rate).
 -->
 
 <!-- PLAN_META

@@ -1,10 +1,13 @@
 # registerClass Lifecycle Plan
 
-<!-- TESTS: register_class/registerClassTest, register_class/registerClassTest2, register_class/RegisterClassTest3, register_class/RegisterClassTest4 -->
+<!-- TESTS: register_class/registerClassTest, register_class/registerClassTest2, register_class/RegisterClassTest3 -->
+<!-- PROMOTED (removed from TESTS):
+  - register_class/RegisterClassTest4 → ACCEPTED_DIFFS 2026-05-08 (added to from_gnash/_investigation/ACCEPTED_DIFFS.md and from_gnash/misc-ming.all/ignored_tests.txt; Ruffle itself diverges by 33+ lines, structural fixes regress RCT4)
+-->
 
 <!-- PLAN_META
 id: REGISTERCLASS_LIFECYCLE
-status: blocked
+status: closed_via_accepted_diffs
 phases:
   - id: 1
     name: "prototype.onLoad firing for registered-class MCs (registerClassTest)"
@@ -17,14 +20,67 @@ phases:
     status: complete
   - id: 4
     name: "Construct/load/unload cycle ordering on remove+replace (RegisterClassTest4)"
-    status: blocked
+    status: closed_via_accepted_diffs
   - id: 5
     name: "Multi-clip onLoad / frame0 ordering (registerClassTest2 frame interleave)"
     status: complete_partial
 dependencies: []
-blockers:
-  - reason: "Phase 4 (RegisterClassTest4) requires deferring the registered-class onLoad past the parent's DoAction (currently flushed in the sprite's own tagShowFrame), and fixing per-cycle counter loss + an extra constructor invocation. Multi-axis ordering work with high regression risk across the broader sprite-init path; needs a dedicated session. See 2026-05-08 status note."
+closeout:
+  - reason: "Phase 4 (RegisterClassTest4) closed via from_gnash ACCEPTED_DIFFS.md and ignored_tests.txt on 2026-05-08 rather than fixed. Ruffle itself diverges from Flash by 33+ lines on this test, both we and Ruffle reorder `load` relative to the child DoAction at different line indices (so verify_output.py subset_match cannot promote), and the two structural fixes that would address the underlying machinery (INTER_TAG_UNLOAD Option 1 + arch fix; SPRITE_REWIND_IDENTITY Phase 2) both regressed RCT4 by ~10 lines with no plan-target gain. See 2026-05-08 closeout note below."
 -->
+
+## 2026-05-08 session (later) — Phase 4 closed via ACCEPTED_DIFFS, plan effectively complete
+
+After re-reading the 2026-05-08 status note (immediately below), the
+2026-05-03 entries in `blocked/INTER_TAG_UNLOAD_PLAN.md` and
+`blocked/SPRITE_REWIND_IDENTITY_PLAN.md`, and Ruffle's own
+`output.ruffle.txt` for RegisterClassTest4, Phase 4 was closed via
+`from_gnash/_investigation/ACCEPTED_DIFFS.md` rather than fixed.
+
+**Reasons:**
+
+1. **Ruffle itself diverges from Flash by 33+ lines** on this test
+   (Flash 42 lines, Ruffle 75 lines — Ruffle continues the
+   construct/unload/load cycle indefinitely past the dejagnu summary
+   through `Bug ctor: 14`). The test exercises Flash-quirky termination
+   semantics neither we nor Ruffle replicate.
+2. **Both we and Ruffle reorder `load` relative to the child DoAction
+   differently from Flash, but at DIFFERENT line indices.** Ruffle puts
+   `load c: 0` at line 3 BEFORE `2 0`; Flash puts it at line 4 AFTER
+   `2 0` and BEFORE `1 0`; we currently match Ruffle's "before `2 0`"
+   placement. Because our diff index set is not a subset of Ruffle's,
+   `verify_output.py`'s `ruffle_subset_match` cannot promote the test
+   to `ruffle_matched`.
+3. **Structural fixes have repeatedly regressed RCT4 with no plan-target
+   gain.** Two attempts in 2026-05-03 (Option 1 + arch fix in
+   `INTER_TAG_UNLOAD_PLAN.md`; Phase 2 in `SPRITE_REWIND_IDENTITY_PLAN.md`)
+   both took RCT4 from 17/42 → 6-7/42 (-10 to -11 lines) with at most
+   +1 line gain on the plan-target ActionOrderTest3/4/5. The standing
+   instruction in INTER_TAG_UNLOAD_PLAN reads: *"If RegisterClassTest4
+   regresses with no plan-target gain in matching-lines, revert and
+   stop — that's the third repetition of the same trade and the
+   answer is somewhere else."*
+
+**Closeout actions:**
+
+- Added entry to
+  `from_gnash/_investigation/ACCEPTED_DIFFS.md` Category 1, with the
+  full diagnosis (load timing, per-cycle counter loss, off-by-one
+  ctorcalls), the regression trade-table from the two structural
+  attempts, and the rationale for accepting.
+- Added `register_class/RegisterClassTest4` to
+  `from_gnash/misc-ming.all/ignored_tests.txt`.
+- This plan moves from `blocked/` content-status to
+  `closed_via_accepted_diffs` (still physically in `blocked/` for now —
+  the next status sweep can move it to `complete/` or
+  `superseded/` per the directory's conventions).
+
+The structural fixes for the underlying machinery
+(SPRITE_REWIND_IDENTITY, INTER_TAG_UNLOAD) remain in `blocked/` for
+their own plan-target tests (ActionOrderTest3/4/5 etc.). If those plans
+ever land, the RCT4 entry in ACCEPTED_DIFFS may become reviewable —
+but that would require re-running and confirming RCT4's diff against
+Flash actually shrinks (the prior trade-family suggests it would not).
 
 ## 2026-05-08 session — status reconciled; Phase 4 documented as blocker
 

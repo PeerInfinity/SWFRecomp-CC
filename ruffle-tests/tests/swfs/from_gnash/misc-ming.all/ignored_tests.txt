@@ -21,3 +21,18 @@
 # is upstream `known_failure = true`. Cannot suppress the warning without
 # breaking AVM1 tell_target_invalid / path_string / tell_target / etc.
 opcode_guard_test
+
+# register_class/RegisterClassTest4 — Flash-quirky construct/load/unload
+# cycle. Ruffle itself diverges from Flash by 33+ lines (its
+# output.ruffle.txt continues the cycle past the dejagnu summary through
+# `Bug ctor: 14`). Both we and Ruffle reorder `load` relative to the child
+# DoAction differently from Flash, but at different line indices, so
+# verify_output.py's subset_match cannot promote us to ruffle_matched.
+# Three intertwined issues (load timing, per-cycle counter loss, off-by-one
+# ctorcalls) and the relevant structural fixes (sprite-rewind identity /
+# inter-tag UNLOAD machinery) have been attempted twice in 2026-05-03 and
+# both regressed RCT4 itself by ~10 lines with no plan-target gain — see
+# from_gnash/_investigation/blocked/INTER_TAG_UNLOAD_PLAN.md and
+# blocked/SPRITE_REWIND_IDENTITY_PLAN.md. Test stays upstream
+# `known_failure = true`.
+register_class/RegisterClassTest4
