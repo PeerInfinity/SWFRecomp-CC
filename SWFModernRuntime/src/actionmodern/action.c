@@ -7701,7 +7701,7 @@ static int varToStringBufFull(SWFAppContext* app_context, ActionVar* v, char* bu
 // Transform helper functions (NO_GRAPHICS only) and getter/setter implementations
 // ============================================================================
 
-// (was: #ifdef NO_GRAPHICS — un-gated for getDisplayEntryIdxForMC and friends)
+// (was: #if defined(NO_GRAPHICS) || defined(OFFSCREEN_RENDER) — un-gated for getDisplayEntryIdxForMC and friends)
 // Root MovieClip CT globals (root has no ng_display entry)
 static double g_root_cx_ra = 100.0, g_root_cx_ga = 100.0;
 static double g_root_cx_ba = 100.0, g_root_cx_aa = 100.0;
@@ -8120,7 +8120,7 @@ static ActionVar transformMatrixGetter(SWFAppContext* app_context, ActionVar* ar
 	if (!mc_ref || mc_ref->type != ACTION_STACK_VALUE_MOVIECLIP) return r;
 	MovieClip* mc = (MovieClip*) mc_ref->data.numeric_value;
 	if (!mc) return r;
-#ifdef NO_GRAPHICS
+#if defined(NO_GRAPHICS) || defined(OFFSCREEN_RENDER)
 	double a, b, c, d, tx, ty;
 	getLocalMatrixForMC(mc, &a, &b, &c, &d, &tx, &ty);
 	ASObject* mat = makeMatrixObject(app_context, a, b, c, d, tx, ty);
@@ -8145,7 +8145,7 @@ static ActionVar transformMatrixSetter(SWFAppContext* app_context, ActionVar* ar
 	if (args[0].type != ACTION_STACK_VALUE_OBJECT || args[0].data.numeric_value == 0) return undef;
 	ASObject* mat_obj = (ASObject*) args[0].data.numeric_value;
 	if (!getProperty(mat_obj, "a", 1)) return undef;
-#ifdef NO_GRAPHICS
+#if defined(NO_GRAPHICS) || defined(OFFSCREEN_RENDER)
 	double a  = propToDouble(mat_obj, "a",  1);
 	double b  = propToDouble(mat_obj, "b",  1);
 	double c  = propToDouble(mat_obj, "c",  1);
@@ -8181,7 +8181,7 @@ static ActionVar transformCTGetter(SWFAppContext* app_context, ActionVar* args, 
 	if (!mc_ref || mc_ref->type != ACTION_STACK_VALUE_MOVIECLIP) return r;
 	MovieClip* mc = (MovieClip*) mc_ref->data.numeric_value;
 	if (!mc) return r;
-#ifdef NO_GRAPHICS
+#if defined(NO_GRAPHICS) || defined(OFFSCREEN_RENDER)
 	s16 ra, ga, ba, aa, rb, gb, bb, ab;
 	getLocalCTRaw(mc, &ra, &ga, &ba, &aa, &rb, &gb, &bb, &ab);
 	ASObject* ct = makeCTObject(app_context, ra, ga, ba, aa, rb, gb, bb, ab);
@@ -8206,7 +8206,7 @@ static ActionVar transformCTSetter(SWFAppContext* app_context, ActionVar* args, 
 	if (args[0].type != ACTION_STACK_VALUE_OBJECT || args[0].data.numeric_value == 0) return undef;
 	ASObject* ct_obj = (ASObject*) args[0].data.numeric_value;
 	if (!getPropertyWithPrototype(ct_obj, "redMultiplier", 13)) return undef;
-#ifdef NO_GRAPHICS
+#if defined(NO_GRAPHICS) || defined(OFFSCREEN_RENDER)
 	s16 ra, ga, ba, aa, rb, gb, bb, ab;
 	ctObjToRaw(ct_obj, &ra, &ga, &ba, &aa, &rb, &gb, &bb, &ab);
 	setLocalCTRaw(mc, ra, ga, ba, aa, rb, gb, bb, ab);
@@ -8224,7 +8224,7 @@ static ActionVar transformConcatMatrixGetter(SWFAppContext* app_context, ActionV
 	if (!mc_ref || mc_ref->type != ACTION_STACK_VALUE_MOVIECLIP) return r;
 	MovieClip* mc = (MovieClip*) mc_ref->data.numeric_value;
 	if (!mc) return r;
-#ifdef NO_GRAPHICS
+#if defined(NO_GRAPHICS) || defined(OFFSCREEN_RENDER)
 	double a, b, c, d, tx, ty;
 	getConcatMatrixForMC(mc, &a, &b, &c, &d, &tx, &ty);
 	ASObject* mat = makeMatrixObject(app_context, a, b, c, d, tx, ty);
@@ -8246,7 +8246,7 @@ static ActionVar transformConcatCTGetter(SWFAppContext* app_context, ActionVar* 
 	if (!mc_ref || mc_ref->type != ACTION_STACK_VALUE_MOVIECLIP) return r;
 	MovieClip* mc = (MovieClip*) mc_ref->data.numeric_value;
 	if (!mc) return r;
-#ifdef NO_GRAPHICS
+#if defined(NO_GRAPHICS) || defined(OFFSCREEN_RENDER)
 	s16 ra, ga, ba, aa, rb, gb, bb, ab;
 	getConcatCTForMC(mc, &ra, &ga, &ba, &aa, &rb, &gb, &bb, &ab);
 	ASObject* ct = makeCTObject(app_context, ra, ga, ba, aa, rb, gb, bb, ab);
@@ -8268,7 +8268,7 @@ static ActionVar transformPixelBoundsGetter(SWFAppContext* app_context, ActionVa
 	if (!mc_ref || mc_ref->type != ACTION_STACK_VALUE_MOVIECLIP) return r;
 	MovieClip* mc = (MovieClip*) mc_ref->data.numeric_value;
 	if (!mc) return r;
-#ifdef NO_GRAPHICS
+#if defined(NO_GRAPHICS) || defined(OFFSCREEN_RENDER)
 	size_t entry_idx = getDisplayEntryIdxForMC(mc);
 	float lxmin, lxmax, lymin, lymax;
 	if (!ng_getDisplayEntryBounds(entry_idx, &lxmin, &lxmax, &lymin, &lymax)) {
@@ -9930,7 +9930,7 @@ static ActionVar colorGetTransform(SWFAppContext* app_context, ActionVar* args, 
 	double ra = 100.0, ga = 100.0, ba = 100.0, aa = 100.0;
 	double rb = 0.0,   gb = 0.0,   bb = 0.0,   ab = 0.0;
 
-#ifdef NO_GRAPHICS
+#if defined(NO_GRAPHICS) || defined(OFFSCREEN_RENDER)
 	if (!colorGetMCName(app_context, obj, name, sizeof(name))) {
 		ActionVar undef = {0}; undef.type = ACTION_STACK_VALUE_UNDEFINED;
 		return undef;
@@ -9982,7 +9982,7 @@ static ActionVar colorSetTransform(SWFAppContext* app_context, ActionVar* args, 
 	if (!param) return undef;
 
 	char name[256] = {0};
-#ifdef NO_GRAPHICS
+#if defined(NO_GRAPHICS) || defined(OFFSCREEN_RENDER)
 	if (!colorGetMCName(app_context, self, name, sizeof(name))) return undef;
 
 	// Read current transform
@@ -10036,7 +10036,7 @@ static ActionVar colorGetRGB(SWFAppContext* app_context, ActionVar* args, u32 ar
 	ASObject* obj = (ASObject*)this_obj;
 	char name[256] = {0};
 
-#ifdef NO_GRAPHICS
+#if defined(NO_GRAPHICS) || defined(OFFSCREEN_RENDER)
 	if (!colorGetMCName(app_context, obj, name, sizeof(name))) return undef;
 	double ra, ga, ba, aa, rb, gb, bb, ab;
 	if (!ng_getColorTransform(name, &ra, &ga, &ba, &aa, &rb, &gb, &bb, &ab)) {
@@ -10068,7 +10068,7 @@ static ActionVar colorSetRGB(SWFAppContext* app_context, ActionVar* args, u32 ar
 	if (arg_count == 0) return undef;
 	char name[256] = {0};
 
-#ifdef NO_GRAPHICS
+#if defined(NO_GRAPHICS) || defined(OFFSCREEN_RENDER)
 	if (!colorGetMCName(app_context, obj, name, sizeof(name))) return undef;
 	double ra_cur, ga_cur, ba_cur, aa_cur, rb_cur, gb_cur, bb_cur, ab_cur;
 	extern MovieClip* actionFindMovieClipByName(const char* instance_name);
@@ -15608,7 +15608,7 @@ static int textFormatSetProperty(SWFAppContext* app_context, ASObject* obj, cons
 
 static void initTextFormatPrototype(SWFAppContext* app_context);
 
-#ifdef NO_GRAPHICS
+#if defined(NO_GRAPHICS) || defined(OFFSCREEN_RENDER)
 // Create a TextFormat object populated from a textfield's metadata.
 // If tf_idx < 0, returns a TextFormat with default values (for dynamic/non-EditText fields).
 // If is_new_text_format is true, always populates all properties (getNewTextFormat behavior).
@@ -17547,7 +17547,7 @@ MovieClip root_movieclip = {
 	.blend_mode = 0,
 	.is_button_mc = 0,
 	.depth = -16384,   // _root is at Flash "level 0" depth
-#ifdef NO_GRAPHICS
+#if defined(NO_GRAPHICS) || defined(OFFSCREEN_RENDER)
 	.display_obj = NULL,
 	.last_transform_id = 0,
 	.as_set_flags = 0,
@@ -17581,7 +17581,7 @@ static MovieClip* getMovieClipByTarget(const char* target) {
 	if (!target || strlen(target) == 0) {
 		// Empty target = "this clip" = current execution context (not necessarily root).
 		// When running inside a sprite frame, g_current_context points to the sprite's MC.
-#ifdef NO_GRAPHICS
+#if defined(NO_GRAPHICS) || defined(OFFSCREEN_RENDER)
 		return g_current_context ? g_current_context : &root_movieclip;
 #else
 		return &root_movieclip;
@@ -17722,7 +17722,7 @@ static MovieClip* resolveSlashPathToMC(SWFAppContext* app_context, const char* p
 
 	MovieClip* mc = start_mc;
 
-#ifdef NO_GRAPHICS
+#if defined(NO_GRAPHICS) || defined(OFFSCREEN_RENDER)
 	// Track current position in display list tree for correct child lookup.
 	// cur_sprite_dl/cur_sprite_max point to the current MC's sprite children.
 	extern DisplayObject* display_list;
@@ -17768,7 +17768,7 @@ static MovieClip* resolveSlashPathToMC(SWFAppContext* app_context, const char* p
 	u32 pos = 0;
 	if (path[0] == '/') {
 		mc = &root_movieclip;
-#ifdef NO_GRAPHICS
+#if defined(NO_GRAPHICS) || defined(OFFSCREEN_RENDER)
 		cur_sprite_dl = display_list;
 		cur_sprite_max = max_depth;
 #endif
@@ -17806,7 +17806,7 @@ static MovieClip* resolveSlashPathToMC(SWFAppContext* app_context, const char* p
 			// (e.g. gnash case-v6's `/_ROOT/MC0/` slash-path SetProperty target).
 			if (swf_name_match(seg_buf, "_root") || swf_name_match(seg_buf, "_level0")) {
 				mc = &root_movieclip;
-#ifdef NO_GRAPHICS
+#if defined(NO_GRAPHICS) || defined(OFFSCREEN_RENDER)
 				cur_sprite_dl = display_list;
 				cur_sprite_max = max_depth;
 #endif
@@ -17824,7 +17824,7 @@ static MovieClip* resolveSlashPathToMC(SWFAppContext* app_context, const char* p
 					extern MovieClip* g_levels[MAX_LEVELS];
 					if (level_num > 0 && level_num < MAX_LEVELS && g_levels[level_num] != NULL) {
 						mc = g_levels[level_num];
-#ifdef NO_GRAPHICS
+#if defined(NO_GRAPHICS) || defined(OFFSCREEN_RENDER)
 						cur_sprite_dl = NULL;
 						cur_sprite_max = 0;
 						if (mc->display_obj != NULL) {
@@ -17842,7 +17842,7 @@ static MovieClip* resolveSlashPathToMC(SWFAppContext* app_context, const char* p
 				goto slash_path_named_child;
 			} else {
 				slash_path_named_child:;
-#ifdef NO_GRAPHICS
+#if defined(NO_GRAPHICS) || defined(OFFSCREEN_RENDER)
 				// Search cur_sprite_dl first (tracks our position in display tree)
 				size_t child_depth = SIZE_MAX;
 				DisplayObject* found_entry = NULL;
@@ -18560,7 +18560,7 @@ static char* tf_serialize_html(TFRunTable* table, int is_multiline);
 static void tf_get_plain_text(TFRunTable* table, char* out_buf, u32 out_buf_size, int is_multiline);
 static TFRun* tf_find_run_at_index(TFRunTable* table, u32 char_idx);
 
-#ifdef NO_GRAPHICS
+#if defined(NO_GRAPHICS) || defined(OFFSCREEN_RENDER)
 // Find a display entry by name, first in root display list, then in parent sprite.
 // Returns the root depth or encoded depth, SIZE_MAX if not found.
 // Also fills *out_char_id with the found entry's char_id.
@@ -18648,7 +18648,7 @@ static MovieClip* findOrCreateMovieClip(SWFAppContext* app_context, const char* 
 		}
 	}
 	if (mc != NULL) {
-#ifdef NO_GRAPHICS
+#if defined(NO_GRAPHICS) || defined(OFFSCREEN_RENDER)
 		// Check if textfield was re-placed with a different char_id
 		size_t cdepth = ng_findDisplayEntryByName(instance_name);
 		if (cdepth != SIZE_MAX && ng_isTextFieldAtDepth(cdepth)) {
@@ -18664,7 +18664,7 @@ static MovieClip* findOrCreateMovieClip(SWFAppContext* app_context, const char* 
 		// Use the actual display list instance name (not the lookup name)
 		// so the MC's name/target reflect the canonical name
 		const char* canonical_name = instance_name;
-#ifdef NO_GRAPHICS
+#if defined(NO_GRAPHICS) || defined(OFFSCREEN_RENDER)
 		{
 			size_t d = ng_findDisplayEntryByName(instance_name);
 			if (d != SIZE_MAX) {
@@ -18678,7 +18678,7 @@ static MovieClip* findOrCreateMovieClip(SWFAppContext* app_context, const char* 
 		is_new = 1;
 	}
 
-#ifdef NO_GRAPHICS
+#if defined(NO_GRAPHICS) || defined(OFFSCREEN_RENDER)
 	// Init or re-init: sync x/y from transform_data
 	if (mc != NULL) {
 		size_t depth = ng_findDisplayEntryByName(instance_name);
@@ -20485,7 +20485,7 @@ void actionFirePendingUnloads(SWFAppContext* app_context)
 	run_pending_finalize(app_context);
 }
 
-#ifdef NO_GRAPHICS
+#if defined(NO_GRAPHICS) || defined(OFFSCREEN_RENDER)
 // Clean up child MCs during backward goto.
 // Removes dynamically created MCs (createEmptyMovieClip) from cache and dynamic_props,
 // and resets swapped depths so the timeline replay restores original positions.
@@ -20657,7 +20657,7 @@ void actionRenameMovieClip(const char* old_name, const char* new_name)
 }
 #endif
 
-// (was: #ifdef NO_GRAPHICS — un-gated for textfield helpers used by tag_stubs.c when compiled in graphics)
+// (was: #if defined(NO_GRAPHICS) || defined(OFFSCREEN_RENDER) — un-gated for textfield helpers used by tag_stubs.c when compiled in graphics)
 // ==================================================================
 // TextField Variable Binding
 // ==================================================================
@@ -20766,7 +20766,7 @@ static uint16_t* strip_html_tags_u16(SWFAppContext* app_context, const uint16_t*
 // =============================================
 // HTML Text Format Run System (definitions — types declared above)
 // =============================================
-// (was: #ifdef NO_GRAPHICS — inner TF helpers, un-gated)
+// (was: #if defined(NO_GRAPHICS) || defined(OFFSCREEN_RENDER) — inner TF helpers, un-gated)
 static TFRunTable g_tf_run_tables[TF_MAX_TABLES];
 
 static TFRunTable* tf_get_table(MovieClip* mc) {
@@ -23216,7 +23216,7 @@ static void mcGetEffectiveSize(MovieClip* mc, double* eff_w, double* eff_h);
 // Returns 1 if bounds found, 0 if not.
 static int mcGetOriginalBounds(MovieClip* mc, double* out_nat_w, double* out_nat_h)
 {
-#ifdef NO_GRAPHICS
+#if defined(NO_GRAPHICS) || defined(OFFSCREEN_RENDER)
 	extern MovieClip root_movieclip;
 	float gxmin, gxmax, gymin, gymax;
 
@@ -23388,7 +23388,7 @@ static void mcGetEffectiveSize(MovieClip* mc, double* eff_w, double* eff_h)
 {
 	double nat_w = 0.0, nat_h = 0.0;
 
-#ifdef NO_GRAPHICS
+#if defined(NO_GRAPHICS) || defined(OFFSCREEN_RENDER)
 	// Always compute from original bounds + xscale/yscale
 	// For textfields, mcGetOriginalBounds uses mc->width/mc->height as natural bounds.
 	// For sprites/shapes, it uses ng_getDisplayEntryBounds.
@@ -23398,7 +23398,7 @@ static void mcGetEffectiveSize(MovieClip* mc, double* eff_w, double* eff_h)
 	nat_h = (double)mc->height;
 #endif
 
-#ifdef NO_GRAPHICS
+#if defined(NO_GRAPHICS) || defined(OFFSCREEN_RENDER)
 	// When the MC's transform comes from the timeline (no AS-set scale/rotation),
 	// use the actual matrix from transform_data — which preserves skew that
 	// xscale/yscale/rotation lose under decomposition. Round each transformed
@@ -23505,7 +23505,7 @@ static void mcGetEffectiveSize(MovieClip* mc, double* eff_w, double* eff_h)
 static void mcSetEffectiveWidth(SWFAppContext* app_context, MovieClip* mc, double v)
 {
 	if (mc == NULL) return;
-#ifdef NO_GRAPHICS
+#if defined(NO_GRAPHICS) || defined(OFFSCREEN_RENDER)
 	// TextFields (static or dynamic) store _width as a direct dimension, not via xscale.
 	// Flash stores in twips (1/20 pixel), truncating fractional twips.
 	if (MC_IS_TEXTFIELD(mc)) {
@@ -23560,7 +23560,7 @@ static void mcSetEffectiveWidth(SWFAppContext* app_context, MovieClip* mc, doubl
 static void mcSetEffectiveHeight(SWFAppContext* app_context, MovieClip* mc, double v)
 {
 	if (mc == NULL) return;
-#ifdef NO_GRAPHICS
+#if defined(NO_GRAPHICS) || defined(OFFSCREEN_RENDER)
 	// TextFields (static or dynamic) store _height as a direct dimension, not via yscale.
 	// Flash stores in twips (1/20 pixel), truncating fractional twips.
 	if (MC_IS_TEXTFIELD(mc)) {
@@ -23700,7 +23700,7 @@ int g_settarget_context_changed = 0;
 // Saves the natural g_current_context before SetTarget changed it.
 MovieClip* g_settarget_saved_context = NULL;
 
-#ifdef NO_GRAPHICS
+#if defined(NO_GRAPHICS) || defined(OFFSCREEN_RENDER)
 // Set when actionSetTarget() explicitly redirects to root ("_root" or "").
 // Allows actionGotoFrame() to distinguish "goto root" (deferred) vs
 // "goto sprite that has no instance name" (apply to sprite immediately).
@@ -25602,7 +25602,7 @@ static void freeEnumeratedNames(EnumeratedName* head)
 }
 
 // Callback for ng_enumerateChildren — pushes child instance name onto the ActionScript stack
-#ifdef NO_GRAPHICS
+#if defined(NO_GRAPHICS) || defined(OFFSCREEN_RENDER)
 static void enum_child_callback(const char* name, u32 name_len, void* user_data)
 {
 	SWFAppContext* app_context = (SWFAppContext*)user_data;
@@ -25946,7 +25946,7 @@ void actionEnumerate(SWFAppContext* app_context, char* str_buffer)
 	freeEnumeratedNames(enumerated_head);
 
 	// Enumerate child MovieClip instance names (pushed after own props = popped before)
-#ifdef NO_GRAPHICS
+#if defined(NO_GRAPHICS) || defined(OFFSCREEN_RENDER)
 	if (mc != NULL)
 	{
 		// Prefer mc->display_obj walk so nested MCs (e.g. button MCs whose
@@ -26268,7 +26268,7 @@ void actionNextFrame(SWFAppContext* app_context)
 	extern size_t next_frame;
 	extern int manual_next_frame;
 
-#ifdef NO_GRAPHICS
+#if defined(NO_GRAPHICS) || defined(OFFSCREEN_RENDER)
 	extern int g_settarget_explicit_root;
 	if (ng_isInsideSpriteInit() && g_settarget_explicit_root) {
 		// SetTarget("_root") + NextFrame from inside sprite init:
@@ -26843,7 +26843,7 @@ void actionGotoFrame(SWFAppContext* app_context, u16 frame)
 		was_clamped = 1;
 	}
 
-#ifdef NO_GRAPHICS
+#if defined(NO_GRAPHICS) || defined(OFFSCREEN_RENDER)
 	extern int goto_from_action;
 #endif
 
@@ -26852,7 +26852,7 @@ void actionGotoFrame(SWFAppContext* app_context, u16 frame)
 	// callback (e.g., Dejagnu checker) retries every tick until its condition
 	// is met, so skipping one goto is safe. This prevents the enterFrame goto
 	// from overriding the natural frame advance via manual_next_frame.
-#ifdef NO_GRAPHICS
+#if defined(NO_GRAPHICS) || defined(OFFSCREEN_RENDER)
 	{
 		extern int g_inside_enterframe_dispatch;
 		if (g_inside_enterframe_dispatch) {
@@ -26868,7 +26868,7 @@ void actionGotoFrame(SWFAppContext* app_context, u16 frame)
 	// Update _currentframe immediately so scripts can read the new value
 	root_movieclip.currentframe = frame + 1;  // 1-indexed
 
-#ifdef NO_GRAPHICS
+#if defined(NO_GRAPHICS) || defined(OFFSCREEN_RENDER)
 	goto_from_action = 1;
 	// Phase E (GOTO_FIFO_UNIFICATION_INCREMENTAL): ng_executeGotoCatchUp now
 	// inlines funcs[target] in scripts-only mode at the end of the call.
@@ -26965,7 +26965,7 @@ void actionGoToLabel(SWFAppContext* app_context, const char* label)
 		// Update _currentframe immediately so scripts can read the new value
 		root_movieclip.currentframe = frame_index + 1;  // 1-indexed
 
-#ifdef NO_GRAPHICS
+#if defined(NO_GRAPHICS) || defined(OFFSCREEN_RENDER)
 		extern int goto_from_action;
 		goto_from_action = 1;
 
@@ -27117,7 +27117,7 @@ void actionGotoFrame2(SWFAppContext* app_context, u8 play_flag, u16 scene_bias)
 			frame_part = colon + 1;
 		}
 
-#ifdef NO_GRAPHICS
+#if defined(NO_GRAPHICS) || defined(OFFSCREEN_RENDER)
 		// Target path support: resolve "/path/:frame" or "path:frame" to a sprite
 		// MovieClip and navigate that sprite. Mirrors actionCall's target-path
 		// handling. Without this, the path was silently stripped and the frame
@@ -27203,7 +27203,7 @@ void actionGotoFrame2(SWFAppContext* app_context, u8 play_flag, u16 scene_bias)
 	}
 
 	// Navigate: actionGotoFrame uses 0-based
-#ifdef NO_GRAPHICS
+#if defined(NO_GRAPHICS) || defined(OFFSCREEN_RENDER)
 	{
 		extern int g_settarget_none;
 		if (g_settarget_none) {
@@ -27243,7 +27243,7 @@ void actionGotoFrame2(SWFAppContext* app_context, u8 play_flag, u16 scene_bias)
 	actionGotoFrame(app_context, (u16)(frame_final - 1));
 
 	if (play_flag) {
-#ifdef NO_GRAPHICS
+#if defined(NO_GRAPHICS) || defined(OFFSCREEN_RENDER)
 		extern int g_settarget_explicit_root;
 		if (ng_isInsideSprite() && g_settarget_explicit_root) {
 			is_playing = 1;
@@ -27278,10 +27278,12 @@ void actionEndDrag(SWFAppContext* app_context)
 	if (is_dragging) {
 		is_dragging = 0;
 
-#ifdef NO_GRAPHICS
+#if defined(NO_GRAPHICS) || defined(OFFSCREEN_RENDER)
 		// Compute _droptarget: find the clip under the dragged hotspot (g_drag_virt_x/y),
 		// skipping the dragged clip itself.  Use g_drag_target_name because dragged_target
 		// may be wrong (GetVariable("this") returns root, not the clip's own name).
+		extern int ng_compute_droptarget(float stage_x_twips, float stage_y_twips,
+		    const char* skip_name, char* out_path, size_t out_size);
 		char path[256];
 		ng_compute_droptarget(g_drag_virt_x, g_drag_virt_y,
 		    g_drag_target_name[0] ? g_drag_target_name : dragged_target,
@@ -27353,7 +27355,7 @@ void actionStopSounds(SWFAppContext* app_context)
 int actionFindDynamicDropTarget(float stage_x_twips, float stage_y_twips,
     const char* skip_name, char* out_path, size_t out_size)
 {
-#ifdef NO_GRAPHICS
+#if defined(NO_GRAPHICS) || defined(OFFSCREEN_RENDER)
 	if (out_size == 0) return 0;
 	out_path[0] = '\0';
 
@@ -27449,7 +27451,7 @@ int actionFindDynamicDropTarget(float stage_x_twips, float stage_y_twips,
 // an in-progress startDrag-without-endDrag pattern).
 static void actionRefreshDropTargetIfDragged(MovieClip* mc)
 {
-#ifdef NO_GRAPHICS
+#if defined(NO_GRAPHICS) || defined(OFFSCREEN_RENDER)
 	if (mc == NULL || !is_dragging) return;
 	if (g_drag_target_name[0] == '\0') return;
 	// Match by name (g_drag_target_name may be a path like "_level0.draggable50";
@@ -30192,7 +30194,7 @@ static ASFunction g_selection_getBeginIndex_func;
 static ASFunction g_selection_getCaretIndex_func;
 static ASFunction g_selection_getEndIndex_func;
 static ASFunction g_selection_setSelection_func;
-#ifdef NO_GRAPHICS
+#if defined(NO_GRAPHICS) || defined(OFFSCREEN_RENDER)
 // Forward declarations — implementations are in the NO_GRAPHICS block at end of file
 static ActionVar builtin_selection_setFocus(SWFAppContext* app_context, ActionVar* args, u32 arg_count, ActionVar* registers, void* this_obj);
 static ActionVar builtin_selection_getFocus(SWFAppContext* app_context, ActionVar* args, u32 arg_count, ActionVar* registers, void* this_obj);
@@ -33041,7 +33043,7 @@ static void ensureGlobalInit(SWFAppContext* app_context)
 	installAsBroadcaster(app_context, g_selection_obj);
 
 	// Install Selection methods
-#ifdef NO_GRAPHICS
+#if defined(NO_GRAPHICS) || defined(OFFSCREEN_RENDER)
 	{
 		static int sel_funcs_init = 0;
 		if (!sel_funcs_init) {
@@ -34572,7 +34574,7 @@ void actionGetVariable(SWFAppContext* app_context)
 			const char* prop_name = last_sep + 1;
 			u32 prop_len = var_name_len - target_len - 1;
 
-#ifdef NO_GRAPHICS
+#if defined(NO_GRAPHICS) || defined(OFFSCREEN_RENDER)
 			// Try resolving left side as MC path via resolveFlashPathToMC
 			// Ruffle compatibility: _level0 in dot-paths only resolves when the scope's
 			// local object is a MovieClip (via StageObject _levelN handling). Inside a
@@ -35109,7 +35111,7 @@ check_special_vars:
 				// changed g_current_context, use the saved pre-SetTarget context.
 				extern MovieClip root_movieclip;
 				MovieClip* ctx = g_base_clip;
-#ifdef NO_GRAPHICS
+#if defined(NO_GRAPHICS) || defined(OFFSCREEN_RENDER)
 				if (ctx == NULL) {
 					extern int g_settarget_context_changed;
 					extern MovieClip* g_settarget_saved_context;
@@ -35828,7 +35830,7 @@ check_special_vars:
 		// In Flash, timeline variables and MC properties share the same namespace
 		if (var_name_len > 0 && var_name[0] == '_')
 		{
-#ifdef NO_GRAPHICS
+#if defined(NO_GRAPHICS) || defined(OFFSCREEN_RENDER)
 			// When tellTarget failed, MC builtin property accesses return undefined,
 			// EXCEPT _target — bare GetVariable("_target") ascends through scope to
 			// root (per gnash opcode_guard_test: "getVariable will ascend to _root!").
@@ -35879,7 +35881,7 @@ check_special_vars:
 				return;
 			}
 			if (strcasecmp(var_name, "_xmouse") == 0) {
-#ifdef NO_GRAPHICS
+#if defined(NO_GRAPHICS) || defined(OFFSCREEN_RENDER)
 				double lx, ly; mc_get_local_mouse(app_context, mc, &lx, &ly);
 				PUSH(ACTION_STACK_VALUE_F64, VAL(u64, &lx)); return;
 #else
@@ -35887,7 +35889,7 @@ check_special_vars:
 #endif
 			}
 			if (strcasecmp(var_name, "_ymouse") == 0) {
-#ifdef NO_GRAPHICS
+#if defined(NO_GRAPHICS) || defined(OFFSCREEN_RENDER)
 				double lx, ly; mc_get_local_mouse(app_context, mc, &lx, &ly);
 				PUSH(ACTION_STACK_VALUE_F64, VAL(u64, &ly)); return;
 #else
@@ -35979,7 +35981,7 @@ void actionSetVariable(SWFAppContext* app_context)
 			peekVar(app_context, &value_var);
 			POP_2();
 
-#ifdef NO_GRAPHICS
+#if defined(NO_GRAPHICS) || defined(OFFSCREEN_RENDER)
 			// Resolve target path via resolveFlashPathToMC (first_element=1)
 			MovieClip* ctx = g_current_context ? g_current_context : &root_movieclip;
 			MovieClip* target_mc = resolveFlashPathToMC(app_context, var_name, target_len, ctx, 1);
@@ -36138,7 +36140,7 @@ void actionSetVariable(SWFAppContext* app_context)
 				ActionVar value_var;
 				peekVar(app_context, &value_var);
 				setProperty(app_context, scope_chain[i], var_name, var_name_len, &value_var);
-#ifdef NO_GRAPHICS
+#if defined(NO_GRAPHICS) || defined(OFFSCREEN_RENDER)
 				ng_syncVarToTextFields(app_context, var_name, var_name_len, &value_var);
 #endif
 
@@ -36216,17 +36218,17 @@ void actionSetVariable(SWFAppContext* app_context)
 		if (strcasecmp(var_name, "_x") == 0) { RESOLVE_NUM_PROP(); if (num_ok) mc->x = fval; handled = 1; }
 		else if (strcasecmp(var_name, "_y") == 0) { RESOLVE_NUM_PROP(); if (num_ok) mc->y = fval; handled = 1; }
 		else if (strcasecmp(var_name, "_xscale") == 0) { RESOLVE_NUM_PROP(); if (num_ok) { mc->xscale = fval;
-#ifdef NO_GRAPHICS
+#if defined(NO_GRAPHICS) || defined(OFFSCREEN_RENDER)
 			mc->as_set_flags |= 4;
 #endif
 			} handled = 1; }
 		else if (strcasecmp(var_name, "_yscale") == 0) { RESOLVE_NUM_PROP(); if (num_ok) { mc->yscale = fval;
-#ifdef NO_GRAPHICS
+#if defined(NO_GRAPHICS) || defined(OFFSCREEN_RENDER)
 			mc->as_set_flags |= 8;
 #endif
 			} handled = 1; }
 		else if (strcasecmp(var_name, "_rotation") == 0) { RESOLVE_NUM_PROP(); if (num_ok) { mc->rotation = normalizeRotation(fval);
-#ifdef NO_GRAPHICS
+#if defined(NO_GRAPHICS) || defined(OFFSCREEN_RENDER)
 			mc->as_set_flags |= 16;
 #endif
 			} handled = 1; }
@@ -36236,7 +36238,7 @@ void actionSetVariable(SWFAppContext* app_context)
 				// Quantize through 8.8 fixed-point like Flash's color transform
 				mc->alpha = (float)((double)(int16_t)roundf(fval * 256.0f / 100.0f) * 100.0 / 256.0);
 				mc->cx_aa = (float)quantifyColorMult(dval);  // Sync MC color transform (uses integer truncation like setTransform)
-#ifdef NO_GRAPHICS
+#if defined(NO_GRAPHICS) || defined(OFFSCREEN_RENDER)
 				// Sync with display list cx_aa so Color.getTransform() reads the updated value
 				{
 					extern size_t ng_findDisplayEntryByName(const char* name);
@@ -36505,7 +36507,7 @@ void actionSetVariable(SWFAppContext* app_context)
 		}
 	}
 
-#ifdef NO_GRAPHICS
+#if defined(NO_GRAPHICS) || defined(OFFSCREEN_RENDER)
 	// Sync variable → text fields
 	{
 		ActionVar sync_val;
@@ -36845,7 +36847,7 @@ void actionDefineLocal(SWFAppContext* app_context)
 		}
 	}
 
-#ifdef NO_GRAPHICS
+#if defined(NO_GRAPHICS) || defined(OFFSCREEN_RENDER)
 	// Sync variable → text fields
 	{
 		ActionVar sync_val;
@@ -37064,7 +37066,7 @@ void actionSetTarget2(SWFAppContext* app_context)
 			setCurrentContext(base);
 			picked = base;
 		}
-#ifdef NO_GRAPHICS
+#if defined(NO_GRAPHICS) || defined(OFFSCREEN_RENDER)
 		// Mirror actionSetTarget's bookkeeping so subsequent GotoFrame /
 		// Play / Stop pick the correct branch. Without this, SetTarget2(_root)
 		// where the stack already holds the MOVIECLIP-typed _root reference
@@ -37094,7 +37096,7 @@ void actionSetTarget2(SWFAppContext* app_context)
 		POP();
 		MovieClip* base = g_base_clip ? g_base_clip : &root_movieclip;
 		setCurrentContext(base);
-#ifdef NO_GRAPHICS
+#if defined(NO_GRAPHICS) || defined(OFFSCREEN_RENDER)
 		extern int g_settarget_explicit_root;
 		extern int g_settarget_invalid;
 		extern int g_settarget_none;
@@ -37177,7 +37179,7 @@ void actionGetProperty(SWFAppContext* app_context)
 		return;
 	}
 
-#ifdef NO_GRAPHICS
+#if defined(NO_GRAPHICS) || defined(OFFSCREEN_RENDER)
 	// When tellTarget failed (invalid target), all property accesses return undefined
 	{
 		extern int g_settarget_invalid;
@@ -37195,7 +37197,7 @@ void actionGetProperty(SWFAppContext* app_context)
 
 	switch (prop_index) {
 		case 0:  // _x
-#ifdef NO_GRAPHICS
+#if defined(NO_GRAPHICS) || defined(OFFSCREEN_RENDER)
 			if (mc) syncTransformIfNeeded(mc);
 			if (mc && !(mc->as_set_flags & 1)) {
 				size_t _dep = ng_findDisplayEntryByName(mc->name);
@@ -37211,7 +37213,7 @@ void actionGetProperty(SWFAppContext* app_context)
 			{ double _dx = mc ? round((double)mc->x * 20.0) / 20.0 : 0.0;
 			  PUSH(ACTION_STACK_VALUE_F64, VAL(u64, &_dx)); return; }
 		case 1:  // _y
-#ifdef NO_GRAPHICS
+#if defined(NO_GRAPHICS) || defined(OFFSCREEN_RENDER)
 			if (mc) syncTransformIfNeeded(mc);
 			if (mc && !(mc->as_set_flags & 2)) {
 				size_t _dep = ng_findDisplayEntryByName(mc->name);
@@ -37227,13 +37229,13 @@ void actionGetProperty(SWFAppContext* app_context)
 			{ double _dy = mc ? round((double)mc->y * 20.0) / 20.0 : 0.0;
 			  PUSH(ACTION_STACK_VALUE_F64, VAL(u64, &_dy)); return; }
 		case 2:  // _xscale
-#ifdef NO_GRAPHICS
+#if defined(NO_GRAPHICS) || defined(OFFSCREEN_RENDER)
 			if (mc) syncTransformIfNeeded(mc);
 #endif
 			value = mc ? mc->xscale : 100.0f;
 			break;
 		case 3:  // _yscale
-#ifdef NO_GRAPHICS
+#if defined(NO_GRAPHICS) || defined(OFFSCREEN_RENDER)
 			if (mc) syncTransformIfNeeded(mc);
 #endif
 			value = mc ? mc->yscale : 100.0f;
@@ -37257,7 +37259,7 @@ void actionGetProperty(SWFAppContext* app_context)
 			if (mc) { double _ew, _eh; mcGetEffectiveSize(mc, &_ew, &_eh); value = (float)_eh; } else { value = 0.0f; }
 			break;
 		case 10: // _rotation
-#ifdef NO_GRAPHICS
+#if defined(NO_GRAPHICS) || defined(OFFSCREEN_RENDER)
 			if (mc) syncTransformIfNeeded(mc);
 #endif
 			value = mc ? mc->rotation : 0.0f;
@@ -37316,7 +37318,7 @@ void actionGetProperty(SWFAppContext* app_context)
 			is_string = 1;
 			break;
 		case 20: // _xmouse (SWF 5+)
-#ifdef NO_GRAPHICS
+#if defined(NO_GRAPHICS) || defined(OFFSCREEN_RENDER)
 			if (mc) {
 				double lx, ly; mc_get_local_mouse(app_context, mc, &lx, &ly);
 				PUSH(ACTION_STACK_VALUE_F64, VAL(u64, &lx));
@@ -37327,7 +37329,7 @@ void actionGetProperty(SWFAppContext* app_context)
 #endif
 			break;
 		case 21: // _ymouse (SWF 5+)
-#ifdef NO_GRAPHICS
+#if defined(NO_GRAPHICS) || defined(OFFSCREEN_RENDER)
 			if (mc) {
 				double lx, ly; mc_get_local_mouse(app_context, mc, &lx, &ly);
 				PUSH(ACTION_STACK_VALUE_F64, VAL(u64, &ly));
@@ -37485,7 +37487,7 @@ void actionTypeof(SWFAppContext* app_context, char* str_buffer)
 {
 	// Peek at the type without modifying value
 	u8 type = STACK_TOP_TYPE;
-#ifdef NO_GRAPHICS
+#if defined(NO_GRAPHICS) || defined(OFFSCREEN_RENDER)
 	u64 typeof_val = VAL(u64, &STACK_TOP_VALUE);
 #endif
 
@@ -37519,7 +37521,7 @@ void actionTypeof(SWFAppContext* app_context, char* str_buffer)
 			break;
 
 		case ACTION_STACK_VALUE_MOVIECLIP:
-#ifdef NO_GRAPHICS
+#if defined(NO_GRAPHICS) || defined(OFFSCREEN_RENDER)
 			// In Flash, text fields and buttons return "object" for typeof,
 			// only actual sprites/movieclips return "movieclip".
 			// Exception: in SWF5 the TextField class didn't exist yet, so
@@ -37767,7 +37769,7 @@ void actionDelete2(SWFAppContext* app_context, char* str_buffer)
 
 			// Check if name matches a child display object (non-deletable)
 			success = false;  // deleting non-existent variable returns false
-#ifdef NO_GRAPHICS
+#if defined(NO_GRAPHICS) || defined(OFFSCREEN_RENDER)
 			extern size_t ng_findDisplayEntryByName(const char* name);
 			if (var_name != NULL && var_name_len > 0) {
 				char _del_name[64];
@@ -38519,7 +38521,7 @@ void actionEnumerate2(SWFAppContext* app_context, char* str_buffer)
 		if (mc != NULL)
 		{
 			// Enumerate child MovieClip instance names first (pushed early = popped late)
-#ifdef NO_GRAPHICS
+#if defined(NO_GRAPHICS) || defined(OFFSCREEN_RENDER)
 			{
 				// Phase 1e: push transient (just-removed previous-state) button
 				// children FIRST so LIFO yields them LAST in for-in order.
@@ -39709,7 +39711,7 @@ int actionCall(SWFAppContext* app_context)
 	frame_func* call_funcs = g_frame_funcs;
 	size_t call_count = g_frame_count;
 	MovieClip* call_ctx = NULL;
-#ifdef NO_GRAPHICS
+#if defined(NO_GRAPHICS) || defined(OFFSCREEN_RENDER)
 	// If current context is a sprite (not root), use the sprite's frame functions
 	// Use g_current_context (affected by tellTarget), NOT g_base_clip.
 	// Ruffle: target_clip_or_root() — the clip set by SetTarget, or root.
@@ -39849,7 +39851,7 @@ int actionCall(SWFAppContext* app_context)
 		size_t target_count = call_count;
 		size_t target_char_id = 0;  // for sprite label lookup
 		MovieClip* call_target_mc = NULL;  // MC to switch context to during call
-#ifdef NO_GRAPHICS
+#if defined(NO_GRAPHICS) || defined(OFFSCREEN_RENDER)
 		if (target) {
 			// Resolve slash path to MovieClip
 			MovieClip* start_mc_for_resolve = (target[0] == '/') ? &root_movieclip : (call_ctx ? call_ctx : &root_movieclip);
@@ -39900,7 +39902,7 @@ int actionCall(SWFAppContext* app_context)
 		} else {
 			// Frame label lookup
 			int label_frame = -1;
-#ifdef NO_GRAPHICS
+#if defined(NO_GRAPHICS) || defined(OFFSCREEN_RENDER)
 			if (target_char_id > 0) {
 				extern int ng_findSpriteLabelFrame(size_t char_id, const char* label);
 				label_frame = ng_findSpriteLabelFrame(target_char_id, frame_part);
@@ -41616,7 +41618,7 @@ void actionSetMember(SWFAppContext* app_context)
 					// Quantize through 8.8 fixed-point like Flash's color transform
 					mc->alpha = (float)((double)(int16_t)roundf(fval * 256.0f / 100.0f) * 100.0 / 256.0);
 					mc->cx_aa = (float)quantifyColorMult(dval);  // Sync MC color transform (uses integer truncation like setTransform)
-#ifdef NO_GRAPHICS
+#if defined(NO_GRAPHICS) || defined(OFFSCREEN_RENDER)
 					// Sync with display list cx_aa so Color.getTransform() reads the updated value
 					{
 						extern size_t ng_findDisplayEntryByName(const char* name);
@@ -41781,7 +41783,7 @@ void actionSetMember(SWFAppContext* app_context)
 						char old_name[256];
 						strncpy(old_name, mc->name, sizeof(old_name) - 1);
 						old_name[sizeof(old_name) - 1] = '\0';
-#ifdef NO_GRAPHICS
+#if defined(NO_GRAPHICS) || defined(OFFSCREEN_RENDER)
 						extern void ng_renameDisplayEntry(const char* old_name, const char* new_name);
 						ng_renameDisplayEntry(mc->name, new_name);
 #endif
@@ -42087,7 +42089,7 @@ void actionSetMember(SWFAppContext* app_context)
 				len_val.type = ACTION_STACK_VALUE_F64;
 				VAL(double, &len_val.data.numeric_value) = (double)_txt_len;
 				setProperty(app_context, props, "length", 6, &len_val);
-#ifdef NO_GRAPHICS
+#if defined(NO_GRAPHICS) || defined(OFFSCREEN_RENDER)
 				// Sync text → variable binding
 				ng_syncTextToVar(app_context, mc, &value_var);
 				// Sync text → htmlText (they should stay in sync)
@@ -42212,7 +42214,7 @@ void actionSetMember(SWFAppContext* app_context)
 						is_multiline = 1;
 
 					// Parse HTML into format runs (NO_GRAPHICS only — tf_* system not available in graphics mode)
-#ifdef NO_GRAPHICS
+#if defined(NO_GRAPHICS) || defined(OFFSCREEN_RENDER)
 					TFRunTable* table = tf_get_table(mc);
 					table->from_html_text = 1; // Content set via .htmlText
 					TFRun defaults;
@@ -42362,7 +42364,7 @@ void actionSetMember(SWFAppContext* app_context)
 						len_val.type = ACTION_STACK_VALUE_F64;
 						VAL(double, &len_val.data.numeric_value) = (double)value_var.str_size;
 						setProperty(app_context, props, "length", 6, &len_val);
-#ifdef NO_GRAPHICS
+#if defined(NO_GRAPHICS) || defined(OFFSCREEN_RENDER)
 						// Invalidate any existing run table so a subsequent htmlText read
 						// (after html is re-enabled or a stylesheet is attached) regenerates
 						// from the new plain text via the raw-content fallback path — not
@@ -42383,7 +42385,7 @@ void actionSetMember(SWFAppContext* app_context)
 			// TextField variable: changing binding breaks old, creates new
 			if (strcmp(prop_name, "variable") == 0 && mc->ng_textfield_idx >= 0 && mc->dynamic_props != NULL)
 			{
-#ifdef NO_GRAPHICS
+#if defined(NO_GRAPHICS) || defined(OFFSCREEN_RENDER)
 				// When variable binding changes: read new variable (or use initial text)
 				// and reset the text field, then create the variable if needed.
 				if (value_var.type == ACTION_STACK_VALUE_STRING && value_var.str_size > 0) {
@@ -42450,7 +42452,7 @@ void actionSetMember(SWFAppContext* app_context)
 #endif
 			}
 			// TextField styleSheet setter: on removal, sync text/htmlText to stripped plain text
-#ifdef NO_GRAPHICS
+#if defined(NO_GRAPHICS) || defined(OFFSCREEN_RENDER)
 			if (prop_name_len == 10 && strncmp(prop_name, "styleSheet", 10) == 0
 				&& MC_IS_TEXTFIELD(mc) && mc->dynamic_props != NULL)
 			{
@@ -42596,7 +42598,7 @@ void actionSetMember(SWFAppContext* app_context)
 					ival = (int32_t)i64;
 				}
 				// Dynamically compute maxscroll from text content
-#ifdef NO_GRAPHICS
+#if defined(NO_GRAPHICS) || defined(OFFSCREEN_RENDER)
 				int32_t max_scroll = recomputeMaxScroll(app_context, mc);
 #else
 				int32_t max_scroll = 1;
@@ -42621,7 +42623,7 @@ void actionSetMember(SWFAppContext* app_context)
 					ival = 0;
 				else
 					ival = (int32_t)dval; // int32 truncation (2147483648 wraps to negative)
-#ifdef NO_GRAPHICS
+#if defined(NO_GRAPHICS) || defined(OFFSCREEN_RENDER)
 				// Compute maxhscroll dynamically
 				char _hs_utf8[4096];
 				u16 _hs_fid, _hs_fh; s16 _hs_ld;
@@ -42685,7 +42687,7 @@ void actionSetMember(SWFAppContext* app_context)
 							mc->xscale = src_mc->xscale; mc->yscale = src_mc->yscale;
 							mc->rotation = src_mc->rotation;
 							mc->skew = src_mc->skew;
-#ifdef NO_GRAPHICS
+#if defined(NO_GRAPHICS) || defined(OFFSCREEN_RENDER)
 							mc->as_set_flags |= (1|2|4|8|16);
 							s16 sra, sga, sba, saa, srb, sgb, sbb, sab;
 							getLocalCTRaw(src_mc, &sra, &sga, &sba, &saa, &srb, &sgb, &sbb, &sab);
@@ -42919,7 +42921,7 @@ void actionSetMember(SWFAppContext* app_context)
 				retainObject((ASObject*) mc->dynamic_props);
 			}
 			setProperty(app_context, (ASObject*) mc->dynamic_props, prop_name, prop_name_len, &value_var);
-#ifdef NO_GRAPHICS
+#if defined(NO_GRAPHICS) || defined(OFFSCREEN_RENDER)
 			// Trigger autoSize recalculation when autoSize, text, or htmlText changes
 			if (MC_IS_TEXTFIELD(mc) && (
 				(prop_name_len == 8 && strncmp(prop_name, "autoSize", 8) == 0) ||
@@ -42935,14 +42937,14 @@ void actionSetMember(SWFAppContext* app_context)
 			extern MovieClip root_movieclip;
 			if (mc == &root_movieclip) {
 				setGlobalVariableByName(prop_name, &value_var);
-#ifdef NO_GRAPHICS
+#if defined(NO_GRAPHICS) || defined(OFFSCREEN_RENDER)
 				// Also sync to any textfields bound to this simple variable name
 				// (e.g., textfield.variable = "textVar1" and user writes `_root.textVar1 = X`).
 				// Path-bound fields are handled by the loop below.
 				ng_syncVarToTextFields(app_context, prop_name, prop_name_len, &value_var);
 #endif
 			}
-#ifdef NO_GRAPHICS
+#if defined(NO_GRAPHICS) || defined(OFFSCREEN_RENDER)
 			// Sync path variable → text fields when setting a property on a MovieClip
 			// E.g., mc.theVar = "Test1" should update textfields bound to "_root.mc.theVar"
 			for (int tfi = 0; tfi < child_mc_count; tfi++) {
@@ -43377,7 +43379,7 @@ void actionDelete(SWFAppContext* app_context)
 	PUSH(ACTION_STACK_VALUE_BOOLEAN, success ? 1ULL : 0ULL);
 }
 
-#ifdef NO_GRAPHICS
+#if defined(NO_GRAPHICS) || defined(OFFSCREEN_RENDER)
 // Separate noinline function to prevent GCC -O2 from misoptimizing the
 // textWidth/textHeight computation when inlined into the large actionGetMember.
 static __attribute__((noinline)) int computeTextFieldDimension(
@@ -44703,7 +44705,7 @@ void actionGetMember(SWFAppContext* app_context)
 		// In Flash/Ruffle, child clip names take priority over builtin MC properties
 		// (e.g., a child named "_x" shadows the builtin _x property)
 		// Exception: _levelN/_flashN names are resolved as level references, not child clips
-#ifdef NO_GRAPHICS
+#if defined(NO_GRAPHICS) || defined(OFFSCREEN_RENDER)
 		if (mc != NULL && prop_name_len > 1 && prop_name[0] == '_' &&
 		    !(prop_name_len >= 6 && (strncmp(prop_name, "_level", 6) == 0 || strncmp(prop_name, "_flash", 6) == 0)))
 		{
@@ -44799,7 +44801,7 @@ void actionGetMember(SWFAppContext* app_context)
 		{
 			// Case-insensitive comparison for built-in MC properties
 			if (strcasecmp(prop_name, "_x") == 0) {
-#ifdef NO_GRAPHICS
+#if defined(NO_GRAPHICS) || defined(OFFSCREEN_RENDER)
 				if (mc->pending_removal) {
 					// Pending_removal MC: compute x from last known transform for full double precision
 					extern float transform_data[][16];
@@ -44846,7 +44848,7 @@ void actionGetMember(SWFAppContext* app_context)
 					PUSH(ACTION_STACK_VALUE_F64, VAL(u64, &dx)); return;
 				} }
 			if (strcasecmp(prop_name, "_y") == 0) {
-#ifdef NO_GRAPHICS
+#if defined(NO_GRAPHICS) || defined(OFFSCREEN_RENDER)
 				syncTransformIfNeeded(mc);
 				if (!(mc->as_set_flags & 2)) {
 					size_t _dep = ng_findDisplayEntryByName(mc->name);
@@ -44885,17 +44887,17 @@ void actionGetMember(SWFAppContext* app_context)
 					PUSH(ACTION_STACK_VALUE_F64, VAL(u64, &dy)); return;
 				} }
 			if (strcasecmp(prop_name, "_xscale") == 0) {
-#ifdef NO_GRAPHICS
+#if defined(NO_GRAPHICS) || defined(OFFSCREEN_RENDER)
 				syncTransformIfNeeded(mc);
 #endif
 				float v = mc->xscale; PUSH(ACTION_STACK_VALUE_F32, VAL(u32, &v)); return; }
 			if (strcasecmp(prop_name, "_yscale") == 0) {
-#ifdef NO_GRAPHICS
+#if defined(NO_GRAPHICS) || defined(OFFSCREEN_RENDER)
 				syncTransformIfNeeded(mc);
 #endif
 				float v = mc->yscale; PUSH(ACTION_STACK_VALUE_F32, VAL(u32, &v)); return; }
 			if (strcasecmp(prop_name, "_rotation") == 0) {
-#ifdef NO_GRAPHICS
+#if defined(NO_GRAPHICS) || defined(OFFSCREEN_RENDER)
 				syncTransformIfNeeded(mc);
 #endif
 				float v = mc->rotation; PUSH(ACTION_STACK_VALUE_F32, VAL(u32, &v)); return; }
@@ -44916,7 +44918,7 @@ void actionGetMember(SWFAppContext* app_context)
 			if (strcasecmp(prop_name, "_droptarget") == 0) { actionRefreshDropTargetIfDragged(mc); PUSH_STR(mc->droptarget, strlen(mc->droptarget)); return; }
 			if (strcasecmp(prop_name, "_quality") == 0) { PUSH_STR(mc->quality, strlen(mc->quality)); return; }
 			if (strcasecmp(prop_name, "_xmouse") == 0) {
-#ifdef NO_GRAPHICS
+#if defined(NO_GRAPHICS) || defined(OFFSCREEN_RENDER)
 				double lx, ly; mc_get_local_mouse(app_context, mc, &lx, &ly);
 				PUSH(ACTION_STACK_VALUE_F64, VAL(u64, &lx)); return;
 #else
@@ -44924,7 +44926,7 @@ void actionGetMember(SWFAppContext* app_context)
 #endif
 			}
 			if (strcasecmp(prop_name, "_ymouse") == 0) {
-#ifdef NO_GRAPHICS
+#if defined(NO_GRAPHICS) || defined(OFFSCREEN_RENDER)
 				double lx, ly; mc_get_local_mouse(app_context, mc, &lx, &ly);
 				PUSH(ACTION_STACK_VALUE_F64, VAL(u64, &ly)); return;
 #else
@@ -44989,7 +44991,7 @@ void actionGetMember(SWFAppContext* app_context)
 		}
 
 		// Dynamically compute textWidth/textHeight/maxscroll/bottomScroll for TextField MovieClips
-#ifdef NO_GRAPHICS
+#if defined(NO_GRAPHICS) || defined(OFFSCREEN_RENDER)
 		if (mc != NULL && MC_IS_TEXTFIELD(mc) && mc->dynamic_props != NULL) {
 			double _tw_result = -999.0;
 			int _tw_matched = computeTextFieldDimension(app_context, mc, prop_name, prop_name_len, &_tw_result);
@@ -45011,7 +45013,7 @@ void actionGetMember(SWFAppContext* app_context)
 			ActionVar* prop = getPropertyWithPrototype((ASObject*) mc->dynamic_props, prop_name, prop_name_len);
 			if (prop != NULL)
 			{
-#ifdef NO_GRAPHICS
+#if defined(NO_GRAPHICS) || defined(OFFSCREEN_RENDER)
 				// TextField htmlText getter: re-serialize from format runs.
 				// Ruffle returns the format-serialized HTML only when the field is
 				// "effectively HTML" — the html flag is set OR a styleSheet is active.
@@ -45202,7 +45204,7 @@ void actionGetMember(SWFAppContext* app_context)
 		}
 
 		// Check child instance names (in Flash, mc.childName resolves to child clips)
-#ifdef NO_GRAPHICS
+#if defined(NO_GRAPHICS) || defined(OFFSCREEN_RENDER)
 		if (mc != NULL)
 		{
 			char child_name_buf[64];
@@ -48201,28 +48203,28 @@ void actionSetProperty(SWFAppContext* app_context)
 	switch (prop_index) {
 		case 0:  // _x
 			mc->x = num_value;
-#ifdef NO_GRAPHICS
+#if defined(NO_GRAPHICS) || defined(OFFSCREEN_RENDER)
 			mc->as_set_flags |= 1;
 #endif
 			markTransformedByScript(mc);
 			break;
 		case 1:  // _y
 			mc->y = num_value;
-#ifdef NO_GRAPHICS
+#if defined(NO_GRAPHICS) || defined(OFFSCREEN_RENDER)
 			mc->as_set_flags |= 2;
 #endif
 			markTransformedByScript(mc);
 			break;
 		case 2:  // _xscale
 			mc->xscale = num_value;
-#ifdef NO_GRAPHICS
+#if defined(NO_GRAPHICS) || defined(OFFSCREEN_RENDER)
 			mc->as_set_flags |= 4;
 #endif
 			markTransformedByScript(mc);
 			break;
 		case 3:  // _yscale
 			mc->yscale = num_value;
-#ifdef NO_GRAPHICS
+#if defined(NO_GRAPHICS) || defined(OFFSCREEN_RENDER)
 			mc->as_set_flags |= 8;
 #endif
 			markTransformedByScript(mc);
@@ -48249,7 +48251,7 @@ void actionSetProperty(SWFAppContext* app_context)
 			break;
 		case 10: // _rotation
 			mc->rotation = normalizeRotation(num_value);
-#ifdef NO_GRAPHICS
+#if defined(NO_GRAPHICS) || defined(OFFSCREEN_RENDER)
 			mc->as_set_flags |= 16;
 #endif
 			markTransformedByScript(mc);
@@ -48360,7 +48362,7 @@ void actionSetProperty(SWFAppContext* app_context)
 void actionMarkCloneStripped(SWFAppContext* app_context)
 {
 	(void)app_context;
-#ifdef NO_GRAPHICS
+#if defined(NO_GRAPHICS) || defined(OFFSCREEN_RENDER)
 	g_clone_depth_already_unbiased = 1;
 #endif
 }
@@ -48782,7 +48784,7 @@ static const char* mcToDotBasePath(MovieClip* mc) {
 
 void actionSetTarget(SWFAppContext* app_context, const char* target_name)
 {
-#ifdef NO_GRAPHICS
+#if defined(NO_GRAPHICS) || defined(OFFSCREEN_RENDER)
 	extern int g_settarget_explicit_root;
 	extern int g_settarget_invalid;
 	extern int g_settarget_none;
@@ -48793,7 +48795,7 @@ void actionSetTarget(SWFAppContext* app_context, const char* target_name)
 
 	// Empty string or NULL means return to base clip (the clip whose script is running)
 	if (!target_name || strlen(target_name) == 0) {
-#ifdef NO_GRAPHICS
+#if defined(NO_GRAPHICS) || defined(OFFSCREEN_RENDER)
 		g_settarget_context_changed = 0;
 		g_settarget_saved_context = NULL;
 #endif
@@ -48801,14 +48803,14 @@ void actionSetTarget(SWFAppContext* app_context, const char* target_name)
 			// Base clip is removed/dead: Ruffle treats target_clip() as None.
 			// GotoFrame/Play/Stop become no-ops; scope falls back to root for variables.
 			setCurrentContext(&root_movieclip);
-#ifdef NO_GRAPHICS
+#if defined(NO_GRAPHICS) || defined(OFFSCREEN_RENDER)
 			g_settarget_explicit_root = 0;
 			g_settarget_invalid = 1;
 			g_settarget_none = 1;
 #endif
 		} else {
 			setCurrentContext(base);
-#ifdef NO_GRAPHICS
+#if defined(NO_GRAPHICS) || defined(OFFSCREEN_RENDER)
 			g_settarget_explicit_root = (base == &root_movieclip) ? 1 : 0;
 			g_settarget_invalid = 0;
 			g_settarget_none = 0;
@@ -48823,7 +48825,7 @@ void actionSetTarget(SWFAppContext* app_context, const char* target_name)
 	// Check for _root
 	if (strcmp(target_name, "_root") == 0 || strcmp(target_name, "/") == 0) {
 		setCurrentContext(&root_movieclip);
-#ifdef NO_GRAPHICS
+#if defined(NO_GRAPHICS) || defined(OFFSCREEN_RENDER)
 		g_settarget_explicit_root = 1;
 		g_settarget_invalid = 0;
 		g_settarget_none = 0;
@@ -48837,7 +48839,7 @@ void actionSetTarget(SWFAppContext* app_context, const char* target_name)
 	// --- SetTarget path resolution ---
 	// Uses the Flash/Ruffle resolve_target_path algorithm.
 	// For tellTarget, first_element is false (this/_root are not keywords).
-#ifdef NO_GRAPHICS
+#if defined(NO_GRAPHICS) || defined(OFFSCREEN_RENDER)
 	// Save current context before SetTarget changes it.
 	// GetVariable("this") uses this to return the correct clip.
 	if (!g_settarget_context_changed) {
@@ -48850,7 +48852,7 @@ void actionSetTarget(SWFAppContext* app_context, const char* target_name)
 		MovieClip* target_mc = resolveFlashPathToMC(app_context, target_name, tn_len, base, 0);
 		if (target_mc && target_mc->depth != INT_MIN) {
 			setCurrentContext(target_mc);
-#ifdef NO_GRAPHICS
+#if defined(NO_GRAPHICS) || defined(OFFSCREEN_RENDER)
 			g_settarget_explicit_root = (target_mc == &root_movieclip) ? 1 : 0;
 			g_settarget_invalid = 0;
 			g_settarget_none = 0;
@@ -48865,7 +48867,7 @@ void actionSetTarget(SWFAppContext* app_context, const char* target_name)
 			MovieClip* obj_target_mc = resolveObjectPathToMC(app_context, target_name, tn_len, base, 0);
 			if (obj_target_mc && obj_target_mc->depth != INT_MIN) {
 				setCurrentContext(obj_target_mc);
-#ifdef NO_GRAPHICS
+#if defined(NO_GRAPHICS) || defined(OFFSCREEN_RENDER)
 				g_settarget_explicit_root = (obj_target_mc == &root_movieclip) ? 1 : 0;
 				g_settarget_invalid = 0;
 				g_settarget_none = 0;
@@ -48882,7 +48884,7 @@ void actionSetTarget(SWFAppContext* app_context, const char* target_name)
 		MovieClip* target_mc = resolveSlashPathToMC(app_context, target_name, (u32)strlen(target_name), base);
 		if (target_mc && target_mc->depth != INT_MIN) {
 			setCurrentContext(target_mc);
-#ifdef NO_GRAPHICS
+#if defined(NO_GRAPHICS) || defined(OFFSCREEN_RENDER)
 			g_settarget_explicit_root = (target_mc == &root_movieclip) ? 1 : 0;
 			g_settarget_invalid = 0;
 			g_settarget_none = 0;
@@ -48903,7 +48905,7 @@ void actionSetTarget(SWFAppContext* app_context, const char* target_name)
 		target_mc = getMovieClipByTarget(target_name);
 		if (target_mc && target_mc->depth != INT_MIN) {
 			setCurrentContext(target_mc);
-#ifdef NO_GRAPHICS
+#if defined(NO_GRAPHICS) || defined(OFFSCREEN_RENDER)
 			g_settarget_explicit_root = 0;
 			g_settarget_invalid = 0;
 			g_settarget_none = 0;
@@ -48911,7 +48913,7 @@ void actionSetTarget(SWFAppContext* app_context, const char* target_name)
 			return;
 		}
 
-#ifdef NO_GRAPHICS
+#if defined(NO_GRAPHICS) || defined(OFFSCREEN_RENDER)
 		// Final fallback: var_map lookup for MOVIECLIP entries.
 		// duplicateMovieClip / CloneSprite / createEmptyMovieClip register
 		// their clones in var_map (via setVariableByName) but not in the
@@ -48947,7 +48949,7 @@ void actionSetTarget(SWFAppContext* app_context, const char* target_name)
 	// GotoFrame/Play/Stop use target_clip() → no-op when None.
 	// GotoFrame2 uses target_clip_or_root() → falls back to root.
 	setCurrentContext(&root_movieclip);
-#ifdef NO_GRAPHICS
+#if defined(NO_GRAPHICS) || defined(OFFSCREEN_RENDER)
 	g_settarget_explicit_root = 0;
 	g_settarget_invalid = 1;
 	g_settarget_none = 1;
@@ -49013,35 +49015,35 @@ static int setMCBuiltinProperty(SWFAppContext* app_context, MovieClip* mc, const
 	float fval = (float)dval;
 
 	if (strcasecmp(name, "_x") == 0) {
-#ifdef NO_GRAPHICS
+#if defined(NO_GRAPHICS) || defined(OFFSCREEN_RENDER)
 		mc->as_set_flags |= 1;
 #endif
 		markTransformedByScript(mc);
 		mc->x = fval; return 1;
 	}
 	if (strcasecmp(name, "_y") == 0) {
-#ifdef NO_GRAPHICS
+#if defined(NO_GRAPHICS) || defined(OFFSCREEN_RENDER)
 		mc->as_set_flags |= 2;
 #endif
 		markTransformedByScript(mc);
 		mc->y = fval; return 1;
 	}
 	if (strcasecmp(name, "_xscale") == 0) {
-#ifdef NO_GRAPHICS
+#if defined(NO_GRAPHICS) || defined(OFFSCREEN_RENDER)
 		mc->as_set_flags |= 4;
 #endif
 		markTransformedByScript(mc);
 		mc->xscale = fval; return 1;
 	}
 	if (strcasecmp(name, "_yscale") == 0) {
-#ifdef NO_GRAPHICS
+#if defined(NO_GRAPHICS) || defined(OFFSCREEN_RENDER)
 		mc->as_set_flags |= 8;
 #endif
 		markTransformedByScript(mc);
 		mc->yscale = fval; return 1;
 	}
 	if (strcasecmp(name, "_rotation") == 0) {
-#ifdef NO_GRAPHICS
+#if defined(NO_GRAPHICS) || defined(OFFSCREEN_RENDER)
 		mc->as_set_flags |= 16;
 #endif
 		markTransformedByScript(mc);
@@ -51323,7 +51325,7 @@ void actionCallFunction(SWFAppContext* app_context, char* str_buffer)
 	// In Flash, calling createTextField() as a free function acts on the current MovieClip scope (_root).
 	else if (func_name_len == 15 && strncmp(func_name, "createTextField", 15) == 0)
 	{
-#ifdef NO_GRAPHICS
+#if defined(NO_GRAPHICS) || defined(OFFSCREEN_RENDER)
 		if (num_args >= 6) {
 			extern MovieClip root_movieclip;
 			MovieClip* mc = &root_movieclip;
@@ -51549,7 +51551,7 @@ void actionCallFunction(SWFAppContext* app_context, char* str_buffer)
 			pushUndefined(app_context);
 			return;
 		}
-#ifdef NO_GRAPHICS
+#if defined(NO_GRAPHICS) || defined(OFFSCREEN_RENDER)
 		if (num_args >= 2) {
 			extern MovieClip root_movieclip;
 			MovieClip* mc = g_current_context ? g_current_context : &root_movieclip;
@@ -51654,7 +51656,7 @@ void actionCallFunction(SWFAppContext* app_context, char* str_buffer)
 	// attachMovie(linkageId, newName, depth [, initObject]) — MC method called as CallFunction
 	else if (func_name_len == 11 && strncmp(func_name, "attachMovie", 11) == 0)
 	{
-#ifdef NO_GRAPHICS
+#if defined(NO_GRAPHICS) || defined(OFFSCREEN_RENDER)
 		if (num_args >= 3) {
 			extern MovieClip root_movieclip;
 			MovieClip* mc = g_current_context ? g_current_context : &root_movieclip;
@@ -51821,7 +51823,7 @@ void actionCallFunction(SWFAppContext* app_context, char* str_buffer)
 	// form). Checking both lets clones placed at SWF-space depths still resolve.
 	else if (func_name_len == 18 && strncmp(func_name, "getInstanceAtDepth", 18) == 0)
 	{
-#ifdef NO_GRAPHICS
+#if defined(NO_GRAPHICS) || defined(OFFSCREEN_RENDER)
 		extern MovieClip root_movieclip;
 		MovieClip* parent_mc = g_current_context ? g_current_context : &root_movieclip;
 		if (num_args == 0 ||
@@ -52009,7 +52011,7 @@ void actionCallFunction(SWFAppContext* app_context, char* str_buffer)
 					s32 _gf = (s32)varToDouble(&args[0]);
 					if (_gf > 0) {
 						u16 _gf0 = (u16)(_gf - 1);
-#ifdef NO_GRAPHICS
+#if defined(NO_GRAPHICS) || defined(OFFSCREEN_RENDER)
 						extern MovieClip root_movieclip;
 						if (_mc_target == &root_movieclip) {
 							actionGotoFrame(app_context, _gf0);
@@ -52044,7 +52046,7 @@ void actionCallFunction(SWFAppContext* app_context, char* str_buffer)
 					// Mirrors the actionCallMethod MOVIECLIP getDepth handler:
 					// nonscriptable shapes / shape aliases push undefined.
 					if (args != NULL) FREE(args);
-#ifdef NO_GRAPHICS
+#if defined(NO_GRAPHICS) || defined(OFFSCREEN_RENDER)
 					if (mc_is_nonscriptable_shape(_mc_target) || g_shape_alias_resolution) {
 						g_shape_alias_resolution = 0;
 						pushUndefined(app_context);
@@ -57853,7 +57855,7 @@ void actionCallMethod(SWFAppContext* app_context, char* str_buffer)
 					// Built-in MC method (e.g., removeMovieClip) applied to a target
 					if (apply_args != NULL) FREE(apply_args);
 					if (args != NULL) FREE(args);
-#ifdef NO_GRAPHICS
+#if defined(NO_GRAPHICS) || defined(OFFSCREEN_RENDER)
 					if (strcmp(func->name, "removeMovieClip") == 0) {
 						MovieClip* _apply_mc = apply_this_mc ? apply_this_mc : (MovieClip*)this_obj;
 						#ifndef AVM_MAX_REMOVE_DEPTH
@@ -58276,7 +58278,7 @@ void actionCallMethod(SWFAppContext* app_context, char* str_buffer)
 						frame_num = (s32)parsed;
 					} else {
 						// Try label lookup (sprite-specific first, then root)
-#ifdef NO_GRAPHICS
+#if defined(NO_GRAPHICS) || defined(OFFSCREEN_RENDER)
 						if (!force_root) {
 							size_t cid = ng_getCharIdByMC(mc);
 							if (cid > 0) {
@@ -58292,7 +58294,7 @@ void actionCallMethod(SWFAppContext* app_context, char* str_buffer)
 					}
 				}
 				if (frame_num > 0) {
-#ifdef NO_GRAPHICS
+#if defined(NO_GRAPHICS) || defined(OFFSCREEN_RENDER)
 					u16 frame0 = (u16)(frame_num - 1);
 					if (force_root || mc == &root_movieclip) {
 						// Root goto via method call: always inline catch-up
@@ -58332,7 +58334,7 @@ void actionCallMethod(SWFAppContext* app_context, char* str_buffer)
 		}
 		else if (method_name_len == 9 && strncasecmp(method_name, "prevFrame", 9) == 0)
 		{
-#ifdef NO_GRAPHICS
+#if defined(NO_GRAPHICS) || defined(OFFSCREEN_RENDER)
 			if (mc) {
 				int cf = mc->currentframe;  // 1-indexed
 				if (cf > 1) {
@@ -58371,7 +58373,7 @@ void actionCallMethod(SWFAppContext* app_context, char* str_buffer)
 		}
 		else if (method_name_len == 9 && strncasecmp(method_name, "nextFrame", 9) == 0)
 		{
-#ifdef NO_GRAPHICS
+#if defined(NO_GRAPHICS) || defined(OFFSCREEN_RENDER)
 			if (mc) {
 				int cf = mc->currentframe;  // 1-indexed
 				u16 frame0 = (u16)cf;  // next frame, 0-indexed (cf is 1-indexed, so cf = next 0-indexed)
@@ -58405,7 +58407,7 @@ void actionCallMethod(SWFAppContext* app_context, char* str_buffer)
 		}
 		else if (method_name_len == 4 && strncasecmp(method_name, "play", 4) == 0)
 		{
-#ifdef NO_GRAPHICS
+#if defined(NO_GRAPHICS) || defined(OFFSCREEN_RENDER)
 			// Try clip-specific play first
 			if (mc) {
 				size_t depth = ng_findDisplayEntryByName(mc->name);
@@ -58425,7 +58427,7 @@ void actionCallMethod(SWFAppContext* app_context, char* str_buffer)
 		}
 		else if (method_name_len == 4 && strncasecmp(method_name, "stop", 4) == 0)
 		{
-#ifdef NO_GRAPHICS
+#if defined(NO_GRAPHICS) || defined(OFFSCREEN_RENDER)
 			// Try clip-specific stop first
 			if (mc) {
 				size_t depth = ng_findDisplayEntryByName(mc->name);
@@ -58446,7 +58448,7 @@ void actionCallMethod(SWFAppContext* app_context, char* str_buffer)
 		else if (method_name_len == 15 && strncasecmp(method_name, "removeTextField", 15) == 0)
 		{
 			// removeTextField(): remove a dynamically-created text field
-#ifdef NO_GRAPHICS
+#if defined(NO_GRAPHICS) || defined(OFFSCREEN_RENDER)
 			// Remove from child_mc_cache
 			for (int i = 0; i < child_mc_count; i++) {
 				if (child_mc_cache[i] == mc) {
@@ -58467,7 +58469,7 @@ void actionCallMethod(SWFAppContext* app_context, char* str_buffer)
 		{
 			// createTextField(instanceName, depth, x, y, width, height)
 			// Creates a new dynamic text field as a child of this movie clip
-#ifdef NO_GRAPHICS
+#if defined(NO_GRAPHICS) || defined(OFFSCREEN_RENDER)
 			if (num_args >= 6) {
 				char _mctf_name_buf[512];
 				const char* inst_name = "";
@@ -58675,7 +58677,7 @@ void actionCallMethod(SWFAppContext* app_context, char* str_buffer)
 		{
 			// attachMovie(linkageId, newName, depth [, initObject])
 			// Instantiates an exported library symbol as a child clip
-#ifdef NO_GRAPHICS
+#if defined(NO_GRAPHICS) || defined(OFFSCREEN_RENDER)
 			if (num_args >= 3) {
 				char _am_id_buf[512], _am_name_buf[512];
 				const char* linkage_id = "";
@@ -59027,7 +59029,7 @@ void actionCallMethod(SWFAppContext* app_context, char* str_buffer)
 			// duplicateMovieClip(target, depth [, initObject])
 			// Clones this MC to a new name/depth, optionally applying initObject properties.
 			// Returns the new MovieClip.
-#ifdef NO_GRAPHICS
+#if defined(NO_GRAPHICS) || defined(OFFSCREEN_RENDER)
 			if (num_args >= 2) {
 				// Coerce args[0] to string — Ruffle uses coerce_to_string which turns
 				// null → "null", undefined → "undefined" (SWF≥7) or "" (SWF<7), numbers
@@ -59131,7 +59133,7 @@ void actionCallMethod(SWFAppContext* app_context, char* str_buffer)
 		{
 			// setTextFormat(fmt) / setTextFormat(begin, fmt) / setTextFormat(begin, end, fmt)
 			// In Flash, setTextFormat does NOT change the textColor property
-#ifdef NO_GRAPHICS
+#if defined(NO_GRAPHICS) || defined(OFFSCREEN_RENDER)
 			// Extract font info from the TextFormat for textWidth/textHeight computation
 			{
 				ActionVar* fmt_arg = NULL;
@@ -59413,7 +59415,7 @@ void actionCallMethod(SWFAppContext* app_context, char* str_buffer)
 		}
 		else if (method_name_len == 16 && strncasecmp(method_name, "setNewTextFormat", 16) == 0)
 		{
-#ifdef NO_GRAPHICS
+#if defined(NO_GRAPHICS) || defined(OFFSCREEN_RENDER)
 			// setNewTextFormat(fmt): set the default format for newly-typed text
 			if (num_args >= 1 && args[0].type == ACTION_STACK_VALUE_OBJECT && args[0].data.numeric_value != 0) {
 				ASObject* fmt_obj = (ASObject*) args[0].data.numeric_value;
@@ -59519,7 +59521,7 @@ void actionCallMethod(SWFAppContext* app_context, char* str_buffer)
 		}
 		else if (method_name_len == 13 && strncasecmp(method_name, "getTextFormat", 13) == 0)
 		{
-#ifdef NO_GRAPHICS
+#if defined(NO_GRAPHICS) || defined(OFFSCREEN_RENDER)
 			int tf_idx = mc->ng_textfield_idx;
 			// getTextFormat(beginIndex, endIndex): if range is zero-length, return all-null
 			int force_null = 0;
@@ -59674,7 +59676,7 @@ void actionCallMethod(SWFAppContext* app_context, char* str_buffer)
 		}
 		else if (method_name_len == 16 && strncasecmp(method_name, "getNewTextFormat", 16) == 0)
 		{
-#ifdef NO_GRAPHICS
+#if defined(NO_GRAPHICS) || defined(OFFSCREEN_RENDER)
 			int tf_idx = mc->ng_textfield_idx;
 			// Compute HTML-aware alignment override (SWF7/SWF8 behavior differ)
 			int html_align_override_ntf = -1; // default: use tag-defined align
@@ -59721,7 +59723,7 @@ void actionCallMethod(SWFAppContext* app_context, char* str_buffer)
 		}
 		else if (method_name_len == 10 && strncasecmp(method_name, "replaceSel", 10) == 0)
 		{
-#ifdef NO_GRAPHICS
+#if defined(NO_GRAPHICS) || defined(OFFSCREEN_RENDER)
 			// replaceSel(newText): replace selected text range [begin, end) with newText.
 			// Uses global selection indices (g_selection_begin, g_selection_end).
 			// If this MC is not the focused textfield or selection is unset, defaults to position 0.
@@ -59849,7 +59851,7 @@ void actionCallMethod(SWFAppContext* app_context, char* str_buffer)
 		{
 			// Return the ActionScript depth of this clip
 			if (args != NULL) FREE(args);
-#ifdef NO_GRAPHICS
+#if defined(NO_GRAPHICS) || defined(OFFSCREEN_RENDER)
 			// Shape / morph / static-text placements allow property access but
 			// are not real scriptable display objects — getDepth returns undefined.
 			// Two cases: (a) a shape has its own cached MC (rare), (b) the
@@ -60104,7 +60106,7 @@ void actionCallMethod(SWFAppContext* app_context, char* str_buffer)
 						_target->depth = _tmp;
 						mc->depth_swapped = 1;
 						_target->depth_swapped = 1;
-#ifdef NO_GRAPHICS
+#if defined(NO_GRAPHICS) || defined(OFFSCREEN_RENDER)
 						if (mc->name[0] && _target->name[0]) {
 							// Try a full display list swap first
 							ng_swapDisplayDepths(mc->name, _target->name);
@@ -60172,7 +60174,7 @@ void actionCallMethod(SWFAppContext* app_context, char* str_buffer)
 						_target_mc->depth = _tmp;
 						mc->depth_swapped = 1;
 						_target_mc->depth_swapped = 1;
-#ifdef NO_GRAPHICS
+#if defined(NO_GRAPHICS) || defined(OFFSCREEN_RENDER)
 						if (mc->name[0] && _target_mc->name[0])
 							ng_swapDisplayDepths(mc->name, _target_mc->name);
 #endif
@@ -60207,7 +60209,7 @@ void actionCallMethod(SWFAppContext* app_context, char* str_buffer)
 			}
 			mc->depth = _new_depth;
 			mc->depth_swapped = 1;
-#ifdef NO_GRAPHICS
+#if defined(NO_GRAPHICS) || defined(OFFSCREEN_RENDER)
 			if (mc->name[0])
 				ng_updateDisplayDepth(mc->name, _new_depth);
 #endif
@@ -60227,7 +60229,7 @@ void actionCallMethod(SWFAppContext* app_context, char* str_buffer)
 			// undefined and calling undefined() yields undefined.
 			// Returns the MovieClip at the given depth, or the parent MC for non-MC objects,
 			// or undefined if no object at that depth.
-#ifdef NO_GRAPHICS
+#if defined(NO_GRAPHICS) || defined(OFFSCREEN_RENDER)
 			if (num_args == 0 || args[0].type == ACTION_STACK_VALUE_UNDEFINED ||
 			    args[0].type == ACTION_STACK_VALUE_NULL) {
 				if (args != NULL) FREE(args);
@@ -60349,7 +60351,7 @@ void actionCallMethod(SWFAppContext* app_context, char* str_buffer)
 				return;
 			}
 
-#ifdef NO_GRAPHICS
+#if defined(NO_GRAPHICS) || defined(OFFSCREEN_RENDER)
 			{
 				extern DisplayObject* display_list;
 				extern size_t max_depth;
@@ -60686,7 +60688,7 @@ void actionCallMethod(SWFAppContext* app_context, char* str_buffer)
 			ActionVar ht_args[3] = {0};
 			for (int hi = 0; hi < num_args && hi < 3; hi++) ht_args[hi] = args[hi];
 			if (args != NULL) FREE(args);
-#ifdef NO_GRAPHICS
+#if defined(NO_GRAPHICS) || defined(OFFSCREEN_RENDER)
 			{
 				extern DisplayObject* display_list;
 				extern size_t max_depth;
@@ -61509,7 +61511,7 @@ void actionCallMethod(SWFAppContext* app_context, char* str_buffer)
 			ASObject* _ltg_pt = (ASObject*) args[0].data.numeric_value;
 			if (args != NULL) FREE(args);
 			if (_ltg_pt == NULL) { pushUndefined(app_context); return; }
-#ifdef NO_GRAPHICS
+#if defined(NO_GRAPHICS) || defined(OFFSCREEN_RENDER)
 			{
 				ActionVar* _ltg_xv = getProperty(_ltg_pt, "x", 1);
 				ActionVar* _ltg_yv = getProperty(_ltg_pt, "y", 1);
@@ -61571,7 +61573,7 @@ void actionCallMethod(SWFAppContext* app_context, char* str_buffer)
 			ASObject* _gtl_pt = (ASObject*) args[0].data.numeric_value;
 			if (args != NULL) FREE(args);
 			if (_gtl_pt == NULL) { pushUndefined(app_context); return; }
-#ifdef NO_GRAPHICS
+#if defined(NO_GRAPHICS) || defined(OFFSCREEN_RENDER)
 			{
 				ActionVar* _gtl_xv = getProperty(_gtl_pt, "x", 1);
 				ActionVar* _gtl_yv = getProperty(_gtl_pt, "y", 1);
@@ -61667,7 +61669,7 @@ void actionCallMethod(SWFAppContext* app_context, char* str_buffer)
 				// directly here to suppress timeline PlaceObject MOVE updates on the
 				// dragged clip (and persist post-stopDrag — Flash semantics).
 				markTransformedByScript(mc);
-#ifdef NO_GRAPHICS
+#if defined(NO_GRAPHICS) || defined(OFFSCREEN_RENDER)
 				g_drag_virt_x = app_context->mouse.stage_x;
 				g_drag_virt_y = app_context->mouse.stage_y;
 				snprintf(g_drag_target_name, sizeof(g_drag_target_name), "%s", mc->name);
@@ -61771,7 +61773,7 @@ void actionCallMethod(SWFAppContext* app_context, char* str_buffer)
 		else if (method_name_len == 15 && strncasecmp(method_name, "removeMovieClip", 15) == 0)
 		{
 			if (args != NULL) FREE(args);
-#ifdef NO_GRAPHICS
+#if defined(NO_GRAPHICS) || defined(OFFSCREEN_RENDER)
 			// Only dynamically-created clips at removable AS depths [0, 2130690032) can be removed.
 			// Timeline-placed clips (negative depth) and reserved-range clips are immune.
 			#define AVM_MAX_REMOVE_DEPTH 2130690032
@@ -62685,7 +62687,7 @@ void actionStartDrag(SWFAppContext* app_context)
 		dragged_target = NULL;
 	}
 
-#ifdef NO_GRAPHICS
+#if defined(NO_GRAPHICS) || defined(OFFSCREEN_RENDER)
 	// Initialize virtual drag position to current mouse position.
 	// For lock_center=true, the clip center tracks the mouse exactly.
 	g_drag_virt_x = app_context->mouse.stage_x;
@@ -63015,7 +63017,7 @@ static int mc_get_track_as_menu_ng(MovieClip* mc)
 	return 0;
 }
 
-// (was: #ifdef NO_GRAPHICS — also un-gated for AS2 mouse dispatch)
+// (was: #if defined(NO_GRAPHICS) || defined(OFFSCREEN_RENDER) — also un-gated for AS2 mouse dispatch)
 
 // Invoke a named AS2 event handler (onPress, onRelease, onDragOver, ...) stored
 // in mc->dynamic_props, with `this` bound to mc.
@@ -63217,7 +63219,7 @@ int actionMCMouseInsidePick(MovieClip* mc, float mx, float my)
 	return (mx >= x1 && mx <= x2 && my >= y1 && my <= y2);
 }
 
-// (was: #ifdef NO_GRAPHICS — un-gated to expose AS2 mouse dispatch / focus / text-field handling in graphics builds)
+// (was: #if defined(NO_GRAPHICS) || defined(OFFSCREEN_RENDER) — un-gated to expose AS2 mouse dispatch / focus / text-field handling in graphics builds)
 
 // Whether any ancestor of this MC is button-mode AND its hit area contains
 // the mouse. When true, that ancestor "catches" mouse events as a unit
@@ -64230,7 +64232,7 @@ void actionUpdateHighlightState(void)
 // ng_getDisplayEntryBounds, and getConcatMatrixForMC, all of which depend
 // on tag_stubs.c helpers that aren't in the graphics build. swf.c provides
 // a stub returning 0 for graphics mode.
-#ifdef NO_GRAPHICS
+#if defined(NO_GRAPHICS) || defined(OFFSCREEN_RENDER)
 int actionGetFocusRectInfo(FocusRectInfo* out)
 {
 	if (g_focused_mc == NULL) return 0;

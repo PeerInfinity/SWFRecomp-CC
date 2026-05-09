@@ -45,8 +45,8 @@ float (*ng_getMovieTransformData(u8 movie_id))[16] {
 	return g_movie_transform_data[movie_id];
 }
 
-#if defined(NO_GRAPHICS) || defined(HEADLESS_GRAPHICS)
-// NO_GRAPHICS / HEADLESS: extern data arrays from generated code
+#if defined(NO_GRAPHICS) || defined(HEADLESS_GRAPHICS) || defined(OFFSCREEN_RENDER)
+// NO_GRAPHICS / HEADLESS / graphics-native: extern data arrays from generated code
 extern float transform_data[][16];
 extern float cxform_data[];
 
@@ -91,7 +91,12 @@ size_t g_place_gen = 0;
 // NOT bumped by swapDepths — depth changes, instantiation order is preserved.
 size_t g_place_seq = 0;
 
-#ifdef NO_GRAPHICS
+// Frame-helper machinery used by both NO_GRAPHICS / HEADLESS frame loops
+// (swf_core.c, swf_headless.c) and the new --mode=graphics native build
+// (swf.c with OFFSCREEN_RENDER). HEADLESS_GRAPHICS implies both NO_GRAPHICS
+// and OFFSCREEN_RENDER, so this gate covers all three modes. wasm graphics
+// still uses the #else stubs in graphics_stubs.c.
+#if defined(NO_GRAPHICS) || defined(OFFSCREEN_RENDER)
 // Tracks the currently-executing sprite's DisplayObject.
 // Set by advance_sprite_frames before each sprite frame function call.
 DisplayObject* g_current_sprite_obj = NULL;
@@ -195,7 +200,7 @@ static int g_eager_init_depth = 0;
 // Key test: avm1/issue_9885.
 static int g_button_state_change_depth = 0;
 
-#endif // NO_GRAPHICS
+#endif // NO_GRAPHICS || OFFSCREEN_RENDER
 
 // Snapshot of (depth → char_id) and (depth → instance_name) of a button's
 // children at the start of a state transition. tagPlaceObject2 consults this
@@ -238,7 +243,7 @@ static DisplayObject* g_btn_transient_dobj = NULL;
 static char*          g_btn_transient_names[BTN_STATE_SNAP_MAX]; // strdup'd, owned
 static size_t         g_btn_transient_count = 0;
 
-#ifdef NO_GRAPHICS
+#if defined(NO_GRAPHICS) || defined(OFFSCREEN_RENDER)
 
 int actionEagerInitActive(void) {
 	return g_eager_init_depth > 0 && g_button_state_change_depth == 0;
@@ -708,7 +713,7 @@ extern void exec_sprite_frame(SWFAppContext* app_context, DisplayObject* obj, fr
 
 // Public wrapper for process_sprite_needs_init (called from tag_stubs.c for
 // attachMovie'd sprite child initialization).
-#ifdef NO_GRAPHICS
+#if defined(NO_GRAPHICS) || defined(OFFSCREEN_RENDER)
 void process_sprite_needs_init_public(SWFAppContext* app_context, MovieClip* parent_mc)
 {
 	process_sprite_needs_init(app_context, parent_mc);
@@ -734,7 +739,7 @@ int g_advance_defer_nested = 0;
 // swapped to the sprite's list), recurse to advance any nested sprites.
 void advance_sprite_frames(SWFAppContext* app_context)
 {
-#ifdef NO_GRAPHICS
+#if defined(NO_GRAPHICS) || defined(OFFSCREEN_RENDER)
 	if (catch_up_mode) return;
 #endif
 
@@ -1006,7 +1011,7 @@ void advance_sprite_frames(SWFAppContext* app_context)
 		// Mark eligible for AS2 onEnterFrame dispatch (sprite actually advanced)
 		obj->enterframe_eligible = 1;
 
-#ifdef NO_GRAPHICS
+#if defined(NO_GRAPHICS) || defined(OFFSCREEN_RENDER)
 		// Initialize any children placed by the frame function (deferred Phase 2
 		// scripts from eager init). Sprite frame functions don't have tagShowFrame,
 		// so process_sprite_needs_init must be called explicitly here.
@@ -1073,7 +1078,7 @@ void advance_sprite_frames(SWFAppContext* app_context)
 // g_advance_defer_nested is 0).
 void advance_nested_sprite_frames(SWFAppContext* app_context)
 {
-#ifdef NO_GRAPHICS
+#if defined(NO_GRAPHICS) || defined(OFFSCREEN_RENDER)
 	if (catch_up_mode) return;
 #endif
 
@@ -2318,7 +2323,7 @@ void tagFlushPendingEnterFrame(SWFAppContext* app_context)
 	if (!g_enterframe_flush_pending) return;
 	g_enterframe_flush_pending = 0;
 
-#ifdef NO_GRAPHICS
+#if defined(NO_GRAPHICS) || defined(OFFSCREEN_RENDER)
 	// Mark (but don't clear display_list) any MCs queued for finalize, so
 	// ENTER_FRAME skips MCs being removed by tag-stream tagRemoveObject2 in
 	// this frame. The clear (which frees sprite_display_list and would dangle
@@ -2769,7 +2774,7 @@ void tagRerenderFrame(SWFAppContext* app_context)
 
 void tagShowFrame(SWFAppContext* app_context)
 {
-#ifdef NO_GRAPHICS
+#if defined(NO_GRAPHICS) || defined(OFFSCREEN_RENDER)
 	if (g_tag_skip_mode) return;
 	if (g_in_action_call) return;
 
@@ -2896,6 +2901,21 @@ void tagShowFrame(SWFAppContext* app_context)
 		g_root_enterframe_eligible = 1;
 	}
 #else
+#  ifdef OFFSCREEN_RENDER
+	// graphics-native: run sprite-init for newly placed sprites BEFORE
+	// advance_sprite_frames, so their MovieClip entries exist when
+	// actionFindMovieClipByName looks them up during the first frame func.
+	// NO_GRAPHICS does the equivalent above (around line 2846); the wasm
+	// graphics build relies on no-op stubs in graphics_stubs.c and skips
+	// this — sprite-relative scripts in wasm graphics still run in root
+	// context.
+	{
+		extern MovieClip* g_current_context;
+		MovieClip* _si_parent = (g_current_context != NULL) ? g_current_context : &root_movieclip;
+		process_sprite_needs_init(app_context, _si_parent);
+	}
+#  endif
+
 	// --- Advance sprite timelines (recursive) ---
 	advance_sprite_frames(app_context);
 
@@ -3282,7 +3302,7 @@ void tagShowFrame(SWFAppContext* app_context)
 	g_place_gen++;
 }
 
-#ifdef NO_GRAPHICS
+#if defined(NO_GRAPHICS) || defined(OFFSCREEN_RENDER)
 // ---------------------------------------------------------------------------
 // Sprite content bounds helper (in LOCAL twips of the sprite's own space)
 // ---------------------------------------------------------------------------
@@ -3952,7 +3972,7 @@ void tagDefineShape(SWFAppContext* app_context, CharacterType type, size_t char_
 	dictionary[char_id].shape_offset = shape_offset;
 	dictionary[char_id].size = shape_size;
 
-#ifdef NO_GRAPHICS
+#if defined(NO_GRAPHICS) || defined(OFFSCREEN_RENDER)
 	ng_record_char_bounds(char_id, bounds_xmin, bounds_xmax, bounds_ymin, bounds_ymax);
 #else
 	(void)bounds_xmin; (void)bounds_xmax; (void)bounds_ymin; (void)bounds_ymax;
@@ -3975,7 +3995,7 @@ void tagDefineMorphShape(SWFAppContext* app_context, size_t char_id,
 	dictionary[char_id].morph_color_start = morph_color_start;
 	dictionary[char_id].morph_color_count = morph_color_count;
 
-#ifdef NO_GRAPHICS
+#if defined(NO_GRAPHICS) || defined(OFFSCREEN_RENDER)
 	ng_record_char_bounds(char_id, bounds_xmin, bounds_xmax, bounds_ymin, bounds_ymax);
 	ng_record_morph_end_bounds(char_id, end_bounds_xmin, end_bounds_xmax, end_bounds_ymin, end_bounds_ymax);
 #else
@@ -4004,7 +4024,7 @@ void tagDefineText(SWFAppContext* app_context, size_t char_id, size_t text_start
 		dictionary[char_id].text_size = text_size;
 		dictionary[char_id].transform_start = transform_start;
 		dictionary[char_id].cxform_id = cxform_id;
-#ifdef NO_GRAPHICS
+#if defined(NO_GRAPHICS) || defined(OFFSCREEN_RENDER)
 		ng_record_char_bounds(char_id, bounds_xmin, bounds_xmax, bounds_ymin, bounds_ymax);
 #else
 		(void)bounds_xmin; (void)bounds_xmax; (void)bounds_ymin; (void)bounds_ymax;
@@ -4019,7 +4039,7 @@ void tagDefineEditTextProps(SWFAppContext* app_context, size_t char_id,
     const char* variable_name, u16 flags,
     s32 bounds_xmin, s32 bounds_xmax, s32 bounds_ymin, s32 bounds_ymax)
 {
-#ifdef NO_GRAPHICS
+#if defined(NO_GRAPHICS) || defined(OFFSCREEN_RENDER)
 	ng_record_textfield_props(app_context, char_id, plain_text, raw_html_text, text_color,
 		font_id, font_height, max_length,
 		align, left_margin, right_margin, indent, leading,
@@ -4040,7 +4060,7 @@ void tagDefineEditTextProps(SWFAppContext* app_context, size_t char_id,
 void tagCSMTextSettings(size_t text_id, const char* anti_alias_type, const char* grid_fit_type,
     float thickness, float sharpness)
 {
-#ifdef NO_GRAPHICS
+#if defined(NO_GRAPHICS) || defined(OFFSCREEN_RENDER)
 	ng_record_csm(text_id, anti_alias_type, grid_fit_type, thickness, sharpness);
 #else
 	(void)text_id; (void)anti_alias_type; (void)grid_fit_type;
@@ -4072,7 +4092,7 @@ int g_skip_pending_removal_mc = 0;  // When set, findOrCreateMovieClip skips pen
 // tagPlaceObject2 call site (constructors now queue through the ActionQueue
 // at placement time); this helper is still called from ng_fire_child_constructors
 // for the attachMovie AS-level path, which follows a different flow.
-#ifdef NO_GRAPHICS
+#if defined(NO_GRAPHICS) || defined(OFFSCREEN_RENDER)
 static void fire_eager_constructors(SWFAppContext* app_context, DisplayObject* dl, size_t dl_max, MovieClip* parent_mc)
 {
 	extern const char* ng_lookupExportName(size_t char_id);
@@ -4111,7 +4131,7 @@ static void fire_eager_constructors(SWFAppContext* app_context, DisplayObject* d
 }
 #endif
 
-#ifdef NO_GRAPHICS
+#if defined(NO_GRAPHICS) || defined(OFFSCREEN_RENDER)
 // Phase 4 of ACTION_QUEUE_PLAN: CLIP_EVENT_INITIALIZE handlers are routed
 // through the unified ActionQueue at AQ_PRIORITY_INITIALIZE / AQ_KIND_CLIP_INIT.
 //
@@ -4445,12 +4465,12 @@ void ng_queue_slot_unload_events(SWFAppContext* app_context, size_t depth, Movie
 
 void tagPlaceObject2(SWFAppContext* app_context, size_t depth, size_t char_id, u32 transform_id, u32 cxform_id, u16 clip_depth)
 {
-#ifdef NO_GRAPHICS
+#if defined(NO_GRAPHICS) || defined(OFFSCREEN_RENDER)
 	if (g_tag_skip_mode) return;
 #endif
 	ENSURE_SIZE(display_list, depth, display_list_capacity, sizeof(DisplayObject));
 
-#ifdef NO_GRAPHICS
+#if defined(NO_GRAPHICS) || defined(OFFSCREEN_RENDER)
 	// In script_only_mode (Phase 2), placement is already done from Phase 1 — skip entirely.
 	if (g_script_only_mode) return;
 
@@ -4528,7 +4548,7 @@ void tagPlaceObject2(SWFAppContext* app_context, size_t depth, size_t char_id, u
 		// incorrectly remove the object during backward goto catch-up.
 		init_cx_fields(&display_list[depth]);
 		if (depth > max_depth) max_depth = depth;
-#ifdef NO_GRAPHICS
+#if defined(NO_GRAPHICS) || defined(OFFSCREEN_RENDER)
 		// Skip caching the new transform when it was rejected above so the
 		// cached x/y/xscale/yscale on the DisplayObject continue to reflect the
 		// AS-set values.
@@ -4552,7 +4572,7 @@ void tagPlaceObject2(SWFAppContext* app_context, size_t depth, size_t char_id, u
 		return;
 	}
 
-#ifdef NO_GRAPHICS
+#if defined(NO_GRAPHICS) || defined(OFFSCREEN_RENDER)
 	// During backward goto catch-up, if the same character is already at this depth,
 	// preserve it (update transform only) instead of destroying and re-creating.
 	// Flash preserves existing child movieclips during backward goto; their scripts
@@ -4791,7 +4811,7 @@ void tagPlaceObject2(SWFAppContext* app_context, size_t depth, size_t char_id, u
 	    && display_list[depth].place_gen != g_place_gen)
 	{
 		display_list[depth].transform_id = transform_id;
-#ifdef NO_GRAPHICS
+#if defined(NO_GRAPHICS) || defined(OFFSCREEN_RENDER)
 		ng_cache_transform(&display_list[depth], transform_id);
 #endif
 		display_list[depth].cxform_id = cxform_id;
@@ -4806,7 +4826,7 @@ void tagPlaceObject2(SWFAppContext* app_context, size_t depth, size_t char_id, u
 		return;
 	}
 
-#ifdef NO_GRAPHICS
+#if defined(NO_GRAPHICS) || defined(OFFSCREEN_RENDER)
 	// Cross-frame sprite-by-sprite REPLACE preservation. When the existing depth holds
 	// a sprite placed by a previous frame, and a different sprite char_id is being
 	// placed by the current frame's PlaceObject2/3 with move=1+has_character=1, Flash/
@@ -4871,7 +4891,7 @@ void tagPlaceObject2(SWFAppContext* app_context, size_t depth, size_t char_id, u
 		}
 		// Same character at same depth in same frame: treat as modify (don't re-init)
 		display_list[depth].transform_id = transform_id;
-#ifdef NO_GRAPHICS
+#if defined(NO_GRAPHICS) || defined(OFFSCREEN_RENDER)
 		ng_cache_transform(&display_list[depth], transform_id);
 #endif
 		display_list[depth].cxform_id = cxform_id;
@@ -4897,7 +4917,7 @@ void tagPlaceObject2(SWFAppContext* app_context, size_t depth, size_t char_id, u
 
 	display_list[depth].char_id = char_id;
 	display_list[depth].transform_id = transform_id;
-#ifdef NO_GRAPHICS
+#if defined(NO_GRAPHICS) || defined(OFFSCREEN_RENDER)
 	ng_cache_transform(&display_list[depth], transform_id);
 #endif
 	display_list[depth].cxform_id = cxform_id;
@@ -4968,7 +4988,7 @@ void tagPlaceObject2(SWFAppContext* app_context, size_t depth, size_t char_id, u
 		max_depth = depth;
 	}
 
-#ifdef NO_GRAPHICS
+#if defined(NO_GRAPHICS) || defined(OFFSCREEN_RENDER)
 	ng_on_place_object2(app_context, depth, char_id);
 
 	// Consume pending clip actions (set by WithClipActions variants).
@@ -5133,7 +5153,7 @@ void tagPlaceObject2(SWFAppContext* app_context, size_t depth, size_t char_id, u
 void tagPlaceObject2WithClipActions(SWFAppContext* app_context, size_t depth, size_t char_id,
     u32 transform_id, u32 cxform_id, u16 clip_depth, ClipAction* clip_actions, size_t clip_action_count)
 {
-#ifdef NO_GRAPHICS
+#if defined(NO_GRAPHICS) || defined(OFFSCREEN_RENDER)
 	if (g_tag_skip_mode) return;
 #endif
 	// Set pending so tagPlaceObject2 attaches them before eager init
@@ -5158,12 +5178,12 @@ void tagSetClipActions(SWFAppContext* app_context, size_t depth, ClipAction* cli
 void tagPlaceObject2Ratio(SWFAppContext* app_context, size_t depth, size_t char_id,
     u32 transform_id, u32 cxform_id, u16 clip_depth, u16 ratio)
 {
-#ifdef NO_GRAPHICS
+#if defined(NO_GRAPHICS) || defined(OFFSCREEN_RENDER)
 	if (g_tag_skip_mode) return;
 #endif
 	ENSURE_SIZE(display_list, depth, display_list_capacity, sizeof(DisplayObject));
 
-#ifdef NO_GRAPHICS
+#if defined(NO_GRAPHICS) || defined(OFFSCREEN_RENDER)
 	// During backward goto catch-up, preserve existing sprite at same depth/char
 	{
 		extern int catch_up_backward;
@@ -5299,7 +5319,7 @@ void tagPlaceObject2Ratio(SWFAppContext* app_context, size_t depth, size_t char_
 		// Update only the fields that PlaceObject2 can modify
 		if (transform_id != 0) {
 			display_list[depth].transform_id = transform_id;
-#ifdef NO_GRAPHICS
+#if defined(NO_GRAPHICS) || defined(OFFSCREEN_RENDER)
 			ng_cache_transform(&display_list[depth], transform_id);
 #endif
 		}
@@ -5312,7 +5332,7 @@ void tagPlaceObject2Ratio(SWFAppContext* app_context, size_t depth, size_t char_
 		return;
 	}
 
-#ifdef NO_GRAPHICS
+#if defined(NO_GRAPHICS) || defined(OFFSCREEN_RENDER)
 	// Cross-frame sprite-by-sprite REPLACE preservation — see tagPlaceObject2 above
 	// for rationale (Ruffle PlaceObjectAction::Replace; replace_with is noop for
 	// MovieClip; apply_place_object updates only matrix/cxform/ratio).
@@ -5349,7 +5369,7 @@ void tagPlaceObject2Ratio(SWFAppContext* app_context, size_t depth, size_t char_
 
 	display_list[depth].char_id = char_id;
 	display_list[depth].transform_id = transform_id;
-#ifdef NO_GRAPHICS
+#if defined(NO_GRAPHICS) || defined(OFFSCREEN_RENDER)
 	ng_cache_transform(&display_list[depth], transform_id);
 #endif
 	display_list[depth].cxform_id = cxform_id;
@@ -5407,7 +5427,7 @@ void tagPlaceObject2Ratio(SWFAppContext* app_context, size_t depth, size_t char_
 		max_depth = depth;
 	}
 
-#ifdef NO_GRAPHICS
+#if defined(NO_GRAPHICS) || defined(OFFSCREEN_RENDER)
 	ng_on_place_object2(app_context, depth, char_id);
 
 	// Consume pending clip actions (set by WithClipActions variants).
@@ -5554,7 +5574,7 @@ void tagPlaceObject2Ratio(SWFAppContext* app_context, size_t depth, size_t char_
 void tagPlaceObject2RatioWithClipActions(SWFAppContext* app_context, size_t depth, size_t char_id,
     u32 transform_id, u32 cxform_id, u16 clip_depth, u16 ratio, ClipAction* clip_actions, size_t clip_action_count)
 {
-#ifdef NO_GRAPHICS
+#if defined(NO_GRAPHICS) || defined(OFFSCREEN_RENDER)
 	if (g_tag_skip_mode) return;
 #endif
 	// Set pending so tagPlaceObject2Ratio attaches them before eager init
@@ -5575,7 +5595,7 @@ void tagReplaceObject2RatioWithClipActions(SWFAppContext* app_context, size_t de
     ClipAction* old_clip_actions, size_t old_clip_action_count,
     ClipAction* new_clip_actions, size_t new_clip_action_count)
 {
-#ifdef NO_GRAPHICS
+#if defined(NO_GRAPHICS) || defined(OFFSCREEN_RENDER)
 	char* saved_name = display_list[depth].instance_name;
 	if (saved_name != NULL) {
 		// Check if old MC has unload handler (clip_actions UNLOAD or AS-level onUnload).
@@ -5612,7 +5632,7 @@ void tagReplaceObject2RatioWithClipActions(SWFAppContext* app_context, size_t de
 	// Place the new clip (clears all fields including clip_actions)
 	tagPlaceObject2Ratio(app_context, depth, char_id, transform_id, cxform_id, clip_depth, ratio);
 
-#ifdef NO_GRAPHICS
+#if defined(NO_GRAPHICS) || defined(OFFSCREEN_RENDER)
 	// Ensure the NEW clip MC is created in the cache so actionMarkMCPendingRemoval
 	// can find it when this entry is later removed from the display list.
 	// Keep g_skip_pending_removal_mc=1 so we create a fresh MC (not reuse the old one).
@@ -5641,7 +5661,7 @@ void tagReplaceObject2RatioWithClipActions(SWFAppContext* app_context, size_t de
 //   - typeof / _root.mc lookups via display_list iteration still find the MC
 //     by name (instance_name stays populated until finalize).
 // For MCs WITHOUT unload handlers, both run inline (no handler to wait for).
-#ifdef NO_GRAPHICS
+#if defined(NO_GRAPHICS) || defined(OFFSCREEN_RENDER)
 #define NG_PENDING_FINALIZE_CAP 256
 typedef struct {
 	MovieClip* mc;
@@ -5860,7 +5880,7 @@ void tagRemoveObject(SWFAppContext* app_context, size_t depth)
 {
 	if (depth <= max_depth && display_list[depth].char_id != 0)
 	{
-#ifdef NO_GRAPHICS
+#if defined(NO_GRAPHICS) || defined(OFFSCREEN_RENDER)
 		// Defer removal during catch_up_mode for entries with UNLOAD handlers
 		// (same rationale as tagRemoveObject2 — see comment there).
 		if (catch_up_mode)
@@ -5884,7 +5904,7 @@ void tagRemoveObject(SWFAppContext* app_context, size_t depth)
 		// Queue accumulated clip actions (from prior Remove+Replace cycle) first.
 		// Snapshot the action_fn pointer (recompiler-emitted static code) so
 		// dropping the accumulated_clip_actions array reference is safe.
-#ifdef NO_GRAPHICS
+#if defined(NO_GRAPHICS) || defined(OFFSCREEN_RENDER)
 		MovieClip* _ro_parent_mc1 = NULL;
 		if (display_list[depth].instance_name != NULL)
 			_ro_parent_mc1 = actionFindOrCreateMovieClip(app_context, display_list[depth].instance_name, &root_movieclip);
@@ -5908,7 +5928,7 @@ void tagRemoveObject(SWFAppContext* app_context, size_t depth)
 					actionQueueClipActionUnload(display_list[depth].clip_actions[a].action, _ro_parent_mc1);
 			}
 		}
-#ifdef NO_GRAPHICS
+#if defined(NO_GRAPHICS) || defined(OFFSCREEN_RENDER)
 		// See tagRemoveObject2 for the rationale.
 		int _ro1_has_unload = 0;
 		MovieClip* _ro1_mc = _ro_parent_mc1;
@@ -5939,12 +5959,12 @@ void tagRemoveObject(SWFAppContext* app_context, size_t depth)
 
 void tagRemoveObject2(SWFAppContext* app_context, size_t depth)
 {
-#ifdef NO_GRAPHICS
+#if defined(NO_GRAPHICS) || defined(OFFSCREEN_RENDER)
 	if (g_tag_skip_mode) return;
 #endif
 	if (depth <= max_depth && display_list[depth].char_id != 0)
 	{
-#ifdef NO_GRAPHICS
+#if defined(NO_GRAPHICS) || defined(OFFSCREEN_RENDER)
 		// During backward catch-up, the replay loop runs frames 0..target. PlaceObject2
 		// at frame X re-asserts entries; RemoveObject2 at frame Y > X must take effect
 		// so the post-replay display list reflects target's actual state. Only protect
@@ -6044,7 +6064,7 @@ void tagRemoveObject2(SWFAppContext* app_context, size_t depth)
 			if (has_child_unload_cu) return;
 		}
 #endif
-#ifdef NO_GRAPHICS
+#if defined(NO_GRAPHICS) || defined(OFFSCREEN_RENDER)
 		MovieClip* _remove_parent_mc = NULL;
 		if (display_list[depth].instance_name != NULL)
 			_remove_parent_mc = actionFindOrCreateMovieClip(app_context, display_list[depth].instance_name, &root_movieclip);
@@ -6061,7 +6081,7 @@ void tagRemoveObject2(SWFAppContext* app_context, size_t depth)
 			}
 		}
 		// Queue CLIP_EVENT_UNLOAD for children first (recursive, depth-first)
-#ifdef NO_GRAPHICS
+#if defined(NO_GRAPHICS) || defined(OFFSCREEN_RENDER)
 		if (display_list[depth].sprite_display_list != NULL && display_list[depth].sprite_max_depth > 0)
 		{
 			fire_recursive_child_unloads(app_context,
@@ -6087,7 +6107,7 @@ void tagRemoveObject2(SWFAppContext* app_context, size_t depth)
 					actionQueueClipActionUnload(display_list[depth].clip_actions[a].action, _remove_parent_mc);
 			}
 		}
-#ifdef NO_GRAPHICS
+#if defined(NO_GRAPHICS) || defined(OFFSCREEN_RENDER)
 		// Compute has_unload to decide finalization path:
 		//  - has_unload=1: queue AS-level handler (lookup at queue time);
 		//    defer Mark to post-drain finalize so the MC stays !pending_removal
@@ -6122,7 +6142,7 @@ void tagRemoveObject2(SWFAppContext* app_context, size_t depth)
 		clear_display_entry(app_context, depth);
 #endif
 	}
-#ifdef NO_GRAPHICS
+#if defined(NO_GRAPHICS) || defined(OFFSCREEN_RENDER)
 	else
 	{
 		// Display list slot is empty. A duplicateMovieClip clone swapped
@@ -6302,7 +6322,7 @@ void tagDefineButton(SWFAppContext* app_context, size_t char_id, frame_func* sta
 	dictionary[char_id].button_actions = actions;
 	dictionary[char_id].button_action_count = action_count;
 
-#ifdef NO_GRAPHICS
+#if defined(NO_GRAPHICS) || defined(OFFSCREEN_RENDER)
 	ng_record_button(char_id);
 #endif
 }
@@ -6728,7 +6748,7 @@ const FilterListData* ng_getFilterListData(size_t entry_idx)
 void tagSetInstanceName(SWFAppContext* app_context, size_t depth, const char* name)
 {
 	(void)app_context;
-#ifdef NO_GRAPHICS
+#if defined(NO_GRAPHICS) || defined(OFFSCREEN_RENDER)
 	// In script_only_mode (Phase 2), display list is already set up from Phase 1 — skip.
 	if (g_script_only_mode) return;
 	// In tag_skip mode (deferred goto target-script replay), tags are no-ops.
@@ -6745,7 +6765,7 @@ void tagSetInstanceName(SWFAppContext* app_context, size_t depth, const char* na
 		g_pending_instance_name = name;
 		return;
 	}
-#ifdef NO_GRAPHICS
+#if defined(NO_GRAPHICS) || defined(OFFSCREEN_RENDER)
 	// Same-frame Remove+Place sequence at this depth with a NAME CHANGE:
 	// the prior tagRemoveObject2 queued a deferred finalize for the existing
 	// MC (it has an UNLOAD handler). display_list[depth] still holds the
@@ -6819,14 +6839,14 @@ void tagSetInstanceName(SWFAppContext* app_context, size_t depth, const char* na
 	{
 		char* old_name = display_list[depth].instance_name;
 		// Rename cached MC if it was previously given a different name (e.g. auto-assigned)
-#ifdef NO_GRAPHICS
+#if defined(NO_GRAPHICS) || defined(OFFSCREEN_RENDER)
 		if (old_name != NULL && strcmp(old_name, name) != 0)
 			actionRenameMovieClip(old_name, name);
 #endif
 		// Free auto-assigned name if we own it; reclaim counter slot if it was the last one
 		if (display_list[depth].instance_name_owned && old_name != NULL)
 		{
-#ifdef NO_GRAPHICS
+#if defined(NO_GRAPHICS) || defined(OFFSCREEN_RENDER)
 			ng_try_reclaim_auto_instance_name(old_name);
 #endif
 			free(old_name);
@@ -6842,7 +6862,7 @@ void tagSetInstanceName(SWFAppContext* app_context, size_t depth, const char* na
 		// the previous iteration's character.
 		g_pending_instance_name = name;
 
-#ifdef NO_GRAPHICS
+#if defined(NO_GRAPHICS) || defined(OFFSCREEN_RENDER)
 		// Invoke registered class constructor now that the instance name is set.
 		// This fires after tagPlaceObject2 (which did eager init) but before DoAction scripts.
 		if (!catch_up_mode && display_list[depth].sprite_needs_init
@@ -6934,7 +6954,7 @@ DisplayObject* findDisplayObjectByName(const char* name)
 
 void tagDefineFontInfo(SWFAppContext* app_context, u16 font_id, const char* name, int bold, int italic)
 {
-#ifdef NO_GRAPHICS
+#if defined(NO_GRAPHICS) || defined(OFFSCREEN_RENDER)
 	ng_record_font(app_context, font_id, name, bold, italic);
 #else
 	(void)app_context; (void)font_id; (void)name; (void)bold; (void)italic;
@@ -6945,7 +6965,7 @@ void tagDefineFontMetrics(SWFAppContext* app_context, u16 font_id,
     s16 ascent, s16 descent, s16 leading, int em_square,
     const u16* code_table, const s16* advance_table, size_t glyph_count)
 {
-#ifdef NO_GRAPHICS
+#if defined(NO_GRAPHICS) || defined(OFFSCREEN_RENDER)
 	ng_record_font_metrics(app_context, font_id, ascent, descent, leading, em_square,
 	    code_table, advance_table, glyph_count);
 #else
@@ -6956,7 +6976,7 @@ void tagDefineFontMetrics(SWFAppContext* app_context, u16 font_id,
 
 void tagDefineFontGlyphBase(u16 font_id, size_t glyph_base)
 {
-#ifdef NO_GRAPHICS
+#if defined(NO_GRAPHICS) || defined(OFFSCREEN_RENDER)
 	ng_record_font_glyph_base(font_id, glyph_base);
 #else
 	(void)font_id; (void)glyph_base;
@@ -6965,14 +6985,14 @@ void tagDefineFontGlyphBase(u16 font_id, size_t glyph_base)
 
 void tagDefineVideoStream(SWFAppContext* app_context, u16 char_id)
 {
-#ifdef NO_GRAPHICS
+#if defined(NO_GRAPHICS) || defined(OFFSCREEN_RENDER)
 	ng_record_video(app_context, char_id);
 #else
 	(void)app_context; (void)char_id;
 #endif
 }
 
-#ifdef NO_GRAPHICS
+#if defined(NO_GRAPHICS) || defined(OFFSCREEN_RENDER)
 // Returns 1 if any multi-frame sprite at root level is playing or has pending navigation.
 // A sprite with sprite_manual_next_frame=1 has a pending gotoAndStop/gotoAndPlay that
 // advance_sprite_frames must process, even if sprite_is_playing is false.
@@ -7056,7 +7076,7 @@ static void ng_run_deferred_sprite_init_impl(SWFAppContext* app_context, int fil
 // Called after attachMovie fires the parent's constructor so that child
 // constructors (e.g. "box" inside an attached "a" clip) fire immediately
 // during the attachMovie call, before any goto catch-up places new sprites.
-#ifdef NO_GRAPHICS
+#if defined(NO_GRAPHICS) || defined(OFFSCREEN_RENDER)
 void ng_fire_child_constructors(SWFAppContext* app_context, MovieClip* mc)
 {
 	if (mc == NULL || mc->display_obj == NULL) return;

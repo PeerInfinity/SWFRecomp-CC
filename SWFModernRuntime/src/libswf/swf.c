@@ -31,19 +31,36 @@ size_t g_frame_count = 0;
 // Drag state tracking
 int is_dragging = 0;
 char* dragged_target = NULL;
+float g_drag_virt_x = 0.0f;
+float g_drag_virt_y = 0.0f;
+char g_drag_target_name[256] = "";
 
 // Frame execution state — needed by tag.c sprite advancement
 int catch_up_mode = 0;
 int g_tag_skip_mode = 0;
+
+// Goto-catch-up state — full impls in swf_core.c (NO_GRAPHICS) and
+// swf_headless.c (HEADLESS). graphics-native (OFFSCREEN_RENDER) currently
+// stubs these as zero-init globals + no-op functions: GotoFrame inside
+// sprite scripts won't trigger catch-up. Phase 2 backport candidate.
+int goto_from_action = 0;
+int g_deferred_root_goto = 0;
+int g_skip_inline_target_script = 0;
+void ng_executeGotoCatchUp(SWFAppContext* app_context) { (void)app_context; }
+void ng_executeGotoTagsOnly(SWFAppContext* app_context) { (void)app_context; }
 
 Character* dictionary = NULL;
 
 DisplayObject* display_list = NULL;
 size_t max_depth = 0;
 
-// Dummy sprite object pointer — in graphics mode sprites are managed by the renderer.
-// action.c saves/restores this during function calls, so it needs to exist.
+// Dummy sprite object pointer for the wasm browser graphics build only —
+// in --mode=graphics native (OFFSCREEN_RENDER), tag.c's widened
+// (NO_GRAPHICS || OFFSCREEN_RENDER) arm provides the real one and defining
+// it here would conflict.
+#ifndef OFFSCREEN_RENDER
 DisplayObject* g_current_sprite_obj = NULL;
+#endif
 
 RenderContext* context;
 
@@ -387,14 +404,14 @@ void swfStart(SWFAppContext* app_context)
 	free(display_list);
 }
 
-// Focus rect stub — full implementation lives in action.c under #ifdef NO_GRAPHICS.
-// Real impl depends on getDisplayEntryIdxForMC / getConcatMatrixForMC, which
-// are still NO_GRAPHICS-only in action.c. Once those are un-gated this stub
-// can be removed and the real actionGetFocusRectInfo will link.
+// Focus rect stub — wasm graphics only. action.c's widened arm provides
+// the real impl in OFFSCREEN_RENDER (graphics-native).
+#ifndef OFFSCREEN_RENDER
 int actionGetFocusRectInfo(FocusRectInfo* out) {
 	(void)out;
 	return 0;
 }
+#endif
 
 // Default findMovieEntry stub when no child movies are linked
 #ifndef HAS_CHILD_MOVIES
