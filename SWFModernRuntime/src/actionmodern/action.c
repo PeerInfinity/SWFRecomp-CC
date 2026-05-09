@@ -20766,7 +20766,7 @@ static uint16_t* strip_html_tags_u16(SWFAppContext* app_context, const uint16_t*
 // =============================================
 // HTML Text Format Run System (definitions — types declared above)
 // =============================================
-#ifdef NO_GRAPHICS
+// (was: #ifdef NO_GRAPHICS — inner TF helpers, un-gated)
 static TFRunTable g_tf_run_tables[TF_MAX_TABLES];
 
 static TFRunTable* tf_get_table(MovieClip* mc) {
@@ -22220,7 +22220,7 @@ static void tf_get_plain_text(TFRunTable* table, char* out_buf, u32 out_buf_size
 static void tf_condense_white(TFRunTable* table, int swf_version) {
 	(void)table; (void)swf_version;
 }
-#endif // NO_GRAPHICS
+// (was: #endif — inner TF helpers)
 
 // Sync variable → all text fields bound to var_name
 // Called when a variable is set via SetVariable/DefineLocal/etc.

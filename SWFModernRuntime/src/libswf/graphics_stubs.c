@@ -39,13 +39,40 @@ int g_settarget_explicit_root = 0;
 int g_settarget_invalid = 0;
 int g_settarget_none = 0;
 
-// Sprite-init-depth bump/unbump. NO_GRAPHICS tracks this so inline goto
-// catch-up can swap to the root display list. Graphics mode has no
-// inline catch-up, so the bump/unbump are no-ops. ng_isInsideSpriteInit()
-// (also NO_GRAPHICS-only at the call sites) consequently returns false
-// in graphics mode, which is correct.
-void ng_bumpSpriteInitDepth(void) {}
-void ng_unbumpSpriteInitDepth(void) {}
+// Force-quit flag — set by exit handlers in NO_GRAPHICS swf_core.c.
+// Graphics frame loop in swf.c uses its own quit_swf flag; g_force_quit
+// is checked from action.c (e.g. AS-level fscommand("quit")) but in
+// graphics mode we just leave it at 0 (no-op).
+int g_force_quit = 0;
 
+// Sprite-init / catch-up state-machine accessors. Real impls in tag.c under
+// #ifdef NO_GRAPHICS track the state of NO_GRAPHICS-only init phases:
+// eager init (Phase 1), script-only re-run (Phase 2), goto catch-up,
+// deferred sprite init, and attachMovie's Phase F. Graphics builds have
+// none of these phases — frame execution is straight-through — so the
+// accessors all return 0 ("not in any special mode") and the
+// Enter/Leave wrappers are no-ops. The recompiler-generated tagMain.c
+// queries these via the accessor to choose between sync-fire and queue
+// modes for sprite script dispatch; with all returning 0, it picks the
+// straightforward sync-fire path which matches graphics-mode semantics.
+int actionEagerInitActive(void)            { return 0; }
+int actionScriptOnlyMode(void)             { return 0; }
+int actionGotoCatchupActive(void)          { return 0; }
+int actionDeferredSpriteInitActive(void)   { return 0; }
+int actionAttachInitActive(void)           { return 0; }
+void actionEagerInitEnter(void)            {}
+void actionEagerInitLeave(void)            {}
+void actionGotoCatchupEnter(void)          {}
+void actionGotoCatchupLeave(void)          {}
+void actionDeferredSpriteInitEnter(void)   {}
+void actionDeferredSpriteInitLeave(void)   {}
+void actionAttachInitEnter(void)           {}
+void actionAttachInitLeave(void)           {}
+
+// Sprite-init-depth bump/unbump (real impls in tag.c NO_GRAPHICS).
+// No-ops; ng_isInsideSpriteInit returns 0 below.
+void ng_bumpSpriteInitDepth(void)          {}
+void ng_unbumpSpriteInitDepth(void)        {}
+int ng_isInsideSpriteInit(void)            { return 0; }
 
 #endif // USE_WEBGPU && !NO_GRAPHICS && !HEADLESS_GRAPHICS

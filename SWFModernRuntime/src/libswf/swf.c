@@ -87,8 +87,10 @@ void tagMain(SWFAppContext* app_context)
 				actionResetHighlightForEvent(0); // 0=mouse_move
 				// Extend textfield drag selection if mouse is moved while button
 				// is held (matches swf_core.c EV_MOUSE_MOVE behavior).
-				if (app_context->mouse.button_down)
+				if (app_context->mouse.button_down) {
+					extern void actionTextFieldDragSelect(SWFAppContext*);
 					actionTextFieldDragSelect(app_context);
+				}
 			}
 			if (app_context->mouse.clicked) {
 				actionDispatchMouseDown(app_context);       // Mouse listener broadcast
@@ -99,6 +101,7 @@ void tagMain(SWFAppContext* app_context)
 				actionClearVirtualHover();
 			}
 			if (app_context->mouse.released) {
+				extern void actionTextFieldDragEnd(SWFAppContext*);
 				actionTextFieldDragEnd(app_context);         // Finalize drag selection
 				actionDispatchMouseUp(app_context);          // Mouse listener broadcast
 				actionDispatchMCMouseUp(app_context);        // Per-MC AS2 dispatch
@@ -188,6 +191,8 @@ void tagMain(SWFAppContext* app_context)
 			extern char g_ime_commit_text[];
 			extern int  g_ime_compose_pending;
 			extern int  g_ime_commit_pending;
+			extern void actionTextFieldImeCompose(SWFAppContext*, const char*, int, int);
+			extern void actionTextFieldImeCommit(SWFAppContext*, const char*);
 			if (g_ime_compose_pending) {
 				g_ime_compose_pending = 0;
 				int len = (int)strlen(g_ime_compose_text);
