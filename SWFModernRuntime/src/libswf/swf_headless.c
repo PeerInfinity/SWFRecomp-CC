@@ -81,6 +81,13 @@ int g_tag_skip_mode = 0;            // 1 = tag functions are no-ops (scripts-onl
 // the last frame but Flash does not run that frame's actions).
 int g_skip_inline_target_script = 0;
 
+// Drift-fix: globals added to swf_core.c (and graphics_stubs.c for the wasm
+// graphics build) but never mirrored here. Referenced by shared sources
+// (action.c, action_queue.c, tag.c) and by swf_headless.c's own catch-up.
+int g_force_quit = 0;
+int g_goto_inlined_in_caller_frame = 0;
+int g_natural_wrap_cleanup_pending = 0;
+
 // Execute goto catch-up inline (called from actionGotoFrame)
 // Processes intermediate frame tags and target frame tags immediately
 void ng_executeGotoCatchUp(SWFAppContext* app_context)
