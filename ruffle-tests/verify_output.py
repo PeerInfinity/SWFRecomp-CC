@@ -1366,8 +1366,11 @@ def get_self_load(test_dir):
     return False
 
 
-def compile_native(test_dir, num_frames, build_dir, headless=False, has_image_comparisons=False, asan=False, use_ccache=True):
-    """Compile generated C code with runtime into native binary."""
+def compile_native(test_dir, num_frames, build_dir, mode="no-graphics", has_image_comparisons=False, asan=False, use_ccache=True):
+    """Compile generated C code with runtime into native binary.
+
+    mode is one of: "no-graphics", "graphics", "graphics-headless-legacy".
+    """
     mem_dir = build_dir / "memory"
     mem_dir.mkdir(exist_ok=True)
 
@@ -1391,8 +1394,15 @@ def compile_native(test_dir, num_frames, build_dir, headless=False, has_image_co
         "src/libswf/hit_test.c",
         "src/memory/heap.c",
     ]
-    if headless:
+    if mode == "graphics-headless-legacy":
         core_sources.append("src/libswf/swf_headless.c")
+        core_sources.append("src/rendering/render_webgpu.c")
+    elif mode == "graphics":
+        # Full graphics-mode runtime + offscreen Dawn rendering, native target.
+        core_sources.append("src/libswf/swf.c")
+        core_sources.append("src/libswf/graphics_stubs.c")
+        core_sources.append("src/audio/audio.c")
+        core_sources.append("src/audio/audio_output_web.c")  # native stub branch
         core_sources.append("src/rendering/render_webgpu.c")
     else:
         core_sources.append("src/libswf/swf_core.c")
@@ -1570,8 +1580,13 @@ def compile_native(test_dir, num_frames, build_dir, headless=False, has_image_co
     mode_defines = []
     mode_includes = []
     mode_libs = []
-    if headless:
-        mode_defines = ["-DNO_GRAPHICS", "-DHEADLESS_GRAPHICS", "-DUSE_WEBGPU", "-DNDEBUG"]
+    if mode in ("graphics-headless-legacy", "graphics"):
+        if mode == "graphics-headless-legacy":
+            mode_defines = ["-DNO_GRAPHICS", "-DHEADLESS_GRAPHICS", "-DUSE_WEBGPU", "-DNDEBUG"]
+        else:  # mode == "graphics"
+            # Full graphics native: NO_GRAPHICS / HEADLESS_GRAPHICS NOT defined;
+            # OFFSCREEN_RENDER tells render_webgpu.c to skip SDL3 / browser paths.
+            mode_defines = ["-DUSE_WEBGPU", "-DOFFSCREEN_RENDER", "-DNDEBUG"]
         if has_image_comparisons:
             mode_defines.append("-DHEADLESS_RENDER_ENABLED")
         mode_includes = [
@@ -2320,8 +2335,14 @@ examples:
         "--json", metavar="PATH",
         help="Write JSON results report to PATH")
     parser.add_argument(
+        "--mode", choices=["no-graphics", "graphics", "graphics-headless-legacy"],
+        default=None,
+        help="Build mode. Default 'no-graphics' (swf_core.c, no rendering). "
+             "'graphics' is the new full-graphics-native mode (swf.c + offscreen Dawn). "
+             "'graphics-headless-legacy' is the legacy headless mode (swf_headless.c + offscreen Dawn).")
+    parser.add_argument(
         "--headless", action="store_true",
-        help="Build with HEADLESS_GRAPHICS mode (offscreen WebGPU rendering + trace)")
+        help="DEPRECATED alias for --mode=graphics-headless-legacy.")
     parser.add_argument(
         "--append", action="store_true",
         help="Append to existing JSON results instead of overwriting (merge by test name)")
@@ -2368,6 +2389,16 @@ def main():
     global TESTS_DIR, RESULTS_DIR, RESULTS_FINAL, RESULTS_PREVIOUS, RESULTS_CURRENT
     args = parse_args()
 
+    # Resolve mode from --mode (preferred) and the deprecated --headless alias.
+    if args.mode is None:
+        args.mode = "graphics-headless-legacy" if args.headless else "no-graphics"
+    elif args.headless and args.mode != "graphics-headless-legacy":
+        print(f"Warning: --headless ignored because --mode={args.mode} was also given",
+              file=sys.stderr)
+    # Legacy boolean kept in sync so existing call sites still work.
+    args.headless = (args.mode == "graphics-headless-legacy")
+    args.uses_dawn = args.mode in ("graphics", "graphics-headless-legacy")
+
     # Determine expected output filename
     expected_filename = f"output.{args.expected_suffix}.txt" if args.expected_suffix else "output.txt"
 
@@ -2395,7 +2426,7 @@ def main():
         print(f"Build it first:  cd {PROJECT_ROOT}/SWFRecomp/build && cmake .. && make -j")
         sys.exit(1)
 
-    if args.headless:
+    if args.uses_dawn:
         dawn_lib = DAWN_INSTALL / "lib" / "libwebgpu_dawn.a"
         if not dawn_lib.exists():
             print(f"Error: Dawn library not found at {dawn_lib}")
@@ -2469,8 +2500,10 @@ def main():
 
     # Determine json_path early so --append can write incrementally
     json_path = args.json
-    if json_path is None and args.headless:
+    if json_path is None and args.mode == "graphics-headless-legacy":
         json_path = str(RESULTS_DIR / "results_headless.json")
+    elif json_path is None and args.mode == "graphics":
+        json_path = str(RESULTS_DIR / "results_graphics.json")
     if json_path is None and not args.test:
         json_path = str(RESULTS_FINAL)
 
@@ -2577,14 +2610,14 @@ def main():
             num_frames = get_num_frames(test_dir, wait_count, has_input=input_json.exists())
             entry["num_frames"] = num_frames
             # Parse image comparisons early so we can enable rendering at compile time
-            image_comparisons = parse_image_comparisons(test_dir) if args.headless else {}
+            image_comparisons = parse_image_comparisons(test_dir) if args.uses_dawn else {}
             has_image_cmps = bool(image_comparisons) and HAS_PIL
             _t = time.perf_counter()
             if args.wasm:
                 ok, err = compile_wasm(test_dir, num_frames, build_dir)
             else:
                 ok, err = compile_native(test_dir, num_frames, build_dir,
-                                         headless=args.headless,
+                                         mode=args.mode,
                                          has_image_comparisons=has_image_cmps,
                                          asan=args.asan,
                                          use_ccache=not args.no_ccache)
@@ -2629,7 +2662,7 @@ def main():
 
             # Set up capture triggers for image comparison tests
             run_env = {}
-            if has_image_cmps and args.headless:
+            if has_image_cmps and args.uses_dawn:
                 triggers = []
                 for cmp_name, cmp_config in image_comparisons.items():
                     trig = cmp_config["trigger"]
@@ -2699,9 +2732,9 @@ def main():
                 save_incremental()
                 continue
 
-            # Step 3b: Image comparisons (only in headless mode with rendering)
-            # image_comparisons was already parsed before compile when headless
-            if not args.headless:
+            # Step 3b: Image comparisons (only when rendering is enabled)
+            # image_comparisons was already parsed before compile when uses_dawn
+            if not args.uses_dawn:
                 image_comparisons = {}
             elif not image_comparisons:
                 image_comparisons = parse_image_comparisons(test_dir)

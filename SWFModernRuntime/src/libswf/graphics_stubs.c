@@ -75,4 +75,76 @@ void ng_bumpSpriteInitDepth(void)          {}
 void ng_unbumpSpriteInitDepth(void)        {}
 int ng_isInsideSpriteInit(void)            { return 0; }
 
+// ---- Phase 1 stubs for --mode=graphics (graphics-native test mode) ----
+// These were sufficient for the old wasm --mode=graphics path because action.c
+// only referenced them under NO_GRAPHICS. Recent un-gating commits broadened
+// the references; running tests against swf.c natively now also reaches them.
+// Phase 2 of graphics-native-test-mode-plan.md will backport real impls or
+// widen the gates in tag.c.
+
+#include <swf.h>
+#include <tag.h>
+
+// Active transform data pointer. Real impl in tag.c (NO_GRAPHICS arm) swaps
+// to a child SWF's transform array. With NULL, ng_cache_transform() in tag.c
+// falls back to the main SWF's transform_data — correct for single-SWF tests,
+// possibly wrong for multi-SWF (loadMovie) tests.
+float (*g_active_transform_data)[16] = NULL;
+
+// Clone-depth-already-unbiased flag — set by createEmptyMovieClip path in
+// swf_core.c. Graphics-native createEmptyMovieClip path will set its own.
+int g_clone_depth_already_unbiased = 0;
+
+// JS-callback inputs (text input, IME, focus). In emscripten browser builds
+// these live in render_webgpu.c and are populated by JS event listeners. In
+// native offscreen mode there is no input source, so they remain zero —
+// swf.c's per-frame drain reads zero, no events fire.
+#define _OR_TEXT_INPUT_RING_SIZE 64
+#define _OR_IME_TEXT_BUF_SIZE 256
+int g_text_input_ring[_OR_TEXT_INPUT_RING_SIZE];
+int g_text_input_ring_head = 0;
+int g_text_input_ring_tail = 0;
+int g_window_focus_lost = 0;
+char g_ime_compose_text[_OR_IME_TEXT_BUF_SIZE];
+char g_ime_commit_text[_OR_IME_TEXT_BUF_SIZE];
+int g_ime_compose_pending = 0;
+int g_ime_commit_pending = 0;
+
+// Function stubs — minimum needed to link.
+// exec_sprite_frame: real impl swaps current_sprite_obj / context / settarget
+// state and calls f. The stub just calls f. Loses context-switch semantics —
+// many sprite tests will diverge. Phase 2.
+void exec_sprite_frame(SWFAppContext* app_context, DisplayObject* obj, frame_func f) {
+    (void)obj;
+    if (f) f(app_context);
+}
+
+// sprite_content_bounds_twips: returns 0 (no bounds). getBounds-on-sprite
+// tests will report 0×0. Phase 2.
+int sprite_content_bounds_twips(DisplayObject* dl, size_t dl_max,
+                                float* xmin_out, float* xmax_out,
+                                float* ymin_out, float* ymax_out) {
+    (void)dl; (void)dl_max;
+    if (xmin_out) *xmin_out = 0;
+    if (xmax_out) *xmax_out = 0;
+    if (ymin_out) *ymin_out = 0;
+    if (ymax_out) *ymax_out = 0;
+    return 0;
+}
+
+// process_sprite_needs_init_public: NO_GRAPHICS sprite-needs-init phase. No-op.
+void process_sprite_needs_init_public(SWFAppContext* app_context, MovieClip* parent_mc) {
+    (void)app_context; (void)parent_mc;
+}
+
+// ng_set_script_only_mode: NO_GRAPHICS script-only re-run phase. No-op.
+void ng_set_script_only_mode(int mode) { (void)mode; }
+
+// ng_queue_placement_clip_events: queues clip events for newly-placed sprites.
+// Stub means CONSTRUCT/LOAD events on attachMovie won't fire in graphics-native
+// mode. Phase 2.
+void ng_queue_placement_clip_events(SWFAppContext* app_context, size_t depth) {
+    (void)app_context; (void)depth;
+}
+
 #endif // USE_WEBGPU && !NO_GRAPHICS && !HEADLESS_GRAPHICS

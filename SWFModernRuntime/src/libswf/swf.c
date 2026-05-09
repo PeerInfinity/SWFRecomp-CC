@@ -52,8 +52,19 @@ void tagMain(SWFAppContext* app_context)
 	frame_func* frame_funcs = app_context->frame_funcs;
 	u32 frame_ms = app_context->fps > 0 ? 1000 / app_context->fps : 83;
 
+#ifdef MAX_FRAMES
+	// Test-mode termination: bound the loop. Mirrors swf_core.c's max_ticks.
+	const size_t max_ticks = MAX_FRAMES;
+	size_t tick_count = 0;
+#endif
+
 	while (!quit_swf)
 	{
+#ifdef MAX_FRAMES
+		if (tick_count >= max_ticks) break;
+		tick_count++;
+#endif
+
 #ifdef __EMSCRIPTEN__
 		double frame_start = emscripten_get_now();
 #endif
@@ -257,8 +268,20 @@ void tagMain(SWFAppContext* app_context)
 		return;
 	}
 
+#ifdef MAX_FRAMES
+	// Test-mode: bound the post-quit drain loop too. renderer_poll returns 0
+	// indefinitely in OFFSCREEN_RENDER (no input source), so without a bound
+	// this hangs.
+	size_t drain_ticks = 0;
+	const size_t max_drain_ticks = MAX_FRAMES;
+#endif
+
 	while (!renderer_poll(app_context))
 	{
+#ifdef MAX_FRAMES
+		if (drain_ticks >= max_drain_ticks) break;
+		drain_ticks++;
+#endif
 #ifdef __EMSCRIPTEN__
 		double frame_start2 = emscripten_get_now();
 #endif
