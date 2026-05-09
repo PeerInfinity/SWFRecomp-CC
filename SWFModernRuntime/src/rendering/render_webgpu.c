@@ -13,8 +13,17 @@
 #include <swf.h>
 #include <heap.h>
 
-#ifdef HEADLESS_GRAPHICS
-// Headless mode: no SDL, no Emscripten — offscreen rendering only
+// Renderer-mode flag. Set when the renderer must run without a window
+// surface — no SDL, no JS canvas. Decoupled from HEADLESS_GRAPHICS so the
+// new --mode=graphics native build can use offscreen rendering without
+// inheriting the legacy headless frame loop in swf_headless.c.
+// HEADLESS_GRAPHICS implies OFFSCREEN_RENDER (back-compat).
+#if defined(HEADLESS_GRAPHICS) && !defined(OFFSCREEN_RENDER)
+#define OFFSCREEN_RENDER
+#endif
+
+#ifdef OFFSCREEN_RENDER
+// Offscreen mode: no SDL, no Emscripten — render to a buffer for capture.
 #define STB_IMAGE_WRITE_IMPLEMENTATION
 #include "stb_image_write.h"
 #elif !defined(__EMSCRIPTEN__)
@@ -319,7 +328,7 @@ static void request_adapter_sync(WebGPURenderContext* ctx,
 	{
 		emscripten_sleep(10);
 	}
-#elif defined(HEADLESS_GRAPHICS)
+#elif defined(OFFSCREEN_RENDER)
 	// Headless: use ProcessEvents polling (WaitAny requires timed wait features)
 	(void)future;
 	while (ctx->adapter == NULL)
@@ -366,7 +375,7 @@ static void request_device_sync(WebGPURenderContext* ctx,
 	{
 		emscripten_sleep(10);
 	}
-#elif defined(HEADLESS_GRAPHICS)
+#elif defined(OFFSCREEN_RENDER)
 	(void)future;
 	while (ctx->device == NULL)
 		wgpuInstanceProcessEvents(ctx->instance);
@@ -594,7 +603,7 @@ void render_webgpu_init(SWFAppContext* app_context, WebGPURenderContext* ctx)
 	assert(ctx->instance != NULL);
 
 	// --- Create surface ---
-#ifdef HEADLESS_GRAPHICS
+#ifdef OFFSCREEN_RENDER
 	// Headless mode: no surface, no window
 	ctx->surface = NULL;
 #elif defined(__EMSCRIPTEN__)
@@ -618,14 +627,14 @@ void render_webgpu_init(SWFAppContext* app_context, WebGPURenderContext* ctx)
 
 	ctx->surface = SDL_GetWGPUSurface(ctx->instance, ctx->window);
 #endif
-#ifndef HEADLESS_GRAPHICS
+#ifndef OFFSCREEN_RENDER
 	assert(ctx->surface != NULL);
 #endif
 
 	// --- Request adapter ---
 	{
 		WGPURequestAdapterOptions opts = {0};
-#ifdef HEADLESS_GRAPHICS
+#ifdef OFFSCREEN_RENDER
 		opts.compatibleSurface = NULL;  // No surface in headless mode
 #else
 		opts.compatibleSurface = ctx->surface;
@@ -650,7 +659,7 @@ void render_webgpu_init(SWFAppContext* app_context, WebGPURenderContext* ctx)
 	// --- Configure surface (or create offscreen texture for headless) ---
 	ctx->surface_format = WGPUTextureFormat_BGRA8Unorm;
 
-#ifdef HEADLESS_GRAPHICS
+#ifdef OFFSCREEN_RENDER
 	// Create offscreen render target texture (used as MSAA resolve target)
 	{
 		WGPUTextureDescriptor offscreen_desc = {0};
@@ -708,7 +717,7 @@ void render_webgpu_init(SWFAppContext* app_context, WebGPURenderContext* ctx)
 	}
 
 	// --- Register mouse input callbacks (WASM only, not headless) ---
-#if defined(__EMSCRIPTEN__) && !defined(HEADLESS_GRAPHICS)
+#if defined(__EMSCRIPTEN__) && !defined(OFFSCREEN_RENDER)
 	g_mouse_app_context = app_context;
 	emscripten_set_mousemove_callback("#canvas", NULL, 0, on_mouse_move);
 	emscripten_set_mousedown_callback("#canvas", NULL, 0, on_mouse_down);
@@ -1489,7 +1498,7 @@ static void run_compute_pass(WebGPURenderContext* ctx)
 // ---------------------------------------------------------------------------
 int render_webgpu_poll(SWFAppContext* app_context)
 {
-#ifdef HEADLESS_GRAPHICS
+#ifdef OFFSCREEN_RENDER
 	// Headless mode: no events to poll
 	(void)app_context;
 	return 0;
@@ -1548,7 +1557,7 @@ void render_webgpu_open_pass(WebGPURenderContext* ctx)
 	ctx->dynamic_vertex_used = 0;
 	ctx->dynamic_gradient_used = 0;
 	ctx->dynamic_bitmap_used = 0;
-#ifdef HEADLESS_GRAPHICS
+#ifdef OFFSCREEN_RENDER
 	// Headless: use the persistent offscreen texture as resolve target
 	ctx->surface_view = ctx->offscreen_view;
 #else
@@ -2035,7 +2044,7 @@ void render_webgpu_close_pass(WebGPURenderContext* ctx)
 	if (!ctx->renderer_ok) return;
 	wgpuRenderPassEncoderEnd(ctx->render_pass);
 
-#ifdef HEADLESS_GRAPHICS
+#ifdef OFFSCREEN_RENDER
 	// Headless: copy offscreen texture to staging buffer for readback
 	if (ctx->capture_requested)
 	{
@@ -2060,7 +2069,7 @@ void render_webgpu_close_pass(WebGPURenderContext* ctx)
 	WGPUCommandBuffer cmd = wgpuCommandEncoderFinish(ctx->encoder, &cmd_desc);
 	wgpuQueueSubmit(ctx->queue, 1, &cmd);
 
-#ifdef HEADLESS_GRAPHICS
+#ifdef OFFSCREEN_RENDER
 	// Headless: no surface to present
 #elif !defined(__EMSCRIPTEN__)
 	wgpuSurfacePresent(ctx->surface);
@@ -2070,13 +2079,13 @@ void render_webgpu_close_pass(WebGPURenderContext* ctx)
 	wgpuCommandBufferRelease(cmd);
 	wgpuRenderPassEncoderRelease(ctx->render_pass);
 	wgpuCommandEncoderRelease(ctx->encoder);
-#ifndef HEADLESS_GRAPHICS
+#ifndef OFFSCREEN_RENDER
 	wgpuTextureViewRelease(ctx->surface_view);
 #endif
 
 	ctx->render_pass = NULL;
 	ctx->encoder = NULL;
-#ifndef HEADLESS_GRAPHICS
+#ifndef OFFSCREEN_RENDER
 	ctx->surface_view = NULL;
 #endif
 }
@@ -2910,12 +2919,12 @@ void render_webgpu_free(SWFAppContext* app_context, WebGPURenderContext* ctx)
 	FREE(ctx->bitmap_sizes);
 
 	// Destroy SDL window (native only)
-#if !defined(__EMSCRIPTEN__) && !defined(HEADLESS_GRAPHICS)
+#if !defined(__EMSCRIPTEN__) && !defined(OFFSCREEN_RENDER)
 	if (ctx->window)
 		SDL_DestroyWindow(ctx->window);
 #endif
 
-#ifdef HEADLESS_GRAPHICS
+#ifdef OFFSCREEN_RENDER
 	// Release headless resources
 	if (ctx->offscreen_view) wgpuTextureViewRelease(ctx->offscreen_view);
 	if (ctx->offscreen_texture) wgpuTextureRelease(ctx->offscreen_texture);
@@ -2928,7 +2937,7 @@ void render_webgpu_free(SWFAppContext* app_context, WebGPURenderContext* ctx)
 // ---------------------------------------------------------------------------
 // Headless framebuffer capture and PNG output
 // ---------------------------------------------------------------------------
-#ifdef HEADLESS_GRAPHICS
+#ifdef OFFSCREEN_RENDER
 
 // Synchronous callback state for buffer mapping
 static volatile int g_map_done = 0;
@@ -3010,4 +3019,4 @@ int render_webgpu_save_png(WebGPURenderContext* ctx, const char* path)
 	return ok;
 }
 
-#endif // HEADLESS_GRAPHICS
+#endif // OFFSCREEN_RENDER

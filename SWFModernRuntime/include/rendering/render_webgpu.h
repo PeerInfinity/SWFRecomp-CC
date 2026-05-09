@@ -11,6 +11,12 @@
 #include <webgpu/webgpu.h>
 #include <common.h>
 
+// HEADLESS_GRAPHICS implies OFFSCREEN_RENDER (back-compat). See the matching
+// shim in render_webgpu.c for rationale.
+#if defined(HEADLESS_GRAPHICS) && !defined(OFFSCREEN_RENDER)
+#define OFFSCREEN_RENDER
+#endif
+
 // Forward declaration
 typedef struct SWFAppContext SWFAppContext;
 
@@ -136,11 +142,11 @@ typedef struct WebGPURenderContext
 	WGPUPipelineLayout composite_pipeline_layout;
 
 	// --- SDL window (native only) ---
-#if !defined(__EMSCRIPTEN__) && !defined(HEADLESS_GRAPHICS)
+#if !defined(__EMSCRIPTEN__) && !defined(OFFSCREEN_RENDER)
 	struct SDL_Window* window;
 #endif
 
-#ifdef HEADLESS_GRAPHICS
+#ifdef OFFSCREEN_RENDER
 	// --- Headless rendering resources ---
 	WGPUTexture offscreen_texture;   // offscreen RGBA8 render target (resolve target)
 	WGPUTextureView offscreen_view;  // persistent view of offscreen_texture
@@ -215,7 +221,7 @@ void render_webgpu_composite_filtered(WebGPURenderContext* context, float offset
 void render_webgpu_ensure_filter_resources(WebGPURenderContext* context);
 void render_webgpu_free(SWFAppContext* app_context, WebGPURenderContext* context);
 
-#ifdef HEADLESS_GRAPHICS
+#ifdef OFFSCREEN_RENDER
 // Headless rendering: framebuffer capture and PNG output
 void render_webgpu_request_capture(WebGPURenderContext* context);
 int render_webgpu_save_png(WebGPURenderContext* context, const char* path);
