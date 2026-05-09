@@ -21,7 +21,26 @@ blockers:
 
 Covers **misc-ming.all** and **misc-swfc.all**. Both suites use the inlined-Dejagnu harness described in `complete/DEJAGNU_FRAMEWORK_PLAN.md`.
 
-Status (CI at f7f8fbe6 — 2026-04-29 run): **misc-ming.all 67/102 effective (65.7%); misc-swfc.all 8/16 effective (50.0%).** Phase 1 substantially complete — all the listed near-passing tests have landed. Phase 2 partially complete; remaining items are documented blockers (deferred CLIP_EVENT_UNLOAD, CloneSprite depth-bias unification, tagImportCharacter dictionary, mouse/key input drivers) or multi-issue tests that need fresh investigation. Phase 3 (zero-output) still blocked.
+Status (CI at f8e172e9 — 2026-05-08 run): **misc-ming.all 89/102 effective
+(87.3%) raw / 88.1% filtered (89/101, with `opcode_guard_test` ignored);
+misc-swfc.all 14/16 effective (87.5%).** Phase 1 complete. Phase 2
+substantially complete — most remaining items are split out into dedicated
+plans (`incomplete/REGISTERCLASS_LIFECYCLE_PLAN.md`,
+`incomplete/REMAINING_TAIL_TRIAGE.md`,
+`incomplete/SPRITE_EXEC_LIST_LIFO_PLAN.md`,
+`blocked/INTER_TAG_UNLOAD_PLAN.md`,
+`blocked/SPRITE_REWIND_IDENTITY_PLAN.md`) or have landed since the last
+update of this status line. Phase 3 (zero-output / DoInitAction-for-library-
+exports) still blocked, but most "zero-output" tests turned out to be
+unrelated narrow fixes (see `complete/ZERO_OUTPUT_TRIAGE_PLAN.md`).
+
+**Remaining raw failures (this CI):**
+- misc-ming.all (13): `DefineEditTextVariableNameTest`, `DrawingApiTest`,
+  `EmbeddedFontTest`, `NetStream-SquareTest`, `masks_test`,
+  `action_order/action_execution_order_test{5,6,11}`,
+  `action_order/ActionOrderTest{3,4,5}`,
+  `register_class/RegisterClassTest4`, `opcode_guard_test` (ignored).
+- misc-swfc.all (2): `movieclip_destruction_test4`, `sound` (ignored).
 
 ### Latest fix (2026-04-29, pending CI)
 

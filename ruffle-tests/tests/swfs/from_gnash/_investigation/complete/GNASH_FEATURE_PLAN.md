@@ -1,18 +1,19 @@
 # Gnash Failing Tests by Feature Category (Umbrella Plan)
-<!-- TESTS: AsBroadcaster-v6, AsBroadcaster-v7, AsBroadcaster-v8, ContextMenu-v7, ContextMenu-v8, Global-v6, Global-v7, Global-v8, HitTest-v6, HitTest-v7, HitTest-v8, Instance-v5, Instance-v6, Instance-v7, Instance-v8, Matrix-v7, Matrix-v8, MovieClip-v5, Number-v5, Number-v6, Number-v7, Number-v8, Sound-v6, Sound-v7, Sound-v8, TextFormat-v5, TextFormat-v6, TextFormat-v7 -->
-<!-- PASSING (removed from TESTS): Point-v8 (ruffle_matched, 2026-04-14), TextSnapshot-v6/v7/v8 (pass), delete-v5..v8 (pass), enumerate-v6..v8 (pass), Camera-v6/v7/v8 (ruffle_matched), Microphone-v6/v7/v8 (ruffle_matched), Sound-v5 (ruffle_matched), targetPath-v6/v7/v8 (ruffle_matched), System-v5/v6/v7/v8 (pass, 2026-04-14 session 3), case-v7/v8 (pass, 2026-04-30 session — onConstruct fix), case-v6 (pass, 2026-04-30 session — slash-path SetProperty + authoritative-name createEmptyMovieClip rebind), case-v5 (already passing per CI 7a142bfc — docs were stale), ExternalInterface-v6/v7 (pass, 2026-04-30 session — flash_flags=0x1000 hides EI internals in SWF<=7) -->
+<!-- TESTS: -->
+<!-- PASSING (removed from TESTS, all promoted as of 2026-05-08 CI): AsBroadcaster-v6/v7/v8 (ruffle_matched), ContextMenu-v7/v8 (pass), Global-v6 (ruffle_matched), Global-v7/v8 (pass), HitTest-v6/v7/v8 (ruffle_matched), Instance-v5/v6/v7/v8 (pass), Matrix-v7/v8 (ruffle_matched), MovieClip-v5 (ruffle_matched), Number-v5 (ruffle_matched), Number-v6/v7/v8 (pass), Sound-v6/v7/v8 (ruffle_matched), TextFormat-v5/v6 (pass), TextFormat-v7 (ruffle_matched), Point-v8 (ruffle_matched, 2026-04-14), TextSnapshot-v6/v7/v8 (pass), delete-v5..v8 (pass), enumerate-v6..v8 (pass), Camera-v6/v7/v8 (ruffle_matched), Microphone-v6/v7/v8 (ruffle_matched), Sound-v5 (ruffle_matched), targetPath-v6/v7/v8 (ruffle_matched), System-v5/v6/v7/v8 (pass, 2026-04-14 session 3), case-v5/v6/v7/v8 (pass, 2026-04-30), ExternalInterface-v6/v7 (pass, 2026-04-30) -->
 <!-- SPLIT OUT TO DEDICATED PLANS (2026-04-17):
-  - ASnative-v5/v6/v7/v8 → ASNATIVE_CLASSES_PLAN.md
-  - String-v5/v6/v7/v8 → STRING_REGEX_PLAN.md
-  - BitmapData-v8 → BITMAPDATA_PLAN.md
-  - LoadVars-v6/v7/v8, MovieClipLoader-v7/v8 → LOADVARS_MOVIECLIPLOADER_PLAN.md
-  - with-v5/v6/v7/v8 → WITH_AUTOBOXING_PLAN.md
+  - ASnative-v5/v6/v7/v8 → complete/ASNATIVE_CLASSES_PLAN.md
+  - String-v5/v6/v7/v8 → blocked/STRING_REGEX_PLAN.md
+  - BitmapData-v8 → complete/BITMAPDATA_PLAN.md (ruffle_matched 2026-05-08)
+  - LoadVars-v6/v7/v8, MovieClipLoader-v7/v8 → complete/LOADVARS_MOVIECLIPLOADER_PLAN.md
+  - with-v5/v6/v7/v8 → complete/WITH_AUTOBOXING_PLAN.md
   - Matrix-v6, Rectangle-v8, toString_valueOf-v5/v6/v7/v8 → complete/IMPLICIT_COERCION_PLAN.md (all ruffle_matched 2026-04-19)
+  - array-v5 → incomplete/ARRAY_V5_PLAN.md (only remaining raw failure in actionscript.all)
 -->
 
 <!-- PLAN_META
 id: GNASH_FAILING_BY_FEATURE
-status: incomplete
+status: complete
 phases:
   - id: 1
     name: "Near-passing fixes (ops, Math, NetStream, Error, Color)"
@@ -22,15 +23,18 @@ phases:
     status: complete
   - id: 3
     name: "Medium-effort feature work (delete, toString_valueOf, Number, etc.)"
-    status: in_progress
+    status: complete
   - id: 4
     name: "Large features (ASnative, String regex, With auto-boxing)"
-    status: not_started
+    status: split_out
 dependencies: []
 blockers: []
 -->
 
-Last updated: 2026-04-17 (Phase 3 in progress — objectCallValueOf type 1 `this` context fix)
+Last updated: 2026-05-08 (all umbrella-tracked tests have promoted to PASS or
+ruffle_matched per `from_gnash/actionscript.all/_results/results.json`. The only
+remaining raw failure in the suite is `array-v5`, which has its own plan at
+`incomplete/ARRAY_V5_PLAN.md`. Plan moved from `incomplete/` to `complete/`.)
 
 ## 2026-04-17 session (objectCallValueOf type 1 `this` + scope setup)
 

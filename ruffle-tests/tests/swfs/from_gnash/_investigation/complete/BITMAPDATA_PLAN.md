@@ -1,8 +1,14 @@
 # BitmapData Plan
 <!-- TESTS: BitmapData-v8 -->
 
-Last updated: 2026-04-18 (session 5)
-Status: IN PROGRESS — 1 test, 375/410 check lines pass (35 failed) — remaining diffs are Cat 3 (MovieClip draw) blocked on software rasterizer (`MOVIECLIP_DRAW_PLAN.md`)
+Last updated: 2026-05-08 (CI confirmed)
+Status: COMPLETE — `BitmapData-v8` is `ruffle_matched` (effective pass) per
+`from_gnash/actionscript.all/_results/results.json`. Cats 1/2/4 landed in
+this plan (sessions 3-5, 2026-04-18); Cat 3 (MovieClip-source draw) was
+delegated to `complete/MOVIECLIP_DRAW_PLAN.md` and landed 2026-04-28. The
+8 residual literal-line diffs are sub-pixel rasterizer boundary cases
+explicitly accepted in `MOVIECLIP_DRAW_PLAN.md`. Plan moved from
+`incomplete/` to `complete/` 2026-05-08.
 
 ---
 

@@ -1,6 +1,14 @@
 # Sprite Execution Order: LIFO Instantiation Plan
 
-<!-- TESTS: action_order/action_execution_order_test2, action_order/action_execution_order_test5, action_order/action_execution_order_test11 -->
+<!-- TESTS: action_order/action_execution_order_test5, action_order/action_execution_order_test11 -->
+<!-- PROMOTED (removed from TESTS):
+  - action_execution_order_test2 → PASS 2026-05-08 (Phases 1-3 sort by place_seq DESC fixed it)
+-->
+<!-- Residual: test5 (26/35) and test11 (27/32) remain `output_mismatch`. Phases 1-3
+plus the 2026-05-08 flat clip-event dispatch landed; remaining diffs are NOT
+LIFO-ordering related — test5 cleanup-phase, test11 mc2/mc1 enterFrame interleave.
+See "Status as of 2026-05-08" below for what's left and why Phase 4 dispatcher-
+proper is not the right next step. -->
 
 <!-- PLAN_META
 id: SPRITE_EXEC_LIST_LIFO

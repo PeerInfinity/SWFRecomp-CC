@@ -1,6 +1,11 @@
 # Remaining Tail Triage
 
-<!-- TESTS: matrix_test, DefineEditTextVariableNameTest, EmbeddedFontTest, DrawingApiTest, NetStream-SquareTest, masks_test, duplicate_movie_clip_test, soft_reference_test1, movieclip_destruction_test4, action_order/action_execution_order_test6 -->
+<!-- TESTS: DefineEditTextVariableNameTest, EmbeddedFontTest, DrawingApiTest, NetStream-SquareTest, masks_test, movieclip_destruction_test4, action_order/action_execution_order_test6 -->
+<!-- PROMOTED (removed from TESTS):
+  - matrix_test → ruffle_matched 2026-05-08 (see complete/MATRIX_TEST_SKEW_PLAN.md)
+  - duplicate_movie_clip_test → ruffle_matched 2026-05-08 (CLONESPRITE_DEPTH_BIAS work)
+  - soft_reference_test1 → ruffle_matched 2026-05-04 (_name setter syncs parent.dynamic_props + var_map)
+-->
 
 <!-- Resolved 2026-05-02:
   - loop/loop_test → PASS (was 5/21; fixed in cluster work)

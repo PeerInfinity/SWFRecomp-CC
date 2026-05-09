@@ -4,7 +4,7 @@
 
 <!-- PLAN_META
 id: MATRIX_TEST_SKEW
-status: in_progress
+status: complete
 phases:
   - id: 1
     name: "Add `skew` field to MovieClip + initialize at all creation sites"
@@ -31,9 +31,9 @@ dependencies: []
 blockers: []
 -->
 
-Last updated: 2026-05-07 (post-line-225 fix). Skew tracking implemented; matrix_test went from 135 raw failures (948/1083 raw match) to 3 raw failures (1080/1083 raw match, 99.7%) with line 225 also fixed locally → test now auto-promotes to **`ruffle_matched`** (verified locally via `verify_output.py::ruffle_subset_match`).
+Last updated: 2026-05-08 (CI confirmed). Skew tracking implemented; `matrix_test` is `ruffle_matched` in `from_gnash/misc-ming.all/_results/results.json`. All 7 phases landed. Plan moved from `incomplete/` to `complete/`.
 
-## Status: complete pending CI confirmation
+## Status: complete (CI confirmed)
 
 `mcGetEffectiveSize` previously transformed a `(0, 0, W, H)` box and rounded each transformed corner to twips before taking max-min. Under skewed timeline matrices, asymmetric position around the origin made per-component twip rounding leak a 1-twip error into the extent (e.g. `(a+c)*W = 7649.45 → round 7649` while the centered-shape equivalent rounds symmetrically to ±3825 → extent 7650, matching `getBounds(_root)` parity).
 
