@@ -3,9 +3,9 @@
 *Tests on the [ignored list](ruffle-tests/ignored_tests.txt) are excluded.*  
 *See [RUFFLE_RESULTS.md](RUFFLE_RESULTS.md) for unfiltered results.*
 
-**Commit:** `5a7e90329729`  
-**Date:** 2026-05-09 02:17 UTC  
-**Total duration:** 8m47s
+**Commit:** `4eada4640851`  
+**Date:** 2026-05-09 03:19 UTC  
+**Total duration:** 1h56m53s
 
 ## Results by Suite
 
@@ -29,13 +29,13 @@
 |-------|--------:|---------:|---------:|
 | avm1 | 95,697 | 95,875 | 99.8% |
 | from_gnash/actionscript.all | 15,393 | 16,957 | 90.8% |
-| from_gnash/misc-ming.all | 3,709 | 4,517 | 82.1% |
+| from_gnash/misc-ming.all | 3,723 | 4,517 | 82.4% |
 | from_gnash/misc-mtasc.all | 211 | 231 | 91.3% |
 | from_gnash/misc-swfc.all | 381 | 492 | 77.4% |
 | from_gnash/misc-swfmill.all | 49 | 51 | 96.1% |
 | from_shumway | 621 | 637 | 97.5% |
 | from_shumway/avm1 | 480 | 480 | 100% |
-| **Total** | **116,541** | **119,240** | **97.7%** |
+| **Total** | **116,555** | **119,240** | **97.7%** |
 
 ## Failure Breakdown
 
@@ -58,6 +58,7 @@ Tests with `output_mismatch` status but ≥80% of expected lines matching.
 | Suite | Test | Match Rate |
 |-------|------|----------:|
 | from_gnash/actionscript.all | array-v5 | 96% |
+| from_gnash/misc-ming.all | DrawingApiTest | 86% |
 | from_gnash/misc-ming.all | action_order/action_execution_order_test11 | 81% |
 
 ## Flash-Spec Results
@@ -74,59 +75,59 @@ Tests verified against Flash's actual output (`output.flash.txt`).
 
 - **Pass:** 604/608 (99.3%)
 - **Ignored:** 40 tests
-- **Duration:** 4m28s across 30 shards
+- **Duration:** 54m52s across 30 shards
 - **Lines:** 95,697/95,875 matching (99.8%)
-- **Avg test duration:** 0.4s — slowest: `bitmap_data_copypixels` (15.5s)
+- **Avg test duration:** 5.0s — slowest: `timeout` (22.1s)
 
 ### from_gnash/actionscript.all
 
 - **Pass:** 126/190 (66.3%)
-- **Duration:** 1m23s across 30 shards
+- **Duration:** 11m54s across 30 shards
 - **Lines:** 15,393/16,957 matching (90.8%)
-- **Avg test duration:** 0.4s — slowest: `BitmapData-v8` (20.2s)
+- **Avg test duration:** 3.7s — slowest: `LoadVars-v5` (18.9s)
 
 ### from_gnash/misc-ming.all
 
 - **Pass:** 65/100 (65.0%)
 - **Ignored:** 2 tests
-- **Duration:** 1m19s across 30 shards
-- **Lines:** 3,709/4,517 matching (82.1%)
-- **Avg test duration:** 0.7s — slowest: `EmbeddedFontTest` (20.6s)
+- **Duration:** 24m03s across 30 shards
+- **Lines:** 3,723/4,517 matching (82.4%)
+- **Avg test duration:** 14.0s — slowest: `matrix_test` (22.3s)
 
 ### from_gnash/misc-mtasc.all
 
 - **Pass:** 7/9 (77.8%)
-- **Duration:** 18s across 30 shards
+- **Duration:** 2m03s across 30 shards
 - **Lines:** 211/231 matching (91.3%)
-- **Avg test duration:** 1.9s — slowest: `exception` (15.8s)
+- **Avg test duration:** 13.6s — slowest: `hello` (18.0s)
 
 ### from_gnash/misc-swfc.all
 
 - **Pass:** 8/15 (53.3%)
 - **Ignored:** 1 tests
-- **Duration:** 20s across 30 shards
+- **Duration:** 4m08s across 30 shards
 - **Lines:** 381/492 matching (77.4%)
-- **Avg test duration:** 1.2s — slowest: `edittext_test1` (15.8s)
+- **Avg test duration:** 15.3s — slowest: `movieclip_destruction_test4` (18.7s)
 
 ### from_gnash/misc-swfmill.all
 
 - **Pass:** 17/18 (94.4%)
-- **Duration:** 18s across 30 shards
+- **Duration:** 5m19s across 30 shards
 - **Lines:** 49/51 matching (96.1%)
-- **Avg test duration:** 1.0s — slowest: `dict_callframe` (14.7s)
+- **Avg test duration:** 17.7s — slowest: `trace-as2/super` (18.9s)
 
 ### from_shumway
 
 - **Pass:** 73/76 (96.1%)
 - **Ignored:** 16 tests
-- **Duration:** 25s across 30 shards
+- **Duration:** 13m05s across 30 shards
 - **Lines:** 621/637 matching (97.5%)
-- **Avg test duration:** 0.2s — slowest: `avm1/duplicateMovieClip/name-coercion` (1.2s)
+- **Avg test duration:** 6.6s — slowest: `button3` (18.9s)
 
 ### from_shumway/avm1
 
 - **Pass:** 45/45 (100%)
 - **Ignored:** 2 tests
-- **Duration:** 14s across 30 shards
+- **Duration:** 1m26s across 30 shards
 - **Lines:** 480/480 matching (100%)
-- **Avg test duration:** 0.2s — slowest: `doactionorder/doactionorder` (1.4s)
+- **Avg test duration:** 1.5s — slowest: `label` (18.7s)
