@@ -18818,6 +18818,64 @@ static MovieClip* findOrCreateMovieClip(SWFAppContext* app_context, const char* 
 					VAL(u64, &var_val.data.numeric_value) = (u64)_vn_u16;
 					setProperty(app_context, props, "variable", 8, &var_val);
 				}
+				// Initialize the bound variable on the textfield's parent MC scope:
+				// for a simple-name binding, look up the value on the parent's
+				// dynamic_props (or var_map for a root-parented field) and use it as
+				// the textfield text if it already exists; otherwise create the
+				// variable on the parent's scope with the initial text. This mirrors
+				// Ruffle's EditText::set_variable behavior at placement time so that
+				// `mcN.bound_var` reflects the textfield's initial text and changes
+				// to either side stay in sync via ng_syncTextToVar / actionSetMember.
+				if (var_name[0] != '\0' && strchr(var_name, '.') == NULL)
+				{
+					extern MovieClip root_movieclip;
+					MovieClip* binding_mc = (mc->parent != NULL) ? mc->parent : &root_movieclip;
+					ActionVar existing_val = {0};
+					int has_existing = 0;
+					u32 var_name_len = (u32)strlen(var_name);
+					if (binding_mc->dynamic_props != NULL) {
+						ActionVar* ev = getProperty((ASObject*) binding_mc->dynamic_props, var_name, var_name_len);
+						if (ev != NULL && ev->type != ACTION_STACK_VALUE_UNDEFINED) {
+							existing_val = *ev;
+							has_existing = 1;
+						}
+					}
+					if (!has_existing && binding_mc == &root_movieclip) {
+						extern bool hasVariable(char* var_name, size_t key_size);
+						if (hasVariable((char*)var_name, var_name_len)) {
+							PUSH_STR(var_name, var_name_len);
+							actionGetVariable(app_context);
+							peekVar(app_context, &existing_val);
+							POP();
+							if (existing_val.type != ACTION_STACK_VALUE_UNDEFINED)
+								has_existing = 1;
+						}
+					}
+					if (has_existing) {
+						// Bind: textfield.text comes from the existing variable value.
+						setProperty(app_context, props, "text", 4, &existing_val);
+						ActionVar _len_v = {0}; _len_v.type = ACTION_STACK_VALUE_F64;
+						u32 _ev_len = (existing_val.type == ACTION_STACK_VALUE_STRING) ? existing_val.str_size : 0;
+						VAL(double, &_len_v.data.numeric_value) = (double)_ev_len;
+						setProperty(app_context, props, "length", 6, &_len_v);
+					} else if (text_val.type == ACTION_STACK_VALUE_STRING && text_val.str_size > 0) {
+						// Create the bound variable on the parent's scope, seeded
+						// with the textfield's initial text (already in `text_val`).
+						// Skip auto-init when initial text is empty — Flash leaves
+						// the variable undefined in that case (mc4/mc5 in
+						// DefineEditTextVariableNameTest assert
+						// `typeof(mc4.uninitalized_text_var) == 'undefined'`
+						// before any explicit text is set).
+						if (binding_mc->dynamic_props == NULL) {
+							binding_mc->dynamic_props = (void*) allocObject(app_context, 4);
+							retainObject((ASObject*) binding_mc->dynamic_props);
+						}
+						setProperty(app_context, (ASObject*) binding_mc->dynamic_props,
+							var_name, var_name_len, &text_val);
+						if (binding_mc == &root_movieclip)
+							setVariableByName(var_name, &text_val);
+					}
+				}
 				// autoSize
 				ActionVar autosize_val = {0}; autosize_val.type = ACTION_STACK_VALUE_STRING;
 				if (tf_flags & 0x0100) { autosize_val.str_size = 4; VAL(u64, &autosize_val.data.numeric_value) = (u64)u16_left; }
@@ -22355,26 +22413,59 @@ static void ng_syncTextToVar(SWFAppContext* app_context, MovieClip* mc, ActionVa
 		return;
 	}
 
-	// Simple variable name — update global variable
-	setVariableByName(var_name, text_value);
-	// Also mirror to _root.dynamic_props so _root.varName reads the new value
-	// and hasOwnProperty returns true (matches actionSetVariable + actionSetMember
-	// on _root, both of which update dynamic_props alongside var_map).
+	// Simple variable name — bind to parent MovieClip's scope.
+	// In Flash AVM1, an unqualified textfield variable resolves against the
+	// parent MovieClip's stage object (Ruffle: EditText::bindings target a
+	// resolved path from the parent's scope). For textfields directly on
+	// _root the parent is &root_movieclip, so the legacy global var_map +
+	// root.dynamic_props sync still applies; for textfields inside a child
+	// sprite the binding lives on the parent MC's dynamic_props only.
+	extern MovieClip root_movieclip;
+	MovieClip* binding_mc = (mc->parent != NULL) ? mc->parent : &root_movieclip;
+	u32 var_name_simple_len = (u32)strlen(var_name);
+	if (binding_mc->dynamic_props == NULL) {
+		binding_mc->dynamic_props = (void*) allocObject(app_context, 4);
+		retainObject((ASObject*) binding_mc->dynamic_props);
+	}
+	// Honor ASSetPropFlags read-only locks on the bound variable: if the
+	// existing entry has WRITABLE cleared, skip the write so a textfield
+	// edit cannot bypass the lock (matches Flash AVM1: ASSetPropFlags-locked
+	// vars are not auto-updated by their bound textfields). Test:
+	// DefineEditTextVariableNameTest mc7 (`ASSetPropFlags(_root.mc7, null, 7, 7)`
+	// makes `mc7.text_var7` read-only — a subsequent `mc7.textfield.text` edit
+	// must leave `mc7.text_var7` at its previous value).
+	int writable_ok = 1;
 	{
-		extern MovieClip root_movieclip;
-		if (root_movieclip.dynamic_props == NULL) {
-			root_movieclip.dynamic_props = (void*) allocObject(app_context, 4);
-			retainObject((ASObject*) root_movieclip.dynamic_props);
+		ASObject* _bp = (ASObject*) binding_mc->dynamic_props;
+		for (u32 _i = 0; _i < _bp->num_used; _i++) {
+			if (_bp->properties[_i].name == NULL) continue;
+			if (_bp->properties[_i].name_length == var_name_simple_len &&
+			    strncmp(_bp->properties[_i].name, var_name, var_name_simple_len) == 0) {
+				if (!(_bp->properties[_i].flags & PROPERTY_FLAG_WRITABLE))
+					writable_ok = 0;
+				break;
+			}
 		}
-		setProperty(app_context, (ASObject*) root_movieclip.dynamic_props,
-			var_name, (u32)strlen(var_name), text_value);
+	}
+	if (writable_ok) {
+		setProperty(app_context, (ASObject*) binding_mc->dynamic_props,
+			var_name, var_name_simple_len, text_value);
+		if (binding_mc == &root_movieclip) {
+			// Root-bound textfield: also sync to var_map so bare-name lookups
+			// (`varName` without `_root.` prefix) find the new value.
+			setVariableByName(var_name, text_value);
+		}
 	}
 
-	// Also sync to all other text fields with the same binding
+	// Also sync to all other text fields with the same binding in the same
+	// scope (i.e., sharing the same parent MC). Bindings in different parent
+	// scopes are independent — only same-scope siblings should propagate.
 	u32 var_name_len = strlen(var_name);
+	(void)var_name_len;
 	for (int i = 0; i < child_mc_count; i++) {
 		MovieClip* other = child_mc_cache[i];
 		if (other == mc || other == NULL || other->ng_textfield_idx < 0) continue;
+		if (other->parent != binding_mc) continue;
 		ASObject* other_props = (ASObject*) other->dynamic_props;
 		if (other_props == NULL) continue;
 		ActionVar* other_var = getProperty(other_props, "variable", 8);
@@ -42866,7 +42957,25 @@ void actionSetMember(SWFAppContext* app_context)
 				else
 					_bd_buf[0] = '\0';
 				const char* bound = _bd_buf;
-				if (bound[0] == '\0' || strchr(bound, '.') == NULL) continue;
+				if (bound[0] == '\0') continue;
+				if (strchr(bound, '.') == NULL) {
+					// Simple-name binding: matches a write on the textfield's
+					// parent MovieClip when the property name equals the binding.
+					// (Ruffle EditText bindings: an unqualified `variable` resolves
+					// against the textfield's parent stage object.)
+					if (mc != &root_movieclip && tf_mc->parent == mc &&
+						strlen(bound) == prop_name_len &&
+						strncmp(bound, prop_name, prop_name_len) == 0) {
+						setProperty(app_context, tf_props, "text", 4, &value_var);
+						ActionVar len_val = {0};
+						len_val.type = ACTION_STACK_VALUE_F64;
+						if (value_var.type == ACTION_STACK_VALUE_STRING) {
+							VAL(double, &len_val.data.numeric_value) = (double)value_var.str_size;
+						}
+						setProperty(app_context, tf_props, "length", 6, &len_val);
+					}
+					continue;
+				}
 				// Check if binding ends with ".prop_name"
 				const char* last_dot = strrchr(bound, '.');
 				if (last_dot == NULL) continue;

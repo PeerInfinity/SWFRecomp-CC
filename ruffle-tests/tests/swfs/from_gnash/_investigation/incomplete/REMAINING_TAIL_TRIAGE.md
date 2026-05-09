@@ -1,6 +1,35 @@
 # Remaining Tail Triage
 
-<!-- TESTS: DefineEditTextVariableNameTest, EmbeddedFontTest, DrawingApiTest, NetStream-SquareTest, masks_test, movieclip_destruction_test4, action_order/action_execution_order_test6 -->
+<!-- TESTS: EmbeddedFontTest, DrawingApiTest, NetStream-SquareTest, masks_test, movieclip_destruction_test4, action_order/action_execution_order_test6 -->
+<!-- PROMOTED (removed from TESTS, 2026-05-09):
+  - DefineEditTextVariableNameTest → PASS 72/72 (was 49/72, output_mismatch).
+    Three paired AVM1 textfield-binding fixes:
+    1) ng_syncTextToVar (action.c ~22358): simple-name binding now resolves
+       against the textfield's parent MC scope (not always _root). Sibling
+       sync also filters by shared parent so unrelated same-name bindings
+       in different scopes don't cross-talk.
+    2) ng_syncTextToVar respects ASSetPropFlags read-only locks: skips the
+       write when the existing entry on the parent has WRITABLE cleared
+       (so `mc.textfield.text = X` cannot bypass `ASSetPropFlags(mc,null,7,7)`
+       on `mc.bound_var`).
+    3) findOrCreateMovieClip nested textfield init (action.c ~18821):
+       on placement with a simple-name binding, look up the variable on
+       the parent MC scope (or var_map for root parent) and bind the
+       textfield text to the existing value, OR auto-create the variable
+       seeded with the textfield's initial text. Skip auto-create when
+       initial text is empty (Flash leaves the variable undefined in that
+       case — DefineEditTextVariableNameTest mc4/mc5).
+    The corresponding actionSetMember MOVIECLIP path (action.c ~42852)
+    now also fires the var→text sync for simple-name bindings on non-root
+    MCs (was only handling dot-paths). Verified regression-free across
+    the avm1 textfield/variable battery (textfield_text, textfield_variable,
+    watch_textfield, clone_sprite_edittext, clone_sprite_edittext_dynamic,
+    nested_textfields_in_buttons, watch, edittext_default_format,
+    edittext_html_*, etc.), the as_set_prop_flags battery (8 tests), and
+    the misc-ming.all near-passing battery (DefineEditTextTest, DefineTextTest,
+    PlaceObject2Test, attachMovie* etc.). -->
+
+
 <!-- PROMOTED (removed from TESTS):
   - matrix_test → ruffle_matched 2026-05-08 (see complete/MATRIX_TEST_SKEW_PLAN.md)
   - duplicate_movie_clip_test → ruffle_matched 2026-05-08 (CLONESPRITE_DEPTH_BIAS work)
@@ -302,24 +331,19 @@ pass. Full PASS still requires the FP precision and mouse-click
 issues described originally; deferred until those root causes have a
 home.
 
-### DefineEditTextVariableNameTest (68.1%, 49/72)
+### ~~DefineEditTextVariableNameTest~~ — RESOLVED to PASS (2026-05-09)
 
-**Symptom.** Per `MISC_MING_SWFC_PLAN.md`: every check from
-`mc4.uninitalized_text_var == 'string'` (line 340) onward is
-duplicated in our output. Earlier checks fire once; later checks
-fire twice. Looks like a frame loops back and re-runs a sub-range
-of the timeline.
-
-**Hypothesis.** v2 of this test (`DefineEditTextVariableNameTest2`)
-already PASSES (39/39 — fixed 2026-04-23). v1 has more frames; the
-extra frames presumably do something v2 doesn't (e.g., explicit
-`gotoAndPlay` back to an earlier frame, or a different SWF
-structure that hits a frame-replay bug). Likely overlaps
-`GOTO_CATCHUP_HYGIENE_PLAN.md` Phase 4 (sprite double-fire on
-nested goto).
-
-**Scope.** 2-3 hours of investigation; may resolve as a free
-benefit of GOTO_CATCHUP_HYGIENE Phase 4 landing.
+Now PASS 72/72. Original triage misread the diff: the duplicated
+counter lines at end-of-output are correct (Dejagnu xtrace mirrors
+`#passed` / `#failed` / `#total` to both stdout and the
+`_xtrace_win` textfield), and the FAILED-line pairs were the same
+xtrace mirror. Real bug was AVM1 textfield variable-binding scope:
+unqualified `variable` on a textfield inside a child sprite was
+binding to `_root` global / `_root.dynamic_props` instead of the
+textfield's parent MC, and the placement-time auto-init was missing.
+Fix landed via three paired changes (see PROMOTED comment at top of
+this doc). Verified no regressions in the textfield-binding,
+ASSetPropFlags, and misc-ming.all near-passing batteries.
 
 ### EmbeddedFontTest (58.6%, 51/87) and DrawingApiTest (86.0%, 80/93)
 
