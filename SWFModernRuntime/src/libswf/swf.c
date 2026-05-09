@@ -231,6 +231,19 @@ void tagMain(SWFAppContext* app_context)
 
 		current_frame = next_frame;
 
+#ifdef OFFSCREEN_RENDER
+		// Finalize MCs marked for pending removal in the previous frame.
+		// Mirrors swf_core.c's frame-start hook (around line 955). Without
+		// this, AS-level removeMovieClip / tag RemoveObject2 with onUnload
+		// handlers leave dynamic_props and var_map bindings live, so
+		// `typeof(_root.clipN)` reports 'movieclip' on the next frame
+		// instead of 'undefined'. Key test: avm1/unload.
+		{
+			extern void actionFinalizePendingRemovals(SWFAppContext* app_context);
+			actionFinalizePendingRemovals(app_context);
+		}
+#endif
+
 		// Per-frame AS2 input dispatch.
 		// In NO_GRAPHICS mode swf_core.c dispatches these per event; here we
 		// dispatch per frame based on the flags + state set by render_webgpu.c's
@@ -382,10 +395,58 @@ void tagMain(SWFAppContext* app_context)
 
 		app_context->mouse.clicked = 0;
 		app_context->mouse.released = 0;
+
+#ifdef OFFSCREEN_RENDER
+		// Advance root-level sprites BEFORE root frame_func runs, mirroring
+		// swf_core.c's two-phase order. Each sprite's frame_func queues its
+		// script via actionQueueSpriteScript; the recompiler-emitted
+		// actionDrainAllInPriorityOrder at the top of root frame_funcs[current_frame]
+		// drains those scripts before the root's own DoAction. Without this
+		// call, sprite frame_funcs (frame > 0) never run.
+		{
+			extern void advance_sprite_frames(SWFAppContext* app_context);
+			extern int g_advance_defer_nested;
+			g_advance_defer_nested = 1;
+			advance_sprite_frames(app_context);
+			g_advance_defer_nested = 0;
+		}
+
+		// Mark ENTER_FRAME dispatch pending. tagFlushPendingEnterFrame is
+		// called by the recompiler-emitted code right before each DoAction
+		// (after RemoveObject) and dispatches clip event ENTER_FRAME +
+		// AS2 onEnterFrame handlers. Mirrors swf_core.c line ~985.
+		{
+			extern int g_enterframe_flush_pending;
+			g_enterframe_flush_pending = 1;
+		}
+#endif
+
 		if (current_frame < g_frame_count && frame_funcs[current_frame] != NULL)
 		{
 			frame_funcs[current_frame](app_context);
 		}
+
+#ifdef OFFSCREEN_RENDER
+		// Fallback flush: if frame_func didn't run (root stopped,
+		// past-last-frame, ...), flush enter_frame here so clip event
+		// ENTER_FRAME and onEnterFrame handlers still fire.
+		{
+			extern int g_enterframe_flush_pending;
+			extern void tagFlushPendingEnterFrame(SWFAppContext*);
+			if (g_enterframe_flush_pending)
+				tagFlushPendingEnterFrame(app_context);
+		}
+
+		// Phase 3: advance nested sprite children (deferred from Phase 1
+		// via g_advance_defer_nested above).
+		{
+			extern void advance_nested_sprite_frames(SWFAppContext* app_context);
+			advance_nested_sprite_frames(app_context);
+		}
+		// Drain any sprite SCRIPT entries queued during advance_*_sprite_frames
+		// that the recompiler-emitted in-frame drain didn't cover.
+		actionDrainActionQueueByKind(app_context, AQ_KIND_SCRIPT);
+#endif
 		if (manual_next_frame)
 		{
 			// Goto/play command set next_frame directly
