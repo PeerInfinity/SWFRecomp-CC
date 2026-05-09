@@ -179,10 +179,12 @@ if [ "$HEADLESS_FLAG" = true ]; then
     cp "${SWFMODERN_SRC}/rendering/render_webgpu.c" "${BUILD_DIR}/"
 elif [ "$GRAPHICS_FLAG" = true ]; then
     echo "Using GRAPHICS mode (WebGPU) for ${TARGET} build..."
+    cp "${SWFMODERN_SRC}/actionmodern/action_queue.c" "${BUILD_DIR}/"
     cp "${SWFMODERN_SRC}/libswf/swf.c" "${BUILD_DIR}/"
     cp "${SWFMODERN_SRC}/libswf/tag.c" "${BUILD_DIR}/"
     cp "${SWFMODERN_SRC}/libswf/ng_shared.c" "${BUILD_DIR}/"
     cp "${SWFMODERN_SRC}/libswf/hit_test.c" "${BUILD_DIR}/"
+    cp "${SWFMODERN_SRC}/libswf/graphics_stubs.c" "${BUILD_DIR}/"
     cp "${SWFMODERN_SRC}/rendering/render_webgpu.c" "${BUILD_DIR}/"
     cp "${SWFMODERN_SRC}/audio/audio.c" "${BUILD_DIR}/"
     cp "${SWFMODERN_SRC}/audio/audio_output_web.c" "${BUILD_DIR}/"
