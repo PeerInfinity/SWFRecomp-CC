@@ -421,7 +421,11 @@ void tagMain(SWFAppContext* app_context)
 		}
 #endif
 
-		if (current_frame < g_frame_count && frame_funcs[current_frame] != NULL)
+		if (current_frame < g_frame_count && frame_funcs[current_frame] != NULL
+#ifdef OFFSCREEN_RENDER
+		    && (is_playing || manual_next_frame)
+#endif
+		    )
 		{
 			frame_funcs[current_frame](app_context);
 		}
@@ -453,6 +457,25 @@ void tagMain(SWFAppContext* app_context)
 		{
 			extern void input_events_pump_tick(SWFAppContext* app_context);
 			input_events_pump_tick(app_context);
+		}
+
+		// Mirror swf_headless.c (line ~1208) / swf_core.c (line ~1309): fire
+		// AS2 setInterval/setTimeout callbacks, LoadVars onData, and end-of-frame
+		// hooks. Without processTimers, setInterval-driven callbacks never run
+		// in graphics-native, so any test relying on them (Dejagnu's
+		// setInterval(checkIt, ...) — every actionscript.all test) gets stuck
+		// because the only checkIt invocation path left (onEnterFrame) bails
+		// inside enterFrame dispatch via the g_inside_enterframe_dispatch guard
+		// in actionGotoFrame.
+		{
+			extern void processTimers(SWFAppContext*, double);
+			extern void processLoadVarsLoads(SWFAppContext*);
+			extern void actionFlushPendingOnLoads(SWFAppContext*);
+			double frame_duration_ms = (app_context->fps > 0) ? (1000.0 / app_context->fps) : 83.33;
+			actionFlushPendingOnLoads(app_context);
+			processTimers(app_context, frame_duration_ms);
+			processLoadVarsLoads(app_context);
+			actionFlushPendingOnLoads(app_context);
 		}
 #endif
 		if (manual_next_frame)
@@ -594,7 +617,34 @@ void swfStart(SWFAppContext* app_context)
 
 	renderer_init(app_context, context);
 
+#ifdef OFFSCREEN_RENDER
+	// Initialize root display sentinel and set root_movieclip.display_obj.
+	// Mirrors swf_core.c (line ~815) and swf_headless.c (line ~862). Without
+	// this, root_movieclip.display_obj is NULL when actionImportAssets runs
+	// from frame_0, and the imported SWF's init code that resolves through
+	// _root or g_current_context misses the root sentinel. Key cluster:
+	// from_gnash/actionscript.all (Dejagnu.swf-based tests).
+	{
+		extern void ng_sync_root_display_obj(void);
+		extern void* ng_get_root_display_obj(void);
+		extern MovieClip root_movieclip;
+		ng_sync_root_display_obj();
+		root_movieclip.display_obj = ng_get_root_display_obj();
+	}
+#endif
+
 	tagInit(app_context);
+
+#ifdef OFFSCREEN_RENDER
+	// Set root movieclip as default execution context (for 'this' resolution).
+	// Mirrors swf_core.c / swf_headless.c. Without this g_current_context is
+	// NULL when frame_0 runs, breaking actions that resolve through the
+	// current MC (e.g., DefineFunction / SetVariable inside imported SWFs).
+	{
+		extern MovieClip root_movieclip;
+		actionSetCurrentContext(&root_movieclip);
+	}
+#endif
 
 	tagMain(app_context);
 
