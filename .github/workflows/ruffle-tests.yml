@@ -390,6 +390,12 @@ jobs:
           # Discard working tree so we can switch branches cleanly. Files
           # we need are already in /tmp.
           git reset --hard HEAD
+          # Also delete untracked `*_previous.json` files written by the
+          # "Fetch previous results" step. They're untracked on master but
+          # tracked on ruffle-test-results, so the checkout below would
+          # refuse with "untracked working tree files would be overwritten".
+          # The ones we need are already saved to /tmp/results_backup.
+          find ruffle-tests/tests/swfs -path '*/_results/*_previous.json' -delete 2>/dev/null || true
 
           # Inherit from existing ruffle-test-results so prior runs' results
           # (in any mode) are preserved. Falls back to current HEAD if the
@@ -1158,6 +1164,12 @@ jobs:
           # Discard working tree so we can switch branches cleanly. Files
           # we need are already in /tmp.
           git reset --hard HEAD
+          # Also delete untracked `*_previous.json` files written by the
+          # "Fetch previous results" step. They're untracked on master but
+          # tracked on ruffle-test-results, so the checkout below would
+          # refuse with "untracked working tree files would be overwritten".
+          # The ones we need are already saved to /tmp/results_backup.
+          find ruffle-tests/tests/swfs -path '*/_results/*_previous.json' -delete 2>/dev/null || true
 
           # Inherit from existing ruffle-test-results so prior runs' results
           # (in any mode) are preserved. Falls back to current HEAD if the
