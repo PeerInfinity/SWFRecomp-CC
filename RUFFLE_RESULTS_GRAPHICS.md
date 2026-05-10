@@ -97,6 +97,10 @@ Tests with `output_mismatch` status but ≥80% of expected lines matching.
 | avm1 | tell_target_invalid_swf6 | 80% |
 | from_gnash/misc-ming.all | ResolveEventsTest | 80% |
 
+## Changes Since Last Run
+
+*No changes since last run.*
+
 ## Per-Suite Details
 
 ### avm1

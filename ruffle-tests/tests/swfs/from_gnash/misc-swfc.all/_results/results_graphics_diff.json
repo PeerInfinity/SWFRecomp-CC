@@ -1,0 +1,33 @@
+{
+  "metadata": {
+    "old_timestamp": "2026-05-10T18:18:09.582321+00:00",
+    "old_git_sha": "ebaa7506c162a10516bd98f8d61fdf2f422b2337",
+    "new_timestamp": "2026-05-10T18:18:09.582321+00:00",
+    "new_git_sha": "ebaa7506c162a10516bd98f8d61fdf2f422b2337",
+    "partial": false,
+    "same_commit": true
+  },
+  "summary": {
+    "old_pass": 6,
+    "old_ruffle_matched": 5,
+    "old_effective_pass": 11,
+    "old_total": 16,
+    "old_pass_rate": 37.5,
+    "new_pass": 6,
+    "new_ruffle_matched": 5,
+    "new_effective_pass": 11,
+    "new_total": 16,
+    "new_pass_rate": 37.5,
+    "old_mismatched_lines": 167,
+    "new_mismatched_lines": 167,
+    "increased_mismatches": 0,
+    "decreased_mismatches": 0,
+    "newly_passing": 0,
+    "newly_failing": 0,
+    "status_changed": 0,
+    "unchanged": 16,
+    "added": 0,
+    "removed": 0
+  },
+  "changes": []
+}
