@@ -1,74 +1,53 @@
 # Ruffle Test Results Diff
 
-**Previous:** `7767c2657e47` (2026-05-10T21:29:58.632068+00:00)
-**Current:** `ab614b80ddcf` (2026-05-10T22:54:41.151328+00:00)
+**Previous:** `ab614b80ddcf` (2026-05-10T22:54:41.151328+00:00)
+**Current:** `e527f410660e` (2026-05-10T23:40:32.507025+00:00)
 
 ## Summary
 
 | Metric | Previous | Current | Delta |
 |--------|----------|---------|-------|
-| Passing | 510 | 513 | +3 |
+| Passing | 513 | 523 | +10 |
 | Total | 651 | 651 | 0 |
-| Pass rate | 78.3% | 78.8% | +0.5% |
-| Mismatched lines | 11986 | 10988 | -998 |
-|   Decreased | | | -1153 |
-|   Increased | | | +155 |
+| Pass rate | 78.8% | 80.3% | +1.5% |
+| Mismatched lines | 10988 | 10586 | -402 |
+|   Decreased | | | -402 |
 
-## Newly Passing (8)
+## Newly Passing (11)
 
 | Test | Previous Status | Lines (prev) | Lines (now) |
 |------|----------------|--------------|-------------|
-| `bad_placeobject_clipaction` | output_mismatch | 1/2 | 2/2 |
-| `drag_drop` | output_mismatch | 1/10 | 10/10 |
-| `mouse_pos` | output_mismatch | 8/665 | 665/665 |
-| `mouse_pos_with_scale_factor` | output_mismatch | 8/260 | 260/260 |
-| `slash_syntax` | output_mismatch | 0/14 | 14/14 |
-| `target_clip_swf5` | output_mismatch | 0/2 | 2/2 |
-| `target_clip_swf6` | output_mismatch | 0/2 | 2/2 |
-| `tell_target` | output_mismatch | 0/37 | 37/37 |
+| `button_keypress` | output_mismatch | 1/3 | 3/3 |
+| `call` | output_mismatch | 0/63 | 63/63 |
+| `execution_order1` | output_mismatch | 4/5 | 5/5 |
+| `execution_order2` | output_mismatch | 7/7 | 7/7 |
+| `execution_order4` | output_mismatch | 12/12 | 12/12 |
+| `function_base_clip` | output_mismatch | 0/8 | 8/8 |
+| `goto_frame` | output_mismatch | 3/12 | 12/12 |
+| `goto_label` | output_mismatch | 3/17 | 17/17 |
+| `target_clip_removed` | output_mismatch | 5/5 | 5/5 |
+| `tell_target_invalid` | output_mismatch | 5/6 | 6/6 |
+| `tell_target_invalid_swf6` | output_mismatch | 4/5 | 5/5 |
 
-## Newly Failing (5)
+## Newly Failing (1)
 
 | Test | New Status | Lines (prev) | Lines (now) |
 |------|-----------|--------------|-------------|
-| `create_empty_movie_clip` | output_mismatch | 3/3 | 3/3 |
-| `form_loader_encoding_1` | output_mismatch | 1/1 | 1/1 |
-| `issue_2084` | output_mismatch | 16/16 | 16/16 |
-| `loadmovie_replace_root` | output_mismatch | 5/5 | 5/5 |
-| `textfield_cache_as_bitmap` | output_mismatch | 1/1 | 1/1 |
+| `issue_9885` | output_mismatch | 2/2 | 2/2 |
 
-## Status Changed (5)
+## Status Changed (2)
 
 | Test | Previous | Current | Lines (prev) | Lines (now) |
 |------|----------|---------|--------------|-------------|
-| `form_loader_encoding_4` | ruffle_matched | output_mismatch | 1/3 | 1/3 |
-| `movieclip_invalid_get_bounds_6` | output_mismatch | runtime_error | 4/10 | 2/10 |
-| `movieclip_invalid_get_bounds_7` | output_mismatch | runtime_error | 4/10 | 2/10 |
-| `movieclip_library_state_values` | ruffle_matched | output_mismatch | 71/78 | 70/78 |
-| `native_objects_swf6` | segfault | output_mismatch | 9/115 | 114/115 |
+| `movieclip_invalid_get_bounds_6` | runtime_error | output_mismatch | 2/10 | 2/10 |
+| `movieclip_invalid_get_bounds_7` | runtime_error | output_mismatch | 2/10 | 2/10 |
 
-## Line Count Changed (21)
+## Line Count Changed (5)
 
 | Test | Status | Lines (prev) | Lines (now) | Diff |
 |------|--------|--------------|-------------|------|
-| `localconnection` | output_mismatch | 63/579 | 111/579 | -48 |
-| `sound_duration_position_props` | output_mismatch | 20/290 | 38/290 | -18 |
-| `movieclip_state_values` | output_mismatch | 3/114 | 11/114 | -8 |
-| `button_order` | output_mismatch | 2/2 | 2/2 | 0 |
-| `edittext_ime_focus_lost` | output_mismatch | 0/7 | 0/7 | 0 |
-| `form_loader_encoding_3` | output_mismatch | 1/3 | 1/3 | 0 |
-| `loadmovie_var_persistence` | output_mismatch | 2/8 | 2/8 | 0 |
-| `loadmovienum_cross_version_prototype` | output_mismatch | 1/9 | 1/9 | 0 |
-| `loadvariables2` | output_mismatch | 2/8 | 2/8 | 0 |
-| `movieclip_lockroot` | output_mismatch | 16/29 | 16/29 | 0 |
-| `netconnection_send_remote` | output_mismatch | 2/50 | 2/50 | 0 |
-| `netstream_play_flv` | output_mismatch | 2/21 | 2/21 | 0 |
-| `set_interval` | output_mismatch | 17/27 | 17/27 | 0 |
-| `movieclip_invalid_get_bounds_5` | output_mismatch | 6/11 | 4/11 | +2 |
-| `movieclip_invalid_get_bounds_8` | output_mismatch | 6/11 | 4/11 | +2 |
-| `movieclip_invalid_get_bounds_1` | output_mismatch | 13/75 | 9/75 | +4 |
-| `movieclip_invalid_get_bounds_2` | output_mismatch | 13/75 | 9/75 | +4 |
-| `movieclip_invalid_get_bounds_3` | output_mismatch | 8/13 | 4/13 | +4 |
-| `movieclip_invalid_get_bounds_4` | output_mismatch | 8/13 | 4/13 | +4 |
-| `global_instance_decls` | output_mismatch | 23/758 | 15/758 | +8 |
-| `global_proto_decls` | segfault | 862/4497 | 740/4497 | +122 |
+| `movieclip_hittest_shapeflag` | output_mismatch | 193/338 | 329/338 | -136 |
+| `global_proto_decls` | segfault | 740/4497 | 862/4497 | -122 |
+| `goto_frame2` | output_mismatch | 4/44 | 39/44 | -35 |
+| `global_instance_decls` | output_mismatch | 15/758 | 23/758 | -8 |
+| `removed_clip_halts_script` | output_mismatch | 3/15 | 5/15 | -2 |
