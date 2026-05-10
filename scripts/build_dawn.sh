@@ -52,10 +52,16 @@ mkdir -p build
 cd build
 
 # Static library, no GUI deps (no GLFW / X11 / Wayland).
-# DAWN_USE_BUILT_DXC is needed on Windows but a no-op on Linux.
+#
+# DAWN_ENABLE_INSTALL=ON is REQUIRED — Dawn's CMake by default only
+# installs the `tint` binaries; it omits libwebgpu_dawn.a and the
+# webgpu/dawn headers unless this option is set + DAWN_BUILD_MONOLITHIC_LIBRARY
+# is STATIC or SHARED (STATIC is the default).
 cmake .. -GNinja \
     -DCMAKE_BUILD_TYPE=Release \
     -DCMAKE_INSTALL_PREFIX="$INSTALL_PREFIX" \
+    -DDAWN_ENABLE_INSTALL=ON \
+    -DDAWN_BUILD_MONOLITHIC_LIBRARY=STATIC \
     -DDAWN_BUILD_SAMPLES=OFF \
     -DDAWN_USE_GLFW=OFF \
     -DDAWN_USE_X11=OFF \
