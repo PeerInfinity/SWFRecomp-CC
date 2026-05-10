@@ -20,9 +20,12 @@
 
 set -euo pipefail
 
-# Pinned Dawn ref. Bump this when the SWFModernRuntime renderer needs a
-# newer WebGPU API surface. Changing this value invalidates the CI cache.
-DAWN_REF="chromium/6478"
+# Pinned Dawn commit. This SHA matches what was built locally for
+# ~/CC/dawn-install on 2026-03-07 (from main: "Remove stale WebGPU Compat
+# CTS expectations"). The renderer code in SWFModernRuntime/src/rendering/
+# was tested against this version. Bump only when intentionally upgrading
+# Dawn — changing this value invalidates the CI cache.
+DAWN_REF="620a520f5029e14b57a0b58096c022e339b1857b"
 
 INSTALL_PREFIX="${1:?Usage: $0 <install-prefix>}"
 INSTALL_PREFIX="$(realpath -m "$INSTALL_PREFIX")"
@@ -32,10 +35,15 @@ trap 'rm -rf "$WORK_DIR"' EXIT
 
 echo "=== Building Dawn ($DAWN_REF) → $INSTALL_PREFIX ==="
 
+# Shallow fetch by commit SHA. `git clone --branch` doesn't accept arbitrary
+# SHAs, so we init + fetch + checkout instead.
 cd "$WORK_DIR"
-git clone --depth 1 --branch "$DAWN_REF" \
-    https://dawn.googlesource.com/dawn dawn-src
+mkdir dawn-src
 cd dawn-src
+git init -q
+git remote add origin https://dawn.googlesource.com/dawn
+git fetch --depth 1 origin "$DAWN_REF"
+git checkout -q FETCH_HEAD
 
 # Dawn's dependency fetcher (replaces the older `gclient sync` flow).
 python3 tools/fetch_dawn_dependencies.py
