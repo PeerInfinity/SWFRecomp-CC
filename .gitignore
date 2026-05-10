@@ -145,3 +145,6 @@ docs/local_catalog.json
 SWFRecomp/tests/local_batch/
 local_swf_batch/*.swf
 local_swf_batch/*.SWF
+
+# AI agent handoff scratch directory (cross-instance messages, runtime probes)
+.ai_handoff/
