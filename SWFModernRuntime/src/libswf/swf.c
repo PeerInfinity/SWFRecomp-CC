@@ -585,9 +585,6 @@ void swfStart(SWFAppContext* app_context)
 	context->cxform_data = app_context->cxform_data;
 	context->cxform_data_size = app_context->cxform_data_size;
 
-	dictionary = malloc(INITIAL_DICTIONARY_CAPACITY*sizeof(Character));
-	display_list = malloc(INITIAL_DISPLAYLIST_CAPACITY*sizeof(DisplayObject));
-
 	// Allocate stack into app_context (use system malloc, not heap - stack is allocated before heap_init)
 	app_context->stack = (char*) malloc(INITIAL_STACK_SIZE);
 	app_context->sp = INITIAL_SP;
@@ -607,6 +604,21 @@ void swfStart(SWFAppContext* app_context)
 	// Initialize heap allocator (must be before renderer_init which uses HALLOC)
 	if (!heap_init(app_context, 0)) {  // 0 = use default size (64 MB)
 		fprintf(stderr, "Failed to initialize heap allocator\n");
+		return;
+	}
+
+	// Allocate display state via HCALLOC so grow_ptr's HALLOC + FREE pair works.
+	// Must use HCALLOC (heap allocator) so grow_ptr can FREE them without
+	// passing a system-malloc'd pointer to heap_free. Mirrors swf_core.c
+	// (line ~807) / swf_headless.c (line ~845). With system malloc here, the
+	// first display_list/dictionary growth during execution called HALLOC for
+	// the new buffer and FREE on the old malloc'd one, leaving an "invalid
+	// pointer" entry that heap_shutdown traversal hits at exit — surfaces as
+	// "SIGSEGV (output matches)" on any test that grows the display list.
+	dictionary = HCALLOC(INITIAL_DICTIONARY_CAPACITY, sizeof(Character));
+	display_list = HCALLOC(INITIAL_DISPLAYLIST_CAPACITY, sizeof(DisplayObject));
+	if (!dictionary || !display_list) {
+		fprintf(stderr, "Failed to allocate display state\n");
 		return;
 	}
 
@@ -657,9 +669,6 @@ void swfStart(SWFAppContext* app_context)
 	freeMap();
 
 	free(app_context->stack);
-
-	free(dictionary);
-	free(display_list);
 }
 
 // Focus rect stub — wasm graphics only. action.c's widened arm provides
