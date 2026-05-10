@@ -1,13 +1,11 @@
 {
   "metadata": {
-    "timestamp": "2026-05-10T21:29:58.664721+00:00",
-    "git_sha": "7767c2657e471050628b646e18adee298ab181b1",
-    "duration_seconds": 7.86,
+    "timestamp": "2026-05-10T18:18:09.574531+00:00",
+    "git_sha": "ebaa7506c162a10516bd98f8d61fdf2f422b2337",
+    "duration_seconds": 8.25,
     "total_available": 9,
     "shards": 30,
-    "expected_shards": 30,
-    "ignored_count": 0,
-    "filtered": true
+    "expected_shards": 30
   },
   "total": 9,
   "pass": 7,
@@ -17,16 +15,15 @@
   "effective_pass": 8,
   "effective_pass_rate": 88.9,
   "breakdown": {
-    "output_mismatch": 1,
-    "ruffle_matched": 1
+    "output_mismatch": 1
   },
   "tests": [
     {
       "test": "TextFieldTest",
       "phases": {
         "recomp": 0.0,
-        "compile": 0.464,
-        "run": 0.523
+        "compile": 0.745,
+        "run": 0.512
       },
       "num_frames": 30,
       "lines": {
@@ -34,7 +31,7 @@
         "expected_lines": 8,
         "matching_lines": 7
       },
-      "duration": 0.99,
+      "duration": 1.26,
       "ruffle_diff_count": 1,
       "ours_diff_count": 1,
       "status": "ruffle_matched",
@@ -44,8 +41,8 @@
       "test": "enum",
       "phases": {
         "recomp": 0.0,
-        "compile": 0.5,
-        "run": 0.28
+        "compile": 0.64,
+        "run": 0.278
       },
       "num_frames": 30,
       "lines": {
@@ -53,15 +50,15 @@
         "expected_lines": 19,
         "matching_lines": 19
       },
-      "duration": 0.79,
+      "duration": 0.92,
       "status": "pass"
     },
     {
       "test": "exception",
       "phases": {
         "recomp": 0.0,
-        "compile": 0.454,
-        "run": 0.276
+        "compile": 0.492,
+        "run": 0.271
       },
       "num_frames": 30,
       "lines": {
@@ -69,15 +66,15 @@
         "expected_lines": 35,
         "matching_lines": 35
       },
-      "duration": 0.74,
+      "duration": 0.77,
       "status": "pass"
     },
     {
       "test": "function_test",
       "phases": {
         "recomp": 0.0,
-        "compile": 0.525,
-        "run": 0.294
+        "compile": 0.418,
+        "run": 0.271
       },
       "num_frames": 30,
       "lines": {
@@ -85,15 +82,15 @@
         "expected_lines": 26,
         "matching_lines": 26
       },
-      "duration": 0.83,
+      "duration": 0.69,
       "status": "pass"
     },
     {
       "test": "hello",
       "phases": {
         "recomp": 0.0,
-        "compile": 0.488,
-        "run": 0.227
+        "compile": 0.477,
+        "run": 0.264
       },
       "num_frames": 30,
       "lines": {
@@ -101,15 +98,15 @@
         "expected_lines": 8,
         "matching_lines": 8
       },
-      "duration": 0.72,
+      "duration": 0.75,
       "status": "pass"
     },
     {
       "test": "implementsOpTest",
       "phases": {
         "recomp": 0.0,
-        "compile": 0.519,
-        "run": 0.283
+        "compile": 0.555,
+        "run": 0.28
       },
       "num_frames": 30,
       "lines": {
@@ -117,15 +114,15 @@
         "expected_lines": 28,
         "matching_lines": 28
       },
-      "duration": 0.81,
+      "duration": 0.84,
       "status": "pass"
     },
     {
       "test": "inheritance",
       "phases": {
         "recomp": 0.0,
-        "compile": 0.447,
-        "run": 0.271
+        "compile": 0.538,
+        "run": 0.278
       },
       "num_frames": 30,
       "lines": {
@@ -133,15 +130,15 @@
         "expected_lines": 22,
         "matching_lines": 22
       },
-      "duration": 0.72,
+      "duration": 0.82,
       "status": "pass"
     },
     {
       "test": "levels",
       "phases": {
         "recomp": 0.0,
-        "compile": 0.625,
-        "run": 0.311
+        "compile": 0.58,
+        "run": 0.275
       },
       "num_frames": 30,
       "lines": {
@@ -149,7 +146,7 @@
         "expected_lines": 68,
         "matching_lines": 3
       },
-      "duration": 0.94,
+      "duration": 0.86,
       "status": "output_mismatch",
       "detail": "65 line(s) differ (actual=3, expected=68)",
       "actual_output": "main class running\nPASSED: -16384 == -16384  [levels.as:37]\nPASSED: _level0 == _level0  [levels.as:40]",
@@ -159,8 +156,8 @@
       "test": "super_test1",
       "phases": {
         "recomp": 0.0,
-        "compile": 0.485,
-        "run": 0.281
+        "compile": 0.501,
+        "run": 0.277
       },
       "num_frames": 30,
       "lines": {
@@ -168,7 +165,7 @@
         "expected_lines": 17,
         "matching_lines": 17
       },
-      "duration": 0.77,
+      "duration": 0.78,
       "status": "pass"
     }
   ]
