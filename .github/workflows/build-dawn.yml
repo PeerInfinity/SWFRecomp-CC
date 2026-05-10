@@ -1,0 +1,81 @@
+name: Build Dawn (cached for ruffle-tests)
+
+# Builds Dawn (WebGPU) and stores it in the GitHub Actions cache so the
+# ruffle-tests workflow can restore it for graphics-mode runs.
+#
+# Triggers:
+#   - workflow_dispatch: manual; bump cache_schema input to force rebuild
+#     even if the cache key would otherwise hit
+#   - schedule: weekly, to keep the cache warm against the 7-day no-access
+#     eviction TTL. Cache hit → fast no-op (~30s). Cache miss → ~30 min build
+#
+# Cache key strategy:
+#   The cache key includes scripts/build_dawn.sh's content hash, so editing
+#   the build script (changing DAWN_REF, build flags, etc.) automatically
+#   triggers a rebuild on the next run. cache_schema lets you force a rebuild
+#   without script changes (e.g. if you suspect cache corruption).
+
+on:
+  workflow_dispatch:
+    inputs:
+      cache_schema:
+        description: 'Cache key suffix (bump to force a rebuild on top of script changes)'
+        required: false
+        default: 'v1'
+        type: string
+  schedule:
+    - cron: '0 6 * * 0'  # Sunday 06:00 UTC
+
+permissions:
+  contents: read
+  actions: write   # for actions/cache writes
+
+jobs:
+  build-dawn:
+    name: Build Dawn → Actions cache
+    runs-on: ubuntu-latest
+    timeout-minutes: 60
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v5
+
+      - name: Compute cache key
+        id: key
+        run: |
+          # Hash includes the build script so any change (DAWN_REF, flags,
+          # ...) invalidates. cache_schema (default "v1") lets you force a
+          # rebuild manually.
+          script_hash=$(sha256sum scripts/build_dawn.sh | cut -c1-16)
+          schema="${{ inputs.cache_schema || 'v1' }}"
+          key="dawn-prebuilt-linux-x64-${script_hash}-${schema}"
+          echo "key=$key" >> "$GITHUB_OUTPUT"
+          echo "Cache key: $key"
+
+      - name: Try cache restore
+        id: cache
+        uses: actions/cache@v4
+        with:
+          path: ${{ runner.temp }}/dawn-install
+          key: ${{ steps.key.outputs.key }}
+
+      - name: Cache hit — refresh TTL only
+        if: steps.cache.outputs.cache-hit == 'true'
+        run: |
+          echo "Dawn cache restored — no build needed."
+          echo "Cache TTL refreshed by this access."
+          ls -la "${RUNNER_TEMP}/dawn-install/lib/" | head
+
+      - name: Install build dependencies
+        if: steps.cache.outputs.cache-hit != 'true'
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y build-essential cmake git ninja-build python3
+
+      - name: Build Dawn
+        if: steps.cache.outputs.cache-hit != 'true'
+        run: |
+          bash scripts/build_dawn.sh "${RUNNER_TEMP}/dawn-install"
+
+      # actions/cache@v4 writes back automatically at job end on a fresh build
+      # (cache-hit was 'false'); no explicit save step needed.

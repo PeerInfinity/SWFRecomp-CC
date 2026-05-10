@@ -23,10 +23,17 @@ under `--mode=graphics`. Two options:
   single-runner job
 
 **One-time prerequisite:** Both graphics modes need a prebuilt Dawn
-binary at a `dawn-prebuilt` release on this repo. The workflow's
-"Install Vulkan + Dawn (graphics modes)" step has the build/upload
-instructions. If the release is missing, the workflow fails with a
-helpful error rather than silently running NO_GRAPHICS.
+binary in the GitHub Actions cache. Run the `build-dawn.yml` workflow
+once to populate it (~30 minutes). After that, a weekly cron keeps the
+cache warm so it doesn't evict. If `ruffle-tests.yml` runs in graphics
+mode and the cache is missing, it fails with a clear error pointing at
+`gh workflow run build-dawn.yml`.
+
+```bash
+# One-time (and after editing scripts/build_dawn.sh, e.g. to bump DAWN_REF):
+gh workflow run build-dawn.yml
+gh run watch  # ~30 min
+```
 
 Trigger:
 ```bash

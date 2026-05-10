@@ -112,33 +112,39 @@ jobs:
         run: sudo apt-get update && sudo apt-get install -y build-essential cmake ccache
 
       # Graphics modes (graphics, graphics-headless-legacy) need Vulkan +
-      # a prebuilt Dawn library. Dawn does not publish official binary
-      # releases we can use, so this workflow expects a hand-built tarball
-      # uploaded to a GitHub release named `dawn-prebuilt` on this repo.
-      #
-      # To set up the release (one-time):
-      #   1. Build Dawn locally — see SWFRecompDocs/notes/headless_rendering.md.
-      #   2. Tar the install dir with the layout `dawn-install/{include,lib}/`:
-      #        cd ~/CC && tar -czf dawn-linux-x86_64.tar.gz dawn-install
-      #   3. Upload as a release asset:
-      #        gh release create dawn-prebuilt dawn-linux-x86_64.tar.gz \
-      #          --title "Dawn prebuilt for CI" --notes "Linux x86_64"
-      #      Re-upload the asset (gh release upload --clobber) to update.
-      - name: Install Vulkan + Dawn (graphics modes)
+      # a prebuilt Dawn library. Dawn is built by .github/workflows/build-dawn.yml
+      # and stored in the GitHub Actions cache. If the cache is missing
+      # (first run on a new ref or post-eviction), trigger build-dawn.yml
+      # manually first: `gh workflow run build-dawn.yml`.
+      - name: Compute Dawn cache key
         if: inputs.mode != 'no-graphics'
-        env:
-          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        id: dawn_key
         run: |
-          sudo apt-get install -y mesa-vulkan-drivers vulkan-tools libvulkan1
-          mkdir -p "$RUNNER_TEMP/dawn"
-          cd "$RUNNER_TEMP/dawn"
-          if ! gh release download dawn-prebuilt --pattern 'dawn-linux-x86_64.tar.gz' 2>/dev/null; then
-            echo "::error::No Dawn prebuilt release found. Upload dawn-linux-x86_64.tar.gz to release tag 'dawn-prebuilt' first — see workflow comment for instructions."
+          script_hash=$(sha256sum scripts/build_dawn.sh | cut -c1-16)
+          # The cache_schema 'v1' must match the default in build-dawn.yml.
+          # If you bump it there, bump it here too.
+          key="dawn-prebuilt-linux-x64-${script_hash}-v1"
+          echo "key=$key" >> "$GITHUB_OUTPUT"
+
+      - name: Restore Dawn from cache
+        if: inputs.mode != 'no-graphics'
+        id: dawn_cache
+        uses: actions/cache/restore@v4
+        with:
+          path: ${{ runner.temp }}/dawn-install
+          key: ${{ steps.dawn_key.outputs.key }}
+
+      - name: Install Vulkan + verify Dawn cache hit
+        if: inputs.mode != 'no-graphics'
+        run: |
+          if [ "${{ steps.dawn_cache.outputs.cache-hit }}" != "true" ]; then
+            echo "::error::Dawn cache miss for key ${{ steps.dawn_key.outputs.key }}."
+            echo "::error::Run the build-dawn.yml workflow first: gh workflow run build-dawn.yml"
             exit 1
           fi
-          tar -xzf dawn-linux-x86_64.tar.gz
+          sudo apt-get install -y mesa-vulkan-drivers vulkan-tools libvulkan1
           {
-            echo "DAWN_INSTALL=$RUNNER_TEMP/dawn/dawn-install"
+            echo "DAWN_INSTALL=$RUNNER_TEMP/dawn-install"
             echo "VK_ICD_FILENAMES=/usr/share/vulkan/icd.d/lvp_icd.json"
             echo "VK_DRIVER_FILES=/usr/share/vulkan/icd.d/lvp_icd.json"
           } >> "$GITHUB_ENV"
@@ -508,23 +514,33 @@ jobs:
       - name: Install system dependencies
         run: sudo apt-get update && sudo apt-get install -y build-essential ccache
 
-      # Same Dawn prebuilt expectation as the single-runner job — see comment
-      # at the top of the ruffle-tests job for setup instructions.
-      - name: Install Vulkan + Dawn (graphics modes)
+      # Same Dawn cache restore as the single-runner job — see comment there.
+      - name: Compute Dawn cache key
         if: inputs.mode != 'no-graphics'
-        env:
-          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        id: dawn_key
         run: |
-          sudo apt-get install -y mesa-vulkan-drivers vulkan-tools libvulkan1
-          mkdir -p "$RUNNER_TEMP/dawn"
-          cd "$RUNNER_TEMP/dawn"
-          if ! gh release download dawn-prebuilt --pattern 'dawn-linux-x86_64.tar.gz' 2>/dev/null; then
-            echo "::error::No Dawn prebuilt release found. See ruffle-tests job comment."
+          script_hash=$(sha256sum scripts/build_dawn.sh | cut -c1-16)
+          key="dawn-prebuilt-linux-x64-${script_hash}-v1"
+          echo "key=$key" >> "$GITHUB_OUTPUT"
+
+      - name: Restore Dawn from cache
+        if: inputs.mode != 'no-graphics'
+        id: dawn_cache
+        uses: actions/cache/restore@v4
+        with:
+          path: ${{ runner.temp }}/dawn-install
+          key: ${{ steps.dawn_key.outputs.key }}
+
+      - name: Install Vulkan + verify Dawn cache hit
+        if: inputs.mode != 'no-graphics'
+        run: |
+          if [ "${{ steps.dawn_cache.outputs.cache-hit }}" != "true" ]; then
+            echo "::error::Dawn cache miss. Run build-dawn.yml workflow first."
             exit 1
           fi
-          tar -xzf dawn-linux-x86_64.tar.gz
+          sudo apt-get install -y mesa-vulkan-drivers vulkan-tools libvulkan1
           {
-            echo "DAWN_INSTALL=$RUNNER_TEMP/dawn/dawn-install"
+            echo "DAWN_INSTALL=$RUNNER_TEMP/dawn-install"
             echo "VK_ICD_FILENAMES=/usr/share/vulkan/icd.d/lvp_icd.json"
             echo "VK_DRIVER_FILES=/usr/share/vulkan/icd.d/lvp_icd.json"
           } >> "$GITHUB_ENV"
