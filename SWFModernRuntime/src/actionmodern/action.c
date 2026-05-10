@@ -26366,13 +26366,14 @@ void actionNextFrame(SWFAppContext* app_context)
 void actionPlay(SWFAppContext* app_context)
 {
 	(void)app_context;
-#ifndef NO_GRAPHICS
+#if !defined(NO_GRAPHICS) && !defined(OFFSCREEN_RENDER)
 	if (targeted_sprite != NULL)
 	{
 		targeted_sprite->sprite_is_playing = 1;
 		return;
 	}
-#else
+#endif
+#if defined(NO_GRAPHICS) || defined(OFFSCREEN_RENDER)
 	{ extern int g_settarget_none; if (g_settarget_none) return; }
 	if (ng_isInsideSprite()) { ng_playCurrentSprite(); return; }
 #endif
@@ -26382,13 +26383,14 @@ void actionPlay(SWFAppContext* app_context)
 void actionStop(SWFAppContext* app_context)
 {
 	(void)app_context;
-#ifndef NO_GRAPHICS
+#if !defined(NO_GRAPHICS) && !defined(OFFSCREEN_RENDER)
 	if (targeted_sprite != NULL)
 	{
 		targeted_sprite->sprite_is_playing = 0;
 		return;
 	}
-#else
+#endif
+#if defined(NO_GRAPHICS) || defined(OFFSCREEN_RENDER)
 	{ extern int g_settarget_none; if (g_settarget_none) return; }
 	if (ng_isInsideSprite()) { ng_stopCurrentSprite(); return; }
 #endif
@@ -26777,7 +26779,7 @@ void actionGotoFrame(SWFAppContext* app_context, u16 frame)
 {
 	(void)app_context;
 
-#ifndef NO_GRAPHICS
+#if !defined(NO_GRAPHICS) && !defined(OFFSCREEN_RENDER)
 	if (targeted_sprite != NULL)
 	{
 		targeted_sprite->sprite_next_frame = frame;
@@ -26785,7 +26787,8 @@ void actionGotoFrame(SWFAppContext* app_context, u16 frame)
 		targeted_sprite->sprite_is_playing = 0;
 		return;
 	}
-#else
+#endif
+#if defined(NO_GRAPHICS) || defined(OFFSCREEN_RENDER)
 	extern int g_settarget_explicit_root;
 	extern int g_settarget_none;
 	// SWF7+ SetTarget2(undefined) sets target to None — GotoFrame is a no-op
