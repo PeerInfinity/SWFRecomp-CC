@@ -1,9 +1,9 @@
 {
   "metadata": {
-    "old_timestamp": "2026-05-10T18:18:09.558038+00:00",
-    "old_git_sha": "ebaa7506c162a10516bd98f8d61fdf2f422b2337",
-    "new_timestamp": "2026-05-10T21:29:58.646795+00:00",
-    "new_git_sha": "7767c2657e471050628b646e18adee298ab181b1",
+    "old_timestamp": "2026-05-10T21:29:58.646795+00:00",
+    "old_git_sha": "7767c2657e471050628b646e18adee298ab181b1",
+    "new_timestamp": "2026-05-10T22:54:41.166870+00:00",
+    "new_git_sha": "ab614b80ddcf2b8f3fcb64089a3b083e652626a7",
     "partial": false,
     "same_commit": false
   },
@@ -25,9 +25,42 @@
     "newly_passing": 0,
     "newly_failing": 0,
     "status_changed": 0,
-    "unchanged": 47,
+    "unchanged": 45,
     "added": 0,
     "removed": 0
   },
-  "changes": []
+  "changes": [
+    {
+      "test": "setinterval",
+      "change_type": "changed",
+      "old_status": "output_mismatch",
+      "new_status": "output_mismatch",
+      "old_lines": {
+        "actual_lines": 14,
+        "expected_lines": 20,
+        "matching_lines": 14
+      },
+      "new_lines": {
+        "actual_lines": 12719,
+        "expected_lines": 20,
+        "matching_lines": 14
+      }
+    },
+    {
+      "test": "settimeout",
+      "change_type": "changed",
+      "old_status": "output_mismatch",
+      "new_status": "output_mismatch",
+      "old_lines": {
+        "actual_lines": 14,
+        "expected_lines": 17,
+        "matching_lines": 14
+      },
+      "new_lines": {
+        "actual_lines": 31,
+        "expected_lines": 17,
+        "matching_lines": 14
+      }
+    }
+  ]
 }

@@ -1,8 +1,8 @@
 # Ruffle Test Results (Filtered)
 
-**Date**: 2026-05-10 21:29 UTC
+**Date**: 2026-05-10 22:54 UTC
 
-**Git SHA**: `7767c2657e`
+**Git SHA**: `ab614b80dd`
 
 **Run Duration**: 0m 8s
 
@@ -33,13 +33,13 @@
 
 | # | Test | Lines | Duration | Notes |
 |---|------|-------|----------|-------|
-| 1 | `enum` | 19 | 0.8s |  |
+| 1 | `enum` | 19 | 1.1s |  |
 | 2 | `exception` | 35 | 0.7s |  |
 | 3 | `function_test` | 26 | 0.8s |  |
-| 4 | `hello` | 8 | 0.7s |  |
-| 5 | `implementsOpTest` | 28 | 0.8s |  |
+| 4 | `hello` | 8 | 0.8s |  |
+| 5 | `implementsOpTest` | 28 | 0.7s |  |
 | 6 | `inheritance` | 22 | 0.7s |  |
-| 7 | `super_test1` | 17 | 0.8s |  |
+| 7 | `super_test1` | 17 | 0.6s |  |
 
 ## Ruffle-Matched Tests
 
@@ -47,7 +47,7 @@
 
 | # | Test | Our diffs | Ruffle diffs | Duration | Notes |
 |---|------|-----------|--------------|----------|-------|
-| 1 | `TextFieldTest` | 1 | 1 | 1.0s |  |
+| 1 | `TextFieldTest` | 1 | 1 | 1.2s |  |
 
 ## Near-Passing Tests
 
@@ -75,4 +75,4 @@ No timeouts.
 
 | # | Test | Match Rate | Matching/Total | Actual | Expected | Notes |
 |---|------|------------|----------------|--------|----------|-------|
-| 1 | `levels` | 4.4% | 3/68 | 3 | 68 |  |
+| 1 | `levels` | 3.3% | 3/90 | 90 | 68 |  |
