@@ -26805,6 +26805,18 @@ void actionGotoFrame(SWFAppContext* app_context, u16 frame)
 				next_frame = frame;
 				manual_next_frame = 1;
 				root_movieclip.currentframe = frame + 1;
+#if defined(OFFSCREEN_RENDER) && !defined(NO_GRAPHICS)
+				// Graphics-native (swf.c) doesn't consume g_deferred_root_goto in
+				// its main loop, so deferring leaves manual_next_frame=1 +
+				// is_playing=1 dangling and the recompiler-emitted last-frame
+				// wrap-back re-fires the catch-up target's scripts on the next
+				// tick. Match the OLD behavior by stopping the root and running
+				// catch-up inline (mirrors actionGotoFrame's root-goto fallback
+				// below). Key test: avm1/issue_9885.
+				is_playing = 0;
+				extern void ng_executeGotoCatchUp(SWFAppContext* app_context);
+				ng_executeGotoCatchUp(app_context);
+#else
 				if (ng_isInsideSpriteInit()) {
 					// Inside sprite init: inline catch-up so RemoveObject2
 					// fires synchronously and avm1_removed gets set.
@@ -26816,6 +26828,7 @@ void actionGotoFrame(SWFAppContext* app_context, u16 frame)
 					extern int g_deferred_root_goto;
 					g_deferred_root_goto = 1;
 				}
+#endif
 			}
 			return;
 		}
