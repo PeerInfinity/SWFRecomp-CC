@@ -5,7 +5,7 @@
 
 **Commit:** `ebaa7506c162`  
 **Date:** 2026-05-10 18:18 UTC  
-**Total duration:** 57m42s
+**Total duration:** 1h02m44s
 
 ## Results by Suite
 
@@ -16,10 +16,12 @@
 | from_gnash/misc-ming.all | 43 | 100 | 43.0% | [details](ruffle-tests/tests/swfs/from_gnash/misc-ming.all/_results/results_graphics_filtered.md) |
 | from_gnash/misc-mtasc.all | 7 | 9 | 77.8% | [details](ruffle-tests/tests/swfs/from_gnash/misc-mtasc.all/_results/results_graphics_filtered.md) |
 | from_gnash/misc-swfc.all | 6 | 15 | 40.0% | [details](ruffle-tests/tests/swfs/from_gnash/misc-swfc.all/_results/results_graphics_filtered.md) |
+| from_gnash/misc-swfmill.all | 17 | 18 | 94.4% | [details](ruffle-tests/tests/swfs/from_gnash/misc-swfmill.all/_results/results_graphics_filtered.md) |
 | from_shumway | 52 | 76 | 68.4% | [details](ruffle-tests/tests/swfs/from_shumway/_results/results_graphics_filtered.md) |
-| **Total** | **742** | **1001** | **74.1%** | |
+| from_shumway/avm1 | 37 | 45 | 82.2% | [details](ruffle-tests/tests/swfs/from_shumway/avm1/_results/results_graphics_filtered.md) |
+| **Total** | **796** | **1064** | **74.8%** | |
 
-*59 tests ignored.*
+*61 tests ignored.*
 
 ## Line-Level Accuracy
 
@@ -30,8 +32,10 @@
 | from_gnash/misc-ming.all | 2,760 | 4,445 | 62.1% |
 | from_gnash/misc-mtasc.all | 165 | 231 | 71.4% |
 | from_gnash/misc-swfc.all | 326 | 492 | 66.3% |
+| from_gnash/misc-swfmill.all | 49 | 51 | 96.1% |
 | from_shumway | 558 | 637 | 87.6% |
-| **Total** | **112,475** | **118,649** | **94.8%** |
+| from_shumway/avm1 | 456 | 480 | 95.0% |
+| **Total** | **112,980** | **119,180** | **94.8%** |
 
 ## Failure Breakdown
 
@@ -42,8 +46,10 @@
 | from_gnash/misc-ming.all | 40 | 14 | - | 3 | - |
 | from_gnash/misc-mtasc.all | 1 | 1 | - | - | - |
 | from_gnash/misc-swfc.all | 4 | 5 | - | - | - |
+| from_gnash/misc-swfmill.all | - | 1 | - | - | - |
 | from_shumway | 19 | 5 | - | - | - |
-| **Total** | **160** | **92** | **3** | **3** | **1** |
+| from_shumway/avm1 | 8 | - | - | - | - |
+| **Total** | **168** | **93** | **3** | **3** | **1** |
 
 ## Near-Passing Tests (≥80% line match)
 
@@ -78,6 +84,7 @@ Tests with `output_mismatch` status but ≥80% of expected lines matching.
 | avm1 | local_to_global | 84% |
 | avm1 | tell_target_invalid | 83% |
 | from_shumway | avm1/settimeout | 82% |
+| from_shumway/avm1 | settimeout | 82% |
 | from_gnash/misc-ming.all | action_order/action_execution_order_test8-v5 | 82% |
 | from_gnash/misc-ming.all | action_order/action_execution_order_test8-v6 | 82% |
 | from_gnash/misc-ming.all | action_order/action_execution_order_test11 | 81% |
@@ -126,6 +133,13 @@ Tests with `output_mismatch` status but ≥80% of expected lines matching.
 - **Lines:** 326/492 matching (66.3%)
 - **Avg test duration:** 11.6s — slowest: `movieclip_destruction_test4` (20.8s)
 
+### from_gnash/misc-swfmill.all
+
+- **Pass:** 17/18 (94.4%)
+- **Duration:** 2m49s across 30 shards
+- **Lines:** 49/51 matching (96.1%)
+- **Avg test duration:** 9.4s — slowest: `background` (19.9s)
+
 ### from_shumway
 
 - **Pass:** 52/76 (68.4%)
@@ -133,3 +147,11 @@ Tests with `output_mismatch` status but ≥80% of expected lines matching.
 - **Duration:** 9m50s across 30 shards
 - **Lines:** 558/637 matching (87.6%)
 - **Avg test duration:** 4.2s — slowest: `fuzz/07580c34e05cda7bd4c976c459f0a667ca3c2602110e34186bca676f311e84da` (19.8s)
+
+### from_shumway/avm1
+
+- **Pass:** 37/45 (82.2%)
+- **Ignored:** 2 tests
+- **Duration:** 2m12s across 30 shards
+- **Lines:** 456/480 matching (95.0%)
+- **Avg test duration:** 2.4s — slowest: `text-bind` (20.6s)
