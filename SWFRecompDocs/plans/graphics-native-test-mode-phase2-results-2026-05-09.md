@@ -271,3 +271,66 @@ either depends on. Pick them up after the cluster mining stabilizes.
    resolved).
 3. Subtle smokes (`tell_target_invalid`, `unload`) — see diagnoses
    above.
+
+---
+
+## 2026-05-10 follow-up #2 — `quit_swf` premature-exit fix
+
+`swf.c`'s `tagMain` exited as soon as the recompiler-emitted
+`quit_swf = 1` fired at the end of the last root frame. That's
+incorrect when multi-frame sprites placed by that frame still need to
+advance through their own timelines — those sprites are silently
+abandoned. Mirror `swf_core.c`'s exit condition (around line 1056):
+keep ticking while any of `actionHasEnterFrameHandlers`,
+`hasPlayingSprites`, `hasActiveTimers`, `hasPlayingSounds`,
+`hasActiveNetStreams`, `hasPlayingLevels`, or
+`hasClipEnterFrameHandlers` is true. Only break when `quit_swf` is set
+**and** none of those have anything left to do.
+
+Confirmed unlocks (local single-test):
+- `avm1/tell_target` (was 0/37 → PASS) — script_3 lives on
+  `sprite_6_frame_1`, so it never ran without continued ticking after
+  the last root frame's `quit_swf = 1`.
+- `avm1/mouse_pos` (was 8/665 → PASS) — 75-frame test with input
+  events; loop was exiting after one root cycle.
+
+Smoke set re-checked: unchanged (`tell_target_invalid` and `unload`
+still match prior 5/6 and 47/52 status). No regressions in `add`,
+`clip_events`, `edittext_default_format`, `button_key_events`,
+`goto_rewind3`, `register_and_init_order`, `bitmap_data_colortransform`.
+
+### `actionStop` parity follow-up — not landed
+
+`avm1/call`, `function_base_clip`, `swf{5,6}_to_{6,5}_cross_call`,
+`register_class_swf6`, `cross_movie_root` and similar still fail with
+empty (or near-empty) output even after the exit-condition fix. Root
+cause for the cluster: when a SPRITE's frame-0 init script calls
+`actionStop` (e.g. `function_base_clip`'s `f`-defining script_0),
+graphics-native's path falls through to `is_playing = 0` because
+`targeted_sprite` is `NULL`. That stops the ROOT — the next root
+frame's DoAction (the actual test logic) never runs.
+
+NO_GRAPHICS uses the modern `ng_isInsideSprite()` / `ng_stopCurrentSprite()`
+path in the `#else` branch, which stops just the enclosing sprite and
+leaves the root playing. Naive widening (OR-ing `OFFSCREEN_RENDER` with
+`NO_GRAPHICS` on that branch) introduces an infinite-loop regression
+in `function_base_clip`: after the change, `script_1`'s
+`this.gotoAndStop(2)` triggers an unbounded sequence of
+`actionStop` calls from root context (inside_sprite=0,
+fallthrough → is_playing=0). The exact trigger isn't pinned down —
+candidate is `ng_gotoFrameCurrentSprite` re-queueing
+`actionQueuePendingSpriteScript`, which somehow re-enters
+script_0 each tick. Worth a deeper look before re-attempting; the
+infinite-loop debug dump from the abandoned attempt is captured in
+session notes.
+
+### Where to start next session
+
+1. Investigate the `actionStop` widening regression on
+   `function_base_clip` — the cluster of `call` / `function_base_clip` /
+   `swf{5,6}_to_{6,5}_cross_call` / `register_class_swf6` /
+   `cross_movie_root` / `slash_syntax` / `target_clip_swf{5,6}` /
+   `lock_root` / `loadmovie_*` would all unlock together.
+2. Continue the `avm1` long-tail (~125 remaining output_mismatch tests
+   after this session's commits).
+3. Subtle smokes (`tell_target_invalid`, `unload`) — see prior diagnoses.

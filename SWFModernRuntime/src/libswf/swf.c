@@ -214,11 +214,37 @@ void tagMain(SWFAppContext* app_context)
 	size_t tick_count = 0;
 #endif
 
-	while (!quit_swf)
+	while (1)
 	{
 #ifdef MAX_FRAMES
 		if (tick_count >= max_ticks) break;
 		tick_count++;
+#endif
+
+#ifdef OFFSCREEN_RENDER
+		// Mirror swf_core.c's exit condition (around line 1056). The
+		// recompiler-emits `quit_swf = 1` at the end of the last root
+		// frame, but multi-frame sprites placed by that frame still need
+		// to advance through their own timelines. Without this widened
+		// check, the loop exits after one root tick and any sprite that
+		// hasn't reached its own last frame is silently abandoned. Key
+		// test: avm1/tell_target (script_3 lives on sprite_6 frame 1, so
+		// it never runs without continued ticking after quit_swf=1).
+		{
+			extern int hasPlayingSounds(void);
+			extern int hasActiveNetStreams(void);
+			extern int hasPlayingLevels(void);
+			if (quit_swf
+			    && !actionHasEnterFrameHandlers()
+			    && !hasPlayingSprites()
+			    && !hasActiveTimers()
+			    && !hasPlayingSounds()
+			    && !hasActiveNetStreams()
+			    && !hasPlayingLevels()
+			    && !hasClipEnterFrameHandlers()) break;
+		}
+#else
+		if (quit_swf) break;
 #endif
 
 #ifdef __EMSCRIPTEN__
@@ -230,7 +256,6 @@ void tagMain(SWFAppContext* app_context)
 		app_context->oldSP = 0;
 
 		current_frame = next_frame;
-
 #ifdef OFFSCREEN_RENDER
 		// Finalize MCs marked for pending removal in the previous frame.
 		// Mirrors swf_core.c's frame-start hook (around line 955). Without
