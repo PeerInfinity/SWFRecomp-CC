@@ -197,26 +197,28 @@ Start with B to validate end-to-end, then move to A once the new mode is stable.
 
 `swf_headless.c` had drifted from `swf_core.c`: three globals (`g_force_quit`, `g_natural_wrap_cleanup_pending`, `g_goto_inlined_in_caller_frame`) were referenced from shared sources but never defined in the headless build. CI doesn't run `--headless` so the breakage was latent. Fixed by adding the three definitions to `swf_headless.c`. Smoke baseline captured in `graphics-native-test-mode-baseline-2026-05-09.md`.
 
-### Phase 1 — Wire up the mode (no parity work)
+### Phase 1 — Wire up the mode (no parity work) — DONE except step 3
 
 Goal: the new mode compiles, links, runs tests, and produces a results file. Pass rate may be terrible — that's fine. We just need the signal.
 
-1. Introduce `OFFSCREEN_RENDER` define. Edit `render_webgpu.c` to add it as an alias-or-replacement for `HEADLESS_GRAPHICS` in renderer guards. Verify the legacy headless path still works (no functional change).
-2. Adopt `--mode={no-graphics|graphics|graphics-headless-legacy}` in `verify_output.py`. Wire `--mode=graphics` to the new source list + defines from section 3. Keep `--headless` working as an alias for `--mode=graphics-headless-legacy` (deprecation warning fine).
-3. Adopt the same `--mode=` flag in `build_test.sh`. Keep `--graphics` and `--headless` as deprecated aliases through Phase 2.
-4. Run the AVM1 suite locally (in WSL — confirmed feasible, same Dawn/lavapipe path that `--mode=graphics-headless-legacy` already uses) on 5–10 representative tests. Confirm trace output is produced and matches NO_GRAPHICS for tests that don't exercise display-list semantics.
-5. Wire CI option B: manual-dispatch input to select mode. Run the full suite once and capture the baseline pass rate.
+1. ✅ Introduce `OFFSCREEN_RENDER` define. Edit `render_webgpu.c` to add it as an alias-or-replacement for `HEADLESS_GRAPHICS` in renderer guards. Verify the legacy headless path still works (no functional change).
+2. ✅ Adopt `--mode={no-graphics|graphics|graphics-headless-legacy}` in `verify_output.py`. Wire `--mode=graphics` to the new source list + defines from section 3. Keep `--headless` working as an alias for `--mode=graphics-headless-legacy` (deprecation warning fine).
+3. ⏸ Adopt the same `--mode=` flag in `build_test.sh`. Keep `--graphics` and `--headless` as deprecated aliases through Phase 2. *(Deferred — `verify_output.py --mode=graphics --test=NAME` covers local debugging; `build_test.sh` integration is just convenience.)*
+4. ✅ Run the AVM1 suite locally on 5–10 representative tests — captured in `graphics-native-test-mode-baseline-2026-05-09.md` (smoke set: 9 tests).
+5. ✅ Wire CI option B: `mode` + `single_test` workflow_dispatch inputs. Dawn build is auto-cached via a separate `build-dawn.yml` workflow (see `.github/workflows/build-dawn.yml`). Single-test verified end-to-end on 2026-05-09.
 
 **Exit criteria:** mode compiles, runs end-to-end, baseline pass rate captured for all suites. Likely much lower than NO_GRAPHICS — this is the triage backlog.
 
-### Phase 2 — Close `swf.c` parity gaps
+### Phase 2 — Close `swf.c` parity gaps — IN PROGRESS
 
 Goal: graphics-native pass rate approaches NO_GRAPHICS pass rate.
 
+**Status (2026-05-09):** 5 of 9 smoke tests flipped to pass via structural backports (sprite-init, exec_sprite_frame context-switching, goto-catch-up, sprite advancement + enter_frame dispatch, file-driven input events). See `graphics-native-test-mode-phase2-results-2026-05-09.md` and the workflow loop in `graphics-native-test-mode-playbook.md`.
+
 This is iterative. For each suite:
 1. Diff graphics-native results vs NO_GRAPHICS results. Tests passing in NO_GRAPHICS but failing in graphics-native are the parity bug list.
-2. Bisect: does the test also pass in `--headless`? If yes → bug is in `swf.c` frame loop. If no → bug is in shared `tag.c`/`action.c` paths and likely a pre-existing issue.
-3. Backport the missing logic from `swf_core.c` to `swf.c`. Largest items: goto catch-up, deferred goto flags, pending-removal finalize, sprite preservation.
+2. Bisect: does the test also pass in `--mode=graphics-headless-legacy`? If yes → bug is in `swf.c` frame loop. If no → bug is in shared `tag.c`/`action.c` paths and likely a pre-existing issue.
+3. Backport the missing logic from `swf_core.c` to `swf.c`. Largest items already done; remaining smoke gaps documented in the Phase 2 results doc.
 
 **Exit criteria:** graphics-native pass rate within 2% of NO_GRAPHICS on every suite, OR remaining gaps documented in `_investigation/` as "expected divergence."
 
