@@ -15,8 +15,8 @@ Tests that **pass** in trace mode but **fail** in graphics mode.
 | 5 | `moviecliploader` | Output Mismatch | 6/7 lines match |
 | 6 | `nested-button` | Output Mismatch | 0/1 lines match |
 | 7 | `rollover` | Output Mismatch | 1/4 lines match |
-| 8 | `setinterval` | Output Mismatch | 14/20 lines match |
-| 9 | `settimeout` | Output Mismatch | 14/17 lines match |
+| 8 | `setinterval` | Output Mismatch | 14/12719 lines match |
+| 9 | `settimeout` | Output Mismatch | 14/31 lines match |
 
 ## Graphics Improvements (0 tests)
 
