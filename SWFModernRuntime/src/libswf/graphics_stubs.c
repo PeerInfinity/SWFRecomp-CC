@@ -65,9 +65,12 @@ int g_clone_depth_already_unbiased = 0;
 #endif
 
 // JS-callback inputs (text input, IME, focus). In emscripten browser builds
-// these live in render_webgpu.c populated by JS event listeners. In native
-// offscreen mode there is no input source, so they remain zero — swf.c's
-// per-frame drain reads zero, no events fire.
+// these live in render_webgpu.c populated by JS event listeners (gated by
+// __EMSCRIPTEN__ there), so we must NOT redefine them here for wasm graphics.
+// In native offscreen mode render_webgpu.c's __EMSCRIPTEN__ arm is inactive,
+// so the symbols are missing — provide zero-init stubs. swf.c's per-frame
+// drain then reads zero and no events fire.
+#ifdef OFFSCREEN_RENDER
 #define _OR_TEXT_INPUT_RING_SIZE 64
 #define _OR_IME_TEXT_BUF_SIZE 256
 int g_text_input_ring[_OR_TEXT_INPUT_RING_SIZE];
@@ -78,6 +81,7 @@ char g_ime_compose_text[_OR_IME_TEXT_BUF_SIZE];
 char g_ime_commit_text[_OR_IME_TEXT_BUF_SIZE];
 int g_ime_compose_pending = 0;
 int g_ime_commit_pending = 0;
+#endif
 
 // sprite_content_bounds_twips and ng_queue_placement_clip_events:
 // stubs for wasm graphics. In OFFSCREEN_RENDER tag.c provides real impls.
