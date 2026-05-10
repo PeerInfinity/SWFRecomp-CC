@@ -1,13 +1,18 @@
 #!/usr/bin/env python3
-"""Filter ruffle test results.json by removing ignored tests.
+"""Filter a ruffle test results JSON file by removing ignored tests.
 
-Reads ignored_tests.txt and produces a filtered copy of results.json
+Reads ignored_tests.txt and produces a filtered copy of the input
 with ignored tests removed and stats recalculated.
 
 Usage:
     python3 filter_results.py results.json [results_filtered.json]
+    python3 filter_results.py results_graphics.json   # → results_graphics_filtered.json
+    python3 filter_results.py results_headless.json   # → results_headless_filtered.json
 
-If output path is omitted, writes to results_filtered.json next to the input.
+If output path is omitted, the output filename is derived from the input
+stem: <stem>.json → <stem>_filtered.json. This keeps per-mode results
+(results.json / results_graphics.json / results_headless.json) separate
+in their corresponding _filtered counterparts.
 """
 
 import json
@@ -83,7 +88,12 @@ def main():
     if len(sys.argv) >= 3:
         output_path = Path(sys.argv[2])
     else:
-        output_path = input_path.parent / "results_filtered.json"
+        # Derive output from input stem so each mode's results filter to
+        # a matching _filtered.json. e.g.
+        #   results.json          → results_filtered.json
+        #   results_graphics.json → results_graphics_filtered.json
+        #   results_headless.json → results_headless_filtered.json
+        output_path = input_path.parent / f"{input_path.stem}_filtered.json"
 
     # Load global ignore list (ruffle-tests/ignored_tests.txt)
     global_ignore_path = Path(__file__).parent / "ignored_tests.txt"

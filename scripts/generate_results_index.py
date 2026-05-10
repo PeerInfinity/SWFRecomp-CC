@@ -17,6 +17,17 @@ SWF_DIR = RUFFLE_DIR / "tests" / "swfs"
 OUTPUT_RAW = BASE_DIR / "RUFFLE_RESULTS.md"
 OUTPUT_FILTERED = BASE_DIR / "RUFFLE_RESULTS_FILTERED.md"
 
+# Per-mode index variants. Each entry produces a parallel pair of top-level
+# files (raw + filtered) plus rolls up the matching per-suite JSONs. The
+# `stem` is the prefix of the result files in each suite's _results/ dir
+# (results.json → results.md, results_graphics.json → results_graphics.md).
+MODE_INDEX_FILES = [
+    # (stem,              label,      raw_path,                                  filtered_path)
+    ("results",           "",         BASE_DIR / "RUFFLE_RESULTS.md",            BASE_DIR / "RUFFLE_RESULTS_FILTERED.md"),
+    ("results_graphics",  "Graphics", BASE_DIR / "RUFFLE_RESULTS_GRAPHICS.md",   BASE_DIR / "RUFFLE_RESULTS_GRAPHICS_FILTERED.md"),
+    ("results_headless",  "Headless", BASE_DIR / "RUFFLE_RESULTS_HEADLESS.md",   BASE_DIR / "RUFFLE_RESULTS_HEADLESS_FILTERED.md"),
+]
+
 
 def load_json(path):
     try:
@@ -84,14 +95,17 @@ def count_near_passing(tests, threshold=0.8):
     return near
 
 
-def load_all_suites():
-    """Load all test suite data from disk."""
-    results_files = sorted(glob.glob(
-        str(SWF_DIR / "**" / "_results" / "results.json"), recursive=True))
+def load_all_suites(stem: str = "results"):
+    """Load all test suite data from disk for a given mode stem.
 
-    if not results_files:
-        print("No _results/results.json files found.", file=sys.stderr)
-        sys.exit(1)
+    stem="results"          → trace mode (results.json + results_filtered.json + …)
+    stem="results_graphics" → graphics mode (results_graphics.json + results_graphics_filtered.json + …)
+    stem="results_headless" → legacy headless (results_headless.json + …)
+
+    Returns an empty list when no suite has results for the requested mode.
+    """
+    results_files = sorted(glob.glob(
+        str(SWF_DIR / "**" / "_results" / f"{stem}.json"), recursive=True))
 
     rows = []
     for path_str in results_files:
@@ -111,20 +125,26 @@ def load_all_suites():
         rows.append({
             "cat_name": cat_name,
             "results_rel": str(results_dir.relative_to(BASE_DIR)),
+            "stem": stem,
             "data": data,
-            "filtered": load_json(results_dir / "results_filtered.json"),
-            "diff": load_json(results_dir / "results_diff.json"),
-            "flash": load_json(results_dir / "results_flash.json"),
+            "filtered": load_json(results_dir / f"{stem}_filtered.json"),
+            "diff": load_json(results_dir / f"{stem}_diff.json"),
+            # Flash-spec is only generated for the trace mode today.
+            "flash": load_json(results_dir / "results_flash.json") if stem == "results" else None,
         })
 
     return rows
 
 
-def generate_report(rows, filtered):
+def generate_report(rows, filtered, mode_label: str = ""):
     """Generate a markdown report.
 
-    If filtered=True, uses results_filtered.json data and skips suites without it.
-    If filtered=False, uses results.json data.
+    If filtered=True, uses {stem}_filtered.json data and skips suites without it.
+    If filtered=False, uses {stem}.json data.
+
+    mode_label adjusts the heading and cross-link to disambiguate between the
+    trace, graphics, and headless index files. Empty string = trace (the
+    canonical RUFFLE_RESULTS.md / RUFFLE_RESULTS_FILTERED.md).
     """
     lines = []
 
@@ -142,14 +162,25 @@ def generate_report(rows, filtered):
     if not suite_rows:
         return None
 
+    # --- Per-mode filenames for header cross-links ---
+    if mode_label:
+        upper = mode_label.upper()
+        raw_name = f"RUFFLE_RESULTS_{upper}.md"
+        filt_name = f"RUFFLE_RESULTS_{upper}_FILTERED.md"
+        title_suffix = f" ({mode_label})"
+    else:
+        raw_name = "RUFFLE_RESULTS.md"
+        filt_name = "RUFFLE_RESULTS_FILTERED.md"
+        title_suffix = ""
+
     # --- Header ---
     if filtered:
-        lines.append("# Ruffle Test Results (Filtered)\n")
+        lines.append(f"# Ruffle Test Results{title_suffix} (Filtered)\n")
         lines.append("*Tests on the [ignored list](ruffle-tests/ignored_tests.txt) are excluded.*  ")
-        lines.append("*See [RUFFLE_RESULTS.md](RUFFLE_RESULTS.md) for unfiltered results.*\n")
+        lines.append(f"*See [{raw_name}]({raw_name}) for unfiltered results.*\n")
     else:
-        lines.append("# Ruffle Test Results\n")
-        lines.append("*See [RUFFLE_RESULTS_FILTERED.md](RUFFLE_RESULTS_FILTERED.md) "
+        lines.append(f"# Ruffle Test Results{title_suffix}\n")
+        lines.append(f"*See [{filt_name}]({filt_name}) "
                       "for results with ignored tests excluded.*\n")
 
     newest_ts = None
@@ -192,10 +223,11 @@ def generate_report(rows, filtered):
         grand_total += total
 
         rel = row["results_rel"]
+        stem = row.get("stem", "results")
         if filtered:
-            report_link = f"[details]({rel}/results_filtered.md)"
+            report_link = f"[details]({rel}/{stem}_filtered.md)"
         else:
-            report_link = f"[details]({rel}/results.md)"
+            report_link = f"[details]({rel}/{stem}.md)"
 
         meta = d.get("metadata", {})
         note = ""
@@ -404,26 +436,39 @@ def generate_report(rows, filtered):
 
 
 def main():
-    rows = load_all_suites()
+    any_generated = False
 
-    raw_md = generate_report(rows, filtered=False)
-    with open(OUTPUT_RAW, "w") as f:
-        f.write(raw_md)
-    print(f"Written to {OUTPUT_RAW}")
+    for stem, label, raw_path, filtered_path in MODE_INDEX_FILES:
+        rows = load_all_suites(stem)
+        if not rows:
+            # Skip silently when this mode hasn't been run yet
+            continue
 
-    filtered_md = generate_report(rows, filtered=True)
-    if filtered_md:
-        with open(OUTPUT_FILTERED, "w") as f:
-            f.write(filtered_md)
-        print(f"Written to {OUTPUT_FILTERED}")
+        raw_md = generate_report(rows, filtered=False, mode_label=label)
+        if raw_md:
+            with open(raw_path, "w") as f:
+                f.write(raw_md)
+            print(f"Written to {raw_path}")
+            any_generated = True
 
-    for row in rows:
-        d = row["data"]
-        fd = row["filtered"]
-        f_info = ""
-        if fd:
-            f_info = f" (filtered: {fd['pass']}/{fd['total']}, {format_pct(fd['pass'], fd['total'])})"
-        print(f"  {row['cat_name']}: {d['pass']}/{d['total']} ({format_pct(d['pass'], d['total'])}){f_info}")
+        filtered_md = generate_report(rows, filtered=True, mode_label=label)
+        if filtered_md:
+            with open(filtered_path, "w") as f:
+                f.write(filtered_md)
+            print(f"Written to {filtered_path}")
+
+        title = label or "Trace"
+        for row in rows:
+            d = row["data"]
+            fd = row["filtered"]
+            f_info = ""
+            if fd:
+                f_info = f" (filtered: {fd['pass']}/{fd['total']}, {format_pct(fd['pass'], fd['total'])})"
+            print(f"  [{title}] {row['cat_name']}: {d['pass']}/{d['total']} ({format_pct(d['pass'], d['total'])}){f_info}")
+
+    if not any_generated:
+        print("No _results/results*.json files found.", file=sys.stderr)
+        sys.exit(1)
 
 
 if __name__ == "__main__":

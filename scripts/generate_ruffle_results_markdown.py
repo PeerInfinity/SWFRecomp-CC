@@ -511,51 +511,57 @@ def generate_investigation_legend(doc_list: list[tuple[str, str, list[str]]], da
 # Headless regressions
 # ---------------------------------------------------------------------------
 
-def generate_headless_regressions(normal_path: Path, headless_path: Path, output_path: Path):
-    """Generate report of tests that pass in normal mode but fail in headless mode."""
-    print(f"Generating headless regressions report...")
+def generate_mode_regressions(baseline_path: Path, current_path: Path, output_path: Path,
+                              baseline_label: str = "Normal", current_label: str = "Headless"):
+    """Generate report of tests that pass in baseline mode but fail in the
+    current mode (and vice versa).
 
-    normal_data = load_results(normal_path)
-    headless_data = load_results(headless_path)
+    Originally written for `Normal vs Headless`; generalized so it also covers
+    `Trace vs Graphics` etc. by accepting custom labels.
+    """
+    print(f"Generating {current_label.lower()} regressions report...")
 
-    normal_status = {t["test"]: t for t in normal_data["tests"]}
-    headless_status = {t["test"]: t for t in headless_data["tests"]}
+    baseline_data = load_results(baseline_path)
+    current_data = load_results(current_path)
 
-    # Tests that pass in normal but fail in headless
+    baseline_status = {t["test"]: t for t in baseline_data["tests"]}
+    current_status = {t["test"]: t for t in current_data["tests"]}
+
+    # Tests that pass in baseline but fail in current
     regressions = []
-    for name, nt in sorted(normal_status.items()):
+    for name, nt in sorted(baseline_status.items()):
         if nt["status"] != "pass":
             continue
-        ht = headless_status.get(name)
+        ht = current_status.get(name)
         if ht is None or ht["status"] == "pass":
             continue
         regressions.append((name, ht))
 
-    # Tests that fail in normal but pass in headless
+    # Tests that fail in baseline but pass in current
     improvements = []
-    for name, ht in sorted(headless_status.items()):
+    for name, ht in sorted(current_status.items()):
         if ht["status"] != "pass":
             continue
-        nt = normal_status.get(name)
+        nt = baseline_status.get(name)
         if nt is None or nt["status"] == "pass":
             continue
         improvements.append((name, nt))
 
     md = []
-    md.append("# Headless vs Normal Mode Differences")
+    md.append(f"# {current_label} vs {baseline_label} Mode Differences")
     md.append("")
-    md.append(f"Normal: {normal_data['pass']}/{normal_data['total']} passing | "
-              f"Headless: {headless_data['pass']}/{headless_data['total']} passing")
+    md.append(f"{baseline_label}: {baseline_data['pass']}/{baseline_data['total']} passing | "
+              f"{current_label}: {current_data['pass']}/{current_data['total']} passing")
     md.append("")
 
     # Regressions
-    md.append(f"## Headless Regressions ({len(regressions)} tests)")
+    md.append(f"## {current_label} Regressions ({len(regressions)} tests)")
     md.append("")
-    md.append("Tests that **pass** in normal mode but **fail** in headless mode.")
+    md.append(f"Tests that **pass** in {baseline_label.lower()} mode but **fail** in {current_label.lower()} mode.")
     md.append("")
 
     if regressions:
-        md.append("| # | Test | Headless Status | Detail |")
+        md.append(f"| # | Test | {current_label} Status | Detail |")
         md.append("|---|------|-----------------|--------|")
         for i, (name, ht) in enumerate(regressions, 1):
             status = ht["status"].replace("_", " ").title()
@@ -569,13 +575,13 @@ def generate_headless_regressions(normal_path: Path, headless_path: Path, output
     md.append("")
 
     # Improvements
-    md.append(f"## Headless Improvements ({len(improvements)} tests)")
+    md.append(f"## {current_label} Improvements ({len(improvements)} tests)")
     md.append("")
-    md.append("Tests that **fail** in normal mode but **pass** in headless mode.")
+    md.append(f"Tests that **fail** in {baseline_label.lower()} mode but **pass** in {current_label.lower()} mode.")
     md.append("")
 
     if improvements:
-        md.append("| # | Test | Normal Status | Detail |")
+        md.append(f"| # | Test | {baseline_label} Status | Detail |")
         md.append("|---|------|---------------|--------|")
         for i, (name, nt) in enumerate(improvements, 1):
             status = nt["status"].replace("_", " ").title()
@@ -595,11 +601,79 @@ def generate_headless_regressions(normal_path: Path, headless_path: Path, output
     print(f"  {len(regressions)} regressions, {len(improvements)} improvements")
 
 
+def generate_headless_regressions(normal_path: Path, headless_path: Path, output_path: Path):
+    """Backwards-compatible wrapper for generate_mode_regressions with the
+    historical Normal/Headless labels."""
+    generate_mode_regressions(normal_path, headless_path, output_path,
+                              baseline_label="Normal", current_label="Headless")
+
+
 # ---------------------------------------------------------------------------
 # Main
 # ---------------------------------------------------------------------------
 
 _UNSET = object()
+
+
+# Per-mode result file stems and their human-readable labels. Used by the
+# multi-mode scan helper to discover all mode-specific JSONs and produce
+# matching .md outputs (results.md, results_graphics.md, results_headless.md)
+# plus regressions reports for non-baseline modes.
+MODE_STEMS = [
+    # (stem, label, is_baseline)
+    ("results",          "Trace",    True),
+    ("results_graphics", "Graphics", False),
+    ("results_headless", "Headless", False),
+]
+BASELINE_STEM = "results"
+BASELINE_LABEL = "Trace"
+
+
+def scan_all_modes(generated_paths: list[Path] = None) -> bool:
+    """Walk every _results/ directory under ruffle-tests/tests/swfs/ and
+    generate .md files for every mode-specific results JSON it contains.
+
+    For each suite that has a results_<mode>.json:
+      - results_<mode>.md (main report)
+      - results_<mode>_filtered.md (if results_<mode>_filtered.json exists)
+      - results_<mode>_regressions.md (non-baseline modes only; compares
+        against the suite's baseline results.json if it exists)
+
+    Returns True iff at least one .md was written.
+    """
+    import glob as glob_mod
+    generated = False
+    for stem, label, is_baseline in MODE_STEMS:
+        pattern = str(RUFFLE_DIR / "tests" / "swfs" / "**" / "_results" / f"{stem}.json")
+        for results_json in sorted(glob_mod.glob(pattern, recursive=True)):
+            results_json = Path(results_json)
+            results_dir = results_json.parent
+            inv_dir = results_dir.parent / "_investigation"
+            inv_arg = inv_dir if inv_dir.is_dir() else None
+
+            generate_one(results_json, results_dir / f"{stem}.md",
+                          investigation_dir=inv_arg)
+
+            filtered_json = results_dir / f"{stem}_filtered.json"
+            if filtered_json.exists():
+                generate_one(filtered_json, results_dir / f"{stem}_filtered.md",
+                              investigation_dir=inv_arg)
+
+            # Non-baseline modes get a regressions report vs the baseline
+            # (trace) results, when both are present.
+            if not is_baseline:
+                baseline_json = results_dir / f"{BASELINE_STEM}.json"
+                if baseline_json.exists():
+                    generate_mode_regressions(
+                        baseline_json, results_json,
+                        results_dir / f"{stem}_regressions.md",
+                        baseline_label=BASELINE_LABEL,
+                        current_label=label,
+                    )
+
+            generated = True
+    return generated
+
 
 def generate_one(results_path: Path, output_path: Path, investigation_dir = _UNSET):
     """Generate a single markdown report from a results JSON file.
@@ -677,24 +751,8 @@ def generate_markdown():
         return
 
     if args.scan:
-        import glob as glob_mod
-        generated = False
-        for results_json in sorted(glob_mod.glob(
-                str(RUFFLE_DIR / "tests" / "swfs" / "**" / "_results" / "results.json"),
-                recursive=True)):
-            results_json = Path(results_json)
-            results_dir = results_json.parent
-            inv_dir = results_dir.parent / "_investigation"
-            generate_one(results_json, results_dir / "results.md",
-                          investigation_dir=inv_dir if inv_dir.is_dir() else None)
-            # Also generate filtered report if available
-            filtered_json = results_dir / "results_filtered.json"
-            if filtered_json.exists():
-                generate_one(filtered_json, results_dir / "results_filtered.md",
-                              investigation_dir=inv_dir if inv_dir.is_dir() else None)
-            generated = True
-        if not generated:
-            print("No _results/results.json files found under ruffle-tests/tests/swfs/",
+        if not scan_all_modes():
+            print("No _results/results*.json files found under ruffle-tests/tests/swfs/",
                   file=sys.stderr)
             sys.exit(1)
         print("\nDone.")
@@ -730,24 +788,8 @@ def generate_markdown():
         print("\nDone.")
         return
 
-    # Default: scan for _results dirs
-    import glob as glob_mod
-    generated = False
-    for results_json in sorted(glob_mod.glob(
-            str(RUFFLE_DIR / "tests" / "swfs" / "**" / "_results" / "results.json"),
-            recursive=True)):
-        results_json = Path(results_json)
-        results_dir = results_json.parent
-        inv_dir = results_dir.parent / "_investigation"
-        generate_one(results_json, results_dir / "results.md",
-                      investigation_dir=inv_dir if inv_dir.is_dir() else None)
-        filtered_json = results_dir / "results_filtered.json"
-        if filtered_json.exists():
-            generate_one(filtered_json, results_dir / "results_filtered.md",
-                          investigation_dir=inv_dir if inv_dir.is_dir() else None)
-        generated = True
-
-    if not generated:
+    # Default: scan all mode JSONs across all _results/ dirs
+    if not scan_all_modes():
         print("Error: No results JSON files found", file=sys.stderr)
         sys.exit(1)
 
