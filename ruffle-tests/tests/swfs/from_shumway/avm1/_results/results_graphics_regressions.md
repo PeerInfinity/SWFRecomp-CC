@@ -1,8 +1,8 @@
 # Graphics vs Trace Mode Differences
 
-Trace: 46/47 passing | Graphics: 37/47 passing
+Trace: 46/47 passing | Graphics: 38/47 passing
 
-## Graphics Regressions (9 tests)
+## Graphics Regressions (8 tests)
 
 Tests that **pass** in trace mode but **fail** in graphics mode.
 
@@ -14,9 +14,8 @@ Tests that **pass** in trace mode but **fail** in graphics mode.
 | 4 | `mouse-transparency` | Output Mismatch | 0/1 lines match |
 | 5 | `moviecliploader` | Output Mismatch | 6/7 lines match |
 | 6 | `nested-button` | Output Mismatch | 0/1 lines match |
-| 7 | `rollover` | Output Mismatch | 1/4 lines match |
-| 8 | `setinterval` | Output Mismatch | 14/12719 lines match |
-| 9 | `settimeout` | Output Mismatch | 14/31 lines match |
+| 7 | `setinterval` | Output Mismatch | 14/12719 lines match |
+| 8 | `settimeout` | Output Mismatch | 14/31 lines match |
 
 ## Graphics Improvements (0 tests)
 
