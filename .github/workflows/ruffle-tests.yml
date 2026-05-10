@@ -751,12 +751,24 @@ jobs:
       - name: Combine shard results
         env:
           EXPECTED_SHARDS: ${{ needs.setup-parallel.outputs.total }}
+          MODE: ${{ inputs.mode }}
         run: |
           python3 << 'EOF'
           import json, glob, os
           from datetime import datetime, timezone
 
           expected_shards = int(os.environ.get("EXPECTED_SHARDS") or "0")
+          # Mode-specific output filename so a graphics-mode run doesn't
+          # overwrite the no-graphics results.json (and vice versa).
+          # Mirrors verify_output.py's single-runner path.
+          mode = os.environ.get("MODE") or "no-graphics"
+          if mode == "graphics":
+              out_filename = "results_graphics.json"
+          elif mode == "graphics-headless-legacy":
+              out_filename = "results_headless.json"
+          else:
+              out_filename = "results.json"
+          print(f"Mode: {mode} → writing combined results to {out_filename}")
 
           # Map of shard tag -> output results dir
           categories = {
@@ -847,7 +859,7 @@ jobs:
               }
 
               os.makedirs(out_dir, exist_ok=True)
-              with open(f"{out_dir}/results.json", "w") as fp:
+              with open(f"{out_dir}/{out_filename}", "w") as fp:
                   json.dump(report, fp, indent=2)
 
               suffix = f" — INCOMPLETE ({missing_shards} shards missing)" if missing_shards > 0 else ""
