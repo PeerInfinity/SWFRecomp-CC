@@ -29,6 +29,20 @@ on:
           - '20'
           - '30'
         default: '30'
+      mode:
+        description: 'Build mode (graphics modes need Dawn prebuilt — see workflow comment)'
+        required: true
+        type: choice
+        options:
+          - 'no-graphics'
+          - 'graphics'
+          - 'graphics-headless-legacy'
+        default: 'no-graphics'
+      single_test:
+        description: 'Run a single test by name (overrides categories; auto-uses single runner)'
+        required: false
+        default: ''
+        type: string
   workflow_call:
     inputs:
       categories:
@@ -45,6 +59,16 @@ on:
         description: 'Number of parallel runners'
         required: false
         default: '30'
+        type: string
+      mode:
+        description: 'Build mode (no-graphics | graphics | graphics-headless-legacy)'
+        required: false
+        default: 'no-graphics'
+        type: string
+      single_test:
+        description: 'Run a single test by name'
+        required: false
+        default: ''
         type: string
 
 permissions:
@@ -67,7 +91,7 @@ jobs:
   # --- Single runner path ---
   ruffle-tests:
     name: Run Tests
-    if: inputs.parallel == '1'
+    if: inputs.parallel == '1' || inputs.single_test != ''
     runs-on: ubuntu-latest
 
     env:
@@ -87,6 +111,38 @@ jobs:
       - name: Install system dependencies
         run: sudo apt-get update && sudo apt-get install -y build-essential cmake ccache
 
+      # Graphics modes (graphics, graphics-headless-legacy) need Vulkan +
+      # a prebuilt Dawn library. Dawn does not publish official binary
+      # releases we can use, so this workflow expects a hand-built tarball
+      # uploaded to a GitHub release named `dawn-prebuilt` on this repo.
+      #
+      # To set up the release (one-time):
+      #   1. Build Dawn locally — see SWFRecompDocs/notes/headless_rendering.md.
+      #   2. Tar the install dir with the layout `dawn-install/{include,lib}/`:
+      #        cd ~/CC && tar -czf dawn-linux-x86_64.tar.gz dawn-install
+      #   3. Upload as a release asset:
+      #        gh release create dawn-prebuilt dawn-linux-x86_64.tar.gz \
+      #          --title "Dawn prebuilt for CI" --notes "Linux x86_64"
+      #      Re-upload the asset (gh release upload --clobber) to update.
+      - name: Install Vulkan + Dawn (graphics modes)
+        if: inputs.mode != 'no-graphics'
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          sudo apt-get install -y mesa-vulkan-drivers vulkan-tools libvulkan1
+          mkdir -p "$RUNNER_TEMP/dawn"
+          cd "$RUNNER_TEMP/dawn"
+          if ! gh release download dawn-prebuilt --pattern 'dawn-linux-x86_64.tar.gz' 2>/dev/null; then
+            echo "::error::No Dawn prebuilt release found. Upload dawn-linux-x86_64.tar.gz to release tag 'dawn-prebuilt' first — see workflow comment for instructions."
+            exit 1
+          fi
+          tar -xzf dawn-linux-x86_64.tar.gz
+          {
+            echo "DAWN_INSTALL=$RUNNER_TEMP/dawn/dawn-install"
+            echo "VK_ICD_FILENAMES=/usr/share/vulkan/icd.d/lvp_icd.json"
+            echo "VK_DRIVER_FILES=/usr/share/vulkan/icd.d/lvp_icd.json"
+          } >> "$GITHUB_ENV"
+
       - name: Pin ccache directory
         run: echo "CCACHE_DIR=$HOME/.ccache" >> "$GITHUB_ENV"
 
@@ -94,8 +150,9 @@ jobs:
         uses: actions/cache@v4
         with:
           path: ${{ env.CCACHE_DIR }}
-          key: ccache-ruffle-single-${{ github.run_id }}
+          key: ccache-ruffle-single-${{ inputs.mode }}-${{ github.run_id }}
           restore-keys: |
+            ccache-ruffle-single-${{ inputs.mode }}-
             ccache-ruffle-single-
 
       - name: Configure ccache
@@ -146,7 +203,19 @@ jobs:
             done
           fi
 
+      - name: Verify single test
+        if: inputs.single_test != ''
+        env:
+          TZ: NPT-5:45
+        run: |
+          echo "=== Running single test: ${{ inputs.single_test }} (mode=${{ inputs.mode }}) ==="
+          python3 ruffle-tests/verify_output.py -v \
+            --test='${{ inputs.single_test }}' \
+            --mode='${{ inputs.mode }}' \
+            --diff
+
       - name: Verify runtime output
+        if: inputs.single_test == ''
         env:
           TZ: NPT-5:45
         run: |
@@ -163,16 +232,19 @@ jobs:
           for dir in $DIRS; do
             [ -d "$dir" ] || continue
             echo "=== Running: $dir ==="
-            python3 ruffle-tests/verify_output.py -v --tests-dir="$dir" $LIMIT_ARGS || true
+            python3 ruffle-tests/verify_output.py -v --tests-dir="$dir" \
+              --mode='${{ inputs.mode }}' $LIMIT_ARGS || true
           done
 
       - name: Verify Flash-spec expected output
-        if: always() && (env.RUN_AVM1 == 'true')
+        if: always() && inputs.single_test == '' && (env.RUN_AVM1 == 'true')
         env:
           TZ: NPT-5:45
         run: |
           echo "=== Running Flash-spec tests (output.flash.txt) ==="
-          python3 ruffle-tests/verify_output.py -v --expected-suffix=flash || true
+          python3 ruffle-tests/verify_output.py -v \
+            --mode='${{ inputs.mode }}' \
+            --expected-suffix=flash || true
 
       - name: ccache stats
         if: always()
@@ -326,7 +398,7 @@ jobs:
   # --- Parallel runner path: shared setup ---
   setup-parallel:
     name: Setup (Build + Download + Recompile)
-    if: inputs.parallel != '1'
+    if: inputs.parallel != '1' && inputs.single_test == ''
     runs-on: ubuntu-latest
 
     outputs:
@@ -411,7 +483,7 @@ jobs:
   # --- Parallel runner path: shards ---
   ruffle-tests-shard:
     name: Shard ${{ matrix.shard }}/${{ needs.setup-parallel.outputs.total }}
-    if: inputs.parallel != '1'
+    if: inputs.parallel != '1' && inputs.single_test == ''
     needs: setup-parallel
     runs-on: ubuntu-latest
 
@@ -436,6 +508,27 @@ jobs:
       - name: Install system dependencies
         run: sudo apt-get update && sudo apt-get install -y build-essential ccache
 
+      # Same Dawn prebuilt expectation as the single-runner job — see comment
+      # at the top of the ruffle-tests job for setup instructions.
+      - name: Install Vulkan + Dawn (graphics modes)
+        if: inputs.mode != 'no-graphics'
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          sudo apt-get install -y mesa-vulkan-drivers vulkan-tools libvulkan1
+          mkdir -p "$RUNNER_TEMP/dawn"
+          cd "$RUNNER_TEMP/dawn"
+          if ! gh release download dawn-prebuilt --pattern 'dawn-linux-x86_64.tar.gz' 2>/dev/null; then
+            echo "::error::No Dawn prebuilt release found. See ruffle-tests job comment."
+            exit 1
+          fi
+          tar -xzf dawn-linux-x86_64.tar.gz
+          {
+            echo "DAWN_INSTALL=$RUNNER_TEMP/dawn/dawn-install"
+            echo "VK_ICD_FILENAMES=/usr/share/vulkan/icd.d/lvp_icd.json"
+            echo "VK_DRIVER_FILES=/usr/share/vulkan/icd.d/lvp_icd.json"
+          } >> "$GITHUB_ENV"
+
       - name: Pin ccache directory
         run: echo "CCACHE_DIR=$HOME/.ccache" >> "$GITHUB_ENV"
 
@@ -443,8 +536,9 @@ jobs:
         uses: actions/cache@v4
         with:
           path: ${{ env.CCACHE_DIR }}
-          key: ccache-ruffle-shard-${{ matrix.shard }}-${{ github.run_id }}
+          key: ccache-ruffle-shard-${{ matrix.shard }}-${{ inputs.mode }}-${{ github.run_id }}
           restore-keys: |
+            ccache-ruffle-shard-${{ matrix.shard }}-${{ inputs.mode }}-
             ccache-ruffle-shard-${{ matrix.shard }}-
             ccache-ruffle-shard-
 
@@ -480,6 +574,7 @@ jobs:
             LIMIT_ARGS="--limit=${{ inputs.limit }}"
           fi
           python3 ruffle-tests/verify_output.py -v \
+            --mode='${{ inputs.mode }}' \
             --json=ruffle-tests/results-shard-avm1-${{ matrix.shard }}.json \
             --shard="$SHARD" $LIMIT_ARGS || true
 
@@ -500,10 +595,12 @@ jobs:
         run: |
           SHARD="${{ matrix.shard }}/${{ needs.setup-parallel.outputs.total }}"
           python3 ruffle-tests/verify_output.py -v \
+            --mode='${{ inputs.mode }}' \
             --tests-dir="$SHUMWAY_AVM1_DIR" \
             --json=ruffle-tests/results-shard-shumway_avm1-${{ matrix.shard }}.json \
             --shard="$SHARD" || true
           python3 ruffle-tests/verify_output.py -v \
+            --mode='${{ inputs.mode }}' \
             --tests-dir="$SHUMWAY_FLAT_DIR" \
             --json=ruffle-tests/results-shard-shumway_flat-${{ matrix.shard }}.json \
             --shard="$SHARD" || true
@@ -525,23 +622,28 @@ jobs:
         run: |
           SHARD="${{ matrix.shard }}/${{ needs.setup-parallel.outputs.total }}"
           python3 ruffle-tests/verify_output.py -v \
+            --mode='${{ inputs.mode }}' \
             --tests-dir="$GNASH_SWFMILL_DIR" \
             --json=ruffle-tests/results-shard-gnash_swfmill-${{ matrix.shard }}.json \
             --shard="$SHARD" || true
           python3 ruffle-tests/verify_output.py -v \
+            --mode='${{ inputs.mode }}' \
             --tests-dir="$GNASH_AS_DIR" \
             --json=ruffle-tests/results-shard-gnash_as-${{ matrix.shard }}.json \
             --shard="$SHARD" || true
           python3 ruffle-tests/verify_output.py -v \
+            --mode='${{ inputs.mode }}' \
             --tests-dir="$GNASH_MTASC_DIR" \
             --json=ruffle-tests/results-shard-gnash_mtasc-${{ matrix.shard }}.json \
             --shard="$SHARD" || true
           python3 ruffle-tests/verify_output.py -v \
+            --mode='${{ inputs.mode }}' \
             --tests-dir="$GNASH_MING_DIR" \
             --json=ruffle-tests/results-shard-gnash_ming-${{ matrix.shard }}.json \
             --shard="$SHARD" \
             --exclude=gotoFrame2Test || true
           python3 ruffle-tests/verify_output.py -v \
+            --mode='${{ inputs.mode }}' \
             --tests-dir="$GNASH_SWFC_DIR" \
             --json=ruffle-tests/results-shard-gnash_swfc-${{ matrix.shard }}.json \
             --shard="$SHARD" \
@@ -562,7 +664,7 @@ jobs:
   # --- Combine shard results ---
   combine-results:
     name: Combine Results
-    if: inputs.parallel != '1' && !cancelled()
+    if: inputs.parallel != '1' && inputs.single_test == '' && !cancelled()
     needs: [setup-parallel, ruffle-tests-shard]
     runs-on: ubuntu-latest
 
@@ -747,7 +849,9 @@ jobs:
           TZ: NPT-5:45
         run: |
           echo "=== Running Flash-spec tests (output.flash.txt) ==="
-          python3 ruffle-tests/verify_output.py -v --expected-suffix=flash || true
+          python3 ruffle-tests/verify_output.py -v \
+            --mode='${{ inputs.mode }}' \
+            --expected-suffix=flash || true
 
       - name: ccache stats
         if: always()

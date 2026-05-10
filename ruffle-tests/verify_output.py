@@ -386,7 +386,7 @@ RECOMP_CONFIG = SCRIPT_DIR / "_shared" / "config.toml"
 SWFMODERN = PROJECT_ROOT / "SWFModernRuntime"
 MAIN_C = PROJECT_ROOT / "SWFRecomp" / "wasm_wrappers" / "main.c"
 DIFF_SCRIPT = PROJECT_ROOT / "scripts" / "diff_ruffle_results.py"
-DAWN_INSTALL = PROJECT_ROOT.parent / "dawn-install"
+DAWN_INSTALL = Path(os.environ.get("DAWN_INSTALL", PROJECT_ROOT.parent / "dawn-install"))
 STB_DIR = PROJECT_ROOT / "SWFRecomp" / "lib" / "stb"
 # Ruffle upstream test assets (expected PNGs live here)
 RUFFLE_UPSTREAM = Path.home() / "CC" / "ruffle" / "tests" / "tests" / "swfs" / "avm1"
