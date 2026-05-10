@@ -186,3 +186,88 @@ finalize against something other than `pending_removal == 1`.
 
 Net: ~+800 lines of code changed, mostly mechanical gate-widening that
 inverts to deletion in Phase 3 when `swf_headless.c` is retired.
+
+---
+
+## 2026-05-10 follow-up
+
+Smoke set moved from 7/9 → 7/9 (unchanged — the two outstanding subtle
+failures `tell_target_invalid` and `unload` are still open) but the
+**full-suite numbers jumped by +224 tests** in one session via two
+structural fixes. Details in the 2026-05-10 section of
+`graphics-native-test-mode-fullsuite-baseline-2026-05-09.md`.
+
+### Two commits, two clusters
+
+**`fff977ec`** — `from_gnash/actionscript.all` was 0/190 because every
+test uses Dejagnu, which calls `setInterval(checkIt, 200ms)` and
+`Stop()` at frame 0, then waits for the interval to fire `checkIt` →
+`gotoFrame(0); play()` to advance through frame 1's Dejagnu module
+init. Three nested gaps in `swf.c` kept it stuck:
+
+1. **No `is_playing || manual_next_frame` gate** on the per-tick
+   `funcs[current_frame]` call (both `swf_core.c` and `swf_headless.c`
+   have it). After `Stop()`, `swf.c` re-ran frame_0 every tick → re-
+   queued `script_1` → re-called `setInterval(checkIt, 200ms)` →
+   created a brand-new timer entry each tick with `elapsed_ms` reset
+   to 0. The 200 ms threshold was never reached.
+2. **No `processTimers` call** in the main loop. Even if the timer had
+   accumulated, nothing would have fired it.
+3. **No `ng_sync_root_display_obj` / `actionSetCurrentContext(&root_movieclip)`**
+   before `tagMain`. `actionImportAssets("Dejagnu.swf")` then ran with
+   `g_current_context = NULL`, so the imported SWF's `_root.*`
+   assignments missed the root MC.
+
+All three gated on `OFFSCREEN_RENDER` — wasm-browser graphics
+unaffected. Net: actionscript.all jumped 0 → 125 (+125, NO_GRAPHICS
+parity at 126).
+
+**`ebaa7506`** — "SIGSEGV (output matches)" cluster (47 tests in avm1,
+plus all of `misc-mtasc.all` and 7 in `misc-ming.all`) was caused by
+`swf.c::swfStart` allocating `dictionary` and `display_list` with
+system `malloc` while the shared `grow_ptr` helper (`utils.c`) uses
+`HALLOC` for the new buffer and `FREE` (= `heap_free`) on the old
+one. First display-list growth during execution handed a malloc'd
+pointer to `heap_free` → invalid record in the heap pool →
+`heap_shutdown`'s enumeration walked into the bad entry at exit.
+
+Fix: mirror `swf_core.c` / `swf_headless.c` — switch to `HCALLOC`
+(after `heap_init`) and drop the manual `free()` in shutdown
+(heap_shutdown releases the pool). Net: avm1 segfaults 47 → 1;
+misc-mtasc reached full NO_GRAPHICS parity (7/7 of those that pass
+there).
+
+### Smoke set unchanged
+
+`tell_target_invalid` and `unload` still failing per the diagnoses
+above. The structural fixes this session didn't touch the code paths
+either depends on. Pick them up after the cluster mining stabilizes.
+
+### Tooling commits (don't affect pass rate)
+
+- `784bb3ae` — CI inherits `ruffle-test-results` instead of building
+  from master, so trace/graphics runs don't clobber each other on the
+  results branch.
+- `b3f2cb8e` — Per-mode `.md` generators (results.md /
+  results_graphics.md / results_headless.md per suite + matching
+  top-level RUFFLE_RESULTS\*.md). Filter / diff / markdown / index
+  generation moved into the commit step (after the branch switch) so
+  outputs reflect the merged state.
+- `ea65de7f` — Workflow auto-builds Dawn on cache miss in
+  `setup-parallel` (~30 min the first time, cached after); ccache
+  capped at 200M to prevent eviction of the smaller Dawn cache via
+  the 10 GiB per-repo limit; old ccache entries pruned at end of run.
+- `7767c265` — Commit step deletes untracked `*_previous.json` before
+  the `git checkout -B ruffle-test-results` to avoid an add/add
+  conflict on the branch switch.
+
+### Where to start next session
+
+1. Cluster-mine `avm1` (142-test gap pre-session, ~138 post-session).
+   Run is at 510/651 with 128 output_mismatch + 1 segfault + 1
+   timeout. No dominant cluster left — sort `results_graphics_diff.md`
+   by diff size, look for shared first-line divergences.
+2. `misc-ming.all` long tail (50+ output_mismatches after segfaults
+   resolved).
+3. Subtle smokes (`tell_target_invalid`, `unload`) — see diagnoses
+   above.

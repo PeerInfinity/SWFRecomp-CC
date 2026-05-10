@@ -1,5 +1,11 @@
 # Graphics-Native Full-Suite Baseline (2026-05-09)
 
+> **Update 2026-05-10:** This baseline is the pre-session-of-2026-05-10
+> snapshot. The numbers below are now stale (graphics-native moved from
+> 573/1122 → 797/1125 in one session). See the **2026-05-10** sections
+> at the bottom of this doc and `graphics-native-test-mode-plan.md` for
+> the current state. Kept for historical comparison.
+
 First full-suite CI run of `--mode=graphics` after Phase 2's structural
 backports landed. Run ID: 25616804905, parallel=10, completed in ~19
 minutes. Results live at `origin/ruffle-test-results` as
@@ -115,3 +121,54 @@ To re-run the same baseline:
 gh workflow run ruffle-tests.yml --ref master \
   -f mode=graphics -f categories=all -f parallel=10
 ```
+
+---
+
+## 2026-05-10 update: post-session re-baseline
+
+Two commits landed this session, each unblocking a single structural
+cluster:
+
+| Commit | Cluster | Per-suite effect |
+|---|---|---|
+| `fff977ec` | `from_gnash/actionscript.all` 0/190 (Dejagnu setInterval stuck on frame 0) | +125 actionscript.all; smaller bumps on other Dejagnu-using suites |
+| `ebaa7506` | "SIGSEGV (output matches)" cluster (shutdown crash from `malloc`'d display_list passed to `heap_free`) | avm1: 47 segfaults → 1; misc-mtasc 0 → 7; misc-ming +34 |
+
+### Per-suite delta
+
+| Suite | NO_GRAPHICS | 2026-05-09 graphics | 2026-05-10 graphics | Δ | Effective pass |
+|---|---|---|---|---|---|
+| avm1 | 605/648 (93.4%) | 463 (71.5%) | **510 (78.3%)** | **+47** | 521/651 |
+| from_gnash/actionscript.all | 126/190 | 0 | **125 (65.8%)** | **+125** | 186/190 |
+| from_gnash/misc-ming.all | 66/102 | 9 | **43 (42.2%)** | **+34** | 57/102 |
+| from_gnash/misc-mtasc.all | 7/9 | 0 | **7 (77.8%)** | **+7** | 8/9 |
+| from_gnash/misc-swfc.all | 8/16 | 5 | 6 (37.5%) | +1 | 11/16 |
+| from_gnash/misc-swfmill.all | 17/18 | 16 | 17 (94.4%) | +1 | 18/18 |
+| from_shumway | 73/92 | 47 | 52 (56.5%) | +5 | 57/92 |
+| from_shumway/avm1 | 46/47 | 33 | 37 (78.7%) | +4 | 38/47 |
+| **TOTAL** | **948/1122 (84.5%)** | **573 (51.1%)** | **797 (70.8%)** | **+224** | **896/1125 (79.6%)** |
+
+### Cluster status
+
+- **actionscript.all 0/190**: fully resolved by `fff977ec` (now at
+  NO_GRAPHICS parity 125 vs 126; effective pass 186/190).
+- **SIGSEGV (output matches) cluster**: fully resolved by `ebaa7506`
+  (avm1 segfaults 47 → 1; misc-mtasc full NO_GRAPHICS parity).
+- **misc-ming long tail**: +34 from session, but still 50+ failures.
+  Mix of segfaults (resolved) and output_mismatches (long tail).
+- **avm1 long tail**: 128 output_mismatch + 1 segfault + 1 timeout.
+  No dominant cluster — per-test triage from here.
+
+### What's left
+
+- ~52 tests separate the current 896 effective pass from the 948
+  NO_GRAPHICS baseline. No structural cluster left; this is cluster-
+  mining territory (see `graphics-native-test-mode-playbook.md`).
+- Two smoke failures still subtle: `tell_target_invalid`, `unload`
+  (diagnoses in `graphics-native-test-mode-phase2-results-2026-05-09.md`).
+
+### Reproducibility
+
+Latest CI run: 25640191347 (mode=graphics, parallel=30, ~6 min). Cache
+state after `ea65de7f`: Dawn auto-builds on miss; ccache capped at
+200M; old caches pruned at end of each run.
