@@ -215,6 +215,24 @@ cause.
    rm -f ruffle-tests/tests/swfs/avm1/_results/results_graphics.json
    ```
 
+9. **Loosening loop-exit gates surfaces sprite over-execution.** When
+   you make `tagMain`'s loop continue past `quit_swf` (e.g. to let a
+   sprite frame_func that lives on a non-zero frame get a chance to
+   run), tests that previously passed because the loop exited early
+   may now over-execute: sprites with `sprite_is_playing=1` keep
+   firing their scripts until `MAX_FRAMES`, producing extra trailing
+   trace lines that break expected-output match. Symptom in the diff:
+   `lines: matching=N, expected=N` (perfect match) but `actual_lines >
+   expected_lines` and `status=output_mismatch`. Cluster from commit
+   `ab614b80`: `create_empty_movie_clip`, `form_loader_encoding_1`,
+   `issue_2084`, `loadmovie_replace_root`, `textfield_cache_as_bitmap`
+   (avm1) plus 2 fuzz tests in `from_shumway` flipped from
+   `ruffle_matched` → `output_mismatch`. The right fix is figuring out
+   why those sprites should have stopped (often: the `actionStop` call
+   from a sprite script is hitting graphics-native's `is_playing = 0`
+   fallthrough instead of `ng_stopCurrentSprite()`); the wrong fix is
+   tightening the loop-exit gate so the over-execution gets cut off.
+
 ## Useful commands
 
 ```bash
