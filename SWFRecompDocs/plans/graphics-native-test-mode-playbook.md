@@ -13,15 +13,32 @@ already been done.
 Before triaging individual failures, get a per-suite pass-rate snapshot
 under `--mode=graphics`. Two options:
 
-**Option A — CI (preferred once wired).** Per the plan, Phase 1 step 5
-("Wire CI option B: manual-dispatch input to select mode") is still
-deferred. When done, you can dispatch the workflow with `mode=graphics`
-and let it produce `_results/results_graphics.json` per suite. Until
-then, use Option B.
+**Option A — CI (recommended).** The `ruffle-tests.yml` workflow has
+`mode` and `single_test` inputs:
+
+- `mode=no-graphics` (default) — existing behavior, unchanged
+- `mode=graphics` — runs the new full-graphics-native build
+- `mode=graphics-headless-legacy` — runs `swf_headless.c` + offscreen Dawn
+- `single_test=NAME` — runs just one test (any mode), auto-uses the
+  single-runner job
+
+**One-time prerequisite:** Both graphics modes need a prebuilt Dawn
+binary at a `dawn-prebuilt` release on this repo. The workflow's
+"Install Vulkan + Dawn (graphics modes)" step has the build/upload
+instructions. If the release is missing, the workflow fails with a
+helpful error rather than silently running NO_GRAPHICS.
+
+Trigger:
+```bash
+gh workflow run ruffle-tests.yml --ref master \
+  -f mode=graphics -f categories=avm1 -f parallel=10
+# or single test:
+gh workflow run ruffle-tests.yml --ref master \
+  -f mode=graphics -f single_test=tell_target_invalid
+```
 
 **Option B — local full-suite run.** Each test takes ~5–10s (ccache
 warm), so a full suite is ~10–30 min, all suites together ~1.5–3 hours.
-The runner's full-suite invocation:
 
 ```bash
 python3 ruffle-tests/verify_output.py --mode=graphics
@@ -29,9 +46,9 @@ python3 ruffle-tests/verify_output.py --mode=graphics
 python3 ruffle-tests/verify_output.py --mode=graphics --tests-dir=ruffle-tests/tests/swfs/avm1
 ```
 
-CLAUDE.md says NOT to run full suites in normal sessions — that
-guidance still applies. If you need a full baseline, ask the user
-first (or wait for CI).
+CLAUDE.md says NOT to run full suites in normal sessions — use CI
+unless you specifically need local timing or are iterating without
+push access.
 
 ## How to find tests to work on
 
