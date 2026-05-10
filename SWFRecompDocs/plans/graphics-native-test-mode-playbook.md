@@ -1,37 +1,80 @@
 # Graphics-Native Test Mode — Phase 2 Playbook
 
-How to make another failing Ruffle test pass under `--mode=graphics`.
-Focused on the workflow + gotchas that actually came up; not a
-comprehensive reference. See `graphics-native-test-mode-plan.md` for
-goals and `graphics-native-test-mode-phase2-results-2026-05-09.md` for
-what's already been done.
+How to keep increasing the `--mode=graphics` pass rate across the full
+Ruffle test suites (~1100 tests across `avm1`, `from_gnash/*`,
+`from_shumway`, `from_shumway/avm1`). Focused on the workflow + gotchas
+that actually came up while flipping 5 of 9 smoke tests. See
+`graphics-native-test-mode-plan.md` for goals and
+`graphics-native-test-mode-phase2-results-2026-05-09.md` for what's
+already been done.
 
-## The loop
+## Setup: get a full-suite baseline
 
-1. **Pick a test.** Look at recent failure list (full-suite results JSON,
-   or run the smoke set). Prefer tests that are CLOSE to passing —
-   first-line-divergence ones are usually structural; many-line-mismatch
-   ones may need bigger work.
+Before triaging individual failures, get a per-suite pass-rate snapshot
+under `--mode=graphics`. Two options:
 
-2. **Diff it.** First line of divergence usually points at what's
-   missing.
+**Option A — CI (preferred once wired).** Per the plan, Phase 1 step 5
+("Wire CI option B: manual-dispatch input to select mode") is still
+deferred. When done, you can dispatch the workflow with `mode=graphics`
+and let it produce `_results/results_graphics.json` per suite. Until
+then, use Option B.
 
-   ```
+**Option B — local full-suite run.** Each test takes ~5–10s (ccache
+warm), so a full suite is ~10–30 min, all suites together ~1.5–3 hours.
+The runner's full-suite invocation:
+
+```bash
+python3 ruffle-tests/verify_output.py --mode=graphics
+# or for a single suite:
+python3 ruffle-tests/verify_output.py --mode=graphics --tests-dir=ruffle-tests/tests/swfs/avm1
+```
+
+CLAUDE.md says NOT to run full suites in normal sessions — that
+guidance still applies. If you need a full baseline, ask the user
+first (or wait for CI).
+
+## How to find tests to work on
+
+Once you have `_results/results_graphics.json` for a suite, prioritize.
+Most-bang-for-buck order:
+
+1. **Tests that pass in NO_GRAPHICS but fail in `--mode=graphics`** —
+   these are the parity gaps. Filter by comparing the two JSONs.
+2. **Tests with `compile_fail` or `runtime_segfault`** — structural
+   blockers, often shared by many other failing tests.
+3. **Tests with `output_mismatch` and a high `matching_lines /
+   expected_lines` ratio** — close to passing, usually one missing
+   structural piece. These are where the smoke set spent its time.
+4. **Tests with low matching ratio** — likely need many fixes; defer
+   until the easy wins are gone.
+
+Then look for **clusters**: 50 EditText tests failing the same way
+usually means one EditText-related fix unlocks all of them. Reading the
+diff for two or three tests in the cluster will reveal the shared root
+cause.
+
+## The loop (per test)
+
+1. **Diff it.**
+
+   ```bash
    python3 ruffle-tests/verify_output.py --test=NAME --mode=graphics --diff
    ```
 
-   The output shows `-` (expected) vs `+` (actual) for the first ~6
-   diverging lines.
+   First line of divergence usually points at what's missing.
 
-3. **Bisect via the legacy mode.** Run the same test under
-   `--mode=graphics-headless-legacy`:
+2. **Bisect via the legacy mode.**
+
+   ```bash
+   python3 ruffle-tests/verify_output.py --test=NAME --mode=graphics-headless-legacy --diff
+   ```
 
    - Passes there but fails in graphics-native → bug is in `swf.c`'s
      frame loop or in a recently-widened gate. **Most common case.**
    - Fails in both → shared-code bug in `tag.c` / `action.c` /
      `action_queue.c`. Rarer; investigate with NO_GRAPHICS as control.
 
-4. **Find what's missing.** Three things are usually missing:
+3. **Find what's missing.** Three things are usually missing:
 
    a. **A NO_GRAPHICS-only global** referenced by widened code →
       add definition to `graphics_stubs.c` (always-active group), or to
@@ -49,10 +92,10 @@ what's already been done.
       `actionFinalizePendingRemovals`, `input_events_pump_tick`, etc.
       Each is a one-line call but at the right point in the loop.
 
-5. **Apply the fix, re-baseline.** Don't just fix — re-run the smoke
-   set to make sure no regressions:
+4. **Apply the fix, re-baseline locally.** Don't just fix — re-run the
+   smoke set (it's fast and catches obvious regressions):
 
-   ```
+   ```bash
    for t in add tell_target_invalid clip_events edittext_default_format \
             button_key_events goto_rewind3 register_and_init_order \
             unload bitmap_data_colortransform; do
@@ -63,16 +106,24 @@ what's already been done.
    done
    ```
 
-6. **Verify legacy modes unchanged.** After any tag.c / action.c gate
-   change, sanity-check:
+   Plus run the test you were targeting and a handful of others from
+   its cluster.
 
-   ```
+5. **Verify legacy modes unchanged.** After any `tag.c` / `action.c`
+   gate change, sanity-check that NO_GRAPHICS and legacy headless
+   didn't regress:
+
+   ```bash
    python3 ruffle-tests/verify_output.py --test=NAME --diff                          # NO_GRAPHICS
    python3 ruffle-tests/verify_output.py --test=NAME --mode=graphics-headless-legacy --diff
    ```
 
-7. **Commit.** Per-fix commits with a clear "what flipped" line in the
-   message.
+   For a structural change (gate widening, new call site), pick 2–3
+   tests in the suite and run all three modes.
+
+6. **Commit.** Per-fix commits with a clear "what flipped" line in the
+   message. After several fixes, push and let CI run the full suites
+   for a real delta.
 
 ## Decision framework: widen vs port vs stub
 
@@ -109,7 +160,7 @@ what's already been done.
 
 4. **Widening surfaces dependency cascades.** Widening a gate around
    function F often surfaces undefined references to G that F calls.
-   Widen G's gate too. May cascade 2-3 deep before settling.
+   Widen G's gate too. May cascade 2–3 deep before settling.
 
 5. **Multi-definition errors after widening.** If `graphics_stubs.c`
    was providing a stub of what `tag.c` (now widened) defines, link
@@ -135,7 +186,7 @@ what's already been done.
    overwritten by per-test runs.** They show up dirty in git status
    after smoke runs; revert / delete before committing other changes:
 
-   ```
+   ```bash
    git checkout -- ruffle-tests/tests/swfs/avm1/_results/results_headless.json
    rm -f ruffle-tests/tests/swfs/avm1/_results/results_graphics.json
    ```
@@ -144,7 +195,8 @@ what's already been done.
 
 ```bash
 # Find canonical impl of a function (NO_GRAPHICS arm)
-grep -n "^void FUNC\|^int FUNC\|^static.*FUNC" SWFModernRuntime/src/libswf/*.c SWFModernRuntime/src/actionmodern/*.c
+grep -n "^void FUNC\|^int FUNC\|^static.*FUNC" \
+  SWFModernRuntime/src/libswf/*.c SWFModernRuntime/src/actionmodern/*.c
 
 # Find conditional context around a line in a file
 awk 'NR<=LINE && /^#if|^#elif|^#else|^#endif/{print NR":"$0}' FILE
@@ -158,27 +210,50 @@ grep -rn "FUNC(" SWFModernRuntime/src/
 
 # See where a global is defined vs declared
 grep -rn "^int GLOBAL\|^extern int GLOBAL" SWFModernRuntime/src/ SWFModernRuntime/include/
+
+# Compare a suite's NO_GRAPHICS vs graphics results to find the parity gaps
+python3 -c "
+import json
+ng = {t['test']: t for t in json.load(open('ruffle-tests/tests/swfs/avm1/_results/results.json'))['tests']}
+g  = {t['test']: t for t in json.load(open('ruffle-tests/tests/swfs/avm1/_results/results_graphics.json'))['tests']}
+gaps = [n for n in ng if ng[n].get('status')=='pass' and g.get(n,{}).get('status')!='pass']
+print(f'{len(gaps)} parity gaps')
+for n in gaps[:20]: print(' ', n)
+"
 ```
+
+## Picking what to work on next
+
+When you have a per-suite `_results/results_graphics.json`, the most
+productive moves are usually:
+
+- **Cluster mining.** If 30 EditText tests share the same first-line
+  divergence, one fix likely unlocks 25+ of them. Look for shared
+  diff prefixes.
+- **Compile/segfault first.** A compile_fail test isn't going to start
+  passing without code changes; find out which symbol is missing and
+  it's likely shared by many other tests.
+- **Smoke-set-near misses.** The two smoke failures we left
+  (`tell_target_invalid`, `unload`) have detailed diagnoses in the
+  Phase 2 results doc — if you're about to dive into one of them,
+  that doc has 80% of the context already.
 
 ## When you're stuck
 
-The two failures we left in the smoke set (`tell_target_invalid` and
-`unload`) are both subtle semantic issues, not structural gaps. If a
-test you're working on falls into the same category — i.e., the test
-runs end-to-end and most of the output matches but a few lines diverge
-in subtle ways — it's worth:
+Subtle semantic failures (test runs end-to-end, most output matches,
+a few lines diverge in unclear ways) take longer per test than
+structural ones. If you've spent more than ~30 min on a single subtle
+test and aren't converging:
 
-- Reading the recompiled scripts under `RecompiledScripts/script_N.c`
+- Read the recompiled scripts under `RecompiledScripts/script_N.c`
   to understand what the test actually does (the `actionTrace` /
   `actionGotoFrame` / `actionStop` calls are usually readable).
-- Adding `fprintf(stderr, ...)` to the suspect handler (e.g.,
-  `actionStop`, `actionFinalizePendingRemovals`) to trace when and how
-  it's called. Remember to revert before commit.
-- Comparing against `--mode=graphics-headless-legacy` and reading the
+- Add `fprintf(stderr, ...)` to the suspect handler to trace when and
+  how it's called. Remember to revert before commit.
+- Compare against `--mode=graphics-headless-legacy` and read the
   trace under that mode to see where the divergence first appears.
 
-Don't sink hours on one subtle test if you're about to give up — commit
-what you have (even partial progress can show up as "failure shifted to
-later line"), and pick a different test that has a structural cause.
-The structural ones unlock multiple tests at once; the subtle ones
-unlock just themselves.
+Don't sink hours on one subtle test. Commit what you have (even
+"failure shifted to later line" is progress) and pick a different
+test that has a structural cause. **Structural fixes unlock multiple
+tests at once; subtle fixes unlock just themselves.**
