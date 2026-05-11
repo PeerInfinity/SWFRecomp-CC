@@ -1,21 +1,15 @@
 # Ruffle Test Results Diff
 
-**Previous:** `b232f7e6facb` (2026-05-11T04:19:19.369241+00:00)
-**Current:** `e0568fe7e53f` (2026-05-11T17:30:43.932450+00:00)
+**Previous:** `e0568fe7e53f` (2026-05-11T17:30:43.932450+00:00)
+**Current:** `65b80680126b` (2026-05-11T18:15:21.439750+00:00)
 
 ## Summary
 
 | Metric | Previous | Current | Delta |
 |--------|----------|---------|-------|
-| Passing | 42 | 44 | +2 |
+| Passing | 44 | 44 | 0 |
 | Total | 47 | 47 | 0 |
-| Pass rate | 89.4% | 93.6% | +4.2% |
-| Mismatched lines | 9 | 4 | -5 |
-|   Decreased | | | -5 |
+| Pass rate | 93.6% | 93.6% | 0% |
+| Mismatched lines | 4 | 4 | 0 |
 
-## Newly Passing (2)
-
-| Test | Previous Status | Lines (prev) | Lines (now) |
-|------|----------------|--------------|-------------|
-| `duplicateMovieClip/dontremove` | output_mismatch | 3/6 | 6/6 |
-| `duplicateMovieClip/samedepth` | output_mismatch | 4/6 | 6/6 |
+No changes detected.
