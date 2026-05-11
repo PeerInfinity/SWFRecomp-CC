@@ -275,10 +275,10 @@ productive moves are usually:
 - **Compile/segfault first.** A compile_fail test isn't going to start
   passing without code changes; find out which symbol is missing and
   it's likely shared by many other tests.
-- **Smoke-set-near misses.** The two smoke failures we left
-  (`tell_target_invalid`, `unload`) have detailed diagnoses in the
-  Phase 2 results doc — if you're about to dive into one of them,
-  that doc has 80% of the context already.
+- **Smoke-set-near misses.** `unload` is the only smoke failure still
+  outstanding (`tell_target_invalid` was unlocked by the 2026-05-10
+  `actionStop`/`actionGotoFrame` widening). Detailed `unload` diagnosis
+  in the Phase 2 results doc.
 
 ## When you're stuck
 

@@ -301,6 +301,22 @@ still match prior 5/6 and 47/52 status). No regressions in `add`,
 
 ### `actionStop` parity follow-up — not landed
 
+**RESOLVED 2026-05-10 in commits `e527f410` + `f8745996`.** Diagnosis
+below is preserved as historical context; the post-resolution writeup
+lives in `graphics-native-test-mode-plan.md` (Phase 2 §"2026-05-10
+follow-up — `actionStop`/`Play`/`GotoFrame` widening"). Short version:
+the infinite loop was in `actionGotoFrame`, not `actionStop` — naive
+widening of all three (`actionStop` / `actionPlay` / `actionGotoFrame`)
+worked once the `g_current_context != &root_movieclip` branch in
+`actionGotoFrame` was reached (which routes through `ng_gotoFrameByMC`
+instead of the root-goto fallback that was infinite-recursing through
+`ng_executeGotoCatchUp`). A follow-up commit fixed an `issue_9885`
+regression in the same path (deferred root-goto branch — see plan doc).
+
+---
+
+Original diagnosis follows:
+
 `avm1/call`, `function_base_clip`, `swf{5,6}_to_{6,5}_cross_call`,
 `register_class_swf6`, `cross_movie_root` and similar still fail with
 empty (or near-empty) output even after the exit-condition fix. Root
@@ -326,11 +342,12 @@ session notes.
 
 ### Where to start next session
 
-1. Investigate the `actionStop` widening regression on
-   `function_base_clip` — the cluster of `call` / `function_base_clip` /
-   `swf{5,6}_to_{6,5}_cross_call` / `register_class_swf6` /
-   `cross_movie_root` / `slash_syntax` / `target_clip_swf{5,6}` /
-   `lock_root` / `loadmovie_*` would all unlock together.
+1. ~~Investigate the `actionStop` widening regression on
+   `function_base_clip`~~ — **DONE 2026-05-10.** The cluster (`call`,
+   `function_base_clip`, `slash_syntax`, `target_clip_swf{5,6}`,
+   `tell_target_invalid`, …) unlocked. `swf{5,6}_to_{6,5}_cross_call`,
+   `register_class_swf6`, `cross_movie_root`, `lock_root` are still
+   failing with separate root causes.
 2. Continue the `avm1` long-tail (~125 remaining output_mismatch tests
    after this session's commits).
 3. Subtle smokes (`tell_target_invalid`, `unload`) — see prior diagnoses.
