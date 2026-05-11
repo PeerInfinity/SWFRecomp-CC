@@ -267,6 +267,19 @@ void tagMain(SWFAppContext* app_context)
 
 		current_frame = next_frame;
 #ifdef OFFSCREEN_RENDER
+		// Keep root _currentframe in sync with the natural advance. Mirrors
+		// swf_core.c lines ~1425/1431 (which update at the END of each tick).
+		// Without this, scripts running on frame N read a stale value left
+		// behind by the most recent explicit goto, and pure natural advance
+		// never updates _currentframe at all. Key test: avm1/goto_frame2 —
+		// after gotoAndPlay(2) on frame 1 the natural advance to frames 2
+		// and 3 leaves root_movieclip.currentframe stuck at 2 until the
+		// next explicit goto.
+		{
+			extern MovieClip root_movieclip;
+			root_movieclip.currentframe = (int)current_frame + 1;
+		}
+
 		// Process deferred unloadMovie state (MC properties change on
 		// next frame). Mirrors swf_core.c line ~918. Runs before
 		// pending-removal finalize so any properties cleared by
@@ -299,11 +312,19 @@ void tagMain(SWFAppContext* app_context)
 		}
 #endif
 
+#ifndef OFFSCREEN_RENDER
 		// Per-frame AS2 input dispatch.
 		// In NO_GRAPHICS mode swf_core.c dispatches these per event; here we
 		// dispatch per frame based on the flags + state set by render_webgpu.c's
 		// callbacks. Runs BEFORE clearing the per-frame flags and BEFORE the
 		// frame func so the transitions are visible to user scripts.
+		//
+		// Gated off in OFFSCREEN_RENDER because input_events_pump_tick (line
+		// ~542) is the canonical event source there — it dispatches synchronously
+		// AND sets mouse.clicked / .released, so a top-of-tick re-read here
+		// would double-fire every mouse and key event. Key test: avm1/click_block
+		// (last click was duplicated because the final EV_MOUSE_DOWN_LEFT in tick N
+		// set mouse.clicked=1, and tick N+1's top dispatched MouseDown again).
 		{
 			// --- Mouse ---
 			static float prev_stage_x = 0.0f;
@@ -450,6 +471,7 @@ void tagMain(SWFAppContext* app_context)
 
 		app_context->mouse.clicked = 0;
 		app_context->mouse.released = 0;
+#endif
 
 #ifdef OFFSCREEN_RENDER
 		// Advance root-level sprites BEFORE root frame_func runs, mirroring
