@@ -1,18 +1,18 @@
 {
   "metadata": {
-    "old_timestamp": "2026-05-10T22:54:41.180059+00:00",
-    "old_git_sha": "ab614b80ddcf2b8f3fcb64089a3b083e652626a7",
-    "new_timestamp": "2026-05-10T23:40:32.533980+00:00",
-    "new_git_sha": "e527f410660eae272f482bd3f0f3c4aad4693e93",
+    "old_timestamp": "2026-05-10T23:40:32.533980+00:00",
+    "old_git_sha": "e527f410660eae272f482bd3f0f3c4aad4693e93",
+    "new_timestamp": "2026-05-11T00:07:44.448366+00:00",
+    "new_git_sha": "f8745996297b377e532636cdd61008e88ac36998",
     "partial": false,
     "same_commit": false
   },
   "summary": {
-    "old_pass": 124,
+    "old_pass": 125,
     "old_ruffle_matched": 61,
-    "old_effective_pass": 185,
+    "old_effective_pass": 186,
     "old_total": 190,
-    "old_pass_rate": 65.3,
+    "old_pass_rate": 65.8,
     "new_pass": 125,
     "new_ruffle_matched": 61,
     "new_effective_pass": 186,
@@ -22,45 +22,12 @@
     "new_mismatched_lines": 1583,
     "increased_mismatches": 0,
     "decreased_mismatches": 0,
-    "newly_passing": 1,
+    "newly_passing": 0,
     "newly_failing": 0,
-    "status_changed": 2,
-    "unchanged": 188,
+    "status_changed": 0,
+    "unchanged": 190,
     "added": 0,
     "removed": 0
   },
-  "changes": [
-    {
-      "test": "Inheritance-v5",
-      "change_type": "changed",
-      "old_status": "segfault",
-      "new_status": "runtime_error",
-      "old_lines": {
-        "actual_lines": 115,
-        "expected_lines": 114,
-        "matching_lines": 114
-      },
-      "new_lines": {
-        "actual_lines": 115,
-        "expected_lines": 114,
-        "matching_lines": 114
-      }
-    },
-    {
-      "test": "case-v5",
-      "change_type": "changed",
-      "old_status": "runtime_error",
-      "new_status": "pass",
-      "old_lines": {
-        "actual_lines": 39,
-        "expected_lines": 39,
-        "matching_lines": 39
-      },
-      "new_lines": {
-        "actual_lines": 39,
-        "expected_lines": 39,
-        "matching_lines": 39
-      }
-    }
-  ]
+  "changes": []
 }
