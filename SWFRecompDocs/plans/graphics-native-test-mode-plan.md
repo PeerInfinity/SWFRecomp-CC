@@ -213,7 +213,7 @@ Goal: the new mode compiles, links, runs tests, and produces a results file. Pas
 
 Goal: graphics-native pass rate approaches NO_GRAPHICS pass rate.
 
-**Status (2026-05-11):** **870/1125 pass (77.3%).** Pre-session smoke
+**Status (2026-05-11):** **940/1125 pass (83.6%).** Pre-session smoke
 now 8/9 — `unload` remains the only smoke failure (documented partial
 in `graphics-native-test-mode-phase2-results-2026-05-09.md`).
 
