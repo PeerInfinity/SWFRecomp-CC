@@ -300,8 +300,10 @@ cause.
     select between "NO_GRAPHICS" and "browser graphics" actually
     routes graphics-native through the browser-graphics arm — often
     the wrong choice, because graphics-native shares semantics with
-    NO_GRAPHICS far more than with wasm-graphics. Two real bugs
-    from this pattern, both fixed in `be795aae` / `b7f11901`:
+    NO_GRAPHICS far more than with wasm-graphics. Four real bugs
+    from this pattern, two from `be795aae` / `b7f11901` (silent
+    behavioral divergence) and two from `e0568fe7` (gated arm is a
+    *stub*, silently drops the opcode entirely):
 
     - **`actionGetVariable`'s display-list-by-name lookup**: the
       `#ifndef NO_GRAPHICS` arm called `findDisplayObjectByName`
@@ -322,6 +324,23 @@ cause.
       downstream `getMovieClipByTarget` + var_map fallback from
       running.
 
+    - **`actionCloneSprite` (opcode 0x24)**: the `#ifndef NO_GRAPHICS`
+      arm called `cloneMovieClip(source_name, target_name, depth)` —
+      a literal empty-body stub. The `#else` arm had the full real
+      implementation using `ng_cloneSprite` / `ng_cloneSpriteFromMC`
+      / `child_mc_cache`. Graphics-native silently dropped every
+      opcode-form `duplicateMovieClip(target, name, depth)` the
+      recompiler emitted. Method-form `mc.duplicateMovieClip(...)`
+      worked because it routes through `actionCallMethod`'s
+      MOVIECLIP arm directly, bypassing this opcode.
+
+    - **`actionRemoveSprite` (opcode 0x25)**: the `#ifndef NO_GRAPHICS`
+      arm was a `#ifdef DEBUG printf(...)`. The `#else` arm had the
+      full real implementation (focus clearing, unload-handler
+      queue, depth shifting, dynamic_props teardown, var_map
+      cleanup). Opcode-form `removeMovieClip(name)` was silently
+      dropped in graphics-native.
+
     **Rule of thumb**: if a `#ifndef NO_GRAPHICS` block touches
     `findDisplayObjectByName`, `targeted_sprite`, or any other symbol
     keyed to wasm-graphics-only state, tighten the gate to
@@ -329,6 +348,13 @@ cause.
     if a block is generic "do something display-related,"
     `#if defined(NO_GRAPHICS) || defined(OFFSCREEN_RENDER)` is the
     right way to share it between NO_GRAPHICS and graphics-native.
+
+    **Stronger rule**: if the gated arm is a stub (empty function,
+    `(void)` casts, `#ifdef DEBUG printf`, or a comment that says
+    "would..." / "TODO" / "not yet implemented") and the `#else`
+    arm has working code, you're definitely looking at this gotcha.
+    `e0568fe7` was two of those in one commit, +19 raw pass.
+
     Symptom of the bug: NO_GRAPHICS passes, `--mode=graphics-headless-legacy`
     also passes (uses `swf_headless.c`, which is gated as
     `HEADLESS_GRAPHICS` and goes through the NO_GRAPHICS-style arms),
@@ -337,11 +363,19 @@ cause.
     to detect this — when graphics-headless-legacy passes but
     graphics fails, suspect a misgated `#ifndef NO_GRAPHICS`.
 
-    Net **+12 raw pass** from finding and fixing two instances of
-    this in one commit (`be795aae`). Worth grepping
-    `grep -n '#ifndef NO_GRAPHICS' SWFModernRuntime/src/actionmodern/action.c`
+    Net **+31 raw pass** from finding and fixing four instances of
+    this across two commits (`be795aae` +12, `e0568fe7` +19). Worth
+    grepping `grep -n '#ifndef NO_GRAPHICS' SWFModernRuntime/src/actionmodern/action.c`
     when stuck on a graphics-native-only divergence; not every hit
-    is a bug, but every hit is worth a 30-second audit.
+    is a bug, but every hit is worth a 30-second audit. As of
+    `e0568fe7`, the remaining bare `#ifndef NO_GRAPHICS` hits in
+    `action.c` are all audited-clean: declarations of
+    `targeted_sprite` / `findDisplayObjectByName`, harmless dead
+    writes (`targeted_sprite = NULL` resets), or thin pass-through
+    calls whose underlying symbol exists in both modes (e.g.
+    `actionStopSounds` → `tagStopAllSounds`, defined in both
+    `audio.c` and `tag_stubs.c`). Audit the next session's hits
+    fresh — code shifts.
 
 ## Useful commands
 
