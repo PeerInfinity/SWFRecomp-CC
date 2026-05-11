@@ -1,8 +1,8 @@
 # Ruffle Test Results (Filtered)
 
-**Date**: 2026-05-11 19:12 UTC
+**Date**: 2026-05-11 20:06 UTC
 
-**Git SHA**: `3589c6bcc8`
+**Git SHA**: `ce31587cf1`
 
 **Run Duration**: 0m 57s
 
@@ -50,7 +50,7 @@
 | 15 | `Color-v6` | 171 | 0.2s |  |
 | 16 | `Color-v7` | 161 | 0.2s |  |
 | 17 | `Color-v8` | 161 | 0.2s |  |
-| 18 | `ColorTransform-v5` | 7 | 0.2s |  |
+| 18 | `ColorTransform-v5` | 7 | 0.5s |  |
 | 19 | `ColorTransform-v6` | 7 | 0.2s |  |
 | 20 | `ColorTransform-v7` | 7 | 0.2s |  |
 | 21 | `ColorTransform-v8` | 55 | 0.2s |  |
@@ -81,7 +81,7 @@
 | 46 | `LocalConnection-v7` | 58 | 0.2s |  |
 | 47 | `LocalConnection-v8` | 58 | 0.2s |  |
 | 48 | `Matrix-v5` | 7 | 0.2s |  |
-| 49 | `Microphone-v5` | 6 | 0.8s |  |
+| 49 | `Microphone-v5` | 6 | 0.2s |  |
 | 50 | `Mouse-v5` | 13 | 0.2s |  |
 | 51 | `Mouse-v6` | 21 | 0.2s |  |
 | 52 | `Mouse-v7` | 21 | 0.2s |  |
@@ -100,10 +100,10 @@
 | 65 | `Point-v6` | 7 | 0.2s |  |
 | 66 | `Point-v7` | 7 | 0.2s |  |
 | 67 | `Point-v8` | 193 | 0.2s |  |
-| 68 | `Random-v5` | 30 | 0.3s |  |
-| 69 | `Random-v6` | 30 | 0.3s |  |
-| 70 | `Random-v7` | 30 | 0.2s |  |
-| 71 | `Random-v8` | 30 | 0.2s |  |
+| 68 | `Random-v5` | 30 | 0.2s |  |
+| 69 | `Random-v6` | 30 | 0.2s |  |
+| 70 | `Random-v7` | 30 | 0.3s |  |
+| 71 | `Random-v8` | 30 | 0.3s |  |
 | 72 | `Rectangle-v5` | 7 | 0.2s |  |
 | 73 | `Rectangle-v6` | 7 | 0.2s |  |
 | 74 | `Rectangle-v7` | 7 | 0.2s |  |
@@ -124,12 +124,12 @@
 | 89 | `TextSnapshot-v7` | 173 | 0.2s |  |
 | 90 | `TextSnapshot-v8` | 173 | 0.2s |  |
 | 91 | `Transform-v5` | 7 | 0.2s |  |
-| 92 | `Transform-v6` | 7 | 0.3s |  |
+| 92 | `Transform-v6` | 7 | 0.2s |  |
 | 93 | `Transform-v7` | 7 | 0.2s |  |
 | 94 | `Try-v5` | 20 | 0.2s |  |
-| 95 | `Try-v6` | 20 | 0.2s |  |
-| 96 | `Try-v7` | 20 | 0.2s |  |
-| 97 | `Try-v8` | 20 | 0.2s |  |
+| 95 | `Try-v6` | 20 | 0.4s |  |
+| 96 | `Try-v7` | 20 | 0.5s |  |
+| 97 | `Try-v8` | 20 | 0.6s |  |
 | 98 | `Video-v5` | 7 | 0.2s |  |
 | 99 | `Video-v6` | 85 | 0.2s |  |
 | 100 | `Video-v7` | 85 | 0.2s |  |
@@ -147,7 +147,7 @@
 | 112 | `delete-v6` | 60 | 0.2s |  |
 | 113 | `delete-v7` | 60 | 0.2s |  |
 | 114 | `delete-v8` | 60 | 0.2s |  |
-| 115 | `enumerate-v5` | 6 | 0.2s |  |
+| 115 | `enumerate-v5` | 6 | 0.3s |  |
 | 116 | `enumerate-v6` | 49 | 0.2s |  |
 | 117 | `enumerate-v7` | 49 | 0.2s |  |
 | 118 | `enumerate-v8` | 49 | 0.2s |  |
@@ -166,9 +166,9 @@
 
 | # | Test | Our diffs | Ruffle diffs | Duration | Notes |
 |---|------|-----------|--------------|----------|-------|
-| 1 | `ASnative-v5` | 35 | 35 | 0.2s |  |
-| 2 | `ASnative-v6` | 40 | 40 | 0.2s |  |
-| 3 | `ASnative-v7` | 40 | 40 | 0.2s |  |
+| 1 | `ASnative-v5` | 35 | 35 | 0.3s |  |
+| 2 | `ASnative-v6` | 40 | 40 | 0.4s |  |
+| 3 | `ASnative-v7` | 40 | 40 | 0.7s |  |
 | 4 | `ASnative-v8` | 40 | 40 | 0.2s |  |
 | 5 | `AsBroadcaster-v6` | 7 | 13 | 0.2s |  |
 | 6 | `AsBroadcaster-v7` | 7 | 13 | 0.2s |  |
@@ -181,23 +181,23 @@
 | 13 | `Global-v6` | 9 | 10 | 0.2s |  |
 | 14 | `HitTest-v6` | 8 | 8 | 0.2s |  |
 | 15 | `HitTest-v7` | 8 | 8 | 0.2s |  |
-| 16 | `HitTest-v8` | 9 | 9 | 0.2s |  |
-| 17 | `Inheritance-v5` | 1 | 17 | 0.2s |  |
-| 18 | `Inheritance-v6` | 9 | 16 | 0.2s |  |
+| 16 | `HitTest-v8` | 9 | 9 | 0.3s |  |
+| 17 | `Inheritance-v5` | 1 | 17 | 0.5s |  |
+| 18 | `Inheritance-v6` | 9 | 16 | 0.7s |  |
 | 19 | `Inheritance-v7` | 5 | 10 | 0.2s |  |
 | 20 | `Inheritance-v8` | 5 | 10 | 0.2s |  |
 | 21 | `LoadVars-v6` | 6 | 8 | 0.2s |  |
 | 22 | `LoadVars-v7` | 6 | 8 | 0.2s |  |
 | 23 | `LoadVars-v8` | 6 | 8 | 0.2s |  |
-| 24 | `Math-v5` | 5 | 5 | 0.2s |  |
+| 24 | `Math-v5` | 5 | 5 | 0.3s |  |
 | 25 | `Math-v6` | 5 | 5 | 0.2s |  |
 | 26 | `Math-v7` | 5 | 5 | 0.2s |  |
 | 27 | `Math-v8` | 5 | 5 | 0.2s |  |
 | 28 | `Matrix-v6` | 29 | 71 | 0.2s |  |
 | 29 | `Matrix-v7` | 28 | 70 | 0.2s |  |
 | 30 | `Matrix-v8` | 28 | 70 | 0.2s |  |
-| 31 | `Microphone-v6` | 31 | 31 | 2.5s |  |
-| 32 | `Microphone-v7` | 31 | 31 | 0.6s |  |
+| 31 | `Microphone-v6` | 31 | 31 | 0.2s |  |
+| 32 | `Microphone-v7` | 31 | 31 | 0.2s |  |
 | 33 | `Microphone-v8` | 31 | 31 | 0.2s |  |
 | 34 | `MovieClip-v5` | 48 | 226 | 0.2s |  |
 | 35 | `MovieClipLoader-v7` | 118 | 118 | 0.2s |  |
@@ -223,7 +223,7 @@
 | 55 | `targetPath-v8` | 17 | 17 | 0.2s |  |
 | 56 | `toString_valueOf-v5` | 34 | 34 | 0.2s |  |
 | 57 | `toString_valueOf-v6` | 5 | 5 | 0.2s |  |
-| 58 | `toString_valueOf-v7` | 5 | 5 | 0.3s |  |
+| 58 | `toString_valueOf-v7` | 5 | 5 | 0.2s |  |
 | 59 | `toString_valueOf-v8` | 5 | 5 | 0.2s |  |
 | 60 | `with-v5` | 42 | 42 | 0.2s |  |
 | 61 | `with-v6` | 91 | 91 | 0.2s |  |
