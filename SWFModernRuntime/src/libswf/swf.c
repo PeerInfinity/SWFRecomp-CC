@@ -787,6 +787,25 @@ void swfStart(SWFAppContext* app_context)
 		ng_sync_root_display_obj();
 		root_movieclip.display_obj = ng_get_root_display_obj();
 	}
+
+	// Set root url and byte_size from compile-time SWF metadata. Mirrors
+	// swf_core.c (line ~821-827). Without these, root.getBytesLoaded() /
+	// getBytesTotal() return 0 instead of the actual SWF size, and
+	// _url / loadVariables-relative URL construction sees an empty base.
+	// Key test: avm1/get_bytes_total.
+#ifdef SWF_URL
+	{
+		extern MovieClip root_movieclip;
+		strncpy(root_movieclip.url, SWF_URL, sizeof(root_movieclip.url) - 1);
+		root_movieclip.url[sizeof(root_movieclip.url) - 1] = '\0';
+	}
+#endif
+#ifdef SWF_FILE_SIZE
+	{
+		extern MovieClip root_movieclip;
+		root_movieclip.byte_size = SWF_FILE_SIZE;
+	}
+#endif
 #endif
 
 	tagInit(app_context);
