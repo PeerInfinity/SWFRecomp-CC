@@ -449,6 +449,9 @@ void tagDefineSound(SWFAppContext* app_context, u16 sound_id,
 	audio_define_sound(app_context, sound_id,
 		format, rate, sample_size, stereo,
 		sample_count, data, data_size);
+
+	extern void ng_registerSoundMetadata(u16 sound_id, u8 rate, u32 sample_count);
+	ng_registerSoundMetadata(sound_id, rate, sample_count);
 }
 
 void tagStartSound(SWFAppContext* app_context, u16 sound_id,

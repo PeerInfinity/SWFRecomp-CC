@@ -2,6 +2,7 @@
 
 #include <stdlib.h>
 #include <string.h>
+#include <setjmp.h>
 #include <swf.h>
 #include <tag.h>
 #include <action.h>
@@ -212,6 +213,26 @@ void tagMain(SWFAppContext* app_context)
 	// Test-mode termination: bound the loop. Mirrors swf_core.c's max_ticks.
 	const size_t max_ticks = MAX_FRAMES;
 	size_t tick_count = 0;
+#endif
+
+#ifdef OFFSCREEN_RENDER
+	// Execution timeout (mirrors swf_core.c): bound any single script's
+	// wall-clock time so an infinite loop in AS doesn't hang the test
+	// runner. Tests opt-in via `max_execution_duration` in test.toml →
+	// `-DMAX_EXECUTION_MS=N` from verify_output.py. On timeout,
+	// actionCheckExecutionTimeout longjmps back here. Key test:
+	// avm1/timeout (infinite-loop try/catch).
+#ifdef MAX_EXECUTION_MS
+	actionSetMaxExecutionDuration(MAX_EXECUTION_MS);
+#endif
+	actionResetExecutionTimer();
+	jmp_buf timeout_jmp;
+	if (setjmp(timeout_jmp) != 0)
+	{
+		// Returned here via longjmp — execution was halted by timeout.
+		goto frame_loop_exit;
+	}
+	actionSetTimeoutJmp(&timeout_jmp);
 #endif
 
 	while (1)
@@ -850,6 +871,12 @@ void tagMain(SWFAppContext* app_context)
 #endif
 		quit_swf |= bad_poll;
 	}
+
+#ifdef OFFSCREEN_RENDER
+frame_loop_exit:
+	// Deactivate timeout longjmp (jmp_buf is stack-local, must not be used after return).
+	actionSetTimeoutJmp(NULL);
+#endif
 
 	if (bad_poll)
 	{

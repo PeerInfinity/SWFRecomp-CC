@@ -3287,9 +3287,33 @@ static ActionVar builtin_ns_seek(SWFAppContext* app_context, ActionVar* args, u3
 
 static ActionVar builtin_ns_pause(SWFAppContext* app_context, ActionVar* args, u32 arg_count, ActionVar* registers, void* this_obj)
 {
-	(void)args; (void)arg_count; (void)registers;
-	// pause() returns undefined in Flash
+	(void)app_context; (void)registers;
+	ASObject* ns = (ASObject*)this_obj;
 	ActionVar ret = {0}; ret.type = ACTION_STACK_VALUE_UNDEFINED;
+	if (ns == NULL) return ret;
+
+	for (int i = 0; i < MAX_ACTIVE_NETSTREAMS; i++)
+	{
+		if (g_active_netstreams[i].active && g_active_netstreams[i].ns_obj == ns)
+		{
+			// Flash semantics: pause(true)=pause, pause(false)=resume,
+			// no-arg toggles.
+			int want_paused;
+			if (arg_count == 0)
+				want_paused = !g_active_netstreams[i].paused;
+			else if (args[0].type == ACTION_STACK_VALUE_UNDEFINED
+			         || args[0].type == ACTION_STACK_VALUE_NULL)
+				want_paused = 0;
+			else if (args[0].type == ACTION_STACK_VALUE_BOOLEAN
+			         || args[0].type == ACTION_STACK_VALUE_F32
+			         || args[0].type == ACTION_STACK_VALUE_F64)
+				want_paused = (args[0].data.numeric_value != 0);
+			else
+				want_paused = 1;
+			g_active_netstreams[i].paused = want_paused ? 1 : 0;
+			break;
+		}
+	}
 	return ret;
 }
 
