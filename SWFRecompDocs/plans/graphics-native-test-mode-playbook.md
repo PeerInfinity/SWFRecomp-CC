@@ -293,6 +293,56 @@ cause.
     drain produces 0× "correct!" instead of 1×. The two changes are
     a pair; commit `0fcfe324` did both together.
 
+13. **`#ifndef NO_GRAPHICS` is wrong for any "wasm-graphics only"
+    code path.** This gate evaluates true for *both* wasm-graphics
+    (`!NO_GRAPHICS && !OFFSCREEN_RENDER`) AND graphics-native
+    (`!NO_GRAPHICS && OFFSCREEN_RENDER`). So a block intended to
+    select between "NO_GRAPHICS" and "browser graphics" actually
+    routes graphics-native through the browser-graphics arm — often
+    the wrong choice, because graphics-native shares semantics with
+    NO_GRAPHICS far more than with wasm-graphics. Two real bugs
+    from this pattern, both fixed in `be795aae` / `b7f11901`:
+
+    - **`actionGetVariable`'s display-list-by-name lookup**: the
+      `#ifndef NO_GRAPHICS` arm called `findDisplayObjectByName`
+      (strcmp, case-sensitive) where the `#else` arm called
+      `ng_findDisplayEntryByName` (swf_name_match, case-insensitive
+      in SWF<=6) plus a pending_removal MC check. In SWF6, scripts
+      that depend on case-insensitive name resolution (`Button.prototype.hasOwnProperty(...)`,
+      `clip5._x` after `clip5` enters pending_removal, etc.) silently
+      diverged: NO_GRAPHICS passed, graphics-native fell through to
+      `_global` instead of finding the instance.
+
+    - **`actionSetTarget`'s display-list-by-name fallback**: same
+      strcmp lookup, but the result was stashed on `targeted_sprite`
+      — which is only consumed in the `!NO_GRAPHICS && !OFFSCREEN_RENDER`
+      arms of `actionStop` / `actionPlay` / `actionGotoFrame`. In
+      graphics-native the assignment was a dead write and the
+      function returned, swallowing the lookup and preventing the
+      downstream `getMovieClipByTarget` + var_map fallback from
+      running.
+
+    **Rule of thumb**: if a `#ifndef NO_GRAPHICS` block touches
+    `findDisplayObjectByName`, `targeted_sprite`, or any other symbol
+    keyed to wasm-graphics-only state, tighten the gate to
+    `!defined(NO_GRAPHICS) && !defined(OFFSCREEN_RENDER)`. Conversely,
+    if a block is generic "do something display-related,"
+    `#if defined(NO_GRAPHICS) || defined(OFFSCREEN_RENDER)` is the
+    right way to share it between NO_GRAPHICS and graphics-native.
+    Symptom of the bug: NO_GRAPHICS passes, `--mode=graphics-headless-legacy`
+    also passes (uses `swf_headless.c`, which is gated as
+    `HEADLESS_GRAPHICS` and goes through the NO_GRAPHICS-style arms),
+    `--mode=graphics` fails. The bisect via `graphics-headless-legacy`
+    workflow in step 2 of the per-test loop is exactly the right tool
+    to detect this — when graphics-headless-legacy passes but
+    graphics fails, suspect a misgated `#ifndef NO_GRAPHICS`.
+
+    Net **+12 raw pass** from finding and fixing two instances of
+    this in one commit (`be795aae`). Worth grepping
+    `grep -n '#ifndef NO_GRAPHICS' SWFModernRuntime/src/actionmodern/action.c`
+    when stuck on a graphics-native-only divergence; not every hit
+    is a bug, but every hit is worth a 30-second audit.
+
 ## Useful commands
 
 ```bash
