@@ -1,8 +1,8 @@
 # Graphics vs Trace Mode Differences
 
-Trace: 605/651 passing | Graphics: 568/651 passing
+Trace: 605/651 passing | Graphics: 569/651 passing
 
-## Graphics Regressions (37 tests)
+## Graphics Regressions (36 tests)
 
 Tests that **pass** in trace mode but **fail** in graphics mode.
 
@@ -24,27 +24,26 @@ Tests that **pass** in trace mode but **fail** in graphics mode.
 | 14 | `hittest_morph_input` | Output Mismatch | 0/1 lines match |
 | 15 | `key_isToggled` | Output Mismatch | 3/9 lines match |
 | 16 | `local_to_global` | Output Mismatch | 41/49 lines match |
-| 17 | `mcl_unloadclip` | Output Mismatch | 5/6 lines match |
-| 18 | `movieclip_getbounds` | Output Mismatch | 163/191 lines match |
-| 19 | `netstream_seek_flv` | Output Mismatch | 25/37 lines match |
-| 20 | `remove_movie_clip` | Output Mismatch | 26/29 lines match |
-| 21 | `removed_clip_halts_script` | Output Mismatch | 5/19 lines match |
-| 22 | `removed_target_clip_scope` | Output Mismatch | 12/37 lines match |
-| 23 | `root_button_mode` | Output Mismatch | 0/10 lines match |
-| 24 | `selection_handlers` | Output Mismatch | 19/27 lines match |
-| 25 | `sound` | Output Mismatch | 624/628 lines match |
-| 26 | `string_paths_hidden` | Output Mismatch | 53/54 lines match |
-| 27 | `string_paths_variable_scopes` | Output Mismatch | 3/5 lines match |
-| 28 | `swf6_case_insensitive` | Output Mismatch | 41/42 lines match |
-| 29 | `tab_ordering_events` | Output Mismatch | 131/150 lines match |
-| 30 | `tab_ordering_events_mouse` | Output Mismatch | 5/65 lines match |
-| 31 | `text_blocks_clicks` | Output Mismatch | 0/4 lines match |
-| 32 | `textsnapshot_available_text` | Output Mismatch | 13/20 lines match |
-| 33 | `timeout` | Timeout | runtime timeout (>10s) |
-| 34 | `transform` | Output Mismatch | 62/70 lines match |
-| 35 | `unload` | Output Mismatch | 47/52 lines match |
-| 36 | `unload_nested_child` | Output Mismatch | 3/5 lines match |
-| 37 | `unloadmovienum` | Output Mismatch | 13/14 lines match |
+| 17 | `movieclip_getbounds` | Output Mismatch | 163/191 lines match |
+| 18 | `netstream_seek_flv` | Output Mismatch | 25/37 lines match |
+| 19 | `remove_movie_clip` | Output Mismatch | 26/29 lines match |
+| 20 | `removed_clip_halts_script` | Output Mismatch | 5/19 lines match |
+| 21 | `removed_target_clip_scope` | Output Mismatch | 12/37 lines match |
+| 22 | `root_button_mode` | Output Mismatch | 0/10 lines match |
+| 23 | `selection_handlers` | Output Mismatch | 19/27 lines match |
+| 24 | `sound` | Output Mismatch | 624/628 lines match |
+| 25 | `string_paths_hidden` | Output Mismatch | 53/54 lines match |
+| 26 | `string_paths_variable_scopes` | Output Mismatch | 3/5 lines match |
+| 27 | `swf6_case_insensitive` | Output Mismatch | 41/42 lines match |
+| 28 | `tab_ordering_events` | Output Mismatch | 131/150 lines match |
+| 29 | `tab_ordering_events_mouse` | Output Mismatch | 5/65 lines match |
+| 30 | `text_blocks_clicks` | Output Mismatch | 0/4 lines match |
+| 31 | `textsnapshot_available_text` | Output Mismatch | 13/20 lines match |
+| 32 | `timeout` | Timeout | runtime timeout (>10s) |
+| 33 | `transform` | Output Mismatch | 62/70 lines match |
+| 34 | `unload` | Output Mismatch | 47/52 lines match |
+| 35 | `unload_nested_child` | Output Mismatch | 3/5 lines match |
+| 36 | `unloadmovienum` | Output Mismatch | 13/14 lines match |
 
 ## Graphics Improvements (0 tests)
 
