@@ -587,6 +587,64 @@ cause.
     leftover that double-dispatches under OFFSCREEN_RENDER —
     gate it on `#ifndef OFFSCREEN_RENDER`.
 
+    - **(2026-05-11 #5 — pre-loop setup blocks)** — Same heuristic
+      extends to one-shot setup *before* the loop, not just blocks
+      inside it. swf.c was missing swf_core.c's pre-loop
+      execution-timeout setup (`actionSetMaxExecutionDuration` +
+      `actionResetExecutionTimer` + `setjmp` + `actionSetTimeoutJmp`)
+      and the matching `frame_loop_exit:` label after the loop that
+      clears the jmp on the way out. Port verbatim under
+      `#ifdef OFFSCREEN_RENDER`. Key test: avm1/timeout (infinite
+      try/catch — without this, the harness's 10s timeout fires
+      instead of the SWF-declared max_execution_duration).
+
+15. **NO_GRAPHICS doesn't necessarily prove correctness — the
+    swf_core.c root-stopped exit gate masks bugs.** swf_core.c
+    (line ~1433-1454) breaks the loop when `is_playing=0` AND no
+    playing sprites/timers/enter-frame-handlers/events/pending-MCL.
+    Notably absent: `hasActiveNetStreams()` and (you might assume)
+    other long-lived background subsystems. So a NetStream that's
+    still "active" (script forgot to close, or `pause()` is broken
+    so it should still be counted as paused-not-stopped) gets
+    silently killed by an early exit in NO_GRAPHICS, while
+    graphics-native — whose loop runs every tick to max_ticks
+    waiting on `hasActiveNetStreams()` — runs the NetStream's full
+    lifecycle. The graphics-native output ends up "more correct"
+    in some sense but mismatches the NO_GRAPHICS-driven expected
+    output. The fix is whichever direction matches the test's
+    declared expected output (in netstream_seek_flv, the fix was
+    making `pause()` actually pause — which silences the
+    graphics-native loop's extra completion events).
+
+    **Heuristic**: when graphics-native produces EXTRA trailing
+    lines past NO_GRAPHICS, check whether a long-lived subsystem
+    (NetStream, Sound, timer) is left in an "active" state that
+    NO_GRAPHICS's root-stopped exit gate is silently terminating.
+    Either fix the subsystem state machine (the right approach
+    when there's a script-visible API like `pause` that should
+    have stopped it) or add the missing `has<Subsystem>()` check
+    to swf_core.c's root-stopped exit gate (only if the subsystem
+    is meant to keep the player alive on its own).
+
+16. **NO_GRAPHICS-specific files have parity siblings in graphics
+    builds.** Some functions are defined in TWO files: one under
+    `tag_stubs.c` (`#if defined(NO_GRAPHICS) || defined(HEADLESS_GRAPHICS)`)
+    and one under a graphics-mode-only file like `audio.c`
+    (`#ifndef NO_GRAPHICS`). The stub version may register state
+    or perform bookkeeping that the "real" version forgets, because
+    the real version is focused on actual playback. **Always
+    diff** the two siblings when a test passes in NO_GRAPHICS but
+    not in graphics. Concrete example: `tagDefineSound` —
+    tag_stubs.c version registered metadata via
+    `ng_registerSoundMetadata` so `attachSound`/`getDuration` had
+    a duration to return; audio.c version called `audio_define_sound`
+    for actual playback but skipped the metadata registration. Key
+    test: avm1/sound.
+
+    **Search pattern**: `grep -rn "^void FUNC\|^int FUNC" SWFModernRuntime/src/`
+    — if a function name shows up in both `tag_stubs.c` and a
+    graphics-only `.c`, diff them.
+
 ## Useful commands
 
 ```bash

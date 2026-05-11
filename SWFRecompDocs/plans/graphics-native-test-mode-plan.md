@@ -856,6 +856,73 @@ matches") — same CI-only-flake category as native_objects_swf6.
 shifted whatever was causing the CI segfault, though the test
 still doesn't fully pass. Smoke set (22 tests) clean.
 
+#### 2026-05-11 follow-up #5 — close the last three strict parity gaps
+
+After follow-up #4, the strict parity-gap survey (tests passing in
+NO_GRAPHICS but failing in graphics-native) was down to 5 tests
+across all suites. Two of those (case-v6 CI-flake,
+place_and_remove_object_insane_test shared-code bug in tag.c) are
+deferred. The remaining three were each a single isolated subsystem
+gap. All three landed in one commit:
+
+- **avm1/sound (sound1.duration/getDuration undefined →
+  1452/907)**: `tag_stubs.c::tagDefineSound` (NO_GRAPHICS/HEADLESS
+  variant) already registered sound metadata via
+  `ng_registerSoundMetadata` so that `attachSound` /
+  `Sound.getDuration` could look up duration by char_id; the
+  parallel `audio.c::tagDefineSound` (used by every non-NO_GRAPHICS
+  build, including OFFSCREEN_RENDER) did not. Adding the same
+  one-line registration to audio.c gave every graphics-mode build
+  matching sound metadata. Browser-WASM-graphics inherits the fix
+  for free.
+
+- **avm1/netstream_seek_flv (extra Buffer.Flush / Play.Stop /
+  Buffer.Empty lines after expected end)**:
+  `action.c::builtin_ns_pause` was a no-op stub returning undefined
+  without setting `ns->paused`. `processNetStreams` kept advancing
+  `elapsed_ms` after the script-level `pause()`, eventually firing
+  the playback-complete trio. NO_GRAPHICS happened to mask the bug
+  because swf_core.c's root-stopped exit gate (lines 1433-1454)
+  breaks the loop without checking `hasActiveNetStreams()`, so the
+  loop exited before completion fired (it had `is_playing=0` from
+  the recompiler's end-of-frame marker and no active sprites /
+  timers / enter-frame handlers). Graphics-native triggered the
+  bug because its loop runs to max_ticks while
+  `hasActiveNetStreams()` returns true. The fix is a proper
+  pause/resume/toggle for ns->paused, honoring Flash's
+  pause(true)/pause(false)/no-arg-toggle semantics. The NG-side
+  root-stopped break gap is a separate bug (loop should respect
+  `hasActiveNetStreams()`); leaving for a future follow-up because
+  no current test exercises it.
+
+- **avm1/timeout (10s harness timeout instead of script halt)**:
+  swf_core.c sets up the `actionSetMaxExecutionDuration` +
+  `actionResetExecutionTimer` + setjmp/longjmp machinery before
+  its main loop (lines 848-862). swf.c had no equivalent. Ported
+  the full block (gated `#ifdef OFFSCREEN_RENDER`) plus a
+  `frame_loop_exit:` label after the main loop that clears the
+  jmp_buf on the way out. Tests opt-in via
+  `max_execution_duration` in test.toml, which `verify_output.py`
+  translates to `-DMAX_EXECUTION_MS=N`.
+
+Remaining strict parity gaps:
+- `case-v6` (from_gnash/actionscript.all): CI-only flake — passes
+  locally after follow-up #4's wrap-back undo, but in CI the run
+  still ends with exit code -6 ("output matches"). Same category
+  as native_objects_swf6. Not chasing locally.
+- `place_and_remove_object_insane_test` (from_gnash/misc-ming.all):
+  15/19 in graphics-native vs 19/19 in NO_GRAPHICS. Same diff
+  appears in `--mode=graphics-headless-legacy`, so the bug is in
+  shared code (tag.c or `#ifdef NO_GRAPHICS`-gated tag handling),
+  NOT in swf.c. Defer to a tag.c-focused session.
+
+Combined: **+3 raw avm1 pass** (sound, netstream_seek_flv,
+timeout). Smoke set (25 tests including the three keys) clean.
+This is the cleanest "close out the parity-gap survey" pass we'll
+get; subsequent graphics-native work has to widen the survey
+(tests that fail in BOTH modes but represent overall recoverable
+pass rate).
+
 **Exit criteria:** graphics-native pass rate within 2% of NO_GRAPHICS on every suite, OR remaining gaps documented in `_investigation/` as "expected divergence."
 
 ### Phase 3 — Migrate image tests + retire HEADLESS_GRAPHICS
