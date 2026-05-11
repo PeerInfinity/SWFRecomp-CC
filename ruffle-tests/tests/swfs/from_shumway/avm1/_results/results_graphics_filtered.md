@@ -1,10 +1,10 @@
 # Ruffle Test Results (Filtered)
 
-**Date**: 2026-05-11 21:26 UTC
+**Date**: 2026-05-11 22:57 UTC
 
-**Git SHA**: `6beabb40c1`
+**Git SHA**: `a48ecfae33`
 
-**Run Duration**: 0m 38s
+**Run Duration**: 1m 55s
 
 **Filtered**: 2 tests ignored out of 47 available
 
@@ -25,51 +25,51 @@
 
 | # | Test | Lines | Duration | Notes |
 |---|------|-------|----------|-------|
-| 1 | `array` | 7 | 0.7s |  |
-| 2 | `bitmapdata/getPixel` | 2 | 0.7s |  |
-| 3 | `bitmapdata/loadBitmap` | 3 | 0.8s |  |
-| 4 | `callee` | 2 | 0.8s |  |
+| 1 | `array` | 7 | 0.9s |  |
+| 2 | `bitmapdata/getPixel` | 2 | 0.9s |  |
+| 3 | `bitmapdata/loadBitmap` | 3 | 0.9s |  |
+| 4 | `callee` | 2 | 0.9s |  |
 | 5 | `depth` | 6 | 0.9s |  |
 | 6 | `doactionorder/doactionorder` | 7 | 0.8s |  |
-| 7 | `doactionorder/symbolclass` | 4 | 0.7s |  |
-| 8 | `duplicateMovieClip/dontremove` | 6 | 0.7s |  |
-| 9 | `duplicateMovieClip/duplicateMovieClip` | 4 | 0.8s |  |
-| 10 | `duplicateMovieClip/name-coercion` | 3 | 0.8s |  |
-| 11 | `duplicateMovieClip/samedepth` | 6 | 0.7s |  |
-| 12 | `externalinterface` | 4 | 0.7s |  |
-| 13 | `filters` | 149 | 0.9s |  |
-| 14 | `haxe/flocons1` | 2 | 0.7s |  |
-| 15 | `haxe/flocons2` | 3 | 0.7s |  |
-| 16 | `label` | 4 | 0.8s |  |
-| 17 | `levels` | 9 | 0.8s |  |
-| 18 | `loadevent` | 9 | 0.8s |  |
-| 19 | `loadvariables/loadvariables` | 7 | 0.8s |  |
-| 20 | `loadvariables/loadvars` | 2 | 0.8s |  |
-| 21 | `lookup` | 3 | 0.8s |  |
-| 22 | `mouse-transparency` | 1 | 0.8s |  |
+| 7 | `doactionorder/symbolclass` | 4 | 0.8s |  |
+| 8 | `duplicateMovieClip/dontremove` | 6 | 17.3s |  |
+| 9 | `duplicateMovieClip/duplicateMovieClip` | 4 | 1.0s |  |
+| 10 | `duplicateMovieClip/name-coercion` | 3 | 1.0s |  |
+| 11 | `duplicateMovieClip/samedepth` | 6 | 1.0s |  |
+| 12 | `externalinterface` | 4 | 1.0s |  |
+| 13 | `filters` | 149 | 1.1s |  |
+| 14 | `haxe/flocons1` | 2 | 1.0s |  |
+| 15 | `haxe/flocons2` | 3 | 0.9s |  |
+| 16 | `label` | 4 | 18.2s |  |
+| 17 | `levels` | 9 | 1.0s |  |
+| 18 | `loadevent` | 9 | 0.9s |  |
+| 19 | `loadvariables/loadvariables` | 7 | 0.9s |  |
+| 20 | `loadvariables/loadvars` | 2 | 0.9s |  |
+| 21 | `lookup` | 3 | 0.9s |  |
+| 22 | `mouse-transparency` | 1 | 1.1s |  |
 | 23 | `nativeinheritance` | 6 | 0.8s |  |
 | 24 | `nested-button` | 1 | 0.8s |  |
-| 25 | `operations` | 13 | 0.8s |  |
-| 26 | `property-paths/property-paths-6` | 6 | 0.8s |  |
-| 27 | `property-paths/property-paths-7` | 7 | 0.7s |  |
-| 28 | `propertycase/propertycase` | 7 | 0.7s |  |
-| 29 | `propertycase/propertycase-preserving-6` | 2 | 0.7s |  |
-| 30 | `propertycase/propertycase-preserving-7` | 5 | 0.6s |  |
+| 25 | `operations` | 13 | 0.9s |  |
+| 26 | `property-paths/property-paths-6` | 6 | 0.9s |  |
+| 27 | `property-paths/property-paths-7` | 7 | 0.9s |  |
+| 28 | `propertycase/propertycase` | 7 | 0.9s |  |
+| 29 | `propertycase/propertycase-preserving-6` | 2 | 0.9s |  |
+| 30 | `propertycase/propertycase-preserving-7` | 5 | 0.7s |  |
 | 31 | `rollover` | 4 | 0.9s |  |
-| 32 | `scope` | 14 | 0.7s |  |
-| 33 | `setinterval` | 20 | 0.8s |  |
-| 34 | `settimeout` | 17 | 0.8s |  |
-| 35 | `super` | 11 | 0.7s |  |
-| 36 | `target` | 18 | 0.7s |  |
-| 37 | `text-bind` | 0 | 0.7s |  |
+| 32 | `scope` | 14 | 0.8s |  |
+| 33 | `setinterval` | 20 | 0.9s |  |
+| 34 | `settimeout` | 17 | 1.1s |  |
+| 35 | `super` | 11 | 0.9s |  |
+| 36 | `target` | 18 | 0.9s |  |
+| 37 | `text-bind` | 0 | 18.6s |  |
 | 38 | `textfield/textfield-html` | 4 | 0.8s |  |
-| 39 | `textfield/textfield-text-setters` | 8 | 0.8s |  |
-| 40 | `undefined/undefined-swf6` | 39 | 0.7s |  |
-| 41 | `undefined/undefined-swf7` | 39 | 0.7s |  |
-| 42 | `watch` | 2 | 0.8s |  |
-| 43 | `xml/xmlbuild` | 1 | 0.7s |  |
-| 44 | `xml/xmlload` | 4 | 0.7s |  |
-| 45 | `xml/xmlstring` | 9 | 0.8s |  |
+| 39 | `textfield/textfield-text-setters` | 8 | 0.9s |  |
+| 40 | `undefined/undefined-swf6` | 39 | 0.9s |  |
+| 41 | `undefined/undefined-swf7` | 39 | 1.0s |  |
+| 42 | `watch` | 2 | 0.9s |  |
+| 43 | `xml/xmlbuild` | 1 | 0.9s |  |
+| 44 | `xml/xmlload` | 4 | 1.0s |  |
+| 45 | `xml/xmlstring` | 9 | 1.0s |  |
 
 ## Near-Passing Tests
 
