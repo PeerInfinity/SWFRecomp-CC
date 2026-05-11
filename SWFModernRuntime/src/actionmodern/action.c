@@ -35800,7 +35800,7 @@ check_special_vars:
 				name_buf[63] = '\0';
 			}
 
-#ifndef NO_GRAPHICS
+#if !defined(NO_GRAPHICS) && !defined(OFFSCREEN_RENDER)
 			DisplayObject* dobj = findDisplayObjectByName(name_buf);
 			if (dobj != NULL)
 			{
@@ -35813,6 +35813,13 @@ check_special_vars:
 				}
 			}
 #else
+			// In graphics-native (OFFSCREEN_RENDER) and NO_GRAPHICS, route name
+			// lookup through ng_findDisplayEntryByName, which uses swf_name_match
+			// (case-insensitive in SWF<=6). The wasm-graphics branch above uses
+			// findDisplayObjectByName (strcmp), which is case-sensitive — so
+			// `Button` would miss the "button" instance and fall through to
+			// _global, returning the global Button class instead of the instance.
+			// Key test: avm1/focusrect_property_swf6.
 			// Check pending_removal MCs first
 			{
 				int found_pending = 0;
