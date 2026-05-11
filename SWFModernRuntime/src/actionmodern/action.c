@@ -48498,12 +48498,12 @@ void actionCloneSprite(SWFAppContext* app_context)
 		target_name = _clone_tgt_buf;
 	}
 
-	#ifndef NO_GRAPHICS
-	// Full implementation would:
-	// 1. Find source MovieClip in display list
-	// 2. Create deep copy of sprite and its children
-	// 3. Add to display list at specified depth
-	// 4. Assign new name
+	#if !defined(NO_GRAPHICS) && !defined(OFFSCREEN_RENDER)
+	// Browser-WASM graphics path is still a stub. Graphics-native
+	// (OFFSCREEN_RENDER) is routed through the NO_GRAPHICS implementation
+	// below — it uses ng_cloneSprite / ng_cloneSpriteFromMC + child_mc_cache,
+	// which exist in both modes. Without this gate widening, opcode-form
+	// duplicateMovieClip silently no-ops in graphics-native (gotcha #13).
 	cloneMovieClip(source_name, target_name, (int)VAL(float, &depth.data.numeric_value));
 	#else
 	{
@@ -48693,12 +48693,16 @@ void actionRemoveSprite(SWFAppContext* app_context)
 		return;
 	}
 
-	#ifndef NO_GRAPHICS
+	#if !defined(NO_GRAPHICS) && !defined(OFFSCREEN_RENDER)
+	// Browser-WASM graphics: stubbed. Graphics-native (OFFSCREEN_RENDER)
+	// falls through to the NO_GRAPHICS implementation below — same
+	// child_mc_cache / display_list / queueOnUnload primitives are
+	// available, so the real removal path runs (gotcha #13).
 	#ifdef DEBUG
 	printf("[RemoveSprite] Graphics mode stub: would remove %s\n", target_name);
 	#endif
 	#else
-	// NO_GRAPHICS mode: find the clip by name and remove it if dynamically created
+	// NO_GRAPHICS / OFFSCREEN_RENDER mode: find the clip by name and remove it if dynamically created
 	{
 		MovieClip* _rs_mc = NULL;
 		for (int _rs_i = 0; _rs_i < child_mc_count; _rs_i++) {
