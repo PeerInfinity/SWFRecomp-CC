@@ -484,6 +484,69 @@ cause.
       fail in graphics — they often share the per-tick flush
       dependency.
 
+    - **(2026-05-11 #4 — `g_force_quit` early-exit)** — At the top
+      of swf.c's OFFSCREEN_RENDER quit gate, add a second
+      escape that breaks on `g_force_quit` (set only by
+      FSCommand:quit) bypassing `hasPlayingSprites` /
+      `hasPlayingLevels` / pending-load checks. `swf_core.c`
+      (line ~906) has this. The regular `quit_swf` gate (set by
+      both FSCommand:quit AND the recompiler-emitted end-of-movie
+      marker) insists on all the "still alive" predicates being
+      false, so a SWF that calls FSCommand:quit from a non-last
+      frame but still has a playing sprite or a recompiler-emitted
+      natural-wrap-back loops forever. Key test:
+      `from_shumway/timeline/timeline_as2_1` (frame 2 calls
+      FSCommand:quit but frame 4's wrap-back keeps sending us
+      back to frame 0, so without g_force_quit the test cycles 3×
+      until max_ticks).
+
+    - **(2026-05-11 #4 — `g_goto_inlined_in_caller_frame`
+      wrap-back undo)** — Right after
+      `frame_funcs[current_frame](app_context)` returns, add
+      swf_core.c's (line ~1013) undo: if
+      `g_goto_inlined_in_caller_frame` is set AND
+      `manual_next_frame && next_frame == 0 && !g_deferred_root_goto`,
+      clear `manual_next_frame = 0` AND set
+      `next_frame = current_frame`. swf.c was already SETTING
+      `g_goto_inlined_in_caller_frame=1` in ng_executeGotoCatchUp
+      but had no consumer, so the recompiler-emitted last-frame
+      wrap-back (`next_frame=0; manual_next_frame=1`) fired after
+      an in-script `gotoAndPlay`/`gotoAndStop` had already
+      inlined the target via catch-up (which cleared
+      `manual_next_frame=0`), looping the timeline back to frame
+      0 instead of advancing past the goto target. **Note** the
+      extra `next_frame = current_frame` not present in
+      swf_core.c: swf_core.c uses a `current_frame++` natural
+      advance model where current_frame is the source of truth;
+      swf.c increments next_frame and copies to current_frame at
+      tick top, so the wrap-back's `next_frame=0` survives the
+      undo unless we also reset next_frame. Key tests:
+      `from_shumway/timeline/timeline_as2_1` (loops 3× without
+      the undo + g_force_quit), `from_gnash/actionscript.all/case-v6`
+      (all lines matched but runtime halt because the timeline
+      kept ticking past expected exit),
+      `from_gnash/misc-ming.all/displaylist_depths/displaylist_depths_test8`
+      (extra check ran after natural wrap looped past expected
+      stop frame). The wrap-back undo is the **highest-impact
+      isolated landing in this category since 3a54d056** — three
+      tests across two suites unlocked by a 5-line change.
+
+    - **(2026-05-11 #4 — `g_defer_sprite_init = 0` tick-boundary
+      clear)** — Inside swf.c's OFFSCREEN_RENDER block right after
+      the `current_frame = next_frame` and currentframe sync, add
+      `{ extern int g_defer_sprite_init; g_defer_sprite_init = 0; }`.
+      Mirrors swf_core.c (line ~951). `ng_executeGotoCatchUp`
+      intentionally leaves the flag set so the calling frame's
+      `tagShowFrame` continues to defer sprite init for the rest
+      of THAT tick, but a regular-frame-script `gotoAndPlay` /
+      `gotoAndStop` then exits the action handler with the flag
+      still set, suppressing `process_sprite_needs_init` for
+      newly-placed sprites on subsequent frames. swf_core.c's
+      comment explicitly names the key test:
+      `from_gnash/misc-ming.all/timeline_var_test` — `setTarget`
+      DoAction inside a sprite placed on frame 3 never queues its
+      trace because the sprite's `sprite_initialized` stays at 0.
+
     Companion class — **swf.c top-of-tick blocks that re-fire
     events `input_events_pump_tick` already dispatched**:
 

@@ -782,6 +782,75 @@ Combined: +10 raw avm1 (3 narrow misses + 7 cluster). Smoke set
 newly-passing tests) clean. Cross-suite delta from these changes
 will be reported after CI.
 
+#### 2026-05-11 follow-up #4 — three more swf.c parity gaps with swf_core.c
+
+Three independent gotcha-#14 landings in swf.c, fixing all of the
+"close" cluster regressions:
+
+- `timeline_as2_1` (0/9 → 9/9, +1 from_shumway) AND `case-v6`
+  (73/73 lines + runtime error → 73/73 pass, +1 from_gnash/
+  actionscript.all): Two related gaps from the
+  `g_goto_inlined_in_caller_frame` mechanism.
+  - **`g_force_quit` early-exit** at the top of the OFFSCREEN_RENDER
+    quit gate. `swf_core.c` (line ~906) breaks the loop after
+    FSCommand:quit even with `hasPlayingSprites()=true`, because
+    `g_force_quit` is set only by the FSCommand:quit path (not the
+    recompiler-emitted end-of-movie `quit_swf=1`). Without it,
+    `timeline_as2_1`'s frame-4 → goto(1)+play → frame-1 trace →
+    frame-2 FSCommand:quit cycle keeps the player alive (sprite
+    is_playing stays true after the early goto+play) and the test
+    runs to max_ticks instead of stopping. Same gate is needed for
+    cases where FSCommand:quit fires from a non-last frame.
+  - **`g_goto_inlined_in_caller_frame` wrap-back undo** right after
+    `frame_funcs[current_frame](app_context)`. `swf_core.c` (line
+    ~1013) undoes the recompiler-emitted natural wrap-back
+    (`next_frame=0; manual_next_frame=1` at end of last frame) when
+    a `gotoAndPlay`/`gotoAndStop` inside the script already inlined
+    the target via `ng_executeGotoCatchUp`. swf.c was SETTING
+    `g_goto_inlined_in_caller_frame=1` (line 140) but never
+    consuming it. Without the undo, `frame_4`'s
+    `actionGotoFrame(1); actionPlay()` clears `manual_next_frame=0`
+    inside catch-up, then `frame_4`'s emitted wrap-back sees `mnf=0
+    && ip=1` and triggers `next_frame=0; mnf=1`, looping the
+    timeline back to frame 0 on the next tick. swf.c's next-frame
+    advance also needs `next_frame = current_frame` in the undo
+    (swf_core.c uses a `current_frame++` model that doesn't need
+    this — see code comment for details). Key tests: timeline_as2_1
+    (loops 3× instead of quitting once), case-v6 (lines all matched
+    because exit happened gracefully via timeout but the runtime
+    halt counted as error).
+- `timeline_var_test` (6/7 → 7/7, +1 from_gnash/misc-ming.all):
+  **`g_defer_sprite_init = 0` tick-boundary clear** inside
+  swf.c's OFFSCREEN_RENDER block right after `current_frame =
+  next_frame;`. `swf_core.c` (line ~951) explicitly names this
+  test as the key test for the clear:
+  `ng_executeGotoCatchUp` intentionally leaves `g_defer_sprite_init=1`
+  so the calling frame's `tagShowFrame` continues to defer
+  sprite init for the rest of THAT tick, but a regular-frame-script
+  `gotoAndPlay`/`gotoAndStop` then exits the action handler with
+  the flag still set. Without a tick-boundary clear, the flag
+  suppresses `process_sprite_needs_init` for newly-placed sprites
+  on subsequent frames (sprite_initialized stays 0, onEnterFrame
+  clip-actions never dispatch, the `setTarget` DoAction never
+  pushes its string into the array).
+- `displaylist_depths/displaylist_depths_test8` (9/10 → 10/10, +1
+  from_gnash/misc-ming.all): also resolved by the wrap-back undo
+  above (final assertion no longer runs an extra time after the
+  natural-wrap-back loops a stopped-on-frame-5 timeline back).
+
+Still failing post-this-session (separate root cause, not the
+gotcha-#14 family):
+- `place_and_remove_object_insane_test` (15/19 in graphics vs
+  19/19 in NO_GRAPHICS) — lines 10-13 show out-of-order
+  display-list state at one of the iterations. Same diff in
+  graphics-headless-legacy, so the bug is in shared code (tag.c
+  or `#ifdef NO_GRAPHICS`-gated tag handling), not swf.c. Defer.
+
+Combined: +4 raw cross-suite (1 from_shumway, 1
+from_gnash/actionscript.all, 2 from_gnash/misc-ming.all) plus
+adjacent unlocks. Smoke set (22 tests) clean. Cross-suite delta
+from these changes reported after CI.
+
 **Exit criteria:** graphics-native pass rate within 2% of NO_GRAPHICS on every suite, OR remaining gaps documented in `_investigation/` as "expected divergence."
 
 ### Phase 3 — Migrate image tests + retire HEADLESS_GRAPHICS
