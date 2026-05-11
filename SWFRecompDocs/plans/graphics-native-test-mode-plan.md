@@ -601,6 +601,65 @@ NO_GRAPHICS, and the existing load/unload tests
 `movieclip_library_state_values`, `MovieClipLoader-v{5,6,8}`,
 `loadmovienum_cross_version_prototype`) all unchanged.
 
+#### 2026-05-11 follow-up — actionCloneSprite + actionRemoveSprite gate widening
+
+Same `#ifndef NO_GRAPHICS` misgate as the case-insensitive lookup, but
+the consequences were much worse: the gated arms were a no-op stub
+(`actionCloneSprite` → `cloneMovieClip` empty function) and a `#ifdef
+DEBUG` printf (`actionRemoveSprite`). The recompiler emits both
+unconditionally for opcodes 0x24 / 0x25, so graphics-native silently
+dropped every opcode-form `duplicateMovieClip(target, name, depth)`
+and `removeMovieClip(name)`. The `#else` (NO_GRAPHICS) arms have the
+real implementations: `ng_cloneSprite` / `ng_cloneSpriteFromMC` for
+clone, `child_mc_cache` / `display_list` / `queueOnUnload` /
+`ng_queue_slot_unload_events` for remove — all symbols that exist
+unconditionally (or for graphics builds too — `display_list` is
+defined in `swf.c` line 193).
+
+6. **`e0568fe7` — gate widening for both handlers** to
+   `!defined(NO_GRAPHICS) && !defined(OFFSCREEN_RENDER)`, routing
+   graphics-native through the NO_GRAPHICS implementations. The
+   browser-WASM-graphics arm remains stubbed (separate workstream;
+   browsers run the wasm-graphics path).
+
+#### Per-suite cumulative delta (`b7f11901` → `e0568fe7`)
+
+| Suite | Pre | Post | Δ |
+|---|---:|---:|---:|
+| `avm1` | 578 | 587 | +9 |
+| `from_gnash/actionscript.all` | 125 | 125 | 0 |
+| `from_gnash/misc-ming.all` | 52 | 57 | +5 |
+| `from_gnash/misc-mtasc.all` | 7 | 7 | 0 |
+| `from_gnash/misc-swfc.all` | 7 | 7 | 0 |
+| `from_gnash/misc-swfmill.all` | 17 | 17 | 0 |
+| `from_shumway` | 59 | 61 | +2 |
+| `from_shumway/avm1` | 42 | 44 | +2 |
+| **TOTAL (avm1 + gnash + shumway-top)** | **886** | **905** | **+19** |
+
+Newly passing (avm1, +9): `clone_sprite_edittext` (3→94),
+`clone_sprite_edittext_dynamic` (3→86), `clone_sprite_types` (18→24),
+`duplicate_movie_clip` (12→20), `duplicate_movie_clip_drawing` (1→2),
+`remove_movie_clip` (26→29), `removed_target_clip_scope` (12→35),
+`string_paths_variable_scopes` (3→5), `textsnapshot_available_text`
+(13→20).
+
+Newly passing (misc-ming, +5): `DepthLimitsTest` (15→20),
+`displaylist_depths_test9` (3→23), `duplicate_movie_clip_test2`
+(11→21), `static_vs_dynamic1` (11→17), `static_vs_dynamic2` (6→18).
+Plus 2 `ruffle_matched` improvements (`displaylist_depths_test`
+61→104, `duplicate_movie_clip_test` 1→29).
+
+Newly passing (from_shumway, +2): `avm1/duplicateMovieClip/dontremove`,
+`avm1/duplicateMovieClip/samedepth` (same two surface in the avm1
+sub-suite row).
+
+`opcode_guard_test2` (misc-swfc) also flipped from `output_mismatch`
+to `ruffle_matched` (16→19).
+
+Net **+19 raw pass**: 886 → 905 / 1125 (78.8% → 80.4%). Smoke set,
+NO_GRAPHICS, and previously-unlocked load/unload + case-insensitive
+tests all unchanged.
+
 **Exit criteria:** graphics-native pass rate within 2% of NO_GRAPHICS on every suite, OR remaining gaps documented in `_investigation/` as "expected divergence."
 
 ### Phase 3 — Migrate image tests + retire HEADLESS_GRAPHICS
