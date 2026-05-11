@@ -263,6 +263,29 @@ void tagMain(SWFAppContext* app_context)
 			    && !hasClipEnterFrameHandlers()
 			    && g_pending_mcl_load_count == 0
 			    && g_pending_direct_load_count == 0) break;
+
+			// FSCommand:quit was called in a prior tick — exit as soon as
+			// nothing is still asking to run. Without this, a SWF that
+			// FSCommand:quits from a non-last frame but still has the natural
+			// end-of-movie loopback (manual_next_frame=1, next_frame=0) keeps
+			// restarting frame 0 forever, because hasPlayingSprites() stays
+			// true. `g_force_quit` is set only by FSCommand:quit (not by the
+			// recompiler-emitted end-of-movie quit_swf=1), so this bypasses
+			// hasPlayingSprites / hasPlayingLevels / pending-load checks that
+			// the regular quit_swf gate insists on. Mirrors swf_core.c
+			// (line ~906). Key test: from_shumway/timeline/timeline_as2_1
+			// (frame 5 calls FSCommand:quit but frame 4 loops back to
+			// frame 1, so the test re-cycles 3× before max_ticks hits).
+			{
+				extern int g_force_quit;
+				if (g_force_quit
+				    && g_event_pos >= g_event_count
+				    && !actionHasEnterFrameHandlers()
+				    && !hasActiveTimers()
+				    && !hasPlayingSounds()
+				    && !hasActiveNetStreams()
+				    && !hasClipEnterFrameHandlers()) break;
+			}
 		}
 #else
 		if (quit_swf) break;
@@ -290,6 +313,20 @@ void tagMain(SWFAppContext* app_context)
 			extern MovieClip root_movieclip;
 			root_movieclip.currentframe = (int)current_frame + 1;
 		}
+
+		// Clear g_defer_sprite_init at tick boundary. ng_executeGotoCatchUp
+		// intentionally leaves it set so the calling frame's tagShowFrame
+		// continues to defer sprite init for the rest of THAT tick. Without
+		// a tick-boundary clear, a leak from a regular-frame-script
+		// gotoAndPlay/gotoAndStop persists into subsequent frames, where it
+		// suppresses process_sprite_needs_init for newly-placed sprites
+		// (sprite_initialized stays 0 → onEnterFrame clip-actions never
+		// dispatch). Mirrors swf_core.c (line ~951). Key test:
+		// from_gnash/misc-ming.all/timeline_var_test — frame 1's
+		// gotoAndPlay leaves the flag set, so the sprite placed on frame 3
+		// never inits and its setTarget DoAction never pushes "setTarget"
+		// into the ar array.
+		{ extern int g_defer_sprite_init; g_defer_sprite_init = 0; }
 
 		// Process deferred unloadMovie state (MC properties change on
 		// next frame). Mirrors swf_core.c line ~918. Runs before
@@ -516,6 +553,36 @@ void tagMain(SWFAppContext* app_context)
 		    )
 		{
 			frame_funcs[current_frame](app_context);
+#ifdef OFFSCREEN_RENDER
+			// If a goto inside the script inlined the target frame's body
+			// AND the recompiler-emitted last-frame wrap-back fired
+			// afterward (signature: next_frame=0; manual_next_frame=1),
+			// undo the wrap-back so the natural advance moves to
+			// current_frame+1 (gotoAndPlay) or stays in place
+			// (gotoAndStop). Without this, gotoAndPlay/Stop from inside
+			// the last frame's script loops back to 0. Mirrors swf_core.c
+			// (line ~1013). swf.c's next_frame-based natural advance also
+			// needs next_frame resynced to current_frame: the wrap-back set
+			// next_frame=0, so the loop-bottom `next_frame += 1` would land
+			// on frame 1 (re-running the target script) instead of
+			// current_frame+1. Setting next_frame=current_frame turns the
+			// natural advance into current_frame+1 (gotoAndPlay) or stay
+			// (gotoAndStop, is_playing=0). Key test:
+			// from_shumway/timeline/timeline_as2_1 — frame_4's script
+			// gotoAndPlay(1) inlines script_1 via ng_executeGotoCatchUp,
+			// the wrap-back then fires, and without the undo the timeline
+			// loops to frame 0 instead of advancing to frame 2's
+			// FSCommand:quit.
+			if (g_goto_inlined_in_caller_frame)
+			{
+				extern int g_deferred_root_goto;
+				g_goto_inlined_in_caller_frame = 0;
+				if (manual_next_frame && next_frame == 0 && !g_deferred_root_goto) {
+					manual_next_frame = 0;
+					next_frame = current_frame;
+				}
+			}
+#endif
 		}
 
 #ifdef OFFSCREEN_RENDER
