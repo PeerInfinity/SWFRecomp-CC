@@ -1,8 +1,8 @@
 # Graphics vs Trace Mode Differences
 
-Trace: 73/92 passing | Graphics: 58/92 passing
+Trace: 73/92 passing | Graphics: 59/92 passing
 
-## Graphics Regressions (15 tests)
+## Graphics Regressions (14 tests)
 
 Tests that **pass** in trace mode but **fail** in graphics mode.
 
@@ -21,8 +21,7 @@ Tests that **pass** in trace mode but **fail** in graphics mode.
 | 11 | `fuzz/ac93c8c9a3efe3e9a0421d6163158827696b5e4d0ac4fa1262f32e8c5bb7f732` | Output Mismatch | 4/54 lines match |
 | 12 | `fuzz/b480790b84c3a62fe6fa3486d26fd23988a5acd038261c04349ad4368107e6ca` | Ruffle Matched | 1/5 lines match |
 | 13 | `fuzz/c8b8069c2ba2a93e50b8d8410ed73191c3bb39b75ba0749309f9e580e0525d69` | Output Mismatch | 3/51 lines match |
-| 14 | `movieinfo1` | Output Mismatch | 1/3 lines match |
-| 15 | `timeline/timeline_as2_1` | Output Mismatch | 3/9 lines match |
+| 14 | `timeline/timeline_as2_1` | Output Mismatch | 3/9 lines match |
 
 ## Graphics Improvements (0 tests)
 
