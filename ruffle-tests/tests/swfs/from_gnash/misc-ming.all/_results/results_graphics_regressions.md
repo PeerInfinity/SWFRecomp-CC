@@ -10,7 +10,7 @@ Tests that **pass** in trace mode but **fail** in graphics mode.
 |---|------|-----------------|--------|
 | 1 | `DefineEditTextVariableNameTest` | Segfault | SIGSEGV |
 | 2 | `DepthLimitsTest` | Output Mismatch | 15/20 lines match |
-| 3 | `ResolveEventsTest` | Output Mismatch | 12/15 lines match |
+| 3 | `ResolveEventsTest` | Output Mismatch | 13/15 lines match |
 | 4 | `action_order/action_execution_order_test8-v5` | Output Mismatch | 9/11 lines match |
 | 5 | `action_order/action_execution_order_test8-v6` | Output Mismatch | 9/11 lines match |
 | 6 | `displaylist_depths/displaylist_depths_test8` | Output Mismatch | 9/16 lines match |
