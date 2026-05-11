@@ -501,6 +501,36 @@ Unlocks (raw passes flipped):
 - `Inheritance-v6` (`from_gnash/actionscript.all`): runtime_error →
   segfault, 173/181 lines unchanged. Same flaky-status-flip pattern.
 
+#### 2026-05-11 follow-up — MovieClipLoader.unloadClip actually stops the loaded child SWF
+
+`builtin_mcl_unloadClip` previously only fired the target's `onUnload`
+handler; it did not stop the loaded child SWF's per-tick frame
+advancement. NO_GRAPHICS hid the bug because `swf_core.c`'s "root
+stopped, current_frame < g_frame_count" exit branch (line ~1433) breaks
+out of the main loop without consulting `hasPlayingLevels` — so once
+the test's root timeline stops, the loop exits regardless of any
+loaded-child level advancement. `swf.c`'s exit condition keys on
+`quit_swf` instead, and `quit_swf` is never set when the root simply
+stops mid-timeline — so the loaded child kept ticking via
+`actionAdvancePlayingLevels` until it reached its own last frame.
+
+Fix: set `target_mc->unloaded = 1` immediately (matches Ruffle's
+`avm1_unload_movie` for non-root targets in
+`core/src/avm1/globals/movie_clip_loader.rs`) and queue the property
+reset via the existing `g_deferred_unload_mcs` deferred queue so
+`_totalframes` / `_currentframe` / `_url` move to the unloaded values
+on the next tick (the deferred queue is reused from the unloadMovie
+path at `action.c:40075`). `actionAdvancePlayingLevels` skips entries
+whose `mc->unloaded` is set, so the loaded child SWF stops dead on
+the same tick.
+
+Net **+1 raw pass**: 870 → 871 / 1125 (77.3% → 77.4%). Unlocks just
+`avm1/mcl_unloadclip` — the only test in the suite that explicitly
+exercises this code path. Smoke set + NO_GRAPHICS + the existing
+load/unload tests (`unloadmovie`, `unloadmovie_method`,
+`unload_clip_event`, `movieclip_library_state_values`,
+`MovieClipLoader-v{5,6,8}`) all unchanged.
+
 **Exit criteria:** graphics-native pass rate within 2% of NO_GRAPHICS on every suite, OR remaining gaps documented in `_investigation/` as "expected divergence."
 
 ### Phase 3 — Migrate image tests + retire HEADLESS_GRAPHICS
