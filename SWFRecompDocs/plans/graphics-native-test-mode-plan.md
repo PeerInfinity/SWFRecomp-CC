@@ -846,10 +846,15 @@ gotcha-#14 family):
   graphics-headless-legacy, so the bug is in shared code (tag.c
   or `#ifdef NO_GRAPHICS`-gated tag handling), not swf.c. Defer.
 
-Combined: +4 raw cross-suite (1 from_shumway, 1
-from_gnash/actionscript.all, 2 from_gnash/misc-ming.all) plus
-adjacent unlocks. Smoke set (22 tests) clean. Cross-suite delta
-from these changes reported after CI.
+Combined: **+3 raw cross-suite** (1 from_shumway, 2
+from_gnash/misc-ming.all) confirmed post-CI (run 25697964640).
+case-v6 fix verified locally (passes after the wrap-back undo),
+but in CI it stays at runtime_error with exit code -6 ("output
+matches") — same CI-only-flake category as native_objects_swf6.
+**Bonus**: `native_objects_swf6` line-match went from 9/115
+(segfault) to 114/115 (output_mismatch) — the wrap-back undo
+shifted whatever was causing the CI segfault, though the test
+still doesn't fully pass. Smoke set (22 tests) clean.
 
 **Exit criteria:** graphics-native pass rate within 2% of NO_GRAPHICS on every suite, OR remaining gaps documented in `_investigation/` as "expected divergence."
 
