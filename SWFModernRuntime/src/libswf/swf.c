@@ -529,6 +529,64 @@ void tagMain(SWFAppContext* app_context)
 			input_events_pump_tick(app_context);
 		}
 
+		// Goto catch-up: when a script-initiated goto (e.g. mc.gotoAndStop("/:N")
+		// with a force_root path) called ng_executeGotoTagsOnly during this
+		// tick, it left goto_from_action + manual_next_frame + g_deferred_root_goto
+		// set so the main loop runs the target frame's scripts. Without this
+		// block, manual_next_frame gets cleared at end-of-tick (line ~613) and
+		// the next tick sees is_playing=0 (from gotoAndStop), so funcs[target]
+		// never runs. Mirrors swf_core.c outer catch-up loop (line ~1195+).
+		// Key test: avm1/goto_frame_number.
+		{
+			int _goto_retry_limit = 16;
+			while (goto_from_action && manual_next_frame && _goto_retry_limit-- > 0)
+			{
+				size_t original_frame = current_frame;
+				size_t target = next_frame;
+				manual_next_frame = 0;
+				goto_from_action = 0;
+
+				ng_display_clear_after(app_context, target);
+
+				catch_up_mode = 1;
+				if (target <= original_frame)
+				{
+					actionRewindCleanup(app_context);
+					catch_up_backward = 1;
+					catch_up_target = target;
+					for (size_t f = 0; f < target && f < g_frame_count; f++)
+					{
+						current_frame = f;
+						if (frame_funcs[f]) frame_funcs[f](app_context);
+					}
+					catch_up_mode = 0;
+					if (target < g_frame_count)
+					{
+						current_frame = target;
+						if (frame_funcs[target]) frame_funcs[target](app_context);
+					}
+					catch_up_backward = 0;
+					ng_display_cleanup_unplaced_after(app_context, target);
+				}
+				else
+				{
+					for (size_t f = original_frame + 1; f < target && f < g_frame_count; f++)
+					{
+						current_frame = f;
+						if (frame_funcs[f]) frame_funcs[f](app_context);
+					}
+					catch_up_mode = 0;
+					if (target < g_frame_count)
+					{
+						current_frame = target;
+						if (frame_funcs[target]) frame_funcs[target](app_context);
+					}
+				}
+				current_frame = target;
+				g_deferred_root_goto = 0;
+			}
+		}
+
 		// Process deferred failed-load state and direct loadMovie inits
 		// queued by this tick's frame/sprite scripts. Mirrors swf_core.c
 		// (lines ~1282-1300). Without actionFirePendingDirectLoads, a
