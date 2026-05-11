@@ -1,8 +1,8 @@
 # Ruffle Test Results (Unfiltered)
 
-**Date**: 2026-05-11 18:12 UTC
+**Date**: 2026-05-11 19:12 UTC
 
-**Git SHA**: `65b8068012`
+**Git SHA**: `3589c6bcc8`
 
 **Run Duration**: 0m 4s
 
@@ -34,10 +34,10 @@
 | 1 | `button_test1` | 31 | 0.2s |  |
 | 2 | `edittext_test1` | 47 | 0.2s |  |
 | 3 | `gotoFrameLabelAsFunction` | 6 | 0.2s |  |
-| 4 | `hello` | 4 | 0.1s |  |
+| 4 | `hello` | 4 | 0.2s |  |
 | 5 | `mouse_drag_test` | 12 | 0.2s |  |
 | 6 | `movieclip_destruction_test2` | 56 | 0.2s |  |
-| 7 | `stackscope` | 11 | 0.2s |  |
+| 7 | `stackscope` | 11 | 0.1s |  |
 | 8 | `submoviegetvar` | 4 | 0.2s |  |
 
 ## Ruffle-Matched Tests

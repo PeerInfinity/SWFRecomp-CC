@@ -3,9 +3,9 @@
 *Tests on the [ignored list](ruffle-tests/ignored_tests.txt) are excluded.*  
 *See [RUFFLE_RESULTS.md](RUFFLE_RESULTS.md) for unfiltered results.*
 
-**Commit:** `65b80680126b`  
-**Date:** 2026-05-11 18:12 UTC  
-**Total duration:** 4m57s
+**Commit:** `3589c6bcc859`  
+**Date:** 2026-05-11 19:12 UTC  
+**Total duration:** 5m03s
 
 ## Results by Suite
 
@@ -75,24 +75,24 @@ Tests verified against Flash's actual output (`output.flash.txt`).
 
 - **Pass:** 604/611 (98.9%)
 - **Ignored:** 40 tests
-- **Duration:** 2m43s across 30 shards
+- **Duration:** 2m48s across 30 shards
 - **Lines:** 95,707/95,887 matching (99.8%)
-- **Avg test duration:** 0.2s — slowest: `edittext_newline_stripping` (6.1s)
+- **Avg test duration:** 0.2s — slowest: `edittext_newline_stripping` (6.3s)
 
 ### from_gnash/actionscript.all
 
 - **Pass:** 126/190 (66.3%)
-- **Duration:** 55s across 30 shards
+- **Duration:** 57s across 30 shards
 - **Lines:** 15,393/16,957 matching (90.8%)
-- **Avg test duration:** 0.2s — slowest: `Sound-v8` (0.5s)
+- **Avg test duration:** 0.2s — slowest: `Microphone-v6` (2.5s)
 
 ### from_gnash/misc-ming.all
 
 - **Pass:** 66/100 (66.0%)
 - **Ignored:** 2 tests
-- **Duration:** 35s across 30 shards
+- **Duration:** 34s across 30 shards
 - **Lines:** 3,746/4,517 matching (82.9%)
-- **Avg test duration:** 0.3s — slowest: `matrix_test` (4.4s)
+- **Avg test duration:** 0.3s — slowest: `matrix_test` (3.2s)
 
 ### from_gnash/misc-mtasc.all
 
@@ -114,20 +114,20 @@ Tests verified against Flash's actual output (`output.flash.txt`).
 - **Pass:** 17/18 (94.4%)
 - **Duration:** 4s across 30 shards
 - **Lines:** 49/51 matching (96.1%)
-- **Avg test duration:** 0.2s — slowest: `trace-as2/super` (0.2s)
+- **Avg test duration:** 0.2s — slowest: `func_dict` (0.4s)
 
 ### from_shumway
 
 - **Pass:** 73/76 (96.1%)
 - **Ignored:** 16 tests
-- **Duration:** 24s across 30 shards
+- **Duration:** 23s across 30 shards
 - **Lines:** 621/637 matching (97.5%)
-- **Avg test duration:** 0.2s — slowest: `avm1/undefined/undefined-swf7` (0.6s)
+- **Avg test duration:** 0.2s — slowest: `timeline/timeline_as2_4` (0.6s)
 
 ### from_shumway/avm1
 
 - **Pass:** 45/45 (100%)
 - **Ignored:** 2 tests
-- **Duration:** 11s across 30 shards
+- **Duration:** 10s across 30 shards
 - **Lines:** 480/480 matching (100%)
-- **Avg test duration:** 0.2s — slowest: `array` (0.4s)
+- **Avg test duration:** 0.2s — slowest: `depth` (0.3s)
