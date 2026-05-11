@@ -1,8 +1,8 @@
 {
   "metadata": {
-    "timestamp": "2026-05-11T18:12:11.691196+00:00",
-    "git_sha": "65b80680126b86e47893e522a9b8b2e3ba6a230a",
-    "duration_seconds": 3.8,
+    "timestamp": "2026-05-11T19:12:55.578183+00:00",
+    "git_sha": "3589c6bcc859e042fdd1e7ef25abcb8c0e8fc3f6",
+    "duration_seconds": 3.74,
     "total_available": 16,
     "shards": 30,
     "expected_shards": 30
@@ -22,7 +22,7 @@
       "test": "action_execution_order_test10",
       "phases": {
         "recomp": 0.0,
-        "compile": 0.197,
+        "compile": 0.194,
         "run": 0.003
       },
       "num_frames": 30,
@@ -41,8 +41,8 @@
       "test": "button_test1",
       "phases": {
         "recomp": 0.0,
-        "compile": 0.166,
-        "run": 0.004
+        "compile": 0.159,
+        "run": 0.003
       },
       "num_frames": 30,
       "lines": {
@@ -57,7 +57,7 @@
       "test": "edittext_test1",
       "phases": {
         "recomp": 0.0,
-        "compile": 0.19,
+        "compile": 0.186,
         "run": 0.003
       },
       "num_frames": 30,
@@ -66,15 +66,15 @@
         "expected_lines": 47,
         "matching_lines": 47
       },
-      "duration": 0.2,
+      "duration": 0.19,
       "status": "pass"
     },
     {
       "test": "gotoFrameLabelAsFunction",
       "phases": {
         "recomp": 0.0,
-        "compile": 0.157,
-        "run": 0.002
+        "compile": 0.17,
+        "run": 0.003
       },
       "num_frames": 30,
       "lines": {
@@ -82,14 +82,14 @@
         "expected_lines": 6,
         "matching_lines": 6
       },
-      "duration": 0.16,
+      "duration": 0.18,
       "status": "pass"
     },
     {
       "test": "hello",
       "phases": {
         "recomp": 0.0,
-        "compile": 0.117,
+        "compile": 0.157,
         "run": 0.002
       },
       "num_frames": 30,
@@ -98,14 +98,14 @@
         "expected_lines": 4,
         "matching_lines": 4
       },
-      "duration": 0.12,
+      "duration": 0.16,
       "status": "pass"
     },
     {
       "test": "mouse_drag_test",
       "phases": {
         "recomp": 0.0,
-        "compile": 0.177,
+        "compile": 0.175,
         "run": 0.003
       },
       "num_frames": 30,
@@ -121,7 +121,7 @@
       "test": "movieclip_destruction_test1",
       "phases": {
         "recomp": 0.0,
-        "compile": 0.208,
+        "compile": 0.212,
         "run": 0.004
       },
       "num_frames": 30,
@@ -140,7 +140,7 @@
       "test": "movieclip_destruction_test2",
       "phases": {
         "recomp": 0.0,
-        "compile": 0.165,
+        "compile": 0.161,
         "run": 0.003
       },
       "num_frames": 30,
@@ -156,7 +156,7 @@
       "test": "movieclip_destruction_test4",
       "phases": {
         "recomp": 0.0,
-        "compile": 0.178,
+        "compile": 0.179,
         "run": 0.004
       },
       "num_frames": 30,
@@ -165,7 +165,7 @@
         "expected_lines": 40,
         "matching_lines": 8
       },
-      "duration": 0.18,
+      "duration": 0.19,
       "status": "output_mismatch",
       "detail": "32 line(s) differ (actual=24, expected=40)",
       "actual_output": "... (3 lines before) ...\nRunning frame1[1] actions of mc2[/brother2] (adding red square) [movieclip_destruction_test4.sc:76]\nRunning frame1[1] actions of mc3[/brother3] (adding blue square) [movieclip_destruction_test4.sc:101]\nRunning frame1[1] actions of mc3[/brother4] (adding blue square) [movieclip_destruction_test4.sc:101]\nRunning frame1[1] actions of mc3[/brother5] (adding blue square) [movieclip_destruction_test4.sc:101]\nRunning frame1[1] actions of mc3[/brother6] (adding blue square) [movieclip_destruction_test4.sc:101]\nRunning frame3 actions of _root (nothing new) [movieclip_destruction_test4.sc:154]\nRunning frame5 actions of _root [movieclip_destruction_test4.sc:160]\nFAILED: typeof(brother1): expected: \"undefined\" , obtained: \"movieclip\"  [movieclip_destruction_test4.sc:161]\nPASSED: typeof(brother2) == movieclip  [movieclip_destruction_test4.sc:162]\nFAILED: typeof(brother3): expected: \"undefined\" , obtained: \"movieclip\"  [movieclip_destruction_test4.sc:163]\nPASSED: typeof(brother4) == movieclip  [movieclip_destruction_test4.sc:164]\nPASSED: typeof(brother5) == movieclip  [movieclip_destruction_test4.sc:165]\nPASSED: typeof(brother6) == movieclip  [movieclip_destruction_test4.sc:166]\nFAILED: typeof(brother1): expected: \"undefined\" , obtained: \"movieclip\"  [movieclip_destruction_test4.sc:172]\nPASSED: typeof(brother2) == movieclip  [movieclip_destruction_test4.sc:173]\nFAILED: typeof(brother3): expected: \"undefined\" , obtained: \"movieclip\"  [movieclip_destruction_test4.sc:174]\nTotal tests run: 9 typeof expected: number\nFAILED: TOTAL tests run: 9, expected: 19 [ [movieclip_destruction_test4.sc:176]]\n#passed: 5\n#failed: 5\n__END_OF_TEST__",
@@ -175,7 +175,7 @@
       "test": "opcode_guard_test2",
       "phases": {
         "recomp": 0.0,
-        "compile": 0.175,
+        "compile": 0.178,
         "run": 0.003
       },
       "num_frames": 30,
@@ -194,8 +194,8 @@
       "test": "registerclass_test3",
       "phases": {
         "recomp": 0.0,
-        "compile": 0.177,
-        "run": 0.005
+        "compile": 0.174,
+        "run": 0.004
       },
       "num_frames": 30,
       "lines": {
@@ -213,8 +213,8 @@
       "test": "soft_reference_test1",
       "phases": {
         "recomp": 0.0,
-        "compile": 0.134,
-        "run": 0.004
+        "compile": 0.136,
+        "run": 0.003
       },
       "num_frames": 30,
       "lines": {
@@ -232,7 +232,7 @@
       "test": "sound",
       "phases": {
         "recomp": 0.0,
-        "compile": 0.158,
+        "compile": 0.156,
         "run": 0.002
       },
       "num_frames": 30,
@@ -251,8 +251,8 @@
       "test": "stackscope",
       "phases": {
         "recomp": 0.0,
-        "compile": 0.177,
-        "run": 0.003
+        "compile": 0.134,
+        "run": 0.002
       },
       "num_frames": 30,
       "lines": {
@@ -260,14 +260,14 @@
         "expected_lines": 11,
         "matching_lines": 11
       },
-      "duration": 0.18,
+      "duration": 0.14,
       "status": "pass"
     },
     {
       "test": "submoviegetvar",
       "phases": {
         "recomp": 0.0,
-        "compile": 0.162,
+        "compile": 0.151,
         "run": 0.002
       },
       "num_frames": 30,
@@ -276,14 +276,14 @@
         "expected_lines": 4,
         "matching_lines": 4
       },
-      "duration": 0.17,
+      "duration": 0.16,
       "status": "pass"
     },
     {
       "test": "swf4opcode",
       "phases": {
         "recomp": 0.0,
-        "compile": 0.197,
+        "compile": 0.188,
         "run": 0.003
       },
       "num_frames": 30,
@@ -292,7 +292,7 @@
         "expected_lines": 117,
         "matching_lines": 113
       },
-      "duration": 0.2,
+      "duration": 0.19,
       "ruffle_diff_count": 13,
       "ours_diff_count": 4,
       "status": "ruffle_matched",
