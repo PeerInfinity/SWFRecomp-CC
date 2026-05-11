@@ -496,6 +496,21 @@ void tagMain(SWFAppContext* app_context)
 				tagFlushPendingEnterFrame(app_context);
 		}
 
+		// Mark dynamic MCs (createEmptyMovieClip, etc. — no display_obj)
+		// as eligible for the NEXT tick's enterFrame dispatch. Mirrors
+		// swf_core.c line ~1100. Without this, MCs created by DoAction
+		// scripts during this tick are never marked, so
+		// actionDispatchEnterFrameHandlers skips them on subsequent
+		// ticks (it checks mc_enterframe_eligible for MCs with NULL
+		// display_obj). Symptom: create_empty_movie_clip's
+		// mc2.onEnterFrame never fires from the main loop, was only
+		// firing via the post-quit drain (and firing too many times
+		// there). Key test: avm1/create_empty_movie_clip.
+		{
+			extern void actionMarkDynamicMCsEnterFrameEligible(void);
+			actionMarkDynamicMCsEnterFrameEligible();
+		}
+
 		// Phase 3: advance nested sprite children (deferred from Phase 1
 		// via g_advance_defer_nested above).
 		{
@@ -643,20 +658,21 @@ void tagMain(SWFAppContext* app_context)
 		return;
 	}
 
-#ifdef MAX_FRAMES
-	// Test-mode: bound the post-quit drain loop too. renderer_poll returns 0
-	// indefinitely in OFFSCREEN_RENDER (no input source), so without a bound
-	// this hangs.
-	size_t drain_ticks = 0;
-	const size_t max_drain_ticks = MAX_FRAMES;
-#endif
-
+#ifndef OFFSCREEN_RENDER
+	// Post-quit drain loop: in browser/emscripten mode the SWF stays "alive"
+	// after its timeline ends — onEnterFrame handlers and sprite timelines
+	// keep firing until the user closes the window. renderer_poll returns
+	// nonzero on window close.
+	//
+	// Skipped in OFFSCREEN_RENDER (test mode): swf_core.c has no equivalent
+	// drain loop. The main loop's quit_swf gate already waits on all pending
+	// work (sprites, timers, MCL loads, onEnterFrame handlers), and now that
+	// actionMarkDynamicMCsEnterFrameEligible runs at each tick boundary,
+	// dynamic-MC handlers fire from the main loop too. Running the drain
+	// here on top caused duplicate onEnterFrame dispatches (e.g.
+	// create_empty_movie_clip's mc2.onEnterFrame firing twice).
 	while (!renderer_poll(app_context))
 	{
-#ifdef MAX_FRAMES
-		if (drain_ticks >= max_drain_ticks) break;
-		drain_ticks++;
-#endif
 #ifdef __EMSCRIPTEN__
 		double frame_start2 = emscripten_get_now();
 #endif
@@ -682,6 +698,7 @@ void tagMain(SWFAppContext* app_context)
 			emscripten_sleep(0);
 #endif
 	}
+#endif
 }
 
 void swfStart(SWFAppContext* app_context)
