@@ -209,17 +209,19 @@ Goal: the new mode compiles, links, runs tests, and produces a results file. Pas
 
 **Exit criteria:** mode compiles, runs end-to-end, baseline pass rate captured for all suites. Likely much lower than NO_GRAPHICS — this is the triage backlog.
 
-### Phase 2 — Close `swf.c` parity gaps — IN PROGRESS
+### Phase 2 — Close `swf.c` parity gaps — DONE (2026-05-12)
 
 Goal: graphics-native pass rate approaches NO_GRAPHICS pass rate.
 
-**Status (2026-05-11, post follow-up #5):** **948/1125 pass (84.3%).**
-Strict cross-suite parity-gap survey now down to **two tests**:
-`case-v6` (from_gnash/actionscript.all) is a CI-only flake (passes
-locally after follow-up #4); `place_and_remove_object_insane_test`
-(from_gnash/misc-ming.all) is a shared-code bug in tag.c, not
-swf.c (also fails in `--mode=graphics-headless-legacy`). Smoke set
-clean.
+**Status (2026-05-12, post follow-up #5 + latest CI):** **946/1125
+raw pass (84.1%)** in `--mode=graphics` vs **948/1125 (84.3%)** in
+`--mode=no-graphics`. The two-test cross-suite gap is fully
+accounted for: `from_gnash/actionscript.all/case-v6` (CI-only flake)
+and `from_gnash/misc-ming.all/place_and_remove_object_insane_test`
+(shared-code bug in `tag.c`, also fails in
+`--mode=graphics-headless-legacy`) — both deferred in
+[`SWFRecompDocs/BACKLOG.md`](../BACKLOG.md#deferred-test-failures).
+Smoke set clean.
 
 **Session-of-2026-05-10 commits (in order):**
 - `fff977ec` — Frame-loop parity (`is_playing || manual_next_frame` gate on `funcs[current_frame]`, `processTimers`, `root_movieclip` init). Unblocked the full `from_gnash/actionscript.all` 0/190 cluster.
@@ -929,15 +931,81 @@ pass rate).
 
 **Exit criteria:** graphics-native pass rate within 2% of NO_GRAPHICS on every suite, OR remaining gaps documented in `_investigation/` as "expected divergence."
 
+#### Phase 2 exit-criteria check (2026-05-12)
+
+Per-suite raw pass (NO_GRAPHICS vs graphics-native, from the
+latest CI run on master):
+
+| Suite | NO_GRAPHICS | graphics | Δ | Δ% |
+|---|---:|---:|---:|---:|
+| `avm1` | 605/651 | 605/651 | 0 | 0.0% |
+| `from_gnash/actionscript.all` | 126/190 | 125/190 | -1 | 0.5% |
+| `from_gnash/misc-ming.all` | 66/102 | 65/102 | -1 | 1.0% |
+| `from_gnash/misc-mtasc.all` | 7/9 | 7/9 | 0 | 0.0% |
+| `from_gnash/misc-swfc.all` | 8/16 | 8/16 | 0 | 0.0% |
+| `from_gnash/misc-swfmill.all` | 17/18 | 17/18 | 0 | 0.0% |
+| `from_shumway` | 73/92 | 73/92 | 0 | 0.0% |
+| `from_shumway/avm1` | 46/47 | 46/47 | 0 | 0.0% |
+| **TOTAL** | **948/1125** | **946/1125** | **-2** | **0.18%** |
+
+Max suite gap: 1.0% (`misc-ming.all`, one test). Both
+non-zero-delta suites lose exactly one test, and both are the
+deferred items in [`BACKLOG.md`](../BACKLOG.md#deferred-test-failures)
+— neither is a swf.c parity issue (case-v6 is a CI-environment
+flake; place_and_remove_object_insane_test fails identically in
+`--mode=graphics-headless-legacy`, so the bug is in shared tag.c
+code). Every suite is well within the 2% exit threshold, and the
+two outstanding tests are documented rather than undiagnosed. **Phase
+2 is closed.**
+
 ### Phase 3 — Migrate image tests + retire HEADLESS_GRAPHICS
 
 Goal: one rendering path instead of two.
 
-1. Switch `run_image_tests.py` from `--mode=graphics-headless-legacy` to `--mode=graphics`. Verify image-comparison results don't regress.
-2. Move CI to option A (parallel matrix). The legacy mode is no longer the primary rendering CI path.
-3. Once the legacy mode has zero unique callers and graphics-native is matching it on every suite for ≥1 month: delete `swf_headless.c`, remove `HEADLESS_GRAPHICS` from `render_webgpu.c` / `audio_output_web.c` / `swf.c` / build scripts, drop the `--mode=graphics-headless-legacy` value (and the deprecated `--headless` alias).
+1. Switch `run_image_tests.py` from `--mode=graphics-headless-legacy` to `--mode=graphics`. Verify image-comparison results don't regress. **BLOCKED (2026-05-12) — image-capture machinery lives only in `swf_headless.c`.** See parity-check section below.
+2. Move CI to option A (parallel matrix). The legacy mode is no longer the primary rendering CI path. **BLOCKED on step 1.**
+3. Once the legacy mode has zero unique callers and graphics-native is matching it on every suite for ≥1 month: delete `swf_headless.c`, remove `HEADLESS_GRAPHICS` from `render_webgpu.c` / `audio_output_web.c` / `swf.c` / build scripts, drop the `--mode=graphics-headless-legacy` value (and the deprecated `--headless` alias). **BLOCKED on step 2 (1-month clock starts after step 2 lands).**
 
 **Exit criteria:** `swf_headless.c` deleted, `HEADLESS_GRAPHICS` removed from the codebase.
+
+#### Phase 3 step 1 parity check (2026-05-12)
+
+Re-ran `bitmap_data_colortransform` in both modes locally before
+flipping the default in `run_image_tests.py`:
+
+| Mode | Trace | Image |
+|---|---|---|
+| `graphics-headless-legacy` | PASS | PASS — 0 outliers, max diff 4 |
+| `graphics` | PASS | **FAIL — No actual image produced for `output`** |
+
+Root cause: the entire image-capture infrastructure (CaptureEntry
+table, `parse_capture_triggers`, `save_capture`, `headless_on_fscommand_capture`,
+`headless_has_pending_captures`, plus four integration points in the
+main loop — capture scheduling before frame render, post-event
+re-render, end-of-frame save, and the `CAPTURE_OUTPUT_DIR` env-var
+plumbing — see `swf_headless.c:638-770, 856, 904, 1246-1267, 1332`)
+lives only in `swf_headless.c`. `swf.c` has no equivalent. The
+`-DHEADLESS_RENDER_ENABLED` flag that `verify_output.py` sets in
+graphics mode for tests with `[image_comparisons]` (line 1592) is
+load-bearing inside `swf_headless.c` but a no-op inside `swf.c`.
+Result: the graphics-mode binary never writes `output.png` to
+`CAPTURE_OUTPUT_DIR`, image comparison fails universally.
+
+Drive-by `verify_output.py` fix landed in the same commit: removed
+a `actual_png = test_dir / "{cmp_name}.actual.png"` fallback that
+silently picked up verify's own prior-run backup PNG (created by
+the verbose-mode `shutil.copy2` at line 2779-2780). The fallback
+caused a `SameFileError` on the next run and masked the real
+"binary produced no PNG" failure mode. Now the comparison cleanly
+reports "No actual image produced" when the runtime writes nothing.
+
+**Phase 3 step 1 is blocked** until the capture machinery is ported
+from `swf_headless.c` into `swf.c` (or extracted into a shared
+file usable by both). Tracked in
+[`BACKLOG.md`](../BACKLOG.md#runtime--frame-loop--exit-gates) as a
+dedicated workstream — that port is the only thing standing between
+the current state and being able to flip step 1; steps 2 and 3
+unblock immediately once it lands.
 
 ---
 

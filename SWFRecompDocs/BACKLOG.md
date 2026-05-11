@@ -25,6 +25,20 @@ first).
 
 ## Runtime — frame loop / exit gates
 
+- **Image-capture machinery only in `swf_headless.c`.** The
+  `CaptureEntry` table, `parse_capture_triggers`, `save_capture`,
+  `headless_on_fscommand_capture`, `headless_has_pending_captures`,
+  and four frame-loop integration points
+  (`swf_headless.c:638-770, 856, 904, 1246-1267, 1332`) have no
+  counterpart in `swf.c`. Blocks Phase 3 step 1 of
+  `plans/graphics-native-test-mode-plan.md` (switching
+  `run_image_tests.py` to `--mode=graphics`). Cleanest port likely
+  extracts the capture state machine into a shared file
+  (`capture.c`?) consumed by both frame loops; alternative is a
+  straight backport into `swf.c` gated on `OFFSCREEN_RENDER`. Either
+  way the `-DHEADLESS_RENDER_ENABLED` define already plumbs through
+  `verify_output.py` for graphics-mode image tests, so no flag
+  changes are needed in the test runner. (2026-05-12)
 - **`swf_core.c` root-stopped exit gate ignores long-lived
   subsystems.** `swf_core.c:1433-1454` breaks the loop when
   `is_playing=0` and no playing sprites/timers/enter-frame handlers/

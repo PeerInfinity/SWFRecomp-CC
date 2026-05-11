@@ -2750,9 +2750,6 @@ def main():
                             expected_png = upstream_png
                     # Actual PNG: look in build_dir (produced by test binary)
                     actual_png = build_dir / f"{cmp_name}.png"
-                    if not actual_png.exists():
-                        # Also check test_dir in case the binary writes there
-                        actual_png = test_dir / f"{cmp_name}.actual.png"
                     if not expected_png.exists():
                         image_results[cmp_name] = {
                             "status": "skip",
