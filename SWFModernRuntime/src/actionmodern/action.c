@@ -48978,8 +48978,17 @@ void actionSetTarget(SWFAppContext* app_context, const char* target_name)
 			return;
 		}
 
-#ifndef NO_GRAPHICS
-		// Graphics mode: try display list lookup
+#if !defined(NO_GRAPHICS) && !defined(OFFSCREEN_RENDER)
+		// Browser-WASM graphics: try display list lookup and stash on
+		// targeted_sprite for play/stop/goto interception. targeted_sprite
+		// is only consumed in this mode (the OFFSCREEN_RENDER and NO_GRAPHICS
+		// arms of actionStop/actionPlay/actionGotoFrame fall through to
+		// the ng_isInsideSprite path), and findDisplayObjectByName uses
+		// strcmp (case-sensitive). Routing graphics-native here would
+		// just silently miss case-insensitive SWF<=6 lookups while doing
+		// nothing useful since targeted_sprite is never read. Let the
+		// downstream getMovieClipByTarget / var_map fallback handle
+		// graphics-native instead.
 		DisplayObject* obj = findDisplayObjectByName(target_name);
 		if (obj != NULL) {
 			targeted_sprite = obj;
