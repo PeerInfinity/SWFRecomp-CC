@@ -1,49 +1,65 @@
 {
   "metadata": {
-    "old_timestamp": "2026-05-11T01:17:47.701982+00:00",
-    "old_git_sha": "0fcfe324ea469bf248f6a28ae7f89d89e5096b36",
-    "new_timestamp": "2026-05-11T03:08:09.131154+00:00",
-    "new_git_sha": "a3b81f5aab082e8362d9d3fee49e92f006df5b54",
+    "old_timestamp": "2026-05-11T03:08:09.131154+00:00",
+    "old_git_sha": "a3b81f5aab082e8362d9d3fee49e92f006df5b54",
+    "new_timestamp": "2026-05-11T03:25:39.965104+00:00",
+    "new_git_sha": "947b8351af9abb3274a572004d6ff1aee8118967",
     "partial": false,
     "same_commit": false
   },
   "summary": {
-    "old_pass": 568,
+    "old_pass": 569,
     "old_ruffle_matched": 11,
-    "old_effective_pass": 579,
+    "old_effective_pass": 580,
     "old_total": 651,
-    "old_pass_rate": 87.3,
-    "new_pass": 569,
+    "old_pass_rate": 87.4,
+    "new_pass": 570,
     "new_ruffle_matched": 11,
-    "new_effective_pass": 580,
+    "new_effective_pass": 581,
     "new_total": 651,
-    "new_pass_rate": 87.4,
+    "new_pass_rate": 87.6,
     "old_mismatched_lines": 9532,
-    "new_mismatched_lines": 9532,
+    "new_mismatched_lines": 9427,
     "increased_mismatches": 0,
-    "decreased_mismatches": 0,
+    "decreased_mismatches": 105,
     "newly_passing": 1,
     "newly_failing": 0,
-    "status_changed": 1,
-    "unchanged": 650,
+    "status_changed": 2,
+    "unchanged": 649,
     "added": 0,
     "removed": 0
   },
   "changes": [
     {
-      "test": "mcl_unloadclip",
+      "test": "native_objects_swf6",
+      "change_type": "changed",
+      "old_status": "segfault",
+      "new_status": "output_mismatch",
+      "old_lines": {
+        "actual_lines": 9,
+        "expected_lines": 115,
+        "matching_lines": 9
+      },
+      "new_lines": {
+        "actual_lines": 115,
+        "expected_lines": 115,
+        "matching_lines": 114
+      }
+    },
+    {
+      "test": "unloadmovienum",
       "change_type": "changed",
       "old_status": "output_mismatch",
       "new_status": "pass",
       "old_lines": {
-        "actual_lines": 6,
-        "expected_lines": 5,
-        "matching_lines": 5
+        "actual_lines": 14,
+        "expected_lines": 13,
+        "matching_lines": 13
       },
       "new_lines": {
-        "actual_lines": 5,
-        "expected_lines": 5,
-        "matching_lines": 5
+        "actual_lines": 13,
+        "expected_lines": 13,
+        "matching_lines": 13
       }
     }
   ]

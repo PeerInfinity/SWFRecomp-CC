@@ -1,19 +1,26 @@
 # Ruffle Test Results Diff
 
-**Previous:** `0fcfe324ea46` (2026-05-11T01:17:47.701982+00:00)
-**Current:** `a3b81f5aab08` (2026-05-11T03:08:09.131154+00:00)
+**Previous:** `a3b81f5aab08` (2026-05-11T03:08:09.131154+00:00)
+**Current:** `947b8351af9a` (2026-05-11T03:25:39.965104+00:00)
 
 ## Summary
 
 | Metric | Previous | Current | Delta |
 |--------|----------|---------|-------|
-| Passing | 568 | 569 | +1 |
+| Passing | 569 | 570 | +1 |
 | Total | 651 | 651 | 0 |
-| Pass rate | 87.3% | 87.4% | +0.1% |
-| Mismatched lines | 9532 | 9532 | 0 |
+| Pass rate | 87.4% | 87.6% | +0.2% |
+| Mismatched lines | 9532 | 9427 | -105 |
+|   Decreased | | | -105 |
 
 ## Newly Passing (1)
 
 | Test | Previous Status | Lines (prev) | Lines (now) |
 |------|----------------|--------------|-------------|
-| `mcl_unloadclip` | output_mismatch | 5/5 | 5/5 |
+| `unloadmovienum` | output_mismatch | 13/13 | 13/13 |
+
+## Status Changed (1)
+
+| Test | Previous | Current | Lines (prev) | Lines (now) |
+|------|----------|---------|--------------|-------------|
+| `native_objects_swf6` | segfault | output_mismatch | 9/115 | 114/115 |
