@@ -213,7 +213,7 @@ Goal: the new mode compiles, links, runs tests, and produces a results file. Pas
 
 Goal: graphics-native pass rate approaches NO_GRAPHICS pass rate.
 
-**Status (2026-05-10):** **797/1125 pass (70.8%) — 896/1125 effective (79.6%).** Up from 573/1125 (51.1%) on 2026-05-09 (+224 tests in one session via structural fixes; see commits below). Remaining gap to NO_GRAPHICS effective pass: **~52 tests**. Pre-session smoke was 5/9; current smoke is 7/9 (`tell_target_invalid` and `unload` are the two outstanding subtle failures documented in `graphics-native-test-mode-phase2-results-2026-05-09.md`).
+**Status (2026-05-10):** **817/1125 pass (72.6%).** Pre-session smoke now 8/9 — `unload` remains the only smoke failure (documented partial in `graphics-native-test-mode-phase2-results-2026-05-09.md`).
 
 **Session-of-2026-05-10 commits (in order):**
 - `fff977ec` — Frame-loop parity (`is_playing || manual_next_frame` gate on `funcs[current_frame]`, `processTimers`, `root_movieclip` init). Unblocked the full `from_gnash/actionscript.all` 0/190 cluster.
@@ -293,6 +293,62 @@ NO_GRAPHICS. Naive widening triggered an infinite-loop regression in
 `function_base_clip` (`script_1`'s `this.gotoAndStop(2)` re-enters
 `actionStop` from root context unboundedly). Detail + abandoned-attempt
 notes in `graphics-native-test-mode-phase2-results-2026-05-09.md`.
+
+#### 2026-05-10 follow-up — `actionStop`/`Play`/`GotoFrame` widening (commits `e527f410`, `f8745996`)
+
+Widened the modern `ng_isInsideSprite()` / `ng_stopCurrentSprite()` /
+`ng_gotoFrameByMC()` arm of `actionStop` / `actionPlay` /
+`actionGotoFrame` from `#else NO_GRAPHICS` to `defined(NO_GRAPHICS) ||
+defined(OFFSCREEN_RENDER)`. The legacy `targeted_sprite` arm is now
+gated to `!NO_GRAPHICS && !OFFSCREEN_RENDER` — i.e. browser-WASM
+graphics only, where it was actually live.
+
+The `function_base_clip` infinite loop traced to `actionGotoFrame`,
+not `actionStop`: `this.gotoAndStop(2)` on a non-root MC compiles to
+`actionGotoFrame2` → `actionGotoFrame`. Pre-widening, graphics-native
+took the `targeted_sprite == NULL` arm and fell through to the
+root-goto fallback, which called `ng_executeGotoCatchUp` inline — and
+the catch-up re-ran the current frame's `DoAction`, re-entering the
+same `gotoAndStop` call, infinitely. The widening routes non-root
+`actionGotoFrame` through `ng_gotoFrameByMC` instead.
+
+Second commit (`f8745996`) handles `actionGotoFrame`'s
+"sprite-script + `g_settarget_explicit_root`" sub-branch in
+OFFSCREEN_RENDER: that branch defers via `g_deferred_root_goto = 1`
+which `swf_core.c` consumes but `swf.c` never reads. Without the
+fix, `issue_9885` regressed (script_1 was re-executed by the
+recompiler-emitted last-frame wrap-back). Resolution: in
+OFFSCREEN_RENDER, take the inline-catch-up branch (matches the OLD
+fallthrough behavior).
+
+Net **+18 raw pass**: 799 → 817 / 1125 (72.6%).
+Per-suite delta vs the post-`ab614b80` baseline:
+
+| Suite | Pre | Post | Δ |
+|---|---:|---:|---:|
+| `avm1` | 513 | 524 | +11 |
+| `from_gnash/actionscript.all` | 124 | 125 | +1 |
+| `from_gnash/misc-ming.all` | 43 | 47 | +4 |
+| `from_shumway` | 52 | 53 | +1 |
+| `from_shumway/avm1` | 37 | 38 | +1 |
+
+Notable `avm1` unlocks: `call` (0/63 → pass), `function_base_clip`
+(0/8 → pass), `goto_frame` (3/12 → pass), `goto_label` (3/17 → pass),
+`button_keypress` (1/3 → pass), `tell_target_invalid` (5/6 → pass),
+`tell_target_invalid_swf6` (4/5 → pass), `execution_order1/2/4`,
+`target_clip_removed`. Plus `movieclip_hittest_shapeflag` 193/338 →
+329/338 and several other partial improvements.
+
+The 5 sprite-over-execution regressions from `ab614b80` and the 4
+ruffle_matched → output_mismatch regressions are still present —
+they're a separate root cause (sprite stops via actionStop need to
+work inside the sprite's own scope; this widening *should* help once
+the sprite-init path queues actionStop to fire on the right
+`g_current_sprite_obj`).
+
+Remaining cluster targets (still failing in graphics-native, separate
+root causes): `swf5_to_6_cross_call`, `swf6_to_5_cross_call`,
+`register_class_swf6`, `cross_movie_root`, `lock_root`.
 
 **Exit criteria:** graphics-native pass rate within 2% of NO_GRAPHICS on every suite, OR remaining gaps documented in `_investigation/` as "expected divergence."
 
