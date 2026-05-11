@@ -213,9 +213,13 @@ Goal: the new mode compiles, links, runs tests, and produces a results file. Pas
 
 Goal: graphics-native pass rate approaches NO_GRAPHICS pass rate.
 
-**Status (2026-05-11):** **940/1125 pass (83.6%).** Pre-session smoke
-now 8/9 — `unload` remains the only smoke failure (documented partial
-in `graphics-native-test-mode-phase2-results-2026-05-09.md`).
+**Status (2026-05-11, post follow-up #5):** **948/1125 pass (84.3%).**
+Strict cross-suite parity-gap survey now down to **two tests**:
+`case-v6` (from_gnash/actionscript.all) is a CI-only flake (passes
+locally after follow-up #4); `place_and_remove_object_insane_test`
+(from_gnash/misc-ming.all) is a shared-code bug in tag.c, not
+swf.c (also fails in `--mode=graphics-headless-legacy`). Smoke set
+clean.
 
 **Session-of-2026-05-10 commits (in order):**
 - `fff977ec` — Frame-loop parity (`is_playing || manual_next_frame` gate on `funcs[current_frame]`, `processTimers`, `root_movieclip` init). Unblocked the full `from_gnash/actionscript.all` 0/190 cluster.
