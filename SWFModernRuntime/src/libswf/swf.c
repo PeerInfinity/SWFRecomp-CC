@@ -242,7 +242,18 @@ void tagMain(SWFAppContext* app_context)
 			extern int hasPlayingLevels(void);
 			extern int g_pending_mcl_load_count;
 			extern int g_pending_direct_load_count;
+			// Keep the loop alive while pre-loaded input events remain so
+			// post-quit_swf MouseMove / KeyDown / etc. still fire their AS2
+			// handlers. swf_core.c (line ~1056) and swf_headless.c (line
+			// ~1023) both gate on this. Without it, a test whose root
+			// frame_0 sets quit_swf=1 and stops all sprites exits the loop
+			// before input_events_pump_tick gets to deliver the queued
+			// events. Key test: avm1/hittest_morph_input — onRollOver
+			// queued for MouseMove (180,160) never fired.
+			extern size_t g_event_count;
+			extern size_t g_event_pos;
 			if (quit_swf
+			    && g_event_pos >= g_event_count
 			    && !actionHasEnterFrameHandlers()
 			    && !hasPlayingSprites()
 			    && !hasActiveTimers()
@@ -543,6 +554,18 @@ void tagMain(SWFAppContext* app_context)
 		// that the recompiler-emitted in-frame drain didn't cover.
 		actionDrainActionQueueByKind(app_context, AQ_KIND_SCRIPT);
 
+		// Flush deferred rollOver/rollOut events from Selection.setFocus()
+		// calls that occurred during frame scripts. These fire
+		// asynchronously (after script completes) but before input events
+		// are processed. Mirrors swf_core.c (line ~1105) / swf_headless.c
+		// (line ~1062). input_events_pump_tick also flushes between
+		// queued events, but tests with no input.json need this call to
+		// drain rolls queued by frame-script Selection.setFocus.
+		// Key test: avm1/selection_handlers — Selection.setFocus calls
+		// from script_0 queue rollOver/rollOut on text/button/clip that
+		// never fired without this.
+		actionFlushDeferredRollEvents(app_context);
+
 		// Drive file-driven test input (KEY_DOWN, MOUSE_MOVE, etc.) AFTER
 		// frame scripts have set up their listeners. Mirrors swf_core.c's
 		// placement (around line 1109). No-op when no event file is loaded.
@@ -692,6 +715,34 @@ void tagMain(SWFAppContext* app_context)
 #endif
 		if (manual_next_frame)
 		{
+#ifdef OFFSCREEN_RENDER
+			// Natural backward wrap (recompiler-emitted at end of last frame
+			// when total frame count > 1): invalidate cached MCs and clear
+			// display entries placed at frames > target so names placed only
+			// at later frames don't bleed into the next loop's frame 0.
+			// Mirrors swf_core.c (line ~1395). Goto-from-action wraps go
+			// through ng_executeGotoCatchUp / the outer catch-up loop above,
+			// which handle their own cleanup. Key test: avm1/default_names —
+			// without this, the second-iteration auto-instance counter is
+			// short by the number of stale-depth modifies that would have
+			// been fresh placements.
+			if (!goto_from_action && next_frame < current_frame)
+			{
+				extern void actionInvalidateCachedMovieClip(SWFAppContext*, const char*, int);
+				for (size_t d = 1; d <= max_depth && d < 16384; d++)
+				{
+					if (display_list[d].char_id != 0 &&
+					    display_list[d].placed_at_frame > next_frame &&
+					    display_list[d].instance_name != NULL)
+					{
+						actionInvalidateCachedMovieClip(app_context,
+						    display_list[d].instance_name, (int)d);
+					}
+				}
+				ng_display_clear_after(app_context, next_frame);
+				ng_display_cleanup_unplaced_after(app_context, next_frame);
+			}
+#endif
 			// Goto/play command set next_frame directly
 			manual_next_frame = 0;
 		}
