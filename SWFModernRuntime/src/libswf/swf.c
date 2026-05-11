@@ -230,10 +230,18 @@ void tagMain(SWFAppContext* app_context)
 		// hasn't reached its own last frame is silently abandoned. Key
 		// test: avm1/tell_target (script_3 lives on sprite_6 frame 1, so
 		// it never runs without continued ticking after quit_swf=1).
+		// Also gate on pending loadMovie / loadClip queues — otherwise
+		// loadMovie from the last root frame exits before
+		// actionFirePendingDirectLoads / actionFirePendingLoadInits get
+		// to fire the child's init+frame0 (drops the "Child movie loaded!"
+		// trace line in avm1/loadmovie and the loadmovie/loadmovienum
+		// cluster). Mirrors swf_core.c (line ~1064).
 		{
 			extern int hasPlayingSounds(void);
 			extern int hasActiveNetStreams(void);
 			extern int hasPlayingLevels(void);
+			extern int g_pending_mcl_load_count;
+			extern int g_pending_direct_load_count;
 			if (quit_swf
 			    && !actionHasEnterFrameHandlers()
 			    && !hasPlayingSprites()
@@ -241,7 +249,9 @@ void tagMain(SWFAppContext* app_context)
 			    && !hasPlayingSounds()
 			    && !hasActiveNetStreams()
 			    && !hasPlayingLevels()
-			    && !hasClipEnterFrameHandlers()) break;
+			    && !hasClipEnterFrameHandlers()
+			    && g_pending_mcl_load_count == 0
+			    && g_pending_direct_load_count == 0) break;
 		}
 #else
 		if (quit_swf) break;
@@ -257,6 +267,15 @@ void tagMain(SWFAppContext* app_context)
 
 		current_frame = next_frame;
 #ifdef OFFSCREEN_RENDER
+		// Process deferred unloadMovie state (MC properties change on
+		// next frame). Mirrors swf_core.c line ~918. Runs before
+		// pending-removal finalize so any properties cleared by
+		// unloadMovie are visible to the upcoming frame scripts.
+		{
+			extern void actionProcessDeferredUnloads(void);
+			actionProcessDeferredUnloads();
+		}
+
 		// Finalize MCs marked for pending removal in the previous frame.
 		// Mirrors swf_core.c's frame-start hook (around line 955). Without
 		// this, AS-level removeMovieClip / tag RemoveObject2 with onUnload
@@ -266,6 +285,17 @@ void tagMain(SWFAppContext* app_context)
 		{
 			extern void actionFinalizePendingRemovals(SWFAppContext* app_context);
 			actionFinalizePendingRemovals(app_context);
+		}
+
+		// Promote pending MCL loads queued during the previous tick into
+		// the "fire this tick" bucket. Mirrors swf_core.c line ~961.
+		// Without this, MovieClipLoader.loadClip events queued for the
+		// next tick never advance into the dispatch bucket and the
+		// onLoadStart / onLoadComplete / onLoadInit listeners never
+		// fire. Affects avm1/loadmovie_method, mcl_getprogress, etc.
+		{
+			extern void actionPromotePendingMCLLoads(SWFAppContext* app_context);
+			actionPromotePendingMCLLoads(app_context);
 		}
 #endif
 
@@ -484,6 +514,33 @@ void tagMain(SWFAppContext* app_context)
 			input_events_pump_tick(app_context);
 		}
 
+		// Process deferred failed-load state and direct loadMovie inits
+		// queued by this tick's frame/sprite scripts. Mirrors swf_core.c
+		// (lines ~1282-1300). Without actionFirePendingDirectLoads, a
+		// loadMovie call from frame_0 never runs the child's init+frame0
+		// — drops the "Child movie loaded!" trace line in loadmovie /
+		// loadmovie_flashvars / loadmovie_method / loadmovie_registerclass
+		// / loadmovie_replace_root / loadmovie_var_persistence and the
+		// loadmovienum cluster. Also unblocks the "After load movie:"
+		// tail of focusrect_property_swf{5,6,7}.
+		{
+			extern void actionProcessDeferredFailedLoads(void);
+			extern void actionFirePendingDirectLoads(SWFAppContext*);
+			extern int g_pending_direct_load_count;
+			actionProcessDeferredFailedLoads();
+			int dl_guard = 0;
+			while (g_pending_direct_load_count > 0 && dl_guard++ < 32)
+				actionFirePendingDirectLoads(app_context);
+		}
+
+		// Advance multi-frame _levelN loads (loadMovieNum into a level slot
+		// not in display_list — advance_sprite_frames doesn't reach those).
+		// Mirrors swf_core.c line ~1299.
+		{
+			extern void actionAdvancePlayingLevels(SWFAppContext*);
+			actionAdvancePlayingLevels(app_context);
+		}
+
 		// Mirror swf_headless.c (line ~1208) / swf_core.c (line ~1309): fire
 		// AS2 setInterval/setTimeout callbacks, LoadVars onData, and end-of-frame
 		// hooks. Without processTimers, setInterval-driven callbacks never run
@@ -495,13 +552,48 @@ void tagMain(SWFAppContext* app_context)
 		{
 			extern void processTimers(SWFAppContext*, double);
 			extern void processLoadVarsLoads(SWFAppContext*);
+			extern void processSoundPlayback(SWFAppContext*, double);
+			extern void processNetStreams(SWFAppContext*, double);
+			extern void processLocalConnectionMessages(SWFAppContext*);
 			extern void actionFlushPendingOnLoads(SWFAppContext*);
 			double frame_duration_ms = (app_context->fps > 0) ? (1000.0 / app_context->fps) : 83.33;
 			actionFlushPendingOnLoads(app_context);
 			processTimers(app_context, frame_duration_ms);
 			processLoadVarsLoads(app_context);
+			processSoundPlayback(app_context, frame_duration_ms);
+			processNetStreams(app_context, frame_duration_ms);
+			processLocalConnectionMessages(app_context);
 			actionFlushPendingOnLoads(app_context);
 		}
+
+		// Drain MCL pending loads queued during frame scripts / timers /
+		// onLoadInit chains. Mirrors swf_core.c lines ~1336-1345.
+		{
+			extern void actionFirePendingLoadInits(SWFAppContext*);
+			extern int g_pending_mcl_load_count_this_tick;
+			int mcl_guard = 0;
+			while (g_pending_mcl_load_count_this_tick > 0 && mcl_guard++ < 32)
+				actionFirePendingLoadInits(app_context);
+		}
+
+		// Last-tick MCL drain: when this is the final tick (tick_count
+		// reaches max_ticks), promote any _next_tick loads and drain so
+		// listeners get to run. Mirrors swf_core.c lines ~1353-1358.
+#ifdef MAX_FRAMES
+		if (tick_count >= max_ticks)
+		{
+			extern void actionPromotePendingMCLLoads(SWFAppContext*);
+			extern void actionFirePendingLoadInits(SWFAppContext*);
+			extern int g_pending_mcl_load_count_this_tick;
+			extern int g_pending_mcl_load_count_next_tick;
+			if (g_pending_mcl_load_count_next_tick > 0) {
+				actionPromotePendingMCLLoads(app_context);
+				int mcl_guard = 0;
+				while (g_pending_mcl_load_count_this_tick > 0 && mcl_guard++ < 32)
+					actionFirePendingLoadInits(app_context);
+			}
+		}
+#endif
 #endif
 		if (manual_next_frame)
 		{
@@ -511,9 +603,19 @@ void tagMain(SWFAppContext* app_context)
 		else if (is_playing)
 		{
 			next_frame += 1;
-			// Wrap around when reaching the end (Flash movies loop by default)
+			// Wrap around when reaching the end. SWFs loop by default in
+			// real playback; but in test mode (OFFSCREEN_RENDER), the
+			// recompiler emits its own natural-wrap as
+			// `manual_next_frame=1; next_frame=0` at the end of the last
+			// frame and pairs it with `quit_swf=1`. Auto-wrapping here on
+			// top of that re-runs frame 0 every tick whenever something
+			// else is keeping the loop alive (a playing child sprite,
+			// pending MCL load, etc.), producing duplicated trace output
+			// — the loadmovie_var_persistence cluster of failures.
+#ifndef OFFSCREEN_RENDER
 			if (next_frame >= g_frame_count)
 				next_frame = 0;
+#endif
 		}
 		// else: stopped — stay on current frame
 		bad_poll |= renderer_poll(app_context);
