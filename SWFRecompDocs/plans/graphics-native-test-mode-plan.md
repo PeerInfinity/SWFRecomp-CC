@@ -674,7 +674,7 @@ frame's DoAction. swf_core.c has an outer goto catch-up loop (line
 got cleared at end-of-tick and the next tick saw `is_playing=0` (from
 gotoAndStop) — `funcs[target]` never ran.
 
-7. **`<TBD>` — outer goto catch-up loop ported to swf.c**, placed
+7. **`3a54d056` — outer goto catch-up loop ported to swf.c**, placed
    after `input_events_pump_tick` and before deferred-load
    processing (mirrors swf_core.c's placement just before timer
    processing). Runs intermediate frames with `catch_up_mode=1`
