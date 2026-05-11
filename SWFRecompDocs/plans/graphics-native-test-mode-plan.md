@@ -660,6 +660,36 @@ Net **+19 raw pass**: 886 → 905 / 1125 (78.8% → 80.4%). Smoke set,
 NO_GRAPHICS, and previously-unlocked load/unload + case-insensitive
 tests all unchanged.
 
+#### 2026-05-11 follow-up — swf.c outer goto catch-up loop
+
+`avm1/goto_frame_number` failed in graphics-native (2/3 lines: "//
+frame 5" missing) even though all other goto handling worked. Root
+cause: `mc.gotoAndStop("/:5")` with a force_root path calls
+`ng_executeGotoTagsOnly`, which runs intermediate frames in tags-only
+mode and sets `goto_from_action + manual_next_frame +
+g_deferred_root_goto = 1` — expecting the main loop to run
+`funcs[target]` with scripts enabled to actually fire the target
+frame's DoAction. swf_core.c has an outer goto catch-up loop (line
+~1195+) that consumes this state; swf.c didn't, so manual_next_frame
+got cleared at end-of-tick and the next tick saw `is_playing=0` (from
+gotoAndStop) — `funcs[target]` never ran.
+
+7. **`<TBD>` — outer goto catch-up loop ported to swf.c**, placed
+   after `input_events_pump_tick` and before deferred-load
+   processing (mirrors swf_core.c's placement just before timer
+   processing). Runs intermediate frames with `catch_up_mode=1`
+   (scripts suppressed) then `funcs[target]` with `catch_up_mode=0`
+   (scripts enabled). Handles both forward and backward gotos with
+   the rewind / cleanup-unplaced pair on the backward branch.
+   Retry-limited to 16 iterations so a goto-inside-target-script
+   chain can't loop forever. Clears `g_deferred_root_goto` at end of
+   each iteration.
+
+Newly passing (avm1, +1): `goto_frame_number` (2→3). Total raw pass:
+905 → 906 / 1125 (80.4% → 80.5%). Smoke set unchanged
+(`goto_frame2`'s 5-line pre-existing mismatch is the same lines as
+before — not a regression from this change).
+
 **Exit criteria:** graphics-native pass rate within 2% of NO_GRAPHICS on every suite, OR remaining gaps documented in `_investigation/` as "expected divergence."
 
 ### Phase 3 — Migrate image tests + retire HEADLESS_GRAPHICS
