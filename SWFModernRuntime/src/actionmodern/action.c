@@ -28525,6 +28525,22 @@ static ActionVar builtin_mcl_unloadClip(SWFAppContext* app_context, ActionVar* a
         }
     }
 
+    // Stop the loaded child SWF's playhead. Ruffle's avm1_unload_movie calls
+    // avm1_unload + transform_to_unloaded_state synchronously for non-root
+    // targets (movie_clip_loader.rs: unload_clip). Mark the target as
+    // unloaded immediately so actionAdvancePlayingLevels skips it on this
+    // same tick (it runs after frame_func), then queue the deferred property
+    // reset that matches the Flash "MC properties change on next frame"
+    // pattern already used by the unloadMovie path. Without this, a child
+    // loaded via loadClip keeps advancing forever — e.g. avm1/mcl_unloadclip
+    // had target.swf reaching frame 10 and tracing TEST FAILURE.
+    if (target_mc != &root_movieclip) {
+        target_mc->unloaded = 1;
+        if (g_deferred_unload_mc_count < MAX_DEFERRED_UNLOADS) {
+            g_deferred_unload_mcs[g_deferred_unload_mc_count++] = target_mc;
+        }
+    }
+
     VAL(u64, &result.data.numeric_value) = 1;
     return result;
 }
