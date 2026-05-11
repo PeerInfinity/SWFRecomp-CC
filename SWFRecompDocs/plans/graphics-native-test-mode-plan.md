@@ -732,6 +732,56 @@ Combined: +3 raw avm1, +1 ruffle_matched in
 `from_gnash/misc-ming.all` (`get_frame_number_test`).
 Smoke set + all 62 input-driven avm1 tests rerun: no regressions.
 
+#### 2026-05-11 follow-up #3 — three more swf.c parity gaps with swf_core.c
+
+Three independent gotcha-#14 landings in swf.c, each filling a hole
+in OFFSCREEN_RENDER mode that swf_core.c had:
+
+- `hittest_morph_input` (0/1 → 1/1, +1): swf.c's loop-exit gate in
+  OFFSCREEN_RENDER didn't check pre-loaded input events.
+  swf_core.c (line ~1056) and swf_headless.c (line ~1023) both gate
+  on `!(g_events && g_event_pos < g_event_count)`. When the root
+  frame_0 sets `quit_swf=1` and `gotoAndStop` stops the sprite, all
+  the other "keep loop alive" conditions return false, and swf.c
+  would exit before `input_events_pump_tick` got to deliver the
+  queued MouseMove. Fix: extern `g_event_count` / `g_event_pos`
+  from input_events.c and add `g_event_pos >= g_event_count` to the
+  exit gate.
+
+- `default_names` (42/52 → 52/52, +1): swf.c's end-of-tick had no
+  natural-backward-wrap cleanup. swf_core.c (line ~1395, gated on
+  `#ifdef NO_GRAPHICS` because swf_core.c is only compiled in
+  NO_GRAPHICS) invalidates cached MCs and clears display entries
+  placed at frames > target before `current_frame = next_frame`
+  triggers a wrap-back. Without it, depth entries from the final
+  frame linger when frame 0 re-runs, so depth-replaces are treated
+  as modifies and don't claim a new auto-instance number. Fix:
+  port the cleanup block into swf.c's `if (manual_next_frame)` arm,
+  gated on `#ifdef OFFSCREEN_RENDER` (goto-from-action wraps go
+  through ng_executeGotoCatchUp / the outer catch-up loop which
+  handle their own cleanup).
+
+- `selection_handlers` (19/27 → 27/27, +1) **and 7 cluster wins**:
+  swf.c had no per-tick `actionFlushDeferredRollEvents` call.
+  swf_core.c (line ~1105) and swf_headless.c (line ~1062) both
+  flush after `actionMarkDynamicMCsEnterFrameEligible` and before
+  `input_events_pump_tick`. `Selection.setFocus` from frame
+  scripts queues virtual rollOver/rollOut on the focused MC; the
+  shared `input_events_pump_tick` (input_events.c:387) flushes
+  between events but does nothing when no input.json exists, so
+  the queue stayed full forever and the rolls never fired.
+  Adding the per-tick flush unlocked the whole input/focus
+  regression cluster in one shot: clip_event_propagation_order
+  (5/17 → 17/17), tab_ordering_events (131/150 → 150/150),
+  tab_ordering_events_mouse (5/65 → 65/65), focusrect_swf6
+  (4/42 → 42/42), key_isToggled (3/9 → 9/9), root_button_mode
+  (0/10 → 10/10), text_blocks_clicks (0/4 → 4/4).
+
+Combined: +10 raw avm1 (3 narrow misses + 7 cluster). Smoke set
+(23 tests including the recently-unlocked goto cluster + the three
+newly-passing tests) clean. Cross-suite delta from these changes
+will be reported after CI.
+
 **Exit criteria:** graphics-native pass rate within 2% of NO_GRAPHICS on every suite, OR remaining gaps documented in `_investigation/` as "expected divergence."
 
 ### Phase 3 — Migrate image tests + retire HEADLESS_GRAPHICS

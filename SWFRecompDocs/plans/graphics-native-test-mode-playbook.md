@@ -425,6 +425,65 @@ cause.
       (full pass). Look for tests that exercise `_currentframe`
       after natural frame advance with no intervening goto.
 
+    - **(2026-05-11 #3 — loop-exit gate)** — Add `g_event_pos >=
+      g_event_count` (extern'd from `input_events.c`) to swf.c's
+      OFFSCREEN_RENDER loop-exit guard at the top of `tagMain`.
+      Both `swf_core.c` (line ~1056) and `swf_headless.c` (line
+      ~1023) gate exit on `!(g_events && g_event_pos <
+      g_event_count)`. When the root frame_0 sets `quit_swf=1`
+      *and* `gotoAndStop` stops the sprite, every other "stay
+      alive" predicate returns false; without the event gate,
+      swf.c exits before `input_events_pump_tick` can deliver the
+      queued `MouseMove`. Key test: `avm1/hittest_morph_input`
+      (0/1 → 1/1; expected "hovering" trace was empty because
+      onRollOver's MouseMove never fired). Look for tests with
+      `input.json`, `num_frames` small, and an empty actual output
+      — that's the signature.
+
+    - **(2026-05-11 #3 — natural-wrap cleanup)** — Port the
+      `if (!goto_from_action && next_frame < current_frame)`
+      invalidate/clear block from swf_core.c (line ~1395) into
+      swf.c's `if (manual_next_frame)` arm, gated on
+      `#ifdef OFFSCREEN_RENDER`. swf_core.c's version is bare
+      `#ifdef NO_GRAPHICS` because that file is only ever compiled
+      in NO_GRAPHICS — semantically the cleanup is needed in any
+      mode that runs the recompiler-emitted natural wrap-back
+      (`next_frame=0; manual_next_frame=1` at end of the last
+      frame). Without it, display entries placed at frames > 0
+      survive the wrap; when frame 0 re-runs, tagPlaceObject2
+      sees the depth occupied and treats the placement as a
+      modify rather than a fresh placement, so auto-instance
+      counter increments are skipped. Key test:
+      `avm1/default_names` (42/52 → 52/52; second-iteration
+      auto-instance names short by 5 due to 5 stale-depth
+      modifies that should have been fresh placements). Look for
+      tests whose actual output drifts numerically from expected
+      after a natural wrap-back.
+
+    - **(2026-05-11 #3 — per-tick deferred-roll flush)** — Add
+      `actionFlushDeferredRollEvents(app_context)` between
+      `actionDrainActionQueueByKind(AQ_KIND_SCRIPT)` and
+      `input_events_pump_tick` in swf.c's OFFSCREEN_RENDER block.
+      `swf_core.c` (line ~1105) and `swf_headless.c` (line ~1062)
+      both have it. `Selection.setFocus` from frame scripts queues
+      virtual rollOver/rollOut on the focused MC; the shared
+      `input_events_pump_tick` (input_events.c:387) flushes
+      between events but does *nothing* when no input.json is
+      loaded, so on tests without input events the queue stays
+      full forever and the rolls never fire. **Biggest cluster
+      unlock of the session**: `avm1/selection_handlers`
+      (19/27 → 27/27) plus seven other input/focus regression
+      tests that all share this dependency:
+      `clip_event_propagation_order` (5/17 → 17/17),
+      `tab_ordering_events` (131/150 → 150/150),
+      `tab_ordering_events_mouse` (5/65 → 65/65),
+      `focusrect_swf6` (4/42 → 42/42), `key_isToggled` (3/9 → 9/9),
+      `root_button_mode` (0/10 → 10/10), `text_blocks_clicks`
+      (0/4 → 4/4). Look for clusters where focus/keyboard/tab
+      tests pass in NO_GRAPHICS + graphics-headless-legacy but
+      fail in graphics — they often share the per-tick flush
+      dependency.
+
     Companion class — **swf.c top-of-tick blocks that re-fire
     events `input_events_pump_tick` already dispatched**:
 
