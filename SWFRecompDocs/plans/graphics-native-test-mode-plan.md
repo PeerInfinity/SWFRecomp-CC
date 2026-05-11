@@ -949,7 +949,7 @@ For Phase 1:
 
 For Phase 2:
 - After each `swf.c` parity backport, re-run the suite in graphics-native mode. Track delta on the full results JSON.
-- Maintain a `swf_c_parity_backlog.md` in `ruffle-tests/tests/swfs/_investigation/` listing tests that pass in NO_GRAPHICS but fail in graphics-native, grouped by suspected root cause.
+- For the parity gap list, read each suite's CI-generated `_results/results_graphics_diff.md` — it already enumerates every test that flipped status. For non-test-status TODOs uncovered along the way (subsystem bugs, deferred refactors), add an entry to `SWFRecompDocs/BACKLOG.md`.
 
 For Phase 3:
 - Before deleting `swf_headless.c`, run `run_image_tests.py --graphics-native` and confirm pixel parity vs `--headless` baseline on every image-comparison test.
