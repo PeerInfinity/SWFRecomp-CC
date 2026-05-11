@@ -501,35 +501,55 @@ Unlocks (raw passes flipped):
 - `Inheritance-v6` (`from_gnash/actionscript.all`): runtime_error →
   segfault, 173/181 lines unchanged. Same flaky-status-flip pattern.
 
-#### 2026-05-11 follow-up — MovieClipLoader.unloadClip actually stops the loaded child SWF
+#### 2026-05-11 follow-up — unload paths stop loaded-child playhead + root url/byte_size init
 
-`builtin_mcl_unloadClip` previously only fired the target's `onUnload`
-handler; it did not stop the loaded child SWF's per-tick frame
-advancement. NO_GRAPHICS hid the bug because `swf_core.c`'s "root
-stopped, current_frame < g_frame_count" exit branch (line ~1433) breaks
-out of the main loop without consulting `hasPlayingLevels` — so once
-the test's root timeline stops, the loop exits regardless of any
-loaded-child level advancement. `swf.c`'s exit condition keys on
-`quit_swf` instead, and `quit_swf` is never set when the root simply
-stops mid-timeline — so the loaded child kept ticking via
+Three small fixes that close the gap on the "loaded child SWF keeps
+running past its unload" cluster the prior session flagged
+(`mcl_unloadclip`, `unloadmovienum`, `unload` smoke holdout). NO_GRAPHICS
+masked all three because `swf_core.c`'s "root stopped, current_frame <
+g_frame_count" exit branch (line ~1433) breaks out of the main loop
+without consulting `hasPlayingLevels` — so once a test's root timeline
+stops, the loop exits regardless of any loaded-child level advancement.
+`swf.c`'s exit gate keys on `quit_swf` instead, which is never set when
+the root just stops mid-timeline, so the loaded child kept ticking via
 `actionAdvancePlayingLevels` until it reached its own last frame.
 
-Fix: set `target_mc->unloaded = 1` immediately (matches Ruffle's
-`avm1_unload_movie` for non-root targets in
-`core/src/avm1/globals/movie_clip_loader.rs`) and queue the property
-reset via the existing `g_deferred_unload_mcs` deferred queue so
-`_totalframes` / `_currentframe` / `_url` move to the unloaded values
-on the next tick (the deferred queue is reused from the unloadMovie
-path at `action.c:40075`). `actionAdvancePlayingLevels` skips entries
-whose `mc->unloaded` is set, so the loaded child SWF stops dead on
-the same tick.
+1. **`7598d07a` — MovieClipLoader.unloadClip** (now superseded by 2,
+   below): originally set `target_mc->unloaded = 1` + queued the
+   deferred-reset queue. Refactored in (2) to the cleaner
+   `actionUnregisterLevelAdvance` path.
 
-Net **+1 raw pass**: 870 → 871 / 1125 (77.3% → 77.4%). Unlocks just
-`avm1/mcl_unloadclip` — the only test in the suite that explicitly
-exercises this code path. Smoke set + NO_GRAPHICS + the existing
-load/unload tests (`unloadmovie`, `unloadmovie_method`,
-`unload_clip_event`, `movieclip_library_state_values`,
-`MovieClipLoader-v{5,6,8}`) all unchanged.
+2. **`947b8351` — unloadMovie / unloadMovieNum / actionGetURL paths**:
+   factored out `actionUnregisterLevelAdvance(MovieClip*)` that
+   walks `g_level_advance` and nulls the entry for a given MC, and
+   called it from all three unload sites:
+   - `builtin_mcl_unloadClip` (replacing the earlier `unloaded = 1` +
+     deferred-queue pair from `7598d07a`),
+   - `actionGetURL` (both the `_level<N>` arm and the named-clip arm)
+     — the `_level` arm previously had only a "level MC persists"
+     no-op comment,
+   - `actionGetURL2` (the SWF6 `loadMovie` action with empty URL).
+   No deferred property reset is added to the `actionGetURL` arms:
+   doing so clears `totalframes` / `url` / `swf_version` on the next
+   tick and breaks `loadmovienum_cross_version_prototype`, which
+   intentionally reads level state after unload. The `actionGetURL2`
+   site keeps its existing deferred queue. Unlocks
+   `avm1/unloadmovienum` and preserves `mcl_unloadclip`,
+   `loadmovienum_cross_version_prototype`, the rest of the
+   `unloadmovie*` family, and `movieclip_library_state_values`.
+
+3. **`2d62509c` — root `url` + `byte_size` init in `swf.c`**: mirrored
+   the `#ifdef SWF_URL` / `#ifdef SWF_FILE_SIZE` block from
+   `swf_core.c` (lines ~821-827). Without this, `root._url` was empty
+   and `root.getBytesLoaded()` / `getBytesTotal()` returned 0.
+   Unlocks `avm1/get_bytes_total`.
+
+Net **+3 raw pass**: 870 → 873 / 1125 (77.3% → 77.6%). Each fix unlocks
+one test; the unload trio is a single cluster and (1)+(2) together
+close it. Smoke set + NO_GRAPHICS + the existing load/unload tests
+(`unloadmovie`, `unloadmovie_method`, `unload_clip_event`,
+`movieclip_library_state_values`, `MovieClipLoader-v{5,6,8}`,
+`loadmovienum_cross_version_prototype`) all unchanged.
 
 **Exit criteria:** graphics-native pass rate within 2% of NO_GRAPHICS on every suite, OR remaining gaps documented in `_investigation/` as "expected divergence."
 
