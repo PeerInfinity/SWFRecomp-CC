@@ -233,6 +233,43 @@ cause.
    fallthrough instead of `ng_stopCurrentSprite()`); the wrong fix is
    tightening the loop-exit gate so the over-execution gets cut off.
 
+10. **`swf.c`'s `next_frame = 0` wrap re-runs frame 0 forever in test
+    mode.** `swf.c`'s pre-`f1b087ec` `else if (is_playing) { next_frame
+    += 1; if (next_frame >= g_frame_count) next_frame = 0; }` is
+    correct for real playback (SWFs loop by default) but wrong in
+    test mode: the recompiler already emits its own natural-wrap as
+    `manual_next_frame=1; next_frame=0` at end of the last frame,
+    paired with `quit_swf=1`. Auto-wrapping on top re-runs
+    `frame_funcs[0]` every tick whenever something else keeps the
+    loop alive — a playing child sprite, a pending MCL load, a
+    pending direct loadMovie, an onEnterFrame handler, etc. Symptom
+    in the diff: the actual output is the expected output repeated
+    in N cycles, where N = `MAX_FRAMES` divided by the number of
+    expected lines (e.g. a 1-frame test that expects 8 trace lines
+    produces 6 × 8 = 48 lines at `num_ticks = 6`). Fix: gate the
+    wrap on `#ifndef OFFSCREEN_RENDER`. The existing `current_frame
+    < g_frame_count` guard at the frame-func call prevents OOB once
+    `next_frame` advances past the count. Commit `f1b087ec` unlocked
+    the full loadmovie cluster, the cross-version closure cluster
+    (`swf5_to_6_cross_call`, `swf6_to_5_cross_call`,
+    `register_class_swf6`, `cross_movie_root`, `lock_root`), and 4
+    of the 5 sprite-over-execution regressions from `ab614b80` —
+    `+51 raw pass` total.
+
+11. **Missing pending-load drain calls cause silent loadMovie
+    failures.** `swf.c` historically did not call
+    `actionFirePendingDirectLoads`, `actionPromotePendingMCLLoads`, or
+    `actionFirePendingLoadInits`, so any test that called `loadMovie`
+    / `loadMovieNum` / `MovieClipLoader.loadClip` ran the root frame
+    that issued the call but never fired the child's `init+frame0`.
+    Symptom: a test that traces something before the load and
+    something inside the child's frame_0 produces only the
+    pre-load trace lines. Mirrors `swf_core.c` lines ~1282-1345.
+    Whenever you add a new pending-load mechanism, make sure to call
+    its drain function from both `swf.c` (graphics-native) and
+    `swf_core.c` (NO_GRAPHICS) and gate the `tagMain` exit condition
+    on the corresponding pending-load count.
+
 ## Useful commands
 
 ```bash
@@ -275,10 +312,13 @@ productive moves are usually:
 - **Compile/segfault first.** A compile_fail test isn't going to start
   passing without code changes; find out which symbol is missing and
   it's likely shared by many other tests.
-- **Smoke-set-near misses.** `unload` is the only smoke failure still
+- **Smoke-set-near misses.** `unload` is still the only smoke failure
   outstanding (`tell_target_invalid` was unlocked by the 2026-05-10
-  `actionStop`/`actionGotoFrame` widening). Detailed `unload` diagnosis
-  in the Phase 2 results doc.
+  `actionStop`/`actionGotoFrame` widening; the loadmovie / cross-call
+  clusters and most of the sprite-over-execution regressions were
+  unlocked by the 2026-05-11 `next_frame`-no-wrap + pending-load drain
+  commit `f1b087ec`). Detailed `unload` diagnosis in the Phase 2
+  results doc.
 
 ## When you're stuck
 

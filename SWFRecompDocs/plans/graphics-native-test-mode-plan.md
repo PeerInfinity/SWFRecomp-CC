@@ -213,7 +213,9 @@ Goal: the new mode compiles, links, runs tests, and produces a results file. Pas
 
 Goal: graphics-native pass rate approaches NO_GRAPHICS pass rate.
 
-**Status (2026-05-10):** **817/1125 pass (72.6%).** Pre-session smoke now 8/9 — `unload` remains the only smoke failure (documented partial in `graphics-native-test-mode-phase2-results-2026-05-09.md`).
+**Status (2026-05-11):** **868/1125 pass (77.2%).** Pre-session smoke
+now 8/9 — `unload` remains the only smoke failure (documented partial
+in `graphics-native-test-mode-phase2-results-2026-05-09.md`).
 
 **Session-of-2026-05-10 commits (in order):**
 - `fff977ec` — Frame-loop parity (`is_playing || manual_next_frame` gate on `funcs[current_frame]`, `processTimers`, `root_movieclip` init). Unblocked the full `from_gnash/actionscript.all` 0/190 cluster.
@@ -349,6 +351,97 @@ the sprite-init path queues actionStop to fire on the right
 Remaining cluster targets (still failing in graphics-native, separate
 root causes): `swf5_to_6_cross_call`, `swf6_to_5_cross_call`,
 `register_class_swf6`, `cross_movie_root`, `lock_root`.
+
+#### 2026-05-11 follow-up — loadMovie drain + drop next_frame wrap (commit `f1b087ec`)
+
+Two structural backports from `swf_core.c` to `swf.c`'s tagMain, both
+gated on `OFFSCREEN_RENDER` so the wasm browser path is untouched:
+
+1. **Pending-load infrastructure.** Added at frame start:
+   `actionProcessDeferredUnloads`, `actionPromotePendingMCLLoads`.
+   Added after timers: `actionProcessDeferredFailedLoads`,
+   `actionFirePendingDirectLoads`, `actionAdvancePlayingLevels`,
+   `actionFirePendingLoadInits` drain, `processSoundPlayback`,
+   `processNetStreams`, `processLocalConnectionMessages`. Extended the
+   `quit_swf` exit gate to also wait on `g_pending_mcl_load_count` and
+   `g_pending_direct_load_count`. Plus a last-tick MCL drain that
+   promotes any `_next_tick` loads when `tick_count >= max_ticks`,
+   matching `swf_core.c` lines ~1353-1358.
+
+2. **Dropped the unconditional `next_frame = 0` wrap.** The
+   pre-existing `else if (is_playing) { next_frame += 1; if (next_frame
+   >= g_frame_count) next_frame = 0; }` is correct for real playback
+   (SWFs loop by default) but wrong in test mode: the recompiler emits
+   its own natural-wrap as `manual_next_frame=1; next_frame=0` paired
+   with `quit_swf=1`. Auto-wrapping on top re-ran `frame_0` every tick
+   whenever anything else kept the loop alive (a playing child sprite,
+   an MCL load, a deferred direct load, etc.), producing duplicated
+   trace output. The wrap is now `#ifndef OFFSCREEN_RENDER`; in
+   OFFSCREEN_RENDER mode `next_frame` is allowed to pass
+   `g_frame_count`, and the existing `current_frame < g_frame_count`
+   guard at the top of the frame-func call prevents OOB.
+
+Net **+51 raw pass**: 817 → 868 / 1125 (72.6% → 77.2%);
+-1054 mismatched lines.
+
+**Per-suite delta vs the post-`e527f410`/`f8745996` baseline:**
+
+| Suite | Pre | Post | Δ |
+|---|---:|---:|---:|
+| `avm1` | 524 | 565 | +41 |
+| `from_gnash/actionscript.all` | 125 | 125 | 0 |
+| `from_gnash/misc-ming.all` | 47 | 48 | +1 |
+| `from_gnash/misc-mtasc.all` | 7 | 7 | 0 |
+| `from_gnash/misc-swfc.all` | 6 | 6 | 0 |
+| `from_gnash/misc-swfmill.all` | 17 | 17 | 0 |
+| `from_shumway` | 53 | 58 | +5 |
+| `from_shumway/avm1` | 38 | 42 | +4 |
+| **TOTAL** | **817** | **868** | **+51** |
+
+Cluster unlocks (raw passes flipped):
+
+- Full loadMovie / loadMovieNum / MovieClipLoader cluster (~13 tests):
+  `loadmovie`, `loadmovie_flashvars`, `loadmovie_method`,
+  `loadmovie_registerclass`, `loadmovie_replace_root`,
+  `loadmovie_var_persistence`, `loadmovienum`,
+  `loadmovienum_cross_version_prototype`, `mcl_getprogress`,
+  `focusrect_property_swf5/7`, `unloadmovie`, `unloadmovienum`.
+- Cross-version closure cluster (5 tests): `swf5_to_6_cross_call`,
+  `swf6_to_5_cross_call`, `register_class_swf6`, `cross_movie_root`,
+  `lock_root`.
+- `set_interval` (17/901 → pass), `movieclip_state_values` (11/294 →
+  pass), `movieclip_invalid_get_bounds_{1..8}`, `goto_frame_number`,
+  `goto_frame2`, `key_isToggled`, `movieclip_lockroot`, and
+  ~15 other smaller tests.
+- 4 of 5 sprite-over-execution regressions from `ab614b80`
+  (`form_loader_encoding_1`, `issue_2084`, `loadmovie_replace_root`,
+  `textfield_cache_as_bitmap`); `create_empty_movie_clip` still fails.
+- Several status-flip wins: `form_loader_encoding_4` and
+  `movieclip_library_state_values` from `output_mismatch` →
+  `ruffle_matched`; `localconnection` jumped 111/579 → 433/579.
+
+**Regressions to investigate next session:**
+
+- `native_objects_swf6` (avm1): 114/115 `output_mismatch` → segfault
+  9/115 in CI. **Does NOT reproduce locally** — still 114/115
+  `output_mismatch` with the diverging line at 56 (`new TextField():
+  non-object: undefined` expected vs `native` actual). Likely
+  build-env-specific (ASan / optimization / memory layout) rather
+  than a real regression in semantic behavior.
+- `mcl_unloadclip` (avm1): `ruffle_matched` → `output_mismatch` with
+  unchanged 5/5 line count — pure categorization flip.
+- The single remaining sprite-over-execution regression
+  (`create_empty_movie_clip`) still fails.
+- `focusrect_property_swf6` still 1236/1237 (improved by +1 line but
+  not yet passing).
+
+**Remaining cluster targets** (now ~80 raw-pass gap to NO_GRAPHICS):
+the `from_gnash/misc-ming.all` long tail (~54 failures), the
+`from_shumway` long tail, the smoke-set hold-out `unload` (47/52),
+and a smaller assortment in `avm1`. The cluster-mining workflow in
+the playbook is the right tool — most large clusters are now
+unlocked, so the remaining work shifts toward per-test long-tail
+debugging.
 
 **Exit criteria:** graphics-native pass rate within 2% of NO_GRAPHICS on every suite, OR remaining gaps documented in `_investigation/` as "expected divergence."
 
