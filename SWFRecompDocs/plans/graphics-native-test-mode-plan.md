@@ -213,7 +213,7 @@ Goal: the new mode compiles, links, runs tests, and produces a results file. Pas
 
 Goal: graphics-native pass rate approaches NO_GRAPHICS pass rate.
 
-**Status (2026-05-11):** **868/1125 pass (77.2%).** Pre-session smoke
+**Status (2026-05-11):** **870/1125 pass (77.3%).** Pre-session smoke
 now 8/9 — `unload` remains the only smoke failure (documented partial
 in `graphics-native-test-mode-phase2-results-2026-05-09.md`).
 
@@ -442,6 +442,64 @@ and a smaller assortment in `avm1`. The cluster-mining workflow in
 the playbook is the right tool — most large clusters are now
 unlocked, so the remaining work shifts toward per-test long-tail
 debugging.
+
+#### 2026-05-11 follow-up — dynamic-MC enter-frame eligibility + skip post-quit drain (commit `0fcfe324`)
+
+Two changes in `swf.c`'s `tagMain`, both gated on `OFFSCREEN_RENDER`
+and both mirroring existing `swf_core.c` behavior:
+
+1. **Call `actionMarkDynamicMCsEnterFrameEligible()` at each main-loop
+   tick boundary** (after the fallback flush). Mirrors `swf_core.c`
+   line ~1100. Without this, MCs created by DoAction scripts during
+   a tick stay `mc_enterframe_eligible=0` forever, so
+   `actionDispatchEnterFrameHandlers` skips them on every subsequent
+   tick (it gates dispatch for `display_obj==NULL` MCs on this flag).
+
+2. **Skip the post-quit drain loop in `OFFSCREEN_RENDER`.**
+   `swf_core.c` has no equivalent drain loop — its main loop's
+   `quit_swf` gate already waits on all pending work, and once it
+   exits the test is done. The drain loop is for browser/emscripten
+   mode where the SWF stays alive past its timeline end to keep
+   firing handlers until the user closes the window. Running it in
+   test mode caused dynamic-MC `onEnterFrame` to fire up to
+   `MAX_FRAMES` extra times.
+
+Net **+2 raw pass**: 868 → 870 / 1125 (77.2% → 77.3%). Smaller than
+recent commits because all three structural blockers are now closed
+and remaining work is per-test long-tail.
+
+**Per-suite delta vs the post-`f1b087ec` baseline:**
+
+| Suite | Pre | Post | Δ |
+|---|---:|---:|---:|
+| `avm1` | 565 | 568 | +3 |
+| `from_gnash/actionscript.all` | 125 | 124 | -1 |
+| `from_gnash/misc-ming.all` | 48 | 48 | 0 |
+| `from_gnash/misc-mtasc.all` | 7 | 7 | 0 |
+| `from_gnash/misc-swfc.all` | 6 | 6 | 0 |
+| `from_gnash/misc-swfmill.all` | 17 | 17 | 0 |
+| `from_shumway` | 58 | 58 | 0 |
+| `from_shumway/avm1` | 42 | 42 | 0 |
+| **TOTAL** | **868** | **870** | **+2** |
+
+Unlocks (raw passes flipped):
+
+- `create_empty_movie_clip` — the last sprite-over-execution holdout
+  from `ab614b80`. mc2's `onEnterFrame` was firing 2× via the drain
+  loop instead of 1× via the main loop. Now: 1×, matches expected.
+- `button_order`, `movieclip_in_removed_button` — these had been
+  CI-flaky around the drain-loop boundary; both now passing
+  consistently.
+
+**CI-only flaky regressions** (pass locally, fail in CI):
+
+- `case-v5` (`from_gnash/actionscript.all`): pass → runtime_error
+  with 39/39 expected lines. Same build-env-specific pattern as
+  `native_objects_swf6` (passes locally, segfaults in CI). Probably
+  ASan/optimization/memory-layout sensitivity rather than a real
+  semantic regression.
+- `Inheritance-v6` (`from_gnash/actionscript.all`): runtime_error →
+  segfault, 173/181 lines unchanged. Same flaky-status-flip pattern.
 
 **Exit criteria:** graphics-native pass rate within 2% of NO_GRAPHICS on every suite, OR remaining gaps documented in `_investigation/` as "expected divergence."
 

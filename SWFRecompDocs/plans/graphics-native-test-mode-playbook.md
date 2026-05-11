@@ -270,6 +270,29 @@ cause.
     `swf_core.c` (NO_GRAPHICS) and gate the `tagMain` exit condition
     on the corresponding pending-load count.
 
+12. **`swf.c`'s post-quit drain loop dispatches `onEnterFrame`.**
+    `swf.c` ends `tagMain` with a `while (!renderer_poll())` loop
+    that calls `set_enterframe_eligible_recursive`,
+    `actionDispatchEnterFrameHandlers`,
+    `actionDispatchRootVarMapEnterFrame`, and `tagShowFrame`. In
+    browser/emscripten mode this is correct — the SWF stays alive
+    past its timeline end and keeps firing handlers until the user
+    closes the window. In OFFSCREEN_RENDER (test mode) it's wrong:
+    `swf_core.c` has no equivalent, and the drain fires up to
+    `MAX_FRAMES` extra `onEnterFrame` dispatches after `quit_swf` is
+    set. Each call to `actionDispatchEnterFrameHandlers` also marks
+    dynamic MCs eligible at the end, so the drain self-perpetuates
+    once any dynamic MC has an `onEnterFrame`. Symptom: a single
+    expected trace line repeats N times where N ≈ MAX_FRAMES (e.g.
+    `create_empty_movie_clip`'s `mc2.onEnterFrame` → 2× "correct!"
+    instead of 1×). Fix: gate the post-quit drain loop on
+    `#ifndef OFFSCREEN_RENDER`. **But also** add the matching
+    `actionMarkDynamicMCsEnterFrameEligible()` call inside the main
+    loop (swf_core.c does this at line ~1100, swf.c didn't) —
+    otherwise dynamic MCs never get their flag set and skipping the
+    drain produces 0× "correct!" instead of 1×. The two changes are
+    a pair; commit `0fcfe324` did both together.
+
 ## Useful commands
 
 ```bash
