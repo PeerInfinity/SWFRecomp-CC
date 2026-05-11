@@ -407,6 +407,50 @@ cause.
       `from_gnash/misc-ming.all/goto_frame_test` (7/15 → 9/15
       ruffle_matched). +2 raw pass net.
 
+    - **(2026-05-11 #2)** — `root_movieclip.currentframe =
+      (int)current_frame + 1;` right after `current_frame =
+      next_frame;` in the OFFSCREEN_RENDER block at the top of each
+      tick. `swf_core.c` syncs the 1-indexed AS-visible
+      `_currentframe` on both branches of its end-of-iteration
+      block (manual-goto line ~1425, natural-advance line ~1431);
+      `swf.c` never did, so pure natural advance never touched
+      `_currentframe` and scripts on frame N read whatever value
+      the last explicit goto left behind. Symptom: an early
+      `gotoAndPlay(K)` sets `_currentframe=K`, then a no-op
+      `gotoAndStop(0)` later on a different frame traces K instead
+      of the actual current frame. Key test:
+      `avm1/goto_frame2` (39/44 → 44/44),
+      `from_gnash/misc-ming.all/goto_frame_test` (now full ruffle
+      match), `from_gnash/misc-ming.all/get_frame_number_test`
+      (full pass). Look for tests that exercise `_currentframe`
+      after natural frame advance with no intervening goto.
+
+    Companion class — **swf.c top-of-tick blocks that re-fire
+    events `input_events_pump_tick` already dispatched**:
+
+    - **(2026-05-11 #2)** — Gate the entire "Per-frame AS2 input
+      dispatch" block (lines ~315-462 + trailing
+      `mouse.clicked/released = 0` clear) on `#ifndef
+      OFFSCREEN_RENDER`. The block exists for the browser-callback
+      model (JS event → set flag → top of next tick processes
+      flag). In OFFSCREEN_RENDER, `input_events_pump_tick`
+      dispatches each event synchronously AND sets
+      `mouse.clicked=1` — that flag then survives end-of-tick
+      because the clear at line ~464 runs BEFORE the pump on the
+      same tick, not after. Next tick's top re-fires the same
+      MouseDown. Same shape for keyboard. `swf_core.c` has no such
+      block — input_events_pump_tick is the only event source.
+      Key test: `avm1/click_block` (5/6 → 5/5;
+      duplicate last "Clicked at"), `avm1/removed_clip_halts_script`
+      (5/19 → 19/19; same root cause cascading into
+      pending-removal logic). Look for tests where the last
+      input event in the file is duplicated, or where a
+      handler's state machine looks like it stepped one event too
+      far. **General principle**: any swf.c block that re-reads
+      browser-callback state at top-of-tick is redundant in
+      OFFSCREEN_RENDER and should be gated off — input is purely
+      file-driven there.
+
     **Heuristic**: if you find a non-trivial block in `swf_core.c`'s
     main loop that has no counterpart in `swf.c`, it's a candidate
     for porting. The `OFFSCREEN_RENDER` define means most of the
@@ -415,7 +459,11 @@ cause.
     has its own logic for at the top of each tick). Match the
     placement against `swf_core.c`: if it's after frame-func and
     before timers in `swf_core.c`, put it in the same relative
-    position in `swf.c`.
+    position in `swf.c`. **Inverse heuristic**: if you find a
+    non-trivial block in `swf.c`'s top-of-tick that has no
+    counterpart in `swf_core.c`, suspect a browser-callback
+    leftover that double-dispatches under OFFSCREEN_RENDER —
+    gate it on `#ifndef OFFSCREEN_RENDER`.
 
 ## Useful commands
 

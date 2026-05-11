@@ -690,6 +690,48 @@ Newly passing (avm1, +1): `goto_frame_number` (2→3). Total raw pass:
 (`goto_frame2`'s 5-line pre-existing mismatch is the same lines as
 before — not a regression from this change).
 
+#### 2026-05-11 follow-up #2 — swf.c root `_currentframe` sync + redundant top-of-tick input dispatch
+
+Two narrow-miss avm1 tests cleared once their root cause was
+isolated:
+
+- `goto_frame2` (39/44 → 44/44, +1): five reads of `_currentframe`
+  after a no-op `gotoAndStop(0)` / `(-100)` / `(invalid)` / `(NaN)` /
+  `(4.123)` all returned the value from the most recent explicit goto
+  instead of the current frame. Root cause: `swf.c` advances
+  `current_frame` at the top of each tick (line ~268) but never
+  syncs `root_movieclip.currentframe` to it. `swf_core.c` does this
+  at the END of each iteration on the manual-goto branch (line
+  ~1425) AND the natural-advance branch (line ~1431). Without the
+  sync, pure natural advance never touches `_currentframe`, so frame
+  3's script reads frame 2's value. Gotcha #14 (swf.c subset of
+  swf_core.c main loop). Fixed by adding
+  `root_movieclip.currentframe = current_frame + 1` right after
+  `current_frame = next_frame;` inside the `OFFSCREEN_RENDER` block.
+
+- `click_block` (5/6 → 5/5, +1) and `removed_clip_halts_script`
+  (5/19 → 19/19, +1): swf.c's top-of-tick "Per-frame AS2 input
+  dispatch" block (lines ~315-462) reads `mouse.clicked` /
+  `mouse.released` set by the browser's JS callbacks and dispatches
+  the matching AS2 handlers. In OFFSCREEN_RENDER mode, however,
+  `input_events_pump_tick` (further down the same tick) is the
+  canonical event source — and it dispatches synchronously *and*
+  sets `mouse.clicked = 1`. The flag then survives end-of-tick (it
+  was being cleared right before frame_func, not after the pump),
+  so tick N+1's top-of-tick block re-fires the same MouseDown.
+  Click_block's last click was duplicated for this reason;
+  `removed_clip_halts_script` was hit by a related cascade. Fixed
+  by gating the entire top-of-tick AS2 input dispatch block (and
+  the trailing `mouse.clicked/released = 0` clear) on
+  `#ifndef OFFSCREEN_RENDER`. swf_core.c never had an equivalent
+  block — events fire only from `input_events_pump_tick` there —
+  so this matches the reference semantics.
+
+Combined: +3 raw avm1, +1 ruffle_matched in
+`from_gnash/misc-ming.all` (`goto_frame_test`), +1 raw in
+`from_gnash/misc-ming.all` (`get_frame_number_test`).
+Smoke set + all 62 input-driven avm1 tests rerun: no regressions.
+
 **Exit criteria:** graphics-native pass rate within 2% of NO_GRAPHICS on every suite, OR remaining gaps documented in `_investigation/` as "expected divergence."
 
 ### Phase 3 — Migrate image tests + retire HEADLESS_GRAPHICS
