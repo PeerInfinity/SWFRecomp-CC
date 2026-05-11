@@ -20076,6 +20076,27 @@ void actionRegisterLevelAdvance(MovieClip* mc, MovieEntry* entry)
 	e->current_frame = 1;
 }
 
+// Stop per-tick frame advancement for a previously-registered level/MC.
+// Called from unloadMovie/unloadMovieNum/MovieClipLoader.unloadClip — Ruffle's
+// avm1_unload_movie+transform_to_unloaded_state stops the playhead synchronously
+// for non-root targets. Our deferred-unload queue only flips `mc->unloaded` on
+// the NEXT tick (matching Flash's deferred property reset for
+// movieclip_library_state_values); without this immediate unregister, the level
+// still advances one frame after the unload call before the deferred flag kicks
+// in — enough to reach a child SWF's terminal "TEST FAILURE" frame in graphics
+// mode where the loop doesn't exit early on root stop. Key tests:
+// avm1/mcl_unloadclip, avm1/unloadmovienum.
+void actionUnregisterLevelAdvance(MovieClip* mc)
+{
+	if (mc == NULL) return;
+	for (int i = 0; i < g_level_advance_count; i++) {
+		if (g_level_advance[i].mc == mc) {
+			g_level_advance[i].mc = NULL;
+			g_level_advance[i].entry = NULL;
+		}
+	}
+}
+
 int hasPlayingLevels(void)
 {
 	for (int i = 0; i < g_level_advance_count; i++) {
@@ -27643,7 +27664,20 @@ void actionGetURL(SWFAppContext* app_context, const char* url, const char* targe
 						}
 					}
 				}
-				// Note: level MC persists (Flash behavior) — just clear content
+				// Stop per-tick level advance immediately so the loaded SWF's
+				// timeline stops on this tick (Ruffle's avm1_unload_movie is
+				// synchronous for non-root targets). Without this, the level
+				// keeps advancing one frame after the unload in graphics mode
+				// (the main loop doesn't exit early on root stop), reaching
+				// the child SWF's terminal "TEST FAILURE" trace. We do NOT
+				// queue for deferred property reset here — that would clear
+				// totalframes/url/swf_version on the next tick and regress
+				// loadmovienum_cross_version_prototype, which intentionally
+				// reads level state after unload. Note that this leaves
+				// `unloaded` and the other MC properties as-is; that's a
+				// faithful match for the current Flash-vs-Ruffle compromise.
+				// Key test: avm1/unloadmovienum.
+				actionUnregisterLevelAdvance(mc);
 			}
 			return;
 		}
@@ -27705,6 +27739,11 @@ void actionGetURL(SWFAppContext* app_context, const char* url, const char* targe
 						actionSetCurrentContext(saved);
 					}
 				}
+			}
+			// Stop per-tick level advance for the same reason as the _level
+			// path above. No deferred property reset (see comment there).
+			if (mc != NULL && mc != &root_movieclip) {
+				actionUnregisterLevelAdvance(mc);
 			}
 			return;
 		}
@@ -28525,20 +28564,17 @@ static ActionVar builtin_mcl_unloadClip(SWFAppContext* app_context, ActionVar* a
         }
     }
 
-    // Stop the loaded child SWF's playhead. Ruffle's avm1_unload_movie calls
-    // avm1_unload + transform_to_unloaded_state synchronously for non-root
-    // targets (movie_clip_loader.rs: unload_clip). Mark the target as
-    // unloaded immediately so actionAdvancePlayingLevels skips it on this
-    // same tick (it runs after frame_func), then queue the deferred property
-    // reset that matches the Flash "MC properties change on next frame"
-    // pattern already used by the unloadMovie path. Without this, a child
-    // loaded via loadClip keeps advancing forever — e.g. avm1/mcl_unloadclip
-    // had target.swf reaching frame 10 and tracing TEST FAILURE.
+    // Stop the loaded child SWF's playhead immediately. Ruffle's
+    // avm1_unload_movie calls avm1_unload + transform_to_unloaded_state
+    // synchronously for non-root targets (movie_clip_loader.rs: unload_clip).
+    // Unregister from level advance now so actionAdvancePlayingLevels (which
+    // runs later in the same tick) skips the loaded SWF. Without this, a
+    // child loaded via loadClip keeps advancing forever in graphics mode
+    // (where the main loop doesn't exit early on root stop) — e.g.
+    // avm1/mcl_unloadclip had target.swf reaching frame 10 and tracing
+    // TEST FAILURE.
     if (target_mc != &root_movieclip) {
-        target_mc->unloaded = 1;
-        if (g_deferred_unload_mc_count < MAX_DEFERRED_UNLOADS) {
-            g_deferred_unload_mcs[g_deferred_unload_mc_count++] = target_mc;
-        }
+        actionUnregisterLevelAdvance(target_mc);
     }
 
     VAL(u64, &result.data.numeric_value) = 1;
@@ -40086,6 +40122,17 @@ void actionGetURL2(SWFAppContext* app_context, u8 send_vars_method, u8 load_targ
 							actionSetCurrentContext(_ul_saved);
 						}
 					}
+				}
+				// Stop per-tick level/sprite advancement immediately. Ruffle's
+				// avm1_unload_movie does this synchronously for non-root targets.
+				// The deferred queue below only flips `unloaded` on the NEXT tick;
+				// without an immediate unregister, actionAdvancePlayingLevels still
+				// runs the loaded child's next frame this tick — enough to reach
+				// a terminal "TEST FAILURE" trace in graphics mode where the
+				// main loop doesn't exit early on root stop. Key test:
+				// avm1/unloadmovienum.
+				if (_gu2_mc != &root_movieclip) {
+					actionUnregisterLevelAdvance(_gu2_mc);
 				}
 				// Defer marking MC as unloaded until next frame (Flash defers unload state)
 				if (g_deferred_unload_mc_count < MAX_DEFERRED_UNLOADS) {
