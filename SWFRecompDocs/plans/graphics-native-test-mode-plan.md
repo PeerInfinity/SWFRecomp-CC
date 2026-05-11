@@ -544,9 +544,59 @@ the root just stops mid-timeline, so the loaded child kept ticking via
    and `root.getBytesLoaded()` / `getBytesTotal()` returned 0.
    Unlocks `avm1/get_bytes_total`.
 
-Net **+3 raw pass**: 870 → 873 / 1125 (77.3% → 77.6%). Each fix unlocks
-one test; the unload trio is a single cluster and (1)+(2) together
-close it. Smoke set + NO_GRAPHICS + the existing load/unload tests
+#### 2026-05-11 follow-up — case-insensitive display-name lookup in actionGetVariable / actionSetTarget
+
+The display-list-by-name lookup in `actionGetVariable` was gated on
+`#ifndef NO_GRAPHICS`, routing graphics-native (OFFSCREEN_RENDER)
+through `findDisplayObjectByName` in `tag.c` (case-sensitive `strcmp`).
+The NO_GRAPHICS arm uses `ng_findDisplayEntryByName`, which calls
+`swf_name_match` — case-insensitive in SWF<=6 — plus a separate
+`pending_removal` MC check beforehand.
+
+Result: in SWF6, a script like `Button.prototype.hasOwnProperty(...)`
+or `clip5._x` worked in NO_GRAPHICS because case-insensitive lookup
+hit the actual instance/pending_removal MC, but in graphics-native the
+case-sensitive miss fell through to `_global` (returning the Button
+class instead of the button instance, etc.).
+
+4. **`be795aae` — tighten the gate to `!defined(NO_GRAPHICS) &&
+   !defined(OFFSCREEN_RENDER)`** so graphics-native and NO_GRAPHICS
+   both route through the same `ng_findDisplayEntryByName` path. The
+   strcmp-based `findDisplayObjectByName` arm is left for browser-WASM
+   graphics only.
+
+5. **`b7f11901` — same gate tightening in `actionSetTarget`**: it had
+   a separate `#ifndef NO_GRAPHICS` branch that set `targeted_sprite`,
+   which is only consumed in `!NO_GRAPHICS && !OFFSCREEN_RENDER`
+   (per `targeted_sprite` memory note). In graphics-native the
+   assignment was a dead write that swallowed the lookup result and
+   prevented the downstream `getMovieClipByTarget` + var_map fallback
+   from running. Tightening to `!NO_GRAPHICS && !OFFSCREEN_RENDER` lets
+   graphics-native fall through to those fallbacks.
+
+#### Per-suite cumulative delta (`a4bcde12` → `b7f11901`)
+
+| Suite | Pre | Post | Δ |
+|---|---:|---:|---:|
+| `avm1` | 568 | 578 | +10 |
+| `from_gnash/actionscript.all` | 124 | 124 | 0 |
+| `from_gnash/misc-ming.all` | 48 | 52 | +4 |
+| `from_gnash/misc-mtasc.all` | 7 | 7 | 0 |
+| `from_gnash/misc-swfc.all` | 6 | 7 | +1 |
+| `from_gnash/misc-swfmill.all` | 17 | 17 | 0 |
+| `from_shumway` | 58 | 59 | +1 |
+| `from_shumway/avm1` | 42 | 42 | 0 |
+| **TOTAL** | **870** | **886** | **+16** |
+
+Newly passing (avm1): `mcl_unloadclip`, `unloadmovienum`,
+`get_bytes_total`, `focusrect_property_swf6`, `local_to_global`,
+`movieclip_getbounds`, `string_paths_hidden`, `swf6_case_insensitive`,
+`transform`, `unload` (smoke holdout).
+Newly passing (misc-ming): `DefineEditTextVariableNameTest` (was
+segfault), `loop/loop_test8`, `replace_shapes1test`, `shape_test`.
+
+Net **+16 raw pass**: 870 → 886 / 1125 (77.3% → 78.8%). Smoke set,
+NO_GRAPHICS, and the existing load/unload tests
 (`unloadmovie`, `unloadmovie_method`, `unload_clip_event`,
 `movieclip_library_state_values`, `MovieClipLoader-v{5,6,8}`,
 `loadmovienum_cross_version_prototype`) all unchanged.
