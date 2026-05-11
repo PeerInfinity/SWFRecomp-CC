@@ -3,23 +3,23 @@
 *Tests on the [ignored list](ruffle-tests/ignored_tests.txt) are excluded.*  
 *See [RUFFLE_RESULTS_GRAPHICS.md](RUFFLE_RESULTS_GRAPHICS.md) for unfiltered results.*
 
-**Commit:** `947b8351af9a`  
-**Date:** 2026-05-11 03:25 UTC  
-**Total duration:** 2h04m40s
+**Commit:** `be795aae226b`  
+**Date:** 2026-05-11 03:59 UTC  
+**Total duration:** 2h07m31s
 
 ## Results by Suite
 
 | Suite | Pass | Total | Rate | Report |
 |-------|-----:|------:|-----:|--------|
-| avm1 | 569 | 611 | 93.1% | [details](ruffle-tests/tests/swfs/avm1/_results/results_graphics_filtered.md) |
+| avm1 | 577 | 611 | 94.4% | [details](ruffle-tests/tests/swfs/avm1/_results/results_graphics_filtered.md) |
 | from_gnash/actionscript.all | 125 | 190 | 65.8% | [details](ruffle-tests/tests/swfs/from_gnash/actionscript.all/_results/results_graphics_filtered.md) |
-| from_gnash/misc-ming.all | 48 | 100 | 48.0% | [details](ruffle-tests/tests/swfs/from_gnash/misc-ming.all/_results/results_graphics_filtered.md) |
+| from_gnash/misc-ming.all | 52 | 100 | 52.0% | [details](ruffle-tests/tests/swfs/from_gnash/misc-ming.all/_results/results_graphics_filtered.md) |
 | from_gnash/misc-mtasc.all | 7 | 9 | 77.8% | [details](ruffle-tests/tests/swfs/from_gnash/misc-mtasc.all/_results/results_graphics_filtered.md) |
-| from_gnash/misc-swfc.all | 6 | 15 | 40.0% | [details](ruffle-tests/tests/swfs/from_gnash/misc-swfc.all/_results/results_graphics_filtered.md) |
+| from_gnash/misc-swfc.all | 7 | 15 | 46.7% | [details](ruffle-tests/tests/swfs/from_gnash/misc-swfc.all/_results/results_graphics_filtered.md) |
 | from_gnash/misc-swfmill.all | 17 | 18 | 94.4% | [details](ruffle-tests/tests/swfs/from_gnash/misc-swfmill.all/_results/results_graphics_filtered.md) |
-| from_shumway | 58 | 76 | 76.3% | [details](ruffle-tests/tests/swfs/from_shumway/_results/results_graphics_filtered.md) |
+| from_shumway | 59 | 76 | 77.6% | [details](ruffle-tests/tests/swfs/from_shumway/_results/results_graphics_filtered.md) |
 | from_shumway/avm1 | 41 | 45 | 91.1% | [details](ruffle-tests/tests/swfs/from_shumway/avm1/_results/results_graphics_filtered.md) |
-| **Total** | **871** | **1064** | **81.9%** | |
+| **Total** | **885** | **1064** | **83.2%** | |
 
 *61 tests ignored.*
 
@@ -27,29 +27,29 @@
 
 | Suite | Matching | Expected | Accuracy |
 |-------|--------:|---------:|---------:|
-| avm1 | 95,235 | 95,887 | 99.3% |
+| avm1 | 95,294 | 95,887 | 99.4% |
 | from_gnash/actionscript.all | 15,393 | 16,957 | 90.8% |
-| from_gnash/misc-ming.all | 2,834 | 4,445 | 63.8% |
+| from_gnash/misc-ming.all | 2,937 | 4,517 | 65.0% |
 | from_gnash/misc-mtasc.all | 211 | 231 | 91.3% |
-| from_gnash/misc-swfc.all | 326 | 492 | 66.3% |
+| from_gnash/misc-swfc.all | 367 | 492 | 74.6% |
 | from_gnash/misc-swfmill.all | 49 | 51 | 96.1% |
-| from_shumway | 577 | 637 | 90.6% |
+| from_shumway | 579 | 637 | 90.9% |
 | from_shumway/avm1 | 473 | 480 | 98.5% |
-| **Total** | **115,098** | **119,180** | **96.6%** |
+| **Total** | **115,303** | **119,252** | **96.7%** |
 
 ## Failure Breakdown
 
 | Suite | output_mismatch | ruffle_matched | runtime_error | segfault | timeout |
 |-------|-----------------:|----------------:|---------------:|----------:|---------:|
-| avm1 | 35 | 6 | - | - | 1 |
+| avm1 | 27 | 6 | - | - | 1 |
 | from_gnash/actionscript.all | 1 | 61 | 3 | - | - |
-| from_gnash/misc-ming.all | 32 | 17 | - | 3 | - |
+| from_gnash/misc-ming.all | 29 | 17 | - | 2 | - |
 | from_gnash/misc-mtasc.all | - | 2 | - | - | - |
-| from_gnash/misc-swfc.all | 4 | 5 | - | - | - |
+| from_gnash/misc-swfc.all | 3 | 5 | - | - | - |
 | from_gnash/misc-swfmill.all | - | 1 | - | - | - |
-| from_shumway | 15 | 3 | - | - | - |
+| from_shumway | 14 | 3 | - | - | - |
 | from_shumway/avm1 | 4 | - | - | - | - |
-| **Total** | **91** | **95** | **3** | **3** | **1** |
+| **Total** | **78** | **95** | **3** | **2** | **1** |
 
 ## Near-Passing Tests (≥80% line match)
 
@@ -60,87 +60,80 @@ Tests with `output_mismatch` status but ≥80% of expected lines matching.
 | avm1 | click_block | 100% |
 | avm1 | netstream_seek_flv | 100% |
 | from_shumway | timeline/timeline_as2_1 | 100% |
-| avm1 | focusrect_property_swf6 | 100% |
 | avm1 | sound | 99% |
-| avm1 | string_paths_hidden | 98% |
-| avm1 | swf6_case_insensitive | 98% |
 | from_gnash/actionscript.all | array-v5 | 96% |
-| from_gnash/misc-ming.all | loop/loop_test8 | 92% |
-| avm1 | unload | 90% |
 | from_gnash/misc-ming.all | get_frame_number_test | 90% |
 | avm1 | remove_movie_clip | 90% |
+| from_gnash/misc-ming.all | loading/loadMovieTest | 89% |
 | avm1 | goto_frame2 | 89% |
-| avm1 | transform | 89% |
 | avm1 | tab_ordering_events | 87% |
 | from_gnash/misc-ming.all | ResolveEventsTest | 87% |
 | from_gnash/misc-ming.all | DrawingApiTest | 86% |
-| avm1 | movieclip_getbounds | 85% |
-| from_gnash/misc-ming.all | loading/loadMovieTest | 84% |
-| avm1 | local_to_global | 84% |
 | from_gnash/misc-ming.all | action_order/action_execution_order_test8-v5 | 82% |
 | from_gnash/misc-ming.all | action_order/action_execution_order_test8-v6 | 82% |
 | from_gnash/misc-ming.all | action_order/action_execution_order_test11 | 81% |
 | avm1 | default_names | 81% |
+| avm1 | unload_nested_child | 80% |
 
 ## Per-Suite Details
 
 ### avm1
 
-- **Pass:** 569/611 (93.1%)
+- **Pass:** 577/611 (94.4%)
 - **Ignored:** 40 tests
-- **Duration:** 1h00m00s across 30 shards
-- **Lines:** 95,235/95,887 matching (99.3%)
-- **Avg test duration:** 5.4s — slowest: `timeout` (47.6s)
+- **Duration:** 1h01m45s across 30 shards
+- **Lines:** 95,294/95,887 matching (99.4%)
+- **Avg test duration:** 5.6s — slowest: `timeout` (47.7s)
 
 ### from_gnash/actionscript.all
 
 - **Pass:** 125/190 (65.8%)
-- **Duration:** 13m07s across 30 shards
+- **Duration:** 13m44s across 30 shards
 - **Lines:** 15,393/16,957 matching (90.8%)
-- **Avg test duration:** 4.1s — slowest: `BitmapData-v7` (19.4s)
+- **Avg test duration:** 4.3s — slowest: `NetConnection-v5` (22.8s)
 
 ### from_gnash/misc-ming.all
 
-- **Pass:** 48/100 (48.0%)
+- **Pass:** 52/100 (52.0%)
 - **Ignored:** 2 tests
-- **Duration:** 24m28s across 30 shards
-- **Lines:** 2,834/4,445 matching (63.8%)
-- **Avg test duration:** 14.3s — slowest: `DefineEditTextVariableNameTest` (20.5s)
+- **Duration:** 24m40s across 30 shards
+- **Lines:** 2,937/4,517 matching (65.0%)
+- **Avg test duration:** 14.4s — slowest: `matrix_test` (21.7s)
 
 ### from_gnash/misc-mtasc.all
 
 - **Pass:** 7/9 (77.8%)
-- **Duration:** 2m09s across 30 shards
+- **Duration:** 2m06s across 30 shards
 - **Lines:** 211/231 matching (91.3%)
-- **Avg test duration:** 14.3s — slowest: `exception` (19.2s)
+- **Avg test duration:** 14.0s — slowest: `TextFieldTest` (19.1s)
 
 ### from_gnash/misc-swfc.all
 
-- **Pass:** 6/15 (40.0%)
+- **Pass:** 7/15 (46.7%)
 - **Ignored:** 1 tests
-- **Duration:** 4m11s across 30 shards
-- **Lines:** 326/492 matching (66.3%)
-- **Avg test duration:** 15.5s — slowest: `edittext_test1` (19.3s)
+- **Duration:** 4m13s across 30 shards
+- **Lines:** 367/492 matching (74.6%)
+- **Avg test duration:** 15.6s — slowest: `swf4opcode` (20.7s)
 
 ### from_gnash/misc-swfmill.all
 
 - **Pass:** 17/18 (94.4%)
-- **Duration:** 5m22s across 30 shards
+- **Duration:** 5m23s across 30 shards
 - **Lines:** 49/51 matching (96.1%)
-- **Avg test duration:** 17.9s — slowest: `dict_callframe` (19.4s)
+- **Avg test duration:** 17.9s — slowest: `trace-as2/root_onload` (22.2s)
 
 ### from_shumway
 
-- **Pass:** 58/76 (76.3%)
+- **Pass:** 59/76 (77.6%)
 - **Ignored:** 16 tests
-- **Duration:** 13m40s across 30 shards
-- **Lines:** 577/637 matching (90.6%)
-- **Avg test duration:** 7.0s — slowest: `fuzz/0db0a01a92ae6ad0d2805dcfbac2ddf9a9689e77cd007924adfac57b543b1ed2` (19.9s)
+- **Duration:** 13m48s across 30 shards
+- **Lines:** 579/637 matching (90.9%)
+- **Avg test duration:** 7.2s — slowest: `avm1timeline1` (20.6s)
 
 ### from_shumway/avm1
 
 - **Pass:** 41/45 (91.1%)
 - **Ignored:** 2 tests
-- **Duration:** 1m39s across 30 shards
+- **Duration:** 1m48s across 30 shards
 - **Lines:** 473/480 matching (98.5%)
-- **Avg test duration:** 1.7s — slowest: `duplicateMovieClip/dontremove` (18.1s)
+- **Avg test duration:** 2.0s — slowest: `label` (18.3s)
