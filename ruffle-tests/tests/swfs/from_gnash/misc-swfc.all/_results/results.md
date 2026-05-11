@@ -1,8 +1,8 @@
 # Ruffle Test Results (Unfiltered)
 
-**Date**: 2026-05-11 20:06 UTC
+**Date**: 2026-05-11 21:23 UTC
 
-**Git SHA**: `ce31587cf1`
+**Git SHA**: `6beabb40c1`
 
 **Run Duration**: 0m 4s
 
@@ -48,10 +48,10 @@
 |---|------|-----------|--------------|----------|-------|
 | 1 | `action_execution_order_test10` | 12 | 14 | 0.2s |  |
 | 2 | `movieclip_destruction_test1` | 43 | 52 | 0.2s |  |
-| 3 | `opcode_guard_test2` | 5 | 5 | 0.5s |  |
+| 3 | `opcode_guard_test2` | 5 | 5 | 0.2s |  |
 | 4 | `registerclass_test3` | 12 | 20 | 0.2s |  |
 | 5 | `soft_reference_test1` | 3 | 4 | 0.2s |  |
-| 6 | `swf4opcode` | 4 | 13 | 0.2s |  |
+| 6 | `swf4opcode` | 4 | 13 | 0.1s |  |
 
 ## Near-Passing Tests
 

@@ -3,9 +3,9 @@
 *Tests on the [ignored list](ruffle-tests/ignored_tests.txt) are excluded.*  
 *See [RUFFLE_RESULTS.md](RUFFLE_RESULTS.md) for unfiltered results.*
 
-**Commit:** `ce31587cf186`  
-**Date:** 2026-05-11 20:06 UTC  
-**Total duration:** 5m01s
+**Commit:** `6beabb40c149`  
+**Date:** 2026-05-11 21:23 UTC  
+**Total duration:** 5m08s
 
 ## Results by Suite
 
@@ -75,31 +75,31 @@ Tests verified against Flash's actual output (`output.flash.txt`).
 
 - **Pass:** 604/611 (98.9%)
 - **Ignored:** 40 tests
-- **Duration:** 2m46s across 30 shards
+- **Duration:** 2m53s across 30 shards
 - **Lines:** 95,707/95,887 matching (99.8%)
 - **Avg test duration:** 0.2s — slowest: `edittext_newline_stripping` (6.5s)
 
 ### from_gnash/actionscript.all
 
 - **Pass:** 126/190 (66.3%)
-- **Duration:** 57s across 30 shards
+- **Duration:** 55s across 30 shards
 - **Lines:** 15,393/16,957 matching (90.8%)
-- **Avg test duration:** 0.2s — slowest: `ASnative-v7` (0.7s)
+- **Avg test duration:** 0.2s — slowest: `LocalConnection-v6` (0.5s)
 
 ### from_gnash/misc-ming.all
 
 - **Pass:** 66/100 (66.0%)
 - **Ignored:** 2 tests
-- **Duration:** 35s across 30 shards
+- **Duration:** 36s across 30 shards
 - **Lines:** 3,746/4,517 matching (82.9%)
-- **Avg test duration:** 0.3s — slowest: `matrix_test` (4.1s)
+- **Avg test duration:** 0.3s — slowest: `matrix_test` (4.3s)
 
 ### from_gnash/misc-mtasc.all
 
 - **Pass:** 7/9 (77.8%)
 - **Duration:** 2s across 30 shards
 - **Lines:** 211/231 matching (91.3%)
-- **Avg test duration:** 0.2s — slowest: `levels` (0.2s)
+- **Avg test duration:** 0.2s — slowest: `levels` (0.3s)
 
 ### from_gnash/misc-swfc.all
 
@@ -107,22 +107,22 @@ Tests verified against Flash's actual output (`output.flash.txt`).
 - **Ignored:** 1 tests
 - **Duration:** 4s across 30 shards
 - **Lines:** 381/492 matching (77.4%)
-- **Avg test duration:** 0.2s — slowest: `opcode_guard_test2` (0.5s)
+- **Avg test duration:** 0.2s — slowest: `movieclip_destruction_test1` (0.2s)
 
 ### from_gnash/misc-swfmill.all
 
 - **Pass:** 17/18 (94.4%)
 - **Duration:** 4s across 30 shards
 - **Lines:** 49/51 matching (96.1%)
-- **Avg test duration:** 0.2s — slowest: `initaction_in_definesprite` (0.2s)
+- **Avg test duration:** 0.2s — slowest: `trace-as2/shortstack` (0.2s)
 
 ### from_shumway
 
 - **Pass:** 73/76 (96.1%)
 - **Ignored:** 16 tests
-- **Duration:** 22s across 30 shards
+- **Duration:** 23s across 30 shards
 - **Lines:** 621/637 matching (97.5%)
-- **Avg test duration:** 0.2s — slowest: `fuzz/c8b8069c2ba2a93e50b8d8410ed73191c3bb39b75ba0749309f9e580e0525d69` (0.5s)
+- **Avg test duration:** 0.2s — slowest: `avm1/depth` (0.3s)
 
 ### from_shumway/avm1
 
@@ -130,4 +130,4 @@ Tests verified against Flash's actual output (`output.flash.txt`).
 - **Ignored:** 2 tests
 - **Duration:** 11s across 30 shards
 - **Lines:** 480/480 matching (100%)
-- **Avg test duration:** 0.2s — slowest: `doactionorder/symbolclass` (0.6s)
+- **Avg test duration:** 0.2s — slowest: `depth` (0.3s)
