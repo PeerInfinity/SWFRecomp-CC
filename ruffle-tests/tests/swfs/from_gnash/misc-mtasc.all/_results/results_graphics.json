@@ -1,29 +1,27 @@
 {
   "metadata": {
-    "timestamp": "2026-05-11T00:07:44.453995+00:00",
-    "git_sha": "f8745996297b377e532636cdd61008e88ac36998",
-    "duration_seconds": 130.44,
+    "timestamp": "2026-05-11T00:46:00.169308+00:00",
+    "git_sha": "f1b087ec6a6b69ff7536d5eb60d1ae81d595497b",
+    "duration_seconds": 8.22,
     "total_available": 9,
     "shards": 30,
     "expected_shards": 30
   },
   "total": 9,
   "pass": 7,
-  "ruffle_matched": 1,
-  "fail": 1,
+  "ruffle_matched": 2,
+  "fail": 0,
   "pass_rate": 77.8,
-  "effective_pass": 8,
-  "effective_pass_rate": 88.9,
-  "breakdown": {
-    "output_mismatch": 1
-  },
+  "effective_pass": 9,
+  "effective_pass_rate": 100.0,
+  "breakdown": {},
   "tests": [
     {
       "test": "TextFieldTest",
       "phases": {
         "recomp": 0.0,
-        "compile": 18.52,
-        "run": 0.406
+        "compile": 0.689,
+        "run": 0.526
       },
       "num_frames": 30,
       "lines": {
@@ -31,7 +29,7 @@
         "expected_lines": 8,
         "matching_lines": 7
       },
-      "duration": 18.93,
+      "duration": 1.22,
       "ruffle_diff_count": 1,
       "ours_diff_count": 1,
       "status": "ruffle_matched",
@@ -41,8 +39,8 @@
       "test": "enum",
       "phases": {
         "recomp": 0.0,
-        "compile": 17.358,
-        "run": 0.263
+        "compile": 0.637,
+        "run": 0.275
       },
       "num_frames": 30,
       "lines": {
@@ -50,15 +48,15 @@
         "expected_lines": 19,
         "matching_lines": 19
       },
-      "duration": 17.63,
+      "duration": 0.92,
       "status": "pass"
     },
     {
       "test": "exception",
       "phases": {
         "recomp": 0.0,
-        "compile": 18.031,
-        "run": 0.283
+        "compile": 0.45,
+        "run": 0.235
       },
       "num_frames": 30,
       "lines": {
@@ -66,15 +64,15 @@
         "expected_lines": 35,
         "matching_lines": 35
       },
-      "duration": 18.32,
+      "duration": 0.69,
       "status": "pass"
     },
     {
       "test": "function_test",
       "phases": {
         "recomp": 0.0,
-        "compile": 17.142,
-        "run": 0.264
+        "compile": 0.542,
+        "run": 0.299
       },
       "num_frames": 30,
       "lines": {
@@ -82,15 +80,15 @@
         "expected_lines": 26,
         "matching_lines": 26
       },
-      "duration": 17.41,
+      "duration": 0.85,
       "status": "pass"
     },
     {
       "test": "hello",
       "phases": {
         "recomp": 0.0,
-        "compile": 18.553,
-        "run": 0.287
+        "compile": 0.484,
+        "run": 0.297
       },
       "num_frames": 30,
       "lines": {
@@ -98,15 +96,15 @@
         "expected_lines": 8,
         "matching_lines": 8
       },
-      "duration": 18.85,
+      "duration": 0.79,
       "status": "pass"
     },
     {
       "test": "implementsOpTest",
       "phases": {
         "recomp": 0.0,
-        "compile": 17.201,
-        "run": 0.263
+        "compile": 0.535,
+        "run": 0.281
       },
       "num_frames": 30,
       "lines": {
@@ -114,15 +112,15 @@
         "expected_lines": 28,
         "matching_lines": 28
       },
-      "duration": 17.47,
+      "duration": 0.82,
       "status": "pass"
     },
     {
       "test": "inheritance",
       "phases": {
         "recomp": 0.0,
-        "compile": 19.02,
-        "run": 0.292
+        "compile": 0.499,
+        "run": 0.29
       },
       "num_frames": 30,
       "lines": {
@@ -130,33 +128,33 @@
         "expected_lines": 22,
         "matching_lines": 22
       },
-      "duration": 19.32,
+      "duration": 0.8,
       "status": "pass"
     },
     {
       "test": "levels",
       "phases": {
         "recomp": 0.0,
-        "compile": 0.697,
-        "run": 0.357
+        "compile": 0.498,
+        "run": 0.271
       },
       "num_frames": 30,
       "lines": {
-        "actual_lines": 90,
+        "actual_lines": 68,
         "expected_lines": 68,
-        "matching_lines": 3
+        "matching_lines": 49
       },
-      "duration": 1.06,
-      "status": "output_mismatch",
-      "detail": "87 line(s) differ (actual=90, expected=68)",
-      "actual_output": "main class running\nPASSED: -16384 == -16384  [levels.as:37]\nPASSED: _level0 == _level0  [levels.as:40]\nmain class running\nPASSED: -16384 == -16384  [levels.as:37]\nPASSED: _level0 == _level0  [levels.as:40]\nmain class running\nPASSED: -16384 == -16384  [levels.as:37]\nPASSED: _level0 == _level0  [levels.as:40]\nmain class running\nPASSED: -16384 == -16384  [levels.as:37]\nPASSED: _level0 == _level0  [levels.as:40]\nmain class running\nPASSED: -16384 == -16384  [levels.as:37]\nPASSED: _level0 == _level0  [levels.as:40]\nmain class running\nPASSED: -16384 == -16384  [levels.as:37]\nPASSED: _level0 == _level0  [levels.as:40]\nmain class running\nPASSED: -16384 == -16384  [levels.as:37]\nPASSED: _level0 == _level0  [levels.as:40]\nmain class running\nPASSED: -16384 == -16384  [levels.as:37]\nPASSED: _level0 == _level0  [levels.as:40]\nmain class running\nPASSED: -16384 == -16384  [levels.as:37]\nPASSED: _level0 == _level0  [levels.as:40]\nmain class running\nPASSED: -16384 == -16384  [levels.as:37]\nPASSED: _level0 == _level0  [levels.as:40]\nmain class running\nPASSED: -16384 == -16384  [levels.as:37]\nPASSED: _level0 == _level0  [levels.as:40]\nmain class running\nPASSED: -16384 == -16384  [levels.as:37]\nPASSED: _level0 == _level0  [levels.as:40]\nmain class running\nPASSED: -16384 == -16384  [levels.as:37]\nPASSED: _level0 == _level0  [levels.as:40]\nmain class running\nPASSED: -16384 == -16384  [levels.as:37]\nPASSED: _level0 == _level0  [levels.as:40]\nmain class running\nPASSED: -16384 == -16384  [levels.as:37]\nPASSED: _level0 == _level0  [levels.as:40]\nmain class running\nPASSED: -16384 == -16384  [levels.as:37]\nPASSED: _level0 == _level0  [levels.as:40]\nmain class running\nPASSED: -16384 == -16384  [levels.as:37]\n... (40 lines after) ...",
-      "expected_output": "main class running\nPASSED: -16384 == -16384  [levels.as:37]\nPASSED: _level0 == _level0  [levels.as:40]\nPASSED: 1 == 1  [level5.as:30]\nPASSED: _level0.frameno >= 1  [level5.as:32]\nPASSED: -16379 == -16379  [level5.as:35]\nPASSED: _level5 == _level5  [level5.as:38]\nPASSED: _level0 == _level0  [level5.as:41]\nPASSED: 1239 == 1239  [level5.as:44]\nPASSED:  ==   [level5.as:47]\nPASSED: 6789 == 6789  [level5.as:49]\nPASSED:  ==   [level5.as:52]\nPASSED: true == true  [level5.as:54]\nPASSED: _level5/ch == _level5/ch  [level5.as:79]\nPASSED: 1 == 1  [level87.as:47]\nPASSED: -16297 == -16297  [level87.as:50]\nPASSED: _level87 == _level87  [level87.as:53]\nPASSED: _level0.frameno >= 2  [level87.as:65]\nPASSED: 1 == 1  [level87.as:75]\nPASSED: 1 == 1  [level99.as:47]\nPASSED: _level0.frameno >= 2  [level99.as:49]\nPASSED: -16285 == -16285  [level99.as:52]\nPASSED: _level99 == _level99  [level99.as:55]\nPASSED: _level99 == _level99  [level99.as:56]\nPASSED: _level99.ch == _level99.ch  [level99.as:58]\nPASSED: _level99 == _level99  [level99.as:61]\nPASSED: _level0 == _level0  [level99.as:64]\nPASSED: 1239 == 1239  [level99.as:67]\nPASSED: true == true  [level99.as:68]\nPASSED: 6789 == 6789  [level99.as:71]\nPASSED:  ==   [level99.as:74]\nPASSED: hello == hello  [level99.as:76]\nPASSED:  ==   [level99.as:79]\nPASSED: goodbye == goodbye  [level99.as:81]\nPASSED: movieclip == movieclip  [level99.as:83]\nPASSED: -16379 == -16379  [level99.as:85]\nPASSED: undefined == undefined  [level99.as:87]\nPASSED: movieclip == movieclip  [level99.as:88]\nPASSED: 10 == 10  [level99.as:89]\nPASSED: _level16394 == _level16394  [level99.as:90]\nPASSED: movieclip == movieclip  [level99.as:91]\nPASSED: 10 == 10  [level99.as:93]\nPASSED: _level16394 == _level16394  [level99.as:94]\nPASSED:  ==   [level99.as:95]\nPASSED: _level5 == _level5  [level99.as:96]\nPASSED: 30 == 30  [level99.as:100]\nPASSED: _level16414 == _level16414  [level99.as:101]\nPASSED: 30 == 30  [level99.as:103]\nPASSED: _level16414 == _level16414  [level99.as:104]\nPASSED:  ==   [level99.as:105]\n... (18 lines after) ..."
+      "duration": 0.78,
+      "ruffle_diff_count": 21,
+      "ours_diff_count": 19,
+      "status": "ruffle_matched",
+      "detail": "diffs 19 \u2286 ruffle 21"
     },
     {
       "test": "super_test1",
       "phases": {
         "recomp": 0.0,
-        "compile": 0.622,
+        "compile": 0.515,
         "run": 0.281
       },
       "num_frames": 30,
@@ -165,7 +163,7 @@
         "expected_lines": 17,
         "matching_lines": 17
       },
-      "duration": 0.91,
+      "duration": 0.8,
       "status": "pass"
     }
   ]

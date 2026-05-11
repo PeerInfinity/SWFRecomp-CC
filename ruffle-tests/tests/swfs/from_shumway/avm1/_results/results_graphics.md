@@ -1,74 +1,78 @@
 # Ruffle Test Results (Unfiltered)
 
-**Date**: 2026-05-11 00:07 UTC
+**Date**: 2026-05-11 00:46 UTC
 
-**Git SHA**: `f874599629`
+**Git SHA**: `f1b087ec6a`
 
-**Run Duration**: 1m 49s
+**Run Duration**: 0m 36s
 
 ## Summary
 
 | Metric | Value |
 |--------|-------|
 | Total tests | 47 |
-| Passing | **38** (80.9%) |
+| Passing | **42** (89.4%) |
 | Ruffle-matched | 1 (diffs ⊆ Ruffle's against Flash) |
-| Effective pass | **39** (83.0%) |
-| Failing | 8 |
+| Effective pass | **43** (91.5%) |
+| Failing | 4 |
 | Total expected lines | 491 |
-| Matching lines | 467 (95.1%) |
-| Mismatched lines | 24 |
+| Matching lines | 482 (98.2%) |
+| Mismatched lines | 9 |
 
 ### Failure Breakdown
 
 | Category | Count | % of Failures |
 |----------|-------|---------------|
-| Output Mismatch | 8 | 100.0% |
+| Output Mismatch | 4 | 100.0% |
 
 ## Passing Tests
 
-**38 tests passing**
+**42 tests passing**
 
 | # | Test | Lines | Duration | Notes |
 |---|------|-------|----------|-------|
-| 1 | `array` | 7 | 0.6s |  |
-| 2 | `bitmapdata/getPixel` | 2 | 0.6s |  |
+| 1 | `array` | 7 | 0.7s |  |
+| 2 | `bitmapdata/getPixel` | 2 | 0.7s |  |
 | 3 | `bitmapdata/loadBitmap` | 3 | 0.7s |  |
 | 4 | `callee` | 2 | 0.7s |  |
-| 5 | `depth` | 6 | 0.9s |  |
-| 6 | `doactionorder/doactionorder` | 7 | 0.8s |  |
-| 7 | `doactionorder/symbolclass` | 4 | 0.7s |  |
-| 8 | `duplicateMovieClip/duplicateMovieClip` | 4 | 0.8s |  |
-| 9 | `duplicateMovieClip/name-coercion` | 3 | 0.8s |  |
+| 5 | `depth` | 6 | 0.7s |  |
+| 6 | `doactionorder/doactionorder` | 7 | 0.6s |  |
+| 7 | `doactionorder/symbolclass` | 4 | 0.8s |  |
+| 8 | `duplicateMovieClip/duplicateMovieClip` | 4 | 0.6s |  |
+| 9 | `duplicateMovieClip/name-coercion` | 3 | 0.6s |  |
 | 10 | `externalinterface` | 4 | 0.7s |  |
-| 11 | `filters` | 149 | 1.0s |  |
-| 12 | `haxe/flocons1` | 2 | 0.8s |  |
-| 13 | `haxe/flocons2` | 3 | 0.7s |  |
-| 14 | `label` | 4 | 18.4s |  |
-| 15 | `loadevent` | 9 | 0.8s |  |
-| 16 | `loadvariables/loadvariables` | 7 | 0.8s |  |
-| 17 | `loadvariables/loadvars` | 2 | 0.8s |  |
-| 18 | `lookup` | 3 | 0.8s |  |
-| 19 | `nativeinheritance` | 6 | 0.8s |  |
-| 20 | `operations` | 13 | 0.9s |  |
-| 21 | `property-paths/property-paths-6` | 6 | 0.9s |  |
-| 22 | `property-paths/property-paths-7` | 7 | 0.8s |  |
-| 23 | `propertycase/propertycase` | 7 | 0.8s |  |
-| 24 | `propertycase/propertycase-preserving-6` | 2 | 0.8s |  |
-| 25 | `propertycase/propertycase-preserving-7` | 5 | 0.8s |  |
-| 26 | `rollover` | 4 | 0.9s |  |
-| 27 | `scope` | 14 | 0.7s |  |
-| 28 | `super` | 11 | 0.8s |  |
-| 29 | `target` | 18 | 0.7s |  |
-| 30 | `text-bind` | 0 | 18.6s |  |
-| 31 | `textfield/textfield-html` | 4 | 0.8s |  |
-| 32 | `textfield/textfield-text-setters` | 8 | 0.7s |  |
-| 33 | `undefined/undefined-swf6` | 39 | 0.6s |  |
-| 34 | `undefined/undefined-swf7` | 39 | 0.8s |  |
-| 35 | `watch` | 2 | 0.8s |  |
-| 36 | `xml/xmlbuild` | 1 | 0.7s |  |
-| 37 | `xml/xmlload` | 4 | 0.7s |  |
-| 38 | `xml/xmlstring` | 9 | 0.8s |  |
+| 11 | `filters` | 149 | 0.8s |  |
+| 12 | `haxe/flocons1` | 2 | 0.7s |  |
+| 13 | `haxe/flocons2` | 3 | 0.6s |  |
+| 14 | `label` | 4 | 0.8s |  |
+| 15 | `levels` | 9 | 0.8s |  |
+| 16 | `loadevent` | 9 | 0.7s |  |
+| 17 | `loadvariables/loadvariables` | 7 | 0.8s |  |
+| 18 | `loadvariables/loadvars` | 2 | 0.7s |  |
+| 19 | `lookup` | 3 | 0.7s |  |
+| 20 | `moviecliploader` | 7 | 0.8s |  |
+| 21 | `nativeinheritance` | 6 | 0.7s |  |
+| 22 | `operations` | 13 | 0.7s |  |
+| 23 | `property-paths/property-paths-6` | 6 | 0.7s |  |
+| 24 | `property-paths/property-paths-7` | 7 | 0.7s |  |
+| 25 | `propertycase/propertycase` | 7 | 0.6s |  |
+| 26 | `propertycase/propertycase-preserving-6` | 2 | 0.6s |  |
+| 27 | `propertycase/propertycase-preserving-7` | 5 | 0.6s |  |
+| 28 | `rollover` | 4 | 0.8s |  |
+| 29 | `scope` | 14 | 0.7s |  |
+| 30 | `setinterval` | 20 | 1.0s |  |
+| 31 | `settimeout` | 17 | 0.9s |  |
+| 32 | `super` | 11 | 0.7s |  |
+| 33 | `target` | 18 | 0.7s |  |
+| 34 | `text-bind` | 0 | 0.7s |  |
+| 35 | `textfield/textfield-html` | 4 | 0.7s |  |
+| 36 | `textfield/textfield-text-setters` | 8 | 0.6s |  |
+| 37 | `undefined/undefined-swf6` | 39 | 0.7s |  |
+| 38 | `undefined/undefined-swf7` | 39 | 0.8s |  |
+| 39 | `watch` | 2 | 0.6s |  |
+| 40 | `xml/xmlbuild` | 1 | 0.5s |  |
+| 41 | `xml/xmlload` | 4 | 0.7s |  |
+| 42 | `xml/xmlstring` | 9 | 0.6s |  |
 
 ## Ruffle-Matched Tests
 
@@ -76,19 +80,18 @@
 
 | # | Test | Our diffs | Ruffle diffs | Duration | Notes |
 |---|------|-----------|--------------|----------|-------|
-| 1 | `hitarea` | 2 | 2 | 18.1s |  |
+| 1 | `hitarea` | 2 | 2 | 0.7s |  |
 
 ## Near-Passing Tests
 
 Tests with output mismatch but >= 50% line match rate (low-hanging fruit).
 
-**3 tests** within reach
+**2 tests** within reach
 
 | # | Test | Match Rate | Matching | Total | Diff Lines | Notes |
 |---|------|------------|----------|-------|------------|-------|
-| 1 | `moviecliploader` | 85.7% | 6 | 7 | 1 |  |
-| 2 | `duplicateMovieClip/samedepth` | 66.7% | 4 | 6 | 2 |  |
-| 3 | `duplicateMovieClip/dontremove` | 50.0% | 3 | 6 | 3 |  |
+| 1 | `duplicateMovieClip/samedepth` | 66.7% | 4 | 6 | 2 |  |
+| 2 | `duplicateMovieClip/dontremove` | 50.0% | 3 | 6 | 3 |  |
 
 ## Segfaults
 
@@ -104,15 +107,11 @@ No timeouts.
 
 ## All Output Mismatches
 
-**8 tests** with output mismatch, sorted by match rate (best first)
+**4 tests** with output mismatch, sorted by match rate (best first)
 
 | # | Test | Match Rate | Matching/Total | Actual | Expected | Notes |
 |---|------|------------|----------------|--------|----------|-------|
-| 1 | `moviecliploader` | 85.7% | 6/7 | 6 | 7 |  |
-| 2 | `duplicateMovieClip/samedepth` | 66.7% | 4/6 | 6 | 6 |  |
-| 3 | `duplicateMovieClip/dontremove` | 50.0% | 3/6 | 6 | 6 |  |
-| 4 | `settimeout` | 45.2% | 14/31 | 31 | 17 |  |
-| 5 | `levels` | 44.4% | 4/9 | 4 | 9 |  |
-| 6 | `setinterval` | 0.1% | 14/12719 | 12719 | 20 |  |
-| 7 | `mouse-transparency` | 0.0% | 0/1 | 0 | 1 |  |
-| 8 | `nested-button` | 0.0% | 0/1 | 0 | 1 |  |
+| 1 | `duplicateMovieClip/samedepth` | 66.7% | 4/6 | 6 | 6 |  |
+| 2 | `duplicateMovieClip/dontremove` | 50.0% | 3/6 | 6 | 6 |  |
+| 3 | `mouse-transparency` | 0.0% | 0/1 | 0 | 1 |  |
+| 4 | `nested-button` | 0.0% | 0/1 | 0 | 1 |  |
