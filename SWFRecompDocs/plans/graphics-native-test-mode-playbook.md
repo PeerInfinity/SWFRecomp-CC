@@ -377,6 +377,46 @@ cause.
     `audio.c` and `tag_stubs.c`). Audit the next session's hits
     fresh — code shifts.
 
+14. **`swf.c`'s main loop is structurally a subset of `swf_core.c`'s.**
+    `swf.c` was originally written as the browser frame loop —
+    `swf_core.c`'s test-mode infrastructure (goto catch-up,
+    pending-load drains, dynamic-MC enter-frame eligibility, etc.)
+    got bolted on incrementally. When a test passes in NO_GRAPHICS
+    + `graphics-headless-legacy` (both go through `swf_core.c` /
+    `swf_headless.c`) but fails in `--mode=graphics`, *and* gotcha
+    #13's `#ifndef NO_GRAPHICS` arm misgate isn't the cause, look
+    next at `swf.c`'s main loop for a missing block that
+    `swf_core.c` has. Walk `swf_core.c`'s main loop top-to-bottom
+    and compare each block against `swf.c` for the affected
+    test-state transition. Recent landings of this kind:
+
+    - `f1b087ec` — drop test-mode `next_frame = 0` natural wrap.
+    - `0fcfe324` — `actionMarkDynamicMCsEnterFrameEligible()` per
+      tick + skip post-quit drain loop.
+    - `3a54d056` — outer goto catch-up `while (goto_from_action &&
+      manual_next_frame)` block. Without this, scripts that defer
+      a root goto via `ng_executeGotoTagsOnly` (sets the deferred
+      state but doesn't run `funcs[target]`) leave the deferred
+      state hanging — `manual_next_frame` gets cleared at
+      end-of-tick and `is_playing=0` from gotoAndStop means the
+      next tick's frame-func check fails, so the target frame's
+      DoAction never fires. Symptom: trace output is missing the
+      target frame's lines but otherwise matches up to the goto.
+      Key test: `avm1/goto_frame_number` (2/3 → 3/3),
+      `avm1/unload_nested_child` (4/5 → 5/5),
+      `from_gnash/misc-ming.all/goto_frame_test` (7/15 → 9/15
+      ruffle_matched). +2 raw pass net.
+
+    **Heuristic**: if you find a non-trivial block in `swf_core.c`'s
+    main loop that has no counterpart in `swf.c`, it's a candidate
+    for porting. The `OFFSCREEN_RENDER` define means most of the
+    test-mode machinery can be shared verbatim; the parts that
+    can't are usually around real-time input pumping (which `swf.c`
+    has its own logic for at the top of each tick). Match the
+    placement against `swf_core.c`: if it's after frame-func and
+    before timers in `swf_core.c`, put it in the same relative
+    position in `swf.c`.
+
 ## Useful commands
 
 ```bash
