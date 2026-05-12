@@ -7481,13 +7481,25 @@ namespace SWFRecomp
 						}
 						
 						processShape(shapes.back(), paths[i].fill_styles);
-						
+
 						shapes.back().fill_style_list = paths[i].fill_style_list;
-						
+
 						if (paths[i].fill_styles[shapes.back().fill_right] == 0 && paths[i].fill_styles[!shapes.back().fill_right] != 0)
 						{
-							shapes.back().hole = true;
-							shapes.back().outer_fill = paths[i].fill_styles[!shapes.back().fill_right];
+							if (is_font)
+							{
+								// Font glyphs: a self-closed path with fill on only one side
+								// is a filled glyph, not a hole. signed_area-based fill_right
+								// picks the wrong side for some Y-down CW glyph encodings
+								// (e.g. TestFont rectangles). Flip to the side that's actually filled.
+								shapes.back().fill_right = !shapes.back().fill_right;
+								shapes.back().inner_fill = paths[i].fill_styles[shapes.back().fill_right];
+							}
+							else
+							{
+								shapes.back().hole = true;
+								shapes.back().outer_fill = paths[i].fill_styles[!shapes.back().fill_right];
+							}
 						}
 					}
 				}

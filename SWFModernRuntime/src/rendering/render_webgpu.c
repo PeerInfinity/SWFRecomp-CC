@@ -751,9 +751,13 @@ void render_webgpu_init(SWFAppContext* app_context, WebGPURenderContext* ctx)
 // ---------------------------------------------------------------------------
 static void create_buffers_and_upload(WebGPURenderContext* ctx)
 {
-	// Vertex buffer (shape geometry) — over-allocate for dynamic rendering
-	#define MAX_DYNAMIC_RECTS 256     // max color slots for dynamic rendering
-	#define MAX_DYNAMIC_VERTICES 8192 // max vertices for dynamic rendering
+	// Vertex buffer (shape geometry) — over-allocate for dynamic rendering.
+	// MAX_DYNAMIC_RECTS must accommodate the largest per-frame draw count: each
+	// dynamic createTextField with a border emits 4 draw_rect calls (one per
+	// border edge), plus one draw_tris per glyph rendered. Tests like
+	// avm1/edittext_stylesheet create 60+ text fields with borders + glyphs.
+	#define MAX_DYNAMIC_RECTS 1024    // max color slots for dynamic rendering
+	#define MAX_DYNAMIC_VERTICES 32768 // max vertices for dynamic rendering
 	{
 		u32 orig_verts = (u32)(ctx->shape_data_size / (4 * sizeof(u32)));
 		size_t extra_bytes = (size_t)MAX_DYNAMIC_VERTICES * 4 * sizeof(u32);
