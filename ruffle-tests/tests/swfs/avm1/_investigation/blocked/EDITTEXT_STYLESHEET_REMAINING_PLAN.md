@@ -3,7 +3,7 @@
 
 <!-- PLAN_META
 id: EDITTEXT_STYLESHEET_REMAINING
-status: incomplete
+status: blocked
 phases:
   - id: 1
     name: "Style preservation across styleSheet=null"
@@ -14,21 +14,30 @@ phases:
     status: complete
     impact: "~4096 outliers (3 plan cells + 5 incidental)"
   - id: 3
-    name: "Small positioning offsets"
-    status: pending
-    impact: "~249 outliers (3 cells)"
+    name: "Device-font fallback synthesizes glyphs for empty SWF font slots"
+    status: blocked
+    impact: "753 outliers (3 cells)"
 dependencies:
   - plan: CREATETEXTFIELD_RENDERING
     type: builds_on
     reason: "Glyph rendering pipeline + per-run color/font_height already wired"
-blockers: []
+blockers:
+  - reason: "Recompiler's device-font fallback (Noto Sans via stbtt) synthesises triangle data for SWF glyphs with empty shape outlines; fix requires either tracking per-glyph synthesis source or plumbing embedFonts through TextFieldGlyphInfo, with unbounded regression risk under the per-test-only rule."
 -->
 
 Last updated: 2026-05-12
 
 ## Status
 
-Trace: **325/325 PASS** (unchanged). Image: **753 outliers** (down from 16944 starting baseline, 4849 after Phase 1, now 753 after Phase 2). Failing image check (limit 0 outliers, tolerance 64 per channel). Trace status is the official pass/fail signal; image is gravy.
+Trace: **325/325 PASS** (unchanged). Image: **753 outliers** (down from 16944
+starting baseline, 4849 after Phase 1, 753 after Phase 2; Phase 3 diagnosed
+as blocked, no change). Failing image check (limit 0 outliers, tolerance 64
+per channel). Trace status is the official pass/fail signal; image is gravy.
+
+Phase 3 is now in the blocked bucket — see post-mortem below. The 753
+remaining outliers are device-font-synthesized glyphs being drawn for SWF
+font slots that should be invisible; fixing requires recompiler / runtime
+plumbing work whose blast radius can't be bounded under the per-test rule.
 
 ### Session timeline (2026-05-11 → 2026-05-12)
 
@@ -287,36 +296,94 @@ Three cells fail because we render every glyph left-justified inside `field.x + 
 
 ---
 
-## Phase 3: Small positioning offsets (~249 outliers)
+## Phase 3: Device-font fallback synthesizes glyphs for empty SWF font slots — BLOCKED / WON'T-FIX
 
-### Problem
+### Post-mortem (2026-05-12)
 
-Three cells have ~83 outliers each in a tight 10×11-pixel cluster — visually a single glyph anti-aliased differently or shifted by 1 pixel. All three cells contain literal HTML markup as plain text (e.g., `ab<font...>b</font>` with html=false, styleSheet=null) so the field renders the raw string.
+None of the plan's three candidate causes matched. The 753 outliers are not
+positioning offsets or anti-aliasing — they're an **extra curved glyph** that
+our renderer draws and Ruffle does not.
 
-| Cell | Diff cluster | Outlier shape |
-|------|--------------|---------------|
-| col0_row12 | x=35..44, y=487..497 | 10×11, mid-grey antialias values (64, 128, 255 mix) |
-| col1_row1 | x=115..124, y=47..57 | Same |
-| col1_row2 | x=115..124, y=87..97 | Same |
+The blob is roughly 9-10 px wide, teardrop/oval shaped, and appears at the
+position right after `b` in the literal text `ab<font     face="TestFont">b</font>`.
+TestFont contains only axis-aligned rectangle glyphs ('a','b','c','d' →
+filled square / thin descender bar) and empty-shape glyphs ('e','g','i','k',
+'m','o','q','space','tab','LF','CR'); the round blob cannot be from
+TestFont's own outline data.
 
-### Not yet investigated
+**Root cause.** `SWFRecomp/src/swf.cpp:1880-2042` runs a device-font
+fallback: when a SWF glyph has zero contours, it looks up the codepoint in
+Noto Sans via stbtt and synthesizes triangle + path data from the device
+font's outline. The runtime renderer (`tag.c::textfield_glyph_render_cb`)
+treats those synthesized triangles as regular glyph data and draws them.
 
-Possible causes — all need verification before picking one:
+For this test the literal field text contains an `o` (codepoint 111) at
+position 4 (`ab<font…`). TestFont's `o` is intentionally empty (TTX:
+`<TTGlyph name="o"/><!-- contains no outline data -->`), so Ruffle draws
+nothing for it. Our recompiler instead synthesized 174 vertices of Noto
+Sans `o` shape — `glyph_data[4·13+1] = 174`, offset 1098, starting with the
+curved vertices at `shape_data[1098..]`. The renderer paints this Noto
+Sans `o` at x≈114-123 (just past the visible `b` at x=97-112) — the round
+blob in the diff.
 
-1. **Glyph advance discrepancy** between our `ng_font_glyph_advance_by_idx` and what Ruffle computes from the font's HMTX table. A 1-pixel difference accumulated over ~5 glyphs would produce a 5-pixel offset on the 6th glyph. Compare advances for 'a','b','<','>','f','o','n','t' in TestFont.
-2. **Subpixel positioning** — Ruffle renders glyphs with subpixel-x positioning then anti-aliases; we render at integer pixel positions. If a glyph lands at x=42.5 in Ruffle, we put it at x=42 or x=43. Mid-grey diff values are consistent with this.
-3. **Special glyph for `<` or `>` or `"`** — TestFont may render these as different widths than our impl assumes (or may not have them at all, falling back to advance=0 vs advance=em).
+Trace pass count is unaffected (`325/325`), trace is the official signal.
 
-### Investigation steps
+### Why it's not in the plan's three candidates
 
-1. Crop expected.png to one of these cells, find the boundary between matching and mismatching pixels — pin down the exact x of the first divergent glyph.
-2. Compare the character at that position. Cross-check Ruffle's advance for that codepoint in TestFont.
-3. If it's subpixel rendering, the gap is the same as the `CREATETEXTFIELD_RENDERING` blocker (aliased tessellation vs anti-aliased raster). Mark as won't-fix.
+1. **Glyph advance discrepancy** — verified by inspecting the SWF's
+   `font_1_advances` table (`tagDefineFontMetrics` call in
+   `RecompiledTags/tagMain.c:40`): advances are 16380 twips for
+   `a,b,c,d,space,x` and 20480 twips for `e,g,i,k,m,o,q`, em_square 20480.
+   These match Ruffle's HMTX-derived advances exactly. Visible `a` and `b`
+   in the diff sit exactly where expected (x=82-97 and x=97-112). Not an
+   advance issue.
+2. **Subpixel positioning** — the round blob's per-pixel values are not
+   antialiased near-misses; centre pixels are fully black (0,0,0,255) and
+   the edges show clean alpha falloff. This is a real shape being rasterised,
+   not a subpixel-rounding artefact.
+3. **Special glyph widths for `<`, `>`, `"`** — codepoints 60, 62, 34 aren't
+   in `font_1_codes` at all, so `ng_font_find_glyph` returns -1 and the
+   renderer correctly skips them (no draw, no advance). Same as Ruffle.
 
-### Verification
+### Why this is blocked
 
-- Trace: 325/325.
-- Image: per-cell outliers → 0 (or document as anti-aliasing blocker if subpixel).
+A clean fix splits the recompiler's "all glyphs get device-font fallback"
+behaviour into two cases:
+- SWFs that have `DefineFont2`/`3` with deliberately empty glyph slots
+  (TestFont in this test) — should NOT synthesize; Ruffle treats those as
+  invisible glyphs with advance.
+- SWFs that have `DefineFontInfo` only and rely on device font for shapes
+  — should synthesize, as current.
+
+Plumbing the distinction requires either:
+1. **Recompiler side:** track per-glyph "explicitly empty in DefineFont"
+   vs "no DefineFont for this font" and only synthesize for the latter.
+   Touches `SWFRecomp/src/swf.cpp:1880-2042` and the `font_glyph_entries`
+   bookkeeping; small change to the recompiler but changes regenerated
+   output for every SWF.
+2. **Runtime side:** mark synthesized glyphs in the emitted `glyph_data`
+   (e.g. high bit of offset field) and plumb the textfield's `embedFonts`
+   flag through `TextFieldGlyphInfo` so `textfield_glyph_render_cb` can
+   skip the draw while keeping the advance. Larger surface area; touches
+   `glyph_data` layout, `TextFieldGlyphInfo` struct, and the renderer.
+
+Either fix risks regressing any other graphics-mode test whose textfield
+renders chars outside its embedded font set today — those tests currently
+benefit (cosmetically) from the synthesized Noto Sans glyphs. The local
+"per-test only" rule in this project means we can't sweep the test suite
+to bound that blast radius before committing. The trade is **753 image
+outliers across 3 cells in 1 test** vs. **uncertain regression in N
+unknown tests**. Not worth it for cosmetic-only image diffs while trace
+is 325/325.
+
+### Cross-reference
+
+The aliased-tessellation vs anti-aliased-raster issue under
+`blocked/CREATETEXTFIELD_RENDERING_PLAN.md` is a separate problem; the
+plan suggested Phase 3 might converge with it but it doesn't — that
+blocker concerns *how* glyphs rasterise, this concerns *which* glyphs
+get drawn at all. Add a "won't-fix-without-broader-scope" entry for
+both if a future pass tackles the embedFonts plumbing.
 
 ---
 
@@ -345,3 +412,5 @@ Possible causes — all need verification before picking one:
 | `~/CC/ruffle/core/src/display_object/edit_text.rs:723` | Ruffle's `set_style_sheet` reference for Phase 1 |
 | `~/CC/ruffle/core/src/html/text_format.rs:778-910` | Ruffle's tag parsing for `<p>`, `<a>`, `<li>` — Phase 2 reference |
 | `~/CC/ruffle/core/src/html/layout.rs:697` | Ruffle's `append_bullet` and alignment cursor logic — Phase 2 reference |
+| `SWFRecomp/src/swf.cpp:1880-2042` | Device-font fallback that synthesises glyph triangles via stbtt for empty SWF glyphs — Phase 3 root cause |
+| `RecompiledTags/draws.c` `glyph_data[]` | Per-glyph (tri_offset, tri_count, path_offset, path_count); empty SWF slots end up with non-zero tri_count from the fallback |

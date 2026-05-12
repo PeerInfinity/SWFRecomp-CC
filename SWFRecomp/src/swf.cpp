@@ -34,6 +34,23 @@ static unsigned char* g_device_font_data = NULL;
 
 static std::string g_device_font_path; // set from argv[0] or explicit path
 
+// Allows disabling the synthesized-glyph fallback via
+// SWFRECOMP_DEVICE_FONT_FALLBACK=0. Default is enabled (current behaviour).
+// When disabled, glyphs that the SWF defines with empty outlines stay empty —
+// the runtime renderer keeps the advance but draws nothing, matching how
+// Ruffle treats embedded fonts with deliberately-empty glyph slots.
+static bool deviceFontFallbackEnabled()
+{
+	static int cached = -1;
+	if (cached == -1) {
+		const char* v = getenv("SWFRECOMP_DEVICE_FONT_FALLBACK");
+		cached = (v && (v[0] == '0' || (v[0] == 'f' && v[1] == 'a') ||
+			(v[0] == 'F' && v[1] == 'A') || (v[0] == 'n' && v[1] == 'o') ||
+			(v[0] == 'N' && v[1] == 'O'))) ? 0 : 1;
+	}
+	return cached != 0;
+}
+
 static bool loadDeviceFont()
 {
 	if (g_device_font_loaded) return g_device_font_ok;
@@ -1876,8 +1893,11 @@ namespace SWFRecomp
 					cur_pos = font_tag_start + font_tag_length;
 				}
 
-				// Device font fallback: if glyph shapes are empty, tessellate from Noto Sans TTF
-				if (font_code_tables.count(font_id) && loadDeviceFont())
+				// Device font fallback: if glyph shapes are empty, tessellate from Noto Sans TTF.
+				// Gated by SWFRECOMP_DEVICE_FONT_FALLBACK env var (default on); disable with =0
+				// to make deliberately-empty embedded glyphs render as nothing (advance kept),
+				// matching Ruffle's embedded-font behaviour.
+				if (font_code_tables.count(font_id) && deviceFontFallbackEnabled() && loadDeviceFont())
 				{
 					float swf_em = font_em_square.count(font_id) ? font_em_square[font_id] : 1024.0f;
 					float ttf_scale = swf_em / 1000.0f; // Noto Sans EM = 1000
