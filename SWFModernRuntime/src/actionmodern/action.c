@@ -23040,6 +23040,40 @@ int actionIterateTextFieldGlyphs(TextFieldGlyphCallback cb, void* user_data)
 			text_utf8 = _tfg_utf8;
 		}
 
+		// Layout margins/indent. _tf_* dynamic props (pixels) override the
+		// DefineEditText tag values (twips); blockIndent folds into left_margin
+		// per Ruffle's `left_alignment_offset` formula. Mirrors the convention in
+		// actionTextFieldWidthOrTextWidth (action.c around line 44010).
+		s32 left_margin_twips = 0, right_margin_twips = 0, indent_twips = 0;
+		{
+			ActionVar* lm_prop = getProperty(props, "_tf_leftMargin", 14);
+			if (lm_prop != NULL && lm_prop->type == ACTION_STACK_VALUE_F64) {
+				double lm; memcpy(&lm, &lm_prop->data.numeric_value, sizeof(double));
+				left_margin_twips = (s32)(lm * 20.0);
+			} else if (mc->ng_textfield_idx >= 0) {
+				left_margin_twips = (s32)ng_getTextFieldLeftMargin(mc->ng_textfield_idx);
+			}
+			ActionVar* rm_prop = getProperty(props, "_tf_rightMargin", 15);
+			if (rm_prop != NULL && rm_prop->type == ACTION_STACK_VALUE_F64) {
+				double rm; memcpy(&rm, &rm_prop->data.numeric_value, sizeof(double));
+				right_margin_twips = (s32)(rm * 20.0);
+			} else if (mc->ng_textfield_idx >= 0) {
+				right_margin_twips = (s32)ng_getTextFieldRightMargin(mc->ng_textfield_idx);
+			}
+			ActionVar* ind_prop = getProperty(props, "_tf_indent", 10);
+			if (ind_prop != NULL && ind_prop->type == ACTION_STACK_VALUE_F64) {
+				double ind; memcpy(&ind, &ind_prop->data.numeric_value, sizeof(double));
+				indent_twips = (s32)(ind * 20.0);
+			} else if (mc->ng_textfield_idx >= 0) {
+				indent_twips = (s32)ng_getTextFieldIndent(mc->ng_textfield_idx);
+			}
+			ActionVar* bi_prop = getProperty(props, "_tf_blockIndent", 15);
+			if (bi_prop != NULL && bi_prop->type == ACTION_STACK_VALUE_F64) {
+				double bi; memcpy(&bi, &bi_prop->data.numeric_value, sizeof(double));
+				left_margin_twips += (s32)(bi * 20.0);
+			}
+		}
+
 		TextFieldGlyphInfo info;
 		info.font_id = font_id;
 		info.font_height = font_height;
@@ -23052,6 +23086,9 @@ int actionIterateTextFieldGlyphs(TextFieldGlyphCallback cb, void* user_data)
 		info.text_len = utf8_len;
 		info.runs = runs_out;
 		info.run_count = run_count_out;
+		info.left_margin_twips = left_margin_twips;
+		info.right_margin_twips = right_margin_twips;
+		info.indent_twips = indent_twips;
 
 		cb(&info, user_data);
 		count++;

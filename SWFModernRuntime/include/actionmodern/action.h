@@ -616,6 +616,11 @@ typedef struct TextFieldGlyphInfo {
     size_t text_len;      // text length in bytes
     const TextFieldGlyphRun* runs; // per-run color/font_height, NULL if none
     int run_count;
+    // Layout margins/indent in twips (left_margin already includes block_indent).
+    // s32 so we can hold s16 indent + non-negative block/left margin without overflow.
+    s32 left_margin_twips;
+    s32 right_margin_twips;
+    s32 indent_twips;
 } TextFieldGlyphInfo;
 
 typedef void (*TextFieldGlyphCallback)(const TextFieldGlyphInfo* info, void* user_data);

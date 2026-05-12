@@ -2545,24 +2545,35 @@ static void textfield_glyph_render_cb(const TextFieldGlyphInfo* info, void* user
 		par_count = cur_par;
 	}
 
-	// Compute per-paragraph x_offset = bullet_indent + alignment_offset.
+	// Compute per-paragraph x_offset = left_alignment_offset + alignment_offset.
 	// line_width matches the clip mask width (gutter-inset on both sides).
 	// Bullet indent is a fixed 36px constant — Ruffle hard-codes this in
 	// `left_alignment_offset` (core/src/html/layout.rs:759). The actual U+2022
 	// bullet glyph is positioned at +18px, but we don't draw it (the test font
 	// has no U+2022 glyph and the expected output reserves space without
 	// rendering anything visible).
+	//
+	// First-line offset = max(0, left_margin + block_indent + indent) (twips).
+	// Subsequent paragraphs after a hard newline are also "first lines" in
+	// Ruffle's model (`is_first_line = end_of_para` in layout.rs:454), so they
+	// receive the indent too. left_margin already has block_indent folded in by
+	// the iterator.
 	float line_width = info->w * 20.0f - 2.0f * gutter_twips;
+	s32 first_line_left_off = info->left_margin_twips + info->indent_twips;
+	if (first_line_left_off < 0) first_line_left_off = 0;
+	float right_off = (float)(info->right_margin_twips > 0 ? info->right_margin_twips : 0);
+	float usable_line_width = line_width - (float)first_line_left_off - right_off;
+	if (usable_line_width < 0.0f) usable_line_width = 0.0f;
 	float par_x_offset[MAX_TF_PARAGRAPHS] = {0};
 	for (int p = 0; p < par_count; p++) {
 		float bul = pars[p].bullet ? 720.0f : 0.0f;
-		float remaining = line_width - bul - pars[p].width;
+		float remaining = usable_line_width - bul - pars[p].width;
 		float offset = 0.0f;
 		if (pars[p].align == 1) offset = remaining;            // right
 		else if (pars[p].align == 2) offset = remaining * 0.5f;// center
 		// justify: fall back to left for single-glyph paragraphs
 		if (offset < 0.0f) offset = 0.0f;
-		par_x_offset[p] = bul + offset;
+		par_x_offset[p] = (float)first_line_left_off + bul + offset;
 	}
 
 	// Draw pass: same walk as measure, but pull per-paragraph x_offset at
