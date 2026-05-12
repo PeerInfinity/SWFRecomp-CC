@@ -1477,6 +1477,17 @@ static void render_single_object(SWFAppContext* app_context, DisplayObject* obj)
 				obj->transform_id, obj->cxform_id);
 			break;
 		case CHAR_TYPE_TEXT:
+#if defined(HEADLESS_GRAPHICS) || defined(OFFSCREEN_RENDER)
+			// DefineEditText reuses CHAR_TYPE_TEXT in the dictionary so the
+			// recompiler can pre-bake glyph transforms for the initial text,
+			// but the EditText is rendered dynamically via
+			// actionIterateTextFieldGlyphs (textfield_glyph_render_cb) inside
+			// the stencil-clipped field bounds. Drawing the static glyphs
+			// here too would double-render unclipped and leak the initial
+			// 'a' glyph (16x16, anchored to the field's top) up into the
+			// inter-field gap region above each field.
+			if (ng_getCharTextfieldIdx(obj->char_id) >= 0) break;
+#endif
 			for (size_t j = 0; j < ch->text_size; ++j)
 			{
 				size_t glyph_index = 4*app_context->text_data[ch->text_start + j];
@@ -1533,6 +1544,11 @@ static void render_display_list(SWFAppContext* app_context, DisplayObject* dl, s
 				break;
 
 			case CHAR_TYPE_TEXT:
+#if defined(HEADLESS_GRAPHICS) || defined(OFFSCREEN_RENDER)
+				// See render_single_object — skip static draw for EditTexts;
+				// they render dynamically via actionIterateTextFieldGlyphs.
+				if (ng_getCharTextfieldIdx(obj->char_id) >= 0) break;
+#endif
 				for (size_t j = 0; j < ch->text_size; ++j)
 				{
 					size_t glyph_index = 4*app_context->text_data[ch->text_start + j];
