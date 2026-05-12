@@ -22684,11 +22684,13 @@ static u32 tf_styled_runs_from_html(SWFAppContext* app_context, MovieClip* mc,
 		}
 	}
 
-	typedef struct { u32 color; u16 font_height; } StyleFrame;
+	typedef struct { u32 color; u16 font_height; u8 align; u8 bullet; } StyleFrame;
 	StyleFrame stack[16];
 	int sp = 0;
 	stack[0].color = default_color & 0x00FFFFFF;
 	stack[0].font_height = default_fh;
+	stack[0].align = 0;
+	stack[0].bullet = 0;
 
 	u32 out_pos = 0;
 	int run_count = 0;
@@ -22699,6 +22701,8 @@ static u32 tf_styled_runs_from_html(SWFAppContext* app_context, MovieClip* mc,
 			out_runs[run_count].byte_length = out_pos - cur_run_start; \
 			out_runs[run_count].color = stack[sp].color; \
 			out_runs[run_count].font_height = stack[sp].font_height; \
+			out_runs[run_count].align = stack[sp].align; \
+			out_runs[run_count].bullet = stack[sp].bullet; \
 			run_count++; \
 		} \
 		cur_run_start = out_pos; \
@@ -22777,11 +22781,34 @@ static u32 tf_styled_runs_from_html(SWFAppContext* app_context, MovieClip* mc,
 										double _sz; memcpy(&_sz, &_szp->data.numeric_value, sizeof(double)); \
 										if (_sz > 0) nf.font_height = (u16)(_sz * 20.0); \
 									} \
+									/* StyleSheet.transform stores the post-transform
+									 * format object with property key "align"
+									 * (lowercased "left"/"center"/"right"/"justify"),
+									 * not the raw CSS "textAlign". See
+									 * stylesheetTransform — action.c:14549.
+									 */ \
+									ActionVar* _tap = getProperty(_fmt, "align", 5); \
+									if (_tap != NULL && _tap->type == ACTION_STACK_VALUE_STRING) { \
+										const uint16_t* _tau = varGetU16Ptr(_tap); \
+										if (_tau != NULL) { \
+											char _tab[16]; \
+											u16_to_utf8(_tau, _tap->str_size, _tab, sizeof(_tab)); \
+											if (strcasecmp(_tab, "left") == 0) nf.align = 0; \
+											else if (strcasecmp(_tab, "right") == 0) nf.align = 1; \
+											else if (strcasecmp(_tab, "center") == 0) nf.align = 2; \
+											else if (strcasecmp(_tab, "justify") == 0) nf.align = 3; \
+										} \
+									} \
 									break; \
 								} \
 							} \
 						} \
 					} while (0)
+
+					// <li> allocates bullet indent before any styleSheet lookup
+					// — Ruffle sets format.bullet = Some(true) unconditionally in
+					// core/src/html/text_format.rs:910.
+					if (strcmp(tag_name, "li") == 0) nf.bullet = 1;
 
 					if (has_tag_style) APPLY_STYLE(tag_name, tag_name_len);
 
@@ -22845,6 +22872,23 @@ static u32 tf_styled_runs_from_html(SWFAppContext* app_context, MovieClip* mc,
 						} else if (strcmp(an, "size") == 0 && is_font) {
 							int sz = atoi(html + val_start);
 							if (sz > 0) nf.font_height = (u16)(sz * 20);
+						} else if (strcmp(an, "align") == 0 &&
+						           strcmp(tag_name, "p") == 0) {
+							// <p align="left|right|center|justify"> — Ruffle
+							// core/src/html/text_format.rs ~788.
+							u32 vl = val_end - val_start;
+							char av[16];
+							u32 al = vl < sizeof(av) - 1 ? vl : sizeof(av) - 1;
+							for (u32 k = 0; k < al; k++) {
+								char tc = html[val_start + k];
+								if (tc >= 'A' && tc <= 'Z') tc = (char)(tc - 'A' + 'a');
+								av[k] = tc;
+							}
+							av[al] = '\0';
+							if (strcmp(av, "left") == 0) nf.align = 0;
+							else if (strcmp(av, "right") == 0) nf.align = 1;
+							else if (strcmp(av, "center") == 0) nf.align = 2;
+							else if (strcmp(av, "justify") == 0) nf.align = 3;
 						}
 					}
 

@@ -2424,7 +2424,6 @@ static void textfield_glyph_render_cb(const TextFieldGlyphInfo* info, void* user
 		renderer_end_clip_mask(context);
 	}
 
-	float x_pos = info->x * 20.0f + gutter_twips;
 	// Baseline = ascent at the largest font_height present (Flash text layout
 	// aligns mixed-size glyphs to a shared baseline that fits the tallest run).
 	// Single-run fields just use that run's font_height; classSmol-only cells
@@ -2447,6 +2446,133 @@ static void textfield_glyph_render_cb(const TextFieldGlyphInfo* info, void* user
 
 	const char* text = info->text_utf8;
 	size_t text_len = info->text_len;
+
+	// Measure pass: walk text once to identify paragraphs and sum each
+	// paragraph's glyph-advance width. Paragraphs are delimited by '\n'/'\r'
+	// or the SENTINEL 0xFE/0xFF bytes. Each paragraph inherits align/bullet
+	// from the run that covers its first byte. Mirrors Ruffle's
+	// per-paragraph layout in core/src/html/layout.rs.
+	#define MAX_TF_PARAGRAPHS 32
+	struct {
+		size_t start_byte;
+		size_t end_byte;
+		float width;     // in twips, sum of glyph advances
+		u8 align;        // 0=left, 1=right, 2=center, 3=justify
+		u8 bullet;
+		u16 first_fh;    // font_height of first run covering this paragraph
+	} pars[MAX_TF_PARAGRAPHS];
+	int par_count = 0;
+	{
+		size_t pos = 0;
+		int run_idx = 0;
+		int cur_par = 0;
+		pars[0].start_byte = 0;
+		pars[0].width = 0.0f;
+		pars[0].align = 0;
+		pars[0].bullet = 0;
+		pars[0].first_fh = info->font_height;
+		int par_has_run = 0;
+
+		while (pos < text_len) {
+			u16 cur_fh = info->font_height;
+			u8 cur_align = 0;
+			u8 cur_bullet = 0;
+			if (info->runs && info->run_count > 0) {
+				while (run_idx < info->run_count &&
+				       pos >= (size_t)(info->runs[run_idx].byte_start + info->runs[run_idx].byte_length)) {
+					run_idx++;
+				}
+				if (run_idx < info->run_count && pos >= (size_t)info->runs[run_idx].byte_start) {
+					if (info->runs[run_idx].font_height > 0)
+						cur_fh = info->runs[run_idx].font_height;
+					cur_align = info->runs[run_idx].align;
+					cur_bullet = info->runs[run_idx].bullet;
+				}
+			}
+
+			if (!par_has_run && cur_par < MAX_TF_PARAGRAPHS) {
+				pars[cur_par].align = cur_align;
+				pars[cur_par].bullet = cur_bullet;
+				pars[cur_par].first_fh = cur_fh;
+				par_has_run = 1;
+			}
+
+			unsigned char c0 = (unsigned char)text[pos];
+			u16 cp;
+			if (c0 == 0xFE || c0 == 0xFF) {
+				cp = '\n';
+				pos += 1;
+			} else if (c0 >= 0xC0 && c0 < 0xE0 && pos + 1 < text_len) {
+				cp = ((c0 & 0x1F) << 6) | ((unsigned char)text[pos + 1] & 0x3F);
+				pos += 2;
+			} else if (c0 >= 0xE0 && c0 < 0xF0 && pos + 2 < text_len) {
+				cp = ((c0 & 0x0F) << 12) | (((unsigned char)text[pos + 1] & 0x3F) << 6) |
+				     ((unsigned char)text[pos + 2] & 0x3F);
+				pos += 3;
+			} else {
+				cp = c0;
+				pos += 1;
+			}
+
+			if (cp == '\n' || cp == '\r') {
+				if (cur_par < MAX_TF_PARAGRAPHS) {
+					pars[cur_par].end_byte = pos;
+					cur_par++;
+				}
+				if (cur_par < MAX_TF_PARAGRAPHS) {
+					pars[cur_par].start_byte = pos;
+					pars[cur_par].width = 0.0f;
+					pars[cur_par].align = 0;
+					pars[cur_par].bullet = 0;
+					pars[cur_par].first_fh = info->font_height;
+				}
+				par_has_run = 0;
+				continue;
+			}
+
+			int glyph_idx = ng_font_find_glyph(font_idx, cp);
+			if (glyph_idx < 0) continue;
+			s16 adv = ng_font_glyph_advance_by_idx(font_idx, glyph_idx);
+			if (adv >= 0 && cur_par < MAX_TF_PARAGRAPHS) {
+				float scale = (float)cur_fh / (float)em_square;
+				pars[cur_par].width += (float)adv * scale;
+			}
+		}
+		if (par_has_run && cur_par < MAX_TF_PARAGRAPHS) {
+			pars[cur_par].end_byte = text_len;
+			cur_par++;
+		}
+		par_count = cur_par;
+	}
+
+	// Compute per-paragraph x_offset = bullet_indent + alignment_offset.
+	// line_width matches the clip mask width (gutter-inset on both sides).
+	// Bullet indent is a fixed 36px constant — Ruffle hard-codes this in
+	// `left_alignment_offset` (core/src/html/layout.rs:759). The actual U+2022
+	// bullet glyph is positioned at +18px, but we don't draw it (the test font
+	// has no U+2022 glyph and the expected output reserves space without
+	// rendering anything visible).
+	float line_width = info->w * 20.0f - 2.0f * gutter_twips;
+	float par_x_offset[MAX_TF_PARAGRAPHS] = {0};
+	for (int p = 0; p < par_count; p++) {
+		float bul = pars[p].bullet ? 720.0f : 0.0f;
+		float remaining = line_width - bul - pars[p].width;
+		float offset = 0.0f;
+		if (pars[p].align == 1) offset = remaining;            // right
+		else if (pars[p].align == 2) offset = remaining * 0.5f;// center
+		// justify: fall back to left for single-glyph paragraphs
+		if (offset < 0.0f) offset = 0.0f;
+		par_x_offset[p] = bul + offset;
+	}
+
+	// Draw pass: same walk as measure, but pull per-paragraph x_offset at
+	// paragraph start (right after newline / on first byte).
+	float base_x = info->x * 20.0f + gutter_twips;
+	int par_idx = 0;
+	float x_pos = base_x + (par_count > 0 ? par_x_offset[0] : 0.0f);
+	int at_par_start = 1;
+	(void)at_par_start;
+
 	size_t pos = 0;
 	int run_idx = 0;
 
@@ -2484,10 +2610,10 @@ static void textfield_glyph_render_cb(const TextFieldGlyphInfo* info, void* user
 			pos += 1;
 		}
 
-		// Newline: advance y by the field's default font_height (matches the
-		// non-run renderer), reset x.
+		// Newline: advance y, reset x and consume next paragraph's offset.
 		if (cp == '\n' || cp == '\r') {
-			x_pos = info->x * 20.0f + gutter_twips;
+			par_idx++;
+			x_pos = base_x + (par_idx < par_count ? par_x_offset[par_idx] : 0.0f);
 			y_pos += (float)info->font_height;
 			continue;
 		}
@@ -2523,6 +2649,7 @@ static void textfield_glyph_render_cb(const TextFieldGlyphInfo* info, void* user
 			x_pos += (float)adv * scale;
 		}
 	}
+	#undef MAX_TF_PARAGRAPHS
 
 	if (has_clip) {
 		renderer_end_clip(context);

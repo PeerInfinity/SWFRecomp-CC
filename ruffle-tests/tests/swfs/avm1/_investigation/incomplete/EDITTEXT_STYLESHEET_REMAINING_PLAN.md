@@ -11,8 +11,8 @@ phases:
     impact: "~512 outliers (2 cells)"
   - id: 2
     name: "Paragraph alignment + <li> bullet indent"
-    status: pending
-    impact: "~1536 outliers (3 cells)"
+    status: complete
+    impact: "~4096 outliers (3 plan cells + 5 incidental)"
   - id: 3
     name: "Small positioning offsets"
     status: pending
@@ -28,7 +28,7 @@ Last updated: 2026-05-12
 
 ## Status
 
-Trace: **325/325 PASS** (unchanged). Image: **4849 outliers** (down from 16944 starting baseline). Failing image check (limit 0 outliers, tolerance 64 per channel). Trace status is the official pass/fail signal; image is gravy.
+Trace: **325/325 PASS** (unchanged). Image: **753 outliers** (down from 16944 starting baseline, 4849 after Phase 1, now 753 after Phase 2). Failing image check (limit 0 outliers, tolerance 64 per channel). Trace status is the official pass/fail signal; image is gravy.
 
 ### Session timeline (2026-05-11 → 2026-05-12)
 
@@ -39,7 +39,8 @@ Trace: **325/325 PASS** (unchanged). Image: **4849 outliers** (down from 16944 s
 | `21dd4499` | Stencil clip mask at field bounds (`grow_x(-GUTTER)`) — kills overflow into neighbouring fields. **16944 → 6385.** |
 | `75868d0e` | `tf_styled_runs_from_html` takes class attribute verbatim (no trim, no split on space). **6385 → 5361.** |
 | `03436e9f` + `a8b5cb8c` | `verify_output.py` saves visible diff PNGs (alpha=255 on save buffer only — don't mutate `difference_data` or per-channel counting breaks). |
-| pending  | Phase 1 landed: capture styled state at `styleSheet=null` (parse current `htmlText` with old SS, populate `TFRunTable`); invalidate `TFRunTable` on text/htmlText writes that don't repopulate. **5361 → 4849.** |
+| `3e67417a` | Phase 1 landed: capture styled state at `styleSheet=null` (parse current `htmlText` with old SS, populate `TFRunTable`); invalidate `TFRunTable` on text/htmlText writes that don't repopulate. **5361 → 4849.** |
+| pending  | Phase 2 landed: per-run `align`/`bullet` in `TextFieldGlyphRun`; CSS `align` lookup (not `textAlign` — that's the pre-transform CSS key); `<p align=...>` attribute support; renderer measure pass + per-paragraph offset; bullet indent = fixed 36 px constant. **4849 → 753.** |
 
 ## Remaining outlier distribution
 
@@ -47,9 +48,9 @@ Cells listed by location (column × row in the test grid). "Outliers" = pixels w
 
 | Cell | Outliers | Test case | Root cause |
 |------|----------|-----------|-----------|
-| col4_row1 | 512 | `<p>a</p>` with `style.p.textAlign="center"` | `<p>` alignment ignored — glyph left-aligned, expected centred. |
-| col4_row2 | 512 | `<p class="classp">a</p>` with `classp.textAlign="right"` | `<p>` alignment ignored — glyph left-aligned, expected right-aligned. |
-| col3_row12 | 512 | `<li>a</li>` with `style.li={color:"#0000FF"}` | `<li>` bullet indent not allocated — glyph at left, expected ~16px in. |
+| ~~col4_row1~~ | ~~512~~ | `<p>a</p>` with `style.p.textAlign="center"` | **FIXED (Phase 2).** Per-paragraph centre offset applied. |
+| ~~col4_row2~~ | ~~512~~ | `<p class="classp">a</p>` with `classp.textAlign="right"` | **FIXED (Phase 2).** Class rule's `align` overrides tag rule. |
+| ~~col3_row12~~ | ~~512~~ | `<li>a</li>` with `style.li={color:"#0000FF"}` | **FIXED (Phase 2).** Bullet indent = 36 px (Ruffle constant). |
 | ~~col0_row14~~ | ~~256~~ | `text.styleSheet=style; text.text='<font>...<span class=classRed>a</span></font>'; text.styleSheet=null` | **FIXED (Phase 1).** Captures styled state at SS=null. |
 | ~~col1_row3~~ | ~~256~~ | `text.styleSheet=empty; text.htmlText=HTML; text.styleSheet=style; text.styleSheet=null` | **FIXED (Phase 1).** Captures styled state at SS=null. |
 | col0_row12 | 83 | `text.htmlText='ab<font...><span class=classRed>b</span></font>'` after styleSheet=null | ~10×11 anti-aliased edge mismatch on one glyph; subpixel offset. Not yet investigated. |
@@ -175,7 +176,71 @@ Three coordinated changes:
 
 ---
 
-## Phase 2: Paragraph alignment + `<li>` bullet (~1536 outliers)
+## Phase 2: Paragraph alignment + `<li>` bullet (~1536 outliers) — DONE
+
+### Post-mortem (2026-05-12)
+
+Landed in one commit. The plan's three-cell estimate (1536 outliers) was
+short — actual drop was 4096 (4849 → 753). The extra eliminations came from
+additional cells that exercised `<p>` or `<li>` markup without explicit
+`textAlign`, where the previous left-aligned-everything rendering was
+slightly off in ways the per-channel diff counted.
+
+Two false starts worth recording:
+
+1. **The CSS property key is `align`, not `textAlign`.** My initial
+   `tf_styled_runs_from_html` extension read `textAlign` from format
+   objects in `styleSheet._styles`. Outlier count was unchanged. The
+   `StyleSheet.transform` function (action.c:14549) normalises the CSS
+   property `textAlign` into the lowercased `align` on the post-transform
+   format clone, which is what the `_styles` map stores. Once I switched
+   the lookup to `getProperty(_fmt, "align", 5)`, the two paragraph
+   alignment cells fell to 0 outliers immediately and total dropped to
+   1777.
+
+2. **Bullet width is a fixed 36 px constant, not a font-derived value.**
+   I first guessed `bullet_width = font_height` (20 px at size=20). That
+   shifted the `<li>` glyph right by ~20 px but expected was ~37 px.
+   Ruffle hard-codes the bullet indent at 36 px in
+   `core/src/html/layout.rs:759` (`Twips::from_pixels(36.0 + ...)`) —
+   independent of font size. The bullet glyph itself is placed at
+   +18 px from line start, but TestFont has no U+2022 so nothing visible
+   is drawn there and we skip rendering the bullet glyph entirely.
+   Switching to 720 twips brought field 47 (`<li>a</li>`) to exact match.
+
+**Changes:**
+
+1. `SWFModernRuntime/include/actionmodern/action.h` `TextFieldGlyphRun`:
+   added `u8 align` and `u8 bullet` fields.
+2. `action.c` `tf_styled_runs_from_html`: extended `StyleFrame` with
+   `align`/`bullet`; FLUSH_RUN copies them onto each emitted run.
+   `APPLY_STYLE` now reads the normalised `align` property (with
+   `strcasecmp` to handle "Center" etc.). `<li>` open sets `nf.bullet=1`
+   unconditionally (Ruffle text_format.rs:910). `<p>` attribute parser
+   handles `<p align="left|right|center|justify">` (text_format.rs:788).
+3. `SWFModernRuntime/src/libswf/tag.c` `textfield_glyph_render_cb`:
+   added a measure pass that walks text once to build per-paragraph
+   width/align/bullet, then computes `par_x_offset[p] = bullet_indent
+   + alignment_offset` (centre = (line_width − width)/2, right =
+   line_width − width). Draw pass starts each paragraph at
+   `base_x + par_x_offset[par_idx]` and advances on `\n`/`\r`/SENTINEL.
+   Bullet indent is a fixed 36 px (720 twips). Measurement uses the
+   same `ng_font_glyph_advance_by_idx` the draw pass uses, so the
+   right-alignment offset stays glyph-exact.
+
+**Result:** 4849 → 753 outliers (-4096, ~2.7× the plan estimate). Trace
+still 325/325. All seven smoke tests clean: `edittext_align`,
+`edittext_align_trailing_spaces_swf7/swf8`, `edittext_bullet`,
+`edittext_html_align_swf7/swf8`, `edittext_stylesheet` in NO_GRAPHICS
+mode.
+
+The remaining 753 outliers are clustered in three Phase 3 cells (col0,
+col1 small-glyph offsets) plus two stray ~1-pixel dots at (150,160) and
+(410,440). The total exceeds the plan's Phase 3 estimate of ~249 by
+~500; some of that is the cells now showing up more clearly post-Phase
+2, and ~12 pixels per Phase 3 cell appear to be near-misses around the
+edges that the per-channel counter is generous about. Phase 3 still
+"not yet investigated" per the original plan.
 
 ### Problem
 

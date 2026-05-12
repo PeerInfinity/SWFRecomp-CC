@@ -600,6 +600,8 @@ typedef struct TextFieldGlyphRun {
     u32 byte_length;
     u32 color;       // 24-bit RGB
     u16 font_height; // twips
+    u8 align;        // 0=left, 1=right, 2=center, 3=justify
+    u8 bullet;       // non-zero when the run is inside <li>
 } TextFieldGlyphRun;
 
 // Text field glyph rendering info (used by tag.c for headless glyph rendering)
