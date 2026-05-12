@@ -27658,10 +27658,10 @@ void actionGetURL(SWFAppContext* app_context, const char* url, const char* targe
 			quit_swf = 1;
 			g_force_quit = 1;
 		}
-#ifdef HEADLESS_GRAPHICS
+#if defined(HEADLESS_GRAPHICS) || defined(OFFSCREEN_RENDER)
 		else if (strcasecmp(cmd, "capture") == 0) {
-			extern void headless_on_fscommand_capture(void);
-			headless_on_fscommand_capture();
+			extern void capture_on_fscommand(void);
+			capture_on_fscommand();
 		}
 #endif
 		return;
@@ -40089,10 +40089,10 @@ void actionGetURL2(SWFAppContext* app_context, u8 send_vars_method, u8 load_targ
 				quit_swf = 1;
 				g_force_quit = 1;
 			}
-#ifdef HEADLESS_GRAPHICS
+#if defined(HEADLESS_GRAPHICS) || defined(OFFSCREEN_RENDER)
 			else if (strcasecmp(cmd, "capture") == 0) {
-				extern void headless_on_fscommand_capture(void);
-				headless_on_fscommand_capture();
+				extern void capture_on_fscommand(void);
+				capture_on_fscommand();
 			}
 #endif
 			return;

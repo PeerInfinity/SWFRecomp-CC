@@ -2540,7 +2540,7 @@ static void attached_bitmap_render_cb(const AttachedBitmapInfo* info, void* user
 
 // Re-render current display list state (for headless per-tick image capture).
 // Only does the rendering pass — no frame script processing, no sprite init, etc.
-#ifdef HEADLESS_GRAPHICS
+#if defined(HEADLESS_GRAPHICS) || defined(OFFSCREEN_RENDER)
 void tagRerenderFrame(SWFAppContext* app_context)
 {
 	if (context == NULL || !context->renderer_ok) return;
@@ -2652,8 +2652,8 @@ void tagRerenderFrame(SWFAppContext* app_context)
 	renderer_open_pass(context);
 
 #ifdef HEADLESS_RENDER_ENABLED
-	extern int headless_has_pending_captures(void);
-	if (headless_has_pending_captures())
+	extern int capture_has_pending(void);
+	if (capture_has_pending())
 		renderer_request_capture(context);
 #endif
 

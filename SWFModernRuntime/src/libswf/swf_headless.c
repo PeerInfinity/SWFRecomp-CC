@@ -21,6 +21,7 @@
 #include <utils.h>
 #include <heap.h>
 #include <renderer.h>
+#include <libswf/capture.h>
 
 // Core runtime state - exported
 int quit_swf = 0;
@@ -629,141 +630,9 @@ static void input_events_pump_tick(SWFAppContext* app_context)
     }
 }
 
-// ---------------------------------------------------------------------------
-// Frame Capture Scheduling (Phase 4)
-// Reads CAPTURE_TRIGGERS env var to determine when to save rendered frames
-// as PNG files. Format: "name:type[:value]" comma-separated.
-//   name:last_frame          — save on last rendered frame before exit
-//   name:iteration:N         — save on tick N (1-based)
-//   name:fs_command           — save when fscommand("capture") fires
-// Output directory comes from CAPTURE_OUTPUT_DIR env var (defaults to ".").
-// ---------------------------------------------------------------------------
-
-#define MAX_CAPTURES 16
-
-typedef enum {
-	CAPTURE_LAST_FRAME,
-	CAPTURE_ITERATION,
-	CAPTURE_FS_COMMAND,
-} CaptureType;
-
-typedef struct {
-	char name[128];
-	CaptureType type;
-	int iteration;   // for CAPTURE_ITERATION
-	int saved;        // 1 if already saved
-} CaptureEntry;
-
-static CaptureEntry g_captures[MAX_CAPTURES];
-static int g_capture_count = 0;
-static char g_capture_output_dir[512] = ".";
-static int g_has_last_frame_capture = 0;
-#ifdef HEADLESS_RENDER_ENABLED
-// Track the next fs_command capture index
-static int g_fscommand_capture_idx = 0;
-#endif
-
-static void parse_capture_triggers(void)
-{
-	const char* dir = getenv("CAPTURE_OUTPUT_DIR");
-	if (dir) {
-		strncpy(g_capture_output_dir, dir, sizeof(g_capture_output_dir) - 1);
-		g_capture_output_dir[sizeof(g_capture_output_dir) - 1] = '\0';
-	}
-
-	const char* env = getenv("CAPTURE_TRIGGERS");
-	if (!env || !*env) return;
-
-	// Parse comma-separated entries
-	char buf[4096];
-	strncpy(buf, env, sizeof(buf) - 1);
-	buf[sizeof(buf) - 1] = '\0';
-
-	char* saveptr = NULL;
-	for (char* token = strtok_r(buf, ",", &saveptr);
-	     token && g_capture_count < MAX_CAPTURES;
-	     token = strtok_r(NULL, ",", &saveptr))
-	{
-		CaptureEntry* e = &g_captures[g_capture_count];
-		memset(e, 0, sizeof(*e));
-
-		// Parse "name:type[:value]"
-		char* colon1 = strchr(token, ':');
-		if (!colon1) continue;
-		size_t name_len = (size_t)(colon1 - token);
-		if (name_len >= sizeof(e->name)) name_len = sizeof(e->name) - 1;
-		memcpy(e->name, token, name_len);
-		e->name[name_len] = '\0';
-
-		char* type_str = colon1 + 1;
-		if (strncmp(type_str, "last_frame", 10) == 0) {
-			e->type = CAPTURE_LAST_FRAME;
-			g_has_last_frame_capture = 1;
-		} else if (strncmp(type_str, "iteration:", 10) == 0) {
-			e->type = CAPTURE_ITERATION;
-			e->iteration = atoi(type_str + 10);
-		} else if (strncmp(type_str, "fs_command", 10) == 0) {
-			e->type = CAPTURE_FS_COMMAND;
-		} else {
-			continue;
-		}
-		g_capture_count++;
-	}
-}
-
-#ifdef HEADLESS_RENDER_ENABLED
-static void save_capture(CaptureEntry* e)
-{
-	if (e->saved) return;
-	char path[1024];
-	snprintf(path, sizeof(path), "%s/%s.png", g_capture_output_dir, e->name);
-	if (renderer_save_png(context, path))
-		fprintf(stderr, "[capture] Saved %s\n", path);
-	else
-		fprintf(stderr, "[capture] Failed to save %s\n", path);
-	e->saved = 1;
-	// Clear capture_requested so we don't keep copying to readback buffer
-	// unless another capture still needs it (e.g., last_frame keeps going)
-	int still_need_capture = 0;
-	for (int i = 0; i < g_capture_count; i++) {
-		if (!g_captures[i].saved && (g_captures[i].type == CAPTURE_LAST_FRAME ||
-		    g_captures[i].type == CAPTURE_FS_COMMAND))
-			still_need_capture = 1;
-	}
-	if (!still_need_capture)
-		context->capture_requested = 0;
-}
-
-// Index of the next fs_command capture to fire (-1 = none pending)
-static int g_fscommand_pending = -1;
-
-// Check if any captures remain unsaved for this tick (used by tagRerenderFrame).
-int headless_has_pending_captures(void)
-{
-	for (int i = 0; i < g_capture_count; i++) {
-		if (!g_captures[i].saved) return 1;
-	}
-	return 0;
-}
-#endif
-
-// Called from actionFSCommand when fscommand("capture", ...) fires.
-// This runs BEFORE tagShowFrame in the same tick (DoAction precedes ShowFrame),
-// so requesting capture here means close_pass will copy to the readback buffer.
-void headless_on_fscommand_capture(void)
-{
-#ifdef HEADLESS_RENDER_ENABLED
-	if (!context || !context->renderer_ok) return;
-	for (int i = g_fscommand_capture_idx; i < g_capture_count; i++) {
-		if (g_captures[i].type == CAPTURE_FS_COMMAND && !g_captures[i].saved) {
-			renderer_request_capture(context);
-			g_fscommand_pending = i;
-			g_fscommand_capture_idx = i + 1;
-			return;
-		}
-	}
-#endif
-}
+// Frame-capture machinery (parse_capture_triggers, capture_tick_*,
+// capture_on_fscommand, capture_has_pending) now lives in capture.c and is
+// shared with swf.c's OFFSCREEN_RENDER path. See include/libswf/capture.h.
 
 // Headless graphics swfStart implementation:
 // Combines renderer initialization from swf.c with the sophisticated frame
@@ -901,22 +770,7 @@ void swfStart(SWFAppContext* app_context)
 		app_context->oldSP = 0;
 
 		// --- Capture scheduling: request capture before frame renders ---
-#ifdef HEADLESS_RENDER_ENABLED
-		if (context->renderer_ok) {
-			int need_capture = 0;
-			// last_frame: always request so readback buffer has latest frame
-			if (g_has_last_frame_capture) need_capture = 1;
-			// specific iteration: request on matching tick
-			for (int ci = 0; ci < g_capture_count; ci++) {
-				if (g_captures[ci].type == CAPTURE_ITERATION &&
-				    g_captures[ci].iteration == (int)tick_count &&
-				    !g_captures[ci].saved)
-					need_capture = 1;
-			}
-			if (need_capture)
-				renderer_request_capture(context);
-		}
-#endif
+		capture_tick_pre_frame();
 
 		// Process deferred unloadMovie state (MC properties change on next frame)
 		extern void actionProcessDeferredUnloads(void);
@@ -1246,39 +1100,10 @@ void swfStart(SWFAppContext* app_context)
 		// --- Re-render after events so captures reflect event-driven state changes ---
 		// Events (Tab key, mouse) can change focus state, button states, etc.
 		// Re-render so the next capture reflects the post-event display state.
-#ifdef HEADLESS_RENDER_ENABLED
-		if (context->renderer_ok) {
-			int need_render = 0;
-			for (int ci = 0; ci < g_capture_count; ci++) {
-				CaptureEntry* e = &g_captures[ci];
-				if (!e->saved && e->type == CAPTURE_ITERATION && e->iteration == (int)tick_count) {
-					need_render = 1;
-					break;
-				}
-			}
-			if (need_render) {
-				extern void tagRerenderFrame(SWFAppContext* app_context);
-				tagRerenderFrame(app_context);
-			}
-		}
-#endif
+		capture_tick_after_events(app_context);
 
 		// --- Save captures after this tick's tagShowFrame has rendered ---
-#ifdef HEADLESS_RENDER_ENABLED
-		if (context->renderer_ok) {
-			for (int ci = 0; ci < g_capture_count; ci++) {
-				CaptureEntry* e = &g_captures[ci];
-				if (e->saved) continue;
-				if (e->type == CAPTURE_ITERATION && e->iteration == (int)tick_count)
-					save_capture(e);
-			}
-			// Save pending fs_command capture (requested before close_pass, now in readback buffer)
-			if (g_fscommand_pending >= 0) {
-				save_capture(&g_captures[g_fscommand_pending]);
-				g_fscommand_pending = -1;
-			}
-		}
-#endif
+		capture_tick_post_frame();
 
 		// Advance to next frame
 		// IMPORTANT: Process manual_next_frame BEFORE checking is_playing
@@ -1329,14 +1154,7 @@ void swfStart(SWFAppContext* app_context)
 	}
 
 	// --- Save last_frame captures (readback buffer has the final rendered frame) ---
-#ifdef HEADLESS_RENDER_ENABLED
-	if (context->renderer_ok) {
-		for (int ci = 0; ci < g_capture_count; ci++) {
-			if (g_captures[ci].type == CAPTURE_LAST_FRAME && !g_captures[ci].saved)
-				save_capture(&g_captures[ci]);
-		}
-	}
-#endif
+	capture_save_last_frame();
 
 	printf("\n=== SWF Execution Completed ===\n");
 

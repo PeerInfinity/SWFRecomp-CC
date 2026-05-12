@@ -12,6 +12,9 @@
 #include <utils.h>
 #include <heap.h>
 #include <audio/audio.h>
+#ifdef OFFSCREEN_RENDER
+#include <libswf/capture.h>
+#endif
 
 #ifdef __EMSCRIPTEN__
 #include <emscripten.h>
@@ -322,6 +325,12 @@ void tagMain(SWFAppContext* app_context)
 
 		current_frame = next_frame;
 #ifdef OFFSCREEN_RENDER
+		// Capture scheduling: request a readback before this tick's frame
+		// renders. With HEADLESS_RENDER_ENABLED on, this is a no-op unless
+		// CAPTURE_TRIGGERS asks for the current tick or any last_frame.
+		// Mirrors swf_headless.c line ~904.
+		capture_tick_pre_frame();
+
 		// Keep root _currentframe in sync with the natural advance. Mirrors
 		// swf_core.c lines ~1425/1431 (which update at the END of each tick).
 		// Without this, scripts running on frame N read a stale value left
@@ -800,6 +809,16 @@ void tagMain(SWFAppContext* app_context)
 			}
 		}
 #endif
+
+		// Re-render after events so iteration captures reflect post-event
+		// display state (Tab focus, button hover, etc.). Mirrors
+		// swf_headless.c line ~1249.
+		capture_tick_after_events(app_context);
+
+		// Save captures whose tick has arrived (iteration matches; pending
+		// fscommand). last_frame captures wait until end-of-loop. Mirrors
+		// swf_headless.c line ~1267.
+		capture_tick_post_frame();
 #endif
 		if (manual_next_frame)
 		{
@@ -999,6 +1018,12 @@ void swfStart(SWFAppContext* app_context)
 	renderer_init(app_context, context);
 
 #ifdef OFFSCREEN_RENDER
+	// Parse CAPTURE_TRIGGERS / CAPTURE_OUTPUT_DIR env vars so the tick-loop
+	// capture wrappers know which frames to save. Mirrors swf_headless.c.
+	parse_capture_triggers();
+#endif
+
+#ifdef OFFSCREEN_RENDER
 	// Initialize root display sentinel and set root_movieclip.display_obj.
 	// Mirrors swf_core.c (line ~815) and swf_headless.c (line ~862). Without
 	// this, root_movieclip.display_obj is NULL when actionImportAssets runs
@@ -1047,6 +1072,12 @@ void swfStart(SWFAppContext* app_context)
 #endif
 
 	tagMain(app_context);
+
+#ifdef OFFSCREEN_RENDER
+	// Save any unsaved last_frame captures from the readback buffer before
+	// renderer teardown. Mirrors swf_headless.c line ~1332.
+	capture_save_last_frame();
+#endif
 
 	audio_output_shutdown();
 	audio_shutdown(app_context);
