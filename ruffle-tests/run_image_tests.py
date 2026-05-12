@@ -764,6 +764,13 @@ def main():
              "test dir into _image-test-output/. Useful for rebuilding the "
              "gathered tree from leftover --verbose run artifacts.")
     parser.add_argument(
+        "--rebuild-json", action="store_true",
+        help="Skip running tests; rebuild image_results.json (and the "
+             "MD/HTML reports) by re-running compare_images() over the "
+             "*.expected.png / *.actual.png pairs already on disk. "
+             "trace_status and duration are marked unknown / 0 since those "
+             "only come from a fresh run.")
+    parser.add_argument(
         "--no-report", action="store_true",
         help="Skip markdown generation")
     parser.add_argument(
@@ -789,6 +796,16 @@ def main():
         tests = discover_image_tests()
         print(f"Collecting image output for {len(tests)} test(s)...")
         collect_image_output(tests, full_sweep=True)
+        return
+
+    if args.rebuild_json:
+        tests = discover_image_tests()
+        print(f"Rebuilding {json_path} from on-disk PNGs over {len(tests)} test(s)...")
+        rebuild_json_from_disk(tests, json_path)
+        if not args.no_report:
+            generate_markdown(json_path, md_path)
+        if not args.no_html:
+            generate_html(json_path, html_path)
         return
 
     # Discover tests
@@ -886,6 +903,103 @@ def main():
         except OSError:
             # Non-empty — leave it for the user to inspect.
             pass
+
+
+def rebuild_json_from_disk(tests, json_path):
+    """Recompute image_results.json from the persisted PNGs without running
+    any tests. Reads each test.toml for its image_comparisons configuration
+    and re-runs verify_output.compare_images() over the *.actual.png /
+    *.expected.png pairs in each test dir.
+
+    trace_status is set to "unknown" and duration to 0 because both
+    signals only come from an actual run.
+    """
+    # Lazy import — verify_output pulls in PIL etc.
+    sys.path.insert(0, str(SCRIPT_DIR))
+    from verify_output import parse_image_comparisons, compare_images
+    import re
+
+    test_results = []
+    run_start = time.monotonic()
+
+    for name in tests:
+        test_dir = TESTS_DIR / name
+        cfg = parse_image_comparisons(test_dir)
+
+        image_results = {}
+        for cmp_name, cmp_cfg in cfg.items():
+            actual = test_dir / f"{cmp_name}.actual.png"
+            expected = test_dir / f"{cmp_name}.expected.png"
+            # Fallback for expected: some tests keep upstream/<name>/<cmp>.expected.png
+            # only — but verify_output's main run path copies them next to the test.
+            # If neither exists, compare_images returns a meaningful error message.
+            if not actual.exists():
+                # Skip this cmp; if all cmps end up missing, the overall
+                # status will fall through to "no_render" below.
+                image_results[cmp_name] = {
+                    "status": "fail",
+                    "message": f"No actual image on disk ({actual.name}); rerun the test",
+                    "outliers": None,
+                    "max_diff": None,
+                }
+                continue
+            passed, message, max_diff = compare_images(
+                actual, expected, cmp_cfg["checks"])
+            m = re.search(r'(\d+) outliers', message)
+            outliers = int(m.group(1)) if m else None
+            image_results[cmp_name] = {
+                "status": "pass" if passed else "fail",
+                "message": message,
+                "outliers": outliers,
+                "max_diff": max_diff,
+            }
+
+        entry = {
+            "test": name,
+            "duration": 0,
+            "trace_status": "unknown",
+            "image_comparisons": image_results,
+        }
+
+        # Status aggregation — mirrors run_single_test exactly so the
+        # report consumers (build_report, generate_markdown, generate_html)
+        # don't need to know we took a shortcut here.
+        valid_pngs = {k: v for k, v in image_results.items()
+                      if v["message"] and not v["message"].startswith("No actual image on disk")}
+        if not image_results:
+            entry["image_status"] = "no_render"
+            entry["image_status_strict"] = "no_render"
+        elif not valid_pngs:
+            # All cmps had missing actual.png — treat as no_render so the
+            # report flags it for rerun rather than counting as a fail.
+            entry["image_status"] = "no_render"
+            entry["image_status_strict"] = "no_render"
+        else:
+            if all(r["status"] == "pass" for r in image_results.values()):
+                entry["image_status"] = "pass"
+            elif all(r["status"] == "skip" for r in image_results.values()):
+                entry["image_status"] = "skip"
+            else:
+                entry["image_status"] = "fail"
+            if all(r.get("outliers") == 0 and r.get("max_diff", 0) == 0
+                   for r in image_results.values() if r["status"] != "skip"):
+                entry["image_status_strict"] = "pass"
+            elif all(r["status"] == "skip" for r in image_results.values()):
+                entry["image_status_strict"] = "skip"
+            else:
+                entry["image_status_strict"] = "fail"
+
+        test_results.append(entry)
+
+    report = build_report(test_results, run_start)
+    with open(json_path, "w") as f:
+        json.dump(report, f, indent=2)
+    print(f"JSON report rebuilt from disk: {json_path} "
+          f"({report['total']} tests; "
+          f"strict={report['strict_pass']} "
+          f"pass={report['image_pass']} "
+          f"fail={report['image_fail']} "
+          f"no_render={report['image_no_render']})")
 
 
 def collect_image_output(tests, *, full_sweep=True):
