@@ -7,7 +7,7 @@ status: incomplete
 phases:
   - id: 1
     name: "Style preservation across styleSheet=null"
-    status: pending
+    status: complete
     impact: "~512 outliers (2 cells)"
   - id: 2
     name: "Paragraph alignment + <li> bullet indent"
@@ -28,7 +28,7 @@ Last updated: 2026-05-12
 
 ## Status
 
-Trace: **325/325 PASS** (unchanged). Image: **5361 outliers** (down from 16944 starting baseline). Failing image check (limit 0 outliers, tolerance 64 per channel). Trace status is the official pass/fail signal; image is gravy.
+Trace: **325/325 PASS** (unchanged). Image: **4849 outliers** (down from 16944 starting baseline). Failing image check (limit 0 outliers, tolerance 64 per channel). Trace status is the official pass/fail signal; image is gravy.
 
 ### Session timeline (2026-05-11 → 2026-05-12)
 
@@ -39,6 +39,7 @@ Trace: **325/325 PASS** (unchanged). Image: **5361 outliers** (down from 16944 s
 | `21dd4499` | Stencil clip mask at field bounds (`grow_x(-GUTTER)`) — kills overflow into neighbouring fields. **16944 → 6385.** |
 | `75868d0e` | `tf_styled_runs_from_html` takes class attribute verbatim (no trim, no split on space). **6385 → 5361.** |
 | `03436e9f` + `a8b5cb8c` | `verify_output.py` saves visible diff PNGs (alpha=255 on save buffer only — don't mutate `difference_data` or per-channel counting breaks). |
+| pending  | Phase 1 landed: capture styled state at `styleSheet=null` (parse current `htmlText` with old SS, populate `TFRunTable`); invalidate `TFRunTable` on text/htmlText writes that don't repopulate. **5361 → 4849.** |
 
 ## Remaining outlier distribution
 
@@ -49,8 +50,8 @@ Cells listed by location (column × row in the test grid). "Outliers" = pixels w
 | col4_row1 | 512 | `<p>a</p>` with `style.p.textAlign="center"` | `<p>` alignment ignored — glyph left-aligned, expected centred. |
 | col4_row2 | 512 | `<p class="classp">a</p>` with `classp.textAlign="right"` | `<p>` alignment ignored — glyph left-aligned, expected right-aligned. |
 | col3_row12 | 512 | `<li>a</li>` with `style.li={color:"#0000FF"}` | `<li>` bullet indent not allocated — glyph at left, expected ~16px in. |
-| col0_row14 | 256 | `text.styleSheet=style; text.text='<font>...<span class=classRed>a</span></font>'; text.styleSheet=null` | Style info lost when stylesheet removed — render produces black 'a'. |
-| col1_row3 | 256 | `text.styleSheet=empty; text.htmlText=HTML; text.styleSheet=style; text.styleSheet=null` | Style info lost when stylesheet removed — render produces black 'a'. |
+| ~~col0_row14~~ | ~~256~~ | `text.styleSheet=style; text.text='<font>...<span class=classRed>a</span></font>'; text.styleSheet=null` | **FIXED (Phase 1).** Captures styled state at SS=null. |
+| ~~col1_row3~~ | ~~256~~ | `text.styleSheet=empty; text.htmlText=HTML; text.styleSheet=style; text.styleSheet=null` | **FIXED (Phase 1).** Captures styled state at SS=null. |
 | col0_row12 | 83 | `text.htmlText='ab<font...><span class=classRed>b</span></font>'` after styleSheet=null | ~10×11 anti-aliased edge mismatch on one glyph; subpixel offset. Not yet investigated. |
 | col1_row1 | 83 | `text.text='ab<font...>b</font>'` after styleSheet=null | Same shape as col0_row12. |
 | col1_row2 | 83 | `text.htmlText=HTML; text.styleSheet=s; text.styleSheet=null; text.text='ab<font...>b</font>'` | Same shape as col0_row12. |
@@ -59,7 +60,55 @@ The diff PNG (visible since commit `03436e9f`) shows these as: red squares (Phas
 
 ---
 
-## Phase 1: Style preservation across `styleSheet=null` (~512 outliers)
+## Phase 1: Style preservation across `styleSheet=null` (~512 outliers) — DONE
+
+### Post-mortem (2026-05-12)
+
+Landed in one commit. Approach diverged from the original three-site proposal —
+instead of changing `text.text`, `text.htmlText`, *and* `text.styleSheet` setters,
+only the `styleSheet` setter needed substantive new logic. The text/htmlText
+setters got matching `TFRunTable` invalidation (to mirror what already existed in
+the no-stylesheet htmlText branch) so the captured runs don't leak as stale data
+once the text changes again.
+
+**Changes in `action.c`:**
+
+1. `styleSheet` setter (`~42867`): on `_ss_removing && _ss_had_old`, read the
+   stored `htmlText`, call `tf_styled_runs_from_html` (which resolves the still-active
+   old stylesheet from `mc->dynamic_props`), and populate `TFRunTable.text` /
+   `TFRunTable.runs` with the styled output. `TFRun` fields initialised from
+   `tf_get_defaults(mc, …)` then overridden with `color` and `font_height` from
+   the parsed `TextFieldGlyphRun`. The pre-existing `TFRunTable` clear at the end
+   of the removal branch was deleted.
+2. `text.text` setter html-flag branch (`~42591`): added `else { invalidate }` —
+   on `html=false`, clear any previously-populated table so the renderer falls
+   back to `props.text` or to the live-parse path on the next stylesheet-active
+   write.
+3. `text.htmlText` setter stylesheet-active branch (`~42729`): added
+   `TFRunTable` invalidation so the renderer's live-parse fallback fires when
+   the user updates HTML while a stylesheet is active. Without this, runs
+   captured by a prior `styleSheet=null` capture would stick around as stale
+   references.
+
+**Result:** 5361 → 4849 outliers (-512, exactly the two Phase 1 cells × 256
+each). Trace still 325/325. Smoke clean across `edittext_default_format`,
+`edittext_align`, `edittext_html_color`, `edittext_html_swf8` in both graphics
+and NO_GRAPHICS modes.
+
+**Intermediate state worth recording:** my first attempt populated `TFRunTable`
+at `styleSheet=null` but did NOT add the invalidation hooks. Outliers went *up*
+(5361 → 6847) because cells with patterns like
+`text.styleSheet=null; text.text='ab<font…>b</font>'` (line 184 of `test.as`)
+left the captured 'aba' runs in place while `props.text` got the new raw HTML
+literal. The renderer kept reading the stale `TFRunTable`. The invalidation in
+the text/htmlText setters fixes that without re-introducing other regressions.
+
+**Why not change the three setters as the plan originally proposed?** The
+renderer at `action.c:22941` already has a live-parse fallback that fires while
+a stylesheet is active. As long as we keep the `TFRunTable` empty during
+stylesheet-active updates, the fallback handles in-flight stylesheet/HTML
+changes. The only persistent-state need is *after* `styleSheet=null`, which is
+the one site we touched. Simpler and less surface area.
 
 ### Problem
 

@@ -42587,6 +42587,19 @@ void actionSetMember(SWFAppContext* app_context)
 								pstart = pi + 1;
 							}
 						}
+					} else {
+						// Non-HTML field: invalidate any existing run table so a
+						// subsequent render falls back to props.text. Without this,
+						// runs that were populated by an earlier styleSheet=null
+						// capture (or a prior html=true write) would leak as stale
+						// data referencing the wrong text.
+						TFRunTable* _inv_table = tf_find_table(mc);
+						if (_inv_table != NULL) {
+							_inv_table->mc = NULL;
+							_inv_table->run_count = 0;
+							_inv_table->text_len = 0;
+							_inv_table->from_html_text = 0;
+						}
 					}
 				}
 #endif
@@ -42730,6 +42743,20 @@ void actionSetMember(SWFAppContext* app_context)
 						// Clear raw-content flag (stylesheet-active path)
 						ActionVar _rc_zero = {0}; _rc_zero.type = ACTION_STACK_VALUE_F64;
 						setProperty(app_context, props, "_tf_raw_content", 15, &_rc_zero);
+						// Invalidate any existing run table — the renderer's
+						// live-parse fallback will re-parse from htmlText each
+						// frame while the stylesheet is active. Without this,
+						// runs populated by a prior styleSheet=null capture
+						// would leak as stale references to the old text.
+						{
+							TFRunTable* _inv_table = tf_find_table(mc);
+							if (_inv_table != NULL) {
+								_inv_table->mc = NULL;
+								_inv_table->run_count = 0;
+								_inv_table->text_len = 0;
+								_inv_table->from_html_text = 0;
+							}
+						}
 						// Stylesheet active: strip tags and store as text
 						const uint16_t* _ht_u16 = varGetU16Ptr(&value_var);
 						char _ht_buf[16384];
@@ -42885,6 +42912,67 @@ void actionSetMember(SWFAppContext* app_context)
 				ActionVar* _ss_old = getProperty(_ss_props, "styleSheet", 10);
 				int _ss_had_old = (_ss_old != NULL && _ss_old->type == ACTION_STACK_VALUE_OBJECT);
 				if (_ss_removing && _ss_had_old) {
+					// Ruffle's set_style_sheet (core/src/display_object/edit_text.rs:723):
+					// setting styleSheet to null clears original_html_text but DOES NOT
+					// re-parse — the existing text_spans (already parsed with the old
+					// stylesheet's styles) are kept verbatim. Capture that state here by
+					// parsing the stored htmlText with the still-active old stylesheet
+					// and populating the TFRunTable. The renderer then reads the styled
+					// runs even after the stylesheet is gone.
+					ActionVar* _ss_ht = getProperty(_ss_props, "htmlText", 8);
+					if (_ss_ht != NULL && _ss_ht->type == ACTION_STACK_VALUE_STRING && _ss_ht->str_size > 0) {
+						const uint16_t* _ss_ht_u16 = varGetU16Ptr(_ss_ht);
+						if (_ss_ht_u16 != NULL) {
+							static char _ss_ht_buf[16384];
+							static char _ss_tfg_text[16384];
+							static TextFieldGlyphRun _ss_tfg_runs[TF_MAX_RUNS];
+							u32 _ss_ht_len = (u32)u16_to_utf8(_ss_ht_u16, _ss_ht->str_size,
+								_ss_ht_buf, sizeof(_ss_ht_buf));
+							u32 _ss_def_color = 0x000000;
+							ActionVar* _ss_tc = getProperty(_ss_props, "textColor", 9);
+							if (_ss_tc != NULL && _ss_tc->type == ACTION_STACK_VALUE_F64) {
+								double _tcd; memcpy(&_tcd, &_ss_tc->data.numeric_value, sizeof(double));
+								_ss_def_color = (u32)_tcd & 0x00FFFFFF;
+							}
+							u16 _ss_def_fh = 240;
+							if (mc->ng_textfield_idx >= 0)
+								_ss_def_fh = ng_getTextFieldFontHeight(mc->ng_textfield_idx);
+							ActionVar* _ss_fh = getProperty(_ss_props, "_tf_fontHeight", 14);
+							if (_ss_fh != NULL && _ss_fh->type == ACTION_STACK_VALUE_F64)
+								_ss_def_fh = (u16)varToDoubleSimple(_ss_fh);
+							int _ss_tfg_rc = 0;
+							u32 _ss_plen = tf_styled_runs_from_html(app_context, mc,
+								_ss_ht_buf, _ss_ht_len,
+								_ss_tfg_text, sizeof(_ss_tfg_text),
+								_ss_tfg_runs, &_ss_tfg_rc, TF_MAX_RUNS,
+								_ss_def_color, _ss_def_fh);
+							if (_ss_plen > 0 && _ss_tfg_rc > 0) {
+								TFRunTable* _ss_keep = tf_get_table(mc);
+								TFRun _ss_def_run;
+								tf_get_defaults(mc, &_ss_def_run);
+								_ss_def_run.color = _ss_def_color;
+								_ss_keep->run_count = 0;
+								_ss_keep->text_len = 0;
+								_ss_keep->from_html_text = 0;
+								if (_ss_plen >= sizeof(_ss_keep->text))
+									_ss_plen = (u32)sizeof(_ss_keep->text) - 1;
+								memcpy(_ss_keep->text, _ss_tfg_text, _ss_plen);
+								_ss_keep->text[_ss_plen] = '\0';
+								_ss_keep->text_len = _ss_plen;
+								int _ss_n = _ss_tfg_rc;
+								if (_ss_n > TF_MAX_RUNS) _ss_n = TF_MAX_RUNS;
+								for (int _r = 0; _r < _ss_n; _r++) {
+									TFRun* tr = &_ss_keep->runs[_ss_keep->run_count];
+									*tr = _ss_def_run;
+									tr->start = _ss_tfg_runs[_r].byte_start;
+									tr->length = _ss_tfg_runs[_r].byte_length;
+									tr->color = _ss_tfg_runs[_r].color & 0x00FFFFFF;
+									tr->font_height = (s16)_ss_tfg_runs[_r].font_height;
+									_ss_keep->run_count++;
+								}
+							}
+						}
+					}
 					// Clear raw-content flag on stylesheet removal
 					ActionVar _rc_zero = {0}; _rc_zero.type = ACTION_STACK_VALUE_F64;
 					setProperty(app_context, _ss_props, "_tf_raw_content", 15, &_rc_zero);
@@ -42909,12 +42997,6 @@ void actionSetMember(SWFAppContext* app_context)
 							// No tags — just sync htmlText = text
 							setProperty(app_context, _ss_props, "htmlText", 8, _ss_text);
 						}
-					}
-					// Clear TFRunTable
-					TFRunTable* _ss_table = tf_find_table(mc);
-					if (_ss_table != NULL) {
-						_ss_table->mc = NULL;
-						_ss_table->run_count = 0;
 					}
 				}
 			}
