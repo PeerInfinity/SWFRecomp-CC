@@ -2387,6 +2387,11 @@ static void textfield_render_cb(const TextFieldRenderInfo* info, void* user_data
 // When info->runs is non-NULL, per-byte color and font_height are looked up
 // from the run array (htmlText / styleSheet pipeline). SENTINEL bytes 0xFE and
 // 0xFF mark structural paragraph breaks and behave like newlines.
+//
+// Rendering is clipped to the field's bounds via a stencil mask. Mirrors
+// Ruffle's `EditText::render_self` which pushes a mask at
+// `bounds.grow_x(-GUTTER)` — gutter-inset horizontally, full height
+// vertically. Without this, long text overflows into neighboring fields.
 static void textfield_glyph_render_cb(const TextFieldGlyphInfo* info, void* user_data)
 {
 	(void)user_data;
@@ -2405,6 +2410,20 @@ static void textfield_glyph_render_cb(const TextFieldGlyphInfo* info, void* user
 
 	// 2px gutter on each side (Flash text field internal padding)
 	float gutter_twips = 40.0f;
+
+	// Field clipping mask (stencil): gutter-inset horizontally, full height
+	// vertically. Matches Ruffle EditText::render_self mask.
+	float mask_x = info->x * 20.0f + gutter_twips;
+	float mask_y = info->y * 20.0f;
+	float mask_w = info->w * 20.0f - 2.0f * gutter_twips;
+	float mask_h = info->h * 20.0f;
+	int has_clip = (mask_w > 0.0f && mask_h > 0.0f);
+	if (has_clip) {
+		renderer_begin_clip_mask(context);
+		renderer_draw_rect(context, mask_x, mask_y, mask_w, mask_h, 1.0f, 1.0f, 1.0f, 1.0f, 0, 0);
+		renderer_end_clip_mask(context);
+	}
+
 	float x_pos = info->x * 20.0f + gutter_twips;
 	// Baseline = ascent at the largest font_height present (Flash text layout
 	// aligns mixed-size glyphs to a shared baseline that fits the tallest run).
@@ -2503,6 +2522,10 @@ static void textfield_glyph_render_cb(const TextFieldGlyphInfo* info, void* user
 		if (adv >= 0) {
 			x_pos += (float)adv * scale;
 		}
+	}
+
+	if (has_clip) {
+		renderer_end_clip(context);
 	}
 }
 
