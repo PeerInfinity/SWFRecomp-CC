@@ -945,6 +945,15 @@ def rebuild_json_from_disk(tests, json_path):
                 continue
             passed, message, max_diff = compare_images(
                 actual, expected, cmp_cfg["checks"])
+            # compare_images derives the diff PNG path from actual.stem,
+            # which here is "<cmp>.actual" (because we feed it the
+            # test-dir-resident copy), so the diff lands at
+            # "<cmp>.actual.difference.png". Rename to the canonical
+            # "<cmp>.difference.png" the rest of the toolchain expects.
+            stray_diff = test_dir / f"{cmp_name}.actual.difference.png"
+            canonical_diff = test_dir / f"{cmp_name}.difference.png"
+            if stray_diff.exists():
+                stray_diff.replace(canonical_diff)
             m = re.search(r'(\d+) outliers', message)
             outliers = int(m.group(1)) if m else None
             image_results[cmp_name] = {
