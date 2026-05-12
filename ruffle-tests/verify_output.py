@@ -285,8 +285,17 @@ def compare_images(actual_path, expected_path, checks):
     if max_diff > 0:
         diff_image_path = actual_path.parent / (actual_path.stem + ".difference.png")
         try:
+            # Force alpha=255 so the diff is visible. Both inputs are typically
+            # opaque, so per-channel alpha diff is 0, which would render the
+            # whole image fully transparent and appear empty in viewers.
+            for i in range(3, num_pixels * 4, 4):
+                difference_data[i] = 255
             diff_img = Image.frombytes("RGBA", actual_img.size, bytes(difference_data))
-            diff_img = diff_img.point(lambda x: min(x * 4, 255))
+            # Brighten RGB channels (×4 clamped) without touching alpha.
+            r, g, b, a = diff_img.split()
+            lut = bytes(min(x * 4, 255) for x in range(256))
+            r = r.point(lut); g = g.point(lut); b = b.point(lut)
+            diff_img = Image.merge("RGBA", (r, g, b, a))
             diff_img.save(str(diff_image_path))
         except Exception:
             pass
