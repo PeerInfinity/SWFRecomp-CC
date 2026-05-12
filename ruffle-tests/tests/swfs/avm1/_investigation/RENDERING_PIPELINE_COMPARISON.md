@@ -15,7 +15,7 @@ After fixing three bugs in April 2026 (focal type upgrade, NaN handling, linearR
 | Gradient ramp | 256-texel RGBA8 array texture | 256-texel RGBA8 standalone texture |
 | Gradient pipeline | Shared with all fills | Dedicated pipeline per gradient |
 | Coordinate space | Twips ([-16384, 16384]) | Normalized ([-1, 1] or [0, 1]) |
-| MSAA | 4x | 4x |
+| MSAA | 4× (standard sample positions) | 4× (samples appear to bleed coverage further across integer boundaries — see §4 below) |
 | Framebuffer | RGBA8Unorm | RGBA8Unorm |
 
 ## Detailed Pipeline Comparison
@@ -148,6 +148,28 @@ These are algebraically identical for all finite inputs. For NaN/Inf edge cases,
 
 **Affected pixels**: Line join points (corners).
 
+### 4. EditText Glyph-Run Sub-pixel Coverage (≤80 px per field at edge column)
+
+**Symptom signature**: A single 1-px-wide column adjacent to the right edge of a glyph run. In the column, our renderer paints either pure black or pure white; Ruffle paints partial coverage in the same column — typically light gray (~191, i.e. 25 % covered) where one glyph's body is about to begin, and dark gray (~63, i.e. 75 % covered) where another glyph's body is ending. Max channel diff is ≤64.
+
+**When it appears**: At a glyph-advance boundary that lands ~0.02 px shy of an integer pixel — e.g. the test font's `'a'`+`'b'`+`'c'`+`'d'` run is 35.977 px (16380+2040+16380+2040 EM-units × 400/1024 / 20), so the second `'a'` after the run starts at base_x + 35.977. Sub-pixel position 0.98 lands one pixel-sample's-width away from the integer boundary at 36, and MSAA-4× standard sample positions (cap at .875) all read as "outside the glyph" while Ruffle's sampling treats them as partially inside.
+
+**Affected pixels**: 1 px column at the right edge of any glyph run that ends on a fractional advance. In `edittext_tag_indent`, columns x=37 (text2/text3), x=39 (text4), x=41 (text5), rows y=53..72 / 103..122 / 153..172 / 203..222 — total 80 px, all max diff ≤64. `edittext_align`, `edittext_bullet`, and similar layouts almost certainly contain the same column at sub-tolerance levels (their thresholds absorb it).
+
+**Cause**: MSAA-4× with standard sample positions {.125, .375, .625, .875}. Ruffle's `wgpu` backend appears to use either programmable / shifted sample positions or post-rasterization coverage adjustment that bleeds ~25 % across the integer pixel boundary at sub-pixel-aligned glyph edges.
+
+**Threshold to care**: tests with `tolerance ≤64` AND a near-integer glyph-advance boundary in the rendered text. Tests at `tolerance ≥128` absorb this silently.
+
+### 5. EditText Border-Corner Over-Coverage (1-2 px per affected corner)
+
+**Symptom signature**: A single pixel at the bottom-right corner of an EditText border is fully black (0) in our output but partially gray (~95, i.e. 37 % covered) in Ruffle's expected. Max channel diff ≤95.
+
+**When it appears**: Inconsistently — in `edittext_stylesheet`, all 37 detected bottom-right border corners look pixel-identical in our output, but Ruffle paints only 2 of them with partial coverage. Correlated with field content, not field position.
+
+**Affected pixels**: `edittext_stylesheet` (150, 160) and (410, 440) — 2 px × 3 channels = 6 outliers, fails the test's `tolerance = 64`.
+
+**Cause** (not fully diagnosed): Probably Ruffle compositing the border draw with content that overlaps the corner pixel (a glyph's anti-aliased extent reaching into the border row), where our textfield clip mask prevents the overlap. Distinct mechanism from §4 — different magnitude (~95 vs ≤64), different geometry (isolated pixels vs columns), different correlation (content-dependent vs always-present at boundaries).
+
 ## What It Would Take to Fix Each Issue
 
 ### Fix 1: Replace Fan Tessellation with Lyon — DONE (libtess2 integrated)
@@ -180,6 +202,20 @@ Composed the [0,1] normalization into the inverse gradient matrix on the CPU sid
 
 Replaced fixed 8-segment subdivision with adaptive flattening: 1/4/8/16 segments based on control point deviation from the start-end midpoint (~0.5px tolerance). Reduces vertex count for flat curves, increases quality for tight curves. No impact on current tests (straight-line rectangles only).
 
+### Fix 5: Match Ruffle's MSAA Sub-pixel Coverage — NOT PURSUED
+
+To close the gap described in §4, three approaches were considered:
+
+1. **Programmable MSAA sample positions** — WebGPU doesn't expose `setSampleLocations` portably; using it would lock us out of WebGPU backends that don't implement it.
+2. **Coverage-based AA emulation on top of MSAA** — render each glyph to an offscreen target, compute per-pixel coverage analytically, composite with alpha blending. Large pipeline change for ≤1 channel of diff per pixel at glyph-run boundaries.
+3. **1-px glyph geometry outset** — extend each glyph's bounding quad by 1 px to force MSAA-edge sampling at the integer boundary. Risks subtly changing every glyph edge in every test (current pixel-perfect alignments would shift).
+
+All three are large bets for sub-tolerance diffs that already pass on `tolerance ≥128` tests. Not pursued.
+
+### Fix 6: EditText Border-Corner Coverage — NOT DIAGNOSED
+
+§5's mechanism isn't fully understood. The 2 affected corners in `edittext_stylesheet` would need a Ruffle-side trace (what is Ruffle actually drawing at those pixels?) before deciding on a fix.
+
 ## Status After All Fixes
 
 Fixes 1, 2, and 4 are now implemented. Fix 3 (separate gradient pipeline) was assessed as high effort / low impact and skipped.
@@ -188,6 +224,11 @@ Fixes 1, 2, and 4 are now implemented. Fix 3 (separate gradient pipeline) was as
 
 1. The test tolerance is 6, and our center-pixel diffs are 0-3 for most gradients (within tolerance).
 2. The remaining outlier count (~10K per test) is dominated by focal radial singularity precision (~8K) and edge AA from different tessellators (~2K).
-3. Matching Ruffle pixel-for-pixel would require porting their exact tessellator (Lyon) and rendering architecture — essentially rebuilding our rendering backend to be a Ruffle clone.
+3. EditText tests show a separate ≤80 px-per-field column-AA divergence (§4) and occasional border-corner divergences (§5). Both are sub-tolerance on tests with `tolerance ≥128` (e.g. `edittext_tag_indent` after the static-text double-render fix). `edittext_stylesheet` (`tolerance = 64`) trips on §5.
+4. Matching Ruffle pixel-for-pixel would require porting their exact tessellator (Lyon) and rendering architecture — essentially rebuilding our rendering backend to be a Ruffle clone.
 
-**The only remaining actionable fix** is Fix 3 (separate gradient pipeline), which would marginally improve precision by passing gradient parameters as uniforms instead of vertex attributes. This is estimated at 1-2 weeks for negligible visual improvement.
+**Actionable fixes** at this point are:
+- Fix 3 (separate gradient pipeline) — 1-2 weeks for marginal precision gain. Not recommended.
+- Fix 6 (EditText border-corner) — needs Ruffle-side investigation first.
+
+Fix 5 (MSAA sub-pixel coverage to match Ruffle's glyph-edge AA) is not pursued — the three viable approaches all carry significant risk for ≤1 channel/pixel improvement.
