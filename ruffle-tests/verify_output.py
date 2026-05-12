@@ -286,13 +286,18 @@ def compare_images(actual_path, expected_path, checks):
         diff_image_path = actual_path.parent / (actual_path.stem + ".difference.png")
         try:
             # Copy into a separate buffer so the outlier counter below still
-            # sees the true per-channel alpha diff. Force alpha=255 in the
-            # copy so the saved PNG is visible: both inputs are typically
-            # opaque, giving alpha diff = 0 everywhere, which would render
-            # the whole PNG fully transparent and appear empty in viewers.
+            # sees the true per-channel alpha diff. Set alpha=0 on pixels
+            # where every channel matches (so matching regions show through
+            # transparently in viewers that composite onto a background),
+            # and alpha=255 where any channel differs (so mismatches are
+            # opaque and clearly visible).
             png_bytes = bytearray(difference_data)
-            for i in range(3, num_pixels * 4, 4):
-                png_bytes[i] = 255
+            for px in range(num_pixels):
+                base = px * 4
+                if png_bytes[base] | png_bytes[base + 1] | png_bytes[base + 2] | png_bytes[base + 3]:
+                    png_bytes[base + 3] = 255
+                else:
+                    png_bytes[base + 3] = 0
             diff_img = Image.frombytes("RGBA", actual_img.size, bytes(png_bytes))
             # Brighten RGB channels (×4 clamped) without touching alpha.
             r, g, b, a = diff_img.split()
