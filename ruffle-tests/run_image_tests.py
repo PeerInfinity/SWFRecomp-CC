@@ -81,7 +81,7 @@ def run_single_test(test_name):
     cmd = [
         sys.executable, str(VERIFY_SCRIPT),
         f"--test={test_name}",
-        "--headless",
+        "--mode=graphics",
         "--verbose",
         "--diff",
     ]

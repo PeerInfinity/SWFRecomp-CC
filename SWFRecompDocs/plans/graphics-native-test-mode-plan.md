@@ -962,8 +962,8 @@ two outstanding tests are documented rather than undiagnosed. **Phase
 
 Goal: one rendering path instead of two.
 
-1. Switch `run_image_tests.py` from `--mode=graphics-headless-legacy` to `--mode=graphics`. Verify image-comparison results don't regress. **BLOCKED (2026-05-12) — image-capture machinery lives only in `swf_headless.c`.** See parity-check section below.
-2. Move CI to option A (parallel matrix). The legacy mode is no longer the primary rendering CI path. **BLOCKED on step 1.**
+1. Switch `run_image_tests.py` from `--headless` to `--mode=graphics`. Verify image-comparison results don't regress. **DONE (2026-05-12, commit `c0def42f` + flip).** 31/31 image tests parity confirmed locally; see post-port parity check below.
+2. Move CI to option A (parallel matrix). The legacy mode is no longer the primary rendering CI path. **READY.**
 3. Once the legacy mode has zero unique callers and graphics-native is matching it on every suite for ≥1 month: delete `swf_headless.c`, remove `HEADLESS_GRAPHICS` from `render_webgpu.c` / `audio_output_web.c` / `swf.c` / build scripts, drop the `--mode=graphics-headless-legacy` value (and the deprecated `--headless` alias). **BLOCKED on step 2 (1-month clock starts after step 2 lands).**
 
 **Exit criteria:** `swf_headless.c` deleted, `HEADLESS_GRAPHICS` removed from the codebase.
@@ -1006,6 +1006,53 @@ file usable by both). Tracked in
 dedicated workstream — that port is the only thing standing between
 the current state and being able to flip step 1; steps 2 and 3
 unblock immediately once it lands.
+
+#### Phase 3 step 1 unblock (2026-05-12, commit `c0def42f`)
+
+Ported the capture machinery into a shared
+`SWFModernRuntime/src/libswf/capture.c` (+ `include/libswf/capture.h`)
+that both `swf_headless.c` (HEADLESS_GRAPHICS) and `swf.c`
+(OFFSCREEN_RENDER) drive. Public API:
+
+- `parse_capture_triggers()` — one-shot env-var parse at `swfStart`.
+- `capture_tick_pre_frame()` / `capture_tick_after_events(ctx)` /
+  `capture_tick_post_frame()` — per-tick wrappers.
+- `capture_save_last_frame()` — end-of-loop.
+- `capture_on_fscommand()` / `capture_has_pending()` — `tag.c` /
+  `action.c` integration.
+
+Renderer-touching paths gate on `HEADLESS_RENDER_ENABLED`, so non-image
+tests pay only an `getenv` call. Gate widenings landed in:
+
+- `renderer.h` — `renderer_request_capture` / `renderer_save_png` macros
+  now defined for `HEADLESS_GRAPHICS || OFFSCREEN_RENDER`.
+- `tag.c` — `tagRerenderFrame` widened to both gates.
+- `action.c` — two `fscommand("capture")` sites widened.
+
+Local parity check across all 31 image-comparison tests under
+`--mode=graphics` vs `--mode=graphics-headless-legacy`:
+
+- **31/31 image-comparison results identical** (status, max_diff,
+  outlier count). Image-passing tests: 15. Image-failing tests:
+  16 (these were already failing in the legacy mode for unrelated
+  reasons — bitmap_data_copypixels, mcl_target_{gif87a,gif89a,jpg,png},
+  edittext_stylesheet, edittext_tag_indent,
+  movieclip_{begin_gradient_fill,line_gradient_style,setmask,
+  methods_with_loaded_image}, mouse_events_visible_enabled,
+  netstream_play_flv*).
+- Trace status: 30/31 match. The 1 outlier (`netstream_play_flv`)
+  shows pre-existing trace nondeterminism in the legacy mode that
+  the graphics-native path happens not to hit on this local run;
+  image output is byte-identical.
+
+CI on `c0def42f`: graphics-mode trace-suite + no-graphics trace-suite
+both clean (zero delta vs prior baselines across all eight suites —
+1125 tests per mode, no regressions, no improvements). Same-SHA
+parity confirmed: graphics 946/1125, no-graphics 948/1125.
+
+`run_image_tests.py:84` flipped to `--mode=graphics` in the same
+landing. Phase 3 step 2 (CI option A) is now ready; step 3 (delete
+`swf_headless.c`) starts its 1-month wait clock after step 2 ships.
 
 ---
 
