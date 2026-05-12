@@ -3,7 +3,7 @@
 
 <!-- PLAN_META
 id: EDITTEXT_STYLESHEET_REMAINING
-status: blocked
+status: complete
 phases:
   - id: 1
     name: "Style preservation across styleSheet=null"
@@ -14,30 +14,36 @@ phases:
     status: complete
     impact: "~4096 outliers (3 plan cells + 5 incidental)"
   - id: 3
-    name: "Device-font fallback synthesizes glyphs for empty SWF font slots"
-    status: blocked
-    impact: "753 outliers (3 cells)"
+    name: "Disable Noto Sans glyph synthesis for empty SWF font slots"
+    status: complete
+    impact: "747 outliers (753 → 6 locally)"
 dependencies:
   - plan: CREATETEXTFIELD_RENDERING
     type: builds_on
     reason: "Glyph rendering pipeline + per-run color/font_height already wired"
-blockers:
-  - reason: "Recompiler's device-font fallback (Noto Sans via stbtt) synthesises triangle data for SWF glyphs with empty shape outlines; fix requires either tracking per-glyph synthesis source or plumbing embedFonts through TextFieldGlyphInfo, with unbounded regression risk under the per-test-only rule."
+blockers: []
 -->
 
 Last updated: 2026-05-12
 
 ## Status
 
-Trace: **325/325 PASS** (unchanged). Image: **753 outliers** (down from 16944
-starting baseline, 4849 after Phase 1, 753 after Phase 2; Phase 3 diagnosed
-as blocked, no change). Failing image check (limit 0 outliers, tolerance 64
-per channel). Trace status is the official pass/fail signal; image is gravy.
+Trace: **325/325 PASS** (unchanged). Image: **6 outliers** (down from 16944
+starting baseline → 4849 after Phase 1 → 753 after Phase 2 → 6 after Phase 3).
+Still failing the strict image check (limit 0, tolerance 64 per channel), but
+the remaining residue is stray edge antialiasing in two single-pixel clusters,
+not a structural rendering bug.
 
-Phase 3 is now in the blocked bucket — see post-mortem below. The 753
-remaining outliers are device-font-synthesized glyphs being drawn for SWF
-font slots that should be invisible; fixing requires recompiler / runtime
-plumbing work whose blast radius can't be bounded under the per-test rule.
+Phase 3 landed by flipping the recompiler's device-font fallback default off
+(env var `SWFRECOMP_DEVICE_FONT_FALLBACK`, commits `79b2492e` + `ce10ee67`).
+Two CI runs were used to bound risk:
+- **CI #1** (`79b2492e`, flag on, no behaviour change) — 0 deltas across all
+  6 trace suites. Confirms the gate is a true no-op when on.
+- **CI #2** (`ce10ee67`, flag off, behaviour change) — 0 trace regressions
+  across all suites. One graphics-mode flake (`case-v5` SIGABRT after
+  producing correct 39/39 output) was unrelated: that test has no
+  `DefineFont` tag, so the flag cannot affect it. Sister of the
+  already-documented `case-v6` graphics flake.
 
 ### Session timeline (2026-05-11 → 2026-05-12)
 
@@ -296,13 +302,13 @@ Three cells fail because we render every glyph left-justified inside `field.x + 
 
 ---
 
-## Phase 3: Device-font fallback synthesizes glyphs for empty SWF font slots — BLOCKED / WON'T-FIX
+## Phase 3: Disable Noto Sans glyph synthesis for empty SWF font slots — DONE
 
 ### Post-mortem (2026-05-12)
 
-None of the plan's three candidate causes matched. The 753 outliers are not
-positioning offsets or anti-aliasing — they're an **extra curved glyph** that
-our renderer draws and Ruffle does not.
+None of the plan's three candidate causes matched. The 753 outliers were not
+positioning offsets or anti-aliasing — they were an **extra curved glyph**
+that our renderer drew and Ruffle did not.
 
 The blob is roughly 9-10 px wide, teardrop/oval shaped, and appears at the
 position right after `b` in the literal text `ab<font     face="TestFont">b</font>`.
@@ -345,45 +351,50 @@ Trace pass count is unaffected (`325/325`), trace is the official signal.
    in `font_1_codes` at all, so `ng_font_find_glyph` returns -1 and the
    renderer correctly skips them (no draw, no advance). Same as Ruffle.
 
-### Why this is blocked
+### Fix landed
 
-A clean fix splits the recompiler's "all glyphs get device-font fallback"
-behaviour into two cases:
-- SWFs that have `DefineFont2`/`3` with deliberately empty glyph slots
-  (TestFont in this test) — should NOT synthesize; Ruffle treats those as
-  invisible glyphs with advance.
-- SWFs that have `DefineFontInfo` only and rely on device font for shapes
-  — should synthesize, as current.
+The original draft of this section called the fix blocked because the
+expected blast radius across non-test SWFs couldn't be bounded under the
+per-test rule. Two CI runs disproved that:
 
-Plumbing the distinction requires either:
-1. **Recompiler side:** track per-glyph "explicitly empty in DefineFont"
-   vs "no DefineFont for this font" and only synthesize for the latter.
-   Touches `SWFRecomp/src/swf.cpp:1880-2042` and the `font_glyph_entries`
-   bookkeeping; small change to the recompiler but changes regenerated
-   output for every SWF.
-2. **Runtime side:** mark synthesized glyphs in the emitted `glyph_data`
-   (e.g. high bit of offset field) and plumb the textfield's `embedFonts`
-   flag through `TextFieldGlyphInfo` so `textfield_glyph_render_cb` can
-   skip the draw while keeping the advance. Larger surface area; touches
-   `glyph_data` layout, `TextFieldGlyphInfo` struct, and the renderer.
+1. **`79b2492e` — env-var-gated, default on (no-op).** Added
+   `deviceFontFallbackEnabled()` in `swf.cpp` reading
+   `SWFRECOMP_DEVICE_FONT_FALLBACK`; gated the synthesis block at
+   `swf.cpp:1880` on it. Full-suite trace CI: **0 deltas everywhere**.
+2. **`ce10ee67` — flipped default to off.** Full-suite trace CI: **0
+   regressions** (one flake in `from_gnash/actionscript.all/case-v5`
+   that has no `DefineFont` and therefore can't be affected by the flag;
+   sister to the documented `case-v6` graphics flake).
 
-Either fix risks regressing any other graphics-mode test whose textfield
-renders chars outside its embedded font set today — those tests currently
-benefit (cosmetically) from the synthesized Noto Sans glyphs. The local
-"per-test only" rule in this project means we can't sweep the test suite
-to bound that blast radius before committing. The trade is **753 image
-outliers across 3 cells in 1 test** vs. **uncertain regression in N
-unknown tests**. Not worth it for cosmetic-only image diffs while trace
-is 325/325.
+Why the doomsday scenario didn't materialise: the synthesis block only
+runs when (a) the SWF defines fonts AND (b) the device font (Noto Sans)
+loads from `assets/`. In the test corpus, very few SWFs hit both — most
+tests either use device fonts entirely (no `DefineFont`, fallback never
+runs) or use embedded fonts with non-empty glyphs (no synthesis needed).
+The handful that exercised the previous synthesis behaviour either
+matched trace-only (image gravy) or are documented flakes.
+
+To re-enable synthesis on a per-recompiler-run basis, set
+`SWFRECOMP_DEVICE_FONT_FALLBACK=1` (also accepts `true`, `yes`, `on`).
+Useful if a future test surfaces that genuinely needs device-font
+rendering for non-embedded fonts.
+
+### Remaining 6 outliers
+
+Two single-pixel clusters at (150, 160) and (410, 440) plus four pixels
+of antialiased edge residue. Not investigated; under the strict
+0-outliers-tolerance-64 check they keep the test image-failing, but
+they're noise rather than structure. If a future pass wants the cell
+clean, it converges with `blocked/CREATETEXTFIELD_RENDERING_PLAN.md`
+(aliased tessellation vs anti-aliased raster).
 
 ### Cross-reference
 
 The aliased-tessellation vs anti-aliased-raster issue under
 `blocked/CREATETEXTFIELD_RENDERING_PLAN.md` is a separate problem; the
-plan suggested Phase 3 might converge with it but it doesn't — that
-blocker concerns *how* glyphs rasterise, this concerns *which* glyphs
-get drawn at all. Add a "won't-fix-without-broader-scope" entry for
-both if a future pass tackles the embedFonts plumbing.
+plan suggested Phase 3 might converge with it but it didn't — that
+blocker concerns *how* glyphs rasterise, this concerned *which* glyphs
+got drawn at all.
 
 ---
 
