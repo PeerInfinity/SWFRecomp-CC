@@ -477,6 +477,11 @@ def main():
         "--report-only", action="store_true",
         help="Skip running tests; regenerate .md from existing JSON")
     parser.add_argument(
+        "--collect-only", action="store_true",
+        help="Skip running tests; just gather *.png from each discovered "
+             "test dir into _image-test-output/. Useful for rebuilding the "
+             "gathered tree from leftover --verbose run artifacts.")
+    parser.add_argument(
         "--no-report", action="store_true",
         help="Skip markdown generation")
     args = parser.parse_args()
@@ -489,6 +494,12 @@ def main():
             print(f"Error: {json_path} not found", file=sys.stderr)
             sys.exit(1)
         generate_markdown(json_path, md_path)
+        return
+
+    if args.collect_only:
+        tests = discover_image_tests()
+        print(f"Collecting image output for {len(tests)} test(s)...")
+        collect_image_output(tests, full_sweep=True)
         return
 
     # Discover tests
@@ -565,8 +576,12 @@ def main():
     if not args.no_report:
         generate_markdown(json_path, md_path)
 
-    # Collect image output PNGs into _image-test-output/
-    collect_image_output(tests)
+    # Collect image output PNGs into _image-test-output/. A single-test
+    # invocation (--test=foo) should refresh just that test's gathered
+    # dir; a full-suite invocation does a complete sweep (clean rebuild).
+    # Without this distinction, `--test=foo` after a full sweep would
+    # rmtree the whole gathered tree and leave only foo's dir.
+    collect_image_output(tests, full_sweep=not args.test)
 
     # verify_output.py's main() unconditionally creates RESULTS_DIR
     # (= TESTS_DIR / "_results"). With TESTS_DIR pointing at
@@ -582,12 +597,21 @@ def main():
             pass
 
 
-def collect_image_output(tests):
-    """Copy all PNG files from each test directory into _image-test-output/{test}/."""
+def collect_image_output(tests, *, full_sweep=True):
+    """Copy all PNG files from each test directory into _image-test-output/{test}/.
+
+    full_sweep=True wipes _image-test-output/ first and rebuilds from `tests`.
+    full_sweep=False preserves any per-test dirs not in `tests` (used for
+    --test=X / single-test runs so a smoke check doesn't blow away gathered
+    output from a prior full run).
+    """
     output_root = TESTS_DIR / "_image-test-output"
-    if output_root.exists():
-        shutil.rmtree(output_root)
-    output_root.mkdir()
+    if full_sweep:
+        if output_root.exists():
+            shutil.rmtree(output_root)
+        output_root.mkdir()
+    else:
+        output_root.mkdir(exist_ok=True)
 
     copied = 0
     for name in tests:
@@ -596,6 +620,10 @@ def collect_image_output(tests):
         if not pngs:
             continue
         dest = output_root / name
+        if not full_sweep and dest.exists():
+            # Refresh just this test's gathered files; stale PNGs from a
+            # prior run with different capture names would otherwise linger.
+            shutil.rmtree(dest)
         dest.mkdir(parents=True, exist_ok=True)
         for png in pngs:
             shutil.copy2(png, dest / png.name)
