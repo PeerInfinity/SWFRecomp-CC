@@ -124,9 +124,9 @@ def run_single_test(test_name):
         # Skip lines with image comparison results
         if "[image:" in stripped:
             continue
-        if stripped == "PASS":
+        if stripped.startswith("PASS"):
             trace_status = "pass"
-        elif stripped == "MISMATCH":
+        elif stripped.startswith("MISMATCH"):
             trace_status = "output_mismatch"
         elif "RECOMP_FAIL" in stripped:
             trace_status = "recomp_fail"
