@@ -34,19 +34,20 @@ static unsigned char* g_device_font_data = NULL;
 
 static std::string g_device_font_path; // set from argv[0] or explicit path
 
-// Allows disabling the synthesized-glyph fallback via
-// SWFRECOMP_DEVICE_FONT_FALLBACK=0. Default is enabled (current behaviour).
-// When disabled, glyphs that the SWF defines with empty outlines stay empty —
-// the runtime renderer keeps the advance but draws nothing, matching how
-// Ruffle treats embedded fonts with deliberately-empty glyph slots.
+// Allows enabling the synthesized-glyph fallback via
+// SWFRECOMP_DEVICE_FONT_FALLBACK=1. Default is disabled: SWF glyphs with
+// empty outlines stay empty, and the runtime renderer keeps the advance
+// but draws nothing — matching how Ruffle treats embedded fonts with
+// deliberately-empty glyph slots.
 static bool deviceFontFallbackEnabled()
 {
 	static int cached = -1;
 	if (cached == -1) {
 		const char* v = getenv("SWFRECOMP_DEVICE_FONT_FALLBACK");
-		cached = (v && (v[0] == '0' || (v[0] == 'f' && v[1] == 'a') ||
-			(v[0] == 'F' && v[1] == 'A') || (v[0] == 'n' && v[1] == 'o') ||
-			(v[0] == 'N' && v[1] == 'O'))) ? 0 : 1;
+		cached = (v && (v[0] == '1' || (v[0] == 't' && v[1] == 'r') ||
+			(v[0] == 'T' && v[1] == 'R') || (v[0] == 'y' && v[1] == 'e') ||
+			(v[0] == 'Y' && v[1] == 'E') || (v[0] == 'o' && v[1] == 'n') ||
+			(v[0] == 'O' && v[1] == 'N'))) ? 1 : 0;
 	}
 	return cached != 0;
 }
@@ -1894,9 +1895,9 @@ namespace SWFRecomp
 				}
 
 				// Device font fallback: if glyph shapes are empty, tessellate from Noto Sans TTF.
-				// Gated by SWFRECOMP_DEVICE_FONT_FALLBACK env var (default on); disable with =0
-				// to make deliberately-empty embedded glyphs render as nothing (advance kept),
-				// matching Ruffle's embedded-font behaviour.
+				// Gated by SWFRECOMP_DEVICE_FONT_FALLBACK env var (default off); enable with =1
+				// to restore the synthesized-glyph behaviour. With it off, deliberately-empty
+				// embedded glyphs render as nothing (advance kept), matching Ruffle.
 				if (font_code_tables.count(font_id) && deviceFontFallbackEnabled() && loadDeviceFont())
 				{
 					float swf_em = font_em_square.count(font_id) ? font_em_square[font_id] : 1024.0f;
