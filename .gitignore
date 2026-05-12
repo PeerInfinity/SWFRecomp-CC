@@ -139,6 +139,15 @@ ruffle-tests/tests/swfs/**/_results/results_current.json
 ruffle-tests/tests/swfs/**/_results/results_previous.json
 .claude/scheduled_tasks.lock
 
+# run_image_tests.py outputs (gathered actual/expected/difference PNGs,
+# plus the side-effect _results/ dir verify_output.py creates when run
+# with --tests-dir=tests/swfs). Per-suite _image-test-output/ dirs are
+# already covered by the per-suite test-data ignore patterns above.
+ruffle-tests/tests/swfs/_image-test-output/
+ruffle-tests/tests/swfs/_results/
+ruffle-tests/image_results.json
+ruffle-image-results.md
+
 # Local-only SWF batch artifacts (build_swf_batch.sh / clean_swf_batch.sh)
 docs/examples/local_batch/
 docs/local_catalog.json

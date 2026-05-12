@@ -18,6 +18,7 @@ import os
 import shutil
 import subprocess
 import sys
+import tempfile
 import time
 from datetime import datetime, timezone
 from pathlib import Path
@@ -28,7 +29,7 @@ except ImportError:
     import tomli as tomllib
 
 SCRIPT_DIR = Path(__file__).parent.resolve()
-TESTS_DIR = SCRIPT_DIR / "tests" / "swfs" / "avm1"
+TESTS_DIR = SCRIPT_DIR / "tests" / "swfs"
 VERIFY_SCRIPT = SCRIPT_DIR / "verify_output.py"
 RESULTS_JSON = SCRIPT_DIR / "image_results.json"
 RESULTS_MD = SCRIPT_DIR.parent / "ruffle-image-results.md"
@@ -78,16 +79,30 @@ def run_single_test(test_name):
 
     Returns (entry_dict, stdout_text).
     """
+    # --json=<sink> keeps verify_output.py from clobbering its default
+    # per-mode results file (tests/swfs/_results/results_graphics.json)
+    # on every single-test invocation. We don't read this JSON — the
+    # canonical output is image_results.json written below.
+    json_sink = tempfile.NamedTemporaryFile(
+        prefix="verify_sink_", suffix=".json", delete=False).name
     cmd = [
         sys.executable, str(VERIFY_SCRIPT),
+        f"--tests-dir={TESTS_DIR}",
         f"--test={test_name}",
         "--mode=graphics",
+        f"--json={json_sink}",
         "--verbose",
         "--diff",
     ]
 
     start = time.monotonic()
-    result = subprocess.run(cmd, capture_output=True, text=True, timeout=300)
+    try:
+        result = subprocess.run(cmd, capture_output=True, text=True, timeout=300)
+    finally:
+        try:
+            os.unlink(json_sink)
+        except OSError:
+            pass
     duration = round(time.monotonic() - start, 2)
 
     stdout = result.stdout
@@ -539,7 +554,8 @@ def main():
     print(f"\n{'='*60}")
     print(f"Total:              {report['total']}")
     print(f"Strict image pass:  {report['strict_pass']}  (0 outliers, exact pixel match)")
-    print(f"Tolerance pass:     {report['image_pass']}  (within test.toml tolerances)")
+    print(f"Tolerance pass:     {report['image_pass'] - report['strict_pass']}  (non-zero diff within test.toml limits)")
+    print(f"Total image pass:   {report['image_pass']}")
     print(f"Image fail:         {report['image_fail']}")
     print(f"No render:          {report['image_no_render']}")
     print(f"Trace pass:         {report['trace_pass']}")
@@ -551,6 +567,19 @@ def main():
 
     # Collect image output PNGs into _image-test-output/
     collect_image_output(tests)
+
+    # verify_output.py's main() unconditionally creates RESULTS_DIR
+    # (= TESTS_DIR / "_results"). With TESTS_DIR pointing at
+    # tests/swfs (not a per-suite dir), that's a stray top-level
+    # _results/ that doesn't belong to any suite. The per-test --json
+    # redirect above keeps it empty, so just remove the empty dir.
+    side_effect_results = TESTS_DIR / "_results"
+    if side_effect_results.exists():
+        try:
+            side_effect_results.rmdir()
+        except OSError:
+            # Non-empty — leave it for the user to inspect.
+            pass
 
 
 def collect_image_output(tests):
@@ -567,7 +596,7 @@ def collect_image_output(tests):
         if not pngs:
             continue
         dest = output_root / name
-        dest.mkdir()
+        dest.mkdir(parents=True, exist_ok=True)
         for png in pngs:
             shutil.copy2(png, dest / png.name)
             copied += 1
