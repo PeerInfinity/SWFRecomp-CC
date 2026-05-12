@@ -22819,14 +22819,15 @@ static u32 tf_styled_runs_from_html(SWFAppContext* app_context, MovieClip* mc,
 						an[anl] = '\0';
 
 						if (strcmp(an, "class") == 0) {
-							u32 vs = val_start;
-							while (vs < val_end && (html[vs] == ' ' || html[vs] == '\t')) vs++;
-							u32 ve = vs;
-							while (ve < val_end && html[ve] != ' ' && html[ve] != '\t') ve++;
-							if (ve > vs) {
-								class_len = ve - vs;
+							// Ruffle takes the entire class value verbatim
+							// (no trim, no split on space) and prepends "."
+							// to form the selector. Multiple classes and
+							// surrounding whitespace therefore don't match
+							// rules keyed by a single class name.
+							if (val_end > val_start) {
+								class_len = val_end - val_start;
 								if (class_len >= sizeof(class_buf)) class_len = sizeof(class_buf) - 1;
-								memcpy(class_buf, html + vs, class_len);
+								memcpy(class_buf, html + val_start, class_len);
 								class_buf[class_len] = '\0';
 							}
 						} else if (strcmp(an, "color") == 0 && is_font) {
