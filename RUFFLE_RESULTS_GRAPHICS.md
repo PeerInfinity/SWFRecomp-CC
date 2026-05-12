@@ -2,9 +2,9 @@
 
 *See [RUFFLE_RESULTS_GRAPHICS_FILTERED.md](RUFFLE_RESULTS_GRAPHICS_FILTERED.md) for results with ignored tests excluded.*
 
-**Commit:** `a48ecfae33b6`  
-**Date:** 2026-05-11 22:57 UTC  
-**Total duration:** 2h10m07s
+**Commit:** `c0def42f9429`  
+**Date:** 2026-05-12 00:37 UTC  
+**Total duration:** 2h12m47s
 
 ## Results by Suite
 
@@ -67,69 +67,64 @@ Tests with `output_mismatch` status but ≥80% of expected lines matching.
 
 ## Changes Since Last Run
 
-| Suite | Newly Passing | Newly Failing | Lines Improved | Lines Regressed |
-|-------|-------------:|-------------:|--------------:|----------------:|
-| avm1 | 3 | - | 4 | - |
-| from_gnash/misc-swfc.all | - | - | 1 | - |
+*No changes since last run.*
 
-**avm1 — newly passing:** `netstream_seek_flv`, `sound`, `timeout`
-
-*Comparing `6beabb40c149` → `a48ecfae33b6`*
+*Comparing `a48ecfae33b6` → `c0def42f9429`*
 
 ## Per-Suite Details
 
 ### avm1
 
 - **Pass:** 605/651 (92.9%)
-- **Duration:** 1h02m58s across 30 shards
+- **Duration:** 1h04m11s across 30 shards
 - **Lines:** 106,041/114,995 matching (92.2%)
-- **Avg test duration:** 5.7s — slowest: `form_loader_encoding_1` (25.0s)
+- **Avg test duration:** 5.9s — slowest: `timeout` (25.0s)
 
 ### from_gnash/actionscript.all
 
 - **Pass:** 125/190 (65.8%)
-- **Duration:** 13m56s across 30 shards
+- **Duration:** 14m17s across 30 shards
 - **Lines:** 15,393/16,957 matching (90.8%)
-- **Avg test duration:** 4.3s — slowest: `Sound-v7` (20.8s)
+- **Avg test duration:** 4.5s — slowest: `LoadVars-v6` (19.8s)
 
 ### from_gnash/misc-ming.all
 
 - **Pass:** 65/102 (63.7%)
-- **Duration:** 25m19s across 30 shards
+- **Duration:** 25m45s across 30 shards
 - **Lines:** 3,131/4,577 matching (68.4%)
-- **Avg test duration:** 14.8s — slowest: `matrix_test` (23.1s)
+- **Avg test duration:** 15.1s — slowest: `matrix_test` (23.3s)
 
 ### from_gnash/misc-mtasc.all
 
 - **Pass:** 7/9 (77.8%)
-- **Duration:** 2m06s across 30 shards
+- **Duration:** 2m12s across 30 shards
 - **Lines:** 211/231 matching (91.3%)
-- **Avg test duration:** 14.0s — slowest: `implementsOpTest` (19.2s)
+- **Avg test duration:** 14.6s — slowest: `hello` (19.2s)
 
 ### from_gnash/misc-swfc.all
 
 - **Pass:** 8/16 (50.0%)
-- **Duration:** 4m12s across 30 shards
+- **Duration:** 4m20s across 30 shards
 - **Lines:** 388/499 matching (77.8%)
-- **Avg test duration:** 15.7s — slowest: `registerclass_test3` (19.8s)
+- **Avg test duration:** 16.2s — slowest: `opcode_guard_test2` (19.3s)
 
 ### from_gnash/misc-swfmill.all
 
 - **Pass:** 17/18 (94.4%)
-- **Duration:** 5m22s across 30 shards
+- **Duration:** 5m34s across 30 shards
 - **Lines:** 49/51 matching (96.1%)
-- **Avg test duration:** 17.8s — slowest: `missing_bitmap` (21.1s)
+- **Avg test duration:** 18.5s — slowest: `trace-as2/root_onload` (19.4s)
 
 ### from_shumway
 
 - **Pass:** 73/92 (79.3%)
-- **Duration:** 14m17s across 30 shards
+- **Duration:** 14m26s across 30 shards
 - **Lines:** 882/1,276 matching (69.1%)
-- **Avg test duration:** 9.3s — slowest: `fuzz/1276557624e197ee764676c0aa9cb8ee52156dc7269956ee9b3e131a6f7b6dd0` (20.7s)
+- **Avg test duration:** 9.4s — slowest: `gradientTransform` (20.0s)
 
 ### from_shumway/avm1
 
 - **Pass:** 46/47 (97.9%)
-- **Duration:** 1m54s across 30 shards
+- **Duration:** 1m58s across 30 shards
 - **Lines:** 489/491 matching (99.6%)
-- **Avg test duration:** 2.4s — slowest: `text-bind` (18.6s)
+- **Avg test duration:** 2.5s — slowest: `text-bind` (19.8s)
