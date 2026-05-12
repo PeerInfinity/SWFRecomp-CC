@@ -33,6 +33,7 @@ TESTS_DIR = SCRIPT_DIR / "tests" / "swfs"
 VERIFY_SCRIPT = SCRIPT_DIR / "verify_output.py"
 RESULTS_JSON = SCRIPT_DIR / "image_results.json"
 RESULTS_MD = SCRIPT_DIR.parent / "ruffle-image-results.md"
+RESULTS_HTML = SCRIPT_DIR.parent / "ruffle-image-results.html"
 
 
 _DISCOVERY_SKIP_DIRS = {
@@ -461,6 +462,284 @@ def generate_markdown(results_path, output_path):
     print(f"Markdown report written to {output_path}")
 
 
+HTML_TEMPLATE = r"""<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>Ruffle Image Test Results</title>
+<style>
+  :root {
+    --bg: #1a1a1a; --fg: #e8e8e8; --muted: #888; --card: #242424;
+    --border: #333; --accent: #4a9eff;
+    --strict: #4caf50; --tolerance: #d4a017; --fail: #e53935; --norender: #666;
+  }
+  body.light {
+    --bg: #fafafa; --fg: #222; --muted: #666; --card: #fff;
+    --border: #ddd; --accent: #1565c0;
+  }
+  * { box-sizing: border-box; }
+  body { margin: 0; font: 14px/1.4 -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+         background: var(--bg); color: var(--fg); }
+  header.page { padding: 16px 24px; border-bottom: 1px solid var(--border);
+                position: sticky; top: 0; background: var(--bg); z-index: 10; }
+  header.page h1 { margin: 0 0 4px 0; font-size: 18px; }
+  .meta { color: var(--muted); font-size: 12px; margin-bottom: 12px; }
+  .meta code { color: var(--fg); }
+  .controls { display: flex; flex-wrap: wrap; gap: 12px; align-items: center; }
+  .filter-group { display: inline-flex; gap: 4px; align-items: center; }
+  .filter-group .label { color: var(--muted); font-size: 11px; text-transform: uppercase; margin-right: 4px; }
+  .chip { padding: 4px 10px; border: 1px solid var(--border); border-radius: 12px;
+          background: var(--card); cursor: pointer; font-size: 12px; user-select: none; }
+  .chip.active { background: var(--accent); color: white; border-color: var(--accent); }
+  .chip .count { color: var(--muted); margin-left: 4px; font-size: 11px; }
+  .chip.active .count { color: rgba(255,255,255,0.8); }
+  input[type=search], select { padding: 4px 8px; background: var(--card); color: var(--fg);
+                                border: 1px solid var(--border); border-radius: 4px; font-size: 12px; }
+  input[type=search] { min-width: 200px; }
+  main { padding: 16px 24px; }
+  .card { background: var(--card); border: 1px solid var(--border); border-radius: 6px;
+          margin-bottom: 12px; overflow: hidden; }
+  .card.hidden { display: none; }
+  .card-header { display: flex; align-items: center; gap: 12px; padding: 10px 14px;
+                 border-bottom: 1px solid var(--border); cursor: pointer; }
+  .card-name { font-family: ui-monospace, "SF Mono", Consolas, monospace; font-weight: 600; flex: 1; }
+  .badge { padding: 2px 8px; border-radius: 10px; font-size: 11px; font-weight: 600;
+           text-transform: uppercase; letter-spacing: 0.04em; }
+  .badge-strict     { background: var(--strict); color: white; }
+  .badge-tolerance  { background: var(--tolerance); color: #1a1a1a; }
+  .badge-fail       { background: var(--fail); color: white; }
+  .badge-no-render  { background: var(--norender); color: white; }
+  .max-diff { color: var(--muted); font-size: 12px; font-family: ui-monospace, monospace; }
+  .card-body { padding: 8px 14px 14px; }
+  .card.collapsed .card-body { display: none; }
+  .comparison { margin: 8px 0; }
+  .cmp-name { font-family: ui-monospace, monospace; font-size: 12px; color: var(--muted); margin: 6px 0 4px; }
+  .triptych { display: flex; gap: 8px; flex-wrap: wrap; }
+  .triptych figure { margin: 0; text-align: center; background: #000;
+                      border: 1px solid var(--border); padding: 4px; }
+  .triptych figure img { display: block; max-width: 280px; max-height: 280px;
+                          image-rendering: pixelated; background:
+                            repeating-conic-gradient(#222 0% 25%, #2a2a2a 0% 50%) 50% / 16px 16px; }
+  body.light .triptych figure img { background:
+    repeating-conic-gradient(#e8e8e8 0% 25%, #d8d8d8 0% 50%) 50% / 16px 16px; }
+  .triptych figcaption { color: var(--muted); font-size: 10px; padding-top: 4px;
+                          text-transform: uppercase; letter-spacing: 0.04em; }
+  .triptych figure.missing img { width: 100px; height: 100px; }
+  .triptych figure.missing::after { content: "no image"; color: var(--muted); font-size: 10px; }
+  .cmp-detail { color: var(--muted); font-size: 12px; margin-top: 6px;
+                font-family: ui-monospace, monospace; }
+  .empty { color: var(--muted); padding: 40px; text-align: center; font-style: italic; }
+  .toggle-theme { background: transparent; color: var(--fg); border: 1px solid var(--border);
+                   padding: 4px 10px; border-radius: 4px; cursor: pointer; font-size: 12px; }
+</style>
+</head>
+<body>
+<header class="page">
+  <h1>Ruffle Image Test Results</h1>
+  <div class="meta">
+    <span id="meta-sha">SHA: <code>…</code></span> ·
+    <span id="meta-ts">…</span> ·
+    <span id="meta-counts">…</span>
+  </div>
+  <div class="controls">
+    <div class="filter-group">
+      <span class="label">Status</span>
+      <span class="chip active" data-status-filter="all">All</span>
+      <span class="chip" data-status-filter="fail">Fail</span>
+      <span class="chip" data-status-filter="tolerance">Tolerance</span>
+      <span class="chip" data-status-filter="strict">Strict</span>
+      <span class="chip" data-status-filter="no-render">No render</span>
+    </div>
+    <div class="filter-group" id="suite-filters">
+      <span class="label">Suite</span>
+      <span class="chip active" data-suite-filter="all">All</span>
+    </div>
+    <input type="search" id="search" placeholder="filter by name…">
+    <select id="sort">
+      <option value="status">Sort: status (worst first)</option>
+      <option value="name">Sort: name</option>
+      <option value="max-diff-desc">Sort: max diff (desc)</option>
+    </select>
+    <button class="toggle-theme" id="toggle-theme">☀</button>
+  </div>
+</header>
+<main id="cards"></main>
+<script>
+const RESULTS = __RESULTS_JSON__;
+const IMG_ROOT = "__IMG_ROOT__";
+
+function classify(t) {
+  if (t.image_status === "no_render") return "no-render";
+  if (t.image_status === "fail")      return "fail";
+  if (t.image_status_strict === "pass") return "strict";
+  if (t.image_status === "pass")      return "tolerance";
+  return "fail";
+}
+function maxDiff(t) {
+  let m = 0;
+  for (const c of Object.values(t.image_comparisons || {}))
+    if (typeof c.max_diff === "number" && c.max_diff > m) m = c.max_diff;
+  return m;
+}
+function statusRank(s) {
+  return {fail:0, "no-render":1, tolerance:2, strict:3}[s] ?? 4;
+}
+
+const tests = (RESULTS.tests || []).map(t => ({
+  ...t,
+  suite: t.test.split("/")[0],
+  klass: classify(t),
+  max_diff: maxDiff(t),
+}));
+
+const statusCounts = {all: tests.length, fail:0, tolerance:0, strict:0, "no-render":0};
+for (const t of tests) statusCounts[t.klass]++;
+
+const suiteCounts = {all: tests.length};
+for (const t of tests) suiteCounts[t.suite] = (suiteCounts[t.suite] || 0) + 1;
+
+document.querySelectorAll("[data-status-filter]").forEach(c => {
+  const k = c.dataset.statusFilter;
+  c.innerHTML += ` <span class="count">${statusCounts[k] ?? 0}</span>`;
+});
+const suiteContainer = document.getElementById("suite-filters");
+for (const suite of Object.keys(suiteCounts).filter(s => s !== "all").sort()) {
+  const chip = document.createElement("span");
+  chip.className = "chip";
+  chip.dataset.suiteFilter = suite;
+  chip.innerHTML = `${suite} <span class="count">${suiteCounts[suite]}</span>`;
+  suiteContainer.appendChild(chip);
+}
+document.querySelector('[data-suite-filter="all"]').innerHTML += ` <span class="count">${suiteCounts.all}</span>`;
+
+document.getElementById("meta-sha").innerHTML = `SHA: <code>${(RESULTS.metadata?.git_sha || "?").slice(0,8)}</code>`;
+document.getElementById("meta-ts").textContent = RESULTS.metadata?.timestamp || "?";
+document.getElementById("meta-counts").innerHTML =
+  `${RESULTS.total} total · ` +
+  `<span style="color:var(--strict)">strict ${RESULTS.strict_pass}</span> · ` +
+  `<span style="color:var(--tolerance)">tolerance ${RESULTS.image_pass - RESULTS.strict_pass}</span> · ` +
+  `<span style="color:var(--fail)">fail ${RESULTS.image_fail}</span> · ` +
+  `<span style="color:var(--norender)">no-render ${RESULTS.image_no_render}</span>`;
+
+const state = { status: "all", suite: "all", search: "", sort: "status" };
+
+function renderCard(t) {
+  const card = document.createElement("article");
+  card.className = "card";
+  card.dataset.status = t.klass;
+  card.dataset.suite = t.suite;
+  card.dataset.name = t.test;
+
+  const labelByStatus = {
+    strict: "STRICT", tolerance: "TOLERANCE", fail: "FAIL", "no-render": "NO RENDER",
+  };
+
+  const header = document.createElement("div");
+  header.className = "card-header";
+  header.innerHTML = `
+    <span class="card-name">${t.test}</span>
+    <span class="badge badge-${t.klass}">${labelByStatus[t.klass]}</span>
+    <span class="max-diff">max_diff: ${t.max_diff}</span>
+  `;
+  header.addEventListener("click", () => card.classList.toggle("collapsed"));
+  card.appendChild(header);
+
+  const body = document.createElement("div");
+  body.className = "card-body";
+  for (const [cmpName, cmp] of Object.entries(t.image_comparisons || {})) {
+    const cmpDiv = document.createElement("div");
+    cmpDiv.className = "comparison";
+    const showDiff = (cmp.status !== "pass") || (cmp.max_diff && cmp.max_diff > 0);
+    const dir = `${IMG_ROOT}/${t.test}`;
+    cmpDiv.innerHTML = `
+      <div class="cmp-name">${cmpName} — ${cmp.status} (max_diff ${cmp.max_diff ?? "?"})</div>
+      <div class="triptych">
+        <figure><a href="${dir}/${cmpName}.expected.png" target="_blank"><img loading="lazy" src="${dir}/${cmpName}.expected.png" alt="expected"></a><figcaption>expected</figcaption></figure>
+        <figure><a href="${dir}/${cmpName}.actual.png" target="_blank"><img loading="lazy" src="${dir}/${cmpName}.actual.png" alt="actual" onerror="this.parentElement.parentElement.classList.add('missing'); this.remove();"></a><figcaption>actual</figcaption></figure>
+        ${showDiff ? `<figure><a href="${dir}/${cmpName}.difference.png" target="_blank"><img loading="lazy" src="${dir}/${cmpName}.difference.png" alt="diff" onerror="this.parentElement.parentElement.classList.add('missing'); this.remove();"></a><figcaption>diff</figcaption></figure>` : ""}
+      </div>
+      ${cmp.message ? `<div class="cmp-detail">${cmp.message}</div>` : ""}
+    `;
+    body.appendChild(cmpDiv);
+  }
+  card.appendChild(body);
+  return card;
+}
+
+function refresh() {
+  const container = document.getElementById("cards");
+  const search = state.search.toLowerCase();
+  let filtered = tests.filter(t =>
+    (state.status === "all" || t.klass === state.status) &&
+    (state.suite === "all" || t.suite === state.suite) &&
+    (search === "" || t.test.toLowerCase().includes(search))
+  );
+  if (state.sort === "name") filtered.sort((a,b) => a.test.localeCompare(b.test));
+  else if (state.sort === "max-diff-desc") filtered.sort((a,b) => b.max_diff - a.max_diff || a.test.localeCompare(b.test));
+  else filtered.sort((a,b) => statusRank(a.klass) - statusRank(b.klass) || a.test.localeCompare(b.test));
+
+  container.innerHTML = "";
+  if (filtered.length === 0) {
+    container.innerHTML = '<div class="empty">no tests match the current filters</div>';
+    return;
+  }
+  for (const t of filtered) container.appendChild(renderCard(t));
+}
+
+document.querySelectorAll("[data-status-filter]").forEach(c => c.addEventListener("click", () => {
+  document.querySelectorAll("[data-status-filter]").forEach(x => x.classList.remove("active"));
+  c.classList.add("active");
+  state.status = c.dataset.statusFilter;
+  refresh();
+}));
+function wireSuites() {
+  document.querySelectorAll("[data-suite-filter]").forEach(c => c.addEventListener("click", () => {
+    document.querySelectorAll("[data-suite-filter]").forEach(x => x.classList.remove("active"));
+    c.classList.add("active");
+    state.suite = c.dataset.suiteFilter;
+    refresh();
+  }));
+}
+wireSuites();
+document.getElementById("search").addEventListener("input", e => { state.search = e.target.value; refresh(); });
+document.getElementById("sort").addEventListener("change", e => { state.sort = e.target.value; refresh(); });
+document.getElementById("toggle-theme").addEventListener("click", () => {
+  document.body.classList.toggle("light");
+  document.getElementById("toggle-theme").textContent = document.body.classList.contains("light") ? "☾" : "☀";
+});
+
+refresh();
+</script>
+</body>
+</html>
+"""
+
+
+def generate_html(results_path, output_path):
+    """Render a self-contained HTML viewer for the image-test results."""
+    with open(results_path) as f:
+        data = json.load(f)
+
+    # Relative path from the HTML file's dir to _image-test-output/.
+    # Default html_path is the project root, so this resolves to
+    # ruffle-tests/tests/swfs/_image-test-output. If the user redirects
+    # --html to a different location we recompute accordingly.
+    image_root_abs = TESTS_DIR / "_image-test-output"
+    try:
+        rel = os.path.relpath(image_root_abs, output_path.parent)
+    except ValueError:
+        # Different drives on Windows — fall back to absolute path.
+        rel = str(image_root_abs)
+    rel = rel.replace(os.sep, "/")
+
+    html = (HTML_TEMPLATE
+            .replace("__RESULTS_JSON__", json.dumps(data))
+            .replace("__IMG_ROOT__", rel))
+    with open(output_path, "w") as f:
+        f.write(html)
+    print(f"HTML report written to {output_path}")
+
+
 def main():
     parser = argparse.ArgumentParser(
         description="Run Ruffle AVM1 image comparison tests (headless WebGPU)")
@@ -474,6 +753,9 @@ def main():
         "--md", metavar="PATH", default=str(RESULTS_MD),
         help=f"Output markdown path (default: {RESULTS_MD.name})")
     parser.add_argument(
+        "--html", metavar="PATH", default=str(RESULTS_HTML),
+        help=f"Output HTML path (default: {RESULTS_HTML.name})")
+    parser.add_argument(
         "--report-only", action="store_true",
         help="Skip running tests; regenerate .md from existing JSON")
     parser.add_argument(
@@ -484,16 +766,23 @@ def main():
     parser.add_argument(
         "--no-report", action="store_true",
         help="Skip markdown generation")
+    parser.add_argument(
+        "--no-html", action="store_true",
+        help="Skip HTML report generation")
     args = parser.parse_args()
 
     json_path = Path(args.json)
     md_path = Path(args.md)
+    html_path = Path(args.html)
 
     if args.report_only:
         if not json_path.exists():
             print(f"Error: {json_path} not found", file=sys.stderr)
             sys.exit(1)
-        generate_markdown(json_path, md_path)
+        if not args.no_report:
+            generate_markdown(json_path, md_path)
+        if not args.no_html:
+            generate_html(json_path, html_path)
         return
 
     if args.collect_only:
@@ -575,6 +864,8 @@ def main():
     # Generate markdown
     if not args.no_report:
         generate_markdown(json_path, md_path)
+    if not args.no_html:
+        generate_html(json_path, html_path)
 
     # Collect image output PNGs into _image-test-output/. A single-test
     # invocation (--test=foo) should refresh just that test's gathered

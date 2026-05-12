@@ -147,6 +147,7 @@ ruffle-tests/tests/swfs/_image-test-output/
 ruffle-tests/tests/swfs/_results/
 ruffle-tests/image_results.json
 ruffle-image-results.md
+ruffle-image-results.html
 
 # Local-only SWF batch artifacts (build_swf_batch.sh / clean_swf_batch.sh)
 docs/examples/local_batch/
