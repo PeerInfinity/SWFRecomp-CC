@@ -591,14 +591,29 @@ typedef struct TextFieldRenderInfo {
 typedef void (*TextFieldRenderCallback)(const TextFieldRenderInfo* info, void* user_data);
 int actionIterateTextFields(TextFieldRenderCallback cb, void* user_data);
 
+// Per-run formatting info (color, font_height) keyed by UTF-8 byte offsets
+// into TextFieldGlyphInfo.text_utf8. Runs cover the text consecutively. Used
+// only when text was set via htmlText/text with a TFRunTable populated; for
+// plain-text fields with no run table, runs is NULL and run_count is 0.
+typedef struct TextFieldGlyphRun {
+    u32 byte_start;
+    u32 byte_length;
+    u32 color;       // 24-bit RGB
+    u16 font_height; // twips
+} TextFieldGlyphRun;
+
 // Text field glyph rendering info (used by tag.c for headless glyph rendering)
 typedef struct TextFieldGlyphInfo {
     u16 font_id;          // SWF font ID
-    u16 font_height;      // font size in twips
-    u32 text_color;       // 24-bit RGB
+    u16 font_height;      // font size in twips (fallback default when no runs)
+    u32 text_color;       // 24-bit RGB (fallback default when no runs)
     float x, y, w, h;    // field bounds in pixels
-    const char* text_utf8; // text content (UTF-8, null-terminated)
+    const char* text_utf8; // text content (UTF-8, null-terminated); may contain
+                            // SENTINEL_TAG_BREAK (0xFE) / SENTINEL_BR_BREAK (0xFF)
+                            // bytes when sourced from a TFRunTable — treat as newline.
     size_t text_len;      // text length in bytes
+    const TextFieldGlyphRun* runs; // per-run color/font_height, NULL if none
+    int run_count;
 } TextFieldGlyphInfo;
 
 typedef void (*TextFieldGlyphCallback)(const TextFieldGlyphInfo* info, void* user_data);

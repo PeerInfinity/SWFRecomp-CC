@@ -2384,6 +2384,9 @@ static void textfield_render_cb(const TextFieldRenderInfo* info, void* user_data
 
 // Callback for actionIterateTextFieldGlyphs: render text field glyph shapes.
 // Reads glyph vertices from shape_data, applies CPU-side transform, renders via draw_tris.
+// When info->runs is non-NULL, per-byte color and font_height are looked up
+// from the run array (htmlText / styleSheet pipeline). SENTINEL bytes 0xFE and
+// 0xFF mark structural paragraph breaks and behave like newlines.
 static void textfield_glyph_render_cb(const TextFieldGlyphInfo* info, void* user_data)
 {
 	(void)user_data;
@@ -2399,16 +2402,26 @@ static void textfield_glyph_render_cb(const TextFieldGlyphInfo* info, void* user
 	if (em_square == 0) return;
 
 	size_t glyph_base = ng_font_get_glyph_base(font_idx);
-	float scale = (float)info->font_height / (float)em_square;
-
-	float r = ((info->text_color >> 16) & 0xFF) / 255.0f;
-	float g = ((info->text_color >> 8) & 0xFF) / 255.0f;
-	float b = (info->text_color & 0xFF) / 255.0f;
 
 	// 2px gutter on each side (Flash text field internal padding)
 	float gutter_twips = 40.0f;
 	float x_pos = info->x * 20.0f + gutter_twips;
-	float y_pos = info->y * 20.0f + (float)ascent * scale + gutter_twips;
+	// Baseline = ascent at the largest font_height present (Flash text layout
+	// aligns mixed-size glyphs to a shared baseline that fits the tallest run).
+	// Single-run fields just use that run's font_height; classSmol-only cells
+	// for example position their small glyph at y_top ≈ cell_top instead of
+	// the larger default-font ascent.
+	u16 baseline_fh = info->font_height;
+	if (info->runs && info->run_count > 0) {
+		u16 max_fh = 0;
+		for (int ri = 0; ri < info->run_count; ri++) {
+			if (info->runs[ri].font_height > max_fh)
+				max_fh = info->runs[ri].font_height;
+		}
+		if (max_fh > 0) baseline_fh = max_fh;
+	}
+	float baseline_scale = (float)baseline_fh / (float)em_square;
+	float y_pos = info->y * 20.0f + (float)ascent * baseline_scale + gutter_twips;
 
 	// Max 512 triangle vertices per draw_tris call (batch by glyph)
 	static float xy_buf[1024];
@@ -2416,12 +2429,31 @@ static void textfield_glyph_render_cb(const TextFieldGlyphInfo* info, void* user
 	const char* text = info->text_utf8;
 	size_t text_len = info->text_len;
 	size_t pos = 0;
+	int run_idx = 0;
 
 	while (pos < text_len) {
-		// Decode one UTF-8 character
+		// Resolve run covering this byte position (runs are in order, monotonic).
+		u32 cur_color = info->text_color;
+		u16 cur_fh = info->font_height;
+		if (info->runs && info->run_count > 0) {
+			while (run_idx < info->run_count &&
+			       pos >= (size_t)(info->runs[run_idx].byte_start + info->runs[run_idx].byte_length)) {
+				run_idx++;
+			}
+			if (run_idx < info->run_count && pos >= (size_t)info->runs[run_idx].byte_start) {
+				cur_color = info->runs[run_idx].color;
+				if (info->runs[run_idx].font_height > 0)
+					cur_fh = info->runs[run_idx].font_height;
+			}
+		}
+
+		// Decode one UTF-8 character. Treat SENTINEL 0xFE/0xFF as paragraph breaks.
 		unsigned char c0 = (unsigned char)text[pos];
 		u16 cp;
-		if (c0 >= 0xC0 && c0 < 0xE0 && pos + 1 < text_len) {
+		if (c0 == 0xFE || c0 == 0xFF) {
+			cp = '\n';
+			pos += 1;
+		} else if (c0 >= 0xC0 && c0 < 0xE0 && pos + 1 < text_len) {
 			cp = ((c0 & 0x1F) << 6) | ((unsigned char)text[pos + 1] & 0x3F);
 			pos += 2;
 		} else if (c0 >= 0xE0 && c0 < 0xF0 && pos + 2 < text_len) {
@@ -2433,7 +2465,8 @@ static void textfield_glyph_render_cb(const TextFieldGlyphInfo* info, void* user
 			pos += 1;
 		}
 
-		// Newline: advance y, reset x
+		// Newline: advance y by the field's default font_height (matches the
+		// non-run renderer), reset x.
 		if (cp == '\n' || cp == '\r') {
 			x_pos = info->x * 20.0f + gutter_twips;
 			y_pos += (float)info->font_height;
@@ -2442,6 +2475,11 @@ static void textfield_glyph_render_cb(const TextFieldGlyphInfo* info, void* user
 
 		int glyph_idx = ng_font_find_glyph(font_idx, cp);
 		if (glyph_idx < 0) continue; // missing glyph — skip
+
+		float scale = (float)cur_fh / (float)em_square;
+		float r = ((cur_color >> 16) & 0xFF) / 255.0f;
+		float g = ((cur_color >> 8) & 0xFF) / 255.0f;
+		float b = (cur_color & 0xFF) / 255.0f;
 
 		// Global glyph index
 		size_t global_idx = glyph_base + (size_t)glyph_idx;

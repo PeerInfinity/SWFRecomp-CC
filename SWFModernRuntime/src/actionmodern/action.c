@@ -22644,11 +22644,248 @@ int actionIterateTextFields(TextFieldRenderCallback cb, void* user_data)
 	return count;
 }
 
+// Parse the textfield's stored htmlText with styleSheet awareness, producing
+// per-run color/font_height runs keyed against a freshly-stripped plain-text
+// buffer. Used by the graphics-mode renderer when a styleSheet is active — the
+// existing tf_parse_html pipeline only fires when the field's html flag is set
+// to true (rare in scripts that rely on styleSheet semantics), so we do a
+// lightweight one-off parse here. Recognizes <span class="…">, <font
+// color="#…">, and <p class="…">; class lookup goes through styleSheet._styles
+// (the post-transform TextFormat clones), reading .color and .size.
+//
+// Output writes to out_text (UTF-8, null-terminated) and out_runs. Returns the
+// length of out_text. On failure / nothing to do, returns 0.
+static u32 tf_styled_runs_from_html(SWFAppContext* app_context, MovieClip* mc,
+	const char* html, u32 html_len,
+	char* out_text, u32 out_text_cap,
+	TextFieldGlyphRun* out_runs, int* out_run_count, int out_run_cap,
+	u32 default_color, u16 default_fh)
+{
+	(void)app_context;
+	if (html == NULL || html_len == 0 || out_text_cap == 0 || out_run_cap == 0) {
+		if (out_run_count) *out_run_count = 0;
+		if (out_text_cap > 0) out_text[0] = '\0';
+		return 0;
+	}
+
+	// Look up styleSheet._styles map (a transform-applied TextFormat per selector)
+	ASObject* styles_obj = NULL;
+	if (mc->dynamic_props != NULL) {
+		ASObject* props = (ASObject*)mc->dynamic_props;
+		ActionVar* ss_var = getProperty(props, "styleSheet", 10);
+		if (ss_var != NULL && ss_var->type == ACTION_STACK_VALUE_OBJECT &&
+		    ss_var->data.numeric_value != 0) {
+			ASObject* ss_obj = (ASObject*)ss_var->data.numeric_value;
+			ActionVar* styles_var = getProperty(ss_obj, "_styles", 7);
+			if (styles_var != NULL && styles_var->type == ACTION_STACK_VALUE_OBJECT &&
+			    styles_var->data.numeric_value != 0) {
+				styles_obj = (ASObject*)styles_var->data.numeric_value;
+			}
+		}
+	}
+
+	typedef struct { u32 color; u16 font_height; } StyleFrame;
+	StyleFrame stack[16];
+	int sp = 0;
+	stack[0].color = default_color & 0x00FFFFFF;
+	stack[0].font_height = default_fh;
+
+	u32 out_pos = 0;
+	int run_count = 0;
+	u32 cur_run_start = 0;
+	#define FLUSH_RUN() do { \
+		if (out_pos > cur_run_start && run_count < out_run_cap) { \
+			out_runs[run_count].byte_start = cur_run_start; \
+			out_runs[run_count].byte_length = out_pos - cur_run_start; \
+			out_runs[run_count].color = stack[sp].color; \
+			out_runs[run_count].font_height = stack[sp].font_height; \
+			run_count++; \
+		} \
+		cur_run_start = out_pos; \
+	} while (0)
+
+	u32 i = 0;
+	while (i < html_len && out_pos + 1 < out_text_cap) {
+		char c = html[i];
+		if (c == '<') {
+			// Find tag end
+			u32 tag_end = i + 1;
+			while (tag_end < html_len && html[tag_end] != '>') tag_end++;
+			if (tag_end >= html_len) break;
+			u32 tag_start = i + 1;
+			int is_close = 0;
+			if (tag_start < tag_end && html[tag_start] == '/') {
+				is_close = 1;
+				tag_start++;
+			}
+			// Extract tag name (up to space or '>')
+			u32 name_end = tag_start;
+			while (name_end < tag_end && html[name_end] != ' ' && html[name_end] != '\t') name_end++;
+			char tag_name[16];
+			u32 tag_name_len = name_end - tag_start;
+			if (tag_name_len >= sizeof(tag_name)) tag_name_len = sizeof(tag_name) - 1;
+			for (u32 k = 0; k < tag_name_len; k++) {
+				char tc = html[tag_start + k];
+				if (tc >= 'A' && tc <= 'Z') tc = (char)(tc - 'A' + 'a');
+				tag_name[k] = tc;
+			}
+			tag_name[tag_name_len] = '\0';
+
+			// Ruffle's HTML parser applies styleSheet selectors per-tag with
+			// per-tag rules (core/src/html/text_format.rs ~770-960):
+			//   <p>, <a>, <li>, other tags: apply_style(tag_name) THEN ".class"
+			//   <span>:                     apply_style(".class") only (no tag)
+			//   <font>, <textformat>:       NO styleSheet — attributes only
+			//   <b>, <i>, <u>, <br>, <sbr>: NO styleSheet
+			// We handle the subset relevant to color/size rendering.
+			int is_span = (strcmp(tag_name, "span") == 0);
+			int is_font = (strcmp(tag_name, "font") == 0);
+			int is_textformat = (strcmp(tag_name, "textformat") == 0);
+			int has_tag_style = (strcmp(tag_name, "p") == 0 ||
+			                     strcmp(tag_name, "a") == 0 ||
+			                     strcmp(tag_name, "li") == 0);
+			int has_class_style = (is_span || strcmp(tag_name, "p") == 0 ||
+			                       strcmp(tag_name, "a") == 0);
+			int is_format_tag = (is_span || is_font || is_textformat || has_tag_style);
+
+			if (is_format_tag) {
+				FLUSH_RUN();
+				if (is_close) {
+					if (sp > 0) sp--;
+				} else if (sp + 1 < (int)(sizeof(stack)/sizeof(stack[0]))) {
+					StyleFrame nf = stack[sp];
+					// apply_style: case-insensitive lookup of a selector in
+					// the styleSheet's _styles map (ASObject string-keyed).
+					// Mirrors Ruffle's lowercased StyleSheet.get_style.
+					#define APPLY_STYLE(_selector, _sel_len) do { \
+						if (styles_obj != NULL) { \
+							ASObject* _so = styles_obj; \
+							for (u32 _pi = 0; _pi < _so->num_used; _pi++) { \
+								ASProperty* _p = &_so->properties[_pi]; \
+								if (_p->name_length == (u32)(_sel_len) && \
+								    strncasecmp(_p->name, (_selector), (size_t)(_sel_len)) == 0 && \
+								    _p->value.type == ACTION_STACK_VALUE_OBJECT && \
+								    _p->value.data.numeric_value != 0) { \
+									ASObject* _fmt = (ASObject*)_p->value.data.numeric_value; \
+									ActionVar* _cp = getProperty(_fmt, "color", 5); \
+									if (_cp != NULL && _cp->type == ACTION_STACK_VALUE_F64) { \
+										double _cd; memcpy(&_cd, &_cp->data.numeric_value, sizeof(double)); \
+										nf.color = (u32)_cd & 0x00FFFFFF; \
+									} \
+									ActionVar* _szp = getProperty(_fmt, "size", 4); \
+									if (_szp != NULL && _szp->type == ACTION_STACK_VALUE_F64) { \
+										double _sz; memcpy(&_sz, &_szp->data.numeric_value, sizeof(double)); \
+										if (_sz > 0) nf.font_height = (u16)(_sz * 20.0); \
+									} \
+									break; \
+								} \
+							} \
+						} \
+					} while (0)
+
+					if (has_tag_style) APPLY_STYLE(tag_name, tag_name_len);
+
+					char class_buf[120] = "";
+					u32 class_len = 0;
+					u32 ai = name_end;
+					while (ai < tag_end) {
+						while (ai < tag_end && (html[ai] == ' ' || html[ai] == '\t')) ai++;
+						if (ai >= tag_end) break;
+						u32 attr_name_start = ai;
+						while (ai < tag_end && html[ai] != '=' && html[ai] != ' ' && html[ai] != '\t') ai++;
+						u32 attr_name_end = ai;
+						if (ai >= tag_end || html[ai] != '=') continue;
+						ai++;
+						if (ai >= tag_end) break;
+						char quote = 0;
+						if (html[ai] == '"' || html[ai] == '\'') { quote = html[ai]; ai++; }
+						u32 val_start = ai;
+						while (ai < tag_end) {
+							if (quote && html[ai] == quote) break;
+							if (!quote && (html[ai] == ' ' || html[ai] == '\t')) break;
+							ai++;
+						}
+						u32 val_end = ai;
+						if (quote && ai < tag_end) ai++;
+
+						u32 attr_name_len = attr_name_end - attr_name_start;
+						char an[16];
+						u32 anl = attr_name_len < sizeof(an) - 1 ? attr_name_len : sizeof(an) - 1;
+						for (u32 k = 0; k < anl; k++) {
+							char tc = html[attr_name_start + k];
+							if (tc >= 'A' && tc <= 'Z') tc = (char)(tc - 'A' + 'a');
+							an[k] = tc;
+						}
+						an[anl] = '\0';
+
+						if (strcmp(an, "class") == 0) {
+							u32 vs = val_start;
+							while (vs < val_end && (html[vs] == ' ' || html[vs] == '\t')) vs++;
+							u32 ve = vs;
+							while (ve < val_end && html[ve] != ' ' && html[ve] != '\t') ve++;
+							if (ve > vs) {
+								class_len = ve - vs;
+								if (class_len >= sizeof(class_buf)) class_len = sizeof(class_buf) - 1;
+								memcpy(class_buf, html + vs, class_len);
+								class_buf[class_len] = '\0';
+							}
+						} else if (strcmp(an, "color") == 0 && is_font) {
+							if (val_end - val_start == 7 && html[val_start] == '#') {
+								u32 col = 0;
+								for (u32 k = 1; k <= 6; k++) {
+									char hc = html[val_start + k];
+									col <<= 4;
+									if (hc >= '0' && hc <= '9') col |= (hc - '0');
+									else if (hc >= 'a' && hc <= 'f') col |= (hc - 'a' + 10);
+									else if (hc >= 'A' && hc <= 'F') col |= (hc - 'A' + 10);
+								}
+								nf.color = col & 0x00FFFFFF;
+							}
+						} else if (strcmp(an, "size") == 0 && is_font) {
+							int sz = atoi(html + val_start);
+							if (sz > 0) nf.font_height = (u16)(sz * 20);
+						}
+					}
+
+					if (class_len > 0 && has_class_style) {
+						char sel_dot[128];
+						int sdl = snprintf(sel_dot, sizeof(sel_dot), ".%s", class_buf);
+						if (sdl > 0 && sdl < (int)sizeof(sel_dot)) APPLY_STYLE(sel_dot, sdl);
+					}
+					#undef APPLY_STYLE
+					sp++;
+					stack[sp] = nf;
+				}
+			}
+			i = tag_end + 1;
+			continue;
+		}
+		// Plain text: copy with the same \n→\r / drop-\r convention as the
+		// stylesheet-active simple-strip path in the htmlText setter, so
+		// out_text bytes align with what props "text" stores.
+		if (c == '\n') {
+			out_text[out_pos++] = '\r';
+		} else if (c == '\r') {
+			// drop
+		} else {
+			out_text[out_pos++] = c;
+		}
+		i++;
+	}
+	FLUSH_RUN();
+	#undef FLUSH_RUN
+	out_text[out_pos] = '\0';
+	*out_run_count = run_count;
+	return out_pos;
+}
+
 // Iterate text fields and provide glyph rendering info (text content, font, color).
 int actionIterateTextFieldGlyphs(TextFieldGlyphCallback cb, void* user_data)
 {
 	int count = 0;
-	static char _tfg_utf8[4096]; // shared buffer for UTF-8 conversion
+	static char _tfg_utf8[4096]; // shared buffer for UTF-8 conversion (no-table fallback)
+	static char _tfg_styled_text[4096]; // styled-parse output buffer
+	static TextFieldGlyphRun _tfg_runs[TF_MAX_RUNS]; // shared run buffer
 	for (int i = 0; i < child_mc_count; i++) {
 		MovieClip* mc = child_mc_cache[i];
 		if (mc == NULL || mc->depth == INT_MIN) continue;
@@ -22657,17 +22894,6 @@ int actionIterateTextFieldGlyphs(TextFieldGlyphCallback cb, void* user_data)
 		if (!mc->visible) continue;
 
 		ASObject* props = (ASObject*)mc->dynamic_props;
-
-		// Get text content
-		ActionVar* text_var = getProperty(props, "text", 4);
-		if (!text_var || text_var->type != ACTION_STACK_VALUE_STRING) continue;
-		if (text_var->str_size == 0) continue;
-
-		const uint16_t* u16ptr = varGetU16Ptr(text_var);
-		if (!u16ptr) continue;
-		u16_to_utf8(u16ptr, text_var->str_size, _tfg_utf8, sizeof(_tfg_utf8));
-		size_t utf8_len = strlen(_tfg_utf8);
-		if (utf8_len == 0) continue;
 
 		// Get font info: _tf_fontId/_tf_fontHeight from TextFormat, or static metadata
 		u16 font_id = 0;
@@ -22681,7 +22907,7 @@ int actionIterateTextFieldGlyphs(TextFieldGlyphCallback cb, void* user_data)
 			else if (mc->ng_textfield_idx >= 0) font_height = ng_getTextFieldFontHeight(mc->ng_textfield_idx);
 		}
 
-		// Get text color
+		// Get text color (fallback when no run table or run color missing)
 		u32 text_color = 0x000000;
 		{
 			ActionVar* tc = getProperty(props, "textColor", 9);
@@ -22697,6 +22923,78 @@ int actionIterateTextFieldGlyphs(TextFieldGlyphCallback cb, void* user_data)
 			if (voy) vis_off_y = (float)varToDoubleSimple(voy);
 		}
 
+		// Prefer TFRunTable.text + run formatting when available (htmlText/styleSheet
+		// path populates per-run color and font_height). Falls back to props "text"
+		// (UTF-16 → UTF-8) painted with a single text_color when no table exists.
+		const char* text_utf8 = NULL;
+		size_t utf8_len = 0;
+		const TextFieldGlyphRun* runs_out = NULL;
+		int run_count_out = 0;
+
+		TFRunTable* table = tf_find_table(mc);
+		// Check for an active styleSheet — if present and the raw-content flag
+		// is clear, parse the stored htmlText with stylesheet awareness to get
+		// per-run colors. (The existing tf_parse_html only fires for
+		// `html` = true; many AS2 scripts rely on styleSheet alone.)
+		int used_styled = 0;
+		if (table == NULL || table->run_count == 0) {
+			ActionVar* ss_var = getProperty(props, "styleSheet", 10);
+			int ss_active = (ss_var != NULL && ss_var->type == ACTION_STACK_VALUE_OBJECT &&
+				ss_var->data.numeric_value != 0);
+			if (ss_active) {
+				ActionVar* ht_var = getProperty(props, "htmlText", 8);
+				if (ht_var != NULL && ht_var->type == ACTION_STACK_VALUE_STRING &&
+				    ht_var->str_size > 0) {
+					const uint16_t* ht_u16 = varGetU16Ptr(ht_var);
+					if (ht_u16 != NULL) {
+						char ht_utf8[16384];
+						u32 ht_len = (u32)u16_to_utf8(ht_u16, ht_var->str_size,
+							ht_utf8, sizeof(ht_utf8));
+						int rc_out = 0;
+						u32 plen = tf_styled_runs_from_html(NULL, mc,
+							ht_utf8, ht_len,
+							_tfg_styled_text, sizeof(_tfg_styled_text),
+							_tfg_runs, &rc_out, TF_MAX_RUNS,
+							text_color, font_height);
+						if (plen > 0) {
+							text_utf8 = _tfg_styled_text;
+							utf8_len = plen;
+							runs_out = _tfg_runs;
+							run_count_out = rc_out;
+							used_styled = 1;
+						}
+					}
+				}
+			}
+		}
+		if (used_styled) {
+			// already wired up
+		} else if (table != NULL && table->run_count > 0 && table->text_len > 0) {
+			text_utf8 = table->text;
+			utf8_len = table->text_len;
+			int rc = (int)table->run_count;
+			if (rc > TF_MAX_RUNS) rc = TF_MAX_RUNS;
+			for (int ri = 0; ri < rc; ri++) {
+				TFRun* r = &table->runs[ri];
+				_tfg_runs[ri].byte_start = r->start;
+				_tfg_runs[ri].byte_length = r->length;
+				_tfg_runs[ri].color = r->color & 0x00FFFFFF;
+				_tfg_runs[ri].font_height = (u16)r->font_height;
+			}
+			runs_out = _tfg_runs;
+			run_count_out = rc;
+		} else {
+			ActionVar* text_var = getProperty(props, "text", 4);
+			if (!text_var || text_var->type != ACTION_STACK_VALUE_STRING) continue;
+			if (text_var->str_size == 0) continue;
+			const uint16_t* u16ptr = varGetU16Ptr(text_var);
+			if (!u16ptr) continue;
+			u16_to_utf8(u16ptr, text_var->str_size, _tfg_utf8, sizeof(_tfg_utf8));
+			utf8_len = strlen(_tfg_utf8);
+			if (utf8_len == 0) continue;
+			text_utf8 = _tfg_utf8;
+		}
+
 		TextFieldGlyphInfo info;
 		info.font_id = font_id;
 		info.font_height = font_height;
@@ -22705,8 +23003,10 @@ int actionIterateTextFieldGlyphs(TextFieldGlyphCallback cb, void* user_data)
 		info.y = mc->y + vis_off_y;
 		info.w = mc->width;
 		info.h = mc->height;
-		info.text_utf8 = _tfg_utf8;
+		info.text_utf8 = text_utf8;
 		info.text_len = utf8_len;
+		info.runs = runs_out;
+		info.run_count = run_count_out;
 
 		cb(&info, user_data);
 		count++;
