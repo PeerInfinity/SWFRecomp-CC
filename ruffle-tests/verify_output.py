@@ -277,6 +277,20 @@ def compare_images(actual_path, expected_path, checks):
         if d > max_diff:
             max_diff = d
 
+    # Save the difference image whenever there's something to look at.
+    # Skips strict passes (max_diff=0 → an all-black PNG that adds no
+    # signal); tolerance passes still get a diff written so reviewers
+    # can see which pixels drift even on a "pass". Best-effort: a failed
+    # save doesn't fail the check itself.
+    if max_diff > 0:
+        diff_image_path = actual_path.parent / (actual_path.stem + ".difference.png")
+        try:
+            diff_img = Image.frombytes("RGBA", actual_img.size, bytes(difference_data))
+            diff_img = diff_img.point(lambda x: min(x * 4, 255))
+            diff_img.save(str(diff_image_path))
+        except Exception:
+            pass
+
     # Try each check -- test passes if ANY check passes (Ruffle semantics)
     best_outliers = None
     best_max_outliers = None
@@ -304,17 +318,8 @@ def compare_images(actual_path, expected_path, checks):
             best_outliers = outliers
             best_max_outliers = max_outliers
 
-    # All checks failed -- generate difference image
-    diff_image_path = actual_path.parent / (actual_path.stem + ".difference.png")
-    try:
-        diff_img = Image.frombytes("RGBA", actual_img.size, bytes(difference_data))
-        # Scale up for visibility: multiply difference values by 4
-        from PIL import ImageEnhance
-        diff_img = diff_img.point(lambda x: min(x * 4, 255))
-        diff_img.save(str(diff_image_path))
-    except Exception:
-        pass  # Don't fail the test just because we couldn't save the diff image
-
+    # All checks failed. The difference image was already saved above
+    # (or skipped, if max_diff was 0 — which can't happen on a fail).
     return (False,
             f"Image comparison failed: {best_outliers} outliers exceed limit of "
             f"{best_max_outliers}, max difference {max_diff}",
