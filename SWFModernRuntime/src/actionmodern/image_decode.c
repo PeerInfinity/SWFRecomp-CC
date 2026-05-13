@@ -45,9 +45,15 @@ int decodeAndAttachImageToMC(MovieClip* mc, const unsigned char* data, int data_
 			argb[i] = 0;
 			continue;
 		} else {
-			pr = ((uint32_t)r * a + 127) / 255;
-			pg = ((uint32_t)g * a + 127) / 255;
-			pb = ((uint32_t)b * a + 127) / 255;
+			// Floor division (NOT round) to match Ruffle's premultiplied
+			// alpha math. Off-by-one differences are visible against
+			// solid white backdrops — key test:
+			// avm1/movieclip_methods_with_loaded_image, where source
+			// (174, 49, 63 alpha) blends to (255, 234, 204) with floor
+			// vs (255, 235, 204) with round-half-up.
+			pr = (uint32_t)r * a / 255;
+			pg = (uint32_t)g * a / 255;
+			pb = (uint32_t)b * a / 255;
 		}
 		argb[i] = ((uint32_t)a << 24) | (pr << 16) | (pg << 8) | pb;
 	}

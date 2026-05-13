@@ -1091,6 +1091,19 @@ void swfStart(SWFAppContext* app_context)
 	tagMain(app_context);
 
 #ifdef OFFSCREEN_RENDER
+	// Refresh the readback buffer with the final scene state before saving
+	// last_frame captures. Without this, tests whose only meaningful state
+	// change happens AFTER the last tagShowFrame (e.g. mc.loadMovie on a
+	// single-frame SWF: tagShowFrame runs before actionFirePendingDirectLoads
+	// attaches the decoded pixels, and no later tick re-renders) capture an
+	// out-of-date snapshot. Key test: avm1/movieclip_methods_with_loaded_image.
+	{
+		extern void tagRerenderFrame(SWFAppContext* app_context);
+		if (context != NULL && context->renderer_ok) {
+			renderer_request_capture(context);
+			tagRerenderFrame(app_context);
+		}
+	}
 	// Save any unsaved last_frame captures from the readback buffer before
 	// renderer teardown. Mirrors swf_headless.c line ~1332.
 	capture_save_last_frame();

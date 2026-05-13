@@ -20273,6 +20273,17 @@ void actionFirePendingDirectLoads(SWFAppContext* app_context)
 		if (entry->swf_version == 0) {
 			mc->loaded_image_width = entry->stage_width;
 			mc->loaded_image_height = entry->stage_height;
+			// Decode bundled image bytes and attach to MC so the renderer
+			// can draw it. Mirrors the MCL Pre-phase path in
+			// actionFirePendingLoadInits — loadMovie targets a non-MCL MC
+			// but needs the same decode + attached_bitmap_pixels wiring.
+			extern int decodeAndAttachImageToMC(MovieClip*, const unsigned char*, int);
+			DataFileEntry* img_data = findDataFile(entry->filename);
+			if (img_data != NULL && img_data->content != NULL && img_data->content_length > 0) {
+				decodeAndAttachImageToMC(mc,
+				                         (const unsigned char*)img_data->content,
+				                         img_data->content_length);
+			}
 			continue;
 		}
 		mc->loaded_image_width = 0;
