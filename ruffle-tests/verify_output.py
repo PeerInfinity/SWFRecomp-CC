@@ -1321,6 +1321,29 @@ def generate_data_registry(data_files, build_dir):
     lines.append("}")
     lines.append("")
 
+    # Scan bundled data files for image dimensions so the renderer can size
+    # its dynamic bitmap texture array to fit MCL image loads (.gif/.jpg/.png).
+    # Uses stbi_info_from_memory (declared locally to avoid pulling in all of
+    # stb_image.h from a generated file).
+    lines.append("extern int stbi_info_from_memory(const unsigned char* buffer, int len,")
+    lines.append("    int* x, int* y, int* comp);")
+    lines.append("")
+    lines.append("void getDataFilesMaxImageDims(int* out_w, int* out_h) {")
+    lines.append("    int max_w = 0, max_h = 0;")
+    lines.append("    for (int i = 0; g_data_files[i].filename != NULL; i++) {")
+    lines.append("        int w = 0, h = 0, comp = 0;")
+    lines.append("        if (stbi_info_from_memory(")
+    lines.append("                (const unsigned char*)g_data_files[i].content,")
+    lines.append("                g_data_files[i].content_length, &w, &h, &comp)) {")
+    lines.append("            if (w > max_w) max_w = w;")
+    lines.append("            if (h > max_h) max_h = h;")
+    lines.append("        }")
+    lines.append("    }")
+    lines.append("    if (out_w) *out_w = max_w;")
+    lines.append("    if (out_h) *out_h = max_h;")
+    lines.append("}")
+    lines.append("")
+
     out_path = build_dir / "data_registry.c"
     out_path.write_text("\n".join(lines))
 
@@ -1407,6 +1430,7 @@ def compile_native(test_dir, num_frames, build_dir, mode="no-graphics", has_imag
         "src/actionmodern/object.c",
         "src/actionmodern/action_queue.c",
         "src/actionmodern/sprite_frame_scripts.c",
+        "src/actionmodern/image_decode.c",
         "src/actionmodern/unicode_case_tables.h",
         "src/utils.c",
         "src/libswf/tag.c",
@@ -1414,6 +1438,7 @@ def compile_native(test_dir, num_frames, build_dir, mode="no-graphics", has_imag
         "src/libswf/shape_hit_test.c",
         "src/libswf/ng_shared.c",
         "src/libswf/hit_test.c",
+        "src/libswf/stb_image_impl.c",
         "src/memory/heap.c",
     ]
     if mode == "graphics-headless-legacy":
@@ -1437,6 +1462,7 @@ def compile_native(test_dir, num_frames, build_dir, mode="no-graphics", has_imag
     shutil.copy2(SWFMODERN / "lib/c-hashmap/map.c", build_dir)
     shutil.copy2(SWFMODERN / "lib/o1heap/o1heap.c", build_dir)
     shutil.copy2(SWFMODERN / "lib/o1heap/o1heap.h", build_dir)
+    shutil.copy2(SWFMODERN / "lib/stb/stb_image.h", build_dir)
     shutil.copy2(SWFMODERN / "include/memory/heap.h", mem_dir)
     # Copy libtess2 tessellation library
     libtess2_dir = SWFMODERN / "third_party" / "libtess2"
@@ -1741,11 +1767,13 @@ def compile_wasm(test_dir, num_frames, build_dir):
         "src/actionmodern/object.c",
         "src/actionmodern/action_queue.c",
         "src/actionmodern/sprite_frame_scripts.c",
+        "src/actionmodern/image_decode.c",
         "src/actionmodern/unicode_case_tables.h",
         "src/utils.c",
         "src/libswf/tag.c",
         "src/libswf/ng_shared.c",
         "src/libswf/hit_test.c",
+        "src/libswf/stb_image_impl.c",
         "src/memory/heap.c",
         "src/libswf/swf_core.c",
         "src/libswf/tag_stubs.c",
@@ -1756,6 +1784,7 @@ def compile_wasm(test_dir, num_frames, build_dir):
     shutil.copy2(SWFMODERN / "lib/c-hashmap/map.c", build_dir)
     shutil.copy2(SWFMODERN / "lib/o1heap/o1heap.c", build_dir)
     shutil.copy2(SWFMODERN / "lib/o1heap/o1heap.h", build_dir)
+    shutil.copy2(SWFMODERN / "lib/stb/stb_image.h", build_dir)
     shutil.copy2(SWFMODERN / "include/memory/heap.h", mem_dir)
     libtess2_dir = SWFMODERN / "third_party" / "libtess2"
     if libtess2_dir.exists():

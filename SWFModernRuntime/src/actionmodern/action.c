@@ -29198,6 +29198,19 @@ void actionFirePendingLoadInits(SWFAppContext* app_context)
                     loads[i].target->currentframe = 1;
                     loads[i].target->byte_size = loads[i].entry->file_size;
                     loads[i].target->movie_id = loads[i].entry->movie_id;
+                    // Decode bundled bytes (if any) and attach to MC so the
+                    // renderer can draw the image. The MovieEntry only carries
+                    // dimensions/metadata; the raw bytes live in the data
+                    // registry under the same filename. Matches the rendering
+                    // behaviour of the .gif branch below.
+                    extern DataFileEntry* findDataFile(const char* name);
+                    extern int decodeAndAttachImageToMC(MovieClip*, const unsigned char*, int);
+                    DataFileEntry* img_data = findDataFile(loads[i].entry->filename);
+                    if (img_data != NULL && img_data->content != NULL && img_data->content_length > 0) {
+                        decodeAndAttachImageToMC(loads[i].target,
+                                                 (const unsigned char*)img_data->content,
+                                                 img_data->content_length);
+                    }
                 } else {
                     loads[i].target->loaded_image_width = 0;
                     loads[i].target->loaded_image_height = 0;
@@ -29210,6 +29223,28 @@ void actionFirePendingLoadInits(SWFAppContext* app_context)
             } else if (loads[i].is_swf_url) {
                 // Failed .swf load: still update the URL on the target MC
                 constructChildURL(loads[i].target->url, sizeof(loads[i].target->url), loads[i].url);
+            } else {
+                // Non-.swf URL (e.g. .gif/.jpg/.png): look up bundled bytes
+                // and decode → premultiplied ARGB attached to the target MC.
+                // The renderer picks up attached_bitmap_pixels via
+                // actionIterateAttachedBitmaps and draws a textured quad at
+                // mc->x, mc->y. Trace events still fire normally; if decode
+                // fails the MC stays blank but events are unaffected.
+                constructChildURL(loads[i].target->url, sizeof(loads[i].target->url), loads[i].url);
+                extern DataFileEntry* findDataFile(const char* name);
+                extern int decodeAndAttachImageToMC(MovieClip*, const unsigned char*, int);
+                DataFileEntry* data = findDataFile(loads[i].url);
+                if (data != NULL && data->content != NULL && data->content_length > 0) {
+                    if (decodeAndAttachImageToMC(loads[i].target,
+                                                 (const unsigned char*)data->content,
+                                                 data->content_length)) {
+                        loads[i].target->load_failed = 0;
+                        loads[i].target->totalframes = 1;
+                        loads[i].target->framesloaded = 1;
+                        loads[i].target->currentframe = 1;
+                        loads[i].target->byte_size = data->content_length;
+                    }
+                }
             }
         }
     }

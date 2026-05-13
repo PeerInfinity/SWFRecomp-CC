@@ -57,6 +57,10 @@ DataFileEntry* findDataFile(const char* filename) {
 	(void)filename;
 	return NULL;
 }
+void getDataFilesMaxImageDims(int* out_w, int* out_h) {
+	if (out_w) *out_w = 0;
+	if (out_h) *out_h = 0;
+}
 #endif
 
 // Renderer context (global, referenced by tag.c for rendering)

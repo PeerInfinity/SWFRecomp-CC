@@ -1015,6 +1015,23 @@ void swfStart(SWFAppContext* app_context)
 	// renderer_init calls emscripten_sleep() which consumes the gesture.
 	audio_output_init(app_context);
 
+	// Size the dynamic bitmap texture array large enough for any bundled
+	// image the test may load via MovieClipLoader.loadClip("foo.png" / .gif /
+	// .jpg). Defaults to 256×256 inside the renderer; bump up here when the
+	// data registry reports a larger image (capped at 2048 to keep VRAM use
+	// reasonable). The renderer preserves a pre-set value (see
+	// create_buffers_and_upload in render_webgpu.c).
+	{
+		int max_w = 0, max_h = 0;
+		getDataFilesMaxImageDims(&max_w, &max_h);
+		if (max_w > 2048) max_w = 2048;
+		if (max_h > 2048) max_h = 2048;
+		if ((u32)max_w > context->dynamic_bitmap_max_w)
+			context->dynamic_bitmap_max_w = (u32)max_w;
+		if ((u32)max_h > context->dynamic_bitmap_max_h)
+			context->dynamic_bitmap_max_h = (u32)max_h;
+	}
+
 	renderer_init(app_context, context);
 
 #ifdef OFFSCREEN_RENDER
@@ -1112,6 +1129,10 @@ MovieEntry* findMovieEntry(const char* filename) {
 DataFileEntry* findDataFile(const char* filename) {
 	(void)filename;
 	return NULL;
+}
+void getDataFilesMaxImageDims(int* out_w, int* out_h) {
+	if (out_w) *out_w = 0;
+	if (out_h) *out_h = 0;
 }
 #endif
 

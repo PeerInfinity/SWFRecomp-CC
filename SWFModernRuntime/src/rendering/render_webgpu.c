@@ -839,8 +839,11 @@ static void create_buffers_and_upload(WebGPURenderContext* ctx)
 		ctx->dynamic_bitmap_base = (u32)ctx->bitmap_count;
 		ctx->dynamic_bitmap_capacity = MAX_DYNAMIC_BITMAPS;
 		ctx->dynamic_bitmap_used = 0;
-		ctx->dynamic_bitmap_max_w = 256;
-		ctx->dynamic_bitmap_max_h = 256;
+		// Callers (e.g. swf.c::swfStart) may pre-set these to fit a bundled
+		// image larger than 256×256 before renderer_init; only apply the
+		// default floor when unset.
+		if (ctx->dynamic_bitmap_max_w == 0) ctx->dynamic_bitmap_max_w = 256;
+		if (ctx->dynamic_bitmap_max_h == 0) ctx->dynamic_bitmap_max_h = 256;
 	}
 
 	// Over-allocate cxform buffer for dynamic runtime cxform slots

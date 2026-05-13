@@ -343,4 +343,11 @@ typedef struct DataFileEntry {
 // Find a pre-bundled data file by filename (defined in data_registry.c when HAS_DATA_FILES)
 DataFileEntry* findDataFile(const char* filename);
 
+// Scan bundled data files for the largest image (GIF/JPEG/PNG/BMP) dimensions.
+// Returns 0 in both outputs when no data files are linked or none are images.
+// Defined in data_registry.c when HAS_DATA_FILES; stubbed otherwise.
+// Used by the renderer to size the dynamic bitmap texture array for
+// MovieClipLoader.loadClip("foo.{gif,jpg,png}") image loads.
+void getDataFilesMaxImageDims(int* out_w, int* out_h);
+
 void swfStart(SWFAppContext* app_context);
