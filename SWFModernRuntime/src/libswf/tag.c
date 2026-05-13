@@ -2834,30 +2834,22 @@ void tagRerenderFrame(SWFAppContext* app_context)
 		}
 		else if (ch->type == CHAR_TYPE_BUTTON)
 		{
-			DisplayObject* saved_display_list = display_list;
-			size_t saved_max_depth = max_depth;
-			size_t saved_capacity = display_list_capacity;
-			display_list_capacity = INITIAL_DISPLAYLIST_CAPACITY;
-			display_list = (DisplayObject*) calloc(display_list_capacity, sizeof(DisplayObject));
-			max_depth = 0;
-			u8 state = obj->button_state;
-			if (ch->button_state_funcs[state] != NULL)
-				ch->button_state_funcs[state](app_context);
-			const float* btn_xform = (const float*)app_context->transform_data + obj->transform_id * 16;
-			int saved_xform_count = g_xform_override_count;
-			int saved_cxform_count = g_cxform_override_count;
-			compose_children(app_context, display_list, max_depth, btn_xform,
-				obj->cx_overridden || obj->has_cxform, obj->cxform_id);
-			for (int k = g_xform_override_count - 1; k >= saved_xform_count; --k)
-				g_xform_overrides[k].obj->transform_id = g_xform_overrides[k].original_id;
-			g_xform_override_count = saved_xform_count;
-			for (int k = g_cxform_override_count - 1; k >= saved_cxform_count; --k)
-				g_cxform_overrides[k].obj->cxform_id = g_cxform_overrides[k].original_id;
-			g_cxform_override_count = saved_cxform_count;
-			free(display_list);
-			display_list = saved_display_list;
-			max_depth = saved_max_depth;
-			display_list_capacity = saved_capacity;
+			// Compose against the persistent obj->sprite_display_list populated
+			// by the first tagShowFrame. The previous implementation built a
+			// fresh temp display_list via ch->button_state_funcs and freed it
+			// here, which leaked the cxform/transform propagation: render_single_object
+			// reads obj->sprite_display_list and so saw the original (uncomposed)
+			// child entries. That caused buttons to render with identity cxform
+			// and the un-composed transform (often slot 0/position 0), overlapping
+			// other display-list entries.
+			if (obj->sprite_display_list != NULL && obj->sprite_max_depth > 0)
+			{
+				const float* btn_xform = (const float*)app_context->transform_data + obj->transform_id * 16;
+				compose_children(app_context,
+					obj->sprite_display_list, obj->sprite_max_depth,
+					btn_xform,
+					obj->cx_overridden || obj->has_cxform, obj->cxform_id);
+			}
 		}
 		else if (ch->type == CHAR_TYPE_TEXT)
 		{
