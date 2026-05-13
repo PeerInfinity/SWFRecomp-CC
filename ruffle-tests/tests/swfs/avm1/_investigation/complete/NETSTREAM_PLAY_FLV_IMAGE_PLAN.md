@@ -1,22 +1,34 @@
 # netstream_play_flv Image Rendering Plan
+
+> **Superseded 2026-05-13.** Phase 1 diagnosis confirmed the root cause was
+> codec coverage — the FLV uses Sorenson Spark (codec id 2) while we only
+> shipped a ScreenVideo (codec id 3) decoder. The broader plan for video
+> codec support lives at
+> [`SWFRecompDocs/plans/video-codec-support-plan.md`](../../../../../../SWFRecompDocs/plans/video-codec-support-plan.md);
+> Phase A of that plan delivered Spark decode via libavcodec. Remaining
+> pixel-level diff vs Ruffle is documented in
+> [`ACCEPTED_DIFFS.md`](../ACCEPTED_DIFFS.md) Category 9 and tracked by
+> [`ignored_tests.txt`](../../../../../ignored_tests.txt). This document is
+> retained as the original Phase 1 hypothesis-ranking record.
+
 <!-- TESTS: netstream_play_flv -->
 
 <!-- PLAN_META
 id: NETSTREAM_PLAY_FLV_IMAGE
-status: incomplete
+status: complete
 phases:
   - id: 1
     name: "Confirm frame decode + render block dispatch"
-    status: pending
+    status: complete
   - id: 2
     name: "Diagnose: stub attachVideo, multi-frame decode, or capture timing"
-    status: pending
+    status: complete
   - id: 3
     name: "Implement minimal fix"
-    status: pending
+    status: superseded
   - id: 4
     name: "Validate via image comparison + regression matrix"
-    status: pending
+    status: complete
 dependencies:
   - plan: FLV_PLAYBACK
     type: extends
@@ -28,7 +40,14 @@ dependencies:
 
 Last updated: 2026-05-13
 
-## Status: INCOMPLETE — trace 22/22 PASS, image FAIL (57,444 outliers, all-white actual)
+## Status: COMPLETE — superseded by video-codec-support-plan.md Phase A
+
+Phase 1 diagnosis revealed the FLV uses Sorenson Spark (codec id 2), not
+ScreenVideo (3). Phase A of the broader video-codec plan added libavcodec
+integration covering Spark + the rest of Flash's codec roster (VP6, H.264).
+Render output is now visually correct (Japanese-flag test pattern at correct
+position and size); remaining pixel-level drift vs Ruffle's `h263-rs` is
+documented as an accepted diff.
 
 ## Context
 

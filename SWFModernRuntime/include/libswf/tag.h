@@ -183,7 +183,7 @@ void tagDefineFontMetrics(SWFAppContext* app_context, u16 font_id,
     s16 ascent, s16 descent, s16 leading, int em_square,
     const u16* code_table, const s16* advance_table, size_t glyph_count);
 void tagDefineFontGlyphBase(u16 font_id, size_t glyph_base);
-void tagDefineVideoStream(SWFAppContext* app_context, u16 char_id);
+void tagDefineVideoStream(SWFAppContext* app_context, u16 char_id, u16 width, u16 height);
 void tagRegisterExport(SWFAppContext* app_context, const char* name, size_t char_id);
 void tagImportCharacter(SWFAppContext* app_context, size_t local_char_id, const char* export_name);
 
@@ -454,8 +454,9 @@ void ng_computeScrollMixedFont(u16 font_id, u16 base_font_height, s16 leading_tw
     int* out_maxscroll, int* out_bottomscroll, int* out_text_height_twips);
 // ng_findFontIdByName, ng_getTextExtent, ng_lookupExport, ng_getSoundDuration
 // are declared above (outside #ifdef NO_GRAPHICS) since action.c needs them in all modes.
-void ng_record_video(SWFAppContext* app_context, u16 char_id);
+void ng_record_video(SWFAppContext* app_context, u16 char_id, u16 width, u16 height);
 int ng_isVideoChar(size_t char_id);
+int ng_getVideoDimensions(size_t char_id, u16* out_w, u16* out_h);
 // Attach a library symbol by char_id. Returns created MC, or NULL if not sprite.
 MovieClip* ng_attachMovie(SWFAppContext* app_context, size_t char_id, const char* new_name, int as_depth, MovieClip* parent);
 // Called after tagPlaceObject2 places an object (handles auto-naming, MC creation, textfield init)

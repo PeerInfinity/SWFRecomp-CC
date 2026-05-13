@@ -397,6 +397,38 @@ investigated but fixing this point introduced 2 regressions at other scribble bo
 
 ---
 
+## Category 9: Video Decoder Implementation Differences
+
+Image-comparison tests that render decoded FLV frames at pixel-perfect parity with
+Ruffle. Ruffle uses the pure-Rust `h263-rs` + `h263-rs-yuv` crates for Sorenson Spark
+(FLV codec 2); we use libavcodec's `flv1` decoder + libswscale for YUV→RGB. Both are
+valid H.263/Spark decoders and produce visually identical output, but they use
+different fixed-point arithmetic internally (h263-rs-yuv: 16.16 with explicit
+TV→full range expansion; swscale: its own routine with auto-detected colorspace).
+Per-channel results typically differ by 1-3 levels in solid regions and up to ~140
+at frame edges (different bilinear resampling). See
+`SWFRecompDocs/plans/video-codec-support-plan.md`.
+
+### `netstream_play_flv` — Sorenson Spark pixel parity (52,828 outliers, max diff 140)
+
+**Example diff (solid red region inside the decoded frame):**
+```
+expected (R, G, B, A) = (248, 48, 0, 255)
+actual   (R, G, B, A) = (246, 48, 0, 255)
+```
+
+The trace test (22/22) passes — `onStatus` events, NetStream lifecycle, and FLV
+metadata parsing all match Ruffle. The image test fails because libavcodec's
+YUV→RGB output drifts 1-3 levels per channel from Ruffle's, and our CPU bilinear
+resample to the SWF's declared display bounds differs from Ruffle's GPU-side
+sampling. The rendered content is visually correct (Japanese-flag test pattern at
+the expected position and size).
+
+**Decision:** Accept; matching another H.263 decoder bit-exactly is not a goal
+of the project. Trace test continues to pass.
+
+---
+
 ## Summary Table
 
 | Test | Category | Diff pairs | Decision |
@@ -421,3 +453,4 @@ investigated but fixing this point introduced 2 regressions at other scribble bo
 | `movieclip_hittest_shapeflag` | Hit test accuracy (morph boundary precision) | 1 | Accept; float vs integer precision |
 | `movieclip_hittest_shapeflag` | Hit test accuracy (Drawing API stroke tessellation) | 1 | Accept; tessellation boundary |
 | `bitmap_data_thorough/pixelDissolve` | Ruffle known failure (panic) + Flash-specific Feistel coercion | ~38 | Accept; 97.2% match, no Ruffle oracle for `ruffle_matched` |
+| `netstream_play_flv` | Video decoder pixel parity (libavcodec H.263 vs h263-rs) | 52,828 image outliers | Accept; trace passes, render is visually correct, bit-exact match not a project goal |

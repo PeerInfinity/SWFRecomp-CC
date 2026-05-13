@@ -588,7 +588,12 @@ int actionIterateAttachedBitmaps(AttachedBitmapCallback cb, void* user_data);
 // Video frame access for headless rendering (decoded FLV frames).
 // Returns 1 if a decoded frame is available. Caller must free *out_argb.
 // Format: ARGB u32 (A=bits31-24, R=bits23-16, G=bits15-8, B=bits7-0).
-int actionGetVideoFramePixels(uint32_t** out_argb, int* out_w, int* out_h);
+//
+// If target_w > 0 && target_h > 0 and the cached frame is at different
+// dimensions, the frame is resampled (via libswscale when available) to the
+// target before ARGB packing. Pass target_w=target_h=0 to get native size.
+int actionGetVideoFramePixels(uint32_t** out_argb, int target_w, int target_h,
+                              int* out_w, int* out_h);
 
 // Text field rendering info (used by tag.c in graphics mode)
 typedef struct TextFieldRenderInfo {

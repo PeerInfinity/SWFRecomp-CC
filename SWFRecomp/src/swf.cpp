@@ -4264,20 +4264,31 @@ namespace SWFRecomp
 
 			case SWF_TAG_DEFINE_VIDEO_STREAM:
 			{
-				// DefineVideoStream: CharacterID (UI16) is first field (bytes 0-1 of tag data)
-				// Use a temp pointer so parseFields doesn't advance the real cur_pos
+				// DefineVideoStream layout: CharacterID (UI16), NumFrames (UI16),
+				// Width (UI16, pixels), Height (UI16, pixels), then flags + CodecID.
+				// We need char_id + the declared display dimensions; the renderer
+				// scales decoded frames to (Width, Height) so an FLV encoded at a
+				// different resolution still occupies the placed bounds.
 				char* tmp = cur_pos;
 				tag.clearFields();
-				tag.setFieldCount(1);
+				tag.setFieldCount(4);
 				tag.configureNextField(SWF_FIELD_UI16); // CharacterID
+				tag.configureNextField(SWF_FIELD_UI16); // NumFrames
+				tag.configureNextField(SWF_FIELD_UI16); // Width
+				tag.configureNextField(SWF_FIELD_UI16); // Height
 				tag.parseFields(tmp); // advances tmp, not cur_pos
 
 				u16 video_char_id = (u16) tag.fields[0].value;
+				u16 video_width   = (u16) tag.fields[2].value;
+				u16 video_height  = (u16) tag.fields[3].value;
 
 				// Register video char_id for place-before-define tracking.
 				defined_chars.insert(video_char_id);
 
-				tag_init << endl << "\ttagDefineVideoStream(app_context, " << to_string(video_char_id) << ");";
+				tag_init << endl << "\ttagDefineVideoStream(app_context, "
+				         << to_string(video_char_id) << ", "
+				         << to_string(video_width) << ", "
+				         << to_string(video_height) << ");";
 
 				cur_pos += tag.length;
 				break;

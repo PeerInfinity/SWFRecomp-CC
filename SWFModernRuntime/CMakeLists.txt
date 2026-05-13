@@ -17,6 +17,15 @@ option(USE_WEBGPU "Use WebGPU rendering backend (native + WASM)" OFF)
 # Option for headless graphics mode (NO_GRAPHICS display management + WebGPU offscreen rendering)
 option(HEADLESS_GRAPHICS "Build headless graphics mode for image testing" OFF)
 
+# Link libavcodec for full Flash video codec coverage (Spark, VP6, H.264, ...).
+# Default: ON for any graphics-capable native build; OFF for NO_GRAPHICS and
+# Emscripten (WASM strategy handled in Phase E of the video codec plan).
+if(NO_GRAPHICS OR EMSCRIPTEN)
+    option(WITH_LIBAVCODEC "Link libavcodec for full Flash video codec support" OFF)
+else()
+    option(WITH_LIBAVCODEC "Link libavcodec for full Flash video codec support" ON)
+endif()
+
 # Core sources (always included)
 set(CORE_SOURCES
     ${PROJECT_SOURCE_DIR}/src/actionmodern/action.c
@@ -28,6 +37,7 @@ set(CORE_SOURCES
     ${PROJECT_SOURCE_DIR}/src/actionmodern/object.c
     ${PROJECT_SOURCE_DIR}/src/actionmodern/action_queue.c
     ${PROJECT_SOURCE_DIR}/src/actionmodern/sprite_frame_scripts.c
+    ${PROJECT_SOURCE_DIR}/src/actionmodern/video_codec.c
     ${PROJECT_SOURCE_DIR}/src/utils.c
 
     # Compile hashmap file directly to avoid undefined symbols on Linux
@@ -115,6 +125,18 @@ set(RENAME_ZCONF OFF)
 
 add_subdirectory(${PROJECT_SOURCE_DIR}/lib/zlib)
 add_subdirectory(${PROJECT_SOURCE_DIR}/lib/lzma)
+
+# libavcodec / libavutil / libswscale — Flash video codec coverage. See
+# SWFRecompDocs/plans/video-codec-support-plan.md.
+if(WITH_LIBAVCODEC)
+    find_package(PkgConfig REQUIRED)
+    pkg_check_modules(LIBAV REQUIRED IMPORTED_TARGET libavcodec libavutil libswscale)
+    target_compile_definitions(${PROJECT_NAME} PRIVATE SWF_HAVE_LIBAVCODEC)
+    target_link_libraries(${PROJECT_NAME} PUBLIC PkgConfig::LIBAV)
+    message(STATUS "WITH_LIBAVCODEC: ON (libavcodec ${LIBAV_libavcodec_VERSION})")
+else()
+    message(STATUS "WITH_LIBAVCODEC: OFF — only ScreenVideo (codec id 3) will decode")
+endif()
 
 if(HEADLESS_GRAPHICS)
     # Headless graphics: WebGPU rendering but no SDL windowing

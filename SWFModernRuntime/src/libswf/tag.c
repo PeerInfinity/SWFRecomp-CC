@@ -1457,7 +1457,9 @@ static void render_single_object(SWFAppContext* app_context, DisplayObject* obj)
 	if (ng_isVideoChar(obj->char_id)) {
 		uint32_t* argb = NULL;
 		int vw = 0, vh = 0;
-		if (actionGetVideoFramePixels(&argb, &vw, &vh)) {
+		u16 decl_w = 0, decl_h = 0;
+		ng_getVideoDimensions(obj->char_id, &decl_w, &decl_h);
+		if (actionGetVideoFramePixels(&argb, (int)decl_w, (int)decl_h, &vw, &vh)) {
 			renderer_draw_bitmap_quad(context, argb, (u32)vw, (u32)vh,
 				0.0f, 0.0f, obj->transform_id, obj->cxform_id);
 			free(argb);
@@ -1521,7 +1523,9 @@ static void render_display_list(SWFAppContext* app_context, DisplayObject* dl, s
 		if (ng_isVideoChar(obj->char_id)) {
 			uint32_t* argb = NULL;
 			int vw = 0, vh = 0;
-			if (actionGetVideoFramePixels(&argb, &vw, &vh)) {
+			u16 decl_w = 0, decl_h = 0;
+			ng_getVideoDimensions(obj->char_id, &decl_w, &decl_h);
+			if (actionGetVideoFramePixels(&argb, (int)decl_w, (int)decl_h, &vw, &vh)) {
 				renderer_draw_bitmap_quad(context, argb, (u32)vw, (u32)vh,
 					0.0f, 0.0f, obj->transform_id, obj->cxform_id);
 				free(argb);
@@ -7200,12 +7204,12 @@ void tagDefineFontGlyphBase(u16 font_id, size_t glyph_base)
 #endif
 }
 
-void tagDefineVideoStream(SWFAppContext* app_context, u16 char_id)
+void tagDefineVideoStream(SWFAppContext* app_context, u16 char_id, u16 width, u16 height)
 {
 #if defined(NO_GRAPHICS) || defined(OFFSCREEN_RENDER)
-	ng_record_video(app_context, char_id);
+	ng_record_video(app_context, char_id, width, height);
 #else
-	(void)app_context; (void)char_id;
+	(void)app_context; (void)char_id; (void)width; (void)height;
 #endif
 }
 

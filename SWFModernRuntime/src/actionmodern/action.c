@@ -39,6 +39,7 @@
 #include <actionmodern/actionregclass.h>
 #include <actionmodern/actiontimer.h>
 #include <actionmodern/action_queue.h>
+#include <actionmodern/video_codec.h>
 #include "unicode_case_tables.h"
 
 // Forward declarations for array helpers (defined later in file)
@@ -2929,7 +2930,18 @@ static unsigned char* flv_decode_first_frame(const unsigned char* data, int len,
 				                              out_width, out_height, &pixels))
 					return pixels;
 			}
-			// Other codecs not supported yet
+			else if (video_codec_supported(codec_id) && frame_type == 1)
+			{
+				// Spark / VP6 / H.264 via libavcodec — keyframe only in Phase A.
+				// Multi-frame decoding is Phase D of the video codec plan.
+				unsigned char* pixels = NULL;
+				if (video_decode_one_frame(codec_id, frame_type,
+				                            data + tag_data_start + 1,
+				                            tag_size - 1,
+				                            out_width, out_height,
+				                            &pixels))
+					return pixels;
+			}
 		}
 		offset = tag_data_start + tag_size + 4;
 	}
@@ -2967,18 +2979,40 @@ static void ns_store_decoded_frame(ASObject* ns, unsigned char* pixels, int w, i
 // Expose decoded video frame for headless rendering (tag.c calls this).
 // Converts RGBA u8 to ARGB u32 (format expected by renderer_draw_bitmap_quad).
 // Returns 1 if a frame was found, 0 otherwise. Caller must free *out_argb.
-int actionGetVideoFramePixels(uint32_t** out_argb, int* out_w, int* out_h)
+//
+// If target_w > 0 && target_h > 0 and differs from the cached frame size, the
+// frame is resampled (via libswscale when available; nearest-neighbour
+// fallback otherwise) to the target dimensions before ARGB packing.
+int actionGetVideoFramePixels(uint32_t** out_argb, int target_w, int target_h,
+                              int* out_w, int* out_h)
 {
 	for (int i = 0; i < MAX_VIDEO_FRAMES; i++)
 	{
 		if (g_video_frames[i].active && g_video_frames[i].pixels)
 		{
-			int w = g_video_frames[i].width;
-			int h = g_video_frames[i].height;
-			int n = w * h;
+			int src_w = g_video_frames[i].width;
+			int src_h = g_video_frames[i].height;
+			unsigned char* src_rgba = g_video_frames[i].pixels;
+
+			int dst_w = (target_w > 0 && target_h > 0) ? target_w : src_w;
+			int dst_h = (target_w > 0 && target_h > 0) ? target_h : src_h;
+
+			unsigned char* scratch = NULL;  // resample destination, freed at end
+			unsigned char* rgba = src_rgba;
+
+			if (dst_w != src_w || dst_h != src_h) {
+				if (!video_resample_rgba(src_rgba, src_w, src_h,
+				                         &scratch, dst_w, dst_h)) {
+					// Resample failed — fall back to native size.
+					dst_w = src_w; dst_h = src_h;
+				} else {
+					rgba = scratch;
+				}
+			}
+
+			int n = dst_w * dst_h;
 			uint32_t* argb = (uint32_t*)malloc(n * sizeof(uint32_t));
-			if (!argb) return 0;
-			unsigned char* rgba = g_video_frames[i].pixels;
+			if (!argb) { free(scratch); return 0; }
 			for (int p = 0; p < n; p++)
 			{
 				argb[p] = ((uint32_t)rgba[p*4+3] << 24) |
@@ -2986,9 +3020,10 @@ int actionGetVideoFramePixels(uint32_t** out_argb, int* out_w, int* out_h)
 				           ((uint32_t)rgba[p*4+1] << 8) |
 				           (uint32_t)rgba[p*4+2];
 			}
+			free(scratch);
 			*out_argb = argb;
-			*out_w = w;
-			*out_h = h;
+			*out_w = dst_w;
+			*out_h = dst_h;
 			return 1;
 		}
 	}

@@ -1440,6 +1440,7 @@ def compile_native(test_dir, num_frames, build_dir, mode="no-graphics", has_imag
         "src/actionmodern/action_queue.c",
         "src/actionmodern/sprite_frame_scripts.c",
         "src/actionmodern/image_decode.c",
+        "src/actionmodern/video_codec.c",
         "src/actionmodern/unicode_case_tables.h",
         "src/utils.c",
         "src/libswf/tag.c",
@@ -1658,6 +1659,24 @@ def compile_native(test_dir, num_frames, build_dir, mode="no-graphics", has_imag
             str(DAWN_INSTALL / "lib" / "libwebgpu_dawn.a"),
             "-lstdc++", "-lpthread", "-ldl",
         ]
+        # libavcodec for Flash video codec coverage (Sorenson Spark, VP6, H.264,
+        # etc.). See SWFRecompDocs/plans/video-codec-support-plan.md. Probe via
+        # pkg-config; if libavcodec isn't installed, video_codec.c falls back to
+        # ScreenVideo-only mode (only codec id 3 decodes).
+        try:
+            av_cflags = subprocess.check_output(
+                ["pkg-config", "--cflags", "libavcodec", "libavutil", "libswscale"],
+                stderr=subprocess.DEVNULL,
+            ).decode().split()
+            av_libs = subprocess.check_output(
+                ["pkg-config", "--libs", "libavcodec", "libavutil", "libswscale"],
+                stderr=subprocess.DEVNULL,
+            ).decode().split()
+            mode_defines.append("-DSWF_HAVE_LIBAVCODEC")
+            mode_includes.extend(av_cflags)
+            mode_libs.extend(av_libs)
+        except (subprocess.CalledProcessError, FileNotFoundError):
+            pass
     else:
         mode_defines = ["-DNO_GRAPHICS"]
 
