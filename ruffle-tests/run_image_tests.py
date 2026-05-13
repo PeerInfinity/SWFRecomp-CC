@@ -9,6 +9,7 @@ Usage:
     python3 ruffle-tests/run_image_tests.py                  # run all
     python3 ruffle-tests/run_image_tests.py --test=color     # run one
     python3 ruffle-tests/run_image_tests.py --report-only    # regenerate .md from existing JSON
+    python3 ruffle-tests/run_image_tests.py --no-run         # skip test run; redo JSON rebuild + PNG collect + MD + HTML
 """
 
 import argparse
@@ -764,12 +765,13 @@ def main():
              "test dir into _image-test-output/. Useful for rebuilding the "
              "gathered tree from leftover --verbose run artifacts.")
     parser.add_argument(
-        "--rebuild-json", action="store_true",
-        help="Skip running tests; rebuild image_results.json (and the "
-             "MD/HTML reports) by re-running compare_images() over the "
-             "*.expected.png / *.actual.png pairs already on disk. "
-             "trace_status and duration are marked unknown / 0 since those "
-             "only come from a fresh run.")
+        "--rebuild-json", "--no-run", dest="no_run", action="store_true",
+        help="Skip running tests; do every other step — rebuild "
+             "image_results.json by re-running compare_images() over the "
+             "*.actual.png / *.expected.png pairs already on disk, refresh "
+             "the gathered _image-test-output/ tree, and regenerate the MD + "
+             "HTML reports. trace_status and duration are marked unknown / 0 "
+             "since those only come from a fresh run.")
     parser.add_argument(
         "--no-report", action="store_true",
         help="Skip markdown generation")
@@ -798,10 +800,16 @@ def main():
         collect_image_output(tests, full_sweep=True)
         return
 
-    if args.rebuild_json:
+    # --no-run and --rebuild-json are synonyms (both set args.no_run via the
+    # shared dest): both do every post-run step (rebuild JSON from on-disk
+    # PNGs + collect into _image-test-output/ + regenerate MD + HTML)
+    # without re-running the tests themselves.
+    if args.no_run:
         tests = discover_image_tests()
-        print(f"Rebuilding {json_path} from on-disk PNGs over {len(tests)} test(s)...")
+        print(f"Skipping test run; rebuilding JSON + collecting output + "
+              f"regenerating reports for {len(tests)} test(s)...")
         rebuild_json_from_disk(tests, json_path)
+        collect_image_output(tests, full_sweep=True)
         if not args.no_report:
             generate_markdown(json_path, md_path)
         if not args.no_html:
