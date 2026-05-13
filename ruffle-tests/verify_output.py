@@ -2523,14 +2523,21 @@ def main():
 
     incremental = not args.test  # Write live results when running full suite
 
-    # Determine json_path early so --append can write incrementally
+    # Determine json_path early so --append can write incrementally.
+    # Only auto-default to the per-mode canonical path for full-suite runs;
+    # single-test runs (--test=X) leave json_path as None unless the caller
+    # passed --json explicitly. The canonical files (results_graphics.json
+    # etc.) are CI-only artifacts (committed via the ruffle-test-results
+    # branch), and clobbering them with a 1-test report on every local
+    # invocation made every --test invocation dirty the working tree.
     json_path = args.json
-    if json_path is None and args.mode == "graphics-headless-legacy":
-        json_path = str(RESULTS_DIR / "results_headless.json")
-    elif json_path is None and args.mode == "graphics":
-        json_path = str(RESULTS_DIR / "results_graphics.json")
     if json_path is None and not args.test:
-        json_path = str(RESULTS_FINAL)
+        if args.mode == "graphics-headless-legacy":
+            json_path = str(RESULTS_DIR / "results_headless.json")
+        elif args.mode == "graphics":
+            json_path = str(RESULTS_DIR / "results_graphics.json")
+        else:
+            json_path = str(RESULTS_FINAL)
 
     # --auto-start: start from the first test with no results
     if args.auto_start:
