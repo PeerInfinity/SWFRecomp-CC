@@ -1451,7 +1451,7 @@ static void render_display_list(SWFAppContext* app_context, DisplayObject* dl, s
 // Helper: render a single object into the current render pass
 static void render_single_object(SWFAppContext* app_context, DisplayObject* obj)
 {
-#ifdef HEADLESS_GRAPHICS
+#if defined(HEADLESS_GRAPHICS) || defined(OFFSCREEN_RENDER)
 	// Video display objects have type=0 (CHAR_TYPE_SHAPE) in dictionary because
 	// tagDefineVideoStream doesn't set a type. Check for video BEFORE the switch.
 	if (ng_isVideoChar(obj->char_id)) {
@@ -1515,7 +1515,7 @@ static void render_display_list(SWFAppContext* app_context, DisplayObject* dl, s
 		DisplayObject* obj = &dl[i];
 		if (obj->char_id == 0) continue;
 
-#ifdef HEADLESS_GRAPHICS
+#if defined(HEADLESS_GRAPHICS) || defined(OFFSCREEN_RENDER)
 		// Video display objects have type=0 (CHAR_TYPE_SHAPE) in dictionary.
 		// Check for video BEFORE the switch to avoid rendering as empty shape.
 		if (ng_isVideoChar(obj->char_id)) {
