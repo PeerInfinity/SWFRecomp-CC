@@ -586,6 +586,12 @@ void ng_ime_commit_set(const char* text) {
 WebGPURenderContext* render_webgpu_new(void)
 {
 	WebGPURenderContext* ctx = calloc(1, sizeof(WebGPURenderContext));
+	// Default background is white when the SWF has no SetBackgroundColor tag
+	// (matches Flash Player behavior). tagSetBackgroundColor overrides this
+	// during recompiled tag execution.
+	ctx->red = 255;
+	ctx->green = 255;
+	ctx->blue = 255;
 	return ctx;
 }
 
