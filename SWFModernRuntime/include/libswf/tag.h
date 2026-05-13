@@ -18,6 +18,16 @@ void ng_simulateButtonPressRelease(SWFAppContext* app_context, void* mc);
 // Run button hit-test + state machine + action dispatch for current mouse state.
 // In NO_GRAPHICS mode called per mouse event; in graphics mode called from tagShowFrame.
 int ng_update_button_states(SWFAppContext* app_context);
+
+// Recover the original (pre-compose_children) transform_id for a DisplayObject.
+// During the render frame, compose_children remaps obj->transform_id to a
+// dynamic GPU slot that has no entry in the CPU-side transform_data array;
+// callers that need the static transform must use this accessor. Defined in
+// tag.c in graphics builds; not available in NO_GRAPHICS.
+#if !defined(NO_GRAPHICS) || defined(HEADLESS_GRAPHICS)
+u32 ng_get_original_transform_id(DisplayObject* obj);
+#endif
+
 #ifdef NO_GRAPHICS
 // Dispatch CLIP_EVENT_PRESS for all sprites whose hit area contains the mouse.
 // Called from swf_core.c on EV_MOUSE_DOWN_LEFT.

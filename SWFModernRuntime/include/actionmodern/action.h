@@ -644,6 +644,16 @@ typedef struct TextFieldGlyphInfo {
 typedef void (*TextFieldGlyphCallback)(const TextFieldGlyphInfo* info, void* user_data);
 int actionIterateTextFieldGlyphs(TextFieldGlyphCallback cb, void* user_data);
 
+// Render text fields that have no AVM1 MovieClip wrapper in child_mc_cache —
+// i.e. placed DefineEditText DisplayObjects that no script has touched.
+// Walks the display list recursively, builds glyph + border/background info
+// from the static metadata + the current value of the bound variable (if
+// any), and invokes the supplied callbacks. Mirrors Flash's behavior where
+// every placed DisplayObject renders regardless of script interaction.
+int actionIterateOrphanTextFields(SWFAppContext* app_context,
+	TextFieldRenderCallback render_cb, TextFieldGlyphCallback glyph_cb,
+	void* user_data);
+
 // Focus rect rendering info (used by tag.c in graphics mode)
 typedef struct FocusRectInfo {
 	float x, y, w, h;  // world-space bounds in twips

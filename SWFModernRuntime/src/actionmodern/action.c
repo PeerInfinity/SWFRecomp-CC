@@ -23263,6 +23263,296 @@ int actionIterateTextFieldGlyphs(TextFieldGlyphCallback cb, void* user_data)
 }
 
 // ---------------------------------------------------------------------------
+// Orphan-textfield render walk (Phase A of TextField parity plan)
+// ---------------------------------------------------------------------------
+// actionIterateTextFields / actionIterateTextFieldGlyphs walk child_mc_cache,
+// so they only render text fields that have an AVM1 MovieClip wrapper. In
+// Flash every PlaceObject2 instantiates a real DisplayObject at placement;
+// our wrapper is lazy and only fires on AS path resolution. The canonical
+// gap is the gnash dejagnu trace TextField (`_xtrace_win` bound to
+// `_root._trace_text`): scripts only write the bound variable, no path
+// touches the field, no wrapper is created, nothing renders.
+//
+// Phase A walks the display list directly, finds placed text fields whose
+// wrapper does not exist, builds a TextFieldGlyphInfo from the static
+// DefineEditText metadata + the current value of the bound variable (if
+// any), and feeds the same callbacks tag.c already uses for the MC walk.
+// No AS-observable side effects, no MC lifecycle change.
+//
+// Gated on graphics-capable builds because it depends on
+// ng_get_original_transform_id (defined in tag.c, which only exposes the
+// xform_overrides table in graphics modes). NO_GRAPHICS builds never run
+// rendering, so a stub-less compile unit is correct.
+#if !defined(NO_GRAPHICS) || defined(HEADLESS_GRAPHICS)
+
+static MovieClip* otf_find_child_mc(MovieClip* parent_mc, const char* name)
+{
+	if (name == NULL) return NULL;
+	for (int i = 0; i < child_mc_count; i++) {
+		MovieClip* mc = child_mc_cache[i];
+		if (mc == NULL || mc->depth == INT_MIN) continue;
+		if (mc->parent != parent_mc) continue;
+		if (mc->name && strcmp(mc->name, name) == 0) return mc;
+	}
+	return NULL;
+}
+
+// Resolve a variable path ("_root._trace_text", "_root.mc.foo", "bar") to
+// its current value. Returns 1 if found and not undefined, 0 otherwise.
+// *out_val is a shallow copy — string pointers reuse existing heap data.
+static int otf_resolve_var_path(SWFAppContext* app_context, const char* path,
+	ActionVar* out_val)
+{
+	(void)app_context;
+	if (path == NULL || path[0] == '\0' || out_val == NULL) return 0;
+
+	const char* p = path;
+	const char* dot = strchr(p, '.');
+
+	// No-dot path: simple variable in the global var_map.
+	if (dot == NULL) {
+		size_t plen = strlen(p);
+		if (!hasVariable((char*)p, plen)) return 0;
+		ActionVar* v = getVariable((char*)p, plen);
+		if (v == NULL || v->type == ACTION_STACK_VALUE_UNDEFINED) return 0;
+		*out_val = *v;
+		return 1;
+	}
+
+	// First segment — either "_root" (special) or a global var that names
+	// a MovieClip / Object.
+	size_t seg_len = (size_t)(dot - p);
+	ASObject* current_obj = NULL;
+
+	extern MovieClip root_movieclip;
+	if (seg_len == 5 && strncmp(p, "_root", 5) == 0) {
+		current_obj = (ASObject*) root_movieclip.dynamic_props;
+		if (current_obj == NULL) return 0;
+	} else {
+		char seg_buf[256];
+		if (seg_len >= sizeof(seg_buf)) return 0;
+		memcpy(seg_buf, p, seg_len);
+		seg_buf[seg_len] = '\0';
+		if (!hasVariable(seg_buf, seg_len)) return 0;
+		ActionVar* v = getVariable(seg_buf, seg_len);
+		if (v == NULL) return 0;
+		if (v->type == ACTION_STACK_VALUE_MOVIECLIP) {
+			MovieClip* mc = (MovieClip*) VAL(u64, &v->data.numeric_value);
+			if (mc == NULL || mc->dynamic_props == NULL) return 0;
+			current_obj = (ASObject*) mc->dynamic_props;
+		} else if (v->type == ACTION_STACK_VALUE_OBJECT) {
+			current_obj = (ASObject*) VAL(u64, &v->data.numeric_value);
+			if (current_obj == NULL) return 0;
+		} else {
+			return 0;
+		}
+	}
+
+	// Walk remaining segments.
+	p = dot + 1;
+	while (1) {
+		dot = strchr(p, '.');
+		size_t name_len = dot ? (size_t)(dot - p) : strlen(p);
+		if (name_len == 0) return 0;
+		ActionVar* prop = getProperty(current_obj, p, (u32)name_len);
+		if (prop == NULL || prop->type == ACTION_STACK_VALUE_UNDEFINED) return 0;
+		if (dot == NULL) {
+			*out_val = *prop;
+			return 1;
+		}
+		if (prop->type == ACTION_STACK_VALUE_MOVIECLIP) {
+			MovieClip* mc = (MovieClip*) VAL(u64, &prop->data.numeric_value);
+			if (mc == NULL || mc->dynamic_props == NULL) return 0;
+			current_obj = (ASObject*) mc->dynamic_props;
+		} else if (prop->type == ACTION_STACK_VALUE_OBJECT) {
+			current_obj = (ASObject*) VAL(u64, &prop->data.numeric_value);
+			if (current_obj == NULL) return 0;
+		} else {
+			return 0;
+		}
+		p = dot + 1;
+	}
+}
+
+// Build TextFieldGlyphInfo + TextFieldRenderInfo for an orphan placement and
+// invoke the supplied callbacks.
+static void otf_emit_textfield(SWFAppContext* app_context, int tf_idx,
+	DisplayObject* obj, float world_x_px, float world_y_px,
+	TextFieldRenderCallback render_cb, TextFieldGlyphCallback glyph_cb,
+	void* user_data)
+{
+	(void)obj;
+	u16 font_id = ng_getTextFieldFontId(tf_idx);
+	u16 font_height = ng_getTextFieldFontHeight(tf_idx);
+	u32 text_color = ng_getTextFieldColorByIdx(tf_idx);
+	u16 tf_flags = ng_getTextFieldFlags(tf_idx);
+	s32 bxmin, bxmax, bymin, bymax;
+	ng_getTextFieldBounds(tf_idx, &bxmin, &bxmax, &bymin, &bymax);
+
+	// Mirror the MC walk's convention (see actionIterateTextFields):
+	// info.x/y = placement translation in pixels (no bbox-min offset —
+	// the bbox-min twip values are an internal gutter that
+	// textfield_glyph_render_cb accounts for via gutter_twips + ascent).
+	// info.w/h = full bbox extent.
+	float field_x_px = world_x_px;
+	float field_y_px = world_y_px;
+	float field_w_px = (float)(bxmax - bxmin) / 20.0f;
+	float field_h_px = (float)(bymax - bymin) / 20.0f;
+
+	int has_bg = (tf_flags & 0x0020) ? 1 : 0;  // Border flag in DefineEditText
+	int has_border = has_bg;
+	if (render_cb && (has_bg || has_border)) {
+		TextFieldRenderInfo render_info = {0};
+		render_info.has_background = has_bg;
+		render_info.background_color = 0xFFFFFF;
+		render_info.has_border = has_border;
+		render_info.border_color = 0x000000;
+		render_info.x = field_x_px;
+		render_info.y = field_y_px;
+		// Flash includes the +1 edge pixel on positive-dimension fields.
+		render_info.w = field_w_px + 1.0f;
+		render_info.h = field_h_px + 1.0f;
+		render_cb(&render_info, user_data);
+	}
+
+	if (glyph_cb == NULL) return;
+
+	// Pick the text to render. Variable-bound fields use the variable's
+	// current value when it exists; otherwise fall back to the initial
+	// text baked into the DefineEditText tag.
+	static char text_buf[4096];
+	const char* var_name = ng_getTextFieldVariableName(tf_idx);
+	const char* initial_text = ng_getTextFieldInitialTextByIdx(tf_idx);
+	const char* text_utf8 = initial_text ? initial_text : "";
+	size_t text_len = strlen(text_utf8);
+
+	if (var_name && var_name[0] != '\0') {
+		ActionVar resolved = {0};
+		if (otf_resolve_var_path(app_context, var_name, &resolved)) {
+			if (resolved.type == ACTION_STACK_VALUE_STRING) {
+				if (resolved.str_size > 0) {
+					const uint16_t* u16 = varGetU16Ptr(&resolved);
+					if (u16) {
+						int n = u16_to_utf8(u16, resolved.str_size,
+							text_buf, (int)sizeof(text_buf));
+						if (n > 0) {
+							if (n >= (int)sizeof(text_buf))
+								n = (int)sizeof(text_buf) - 1;
+							text_buf[n] = '\0';
+							text_utf8 = text_buf;
+							text_len = (size_t)n;
+						}
+					}
+				} else {
+					// Bound to an empty string — render nothing rather than
+					// the static initial text. Matches Ruffle's
+					// set_initial_value: when the property exists, the
+					// variable wins.
+					text_utf8 = "";
+					text_len = 0;
+				}
+			} else {
+				int n = varToStringBuf(app_context, &resolved, text_buf,
+					(int)sizeof(text_buf));
+				if (n > 0) {
+					text_utf8 = text_buf;
+					text_len = (size_t)n;
+				}
+			}
+		}
+	}
+
+	if (text_len == 0) return;
+
+	TextFieldGlyphInfo info = {0};
+	info.font_id = font_id;
+	info.font_height = font_height;
+	info.text_color = text_color;
+	info.x = field_x_px;
+	info.y = field_y_px;
+	info.w = field_w_px;
+	info.h = field_h_px;
+	info.text_utf8 = text_utf8;
+	info.text_len = text_len;
+	info.runs = NULL;
+	info.run_count = 0;
+	info.left_margin_twips = (s32) ng_getTextFieldLeftMargin(tf_idx);
+	info.right_margin_twips = (s32) ng_getTextFieldRightMargin(tf_idx);
+	info.indent_twips = (s32) ng_getTextFieldIndent(tf_idx);
+	glyph_cb(&info, user_data);
+}
+
+static void otf_walk_dl(SWFAppContext* app_context,
+	DisplayObject* dl, size_t dl_max,
+	MovieClip* parent_mc, float parent_tx_px, float parent_ty_px,
+	TextFieldRenderCallback render_cb, TextFieldGlyphCallback glyph_cb,
+	void* user_data, int* count)
+{
+	extern float transform_data[][16];
+	// ng_get_original_transform_id declared in tag.h (already included).
+
+	for (size_t d = 1; d <= dl_max; d++) {
+		DisplayObject* obj = &dl[d];
+		if (obj->char_id == 0) continue;
+
+		// Compose this entry's world translation by adding the local
+		// transform's tx/ty (twips → pixels) onto the parent's running
+		// translation. Use the original (pre-compose_children)
+		// transform_id — compose_children rewrites obj->transform_id to
+		// a dynamic GPU slot during the render frame, which has no
+		// corresponding entry in the CPU-side transform_data array.
+		//
+		// Phase A handles translation only; scale/rotation composition is
+		// deferred (most orphan TFs in test SWFs are identity-placed; the
+		// dejagnu trace TextField is the driver case and is identity).
+		u32 tid = ng_get_original_transform_id(obj);
+		float local_tx = transform_data[tid][12] / 20.0f;
+		float local_ty = transform_data[tid][13] / 20.0f;
+		float world_x = parent_tx_px + local_tx;
+		float world_y = parent_ty_px + local_ty;
+
+		int tf_idx = ng_find_textfield(obj->char_id);
+		if (tf_idx >= 0) {
+			MovieClip* tf_mc = otf_find_child_mc(parent_mc, obj->instance_name);
+			if (tf_mc == NULL || !MC_IS_TEXTFIELD(tf_mc)) {
+				otf_emit_textfield(app_context, tf_idx, obj,
+					world_x, world_y, render_cb, glyph_cb, user_data);
+				if (count) (*count)++;
+			}
+			continue;
+		}
+
+		// Recurse into sprite children. Buttons (CHAR_TYPE_BUTTON) intentionally
+		// skipped — their child display list is reconstructed per state by
+		// button_state_funcs and not represented as a persistent DL.
+		if (dictionary[obj->char_id].type == CHAR_TYPE_SPRITE
+		    && obj->sprite_display_list != NULL)
+		{
+			MovieClip* child_mc = otf_find_child_mc(parent_mc, obj->instance_name);
+			otf_walk_dl(app_context,
+				obj->sprite_display_list, obj->sprite_max_depth,
+				child_mc, world_x, world_y,
+				render_cb, glyph_cb, user_data, count);
+		}
+	}
+}
+
+int actionIterateOrphanTextFields(SWFAppContext* app_context,
+	TextFieldRenderCallback render_cb, TextFieldGlyphCallback glyph_cb,
+	void* user_data)
+{
+	extern DisplayObject* display_list;
+	extern size_t max_depth;
+	extern MovieClip root_movieclip;
+	int count = 0;
+	otf_walk_dl(app_context, display_list, max_depth, &root_movieclip,
+		0.0f, 0.0f, render_cb, glyph_cb, user_data, &count);
+	return count;
+}
+
+#endif // !NO_GRAPHICS || HEADLESS_GRAPHICS
+
+// ---------------------------------------------------------------------------
 // Drawing API — Path recording, tessellation, and iterator
 // ---------------------------------------------------------------------------
 

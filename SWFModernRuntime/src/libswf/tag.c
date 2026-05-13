@@ -1207,6 +1207,22 @@ static void xform_overrides_restore(void)
 	g_xform_override_count = 0;
 }
 
+// Recover the original (pre-compose_children) transform_id for a display
+// object. compose_children rewrites obj->transform_id to point at a
+// dynamically-allocated GPU slot; CPU-side `transform_data` has no entry
+// at that slot, so reading it is UB. Callers that need to consult the
+// CPU-side transform table during the render frame (between compose and
+// xform_overrides_restore) must use this accessor.
+u32 ng_get_original_transform_id(DisplayObject* obj)
+{
+	if (obj == NULL) return 0;
+	for (int i = 0; i < g_xform_override_count; i++) {
+		if (g_xform_overrides[i].obj == obj)
+			return g_xform_overrides[i].original_id;
+	}
+	return obj->transform_id;
+}
+
 // ---------------------------------------------------------------------------
 // Dynamic cxform slot allocator for runtime Color.setRGB/setTransform changes.
 // Same pattern as the transform slot allocator above.
@@ -2958,6 +2974,8 @@ void tagRerenderFrame(SWFAppContext* app_context)
 	// Text field backgrounds/borders and glyph rendering
 	actionIterateTextFields(textfield_render_cb, NULL);
 	actionIterateTextFieldGlyphs(textfield_glyph_render_cb, NULL);
+	actionIterateOrphanTextFields(app_context, textfield_render_cb,
+		textfield_glyph_render_cb, NULL);
 
 	// Drawing API fills and strokes
 	actionIterateDrawings(drawing_render_cb, NULL);
@@ -3480,6 +3498,8 @@ void tagShowFrame(SWFAppContext* app_context)
 	// on the tag display list. Render their background/border rectangles here.
 	actionIterateTextFields(textfield_render_cb, NULL);
 	actionIterateTextFieldGlyphs(textfield_glyph_render_cb, NULL);
+	actionIterateOrphanTextFields(app_context, textfield_render_cb,
+		textfield_glyph_render_cb, NULL);
 
 	// --- Render Drawing API fills and strokes ---
 	actionIterateDrawings(drawing_render_cb, NULL);
