@@ -280,10 +280,12 @@ def compare_images(actual_path, expected_path, checks):
     # Save the difference image whenever there's something to look at.
     # Skips strict passes (max_diff=0 → an all-black PNG that adds no
     # signal); tolerance passes still get a diff written so reviewers
-    # can see which pixels drift even on a "pass". Best-effort: a failed
-    # save doesn't fail the check itself.
+    # can see which pixels drift even on a "pass". When skipping, also
+    # remove any stale diff PNG from a prior failing run so the on-disk
+    # state reflects the current outcome. Best-effort: a failed save
+    # doesn't fail the check itself.
+    diff_image_path = actual_path.parent / (actual_path.stem + ".difference.png")
     if max_diff > 0:
-        diff_image_path = actual_path.parent / (actual_path.stem + ".difference.png")
         try:
             # Copy into a separate buffer so the outlier counter below still
             # sees the true per-channel alpha diff. Set alpha=0 on pixels
@@ -305,6 +307,13 @@ def compare_images(actual_path, expected_path, checks):
             r = r.point(lut); g = g.point(lut); b = b.point(lut)
             diff_img = Image.merge("RGBA", (r, g, b, a))
             diff_img.save(str(diff_image_path))
+        except Exception:
+            pass
+    else:
+        try:
+            diff_image_path.unlink()
+        except FileNotFoundError:
+            pass
         except Exception:
             pass
 
@@ -2836,9 +2845,19 @@ def main():
                         saved_actual = test_dir / f"{cmp_name}.actual.png"
                         shutil.copy2(str(actual_png), str(saved_actual))
                         diff_in_build = actual_png.parent / (actual_png.stem + ".difference.png")
+                        saved_diff = test_dir / f"{cmp_name}.difference.png"
                         if diff_in_build.exists():
-                            saved_diff = test_dir / f"{cmp_name}.difference.png"
                             shutil.copy2(str(diff_in_build), str(saved_diff))
+                        else:
+                            # No diff produced this run (strict pass) — remove any
+                            # stale copy from a prior failing run so the test_dir
+                            # state reflects the current outcome.
+                            try:
+                                saved_diff.unlink()
+                            except FileNotFoundError:
+                                pass
+                            except Exception:
+                                pass
 
         # Step 4: Filter and compare trace output
         actual = filter_output(raw_output)
