@@ -11,7 +11,7 @@
 
 | Suite | Pass | Total | Rate | Report |
 |-------|-----:|------:|-----:|--------|
-| avm1 | 604 | 611 | 98.9% | [details](ruffle-tests/tests/swfs/avm1/_results/results_filtered.md) |
+| avm1 | 603 | 610 | 98.9% | [details](ruffle-tests/tests/swfs/avm1/_results/results_filtered.md) |
 | from_gnash/actionscript.all | 126 | 190 | 66.3% | [details](ruffle-tests/tests/swfs/from_gnash/actionscript.all/_results/results_filtered.md) |
 | from_gnash/misc-ming.all | 66 | 100 | 66.0% | [details](ruffle-tests/tests/swfs/from_gnash/misc-ming.all/_results/results_filtered.md) |
 | from_gnash/misc-mtasc.all | 7 | 9 | 77.8% | [details](ruffle-tests/tests/swfs/from_gnash/misc-mtasc.all/_results/results_filtered.md) |
@@ -19,15 +19,15 @@
 | from_gnash/misc-swfmill.all | 17 | 18 | 94.4% | [details](ruffle-tests/tests/swfs/from_gnash/misc-swfmill.all/_results/results_filtered.md) |
 | from_shumway | 73 | 76 | 96.1% | [details](ruffle-tests/tests/swfs/from_shumway/_results/results_filtered.md) |
 | from_shumway/avm1 | 45 | 45 | 100% | [details](ruffle-tests/tests/swfs/from_shumway/avm1/_results/results_filtered.md) |
-| **Total** | **946** | **1064** | **88.9%** | |
+| **Total** | **945** | **1063** | **88.9%** | |
 
-*61 tests ignored.*
+*62 tests ignored.*
 
 ## Line-Level Accuracy
 
 | Suite | Matching | Expected | Accuracy |
 |-------|--------:|---------:|---------:|
-| avm1 | 95,707 | 95,887 | 99.8% |
+| avm1 | 95,686 | 95,866 | 99.8% |
 | from_gnash/actionscript.all | 15,393 | 16,957 | 90.8% |
 | from_gnash/misc-ming.all | 3,746 | 4,517 | 82.9% |
 | from_gnash/misc-mtasc.all | 211 | 231 | 91.3% |
@@ -35,7 +35,7 @@
 | from_gnash/misc-swfmill.all | 49 | 51 | 96.1% |
 | from_shumway | 621 | 637 | 97.5% |
 | from_shumway/avm1 | 480 | 480 | 100% |
-| **Total** | **116,588** | **119,252** | **97.8%** |
+| **Total** | **116,567** | **119,231** | **97.8%** |
 
 ## Failure Breakdown
 
@@ -73,10 +73,10 @@ Tests verified against Flash's actual output (`output.flash.txt`).
 
 ### avm1
 
-- **Pass:** 604/611 (98.9%)
-- **Ignored:** 40 tests
+- **Pass:** 603/610 (98.9%)
+- **Ignored:** 41 tests
 - **Duration:** 56m07s across 30 shards
-- **Lines:** 95,707/95,887 matching (99.8%)
+- **Lines:** 95,686/95,866 matching (99.8%)
 - **Avg test duration:** 5.1s — slowest: `timeout` (23.8s)
 
 ### from_gnash/actionscript.all
