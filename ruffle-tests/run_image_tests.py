@@ -929,8 +929,10 @@ def rebuild_json_from_disk(tests, json_path):
 
     test_results = []
     run_start = time.monotonic()
+    total = len(tests)
 
-    for name in tests:
+    for i, name in enumerate(tests, 1):
+        print(f"[{i}/{total}] {name}...", end=" ", flush=True)
         test_dir = TESTS_DIR / name
         cfg = parse_image_comparisons(test_dir)
 
@@ -1007,6 +1009,15 @@ def rebuild_json_from_disk(tests, json_path):
                 entry["image_status_strict"] = "fail"
 
         test_results.append(entry)
+
+        # Per-test summary line (matches run-mode at line ~841 in style).
+        strict = entry.get("image_status_strict", "?").upper()
+        tolerant = entry["image_status"].upper()
+        if strict == tolerant:
+            img_label = f"image:{strict}"
+        else:
+            img_label = f"image:strict={strict},tolerance={tolerant}"
+        print(img_label)
 
     report = build_report(test_results, run_start)
     with open(json_path, "w") as f:
