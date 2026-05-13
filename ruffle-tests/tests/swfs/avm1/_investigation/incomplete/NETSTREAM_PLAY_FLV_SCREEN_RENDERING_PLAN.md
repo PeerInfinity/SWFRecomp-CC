@@ -19,7 +19,7 @@ phases:
     status: blocked
   - id: 5
     name: "Resolve createINCManager → undefined (NCManager dispatch gap)"
-    status: ready
+    status: in_progress
 dependencies:
   - plan: CONSTRUCT_PARAMETER_REPLAY
     type: extends
@@ -189,37 +189,93 @@ Once Phase 3 lands locally, push to CI for full-suite regression sweep before de
 
 ### Phase 5 — Resolve `createINCManager` → undefined
 
-First step: find `createINCManager`'s body in `script_defs.c`
-(currently grep-able via `str_470 = "createINCManager"` and the two
-`PUSH_STR_ID(str_470, …)` call sites at 27070 and 32966; the body
-lives in whichever `func2_anonymous_*` registers the method on the
-VideoPlayer prototype). Disassemble it manually to determine which
-expression returns `undefined`.
+**2026-05-13 trace findings.** `createINCManager` is defined in
+`script_3.c:684` as a **Type 1** (simple) `actionDefineFunction` —
+`func_anonymous_17`, body at `script_defs.c:38767`. Reconstructed
+source:
 
-Cheap empirical pass first:
-- Instrument every `actionGetMember(... "NCManager")` /
-  `actionGetMember(... "mx")` / `actionGetVariable("mx")` etc. during
-  the replay window. Log the type returned. If `mx.video.NCManager`
-  evaluates to UNDEFINED at the moment `createINCManager` runs, the
-  class lookup is the bug.
-- If the class IS found but `new` produces UNDEFINED, the bug is in
-  `actionNewObject` for this specific class (unlikely — `new
-  NetStream` works in other tests).
+```as
+function createINCManager() {
+    if (this.ncMgrClassName == null) {
+        this.ncMgrClassName = mx.video.VideoPlayer.DEFAULT_INCMANAGER;
+    }
+    var ncMgrConstructor = eval(this.ncMgrClassName);  // GetVariable on stack-top string
+    this._ncMgr = new ncMgrConstructor();
+    this._ncMgr.setVideoPlayer(this);
+}
+```
 
-Likely fix scopes by hypothesis:
-- Hypothesis 1 (class lookup miss): a path-resolution gap in
-  `actionGetMember` for nested package lookups (`_global.mx.video.X`).
-  Adjacent code: `findPropertyStructWithPrototype` walks in
-  `object.c`, and `__Packages` registry handling in `action.c` (search
-  for `__Packages.`).
-- Hypothesis 2 (`_global` write lost): inspect the `_global.mx = ...`
-  / `_global.mx.video = ...` writes in script_2/3/4 — verify they end
-  up on `global_object` and don't get shadowed by per-MC dynamic_props
-  during DoInitAction context switches.
-- Hypothesis 3 (static class property): the FLVPlayback class stores
-  `_iNCManagerClass` as a class-level static. If our `static` semantics
-  for AS2 classes lazily reset or don't survive across constructor
-  invocations, this static could read as undefined.
+Tight-gated trace (only inside `createINCManager` dispatch, all
+`actionGetVariable`/`actionGetMember`/`actionNewObject` logged) shows:
+
+```
+[trace_on] createINCManager dispatch BEGIN mc=0x64ed8a471510
+  [gv] name=this
+  [gm] obj_type=11 prop=ncMgrClassName       <- this.ncMgrClassName (null)
+  [gv] name=this
+  [gv] name=mx
+  [gm] obj_type=11 prop=video
+  [gm] obj_type=11 prop=VideoPlayer
+  [gm] obj_type=13 prop=DEFAULT_INCMANAGER   <- on FUNCTION (the class)
+  [gv] name=this
+  [gm] obj_type=11 prop=ncMgrClassName       <- re-read after assign
+  [gv] name=this
+  [new] ctor=ncMgrConstructor                <- !!
+  [gv] name=this
+  [gv] name=this
+  [gm] obj_type=11 prop=_ncMgr
+[trace_off] createINCManager dispatch END result.type=3       <- UNDEFINED
+```
+
+Three concrete observations from this trace:
+
+1. **`this` resolves to OBJECT (type=11), not MOVIECLIP (14).** Probably
+   benign — `mc->dynamic_props` is itself an `ASObject*` and our
+   actionGetVariable("this") inside the function returns the
+   dynamic_props view rather than the MC. Property reads work either
+   way for `ncMgrClassName` / `_ncMgr` since those are stored on
+   `dynamic_props`. Still worth flagging — there may be downstream code
+   that breaks when `this.someMcBuiltin` is asked.
+2. **There is no `[gv]` log between the second `gm ncMgrClassName` and
+   `[new] ctor=ncMgrConstructor`.** That means the `eval(className)`
+   step (which AS2 emits as a `GetVariable` opcode after `gm
+   ncMgrClassName`) either takes the early-return path in our
+   `actionGetVariable` for non-STRING stack tops (line 34953–34962, NULL
+   / UNDEFINED → push UNDEFINED) **without going through the trace
+   point**, or some other branch we haven't audited. **This is the
+   top suspect: `this.ncMgrClassName` after the assignment is not a
+   STRING — it's likely a FUNCTION (the class itself) — and our
+   `GetVariable` on a FUNCTION stack-top falls through `convertString`
+   into a no-such-variable miss.**
+3. **`actionNewObject` is called with literal `ctor_name = "ncMgrConstructor"`.**
+   That's the *local variable name*, not a class name. Our
+   `actionNewObject` resolution does walk the scope chain at
+   `action.c:47640-47648` for local vars holding a FUNCTION — but
+   `ncMgrConstructor` was never bound (the prior eval step
+   short-circuited), so the scope-chain lookup misses, and the call
+   falls through to all paths returning UNDEFINED.
+
+**Likely root cause (re-prioritised):** `DEFAULT_INCMANAGER` on
+`mx.video.VideoPlayer` is **the class function itself**, not the
+class-name string. The AS2 source likely does
+`public static var DEFAULT_INCMANAGER:Function = mx.video.NCManager`.
+The `eval(this.ncMgrClassName)` step is designed for when
+`DEFAULT_INCMANAGER` IS a string path; if it's already the class
+function, the `eval` is a no-op (Ruffle's `GetVariable` on a non-string
+returns the value itself, or coerces sensibly).
+
+**Cheapest first fix to try:** in `actionGetVariable`, when stack-top
+is `FUNCTION` (or `OBJECT`), push the value back without doing a
+string-name lookup. This mirrors Ruffle's `Activation.get_variable`
+behaviour where non-string sources fall through to a value-pass-through.
+Verify against `on_construct` (25/25), full netstream / register-class
+matrix, and the FLV-screen image.
+
+If that doesn't unblock: instrument `actionGetVariable`'s
+non-STRING early-return path to log the type that comes in, and
+re-route accordingly. The second suspect is the dot-path resolution
+inside `actionGetVariable` when the className IS a string like
+`"mx.video.NCManager"`.
 
 Validation: same matrix as Phase 4. The trace test (0 lines) cannot
 catch this regression — only the image diff or callmethod-trace
