@@ -116,6 +116,19 @@ void actionSetTimeoutJmp(void* jmp_buf_ptr);
 
 // Set the current execution context
 void actionSetCurrentContext(MovieClip* mc);
+
+// CONSTRUCT clip-action parameter capture + post-constructor replay.
+// See action.c definition for rationale. Wired from:
+//   - tag.c (aq_dispatch_clip_construct): Begin/End bracket the CONSTRUCT loop.
+//   - action.c (actionSetVariable non-root MC path): Capture each SetVariable
+//     whose name resolves to an addProperty setter on the MC's prototype chain.
+//   - registered_class.c (actionInvokeRegisteredClassConstructor): Replay
+//     captured params for that MC after the constructor body returns.
+void actionBeginConstructCapture(MovieClip* mc);
+void actionEndConstructCapture(void);
+int  actionCaptureConstructSetVar(MovieClip* mc, const char* name, u32 name_len,
+                                   ActionVar* value);
+void actionReplayConstructParams(SWFAppContext* app_context, MovieClip* mc);
 // Set/get the base clip (the clip whose timeline code is executing).
 // actionSetTarget("") resets to base_clip, not root.
 void actionSetBaseClip(MovieClip* mc);

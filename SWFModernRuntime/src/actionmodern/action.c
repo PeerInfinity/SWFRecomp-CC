@@ -7522,6 +7522,109 @@ static void invokePropertySetter(SWFAppContext* app_context, ASFunction* func, v
 }
 
 // ============================================================================
+// CONSTRUCT clip-action parameter capture + post-constructor replay
+// ============================================================================
+// Flash fires CLIP_EVENT_CONSTRUCT before the registered-class constructor.
+// AS2 component CONSTRUCT handlers (e.g. FLVPlayback) call SetVariable on
+// addProperty-backed names — the setters fire, but at that point the internal
+// state the setter needs (_vp, _ncMgr, etc.) has not been built by the
+// constructor, so the setter takes its "uninitialised" branch and stores a
+// shadow property without side effects. After the constructor finishes
+// creating that state, we replay each captured SetVariable so the setters'
+// real bodies fire with the original CONSTRUCT-time values.
+//
+// See _investigation/incomplete/NETSTREAM_PLAY_FLV_SCREEN_RENDERING_PLAN.md
+// (Phase 3) and the prior _investigation/blocked/CONSTRUCT_PARAMETER_REPLAY_PLAN.md
+// for the design rationale.
+
+typedef struct {
+	MovieClip* mc;
+	char* name;
+	u32 name_len;
+	ActionVar value;       // owns string heap buffer when type==STRING
+} ConstructParam;
+
+#define MAX_CONSTRUCT_PARAMS 64
+static ConstructParam g_construct_params[MAX_CONSTRUCT_PARAMS];
+static u32 g_construct_param_count = 0;
+static MovieClip* g_construct_capture_mc = NULL;
+
+void actionBeginConstructCapture(MovieClip* mc) { g_construct_capture_mc = mc; }
+void actionEndConstructCapture(void)            { g_construct_capture_mc = NULL; }
+
+// Called from actionSetVariable's non-root-MC addProperty-setter path during
+// CONSTRUCT clip-action dispatch. Returns 1 if the (name, value) pair was
+// captured for replay; caller still invokes the setter inline to preserve
+// CONSTRUCT-time semantics (the setter's "uninitialised" branch may itself
+// store shadow state that the constructor reads).
+int actionCaptureConstructSetVar(MovieClip* mc, const char* name, u32 name_len,
+                                  ActionVar* value)
+{
+	if (g_construct_capture_mc == NULL || mc != g_construct_capture_mc) return 0;
+	if (g_construct_param_count >= MAX_CONSTRUCT_PARAMS) return 0;
+	if (name == NULL || name_len == 0 || value == NULL) return 0;
+	ConstructParam* p = &g_construct_params[g_construct_param_count];
+	p->mc = mc;
+	p->name = (char*) malloc(name_len + 1);
+	if (p->name == NULL) return 0;
+	memcpy(p->name, name, name_len);
+	p->name[name_len] = 0;
+	p->name_len = name_len;
+	p->value = *value;
+	if (value->type == ACTION_STACK_VALUE_STRING && value->str_size > 0
+	    && value->data.numeric_value != 0)
+	{
+		uint16_t* src = (uint16_t*)(uintptr_t) value->data.numeric_value;
+		uint16_t* dst = (uint16_t*) malloc(sizeof(uint16_t) * (value->str_size + 1));
+		if (dst == NULL) { free(p->name); return 0; }
+		memcpy(dst, src, sizeof(uint16_t) * value->str_size);
+		dst[value->str_size] = 0;
+		p->value.data.numeric_value = (u64)(uintptr_t) dst;
+	}
+	g_construct_param_count++;
+	return 1;
+}
+
+// Replay every captured SetVariable for `mc` against its current
+// dynamic_props prototype chain. Each setter now sees the post-constructor
+// state (_vp etc.) so its real side-effecting branch runs. Entries for
+// other MCs are preserved in case multiple CONSTRUCT clip actions are
+// pending across nested placements.
+void actionReplayConstructParams(SWFAppContext* app_context, MovieClip* mc)
+{
+	if (mc == NULL || g_construct_param_count == 0) return;
+	u32 w = 0;
+	for (u32 r = 0; r < g_construct_param_count; r++) {
+		ConstructParam* p = &g_construct_params[r];
+		if (p->mc != mc) {
+			if (w != r) g_construct_params[w] = *p;
+			w++;
+			continue;
+		}
+		ASObject* dp = (ASObject*) mc->dynamic_props;
+		if (dp != NULL) {
+			ASProperty* prop_struct = findPropertyStructWithPrototype(dp, p->name, p->name_len);
+			if (prop_struct != NULL && prop_struct->setter != NULL) {
+				MovieClip* saved_event_this = g_event_this_mc;
+				g_event_this_mc = mc;
+				MovieClip* saved_ctx = g_current_context;
+				actionSetCurrentContext(mc);
+				invokePropertySetter(app_context, (ASFunction*) prop_struct->setter,
+				                     NULL, &p->value);
+				actionSetCurrentContext(saved_ctx);
+				g_event_this_mc = saved_event_this;
+			}
+		}
+		// Intentionally not freeing p->name or string buffer — the setter body
+		// (via setProperty/pushVar) may have aliased the buffer into newly-
+		// created object properties. Per-CONSTRUCT leakage is bounded (<= 12
+		// params × ~30 chars per component instance).
+		(void)p;
+	}
+	g_construct_param_count = w;
+}
+
+// ============================================================================
 // Native toString implementations for flash.geom classes
 // ============================================================================
 
@@ -36704,6 +36807,12 @@ void actionSetVariable(SWFAppContext* app_context)
 		ASProperty* prop_struct = findPropertyStructWithPrototype(clip_props, var_name, var_name_len);
 		if (prop_struct != NULL && prop_struct->setter != NULL)
 		{
+			// Capture for post-constructor replay (no-op outside CONSTRUCT dispatch).
+			// Capturing here preserves the inline setter invocation that follows —
+			// the CONSTRUCT-time setter call may still store shadow state that the
+			// registered-class constructor reads. Replay re-fires the setter after
+			// the constructor has built _vp / _ncMgr / etc.
+			actionCaptureConstructSetVar(g_current_context, var_name, var_name_len, &value_var);
 			POP_2();
 			// Use g_event_this_mc so the setter's preload_this gets MOVIECLIP type
 			// (passing mc directly as this_obj would make it ACTION_STACK_VALUE_OBJECT

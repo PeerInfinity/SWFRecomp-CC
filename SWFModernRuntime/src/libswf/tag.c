@@ -4437,10 +4437,12 @@ static void aq_dispatch_clip_construct(SWFAppContext* app_context, void* user)
 		if (_exp != NULL && pcc->mc != NULL)
 			actionSetupRegisteredClassPrototype(app_context, _exp, pcc->mc);
 	}
+	actionBeginConstructCapture(pcc->mc);
 	for (size_t a = 0; a < pcc->clip_action_count; a++) {
 		if (pcc->clip_actions[a].event_flags & CLIP_EVENT_CONSTRUCT)
 			pcc->clip_actions[a].action(app_context);
 	}
+	actionEndConstructCapture();
 	actionSetCurrentContext(saved_ctx);
 	free(pcc);
 }

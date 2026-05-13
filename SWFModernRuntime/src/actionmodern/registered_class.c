@@ -19,6 +19,7 @@
 
 #include <actionmodern/action_internal.h>
 #include <actionmodern/actionregclass.h>
+#include <action.h>  // actionReplayConstructParams
 #include <tag.h>    // ng_lookupExportVersion
 
 // ng_forEachExportName lives in libswf/ng_shared.c but isn't declared
@@ -385,4 +386,11 @@ void actionInvokeRegisteredClassConstructor(SWFAppContext* app_context, const ch
 
 	popSuperContext();
 	actionSetCurrentContext(saved_ctx);
+
+	// Replay any SetVariable calls captured during this MC's CLIP_EVENT_CONSTRUCT
+	// dispatch. The setters fire again — this time with internal state (_vp,
+	// _ncMgr, etc.) created by the constructor body above — so their real
+	// side-effecting branches run (e.g. FLVPlayback's contentPath setter
+	// invokes _vp[_activeVP].play(url) when _vp now exists).
+	actionReplayConstructParams(app_context, mc);
 }
