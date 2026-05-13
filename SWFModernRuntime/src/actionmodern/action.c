@@ -7424,18 +7424,35 @@ static void invokePropertySetter(SWFAppContext* app_context, ASFunction* func, v
 		return;
 	}
 
-	// Build the "this" var passed to setter: receiver object as ActionVar.
-	// Same g_this_stack push as invokePropertyGetter so getVariable("this")
-	// inside the setter body returns the receiver.
+	// Build the "this" var bound to the setter via its local scope (below).
+	// When this_obj is NULL but g_event_this_mc is set (the MC-setter dispatch
+	// pattern used by SetVariable/SetMember on MovieClip receivers and by
+	// actionReplayConstructParams), the receiver is the MovieClip — emit a
+	// MOVIECLIP-typed binding rather than OBJECT(NULL) so the setter body's
+	// `this` reads land on the MC's dynamic_props.
 	ActionVar this_var = {0};
-	this_var.type = ACTION_STACK_VALUE_OBJECT;
-	this_var.data.numeric_value = (u64) this_obj;
-	u32 saved_this_depth = g_this_depth;
-	if (g_this_depth < MAX_THIS_DEPTH)
-	{
-		g_this_stack[g_this_depth] = this_var;
-		g_this_depth++;
+	if (this_obj != NULL) {
+		this_var.type = ACTION_STACK_VALUE_OBJECT;
+		this_var.data.numeric_value = (u64) this_obj;
+	} else if (g_event_this_mc != NULL) {
+		this_var.type = ACTION_STACK_VALUE_MOVIECLIP;
+		this_var.data.numeric_value = (u64) g_event_this_mc;
+	} else {
+		this_var.type = ACTION_STACK_VALUE_UNDEFINED;
 	}
+	// Save g_this_depth and reset to 0 for the duration of the setter call so
+	// nested method calls (which don't push g_this_stack themselves) don't
+	// inherit the outer caller's `this` via the early-this fast path in
+	// actionGetVariable. The setter body and its nested calls each get their
+	// `this` from their own scope-chain binding (setProperty(local_scope,
+	// "this", &this_var) below for the setter; actionCallMethod's MC
+	// user-method dispatch sets the same for nested receiver MCs).
+	// Without this, FLVPlayback's contentPath setter → createINCManager
+	// resolved `this` to the outer setter's receiver (or OBJECT(NULL) on the
+	// older NULL-this_obj path), causing `this.ncMgrClassName = ...` to write
+	// to the wrong object and the read-back to return undefined.
+	u32 saved_this_depth = g_this_depth;
+	g_this_depth = 0;
 
 	if (func->function_type == 2)
 	{

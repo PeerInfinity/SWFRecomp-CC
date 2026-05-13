@@ -158,3 +158,6 @@ local_swf_batch/*.SWF
 
 # AI agent handoff scratch directory (cross-instance messages, runtime probes)
 .ai_handoff/
+
+# Per-session prompt scratch (carries instructions across Claude Code sessions)
+.claude/next-session-prompt.md

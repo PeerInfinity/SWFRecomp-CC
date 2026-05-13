@@ -3,7 +3,7 @@
 
 <!-- PLAN_META
 id: NETSTREAM_PLAY_FLV_SCREEN_RENDERING
-status: incomplete
+status: complete
 phases:
   - id: 1
     name: "Widen video render gate for OFFSCREEN_RENDER (graphics-native)"
@@ -16,10 +16,10 @@ phases:
     status: complete
   - id: 4
     name: "Validate via image comparison"
-    status: blocked
+    status: complete
   - id: 5
-    name: "Resolve createINCManager → undefined (NCManager dispatch gap)"
-    status: in_progress
+    name: "Resolve createINCManager → undefined (invokePropertySetter g_this_stack leak)"
+    status: complete
 dependencies:
   - plan: CONSTRUCT_PARAMETER_REPLAY
     type: extends
@@ -27,13 +27,68 @@ dependencies:
   - plan: FLV_PLAYBACK
     type: requires
     reason: "FLV decode, NetStream play, video frame readback all work — this plan adds the rendering tail and re-attempts the component-parameter unlock."
-blockers:
-  - "createINCManager returns undefined when called from VideoPlayer._load — subsequent _ncMgr.setVideoPlayer / _ncMgr.connectToURL fire on undefined and silently no-op (verified by callmethod tracing). NetStream.play() is never reached. New phase 5 scoped below."
 -->
 
 Last updated: 2026-05-13
 
-## Status: INCOMPLETE — gate widen + Option B replay landed; downstream NCManager dispatch is the next blocker
+## Status: COMPLETE — image PASS (0 outliers, max diff 0)
+
+## 2026-05-13 update #2 (Phase 5 resolved)
+
+The Phase 5 root cause was **not** `eval(non-STRING)` semantics. The
+trace pass-through fix had no effect on this test because the eval
+call's stack-top was already UNDEFINED (the previous setter write to
+`this.ncMgrClassName` had silently dropped). The real bug was in
+`invokePropertySetter`:
+
+1. `actionReplayConstructParams` invokes `__set__contentPath` with
+   `this_obj = NULL` (relying on `g_event_this_mc` for the recompiler-
+   emitted preload-`this` register).
+2. `invokePropertySetter` built `this_var = OBJECT(this_obj) = OBJECT(NULL)`
+   and pushed it onto `g_this_stack`.
+3. The setter chain `this._vp[i].load(url) → _load() → createINCManager()`
+   dispatches each nested call via `actionCallMethod`'s MC user-method
+   path, which sets `this` on the scope chain but does **not** push to
+   `g_this_stack`. The early-this fast path in `actionGetVariable`
+   (`action.c:35400`) checks `g_this_stack` first and returned the
+   leaked `OBJECT(NULL)` from step 2 inside every nested call.
+4. Inside `createINCManager`, `this.ncMgrClassName = mx.video.VideoPlayer.DEFAULT_INCMANAGER`
+   resolved `this` to `OBJECT(NULL)` and the SetMember silently
+   dropped the write. The re-read returned UNDEFINED, the eval
+   returned UNDEFINED, `new ncMgrConstructor()` failed, NetStream.play
+   was never reached.
+
+Fix (commit pending, +10/–6 lines in `invokePropertySetter`):
+
+- When `this_obj == NULL` but `g_event_this_mc != NULL` (the MC-setter
+  dispatch pattern), build `this_var` as `MOVIECLIP(g_event_this_mc)`
+  instead of `OBJECT(NULL)`.
+- Save `g_this_depth`, **reset to 0** for the duration of the setter,
+  and restore at the end. Removes the push to `g_this_stack`
+  entirely — the setter body and every nested call now resolve `this`
+  via their own scope-chain bindings (already set by
+  `setProperty(local_scope, "this", &this_var)` in both Type 1 and
+  Type 2 paths, and by `actionCallMethod`'s MC user-method dispatch
+  for nested receiver MCs).
+
+Validation:
+
+- `netstream_play_flv_screen --mode=graphics`: image PASS, 0 outliers,
+  max diff 0 (was 45,183 outliers).
+- Regression matrix (all PASS): `on_construct`, `netstream_play_flv`,
+  `netstream_seek_flv`, `register_and_init_order`,
+  `register_class_return_value`, `register_class`,
+  `register_class_swf6`, `register_class_with_sound`,
+  `loadmovie_registerclass`, `infinite_recursion_function_in_setter`,
+  `edittext_autosize_setter`, `object_resolve`, `super_edge_cases`,
+  `as2_oop`, `as2_super_and_this_v6`, `as2_super_and_this_v8`,
+  `as2_super_via_manual_prototype`, `extends_chain`,
+  `define_function2_preload_order`, `swf5_no_closure`,
+  `swf5_to_6_cross_call`, `goto_rewind3`.
+
+Full CI sweep pending via `.claude/pipeline-handoff.md`.
+
+## 2026-05-13 update #1 (Phases 1–3)
 
 ## 2026-05-13 update
 
