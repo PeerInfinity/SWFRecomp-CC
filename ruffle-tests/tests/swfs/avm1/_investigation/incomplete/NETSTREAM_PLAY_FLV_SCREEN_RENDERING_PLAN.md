@@ -7,15 +7,18 @@ status: incomplete
 phases:
   - id: 1
     name: "Widen video render gate for OFFSCREEN_RENDER (graphics-native)"
-    status: ready
+    status: complete
   - id: 2
     name: "Trace contentPath setter to confirm the 'pre-constructor' branch is taken"
-    status: ready
+    status: complete
   - id: 3
     name: "Try CONSTRUCT_PARAMETER_REPLAY Option B speculatively"
-    status: ready
+    status: complete
   - id: 4
     name: "Validate via image comparison"
+    status: blocked
+  - id: 5
+    name: "Resolve createINCManager → undefined (NCManager dispatch gap)"
     status: ready
 dependencies:
   - plan: CONSTRUCT_PARAMETER_REPLAY
@@ -24,12 +27,62 @@ dependencies:
   - plan: FLV_PLAYBACK
     type: requires
     reason: "FLV decode, NetStream play, video frame readback all work — this plan adds the rendering tail and re-attempts the component-parameter unlock."
-blockers: []
+blockers:
+  - "createINCManager returns undefined when called from VideoPlayer._load — subsequent _ncMgr.setVideoPlayer / _ncMgr.connectToURL fire on undefined and silently no-op (verified by callmethod tracing). NetStream.play() is never reached. New phase 5 scoped below."
 -->
 
-Last updated: 2026-05-12
+Last updated: 2026-05-13
 
-## Status: INCOMPLETE — gate widening ready, parameter-replay re-attempt scoped
+## Status: INCOMPLETE — gate widen + Option B replay landed; downstream NCManager dispatch is the next blocker
+
+## 2026-05-13 update
+
+Phases 1–3 landed in commits `049bfb22` (gate widen) and `066b68ca`
+(CONSTRUCT capture/replay). Phase 2 instrumentation confirmed the
+existing plan's root cause exactly and Phase 3 (Option B replay) was
+implemented and validated against the regression matrix locally
+(on_construct 25/25, netstream_play_flv 21/21, netstream_seek_flv
+25/25, register_and_init_order 233/233, register_class_return_value
+16/16).
+
+CI run `25776126693` against `066b68ca` reported **zero regressions
+across all eight suites** — avm1 605/651, gnash actionscript.all
+126/190, misc-ming.all 66/102, misc-mtasc.all 7/9, misc-swfc.all
+8/16, misc-swfmill.all 17/18, shumway 73/92, shumway/avm1 46/47.
+Pass counts and mismatched-line counts unchanged versus the prior
+master baseline (`ce10ee67`).
+
+The 12-property CONSTRUCT capture now correctly replays after the
+registered-class constructor builds `_vp`. The contentPath setter's
+post-constructor branch fires and reaches:
+
+```
+contentPath setter
+  → _vp[_activeVP].load(url, isLive, totalTime)
+    → VideoPlayer.load: __get__stateResponsive, execQueuedCmds, _load
+      → _load: closeNS, createINCManager, setVideoPlayer, connectToURL,
+        setState, dispatchEvent ... attachMovie (new VideoPlayer)
+```
+
+**New stall point (Phase 5):** `createINCManager` returns `UNDEFINED`,
+so `_ncMgr.setVideoPlayer(this)` and `_ncMgr.connectToURL(url)` are
+called on UNDEFINED (verified by `obj_type=3` in the method-call trace
+— ACTION_STACK_VALUE_UNDEFINED). The chain silently no-ops and
+`NetStream.play()` is still never reached.
+
+Likely causes (in descending probability):
+1. `createINCManager`'s body resolves the class via a path like
+   `_global.mx.video.NCManager` that fails to evaluate to the
+   class function under our addProperty-getter / `__resolve` /
+   `__Packages` lookup semantics.
+2. The `__Packages.mx.video.NCManager` init action (script_11 →
+   char 18) runs, but the assignment of the constructor to
+   `_global.mx.video.NCManager` doesn't survive subsequent class-system
+   bookkeeping (e.g., a `_global` write is being shadowed somewhere).
+3. `createINCManager` reads its NCManager class reference from a
+   FLVPlayback static (`_iNCManagerClass`-style) that's set up at class
+   definition time but doesn't get populated under our `static`
+   property semantics.
 
 ## Context
 
@@ -133,6 +186,44 @@ static int g_in_construct_clip_action = 0;
 Local: `python3 ruffle-tests/verify_output.py --test=netstream_play_flv_screen --mode=graphics --verbose`. The trace expectation is empty — image is the only signal. Watch for stray `printf` / `fprintf(stderr)` from new code (would still show in `--verbose` but pollutes CI filtered-pass).
 
 Once Phase 3 lands locally, push to CI for full-suite regression sweep before declaring done.
+
+### Phase 5 — Resolve `createINCManager` → undefined
+
+First step: find `createINCManager`'s body in `script_defs.c`
+(currently grep-able via `str_470 = "createINCManager"` and the two
+`PUSH_STR_ID(str_470, …)` call sites at 27070 and 32966; the body
+lives in whichever `func2_anonymous_*` registers the method on the
+VideoPlayer prototype). Disassemble it manually to determine which
+expression returns `undefined`.
+
+Cheap empirical pass first:
+- Instrument every `actionGetMember(... "NCManager")` /
+  `actionGetMember(... "mx")` / `actionGetVariable("mx")` etc. during
+  the replay window. Log the type returned. If `mx.video.NCManager`
+  evaluates to UNDEFINED at the moment `createINCManager` runs, the
+  class lookup is the bug.
+- If the class IS found but `new` produces UNDEFINED, the bug is in
+  `actionNewObject` for this specific class (unlikely — `new
+  NetStream` works in other tests).
+
+Likely fix scopes by hypothesis:
+- Hypothesis 1 (class lookup miss): a path-resolution gap in
+  `actionGetMember` for nested package lookups (`_global.mx.video.X`).
+  Adjacent code: `findPropertyStructWithPrototype` walks in
+  `object.c`, and `__Packages` registry handling in `action.c` (search
+  for `__Packages.`).
+- Hypothesis 2 (`_global` write lost): inspect the `_global.mx = ...`
+  / `_global.mx.video = ...` writes in script_2/3/4 — verify they end
+  up on `global_object` and don't get shadowed by per-MC dynamic_props
+  during DoInitAction context switches.
+- Hypothesis 3 (static class property): the FLVPlayback class stores
+  `_iNCManagerClass` as a class-level static. If our `static` semantics
+  for AS2 classes lazily reset or don't survive across constructor
+  invocations, this static could read as undefined.
+
+Validation: same matrix as Phase 4. The trace test (0 lines) cannot
+catch this regression — only the image diff or callmethod-trace
+inspection can.
 
 ## Out of scope (deferred)
 
