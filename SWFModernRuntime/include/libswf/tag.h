@@ -365,6 +365,30 @@ int ng_getCTFromEntry(size_t entry_idx, double* ra, double* ga, double* ba, doub
 int ng_setCTOnEntry(size_t entry_idx, double ra, double ga, double ba, double aa, double rb, double gb, double bb, double ab);
 // TextField variable binding — called from tag_stubs.c at placement time
 void actionInitTextFieldVariable(SWFAppContext* app_context, const char* var_name, const char* init_text);
+
+// Phase B (textfield-variable-binding-plan.md): try to bind a placed
+// TextField's variable to its parent's scope.
+//   set_initial_value=1: at placement / wrapper creation. Initial-value
+//     direction matches Flash: variable wins if defined, else TF.text seeds
+//     the variable.
+//   set_initial_value=0: retry from the unbound queue (variable was already
+//     handled when the TF was first queued; just confirm the path resolves).
+// Returns 1 if binding resolved (or no variable to bind); 0 if the path
+// can't be resolved yet (caller queues the TF for retry).
+int actionTryBindTextFieldVariable(SWFAppContext* app_context, MovieClip* tf_mc, int set_initial_value);
+
+// Retry every TF in the unbound queue. Drains those whose path now resolves.
+// Called per-tick from the frame loop, mirroring Ruffle's bind_variables
+// invocation from MovieClip::run_frame_avm1.
+int actionRetryUnboundTextFields(SWFAppContext* app_context);
+
+// Push a TF MC onto the unbound queue (called from placement when the bind
+// path can't be resolved yet). Idempotent.
+void actionUnboundTextFieldsPush(MovieClip* mc);
+
+// Drop a freed/unloaded MC from the unbound queue (called from MC destruction
+// sites to avoid retrying dangling pointers).
+void actionUnboundTextFieldsDrop(MovieClip* mc);
 // Rename a cached MovieClip when tagSetInstanceName updates a sprite's display entry
 void actionRenameMovieClip(const char* old_name, const char* new_name);
 // Enumerate child instance names for a MovieClip (for for-in enumeration)

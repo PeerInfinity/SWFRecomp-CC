@@ -18803,6 +18803,227 @@ static int mc_is_nonscriptable_shape(MovieClip* mc) {
 }
 #endif
 
+// Unbound-TextField retry queue. Mirrors Ruffle's
+// `context.unbound_text_fields: Vec<EditText>` (core/src/context.rs). When a
+// TF placement attempts to bind a path variable whose container path can't yet
+// be resolved (e.g. `_root.mc.var` placed before `mc`), the TF MC is pushed
+// here; actionRetryUnboundTextFields() retries each entry per tick and removes
+// the ones that bind successfully. Fixed-size array — empirically 64 entries
+// covers every test we've seen with cross-clip path bindings.
+#define UNBOUND_TF_MAX 64
+static MovieClip* g_unbound_textfields[UNBOUND_TF_MAX];
+static int g_unbound_textfield_count;
+
+static void unbound_tf_push(MovieClip* mc)
+{
+	if (mc == NULL) return;
+	for (int i = 0; i < g_unbound_textfield_count; i++) {
+		if (g_unbound_textfields[i] == mc) return;  // already queued
+	}
+	if (g_unbound_textfield_count < UNBOUND_TF_MAX)
+		g_unbound_textfields[g_unbound_textfield_count++] = mc;
+}
+
+static void unbound_tf_remove_at(int idx)
+{
+	if (idx < 0 || idx >= g_unbound_textfield_count) return;
+	// Swap-remove (order doesn't matter for retry semantics).
+	g_unbound_textfields[idx] = g_unbound_textfields[g_unbound_textfield_count - 1];
+	g_unbound_textfield_count--;
+}
+
+// Drop any queued entries pointing at a freed/unloaded MC. Called from MC
+// destruction sites (createMovieClip's recycling logic + sprite/TF unload).
+void actionUnboundTextFieldsDrop(MovieClip* mc)
+{
+	if (mc == NULL) return;
+	for (int i = g_unbound_textfield_count - 1; i >= 0; i--) {
+		if (g_unbound_textfields[i] == mc) unbound_tf_remove_at(i);
+	}
+}
+
+// Push a TF MC onto the unbound queue. Idempotent (won't add a duplicate).
+void actionUnboundTextFieldsPush(MovieClip* mc)
+{
+	unbound_tf_push(mc);
+}
+
+// Try to bind a TextField MovieClip's variable to its parent's scope. Mirrors
+// Ruffle's EditText::try_bind_text_field_variable (core/src/display_object/edit_text.rs).
+//
+// set_initial_value:
+//   1 = initial bind at placement / wrapper creation. If the variable already
+//       has a defined value, copy it into TF.text (variable wins). Otherwise,
+//       if TF.text is non-empty, seed the variable with TF.text (TF wins).
+//   0 = retry from the unbound queue. Just confirm the path resolves; don't
+//       redo the initial-value copy.
+//
+// Returns 1 if the binding resolved (or there was no variable to bind);
+// 0 if the path couldn't be resolved (caller should keep TF in the unbound
+// queue for retry).
+//
+// Idempotent: calling repeatedly is safe — the "variable" / "text" properties
+// on the TF are just overwritten with current values.
+int actionTryBindTextFieldVariable(SWFAppContext* app_context, MovieClip* tf_mc, int set_initial_value)
+{
+	if (tf_mc == NULL || tf_mc->ng_textfield_idx < 0) return 1;
+	ASObject* props = (ASObject*) tf_mc->dynamic_props;
+	if (props == NULL) return 1;
+
+	int tf_idx = tf_mc->ng_textfield_idx;
+	const char* var_name = ng_getTextFieldVariableName(tf_idx);
+	if (var_name == NULL || var_name[0] == '\0') return 1;  // no variable
+
+	u16 tf_flags = ng_getTextFieldFlags(tf_idx);
+	int is_html = (tf_flags & 0x0040) != 0;
+
+	extern MovieClip root_movieclip;
+
+	// Resolve the binding container + property name. Path variables
+	// ("_root.mc.var") resolve the container via actionGetVariable; simple
+	// names ("var_name") bind on the TF's parent MC scope.
+	ASObject* container = NULL;
+	const char* prop_name = NULL;
+	u32 prop_name_len = 0;
+	int is_path = (strchr(var_name, '.') != NULL);
+	MovieClip* simple_binding_mc = NULL;  // for simple-name → also mirror to global var_map if root
+
+	if (is_path) {
+		const char* last_dot = strrchr(var_name, '.');
+		u32 container_path_len = (u32)(last_dot - var_name);
+		prop_name = last_dot + 1;
+		prop_name_len = (u32)strlen(prop_name);
+
+		PUSH_STR(var_name, container_path_len);
+		actionGetVariable(app_context);
+		ActionVar cvar;
+		peekVar(app_context, &cvar);
+		POP();
+
+		if (cvar.type == ACTION_STACK_VALUE_OBJECT) {
+			container = (ASObject*) VAL(u64, &cvar.data.numeric_value);
+		} else if (cvar.type == ACTION_STACK_VALUE_MOVIECLIP) {
+			MovieClip* container_mc = (MovieClip*) VAL(u64, &cvar.data.numeric_value);
+			if (container_mc == NULL) return 0;  // unresolvable
+			if (container_mc->dynamic_props == NULL) {
+				container_mc->dynamic_props = (void*) allocObject(app_context, 4);
+				retainObject((ASObject*) container_mc->dynamic_props);
+			}
+			container = (ASObject*) container_mc->dynamic_props;
+		} else {
+			return 0;  // container path doesn't resolve to an Object/MC yet
+		}
+	} else {
+		simple_binding_mc = (tf_mc->parent != NULL) ? tf_mc->parent : &root_movieclip;
+		if (simple_binding_mc->dynamic_props == NULL) {
+			simple_binding_mc->dynamic_props = (void*) allocObject(app_context, 4);
+			retainObject((ASObject*) simple_binding_mc->dynamic_props);
+		}
+		container = (ASObject*) simple_binding_mc->dynamic_props;
+		prop_name = var_name;
+		prop_name_len = (u32)strlen(var_name);
+	}
+
+	if (container == NULL) return 0;
+
+	if (!set_initial_value) return 1;  // retry path — binding resolved, done.
+
+	// Set-initial-value direction: variable wins if defined; otherwise TF.text
+	// seeds the variable.
+	ActionVar existing_val = {0};
+	int has_existing = 0;
+	{
+		ActionVar* ev = getProperty(container, prop_name, prop_name_len);
+		if (ev != NULL && ev->type != ACTION_STACK_VALUE_UNDEFINED) {
+			existing_val = *ev;
+			has_existing = 1;
+		}
+	}
+	// For root-bound simple names, also accept a value sitting in the global
+	// var_map (set by `setVariableByName` outside a property-write path).
+	if (!has_existing && !is_path && simple_binding_mc == &root_movieclip) {
+		size_t vlen = strlen(var_name);
+		if (hasVariable((char*)var_name, vlen)) {
+			PUSH_STR(var_name, (u32)vlen);
+			actionGetVariable(app_context);
+			peekVar(app_context, &existing_val);
+			POP();
+			if (existing_val.type != ACTION_STACK_VALUE_UNDEFINED)
+				has_existing = 1;
+		}
+	}
+
+	if (has_existing) {
+		// Variable wins — copy to TF. HTML fields parse via strip_html_tags_u16.
+		if (is_html && existing_val.type == ACTION_STACK_VALUE_STRING) {
+			setProperty(app_context, props, "htmlText", 8, &existing_val);
+			const uint16_t* u16 = varGetU16Ptr(&existing_val);
+			if (u16 != NULL) {
+				u32 stripped_len;
+				uint16_t* stripped = strip_html_tags_u16(app_context, u16, existing_val.str_size, &stripped_len);
+				ActionVar text_val = {0};
+				text_val.type = ACTION_STACK_VALUE_STRING;
+				text_val.str_size = stripped_len;
+				VAL(u64, &text_val.data.numeric_value) = (u64)stripped;
+				setProperty(app_context, props, "text", 4, &text_val);
+				ActionVar len_val = {0};
+				len_val.type = ACTION_STACK_VALUE_F64;
+				VAL(double, &len_val.data.numeric_value) = (double)stripped_len;
+				setProperty(app_context, props, "length", 6, &len_val);
+			}
+		} else {
+			setProperty(app_context, props, "text", 4, &existing_val);
+			ActionVar len_val = {0};
+			len_val.type = ACTION_STACK_VALUE_F64;
+			u32 elen = (existing_val.type == ACTION_STACK_VALUE_STRING) ? existing_val.str_size : 0;
+			VAL(double, &len_val.data.numeric_value) = (double)elen;
+			setProperty(app_context, props, "length", 6, &len_val);
+		}
+	} else {
+		// TF wins — seed the variable with TF.text if non-empty. Skip when
+		// initial text is empty; Flash leaves the variable undefined in that
+		// case (DefineEditTextVariableNameTest mc4/mc5: assert
+		// `typeof(mc4.uninitalized_text_var) == 'undefined'` before any
+		// explicit text is set).
+		ActionVar* tf_text = getProperty(props, "text", 4);
+		if (tf_text != NULL && tf_text->type == ACTION_STACK_VALUE_STRING && tf_text->str_size > 0) {
+			setProperty(app_context, container, prop_name, prop_name_len, tf_text);
+			// Mirror to global var_map for root-bound simple names so scope-chain
+			// lookups elsewhere find it (existing behavior in pre-Phase-B init
+			// block; preserves callers that read via getVariable).
+			if (!is_path && simple_binding_mc == &root_movieclip)
+				setVariableByName(var_name, tf_text);
+		}
+	}
+
+	return 1;
+}
+
+// Retry every TF in the unbound queue. Mirrors Ruffle's
+// `Avm1TextFieldBinding::bind_variables` called from
+// MovieClip::run_frame_avm1 (core/src/display_object/movie_clip.rs:1999).
+// `set_initial_value=0`: bind silently; don't redo the initial-value copy
+// (that already ran at placement time when we first queued).
+int actionRetryUnboundTextFields(SWFAppContext* app_context)
+{
+	int resolved = 0;
+	int i = 0;
+	while (i < g_unbound_textfield_count) {
+		MovieClip* tf_mc = g_unbound_textfields[i];
+		if (tf_mc == NULL || tf_mc->depth == INT_MIN || tf_mc->ng_textfield_idx < 0) {
+			unbound_tf_remove_at(i);
+			continue;
+		}
+		if (actionTryBindTextFieldVariable(app_context, tf_mc, /*set_initial_value=*/0)) {
+			unbound_tf_remove_at(i);
+			resolved++;
+			continue;
+		}
+		i++;
+	}
+	return resolved;
+}
+
 static MovieClip* findOrCreateMovieClip(SWFAppContext* app_context, const char* instance_name, MovieClip* parent) {
 	(void)app_context;  // used only in NO_GRAPHICS for TextField init
 	MovieClip* mc = NULL;
@@ -18996,64 +19217,16 @@ static MovieClip* findOrCreateMovieClip(SWFAppContext* app_context, const char* 
 					VAL(u64, &var_val.data.numeric_value) = (u64)_vn_u16;
 					setProperty(app_context, props, "variable", 8, &var_val);
 				}
-				// Initialize the bound variable on the textfield's parent MC scope:
-				// for a simple-name binding, look up the value on the parent's
-				// dynamic_props (or var_map for a root-parented field) and use it as
-				// the textfield text if it already exists; otherwise create the
-				// variable on the parent's scope with the initial text. This mirrors
-				// Ruffle's EditText::set_variable behavior at placement time so that
-				// `mcN.bound_var` reflects the textfield's initial text and changes
-				// to either side stay in sync via ng_syncTextToVar / actionSetMember.
-				if (var_name[0] != '\0' && strchr(var_name, '.') == NULL)
-				{
-					extern MovieClip root_movieclip;
-					MovieClip* binding_mc = (mc->parent != NULL) ? mc->parent : &root_movieclip;
-					ActionVar existing_val = {0};
-					int has_existing = 0;
-					u32 var_name_len = (u32)strlen(var_name);
-					if (binding_mc->dynamic_props != NULL) {
-						ActionVar* ev = getProperty((ASObject*) binding_mc->dynamic_props, var_name, var_name_len);
-						if (ev != NULL && ev->type != ACTION_STACK_VALUE_UNDEFINED) {
-							existing_val = *ev;
-							has_existing = 1;
-						}
-					}
-					if (!has_existing && binding_mc == &root_movieclip) {
-						extern bool hasVariable(char* var_name, size_t key_size);
-						if (hasVariable((char*)var_name, var_name_len)) {
-							PUSH_STR(var_name, var_name_len);
-							actionGetVariable(app_context);
-							peekVar(app_context, &existing_val);
-							POP();
-							if (existing_val.type != ACTION_STACK_VALUE_UNDEFINED)
-								has_existing = 1;
-						}
-					}
-					if (has_existing) {
-						// Bind: textfield.text comes from the existing variable value.
-						setProperty(app_context, props, "text", 4, &existing_val);
-						ActionVar _len_v = {0}; _len_v.type = ACTION_STACK_VALUE_F64;
-						u32 _ev_len = (existing_val.type == ACTION_STACK_VALUE_STRING) ? existing_val.str_size : 0;
-						VAL(double, &_len_v.data.numeric_value) = (double)_ev_len;
-						setProperty(app_context, props, "length", 6, &_len_v);
-					} else if (text_val.type == ACTION_STACK_VALUE_STRING && text_val.str_size > 0) {
-						// Create the bound variable on the parent's scope, seeded
-						// with the textfield's initial text (already in `text_val`).
-						// Skip auto-init when initial text is empty — Flash leaves
-						// the variable undefined in that case (mc4/mc5 in
-						// DefineEditTextVariableNameTest assert
-						// `typeof(mc4.uninitalized_text_var) == 'undefined'`
-						// before any explicit text is set).
-						if (binding_mc->dynamic_props == NULL) {
-							binding_mc->dynamic_props = (void*) allocObject(app_context, 4);
-							retainObject((ASObject*) binding_mc->dynamic_props);
-						}
-						setProperty(app_context, (ASObject*) binding_mc->dynamic_props,
-							var_name, var_name_len, &text_val);
-						if (binding_mc == &root_movieclip)
-							setVariableByName(var_name, &text_val);
-					}
-				}
+				// Initialize the bound variable on the textfield's scope.
+				// Phase B: consolidated into actionTryBindTextFieldVariable
+				// (mirrors Ruffle's try_bind_text_field_variable). Handles
+				// both simple-name (parent-scope) and path-variable bindings;
+				// returns 0 when the path is unresolvable (caller should keep
+				// in unbound queue, which is the responsibility of
+				// ng_on_place_object2's eager-bind path — this lazy site
+				// just drops the binding and waits for actionSetMember to
+				// later set up via syncVarToTextFields).
+				actionTryBindTextFieldVariable(app_context, mc, /*set_initial_value=*/1);
 				// autoSize
 				ActionVar autosize_val = {0}; autosize_val.type = ACTION_STACK_VALUE_STRING;
 				if (tf_flags & 0x0100) { autosize_val.str_size = 4; VAL(u64, &autosize_val.data.numeric_value) = (u64)u16_left; }
@@ -19294,68 +19467,11 @@ static MovieClip* findOrCreateMovieClip(SWFAppContext* app_context, const char* 
 					VAL(u64, &var_val.data.numeric_value) = (u64)_vn_u16;
 					setProperty(app_context, props, "variable", 8, &var_val);
 				}
-				// If the bound variable already has a value (e.g., textfield placed after
-				// the variable was set), initialize text from that current value.
-				if (var_name[0] != '\0') {
-					ActionVar* _fi_val = NULL;
-					const char* _fi_dot = strchr(var_name, '.');
-					if (_fi_dot != NULL) {
-						// Path variable (e.g., "obj.theVar"): resolve container then read property
-						const char* _fi_last_dot = _fi_dot;
-						for (const char* _fi_p = _fi_dot + 1; *_fi_p; _fi_p++)
-							if (*_fi_p == '.') _fi_last_dot = _fi_p;
-						u32 _fi_clen = (u32)(_fi_last_dot - var_name);
-						const char* _fi_prop = _fi_last_dot + 1;
-						u32 _fi_plen = (u32)strlen(_fi_prop);
-						PUSH_STR(var_name, _fi_clen);
-						actionGetVariable(app_context);
-						ActionVar _fi_cvar;
-						peekVar(app_context, &_fi_cvar);
-						POP();
-						ASObject* _fi_obj = NULL;
-						if (_fi_cvar.type == ACTION_STACK_VALUE_OBJECT)
-							_fi_obj = (ASObject*) VAL(u64, &_fi_cvar.data.numeric_value);
-						else if (_fi_cvar.type == ACTION_STACK_VALUE_MOVIECLIP) {
-							MovieClip* _fi_mc = (MovieClip*) VAL(u64, &_fi_cvar.data.numeric_value);
-							if (_fi_mc != NULL) _fi_obj = (ASObject*) _fi_mc->dynamic_props;
-						}
-						if (_fi_obj != NULL) {
-							_fi_val = getProperty(_fi_obj, _fi_prop, _fi_plen);
-							if (_fi_val != NULL && _fi_val->type == ACTION_STACK_VALUE_UNDEFINED)
-								_fi_val = NULL;
-						}
-					} else {
-						// Simple variable: look up in global scope
-						extern bool hasVariable(char* var_name, size_t key_size);
-						if (hasVariable((char*)var_name, strlen(var_name))) {
-							PUSH_STR(var_name, (u32)strlen(var_name));
-							actionGetVariable(app_context);
-							static ActionVar _fi_simple_val;
-							peekVar(app_context, &_fi_simple_val);
-							POP();
-							if (_fi_simple_val.type != ACTION_STACK_VALUE_UNDEFINED)
-								_fi_val = &_fi_simple_val;
-						}
-					}
-				if (_fi_val != NULL) {
-						int _fi_is_html = (tf_flags & 0x0040) != 0;
-						if (_fi_is_html && _fi_val->type == ACTION_STACK_VALUE_STRING) {
-							// HTML field: store raw as htmlText, stripped as text
-							setProperty(app_context, props, "htmlText", 8, _fi_val);
-							const uint16_t* _fi_u16 = varGetU16Ptr(_fi_val);
-							u32 _fi_u16_len = _fi_val->str_size;
-							u32 _fi_stripped_len;
-							uint16_t* _fi_stripped = strip_html_tags_u16(app_context, _fi_u16, _fi_u16_len, &_fi_stripped_len);
-							ActionVar _fi_text_val = {0};
-							_fi_text_val.type = ACTION_STACK_VALUE_STRING;
-							_fi_text_val.str_size = _fi_stripped_len;
-							VAL(u64, &_fi_text_val.data.numeric_value) = (u64)_fi_stripped;
-							setProperty(app_context, props, "text", 4, &_fi_text_val);
-						} else {
-							setProperty(app_context, props, "text", 4, _fi_val);
-						}
-					}
-				}
+				// Phase B: bind variable via consolidated helper. Covers both
+				// path-variable and simple-name forms, with the same
+				// "variable wins; else TF seeds variable" semantics as
+				// Ruffle's try_bind_text_field_variable(set_initial_value=1).
+				actionTryBindTextFieldVariable(app_context, mc, /*set_initial_value=*/1);
 				// autoSize (from DefineEditText AutoSize flag)
 				ActionVar autosize_val = {0};
 				autosize_val.type = ACTION_STACK_VALUE_STRING;

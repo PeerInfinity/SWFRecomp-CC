@@ -709,13 +709,38 @@ void ng_on_place_object2(SWFAppContext* app_context, size_t depth, size_t char_i
 		}
 	}
 
-	// Initialize textfield variable binding
+	// Initialize textfield variable binding (placement-time scope seeding).
+	// Preserved across Phase B for tests / paths that read the bound variable
+	// before the wrapper MC's bind logic runs (e.g. scope-chain lookups that
+	// don't go through findOrCreateMovieClip).
 	if (is_tf && tf_idx >= 0)
 	{
 		const char* var_name  = ng_getTextFieldVariableName(tf_idx);
 		const char* init_text = ng_getTextFieldInitialTextByIdx(tf_idx);
 		if (var_name[0] != '\0')
 			actionInitTextFieldVariable(app_context, var_name, init_text);
+	}
+
+	// Phase B: eagerly create the AVM1 wrapper for placed text fields, so
+	// every placed TF behaves like a real DisplayObject from placement —
+	// matches Flash, where DefineEditText DisplayObjects exist immediately
+	// at PlaceObject2 time rather than lazily on first AS access.
+	// findOrCreateMovieClip's init path calls actionTryBindTextFieldVariable
+	// (set_initial_value=1) as part of TF property pre-population. If the
+	// path can't yet be resolved (parent path not in scope), push to the
+	// unbound retry queue.
+	if (is_tf && tf_idx >= 0 && obj->instance_name != NULL)
+	{
+		extern MovieClip root_movieclip;
+		MovieClip* parent_mc = g_current_context ? g_current_context : &root_movieclip;
+		MovieClip* tf_mc = actionFindOrCreateMovieClip(app_context, obj->instance_name, parent_mc);
+		const char* var_name = ng_getTextFieldVariableName(tf_idx);
+		if (tf_mc != NULL && var_name[0] != '\0') {
+			if (!actionTryBindTextFieldVariable(app_context, tf_mc, /*set_initial_value=*/1)) {
+				// Path-variable container not yet reachable — queue for retry.
+				actionUnboundTextFieldsPush(tf_mc);
+			}
+		}
 	}
 
 	// Allocate sprite display list and mark for initialization.

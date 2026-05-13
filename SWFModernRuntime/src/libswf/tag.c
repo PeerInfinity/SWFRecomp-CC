@@ -3529,6 +3529,12 @@ void tagShowFrame(SWFAppContext* app_context)
 	// Dispatch _root.onLoad once after first frame
 	actionDispatchRootOnLoad(app_context);
 
+	// Phase B: retry every TF whose variable-binding path wasn't resolvable
+	// at placement time. Mirrors Ruffle's Avm1TextFieldBinding::bind_variables
+	// invocation from MovieClip::run_frame_avm1 (per-tick). Most-common case
+	// is a no-op because eager bind in ng_on_place_object2 already succeeded.
+	actionRetryUnboundTextFields(app_context);
+
 	// Advance placement generation so next frame's placements are distinguishable
 	g_place_gen++;
 }
