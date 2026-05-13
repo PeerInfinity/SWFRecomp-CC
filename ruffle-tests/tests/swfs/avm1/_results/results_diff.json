@@ -1,9 +1,9 @@
 {
   "metadata": {
-    "old_timestamp": "2026-05-13T03:29:43.754017+00:00",
-    "old_git_sha": "066b68ca2a067730b966bb630f2457a7601231da",
-    "new_timestamp": "2026-05-13T17:52:23.196906+00:00",
-    "new_git_sha": "0a7f72f11e39d352f56a58d9c0b072bfd52506bd",
+    "old_timestamp": "2026-05-13T17:52:23.196906+00:00",
+    "old_git_sha": "0a7f72f11e39d352f56a58d9c0b072bfd52506bd",
+    "new_timestamp": "2026-05-13T22:40:26.356121+00:00",
+    "new_git_sha": "bf47589e067ee1cfa67e7ab4b9a2754f99ba9d75",
     "partial": false,
     "same_commit": false
   },
@@ -16,18 +16,55 @@
     "new_pass": 605,
     "new_ruffle_matched": 11,
     "new_effective_pass": 616,
-    "new_total": 651,
-    "new_pass_rate": 92.9,
+    "new_total": 654,
+    "new_pass_rate": 92.5,
     "old_mismatched_lines": 8889,
-    "new_mismatched_lines": 8889,
+    "new_mismatched_lines": 9111,
     "increased_mismatches": 0,
     "decreased_mismatches": 0,
     "newly_passing": 0,
     "newly_failing": 0,
     "status_changed": 0,
     "unchanged": 651,
-    "added": 0,
+    "added": 3,
     "removed": 0
   },
-  "changes": []
+  "changes": [
+    {
+      "test": "array_reverse",
+      "change_type": "added",
+      "old_status": null,
+      "new_status": "output_mismatch",
+      "old_lines": null,
+      "new_lines": {
+        "actual_lines": 226,
+        "expected_lines": 226,
+        "matching_lines": 122
+      }
+    },
+    {
+      "test": "array_shift",
+      "change_type": "added",
+      "old_status": null,
+      "new_status": "output_mismatch",
+      "old_lines": null,
+      "new_lines": {
+        "actual_lines": 216,
+        "expected_lines": 216,
+        "matching_lines": 149
+      }
+    },
+    {
+      "test": "array_unshift",
+      "change_type": "added",
+      "old_status": null,
+      "new_status": "output_mismatch",
+      "old_lines": null,
+      "new_lines": {
+        "actual_lines": 146,
+        "expected_lines": 146,
+        "matching_lines": 95
+      }
+    }
+  ]
 }
