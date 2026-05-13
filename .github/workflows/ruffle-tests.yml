@@ -149,10 +149,16 @@ jobs:
           echo "::notice::Dawn cache miss — building inline (~30 min). actions/cache@v4 will save the result automatically."
           bash scripts/build_dawn.sh "${RUNNER_TEMP}/dawn-install"
 
-      - name: Install Vulkan
+      - name: Install Vulkan + libavcodec
         if: inputs.mode != 'no-graphics'
         run: |
-          sudo apt-get install -y mesa-vulkan-drivers vulkan-tools libvulkan1
+          # libav* are needed by SWFModernRuntime's video codec backend
+          # (SWFRecompDocs/plans/video-codec-support-plan.md). verify_output.py
+          # probes pkg-config in graphics modes and defines SWF_HAVE_LIBAVCODEC
+          # when found; absent, only ScreenVideo (FLV codec 3) decodes.
+          sudo apt-get install -y \
+            mesa-vulkan-drivers vulkan-tools libvulkan1 \
+            libavcodec-dev libavutil-dev libswscale-dev
           {
             echo "DAWN_INSTALL=$RUNNER_TEMP/dawn-install"
             echo "VK_ICD_FILENAMES=/usr/share/vulkan/icd.d/lvp_icd.json"
@@ -684,14 +690,18 @@ jobs:
           path: ${{ runner.temp }}/dawn-install
           key: ${{ steps.dawn_key.outputs.key }}
 
-      - name: Install Vulkan + verify Dawn cache hit
+      - name: Install Vulkan + libavcodec + verify Dawn cache hit
         if: inputs.mode != 'no-graphics'
         run: |
           if [ "${{ steps.dawn_cache.outputs.cache-hit }}" != "true" ]; then
             echo "::error::Dawn cache miss in shard. setup-parallel was supposed to populate it — investigate why this shard didn't see the cache."
             exit 1
           fi
-          sudo apt-get install -y mesa-vulkan-drivers vulkan-tools libvulkan1
+          # libav* are needed by SWFModernRuntime's video codec backend
+          # (see SWFRecompDocs/plans/video-codec-support-plan.md).
+          sudo apt-get install -y \
+            mesa-vulkan-drivers vulkan-tools libvulkan1 \
+            libavcodec-dev libavutil-dev libswscale-dev
           {
             echo "DAWN_INSTALL=$RUNNER_TEMP/dawn-install"
             echo "VK_ICD_FILENAMES=/usr/share/vulkan/icd.d/lvp_icd.json"
