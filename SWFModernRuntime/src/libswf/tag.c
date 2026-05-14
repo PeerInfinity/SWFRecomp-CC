@@ -1696,6 +1696,12 @@ static void render_display_list(SWFAppContext* app_context, DisplayObject* dl, s
 
 void tagSetBackgroundColor(u8 red, u8 green, u8 blue)
 {
+	// Only the first SetBackgroundColor tag in the SWF wins; subsequent tags
+	// are ignored (matches Ruffle/Flash — see Ruffle
+	// core/src/display_object/movie_clip.rs `set_background_color`).
+	static int already_set = 0;
+	if (already_set) return;
+	already_set = 1;
 #if !defined(NO_GRAPHICS) || defined(HEADLESS_GRAPHICS)
 	renderer_set_background(context, red, green, blue);
 #else
