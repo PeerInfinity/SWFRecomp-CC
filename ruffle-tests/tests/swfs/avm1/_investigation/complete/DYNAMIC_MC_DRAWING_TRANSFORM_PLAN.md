@@ -3,17 +3,17 @@
 
 <!-- PLAN_META
 id: DYNAMIC_MC_DRAWING_TRANSFORM
-status: not_started
+status: completed
 phases:
   - id: 1
     name: "Allocate dynamic GPU transform slots for dynamic MCs with as_set_flags"
-    status: not_started
+    status: completed
   - id: 2
     name: "Route per-path transform_id through fillDrawingInfos / drawing_render_cb"
-    status: not_started
+    status: completed
   - id: 3
     name: "Verify BeginBitmapFill mc2 + other dynamic-MC transform.matrix tests"
-    status: not_started
+    status: completed
 dependencies:
   - plan: RUNTIME_TRANSFORM_GPU
     type: requires
@@ -23,7 +23,28 @@ blockers: []
 
 Last updated: 2026-05-14
 
-## Status: NOT STARTED
+## Status: COMPLETED — BeginBitmapFill mc2 now renders with its
+`transform.matrix` applied. Outlier count dropped from 18387 → 1389
+(test is `known_failure = true`; remaining diff is sub-pixel
+anti-aliasing along the diagonal stripe edges, out of scope here).
+
+### What landed (commit forthcoming)
+
+- New transient `mc->dynamic_xform_slot` field on `MovieClip`
+  (`action.h`), zero meaning "no override".
+- New helper `apply_dynamic_mc_transforms(app_context)` in `tag.c`
+  (next to `apply_as_transform`). Walks `child_mc_cache[]`; for each MC
+  that is not in `display_list` (`display_obj == NULL`), not removed,
+  and has `as_set_flags != 0`, allocates a fresh GPU xform slot, builds
+  the matrix on top of identity using `apply_as_transform` with all
+  spatial bits forced (since dynamic MCs have no original placement
+  slot to inherit from), uploads via `renderer_write_transform`, and
+  stashes the slot id on the MC.
+- `fillDrawingInfos` (`action.c`) prefers `mc->dynamic_xform_slot` when
+  non-zero, falling back to `mc->last_transform_id` for placed MCs and
+  identity-only dynamics.
+- Called from both `tagShowFrame` and `tagRerenderFrame`, right after
+  the existing display-list runtime-transform loop.
 
 ## Problem
 

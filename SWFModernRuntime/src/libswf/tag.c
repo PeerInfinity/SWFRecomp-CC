@@ -1288,6 +1288,62 @@ static void apply_as_transform(float slot[16], const MovieClip* mc, u8 flags)
 }
 
 // ---------------------------------------------------------------------------
+// Helper: Allocate per-tick GPU transform slots for dynamic MCs.
+//
+// Dynamic MCs (createEmptyMovieClip / duplicateMovieClip / etc.) aren't in
+// display_list, so the runtime transform-update loop in tagShowFrame doesn't
+// touch them. Their Drawing-API paths render via fillDrawingInfos using
+// mc->last_transform_id — which is 0 (slot 0, typically identity) for a fresh
+// dynamic MC. When AS sets transform.matrix / _x / _xscale / etc. on a
+// dynamic MC, we need to land that transform on a fresh GPU slot and route
+// fillDrawingInfos through it.
+//
+// Limitation: only world-space-equals-local-space cases work right now (i.e.
+// parent chain is identity). For dynamic children of transformed sprites, the
+// parent's world transform would need to compose here. Tracked in
+// DYNAMIC_MC_DRAWING_TRANSFORM_PLAN.
+// ---------------------------------------------------------------------------
+#if !defined(NO_GRAPHICS) || defined(HEADLESS_GRAPHICS) || defined(OFFSCREEN_RENDER)
+static void apply_dynamic_mc_transforms(SWFAppContext* app_context)
+{
+	extern MovieClip* child_mc_cache[];
+	extern int child_mc_count;
+
+	for (int i = 0; i < child_mc_count; i++) {
+		MovieClip* mc = child_mc_cache[i];
+		if (mc == NULL) continue;
+		// Clear any stale slot from previous ticks (per-tick allocator
+		// resets g_next_dynamic_xform_slot, so stashed IDs are invalid).
+		mc->dynamic_xform_slot = 0;
+		if (mc->depth == INT_MIN) continue;       // removed
+		if (mc->display_obj != NULL) continue;    // placed — handled by display_list loop
+		if (mc->as_set_flags == 0) continue;      // identity — fall through to last_transform_id
+
+		u32 new_slot = g_next_dynamic_xform_slot;
+		if (new_slot >= g_xform_slot_capacity) continue;  // exhausted
+		g_next_dynamic_xform_slot++;
+
+		// Identity 4x4 (column-major), then overlay AS-set fields.
+		float xform[16] = {
+			1.0f, 0.0f, 0.0f, 0.0f,
+			0.0f, 1.0f, 0.0f, 0.0f,
+			0.0f, 0.0f, 1.0f, 0.0f,
+			0.0f, 0.0f, 0.0f, 1.0f,
+		};
+		// apply_as_transform only overwrites entries whose flag is set.
+		// Force-overlay all spatial fields so the slot reflects mc's current
+		// state regardless of which subset of flags is set (e.g. just _x or
+		// just _xscale).
+		apply_as_transform(xform, mc, (u8)(1|2|4|8|16));
+
+		renderer_write_transform(context, new_slot, xform);
+		mc->dynamic_xform_slot = new_slot;
+	}
+	(void)app_context;
+}
+#endif
+
+// ---------------------------------------------------------------------------
 // Helper: Build a 20-float cxform entry from DisplayObject cx_* fields.
 // GPU format: 4x4 diagonal matrix (mult) + 4 add values.
 // ---------------------------------------------------------------------------
@@ -2844,6 +2900,10 @@ void tagRerenderFrame(SWFAppContext* app_context)
 			apply_as_transform(slot, mc, mc->as_set_flags);
 			renderer_write_transform(context, obj->transform_id, slot);
 		}
+		// Dynamic MCs (createEmptyMovieClip etc.) aren't in display_list —
+		// allocate per-tick slots for any with AS-set transforms so their
+		// Drawing-API paths route through the freshly built matrix.
+		apply_dynamic_mc_transforms(app_context);
 		__asm__ volatile("" ::: "memory");
 		for (size_t i = 1; i <= max_depth; ++i)
 		{
@@ -3244,6 +3304,11 @@ void tagShowFrame(SWFAppContext* app_context)
 			// Also update the GPU buffer for this slot
 			renderer_write_transform(context, obj->transform_id, slot);
 		}
+
+		// Dynamic MCs (createEmptyMovieClip etc.) aren't in display_list —
+		// allocate per-tick slots for any with AS-set transforms so their
+		// Drawing-API paths route through the freshly built matrix.
+		apply_dynamic_mc_transforms(app_context);
 
 		// --- Runtime cxform updates ---
 		// When Color.setRGB()/setTransform() modifies display object color,

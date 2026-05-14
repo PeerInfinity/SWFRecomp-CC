@@ -63,6 +63,14 @@ struct MovieClip {
 	u16 swf_version;       // SWF version of the movie loaded into this MC (for getSWFVersion)
 	void* display_obj;     // Pointer to this MC's DisplayObject entry (for direct child lookup without global display_list)
 	u32 last_transform_id; // Last synced transform_id (for _x/_y from display list)
+	// Per-tick dynamic GPU transform slot for dynamic (createEmptyMovieClip /
+	// duplicateMovieClip / attachMovie-without-placement) MCs that have AS-set
+	// transforms. Allocated by tag.c each tick when mc->as_set_flags != 0 and
+	// mc->display_obj == NULL; read by fillDrawingInfos to route the MC's
+	// Drawing-API paths through the freshly built GPU matrix instead of
+	// last_transform_id (which would otherwise resolve to slot 0 / identity for
+	// a dynamic MC). 0 means "no override — use last_transform_id".
+	u32 dynamic_xform_slot;
 	u8 as_set_flags;       // Bitmask: bit 0 = _x set by AS, bit 1 = _y set by AS
 	int ng_textfield_idx;  // index into ng_textfields, or -1 if not a textfield
 	// Cached skew (radians), preserved across _xscale/_yscale/_rotation setters (Ruffle parity).

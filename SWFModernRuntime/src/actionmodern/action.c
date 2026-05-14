@@ -24578,7 +24578,13 @@ static int fillDrawingInfos(MovieClip* mc, DrawingRenderInfo* out, int max_out)
 		info->line_focal_ratio = path->line_focal_ratio;
 		info->line_gradient_ramp = path->has_line_gradient ? path->line_gradient_ramp : NULL;
 		info->line_gradient_matrix = path->has_line_gradient ? path->line_gradient_matrix : NULL;
-		info->transform_id = mc->last_transform_id;
+		// Prefer the per-tick dynamic GPU slot when the renderer has stashed one
+		// on this MC (tag.c's apply_dynamic_mc_transforms allocates these for
+		// dynamic MCs with AS-set transforms — see action.h MovieClip::dynamic_xform_slot).
+		// Falls back to last_transform_id otherwise (placed MCs, identity-only dynamics).
+		info->transform_id = (mc->dynamic_xform_slot != 0)
+			? mc->dynamic_xform_slot
+			: mc->last_transform_id;
 		info->cxform_id = 0;
 	}
 	return count;
