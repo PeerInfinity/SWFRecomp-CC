@@ -2975,6 +2975,27 @@ void tagRerenderFrame(SWFAppContext* app_context)
 	// --- Render pass ---
 	renderer_open_pass(context);
 
+	// Apply _root's AS-set transform (e.g. `_root._x = 200`) by composing it
+	// onto the stage_to_ndc projection — this is the cheapest way to honor
+	// "root is just another DisplayObject with its own transform" without
+	// touching every per-child transform. Mirrors Ruffle's Stage→root chain
+	// where root's matrix sits between the projection and child transforms.
+	{
+		extern MovieClip root_movieclip;
+		if (root_movieclip.as_set_flags != 0) {
+			float root_xform[16] = {
+				1.0f, 0.0f, 0.0f, 0.0f,
+				0.0f, 1.0f, 0.0f, 0.0f,
+				0.0f, 0.0f, 1.0f, 0.0f,
+				0.0f, 0.0f, 0.0f, 1.0f,
+			};
+			apply_as_transform(root_xform, &root_movieclip, (u8)(1|2|4|8|16));
+			float composed[16];
+			hit_test_mat4_multiply(composed, app_context->stage_to_ndc, root_xform);
+			renderer_upload_stage_transform(context, composed);
+		}
+	}
+
 #ifdef HEADLESS_RENDER_ENABLED
 	extern int capture_has_pending(void);
 	if (capture_has_pending())
@@ -3067,6 +3088,42 @@ void tagRerenderFrame(SWFAppContext* app_context)
 	}
 	if (active_clip_depth > 0)
 		renderer_end_clip(context);
+
+	// Root-attached MovieClips (see comment in tagShowFrame for rationale —
+	// these live in child_mc_cache, not display_list, and need their own
+	// render pass after the timeline display loop).
+	{
+		extern MovieClip* child_mc_cache[];
+		extern int child_mc_count;
+		for (int i = 0; i < child_mc_count; i++) {
+			MovieClip* mc = child_mc_cache[i];
+			if (mc == NULL) continue;
+			if (mc->depth == INT_MIN) continue;
+			if (mc->parent != &root_movieclip) continue;
+			if (mc->display_obj == NULL) continue;
+			uintptr_t dl_lo = (uintptr_t)display_list;
+			uintptr_t dl_hi = dl_lo + display_list_capacity * sizeof(DisplayObject);
+			uintptr_t dobj = (uintptr_t)mc->display_obj;
+			if (dobj >= dl_lo && dobj < dl_hi) continue;
+
+			DisplayObject* d = (DisplayObject*)mc->display_obj;
+			if (d->sprite_display_list == NULL || d->sprite_max_depth == 0)
+				continue;
+			float mc_xform[16] = {
+				1.0f, 0.0f, 0.0f, 0.0f,
+				0.0f, 1.0f, 0.0f, 0.0f,
+				0.0f, 0.0f, 1.0f, 0.0f,
+				0.0f, 0.0f, 0.0f, 1.0f,
+			};
+			if (mc->as_set_flags != 0) {
+				apply_as_transform(mc_xform, mc, (u8)(1|2|4|8|16));
+			}
+			compose_children(app_context, d->sprite_display_list,
+				d->sprite_max_depth, mc_xform, 0, 0);
+			render_display_list(app_context, d->sprite_display_list,
+				d->sprite_max_depth);
+		}
+	}
 
 	// Text field backgrounds/borders and glyph rendering
 	actionIterateTextFields(textfield_render_cb, NULL);
@@ -3459,6 +3516,24 @@ void tagShowFrame(SWFAppContext* app_context)
 
 	renderer_open_pass(context);
 
+	// Apply _root's AS-set transform on top of stage_to_ndc. See the matching
+	// block in tagRerenderFrame for rationale.
+	{
+		extern MovieClip root_movieclip;
+		if (root_movieclip.as_set_flags != 0) {
+			float root_xform[16] = {
+				1.0f, 0.0f, 0.0f, 0.0f,
+				0.0f, 1.0f, 0.0f, 0.0f,
+				0.0f, 0.0f, 1.0f, 0.0f,
+				0.0f, 0.0f, 0.0f, 1.0f,
+			};
+			apply_as_transform(root_xform, &root_movieclip, (u8)(1|2|4|8|16));
+			float composed[16];
+			hit_test_mat4_multiply(composed, app_context->stage_to_ndc, root_xform);
+			renderer_upload_stage_transform(context, composed);
+		}
+	}
+
 	u16 active_clip_depth = 0;
 
 	for (size_t i = 1; i <= max_depth; ++i)
@@ -3593,6 +3668,52 @@ void tagShowFrame(SWFAppContext* app_context)
 	if (active_clip_depth > 0)
 	{
 		renderer_end_clip(context);
+	}
+
+	// --- Render root-attached MovieClips (attachMovie with parent=_root) ---
+	// These live in child_mc_cache, not display_list — the dense, pointer-
+	// stable display_list can't hold them at AS depths (would force grow_ptr
+	// to invalidate every cached `mc->display_obj`). Rendered after the
+	// timeline display loop so they sit above all timeline children, matching
+	// Flash's depth ordering (AS-attached depths are biased into 16384+).
+	{
+		extern MovieClip* child_mc_cache[];
+		extern int child_mc_count;
+		for (int i = 0; i < child_mc_count; i++) {
+			MovieClip* mc = child_mc_cache[i];
+			if (mc == NULL) continue;
+			if (mc->depth == INT_MIN) continue;            // removed
+			if (mc->parent != &root_movieclip) continue;   // non-root attach
+			if (mc->display_obj == NULL) continue;         // no sprite content
+			// Skip timeline-placed root children: their display_obj points
+			// into the global display_list array, so the main render loop
+			// already drew them. Root attaches have a separately HCALLOC'd
+			// DisplayObject (ng_attachMovie:414-420).
+			uintptr_t dl_lo = (uintptr_t)display_list;
+			uintptr_t dl_hi = dl_lo + display_list_capacity * sizeof(DisplayObject);
+			uintptr_t dobj = (uintptr_t)mc->display_obj;
+			if (dobj >= dl_lo && dobj < dl_hi) continue;
+
+			DisplayObject* d = (DisplayObject*)mc->display_obj;
+			if (d->sprite_display_list == NULL || d->sprite_max_depth == 0)
+				continue;
+			// Build the MC's own transform (composing AS-set _x/_y/scale on
+			// identity), allocate a fresh slot, and use it as parent_composed
+			// for compose_children + the inner render pass.
+			float mc_xform[16] = {
+				1.0f, 0.0f, 0.0f, 0.0f,
+				0.0f, 1.0f, 0.0f, 0.0f,
+				0.0f, 0.0f, 1.0f, 0.0f,
+				0.0f, 0.0f, 0.0f, 1.0f,
+			};
+			if (mc->as_set_flags != 0) {
+				apply_as_transform(mc_xform, mc, (u8)(1|2|4|8|16));
+			}
+			compose_children(app_context, d->sprite_display_list,
+				d->sprite_max_depth, mc_xform, 0, 0);
+			render_display_list(app_context, d->sprite_display_list,
+				d->sprite_max_depth);
+		}
 	}
 
 	// --- Render text field backgrounds, borders, and glyphs ---

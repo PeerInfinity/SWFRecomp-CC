@@ -558,7 +558,17 @@ MovieClip* ng_attachMovie(SWFAppContext* app_context, size_t char_id, const char
 	}
 
 	// Register the new child in the parent's sprite display list so that
-	// resolveSlashPathToMC can find it (e.g., GetVariable("target2") inside base2)
+	// resolveSlashPathToMC can find it (e.g., GetVariable("target2") inside base2).
+	// Root attaches deliberately skip this: the global display_list is dense
+	// and indexed by depth; growing it to as_depth + 16384 would force the
+	// HCALLOC/memcpy/FREE in grow_ptr to invalidate the `mc->display_obj`
+	// pointers that every timeline-placed root child stores back into the
+	// array (tag.c sets `mc->display_obj = &display_list[depth]`). Until
+	// those pointers are made grow-safe (the broader refactor that would
+	// finally let Flash's single-tree depth model fit cleanly), root attaches
+	// reach the renderer via a separate child_mc_cache walk in tag.c's
+	// render path — see render_root_attached_mcs(). resolveSlashPathToMC's
+	// name lookup already covers them via setVariableByName above.
 	if (parent != &root_movieclip && parent->display_obj != NULL) {
 		DisplayObject* pdobj = (DisplayObject*)parent->display_obj;
 		if (pdobj->sprite_display_list != NULL) {

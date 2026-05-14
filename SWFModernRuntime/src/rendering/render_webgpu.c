@@ -1560,6 +1560,14 @@ void render_webgpu_set_background(WebGPURenderContext* ctx, u8 r, u8 g, u8 b)
 	ctx->blue = b;
 }
 
+// Overwrites the stage_to_ndc uniform buffer. Called from tag.c after
+// render_webgpu_open_pass when _root has an AS-set transform to compose
+// (e.g. _root._x = 200 shifting the whole scene).
+void render_webgpu_upload_stage_transform(WebGPURenderContext* ctx, const float matrix[16])
+{
+	wgpuQueueWriteBuffer(ctx->queue, ctx->stage_to_ndc_buf, 0, matrix, 16 * sizeof(float));
+}
+
 // ---------------------------------------------------------------------------
 // render_webgpu_open_pass
 // ---------------------------------------------------------------------------

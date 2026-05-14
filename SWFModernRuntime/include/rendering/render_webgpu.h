@@ -192,6 +192,9 @@ void render_webgpu_set_background(WebGPURenderContext* context, u8 r, u8 g, u8 b
 void render_webgpu_upload_bitmap(WebGPURenderContext* context, size_t offset, size_t size, u32 width, u32 height);
 void render_webgpu_finalize_bitmaps(WebGPURenderContext* context);
 void render_webgpu_open_pass(WebGPURenderContext* context);
+// Overwrite the per-pass stage_to_ndc uniform with a caller-composed matrix
+// (used to apply _root._x / _root._xscale / etc. on top of the projection).
+void render_webgpu_upload_stage_transform(WebGPURenderContext* context, const float matrix[16]);
 void render_webgpu_upload_extra_transform_id(WebGPURenderContext* context, u32 transform_id);
 void render_webgpu_upload_extra_transform(WebGPURenderContext* context, float* transform);
 void render_webgpu_upload_cxform_id(WebGPURenderContext* context, u32 cxform_id);
