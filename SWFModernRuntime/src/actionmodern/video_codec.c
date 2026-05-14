@@ -181,3 +181,134 @@ int video_decode_one_frame(int codec_id, int frame_type,
 	(void)codec_id;
 	return 0;
 }
+
+// ---------------------------------------------------------------------------
+// Persistent decoder
+// ---------------------------------------------------------------------------
+struct VideoDecoderCtx {
+	int codec_id;
+#ifdef SWF_HAVE_LIBAVCODEC
+	AVCodecContext* cctx;
+	struct SwsContext* sws;
+	int sws_w, sws_h;
+	int sws_pixfmt;
+#else
+	int unused;
+#endif
+};
+
+VideoDecoderCtx* video_decoder_create(int codec_id)
+{
+	if (!video_codec_supported(codec_id)) return NULL;
+
+	VideoDecoderCtx* ctx = (VideoDecoderCtx*)calloc(1, sizeof(VideoDecoderCtx));
+	if (!ctx) return NULL;
+	ctx->codec_id = codec_id;
+
+#ifdef SWF_HAVE_LIBAVCODEC
+	enum AVCodecID avid = map_flv_codec_id(codec_id);
+	if (avid == AV_CODEC_ID_NONE) { free(ctx); return NULL; }
+
+	const AVCodec* codec = avcodec_find_decoder(avid);
+	if (!codec) { free(ctx); return NULL; }
+
+	ctx->cctx = avcodec_alloc_context3(codec);
+	if (!ctx->cctx) { free(ctx); return NULL; }
+
+	if (avcodec_open2(ctx->cctx, codec, NULL) < 0) {
+		avcodec_free_context(&ctx->cctx);
+		free(ctx);
+		return NULL;
+	}
+#endif
+	return ctx;
+}
+
+void video_decoder_destroy(VideoDecoderCtx* ctx)
+{
+	if (!ctx) return;
+#ifdef SWF_HAVE_LIBAVCODEC
+	if (ctx->sws) sws_freeContext(ctx->sws);
+	if (ctx->cctx) avcodec_free_context(&ctx->cctx);
+#endif
+	free(ctx);
+}
+
+int video_decoder_decode(VideoDecoderCtx* ctx, int frame_type,
+                         const unsigned char* payload, int payload_len,
+                         int* out_w, int* out_h,
+                         unsigned char** out_rgba)
+{
+	(void)frame_type;
+	if (!ctx || !payload || payload_len <= 0 || !out_w || !out_h || !out_rgba)
+		return 0;
+
+#ifdef SWF_HAVE_LIBAVCODEC
+	if (!ctx->cctx) return 0;
+
+	AVPacket* pkt = av_packet_alloc();
+	AVFrame* frame = av_frame_alloc();
+	unsigned char* rgba = NULL;
+	int ok = 0;
+
+	if (!pkt || !frame) goto done;
+
+	pkt->data = (uint8_t*)payload;
+	pkt->size = payload_len;
+
+	if (avcodec_send_packet(ctx->cctx, pkt) < 0) goto done;
+	if (avcodec_receive_frame(ctx->cctx, frame) < 0) goto done;
+
+	int w = frame->width;
+	int h = frame->height;
+	if (w <= 0 || h <= 0) goto done;
+
+	// (Re)build sws context if dimensions or pixel format changed.
+	if (!ctx->sws || ctx->sws_w != w || ctx->sws_h != h ||
+	    ctx->sws_pixfmt != frame->format) {
+		if (ctx->sws) { sws_freeContext(ctx->sws); ctx->sws = NULL; }
+		ctx->sws = sws_getContext(w, h, (enum AVPixelFormat)frame->format,
+		                          w, h, AV_PIX_FMT_RGBA,
+		                          SWS_BILINEAR, NULL, NULL, NULL);
+		if (!ctx->sws) goto done;
+		ctx->sws_w = w; ctx->sws_h = h; ctx->sws_pixfmt = frame->format;
+
+		// Same explicit BT.601 limited→full range coercion as the one-shot
+		// path: H.263 / Spark streams don't carry colorspace tags so swscale
+		// auto-detection can pick a wrong matrix and shift colors by 1-3
+		// levels. Match Ruffle's h263-rs-yuv (BT.601, TV→full).
+		const int* inv_table = sws_getCoefficients(SWS_CS_ITU601);
+		const int* table     = sws_getCoefficients(SWS_CS_DEFAULT);
+		sws_setColorspaceDetails(ctx->sws,
+		                          inv_table, /*srcRange=*/0,
+		                          table,     /*dstRange=*/1,
+		                          /*brightness=*/0,
+		                          /*contrast=*/1 << 16,
+		                          /*saturation=*/1 << 16);
+	}
+
+	rgba = (unsigned char*)malloc((size_t)w * (size_t)h * 4);
+	if (!rgba) goto done;
+
+	uint8_t* dst_data[4] = { rgba, NULL, NULL, NULL };
+	int dst_linesize[4] = { w * 4, 0, 0, 0 };
+	if (sws_scale(ctx->sws, (const uint8_t* const*)frame->data, frame->linesize,
+	              0, h, dst_data, dst_linesize) <= 0) {
+		free(rgba); rgba = NULL;
+		goto done;
+	}
+
+	*out_w = w;
+	*out_h = h;
+	*out_rgba = rgba;
+	ok = 1;
+
+done:
+	if (frame) av_frame_free(&frame);
+	if (pkt) av_packet_free(&pkt);
+	return ok;
+#else
+	(void)payload_len;
+	return 0;
+#endif
+}

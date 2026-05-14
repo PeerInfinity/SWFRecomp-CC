@@ -1475,7 +1475,14 @@ static void render_single_object(SWFAppContext* app_context, DisplayObject* obj)
 		int vw = 0, vh = 0;
 		u16 decl_w = 0, decl_h = 0;
 		int has_decl = ng_getVideoDimensions(obj->char_id, &decl_w, &decl_h);
-		if (actionGetVideoFramePixels(&argb, (int)decl_w, (int)decl_h, &vw, &vh)) {
+		// Try embedded (DefineVideoStream + VideoFrame) path first using
+		// the display object's ratio field as the frame index; fall back
+		// to the NetStream-keyed FLV path.
+		int got_pixels =
+			actionGetEmbeddedVideoFramePixels(obj->char_id, obj->ratio,
+			                                  &argb, &vw, &vh) ||
+			actionGetVideoFramePixels(&argb, (int)decl_w, (int)decl_h, &vw, &vh);
+		if (got_pixels) {
 			// Flash renders the decoded frame stretched to fit the
 			// DefineVideoStream declared bounds, then applies the
 			// PlaceObject2 matrix. Fall back to source-equals-dest if
@@ -1548,7 +1555,11 @@ static void render_display_list(SWFAppContext* app_context, DisplayObject* dl, s
 			int vw = 0, vh = 0;
 			u16 decl_w = 0, decl_h = 0;
 			int has_decl = ng_getVideoDimensions(obj->char_id, &decl_w, &decl_h);
-			if (actionGetVideoFramePixels(&argb, (int)decl_w, (int)decl_h, &vw, &vh)) {
+			int got_pixels =
+				actionGetEmbeddedVideoFramePixels(obj->char_id, obj->ratio,
+				                                  &argb, &vw, &vh) ||
+				actionGetVideoFramePixels(&argb, (int)decl_w, (int)decl_h, &vw, &vh);
+			if (got_pixels) {
 				u32 dst_w = has_decl ? (u32)decl_w : (u32)vw;
 				u32 dst_h = has_decl ? (u32)decl_h : (u32)vh;
 				renderer_draw_bitmap_quad_scaled(context, argb,
@@ -7232,12 +7243,35 @@ void tagDefineFontGlyphBase(u16 font_id, size_t glyph_base)
 #endif
 }
 
-void tagDefineVideoStream(SWFAppContext* app_context, u16 char_id, u16 width, u16 height)
+void tagDefineVideoStream(SWFAppContext* app_context, u16 char_id, u16 width, u16 height, u8 codec_id)
 {
 #if defined(NO_GRAPHICS) || defined(OFFSCREEN_RENDER)
-	ng_record_video(app_context, char_id, width, height);
+	ng_record_video(app_context, char_id, width, height, codec_id);
 #else
-	(void)app_context; (void)char_id; (void)width; (void)height;
+	(void)app_context; (void)char_id; (void)width; (void)height; (void)codec_id;
+#endif
+}
+
+// VideoFrame tag handler — feeds the encoded payload for one frame of an
+// embedded DefineVideoStream into the per-stream persistent decoder. The
+// recompiler emits one call per VideoFrame tag at the tag's place in the
+// frame function (so frame N's payload is decoded as part of frame N's
+// timeline execution).
+//
+// Implementation lives in action.c because that's where the persistent
+// decoder context + decoded frame storage live (alongside the existing
+// NetStream-keyed FLV path).
+extern void actionStoreEmbeddedVideoFrame(size_t char_id, u16 frame_num,
+    const unsigned char* payload, size_t payload_size);
+
+void tagVideoFrame(SWFAppContext* app_context, u16 char_id, u16 frame_num,
+    const unsigned char* payload, size_t payload_size)
+{
+	(void)app_context;
+#if defined(NO_GRAPHICS) || defined(OFFSCREEN_RENDER)
+	actionStoreEmbeddedVideoFrame((size_t)char_id, frame_num, payload, payload_size);
+#else
+	(void)char_id; (void)frame_num; (void)payload; (void)payload_size;
 #endif
 }
 

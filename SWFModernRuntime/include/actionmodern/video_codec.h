@@ -35,6 +35,27 @@ int video_decode_one_frame(int codec_id, int frame_type,
                            int* out_w, int* out_h,
                            unsigned char** out_rgba);
 
+// Persistent per-stream decoder. Inter-frame codecs (Sorenson Spark, VP6,
+// H.264) need the prior keyframe's reference state when decoding subsequent
+// inter-frames; the one-shot `video_decode_one_frame` allocates a fresh
+// AVCodecContext per call and so cannot decode anything past the keyframe.
+// SWF embedded video (DefineVideoStream + VideoFrame tags) needs this path.
+typedef struct VideoDecoderCtx VideoDecoderCtx;
+
+// Create a persistent decoder for the given codec id, or NULL if the codec
+// is unsupported in this build.
+VideoDecoderCtx* video_decoder_create(int codec_id);
+
+// Decode one VideoFrame payload through the persistent context. Same arg
+// semantics as `video_decode_one_frame`. Returns 1 on success, 0 otherwise.
+int video_decoder_decode(VideoDecoderCtx* ctx, int frame_type,
+                         const unsigned char* payload, int payload_len,
+                         int* out_w, int* out_h,
+                         unsigned char** out_rgba);
+
+// Release a persistent decoder. Safe to pass NULL.
+void video_decoder_destroy(VideoDecoderCtx* ctx);
+
 // Resample a packed RGBA8 buffer (R=byte0, G=byte1, B=byte2, A=byte3) to new
 // dimensions. Uses libswscale when SWF_HAVE_LIBAVCODEC is defined (bilinear);
 // otherwise falls back to nearest-neighbour. Returns 1 on success and fills

@@ -610,6 +610,15 @@ int actionIterateAttachedBitmaps(AttachedBitmapCallback cb, void* user_data);
 int actionGetVideoFramePixels(uint32_t** out_argb, int target_w, int target_h,
                               int* out_w, int* out_h);
 
+// Embedded-video (DefineVideoStream + VideoFrame) per-stream pixel accessor.
+// Looks up the most recently decoded frame for (char_id, frame_num); returns 1
+// if available and fills *out_argb (caller frees) + *out_w/*out_h. The
+// renderer's two video sites in tag.c try this path first, then fall back to
+// the NetStream-keyed actionGetVideoFramePixels.
+int actionGetEmbeddedVideoFramePixels(size_t char_id, u16 frame_num,
+                                      uint32_t** out_argb,
+                                      int* out_w, int* out_h);
+
 // Text field rendering info (used by tag.c in graphics mode)
 typedef struct TextFieldRenderInfo {
 	int has_background;

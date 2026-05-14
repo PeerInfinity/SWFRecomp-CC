@@ -233,6 +233,7 @@ void ng_record_button(size_t char_id)
 static size_t ng_video_ids[MAX_VIDEOS_NG];
 static u16    ng_video_widths[MAX_VIDEOS_NG];
 static u16    ng_video_heights[MAX_VIDEOS_NG];
+static u8     ng_video_codecs[MAX_VIDEOS_NG];
 static size_t ng_video_count = 0;
 
 int ng_find_video(size_t char_id)
@@ -242,13 +243,14 @@ int ng_find_video(size_t char_id)
 	return 0;
 }
 
-void ng_record_video(SWFAppContext* app_context, u16 char_id, u16 width, u16 height)
+void ng_record_video(SWFAppContext* app_context, u16 char_id, u16 width, u16 height, u8 codec_id)
 {
 	(void)app_context;
 	if (ng_video_count < MAX_VIDEOS_NG) {
 		ng_video_ids[ng_video_count] = (size_t)char_id;
 		ng_video_widths[ng_video_count] = width;
 		ng_video_heights[ng_video_count] = height;
+		ng_video_codecs[ng_video_count] = codec_id;
 		ng_video_count++;
 	}
 }
@@ -271,6 +273,15 @@ int ng_getVideoDimensions(size_t char_id, u16* out_w, u16* out_h)
 			return 1;
 		}
 	}
+	return 0;
+}
+
+// FLV/SWF CodecID for the given video char_id. Returns 0 if char_id
+// isn't a registered video.
+u8 ng_getVideoCodec(size_t char_id)
+{
+	for (size_t i = 0; i < ng_video_count; i++)
+		if (ng_video_ids[i] == char_id) return ng_video_codecs[i];
 	return 0;
 }
 

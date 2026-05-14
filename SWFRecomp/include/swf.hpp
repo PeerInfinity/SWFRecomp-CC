@@ -214,6 +214,12 @@ namespace SWFRecomp
 		size_t current_sound_id;
 		bool has_streaming_sound;
 
+		// DefineVideoStream + VideoFrame embedded video. Encoded payload bytes
+		// concatenated across all VideoFrame tags in the SWF; each tagVideoFrame
+		// emission references a (offset, length) slice.
+		std::stringstream video_data;
+		size_t current_video_byte;
+
 		std::stringstream sprite_definitions;
 		std::stringstream sprite_forward_decls;
 		// Accumulates SpriteFrameScriptEntry initializers — one per

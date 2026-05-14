@@ -213,6 +213,7 @@ namespace SWFRecomp
 								 current_sound_byte(0),
 								 current_sound_id(0),
 								 has_streaming_sound(false),
+								 current_video_byte(0),
 							 shape_has_alpha(false),
 							 shape_is_v4(false),
 							 shape_is_morph2(false),
@@ -823,6 +824,11 @@ namespace SWFRecomp
 						  << (current_sound_byte ? sound_data.str() : "\t0\n")
 						  << "};" << endl
 						  << endl
+						  << "u8 video_data[" << to_string(current_video_byte ? current_video_byte : 1) << "] =" << endl
+						  << "{" << endl
+						  << (current_video_byte ? video_data.str() : "\t0\n")
+						  << "};" << endl
+						  << endl
 						  << "float path_data[" << to_string(current_path_entry ? current_path_entry : 1) << "][3] =" << endl
 						  << "{" << endl
 						  << (current_path_entry ? path_data.str() : "\t{0}\n")
@@ -842,6 +848,7 @@ namespace SWFRecomp
 								 << "extern float morph_end_shape_data[" << to_string(current_morph_end_vertex ? current_morph_end_vertex : 1) << "][2];" << endl
 								 << "extern float morph_end_color_data[" << to_string(current_morph_end_color ? current_morph_end_color : 1) << "][4];" << endl
 								 << "extern u8 sound_data[" << to_string(current_sound_byte ? current_sound_byte : 1) << "];" << endl
+								 << "extern u8 video_data[" << to_string(current_video_byte ? current_video_byte : 1) << "];" << endl
 								 << "extern float path_data[" << to_string(current_path_entry ? current_path_entry : 1) << "][3];" << endl;
 
 		// Emit sprite forward declarations (frame_func arrays)
@@ -4255,20 +4262,64 @@ namespace SWFRecomp
 			case SWF_TAG_DEFINE_FONT_ALIGN_ZONES:
 			case SWF_TAG_DEFINE_FONT_NAME:
 			case SWF_TAG_FREE_CHARACTER:
-			case SWF_TAG_VIDEO_FRAME:
 			{
 				cur_pos += tag.length;
 
 				break;
 			}
 
+			case SWF_TAG_VIDEO_FRAME:
+			{
+				// VideoFrame layout: StreamID (UI16) + FrameNum (UI16) +
+				// raw codec payload (rest of tag). Bake payload bytes into
+				// video_data[] and emit a tagVideoFrame call inline at this
+				// tag's place in the surrounding frame function so the
+				// runtime decoder sees frame N's payload as part of frame
+				// N's timeline execution.
+				if (tag.length < 4) {
+					cur_pos += tag.length;
+					break;
+				}
+				char* tmp = cur_pos;
+				tag.clearFields();
+				tag.setFieldCount(2);
+				tag.configureNextField(SWF_FIELD_UI16); // StreamID
+				tag.configureNextField(SWF_FIELD_UI16); // FrameNum
+				tag.parseFields(tmp);
+
+				u16 vf_stream_id = (u16) tag.fields[0].value;
+				u16 vf_frame_num = (u16) tag.fields[1].value;
+
+				size_t payload_size = tag.length - 4;
+				size_t payload_offset = current_video_byte;
+				const unsigned char* payload_bytes = (const unsigned char*)(cur_pos + 4);
+				for (size_t i = 0; i < payload_size; ++i) {
+					video_data << "\t0x" << std::hex << std::uppercase << std::setw(2) << std::setfill('0')
+					           << (u32)payload_bytes[i] << "," << std::dec << endl;
+				}
+				current_video_byte += payload_size;
+
+				context.tag_main << "\t" << "tagVideoFrame(app_context, "
+				                 << to_string(vf_stream_id) << ", "
+				                 << to_string(vf_frame_num) << ", "
+				                 << "video_data + " << to_string(payload_offset) << ", "
+				                 << to_string(payload_size) << ");" << endl;
+
+				cur_pos += tag.length;
+				break;
+			}
+
 			case SWF_TAG_DEFINE_VIDEO_STREAM:
 			{
 				// DefineVideoStream layout: CharacterID (UI16), NumFrames (UI16),
-				// Width (UI16, pixels), Height (UI16, pixels), then flags + CodecID.
-				// We need char_id + the declared display dimensions; the renderer
-				// scales decoded frames to (Width, Height) so an FLV encoded at a
-				// different resolution still occupies the placed bounds.
+				// Width (UI16, pixels), Height (UI16, pixels), then a flags byte
+				// (4 bits reserved + 3 bits deblocking + 1 bit smoothing), then
+				// CodecID (UI8). Codec id is mandatory for the runtime to pick
+				// the right decoder for VideoFrame payloads.
+				if (tag.length < 10) {
+					cur_pos += tag.length;
+					break;
+				}
 				char* tmp = cur_pos;
 				tag.clearFields();
 				tag.setFieldCount(4);
@@ -4281,6 +4332,7 @@ namespace SWFRecomp
 				u16 video_char_id = (u16) tag.fields[0].value;
 				u16 video_width   = (u16) tag.fields[2].value;
 				u16 video_height  = (u16) tag.fields[3].value;
+				u8 video_codec_id = (u8) cur_pos[9]; // byte after the 4 UI16s + flags byte
 
 				// Register video char_id for place-before-define tracking.
 				defined_chars.insert(video_char_id);
@@ -4288,7 +4340,8 @@ namespace SWFRecomp
 				tag_init << endl << "\ttagDefineVideoStream(app_context, "
 				         << to_string(video_char_id) << ", "
 				         << to_string(video_width) << ", "
-				         << to_string(video_height) << ");";
+				         << to_string(video_height) << ", "
+				         << to_string((u32)video_codec_id) << ");";
 
 				cur_pos += tag.length;
 				break;

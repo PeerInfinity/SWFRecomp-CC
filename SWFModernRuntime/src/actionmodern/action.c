@@ -3022,6 +3022,127 @@ int actionGetVideoFramePixels(uint32_t** out_argb, int target_w, int target_h,
 	return 0;
 }
 
+// ---------------------------------------------------------------------------
+// Embedded video (DefineVideoStream + VideoFrame): per-(char_id, frame_num)
+// decoded frame storage with a persistent decoder per stream so Sorenson
+// Spark / VP6 inter-frames can resolve against the prior keyframe.
+// ---------------------------------------------------------------------------
+#include "actionmodern/video_codec.h"
+
+#define MAX_EMBEDDED_VIDEO_STREAMS 8
+#define MAX_EMBEDDED_VIDEO_FRAMES_PER_STREAM 256
+
+typedef struct {
+	unsigned char* rgba;
+	int w, h;
+} EmbeddedVideoFrame;
+
+typedef struct {
+	int active;
+	size_t char_id;
+	VideoDecoderCtx* decoder;
+	EmbeddedVideoFrame frames[MAX_EMBEDDED_VIDEO_FRAMES_PER_STREAM];
+} EmbeddedVideoStream;
+
+static EmbeddedVideoStream g_embedded_video_streams[MAX_EMBEDDED_VIDEO_STREAMS];
+
+static EmbeddedVideoStream* find_or_create_embedded_stream(size_t char_id)
+{
+	for (int i = 0; i < MAX_EMBEDDED_VIDEO_STREAMS; i++) {
+		if (g_embedded_video_streams[i].active &&
+		    g_embedded_video_streams[i].char_id == char_id) {
+			return &g_embedded_video_streams[i];
+		}
+	}
+	for (int i = 0; i < MAX_EMBEDDED_VIDEO_STREAMS; i++) {
+		if (!g_embedded_video_streams[i].active) {
+			u8 codec_id = ng_getVideoCodec(char_id);
+			VideoDecoderCtx* dec = video_decoder_create((int)codec_id);
+			if (!dec) return NULL;
+			g_embedded_video_streams[i].active = 1;
+			g_embedded_video_streams[i].char_id = char_id;
+			g_embedded_video_streams[i].decoder = dec;
+			return &g_embedded_video_streams[i];
+		}
+	}
+	return NULL;
+}
+
+// Called from tag.c::tagVideoFrame. Decodes the payload through the
+// per-stream persistent decoder and stashes the RGBA result keyed by
+// (char_id, frame_num). The renderer reads it back in
+// actionGetEmbeddedVideoFramePixels.
+//
+// Spark frame-type byte: the first byte of a Sorenson Spark VideoFrame
+// payload encodes pict_type (1=keyframe, 2=inter). We pass it as the
+// frame_type hint to the decoder; libavcodec figures the rest out from
+// the bitstream itself, so the hint is informational.
+void actionStoreEmbeddedVideoFrame(size_t char_id, u16 frame_num,
+                                   const unsigned char* payload, size_t payload_size)
+{
+	if (frame_num >= MAX_EMBEDDED_VIDEO_FRAMES_PER_STREAM) return;
+	if (!payload || payload_size == 0) return;
+
+	EmbeddedVideoStream* stream = find_or_create_embedded_stream(char_id);
+	if (!stream) return;
+
+	int frame_type = 0;
+	if (ng_getVideoCodec(char_id) == 2 && payload_size >= 1) {
+		// H.263 picture_start_code is 17 bits; bit 18 is the picture type
+		// (0=intra/keyframe, 1=inter). Hand it through as a hint.
+		frame_type = ((payload[0] >> 5) & 0x07) ? 2 : 1;
+	}
+
+	int w = 0, h = 0;
+	unsigned char* rgba = NULL;
+	if (!video_decoder_decode(stream->decoder, frame_type,
+	                          payload, (int)payload_size, &w, &h, &rgba)) {
+		return;
+	}
+
+	EmbeddedVideoFrame* slot = &stream->frames[frame_num];
+	if (slot->rgba) free(slot->rgba);
+	slot->rgba = rgba;
+	slot->w = w;
+	slot->h = h;
+}
+
+int actionGetEmbeddedVideoFramePixels(size_t char_id, u16 frame_num,
+                                      uint32_t** out_argb,
+                                      int* out_w, int* out_h)
+{
+	if (!out_argb || !out_w || !out_h) return 0;
+
+	for (int i = 0; i < MAX_EMBEDDED_VIDEO_STREAMS; i++) {
+		EmbeddedVideoStream* stream = &g_embedded_video_streams[i];
+		if (!stream->active || stream->char_id != char_id) continue;
+
+		// Walk back from requested frame to find the latest decoded frame
+		// at or before frame_num. Catches the case where a frame's payload
+		// failed to decode but earlier ones succeeded.
+		for (int f = frame_num; f >= 0; f--) {
+			EmbeddedVideoFrame* slot = &stream->frames[f];
+			if (!slot->rgba) continue;
+			int n = slot->w * slot->h;
+			uint32_t* argb = (uint32_t*)malloc(n * sizeof(uint32_t));
+			if (!argb) return 0;
+			const unsigned char* rgba = slot->rgba;
+			for (int p = 0; p < n; p++) {
+				argb[p] = ((uint32_t)rgba[p*4+3] << 24) |
+				          ((uint32_t)rgba[p*4+0] << 16) |
+				          ((uint32_t)rgba[p*4+1] << 8) |
+				          (uint32_t)rgba[p*4+2];
+			}
+			*out_argb = argb;
+			*out_w = slot->w;
+			*out_h = slot->h;
+			return 1;
+		}
+		return 0;
+	}
+	return 0;
+}
+
 static void ns_dispatch_onStatus(SWFAppContext* app_context, ASObject* ns,
                                   const char* code, const char* level)
 {
