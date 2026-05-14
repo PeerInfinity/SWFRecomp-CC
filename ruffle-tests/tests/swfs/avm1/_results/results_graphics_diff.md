@@ -1,7 +1,7 @@
 # Ruffle Test Results Diff
 
-**Previous:** `a05dfc7c03e4` (2026-05-14T00:04:37.389852+00:00)
-**Current:** `b20ee46207a4` (2026-05-14T00:49:24.319022+00:00)
+**Previous:** `b20ee46207a4` (2026-05-14T00:49:24.319022+00:00)
+**Current:** `9772ba90dd5f` (2026-05-14T02:26:28.688220+00:00)
 
 ## Summary
 
@@ -10,6 +10,11 @@
 | Passing | 605 | 605 | 0 |
 | Total | 654 | 654 | 0 |
 | Pass rate | 92.5% | 92.5% | 0% |
-| Mismatched lines | 9175 | 9175 | 0 |
+| Mismatched lines | 9175 | 9288 | +113 |
+|   Increased | | | +113 |
 
-No changes detected.
+## Status Changed (1)
+
+| Test | Previous | Current | Lines (prev) | Lines (now) |
+|------|----------|---------|--------------|-------------|
+| `native_objects_swf6` | output_mismatch | segfault | 114/115 | 1/115 |
