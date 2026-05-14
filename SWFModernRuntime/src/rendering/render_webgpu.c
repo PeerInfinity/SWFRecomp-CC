@@ -1889,24 +1889,32 @@ void render_webgpu_draw_gradient_tris(WebGPURenderContext* ctx,
 }
 
 // ---------------------------------------------------------------------------
-// render_webgpu_draw_bitmap_quad — render an attached BitmapData as a textured quad
+// render_webgpu_draw_bitmap_quad_scaled — render an attached BitmapData as a
+// textured quad with separate source (texture) and destination (quad) sizes.
+//
+// src_w/src_h: pixel dims of argb_pixels — drives texture upload + UV range.
+// dst_w/dst_h: on-stage pixel dims — drives quad twips. The shader sample-
+// stretches via UV mapping when src != dst (Flash's Video render rule).
+// When src == dst, equivalent to the original unscaled function.
 // ---------------------------------------------------------------------------
-void render_webgpu_draw_bitmap_quad(WebGPURenderContext* ctx,
-	const uint32_t* argb_pixels, u32 bmp_width, u32 bmp_height,
+void render_webgpu_draw_bitmap_quad_scaled(WebGPURenderContext* ctx,
+	const uint32_t* argb_pixels, u32 src_w, u32 src_h,
+	u32 dst_w, u32 dst_h,
 	float x_twips, float y_twips,
 	u32 transform_id, u32 cxform_id)
 {
 	if (!ctx->renderer_ok || argb_pixels == NULL) return;
-	if (bmp_width == 0 || bmp_height == 0) return;
+	if (src_w == 0 || src_h == 0 || dst_w == 0 || dst_h == 0) return;
 	if (ctx->dynamic_bitmap_used >= ctx->dynamic_bitmap_capacity) return;
-	if (bmp_width > ctx->dynamic_bitmap_max_w || bmp_height > ctx->dynamic_bitmap_max_h) return;
+	if (src_w > ctx->dynamic_bitmap_max_w || src_h > ctx->dynamic_bitmap_max_h) return;
 	if (ctx->dynamic_vertex_used + 6 > MAX_DYNAMIC_VERTICES) return;
 
 	// Allocate a dynamic bitmap layer
 	u32 bmp_layer = ctx->dynamic_bitmap_base + ctx->dynamic_bitmap_used;
 	ctx->dynamic_bitmap_used++;
 
-	// Upload ARGB pixels as RGBA to the bitmap texture layer
+	// Upload ARGB pixels as RGBA to the bitmap texture layer.
+	// Texture upload uses src dims; layer is padded to (bw, bh).
 	{
 		u32 bw = (u32)(ctx->bitmap_highest_w + 1);
 		u32 bh = (u32)(ctx->bitmap_highest_h + 1);
@@ -1916,11 +1924,11 @@ void render_webgpu_draw_bitmap_quad(WebGPURenderContext* ctx,
 		// Convert premultiplied ARGB to premultiplied RGBA with edge clamping.
 		// Keep premultiplied — renderer uses premultiplied alpha blend mode.
 		u32* dst = (u32*)temp;
-		for (u32 y = 0; y <= bmp_height; y++) {
-			u32 sy = (y < bmp_height) ? y : bmp_height - 1;
-			for (u32 x = 0; x <= bmp_width; x++) {
-				u32 sx = (x < bmp_width) ? x : bmp_width - 1;
-				u32 argb = argb_pixels[sy * bmp_width + sx];
+		for (u32 y = 0; y <= src_h; y++) {
+			u32 sy = (y < src_h) ? y : src_h - 1;
+			for (u32 x = 0; x <= src_w; x++) {
+				u32 sx_px = (x < src_w) ? x : src_w - 1;
+				u32 argb = argb_pixels[sy * src_w + sx_px];
 				// ARGB u32: A=bits31-24, R=bits23-16, G=bits15-8, B=bits7-0
 				u32 a = (argb >> 24) & 0xFF;
 				u32 r = (argb >> 16) & 0xFF;
@@ -1951,15 +1959,15 @@ void render_webgpu_draw_bitmap_quad(WebGPURenderContext* ctx,
 
 	// Compute and upload inverse matrix for UV mapping (twips → pixel coordinates).
 	// Maps vertex position (x_twips, y_twips) → (0, 0) in bitmap space and
-	// (x_twips + w*20, y_twips + h*20) → (w, h) in bitmap space.
-	// Matrix: translate by (-x, -y) then scale by 1/20.
+	// (x_twips + dst_w*20, y_twips + dst_h*20) → (src_w, src_h) in bitmap space.
+	// Sample-stretch happens for free when src != dst.
 	// Column-major 4x4: [sx, 0, 0, 0,  0, sy, 0, 0,  0, 0, 1, 0,  tx, ty, 0, 1]
 	u32 inv_mat_id = ctx->static_mat_count + MAX_DYNAMIC_GRADIENTS + (ctx->dynamic_bitmap_used - 1);
 	{
-		float sx = 1.0f / 20.0f;
-		float sy = 1.0f / 20.0f;
-		float tx = -x_twips / 20.0f;
-		float ty = -y_twips / 20.0f;
+		float sx = (float)src_w / ((float)dst_w * 20.0f);
+		float sy = (float)src_h / ((float)dst_h * 20.0f);
+		float tx = -x_twips * sx;
+		float ty = -y_twips * sy;
 		float inv_mat[16] = {
 			sx,   0.0f, 0.0f, 0.0f,
 			0.0f, sy,   0.0f, 0.0f,
@@ -1975,8 +1983,8 @@ void render_webgpu_draw_bitmap_quad(WebGPURenderContext* ctx,
 	// Vertex format: { float x, float y, u32 style_type, u32 style_id }
 	// style_type = 0x41 (clipped bitmap fill, no repeat)
 	// style_id = bitmap_layer_id (lower 16) | inv_mat_id (upper 16)
-	float w_twips = (float)bmp_width * 20.0f;
-	float h_twips = (float)bmp_height * 20.0f;
+	float w_twips = (float)dst_w * 20.0f;
+	float h_twips = (float)dst_h * 20.0f;
 
 	union { float f; u32 u; } x0, y0, x1, y1;
 	x0.f = x_twips;            y0.f = y_twips;
@@ -2006,6 +2014,18 @@ void render_webgpu_draw_bitmap_quad(WebGPURenderContext* ctx,
 	render_webgpu_draw_shape(ctx, vert_base, 6, transform_id, cxform_id);
 	// Restore normal blend pipeline
 	wgpuRenderPassEncoderSetPipeline(ctx->render_pass, ctx->render_pipeline);
+}
+
+// Unscaled wrapper — quad geometry matches source dims (no GPU sample-stretch).
+// Used by attachBitmap and the video render fallback when declared bounds are 0.
+void render_webgpu_draw_bitmap_quad(WebGPURenderContext* ctx,
+	const uint32_t* argb_pixels, u32 bmp_width, u32 bmp_height,
+	float x_twips, float y_twips,
+	u32 transform_id, u32 cxform_id)
+{
+	render_webgpu_draw_bitmap_quad_scaled(ctx, argb_pixels,
+		bmp_width, bmp_height, bmp_width, bmp_height,
+		x_twips, y_twips, transform_id, cxform_id);
 }
 
 // ---------------------------------------------------------------------------

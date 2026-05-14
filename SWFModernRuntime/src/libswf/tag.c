@@ -1474,9 +1474,16 @@ static void render_single_object(SWFAppContext* app_context, DisplayObject* obj)
 		uint32_t* argb = NULL;
 		int vw = 0, vh = 0;
 		u16 decl_w = 0, decl_h = 0;
-		ng_getVideoDimensions(obj->char_id, &decl_w, &decl_h);
+		int has_decl = ng_getVideoDimensions(obj->char_id, &decl_w, &decl_h);
 		if (actionGetVideoFramePixels(&argb, (int)decl_w, (int)decl_h, &vw, &vh)) {
-			renderer_draw_bitmap_quad(context, argb, (u32)vw, (u32)vh,
+			// Flash renders the decoded frame stretched to fit the
+			// DefineVideoStream declared bounds, then applies the
+			// PlaceObject2 matrix. Fall back to source-equals-dest if
+			// no declared bounds were recorded.
+			u32 dst_w = has_decl ? (u32)decl_w : (u32)vw;
+			u32 dst_h = has_decl ? (u32)decl_h : (u32)vh;
+			renderer_draw_bitmap_quad_scaled(context, argb,
+				(u32)vw, (u32)vh, dst_w, dst_h,
 				0.0f, 0.0f, obj->transform_id, obj->cxform_id);
 			free(argb);
 		}
@@ -1540,9 +1547,12 @@ static void render_display_list(SWFAppContext* app_context, DisplayObject* dl, s
 			uint32_t* argb = NULL;
 			int vw = 0, vh = 0;
 			u16 decl_w = 0, decl_h = 0;
-			ng_getVideoDimensions(obj->char_id, &decl_w, &decl_h);
+			int has_decl = ng_getVideoDimensions(obj->char_id, &decl_w, &decl_h);
 			if (actionGetVideoFramePixels(&argb, (int)decl_w, (int)decl_h, &vw, &vh)) {
-				renderer_draw_bitmap_quad(context, argb, (u32)vw, (u32)vh,
+				u32 dst_w = has_decl ? (u32)decl_w : (u32)vw;
+				u32 dst_h = has_decl ? (u32)decl_h : (u32)vh;
+				renderer_draw_bitmap_quad_scaled(context, argb,
+					(u32)vw, (u32)vh, dst_w, dst_h,
 					0.0f, 0.0f, obj->transform_id, obj->cxform_id);
 				free(argb);
 			}
