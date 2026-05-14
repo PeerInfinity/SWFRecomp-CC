@@ -1,10 +1,10 @@
 # Ruffle Test Results (Filtered)
 
-**Date**: 2026-05-14 00:04 UTC
+**Date**: 2026-05-14 00:49 UTC
 
-**Git SHA**: `a05dfc7c03`
+**Git SHA**: `b20ee46207`
 
-**Run Duration**: 2m 33s
+**Run Duration**: 2m 46s
 
 **Filtered**: 2 tests ignored out of 47 available
 
@@ -25,51 +25,51 @@
 
 | # | Test | Lines | Duration | Notes |
 |---|------|-------|----------|-------|
-| 1 | `array` | 7 | 1.5s |  |
-| 2 | `bitmapdata/getPixel` | 2 | 1.4s |  |
-| 3 | `bitmapdata/loadBitmap` | 3 | 1.2s |  |
-| 4 | `callee` | 2 | 1.1s |  |
-| 5 | `depth` | 6 | 1.4s |  |
-| 6 | `doactionorder/doactionorder` | 7 | 1.4s |  |
-| 7 | `doactionorder/symbolclass` | 4 | 1.4s |  |
-| 8 | `duplicateMovieClip/dontremove` | 6 | 19.1s |  |
-| 9 | `duplicateMovieClip/duplicateMovieClip` | 4 | 1.4s |  |
-| 10 | `duplicateMovieClip/name-coercion` | 3 | 1.2s |  |
-| 11 | `duplicateMovieClip/samedepth` | 6 | 1.4s |  |
-| 12 | `externalinterface` | 4 | 1.2s |  |
-| 13 | `filters` | 149 | 1.8s |  |
-| 14 | `haxe/flocons1` | 2 | 1.3s |  |
-| 15 | `haxe/flocons2` | 3 | 1.1s |  |
-| 16 | `label` | 4 | 18.7s |  |
-| 17 | `levels` | 9 | 1.2s |  |
-| 18 | `loadevent` | 9 | 1.6s |  |
-| 19 | `loadvariables/loadvariables` | 7 | 1.3s |  |
-| 20 | `loadvariables/loadvars` | 2 | 19.6s |  |
-| 21 | `lookup` | 3 | 1.4s |  |
-| 22 | `mouse-transparency` | 1 | 1.5s |  |
+| 1 | `array` | 7 | 1.8s |  |
+| 2 | `bitmapdata/getPixel` | 2 | 1.6s |  |
+| 3 | `bitmapdata/loadBitmap` | 3 | 1.6s |  |
+| 4 | `callee` | 2 | 1.6s |  |
+| 5 | `depth` | 6 | 1.8s |  |
+| 6 | `doactionorder/doactionorder` | 7 | 1.7s |  |
+| 7 | `doactionorder/symbolclass` | 4 | 1.7s |  |
+| 8 | `duplicateMovieClip/dontremove` | 6 | 19.5s |  |
+| 9 | `duplicateMovieClip/duplicateMovieClip` | 4 | 1.6s |  |
+| 10 | `duplicateMovieClip/name-coercion` | 3 | 1.4s |  |
+| 11 | `duplicateMovieClip/samedepth` | 6 | 1.6s |  |
+| 12 | `externalinterface` | 4 | 1.4s |  |
+| 13 | `filters` | 149 | 2.0s |  |
+| 14 | `haxe/flocons1` | 2 | 1.4s |  |
+| 15 | `haxe/flocons2` | 3 | 1.5s |  |
+| 16 | `label` | 4 | 19.0s |  |
+| 17 | `levels` | 9 | 1.6s |  |
+| 18 | `loadevent` | 9 | 1.8s |  |
+| 19 | `loadvariables/loadvariables` | 7 | 1.5s |  |
+| 20 | `loadvariables/loadvars` | 2 | 19.5s |  |
+| 21 | `lookup` | 3 | 1.6s |  |
+| 22 | `mouse-transparency` | 1 | 1.8s |  |
 | 23 | `nativeinheritance` | 6 | 1.4s |  |
-| 24 | `nested-button` | 1 | 1.3s |  |
-| 25 | `operations` | 13 | 1.4s |  |
-| 26 | `property-paths/property-paths-6` | 6 | 1.3s |  |
-| 27 | `property-paths/property-paths-7` | 7 | 1.4s |  |
-| 28 | `propertycase/propertycase` | 7 | 1.4s |  |
-| 29 | `propertycase/propertycase-preserving-6` | 2 | 1.1s |  |
-| 30 | `propertycase/propertycase-preserving-7` | 5 | 0.7s |  |
-| 31 | `rollover` | 4 | 1.5s |  |
-| 32 | `scope` | 14 | 1.5s |  |
-| 33 | `setinterval` | 20 | 1.4s |  |
-| 34 | `settimeout` | 17 | 1.4s |  |
-| 35 | `super` | 11 | 1.4s |  |
-| 36 | `target` | 18 | 1.4s |  |
-| 37 | `text-bind` | 0 | 21.2s |  |
-| 38 | `textfield/textfield-html` | 4 | 1.4s |  |
-| 39 | `textfield/textfield-text-setters` | 8 | 1.2s |  |
-| 40 | `undefined/undefined-swf6` | 39 | 1.4s |  |
-| 41 | `undefined/undefined-swf7` | 39 | 1.5s |  |
-| 42 | `watch` | 2 | 1.1s |  |
-| 43 | `xml/xmlbuild` | 1 | 1.4s |  |
-| 44 | `xml/xmlload` | 4 | 1.5s |  |
-| 45 | `xml/xmlstring` | 9 | 1.4s |  |
+| 24 | `nested-button` | 1 | 1.4s |  |
+| 25 | `operations` | 13 | 1.6s |  |
+| 26 | `property-paths/property-paths-6` | 6 | 1.6s |  |
+| 27 | `property-paths/property-paths-7` | 7 | 1.2s |  |
+| 28 | `propertycase/propertycase` | 7 | 1.2s |  |
+| 29 | `propertycase/propertycase-preserving-6` | 2 | 1.6s |  |
+| 30 | `propertycase/propertycase-preserving-7` | 5 | 1.0s |  |
+| 31 | `rollover` | 4 | 1.6s |  |
+| 32 | `scope` | 14 | 1.6s |  |
+| 33 | `setinterval` | 20 | 1.6s |  |
+| 34 | `settimeout` | 17 | 1.5s |  |
+| 35 | `super` | 11 | 1.6s |  |
+| 36 | `target` | 18 | 1.6s |  |
+| 37 | `text-bind` | 0 | 21.0s |  |
+| 38 | `textfield/textfield-html` | 4 | 1.6s |  |
+| 39 | `textfield/textfield-text-setters` | 8 | 1.3s |  |
+| 40 | `undefined/undefined-swf6` | 39 | 1.5s |  |
+| 41 | `undefined/undefined-swf7` | 39 | 1.6s |  |
+| 42 | `watch` | 2 | 1.5s |  |
+| 43 | `xml/xmlbuild` | 1 | 1.3s |  |
+| 44 | `xml/xmlload` | 4 | 1.7s |  |
+| 45 | `xml/xmlstring` | 9 | 1.5s |  |
 
 ## Near-Passing Tests
 
