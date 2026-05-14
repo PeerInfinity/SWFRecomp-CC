@@ -1,15 +1,77 @@
 # Ruffle Test Results Diff
 
-**Previous:** `50f5aa00c13c` (2026-05-14T03:41:45.527566+00:00)
-**Current:** `e12de2387ba2` (2026-05-14T04:24:54.162206+00:00)
+**Previous:** `e12de2387ba2` (2026-05-14T04:24:54.162206+00:00)
+**Current:** `321bbbae51a1` (2026-05-14T19:34:18.013650+00:00)
 
 ## Summary
 
 | Metric | Previous | Current | Delta |
 |--------|----------|---------|-------|
-| Passing | 124 | 124 | 0 |
-| Total | 190 | 190 | 0 |
-| Pass rate | 65.3% | 65.3% | 0% |
-| Mismatched lines | 1564 | 1564 | 0 |
+| Passing | 124 | 126 | +2 |
+| Total | 190 | 243 | +53 |
+| Pass rate | 65.3% | 51.9% | -13.4% |
+| Mismatched lines | 1564 | 11122 | +9558 |
 
-No changes detected.
+## Newly Passing (1)
+
+| Test | Previous Status | Lines (prev) | Lines (now) |
+|------|----------------|--------------|-------------|
+| `case-v5` | runtime_error | 39/39 | 39/39 |
+
+## Added Tests (53)
+
+| Test | Status | Lines |
+|------|--------|-------|
+| `Date-v5` | output_mismatch | 305/315 |
+| `Date-v6` | output_mismatch | 348/357 |
+| `Date-v7` | output_mismatch | 349/357 |
+| `Date-v8` | output_mismatch | 349/357 |
+| `Function-v5` | output_mismatch | 135/158 |
+| `Function-v6` | output_mismatch | 181/271 |
+| `Function-v7` | output_mismatch | 205/272 |
+| `Function-v8` | output_mismatch | 205/272 |
+| `Global-v5` | pass | 172/172 |
+| `MovieClip-v6` | output_mismatch | 777/936 |
+| `MovieClip-v7` | output_mismatch | 798/969 |
+| `MovieClip-v8` | output_mismatch | 885/1087 |
+| `NetConnection-v6` | output_mismatch | 71/126 |
+| `NetConnection-v7` | output_mismatch | 75/126 |
+| `NetConnection-v8` | output_mismatch | 75/126 |
+| `Object-v5` | output_mismatch | 135/145 |
+| `Object-v6` | output_mismatch | 279/333 |
+| `Object-v7` | output_mismatch | 292/333 |
+| `Object-v8` | output_mismatch | 292/333 |
+| `Stage-v6` | output_mismatch | 54/64 |
+| `Stage-v7` | output_mismatch | 54/64 |
+| `Stage-v8` | output_mismatch | 54/64 |
+| `TextField-v6` | output_mismatch | 403/545 |
+| `TextField-v7` | output_mismatch | 414/570 |
+| `TextField-v8` | output_mismatch | 416/571 |
+| `TextFormat-v8` | output_mismatch | 128/172 |
+| `Transform-v8` | output_mismatch | 71/101 |
+| `XML-v5` | output_mismatch | 281/449 |
+| `XML-v6` | output_mismatch | 288/486 |
+| `XML-v7` | output_mismatch | 288/486 |
+| `XML-v8` | output_mismatch | 288/465 |
+| `XMLNode-v5` | output_mismatch | 174/207 |
+| `XMLNode-v6` | output_mismatch | 174/207 |
+| `XMLNode-v7` | output_mismatch | 174/207 |
+| `XMLNode-v8` | output_mismatch | 174/207 |
+| `argstest-v6` | output_mismatch | 44/2192 |
+| `argstest-v7` | output_mismatch | 46/2061 |
+| `argstest-v8` | output_mismatch | 46/2434 |
+| `array-v6` | output_mismatch | 604/644 |
+| `array-v7` | output_mismatch | 585/654 |
+| `array-v8` | output_mismatch | 585/654 |
+| `flash-v8` | output_mismatch | 36/41 |
+| `getvariable-v5` | output_mismatch | 44/58 |
+| `getvariable-v6` | output_mismatch | 48/64 |
+| `getvariable-v7` | output_mismatch | 49/64 |
+| `getvariable-v8` | output_mismatch | 49/64 |
+| `ops-v5` | ruffle_matched | 253/260 |
+| `ops-v6` | ruffle_matched | 253/260 |
+| `ops-v7` | ruffle_matched | 255/262 |
+| `setProperty-v5` | ruffle_matched | 3/52 |
+| `setProperty-v6` | ruffle_matched | 3/52 |
+| `setProperty-v7` | ruffle_matched | 3/52 |
+| `setProperty-v8` | ruffle_matched | 3/52 |
