@@ -7571,20 +7571,12 @@ namespace SWFRecomp
 
 						if (paths[i].fill_styles[shapes.back().fill_right] == 0 && paths[i].fill_styles[!shapes.back().fill_right] != 0)
 						{
-							if (is_font)
-							{
-								// Font glyphs: a self-closed path with fill on only one side
-								// is a filled glyph, not a hole. signed_area-based fill_right
-								// picks the wrong side for some Y-down CW glyph encodings
-								// (e.g. TestFont rectangles). Flip to the side that's actually filled.
-								shapes.back().fill_right = !shapes.back().fill_right;
-								shapes.back().inner_fill = paths[i].fill_styles[shapes.back().fill_right];
-							}
-							else
-							{
-								shapes.back().hole = true;
-								shapes.back().outer_fill = paths[i].fill_styles[!shapes.back().fill_right];
-							}
+							// Phase A: defer outer/hole decision to the containment pass.
+							// Always flip to the non-zero fill side; the containment pass
+							// below decides whether this shape is a positive fill or a hole
+							// based on spatial containment + same-fill parent matching.
+							shapes.back().fill_right = !shapes.back().fill_right;
+							shapes.back().inner_fill = paths[i].fill_styles[shapes.back().fill_right];
 						}
 					}
 				}
@@ -7695,55 +7687,70 @@ namespace SWFRecomp
 				// Sort shapes by area of bounding box
 				std::sort(shapes.begin(), shapes.end(), compareArea);
 				
+				// Phase A: scan every shape (not just hole-marked ones). For each
+				// valid filled shape, look for its smallest spatial parent. If the
+				// parent's inner_fill matches this shape's inner_fill, demote this
+				// shape to a hole of that parent. Otherwise it stays a positive
+				// fill (different-color nested region, or outermost shape).
 				for (size_t i = 0; i < shapes.size(); ++i)
 				{
-					if (shapes[i].hole)
+					if (shapes[i].invalid || shapes[i].hole || shapes[i].inner_fill == 0)
 					{
-						Shape& hole = shapes[i];
-						
-						std::vector<Shape*> outer_candidates;
-						
-						for (size_t j = 0; j < shapes.size(); ++j)
-						{
-							if (shapes[j].invalid)
-							{
-								continue;
-							}
-							
-							Shape& test_shape = shapes[j];
-							
-							if (test_shape.min.x < hole.min.x && test_shape.max.x > hole.max.x &&
-								test_shape.min.y < hole.min.y && test_shape.max.y > hole.max.y)
-							{
-								outer_candidates.push_back(&test_shape);
-							}
-						}
-						
-						std::vector<Shape*> final_outer_candidates;
-						
-						for (Shape* c : outer_candidates)
-						{
-							bool v_in_c = true;
-							
-							for (const Vertex& v : hole.verts)
-							{
-								if (!isInShape(v, c))
-								{
-									v_in_c = false;
-									break;
-								}
-							}
-							
-							if (v_in_c)
-							{
-								final_outer_candidates.push_back(c);
-							}
-						}
-						
-						std::sort(final_outer_candidates.begin(), final_outer_candidates.end(), compareAreaPtr);
+						continue;
+					}
 
-						if (!final_outer_candidates.empty())
-							final_outer_candidates.back()->holes.push_back(&hole);
+					Shape& candidate = shapes[i];
+
+					std::vector<Shape*> outer_candidates;
+
+					for (size_t j = 0; j < shapes.size(); ++j)
+					{
+						if (i == j || shapes[j].invalid || shapes[j].inner_fill == 0)
+						{
+							continue;
+						}
+
+						Shape& test_shape = shapes[j];
+
+						if (test_shape.min.x < candidate.min.x && test_shape.max.x > candidate.max.x &&
+							test_shape.min.y < candidate.min.y && test_shape.max.y > candidate.max.y)
+						{
+							outer_candidates.push_back(&test_shape);
+						}
+					}
+
+					std::vector<Shape*> final_outer_candidates;
+
+					for (Shape* c : outer_candidates)
+					{
+						bool v_in_c = true;
+
+						for (const Vertex& v : candidate.verts)
+						{
+							if (!isInShape(v, c))
+							{
+								v_in_c = false;
+								break;
+							}
+						}
+
+						if (v_in_c)
+						{
+							final_outer_candidates.push_back(c);
+						}
+					}
+
+					std::sort(final_outer_candidates.begin(), final_outer_candidates.end(), compareAreaPtr);
+
+					if (!final_outer_candidates.empty())
+					{
+						Shape* parent = final_outer_candidates.back();
+						if (parent->inner_fill == candidate.inner_fill)
+						{
+							candidate.hole = true;
+							candidate.outer_fill = parent->inner_fill;
+							parent->holes.push_back(&candidate);
+						}
 					}
 				}
 				
