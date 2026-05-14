@@ -203,6 +203,10 @@ void tagDoInitActionGuarded(SWFAppContext* app_context, size_t char_id, frame_fu
 
 // Forward declaration (defined in actionmodern/action.h)
 typedef struct MovieClip MovieClip;
+// ActionVar is defined in actionmodern/variables.h. Include via direct path
+// rather than re-declaring (it's an anonymous-struct typedef, so a forward
+// declaration with the same name doesn't link).
+#include <actionmodern/variables.h>
 
 // Frame label entry for label→frame mapping
 typedef struct {
@@ -389,6 +393,17 @@ void actionUnboundTextFieldsPush(MovieClip* mc);
 // Drop a freed/unloaded MC from the unbound queue (called from MC destruction
 // sites to avoid retrying dangling pointers).
 void actionUnboundTextFieldsDrop(MovieClip* mc);
+
+// Phase C: per-container TextField binding registry.
+// actionRegisterTextFieldBinding records (tf, var_name) on the container;
+// actionNotifyPropertyChange propagates a property write to bound TFs;
+// actionUnregisterTextFieldBindings drains all bindings on container unload
+// (and pushes the TFs back to the unbound retry queue).
+void actionRegisterTextFieldBinding(MovieClip* container, MovieClip* tf_mc, const char* variable_name);
+int  actionNotifyPropertyChange(SWFAppContext* app_context, MovieClip* container,
+	const char* prop_name, u32 prop_name_len, ActionVar* value);
+void actionUnregisterTextFieldBindings(MovieClip* container);
+void actionDropTextFieldBindingForTF(MovieClip* container, MovieClip* tf_mc);
 // Rename a cached MovieClip when tagSetInstanceName updates a sprite's display entry
 void actionRenameMovieClip(const char* old_name, const char* new_name);
 // Enumerate child instance names for a MovieClip (for for-in enumeration)

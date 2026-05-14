@@ -16,6 +16,15 @@ extern u8 g_execution_halted;
 typedef struct MovieClip MovieClip;
 
 // MovieClip structure for Flash movie clip properties
+// Phase C: a registered binding between a container MovieClip's property and
+// a TextField that should mirror its value. Mirrors Ruffle's
+// `Avm1TextFieldBinding { text_field, variable_name }`
+// (core/src/display_object.rs:3015). Owned by the *container* MC, not the TF.
+typedef struct Avm1TextFieldBinding {
+	MovieClip* text_field;
+	char* variable_name;  // heap-allocated; freed on unregister.
+} Avm1TextFieldBinding;
+
 struct MovieClip {
 	float x, y;
 	float xscale, yscale;
@@ -85,6 +94,12 @@ struct MovieClip {
 	uint32_t* attached_bitmap_pixels;   // ARGB premultiplied pixel data (NULL if none)
 	u16 attached_bitmap_width;
 	u16 attached_bitmap_height;
+	// Phase C: TextField bindings registered against this MC's property scope.
+	// Lazily allocated; freed when the MC is unloaded (also pushes TFs back to
+	// the unbound retry queue, mirroring Ruffle's unregister_bindings).
+	Avm1TextFieldBinding* avm1_text_field_bindings;
+	u16 avm1_text_field_binding_count;
+	u16 avm1_text_field_binding_capacity;
 };
 
 // Global root MovieClip

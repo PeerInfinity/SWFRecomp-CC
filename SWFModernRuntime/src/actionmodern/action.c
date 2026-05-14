@@ -18848,6 +18848,189 @@ void actionUnboundTextFieldsPush(MovieClip* mc)
 	unbound_tf_push(mc);
 }
 
+// ---------------------------------------------------------------------------
+// Phase C: TextField binding registry on the container MC
+// ---------------------------------------------------------------------------
+// Each container MC holds a list of (TF, var_name) pairs that should mirror
+// its property writes. Mirrors Ruffle's avm1_text_field_bindings list on
+// DisplayObject. Registered by actionTryBindTextFieldVariable on a successful
+// bind, drained when the container unloads (TFs returned to the unbound
+// queue for re-binding if a new container appears at the same path), and
+// consulted by actionNotifyPropertyChange when a property is written.
+
+static void tf_bindings_grow(MovieClip* container)
+{
+	u16 new_cap = container->avm1_text_field_binding_capacity == 0
+		? 2 : (u16)(container->avm1_text_field_binding_capacity * 2);
+	Avm1TextFieldBinding* new_arr = (Avm1TextFieldBinding*)
+		realloc(container->avm1_text_field_bindings,
+			(size_t)new_cap * sizeof(Avm1TextFieldBinding));
+	if (new_arr == NULL) return;
+	container->avm1_text_field_bindings = new_arr;
+	container->avm1_text_field_binding_capacity = new_cap;
+}
+
+// Register a (TF, var_name) binding on the container. Replaces any existing
+// entry for the same TF (var_name may have changed via `tf.variable = X`).
+void actionRegisterTextFieldBinding(MovieClip* container, MovieClip* tf_mc, const char* variable_name)
+{
+	if (container == NULL || tf_mc == NULL || variable_name == NULL) return;
+	if (variable_name[0] == '\0') return;
+	// Replace existing entry for this TF if present.
+	for (u16 i = 0; i < container->avm1_text_field_binding_count; i++) {
+		if (container->avm1_text_field_bindings[i].text_field == tf_mc) {
+			char* old_name = container->avm1_text_field_bindings[i].variable_name;
+			container->avm1_text_field_bindings[i].variable_name = strdup(variable_name);
+			free(old_name);
+			return;
+		}
+	}
+	if (container->avm1_text_field_binding_count >=
+	    container->avm1_text_field_binding_capacity) {
+		tf_bindings_grow(container);
+		if (container->avm1_text_field_bindings == NULL) return;
+	}
+	container->avm1_text_field_bindings[container->avm1_text_field_binding_count].text_field = tf_mc;
+	container->avm1_text_field_bindings[container->avm1_text_field_binding_count].variable_name = strdup(variable_name);
+	container->avm1_text_field_binding_count++;
+}
+
+// Drain every binding off the container and push the TFs back to the unbound
+// retry queue. Mirrors Ruffle's unregister_bindings called on
+// DisplayObject removal (core/src/display_object.rs:3060). Called when the
+// container MC is unloaded.
+void actionUnregisterTextFieldBindings(MovieClip* container)
+{
+	if (container == NULL || container->avm1_text_field_bindings == NULL) return;
+	for (u16 i = 0; i < container->avm1_text_field_binding_count; i++) {
+		MovieClip* tf_mc = container->avm1_text_field_bindings[i].text_field;
+		free(container->avm1_text_field_bindings[i].variable_name);
+		container->avm1_text_field_bindings[i].variable_name = NULL;
+		if (tf_mc != NULL) unbound_tf_push(tf_mc);
+	}
+	free(container->avm1_text_field_bindings);
+	container->avm1_text_field_bindings = NULL;
+	container->avm1_text_field_binding_count = 0;
+	container->avm1_text_field_binding_capacity = 0;
+}
+
+// Drop a specific TF binding (called when a TF MC is freed or its variable
+// property is cleared). Idempotent.
+void actionDropTextFieldBindingForTF(MovieClip* container, MovieClip* tf_mc)
+{
+	if (container == NULL || container->avm1_text_field_bindings == NULL || tf_mc == NULL) return;
+	for (u16 i = 0; i < container->avm1_text_field_binding_count; i++) {
+		if (container->avm1_text_field_bindings[i].text_field == tf_mc) {
+			free(container->avm1_text_field_bindings[i].variable_name);
+			// Swap-remove
+			container->avm1_text_field_bindings[i] =
+				container->avm1_text_field_bindings[container->avm1_text_field_binding_count - 1];
+			container->avm1_text_field_binding_count--;
+			return;
+		}
+	}
+}
+
+// Propagate a property change from `container` to any bound TextField that
+// targets this property name. Mirrors Ruffle's
+// `notify_property_change` (core/src/avm1/object/stage_object.rs:63).
+// Returns the number of bindings notified (0 if none).
+int actionNotifyPropertyChange(SWFAppContext* app_context, MovieClip* container,
+	const char* prop_name, u32 prop_name_len, ActionVar* value)
+{
+	if (container == NULL || container->avm1_text_field_bindings == NULL) return 0;
+	if (value->type == ACTION_STACK_VALUE_UNDEFINED ||
+	    value->type == ACTION_STACK_VALUE_HOLE) return 0;
+
+	int notified = 0;
+	int case_sensitive = (g_swf_version >= 7);
+
+	// Lazy coerce the value to a UTF-16 string; defer until we find a match
+	// so non-bound writes don't trigger toString side-effects.
+	const uint16_t* text_u16 = NULL;
+	u32 text_len = 0;
+	int coerced = 0;
+	if (value->type == ACTION_STACK_VALUE_STRING) {
+		text_u16 = varGetU16Ptr(value);
+		text_len = value->str_size;
+		coerced = 1;
+	}
+
+	for (u16 i = 0; i < container->avm1_text_field_binding_count; i++) {
+		const Avm1TextFieldBinding* b = &container->avm1_text_field_bindings[i];
+		if (b->text_field == NULL || b->variable_name == NULL) continue;
+		// Match against the *last segment* of the binding's variable name.
+		// Path bindings ("_root.mc.foo") register on the container with the
+		// terminal property name ("foo"); simple-name bindings register
+		// with the whole name. Either way the registry's variable_name
+		// is the property we care about.
+		const char* match_name = b->variable_name;
+		const char* last_dot = strrchr(match_name, '.');
+		if (last_dot != NULL) match_name = last_dot + 1;
+		size_t match_len = strlen(match_name);
+		if (match_len != prop_name_len) continue;
+		int match = case_sensitive
+			? (memcmp(match_name, prop_name, prop_name_len) == 0)
+			: (strncasecmp(match_name, prop_name, prop_name_len) == 0);
+		if (!match) continue;
+
+		MovieClip* tf_mc = b->text_field;
+		if (tf_mc->depth == INT_MIN || tf_mc->dynamic_props == NULL) continue;
+		ASObject* props = (ASObject*) tf_mc->dynamic_props;
+
+		if (!coerced) {
+			char _sv_buf[512];
+			int n = varToStringBuf(app_context, value, _sv_buf, sizeof(_sv_buf));
+			if (n > 0) {
+				u32 _u16_len;
+				text_u16 = utf8_to_u16(app_context, _sv_buf, (u32)n, &_u16_len);
+				text_len = _u16_len;
+			}
+			coerced = 1;
+		}
+		if (text_u16 == NULL) continue;
+
+		u16 tf_flags = ng_getTextFieldFlags(tf_mc->ng_textfield_idx);
+		int is_html = (tf_flags & 0x0040) != 0;
+		if (is_html) {
+			ActionVar* html_prop = getProperty(props, "html", 4);
+			if (html_prop != NULL && html_prop->type == ACTION_STACK_VALUE_BOOLEAN)
+				is_html = html_prop->data.numeric_value ? 1 : 0;
+		}
+
+		if (is_html && text_len > 0) {
+			ActionVar html_val = {0};
+			html_val.type = ACTION_STACK_VALUE_STRING;
+			html_val.str_size = text_len;
+			VAL(u64, &html_val.data.numeric_value) = (u64)text_u16;
+			setProperty(app_context, props, "htmlText", 8, &html_val);
+			u32 stripped_len;
+			uint16_t* stripped = strip_html_tags_u16(app_context, text_u16, text_len, &stripped_len);
+			ActionVar text_val = {0};
+			text_val.type = ACTION_STACK_VALUE_STRING;
+			text_val.str_size = stripped_len;
+			VAL(u64, &text_val.data.numeric_value) = (u64)stripped;
+			setProperty(app_context, props, "text", 4, &text_val);
+			ActionVar len_val = {0};
+			len_val.type = ACTION_STACK_VALUE_F64;
+			VAL(double, &len_val.data.numeric_value) = (double)stripped_len;
+			setProperty(app_context, props, "length", 6, &len_val);
+		} else {
+			ActionVar text_val = {0};
+			text_val.type = ACTION_STACK_VALUE_STRING;
+			text_val.str_size = text_len;
+			VAL(u64, &text_val.data.numeric_value) = (u64)text_u16;
+			setProperty(app_context, props, "text", 4, &text_val);
+			ActionVar len_val = {0};
+			len_val.type = ACTION_STACK_VALUE_F64;
+			VAL(double, &len_val.data.numeric_value) = (double)text_len;
+			setProperty(app_context, props, "length", 6, &len_val);
+		}
+		notified++;
+	}
+	return notified;
+}
+
 // Try to bind a TextField MovieClip's variable to its parent's scope. Mirrors
 // Ruffle's EditText::try_bind_text_field_variable (core/src/display_object/edit_text.rs).
 //
@@ -18887,6 +19070,10 @@ int actionTryBindTextFieldVariable(SWFAppContext* app_context, MovieClip* tf_mc,
 	u32 prop_name_len = 0;
 	int is_path = (strchr(var_name, '.') != NULL);
 	MovieClip* simple_binding_mc = NULL;  // for simple-name → also mirror to global var_map if root
+	// Phase C: track the container MC (when resolvable to an MC) for binding
+	// registration after a successful bind. NULL when the container is a
+	// plain Object (path resolves to non-MC) — those don't get registered.
+	MovieClip* binding_container_mc = NULL;
 
 	if (is_path) {
 		const char* last_dot = strrchr(var_name, '.');
@@ -18910,6 +19097,7 @@ int actionTryBindTextFieldVariable(SWFAppContext* app_context, MovieClip* tf_mc,
 				retainObject((ASObject*) container_mc->dynamic_props);
 			}
 			container = (ASObject*) container_mc->dynamic_props;
+			binding_container_mc = container_mc;
 		} else {
 			return 0;  // container path doesn't resolve to an Object/MC yet
 		}
@@ -18922,6 +19110,7 @@ int actionTryBindTextFieldVariable(SWFAppContext* app_context, MovieClip* tf_mc,
 		container = (ASObject*) simple_binding_mc->dynamic_props;
 		prop_name = var_name;
 		prop_name_len = (u32)strlen(var_name);
+		binding_container_mc = simple_binding_mc;
 	}
 
 	if (container == NULL) return 0;
@@ -18995,6 +19184,14 @@ int actionTryBindTextFieldVariable(SWFAppContext* app_context, MovieClip* tf_mc,
 				setVariableByName(var_name, tf_text);
 		}
 	}
+
+	// Phase C: register the (TF, var_name) binding on the container MC so
+	// subsequent property writes (via setMember etc.) propagate via the
+	// avm1_text_field_bindings registry instead of the O(child_mc_count)
+	// ng_syncVarToTextFields scan. Only registered when the container is a
+	// MovieClip — plain Object containers don't carry the binding list.
+	if (binding_container_mc != NULL)
+		actionRegisterTextFieldBinding(binding_container_mc, tf_mc, var_name);
 
 	return 1;
 }
@@ -19910,6 +20107,11 @@ void actionInvalidateCachedMovieClip(SWFAppContext* app_context, const char* nam
 				if (_ifc)
 					selection_do_focus_change(app_context, g_focused_mc, NULL);
 			}
+			// Phase C: drain the container's TF binding registry before
+			// nulling state. Pushes any bound TFs back to the unbound queue
+			// so a re-created container at the same path can re-bind.
+			actionUnregisterTextFieldBindings(child_mc_cache[i]);
+			actionUnboundTextFieldsDrop(child_mc_cache[i]);
 			child_mc_cache[i]->avm1_removed = 1;
 			child_mc_cache[i]->dynamic_props = NULL;
 			child_mc_cache[i]->ng_textfield_idx = -1;
@@ -19975,6 +20177,9 @@ void actionInvalidateMCAtASDepth(SWFAppContext* app_context, int as_depth)
 			if (is_focus_chain)
 				selection_do_focus_change(app_context, g_focused_mc, NULL);
 		}
+		// Phase C: drain TF binding registry on container unload.
+		actionUnregisterTextFieldBindings(ch);
+		actionUnboundTextFieldsDrop(ch);
 		ch->avm1_removed = 1;
 		ch->dynamic_props = NULL;
 		ch->ng_textfield_idx = -1;
@@ -20024,6 +20229,9 @@ void actionInvalidateCachedMovieClipDirect(SWFAppContext* app_context, MovieClip
 		if (_ifc)
 			selection_do_focus_change(app_context, g_focused_mc, NULL);
 	}
+	// Phase C: drain TF binding registry on container unload.
+	actionUnregisterTextFieldBindings(mc);
+	actionUnboundTextFieldsDrop(mc);
 	mc->avm1_removed = 1;
 	mc->dynamic_props = NULL;
 	mc->ng_textfield_idx = -1;
@@ -20137,6 +20345,9 @@ void actionFinalizePendingRemovals(SWFAppContext* app_context)
 					}
 				}
 			}
+			// Phase C: drain TF binding registry on container unload.
+			actionUnregisterTextFieldBindings(_fpr_mc);
+			actionUnboundTextFieldsDrop(_fpr_mc);
 			_fpr_mc->dynamic_props = NULL;
 			_fpr_mc->ng_textfield_idx = -1;
 			_fpr_mc->pending_removal = 0;
@@ -20154,6 +20365,9 @@ void actionFinalizePendingRemovals(SWFAppContext* app_context)
 			if (ch->depth == INT_MIN) continue;
 			if (ch->parent == NULL) continue;
 			if (ch->parent->depth != INT_MIN) continue;
+			// Phase C: drain TF binding registry on cascade-unload.
+			actionUnregisterTextFieldBindings(ch);
+			actionUnboundTextFieldsDrop(ch);
 			ch->avm1_removed = 1;
 			ch->dynamic_props = NULL;
 			ch->ng_textfield_idx = -1;
@@ -44122,18 +44336,31 @@ void actionSetMember(SWFAppContext* app_context)
 			// (timeline variables on root are also accessible as globals)
 			// Child MC properties must NOT leak into global scope.
 			extern MovieClip root_movieclip;
+#if defined(NO_GRAPHICS) || defined(OFFSCREEN_RENDER)
+			// Phase C: fast path — notify TF bindings registered against
+			// this MC's property scope. Covers every TF placed via the
+			// tag stream (Phase B eager wrapper registers them). When this
+			// notifies at least one binding, the fallback child_mc_cache
+			// scans below are skipped to avoid double-handling +
+			// double-allocating the HTML-strip buffer.
+			int _notified = actionNotifyPropertyChange(app_context, mc, prop_name, prop_name_len, &value_var);
+#else
+			int _notified = 0;
+#endif
 			if (mc == &root_movieclip) {
 				setGlobalVariableByName(prop_name, &value_var);
 #if defined(NO_GRAPHICS) || defined(OFFSCREEN_RENDER)
-				// Also sync to any textfields bound to this simple variable name
-				// (e.g., textfield.variable = "textVar1" and user writes `_root.textVar1 = X`).
-				// Path-bound fields are handled by the loop below.
-				ng_syncVarToTextFields(app_context, prop_name, prop_name_len, &value_var);
+				// Fallback for dynamic TFs (createTextField + later
+				// `tf.variable = "name"`) whose binding isn't in the
+				// per-container registry.
+				if (_notified == 0)
+					ng_syncVarToTextFields(app_context, prop_name, prop_name_len, &value_var);
 #endif
 			}
 #if defined(NO_GRAPHICS) || defined(OFFSCREEN_RENDER)
-			// Sync path variable → text fields when setting a property on a MovieClip
-			// E.g., mc.theVar = "Test1" should update textfields bound to "_root.mc.theVar"
+			// Path-binding fallback scan (skipped when the Phase C registry
+			// already covered the write).
+			if (_notified == 0)
 			for (int tfi = 0; tfi < child_mc_count; tfi++) {
 				MovieClip* tf_mc = child_mc_cache[tfi];
 				if (tf_mc == NULL || tf_mc->ng_textfield_idx < 0) continue;
