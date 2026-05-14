@@ -7765,7 +7765,6 @@ namespace SWFRecomp
 							if (candidate.nesting_depth & 1u)
 							{
 								candidate.hole = true;
-								candidate.outer_fill = parent->inner_fill;
 								parent->holes.push_back(&candidate);
 							}
 						}

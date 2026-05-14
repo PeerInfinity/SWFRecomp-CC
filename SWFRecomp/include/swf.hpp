@@ -77,7 +77,6 @@ namespace SWFRecomp
 		u32 fill_style_list;
 		u32 line_style_list;
 		u32 inner_fill;
-		u32 outer_fill;
 		u32 nesting_depth;
 		bool fill_right;
 		bool closed;
