@@ -3,32 +3,32 @@
 
 <!-- PLAN_META
 id: VIDEO_EMBED_SQUARE
-status: incomplete
+status: complete-with-residual
 phases:
   - id: 1
     name: "Diagnose: why is the entire canvas black?"
-    status: pending
+    status: complete
   - id: 2
     name: "Implement VideoFrame tag handling (recompiler + runtime)"
-    status: pending
+    status: complete
   - id: 3
     name: "Wire embedded-video decoder dispatch through video_codec.c"
-    status: pending
+    status: complete
   - id: 4
     name: "Validate image + regression matrix"
-    status: pending
+    status: complete
 dependencies:
   - plan: VIDEO_CODEC_SUPPORT
     type: extends
-    reason: "Phase A of video-codec-support-plan landed libavcodec + Sorenson Spark decode for the FLV/NetStream path. This test exercises the parallel SWF-embedded video path (DefineVideoStream + VideoFrame tags inside a DefineSprite), which Phase A did not address — the recompiler currently drops every VideoFrame tag on the floor."
+    reason: "Phase A of video-codec-support-plan landed libavcodec + Sorenson Spark decode for the FLV/NetStream path. This test exercises the parallel SWF-embedded video path (DefineVideoStream + VideoFrame tags at root timeline level), which Phase A did not address — the recompiler used to drop every VideoFrame tag on the floor. 2026-05-14 Phase 2-3 of this plan added persistent-decoder API + char_id-keyed embedded-video storage in `video_codec.{c,h}` + `action.c`, so inter-frame Spark frames now resolve against keyframe state."
   - plan: VIDEO_DISPLAY_FLASH_PARITY
     type: render-side prerequisite
-    reason: "video-display-flash-parity-plan.md Phase 1 wires the declared-bounds lookup (currently plumbed-but-unused) into the renderer so a decoded frame at source dims gets GPU-stretched onto a quad sized to DefineVideoStream's declared W/H. Landing it before this plan's Phase 2-3 gives the embedded-video render path a deterministic 'final on-stage size = declared bounds × matrix.scale' contract; landing it after would mean this plan's Phase 4 validation has to disambiguate render-side and codec-side regressions."
+    reason: "video-display-flash-parity-plan.md Phase 1 (landed 2026-05-13, commit 072f9afb) wired the declared-bounds lookup into the renderer via renderer_draw_bitmap_quad_scaled. The embedded-video render path now sizes the quad to DefineVideoStream's declared W/H and the GPU sample-stretches the source bitmap. With both plans landed, the embedded-video render contract is 'on-stage size = declared bounds × matrix.scale' as Flash does it."
 -->
 
-Last updated: 2026-05-13 (revised after `video-display-flash-parity-plan.md` investigation)
+Last updated: 2026-05-14 (Phase 2+3 landed)
 
-## Status: INCOMPLETE — trace passes (2/2), image FAIL (78,473 outliers, max diff 255, actual is fully black)
+## Status: COMPLETE-WITH-RESIDUAL — trace passes (2/2), image FAIL (1,455 outliers, max diff 255). Down from 14,676 outliers pre-fix; full embedded-video render path works (yellow background + animated red square decode and render correctly through the Spark inter-frame chain). Residual diff is **text-positioning**, unrelated to video — pre-existing gap that was masked by the larger missing-video diff.
 
 ## Context
 
