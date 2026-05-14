@@ -499,6 +499,17 @@ audio playback, only on `onStatus` event timing (already correct).
 - **2026-05-13:** Plan written. Phase 1 diagnosis of
   `netstream_play_flv` confirmed codec gap (Sorenson Spark
   unsupported). Phase A starting.
+- **2026-05-13:** Phase A regression follow-up. The CPU-side resampling in
+  `actionGetVideoFramePixels` (added the same day to fit Spark frames into
+  the SWF's declared bounds) regressed `netstream_play_flv_screen` because
+  FLVPlayback authors its bundled ScreenVideo at the stage's native size
+  and depends on the renderer drawing at source dimensions. Reverted to
+  source-dim rendering. `netstream_play_flv` image diff regrew from ~53k
+  to ~221k outliers (content still decodes correctly, just renders at
+  source dimensions which overflow the intended placed area) — entry in
+  `ACCEPTED_DIFFS.md` Cat 9 updated. Proper fix is renderer-side matrix
+  scaling per Ruffle's `core/src/display_object/video.rs:528-530` — moved
+  into Phase D scope.
 - **2026-05-13:** Phase A complete. libavcodec wired into native
   graphics builds via a new `WITH_LIBAVCODEC` CMake option and
   matching plumbing in `verify_output.py`. New translation unit

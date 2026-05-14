@@ -2986,33 +2986,26 @@ static void ns_store_decoded_frame(ASObject* ns, unsigned char* pixels, int w, i
 int actionGetVideoFramePixels(uint32_t** out_argb, int target_w, int target_h,
                               int* out_w, int* out_h)
 {
+	// target_w/target_h were a 2026-05-13 Phase A experiment that resampled
+	// the decoded frame to the SWF's declared display bounds via libswscale.
+	// It regressed the FLVPlayback path (netstream_play_flv_screen) because
+	// FLVPlayback authors its bundled video at the stage's native size and
+	// relies on the renderer drawing at source dimensions rather than fitting
+	// to declared bounds. The args are kept in the signature for the eventual
+	// proper fix (matrix-side scaling per Ruffle's video.rs:528-530), but for
+	// now we always render at source size.
+	(void)target_w; (void)target_h;
 	for (int i = 0; i < MAX_VIDEO_FRAMES; i++)
 	{
 		if (g_video_frames[i].active && g_video_frames[i].pixels)
 		{
-			int src_w = g_video_frames[i].width;
-			int src_h = g_video_frames[i].height;
-			unsigned char* src_rgba = g_video_frames[i].pixels;
-
-			int dst_w = (target_w > 0 && target_h > 0) ? target_w : src_w;
-			int dst_h = (target_w > 0 && target_h > 0) ? target_h : src_h;
-
-			unsigned char* scratch = NULL;  // resample destination, freed at end
-			unsigned char* rgba = src_rgba;
-
-			if (dst_w != src_w || dst_h != src_h) {
-				if (!video_resample_rgba(src_rgba, src_w, src_h,
-				                         &scratch, dst_w, dst_h)) {
-					// Resample failed — fall back to native size.
-					dst_w = src_w; dst_h = src_h;
-				} else {
-					rgba = scratch;
-				}
-			}
+			int dst_w = g_video_frames[i].width;
+			int dst_h = g_video_frames[i].height;
+			unsigned char* rgba = g_video_frames[i].pixels;
 
 			int n = dst_w * dst_h;
 			uint32_t* argb = (uint32_t*)malloc(n * sizeof(uint32_t));
-			if (!argb) { free(scratch); return 0; }
+			if (!argb) return 0;
 			for (int p = 0; p < n; p++)
 			{
 				argb[p] = ((uint32_t)rgba[p*4+3] << 24) |
@@ -3020,7 +3013,6 @@ int actionGetVideoFramePixels(uint32_t** out_argb, int target_w, int target_h,
 				           ((uint32_t)rgba[p*4+1] << 8) |
 				           (uint32_t)rgba[p*4+2];
 			}
-			free(scratch);
 			*out_argb = argb;
 			*out_w = dst_w;
 			*out_h = dst_h;
