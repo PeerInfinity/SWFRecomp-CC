@@ -21,9 +21,12 @@ dependencies:
   - plan: VIDEO_CODEC_SUPPORT
     type: extends
     reason: "Phase A of video-codec-support-plan landed libavcodec + Sorenson Spark decode for the FLV/NetStream path. This test exercises the parallel SWF-embedded video path (DefineVideoStream + VideoFrame tags inside a DefineSprite), which Phase A did not address — the recompiler currently drops every VideoFrame tag on the floor."
+  - plan: VIDEO_DISPLAY_FLASH_PARITY
+    type: render-side prerequisite
+    reason: "video-display-flash-parity-plan.md Phase 1 wires the declared-bounds lookup (currently plumbed-but-unused) into the renderer so a decoded frame at source dims gets GPU-stretched onto a quad sized to DefineVideoStream's declared W/H. Landing it before this plan's Phase 2-3 gives the embedded-video render path a deterministic 'final on-stage size = declared bounds × matrix.scale' contract; landing it after would mean this plan's Phase 4 validation has to disambiguate render-side and codec-side regressions."
 -->
 
-Last updated: 2026-05-13
+Last updated: 2026-05-13 (revised after `video-display-flash-parity-plan.md` investigation)
 
 ## Status: INCOMPLETE — trace passes (2/2), image FAIL (78,473 outliers, max diff 255, actual is fully black)
 
@@ -248,11 +251,17 @@ B/C of the broader video codec plan needs to land first.
 
 ### Phase 4 — Validation
 
-| Test | Pre-fix | Target after Phase 2-3 |
-|------|---------|------------------------|
+Validation expectations assume **`video-display-flash-parity-plan.md`
+Phase 1 has already landed** (recommended ordering). If this plan
+ships first, the per-test outcomes for the FLV pair below will differ
+— the screen variant will still pass by source-dim coincidence rather
+than being moved to RUFFLE_VS_FLASH_DIFFERENCES.
+
+| Test | Pre-fix (assuming Flash-parity Phase 1 landed) | Target after Phase 2-3 |
+|------|----------------------------------------------|------------------------|
 | `from_gnash/misc-ming.all/Video-EmbedSquareTest` | trace 2/2, image FAIL (78,473 outliers, black canvas) | trace 2/2, image PASS (≤ `tolerance=5`) — or accepted-diff entry if Phase A's codec-parity issue resurfaces here |
-| `avm1/netstream_play_flv_screen` | trace + image PASS | unchanged (FLVPlayback path) |
-| `avm1/netstream_play_flv` | trace 22/22, image accepted-diff | unchanged |
+| `avm1/netstream_play_flv_screen` | image FAIL (~45k outliers, declared-bounds overflow on 128×128 canvas — in RUFFLE_VS_FLASH_DIFFERENCES per Flash-parity Phase 1) | unchanged |
+| `avm1/netstream_play_flv` | trace 22/22, image diff narrowed to libavcodec H.263 pixel precision (in ACCEPTED_DIFFS Cat 9, revised by Flash-parity Phase 1) | unchanged |
 | 13 misc-ming siblings listed at MISC_MING_SWFC_PLAN.md:240 | passing | unchanged |
 | Full graphics-native suite via CI | 948/1125 (84.3%) baseline | ≥ baseline + N where N = number of newly-passing embedded-video tests |
 
@@ -278,10 +287,22 @@ B/C of the broader video codec plan needs to land first.
   there's no NetStream object here.
 - `SWFModernRuntime/src/libswf/tag.c:1457` / `:1521` — the two video
   render block sites in `render_single_object` and `render_display_list`.
-  Already look up declared bounds via `ng_getVideoDimensions`.
+  Look up declared bounds via `ng_getVideoDimensions` and pass them as
+  `target_w` / `target_h` to `actionGetVideoFramePixels`. **As of
+  `591e398a` those target args are inert** — `actionGetVideoFramePixels`
+  `(void)`-casts them and always returns native source dims. The
+  Flash-parity plan's Phase 1 wires them through to the renderer (quad
+  sized to declared bounds, GPU sample-stretches the source bitmap).
+  Land that before this plan's Phase 2-3 — otherwise the
+  Video-EmbedSquareTest's rendered output will be at source pixel dims
+  rather than the declared 64×64-ish bounds and the validation
+  comparison becomes ambiguous.
 - `SWFRecompDocs/plans/video-codec-support-plan.md` — the parent plan;
   this plan is Phase D-adjacent (multi-frame decode) plus the SWF-embedded
   path which Phase A didn't enumerate.
+- `SWFRecompDocs/plans/video-display-flash-parity-plan.md` — render-side
+  prerequisite. Phase 1 of that plan (GPU matrix-scale rendering) is a
+  soft dependency of this plan's Phase 2-3 work.
 
 ## Scope discipline
 
@@ -298,10 +319,10 @@ B/C of the broader video codec plan needs to land first.
 
 ## Notes for the next session
 
-- Phase 1 is the gate. Do not start Phase 2 / 3 work until the black-
-  canvas diagnosis is in hand — fixing VideoFrame plumbing while the
-  canvas-clear is broken would mean a second wave of "still black"
-  surprises.
+- Phase 1 (this plan's black-canvas diagnosis) is the gate. Do not
+  start Phase 2 / 3 work until the diagnosis is in hand — fixing
+  VideoFrame plumbing while the canvas-clear is broken would mean a
+  second wave of "still black" surprises.
 - If Phase 1 reveals H4 (clear-color bug), the fix probably benefits
   many other graphics-native tests, not just this one. Coordinate via
   CURRENT_STATUS.md before chasing the fix.
@@ -309,3 +330,15 @@ B/C of the broader video codec plan needs to land first.
   `misc-ming.all/*Test` that's known to pass in graphics mode and has
   an image expectation; that's the cleanest "is the baseline OK?"
   check.
+- **Ordering with `video-display-flash-parity-plan.md`:** that plan's
+  Phase 1 lands GPU matrix-scale rendering for the Video display
+  object — render bitmap at source dims, size the quad to declared
+  bounds. Land it BEFORE this plan's Phase 2-3 so the embedded test's
+  Phase 4 validation has a clean Flash-faithful target (declared bounds
+  × matrix). Sequence: Flash-parity Phase 1 → this plan's Phase 1
+  diagnosis → this plan's Phase 2-3 implementation. If Flash-parity
+  Phase 1 turns out to require more work than expected, this plan can
+  proceed independently with the caveat that the rendered size will be
+  at source pixel dims rather than declared bounds (and the validation
+  comparison will need a manual visual sanity-check rather than
+  pixel-strict).
