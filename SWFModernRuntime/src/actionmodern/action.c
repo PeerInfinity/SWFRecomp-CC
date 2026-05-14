@@ -23235,13 +23235,22 @@ int actionIterateTextFields(TextFieldRenderCallback cb, void* user_data)
 			if (voy) vis_off_y = (float)varToDoubleSimple(voy);
 		}
 
+		// Compose parent-chain translations (see actionIterateTextFieldGlyphs
+		// for the rationale). mc->x/y are local-to-parent.
+		float world_x = mc->x;
+		float world_y = mc->y;
+		for (MovieClip* p = mc->parent; p != NULL; p = p->parent) {
+			world_x += p->x;
+			world_y += p->y;
+		}
+
 		TextFieldRenderInfo info;
 		info.has_background = has_bg;
 		info.background_color = bg_color;
 		info.has_border = has_border;
 		info.border_color = bd_color;
-		info.x = mc->x + vis_off_x;
-		info.y = mc->y + vis_off_y;
+		info.x = world_x + vis_off_x;
+		info.y = world_y + vis_off_y;
 		// Flash includes the right/bottom edge pixel (+1) for positive-dimension text fields,
 		// but not for negative-dimension ones (where the visual offset adjusts the origin).
 		info.w = mc->width + (vis_off_x == 0.0f ? 1.0f : 0.0f);
@@ -23683,12 +23692,26 @@ int actionIterateTextFieldGlyphs(TextFieldGlyphCallback cb, void* user_data)
 			}
 		}
 
+		// Compose parent-chain translations onto the textfield's local
+		// (mc->x, mc->y) so a field placed inside a translated sprite
+		// renders at its world position. mc->x is local-to-parent in Flash
+		// semantics (`_x` AS-property), so summing parent translations up
+		// to root gives world coords. Translation-only — scale/rotation
+		// composition is deferred (mirrors the Phase-A orphan walk
+		// limitation; most textfields in test SWFs are identity-scaled).
+		float world_x = mc->x;
+		float world_y = mc->y;
+		for (MovieClip* p = mc->parent; p != NULL; p = p->parent) {
+			world_x += p->x;
+			world_y += p->y;
+		}
+
 		TextFieldGlyphInfo info;
 		info.font_id = font_id;
 		info.font_height = font_height;
 		info.text_color = text_color;
-		info.x = mc->x + vis_off_x;
-		info.y = mc->y + vis_off_y;
+		info.x = world_x + vis_off_x;
+		info.y = world_y + vis_off_y;
 		info.w = mc->width;
 		info.h = mc->height;
 		info.text_utf8 = text_utf8;
