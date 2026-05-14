@@ -7590,14 +7590,24 @@ namespace SWFRecomp
 				
 				for (size_t i = 0; i < paths.size(); ++i)
 				{
-					if (paths[i].self_closed)
+					// Phase 1: auto-close an open path with a one-sided fill so it can
+					// emit fill triangles. earcut implicitly closes the contour, and
+					// processShape's signed_area wraps from last vert to verts[0]. We
+					// build the Shape from the open path's verts directly — paths[i].verts
+					// stays unchanged so the stroke pass below still emits the polyline
+					// without a synthetic closing edge. Gate on >=3 verts to skip
+					// degenerate cases (R1.1).
+					bool has_fill = (paths[i].fill_styles[0] != 0 || paths[i].fill_styles[1] != 0);
+					bool fill_open_path = (!paths[i].self_closed && has_fill && paths[i].verts.size() >= 3);
+
+					if (paths[i].self_closed || fill_open_path)
 					{
 						shapes.push_back(Shape());
 						shapes.back().closed = true;
 						shapes.back().hole = false;
 						shapes.back().invalid = false;
 						shapes.back().nesting_depth = 0;
-						
+
 						for (size_t k = 0; k < paths[i].verts.size(); ++k)
 						{
 							if (k >= 1 &&
@@ -7606,10 +7616,10 @@ namespace SWFRecomp
 							{
 								continue;
 							}
-							
+
 							shapes.back().verts.push_back(paths[i].verts[k]);
 						}
-						
+
 						processShape(shapes.back(), paths[i].fill_styles);
 
 						shapes.back().fill_style_list = paths[i].fill_style_list;
