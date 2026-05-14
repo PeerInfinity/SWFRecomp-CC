@@ -7552,6 +7552,7 @@ namespace SWFRecomp
 						shapes.back().closed = true;
 						shapes.back().hole = false;
 						shapes.back().invalid = false;
+						shapes.back().nesting_depth = 0;
 						
 						for (size_t k = 0; k < paths[i].verts.size(); ++k)
 						{
@@ -7596,6 +7597,7 @@ namespace SWFRecomp
 					shapes.back().closed = true;
 					shapes.back().hole = false;
 					shapes.back().invalid = false;
+					shapes.back().nesting_depth = 0;
 					
 					for (size_t j = 0; j < cycle.size(); ++j)
 					{
@@ -7687,11 +7689,23 @@ namespace SWFRecomp
 				// Sort shapes by area of bounding box
 				std::sort(shapes.begin(), shapes.end(), compareArea);
 				
-				// Phase A: scan every shape (not just hole-marked ones). For each
-				// valid filled shape, look for its smallest spatial parent. If the
-				// parent's inner_fill matches this shape's inner_fill, demote this
-				// shape to a hole of that parent. Otherwise it stays a positive
-				// fill (different-color nested region, or outermost shape).
+				// Phase B: even-odd nesting parity. Process shapes largest-first
+				// (the sort above is by area descending). For each shape, find
+				// its smallest spatial parent. If that parent has the same
+				// inner_fill, this shape sits inside a same-color ring, so its
+				// nesting depth is parent->depth + 1. Under the even-odd fill
+				// rule (SWF default), odd-depth shapes become holes of their
+				// immediate parent; even-depth shapes stay as positive fills
+				// that may in turn carry their own holes (depth+1 children).
+				//
+				// Different-color spatial containment breaks the same-fill chain
+				// and resets depth to 0 — the inner shape is a smaller filled
+				// region painted on top, not a hole of the outer.
+				//
+				// Non-zero winding rule (DefineShape4 + UsesFillWindingRule) is
+				// not implemented here; we'd need to aggregate per-path signed
+				// crossings along the parent chain. Defer until a driver test
+				// exercises it.
 				for (size_t i = 0; i < shapes.size(); ++i)
 				{
 					if (shapes[i].invalid || shapes[i].hole || shapes[i].inner_fill == 0)
@@ -7747,9 +7761,13 @@ namespace SWFRecomp
 						Shape* parent = final_outer_candidates.back();
 						if (parent->inner_fill == candidate.inner_fill)
 						{
-							candidate.hole = true;
-							candidate.outer_fill = parent->inner_fill;
-							parent->holes.push_back(&candidate);
+							candidate.nesting_depth = parent->nesting_depth + 1;
+							if (candidate.nesting_depth & 1u)
+							{
+								candidate.hole = true;
+								candidate.outer_fill = parent->inner_fill;
+								parent->holes.push_back(&candidate);
+							}
 						}
 					}
 				}
