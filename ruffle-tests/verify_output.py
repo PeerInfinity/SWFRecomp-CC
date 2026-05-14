@@ -218,6 +218,65 @@ def parse_image_comparisons(test_dir):
     return result
 
 
+def resolve_expected_filename(test_dir, suffix_override=None):
+    """Pick the expected-output filename for `test_dir`, relative to it.
+
+    Resolution order:
+      1. If `suffix_override` is set, return f"output.{suffix_override}.txt"
+         unconditionally (caller-asserted).
+      2. If `output.txt` exists, use it.
+      3. If `test.toml` has a `[subtests]` table with one or more
+         `[subtests.NAME]` sub-tables, pick the variant with the highest
+         `player_options.version` (Option A from SUBTESTS_HARNESS_PLAN —
+         canonical-variant mode, no actual runtime version override) and
+         return its `output_path`.
+      4. Otherwise return None (caller treats as "no expected file").
+
+    The returned filename is just a basename — callers form the full path
+    with `test_dir / returned`.
+    """
+    if suffix_override:
+        return f"output.{suffix_override}.txt"
+
+    if (test_dir / "output.txt").exists():
+        return "output.txt"
+
+    toml_path = test_dir / "test.toml"
+    if not toml_path.exists():
+        return None
+    try:
+        with open(toml_path, "rb") as f:
+            data = tomllib.load(f)
+    except Exception:
+        return None
+    subtests = data.get("subtests")
+    if not isinstance(subtests, dict) or not subtests:
+        return None
+
+    best_version = -1
+    best_output_path = None
+    for variant_name, variant in subtests.items():
+        if not isinstance(variant, dict):
+            continue
+        output_path = variant.get("output_path")
+        if not output_path:
+            continue
+        # player_options.version may be nested or flat (player_options is a
+        # sub-table). Accept both shapes.
+        version = None
+        po = variant.get("player_options")
+        if isinstance(po, dict):
+            version = po.get("version")
+        if version is None:
+            version = variant.get("player_options.version")
+        # Treat missing version as -inf so it loses to any explicit number.
+        v = int(version) if isinstance(version, (int, float)) else -1
+        if v > best_version:
+            best_version = v
+            best_output_path = output_path
+    return best_output_path
+
+
 def compare_images(actual_path, expected_path, checks):
     """Compare two PNG images using Ruffle's per-pixel per-channel algorithm.
 
@@ -442,19 +501,30 @@ DISCOVERY_SKIP_DIRS = {
 }
 
 
-def discover_tests(tests_dir, expected_filename="output.txt"):
+def discover_tests(tests_dir, expected_filename=None, suffix_override=None):
     """Walk `tests_dir` recursively and yield each discovered test's relative
     path name (with forward-slashes) in sorted order.
 
-    A directory is considered a test iff it contains both `test.swf` and the
-    expected-output file (`output.txt` by default). Walks skip any directory
-    whose name is in `DISCOVERY_SKIP_DIRS` and stops descending once it has
-    found a test (tests don't nest inside each other)."""
+    A directory is considered a test iff it contains `test.swf` and a
+    resolvable expected-output file. If `expected_filename` is given it's
+    used directly (back-compat). Otherwise the file is resolved per-test via
+    `resolve_expected_filename(test_dir, suffix_override)`, which honors
+    `output.txt` first, then a `[subtests]` block's highest-version variant.
+
+    Walks skip any directory whose name is in `DISCOVERY_SKIP_DIRS` and stops
+    descending once it has found a test (tests don't nest inside each other).
+    """
     results = []
+
+    def _has_expected(current):
+        if expected_filename is not None:
+            return (current / expected_filename).exists()
+        resolved = resolve_expected_filename(current, suffix_override)
+        return resolved is not None and (current / resolved).exists()
 
     def _walk(current):
         # If this directory is itself a test, record it and don't descend.
-        if (current / "test.swf").exists() and (current / expected_filename).exists():
+        if (current / "test.swf").exists() and _has_expected(current):
             rel = current.relative_to(tests_dir)
             rel_str = rel.as_posix()
             if rel_str and rel_str != ".":
@@ -2481,8 +2551,11 @@ def main():
     args.headless = (args.mode == "graphics-headless-legacy")
     args.uses_dawn = args.mode in ("graphics", "graphics-headless-legacy")
 
-    # Determine expected output filename
-    expected_filename = f"output.{args.expected_suffix}.txt" if args.expected_suffix else "output.txt"
+    # Expected-output filename is resolved per-test via
+    # resolve_expected_filename, which honors --expected-suffix first, then
+    # output.txt, then a [subtests] block's highest-version variant
+    # (Option A from SUBTESTS_HARNESS_PLAN). Discovery uses the same logic.
+    suffix_override = args.expected_suffix
 
     # Override tests directory if specified
     if args.tests_dir:
@@ -2520,7 +2593,7 @@ def main():
     # names are forward-slashed relative paths under TESTS_DIR.
     if args.test:
         import fnmatch
-        all_tests = discover_tests(TESTS_DIR, expected_filename)
+        all_tests = discover_tests(TESTS_DIR, suffix_override=suffix_override)
         tests = []
         for t in args.test:
             if '*' in t or '?' in t:
@@ -2536,7 +2609,7 @@ def main():
                 tests.append(t)
         tests = sorted(set(tests))
     else:
-        tests = discover_tests(TESTS_DIR, expected_filename)
+        tests = discover_tests(TESTS_DIR, suffix_override=suffix_override)
 
     # Apply --exclude filter
     if args.exclude:
@@ -2800,7 +2873,8 @@ def main():
                 # Still compare output even for crashing tests
                 if raw_output and raw_output.strip():
                     crash_actual = filter_output(raw_output)
-                    crash_expected = (test_dir / expected_filename).read_text(encoding="utf-8", errors="replace").replace("\r\n", "\n").rstrip("\n")
+                    _crash_expected_name = resolve_expected_filename(test_dir, suffix_override)
+                    crash_expected = (test_dir / _crash_expected_name).read_text(encoding="utf-8", errors="replace").replace("\r\n", "\n").rstrip("\n") if _crash_expected_name else ""
                     crash_match, crash_diff, crash_line_stats = compare_output(crash_actual, crash_expected, epsilon, number_patterns)
                     entry["lines"] = crash_line_stats
                     if crash_match:
@@ -2884,6 +2958,9 @@ def main():
             Path(args.save_actual).write_text(actual + "\n", encoding="utf-8")
             print(f"  Saved actual output ({len(actual.splitlines())} lines) to {args.save_actual}")
             args.save_actual = None  # only save once
+        # Resolve per-test (handles [subtests] for from_gnash/* tests that
+        # don't ship a canonical output.txt — picks the highest-version variant).
+        expected_filename = resolve_expected_filename(test_dir, suffix_override)
         expected = (test_dir / expected_filename).read_text(encoding="utf-8", errors="replace").replace("\r\n", "\n").rstrip("\n")
 
         match, diff_summary, line_stats = compare_output(actual, expected, epsilon, number_patterns)
@@ -2914,7 +2991,14 @@ def main():
             # a subset of Ruffle's diff lines against the same output.txt,
             # promote to `ruffle_matched` — we're doing at least as well as
             # Ruffle, which is the reference implementation for AVM1.
-            ruffle_actual_path = test_dir / "output.ruffle.txt"
+            # For subtests, the matching Ruffle-actual is named
+            # output.fpN.ruffle.txt — derive from the resolved expected name.
+            # (For canonical output.txt → output.ruffle.txt, same logic.)
+            if expected_filename and expected_filename.endswith(".txt"):
+                ruffle_actual_name = expected_filename[:-4] + ".ruffle.txt"
+            else:
+                ruffle_actual_name = "output.ruffle.txt"
+            ruffle_actual_path = test_dir / ruffle_actual_name
             ruffle_matched = False
             if (ruffle_actual_path.is_file()
                     and _test_is_known_failure(test_dir)):

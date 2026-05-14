@@ -3,27 +3,58 @@
 
 <!-- PLAN_META
 id: SUBTESTS_HARNESS
-status: not_started
+status: completed
 phases:
   - id: 1
     name: "Parse [subtests] in test.toml and enumerate variants"
-    status: not_started
+    status: completed
   - id: 2
     name: "Pick canonical variant per test (or run all variants)"
-    status: not_started
+    status: completed
   - id: 3
     name: "Wire output_path through verify_output.py expected-file selection"
-    status: not_started
+    status: completed
   - id: 4
     name: "Validate against affected tests"
-    status: not_started
+    status: completed
 dependencies: []
 blockers: []
 -->
 
 Last updated: 2026-05-14
 
-## Status: NOT STARTED
+## Status: COMPLETED — Option A (canonical-variant mode) shipped
+
+`verify_output.py` now resolves the expected-output filename per-test via
+a new `resolve_expected_filename(test_dir, suffix_override)` helper.
+Resolution order:
+
+1. `--expected-suffix=SUFFIX` (if given on the CLI) → `output.SUFFIX.txt`
+2. `output.txt` if present (canonical / single-variant tests)
+3. `[subtests]` table in `test.toml`: pick the variant with the highest
+   `player_options.version` and use its `output_path`
+4. Otherwise `None` (test excluded from discovery)
+
+The matching Ruffle-actual filename (`output.fpN.ruffle.txt` etc.) is
+derived from the resolved expected name, so the existing
+`ruffle_matched` heuristic continues to work.
+
+No runtime player-version override — we just compare our normal output
+against the highest-version expected. Per-version-gated behavior
+mismatches will land as line diffs and can be triaged via
+`ACCEPTED_DIFFS.md` or fixed individually.
+
+Verified locally:
+
+- `GradientFillTest` → runs (resolves `output.fp10.txt`); image fails on
+  real feature gaps (#2/#3 below), not the harness.
+- `BitmapDataDraw` → resolves `output.fp15.txt`; reports
+  `Ruffle-matched: 1 (100.0%)` (was `runtime_error` before).
+- `matrix_accuracy_test1` → resolves `output.fp10.txt`; runs trace diff
+  cleanly.
+- `Date-v5`, `MovieClip-v6` (fp23), `Object-v6` (fp18-20) — picked up by
+  discovery.
+- `display_object_properties`, `matrix`, etc. (output.txt) → unchanged.
 
 ## Problem
 
