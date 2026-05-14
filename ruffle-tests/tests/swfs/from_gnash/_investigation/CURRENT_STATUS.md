@@ -1,5 +1,7 @@
 # Gnash Test Suite Status
 
+Last updated: 2026-05-13 (textfield-variable-binding plan complete: Phase A `fda90c99`, Phase B `a05dfc7c`, Phase C `b20ee462`. Dejagnu `_xtrace_win` trace TextField (bound to `_root._trace_text`) and similar variable-only-observed EditTexts now render correctly in graphics mode — driven by `place_object_test`, which stays RUFFLE_MATCHED but visually now matches what we'd expect under our AS2-spec depth handling. No pass-count delta (the affected tests were already effective-pass via RUFFLE_MATCHED); win is qualitative and architectural. See `SWFRecompDocs/plans/textfield-variable-binding-plan.md`.)
+
 Last updated: 2026-05-08 (pending CI — `DrawingApiTest` 66/93 → 80/93 line match via Drawing-API `getBounds()` rewrite: `moveTo` no longer folds the pen into bounds, `lineTo`/`curveTo` always fold endpoints in, and stroked segments expand by FULL line thickness on each side (Flash semantics). Also fixed `lineStyle()` thickness coercion to handle Object-with-`valueOf`. Test stays `output_mismatch` — residual 13 diff lines are all hitTest precision issues unrelated to bounds.)
 
 ### CI snapshot (commit `f8e172e9`, 2026-05-08; misc-swfc.all also reflects intervening commit `5a7e9032` which added `RegisterClassTest4` to ignore list)

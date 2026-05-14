@@ -1,13 +1,24 @@
 # SWFRecomp TextField Variable Binding — Flash-Parity Plan
 
-**Document Version:** 1.0
+**Document Version:** 1.1
 
 **Created:** 2026-05-13
 
-**Status:** Planning. No code landed yet. Driven by
-`from_gnash/misc-ming.all/place_object_test` investigation (RUFFLE_MATCHED
-on output, image still off because the dejagnu `_xtrace_win` trace text
-never renders).
+**Status:** All three phases complete (2026-05-13):
+
+- **Phase A** — `fda90c99` `textfield: render orphan EditTexts via display-list walk`
+- **Phase B** — `a05dfc7c` `textfield: eager wrapper + binding retry at placement`
+- **Phase C** — `b20ee462` `textfield: per-container binding registry + notify`
+
+CI green across default and graphics modes (run 25834420066 + 25834425552).
+No regressions; no new pass-count delta (expected — the change is qualitative:
+the dejagnu trace TextField in `place_object_test` and siblings now renders
+on canvas; binding propagation is now O(B) registry lookup instead of
+O(child_mc_count) scan).
+
+Driven by `from_gnash/misc-ming.all/place_object_test` investigation
+(RUFFLE_MATCHED on output, image was off because the dejagnu `_xtrace_win`
+trace text never rendered).
 
 ---
 

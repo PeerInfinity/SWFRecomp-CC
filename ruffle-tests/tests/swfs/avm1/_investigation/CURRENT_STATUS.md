@@ -1,5 +1,7 @@
 # Current Ruffle Test Status
 
+Last updated: 2026-05-13 (textfield-variable-binding plan complete: Phase A `fda90c99` adds an orphan TF display-list render walk; Phase B `a05dfc7c` eagerly creates the TF MovieClip wrapper at PlaceObject2 and consolidates the two existing init blocks into `actionTryBindTextFieldVariable` with an `unbound_text_fields` retry queue; Phase C `b20ee462` adds a per-container `avm1_text_field_bindings` registry consulted by `actionNotifyPropertyChange`. AVM1 pass counts unchanged (605/654 default, 605/654 graphics). The affected variable-bound TFs are mostly in `from_gnash/misc-ming.all`; AVM1's own EditText tests already had MC-wrapped TFs through normal script access and were unaffected. See `SWFRecompDocs/plans/textfield-variable-binding-plan.md`.)
+
 Last updated: 2026-05-07 (CI `8fdf3311`: `placeobject_occupied_depth` + `textsnapshot_available_text` recovered via place-before-define narrowing fix — both regressed in CI `873e520e` then restored. AVM1 filtered effective pass remains 100%. Earlier CI `035950cf`: `try_catch_stack` PASS via catch-entry stack truncate.).
 
 ## Latest CI snapshot (commit `035950cf`, 2026-05-07)
