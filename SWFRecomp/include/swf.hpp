@@ -75,7 +75,6 @@ namespace SWFRecomp
 		Vertex max;
 		bool got_min_max;
 		u32 fill_style_list;
-		u32 line_style_list;
 		u32 inner_fill;
 		u32 nesting_depth;
 		bool fill_right;
