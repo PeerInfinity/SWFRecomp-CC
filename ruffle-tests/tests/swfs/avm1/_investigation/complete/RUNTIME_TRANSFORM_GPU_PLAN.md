@@ -3,27 +3,61 @@
 
 <!-- PLAN_META
 id: RUNTIME_TRANSFORM_GPU
-status: not_started
+status: completed
 phases:
   - id: 1
     name: "Build transform matrix from MovieClip properties"
-    status: not_started
+    status: completed
   - id: 2
     name: "Detect runtime-modified transforms in compose_children"
-    status: not_started
+    status: completed
   - id: 3
     name: "Handle non-sprite display objects"
-    status: not_started
+    status: completed
   - id: 4
     name: "Test with display_object_properties"
-    status: not_started
+    status: completed
 dependencies: []
 blockers: []
 -->
 
-Last updated: 2026-03-27
+Last updated: 2026-05-14
 
-## Status: NOT STARTED — Tier 1 (closest to passing, bug fix only)
+## Status: COMPLETED — both Tier 1 image tests pass under `--mode=graphics`
+
+Phases 1-3 were implemented incrementally before this plan doc was revisited.
+The infrastructure now lives in `SWFModernRuntime/src/libswf/tag.c`:
+
+- `apply_as_transform()` (tag.c ~1266): rebuilds a 4x4 transform from
+  `mc->x`/`y`/`xscale`/`yscale`/`rotation`/`skew` whenever `mc->as_set_flags`
+  is non-zero. Mirrors `getLocalMatrixForMC` in action.c so the round-trip
+  through `transform.matrix = ...` reproduces the same matrix.
+- The runtime transform update loop in both `tagShowFrame` (~tag.c:3220)
+  and `tagRerenderFrame` (~tag.c:2830) walks `display_list[i]`, calls
+  `actionFindMovieClipByName` to get the MC, and rewrites the GPU slot via
+  `renderer_write_transform`. `compose_children` then propagates the
+  modified parent transform to nested sprite/text/morph children.
+- The cxform runtime-update loop in the same blocks handles the
+  `color` test (also depends on `RUNTIME_CXFORM_GPU_PLAN`).
+
+### Final Phase 1 fix (2026-05-14)
+
+`apply_as_transform` previously ignored `mc->skew`. `transformMatrixSetter`
+in action.c decomposes a non-rotation-only `Matrix` into
+`xscale/yscale/rotation/skew` (skew = `atan2(-c,d) - atan2(b,a)`), so any
+`transform.matrix = new Matrix(2, -1.3, 2.4, 1, ...)` with shear was being
+reconstructed as a pure rotation. Added the `cos(rad+skew)`/`sin(rad+skew)`
+terms for the c/d components to match `getLocalMatrixForMC`.
+
+### Out of scope — separate follow-up
+
+`from_gnash/misc-ming.all/BeginBitmapFill` mc2 still doesn't pick up its
+`transform.matrix`. Root cause: mc2 is created by `createEmptyMovieClip`
+(dynamic MC, not in `display_list`), and its Drawing API paths render via
+`actionIterateDrawings` → `render_drawing_path` using
+`mc->last_transform_id`. The runtime transform update loop in tag.c only
+iterates `display_list[i]`, so dynamic MCs are never touched. Needs a
+separate dynamic-MC drawing transform path. Tracked separately.
 
 ### Problem
 

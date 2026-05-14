@@ -1265,17 +1265,22 @@ static void cxform_overrides_restore(void)
 // ---------------------------------------------------------------------------
 static void apply_as_transform(float slot[16], const MovieClip* mc, u8 flags)
 {
-	// Overlay scale/rotation (bits 4|8|16 = xscale|yscale|rotation)
+	// Overlay scale/rotation (bits 4|8|16 = xscale|yscale|rotation).
+	// Mirrors getLocalMatrixForMC in action.c: uses mc->skew so that direct
+	// `transform.matrix = ...` assignments with non-rotation-only matrices
+	// (e.g. Matrix(2, -1.3, 2.4, 1, ...)) reconstruct correctly.
 	if (flags & (4|8|16))
 	{
 		float sx = mc->xscale / 100.0f;
 		float sy = mc->yscale / 100.0f;
 		float rad = mc->rotation * 3.14159265358979323846f / 180.0f;
-		float c = cosf(rad), s = sinf(rad);
-		slot[0]  = sx * c;    // a
-		slot[1]  = sx * s;    // b
-		slot[4]  = -(sy * s); // c
-		slot[5]  = sy * c;    // d
+		float skew = mc->skew;
+		float cr_x = cosf(rad),        sr_x = sinf(rad);
+		float cr_y = cosf(rad + skew), sr_y = sinf(rad + skew);
+		slot[0]  = sx * cr_x;    // a
+		slot[1]  = sx * sr_x;    // b
+		slot[4]  = -(sy * sr_y); // c
+		slot[5]  = sy * cr_y;    // d
 	}
 	// Overlay translation (bit 0 = _x, bit 1 = _y)
 	if (flags & 1) slot[12] = rintf(mc->x * 20.0f);  // pixels to twips
