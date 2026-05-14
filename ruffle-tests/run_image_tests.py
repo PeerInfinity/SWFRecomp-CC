@@ -203,6 +203,113 @@ def run_single_test(test_name):
     return entry, stdout
 
 
+def _write_pixel_diff_png(a_path, b_path, out_path):
+    """Compute a per-pixel/per-channel abs-diff PNG between two RGBA images.
+
+    Mirrors the diff renderer in verify_output.compare_images: per-channel
+    abs difference, alpha=0 where every channel matches (so matching regions
+    are transparent in viewers that composite onto a background), alpha=255
+    where any channel differs, RGB channels brightened ×4 (clamped). Returns
+    True if the file was written, False if either source is missing, sizes
+    mismatch, or PIL isn't available.
+    """
+    try:
+        from PIL import Image
+    except ImportError:
+        return False
+    a_path = Path(a_path)
+    b_path = Path(b_path)
+    if not a_path.exists() or not b_path.exists():
+        return False
+    try:
+        a_img = Image.open(a_path).convert("RGBA")
+        b_img = Image.open(b_path).convert("RGBA")
+    except Exception:
+        return False
+    if a_img.size != b_img.size:
+        return False
+    a_data = a_img.tobytes()
+    b_data = b_img.tobytes()
+    num_pixels = a_img.size[0] * a_img.size[1]
+    buf = bytearray(num_pixels * 4)
+    for i in range(num_pixels * 4):
+        buf[i] = abs(a_data[i] - b_data[i])
+    for px in range(num_pixels):
+        base = px * 4
+        if buf[base] | buf[base + 1] | buf[base + 2] | buf[base + 3]:
+            buf[base + 3] = 255
+        else:
+            buf[base + 3] = 0
+    try:
+        diff_img = Image.frombytes("RGBA", a_img.size, bytes(buf))
+        r, g, b, a = diff_img.split()
+        lut = bytes(min(x * 4, 255) for x in range(256))
+        r = r.point(lut); g = g.point(lut); b = b.point(lut)
+        diff_img = Image.merge("RGBA", (r, g, b, a))
+        diff_img.save(str(out_path))
+        return True
+    except Exception:
+        return False
+
+
+def generate_ruffle_diffs(tests):
+    """For each (test, comparison) pair with both ``<cmp>.actual.png`` and
+    ``<cmp>.ruffle.png`` on disk, write ``<cmp>.ruffle.difference.png`` next
+    to them. Stale ruffle.difference.png files (where one of the sources
+    has since disappeared) are removed so the on-disk state stays consistent
+    with what the HTML viewer expects to load.
+
+    Returns dict: test_name -> {cmp_name: bool}
+    where the bool is True iff a fresh ``<cmp>.ruffle.difference.png`` was
+    written (which also implies ``<cmp>.ruffle.png`` exists and the diff
+    panel should be shown in the HTML).
+    """
+    sys.path.insert(0, str(SCRIPT_DIR))
+    from verify_output import parse_image_comparisons
+
+    out = {}
+    written = 0
+    cleaned = 0
+    for name in tests:
+        test_dir = TESTS_DIR / name
+        cfg = parse_image_comparisons(test_dir)
+        per_cmp = {}
+        for cmp_name in cfg.keys():
+            actual = test_dir / f"{cmp_name}.actual.png"
+            ruffle = test_dir / f"{cmp_name}.ruffle.png"
+            diff_out = test_dir / f"{cmp_name}.ruffle.difference.png"
+            if actual.exists() and ruffle.exists():
+                ok = _write_pixel_diff_png(actual, ruffle, diff_out)
+                per_cmp[cmp_name] = bool(ok)
+                if ok:
+                    written += 1
+            else:
+                # Source missing — clear any stale diff so viewer doesn't show old data.
+                if diff_out.exists():
+                    try:
+                        diff_out.unlink()
+                        cleaned += 1
+                    except OSError:
+                        pass
+                per_cmp[cmp_name] = False
+        out[name] = per_cmp
+    print(f"Ruffle diffs: {written} written, {cleaned} stale removed")
+    return out
+
+
+def annotate_has_ruffle(report, ruffle_map):
+    """Set ``has_ruffle`` on each comparison entry in the JSON report so
+    the HTML renderer knows whether to show the ruffle/ruffle-diff figures.
+    Idempotent — safe to re-run.
+    """
+    for t in report.get("tests", []):
+        name = t.get("test")
+        cmps = t.get("image_comparisons") or {}
+        per_cmp = ruffle_map.get(name, {}) if ruffle_map else {}
+        for cmp_name, cmp in cmps.items():
+            cmp["has_ruffle"] = bool(per_cmp.get(cmp_name, False))
+
+
 def get_git_sha():
     """Get current git SHA."""
     try:
@@ -657,7 +764,9 @@ function renderCard(t) {
       <div class="triptych">
         <figure><a href="${dir}/${cmpName}.expected.png" target="_blank"><img loading="lazy" src="${dir}/${cmpName}.expected.png" alt="expected"></a><figcaption>expected</figcaption></figure>
         <figure><a href="${dir}/${cmpName}.actual.png" target="_blank"><img loading="lazy" src="${dir}/${cmpName}.actual.png" alt="actual" onerror="this.parentElement.parentElement.classList.add('missing'); this.remove();"></a><figcaption>actual</figcaption></figure>
-        ${showDiff ? `<figure><a href="${dir}/${cmpName}.difference.png" target="_blank"><img loading="lazy" src="${dir}/${cmpName}.difference.png" alt="diff" onerror="this.parentElement.parentElement.classList.add('missing'); this.remove();"></a><figcaption>diff</figcaption></figure>` : ""}
+        ${showDiff ? `<figure><a href="${dir}/${cmpName}.difference.png" target="_blank"><img loading="lazy" src="${dir}/${cmpName}.difference.png" alt="diff" onerror="this.parentElement.parentElement.classList.add('missing'); this.remove();"></a><figcaption>diff vs expected</figcaption></figure>` : ""}
+        ${cmp.has_ruffle ? `<figure><a href="${dir}/${cmpName}.ruffle.png" target="_blank"><img loading="lazy" src="${dir}/${cmpName}.ruffle.png" alt="ruffle" onerror="this.parentElement.parentElement.classList.add('missing'); this.remove();"></a><figcaption>ruffle</figcaption></figure>` : ""}
+        ${cmp.has_ruffle ? `<figure><a href="${dir}/${cmpName}.ruffle.difference.png" target="_blank"><img loading="lazy" src="${dir}/${cmpName}.ruffle.difference.png" alt="diff vs ruffle" onerror="this.parentElement.parentElement.classList.add('missing'); this.remove();"></a><figcaption>diff vs ruffle</figcaption></figure>` : ""}
       </div>
       ${cmp.message ? `<div class="cmp-detail">${cmp.message}</div>` : ""}
     `;
@@ -797,6 +906,16 @@ def main():
     if args.collect_only:
         tests = discover_image_tests()
         print(f"Collecting image output for {len(tests)} test(s)...")
+        ruffle_map = generate_ruffle_diffs(tests)
+        if json_path.exists():
+            try:
+                with open(json_path) as f:
+                    report = json.load(f)
+                annotate_has_ruffle(report, ruffle_map)
+                with open(json_path, "w") as f:
+                    json.dump(report, f, indent=2)
+            except Exception as e:
+                print(f"Warning: could not annotate {json_path} with has_ruffle: {e}")
         collect_image_output(tests, full_sweep=True)
         return
 
@@ -809,6 +928,16 @@ def main():
         print(f"Skipping test run; rebuilding JSON + collecting output + "
               f"regenerating reports for {len(tests)} test(s)...")
         rebuild_json_from_disk(tests, json_path)
+        ruffle_map = generate_ruffle_diffs(tests)
+        # Re-load the JSON we just wrote, annotate has_ruffle, write back.
+        try:
+            with open(json_path) as f:
+                report = json.load(f)
+            annotate_has_ruffle(report, ruffle_map)
+            with open(json_path, "w") as f:
+                json.dump(report, f, indent=2)
+        except Exception as e:
+            print(f"Warning: could not annotate {json_path} with has_ruffle: {e}")
         collect_image_output(tests, full_sweep=True)
         if not args.no_report:
             generate_markdown(json_path, md_path)
@@ -869,8 +998,12 @@ def main():
                     parts.append(msg[:80])
         print(f"{' | '.join(parts)} ({entry['duration']:.1f}s)")
 
-    # Build and write JSON report
+    # Build the report, attach has_ruffle from on-disk ruffle.png presence
+    # (computed by generate_ruffle_diffs which also writes the ruffle.difference.png
+    # files used by the HTML report's ruffle panel).
     report = build_report(test_results, run_start)
+    ruffle_map = generate_ruffle_diffs(tests)
+    annotate_has_ruffle(report, ruffle_map)
     with open(json_path, "w") as f:
         json.dump(report, f, indent=2)
     print(f"\nResults written to {json_path}")
