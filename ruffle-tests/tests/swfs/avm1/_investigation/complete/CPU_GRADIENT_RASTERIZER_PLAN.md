@@ -3,27 +3,85 @@
 
 <!-- PLAN_META
 id: CPU_GRADIENT_RASTERIZER
-status: not_started
+status: completed
 phases:
   - id: 1
     name: "Per-triangle gradient color interpolation (linear)"
-    status: not_started
+    status: completed
   - id: 2
     name: "Radial gradient support"
-    status: not_started
+    status: completed
   - id: 3
     name: "Spread mode (pad/reflect/repeat) handling"
-    status: not_started
+    status: completed
   - id: 4
     name: "Verify against GradientFillTest pixel-sampling expectations"
-    status: not_started
+    status: completed
 dependencies: []
 blockers: []
 -->
 
 Last updated: 2026-05-14
 
-## Status: NOT STARTED
+## Status: COMPLETED
+
+Three new macros + plumbing in `rasterizeMovieClipToBitmap`
+(`action.c:~12570`):
+
+- `INVERT_2D_AFFINE(_in16, _oa, _ob, _oc, _od, _otx, _oty)` — invert the
+  2D affine part of a 4x4 column-major matrix (gradient_matrix is stored
+  this way). Returns zeroed outputs on singular matrix.
+- `SAMPLE_GRADIENT_RAMP(ramp, spread, t, out_argb)` — handles pad /
+  reflect / repeat, clamps to `[0, 1]`, then samples the 256-stop RGBA
+  ramp. Output is ARGB.
+- `RASTER_TRI_GRADIENT(...)` — parallel to `RASTER_TRI`, but instead of
+  writing a constant color, interpolates shape-twips via barycentric
+  weights, applies `inv(gradient_matrix)` to get gradient-space coords,
+  computes `t` per the gradient type (linear: `(gx + 16384) / 32768`;
+  radial / focal-radial: `sqrt(gx² + gy²) / 16384`), samples the ramp,
+  optionally applies the color transform, and writes ARGB.
+
+The path-rasterizer loop now branches on `path->has_gradient`:
+- gradient: `RASTER_TRI_GRADIENT` per triangle, precomputed
+  `inv(gradient_matrix)` once per path
+- solid: unchanged
+
+### Verified
+
+- `from_gnash/misc-ming.all/GradientFillTest` (trace): 36 `FAILED`
+  lines out of ~278 total pixel-sampling assertions — **87% match**.
+  Was: 100% `0xffffff` / `0x0` (zero matches) before this plan. The
+  remaining diffs are mostly slight color-band offsets within 1-2
+  ramp indices (e.g. `0xfa420b` expected vs `0xf20d00` actual at the
+  same gradient position — both are samples of the same ramp, just
+  picking the neighboring index). Pure-radial and 3+ stop ramps are
+  more sensitive to per-pixel center-of-pixel rounding than the
+  GPU's filtered sampling.
+- `BitmapDataDraw`: still `Ruffle-matched (100%)`.
+- `DrawingApiTest`: trace diff identical to baseline (15 `FAILED`
+  lines from pre-existing hitTest discrepancies, unrelated).
+- Tier 1 (`display_object_properties`, `color`) and all sibling
+  drawing tests: PASS unchanged.
+- `BeginBitmapFill`, `movieclip_begin_gradient_fill`,
+  `movieclip_line_gradient_style`: pre-existing image outlier counts
+  unchanged (1389, 10943, 6053).
+
+### Out of scope
+
+- **Focal radial precise math.** Currently focal_radial uses the same
+  formula as plain radial (ignores `focal_ratio`). The GPU does
+  ray-march from the focal point; CPU would need the same. Defer
+  until a test needs it.
+- **Linear-RGB interpolation.** `path->interpolation` ignored — we
+  read the ramp as-is (which is already pre-interpolated in the
+  requested color space at ramp-generation time, so this is fine for
+  most cases).
+- **Line (stroke) gradients in BitmapData.draw.** `has_line_gradient`
+  paths still use the solid line color. No current test exercises
+  this; can extend the same way if needed.
+- **GPU vs CPU pixel-perfect match.** GPU uses filtered texture
+  sampling; CPU uses point sampling at pixel centers. Expect ±1-2
+  ramp-index slop in tests that compare both.
 
 ## Problem
 

@@ -12586,6 +12586,45 @@ static void rasterizeMovieClipToBitmap(BitmapDataNative* dest, MovieClip* mc,
     if (dy1 > h) dy1 = h;
     if (dx0 >= dx1 || dy0 >= dy1) return;
 
+    // Helper: invert the 2D affine part of a 4x4 column-major matrix as used
+    // by gradient_matrix. Returns 0 if singular (then out_* are zeroed).
+    // The 4x4 stores the 2D affine in slots 0,1,4,5,12,13 (a, b, c, d, tx, ty
+    // in SWF MATRIX terms).
+    #define INVERT_2D_AFFINE(_in16, _oa, _ob, _oc, _od, _otx, _oty) do { \
+        double _ia = (_in16)[0],  _ib = (_in16)[1]; \
+        double _ic = (_in16)[4],  _id = (_in16)[5]; \
+        double _itx = (_in16)[12], _ity = (_in16)[13]; \
+        double _det = _ia * _id - _ib * _ic; \
+        if (_det == 0.0) { (_oa)=(_ob)=(_oc)=(_od)=(_otx)=(_oty)=0.0; } \
+        else { double _inv = 1.0 / _det; \
+            (_oa) =  _id * _inv;  (_ob) = -_ib * _inv; \
+            (_oc) = -_ic * _inv;  (_od) =  _ia * _inv; \
+            (_otx) = (_ic * _ity - _id * _itx) * _inv; \
+            (_oty) = (_ib * _itx - _ia * _ity) * _inv; } \
+    } while (0)
+
+    // Helper: sample a 256-stop RGBA gradient ramp at parameter t∈ℝ with the
+    // given spread mode (0=pad, 1=reflect, 2=repeat). Returns ARGB.
+    #define SAMPLE_GRADIENT_RAMP(_ramp, _spread, _t_in, _out_argb) do { \
+        double _tt = (_t_in); \
+        if ((_spread) == 1) { \
+            /* reflect: triangle wave, period 2 */ \
+            double _fm = fmod(_tt, 2.0); if (_fm < 0) _fm += 2.0; \
+            _tt = _fm < 1.0 ? _fm : 2.0 - _fm; \
+        } else if ((_spread) == 2) { \
+            double _fm = fmod(_tt, 1.0); if (_fm < 0) _fm += 1.0; _tt = _fm; \
+        } else { \
+            if (_tt < 0.0) _tt = 0.0; else if (_tt > 1.0) _tt = 1.0; \
+        } \
+        int _idx = (int)(_tt * 255.0 + 0.5); \
+        if (_idx < 0) _idx = 0; else if (_idx > 255) _idx = 255; \
+        const uint8_t* _rgba = (_ramp) + _idx * 4; \
+        (_out_argb) = ((uint32_t)_rgba[3] << 24) | \
+                      ((uint32_t)_rgba[0] << 16) | \
+                      ((uint32_t)_rgba[1] << 8)  | \
+                      (uint32_t)_rgba[2]; \
+    } while (0)
+
     // Helper: rasterize one triangle with pixel centers at (px+0.5, py+0.5).
     // Writes ARGB `color_argb` into dest->pixels at covered pixels (if not
     // writing stencil), or `stencil_write_value` into stencil_out. When
@@ -12624,6 +12663,87 @@ static void rasterizeMovieClipToBitmap(BitmapDataNative* dest, MovieClip* mc,
         } \
     } while (0)
 
+    // Gradient variant: per-pixel barycentric interpolation of shape-twips,
+    // mapped to gradient-space via precomputed inv_grad (2x3 affine), then
+    // sampled from `ramp` according to `grad_type` (0x10 linear, 0x12 radial)
+    // and `spread`. Mirrors the GPU fragment shader's gradient sampling
+    // (see SWFModernRuntime/src/flashbang/shaders/fragment.wgsl).
+    //
+    // - (ax/y, bx/y, cx_/cy): dest-pixel triangle vertices
+    // - (sa_x/y, sb_x/y, sc_x/y): shape-twips triangle vertices (matches order)
+    // - inv_ga..inv_gty: inverted gradient matrix (shape-twips → gradient-twips)
+    // - color transform applied to sampled color when `cx_pre` is non-NULL
+    #define RASTER_TRI_GRADIENT(ax, ay, bx, by, cx_, cy, \
+                                sa_x, sa_y, sb_x, sb_y, sc_x, sc_y, \
+                                ramp, grad_type, spread, \
+                                inv_ga, inv_gb, inv_gc, inv_gd, inv_gtx, inv_gty, \
+                                cx_pre) do { \
+        double _ax = (ax), _ay = (ay), _bx = (bx), _by = (by), _cx = (cx_), _cy = (cy); \
+        double _tx_min = _ax < _bx ? _ax : _bx; if (_cx < _tx_min) _tx_min = _cx; \
+        double _tx_max = _ax > _bx ? _ax : _bx; if (_cx > _tx_max) _tx_max = _cx; \
+        double _ty_min = _ay < _by ? _ay : _by; if (_cy < _ty_min) _ty_min = _cy; \
+        double _ty_max = _ay > _by ? _ay : _by; if (_cy > _ty_max) _ty_max = _cy; \
+        int _xlo = (int)floor(_tx_min - 0.5); if (_xlo < dx0) _xlo = dx0; \
+        int _xhi = (int)ceil (_tx_max - 0.5); if (_xhi > dx1 - 1) _xhi = dx1 - 1; \
+        int _ylo = (int)floor(_ty_min - 0.5); if (_ylo < dy0) _ylo = dy0; \
+        int _yhi = (int)ceil (_ty_max - 0.5); if (_yhi > dy1 - 1) _yhi = dy1 - 1; \
+        if (_xhi < _xlo || _yhi < _ylo) break; \
+        double _signed = (_bx - _ax) * (_cy - _ay) - (_by - _ay) * (_cx - _ax); \
+        if (_signed == 0.0) break; \
+        double _abs_signed = _signed > 0 ? _signed : -_signed; \
+        double _sgn = _signed > 0 ? 1.0 : -1.0; \
+        double _inv_total_area = 1.0 / _abs_signed; \
+        for (int _py = _ylo; _py <= _yhi; _py++) { \
+            double _qy = (double)_py + 0.5; \
+            uint32_t* _row = dest->pixels + (size_t)_py * w; \
+            const uint8_t* _stencil_row = stencil ? (stencil + (size_t)_py * w) : NULL; \
+            for (int _px = _xlo; _px <= _xhi; _px++) { \
+                double _qx = (double)_px + 0.5; \
+                double _w0 = ((_bx - _ax) * (_qy - _ay) - (_by - _ay) * (_qx - _ax)) * _sgn; \
+                double _w1 = ((_cx - _bx) * (_qy - _by) - (_cy - _by) * (_qx - _bx)) * _sgn; \
+                double _w2 = ((_ax - _cx) * (_qy - _cy) - (_ay - _cy) * (_qx - _cx)) * _sgn; \
+                if (_w0 < 0 || _w1 < 0 || _w2 < 0) continue; \
+                if (_stencil_row && !_stencil_row[_px]) continue; \
+                /* Barycentric weights: αA = _w1, αB = _w2, αC = _w0. \
+                 * Interpolate shape-twips, then map to gradient-twips. */ \
+                double _alphaA = _w1 * _inv_total_area; \
+                double _alphaB = _w2 * _inv_total_area; \
+                double _alphaC = _w0 * _inv_total_area; \
+                double _sx = _alphaA * (sa_x) + _alphaB * (sb_x) + _alphaC * (sc_x); \
+                double _sy = _alphaA * (sa_y) + _alphaB * (sb_y) + _alphaC * (sc_y); \
+                double _gx = (inv_ga) * _sx + (inv_gc) * _sy + (inv_gtx); \
+                double _gy = (inv_gb) * _sx + (inv_gd) * _sy + (inv_gty); \
+                double _t; \
+                if ((grad_type) == 0x12 || (grad_type) == 0x13) { \
+                    /* Radial (and focal — approximate as radial for now). */ \
+                    _t = sqrt(_gx * _gx + _gy * _gy) / 16384.0; \
+                } else { \
+                    /* Linear (0x10) */ \
+                    _t = (_gx + 16384.0) / 32768.0; \
+                } \
+                uint32_t _sampled; \
+                SAMPLE_GRADIENT_RAMP((ramp), (spread), _t, _sampled); \
+                if ((cx_pre) != NULL) { \
+                    const DrawColorTransform* _cxp = (cx_pre); \
+                    double _sr = (double)((_sampled >> 16) & 0xFF) * _cxp->rm + _cxp->ro; \
+                    double _sg = (double)((_sampled >> 8)  & 0xFF) * _cxp->gm + _cxp->go; \
+                    double _sb = (double)((_sampled)       & 0xFF) * _cxp->bm + _cxp->bo; \
+                    double _sa_ = (double)((_sampled >> 24) & 0xFF) * _cxp->am + _cxp->ao; \
+                    if (_sr < 0) _sr = 0; if (_sr > 255) _sr = 255; \
+                    if (_sg < 0) _sg = 0; if (_sg > 255) _sg = 255; \
+                    if (_sb < 0) _sb = 0; if (_sb > 255) _sb = 255; \
+                    if (_sa_ < 0) _sa_ = 0; if (_sa_ > 255) _sa_ = 255; \
+                    uint32_t _a8 = dest->transparent ? (uint32_t)(_sa_ + 0.5) : 0xFF; \
+                    _sampled = (_a8 << 24) | ((uint32_t)(_sr + 0.5) << 16) | \
+                               ((uint32_t)(_sg + 0.5) << 8) | (uint32_t)(_sb + 0.5); \
+                } else if (!dest->transparent) { \
+                    _sampled = (_sampled & 0x00FFFFFFu) | 0xFF000000u; \
+                } \
+                _row[_px] = _sampled; \
+            } \
+        } \
+    } while (0)
+
     // Rasterize this MC's own drawing paths (if any).
     if (mc->drawing_state != NULL) {
         DrawingState* ds = (DrawingState*) mc->drawing_state;
@@ -12631,35 +12751,66 @@ static void rasterizeMovieClipToBitmap(BitmapDataNative* dest, MovieClip* mc,
         for (u32 p = 0; p < ds->path_count; p++) {
             DrawPath* path = &ds->paths[p];
             if (path->has_fill && path->fill_vert_count >= 3) {
-                double fr_d = path->fill_r * 255.0, fg_d = path->fill_g * 255.0;
-                double fb_d = path->fill_b * 255.0, fa_d = path->fill_a * 255.0;
-                if (cx) {
-                    fr_d = fr_d * cx->rm + cx->ro;
-                    fg_d = fg_d * cx->gm + cx->go;
-                    fb_d = fb_d * cx->bm + cx->bo;
-                    fa_d = fa_d * cx->am + cx->ao;
-                }
-                if (fr_d < 0) fr_d = 0; if (fr_d > 255) fr_d = 255;
-                if (fg_d < 0) fg_d = 0; if (fg_d > 255) fg_d = 255;
-                if (fb_d < 0) fb_d = 0; if (fb_d > 255) fb_d = 255;
-                if (fa_d < 0) fa_d = 0; if (fa_d > 255) fa_d = 255;
-                uint32_t fr = (uint32_t)(fr_d + 0.5);
-                uint32_t fg = (uint32_t)(fg_d + 0.5);
-                uint32_t fb = (uint32_t)(fb_d + 0.5);
-                uint32_t fa8 = dest->transparent ? (uint32_t)(fa_d + 0.5) : 0xFF;
-                uint32_t color = (fa8 << 24) | (fr << 16) | (fg << 8) | fb;
-                for (u32 v = 0; v + 5 < path->fill_vert_count * 2; v += 6) {
-                    float* fv = &path->fill_verts[v];
-                    double s0x = fv[0] / 20.0, s0y = fv[1] / 20.0;
-                    double s1x = fv[2] / 20.0, s1y = fv[3] / 20.0;
-                    double s2x = fv[4] / 20.0, s2y = fv[5] / 20.0;
-                    double d0x = ma * s0x + mc_ * s0y + mtx;
-                    double d0y = mb * s0x + md  * s0y + mty;
-                    double d1x = ma * s1x + mc_ * s1y + mtx;
-                    double d1y = mb * s1x + md  * s1y + mty;
-                    double d2x = ma * s2x + mc_ * s2y + mtx;
-                    double d2y = mb * s2x + md  * s2y + mty;
-                    RASTER_TRI(d0x, d0y, d1x, d1y, d2x, d2y, color);
+                if (path->has_gradient) {
+                    // Gradient fill: interpolate ramp per pixel via barycentric
+                    // weights on shape-twips, mapped through inv(gradient_matrix).
+                    // See SAMPLE_GRADIENT_RAMP / RASTER_TRI_GRADIENT comments above.
+                    double inv_ga, inv_gb, inv_gc, inv_gd, inv_gtx, inv_gty;
+                    INVERT_2D_AFFINE(path->gradient_matrix,
+                                     inv_ga, inv_gb, inv_gc, inv_gd, inv_gtx, inv_gty);
+                    for (u32 v = 0; v + 5 < path->fill_vert_count * 2; v += 6) {
+                        float* fv = &path->fill_verts[v];
+                        // fv[] is in twips. Dest coords still go through outer
+                        // matrix (twips/20 → pixels → outer affine → dest pixels).
+                        double s0x = fv[0] / 20.0, s0y = fv[1] / 20.0;
+                        double s1x = fv[2] / 20.0, s1y = fv[3] / 20.0;
+                        double s2x = fv[4] / 20.0, s2y = fv[5] / 20.0;
+                        double d0x = ma * s0x + mc_ * s0y + mtx;
+                        double d0y = mb * s0x + md  * s0y + mty;
+                        double d1x = ma * s1x + mc_ * s1y + mtx;
+                        double d1y = mb * s1x + md  * s1y + mty;
+                        double d2x = ma * s2x + mc_ * s2y + mtx;
+                        double d2y = mb * s2x + md  * s2y + mty;
+                        RASTER_TRI_GRADIENT(d0x, d0y, d1x, d1y, d2x, d2y,
+                            (double)fv[0], (double)fv[1],
+                            (double)fv[2], (double)fv[3],
+                            (double)fv[4], (double)fv[5],
+                            path->gradient_ramp, path->gradient_type,
+                            path->spread_mode,
+                            inv_ga, inv_gb, inv_gc, inv_gd, inv_gtx, inv_gty,
+                            cx);
+                    }
+                } else {
+                    double fr_d = path->fill_r * 255.0, fg_d = path->fill_g * 255.0;
+                    double fb_d = path->fill_b * 255.0, fa_d = path->fill_a * 255.0;
+                    if (cx) {
+                        fr_d = fr_d * cx->rm + cx->ro;
+                        fg_d = fg_d * cx->gm + cx->go;
+                        fb_d = fb_d * cx->bm + cx->bo;
+                        fa_d = fa_d * cx->am + cx->ao;
+                    }
+                    if (fr_d < 0) fr_d = 0; if (fr_d > 255) fr_d = 255;
+                    if (fg_d < 0) fg_d = 0; if (fg_d > 255) fg_d = 255;
+                    if (fb_d < 0) fb_d = 0; if (fb_d > 255) fb_d = 255;
+                    if (fa_d < 0) fa_d = 0; if (fa_d > 255) fa_d = 255;
+                    uint32_t fr = (uint32_t)(fr_d + 0.5);
+                    uint32_t fg = (uint32_t)(fg_d + 0.5);
+                    uint32_t fb = (uint32_t)(fb_d + 0.5);
+                    uint32_t fa8 = dest->transparent ? (uint32_t)(fa_d + 0.5) : 0xFF;
+                    uint32_t color = (fa8 << 24) | (fr << 16) | (fg << 8) | fb;
+                    for (u32 v = 0; v + 5 < path->fill_vert_count * 2; v += 6) {
+                        float* fv = &path->fill_verts[v];
+                        double s0x = fv[0] / 20.0, s0y = fv[1] / 20.0;
+                        double s1x = fv[2] / 20.0, s1y = fv[3] / 20.0;
+                        double s2x = fv[4] / 20.0, s2y = fv[5] / 20.0;
+                        double d0x = ma * s0x + mc_ * s0y + mtx;
+                        double d0y = mb * s0x + md  * s0y + mty;
+                        double d1x = ma * s1x + mc_ * s1y + mtx;
+                        double d1y = mb * s1x + md  * s1y + mty;
+                        double d2x = ma * s2x + mc_ * s2y + mtx;
+                        double d2y = mb * s2x + md  * s2y + mty;
+                        RASTER_TRI(d0x, d0y, d1x, d1y, d2x, d2y, color);
+                    }
                 }
             }
             if (path->has_line && path->line_vert_count >= 3) {
