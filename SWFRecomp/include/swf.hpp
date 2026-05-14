@@ -304,6 +304,7 @@ namespace SWFRecomp
 		void writeFrameInitMarker(Context& context);
 		void flushFrameInitPrologue(Context& context);
 		void recompileMatrix(MATRIX matrix, std::stringstream& out);
+		void recompileGradientMatrix(MATRIX matrix, std::stringstream& out);
 		FillStyle* parseFillStyles(u16 fill_style_count);
 		FillStyle* parseMorphFillStyles(u16 fill_style_count);
 		LineStyle* parseLineStyles(u16 line_style_count);

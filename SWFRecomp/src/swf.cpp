@@ -5960,19 +5960,63 @@ namespace SWFRecomp
 			<< "\t" << matrix.rotateskew_0 << "f," << endl
 			<< "\t" << "0.0f," << endl
 			<< "\t" << "0.0f," << endl
-			
+
 			<< "\t" << matrix.rotateskew_1 << "f," << endl
 			<< "\t" << matrix.scale_y << "f," << endl
 			<< "\t" << "0.0f," << endl
 			<< "\t" << "0.0f," << endl
-			
+
 			<< "\t" << "0.0f," << endl
 			<< "\t" << "0.0f," << endl
 			<< "\t" << "1.0f," << endl
 			<< "\t" << "0.0f," << endl
-			
+
 			<< "\t" << (float) matrix.translate_x << "f," << endl
 			<< "\t" << (float) matrix.translate_y << "f," << endl
+			<< "\t" << "0.0f," << endl
+			<< "\t" << "1.0f," << endl;
+	}
+
+	// Emit a SWF gradient MATRIX as a 4x4 forward matrix that maps normalized
+	// gradient UVs in [0,1] (not SWF's native [-16384,+16384]) to shape coords.
+	// The runtime's vertex shader uses the (compute-shader-inverted) matrix to
+	// compute `linear_t = apply_spread(inv_pos.x, ...)` and `apply_spread` for
+	// pad mode clamps to [0,1], so an un-normalized matrix collapses the entire
+	// shape to the two gradient endpoints. (See render_webgpu.c
+	// "normalization baked into inverse matrix" for the matching dynamic path.)
+	// Bakes M_new = M_old * N^-1 where N^-1 = diag(32768,32768,1,1) with
+	// translate column (-16384,-16384,0,1), equivalent to substituting
+	// grad_coord = uv * 32768 - 16384 into the old forward matrix.
+	void SWF::recompileGradientMatrix(MATRIX matrix, std::stringstream& out)
+	{
+		float new_scale_x       = 32768.0f * matrix.scale_x;
+		float new_rotateskew_0  = 32768.0f * matrix.rotateskew_0;
+		float new_rotateskew_1  = 32768.0f * matrix.rotateskew_1;
+		float new_scale_y       = 32768.0f * matrix.scale_y;
+		float new_translate_x   = -16384.0f * matrix.scale_x
+		                          - 16384.0f * matrix.rotateskew_1
+		                          + (float) matrix.translate_x;
+		float new_translate_y   = -16384.0f * matrix.rotateskew_0
+		                          - 16384.0f * matrix.scale_y
+		                          + (float) matrix.translate_y;
+		out << std::fixed << std::setprecision(15)
+			<< "\t" << new_scale_x       << "f," << endl
+			<< "\t" << new_rotateskew_0  << "f," << endl
+			<< "\t" << "0.0f," << endl
+			<< "\t" << "0.0f," << endl
+
+			<< "\t" << new_rotateskew_1  << "f," << endl
+			<< "\t" << new_scale_y       << "f," << endl
+			<< "\t" << "0.0f," << endl
+			<< "\t" << "0.0f," << endl
+
+			<< "\t" << "0.0f," << endl
+			<< "\t" << "0.0f," << endl
+			<< "\t" << "1.0f," << endl
+			<< "\t" << "0.0f," << endl
+
+			<< "\t" << new_translate_x   << "f," << endl
+			<< "\t" << new_translate_y   << "f," << endl
 			<< "\t" << "0.0f," << endl
 			<< "\t" << "1.0f," << endl;
 	}
@@ -6036,17 +6080,17 @@ namespace SWFRecomp
 				{
 					MATRIX matrix;
 					parseMatrix(matrix);
-					
-					recompileMatrix(matrix, uninv_mat_data);
+
+					recompileGradientMatrix(matrix, uninv_mat_data);
 					current_uninv += 1;
-					
+
 					fill_data.clearFields();
 					fill_data.setFieldCount(1);
-					
+
 					fill_data.configureNextField(SWF_FIELD_UI8);
-					
+
 					fill_data.parseFields(cur_pos);
-					
+
 					fill_styles[i].gradient.spread_mode = (u8) ((fill_data.fields[0].value & 0b11000000) >> 6);
 					fill_styles[i].gradient.interpolation_mode = (u8) ((fill_data.fields[0].value & 0b00110000) >> 4);
 					fill_styles[i].gradient.num_grads = (u8) (fill_data.fields[0].value & 0b00001111);
@@ -6382,7 +6426,7 @@ namespace SWFRecomp
 					MATRIX matrix;
 					parseMatrix(matrix);
 
-					recompileMatrix(matrix, uninv_mat_data);
+					recompileGradientMatrix(matrix, uninv_mat_data);
 					current_uninv += 1;
 
 					// Skip EndGradientMatrix
