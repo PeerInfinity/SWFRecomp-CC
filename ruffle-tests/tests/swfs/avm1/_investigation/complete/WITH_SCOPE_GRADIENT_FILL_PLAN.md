@@ -3,24 +3,68 @@
 
 <!-- PLAN_META
 id: WITH_SCOPE_GRADIENT_FILL
-status: not_started
+status: completed
 phases:
   - id: 1
     name: "Add beginGradientFill handler to with-scope actionCallFunction branch"
-    status: not_started
+    status: completed
   - id: 2
     name: "Add lineGradientStyle handler (same branch)"
-    status: not_started
+    status: completed
   - id: 3
     name: "Verify GradientFillTest canvas + DrawingApiTest"
-    status: not_started
+    status: completed
 dependencies: []
 blockers: []
 -->
 
 Last updated: 2026-05-14
 
-## Status: NOT STARTED — root cause confirmed, fix scope is tight
+## Status: COMPLETED
+
+Two static helpers extracted from `actionCallMethod` and shared between
+both dispatch sites:
+
+- `applyGradientFillToMC(app_context, mc, args, num_args)`
+- `applyLineGradientStyleToMC(app_context, mc, args, num_args)`
+
+Both placed in `action.c` just after `drawingBuildGradientAbcdMatrix`.
+A forward declaration for `varToDouble` was added at the top of the file
+(the helpers use it before its `static inline` definition at line ~25778).
+
+`actionCallMethod`'s `beginGradientFill` / `lineGradientStyle` cases now
+call the helpers instead of inlining the body (~270 LOC removed there).
+`actionCallFunction`'s with-scope drawing-API branch added two new
+`else if` arms calling the same helpers.
+
+### Verified
+
+- `from_gnash/misc-ming.all/GradientFillTest` (image) → outliers
+  **355936 → 12085** (29× drop). All 19 gradient shapes now render on the
+  canvas in the correct positions (image matches `output.expected.png`
+  shape-for-shape; the remaining 12k outliers are gradient-edge AA /
+  blending fidelity, not missing shapes).
+- `from_gnash/misc-ming.all/DrawingApiTest` (trace) → diff identical to
+  baseline (3 hitTest discrepancies + `delete onEnterFrame` are
+  pre-existing, unrelated bugs). No regression.
+- `display_object_properties`, `color`, `bitmap_data_fillrect`,
+  `mask_with_drawing` → PASS unchanged.
+- `movieclip_begin_gradient_fill`, `movieclip_line_gradient_style` →
+  outlier counts unchanged (10943, 6053) — pre-existing failures from
+  different root causes.
+- `BeginBitmapFill` → 1389 outliers unchanged.
+- `matrix`, `duplicate_movie_clip_drawing`, `bitmap_data_draw_cliprect` →
+  trace PASS unchanged.
+
+### Out of scope (handled by sibling plans)
+
+- `testbmp.draw(grad)` still returns 0x0 (transparent) pixels — the CPU
+  rasterizer in `rasterizeMovieClipToBitmap` still doesn't do gradients.
+  That's `CPU_GRADIENT_RASTERIZER_PLAN`. With this plan landed, the
+  rasterizer now correctly enters the path-drawing branch (`has_fill`
+  is set), it just uses the unset `fill_r/g/b/a` solid color (zero), so
+  pixels are transparent instead of white. Plan #2 will replace those
+  zero-alpha writes with per-pixel gradient sampling.
 
 ## Problem
 

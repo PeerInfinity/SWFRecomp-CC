@@ -52,6 +52,7 @@ static ActionVar builtin_array_method(SWFAppContext* app_context, ActionVar* arg
 static ActionVar objectCallValueOf(SWFAppContext* app_context, ActionVar* obj_var, int* found);
 // varToDoubleSWF / Function2Ptr / ASFunction / helpers are declared in action_internal.h
 static inline int32_t varToInt32(ActionVar* v);
+static inline double varToDouble(ActionVar* v);
 static int callArrayMethod(SWFAppContext* app_context, ASArray* arr,
                            const char* method_name, u32 method_name_len,
                            ActionVar* args, u32 num_args);
@@ -24260,6 +24261,276 @@ static void drawingBuildGradientAbcdMatrix(float a, float b, float c, float d,
 	out[12] = tx_pixels * 20.0f;  // pixels → twips
 	out[13] = ty_pixels * 20.0f;
 	out[15] = 1.0f;
+}
+
+// Apply beginGradientFill(fillType, colors, alphas, ratios, matrix
+// [, spreadMode [, interpolationMode [, focalPointRatio]]]) to `mc`.
+// Shared between actionCallMethod's MC dispatch and actionCallFunction's
+// with(mc) scope. Caller still handles args FREE / pushUndefined / return.
+// Silently no-ops on malformed args (Ruffle semantics).
+static void applyGradientFillToMC(SWFAppContext* app_context, MovieClip* mc,
+	ActionVar* args, u32 num_args)
+{
+	if (mc == NULL || num_args < 5) return;
+
+	// First arg undefined → clear fill (checked before arg count validation)
+	if (args[0].type == ACTION_STACK_VALUE_UNDEFINED) {
+		DrawingState* ds = getOrCreateDrawingState(mc);
+		drawingBeginNewFill(ds);
+		ds->has_fill = 0;
+		ds->has_gradient = 0;
+		return;
+	}
+	// Too many args: silently fail (per Ruffle)
+	if (num_args > 8 || (num_args > 5 && g_swf_version < 8)) return;
+
+	// Parse gradient type
+	char gt_buf[32];
+	int gt_len = varToStringBuf(app_context, &args[0], gt_buf, sizeof(gt_buf));
+	u8 grad_type;
+	if (gt_len == 6 && strncmp(gt_buf, "linear", 6) == 0) grad_type = 0x10;
+	else if (gt_len == 6 && strncmp(gt_buf, "radial", 6) == 0) grad_type = 0x12;
+	else return;
+
+	// colors, alphas, ratios must be arrays/objects
+	if (args[1].type != ACTION_STACK_VALUE_OBJECT &&
+	    args[1].type != ACTION_STACK_VALUE_ARRAY) return;
+
+	// Helper: get array/object length and element access
+	// Arrays (type 12) use ASArray; Objects (type 11) use getProperty
+	#define _AGF_ARG_LEN(argvar) ( \
+		(argvar).type == ACTION_STACK_VALUE_ARRAY ? \
+			(int)((ASArray*)(uintptr_t)(argvar).data.numeric_value)->length : \
+		(argvar).type == ACTION_STACK_VALUE_OBJECT ? \
+			({ ActionVar* _lv = getProperty((ASObject*)(uintptr_t)(argvar).data.numeric_value, "length", 6); _lv ? (int)varToDouble(_lv) : 0; }) : 0)
+	#define _AGF_ARG_ELEM(argvar, idx) ( \
+		(argvar).type == ACTION_STACK_VALUE_ARRAY ? \
+			((idx) < (int)((ASArray*)(uintptr_t)(argvar).data.numeric_value)->length ? \
+				&((ASArray*)(uintptr_t)(argvar).data.numeric_value)->elements[(idx)] : NULL) : \
+		(argvar).type == ACTION_STACK_VALUE_OBJECT ? \
+			({ char _is[8]; int _il = snprintf(_is, sizeof(_is), "%d", (idx)); getProperty((ASObject*)(uintptr_t)(argvar).data.numeric_value, _is, _il); }) : NULL)
+
+	if ((args[2].type != ACTION_STACK_VALUE_OBJECT && args[2].type != ACTION_STACK_VALUE_ARRAY) ||
+	    (args[3].type != ACTION_STACK_VALUE_OBJECT && args[3].type != ACTION_STACK_VALUE_ARRAY)) return;
+	int colors_len = _AGF_ARG_LEN(args[1]);
+	int alphas_len = _AGF_ARG_LEN(args[2]);
+	int ratios_len = _AGF_ARG_LEN(args[3]);
+	if (colors_len != alphas_len || colors_len != ratios_len || colors_len == 0) return;
+	if (colors_len > 16) colors_len = 16;  // cap at 16 stops
+
+	u32 grad_colors[16];
+	float grad_alphas[16];
+	u8 grad_ratios[16];
+	int valid = 1;
+	for (int i = 0; i < colors_len; i++) {
+		ActionVar* cv = _AGF_ARG_ELEM(args[1], i);
+		ActionVar* av = _AGF_ARG_ELEM(args[2], i);
+		ActionVar* rv = _AGF_ARG_ELEM(args[3], i);
+		grad_colors[i] = cv ? (u32)varToDouble(cv) : 0;
+		float a_val = av ? varToDouble(av) : 100.0;
+		if (a_val < 0) a_val = 0; if (a_val > 100) a_val = 100;
+		grad_alphas[i] = (float)a_val;
+		double r_val = rv ? varToDouble(rv) : 0.0;
+		if (r_val <= -1.0 || r_val >= 256.0) { valid = 0; break; }
+		grad_ratios[i] = (u8)r_val;
+	}
+	#undef _AGF_ARG_LEN
+	#undef _AGF_ARG_ELEM
+	if (!valid) return;
+
+	// Parse matrix (arg 4)
+	ASObject* matrix_obj = NULL;
+	if (args[4].type == ACTION_STACK_VALUE_OBJECT)
+		matrix_obj = (ASObject*)(uintptr_t)args[4].data.numeric_value;
+	if (!matrix_obj) return;
+
+	// Parse spread mode (arg 5)
+	u8 spread = 0;  // pad
+	if (num_args >= 6) {
+		char sp_buf[32];
+		int sp_len = varToStringBuf(app_context, &args[5], sp_buf, sizeof(sp_buf));
+		if (sp_len == 7 && strncmp(sp_buf, "reflect", 7) == 0) spread = 1;
+		else if (sp_len == 6 && strncmp(sp_buf, "repeat", 6) == 0) spread = 2;
+	}
+	// Parse interpolation mode (arg 6)
+	u8 interp = 0;  // RGB
+	if (num_args >= 7) {
+		char ip_buf[32];
+		int ip_len = varToStringBuf(app_context, &args[6], ip_buf, sizeof(ip_buf));
+		if (ip_len == 9 && strncmp(ip_buf, "linearRGB", 9) == 0) interp = 1;
+	}
+	// Parse focal point ratio (arg 7) — only applies to radial gradients
+	float focal = 0.0f;
+	if (num_args >= 8) {
+		focal = (float)varToDoubleSimple(&args[7]);
+		if (isnan(focal) || isinf(focal)) focal = 0.0f;
+		if (focal != 0.0f && grad_type == 0x12) grad_type = 0x13;  // focal radial
+	}
+
+	// Build gradient matrix
+	DrawingState* ds = getOrCreateDrawingState(mc);
+	drawingBeginNewFill(ds);
+	// Check if matrixType == "box"
+	ActionVar* mt_v = getProperty(matrix_obj, "matrixType", 10);
+	int is_box = 0;
+	if (mt_v) {
+		char mt_buf[32];
+		int mt_len = varToStringBuf(app_context, mt_v, mt_buf, sizeof(mt_buf));
+		is_box = (mt_len == 3 && strncmp(mt_buf, "box", 3) == 0);
+	}
+	if (is_box) {
+		ActionVar* mx_v = getProperty(matrix_obj, "x", 1);
+		ActionVar* my_v = getProperty(matrix_obj, "y", 1);
+		ActionVar* mw_v = getProperty(matrix_obj, "w", 1);
+		ActionVar* mh_v = getProperty(matrix_obj, "h", 1);
+		ActionVar* mr_v = getProperty(matrix_obj, "r", 1);
+		float mx = mx_v ? (float)varToDouble(mx_v) : 0;
+		float my = my_v ? (float)varToDouble(my_v) : 0;
+		float mw = mw_v ? (float)varToDouble(mw_v) : 0;
+		float mh = mh_v ? (float)varToDouble(mh_v) : 0;
+		float mr = mr_v ? (float)varToDouble(mr_v) : 0;
+		drawingBuildGradientBoxMatrix(mx, my, mw, mh, mr, ds->gradient_matrix);
+	} else {
+		ActionVar* ma_v = getProperty(matrix_obj, "a", 1);
+		ActionVar* mb_v = getProperty(matrix_obj, "b", 1);
+		ActionVar* mc_v = getProperty(matrix_obj, "c", 1);
+		ActionVar* md_v = getProperty(matrix_obj, "d", 1);
+		ActionVar* mtx_v = getProperty(matrix_obj, "tx", 2);
+		ActionVar* mty_v = getProperty(matrix_obj, "ty", 2);
+		float ma = ma_v ? (float)varToDouble(ma_v) : 1;
+		float mb = mb_v ? (float)varToDouble(mb_v) : 0;
+		float mat_c = mc_v ? (float)varToDouble(mc_v) : 0;
+		float md = md_v ? (float)varToDouble(md_v) : 1;
+		float mtx = mtx_v ? (float)varToDouble(mtx_v) : 0;
+		float mty = mty_v ? (float)varToDouble(mty_v) : 0;
+		drawingBuildGradientAbcdMatrix(ma, mb, mat_c, md, mtx, mty, ds->gradient_matrix);
+	}
+	// Generate ramp and store state
+	drawingGenerateGradientRamp(grad_colors, grad_alphas, grad_ratios, colors_len,
+		interp == 1, ds->gradient_ramp);
+	ds->has_gradient = 1;
+	ds->gradient_type = grad_type;
+	ds->gradient_spread = spread;
+	ds->gradient_interp = interp;
+	ds->gradient_focal = focal;
+	ds->has_fill = 1;  // gradient counts as a fill
+}
+
+// Apply lineGradientStyle(fillType, colors, alphas, ratios, matrix
+// [, spreadMode [, interpolationMode [, focalPointRatio]]]) to `mc`.
+// Sister of applyGradientFillToMC but for stroke (line) gradients.
+static void applyLineGradientStyleToMC(SWFAppContext* app_context, MovieClip* mc,
+	ActionVar* args, u32 num_args)
+{
+	if (mc == NULL || num_args < 5) return;
+	if (num_args > 8 || (num_args > 5 && g_swf_version < 8)) return;
+
+	char lgt_buf[32];
+	int lgt_len = varToStringBuf(app_context, &args[0], lgt_buf, sizeof(lgt_buf));
+	u8 grad_type;
+	if (lgt_len == 6 && strncmp(lgt_buf, "linear", 6) == 0) grad_type = 0x10;
+	else if (lgt_len == 6 && strncmp(lgt_buf, "radial", 6) == 0) grad_type = 0x12;
+	else return;
+
+	if (args[1].type != ACTION_STACK_VALUE_OBJECT && args[1].type != ACTION_STACK_VALUE_ARRAY) return;
+	if ((args[2].type != ACTION_STACK_VALUE_OBJECT && args[2].type != ACTION_STACK_VALUE_ARRAY) ||
+	    (args[3].type != ACTION_STACK_VALUE_OBJECT && args[3].type != ACTION_STACK_VALUE_ARRAY)) return;
+
+	#define _ALG_ARG_LEN(argvar) ( \
+		(argvar).type == ACTION_STACK_VALUE_ARRAY ? \
+			(int)((ASArray*)(uintptr_t)(argvar).data.numeric_value)->length : \
+		(argvar).type == ACTION_STACK_VALUE_OBJECT ? \
+			({ ActionVar* _lv = getProperty((ASObject*)(uintptr_t)(argvar).data.numeric_value, "length", 6); _lv ? (int)varToDouble(_lv) : 0; }) : 0)
+	#define _ALG_ARG_ELEM(argvar, idx) ( \
+		(argvar).type == ACTION_STACK_VALUE_ARRAY ? \
+			((idx) < (int)((ASArray*)(uintptr_t)(argvar).data.numeric_value)->length ? \
+				&((ASArray*)(uintptr_t)(argvar).data.numeric_value)->elements[(idx)] : NULL) : \
+		(argvar).type == ACTION_STACK_VALUE_OBJECT ? \
+			({ char _is[8]; int _il = snprintf(_is, sizeof(_is), "%d", (idx)); getProperty((ASObject*)(uintptr_t)(argvar).data.numeric_value, _is, _il); }) : NULL)
+
+	int cl = _ALG_ARG_LEN(args[1]);
+	int al = _ALG_ARG_LEN(args[2]);
+	int rl = _ALG_ARG_LEN(args[3]);
+	if (cl != al || cl != rl || cl == 0) return;
+	if (cl > 16) cl = 16;
+	u32 gc[16]; float ga[16]; u8 gr[16];
+	int valid = 1;
+	for (int i = 0; i < cl; i++) {
+		ActionVar* cv = _ALG_ARG_ELEM(args[1], i);
+		ActionVar* av = _ALG_ARG_ELEM(args[2], i);
+		ActionVar* rv = _ALG_ARG_ELEM(args[3], i);
+		gc[i] = cv ? (u32)varToDouble(cv) : 0;
+		float a_v = av ? varToDouble(av) : 100.0;
+		if (a_v < 0) a_v = 0; if (a_v > 100) a_v = 100;
+		ga[i] = (float)a_v;
+		double r_v = rv ? varToDouble(rv) : 0.0;
+		if (r_v <= -1.0 || r_v >= 256.0) { valid = 0; break; }
+		gr[i] = (u8)r_v;
+	}
+	#undef _ALG_ARG_LEN
+	#undef _ALG_ARG_ELEM
+	if (!valid) return;
+
+	ASObject* matrix_obj = (args[4].type == ACTION_STACK_VALUE_OBJECT) ?
+		(ASObject*)(uintptr_t)args[4].data.numeric_value : NULL;
+	if (!matrix_obj) return;
+
+	u8 spread = 0, interp = 0;
+	if (num_args >= 6) {
+		char sp_buf[32];
+		int sp_len = varToStringBuf(app_context, &args[5], sp_buf, sizeof(sp_buf));
+		if (sp_len == 7 && strncmp(sp_buf, "reflect", 7) == 0) spread = 1;
+		else if (sp_len == 6 && strncmp(sp_buf, "repeat", 6) == 0) spread = 2;
+	}
+	if (num_args >= 7) {
+		char ip_buf[32];
+		int ip_len = varToStringBuf(app_context, &args[6], ip_buf, sizeof(ip_buf));
+		if (ip_len == 9 && strncmp(ip_buf, "linearRGB", 9) == 0) interp = 1;
+	}
+	float focal = 0.0f;
+	if (num_args >= 8) {
+		focal = (float)varToDoubleSimple(&args[7]);
+		if (isnan(focal) || isinf(focal)) focal = 0.0f;
+		if (focal != 0.0f && grad_type == 0x12) grad_type = 0x13;
+	}
+
+	DrawingState* ds = getOrCreateDrawingState(mc);
+	ActionVar* lmt_v = getProperty(matrix_obj, "matrixType", 10);
+	int l_is_box = 0;
+	if (lmt_v) {
+		char lmt_buf[32];
+		int lmt_len = varToStringBuf(app_context, lmt_v, lmt_buf, sizeof(lmt_buf));
+		l_is_box = (lmt_len == 3 && strncmp(lmt_buf, "box", 3) == 0);
+	}
+	if (l_is_box) {
+		ActionVar* mx_v = getProperty(matrix_obj, "x", 1);
+		ActionVar* my_v = getProperty(matrix_obj, "y", 1);
+		ActionVar* mw_v = getProperty(matrix_obj, "w", 1);
+		ActionVar* mh_v = getProperty(matrix_obj, "h", 1);
+		ActionVar* mr_v = getProperty(matrix_obj, "r", 1);
+		drawingBuildGradientBoxMatrix(
+			mx_v ? (float)varToDouble(mx_v) : 0, my_v ? (float)varToDouble(my_v) : 0,
+			mw_v ? (float)varToDouble(mw_v) : 0, mh_v ? (float)varToDouble(mh_v) : 0,
+			mr_v ? (float)varToDouble(mr_v) : 0, ds->line_gradient_matrix);
+	} else {
+		ActionVar* ma = getProperty(matrix_obj, "a", 1);
+		ActionVar* mb = getProperty(matrix_obj, "b", 1);
+		ActionVar* mat_c = getProperty(matrix_obj, "c", 1);
+		ActionVar* md = getProperty(matrix_obj, "d", 1);
+		ActionVar* mtx = getProperty(matrix_obj, "tx", 2);
+		ActionVar* mty = getProperty(matrix_obj, "ty", 2);
+		drawingBuildGradientAbcdMatrix(
+			ma ? (float)varToDouble(ma) : 1, mb ? (float)varToDouble(mb) : 0,
+			mat_c ? (float)varToDouble(mat_c) : 0, md ? (float)varToDouble(md) : 1,
+			mtx ? (float)varToDouble(mtx) : 0, mty ? (float)varToDouble(mty) : 0,
+			ds->line_gradient_matrix);
+	}
+	drawingGenerateGradientRamp(gc, ga, gr, cl, interp == 1, ds->line_gradient_ramp);
+	ds->has_line_gradient = 1;
+	ds->line_gradient_type = grad_type;
+	ds->line_gradient_spread = spread;
+	ds->line_gradient_interp = interp;
+	ds->line_gradient_focal = focal;
 }
 
 // Finalize the active path: tessellate to triangles and add to paths array.
@@ -52338,6 +52609,12 @@ void actionCallFunction(SWFAppContext* app_context, char* str_buffer)
 					ds->bitmap_repeat = repeat;
 					ds->bitmap_smooth = smooth;
 				}
+			} else if (func_name_len == 17 && strncmp(func_name, "beginGradientFill", 17) == 0) {
+				// `with(mc) { beginGradientFill(...); }` — Gnash test idiom.
+				// See WITH_SCOPE_GRADIENT_FILL_PLAN.
+				applyGradientFillToMC(app_context, _with_mc, args, num_args);
+			} else if (func_name_len == 17 && strncmp(func_name, "lineGradientStyle", 17) == 0) {
+				applyLineGradientStyleToMC(app_context, _with_mc, args, num_args);
 			} else {
 				_draw_handled = 0;
 			}
@@ -62890,174 +63167,7 @@ void actionCallMethod(SWFAppContext* app_context, char* str_buffer)
 		else if (method_name_len == 17 && strncasecmp(method_name, "beginGradientFill", 17) == 0)
 		{
 			// beginGradientFill(fillType, colors, alphas, ratios, matrix [, spreadMode [, interpolationMode [, focalPointRatio]]])
-			if (mc != NULL && num_args >= 5) {
-				// First arg undefined → clear fill (checked before arg count validation)
-				if (args[0].type == ACTION_STACK_VALUE_UNDEFINED) {
-					DrawingState* ds = getOrCreateDrawingState(mc);
-					drawingBeginNewFill(ds);
-					ds->has_fill = 0;
-					ds->has_gradient = 0;
-					if (args != NULL) FREE(args);
-					pushUndefined(app_context);
-					return;
-				}
-				// Too many args: silently fail (per Ruffle)
-				if (num_args > 8 || (num_args > 5 && g_swf_version < 8)) {
-					if (args != NULL) FREE(args);
-					pushUndefined(app_context);
-					return;
-				}
-				// Parse gradient type
-				char gt_buf[32];
-				int gt_len = varToStringBuf(app_context, &args[0], gt_buf, sizeof(gt_buf));
-				u8 grad_type;
-				if (gt_len == 6 && strncmp(gt_buf, "linear", 6) == 0) grad_type = 0x10;
-				else if (gt_len == 6 && strncmp(gt_buf, "radial", 6) == 0) grad_type = 0x12;
-				else {
-					// Invalid gradient type
-					if (args != NULL) FREE(args);
-					pushUndefined(app_context);
-					return;
-				}
-				// colors, alphas, ratios must be arrays/objects
-				if (args[1].type != ACTION_STACK_VALUE_OBJECT &&
-				    args[1].type != ACTION_STACK_VALUE_ARRAY) {
-					if (args != NULL) FREE(args);
-					pushUndefined(app_context);
-					return;
-				}
-				// Helper: get array/object length and element access
-				// Arrays (type 12) use ASArray; Objects (type 11) use getProperty
-				#define GRAD_ARG_LEN(argvar) ( \
-					(argvar).type == ACTION_STACK_VALUE_ARRAY ? \
-						(int)((ASArray*)(uintptr_t)(argvar).data.numeric_value)->length : \
-					(argvar).type == ACTION_STACK_VALUE_OBJECT ? \
-						({ ActionVar* _lv = getProperty((ASObject*)(uintptr_t)(argvar).data.numeric_value, "length", 6); _lv ? (int)varToDouble(_lv) : 0; }) : 0)
-				#define GRAD_ARG_ELEM(argvar, idx) ( \
-					(argvar).type == ACTION_STACK_VALUE_ARRAY ? \
-						((idx) < (int)((ASArray*)(uintptr_t)(argvar).data.numeric_value)->length ? \
-							&((ASArray*)(uintptr_t)(argvar).data.numeric_value)->elements[(idx)] : NULL) : \
-					(argvar).type == ACTION_STACK_VALUE_OBJECT ? \
-						({ char _is[8]; int _il = snprintf(_is, sizeof(_is), "%d", (idx)); getProperty((ASObject*)(uintptr_t)(argvar).data.numeric_value, _is, _il); }) : NULL)
-
-				if ((args[2].type != ACTION_STACK_VALUE_OBJECT && args[2].type != ACTION_STACK_VALUE_ARRAY) ||
-				    (args[3].type != ACTION_STACK_VALUE_OBJECT && args[3].type != ACTION_STACK_VALUE_ARRAY)) {
-					if (args != NULL) FREE(args);
-					pushUndefined(app_context);
-					return;
-				}
-				int colors_len = GRAD_ARG_LEN(args[1]);
-				int alphas_len = GRAD_ARG_LEN(args[2]);
-				int ratios_len = GRAD_ARG_LEN(args[3]);
-				if (colors_len != alphas_len || colors_len != ratios_len || colors_len == 0) {
-					if (args != NULL) FREE(args);
-					pushUndefined(app_context);
-					return;
-				}
-				if (colors_len > 16) colors_len = 16;  // cap at 16 stops
-				// Read color/alpha/ratio values
-				u32 grad_colors[16];
-				float grad_alphas[16];
-				u8 grad_ratios[16];
-				int valid = 1;
-				for (int i = 0; i < colors_len; i++) {
-					ActionVar* cv = GRAD_ARG_ELEM(args[1], i);
-					ActionVar* av = GRAD_ARG_ELEM(args[2], i);
-					ActionVar* rv = GRAD_ARG_ELEM(args[3], i);
-					grad_colors[i] = cv ? (u32)varToDouble(cv) : 0;
-					float a_val = av ? varToDouble(av) : 100.0;
-					if (a_val < 0) a_val = 0; if (a_val > 100) a_val = 100;
-					grad_alphas[i] = (float)a_val;
-					double r_val = rv ? varToDouble(rv) : 0.0;
-					if (r_val <= -1.0 || r_val >= 256.0) { valid = 0; break; }
-					grad_ratios[i] = (u8)r_val;
-				}
-				#undef GRAD_ARG_LEN
-				#undef GRAD_ARG_ELEM
-				if (!valid) {
-					if (args != NULL) FREE(args);
-					pushUndefined(app_context);
-					return;
-				}
-				// Parse matrix (arg 4)
-				ASObject* matrix_obj = NULL;
-				if (args[4].type == ACTION_STACK_VALUE_OBJECT)
-					matrix_obj = (ASObject*)(uintptr_t)args[4].data.numeric_value;
-				if (!matrix_obj) {
-					if (args != NULL) FREE(args);
-					pushUndefined(app_context);
-					return;
-				}
-				// Parse spread mode (arg 5)
-				u8 spread = 0;  // pad
-				if (num_args >= 6) {
-					char sp_buf[32];
-					int sp_len = varToStringBuf(app_context, &args[5], sp_buf, sizeof(sp_buf));
-					if (sp_len == 7 && strncmp(sp_buf, "reflect", 7) == 0) spread = 1;
-					else if (sp_len == 6 && strncmp(sp_buf, "repeat", 6) == 0) spread = 2;
-				}
-				// Parse interpolation mode (arg 6)
-				u8 interp = 0;  // RGB
-				if (num_args >= 7) {
-					char ip_buf[32];
-					int ip_len = varToStringBuf(app_context, &args[6], ip_buf, sizeof(ip_buf));
-					if (ip_len == 9 && strncmp(ip_buf, "linearRGB", 9) == 0) interp = 1;
-				}
-				// Parse focal point ratio (arg 7) — only applies to radial gradients
-				float focal = 0.0f;
-				if (num_args >= 8) {
-					focal = (float)varToDoubleSimple(&args[7]);
-					if (isnan(focal) || isinf(focal)) focal = 0.0f;
-					if (focal != 0.0f && grad_type == 0x12) grad_type = 0x13;  // focal radial
-				}
-				// Build gradient matrix
-				DrawingState* ds = getOrCreateDrawingState(mc);
-				drawingBeginNewFill(ds);
-				// Check if matrixType == "box"
-				ActionVar* mt_v = getProperty(matrix_obj, "matrixType", 10);
-				int is_box = 0;
-				if (mt_v) {
-					char mt_buf[32];
-					int mt_len = varToStringBuf(app_context, mt_v, mt_buf, sizeof(mt_buf));
-					is_box = (mt_len == 3 && strncmp(mt_buf, "box", 3) == 0);
-				}
-				if (is_box) {
-					ActionVar* mx_v = getProperty(matrix_obj, "x", 1);
-					ActionVar* my_v = getProperty(matrix_obj, "y", 1);
-					ActionVar* mw_v = getProperty(matrix_obj, "w", 1);
-					ActionVar* mh_v = getProperty(matrix_obj, "h", 1);
-					ActionVar* mr_v = getProperty(matrix_obj, "r", 1);
-					float mx = mx_v ? (float)varToDouble(mx_v) : 0;
-					float my = my_v ? (float)varToDouble(my_v) : 0;
-					float mw = mw_v ? (float)varToDouble(mw_v) : 0;
-					float mh = mh_v ? (float)varToDouble(mh_v) : 0;
-					float mr = mr_v ? (float)varToDouble(mr_v) : 0;
-					drawingBuildGradientBoxMatrix(mx, my, mw, mh, mr, ds->gradient_matrix);
-				} else {
-					ActionVar* ma_v = getProperty(matrix_obj, "a", 1);
-					ActionVar* mb_v = getProperty(matrix_obj, "b", 1);
-					ActionVar* mc_v = getProperty(matrix_obj, "c", 1);
-					ActionVar* md_v = getProperty(matrix_obj, "d", 1);
-					ActionVar* mtx_v = getProperty(matrix_obj, "tx", 2);
-					ActionVar* mty_v = getProperty(matrix_obj, "ty", 2);
-					float ma = ma_v ? (float)varToDouble(ma_v) : 1;
-					float mb = mb_v ? (float)varToDouble(mb_v) : 0;
-					float mat_c = mc_v ? (float)varToDouble(mc_v) : 0;
-					float md = md_v ? (float)varToDouble(md_v) : 1;
-					float mtx = mtx_v ? (float)varToDouble(mtx_v) : 0;
-					float mty = mty_v ? (float)varToDouble(mty_v) : 0;
-					drawingBuildGradientAbcdMatrix(ma, mb, mat_c, md, mtx, mty, ds->gradient_matrix);
-				}
-				// Generate ramp and store state
-				drawingGenerateGradientRamp(grad_colors, grad_alphas, grad_ratios, colors_len,
-					interp == 1, ds->gradient_ramp);
-				ds->has_gradient = 1;
-				ds->gradient_type = grad_type;
-				ds->gradient_spread = spread;
-				ds->gradient_interp = interp;
-				ds->gradient_focal = focal;
-				ds->has_fill = 1;  // gradient counts as a fill
-			}
+			applyGradientFillToMC(app_context, mc, args, num_args);
 			if (args != NULL) FREE(args);
 			pushUndefined(app_context);
 			return;
@@ -63191,119 +63301,7 @@ void actionCallMethod(SWFAppContext* app_context, char* str_buffer)
 		{
 			// lineGradientStyle(fillType, colors, alphas, ratios, matrix [, spreadMode [, interpolationMode [, focalPointRatio]]])
 			// Same arg format as beginGradientFill, but applies to strokes
-			if (mc != NULL && num_args >= 5) {
-				if (num_args > 8 || (num_args > 5 && g_swf_version < 8)) {
-					if (args != NULL) FREE(args);
-					pushUndefined(app_context);
-					return;
-				}
-				char lgt_buf[32];
-				int lgt_len = varToStringBuf(app_context, &args[0], lgt_buf, sizeof(lgt_buf));
-				u8 grad_type;
-				if (lgt_len == 6 && strncmp(lgt_buf, "linear", 6) == 0) grad_type = 0x10;
-				else if (lgt_len == 6 && strncmp(lgt_buf, "radial", 6) == 0) grad_type = 0x12;
-				else { if (args != NULL) FREE(args); pushUndefined(app_context); return; }
-				if (args[1].type != ACTION_STACK_VALUE_OBJECT && args[1].type != ACTION_STACK_VALUE_ARRAY) {
-					if (args != NULL) FREE(args); pushUndefined(app_context); return;
-				}
-				if ((args[2].type != ACTION_STACK_VALUE_OBJECT && args[2].type != ACTION_STACK_VALUE_ARRAY) ||
-				    (args[3].type != ACTION_STACK_VALUE_OBJECT && args[3].type != ACTION_STACK_VALUE_ARRAY)) {
-					if (args != NULL) FREE(args); pushUndefined(app_context); return;
-				}
-				#define LGS_ARG_LEN(argvar) ( \
-					(argvar).type == ACTION_STACK_VALUE_ARRAY ? \
-						(int)((ASArray*)(uintptr_t)(argvar).data.numeric_value)->length : \
-					(argvar).type == ACTION_STACK_VALUE_OBJECT ? \
-						({ ActionVar* _lv = getProperty((ASObject*)(uintptr_t)(argvar).data.numeric_value, "length", 6); _lv ? (int)varToDouble(_lv) : 0; }) : 0)
-				#define LGS_ARG_ELEM(argvar, idx) ( \
-					(argvar).type == ACTION_STACK_VALUE_ARRAY ? \
-						((idx) < (int)((ASArray*)(uintptr_t)(argvar).data.numeric_value)->length ? \
-							&((ASArray*)(uintptr_t)(argvar).data.numeric_value)->elements[(idx)] : NULL) : \
-					(argvar).type == ACTION_STACK_VALUE_OBJECT ? \
-						({ char _is[8]; int _il = snprintf(_is, sizeof(_is), "%d", (idx)); getProperty((ASObject*)(uintptr_t)(argvar).data.numeric_value, _is, _il); }) : NULL)
-				int cl = LGS_ARG_LEN(args[1]);
-				int al = LGS_ARG_LEN(args[2]);
-				int rl = LGS_ARG_LEN(args[3]);
-				if (cl != al || cl != rl || cl == 0) {
-					if (args != NULL) FREE(args); pushUndefined(app_context); return;
-				}
-				if (cl > 16) cl = 16;
-				u32 gc[16]; float ga[16]; u8 gr[16];
-				int valid = 1;
-				for (int i = 0; i < cl; i++) {
-					ActionVar* cv = LGS_ARG_ELEM(args[1], i);
-					ActionVar* av = LGS_ARG_ELEM(args[2], i);
-					ActionVar* rv = LGS_ARG_ELEM(args[3], i);
-					gc[i] = cv ? (u32)varToDouble(cv) : 0;
-					float a_v = av ? varToDouble(av) : 100.0;
-					if (a_v < 0) a_v = 0; if (a_v > 100) a_v = 100;
-					ga[i] = (float)a_v;
-					double r_v = rv ? varToDouble(rv) : 0.0;
-					if (r_v <= -1.0 || r_v >= 256.0) { valid = 0; break; }
-					gr[i] = (u8)r_v;
-				}
-				#undef LGS_ARG_LEN
-				#undef LGS_ARG_ELEM
-				if (!valid) { if (args != NULL) FREE(args); pushUndefined(app_context); return; }
-				ASObject* matrix_obj = (args[4].type == ACTION_STACK_VALUE_OBJECT) ?
-					(ASObject*)(uintptr_t)args[4].data.numeric_value : NULL;
-				if (!matrix_obj) { if (args != NULL) FREE(args); pushUndefined(app_context); return; }
-				u8 spread = 0, interp = 0;
-				if (num_args >= 6) {
-					char sp_buf[32];
-					int sp_len = varToStringBuf(app_context, &args[5], sp_buf, sizeof(sp_buf));
-					if (sp_len == 7 && strncmp(sp_buf, "reflect", 7) == 0) spread = 1;
-					else if (sp_len == 6 && strncmp(sp_buf, "repeat", 6) == 0) spread = 2;
-				}
-				if (num_args >= 7) {
-					char ip_buf[32];
-					int ip_len = varToStringBuf(app_context, &args[6], ip_buf, sizeof(ip_buf));
-					if (ip_len == 9 && strncmp(ip_buf, "linearRGB", 9) == 0) interp = 1;
-				}
-				float focal = 0.0f;
-				if (num_args >= 8) {
-					focal = (float)varToDoubleSimple(&args[7]);
-					if (isnan(focal) || isinf(focal)) focal = 0.0f;
-					if (focal != 0.0f && grad_type == 0x12) grad_type = 0x13;
-				}
-				DrawingState* ds = getOrCreateDrawingState(mc);
-				ActionVar* lmt_v = getProperty(matrix_obj, "matrixType", 10);
-				int l_is_box = 0;
-				if (lmt_v) {
-					char lmt_buf[32];
-					int lmt_len = varToStringBuf(app_context, lmt_v, lmt_buf, sizeof(lmt_buf));
-					l_is_box = (lmt_len == 3 && strncmp(lmt_buf, "box", 3) == 0);
-				}
-				if (l_is_box) {
-					ActionVar* mx_v = getProperty(matrix_obj, "x", 1);
-					ActionVar* my_v = getProperty(matrix_obj, "y", 1);
-					ActionVar* mw_v = getProperty(matrix_obj, "w", 1);
-					ActionVar* mh_v = getProperty(matrix_obj, "h", 1);
-					ActionVar* mr_v = getProperty(matrix_obj, "r", 1);
-					drawingBuildGradientBoxMatrix(
-						mx_v ? (float)varToDouble(mx_v) : 0, my_v ? (float)varToDouble(my_v) : 0,
-						mw_v ? (float)varToDouble(mw_v) : 0, mh_v ? (float)varToDouble(mh_v) : 0,
-						mr_v ? (float)varToDouble(mr_v) : 0, ds->line_gradient_matrix);
-				} else {
-					ActionVar* ma = getProperty(matrix_obj, "a", 1);
-					ActionVar* mb = getProperty(matrix_obj, "b", 1);
-					ActionVar* mat_c = getProperty(matrix_obj, "c", 1);
-					ActionVar* md = getProperty(matrix_obj, "d", 1);
-					ActionVar* mtx = getProperty(matrix_obj, "tx", 2);
-					ActionVar* mty = getProperty(matrix_obj, "ty", 2);
-					drawingBuildGradientAbcdMatrix(
-						ma ? (float)varToDouble(ma) : 1, mb ? (float)varToDouble(mb) : 0,
-						mat_c ? (float)varToDouble(mat_c) : 0, md ? (float)varToDouble(md) : 1,
-						mtx ? (float)varToDouble(mtx) : 0, mty ? (float)varToDouble(mty) : 0,
-						ds->line_gradient_matrix);
-				}
-				drawingGenerateGradientRamp(gc, ga, gr, cl, interp == 1, ds->line_gradient_ramp);
-				ds->has_line_gradient = 1;
-				ds->line_gradient_type = grad_type;
-				ds->line_gradient_spread = spread;
-				ds->line_gradient_interp = interp;
-				ds->line_gradient_focal = focal;
-			}
+			applyLineGradientStyleToMC(app_context, mc, args, num_args);
 			if (args != NULL) FREE(args);
 			pushUndefined(app_context);
 			return;
