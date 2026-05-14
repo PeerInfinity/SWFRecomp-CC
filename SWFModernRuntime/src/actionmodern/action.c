@@ -12543,6 +12543,7 @@ static ActionVar bitmapDataApplyFilter(SWFAppContext* app_context, ActionVar* ar
 
 // Forward decl: drawingFinalizePath is defined later in this file.
 static void drawingFinalizePath(DrawingState* ds);
+static void drawingBeginNewFill(DrawingState* ds);
 // Forward decl: child_mc_cache registry is defined later.
 extern MovieClip* child_mc_cache[];
 extern int child_mc_count;
@@ -24262,20 +24263,46 @@ static void drawingBuildGradientAbcdMatrix(float a, float b, float c, float d,
 }
 
 // Finalize the active path: tessellate to triangles and add to paths array.
+// Each MOVE_TO starts a new contour; tessellation unions all contours under
+// the current fill style (Flash's "all sub-paths share the active fill" rule).
 static void drawingFinalizePath(DrawingState* ds)
 {
 	if (ds->cmd_count == 0) return;
 
-	// Extract polygon vertices from commands
+	// Extract polygon vertices from commands. Track contour boundaries:
+	// `contour_starts[i]` is the first vertex index of contour i; the contour
+	// ends at `contour_starts[i+1]` (or poly_count for the last contour).
 	float* poly = NULL;
 	u32 poly_count = 0, poly_cap = 0;
+	u32* contour_starts = NULL;
+	u32 contour_count = 0, contour_cap = 0;
+
+	#define _DR_ADD_CONTOUR_START() do { \
+		if (contour_count >= contour_cap) { \
+			contour_cap = contour_cap ? contour_cap * 2 : 8; \
+			contour_starts = (u32*)realloc(contour_starts, contour_cap * sizeof(u32)); \
+		} \
+		contour_starts[contour_count++] = poly_count; \
+	} while (0)
 
 	for (u32 i = 0; i < ds->cmd_count; i++) {
 		DrawCmd* c = &ds->cmds[i];
-		if (c->type == 2) {
+		if (c->type == 0) {
+			// MOVE_TO: start a new contour at this point
+			_DR_ADD_CONTOUR_START();
+			if (poly_count >= poly_cap) {
+				poly_cap = poly_cap ? poly_cap * 2 : 64;
+				poly = (float*)realloc(poly, poly_cap * 2 * sizeof(float));
+			}
+			poly[poly_count*2] = c->x;
+			poly[poly_count*2+1] = c->y;
+			poly_count++;
+		} else if (c->type == 2) {
 			// CURVE_TO: adaptive Bezier flattening based on flatness tolerance
 			float sx = (i > 0) ? ds->cmds[i-1].x : ds->pen_x;
 			float sy = (i > 0) ? ds->cmds[i-1].y : ds->pen_y;
+			// Ensure a contour exists if the cmd stream began with a curve.
+			if (contour_count == 0) _DR_ADD_CONTOUR_START();
 			// Flatness test: max distance of control point from midpoint of start→end
 			float mx = (sx + c->x) * 0.5f, my = (sy + c->y) * 0.5f;
 			float dx = c->cx - mx, dy = c->cy - my;
@@ -24300,7 +24327,8 @@ static void drawingFinalizePath(DrawingState* ds)
 				poly_count++;
 			}
 		} else {
-			// MOVE_TO or LINE_TO: just add the point
+			// LINE_TO: extend current contour (or start one if first cmd is a LINE)
+			if (contour_count == 0) _DR_ADD_CONTOUR_START();
 			if (poly_count >= poly_cap) {
 				poly_cap = poly_cap ? poly_cap * 2 : 64;
 				poly = (float*)realloc(poly, poly_cap * 2 * sizeof(float));
@@ -24310,6 +24338,7 @@ static void drawingFinalizePath(DrawingState* ds)
 			poly_count++;
 		}
 	}
+	#undef _DR_ADD_CONTOUR_START
 
 	// Ensure path capacity
 	if (ds->path_count >= ds->path_capacity) {
@@ -24336,6 +24365,15 @@ static void drawingFinalizePath(DrawingState* ds)
 		memcpy(path->gradient_matrix, ds->gradient_matrix, 16 * sizeof(float));
 		path->has_fill = 1;  // gradient is a fill
 	}
+	// Copy bitmap fill state
+	if (ds->has_bitmap_fill) {
+		path->has_bitmap_fill = 1;
+		path->bitmap_native = ds->bitmap_native;
+		memcpy(path->bitmap_matrix, ds->bitmap_matrix, 6 * sizeof(float));
+		path->bitmap_repeat = ds->bitmap_repeat;
+		path->bitmap_smooth = ds->bitmap_smooth;
+		path->has_fill = 1;  // bitmap is a fill
+	}
 	// Copy line gradient state
 	if (ds->has_line_gradient) {
 		path->has_line_gradient = 1;
@@ -24347,8 +24385,10 @@ static void drawingFinalizePath(DrawingState* ds)
 		memcpy(path->line_gradient_matrix, ds->line_gradient_matrix, 16 * sizeof(float));
 	}
 
-	// Tessellate fill using libtess2 (constrained Delaunay triangulation)
-	if (path->has_fill && poly_count >= 3) {
+	// Tessellate fill using libtess2 (constrained Delaunay triangulation),
+	// feeding each contour as a separate tessAddContour. libtess2 handles the
+	// union of multiple sub-paths under the active winding rule.
+	if (path->has_fill && poly_count >= 3 && contour_count > 0) {
 		// Convert polygon to twips for tessellation input
 		float* twips_poly = (float*)malloc(poly_count * 2 * sizeof(float));
 		for (u32 i = 0; i < poly_count; i++) {
@@ -24358,8 +24398,17 @@ static void drawingFinalizePath(DrawingState* ds)
 		TESStesselator* tess = tessNewTess(NULL);
 		if (tess) {
 			tessSetOption(tess, TESS_CONSTRAINED_DELAUNAY_TRIANGULATION, 1);
-			tessAddContour(tess, 2, twips_poly, sizeof(float) * 2, (int)poly_count);
-			if (tessTesselate(tess, TESS_WINDING_NONZERO, TESS_POLYGONS, 3, 2, NULL)) {
+			int contributing_contours = 0;
+			for (u32 ci = 0; ci < contour_count; ci++) {
+				u32 cstart = contour_starts[ci];
+				u32 cend = (ci + 1 < contour_count) ? contour_starts[ci + 1] : poly_count;
+				int n = (int)(cend - cstart);
+				if (n < 3) continue;  // degenerate contour (e.g. lone moveTo)
+				tessAddContour(tess, 2, &twips_poly[cstart * 2], sizeof(float) * 2, n);
+				contributing_contours++;
+			}
+			if (contributing_contours > 0 &&
+			    tessTesselate(tess, TESS_WINDING_NONZERO, TESS_POLYGONS, 3, 2, NULL)) {
 				const TESSreal* verts = tessGetVertices(tess);
 				const TESSindex* elems = tessGetElements(tess);
 				int ntris = tessGetElementCount(tess);
@@ -24372,16 +24421,24 @@ static void drawingFinalizePath(DrawingState* ds)
 						path->fill_verts[i*6 + j*2 + 1] = verts[idx * 2 + 1];
 					}
 				}
-			} else {
-				// Fallback to fan tessellation if libtess2 fails
-				u32 tri_count = poly_count - 2;
-				path->fill_vert_count = tri_count * 3;
-				path->fill_verts = (float*)malloc(path->fill_vert_count * 2 * sizeof(float));
-				for (u32 i = 0; i < tri_count; i++) {
-					float* out = &path->fill_verts[i * 6];
-					out[0] = twips_poly[0]; out[1] = twips_poly[1];
-					out[2] = twips_poly[(i+1)*2]; out[3] = twips_poly[(i+1)*2+1];
-					out[4] = twips_poly[(i+2)*2]; out[5] = twips_poly[(i+2)*2+1];
+			} else if (contributing_contours == 1) {
+				// Fallback to fan tessellation over the single contour
+				u32 cstart = contour_starts[0];
+				u32 cend = (contour_count > 1) ? contour_starts[1] : poly_count;
+				u32 n = cend - cstart;
+				if (n >= 3) {
+					u32 tri_count = n - 2;
+					path->fill_vert_count = tri_count * 3;
+					path->fill_verts = (float*)malloc(path->fill_vert_count * 2 * sizeof(float));
+					for (u32 i = 0; i < tri_count; i++) {
+						float* out = &path->fill_verts[i * 6];
+						out[0] = twips_poly[cstart * 2];
+						out[1] = twips_poly[cstart * 2 + 1];
+						out[2] = twips_poly[(cstart + i + 1) * 2];
+						out[3] = twips_poly[(cstart + i + 1) * 2 + 1];
+						out[4] = twips_poly[(cstart + i + 2) * 2];
+						out[5] = twips_poly[(cstart + i + 2) * 2 + 1];
+					}
 				}
 			}
 			tessDeleteTess(tess);
@@ -24389,32 +24446,55 @@ static void drawingFinalizePath(DrawingState* ds)
 		free(twips_poly);
 	}
 
-	// Line stroke expansion: for each consecutive pair, expand to quad
-	if (path->has_line && poly_count >= 2) {
-		u32 seg_count = poly_count - 1;
-		// Check if first == last (closed path) — don't draw closing segment twice
-		// Actually, each line_to IS a segment, so iterate pairwise
-		path->line_vert_count = seg_count * 6;  // 2 triangles per segment
-		path->line_verts = (float*)malloc(path->line_vert_count * 2 * sizeof(float));
-		float half_w = path->line_width * 0.5f * 20.0f;  // half width in twips
-		for (u32 i = 0; i < seg_count; i++) {
-			float x0 = poly[i*2] * 20.0f, y0 = poly[i*2+1] * 20.0f;
-			float x1 = poly[(i+1)*2] * 20.0f, y1 = poly[(i+1)*2+1] * 20.0f;
-			float dx = x1 - x0, dy = y1 - y0;
-			float len = sqrtf(dx*dx + dy*dy);
-			if (len < 0.001f) len = 0.001f;
-			float nx = -dy / len * half_w, ny = dx / len * half_w;
-			float* out = &path->line_verts[i * 12];
-			// Quad as 2 triangles
-			out[0]=x0+nx; out[1]=y0+ny;  out[2]=x0-nx; out[3]=y0-ny;  out[4]=x1+nx; out[5]=y1+ny;
-			out[6]=x0-nx; out[7]=y0-ny;  out[8]=x1-nx; out[9]=y1-ny;  out[10]=x1+nx; out[11]=y1+ny;
+	// Line stroke expansion: emit quads per contour (skip MOVE_TO seams).
+	if (path->has_line && contour_count > 0) {
+		// First pass: count total stroke segments across all contours
+		u32 total_segs = 0;
+		for (u32 ci = 0; ci < contour_count; ci++) {
+			u32 cstart = contour_starts[ci];
+			u32 cend = (ci + 1 < contour_count) ? contour_starts[ci + 1] : poly_count;
+			if (cend > cstart + 1) total_segs += (cend - cstart - 1);
+		}
+		if (total_segs > 0) {
+			path->line_vert_count = total_segs * 6;
+			path->line_verts = (float*)malloc(path->line_vert_count * 2 * sizeof(float));
+			float half_w = path->line_width * 0.5f * 20.0f;
+			u32 out_seg = 0;
+			for (u32 ci = 0; ci < contour_count; ci++) {
+				u32 cstart = contour_starts[ci];
+				u32 cend = (ci + 1 < contour_count) ? contour_starts[ci + 1] : poly_count;
+				for (u32 i = cstart; i + 1 < cend; i++) {
+					float x0 = poly[i*2] * 20.0f, y0 = poly[i*2+1] * 20.0f;
+					float x1 = poly[(i+1)*2] * 20.0f, y1 = poly[(i+1)*2+1] * 20.0f;
+					float dx = x1 - x0, dy = y1 - y0;
+					float len = sqrtf(dx*dx + dy*dy);
+					if (len < 0.001f) len = 0.001f;
+					float nx = -dy / len * half_w, ny = dx / len * half_w;
+					float* out = &path->line_verts[out_seg * 12];
+					out[0]=x0+nx; out[1]=y0+ny;  out[2]=x0-nx; out[3]=y0-ny;  out[4]=x1+nx; out[5]=y1+ny;
+					out[6]=x0-nx; out[7]=y0-ny;  out[8]=x1-nx; out[9]=y1-ny;  out[10]=x1+nx; out[11]=y1+ny;
+					out_seg++;
+				}
+			}
 		}
 	}
 
 	free(poly);
+	free(contour_starts);
 
 	// Clear active commands
 	ds->cmd_count = 0;
+}
+
+// Used by begin{Fill,GradientFill,BitmapFill}: finalize the previous path
+// (with its old fill style) and re-seed the cmd buffer with a MOVE_TO at the
+// current pen so subsequent lineTo/curveTo segments retain their implicit
+// starting vertex. Without this, the `moveTo; begin*; lineTo` idiom loses
+// the moveTo and produces a polygon missing its first corner.
+static void drawingBeginNewFill(DrawingState* ds)
+{
+	if (ds->cmd_count > 0) drawingFinalizePath(ds);
+	if (ds->pen_set) drawingAddCmd(ds, 0, ds->pen_x, ds->pen_y, 0, 0);
 }
 
 // Clear all drawing data for an MC.
@@ -24433,6 +24513,8 @@ static void drawingClear(MovieClip* mc)
 	ds->pen_set = 0;
 	ds->has_fill = 0;
 	ds->has_gradient = 0;
+	ds->has_bitmap_fill = 0;
+	ds->bitmap_native = NULL;
 	ds->has_line = 0;
 	ds->has_line_gradient = 0;
 	mc->draw_has_bounds = 0;
@@ -24444,6 +24526,10 @@ static int fillDrawingInfos(MovieClip* mc, DrawingRenderInfo* out, int max_out)
 {
 	DrawingState* ds = (DrawingState*)mc->drawing_state;
 	if (ds == NULL) return 0;
+	// Auto-finalize any pending path so renders see all geometry even when
+	// the AS source never called endFill (common with Gnash/Flash-style code
+	// that relies on each begin* implicitly closing the previous fill).
+	if (ds->cmd_count > 0) drawingFinalizePath(ds);
 	int count = 0;
 	for (u32 p = 0; p < ds->path_count && count < max_out; p++) {
 		DrawPath* path = &ds->paths[p];
@@ -24461,6 +24547,26 @@ static int fillDrawingInfos(MovieClip* mc, DrawingRenderInfo* out, int max_out)
 		info->focal_ratio = path->focal_ratio;
 		info->gradient_ramp = path->has_gradient ? path->gradient_ramp : NULL;
 		info->gradient_matrix = path->has_gradient ? path->gradient_matrix : NULL;
+		// Bitmap fill — resolve BitmapDataNative live (may have changed/disposed since draw)
+		info->has_bitmap_fill = 0;
+		info->bitmap_pixels = NULL;
+		info->bitmap_width = 0;
+		info->bitmap_height = 0;
+		info->bitmap_matrix = NULL;
+		info->bitmap_repeat = 0;
+		info->bitmap_smooth = 0;
+		if (path->has_bitmap_fill && path->bitmap_native != NULL) {
+			BitmapDataNative* bn = (BitmapDataNative*)path->bitmap_native;
+			if (!bn->disposed && bn->pixels != NULL && bn->width > 0 && bn->height > 0) {
+				info->has_bitmap_fill = 1;
+				info->bitmap_pixels = bn->pixels;
+				info->bitmap_width = (u32)bn->width;
+				info->bitmap_height = (u32)bn->height;
+				info->bitmap_matrix = path->bitmap_matrix;
+				info->bitmap_repeat = path->bitmap_repeat;
+				info->bitmap_smooth = path->bitmap_smooth;
+			}
+		}
 		info->line_verts = path->line_verts;
 		info->line_count = path->has_line ? path->line_vert_count : 0;
 		info->line_r = path->line_r; info->line_g = path->line_g;
@@ -52076,7 +52182,7 @@ void actionCallFunction(SWFAppContext* app_context, char* str_buffer)
 			int _draw_handled = 1;
 			if (func_name_len == 9 && strncmp(func_name, "beginFill", 9) == 0) {
 				DrawingState* ds = getOrCreateDrawingState(_with_mc);
-				if (ds->cmd_count > 0) drawingFinalizePath(ds);
+				drawingBeginNewFill(ds);
 				u32 rgb = (num_args >= 1) ? (u32)varToDouble(&args[0]) : 0;
 				float alpha = 1.0f;
 				if (num_args >= 2) {
@@ -52165,6 +52271,67 @@ void actionCallFunction(SWFAppContext* app_context, char* str_buffer)
 				}
 			} else if (func_name_len == 5 && strncmp(func_name, "clear", 5) == 0) {
 				drawingClear(_with_mc);
+			} else if (func_name_len == 15 && strncmp(func_name, "beginBitmapFill", 15) == 0) {
+				DrawingState* ds = getOrCreateDrawingState(_with_mc);
+				drawingBeginNewFill(ds);
+				BitmapDataNative* bmp = NULL;
+				if (num_args >= 1 && args[0].type == ACTION_STACK_VALUE_OBJECT) {
+					ASObject* bmp_obj = (ASObject*)(uintptr_t)args[0].data.numeric_value;
+					bmp = getBitmapNative(bmp_obj);
+				}
+				if (bmp == NULL || bmp->disposed || bmp->pixels == NULL ||
+				    bmp->width <= 0 || bmp->height <= 0) {
+					ds->has_fill = 0;
+					ds->has_gradient = 0;
+					ds->has_bitmap_fill = 0;
+					ds->bitmap_native = NULL;
+				} else {
+					float a = 1.0f, b = 0.0f, c = 0.0f, d = 1.0f, tx = 0.0f, ty = 0.0f;
+					if (num_args >= 2 && args[1].type == ACTION_STACK_VALUE_OBJECT) {
+						ASObject* m_obj = (ASObject*)(uintptr_t)args[1].data.numeric_value;
+						ActionVar* mv;
+						if ((mv = getProperty(m_obj, "a", 1)))  a  = (float)varToDouble(mv);
+						if ((mv = getProperty(m_obj, "b", 1)))  b  = (float)varToDouble(mv);
+						if ((mv = getProperty(m_obj, "c", 1)))  c  = (float)varToDouble(mv);
+						if ((mv = getProperty(m_obj, "d", 1)))  d  = (float)varToDouble(mv);
+						if ((mv = getProperty(m_obj, "tx", 2))) tx = (float)varToDouble(mv);
+						if ((mv = getProperty(m_obj, "ty", 2))) ty = (float)varToDouble(mv);
+					}
+					int repeat = 1;
+					if (num_args >= 3) {
+						ActionVar* v = &args[2];
+						if (v->type == ACTION_STACK_VALUE_BOOLEAN) repeat = v->data.numeric_value ? 1 : 0;
+						else if (v->type == ACTION_STACK_VALUE_F64 || v->type == ACTION_STACK_VALUE_F32) {
+							double dd = varToDouble(v);
+							repeat = (dd != 0 && dd == dd) ? 1 : 0;
+						} else if (v->type == ACTION_STACK_VALUE_UNDEFINED || v->type == ACTION_STACK_VALUE_NULL) {
+							repeat = 0;
+						} else {
+							repeat = 1;
+						}
+					}
+					int smooth = 0;
+					if (num_args >= 4) {
+						ActionVar* v = &args[3];
+						if (v->type == ACTION_STACK_VALUE_BOOLEAN) smooth = v->data.numeric_value ? 1 : 0;
+						else if (v->type == ACTION_STACK_VALUE_F64 || v->type == ACTION_STACK_VALUE_F32) {
+							double dd = varToDouble(v);
+							smooth = (dd != 0 && dd == dd) ? 1 : 0;
+						}
+					}
+					ds->has_bitmap_fill = 1;
+					ds->has_fill = 1;
+					ds->has_gradient = 0;
+					ds->bitmap_native = bmp;
+					ds->bitmap_matrix[0] = a;
+					ds->bitmap_matrix[1] = b;
+					ds->bitmap_matrix[2] = c;
+					ds->bitmap_matrix[3] = d;
+					ds->bitmap_matrix[4] = tx;
+					ds->bitmap_matrix[5] = ty;
+					ds->bitmap_repeat = repeat;
+					ds->bitmap_smooth = smooth;
+				}
 			} else {
 				_draw_handled = 0;
 			}
@@ -62695,8 +62862,7 @@ void actionCallMethod(SWFAppContext* app_context, char* str_buffer)
 			// beginFill(rgb [, alpha]) — start solid fill
 			if (mc != NULL) {
 				DrawingState* ds = getOrCreateDrawingState(mc);
-				// Finalize any pending path before starting a new fill
-				if (ds->cmd_count > 0) drawingFinalizePath(ds);
+				drawingBeginNewFill(ds);
 				u32 rgb = 0;
 				float alpha = 1.0f;
 				if (num_args >= 1) rgb = (u32)varToDouble(&args[0]);
@@ -62722,7 +62888,7 @@ void actionCallMethod(SWFAppContext* app_context, char* str_buffer)
 				// First arg undefined → clear fill (checked before arg count validation)
 				if (args[0].type == ACTION_STACK_VALUE_UNDEFINED) {
 					DrawingState* ds = getOrCreateDrawingState(mc);
-					if (ds->cmd_count > 0) drawingFinalizePath(ds);
+					drawingBeginNewFill(ds);
 					ds->has_fill = 0;
 					ds->has_gradient = 0;
 					if (args != NULL) FREE(args);
@@ -62840,7 +63006,7 @@ void actionCallMethod(SWFAppContext* app_context, char* str_buffer)
 				}
 				// Build gradient matrix
 				DrawingState* ds = getOrCreateDrawingState(mc);
-				if (ds->cmd_count > 0) drawingFinalizePath(ds);
+				drawingBeginNewFill(ds);
 				// Check if matrixType == "box"
 				ActionVar* mt_v = getProperty(matrix_obj, "matrixType", 10);
 				int is_box = 0;
@@ -62890,6 +63056,85 @@ void actionCallMethod(SWFAppContext* app_context, char* str_buffer)
 			pushUndefined(app_context);
 			return;
 		}
+		else if (method_name_len == 15 && strncasecmp(method_name, "beginBitmapFill", 15) == 0)
+		{
+			// beginBitmapFill(bitmap [, matrix [, repeat [, smooth]]])
+			// Matrix maps bitmap pixel coords → fill space (MC local pixels).
+			// repeat defaults to true; smooth defaults to false (Ruffle semantics).
+			if (mc != NULL) {
+				DrawingState* ds = getOrCreateDrawingState(mc);
+				drawingBeginNewFill(ds);
+
+				BitmapDataNative* bmp = NULL;
+				if (num_args >= 1 && args[0].type == ACTION_STACK_VALUE_OBJECT) {
+					ASObject* bmp_obj = (ASObject*)(uintptr_t)args[0].data.numeric_value;
+					bmp = getBitmapNative(bmp_obj);
+				}
+
+				if (bmp == NULL || bmp->disposed || bmp->pixels == NULL ||
+				    bmp->width <= 0 || bmp->height <= 0) {
+					// No usable bitmap → clear fill
+					ds->has_fill = 0;
+					ds->has_gradient = 0;
+					ds->has_bitmap_fill = 0;
+					ds->bitmap_native = NULL;
+				} else {
+					// Parse matrix (default identity)
+					float a = 1.0f, b = 0.0f, c = 0.0f, d = 1.0f, tx = 0.0f, ty = 0.0f;
+					if (num_args >= 2 && args[1].type == ACTION_STACK_VALUE_OBJECT) {
+						ASObject* m_obj = (ASObject*)(uintptr_t)args[1].data.numeric_value;
+						ActionVar* mv;
+						if ((mv = getProperty(m_obj, "a", 1)))  a  = (float)varToDouble(mv);
+						if ((mv = getProperty(m_obj, "b", 1)))  b  = (float)varToDouble(mv);
+						if ((mv = getProperty(m_obj, "c", 1)))  c  = (float)varToDouble(mv);
+						if ((mv = getProperty(m_obj, "d", 1)))  d  = (float)varToDouble(mv);
+						if ((mv = getProperty(m_obj, "tx", 2))) tx = (float)varToDouble(mv);
+						if ((mv = getProperty(m_obj, "ty", 2))) ty = (float)varToDouble(mv);
+					}
+					// repeat defaults to true; smooth defaults to false. Coerce inline.
+					int repeat = 1;
+					if (num_args >= 3) {
+						ActionVar* v = &args[2];
+						if (v->type == ACTION_STACK_VALUE_BOOLEAN) {
+							repeat = v->data.numeric_value ? 1 : 0;
+						} else if (v->type == ACTION_STACK_VALUE_F64 || v->type == ACTION_STACK_VALUE_F32) {
+							double dd = varToDouble(v);
+							repeat = (dd != 0 && dd == dd) ? 1 : 0;
+						} else if (v->type == ACTION_STACK_VALUE_UNDEFINED || v->type == ACTION_STACK_VALUE_NULL) {
+							repeat = 0;
+						} else {
+							repeat = 1;
+						}
+					}
+					int smooth = 0;
+					if (num_args >= 4) {
+						ActionVar* v = &args[3];
+						if (v->type == ACTION_STACK_VALUE_BOOLEAN) {
+							smooth = v->data.numeric_value ? 1 : 0;
+						} else if (v->type == ACTION_STACK_VALUE_F64 || v->type == ACTION_STACK_VALUE_F32) {
+							double dd = varToDouble(v);
+							smooth = (dd != 0 && dd == dd) ? 1 : 0;
+						}
+					}
+
+					ds->has_bitmap_fill = 1;
+					ds->has_fill = 1;
+					ds->has_gradient = 0;
+					ds->bitmap_native = bmp;
+					ds->bitmap_matrix[0] = a;
+					ds->bitmap_matrix[1] = b;
+					ds->bitmap_matrix[2] = c;
+					ds->bitmap_matrix[3] = d;
+					ds->bitmap_matrix[4] = tx;
+					ds->bitmap_matrix[5] = ty;
+					ds->bitmap_repeat = repeat;
+					ds->bitmap_smooth = smooth;
+				}
+			}
+			if (args != NULL) FREE(args);
+			pushUndefined(app_context);
+			return;
+		}
 		else if (method_name_len == 7 && strncasecmp(method_name, "endFill", 7) == 0)
 		{
 			// endFill() — finalize current path
@@ -62898,6 +63143,8 @@ void actionCallMethod(SWFAppContext* app_context, char* str_buffer)
 				drawingFinalizePath(ds);
 				ds->has_fill = 0;
 				ds->has_gradient = 0;
+				ds->has_bitmap_fill = 0;
+				ds->bitmap_native = NULL;
 			}
 			if (args != NULL) FREE(args);
 			pushUndefined(app_context);

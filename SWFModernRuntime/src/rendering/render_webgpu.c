@@ -2029,6 +2029,142 @@ void render_webgpu_draw_bitmap_quad(WebGPURenderContext* ctx,
 }
 
 // ---------------------------------------------------------------------------
+// render_webgpu_draw_bitmap_tris — bitmap-filled triangles for the Drawing
+// API's beginBitmapFill. Source `argb_pixels` is uploaded with row-stride
+// padding to fill the whole bitmap-array layer: tiled (for repeat=true) or
+// edge-clamped (for repeat=false), so that UVs outside the data region map
+// to the desired values without a custom sampler.
+// user_matrix6: a, b, c, d, tx_pixels, ty_pixels — maps bitmap pixel coords →
+// MC local pixel coords (Flash semantics).
+// ---------------------------------------------------------------------------
+void render_webgpu_draw_bitmap_tris(WebGPURenderContext* ctx,
+	const float* xy_pairs, u32 vertex_count,
+	const uint32_t* argb_pixels, u32 src_w, u32 src_h,
+	const float* user_matrix6, int repeat, int smooth,
+	u32 transform_id, u32 cxform_id)
+{
+	(void)smooth;  // smoothing flag — sampler is currently fixed at linear
+	if (!ctx->renderer_ok || vertex_count == 0 || xy_pairs == NULL) return;
+	if (argb_pixels == NULL || src_w == 0 || src_h == 0) return;
+	if (ctx->dynamic_bitmap_used >= ctx->dynamic_bitmap_capacity) return;
+	if (ctx->dynamic_vertex_used + vertex_count > MAX_DYNAMIC_VERTICES)
+		vertex_count = MAX_DYNAMIC_VERTICES - ctx->dynamic_vertex_used;
+	if (vertex_count == 0) return;
+
+	// Allocate dynamic bitmap layer
+	u32 bmp_layer = ctx->dynamic_bitmap_base + ctx->dynamic_bitmap_used;
+	ctx->dynamic_bitmap_used++;
+
+	u32 bw = (u32)(ctx->bitmap_highest_w + 1);
+	u32 bh = (u32)(ctx->bitmap_highest_h + 1);
+
+	// Build the padded layer: tile for repeat=true, edge-clamp for repeat=false.
+	{
+		size_t slice_bytes = (size_t)bw * bh * 4;
+		u8* temp = (u8*)calloc(1, slice_bytes);
+		u32* dst = (u32*)temp;
+		for (u32 y = 0; y < bh; y++) {
+			u32 sy;
+			if (repeat) sy = y % src_h;
+			else        sy = (y < src_h) ? y : src_h - 1;
+			for (u32 x = 0; x < bw; x++) {
+				u32 sx;
+				if (repeat) sx = x % src_w;
+				else        sx = (x < src_w) ? x : src_w - 1;
+				u32 argb = argb_pixels[sy * src_w + sx];
+				u32 a = (argb >> 24) & 0xFF;
+				u32 r = (argb >> 16) & 0xFF;
+				u32 g = (argb >> 8)  & 0xFF;
+				u32 b =  argb        & 0xFF;
+				dst[y * bw + x] = r | (g << 8) | (b << 16) | (a << 24);
+			}
+		}
+
+		WGPUTexelCopyTextureInfo dest = {0};
+		dest.texture = ctx->bitmap_tex;
+		dest.origin = (WGPUOrigin3D){0, 0, bmp_layer};
+		WGPUTexelCopyBufferLayout layout = {0};
+		layout.bytesPerRow = bw * 4;
+		layout.rowsPerImage = bh;
+		WGPUExtent3D extent = {bw, bh, 1};
+		wgpuQueueWriteTexture(ctx->queue, &dest, temp, slice_bytes, &layout, &extent);
+
+		// Record the bitmap size for the layer (same convention as other paths).
+		u32 sizes[2] = { bw, bh };
+		wgpuQueueWriteBuffer(ctx->queue, ctx->bitmap_sizes_buffer,
+			(uint64_t)bmp_layer * 2 * sizeof(u32), sizes, sizeof(sizes));
+
+		free(temp);
+	}
+
+	// Compose inv_mat: pos_twips → bitmap_pixel_coord in layer space.
+	// Flash matrix M = [a, c, tx; b, d, ty] maps bitmap_pixel → mc_local_pixel.
+	// M^-1 maps mc_local_pixel → bitmap_pixel. We also fold a (1/20) factor so
+	// the matrix consumes pos_twips directly.
+	u32 inv_mat_id = ctx->static_mat_count + MAX_DYNAMIC_GRADIENTS + (ctx->dynamic_bitmap_used - 1);
+	{
+		float a = user_matrix6[0], b = user_matrix6[1];
+		float c = user_matrix6[2], d = user_matrix6[3];
+		float tx = user_matrix6[4], ty = user_matrix6[5];
+		float det = a * d - b * c;
+		float inv_mat[16];
+		for (int i = 0; i < 16; i++) inv_mat[i] = 0.0f;
+		inv_mat[10] = 1.0f;
+		inv_mat[15] = 1.0f;
+		if (det != 0.0f) {
+			float inv_det = 1.0f / det;
+			float ai =  d * inv_det, bi = -b * inv_det;
+			float ci = -c * inv_det, di =  a * inv_det;
+			// Translation in inverse: -M^-1 * t (pixel space)
+			float txi = -(ai * tx + ci * ty);
+			float tyi = -(bi * tx + di * ty);
+			// Combined matrix: (1/20) scale on the 2x2 part folds in the twips→pixel divide.
+			inv_mat[0]  = ai / 20.0f;
+			inv_mat[1]  = bi / 20.0f;
+			inv_mat[4]  = ci / 20.0f;
+			inv_mat[5]  = di / 20.0f;
+			inv_mat[12] = txi;
+			inv_mat[13] = tyi;
+		} else {
+			// Singular: collapse to (0,0) — fill samples bitmap origin
+			inv_mat[0] = 0.0f; inv_mat[5] = 0.0f;
+			inv_mat[12] = 0.0f; inv_mat[13] = 0.0f;
+		}
+		uint64_t mat_offset = (uint64_t)inv_mat_id * 16 * sizeof(float);
+		wgpuQueueWriteBuffer(ctx->queue, ctx->inv_mat_buffer, mat_offset,
+			inv_mat, 16 * sizeof(float));
+	}
+
+	// Generate triangle vertices.
+	// style_type 0x40 = repeating bitmap fill, 0x41 = clipped (no repeat).
+	u32 sx_word = repeat ? 0x40u : 0x41u;
+	u32 sy_word = (bmp_layer & 0xFFFFu) | ((inv_mat_id & 0xFFFFu) << 16);
+
+	u32 vert_base = ctx->dynamic_vertex_base + ctx->dynamic_vertex_used;
+	ctx->dynamic_vertex_used += vertex_count;
+
+	u32* verts = (u32*)malloc((size_t)vertex_count * 4 * sizeof(u32));
+	for (u32 i = 0; i < vertex_count; i++) {
+		union { float f; u32 u; } xv, yv;
+		xv.f = xy_pairs[i * 2];
+		yv.f = xy_pairs[i * 2 + 1];
+		verts[i * 4 + 0] = xv.u;
+		verts[i * 4 + 1] = yv.u;
+		verts[i * 4 + 2] = sx_word;
+		verts[i * 4 + 3] = sy_word;
+	}
+	uint64_t byte_offset = (uint64_t)vert_base * 4 * sizeof(u32);
+	wgpuQueueWriteBuffer(ctx->queue, ctx->vertex_buffer,
+		byte_offset, verts, (size_t)vertex_count * 4 * sizeof(u32));
+	free(verts);
+
+	// Premultiplied blend (bitmap data is pre-multiplied via fillRect).
+	wgpuRenderPassEncoderSetPipeline(ctx->render_pass, ctx->blend_premul_pipeline);
+	render_webgpu_draw_shape(ctx, vert_base, vertex_count, transform_id, cxform_id);
+	wgpuRenderPassEncoderSetPipeline(ctx->render_pass, ctx->render_pipeline);
+}
+
+// ---------------------------------------------------------------------------
 // Clip mask control: stencil-based clipping for PlaceObject2 clipDepth
 // ---------------------------------------------------------------------------
 void render_webgpu_begin_clip_mask(WebGPURenderContext* ctx)

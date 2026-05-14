@@ -2728,7 +2728,12 @@ static void textfield_glyph_render_cb(const TextFieldGlyphInfo* info, void* user
 static void render_drawing_path(const DrawingRenderInfo* info)
 {
 	if (info->fill_count > 0) {
-		if (info->has_gradient && info->gradient_ramp && info->gradient_matrix) {
+		if (info->has_bitmap_fill && info->bitmap_pixels && info->bitmap_matrix) {
+			renderer_draw_bitmap_tris(context, info->fill_verts, info->fill_count,
+				info->bitmap_pixels, info->bitmap_width, info->bitmap_height,
+				info->bitmap_matrix, info->bitmap_repeat, info->bitmap_smooth,
+				info->transform_id, info->cxform_id);
+		} else if (info->has_gradient && info->gradient_ramp && info->gradient_matrix) {
 			renderer_draw_gradient_tris(context, info->fill_verts, info->fill_count,
 				info->gradient_type, info->spread_mode, info->interpolation, info->focal_ratio,
 				info->gradient_ramp, info->gradient_matrix,

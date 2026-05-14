@@ -503,6 +503,12 @@ typedef struct {
 	float line_focal_ratio;
 	u8 line_gradient_ramp[256 * 4];
 	float line_gradient_matrix[16];
+	// Bitmap fill data (mutually exclusive with solid/gradient fill)
+	int has_bitmap_fill;
+	void* bitmap_native;        // BitmapDataNative* — read live at render time
+	float bitmap_matrix[6];     // user-supplied affine in PIXEL space (a,b,c,d,tx,ty)
+	int bitmap_repeat;
+	int bitmap_smooth;
 	// Tessellated output (filled after endFill)
 	float* fill_verts;     // x,y pairs in twips (triangle vertices)
 	u32 fill_vert_count;   // number of vertices (multiple of 3)
@@ -540,6 +546,12 @@ typedef struct {
 	float line_gradient_focal;
 	u8 line_gradient_ramp[256 * 4];
 	float line_gradient_matrix[16];
+	// Bitmap fill state (set by beginBitmapFill)
+	int has_bitmap_fill;
+	void* bitmap_native;        // BitmapDataNative* — read live at render time
+	float bitmap_matrix[6];     // user-supplied affine in PIXEL space (a,b,c,d,tx,ty)
+	int bitmap_repeat;
+	int bitmap_smooth;
 	// Active path commands (between beginFill and endFill)
 	DrawCmd* cmds;
 	u32 cmd_count;
@@ -558,6 +570,13 @@ typedef struct {
 	float focal_ratio;
 	const u8* gradient_ramp;  // 256*4 RGBA8 entries
 	const float* gradient_matrix; // 4x4 column-major
+	// Bitmap fill (beginBitmapFill) — resolved live from the BitmapDataNative
+	int has_bitmap_fill;
+	const u32* bitmap_pixels;  // premultiplied ARGB, row-major
+	u32 bitmap_width, bitmap_height;
+	const float* bitmap_matrix;      // 6 floats: a,b,c,d,tx_px,ty_px
+	int bitmap_repeat;
+	int bitmap_smooth;
 	const float* line_verts;
 	u32 line_count;
 	float line_r, line_g, line_b, line_a;
