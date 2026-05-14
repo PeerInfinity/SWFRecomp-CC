@@ -507,9 +507,11 @@ audio playback, only on `onStatus` event timing (already correct).
   source-dim rendering. `netstream_play_flv` image diff regrew from ~53k
   to ~221k outliers (content still decodes correctly, just renders at
   source dimensions which overflow the intended placed area) — entry in
-  `ACCEPTED_DIFFS.md` Cat 9 updated. Proper fix is renderer-side matrix
-  scaling per Ruffle's `core/src/display_object/video.rs:528-530` — moved
-  into Phase D scope.
+  `ACCEPTED_DIFFS.md` Cat 9 updated. Matrix-scale rendering for the Video
+  display object is delivered separately under
+  [`video-display-flash-parity-plan.md`](video-display-flash-parity-plan.md)
+  Phase 1 (GPU-side `renderer_draw_bitmap_quad_scaled`); not part of this
+  plan's scope.
 - **2026-05-13:** Phase A complete. libavcodec wired into native
   graphics builds via a new `WITH_LIBAVCODEC` CMake option and
   matching plumbing in `verify_output.py`. New translation unit

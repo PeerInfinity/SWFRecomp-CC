@@ -409,28 +409,24 @@ Per-channel results typically differ by 1-3 levels in solid regions and up to ~1
 at frame edges (different bilinear resampling). See
 `SWFRecompDocs/plans/video-codec-support-plan.md`.
 
-### `netstream_play_flv` — Sorenson Spark size / pixel parity (~221k outliers, max diff 255)
+### `netstream_play_flv` — Sorenson Spark pixel parity (~52k outliers, max diff 64)
 
 The trace test (22/22) passes — `onStatus` events, NetStream lifecycle, and FLV
-metadata parsing all match Ruffle. The image rendering shows the correct content
-(the Japanese-flag test pattern decoded from the FLV's Sorenson Spark keyframe)
-but at the **source decoded dimensions (320×234)** rather than the SWF's declared
-Video bounds (160×120). Ruffle scales the transform matrix by `(declared/source)`
-so the GPU samples the source bitmap onto a declared-sized quad
-(`core/src/display_object/video.rs:528-530`); our renderer currently renders the
-bitmap at native dimensions and applies only the SWF's PlaceObject2 matrix, so
-the on-stage area is larger than Ruffle's. Additionally, libavcodec's YUV→RGB
-output drifts 1-3 levels per channel from Ruffle's `h263-rs-yuv` in solid regions.
+metadata parsing all match Ruffle. After the 2026-05-13 Phase 1 landing of
+GPU-side matrix-scale rendering for the Video display object
+(`renderer_draw_bitmap_quad_scaled`, see
+`SWFRecompDocs/plans/video-display-flash-parity-plan.md`), the decoded frame is
+rendered at the SWF-declared bounds (160×120) per Flash's documented Video
+render rule; the on-stage size matches expected. The remaining diff is purely
+**libavcodec H.263 vs Ruffle's `h263-rs-yuv` pixel precision**: libavcodec's
+YUV→RGB output drifts 1-3 levels per channel from Ruffle's pure-Rust decoder in
+solid regions, plus larger drifts at the resampling boundary where the GPU
+sample-stretch (320×234 → 160×120) interacts with codec-output differences.
+Both are valid H.263/Spark decoders; the difference is fixed-point arithmetic
+choices, not a correctness gap.
 
-A 2026-05-13 attempt to fix size parity by CPU-resampling to declared bounds in
-`actionGetVideoFramePixels` regressed `netstream_play_flv_screen` (FLVPlayback
-authors its bundled ScreenVideo at the stage's native size and relies on
-source-dim rendering); reverted. The proper fix is renderer-side matrix scaling
-matching Ruffle's approach — tracked under Phase D of
-`SWFRecompDocs/plans/video-codec-support-plan.md`.
-
-**Decision:** Accept; content decodes correctly, size diff is a known
-renderer-architecture gap rather than a codec bug. Trace test continues to pass.
+**Decision:** Accept; content decodes correctly and renders at the correct
+on-stage size. Trace test continues to pass.
 
 ---
 
@@ -458,4 +454,4 @@ renderer-architecture gap rather than a codec bug. Trace test continues to pass.
 | `movieclip_hittest_shapeflag` | Hit test accuracy (morph boundary precision) | 1 | Accept; float vs integer precision |
 | `movieclip_hittest_shapeflag` | Hit test accuracy (Drawing API stroke tessellation) | 1 | Accept; tessellation boundary |
 | `bitmap_data_thorough/pixelDissolve` | Ruffle known failure (panic) + Flash-specific Feistel coercion | ~38 | Accept; 97.2% match, no Ruffle oracle for `ruffle_matched` |
-| `netstream_play_flv` | Video render-size parity (source-dim vs declared-bounds rendering) + libavcodec H.263 pixel parity | ~221k image outliers | Accept; trace passes, content decodes correctly, renderer architecture gap (Ruffle scales matrix; we render at source). Proper fix tracked under video-codec-support-plan.md Phase D |
+| `netstream_play_flv` | libavcodec H.263 vs h263-rs pixel precision | ~52k image outliers, max diff 64 | Accept; trace passes, on-stage size matches Flash after Phase 1 matrix-scale render, residual diff is decoder fixed-point arithmetic |

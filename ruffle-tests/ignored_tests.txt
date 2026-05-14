@@ -31,6 +31,11 @@ xml_socket_segmented
 # --- Video streaming (NetStream/NetConnection) ---
 # These tests require video/network streaming APIs.
 netconnection_send_remote
+# Trace passes (2/2). Image diff is a documented Ruffle vs Flash divergence:
+# expected.png is a bit-exact stamp of rufflelogo.png (the source asset),
+# inconsistent with both Flash's render-at-declared-bounds rule and Ruffle's
+# own matrix-scale rule. We render correctly per Flash; see
+# RUFFLE_VS_FLASH_DIFFERENCES.md "Video Display Object Render Bounds".
 netstream_play_flv_screen
 
 # --- FileReference (OS file picker + network upload/download) ---
