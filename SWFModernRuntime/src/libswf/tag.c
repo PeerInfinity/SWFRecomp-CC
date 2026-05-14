@@ -5220,11 +5220,20 @@ void tagPlaceObject2(SWFAppContext* app_context, size_t depth, size_t char_id, u
 	{
 		if (display_list[depth].char_id != char_id)
 		{
-			// Flash rejects placing a different character at a depth already occupied this frame
+			// Flash rejects placing a different character at a depth already occupied this frame.
+			// Discard any pending instance_name set by a preceding tagSetInstanceName so the
+			// rejected placement's name doesn't leak to the next placement (and doesn't
+			// overwrite the surviving first placement's name either). Required for
+			// gnash misc-ming place_object_test where the first placement's name (sh1/mc2)
+			// must survive the second placement's rejection.
+			g_pending_instance_name = NULL;
 			printf("Warning: Failed to place object at depth %zu.\n", depth);
 			return;
 		}
-		// Same character at same depth in same frame: treat as modify (don't re-init)
+		// Same character at same depth in same frame: treat as modify (don't re-init).
+		// Per Ruffle apply_place_object, name is "Purposely omitted" on modify — discard
+		// any pending instance_name without consuming it.
+		g_pending_instance_name = NULL;
 		display_list[depth].transform_id = transform_id;
 #if defined(NO_GRAPHICS) || defined(OFFSCREEN_RENDER)
 		ng_cache_transform(&display_list[depth], transform_id);
@@ -7148,22 +7157,27 @@ void tagSetInstanceName(SWFAppContext* app_context, size_t depth, const char* na
 			return;
 		}
 	}
-	// Cross-frame REPLACE preservation: when an existing entry at this depth
-	// was placed by a previous frame, the upcoming PlaceObject2 is a REPLACE
-	// (move=1, has_character=1). Per Ruffle apply_place_object, name is
+	// REPLACE preservation: when an existing entry occupies this depth, the
+	// upcoming PlaceObject2 is either a REPLACE/MODIFY (cross-frame: move=1
+	// against the existing child) or a same-frame conflict (Flash rejects
+	// the second placement). Per Ruffle apply_place_object, name is
 	// "Purposely omitted" — REPLACE/MODIFY tags do not update the name of an
-	// existing child. Stash as pending; tagPlaceObject2's REPLACE-preservation
-	// path will discard it (matching Ruffle), while the rare full-replacement
-	// fallback (different placement that doesn't trigger that path) can still
-	// consume it. Skip when an UNLOAD-handler Remove was just deferred at this
-	// depth (the entry's char_id is stale post-Remove; treat as pre-place
-	// pending name like the empty-depth branch above).
+	// existing child, and rejected same-frame placements must not leak the
+	// new name onto the surviving first placement either. Stash as pending;
+	// tagPlaceObject2's REPLACE-preservation / same-frame-conflict paths
+	// discard the pending name (matching Ruffle), while the rare full-
+	// replacement fallback (different placement that doesn't trigger those
+	// paths) can still consume it. Skip when an UNLOAD-handler Remove was
+	// just deferred at this depth (the entry's char_id is stale post-Remove;
+	// treat as pre-place pending name like the empty-depth branch above).
 	// Applies to both sprites (existing handling) and non-sprite chars
 	// (shapes/text/buttons) — the latter is exercised by misc-ming
 	// replace_shapes1test where a frame-3 shape REPLACE supplies a new name.
+	// Same-frame coverage: gnash misc-ming place_object_test, where a second
+	// PlaceObject at depth 3/4 in the same frame is rejected and the first
+	// placement's name (sh1/mc2) must survive.
 	extern int ng_depth_has_pending_finalize(size_t);
 	if (display_list[depth].char_id != 0
-	    && display_list[depth].place_gen != g_place_gen
 	    && !ng_depth_has_pending_finalize(depth))
 	{
 		g_pending_instance_name = name;
