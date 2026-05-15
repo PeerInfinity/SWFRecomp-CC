@@ -117,6 +117,29 @@ def get_scale_factor(test_dir):
     return float(m.group(1)) if m else 1.0
 
 
+def get_log_warnings(test_dir):
+    """Parse `log_warnings` from test.toml, default True. Ruffle uses this to
+    suppress avm_warning output when comparing the test's stdout to expected;
+    we mirror that by stripping "Warning: ..." lines from our captured output
+    before comparison."""
+    toml_path = test_dir / "test.toml"
+    if not toml_path.exists():
+        return True
+    text = toml_path.read_text()
+    m = re.search(r"^\s*log_warnings\s*=\s*(true|false)\s*$", text, re.MULTILINE)
+    if not m:
+        return True
+    return m.group(1) == "true"
+
+
+def filter_log_warnings(text):
+    """Strip lines that look like Ruffle's avm_warning output. Called when
+    `log_warnings = false` in test.toml. Matches "Warning: ..." prefix."""
+    return "\n".join(
+        line for line in text.split("\n") if not line.startswith("Warning:")
+    )
+
+
 def get_viewport_dimensions(test_dir):
     """Parse viewport width/height from test.toml, returns (width, height) or None."""
     toml_path = test_dir / "test.toml"
@@ -2954,6 +2977,12 @@ def main():
 
         # Step 4: Filter and compare trace output
         actual = filter_output(raw_output)
+        # Ruffle's avm_warning output is suppressed when test.toml sets
+        # `log_warnings = false`; mirror that filter for parity with Ruffle's
+        # expected output (e.g. shape_test refuses Place-on-occupied with a
+        # warning that the expected output omits).
+        if not get_log_warnings(test_dir):
+            actual = filter_log_warnings(actual)
         if args.save_actual and actual:
             Path(args.save_actual).write_text(actual + "\n", encoding="utf-8")
             print(f"  Saved actual output ({len(actual.splitlines())} lines) to {args.save_actual}")

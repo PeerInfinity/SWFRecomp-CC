@@ -5013,6 +5013,11 @@ void tagPlaceObject2(SWFAppContext* app_context, size_t depth, size_t char_id, u
 	    && display_list[depth].char_id != char_id
 	    && display_list[depth].placed_at_frame <= current_frame)
 	{
+		// Match Ruffle's avm_warning on a refused Place (and the existing
+		// same-frame check at ~line 5362, which this earlier-firing gate would
+		// otherwise mask — e.g. avm1/placeobject_occupied_depth expects two
+		// such lines on stdout).
+		printf("Warning: Failed to place object at depth %zu.\n", depth);
 		g_pending_clip_actions = NULL;
 		g_pending_clip_action_count = 0;
 		g_pending_instance_name = NULL;
@@ -5697,6 +5702,7 @@ void tagPlaceObject2Ratio(SWFAppContext* app_context, size_t depth, size_t char_
 	    && display_list[depth].char_id != char_id
 	    && display_list[depth].placed_at_frame <= current_frame)
 	{
+		printf("Warning: Failed to place object at depth %zu.\n", depth);
 		g_pending_clip_actions = NULL;
 		g_pending_clip_action_count = 0;
 		g_pending_instance_name = NULL;
