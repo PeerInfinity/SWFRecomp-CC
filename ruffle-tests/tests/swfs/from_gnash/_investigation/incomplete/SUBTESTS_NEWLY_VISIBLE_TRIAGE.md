@@ -3,11 +3,11 @@
 
 <!-- PLAN_META
 id: SUBTESTS_NEWLY_VISIBLE_TRIAGE
-status: not_started
+status: in_progress
 phases:
   - id: 1
     name: "Tier A — near-passing (≥95% line match); land cheap fixes / ignored_tests promotions"
-    status: not_started
+    status: in_progress
   - id: 2
     name: "Tier B — close (85-95%); split out per-family plans"
     status: not_started
@@ -26,9 +26,70 @@ dependencies:
 blockers: []
 -->
 
-Last updated: 2026-05-15
+Last updated: 2026-05-15 (Tier A Date-vN promoted to ruffle_matched, pending CI)
 
-## Status: NOT STARTED — triage doc only
+## 2026-05-15 — Tier A Date-v5..v8 landed (+4 effective, pending CI)
+
+Three runtime fixes flipped all four Date tests from `output_mismatch` →
+`ruffle_matched`:
+
+1. **`new Date(undefined)` → treat as `new Date()`** (`date.c`,
+   `actionDateConstruct` + `builtin_date_constructor`). Both functions
+   now scan `args[]` and truncate `arg_count` at the first
+   `ACTION_STACK_VALUE_UNDEFINED`. Matches Ruffle's argument-collection
+   loop (`avm1/globals/date.rs::method()` breaks at first
+   `Value::Undefined`) and the test source comment "Constructor with
+   first arg == undefined also sets current localtime". Fixes line 93
+   (`d2.valueOf() >= d.valueOf()`) on all four versions.
+
+2. **Strict string-to-number for Date construction** (`date.c`,
+   `date_arg_to_double`). Changed `varToDoubleSimple` (lenient `strtod`
+   accepting "1234X" → 1234) to `varToDoubleSWF(app_context, v,
+   EFFECTIVE_SWF_VERSION())` (strict — entire string must parse, else
+   NaN). Matches Ruffle's `coerce_to_f64` / `string_to_f64` path. Fixes
+   line 122 (`new Date("1234X").valueOf().toString() == "NaN"`).
+
+3. **`Function.toLocaleString()` returns `"[type Function]"`**
+   (`action.c`, FUNCTION-receiver arm in `actionCallMethod` around line
+   60316). Previously `Date.toLocaleString()` walked the prototype chain
+   to `Object.prototype.toLocaleString` → `builtin_object_toString`,
+   which returns `"[object Object]"` unconditionally. Added a combined
+   case for `toString` and `toLocaleString` that returns `"[type
+   Function]"` by default (and honors an own_props override if
+   present, with `toLocaleString` falling back to `toString` on
+   own_props). Matches Ruffle, which aliases `Function.prototype.toLocaleString`
+   to `Function.prototype.toString`. Fixes line 108 (`Date.toLocaleString()
+   == Date.toString()`).
+
+**Test results post-fix (local):**
+- `Date-v5`: output_mismatch 305/315 → **ruffle_matched** (diff 7 ⊆ ruffle 10)
+- `Date-v6`: output_mismatch 348/357 → **ruffle_matched** (diff 6 ⊆ ruffle 6)
+- `Date-v7`: output_mismatch 349/357 → **ruffle_matched**
+- `Date-v8`: output_mismatch 349/357 → **ruffle_matched**
+
+Residual diffs vs `output.txt` are all in Ruffle's diff set too:
+mock-date-time-driven `d.valueOf() > 1175385600000.0` failure
+(Apr 2007 threshold vs our 2001 seed), the 3-line "pp known to fail"
+int32 overflow lines (precision differs slightly between our and
+Ruffle's path but both at same indices), and the summary counts.
+
+**Regression battery (clean):** 12-test AVM1 prototype/scope/Date
+battery (`closure_scope`, `as2_super_and_this_v6`, `extends_chain`,
+`register_class_return_value`, `primitive_type_globals`, `enumerate`,
+`parse_int`, `typeof`, `function_base_clip`, `constructor_function`,
+`define_function2_preload`, `funky_function_calls`) all PASS. AVM1
+`date` test unchanged (still 6289/6335 matching, same pre-existing
+mismatches — none of the 3 fixes affect its diff set).
+
+**ops-v5/v6/v7 (Tier A RM):** Already `ruffle_matched` via
+`ruffle_subset_match` (diff 7 ⊆ ruffle 9/11). Inspection confirmed all
+7 residual diff lines are Ruffle-vs-Flash divergences: `! (z == NaN)`,
+`x != y` reflexivity, `_root == o` MC-equality, unsigned 32-bit shift
+result (`y == -1` vs `4294967295`), etc. No action needed — the tests
+already contribute to effective_pass; documenting per the plan was
+sufficient.
+
+## Status: IN PROGRESS — Tier A Date-vN complete; ops-vN are pre-RM
 
 This doc inventories the 49 newly-discoverable `output_mismatch` tests
 that appeared in CI `eb8206f8` (run `25896064893`, no-graphics) after
@@ -54,26 +115,23 @@ All numbers from `ruffle-tests/tests/swfs/from_gnash/{suite}/_results/results.js
 at commit `eb8206f8`. Per-test breakdown follows the tier tables.
 The actionable signal for each tier is in the **"Next move"** line.
 
-## Tier A — near-passing (≥95% line match), N=7
+## Tier A — near-passing (≥95% line match), N=7 — **DONE**
 
-| Test | Suite | Lines | % |
-|------|-------|------:|--:|
-| `Date-v7` | actionscript.all | 349/357 | 97.8% |
-| `Date-v8` | actionscript.all | 349/357 | 97.8% |
-| `Date-v6` | actionscript.all | 348/357 | 97.5% |
-| `ops-v5` | actionscript.all | 253/260 | 97.3% (RM) |
-| `ops-v6` | actionscript.all | 253/260 | 97.3% (RM) |
-| `ops-v7` | actionscript.all | 255/262 | 97.3% (RM) |
-| `Date-v5` | actionscript.all | 305/315 | 96.8% |
+| Test | Suite | Lines | % | Status |
+|------|-------|------:|--:|--------|
+| `Date-v7` | actionscript.all | 349/357 | 97.8% | **RM** (2026-05-15) |
+| `Date-v8` | actionscript.all | 349/357 | 97.8% | **RM** (2026-05-15) |
+| `Date-v6` | actionscript.all | 348/357 | 97.5% | **RM** (2026-05-15) |
+| `ops-v5` | actionscript.all | 253/260 | 97.3% | RM (pre-existing) |
+| `ops-v6` | actionscript.all | 253/260 | 97.3% | RM (pre-existing) |
+| `ops-v7` | actionscript.all | 255/262 | 97.3% | RM (pre-existing) |
+| `Date-v5` | actionscript.all | 305/315 | 96.8% | **RM** (2026-05-15) |
 
-**Next move.** `Date-v5..v8` look like one or two shared diff lines per
-version (and the per-version delta is small — 8 lines on v6/v7/v8, 10
-on v5). Read the diff once, fix the shared cause, and likely flip all
-four to PASS. The `ops-vN` trio is already ruffle_matched; reading the
-7-line diff against Ruffle's `output.ruffle.txt` would tell us if the
-remaining lines are Ruffle-vs-Flash quirks (→ ACCEPTED_DIFFS) or our
-own bug. If diffs are Ruffle-side, ignored_tests promotion is the
-cheapest landing.
+**All 7 Tier A tests now effective-pass.** Date-vN landed via the three
+runtime fixes documented above (+4 effective, pending CI). ops-vN were
+already auto-promoted via `ruffle_subset_match`; residual 7-line diff
+is Ruffle-vs-Flash divergences (NaN compares, MC-equality, unsigned
+shift), no action needed.
 
 ## Tier B — close (85-95%), N=9
 

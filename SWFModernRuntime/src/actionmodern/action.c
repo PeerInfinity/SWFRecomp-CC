@@ -60313,16 +60313,23 @@ void actionCallMethod(SWFAppContext* app_context, char* str_buffer)
 			return;
 		}
 
-		if (method_name_len == 8 && strncasecmp(method_name, "toString", 8) == 0)
+		if ((method_name_len == 8 && strncasecmp(method_name, "toString", 8) == 0) ||
+			(method_name_len == 14 && strncasecmp(method_name, "toLocaleString", 14) == 0))
 		{
+			int is_locale = (method_name_len == 14);
 			if (args != NULL) FREE(args);
-			// Check if toString was overridden on this function's own_props
+			// Check if the method was overridden on this function's own_props.
+			// toLocaleString falls back to toString on own_props if no toLocaleString override.
 			if (func != NULL && func->own_props != NULL)
 			{
-				ActionVar* ts_prop = getProperty(func->own_props, "toString", 8);
+				ActionVar* ts_prop = is_locale
+					? getProperty(func->own_props, "toLocaleString", 14)
+					: getProperty(func->own_props, "toString", 8);
+				if (is_locale && ts_prop == NULL)
+					ts_prop = getProperty(func->own_props, "toString", 8);
 				if (ts_prop != NULL)
 				{
-					// toString exists on own_props — if it's undefined, return undefined
+					// method exists on own_props — if it's undefined, return undefined
 					if (ts_prop->type == ACTION_STACK_VALUE_UNDEFINED)
 					{
 						pushUndefined(app_context);
@@ -60341,7 +60348,7 @@ void actionCallMethod(SWFAppContext* app_context, char* str_buffer)
 					}
 				}
 			}
-			// Default: Function.toString() returns "[type Function]"
+			// Default: Function.toString() and Function.toLocaleString() both return "[type Function]"
 			ActionVar result;
 			result.type = ACTION_STACK_VALUE_STRING;
 			result.str_size = 15;

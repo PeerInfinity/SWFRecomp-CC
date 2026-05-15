@@ -298,7 +298,11 @@ static double date_arg_to_double(SWFAppContext* app_context, ActionVar* v) {
 	}
 	if (v->type == ACTION_STACK_VALUE_NULL) return NAN;
 	if (v->type == ACTION_STACK_VALUE_STRING) {
-		return varToDoubleSimple(v);
+		// Date construction uses strict ECMAScript ToNumber semantics on strings:
+		// the entire string must parse as a number, else NaN. (Matches Ruffle's
+		// coerce_to_f64 / string_to_f64 path.) `varToDoubleSimple` does lenient
+		// strtod, which would let "1234X" → 1234.
+		return varToDoubleSWF(app_context, v, EFFECTIVE_SWF_VERSION());
 	}
 	if (v->type == ACTION_STACK_VALUE_OBJECT) {
 		// Call valueOf
@@ -676,6 +680,15 @@ ASObject* actionDateConstruct(SWFAppContext* app_context, ActionVar* args, u32 a
 	proto_var.data.numeric_value = (u64)g_date_prototype;
 	setProperty(app_context, date, "__proto__", 9, &proto_var);
 
+	// Truncate args at first UNDEFINED (matches Ruffle / ECMAScript semantics:
+	// `new Date(undefined)` → current time, same as `new Date()`).
+	for (u32 i = 0; i < arg_count; i++) {
+		if (args[i].type == ACTION_STACK_VALUE_UNDEFINED) {
+			arg_count = i;
+			break;
+		}
+	}
+
 	double t;
 	if (arg_count == 0) {
 #ifdef MOCK_DATE_TIME
@@ -741,6 +754,14 @@ static ActionVar builtin_date_constructor(SWFAppContext* app_context, ActionVar*
 
 	// Non-native object: initialize as Date
 	obj->native_type = NATIVE_DATE;
+
+	// Truncate args at first UNDEFINED (see actionDateConstruct).
+	for (u32 i = 0; i < arg_count; i++) {
+		if (args[i].type == ACTION_STACK_VALUE_UNDEFINED) {
+			arg_count = i;
+			break;
+		}
+	}
 
 	double t;
 	if (arg_count == 0) {
