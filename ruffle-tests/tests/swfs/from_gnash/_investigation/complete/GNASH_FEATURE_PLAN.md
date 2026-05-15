@@ -1,6 +1,8 @@
 # Gnash Failing Tests by Feature Category (Umbrella Plan)
 <!-- TESTS: -->
 <!-- PASSING (removed from TESTS, all promoted as of 2026-05-08 CI): AsBroadcaster-v6/v7/v8 (ruffle_matched), ContextMenu-v7/v8 (pass), Global-v6 (ruffle_matched), Global-v7/v8 (pass), HitTest-v6/v7/v8 (ruffle_matched), Instance-v5/v6/v7/v8 (pass), Matrix-v7/v8 (ruffle_matched), MovieClip-v5 (ruffle_matched), Number-v5 (ruffle_matched), Number-v6/v7/v8 (pass), Sound-v6/v7/v8 (ruffle_matched), TextFormat-v5/v6 (pass), TextFormat-v7 (ruffle_matched), Point-v8 (ruffle_matched, 2026-04-14), TextSnapshot-v6/v7/v8 (pass), delete-v5..v8 (pass), enumerate-v6..v8 (pass), Camera-v6/v7/v8 (ruffle_matched), Microphone-v6/v7/v8 (ruffle_matched), Sound-v5 (ruffle_matched), targetPath-v6/v7/v8 (ruffle_matched), System-v5/v6/v7/v8 (pass, 2026-04-14 session 3), case-v5/v6/v7/v8 (pass, 2026-04-30), ExternalInterface-v6/v7 (pass, 2026-04-30) -->
+<!-- PASSING (newly-visible via SUBTESTS_HARNESS, CI eb8206f8 2026-05-15): Global-v5 (pass), ops-v5/v6/v7 (ruffle_matched). All of these tests ship only output.fpN.txt with no canonical output.txt, so they were silently dropped from discovery until commit 39b797ac (avm1/_investigation/complete/SUBTESTS_HARNESS_PLAN.md). The ops-v8 entry in the original PASSING list above predates SUBTESTS_HARNESS — it had its own output.txt. -->
+<!-- RUFFLE_MATCHED BUT NOT FIX TARGETS (CI eb8206f8 2026-05-15, also via SUBTESTS_HARNESS): setProperty-v5/v6/v7/v8 (3/52 lines match each; status is ruffle_matched only because our 49-line diff against Flash exactly matches Ruffle's 49-line diff — both we and Ruffle disagree with Flash identically). These are candidates for ACCEPTED_DIFFS.md / RUFFLE_VS_FLASH_DIFFERENCES.md rather than fix targets. -->
 <!-- SPLIT OUT TO DEDICATED PLANS (2026-04-17):
   - ASnative-v5/v6/v7/v8 → complete/ASNATIVE_CLASSES_PLAN.md
   - String-v5/v6/v7/v8 → blocked/STRING_REGEX_PLAN.md
@@ -30,6 +32,14 @@ phases:
 dependencies: []
 blockers: []
 -->
+
+Last updated: 2026-05-15 (CI `eb8206f8`. SUBTESTS_HARNESS shipped 2026-05-14
+and exposed 53 previously-undiscoverable tests in actionscript.all. 45 of those
+landed as `output_mismatch` and are out of scope for this umbrella plan — they
+have their own triage at `incomplete/SUBTESTS_NEWLY_VISIBLE_TRIAGE.md`. The
+umbrella tests this plan originally tracked all remain at PASS/ruffle_matched.
+`array-v5` is still the only umbrella-scope raw failure (plan at
+`incomplete/ARRAY_V5_PLAN.md`).)
 
 Last updated: 2026-05-08 (all umbrella-tracked tests have promoted to PASS or
 ruffle_matched per `from_gnash/actionscript.all/_results/results.json`. The only

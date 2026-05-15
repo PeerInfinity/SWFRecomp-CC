@@ -178,10 +178,14 @@ alongside.
    math, no rendering changes.
 
 3. **Doesn't fix the test alone.** GradientFillTest also depends on
-   `SUBTESTS_HARNESS_PLAN` (to find an expected output) and
-   `CPU_GRADIENT_RASTERIZER_PLAN` (for the trace pixel checks via
-   BitmapData.draw). Landing all three is what gets the test to PASS
-   (or to ACCEPTED_DIFFS for unfixable per-fp-version diffs).
+   `complete/SUBTESTS_HARNESS_PLAN.md` (to find an expected output —
+   **shipped 2026-05-14 in commit `39b797ac`**) and
+   `complete/CPU_GRADIENT_RASTERIZER_PLAN.md` (for the trace pixel
+   checks via BitmapData.draw). All three plans have now landed; the
+   test is now discoverable and runs (CI `eb8206f8`, 2026-05-15: 119/278
+   lines, status `output_mismatch`). Remaining gap is gradient
+   anti-aliasing / blending fidelity, not the dispatch or harness work
+   covered here.
 
 ## Estimated Complexity
 

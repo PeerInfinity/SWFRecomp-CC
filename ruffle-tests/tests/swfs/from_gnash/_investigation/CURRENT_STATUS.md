@@ -1,18 +1,36 @@
 # Gnash Test Suite Status
 
+Last updated: 2026-05-15 (CI `eb8206f8`, no-graphics, run `25896064893` — first run after SUBTESTS_HARNESS shipped in commit `39b797ac`. 66 previously-undiscoverable tests (53 actionscript.all, 8 misc-ming.all, 3 misc-swfc.all, 2 misc-swfmill.all) now run. Per-suite totals jumped accordingly; effective rates dropped *numerically* purely from denominator growth, while raw passing counts grew (+2 Gnash, +9 effective). Newly-discovered passes/RMs: `Global-v5` PASS, `ops-v5/v6/v7` RM, `setProperty-v5/v6/v7/v8` RM, `BitmapDataDraw` RM, `trace-as2/arguments` PASS (misc-swfmill.all). Two new regressions: `misc-ming.all/loop/loop_test10` RM (5/28) → output_mismatch (1/28); `misc-ming.all/register_class/RegisterClassTest4` 17/42 → 7/42 lines. Triage of 45 newly-visible output_mismatch tests in `incomplete/SUBTESTS_NEWLY_VISIBLE_TRIAGE.md`.)
+
 Last updated: 2026-05-13 (textfield-variable-binding plan complete: Phase A `fda90c99`, Phase B `a05dfc7c`, Phase C `b20ee462`. Dejagnu `_xtrace_win` trace TextField (bound to `_root._trace_text`) and similar variable-only-observed EditTexts now render correctly in graphics mode — driven by `place_object_test`, which stays RUFFLE_MATCHED but visually now matches what we'd expect under our AS2-spec depth handling. No pass-count delta (the affected tests were already effective-pass via RUFFLE_MATCHED); win is qualitative and architectural. See `SWFRecompDocs/plans/textfield-variable-binding-plan.md`.)
 
 Last updated: 2026-05-08 (pending CI — `DrawingApiTest` 66/93 → 80/93 line match via Drawing-API `getBounds()` rewrite: `moveTo` no longer folds the pen into bounds, `lineTo`/`curveTo` always fold endpoints in, and stroked segments expand by FULL line thickness on each side (Flash semantics). Also fixed `lineStyle()` thickness coercion to handle Object-with-`valueOf`. Test stays `output_mismatch` — residual 13 diff lines are all hitTest precision issues unrelated to bounds.)
 
-### CI snapshot (commit `f8e172e9`, 2026-05-08; misc-swfc.all also reflects intervening commit `5a7e9032` which added `RegisterClassTest4` to ignore list)
+### CI snapshot (commit `eb8206f8`, 2026-05-15, no-graphics)
 
 | Suite | Pass | RM | Effective | Total | Filtered Eff | Rate |
 |-------|------|----|-----------|-------|-------------|------|
-| actionscript.all | 126 | 63 | 189 | 190 | — | **99.5%** |
-| misc-ming.all | 65 | 24 | 89 | 102 | 89/101 | 87.3% raw / **88.1% filtered** |
-| misc-mtasc.all | 7 | 2 | 9 | 9 | — | 100.0% |
-| misc-swfc.all | 8 | 6 | 14 | 16 | — | **87.5%** |
-| misc-swfmill.all | 17 | 1 | 18 | 18 | — | 100.0% |
+| actionscript.all | 127 | 70 | 197 | 243 | — | **81.1%** |
+| misc-ming.all | 66 | 24 | 90 | 110 | 90/108 | 81.8% raw / **83.3% filtered** |
+| misc-mtasc.all | 7 | 2 | 9 | 9 | — | **100.0%** |
+| misc-swfc.all | 8 | 6 | 14 | 19 | 14/18 | 73.7% raw / **77.8% filtered** |
+| misc-swfmill.all | 18 | 1 | 19 | 20 | — | **95.0%** |
+
+The denominator growth comes from SUBTESTS_HARNESS shipping (+53 actionscript.all, +8 misc-ming.all, +3 misc-swfc.all, +2 misc-swfmill.all). Previous snapshot for comparison (commit `f8e172e9`, 2026-05-08): actionscript.all 126/63 of 190 (99.5%), misc-ming.all 65/24 of 102 (87.3% / 88.1%), misc-mtasc.all 7/2 of 9 (100%), misc-swfc.all 8/6 of 16 (87.5%), misc-swfmill.all 17/1 of 18 (100%). Raw passes grew (+2 across the four sub-suites) but effective rates fell numerically.
+
+### CI baseline (2026-05-15, commit `eb8206f8`, no-graphics run `25896064893`) — SUBTESTS_HARNESS discovers 66 new tests
+
+- **SUBTESTS_HARNESS (`39b797ac`).** `verify_output.py` now resolves expected-output filenames per-test via `resolve_expected_filename()`: `--expected-suffix` override → `output.txt` → `[subtests]` table's highest `player_options.version` variant. 66 tests that ship only `output.fpN.txt` were previously **invisible to discovery** (not failing — absent from totals). Distribution: 53 in actionscript.all, 8 in misc-ming.all, 3 in misc-swfc.all, 2 in misc-swfmill.all.
+
+- **Newly-discovered: 2 PASS, 8 ruffle_matched, 45 output_mismatch.** Direct wins: `Global-v5` and `misc-swfmill.all/trace-as2/arguments` are clean PASSES. RMs: `ops-v5/v6/v7`, `setProperty-v5/v6/v7/v8`, and `BitmapDataDraw`. Effective gain: **+9 (2 raw + 7 RM, treating `ops-v5/v6/v7` as additions even though related v8 already passed)**. The 45 output_mismatch tests have widely varying line-match scores (1/2192 to 349/357) — triaged by tier in `incomplete/SUBTESTS_NEWLY_VISIBLE_TRIAGE.md`.
+
+- **Two regressions in misc-ming.all** (unrelated to SUBTESTS_HARNESS).
+  - `loop/loop_test10`: ruffle_matched 5/28 → output_mismatch 1/28. Status reverted from the 2026-05-08 RM promotion (`96a5d81e` + `f0d575ca` same-frame Remove+Place fix).
+  - `register_class/RegisterClassTest4`: 17/42 → 7/42 lines (still output_mismatch but lost 10 lines). Already in `ignored_tests.txt`, so doesn't impact filtered rate.
+
+- **Quiet line-match wins** (status unchanged but lines moved): `path_format_test` 0/27 → 16/27 (RM); `place_object_test2` 0/19 → 14/19 (RM); `place_object_test` 0/12 → 6/12 (RM). Likely follow-on from the 2026-05-13 textfield-variable-binding plan.
+
+- **FAILING_TESTS_BY_FEATURE.md / _FILTERED.md regenerated this CI.** Several feature entries previously read "(1 failing / 1 total)" only because the other `-vN` versions weren't being discovered. Per-family cohorts (MovieClip-v6/v7/v8, TextField-v6/v7/v8, ops-v5/v6/v7, Date-v5..v8, Object-v5..v8, Function-v5..v8, XML/XMLNode-v5..v8, getvariable-v5..v8, setProperty-v5..v8, array-v6/v7/v8, NetConnection-v6/v7/v8, Stage-v6/v7/v8, argstest-v6/v7/v8, plus singletons like `flash-v8`, `Transform-v8`, `TextFormat-v8`) are now correctly represented.
 
 ### Latest fix (2026-05-08, pending CI)
 

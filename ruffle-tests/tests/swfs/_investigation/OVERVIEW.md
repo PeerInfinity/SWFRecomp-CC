@@ -2,23 +2,40 @@
 
 Cross-suite summary of all Ruffle-derived test suites. Each suite has its own `_investigation/` directory with detailed status docs.
 
-Last updated: 2026-05-08 (pending CI — `array-v5` 535/560 → **536/560** (+1) via ARRAY-typed `__proto__` chain follow in `resolveProtoVar` + inline `actionCallMethod` walk. `X.prototype = new Array()` user-class-extends-Array now resolves inherited methods (`o.push`/`o.pop` on a non-Array receiver). Prior CI baseline `f8e172e9`: `array-v5` 528/560 → 535/560 via Array.prototype.shift DontDelete honoring + syncArrayToObject HOLE skip + ARRAY-branch `__resolve` hook.)
+Last updated: 2026-05-15 (CI `eb8206f8` no-graphics, run `25896064893` — first run after SUBTESTS_HARNESS shipped. 66 previously-undiscoverable tests with `[subtests]`/no `output.txt` are now visible (53 in actionscript.all, 8 in misc-ming.all, 3 in misc-swfc.all, 2 in misc-swfmill.all). Newly-added: 2 raw pass (`Global-v5`, `misc-swfmill.all/trace-as2/arguments`), 8 ruffle_matched (`ops-v5/v6/v7`, `setProperty-v5/v6/v7/v8`, `BitmapDataDraw`), 45 output_mismatch. Three regressions: `avm1/placeobject_occupied_depth` (pass → output_mismatch), `misc-ming.all/loop/loop_test10` (RM 5/28 → mismatch 1/28), `misc-ming.all/register_class/RegisterClassTest4` (17/42 → 7/42 lines). Triage of the new output_mismatch tests in `from_gnash/_investigation/incomplete/SUBTESTS_NEWLY_VISIBLE_TRIAGE.md`.)
 
 ## Suite Summary
 
 "Effective pass" = raw pass + `ruffle_matched` (diffs ⊆ Ruffle's diffs against Flash; auto-promoted when upstream has `known_failure=true` + `output.ruffle.txt`).
 
+Numbers below are from CI `eb8206f8` (no-graphics, 2026-05-15). The four Gnash sub-suites grew this run because SUBTESTS_HARNESS now discovers tests that ship only `[subtests]`/`output.fpN.txt` — previous totals (190 / 102 / 16 / 18) silently omitted those.
+
 | Suite | Tests | Pass | RM | Effective | Effective Rate | Filtered Rate | Notes |
 |-------|-------|------|----|-----------| ---------------|---------------|-------|
-| [avm1](../avm1/_investigation/CURRENT_STATUS.md) | 648 | 605 | 9 | 614 | 94.8% | **100.0%** (608/608) | 40 ignored. Zero filtered failures. `placeobject_occupied_depth` + `textsnapshot_available_text` recovered this CI via place-before-define narrowing. |
-| [from_gnash/actionscript.all](../from_gnash/_investigation/CURRENT_STATUS.md) | 190 | 126 | 63 | 189 | **99.5%** | — | Only `array-v5` remains as raw failure (535/560 lines this CI, +7 from shift DontDelete honoring + syncArrayToObject HOLE-skip + ARRAY `__resolve`). Full Dejagnu recovery in prior CI. |
+| [avm1](../avm1/_investigation/CURRENT_STATUS.md) | 654 | 604 | 11 | 615 | 94.0% | **99.2%** (608/613) | 41 ignored. `placeobject_occupied_depth` regressed (pass → output_mismatch) this CI; needs root-cause. |
+| [from_gnash/actionscript.all](../from_gnash/_investigation/CURRENT_STATUS.md) | 243 | 127 | 70 | 197 | **81.1%** | — | +53 tests (SUBTESTS_HARNESS). Effective rate dropped from 99.5% denominator-growth, raw pass +1 (`Global-v5`). 45 newly-visible output_mismatch entries pending triage. |
 | [from_gnash/misc-mtasc.all](../from_gnash/_investigation/CURRENT_STATUS.md) | 9 | 7 | 2 | 9 | **100.0%** | — | All effective pass. Unchanged this CI. |
-| [from_gnash/misc-swfmill.all](../from_gnash/_investigation/CURRENT_STATUS.md) | 18 | 17 | 1 | 18 | **100.0%** | — | All effective pass. Unchanged this CI. |
-| [from_gnash/misc-ming.all](../from_gnash/_investigation/CURRENT_STATUS.md) | 102 | 65 | 24 | 89 | 87.3% | **88.1%** (89/101) | 1 ignored (`opcode_guard_test`). `loop/loop_test10` promoted to ruffle_matched this CI via the same-frame Remove+Place fix (root timeline narrow). |
-| [from_gnash/misc-swfc.all](../from_gnash/_investigation/CURRENT_STATUS.md) | 16 | 8 | 6 | 14 | 87.5% | — | `opcode_guard_test2` promoted to ruffle_matched this CI: AS-level `removeMovieClip` on clips with `onUnload` now follows the deferred-removal pattern (shifted depth, dynamic_props/var_map preserved for same-frame reads). |
-| [from_shumway](../from_shumway/_investigation/CURRENT_STATUS.md) (flat) | 92 | 73 | 3 | 76 | 82.6% | **100.0%** (76/76) | `avm1/moviecliploader` 6/7 → **PASS** this CI via Part C (per-tick advance for the loadee MC after Phase 2 — `actionRegisterLevelAdvance` registration when `entry->frame_count > 1`). 16 fuzz tests still MISMATCH (in `ignored_tests.txt`). |
-| [from_shumway/avm1](../from_shumway/_investigation/CURRENT_STATUS.md) | 47 | 46 | 0 | 46 | 97.9% | **100.0%** (45/45) | 2 ignored. `moviecliploader` 6/7 → **PASS** this CI via Part C (loadee per-tick advance). |
+| [from_gnash/misc-swfmill.all](../from_gnash/_investigation/CURRENT_STATUS.md) | 20 | 18 | 1 | 19 | **95.0%** | — | +2 tests (SUBTESTS_HARNESS): `trace-as2/arguments` → PASS, `registers` → output_mismatch (30/36). |
+| [from_gnash/misc-ming.all](../from_gnash/_investigation/CURRENT_STATUS.md) | 110 | 66 | 24 | 90 | 81.8% | **83.3%** (90/108) | +8 tests (SUBTESTS_HARNESS) including `BitmapDataDraw` (RM). `loop/loop_test10` regressed RM → output_mismatch; `RegisterClassTest4` dropped 17/42 → 7/42 lines (still mismatch). |
+| [from_gnash/misc-swfc.all](../from_gnash/_investigation/CURRENT_STATUS.md) | 19 | 8 | 6 | 14 | 73.7% | **77.8%** (14/18) | +3 tests (SUBTESTS_HARNESS): `matrix_accuracy_test1`, `movieclip_destruction_test3`, `action_execution_order_test12` (all output_mismatch). |
+| [from_shumway](../from_shumway/_investigation/CURRENT_STATUS.md) (flat) | 92 | 73 | 3 | 76 | 82.6% | **100.0%** (76/76) | Unchanged this CI. 16 fuzz tests still MISMATCH (in `ignored_tests.txt`). |
+| [from_shumway/avm1](../from_shumway/_investigation/CURRENT_STATUS.md) | 47 | 46 | 1 | 47 | **100.0%** | **100.0%** (45/45) | 2 ignored. Quietly added 1 RM since prior snapshot. |
 | **SWFRecomp/tests** (old suite) | 158+59 | all trace pass | — | — | **100%** | — | Hand-written opcode tests. CI only. |
+
+## Progress Since 2026-05-14 (CI `eb8206f8`, no-graphics, run `25896064893`) — SUBTESTS_HARNESS shipped, 66 newly-visible tests
+
+- **SUBTESTS_HARNESS (commit `39b797ac`, plan `avm1/_investigation/complete/SUBTESTS_HARNESS_PLAN.md`).** `verify_output.py` now resolves the expected-output filename per-test via `resolve_expected_filename()`: honor `--expected-suffix` first, then `output.txt`, then `[subtests]` table's highest `player_options.version` variant. 66 tests that ship only `output.fpN.txt` (53 actionscript.all, 8 misc-ming.all, 3 misc-swfc.all, 2 misc-swfmill.all) were previously **invisible to discovery** — not "failing", not "errored", just absent from results. They now run and are counted.
+
+- **Newly-discovered status mix.** 2 raw PASS (`Global-v5`, `misc-swfmill.all/trace-as2/arguments`). 8 ruffle_matched (`ops-v5/v6/v7`, `setProperty-v5/v6/v7/v8`, `BitmapDataDraw`). 45 output_mismatch. 11 ruffle_matched and pass entries are an immediate win; the 45 output_mismatch entries are triaged by line-match tier in `from_gnash/_investigation/incomplete/SUBTESTS_NEWLY_VISIBLE_TRIAGE.md`.
+
+- **Three regressions (all unrelated to SUBTESTS_HARNESS).**
+  1. `avm1/placeobject_occupied_depth` — pass → output_mismatch (6/6 → 0/6). New in this CI. Needs root-cause investigation.
+  2. `misc-ming.all/loop/loop_test10` — ruffle_matched (5/28) → output_mismatch (1/28). Likely interaction with the same-frame Remove+Place fix landed in `f8e172e9`; that fix promoted loop_test10 to RM at the time.
+  3. `misc-ming.all/register_class/RegisterClassTest4` — output_mismatch 17/42 → 7/42 (10-line drop, still mismatch).
+
+- **Quiet wins among already-discovered tests.** `path_format_test` (0/27 → 16/27 lines, stays RM), `place_object_test2` (0/19 → 14/19, RM), `place_object_test` (0/12 → 6/12, RM) — line-match grew substantially despite static status, likely benefiting from the same upstream textfield-variable-binding plan that landed on 2026-05-13.
+
+- **What changed in the per-suite "Tests" totals.** Previously-published totals were 190 (actionscript.all), 102 (misc-ming.all), 16 (misc-swfc.all), 18 (misc-swfmill.all). New totals are 243 / 110 / 19 / 20. Effective rates *dropped numerically* because the denominator grew faster than the raw passes did — this is denominator growth, not regression. Raw passes went up (Gnash +2 across the four sub-suites; effective +9). Per-feature failure tables (`from_gnash/_investigation/FAILING_TESTS_BY_FEATURE.md` + `_FILTERED.md`) were regenerated this CI; many `(1 failing / 1 total)` entries that reflected discovery limits now show their full version cohort (e.g. MovieClip-v6/v7/v8, TextField-v6/v7/v8, ops-v5/v6/v7, Date-v5..v8 — all newly present).
 
 ## Progress Since 2026-05-08 (pending CI) — `array-v5` ARRAY-typed __proto__ chain follow
 
