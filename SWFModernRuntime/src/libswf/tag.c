@@ -2565,8 +2565,13 @@ static void textfield_glyph_render_cb(const TextFieldGlyphInfo* info, void* user
 	float baseline_scale = (float)baseline_fh / (float)em_square;
 	float y_pos = info->y * 20.0f + (float)ascent * baseline_scale + gutter_twips;
 
-	// Max 512 triangle vertices per draw_tris call (batch by glyph)
-	static float xy_buf[1024];
+	// Per-glyph vertex buffer. SWF glyphs are stored as triangulated fills in
+	// shape_data, and complex glyphs can hold many vertices (e.g. Bitstream
+	// Vera Sans '8' is 582 vertices = 1164 floats). 8192 vertices (16384
+	// floats / 64KB) covers anything reasonable; oversized glyphs hit the
+	// guard below and are dropped, matching the previous behavior.
+	#define TF_GLYPH_MAX_VERTS 8192
+	static float xy_buf[TF_GLYPH_MAX_VERTS * 2];
 
 	const char* text = info->text_utf8;
 	size_t text_len = info->text_len;
@@ -2766,7 +2771,7 @@ static void textfield_glyph_render_cb(const TextFieldGlyphInfo* info, void* user
 		size_t g_offset = (size_t)glyph_data[4 * global_idx][0];
 		size_t g_size = (size_t)glyph_data[4 * global_idx + 1][0];
 
-		if (g_size > 0 && g_size <= 512) {
+		if (g_size > 0 && g_size <= TF_GLYPH_MAX_VERTS) {
 			// Transform glyph vertices: scale from EM space + translate to position
 			for (size_t v = 0; v < g_size; v++) {
 				union { u32 u; float f; } vx, vy;
