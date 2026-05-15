@@ -701,6 +701,13 @@ static ASFunction g_array_proto_funcs[12];  // push,pop,shift,unshift,reverse,jo
 static ASFunction g_array_constructor_static;
 static int g_array_constructor_static_init = 0;
 
+// File-scope Object constructor — shared between actionGetVariable("Object") and actionNewObject
+static ASFunction g_object_constructor_static;
+static ASFunction g_object_registerClass_func;
+static int g_object_constructor_static_init = 0;
+static ASFunction* ensureObjectConstructor(SWFAppContext* app_context);
+static void registerGeomMethod(ASFunction* func, const char* name, Function2Ptr impl, SWFAppContext* app_context, ASObject* proto);
+
 // Currently executing user-defined function — used to set arguments.caller
 static ASFunction* g_current_executing_func = NULL;
 // Previously executing function — used for arguments.caller in preloaded-arguments functions
@@ -14150,6 +14157,52 @@ static inline int versionGroup(int version) { return (version <= 6) ? 0 : 1; }
 // Get the version-appropriate Function.prototype (for function __proto__ identity)
 static inline ASObject* getFunctionProto(int version) {
 	return (version <= 6) ? g_function_proto_legacy : g_function_proto_modern;
+}
+
+// Lazily initialize and return the built-in Object constructor function.
+// Shared between actionGetVariable("Object") and actionNewObject (which sets
+// __constructor__ on freshly allocated objects).
+static ASFunction* ensureObjectConstructor(SWFAppContext* app_context)
+{
+	if (!g_object_constructor_static_init)
+	{
+		memset(&g_object_constructor_static, 0, sizeof(ASFunction));
+		strncpy(g_object_constructor_static.name, "Object", 255);
+		g_object_constructor_static.function_type = 1;
+		g_object_constructor_static.param_count = 0;
+		g_object_constructor_static.prototype_obj = getObjectPrototype(app_context);
+
+		g_object_constructor_static.own_props = allocObject(app_context, 4);
+		retainObject(g_object_constructor_static.own_props);
+		{
+			ASObject* _fn_p = getFunctionProto(g_swf_version);
+			if (_fn_p) {
+				ActionVar _fpv = {0}; _fpv.type = ACTION_STACK_VALUE_OBJECT;
+				_fpv.data.numeric_value = (u64)_fn_p;
+				setProperty(app_context, g_object_constructor_static.own_props, "__proto__", 9, &_fpv);
+			}
+		}
+		registerGeomMethod(&g_object_registerClass_func, "registerClass",
+			(Function2Ptr)actionObjectRegisterClass, app_context,
+			g_object_constructor_static.own_props);
+
+		{
+			ActionVar _cv = {0}; _cv.type = ACTION_STACK_VALUE_FUNCTION;
+			_cv.data.numeric_value = (u64)&g_object_constructor_static;
+			setProperty(app_context, g_object_constructor_static.prototype_obj, "constructor", 11, &_cv);
+		}
+
+		// Mark Object.prototype as permanently read-only so
+		// `Object.prototype = X` is silently ignored (Flash quirk).
+		{
+			ActionVar _uv = {0}; _uv.type = ACTION_STACK_VALUE_UNDEFINED;
+			setPropertyWithFlags(app_context, g_object_constructor_static.own_props,
+				"prototype", 9, &_uv, PROPERTY_FLAG_PERM_READONLY);
+		}
+
+		g_object_constructor_static_init = 1;
+	}
+	return &g_object_constructor_static;
 }
 
 // Forward declaration (defined at ~line 8134)
@@ -37401,59 +37454,8 @@ check_special_vars:
 		}
 		else if (var_name_len == 6 && _CMP_BUILTIN_NAME(var_name, "Object", 6))
 		{
-			// Return the built-in Object constructor as a function
-			static ASFunction g_object_constructor;
-			static ASFunction g_registerClass_func;
-			static int g_object_constructor_init = 0;
-			if (!g_object_constructor_init)
-			{
-				memset(&g_object_constructor, 0, sizeof(ASFunction));
-				strncpy(g_object_constructor.name, "Object", 255);
-				g_object_constructor.function_type = 1;
-				g_object_constructor.param_count = 0;
-				// Point prototype_obj at the REAL g_object_prototype so that
-				// Object.prototype identity checks (isPrototypeOf etc.) work correctly
-				g_object_constructor.prototype_obj = getObjectPrototype(app_context);
-
-				// Add registerClass as a static method on Object (own_props)
-				g_object_constructor.own_props = allocObject(app_context, 4);
-				retainObject(g_object_constructor.own_props);
-				// Set __proto__ to Function.prototype (not Object.prototype)
-				{
-					ASObject* _fn_p = getFunctionProto(g_swf_version);
-					if (_fn_p) {
-						ActionVar _fpv = {0}; _fpv.type = ACTION_STACK_VALUE_OBJECT;
-						_fpv.data.numeric_value = (u64)_fn_p;
-						setProperty(app_context, g_object_constructor.own_props, "__proto__", 9, &_fpv);
-					}
-				}
-				registerGeomMethod(&g_registerClass_func, "registerClass",
-					(Function2Ptr)actionObjectRegisterClass, app_context,
-					g_object_constructor.own_props);
-
-				// Set Object.prototype.constructor = Object (Flash default)
-				{
-					ActionVar _cv = {0}; _cv.type = ACTION_STACK_VALUE_FUNCTION;
-					_cv.data.numeric_value = (u64)&g_object_constructor;
-					setProperty(app_context, g_object_constructor.prototype_obj, "constructor", 11, &_cv);
-				}
-
-				// Mark Object.prototype as permanently read-only so
-				// `Object.prototype = X` is silently ignored (Flash quirk).
-				// PERM_READONLY survives ASSetPropFlags. The actual prototype
-				// is read from prototype_obj via the FUNCTION+"prototype" path
-				// in actionGetMember; we only place an UNDEFINED sentinel here
-				// so the WRITABLE check in actionSetMember rejects writes.
-				// Required by gnash actionscript.all/Instance-v5/v6/v7/v8.
-				{
-					ActionVar _uv = {0}; _uv.type = ACTION_STACK_VALUE_UNDEFINED;
-					setPropertyWithFlags(app_context, g_object_constructor.own_props,
-						"prototype", 9, &_uv, PROPERTY_FLAG_PERM_READONLY);
-				}
-
-				g_object_constructor_init = 1;
-			}
-			PUSH(ACTION_STACK_VALUE_FUNCTION, (u64)&g_object_constructor);
+			ASFunction* obj_ctor = ensureObjectConstructor(app_context);
+			PUSH(ACTION_STACK_VALUE_FUNCTION, (u64)obj_ctor);
 			return;
 		}
 		else if (var_name_len == 9 && _CMP_BUILTIN_NAME(var_name, "MovieClip", 9))
@@ -48400,6 +48402,22 @@ void actionNewObject(SWFAppContext* app_context)
 		// No args or null/undefined arg → create empty object
 		ASObject* obj = allocObject(app_context, 8);
 		setObjectProto(app_context, obj);
+		// Set __constructor__ on the new object — DontEnum, plus flash_flags=0x80
+		// so it is hidden in SWF5 (until ASSetPropFlags unhides) but visible in
+		// SWF6+. Gnash actionscript.all/Object-vN tests rely on this.
+		{
+			ASFunction* _obj_ctor = ensureObjectConstructor(app_context);
+			ActionVar _ctor_var = {0};
+			_ctor_var.type = ACTION_STACK_VALUE_FUNCTION;
+			_ctor_var.data.numeric_value = (u64)_obj_ctor;
+			setPropertyWithFlags(app_context, obj, "__constructor__", 15, &_ctor_var, PROPERTY_FLAGS_DONTENUM);
+			if (obj->num_used > 0) {
+				ASProperty* _p = &obj->properties[obj->num_used - 1];
+				if (_p->name_length == 15 && strncmp(_p->name, "__constructor__", 15) == 0) {
+					_p->flash_flags = 0x0080;
+				}
+			}
+		}
 		new_obj = obj;
 		PUSH(ACTION_STACK_VALUE_OBJECT, (u64) new_obj);
 		return;
@@ -49975,6 +49993,18 @@ void actionNewMethod(SWFAppContext* app_context)
 		else
 		{
 			ASObject* obj = allocObject(app_context, 8);
+			setObjectProto(app_context, obj);
+			ASFunction* _obj_ctor = ensureObjectConstructor(app_context);
+			ActionVar _ctor_var = {0};
+			_ctor_var.type = ACTION_STACK_VALUE_FUNCTION;
+			_ctor_var.data.numeric_value = (u64)_obj_ctor;
+			setPropertyWithFlags(app_context, obj, "__constructor__", 15, &_ctor_var, PROPERTY_FLAGS_DONTENUM);
+			if (obj->num_used > 0) {
+				ASProperty* _p = &obj->properties[obj->num_used - 1];
+				if (_p->name_length == 15 && strncmp(_p->name, "__constructor__", 15) == 0) {
+					_p->flash_flags = 0x0080;
+				}
+			}
 			new_obj = obj;
 			PUSH(ACTION_STACK_VALUE_OBJECT, (u64) new_obj);
 		}

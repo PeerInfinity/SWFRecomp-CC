@@ -26,7 +26,64 @@ dependencies:
 blockers: []
 -->
 
-Last updated: 2026-05-15 (Tier A Date-vN promoted to ruffle_matched, pending CI)
+Last updated: 2026-05-15 (Tier A Date-vN RM; Tier B Object-vN partial fix: +2 lines per version via new-Object __constructor__, pending CI)
+
+## 2026-05-15 — Tier B Object-vN: __constructor__ on new Object() (+8 lines, pending CI)
+
+Single targeted fix in `SWFModernRuntime/src/actionmodern/action.c`: new
+objects created via `new Object()` (both the `NewObject` opcode at
+`actionNewObject` and the `NewMethod` opcode at `actionNewMethod`)
+now set `__constructor__` to the Object constructor function as an
+**own property** with `PROPERTY_FLAGS_DONTENUM` + `flash_flags=0x80`
+(hidden in SWF5 via the existing FLASH_HIDE_MASK 0x7480 → 0x80 hit; not
+hidden in SWF6+ via mask 0x7500 → 0x80 miss). This matches Flash's
+documented `__constructor__` behavior: gnash actionscript.all/Object.as
+lines 151/154/156/176 (`check(obj.__constructor__ == undefined)` then
+`ASSetPropFlags(obj, null, 8, 128+1)` then `check(obj.__constructor__ == Object)`
+in SWF5; direct `check(obj.__constructor__ == Object)` and
+`check(obj.hasOwnProperty('__constructor__'))` in SWF6+).
+
+Shared helper: `ensureObjectConstructor()` hoists the lazy-init pattern
+from inside the GetVariable("Object") `_CMP_BUILTIN_NAME` branch to file
+scope, so both `actionGetVariable("Object")` and `actionNewObject` /
+`actionNewMethod` return the same Object constructor function pointer.
+Forward declarations for `registerGeomMethod` added near the helper.
+
+**Test results post-fix (local):**
+- Object-v5: 128 → 130 PASSED lines (135 → 137 matching) — still output_mismatch (5 ours-only diffs remain: 7, 83, 94, 95, 119, 122 — `Object.__proto__` SWF5 visibility, `Object.prototype.toLocaleString(1)` calling toString, primitive conversion with `__proto__=undefined`, `TestO.prototype` ASSetPropFlags 8193 hiding)
+- Object-v6: 272 → 274 PASSED lines (279 → 281 matching)
+- Object-v7: 285 → 287 PASSED lines (292 → 294 matching)
+- Object-v8: 285 → 287 PASSED lines (292 → 294 matching)
+
+**Regression battery (clean):** 10-test AVM1 lifecycle/scope battery
+(closure_scope, as2_super_and_this_v6, extends_chain, register_class_return_value,
+on_construct, funky_function_calls, enumerate, parse_int, typeof,
+primitive_type_globals) all PASS. 10-test Gnash prototype/inheritance battery
+(ASnative-v5/v6, Boolean-v5, case-v5/v6, delete-v5/v6, Inheritance-v5/v6,
+Number-v5) all effective-pass. Date-v5..v8 still RUFFLE_MATCHED (the Tier A
+fix from earlier this session is preserved). Global-v5/v6/v7 + Inheritance-v7/v8
+all effective-pass.
+
+**Why not full ruffle_matched promotion:** Object-v5 ruffle-diff set is
+{7, 38, 46, 120, 121, 134, 139, 142}; ours-only is {83, 94, 95, 119, 122}.
+These 5 require:
+- Line 83 (toLocaleString(1) == "toString0"): toLocaleString should call
+  toString **with no args** (not pass through args). Our impl probably
+  inherits to `[object Object]` instead of calling Object.prototype.toString.
+- Lines 94/95 (`"string + " + nothing == "string + "` after
+  `nothing.__proto__ = undefined`): primitive conversion when `__proto__`
+  is undefined should return empty string (SWF<7), not call own toString.
+- Lines 119/122 (`TestO.prototype == undefined` after
+  `ASSetPropFlags(TestO, null, 8193)`): need to honor flash_flags hiding
+  on the FUNCTION+"prototype" GetMember path (currently reads via
+  prototype_obj, bypassing flash_flags). Bit 0x2000 hides in SWF≤8.
+
+Object-v6/v7/v8 have additional widespread divergences (addProperty/watch
+counter mismatches reporting "65" instead of "1", `[type Function]`
+toString regression from the Date-vN fix, and the deep watch() machinery)
+that are out of scope for a quick Tier B sweep.
+
+
 
 ## 2026-05-15 — Tier A Date-v5..v8 landed (+4 effective, pending CI)
 
