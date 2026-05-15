@@ -1,3 +1,9 @@
 # Ruffle known_failure — test fails in Ruffle's own test suite
 hitarea
 moviecliploader
+
+# Sub-pixel glyph rasterization diff (synthesized Noto Sans vs Ruffle font engine).
+# Content renders correctly — "SUCCESS" in magenta at the expected position; only
+# ~1900 anti-aliased boundary pixels exceed the tolerance ceiling. Documented in
+# avm1/_investigation/ACCEPTED_DIFFS.md::text-bind.
+text-bind

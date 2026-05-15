@@ -397,6 +397,38 @@ investigated but fixing this point introduced 2 regressions at other scribble bo
 
 ---
 
+### `from_shumway/avm1/text-bind` — Noto Sans synthesized glyph outlines (~1900 outlier pixels, max diff 158)
+
+**Test:** image-only comparison. Expected and actual both render "SUCCESS"
+in magenta (`#d662c6`) at the same position with the same font size (42).
+Diff is purely glyph outline precision at anti-aliased edges.
+
+The SWF declares font_id=1 as `_sans` device font with empty `<glyphs/>`
+(`DefineFont3` with no embedded glyphs). The recompiler's Phase A
+synthesis (device-font-rendering-plan.md, commit `1401e62c`) tessellates
+ASCII 32..126 from `NotoSans.ttf` via stb_truetype + earcut. Ruffle's
+test runner rasterizes via its own font engine (cosmic-text path). Both
+produce visually identical "SUCCESS" content, but the glyph outlines
+diverge sub-pixel at the curve edges, producing ~1900 pixels with diff
+130-158 along the anti-aliased glyph boundaries. The test's
+`tolerance = 128` ceiling rules these out as outliers (above 128 is
+"outlier"); 1918 outliers exceed the 100 limit.
+
+Same root cause class as `movieclip_hittest_shapeflag`'s Noto-Sans-vs-
+Flash entry above — our synthesized Noto Sans outlines disagree at
+sub-pixel boundaries with Ruffle's font rasterizer. Fixable only by
+switching to runtime stb_truetype rasterization that matches Ruffle's
+output exactly (Phase C of `SWFRecompDocs/plans/device-font-rendering-plan.md`),
+or by relaxing the test's tolerance ceiling. Phase C is the eventual
+destination but a substantial scope; the test functionally renders
+correctly today.
+
+**Decision:** Accept; sub-pixel glyph rasterization differences between
+our compile-time stb_truetype + earcut tessellation and Ruffle's
+runtime font engine. Content matches at the semantic level.
+
+---
+
 ## Category 9: Video Decoder Implementation Differences
 
 Image-comparison tests that render decoded FLV frames at pixel-perfect parity with
@@ -451,6 +483,7 @@ on-stage size. Trace test continues to pass.
 | `string_paths_reference_launder` | Ruffle known failure (stack_push) | 2 | Accept; Ruffle also fails this test |
 | `tab_ordering_properties_tab_index_edge_case` | Ruffle known failure (conflicting test expectations) | 4 | Accept; contradicts `tab_ordering_properties` |
 | `movieclip_hittest_shapeflag` | Hit test accuracy (Noto Sans glyph outlines) | 7 | Accept; proprietary Flash font metrics |
+| `from_shumway/avm1/text-bind` | Image: Noto Sans synthesized glyph outlines vs Ruffle font engine | ~1900 px | Accept; sub-pixel rasterization diff, content matches |
 | `movieclip_hittest_shapeflag` | Hit test accuracy (morph boundary precision) | 1 | Accept; float vs integer precision |
 | `movieclip_hittest_shapeflag` | Hit test accuracy (Drawing API stroke tessellation) | 1 | Accept; tessellation boundary |
 | `bitmap_data_thorough/pixelDissolve` | Ruffle known failure (panic) + Flash-specific Feistel coercion | ~38 | Accept; 97.2% match, no Ruffle oracle for `ruffle_matched` |
