@@ -19623,22 +19623,20 @@ int actionTryBindTextFieldVariable(SWFAppContext* app_context, MovieClip* tf_mc,
 	}
 
 	if (has_existing) {
-		// Variable wins — copy to TF. HTML fields parse via strip_html_tags_u16.
+		// Variable wins — copy to TF. For HTML fields, route through
+		// tfRebuildFromHtml so the TFRunTable (the render path's text source)
+		// gets rebuilt — not just the property bag. Without this, the
+		// TFRunTable retains the static initial text and the render path
+		// emits the wrong content. Mirrors Bug A's fix in
+		// actionNotifyPropertyChange; same shape, placement-time call site.
+		// Key test: from_shumway/avm1/text-bind's last_frame capture, which
+		// renders the morph-re-placement (char_id=3) — bound to
+		// _root.testField="SUCCESS" but with static initial text "FAILED".
 		if (is_html && existing_val.type == ACTION_STACK_VALUE_STRING) {
 			setProperty(app_context, props, "htmlText", 8, &existing_val);
 			const uint16_t* u16 = varGetU16Ptr(&existing_val);
 			if (u16 != NULL) {
-				u32 stripped_len;
-				uint16_t* stripped = strip_html_tags_u16(app_context, u16, existing_val.str_size, &stripped_len);
-				ActionVar text_val = {0};
-				text_val.type = ACTION_STACK_VALUE_STRING;
-				text_val.str_size = stripped_len;
-				VAL(u64, &text_val.data.numeric_value) = (u64)stripped;
-				setProperty(app_context, props, "text", 4, &text_val);
-				ActionVar len_val = {0};
-				len_val.type = ACTION_STACK_VALUE_F64;
-				VAL(double, &len_val.data.numeric_value) = (double)stripped_len;
-				setProperty(app_context, props, "length", 6, &len_val);
+				tfRebuildFromHtml(app_context, tf_mc, u16, existing_val.str_size);
 			}
 		} else {
 			setProperty(app_context, props, "text", 4, &existing_val);
