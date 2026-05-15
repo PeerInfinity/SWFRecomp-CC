@@ -6297,6 +6297,15 @@ void run_pending_finalize(SWFAppContext* app_context)
 			// slot as "renamed" and clobbering a same-name same-frame Remove+
 			// Place pattern that does need clearing. Required to preserve
 			// misc-ming.all register_class/RegisterClassTest4.
+			//
+			// When the live display_list array doesn't match the queued one
+			// (sprite-internal pending entry; sprite finished executing and
+			// display_list was swapped back to root by exec_sprite_frame's
+			// caller), temporarily restore the queued display_list before
+			// calling clear_display_entry — otherwise we'd clobber the
+			// unrelated entry at the same depth in root (e.g. action_order
+			// /action_execution_order_test, where mc_blu at sprite_6:depth=3
+			// shares its index with mc_red at root:depth=3).
 			int slot_renamed = 0;
 			if (e->queued_dl_array == (void*)display_list)
 			{
@@ -6308,7 +6317,46 @@ void run_pending_finalize(SWFAppContext* app_context)
 				}
 			}
 			if (!slot_renamed)
-				clear_display_entry(app_context, e->depth);
+			{
+				if (e->queued_dl_array != NULL &&
+				    e->queued_dl_array != (void*)display_list)
+				{
+					// Sprite-internal pending entry: display_list was swapped
+					// back to root by exec_sprite_frame's caller after the
+					// sprite's frame_func returned. Clearing root.display_list
+					// [e->depth] would clobber an unrelated entry — root's depth
+					// e->depth typically holds the *sprite's parent MC* (e.g.
+					// action_order/action_execution_order_test: mc_blu at
+					// sprite_6:depth=3, mc_red at root:depth=3). Instead, peek
+					// at the queued sprite's display_list to decide: if the
+					// slot still holds the original char_id (no replacement
+					// placed in the same frame), clear it on the sprite's dl;
+					// otherwise (e.g. register_class/RegisterClassTest4 where
+					// mc3 frame 1 does Remove+Place at the same depth with the
+					// same name but a different char), leave both untouched —
+					// the fresh placement is now the slot's owner.
+					DisplayObject* qdl = (DisplayObject*)e->queued_dl_array;
+					if (qdl[e->depth].char_id == e->orig_char_id)
+					{
+						DisplayObject* saved_dl = display_list;
+						size_t saved_max = max_depth;
+						size_t saved_cap = display_list_capacity;
+						display_list = qdl;
+						if (max_depth < e->depth) max_depth = e->depth;
+						if (display_list_capacity < e->depth + 1)
+							display_list_capacity = e->depth + 1;
+						clear_display_entry(app_context, e->depth);
+						display_list = saved_dl;
+						max_depth = saved_max;
+						display_list_capacity = saved_cap;
+					}
+					// else: slot already overwritten by fresh Place; skip clear.
+				}
+				else
+				{
+					clear_display_entry(app_context, e->depth);
+				}
+			}
 		}
 	}
 }

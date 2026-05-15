@@ -26,7 +26,63 @@ dependencies:
 blockers: []
 -->
 
-Last updated: 2026-05-15 (Tier B Object-v5 **landed RM** via three runtime fixes: toLocaleString delegation, broken __proto__ primitive-coercion bypass, ASSetPropFlags prototype hiding. Object-v6/v7/v8 still output_mismatch with widespread divergences. Tier A Date-vN RM (earlier this session).)
+Last updated: 2026-05-15 (Tier B `misc-ming.all/action_order/action_execution_order_test` **landed PASS** (16/19 → 19/19) via a `run_pending_finalize` cross-display_list cleanup fix. Object-v5 RM earlier this session. Tier A Date-vN RM (earlier this session).)
+
+## 2026-05-15 — Tier B action_execution_order_test → PASS (+1 effective, pending CI)
+
+Single fix in `SWFModernRuntime/src/libswf/tag.c::run_pending_finalize` flipped
+`misc-ming.all/action_order/action_execution_order_test` from
+`output_mismatch 16/19` to **PASS 19/19**.
+
+**Bug.** `tagRemoveObject2` queues a `PendingFinalizeEntry` (with the
+queue-time `display_list` pointer in `queued_dl_array`) whenever the removed
+MC has an `onUnload` handler. When the queued removal happened *inside a
+sprite's frame_func* (e.g. mc_red's frame 1 in this test removes mc_blu at
+mc_red's sprite-internal depth 3), `display_list` is the sprite's local
+array at queue time but has been swapped back to root by the time
+`run_pending_finalize` fires (after the UNLOAD handler drains, see
+`action_queue.c::actionDrainOnloadAndScriptOne`). The original code then
+called `clear_display_entry(e->depth)` on the live (root) `display_list`,
+which **clobbered an unrelated entry at the same numeric depth** —
+specifically, mc_red itself at `root.display_list[3]` (mc_red is at root
+depth 3; mc_blu is at mc_red:depth 3). After the spurious clear, the
+frame-2 assertion `typeOf(_root.mc_red.func) == 'function'` looked up
+`_root.mc_red` → `undefined` (the slot is gone) → `undefined.func` →
+`undefined`, failing the typeof.
+
+**Fix.** Before clearing, compare `e->queued_dl_array` to the live
+`display_list`. If they match, fall through to the original behavior
+(handles root-level Remove+Place patterns like `loop/loop_test10`). If
+they differ, the queued entry was sprite-internal: peek at
+`queued_dl_array[e->depth].char_id`:
+- If it still matches `e->orig_char_id` → the slot wasn't overwritten by
+  a same-frame fresh Place; swap `display_list` to `queued_dl_array`
+  long enough for `clear_display_entry` to free the sprite's slot, then
+  restore. (action_execution_order_test path.)
+- If it differs → the slot was replaced by a same-frame fresh Place
+  (e.g. `register_class/RegisterClassTest4` where mc3 frame 1 does
+  Remove(mc2) + Place(mc1) at the same depth under the same name) →
+  skip the clear entirely; the fresh placement is now the legitimate
+  owner.
+
+The pre-existing `slot_renamed` check (orig vs. live `instance_name`
+when arrays match) is preserved untouched — it handles the root-level
+`loop_test10` rename-on-remove case.
+
+**Test results post-fix (local):**
+- `misc-ming.all/action_order/action_execution_order_test`: `output_mismatch 16/19` → **PASS 19/19**
+- `misc-ming.all/action_order/ActionOrderTest3`: 3/62 → 4/62 (+1 line, still output_mismatch)
+- `misc-ming.all/action_order/ActionOrderTest4`: 7/64 → 6/64 (−1 line, still output_mismatch — within noise; ActionOrder3/4 alternate ±1 in CI logs)
+- `misc-ming.all/register_class/RegisterClassTest4`: 17/42 → 6/42 (−11 lines, still output_mismatch). **This test is already in `misc-ming.all/ignored_tests.txt`**, so the line-count drop has no effect on filtered/effective rates. The test was previously masking its own brokenness via the spurious cross-dl clear — that clear happened to wipe mc3 from `root.display_list[1]`, which forced a fresh re-Place each loop iteration. The "right" cleanup leaves mc3 in place, exposing a separate same-frame placement-conflict bug at root depth 1 (independent fix territory; the test is ignored regardless).
+
+**Regression battery (clean, all rate-bearing tests):**
+- 17 AVM1 lifecycle/scope/super/closure tests (as2_super_and_this_v6/v8, closure_scope, clip_events, execution_order2/3, goto_frame, goto_frame2, goto_rewind3, register_and_init_order, register_class_return_value, set_interval, swf5_no_closure, swf5_to_6_cross_call, tell_target, tell_target_invalid, tell_target_invalid_swf6) — 17/17 PASS.
+- 13 AVM1 lifecycle-heavy tests (on_construct, clip_events, removed_clip_halts_script, remove_movie_clip, movieclip_in_removed_button, clip_event_propagation_order, tab_ordering_events, duplicate_movie_clip, depth_replacement_audio_unloading, focus_remove, goto_rewind3, function_base_clip_removed, function_base_clip) — 13/13 PASS.
+- 13 AVM1 functional tests (add_property, watch, enumerate, parse_int, typeof, loadvars_tostring, string_paths_eval2, mcl_target_jpg, funky_function_calls, swf4_function_calls, set_variable_scope, function_as_function, extends_chain) — 13/13 PASS.
+- 16 misc-ming.all pending-finalize-heavy tests (loop_test4-9, simple_loop_test, key_event_test, DragDropTest, replace_buttons1test, replace_shapes1test, replace_sprites1test, reverse_execute_PlaceObject2_test1/2, new_child_in_unload_test, unload_movieclip_test1) — 16/16 effective pass (unchanged from baseline).
+- 8 misc-swfc.all destruction/registerclass/soft-reference tests — all match baseline exactly.
+
+Full CI sweep pending to confirm cross-suite stability.
 
 ## 2026-05-15 — Tier B Object-v5 → ruffle_matched (+1 effective, pending CI)
 
@@ -289,7 +345,7 @@ shift), no action needed.
 | `Object-v8` | actionscript.all | 299/333 | 89.8% | output_mismatch (+5 from Tier B) |
 | `Object-v6` | actionscript.all | 286/333 | 85.9% | output_mismatch (+5 from Tier B) |
 | `Function-v5` | actionscript.all | 135/158 | 85.4% | output_mismatch |
-| `action_order/action_execution_order_test` | misc-ming.all | 16/19 | 84.2% | output_mismatch |
+| `action_order/action_execution_order_test` | misc-ming.all | 19/19 | 100% | **PASS** (2026-05-15) |
 | `misc-swfmill.all/registers` | misc-swfmill.all | 30/36 | 83.3% | output_mismatch |
 
 **Next move.** `array-v6/v7/v8` are likely the same shape as
