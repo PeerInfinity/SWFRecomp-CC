@@ -470,6 +470,127 @@ is graphics-only.
 
 ---
 
+## Investigation update (2026-05-15)
+
+### Bug A — fixed
+
+Commit `5d7228e8` extracted `tfRebuildFromHtml` from `actionSetMember`'s
+HTML branch and called it from `actionNotifyPropertyChange`. Confirmed
+via instrumentation that text-bind's render path now receives
+`text='SUCCESS'` (the bound value) instead of `'FAILED'` (the static
+initial text). Image still fails because Bug B is still active.
+
+### Bug B — narrowed but not solved
+
+Per-test probing (probes from the original plan, then more):
+
+- **Per-tick `tagShowFrame` rendering doesn't reach readback either.**
+  Adding `renderer_request_capture(context)` to every per-tick
+  `tagShowFrame` pass + disabling the trailing `tagRerenderFrame` made
+  no difference. So the bug is not specific to `tagRerenderFrame`'s
+  pass; it's specific to the entire OFFSCREEN_RENDER pipeline state
+  for this test.
+- **Rules out the textfield code path.** Commenting out
+  `actionIterateTextFields` / `actionIterateTextFieldGlyphs` /
+  `actionIterateOrphanTextFields` calls in tagShowFrame left the
+  cyan-sanity rect (drawn at the top of the pass, before any
+  textfield code runs) still invisible. So the textfield rendering
+  isn't corrupting state for subsequent draws either.
+- **Rules out the SWF content.** Stripping `tagInit` to bare bones
+  (no `tagDefineFontInfo` / `tagDefineFontMetrics` / `tagDefineText`
+  / `tagDefineEditTextProps` calls — just
+  `tagInitSpriteFrameScripts` + `initVarArray`) plus stripping
+  `frame_0` to just `tagSetBackgroundColor` + `tagShowFrame`
+  reproduced the blank canvas. So **even an empty SWF with this
+  test's metadata renders blank.**
+- **Same code path works for `place_object_test`.** Adding the same
+  cyan rect at the top of `tagShowFrame`'s render pass shows up
+  visibly at (50, 50) px in `place_object_test`'s
+  `output.actual.png`, but not in `text-bind`'s. So
+  `renderer_draw_rect` is functionally correct when invoked from the
+  same call site in another test.
+- **Phase A's synthesized vertex data is well-formed.** Scanned
+  `text-bind`'s `shape_data` (15030 vertices, ~5000 triangles) for
+  IEEE 754 NaN / Inf / out-of-range values; zero occurrences.
+- **Color transform is correct.** `cxform_data[0..19]` is identity
+  (the recompiler emits an identity cxform at slot 0 in
+  `swf.cpp:544-568`). The cyan rect uses `cxform_id=0`, so the
+  shader's `apply_cxform` should not modify the color.
+- **Differences between test-bind and place_object_test SWF
+  metadata:** canvas 550×400 vs 800×600; FRAME_WIDTH_TWIPS
+  11000 vs 16000; SWF_VERSION 17 vs 5; SWF_FRAME_COUNT 6 vs 3.
+  Both have BITMAP_COUNT=0.
+
+### Surfaces during investigation
+
+- **ASAN run reports** these warnings during WebGPU device init for
+  text-bind (uncertain whether they are causal):
+  ```
+  Warning: maxDynamicUniformBuffersPerPipelineLayout artificially
+           reduced from 500000 to 16 to fit dynamic offset
+           allocation limit.
+  Warning: maxDynamicStorageBuffersPerPipelineLayout artificially
+           reduced from 500000 to 16 to fit dynamic offset
+           allocation limit.
+  ```
+  Same warnings appear for `place_object_test`, so they're not a
+  smoking gun, but worth tracking when revisiting.
+
+### Revised hypotheses (after the above probes)
+
+The original plan's hypotheses 1, 2, 3, 5, 6, 7 are largely ruled
+out by the probes above (rendering happens, draws are queued, no
+NaN/Inf, no `tagRerenderFrame`-specific bug, no MC-bounds issue).
+Surviving / new hypotheses:
+
+- **(new) The per-test runtime is loading a stale `.png` from a
+  prior failed run.** Not actually — `verify_output.py:2952-2965`
+  produces `actual_png = build_dir / "output.png"` afresh each test.
+- **(new) The compiled binary has different WebGPU device limits
+  depending on a per-SWF compile-time constant that affects
+  buffer-size negotiation.** The `MAX_DYNAMIC_RECTS` / `MAX_DYNAMIC_VERTICES`
+  constants are fixed but the `xform_buffer` size scales with
+  `transform_data_size` (`render_webgpu.c:785-795`). For text-bind,
+  `transform_data` has 235 entries × 16 floats = 15040 floats →
+  buffer size ~60KB + 512 dynamic slots = 90KB. Below the WebGPU
+  default storage-buffer limit (128MB), so shouldn't trip a hard
+  cap. But maybe `dynamicOffsetAlignment` interacts oddly with a
+  particular total size.
+- **(new) Lavapipe-specific bug.** The runner forces
+  `VK_DRIVER_FILES=/usr/share/vulkan/icd.d/lvp_icd.json` for WSL2
+  compatibility (`verify_output.py:2879-2880`). Lavapipe is a
+  software Vulkan implementation; it has occasional issues that
+  hardware Vulkan would mask. Worth re-running on hardware Vulkan
+  to confirm (or in CI, which uses different driver setup).
+- **(new) The bug is data-driven on a value in one of the per-SWF
+  arrays — `shape_data`, `transform_data`, `cxform_data`, etc. —
+  that is valid as a float but causes the pipeline to misbehave.**
+  Could be a particular cxform combination, a transform with
+  near-zero determinant, etc. Bisection by zeroing one array at a
+  time would isolate it.
+
+### Suggested next steps
+
+- **Bisect by NULLing one app_context array at a time.** Set
+  `app_context.shape_data = NULL` (and `shape_data_size = 0`),
+  see if cyan reappears. Then try `transform_data`, `cxform_data`,
+  etc. Whichever one's removal restores the cyan rect is the
+  culprit.
+- **Diff the WebGPU pipeline state between text-bind and
+  place_object_test at first `tagShowFrame::open_pass`.** Likely
+  identical since the code is the same; if not, that's the bug.
+- **Try a single-frame stub-SWF with text-bind's exact dimensions.**
+  Generate a minimal SWF with width 550, height 400, version 17,
+  6 frames, no content. If cyan still doesn't appear, the bug is
+  in the renderer init for those specific dimensions. If cyan
+  appears, the bug is in some downstream data.
+- **Try setting `SWFRECOMP_DEVICE_FONT_FALLBACK=0` and re-running
+  text-bind with Phase A's synthesis reverted.** If cyan appears,
+  the bug is downstream of Phase A's vertex / glyph data emission.
+  If cyan still doesn't appear, the bug is older than Phase A
+  (text-bind was always blank, Phase A just made the failure
+  more visible because we now expect glyphs to render).
+
 ## Open questions
 
 - **OQ-1.** Does the `actionNotifyPropertyChange` HTML path also
