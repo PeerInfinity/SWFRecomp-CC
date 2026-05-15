@@ -7587,7 +7587,7 @@ namespace SWFRecomp
 				std::vector<Node> nodes;
 				
 				constructEdges(paths, nodes);
-				
+
 				for (size_t i = 0; i < paths.size(); ++i)
 				{
 					// Phase 1: auto-close an open path with a one-sided fill so it can
@@ -7600,25 +7600,213 @@ namespace SWFRecomp
 					bool has_fill = (paths[i].fill_styles[0] != 0 || paths[i].fill_styles[1] != 0);
 					bool fill_open_path = (!paths[i].self_closed && has_fill && paths[i].verts.size() >= 3);
 
-					if (paths[i].self_closed || fill_open_path)
+					if (!(paths[i].self_closed || fill_open_path))
+					{
+						continue;
+					}
+
+					std::vector<Vertex> initial_verts;
+					for (size_t k = 0; k < paths[i].verts.size(); ++k)
+					{
+						if (!initial_verts.empty() &&
+							initial_verts.back().x == paths[i].verts[k].x &&
+							initial_verts.back().y == paths[i].verts[k].y)
+						{
+							continue;
+						}
+
+						initial_verts.push_back(paths[i].verts[k]);
+					}
+
+					// Phase 2: split self-touching closed polygons at touch points.
+					// earcut handles a single contour as if it had no self-intersections;
+					// fed a figure-8 / pinched polygon it triangulates the merged shape
+					// (one diagonal across the pinch + naive fan), not the SWF even-odd
+					// fill of two sub-loops. Splitting at each non-consecutive vertex
+					// repeat yields independent contours; the existing Phase B
+					// containment pass decides hole vs fill spatially.
+					//
+					// Natural-closure (k=0, m=N-1) is skipped — that's just verts[0]
+					// equalling the closing wrap target, not a self-touch. Both sub-loops
+					// must end with >=3 verts so neither becomes a degenerate triangle.
+					std::vector<std::vector<Vertex>> sub_loops;
+					sub_loops.push_back(std::move(initial_verts));
+
+					for (size_t s = 0; s < sub_loops.size(); ++s)
+					{
+						// Edge-edge intersection pre-pass: convert interior edge
+						// crossings into vertex touches by inserting the crossing
+						// point as a new vertex on both edges. The vertex-touch split
+						// below then handles them. Without this, sub-loops produced
+						// by the touch-vertex split can still be self-intersecting
+						// (e.g. shape_test's "P-shape" sub-loop has its closing edge
+						// (20,30)→(20,10) crossing (10,20)→(30,20) at (20,20)),
+						// which earcut triangulates incorrectly.
+						//
+						// Open paths (Phase 1's case): close them with V[0] so the
+						// implicit wrap-around edge participates in intersection
+						// detection. earcut and processShape are agnostic to whether
+						// V[N-1] equals V[0].
+						{
+							std::vector<Vertex>& V = sub_loops[s];
+							if (!V.empty() &&
+								(V.back().x != V.front().x || V.back().y != V.front().y))
+							{
+								V.push_back(V.front());
+							}
+							size_t M = V.size();
+							if (M >= 4)
+							{
+								struct EdgeIntersection
+								{
+									size_t edge;
+									double t;
+									Vertex point;
+								};
+								std::vector<EdgeIntersection> intersections;
+								size_t num_edges = M - 1;
+
+								for (size_t ei = 0; ei + 2 < num_edges; ++ei)
+								{
+									for (size_t ej = ei + 2; ej < num_edges; ++ej)
+									{
+										const Vertex& a1 = V[ei];
+										const Vertex& a2 = V[ei + 1];
+										const Vertex& b1 = V[ej];
+										const Vertex& b2 = V[ej + 1];
+
+										s64 dx1 = (s64) a2.x - a1.x;
+										s64 dy1 = (s64) a2.y - a1.y;
+										s64 dx2 = (s64) b2.x - b1.x;
+										s64 dy2 = (s64) b2.y - b1.y;
+
+										s64 denom = dx1 * dy2 - dy1 * dx2;
+										if (denom == 0)
+										{
+											continue;
+										}
+
+										s64 num_t = ((s64) b1.x - a1.x) * dy2 - ((s64) b1.y - a1.y) * dx2;
+										s64 num_s = ((s64) b1.x - a1.x) * dy1 - ((s64) b1.y - a1.y) * dx1;
+
+										// Strict interior: 0 < t < 1 and 0 < s < 1.
+										// (denominator sign is folded into the comparison.)
+										bool t_in = (denom > 0) ? (num_t > 0 && num_t < denom)
+										                        : (num_t < 0 && num_t > denom);
+										bool s_in = (denom > 0) ? (num_s > 0 && num_s < denom)
+										                        : (num_s < 0 && num_s > denom);
+
+										if (!t_in || !s_in)
+										{
+											continue;
+										}
+
+										double t = (double) num_t / (double) denom;
+										double s_param = (double) num_s / (double) denom;
+
+										Vertex p;
+										p.x = (s32) std::lround((double) a1.x + t * (double) dx1);
+										p.y = (s32) std::lround((double) a1.y + t * (double) dy1);
+										p.morph_index = -1;
+
+										intersections.push_back({ ei, t, p });
+										intersections.push_back({ ej, s_param, p });
+									}
+								}
+
+								if (!intersections.empty())
+								{
+									std::sort(intersections.begin(), intersections.end(),
+										[](const EdgeIntersection& a, const EdgeIntersection& b)
+										{
+											if (a.edge != b.edge) return a.edge < b.edge;
+											return a.t < b.t;
+										});
+
+									std::vector<Vertex> new_verts;
+									new_verts.reserve(M + intersections.size());
+									size_t isect_idx = 0;
+									for (size_t v = 0; v < num_edges; ++v)
+									{
+										new_verts.push_back(V[v]);
+										while (isect_idx < intersections.size() && intersections[isect_idx].edge == v)
+										{
+											const Vertex& p = intersections[isect_idx].point;
+											if (new_verts.back().x != p.x || new_verts.back().y != p.y)
+											{
+												new_verts.push_back(p);
+											}
+											isect_idx++;
+										}
+									}
+									new_verts.push_back(V[num_edges]);
+
+									sub_loops[s] = std::move(new_verts);
+								}
+							}
+						}
+
+						while (true)
+						{
+							std::vector<Vertex>& V = sub_loops[s];
+							size_t N = V.size();
+							if (N < 6)
+							{
+								break;
+							}
+
+							bool found = false;
+							size_t found_k = 0;
+							size_t found_m = 0;
+							for (size_t k = 0; k + 2 < N && !found; ++k)
+							{
+								for (size_t m = k + 2; m < N; ++m)
+								{
+									if (V[k].x != V[m].x || V[k].y != V[m].y)
+									{
+										continue;
+									}
+									if (k == 0 && m == N - 1)
+									{
+										continue;
+									}
+									size_t inner_count = m - k;
+									size_t outer_count = N - (m - k);
+									if (inner_count < 3 || outer_count < 3)
+									{
+										continue;
+									}
+									found_k = k;
+									found_m = m;
+									found = true;
+									break;
+								}
+							}
+
+							if (!found)
+							{
+								break;
+							}
+
+							std::vector<Vertex> inner(V.begin() + found_k, V.begin() + found_m + 1);
+							std::vector<Vertex> outer(V.begin(), V.begin() + found_k + 1);
+							outer.insert(outer.end(), V.begin() + found_m + 1, V.end());
+
+							// `V` becomes invalid once we push (vector may reallocate);
+							// finish all reads of `V` before this point.
+							sub_loops[s] = std::move(outer);
+							sub_loops.push_back(std::move(inner));
+						}
+					}
+
+					for (auto& V : sub_loops)
 					{
 						shapes.push_back(Shape());
 						shapes.back().closed = true;
 						shapes.back().hole = false;
 						shapes.back().invalid = false;
 						shapes.back().nesting_depth = 0;
-
-						for (size_t k = 0; k < paths[i].verts.size(); ++k)
-						{
-							if (k >= 1 &&
-								shapes.back().verts.back().x == paths[i].verts[k].x &&
-								shapes.back().verts.back().y == paths[i].verts[k].y)
-							{
-								continue;
-							}
-
-							shapes.back().verts.push_back(paths[i].verts[k]);
-						}
+						shapes.back().verts = std::move(V);
 
 						processShape(shapes.back(), paths[i].fill_styles);
 
