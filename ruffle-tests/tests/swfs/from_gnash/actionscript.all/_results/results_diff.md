@@ -1,7 +1,7 @@
 # Ruffle Test Results Diff
 
-**Previous:** `eb8206f8aa08` (2026-05-15T02:10:15.266818+00:00)
-**Current:** `b8eef7a3e160` (2026-05-15T17:55:55.394760+00:00)
+**Previous:** `b8eef7a3e160` (2026-05-15T17:55:55.394760+00:00)
+**Current:** `a017c0f6a274` (2026-05-15T18:45:20.633610+00:00)
 
 ## Summary
 
@@ -10,17 +10,17 @@
 | Passing | 127 | 127 | 0 |
 | Total | 243 | 243 | 0 |
 | Pass rate | 52.3% | 52.3% | 0% |
-| Mismatched lines | 11121 | 11111 | -10 |
-|   Decreased | | | -10 |
+| Mismatched lines | 11111 | 11105 | -6 |
+|   Decreased | | | -8 |
+|   Increased | | | +2 |
 
-## Status Changed (7)
+## Line Count Changed (6)
 
-| Test | Previous | Current | Lines (prev) | Lines (now) |
-|------|----------|---------|--------------|-------------|
-| `Date-v5` | output_mismatch | ruffle_matched | 305/315 | 308/315 |
-| `Date-v6` | output_mismatch | ruffle_matched | 348/357 | 351/357 |
-| `Date-v7` | output_mismatch | ruffle_matched | 349/357 | 351/357 |
-| `Date-v8` | output_mismatch | ruffle_matched | 349/357 | 351/357 |
-| `Sound-v6` | ruffle_matched | output_mismatch | 91/121 | 91/121 |
-| `Sound-v7` | ruffle_matched | output_mismatch | 93/121 | 93/121 |
-| `Sound-v8` | ruffle_matched | output_mismatch | 93/121 | 93/121 |
+| Test | Status | Lines (prev) | Lines (now) | Diff |
+|------|--------|--------------|-------------|------|
+| `Object-v5` | output_mismatch | 135/145 | 137/145 | -2 |
+| `Object-v6` | output_mismatch | 279/333 | 281/333 | -2 |
+| `Object-v7` | output_mismatch | 292/333 | 294/333 | -2 |
+| `Object-v8` | output_mismatch | 292/333 | 294/333 | -2 |
+| `MovieClip-v8` | output_mismatch | 885/1087 | 884/1087 | +1 |
+| `TextField-v7` | output_mismatch | 414/570 | 413/570 | +1 |
