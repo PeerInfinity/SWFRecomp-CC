@@ -1,12 +1,14 @@
 # Graphics vs Trace Mode Differences
 
-Trace: 604/654 passing | Graphics: 605/654 passing
+Trace: 604/654 passing | Graphics: 604/654 passing
 
-## Graphics Regressions (0 tests)
+## Graphics Regressions (1 tests)
 
 Tests that **pass** in trace mode but **fail** in graphics mode.
 
-No regressions.
+| # | Test | Graphics Status | Detail |
+|---|------|-----------------|--------|
+| 1 | `swf5_xml_event_handler_context` | Output Mismatch | 0/3 lines match |
 
 ## Graphics Improvements (1 tests)
 

@@ -1,56 +1,40 @@
 {
   "metadata": {
-    "old_timestamp": "2026-05-14T19:34:18.013650+00:00",
-    "old_git_sha": "321bbbae51a185aad78fbe5d0deae17c92a6c187",
-    "new_timestamp": "2026-05-14T21:43:11.803721+00:00",
-    "new_git_sha": "17a60dbb6837a691a8d906f561e2b48aeb00b7cc",
+    "old_timestamp": "2026-05-14T21:43:11.803721+00:00",
+    "old_git_sha": "17a60dbb6837a691a8d906f561e2b48aeb00b7cc",
+    "new_timestamp": "2026-05-15T03:20:32.456601+00:00",
+    "new_git_sha": "45164a5b08549544af474e9761f18537e996d071",
     "partial": false,
     "same_commit": false
   },
   "summary": {
-    "old_pass": 126,
+    "old_pass": 125,
     "old_ruffle_matched": 68,
-    "old_effective_pass": 194,
+    "old_effective_pass": 193,
     "old_total": 243,
-    "old_pass_rate": 51.9,
-    "new_pass": 125,
+    "old_pass_rate": 51.4,
+    "new_pass": 126,
     "new_ruffle_matched": 68,
-    "new_effective_pass": 193,
+    "new_effective_pass": 194,
     "new_total": 243,
-    "new_pass_rate": 51.4,
-    "old_mismatched_lines": 11122,
+    "new_pass_rate": 51.9,
+    "old_mismatched_lines": 11121,
     "new_mismatched_lines": 11121,
     "increased_mismatches": 0,
-    "decreased_mismatches": 1,
-    "newly_passing": 0,
-    "newly_failing": 1,
+    "decreased_mismatches": 0,
+    "newly_passing": 1,
+    "newly_failing": 0,
     "status_changed": 1,
-    "unchanged": 241,
+    "unchanged": 242,
     "added": 0,
     "removed": 0
   },
   "changes": [
     {
-      "test": "TextField-v6",
-      "change_type": "changed",
-      "old_status": "output_mismatch",
-      "new_status": "output_mismatch",
-      "old_lines": {
-        "actual_lines": 545,
-        "expected_lines": 545,
-        "matching_lines": 403
-      },
-      "new_lines": {
-        "actual_lines": 545,
-        "expected_lines": 545,
-        "matching_lines": 404
-      }
-    },
-    {
       "test": "case-v5",
       "change_type": "changed",
-      "old_status": "pass",
-      "new_status": "runtime_error",
+      "old_status": "runtime_error",
+      "new_status": "pass",
       "old_lines": {
         "actual_lines": 39,
         "expected_lines": 39,
