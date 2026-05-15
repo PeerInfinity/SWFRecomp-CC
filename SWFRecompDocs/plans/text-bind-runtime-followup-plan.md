@@ -597,6 +597,101 @@ Surviving / new hypotheses:
   was always blank, Phase A just made the "wrong output" more
   visible (since the test now expects glyphs to render).
 
+### Bug B — root cause found via per-frame captures (2026-05-15)
+
+The breakthrough: configure `test.toml` with multiple
+`[image_comparisons.frameN]` entries with `trigger = N` for
+N = 0..5, plus a small `verify_output.py` tweak to copy actual PNGs
+to the test dir even when `expected.png` doesn't exist:
+
+```toml
+[image_comparisons."frame1"]
+trigger = 1
+tolerance = 128
+max_outliers = 999999
+# ... frame2..frame5 similar
+```
+
+Result: each per-tick capture (`frame1.actual.png` through
+`frame5.actual.png`) shows **correctly rendered text**. `frame5`
+even shows the bound-variable value (`"SUCCESS"`) in magenta at
+the expected position. Only the `last_frame` capture
+(`output.actual.png`) is blank.
+
+So the *entire rendering pipeline works correctly* throughout the
+run. The bug is just that the `last_frame` capture happens at a
+moment when the display_list has been wiped.
+
+**Root cause:** `swf.c:836-851` runs a "natural backward wrap"
+cleanup at end of each tick where `manual_next_frame` is set and
+`next_frame < current_frame`. For `text-bind`, frame_5 sets
+`manual_next_frame=1, next_frame=0` (looping back). The cleanup:
+
+1. Walks display_list looking for entries with `placed_at_frame > next_frame=0`.
+2. For each, invalidates cached MCs and clears the entry.
+
+After frame_5 ran, depth 1 had `placed_at_frame=5` (the morphed
+re-placement). So the cleanup wipes depth 1. The next tick's
+frame_0 would re-place it — but if there is no next tick (we're
+at `tick_count >= max_ticks`), the cleanup just destroys state for
+nothing.
+
+Then the final `tagRerenderFrame` in `swf.c:1101` iterates the
+now-empty display_list and the orphan-TF walk finds no TF to
+render either.
+
+**Fix (commit `498e5148`):** gate the wrap-back cleanup on
+`tick_count < max_ticks` — skip it on the last tick. The skipped
+cleanup was pure destruction with no following frame to consume
+its preparation. Regression batteries green: `avm1/default_names`
+(the canary the wrap-back was originally added for),
+`avm1/goto_frame`, `avm1/goto_frame2`,
+`avm1/register_class_return_value`.
+
+### Bug C — TFRunTable not rebuilt by placement-time binding
+
+After the wrap-back fix, `text-bind`'s `output.actual.png` shows
+"FAILED" instead of "SUCCESS". Same-shape bug as Bug A, different
+call site:
+
+- frame_5 re-places depth 1 with `char_id=3` (a fresh EditText
+  with `initialText="FAILED"`).
+- `findOrCreateMovieClip` detects the textfield-changed case
+  (`new_tf_idx != mc->ng_textfield_idx`) and runs the property
+  re-init at action.c:19744, calling `tf_parse_html(table,
+  raw_html, ...)` — table is now populated with "FAILED" runs.
+- Then `actionTryBindTextFieldVariable` (action.c:19543) finds
+  the bound variable `_root.testField="SUCCESS"` and does:
+  ```c
+  setProperty(props, "htmlText", existing_val);  // raw, no parse
+  strip_html_tags_u16(...);
+  setProperty(props, "text", stripped);
+  setProperty(props, "length", stripped_len);
+  ```
+  Same bug as the pre-Bug-A `actionNotifyPropertyChange`: the
+  binding update sets the property bag but doesn't rebuild the
+  TFRunTable. So when rendering, the table still has the "FAILED"
+  runs from init.
+
+**Fix shape:** call `tfRebuildFromHtml` from
+`actionTryBindTextFieldVariable`'s `is_html` branch after
+`setProperty("htmlText", ...)`. Identical to the Bug A fix in
+shape, just on a different call site. Plain-text path
+(non-HTML field) doesn't need the helper.
+
+**Why per-tick captures still showed "SUCCESS":** during ticks 1-4
+the TF is `char_id=2` (the original placement), which received the
+binding update via Bug A's `actionNotifyPropertyChange` after
+`script_0` wrote `this.testField = "SUCCESS"`. That fix correctly
+rebuilt TF1's TFRunTable. Tick 5 swapped to `char_id=3` (TF2),
+which got the bound value through the placement-time path
+(actionTryBindTextFieldVariable), which has the equivalent bug.
+But tick 5's per-iteration capture happens *during* tick 5 — and
+at that moment, the renderer found TF1's MC still in cache
+(depth still valid, not yet INT_MIN), so it rendered TF1's
+"SUCCESS"-table not TF2's "FAILED"-table. The final capture
+happens after TF1 has been swept; only TF2 is left to render.
+
 ## Open questions
 
 - **OQ-1.** Does the `actionNotifyPropertyChange` HTML path also
