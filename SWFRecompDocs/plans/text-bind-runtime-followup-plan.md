@@ -590,6 +590,12 @@ Surviving / new hypotheses:
   If cyan still doesn't appear, the bug is older than Phase A
   (text-bind was always blank, Phase A just made the failure
   more visible because we now expect glyphs to render).
+  **CONFIRMED 2026-05-15:** Disabling Phase A's synthesis branch
+  (`if (0 && ...)`) and re-running text-bind with a cyan probe rect
+  at the top of `tagShowFrame`'s render pass produces the same
+  blank canvas. So Bug B is independent of Phase A — text-bind
+  was always blank, Phase A just made the "wrong output" more
+  visible (since the test now expects glyphs to render).
 
 ## Open questions
 
