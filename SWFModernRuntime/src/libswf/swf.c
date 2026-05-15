@@ -833,7 +833,20 @@ void tagMain(SWFAppContext* app_context)
 			// without this, the second-iteration auto-instance counter is
 			// short by the number of stale-depth modifies that would have
 			// been fresh placements.
-			if (!goto_from_action && next_frame < current_frame)
+			//
+			// Skip on the last tick of the run: the wrap-back is preparation
+			// for the next tick's frame_0 which will re-place the cleared
+			// entries. If no next tick is going to run, the cleanup just
+			// destroys the display_list and leaves last_frame captures
+			// rendering blank. Key test: from_shumway/avm1/text-bind.
+			// (Per-iteration captures happen *before* this wrap-back so
+			// they're unaffected.)
+#ifdef MAX_FRAMES
+			int _wrap_is_last_tick = (tick_count >= max_ticks);
+#else
+			int _wrap_is_last_tick = 0;
+#endif
+			if (!goto_from_action && next_frame < current_frame && !_wrap_is_last_tick)
 			{
 				extern void actionInvalidateCachedMovieClip(SWFAppContext*, const char*, int);
 				for (size_t d = 1; d <= max_depth && d < 16384; d++)
