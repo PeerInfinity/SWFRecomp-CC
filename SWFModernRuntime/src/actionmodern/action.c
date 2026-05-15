@@ -49731,6 +49731,51 @@ void actionNewMethod(SWFAppContext* app_context)
 			}
 		}
 	}
+	else if (obj_var.type == ACTION_STACK_VALUE_MOVIECLIP)
+	{
+		// Handle MOVIECLIP type, e.g. `new _root.Foo()` where Foo was assigned
+		// via `_root.Foo = function() { ... }`. Without this branch, the lookup
+		// for method_name on the MC fell through and the NewMethod returned
+		// undefined, so `new _root.Foo()` produced an undefined object instead
+		// of running the constructor. Mirrors the MC user-method lookup in
+		// actionCallMethod's `_mc_user_dispatch` block: check dynamic_props
+		// with prototype walk, then root var_map, then function_registry.
+		MovieClip* mc = (MovieClip*) obj_var.data.numeric_value;
+		if (mc != NULL && mc->depth != INT_MIN)
+		{
+			if (mc->dynamic_props != NULL)
+			{
+				ActionVar* method_var = getPropertyWithPrototype(
+					(ASObject*)mc->dynamic_props, method_name, method_name_len);
+				if (method_var != NULL && method_var->type == ACTION_STACK_VALUE_FUNCTION)
+					user_ctor_func = (ASFunction*) method_var->data.numeric_value;
+			}
+			if (user_ctor_func == NULL && mc == &root_movieclip)
+			{
+				extern hashmap* var_map;
+				if (var_map != NULL)
+				{
+					ActionVar* rv = NULL;
+					const char* lk = method_name;
+					char folded[512];
+					u32 klen = method_name_len;
+					if (g_swf_version <= 6 && method_name_len < sizeof(folded))
+					{
+						for (u32 fi = 0; fi < method_name_len; fi++)
+							folded[fi] = (method_name[fi] >= 'A' && method_name[fi] <= 'Z')
+								? (method_name[fi] + 32) : method_name[fi];
+						folded[method_name_len] = '\0';
+						lk = folded;
+					}
+					hashmap_get(var_map, lk, klen, (uintptr_t*)&rv);
+					if (rv != NULL && rv->type == ACTION_STACK_VALUE_FUNCTION)
+						user_ctor_func = (ASFunction*) rv->data.numeric_value;
+				}
+			}
+			if (user_ctor_func == NULL)
+				user_ctor_func = lookupFunctionByName(method_name, method_name_len);
+		}
+	}
 
 	// 6. Create new object based on constructor name
 	void* new_obj = NULL;
