@@ -1901,11 +1901,62 @@ namespace SWFRecomp
 					cur_pos = font_tag_start + font_tag_length;
 				}
 
+				// Phase A of device-font-rendering-plan.md: zero-glyph
+				// DefineFont2/3 (e.g. `_sans` with empty <glyphs/>) declares
+				// a font by name only — Flash and Ruffle render it via a
+				// host system font. Pre-seed ASCII 32..126 from NotoSans.ttf
+				// so the device-font fallback loop below tessellates real
+				// glyphs for it.
+				bool is_zero_glyph_synth = false;
+				if ((tag.code == SWF_TAG_DEFINE_FONT_2 || tag.code == SWF_TAG_DEFINE_FONT_3)
+				    && num_entries == 0
+				    && font_names.count(font_id) && !font_names[font_id].empty()
+				    && loadDeviceFont())
+				{
+					int ttf_ascent_em = 0, ttf_descent_em = 0, ttf_linegap_em = 0;
+					stbtt_GetFontVMetrics(&g_device_font, &ttf_ascent_em,
+						&ttf_descent_em, &ttf_linegap_em);
+					float swf_em = font_em_square.count(font_id) ? font_em_square[font_id] : 1024.0f;
+					float ttf_scale = swf_em / 1000.0f; // Noto Sans EM = 1000
+
+					const u16 SYNTH_FIRST_CP = 32;
+					const u16 SYNTH_LAST_CP  = 126;
+					num_entries = SYNTH_LAST_CP - SYNTH_FIRST_CP + 1;  // 95
+
+					font_code_tables[font_id].clear();
+					font_advance_tables[font_id].clear();
+					font_code_tables[font_id].reserve(num_entries);
+					font_advance_tables[font_id].reserve(num_entries);
+					for (u16 cp = SYNTH_FIRST_CP; cp <= SYNTH_LAST_CP; cp++) {
+						font_code_tables[font_id].push_back(cp);
+						int adv_em = 0, lsb = 0;
+						stbtt_GetCodepointHMetrics(&g_device_font, cp, &adv_em, &lsb);
+						font_advance_tables[font_id].push_back((s16)(adv_em * ttf_scale));
+					}
+					// stb_truetype returns descent as a negative number; flip
+					// to the positive convention used by DefineFont layout.
+					font_ascent [font_id] = (s16)( ttf_ascent_em  * ttf_scale);
+					font_descent[font_id] = (s16)(-ttf_descent_em * ttf_scale);
+					font_leading[font_id] = (s16)( ttf_linegap_em * ttf_scale);
+
+					// Pre-fill glyph entry tracking — the fallback loop below
+					// detects second==0 and emits triangles + path data.
+					font_glyph_entries.assign(num_entries, {0, 0});
+					font_glyph_path_entries.assign(num_entries, {0, 0});
+
+					is_zero_glyph_synth = true;
+				}
+
 				// Device font fallback: if glyph shapes are empty, tessellate from Noto Sans TTF.
 				// Gated by SWFRECOMP_DEVICE_FONT_FALLBACK env var (default off); enable with =1
 				// to restore the synthesized-glyph behaviour. With it off, deliberately-empty
-				// embedded glyphs render as nothing (advance kept), matching Ruffle.
-				if (font_code_tables.count(font_id) && deviceFontFallbackEnabled() && loadDeviceFont())
+				// embedded glyphs render as nothing (advance kept), matching Ruffle. The
+				// zero-glyph synthesis branch above sets is_zero_glyph_synth and bypasses the
+				// env-var gate: those fonts have no embedded glyphs to honour, so synthesis is
+				// always the right answer.
+				if (font_code_tables.count(font_id)
+				    && (is_zero_glyph_synth || deviceFontFallbackEnabled())
+				    && loadDeviceFont())
 				{
 					float swf_em = font_em_square.count(font_id) ? font_em_square[font_id] : 1024.0f;
 					float ttf_scale = swf_em / 1000.0f; // Noto Sans EM = 1000
