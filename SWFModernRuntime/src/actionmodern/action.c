@@ -19197,6 +19197,143 @@ void actionDropTextFieldBindingForTF(MovieClip* container, MovieClip* tf_mc)
 	}
 }
 
+// Rebuild a TextField MC's TFRunTable from HTML and resync derived properties.
+// Mirrors actionSetMember's htmlText-property-setter logic at action.c:~44186
+// (html-flag-true branch). Called from both:
+//   1. actionSetMember when AS code writes mc.htmlText = ...
+//   2. actionNotifyPropertyChange when a bound variable change propagates HTML
+//      content into an isHTML TF (Phase C of textfield-variable-binding-plan).
+//
+// The caller is responsible for setting props["htmlText"] itself; this helper
+// only performs the side effects: parsing the HTML, syncing derived props
+// (_tf_fontHeight / _tf_letterSpacing / _tf_fontId / _tf_leading), and
+// writing props["text"] + props["length"] from the extracted plain text.
+//
+// In NO_GRAPHICS / OFFSCREEN_RENDER the full tf_* run-table system is used.
+// In WASM graphics mode the tf_* system isn't compiled, so we fall back to
+// a simple <...> tag-strip when projecting plain text into props["text"].
+static void tfRebuildFromHtml(SWFAppContext* app_context, MovieClip* mc,
+	const uint16_t* html_u16, u32 html_u16_len)
+{
+	if (mc == NULL || mc->dynamic_props == NULL) return;
+	ASObject* props = (ASObject*) mc->dynamic_props;
+
+	// Clear raw-content flag (HTML parsing path)
+	ActionVar _rc_zero = {0}; _rc_zero.type = ACTION_STACK_VALUE_F64;
+	setProperty(app_context, props, "_tf_raw_content", 15, &_rc_zero);
+
+	// Convert UTF-16 input to UTF-8 for the HTML parser
+	char _ht_buf[16384];
+	if (html_u16 && html_u16_len > 0)
+		u16_to_utf8(html_u16, html_u16_len, _ht_buf, sizeof(_ht_buf));
+	else
+		_ht_buf[0] = '\0';
+	u32 src_len = (u32)strlen(_ht_buf);
+
+	// Read condenseWhite / multiline flags (used by both paths below)
+	int condense_white = 0;
+	int is_multiline = 0;
+	{
+		ActionVar* cw_prop = getProperty(props, "condenseWhite", 13);
+		if (cw_prop != NULL && cw_prop->type == ACTION_STACK_VALUE_BOOLEAN
+		    && cw_prop->data.numeric_value)
+			condense_white = 1;
+		ActionVar* ml_prop = getProperty(props, "multiline", 9);
+		if (ml_prop != NULL && ml_prop->type == ACTION_STACK_VALUE_BOOLEAN
+		    && ml_prop->data.numeric_value)
+			is_multiline = 1;
+	}
+	(void)condense_white; (void)is_multiline;
+
+	char plain_buf[16384];
+#if defined(NO_GRAPHICS) || defined(OFFSCREEN_RENDER)
+	// Run-table system available: full HTML parse + derived-prop sync.
+	TFRunTable* table = tf_get_table(mc);
+	table->from_html_text = 1;
+	TFRun defaults;
+	tf_get_defaults(mc, &defaults);
+	{
+		ActionVar* tc_prop = getProperty(props, "textColor", 9);
+		if (tc_prop != NULL && tc_prop->type == ACTION_STACK_VALUE_F64) {
+			double tc_d; memcpy(&tc_d, &tc_prop->data.numeric_value, sizeof(double));
+			defaults.color = (u32)tc_d & 0x00FFFFFF;
+		}
+	}
+	tf_parse_html(table, _ht_buf, src_len, &defaults, condense_white,
+		g_swf_version, is_multiline);
+
+	// Sync font height / letter spacing / font id / leading from first content run
+	if (table->run_count > 0) {
+		TFRun* first_run = &table->runs[0];
+		for (u32 _ri = 0; _ri < table->run_count; _ri++) {
+			if (table->runs[_ri].length > 0 || _ri == table->run_count - 1) {
+				first_run = &table->runs[_ri];
+				break;
+			}
+		}
+		if (first_run->font_height > 0) {
+			ActionVar fh_val = {0};
+			fh_val.type = ACTION_STACK_VALUE_F64;
+			VAL(double, &fh_val.data.numeric_value) = (double)first_run->font_height;
+			setProperty(app_context, props, "_tf_fontHeight", 14, &fh_val);
+		}
+		{
+			ActionVar ls_val = {0};
+			ls_val.type = ACTION_STACK_VALUE_F64;
+			VAL(double, &ls_val.data.numeric_value) = (double)first_run->letter_spacing / 100.0;
+			setProperty(app_context, props, "_tf_letterSpacing", 17, &ls_val);
+		}
+		if (first_run->font_name[0] != '\0') {
+			u16 found_fid = ng_findFontIdByName(first_run->font_name);
+			ActionVar fid_val = {0};
+			fid_val.type = ACTION_STACK_VALUE_F64;
+			VAL(double, &fid_val.data.numeric_value) = (double)found_fid;
+			setProperty(app_context, props, "_tf_fontId", 10, &fid_val);
+		}
+		// Leading: only overwrite if not already set by setTextFormat /
+		// setNewTextFormat (which is more authoritative than the parsed default).
+		{
+			ActionVar* existing_ld = getProperty(props, "_tf_leading", 11);
+			if (existing_ld == NULL || existing_ld->type != ACTION_STACK_VALUE_F64) {
+				ActionVar ld_val = {0};
+				ld_val.type = ACTION_STACK_VALUE_F64;
+				VAL(double, &ld_val.data.numeric_value) = (double)(first_run->leading * 20);
+				setProperty(app_context, props, "_tf_leading", 11, &ld_val);
+			}
+		}
+	}
+
+	// Extract plain text (with \r as paragraph separator for storage)
+	tf_get_plain_text(table, plain_buf, sizeof(plain_buf), is_multiline);
+#else
+	// Graphics-mode WASM: simple tag-strip fallback.
+	u32 pi = 0;
+	for (u32 si = 0; _ht_buf[si] && pi < sizeof(plain_buf) - 1; si++) {
+		if (_ht_buf[si] == '<') {
+			while (_ht_buf[si] && _ht_buf[si] != '>') si++;
+			if (!_ht_buf[si]) break;
+		} else {
+			plain_buf[pi++] = _ht_buf[si];
+		}
+	}
+	plain_buf[pi] = '\0';
+#endif
+	u32 plain_len = (u32)strlen(plain_buf);
+
+	// Convert plain text to UTF-16 and store as "text" + "length"
+	u32 text_u16_len = 0;
+	uint16_t* text_u16 = utf8_to_u16(app_context, plain_buf, plain_len, &text_u16_len);
+	ActionVar text_val = {0};
+	text_val.type = ACTION_STACK_VALUE_STRING;
+	text_val.str_size = text_u16_len;
+	VAL(u64, &text_val.data.numeric_value) = (u64)text_u16;
+	setProperty(app_context, props, "text", 4, &text_val);
+	ActionVar len_val = {0};
+	len_val.type = ACTION_STACK_VALUE_F64;
+	VAL(double, &len_val.data.numeric_value) = (double)text_u16_len;
+	setProperty(app_context, props, "length", 6, &len_val);
+}
+
 // Propagate a property change from `container` to any bound TextField that
 // targets this property name. Mirrors Ruffle's
 // `notify_property_change` (core/src/avm1/object/stage_object.rs:63).
@@ -19265,22 +19402,17 @@ int actionNotifyPropertyChange(SWFAppContext* app_context, MovieClip* container,
 		}
 
 		if (is_html && text_len > 0) {
+			// Set the htmlText property first so a subsequent re-read sees the
+			// new value; the helper below rebuilds the TFRunTable and projects
+			// plain text into props["text"] + props["length"]. Without the
+			// helper, the render path keeps reading the static-initial
+			// TFRunTable and renders the wrong content.
 			ActionVar html_val = {0};
 			html_val.type = ACTION_STACK_VALUE_STRING;
 			html_val.str_size = text_len;
 			VAL(u64, &html_val.data.numeric_value) = (u64)text_u16;
 			setProperty(app_context, props, "htmlText", 8, &html_val);
-			u32 stripped_len;
-			uint16_t* stripped = strip_html_tags_u16(app_context, text_u16, text_len, &stripped_len);
-			ActionVar text_val = {0};
-			text_val.type = ACTION_STACK_VALUE_STRING;
-			text_val.str_size = stripped_len;
-			VAL(u64, &text_val.data.numeric_value) = (u64)stripped;
-			setProperty(app_context, props, "text", 4, &text_val);
-			ActionVar len_val = {0};
-			len_val.type = ACTION_STACK_VALUE_F64;
-			VAL(double, &len_val.data.numeric_value) = (double)stripped_len;
-			setProperty(app_context, props, "length", 6, &len_val);
+			tfRebuildFromHtml(app_context, tf_mc, text_u16, text_len);
 		} else {
 			ActionVar text_val = {0};
 			text_val.type = ACTION_STACK_VALUE_STRING;
