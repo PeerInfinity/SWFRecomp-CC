@@ -1,10 +1,10 @@
 # Ruffle Test Results (Filtered)
 
-**Date**: 2026-05-15 18:45 UTC
+**Date**: 2026-05-15 20:17 UTC
 
-**Git SHA**: `a017c0f6a2`
+**Git SHA**: `86fc1408b1`
 
-**Run Duration**: 1m 46s
+**Run Duration**: 1m 48s
 
 **Filtered**: 2 tests ignored out of 47 available
 
@@ -29,10 +29,10 @@
 | 2 | `bitmapdata/getPixel` | 2 | 0.3s |  |
 | 3 | `bitmapdata/loadBitmap` | 3 | 0.3s |  |
 | 4 | `callee` | 2 | 0.3s |  |
-| 5 | `depth` | 6 | 0.5s |  |
+| 5 | `depth` | 6 | 0.4s |  |
 | 6 | `doactionorder/doactionorder` | 7 | 0.3s |  |
 | 7 | `doactionorder/symbolclass` | 4 | 0.3s |  |
-| 8 | `duplicateMovieClip/dontremove` | 6 | 18.3s |  |
+| 8 | `duplicateMovieClip/dontremove` | 6 | 18.7s |  |
 | 9 | `duplicateMovieClip/duplicateMovieClip` | 4 | 0.3s |  |
 | 10 | `duplicateMovieClip/name-coercion` | 3 | 0.3s |  |
 | 11 | `duplicateMovieClip/samedepth` | 6 | 0.3s |  |
@@ -40,15 +40,15 @@
 | 13 | `filters` | 149 | 0.3s |  |
 | 14 | `haxe/flocons1` | 2 | 0.3s |  |
 | 15 | `haxe/flocons2` | 3 | 0.3s |  |
-| 16 | `label` | 4 | 18.1s |  |
+| 16 | `label` | 4 | 18.4s |  |
 | 17 | `levels` | 9 | 0.3s |  |
 | 18 | `loadevent` | 9 | 0.3s |  |
 | 19 | `loadvariables/loadvariables` | 7 | 0.3s |  |
-| 20 | `loadvariables/loadvars` | 2 | 18.0s |  |
+| 20 | `loadvariables/loadvars` | 2 | 18.8s |  |
 | 21 | `lookup` | 3 | 0.3s |  |
 | 22 | `mouse-transparency` | 1 | 0.3s |  |
 | 23 | `nativeinheritance` | 6 | 0.3s |  |
-| 24 | `nested-button` | 1 | 0.3s |  |
+| 24 | `nested-button` | 1 | 0.2s |  |
 | 25 | `operations` | 13 | 0.3s |  |
 | 26 | `property-paths/property-paths-6` | 6 | 0.3s |  |
 | 27 | `property-paths/property-paths-7` | 7 | 0.2s |  |
@@ -60,8 +60,8 @@
 | 33 | `setinterval` | 20 | 0.3s |  |
 | 34 | `settimeout` | 17 | 0.3s |  |
 | 35 | `super` | 11 | 0.2s |  |
-| 36 | `target` | 18 | 0.2s |  |
-| 37 | `text-bind` | 0 | 19.2s |  |
+| 36 | `target` | 18 | 0.3s |  |
+| 37 | `text-bind` | 0 | 17.8s |  |
 | 38 | `textfield/textfield-html` | 4 | 0.3s |  |
 | 39 | `textfield/textfield-text-setters` | 8 | 0.3s |  |
 | 40 | `undefined/undefined-swf6` | 39 | 0.3s |  |
