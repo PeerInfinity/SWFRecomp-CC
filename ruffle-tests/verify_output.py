@@ -1455,15 +1455,31 @@ def recompile_swf(test_dir, force=False):
 
     Returns (success, stderr).
     """
-    if not force and (test_dir / "RecompiledScripts").exists():
-        return True, ""
+    scripts_dir = test_dir / "RecompiledScripts"
+    if not force and scripts_dir.exists():
+        # Stale-cache check: if the SWFRecomp binary is newer than the cached
+        # output (or test.swf is newer), the cached code may use an older
+        # function signature than the current runtime expects, leading to
+        # compile_fail downstream. Auto-invalidate so a recompiler signature
+        # change doesn't silently break previously-cached tests.
+        try:
+            cache_mtime = scripts_dir.stat().st_mtime
+            recomp_mtime = RECOMP_BIN.stat().st_mtime
+            swf_mtime = (test_dir / "test.swf").stat().st_mtime
+            if cache_mtime >= recomp_mtime and cache_mtime >= swf_mtime:
+                return True, ""
+        except OSError:
+            return True, ""
+        # Fall through to regenerate.
+    elif not force:
+        # No cache at all → must build.
+        pass
 
-    # Remove old output if forcing
-    if force:
-        for d in ["RecompiledScripts", "RecompiledTags"]:
-            p = test_dir / d
-            if p.exists():
-                shutil.rmtree(p)
+    # Remove old output if forcing OR auto-invalidating.
+    for d in ["RecompiledScripts", "RecompiledTags"]:
+        p = test_dir / d
+        if p.exists():
+            shutil.rmtree(p)
 
     try:
         proc = subprocess.Popen(
