@@ -4554,14 +4554,20 @@ static ActionVar actionASSetPropFlags_func2(SWFAppContext* app_context, ActionVa
 		ASFunction* func = (ASFunction*)(u64)args[0].data.numeric_value;
 		if (func != NULL) {
 			// "prototype" lives on func->prototype_obj (separate field), not in
-			// own_props. To let ASSetPropFlags(func, null, ...) hide it (Object.as:947
-			// `ASSetPropFlags(TestO, null, 8193)` → TestO.prototype reads undefined
-			// in SWF<=8 via flash_flags bit 0x2000), mirror it into own_props on
-			// demand. The apply-all loop below will set flash_flags on this entry;
-			// GetMember "prototype" then consults the same flash_flags before
-			// returning prototype_obj.
+			// own_props. To let ASSetPropFlags(func, null, set_flags, ...) hide
+			// it (Object.as:947 `ASSetPropFlags(TestO, null, 8193)` → TestO.prototype
+			// reads undefined in SWF<=8 via flash_flags bit 0x2000), mirror it into
+			// own_props on demand. Only when set_flags carries a non-trivial bit
+			// — otherwise (e.g., the AVM1 global_proto_decls test's
+			// `ASSetPropFlags(obj, null, 0, 1)`) the mirror would add an extra
+			// enumerable "prototype" entry to every walked function and shift
+			// downstream output.
 			int _spf_apply_all = (args[1].type == ACTION_STACK_VALUE_NULL);
-			if (_spf_apply_all && func->prototype_obj != NULL) {
+			s32 _spf_set_flags_peek = (args[2].type == ACTION_STACK_VALUE_F32 ||
+			                            args[2].type == ACTION_STACK_VALUE_F64 ||
+			                            args[2].type == ACTION_STACK_VALUE_BOOLEAN)
+			                          ? varToInt32(&args[2]) : 0;
+			if (_spf_apply_all && func->prototype_obj != NULL && _spf_set_flags_peek != 0) {
 				if (func->own_props == NULL) {
 					func->own_props = allocObject(app_context, 4);
 					retainObject(func->own_props);
