@@ -4552,7 +4552,30 @@ static ActionVar actionASSetPropFlags_func2(SWFAppContext* app_context, ActionVa
 	else if (args[0].type == ACTION_STACK_VALUE_FUNCTION) {
 		// For functions, ASSetPropFlags operates on own_props
 		ASFunction* func = (ASFunction*)(u64)args[0].data.numeric_value;
-		if (func != NULL) obj = func->own_props;
+		if (func != NULL) {
+			// "prototype" lives on func->prototype_obj (separate field), not in
+			// own_props. To let ASSetPropFlags(func, null, ...) hide it (Object.as:947
+			// `ASSetPropFlags(TestO, null, 8193)` → TestO.prototype reads undefined
+			// in SWF<=8 via flash_flags bit 0x2000), mirror it into own_props on
+			// demand. The apply-all loop below will set flash_flags on this entry;
+			// GetMember "prototype" then consults the same flash_flags before
+			// returning prototype_obj.
+			int _spf_apply_all = (args[1].type == ACTION_STACK_VALUE_NULL);
+			if (_spf_apply_all && func->prototype_obj != NULL) {
+				if (func->own_props == NULL) {
+					func->own_props = allocObject(app_context, 4);
+					retainObject(func->own_props);
+				}
+				if (findPropertyRaw(func->own_props, "prototype", 9) == NULL) {
+					ActionVar _spf_proto_val;
+					_spf_proto_val.type = ACTION_STACK_VALUE_OBJECT;
+					_spf_proto_val.str_size = 0;
+					_spf_proto_val.data.numeric_value = (u64) func->prototype_obj;
+					setProperty(app_context, func->own_props, "prototype", 9, &_spf_proto_val);
+				}
+			}
+			obj = func->own_props;
+		}
 	}
 	else if (args[0].type == ACTION_STACK_VALUE_MOVIECLIP) {
 		// For MovieClips, ASSetPropFlags operates on dynamic_props (timeline vars)
@@ -26049,6 +26072,35 @@ ActionStackValueType convertString(SWFAppContext* app_context, char* var_str)
 					}
 				}
 			}
+			// Detect broken proto chain BEFORE toString lookup. When __proto__
+			// is explicitly set to undefined/null, Flash's primitive coercion
+			// bypasses own toString and returns "" (SWF<7) or "undefined"
+			// (SWF7+). Matches Object.as:875/883 — `nothing.__proto__ = undefined`
+			// followed by `"string + " + nothing` returns "string + " even
+			// when nothing.toString is set as an own property.
+			{
+				ASObject* _cs_pre_o = (ASObject*) STACK_TOP_VALUE;
+				int _cs_pre_broken = 0;
+				if (_cs_pre_o != NULL && _cs_pre_o != (ASObject*) global_object) {
+					ActionVar* _cs_pp = getProperty(_cs_pre_o, "__proto__", 9);
+					if (_cs_pp != NULL &&
+					    (_cs_pp->type == ACTION_STACK_VALUE_UNDEFINED ||
+					     _cs_pp->type == ACTION_STACK_VALUE_NULL))
+						_cs_pre_broken = 1;
+				}
+				if (_cs_pre_broken) {
+					STACK_TOP_TYPE = ACTION_STACK_VALUE_STRING;
+					if (g_swf_version >= 7) {
+						VAL(u64, &STACK_TOP_VALUE) = (u64) u16_undefined;
+						STACK_TOP_N = 9;
+					} else {
+						VAL(u64, &STACK_TOP_VALUE) = (u64) u16_empty;
+						STACK_TOP_N = 0;
+					}
+					break;
+				}
+			}
+
 			int _cs_found = 0;
 			ActionVar _cs_ts = objectCallToString(app_context, &_cs_obj, &_cs_found);
 			STACK_TOP_TYPE = ACTION_STACK_VALUE_STRING;
@@ -26949,8 +27001,24 @@ void actionAdd2(SWFAppContext* app_context, char* str_buffer)
 		}
 		else
 		{
+			// Broken proto chain (__proto__ explicitly undefined/null) skips
+			// own toString and falls through to convertString's broken-proto
+			// branch ("" in SWF<7, "undefined" in SWF7+). See Object.as:875.
+			int _b_broken_proto = 0;
+			if (b_raw.type == ACTION_STACK_VALUE_OBJECT && b_raw.data.numeric_value != 0) {
+				ASObject* _bo = (ASObject*) b_raw.data.numeric_value;
+				if (_bo != (ASObject*) global_object) {
+					ActionVar* _bpp = getProperty(_bo, "__proto__", 9);
+					if (_bpp != NULL &&
+					    (_bpp->type == ACTION_STACK_VALUE_UNDEFINED ||
+					     _bpp->type == ACTION_STACK_VALUE_NULL))
+						_b_broken_proto = 1;
+				}
+			}
 			int ts_found = 0;
-			ActionVar ts = objectCallToString(app_context, &b_raw, &ts_found);
+			ActionVar ts = {0};
+			if (!_b_broken_proto)
+				ts = objectCallToString(app_context, &b_raw, &ts_found);
 			if (ts_found && ts.type == ACTION_STACK_VALUE_STRING)
 				GET_U16_FROM_VAR(ts, u16_b, len_b);
 			else if (ts_found)
@@ -26989,8 +27057,24 @@ void actionAdd2(SWFAppContext* app_context, char* str_buffer)
 		}
 		else
 		{
+			// Broken proto chain (__proto__ explicitly undefined/null) skips
+			// own toString and falls through to convertString's broken-proto
+			// branch ("" in SWF<7, "undefined" in SWF7+). See Object.as:875.
+			int _a_broken_proto = 0;
+			if (a_raw.type == ACTION_STACK_VALUE_OBJECT && a_raw.data.numeric_value != 0) {
+				ASObject* _ao = (ASObject*) a_raw.data.numeric_value;
+				if (_ao != (ASObject*) global_object) {
+					ActionVar* _app = getProperty(_ao, "__proto__", 9);
+					if (_app != NULL &&
+					    (_app->type == ACTION_STACK_VALUE_UNDEFINED ||
+					     _app->type == ACTION_STACK_VALUE_NULL))
+						_a_broken_proto = 1;
+				}
+			}
 			int ts_found = 0;
-			ActionVar ts = objectCallToString(app_context, &a_raw, &ts_found);
+			ActionVar ts = {0};
+			if (!_a_broken_proto)
+				ts = objectCallToString(app_context, &a_raw, &ts_found);
 			if (ts_found && ts.type == ACTION_STACK_VALUE_STRING)
 				GET_U16_FROM_VAR(ts, u16_a, len_a);
 			else if (ts_found)
@@ -46800,6 +46884,20 @@ void actionGetMember(SWFAppContext* app_context)
 			}
 			else
 			{
+				// flash_flags hide check for "prototype": ASSetPropFlags can mirror
+				// the prototype slot into own_props and set version-hide bits
+				// (e.g. 0x2000 hides in SWF<=8). Object.as:947 sets bit 0x2000
+				// via ASSetPropFlags(TestO, null, 8193) and expects TestO.prototype
+				// to read undefined.
+				if (func->own_props != NULL)
+				{
+					ASProperty* _php = findPropertyRaw(func->own_props, "prototype", 9);
+					if (_php != NULL && isPropertyHiddenAtVersion(_php->flash_flags))
+					{
+						pushUndefined(app_context);
+						return;
+					}
+				}
 				// Check for addProperty getter on own_props for "prototype"
 				int _handled = 0;
 				if (func->own_props != NULL)
@@ -58728,6 +58826,53 @@ void actionCallMethod(SWFAppContext* app_context, char* str_buffer)
 				result.data.string_data.owns_memory = true;
 				pushVar(app_context, &result);
 				if (args != NULL) FREE(args);
+				return;
+			}
+		}
+
+		// Object.prototype.toLocaleString: delegate to this.toString() with no args.
+		// Why: g_object_toLocaleString_func.simple_func points at builtin_object_toString
+		// (a delegation hack) which returns "[object Object]" directly instead of
+		// calling this.toString() — so user overrides of toString never fire and
+		// pushed args leak onto the stack (Object.as:641 toLocaleString(1) → "1[object Object]").
+		// Skip when a non-builtin override exists earlier in the proto chain.
+		if (method_name_len == 14 && strncasecmp(method_name, "toLocaleString", 14) == 0) {
+			int resolves_to_builtin = 0;
+			ASObject* _tls_search = obj;
+			int _tls_max_d = 256;
+			while (_tls_search != NULL && _tls_max_d-- > 0) {
+				ActionVar* _tls_v = getProperty(_tls_search, "toLocaleString", 14);
+				if (_tls_v != NULL) {
+					if (_tls_v->type == ACTION_STACK_VALUE_FUNCTION) {
+						ASFunction* _tls_f = lookupFunctionFromVar(_tls_v);
+						if (_tls_f != NULL && _tls_f->function_type == 1 &&
+						    _tls_f->simple_func == (SimpleFunctionPtr) builtin_object_toString) {
+							resolves_to_builtin = 1;
+						}
+					}
+					break;
+				}
+				ActionVar* _tls_np = getProperty(_tls_search, "__proto__", 9);
+				if (_tls_np == NULL || _tls_np->data.numeric_value == 0) break;
+				ASObject* _tls_next = NULL;
+				if (_tls_np->type == ACTION_STACK_VALUE_OBJECT) {
+					_tls_next = (ASObject*) _tls_np->data.numeric_value;
+				} else if (_tls_np->type == ACTION_STACK_VALUE_ARRAY) {
+					ASArray* _tls_arr = (ASArray*) _tls_np->data.numeric_value;
+					_tls_next = (_tls_arr != NULL) ? _tls_arr->props : NULL;
+				}
+				if (_tls_next == NULL || _tls_next == _tls_search) break;
+				_tls_search = _tls_next;
+			}
+			if (resolves_to_builtin) {
+				if (args != NULL) FREE(args);
+				// Recurse into actionCallMethod with num_args=0 so the user toString
+				// override (if any) runs with proper arguments=[] / this=obj setup.
+				double _tls_zero_d = 0.0;
+				PUSH(ACTION_STACK_VALUE_F64, VAL(u64, &_tls_zero_d));
+				pushVar(app_context, &obj_var);
+				PUSH_STR("toString", 8);
+				actionCallMethod(app_context, str_buffer);
 				return;
 			}
 		}

@@ -26,9 +26,95 @@ dependencies:
 blockers: []
 -->
 
-Last updated: 2026-05-15 (Tier A Date-vN RM; Tier B Object-vN partial fix: +2 lines per version via new-Object __constructor__, pending CI)
+Last updated: 2026-05-15 (Tier B Object-v5 **landed RM** via three runtime fixes: toLocaleString delegation, broken __proto__ primitive-coercion bypass, ASSetPropFlags prototype hiding. Object-v6/v7/v8 still output_mismatch with widespread divergences. Tier A Date-vN RM (earlier this session).)
 
-## 2026-05-15 — Tier B Object-vN: __constructor__ on new Object() (+8 lines, pending CI)
+## 2026-05-15 — Tier B Object-v5 → ruffle_matched (+1 effective, pending CI)
+
+Three runtime fixes in `SWFModernRuntime/src/actionmodern/action.c` flipped
+`Object-v5` from `output_mismatch 137/145` to `ruffle_matched 142/145`
+(diff 3 ⊆ ruffle 7):
+
+1. **`Object.prototype.toLocaleString(1)` delegates to `this.toString()` with
+   no args** (Object.as:641). Previously `g_object_toLocaleString_func.simple_func
+   = builtin_object_toString` — a delegation hack that returned `"[object Object]"`
+   directly, bypassing user toString overrides AND leaking the pushed args
+   onto the stack (the dispatcher pushes `num_args` items but the C builtin
+   pops 0, so `obj.toLocaleString(1)` ended up concatenating `1` + the bogus
+   `"[object Object]"` into `"1[object Object]"`). Fix: intercept
+   `toLocaleString` in the OBJECT-receiver dispatch in `actionCallMethod`
+   *before* method lookup; if the resolved method's `simple_func` matches
+   `builtin_object_toString`, free args (no leak), re-issue
+   `actionCallMethod` recursively with `num_args=0` for `"toString"` so the
+   user override (if any) runs with proper `arguments=[]` / `this=obj` setup.
+
+2. **Broken `__proto__` skips own `toString` during implicit primitive
+   coercion** (Object.as:875/883). When `nothing.__proto__ = undefined` and
+   `nothing.toString = function() { return "toString"; }`, Flash's `Add2`
+   stringification returns `""` in SWF<7 (or `"undefined"` in SWF7+) — it
+   does NOT call the own toString. Fix: detect explicit
+   `__proto__ in {undefined, null}` early in both `convertString`'s OBJECT
+   branch and `actionAdd2`'s string-concat path (both `a` and `b` operands).
+   When detected, skip the `objectCallToString` lookup entirely and emit
+   the broken-proto fallback string. The check uses `getProperty(_, "__proto__", 9)`
+   so it fires only when `__proto__` was *explicitly* assigned undefined/null
+   (not for objects that simply never had `__proto__` set — those keep
+   `"[object Object]"`).
+
+3. **`ASSetPropFlags(func, null, 8193)` hides `func.prototype`** (Object.as:947/956).
+   Bit `0x2000` of `flash_flags` hides at every version mask SWF5-8
+   (`0x7480 / 0x7500 / 0x7000 / 0x6000` all include `0x2000`). Our impl
+   stored function prototypes on `ASFunction.prototype_obj` (separate
+   field), so ASSetPropFlags-iteration over `func->own_props` never
+   touched the prototype slot. Two-part fix:
+   - In `actionASSetPropFlags_func2`'s FUNCTION branch, when `apply_all`
+     and `func->prototype_obj != NULL`, mirror the prototype value into
+     `func->own_props["prototype"]` so the apply loop sets `flash_flags`
+     on it.
+   - In `actionGetMember`'s FUNCTION+`"prototype"` path, consult
+     `findPropertyRaw(func->own_props, "prototype", 9)`'s `flash_flags`
+     via `isPropertyHiddenAtVersion()` *before* the existing addProperty-
+     getter / non-object-stored / lazy-create paths; on hit, push
+     `undefined` and return.
+
+**Test results post-fix (local, pending CI):**
+- `Object-v5`: output_mismatch 137/145 → **ruffle_matched** 142/145 (diff 3 ⊆ ruffle 7)
+- `Object-v6`: 282/333 → 286/333 (still output_mismatch; v6/v7/v8 share extra divergences)
+- `Object-v7`: 295/333 → 299/333
+- `Object-v8`: 295/333 → 299/333
+
+**Regression battery (clean, no graphics):** 27-test AVM1 lifecycle/scope/
+super/closure battery (closure_scope, as2_super_and_this_v6/v8,
+extends_chain, register_class_return_value, on_construct,
+funky_function_calls, enumerate, parse_int, typeof, primitive_type_globals,
+constructor_function, define_function2_preload, add_property, watch,
+function_as_function, function_base_clip, goto_methods,
+swf5_to_6_cross_call, swf5_no_closure, assetnative, assetnative_ids,
+set_interval, tell_target, execution_order2, goto_rewind3,
+loadvars_tostring) — 27/27 PASS. 23-test Gnash actionscript.all battery
+(ASnative-v5/v6, Boolean-v5, Date-v5/v8, Inheritance-v5/v8, case-v5/v6,
+Number-v5, delete-v5/v6, array-v5/v6, Global-v5..v8, enumerate-v6/v7/v8,
+Object-v5/v6) — Object-v5 RM, Object-v6/array-v5/v6 unchanged
+output_mismatch (same line counts as baseline). Earlier `__constructor__`
+Tier B fix (`a017c0f6`, 2026-05-15) preserved. AVM1 `date` test still
+6289/6335 (unchanged from baseline).
+
+**Why not full PASS:** Residual Object-v5 diff set is {7, 142, 143}.
+- Line 7 (`typeof(Object.__proto__) == 'undefined'`): Ruffle-shared
+  divergence — Ruffle also fails this against Flash's expected output,
+  so it's in our ⊆ ruffle subset.
+- Line 142 (`typeof(o) == "undefined"` after `delete o`): Ruffle-shared
+  (we report typeof = "object" for a no-longer-defined name; Ruffle
+  same).
+- Line 143/144 (`#passed/#failed` summary lines): mismatch because our
+  count rose to 139 passed but the Gnash expected captures 142 (Flash's
+  count). Won't fix per `ACCEPTED_DIFFS.md` Category 1 pattern.
+
+Object-v6/v7/v8 have widespread divergences out of scope for Tier B
+(addProperty/watch counter mismatches, deep watch() machinery, +SWF6
+addProperty hidden-inherited-setter — same residual the earlier
+__constructor__ fix didn't reach).
+
+## 2026-05-15 (earlier) — Tier B Object-vN: __constructor__ on new Object() (+8 lines)
 
 Single targeted fix in `SWFModernRuntime/src/actionmodern/action.c`: new
 objects created via `new Object()` (both the `NewObject` opcode at
@@ -190,20 +276,21 @@ already auto-promoted via `ruffle_subset_match`; residual 7-line diff
 is Ruffle-vs-Flash divergences (NaN compares, MC-equality, unsigned
 shift), no action needed.
 
-## Tier B — close (85-95%), N=9
+## Tier B — close (85-95%), N=9 — **Object-v5 DONE (RM 2026-05-15)**
 
-| Test | Suite | Lines | % |
-|------|-------|------:|--:|
-| `array-v6` | actionscript.all | 604/644 | 93.8% |
-| `Object-v5` | actionscript.all | 135/145 | 93.1% |
-| `array-v7` | actionscript.all | 585/654 | 89.4% |
-| `array-v8` | actionscript.all | 585/654 | 89.4% |
-| `flash-v8` | actionscript.all | 36/41 | 87.8% |
-| `Object-v7` | actionscript.all | 292/333 | 87.7% |
-| `Object-v8` | actionscript.all | 292/333 | 87.7% |
-| `Function-v5` | actionscript.all | 135/158 | 85.4% |
-| `action_order/action_execution_order_test` | misc-ming.all | 16/19 | 84.2% |
-| `misc-swfmill.all/registers` | misc-swfmill.all | 30/36 | 83.3% |
+| Test | Suite | Lines | % | Status |
+|------|-------|------:|--:|--------|
+| `array-v6` | actionscript.all | 604/644 | 93.8% | output_mismatch |
+| `Object-v5` | actionscript.all | 142/145 | 97.9% | **RM** (2026-05-15) |
+| `array-v7` | actionscript.all | 585/654 | 89.4% | output_mismatch |
+| `array-v8` | actionscript.all | 585/654 | 89.4% | output_mismatch |
+| `flash-v8` | actionscript.all | 36/41 | 87.8% | output_mismatch |
+| `Object-v7` | actionscript.all | 299/333 | 89.8% | output_mismatch (+5 from Tier B) |
+| `Object-v8` | actionscript.all | 299/333 | 89.8% | output_mismatch (+5 from Tier B) |
+| `Object-v6` | actionscript.all | 286/333 | 85.9% | output_mismatch (+5 from Tier B) |
+| `Function-v5` | actionscript.all | 135/158 | 85.4% | output_mismatch |
+| `action_order/action_execution_order_test` | misc-ming.all | 16/19 | 84.2% | output_mismatch |
+| `misc-swfmill.all/registers` | misc-swfmill.all | 30/36 | 83.3% | output_mismatch |
 
 **Next move.** `array-v6/v7/v8` are likely the same shape as
 `incomplete/ARRAY_V5_PLAN.md` covers for v5 — read the diffs and add a
