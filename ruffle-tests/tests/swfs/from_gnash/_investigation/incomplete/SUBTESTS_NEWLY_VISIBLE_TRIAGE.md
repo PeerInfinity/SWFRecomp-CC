@@ -26,6 +26,58 @@ dependencies:
 blockers: []
 -->
 
+Last updated: 2026-05-15 (Tier B `misc-swfmill.all/registers` **landed PASS** (30/36 → 36/36) by capping global registers at 4 in `actionStoreRegister`/`actionPushRegister`. Earlier this session: `misc-ming.all/action_order/action_execution_order_test` PASS (16/19 → 19/19), Object-v5 RM, Date-v5..v8 RM.)
+
+## 2026-05-15 — Tier B misc-swfmill.all/registers → PASS (+1 effective, pending CI)
+
+Single fix in `SWFModernRuntime/src/actionmodern/action.c::actionStoreRegister` /
+`actionPushRegister` flipped `misc-swfmill.all/registers` from `output_mismatch 30/36`
+to **PASS 36/36**.
+
+**Bug.** Our `g_registers[256]` global register array accepted writes for
+any `register_num < MAX_REGISTERS=256` and read back the stored value. Flash
+has exactly **4 global registers** (r0..r3); writes to r4+ at global scope
+are no-ops and reads return `undefined`. Confirmed by Ruffle's
+`core/src/avm1/runtime.rs`: `registers: [Value<'gc>; 4]` plus
+`get_register(id) → self.registers.get(id)` (returns None for id ≥ 4).
+
+**Fix.** Both `actionStoreRegister` and `actionPushRegister` now early-return
+when `register_num >= 4` (new `GLOBAL_REGISTER_COUNT` constant). Storage is a
+no-op; reads push `ACTION_STACK_VALUE_UNDEFINED`. The recompiler already
+emits `regs[N]` for register accesses inside `DefineFunction2` with
+`register_num < function2_register_count` (local registers), so this only
+affects the "bleeds through to caller" path and global-scope code.
+
+**Test results post-fix (local):**
+- `misc-swfmill.all/registers`: output_mismatch 30/36 → **PASS 36/36**
+- 6 lines flipped: all `typeof(gr4) == 'undefined'` checks (global, inside
+  0-reg fun, set in 0-reg/retrieved global, inside 1-reg fun, after 1-reg
+  fun, after 5-reg fun).
+- `gr4 == 'df5reg4'` inside the 5-reg fun still PASSES because the
+  recompiler routes r4 there to local `regs[4]` (register_count=5).
+
+**Regression battery (clean):** 15-test AVM1 lifecycle/scope/super/closure
+battery (as2_super_and_this_v6/v8, array_enumerate, array_sort_random,
+array_trivial, closure_scope, extends_chain, clip_constructors,
+clip_event_propagation_order, register_class_return_value,
+register_and_init_order, on_construct, set_interval, goto_frame2,
+goto_methods) — 15/15 PASS. 17-test gnash actionscript.all battery
+(enumerate-v6/7/8, Object-v5/v6, array-v5/v6, case-v5/v6, Date-v5..v8,
+Global-v5/v6, delete-v5/v6) — 14/17 effective pass, matches baseline
+(Object-v6, array-v5/v6 stay output_mismatch with identical pre-existing
+line counts). 10-test misc-ming.all near-passing battery
+(action_execution_order_test, loop_test4/10, simple_loop_test,
+key_event_test, DragDropTest, opcode_guard_test, registerClassTest,
+registerClassTest2, RegisterClassTest3) — 8/10 effective pass, matches
+baseline (loop_test10 and opcode_guard_test remain output_mismatch with
+identical pre-existing diffs).
+
+Only 4 tests across all suites emit `actionStoreRegister(app_context, N)`
+or `actionPushRegister(app_context, N)` with N≥4: this `registers` test,
+plus `enumerate-v6/v7/v8` (which already effective-pass via `ruffle_matched`
+and continue to do so — Ruffle has the same 4-global-register limit so
+the `_root.var_4 = undefined` rewrite stays inside Ruffle's diff set).
+
 Last updated: 2026-05-15 (Tier B `misc-ming.all/action_order/action_execution_order_test` **landed PASS** (16/19 → 19/19) via a `run_pending_finalize` cross-display_list cleanup fix. Object-v5 RM earlier this session. Tier A Date-vN RM (earlier this session).)
 
 ## 2026-05-15 — Tier B action_execution_order_test → PASS (+1 effective, pending CI)
@@ -346,7 +398,7 @@ shift), no action needed.
 | `Object-v6` | actionscript.all | 286/333 | 85.9% | output_mismatch (+5 from Tier B) |
 | `Function-v5` | actionscript.all | 135/158 | 85.4% | output_mismatch |
 | `action_order/action_execution_order_test` | misc-ming.all | 19/19 | 100% | **PASS** (2026-05-15) |
-| `misc-swfmill.all/registers` | misc-swfmill.all | 30/36 | 83.3% | output_mismatch |
+| `misc-swfmill.all/registers` | misc-swfmill.all | 36/36 | 100% | **PASS** (2026-05-15) |
 
 **Next move.** `array-v6/v7/v8` are likely the same shape as
 `incomplete/ARRAY_V5_PLAN.md` covers for v5 — read the diffs and add a

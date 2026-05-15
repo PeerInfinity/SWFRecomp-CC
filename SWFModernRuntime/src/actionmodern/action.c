@@ -41625,10 +41625,16 @@ void actionResetRegisters(void)
 	}
 }
 
+// Flash has exactly 4 global registers (r0..r3). Stores to r4+ at global scope
+// (or to r4+ from inside a function with register_count <= reg_num, which the
+// recompiler routes here as the "bleeds through to caller" path) are no-ops, and
+// reads return undefined. Matches Ruffle's `registers: [Value<'gc>; 4]` in
+// avm1/runtime.rs.
+#define GLOBAL_REGISTER_COUNT 4
+
 void actionStoreRegister(SWFAppContext* app_context, u8 register_num)
 {
-	// Validate register number
-	if (register_num >= MAX_REGISTERS) {
+	if (register_num >= GLOBAL_REGISTER_COUNT) {
 		return;
 	}
 
@@ -41642,11 +41648,12 @@ void actionStoreRegister(SWFAppContext* app_context, u8 register_num)
 
 void actionPushRegister(SWFAppContext* app_context, u8 register_num)
 {
-	// Validate register number
-	if (register_num >= MAX_REGISTERS) {
-		// Push undefined for invalid register
-		float undef = 0.0f;
-		PUSH(ACTION_STACK_VALUE_F32, VAL(u32, &undef));
+	if (register_num >= GLOBAL_REGISTER_COUNT) {
+		ActionVar undef;
+		undef.type = ACTION_STACK_VALUE_UNDEFINED;
+		undef.data.numeric_value = 0;
+		undef.str_size = 0;
+		pushVar(app_context, &undef);
 		return;
 	}
 
