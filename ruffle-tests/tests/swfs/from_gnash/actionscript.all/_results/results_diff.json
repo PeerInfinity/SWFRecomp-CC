@@ -1,9 +1,9 @@
 {
   "metadata": {
-    "old_timestamp": "2026-05-15T20:17:51.694466+00:00",
-    "old_git_sha": "86fc1408b1b0cafbb6186f4843b129049e39963c",
-    "new_timestamp": "2026-05-15T20:40:41.131392+00:00",
-    "new_git_sha": "d1d22f9515d5ef7f0f90204066d7932971059032",
+    "old_timestamp": "2026-05-15T20:40:41.131392+00:00",
+    "old_git_sha": "d1d22f9515d5ef7f0f90204066d7932971059032",
+    "new_timestamp": "2026-05-15T22:12:43.342922+00:00",
+    "new_git_sha": "1f10363ed7e9efedbf2d64a74697119fcbb70326",
     "partial": false,
     "same_commit": false
   },
@@ -18,48 +18,32 @@
     "new_effective_pass": 199,
     "new_total": 243,
     "new_pass_rate": 52.3,
-    "old_mismatched_lines": 11067,
-    "new_mismatched_lines": 11065,
-    "increased_mismatches": 0,
-    "decreased_mismatches": 2,
+    "old_mismatched_lines": 11065,
+    "new_mismatched_lines": 11066,
+    "increased_mismatches": 1,
+    "decreased_mismatches": 0,
     "newly_passing": 0,
     "newly_failing": 0,
     "status_changed": 0,
-    "unchanged": 241,
+    "unchanged": 242,
     "added": 0,
     "removed": 0
   },
   "changes": [
     {
-      "test": "MovieClip-v7",
+      "test": "MovieClip-v8",
       "change_type": "changed",
       "old_status": "output_mismatch",
       "new_status": "output_mismatch",
       "old_lines": {
-        "actual_lines": 956,
-        "expected_lines": 969,
-        "matching_lines": 797
+        "actual_lines": 1074,
+        "expected_lines": 1087,
+        "matching_lines": 885
       },
       "new_lines": {
-        "actual_lines": 956,
-        "expected_lines": 969,
-        "matching_lines": 798
-      }
-    },
-    {
-      "test": "TextField-v8",
-      "change_type": "changed",
-      "old_status": "output_mismatch",
-      "new_status": "output_mismatch",
-      "old_lines": {
-        "actual_lines": 571,
-        "expected_lines": 571,
-        "matching_lines": 415
-      },
-      "new_lines": {
-        "actual_lines": 571,
-        "expected_lines": 571,
-        "matching_lines": 416
+        "actual_lines": 1074,
+        "expected_lines": 1087,
+        "matching_lines": 884
       }
     }
   ]
