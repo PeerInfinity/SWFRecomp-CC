@@ -2902,7 +2902,8 @@ namespace SWFRecomp
 					current_cxform += 1;
 				}
 
-				context.tag_main << "\t" << "tagPlaceObject2(app_context, " << to_string(depth) << ", " << to_string(char_id) << ", " << to_string(transform_id) << ", " << to_string(cxform_id) << ", 0);" << endl;
+				// PlaceObject1 has no move flag — always Place (is_replace=0).
+				context.tag_main << "\t" << "tagPlaceObject2(app_context, " << to_string(depth) << ", " << to_string(char_id) << ", " << to_string(transform_id) << ", " << to_string(cxform_id) << ", 0, 0);" << endl;
 
 				break;
 			}
@@ -3812,10 +3813,16 @@ namespace SWFRecomp
 					context.tag_main << "\t" << "tagSetInstanceName(app_context, " << to_string(depth) << ", \"" << escaped_name << "\");" << endl;
 				}
 
+				// is_replace_swf: per the SWF spec, a PlaceObject2/3 tag is a "Replace"
+				// when both PlaceFlagMove and PlaceFlagHasCharacter are set. Tags with
+				// only PlaceFlagHasCharacter are "Place" (must fail on occupied depths
+				// per Phase 3). Modify (char_id == 0) is unaffected by this flag.
+				u8 is_replace_swf = (move && has_character) ? 1u : 0u;
+
 				// Emit the place call
 				if (blend_mode_val > 1)
 				{
-					context.tag_main << "\t" << "tagPlaceObject3(app_context, " << to_string(depth) << ", " << to_string(char_id) << ", " << to_string(transform_id) << ", " << to_string(cxform_id) << ", " << to_string(clip_depth_val) << ", " << to_string(blend_mode_val) << ");" << endl;
+					context.tag_main << "\t" << "tagPlaceObject3(app_context, " << to_string(depth) << ", " << to_string(char_id) << ", " << to_string(transform_id) << ", " << to_string(cxform_id) << ", " << to_string(clip_depth_val) << ", " << to_string(blend_mode_val) << ", " << to_string((unsigned) is_replace_swf) << ");" << endl;
 				}
 				else if (is_replace && clip_action_count > 0)
 				{
@@ -3850,11 +3857,11 @@ namespace SWFRecomp
 						}
 						context.tag_main << "\t" << "tagSetInstanceName(app_context, " << to_string(depth) << ", \"" << escaped_name << "\");" << endl;
 					}
-					context.tag_main << "\t" << "tagPlaceObject2RatioWithClipActions(app_context, " << to_string(depth) << ", " << to_string(char_id) << ", " << to_string(transform_id) << ", " << to_string(cxform_id) << ", " << to_string(clip_depth_val) << ", " << to_string(ratio_val) << ", " << clip_actions_var << ", " << to_string(clip_action_count) << ");" << endl;
+					context.tag_main << "\t" << "tagPlaceObject2RatioWithClipActions(app_context, " << to_string(depth) << ", " << to_string(char_id) << ", " << to_string(transform_id) << ", " << to_string(cxform_id) << ", " << to_string(clip_depth_val) << ", " << to_string(ratio_val) << ", " << clip_actions_var << ", " << to_string(clip_action_count) << ", " << to_string((unsigned) is_replace_swf) << ");" << endl;
 				}
 				else if (has_ratio)
 				{
-					context.tag_main << "\t" << "tagPlaceObject2Ratio(app_context, " << to_string(depth) << ", " << to_string(char_id) << ", " << to_string(transform_id) << ", " << to_string(cxform_id) << ", " << to_string(clip_depth_val) << ", " << to_string(ratio_val) << ");" << endl;
+					context.tag_main << "\t" << "tagPlaceObject2Ratio(app_context, " << to_string(depth) << ", " << to_string(char_id) << ", " << to_string(transform_id) << ", " << to_string(cxform_id) << ", " << to_string(clip_depth_val) << ", " << to_string(ratio_val) << ", " << to_string((unsigned) is_replace_swf) << ");" << endl;
 					// Also attach clip actions if both ratio and clip actions are present
 					if (clip_action_count > 0)
 					{
@@ -3874,11 +3881,11 @@ namespace SWFRecomp
 						}
 						context.tag_main << "\t" << "tagSetInstanceName(app_context, " << to_string(depth) << ", \"" << escaped_name << "\");" << endl;
 					}
-					context.tag_main << "\t" << "tagPlaceObject2WithClipActions(app_context, " << to_string(depth) << ", " << to_string(char_id) << ", " << to_string(transform_id) << ", " << to_string(cxform_id) << ", " << to_string(clip_depth_val) << ", " << clip_actions_var << ", " << to_string(clip_action_count) << ");" << endl;
+					context.tag_main << "\t" << "tagPlaceObject2WithClipActions(app_context, " << to_string(depth) << ", " << to_string(char_id) << ", " << to_string(transform_id) << ", " << to_string(cxform_id) << ", " << to_string(clip_depth_val) << ", " << clip_actions_var << ", " << to_string(clip_action_count) << ", " << to_string((unsigned) is_replace_swf) << ");" << endl;
 				}
 				else
 				{
-					context.tag_main << "\t" << "tagPlaceObject2(app_context, " << to_string(depth) << ", " << to_string(char_id) << ", " << to_string(transform_id) << ", " << to_string(cxform_id) << ", " << to_string(clip_depth_val) << ");" << endl;
+					context.tag_main << "\t" << "tagPlaceObject2(app_context, " << to_string(depth) << ", " << to_string(char_id) << ", " << to_string(transform_id) << ", " << to_string(cxform_id) << ", " << to_string(clip_depth_val) << ", " << to_string((unsigned) is_replace_swf) << ");" << endl;
 				}
 
 				// Track clip_actions per depth for future remove+replace detection
@@ -4558,11 +4565,12 @@ namespace SWFRecomp
 								current_cxform += 1;
 							}
 
+							// PlaceObject1 in sprite frame — no move flag, always Place.
 							sprite_definitions << "\t" << "tagPlaceObject2(app_context, "
 											   << to_string(depth) << ", "
 											   << to_string(char_id) << ", "
 											   << to_string(transform_id) << ", "
-											   << to_string(cxform_id) << ", 0);" << endl;
+											   << to_string(cxform_id) << ", 0, 0);" << endl;
 
 							{
 								size_t fi = sprite_frame_i - 1;
@@ -4627,6 +4635,7 @@ namespace SWFRecomp
 							bool has_color = (flags & 0b00001000) != 0;
 							bool has_matrix = (flags & 0b00000100) != 0;
 							bool has_character = (flags & 0b00000010) != 0;
+							bool move = (flags & 0b00000001) != 0;
 
 							// Skip ClassName
 							if (is_sprite_po3 && (sp_has_class_name || (sp_has_image && has_character)))
@@ -5087,6 +5096,11 @@ namespace SWFRecomp
 								sprite_definitions << "\t" << "tagSetInstanceName(app_context, " << to_string(depth) << ", \"" << escaped << "\");" << endl;
 							}
 
+							// is_replace_swf: SWF Replace = both PlaceFlagMove and
+							// PlaceFlagHasCharacter set. See main-timeline emission for full
+							// rationale. Modify (char_id == 0) ignores this flag at runtime.
+							u8 sp_is_replace_swf = (move && has_character) ? 1u : 0u;
+
 							// Emit the place call
 							if (sp_blend_mode_val > 1)
 							{
@@ -5096,7 +5110,8 @@ namespace SWFRecomp
 												   << to_string(transform_id) << ", "
 												   << to_string(cxform_id) << ", "
 												   << to_string(clip_depth_val) << ", "
-												   << to_string(sp_blend_mode_val) << ");" << endl;
+												   << to_string(sp_blend_mode_val) << ", "
+												   << to_string((unsigned) sp_is_replace_swf) << ");" << endl;
 							}
 							else if (has_ratio && clip_action_count > 0)
 							{
@@ -5118,7 +5133,8 @@ namespace SWFRecomp
 												   << to_string(clip_depth_val) << ", "
 												   << to_string(ratio_val) << ", "
 												   << clip_actions_var << ", "
-												   << to_string(clip_action_count) << ");" << endl;
+												   << to_string(clip_action_count) << ", "
+												   << to_string((unsigned) sp_is_replace_swf) << ");" << endl;
 							}
 							else if (has_ratio)
 							{
@@ -5128,7 +5144,8 @@ namespace SWFRecomp
 												   << to_string(transform_id) << ", "
 												   << to_string(cxform_id) << ", "
 												   << to_string(clip_depth_val) << ", "
-												   << to_string(ratio_val) << ");" << endl;
+												   << to_string(ratio_val) << ", "
+												   << to_string((unsigned) sp_is_replace_swf) << ");" << endl;
 								// Also attach clip actions if both ratio and clip actions are present
 								if (clip_action_count > 0)
 								{
@@ -5157,7 +5174,8 @@ namespace SWFRecomp
 												   << to_string(cxform_id) << ", "
 												   << to_string(clip_depth_val) << ", "
 												   << clip_actions_var << ", "
-												   << to_string(clip_action_count) << ");" << endl;
+												   << to_string(clip_action_count) << ", "
+												   << to_string((unsigned) sp_is_replace_swf) << ");" << endl;
 							}
 							else
 							{
@@ -5166,7 +5184,8 @@ namespace SWFRecomp
 												   << to_string(char_id) << ", "
 												   << to_string(transform_id) << ", "
 												   << to_string(cxform_id) << ", "
-												   << to_string(clip_depth_val) << ");" << endl;
+												   << to_string(clip_depth_val) << ", "
+												   << to_string((unsigned) sp_is_replace_swf) << ");" << endl;
 							}
 
 							// Instance name already emitted before the placement call above.
@@ -5793,11 +5812,14 @@ namespace SWFRecomp
 						recompileMatrix(rec.matrix, transform_data);
 						current_transform += 1;
 
+						// Button state record — synthesized placement, always Place.
+						// The runtime's g_btn_state_active preserve branch handles
+						// re-placement at occupied depths before the Phase 3 check.
 						sprite_definitions << "\t" << "tagPlaceObject2(app_context, "
 										   << to_string(rec.depth) << ", "
 										   << to_string(rec.char_id) << ", "
 										   << to_string(transform_id) << ", "
-										   << to_string(rec.cxform_id) << ", 0);" << endl;
+										   << to_string(rec.cxform_id) << ", 0, 0);" << endl;
 					}
 
 					sprite_definitions << "}" << endl << endl;

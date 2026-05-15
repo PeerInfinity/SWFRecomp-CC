@@ -4925,7 +4925,7 @@ void ng_queue_slot_unload_events(SWFAppContext* app_context, size_t depth, Movie
 }
 #endif
 
-void tagPlaceObject2(SWFAppContext* app_context, size_t depth, size_t char_id, u32 transform_id, u32 cxform_id, u16 clip_depth)
+void tagPlaceObject2(SWFAppContext* app_context, size_t depth, size_t char_id, u32 transform_id, u32 cxform_id, u16 clip_depth, u8 is_replace)
 {
 #if defined(NO_GRAPHICS) || defined(OFFSCREEN_RENDER)
 	if (g_tag_skip_mode) return;
@@ -4982,6 +4982,37 @@ void tagPlaceObject2(SWFAppContext* app_context, size_t depth, size_t char_id, u
 		return;
 	}
 #endif
+
+	// Phase 3: Refuse Place (move=0, has_character=1) of a DIFFERENT character on
+	// an already-occupied depth. Per Ruffle's instantiate_child (movie_clip.rs):
+	// a Place creates a new child and is dropped with "Failed to place object at
+	// depth N" if the depth is occupied. Replace (move=1, has_character=1) and
+	// Modify (move=1, has_character=0) operate on existing children and bypass
+	// this check.
+	//
+	// Gates:
+	// - `char_id != display_list[depth].char_id`: same-char re-placement is the
+	//   line-5282 root-timeline-loop-back preservation case; Ruffle never reaches
+	//   instantiate_child there (it goes via run_goto's survives_rewind).
+	// - `placed_at_frame <= current_frame`: the existing entry is from this frame
+	//   or earlier, i.e. it's a true forward conflict. Loop-back replay leaves
+	//   the existing entry at placed_at_frame > current_frame (from a previous
+	//   iteration's later frame); Ruffle handles those via run_goto rewind, not
+	//   instantiate_child. Without this gate, root-timeline loops re-trigger
+	//   refusal each iteration and lose state the test relies on (e.g.
+	//   replace_buttons1test: iter 2 frame 1's Place char 1 at depth 3 where
+	//   iter 1 frame 2 left char 3 must succeed for static1's MC cache entry
+	//   to be re-created — Ruffle's rewind has the equivalent effect).
+	if (char_id != 0 && !is_replace
+	    && display_list[depth].char_id != 0
+	    && display_list[depth].char_id != char_id
+	    && display_list[depth].placed_at_frame <= current_frame)
+	{
+		g_pending_clip_actions = NULL;
+		g_pending_clip_action_count = 0;
+		g_pending_instance_name = NULL;
+		return;
+	}
 
 	if (char_id == 0)
 	{
@@ -5622,7 +5653,7 @@ void tagPlaceObject2(SWFAppContext* app_context, size_t depth, size_t char_id, u
 }
 
 void tagPlaceObject2WithClipActions(SWFAppContext* app_context, size_t depth, size_t char_id,
-    u32 transform_id, u32 cxform_id, u16 clip_depth, ClipAction* clip_actions, size_t clip_action_count)
+    u32 transform_id, u32 cxform_id, u16 clip_depth, ClipAction* clip_actions, size_t clip_action_count, u8 is_replace)
 {
 #if defined(NO_GRAPHICS) || defined(OFFSCREEN_RENDER)
 	if (g_tag_skip_mode) return;
@@ -5630,7 +5661,7 @@ void tagPlaceObject2WithClipActions(SWFAppContext* app_context, size_t depth, si
 	// Set pending so tagPlaceObject2 attaches them before eager init
 	g_pending_clip_actions = clip_actions;
 	g_pending_clip_action_count = clip_action_count;
-	tagPlaceObject2(app_context, depth, char_id, transform_id, cxform_id, clip_depth);
+	tagPlaceObject2(app_context, depth, char_id, transform_id, cxform_id, clip_depth, is_replace);
 	// tagPlaceObject2 consumes g_pending_clip_actions and fires events
 	g_pending_clip_actions = NULL;
 	g_pending_clip_action_count = 0;
@@ -5647,12 +5678,25 @@ void tagSetClipActions(SWFAppContext* app_context, size_t depth, ClipAction* cli
 }
 
 void tagPlaceObject2Ratio(SWFAppContext* app_context, size_t depth, size_t char_id,
-    u32 transform_id, u32 cxform_id, u16 clip_depth, u16 ratio)
+    u32 transform_id, u32 cxform_id, u16 clip_depth, u16 ratio, u8 is_replace)
 {
 #if defined(NO_GRAPHICS) || defined(OFFSCREEN_RENDER)
 	if (g_tag_skip_mode) return;
 #endif
 	ENSURE_SIZE(display_list, depth, display_list_capacity, sizeof(DisplayObject));
+
+	// Phase 3: Refuse Place (move=0, has_character=1) of a DIFFERENT character on
+	// an already-occupied depth. See tagPlaceObject2 for full rationale.
+	if (char_id != 0 && !is_replace
+	    && display_list[depth].char_id != 0
+	    && display_list[depth].char_id != char_id
+	    && display_list[depth].placed_at_frame <= current_frame)
+	{
+		g_pending_clip_actions = NULL;
+		g_pending_clip_action_count = 0;
+		g_pending_instance_name = NULL;
+		return;
+	}
 
 #if defined(NO_GRAPHICS) || defined(OFFSCREEN_RENDER)
 	// During backward goto catch-up, preserve existing sprite at same depth/char
@@ -6043,7 +6087,7 @@ void tagPlaceObject2Ratio(SWFAppContext* app_context, size_t depth, size_t char_
 }
 
 void tagPlaceObject2RatioWithClipActions(SWFAppContext* app_context, size_t depth, size_t char_id,
-    u32 transform_id, u32 cxform_id, u16 clip_depth, u16 ratio, ClipAction* clip_actions, size_t clip_action_count)
+    u32 transform_id, u32 cxform_id, u16 clip_depth, u16 ratio, ClipAction* clip_actions, size_t clip_action_count, u8 is_replace)
 {
 #if defined(NO_GRAPHICS) || defined(OFFSCREEN_RENDER)
 	if (g_tag_skip_mode) return;
@@ -6051,7 +6095,7 @@ void tagPlaceObject2RatioWithClipActions(SWFAppContext* app_context, size_t dept
 	// Set pending so tagPlaceObject2Ratio attaches them before eager init
 	g_pending_clip_actions = clip_actions;
 	g_pending_clip_action_count = clip_action_count;
-	tagPlaceObject2Ratio(app_context, depth, char_id, transform_id, cxform_id, clip_depth, ratio);
+	tagPlaceObject2Ratio(app_context, depth, char_id, transform_id, cxform_id, clip_depth, ratio, is_replace);
 	// tagPlaceObject2Ratio consumes g_pending_clip_actions and fires events
 	g_pending_clip_actions = NULL;
 	g_pending_clip_action_count = 0;
@@ -6100,8 +6144,11 @@ void tagReplaceObject2RatioWithClipActions(SWFAppContext* app_context, size_t de
 	g_skip_pending_removal_mc = 1;
 #endif
 
-	// Place the new clip (clears all fields including clip_actions)
-	tagPlaceObject2Ratio(app_context, depth, char_id, transform_id, cxform_id, clip_depth, ratio);
+	// Place the new clip (clears all fields including clip_actions).
+	// tagReplaceObject2RatioWithClipActions is always a Replace by construction
+	// (only emitted when a buffered RemoveObject + new placement collapse at the
+	// same depth), so pass is_replace=1 to bypass Phase 3's occupied-depth check.
+	tagPlaceObject2Ratio(app_context, depth, char_id, transform_id, cxform_id, clip_depth, ratio, 1);
 
 #if defined(NO_GRAPHICS) || defined(OFFSCREEN_RENDER)
 	// Ensure the NEW clip MC is created in the cache so actionMarkMCPendingRemoval
@@ -6957,9 +7004,9 @@ void ng_simulateButtonPressRelease(SWFAppContext* app_context, void* mc_ptr)
 }
 
 void tagPlaceObject3(SWFAppContext* app_context, size_t depth, size_t char_id,
-    u32 transform_id, u32 cxform_id, u16 clip_depth, u8 blend_mode)
+    u32 transform_id, u32 cxform_id, u16 clip_depth, u8 blend_mode, u8 is_replace)
 {
-	tagPlaceObject2(app_context, depth, char_id, transform_id, cxform_id, clip_depth);
+	tagPlaceObject2(app_context, depth, char_id, transform_id, cxform_id, clip_depth, is_replace);
 	display_list[depth].blend_mode = blend_mode;
 }
 

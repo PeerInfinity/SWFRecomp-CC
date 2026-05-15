@@ -69,21 +69,25 @@ void tagDefineEditTextProps(SWFAppContext* app_context, size_t char_id,
     const char* variable_name, u16 flags,
     s32 bounds_xmin, s32 bounds_xmax, s32 bounds_ymin, s32 bounds_ymax);
 void tagCSMTextSettings(size_t text_id, const char* anti_alias_type, const char* grid_fit_type, float thickness, float sharpness);
-void tagPlaceObject2(SWFAppContext* app_context, size_t depth, size_t char_id, u32 transform_id, u32 cxform_id, u16 clip_depth);
+// is_replace: 1 if the source SWF tag had both PlaceFlagMove and PlaceFlagHasCharacter
+// (Ruffle's PlaceObjectAction::Replace — overwrite the depth's character without firing
+// UNLOAD); 0 otherwise (PlaceObjectAction::Place — must fail if the depth is occupied).
+// Modify-only tags (char_id=0) ignore is_replace.
+void tagPlaceObject2(SWFAppContext* app_context, size_t depth, size_t char_id, u32 transform_id, u32 cxform_id, u16 clip_depth, u8 is_replace);
 void tagPlaceObject2Ratio(SWFAppContext* app_context, size_t depth, size_t char_id,
-    u32 transform_id, u32 cxform_id, u16 clip_depth, u16 ratio);
+    u32 transform_id, u32 cxform_id, u16 clip_depth, u16 ratio, u8 is_replace);
 void tagPlaceObject2RatioWithClipActions(SWFAppContext* app_context, size_t depth, size_t char_id,
-    u32 transform_id, u32 cxform_id, u16 clip_depth, u16 ratio, ClipAction* clip_actions, size_t clip_action_count);
+    u32 transform_id, u32 cxform_id, u16 clip_depth, u16 ratio, ClipAction* clip_actions, size_t clip_action_count, u8 is_replace);
 void tagReplaceObject2RatioWithClipActions(SWFAppContext* app_context, size_t depth, size_t char_id,
     u32 transform_id, u32 cxform_id, u16 clip_depth, u16 ratio,
     ClipAction* old_clip_actions, size_t old_clip_action_count,
     ClipAction* new_clip_actions, size_t new_clip_action_count);
 void tagPlaceObject2WithClipActions(SWFAppContext* app_context, size_t depth, size_t char_id,
-    u32 transform_id, u32 cxform_id, u16 clip_depth, ClipAction* clip_actions, size_t clip_action_count);
+    u32 transform_id, u32 cxform_id, u16 clip_depth, ClipAction* clip_actions, size_t clip_action_count, u8 is_replace);
 // Attach clip actions to a display entry that was already placed (e.g. by tagPlaceObject2Ratio).
 void tagSetClipActions(SWFAppContext* app_context, size_t depth, ClipAction* clip_actions, size_t clip_action_count);
 void tagPlaceObject3(SWFAppContext* app_context, size_t depth, size_t char_id,
-    u32 transform_id, u32 cxform_id, u16 clip_depth, u8 blend_mode);
+    u32 transform_id, u32 cxform_id, u16 clip_depth, u8 blend_mode, u8 is_replace);
 void tagSetFilter(SWFAppContext* app_context, size_t depth,
     u8 type, double blur_x, double blur_y, u8 quality, u8 flags,
     double r, double g, double b, double a, double strength,
