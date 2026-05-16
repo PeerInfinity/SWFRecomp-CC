@@ -1,9 +1,9 @@
 {
   "metadata": {
-    "old_timestamp": "2026-05-16T00:14:25.395267+00:00",
-    "old_git_sha": "9654a9497e7b92f917e5e15d460b74008ef0f6ae",
-    "new_timestamp": "2026-05-16T00:54:28.713648+00:00",
-    "new_git_sha": "406813913c53801052151c27b115fdc98ecf3a8b",
+    "old_timestamp": "2026-05-16T00:54:28.713648+00:00",
+    "old_git_sha": "406813913c53801052151c27b115fdc98ecf3a8b",
+    "new_timestamp": "2026-05-16T20:19:44.812832+00:00",
+    "new_git_sha": "bb069e71ffe2e7565b86d4c23c68bfdc9573f8ba",
     "partial": false,
     "same_commit": false
   },
@@ -16,18 +16,31 @@
     "new_pass": 604,
     "new_ruffle_matched": 11,
     "new_effective_pass": 615,
-    "new_total": 654,
-    "new_pass_rate": 92.4,
+    "new_total": 655,
+    "new_pass_rate": 92.2,
     "old_mismatched_lines": 9113,
-    "new_mismatched_lines": 9113,
+    "new_mismatched_lines": 9115,
     "increased_mismatches": 0,
     "decreased_mismatches": 0,
     "newly_passing": 0,
     "newly_failing": 0,
     "status_changed": 0,
     "unchanged": 654,
-    "added": 0,
+    "added": 1,
     "removed": 0
   },
-  "changes": []
+  "changes": [
+    {
+      "test": "sound_gettransform_props",
+      "change_type": "added",
+      "old_status": null,
+      "new_status": "output_mismatch",
+      "old_lines": null,
+      "new_lines": {
+        "actual_lines": 4,
+        "expected_lines": 4,
+        "matching_lines": 2
+      }
+    }
+  ]
 }
