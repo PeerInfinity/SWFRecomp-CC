@@ -26,7 +26,73 @@ dependencies:
 blockers: []
 -->
 
-Last updated: 2026-05-15 (Tier B `misc-swfmill.all/registers` **landed PASS** (30/36 → 36/36) by capping global registers at 4 in `actionStoreRegister`/`actionPushRegister`. Earlier this session: `misc-ming.all/action_order/action_execution_order_test` PASS (16/19 → 19/19), Object-v5 RM, Date-v5..v8 RM.)
+Last updated: 2026-05-15 (Tier B `flash-v8` **landed PASS** (36/41 → 41/41) via three narrow fixes in `g_flash_object` init, `actionASSetPropFlags_func2` BOOLEAN coercion, and `MovieClip.prototype.transform` SWF8 ReadOnly+DontDelete enforcement at SetMember/Delete sites. Earlier this session: misc-swfmill.all/registers PASS, action_order/action_execution_order_test PASS, Object-v5 RM, Date-v5..v8 RM.)
+
+## 2026-05-15 — Tier B flash-v8 → PASS (+1 effective, pending CI)
+
+Three narrow fixes in `SWFModernRuntime/src/actionmodern/action.c` flipped
+`flash-v8` from `output_mismatch 36/41` to **PASS 41/41**.
+
+**Bug 1 — `g_flash_object` constructor/__proto__ start enumerable.** The
+pre-init in `ensureGlobalInit` set the constructor and __proto__ slots on
+`g_flash_object` with `PROPERTY_FLAG_ENUMERABLE | PROPERTY_FLAG_WRITABLE`,
+so the first `for (i in flash)` (gnash flash.as:46, before
+`ASSetPropFlags(_global.flash, null, 6, true)`) emitted them as trailing
+entries. Flash hides constructor / __proto__ by default; ASSetPropFlags
+unhides them on demand for the second for-in at flash.as:76. Fix: change
+the pre-init flags to `WRITABLE` only (DontEnum + DontDelete).
+
+**Bug 2 — `actionASSetPropFlags_func2` BOOLEAN coercion broken.** The
+function coerced its set/clear flag arguments via `varToInt32`, which only
+handles F32/F64 — it reads `numeric_value` as a raw float and returns ~0
+for BOOLEAN. Gnash flash.as:68 passes
+`ASSetPropFlags(_global.flash, null, 6, true)` — `true` was being coerced
+to 0, so the clear-DontEnum step never fired and constructor / __proto__
+stayed hidden even after Bug 1 was fixed. Replace with `varToDoubleSimple`
+(handles BOOLEAN/STRING/etc.) and apply NaN/Inf guards.
+
+**Bug 3 — `MovieClip.prototype.transform` SWF8 protection.** In SWF8+
+this slot is ReadOnly + DontDelete: writes silently fail and `delete`
+returns false / preserves the slot (flash.as:90-96). Can't enforce via
+property flags at `initMovieClipPrototype` because the init is one-shot
+and the Dejagnu SWF5 harness can trigger it before the SWF8 test runs.
+Fix at the SetMember and Delete sites: when `EFFECTIVE_SWF_VERSION() >= 8`
+and the receiver is `g_movieclip_constructor.prototype_obj` and the
+property name is "transform", silently ignore the write / return false
+for the delete. SWF<8 keeps writable/deletable semantics (flash-v6/v7
+expect the write to take effect on line 36).
+
+**Test results post-fix (local):**
+- `flash-v8`: output_mismatch 36/41 → **PASS 41/41** (+1 effective)
+- `flash-v5/v6/v7`: still PASS (unchanged)
+
+**Regression battery (clean):** 20-test AVM1 lifecycle/scope/super/closure
+(closure_scope, extends_chain, primitive_type_globals, on_construct,
+add_property, watch, set_interval, swf5_to_6_cross_call, etc.) +
+9-test AVM1 movieclip/scope (function_base_clip, removed_clip_halts_script,
+movieclip_state_values, etc.). 25-test Gnash actionscript.all
+(Object-v5..v8, Date-v5..v8, Global-v5..v8, Inheritance-v5..v8,
+case-v5..v7, array-v5/v6, delete-v5..v8) — all unchanged from baseline
+(Object-v6/v7/v8 + array-v5/v6 stay output_mismatch with identical
+pre-existing line counts). 4 misc-ming.all tests (DrawingApiTest,
+DragDropTest, key_event_test, opcode_guard_test) keep their
+ruffle_matched/output_mismatch status. misc-swfmill.all/registers and
+trace-as2/arguments both still PASS. AVM1 `date` matching_lines 6289/6335
+unchanged. Net: +1 effective, no regressions.
+
+**Function-v5 investigated, not pursued.** Diff is ~23 lines across 8
+distinct issues: (a) `arguments` for-in order yields `caller` instead of
+`callee`, (b) custom function.toString override not preferred over
+`[type Function]` default, (c) `Email.constructor.toString() == undefined`
+in SWF5 (Function constructor itself should be undefined), (d)
+`Email.prototype.constructor == Mail` compares against custom Mail
+toString, (e) `super.method()` arg-passing produces parent constructor
+arg instead of child arg, (f) `typeof(mc) == 'movieclip'` not `'object'`
+(possible Ruffle-vs-Flash divergence), (g) local scope leak for nested
+function definitions. Spreads across super, scope, type coercion, and
+function metadata — no single small fix lands a meaningful chunk. Defer
+to a dedicated Function-vN family plan (paired with Function-v6/v7/v8
+which share many divergences, per CURRENT_STATUS Tier B/C buckets).
 
 ## 2026-05-15 — Tier B misc-swfmill.all/registers → PASS (+1 effective, pending CI)
 
@@ -392,7 +458,7 @@ shift), no action needed.
 | `Object-v5` | actionscript.all | 142/145 | 97.9% | **RM** (2026-05-15) |
 | `array-v7` | actionscript.all | 585/654 | 89.4% | output_mismatch |
 | `array-v8` | actionscript.all | 585/654 | 89.4% | output_mismatch |
-| `flash-v8` | actionscript.all | 36/41 | 87.8% | output_mismatch |
+| `flash-v8` | actionscript.all | 41/41 | 100% | **PASS** (2026-05-15) |
 | `Object-v7` | actionscript.all | 299/333 | 89.8% | output_mismatch (+5 from Tier B) |
 | `Object-v8` | actionscript.all | 299/333 | 89.8% | output_mismatch (+5 from Tier B) |
 | `Object-v6` | actionscript.all | 286/333 | 85.9% | output_mismatch (+5 from Tier B) |
