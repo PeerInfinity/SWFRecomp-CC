@@ -1191,11 +1191,14 @@ namespace SWFRecomp
 				size_t target_len = strlen(target_string);
 				action_buffer += target_len + 1;
 
-				out_script << "\t" << "// GetURL: \"" << url_string
-						   << "\" -> \"" << target_string << "\"" << endl
+				std::string url_esc = escape_c_string(url_string, context.swf_version);
+				std::string target_esc = escape_c_string(target_string, context.swf_version);
+
+				out_script << "\t" << "// GetURL: \"" << url_esc
+						   << "\" -> \"" << target_esc << "\"" << endl
 						   << "\t" << "actionGetURL(app_context, "
-						   << "\"" << url_string << "\", "
-						   << "\"" << target_string << "\");" << endl;
+						   << "\"" << url_esc << "\", "
+						   << "\"" << target_esc << "\");" << endl;
 
 				break;
 			}
@@ -1318,14 +1321,7 @@ namespace SWFRecomp
 						target_name += ch;
 					}
 
-					// Escape quotes in target name for C string
-					std::string escaped_target = "";
-					for (char c : target_name) {
-						if (c == '"' || c == '\\') {
-							escaped_target += '\\';
-						}
-						escaped_target += c;
-					}
+					std::string escaped_target = escape_c_string(target_name.c_str(), context.swf_version);
 
 					out_script << "\t" << "// SetTarget: \"" << escaped_target << "\"" << endl
 							   << "\t" << "actionSetTarget(app_context, \"" << escaped_target << "\");" << endl;
@@ -1343,8 +1339,10 @@ namespace SWFRecomp
 						label += ch;
 					}
 
-					out_script << "\t" << "// GoToLabel: \"" << label << "\"" << endl
-							   << "\t" << "actionGoToLabel(app_context, \"" << label << "\");" << endl;
+					std::string label_esc = escape_c_string(label.c_str(), context.swf_version);
+
+					out_script << "\t" << "// GoToLabel: \"" << label_esc << "\"" << endl
+							   << "\t" << "actionGoToLabel(app_context, \"" << label_esc << "\");" << endl;
 
 					action_buffer += length;
 					break;
@@ -2400,9 +2398,20 @@ namespace SWFRecomp
 
 				default:
 				{
-					fprintf(stderr, "Unimplemented action 0x%02X\n", code);
+					fprintf(stderr, "Unimplemented action 0x%02X (length=%u)\n", code, (unsigned)length);
 					out_script << "\t" << "// Unimplemented action 0x"
-							   << std::hex << (int)code << std::dec << endl;
+							   << std::hex << (int)code << std::dec
+							   << " (length=" << length << ")" << endl;
+
+					// Advance past the opcode's payload so the emit pass stays
+					// aligned with the label-collection pass (which always
+					// advances by length at the bottom of its loop). Without
+					// this, high-bit unimplemented opcodes leak `length` bytes
+					// into the parse stream; the parser then misinterprets the
+					// payload as further opcodes, and any JUMP/IF the emit
+					// pass invents from that garbage emits `goto label_X`
+					// references to labels the collection pass never saw.
+					action_buffer += length;
 
 					break;
 				}
