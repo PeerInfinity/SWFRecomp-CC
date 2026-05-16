@@ -111,14 +111,28 @@ will link; Castle Hero's silent emcc failure is still unexplained.
 
 ### 1. Unsupported `DefineBitsLossless` format
 
-- Affected SWFs so far: Art of War (fatal), Avalanche (non-fatal)
+- Affected SWFs so far: Art of War, Avalanche
 - Recompiler only handles format 5 (32-bit RGBA). Format 3 (8-bit
   paletted indexed) and format 4 (15-bit RGB555) are unsupported.
-- **Inconsistency to investigate:** for Art of War this crash terminates
-  the whole recompile; for Avalanche the same error is logged but the
-  recompile continues. Could be tag-handler-specific exception
-  propagation, or Art_of_War may hit a different downstream failure on
-  the same shape table.
+- ~~Inconsistency: Art of War fatal, Avalanche non-fatal.~~
+  **Answered 2026-05-15:** not actually a per-SWF difference. The
+  `throw std::exception()` inside `EXC_ARG` propagates out of an
+  in-flight `operator<<` chain on `constants.h` / `draws.h`, which
+  sets `failbit` on the ofstream. The per-tag `catch` at
+  `swf.cpp:586` did not reset `failbit`, so all subsequent writes
+  silently no-op'd — and the rest of the recompile would emit fewer
+  scripts because downstream tag handlers chained `defined_chars` /
+  bitmap-index updates through the same stream-write paths. The
+  result was non-deterministic: Art_of_War landed in the truncated
+  branch ~1-in-3 runs, Avalanche always in the lucky branch.
+  **Fixed 2026-05-15** by calling `clear()` on every context-owned
+  ofstream after the per-tag catch. 6/6 Art_of_War runs now produce
+  identical output (611 scripts, 16-line constants.h, 232-line
+  draws.h, was variable across {387, 415, 611, 611, 611, 611} pre-fix).
+  Castle_Hero / Avalanche / Doodle_Jump also stabilized at full
+  output. The underlying format-3 / format-4 *decoder* gap is still
+  unimplemented — the fix just makes the failure no longer corrupt
+  later writes.
 
 ### 2. Other tag failures that don't terminate
 
@@ -183,18 +197,11 @@ will link; Castle Hero's silent emcc failure is still unexplained.
 ## Open questions
 
 - ~~Why does the same `DefineBitsLossless format 3` error fatally
-  terminate Art of War but not Avalanche?~~ **Answered 2026-05-15: it
-  doesn't, consistently.** Tested pre-fix Art_of_War 6 times, got
-  `scripts={387, 611, 415, 611, 611, 611}`, `constants.h={11, 16, 11,
-  16, 16, 16}`. Roughly 1-in-3 runs hits the truncated branch, the
-  rest produce complete output. The doc author landed on a truncated
-  run when capturing the original data; Avalanche just happens to
-  land in the lucky branch every time. Same binary, fragile state.
-  *Real* follow-up: investigate why the per-tag catch in
-  `swf.cpp:586` leaves the `constants.h` / `draws.h` ofstream in a
-  state that suppresses subsequent writes in some runs (likely
-  `failbit` set on the in-flight stream when the throw fires
-  mid-statement). A `stream.clear()` after the catch may be enough.
+  terminate Art of War but not Avalanche?~~ **Answered + fixed
+  2026-05-15.** See category #1 above — was `failbit` set on
+  context ofstreams by the in-flight `<<` chain when EXC_ARG threw;
+  per-tag catch didn't `clear()`. Now does, and the truncation
+  is gone.
 - Why does `tag 8 std::bad_alloc` kill Castle Hero's wasm build but not
   Duck Life 1's, given the recompiler exits 0 in both cases?
 - Why does Duck Life 2 still segfault during recompile? Bisecting which

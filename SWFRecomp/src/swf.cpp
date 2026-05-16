@@ -590,6 +590,18 @@ namespace SWFRecomp
 			catch (const std::exception& e)
 			{
 				fprintf(stderr, "Warning: tag %d failed: %s\n", tag.code, e.what());
+				// A throw mid-`<<` chain can set failbit on the in-flight
+				// ofstream; once set, further writes to that stream become
+				// silent no-ops. Reset all context-owned streams so the next
+				// tag's output isn't suppressed.
+				context.tag_main.clear();
+				context.constants.clear();
+				context.constants_header.clear();
+				context.out_script_header.clear();
+				context.out_script_defs.clear();
+				context.out_script_decls.clear();
+				context.out_draws.clear();
+				context.out_draws_header.clear();
 			}
 			// Always advance cur_pos to the end of the tag data,
 			// even if the tag handler didn't consume all bytes
