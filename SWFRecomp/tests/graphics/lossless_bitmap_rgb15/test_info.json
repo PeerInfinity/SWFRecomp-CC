@@ -1,0 +1,23 @@
+{
+  "metadata": {
+    "name": "lossless_bitmap_rgb15",
+    "description": "WebGPU rendering test with DefineBitsLossless (tag 20) format 4 = Rgb15 (15-bit RGB555, big-endian, row-padded) bitmap fill. Uses odd-width (7x7) bitmap to exercise row padding.",
+    "swf_version": 4,
+    "fully_implemented": true
+  },
+  "opcodes": {
+    "tested": [],
+    "supporting": []
+  },
+  "execution": {
+    "type": "deterministic"
+  },
+  "graphics": {
+    "tested": [
+      "DEFINE_SHAPE",
+      "DEFINE_BITS_LOSSLESS",
+      "CLIPPED_BITMAP",
+      "STRAIGHT_EDGE"
+    ]
+  }
+}

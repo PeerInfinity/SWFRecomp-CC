@@ -1,0 +1,23 @@
+{
+  "metadata": {
+    "name": "lossless_bitmap_palette",
+    "description": "WebGPU rendering test with DefineBitsLossless (tag 20) format 3 = ColorMap8 indexed-palette bitmap fill",
+    "swf_version": 4,
+    "fully_implemented": true
+  },
+  "opcodes": {
+    "tested": [],
+    "supporting": []
+  },
+  "execution": {
+    "type": "deterministic"
+  },
+  "graphics": {
+    "tested": [
+      "DEFINE_SHAPE",
+      "DEFINE_BITS_LOSSLESS",
+      "CLIPPED_BITMAP",
+      "STRAIGHT_EDGE"
+    ]
+  }
+}

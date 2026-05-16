@@ -1893,6 +1893,88 @@ class SWFMLBuilder:
         tag_b64 = base64.b64encode(tag_body).decode('ascii')
         self.tags.append(("DefineBitsLossless2", tag_b64))
 
+    def define_bits_lossless_format3(self, object_id, width, height, palette, indices):
+        """Add a DefineBitsLossless tag (tag 20, format 3 = ColorMap8 / 8-bit indexed RGB).
+
+        palette: list of (r, g, b) tuples, at most 256 entries. Each channel 0-255.
+        indices: flat list of palette indices (one per pixel), length = width * height.
+
+        Spec layout (after the zlib decompress):
+          [palette: num_colors * 3 bytes RGB][pixel data: 1 byte/pixel, rows padded to 4]
+        The byte before the zlib data is BitmapColorTableSize = num_colors - 1.
+        """
+        assert 1 <= len(palette) <= 256, f"palette must have 1-256 entries, got {len(palette)}"
+        assert len(indices) == width * height, \
+            f"expected {width*height} indices, got {len(indices)}"
+        assert all(0 <= i < len(palette) for i in indices), "indices must be in palette range"
+        num_colors = len(palette)
+        # Build uncompressed payload: palette (RGB) + row-padded indexed pixels
+        raw = bytearray()
+        for r, g, b in palette:
+            raw.extend((r, g, b))
+        row_stride = (width + 3) & ~3
+        for y in range(height):
+            row = bytes(indices[y * width:(y + 1) * width])
+            raw.extend(row + b"\x00" * (row_stride - width))
+        compressed = zlib.compress(bytes(raw))
+        # Tag body: CharID + Format(3) + W + H + ColorTableSize(num_colors-1) + ZLIB data
+        tag_body = (struct.pack('<HBHHB', object_id, 3, width, height, num_colors - 1)
+                    + compressed)
+        tag_b64 = base64.b64encode(tag_body).decode('ascii')
+        self.tags.append(("DefineBitsLossless", tag_b64))
+
+    def define_bits_lossless2_format3(self, object_id, width, height, palette, indices):
+        """Add a DefineBitsLossless2 tag (tag 36, format 3 = ColorMap8 with RGBA palette).
+
+        palette: list of (r, g, b, a) tuples, at most 256 entries.
+        indices: flat list of palette indices, length = width * height.
+
+        Spec layout: same as format-3 Lossless1 but the palette is RGBA (4 bytes/entry).
+        """
+        assert 1 <= len(palette) <= 256, f"palette must have 1-256 entries, got {len(palette)}"
+        assert len(indices) == width * height, \
+            f"expected {width*height} indices, got {len(indices)}"
+        num_colors = len(palette)
+        raw = bytearray()
+        for r, g, b, a in palette:
+            raw.extend((r, g, b, a))
+        row_stride = (width + 3) & ~3
+        for y in range(height):
+            row = bytes(indices[y * width:(y + 1) * width])
+            raw.extend(row + b"\x00" * (row_stride - width))
+        compressed = zlib.compress(bytes(raw))
+        tag_body = (struct.pack('<HBHHB', object_id, 3, width, height, num_colors - 1)
+                    + compressed)
+        tag_b64 = base64.b64encode(tag_body).decode('ascii')
+        self.tags.append(("DefineBitsLossless2", tag_b64))
+
+    def define_bits_lossless_format4(self, object_id, width, height, pixels):
+        """Add a DefineBitsLossless tag (tag 20, format 4 = Rgb15 / 15-bit RGB555).
+
+        pixels: list of (r, g, b) tuples with each channel 0-255. Channels are
+        downscaled to 5 bits via x >> 3 (matching the spec's 15-bit encoding).
+        Each pixel is packed as 1 big-endian u16: 1 pad + 5R + 5G + 5B.
+        Rows are padded to a multiple of 4 bytes (i.e. even pixel count).
+        Format 4 is invalid in DefineBitsLossless2 per spec.
+        """
+        assert len(pixels) == width * height, \
+            f"expected {width*height} pixels, got {len(pixels)}"
+        # Row stride in BYTES: pixels are 2 bytes each, padded to multiple of 4.
+        row_stride = (width * 2 + 3) & ~3
+        raw = bytearray()
+        for y in range(height):
+            row = bytearray()
+            for x in range(width):
+                r, g, b = pixels[y * width + x]
+                px = ((r >> 3) << 10) | ((g >> 3) << 5) | (b >> 3)
+                row.extend(struct.pack('>H', px))  # big-endian per spec
+            row.extend(b"\x00" * (row_stride - len(row)))
+            raw.extend(row)
+        compressed = zlib.compress(bytes(raw))
+        tag_body = struct.pack('<HBHH', object_id, 4, width, height) + compressed
+        tag_b64 = base64.b64encode(tag_body).decode('ascii')
+        self.tags.append(("DefineBitsLossless", tag_b64))
+
     def define_bits_jpeg2(self, object_id, jpeg_data_bytes):
         """Add a DefineBitsJPEG2 tag (tag 21) with self-contained JPEG data.
 
