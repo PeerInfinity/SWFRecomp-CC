@@ -8298,24 +8298,47 @@ namespace SWFRecomp
 				std::unordered_map<Node*, bool> blocked;
 				std::unordered_map<Node*, std::vector<Node*>> blocked_map;
 				std::vector<std::vector<Path>> closed_paths;
-				
-				johnson(nodes, path_stack, blocked, blocked_map, closed_paths);
-				
+
+				// Cap cycle-expansion: an adversarial / dense shape with
+				// thousands of cycles otherwise blows the per-process
+				// memory limit during the downstream Phase-B O(N²) nesting
+				// walk and the per-vertex emit. Castle_Hero char_id 35 hits
+				// this with 24860 cycles
+				// (see SWFRecompDocs/plans/defineshape4-johnson-bad-alloc.md).
+				//
+				// The expansion cap is matched to johnson's own cycle cap —
+				// no point generating more cycles than we'll consume. 4000
+				// (rather than the johnson default of 8000) was calibrated
+				// empirically on Castle_Hero: 8000 still bad_alloc'd on
+				// shape 3255's downstream processing under the 4 GB ulimit.
+				const size_t MAX_CYCLE_EXPANSION = 4000;
+
+				johnson(nodes, path_stack, blocked, blocked_map, closed_paths,
+						/*max_iterations=*/100000, /*max_cycles=*/MAX_CYCLE_EXPANSION);
+
 				size_t shape_cycles_start = shapes.size();
-				
-				for (auto cycle : closed_paths)
+				bool cycle_expansion_bailed = false;
+
+				// `auto&` to avoid copying each cycle (a vector<Path>) per iteration.
+				for (auto& cycle : closed_paths)
 				{
+					if (shapes.size() - shape_cycles_start >= MAX_CYCLE_EXPANSION)
+					{
+						cycle_expansion_bailed = true;
+						break;
+					}
+
 					shapes.push_back(Shape());
 					shapes.back().closed = true;
 					shapes.back().hole = false;
 					shapes.back().invalid = false;
 					shapes.back().nesting_depth = 0;
-					
+
 					for (size_t j = 0; j < cycle.size(); ++j)
 					{
 						size_t start = (cycle[j].backward) ? cycle[j].verts.size() - 2 : 1;
 						size_t offset = (cycle[j].backward) ? -1 : 1;
-						
+
 						for (size_t k = start; k < cycle[j].verts.size(); k += offset)
 						{
 							if (shapes.back().verts.size() > 0 &&
@@ -8324,14 +8347,23 @@ namespace SWFRecomp
 							{
 								continue;
 							}
-							
+
 							shapes.back().verts.push_back(cycle[j].verts[k]);
 						}
 					}
-					
+
 					processShape(shapes.back(), cycle[0].fill_styles);
-					
+
 					shapes.back().fill_style_list = cycle[0].fill_style_list;
+				}
+
+				if (cycle_expansion_bailed)
+				{
+					fprintf(stderr,
+						"Warning: shape_id=%u cycle expansion bailed at %zu shapes "
+						"(nodes=%zu paths=%zu closed_paths=%zu); remaining cycles dropped.\n",
+						(unsigned) shape_id, MAX_CYCLE_EXPANSION,
+						nodes.size(), paths.size(), closed_paths.size());
 				}
 				
 				for (size_t i = 0; i < closed_paths.size(); ++i)
@@ -8914,11 +8946,20 @@ namespace SWFRecomp
 		}
 	}
 	
-	bool traverseIteration(Node* path, std::vector<Path>& path_stack, std::unordered_map<Node*, bool>& blocked, std::unordered_map<Node*, std::vector<Node*>>& blocked_map, std::vector<std::vector<Path>>& closed_paths, size_t& iterations, size_t max_iterations);
+	bool traverseIteration(Node* path, std::vector<Path>& path_stack, std::unordered_map<Node*, bool>& blocked, std::unordered_map<Node*, std::vector<Node*>>& blocked_map, std::vector<std::vector<Path>>& closed_paths, size_t& iterations, size_t max_iterations, size_t max_cycles);
 
-	bool detectCycle(Node* node, std::vector<Path>& path_stack, std::unordered_map<Node*, bool>& blocked, std::unordered_map<Node*, std::vector<Node*>>& blocked_map, std::vector<std::vector<Path>>& closed_paths, size_t& iterations, size_t max_iterations)
+	// johnson() exit conditions: hit iteration cap OR closed-path cap.
+	// Both halt new cycle discovery. The cycle-expansion loop in interpretShape
+	// has its own cap that uses closed_paths.size() as the trigger.
+	static inline bool johnsonShouldBail(size_t iterations, size_t max_iterations,
+	                                     size_t closed_paths_size, size_t max_cycles)
 	{
-		if (iterations >= max_iterations) return false;
+		return iterations >= max_iterations || closed_paths_size >= max_cycles;
+	}
+
+	bool detectCycle(Node* node, std::vector<Path>& path_stack, std::unordered_map<Node*, bool>& blocked, std::unordered_map<Node*, std::vector<Node*>>& blocked_map, std::vector<std::vector<Path>>& closed_paths, size_t& iterations, size_t max_iterations, size_t max_cycles)
+	{
+		if (johnsonShouldBail(iterations, max_iterations, closed_paths.size(), max_cycles)) return false;
 
 		if (node == path_stack[0].front || node == path_stack[0].back)
 		{
@@ -8939,13 +8980,13 @@ namespace SWFRecomp
 			return false;
 		}
 
-		return traverseIteration(node, path_stack, blocked, blocked_map, closed_paths, iterations, max_iterations);
+		return traverseIteration(node, path_stack, blocked, blocked_map, closed_paths, iterations, max_iterations, max_cycles);
 	}
 
-	bool traverseIteration(Node* node, std::vector<Path>& path_stack, std::unordered_map<Node*, bool>& blocked, std::unordered_map<Node*, std::vector<Node*>>& blocked_map, std::vector<std::vector<Path>>& closed_paths, size_t& iterations, size_t max_iterations)
+	bool traverseIteration(Node* node, std::vector<Path>& path_stack, std::unordered_map<Node*, bool>& blocked, std::unordered_map<Node*, std::vector<Node*>>& blocked_map, std::vector<std::vector<Path>>& closed_paths, size_t& iterations, size_t max_iterations, size_t max_cycles)
 	{
 		++iterations;
-		if (iterations >= max_iterations) return false;
+		if (johnsonShouldBail(iterations, max_iterations, closed_paths.size(), max_cycles)) return false;
 
 		path_stack.push_back(*node->path);
 
@@ -8962,9 +9003,9 @@ namespace SWFRecomp
 				continue;
 			}
 
-			cycle_found |= detectCycle(neighbor, path_stack, blocked, blocked_map, closed_paths, iterations, max_iterations);
+			cycle_found |= detectCycle(neighbor, path_stack, blocked, blocked_map, closed_paths, iterations, max_iterations, max_cycles);
 
-			if (iterations >= max_iterations) break;
+			if (johnsonShouldBail(iterations, max_iterations, closed_paths.size(), max_cycles)) break;
 		}
 
 		path_stack.pop_back();
@@ -8980,7 +9021,7 @@ namespace SWFRecomp
 		return false;
 	}
 
-	void SWF::johnson(std::vector<Node>& nodes, std::vector<Path>& path_stack, std::unordered_map<Node*, bool>& blocked, std::unordered_map<Node*, std::vector<Node*>>& blocked_map, std::vector<std::vector<Path>>& closed_paths, size_t max_iterations)
+	void SWF::johnson(std::vector<Node>& nodes, std::vector<Path>& path_stack, std::unordered_map<Node*, bool>& blocked, std::unordered_map<Node*, std::vector<Node*>>& blocked_map, std::vector<std::vector<Path>>& closed_paths, size_t max_iterations, size_t max_cycles)
 	{
 		size_t iterations = 0;
 
@@ -8991,11 +9032,16 @@ namespace SWFRecomp
 				fprintf(stderr, "Warning: johnson cycle detection exceeded %zu iterations, skipping remaining nodes\n", max_iterations);
 				break;
 			}
+			if (closed_paths.size() >= max_cycles)
+			{
+				fprintf(stderr, "Warning: johnson cycle detection exceeded %zu cycles, skipping remaining nodes\n", max_cycles);
+				break;
+			}
 
 			blocked.clear();
 			blocked_map.clear();
 
-			traverseIteration(&n, path_stack, blocked, blocked_map, closed_paths, iterations, max_iterations);
+			traverseIteration(&n, path_stack, blocked, blocked_map, closed_paths, iterations, max_iterations, max_cycles);
 			n.used = true;
 		}
 	}

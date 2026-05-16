@@ -1,6 +1,55 @@
 # DefineShape4: Johnson Cycle Memory Explosion
 
-**Status:** Investigation — 2026-05-16
+**Status:** Implemented (Option A) — 2026-05-16
+
+## Update — 2026-05-16, post-implementation
+
+Option A landed. The cap was tuned to **4000 cycles** (rather than the
+plan's initial guess of 8000): at 8000, Castle_Hero shape 3255 still
+bad_alloc'd in downstream Phase B / fillShape processing even after
+johnson was bounded. 4000 cleared the last failure under the 4 GB
+ulimit while still preserving enough cycle data for Art_of_War,
+Avalanche, Bloons_TD, and the rest of Castle_Hero to render unchanged.
+
+Verification on the four SWFs covered by the investigation:
+
+| SWF          | Before fix    | After fix             |
+| ------------ | ------------- | --------------------- |
+| Castle_Hero  | 8x bad_alloc + 1x parseAllTags escape | 0 fails; 37 cycle-cap warnings |
+| Art_of_War   | clean         | clean; 170 cycle-cap warnings; identical bitmap output |
+| Avalanche    | clean         | clean; identical bitmap output |
+| Bloons_TD    | clean         | clean; identical bitmap output |
+
+Ruffle smoke (`add2`, `goto_label`, `tell_target_invalid`) and all
+six graphics regression tests (`lossless_bitmap*` ×4 +
+`jpeg_mid_stream_eoi_soi` + `lossless_bitmap_rgba`) still pass.
+
+The cycle-cap warnings on Art_of_War (170) and Castle_Hero (37) are
+new visibility into shapes that were already hitting *some* cap
+before — under the old code they hit `max_iterations=100000`
+silently. The cycle cap fires earlier and names the threshold, which
+is informative; the underlying shape data was already being truncated.
+
+The "cycle expansion bailed" warning (cap firing inside the expansion
+loop rather than johnson) doesn't fire on any test SWF — johnson's
+cap always fires first. The expansion-loop cap is a defense-in-depth
+guard for hypothetical inputs where johnson somehow returns more
+cycles than the cap.
+
+### Files touched
+
+- `SWFRecomp/include/swf.hpp` — added `max_cycles=8000` default to
+  `johnson()` signature (passed as 4000 from the call site, so the
+  default is currently unused; kept conservative for potential
+  future callers).
+- `SWFRecomp/src/swf.cpp` — `johnsonShouldBail()` helper, threaded
+  `max_cycles` through `detectCycle` / `traverseIteration`, two
+  named-cap warnings in `johnson()` itself, `auto&` in the
+  expansion loop, MAX_CYCLE_EXPANSION=4000 cap with a fall-through
+  bail flag and a one-line warning that names the shape_id plus
+  node/path/cycle counts.
+
+---
 
 ## Symptoms
 
