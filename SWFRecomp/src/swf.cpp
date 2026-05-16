@@ -7793,9 +7793,27 @@ namespace SWFRecomp
 							
 							line_style_count = (u16) shape_tag.fields[0].value;
 						}
-						
+
+						// Sanity cap: a StateNewStyles record with absurd fill/line
+						// counts almost always means the bit-stream parser lost
+						// alignment (cur_pos pointing into padding or junk). Without
+						// this guard, parseLineStyles/parseFillStyles loops the
+						// huge count times reading past the SWF body and segfaults.
+						// 8192 is well above any realistic per-shape style count.
+						const u32 SHAPE_STYLE_COUNT_CAP = 8192;
+						if (fill_style_count > SHAPE_STYLE_COUNT_CAP || line_style_count > SHAPE_STYLE_COUNT_CAP)
+						{
+							fprintf(stderr,
+								"Shape %u StateNewStyles: implausible style counts "
+								"(fill=%u line=%u), bit-stream parser likely lost "
+								"alignment; aborting this shape.\n",
+								(unsigned) shape_id,
+								(unsigned) fill_style_count, (unsigned) line_style_count);
+							throw std::exception();
+						}
+
 						all_line_styles.push_back(parseLineStyles(line_style_count));
-						
+
 						current_line_style_list += 1;
 						
 						shape_tag.clearFields();

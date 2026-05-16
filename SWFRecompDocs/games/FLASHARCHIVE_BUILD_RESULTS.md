@@ -37,26 +37,165 @@ already exists. So a SWFRecomp crash that produced partial output stays
 broken across rebuilds unless you `rm -rf
 tests/local_batch/<NAME>/Recompiled{Scripts,Tags}` first.
 
-## Results so far (2026-05-14)
+## Results — 2026-05-16
 
-Total in flasharchive: 56 SWFs.
+Total in flasharchive: 56 SWFs. Fresh end-to-end build + deploy in
+alphabetical order; halted at the first failure (Duck Life 3). All
+previously-failing SWFs in this range now build clean thanks to the
+recent fixes (lossless format 3/4, JPEG mid-stream EOI+SOI strip,
+empty-JPEGTables tolerance, johnson cycle cap, wasm INITIAL_MEMORY
+bump 64→256 MB).
 
-| SWF | Status | Notes |
-|---|---|---|
-| Snake.swf | ✅ Built | First success (SWF5, 57 frames) |
-| Achievement Unlocked.swf | ✅ Built | Built fine during partial batch run |
-| Age of War.swf | ✅ Built | Builds standalone; batch's 180s timeout was the issue |
-| Art of War.swf | ❌ Recompiler crash | `DefineBitsLossless format 3 not yet supported (only format 5).` Tag 20 throws `std::exception` and terminates the recompiler mid-write — `constants.h` is truncated, `draws.h` is 1 line. |
-| Avalanche.swf | ✅ Built | SWF8. Recompiler logs `tag 21/35/36 failed: std::exception` (DefineBitsJPEG2, DefineBitsJPEG3, DefineBitsLossless2) and `DefineBitsLossless2 format 3 not yet supported (only format 5).` and `JPEG2 data returned NULL`/`JPEG3 data returned NULL`, but **continues past the failures** and emits a complete output. Visuals will be missing those bitmaps. |
-| Bloons TD 2.swf | ❌ wasm compile | Recompiler completes but logs *140+* "Unimplemented action 0xXX" warnings. C compile then fails: `script_NNN.c: error: use of undeclared label 'label_NNNNN';` — earlier `goto label_X;` references targets that would have been emitted inside the unrecognized opcodes. |
-| Bloons TD.swf | ❌ wasm compile | Same pattern as Bloons TD 2 (lots of Unimplemented actions + undeclared labels). [Earlier observed `error: \U used with no following hex digits`; not reproducible on a fresh recompile — was a stale-output artifact. The latent escape hole in `GET_URL`/`GOTO_LABEL`/`SET_TARGET` emission was fixed preventatively anyway; see commit log.] |
-| Bloons.swf | ❌ wasm compile | Far fewer Unimplemented actions than Bloons TD/TD 2 (only `0xFB`), but still one `error: use of undeclared label 'label_63980'` enough to fail the build. |
-| Bloxorz.swf | ✅ Built | Only `tag 35 failed: std::exception` + `JPEG3 data returned NULL` — non-fatal, builds fine. |
-| Castle Hero.swf | ❌ wasm build (silent) | Recompiler logs `JPEG bitmap tag encountered before JPEGTables!`, `tag 6 failed: std::exception`, **`tag 8 failed: std::bad_alloc`**. build_test.sh produces no `.wasm` and no `error:` in the log — apparently a clean failure during the link / emcc stage. Worth deeper investigation. |
-| Checkers.swf | ✅ Built | `tag 35 failed: std::exception` + `Tag type 62 not implemented` (DefineFontInfo2). Builds fine. |
-| Doodle Jump.swf | ✅ Built | Zero significant warnings — cleanest recompile so far. |
-| Duck Life 1.swf | ✅ Built | Same `tag 8 std::bad_alloc` warning that broke Castle Hero, but here it builds fine. The bad_alloc warning is recoverable in some SWFs and fatal in others — **the difference isn't the warning itself**. |
-| Duck Life 2.swf | ❌ Recompiler segfault | Same `tag 8 std::bad_alloc` warning, then `Segmentation fault` (exit 139). Truncated `constants.h` (11 lines, missing `FRAME_COUNT`) and 1-line `draws.h`. Third distinct outcome from the same warning chain. |
+Time column is total **build + deploy + per-step catalog regen**.
+Notes summarize recoverable warning counts: `cycle-caps` = shapes that
+hit the johnson 4000-cycle cap (informative — these shapes still
+recompile, just with truncated topology); `jpeg-lenient` = DefineBits
+tags decoded as self-contained JPEG because JPEGTables was missing
+or empty.
+
+| # | SWF | Status | Time | Notes |
+|---|---|---|---|---|
+| 1 | Achievement Unlocked.swf | ✅ Built | 0:50 | clean |
+| 2 | Age of War.swf | ✅ Built | 2:18 | 64 cycle-caps |
+| 3 | Art of War.swf | ✅ Built | 3:02 | 170 cycle-caps. Previously "Recompiler crash" — now clean after Lossless format-3 decoder + clear()-after-catch fixes. |
+| 4 | Avalanche.swf | ✅ Built | 0:57 | 3 cycle-caps. Previously had 3 missing bitmaps; now decodes all of them (Lossless format 3 + JPEG mid-stream EOI+SOI). |
+| 5 | Bloons TD 2.swf | ✅ Built | 3:10 | 36 cycle-caps. Previously "wasm compile" fail (140+ undeclared labels); fixed by recompiler emit-pass parser-alignment patch (`ae2f7aec`). |
+| 6 | Bloons TD.swf | ✅ Built | 1:44 | 17 cycle-caps. Same fix cleared the undeclared-label cascade. |
+| 7 | Bloons.swf | ✅ Built | 1:29 | 26 cycle-caps. Same. |
+| 8 | Bloxorz.swf | ✅ Built | 3:19 | clean — but required bumping `INITIAL_MEMORY` 64→256 MB in `build_test.sh` (516 bitmaps × ~56 MB total bitmap data + other static = 71 MB wasm-ld initial-memory request). First-time failure was `wasm-ld: error: initial memory too small, 71140064 bytes needed`. |
+| 9 | Castle Hero.swf | ✅ Built | 9:49 | 37 cycle-caps, 11 jpeg-lenient. Previously "wasm build (silent)" fail; unlocked by the JPEGTables-empty tolerance + the johnson cycle cap together. The 11 DefineBits tags self-contain-decode (no JPEGTables). |
+| 10 | Checkers.swf | ✅ Built | 0:41 | clean |
+| 11 | Doodle Jump.swf | ✅ Built | 0:42 | 1 cycle-caps |
+| 12 | Duck Life 1.swf | ✅ Built | 3:12 | 16 cycle-caps, 5 jpeg-lenient |
+| 13 | Duck Life 2 - World Champion.swf | ✅ Built | 4:05 | 32 cycle-caps, 5 jpeg-lenient. Previously "Recompiler segfault"; same fix bundle made it build clean. |
+| 14 | Duck Life 3 - Evolution.swf | ❌ Halt | 30:00+ | New failure mode: SWFRecomp completes recompile but generates a **305 MB `draws.c`** because the shape edge-record bit-stream parser repeatedly loses alignment in StateNewStyles records and emits hundreds of garbage shapes. emcc then hangs / OOMs trying to compile it. A defensive sanity cap (`StateNewStyles fill/line counts > 8192 → throw`) was added during investigation and catches the symptom, but only AFTER many garbage shapes have been emitted. Root cause is deeper. See investigation below. |
+
+**Snake.swf** built fine in a preliminary 0:39 run before the alphabetical
+sweep started; it's #44 in the alphabetical order. Builds 15-56 not yet
+attempted in this pass — halted at Duck Life 3 per the user's
+"build until error, then investigate" workflow.
+
+## Investigation — Duck Life 3 bit-stream misalignment (2026-05-16)
+
+**Symptom.** Recompiling `Duck Life 3 - Evolution.swf` (6 MB SWF body,
+SWF v9) writes `RecompiledTags/draws.c` at 305 MB and 3.8 MB
+`tagMain.c`, then `emcc` either hangs for hours or runs out of memory
+trying to consume that source. Capturing emcc output into a bash
+variable (`BUILD_OUTPUT=$(...)`) also OOMs bash.
+
+**Reproduction.** Standalone:
+
+```sh
+cd ~/CC/SWFRecomp-CC/SWFRecomp/tests/local_batch/Duck_Life_3_-_Evolution
+rm -rf RecompiledScripts RecompiledTags
+bash -c 'ulimit -v 4194304; ulimit -s unlimited; exec "$@"' \
+  -- ~/CC/SWFRecomp-CC/SWFRecomp/build/SWFRecomp config.toml
+```
+
+→ exits 0, but produces `draws.c` of 305 MB.
+
+**Diagnostic finding.** Added `fprintf` checkpoints inside the
+StateNewStyles call site in `interpretShape` (swf.cpp ≈ 7797). Many
+shapes log normal values then a follow-up entry with
+`fill_style_count=0 line_style_count=65535`. 65535 = `0xFFFF` = the
+maximum UI16, occurring because the bit-stream cursor read garbage
+bytes (`0xFF` UI8 → "extended" → next UI16 = `0xFFFF`).
+
+**gdb stack trace** (`-batch -ex run -ex bt 20`):
+
+```
+#0 SWFRecomp::SWFField::parse(...)
+#1 SWFRecomp::SWFTag::parseFields(...)
+#2 SWFRecomp::SWF::parseLineStyles(...)
+#3 SWFRecomp::SWF::interpretShape(...)
+#4 SWFRecomp::SWF::interpretTag(...)
+#5 SWFRecomp::SWF::parseAllTags(...)
+```
+
+`parseLineStyles(65535)` allocates `new LineStyle[65535]` (OK by
+itself) then loops 65535 times calling `parseFields`, walking
+`cur_pos` past the end of the SWF buffer → SIGSEGV.
+
+**Defensive cap added** in the same commit:
+
+```cpp
+const u32 SHAPE_STYLE_COUNT_CAP = 8192;
+if (fill_style_count > SHAPE_STYLE_COUNT_CAP ||
+    line_style_count > SHAPE_STYLE_COUNT_CAP) {
+    fprintf(stderr, "Shape %u StateNewStyles: implausible style counts ...");
+    throw std::exception();
+}
+```
+
+This converts the SIGSEGV into a recoverable per-tag failure (caught
+at `swf.cpp:677`). But it doesn't address the underlying
+misalignment: shape edge records that get mis-parsed leak garbage
+into `draws.c` for the parts the cap didn't catch. With Duck Life 3,
+this happens often enough that `draws.c` reaches 305 MB even though
+no SIGSEGV occurs.
+
+**Root cause hypothesis.** The shape edge record stream uses a bit-
+packed format whose alignment depends on accurate per-record bit
+length parsing. If any record's bit count is mis-read (e.g. an
+unsupported edge variant skipped without consuming the right number
+of bits), every subsequent record reads from the wrong bit offset.
+`StateNewStyles` records inside the edge stream then read
+fill/line/style counts from arbitrary cursor positions. Some land on
+plausible-looking values (2 fills, 1 line) and we keep parsing; others
+land on `0xFFFF` and hit the cap.
+
+**What the cap does and doesn't do.**
+
+- ✅ Prevents SIGSEGV on `parseLineStyles(65535)` walking off the end.
+- ✅ Aborts shapes whose misalignment is severe enough to hit a
+  sentinel-like value.
+- ❌ Does NOT fix the misalignment itself. Shapes whose mis-read
+  counts happen to be small (e.g. 5, 12) parse 5 or 12 fake style
+  entries from junk bytes, advance the cursor further, write fake
+  shape data to `draws.c`, and continue.
+- ❌ Does NOT bound the per-tag emission. A shape parsed across
+  10000 misaligned StateNewStyles records can each emit hundreds of
+  vertices into the shape data stream.
+
+**Open questions.**
+
+- Which edge-record opcode does the bit parser mishandle? Likely
+  candidates: `EDGE_RECORD` with a bit length we miscount; a
+  `STYLE_CHANGE` flag combination we don't fully consume; or a
+  DefineShape4-specific bit added later that we skip without bit-
+  alignment fix-up.
+- Could we cheaply bound the per-shape emission output to (say) the
+  source SWF's tag length × N? If a shape parses into more output
+  than tag-length × 100, we're almost certainly emitting garbage.
+- A second `StateNewStyles` instrumentation pass should print
+  cur_pos relative to the tag start; cur_pos > tag_end is a clean
+  abort signal.
+
+**Suggested next steps.** Choose one:
+
+A. **Cap shape output size.** Track bytes emitted into shape_data /
+   path_data / color_data per shape; abort the shape if it exceeds
+   a per-shape ceiling (e.g. 10× the SWF tag length). Easy. Doesn't
+   fix the parser but stops the runaway emission.
+
+B. **Tag-end bound check** in interpretShape's edge loop. After each
+   edge / StateNewStyles record, compare `cur_pos - tag_start` to
+   `tag.length`. If past, abort the shape. Properly addresses the
+   "walked into the next tag's bytes" mode of the misalignment.
+
+C. **Bit parser audit.** Step through interpretShape's edge record
+   loop for Duck Life 3 shape 37 (the first to hit the cap) under
+   gdb / printf instrumentation. Identify the specific bit-length
+   off-by-one. Hardest but only path to fixing affected shapes
+   correctly instead of just aborting them.
+
+---
+
+## Previous results (2026-05-14, retained for context)
+
+These were the originally-reported failures. All but the deep
+DefineShape4 / bit-stream issues now build clean as noted in the
+2026-05-16 results above.
 
 ## Investigation update (2026-05-15)
 

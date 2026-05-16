@@ -118,8 +118,10 @@ fi
 if [ ! -d "${TEST_DIR}/RecompiledScripts" ]; then
     echo "Running SWFRecomp..."
     cd "${TEST_DIR}"
-    # Run with memory limit (4GB) to prevent runaway recompilation from crashing WSL
-    bash -c 'ulimit -v 4194304; exec "$@"' -- "${SWFRECOMP_ROOT}/build/SWFRecomp" config.toml
+    # Run with memory limit (4GB) to prevent runaway recompilation from crashing WSL.
+    # Stack unlimited because interpretShape's johnson cycle walker is recursive
+    # and SWFs with very deep paths (e.g. Duck Life 3) blow the default 8 MB stack.
+    bash -c 'ulimit -v 4194304; ulimit -s unlimited; exec "$@"' -- "${SWFRECOMP_ROOT}/build/SWFRecomp" config.toml
 fi
 
 # Setup build directory
@@ -296,7 +298,7 @@ if [ "$TARGET" == "wasm" ]; then
             -s EXPORTED_FUNCTIONS="${EXPORTED_FUNCS}" \
             -s EXPORTED_RUNTIME_METHODS='["ccall","cwrap","HEAPF32"]' \
             -s ALLOW_MEMORY_GROWTH=1 \
-            -s INITIAL_MEMORY=64MB \
+            -s INITIAL_MEMORY=256MB \
             -sASYNCIFY \
             -sASYNCIFY_STACK_SIZE=65536 \
             -O2
