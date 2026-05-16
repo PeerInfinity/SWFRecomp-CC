@@ -1,19 +1,15 @@
 # Ruffle Test Results Diff
 
-**Previous:** `406813913c53` (2026-05-16T00:54:28.713648+00:00)
-**Current:** `bb069e71ffe2` (2026-05-16T20:19:44.812832+00:00)
+**Previous:** `bb069e71ffe2` (2026-05-16T20:19:44.812832+00:00)
+**Current:** `d89f9994b878` (2026-05-16T22:33:07.261919+00:00)
 
 ## Summary
 
 | Metric | Previous | Current | Delta |
 |--------|----------|---------|-------|
 | Passing | 604 | 604 | 0 |
-| Total | 654 | 655 | +1 |
-| Pass rate | 92.4% | 92.2% | -0.2% |
-| Mismatched lines | 9113 | 9115 | +2 |
+| Total | 655 | 655 | 0 |
+| Pass rate | 92.2% | 92.2% | 0% |
+| Mismatched lines | 9115 | 9115 | 0 |
 
-## Added Tests (1)
-
-| Test | Status | Lines |
-|------|--------|-------|
-| `sound_gettransform_props` | output_mismatch | 2/4 |
+No changes detected.
