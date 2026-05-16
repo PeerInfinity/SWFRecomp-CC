@@ -676,7 +676,9 @@ namespace SWFRecomp
 			}
 			catch (const std::exception& e)
 			{
-				fprintf(stderr, "Warning: tag %d failed: %s\n", tag.code, e.what());
+				fprintf(stderr, "Warning: tag %d failed: %s (tag_start=%ld, length=%zu)\n",
+						tag.code, e.what(),
+						(long)(tag_start - swf_buffer), (size_t) tag.length);
 				// A throw mid-`<<` chain can set failbit on the in-flight
 				// ofstream; once set, further writes to that stream become
 				// silent no-ops. Reset all context-owned streams so the next
