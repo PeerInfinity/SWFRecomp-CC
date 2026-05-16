@@ -43152,13 +43152,15 @@ void actionSetMember(SWFAppContext* app_context)
 					} else {
 						canonical = "showAll";
 					}
-					// Read old scaleMode
-					char old_mode[32] = "";
+					// Snapshot old Stage.width / Stage.height — Flash fires onResize
+					// only when the actual reported dimensions change, not just when
+					// the scaleMode label changes (gnash actionscript.all/Stage.as).
+					double old_w = 0.0, old_h = 0.0;
 					{
-						ActionVar* old_sm = getProperty(obj, "scaleMode", 9);
-						if (old_sm && old_sm->type == ACTION_STACK_VALUE_STRING) {
-							u16_to_utf8((const uint16_t*)old_sm->data.numeric_value, old_sm->str_size, old_mode, sizeof(old_mode));
-						}
+						ActionVar* ow = getProperty(obj, "width", 5);
+						ActionVar* oh = getProperty(obj, "height", 6);
+						if (ow) old_w = varToDoubleSimple(ow);
+						if (oh) old_h = varToDoubleSimple(oh);
 					}
 					ActionVar sv = makeStringActionVar(app_context, canonical, (u32)strlen(canonical));
 					setProperty(app_context, obj, "scaleMode", 9, &sv);
@@ -43188,8 +43190,15 @@ void actionSetMember(SWFAppContext* app_context)
 						setProperty(app_context, obj, "height", 6, &sv);
 #endif
 					}
-					// Fire onResize if scaleMode actually changed
-					if (strcmp(old_mode, canonical) != 0) {
+					// Fire onResize only if width or height actually changed.
+					double new_w = old_w, new_h = old_h;
+					{
+						ActionVar* nw = getProperty(obj, "width", 5);
+						ActionVar* nh = getProperty(obj, "height", 6);
+						if (nw) new_w = varToDoubleSimple(nw);
+						if (nh) new_h = varToDoubleSimple(nh);
+					}
+					if (new_w != old_w || new_h != old_h) {
 						static const uint16_t onResize_u16[] = {
 							'o','n','R','e','s','i','z','e'
 						};
