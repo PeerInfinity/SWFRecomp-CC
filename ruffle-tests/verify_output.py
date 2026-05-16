@@ -173,8 +173,15 @@ def parse_image_comparisons(test_dir):
     if not toml_path.exists():
         return {}
 
-    with open(toml_path, "rb") as f:
-        data = tomllib.load(f)
+    try:
+        with open(toml_path, "rb") as f:
+            data = tomllib.load(f)
+    except tomllib.TOMLDecodeError:
+        # Upstream Ruffle has started using TOML 1.1 multi-line inline tables
+        # in some test.tomls (e.g. `optimizations = {` then newline). Python's
+        # tomllib only supports TOML 1.0 and rejects these. Treat as "no
+        # image_comparisons configured" so the test still runs.
+        return {}
 
     ic_section = data.get("image_comparisons")
     if not ic_section or not isinstance(ic_section, dict):
