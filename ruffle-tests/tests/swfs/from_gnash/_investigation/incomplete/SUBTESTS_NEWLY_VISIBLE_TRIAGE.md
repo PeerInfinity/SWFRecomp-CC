@@ -632,7 +632,17 @@ test belongs to a dedicated family plan." The mapping:
 | loading/LoadBitmapTest | Deferred → BitmapData.loadBitmap plan (3 fails: transparent default, __proto__ undefined, typeof undefined) |
 | matrix_accuracy_test1 | Deferred → twips/pixel precision plan |
 | TextSnapshotTest, movieclip_destruction_test3, action_execution_order_test12, action_order/{PlaceAndRemove,action_execution_order_extend_test} | Deferred → action-order / lifecycle plans |
+| BitmapDataDraw | **DONE** at discovery (RM via ruffle_subset_match, 55.4% lines). No fix needed — our diff is a subset of Ruffle's vs Flash. Documented in narrative inventory only |
 | RegisterClassTest4, loop/loop_test10 | Already in `ignored_tests.txt`; unrelated regressions tracked in suite CURRENT_STATUS |
+
+**Audit note (2026-05-16).** The Tier A-E tables together cover only 59
+of the 66 newly-visible tests. The other 7 (BitmapDataDraw, Global-v5,
+trace-as2/arguments, setProperty-v5/v6/v7/v8) were already PASS or RM
+at discovery and so didn't need triage tiers — they're inventoried in
+the "Source data" / "Cross-cutting observations" narrative paragraphs
+and in this Disposition table. All 66 newly-discoverable tests (verified
+by sweeping `from_gnash/**` for directories with `test.swf` + no
+`output.txt` + at least one `output.fpN.txt`) are accounted for.
 
 This plan stays in `incomplete/` only as a per-test inventory and
 attack-order reference. The Phase 1-5 status all read `completed` not
