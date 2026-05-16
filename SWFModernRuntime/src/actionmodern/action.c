@@ -4627,8 +4627,14 @@ static ActionVar actionASSetPropFlags_func2(SWFAppContext* app_context, ActionVa
 		ActionVar coerced = objectCallToString(app_context, &args[1], &found);
 		if (found) args[1] = coerced;
 	}
-	s32 set_flags = varToInt32(&args[2]);
-	s32 clear_flags = (num_args >= 4) ? varToInt32(&args[3]) : 0;
+	// varToInt32 does not handle BOOLEAN (it reads numeric_value as float and yields ~0
+	// for `true`). gnash flash.as:68 passes `ASSetPropFlags(_global.flash, null, 6, true)`
+	// — boolean true must coerce to 1 so the clear-DontEnum step actually fires. Coerce
+	// via varToDoubleSimple, which handles BOOLEAN/STRING/etc.
+	double _spf_set_d   = varToDoubleSimple(&args[2]);
+	double _spf_clear_d = (num_args >= 4) ? varToDoubleSimple(&args[3]) : 0.0;
+	s32 set_flags   = (isnan(_spf_set_d)   || isinf(_spf_set_d))   ? 0 : (s32)(int64_t)_spf_set_d;
+	s32 clear_flags = (isnan(_spf_clear_d) || isinf(_spf_clear_d)) ? 0 : (s32)(int64_t)_spf_clear_d;
 
 	u8 ecma_clear = 0, ecma_set = 0;
 	if (set_flags & 1) ecma_clear |= PROPERTY_FLAG_ENUMERABLE;
@@ -14401,7 +14407,13 @@ static void initMovieClipPrototype(SWFAppContext* app_context)
 		en_val.data.numeric_value = 1;
 		setProperty(app_context, proto, "enabled", 7, &en_val);
 	}
-	// Set MovieClip.prototype.transform = undefined (own property for hasOwnProperty checks)
+	// Set MovieClip.prototype.transform = undefined (own property for hasOwnProperty checks).
+	// In SWF8+ the slot is ReadOnly + DontDelete (gnash flash.as:90-96): write fails,
+	// delete preserves the slot. SWF<8 treats it as a writable, deletable own property
+	// (xcheck_equals expects the write to take effect). The init runs once at module
+	// load when g_swf_version is whatever the *first* loaded SWF used (e.g. SWF5 for
+	// the Dejagnu harness), so the per-version behavior is enforced at SetMember and
+	// Delete time instead of via property flags here.
 	{
 		ActionVar undef_val = {0};
 		undef_val.type = ACTION_STACK_VALUE_UNDEFINED;
@@ -35462,16 +35474,20 @@ static void ensureGlobalInit(SWFAppContext* app_context)
 	// flash package (Gnash Transform-v6/v7 exercises this).
 	if (g_flash_object == NULL) {
 		g_flash_object = allocObject(app_context, 12);
-		// constructor first (enumerated last in LIFO)
-		// Flags: ENUMERABLE | WRITABLE (no CONFIGURABLE = DONT_DELETE)
+		// constructor first (enumerated last in LIFO).
+		// Flags: WRITABLE only (DONT_ENUM + DONT_DELETE). Flash hides constructor
+		// and __proto__ on the flash package by default; gnash flash.as:46 expects
+		// `for (i in flash)` to NOT include them. After `ASSetPropFlags(_global.flash,
+		// null, 6, true)` (clear DONT_ENUM, set DONT_DELETE + READ_ONLY), both
+		// become enumerable — the line-76 for-in result correctly includes them.
 		{
-			const u8 pkg_f = PROPERTY_FLAG_ENUMERABLE | PROPERTY_FLAG_WRITABLE;
+			const u8 pkg_f = PROPERTY_FLAG_WRITABLE;
 			ActionVar cv = {0}; cv.type = ACTION_STACK_VALUE_FUNCTION;
 			cv.data.numeric_value = (u64)&g_ctors[0];
 			setPropertyWithFlags(app_context, g_flash_object, "constructor", 11, &cv, pkg_f);
 			// __proto__ second (enumerated before constructor in LIFO)
 			setObjectProto(app_context, g_flash_object);
-			// Fix __proto__ flags to match constructor (DONT_DELETE)
+			// Fix __proto__ flags to match constructor (DONT_ENUM + DONT_DELETE)
 			ASProperty* fp = findPropertyRaw(g_flash_object, "__proto__", 9);
 			if (fp) fp->flags = pkg_f;
 		}
@@ -42641,6 +42657,18 @@ void actionSetMember(SWFAppContext* app_context)
 			{
 				return;
 			}
+			// MovieClip.prototype.transform is ReadOnly + DontDelete in SWF8+
+			// (gnash actionscript.all/flash.as:90-96): writes silently fail and
+			// hasOwnProperty stays true after delete. SWF<8 allows the write.
+			// The init-time flag setup can't gate on version because Dejagnu may
+			// already have triggered the one-shot init at SWF5, so enforce here.
+			if (EFFECTIVE_SWF_VERSION() >= 8 &&
+			    prop_name_len == 9 && memcmp(prop_name, "transform", 9) == 0 &&
+			    g_movieclip_constructor_init &&
+			    obj == g_movieclip_constructor.prototype_obj)
+			{
+				return;
+			}
 			// BitmapData: width, height, transparent, rectangle are read-only
 			if (obj->native_type == NATIVE_BITMAPDATA && prop_name_len >= 5) {
 				if ((prop_name_len == 5 && memcmp(prop_name, "width", 5) == 0) ||
@@ -45682,6 +45710,19 @@ void actionDelete(SWFAppContext* app_context)
 		u64 result = (obj_var.type == ACTION_STACK_VALUE_UNDEFINED ||
 		              obj_var.type == ACTION_STACK_VALUE_NULL) ? 0ULL : 1ULL;
 		PUSH(ACTION_STACK_VALUE_BOOLEAN, result);
+		return;
+	}
+
+	// MovieClip.prototype.transform is DontDelete in SWF8+ (gnash flash.as:94-96):
+	// `delete MovieClip.prototype.transform` returns false and the slot survives.
+	// Enforce at delete time because the init-time flags can't gate on SWF version
+	// (the Dejagnu harness may have triggered the MC prototype init at SWF5).
+	if (EFFECTIVE_SWF_VERSION() >= 8 &&
+	    prop_name != NULL && prop_name_len == 9 && memcmp(prop_name, "transform", 9) == 0 &&
+	    g_movieclip_constructor_init &&
+	    obj == g_movieclip_constructor.prototype_obj)
+	{
+		PUSH(ACTION_STACK_VALUE_BOOLEAN, 0ULL);
 		return;
 	}
 
