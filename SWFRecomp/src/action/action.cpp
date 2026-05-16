@@ -34,6 +34,15 @@ namespace SWFRecomp
 	static std::string escape_c_string(const char* str, int swf_version = 6)
 	{
 		std::string result;
+		// C's \xNN hex escape greedily consumes all trailing hex digits,
+		// so "\x1eA" is parsed as a single 28-bit escape and rejected.
+		// After any \x..., emit "" to break the sequence iff the next
+		// source character is itself a hex digit (0-9, a-f, A-F).
+		auto needs_break = [](unsigned char next) {
+			return (next >= '0' && next <= '9') ||
+			       (next >= 'a' && next <= 'f') ||
+			       (next >= 'A' && next <= 'F');
+		};
 		for (const char* p = str; *p; ++p)
 		{
 			unsigned char c = (unsigned char)*p;
@@ -44,13 +53,18 @@ namespace SWFRecomp
 				case '\n': result += "\\n"; break;
 				case '\r': result += "\\r"; break;
 				case '\t': result += "\\t"; break;
-				case '\0': result += "\\0"; break;
+				case '\0':
+					result += "\\0";
+					// \0 has the same greedy-digit problem ("\012" = octal 012)
+					if (p[1] >= '0' && p[1] <= '9') result += "\"\"";
+					break;
 				default:
 					if (c < 0x20 || c == 0x7f)
 					{
 						char buf[5];
 						snprintf(buf, sizeof(buf), "\\x%02x", c);
 						result += buf;
+						if (needs_break((unsigned char)p[1])) result += "\"\"";
 					}
 					else if (c >= 0x80 && swf_version < 6)
 					{
@@ -889,8 +903,19 @@ namespace SWFRecomp
 								out_script << "\t\t" << "actionTryEnd(app_context);" << endl;
 							}
 						}
-						out_script << "\t\t" << "return ret_val;" << endl
-								   << "\t" << "}" << endl;
+						// Top-level scripts (parse_depth==1, not inside a function body)
+						// are void; if obfuscated bytecode emits a RETURN at top level
+						// (typically in unreachable junk after another return), emit
+						// `return;` instead of `return ret_val;` to satisfy the void
+						// signature. The popped value is dropped — matches Flash's
+						// "RETURN at top level pops a value but has no return target."
+						if (context.in_function_body) {
+							out_script << "\t\t" << "return ret_val;" << endl;
+						} else {
+							out_script << "\t\t" << "(void)ret_val;" << endl
+									   << "\t\t" << "return;" << endl;
+						}
+						out_script << "\t" << "}" << endl;
 					}
 
 					break;
@@ -2083,9 +2108,16 @@ namespace SWFRecomp
 
 							if (pool_index >= constant_pool.size())
 							{
-								fprintf(stderr, "Constant pool index %d out of range (pool size: %zu)\n",
+								// Out-of-range index — common in obfuscated/protected
+								// SWFs where unreachable code (after a `return`) contains
+								// junk that the recompiler still has to walk past.
+								// Push undefined as a placeholder rather than aborting
+								// the whole script's emission.
+								fprintf(stderr, "Constant pool index %d out of range (pool size: %zu); pushing undefined.\n",
 									pool_index, constant_pool.size());
-								throw std::exception();
+								out_script << "(ConstantPool8[" << (int)pool_index << "] OOR -> undefined)" << endl;
+								out_script << "\t" << "PUSH(ACTION_STACK_VALUE_UNDEFINED, 0);" << endl;
+								break;
 							}
 
 							size_t str_id = constant_pool[pool_index];
@@ -2104,9 +2136,11 @@ namespace SWFRecomp
 
 							if (pool_index >= constant_pool.size())
 							{
-								fprintf(stderr, "Constant pool index %d out of range (pool size: %zu)\n",
+								fprintf(stderr, "Constant pool index %d out of range (pool size: %zu); pushing undefined.\n",
 									pool_index, constant_pool.size());
-								throw std::exception();
+								out_script << "(ConstantPool16[" << (int)pool_index << "] OOR -> undefined)" << endl;
+								out_script << "\t" << "PUSH(ACTION_STACK_VALUE_UNDEFINED, 0);" << endl;
+								break;
 							}
 
 							size_t str_id = constant_pool[pool_index];
