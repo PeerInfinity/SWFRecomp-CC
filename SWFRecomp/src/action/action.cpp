@@ -1206,6 +1206,15 @@ namespace SWFRecomp
 
 			case SWF_ACTION_GET_URL:
 			{
+				// Anchor at the start of the payload so we always land on
+				// `payload_start + length` regardless of what the actual
+				// strings consumed. Obfuscated SWFs sometimes pad the
+				// payload past the two null-terminated strings; the
+				// label-collection pass advances by `length`, so the emit
+				// pass must too or it'll fall behind and walk the padding
+				// as bogus opcodes.
+				char* payload_start = action_buffer;
+
 				// Read UrlString (null-terminated)
 				char* url_string = action_buffer;
 				size_t url_len = strlen(url_string);
@@ -1225,6 +1234,7 @@ namespace SWFRecomp
 						   << "\"" << url_esc << "\", "
 						   << "\"" << target_esc << "\");" << endl;
 
+				action_buffer = payload_start + length;
 				break;
 			}
 
@@ -1339,6 +1349,11 @@ namespace SWFRecomp
 
 				case SWF_ACTION_SET_TARGET:
 				{
+					// Anchor at start of payload so we always land at
+					// payload_start + length (see GET_URL comment above —
+					// obfuscated SWFs pad past the null terminator).
+					char* payload_start = action_buffer;
+
 					// Read TargetName (null-terminated string)
 					std::string target_name;
 					char ch;
@@ -1351,6 +1366,7 @@ namespace SWFRecomp
 					out_script << "\t" << "// SetTarget: \"" << escaped_target << "\"" << endl
 							   << "\t" << "actionSetTarget(app_context, \"" << escaped_target << "\");" << endl;
 
+					action_buffer = payload_start + length;
 					break;
 				}
 
