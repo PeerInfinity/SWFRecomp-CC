@@ -7,26 +7,43 @@ status: in_progress
 phases:
   - id: 1
     name: "Tier A — near-passing (≥95% line match); land cheap fixes / ignored_tests promotions"
-    status: in_progress
+    status: completed
   - id: 2
     name: "Tier B — close (85-95%); split out per-family plans"
-    status: not_started
+    status: completed
+    note: "5 of 9 landed (Object-v5 RM, flash-v8 PASS, action_execution_order_test PASS, registers PASS, trace-as2/arguments PASS). Remaining 4 (array-v6/v7/v8, Function-v5, Object-v6/v7/v8) deferred to dedicated plans per Recommended Attack Order — no further action in this triage."
   - id: 3
     name: "Tier C — mid (75-85%); identify shared root causes across families"
-    status: not_started
+    status: completed
+    note: "Actionable items landed: Stage-v6/v7/v8 RM, getvariable-v5..v8 +38 raw lines. Other families (XMLNode-vN, MovieClip-vN, Function-v7/v8, loading/LoadBitmapTest, Object-v6 watch/addProperty) deferred to dedicated plans — root causes inventoried inline."
   - id: 4
     name: "Tier D — deeper (50-75%); document scope before committing"
-    status: not_started
+    status: completed
+    note: "Inventoried inline; no work landed in this triage. XML/XMLNode combined plan recommended. NetConnection-vN, TextField-vN, TextFormat-v8, Transform-v8 all need dedicated plans. matrix_accuracy_test1 is a known twips-precision edge case. Tracked as 'deferred to dedicated plans'."
   - id: 5
     name: "Tier E — shallow (<50%); decide accept-vs-investigate per test"
-    status: not_started
+    status: completed
+    note: "argstest-v6/v7/v8 inventoried as not actionable (native-object enumeration order divergence cascade; ACCEPTED_DIFFS candidate). PrototypeEventListeners requires mouse/key clip event prototype dispatch (substantial feature work). GradientFillTest deferred to existing CPU_GRADIENT_RASTERIZER plans. Other entries documented inline."
 dependencies:
   - id: SUBTESTS_HARNESS
     reason: "Shipped 2026-05-14 (commit 39b797ac, plan complete/SUBTESTS_HARNESS_PLAN.md). Discovery now resolves expected-output filename per-test."
 blockers: []
+status_note: |
+  As of 2026-05-16 CI (run 25974522152, commit d89f9994), all Tier A/B/C
+  fixes documented in this plan are confirmed landed. Per-suite snapshot:
+  actionscript.all 128/75 of 243 (eff=203), misc-ming.all 64/24 of 110
+  (eff=88), misc-mtasc.all 7/2 of 9 (eff=9), misc-swfc.all 8/6 of 19
+  (eff=14), misc-swfmill.all 19/1 of 20 (eff=20).
+
+  Remaining work is deferred to dedicated plans (one per family). This
+  plan stays in incomplete/ as a reference for the per-test inventory
+  and recommended attack order; close it once the family plans cover
+  every test listed in the TESTS: header.
 -->
 
-Last updated: 2026-05-16 (Tier C **getvariable-v5/v6/v7/v8 +38 raw line matches** via Ruffle-style path validator in `actionGetVariable` / `actionSetVariable`. Adds `isTargetPathStructurallyValid` (simulates Ruffle's `resolve_target_path` iteration without doing the lookups) + `trimLeadingColons` (wraps as `sanitizeTargetPath`). Catches paths that would hit an empty-name lookup in Ruffle (`obj:::xx`, `obj::::xx`, `o..obj2.memb`) and salvages paths Ruffle accepts (`obj::xx`, `::obj:memb`, `_root:clip1:clip2:...clip2` with embedded `:..` parent nav). Both `actionGetVariable`'s and `actionSetVariable`'s dot/colon resolution sections now use the sanitized target and walk only the target portion (not target+prop), with prop GetMember/SetMember done separately. Per-test deltas: v5 44/58 → 52/58 (+8), v6 48/64 → 58/64 (+10), v7 49/64 → 59/64 (+10), v8 49/64 → 59/64 (+10). All four still output_mismatch — residual mismatches are independent closure/this-binding bugs (lines 624, 649, 686 + the line-105 Flash-vs-ours `this._root._level0.varname` divergence where we now resolve correctly but expected output captures the Flash bug). Earlier 2026-05-15: Tier C Stage-v6/v7/v8 RM, Tier B flash-v8 PASS, misc-swfmill.all/registers PASS, action_order/action_execution_order_test PASS, Object-v5 RM, Date-v5..v8 RM.)
+Last updated: 2026-05-16 (CI run `25974522152` confirms all Tier A/B/C fixes from the prior session landed. Per-test status against the plan inventory: Date-v5..v8 RM ✓; ops-v5/v6/v7 RM ✓; Object-v5 RM ✓; flash-v8 PASS ✓; Global-v5 PASS ✓; action_execution_order_test PASS ✓; registers PASS ✓; trace-as2/arguments PASS ✓; Stage-v6/v7/v8 RM ✓; getvariable-v5..v8 52/58, 58/64, 59/64, 59/64 (still output_mismatch but +38 raw lines confirmed in CI). All remaining items in this plan are explicitly deferred to dedicated plans (ARRAY_V5_PLAN extension for array-vN; needed XML_XMLNODE plan; MovieClip-vN; Function-vN; NetConnection-vN; TextField/TextFormat; argstest enumeration order). Closing all 5 phases.)
+
+Earlier 2026-05-16 (commit `d89f9994`): Tier C **getvariable-v5/v6/v7/v8 +38 raw line matches** via Ruffle-style path validator in `actionGetVariable` / `actionSetVariable`. Adds `isTargetPathStructurallyValid` (simulates Ruffle's `resolve_target_path` iteration without doing the lookups) + `trimLeadingColons` (wraps as `sanitizeTargetPath`). Catches paths that would hit an empty-name lookup in Ruffle (`obj:::xx`, `obj::::xx`, `o..obj2.memb`) and salvages paths Ruffle accepts (`obj::xx`, `::obj:memb`, `_root:clip1:clip2:...clip2` with embedded `:..` parent nav). Both `actionGetVariable`'s and `actionSetVariable`'s dot/colon resolution sections now use the sanitized target and walk only the target portion (not target+prop), with prop GetMember/SetMember done separately. Per-test deltas: v5 44/58 → 52/58 (+8), v6 48/64 → 58/64 (+10), v7 49/64 → 59/64 (+10), v8 49/64 → 59/64 (+10). All four still output_mismatch — residual mismatches are independent closure/this-binding bugs (lines 624, 649, 686 + the line-105 Flash-vs-ours `this._root._level0.varname` divergence where we now resolve correctly but expected output captures the Flash bug). Earlier 2026-05-15: Tier C Stage-v6/v7/v8 RM, Tier B flash-v8 PASS, misc-swfmill.all/registers PASS, action_order/action_execution_order_test PASS, Object-v5 RM, Date-v5..v8 RM.)
 
 ## 2026-05-16 — Tier C getvariable-v5/v6/v7/v8 colon-path validation (+38 lines, pending CI)
 
@@ -589,7 +606,38 @@ result (`y == -1` vs `4294967295`), etc. No action needed — the tests
 already contribute to effective_pass; documenting per the plan was
 sufficient.
 
-## Status: IN PROGRESS — Tier A Date-vN complete; ops-vN are pre-RM
+## Status: ALL PHASES CLOSED — actionable Tier A/B/C work landed; remaining items deferred
+
+As of CI run `25974522152` (commit `d89f9994`, 2026-05-16, no-graphics),
+every fix this triage scheduled is in master and reflected in results.
+What's left in each tier is **not** "this triage's TODO" — it's "this
+test belongs to a dedicated family plan." The mapping:
+
+| Test/family | Disposition |
+|-------------|-------------|
+| Date-v5..v8, ops-v5/v6/v7 | **DONE** (RM in CI) |
+| Object-v5, flash-v8, Global-v5, action_execution_order_test, registers, trace-as2/arguments | **DONE** (RM or PASS in CI) |
+| Stage-v6/v7/v8, getvariable-v5..v8 | **DONE** (Stage RM; getvariable +38 raw lines, residuals are independent closure/scope bugs) |
+| array-v6/v7/v8 | Deferred → extend `incomplete/ARRAY_V5_PLAN.md` per Recommended Attack Order |
+| Object-v6/v7/v8 | Deferred → needs dedicated watch()/addProperty plan (this plan's Object-v5 fix landed +5 lines on v6/v7/v8 but residual ~47-34 line diff is widespread) |
+| Function-v5..v8 | Deferred → dedicated Function-vN family plan (8 distinct divergences inventoried inline) |
+| XMLNode-v5..v8, XML-v5..v8 | Deferred → combined `XML_XMLNODE_PLAN.md` (not yet created); XMLNode-v5 survey done |
+| MovieClip-v6/v7/v8 | Deferred → MC plan (150-200 lines off per version; compare against MovieClip-v5 historical work) |
+| TextField-v6/v7/v8, TextFormat-v8, Transform-v8 | Deferred → graphics/text rendering plans |
+| NetConnection-v6/v7/v8 | Deferred → NetConnection lifecycle plan (`connect()` status code routing wrong, isConnected gating, URI handling) |
+| setProperty-v5..v8 | Already RM via ruffle_subset_match (3/52 lines but our diff ⊆ ruffle's). No further work; consider `RUFFLE_VS_FLASH_DIFFERENCES.md` entry |
+| argstest-v6/v7/v8 | **Not actionable** (`_global` enumeration order divergence cascade); `ACCEPTED_DIFFS.md` candidate |
+| PrototypeEventListeners | Deferred → clip-event prototype dispatch plan |
+| GradientFillTest | Deferred → existing CPU_GRADIENT_RASTERIZER plans cover this |
+| loading/LoadBitmapTest | Deferred → BitmapData.loadBitmap plan (3 fails: transparent default, __proto__ undefined, typeof undefined) |
+| matrix_accuracy_test1 | Deferred → twips/pixel precision plan |
+| TextSnapshotTest, movieclip_destruction_test3, action_execution_order_test12, action_order/{PlaceAndRemove,action_execution_order_extend_test} | Deferred → action-order / lifecycle plans |
+| RegisterClassTest4, loop/loop_test10 | Already in `ignored_tests.txt`; unrelated regressions tracked in suite CURRENT_STATUS |
+
+This plan stays in `incomplete/` only as a per-test inventory and
+attack-order reference. The Phase 1-5 status all read `completed` not
+because every test passes, but because the triage's role (categorize,
+land cheap wins, route the rest to dedicated plans) is done.
 
 This doc inventories the 49 newly-discoverable `output_mismatch` tests
 that appeared in CI `eb8206f8` (run `25896064893`, no-graphics) after
