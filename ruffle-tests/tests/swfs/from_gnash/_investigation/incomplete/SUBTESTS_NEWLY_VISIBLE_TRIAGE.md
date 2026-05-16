@@ -26,7 +26,110 @@ dependencies:
 blockers: []
 -->
 
-Last updated: 2026-05-15 (Tier B `flash-v8` **landed PASS** (36/41 → 41/41) via three narrow fixes in `g_flash_object` init, `actionASSetPropFlags_func2` BOOLEAN coercion, and `MovieClip.prototype.transform` SWF8 ReadOnly+DontDelete enforcement at SetMember/Delete sites. Earlier this session: misc-swfmill.all/registers PASS, action_order/action_execution_order_test PASS, Object-v5 RM, Date-v5..v8 RM.)
+Last updated: 2026-05-15 (Tier C **Stage-v6/v7/v8 all landed ruffle_matched** (54/64 → RM, +3 effective) via single fix in `actionSetMember` Stage scaleMode setter: only fire `onResize` when actual `Stage.width`/`Stage.height` changed, not when scaleMode label changed. Also surveyed: `array-v6/v7/v8` strictly larger than v5 (v5 issues + new `__proto__ = primitive` block at array.as:1763-1793 — defer until v5 IN PROGRESS completes); `argstest-v6/v7/v8` not a crash — enumerates _global natives (PrintJob, MovieClipLoader, etc.) in wrong order producing 7700+ lines vs 2192 expected, requires matching Gnash's exact native-object enumeration order (not tractable); `XMLNode-v5` has multiple distinct issues (prototype hasOwnProperty for inherited builtins, `namespaceURI` returns null vs "", attribute order in toString, childNodes.length wrong) — not a single fix, needs dedicated plan. Earlier this session: Tier B `flash-v8` PASS, misc-swfmill.all/registers PASS, action_order/action_execution_order_test PASS, Object-v5 RM, Date-v5..v8 RM.)
+
+## 2026-05-15 — Tier C Stage-v6/v7/v8 → ruffle_matched (+3 effective, pending CI)
+
+Single fix in `SWFModernRuntime/src/actionmodern/action.c` Stage scaleMode setter
+(around line 43143) flipped all three Stage-vN tests from `output_mismatch 54/64`
+to **ruffle_matched**.
+
+**Bug.** The scaleMode setter fired `onResize` whenever the scaleMode *label*
+changed (`if (strcmp(old_mode, canonical) != 0)`). Flash fires `onResize` only
+when the actual reported `Stage.width` / `Stage.height` change — and in
+NO_GRAPHICS test builds, all five scaleMode values (showAll, exactFit,
+noBorder, noScale, plus undefined→showAll) report the same `FRAME_WIDTH` /
+`FRAME_HEIGHT` because there's no separate viewport. So the test's four
+back-to-back `Stage.scaleMode = "X"` assignments produced four spurious
+`Resize event received` lines and the trailing `check_equals(rs_count, 0)`
+failed with `obtained: 4`.
+
+**Fix.** Snapshot `old_w` / `old_h` (via `getProperty + varToDoubleSimple`)
+before the width/height updates, re-read after, and gate the
+`builtin_broadcaster_broadcastMessage("onResize")` call on
+`new_w != old_w || new_h != old_h`. This is also strictly more correct
+semantics on builds that do have a separate viewport (noScale toggle).
+
+**Test results post-fix (local):**
+- `Stage-v6`: output_mismatch 54/64 → **ruffle_matched**
+- `Stage-v7`: output_mismatch 54/64 → **ruffle_matched**
+- `Stage-v8`: output_mismatch 54/64 → **ruffle_matched**
+
+**Regression battery (clean):** 15-test AVM1 lifecycle/scope/super/closure
+(as2_super_and_this_v6/v8, closure_scope, extends_chain,
+register_class_return_value, on_construct, set_interval, goto_methods,
+removed_clip_halts_script, clip_events, function_base_clip,
+swf5_to_6_cross_call, swf5_no_closure, primitive_type_globals,
+set_variable_scope) — 15/15 PASS. 10-test Gnash actionscript.all
+(flash-v5/v6/v7/v8, Date-v8, Object-v5, array-v5, Inheritance-v5,
+case-v5, Global-v5) — 9/10 effective (matches baseline; array-v5
+remains IN PROGRESS per ARRAY_V5_PLAN). Date / Object / flash from
+earlier this session preserved.
+
+## 2026-05-15 — Tier B array-v6/v7/v8 survey (not landed; deferred)
+
+`array-v6/v7/v8` diff sets are **strictly larger** than `array-v5` —
+they share v5's sort/sortOn ordering + plain-Object dispatch + length
+(lines 1244-1636) AND add a new ~22-line block at array.as:1763-1793
+testing primitive assignment to `__proto__`:
+- `ar.__proto__ = 8; typeof(ar.__proto__) == "number"` (we report "object",
+  value `""`).
+- `ar.__proto__ = "string"; typeof(ar.__proto__) == "string"` (we report
+  "object").
+- `delete ar.__proto__; typeof(ar.__proto__) == "undefined"` (we report
+  "object").
+- `typeof(ar.constructor) == "undefined"` initially (we report "function").
+
+Our `__proto__` slot is read everywhere as a prototype-chain step
+(`resolveProtoVar`, `walkProtoChain`, etc.) — primitives at that slot
+would need a definition for "what happens when you walk through a number".
+v5 doesn't exercise this path, so the v5 plan can land independently.
+Right move: finish ARRAY_V5_PLAN for v5 first, then layer a
+"v6+ __proto__-primitive" section onto it (or split off as
+`incomplete/ARRAY_PROTO_PRIMITIVE_PLAN.md`) once the v5 work is in CI.
+
+## 2026-05-15 — Tier E argstest-v6/v7/v8 survey (not actionable)
+
+Recommended attack order called argstest-v6/v7/v8 a likely crash that
+could unlock 6500 expected lines. **It is not a crash.** The tests run
+to completion and emit *more* lines than expected (7731 actual vs 2192
+expected for v6 — 5500 lines over). The test recursively enumerates
+`_global` and tests every property; our enumeration descends into
+native objects (PrintJob, MovieClipLoader, LocalConnection, …) in
+member-iteration order that diverges from Gnash's expected ordering on
+the very first property emitted (`Testing toString()` vs expected
+`Testing send()` at line 28). That misalignment cascades for the
+remaining 7700 lines.
+
+Fixing would require either: (a) matching Gnash's exact native-object
+member enumeration order (not specified anywhere, derived from Gnash's
+internal data-structure walk), or (b) ignoring the tests via
+`ignored_tests.txt`. Neither is "one fix unlocks 6500 lines" tractable.
+Recommend documenting in `ACCEPTED_DIFFS.md` after confirming Ruffle
+exhibits the same divergence (likely).
+
+## 2026-05-15 — Tier C XMLNode-v5 survey (not actionable as a single fix)
+
+XMLNode-v5 (174/207 baseline) diff is *not* a single shared root cause:
+1. `XMLNode.prototype.hasOwnProperty("firstChild" / "lastChild" /
+   "namespaceURI" / "localName" / "attributes" / "childNodes" /
+   "nextSibling" / "nodeName" / "nodeType" / "nodeValue" / "parentNode" /
+   "prefix" / "previousSibling")` all expected true (Gnash stores these
+   as own props on the prototype); we expose them via the getter
+   mechanism, so hasOwnProperty returns false.
+2. `node.namespaceURI` returns `null` instead of `""` for element nodes
+   with no declared namespace (line 109, 114, 148 — but text nodes at
+   line 107 correctly report `null`).
+3. Attribute enumeration order in `toString()` differs (line 91, 92, 94,
+   95 — Gnash emits attrs in insertion order; we emit in storage order).
+4. `childNodes.length` off-by-one after some operations (line 76).
+5. Line 37: `textnode.nodeValue == "text content"` — we PASS but Flash
+   FAILED (Ruffle-vs-Flash divergence likely).
+6. Line 51: `node1.childNodes.push` truthiness — we report falsy.
+
+Likely shared across v5..v8 (all 4 versions at 174/207 = same diff set).
+Right move: dedicated XML_XMLNODE_PLAN.md with one fix per category;
+defer until lower-hanging fruit is exhausted.
 
 ## 2026-05-15 — Tier B flash-v8 → PASS (+1 effective, pending CI)
 
@@ -477,9 +580,9 @@ divergence; worth splitting along that line.
 
 | Test | Suite | Lines | % |
 |------|-------|------:|--:|
-| `Stage-v6` | actionscript.all | 54/64 | 84.4% |
-| `Stage-v7` | actionscript.all | 54/64 | 84.4% |
-| `Stage-v8` | actionscript.all | 54/64 | 84.4% |
+| `Stage-v6` | actionscript.all | 54/64 | 84.4% | **RM** (2026-05-15) |
+| `Stage-v7` | actionscript.all | 54/64 | 84.4% | **RM** (2026-05-15) |
+| `Stage-v8` | actionscript.all | 54/64 | 84.4% | **RM** (2026-05-15) |
 | `XMLNode-v5` | actionscript.all | 174/207 | 84.1% |
 | `XMLNode-v6` | actionscript.all | 174/207 | 84.1% |
 | `XMLNode-v7` | actionscript.all | 174/207 | 84.1% |
