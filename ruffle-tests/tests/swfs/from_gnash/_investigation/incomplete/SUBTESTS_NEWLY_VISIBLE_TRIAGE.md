@@ -26,7 +26,87 @@ dependencies:
 blockers: []
 -->
 
-Last updated: 2026-05-15 (Tier C **Stage-v6/v7/v8 all landed ruffle_matched** (54/64 → RM, +3 effective) via single fix in `actionSetMember` Stage scaleMode setter: only fire `onResize` when actual `Stage.width`/`Stage.height` changed, not when scaleMode label changed. Also surveyed: `array-v6/v7/v8` strictly larger than v5 (v5 issues + new `__proto__ = primitive` block at array.as:1763-1793 — defer until v5 IN PROGRESS completes); `argstest-v6/v7/v8` not a crash — enumerates _global natives (PrintJob, MovieClipLoader, etc.) in wrong order producing 7700+ lines vs 2192 expected, requires matching Gnash's exact native-object enumeration order (not tractable); `XMLNode-v5` has multiple distinct issues (prototype hasOwnProperty for inherited builtins, `namespaceURI` returns null vs "", attribute order in toString, childNodes.length wrong) — not a single fix, needs dedicated plan. Earlier this session: Tier B `flash-v8` PASS, misc-swfmill.all/registers PASS, action_order/action_execution_order_test PASS, Object-v5 RM, Date-v5..v8 RM.)
+Last updated: 2026-05-16 (Tier C **getvariable-v5/v6/v7/v8 +38 raw line matches** via Ruffle-style path validator in `actionGetVariable` / `actionSetVariable`. Adds `isTargetPathStructurallyValid` (simulates Ruffle's `resolve_target_path` iteration without doing the lookups) + `trimLeadingColons` (wraps as `sanitizeTargetPath`). Catches paths that would hit an empty-name lookup in Ruffle (`obj:::xx`, `obj::::xx`, `o..obj2.memb`) and salvages paths Ruffle accepts (`obj::xx`, `::obj:memb`, `_root:clip1:clip2:...clip2` with embedded `:..` parent nav). Both `actionGetVariable`'s and `actionSetVariable`'s dot/colon resolution sections now use the sanitized target and walk only the target portion (not target+prop), with prop GetMember/SetMember done separately. Per-test deltas: v5 44/58 → 52/58 (+8), v6 48/64 → 58/64 (+10), v7 49/64 → 59/64 (+10), v8 49/64 → 59/64 (+10). All four still output_mismatch — residual mismatches are independent closure/this-binding bugs (lines 624, 649, 686 + the line-105 Flash-vs-ours `this._root._level0.varname` divergence where we now resolve correctly but expected output captures the Flash bug). Earlier 2026-05-15: Tier C Stage-v6/v7/v8 RM, Tier B flash-v8 PASS, misc-swfmill.all/registers PASS, action_order/action_execution_order_test PASS, Object-v5 RM, Date-v5..v8 RM.)
+
+## 2026-05-16 — Tier C getvariable-v5/v6/v7/v8 colon-path validation (+38 lines, pending CI)
+
+Three new helpers in `SWFModernRuntime/src/actionmodern/action.c`:
+- `isTargetPathStructurallyValid(path, len)` — purely structural simulation
+  of Ruffle's `resolve_target_path` iteration; returns 1 iff Ruffle would
+  resolve the path to *some* object (no empty-name lookup ever occurs).
+- `trimLeadingColons(path, len, *out_len)` — straightforward leading-`:`
+  strip used after validation to align the path for downstream walkers.
+- `sanitizeTargetPath(path, len, *out_len, *invalid)` — composes the two:
+  validate first, trim on success.
+
+Both `actionGetVariable` (line ~36912) and `actionSetVariable`
+(line ~38263) compute the rfind-split (target_len, prop_len) then call
+`sanitizeTargetPath` on the target. Invalid → push UNDEFINED / silent
+no-op on the set. Valid → use the (possibly offset) `target_ptr` and
+new `target_len` for `resolveFlashPathToMC` and the fallback walk.
+
+**Bug.** Both functions used to (a) blindly skip empty path segments
+between consecutive separators (so `obj:::xx` resolved as `obj.xx` — Ruffle
+rejects), and (b) recurse into `actionGetVariable("obj:")` for the target
+portion of `obj::xx`, which returned undefined (target=`obj`, var=``,
+has_property("") is false), so the subsequent SetMember was a no-op on
+undefined and the valid `obj::xx` set silently failed. Leading-`::`
+paths like `::obj:memb` also failed: the fallback's `first_sep` search
+started at position 0 of the original var_name, giving first_len=0 and
+`actionGetVariable("")` → undefined.
+
+**Fix details.** The validator simulates Ruffle's
+`activation.rs::resolve_target_path` step-by-step:
+- Leading `/` → switch to slash-path mode (absolute from root).
+- Each iteration: trim ALL leading `:` chars; if trimmed-to-empty AND
+  the iteration entered with content, that's an empty-name lookup →
+  invalid.
+- `".."`, `"../"`, `"..:"` → parent navigation (consumed, no name lookup).
+- Otherwise scan to the next delimiter and consume a segment. Segment
+  len 0 (consecutive delimiters in the non-slash-path branch) → empty
+  name lookup → invalid.
+- Once a `/` is seen, `.` is no longer a delimiter.
+
+Earlier (now-reverted) attempts at a one-pass body scan ("flag any two
+consecutive separators") were too coarse: they correctly rejected
+`obj:::xx` and `o..obj2.memb` but also rejected valid Ruffle paths like
+`_root:clip1:clip2:...clip2` (interior `:..` is parent nav after colon
+trim) and `path_string` test's `::::clip1.:::clip2/:::clip3:clip4`
+(runs of `:::` between segments get trimmed to empty by Ruffle's
+per-iteration trim). The full-simulation validator handles those
+correctly without false rejections.
+
+Both `actionGetVariable` (line ~36877) and `actionSetVariable`
+(line ~38263) compute the rfind-split (target_len, prop_len) then call
+`sanitizeTargetPath` on the target. Invalid → push UNDEFINED / silent
+no-op on the set. Valid → use the (possibly offset) `target_ptr` and
+new `target_len` for `resolveFlashPathToMC` and the fallback walk. The
+fallback walk now operates strictly on `target_ptr[0..target_len]` then
+does a single `GetMember(prop_name)` / `SetMember(prop_name, value)` on
+the resolved target — previously it walked the FULL var_name (including
+the prop) segment-by-segment, which silently absorbed the empty-segment
+artifacts and was wrong for leading-`::` paths.
+
+**Test results post-fix (local):**
+- `getvariable-v5`: output_mismatch 44/58 → **output_mismatch 52/58** (+8)
+- `getvariable-v6`: output_mismatch 48/64 → **output_mismatch 58/64** (+10)
+- `getvariable-v7`: output_mismatch 49/64 → **output_mismatch 59/64** (+10)
+- `getvariable-v8`: output_mismatch 49/64 → **output_mismatch 59/64** (+10)
+
+**Lines newly passing across versions:**
+- Line 300/306: `obj::::variable_in_object` GET/SET now correctly rejected as invalid.
+- Line 321: `obj::variable_in_object` SET now correctly mutates (sanitize trims the trailing colon, target resolves to obj).
+- Line 330: `obj:::variable_in_object` SET now correctly rejected.
+- Line 480: `o..obj2.memb` GET now correctly returns undefined (`..` in body rejected).
+- Lines 538/551/564: `::obj:memb`, `::obj::memb`, `::obj.memb` all now correctly GET 4 / 4.4 / 4 (leading `::` stripped, single trailing `:` consumed).
+- v6+ adds lines 345/351/368/374 (same pattern via `mc1`).
+
+**Why not full PASS:**
+- Line 105 (5.4 with `this._root._level0.variable_in_root`): we now PASS (correctly resolve through `this`+`_root`+`_level0`); gnash's expected output captures Flash's bug here. Stays "ours-only" 1-line diff (not promotable but reasonable behavior).
+- Line 624 (function-scope `xx` after `/:xx = '2'`): local `xx` read returns 2 instead of 1 — preexisting separate scope/locals bug.
+- Line 649, 686 (`_root.o.func` / `o2.m.func` callfunction): `this` binding resolves to current context (root) instead of the function's container — preexisting separate callfunction `callable_this` propagation bug (the dot-path lookup at line 54775 in `actionCallFunction` finds the function before the dot-path-resolution branch at line 54824 can set callable_this).
+
+**Regression battery (clean, no graphics):** [pending - smoke test in progress]
 
 ## 2026-05-15 — Tier C Stage-v6/v7/v8 → ruffle_matched (+3 effective, pending CI)
 
@@ -591,12 +671,12 @@ divergence; worth splitting along that line.
 | `MovieClip-v6` | actionscript.all | 777/936 | 83.0% |
 | `MovieClip-v7` | actionscript.all | 798/969 | 82.4% |
 | `MovieClip-v8` | actionscript.all | 885/1087 | 81.4% |
-| `getvariable-v7` | actionscript.all | 49/64 | 76.6% |
-| `getvariable-v8` | actionscript.all | 49/64 | 76.6% |
-| `getvariable-v5` | actionscript.all | 44/58 | 75.9% |
+| `getvariable-v7` | actionscript.all | 59/64 | 92.2% (was 49/64; 2026-05-16 colon-path fix +10) |
+| `getvariable-v8` | actionscript.all | 59/64 | 92.2% (was 49/64; 2026-05-16 colon-path fix +10) |
+| `getvariable-v5` | actionscript.all | 52/58 | 89.7% (was 44/58; 2026-05-16 colon-path fix +8) |
 | `Function-v7` | actionscript.all | 205/272 | 75.4% |
 | `Function-v8` | actionscript.all | 205/272 | 75.4% |
-| `getvariable-v6` | actionscript.all | 48/64 | 75.0% |
+| `getvariable-v6` | actionscript.all | 58/64 | 90.6% (was 48/64; 2026-05-16 colon-path fix +10) |
 | `loading/LoadBitmapTest` | misc-ming.all | 13/17 | 76.5% |
 
 (plus `TextFormat-v8`, `TextField-v6/v7/v8` straddling the 73-74% line — see Tier D)

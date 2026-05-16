@@ -18546,6 +18546,93 @@ static MovieClip* resolveSlashPathToMC(SWFAppContext* app_context, const char* p
 	return mc;
 }
 
+// Simulate Ruffle's resolve_target_path iteration (without actually doing the
+// lookups) to detect paths that would resolve to None due to an empty-name
+// lookup. Used as a pre-validation gate in GetVariable / SetVariable on the
+// target portion (the left side of an rfind(":.") split).
+//
+// Rules mirror Ruffle:
+//   - Leading '/' switches to slash-path mode (absolute from root).
+//   - Each iteration: trim ALL leading ':' chars; if path now empty AND we
+//     entered this iteration with content, the next lookup is for empty name
+//     → invalid.
+//   - "..", "../", "..:" → parent navigation (no name lookup).
+//   - Otherwise scan to next delimiter and consume a segment. Segment len 0
+//     (i.e., two consecutive delimiters in the non-slash-path branch) →
+//     empty name lookup → invalid.
+//   - Once a '/' is seen, '.' is no longer a delimiter.
+//
+// Returns 1 if the path is valid (would resolve to *some* object), 0 if it
+// would fail. Doesn't actually resolve names — it's a purely structural check.
+static int isTargetPathStructurallyValid(const char* path, u32 len)
+{
+	if (len == 0) return 1; // Ruffle's `if path.is_empty() { return Some(start); }`
+	const char* p = path;
+	u32 remaining = len;
+	int is_slash_path = 0;
+	if (p[0] == '/') {
+		is_slash_path = 1; p++; remaining--;
+		if (remaining == 0) return 1;
+	}
+	while (remaining > 0) {
+		// Trim leading ':' (Ruffle's trim_start_matches(b':') at each iter).
+		while (remaining > 0 && p[0] == ':') { p++; remaining--; }
+		if (remaining == 0) return 0; // empty-name lookup
+		// "..", "../", "..:" → parent nav.
+		if (remaining >= 2 && p[0] == '.' && p[1] == '.') {
+			int is_parent = 0;
+			if (remaining == 2) { is_parent = 1; }
+			else if (p[2] == '/' || p[2] == ':') { is_parent = 1; }
+			if (is_parent) {
+				int third_is_slash = (remaining > 2 && p[2] == '/');
+				if (remaining <= 2) { remaining = 0; }
+				else { p += 3; remaining -= 3; }
+				if (third_is_slash) is_slash_path = 1;
+				continue;
+			}
+		}
+		// Scan to next delimiter.
+		u32 seg_len = 0;
+		while (seg_len < remaining) {
+			char c = p[seg_len];
+			if (c == ':') break;
+			if (c == '.' && !is_slash_path) break;
+			if (c == '/') { is_slash_path = 1; break; }
+			seg_len++;
+		}
+		if (seg_len == 0) return 0; // empty-name lookup
+		if (seg_len < remaining) {
+			p += seg_len + 1;
+			remaining -= seg_len + 1;
+		} else {
+			remaining = 0;
+		}
+	}
+	return 1;
+}
+
+// Trim leading ':' from a target path; structural validity should be
+// checked separately via isTargetPathStructurallyValid.
+static const char* trimLeadingColons(const char* path, u32 len, u32* out_len)
+{
+	while (len > 0 && *path == ':') { path++; len--; }
+	*out_len = len;
+	return path;
+}
+
+// Combined helper: validate, then trim leading ':' on success.
+// On invalid: *invalid=1, *out_len=0; returns input pointer unchanged.
+// On valid:   *invalid=0, *out_len=trimmed length, returns offset pointer.
+static const char* sanitizeTargetPath(const char* path, u32 len,
+                                       u32* out_len, int* invalid)
+{
+	if (!isTargetPathStructurallyValid(path, len)) {
+		*invalid = 1; *out_len = 0; return path;
+	}
+	*invalid = 0;
+	return trimLeadingColons(path, len, out_len);
+}
+
 // Resolve a Flash-style path using the Ruffle resolve_target_path algorithm.
 // Rules:
 // - ':' is ALWAYS a token separator
@@ -36828,6 +36915,24 @@ void actionGetVariable(SWFAppContext* app_context)
 			const char* prop_name = last_sep + 1;
 			u32 prop_len = var_name_len - target_len - 1;
 
+			// Apply Ruffle's resolve_target_path consecutive-separator rules to
+			// the target portion. Catches `obj:::xx` (invalid), `o..obj2.memb`
+			// (invalid), and salvages `obj::xx` / `::obj:xx` (valid: trim).
+			// target_ptr / target_len address only the target span; the prop
+			// (last_sep + 1, prop_len) is unaffected. Don't touch var_name —
+			// some downstream lookups still use the full original string.
+			const char* target_ptr = var_name;
+			{
+				int _tp_inv = 0; u32 _tp_len = 0;
+				const char* _tp = sanitizeTargetPath(var_name, target_len, &_tp_len, &_tp_inv);
+				if (_tp_inv) {
+					PUSH(ACTION_STACK_VALUE_UNDEFINED, 0);
+					return;
+				}
+				target_ptr = _tp;
+				target_len = _tp_len;
+			}
+
 #if defined(NO_GRAPHICS) || defined(OFFSCREEN_RENDER)
 			// Try resolving left side as MC path via resolveFlashPathToMC
 			// Ruffle compatibility: _level0 in dot-paths only resolves when the scope's
@@ -36845,9 +36950,9 @@ void actionGetVariable(SWFAppContext* app_context)
 				int target_is_level = 0;
 				if (target_len >= 6) {
 					if (g_swf_version <= 6)
-						target_is_level = (strncasecmp(var_name, "_level", 6) == 0);
+						target_is_level = (strncasecmp(target_ptr, "_level", 6) == 0);
 					else
-						target_is_level = (strncmp(var_name, "_level", 6) == 0);
+						target_is_level = (strncmp(target_ptr, "_level", 6) == 0);
 				}
 
 				// Inside a function, _levelN targets fail (Ruffle scope chain behavior)
@@ -36859,7 +36964,7 @@ void actionGetVariable(SWFAppContext* app_context)
 				}
 
 				MovieClip* ctx = g_current_context ? g_current_context : &root_movieclip;
-				MovieClip* target_mc = resolveFlashPathToMC(app_context, var_name, target_len, ctx, 1);
+				MovieClip* target_mc = resolveFlashPathToMC(app_context, target_ptr, target_len, ctx, 1);
 				if (target_mc != NULL && prop_len > 0) {
 					// Ruffle compatibility: own properties (variables set via SetVariable
 					// on root timeline) are checked BEFORE display list children.
@@ -36915,27 +37020,26 @@ void actionGetVariable(SWFAppContext* app_context)
 			}
 #endif
 
-			// Fall back: resolve first segment via GetVariable, walk remaining via GetMember
+			// Fall back: walk sanitized target_ptr[0..target_len] segment-by-segment,
+			// then GetMember(prop_name) on the final object. Empty sanitized target
+			// (e.g. ".foo" → target="") degenerates to a bare GetVariable(prop_name).
 			{
-				// Find FIRST separator for the first-segment split
-				const char* first_sep = NULL;
-				for (u32 i = 0; i < var_name_len; i++) {
-					if (var_name[i] == '.' || var_name[i] == ':') { first_sep = var_name + i; break; }
-				}
-				if (first_sep != NULL) {
-					u32 first_len = (u32)(first_sep - var_name);
-					PUSH_STR(var_name, first_len);
+				if (target_len == 0) {
+					// Empty target = bare property lookup on current scope.
+					PUSH_STR(prop_name, prop_len);
 					actionGetVariable(app_context);
-
-					const char* rest = first_sep + 1;
-					u32 rest_len = var_name_len - first_len - 1;
-					// Trailing separator with empty property → undefined
-					// e.g. "clipInstance2." → rest_len is 0, should be undefined
-					if (rest_len == 0) {
-						POP();
-						PUSH(ACTION_STACK_VALUE_UNDEFINED, 0);
-						return;
-					}
+					return;
+				}
+				const char* first_sep_t = NULL;
+				for (u32 i = 0; i < target_len; i++) {
+					if (target_ptr[i] == '.' || target_ptr[i] == ':') { first_sep_t = target_ptr + i; break; }
+				}
+				u32 first_len_t = first_sep_t ? (u32)(first_sep_t - target_ptr) : target_len;
+				PUSH_STR(target_ptr, first_len_t);
+				actionGetVariable(app_context);
+				if (first_sep_t != NULL) {
+					const char* rest = first_sep_t + 1;
+					u32 rest_len = target_len - first_len_t - 1;
 					while (rest_len > 0) {
 						const char* next_sep = NULL;
 						for (u32 ri = 0; ri < rest_len; ri++) {
@@ -36949,27 +37053,37 @@ void actionGetVariable(SWFAppContext* app_context)
 						if (next_sep) { rest = next_sep + 1; rest_len -= seg_len + 1; }
 						else { rest_len = 0; }
 					}
+				}
+				if (prop_len > 0) {
+					PUSH_STR(prop_name, prop_len);
+					actionGetMember(app_context);
+				}
 
-					// Fallback: if resolved to undefined, try starting from _global.
-					if (STACK_TOP_TYPE == ACTION_STACK_VALUE_UNDEFINED) {
-						extern ASObject* global_object;
-						if (global_object != NULL) {
-							ActionVar* gprop = getPropertyWithPrototype(global_object, var_name, first_len);
-							if (gprop != NULL && gprop->type != ACTION_STACK_VALUE_UNDEFINED) {
-								POP();
-								pushVar(app_context, gprop);
-								rest = first_sep + 1;
-								rest_len = var_name_len - first_len - 1;
-								while (rest_len > 0) {
+				// Fallback: if resolved to undefined, try the first segment via _global.
+				if (STACK_TOP_TYPE == ACTION_STACK_VALUE_UNDEFINED) {
+					extern ASObject* global_object;
+					if (global_object != NULL) {
+						ActionVar* gprop = getPropertyWithPrototype(global_object, target_ptr, first_len_t);
+						if (gprop != NULL && gprop->type != ACTION_STACK_VALUE_UNDEFINED) {
+							POP();
+							pushVar(app_context, gprop);
+							if (first_sep_t != NULL) {
+								const char* rest2 = first_sep_t + 1;
+								u32 rest_len2 = target_len - first_len_t - 1;
+								while (rest_len2 > 0) {
 									const char* next_sep2 = NULL;
-									for (u32 ri = 0; ri < rest_len; ri++) {
-										if (rest[ri] == '.' || rest[ri] == ':') { next_sep2 = rest + ri; break; }
+									for (u32 ri = 0; ri < rest_len2; ri++) {
+										if (rest2[ri] == '.' || rest2[ri] == ':') { next_sep2 = rest2 + ri; break; }
 									}
-									u32 seg_len2 = next_sep2 ? (u32)(next_sep2 - rest) : rest_len;
-									if (seg_len2 > 0) { PUSH_STR(rest, seg_len2); actionGetMember(app_context); }
-									if (next_sep2) { rest = next_sep2 + 1; rest_len -= seg_len2 + 1; }
-									else { rest_len = 0; }
+									u32 seg_len2 = next_sep2 ? (u32)(next_sep2 - rest2) : rest_len2;
+									if (seg_len2 > 0) { PUSH_STR(rest2, seg_len2); actionGetMember(app_context); }
+									if (next_sep2) { rest2 = next_sep2 + 1; rest_len2 -= seg_len2 + 1; }
+									else { rest_len2 = 0; }
 								}
+							}
+							if (prop_len > 0) {
+								PUSH_STR(prop_name, prop_len);
+								actionGetMember(app_context);
 							}
 						}
 					}
@@ -38191,10 +38305,26 @@ void actionSetVariable(SWFAppContext* app_context)
 			peekVar(app_context, &value_var);
 			POP_2();
 
+			// Apply Ruffle's resolve_target_path consecutive-separator rules to
+			// the target portion. Catches `obj:::xx` (invalid, silent drop) and
+			// salvages `obj::xx` / `::obj:xx` (valid: trim).
+			const char* target_ptr = var_name;
+			{
+				int _tp_inv = 0; u32 _tp_len = 0;
+				const char* _tp = sanitizeTargetPath(var_name, target_len, &_tp_len, &_tp_inv);
+				if (_tp_inv) {
+					// Invalid path → silent no-op (matches Ruffle: resolve_target_path
+					// returns None → set_variable returns Ok without setting).
+					return;
+				}
+				target_ptr = _tp;
+				target_len = _tp_len;
+			}
+
 #if defined(NO_GRAPHICS) || defined(OFFSCREEN_RENDER)
 			// Resolve target path via resolveFlashPathToMC (first_element=1)
 			MovieClip* ctx = g_current_context ? g_current_context : &root_movieclip;
-			MovieClip* target_mc = resolveFlashPathToMC(app_context, var_name, target_len, ctx, 1);
+			MovieClip* target_mc = resolveFlashPathToMC(app_context, target_ptr, target_len, ctx, 1);
 			if (target_mc != NULL && prop_len > 0) {
 				// Use SetMember semantics (handles MC builtins, dynamic_props, etc.)
 				PUSH(ACTION_STACK_VALUE_MOVIECLIP, (u64)target_mc);
@@ -38206,13 +38336,13 @@ void actionSetVariable(SWFAppContext* app_context)
 #endif
 			// Check if the target path contains a slash (indicating slash-path semantics)
 			{
-				int has_slash_in_target = (memchr(var_name, '/', target_len) != NULL);
+				int has_slash_in_target = (memchr(target_ptr, '/', target_len) != NULL);
 				if (has_slash_in_target) {
 					// Slash-path walk: tokenize using Ruffle rules (dots NOT delimiters
 					// once a slash is seen). For each segment, try MC child lookup first,
 					// then fall back to GetMember (handles dynamic properties).
 					MovieClip* ctx = g_current_context ? g_current_context : &root_movieclip;
-					const char* tp = var_name;
+					const char* tp = target_ptr;
 					u32 tp_remaining = target_len;
 					int is_slash = 0;
 					int first_seg = 1;
@@ -38287,9 +38417,18 @@ void actionSetVariable(SWFAppContext* app_context)
 					pushVar(app_context, &value_var);
 					actionSetMember(app_context);
 				} else {
-					// Non-slash path: use actionGetVariable which handles scope chains,
-					// _global fallback, and dot-path resolution correctly.
-					PUSH_STR(var_name, target_len);
+					// Non-slash path: walk sanitized target_ptr to resolve the
+					// target object, then SetMember(prop_name, value). Empty
+					// sanitized target (e.g. ".foo" → target="") falls through to
+					// the existing scope-chain SetVariable path below.
+					if (target_len == 0) {
+						// Empty target = bare SetVariable on the prop name.
+						PUSH_STR(prop_name, prop_len);
+						pushVar(app_context, &value_var);
+						actionSetVariable(app_context);
+						return;
+					}
+					PUSH_STR(target_ptr, target_len);
 					actionGetVariable(app_context);
 					PUSH_STR(prop_name, prop_len);
 					pushVar(app_context, &value_var);
