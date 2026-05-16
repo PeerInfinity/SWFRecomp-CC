@@ -1382,17 +1382,48 @@ namespace SWFRecomp
 					throw std::exception();
 				}
 
-				if (bitmap_format != 5)
+				// Decode per-format. All paths emit 4-byte RGBA per pixel into
+				// `bitmap_data` and bump `current_bitmap_pixel` once per pixel.
+				size_t expected_size = 0;
+				const u8* zlib_src = (const u8*) cur_pos;
+				size_t zlib_src_size = tag_start_remaining;
+				u16 num_colors = 0;
+
+				switch (bitmap_format)
 				{
-					EXC_ARG("DefineBitsLossless format %d not yet supported (only format 5).\n", bitmap_format);
+					case 3:
+						// ColorMap8: BitmapColorTableSize (UI8) precedes zlib data.
+						if (tag_start_remaining < 1)
+						{
+							EXC_ARG("DefineBitsLossless format 3: missing color table size byte (char_id=%u).\n", char_id);
+						}
+						num_colors = (u16)((u8) cur_pos[0]) + 1;
+						zlib_src += 1;
+						zlib_src_size -= 1;
+						// palette (num_colors * 3) + indexed pixels (row-padded to 4).
+						expected_size = (size_t) num_colors * 3
+									  + (size_t)(((size_t) w + 3) & ~(size_t) 3) * h;
+						break;
+
+					case 4:
+						// Rgb15: 2 bytes per pixel, rows padded to 4 bytes.
+						expected_size = (size_t)(((size_t) w * 2 + 3) & ~(size_t) 3) * h;
+						break;
+
+					case 5:
+						expected_size = (size_t) w * h * 4;
+						break;
+
+					default:
+						EXC_ARG("DefineBitsLossless format %d not supported.\n", bitmap_format);
 				}
 
 				// Remaining data is ZLIB-compressed pixel data
-				uLongf uncompressed_size = (uLongf)(w * h * 4);
+				uLongf uncompressed_size = (uLongf) expected_size;
 				u8* uncompressed = new u8[uncompressed_size];
 
 				int zresult = uncompress(uncompressed, &uncompressed_size,
-				                         (const Bytef*) cur_pos, (uLong) tag_start_remaining);
+				                         (const Bytef*) zlib_src, (uLong) zlib_src_size);
 
 				if (zresult != Z_OK)
 				{
@@ -1408,16 +1439,81 @@ namespace SWFRecomp
 
 				size_t bitmap_start = current_bitmap_pixel;
 
-				// Format 5: PIX24 = [0x00_padding, R, G, B] per pixel
-				for (size_t i = 0; i < (size_t)(w * h * 4); i += 4)
+				switch (bitmap_format)
 				{
-					bitmap_data << std::hex << std::uppercase << std::setw(2)
-								<< "\t0x" << (u32) uncompressed[i + 1] << "," << endl
-								<< "\t0x" << (u32) uncompressed[i + 2] << "," << endl
-								<< "\t0x" << (u32) uncompressed[i + 3] << "," << endl
-								<< "\t0xFF," << endl;
+					case 3:
+					{
+						// ColorMap8 (Lossless1): out-of-range index → black.
+						size_t row_stride = ((size_t) w + 3) & ~(size_t) 3;
+						const u8* palette = uncompressed;
+						const u8* pixels = uncompressed + (size_t) num_colors * 3;
+						for (size_t y = 0; y < (size_t) h; ++y)
+						{
+							for (size_t x = 0; x < (size_t) w; ++x)
+							{
+								u8 idx = pixels[y * row_stride + x];
+								u8 r = 0, g = 0, b = 0;
+								if (idx < num_colors)
+								{
+									r = palette[(size_t) idx * 3 + 0];
+									g = palette[(size_t) idx * 3 + 1];
+									b = palette[(size_t) idx * 3 + 2];
+								}
+								bitmap_data << std::hex << std::uppercase << std::setw(2)
+											<< "\t0x" << (u32) r << "," << endl
+											<< "\t0x" << (u32) g << "," << endl
+											<< "\t0x" << (u32) b << "," << endl
+											<< "\t0xFF," << endl;
+								current_bitmap_pixel += 1;
+							}
+						}
+						break;
+					}
 
-					current_bitmap_pixel += 1;
+					case 4:
+					{
+						// Rgb15 (Lossless1): big-endian u16, 1pad/5R/5G/5B, 5→8 = (c*255+15)/31.
+						size_t row_stride = ((size_t) w * 2 + 3) & ~(size_t) 3;
+						for (size_t y = 0; y < (size_t) h; ++y)
+						{
+							for (size_t x = 0; x < (size_t) w; ++x)
+							{
+								u8 hi = uncompressed[y * row_stride + x * 2 + 0];
+								u8 lo = uncompressed[y * row_stride + x * 2 + 1];
+								u16 px = ((u16) hi << 8) | (u16) lo;
+								u8 r5 = (px >> 10) & 0x1F;
+								u8 g5 = (px >> 5) & 0x1F;
+								u8 b5 = px & 0x1F;
+								u8 r = (u8)(((u32) r5 * 255 + 15) / 31);
+								u8 g = (u8)(((u32) g5 * 255 + 15) / 31);
+								u8 b = (u8)(((u32) b5 * 255 + 15) / 31);
+								bitmap_data << std::hex << std::uppercase << std::setw(2)
+											<< "\t0x" << (u32) r << "," << endl
+											<< "\t0x" << (u32) g << "," << endl
+											<< "\t0x" << (u32) b << "," << endl
+											<< "\t0xFF," << endl;
+								current_bitmap_pixel += 1;
+							}
+						}
+						break;
+					}
+
+					case 5:
+					default:
+					{
+						// PIX24 = [0x00_padding, R, G, B] per pixel
+						for (size_t i = 0; i < (size_t)(w * h * 4); i += 4)
+						{
+							bitmap_data << std::hex << std::uppercase << std::setw(2)
+										<< "\t0x" << (u32) uncompressed[i + 1] << "," << endl
+										<< "\t0x" << (u32) uncompressed[i + 2] << "," << endl
+										<< "\t0x" << (u32) uncompressed[i + 3] << "," << endl
+										<< "\t0xFF," << endl;
+
+							current_bitmap_pixel += 1;
+						}
+						break;
+					}
 				}
 
 				delete[] uncompressed;
@@ -1477,22 +1573,60 @@ namespace SWFRecomp
 					throw std::exception();
 				}
 
-				if (bitmap_format != 5)
+				// Decode per-format. All paths emit 4-byte RGBA per pixel.
+				// Format 4 is invalid in DefineBitsLossless2 per spec — we warn and
+				// emit a fully-transparent bitmap rather than throw.
+				size_t expected_size = 0;
+				const u8* zlib_src = (const u8*) cur_pos;
+				size_t zlib_src_size = tag_start_remaining;
+				u16 num_colors = 0;
+				bool emit_transparent_placeholder = false;
+
+				switch (bitmap_format)
 				{
-					EXC_ARG("DefineBitsLossless2 format %d not yet supported (only format 5).\n", bitmap_format);
+					case 3:
+						// ColorMap8 (alpha): BitmapColorTableSize (UI8) precedes zlib data.
+						if (tag_start_remaining < 1)
+						{
+							EXC_ARG("DefineBitsLossless2 format 3: missing color table size byte (char_id=%u).\n", char_id);
+						}
+						num_colors = (u16)((u8) cur_pos[0]) + 1;
+						zlib_src += 1;
+						zlib_src_size -= 1;
+						// palette (num_colors * 4 RGBA) + indexed pixels (row-padded to 4).
+						expected_size = (size_t) num_colors * 4
+									  + (size_t)(((size_t) w + 3) & ~(size_t) 3) * h;
+						break;
+
+					case 4:
+						// Invalid for DefineBitsLossless2. Emit transparent placeholder.
+						fprintf(stderr, "DefineBitsLossless2 format 4 is invalid per spec; emitting transparent bitmap (char_id=%u).\n", char_id);
+						emit_transparent_placeholder = true;
+						expected_size = 0;
+						break;
+
+					case 5:
+						expected_size = (size_t) w * h * 4;
+						break;
+
+					default:
+						EXC_ARG("DefineBitsLossless2 format %d not supported.\n", bitmap_format);
 				}
 
-				// Remaining data is ZLIB-compressed pixel data
-				uLongf uncompressed_size = (uLongf)(w * h * 4);
-				u8* uncompressed = new u8[uncompressed_size];
-
-				int zresult = uncompress(uncompressed, &uncompressed_size,
-				                         (const Bytef*) cur_pos, (uLong) tag_start_remaining);
-
-				if (zresult != Z_OK)
+				u8* uncompressed = NULL;
+				if (!emit_transparent_placeholder)
 				{
-					delete[] uncompressed;
-					EXC_ARG("DefineBitsLossless2: ZLIB decompression failed (code %d).\n", zresult);
+					uLongf uncompressed_size = (uLongf) expected_size;
+					uncompressed = new u8[uncompressed_size];
+
+					int zresult = uncompress(uncompressed, &uncompressed_size,
+					                         (const Bytef*) zlib_src, (uLong) zlib_src_size);
+
+					if (zresult != Z_OK)
+					{
+						delete[] uncompressed;
+						EXC_ARG("DefineBitsLossless2: ZLIB decompression failed (code %d).\n", zresult);
+					}
 				}
 
 				Vertex v;
@@ -1503,16 +1637,69 @@ namespace SWFRecomp
 
 				size_t bitmap_start = current_bitmap_pixel;
 
-				// Format 5: ALPHACOLORMAPDATA/ALPHARGB = [A, R, G, B] per pixel
-				for (size_t i = 0; i < (size_t)(w * h * 4); i += 4)
+				if (emit_transparent_placeholder)
 				{
-					bitmap_data << std::hex << std::uppercase << std::setw(2)
-								<< "\t0x" << (u32) uncompressed[i + 1] << "," << endl
-								<< "\t0x" << (u32) uncompressed[i + 2] << "," << endl
-								<< "\t0x" << (u32) uncompressed[i + 3] << "," << endl
-								<< "\t0x" << (u32) uncompressed[i + 0] << "," << endl;
+					for (size_t i = 0; i < (size_t) w * (size_t) h; ++i)
+					{
+						bitmap_data << "\t0x0," << endl
+									<< "\t0x0," << endl
+									<< "\t0x0," << endl
+									<< "\t0x0," << endl;
+						current_bitmap_pixel += 1;
+					}
+				}
+				else
+				{
+					switch (bitmap_format)
+					{
+						case 3:
+						{
+							// ColorMap8 (alpha): palette is num_colors * 4 RGBA;
+							// out-of-range index → fully transparent.
+							size_t row_stride = ((size_t) w + 3) & ~(size_t) 3;
+							const u8* palette = uncompressed;
+							const u8* pixels = uncompressed + (size_t) num_colors * 4;
+							for (size_t y = 0; y < (size_t) h; ++y)
+							{
+								for (size_t x = 0; x < (size_t) w; ++x)
+								{
+									u8 idx = pixels[y * row_stride + x];
+									u8 r = 0, g = 0, b = 0, a = 0;
+									if (idx < num_colors)
+									{
+										r = palette[(size_t) idx * 4 + 0];
+										g = palette[(size_t) idx * 4 + 1];
+										b = palette[(size_t) idx * 4 + 2];
+										a = palette[(size_t) idx * 4 + 3];
+									}
+									bitmap_data << std::hex << std::uppercase << std::setw(2)
+												<< "\t0x" << (u32) r << "," << endl
+												<< "\t0x" << (u32) g << "," << endl
+												<< "\t0x" << (u32) b << "," << endl
+												<< "\t0x" << (u32) a << "," << endl;
+									current_bitmap_pixel += 1;
+								}
+							}
+							break;
+						}
 
-					current_bitmap_pixel += 1;
+						case 5:
+						default:
+						{
+							// ALPHACOLORMAPDATA/ALPHARGB = [A, R, G, B] per pixel
+							for (size_t i = 0; i < (size_t)(w * h * 4); i += 4)
+							{
+								bitmap_data << std::hex << std::uppercase << std::setw(2)
+											<< "\t0x" << (u32) uncompressed[i + 1] << "," << endl
+											<< "\t0x" << (u32) uncompressed[i + 2] << "," << endl
+											<< "\t0x" << (u32) uncompressed[i + 3] << "," << endl
+											<< "\t0x" << (u32) uncompressed[i + 0] << "," << endl;
+
+								current_bitmap_pixel += 1;
+							}
+							break;
+						}
+					}
 				}
 
 				delete[] uncompressed;
