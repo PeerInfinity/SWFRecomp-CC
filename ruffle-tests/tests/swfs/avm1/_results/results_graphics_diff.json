@@ -1,65 +1,97 @@
 {
   "metadata": {
-    "old_timestamp": "2026-05-14T21:43:11.700776+00:00",
-    "old_git_sha": "17a60dbb6837a691a8d906f561e2b48aeb00b7cc",
-    "new_timestamp": "2026-05-15T03:20:32.428760+00:00",
-    "new_git_sha": "45164a5b08549544af474e9761f18537e996d071",
+    "old_timestamp": "2026-05-15T03:20:32.428760+00:00",
+    "old_git_sha": "45164a5b08549544af474e9761f18537e996d071",
+    "new_timestamp": "2026-05-16T20:55:02.523668+00:00",
+    "new_git_sha": "ef6584787e7ec5f691bbe9feb9b999435dae55f5",
     "partial": false,
     "same_commit": false
   },
   "summary": {
-    "old_pass": 605,
+    "old_pass": 604,
     "old_ruffle_matched": 11,
-    "old_effective_pass": 616,
+    "old_effective_pass": 615,
     "old_total": 654,
-    "old_pass_rate": 92.5,
-    "new_pass": 604,
+    "old_pass_rate": 92.4,
+    "new_pass": 601,
     "new_ruffle_matched": 11,
-    "new_effective_pass": 615,
-    "new_total": 654,
-    "new_pass_rate": 92.4,
-    "old_mismatched_lines": 9175,
-    "new_mismatched_lines": 9290,
-    "increased_mismatches": 115,
+    "new_effective_pass": 612,
+    "new_total": 655,
+    "new_pass_rate": 91.8,
+    "old_mismatched_lines": 9290,
+    "new_mismatched_lines": 9292,
+    "increased_mismatches": 0,
     "decreased_mismatches": 0,
     "newly_passing": 0,
-    "newly_failing": 1,
-    "status_changed": 2,
-    "unchanged": 652,
-    "added": 0,
+    "newly_failing": 3,
+    "status_changed": 3,
+    "unchanged": 650,
+    "added": 1,
     "removed": 0
   },
   "changes": [
     {
-      "test": "native_objects_swf6",
+      "test": "action_to_integer",
+      "change_type": "changed",
+      "old_status": "pass",
+      "new_status": "runtime_error",
+      "old_lines": {
+        "actual_lines": 28,
+        "expected_lines": 28,
+        "matching_lines": 28
+      },
+      "new_lines": null
+    },
+    {
+      "test": "as2_super_and_this_v8",
+      "change_type": "changed",
+      "old_status": "pass",
+      "new_status": "runtime_error",
+      "old_lines": {
+        "actual_lines": 85,
+        "expected_lines": 85,
+        "matching_lines": 85
+      },
+      "new_lines": null
+    },
+    {
+      "test": "as2_super_via_manual_prototype",
+      "change_type": "changed",
+      "old_status": "pass",
+      "new_status": "runtime_error",
+      "old_lines": {
+        "actual_lines": 40,
+        "expected_lines": 40,
+        "matching_lines": 40
+      },
+      "new_lines": null
+    },
+    {
+      "test": "global_proto_decls_delete",
       "change_type": "changed",
       "old_status": "output_mismatch",
-      "new_status": "segfault",
+      "new_status": "output_mismatch",
       "old_lines": {
-        "actual_lines": 115,
-        "expected_lines": 115,
-        "matching_lines": 114
+        "actual_lines": 2370,
+        "expected_lines": 4158,
+        "matching_lines": 386
       },
       "new_lines": {
-        "actual_lines": 1,
-        "expected_lines": 115,
-        "matching_lines": 1
+        "actual_lines": 2371,
+        "expected_lines": 4158,
+        "matching_lines": 386
       }
     },
     {
-      "test": "swf5_xml_event_handler_context",
-      "change_type": "changed",
-      "old_status": "pass",
+      "test": "sound_gettransform_props",
+      "change_type": "added",
+      "old_status": null,
       "new_status": "output_mismatch",
-      "old_lines": {
-        "actual_lines": 2,
-        "expected_lines": 2,
-        "matching_lines": 2
-      },
+      "old_lines": null,
       "new_lines": {
-        "actual_lines": 3,
-        "expected_lines": 2,
-        "matching_lines": 0
+        "actual_lines": 4,
+        "expected_lines": 4,
+        "matching_lines": 2
       }
     }
   ]
