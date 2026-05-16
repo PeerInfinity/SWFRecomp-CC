@@ -1,0 +1,23 @@
+{
+  "metadata": {
+    "name": "jpeg_mid_stream_eoi_soi",
+    "description": "Regression: DefineBitsJPEG2 payload with spurious FF D9 FF D8 (EOI+SOI) sequence injected between encoding tables and SOF0 marker. Verifies stripInvalidJpegMarkers walker (Ruffle remove_invalid_jpeg_data port).",
+    "swf_version": 8,
+    "fully_implemented": true
+  },
+  "opcodes": {
+    "tested": [],
+    "supporting": []
+  },
+  "execution": {
+    "type": "deterministic"
+  },
+  "graphics": {
+    "tested": [
+      "DEFINE_SHAPE",
+      "DEFINE_BITS_JPEG2",
+      "CLIPPED_BITMAP",
+      "STRAIGHT_EDGE"
+    ]
+  }
+}

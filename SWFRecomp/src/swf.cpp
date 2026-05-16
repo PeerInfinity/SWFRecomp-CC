@@ -2,6 +2,7 @@
 #include <algorithm>
 #include <array>
 #include <cmath>
+#include <cstring>
 #include <iomanip>
 #include <sstream>
 
@@ -100,6 +101,92 @@ static bool loadDeviceFont()
 	g_device_font_ok = stbtt_InitFont(&g_device_font, g_device_font_data,
 		stbtt_GetFontOffsetForIndex(g_device_font_data, 0)) != 0;
 	return g_device_font_ok;
+}
+
+// ---------------------------------------------------------------------------
+// JPEG / image-data helpers for DefineBits{,JPEG2,JPEG3,JPEG4}.
+// ---------------------------------------------------------------------------
+
+enum class JpegTagFormat { Jpeg, Png, Gif, Unknown };
+
+static JpegTagFormat detectImageFormat(const unsigned char* data, size_t len)
+{
+	if (len >= 2 && data[0] == 0xFF && data[1] == 0xD8) return JpegTagFormat::Jpeg;
+	if (len >= 4 && data[0] == 0xFF && data[1] == 0xD9
+		&& data[2] == 0xFF && data[3] == 0xD8) return JpegTagFormat::Jpeg;
+	static const unsigned char PNG_MAGIC[8] = {0x89,0x50,0x4E,0x47,0x0D,0x0A,0x1A,0x0A};
+	if (len >= 8 && memcmp(data, PNG_MAGIC, 8) == 0) return JpegTagFormat::Png;
+	if (len >= 6 && data[0] == 0x47 && data[1] == 0x49 && data[2] == 0x46
+		&& data[3] == 0x38 && (data[4] == 0x37 || data[4] == 0x39)
+		&& data[5] == 0x61) return JpegTagFormat::Gif;
+	return JpegTagFormat::Unknown;
+}
+
+// Splice a spurious FF D9 FF D8 (EOI+SOI) sequence out of JPEG data wherever
+// it appears before the SOF0 marker. Per Ruffle's remove_invalid_jpeg_data
+// (render/src/utils.rs:84 — see ruffle-rs/ruffle#8775). Mutates `len` and
+// the buffer in place via memmove. Safe no-op if no such sequence found
+// before SOF0, or if marker parsing gets confused — bails defensively.
+static bool stripInvalidJpegMarkers(unsigned char* data, size_t& len)
+{
+	const unsigned char SOI = 0xD8;
+	const unsigned char EOI = 0xD9;
+	const unsigned char SOF0 = 0xC0;
+
+	// Fast path: strip a single leading FF D9 FF D8 by memmoving down 4.
+	// (We may still need the walker below if a *second* spurious sequence
+	// sits mid-stream — rare but cheap to check.)
+	bool stripped_leading = false;
+	if (len >= 4 && data[0] == 0xFF && data[1] == EOI
+		&& data[2] == 0xFF && data[3] == SOI)
+	{
+		memmove(data, data + 4, len - 4);
+		len -= 4;
+		stripped_leading = true;
+	}
+
+	// Walk markers looking for an interior EOI+SOI before SOF0.
+	size_t pos = 0;
+	while (pos + 4 <= len)
+	{
+		if (data[pos] != 0xFF) return stripped_leading; // not a JPEG / lost the thread
+		unsigned char m = data[pos + 1];
+
+		if (m == EOI && data[pos + 2] == 0xFF && data[pos + 3] == SOI)
+		{
+			// Splice out these 4 bytes.
+			memmove(data + pos, data + pos + 4, len - pos - 4);
+			len -= 4;
+			return true;
+		}
+
+		if (m == SOF0) return stripped_leading; // reached real frame header
+		if (m == SOI || m == EOI || (m >= 0xD0 && m <= 0xD7))
+		{
+			// Standalone marker, no payload length.
+			pos += 2;
+			continue;
+		}
+
+		// Segment with length: [FF mm len_hi len_lo ...] — length includes its own 2 bytes.
+		size_t seg_len = ((size_t) data[pos + 2] << 8) | (size_t) data[pos + 3];
+		if (seg_len < 2 || pos + 2 + seg_len > len) return stripped_leading; // malformed; bail
+		pos += 2 + seg_len;
+	}
+
+	return stripped_leading;
+}
+
+// Some JPEGs are missing the trailing FF D9 (optimizers strip it). stb_image
+// can refuse those, so glue one on if absent. Caller passes a buffer that
+// has room for +2 bytes; if it doesn't, returns false without writing.
+static bool appendTrailingEoiIfMissing(unsigned char* data, size_t& len, size_t cap)
+{
+	if (len >= 2 && data[len - 2] == 0xFF && data[len - 1] == 0xD9) return false;
+	if (len + 2 > cap) return false;
+	data[len++] = 0xFF;
+	data[len++] = 0xD9;
+	return true;
 }
 
 #define NOT_SHARED_LINKS(path1, path2) (std::find(path1.next_neighbors_forward.begin(), path1.next_neighbors_forward.end(), &path2) == path1.next_neighbors_forward.end() && \
@@ -1018,64 +1105,82 @@ namespace SWFRecomp
 			
 			case SWF_TAG_DEFINE_BITS:
 			{
-				if (jpeg_tables == nullptr)
-				{
-					EXC("JPEG bitmap tag encountered before JPEGTables!\n");
-				}
-				
 				size_t new_length = tag.length;
-				
+
 				tag.clearFields();
 				tag.setFieldCount(1);
-				
+
 				tag.configureNextField(SWF_FIELD_UI16);
-				
+
 				tag.parseFields(cur_pos);
-				
+
 				u16 char_id = (u16) tag.fields[0].value;
 				new_length -= 2;
 
 				// Register bitmap char_id for place-before-define tracking.
 				defined_chars.insert(char_id);
 
-				// stupid swf edge cases are stupid
-				if ((u8) cur_pos[0] == 0xFF &&
+				bool have_tables = (jpeg_tables != nullptr && jpeg_tables_size >= 2);
+
+				// Strip an erroneous leading EOI+SOI (or bare SOI) from the payload
+				// — matches Ruffle's glue_tables_to_jpeg behavior of stripping
+				// jpeg_data[..2] when tables are present. When tables are absent
+				// we only strip the erroneous EOI of FF D9 FF D8; the SOI must
+				// stay to mark a valid standalone JPEG.
+				if (new_length >= 4 &&
+					(u8) cur_pos[0] == 0xFF &&
 					(u8) cur_pos[1] == 0xD9 &&
 					(u8) cur_pos[2] == 0xFF &&
 					(u8) cur_pos[3] == 0xD8)
 				{
-					cur_pos += 4;
-					new_length -= 4;
+					if (have_tables) { cur_pos += 4; new_length -= 4; }
+					else             { cur_pos += 2; new_length -= 2; }
 				}
-				
-				else if ((u8) cur_pos[0] == 0xFF &&
-						 (u8) cur_pos[1] == 0xD8)
+				else if (have_tables && new_length >= 2 &&
+						 (u8) cur_pos[0] == 0xFF && (u8) cur_pos[1] == 0xD8)
 				{
 					cur_pos += 2;
 					new_length -= 2;
 				}
-				
-				size_t jpeg_data_size = new_length + jpeg_tables_size;
-				u8* jpeg_data = new u8[jpeg_data_size];
-				
-				for (size_t i = 0; i < jpeg_tables_size; ++i)
+
+				// Build a writable JPEG buffer. With tables: glue tables + data.
+				// Without tables: treat data as self-contained. Reserve +2 bytes
+				// of slack so appendTrailingEoiIfMissing can append in place.
+				size_t prefix_size = have_tables ? jpeg_tables_size : 0;
+				size_t jpeg_data_size = new_length + prefix_size;
+				size_t jpeg_data_cap = jpeg_data_size + 2;
+				u8* jpeg_data = new u8[jpeg_data_cap];
+
+				if (have_tables)
 				{
-					jpeg_data[i] = jpeg_tables[i];
+					for (size_t i = 0; i < jpeg_tables_size; ++i)
+					{
+						jpeg_data[i] = jpeg_tables[i];
+					}
 				}
-				
-				for (size_t i = jpeg_tables_size; i < jpeg_data_size; ++i)
+				else
 				{
-					jpeg_data[i] = cur_pos[i - jpeg_tables_size];
+					fprintf(stderr, "DefineBits char_id=%u: no JPEGTables available, decoding as self-contained JPEG.\n", char_id);
 				}
-				
+
+				for (size_t i = 0; i < new_length; ++i)
+				{
+					jpeg_data[prefix_size + i] = (u8) cur_pos[i];
+				}
+
+				// Splice mid-stream FF D9 FF D8, then ensure trailing FF D9.
+				stripInvalidJpegMarkers(jpeg_data, jpeg_data_size);
+				appendTrailingEoiIfMissing(jpeg_data, jpeg_data_size, jpeg_data_cap);
+
 				int w;
 				int h;
 				int comp;
 				u8* decompressed = stbi_load_from_memory(jpeg_data, (int) jpeg_data_size, &w, &h, &comp, 3);
-				
+
 				if (decompressed == nullptr)
 				{
-					EXC("JPEG data returned NULL.\n");
+					delete[] jpeg_data;
+					EXC_ARG("DefineBits char_id=%u: stbi_load_from_memory failed.\n", char_id);
 				}
 				
 				Vertex v;
@@ -1109,12 +1214,15 @@ namespace SWFRecomp
 						 << ");";
 				
 				current_bitmap += 1;
-				
+
+				stbi_image_free(decompressed);
+				delete[] jpeg_data;
+
 				cur_pos += new_length;
-				
+
 				break;
 			}
-			
+
 			case SWF_TAG_DEFINE_BITS_JPEG2:
 			{
 				size_t new_length = tag.length;
@@ -1132,25 +1240,46 @@ namespace SWFRecomp
 				// Register bitmap char_id for place-before-define tracking.
 				defined_chars.insert(char_id);
 
-				// Strip erroneous EOI+SOI marker (FF D9 FF D8) if present
-				// Tag 21 is self-contained, so a leading FF D8 alone is the valid SOI
-				if ((u8) cur_pos[0] == 0xFF &&
-					(u8) cur_pos[1] == 0xD9 &&
-					(u8) cur_pos[2] == 0xFF &&
-					(u8) cur_pos[3] == 0xD8)
+				// SWF8+ DefineBitsJPEG2 can hold PNG or GIF data per the spec.
+				JpegTagFormat fmt = detectImageFormat((const unsigned char*) cur_pos, new_length);
+
+				int w = 0, h = 0, comp = 0;
+				u8* decompressed = nullptr;
+				u8* work_buf = nullptr;        // writable JPEG buffer (heap-owned)
+				int decoded_channels = 3;      // 3 for JPEG (we synth alpha), 4 for PNG/GIF
+
+				if (fmt == JpegTagFormat::Jpeg)
 				{
-					cur_pos += 4;
-					new_length -= 4;
+					// Copy into a writable buffer with +2 bytes of slack for trailing-EOI.
+					size_t cap = new_length + 2;
+					work_buf = new u8[cap];
+					memcpy(work_buf, cur_pos, new_length);
+					size_t len = new_length;
+
+					stripInvalidJpegMarkers(work_buf, len);
+					appendTrailingEoiIfMissing(work_buf, len, cap);
+
+					decompressed = stbi_load_from_memory(work_buf, (int) len, &w, &h, &comp, 3);
+					if (decompressed == nullptr)
+					{
+						delete[] work_buf;
+						EXC_ARG("DefineBitsJPEG2 char_id=%u: stbi_load_from_memory failed.\n", char_id);
+					}
 				}
-
-				int w;
-				int h;
-				int comp;
-				u8* decompressed = stbi_load_from_memory((u8*) cur_pos, (int) new_length, &w, &h, &comp, 3);
-
-				if (decompressed == nullptr)
+				else if (fmt == JpegTagFormat::Png || fmt == JpegTagFormat::Gif)
 				{
-					EXC("JPEG2 data returned NULL.\n");
+					fprintf(stderr, "DefineBitsJPEG2 char_id=%u: %s data; decoding with stb_image.\n",
+							char_id, fmt == JpegTagFormat::Png ? "PNG" : "GIF");
+					decompressed = stbi_load_from_memory((const u8*) cur_pos, (int) new_length, &w, &h, &comp, 4);
+					decoded_channels = 4;
+					if (decompressed == nullptr)
+					{
+						EXC_ARG("DefineBitsJPEG2 char_id=%u: stbi_load_from_memory failed on PNG/GIF.\n", char_id);
+					}
+				}
+				else
+				{
+					EXC_ARG("DefineBitsJPEG2 char_id=%u: unknown image format (magic bytes do not match JPEG/PNG/GIF).\n", char_id);
 				}
 
 				Vertex v;
@@ -1161,13 +1290,15 @@ namespace SWFRecomp
 
 				size_t bitmap_start = current_bitmap_pixel;
 
-				for (size_t i = 0; i < 3*w*h; i += 3)
+				for (size_t i = 0; i < (size_t)(w * h); ++i)
 				{
+					const u8* px = decompressed + (size_t) i * decoded_channels;
+					u8 a = (decoded_channels == 4) ? px[3] : 0xFF;
 					bitmap_data << std::hex << std::uppercase << std::setw(2)
-								<< "\t0x" << (u32) decompressed[i] << "," << endl
-								<< "\t0x" << (u32) decompressed[i + 1] << "," << endl
-								<< "\t0x" << (u32) decompressed[i + 2] << "," << endl
-								<< "\t0xFF," << endl;
+								<< "\t0x" << (u32) px[0] << "," << endl
+								<< "\t0x" << (u32) px[1] << "," << endl
+								<< "\t0x" << (u32) px[2] << "," << endl
+								<< "\t0x" << (u32) a << "," << endl;
 
 					current_bitmap_pixel += 1;
 				}
@@ -1186,6 +1317,7 @@ namespace SWFRecomp
 				current_bitmap += 1;
 
 				stbi_image_free(decompressed);
+				if (work_buf != nullptr) delete[] work_buf;
 
 				cur_pos += new_length;
 
@@ -1232,46 +1364,74 @@ namespace SWFRecomp
 					new_length -= 2;
 				}
 
-				// JPEG data is alpha_data_offset bytes, alpha data follows
-				char* jpeg_start = cur_pos;
+				// JPEG data is alpha_data_offset bytes; alpha data follows.
+				const u8* jpeg_src = (const u8*) cur_pos;
 				size_t jpeg_len = alpha_data_offset;
 
-				// Strip erroneous EOI+SOI marker (FF D9 FF D8) if present
-				if (jpeg_len >= 4 &&
-					(u8) jpeg_start[0] == 0xFF &&
-					(u8) jpeg_start[1] == 0xD9 &&
-					(u8) jpeg_start[2] == 0xFF &&
-					(u8) jpeg_start[3] == 0xD8)
+				JpegTagFormat fmt = detectImageFormat(jpeg_src, jpeg_len);
+				const char* tag_name = is_jpeg4 ? "DefineBitsJPEG4" : "DefineBitsJPEG3";
+
+				int w = 0, h = 0, comp = 0;
+				u8* decompressed = nullptr;
+				u8* work_buf = nullptr;
+				int decoded_channels = 3;
+
+				if (fmt == JpegTagFormat::Jpeg)
 				{
-					jpeg_start += 4;
-					jpeg_len -= 4;
+					size_t cap = jpeg_len + 2;
+					work_buf = new u8[cap];
+					memcpy(work_buf, jpeg_src, jpeg_len);
+					size_t len = jpeg_len;
+
+					stripInvalidJpegMarkers(work_buf, len);
+					appendTrailingEoiIfMissing(work_buf, len, cap);
+
+					decompressed = stbi_load_from_memory(work_buf, (int) len, &w, &h, &comp, 3);
+					if (decompressed == nullptr)
+					{
+						delete[] work_buf;
+						EXC_ARG((std::string(tag_name) + " char_id=%u: stbi_load_from_memory failed.\n").c_str(), char_id);
+					}
+				}
+				else if (fmt == JpegTagFormat::Png || fmt == JpegTagFormat::Gif)
+				{
+					fprintf(stderr, "%s char_id=%u: %s data (alpha section ignored).\n",
+							tag_name, char_id, fmt == JpegTagFormat::Png ? "PNG" : "GIF");
+					decompressed = stbi_load_from_memory(jpeg_src, (int) jpeg_len, &w, &h, &comp, 4);
+					decoded_channels = 4;
+					if (decompressed == nullptr)
+					{
+						EXC_ARG((std::string(tag_name) + " char_id=%u: stbi_load_from_memory failed on PNG/GIF.\n").c_str(), char_id);
+					}
+				}
+				else
+				{
+					EXC_ARG((std::string(tag_name) + " char_id=%u: unknown image format.\n").c_str(), char_id);
 				}
 
-				int w;
-				int h;
-				int comp;
-				u8* decompressed = stbi_load_from_memory((u8*) jpeg_start, (int) jpeg_len, &w, &h, &comp, 3);
-
-				if (decompressed == nullptr)
+				// Decompress zlib alpha data — only for true JPEG content.
+				u8* alpha_data = nullptr;
+				bool have_alpha = (fmt == JpegTagFormat::Jpeg);
+				if (have_alpha)
 				{
-					EXC("JPEG3 data returned NULL.\n");
-				}
+					char* alpha_compressed = cur_pos + alpha_data_offset;
+					size_t alpha_compressed_len = new_length - alpha_data_offset;
 
-				// Decompress zlib alpha data
-				char* alpha_compressed = cur_pos + alpha_data_offset;
-				size_t alpha_compressed_len = new_length - alpha_data_offset;
+					uLongf alpha_size = (uLongf)(w * h);
+					alpha_data = new u8[alpha_size];
 
-				uLongf alpha_size = (uLongf)(w * h);
-				u8* alpha_data = new u8[alpha_size];
+					int zresult = uncompress(alpha_data, &alpha_size,
+					                         (const Bytef*) alpha_compressed, (uLong) alpha_compressed_len);
 
-				int zresult = uncompress(alpha_data, &alpha_size,
-				                         (const Bytef*) alpha_compressed, (uLong) alpha_compressed_len);
-
-				if (zresult != Z_OK)
-				{
-					stbi_image_free(decompressed);
-					delete[] alpha_data;
-					EXC_ARG("JPEG3: ZLIB alpha decompression failed (code %d).\n", zresult);
+					if (zresult != Z_OK)
+					{
+						stbi_image_free(decompressed);
+						delete[] alpha_data;
+						if (work_buf != nullptr) delete[] work_buf;
+						fprintf(stderr, "%s char_id=%u: ZLIB alpha decompression failed (code %d).\n",
+								tag_name, char_id, zresult);
+						throw std::exception();
+					}
 				}
 
 				Vertex v;
@@ -1284,11 +1444,17 @@ namespace SWFRecomp
 
 				for (size_t i = 0; i < (size_t)(w * h); i++)
 				{
+					const u8* px = decompressed + i * (size_t) decoded_channels;
+					u8 a;
+					if (have_alpha)            a = alpha_data[i];
+					else if (decoded_channels == 4) a = px[3];
+					else                       a = 0xFF;
+
 					bitmap_data << std::hex << std::uppercase << std::setw(2)
-								<< "\t0x" << (u32) decompressed[3*i] << "," << endl
-								<< "\t0x" << (u32) decompressed[3*i + 1] << "," << endl
-								<< "\t0x" << (u32) decompressed[3*i + 2] << "," << endl
-								<< "\t0x" << (u32) alpha_data[i] << "," << endl;
+								<< "\t0x" << (u32) px[0] << "," << endl
+								<< "\t0x" << (u32) px[1] << "," << endl
+								<< "\t0x" << (u32) px[2] << "," << endl
+								<< "\t0x" << (u32) a << "," << endl;
 
 					current_bitmap_pixel += 1;
 				}
@@ -1307,7 +1473,8 @@ namespace SWFRecomp
 				current_bitmap += 1;
 
 				stbi_image_free(decompressed);
-				delete[] alpha_data;
+				if (alpha_data != nullptr) delete[] alpha_data;
+				if (work_buf != nullptr) delete[] work_buf;
 
 				cur_pos += new_length;
 
@@ -1316,13 +1483,25 @@ namespace SWFRecomp
 
 			case SWF_TAG_JPEG_TABLES:
 			{
-				if (jpeg_tables != nullptr)
+				// Allow a later non-empty JPEGTables to supersede an earlier
+				// degenerate one (length < 2). A real duplicate is still an error.
+				if (jpeg_tables != nullptr && jpeg_tables_size > 0)
 				{
 					EXC("More than one JPEGTables tag detected.\n");
 				}
-				
+
 				size_t new_length = tag.length;
-				
+
+				// Degenerate / empty JPEGTables (Castle_Hero has one with length=0).
+				// Leave tables null; DefineBits will fall back to self-contained decode.
+				if (new_length < 2)
+				{
+					fprintf(stderr, "JPEGTables: empty tag (length=%zu); treating as no tables.\n", new_length);
+					if (jpeg_tables == nullptr) { jpeg_tables_size = 0; }
+					cur_pos += new_length;
+					break;
+				}
+
 				if ((u8) cur_pos[0] == 0xFF &&
 					(u8) cur_pos[1] == 0xD9 &&
 					(u8) cur_pos[2] == 0xFF &&
@@ -1331,17 +1510,34 @@ namespace SWFRecomp
 					cur_pos += 2;
 					new_length -= 2;
 				}
-				
+
+				if (new_length < 2)
+				{
+					// Was just "FF D9 FF D8" with nothing useful — same fallback.
+					fprintf(stderr, "JPEGTables: only erroneous EOI+SOI present; treating as no tables.\n");
+					if (jpeg_tables == nullptr) { jpeg_tables_size = 0; }
+					cur_pos += new_length;
+					break;
+				}
+
+				// Free any prior degenerate-empty tables before replacing.
+				if (jpeg_tables != nullptr) { delete[] jpeg_tables; jpeg_tables = nullptr; }
+
 				jpeg_tables = new u8[new_length - 2];
 				jpeg_tables_size = new_length - 2;
-				
+
 				for (size_t i = 0; i < new_length - 2; ++i)
 				{
 					jpeg_tables[i] = cur_pos[i];
 				}
-				
+
+				// Strip any mid-stream FF D9 FF D8 within the tables prelude
+				// (rare, but the same defect documented for DefineBits payloads
+				// could in principle appear here too).
+				stripInvalidJpegMarkers(jpeg_tables, jpeg_tables_size);
+
 				cur_pos += new_length;
-				
+
 				break;
 			}
 			
