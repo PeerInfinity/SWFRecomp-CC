@@ -4261,6 +4261,13 @@ static ASFunction g_color_methods[4];  // getTransform, setTransform, getRGB, se
 static int g_color_init_done = 0;
 
 // ============================================================================
+// flash.geom.Transform global (prototype is owned by `fc_Transform` set up in
+// ensureGlobalInit; this cache lets createTransformObject reach the prototype
+// without re-walking the flash.geom namespace).
+// ============================================================================
+static ASObject* g_transform_prototype = NULL;
+
+// ============================================================================
 // flash.geom.ColorTransform globals
 // ============================================================================
 static ASObject* g_color_transform_prototype = NULL;
@@ -7984,7 +7991,14 @@ static ASObject* createTransformObject(SWFAppContext* app_context, MovieClip* mc
 
 	ASObject* transform = allocObject(app_context, 8);
 	transform->native_type = NATIVE_TRANSFORM;
-	setObjectProto(app_context, transform);
+	if (g_transform_prototype != NULL) {
+		ActionVar proto_var = {0};
+		proto_var.type = ACTION_STACK_VALUE_OBJECT;
+		proto_var.data.numeric_value = (u64) g_transform_prototype;
+		setProperty(app_context, transform, "__proto__", 9, &proto_var);
+	} else {
+		setObjectProto(app_context, transform);
+	}
 
 	// Store MC reference as "__mc__" property (MOVIECLIP type)
 	ActionVar mc_val = {0};
@@ -8155,8 +8169,16 @@ static void getLocalCTRaw(MovieClip* mc,
 	}
 	size_t idx = getDisplayEntryIdxForMC(mc);
 	if (idx == (size_t)-1) {
-		*ra = 256; *ga = 256; *ba = 256; *aa = 256;
-		*rb = 0;   *gb = 0;   *bb = 0;   *ab = 0;
+		// Dynamic MC (createEmptyMovieClip / attachMovie) — read from MC's
+		// cx_* fields, kept in sync by `_alpha` setter and Color.setTransform.
+		*ra = (s16)lround((double)mc->cx_ra * 256.0 / 100.0);
+		*ga = (s16)lround((double)mc->cx_ga * 256.0 / 100.0);
+		*ba = (s16)lround((double)mc->cx_ba * 256.0 / 100.0);
+		*aa = (s16)lround((double)mc->cx_aa * 256.0 / 100.0);
+		*rb = (s16)lround((double)mc->cx_rb);
+		*gb = (s16)lround((double)mc->cx_gb);
+		*bb = (s16)lround((double)mc->cx_bb);
+		*ab = (s16)lround((double)mc->cx_ab);
 		return;
 	}
 	double dra, dga, dba, daa, drb, dgb, dbb, dab;
@@ -8188,6 +8210,18 @@ static void setLocalCTRaw(MovieClip* mc,
 		g_root_cx_ab = (double)ab;
 		return;
 	}
+	// Always mirror to mc->cx_* so subsequent reads via Color.getTransform
+	// or transform.colorTransform see the same values whether or not the MC
+	// has a live display-list entry.
+	mc->cx_ra = (float)((double)ra * 100.0 / 256.0);
+	mc->cx_ga = (float)((double)ga * 100.0 / 256.0);
+	mc->cx_ba = (float)((double)ba * 100.0 / 256.0);
+	mc->cx_aa = (float)((double)aa * 100.0 / 256.0);
+	mc->cx_rb = (float)rb;
+	mc->cx_gb = (float)gb;
+	mc->cx_bb = (float)bb;
+	mc->cx_ab = (float)ab;
+	mc->alpha = (float)mc->cx_aa;
 	size_t idx = getDisplayEntryIdxForMC(mc);
 	if (idx == (size_t)-1) return;
 	ng_setCTOnEntry(idx,
@@ -34755,6 +34789,7 @@ static void initFlashPackage(SWFAppContext* app_context)
 	{
 		ensureStubCtorPrototype(app_context, &fc_Transform);
 		ASObject* tp = fc_Transform.prototype_obj;
+		g_transform_prototype = tp;
 		ActionVar uv = {0}; uv.type = ACTION_STACK_VALUE_UNDEFINED;
 		// LIFO order: matrix, concatenatedMatrix, colorTransform, concatenatedColorTransform, pixelBounds
 		// Enumerated as: pixelBounds, concatenatedColorTransform, colorTransform, concatenatedMatrix, matrix
@@ -49364,6 +49399,23 @@ void actionNewObject(SWFAppContext* app_context)
 		setProperty(app_context, obj, "isConnected", 11, &bv);
 
 		PUSH(ACTION_STACK_VALUE_OBJECT, (u64)obj);
+		return;
+	}
+	else if (strcmp(ctor_name, "Transform") == 0)
+	{
+		// new flash.geom.Transform(mc): wraps a MovieClip in a Transform object.
+		// Without a MovieClip arg, returns undefined (Flash quirk — gnash
+		// actionscript.all/Transform-v8 line 51).
+		if (num_args >= 1 && args[0].type == ACTION_STACK_VALUE_MOVIECLIP)
+		{
+			MovieClip* mc = (MovieClip*) args[0].data.numeric_value;
+			ASObject* tobj = createTransformObject(app_context, mc);
+			PUSH(ACTION_STACK_VALUE_OBJECT, (u64)tobj);
+		}
+		else
+		{
+			pushUndefined(app_context);
+		}
 		return;
 	}
 	else if (strcmp(ctor_name, "Math") == 0 ||
