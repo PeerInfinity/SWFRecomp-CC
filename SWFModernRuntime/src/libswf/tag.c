@@ -629,7 +629,19 @@ static void process_sprite_init_at_depth(SWFAppContext* app_context, MovieClip* 
 				// Queue AS-level onLoad for timeline-placed RegisterClass sprites.
 				// onLoad (prototype method) fires after constructor + process_sprite_needs_init
 				// completes, dispatched from tagShowFrame via actionFlushPendingOnLoads.
-				if (_rc_export != NULL && child_mc != NULL)
+				//
+				// Gated on a class being actually registered (via Object.registerClass)
+				// for this character — registerClass installs the onLoad on the
+				// prototype BEFORE placement, so it's a valid LOAD-time handler.
+				// A plain exported .sprite symbol (every swfc sprite gets an export
+				// name) is NOT a registerClass sprite: its `mc.onLoad = function`
+				// is assigned by a later DoAction, after the clip's LOAD already
+				// passed, so Flash never fires it (action_execution_order_test12
+				// expects loadOrder to stay "0+").
+				extern int g_swf_version;
+				extern void* lookupRegisteredClassByCharId(size_t char_id, int swf_version, const char** out_export_name);
+				if (_rc_export != NULL && child_mc != NULL
+				    && lookupRegisteredClassByCharId(obj->char_id, g_swf_version, NULL) != NULL)
 					actionQueueMCOnLoad(child_mc);
 			}
 
@@ -733,6 +745,14 @@ void ng_set_script_only_mode(int mode)
 // sprites (goto paths still recurse immediately).  The deferred recursion is
 // performed by advance_nested_sprite_frames() after the root frame script.
 int g_advance_defer_nested = 0;
+
+#if defined(NO_GRAPHICS) || defined(OFFSCREEN_RENDER)
+// Forward decl — defined alongside tagRemoveObject2 below. Recursively queues
+// CLIP_EVENT_UNLOAD clip-action callbacks for a display list's children and
+// invalidates the cached child MCs.
+static void fire_recursive_child_unloads(SWFAppContext* app_context,
+	DisplayObject* dl, size_t dl_max, MovieClip* parent_mc);
+#endif
 
 // Iterates the current global display_list for sprites and advances their
 // timelines.  After executing each sprite's frame function (while globals are
@@ -980,6 +1000,27 @@ void advance_sprite_frames(SWFAppContext* app_context)
 		// When looping back to frame 0, reset the display list (Flash behavior)
 		if (frame == 0 && max_depth > 0)
 		{
+#if defined(NO_GRAPHICS) || defined(OFFSCREEN_RENDER)
+			// Flash rewinds a looping sprite to frame 0 via run_goto, which
+			// removes every object not present in frame 0 and fires their
+			// UNLOAD events. The old code freed the child entries silently —
+			// children placed on inner frames (mc11/mc12/mc21 in
+			// action_execution_order_test12) never got onUnload. Queue the
+			// clip-action UNLOADs + AS-level onUnload handlers here, then let
+			// the free loop below clear the slots. AS-level handlers are
+			// queued FIRST (before fire_recursive_child_unloads invalidates
+			// the cached MCs — invalidation sets depth=INT_MIN, which would
+			// make queueChildOnUnloads skip them).
+			if (!catch_up_mode && obj->instance_name != NULL)
+			{
+				extern MovieClip* actionFindMovieClipByName(const char* instance_name);
+				MovieClip* _lb_mc = actionFindMovieClipByName(obj->instance_name);
+				if (_lb_mc != NULL)
+					actionQueueDynamicChildUnloads(_lb_mc);
+				fire_recursive_child_unloads(app_context, display_list, max_depth,
+					_lb_mc != NULL ? _lb_mc : &root_movieclip);
+			}
+#endif
 			for (size_t j = 1; j <= max_depth; ++j)
 			{
 				if (display_list[j].sprite_display_list != NULL)
