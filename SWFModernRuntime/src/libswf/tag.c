@@ -5049,10 +5049,19 @@ void tagPlaceObject2(SWFAppContext* app_context, size_t depth, size_t char_id, u
 	//   replace_buttons1test: iter 2 frame 1's Place char 1 at depth 3 where
 	//   iter 1 frame 2 left char 3 must succeed for static1's MC cache entry
 	//   to be re-created — Ruffle's rewind has the equivalent effect).
+	// - `!ng_depth_has_pending_finalize(depth)`: a same-frame Remove of the
+	//   occupying child (deferred for finalize because it carries an UNLOAD
+	//   handler) logically vacates the depth — the stale char_id lingers only
+	//   until the deferred finalize runs. Ruffle's RemoveObject frees the depth
+	//   immediately (the unload event fires later), so a subsequent Place at
+	//   that depth must succeed. Without this gate, gnash misc-ming
+	//   loop_test10's frame-3 Remove(mc1)+Place(mc2) at depth 100 is refused.
+	extern int ng_depth_has_pending_finalize(size_t);
 	if (char_id != 0 && !is_replace
 	    && display_list[depth].char_id != 0
 	    && display_list[depth].char_id != char_id
-	    && display_list[depth].placed_at_frame <= current_frame)
+	    && display_list[depth].placed_at_frame <= current_frame
+	    && !ng_depth_has_pending_finalize(depth))
 	{
 		// Match Ruffle's avm_warning on a refused Place (and the existing
 		// same-frame check at ~line 5362, which this earlier-firing gate would
@@ -5738,10 +5747,12 @@ void tagPlaceObject2Ratio(SWFAppContext* app_context, size_t depth, size_t char_
 
 	// Phase 3: Refuse Place (move=0, has_character=1) of a DIFFERENT character on
 	// an already-occupied depth. See tagPlaceObject2 for full rationale.
+	extern int ng_depth_has_pending_finalize(size_t);
 	if (char_id != 0 && !is_replace
 	    && display_list[depth].char_id != 0
 	    && display_list[depth].char_id != char_id
-	    && display_list[depth].placed_at_frame <= current_frame)
+	    && display_list[depth].placed_at_frame <= current_frame
+	    && !ng_depth_has_pending_finalize(depth))
 	{
 		printf("Warning: Failed to place object at depth %zu.\n", depth);
 		g_pending_clip_actions = NULL;

@@ -1,20 +1,19 @@
 # loop_test / loop_test10 Regression Plan
 <!-- TESTS: misc-ming.all/loop/loop_test, misc-ming.all/loop/loop_test10 -->
 
-Last updated: 2026-05-19 (initial planning doc; both tests
-previously documented as resolved in REMAINING_TAIL_TRIAGE but
-confirmed failing locally at current `master` SHA)
+Last updated: 2026-05-19 (Phase 2 done — loop_test10 regression
+re-landed; Phase 1 loop_test still pending)
 
 <!-- PLAN_META
 id: LOOP_TEST_REGRESSION_PLAN
-status: pending
+status: in_progress
 phases:
   - id: 1
     name: "loop_test: depth-cycle output reordered; auto-instance-counter off by 1"
     status: pending
   - id: 2
     name: "loop_test10: PlaceObject2 + Remove same-frame regression; auto-instance counter off by 3"
-    status: pending
+    status: done
 dependencies: []
 related:
   - id: SPRITE_EXEC_LIST_LIFO_PLAN
@@ -87,19 +86,31 @@ behavior". Need to git-bisect/git-blame the depth-bias and
 PlaceObject swap code to find which later commit re-introduced
 the regression.
 
-### loop_test10 (1/28)
+### loop_test10 — RESOLVED 2026-05-19 (ruffle_matched)
 
-The test's depth-cycle now produces auto-instance numbers off
-by 3 (expected `/instance3, /instance4, /instance5, /instance6,
-/instance7, /instance9` — we get `/instance2, /instance3,
-/instance4, /instance5, /instance6, /instance8`), plus the
-mc{1,2}Initialized / mc{1,2}Unloaded counts are off by 1.
+Root cause: commit `12fa91a3` ("refuse Place on occupied depth")
+added a Phase-3 gate in `tagPlaceObject2` / `tagPlaceObject2Ratio`
+that rejects a Place of a different character on an occupied
+depth. loop_test10 frame 3 does `Remove(mc1)` + `Place(mc2)` at
+depth 100; mc1 carries an UNLOAD handler so its removal is
+deferred (pending-finalize) and `display_list[100].char_id`
+still holds mc1's stale char_id. The gate saw a different char on
+an "occupied" depth and refused the Place → "Warning: Failed to
+place object at depth 100" instead of mc2 initializing.
 
-The 2026-05-08 fix in REMAINING_TAIL_TRIAGE (commits `96a5d81e` +
-`f0d575ca`) was supposed to handle same-frame Remove+Place at the
-same depth via `tagSetInstanceName` skipping the rename and
-`PendingFinalizeEntry` storing `orig_char_id`. Verify whether
-either fix has been reverted/altered since.
+Fix: added `&& !ng_depth_has_pending_finalize(depth)` to both
+Phase-3 refusal gates. A same-frame Remove of an UNLOAD-handler
+child logically vacates the depth (the stale char_id lingers only
+until the deferred finalize runs); Ruffle's RemoveObject frees the
+depth immediately. Now `loop_test10` is `ruffle_matched`.
+
+Verified no regressions: 12-test placement/replace battery
+(place_object_test{,2}, place_and_remove_object_test{,_insane},
+PlaceObject2Test, replace_{sprites,shapes,buttons}1test,
+reverse_execute_PlaceObject2_test{1,2}, morph_test1, shape_test)
+all effective pass; avm1 placeobject_occupied_depth, clip_events,
+issue_1104, unload, unload_nested_child, default_names,
+button_order, movieclip_in_removed_button, goto_rewind3 all PASS.
 
 ## Recommended approach
 
