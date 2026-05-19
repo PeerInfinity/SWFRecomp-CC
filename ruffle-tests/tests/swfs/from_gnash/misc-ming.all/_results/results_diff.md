@@ -1,7 +1,7 @@
 # Ruffle Test Results Diff
 
-**Previous:** `80e4118e5538` (2026-05-19T22:05:22.804661+00:00)
-**Current:** `2dd16744ffd2` (2026-05-19T22:53:06.812573+00:00)
+**Previous:** `2dd16744ffd2` (2026-05-19T22:53:06.812573+00:00)
+**Current:** `65fb43cd11d1` (2026-05-19T23:31:02.025638+00:00)
 
 ## Summary
 
@@ -10,15 +10,17 @@
 | Passing | 64 | 64 | 0 |
 | Total | 110 | 110 | 0 |
 | Pass rate | 58.2% | 58.2% | 0% |
-| Mismatched lines | 1260 | 1259 | -1 |
-|   Decreased | | | -4 |
-|   Increased | | | +3 |
+| Mismatched lines | 1259 | 1254 | -5 |
+|   Decreased | | | -5 |
 
-## Line Count Changed (4)
+## Status Changed (1)
+
+| Test | Previous | Current | Lines (prev) | Lines (now) |
+|------|----------|---------|--------------|-------------|
+| `loop/loop_test10` | output_mismatch | ruffle_matched | 3/28 | 5/28 |
+
+## Line Count Changed (1)
 
 | Test | Status | Lines (prev) | Lines (now) | Diff |
 |------|--------|--------------|-------------|------|
-| `action_order/ActionOrderTest4` | output_mismatch | 6/64 | 9/64 | -3 |
-| `action_order/ActionOrderTest5` | output_mismatch | 7/51 | 8/51 | -1 |
-| `action_order/action_execution_order_test5` | output_mismatch | 26/35 | 26/35 | 0 |
-| `register_class/RegisterClassTest4` | output_mismatch | 6/42 | 3/42 | +3 |
+| `action_order/ActionOrderTest3` | output_mismatch | 4/62 | 7/62 | -3 |
