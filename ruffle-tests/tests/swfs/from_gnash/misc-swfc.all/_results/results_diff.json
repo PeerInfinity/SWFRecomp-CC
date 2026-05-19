@@ -1,9 +1,9 @@
 {
   "metadata": {
-    "old_timestamp": "2026-05-17T17:57:12.196888+00:00",
-    "old_git_sha": "568b76d17ca09453827cb54a8409cb2bfd3b3bd8",
-    "new_timestamp": "2026-05-19T22:05:22.812502+00:00",
-    "new_git_sha": "80e4118e553876b462dae283a7cda9f52fd92d83",
+    "old_timestamp": "2026-05-19T22:05:22.812502+00:00",
+    "old_git_sha": "80e4118e553876b462dae283a7cda9f52fd92d83",
+    "new_timestamp": "2026-05-19T22:53:06.817462+00:00",
+    "new_git_sha": "2dd16744ffd237b831ecc5c25ed7d6e959089f3b",
     "partial": false,
     "same_commit": false
   },
@@ -14,20 +14,53 @@
     "old_total": 19,
     "old_pass_rate": 42.1,
     "new_pass": 8,
-    "new_ruffle_matched": 6,
-    "new_effective_pass": 14,
+    "new_ruffle_matched": 7,
+    "new_effective_pass": 15,
     "new_total": 19,
     "new_pass_rate": 42.1,
     "old_mismatched_lines": 145,
-    "new_mismatched_lines": 145,
+    "new_mismatched_lines": 133,
     "increased_mismatches": 0,
-    "decreased_mismatches": 0,
-    "newly_passing": 0,
+    "decreased_mismatches": 12,
+    "newly_passing": 1,
     "newly_failing": 0,
-    "status_changed": 0,
-    "unchanged": 19,
+    "status_changed": 1,
+    "unchanged": 17,
     "added": 0,
     "removed": 0
   },
-  "changes": []
+  "changes": [
+    {
+      "test": "action_execution_order_test10",
+      "change_type": "changed",
+      "old_status": "ruffle_matched",
+      "new_status": "ruffle_matched",
+      "old_lines": {
+        "actual_lines": 14,
+        "expected_lines": 16,
+        "matching_lines": 4
+      },
+      "new_lines": {
+        "actual_lines": 14,
+        "expected_lines": 16,
+        "matching_lines": 5
+      }
+    },
+    {
+      "test": "action_execution_order_test12",
+      "change_type": "changed",
+      "old_status": "output_mismatch",
+      "new_status": "ruffle_matched",
+      "old_lines": {
+        "actual_lines": 20,
+        "expected_lines": 22,
+        "matching_lines": 9
+      },
+      "new_lines": {
+        "actual_lines": 22,
+        "expected_lines": 22,
+        "matching_lines": 20
+      }
+    }
+  ]
 }

@@ -3,9 +3,9 @@
 *Tests on the [ignored list](ruffle-tests/ignored_tests.txt) are excluded.*  
 *See [RUFFLE_RESULTS.md](RUFFLE_RESULTS.md) for unfiltered results.*
 
-**Commit:** `80e4118e5538`  
-**Date:** 2026-05-19 22:05 UTC  
-**Total duration:** 8m58s
+**Commit:** `2dd16744ffd2`  
+**Date:** 2026-05-19 22:53 UTC  
+**Total duration:** 7m35s
 
 ## Results by Suite
 
@@ -28,14 +28,14 @@
 | Suite | Matching | Expected | Accuracy |
 |-------|--------:|---------:|---------:|
 | avm1 | 96,205 | 96,675 | 99.5% |
-| from_gnash/actionscript.all | 27,768 | 38,787 | 71.6% |
-| from_gnash/misc-ming.all | 3,962 | 5,179 | 76.5% |
+| from_gnash/actionscript.all | 27,767 | 38,787 | 71.6% |
+| from_gnash/misc-ming.all | 3,966 | 5,179 | 76.6% |
 | from_gnash/misc-mtasc.all | 211 | 231 | 91.3% |
-| from_gnash/misc-swfc.all | 405 | 550 | 73.6% |
+| from_gnash/misc-swfc.all | 417 | 550 | 75.8% |
 | from_gnash/misc-swfmill.all | 93 | 95 | 97.9% |
 | from_shumway | 621 | 637 | 97.5% |
 | from_shumway/avm1 | 480 | 480 | 100% |
-| **Total** | **129,745** | **142,634** | **91.0%** |
+| **Total** | **129,760** | **142,634** | **91.0%** |
 
 ## Failure Breakdown
 
@@ -45,11 +45,11 @@
 | from_gnash/actionscript.all | 41 | 74 |
 | from_gnash/misc-ming.all | 20 | 24 |
 | from_gnash/misc-mtasc.all | - | 2 |
-| from_gnash/misc-swfc.all | 4 | 6 |
+| from_gnash/misc-swfc.all | 3 | 7 |
 | from_gnash/misc-swfmill.all | - | 1 |
 | from_shumway | - | 3 |
 | from_shumway/avm1 | - | - |
-| **Total** | **77** | **116** |
+| **Total** | **76** | **117** |
 
 ## Near-Passing Tests (≥80% line match)
 
@@ -95,24 +95,24 @@ Tests verified against Flash's actual output (`output.flash.txt`).
 
 - **Pass:** 602/620 (97.1%)
 - **Ignored:** 41 tests
-- **Duration:** 5m49s across 30 shards
+- **Duration:** 4m10s across 30 shards
 - **Lines:** 96,205/96,675 matching (99.5%)
-- **Avg test duration:** 0.5s — slowest: `click_block` (21.2s)
+- **Avg test duration:** 0.3s — slowest: `timeout` (5.2s)
 
 ### from_gnash/actionscript.all
 
 - **Pass:** 128/243 (52.7%)
-- **Duration:** 1m39s across 30 shards
-- **Lines:** 27,768/38,787 matching (71.6%)
-- **Avg test duration:** 0.3s — slowest: `MovieClip-v7` (2.4s)
+- **Duration:** 1m45s across 30 shards
+- **Lines:** 27,767/38,787 matching (71.6%)
+- **Avg test duration:** 0.4s — slowest: `MovieClip-v8` (2.1s)
 
 ### from_gnash/misc-ming.all
 
 - **Pass:** 64/108 (59.3%)
 - **Ignored:** 2 tests
-- **Duration:** 42s across 30 shards
-- **Lines:** 3,962/5,179 matching (76.5%)
-- **Avg test duration:** 0.3s — slowest: `matrix_test` (4.9s)
+- **Duration:** 44s across 30 shards
+- **Lines:** 3,966/5,179 matching (76.6%)
+- **Avg test duration:** 0.3s — slowest: `matrix_test` (3.3s)
 
 ### from_gnash/misc-mtasc.all
 
@@ -126,28 +126,28 @@ Tests verified against Flash's actual output (`output.flash.txt`).
 - **Pass:** 8/18 (44.4%)
 - **Ignored:** 1 tests
 - **Duration:** 5s across 30 shards
-- **Lines:** 405/550 matching (73.6%)
-- **Avg test duration:** 0.2s — slowest: `edittext_test1` (0.2s)
+- **Lines:** 417/550 matching (75.8%)
+- **Avg test duration:** 0.2s — slowest: `movieclip_destruction_test1` (0.3s)
 
 ### from_gnash/misc-swfmill.all
 
 - **Pass:** 19/20 (95.0%)
-- **Duration:** 5s across 30 shards
+- **Duration:** 6s across 30 shards
 - **Lines:** 93/95 matching (97.9%)
-- **Avg test duration:** 0.2s — slowest: `background` (0.2s)
+- **Avg test duration:** 0.2s — slowest: `dict_callframe` (0.7s)
 
 ### from_shumway
 
 - **Pass:** 73/76 (96.1%)
 - **Ignored:** 16 tests
-- **Duration:** 25s across 30 shards
+- **Duration:** 28s across 30 shards
 - **Lines:** 621/637 matching (97.5%)
-- **Avg test duration:** 0.2s — slowest: `avm1/depth` (0.3s)
+- **Avg test duration:** 0.2s — slowest: `avm1/duplicateMovieClip/duplicateMovieClip` (0.9s)
 
 ### from_shumway/avm1
 
 - **Pass:** 45/45 (100%)
 - **Ignored:** 2 tests
-- **Duration:** 11s across 30 shards
+- **Duration:** 14s across 30 shards
 - **Lines:** 480/480 matching (100%)
-- **Avg test duration:** 0.2s — slowest: `watch` (0.5s)
+- **Avg test duration:** 0.2s — slowest: `doactionorder/doactionorder` (1.6s)
