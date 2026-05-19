@@ -1,10 +1,10 @@
 # Ruffle Test Results (Filtered)
 
-**Date**: 2026-05-19 22:53 UTC
+**Date**: 2026-05-19 23:31 UTC
 
-**Git SHA**: `2dd16744ff`
+**Git SHA**: `65fb43cd11`
 
-**Run Duration**: 0m 14s
+**Run Duration**: 0m 12s
 
 **Filtered**: 2 tests ignored out of 47 available
 
@@ -29,8 +29,8 @@
 | 2 | `bitmapdata/getPixel` | 2 | 0.2s |  |
 | 3 | `bitmapdata/loadBitmap` | 3 | 0.2s |  |
 | 4 | `callee` | 2 | 0.2s |  |
-| 5 | `depth` | 6 | 0.5s |  |
-| 6 | `doactionorder/doactionorder` | 7 | 1.6s |  |
+| 5 | `depth` | 6 | 0.3s |  |
+| 6 | `doactionorder/doactionorder` | 7 | 0.2s |  |
 | 7 | `doactionorder/symbolclass` | 4 | 0.2s |  |
 | 8 | `duplicateMovieClip/dontremove` | 6 | 0.2s |  |
 | 9 | `duplicateMovieClip/duplicateMovieClip` | 4 | 0.2s |  |
@@ -59,7 +59,7 @@
 | 32 | `scope` | 14 | 0.2s |  |
 | 33 | `setinterval` | 20 | 0.2s |  |
 | 34 | `settimeout` | 17 | 0.2s |  |
-| 35 | `super` | 11 | 0.2s |  |
+| 35 | `super` | 11 | 0.1s |  |
 | 36 | `target` | 18 | 0.2s |  |
 | 37 | `text-bind` | 0 | 0.2s |  |
 | 38 | `textfield/textfield-html` | 4 | 0.2s |  |

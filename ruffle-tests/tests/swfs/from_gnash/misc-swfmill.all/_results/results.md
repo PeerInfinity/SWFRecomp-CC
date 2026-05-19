@@ -1,8 +1,8 @@
 # Ruffle Test Results (Unfiltered)
 
-**Date**: 2026-05-19 22:53 UTC
+**Date**: 2026-05-19 23:31 UTC
 
-**Git SHA**: `2dd16744ff`
+**Git SHA**: `65fb43cd11`
 
 **Run Duration**: 0m 6s
 
@@ -27,7 +27,7 @@
 |---|------|-------|----------|-------|
 | 1 | `afunc_dict` | 2 | 0.2s |  |
 | 2 | `background` | 0 | 0.2s |  |
-| 3 | `dict_callframe` | 3 | 0.7s |  |
+| 3 | `dict_callframe` | 3 | 0.2s |  |
 | 4 | `dict_cross` | 3 | 0.2s |  |
 | 5 | `dict_event` | 5 | 0.2s |  |
 | 6 | `dict_override` | 2 | 0.2s |  |
@@ -36,7 +36,7 @@
 | 9 | `jump_after_end` | 3 | 0.2s |  |
 | 10 | `jump_to_prev_block` | 1 | 0.2s |  |
 | 11 | `missing_bitmap` | 0 | 0.2s |  |
-| 12 | `mixed-bytecode-as2` | 1 | 0.2s |  |
+| 12 | `mixed-bytecode-as2` | 1 | 0.8s |  |
 | 13 | `registers` | 36 | 0.2s |  |
 | 14 | `tags_after_last_showframe` | 1 | 0.2s |  |
 | 15 | `trace-as2/arguments` | 8 | 0.2s |  |

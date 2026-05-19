@@ -2,9 +2,9 @@
 
 *See [RUFFLE_RESULTS_FILTERED.md](RUFFLE_RESULTS_FILTERED.md) for results with ignored tests excluded.*
 
-**Commit:** `2dd16744ffd2`  
-**Date:** 2026-05-19 22:53 UTC  
-**Total duration:** 7m35s
+**Commit:** `65fb43cd11d1`  
+**Date:** 2026-05-19 23:31 UTC  
+**Total duration:** 7m13s
 
 ## Results by Suite
 
@@ -25,14 +25,14 @@
 | Suite | Matching | Expected | Accuracy |
 |-------|--------:|---------:|---------:|
 | avm1 | 106,625 | 115,804 | 92.1% |
-| from_gnash/actionscript.all | 27,767 | 38,787 | 71.6% |
-| from_gnash/misc-ming.all | 3,980 | 5,239 | 76.0% |
+| from_gnash/actionscript.all | 27,768 | 38,787 | 71.6% |
+| from_gnash/misc-ming.all | 3,985 | 5,239 | 76.1% |
 | from_gnash/misc-mtasc.all | 211 | 231 | 91.3% |
 | from_gnash/misc-swfc.all | 424 | 557 | 76.1% |
 | from_gnash/misc-swfmill.all | 93 | 95 | 97.9% |
 | from_shumway | 882 | 1,276 | 69.1% |
 | from_shumway/avm1 | 489 | 491 | 99.6% |
-| **Total** | **140,471** | **162,480** | **86.5%** |
+| **Total** | **140,477** | **162,480** | **86.5%** |
 
 ## Failure Breakdown
 
@@ -40,13 +40,13 @@
 |-------|-----------------:|
 | avm1 | 46 |
 | from_gnash/actionscript.all | 41 |
-| from_gnash/misc-ming.all | 22 |
+| from_gnash/misc-ming.all | 21 |
 | from_gnash/misc-mtasc.all | - |
 | from_gnash/misc-swfc.all | 4 |
 | from_gnash/misc-swfmill.all | - |
 | from_shumway | 16 |
 | from_shumway/avm1 | - |
-| **Total** | **129** |
+| **Total** | **128** |
 
 ## Near-Passing Tests (≥80% line match)
 
@@ -89,11 +89,10 @@ Tests with `output_mismatch` status but ≥80% of expected lines matching.
 
 | Suite | Newly Passing | Newly Failing | Lines Improved | Lines Regressed |
 |-------|-------------:|-------------:|--------------:|----------------:|
-| from_gnash/actionscript.all | - | - | - | 1 |
-| from_gnash/misc-ming.all | - | - | 4 | 3 |
-| from_gnash/misc-swfc.all | 1 | - | 12 | - |
+| from_gnash/actionscript.all | - | - | 1 | - |
+| from_gnash/misc-ming.all | 1 | - | 5 | - |
 
-*Comparing `80e4118e5538` → `2dd16744ffd2`*
+*Comparing `2dd16744ffd2` → `65fb43cd11d1`*
 
 ## Flash-Spec Results
 
@@ -108,22 +107,22 @@ Tests verified against Flash's actual output (`output.flash.txt`).
 ### avm1
 
 - **Pass:** 604/661 (91.4%)
-- **Duration:** 4m10s across 30 shards
+- **Duration:** 3m51s across 30 shards
 - **Lines:** 106,625/115,804 matching (92.1%)
 - **Avg test duration:** 0.3s — slowest: `timeout` (5.2s)
 
 ### from_gnash/actionscript.all
 
 - **Pass:** 128/243 (52.7%)
-- **Duration:** 1m45s across 30 shards
-- **Lines:** 27,767/38,787 matching (71.6%)
-- **Avg test duration:** 0.4s — slowest: `MovieClip-v8` (2.1s)
+- **Duration:** 1m47s across 30 shards
+- **Lines:** 27,768/38,787 matching (71.6%)
+- **Avg test duration:** 0.4s — slowest: `MovieClip-v8` (1.8s)
 
 ### from_gnash/misc-ming.all
 
 - **Pass:** 64/110 (58.2%)
-- **Duration:** 44s across 30 shards
-- **Lines:** 3,980/5,239 matching (76.0%)
+- **Duration:** 43s across 30 shards
+- **Lines:** 3,985/5,239 matching (76.1%)
 - **Avg test duration:** 0.3s — slowest: `matrix_test` (3.3s)
 
 ### from_gnash/misc-mtasc.all
@@ -145,18 +144,18 @@ Tests verified against Flash's actual output (`output.flash.txt`).
 - **Pass:** 19/20 (95.0%)
 - **Duration:** 6s across 30 shards
 - **Lines:** 93/95 matching (97.9%)
-- **Avg test duration:** 0.2s — slowest: `dict_callframe` (0.7s)
+- **Avg test duration:** 0.2s — slowest: `mixed-bytecode-as2` (0.8s)
 
 ### from_shumway
 
 - **Pass:** 73/92 (79.3%)
-- **Duration:** 28s across 30 shards
+- **Duration:** 26s across 30 shards
 - **Lines:** 882/1,276 matching (69.1%)
-- **Avg test duration:** 0.2s — slowest: `avm1/duplicateMovieClip/duplicateMovieClip` (0.9s)
+- **Avg test duration:** 0.2s — slowest: `fuzz/887c02ab98dbdd3ae22b2363b212dba005565738a572a2156e703dd3bf9b40af` (0.9s)
 
 ### from_shumway/avm1
 
 - **Pass:** 46/47 (97.9%)
-- **Duration:** 14s across 30 shards
+- **Duration:** 12s across 30 shards
 - **Lines:** 489/491 matching (99.6%)
-- **Avg test duration:** 0.2s — slowest: `doactionorder/doactionorder` (1.6s)
+- **Avg test duration:** 0.2s — slowest: `depth` (0.3s)
