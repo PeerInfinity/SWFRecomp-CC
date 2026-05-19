@@ -345,53 +345,31 @@ Fix landed via three paired changes (see PROMOTED comment at top of
 this doc). Verified no regressions in the textfield-binding,
 ASSetPropFlags, and misc-ming.all near-passing batteries.
 
-### EmbeddedFontTest (58.6%, 51/87) and DrawingApiTest (86.0%, 80/93)
+### ~~EmbeddedFontTest~~ — graduated to `incomplete/EMBEDDEDFONTTEST_PLAN.md` (2026-05-19)
 
-**DrawingApiTest update 2026-05-08 (pending CI).** Bounds-related
-failures fixed (66/93 → 80/93). Remaining 13 diff lines + 2 trailing
-lines are all hitTest precision (zshape.hitTest undefined, inv4/inv8
-boolean drift, e.hitTest false-positive at corner). Our diffs are
-entirely disjoint from Ruffle's diff set (Ruffle now ahead on bounds,
-behind on hitTests; mirror of our state pre-fix), so no
-ruffle_matched promotion is possible without shape-rasterization /
-hitTest work. See latest entry in `CURRENT_STATUS.md`.
+### ~~DrawingApiTest~~ — graduated to `incomplete/DRAWING_API_HITTEST_PLAN.md` (2026-05-19) for the hitTest residual; bounds work landed 2026-05-08
 
-**Symptom (combined cluster, original).** Both fail on rendered-geometry
-assertions — text glyph widths, drawing-API curve coordinates,
-font advance values. Specific lines vary.
+### ~~NetStream-SquareTest~~ — graduated to `incomplete/NETSTREAM_SQUARETEST_PLAN.md` (2026-05-19)
 
-**Hypothesis.** Float/double precision in geometry pipeline. Likely
-overlaps the same `(float)` round-trip pattern as
-`attachMovieLoopingTest`'s `15.0000001716614`. EmbeddedFontTest
-specifically may also need DefineFont3 / DefineFontAlignZones
-support (newer font tags) — confirm by running with verbose
-stderr and looking for "unsupported tag" or geometry warnings.
+### ~~loop/loop_test~~ — RESOLVED to PASS (2026-05-02 result snapshot); **regressed 2026-05-19**
 
-**Scope.** 3-5 hours combined, after Phase 4 of
-`IMPORT_CHARACTER_PLAN` lands (which will fix the canonical FP
-pattern).
+Originally resolved 2026-05-02 (PASS 21/21). **Regressed since:**
+current CI baseline `eb8206f8` (2026-05-15) and local re-run at
+master both show 4/21 output_mismatch. Some commit between the
+2026-05-02 fix and the 2026-05-15 CI re-introduced the bug.
+Tracked in `incomplete/LOOP_TEST_REGRESSION_PLAN.md` — approach is
+git-bisect to find the regressing commit then port/restore the
+original fix.
 
-### NetStream-SquareTest (39.8%, 86/216)
+### ~~loop/loop_test10~~ — promoted to `ruffle_matched` (2026-05-08); **regressed 2026-05-19**
 
-**Symptom.** NetStream timing test that exercises video playback.
-Expected output cycles through video frames with timing-dependent
-assertions. We produce ~40% of the expected lines.
+Originally promoted to ruffle_matched 2026-05-08 (14/16). **Regressed
+since:** current CI baseline `eb8206f8` and local re-run both show
+1/28 output_mismatch. Same regression pattern as `loop/loop_test`
+above; tracked in `incomplete/LOOP_TEST_REGRESSION_PLAN.md`.
 
-**Hypothesis.** Per `MISC_MING_SWFC_PLAN.md`: "netstream timing".
-NetStream playback uses a timer-based callback; the timer interval
-or sync-with-frame mechanism may diverge from Flash's. The 14
-AVM1 NetStream tests pass, so the basic NetStream API works — this
-test exercises specific timing semantics.
-
-**Scope.** 4-6 hours of timing investigation. **Promote to standalone
-plan when work begins.**
-
-### ~~loop/loop_test~~ — RESOLVED to PASS (2026-05-02 result snapshot)
-
-Now PASS 21/21. Cluster fixes recovered the depth-bias /
-interleave behavior described in the original entry.
-
-### ~~loop/loop_test10~~ — promoted to `ruffle_matched` (2026-05-08)
+The original fix detail is preserved below for reference (it will
+need to be restored or ported through the regressing commit):
 
 Was 3/28 → now 14/16 line match (auto-promoted via subset of Ruffle's
 diff). Root cause (Same-frame Remove+Place at same depth, frame 3:
@@ -468,107 +446,9 @@ Category 1 entry "opcode_guard_test (misc-ming.all) — Gnash silently
 swallows the failed-setTarget warning" for the full diff-index
 analysis.
 
-### masks_test (16.0%, 28/175)
+### ~~masks_test~~ — graduated to `incomplete/MASKS_TEST_PLAN.md` (2026-05-19); blocked on synthetic-input infrastructure
 
-**Symptom (from latest diff):** Output stops at:
-
-```
-Placed staticmc2 (red), ... DisplayObjects
-Placed dynamicmc2 (blue), ... DisplayObjects
- - Press any key to continue -
-<end of actual>
-```
-
-Test waits for a keyboard event before continuing the mask
-assertions. **No `input.json` exists in the test directory** —
-in Flash this would block forever waiting for the user.
-
-**Hypothesis.** Different from `BUTTON_INFRASTRUCTURE_PLAN`
-(those tests have input.json). masks_test needs *synthetic* input
-to drive past the wait — the gnash test runners apparently
-provide a default keypress automatically, or the test expects
-`output.txt` to be the post-keypress run.
-
-**Scope.** Requires verifier infrastructure: either auto-generate
-an `input.json` for tests that detect a "Press any key" prompt,
-or add a CLI flag that injects a default keypress at frame N.
-**Promote to standalone plan when work begins** (verifier change
-is its own concern).
-
-### action_order/action_execution_order_test6 (0%, 0/24) — confirmed case (c) 2026-05-07
-
-**Symptom.** Zero output produced (no common lines in CI). Predicted to flip
-to `ruffle_matched` via subset-of-Ruffle promotion in the 2026-05-04 entry
-of `ZERO_OUTPUT_TRIAGE_PLAN.md`, but the prediction did not pan out at CI
-`c5994ec1` / `c8f6452a` / `035950cf` — still `output_mismatch`, still 0/24.
-
-**Investigation (2026-05-07, local).** Test is `known_failure = true` in
-test.toml and ships `output.ruffle.txt` (12 lines) so promotion path is
-in place. Subset check fails because our diff includes line indices Ruffle
-matches:
-
-- Expected line 0: `mc1 Construct called` — Ruffle matches; we have `mc1 Load called`.
-- Expected line 1: `mc2 Construct called` — Ruffle matches; we have `mc2 Load called`.
-
-Real bug confirmed: our impl fires `CLIP_EVENT_LOAD` for mc1 + mc2 BEFORE
-the `CLIP_EVENT_CONSTRUCT` of any of {mc1, mc2, mc3}. Expected order is
-all three Constructs first, then the Loads. The delayed construct firing
-also produces `mc3 Load/Unload` in the wrong section (lines 4-5 in our
-output vs lines 7-8 in expected for the first cycle). This is independent
-of Ruffle's bug (Ruffle's diff is missing `mc3 Construct` lines but has
-the Construct-before-Load ordering correct on mc1/mc2).
-
-**Hypothesis (case c).** Construct/Load ordering on initial frame placement
-when multiple sprites are placed in the same frame — likely a tagPlaceObject2
-eager-init / clip-event dispatch ordering issue. Construct should batch
-across all same-frame placements before any Load fires; we may be firing
-Load synchronously per-placement.
-
-**Root cause confirmed (2026-05-08, local re-investigation).** The bug is
-NOT that LOAD fires synchronously per-placement — both LOAD (AQ_KIND_SCRIPT)
-and CONSTRUCT (AQ_KIND_CLIP_CONSTRUCT) are queued during the 2→9 forward
-catchup and don't drain mid-catchup (`g_goto_catchup_active` gates the
-`tagShowFrame` drain at `tag.c:2789`, and `ng_executeGotoCatchUp`'s
-post-catchup drain at `swf_core.c:202-203` only handles `AQ_KIND_CLIP_INIT`
-and `AQ_KIND_REGISTER_CTOR`, not CLIP_CONSTRUCT or SCRIPT). The actual
-issue is the `aq_drain` filter at `action_queue.c:151-160`: for entries
-queued during catchup (`queued_in_catchup=1`), if the clip is
-`avm1_removed` or `pending_removal` by drain time, the entry is **skipped**.
-Comment explicitly: "goto_commands aggregation (place+remove in same goto
-sweep) remains canceled."
-
-For test6's first cycle (gotoAndPlay 2→9), all three sprites are placed
-AND removed during the catchup (mc1/mc2 placed at frame 3 + removed at
-frame 5; mc3 placed at frame 6 + removed at frame 8). So all three CONSTRUCT
-entries get filtered out at drain time. The LOAD entries (AQ_KIND_SCRIPT)
-ALSO get the filter — but the test's expected output shows them firing.
-Empirically, our impl emits the LOADs (so the SCRIPT filter must not be
-catching them via the same path) while skipping the CONSTRUCTs. Likely
-LOAD events get `queued_in_catchup=0` somewhere they shouldn't, or the
-clip pointer for SCRIPT kind isn't set — needs deeper trace to confirm
-which side is "wrong" relative to the filter intent.
-
-Either way, Flash's actual semantics fire ALL events for ALL placements,
-even those cancelled in same-goto pairs. Ruffle adopts the cancellation
-model; that's why Ruffle's `output.ruffle.txt` for this test ALSO fails
-(only emits the second cycle's mc1/mc2 events from the inner backward
-goto, which is the only catchup where the placements survive).
-
-**Scope.** Not a 1-hour fix. Construct/Load batching is shared infrastructure
-with broad regression risk. Two viable approaches, both invasive:
-(A) Make CLIP_CONSTRUCT and AQ_KIND_SCRIPT (LOAD) `fires_chronologically`
-    even when `queued_in_catchup=1` — would fire all events Flash-style.
-    Risk: regresses every test that depends on goto_commands aggregation
-    (RegisterClassTest3 explicitly relies on it, comment at
-    `tag.c:2770-2787`).
-(B) Compare Ruffle's `instantiate_child` → `run_frame_avm1` ordering vs
-    our `tagPlaceObject2` Phase 1/Phase 2 init to fix only the lines
-    0-1 ordering (so our diff becomes a subset of Ruffle's), enabling
-    `ruffle_matched` promotion without trying to match Flash exactly.
-
-Standalone plan worth writing if active work begins. Test cannot promote
-to `ruffle_matched` until our ordering is at least as correct as Ruffle's
-on lines 0-1.
+### ~~action_order/action_execution_order_test6~~ — graduated to `incomplete/ACTION_EXECUTION_ORDER_TEST6_PLAN.md` (2026-05-19); contains the 2026-05-08 case-(c) root-cause analysis verbatim
 
 ### duplicate_movie_clip_test (9.1%, 3/33) — **blocked by CLONESPRITE_DEPTH_BIAS**
 
@@ -715,22 +595,7 @@ battery (24/24), 13-test gnash actionscript.all subset (13/13
 effective), 4-test misc-swfc spot-check (4/4 effective),
 `opcode_guard_test` and `DepthLimitsTest` unchanged.
 
-### movieclip_destruction_test4 (20.0%, 8/40)
-
-**Symptom (from latest diff).**
-
-- Missing "Running frame2/frame3 actions of mc2[/brother2]" sprite
-  frame DoAction traces — sprite frames don't fire during goto +
-  removeMovieClip on dynamic clones.
-- `typeof(brother1) == undefined` expected, got `movieclip` —
-  removed brothers stay live.
-
-**Hypothesis.** Composite of GOTO_CATCHUP_HYGIENE Phase 1 (stale
-name resolution) and Phase 4 (sprite double-fire / no-fire). May
-recover most lines after that plan lands.
-
-**Scope.** Re-baseline after GOTO_CATCHUP_HYGIENE Phase 1 + Phase 4
-land.
+### ~~movieclip_destruction_test4~~ — graduated to `incomplete/MOVIECLIP_DESTRUCTION_TEST4_PLAN.md` (2026-05-19); blocked on SPRITE_REWIND_IDENTITY for the sprite-frame-DoAction firing
 
 ---
 

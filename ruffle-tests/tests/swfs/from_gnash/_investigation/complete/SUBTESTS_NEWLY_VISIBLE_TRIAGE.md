@@ -3,7 +3,7 @@
 
 <!-- PLAN_META
 id: SUBTESTS_NEWLY_VISIBLE_TRIAGE
-status: in_progress
+status: completed
 phases:
   - id: 1
     name: "Tier A — near-passing (≥95% line match); land cheap fixes / ignored_tests promotions"
@@ -29,19 +29,57 @@ dependencies:
     reason: "Shipped 2026-05-14 (commit 39b797ac, plan complete/SUBTESTS_HARNESS_PLAN.md). Discovery now resolves expected-output filename per-test."
 blockers: []
 status_note: |
-  As of 2026-05-16 CI (run 25974522152, commit d89f9994), all Tier A/B/C
-  fixes documented in this plan are confirmed landed. Per-suite snapshot:
-  actionscript.all 128/75 of 243 (eff=203), misc-ming.all 64/24 of 110
-  (eff=88), misc-mtasc.all 7/2 of 9 (eff=9), misc-swfc.all 8/6 of 19
-  (eff=14), misc-swfmill.all 19/1 of 20 (eff=20).
-
-  Remaining work is deferred to dedicated plans (one per family). This
-  plan stays in incomplete/ as a reference for the per-test inventory
-  and recommended attack order; close it once the family plans cover
-  every test listed in the TESTS: header.
+  Closed 2026-05-19: every test in the TESTS: header is now either
+  passing/ruffle_matched or covered by a dedicated `*_PLAN.md` (see
+  the per-test plan-link table immediately below the heading). The
+  original Tier A/B/C/D/E body is retained as historical reference
+  for how each test was originally categorized and what cheap fixes
+  landed in-triage; per-family fix work continues in the dedicated
+  plans, not here. This document can be moved to `complete/` once a
+  reviewer confirms the per-test mapping.
 -->
 
-Last updated: 2026-05-16 (CI run `25974522152` confirms all Tier A/B/C fixes from the prior session landed. Per-test status against the plan inventory: Date-v5..v8 RM ✓; ops-v5/v6/v7 RM ✓; Object-v5 RM ✓; flash-v8 PASS ✓; Global-v5 PASS ✓; action_execution_order_test PASS ✓; registers PASS ✓; trace-as2/arguments PASS ✓; Stage-v6/v7/v8 RM ✓; getvariable-v5..v8 52/58, 58/64, 59/64, 59/64 (still output_mismatch but +38 raw lines confirmed in CI). All remaining items in this plan are explicitly deferred to dedicated plans (ARRAY_V5_PLAN extension for array-vN; needed XML_XMLNODE plan; MovieClip-vN; Function-vN; NetConnection-vN; TextField/TextFormat; argstest enumeration order). Closing all 5 phases.)
+Last updated: 2026-05-19 — **CLOSED**. All tests in the TESTS: header are now either passing/RM or covered by a dedicated `*_PLAN.md`. The Tier A/B/C/D/E body below is preserved as historical reference for the original categorization and the cheap in-triage fixes that landed. New investigation work continues in the per-family plans listed in the closure table immediately below.
+
+## Closure mapping (2026-05-19)
+
+| Test(s) from TESTS: header | Status | Dedicated plan |
+|----------------------------|--------|----------------|
+| Date-v5..v8 | ruffle_matched (in-triage 2026-05-15) | — |
+| ops-v5/v6/v7 | ruffle_matched (in-triage 2026-05-15) | — |
+| Object-v5 | ruffle_matched (in-triage) | — |
+| flash-v8 | PASS (in-triage) | — |
+| Global-v5 | PASS (in-triage) | — |
+| Stage-v6/v7/v8 | ruffle_matched (in-triage 2026-05-15) | — |
+| action_order/action_execution_order_test | PASS (in-triage) | — |
+| misc-swfmill.all/registers | PASS (in-triage 2026-05-15) | — |
+| misc-swfmill.all/trace-as2/arguments | PASS (in-triage 2026-05-15) | — |
+| BitmapDataDraw | ruffle_matched (newly-discovered RM) | — |
+| setProperty-v5/v6/v7/v8 | ruffle_matched (RUFFLE_VS_FLASH-style) | — |
+| getvariable-v5..v8 | output_mismatch (+38 lines in-triage) | `GETVARIABLE_VN_PLAN.md` |
+| Function-v5..v8 | output_mismatch | `FUNCTION_VN_PLAN.md` |
+| Object-v6/v7/v8 | output_mismatch | `OBJECT_VN_PLAN.md` |
+| MovieClip-v6/v7/v8 | output_mismatch | `MOVIECLIP_VN_PLAN.md` |
+| TextField-v6/v7/v8 | output_mismatch | `TEXTFIELD_VN_PLAN.md` |
+| TextFormat-v8 | output_mismatch | `TEXTFORMAT_V8_PLAN.md` |
+| Transform-v8 | output_mismatch | `TRANSFORM_V8_PLAN.md` |
+| XML-v5..v8 + XMLNode-v5..v8 | output_mismatch | `XML_XMLNODE_PLAN.md` (combined) |
+| NetConnection-v6/v7/v8 | output_mismatch | `NETCONNECTION_VN_PLAN.md` |
+| array-v6/v7/v8 | output_mismatch | `ARRAY_V6_V8_PLAN.md` (companion to `ARRAY_V5_PLAN.md`) |
+| argstest-v6/v7/v8 | output_mismatch | `ARGSTEST_VN_DECISION.md` (decision doc, likely ACCEPTED_DIFFS) |
+| GradientFillTest | output_mismatch | `GRADIENTFILLTEST_PLAN.md` |
+| PrototypeEventListeners | output_mismatch | `PROTOTYPEEVENTLISTENERS_PLAN.md` |
+| TextSnapshotTest | output_mismatch | `TEXTSNAPSHOTTEST_PLAN.md` |
+| action_order/PlaceAndRemove | output_mismatch | `PLACEANDREMOVE_PLAN.md` |
+| action_order/action_execution_order_extend_test | output_mismatch | `ACTION_EXECUTION_ORDER_EXTEND_PLAN.md` |
+| loading/LoadBitmapTest | output_mismatch | `LOADBITMAPTEST_PLAN.md` |
+| matrix_accuracy_test1 | output_mismatch | `MATRIX_ACCURACY_TEST1_DECISION.md` (decision doc) |
+| movieclip_destruction_test3 | output_mismatch | `MOVIECLIP_DESTRUCTION_TEST3_PLAN.md` |
+| action_execution_order_test12 | output_mismatch | `ACTION_EXECUTION_ORDER_TEST12_PLAN.md` |
+
+---
+
+Earlier 2026-05-16 (CI run `25974522152` confirms all Tier A/B/C fixes from the prior session landed. Per-test status against the plan inventory: Date-v5..v8 RM ✓; ops-v5/v6/v7 RM ✓; Object-v5 RM ✓; flash-v8 PASS ✓; Global-v5 PASS ✓; action_execution_order_test PASS ✓; registers PASS ✓; trace-as2/arguments PASS ✓; Stage-v6/v7/v8 RM ✓; getvariable-v5..v8 52/58, 58/64, 59/64, 59/64 (still output_mismatch but +38 raw lines confirmed in CI). All remaining items in this plan are explicitly deferred to dedicated plans (ARRAY_V5_PLAN extension for array-vN; needed XML_XMLNODE plan; MovieClip-vN; Function-vN; NetConnection-vN; TextField/TextFormat; argstest enumeration order). Closing all 5 phases.)
 
 Earlier 2026-05-16 (commit `d89f9994`): Tier C **getvariable-v5/v6/v7/v8 +38 raw line matches** via Ruffle-style path validator in `actionGetVariable` / `actionSetVariable`. Adds `isTargetPathStructurallyValid` (simulates Ruffle's `resolve_target_path` iteration without doing the lookups) + `trimLeadingColons` (wraps as `sanitizeTargetPath`). Catches paths that would hit an empty-name lookup in Ruffle (`obj:::xx`, `obj::::xx`, `o..obj2.memb`) and salvages paths Ruffle accepts (`obj::xx`, `::obj:memb`, `_root:clip1:clip2:...clip2` with embedded `:..` parent nav). Both `actionGetVariable`'s and `actionSetVariable`'s dot/colon resolution sections now use the sanitized target and walk only the target portion (not target+prop), with prop GetMember/SetMember done separately. Per-test deltas: v5 44/58 → 52/58 (+8), v6 48/64 → 58/64 (+10), v7 49/64 → 59/64 (+10), v8 49/64 → 59/64 (+10). All four still output_mismatch — residual mismatches are independent closure/this-binding bugs (lines 624, 649, 686 + the line-105 Flash-vs-ours `this._root._level0.varname` divergence where we now resolve correctly but expected output captures the Flash bug). Earlier 2026-05-15: Tier C Stage-v6/v7/v8 RM, Tier B flash-v8 PASS, misc-swfmill.all/registers PASS, action_order/action_execution_order_test PASS, Object-v5 RM, Date-v5..v8 RM.)
 

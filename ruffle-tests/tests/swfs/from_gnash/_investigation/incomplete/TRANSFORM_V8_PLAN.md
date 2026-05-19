@@ -1,0 +1,188 @@
+# Transform-v8 Investigation Plan
+<!-- TESTS: Transform-v8 -->
+
+Last updated: 2026-05-19 (initial planning doc, drafted from local
+single-test reproductions at the current `master` SHA; no fixes
+landed yet)
+
+<!-- PLAN_META
+id: TRANSFORM_V8_PLAN
+status: pending
+phases:
+  - id: 1
+    name: "colorTransform multiplier coercion (alphaMultiplier=-128, etc.)"
+    status: pending
+  - id: 2
+    name: "Standalone Transform object: matrix/colorTransform/pixelBounds return undefined"
+    status: pending
+  - id: 3
+    name: "mc.transform = T propagates back to mc._xscale/_yscale/_rotation"
+    status: pending
+  - id: 4
+    name: "mc.transform.matrix re-resolves after swapDepths"
+    status: pending
+  - id: 5
+    name: "concatenatedMatrix computation"
+    status: pending
+  - id: 6
+    name: "Matrix toString float precision (skew decomposition drift)"
+    status: pending
+dependencies:
+  - id: SUBTESTS_HARNESS
+    reason: "Discovery shipped 2026-05-14 (commit 39b797ac); Transform-v8 became visible at that point."
+related:
+  - id: MATRIX_TEST_SKEW_PLAN
+    reason: "Phase 6 (matrix toString float drift) is the same root cause as the misc-ming `matrix_test` (complete/MATRIX_TEST_SKEW_PLAN.md): we round-trip via xscale/yscale/rotation and lose precision. Apply the same skew-field fix here."
+  - id: MOVIECLIP_VN_PLAN
+    reason: "Phase 4 (transform.matrix after swapDepths) interacts with the soft/hard reference cluster in MOVIECLIP_VN Phase 6."
+blockers: []
+status_note: |
+  Singleton test; failure surface small (~18 failures over 95
+  assertions, 85% line-match). Half the failures collapse to two
+  root causes (multiplier coercion, standalone-Transform-returns-
+  default). Strong ruffle_matched candidate.
+-->
+
+## Status
+
+Local CI baseline (commit `eb8206f8`, 2026-05-15):
+
+| Test | Match | % | Status |
+|------|-------|---|--------|
+| Transform-v8 | 86/101 | 85.1% | output_mismatch |
+
+## Test source
+
+Gnash testsuite/actionscript.all/Transform.as. Tests the
+flash.geom.Transform class: matrix get/set, colorTransform get/set,
+pixelBounds, concatenatedMatrix, and the propagation between an MC
+and its `mc.transform`.
+
+## Failure clusters
+
+### A. colorTransform multiplier coercion (Phase 1)
+
+Lines: 27, 30.
+
+```
+- FAILED: expected: "(redMultiplier=1, greenMultiplier=1, blueMultiplier=1, alphaMultiplier=-128, ...)" obtained: (... alphaMultiplier=-126, ...) [./Transform.as:93]
+- FAILED: expected: "(redMultiplier=0, greenMultiplier=-128, blueMultiplier=-128, alphaMultiplier=-128, redOffset=-32768, greenOffset=-32768, ...)" obtained: (redMultiplier=0, greenMultiplier=-59, blueMultiplier=64, alphaMultiplier=-98, redOffset=-22962, ...)
+```
+
+Setting colorTransform multiplier/offset fields with large or
+fractional values should:
+- Floor-truncate to int8 for multipliers (range -128..127)
+- Floor-truncate to int16 for offsets (-32768..32767)
+- Clamp on overflow (the expected `-128` for an out-of-range input)
+
+Our truncation is wrong (-126 vs -128 suggests we drop the fractional
+part but get the rounding mode wrong) AND we mismatch on the
+`-128, -128, -128` "all-multipliers-clamped" case (we get
+`-59, 64, -98`, suggesting different ops on different channels —
+possibly we read the input multipliers in the wrong order).
+
+### B. Standalone Transform returns undefined for component getters (Phase 2)
+
+Lines: 31, 33, 35, 37.
+
+```
+- PASSED: t.matrix == undefined [./Transform.as:110]
++ FAILED: expected: undefined obtained: (a=1, b=0, c=0, d=1, tx=0, ty=0)
+- PASSED: t.colorTransform == undefined [./Transform.as:113]
++ FAILED: expected: undefined obtained: (redMultiplier=1, ...)
+- PASSED: t.pixelBounds == undefined [./Transform.as:116]
++ FAILED: expected: undefined obtained: (x=0, y=0, w=0, h=0)
+```
+
+A Transform constructed without an MC argument has no underlying
+DisplayObject. Its `matrix`, `colorTransform`, `pixelBounds` getters
+should return undefined. We return identity / clean default values.
+
+Fix: track whether the Transform is "bound" (has a `display_obj_ref`)
+and return undefined from the getters when unbound.
+
+### C. mc.transform = T back-propagation (Phase 3)
+
+Lines: 62, 63, 64.
+
+```
+- PASSED: mc2._xscale == 100 [./Transform.as:175]
++ FAILED: expected: 100 obtained: 200
+- PASSED: mc2._rotation == 1.5 [./Transform.as:177]
++ FAILED: expected: 1.5 obtained: 0
+```
+
+After `mc.transform = transformObject`, the MC's `_xscale`,
+`_yscale`, `_rotation` should be derived from the assigned matrix
+(decompose matrix → scale/rotation). We leave the old values
+unchanged.
+
+### D. mc.transform.matrix after swapDepths (Phase 4)
+
+Lines: 49, 52.
+
+```
+- PASSED: mc.transform.matrix.toString() == trans.matrix.toString() [./Transform.as:152]
++ FAILED: expected: trans.matrix.toString() obtained: undefined
+- PASSED: Math.round(mc.transform.matrix.b * 10000) == 262 [./Transform.as:158]
++ FAILED: expected: 262 obtained: NaN
+```
+
+After `mc.swapDepths(mc2)`, `mc.transform.matrix` should refer to
+whatever MC is now at mc's original slot. We return undefined,
+suggesting the Transform's display_object reference was severed by
+the swap.
+
+### E. concatenatedMatrix (Phase 5)
+
+Lines: 74, 75, 76 (already FAILED on both sides — both expected and
+actual fail; check if our diff is subset of Ruffle's).
+
+```
+  FAILED: nearly_equal(conc1.transform.concatenatedMatrix, 1, 0, 0, 1, 39.75, 2)
+```
+
+We don't compute `concatenatedMatrix` (the matrix accumulated from
+root → this MC). Both expected and actual fail on these lines, so
+this is likely already Ruffle-matched and counts as effective pass.
+Verify diff overlap before doing work.
+
+### F. Matrix toString float precision (Phase 6)
+
+Lines: 70, 71, 73.
+
+```
+- PASSED: mc.transform.matrix.toString() == "(a=3, b=0.5, c=0.5, d=2, tx=0, ty=1)"
++ FAILED: ... obtained: (a=2.99999996073879, b=0.499999994913854, c=0.500000019451254, d=2.00000007157344, ...)
+```
+
+Float drift on round-trip through xscale/yscale/rotation
+decomposition. Same root cause as `matrix_test` in misc-ming
+(plan complete: `MATRIX_TEST_SKEW_PLAN.md`). Apply the same skew-
+field-on-MovieClip fix to preserve the assigned matrix without
+re-deriving via decompose/recompose.
+
+## Recommended fix order
+
+1. **Phase 2 (standalone Transform → undefined)** — simple flag,
+   resolves 4 failures. Estimate: 30 min.
+2. **Phase 1 (multiplier/offset clamping)** — diagnose the
+   wrong-truncation pattern (probably bad signed→unsigned cast).
+   Estimate: 1-2 hours.
+3. **Phase 6 (matrix float precision)** — apply MATRIX_TEST_SKEW
+   pattern. Estimate: 1-2 hours (the work is partly already done in
+   the AVM1 codebase if MATRIX_TEST_SKEW_PLAN reused that).
+4. **Phase 3 (back-propagation to _xscale/_yscale/_rotation)** —
+   matrix decompose on assignment. Estimate: 1-2 hours.
+5. **Phase 4 (swapDepths preserves Transform binding)** — small
+   ref-update fix. Estimate: 1 hour.
+6. **Phase 5 (concatenatedMatrix)** — verify it's ACCEPTED_DIFFS-
+   eligible first; if so, document. If not, ~3 hours. Estimate:
+   30 min decision + maybe 3 hours fix.
+
+Total estimate: 4-9 hours, 1-3 sessions.
+
+## Promotion plumbing
+
+`known_failure = true` + `output.fp9-18.ruffle.txt` sidecar. At 85%
+line-match, only need ~10 lines fixed before subset-match promotes.
