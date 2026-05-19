@@ -1,9 +1,9 @@
 {
   "metadata": {
-    "old_timestamp": "2026-05-16T23:01:59.867086+00:00",
-    "old_git_sha": "ef1e45278ca7e14701c223dd41fef85305de6d60",
-    "new_timestamp": "2026-05-17T17:57:12.149257+00:00",
-    "new_git_sha": "568b76d17ca09453827cb54a8409cb2bfd3b3bd8",
+    "old_timestamp": "2026-05-17T17:57:12.149257+00:00",
+    "old_git_sha": "568b76d17ca09453827cb54a8409cb2bfd3b3bd8",
+    "new_timestamp": "2026-05-19T22:05:22.764328+00:00",
+    "new_git_sha": "80e4118e553876b462dae283a7cda9f52fd92d83",
     "partial": false,
     "same_commit": false
   },
@@ -16,18 +16,91 @@
     "new_pass": 604,
     "new_ruffle_matched": 11,
     "new_effective_pass": 615,
-    "new_total": 655,
-    "new_pass_rate": 92.2,
+    "new_total": 661,
+    "new_pass_rate": 91.4,
     "old_mismatched_lines": 9115,
-    "new_mismatched_lines": 9115,
+    "new_mismatched_lines": 9179,
     "increased_mismatches": 0,
     "decreased_mismatches": 0,
     "newly_passing": 0,
     "newly_failing": 0,
     "status_changed": 0,
     "unchanged": 655,
-    "added": 0,
+    "added": 6,
     "removed": 0
   },
-  "changes": []
+  "changes": [
+    {
+      "test": "sound_getters",
+      "change_type": "added",
+      "old_status": null,
+      "new_status": "output_mismatch",
+      "old_lines": null,
+      "new_lines": {
+        "actual_lines": 99,
+        "expected_lines": 99,
+        "matching_lines": 83
+      }
+    },
+    {
+      "test": "sound_nested_clips",
+      "change_type": "added",
+      "old_status": null,
+      "new_status": "output_mismatch",
+      "old_lines": null,
+      "new_lines": {
+        "actual_lines": 10,
+        "expected_lines": 10,
+        "matching_lines": 5
+      }
+    },
+    {
+      "test": "sound_owner_reference",
+      "change_type": "added",
+      "old_status": null,
+      "new_status": "output_mismatch",
+      "old_lines": null,
+      "new_lines": {
+        "actual_lines": 11,
+        "expected_lines": 12,
+        "matching_lines": 1
+      }
+    },
+    {
+      "test": "sound_owner_tostring_fail",
+      "change_type": "added",
+      "old_status": null,
+      "new_status": "output_mismatch",
+      "old_lines": null,
+      "new_lines": {
+        "actual_lines": 8,
+        "expected_lines": 9,
+        "matching_lines": 3
+      }
+    },
+    {
+      "test": "sound_setters",
+      "change_type": "added",
+      "old_status": null,
+      "new_status": "output_mismatch",
+      "old_lines": null,
+      "new_lines": {
+        "actual_lines": 43,
+        "expected_lines": 43,
+        "matching_lines": 31
+      }
+    },
+    {
+      "test": "sound_start_stop",
+      "change_type": "added",
+      "old_status": null,
+      "new_status": "output_mismatch",
+      "old_lines": null,
+      "new_lines": {
+        "actual_lines": 44,
+        "expected_lines": 44,
+        "matching_lines": 30
+      }
+    }
+  ]
 }
