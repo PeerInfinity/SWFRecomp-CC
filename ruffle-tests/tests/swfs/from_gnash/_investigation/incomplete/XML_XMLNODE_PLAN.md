@@ -23,7 +23,7 @@ phases:
     status: complete
   - id: 5
     name: "XML.send / sendAndLoad / addRequestHeader implementations"
-    status: pending
+    status: complete
   - id: 6
     name: "childNodes as an Array instance (instanceof Array, push, length own-prop)"
     status: pending
@@ -35,7 +35,7 @@ phases:
     status: complete
   - id: 9
     name: "Attribute serialization: insertion order + empty-attribute emission"
-    status: pending
+    status: complete
   - id: 10
     name: "Text-node value handling (nodeValue returning null vs string)"
     status: pending
@@ -64,6 +64,61 @@ status_note: |
 -->
 
 ## Status
+
+### 2026-05-20 session #3 — Phases 5, 9 landed
+
+Two more phases implemented in `SWFModernRuntime/src/actionmodern/action.c`:
+
+- **Phase 9 (attribute serialization).** Two fixes in the XML class:
+  - *Read-only `attributes`.* `xml_create_node` now installs the per-node
+    `attributes` object via a new `xml_set_obj_readonly` helper (WRITABLE
+    cleared, ENUMERABLE kept) so `node.attributes = x` is a no-op
+    (XMLNode.as:215, 223 "Seems not to be overwritable"). Writes to the
+    attributes object's *members* are unaffected; internal raw `setProperty`
+    ignores the WRITABLE flag.
+  - *Reverse-insertion serialization.* `xml_serialize_node` now iterates the
+    attributes property array **backwards**. Flash serializes attributes in
+    the order an AVM1 `for..in` enumerates them (reverse-insertion); the XML
+    parser already inserts parsed attributes reversed, so reverse iteration
+    yields document order for parsed XML and most-recent-first for user-set
+    attributes. Verified against all 27 AVM1 `xml*` regression tests (still
+    100%).
+  - Net: XMLNode-v5..v8 each +4 matched lines (191→195 passed; the four
+    attribute checks XMLNode.as:213/217/224/236 now pass).
+
+- **Phase 5 (send / sendAndLoad / addRequestHeader).** Real implementations
+  replace the `builtin_noop_func` stubs on XML.prototype:
+  - `builtin_xml_sendAndLoad`: returns `true` when arg[1] is an object
+    (XML, XMLNode, LoadVars, Date, plain Object), `false` for primitives.
+    Sets `target.loaded = false` through the proper member-set path — for an
+    XML receiver the virtual `loaded` accessor (found via
+    `findPropertyStructWithPrototype` + `invokePropertySetter`) routes the
+    write to the hidden `__xml_loaded` slot so no own `loaded` appears
+    (XML.as:689); a plain object / LoadVars / Date receiver gets a normal own
+    `loaded` data property (XML.as:687,700,732).
+  - `builtin_xml_addRequestHeader`: builds an own `_customHeaders` Array on
+    the receiver (created on the first call regardless of arg validity).
+    Two-string-argument and single-array-argument forms append; every other
+    form appends nothing. If `_customHeaders` was overwritten with a
+    non-array, nothing is appended.
+  - `send` stays a no-op (only its existence is tested).
+  - Net: XML-v5 verbose-diff `^+` mismatch count 124 → 109.
+
+Remaining XML-vN fails: Phase 6 (childNodes as Array), Phase 12 (whitespace
+merge), and **the docTypeDecl/xmlDecl + onLoad-truncation cluster**. New
+diagnosis of the truncation (XML-v5 actual output stops at XML.as:1104,
+449 expected vs 419 actual): `myxml.load(MEDIA(gnash.xml))` fails because
+`findDataFile()` cannot resolve the `MEDIA(gnash.xml)` URL string, so
+`onLoad(false)` fires (output: "No success loading gnash.xml") instead of
+`onLoad(true)`. The `onLoad(false)` branch `return`s before `++onLoadCalls`,
+so `onLoadCalls` never reaches 2, `check_totals(438)` is never called, and no
+`#passed/#failed/#total` lines are emitted — the test "truncates". Two
+sub-issues here: (a) the `MEDIA(gnash.xml)` URL string is not matched by the
+data-file registry even though `gnash.xml` is present in the test dir; (b) our
+`builtin_xml_load` is fully synchronous (fires onLoad inline) whereas Flash's
+load is async (callback fires after all sync code) — so even a successful load
+would interleave onLoad output in the wrong position. Not a named phase;
+worth its own investigation.
 
 ### 2026-05-20 session #2 — Phases 2, 3, 4, 11 landed
 

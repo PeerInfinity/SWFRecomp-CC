@@ -16765,6 +16765,19 @@ static void xml_set_obj(SWFAppContext* ctx, ASObject* obj, const char* name, u32
 	setProperty(ctx, obj, name, nlen, &v);
 }
 
+// Set an object-valued property that is read-only against user SetMember
+// writes (still enumerable, still mutable by internal raw setProperty). Used
+// for `attributes`: Flash makes `node.attributes = x` a no-op (XMLNode.as:215,
+// 223 "Seems not to be overwritable", Phase 9 of XML_XMLNODE_PLAN). Writes to
+// the attributes object's *members* are unaffected.
+static void xml_set_obj_readonly(SWFAppContext* ctx, ASObject* obj, const char* name, u32 nlen, ASObject* val) {
+	ActionVar v = {0};
+	v.type = ACTION_STACK_VALUE_OBJECT;
+	v.data.numeric_value = (u64) val;
+	setPropertyWithFlags(ctx, obj, name, nlen, &v,
+		PROPERTY_FLAG_ENUMERABLE | PROPERTY_FLAG_CONFIGURABLE);
+}
+
 // Set a string-valued property (makes a copy of the string, converts UTF-8 to UTF-16)
 static void xml_set_str(SWFAppContext* ctx, ASObject* obj, const char* name, u32 nlen, const char* val, u32 vlen) {
 	ActionVar v = {0};
@@ -16930,10 +16943,11 @@ static ASObject* xml_create_node(SWFAppContext* app_context, int nodeType,
 	cn.data.numeric_value = (u64) children;
 	setProperty(app_context, node, "childNodes", 10, &cn);
 
-	// attributes — always an object (Flash has attributes defined on text nodes too)
+	// attributes — always an object (Flash has attributes defined on text nodes too).
+	// Read-only against user SetMember writes (`node.attributes = x` is a no-op).
 	{
 		ASObject* attrs = allocObject(app_context, 4);
-		xml_set_obj(app_context, node, "attributes", 10, attrs);
+		xml_set_obj_readonly(app_context, node, "attributes", 10, attrs);
 	}
 
 	// Namespace properties — parse prefix:localName from nodeName
@@ -17682,7 +17696,12 @@ static void xml_serialize_node(SWFAppContext* app_context, ASObject* node, XmlBu
 	if (attrs_prop != NULL && attrs_prop->type == ACTION_STACK_VALUE_OBJECT) {
 		ASObject* attrs = (ASObject*) attrs_prop->data.numeric_value;
 		if (attrs != NULL) {
-			for (u32 i = 0; i < attrs->num_used; i++) {
+			// Flash serializes attributes in reverse-insertion order (the
+			// order an AVM1 `for..in` would enumerate them). The XML parser
+			// inserts parsed attributes reversed, so reverse iteration here
+			// yields document order for parsed XML and most-recent-first for
+			// user-set attributes. Phase 9 of XML_XMLNODE_PLAN.
+			for (u32 i = attrs->num_used; i-- > 0;) {
 				if (attrs->properties[i].name[0] == '\0') continue;
 				if (strcmp(attrs->properties[i].name, "__proto__") == 0) continue;
 				xb_append(app_context, xb, " ", 1);
@@ -18195,6 +18214,79 @@ static ActionVar builtin_xml_load(SWFAppContext* app_context, ActionVar* args, u
 	return ret;
 }
 
+// XML.sendAndLoad(url, target [, method]): kicks off an (offline-no-op)
+// network load into `target`. Returns true when `target` is an object
+// (XML, XMLNode, LoadVars, Date, plain Object, ...), false for primitives.
+// Flash sets `target.loaded = false` through the normal member-set path:
+// for an XML receiver the virtual `loaded` accessor routes the write to the
+// hidden __xml_loaded slot, so no own `loaded` property appears
+// (XML.as:689); a plain object / LoadVars / Date receiver gets a normal own
+// `loaded` data property (XML.as:687,700,732). Phase 5 of XML_XMLNODE_PLAN.
+static ActionVar builtin_xml_sendAndLoad(SWFAppContext* app_context, ActionVar* args, u32 arg_count,
+	ActionVar* registers, void* this_obj)
+{
+	(void)registers; (void)this_obj;
+	ActionVar ret = {0}; ret.type = ACTION_STACK_VALUE_BOOLEAN;
+	ret.data.numeric_value = 0;
+	if (arg_count < 2 || args[1].type != ACTION_STACK_VALUE_OBJECT) return ret;
+	ASObject* target = (ASObject*) args[1].data.numeric_value;
+	if (target == NULL) return ret;
+
+	ActionVar lf = {0}; lf.type = ACTION_STACK_VALUE_BOOLEAN; lf.data.numeric_value = 0;
+	ASProperty* loaded_prop = findPropertyStructWithPrototype(target, "loaded", 6);
+	if (loaded_prop != NULL && loaded_prop->setter != NULL) {
+		invokePropertySetter(app_context, (ASFunction*) loaded_prop->setter, (void*) target, &lf);
+	} else {
+		setProperty(app_context, target, "loaded", 6, &lf);
+	}
+	ret.data.numeric_value = 1;
+	return ret;
+}
+
+// XML.addRequestHeader(name, value) or addRequestHeader([n1,v1,n2,v2,...]):
+// appends HTTP request header name/value pairs onto an own `_customHeaders`
+// Array on the receiver. The array is created on the first call regardless of
+// argument validity. Two-string-argument and single-array-argument forms
+// append; every other form (no args, non-string args, mixed types) creates /
+// keeps `_customHeaders` but appends nothing. If `_customHeaders` was
+// overwritten with a non-array value, nothing is appended. Phase 5 of
+// XML_XMLNODE_PLAN (XML.as:744-811).
+static ActionVar builtin_xml_addRequestHeader(SWFAppContext* app_context, ActionVar* args, u32 arg_count,
+	ActionVar* registers, void* this_obj)
+{
+	(void)registers;
+	ActionVar undef = {0}; undef.type = ACTION_STACK_VALUE_UNDEFINED;
+	ASObject* self = (ASObject*) this_obj;
+	if (self == NULL) return undef;
+
+	ASArray* arr = NULL;
+	ActionVar* ch = getProperty(self, "_customHeaders", 14);
+	if (ch == NULL) {
+		arr = allocArray(app_context, 0);
+		ActionVar cv = {0};
+		cv.type = ACTION_STACK_VALUE_ARRAY;
+		cv.data.numeric_value = (u64) arr;
+		setProperty(app_context, self, "_customHeaders", 14, &cv);
+	} else if (ch->type == ACTION_STACK_VALUE_ARRAY) {
+		arr = (ASArray*) ch->data.numeric_value;
+	}
+	if (arr == NULL) return undef;  // _customHeaders overwritten with a non-array
+
+	if (arg_count == 1 && args[0].type == ACTION_STACK_VALUE_ARRAY) {
+		ASArray* src = (ASArray*) args[0].data.numeric_value;
+		if (src != NULL) {
+			for (u32 i = 0; i < src->length; i++)
+				setArrayElement(app_context, arr, arr->length, &src->elements[i]);
+		}
+	} else if (arg_count >= 2 &&
+	           args[0].type == ACTION_STACK_VALUE_STRING &&
+	           args[1].type == ACTION_STACK_VALUE_STRING) {
+		setArrayElement(app_context, arr, arr->length, &args[0]);
+		setArrayElement(app_context, arr, arr->length, &args[1]);
+	}
+	return undef;
+}
+
 // Helper to init a static method ASFunction
 static void xml_init_method(ASFunction* fn, const char* name, Function2Ptr func) {
 	memset(fn, 0, sizeof(ASFunction));
@@ -18279,8 +18371,8 @@ static void initXMLPrototype(SWFAppContext* app_context) {
 	xml_init_method(&g_xml_fn_onData, "onData", builtin_xml_onData);
 	xml_init_method(&g_xml_fn_onLoad, "onLoad", (Function2Ptr)builtin_noop_func);
 	xml_init_method(&g_xml_fn_send, "send", (Function2Ptr)builtin_noop_func);
-	xml_init_method(&g_xml_fn_sendAndLoad, "sendAndLoad", (Function2Ptr)builtin_noop_func);
-	xml_init_method(&g_xml_fn_addRequestHeader, "addRequestHeader", (Function2Ptr)builtin_noop_func);
+	xml_init_method(&g_xml_fn_sendAndLoad, "sendAndLoad", builtin_xml_sendAndLoad);
+	xml_init_method(&g_xml_fn_addRequestHeader, "addRequestHeader", builtin_xml_addRequestHeader);
 
 	// ---- XMLNode constructor ----
 	memset(&g_xmlnode_constructor, 0, sizeof(ASFunction));
