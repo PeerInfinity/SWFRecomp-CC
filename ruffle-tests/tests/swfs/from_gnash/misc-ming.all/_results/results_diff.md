@@ -1,20 +1,20 @@
 # Ruffle Test Results Diff
 
-**Previous:** `65fb43cd11d1` (2026-05-19T23:31:02.025638+00:00)
-**Current:** `879a8566b213` (2026-05-20T00:10:52.836139+00:00)
+**Previous:** `879a8566b213` (2026-05-20T00:10:52.836139+00:00)
+**Current:** `81af77a89acb` (2026-05-20T00:56:46.256841+00:00)
 
 ## Summary
 
 | Metric | Previous | Current | Delta |
 |--------|----------|---------|-------|
-| Passing | 64 | 65 | +1 |
+| Passing | 65 | 65 | 0 |
 | Total | 110 | 110 | 0 |
-| Pass rate | 58.2% | 59.1% | +0.9% |
-| Mismatched lines | 1254 | 1237 | -17 |
-|   Decreased | | | -17 |
+| Pass rate | 59.1% | 59.1% | 0% |
+| Mismatched lines | 1237 | 1236 | -1 |
+|   Decreased | | | -1 |
 
-## Newly Passing (1)
+## Status Changed (1)
 
-| Test | Previous Status | Lines (prev) | Lines (now) |
-|------|----------------|--------------|-------------|
-| `loop/loop_test` | output_mismatch | 4/21 | 21/21 |
+| Test | Previous | Current | Lines (prev) | Lines (now) |
+|------|----------|---------|--------------|-------------|
+| `loading/LoadBitmapTest` | output_mismatch | ruffle_matched | 13/17 | 14/17 |
