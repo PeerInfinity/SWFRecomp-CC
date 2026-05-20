@@ -49,6 +49,10 @@ int goto_from_action = 0;
 int g_deferred_root_goto = 0;
 int g_skip_inline_target_script = 0;
 int g_goto_inlined_in_caller_frame = 0;
+// See swf_core.c for the rationale. Set to 1 for exactly the frame_0 re-run
+// that follows a natural backward timeline wrap; consulted by tagPlaceObject2.
+int g_loopback_replay = 0;
+int g_loopback_replay_armed = 0;
 
 extern void ng_display_clear_after(SWFAppContext* app_context, size_t target_frame);
 extern void ng_display_cleanup_unplaced_after(SWFAppContext* app_context, size_t target_frame);
@@ -582,7 +586,10 @@ void tagMain(SWFAppContext* app_context)
 #endif
 		    )
 		{
+			g_loopback_replay = g_loopback_replay_armed;
+			g_loopback_replay_armed = 0;
 			frame_funcs[current_frame](app_context);
+			g_loopback_replay = 0;
 #ifdef OFFSCREEN_RENDER
 			// If a goto inside the script inlined the target frame's body
 			// AND the recompiler-emitted last-frame wrap-back fired
@@ -861,6 +868,10 @@ void tagMain(SWFAppContext* app_context)
 				}
 				ng_display_clear_after(app_context, next_frame);
 				ng_display_cleanup_unplaced_after(app_context, next_frame);
+				// The upcoming re-run of frame_funcs[next_frame] is a rewind
+				// (loop wrap); arm the flag so tagPlaceObject2 modifies rather
+				// than refuses a Place on a swapDepths-occupied depth.
+				g_loopback_replay_armed = 1;
 			}
 #endif
 			// Goto/play command set next_frame directly

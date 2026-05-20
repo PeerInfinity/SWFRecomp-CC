@@ -1,16 +1,16 @@
 # loop_test / loop_test10 Regression Plan
 <!-- TESTS: misc-ming.all/loop/loop_test, misc-ming.all/loop/loop_test10 -->
 
-Last updated: 2026-05-19 (Phase 2 done — loop_test10 regression
-re-landed; Phase 1 loop_test still pending)
+Last updated: 2026-05-19 (Phase 1 + Phase 2 both done — loop_test
+PASS, loop_test10 ruffle_matched; plan complete)
 
 <!-- PLAN_META
 id: LOOP_TEST_REGRESSION_PLAN
-status: in_progress
+status: complete
 phases:
   - id: 1
     name: "loop_test: depth-cycle output reordered; auto-instance-counter off by 1"
-    status: pending
+    status: done
   - id: 2
     name: "loop_test10: PlaceObject2 + Remove same-frame regression; auto-instance counter off by 3"
     status: done
@@ -52,39 +52,43 @@ both in CI and locally.
 
 ## Failure surface
 
-### loop_test (4/21)
+### loop_test — RESOLVED 2026-05-19 (PASS)
 
-The actual output reorders + inserts "Warning: Failed to place
-object at depth 64000" / "depth 3" lines that aren't in the
-expected output:
+Root cause: the same Phase-3 Place-refusal gate from commit
+`12fa91a3` that broke loop_test10. loop_test places movieClip1
+(char 5) at depth 64000 and movieClip2 (char 7) at depth 3, then a
+clip-event handler `swapDepths` them every loop iteration. swapDepths
+does NOT bump `placed_at_frame`, so after the swap each depth holds
+a different character whose `placed_at_frame` is still 0. On the
+natural timeline loop wrap (frame 2 → frame 0), frame 0's
+`tagPlaceObject2` Place tags re-target depths 64000/3 — now occupied
+by the swapped-in (different) character. The Phase-3 gate
+(`char_id != display_list[depth].char_id && placed_at_frame <=
+current_frame`) fired and printed "Warning: Failed to place object
+at depth N" — 6 spurious lines (2 per loop). The pairwise-swap
+appearance in the diff was a line-alignment artifact of those 6
+extra lines; actual-minus-warnings already matched expected exactly.
 
-```
-- PASSED: 47616 == 47616   (line 7 expected)
-+ PASSED: -16381 == -16381  (line 7 actual — got line 8's content)
-- PASSED: -16381 == -16381  (line 8 expected)
-+ PASSED: 47616 == 47616    (line 8 actual — swapped with line 7)
-- PASSED: -16381 == -16381  (line 9 expected)
-+ Warning: Failed to place object at depth 64000.   (line 9 actual)
-- PASSED: 47616 == 47616    (line 10 expected)
-+ Warning: Failed to place object at depth 3.       (line 10 actual)
-```
+Ruffle never warns here: a natural loop wrap is an implicit
+`run_goto(1, is_rewind=true)` (`NextFrame::First`), and `run_goto`'s
+`(_, Some(prev_child), true)` arm treats a Place at an occupied
+depth during a rewind as a *modify* of the surviving child, never an
+instantiate/refuse. `survives_rewind` keeps a MovieClip at a depth
+whenever `ratio_equals` holds (id mismatch is irrelevant for MCs),
+so the swapped clips survive and persist across the loop.
 
-Two symptoms in one cluster:
-- Adjacent depth-cycle traces are pairwise swapped (lines 7↔8,
-  13↔14, 17↔18) — looks like the test does a loop over a sprite
-  with two depths and we are iterating in reverse order on
-  successive ticks.
-- "Warning: Failed to place object at depth N" warnings appear
-  where the expected output has clean PASSED lines — the test
-  uses `swapDepths` to negative-bias depths (-16381 ≈ ALSPRITE_FLAG
-  area), and our placement is rejecting some swaps. Probably a
-  bounds check that wasn't present before.
+Fix: a new `g_loopback_replay` flag (`swf_core.c` / `swf.c`), armed
+by the natural-backward-wrap branch and scoped to exactly the
+frame_0 re-run. `tagPlaceObject2`'s Phase-3 refusal is now gated
+`&& !g_loopback_replay`, and the existing `catch_up_backward`
+survives-block (already implementing Ruffle's `survives_rewind` +
+modify) now also fires on `g_loopback_replay`. The natural loop
+wrap thus goes through the same rewind-modify path as a goto-driven
+backward catch-up.
 
-The 2026-05-02 entry in REMAINING_TAIL_TRIAGE said this was
-resolved by "cluster fixes recovered the depth-bias / interleave
-behavior". Need to git-bisect/git-blame the depth-bias and
-PlaceObject swap code to find which later commit re-introduced
-the regression.
+Verified PASS; regression battery clean — see Phase 2 note below
+(same battery covers both fixes) plus 16-test avm1 goto/rewind
+battery and 5-test from_shumway timeline_as2 battery, all green.
 
 ### loop_test10 — RESOLVED 2026-05-19 (ruffle_matched)
 

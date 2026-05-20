@@ -89,6 +89,18 @@ int g_goto_inlined_in_caller_frame = 0;
 // wrap triggers catch-up, signaling actionDrainOnloadAndScript to clean up
 // unsurvivors before scripts run. Cleared on first drain.
 int g_natural_wrap_cleanup_pending = 0;
+// Set to 1 for exactly one frame execution: the frame_0 re-run that immediately
+// follows a natural backward timeline wrap (last frame loops back to frame 0).
+// Mirrors Ruffle's `is_rewind` on the implicit `run_goto(1)` it does for the
+// loop wrap (NextFrame::First branch). tagPlaceObject2 consults this so a
+// timeline Place landing on an occupied depth — e.g. one a script swapDepths'd
+// a different character into — is treated as a modify of the existing child
+// (Ruffle's run_goto `(_, Some(prev_child), true)` arm) rather than refused.
+int g_loopback_replay = 0;
+// Armed by the natural-backward-wrap branch; converted to g_loopback_replay
+// immediately before funcs[current_frame] runs (so it's scoped tightly to the
+// root frame re-run and doesn't leak into advance_sprite_frames).
+int g_loopback_replay_armed = 0;
 size_t catch_up_target = 0;   // target frame for backward goto protection
 int g_deferred_goto_play = 0; // Set when gotoAndPlay targets root from inside a sprite
 int g_deferred_root_goto = 0; // Set when GotoFrame targets root from inside a sprite — skip re-running current frame
@@ -999,7 +1011,10 @@ void swfStart(SWFAppContext* app_context)
 				}
 				else if (funcs[current_frame])
 				{
+					g_loopback_replay = g_loopback_replay_armed;
+					g_loopback_replay_armed = 0;
 					funcs[current_frame](app_context);
+					g_loopback_replay = 0;
 					// If a goto inside the script inlined the target frame's body
 					// AND the recompiler-emitted last-frame wrap-back fired
 					// afterward (signature: next_frame=0; manual_next_frame=1),
@@ -1422,6 +1437,12 @@ void swfStart(SWFAppContext* app_context)
 				ng_display_clear_after(app_context, next_frame);
 				extern void ng_display_cleanup_unplaced_after(SWFAppContext*, size_t);
 				ng_display_cleanup_unplaced_after(app_context, next_frame);
+				// The upcoming re-run of funcs[next_frame] is a rewind (loop
+				// wrap). Arm the flag so tagPlaceObject2 modifies — rather than
+				// refuses — a Place that lands on a depth a script swapDepths'd
+				// a different character into. Converted to g_loopback_replay
+				// right before funcs runs, cleared right after.
+				g_loopback_replay_armed = 1;
 			}
 #endif
 			current_frame = next_frame;

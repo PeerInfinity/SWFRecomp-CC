@@ -5056,12 +5056,21 @@ void tagPlaceObject2(SWFAppContext* app_context, size_t depth, size_t char_id, u
 	//   immediately (the unload event fires later), so a subsequent Place at
 	//   that depth must succeed. Without this gate, gnash misc-ming
 	//   loop_test10's frame-3 Remove(mc1)+Place(mc2) at depth 100 is refused.
+	// - `!g_loopback_replay`: a natural timeline loop wrap re-runs frame 0 as a
+	//   rewind. Ruffle's run_goto treats a Place at an occupied depth during a
+	//   rewind as a modify of the existing child, never an instantiate/refuse.
+	//   The catch_up_backward survives-block below handles the modify; refusing
+	//   here would short-circuit it. Without this, gnash misc-ming loop_test
+	//   prints a spurious "Failed to place" each loop where swapDepths put a
+	//   different character into the depth a frame-0 Place tag targets.
 	extern int ng_depth_has_pending_finalize(size_t);
+	extern int g_loopback_replay;
 	if (char_id != 0 && !is_replace
 	    && display_list[depth].char_id != 0
 	    && display_list[depth].char_id != char_id
 	    && display_list[depth].placed_at_frame <= current_frame
-	    && !ng_depth_has_pending_finalize(depth))
+	    && !ng_depth_has_pending_finalize(depth)
+	    && !g_loopback_replay)
 	{
 		// Match Ruffle's avm_warning on a refused Place (and the existing
 		// same-frame check at ~line 5362, which this earlier-firing gate would
@@ -5133,7 +5142,12 @@ void tagPlaceObject2(SWFAppContext* app_context, size_t depth, size_t char_id, u
 	{
 		extern int catch_up_backward;
 		extern size_t catch_up_target;
-		if (catch_up_backward && display_list[depth].char_id != 0)
+		extern int g_loopback_replay;
+		// catch_up_backward: a goto-driven backward catch-up. g_loopback_replay:
+		// the natural timeline loop wrap (last frame -> frame 0). Both are
+		// rewinds in Ruffle's run_goto sense, so a Place at an occupied depth
+		// is a modify of the surviving child, not an instantiate.
+		if ((catch_up_backward || g_loopback_replay) && display_list[depth].char_id != 0)
 		{
 			// Ruffle survives_rewind: for MovieClip, only ratio_equals is
 			// required (id differences are OK — a swapDepths-moved MC at a
