@@ -1,13 +1,54 @@
 # NetConnection-vN Investigation Plan
 <!-- TESTS: NetConnection-v6, NetConnection-v7, NetConnection-v8 -->
 
-Last updated: 2026-05-19 (initial planning doc, drafted from local
-single-test reproductions at the current `master` SHA; no fixes
-landed yet)
+Last updated: 2026-05-19 (RESOLVED — all three tests now `ruffle_matched`
+(effective pass). NetConnection.connect()/close() rewritten to match
+Flash semantics; see "Resolution" below.)
+
+## Resolution (2026-05-19, pending CI)
+
+`NetConnection-v6/v7/v8` all flipped `output_mismatch` → `ruffle_matched`.
+Single-file change in `SWFModernRuntime/src/actionmodern/action.c`
+(`builtin_nc_connect`, `builtin_nc_close`, `nc_dispatch_onStatus`, and the
+`new NetConnection` constructor). Verified against `output.fp30.txt` (the
+subtests harness resolves the highest-version variant) — our residual diff
+is `{75,76}` (the `connect("http://www.blacklistedserver.org")` sandbox-
+rejection lines) ⊆ Ruffle's 44-line diff, so the tests auto-promote.
+
+Key behaviour changes (all driven by gnash `NetConnection_as.cpp` +
+`NetConnection.as` expected output):
+
+- **`connect()` with no argument is a no-op** — returns undefined, fires
+  no onStatus, leaves isConnected unchanged (Phase 1).
+- **`connect(null)` / `connect(undefined)` (SWF7+) → Connect.Success**,
+  isConnected=true, returns `true` (Phase 3). On SWF6 `connect(undefined)`
+  falls through to the failure path.
+- **`connect(<non-URL string|number>)` → Connect.Failed**, level `error`,
+  returns `false` (Phases 2, 5). Empty string returns false but fires **no**
+  onStatus (matches Flash Player ≥10 / fp30 expected output + Ruffle).
+- **`connect("…://…")`** (rtmp/http) → treated as a pending remote
+  connection: no immediate onStatus, isConnected stays false, but a native
+  `has_remote` flag makes a later `close()` report Connect.Closed. This is
+  the one place we can't be Flash-exact: the gnash test's blacklisted-server
+  URL should report Failed, but distinguishing it from AVM1
+  `netconnection_close`'s `http://example.org` (which must stay pending)
+  needs a sandbox blacklist we don't model. Those 2 lines are inside
+  Ruffle's diff, so the test still promotes.
+- **`nc.uri`** is set unconditionally from the string-coerced first arg as a
+  read-only property (undefined → "" for SWF<7); user writes ignored (Phase 4).
+- **`nc.isConnected`** is a read-only property; AS writes ignored.
+- **onStatus infoObj** is a real Object (`__proto__` → Object.prototype) so
+  `infoObj instanceof Object` and `infoObj.toString()` work (Phase 6).
+- **`close()`** fires Connect.Closed only when a connection (local or pending
+  remote) was live; remote connections also fire a second undefined-event
+  onStatus (Phase 7). `statuses` ordering follows naturally (Phase 8).
+
+No regressions: AVM1 `netconnection_close` PASS, `native_objects_swf7/8`
+PASS, gnash `NetConnection-v5` PASS, `NetStream-v6/v7`, `Video-v6` PASS.
 
 <!-- PLAN_META
 id: NETCONNECTION_VN_PLAN
-status: pending
+status: complete
 phases:
   - id: 1
     name: "connect(undefined) is a no-op, not Connect.Success"

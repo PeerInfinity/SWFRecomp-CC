@@ -47,7 +47,7 @@ whole row.
 | ~~`OBJECT_VN_PLAN`~~ | Object-v6/v7/v8 (v5 already RM) | `incomplete/OBJECT_VN_PLAN.md` (2026-05-19) | Plan written — 7 phases covering Function class identity (shared with FUNCTION_VN), `obj.hasOwnProperty('constructor')`, addProperty getter/setter dispatch (`obtained: 65` bug), watch() callback args, `o._target` undefined-vs-string, watch return-value validation. |
 | ~~`GETVARIABLE_VN_PLAN`~~ | getvariable-v5/v6/v7/v8 | `incomplete/GETVARIABLE_VN_PLAN.md` (2026-05-19) | Plan written — 3 phases covering `var xx` local-shadow vs path-setvariable, path-call `this` binding (`_root.o.func` → this=_root.o), and the line-105 PASS-where-Gnash-expected-FAILED check. |
 | ~~`MOVIECLIP_VN_PLAN`~~ | MovieClip-v6/v7/v8 | `incomplete/MOVIECLIP_VN_PLAN.md` (2026-05-19) | Plan written — 17 phases. Largest clusters: prototype method visibility (`MovieClip.prototype.meth`), getSWFVersion always returning 5, soft/hard reference semantics, getBounds reference-clip transforms, addProperty on MC virtual props. Several small wins (Phase 13 setProperty return-value, Phase 4 _soundbuftime per-root, Phase 11 _yscale sign, Phase 17 _quality BEST). |
-| ~~`NETCONNECTION_VN_PLAN`~~ | NetConnection-v6/v7/v8 | `incomplete/NETCONNECTION_VN_PLAN.md` (2026-05-19) | Plan written — 8 phases. Concentrated bug area: connect()'s argument validation (undefined no-op, null/string coercion, Failed-vs-Closed distinction) and onStatus infoObj shape. Estimated 4-5 hours total, strong ruffle_matched candidate in a single landing. |
+| ~~`NETCONNECTION_VN_PLAN`~~ | NetConnection-v6/v7/v8 | `complete/NETCONNECTION_VN_PLAN.md` (2026-05-19) | **RESOLVED 2026-05-19 → all three ruffle_matched.** connect()/close() rewritten to Flash semantics; residual diff (blacklisted-http lines) ⊆ Ruffle's. |
 | ~~`TEXTFIELD_VN_PLAN`~~ | TextField-v6/v7/v8 | `incomplete/TEXTFIELD_VN_PLAN.md` (2026-05-19) | Plan written — 13 phases covering AsBroadcaster integration, prototype-vs-instance own-prop layout, getFontList, boolean-setter coercion (background/embedFonts/multiline/selectable/password), null-state for maxChars/restrict/variable, MC-only frame-props gated off on TextFields, tf.type case-normalize, tf._width/_height initial value (likely biggest impact), tf.maxhscroll default, tf.length cache, tf._parent silent-no-op, replaceText stub, container-MC identity. |
 | ~~`TEXTFORMAT_V8_PLAN`~~ | TextFormat-v8 | `incomplete/TEXTFORMAT_V8_PLAN.md` (2026-05-19) | Separate from TEXTFIELD — only 2 clusters: INT_MIN clamping on negative numeric setters (blockIndent/leading/indent/size), and getTextExtent font-metric precision (likely RUFFLE_VS_FLASH or ruffle_matched-eligible; diff against `output.fp9-18.ruffle.txt` first). |
 | ~~`TRANSFORM_V8_PLAN`~~ | Transform-v8 | `incomplete/TRANSFORM_V8_PLAN.md` (2026-05-19) | Plan written — 6 phases. Cross-references MATRIX_TEST_SKEW (matrix float drift) and MOVIECLIP_VN (swapDepths binding). At 85% line-match — strong ruffle_matched candidate after Phases 1+2 land. |
@@ -78,6 +78,23 @@ Suggested write order:
 4. **Single-test deferrals**: everything else, lowest priority unless picked up opportunistically.
 
 ### Latest fix (2026-05-19, pending CI)
+
+- **`NetConnection-v6/v7/v8` (actionscript.all): output_mismatch → `ruffle_matched`.**
+  Implements `complete/NETCONNECTION_VN_PLAN.md` (all 8 phases) in one
+  `SWFModernRuntime/src/actionmodern/action.c` change. `NetConnection.connect()`
+  rewritten to Flash semantics: no-arg is a no-op; `connect(null)` /
+  `connect(undefined)`-on-SWF7+ → Connect.Success + `isConnected=true` +
+  return `true`; non-URL string/number → Connect.Failed + return `false`;
+  empty string → false with no onStatus (Flash Player ≥10 / fp30 behaviour);
+  `"…://…"` → pending remote connection (no onStatus, native `has_remote`
+  flag drives a later `close()`'s Connect.Closed). `nc.uri` is now a read-only
+  string property set from the coerced first arg; `nc.isConnected` is
+  read-only too. The onStatus infoObj got an `__proto__` so
+  `infoObj instanceof Object` works. Residual diff `{75,76}` (blacklisted
+  http URL — needs an unmodellable sandbox blacklist) ⊆ Ruffle's 44-line
+  diff against `output.fp30.txt`, so all three auto-promote. No regressions
+  (AVM1 `netconnection_close`, `native_objects_swf7/8`, gnash
+  `NetConnection-v5`, `NetStream-v6/v7`, `Video-v6` all pass).
 
 - **`loading/LoadBitmapTest` (misc-ming.all): 13/17 output_mismatch → ruffle_matched.**
   One change in `SWFModernRuntime/src/actionmodern/action.c::bitmapDataLoadBitmap`.

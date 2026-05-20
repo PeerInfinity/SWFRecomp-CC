@@ -2253,6 +2253,25 @@ static ActionVar makeStringActionVar(SWFAppContext* app_context, const char* str
 static ASFunction g_nc_connect_func;
 static ASFunction g_nc_close_func;
 
+// NetConnection per-instance native state.
+// `has_remote` mirrors gnash's `_currentConnection.get()`: a remote (rtmp/http)
+// connection attempt is "pending" — isConnected stays false but close() still
+// fires Connect.Closed (+ an undefined-event onStatus for remote conns).
+#define MAX_NC_STATES 16
+typedef struct { ASObject* nc; int has_remote; } NCState;
+static NCState g_nc_states[MAX_NC_STATES];
+static int g_nc_state_count = 0;
+
+static NCState* nc_get_state(ASObject* nc)
+{
+	for (int i = 0; i < g_nc_state_count; i++)
+		if (g_nc_states[i].nc == nc) return &g_nc_states[i];
+	if (g_nc_state_count >= MAX_NC_STATES) return &g_nc_states[0];
+	NCState* s = &g_nc_states[g_nc_state_count++];
+	s->nc = nc; s->has_remote = 0;
+	return s;
+}
+
 // --- NetStream playback implementation ---
 
 static ASFunction g_ns_play_func;
@@ -3550,7 +3569,11 @@ static void nc_dispatch_onStatus(SWFAppContext* app_context, ASObject* nc,
 	if (func == NULL) return;
 
 	// Create event object: { code: "...", level: "..." }
+	// __proto__ must point at Object.prototype so the infoObj passed to
+	// onStatus satisfies `infoObj instanceof Object` and inherits toString
+	// ("[object Object]") — see gnash NetConnection.as:234-235.
 	ASObject* event_obj = allocObject(app_context, 4);
+	setObjectProto(app_context, event_obj);
 	ActionVar cv = makeStringActionVar(app_context, code, strlen(code));
 	setProperty(app_context, event_obj, "code", 4, &cv);
 	ActionVar lv = makeStringActionVar(app_context, level, strlen(level));
@@ -3633,40 +3656,77 @@ static ActionVar builtin_nc_connect(SWFAppContext* app_context, ActionVar* args,
 	ActionVar ret = {0}; ret.type = ACTION_STACK_VALUE_UNDEFINED;
 	if (nc == NULL) return ret;
 
-	// If already connected, fire Close first
+	// connect() with no argument is a no-op: nothing changes, returns
+	// undefined (gnash NetConnection_as.cpp netconnection_connect, nargs<1).
+	if (arg_count < 1) return ret;
+
+	NCState* st = nc_get_state(nc);
 	ActionVar* is_conn = getProperty(nc, "isConnected", 11);
-	if (is_conn != NULL && is_conn->type == ACTION_STACK_VALUE_BOOLEAN && is_conn->data.numeric_value != 0)
-	{
-		nc_dispatch_onStatus(app_context, nc, "NetConnection.Connect.Closed", "status");
-	}
+	int was_active = (is_conn != NULL && is_conn->type == ACTION_STACK_VALUE_BOOLEAN
+	                  && is_conn->data.numeric_value != 0) || st->has_remote;
 
-	// Set isConnected = true
-	ActionVar bv = {0}; bv.type = ACTION_STACK_VALUE_BOOLEAN; bv.data.numeric_value = 1;
-	setProperty(app_context, nc, "isConnected", 11, &bv);
-
-	// connect(null) = local connection: fire Success
-	// connect(non-null string) = remote: no onStatus, but store URI for close()
-	int is_null_connect = (arg_count == 0);
-	if (!is_null_connect && arg_count > 0)
+	// uri is set unconditionally from the (string-coerced) first argument,
+	// as a read-only property. undefined coerces to "" for SWF<7.
+	char uri_buf[512];
+	int uri_len;
+	if (args[0].type == ACTION_STACK_VALUE_UNDEFINED && g_swf_version < 7)
 	{
-		is_null_connect = (args[0].type == ACTION_STACK_VALUE_NULL ||
-		                   args[0].type == ACTION_STACK_VALUE_UNDEFINED);
-	}
-
-	if (is_null_connect)
-	{
-		// Clear uri for local connections
-		ActionVar empty_uri = {0}; empty_uri.type = ACTION_STACK_VALUE_NULL;
-		setProperty(app_context, nc, "uri", 3, &empty_uri);
-		nc_dispatch_onStatus(app_context, nc, "NetConnection.Connect.Success", "status");
+		uri_buf[0] = '\0'; uri_len = 0;
 	}
 	else
 	{
-		// Store the URI for remote connections (used by close to detect remote)
-		if (arg_count > 0)
-			setProperty(app_context, nc, "uri", 3, &args[0]);
+		uri_len = varToStringBuf(app_context, &args[0], uri_buf, sizeof(uri_buf));
+		if (uri_len < 0) uri_len = 0;
+	}
+	ActionVar uri_var = makeStringActionVar(app_context, uri_buf, (u32)uri_len);
+	setPropertyWithFlags(app_context, nc, "uri", 3, &uri_var, PROPERTY_FLAG_PERM_READONLY);
+
+	// Success: connect(null), or connect(undefined) on SWF7+ — a "local"
+	// connection that immediately succeeds.
+	int is_success = (args[0].type == ACTION_STACK_VALUE_NULL) ||
+	                 (g_swf_version > 6 && args[0].type == ACTION_STACK_VALUE_UNDEFINED);
+
+	ActionVar bv = {0}; bv.type = ACTION_STACK_VALUE_BOOLEAN;
+
+	// Any new connect attempt closes the previous connection first.
+	if (was_active)
+		nc_dispatch_onStatus(app_context, nc, "NetConnection.Connect.Closed", "status");
+	st->has_remote = 0;
+
+	if (is_success)
+	{
+		bv.data.numeric_value = 1;
+		setPropertyWithFlags(app_context, nc, "isConnected", 11, &bv, PROPERTY_FLAG_PERM_READONLY);
+		nc_dispatch_onStatus(app_context, nc, "NetConnection.Connect.Success", "status");
+		ret.type = ACTION_STACK_VALUE_BOOLEAN;
+		ret.data.numeric_value = 1;
+		return ret;
 	}
 
+	// Failed / remote attempt: isConnected stays false.
+	bv.data.numeric_value = 0;
+	setPropertyWithFlags(app_context, nc, "isConnected", 11, &bv, PROPERTY_FLAG_PERM_READONLY);
+
+	ret.type = ACTION_STACK_VALUE_BOOLEAN;
+	ret.data.numeric_value = 0;
+
+	// Empty string: connect() returns false and sets uri to "", but fires
+	// no onStatus on modern Flash Player (the gnash test's fp30 expected
+	// output — and Ruffle — leave result/level/statuses empty here).
+	if (uri_len == 0)
+		return ret;
+
+	// A URI containing "://" is treated as a remote (rtmp/http) connection:
+	// the attempt is pending — no onStatus fires immediately, but close()
+	// will later report Connect.Closed. A non-URL string (or number) is an
+	// immediate Connect.Failed.
+	if (strstr(uri_buf, "://") != NULL)
+	{
+		st->has_remote = 1;
+		return ret;
+	}
+
+	nc_dispatch_onStatus(app_context, nc, "NetConnection.Connect.Failed", "error");
 	return ret;
 }
 
@@ -3739,23 +3799,26 @@ static ActionVar builtin_nc_close(SWFAppContext* app_context, ActionVar* args, u
 	ActionVar ret = {0}; ret.type = ACTION_STACK_VALUE_UNDEFINED;
 	if (nc == NULL) return ret;
 
-	// Only fire onStatus if currently connected
+	// gnash: needSendClosedStatus = _currentConnection.get() || _isConnected.
+	// A close() only fires Connect.Closed if a connection (local or pending
+	// remote) was actually live.
+	NCState* st = nc_get_state(nc);
 	ActionVar* is_conn = getProperty(nc, "isConnected", 11);
-	if (is_conn != NULL && is_conn->type == ACTION_STACK_VALUE_BOOLEAN && is_conn->data.numeric_value != 0)
-	{
-		// Check if it was a remote connection (has uri property)
-		ActionVar* uri = getProperty(nc, "uri", 3);
-		int was_remote = (uri != NULL && uri->type == ACTION_STACK_VALUE_STRING && uri->str_size > 0);
+	int was_connected = (is_conn != NULL && is_conn->type == ACTION_STACK_VALUE_BOOLEAN
+	                     && is_conn->data.numeric_value != 0);
+	int was_remote = st->has_remote;
 
+	if (was_connected || was_remote)
+	{
 		ActionVar bv = {0}; bv.type = ACTION_STACK_VALUE_BOOLEAN; bv.data.numeric_value = 0;
-		setProperty(app_context, nc, "isConnected", 11, &bv);
+		setPropertyWithFlags(app_context, nc, "isConnected", 11, &bv, PROPERTY_FLAG_PERM_READONLY);
+		st->has_remote = 0;
 		nc_dispatch_onStatus(app_context, nc, "NetConnection.Connect.Closed", "status");
 
-		// Remote connections also fire a second onStatus with undefined event
+		// Remote connections also fire a second onStatus with an undefined
+		// event object (matches AVM1 netconnection_close).
 		if (was_remote)
-		{
 			nc_dispatch_onStatus_undefined(app_context, nc);
-		}
 	}
 
 	return ret;
@@ -49423,11 +49486,13 @@ void actionNewObject(SWFAppContext* app_context)
 			}
 		}
 
-		// Set isConnected = false
+		// Set isConnected = false — read-only native property: AS writes
+		// (`nc.isConnected = true`) are silently ignored; only connect()/
+		// close() update it via setPropertyWithFlags.
 		ActionVar bv = {0};
 		bv.type = ACTION_STACK_VALUE_BOOLEAN;
 		bv.data.numeric_value = 0;
-		setProperty(app_context, obj, "isConnected", 11, &bv);
+		setPropertyWithFlags(app_context, obj, "isConnected", 11, &bv, PROPERTY_FLAG_PERM_READONLY);
 
 		PUSH(ACTION_STACK_VALUE_OBJECT, (u64)obj);
 		return;
