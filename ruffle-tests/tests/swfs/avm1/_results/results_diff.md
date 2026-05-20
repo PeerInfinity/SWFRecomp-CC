@@ -1,7 +1,7 @@
 # Ruffle Test Results Diff
 
-**Previous:** `9806fda5ffaf` (2026-05-20T17:30:34.651837+00:00)
-**Current:** `5eea57759516` (2026-05-20T18:22:15.013404+00:00)
+**Previous:** `5eea57759516` (2026-05-20T18:22:15.013404+00:00)
+**Current:** `1b5cc33d74fd` (2026-05-20T19:08:15.354711+00:00)
 
 ## Summary
 
@@ -10,13 +10,11 @@
 | Passing | 604 | 604 | 0 |
 | Total | 661 | 661 | 0 |
 | Pass rate | 91.4% | 91.4% | 0% |
-| Mismatched lines | 9179 | 9168 | -11 |
-|   Decreased | | | -12 |
-|   Increased | | | +1 |
+| Mismatched lines | 9168 | 9164 | -4 |
+|   Decreased | | | -4 |
 
-## Line Count Changed (2)
+## Line Count Changed (1)
 
 | Test | Status | Lines (prev) | Lines (now) | Diff |
 |------|--------|--------------|-------------|------|
-| `global_proto_decls_delete` | output_mismatch | 386/4158 | 398/4158 | -12 |
-| `global_instance_decls` | output_mismatch | 23/758 | 22/758 | +1 |
+| `global_instance_decls` | output_mismatch | 22/758 | 26/758 | -4 |
