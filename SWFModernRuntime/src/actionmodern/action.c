@@ -54934,7 +54934,11 @@ void actionCallFunction(SWFAppContext* app_context, char* str_buffer)
 			pushUndefined(app_context);
 			builtin_handled = 1;
 		} else {
-			int _as_depth = ecmaToInt32(varToDouble(&args[0]));
+			// Coerce via varToDoubleSWF so an object depth arg with a valueOf()
+			// (e.g. {valueOf:()=>-6}) resolves to its numeric value. Plain
+			// varToDouble bit-reinterprets the object pointer as a float —
+			// nondeterministic under ASLR (MovieClip.as:2071-2072 flake).
+			int _as_depth = ecmaToInt32(varToDoubleSWF(app_context, &args[0], g_swf_version));
 			int _swf_depth_q = _as_depth + 16384;
 			if (args != NULL) FREE(args);
 			int _pushed = 0;
@@ -63422,7 +63426,10 @@ void actionCallMethod(SWFAppContext* app_context, char* str_buffer)
 				pushUndefined(app_context);
 				return;
 			}
-			int _target_depth = ecmaToInt32(varToDouble(&args[0]));
+			// varToDoubleSWF (not varToDouble) so an object depth arg with a
+			// valueOf() coerces numerically instead of bit-reinterpreting the
+			// object pointer as a float (ASLR-nondeterministic).
+			int _target_depth = ecmaToInt32(varToDoubleSWF(app_context, &args[0], g_swf_version));
 			int _target_depth_swf = _target_depth + 16384;
 			if (args != NULL) FREE(args);
 			// 1. Scan child_mc_cache for matching parent + depth (AS or SWF-space).
