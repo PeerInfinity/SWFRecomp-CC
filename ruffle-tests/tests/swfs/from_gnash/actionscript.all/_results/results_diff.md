@@ -1,7 +1,7 @@
 # Ruffle Test Results Diff
 
-**Previous:** `ad8e13f77907` (2026-05-20T21:08:15.384014+00:00)
-**Current:** `21eb4c013f4e` (2026-05-20T21:59:47.490247+00:00)
+**Previous:** `21eb4c013f4e` (2026-05-20T21:59:47.490247+00:00)
+**Current:** `3421761ffa70` (2026-05-20T22:32:02.631031+00:00)
 
 ## Summary
 
@@ -10,15 +10,22 @@
 | Passing | 128 | 128 | 0 |
 | Total | 243 | 243 | 0 |
 | Pass rate | 52.7% | 52.7% | 0% |
-| Mismatched lines | 10424 | 10142 | -282 |
-|   Decreased | | | -282 |
+| Mismatched lines | 10142 | 10034 | -108 |
+|   Decreased | | | -110 |
+|   Increased | | | +2 |
+
+## Status Changed (1)
+
+| Test | Previous | Current | Lines (prev) | Lines (now) |
+|------|----------|---------|--------------|-------------|
+| `XML-v5` | output_mismatch | ruffle_matched | 417/449 | 446/449 |
 
 ## Line Count Changed (5)
 
 | Test | Status | Lines (prev) | Lines (now) | Diff |
 |------|--------|--------------|-------------|------|
-| `XML-v5` | output_mismatch | 342/449 | 417/449 | -75 |
-| `XML-v6` | output_mismatch | 371/486 | 446/486 | -75 |
-| `XML-v7` | output_mismatch | 371/486 | 445/486 | -74 |
-| `XML-v8` | output_mismatch | 371/465 | 427/465 | -56 |
-| `Sound-v6` | output_mismatch | 91/121 | 93/121 | -2 |
+| `XML-v6` | output_mismatch | 446/486 | 473/486 | -27 |
+| `XML-v7` | output_mismatch | 445/486 | 472/486 | -27 |
+| `XML-v8` | output_mismatch | 427/465 | 454/465 | -27 |
+| `TextField-v7` | output_mismatch | 414/570 | 413/570 | +1 |
+| `TextField-v8` | output_mismatch | 416/571 | 415/571 | +1 |
