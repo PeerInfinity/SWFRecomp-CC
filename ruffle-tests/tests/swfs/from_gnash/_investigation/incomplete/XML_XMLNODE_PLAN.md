@@ -65,6 +65,51 @@ status_note: |
 
 ## Status
 
+### 2026-05-20 session #5 — onLoad-truncation cluster fixed
+
+The XML-vN truncation is resolved. Two bugs, both in
+`SWFModernRuntime/src/actionmodern/action.c`:
+
+- **`soundFireCallback` dropped arguments for type-1 (DefineFunction)
+  handlers.** Its `function_type == 2` branch passed `cb_args`/`cb_arg_count`
+  straight to `advanced_func`, but the type-1 branch just called
+  `simple_func(app_context)` with no stack setup — so a handler declared
+  `function(success){...}` saw no `success`. XML's `onLoad(success)` therefore
+  always ran the `if(!success)` branch ("No success loading gnash.xml"),
+  `onLoadCalls` never reached its target, and `check_totals()` never ran — the
+  test "truncated" with no `#passed/#failed/#total`. Fixed by giving the
+  type-1 branch the same arg-push + local-scope + captured-scope + `this` +
+  base_clip setup the type-1 path in `actionEI_callInternalInterface` uses.
+  This also fixes `Sound.onLoad`/`onID3` argument passing.
+
+  *(The session-#3 note's `findDataFile`/`MEDIA(gnash.xml)` diagnosis was
+  wrong — the recompiled URL string is the bare `"gnash.xml"`, `findDataFile`
+  resolves it fine. The real failure was the dropped `success` argument.)*
+
+- **`XML.load` fired `onData`/`onLoad` synchronously.** Flash's `load` is
+  async: `load()` returns immediately and the callbacks fire after the rest
+  of the current script runs (XML.as does ~160 lines of post-load checks
+  before the `onLoad` output is expected). `builtin_xml_load` now keeps only
+  the synchronous side effects inline (`loaded=false`,
+  `_bytesLoaded`/`_bytesTotal`, `status=0` — XML.as:945-956 observes those
+  right after `load()`), and queues the parse + `onData` + `onLoad` as an
+  `AQ_KIND_SCRIPT` action-queue entry (`aq_dispatch_xml_load`) that drains
+  after the in-progress frame script completes. Two `load()` calls queue two
+  entries that drain FIFO — matching the two back-to-back `onLoad` blocks at
+  the end of the expected output.
+
+Results: XML-v5 verbose-diff `^+` count 107 → 32 (truncation gone — the test
+now runs to `#total`). XML-v6 → 40, XML-v7 → 41, XML-v8 → 56. The remaining
+XML-vN diffs are the **docTypeDecl/xmlDecl/comment parse-time cluster**
+(XML.as:1027-1104) plus a few isolated cases (382, 494, 633, 1010) — none of
+them onLoad-related. All 27 AVM1 `xml*` regression tests still pass; `xml_load`
+specifically still passes (the deferral matches its expectation). `load_vars`
+and `sound_start_stop` were already failing at baseline with identical match
+counts (unchanged). Note `XML-v8`'s expected `output.fp9.txt` (465 lines) ends
+after one `onLoad`, but Ruffle's own `output.fp9.ruffle.txt` (486 lines) has
+both — so producing the second `onLoad` block is correct for `ruffle_matched`
+subset purposes.
+
 ### 2026-05-20 session #4 — Phase 6 landed; XMLNode-vN all RUFFLE_MATCHED
 
 Phase 6 (childNodes as a real Array instance) implemented in

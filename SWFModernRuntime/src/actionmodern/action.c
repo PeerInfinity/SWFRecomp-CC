@@ -18157,11 +18157,73 @@ static ActionVar builtin_xml_onData(SWFAppContext* app_context, ActionVar* args,
 	return ret;
 }
 
-// XML.load(url) — load XML from embedded data file, track bytes loaded/total,
-// orphan any previous children, then invoke this.onData(raw_string) which by
-// default parses + fires onLoad. When onData is overridden (e.g., to intercept
-// raw data), the override owns parsing; the default remains accessible via
-// XML.prototype.onData.
+// Deferred-load payload + dispatch. Flash's XML.load is asynchronous: load()
+// returns immediately, and the onData/onLoad callbacks fire only after the
+// rest of the current script has run. We model this by queuing an
+// AQ_KIND_SCRIPT entry that drains right after the in-progress frame script
+// completes (XML.as exercises this — onLoad output must appear after all the
+// post-load synchronous checks). `content` points at the static
+// DataFileEntry buffer, so no copy is needed; NULL content means the load
+// failed and onData(undefined) → onLoad(false) should fire.
+typedef struct {
+	ASObject* doc;
+	const char* content;
+	u32 content_length;
+} XmlLoadDeferred;
+
+static void aq_dispatch_xml_load(SWFAppContext* app_context, void* user) {
+	XmlLoadDeferred* d = (XmlLoadDeferred*) user;
+	if (d == NULL) return;
+	ASObject* doc = d->doc;
+	if (doc != NULL) {
+		if (d->content != NULL && d->content_length > 0) {
+			// Orphan existing children (the real DOM list) before re-parsing
+			ActionVar* cn = getProperty(doc, "__realChildren", 14);
+			if (cn != NULL && cn->type == ACTION_STACK_VALUE_ARRAY) {
+				ASArray* children = (ASArray*) cn->data.numeric_value;
+				if (children != NULL) {
+					for (u32 i = 0; i < children->length; i++) {
+						if (children->elements[i].type == ACTION_STACK_VALUE_OBJECT) {
+							ASObject* child = (ASObject*) children->elements[i].data.numeric_value;
+							if (child != NULL) {
+								xml_set_null(app_context, child, "parentNode", 10);
+								xml_set_null(app_context, child, "previousSibling", 15);
+								xml_set_null(app_context, child, "nextSibling", 11);
+							}
+						}
+					}
+					children->length = 0;
+				}
+			}
+			xml_rebuild_childnodes(app_context, doc);
+			xml_set_null(app_context, doc, "firstChild", 10);
+			xml_set_null(app_context, doc, "lastChild", 9);
+
+			// Build raw src string and call this.onData(src). Default onData
+			// parses and fires onLoad(true); overrides may intercept.
+			u32 src_u16_len;
+			uint16_t* src_u16 = utf8_to_u16(app_context, d->content, d->content_length, &src_u16_len);
+			ActionVar src_arg = {0};
+			src_arg.type = ACTION_STACK_VALUE_STRING;
+			src_arg.str_size = src_u16_len;
+			VAL(u64, &src_arg.data.numeric_value) = (u64)src_u16;
+			soundFireCallback(app_context, doc, "onData", 6, &src_arg, 1);
+		} else {
+			// Failure: call onData(undefined) which default-fires onLoad(false).
+			ActionVar undef_arg = {0};
+			undef_arg.type = ACTION_STACK_VALUE_UNDEFINED;
+			soundFireCallback(app_context, doc, "onData", 6, &undef_arg, 1);
+		}
+		releaseObject(app_context, doc);
+	}
+	free(d);
+}
+
+// XML.load(url) — load XML from embedded data file. Synchronously sets
+// loaded=false and (on a found file) _bytesLoaded/_bytesTotal/status — the
+// caller observes those right after load() returns. The parse + onData +
+// onLoad firing is deferred to after the current script completes (Flash's
+// async load semantics; see aq_dispatch_xml_load).
 static ActionVar builtin_xml_load(SWFAppContext* app_context, ActionVar* args, u32 arg_count, ActionVar* registers, void* this_obj) {
 	ActionVar ret = {0}; ret.type = ACTION_STACK_VALUE_BOOLEAN;
 	if (this_obj == NULL) { ret.data.numeric_value = 0; return ret; }
@@ -18180,7 +18242,7 @@ static ActionVar builtin_xml_load(SWFAppContext* app_context, ActionVar* args, u
 		u16_to_utf8(u16, args[0].str_size, url_utf8, sizeof(url_utf8));
 	}
 
-	// Set loaded = false initially
+	// Set loaded = false initially (observable synchronously)
 	xml_store_loaded(app_context, doc, 0);
 
 	// Look up URL in embedded data file registry
@@ -18189,50 +18251,25 @@ static ActionVar builtin_xml_load(SWFAppContext* app_context, ActionVar* args, u
 	int success = 0;
 
 	if (data != NULL && data->content != NULL && data->content_length > 0) {
-		// Orphan existing children (same as parseXML — the real DOM list)
-		ActionVar* cn = getProperty(doc, "__realChildren", 14);
-		if (cn != NULL && cn->type == ACTION_STACK_VALUE_ARRAY) {
-			ASArray* children = (ASArray*) cn->data.numeric_value;
-			if (children != NULL) {
-				for (u32 i = 0; i < children->length; i++) {
-					if (children->elements[i].type == ACTION_STACK_VALUE_OBJECT) {
-						ASObject* child = (ASObject*) children->elements[i].data.numeric_value;
-						if (child != NULL) {
-							xml_set_null(app_context, child, "parentNode", 10);
-							xml_set_null(app_context, child, "previousSibling", 15);
-							xml_set_null(app_context, child, "nextSibling", 11);
-						}
-					}
-				}
-				children->length = 0;
-			}
-		}
-		xml_rebuild_childnodes(app_context, doc);
-		xml_set_null(app_context, doc, "firstChild", 10);
-		xml_set_null(app_context, doc, "lastChild", 9);
-
-		// Track bytesLoaded / bytesTotal (DONT_ENUM) for getBytesLoaded / getBytesTotal
+		// Track bytesLoaded / bytesTotal (DONT_ENUM) + status synchronously —
+		// XML.as:945-946 checks hasOwnProperty('_bytesLoaded') right after load().
 		ActionVar bv = {0}; bv.type = ACTION_STACK_VALUE_F64;
 		VAL(double, &bv.data.numeric_value) = (double)data->content_length;
 		setPropertyWithFlags(app_context, doc, "_bytesLoaded", 12, &bv, PROPERTY_FLAGS_DONTENUM);
 		setPropertyWithFlags(app_context, doc, "_bytesTotal", 11, &bv, PROPERTY_FLAGS_DONTENUM);
 		xml_store_status(app_context, doc, 0.0);
 		success = 1;
+	}
 
-		// Build raw src string and call this.onData(src). Default onData parses
-		// and fires onLoad(true); overrides may intercept.
-		u32 src_u16_len;
-		uint16_t* src_u16 = utf8_to_u16(app_context, data->content, (u32)data->content_length, &src_u16_len);
-		ActionVar src_arg = {0};
-		src_arg.type = ACTION_STACK_VALUE_STRING;
-		src_arg.str_size = src_u16_len;
-		VAL(u64, &src_arg.data.numeric_value) = (u64)src_u16;
-		soundFireCallback(app_context, doc, "onData", 6, &src_arg, 1);
-	} else {
-		// Failure: call onData(undefined) which default-fires onLoad(false).
-		ActionVar undef_arg = {0};
-		undef_arg.type = ACTION_STACK_VALUE_UNDEFINED;
-		soundFireCallback(app_context, doc, "onData", 6, &undef_arg, 1);
+	// Defer the parse + onData + onLoad to after the current script completes.
+	XmlLoadDeferred* d = (XmlLoadDeferred*) malloc(sizeof(XmlLoadDeferred));
+	if (d != NULL) {
+		d->doc = doc;
+		d->content = success ? data->content : NULL;
+		d->content_length = success ? (u32)data->content_length : 0;
+		retainObject(doc);
+		actionQueueCallbackEx(app_context, aq_dispatch_xml_load, (void*)d,
+		                      AQ_PRIORITY_NORMAL, NULL, /*is_unload=*/0, AQ_KIND_SCRIPT);
 	}
 
 	ret.data.numeric_value = success ? 1 : 0;
@@ -68938,22 +68975,48 @@ static void soundFireCallback(SWFAppContext* app_context, ASObject* sound_obj, c
 	}
 	else
 	{
-		u32 captured_count = func->captured_scope_count;
-		for (u32 ci = 0; ci < captured_count; ci++)
-		{
-			if (scope_depth < MAX_SCOPE_DEPTH) {
-				scope_is_with[scope_depth] = func->captured_scope_is_with[ci];
-				scope_mc[scope_depth] = (MovieClip*)func->captured_scope_mc[ci];
-				scope_chain[scope_depth++] = (ASObject*)func->captured_scope[ci];
-			}
+		// Type 1 (DefineFunction): the function body reads its parameters
+		// off the stack. Push the callback args in reverse, set up a local
+		// scope + captured scopes + `this`, and switch base_clip — mirrors
+		// the type-1 path in actionEI_callInternalInterface. Without the
+		// arg push, a handler declared `function(success){...}` (e.g. an
+		// XML/Sound `onLoad`) would see no `success`.
+		for (int ai = (int)cb_arg_count - 1; ai >= 0; ai--)
+			pushVar(app_context, &cb_args[ai]);
+
+		ASObject* local_scope = allocObject(app_context, 8);
+		if (scope_depth < MAX_SCOPE_DEPTH) {
+			scope_is_with[scope_depth] = 0;
+			scope_mc[scope_depth] = NULL;
+			scope_chain[scope_depth++] = local_scope;
 		}
+
+		u32 captured_count = func->captured_scope_count;
+		for (u32 ci = 0; ci < captured_count && scope_depth < MAX_SCOPE_DEPTH; ci++)
+		{
+			scope_is_with[scope_depth] = func->captured_scope_is_with[ci];
+			scope_mc[scope_depth] = (MovieClip*)func->captured_scope_mc[ci];
+			scope_chain[scope_depth++] = (ASObject*)func->captured_scope[ci];
+		}
+
+		MovieClip* saved_context = g_current_context;
+		if (g_swf_version >= 6 && func->base_clip != NULL)
+			g_current_context = (MovieClip*)func->base_clip;
+
+		ActionVar this_var = {0};
+		this_var.type = ACTION_STACK_VALUE_OBJECT;
+		this_var.data.numeric_value = (u64)(uintptr_t)sound_obj;
+		setVariableByName("this", &this_var);
 
 		g_call_depth++;
 		((ActionVar(*)(SWFAppContext*))func->simple_func)(app_context);
 		g_call_depth--;
 
-		for (u32 ci = 0; ci < captured_count; ci++)
-			if (scope_depth > 0) scope_depth--;
+		g_current_context = saved_context;
+		for (u32 ci = 0; ci < captured_count && scope_depth > 0; ci++)
+			scope_depth--;
+		if (scope_depth > 0) scope_depth--;
+		releaseObject(app_context, local_scope);
 	}
 
 	g_special_depth--;
