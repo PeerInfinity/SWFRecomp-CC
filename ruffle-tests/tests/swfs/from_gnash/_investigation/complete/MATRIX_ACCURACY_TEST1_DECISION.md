@@ -6,14 +6,14 @@ plan)
 
 <!-- PLAN_META
 id: MATRIX_ACCURACY_TEST1_DECISION
-status: pending_decision
+status: complete
 phases:
   - id: 1
     name: "Diff against Ruffle expected — auto-promotion check"
-    status: pending
+    status: complete
   - id: 2
     name: "If not RM-eligible: add to ACCEPTED_DIFFS.md (twips-precision edge case)"
-    status: pending
+    status: complete
 dependencies: []
 related:
   - id: MATRIX_TEST_SKEW_PLAN
@@ -74,10 +74,25 @@ doesn't show up in real content?
 
 The work itself is 30-60 minutes total, no code changes either way.
 
-## Decision (to be made)
+## Decision (made 2026-05-20)
 
-Run the diff (step 1) and choose path 2 or 3. There is no
-realistic path to PASS that's worth the effort, since Gnash's
-expected output is itself slightly wrong vs. Flash and would
-require us to replicate a specific Flash quirk that no real-world
-SWF will exercise.
+**Path 3 — NOT RM-eligible. Added to `ignored_tests.txt` + `ACCEPTED_DIFFS.md`.**
+
+`test.toml` declares `known_failure.panic = "attempt to subtract with
+overflow"` — Ruffle *panics* on this test and ships **no**
+`output.ruffle.txt` sidecar. There is therefore no Ruffle diff to
+subset-match against, and `ruffle_matched` promotion is structurally
+impossible regardless of how close our output is.
+
+Ran `verify_output.py --test=matrix_accuracy_test1 --diff`: 10/18 lines
+match. The 8 diff lines are twips arithmetic at INT_MIN/INT_MAX boundaries —
+most are already `FAILED` in *both* expected and our output (Gnash's own
+captured output disagrees with Flash), and the residual is off-by-one
+u32-wrap (`4294967296` = 2³² vs expected `4294967295` = 2³²−1) plus
+factor-of-2 wrap drift at the fixed-point limits.
+
+No realistic path to PASS worth the effort: Gnash's expected output is
+itself wrong vs. Flash, and matching it would require replicating a Flash
+integer-wrap quirk at twip boundaries that no real-world SWF exercises.
+Documented in `ACCEPTED_DIFFS.md` Category 4; the test is in
+`from_gnash/misc-swfc.all/ignored_tests.txt`.

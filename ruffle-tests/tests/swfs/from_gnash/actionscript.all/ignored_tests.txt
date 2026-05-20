@@ -14,3 +14,16 @@
 #      or the test has no known_failure/output.ruffle.txt in the Ruffle repo)
 #
 # See from_gnash/_investigation/ACCEPTED_DIFFS.md for the historical list.
+
+# argstest-v6/v7/v8 — recursive native-object enumeration walk. Several native
+# objects the test descends into (PrintJob, MovieClipLoader, LocalConnection,
+# textRenderer, System.IME, ...) are unimplemented / carry placeholder
+# prototypes, so for-in coverage and order diverge and the recursive descent
+# multiplies it to a ~3.5x line blow-up (7731/7731/8093 actual vs
+# 2192/2061/2434 expected). known_failure upstream, but Ruffle under-emits
+# (~1298 lines) so our diff is not a subset -> no ruffle_matched promotion.
+# See _investigation/ACCEPTED_DIFFS.md Category 3 and
+# _investigation/incomplete/ARGSTEST_VN_DECISION.md.
+argstest-v6
+argstest-v7
+argstest-v8

@@ -6,14 +6,14 @@ plan)
 
 <!-- PLAN_META
 id: ARGSTEST_VN_DECISION
-status: pending_decision
+status: complete
 phases:
   - id: 1
     name: "Verify Ruffle diff against expected — is this auto-promotion-eligible?"
-    status: pending
+    status: complete
   - id: 2
     name: "If not RM-eligible: add to ACCEPTED_DIFFS.md and ignored_tests.txt"
-    status: pending
+    status: complete
 dependencies: []
 related: []
 blockers: []
@@ -88,7 +88,36 @@ test.
        differs version-by-version of Flash itself.
      - Why we won't fix.
 
-## Decision (to be made)
+## Decision (made 2026-05-20)
 
-Run the diff (step 1) and choose path 2 or 3. The work itself is
-30-60 minutes total, no code changes either way.
+**Path 3 — NOT RM-eligible. Added to `ignored_tests.txt` + `ACCEPTED_DIFFS.md`.**
+
+Ran `verify_output.py --test=argstest-v{6,7,8}` against the resolved
+expected (`output.fp32.txt` / `output.fp13-18.txt` — the highest-version
+`[subtests]` variant). Findings:
+
+| Test | Expected lines | Ruffle lines | Our actual lines |
+|------|----------------|--------------|------------------|
+| argstest-v6 | 2192 | 1298 | **7731** |
+| argstest-v7 | 2061 | 1298 | **7731** |
+| argstest-v8 | 2434 | 1298 | **8093** |
+
+The doc's original premise ("~2000-2400 lines each", enumeration *order*
+divergence) understated the problem. Reality: we *over-emit* by ~3.5×.
+The first ~27 lines match; divergence starts at PrintJob's prototype walk,
+where we emit `Object.prototype`-inherited `toString` plus a triangular
+cascade of spurious numeric keys (`Testing 4()`/`3()`/`2()`/`1()`) instead
+of `send`/`addPage`/`start`. The recursive descent multiplies it.
+
+Root cause is unimplemented / placeholder-prototype native objects
+(PrintJob, MovieClipLoader, LocalConnection, textRenderer, System.IME, …),
+not enumeration order alone. Ruffle *under*-emits (1298 lines, diverging
+~1650 lines from expected), so our 5000+-line diff is nowhere near a subset
+of Ruffle's — `subset_match` cannot promote despite the `known_failure`
+upstream flag.
+
+A real fix would require fully implementing every native object the test
+walks AND replicating Flash's implementation-defined native-object
+iteration order. Not worth it for a `known_failure` enumeration test.
+Documented in `ACCEPTED_DIFFS.md` Category 3; the three tests are in
+`from_gnash/actionscript.all/ignored_tests.txt`.

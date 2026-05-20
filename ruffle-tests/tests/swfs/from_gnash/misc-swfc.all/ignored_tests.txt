@@ -15,3 +15,12 @@
 # totals(2) call, producing extra trailing lines. See REMAINING_TAIL_TRIAGE
 # Path (b) recommendation.
 sound
+
+# matrix_accuracy_test1 — MovieClip transform values at INT_MIN/INT_MAX twip
+# boundaries. Most diff lines are FAILED in both expected and ours (Gnash own
+# output disagrees with Flash); residual is off-by-one u32-wrap (2^32 vs
+# 2^32-1). Ruffle panics on this test (known_failure.panic) and ships no
+# output.ruffle.txt, so no ruffle_matched promotion path exists.
+# See _investigation/ACCEPTED_DIFFS.md Category 4 and
+# _investigation/incomplete/MATRIX_ACCURACY_TEST1_DECISION.md.
+matrix_accuracy_test1

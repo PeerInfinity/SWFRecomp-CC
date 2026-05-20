@@ -52,7 +52,7 @@ whole row.
 | ~~`TEXTFORMAT_V8_PLAN`~~ | TextFormat-v8 | `incomplete/TEXTFORMAT_V8_PLAN.md` (2026-05-19) | Separate from TEXTFIELD — only 2 clusters: INT_MIN clamping on negative numeric setters (blockIndent/leading/indent/size), and getTextExtent font-metric precision (likely RUFFLE_VS_FLASH or ruffle_matched-eligible; diff against `output.fp9-18.ruffle.txt` first). |
 | ~~`TRANSFORM_V8_PLAN`~~ | Transform-v8 | `incomplete/TRANSFORM_V8_PLAN.md` (2026-05-19) | Plan written — 6 phases. Cross-references MATRIX_TEST_SKEW (matrix float drift) and MOVIECLIP_VN (swapDepths binding). At 85% line-match — strong ruffle_matched candidate after Phases 1+2 land. |
 | ~~`ARRAY_V6_V8_PLAN`~~ | array-v6/v7/v8 | `incomplete/ARRAY_V6_V8_PLAN.md` (2026-05-19) | Written as companion to ARRAY_V5_PLAN (same source file with `OUTPUT_VERSION > 5` gates). 5 phases for v6+-only residuals (own length, apply-with-Array-receiver, sparse hasOwnProperty, sortOn length, sort/splice edge cases). |
-| ~~`ARGSTEST_VN_DECISION`~~ | argstest-v6/v7/v8 | `incomplete/ARGSTEST_VN_DECISION.md` (2026-05-19) | Decision doc (not fix plan): diff against `output.fpN.ruffle.txt`; if subset-match works, auto-promotes. If not, add to ACCEPTED_DIFFS as enumeration-order divergence. 30-60 min, no code change either way. |
+| ~~`ARGSTEST_VN_DECISION`~~ | argstest-v6/v7/v8 | `complete/ARGSTEST_VN_DECISION.md` (2026-05-20) | **RESOLVED 2026-05-20 → ACCEPTED_DIFFS Category 3.** Diffed: we over-emit ~3.5× (7731/7731/8093 vs 2192/2061/2434 expected); Ruffle under-emits (~1298). Our diff not a subset → no RM. Added to `actionscript.all/ignored_tests.txt`. |
 | ~~`SOUND_VN_REGRESSION_PLAN`~~ | Sound-v6/v7/v8 | **No plan needed (2026-05-19)** | Local re-runs at current `master` SHA show all three at `ruffle_matched` (effective pass). The CI snapshot `eb8206f8` (2026-05-15) result file shows `output_mismatch` 91/121, 93/121, 93/121 — but local reproduction contradicts that. Discrepancy unexplained; recommend re-running CI to see whether the result file regenerates as RM. Don't write a plan until/unless CI confirms regression. |
 | ~~`GRADIENTFILLTEST_PLAN`~~ | misc-ming.all/GradientFillTest | `incomplete/GRADIENTFILLTEST_PLAN.md` (2026-05-19) | 2 phases. Off-by-low-bit color sampling across all gradient points — gamma/sRGB-vs-linear interpolation precision. |
 | ~~`PROTOTYPEEVENTLISTENERS_PLAN`~~ | misc-ming.all/PrototypeEventListeners | `incomplete/PROTOTYPEEVENTLISTENERS_PLAN.md` (2026-05-19) | 3 phases. Mouse/Key broadcaster doesn't walk prototype chain or `_global` for prototype-defined handlers. Substantial feature work but contained. |
@@ -60,7 +60,7 @@ whole row.
 | ~~`PLACEANDREMOVE_PLAN`~~ | misc-ming.all/action_order/PlaceAndRemove | `incomplete/PLACEANDREMOVE_PLAN.md` (2026-05-19) | Same root cause as ACTION_EXECUTION_ORDER_TEST6 but inverse polarity: this test expects cancellation, that one expects firing. Diff `output.ruffle.txt` for both to determine model. |
 | ~~`ACTION_EXECUTION_ORDER_EXTEND_PLAN`~~ | misc-ming.all/action_order/action_execution_order_extend_test | `blocked/ACTION_EXECUTION_ORDER_EXTEND_PLAN.md` (2026-05-19) | **BLOCKED (re-investigated 2026-05-19).** Not "2 small bugs" — Bug 1 is a missing feature: `onLoad`/`onUnload` METHOD-handler dispatch for plain timeline-placed sprites (`actionDispatchMCOnLoad` only fires for root/attachMovie/registerClass MCs). Fire/no-fire rule is subtle (Flash fires `mc_red.onLoad` but not `mc_blu.onLoad`; Ruffle wrongly fires both) and needs the Gnash C source to pin down. Bug 2 is the SPRITE_EXEC_LIST_LIFO interleave (that plan still in_progress). Neither bug alone promotes the test. |
 | ~~`LOADBITMAPTEST_PLAN`~~ | misc-ming.all/loading/LoadBitmapTest | `complete/LOADBITMAPTEST_PLAN.md` (2026-05-19) | **RESOLVED 2026-05-19 → ruffle_matched.** `bitmapDataLoadBitmap` now derives the loaded bitmap's `__proto__` from the receiver object's `prototype` property (Flash `thisObj.prototype` semantics) when called as a method of a plain object, instead of always using `BitmapData.prototype`. Fixes `c.__proto__ == undefined`. Phases 1/2/3b are Flash-vs-Ruffle divergences (Ruffle fails the same lines). |
-| ~~`MATRIX_ACCURACY_TEST1_DECISION`~~ | misc-swfc.all/matrix_accuracy_test1 | `incomplete/MATRIX_ACCURACY_TEST1_DECISION.md` (2026-05-19) | Decision doc (not fix plan): same pattern as argstest — diff against ruffle.txt; either auto-promotes or accept as twips-arithmetic-at-INT-boundaries. |
+| ~~`MATRIX_ACCURACY_TEST1_DECISION`~~ | misc-swfc.all/matrix_accuracy_test1 | `complete/MATRIX_ACCURACY_TEST1_DECISION.md` (2026-05-20) | **RESOLVED 2026-05-20 → ACCEPTED_DIFFS Category 4.** Ruffle panics (`known_failure.panic`), no `output.ruffle.txt` → RM structurally impossible. 10/18 match; residual is twips u32-wrap off-by-one. Added to `misc-swfc.all/ignored_tests.txt`. |
 | ~~`MOVIECLIP_DESTRUCTION_TEST3_PLAN`~~ | misc-swfc.all/movieclip_destruction_test3 | `incomplete/MOVIECLIP_DESTRUCTION_TEST3_PLAN.md` (2026-05-19) | 3 phases. Deferred removeMovieClip (let current frame's DoAction complete), depth-bias after removal, hard-reference clearance (shared with MOVIECLIP_VN Phase 6). |
 | ~~`ACTION_EXECUTION_ORDER_TEST12_PLAN`~~ | misc-swfc.all/action_execution_order_test12 | `complete/ACTION_EXECUTION_ORDER_TEST12_PLAN.md` (2026-05-19) | **RESOLVED 2026-05-19 → ruffle_matched.** Two `tag.c` fixes: (1) sprite loop-back now fires child onUnload (was a silent free) — also stopped spurious child onEnterFrame; (2) timeline-sprite onLoad gated on an actually-registered class (was queued for every exported `.sprite`). |
 | ~~`DRAWING_API_HITTEST_PLAN`~~ | misc-ming.all/DrawingApiTest | `incomplete/DRAWING_API_HITTEST_PLAN.md` (2026-05-19) | 3 phases. Drawing-API hitTest precision (undefined-on-stroke-only, winding rule, corner-pixel exclusion). |
@@ -76,6 +76,22 @@ Suggested write order:
 2. **Status-divergence plans** that just need rediscovery, not new design: Sound-vN regression, loop_test/loop_test10 regression. Cheap wins to write.
 3. **Decision docs** (not fix plans): argstest-vN, matrix_accuracy_test1 — likely belong in ACCEPTED_DIFFS once confirmed.
 4. **Single-test deferrals**: everything else, lowest priority unless picked up opportunistically.
+
+### Latest update (2026-05-20, docs only — no code change)
+
+- **`argstest-v6/v7/v8` (actionscript.all) and `matrix_accuracy_test1`
+  (misc-swfc.all): resolved the two pending decision docs → ACCEPTED_DIFFS.**
+  Both `ARGSTEST_VN_DECISION` and `MATRIX_ACCURACY_TEST1_DECISION` were
+  pending a diff-and-decide pass. Neither is `ruffle_matched`-eligible:
+  argstest over-emits ~3.5× (7731/7731/8093 vs 2192/2061/2434 expected) due
+  to unimplemented / placeholder-prototype native objects (PrintJob,
+  MovieClipLoader, …) while Ruffle *under*-emits (~1298 lines) — our diff is
+  not a subset; matrix_accuracy_test1 has `known_failure.panic` so Ruffle
+  panics and ships no `output.ruffle.txt` at all. Added all four tests to
+  the respective `ignored_tests.txt` files and documented them in
+  `ACCEPTED_DIFFS.md` (new Category 3: native-object enumeration divergence;
+  new Category 4: twips arithmetic at integer boundaries). Both decision
+  docs moved to `complete/`. No runtime/recompiler code changed.
 
 ### Latest fix (2026-05-19, pending CI)
 
