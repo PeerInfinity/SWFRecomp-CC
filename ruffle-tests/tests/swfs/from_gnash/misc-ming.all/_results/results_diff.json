@@ -1,31 +1,31 @@
 {
   "metadata": {
-    "old_timestamp": "2026-05-20T01:39:09.426811+00:00",
-    "old_git_sha": "747c91f86fe7fe6a2f937a2db4ddcacfaf280713",
-    "new_timestamp": "2026-05-20T03:45:19.688195+00:00",
-    "new_git_sha": "13fe9441a4286d100acc32f1c32cf0c84931ccfd",
+    "old_timestamp": "2026-05-20T03:45:19.688195+00:00",
+    "old_git_sha": "13fe9441a4286d100acc32f1c32cf0c84931ccfd",
+    "new_timestamp": "2026-05-20T03:59:43.540475+00:00",
+    "new_git_sha": "3fe53f7a7328c8f2982dbd9970615a2a498dcc12",
     "partial": false,
     "same_commit": false
   },
   "summary": {
     "old_pass": 65,
-    "old_ruffle_matched": 26,
-    "old_effective_pass": 91,
+    "old_ruffle_matched": 25,
+    "old_effective_pass": 90,
     "old_total": 110,
     "old_pass_rate": 59.1,
     "new_pass": 65,
-    "new_ruffle_matched": 25,
-    "new_effective_pass": 90,
+    "new_ruffle_matched": 26,
+    "new_effective_pass": 91,
     "new_total": 110,
     "new_pass_rate": 59.1,
-    "old_mismatched_lines": 1236,
-    "new_mismatched_lines": 1240,
-    "increased_mismatches": 4,
-    "decreased_mismatches": 0,
-    "newly_passing": 0,
-    "newly_failing": 1,
+    "old_mismatched_lines": 1240,
+    "new_mismatched_lines": 1237,
+    "increased_mismatches": 0,
+    "decreased_mismatches": 3,
+    "newly_passing": 1,
+    "newly_failing": 0,
     "status_changed": 1,
-    "unchanged": 108,
+    "unchanged": 109,
     "added": 0,
     "removed": 0
   },
@@ -33,33 +33,17 @@
     {
       "test": "DragDropTest",
       "change_type": "changed",
-      "old_status": "ruffle_matched",
-      "new_status": "output_mismatch",
+      "old_status": "output_mismatch",
+      "new_status": "ruffle_matched",
       "old_lines": {
-        "actual_lines": 45,
-        "expected_lines": 44,
-        "matching_lines": 33
-      },
-      "new_lines": {
         "actual_lines": 45,
         "expected_lines": 44,
         "matching_lines": 30
-      }
-    },
-    {
-      "test": "callFunction_test",
-      "change_type": "changed",
-      "old_status": "ruffle_matched",
-      "new_status": "ruffle_matched",
-      "old_lines": {
-        "actual_lines": 11,
-        "expected_lines": 11,
-        "matching_lines": 6
       },
       "new_lines": {
-        "actual_lines": 11,
-        "expected_lines": 11,
-        "matching_lines": 5
+        "actual_lines": 45,
+        "expected_lines": 44,
+        "matching_lines": 33
       }
     }
   ]
