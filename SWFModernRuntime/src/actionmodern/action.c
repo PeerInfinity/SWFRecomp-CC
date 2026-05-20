@@ -33910,11 +33910,13 @@ static ActionVar builtin_loadvars_sendAndLoad(SWFAppContext* app_context, Action
 	ASObject* target = (ASObject*) args[1].data.numeric_value;
 	if (target == NULL) return ret;
 
-	// Only create own `loaded` if target doesn't already inherit one from
-	// its prototype chain. XML.prototype.loaded is the canonical case: it
-	// already has a boolean `loaded` so sendAndLoad shouldn't shadow it.
-	ActionVar* existing_loaded = getPropertyWithPrototype(target, "loaded", 6);
-	if (existing_loaded == NULL) {
+	// Create an own `loaded = false` on the target unless it already owns one.
+	// Flash sets `loaded` on the receiver after sendAndLoad (XML.as:687 checks
+	// receiver.hasOwnProperty("loaded")). The guard is own-only: XML.prototype's
+	// `loaded` is a virtual accessor that defaults to undefined, so inheriting
+	// it is not enough — the receiver still needs its own boolean.
+	ASProperty* own_loaded = findPropertyRaw(target, "loaded", 6);
+	if (own_loaded == NULL) {
 		ActionVar lf = {0}; lf.type = ACTION_STACK_VALUE_BOOLEAN; lf.data.numeric_value = 0;
 		setProperty(app_context, target, "loaded", 6, &lf);
 	}

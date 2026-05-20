@@ -106,6 +106,13 @@ Four more phases implemented in `SWFModernRuntime/src/actionmodern/action.c`:
   the WRITABLE flag, so `appendChild`/`removeNode`/`xml_sync_children` still
   work.
 
+`builtin_loadvars_sendAndLoad` was adjusted alongside: it used to skip
+creating an own `loaded` on the receiver when one was *inherited*
+(XML.prototype's old data `loaded`). With `loaded` now a virtual accessor
+that defaults to undefined, the guard became own-only (`findPropertyRaw`)
+so a `new XML()` sendAndLoad receiver still gets its own boolean `loaded`
+(restores `LoadVars-v6/v7/v8` ruffle_matched).
+
 Local single-test results after the change (vs the phase-1/7/8 baseline):
 all eight XML-vN / XMLNode-vN tests improved or held — XML-v5..v8 each gained
 ~20 matched lines; XMLNode-v5..v8 unchanged (these changes only touch the XML
