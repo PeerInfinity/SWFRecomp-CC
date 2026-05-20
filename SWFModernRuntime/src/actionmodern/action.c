@@ -18882,12 +18882,11 @@ static MovieClip* resolveFlashPathToMC(SWFAppContext* app_context, const char* p
 		extern MovieClip root_movieclip;
 
 		// Resolve segment
-		// "_levelN" (N > 0) handler: resolve to g_levels[N]. Only valid as the
-		// FIRST path element — `_levelN` (like `_level0`) is a top-level path
-		// token, not a MovieClip member, so `a._levelN` resolves to undefined
-		// in Flash. Required for paths like `eval("_level50/target10")`.
+		// "_levelN" (N > 0) handler: resolve to g_levels[N]. Applies in both
+		// first_element and subsequent positions. Required for paths like
+		// `eval("_level50/target10")`.
 		int _resolved_level = 0;
-		if (first_element && seg_len > 6 && strncmp(seg_buf, "_level", 6) == 0) {
+		if (seg_len > 6 && strncmp(seg_buf, "_level", 6) == 0) {
 			const char* after = seg_buf + 6;
 			int all_digits = 1;
 			for (const char* c = after; *c != '\0'; c++) {
@@ -18919,27 +18918,12 @@ static MovieClip* resolveFlashPathToMC(SWFAppContext* app_context, const char* p
 			}
 			first_element = 0;
 		} else {
-			// `_root` is a valid MC property at any path position, but `_level0`
-			// (like `_levelN`) is only a path token at the FIRST position — Flash
-			// returns undefined for a `.member` access of `_level0` on an object
-			// (e.g. `this._root._level0.x`, gnash getvariable.as:105).
-			if (strcmp(seg_buf, "_root") == 0) {
+			if (strcmp(seg_buf, "_root") == 0 || strcmp(seg_buf, "_level0") == 0) {
 				mc = &root_movieclip;
 			} else if (strcmp(seg_buf, "_parent") == 0) {
 				if (mc->parent) mc = mc->parent;
 				else return NULL;
-			} else if (seg_len > 6 && strncmp(seg_buf, "_level", 6) == 0) {
-				// `_levelN`/`_level0` is not a valid non-first path component.
-				int _seg_all_digits = 1;
-				for (u32 _di = 6; _di < seg_len; _di++) {
-					if (seg_buf[_di] < '0' || seg_buf[_di] > '9') { _seg_all_digits = 0; break; }
-				}
-				if (_seg_all_digits) return NULL;
-				// (a child clip literally named e.g. "_levelfoo" with non-digits
-				// falls through to the normal child lookup below.)
-				goto _ffp_child_lookup;
 			} else {
-				_ffp_child_lookup:;
 				// Child lookup via resolveSlashPathToMC (handles display list, findOrCreate, etc.)
 				MovieClip* child = resolveSlashPathToMC(app_context, seg_buf, seg_len, mc);
 				if (child == NULL) return NULL;
@@ -47872,13 +47856,9 @@ void actionGetMember(SWFAppContext* app_context)
 			if (is_negative) level_id = -level_id;
 
 			if (level_id == 0) {
-				// `_level0` is NOT a MovieClip member — Flash returns undefined
-				// for a `.member` access of `_level0` on an object (it is only a
-				// top-level path token, resolved by bare GetVariable). Falling
-				// through to normal child/property lookup yields undefined unless
-				// a real child is named `_level0`. Required so paths like
-				// `this._root._level0.x` resolve to undefined (gnash
-				// getvariable.as:105).
+				extern MovieClip root_movieclip;
+				PUSH(ACTION_STACK_VALUE_MOVIECLIP, (u64)&root_movieclip);
+				return;
 			} else if (level_id > 0 && level_id < MAX_LEVELS && g_levels[level_id] != NULL) {
 				PUSH(ACTION_STACK_VALUE_MOVIECLIP, (u64)g_levels[level_id]);
 				return;
