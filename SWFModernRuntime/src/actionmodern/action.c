@@ -14074,7 +14074,19 @@ static ActionVar objectToPrimitive(SWFAppContext* app_context, ActionVar* obj_va
 				}
 				else if (func->function_type == 1 && func->simple_func != NULL)
 				{
+					// Push this=obj so a type-1 valueOf body resolves `this`
+					// (via GetVariable("this")) to the object being converted.
+					// Without this the body reads the caller's `this` (typically
+					// root) — objectCallValueOf already does this; objectToPrimitive
+					// must too.
+					u32 _otp_saved_this = g_this_depth;
+					if (g_this_depth < MAX_THIS_DEPTH) {
+						g_this_stack[g_this_depth].type = ACTION_STACK_VALUE_OBJECT;
+						g_this_stack[g_this_depth].data.numeric_value = (u64)obj;
+						g_this_depth++;
+					}
 					result = ((ActionVar(*)(SWFAppContext*))func->simple_func)(app_context);
+					g_this_depth = _otp_saved_this;
 				}
 				else
 				{
@@ -14129,7 +14141,15 @@ static ActionVar objectToPrimitive(SWFAppContext* app_context, ActionVar* obj_va
 				}
 				else if (func->function_type == 1 && func->simple_func != NULL)
 				{
+					// Push this=obj so a type-1 toString body resolves `this`.
+					u32 _otp_saved_this = g_this_depth;
+					if (g_this_depth < MAX_THIS_DEPTH) {
+						g_this_stack[g_this_depth].type = ACTION_STACK_VALUE_OBJECT;
+						g_this_stack[g_this_depth].data.numeric_value = (u64)obj;
+						g_this_depth++;
+					}
 					result = ((ActionVar(*)(SWFAppContext*))func->simple_func)(app_context);
+					g_this_depth = _otp_saved_this;
 				}
 				else
 				{
@@ -18862,11 +18882,12 @@ static MovieClip* resolveFlashPathToMC(SWFAppContext* app_context, const char* p
 		extern MovieClip root_movieclip;
 
 		// Resolve segment
-		// "_levelN" (N > 0) handler: resolve to g_levels[N]. Applies in both
-		// first_element and subsequent positions. Required for paths like
-		// `eval("_level50/target10")`.
+		// "_levelN" (N > 0) handler: resolve to g_levels[N]. Only valid as the
+		// FIRST path element — `_levelN` (like `_level0`) is a top-level path
+		// token, not a MovieClip member, so `a._levelN` resolves to undefined
+		// in Flash. Required for paths like `eval("_level50/target10")`.
 		int _resolved_level = 0;
-		if (seg_len > 6 && strncmp(seg_buf, "_level", 6) == 0) {
+		if (first_element && seg_len > 6 && strncmp(seg_buf, "_level", 6) == 0) {
 			const char* after = seg_buf + 6;
 			int all_digits = 1;
 			for (const char* c = after; *c != '\0'; c++) {
@@ -18898,12 +18919,27 @@ static MovieClip* resolveFlashPathToMC(SWFAppContext* app_context, const char* p
 			}
 			first_element = 0;
 		} else {
-			if (strcmp(seg_buf, "_root") == 0 || strcmp(seg_buf, "_level0") == 0) {
+			// `_root` is a valid MC property at any path position, but `_level0`
+			// (like `_levelN`) is only a path token at the FIRST position — Flash
+			// returns undefined for a `.member` access of `_level0` on an object
+			// (e.g. `this._root._level0.x`, gnash getvariable.as:105).
+			if (strcmp(seg_buf, "_root") == 0) {
 				mc = &root_movieclip;
 			} else if (strcmp(seg_buf, "_parent") == 0) {
 				if (mc->parent) mc = mc->parent;
 				else return NULL;
+			} else if (seg_len > 6 && strncmp(seg_buf, "_level", 6) == 0) {
+				// `_levelN`/`_level0` is not a valid non-first path component.
+				int _seg_all_digits = 1;
+				for (u32 _di = 6; _di < seg_len; _di++) {
+					if (seg_buf[_di] < '0' || seg_buf[_di] > '9') { _seg_all_digits = 0; break; }
+				}
+				if (_seg_all_digits) return NULL;
+				// (a child clip literally named e.g. "_levelfoo" with non-digits
+				// falls through to the normal child lookup below.)
+				goto _ffp_child_lookup;
 			} else {
+				_ffp_child_lookup:;
 				// Child lookup via resolveSlashPathToMC (handles display list, findOrCreate, etc.)
 				MovieClip* child = resolveSlashPathToMC(app_context, seg_buf, seg_len, mc);
 				if (child == NULL) return NULL;
@@ -47836,9 +47872,13 @@ void actionGetMember(SWFAppContext* app_context)
 			if (is_negative) level_id = -level_id;
 
 			if (level_id == 0) {
-				extern MovieClip root_movieclip;
-				PUSH(ACTION_STACK_VALUE_MOVIECLIP, (u64)&root_movieclip);
-				return;
+				// `_level0` is NOT a MovieClip member — Flash returns undefined
+				// for a `.member` access of `_level0` on an object (it is only a
+				// top-level path token, resolved by bare GetVariable). Falling
+				// through to normal child/property lookup yields undefined unless
+				// a real child is named `_level0`. Required so paths like
+				// `this._root._level0.x` resolve to undefined (gnash
+				// getvariable.as:105).
 			} else if (level_id > 0 && level_id < MAX_LEVELS && g_levels[level_id] != NULL) {
 				PUSH(ACTION_STACK_VALUE_MOVIECLIP, (u64)g_levels[level_id]);
 				return;
@@ -49734,6 +49774,31 @@ void actionNewObject(SWFAppContext* app_context)
 						g_this_depth++;
 					}
 
+					// Push a local activation scope so `var x` declarations inside
+					// the constructor body bind to the activation rather than
+					// leaking to the global variable table. actionCallFunction's
+					// type-1 path does this for ordinary calls; actionNewObject
+					// previously skipped it, so a `var x` in a `new`-invoked
+					// constructor escaped to globals and could be clobbered by a
+					// same-named path-SetVariable (gnash getvariable.as:624).
+					ASObject* ctor_local_scope = allocObject(app_context, 8);
+					u32 _saved_scope_depth_ctor1 = scope_depth;
+				  {
+					u8 _cc1 = ctor_func->captured_scope_count;
+					for (u8 _ci = 0; _ci < _cc1; _ci++) {
+						if (scope_depth < MAX_SCOPE_DEPTH) {
+							scope_is_with[scope_depth] = ctor_func->captured_scope_is_with[_ci];
+							scope_mc[scope_depth] = ctor_func->captured_scope_mc[_ci];
+							scope_chain[scope_depth++] = ctor_func->captured_scope[_ci];
+						}
+					}
+					if (scope_depth < MAX_SCOPE_DEPTH) {
+						scope_is_with[scope_depth] = 0;
+						scope_mc[scope_depth] = NULL;
+						scope_chain[scope_depth++] = ctor_local_scope;
+					}
+				  }
+
 					// Push arguments onto stack for parameter binding
 					// Arguments are already in args[] in pop order (first arg = args[0])
 					// But DefineFunction binds params by popping, so push in reverse
@@ -49749,6 +49814,8 @@ void actionNewObject(SWFAppContext* app_context)
 					popCtorContext();
 					g_call_depth--;
 					g_this_depth = _saved_this_depth;
+					scope_depth = _saved_scope_depth_ctor1;
+					releaseObject(app_context, ctor_local_scope);
 
 					// Per ECMAScript spec: if constructor returns object, use it
 					if (return_value.type == ACTION_STACK_VALUE_OBJECT && return_value.data.numeric_value != 0)
@@ -54929,6 +54996,7 @@ void actionCallFunction(SWFAppContext* app_context, char* str_buffer)
 		ActionVar callable_this = {0};
 		int has_callable_this = 0;
 		int callable_this_is_with = 0;  // 1 if from a WITH scope (used by type 1 functions)
+		int callable_this_from_path = 0;  // 1 if from a dotted/slash member path (e.g. `_root.o.func`)
 
 		// In non-root context, check MC's dynamic_props FIRST.
 		// Functions defined during child SWF init or DoInitAction are stored on
@@ -55031,6 +55099,7 @@ void actionCallFunction(SWFAppContext* app_context, char* str_buffer)
 						    STACK_TOP_TYPE == ACTION_STACK_VALUE_OBJECT) {
 							popVar(app_context, &callable_this);
 							has_callable_this = 1;
+							callable_this_from_path = 1;
 						} else {
 							POP();
 						}
@@ -55040,6 +55109,35 @@ void actionCallFunction(SWFAppContext* app_context, char* str_buffer)
 			else
 			{
 				POP();
+			}
+		}
+
+		// If the function was resolved from a dotted/slash member path
+		// (e.g. `callfunction '_root.o.func'`), bind `this` to the container
+		// object — Flash treats a path-named callfunction like a method call
+		// on the path prefix. The first scope-chain GetVariable above resolves
+		// the full path but does not set g_last_callable_this for member
+		// accesses, so the receiver is resolved explicitly here.
+		if (func != NULL && !has_callable_this && func_name_len > 0 &&
+		    (memchr(func_name, '.', func_name_len) != NULL ||
+		     memchr(func_name, '/', func_name_len) != NULL))
+		{
+			const char* _cp_last = func_name;
+			for (const char* _cp = func_name; _cp < func_name + func_name_len; _cp++) {
+				if (*_cp == '.' || *_cp == '/') _cp_last = _cp;
+			}
+			if (_cp_last > func_name) {
+				u32 _cp_clen = (u32)(_cp_last - func_name);
+				PUSH_STR(func_name, _cp_clen);
+				actionGetVariable(app_context);
+				if (STACK_TOP_TYPE == ACTION_STACK_VALUE_MOVIECLIP ||
+				    STACK_TOP_TYPE == ACTION_STACK_VALUE_OBJECT) {
+					popVar(app_context, &callable_this);
+					has_callable_this = 1;
+					callable_this_from_path = 1;
+				} else {
+					POP();
+				}
 			}
 		}
 
@@ -55243,7 +55341,7 @@ void actionCallFunction(SWFAppContext* app_context, char* str_buffer)
 				// only type 2 functions (DefineFunction2) get scope-object-as-this via g_override_this.
 				u32 saved_this_depth_t1 = g_this_depth;
 				if (g_this_depth < MAX_THIS_DEPTH) {
-					if (has_callable_this && callable_this_is_with) {
+					if (has_callable_this && (callable_this_is_with || callable_this_from_path)) {
 						g_this_stack[g_this_depth] = callable_this;
 					} else {
 						// Default this = current context MC (not root_movieclip)

@@ -1,25 +1,23 @@
 # getvariable-vN Investigation Plan
 <!-- TESTS: getvariable-v5, getvariable-v6, getvariable-v7, getvariable-v8 -->
 
-Last updated: 2026-05-19 (initial planning doc, drafted from local
-single-test reproductions at the current `master` SHA; partial work
-already landed inline in SUBTESTS_NEWLY_VISIBLE_TRIAGE 2026-05-16
-(+38 raw lines via colon-path validator). This plan covers the
-residual 3-4 lines per version.)
+Last updated: 2026-05-19 (COMPLETE — all four tests `getvariable-v5/v6/v7/v8`
+now full PASS. Four changes in `SWFModernRuntime/src/actionmodern/action.c`,
+see "Resolution" below.)
 
 <!-- PLAN_META
 id: GETVARIABLE_VN_PLAN
-status: pending
+status: complete
 phases:
   - id: 1
     name: "Local `var xx` shadowing of `/:xx` setvariable (func_obj pattern)"
-    status: pending
+    status: complete
   - id: 2
     name: "Function called through path: `this.num` vs scope `num` resolution"
-    status: pending
+    status: complete
   - id: 3
     name: "Line 105 PASS-where-Gnash-expected-FAILED divergence"
-    status: pending
+    status: complete
 dependencies:
   - id: SUBTESTS_HARNESS
     reason: "Discovery shipped 2026-05-14 (commit 39b797ac)."
@@ -200,3 +198,47 @@ four tests to PASS, or at least `ruffle_matched`.
 All four tests have `known_failure = true` + `output.fpN.ruffle.txt`
 sidecars; subset-match will auto-promote to `ruffle_matched` once our
 diff is within Ruffle's diff against the expected file.
+
+## Resolution (2026-05-19 — full PASS, all four versions)
+
+Four changes in `SWFModernRuntime/src/actionmodern/action.c`:
+
+1. **Phase 2 — path-call `this` binding.** `actionCallFunction` resolves a
+   dotted/slash function-name (`callfunction '_root.o.func'`) via the first
+   scope-chain GetVariable, but that path never set `g_last_callable_this`
+   for member accesses. Added a new block after the scope-chain/registry
+   lookups: when `func` was found and `func_name` contains `.`/`/`, resolve
+   the container prefix (everything before the last separator) via
+   GetVariable and bind it as `callable_this` with a new
+   `callable_this_from_path` flag. The type-1 `this`-binding condition
+   changed from `callable_this_is_with` to `(callable_this_is_with ||
+   callable_this_from_path)` so `this` inside the callee is the path
+   prefix object (`_root.o`, `o2.m`), not the caller's MovieClip. Fixes
+   lines 649/686.
+
+2. **Phase 1 — `var` in a `new`-invoked constructor.** `actionNewObject`'s
+   type-1 constructor path never pushed a local activation scope (unlike
+   `actionCallFunction`'s type-1 path), so `var xx = 1` inside a
+   `new`-invoked constructor escaped to the global variable table and got
+   clobbered by a same-named `/:xx` path-SetVariable. Added a local-scope
+   alloc + captured-scope restore + push, with a `scope_depth` restore and
+   `releaseObject` on return. Fixes line 624.
+
+3. **objectToPrimitive type-1 `this`** (required by change 2). Making `var`
+   correctly local exposed a latent bug: `objectToPrimitive` invoked a
+   type-1 `valueOf`/`toString` body **without** pushing `this`=obj onto
+   `g_this_stack` (unlike `objectCallValueOf`), so the body's
+   `GetVariable("this")` read the caller's `this` (root). The string-sorting
+   block previously "worked" only because the constructor leaked `strval`
+   to the global table where `root.strval` happened to alias it. Both the
+   valueOf and toString call sites in `objectToPrimitive` now push
+   `this`=obj. Without this, `string_coercion` (AVM1) regressed.
+
+4. **Phase 3 — `_levelN` mid-path resolution.** `_level0`/`_levelN` is a
+   top-level path token, not a MovieClip member: Flash returns undefined
+   for `this._root._level0.x`. `resolveFlashPathToMC` resolved `_levelN`
+   in any path position and `_level0` as a non-first segment; both are now
+   gated to the first element only (non-first `_levelN`/`_level0` returns
+   NULL). `actionGetMember` no longer resolves `_level0` member access to
+   the root. Makes line 105 FAIL like Flash → exact match with the
+   expected `output.fp10.txt`, giving full PASS rather than ruffle_matched.
