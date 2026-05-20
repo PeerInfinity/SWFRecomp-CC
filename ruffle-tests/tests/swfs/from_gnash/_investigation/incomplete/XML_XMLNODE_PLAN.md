@@ -63,6 +63,26 @@ status_note: |
   largely independent — pick whichever cluster looks cheapest.
 -->
 
+## Remaining XML-vN issues
+
+As of 2026-05-20, **XML-v5** and **XMLNode-v5..v8** are RUFFLE_MATCHED. The
+12 numbered phases are all complete; the onLoad-truncation and
+docTypeDecl/xmlDecl clusters are fixed. **XML-v6/v7/v8** remain
+output_mismatch — blocked by five small, independent bugs that the SWF6+
+`#if OUTPUT_VERSION > 5` gates expose. These are not a coherent project and
+need no phase structure; fix directly.
+
+| # | Test line(s) | Symptom | Root-cause hypothesis | Difficulty |
+|---|--------------|---------|-----------------------|------------|
+| R1 | XML.as:884, 885, 900 | After `myxml.load(gnash.xml)`, `topnode = myxml.firstChild` has `nodeName == null` (expected `'XML'`); `childNodes.length == 4` (expected 3) | `gnash.xml` begins with a UTF-8 BOM (`EF BB BF`). The parser keeps the BOM bytes as a leading text node, so `firstChild` is that text node, not `<XML>`. Strip a leading BOM (and probably leading whitespace before the first `<`) in `xml_parse_into`. | Easy (~3 lines, fixes 9 lines across v6/7/8) |
+| R2 | XML.as:760, 762 | `x._customHeaders.toString()` is `header1,…,header4,value4,value4` (expected `header4,,value4` for v6 / `header4,undefined,value4` for v7+) | `addRequestHeader` mishandles an empty/undefined header value — looks like an off-by-one in the array append (`builtin_xml_addRequestHeader`, Phase 5 code). Diagnose the append loop. | Easy–Medium |
+| R3 | XML.as:130 | `! tmp.hasOwnProperty("nodeValue")` fails — a fresh `new XML()` reports an own `nodeValue` | `xml_create_node` sets `nodeValue` as an own data prop on every node, including the document. Flash exposes it as an inherited/virtual prop. Needs a DontEnum-placeholder-on-prototype approach (cf. Phase 1's virtual node props) — may ripple into `nodeValue` reads. | Medium |
+| R4 | XML.as:1114 | `&#229e2;` etc. numeric character references mis-decoded | Numeric character-reference parsing edge cases (malformed/partial numeric entities). Note XML.as:1114 is an `xcheck_equals`, so part of this may already be subset-eligible — confirm against the Ruffle sidecar before investing. | Medium |
+| R5 | XML.as:382 | Inside `with(firstChild) { nodeValue = 4 }`, `typeof(nodeValue)` is `number` (expected `string`) | The session-#6 `actionSetMember` coercion hook only covers member-access writes. `nodeValue = 4` under a `with` scope is an `ActionSetVariable` resolving through the with-object — it bypasses the hook. The coercion must also reach the with-scoped SetVariable path. | Medium |
+
+Not a fix: XML.as:494 (`tmp.toString() == xml_out`) is a Gnash bug where our
+output is *more* correct than Gnash's expectation — subset-eligible, leave it.
+
 ## Status
 
 ### 2026-05-20 session #6 — docTypeDecl/xmlDecl + malformed-XML cluster; XML-v5 RUFFLE_MATCHED
