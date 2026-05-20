@@ -1,10 +1,10 @@
 # Ruffle Test Results (Unfiltered)
 
-**Date**: 2026-05-20 21:08 UTC
+**Date**: 2026-05-20 21:59 UTC
 
-**Git SHA**: `ad8e13f779`
+**Git SHA**: `21eb4c013f`
 
-**Run Duration**: 1m 28s
+**Run Duration**: 1m 24s
 
 ## Summary
 
@@ -32,15 +32,15 @@
 | 5 | `depth` | 6 | 0.4s |  |
 | 6 | `doactionorder/doactionorder` | 7 | 0.3s |  |
 | 7 | `doactionorder/symbolclass` | 4 | 0.2s |  |
-| 8 | `duplicateMovieClip/dontremove` | 6 | 17.8s |  |
-| 9 | `duplicateMovieClip/duplicateMovieClip` | 4 | 0.2s |  |
-| 10 | `duplicateMovieClip/name-coercion` | 3 | 0.2s |  |
+| 8 | `duplicateMovieClip/dontremove` | 6 | 15.0s |  |
+| 9 | `duplicateMovieClip/duplicateMovieClip` | 4 | 0.3s |  |
+| 10 | `duplicateMovieClip/name-coercion` | 3 | 0.3s |  |
 | 11 | `duplicateMovieClip/samedepth` | 6 | 0.3s |  |
 | 12 | `externalinterface` | 4 | 0.3s |  |
-| 13 | `filters` | 149 | 0.3s |  |
-| 14 | `haxe/flocons1` | 2 | 0.3s |  |
+| 13 | `filters` | 149 | 0.2s |  |
+| 14 | `haxe/flocons1` | 2 | 0.2s |  |
 | 15 | `haxe/flocons2` | 3 | 0.3s |  |
-| 16 | `label` | 4 | 18.1s |  |
+| 16 | `label` | 4 | 17.4s |  |
 | 17 | `levels` | 9 | 0.3s |  |
 | 18 | `loadevent` | 9 | 0.3s |  |
 | 19 | `loadvariables/loadvariables` | 7 | 0.3s |  |
@@ -56,18 +56,18 @@
 | 29 | `propertycase/propertycase` | 7 | 0.3s |  |
 | 30 | `propertycase/propertycase-preserving-6` | 2 | 0.3s |  |
 | 31 | `propertycase/propertycase-preserving-7` | 5 | 0.3s |  |
-| 32 | `rollover` | 4 | 0.3s |  |
-| 33 | `scope` | 14 | 0.3s |  |
+| 32 | `rollover` | 4 | 0.2s |  |
+| 33 | `scope` | 14 | 0.2s |  |
 | 34 | `setinterval` | 20 | 0.3s |  |
 | 35 | `settimeout` | 17 | 0.3s |  |
-| 36 | `super` | 11 | 0.2s |  |
+| 36 | `super` | 11 | 0.3s |  |
 | 37 | `target` | 18 | 0.3s |  |
-| 38 | `text-bind` | 0 | 18.9s |  |
+| 38 | `text-bind` | 0 | 18.6s |  |
 | 39 | `textfield/textfield-html` | 4 | 0.3s |  |
 | 40 | `textfield/textfield-text-setters` | 8 | 0.3s |  |
 | 41 | `undefined/undefined-swf6` | 39 | 0.3s |  |
 | 42 | `undefined/undefined-swf7` | 39 | 0.3s |  |
-| 43 | `watch` | 2 | 0.3s |  |
+| 43 | `watch` | 2 | 0.2s |  |
 | 44 | `xml/xmlbuild` | 1 | 0.3s |  |
 | 45 | `xml/xmlload` | 4 | 0.3s |  |
 | 46 | `xml/xmlstring` | 9 | 0.3s |  |
@@ -78,7 +78,7 @@
 
 | # | Test | Our diffs | Ruffle diffs | Duration | Notes |
 |---|------|-----------|--------------|----------|-------|
-| 1 | `hitarea` | 2 | 2 | 18.2s |  |
+| 1 | `hitarea` | 2 | 2 | 18.0s |  |
 
 ## Near-Passing Tests
 
