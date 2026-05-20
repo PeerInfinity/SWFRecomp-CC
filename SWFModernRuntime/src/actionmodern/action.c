@@ -4289,6 +4289,13 @@ typedef struct {
 } BitmapDataNative;
 
 static ASObject* g_bitmapdata_prototype = NULL;
+// own_props bag of the flash.display.BitmapData constructor function. When
+// loadBitmap is dispatched as `BitmapData.loadBitmap(...)`, our method dispatch
+// passes this bag as this_obj — used to recognise the "real" static call.
+static ASObject* g_bitmapdata_ctor_own_props = NULL;
+// Type tag of the receiver for the current method dispatch (set to
+// ACTION_STACK_VALUE_OBJECT only when this_obj is a genuine ASObject).
+static u8 g_call_this_type = 0;
 // Methods: getPixel, getPixel32, setPixel, setPixel32, fillRect, clone, dispose,
 //          copyChannel, floodFill, colorTransform, getColorBoundsRect, toString,
 //          applyFilter, copyPixels, draw, generateFilterRect, hitTest, loadBitmap,
@@ -13209,10 +13216,33 @@ static ActionVar bitmapDataLoadBitmap(SWFAppContext* app_context, ActionVar* arg
     initBitmapDataPrototype(app_context);
     ASObject* obj = allocObject(app_context, 4);
     obj->native_type = NATIVE_BITMAPDATA;
+
+    // Flash sets the result's __proto__ to thisObj.prototype, where thisObj is
+    // the receiver of the loadBitmap() call:
+    //  - BitmapData.loadBitmap(...): receiver is the BitmapData constructor;
+    //    our method dispatch passes its own_props bag as this_obj. Use the real
+    //    BitmapData.prototype (the default below).
+    //  - o.ref(...) where o is a plain object and o.ref aliases loadBitmap: the
+    //    result's __proto__ is o.prototype, which is often undefined. Gnash
+    //    misc-ming.all/loading/LoadBitmapTest exercises this exactly
+    //    (`c.__proto__ == undefined`, `e.__proto__ == backup.prototype`).
     ActionVar proto_var = {0};
     proto_var.type = ACTION_STACK_VALUE_OBJECT;
     proto_var.data.numeric_value = (u64) g_bitmapdata_prototype;
-    setProperty(app_context, obj, "__proto__", 9, &proto_var);
+    int set_proto = 1;
+    if (this_obj != NULL && this_obj == (void*)g_bitmapdata_ctor_own_props) {
+        // Genuine static BitmapData.loadBitmap call — keep default prototype.
+    } else if (this_obj != NULL && g_call_this_type == ACTION_STACK_VALUE_OBJECT) {
+        // Called as a method of some other plain object: __proto__ = thisObj.prototype.
+        ActionVar* tp = getProperty((ASObject*)this_obj, "prototype", 9);
+        if (tp != NULL && tp->type != ACTION_STACK_VALUE_UNDEFINED) {
+            proto_var = *tp;
+        } else {
+            set_proto = 0;  // thisObj.prototype is undefined → result has no __proto__
+        }
+    }
+    if (set_proto)
+        setProperty(app_context, obj, "__proto__", 9, &proto_var);
 
     BitmapDataNative* bmp = (BitmapDataNative*) malloc(sizeof(BitmapDataNative));
     bmp->width = (int32_t)width;
@@ -25877,7 +25907,7 @@ MovieClip* g_event_this_mc = NULL;
 // Type of 'this' argument passed to Function.prototype.call/apply.
 // Set before calling advanced_func so builtin wrappers can distinguish
 // ASArray* from ASObject*. Reset after use. 0 = not set.
-static u8 g_call_this_type = 0;
+// (declared earlier near g_bitmapdata_prototype so bitmapDataLoadBitmap can read it)
 
 // Override 'this' — for passing arbitrary ActionVar (primitive, undefined) as 'this'
 // to DefineFunction2 when void* this_obj can't represent the value.
@@ -34666,6 +34696,7 @@ static void initFlashPackage(SWFAppContext* app_context)
 	// Channel constants on BitmapData constructor
 	fc_BitmapData.own_props = allocObject(app_context, 10);
 	retainObject(fc_BitmapData.own_props);
+	g_bitmapdata_ctor_own_props = fc_BitmapData.own_props;
 	{
 		// Pre-add placeholders (LIFO: first inserted = last enumerated)
 		// Expected enum: ..., __proto__, constructor, prototype

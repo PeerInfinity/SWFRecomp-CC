@@ -1,22 +1,26 @@
 # LoadBitmapTest Plan
 <!-- TESTS: misc-ming.all/loading/LoadBitmapTest -->
 
-Last updated: 2026-05-19 (initial planning doc, drafted from local
-single-test reproduction at the current `master` SHA)
+Last updated: 2026-05-19 (RESOLVED → ruffle_matched. The decisive
+fix was Phase 3a: loadBitmap now derives the result's `__proto__`
+from the receiver object's `prototype` property when called as a
+method of a plain object. Phases 1/2/3b were re-classified as
+Flash-vs-Ruffle divergences — Ruffle fails the same lines, so the
+test auto-promotes via subset-match. See "Resolution" below.)
 
 <!-- PLAN_META
 id: LOADBITMAPTEST_PLAN
-status: pending
+status: complete
 phases:
   - id: 1
     name: "f.transparent default value (false vs true) for loaded bitmaps"
-    status: pending
+    status: wont_fix
   - id: 2
     name: "near(f, 85, 85, 0x000000) — pixel value Flash expects mismatch but we match"
-    status: pending
+    status: wont_fix
   - id: 3
     name: "Detached BitmapData / nonexistent identifiers: __proto__ undefined, typeof undefined"
-    status: pending
+    status: complete
 dependencies:
   - id: SUBTESTS_HARNESS
     reason: "Discovery shipped 2026-05-14 (commit 39b797ac)."
@@ -112,3 +116,62 @@ candidate.
 
 `known_failure = true` + `output.ruffle.txt`. 76% line match —
 close to threshold. Phases 1+3 should clear the test.
+
+## Resolution (2026-05-19) → ruffle_matched
+
+The test resolves to the `fp11` variant (`output.fp11.txt`, highest
+`player_options.version` in `test.toml`). Pre-fix our diff against
+expected was `{4, 9, 11, 12}`; Ruffle's diff (`output.fp11.ruffle.txt`)
+is `{4, 9, 12}`. Line 11 (`c.__proto__ == undefined`) was the only
+ours-only diff blocking subset-match promotion — lines 4/9/12 are all
+Flash-vs-Ruffle divergences that Ruffle fails too.
+
+**Fix (Phase 3a) — `bitmapDataLoadBitmap` in `action.c`.** Gnash's
+`LoadBitmapTest.c` aliases the static method onto a plain object and
+calls it as a method:
+
+```js
+o = {};
+o.func = flash.display.BitmapData.loadBitmap;
+backup = flash.display.BitmapData;
+c = o.func('img1');               // c.__proto__ should be undefined
+o.prototype = backup.prototype;
+e = o.func('img1');               // e.__proto__ should be backup.prototype
+```
+
+Flash sets the loaded bitmap's `__proto__` to **`thisObj.prototype`**,
+where `thisObj` is the receiver of the call — not a hardcoded
+`BitmapData.prototype`. For `c` the receiver `o` has no `prototype`
+property yet, so `c.__proto__` is undefined; for `e` it is
+`backup.prototype`.
+
+`bitmapDataLoadBitmap` previously always set `__proto__` to
+`g_bitmapdata_prototype`. It now:
+- recognises the genuine static call by pointer-comparing `this_obj`
+  against `g_bitmapdata_ctor_own_props` (the BitmapData constructor's
+  `own_props` bag, which our method dispatch passes as `this` for
+  `BitmapData.loadBitmap(...)`) — keeps the default prototype;
+- when called as a method of any other plain object
+  (`g_call_this_type == ACTION_STACK_VALUE_OBJECT`), reads that
+  object's `prototype` own-property and uses it as `__proto__`,
+  leaving `__proto__` unset when it is absent/undefined.
+
+The bare-call case (`d = func('img1')`, `this_obj == NULL`) keeps the
+default prototype unchanged — `d` stays an object both before and
+after (Ruffle agrees, line 12 stays a shared diff).
+
+**Phases 1 / 2 / 3b — won't fix (Flash-vs-Ruffle divergences).**
+- Line 4 (`f.transparent == false`): Ruffle returns `true` too.
+- Line 9 (`near(f,85,85,0x000000)`): Flash's JPEG decoder produces a
+  slightly off-black sample; we and Ruffle both return clean black
+  and "pass" where Flash expects FAILED.
+- Line 12 (`typeof(d) == 'undefined'`): `d` is an object in both
+  Ruffle and our runtime.
+All three are inside Ruffle's diff set, so they do not block
+subset-match promotion.
+
+No regressions: 6-test BitmapData battery (`bitmap_data`,
+`bitmap_data_colortransform`, `bitmap_data_compare`,
+`bitmapdata_channels`, `bitmap_filters`,
+`bitmapdata_applyfilter_colormatrix`) all PASS — the change is inert
+for the static-call path every other test uses.

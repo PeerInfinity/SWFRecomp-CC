@@ -59,7 +59,7 @@ whole row.
 | ~~`TEXTSNAPSHOTTEST_PLAN`~~ | misc-ming.all/TextSnapshotTest | `incomplete/TEXTSNAPSHOTTEST_PLAN.md` (2026-05-19) | 3 phases. AVM1 TextSnapshot work landed stubs; need to actually implement setSelected/getSelected/getSelectedText round-trip with selection-state storage. |
 | ~~`PLACEANDREMOVE_PLAN`~~ | misc-ming.all/action_order/PlaceAndRemove | `incomplete/PLACEANDREMOVE_PLAN.md` (2026-05-19) | Same root cause as ACTION_EXECUTION_ORDER_TEST6 but inverse polarity: this test expects cancellation, that one expects firing. Diff `output.ruffle.txt` for both to determine model. |
 | ~~`ACTION_EXECUTION_ORDER_EXTEND_PLAN`~~ | misc-ming.all/action_order/action_execution_order_extend_test | `blocked/ACTION_EXECUTION_ORDER_EXTEND_PLAN.md` (2026-05-19) | **BLOCKED (re-investigated 2026-05-19).** Not "2 small bugs" — Bug 1 is a missing feature: `onLoad`/`onUnload` METHOD-handler dispatch for plain timeline-placed sprites (`actionDispatchMCOnLoad` only fires for root/attachMovie/registerClass MCs). Fire/no-fire rule is subtle (Flash fires `mc_red.onLoad` but not `mc_blu.onLoad`; Ruffle wrongly fires both) and needs the Gnash C source to pin down. Bug 2 is the SPRITE_EXEC_LIST_LIFO interleave (that plan still in_progress). Neither bug alone promotes the test. |
-| ~~`LOADBITMAPTEST_PLAN`~~ | misc-ming.all/loading/LoadBitmapTest | `incomplete/LOADBITMAPTEST_PLAN.md` (2026-05-19) | 3 small phases. transparent default for JPEG, failed-load BitmapData proto chain, one PASS-where-expected-FAILED. 2-4 hours, strong promotion candidate. |
+| ~~`LOADBITMAPTEST_PLAN`~~ | misc-ming.all/loading/LoadBitmapTest | `complete/LOADBITMAPTEST_PLAN.md` (2026-05-19) | **RESOLVED 2026-05-19 → ruffle_matched.** `bitmapDataLoadBitmap` now derives the loaded bitmap's `__proto__` from the receiver object's `prototype` property (Flash `thisObj.prototype` semantics) when called as a method of a plain object, instead of always using `BitmapData.prototype`. Fixes `c.__proto__ == undefined`. Phases 1/2/3b are Flash-vs-Ruffle divergences (Ruffle fails the same lines). |
 | ~~`MATRIX_ACCURACY_TEST1_DECISION`~~ | misc-swfc.all/matrix_accuracy_test1 | `incomplete/MATRIX_ACCURACY_TEST1_DECISION.md` (2026-05-19) | Decision doc (not fix plan): same pattern as argstest — diff against ruffle.txt; either auto-promotes or accept as twips-arithmetic-at-INT-boundaries. |
 | ~~`MOVIECLIP_DESTRUCTION_TEST3_PLAN`~~ | misc-swfc.all/movieclip_destruction_test3 | `incomplete/MOVIECLIP_DESTRUCTION_TEST3_PLAN.md` (2026-05-19) | 3 phases. Deferred removeMovieClip (let current frame's DoAction complete), depth-bias after removal, hard-reference clearance (shared with MOVIECLIP_VN Phase 6). |
 | ~~`ACTION_EXECUTION_ORDER_TEST12_PLAN`~~ | misc-swfc.all/action_execution_order_test12 | `complete/ACTION_EXECUTION_ORDER_TEST12_PLAN.md` (2026-05-19) | **RESOLVED 2026-05-19 → ruffle_matched.** Two `tag.c` fixes: (1) sprite loop-back now fires child onUnload (was a silent free) — also stopped spurious child onEnterFrame; (2) timeline-sprite onLoad gated on an actually-registered class (was queued for every exported `.sprite`). |
@@ -76,6 +76,27 @@ Suggested write order:
 2. **Status-divergence plans** that just need rediscovery, not new design: Sound-vN regression, loop_test/loop_test10 regression. Cheap wins to write.
 3. **Decision docs** (not fix plans): argstest-vN, matrix_accuracy_test1 — likely belong in ACCEPTED_DIFFS once confirmed.
 4. **Single-test deferrals**: everything else, lowest priority unless picked up opportunistically.
+
+### Latest fix (2026-05-19, pending CI)
+
+- **`loading/LoadBitmapTest` (misc-ming.all): 13/17 output_mismatch → ruffle_matched.**
+  One change in `SWFModernRuntime/src/actionmodern/action.c::bitmapDataLoadBitmap`.
+  Flash sets a loaded bitmap's `__proto__` to `thisObj.prototype` (the
+  receiver of the `loadBitmap` call), not a fixed `BitmapData.prototype`.
+  The test aliases the static method onto a plain object
+  (`o.func = flash.display.BitmapData.loadBitmap`) and calls `o.func('img1')`;
+  the result's `__proto__` must be `o.prototype` (undefined here).
+  `bitmapDataLoadBitmap` now: recognises the genuine static call by
+  pointer-comparing `this_obj` against the BitmapData ctor's `own_props`
+  bag (`g_bitmapdata_ctor_own_props`) and keeps the default prototype;
+  otherwise, when called as a method of a plain object
+  (`g_call_this_type == OBJECT`), reads that object's own `prototype`
+  property and uses it (leaving `__proto__` unset when absent). The
+  bare-call path (`this_obj == NULL`) keeps the default unchanged. Our
+  diff drops from `{4,9,11,12}` to `{4,9,12}` ⊆ Ruffle's `{4,9,12}`, so
+  the test auto-promotes. Lines 4/9/12 are Flash-vs-Ruffle divergences
+  (transparent flag, JPEG-decoder off-black sample, `typeof(d)`). No
+  regressions: 6-test BitmapData battery all PASS.
 
 ### Latest fix (2026-05-08, pending CI)
 
