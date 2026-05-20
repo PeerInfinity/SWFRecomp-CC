@@ -7,7 +7,7 @@ landed yet)
 
 <!-- PLAN_META
 id: XML_XMLNODE_PLAN
-status: in_progress
+status: complete
 phases:
   - id: 1
     name: "XML.prototype / XMLNode.prototype own-vs-inherited method visibility"
@@ -65,25 +65,75 @@ status_note: |
 
 ## Remaining XML-vN issues
 
-As of 2026-05-20, **XML-v5** and **XMLNode-v5..v8** are RUFFLE_MATCHED. The
-12 numbered phases are all complete; the onLoad-truncation and
-docTypeDecl/xmlDecl clusters are fixed. **XML-v6/v7/v8** remain
-output_mismatch — blocked by five small, independent bugs that the SWF6+
-`#if OUTPUT_VERSION > 5` gates expose. These are not a coherent project and
-need no phase structure; fix directly.
+As of 2026-05-20 session #7, **all eight XML-vN / XMLNode-vN tests are
+RUFFLE_MATCHED**. The 12 numbered phases and the R1–R5 cluster below are all
+complete. This plan is ready to move to `complete/`.
 
-| # | Test line(s) | Symptom | Root-cause hypothesis | Difficulty |
-|---|--------------|---------|-----------------------|------------|
-| R1 | XML.as:884, 885, 900 | After `myxml.load(gnash.xml)`, `topnode = myxml.firstChild` has `nodeName == null` (expected `'XML'`); `childNodes.length == 4` (expected 3) | `gnash.xml` begins with a UTF-8 BOM (`EF BB BF`). The parser keeps the BOM bytes as a leading text node, so `firstChild` is that text node, not `<XML>`. Strip a leading BOM (and probably leading whitespace before the first `<`) in `xml_parse_into`. | Easy (~3 lines, fixes 9 lines across v6/7/8) |
-| R2 | XML.as:760, 762 | `x._customHeaders.toString()` is `header1,…,header4,value4,value4` (expected `header4,,value4` for v6 / `header4,undefined,value4` for v7+) | `addRequestHeader` mishandles an empty/undefined header value — looks like an off-by-one in the array append (`builtin_xml_addRequestHeader`, Phase 5 code). Diagnose the append loop. | Easy–Medium |
-| R3 | XML.as:130 | `! tmp.hasOwnProperty("nodeValue")` fails — a fresh `new XML()` reports an own `nodeValue` | `xml_create_node` sets `nodeValue` as an own data prop on every node, including the document. Flash exposes it as an inherited/virtual prop. Needs a DontEnum-placeholder-on-prototype approach (cf. Phase 1's virtual node props) — may ripple into `nodeValue` reads. | Medium |
-| R4 | XML.as:1114 | `&#229e2;` etc. numeric character references mis-decoded | Numeric character-reference parsing edge cases (malformed/partial numeric entities). Note XML.as:1114 is an `xcheck_equals`, so part of this may already be subset-eligible — confirm against the Ruffle sidecar before investing. | Medium |
-| R5 | XML.as:382 | Inside `with(firstChild) { nodeValue = 4 }`, `typeof(nodeValue)` is `number` (expected `string`) | The session-#6 `actionSetMember` coercion hook only covers member-access writes. `nodeValue = 4` under a `with` scope is an `ActionSetVariable` resolving through the with-object — it bypasses the hook. The coercion must also reach the with-scoped SetVariable path. | Medium |
+| # | Test line(s) | Symptom | Resolution | Status |
+|---|--------------|---------|------------|--------|
+| R1 | XML.as:884, 885, 900 | `gnash.xml` UTF-8 BOM leaked as a leading text node | `xml_parse_into` strips a leading `EF BB BF` BOM. | ✅ Done |
+| R2 | XML.as:760, 762 | `_customHeaders[8]=x` after `pop()` showed the popped value at the hole index | Not an `addRequestHeader` bug — `setArrayElement` left stale slots between `length` and a sparse index. It now HOLE-fills the gap. | ✅ Done |
+| R3 | XML.as:130 | `new XML()` reported an own `nodeValue` | `nodeValue` is now inherited (virtual): only text/CDATA nodes get an own data prop; element/document nodes inherit a NULL-typed placeholder on XMLNode.prototype. | ✅ Done |
+| R4 | XML.as:1114 | `&#229e2;` numeric char refs mis-decoded | `xml_unescape` now ignores trailing non-digit junk between the digit run and the `;` (`&#229e2;` → 229); requires ≥1 digit and bails on an intervening `&`/`<`. | ✅ Done |
+| R5 | XML.as:382 | `with(node){ nodeValue = 4 }` stored the number verbatim | The with-scoped `actionSetVariable` path now applies the same XML write-coercion (string/boolean) as the `actionSetMember` hook. | ✅ Done |
+| R6 | XML.as:903 (v7+) | `check_totals` summary never emitted for v6→v7→v8 | The v7+ `onLoad` compiles to `DefineFunction2` (v6 was `DefineFunction`) and reads `this` via `actionGetVariable("this")`. `soundFireCallback`'s type-2 branch never set `this` in scope, so `++this.onLoadCalls` hit `undefined`/NaN and `check_totals` was skipped. Type-2 branch now `setVariableByName("this", …)` like type-1. | ✅ Done |
 
 Not a fix: XML.as:494 (`tmp.toString() == xml_out`) is a Gnash bug where our
-output is *more* correct than Gnash's expectation — subset-eligible, leave it.
+output is *more* correct than Gnash's expectation — subset-eligible, left as-is.
 
 ## Status
+
+### 2026-05-20 session #7 — XML-v6/v7/v8 RUFFLE_MATCHED; plan complete
+
+The R1–R5 cluster (plus a sixth bug, R6, found while investigating a v7-only
+output truncation) is fixed. All changes in
+`SWFModernRuntime/src/actionmodern/action.c` except R2 which is in
+`SWFModernRuntime/src/actionmodern/object.c`:
+
+- **R1 — BOM strip.** `xml_parse_into` skips a leading UTF-8 BOM (`EF BB BF`)
+  before parsing. Without it the BOM bytes became a leading text node, so
+  `myxml.firstChild` was that text node (`nodeName == null`) and
+  `childNodes.length` was 4 instead of 3.
+- **R2 — sparse array hole-fill.** Not an `addRequestHeader` bug. The test
+  does `arr.pop()` then `arr[8] = x`; `pop()` only decrements `length` without
+  clearing the slot, and `setArrayElement` only HOLE-initialized slots when it
+  *grew capacity* — slots within capacity but past `length` kept stale data.
+  `setArrayElement` now HOLE-fills `[length, index)` on any sparse assignment.
+  `Array.toString()`/`join` already render a HOLE as `""` (v6) / `undefined`
+  (v7+).
+- **R3 — nodeValue is virtual.** `xml_create_node` only installs an own
+  `nodeValue` data prop for text/CDATA nodes (which carry content); element
+  and document nodes leave it absent. The XMLNode.prototype `nodeValue`
+  placeholder is NULL-typed (was undefined) so `typeof(elem.nodeValue)` still
+  reads `'null'`. The `new XML()` document-node path (`actionNewMethod` XML
+  branch) no longer sets an own `nodeValue` either.
+- **R4 — numeric char entities.** `xml_unescape` tracks a digit count and, for
+  a reference with ≥1 leading digit but trailing non-digit junk before the
+  `;` (`&#229e2;`), skips the junk and decodes just the digit run. A reference
+  with no digits (`&#ee229;`) or an intervening `&`/`<` stays literal.
+- **R5 — with-scoped write coercion.** `actionSetVariable`'s scope-chain write
+  path now applies the XML node write-coercion (nodeValue/xmlDecl/docTypeDecl/
+  contentType → string, ignoreWhite → boolean) when the with-object is an XML
+  node — mirroring the session-#6 `actionSetMember` hook, which only saw
+  member-access writes.
+- **R6 — `this` in type-2 callbacks.** The XML/Sound `onLoad` handler compiles
+  to `DefineFunction` (type 1) at SWF6 but `DefineFunction2` (type 2) at SWF7+.
+  The v7+ handler reads `this` via `actionGetVariable("this")` (no preload-this
+  register). `soundFireCallback`'s type-1 branch already set `this` in scope
+  via `setVariableByName`, but the type-2 branch did not — so v7/v8's
+  `++this.onLoadCalls` hit `undefined`, `if(onLoadCalls==2)` was never true,
+  and `check_totals` (the `#passed/#failed/#total` summary) never ran. The
+  type-2 branch now sets `this` too; harmless when a preload register is used.
+
+Result: **XML-v6/v7/v8 all promote to RUFFLE_MATCHED.** Regression-clean: all
+27 AVM1 `xml*` tests still 100%, XML-v5 + XMLNode-v5..v8 stay RUFFLE_MATCHED,
+spot-checked array tests (concat/constructor/enumerate/length/properties/
+splice/sort) and sound tests (id3/load_start/multiple_load) still pass.
+`array_shift`/`array_unshift` remain `output_mismatch` with byte-identical
+line counts to baseline (67/51 mismatches) — pre-existing, untouched by the
+`setArrayElement` change.
+
+### 2026-05-20 session #6 — docTypeDecl/xmlDecl + malformed-XML cluster; XML-v5 RUFFLE_MATCHED
 
 ### 2026-05-20 session #6 — docTypeDecl/xmlDecl + malformed-XML cluster; XML-v5 RUFFLE_MATCHED
 

@@ -16938,11 +16938,14 @@ static ASObject* xml_create_node(SWFAppContext* app_context, int nodeType,
 		xml_set_null(app_context, node, "nodeName", 8);
 	}
 
-	// nodeValue
+	// nodeValue — Flash exposes nodeValue as an inherited (virtual) property,
+	// not an own property. Only text/CDATA nodes (which carry actual content)
+	// get an own nodeValue data prop; element and document nodes leave it
+	// absent and inherit the null placeholder from XMLNode.prototype, so
+	// `new XML().hasOwnProperty("nodeValue")` is false (XML.as:130) while
+	// `typeof(node.nodeValue)` still reads 'null' (XML.as:344, 364).
 	if (nodeValue != NULL) {
 		xml_set_str(app_context, node, "nodeValue", 9, nodeValue, valueLen);
-	} else {
-		xml_set_null(app_context, node, "nodeValue", 9);
 	}
 
 	// Navigation — all null initially. All five are read-only against user
@@ -17257,27 +17260,40 @@ static char* xml_unescape(SWFAppContext* app_context, const char* input, u32 len
 				// Numeric character reference: &#NN; or &#xHH;
 				u32 j = i + 2;
 				int codepoint = 0;
+				int digit_count = 0;
 				if (j < len && input[j] == 'x') {
 					// Hex: &#xHH;
 					j++;
 					while (j < len && input[j] != ';') {
 						char c = input[j];
-						if (c >= '0' && c <= '9') codepoint = codepoint * 16 + (c - '0');
-						else if (c >= 'a' && c <= 'f') codepoint = codepoint * 16 + (c - 'a' + 10);
-						else if (c >= 'A' && c <= 'F') codepoint = codepoint * 16 + (c - 'A' + 10);
+						if (c >= '0' && c <= '9') { codepoint = codepoint * 16 + (c - '0'); digit_count++; }
+						else if (c >= 'a' && c <= 'f') { codepoint = codepoint * 16 + (c - 'a' + 10); digit_count++; }
+						else if (c >= 'A' && c <= 'F') { codepoint = codepoint * 16 + (c - 'A' + 10); digit_count++; }
 						else break;
 						j++;
 					}
 				} else {
 					// Decimal: &#NN;
 					while (j < len && input[j] != ';') {
-						if (input[j] >= '0' && input[j] <= '9')
+						if (input[j] >= '0' && input[j] <= '9') {
 							codepoint = codepoint * 10 + (input[j] - '0');
+							digit_count++;
+						}
 						else break;
 						j++;
 					}
 				}
-				if (j < len && input[j] == ';') {
+				// Flash ignores trailing non-digit junk between the digit run
+				// and the ';' — `&#229e2;` decodes as 229 (XML.as:1114). Bail
+				// (keep literal) if the run has no digits, or if a '&'/'<'
+				// intervenes before the ';'.
+				if (digit_count > 0 && j < len && input[j] != ';') {
+					while (j < len && input[j] != ';' &&
+					       input[j] != '&' && input[j] != '<') {
+						j++;
+					}
+				}
+				if (digit_count > 0 && j < len && input[j] == ';') {
 					j++; // skip ';'
 					// Encode as UTF-8
 					if (codepoint < 0x80) {
@@ -17352,6 +17368,18 @@ static void xml_parse_into(SWFAppContext* app_context, ASObject* doc, const char
 	stack[0] = doc;
 
 	u32 pos = 0;
+
+	// Strip a leading UTF-8 BOM (EF BB BF). Flash's XML parser silently
+	// skips it; without this it leaks as a spurious leading text node, so
+	// firstChild is wrong and childNodes has one extra entry
+	// (XML.as:884/885/900 — gnash.xml begins with a BOM).
+	if (text_len >= 3 &&
+	    (unsigned char)text[0] == 0xEF &&
+	    (unsigned char)text[1] == 0xBB &&
+	    (unsigned char)text[2] == 0xBF) {
+		pos = 3;
+	}
+
 	u32 text_start = pos;
 
 	// Fatal parse error tracking. Flash discards the whole document (toString
@@ -18573,7 +18601,14 @@ static void initXMLPrototype(SWFAppContext* app_context) {
 		setPropertyWithFlags(app_context, xmlnode_proto, name, nlen, &uv, PROPERTY_FLAGS_DONTENUM); \
 	} while(0)
 	INSTALL_VPROP("nodeName", 8);
-	INSTALL_VPROP("nodeValue", 9);
+	// nodeValue placeholder is NULL-typed (not undefined): element and
+	// document nodes carry no own nodeValue and inherit this — Flash reports
+	// `typeof(elem.nodeValue) == 'null'` (XML.as:344, 364). Text nodes shadow
+	// it with an own string data prop.
+	{
+		ActionVar nullv = {0}; nullv.type = ACTION_STACK_VALUE_NULL;
+		setPropertyWithFlags(app_context, xmlnode_proto, "nodeValue", 9, &nullv, PROPERTY_FLAGS_DONTENUM);
+	}
 	INSTALL_VPROP("nodeType", 8);
 	INSTALL_VPROP("attributes", 10);
 	INSTALL_VPROP("childNodes", 10);
@@ -39114,6 +39149,37 @@ void actionSetVariable(SWFAppContext* app_context)
 				// Regular property — set it on the direct scope object
 				ActionVar value_var;
 				peekVar(app_context, &value_var);
+				// XML node write coercion: `with(node){ nodeValue = 4 }` is a
+				// SetVariable resolving through the with-object, not a
+				// SetMember, so the actionSetMember coercion hook never sees
+				// it. Mirror that hook here — nodeValue/xmlDecl/docTypeDecl/
+				// contentType coerce to string, ignoreWhite to boolean
+				// (XML.as:382).
+				if (scope_is_with[i])
+				{
+					int xml_str_coerce =
+					    (var_name_len == 9  && memcmp(var_name, "nodeValue", 9) == 0) ||
+					    (var_name_len == 7  && memcmp(var_name, "xmlDecl", 7) == 0) ||
+					    (var_name_len == 11 && memcmp(var_name, "docTypeDecl", 11) == 0) ||
+					    (var_name_len == 11 && memcmp(var_name, "contentType", 11) == 0);
+					int xml_bool_coerce =
+					    (var_name_len == 11 && memcmp(var_name, "ignoreWhite", 11) == 0);
+					if ((xml_str_coerce || xml_bool_coerce) &&
+					    getProperty(scope_chain[i], "nodeType", 8) != NULL)
+					{
+						if (xml_bool_coerce) {
+							ActionVar bv = tfCoerceBoolean(app_context, &value_var);
+							if (bv.type == ACTION_STACK_VALUE_BOOLEAN)
+								value_var = bv;
+						} else if (value_var.type != ACTION_STACK_VALUE_STRING &&
+						           value_var.type != ACTION_STACK_VALUE_NULL &&
+						           value_var.type != ACTION_STACK_VALUE_UNDEFINED) {
+							char _xc[512];
+							u32 _xcl = (u32) varToStringBuf(app_context, &value_var, _xc, sizeof(_xc));
+							value_var = makeStringActionVar(app_context, _xc, _xcl);
+						}
+					}
+				}
 				setProperty(app_context, scope_chain[i], var_name, var_name_len, &value_var);
 #if defined(NO_GRAPHICS) || defined(OFFSCREEN_RENDER)
 				ng_syncVarToTextFields(app_context, var_name, var_name_len, &value_var);
@@ -53303,7 +53369,8 @@ static int invokeNativeSuperConstructor(SWFAppContext* app_context, ASFunction* 
 		ActionVar nt = makeF64(1.0);
 		setProperty(app_context, obj, "nodeType", 8, &nt);
 		xml_set_null(app_context, obj, "nodeName", 8);
-		xml_set_null(app_context, obj, "nodeValue", 9);
+		// nodeValue is inherited (virtual) — no own data prop on the document
+		// node, so `new XML().hasOwnProperty("nodeValue")` is false (XML.as:130).
 		xml_set_null(app_context, obj, "parentNode", 10);
 		xml_set_null(app_context, obj, "firstChild", 10);
 		xml_set_null(app_context, obj, "lastChild", 9);
@@ -69079,6 +69146,17 @@ static void soundFireCallback(SWFAppContext* app_context, ASObject* sound_obj, c
 		MovieClip* saved_context = g_current_context;
 		if (g_swf_version >= 6 && func->base_clip != NULL)
 			g_current_context = (MovieClip*)func->base_clip;
+
+		// Make `this` resolvable by name. A DefineFunction2 handler that
+		// references `this` without a preload-this register reads it via
+		// actionGetVariable("this") — without this the handler's `this` is
+		// undefined (XML.as:903 `++this.onLoadCalls`, v7+ where the handler
+		// compiles to DefineFunction2). Harmless when a preload register is
+		// used (the register wins; the variable is just never read).
+		ActionVar this_var = {0};
+		this_var.type = ACTION_STACK_VALUE_OBJECT;
+		this_var.data.numeric_value = (u64)(uintptr_t)sound_obj;
+		setVariableByName("this", &this_var);
 
 		g_call_depth++;
 		func->advanced_func(app_context, cb_args, cb_arg_count, regs, (void*)sound_obj);

@@ -1148,6 +1148,23 @@ void setArrayElement(SWFAppContext* app_context, ASArray* arr, u32 index, Action
 		}
 	}
 
+	// Fill any gap between the current length and the assigned index with
+	// HOLEs. These slots may be within capacity but logically absent (e.g.
+	// after a pop() shrank length without clearing the slot, or a sparse
+	// assignment past the end). Without this, stale values from popped
+	// elements leak back in (XML.as:760 — `arr[8]=x` after pop must leave
+	// index 7 a hole, not the popped value). Don't free the stale contents:
+	// a popped string's heap_ptr may still be referenced by the stack.
+	if (index > arr->length)
+	{
+		for (u32 i = arr->length; i < index; i++)
+		{
+			arr->elements[i].type = ACTION_STACK_VALUE_HOLE;
+			arr->elements[i].str_size = 0;
+			arr->elements[i].data.numeric_value = 0;
+		}
+	}
+
 	// Set new value
 	arr->elements[index] = *value;
 
