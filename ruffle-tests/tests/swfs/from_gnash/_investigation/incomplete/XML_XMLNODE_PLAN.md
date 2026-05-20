@@ -65,6 +65,44 @@ status_note: |
 
 ## Status
 
+### 2026-05-20 session #6 — docTypeDecl/xmlDecl + malformed-XML cluster; XML-v5 RUFFLE_MATCHED
+
+The docTypeDecl/xmlDecl parse-time cluster (XML.as:1027-1104) is fixed. All
+changes in `SWFModernRuntime/src/actionmodern/action.c`:
+
+- **DOCTYPE / xmlDecl parsing.** `<!doctype>` detection is now case-insensitive
+  (`strncasecmp` — XML.as:1058 `<!DOcTyPE text>`); previously a mixed-case
+  doctype fell through and was parsed as an element. `<?xml?>` detection is
+  case-insensitive too, and multiple declarations now **accumulate** into
+  `xmlDecl` via a new `xml_append_str` helper (XML.as:1081-1082
+  `<?xMl decl?><?XMl new?>`). `docTypeDecl` keeps last-wins (overwrite).
+- **Serialization.** `xml_serialize_node`'s document-root branch now emits
+  `xmlDecl` then `docTypeDecl` (raw, unescaped) before the children,
+  regardless of their source order (XML.as:1054-1104).
+- **Write coercion.** A new `actionSetMember` hook (gated on the property
+  name + a `nodeType` probe) coerces `xmlDecl`/`docTypeDecl`/`contentType`/
+  `nodeValue` writes to string and `ignoreWhite` to boolean (XML.as:1010,
+  1085, 1090, 1097).
+- **Read-only navigation props.** `firstChild`/`lastChild`/`previousSibling`/
+  `nextSibling` join `parentNode` as read-only against user SetMember writes
+  (XML.as:633 `element2.lastChild = 4` is a no-op).
+- **Malformed-XML handling.** Unterminated comments and CDATA sections are
+  now consumed to EOF instead of leaking their tail bytes as text
+  (XML.as:1043, 1046); a bare `<` at end-of-input no longer double-flushes
+  the preceding text (XML.as:1033); and a new `parse_failed` flag — set on an
+  unterminated tag or an orphan close tag — discards the whole document so
+  `toString()` is `""` (XML.as:1027, 1030, 1040).
+
+Result: **XML-v5 promotes to RUFFLE_MATCHED.** XML-v6/v7/v8 still
+output_mismatch — their remaining diffs are unrelated clusters that the
+SWF6+ `#if` gates expose: the `gnash.xml` UTF-8 BOM creating a spurious
+leading text node (XML.as:884/885/900), `addRequestHeader` empty-value
+handling (XML.as:760/762), the `nodeValue` own-prop check (XML.as:130),
+numeric character entities (XML.as:1114), and the `with`-scoped `nodeValue`
+write at XML.as:382 (a SetVariable, not SetMember, so the new coercion hook
+doesn't see it). All 27 AVM1 `xml*` regression tests still pass; XMLNode-v5..v8
+stay RUFFLE_MATCHED.
+
 ### 2026-05-20 session #5 — onLoad-truncation cluster fixed
 
 The XML-vN truncation is resolved. Two bugs, both in

@@ -16789,6 +16789,23 @@ static void xml_set_str(SWFAppContext* ctx, ASObject* obj, const char* name, u32
 	setProperty(ctx, obj, name, nlen, &v);
 }
 
+// Append UTF-8 text to an existing string-valued property (used for xmlDecl
+// accumulation — multiple <?xml?> declarations concatenate; XML.as:1081-1082).
+static void xml_append_str(SWFAppContext* ctx, ASObject* obj, const char* name, u32 nlen, const char* val, u32 vlen) {
+	ActionVar* existing = getProperty(obj, name, nlen);
+	if (existing != NULL && existing->type == ACTION_STACK_VALUE_STRING && existing->str_size > 0) {
+		char buf[4096];
+		const uint16_t* eu16 = varGetU16Ptr(existing);
+		u32 elen = (u32) u16_to_utf8(eu16, existing->str_size, buf, sizeof(buf));
+		if ((size_t)elen + vlen < sizeof(buf)) {
+			memcpy(buf + elen, val, vlen);
+			xml_set_str(ctx, obj, name, nlen, buf, elen + vlen);
+			return;
+		}
+	}
+	xml_set_str(ctx, obj, name, nlen, val, vlen);
+}
+
 // ---- XML.status / XML.loaded virtual accessor support (Phases 3+4) ----
 // Flash exposes `status` and `loaded` as virtual (addProperty-style) accessor
 // properties on XML.prototype. The coerced value lives in a hidden DontEnum
@@ -16928,13 +16945,15 @@ static ASObject* xml_create_node(SWFAppContext* app_context, int nodeType,
 		xml_set_null(app_context, node, "nodeValue", 9);
 	}
 
-	// Navigation — all null initially. parentNode is read-only against user
-	// SetMember writes (Flash: `node.parentNode = x` is a no-op).
+	// Navigation — all null initially. All five are read-only against user
+	// SetMember writes (Flash: `node.parentNode = x` / `node.lastChild = x`
+	// are no-ops — XML.as:578-579, 633). Internal tree mutations go through
+	// raw setProperty, which ignores the WRITABLE flag.
 	xml_set_null_readonly(app_context, node, "parentNode", 10);
-	xml_set_null(app_context, node, "firstChild", 10);
-	xml_set_null(app_context, node, "lastChild", 9);
-	xml_set_null(app_context, node, "previousSibling", 15);
-	xml_set_null(app_context, node, "nextSibling", 11);
+	xml_set_null_readonly(app_context, node, "firstChild", 10);
+	xml_set_null_readonly(app_context, node, "lastChild", 9);
+	xml_set_null_readonly(app_context, node, "previousSibling", 15);
+	xml_set_null_readonly(app_context, node, "nextSibling", 11);
 
 	// childNodes — empty array. Read-only against user SetMember writes
 	// (`node.childNodes = 5` is a no-op — XML.as:359-360). Internal rebuilds
@@ -17335,6 +17354,12 @@ static void xml_parse_into(SWFAppContext* app_context, ASObject* doc, const char
 	u32 pos = 0;
 	u32 text_start = pos;
 
+	// Fatal parse error tracking. Flash discards the whole document (toString
+	// → "") when it hits an unterminated tag or an orphan close tag
+	// (XML.as:1027, 1030, 1040). Unterminated comments / CDATA are NOT fatal
+	// (handled above) — only structural tag errors are.
+	int parse_failed = 0;
+
 	while (pos < text_len) {
 		if (text[pos] == '<') {
 			// Flush accumulated text
@@ -17361,7 +17386,10 @@ static void xml_parse_into(SWFAppContext* app_context, ASObject* doc, const char
 			}
 
 			pos++; // skip '<'
-			if (pos >= text_len) break;
+			// A bare '<' at end-of-input: the preceding text was already
+			// flushed above; sync text_start so the trailing-text flush
+			// doesn't re-emit it (XML.as:1033 `<open>& ' "<`).
+			if (pos >= text_len) { text_start = pos; break; }
 
 			if (text[pos] == '/') {
 				// Closing tag </tag>
@@ -17369,13 +17397,17 @@ static void xml_parse_into(SWFAppContext* app_context, ASObject* doc, const char
 				while (pos < text_len && text[pos] != '>') pos++;
 				if (pos < text_len) pos++; // skip '>'
 				if (stack_top > 0) stack_top--;
+				else parse_failed = 1; // orphan close tag — nothing to close
 			}
 			else if (pos + 2 < text_len && text[pos] == '!' && text[pos+1] == '-' && text[pos+2] == '-') {
 				// Comment <!-- ... -->
 				pos += 3; // skip !--
 				while (pos + 2 < text_len && !(text[pos] == '-' && text[pos+1] == '-' && text[pos+2] == '>'))
 					pos++;
-				if (pos + 2 < text_len) pos += 3; // skip -->
+				// Terminated → skip past "-->"; unterminated → consume to EOF
+				// so trailing bytes don't leak as text (XML.as:1043).
+				if (pos + 2 < text_len) pos += 3;
+				else pos = text_len;
 			}
 			else if (pos + 7 < text_len && strncmp(&text[pos], "![CDATA[", 8) == 0) {
 				// CDATA <![CDATA[...]]>
@@ -17383,15 +17415,22 @@ static void xml_parse_into(SWFAppContext* app_context, ASObject* doc, const char
 				u32 cdata_start = pos;
 				while (pos + 2 < text_len && !(text[pos] == ']' && text[pos+1] == ']' && text[pos+2] == '>'))
 					pos++;
-				u32 cdata_len = pos - cdata_start;
-				char* cdata_text = xml_strdup(app_context, &text[cdata_start], cdata_len);
-				ASObject* tn = xml_create_node(app_context, 3, NULL, 0, cdata_text, cdata_len);
-				xml_do_append(app_context, stack[stack_top], tn);
-				free(cdata_text);
-				if (pos + 2 < text_len) pos += 3; // skip ]]>
+				if (pos + 2 < text_len) {
+					// Terminated CDATA — emit a text node, skip past "]]>"
+					u32 cdata_len = pos - cdata_start;
+					char* cdata_text = xml_strdup(app_context, &text[cdata_start], cdata_len);
+					ASObject* tn = xml_create_node(app_context, 3, NULL, 0, cdata_text, cdata_len);
+					xml_do_append(app_context, stack[stack_top], tn);
+					free(cdata_text);
+					pos += 3; // skip ]]>
+				} else {
+					// Unterminated CDATA — discard entirely (XML.as:1046)
+					pos = text_len;
+				}
 			}
-			else if (pos + 7 < text_len && strncmp(&text[pos], "!DOCTYPE", 8) == 0) {
-				// DOCTYPE <!DOCTYPE ...>
+			else if (pos + 7 < text_len && strncasecmp(&text[pos], "!doctype", 8) == 0) {
+				// DOCTYPE <!DOCTYPE ...> — case-insensitive (XML.as:1058
+				// `<!DOcTyPE text>`). The last declaration wins (overwrite).
 				u32 dt_start = pos - 1; // include '<'
 				while (pos < text_len && text[pos] != '>') pos++;
 				if (pos < text_len) pos++; // skip '>'
@@ -17406,9 +17445,14 @@ static void xml_parse_into(SWFAppContext* app_context, ASObject* doc, const char
 					pos++;
 				if (pos + 1 < text_len) pos += 2; // skip ?>
 				u32 pi_len = pos - pi_start;
-				// Check if it's <?xml ...?>
-				if (pi_len > 5 && strncmp(&text[pi_start + 2], "xml ", 4) == 0) {
-					xml_set_str(app_context, doc, "xmlDecl", 7, &text[pi_start], pi_len);
+				// <?xml ...?> (any case) is the XML declaration. Multiple
+				// declarations accumulate into xmlDecl (XML.as:1081-1082).
+				if (pi_len > 5 && strncasecmp(&text[pi_start + 2], "xml", 3) == 0) {
+					char after = text[pi_start + 5];
+					if (after == ' ' || after == '\t' || after == '\n' ||
+					    after == '\r' || after == '?') {
+						xml_append_str(app_context, doc, "xmlDecl", 7, &text[pi_start], pi_len);
+					}
 				}
 			}
 			else {
@@ -17496,7 +17540,10 @@ static void xml_parse_into(SWFAppContext* app_context, ASObject* doc, const char
 					self_closing = 1;
 					pos++; // skip '/'
 				}
+				// A well-formed tag ends with '>'. Reaching EOF first means an
+				// unterminated tag / attribute value — a fatal parse error.
 				if (pos < text_len && text[pos] == '>') pos++; // skip '>'
+				else parse_failed = 1;
 
 				xml_do_append(app_context, stack[stack_top], elem);
 
@@ -17625,6 +17672,31 @@ static void xml_parse_into(SWFAppContext* app_context, ASObject* doc, const char
 		}
 		free(unescaped);
 	}
+
+	// Fatal parse error: Flash discards the whole document — toString() is ""
+	// (XML.as:1027 `<open att='`, 1030 unterminated tag, 1040 orphan close).
+	if (parse_failed) {
+		ActionVar* rc = getProperty(doc, "__realChildren", 14);
+		if (rc != NULL && rc->type == ACTION_STACK_VALUE_ARRAY) {
+			ASArray* children = (ASArray*) rc->data.numeric_value;
+			if (children != NULL) {
+				for (u32 i = 0; i < children->length; i++) {
+					if (children->elements[i].type == ACTION_STACK_VALUE_OBJECT) {
+						ASObject* child = (ASObject*) children->elements[i].data.numeric_value;
+						if (child != NULL) {
+							xml_set_null(app_context, child, "parentNode", 10);
+							xml_set_null(app_context, child, "previousSibling", 15);
+							xml_set_null(app_context, child, "nextSibling", 11);
+						}
+					}
+				}
+				children->length = 0;
+			}
+		}
+		xml_rebuild_childnodes(app_context, doc);
+		xml_set_null(app_context, doc, "firstChild", 10);
+		xml_set_null(app_context, doc, "lastChild", 9);
+	}
 	#undef XML_STACK_MAX
 }
 
@@ -17684,10 +17756,26 @@ static void xml_serialize_node(SWFAppContext* app_context, ASObject* node, XmlBu
 		name_len = (u32)strlen(nodeName);
 	}
 
-	// If nodeName is null (document root), just serialize children.
+	// If nodeName is null (document root), emit the XML declaration and
+	// DOCTYPE (raw, unescaped — xmlDecl first, then docTypeDecl, regardless
+	// of their order in the source; XML.as:1054-1104), then the children.
 	// Serialization walks the real DOM children, not the public childNodes
 	// array (which may carry user-pushed fakes / be sorted).
 	if (nodeName == NULL) {
+		ActionVar* xd = getProperty(node, "xmlDecl", 7);
+		if (xd != NULL && xd->type != ACTION_STACK_VALUE_UNDEFINED &&
+		    xd->type != ACTION_STACK_VALUE_NULL) {
+			char _xd_buf[1024];
+			u32 _xd_len = (u32) varToStringBuf(app_context, xd, _xd_buf, sizeof(_xd_buf));
+			if (_xd_len > 0) xb_append(app_context, xb, _xd_buf, _xd_len);
+		}
+		ActionVar* dd = getProperty(node, "docTypeDecl", 11);
+		if (dd != NULL && dd->type != ACTION_STACK_VALUE_UNDEFINED &&
+		    dd->type != ACTION_STACK_VALUE_NULL) {
+			char _dd_buf[1024];
+			u32 _dd_len = (u32) varToStringBuf(app_context, dd, _dd_buf, sizeof(_dd_buf));
+			if (_dd_len > 0) xb_append(app_context, xb, _dd_buf, _dd_len);
+		}
 		ActionVar* cn = getProperty(node, "__realChildren", 14);
 		if (cn != NULL && cn->type == ACTION_STACK_VALUE_ARRAY) {
 			ASArray* children = (ASArray*) cn->data.numeric_value;
@@ -43785,6 +43873,35 @@ void actionSetMember(SWFAppContext* app_context)
 				}
 				// distance, bias, divisor: no validation, pass through
 				(void)handled;
+			}
+			// XML node property write coercion: xmlDecl / docTypeDecl /
+			// contentType / nodeValue coerce the assigned value to a string,
+			// ignoreWhite coerces to a boolean (Flash — XML.as:1010 / 1085 /
+			// 1090 / 1097). Gated on the property name so the nodeType probe
+			// only runs for these five names.
+			{
+				int xml_str_coerce =
+				    (prop_name_len == 9  && memcmp(prop_name, "nodeValue", 9) == 0) ||
+				    (prop_name_len == 7  && memcmp(prop_name, "xmlDecl", 7) == 0) ||
+				    (prop_name_len == 11 && memcmp(prop_name, "docTypeDecl", 11) == 0) ||
+				    (prop_name_len == 11 && memcmp(prop_name, "contentType", 11) == 0);
+				int xml_bool_coerce =
+				    (prop_name_len == 11 && memcmp(prop_name, "ignoreWhite", 11) == 0);
+				if ((xml_str_coerce || xml_bool_coerce) &&
+				    getProperty(obj, "nodeType", 8) != NULL)
+				{
+					if (xml_bool_coerce) {
+						ActionVar bv = tfCoerceBoolean(app_context, &value_var);
+						if (bv.type == ACTION_STACK_VALUE_BOOLEAN)
+							value_var = bv;
+					} else if (value_var.type != ACTION_STACK_VALUE_STRING &&
+					           value_var.type != ACTION_STACK_VALUE_NULL &&
+					           value_var.type != ACTION_STACK_VALUE_UNDEFINED) {
+						char _xc[512];
+						u32 _xcl = (u32) varToStringBuf(app_context, &value_var, _xc, sizeof(_xc));
+						value_var = makeStringActionVar(app_context, _xc, _xcl);
+					}
+				}
 			}
 			// TextFormat instances apply per-property coercion
 			if (isTextFormatInstance(obj) && textFormatSetProperty(app_context, obj, prop_name, prop_name_len, &value_var))
