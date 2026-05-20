@@ -391,6 +391,16 @@ jobs:
           mkdir -p /tmp/scripts_backup/ruffle-tests
           cp ruffle-tests/filter_results.py /tmp/scripts_backup/ruffle-tests/ 2>/dev/null || true
           cp ruffle-tests/ignored_tests.txt /tmp/scripts_backup/ruffle-tests/ 2>/dev/null || true
+          # Per-suite ignore lists live alongside each suite directory.
+          # Back them up so the filter step sees master's versions instead
+          # of the (stale) copies inherited from the ruffle-test-results
+          # branch — otherwise per-suite ignored_tests.txt edits on master
+          # never reach filter_results.py.
+          find ruffle-tests/tests/swfs -name ignored_tests.txt -print0 2>/dev/null | \
+            while IFS= read -r -d '' f; do
+              mkdir -p "/tmp/scripts_backup/$(dirname "$f")"
+              cp "$f" "/tmp/scripts_backup/$f"
+            done
 
           git config user.name "github-actions[bot]"
           git config user.email "github-actions[bot]@users.noreply.github.com"
@@ -442,6 +452,17 @@ jobs:
           fi
           if [ -f /tmp/scripts_backup/ruffle-tests/ignored_tests.txt ]; then
             cp /tmp/scripts_backup/ruffle-tests/ignored_tests.txt ruffle-tests/
+          fi
+          # Restore per-suite ignore lists onto the ruffle-test-results
+          # working tree (see the backup step above) so filter_results.py
+          # reads master's versions and the commit carries them forward.
+          if [ -d /tmp/scripts_backup/ruffle-tests/tests/swfs ]; then
+            find /tmp/scripts_backup/ruffle-tests/tests/swfs -name ignored_tests.txt -print0 2>/dev/null | \
+              while IFS= read -r -d '' f; do
+                dest="${f#/tmp/scripts_backup/}"
+                mkdir -p "$(dirname "$dest")"
+                cp "$f" "$dest"
+              done
           fi
 
           # Regenerate filtered results for every mode JSON we now have.
@@ -1175,6 +1196,16 @@ jobs:
           mkdir -p /tmp/scripts_backup/ruffle-tests
           cp ruffle-tests/filter_results.py /tmp/scripts_backup/ruffle-tests/ 2>/dev/null || true
           cp ruffle-tests/ignored_tests.txt /tmp/scripts_backup/ruffle-tests/ 2>/dev/null || true
+          # Per-suite ignore lists live alongside each suite directory.
+          # Back them up so the filter step sees master's versions instead
+          # of the (stale) copies inherited from the ruffle-test-results
+          # branch — otherwise per-suite ignored_tests.txt edits on master
+          # never reach filter_results.py.
+          find ruffle-tests/tests/swfs -name ignored_tests.txt -print0 2>/dev/null | \
+            while IFS= read -r -d '' f; do
+              mkdir -p "/tmp/scripts_backup/$(dirname "$f")"
+              cp "$f" "/tmp/scripts_backup/$f"
+            done
 
           git config user.name "github-actions[bot]"
           git config user.email "github-actions[bot]@users.noreply.github.com"
@@ -1226,6 +1257,17 @@ jobs:
           fi
           if [ -f /tmp/scripts_backup/ruffle-tests/ignored_tests.txt ]; then
             cp /tmp/scripts_backup/ruffle-tests/ignored_tests.txt ruffle-tests/
+          fi
+          # Restore per-suite ignore lists onto the ruffle-test-results
+          # working tree (see the backup step above) so filter_results.py
+          # reads master's versions and the commit carries them forward.
+          if [ -d /tmp/scripts_backup/ruffle-tests/tests/swfs ]; then
+            find /tmp/scripts_backup/ruffle-tests/tests/swfs -name ignored_tests.txt -print0 2>/dev/null | \
+              while IFS= read -r -d '' f; do
+                dest="${f#/tmp/scripts_backup/}"
+                mkdir -p "$(dirname "$dest")"
+                cp "$f" "$dest"
+              done
           fi
 
           # Regenerate filtered results for every mode JSON we now have.
