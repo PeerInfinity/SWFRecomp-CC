@@ -16936,12 +16936,15 @@ static ASObject* xml_create_node(SWFAppContext* app_context, int nodeType,
 	xml_set_null(app_context, node, "previousSibling", 15);
 	xml_set_null(app_context, node, "nextSibling", 11);
 
-	// childNodes — empty array
+	// childNodes — empty array. Read-only against user SetMember writes
+	// (`node.childNodes = 5` is a no-op — XML.as:359-360). Internal rebuilds
+	// mutate the array in place, so read-only on the slot is harmless.
 	ASArray* children = allocArray(app_context, 0);
 	ActionVar cn = {0};
 	cn.type = ACTION_STACK_VALUE_ARRAY;
 	cn.data.numeric_value = (u64) children;
-	setProperty(app_context, node, "childNodes", 10, &cn);
+	setPropertyWithFlags(app_context, node, "childNodes", 10, &cn,
+		PROPERTY_FLAG_ENUMERABLE | PROPERTY_FLAG_CONFIGURABLE);
 
 	// attributes — always an object (Flash has attributes defined on text nodes too).
 	// Read-only against user SetMember writes (`node.attributes = x` is a no-op).
@@ -16991,11 +16994,56 @@ static ASObject* xml_create_node(SWFAppContext* app_context, int nodeType,
 	return node;
 }
 
-// Sync firstChild/lastChild/sibling links from childNodes array
-static void xml_sync_children(SWFAppContext* app_context, ASObject* parent) {
+// Phase 6 of XML_XMLNODE_PLAN: `__realChildren` is the genuine DOM-children
+// list, in insertion order, kept separate from the public `childNodes` array
+// which AS code can freely push()/sort()/index. Every DOM mutation
+// (appendChild/removeNode/insertBefore) updates `__realChildren` then rebuilds
+// `childNodes` from it — which is how Flash discards "fake" pushed items the
+// moment a real element is appended (XMLNode.as:127-176). firstChild /
+// lastChild / siblings and serialization all derive from `__realChildren`.
+static ASArray* xml_get_real_children(SWFAppContext* app_context, ASObject* node) {
+	ActionVar* rc = getProperty(node, "__realChildren", 14);
+	if (rc != NULL && rc->type == ACTION_STACK_VALUE_ARRAY)
+		return (ASArray*) rc->data.numeric_value;
+	ASArray* arr = allocArray(app_context, 0);
+	ActionVar v = {0};
+	v.type = ACTION_STACK_VALUE_ARRAY;
+	v.data.numeric_value = (u64) arr;
+	setPropertyWithFlags(app_context, node, "__realChildren", 14, &v, PROPERTY_FLAGS_DONTENUM);
+	return arr;
+}
+
+// Rebuild the public `childNodes` array in place from `__realChildren`,
+// preserving the array's object identity (so a cached `var c = node.childNodes`
+// stays valid) and discarding any user-pushed fake items.
+static void xml_rebuild_childnodes(SWFAppContext* app_context, ASObject* parent) {
+	ASArray* real = xml_get_real_children(app_context, parent);
 	ActionVar* cn_prop = getProperty(parent, "childNodes", 10);
-	if (cn_prop == NULL || cn_prop->type != ACTION_STACK_VALUE_ARRAY) return;
-	ASArray* children = (ASArray*) cn_prop->data.numeric_value;
+	if (cn_prop == NULL || cn_prop->type != ACTION_STACK_VALUE_ARRAY || real == NULL) return;
+	ASArray* pub = (ASArray*) cn_prop->data.numeric_value;
+	if (pub == NULL) return;
+	if (real->length > pub->capacity) {
+		u32 new_cap = pub->capacity < 4 ? 4 : pub->capacity;
+		while (new_cap < real->length) new_cap *= 2;
+		ActionVar* ne = (ActionVar*) realloc(pub->elements, new_cap * sizeof(ActionVar));
+		if (ne == NULL) return;
+		memset(&ne[pub->capacity], 0, (new_cap - pub->capacity) * sizeof(ActionVar));
+		pub->elements = ne;
+		pub->capacity = new_cap;
+	}
+	for (u32 i = 0; i < real->length; i++)
+		pub->elements[i] = real->elements[i];
+	for (u32 i = real->length; i < pub->capacity; i++) {
+		pub->elements[i].type = ACTION_STACK_VALUE_HOLE;
+		pub->elements[i].data.numeric_value = 0;
+		pub->elements[i].str_size = 0;
+	}
+	pub->length = real->length;
+}
+
+// Sync firstChild/lastChild/sibling links from the real-children list
+static void xml_sync_children(SWFAppContext* app_context, ASObject* parent) {
+	ASArray* children = xml_get_real_children(app_context, parent);
 	if (children == NULL) return;
 
 	u32 count = children->length;
@@ -17053,12 +17101,10 @@ static void xml_do_remove(SWFAppContext* app_context, ASObject* node) {
 	ASObject* parent = (ASObject*) pp->data.numeric_value;
 	if (parent == NULL) return;
 
-	ActionVar* cn_prop = getProperty(parent, "childNodes", 10);
-	if (cn_prop == NULL || cn_prop->type != ACTION_STACK_VALUE_ARRAY) return;
-	ASArray* children = (ASArray*) cn_prop->data.numeric_value;
+	ASArray* children = xml_get_real_children(app_context, parent);
 	if (children == NULL) return;
 
-	// Find and remove from array
+	// Find and remove from the real-children list
 	for (u32 i = 0; i < children->length; i++) {
 		if (children->elements[i].type == ACTION_STACK_VALUE_OBJECT &&
 			(ASObject*) children->elements[i].data.numeric_value == node) {
@@ -17075,7 +17121,8 @@ static void xml_do_remove(SWFAppContext* app_context, ASObject* node) {
 	xml_set_null(app_context, node, "previousSibling", 15);
 	xml_set_null(app_context, node, "nextSibling", 11);
 
-	// Rebuild parent's links
+	// Rebuild parent's public childNodes + links
+	xml_rebuild_childnodes(app_context, parent);
 	xml_sync_children(app_context, parent);
 }
 
@@ -17092,36 +17139,10 @@ static void xml_do_append(SWFAppContext* app_context, ASObject* parent, ASObject
 		xml_do_remove(app_context, child);
 	}
 
-	// Add to childNodes array
-	ActionVar* cn_prop = getProperty(parent, "childNodes", 10);
-	if (cn_prop == NULL || cn_prop->type != ACTION_STACK_VALUE_ARRAY) return;
-	ASArray* children = (ASArray*) cn_prop->data.numeric_value;
+	// Append to the real-children list. The public childNodes array is then
+	// rebuilt from it, which is how appendChild discards user-pushed fakes.
+	ASArray* children = xml_get_real_children(app_context, parent);
 	if (children == NULL) return;
-
-	// Purge elements that were added directly via Array.push() without going through
-	// DOM APIs. Such elements have no parentNode set (or a wrong parentNode).
-	// Flash rebuilds childNodes from actual DOM children when appendChild is called.
-	{
-		u32 write = 0;
-		for (u32 i = 0; i < children->length; i++) {
-			int keep = 1;
-			if (children->elements[i].type == ACTION_STACK_VALUE_OBJECT) {
-				ASObject* elem = (ASObject*) children->elements[i].data.numeric_value;
-				if (elem != NULL) {
-					ActionVar* elem_pp = getProperty(elem, "parentNode", 10);
-					// Keep only elements whose parentNode points to this parent
-					if (elem_pp == NULL ||
-					    elem_pp->type != ACTION_STACK_VALUE_OBJECT ||
-					    (ASObject*)elem_pp->data.numeric_value != parent) {
-						keep = 0;
-					}
-				}
-			}
-			if (keep)
-				children->elements[write++] = children->elements[i];
-		}
-		children->length = write;
-	}
 
 	// Grow array if needed (allocArray uses malloc, so we must use realloc/free here)
 	if (children->length >= children->capacity) {
@@ -17139,6 +17160,7 @@ static void xml_do_append(SWFAppContext* app_context, ASObject* parent, ASObject
 	cv.data.numeric_value = (u64) child;
 	children->elements[children->length++] = cv;
 
+	xml_rebuild_childnodes(app_context, parent);
 	xml_sync_children(app_context, parent);
 }
 
@@ -17156,9 +17178,7 @@ static void xml_do_insert_before(SWFAppContext* app_context, ASObject* parent,
 		xml_do_remove(app_context, newChild);
 	}
 
-	ActionVar* cn_prop = getProperty(parent, "childNodes", 10);
-	if (cn_prop == NULL || cn_prop->type != ACTION_STACK_VALUE_ARRAY) return;
-	ASArray* children = (ASArray*) cn_prop->data.numeric_value;
+	ASArray* children = xml_get_real_children(app_context, parent);
 	if (children == NULL) return;
 
 	// Find refChild position
@@ -17191,6 +17211,7 @@ static void xml_do_insert_before(SWFAppContext* app_context, ASObject* parent,
 	children->elements[pos] = cv;
 	children->length++;
 
+	xml_rebuild_childnodes(app_context, parent);
 	xml_sync_children(app_context, parent);
 }
 
@@ -17663,9 +17684,11 @@ static void xml_serialize_node(SWFAppContext* app_context, ASObject* node, XmlBu
 		name_len = (u32)strlen(nodeName);
 	}
 
-	// If nodeName is null (document root), just serialize children
+	// If nodeName is null (document root), just serialize children.
+	// Serialization walks the real DOM children, not the public childNodes
+	// array (which may carry user-pushed fakes / be sorted).
 	if (nodeName == NULL) {
-		ActionVar* cn = getProperty(node, "childNodes", 10);
+		ActionVar* cn = getProperty(node, "__realChildren", 14);
 		if (cn != NULL && cn->type == ACTION_STACK_VALUE_ARRAY) {
 			ASArray* children = (ASArray*) cn->data.numeric_value;
 			if (children != NULL) {
@@ -17680,8 +17703,8 @@ static void xml_serialize_node(SWFAppContext* app_context, ASObject* node, XmlBu
 		return;
 	}
 
-	// Element with name — check for children
-	ActionVar* cn = getProperty(node, "childNodes", 10);
+	// Element with name — check for children (real DOM children)
+	ActionVar* cn = getProperty(node, "__realChildren", 14);
 	ASArray* children = NULL;
 	if (cn != NULL && cn->type == ACTION_STACK_VALUE_ARRAY)
 		children = (ASArray*) cn->data.numeric_value;
@@ -17777,8 +17800,8 @@ static ActionVar builtin_xml_parseXML(SWFAppContext* app_context, ActionVar* arg
 	}
 	if (text == NULL || text_len == 0) return ret;
 
-	// Orphan existing children
-	ActionVar* cn = getProperty(doc, "childNodes", 10);
+	// Orphan existing children (the real DOM list); rebuild empties childNodes
+	ActionVar* cn = getProperty(doc, "__realChildren", 14);
 	if (cn != NULL && cn->type == ACTION_STACK_VALUE_ARRAY) {
 		ASArray* children = (ASArray*) cn->data.numeric_value;
 		if (children != NULL) {
@@ -17795,6 +17818,7 @@ static ActionVar builtin_xml_parseXML(SWFAppContext* app_context, ActionVar* arg
 			children->length = 0;
 		}
 	}
+	xml_rebuild_childnodes(app_context, doc);
 	xml_set_null(app_context, doc, "firstChild", 10);
 	xml_set_null(app_context, doc, "lastChild", 9);
 
@@ -17875,7 +17899,7 @@ static ActionVar builtin_xml_hasChildNodes(SWFAppContext* app_context, ActionVar
 	ret.type = ACTION_STACK_VALUE_BOOLEAN;
 	ret.data.numeric_value = 0;
 	if (this_obj == NULL) return ret;
-	ActionVar* cn = getProperty((ASObject*) this_obj, "childNodes", 10);
+	ActionVar* cn = getProperty((ASObject*) this_obj, "__realChildren", 14);
 	if (cn != NULL && cn->type == ACTION_STACK_VALUE_ARRAY) {
 		ASArray* children = (ASArray*) cn->data.numeric_value;
 		if (children != NULL && children->length > 0)
@@ -17941,9 +17965,9 @@ static ActionVar builtin_xml_cloneNode(SWFAppContext* app_context, ActionVar* ar
 		}
 	}
 
-	// Deep clone: recursively clone children
+	// Deep clone: recursively clone the real DOM children
 	if (deep) {
-		ActionVar* cn = getProperty(src, "childNodes", 10);
+		ActionVar* cn = getProperty(src, "__realChildren", 14);
 		if (cn && cn->type == ACTION_STACK_VALUE_ARRAY) {
 			ASArray* children = (ASArray*) cn->data.numeric_value;
 			if (children) {
@@ -18165,8 +18189,8 @@ static ActionVar builtin_xml_load(SWFAppContext* app_context, ActionVar* args, u
 	int success = 0;
 
 	if (data != NULL && data->content != NULL && data->content_length > 0) {
-		// Orphan existing children (same as parseXML)
-		ActionVar* cn = getProperty(doc, "childNodes", 10);
+		// Orphan existing children (same as parseXML — the real DOM list)
+		ActionVar* cn = getProperty(doc, "__realChildren", 14);
 		if (cn != NULL && cn->type == ACTION_STACK_VALUE_ARRAY) {
 			ASArray* children = (ASArray*) cn->data.numeric_value;
 			if (children != NULL) {
@@ -18183,6 +18207,7 @@ static ActionVar builtin_xml_load(SWFAppContext* app_context, ActionVar* args, u
 				children->length = 0;
 			}
 		}
+		xml_rebuild_childnodes(app_context, doc);
 		xml_set_null(app_context, doc, "firstChild", 10);
 		xml_set_null(app_context, doc, "lastChild", 9);
 
@@ -47513,26 +47538,35 @@ void actionGetMember(SWFAppContext* app_context)
 			}
 			else
 			{
-				// Non-index property — check array's props object
+				// Non-index property — check the array's own props sidecar,
+				// then fall back to Array.prototype so e.g. `arr.push`
+				// resolves to the Array.prototype.push function value
+				// (Phase 6 of XML_XMLNODE_PLAN — XMLNode tests check
+				// `node.childNodes.push` truthiness).
+				ActionVar* pv = NULL;
 				if (arr->props != NULL)
+					pv = getPropertyWithPrototype(arr->props, prop_name, prop_name_len);
+				if (pv == NULL)
 				{
-					ActionVar* pv = getPropertyWithPrototype(arr->props, prop_name, prop_name_len);
-					if (pv != NULL)
+					initArrayPrototypeMethods(app_context);
+					if (g_array_prototype != NULL)
+						pv = getPropertyWithPrototype(g_array_prototype, prop_name, prop_name_len);
+				}
+				if (pv != NULL)
+				{
+					pushVar(app_context, pv);
+				}
+				else if (arr->props != NULL)
+				{
+					// Try __resolve hook (mirrors OBJECT path)
+					ASFunction* resolve_func = findResolveMethod(app_context, arr->props);
+					if (resolve_func != NULL)
 					{
-						pushVar(app_context, pv);
+						ActionVar result = invokeResolveFunction(app_context, resolve_func, (void*)arr->props, prop_name, prop_name_len);
+						pushVar(app_context, &result);
 					}
 					else
-					{
-						// Try __resolve hook (mirrors OBJECT path)
-						ASFunction* resolve_func = findResolveMethod(app_context, arr->props);
-						if (resolve_func != NULL)
-						{
-							ActionVar result = invokeResolveFunction(app_context, resolve_func, (void*)arr->props, prop_name, prop_name_len);
-							pushVar(app_context, &result);
-						}
-						else
-							pushUndefined(app_context);
-					}
+						pushUndefined(app_context);
 				}
 				else
 				{
@@ -53124,7 +53158,8 @@ static int invokeNativeSuperConstructor(SWFAppContext* app_context, ASFunction* 
 		ASArray* children = allocArray(app_context, 0);
 		ActionVar cn = {0}; cn.type = ACTION_STACK_VALUE_ARRAY;
 		cn.data.numeric_value = (u64)children;
-		setProperty(app_context, obj, "childNodes", 10, &cn);
+		setPropertyWithFlags(app_context, obj, "childNodes", 10, &cn,
+			PROPERTY_FLAG_ENUMERABLE | PROPERTY_FLAG_CONFIGURABLE);
 		ASObject* attrs = allocObject(app_context, 4);
 		xml_set_obj(app_context, obj, "attributes", 10, attrs);
 		ASObject* idmap = allocObject(app_context, 4);
@@ -56579,6 +56614,51 @@ static int callArrayMethod(SWFAppContext* app_context,
                            const char* method_name, u32 method_name_len,
                            ActionVar* args, u32 num_args)
 {
+	// hasOwnProperty(name) — arrays own "length", their live numeric indices,
+	// and any name in the props sidecar. Object.prototype.hasOwnProperty
+	// mis-casts an ASArray to ASObject, so handle it here (XML.as:354
+	// `childNodes.hasOwnProperty('length')`).
+	if (method_name_len == 14 && strncmp(method_name, "hasOwnProperty", 14) == 0)
+	{
+		int found = 0;
+		if (num_args >= 1)
+		{
+			char nb[64];
+			u32 nlen;
+			if (args[0].type == ACTION_STACK_VALUE_STRING)
+			{
+				const uint16_t* u16 = varGetU16Ptr(&args[0]);
+				nlen = (u32) u16_to_utf8(u16, args[0].str_size, nb, sizeof(nb));
+			}
+			else
+			{
+				nlen = (u32) varToStringBuf(app_context, &args[0], nb, sizeof(nb));
+			}
+			if (nlen == 6 && strncmp(nb, "length", 6) == 0)
+			{
+				found = 1;
+			}
+			else
+			{
+				char* endptr;
+				long long idx = strtoll(nb, &endptr, 10);
+				if (nlen > 0 && *endptr == '\0' && idx >= 0 && idx <= 2147483647LL)
+				{
+					ActionVar* e = getArrayElement(arr, (u32) idx);
+					if (e != NULL && e->type != ACTION_STACK_VALUE_HOLE)
+						found = 1;
+				}
+				if (!found && arr->props != NULL && hasPropertyRaw(arr->props, nb, nlen))
+					found = 1;
+			}
+		}
+		ActionVar rv = {0};
+		rv.type = ACTION_STACK_VALUE_BOOLEAN;
+		rv.data.numeric_value = found ? 1 : 0;
+		pushVar(app_context, &rv);
+		return 1;
+	}
+
 	// push(elem1, elem2, ...) - add elements, return new length
 	if (method_name_len == 4 && strncmp(method_name, "push", 4) == 0)
 	{

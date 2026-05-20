@@ -26,7 +26,7 @@ phases:
     status: complete
   - id: 6
     name: "childNodes as an Array instance (instanceof Array, push, length own-prop)"
-    status: pending
+    status: complete
   - id: 7
     name: "namespaceURI returning empty string vs null after parse"
     status: complete
@@ -38,13 +38,13 @@ phases:
     status: complete
   - id: 10
     name: "Text-node value handling (nodeValue returning null vs string)"
-    status: pending
+    status: complete
   - id: 11
     name: "parentNode read-only against user SetMember writes"
     status: complete
   - id: 12
     name: "Whitespace text-node merging during parseXML"
-    status: pending
+    status: complete
 dependencies:
   - id: SUBTESTS_HARNESS
     reason: "Discovery shipped 2026-05-14 (commit 39b797ac); XML-vN and XMLNode-vN became visible at that point."
@@ -64,6 +64,63 @@ status_note: |
 -->
 
 ## Status
+
+### 2026-05-20 session #4 — Phase 6 landed; XMLNode-vN all RUFFLE_MATCHED
+
+Phase 6 (childNodes as a real Array instance) implemented in
+`SWFModernRuntime/src/actionmodern/action.c`. This was the keystone for the
+remaining XMLNode-vN failures, and also subsumed the misdiagnosed Phases 10
+and 12 (see below).
+
+- **`__realChildren` — the genuine DOM-children list.** A new hidden DontEnum
+  `__realChildren` array per node holds the real DOM children in insertion
+  order, kept separate from the public `childNodes` array which AS code may
+  freely `push()`/`sort()`/index. Two new helpers (`xml_get_real_children`,
+  `xml_rebuild_childnodes`) sit before `xml_sync_children`. Every DOM mutation
+  (`xml_do_append`/`xml_do_remove`/`xml_do_insert_before`) now updates
+  `__realChildren`, then rebuilds the public `childNodes` **in place**
+  (preserving the array's object identity) from it — which is exactly how
+  Flash discards user-pushed "fake" items the moment a real element is
+  appended (XMLNode.as:127-176). `xml_sync_children` (firstChild/lastChild/
+  siblings), `xml_serialize_node`, `cloneNode` deep, `hasChildNodes`, and the
+  parseXML/`load` orphan blocks all now derive from `__realChildren`. The
+  numeric-index getMember path (`node.childNodes[i]`) still reads the *public*
+  `childNodes` (the test indexes pushed fakes). The old "purge by parentNode"
+  loop in `xml_do_append` is gone — the rebuild handles it, including the
+  non-object fakes the old purge wrongly kept (XMLNode.as:175 5→4).
+- **`arr.push` resolves to a function.** The ARRAY branch of `actionGetMember`
+  now falls back to `g_array_prototype` (via `initArrayPrototypeMethods`) when
+  a non-index property isn't in the array's `props` sidecar, so
+  `node.childNodes.push` (and `.sort`, `.constructor`, …) read as the actual
+  Array.prototype function value — XMLNode.as:119 `check(...push)`.
+- **`childNodes` read-only against user SetMember.** Both XML-node creation
+  paths (`xml_create_node` + the `actionNewMethod` XML branch) install
+  `childNodes` with WRITABLE cleared, so `node.childNodes = 5` is a no-op
+  (XML.as:359-360). Internal rebuilds mutate the array in place, unaffected.
+- **Array `hasOwnProperty`.** `callArrayMethod` now handles `hasOwnProperty`
+  directly (`length`, live numeric indices, `props`-sidecar names) —
+  `Object.prototype.hasOwnProperty` mis-casts an ASArray to ASObject.
+  XML.as:354 `childNodes.hasOwnProperty('length')`.
+
+Results: **XMLNode-v5..v8 all promote to RUFFLE_MATCHED** (195→full match;
+the four lines 182/187/190/193 plus 119/175 all fixed; line 81 stays a
+subset-eligible Gnash bug). XML-v5 verbose-diff `^+` count 109→107 (XML.as:354
++360 now pass). All 27 AVM1 `xml*` regression tests still 100%; spot-checked
+8 array tests pass (`array_reverse` was already failing identically at
+baseline — 104 `^+`, unchanged).
+
+Phases 10 and 12 were **misdiagnosed** in the original plan and are marked
+complete with no separate code: XMLNode.as:175 ("length == 4") is the
+appendChild-discards-fakes case (Phase 6), *not* parseXML whitespace merging;
+XMLNode.as:187/193 ("nodeValue") were downstream of the firstChild/sibling
+links being driven by the sorted public array instead of the real DOM order
+(Phase 6). The only XMLNode-vN diff left, line 81, is the documented
+subset-eligible Gnash bug.
+
+Remaining XML-vN work is **not a numbered phase**: the onLoad-truncation
+cluster (XML-v5..v8 cap ~340-369/449 because `myxml.load(MEDIA(gnash.xml))`
+fails — see the session-#3 note). That, and the docTypeDecl/xmlDecl
+parse-time cluster, are all that stand between XML-vN and promotion.
 
 ### 2026-05-20 session #3 — Phases 5, 9 landed
 
