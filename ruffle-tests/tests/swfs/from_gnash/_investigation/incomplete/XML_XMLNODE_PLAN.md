@@ -14,13 +14,13 @@ phases:
     status: complete
   - id: 2
     name: "XML.prototype.docTypeDecl / xmlDecl / contentType / ignoreWhite own-prop initialization"
-    status: pending
+    status: complete
   - id: 3
     name: "XML.status setter: coerce non-number args via ToInt32 + INT_MIN clamp"
-    status: pending
+    status: complete
   - id: 4
     name: "XML.loaded setter: coerce non-boolean via ToBoolean"
-    status: pending
+    status: complete
   - id: 5
     name: "XML.send / sendAndLoad / addRequestHeader implementations"
     status: pending
@@ -40,8 +40,8 @@ phases:
     name: "Text-node value handling (nodeValue returning null vs string)"
     status: pending
   - id: 11
-    name: "cloneNode deep mode: parentNode reset"
-    status: pending
+    name: "parentNode read-only against user SetMember writes"
+    status: complete
   - id: 12
     name: "Whitespace text-node merging during parseXML"
     status: pending
@@ -64,6 +64,56 @@ status_note: |
 -->
 
 ## Status
+
+### 2026-05-20 session #2 — Phases 2, 3, 4, 11 landed
+
+Four more phases implemented in `SWFModernRuntime/src/actionmodern/action.c`:
+
+- **Phases 2+3+4 (XML constructor-time prototype props).** Flash's XML
+  constructor installs `docTypeDecl`/`xmlDecl`/`contentType`/`ignoreWhite` as
+  own data props and `status`/`loaded` as virtual accessor props onto
+  **XML.prototype** the first time `new XML()` runs — *not* at prototype-init
+  time (XML.as:108-129 check their absence before the first construction;
+  XML.as:184-189 check presence after). New `xml_install_construct_proto_props`
+  (guarded by `g_xml_proto_props_installed`) is called from both XML
+  constructor paths (`xml_create_document` and the `actionNewMethod` XML
+  branch). The init-time `ignoreWhite`/`loaded` data props were removed from
+  `initXMLPrototype`.
+  - **status**: virtual getter/setter on XML.prototype. The setter coerces via
+    `varToDoubleSWF` (AVM1 ToNumber — objects use `valueOf` only, no `toString`
+    fallback, so a plain or toString-only object yields NaN); NaN / out-of-
+    int32 values clamp to INT_MIN (-2147483648), in-range values truncate
+    toward zero. The coerced value lives in a hidden DontEnum slot
+    `__xml_status` on the instance, so `instance.hasOwnProperty("status")` is
+    false while `XML.prototype.hasOwnProperty("status")` is true. The getter
+    returns undefined when the slot is absent (e.g. read off XML.prototype
+    itself — XML.as `typeof(myxml.__proto__.status)=='undefined'`); instances
+    get the slot defaulted to 0 at construction.
+  - **loaded**: same virtual-accessor pattern with hidden slot `__xml_loaded`.
+    Setter coerces via ToBoolean. A fresh instance has no slot →
+    `typeof(loaded)=='undefined'`. `load()`/`onData()` write the slot via the
+    `xml_store_loaded` helper (not a raw own-prop set) so `loaded` never
+    becomes an instance own property.
+
+- **Phase 11 (parentNode read-only).** *Corrected diagnosis*: the failing case
+  is not cloneNode — the deep clone's `parentNode` is already null after
+  `cloneNode(true)` (XML.as:577 passes). The bug was that `node.parentNode = x`
+  *stuck*. Flash makes `parentNode` read-only against user assignment
+  (XML.as:578-579: assignment is a no-op). Fix: `xml_create_node` now creates
+  the instance's `parentNode` prop with WRITABLE cleared (still enumerable) via
+  `xml_set_null_readonly`, so `actionSetMember`'s WRITABLE check blocks user
+  writes. Internal tree mutations go through raw `setProperty`, which ignores
+  the WRITABLE flag, so `appendChild`/`removeNode`/`xml_sync_children` still
+  work.
+
+Local single-test results after the change (vs the phase-1/7/8 baseline):
+all eight XML-vN / XMLNode-vN tests improved or held — XML-v5..v8 each gained
+~20 matched lines; XMLNode-v5..v8 unchanged (these changes only touch the XML
+class, not XMLNode). All 27 AVM1 `xml*` regression tests still pass 100%.
+Remaining XML-vN fails: Phase 5 (send/sendAndLoad), Phase 6 (childNodes as
+Array), Phase 9 (attribute serialization), Phase 10 (text-node nodeValue),
+Phase 12 (whitespace merge), and a docTypeDecl/xmlDecl parse-time cluster
+(XML.as ~1027-1104).
 
 ### 2026-05-20 session — Phases 1, 7, 8 landed
 

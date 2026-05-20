@@ -16708,6 +16708,12 @@ static ASFunction g_xml_fn_send;
 static ASFunction g_xml_fn_sendAndLoad;
 static ASFunction g_xml_fn_addRequestHeader;
 
+// XML.prototype.status / .loaded virtual accessors (Phases 3+4 of
+// XML_XMLNODE_PLAN). Installed lazily on first `new XML()`.
+static ASFunction g_xml_fn_status_get, g_xml_fn_status_set;
+static ASFunction g_xml_fn_loaded_get, g_xml_fn_loaded_set;
+static int g_xml_proto_props_installed = 0;
+
 // Check if obj is an XML/XMLNode instance (walks __proto__ chain)
 static int isXMLNodeInstance(ASObject* obj) {
 	if (!g_xml_constructor_init || g_xmlnode_constructor.prototype_obj == NULL) return 0;
@@ -16739,6 +16745,18 @@ static void xml_set_null(SWFAppContext* ctx, ASObject* obj, const char* name, u3
 	setProperty(ctx, obj, name, nlen, &v);
 }
 
+// Set a null-valued property that is read-only against user SetMember writes
+// (still enumerable, still mutable by internal raw setProperty). Used for
+// `parentNode`: Flash makes it read-only — `node.parentNode = x` is a no-op
+// (XML.as:577-579, Phase 11 of XML_XMLNODE_PLAN). The runtime's own tree
+// mutations go through raw setProperty, which ignores the WRITABLE flag.
+static void xml_set_null_readonly(SWFAppContext* ctx, ASObject* obj, const char* name, u32 nlen) {
+	ActionVar v = {0};
+	v.type = ACTION_STACK_VALUE_NULL;
+	setPropertyWithFlags(ctx, obj, name, nlen, &v,
+		PROPERTY_FLAG_ENUMERABLE | PROPERTY_FLAG_CONFIGURABLE);
+}
+
 // Set an object-valued property
 static void xml_set_obj(SWFAppContext* ctx, ASObject* obj, const char* name, u32 nlen, ASObject* val) {
 	ActionVar v = {0};
@@ -16756,6 +16774,110 @@ static void xml_set_str(SWFAppContext* ctx, ASObject* obj, const char* name, u32
 	v.str_size = u16_len;
 	v.data.numeric_value = (u64) u16_copy;
 	setProperty(ctx, obj, name, nlen, &v);
+}
+
+// ---- XML.status / XML.loaded virtual accessor support (Phases 3+4) ----
+// Flash exposes `status` and `loaded` as virtual (addProperty-style) accessor
+// properties on XML.prototype. The coerced value lives in a hidden DontEnum
+// own slot on the instance (__xml_status / __xml_loaded) so
+// `instance.hasOwnProperty("status")` is false while
+// `XML.prototype.hasOwnProperty("status")` is true (XML.as:108-109,184-241).
+
+// Internal status/loaded writes (load()/onData()) — store into the same hidden
+// slots the virtual accessors read.
+static void xml_store_status(SWFAppContext* app_context, ASObject* doc, double v) {
+	ActionVar sv = makeF64(v);
+	setPropertyWithFlags(app_context, doc, "__xml_status", 12, &sv, PROPERTY_FLAGS_DONTENUM);
+}
+static void xml_store_loaded(SWFAppContext* app_context, ASObject* doc, int b) {
+	ActionVar bv = {0};
+	bv.type = ACTION_STACK_VALUE_BOOLEAN;
+	bv.data.numeric_value = b ? 1 : 0;
+	setPropertyWithFlags(app_context, doc, "__xml_loaded", 12, &bv, PROPERTY_FLAGS_DONTENUM);
+}
+
+static ActionVar xml_status_getter(SWFAppContext* app_context, ActionVar* args, u32 arg_count,
+                                   ActionVar* registers, void* this_obj) {
+	(void)app_context; (void)args; (void)arg_count; (void)registers;
+	ASObject* obj = (ASObject*) this_obj;
+	if (obj != NULL) {
+		ASProperty* p = findPropertyRaw(obj, "__xml_status", 12);
+		if (p != NULL) return p->value;
+	}
+	// No hidden slot (e.g. read off XML.prototype itself) → undefined.
+	// Instances get the slot defaulted to 0 at construction time.
+	ActionVar undef = {0}; undef.type = ACTION_STACK_VALUE_UNDEFINED;
+	return undef;
+}
+
+static ActionVar xml_status_setter(SWFAppContext* app_context, ActionVar* args, u32 arg_count,
+                                   ActionVar* registers, void* this_obj) {
+	(void)registers;
+	ActionVar undef = {0}; undef.type = ACTION_STACK_VALUE_UNDEFINED;
+	ASObject* obj = (ASObject*) this_obj;
+	if (obj == NULL || arg_count == 0) return undef;
+	// AVM1 ToNumber: objects coerce via valueOf only (no toString fallback),
+	// so a plain object or a toString-only object yields NaN. NaN / out-of-int32
+	// values clamp to INT_MIN; in-range values truncate toward zero (ToInt32).
+	double n = varToDoubleSWF(app_context, &args[0], g_swf_version);
+	int32_t result;
+	if (!(n == n) || n > 2147483647.0 || n < -2147483648.0)
+		result = (-2147483647 - 1);
+	else
+		result = (int32_t) n;
+	xml_store_status(app_context, obj, (double) result);
+	return undef;
+}
+
+static ActionVar xml_loaded_getter(SWFAppContext* app_context, ActionVar* args, u32 arg_count,
+                                   ActionVar* registers, void* this_obj) {
+	(void)app_context; (void)args; (void)arg_count; (void)registers;
+	ASObject* obj = (ASObject*) this_obj;
+	if (obj != NULL) {
+		ASProperty* p = findPropertyRaw(obj, "__xml_loaded", 12);
+		if (p != NULL) return p->value;
+	}
+	ActionVar undef = {0}; undef.type = ACTION_STACK_VALUE_UNDEFINED;
+	return undef;
+}
+
+static ActionVar xml_loaded_setter(SWFAppContext* app_context, ActionVar* args, u32 arg_count,
+                                   ActionVar* registers, void* this_obj) {
+	(void)registers;
+	ActionVar undef = {0}; undef.type = ACTION_STACK_VALUE_UNDEFINED;
+	ASObject* obj = (ASObject*) this_obj;
+	if (obj == NULL || arg_count == 0) return undef;
+	ActionVar* v = &args[0];
+	int b = 0;
+	switch (v->type) {
+		case ACTION_STACK_VALUE_BOOLEAN:
+			b = v->data.numeric_value ? 1 : 0; break;
+		case ACTION_STACK_VALUE_F64: {
+			double d = VAL(double, &v->data.numeric_value);
+			b = (d == d && d != 0.0) ? 1 : 0; break;
+		}
+		case ACTION_STACK_VALUE_F32: {
+			float f = VAL(float, &v->data.numeric_value);
+			b = (f == f && f != 0.0f) ? 1 : 0; break;
+		}
+		case ACTION_STACK_VALUE_STRING:
+			if (g_swf_version >= 7) {
+				b = (v->str_size > 0) ? 1 : 0;
+			} else {
+				double d = varToDoubleSWF(app_context, v, g_swf_version);
+				b = (d == d && d != 0.0) ? 1 : 0;
+			}
+			break;
+		case ACTION_STACK_VALUE_OBJECT:
+		case ACTION_STACK_VALUE_ARRAY:
+		case ACTION_STACK_VALUE_FUNCTION:
+		case ACTION_STACK_VALUE_MOVIECLIP:
+			b = 1; break;
+		default: // null / undefined
+			b = 0; break;
+	}
+	xml_store_loaded(app_context, obj, b);
+	return undef;
 }
 
 // Create a new XML node
@@ -16793,8 +16915,9 @@ static ASObject* xml_create_node(SWFAppContext* app_context, int nodeType,
 		xml_set_null(app_context, node, "nodeValue", 9);
 	}
 
-	// Navigation — all null initially
-	xml_set_null(app_context, node, "parentNode", 10);
+	// Navigation — all null initially. parentNode is read-only against user
+	// SetMember writes (Flash: `node.parentNode = x` is a no-op).
+	xml_set_null_readonly(app_context, node, "parentNode", 10);
 	xml_set_null(app_context, node, "firstChild", 10);
 	xml_set_null(app_context, node, "lastChild", 9);
 	xml_set_null(app_context, node, "previousSibling", 15);
@@ -17982,8 +18105,7 @@ static ActionVar builtin_xml_onData(SWFAppContext* app_context, ActionVar* args,
 		free(buf);
 	}
 
-	ActionVar lv = {0}; lv.type = ACTION_STACK_VALUE_BOOLEAN; lv.data.numeric_value = 1;
-	setProperty(app_context, doc, "loaded", 6, &lv);
+	xml_store_loaded(app_context, doc, 1);
 
 	ActionVar cb = {0};
 	cb.type = ACTION_STACK_VALUE_BOOLEAN;
@@ -18016,10 +18138,7 @@ static ActionVar builtin_xml_load(SWFAppContext* app_context, ActionVar* args, u
 	}
 
 	// Set loaded = false initially
-	{
-		ActionVar lv = {0}; lv.type = ACTION_STACK_VALUE_BOOLEAN; lv.data.numeric_value = 0;
-		setProperty(app_context, doc, "loaded", 6, &lv);
-	}
+	xml_store_loaded(app_context, doc, 0);
 
 	// Look up URL in embedded data file registry
 	extern DataFileEntry* findDataFile(const char* name);
@@ -18053,8 +18172,7 @@ static ActionVar builtin_xml_load(SWFAppContext* app_context, ActionVar* args, u
 		VAL(double, &bv.data.numeric_value) = (double)data->content_length;
 		setPropertyWithFlags(app_context, doc, "_bytesLoaded", 12, &bv, PROPERTY_FLAGS_DONTENUM);
 		setPropertyWithFlags(app_context, doc, "_bytesTotal", 11, &bv, PROPERTY_FLAGS_DONTENUM);
-		ActionVar sv = {0}; sv.type = ACTION_STACK_VALUE_F64; sv.data.numeric_value = 0;
-		setProperty(app_context, doc, "status", 6, &sv);
+		xml_store_status(app_context, doc, 0.0);
 		success = 1;
 
 		// Build raw src string and call this.onData(src). Default onData parses
@@ -18084,6 +18202,60 @@ static void xml_init_method(ASFunction* fn, const char* name, Function2Ptr func)
 	fn->function_type = 2;
 	fn->advanced_func = func;
 	fn->param_count = 0;
+}
+
+// Phase 2+3+4 of XML_XMLNODE_PLAN: install XML.prototype's constructor-time
+// properties. Flash's XML constructor adds docTypeDecl/xmlDecl/contentType/
+// ignoreWhite as own data props and status/loaded as virtual accessors onto
+// XML.prototype the first time `new XML()` runs — not at prototype-init time
+// (XML.as:108-129 check their absence before the first construction;
+// XML.as:184-189 check presence after).
+static void xml_install_construct_proto_props(SWFAppContext* app_context) {
+	if (g_xml_proto_props_installed) return;
+	g_xml_proto_props_installed = 1;
+	ASObject* xml_proto = g_xml_constructor.prototype_obj;
+	if (xml_proto == NULL) return;
+
+	ActionVar undef = {0}; undef.type = ACTION_STACK_VALUE_UNDEFINED;
+	if (findPropertyRaw(xml_proto, "docTypeDecl", 11) == NULL)
+		setPropertyWithFlags(app_context, xml_proto, "docTypeDecl", 11, &undef, PROPERTY_FLAGS_DONTENUM);
+	if (findPropertyRaw(xml_proto, "xmlDecl", 7) == NULL)
+		setPropertyWithFlags(app_context, xml_proto, "xmlDecl", 7, &undef, PROPERTY_FLAGS_DONTENUM);
+	if (findPropertyRaw(xml_proto, "contentType", 11) == NULL) {
+		ActionVar ct = {0};
+		ct.type = ACTION_STACK_VALUE_STRING;
+		u32 ct_u16_len = 0;
+		uint16_t* ct_u16 = utf8_to_u16(app_context,
+			"application/x-www-form-urlencoded", 33, &ct_u16_len);
+		ct.str_size = ct_u16_len;
+		ct.data.numeric_value = (u64) ct_u16;
+		setPropertyWithFlags(app_context, xml_proto, "contentType", 11, &ct, PROPERTY_FLAGS_DONTENUM);
+	}
+	if (findPropertyRaw(xml_proto, "ignoreWhite", 11) == NULL) {
+		ActionVar iw = {0}; iw.type = ACTION_STACK_VALUE_BOOLEAN;
+		setPropertyWithFlags(app_context, xml_proto, "ignoreWhite", 11, &iw, PROPERTY_FLAGS_DONTENUM);
+	}
+
+	// status / loaded virtual accessors
+	memset(&g_xml_fn_status_get, 0, sizeof(ASFunction));
+	g_xml_fn_status_get.function_type = 2;
+	g_xml_fn_status_get.advanced_func = (Function2Ptr) xml_status_getter;
+	memset(&g_xml_fn_status_set, 0, sizeof(ASFunction));
+	g_xml_fn_status_set.function_type = 2;
+	g_xml_fn_status_set.advanced_func = (Function2Ptr) xml_status_setter;
+	memset(&g_xml_fn_loaded_get, 0, sizeof(ASFunction));
+	g_xml_fn_loaded_get.function_type = 2;
+	g_xml_fn_loaded_get.advanced_func = (Function2Ptr) xml_loaded_getter;
+	memset(&g_xml_fn_loaded_set, 0, sizeof(ASFunction));
+	g_xml_fn_loaded_set.function_type = 2;
+	g_xml_fn_loaded_set.advanced_func = (Function2Ptr) xml_loaded_setter;
+
+	if (findPropertyRaw(xml_proto, "status", 6) == NULL)
+		setAddPropertyWithFlags(app_context, xml_proto, "status", 6,
+			&g_xml_fn_status_get, &g_xml_fn_status_set, PROPERTY_FLAGS_DONTENUM);
+	if (findPropertyRaw(xml_proto, "loaded", 6) == NULL)
+		setAddPropertyWithFlags(app_context, xml_proto, "loaded", 6,
+			&g_xml_fn_loaded_get, &g_xml_fn_loaded_set, PROPERTY_FLAGS_DONTENUM);
 }
 
 static void initXMLPrototype(SWFAppContext* app_context) {
@@ -18208,18 +18380,10 @@ static void initXMLPrototype(SWFAppContext* app_context) {
 	INSTALL_METHOD_ON(xml_proto, "getBytesLoaded", 14, &g_xml_fn_getBytesLoaded);
 	INSTALL_METHOD_ON(xml_proto, "getBytesTotal", 13, &g_xml_fn_getBytesTotal);
 
-	// Default ignoreWhite = false on XML.prototype (tests override via XML.prototype.ignoreWhite = true)
-	{
-		ActionVar fw = {0}; fw.type = ACTION_STACK_VALUE_BOOLEAN;
-		setProperty(app_context, xml_proto, "ignoreWhite", 11, &fw);
-	}
-	// Default loaded = false on XML.prototype. XML.load() overrides this with
-	// an own property. LoadVars.sendAndLoad inspects this via
-	// getPropertyWithPrototype to decide whether to add an own `loaded`.
-	{
-		ActionVar lf = {0}; lf.type = ACTION_STACK_VALUE_BOOLEAN;
-		setProperty(app_context, xml_proto, "loaded", 6, &lf);
-	}
+	// Note: docTypeDecl / xmlDecl / contentType / ignoreWhite / status / loaded
+	// are NOT installed here — Flash's XML constructor installs them on
+	// XML.prototype at first construction time. See
+	// xml_install_construct_proto_props (Phases 2+3+4 of XML_XMLNODE_PLAN).
 
 	#undef INSTALL_METHOD
 	#undef INSTALL_METHOD_ON
@@ -18233,6 +18397,9 @@ static void initXMLPrototype(SWFAppContext* app_context) {
 // Create a new XML document object
 static ASObject* xml_create_document(SWFAppContext* app_context) {
 	initXMLPrototype(app_context);
+	// Flash's XML constructor installs docTypeDecl/xmlDecl/contentType/
+	// ignoreWhite/status/loaded onto XML.prototype on first construction.
+	xml_install_construct_proto_props(app_context);
 	ASObject* doc = xml_create_node(app_context, 1, NULL, 0, NULL, 0);
 
 	// Override __proto__ to XML.prototype (not XMLNode.prototype)
@@ -18253,8 +18420,12 @@ static ASObject* xml_create_document(SWFAppContext* app_context) {
 	xml_set_str(app_context, doc, "contentType", 11,
 		"application/x-www-form-urlencoded", 33);
 
-	ActionVar zero_val = {0}; zero_val.type = ACTION_STACK_VALUE_F64;
-	setProperty(app_context, doc, "status", 6, &zero_val);
+	// status is a virtual accessor on XML.prototype (see
+	// xml_install_construct_proto_props) — no own data prop here, otherwise it
+	// would shadow the coercing setter. The instance carries a hidden slot
+	// (__xml_status, DontEnum) defaulted to 0 that the getter reads; the
+	// prototype itself has no slot so XML.prototype.status reads undefined.
+	xml_store_status(app_context, doc, 0.0);
 
 	return doc;
 }
@@ -52844,6 +53015,7 @@ static int invokeNativeSuperConstructor(SWFAppContext* app_context, ASFunction* 
 	// --- XML ---
 	if (strcmp(name, "XML") == 0) {
 		initXMLPrototype(app_context);
+		xml_install_construct_proto_props(app_context);
 		obj->native_type = NATIVE_XML;
 		// Initialize XML document properties on the existing object
 		ActionVar nt = makeF64(1.0);
@@ -52864,8 +53036,9 @@ static int invokeNativeSuperConstructor(SWFAppContext* app_context, ASFunction* 
 		ASObject* idmap = allocObject(app_context, 4);
 		xml_set_obj(app_context, obj, "idMap", 5, idmap);
 		xml_set_str(app_context, obj, "contentType", 11, "application/x-www-form-urlencoded", 33);
-		ActionVar sv = makeF64(0.0);
-		setProperty(app_context, obj, "status", 6, &sv);
+		// status is a virtual accessor on XML.prototype; the instance carries a
+		// hidden __xml_status slot defaulted to 0 (no own "status" data prop).
+		xml_store_status(app_context, obj, 0.0);
 		// Parse source string if provided
 		if (num_args > 0 && args[0].type == ACTION_STACK_VALUE_STRING) {
 			char xml_buf[4096];
