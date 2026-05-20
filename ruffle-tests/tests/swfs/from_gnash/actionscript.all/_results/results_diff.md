@@ -1,7 +1,7 @@
 # Ruffle Test Results Diff
 
-**Previous:** `ddccbffa6b4a` (2026-05-20T19:46:57.272385+00:00)
-**Current:** `b7d4c0d7226a` (2026-05-20T20:21:42.765474+00:00)
+**Previous:** `b7d4c0d7226a` (2026-05-20T20:21:42.765474+00:00)
+**Current:** `ad8e13f77907` (2026-05-20T21:08:15.384014+00:00)
 
 ## Summary
 
@@ -10,24 +10,29 @@
 | Passing | 128 | 128 | 0 |
 | Total | 243 | 243 | 0 |
 | Pass rate | 52.7% | 52.7% | 0% |
-| Mismatched lines | 10608 | 10465 | -143 |
-|   Decreased | | | -145 |
-|   Increased | | | +2 |
+| Mismatched lines | 10465 | 10424 | -41 |
+|   Decreased | | | -41 |
 
-## Line Count Changed (13)
+## Status Changed (4)
+
+| Test | Previous | Current | Lines (prev) | Lines (now) |
+|------|----------|---------|--------------|-------------|
+| `XMLNode-v5` | output_mismatch | ruffle_matched | 198/207 | 204/207 |
+| `XMLNode-v6` | output_mismatch | ruffle_matched | 198/207 | 204/207 |
+| `XMLNode-v7` | output_mismatch | ruffle_matched | 198/207 | 204/207 |
+| `XMLNode-v8` | output_mismatch | ruffle_matched | 198/207 | 204/207 |
+
+## Line Count Changed (10)
 
 | Test | Status | Lines (prev) | Lines (now) | Diff |
 |------|--------|--------------|-------------|------|
-| `XML-v6` | output_mismatch | 332/486 | 369/486 | -37 |
-| `XML-v7` | output_mismatch | 332/486 | 369/486 | -37 |
-| `XML-v8` | output_mismatch | 332/465 | 369/465 | -37 |
-| `XML-v5` | output_mismatch | 325/449 | 340/449 | -15 |
-| `XMLNode-v5` | output_mismatch | 194/207 | 198/207 | -4 |
-| `XMLNode-v6` | output_mismatch | 194/207 | 198/207 | -4 |
-| `XMLNode-v7` | output_mismatch | 194/207 | 198/207 | -4 |
-| `XMLNode-v8` | output_mismatch | 194/207 | 198/207 | -4 |
-| `LoadVars-v6` | ruffle_matched | 145/152 | 146/152 | -1 |
-| `LoadVars-v7` | ruffle_matched | 145/152 | 146/152 | -1 |
-| `LoadVars-v8` | ruffle_matched | 145/152 | 146/152 | -1 |
-| `TextField-v6` | output_mismatch | 404/545 | 403/545 | +1 |
-| `TextField-v8` | output_mismatch | 416/571 | 415/571 | +1 |
+| `XML-v5` | output_mismatch | 340/449 | 342/449 | -2 |
+| `XML-v6` | output_mismatch | 369/486 | 371/486 | -2 |
+| `XML-v7` | output_mismatch | 369/486 | 371/486 | -2 |
+| `XML-v8` | output_mismatch | 369/465 | 371/465 | -2 |
+| `array-v6` | output_mismatch | 604/644 | 606/644 | -2 |
+| `array-v7` | output_mismatch | 585/654 | 587/654 | -2 |
+| `array-v8` | output_mismatch | 585/654 | 587/654 | -2 |
+| `MovieClip-v8` | output_mismatch | 886/1087 | 887/1087 | -1 |
+| `TextField-v6` | output_mismatch | 403/545 | 404/545 | -1 |
+| `TextField-v8` | output_mismatch | 415/571 | 416/571 | -1 |
