@@ -7,11 +7,11 @@ landed yet)
 
 <!-- PLAN_META
 id: XML_XMLNODE_PLAN
-status: pending
+status: in_progress
 phases:
   - id: 1
     name: "XML.prototype / XMLNode.prototype own-vs-inherited method visibility"
-    status: pending
+    status: complete
   - id: 2
     name: "XML.prototype.docTypeDecl / xmlDecl / contentType / ignoreWhite own-prop initialization"
     status: pending
@@ -29,10 +29,10 @@ phases:
     status: pending
   - id: 7
     name: "namespaceURI returning empty string vs null after parse"
-    status: pending
+    status: complete
   - id: 8
     name: "localName / prefix edge cases on trailing-colon nodeNames"
-    status: pending
+    status: complete
   - id: 9
     name: "Attribute serialization: insertion order + empty-attribute emission"
     status: pending
@@ -64,6 +64,49 @@ status_note: |
 -->
 
 ## Status
+
+### 2026-05-20 session — Phases 1, 7, 8 landed
+
+Three phases implemented in `SWFModernRuntime/src/actionmodern/action.c`:
+
+- **Phase 1 (own-vs-inherited prototype methods).** `initXMLPrototype`'s
+  `INSTALL_METHOD` macro hardcoded `xmlnode_proto`, so the XML-specific
+  methods (`parseXML`, `createElement`, `createTextNode`, `load`, `onData`)
+  were installed on **XMLNode.prototype** instead of XML.prototype. Replaced
+  with `INSTALL_METHOD_ON(proto, …)`; XML-specific methods now go on
+  `xml_proto`. `getBytesLoaded`/`getBytesTotal` moved from XMLNode.prototype
+  → XML.prototype (XML.as:98-99 assert their absence from XMLNode.prototype).
+  Added `onLoad`/`send`/`sendAndLoad`/`addRequestHeader` as own-prop method
+  stubs on XML.prototype (`builtin_noop_func` — Phase 5 still owns real
+  behaviour). Also installed the 13 XMLNode virtual node properties
+  (`nodeName`, `nodeValue`, `nodeType`, `attributes`, `childNodes`,
+  `firstChild`, `lastChild`, `parentNode`, `nextSibling`, `previousSibling`,
+  `namespaceURI`, `prefix`, `localName`) as DontEnum placeholder own props
+  on XMLNode.prototype — instances carry their own data copies (set in
+  `xml_create_node`) which shadow them, so reads are unaffected; the
+  placeholders only satisfy `XMLNode.prototype.hasOwnProperty(...)`.
+
+- **Phase 7 (namespaceURI "" vs null).** Element nodes (`nodeType == 1`) now
+  default `namespaceURI` to `""` instead of `null` in `xml_create_node`.
+  The parse-time resolver still overrides with a found URI; an element with
+  no applicable in-scope xmlns keeps `""`. Text/non-element nodes keep
+  `null`.
+
+- **Phase 8 (localName/prefix split).** `xml_create_node` now splits
+  `prefix:localName` at the first colon whenever the local part is
+  non-empty (leading colon → empty prefix is a valid split: `:tag` →
+  prefix `""`/localName `tag`, `:fr:tag` → prefix `""`/localName `fr:tag`).
+  A trailing colon (`tag:`) leaves an empty local part — no split, localName
+  keeps the whole nodeName, prefix `""`.
+
+Local single-test results after the change (vs `eb8206f8` baseline):
+XMLNode-v5 174/207 → 197/207 (10 fails left); XML-v5 281/449 → ~379/449.
+All eight XML-vN / XMLNode-vN tests share source, so v6/v7/v8 move with
+their v5 counterparts. Remaining XMLNode-v5 fails: 1 Gnash bug (line 81,
+subset-eligible), Phase 6 (`childNodes.push`), Phase 9 (attribute order),
+Phases 10/12 (text-node value + whitespace merge).
+
+### CI baseline
 
 Local CI baseline (commit `eb8206f8`, 2026-05-15):
 

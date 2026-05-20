@@ -16703,6 +16703,10 @@ static ASFunction g_xml_fn_getBytesLoaded;
 static ASFunction g_xml_fn_getBytesTotal;
 static ASFunction g_xml_fn_load;
 static ASFunction g_xml_fn_onData;
+static ASFunction g_xml_fn_onLoad;
+static ASFunction g_xml_fn_send;
+static ASFunction g_xml_fn_sendAndLoad;
+static ASFunction g_xml_fn_addRequestHeader;
 
 // Check if obj is an XML/XMLNode instance (walks __proto__ chain)
 static int isXMLNodeInstance(ASObject* obj) {
@@ -16819,13 +16823,28 @@ static ASObject* xml_create_node(SWFAppContext* app_context, int nodeType,
 		if (colon != NULL) {
 			u32 prefix_len = (u32)(colon - nodeName);
 			u32 local_len = nameLen - prefix_len - 1;
-			xml_set_str(app_context, node, "prefix", 6, nodeName, prefix_len);
-			xml_set_str(app_context, node, "localName", 9, colon + 1, local_len);
+			// Flash splits prefix:localName at the FIRST colon. A leading
+			// colon (":tag" → prefix "", localName "tag"; ":fr:tag" →
+			// prefix "", localName "fr:tag") is a valid empty-prefix split.
+			// A trailing colon ("tag:") leaves an empty local part — Flash
+			// does NOT split there, keeping localName == whole nodeName and
+			// prefix "". Phase 8 of XML_XMLNODE_PLAN.
+			if (local_len > 0) {
+				xml_set_str(app_context, node, "prefix", 6, nodeName, prefix_len);
+				xml_set_str(app_context, node, "localName", 9, colon + 1, local_len);
+			} else {
+				xml_set_str(app_context, node, "prefix", 6, "", 0);
+				xml_set_str(app_context, node, "localName", 9, nodeName, nameLen);
+			}
 		} else {
 			xml_set_str(app_context, node, "prefix", 6, "", 0);
 			xml_set_str(app_context, node, "localName", 9, nodeName, nameLen);
 		}
-		xml_set_null(app_context, node, "namespaceURI", 12);
+		// Element nodes default namespaceURI to "" (empty string), not null.
+		// The parse-time resolver overrides this when an in-scope xmlns
+		// (default or prefix-matched) declaration is found; an element with
+		// no applicable namespace keeps "". Phase 7 of XML_XMLNODE_PLAN.
+		xml_set_str(app_context, node, "namespaceURI", 12, "", 0);
 	} else {
 		xml_set_null(app_context, node, "prefix", 6);
 		xml_set_null(app_context, node, "localName", 9);
@@ -18086,6 +18105,10 @@ static void initXMLPrototype(SWFAppContext* app_context) {
 	xml_init_method(&g_xml_fn_getBytesTotal, "getBytesTotal", builtin_xml_getBytesTotal);
 	xml_init_method(&g_xml_fn_load, "load", builtin_xml_load);
 	xml_init_method(&g_xml_fn_onData, "onData", builtin_xml_onData);
+	xml_init_method(&g_xml_fn_onLoad, "onLoad", (Function2Ptr)builtin_noop_func);
+	xml_init_method(&g_xml_fn_send, "send", (Function2Ptr)builtin_noop_func);
+	xml_init_method(&g_xml_fn_sendAndLoad, "sendAndLoad", (Function2Ptr)builtin_noop_func);
+	xml_init_method(&g_xml_fn_addRequestHeader, "addRequestHeader", (Function2Ptr)builtin_noop_func);
 
 	// ---- XMLNode constructor ----
 	memset(&g_xmlnode_constructor, 0, sizeof(ASFunction));
@@ -18103,12 +18126,18 @@ static void initXMLPrototype(SWFAppContext* app_context) {
 		setProperty(app_context, xmlnode_proto, "__proto__", 9, &pv);
 	}
 
-	// Install methods on XMLNode.prototype
-	#define INSTALL_METHOD(name, nlen, fn_ptr) do { \
+	// Install methods on a given prototype object. Phase 1 of
+	// XML_XMLNODE_PLAN: the XMLNode-specific methods go on XMLNode.prototype
+	// and the XML-specific methods go on XML.prototype — previously the macro
+	// hardcoded xmlnode_proto, so the XML-only methods (parseXML, createElement,
+	// load, onData, ...) wrongly landed on XMLNode.prototype, failing both
+	// `XML.prototype.hasOwnProperty(...)` and `!XMLNode.prototype.hasOwnProperty(...)`.
+	#define INSTALL_METHOD_ON(proto, name, nlen, fn_ptr) do { \
 		ActionVar mv = {0}; mv.type = ACTION_STACK_VALUE_FUNCTION; \
 		mv.data.numeric_value = (u64)(fn_ptr); \
-		setProperty(app_context, xmlnode_proto, name, nlen, &mv); \
+		setProperty(app_context, proto, name, nlen, &mv); \
 	} while(0)
+	#define INSTALL_METHOD(name, nlen, fn_ptr) INSTALL_METHOD_ON(xmlnode_proto, name, nlen, fn_ptr)
 
 	INSTALL_METHOD("appendChild", 11, &g_xml_fn_appendChild);
 	INSTALL_METHOD("removeNode", 10, &g_xml_fn_removeNode);
@@ -18118,8 +18147,31 @@ static void initXMLPrototype(SWFAppContext* app_context) {
 	INSTALL_METHOD("toString", 8, &g_xml_fn_toString);
 	INSTALL_METHOD("getNamespaceForPrefix", 21, &g_xml_fn_getNamespaceForPrefix);
 	INSTALL_METHOD("getPrefixForNamespace", 21, &g_xml_fn_getPrefixForNamespace);
-	INSTALL_METHOD("getBytesLoaded", 14, &g_xml_fn_getBytesLoaded);
-	INSTALL_METHOD("getBytesTotal", 13, &g_xml_fn_getBytesTotal);
+
+	// Virtual node properties on XMLNode.prototype — Flash exposes these as
+	// own (DontEnum) accessor properties on the prototype itself. Our XMLNode
+	// instances carry their own data copies (set in xml_create_node), which
+	// shadow these placeholders, so reads are unaffected; the placeholders
+	// only exist to satisfy XMLNode.prototype.hasOwnProperty(). Phase 1 of
+	// XML_XMLNODE_PLAN.
+	#define INSTALL_VPROP(name, nlen) do { \
+		ActionVar uv = {0}; uv.type = ACTION_STACK_VALUE_UNDEFINED; \
+		setPropertyWithFlags(app_context, xmlnode_proto, name, nlen, &uv, PROPERTY_FLAGS_DONTENUM); \
+	} while(0)
+	INSTALL_VPROP("nodeName", 8);
+	INSTALL_VPROP("nodeValue", 9);
+	INSTALL_VPROP("nodeType", 8);
+	INSTALL_VPROP("attributes", 10);
+	INSTALL_VPROP("childNodes", 10);
+	INSTALL_VPROP("firstChild", 10);
+	INSTALL_VPROP("lastChild", 9);
+	INSTALL_VPROP("parentNode", 10);
+	INSTALL_VPROP("nextSibling", 11);
+	INSTALL_VPROP("previousSibling", 15);
+	INSTALL_VPROP("namespaceURI", 12);
+	INSTALL_VPROP("prefix", 6);
+	INSTALL_VPROP("localName", 9);
+	#undef INSTALL_VPROP
 
 	if (function_count < MAX_FUNCTIONS)
 		function_registry[function_count++] = &g_xmlnode_constructor;
@@ -18140,12 +18192,21 @@ static void initXMLPrototype(SWFAppContext* app_context) {
 		setProperty(app_context, xml_proto, "__proto__", 9, &pv);
 	}
 
-	// Install XML-specific methods on XML.prototype
-	INSTALL_METHOD("parseXML", 8, &g_xml_fn_parseXML);
-	INSTALL_METHOD("createElement", 13, &g_xml_fn_createElement);
-	INSTALL_METHOD("createTextNode", 14, &g_xml_fn_createTextNode);
-	INSTALL_METHOD("load", 4, &g_xml_fn_load);
-	INSTALL_METHOD("onData", 6, &g_xml_fn_onData);
+	// Install XML-specific methods on XML.prototype (NOT XMLNode.prototype).
+	// getBytesLoaded/getBytesTotal also live here — Flash exposes them on
+	// XML.prototype only, and XML.as line 98-99 asserts they are absent from
+	// XMLNode.prototype.
+	INSTALL_METHOD_ON(xml_proto, "parseXML", 8, &g_xml_fn_parseXML);
+	INSTALL_METHOD_ON(xml_proto, "createElement", 13, &g_xml_fn_createElement);
+	INSTALL_METHOD_ON(xml_proto, "createTextNode", 14, &g_xml_fn_createTextNode);
+	INSTALL_METHOD_ON(xml_proto, "load", 4, &g_xml_fn_load);
+	INSTALL_METHOD_ON(xml_proto, "onData", 6, &g_xml_fn_onData);
+	INSTALL_METHOD_ON(xml_proto, "onLoad", 6, &g_xml_fn_onLoad);
+	INSTALL_METHOD_ON(xml_proto, "send", 4, &g_xml_fn_send);
+	INSTALL_METHOD_ON(xml_proto, "sendAndLoad", 11, &g_xml_fn_sendAndLoad);
+	INSTALL_METHOD_ON(xml_proto, "addRequestHeader", 16, &g_xml_fn_addRequestHeader);
+	INSTALL_METHOD_ON(xml_proto, "getBytesLoaded", 14, &g_xml_fn_getBytesLoaded);
+	INSTALL_METHOD_ON(xml_proto, "getBytesTotal", 13, &g_xml_fn_getBytesTotal);
 
 	// Default ignoreWhite = false on XML.prototype (tests override via XML.prototype.ignoreWhite = true)
 	{
@@ -18161,6 +18222,7 @@ static void initXMLPrototype(SWFAppContext* app_context) {
 	}
 
 	#undef INSTALL_METHOD
+	#undef INSTALL_METHOD_ON
 
 	if (function_count < MAX_FUNCTIONS)
 		function_registry[function_count++] = &g_xml_constructor;
