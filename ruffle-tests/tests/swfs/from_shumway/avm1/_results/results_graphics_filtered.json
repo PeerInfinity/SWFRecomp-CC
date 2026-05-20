@@ -6,15 +6,15 @@
     "total_available": 47,
     "shards": 30,
     "expected_shards": 30,
-    "ignored_count": 2,
+    "ignored_count": 3,
     "filtered": true
   },
-  "total": 45,
-  "pass": 45,
+  "total": 44,
+  "pass": 44,
   "ruffle_matched": 0,
   "fail": 0,
   "pass_rate": 100.0,
-  "effective_pass": 45,
+  "effective_pass": 44,
   "effective_pass_rate": 100.0,
   "breakdown": {},
   "tests": [
@@ -592,33 +592,6 @@
         "matching_lines": 18
       },
       "duration": 0.78,
-      "status": "pass"
-    },
-    {
-      "test": "text-bind",
-      "phases": {
-        "recomp": 0.0,
-        "compile": 0.466,
-        "run": 0.235
-      },
-      "num_frames": 6,
-      "lines": {
-        "actual_lines": 0,
-        "expected_lines": 0,
-        "matching_lines": 0
-      },
-      "duration": 0.97,
-      "image_comparisons": {
-        "output": {
-          "status": "fail",
-          "message": "Image comparison failed: 1918 outliers exceed limit of 100, max difference 158",
-          "max_diff": 158,
-          "trigger": [
-            "last_frame"
-          ],
-          "known_failure": false
-        }
-      },
       "status": "pass"
     },
     {

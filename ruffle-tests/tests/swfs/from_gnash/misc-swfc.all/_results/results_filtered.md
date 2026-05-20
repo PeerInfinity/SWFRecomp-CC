@@ -1,31 +1,31 @@
 # Ruffle Test Results (Filtered)
 
-**Date**: 2026-05-20 17:14 UTC
+**Date**: 2026-05-20 17:30 UTC
 
-**Git SHA**: `e4fc286f04`
+**Git SHA**: `9806fda5ff`
 
-**Run Duration**: 0m 5s
+**Run Duration**: 0m 4s
 
-**Filtered**: 1 tests ignored out of 19 available
+**Filtered**: 2 tests ignored out of 19 available
 
 ## Summary
 
 | Metric | Value |
 |--------|-------|
-| Total tests | 18 |
-| Passing | **8** (44.4%) |
+| Total tests | 17 |
+| Passing | **8** (47.1%) |
 | Ruffle-matched | 7 (diffs ⊆ Ruffle's against Flash) |
-| Effective pass | **15** (83.3%) |
-| Failing | 3 |
-| Total expected lines | 550 |
-| Matching lines | 417 (75.8%) |
-| Mismatched lines | 133 |
+| Effective pass | **15** (88.2%) |
+| Failing | 2 |
+| Total expected lines | 532 |
+| Matching lines | 407 (76.5%) |
+| Mismatched lines | 125 |
 
 ### Failure Breakdown
 
 | Category | Count | % of Failures |
 |----------|-------|---------------|
-| Output Mismatch | 3 | 100.0% |
+| Output Mismatch | 2 | 100.0% |
 
 ## Passing Tests
 
@@ -35,7 +35,7 @@
 |---|------|-------|----------|-------|
 | 1 | `button_test1` | 31 | 0.2s |  |
 | 2 | `edittext_test1` | 47 | 0.2s |  |
-| 3 | `gotoFrameLabelAsFunction` | 6 | 0.2s |  |
+| 3 | `gotoFrameLabelAsFunction` | 6 | 0.1s |  |
 | 4 | `hello` | 4 | 0.2s |  |
 | 5 | `mouse_drag_test` | 12 | 0.2s |  |
 | 6 | `movieclip_destruction_test2` | 56 | 0.2s |  |
@@ -53,18 +53,16 @@
 | 3 | `movieclip_destruction_test1` | 43 | 52 | 0.2s |  |
 | 4 | `opcode_guard_test2` | 5 | 5 | 0.2s |  |
 | 5 | `registerclass_test3` | 12 | 20 | 0.2s |  |
-| 6 | `soft_reference_test1` | 3 | 4 | 0.1s |  |
+| 6 | `soft_reference_test1` | 3 | 4 | 0.2s |  |
 | 7 | `swf4opcode` | 4 | 13 | 0.2s |  |
 
 ## Near-Passing Tests
 
 Tests with output mismatch but >= 50% line match rate (low-hanging fruit).
 
-**1 tests** within reach
+**0 tests** within reach
 
-| # | Test | Match Rate | Matching | Total | Diff Lines | Notes |
-|---|------|------------|----------|-------|------------|-------|
-| 1 | `matrix_accuracy_test1` | 55.6% | 10 | 18 | 8 |  |
+No tests above 50% match threshold.
 
 ## Segfaults
 
@@ -80,10 +78,9 @@ No timeouts.
 
 ## All Output Mismatches
 
-**3 tests** with output mismatch, sorted by match rate (best first)
+**2 tests** with output mismatch, sorted by match rate (best first)
 
 | # | Test | Match Rate | Matching/Total | Actual | Expected | Notes |
 |---|------|------------|----------------|--------|----------|-------|
-| 1 | `matrix_accuracy_test1` | 55.6% | 10/18 | 18 | 18 |  |
-| 2 | `movieclip_destruction_test3` | 27.8% | 5/18 | 16 | 18 |  |
-| 3 | `movieclip_destruction_test4` | 20.0% | 8/40 | 24 | 40 |  |
+| 1 | `movieclip_destruction_test3` | 27.8% | 5/18 | 16 | 18 |  |
+| 2 | `movieclip_destruction_test4` | 20.0% | 8/40 | 24 | 40 |  |

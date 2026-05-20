@@ -1,10 +1,10 @@
 # Ruffle Test Results (Unfiltered)
 
-**Date**: 2026-05-20 17:14 UTC
+**Date**: 2026-05-20 17:30 UTC
 
-**Git SHA**: `e4fc286f04`
+**Git SHA**: `9806fda5ff`
 
-**Run Duration**: 0m 5s
+**Run Duration**: 0m 4s
 
 ## Summary
 
@@ -33,7 +33,7 @@
 |---|------|-------|----------|-------|
 | 1 | `button_test1` | 31 | 0.2s |  |
 | 2 | `edittext_test1` | 47 | 0.2s |  |
-| 3 | `gotoFrameLabelAsFunction` | 6 | 0.2s |  |
+| 3 | `gotoFrameLabelAsFunction` | 6 | 0.1s |  |
 | 4 | `hello` | 4 | 0.2s |  |
 | 5 | `mouse_drag_test` | 12 | 0.2s |  |
 | 6 | `movieclip_destruction_test2` | 56 | 0.2s |  |
@@ -51,7 +51,7 @@
 | 3 | `movieclip_destruction_test1` | 43 | 52 | 0.2s |  |
 | 4 | `opcode_guard_test2` | 5 | 5 | 0.2s |  |
 | 5 | `registerclass_test3` | 12 | 20 | 0.2s |  |
-| 6 | `soft_reference_test1` | 3 | 4 | 0.1s |  |
+| 6 | `soft_reference_test1` | 3 | 4 | 0.2s |  |
 | 7 | `swf4opcode` | 4 | 13 | 0.2s |  |
 
 ## Near-Passing Tests

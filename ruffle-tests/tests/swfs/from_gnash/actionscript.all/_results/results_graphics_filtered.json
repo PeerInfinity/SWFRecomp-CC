@@ -6,18 +6,18 @@
     "total_available": 243,
     "shards": 30,
     "expected_shards": 30,
-    "ignored_count": 0,
+    "ignored_count": 3,
     "filtered": true
   },
-  "total": 243,
+  "total": 240,
   "pass": 127,
   "ruffle_matched": 73,
-  "fail": 43,
-  "pass_rate": 52.3,
+  "fail": 40,
+  "pass_rate": 52.9,
   "effective_pass": 200,
-  "effective_pass_rate": 82.3,
+  "effective_pass_rate": 83.3,
   "breakdown": {
-    "output_mismatch": 40,
+    "output_mismatch": 37,
     "runtime_error": 3,
     "ruffle_matched": 73
   },
@@ -3344,63 +3344,6 @@
       },
       "duration": 0.67,
       "status": "pass"
-    },
-    {
-      "test": "argstest-v6",
-      "phases": {
-        "recomp": 0.004,
-        "compile": 0.635,
-        "run": 1.061
-      },
-      "num_frames": 30,
-      "lines": {
-        "actual_lines": 7731,
-        "expected_lines": 2192,
-        "matching_lines": 58
-      },
-      "duration": 1.72,
-      "status": "output_mismatch",
-      "detail": "7673 line(s) differ (actual=7731, expected=2192)",
-      "actual_output": "... (22 lines before) ...\nTesting orientation()\nTesting pageWidth()\nTesting pageHeight()\nTesting paperWidth()\nTesting paperHeight()\nTesting toString()\nTesting 4()\nTesting 3()\nTesting 2()\nTesting 1()\nTesting 3()\nTesting 2()\nTesting 1()\nTesting 2()\nTesting 1()\nTesting 1()\nTesting 4()\nTesting 3()\nTesting 2()\nTesting 1()\nTesting 3()\nTesting 2()\nTesting 1()\nTesting 2()\nTesting 1()\nTesting 1()\nTesting __constructor__()\ntesting _global.PrintJob.__constructor__(undefined)\nTesting constructor()\nTesting __proto__()\ntesting _global.MovieClipLoader(function)\nTrying to construct _global.MovieClipLoader\nObject was constructed\nTesting removeListener()\nTesting addListener()\nTesting broadcastMessage()\nTesting unloadClip()\nTesting getProgress()\nTesting loadClip()\nTesting _listeners()\ntesting _global.MovieClipLoader._listeners(undefined)\nTesting __constructor__()\ntesting _global.MovieClipLoader.__constructor__(undefined)\nTesting constructor()\nTesting __proto__()\ntesting _global.LocalConnection(function)\nTrying to construct _global.LocalConnection\nObject was constructed\nTesting isPerUser()\nTesting domain()\n... (7659 lines after) ...",
-      "expected_output": "... (22 lines before) ...\nTesting orientation()\nTesting pageWidth()\nTesting pageHeight()\nTesting paperWidth()\nTesting paperHeight()\nTesting send()\nTesting addPage()\nTesting start()\nTesting __proto__()\nTesting constructor()\ntesting _global.MovieClipLoader(function)\nTrying to construct _global.MovieClipLoader\nObject was constructed\nTesting _listeners()\nTesting removeListener()\nTesting addListener()\nTesting broadcastMessage()\nTesting unloadClip()\nTesting getProgress()\nTesting loadClip()\nTesting __proto__()\nTesting constructor()\ntesting _global.LocalConnection(function)\nTrying to construct _global.LocalConnection\nObject was constructed\nTesting isPerUser()\nTesting domain()\nTesting close()\nTesting send()\nTesting connect()\nTesting __proto__()\nTesting constructor()\ntesting _global.textRenderer(function)\nTrying to construct _global.textRenderer\ntesting _global.flash(undefined)\ntesting _global.System(object)\ntesting _global.System.privateBytes(number)\ntesting _global.System.IME(object)\ntesting _global.System.IME._listeners(object)\ntesting _global.System.IME.removeListener(function)\nTrying to construct _global.System.IME.removeListener\nObject was constructed\nTesting __constructor__()\ntesting _global.System.IME.removeListener.__constructor__(undefined)\nTesting constructor()\nTesting __proto__()\ntesting _global.System.IME.addListener(function)\nTrying to construct _global.System.IME.addListener\nObject was constructed\nTesting __constructor__()\n... (2120 lines after) ..."
-    },
-    {
-      "test": "argstest-v7",
-      "phases": {
-        "recomp": 0.0,
-        "compile": 0.628,
-        "run": 0.872
-      },
-      "num_frames": 30,
-      "lines": {
-        "actual_lines": 7731,
-        "expected_lines": 2061,
-        "matching_lines": 45
-      },
-      "duration": 1.52,
-      "status": "output_mismatch",
-      "detail": "7686 line(s) differ (actual=7731, expected=2061)",
-      "actual_output": "... (22 lines before) ...\nTesting orientation()\nTesting pageWidth()\nTesting pageHeight()\nTesting paperWidth()\nTesting paperHeight()\nTesting toString()\nTesting 4()\nTesting 3()\nTesting 2()\nTesting 1()\nTesting 3()\nTesting 2()\nTesting 1()\nTesting 2()\nTesting 1()\nTesting 1()\nTesting 4()\nTesting 3()\nTesting 2()\nTesting 1()\nTesting 3()\nTesting 2()\nTesting 1()\nTesting 2()\nTesting 1()\nTesting 1()\nTesting constructor()\nTesting __constructor__()\ntesting _global.PrintJob.__constructor__(undefined)\nTesting __proto__()\ntesting _global.MovieClipLoader(function)\nTrying to construct _global.MovieClipLoader\nObject was constructed\nTesting removeListener()\nTesting addListener()\nTesting broadcastMessage()\nTesting unloadClip()\nTesting getProgress()\nTesting loadClip()\nTesting constructor()\nTesting _listeners()\ntesting _global.MovieClipLoader._listeners(undefined)\nTesting __constructor__()\ntesting _global.MovieClipLoader.__constructor__(undefined)\nTesting __proto__()\ntesting _global.LocalConnection(function)\nTrying to construct _global.LocalConnection\nObject was constructed\nTesting isPerUser()\nTesting domain()\n... (7659 lines after) ...",
-      "expected_output": "... (22 lines before) ...\nTesting orientation()\nTesting pageWidth()\nTesting pageHeight()\nTesting paperWidth()\nTesting paperHeight()\nTesting send()\nTesting addPage()\nTesting start()\nTesting __proto__()\nTesting constructor()\ntesting _global.MovieClipLoader(function)\nTrying to construct _global.MovieClipLoader\nObject was constructed\nTesting _listeners()\ntesting _global.MovieClipLoader._listeners(undefined)\nTesting removeListener()\nTesting addListener()\nTesting broadcastMessage()\nTesting unloadClip()\nTesting getProgress()\nTesting loadClip()\nTesting __proto__()\nTesting constructor()\ntesting _global.LocalConnection(function)\nTrying to construct _global.LocalConnection\nObject was constructed\nTesting isPerUser()\nTesting domain()\nTesting close()\nTesting send()\nTesting connect()\nTesting __proto__()\nTesting constructor()\ntesting _global.textRenderer(function)\nTrying to construct _global.textRenderer\ntesting _global.flash(undefined)\ntesting _global.System(object)\ntesting _global.System.privateBytes(number)\ntesting _global.System.IME(object)\ntesting _global.System.IME._listeners(object)\ntesting _global.System.IME.removeListener(function)\nTrying to construct _global.System.IME.removeListener\nObject was constructed\nTesting constructor()\nTesting __constructor__()\ntesting _global.System.IME.removeListener.__constructor__(undefined)\nTesting __proto__()\ntesting _global.System.IME.addListener(function)\nTrying to construct _global.System.IME.addListener\nObject was constructed\n... (1989 lines after) ..."
-    },
-    {
-      "test": "argstest-v8",
-      "phases": {
-        "recomp": 0.004,
-        "compile": 0.59,
-        "run": 0.995
-      },
-      "num_frames": 30,
-      "lines": {
-        "actual_lines": 8093,
-        "expected_lines": 2434,
-        "matching_lines": 51
-      },
-      "duration": 1.61,
-      "status": "output_mismatch",
-      "detail": "8042 line(s) differ (actual=8093, expected=2434)",
-      "actual_output": "... (22 lines before) ...\nTesting orientation()\nTesting pageWidth()\nTesting pageHeight()\nTesting paperWidth()\nTesting paperHeight()\nTesting toString()\nTesting 4()\nTesting 3()\nTesting 2()\nTesting 1()\nTesting 3()\nTesting 2()\nTesting 1()\nTesting 2()\nTesting 1()\nTesting 1()\nTesting 4()\nTesting 3()\nTesting 2()\nTesting 1()\nTesting 3()\nTesting 2()\nTesting 1()\nTesting 2()\nTesting 1()\nTesting 1()\nTesting constructor()\nTesting __constructor__()\ntesting _global.PrintJob.__constructor__(undefined)\nTesting __proto__()\ntesting _global.MovieClipLoader(function)\nTrying to construct _global.MovieClipLoader\nObject was constructed\nTesting removeListener()\nTesting addListener()\nTesting broadcastMessage()\nTesting unloadClip()\nTesting getProgress()\nTesting loadClip()\nTesting constructor()\nTesting _listeners()\ntesting _global.MovieClipLoader._listeners(undefined)\nTesting __constructor__()\ntesting _global.MovieClipLoader.__constructor__(undefined)\nTesting __proto__()\ntesting _global.LocalConnection(function)\nTrying to construct _global.LocalConnection\nObject was constructed\nTesting isPerUser()\nTesting domain()\n... (8021 lines after) ...",
-      "expected_output": "... (22 lines before) ...\nTesting orientation()\nTesting pageWidth()\nTesting pageHeight()\nTesting paperWidth()\nTesting paperHeight()\nTesting send()\nTesting addPage()\nTesting start()\nTesting __proto__()\nTesting constructor()\ntesting _global.MovieClipLoader(function)\nTrying to construct _global.MovieClipLoader\nObject was constructed\nTesting _listeners()\ntesting _global.MovieClipLoader._listeners(undefined)\nTesting removeListener()\nTesting addListener()\nTesting broadcastMessage()\nTesting unloadClip()\nTesting getProgress()\nTesting loadClip()\nTesting __proto__()\nTesting constructor()\ntesting _global.LocalConnection(function)\nTrying to construct _global.LocalConnection\nObject was constructed\nTesting isPerUser()\nTesting domain()\nTesting close()\nTesting send()\nTesting connect()\nTesting __proto__()\nTesting constructor()\ntesting _global.textRenderer(function)\nTrying to construct _global.textRenderer\ntesting _global.flash(object)\ntesting _global.flash.automation(object)\ntesting _global.flash.automation.Configuration(function)\nTrying to construct _global.flash.automation.Configuration\nObject was constructed\nTesting toString()\nTesting valueOf()\nTesting setDeviceConfiguration()\nTesting getDeviceConfiguration()\nTesting getTestAutomationConfiguration()\nTesting constructor()\nTesting __constructor__()\ntesting _global.flash.automation.Configuration.__constructor__(undefined)\nTesting __proto__()\ntesting _global.flash.automation.ActionGenerator(function)\n... (2362 lines after) ..."
     },
     {
       "test": "array-v5",
