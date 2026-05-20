@@ -446,13 +446,27 @@ output is ~2100–2400 lines.
 
 **Root cause:** Several native objects that the test walks (`PrintJob`,
 `MovieClipLoader`, `LocalConnection`, `textRenderer`, `System.IME`, …) are
-either unimplemented or carry a placeholder prototype whose enumerable
-property set does not match Flash's. For `PrintJob` the first five methods
-(`orientation`/`pageWidth`/`pageHeight`/`paperWidth`/`paperHeight`) match,
-but `send`/`addPage`/`start` are missing and instead `Object.prototype`
-methods (`toString`) and spurious numeric keys leak into enumeration. The
-recursive descent then multiplies the divergence: our actual output is
-**7731 lines** (argstest-v6), 7731 (v7), 8093 (v8) versus expected 2192 /
+**stub classes** — entries in `g_stub_ctors[18]`
+(`SWFModernRuntime/src/actionmodern/action.c:32573`) that exist as globals
+with a real-but-incomplete prototype whose methods point at the no-op
+`builtin_stub_method`. Their enumerable property set does not match Flash's.
+
+Worked example — `PrintJob` (`initPrintJobPrototype`, `action.c:32701`):
+- The five enumerable properties `orientation`/`pageWidth`/`pageHeight`/
+  `paperWidth`/`paperHeight` are installed on the prototype and **match**.
+- The methods `send`/`addPage`/`start` are installed only behind
+  `if (g_swf_version >= 7)`. argstest-v6 is a SWF *version 6* file, so they
+  are never installed — but Flash exposes them anyway (the expected output,
+  resolved to the `fp32` `[subtests]` variant, lists all three). The
+  SWF-version gate is the wrong gate for this test.
+- The `Testing 4()/3()/2()/1()` triangular numeric-key cascade is **not**
+  from the prototype (it has no numeric keys); it appears only when the
+  test enumerates the constructed *instance* of a stub class. Not fully
+  root-caused — likely constructor arguments stored as numeric-indexed own
+  properties on the instance.
+
+The recursive descent then multiplies every divergence: our actual output
+is **7731 lines** (argstest-v6), 7731 (v7), 8093 (v8) versus expected 2192 /
 2061 / 2434 — a ~3.5× blow-up.
 
 **Why not RM-eligible:** all three are `known_failure = true` upstream with

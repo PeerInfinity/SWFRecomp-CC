@@ -121,3 +121,32 @@ walks AND replicating Flash's implementation-defined native-object
 iteration order. Not worth it for a `known_failure` enumeration test.
 Documented in `ACCEPTED_DIFFS.md` Category 3; the three tests are in
 `from_gnash/actionscript.all/ignored_tests.txt`.
+
+## Root-cause detail (for anyone who revisits this)
+
+The over-emitting objects are **stub classes** — `g_stub_ctors[18]` in
+`SWFModernRuntime/src/actionmodern/action.c:32573`. A stub class exists as a
+global with a real prototype object, but its methods are no-ops
+(`builtin_stub_method`, `action.c:883`). The 18 stub classes as of this
+writing: AsBroadcaster, Button, Camera, Color, ContextMenu, ContextMenuItem,
+LoadVars, LocalConnection, Microphone, MovieClipLoader, NetConnection,
+NetStream, PrintJob, SharedObject, Sound, TextSnapshot, Video, XMLSocket
+(some — Color, Sound, TextSnapshot — have since grown real implementations;
+the array name is historical).
+
+Two distinct defects observed on `PrintJob` (`initPrintJobPrototype`,
+`action.c:32701`), each of which would recur per stub class:
+
+1. **Wrong version gate.** `send`/`addPage`/`start` are installed behind
+   `if (g_swf_version >= 7)`. argstest-v6 is a SWF6 file, so they are
+   absent — yet Flash's expected output (resolved `fp32` subtest) lists
+   them. Whatever the correct rule is, `g_swf_version >= 7` is not it.
+
+2. **Numeric-key garbage on the instance.** The `Testing 4()/3()/2()/1()`
+   triangular cascade is not on the prototype (it has no numeric keys). It
+   appears only when the test does `for (m in instance)` on a constructed
+   stub-class instance. Not root-caused — most plausibly the stub
+   constructor stores `arguments` as numeric-indexed own properties on the
+   instance, which then enumerate (and the test recurses into each). A
+   future fix should start by inspecting what `actionNewObject` /
+   `builtin_stub_method` leave on a stub instance's `properties` array.
