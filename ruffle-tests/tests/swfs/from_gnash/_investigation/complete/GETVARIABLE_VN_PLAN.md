@@ -17,7 +17,7 @@ phases:
     status: complete
   - id: 3
     name: "Line 105 PASS-where-Gnash-expected-FAILED divergence"
-    status: complete
+    status: reverted
 dependencies:
   - id: SUBTESTS_HARNESS
     reason: "Discovery shipped 2026-05-14 (commit 39b797ac)."
@@ -234,11 +234,18 @@ Four changes in `SWFModernRuntime/src/actionmodern/action.c`:
    valueOf and toString call sites in `objectToPrimitive` now push
    `this`=obj. Without this, `string_coercion` (AVM1) regressed.
 
-4. **Phase 3 — `_levelN` mid-path resolution.** `_level0`/`_levelN` is a
-   top-level path token, not a MovieClip member: Flash returns undefined
-   for `this._root._level0.x`. `resolveFlashPathToMC` resolved `_levelN`
-   in any path position and `_level0` as a non-first segment; both are now
-   gated to the first element only (non-first `_levelN`/`_level0` returns
-   NULL). `actionGetMember` no longer resolves `_level0` member access to
-   the root. Makes line 105 FAIL like Flash → exact match with the
-   expected `output.fp10.txt`, giving full PASS rather than ruffle_matched.
+4. **Phase 3 — `_levelN` mid-path resolution. REVERTED.** Initially
+   `resolveFlashPathToMC` was gated so `_levelN`/`_level0` resolves only as
+   the first path element, and `actionGetMember` stopped resolving
+   `_level0` to root, making line 105 (`this._root._level0.x`) FAIL like
+   Flash and giving full PASS. But CI (`13fe9441a`) showed 5 status
+   regressions — `levels`, `MovieClip-v5`, `DragDropTest`, `button_test1`,
+   `stage_object_children` — because `_level0`/`_levelN` resolution is used
+   pervasively for internal target paths. Phase 3 was reverted in
+   `5f2e8158`. Net result: `getvariable-v6` promotes to `ruffle_matched`
+   (its residual diff is a subset of Ruffle's); `getvariable-v5/v7/v8`
+   stay `output_mismatch` with only the line-105 diff remaining (their
+   pass/fail counters diverge from expected, so subset-match does not
+   promote them). A future, narrower Phase 3 — one that distinguishes
+   genuine top-level `_levelN` path tokens from internal target-path use —
+   could still land the v5/v7/v8 full PASS.
