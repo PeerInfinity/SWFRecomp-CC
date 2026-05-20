@@ -1,7 +1,7 @@
 # Ruffle Test Results Diff
 
-**Previous:** `1b5cc33d74fd` (2026-05-20T19:08:15.381283+00:00)
-**Current:** `c5c0008de303` (2026-05-20T19:25:15.389149+00:00)
+**Previous:** `c5c0008de303` (2026-05-20T19:25:15.389149+00:00)
+**Current:** `ddccbffa6b4a` (2026-05-20T19:46:57.272385+00:00)
 
 ## Summary
 
@@ -10,13 +10,12 @@
 | Passing | 128 | 128 | 0 |
 | Total | 243 | 243 | 0 |
 | Pass rate | 52.7% | 52.7% | 0% |
-| Mismatched lines | 10614 | 10611 | -3 |
+| Mismatched lines | 10611 | 10608 | -3 |
 |   Decreased | | | -3 |
 
-## Status Changed (3)
+## Line Count Changed (2)
 
-| Test | Previous | Current | Lines (prev) | Lines (now) |
-|------|----------|---------|--------------|-------------|
-| `LoadVars-v6` | output_mismatch | ruffle_matched | 144/152 | 145/152 |
-| `LoadVars-v7` | output_mismatch | ruffle_matched | 144/152 | 145/152 |
-| `LoadVars-v8` | output_mismatch | ruffle_matched | 144/152 | 145/152 |
+| Test | Status | Lines (prev) | Lines (now) | Diff |
+|------|--------|--------------|-------------|------|
+| `MovieClip-v8` | output_mismatch | 884/1087 | 886/1087 | -2 |
+| `MovieClip-v7` | output_mismatch | 798/969 | 799/969 | -1 |
