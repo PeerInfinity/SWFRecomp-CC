@@ -6,26 +6,26 @@
 
 **Run Duration**: 0m 16s
 
-**Filtered**: 1 tests ignored out of 19 available
+**Filtered**: 2 tests ignored out of 19 available
 
 ## Summary
 
 | Metric | Value |
 |--------|-------|
-| Total tests | 18 |
-| Passing | **8** (44.4%) |
+| Total tests | 17 |
+| Passing | **8** (47.1%) |
 | Ruffle-matched | 6 (diffs ⊆ Ruffle's against Flash) |
-| Effective pass | **14** (77.8%) |
-| Failing | 4 |
-| Total expected lines | 550 |
-| Matching lines | 405 (73.6%) |
-| Mismatched lines | 145 |
+| Effective pass | **14** (82.4%) |
+| Failing | 3 |
+| Total expected lines | 532 |
+| Matching lines | 395 (74.2%) |
+| Mismatched lines | 137 |
 
 ### Failure Breakdown
 
 | Category | Count | % of Failures |
 |----------|-------|---------------|
-| Output Mismatch | 4 | 100.0% |
+| Output Mismatch | 3 | 100.0% |
 
 ## Passing Tests
 
@@ -59,11 +59,9 @@
 
 Tests with output mismatch but >= 50% line match rate (low-hanging fruit).
 
-**1 tests** within reach
+**0 tests** within reach
 
-| # | Test | Match Rate | Matching | Total | Diff Lines | Notes |
-|---|------|------------|----------|-------|------------|-------|
-| 1 | `matrix_accuracy_test1` | 55.6% | 10 | 18 | 8 |  |
+No tests above 50% match threshold.
 
 ## Segfaults
 
@@ -79,11 +77,10 @@ No timeouts.
 
 ## All Output Mismatches
 
-**4 tests** with output mismatch, sorted by match rate (best first)
+**3 tests** with output mismatch, sorted by match rate (best first)
 
 | # | Test | Match Rate | Matching/Total | Actual | Expected | Notes |
 |---|------|------------|----------------|--------|----------|-------|
-| 1 | `matrix_accuracy_test1` | 55.6% | 10/18 | 18 | 18 |  |
-| 2 | `action_execution_order_test12` | 40.9% | 9/22 | 20 | 22 |  |
-| 3 | `movieclip_destruction_test3` | 27.8% | 5/18 | 16 | 18 |  |
-| 4 | `movieclip_destruction_test4` | 20.0% | 8/40 | 24 | 40 |  |
+| 1 | `action_execution_order_test12` | 40.9% | 9/22 | 20 | 22 |  |
+| 2 | `movieclip_destruction_test3` | 27.8% | 5/18 | 16 | 18 |  |
+| 3 | `movieclip_destruction_test4` | 20.0% | 8/40 | 24 | 40 |  |

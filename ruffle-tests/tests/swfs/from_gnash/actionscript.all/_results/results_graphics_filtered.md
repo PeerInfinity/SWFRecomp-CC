@@ -6,27 +6,27 @@
 
 **Run Duration**: 4m 11s
 
-**Filtered**: 0 tests ignored out of 243 available
+**Filtered**: 3 tests ignored out of 243 available
 
 ## Summary
 
 | Metric | Value |
 |--------|-------|
-| Total tests | 243 |
-| Passing | **127** (52.3%) |
+| Total tests | 240 |
+| Passing | **127** (52.9%) |
 | Ruffle-matched | 73 (diffs ⊆ Ruffle's against Flash) |
-| Effective pass | **200** (82.3%) |
-| Failing | 43 |
-| Total expected lines | 38787 |
-| Matching lines | 27714 (71.5%) |
-| Mismatched lines | 11073 |
+| Effective pass | **200** (83.3%) |
+| Failing | 40 |
+| Total expected lines | 32100 |
+| Matching lines | 27560 (85.9%) |
+| Mismatched lines | 4540 |
 
 ### Failure Breakdown
 
 | Category | Count | % of Failures |
 |----------|-------|---------------|
-| Output Mismatch | 40 | 93.0% |
-| Runtime Error | 3 | 7.0% |
+| Output Mismatch | 37 | 92.5% |
+| Runtime Error | 3 | 7.5% |
 
 ## Passing Tests
 
@@ -308,7 +308,7 @@ No timeouts.
 
 ## All Output Mismatches
 
-**40 tests** with output mismatch, sorted by match rate (best first)
+**37 tests** with output mismatch, sorted by match rate (best first)
 
 | # | Test | Match Rate | Matching/Total | Actual | Expected | Notes |
 |---|------|------------|----------------|--------|----------|-------|
@@ -349,6 +349,3 @@ No timeouts.
 | 35 | `XML-v7` | 59.1% | 288/487 | 487 | 486 |  |
 | 36 | `XML-v8` | 59.1% | 288/487 | 487 | 465 |  |
 | 37 | `NetConnection-v6` | 56.3% | 71/126 | 126 | 126 |  |
-| 38 | `argstest-v6` | 0.8% | 58/7731 | 7731 | 2192 |  |
-| 39 | `argstest-v8` | 0.6% | 51/8093 | 8093 | 2434 |  |
-| 40 | `argstest-v7` | 0.6% | 45/7731 | 7731 | 2061 |  |

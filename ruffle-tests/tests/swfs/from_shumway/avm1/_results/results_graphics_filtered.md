@@ -6,14 +6,14 @@
 
 **Run Duration**: 0m 39s
 
-**Filtered**: 2 tests ignored out of 47 available
+**Filtered**: 3 tests ignored out of 47 available
 
 ## Summary
 
 | Metric | Value |
 |--------|-------|
-| Total tests | 45 |
-| Passing | **45** (100.0%) |
+| Total tests | 44 |
+| Passing | **44** (100.0%) |
 | Failing | 0 |
 | Total expected lines | 480 |
 | Matching lines | 480 (100.0%) |
@@ -21,7 +21,7 @@
 
 ## Passing Tests
 
-**45 tests passing**
+**44 tests passing**
 
 | # | Test | Lines | Duration | Notes |
 |---|------|-------|----------|-------|
@@ -61,15 +61,14 @@
 | 34 | `settimeout` | 17 | 0.6s |  |
 | 35 | `super` | 11 | 0.7s |  |
 | 36 | `target` | 18 | 0.8s |  |
-| 37 | `text-bind` | 0 | 1.0s |  |
-| 38 | `textfield/textfield-html` | 4 | 1.0s |  |
-| 39 | `textfield/textfield-text-setters` | 8 | 0.7s |  |
-| 40 | `undefined/undefined-swf6` | 39 | 0.8s |  |
-| 41 | `undefined/undefined-swf7` | 39 | 0.7s |  |
-| 42 | `watch` | 2 | 0.8s |  |
-| 43 | `xml/xmlbuild` | 1 | 0.8s |  |
-| 44 | `xml/xmlload` | 4 | 0.6s |  |
-| 45 | `xml/xmlstring` | 9 | 0.8s |  |
+| 37 | `textfield/textfield-html` | 4 | 1.0s |  |
+| 38 | `textfield/textfield-text-setters` | 8 | 0.7s |  |
+| 39 | `undefined/undefined-swf6` | 39 | 0.8s |  |
+| 40 | `undefined/undefined-swf7` | 39 | 0.7s |  |
+| 41 | `watch` | 2 | 0.8s |  |
+| 42 | `xml/xmlbuild` | 1 | 0.8s |  |
+| 43 | `xml/xmlload` | 4 | 0.6s |  |
+| 44 | `xml/xmlstring` | 9 | 0.8s |  |
 
 ## Near-Passing Tests
 
