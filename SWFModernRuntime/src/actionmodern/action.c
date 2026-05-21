@@ -579,6 +579,12 @@ bool setVariableOnLocalScope(const char* var_name, ActionVar* value)
 // ==================================================================
 
 int g_swf_version = 5;       // SWF version — set at startup from constants.h
+int g_main_movie_swf_version = 5;  // Main movie's SWF version — set once by main.c, never
+                                   // swapped during child-SWF/import context switches. Used
+                                   // for root_movieclip.swf_version so getSWFVersion() on
+                                   // _root reports the right value even when ensureGlobalInit
+                                   // happens to first run inside an ImportAssets context.
+float g_soundbuftime = 5.0f; // _soundbuftime — stage-wide property (per-root, not per-MC)
 int g_use_network = 0;       // UseNetwork flag from FileAttributes tag
 u32 g_max_call_depth = 256;  // Default; overridden by tagScriptLimits()
 u8 g_execution_halted = 0;   // Set when recursion limit is hit; halts all further script execution
@@ -35952,7 +35958,11 @@ static void ensureGlobalInit(SWFAppContext* app_context)
 
 	// Initialize _level0 to root_movieclip
 	g_levels[0] = &root_movieclip;
-	root_movieclip.swf_version = (u16)g_swf_version;
+	// Use the main movie's version (captured by main.c), not the live
+	// g_swf_version — ensureGlobalInit can first run inside an ImportAssets
+	// context (e.g. Dejagnu.swf, SWF5) where g_swf_version is transiently
+	// the imported child's version.
+	root_movieclip.swf_version = (u16)g_main_movie_swf_version;
 
 	if (global_object == NULL)
 	{
@@ -38988,7 +38998,7 @@ check_special_vars:
 			if (strcasecmp(var_name, "_url") == 0) { PUSH_STR(mc->url, strlen(mc->url)); return; }
 			if (strcasecmp(var_name, "_droptarget") == 0) { actionRefreshDropTargetIfDragged(mc); PUSH_STR(mc->droptarget, strlen(mc->droptarget)); return; }
 			if (strcasecmp(var_name, "_quality") == 0) { PUSH_STR(mc->quality, strlen(mc->quality)); return; }
-			if (strcasecmp(var_name, "_soundbuftime") == 0) { float v = mc->soundbuftime; PUSH(ACTION_STACK_VALUE_F32, VAL(u32, &v)); return; }
+			if (strcasecmp(var_name, "_soundbuftime") == 0) { float v = g_soundbuftime; PUSH(ACTION_STACK_VALUE_F32, VAL(u32, &v)); return; }
 			if (strcasecmp(var_name, "_highquality") == 0) { float v = mc->highquality; PUSH(ACTION_STACK_VALUE_F32, VAL(u32, &v)); return; }
 			if (strcasecmp(var_name, "_focusrect") == 0) {
 				// Bare _focusrect resolves to root MC (stage focus rect)
@@ -39487,7 +39497,7 @@ void actionSetVariable(SWFAppContext* app_context)
 			// Ruffle: coerce to f64 (calls valueOf for objects, parses strings).
 			// NaN → no-op (e.g. {} without valueOf, "string"). Otherwise clamp to i32.
 			double sb_d = coerceVarToNumber(app_context, &value_var);
-			if (!isnan(sb_d)) mc->soundbuftime = (float) clampToI32(sb_d);
+			if (!isnan(sb_d)) g_soundbuftime = (float) clampToI32(sb_d);
 			handled = 1;
 		}
 		if (handled)
@@ -40496,7 +40506,7 @@ void actionGetProperty(SWFAppContext* app_context)
 			return;
 		}
 		case 18: // _soundbuftime
-			value = mc ? mc->soundbuftime : 5.0f;
+			value = g_soundbuftime;
 			break;
 		case 19: // _quality (returns string: "LOW", "MEDIUM", "HIGH", "BEST")
 			str_value = mc ? mc->quality : "HIGH";
@@ -45128,7 +45138,7 @@ void actionSetMember(SWFAppContext* app_context)
 					// Ruffle: coerce to f64 (valueOf for objects, parse for strings).
 					// NaN → no-op. Otherwise clamp to i32.
 					double sb_d = coerceVarToNumber(app_context, &value_var);
-					if (!isnan(sb_d)) mc->soundbuftime = (float) clampToI32(sb_d);
+					if (!isnan(sb_d)) g_soundbuftime = (float) clampToI32(sb_d);
 					return;
 				}
 				if (strcasecmp(prop_name, "_lockroot") == 0) {
@@ -48505,7 +48515,7 @@ void actionGetMember(SWFAppContext* app_context)
 				}
 				return;
 			}
-			if (strcasecmp(prop_name, "_soundbuftime") == 0) { float v = mc->soundbuftime; PUSH(ACTION_STACK_VALUE_F32, VAL(u32, &v)); return; }
+			if (strcasecmp(prop_name, "_soundbuftime") == 0) { float v = g_soundbuftime; PUSH(ACTION_STACK_VALUE_F32, VAL(u32, &v)); return; }
 			if (strcasecmp(prop_name, "_lockroot") == 0) { PUSH(ACTION_STACK_VALUE_BOOLEAN, (u64)mc->lockroot); return; }
 			if (strcasecmp(prop_name, "_parent") == 0) {
 				MovieClip* par = mc->parent;

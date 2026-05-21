@@ -1,9 +1,9 @@
 # MovieClip-vN Investigation Plan
 <!-- TESTS: MovieClip-v6, MovieClip-v7, MovieClip-v8 -->
 
-Last updated: 2026-05-19 (initial planning doc, drafted from local
-single-test reproductions at the current `master` SHA; no fixes
-landed yet)
+Last updated: 2026-05-21 (Phases 2 + 4 landed → MovieClip-v6/v7/v8 each
+−5 mismatched lines, still `output_mismatch`. Zero regressions across
+AVM1 + gnash batteries.)
 
 <!-- PLAN_META
 id: MOVIECLIP_VN_PLAN
@@ -14,13 +14,13 @@ phases:
     status: pending
   - id: 2
     name: "mc.getSWFVersion() returning 5 instead of OUTPUT_VERSION"
-    status: pending
+    status: completed
   - id: 3
     name: "mc.hitTest method not on prototype"
     status: pending
   - id: 4
     name: "_soundbuftime is per-root, not per-MC"
-    status: pending
+    status: completed
   - id: 5
     name: "Renamed-parent _target path propagation to children"
     status: pending
@@ -90,6 +90,36 @@ Local CI baseline (commit `eb8206f8`, 2026-05-15):
 
 MovieClip-v5 already at ruffle_matched (per
 complete/GNASH_FEATURE_PLAN.md).
+
+### Fixes landed (2026-05-21, pending CI)
+
+- **Phase 4 — `_soundbuftime` is stage-wide (MovieClip.as:531/533).**
+  `_soundbuftime` was stored per-MC (`mc->soundbuftime`); the test sets
+  `mc._soundbuftime` and reads it back through `mc2`. Flash's
+  `_soundbuftime` is a single stage-wide value. Added a `g_soundbuftime`
+  global (`SWFModernRuntime/src/actionmodern/action.c`, default 5.0f);
+  all three read sites (bare-var getter, GetProperty case 18, dotted
+  getter) and both write sites (SetVariable, SetProperty) now route
+  through it. `mc->soundbuftime` is left in place but unused.
+
+- **Phase 2 — `_root.getSWFVersion()` returns OUTPUT_VERSION
+  (MovieClip.as:184/2537).** `getSWFVersion()` on `_root` returned 5
+  instead of the movie version. Root cause: `root_movieclip.swf_version`
+  is set by `ensureGlobalInit` from the live `g_swf_version`, but
+  `ensureGlobalInit` first runs *inside* `actionImportAssets("Dejagnu.swf")`
+  — a SWF5 import context where `g_swf_version` is transiently 5. Added
+  `g_main_movie_swf_version`, captured once in
+  `SWFRecomp/wasm_wrappers/main.c` from the `SWF_VERSION` constant (never
+  swapped by child-SWF context switches); `ensureGlobalInit` now uses it
+  for `root_movieclip.swf_version`. Lines 909/910 (`o.getSWFVersion()`,
+  unloaded-`t1.getSWFVersion()`) remain failures — separate clusters.
+
+Each of v6/v7/v8 dropped 5 mismatched lines (151→146, 162→157,
+192→187). Verified no regressions: AVM1 movieclip_default_state,
+movieclip_library_state_values, movieclip_state_values,
+swf5_to_6_cross_call, loadmovienum_cross_version_prototype all
+effective-pass; gnash case-v6, Inheritance-v6, delete-v6, Global-v7,
+ASnative-v8 all effective-pass.
 
 ## Test source
 
