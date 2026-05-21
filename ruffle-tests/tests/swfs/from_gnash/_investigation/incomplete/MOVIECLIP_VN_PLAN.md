@@ -1,9 +1,10 @@
 # MovieClip-vN Investigation Plan
 <!-- TESTS: MovieClip-v6, MovieClip-v7, MovieClip-v8 -->
 
-Last updated: 2026-05-21 (Phases 2 + 4 landed → MovieClip-v6/v7/v8 each
-−5 mismatched lines, still `output_mismatch`. Zero regressions across
-AVM1 + gnash batteries.)
+Last updated: 2026-05-21 (Phase 17 landed → MovieClip-v6/v7/v8 each
+−20 mismatched lines, still `output_mismatch`. Phases 2 + 4 earlier
+the same day landed −5 each. Zero regressions across AVM1 + gnash
+batteries.)
 
 <!-- PLAN_META
 id: MOVIECLIP_VN_PLAN
@@ -59,7 +60,7 @@ phases:
     status: pending
   - id: 17
     name: "_quality setter 'BEST' value"
-    status: pending
+    status: completed
 dependencies:
   - id: SUBTESTS_HARNESS
     reason: "Discovery shipped 2026-05-14 (commit 39b797ac); MovieClip-v6/v7/v8 became visible at that point. MovieClip-v5 was already RM via complete/GNASH_FEATURE_PLAN.md."
@@ -92,6 +93,30 @@ MovieClip-v5 already at ruffle_matched (per
 complete/GNASH_FEATURE_PLAN.md).
 
 ### Fixes landed (2026-05-21, pending CI)
+
+- **Phase 17 — `_quality` / `_highquality` are stage-wide and linked
+  (MovieClip.as:2411-2494).** Both properties were stored per-MC
+  (`mc->quality`, `mc->highquality`) and were independent of each
+  other; the test sets them on one clip and reads them back through
+  another clip and `_root`, and cross-checks `_quality` ⇄
+  `_highquality`. Added a `g_stage_quality[16]` global
+  (`SWFModernRuntime/src/actionmodern/action.c`, default `"HIGH"`) plus
+  two helpers: `stageQualityToHighqualityInt()` (BEST→2, HIGH→1, else→0,
+  mirrors Ruffle `high_quality()`) and `setStageQualityFromHighquality()`
+  (NaN→no-op, `>1.5`→BEST, `==0`→LOW, else→HIGH, mirrors Ruffle
+  `set_high_quality()`). All `_quality`/`_highquality` read sites
+  (bare-var, GetProperty case 16/19, dotted getter) and write sites
+  (SetVariable, dotted SetMember, **and the previously-missing
+  SetProperty action 0x23** cases 16/18/19) now route through the
+  global. `actionToggleQuality` updated too. `mc->quality` /
+  `mc->highquality` left in place but unused.
+
+  Each of v6/v7/v8 dropped ~20 mismatched lines. Verified no
+  regressions: AVM1 movieclip_default_state, movieclip_library_state_values,
+  movieclip_state_values, swf5_to_6_cross_call, target_clip_removed,
+  unload_nested_child, movieclip_setmask, loadmovienum_cross_version_prototype
+  all effective-pass; gnash case-v6, Inheritance-v6, MovieClip-v5 all
+  effective-pass.
 
 - **Phase 4 — `_soundbuftime` is stage-wide (MovieClip.as:531/533).**
   `_soundbuftime` was stored per-MC (`mc->soundbuftime`); the test sets

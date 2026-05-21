@@ -585,6 +585,7 @@ int g_main_movie_swf_version = 5;  // Main movie's SWF version — set once by m
                                    // _root reports the right value even when ensureGlobalInit
                                    // happens to first run inside an ImportAssets context.
 float g_soundbuftime = 5.0f; // _soundbuftime — stage-wide property (per-root, not per-MC)
+char g_stage_quality[16] = "HIGH"; // _quality / _highquality — stage-wide, not per-MC
 int g_use_network = 0;       // UseNetwork flag from FileAttributes tag
 u32 g_max_call_depth = 256;  // Default; overridden by tagScriptLimits()
 u8 g_execution_halted = 0;   // Set when recursion limit is hit; halts all further script execution
@@ -14396,21 +14397,41 @@ static int normalizeQualityValue(const char* in, int in_len, char* out_buf, int 
 	return 0;
 }
 
+// _highquality getter mapping: BEST -> 2, HIGH -> 1, everything else (LOW,
+// MEDIUM, 8X8, 16X16, ...) -> 0. Mirrors Ruffle's high_quality().
+int stageQualityToHighqualityInt(void)
+{
+	extern char g_stage_quality[16];
+	if (strcasecmp(g_stage_quality, "BEST") == 0) return 2;
+	if (strcasecmp(g_stage_quality, "HIGH") == 0) return 1;
+	return 0;
+}
+
+// _highquality setter mapping. Mirrors Ruffle's set_high_quality(): NaN is a
+// no-op; val > 1.5 -> BEST; val == 0 -> LOW; else -> HIGH.
+void setStageQualityFromHighquality(double val)
+{
+	extern char g_stage_quality[16];
+	if (isnan(val)) return;
+	if (val > 1.5)        strcpy(g_stage_quality, "BEST");
+	else if (val == 0.0)  strcpy(g_stage_quality, "LOW");
+	else                  strcpy(g_stage_quality, "HIGH");
+}
+
 void actionToggleQuality(SWFAppContext* app_context)
 {
 	// AVM1 ToggleQuality opcode: cycles between LOW and HIGH/BEST on the stage.
 	// Mirrors Ruffle: HIGH/BEST -> LOW, LOW/MEDIUM -> HIGH (no bitmap downsampling
 	// tracking here yet, so MEDIUM/LOW always go to HIGH).
-	extern MovieClip root_movieclip;
-	MovieClip* mc = &root_movieclip;
-	if (strcasecmp(mc->quality, "HIGH") == 0 || strcasecmp(mc->quality, "BEST") == 0) {
-		strcpy(mc->quality, "LOW");
+	extern char g_stage_quality[16];
+	if (strcasecmp(g_stage_quality, "HIGH") == 0 || strcasecmp(g_stage_quality, "BEST") == 0) {
+		strcpy(g_stage_quality, "LOW");
 	} else {
-		strcpy(mc->quality, "HIGH");
+		strcpy(g_stage_quality, "HIGH");
 	}
 
 	#ifdef DEBUG
-	printf("[ActionToggleQuality] Toggled render quality to %s\n", mc->quality);
+	printf("[ActionToggleQuality] Toggled render quality to %s\n", g_stage_quality);
 	#endif
 }
 
@@ -38997,9 +39018,9 @@ check_special_vars:
 			if (strcasecmp(var_name, "_target") == 0) { PUSH_STR(mc->target, strlen(mc->target)); return; }
 			if (strcasecmp(var_name, "_url") == 0) { PUSH_STR(mc->url, strlen(mc->url)); return; }
 			if (strcasecmp(var_name, "_droptarget") == 0) { actionRefreshDropTargetIfDragged(mc); PUSH_STR(mc->droptarget, strlen(mc->droptarget)); return; }
-			if (strcasecmp(var_name, "_quality") == 0) { PUSH_STR(mc->quality, strlen(mc->quality)); return; }
+			if (strcasecmp(var_name, "_quality") == 0) { PUSH_STR(g_stage_quality, strlen(g_stage_quality)); return; }
 			if (strcasecmp(var_name, "_soundbuftime") == 0) { float v = g_soundbuftime; PUSH(ACTION_STACK_VALUE_F32, VAL(u32, &v)); return; }
-			if (strcasecmp(var_name, "_highquality") == 0) { float v = mc->highquality; PUSH(ACTION_STACK_VALUE_F32, VAL(u32, &v)); return; }
+			if (strcasecmp(var_name, "_highquality") == 0) { float v = (float)stageQualityToHighqualityInt(); PUSH(ACTION_STACK_VALUE_F32, VAL(u32, &v)); return; }
 			if (strcasecmp(var_name, "_focusrect") == 0) {
 				// Bare _focusrect resolves to root MC (stage focus rect)
 				// SWF5: return Number 1/0. SWF6+: return Boolean true/false.
@@ -39464,13 +39485,13 @@ void actionSetVariable(SWFAppContext* app_context)
 			if (len > 0) {
 				char canon[16];
 				if (normalizeQualityValue(buf, len, canon, sizeof(canon))) {
-					strcpy(mc->quality, canon);
+					strcpy(g_stage_quality, canon);
 				}
 				// Invalid quality strings are silently ignored (Flash behavior).
 			}
 			handled = 1;
 		}
-		else if (strcasecmp(var_name, "_highquality") == 0) { mc->highquality = fval; handled = 1; }
+		else if (strcasecmp(var_name, "_highquality") == 0) { RESOLVE_NUM_PROP(); if (num_ok) setStageQualityFromHighquality(dval); handled = 1; }
 		else if (strcasecmp(var_name, "_focusrect") == 0) {
 			// Bare _focusrect always sets stage/root focusrect
 			// Stage setter: null/undefined → no-op, object → false, NaN → no-op
@@ -40480,7 +40501,7 @@ void actionGetProperty(SWFAppContext* app_context)
 			is_string = 1;
 			break;
 		case 16: // _highquality
-			value = mc ? (float)mc->highquality : 1.0f;
+			value = (float)stageQualityToHighqualityInt();
 			break;
 		case 17: { // _focusrect
 			extern MovieClip root_movieclip;
@@ -40509,7 +40530,7 @@ void actionGetProperty(SWFAppContext* app_context)
 			value = g_soundbuftime;
 			break;
 		case 19: // _quality (returns string: "LOW", "MEDIUM", "HIGH", "BEST")
-			str_value = mc ? mc->quality : "HIGH";
+			str_value = g_stage_quality;
 			is_string = 1;
 			break;
 		case 20: // _xmouse (SWF 5+)
@@ -45079,13 +45100,13 @@ void actionSetMember(SWFAppContext* app_context)
 					if (len > 0) {
 						char canon[16];
 						if (normalizeQualityValue(buf, len, canon, sizeof(canon))) {
-							strcpy(mc->quality, canon);
+							strcpy(g_stage_quality, canon);
 						}
 						// Invalid quality strings are silently ignored (Flash behavior).
 					}
 					return;
 				}
-				if (strcasecmp(prop_name, "_highquality") == 0) { mc->highquality = fval; return; }
+				if (strcasecmp(prop_name, "_highquality") == 0) { if (!dval_invalid) setStageQualityFromHighquality(dval); return; }
 				if (strcasecmp(prop_name, "_focusrect") == 0) {
 					extern MovieClip root_movieclip;
 					int _is_stage = (g_swf_version <= 5) || (mc == &root_movieclip);
@@ -48474,7 +48495,7 @@ void actionGetMember(SWFAppContext* app_context)
 			if (strcasecmp(prop_name, "_target") == 0) { PUSH_STR(mc->target, strlen(mc->target)); return; }
 			if (strcasecmp(prop_name, "_url") == 0) { PUSH_STR(mc->url, strlen(mc->url)); return; }
 			if (strcasecmp(prop_name, "_droptarget") == 0) { actionRefreshDropTargetIfDragged(mc); PUSH_STR(mc->droptarget, strlen(mc->droptarget)); return; }
-			if (strcasecmp(prop_name, "_quality") == 0) { PUSH_STR(mc->quality, strlen(mc->quality)); return; }
+			if (strcasecmp(prop_name, "_quality") == 0) { PUSH_STR(g_stage_quality, strlen(g_stage_quality)); return; }
 			if (strcasecmp(prop_name, "_xmouse") == 0) {
 #if defined(NO_GRAPHICS) || defined(OFFSCREEN_RENDER)
 				double lx, ly; mc_get_local_mouse(app_context, mc, &lx, &ly);
@@ -48491,7 +48512,7 @@ void actionGetMember(SWFAppContext* app_context)
 				float v = mc->ymouse; PUSH(ACTION_STACK_VALUE_F32, VAL(u32, &v)); return;
 #endif
 			}
-			if (strcasecmp(prop_name, "_highquality") == 0) { float v = mc->highquality; PUSH(ACTION_STACK_VALUE_F32, VAL(u32, &v)); return; }
+			if (strcasecmp(prop_name, "_highquality") == 0) { float v = (float)stageQualityToHighqualityInt(); PUSH(ACTION_STACK_VALUE_F32, VAL(u32, &v)); return; }
 			if (strcasecmp(prop_name, "_focusrect") == 0) {
 				extern MovieClip root_movieclip;
 				int _is_stage = (g_swf_version <= 5) || (mc == &root_movieclip);
@@ -52003,6 +52024,23 @@ void actionSetProperty(SWFAppContext* app_context)
 						VAL(double, &value_var.data.numeric_value) : (double)num_value;
 					mc->focusrect = (!isnan(_dv) && _dv != 0.0) ? 1.0f : 0.0f;
 				}
+			}
+			break;
+		}
+		case 16: // _highquality — stage-wide; mirrors Ruffle set_high_quality
+			setStageQualityFromHighquality((double)num_value);
+			break;
+		case 18: // _soundbuftime — stage-wide
+			if (isfinite((double)num_value)) g_soundbuftime = (float)clampToI32((double)num_value);
+			break;
+		case 19: { // _quality — stage-wide; value already toString-coerced
+			char _q_buf[32];
+			int _q_len = varToStringBuf(app_context, &value_var, _q_buf, sizeof(_q_buf));
+			if (_q_len > 0) {
+				char _q_canon[16];
+				if (normalizeQualityValue(_q_buf, _q_len, _q_canon, sizeof(_q_canon)))
+					strcpy(g_stage_quality, _q_canon);
+				// Invalid quality strings are silently ignored (Flash behavior).
 			}
 			break;
 		}
