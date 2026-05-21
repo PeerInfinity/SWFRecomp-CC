@@ -61291,6 +61291,10 @@ void actionCallMethod(SWFAppContext* app_context, char* str_buffer)
 						}
 					}
 				}
+				else {
+					// Flash: Function.call() with no thisArg → global object
+					this_obj = (void*) global_object;
+				}
 
 				// Build call_args array from args[1..n]
 				u32 call_arg_count = num_args > 1 ? num_args - 1 : 0;
@@ -61374,6 +61378,30 @@ void actionCallMethod(SWFAppContext* app_context, char* str_buffer)
 						setArrayElement(app_context, arguments_arr_call, i, &call_args[i]);
 						pushVar(app_context, &call_args[i]);
 					}
+					// Pad with undefined up to param_count — a type-1 simple
+					// function body unconditionally pops param_count values
+					// from the stack to bind its named parameters.
+					for (u32 i = call_arg_count; i < func->param_count; i++)
+					{
+						PUSH(ACTION_STACK_VALUE_UNDEFINED, 0);
+					}
+					// Bind 'this' for the callee via g_this_stack — a type-1
+					// body resolves `this` through GetVariable("this") which
+					// reads g_this_stack, not the this_obj pointer arg.
+					ActionVar t1_this_call = {0};
+					if (g_override_this_set && g_override_this.type == ACTION_STACK_VALUE_MOVIECLIP) {
+						t1_this_call = g_override_this;
+					} else if (this_obj != NULL) {
+						t1_this_call.type = ACTION_STACK_VALUE_OBJECT;
+						t1_this_call.data.numeric_value = (u64)(uintptr_t)this_obj;
+					} else if (g_override_this_set) {
+						t1_this_call = g_override_this;
+					} else {
+						t1_this_call.type = ACTION_STACK_VALUE_UNDEFINED;
+					}
+					u32 saved_this_depth_t1c = g_this_depth;
+					if (g_this_depth < MAX_THIS_DEPTH)
+						g_this_stack[g_this_depth++] = t1_this_call;
 					setupArgumentsProps(app_context, arguments_arr_call, func, prev_executing_func_call);
 					ActionVar args_var_call = {0};
 					args_var_call.type = ACTION_STACK_VALUE_ARRAY;
@@ -61409,6 +61437,7 @@ void actionCallMethod(SWFAppContext* app_context, char* str_buffer)
 					g_current_executing_func = prev_executing_func_call;
 					g_call_depth--;
 					g_override_this_set = 0; // clear in case function didn't consume it
+					g_this_depth = saved_this_depth_t1c;
 
 					g_current_context = prev_ctx_call;
 					for (u32 ci = 0; ci < captured_count; ci++) {
@@ -61568,6 +61597,10 @@ void actionCallMethod(SWFAppContext* app_context, char* str_buffer)
 						}
 					}
 				}
+				else {
+					// Flash: Function.apply() with no thisArg → global object
+					this_obj = (void*) global_object;
+				}
 
 				// Extract arguments from array
 				ActionVar* apply_args = NULL;
@@ -61703,6 +61736,30 @@ void actionCallMethod(SWFAppContext* app_context, char* str_buffer)
 						setArrayElement(app_context, arguments_arr_ap, i, &apply_args[i]);
 						pushVar(app_context, &apply_args[i]);
 					}
+					// Pad with undefined up to param_count — a type-1 simple
+					// function body unconditionally pops param_count values
+					// from the stack to bind its named parameters.
+					for (u32 i = apply_arg_count; i < func->param_count; i++)
+					{
+						PUSH(ACTION_STACK_VALUE_UNDEFINED, 0);
+					}
+					// Bind 'this' for the callee via g_this_stack — a type-1
+					// body resolves `this` through GetVariable("this") which
+					// reads g_this_stack, not the this_obj pointer arg.
+					ActionVar t1_this_ap = {0};
+					if (g_override_this_set && g_override_this.type == ACTION_STACK_VALUE_MOVIECLIP) {
+						t1_this_ap = g_override_this;
+					} else if (this_obj != NULL) {
+						t1_this_ap.type = ACTION_STACK_VALUE_OBJECT;
+						t1_this_ap.data.numeric_value = (u64)(uintptr_t)this_obj;
+					} else if (g_override_this_set) {
+						t1_this_ap = g_override_this;
+					} else {
+						t1_this_ap.type = ACTION_STACK_VALUE_UNDEFINED;
+					}
+					u32 saved_this_depth_t1a = g_this_depth;
+					if (g_this_depth < MAX_THIS_DEPTH)
+						g_this_stack[g_this_depth++] = t1_this_ap;
 					setupArgumentsProps(app_context, arguments_arr_ap, func, prev_executing_func_ap);
 					ActionVar args_var_ap = {0};
 					args_var_ap.type = ACTION_STACK_VALUE_ARRAY;
@@ -61738,6 +61795,7 @@ void actionCallMethod(SWFAppContext* app_context, char* str_buffer)
 					g_current_executing_func = prev_executing_func_ap;
 					g_call_depth--;
 					g_override_this_set = 0; // clear in case function didn't consume it
+					g_this_depth = saved_this_depth_t1a;
 
 					g_current_context = prev_ctx_ap1;
 					for (u32 ci = 0; ci < captured_count_ap1; ci++) {

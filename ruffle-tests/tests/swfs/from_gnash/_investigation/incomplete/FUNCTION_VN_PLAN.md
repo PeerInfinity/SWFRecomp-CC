@@ -14,10 +14,10 @@ phases:
     status: complete
   - id: 2
     name: "Function.prototype.call / .apply with non-MC this"
-    status: pending
+    status: complete
   - id: 3
     name: "typeof on auto-bound this in path-call / SetTarget contexts"
-    status: pending
+    status: complete
   - id: 4
     name: "Custom toString on user-defined functions (SWF5 vs SWF6+)"
     status: pending
@@ -58,6 +58,42 @@ status_note: |
 -->
 
 ## Status
+
+### 2026-05-21 — Phases 2 + 3 landed (apply/call this-binding for type-1 functions)
+
+The whole `Function.prototype.call` / `.apply` cluster (Function.as lines
+79–214 on v6) now passes. `Function-v6` went 175 → 205 `#passed`. Three
+fixes in `SWFModernRuntime/src/actionmodern/action.c`, in the FUNCTION-receiver
+`call`/`apply` handlers of `actionCallMethod`:
+
+1. **Type-1 simple functions now bind `this` via `g_this_stack`.** The
+   `function_type == 1` sub-branches of both the `call` and `apply`
+   handlers created a local scope and `arguments` object but never bound
+   `this`. A type-1 body resolves `this` through `GetVariable("this")`,
+   which reads `g_this_stack` (not the `this_obj` pointer arg), so the
+   callee saw the *caller's* `this` (the root MovieClip) instead of the
+   `thisArg`. Now each path pushes a correctly-typed `this` ActionVar
+   (MOVIECLIP via `g_override_this`, else OBJECT via `this_obj`, else
+   the boxed primitive) onto `g_this_stack` before invoking
+   `simple_func` and restores `g_this_depth` after.
+
+2. **Parameter padding to `param_count`.** A type-1 body unconditionally
+   pops `param_count` values off the value stack to bind its named
+   parameters. The handlers pushed only the supplied args; when fewer
+   args than params were given (`apply()`, `apply(this_ref)`,
+   `apply(this_ref, "8")`) the body popped stale values left by a
+   previous call. Both handlers now pad with `PUSH(UNDEFINED)` up to
+   `param_count` — **with braces**, because `PUSH` is a multi-statement
+   macro and a brace-less `for` body only repeats its first statement.
+
+3. **No-thisArg → global object.** `Function.apply()` / `.call()` invoked
+   with zero args now resolve `this` to the global object (Flash
+   semantics), matching the existing `undefined`/`null` thisArg branch.
+
+No regressions: 34-test AVM1 function/call/scope/closure/super/timer
+battery all pass; gnash actionscript.all Object/Inheritance/String/
+toString_valueOf/Global-vN all stay `ruffle_matched`; v5/v7/v8 Function
+`#passed` unchanged (their residual failures are Phases 4/5/7/8/9).
 
 Local CI baseline (commit `eb8206f8`, 2026-05-15):
 
