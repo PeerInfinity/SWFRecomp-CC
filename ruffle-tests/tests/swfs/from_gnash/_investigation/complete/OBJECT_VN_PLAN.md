@@ -7,7 +7,7 @@ landed yet)
 
 <!-- PLAN_META
 id: OBJECT_VN_PLAN
-status: pending
+status: complete
 phases:
   - id: 1
     name: "Function class identity (shared with FUNCTION_VN_PLAN Phase 1)"
@@ -17,19 +17,19 @@ phases:
     status: complete
   - id: 3
     name: "addProperty getter/setter call counters returning 65 instead of expected 1"
-    status: pending
+    status: complete
   - id: 4
     name: "addProperty getter return value lost in trace ('v == 5 obtained:')"
-    status: pending
+    status: complete
   - id: 5
     name: "watch() callback parameter binding (_root.info.nam/.nv/.d/.tv empty)"
-    status: pending
+    status: complete
   - id: 6
-    name: "Object._target should be undefined, not '/_levelN/...' string"
-    status: pending
+    name: "addProperty virtual property shadowing builtin MC _target"
+    status: complete
   - id: 7
-    name: "watch return value (r expected true, got false / vice versa)"
-    status: pending
+    name: "watch/unwatch return value (getter-setter can't be unwatched)"
+    status: complete
 dependencies:
   - id: SUBTESTS_HARNESS
     reason: "Discovery shipped 2026-05-14 (commit 39b797ac); Object-v6/v7/v8 became visible at that point. Object-v5 already passes."
@@ -47,6 +47,45 @@ status_note: |
 -->
 
 ## Status
+
+### 2026-05-20 #3 — Phases 3/5/6/7 residuals landed; Object-v5/6/7/8 all ruffle_matched ✓
+
+All four Object-vN tests are now `ruffle_matched` (effective pass).
+Four fixes in `SWFModernRuntime/src/actionmodern/action.c`, zero
+regressions across the Object/Function/Inheritance/toString_valueOf/
+Global gnash + AVM1 enumerate/typeof/function_as_function/watch*
+battery (Function-v6/7/8 lines 136-138 `apply()` failures confirmed
+pre-existing, unrelated).
+
+- **Phase 7 (unwatch return value) — DONE.** `builtin_object_unwatch`
+  now returns `false` (and leaves the watcher installed) when the
+  named property is currently a getter-setter (`prop->getter/setter`
+  non-NULL). Object.as:846/849: `unwatch("l")` fails while "l" is an
+  addProperty getter-setter, succeeds after `delete o.l` removes it.
+- **Phase 6 (addProperty shadows builtin MC `_target`) — DONE.** The
+  MovieClip `getMember` path now checks `mc->dynamic_props` for an
+  addProperty getter-setter matching the accessed name *before* the
+  builtin-property block. The getter runs under the accessor re-entry
+  guard, so `target_get` reading `this._target` resolves to the
+  uninitialized underlying value → `typeof(o._target) == "undefined"`.
+  Object.as:366.
+- **Phase 3 (addProperty overridden as own property) — DONE.** The
+  OBJECT-receiver `actionCallMethod` dispatch no longer hard-routes
+  `addProperty` to the builtin when the object has its own
+  user-defined `addProperty` function property; it falls through to
+  the generic method lookup. Object.as:443 (`o.addProperty=function(){};
+  o.addProperty(2,5)==7`).
+- **Phase 5 (watch callback args, type-2 watchers) — DONE.** The
+  type-2 (DefineFunction2) watcher invocation in `actionSetMember`
+  now mirrors `invokePropertyGetter`: pushes `g_this_stack`, binds
+  `this` on the local scope, restores captured scopes, switches
+  `base_clip` context. Also fixed a **use-after-free**: the watcher's
+  local scope was released after the call, freeing the pointer-shared
+  property-name arg string that the watcher had stored elsewhere
+  (e.g. `_root.info.nam`) — the freshly-allocated arg is now marked
+  non-owning so the scope release can't free it. Fixes the watch ×
+  addProperty cluster on v7/v8 (Object.as:777/781/800/803/804/818/
+  823/830/831/837) plus the v6 lines.
 
 Local CI baseline (commit `eb8206f8`, 2026-05-15):
 
@@ -253,7 +292,7 @@ May share root cause with [[FUNCTION_VN_PLAN]] Phase 2 (call/apply
 this-binding) if the watch dispatch uses the same call-setup
 machinery.
 
-### F. Object._target returns string (Phase 6)
+### F. addProperty virtual property must shadow builtin MC `_target` (Phase 6)
 
 Lines: 366.
 
@@ -262,11 +301,30 @@ Lines: 366.
 + FAILED: expected: "undefined" obtained: string
 ```
 
-`o` is a plain `new Object()`. Flash returns `undefined` for
-`o._target` (Object instances are not MovieClips and have no
-target path); we return a string. Likely the `_target` getter is
-unconditionally returning the current target path without checking
-the receiver type.
+**Correction (2026-05-20):** the original description ("`o` is a plain
+`new Object()`") is wrong. `o` is a **MovieClip**:
+
+```as
+o = createEmptyMovieClip("hello", 10);   // o._target == "/hello"
+function target_get() { _root.target_get_calls++; return this._target; }
+function target_set(v) { this._target=v; _root.target_set_calls++; }
+ret = o.addProperty("_target", target_get, target_set);
+check_equals(typeof(o._target), "undefined");  // line 366
+```
+
+`o.addProperty("_target", ...)` installs a virtual getter/setter that
+must **shadow** the builtin MovieClip `_target` property. The expected
+result is `"undefined"` (Gnash comment: "native getter-setter don't get
+initialized with underlying value") — i.e. the addProperty property has
+no underlying value, and the SWF6 accessor re-entry guard (limit 1)
+falls back to that uninitialized value. The getter must also NOT fire
+(`_root.target_get_calls` stays `0`, checked at line 364).
+
+The real fix: the MovieClip `getMember` path must consult
+`dynamic_props` addProperty getters/setters **before** resolving builtin
+MC properties like `_target`/`_x`/`_name`. Today it hard-routes to the
+builtin and returns the `"/hello"` target string. This is deeper than a
+single-line tweak.
 
 ### G. watch return value (Phase 7)
 
@@ -291,8 +349,9 @@ May be cheap — a focused arg-count check in `builtin_object_watch`.
 
 1. **Phase 1 (Function class identity)** — already at the top of
    [[FUNCTION_VN_PLAN]]. Defer; do not duplicate work here.
-2. **Phase 6 (_target on Object)** — single-line fix, fastest win.
-   Estimate: 30 min.
+2. **Phase 6 (_target addProperty shadow on MovieClip)** — MC getMember
+   must consult dynamic_props addProperty accessors before builtin MC
+   properties. Not a single-line fix. Estimate: 2-3 hours.
 3. **Phase 7 (watch return value)** — small, validation-only.
    Estimate: 1 hour.
 4. **Phases 3 + 4 (addProperty getter/setter dispatch)** — likely

@@ -4215,6 +4215,19 @@ static ActionVar builtin_object_unwatch(SWFAppContext* app_context, ActionVar* a
 		if (u16 != NULL)
 			prop_name_len = (u32)u16_to_utf8(u16, args[0].str_size, prop_name, (int)(sizeof(prop_name) - 1));
 	}
+	// Flash: a watched property that is currently a getter-setter
+	// (installed via addProperty) cannot be unwatched — unwatch returns
+	// false and leaves the watcher in place. Object.as:846.
+	if (obj != NULL) {
+		for (u32 i = 0; i < obj->num_used; i++) {
+			if (obj->properties[i].name_length == prop_name_len &&
+			    strncmp(obj->properties[i].name, prop_name, prop_name_len) == 0) {
+				if (obj->properties[i].getter != NULL || obj->properties[i].setter != NULL)
+					return ret; // false — can't unwatch a getter-setter
+				break;
+			}
+		}
+	}
 	for (int i = 0; i < g_watch_count; i++) {
 		if (g_watch_table[i].obj == obj &&
 		    g_watch_table[i].mc == mc &&
@@ -44417,20 +44430,58 @@ void actionSetMember(SWFAppContext* app_context)
 								_wargs[3].data.string_data.owns_memory = false;
 							if (_wf->function_type == 2 && _wf->advanced_func != NULL)
 							{
+								// The type-2 watcher's prologue binds args into its
+								// local scope via setProperty (pointer-sharing, no
+								// string copy). When that scope is released after the
+								// call its string properties would be freed — leaving
+								// the watcher-stored copy (e.g. `_root.info.nam`)
+								// dangling. Mark the freshly-allocated property-name
+								// arg non-owning so the scope release can't free it;
+								// the watcher-stored copy then stays valid.
+								_wargs[0].data.string_data.owns_memory = false;
 								ActionVar* _wregs = NULL;
 								if (_wf->register_count > 0)
 									_wregs = (ActionVar*) HCALLOC(_wf->register_count, sizeof(ActionVar));
-								ASObject* _wscope = allocObject(app_context, 4);
+								// Bind `this` → watched object: push g_this_stack so
+								// the watcher body's GetVariable("this") resolves to
+								// the object (not the root MC → "_level0"), and bind
+								// it on the local scope too. Mirrors invokePropertyGetter.
+								ActionVar _wthis = {0};
+								_wthis.type = ACTION_STACK_VALUE_OBJECT;
+								_wthis.data.numeric_value = (u64) obj;
+								u32 _wsaved_this_depth = g_this_depth;
+								if (g_this_depth < MAX_THIS_DEPTH) {
+									g_this_stack[g_this_depth] = _wthis;
+									g_this_depth++;
+								}
+								// Restore the watcher's captured closure scopes.
+								u32 _wcap = _wf->captured_scope_count;
+								for (u32 _wci = 0; _wci < _wcap; _wci++) {
+									if (scope_depth < MAX_SCOPE_DEPTH) {
+										scope_is_with[scope_depth] = _wf->captured_scope_is_with[_wci];
+										scope_mc[scope_depth] = (MovieClip*)_wf->captured_scope_mc[_wci];
+										scope_chain[scope_depth++] = (ASObject*)_wf->captured_scope[_wci];
+									}
+								}
+								ASObject* _wscope = allocObject(app_context, 8);
+								setProperty(app_context, _wscope, "this", 4, &_wthis);
 								if (scope_depth < MAX_SCOPE_DEPTH) {
 									scope_is_with[scope_depth] = 0;
 									scope_mc[scope_depth] = NULL;
 									scope_chain[scope_depth++] = _wscope;
 								}
+								MovieClip* _wsaved_ctx = g_current_context;
+								if (g_swf_version >= 6 && _wf->base_clip != NULL)
+									g_current_context = (MovieClip*)_wf->base_clip;
 								g_call_depth++;
 								// Pass watched object as this_obj for correct this binding
 								ActionVar _wret = _wf->advanced_func(app_context, _wargs, 4, _wregs, (void*)obj);
 								g_call_depth--;
+								g_current_context = _wsaved_ctx;
 								if (scope_depth > 0) scope_depth--;
+								for (u32 _wci = 0; _wci < _wcap; _wci++)
+									if (scope_depth > 0) scope_depth--;
+								g_this_depth = _wsaved_this_depth;
 								releaseObject(app_context, _wscope);
 								if (_wregs != NULL) FREE(_wregs);
 								if (_wret.type != ACTION_STACK_VALUE_UNDEFINED)
@@ -48249,6 +48300,36 @@ void actionGetMember(SWFAppContext* app_context)
 			}
 		}
 #endif
+
+		// addProperty virtual properties installed on a MovieClip's
+		// dynamic_props shadow builtin MC properties (_x, _target, _name,
+		// ...). The builtin block below otherwise hard-routes to the
+		// builtin and never consults the addProperty getter. The getter
+		// is invoked under the accessor re-entry guard so a getter that
+		// reads its own property (e.g. `return this._target`) resolves to
+		// the (uninitialized) underlying value. Object.as:366.
+		if (mc != NULL && mc->dynamic_props != NULL)
+		{
+			ASProperty* _mc_ap = findPropertyRaw((ASObject*)mc->dynamic_props, prop_name, prop_name_len);
+			if (_mc_ap != NULL && (_mc_ap->getter != NULL || _mc_ap->setter != NULL))
+			{
+				ActionVar _mc_ap_result;
+				void* _mc_ap_key = (void*)mc->dynamic_props;
+				if (_mc_ap->getter == NULL ||
+				    countActiveAccessor(_mc_ap_key, prop_name, prop_name_len, 0) >= accessorReentryLimit())
+				{
+					_mc_ap_result = _mc_ap->value;
+				}
+				else
+				{
+					pushActiveAccessor(_mc_ap_key, prop_name, prop_name_len, 0);
+					_mc_ap_result = invokePropertyGetter(app_context, (ASFunction*)_mc_ap->getter, (void*)mc->dynamic_props);
+					popActiveAccessor();
+				}
+				pushVar(app_context, &_mc_ap_result);
+				return;
+			}
+		}
 
 		// Check built-in MovieClip properties (case-insensitive for _ prefixed ones)
 		if (mc != NULL && prop_name_len > 0 && prop_name[0] == '_')
@@ -59921,8 +60002,15 @@ void actionCallMethod(SWFAppContext* app_context, char* str_buffer)
 			return;
 		}
 
-		// Handle addProperty as built-in method
-		if (method_name_len == 11 && strncasecmp(method_name, "addProperty", 11) == 0)
+		// Handle addProperty as built-in method — unless the object has
+		// its own user-defined `addProperty` property shadowing the
+		// builtin (it then dispatches via the generic method lookup
+		// below). Object.as:443.
+		ASProperty* _own_addprop_ms = (method_name_len == 11 &&
+			strncasecmp(method_name, "addProperty", 11) == 0)
+			? findPropertyRaw(obj, "addProperty", 11) : NULL;
+		if (method_name_len == 11 && strncasecmp(method_name, "addProperty", 11) == 0 &&
+		    !(_own_addprop_ms != NULL && _own_addprop_ms->value.type == ACTION_STACK_VALUE_FUNCTION))
 		{
 			u64 result = 0; // boolean false
 			if (num_args >= 3 && (args[0].type == ACTION_STACK_VALUE_STRING ||
