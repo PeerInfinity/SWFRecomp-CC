@@ -1,17 +1,20 @@
 # TextFormat-v8 Investigation Plan
 <!-- TESTS: TextFormat-v8 -->
 
-Last updated: 2026-05-19 (initial planning doc, drafted from local
-single-test reproductions at the current `master` SHA; no fixes
-landed yet)
+Last updated: 2026-05-21 (Phase 1 landed → TextFormat-v8 promoted to
+`ruffle_matched`. Setting a TextFormat numeric property to a
+non-numeric string now coerces via ECMA ToNumber in SWF8+, yielding
+NaN → INT_MIN instead of atof()'s 0. Our residual diff is only the
+Phase 2 getTextExtent font-metric lines, which Ruffle fails too —
+strict subset → auto-promote.)
 
 <!-- PLAN_META
 id: TEXTFORMAT_V8_PLAN
-status: pending
+status: in_progress
 phases:
   - id: 1
     name: "Negative INT_MIN clamping on numeric setters (blockIndent/leading/indent/size)"
-    status: pending
+    status: completed
   - id: 2
     name: "getTextExtent font-metric precision (ascent/descent/width/height/textFieldWidth/textFieldHeight)"
     status: pending
@@ -38,9 +41,47 @@ Local CI baseline (commit `eb8206f8`, 2026-05-15):
 |------|-------|---|--------|
 | TextFormat-v8 | 128/172 | 74.4% | output_mismatch |
 
+After Phase 1 (2026-05-21, pending CI): **`ruffle_matched`**. The 8
+INT_MIN clamping lines (176/186 blockIndent, 208/218 leading,
+240/250 indent, 268/278 size) now PASS. The residual diff is only
+the Phase 2 getTextExtent font-metric lines — Ruffle fails those too
+(its `output.fp10.ruffle.txt` returns 0/4 for the same lines, an
+even larger divergence from Flash), so our diff is a strict subset
+and `verify_output.py::ruffle_subset_match` auto-promotes the test.
+
 For comparison, TextFormat-v5/v6 PASS and v7 is ruffle_matched per
 `complete/GNASH_FEATURE_PLAN.md`. v8 adds assertions the others
 don't have.
+
+### Phase 1 fix (2026-05-21)
+
+Root cause was simpler than the plan's "ToInt32 wrap" hypothesis:
+the test sets `tf.blockIndent = "string"` (a non-numeric *string*),
+and Flash coerces it via ECMA ToNumber → NaN, which the TextFormat
+integer setter maps to INT_MIN (-2147483648). Our `tfCoerceInteger`
+already mapped NaN → INT_MIN correctly, but its STRING branch used
+`atof()`, which yields **0.0** for any unparseable input instead of
+NaN — so `d` was 0, in-range, and stored as 0.
+
+Fix in `SWFModernRuntime/src/actionmodern/action.c`: new
+`tfStringToNumber()` helper. For SWF8+ it routes the string through
+`convertFloat()` (the AVM1 ECMA ToNumber, which correctly returns
+NaN for non-numeric input). For SWF7 and below it keeps the old
+`atof()` behaviour — TextFormat-v5/v6/v7 expect `tf.size = "string"`
+→ 0, not INT_MIN (a genuine version difference; first attempt
+without the version gate regressed v5 lines 266/276). All four tf
+numeric-coercion functions (`tfCoerceInteger`, `tfCoerceNonNegInt`,
+`tfCoerceUnsigned`, `tfCoerceFloat`) now call the helper from their
+STRING branch.
+
+Verified no regressions: TextFormat-v5/v6 PASS, v7 RM (all
+unchanged); AVM1 `text_format_rounding_swf7/swf8`,
+`text_format_get_text_extent_undefined_width`, `gettextextent`,
+`edittext_default_format`, `edittext_default_format_font_style`,
+`edittext_font_size`, `edittext_leading`, `edittext_margins`,
+`edittext_letter_spacing` all PASS; gnash misc-ming
+`DefineEditTextTest`/`DefineEditTextVariableNameTest`/`DefineTextTest`
+unchanged.
 
 ## Test source
 

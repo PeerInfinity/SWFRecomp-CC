@@ -15966,6 +15966,31 @@ static double bankersRound(double x) {
 	return round(x);
 }
 
+// String-to-number coercion for TextFormat numeric setters.
+// SWF8+: ECMA ToNumber via convertFloat — a non-numeric string yields NaN,
+// which the integer coercion then maps to INT_MIN (matching Flash, e.g.
+// `tf.blockIndent = "string"` → -2147483648 in TextFormat-v8).
+// SWF7 and below: keep the older lenient atof() behaviour, where a
+// non-numeric string yields 0.0 (TextFormat-v5/v6/v7 expect `tf.size = "string"`
+// → 0).
+static double tfStringToNumber(SWFAppContext* app_context, ActionVar* value) {
+	if (g_swf_version < 8) {
+		char _vtd_buf[512];
+		const uint16_t* _vtd_u16 = varGetU16Ptr(value);
+		u16_to_utf8(_vtd_u16, value->str_size, _vtd_buf, sizeof(_vtd_buf));
+		return atof(_vtd_buf);
+	}
+	pushVar(app_context, value);
+	convertFloat(app_context);
+	ActionVar tmp;
+	popVar(app_context, &tmp);
+	if (tmp.type == ACTION_STACK_VALUE_F64)
+		return VAL(double, &tmp.data.numeric_value);
+	if (tmp.type == ACTION_STACK_VALUE_F32)
+		return (double) VAL(float, &tmp.data.numeric_value);
+	return 0.0 / 0.0; // NaN
+}
+
 // Coerce value for TextFormat integer property (size, indent, leading, blockIndent)
 static ActionVar tfCoerceInteger(SWFAppContext* app_context, ActionVar* value) {
 	ActionVar result = {0};
@@ -15981,10 +16006,7 @@ static ActionVar tfCoerceInteger(SWFAppContext* app_context, ActionVar* value) {
 	else if (value->type == ACTION_STACK_VALUE_BOOLEAN)
 		d = value->data.numeric_value ? 1.0 : 0.0;
 	else if (value->type == ACTION_STACK_VALUE_STRING) {
-		char _vtd_buf[512];
-		const uint16_t* _vtd_u16 = varGetU16Ptr(value);
-		u16_to_utf8(_vtd_u16, value->str_size, _vtd_buf, sizeof(_vtd_buf));
-		d = atof(_vtd_buf);
+		d = tfStringToNumber(app_context, value);
 	}
 	else if (value->type == ACTION_STACK_VALUE_OBJECT) {
 		int _vof_found = 0;
@@ -16037,10 +16059,7 @@ static ActionVar tfCoerceNonNegInt(SWFAppContext* app_context, ActionVar* value)
 	else if (value->type == ACTION_STACK_VALUE_BOOLEAN)
 		d = value->data.numeric_value ? 1.0 : 0.0;
 	else if (value->type == ACTION_STACK_VALUE_STRING) {
-		char _vtd_buf[512];
-		const uint16_t* _vtd_u16 = varGetU16Ptr(value);
-		u16_to_utf8(_vtd_u16, value->str_size, _vtd_buf, sizeof(_vtd_buf));
-		d = atof(_vtd_buf);
+		d = tfStringToNumber(app_context, value);
 	}
 	else if (value->type == ACTION_STACK_VALUE_OBJECT) {
 		int _vof_found = 0;
@@ -16109,10 +16128,7 @@ static ActionVar tfCoerceUnsigned(SWFAppContext* app_context, ActionVar* value) 
 	else if (value->type == ACTION_STACK_VALUE_BOOLEAN)
 		d = value->data.numeric_value ? 1.0 : 0.0;
 	else if (value->type == ACTION_STACK_VALUE_STRING) {
-		char _vtd_buf[512];
-		const uint16_t* _vtd_u16 = varGetU16Ptr(value);
-		u16_to_utf8(_vtd_u16, value->str_size, _vtd_buf, sizeof(_vtd_buf));
-		d = atof(_vtd_buf);
+		d = tfStringToNumber(app_context, value);
 	}
 	else if (value->type == ACTION_STACK_VALUE_OBJECT) {
 		int _vof_found = 0;
@@ -16157,10 +16173,7 @@ static ActionVar tfCoerceFloat(SWFAppContext* app_context, ActionVar* value) {
 	else if (value->type == ACTION_STACK_VALUE_BOOLEAN)
 		d = value->data.numeric_value ? 1.0 : 0.0;
 	else if (value->type == ACTION_STACK_VALUE_STRING) {
-		char _vtd_buf[512];
-		const uint16_t* _vtd_u16 = varGetU16Ptr(value);
-		u16_to_utf8(_vtd_u16, value->str_size, _vtd_buf, sizeof(_vtd_buf));
-		d = atof(_vtd_buf);
+		d = tfStringToNumber(app_context, value);
 	}
 	else if (value->type == ACTION_STACK_VALUE_OBJECT) {
 		int _vof_found = 0;
