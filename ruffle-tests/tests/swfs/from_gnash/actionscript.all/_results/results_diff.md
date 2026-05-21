@@ -1,7 +1,7 @@
 # Ruffle Test Results Diff
 
-**Previous:** `3538972f18a3` (2026-05-21T03:58:29.415451+00:00)
-**Current:** `ef998315fbff` (2026-05-21T18:11:13.009207+00:00)
+**Previous:** `ef998315fbff` (2026-05-21T18:11:13.009207+00:00)
+**Current:** `1421fc77b043` (2026-05-21T18:54:08.447838+00:00)
 
 ## Summary
 
@@ -10,11 +10,11 @@
 | Passing | 128 | 128 | 0 |
 | Total | 243 | 243 | 0 |
 | Pass rate | 52.7% | 52.7% | 0% |
-| Mismatched lines | 9884 | 9854 | -30 |
-|   Decreased | | | -30 |
+| Mismatched lines | 9854 | 9846 | -8 |
+|   Decreased | | | -8 |
 
-## Line Count Changed (1)
+## Status Changed (1)
 
-| Test | Status | Lines (prev) | Lines (now) | Diff |
-|------|--------|--------------|-------------|------|
-| `Function-v6` | output_mismatch | 182/271 | 212/271 | -30 |
+| Test | Previous | Current | Lines (prev) | Lines (now) |
+|------|----------|---------|--------------|-------------|
+| `TextFormat-v8` | output_mismatch | ruffle_matched | 128/172 | 136/172 |
