@@ -29532,7 +29532,31 @@ void actionTrace(SWFAppContext* app_context)
 
 		case ACTION_STACK_VALUE_FUNCTION:
 		{
-			printf("[type Function]\n");
+			// Flash's trace() honors a per-instance toString override on a
+			// function (e.g. `f.toString = function() { return "x"; }`).
+			// objectCallToString only reports found=1 for a directly-set,
+			// callable toString on the function's own_props; otherwise we
+			// fall back to the default "[type Function]".
+			ActionVar fn_var;
+			fn_var.type = STACK_TOP_TYPE;
+			fn_var.data.numeric_value = STACK_TOP_VALUE;
+			int fn_ts_found = 0;
+			ActionVar fn_ts = objectCallToString(app_context, &fn_var, &fn_ts_found);
+			if (fn_ts_found && fn_ts.type == ACTION_STACK_VALUE_STRING)
+			{
+				const uint16_t* u16 = varGetU16Ptr(&fn_ts);
+				if (u16 && fn_ts.str_size > 0)
+				{
+					char utf8_buf[4096];
+					int utf8_len = u16_to_utf8(u16, fn_ts.str_size, utf8_buf, sizeof(utf8_buf));
+					fwrite(utf8_buf, 1, utf8_len, stdout);
+				}
+				printf("\n");
+			}
+			else
+			{
+				printf("[type Function]\n");
+			}
 			break;
 		}
 

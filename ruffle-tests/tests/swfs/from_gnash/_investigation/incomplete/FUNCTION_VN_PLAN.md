@@ -20,7 +20,7 @@ phases:
     status: complete
   - id: 4
     name: "Custom toString on user-defined functions (SWF5 vs SWF6+)"
-    status: pending
+    status: complete
   - id: 5
     name: "arguments object enumeration via Object.addProperty propRecorder"
     status: pending
@@ -58,6 +58,39 @@ status_note: |
 -->
 
 ## Status
+
+### 2026-05-21 — Phase 4 landed (trace honors per-instance function toString)
+
+`actionTrace`'s `ACTION_STACK_VALUE_FUNCTION` case unconditionally printed
+`[type Function]`, ignoring a per-instance `toString` override. Flash's
+`trace()` (and Gnash's `note()`) on a function honors a directly-set,
+callable `toString` on the function — `Function.as:599`'s
+`note(textOutFunc)` after `textOutFunc.toString = function() { return
+"custom text rep"; }` expects `custom text rep`, and the later
+`note(textOutFunc)` after `textOutFunc.toString = 4` expects
+`[type Function]` again.
+
+Fix in `SWFModernRuntime/src/actionmodern/action.c`: the FUNCTION case now
+calls `objectCallToString` (which for a FUNCTION receiver reports
+`found=1` only for a directly-set, callable `toString` on the function's
+`own_props` — never an inherited one) and prints its string result;
+otherwise falls back to `[type Function]`. `setupNativeFuncOwnProps` only
+installs `constructor`/`__proto__` on native functions' `own_props` (no
+`toString`), so native functions and ordinary user functions still print
+`[type Function]`. Line 99 (the `note` after the custom toString) flips
+to match on Function-v5/v6/v7/v8. No regressions: 8-test AVM1
+function/trace battery + 7-test gnash actionscript.all
+Object/toString_valueOf/Inheritance/case/Global battery all stay
+effective-pass.
+
+The remaining Phase-4-region residual is **v5-only**: `Function.as:589`
+`check_equals(typeof(textOutFunc.toString), 'undefined')` — in SWF5 a
+user-defined function should expose no `toString` at all, but our v5
+function instances still resolve `toString` through an inherited chain
+(returns `function`). This is the same SWF5 Function-class-identity gap
+that fails v5 lines 53/54/57/292/305 — reclassified to **Phase 9**
+(Function.__proto__ identity), not a custom-toString bug. Phase 4 itself
+is complete.
 
 ### 2026-05-21 — Phase 7 investigation (no fix landed): two-constructor identity blocker
 
