@@ -77,6 +77,16 @@ struct MovieClip {
 	// Decomposed from any direct `transform.matrix =` assignment or timeline PlaceObject2 matrix.
 	// 0 for the common rotation-only case.
 	float skew;
+	// Exact matrix from a direct `transform.matrix =` assignment, preserved
+	// verbatim so reading transform.matrix back doesn't lose precision to the
+	// xscale/yscale/rotation/skew decompose→recompose round-trip. The getter
+	// uses these only while the MC's live xscale/yscale/rotation/skew still
+	// bit-match the snapshot taken at assignment time — any later _xscale /
+	// _yscale / _rotation setter writes a different value, the snapshot stops
+	// matching, and the getter self-invalidates back to recomposition.
+	double exact_m_a, exact_m_b, exact_m_c, exact_m_d;
+	float exact_m_xs, exact_m_ys, exact_m_rot, exact_m_skew;
+	u8 has_exact_matrix;
 	// Drawing API bounds tracking (updated by moveTo/lineTo calls)
 	float draw_xmin, draw_xmax, draw_ymin, draw_ymax;
 	int draw_has_bounds;   // 1 if any moveTo/lineTo was called

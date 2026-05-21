@@ -1,13 +1,15 @@
 # Transform-v8 Investigation Plan
 <!-- TESTS: Transform-v8 -->
 
-Last updated: 2026-05-19 (initial planning doc, drafted from local
-single-test reproductions at the current `master` SHA; no fixes
-landed yet)
+Last updated: 2026-05-20 (Phases 4 + 6 landed → Transform-v8 promoted
+to `ruffle_matched`. Our diff against `output.fp10.txt` is now a
+strict subset of Ruffle's, so the test auto-promotes. Phases 1/2/3/5
+remain pending but are shared diffs with Ruffle — they no longer
+block effective pass.)
 
 <!-- PLAN_META
 id: TRANSFORM_V8_PLAN
-status: pending
+status: in_progress
 phases:
   - id: 1
     name: "colorTransform multiplier coercion (alphaMultiplier=-128, etc.)"
@@ -19,14 +21,14 @@ phases:
     name: "mc.transform = T propagates back to mc._xscale/_yscale/_rotation"
     status: pending
   - id: 4
-    name: "mc.transform.matrix re-resolves after swapDepths"
-    status: pending
+    name: "transform.matrix resolves after `delete mc` (instance-name fallback)"
+    status: completed
   - id: 5
     name: "concatenatedMatrix computation"
     status: pending
   - id: 6
-    name: "Matrix toString float precision (skew decomposition drift)"
-    status: pending
+    name: "Matrix toString float precision (exact-matrix cache)"
+    status: completed
 dependencies:
   - id: SUBTESTS_HARNESS
     reason: "Discovery shipped 2026-05-14 (commit 39b797ac); Transform-v8 became visible at that point."
@@ -50,6 +52,48 @@ Local CI baseline (commit `eb8206f8`, 2026-05-15):
 | Test | Match | % | Status |
 |------|-------|---|--------|
 | Transform-v8 | 86/101 | 85.1% | output_mismatch |
+
+After Phases 4 + 6 (2026-05-20, pending CI): **`ruffle_matched`** (91/101
+line-match, #passed 89). Our diff against `output.fp10.txt` is
+`{27,30,31,33,35,37,62,63,64}` ⊆ Ruffle's `{27,30,31,33,35,37,62,63,64}`
+— exact subset, so `verify_output.py::ruffle_subset_match` promotes it.
+The 9 residual diffs are all Phases 1/2/3 (colorTransform multiplier
+coercion, `flash.geom.* = undefined` getter null-out, `mc.transform = T`
+back-propagation) — Ruffle fails the same lines, so they're effective
+pass and no longer block promotion.
+
+### Fixes landed (2026-05-20)
+
+- **Phase 6 — exact-matrix cache (Transform.as:199/200/210).** Reading
+  `mc.transform.matrix` back after `transform.matrix = new Matrix(...)`
+  recomposed from `xscale`/`yscale`/`rotation`/`skew`, losing ~4e-8 of
+  precision (`a=3` → `a=2.99999996073879`). Added `exact_m_a..d` +
+  `has_exact_matrix` + an `exact_m_{xs,ys,rot,skew}` snapshot to
+  `struct MovieClip` (`action.h`). `transformMatrixSetter` stores the
+  assigned a/b/c/d **rounded through f32** (Flash stores DisplayObject
+  matrices at f32 precision — `(float)0.3 = 0.300000011920929`, matching
+  Transform.as:210's expected output) and snapshots the decomposed
+  scale/rotation/skew. `getLocalMatrixForMC` returns the exact a/b/c/d
+  while the live xscale/yscale/rotation/skew still bit-match the
+  snapshot; any later `_xscale`/`_yscale`/`_rotation` setter writes a
+  different value, the snapshot stops matching, and the getter
+  self-invalidates back to recomposition — no setter-site changes
+  needed.
+
+- **Phase 4 — instance-name resolution after `delete mc`
+  (Transform.as:152/158).** AS-created clips (`createEmptyMovieClip` /
+  `duplicateMovieClip` / `attachMovie`) are not in the `ng_display`
+  list — they live only in `child_mc_cache`, and the bare name resolves
+  via the `var_map` / `dynamic_props` binding. `delete mc` cleared both,
+  so `mc` became permanently unresolvable; Flash keeps instance-name
+  resolution independent of the variable namespace. Added a final
+  fallback in `actionGetVariable` (OFFSCREEN/NO_GRAPHICS branch, after
+  `ng_findDisplayEntryByName` misses): scan `child_mc_cache` for a live
+  (`!avm1_removed && !pending_removal && depth != INT_MIN`) clip whose
+  name matches (`swf_name_match`) and whose parent is the current
+  context or root. (Lines 152 + 158 share this single root cause —
+  `_root.removeMovieClip(mc)` at Transform.as:156 is a no-op because
+  removeMovieClip ignores its argument and tries to remove `_root`.)
 
 ## Test source
 

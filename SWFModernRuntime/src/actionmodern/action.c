@@ -8166,6 +8166,17 @@ static void getLocalMatrixForMC(MovieClip* mc,
 	}
 	// Apply AS overrides for scale/rotation (bits 4|8|16) and translation (bits 1|2)
 	if (mc->as_set_flags & (4|8|16)) {
+		// If a direct `transform.matrix =` assignment is still in effect (the
+		// decomposed scale/rotation/skew the getter snapshotted have not been
+		// touched by a later _xscale/_yscale/_rotation setter), return the
+		// exact assigned a/b/c/d instead of recomposing — avoids round-trip
+		// float drift (Transform-v8: a=3 vs a=2.99999996073879).
+		if (mc->has_exact_matrix &&
+		    mc->xscale == mc->exact_m_xs && mc->yscale == mc->exact_m_ys &&
+		    mc->rotation == mc->exact_m_rot && mc->skew == mc->exact_m_skew) {
+			ba = mc->exact_m_a; bb = mc->exact_m_b;
+			bc = mc->exact_m_c; bd = mc->exact_m_d;
+		} else {
 		double xs = (double)mc->xscale / 100.0;
 		double ys = (double)mc->yscale / 100.0;
 		double rot = (double)mc->rotation * 3.14159265358979323846 / 180.0;
@@ -8177,6 +8188,7 @@ static void getLocalMatrixForMC(MovieClip* mc,
 		if (fabs(cr_y) < 1e-12) cr_y = 0.0;
 		if (fabs(sr_y) < 1e-12) sr_y = 0.0;
 		ba = xs*cr_x; bb = xs*sr_x; bc = -(ys*sr_y); bd = ys*cr_y;
+		}
 	}
 	if (mc->as_set_flags & 1) btx = (double)mc->x;
 	if (mc->as_set_flags & 2) bty = (double)mc->y;
@@ -8605,6 +8617,18 @@ static ActionVar transformMatrixSetter(SWFAppContext* app_context, ActionVar* ar
 	mc->rotation = normalizeRotation((float)(rot_x * 180.0 / 3.14159265358979323846));
 	mc->skew = (float)(rot_y - rot_x);
 	mc->as_set_flags |= (1|2|4|8|16);
+	// Preserve the exact assigned matrix so reading transform.matrix back is
+	// lossless. Snapshot the decomposed scale/rotation/skew the getter will
+	// compare against — any later _xscale/_yscale/_rotation setter changes one
+	// of these and the getter self-invalidates. (Transform-v8 lines 199/200/210.)
+	// Flash stores DisplayObject matrix components at f32 precision — round
+	// through float so reading back yields e.g. (float)0.3 = 0.300000011920929
+	// (Transform.as:210), not the exact double 0.3.
+	mc->exact_m_a = (double)(float)a; mc->exact_m_b = (double)(float)b;
+	mc->exact_m_c = (double)(float)c; mc->exact_m_d = (double)(float)d;
+	mc->exact_m_xs = mc->xscale; mc->exact_m_ys = mc->yscale;
+	mc->exact_m_rot = mc->rotation; mc->exact_m_skew = mc->skew;
+	mc->has_exact_matrix = 1;
 	markTransformedByScript(mc);
 #endif
 	return undef;
@@ -38783,6 +38807,28 @@ check_special_vars:
 					return;
 				}
 			}
+			}
+			// Fallback: AS-created clips (createEmptyMovieClip / duplicateMovieClip /
+			// attachMovie) are NOT in the ng_display list — they live only in
+			// child_mc_cache. After `delete <name>` clears the var_map / dynamic_props
+			// binding, the bare instance name must still resolve to the live clip
+			// (Flash keeps instance-name resolution independent of the variable
+			// namespace). Scan child_mc_cache for a live clip whose name matches and
+			// whose parent is the current context (or root). Key test:
+			// from_gnash/actionscript.all/Transform-v8 (`delete mc` at Transform.as:151).
+			{
+				extern MovieClip root_movieclip;
+				MovieClip* gv_ctx = g_current_context ? g_current_context : &root_movieclip;
+				for (int _gci = 0; _gci < child_mc_count; _gci++) {
+					MovieClip* _gcm = child_mc_cache[_gci];
+					if (_gcm == NULL) continue;
+					if (_gcm->avm1_removed || _gcm->pending_removal || _gcm->depth == INT_MIN) continue;
+					if ((_gcm->parent == gv_ctx || _gcm->parent == &root_movieclip) &&
+					    swf_name_match(_gcm->name, name_buf)) {
+						PUSH(ACTION_STACK_VALUE_MOVIECLIP, (u64)_gcm);
+						return;
+					}
+				}
 			}
 #endif
 		}
