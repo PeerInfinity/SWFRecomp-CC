@@ -80,20 +80,29 @@ pass and no longer block promotion.
   self-invalidates back to recomposition — no setter-site changes
   needed.
 
-- **Phase 4 — instance-name resolution after `delete mc`
+- **Phase 4 — `delete` keeps clip instance-name bindings
   (Transform.as:152/158).** AS-created clips (`createEmptyMovieClip` /
   `duplicateMovieClip` / `attachMovie`) are not in the `ng_display`
   list — they live only in `child_mc_cache`, and the bare name resolves
   via the `var_map` / `dynamic_props` binding. `delete mc` cleared both,
-  so `mc` became permanently unresolvable; Flash keeps instance-name
-  resolution independent of the variable namespace. Added a final
-  fallback in `actionGetVariable` (OFFSCREEN/NO_GRAPHICS branch, after
-  `ng_findDisplayEntryByName` misses): scan `child_mc_cache` for a live
-  (`!avm1_removed && !pending_removal && depth != INT_MIN`) clip whose
-  name matches (`swf_name_match`) and whose parent is the current
-  context or root. (Lines 152 + 158 share this single root cause —
-  `_root.removeMovieClip(mc)` at Transform.as:156 is a no-op because
-  removeMovieClip ignores its argument and tries to remove `_root`.)
+  so `mc` became permanently unresolvable; Flash keeps movie-clip
+  instance-name bindings out of the variable namespace's reach
+  (`delete <liveClip>` returns false and does nothing). `actionDelete2`
+  now skips the deletion (and pushes `false`) when the named variable
+  currently holds a live (`!avm1_removed && !pending_removal &&
+  depth != INT_MIN`) clip whose own name matches the variable name
+  (`swf_name_match`). Scoped to `delete` of a clip-named variable — does
+  not touch general variable resolution. (Lines 152 + 158 share this
+  single root cause — `_root.removeMovieClip(mc)` at Transform.as:156 is
+  a no-op because removeMovieClip ignores its argument and tries to
+  remove `_root`.)
+
+  *First attempt* added a broad `child_mc_cache` fallback to
+  `actionGetVariable` instead; CI surfaced 3 regressions
+  (`avm1/global_swf6_7_8`, `avm1/string_paths_other`,
+  `misc-ming.all/displaylist_depths_test9`) where a bare name
+  over-resolved to a root child. Reverted in favour of the narrow
+  `actionDelete2` guard above.
 
 ## Test source
 

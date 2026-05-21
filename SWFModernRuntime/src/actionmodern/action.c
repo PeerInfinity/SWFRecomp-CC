@@ -38808,28 +38808,6 @@ check_special_vars:
 				}
 			}
 			}
-			// Fallback: AS-created clips (createEmptyMovieClip / duplicateMovieClip /
-			// attachMovie) are NOT in the ng_display list — they live only in
-			// child_mc_cache. After `delete <name>` clears the var_map / dynamic_props
-			// binding, the bare instance name must still resolve to the live clip
-			// (Flash keeps instance-name resolution independent of the variable
-			// namespace). Scan child_mc_cache for a live clip whose name matches and
-			// whose parent is the current context (or root). Key test:
-			// from_gnash/actionscript.all/Transform-v8 (`delete mc` at Transform.as:151).
-			{
-				extern MovieClip root_movieclip;
-				MovieClip* gv_ctx = g_current_context ? g_current_context : &root_movieclip;
-				for (int _gci = 0; _gci < child_mc_count; _gci++) {
-					MovieClip* _gcm = child_mc_cache[_gci];
-					if (_gcm == NULL) continue;
-					if (_gcm->avm1_removed || _gcm->pending_removal || _gcm->depth == INT_MIN) continue;
-					if ((_gcm->parent == gv_ctx || _gcm->parent == &root_movieclip) &&
-					    swf_name_match(_gcm->name, name_buf)) {
-						PUSH(ACTION_STACK_VALUE_MOVIECLIP, (u64)_gcm);
-						return;
-					}
-				}
-			}
 #endif
 		}
 
@@ -40697,6 +40675,35 @@ void actionDelete2(SWFAppContext* app_context, char* str_buffer)
 
 	// Default: assume deletion succeeds (Flash behavior)
 	bool success = true;
+
+	// Flash keeps movie-clip instance-name bindings out of the variable
+	// namespace's reach: `delete <clipName>` does NOT remove a live clip that
+	// owns that instance name (it returns false). AS-created clips
+	// (createEmptyMovieClip / duplicateMovieClip / attachMovie) register only
+	// in var_map / dynamic_props — not the ng_display list — so clearing the
+	// binding here would make the bare name permanently unresolvable. Skip the
+	// deletion when the named variable currently holds a live clip whose own
+	// name matches. Key test: from_gnash/actionscript.all/Transform-v8
+	// (`delete mc` at Transform.as:151, then `mc.transform.matrix` read).
+	if (var_name != NULL && var_name_len > 0 && var_name_len < 512)
+	{
+		var_name[var_name_len] = '\0';
+		ActionVar* _dv = NULL;
+		if (hasVariable(var_name, var_name_len))
+			_dv = getVariable(var_name, var_name_len);
+		if (_dv == NULL && g_current_context != NULL && g_current_context->dynamic_props != NULL)
+			_dv = getProperty((ASObject*)g_current_context->dynamic_props, var_name, var_name_len);
+		if (_dv != NULL && _dv->type == ACTION_STACK_VALUE_MOVIECLIP)
+		{
+			MovieClip* _dmc = (MovieClip*) _dv->data.numeric_value;
+			if (_dmc != NULL && !_dmc->avm1_removed && !_dmc->pending_removal &&
+			    _dmc->depth != INT_MIN && swf_name_match(_dmc->name, var_name))
+			{
+				PUSH(ACTION_STACK_VALUE_BOOLEAN, 0ULL);
+				return;
+			}
+		}
+	}
 
 	// Try to delete from scope chain (innermost to outermost)
 	for (int i = scope_depth - 1; i >= 0; i--)
