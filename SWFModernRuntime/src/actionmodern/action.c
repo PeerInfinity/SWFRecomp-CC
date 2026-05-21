@@ -666,6 +666,68 @@ static int g_use_new_invalid_bounds = 0;  // Ruffle: one-way flag, flips to 1 wh
 #define MAX_SPECIAL_DEPTH 66
 static u32 g_special_depth = 0;
 
+// ------------------------------------------------------------------
+// addProperty getter/setter re-entrancy guard.
+//
+// When an addProperty getter for property P on object O reads P on O
+// again (e.g. `function get() { return this.P; }`), Flash does NOT
+// recurse indefinitely. In SWF6 the re-entrant access resolves to the
+// property's underlying stored value after a single getter invocation;
+// in SWF7+ Flash recurses 65 times before bottoming out at the
+// underlying value (a documented Flash quirk — Gnash's Object.as marks
+// the SWF7+ count `xcheck_equals(..., 65) // urgh!`).
+//
+// We model this with a per-(object, property-name) re-entrancy stack:
+// the getter/setter is invoked while the re-entry count is below the
+// version-specific limit (1 for SWF6, 65 for SWF7+); once the limit is
+// reached the access falls back to the property's underlying value.
+#define MAX_ACTIVE_ACCESSORS 96
+typedef struct {
+	void* this_obj;
+	u32 name_len;
+	u8 is_setter;
+	char name[64];
+} ActiveAccessor;
+static ActiveAccessor g_active_accessors[MAX_ACTIVE_ACCESSORS];
+static u32 g_active_accessor_count = 0;
+
+static int countActiveAccessor(void* this_obj, const char* name, u32 name_len, u8 is_setter)
+{
+	int c = 0;
+	for (u32 i = 0; i < g_active_accessor_count; i++)
+	{
+		ActiveAccessor* a = &g_active_accessors[i];
+		if (a->this_obj == this_obj && a->is_setter == is_setter &&
+		    a->name_len == name_len && memcmp(a->name, name, name_len) == 0)
+			c++;
+	}
+	return c;
+}
+
+static void pushActiveAccessor(void* this_obj, const char* name, u32 name_len, u8 is_setter)
+{
+	if (g_active_accessor_count >= MAX_ACTIVE_ACCESSORS) return;
+	ActiveAccessor* a = &g_active_accessors[g_active_accessor_count++];
+	a->this_obj = this_obj;
+	a->is_setter = is_setter;
+	a->name_len = name_len < 63 ? name_len : 63;
+	memcpy(a->name, name, a->name_len);
+	a->name[a->name_len] = 0;
+}
+
+static void popActiveAccessor(void)
+{
+	if (g_active_accessor_count > 0) g_active_accessor_count--;
+}
+
+// Re-entry count at which the accessor invocation is replaced by the
+// property's underlying value: 1 for SWF6 (one invocation, then
+// underlying), 65 for SWF7+ (Flash's quirky deep-recursion count).
+static int accessorReentryLimit(void)
+{
+	return (g_swf_version <= 6) ? 1 : 65;
+}
+
 // ==================================================================
 // Function Storage and Management
 // ==================================================================
@@ -4188,9 +4250,16 @@ static ActionVar builtin_object_addProperty(SWFAppContext* app_context, ActionVa
 	const char* prop_name = _addprop_buf;
 	u32 prop_name_len = (u32)strlen(prop_name);
 
-	ASFunction* getter = NULL;
-	if (args[1].type == ACTION_STACK_VALUE_FUNCTION)
-		getter = (ASFunction*) args[1].data.numeric_value;
+	// Flash validates the accessor arguments: the getter must be a
+	// function; the setter must be a function OR null (null = getter-only,
+	// still valid). undefined / object / any other setter type → false.
+	if (args[1].type != ACTION_STACK_VALUE_FUNCTION)
+		return ret;
+	if (args[2].type != ACTION_STACK_VALUE_FUNCTION &&
+	    args[2].type != ACTION_STACK_VALUE_NULL)
+		return ret;
+
+	ASFunction* getter = (ASFunction*) args[1].data.numeric_value;
 	ASFunction* setter = NULL;
 	if (args[2].type == ACTION_STACK_VALUE_FUNCTION)
 		setter = (ASFunction*) args[2].data.numeric_value;
@@ -44291,42 +44360,44 @@ void actionSetMember(SWFAppContext* app_context)
 						ASFunction* _wf = g_watch_table[_wi].watcher_func;
 						if (_wf != NULL)
 						{
+							// Build prop_name string arg (shared by both type paths)
+							u32 _pname_u16_len;
+							uint16_t* _pname_u16 = ascii_to_u16(app_context, prop_name, (int)prop_name_len, &_pname_u16_len);
+							ActionVar _pname_arg = {0};
+							_pname_arg.type = ACTION_STACK_VALUE_STRING;
+							_pname_arg.str_size = _pname_u16_len;
+							_pname_arg.data.string_data.heap_ptr = _pname_u16;
+							_pname_arg.data.string_data.owns_memory = true;
+							// Get old value via prototype chain (Flash includes inherited values)
+							// IMPORTANT: copy old value before invoking callback, because
+							// the callback or stack operations might free the original string.
+							// Mark old_val as non-owning so only the property itself frees it.
+							ActionVar _old_val = {0};
+							_old_val.type = ACTION_STACK_VALUE_UNDEFINED;
+							ActionVar* _old_ptr = getPropertyWithPrototype(obj, prop_name, prop_name_len);
+							if (_old_ptr != NULL) {
+								_old_val = *_old_ptr;
+								if (_old_val.type == ACTION_STACK_VALUE_STRING)
+									_old_val.data.string_data.owns_memory = false;
+							}
+							// Pass 4 args: (propName, oldVal, newVal, userData).
+							// _wargs[0] (the freshly-allocated property name) keeps
+							// owns_memory = true so ownership transfers to the
+							// watcher — whatever stores it (e.g. `_root.info.nam`)
+							// frees it later. Freeing it here would dangle that
+							// reference. old/new/userData stay non-owning (owned by
+							// the property / watch table, both outlive the call).
+							ActionVar _wargs[4];
+							_wargs[0] = _pname_arg;
+							_wargs[1] = _old_val;
+							_wargs[2] = value_var;
+							if (_wargs[2].type == ACTION_STACK_VALUE_STRING)
+								_wargs[2].data.string_data.owns_memory = false;
+							_wargs[3] = g_watch_table[_wi].user_data;
+							if (_wargs[3].type == ACTION_STACK_VALUE_STRING)
+								_wargs[3].data.string_data.owns_memory = false;
 							if (_wf->function_type == 2 && _wf->advanced_func != NULL)
 							{
-								// Build prop_name string arg
-								u32 _pname_u16_len;
-								uint16_t* _pname_u16 = ascii_to_u16(app_context, prop_name, (int)prop_name_len, &_pname_u16_len);
-								ActionVar _pname_arg = {0};
-								_pname_arg.type = ACTION_STACK_VALUE_STRING;
-								_pname_arg.str_size = _pname_u16_len;
-								_pname_arg.data.string_data.heap_ptr = _pname_u16;
-								_pname_arg.data.string_data.owns_memory = true;
-								// Get old value via prototype chain (Flash includes inherited values)
-								// IMPORTANT: copy old value before invoking callback, because
-								// the callback or stack operations might free the original string.
-								// Mark old_val as non-owning so only the property itself frees it.
-								ActionVar _old_val = {0};
-								_old_val.type = ACTION_STACK_VALUE_UNDEFINED;
-								ActionVar* _old_ptr = getPropertyWithPrototype(obj, prop_name, prop_name_len);
-								if (_old_ptr != NULL) {
-									_old_val = *_old_ptr;
-									if (_old_val.type == ACTION_STACK_VALUE_STRING)
-										_old_val.data.string_data.owns_memory = false;
-								}
-								// Pass 4 args: (propName, oldVal, newVal, userData)
-								// Mark all string args as non-owning to prevent double-free:
-								// the watcher cleanup frees _pname_arg; user_data is owned by
-								// the watch table; old/new values are owned by the property.
-								ActionVar _wargs[4];
-								_wargs[0] = _pname_arg;
-								_wargs[0].data.string_data.owns_memory = false;  // freed below
-								_wargs[1] = _old_val;
-								_wargs[2] = value_var;
-								if (_wargs[2].type == ACTION_STACK_VALUE_STRING)
-									_wargs[2].data.string_data.owns_memory = false;
-								_wargs[3] = g_watch_table[_wi].user_data;
-								if (_wargs[3].type == ACTION_STACK_VALUE_STRING)
-									_wargs[3].data.string_data.owns_memory = false;
 								ActionVar* _wregs = NULL;
 								if (_wf->register_count > 0)
 									_wregs = (ActionVar*) HCALLOC(_wf->register_count, sizeof(ActionVar));
@@ -44343,17 +44414,46 @@ void actionSetMember(SWFAppContext* app_context)
 								if (scope_depth > 0) scope_depth--;
 								releaseObject(app_context, _wscope);
 								if (_wregs != NULL) FREE(_wregs);
-								if (_pname_arg.data.string_data.owns_memory)
-									free(_pname_arg.data.string_data.heap_ptr);  // malloc-allocated string
 								if (_wret.type != ACTION_STACK_VALUE_UNDEFINED)
 									value_var = _wret;
 							}
 							else if (_wf->function_type == 1 && _wf->simple_func != NULL)
 							{
-								// Type 1: call without args (args ignored by watcher body)
+								// Type 1: bind `this` → watched object and push the
+								// 4 watcher args (name, oldVal, newVal, userData)
+								// onto the value stack in order — the type-1
+								// prologue pops the last parameter first, so the
+								// first arg must be pushed first. Without this the
+								// watcher body saw unbound params and this==_level0.
+								ActionVar _wthis = {0};
+								_wthis.type = ACTION_STACK_VALUE_OBJECT;
+								_wthis.data.numeric_value = (u64) obj;
+								u32 _wcap = _wf->captured_scope_count;
+								for (u32 _wci = 0; _wci < _wcap; _wci++) {
+									if (scope_depth < MAX_SCOPE_DEPTH) {
+										scope_is_with[scope_depth] = _wf->captured_scope_is_with[_wci];
+										scope_mc[scope_depth] = (MovieClip*)_wf->captured_scope_mc[_wci];
+										scope_chain[scope_depth++] = (ASObject*)_wf->captured_scope[_wci];
+									}
+								}
+								setVariableByName("this", &_wthis);
+								u32 _wsaved_this_depth = g_this_depth;
+								if (g_this_depth < MAX_THIS_DEPTH) {
+									g_this_stack[g_this_depth] = _wthis;
+									g_this_depth++;
+								}
+								MovieClip* _wsaved_ctx = g_current_context;
+								if (g_swf_version >= 6 && _wf->base_clip != NULL)
+									g_current_context = (MovieClip*)_wf->base_clip;
+								for (int _wai = 0; _wai < 4; _wai++)
+									pushVar(app_context, &_wargs[_wai]);
 								g_call_depth++;
 								ActionVar _wret = ((ActionVar(*)(SWFAppContext*))_wf->simple_func)(app_context);
 								g_call_depth--;
+								g_current_context = _wsaved_ctx;
+								g_this_depth = _wsaved_this_depth;
+								for (u32 _wci = 0; _wci < _wcap; _wci++)
+									if (scope_depth > 0) scope_depth--;
 								if (_wret.type != ACTION_STACK_VALUE_UNDEFINED)
 									value_var = _wret;
 							}
@@ -44406,16 +44506,40 @@ void actionSetMember(SWFAppContext* app_context)
 				}
 				if (setter_prop != NULL)
 				{
-					// Virtual property (addProperty): has getter and/or setter
+					// Virtual property (addProperty): has getter and/or setter.
+					// `_own_vprop` gates the underlying-value ("cache") store to
+					// the case where the virtual property lives on obj itself.
+					bool _own_vprop = (findPropertyRaw(obj, prop_name, prop_name_len) == setter_prop);
 					if (setter_prop->setter != NULL)
 					{
 						// Invoke setter with this = original obj
 						// Push super context so setter can access super
-						pushSuperContext((void*)obj, setter_search_depth);
-						invokePropertySetter(app_context, (ASFunction*)setter_prop->setter, (void*)obj, &value_var);
-						popSuperContext();
+						if (countActiveAccessor((void*)obj, prop_name, prop_name_len, 1) >= accessorReentryLimit())
+						{
+							// Re-entrant write of a property whose setter is
+							// already running — store to the underlying value.
+							setter_prop->value = value_var;
+						}
+						else
+						{
+							pushSuperContext((void*)obj, setter_search_depth);
+							pushActiveAccessor((void*)obj, prop_name, prop_name_len, 1);
+							invokePropertySetter(app_context, (ASFunction*)setter_prop->setter, (void*)obj, &value_var);
+							popActiveAccessor();
+							popSuperContext();
+							// Flash stores the assigned value into the property's
+							// underlying cache after the setter returns — the
+							// setter's own re-entrant writes to the same property
+							// do not survive past it ("did still set the cache").
+							if (_own_vprop) setter_prop->value = value_var;
+						}
 					}
-					// If no setter (read-only virtual property) — silently ignore the assignment
+					else if (_own_vprop)
+					{
+						// Getter-only addProperty property: Flash still updates
+						// the underlying cache on assignment.
+						setter_prop->value = value_var;
+					}
 					return;
 				}
 			}
@@ -47510,9 +47634,21 @@ void actionGetMember(SWFAppContext* app_context)
 			{
 				// Virtual property (addProperty) — invoke getter with this = original obj
 				// Push super context so getter can access super (Ruffle behavior)
-				pushSuperContext((void*)obj, prop_search_depth);
-				ActionVar result = invokePropertyGetter(app_context, (ASFunction*)prop_struct->getter, (void*)obj);
-				popSuperContext();
+				ActionVar result;
+				if (countActiveAccessor((void*)obj, prop_name, prop_name_len, 0) >= accessorReentryLimit())
+				{
+					// Re-entrant read of a property whose getter is already
+					// running on this object — resolve to the underlying value.
+					result = prop_struct->value;
+				}
+				else
+				{
+					pushSuperContext((void*)obj, prop_search_depth);
+					pushActiveAccessor((void*)obj, prop_name, prop_name_len, 0);
+					result = invokePropertyGetter(app_context, (ASFunction*)prop_struct->getter, (void*)obj);
+					popActiveAccessor();
+					popSuperContext();
+				}
 				pushVar(app_context, &result);
 			}
 			else
@@ -59786,11 +59922,18 @@ void actionCallMethod(SWFAppContext* app_context, char* str_buffer)
 					prop_name_len = (u32)strlen(_addprop_buf);
 				}
 
+				// Flash validates the accessor arguments: getter must be a
+				// function, setter must be a function OR null (getter-only).
+				// undefined / object / any other type → addProperty returns false.
 				ASFunction* getter = NULL;
-				if (args[1].type == ACTION_STACK_VALUE_FUNCTION)
-					getter = (ASFunction*) args[1].data.numeric_value;
-
 				ASFunction* setter = NULL;
+				bool _valid_accessors =
+				    (args[1].type == ACTION_STACK_VALUE_FUNCTION) &&
+				    (args[2].type == ACTION_STACK_VALUE_FUNCTION ||
+				     args[2].type == ACTION_STACK_VALUE_NULL);
+				if (_valid_accessors)
+				{
+				getter = (ASFunction*) args[1].data.numeric_value;
 				if (args[2].type == ACTION_STACK_VALUE_FUNCTION)
 					setter = (ASFunction*) args[2].data.numeric_value;
 
@@ -59829,6 +59972,7 @@ void actionCallMethod(SWFAppContext* app_context, char* str_buffer)
 					prop->setter = (void*)setter;
 					result = 1; // boolean true
 				}
+				} // _valid_accessors
 			}
 
 			if (args != NULL) FREE(args);
@@ -60423,10 +60567,17 @@ void actionCallMethod(SWFAppContext* app_context, char* str_buffer)
 					prop_name_ap_len = (u32)strlen(_addprop_buf);
 				}
 
+				// Flash validates the accessors: getter must be a function,
+				// setter must be a function OR null. Otherwise → false.
 				ASFunction* getter = NULL;
-				if (args[1].type == ACTION_STACK_VALUE_FUNCTION)
-					getter = (ASFunction*) args[1].data.numeric_value;
 				ASFunction* setter = NULL;
+				bool _valid_accessors =
+				    (args[1].type == ACTION_STACK_VALUE_FUNCTION) &&
+				    (args[2].type == ACTION_STACK_VALUE_FUNCTION ||
+				     args[2].type == ACTION_STACK_VALUE_NULL);
+				if (_valid_accessors)
+				{
+				getter = (ASFunction*) args[1].data.numeric_value;
 				if (args[2].type == ACTION_STACK_VALUE_FUNCTION)
 					setter = (ASFunction*) args[2].data.numeric_value;
 
@@ -60461,6 +60612,7 @@ void actionCallMethod(SWFAppContext* app_context, char* str_buffer)
 					prop->setter = (void*)setter;
 					result = 1; // boolean true
 				}
+				} // _valid_accessors
 			}
 			if (args != NULL) FREE(args);
 			PUSH(ACTION_STACK_VALUE_BOOLEAN, result);
@@ -65523,10 +65675,17 @@ void actionCallMethod(SWFAppContext* app_context, char* str_buffer)
 					_ap_name_len = (u32)strlen(_addprop_buf);
 				}
 
+				// Flash validates the accessors: getter must be a function,
+				// setter must be a function OR null. Otherwise → false.
 				ASFunction* _ap_getter = NULL;
-				if (args[1].type == ACTION_STACK_VALUE_FUNCTION)
-					_ap_getter = (ASFunction*) args[1].data.numeric_value;
 				ASFunction* _ap_setter = NULL;
+				bool _valid_accessors =
+				    (args[1].type == ACTION_STACK_VALUE_FUNCTION) &&
+				    (args[2].type == ACTION_STACK_VALUE_FUNCTION ||
+				     args[2].type == ACTION_STACK_VALUE_NULL);
+				if (_valid_accessors)
+				{
+				_ap_getter = (ASFunction*) args[1].data.numeric_value;
 				if (args[2].type == ACTION_STACK_VALUE_FUNCTION)
 					_ap_setter = (ASFunction*) args[2].data.numeric_value;
 
@@ -65561,6 +65720,7 @@ void actionCallMethod(SWFAppContext* app_context, char* str_buffer)
 					_ap_prop->setter = (void*)_ap_setter;
 					result = 1; // boolean true
 				}
+				} // _valid_accessors
 			}
 			if (args != NULL) FREE(args);
 			PUSH(ACTION_STACK_VALUE_BOOLEAN, result);

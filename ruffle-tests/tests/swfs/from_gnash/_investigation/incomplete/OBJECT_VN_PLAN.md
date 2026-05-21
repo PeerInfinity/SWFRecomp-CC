@@ -57,6 +57,41 @@ Local CI baseline (commit `eb8206f8`, 2026-05-15):
 | Object-v7 | 299/333 | 89.8% | output_mismatch |
 | Object-v8 | 299/333 | 89.8% | output_mismatch |
 
+### 2026-05-20 — addProperty + watch fixes landed (pending CI)
+
+Object-v6/v7/v8 all moved 279 → 311 #passed (16 residual failures, down
+from ~47). All changes in `SWFModernRuntime/src/actionmodern/action.c`,
+zero regressions across a 24-test addProperty/watch/array/geometry battery.
+
+- **Phase 3+4 (addProperty getter/setter dispatch) — DONE.** The wrong
+  call counter (`obtained: 65` for SWF6) and lost getter return values
+  were one root cause: an addProperty getter that reads `this.<sameProp>`
+  must not recurse unboundedly. Added a per-`(object, property-name)`
+  re-entrancy guard (`g_active_accessors` stack + `accessorReentryLimit()`):
+  the getter/setter is invoked while the re-entry count is below the
+  version limit (1 for SWF6, 65 for SWF7+ — Flash's documented quirk),
+  then falls back to the property's underlying value. Also: on assignment
+  Flash stores the assigned value into the property's underlying cache
+  *after* the setter returns ("did still set the cache" — Object.as:554),
+  and getter-only addProperty properties still update the cache.
+- **Phase 7 (partial) — addProperty arg validation.** `addProperty`
+  now returns `false` when the getter is not a function or the setter is
+  neither a function nor `null` (applied to the OBJECT, ARRAY, and
+  MovieClip method handlers). Fixes Object.as:373/376/385/525/527/541/543.
+- **Phase 5 (partial) — watch callback args.** The type-1 watcher
+  invocation path passed no args and bound no `this`; it now pushes the
+  4 watcher args `(name, oldVal, newVal, userData)` on the value stack
+  and binds `this` → watched object. Fixes Object.as:777-781.
+
+Residual Object-v6 failures (16): line 71 (Function class identity →
+[[FUNCTION_VN_PLAN]] Phase 1), 170 (constructor own-vs-inherited,
+Phase 2), 366 (`_target` re-entrancy on the MovieClip getMember path —
+MC getMember doesn't consult dynamic_props addProperty getters),
+443 (addProperty overridden as an own property — method dispatch
+hard-routes to the builtin), 800/803/804/818/823/830/831 (watch ×
+addProperty interaction — watcher firing on addProperty, watched
+getter-setter), 846/849 (unwatch return value).
+
 ## Test source
 
 Gnash testsuite/actionscript.all/Object.as (~1100 lines). Exercises
