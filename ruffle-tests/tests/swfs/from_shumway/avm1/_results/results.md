@@ -1,10 +1,10 @@
 # Ruffle Test Results (Unfiltered)
 
-**Date**: 2026-05-21 03:58 UTC
+**Date**: 2026-05-21 18:11 UTC
 
-**Git SHA**: `3538972f18`
+**Git SHA**: `ef998315fb`
 
-**Run Duration**: 1m 28s
+**Run Duration**: 1m 30s
 
 ## Summary
 
@@ -29,18 +29,18 @@
 | 2 | `bitmapdata/getPixel` | 2 | 0.3s |  |
 | 3 | `bitmapdata/loadBitmap` | 3 | 0.3s |  |
 | 4 | `callee` | 2 | 0.3s |  |
-| 5 | `depth` | 6 | 0.3s |  |
+| 5 | `depth` | 6 | 0.4s |  |
 | 6 | `doactionorder/doactionorder` | 7 | 0.3s |  |
 | 7 | `doactionorder/symbolclass` | 4 | 0.2s |  |
-| 8 | `duplicateMovieClip/dontremove` | 6 | 15.5s |  |
+| 8 | `duplicateMovieClip/dontremove` | 6 | 17.9s |  |
 | 9 | `duplicateMovieClip/duplicateMovieClip` | 4 | 0.3s |  |
-| 10 | `duplicateMovieClip/name-coercion` | 3 | 0.3s |  |
+| 10 | `duplicateMovieClip/name-coercion` | 3 | 0.4s |  |
 | 11 | `duplicateMovieClip/samedepth` | 6 | 0.3s |  |
 | 12 | `externalinterface` | 4 | 0.3s |  |
-| 13 | `filters` | 149 | 0.2s |  |
-| 14 | `haxe/flocons1` | 2 | 0.2s |  |
+| 13 | `filters` | 149 | 0.3s |  |
+| 14 | `haxe/flocons1` | 2 | 0.3s |  |
 | 15 | `haxe/flocons2` | 3 | 0.3s |  |
-| 16 | `label` | 4 | 19.1s |  |
+| 16 | `label` | 4 | 17.7s |  |
 | 17 | `levels` | 9 | 0.3s |  |
 | 18 | `loadevent` | 9 | 0.3s |  |
 | 19 | `loadvariables/loadvariables` | 7 | 0.3s |  |
@@ -62,13 +62,13 @@
 | 35 | `settimeout` | 17 | 0.3s |  |
 | 36 | `super` | 11 | 0.3s |  |
 | 37 | `target` | 18 | 0.3s |  |
-| 38 | `text-bind` | 0 | 18.4s |  |
+| 38 | `text-bind` | 0 | 18.7s |  |
 | 39 | `textfield/textfield-html` | 4 | 0.3s |  |
 | 40 | `textfield/textfield-text-setters` | 8 | 0.3s |  |
 | 41 | `undefined/undefined-swf6` | 39 | 0.3s |  |
 | 42 | `undefined/undefined-swf7` | 39 | 0.3s |  |
 | 43 | `watch` | 2 | 0.3s |  |
-| 44 | `xml/xmlbuild` | 1 | 0.2s |  |
+| 44 | `xml/xmlbuild` | 1 | 0.3s |  |
 | 45 | `xml/xmlload` | 4 | 0.3s |  |
 | 46 | `xml/xmlstring` | 9 | 0.3s |  |
 
@@ -78,7 +78,7 @@
 
 | # | Test | Our diffs | Ruffle diffs | Duration | Notes |
 |---|------|-----------|--------------|----------|-------|
-| 1 | `hitarea` | 2 | 2 | 19.1s |  |
+| 1 | `hitarea` | 2 | 2 | 19.5s |  |
 
 ## Near-Passing Tests
 
