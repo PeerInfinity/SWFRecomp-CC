@@ -8175,6 +8175,30 @@ static ASObject* createTransformObject(SWFAppContext* app_context, MovieClip* mc
 	return transform;
 }
 
+// Returns 1 if flash.geom.<name> currently resolves to a usable constructor
+// (a FUNCTION), or if the flash package isn't set up / the class property is
+// absent (→ assume the default class is available). Returns 0 only when the
+// property has been explicitly clobbered to a non-constructor value.
+//
+// Flash's Transform getters internally do `new flash.geom.Matrix(...)` (resp.
+// ColorTransform / Rectangle). If the test reassigns `flash.geom.Matrix =
+// undefined`, the getter can no longer build the result and returns undefined
+// (Transform.as "Tricks with the flash package" — Transform.as:110/113/116).
+static int flashGeomClassAvailable(const char* name, u32 len)
+{
+	extern ASObject* global_object;
+	if (global_object == NULL) return 1;
+	ActionVar* fv = getPropertyWithPrototype(global_object, "flash", 5);
+	if (!fv || fv->type != ACTION_STACK_VALUE_OBJECT || fv->data.numeric_value == 0) return 1;
+	ASObject* flash_obj = (ASObject*) fv->data.numeric_value;
+	ActionVar* gv = getPropertyWithPrototype(flash_obj, "geom", 4);
+	if (!gv || gv->type != ACTION_STACK_VALUE_OBJECT || gv->data.numeric_value == 0) return 1;
+	ASObject* geom_obj = (ASObject*) gv->data.numeric_value;
+	ActionVar* cv = getPropertyWithPrototype(geom_obj, name, len);
+	if (cv == NULL) return 1; // property absent → default class available
+	return (cv->type == ACTION_STACK_VALUE_FUNCTION && cv->data.numeric_value != 0) ? 1 : 0;
+}
+
 // ============================================================================
 // Geometry class implementations (Point, Matrix, Rectangle)
 // ============================================================================
@@ -8660,6 +8684,7 @@ static ActionVar transformMatrixGetter(SWFAppContext* app_context, ActionVar* ar
 	if (!mc_ref || mc_ref->type != ACTION_STACK_VALUE_MOVIECLIP) return r;
 	MovieClip* mc = (MovieClip*) mc_ref->data.numeric_value;
 	if (!mc) return r;
+	if (!flashGeomClassAvailable("Matrix", 6)) return r;
 #if defined(NO_GRAPHICS) || defined(OFFSCREEN_RENDER)
 	double a, b, c, d, tx, ty;
 	getLocalMatrixForMC(mc, &a, &b, &c, &d, &tx, &ty);
@@ -8733,6 +8758,7 @@ static ActionVar transformCTGetter(SWFAppContext* app_context, ActionVar* args, 
 	if (!mc_ref || mc_ref->type != ACTION_STACK_VALUE_MOVIECLIP) return r;
 	MovieClip* mc = (MovieClip*) mc_ref->data.numeric_value;
 	if (!mc) return r;
+	if (!flashGeomClassAvailable("ColorTransform", 14)) return r;
 #if defined(NO_GRAPHICS) || defined(OFFSCREEN_RENDER)
 	s16 ra, ga, ba, aa, rb, gb, bb, ab;
 	getLocalCTRaw(mc, &ra, &ga, &ba, &aa, &rb, &gb, &bb, &ab);
@@ -8776,6 +8802,7 @@ static ActionVar transformConcatMatrixGetter(SWFAppContext* app_context, ActionV
 	if (!mc_ref || mc_ref->type != ACTION_STACK_VALUE_MOVIECLIP) return r;
 	MovieClip* mc = (MovieClip*) mc_ref->data.numeric_value;
 	if (!mc) return r;
+	if (!flashGeomClassAvailable("Matrix", 6)) return r;
 #if defined(NO_GRAPHICS) || defined(OFFSCREEN_RENDER)
 	double a, b, c, d, tx, ty;
 	getConcatMatrixForMC(mc, &a, &b, &c, &d, &tx, &ty);
@@ -8798,6 +8825,7 @@ static ActionVar transformConcatCTGetter(SWFAppContext* app_context, ActionVar* 
 	if (!mc_ref || mc_ref->type != ACTION_STACK_VALUE_MOVIECLIP) return r;
 	MovieClip* mc = (MovieClip*) mc_ref->data.numeric_value;
 	if (!mc) return r;
+	if (!flashGeomClassAvailable("ColorTransform", 14)) return r;
 #if defined(NO_GRAPHICS) || defined(OFFSCREEN_RENDER)
 	s16 ra, ga, ba, aa, rb, gb, bb, ab;
 	getConcatCTForMC(mc, &ra, &ga, &ba, &aa, &rb, &gb, &bb, &ab);
@@ -8820,6 +8848,7 @@ static ActionVar transformPixelBoundsGetter(SWFAppContext* app_context, ActionVa
 	if (!mc_ref || mc_ref->type != ACTION_STACK_VALUE_MOVIECLIP) return r;
 	MovieClip* mc = (MovieClip*) mc_ref->data.numeric_value;
 	if (!mc) return r;
+	if (!flashGeomClassAvailable("Rectangle", 9)) return r;
 #if defined(NO_GRAPHICS) || defined(OFFSCREEN_RENDER)
 	size_t entry_idx = getDisplayEntryIdxForMC(mc);
 	float lxmin, lxmax, lymin, lymax;

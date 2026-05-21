@@ -1,6 +1,13 @@
 # Transform-v8 Investigation Plan
 <!-- TESTS: Transform-v8 -->
 
+Last updated: 2026-05-21 (Phase 2 landed → standalone-Transform
+getters now honour `flash.geom.* = undefined` clobbering. Our diff
+against `output.fp10.txt` shrank from 13 to 9 mismatched lines
+(86 → 90 line-match, #passed 86). Test stays `ruffle_matched`.
+Phases 1/3/5 remain pending — shared diffs with Ruffle, don't block
+effective pass.)
+
 Last updated: 2026-05-20 (Phases 4 + 6 landed → Transform-v8 promoted
 to `ruffle_matched`. Our diff against `output.fp10.txt` is now a
 strict subset of Ruffle's, so the test auto-promotes. Phases 1/2/3/5
@@ -16,7 +23,7 @@ phases:
     status: pending
   - id: 2
     name: "Standalone Transform object: matrix/colorTransform/pixelBounds return undefined"
-    status: pending
+    status: completed
   - id: 3
     name: "mc.transform = T propagates back to mc._xscale/_yscale/_rotation"
     status: pending
@@ -61,6 +68,33 @@ The 9 residual diffs are all Phases 1/2/3 (colorTransform multiplier
 coercion, `flash.geom.* = undefined` getter null-out, `mc.transform = T`
 back-propagation) — Ruffle fails the same lines, so they're effective
 pass and no longer block promotion.
+
+### Fixes landed (2026-05-21)
+
+- **Phase 2 — standalone Transform getters honour flash-package
+  clobbering (Transform.as:110/113/116/121).** The "Tricks with the
+  flash package" block reassigns `flash.geom.Matrix = undefined`
+  (resp. `ColorTransform`, `Rectangle`), then expects
+  `transform.matrix` / `.colorTransform` / `.pixelBounds` to return
+  `undefined` — Flash's getters internally do `new flash.geom.Matrix(…)`
+  and can't build the result once the class is gone. New helper
+  `flashGeomClassAvailable(name,len)` in
+  `SWFModernRuntime/src/actionmodern/action.c` resolves
+  `flash.geom.<name>` via `global_object → "flash" → "geom" → name`
+  and returns 0 only when the property exists but is no longer a
+  FUNCTION (absent property / no flash package → returns 1, default
+  available, so non-clobbering tests are unaffected). All five
+  Transform getters (`transformMatrixGetter`, `transformCTGetter`,
+  `transformConcatMatrixGetter`, `transformConcatCTGetter`,
+  `transformPixelBoundsGetter`) consult it after the `__mc__` lookup
+  and return undefined when the class is unavailable. Lines
+  31/33/35/37 of the result file flip to match. No regressions:
+  AVM1 `transform`/`color_transform`/`matrix`/`color`/
+  `as_transformed_flag`/`bitmap_data_colortransform` all PASS;
+  gnash `Transform-v5/v6/v7` PASS, `Color-v8`/`BitmapData-v8`
+  effective pass.
+
+  The earlier Phase 4 (`delete` keeps clip bindings) NOT re-touched.
 
 ### Fixes landed (2026-05-20)
 
@@ -147,12 +181,13 @@ Lines: 31, 33, 35, 37.
 + FAILED: expected: undefined obtained: (x=0, y=0, w=0, h=0)
 ```
 
-A Transform constructed without an MC argument has no underlying
-DisplayObject. Its `matrix`, `colorTransform`, `pixelBounds` getters
-should return undefined. We return identity / clean default values.
-
-Fix: track whether the Transform is "bound" (has a `display_obj_ref`)
-and return undefined from the getters when unbound.
+**RESOLVED 2026-05-21.** The real cause was NOT an unbound Transform
+— `t` IS bound to a real MC. The test does "Tricks with the flash
+package": it sets `flash.geom.Matrix = undefined` and expects
+`t.matrix` to then return undefined (Flash's getter internally
+constructs `new flash.geom.Matrix(…)`). See "Fixes landed
+(2026-05-21)" above — `flashGeomClassAvailable()` gates all five
+Transform getters.
 
 ### C. mc.transform = T back-propagation (Phase 3)
 
@@ -165,10 +200,18 @@ Lines: 62, 63, 64.
 + FAILED: expected: 1.5 obtained: 0
 ```
 
-After `mc.transform = transformObject`, the MC's `_xscale`,
-`_yscale`, `_rotation` should be derived from the assigned matrix
-(decompose matrix → scale/rotation). We leave the old values
-unchanged.
+**NOTE (2026-05-21): the plan's original framing was backwards.**
+The failing lines come *after* `trans.matrix = new Matrix(2,0,0,2,
+10,11)` (Transform.as:169). The test expects `mc2._xscale == 100`
+(UNCHANGED) — i.e. assigning a 2×-scale matrix to `transform.matrix`
+must NOT back-propagate to `_xscale`/`_yscale`/`_rotation`. We
+currently DO decompose-and-write in `transformMatrixSetter` (→
+`_xscale` 200). The real fix is the inverse: `transformMatrixSetter`
+should store the matrix via the `exact_m_*` path (already present
+from Phase 6) and leave `mc->xscale/yscale/rotation` alone. Caution:
+verify the AVM1 `transform` test (which sets `transform.matrix` and
+may read `_xscale`/`_width` afterwards) does not regress before
+landing — non-trivial regression risk.
 
 ### D. mc.transform.matrix after swapDepths (Phase 4)
 
