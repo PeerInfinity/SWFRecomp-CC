@@ -59,6 +59,63 @@ status_note: |
 
 ## Status
 
+### 2026-05-21 — Phase 7 investigation (no fix landed): two-constructor identity blocker
+
+Investigated cluster G (primitive `a.constructor` / `a.__constructor__`).
+Root-caused but did **not** land a fix — the clean fix is a refactor, not
+a localized patch. Findings, so the next session can go straight to it:
+
+1. **`Number.prototype.constructor` / `Boolean.prototype.constructor`
+   are never set.** `String.prototype.constructor` *is* set (in the lazy
+   `g_string_constructor` block in `actionGetVariable`, on a prototype
+   shared with `g_ctors[2]`). Number's and Boolean's lazy blocks
+   allocate a *fresh* `prototype_obj` and never set `constructor`, so a
+   primitive's `n.constructor` walks past the wrapper prototype to
+   `Object.prototype.constructor` → resolves to the **Object**
+   constructor. (Confirmed via `actionEquals2` instrumentation: the
+   `a.constructor == Number` compare is `Number` vs `Object`.)
+
+2. **Two distinct constructor objects per built-in type.** `_global.Number`
+   is `&g_ctors[3]` (bound by `REG_FUNC` in `ensureGlobalInit`, a
+   function-local `static ASFunction g_ctors[6]`). `actionGetVariable("Number")`
+   instead returns `&g_number_constructor` (a *different* function-local
+   `static` in `actionGetVariable`, built lazily with `NaN`/`MAX_VALUE`/…).
+   `getPrimitiveWrapperProto` resolves the wrapper prototype via
+   `_global.Number` → `g_ctors[3].prototype_obj`. So even after setting
+   `constructor` on a prototype, `a.constructor` (whatever
+   `g_ctors[3].prototype_obj.constructor` points at) and `Number`
+   (`g_number_constructor`) are **different pointers** → `==` fails.
+   String happens to work only because its lazy block *shares*
+   `prototype_obj` with `g_ctors[2]` and sets `constructor` =
+   `g_string_constructor` — but that still only works if
+   `actionGetVariable("String")` also returns `g_string_constructor`
+   (it does; the builtin `_CMP_BUILTIN_NAME` block is reached because
+   `getVariable()` checks `var_map`, not `_global`, and misses).
+
+3. **Lazy-init ordering.** Even sharing Number's `prototype_obj` with
+   `g_ctors[3]` and setting `constructor` there is too late: `a.constructor`
+   (a `GetMember`) is evaluated *before* `Number` (a `GetVariable`) on
+   the same line, so on first use the lazy `g_number_constructor` block
+   hasn't run yet and the `constructor` own-prop isn't present.
+
+**Recommended fix (next session): unify the per-type constructor.**
+Either (a) make `actionGetVariable` for `Number`/`Boolean`/`String`
+return the same `g_ctors[N]` object that `_global` and
+`getPrimitiveWrapperProto` use (move the `NaN`/`MAX_VALUE`/… statics
+onto `g_ctors[3]`, delete the lazy `g_number_constructor`), or (b) hoist
+`g_ctors[]` to file scope and have the lazy blocks reuse it. Then set
+`constructor` on `g_ctors[N].prototype_obj` **eagerly** in
+`ensureGlobalInit`. Once the two objects are one, cluster G's
+`a.constructor == Number` line passes; `a.__constructor__` and
+`a.hasOwnProperty('constructor'/'__constructor__')` still need the
+primitive-box own-property synthesis described below.
+
+Phase 7 also needs, separately: a synthesized `__constructor__` on the
+primitive passthrough path (`actionGetMember`, the `_autobox_result == -1`
+branch for F32/F64/BOOLEAN and the STRING branch), plus `hasOwnProperty`
+returning true for `constructor`/`__constructor__` on a primitive
+receiver.
+
 ### 2026-05-21 — Phases 2 + 3 landed (apply/call this-binding for type-1 functions)
 
 The whole `Function.prototype.call` / `.apply` cluster (Function.as lines
