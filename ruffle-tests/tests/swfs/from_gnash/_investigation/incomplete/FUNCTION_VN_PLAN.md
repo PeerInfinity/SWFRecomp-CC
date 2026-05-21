@@ -11,7 +11,7 @@ status: pending
 phases:
   - id: 1
     name: "Function class identity / Function global constructor"
-    status: pending
+    status: complete
   - id: 2
     name: "Function.prototype.call / .apply with non-MC this"
     status: pending
@@ -97,7 +97,17 @@ gated by `#if OUTPUT_VERSION > N` in the source.
 Tagged so phase ordering can reference them. Lines below are
 zero-based source-line numbers in `Function.as`.
 
-### A. Function class identity (Phase 1)
+### A. Function class identity (Phase 1) — DONE 2026-05-20
+
+`TestClass.constructor == Function` (Function.as:292) already passed
+on Function-v6/v7/v8 — user-class `.constructor` resolves through the
+virtual Function.prototype chain. The shared root cause surfaced in
+Object-v6 line 71 (`Object.prototype.toString.constructor ==
+Function`): `setupNativeFuncOwnProps` stored a self-reference for the
+`constructor` slot on native functions' `own_props`. Fixed — see
+[[OBJECT_VN_PLAN]] "2026-05-20 #2" status note. Lines 689/713 below
+are *not* class identity (they are constructor-on-prototype /
+inheritance bugs) and remain open.
 
 Lines: 292, 689, 713 (and similar).
 

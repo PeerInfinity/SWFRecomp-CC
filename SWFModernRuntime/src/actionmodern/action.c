@@ -34717,9 +34717,12 @@ void setupNativeFuncOwnProps(SWFAppContext* app_context, ASFunction* func)
 	func->no_lazy_prototype = 1;
 	func->own_props = allocObject(app_context, 4);
 	retainObject(func->own_props);
-	// constructor (any function ref, test only checks type=[function])
+	// constructor → global Function (every function's `constructor` is Function).
+	// When g_function_constructor isn't available yet (Object.prototype methods +
+	// global stubs are set up before it), store a self-reference as a placeholder;
+	// the fixup loop right after `g_function_constructor` is assigned rewrites it.
 	ActionVar cv = {0}; cv.type = ACTION_STACK_VALUE_FUNCTION;
-	cv.data.numeric_value = (u64)func; // self-reference is fine
+	cv.data.numeric_value = (u64)(g_function_constructor ? g_function_constructor : func);
 	setPropertyWithFlags(app_context, func->own_props, "constructor", 11, &cv, PROPERTY_FLAGS_DEFAULT);
 	// __proto__
 	ActionVar pv = {0}; pv.type = ACTION_STACK_VALUE_OBJECT;
@@ -36545,6 +36548,22 @@ static void ensureGlobalInit(SWFAppContext* app_context)
 		// Set Function.prototype_obj so instanceof Function works
 		g_ctors[5].prototype_obj = fn_proto;
 		g_function_constructor = &g_ctors[5];
+
+		// Fix up `constructor` on native functions set up before this point.
+		// setupNativeFuncOwnProps stores a self-reference placeholder when
+		// g_function_constructor isn't available yet (Object.prototype methods,
+		// global stubs). Every function's `constructor` must resolve to the
+		// global Function so checks like `Object.prototype.toString.constructor
+		// == Function` and `TestClass.constructor == Function` hold.
+		for (int _fi = 0; _fi < function_count; _fi++) {
+			ASFunction* _f = function_registry[_fi];
+			if (_f == NULL || _f->own_props == NULL) continue;
+			ASProperty* _cp = findPropertyRaw(_f->own_props, "constructor", 11);
+			if (_cp != NULL && _cp->value.type == ACTION_STACK_VALUE_FUNCTION &&
+			    (ASFunction*)(uintptr_t)_cp->value.data.numeric_value == _f) {
+				_cp->value.data.numeric_value = (u64) g_function_constructor;
+			}
+		}
 
 		// Add apply and call as own properties on Function.prototype
 		// (actual implementation is via dynamic dispatch in actionCallMethod,
@@ -49627,6 +49646,11 @@ void actionNewObject(SWFAppContext* app_context)
 			ActionVar _ctor_var = {0};
 			_ctor_var.type = ACTION_STACK_VALUE_FUNCTION;
 			_ctor_var.data.numeric_value = (u64)_obj_ctor;
+			// SWF6 only: `constructor` is an own (DontEnum) property of every
+			// Object instance (Object.as:170 — true in SWF6, false in SWF5/7+).
+			if (g_swf_version == 6) {
+				setPropertyWithFlags(app_context, obj, "constructor", 11, &_ctor_var, PROPERTY_FLAGS_DONTENUM);
+			}
 			setPropertyWithFlags(app_context, obj, "__constructor__", 15, &_ctor_var, PROPERTY_FLAGS_DONTENUM);
 			if (obj->num_used > 0) {
 				ASProperty* _p = &obj->properties[obj->num_used - 1];
@@ -51261,6 +51285,11 @@ void actionNewMethod(SWFAppContext* app_context)
 			ActionVar _ctor_var = {0};
 			_ctor_var.type = ACTION_STACK_VALUE_FUNCTION;
 			_ctor_var.data.numeric_value = (u64)_obj_ctor;
+			// SWF6 only: `constructor` is an own (DontEnum) property of every
+			// Object instance (Object.as:170 — true in SWF6, false in SWF5/7+).
+			if (g_swf_version == 6) {
+				setPropertyWithFlags(app_context, obj, "constructor", 11, &_ctor_var, PROPERTY_FLAGS_DONTENUM);
+			}
 			setPropertyWithFlags(app_context, obj, "__constructor__", 15, &_ctor_var, PROPERTY_FLAGS_DONTENUM);
 			if (obj->num_used > 0) {
 				ASProperty* _p = &obj->properties[obj->num_used - 1];

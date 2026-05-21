@@ -11,10 +11,10 @@ status: pending
 phases:
   - id: 1
     name: "Function class identity (shared with FUNCTION_VN_PLAN Phase 1)"
-    status: pending
+    status: complete
   - id: 2
     name: "obj.hasOwnProperty('constructor') — constructor as own vs inherited"
-    status: pending
+    status: complete
   - id: 3
     name: "addProperty getter/setter call counters returning 65 instead of expected 1"
     status: pending
@@ -56,6 +56,35 @@ Local CI baseline (commit `eb8206f8`, 2026-05-15):
 | Object-v6 | 286/333 | 85.9% | output_mismatch |
 | Object-v7 | 299/333 | 89.8% | output_mismatch |
 | Object-v8 | 299/333 | 89.8% | output_mismatch |
+
+### 2026-05-20 #2 — Phase 1 + Phase 2 landed (pending CI)
+
+Both fixes in `SWFModernRuntime/src/actionmodern/action.c`, zero
+regressions across a 16-test battery (Object/Function/Inheritance/
+toString_valueOf/Global gnash + AVM1 enumerate/typeof/
+function_as_function).
+
+- **Phase 1 (Function class identity) — DONE.** `setupNativeFuncOwnProps`
+  stored `constructor` on a native function's `own_props` as a
+  *self-reference* ("any function ref, test only checks type=function").
+  That made `Object.prototype.toString.constructor` resolve to the
+  toString function itself instead of `Function`, so the `==` in
+  `check_equals` failed. Fix: `setupNativeFuncOwnProps` now stores
+  `g_function_constructor` when it's available; for native funcs set up
+  *before* `g_function_constructor` is assigned (Object.prototype
+  methods, global stubs), a fixup loop right after the assignment walks
+  `function_registry` and rewrites any self-referential `constructor`.
+  Fixes Object.as:71 on v6/v7/v8. (Function-vN line 292
+  `TestClass.constructor == Function` already passed — user-class
+  `.constructor` resolves via the virtual Function.prototype chain.)
+- **Phase 2 (constructor own-vs-inherited) — DONE.** `new Object()` now
+  also sets `constructor` as an own DontEnum property **when
+  `g_swf_version == 6`** (both `actionNewObject` "Object" branches).
+  SWF6 expects `obj.hasOwnProperty('constructor')` true; SWF5/SWF7+
+  expect it false (already the case — gated out). Fixes Object.as:170
+  on v6.
+
+Result: Object-v6 #passed 311 → 313, Object-v7/v8 311 → 312.
 
 ### 2026-05-20 — addProperty + watch fixes landed (pending CI)
 
