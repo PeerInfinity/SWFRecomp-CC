@@ -29,7 +29,7 @@ phases:
     status: pending
   - id: 7
     name: "Primitive auto-boxing __constructor__ chain (Number/String/Boolean)"
-    status: pending
+    status: in_progress
   - id: 8
     name: "super-binding property assignments not landing on this (myMail.subject == 'greetings')"
     status: pending
@@ -58,6 +58,47 @@ status_note: |
 -->
 
 ## Status
+
+### 2026-05-22 — Phase 7 partial: Number/Boolean constructor unification
+
+Landed the "unify the per-type constructor" recommendation from the
+2026-05-21 investigation below. Three changes in
+`SWFModernRuntime/src/actionmodern/action.c`:
+
+1. **`actionGetVariable("Number")` / `("Boolean")` now return the
+   primary constructor object** (`g_ctors[3]` / `g_ctors[4]`, the same
+   objects bound on `_global.Number` / `_global.Boolean` and used by
+   `getPrimitiveWrapperProto`), via new file-scope pointers
+   `g_number_ctor_ref` / `g_boolean_ctor_ref`. The old per-call lazy
+   `g_number_constructor` / `g_boolean_constructor` statics (a *second*
+   distinct constructor object per type) are now dead fallback code.
+
+2. **Eager setup in `ensureGlobalInit`.** `g_ctors[3].own_props` gets
+   the Number static constants (`NaN`, `POSITIVE_INFINITY`,
+   `NEGATIVE_INFINITY`, `MIN_VALUE`, `MAX_VALUE`); `g_ctors[3]` /
+   `g_ctors[4]` `.prototype_obj` get `constructor` + `__constructor__`
+   pointing at the constructor. This *must* be eager — `a.constructor`
+   (a GetMember) is evaluated before `Number` (a GetVariable) on the
+   same assertion line, so a lazy init would be too late.
+
+3. **`String.prototype.__constructor__`** added alongside the existing
+   `constructor` (the String block already shared its prototype).
+
+Effect: `a.constructor == Number/Boolean/String` and
+`a.__constructor__ == …` / `typeof(a.__constructor__) == 'function'`
+now resolve correctly for auto-boxed primitives. Function-v6 `#passed`
+205 → 215; v7/v8 198 → 208 (+10 each); v5 unchanged (no Function
+class). Residual Phase 7 failures are only the
+`a.hasOwnProperty('constructor'/'__constructor__')` lines — those need
+primitive-box own-property synthesis (the box is transient and claims
+no ownership), still pending.
+
+No regressions: gnash Number-v5..v8, Boolean-v5/v7/v8, Object-v5..v8,
+Inheritance-v5..v8, toString_valueOf-v5/v6/v8, case-v6 all
+effective-pass; avm1 19-test primitive/proto battery + 10-test
+super/oop battery all pass. `global_proto_decls` (already
+ignored/blocked) gains ~30 position-shifted diff lines from the
+now-more-complete Number enumeration — no filtered-rate impact.
 
 ### 2026-05-21 — Phase 4 landed (trace honors per-instance function toString)
 

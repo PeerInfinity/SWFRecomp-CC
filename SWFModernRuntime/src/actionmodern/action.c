@@ -14518,6 +14518,11 @@ static ASObject* g_array_proto_modern = NULL;
 static ASObject* g_function_proto_legacy = NULL;  // SWF 1-6
 static ASObject* g_function_proto_modern = NULL;  // SWF 7+
 static ASFunction* g_function_constructor = NULL; // Pointer to Function constructor (g_ctors[5])
+// Pointers to the primary Number/Boolean constructors (g_ctors[3]/g_ctors[4]),
+// so actionGetVariable("Number"/"Boolean") returns the same object that
+// _global.Number/_global.Boolean and the primitive __proto__ chain use.
+static ASFunction* g_number_ctor_ref = NULL;
+static ASFunction* g_boolean_ctor_ref = NULL;
 // Per-version-group MovieClip constructor and prototype
 static ASFunction* g_mc_ctor_legacy = NULL;  // SWF 1-6
 static ASFunction* g_mc_ctor_modern = NULL;  // SWF 7+
@@ -36967,6 +36972,49 @@ static void ensureGlobalInit(SWFAppContext* app_context)
 			}
 		}
 
+		// ---- Number / Boolean constructor unification ----
+		// actionGetVariable("Number"/"Boolean") returns these same objects
+		// (via g_number_ctor_ref / g_boolean_ctor_ref), so a primitive's
+		// `a.constructor == Number` is identity-equal. Set up eagerly here —
+		// the comparison is order-sensitive (the GetMember `a.constructor`
+		// is evaluated before the GetVariable `Number` on the same line),
+		// so a lazy init in actionGetVariable would be too late.
+		g_number_ctor_ref = &g_ctors[3];
+		g_boolean_ctor_ref = &g_ctors[4];
+		{
+			// Number static constants on g_ctors[3].own_props
+			if (g_ctors[3].own_props != NULL && getProperty(g_ctors[3].own_props, "MAX_VALUE", 9) == NULL) {
+				ActionVar cv;
+				cv = makeF64(NAN);
+				setProperty(app_context, g_ctors[3].own_props, "NaN", 3, &cv);
+				cv = makeF64(INFINITY);
+				setProperty(app_context, g_ctors[3].own_props, "POSITIVE_INFINITY", 17, &cv);
+				cv = makeF64(-INFINITY);
+				setProperty(app_context, g_ctors[3].own_props, "NEGATIVE_INFINITY", 17, &cv);
+				cv = makeF64(5e-324);
+				setProperty(app_context, g_ctors[3].own_props, "MIN_VALUE", 9, &cv);
+				// Flash traces Number.MAX_VALUE as "1.79769313486231e+308";
+				// the literal below is the nearest double under the %.15g
+				// rounding boundary so the trace text matches.
+				cv = makeF64(1.7976931348623149e+308);
+				setProperty(app_context, g_ctors[3].own_props, "MAX_VALUE", 9, &cv);
+			}
+			// Number.prototype.constructor / __constructor__ = Number
+			if (g_ctors[3].prototype_obj != NULL) {
+				ActionVar nc = {0}; nc.type = ACTION_STACK_VALUE_FUNCTION;
+				nc.data.numeric_value = (u64)&g_ctors[3];
+				setPropertyWithFlags(app_context, g_ctors[3].prototype_obj, "constructor", 11, &nc, PROPERTY_FLAG_WRITABLE);
+				setPropertyWithFlags(app_context, g_ctors[3].prototype_obj, "__constructor__", 15, &nc, PROPERTY_FLAG_WRITABLE);
+			}
+			// Boolean.prototype.constructor / __constructor__ = Boolean
+			if (g_ctors[4].prototype_obj != NULL) {
+				ActionVar bc = {0}; bc.type = ACTION_STACK_VALUE_FUNCTION;
+				bc.data.numeric_value = (u64)&g_ctors[4];
+				setPropertyWithFlags(app_context, g_ctors[4].prototype_obj, "constructor", 11, &bc, PROPERTY_FLAG_WRITABLE);
+				setPropertyWithFlags(app_context, g_ctors[4].prototype_obj, "__constructor__", 15, &bc, PROPERTY_FLAG_WRITABLE);
+			}
+		}
+
 		// Fill in constructor placeholders on System + IME (were UNDEFINED, now Object ctor available)
 		if (g_system_object != NULL) {
 			ActionVar obj_ctor = {0}; obj_ctor.type = ACTION_STACK_VALUE_FUNCTION;
@@ -38717,6 +38765,7 @@ check_special_vars:
 					ActionVar _ctor = {0}; _ctor.type = ACTION_STACK_VALUE_FUNCTION;
 					_ctor.data.numeric_value = (u64)&g_string_constructor;
 					setPropertyWithFlags(app_context, g_string_constructor.prototype_obj, "constructor", 11, &_ctor, PROPERTY_FLAG_WRITABLE);
+					setPropertyWithFlags(app_context, g_string_constructor.prototype_obj, "__constructor__", 15, &_ctor, PROPERTY_FLAG_WRITABLE);
 				}
 				// Core String methods on prototype (for typeof/hasOwnProperty checks)
 				{
@@ -38741,7 +38790,15 @@ check_special_vars:
 		}
 		else if (var_name_len == 6 && _CMP_BUILTIN_NAME(var_name, "Number", 6))
 		{
-			// Return the built-in Number constructor as a function
+			// Return the primary Number constructor (g_ctors[3], unified with
+			// _global.Number and the primitive __proto__ chain).
+			ensureGlobalInit(app_context);
+			if (g_number_ctor_ref != NULL)
+			{
+				PUSH(ACTION_STACK_VALUE_FUNCTION, (u64)g_number_ctor_ref);
+				return;
+			}
+			// Fallback (should be unreachable once ensureGlobalInit has run).
 			static ASFunction g_number_constructor;
 			static int g_number_constructor_init = 0;
 			if (!g_number_constructor_init)
@@ -38769,10 +38826,29 @@ check_special_vars:
 				ActionVar _ncp_max = makeF64(1.7976931348623149e+308);
 				setProperty(app_context, g_number_constructor.own_props, "MAX_VALUE", 9, &_ncp_max);
 
-				// Create Number.prototype with own valueOf/toString
-				g_number_constructor.prototype_obj = allocObject(app_context, 8);
-				retainObject(g_number_constructor.prototype_obj);
-				setObjectProto(app_context, g_number_constructor.prototype_obj);
+				// Share prototype_obj with the primary Number constructor
+				// (g_ctors[3], registered on global_object as "Number"). This
+				// keeps `a.constructor == Number` working for a primitive: the
+				// primitive's __proto__ resolves to g_ctors[3].prototype_obj via
+				// getPrimitiveWrapperProto, and the `constructor` property
+				// installed below makes it identity-equal to GetVariable("Number").
+				ensureGlobalInit(app_context);
+				ASObject* _num_shared_proto = NULL;
+				if (global_object != NULL) {
+					ActionVar* _nv = getPropertyWithPrototype(global_object, "Number", 6);
+					if (_nv != NULL && _nv->type == ACTION_STACK_VALUE_FUNCTION) {
+						ASFunction* _nf = (ASFunction*)(uintptr_t) _nv->data.numeric_value;
+						if (_nf != NULL) _num_shared_proto = _nf->prototype_obj;
+					}
+				}
+				if (_num_shared_proto != NULL) {
+					g_number_constructor.prototype_obj = _num_shared_proto;
+					retainObject(g_number_constructor.prototype_obj);
+				} else {
+					g_number_constructor.prototype_obj = allocObject(app_context, 8);
+					retainObject(g_number_constructor.prototype_obj);
+					setObjectProto(app_context, g_number_constructor.prototype_obj);
+				}
 				if (!g_wrapper_funcs_init) {
 					memset(&g_wrapper_valueOf_func, 0, sizeof(ASFunction));
 					strncpy(g_wrapper_valueOf_func.name, "valueOf", 255);
@@ -38793,6 +38869,13 @@ check_special_vars:
 					ActionVar _ts = {0}; _ts.type = ACTION_STACK_VALUE_FUNCTION;
 					_ts.data.numeric_value = (u64)&g_prim_wrapper_toString_func;
 					setPropertyWithFlags(app_context, g_number_constructor.prototype_obj, "toString", 8, &_ts, PROPERTY_FLAG_WRITABLE);
+					// Number.prototype.constructor / __constructor__ = Number
+					// (identity match with GetVariable("Number") and the
+					// primitive __proto__ chain). Non-enumerable (WRITABLE only).
+					ActionVar _nctor = {0}; _nctor.type = ACTION_STACK_VALUE_FUNCTION;
+					_nctor.data.numeric_value = (u64)&g_number_constructor;
+					setPropertyWithFlags(app_context, g_number_constructor.prototype_obj, "constructor", 11, &_nctor, PROPERTY_FLAG_WRITABLE);
+					setPropertyWithFlags(app_context, g_number_constructor.prototype_obj, "__constructor__", 15, &_nctor, PROPERTY_FLAG_WRITABLE);
 				}
 
 				// Register constructor, __proto__, prototype as own properties
@@ -38820,7 +38903,15 @@ check_special_vars:
 		}
 		else if (var_name_len == 7 && _CMP_BUILTIN_NAME(var_name, "Boolean", 7))
 		{
-			// Return the built-in Boolean constructor as a function
+			// Return the primary Boolean constructor (g_ctors[4], unified with
+			// _global.Boolean and the primitive __proto__ chain).
+			ensureGlobalInit(app_context);
+			if (g_boolean_ctor_ref != NULL)
+			{
+				PUSH(ACTION_STACK_VALUE_FUNCTION, (u64)g_boolean_ctor_ref);
+				return;
+			}
+			// Fallback (should be unreachable once ensureGlobalInit has run).
 			static ASFunction g_boolean_constructor;
 			static int g_boolean_constructor_init = 0;
 			if (!g_boolean_constructor_init)
@@ -38830,10 +38921,27 @@ check_special_vars:
 				g_boolean_constructor.function_type = 1;
 				g_boolean_constructor.param_count = 0;
 
-				// Create Boolean.prototype with own valueOf/toString
-				g_boolean_constructor.prototype_obj = allocObject(app_context, 8);
-				retainObject(g_boolean_constructor.prototype_obj);
-				setObjectProto(app_context, g_boolean_constructor.prototype_obj);
+				// Share prototype_obj with the primary Boolean constructor
+				// (g_ctors[4], registered on global_object as "Boolean") so a
+				// primitive's `a.constructor == Boolean` is identity-equal to
+				// GetVariable("Boolean"). See the Number block above.
+				ensureGlobalInit(app_context);
+				ASObject* _bool_shared_proto = NULL;
+				if (global_object != NULL) {
+					ActionVar* _bv = getPropertyWithPrototype(global_object, "Boolean", 7);
+					if (_bv != NULL && _bv->type == ACTION_STACK_VALUE_FUNCTION) {
+						ASFunction* _bf = (ASFunction*)(uintptr_t) _bv->data.numeric_value;
+						if (_bf != NULL) _bool_shared_proto = _bf->prototype_obj;
+					}
+				}
+				if (_bool_shared_proto != NULL) {
+					g_boolean_constructor.prototype_obj = _bool_shared_proto;
+					retainObject(g_boolean_constructor.prototype_obj);
+				} else {
+					g_boolean_constructor.prototype_obj = allocObject(app_context, 8);
+					retainObject(g_boolean_constructor.prototype_obj);
+					setObjectProto(app_context, g_boolean_constructor.prototype_obj);
+				}
 				if (!g_wrapper_funcs_init) {
 					memset(&g_wrapper_valueOf_func, 0, sizeof(ASFunction));
 					strncpy(g_wrapper_valueOf_func.name, "valueOf", 255);
@@ -38854,6 +38962,11 @@ check_special_vars:
 					ActionVar _ts = {0}; _ts.type = ACTION_STACK_VALUE_FUNCTION;
 					_ts.data.numeric_value = (u64)&g_prim_wrapper_toString_func;
 					setPropertyWithFlags(app_context, g_boolean_constructor.prototype_obj, "toString", 8, &_ts, PROPERTY_FLAG_WRITABLE);
+					// Boolean.prototype.constructor / __constructor__ = Boolean
+					ActionVar _bctor = {0}; _bctor.type = ACTION_STACK_VALUE_FUNCTION;
+					_bctor.data.numeric_value = (u64)&g_boolean_constructor;
+					setPropertyWithFlags(app_context, g_boolean_constructor.prototype_obj, "constructor", 11, &_bctor, PROPERTY_FLAG_WRITABLE);
+					setPropertyWithFlags(app_context, g_boolean_constructor.prototype_obj, "__constructor__", 15, &_bctor, PROPERTY_FLAG_WRITABLE);
 				}
 
 				g_boolean_constructor_init = 1;
