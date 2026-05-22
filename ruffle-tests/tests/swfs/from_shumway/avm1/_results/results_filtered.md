@@ -1,10 +1,10 @@
 # Ruffle Test Results (Filtered)
 
-**Date**: 2026-05-22 01:48 UTC
+**Date**: 2026-05-22 02:55 UTC
 
-**Git SHA**: `fe2bc55344`
+**Git SHA**: `eb3b66ccfb`
 
-**Run Duration**: 1m 30s
+**Run Duration**: 1m 27s
 
 **Filtered**: 3 tests ignored out of 47 available
 
@@ -32,23 +32,23 @@
 | 5 | `depth` | 6 | 0.4s |  |
 | 6 | `doactionorder/doactionorder` | 7 | 0.3s |  |
 | 7 | `doactionorder/symbolclass` | 4 | 0.3s |  |
-| 8 | `duplicateMovieClip/dontremove` | 6 | 18.0s |  |
+| 8 | `duplicateMovieClip/dontremove` | 6 | 18.2s |  |
 | 9 | `duplicateMovieClip/duplicateMovieClip` | 4 | 0.3s |  |
 | 10 | `duplicateMovieClip/name-coercion` | 3 | 0.3s |  |
-| 11 | `duplicateMovieClip/samedepth` | 6 | 0.2s |  |
-| 12 | `externalinterface` | 4 | 0.2s |  |
+| 11 | `duplicateMovieClip/samedepth` | 6 | 0.3s |  |
+| 12 | `externalinterface` | 4 | 0.3s |  |
 | 13 | `filters` | 149 | 0.3s |  |
 | 14 | `haxe/flocons1` | 2 | 0.3s |  |
 | 15 | `haxe/flocons2` | 3 | 0.3s |  |
-| 16 | `label` | 4 | 18.5s |  |
+| 16 | `label` | 4 | 19.3s |  |
 | 17 | `levels` | 9 | 0.3s |  |
 | 18 | `loadevent` | 9 | 0.3s |  |
 | 19 | `loadvariables/loadvariables` | 7 | 0.3s |  |
 | 20 | `loadvariables/loadvars` | 2 | 0.3s |  |
 | 21 | `lookup` | 3 | 0.3s |  |
-| 22 | `mouse-transparency` | 1 | 0.4s |  |
-| 23 | `nativeinheritance` | 6 | 0.3s |  |
-| 24 | `nested-button` | 1 | 0.2s |  |
+| 22 | `mouse-transparency` | 1 | 0.3s |  |
+| 23 | `nativeinheritance` | 6 | 0.4s |  |
+| 24 | `nested-button` | 1 | 0.3s |  |
 | 25 | `operations` | 13 | 0.3s |  |
 | 26 | `property-paths/property-paths-6` | 6 | 0.3s |  |
 | 27 | `property-paths/property-paths-7` | 7 | 0.3s |  |
@@ -63,11 +63,11 @@
 | 36 | `target` | 18 | 0.3s |  |
 | 37 | `textfield/textfield-html` | 4 | 0.3s |  |
 | 38 | `textfield/textfield-text-setters` | 8 | 0.3s |  |
-| 39 | `undefined/undefined-swf6` | 39 | 0.2s |  |
-| 40 | `undefined/undefined-swf7` | 39 | 0.2s |  |
+| 39 | `undefined/undefined-swf6` | 39 | 0.3s |  |
+| 40 | `undefined/undefined-swf7` | 39 | 0.3s |  |
 | 41 | `watch` | 2 | 0.3s |  |
-| 42 | `xml/xmlbuild` | 1 | 0.2s |  |
-| 43 | `xml/xmlload` | 4 | 0.3s |  |
+| 42 | `xml/xmlbuild` | 1 | 0.3s |  |
+| 43 | `xml/xmlload` | 4 | 0.2s |  |
 | 44 | `xml/xmlstring` | 9 | 0.3s |  |
 
 ## Near-Passing Tests
