@@ -6293,6 +6293,28 @@ static void init_conv_filter_natives(void)
 	g_conv_filter_natives_init = 1;
 }
 
+// Read a function's `.prototype` value, mirroring the FUNCTION-receiver
+// GetMember "prototype" logic: an explicitly-assigned non-object prototype
+// lives in own_props (prototype_obj is cleared); otherwise prototype_obj holds
+// the prototype object. Returns undefined when neither is present.
+static ActionVar funcPrototypeVar(ASFunction* func)
+{
+	ActionVar v = {0};
+	v.type = ACTION_STACK_VALUE_UNDEFINED;
+	if (func == NULL) return v;
+	if (func->prototype_obj != NULL) {
+		v.type = ACTION_STACK_VALUE_OBJECT;
+		v.data.numeric_value = (u64)func->prototype_obj;
+		return v;
+	}
+	if (func->own_props != NULL) {
+		ActionVar* stored = getProperty(func->own_props, "prototype", 9);
+		if (stored != NULL && stored->type != ACTION_STACK_VALUE_UNDEFINED)
+			return *stored;
+	}
+	return v;
+}
+
 // ASnative(class_id, method_index) — returns a native method by numeric address.
 // Handles class 2 (ASNew), class 101 (Object.prototype), class 100 (global functions), class 200 (Math), class 252 (Array).
 static ActionVar builtin_asnative(SWFAppContext* app_context, ActionVar* args, u32 arg_count, ActionVar* registers, void* this_obj)
@@ -6322,6 +6344,56 @@ static ActionVar builtin_asnative(SWFAppContext* app_context, ActionVar* args, u
 			return result;
 		}
 		return undef;
+	}
+
+	// Class 1: Function-class natives. The Gnash Function.as test (lines
+	// 1043-1121) uses ASnative(1, 0) purely to obtain a *fresh* function
+	// object and inspect its __proto__/constructor wiring. Each call returns
+	// a new ASFunction whose own properties mirror `_global.Function` at call
+	// time (Flash semantics — see Function.as comments "Sets constructor to be
+	// _global.Function" / "Sets __proto__ to be _global.Function.prototype"):
+	//   - `constructor` is set to `_global.Function` whenever it is a
+	//     non-primitive (OBJECT/ARRAY/FUNCTION/MOVIECLIP);
+	//   - `__proto__` is set to `_global.Function.prototype` only when
+	//     `_global.Function` is callable (a FUNCTION).
+	// When `_global.Function` is a primitive, neither own property is added,
+	// so `hasOwnProperty('__proto__'/'constructor')` reads false.
+	if (class_id == 1) {
+		ASFunction* fn = (ASFunction*)calloc(1, sizeof(ASFunction));
+		if (fn == NULL) return undef;
+		fn->function_type = 2;
+		fn->advanced_func = (Function2Ptr)builtin_noop_func;
+		fn->no_lazy_prototype = 1;
+		strncpy(fn->name, "Function", 255);
+
+		extern ASObject* global_object;
+		if (global_object != NULL) {
+			ActionVar* gfn_ptr = getProperty(global_object, "Function", 8);
+			if (gfn_ptr != NULL) {
+				ActionVar gfn = *gfn_ptr;  // snapshot before allocObject below
+				int is_func = (gfn.type == ACTION_STACK_VALUE_FUNCTION);
+				int is_obj  = is_func ||
+				              gfn.type == ACTION_STACK_VALUE_OBJECT ||
+				              gfn.type == ACTION_STACK_VALUE_ARRAY ||
+				              gfn.type == ACTION_STACK_VALUE_MOVIECLIP;
+				if (is_obj) {
+					fn->own_props = allocObject(app_context, 4);
+					retainObject(fn->own_props);
+					setPropertyWithFlags(app_context, fn->own_props, "constructor", 11,
+					                     &gfn, PROPERTY_FLAGS_DEFAULT);
+					if (is_func) {
+						ASFunction* gff = (ASFunction*)(uintptr_t)gfn.data.numeric_value;
+						ActionVar protov = funcPrototypeVar(gff);
+						setPropertyWithFlags(app_context, fn->own_props, "__proto__", 9,
+						                     &protov, PROPERTY_FLAGS_DEFAULT);
+					}
+				}
+			}
+		}
+		ActionVar result = {0};
+		result.type = ACTION_STACK_VALUE_FUNCTION;
+		VAL(u64, &result.data.numeric_value) = (u64)fn;
+		return result;
 	}
 
 	// Class 101: Object.prototype methods

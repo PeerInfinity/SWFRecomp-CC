@@ -35,7 +35,7 @@ phases:
     status: complete
   - id: 9
     name: "Function.__proto__ identity / Function.prototype mutation"
-    status: pending
+    status: in_progress
 dependencies:
   - id: SUBTESTS_HARNESS
     reason: "Discovery shipped 2026-05-14 (commit 39b797ac). Function-v5..v8 became visible at that point."
@@ -58,6 +58,62 @@ status_note: |
 -->
 
 ## Status
+
+### 2026-05-22 — Phase 9 mostly landed (ASnative(1,0) + conditional __proto__/constructor)
+
+Cluster I (Function.as:1043-1121) implemented. `builtin_asnative` had no
+`class_id == 1` handler, so every `f = ASnative(1, 0)` returned `undefined`
+— `typeof(f)` came back `undefined` and all of `f.__proto__` / `f.constructor`
+were unresolvable.
+
+Two changes in `SWFModernRuntime/src/actionmodern/action.c`:
+
+1. **New `class_id == 1` branch in `builtin_asnative`.** Each call
+   `calloc`s a *fresh* type-2 `ASFunction` (callable stub `builtin_noop_func`,
+   `no_lazy_prototype = 1`). This per-call freshness is load-bearing —
+   Function.as:1049 checks the *previous* `f` keeps its old `__proto__`
+   (`backup`) while a newly-obtained `f` reflects the mutated
+   `_global.Function.prototype`.
+
+2. **Conditional own `__proto__` / `constructor` wiring.** The fresh
+   function's own props mirror `_global.Function` (read from `global_object`)
+   at call time, per the Flash rule the test's `output.fpN.txt` actually
+   exhibits (the source comment is slightly version-skewed):
+   - `constructor` is added (→ `_global.Function`) whenever `_global.Function`
+     is a non-primitive (OBJECT / ARRAY / FUNCTION / MOVIECLIP);
+   - `__proto__` is added (→ `_global.Function.prototype`) only when
+     `_global.Function` is callable (FUNCTION-typed).
+   When `_global.Function` is a primitive, neither own prop is added.
+   This nuance is what makes `_global.Function = {}` →
+   `!f.hasOwnProperty("constructor")` read FAILED (Function.as:1111) — the
+   plain-object case still adds `constructor`. New helper `funcPrototypeVar`
+   reads a function's `.prototype` value (own_props non-object override, else
+   `prototype_obj`), mirroring the FUNCTION-receiver GetMember logic.
+
+Effect: Function-v6 `#passed` 230 → 242 (+12); v7/v8 +~12-15 each
+(line-match only — their dominant residual is the Phase-2 apply/call cluster
+which only ever fixed type-1 functions; v7/v8's `getThisName`/`isThisGlobal`
+are type-2 / `DefineFunction2` and still fail lines 11-54). v5 unaffected
+(no Function class). The whole Function.as:1043-1121 cluster (result lines
+247-267) is now a strict subset of Ruffle's diff against expected.
+
+Residual Phase-9 lines 256/257 (`uf.p`/`uf.__proto__` for a SWF-defined
+function — needs user-function `__proto__` to chain to the *live*
+`_global.Function.prototype` rather than the snapshot version-group proto)
+stay FAILED, but they are inside Ruffle's diff set, so they do not block
+`ruffle_matched` promotion.
+
+**Function-v6 still `output_mismatch`** — promotion is blocked by the
+remaining ours-only diff lines outside Phase 9: 73 (Object.prototype.addProperty
+override), 123/124 (Phase 5 arguments enum), 146/147 (Function.as:568/569
+`new this`), 162/163/170/171/178/179 (Phase 7 remainder — `hasOwnProperty`
+on primitive boxes), 221/223 (Function.as:802/808 plain-call `this` →
+movieclip). All five clusters must clear before v6 promotes.
+
+No regressions: avm1 assetnative/assetnative_ids/native_objects_swf6-8/
+as2_oop/extends_chain/object_constructor/function_as_function/closure_scope,
+gnash actionscript.all Global-v6/v7, Inheritance-v6, Object-v6, ASnative-v6,
+toString_valueOf-v6 all effective-pass.
 
 ### 2026-05-21 — Phase 6 landed (type-1 call arg-count discipline = eval-stack survival)
 
