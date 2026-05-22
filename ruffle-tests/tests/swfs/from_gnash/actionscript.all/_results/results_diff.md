@@ -1,7 +1,7 @@
 # Ruffle Test Results Diff
 
-**Previous:** `ff61bed4bb2f` (2026-05-22T00:14:37.855685+00:00)
-**Current:** `9516b17f890c` (2026-05-22T00:51:47.789789+00:00)
+**Previous:** `9516b17f890c` (2026-05-22T00:51:47.789789+00:00)
+**Current:** `fe2bc553447e` (2026-05-22T01:48:01.238582+00:00)
 
 ## Summary
 
@@ -10,13 +10,14 @@
 | Passing | 128 | 128 | 0 |
 | Total | 243 | 243 | 0 |
 | Pass rate | 52.7% | 52.7% | 0% |
-| Mismatched lines | 9762 | 9662 | -100 |
-|   Decreased | | | -100 |
+| Mismatched lines | 9662 | 9631 | -31 |
+|   Decreased | | | -31 |
 
-## Line Count Changed (3)
+## Line Count Changed (4)
 
 | Test | Status | Lines (prev) | Lines (now) | Diff |
 |------|--------|--------------|-------------|------|
-| `TextField-v6` | output_mismatch | 404/545 | 438/545 | -34 |
-| `TextField-v7` | output_mismatch | 413/570 | 447/570 | -34 |
-| `TextField-v8` | output_mismatch | 416/571 | 448/571 | -32 |
+| `Function-v6` | output_mismatch | 213/271 | 223/271 | -10 |
+| `Function-v7` | output_mismatch | 206/272 | 216/272 | -10 |
+| `Function-v8` | output_mismatch | 206/272 | 216/272 | -10 |
+| `TextField-v8` | output_mismatch | 448/571 | 449/571 | -1 |
