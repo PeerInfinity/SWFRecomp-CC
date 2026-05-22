@@ -40065,6 +40065,13 @@ void actionDefineLocal(SWFAppContext* app_context)
 	// In Ruffle, type 1 functions resolve via Callable this-binding; we approximate by storing on MC.
 	int _dl_resolve_paths = (g_call_depth == 0) ||
 		(g_current_executing_func != NULL && g_current_executing_func->function_type == 1);
+	// A type-1 function called bare from a local scope now binds `this` to
+	// that scope object, so a literal path-shaped key must also land on the
+	// innermost local scope for `this['/:pqr']` to resolve. Capture it here.
+	ASObject* _dl_local_scope = NULL;
+	if (_dl_resolve_paths && g_call_depth > 0 && scope_depth > 0 &&
+	    !scope_is_with[scope_depth - 1])
+		_dl_local_scope = scope_chain[scope_depth - 1];
 	if (_dl_resolve_paths) {
 		const char* colon = NULL;
 		for (int ci = (int)var_name_len - 1; ci >= 0; ci--) {
@@ -40092,6 +40099,10 @@ void actionDefineLocal(SWFAppContext* app_context)
 					}
 					setProperty(app_context, (ASObject*)target_mc->dynamic_props,
 						var_name, var_name_len, &value_var);
+					// Also store the literal key on the innermost local scope so
+					// `this['/:pqr']` resolves when `this` is bound to that scope.
+					if (_dl_local_scope != NULL)
+						setProperty(app_context, _dl_local_scope, var_name, var_name_len, &value_var);
 					POP_2();
 					return;
 				}
@@ -40136,6 +40147,8 @@ void actionDefineLocal(SWFAppContext* app_context)
 						PUSH_STR(prop_name, prop_len);
 						pushVar(app_context, &value_var);
 						actionSetMember(app_context);
+						if (_dl_local_scope != NULL)
+							setProperty(app_context, _dl_local_scope, var_name, var_name_len, &value_var);
 						POP_2();
 						return;
 					}
@@ -40176,6 +40189,8 @@ void actionDefineLocal(SWFAppContext* app_context)
 					PUSH_STR(prop_name, prop_len);
 					pushVar(app_context, &value_var);
 					actionSetMember(app_context);
+					if (_dl_local_scope != NULL)
+						setProperty(app_context, _dl_local_scope, var_name, var_name_len, &value_var);
 					POP_2();
 					return;
 				}
