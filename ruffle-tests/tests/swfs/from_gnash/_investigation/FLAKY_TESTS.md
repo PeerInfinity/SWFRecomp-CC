@@ -78,8 +78,39 @@ choice on our side.
 
 ---
 
+## ~~actionscript.all / TextField-v6, TextField-v7, TextField-v8~~ — RESOLVED (2026-05-22)
+
+**Was:** `matching_lines` wobbled by ±1 across CI runs at different SHAs with no
+pass/fail flip. Observed over 6 consecutive CI snapshots: v6 = 437/438/438/438/438/438,
+v7 = 446/446/447/447/447/447, v8 = 448/449/448/449/449/448 (all `output_mismatch`).
+Local reruns of `TextField-v6` confirmed it directly — the per-line diff hash
+changed between back-to-back runs at a fixed binary.
+
+**Cause:** The `backgroundColor` / `borderColor` / `textColor` setter in
+`actionSetMember` (`SWFModernRuntime/src/actionmodern/action.c`) coerced its
+value with bare `varToDouble`, which **bit-reinterprets a STRING/OBJECT
+operand's heap pointer as a `double`**. `TextField.as:269-273` does
+`tf.backgroundColor = 'red'` (a string) and `tf.backgroundColor = o` (an object
+with `valueOf`), so the stored color became ASLR-nondeterministic garbage
+(observed `2389084` vs `982039` for the same assignment on two runs). The two
+lines `[./TextField.as:270]` and `[./TextField.as:273]` therefore matched the
+expected value only by coincidence on any given run.
+
+**Fix (2026-05-22):** Switched the color-property setter to
+`varToDoubleSWF(app_context, &value_var, g_swf_version)`, which routes a STRING
+through ECMA ToNumber (`'red'` → NaN → `0x000000`) and invokes `valueOf` on an
+OBJECT (`o` → `0x0000FF`). This is both deterministic *and* Flash-correct —
+lines 270 and 273 now genuinely PASS rather than coincidentally matching. Each
+of v6/v7/v8 gained +2 matching lines and the count is locked across reruns
+(verified: 8 back-to-back local runs of `TextField-v6` produced an identical
+diff hash). Same root cause as the documented `varToDouble` ASLR garbage in the
+Drawing-API `lineStyle` thickness coercion.
+
+---
+
 ## Summary Table
 
 | Test | Status | Cause | Fixed in |
 |------|--------|-------|----------|
 | ~~actionscript.all / array-v5~~ | RESOLVED | `Math.random()` inside `Array.sort` comparator | `f42c9fc2` (2026-04-16) |
+| ~~actionscript.all / TextField-v6/v7/v8~~ | RESOLVED | `varToDouble` bit-reinterprets STRING/OBJECT pointer in color setter | 2026-05-22 |

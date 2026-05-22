@@ -45673,7 +45673,12 @@ void actionSetMember(SWFAppContext* app_context)
 				strcmp(prop_name, "borderColor") == 0 ||
 				strcmp(prop_name, "textColor") == 0)
 			{
-				double dval = varToDouble(&value_var);
+				// varToDoubleSWF (not varToDouble): a STRING value goes through
+				// ECMA ToNumber ('red' → NaN → 0) and an OBJECT with valueOf is
+				// invoked. Bare varToDouble bit-reinterprets the string/object
+				// pointer as a double — ASLR-nondeterministic garbage, which
+				// made TextField-v6/v7/v8 flaky on TextField.as:270/273.
+				double dval = varToDoubleSWF(app_context, &value_var, g_swf_version);
 				int32_t ival = ecmaToInt32(dval);
 				u32 masked = (u32)ival & 0x00FFFFFF;
 				value_var.type = ACTION_STACK_VALUE_F64;
