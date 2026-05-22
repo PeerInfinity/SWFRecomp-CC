@@ -1,9 +1,9 @@
 {
   "metadata": {
-    "old_timestamp": "2026-05-21T22:34:19.225082+00:00",
-    "old_git_sha": "464a0defa418815331fda87eca9b7e24450c181d",
-    "new_timestamp": "2026-05-21T23:29:55.203343+00:00",
-    "new_git_sha": "509d342d2f6e3fdc57f0cf6a94791f4909d523a6",
+    "old_timestamp": "2026-05-21T23:29:55.203343+00:00",
+    "old_git_sha": "509d342d2f6e3fdc57f0cf6a94791f4909d523a6",
+    "new_timestamp": "2026-05-22T00:14:37.855685+00:00",
+    "new_git_sha": "ff61bed4bb2fd558bba09deb39be2cf51310967f",
     "partial": false,
     "same_commit": false
   },
@@ -18,10 +18,10 @@
     "new_effective_pass": 219,
     "new_total": 243,
     "new_pass_rate": 52.7,
-    "old_mismatched_lines": 9765,
-    "new_mismatched_lines": 9761,
-    "increased_mismatches": 1,
-    "decreased_mismatches": 5,
+    "old_mismatched_lines": 9761,
+    "new_mismatched_lines": 9762,
+    "increased_mismatches": 2,
+    "decreased_mismatches": 1,
     "newly_passing": 0,
     "newly_failing": 0,
     "status_changed": 0,
@@ -38,12 +38,12 @@
       "old_lines": {
         "actual_lines": 545,
         "expected_lines": 545,
-        "matching_lines": 404
+        "matching_lines": 403
       },
       "new_lines": {
         "actual_lines": 545,
         "expected_lines": 545,
-        "matching_lines": 403
+        "matching_lines": 404
       }
     },
     {
@@ -54,12 +54,12 @@
       "old_lines": {
         "actual_lines": 570,
         "expected_lines": 570,
-        "matching_lines": 413
+        "matching_lines": 414
       },
       "new_lines": {
         "actual_lines": 570,
         "expected_lines": 570,
-        "matching_lines": 414
+        "matching_lines": 413
       }
     },
     {
@@ -70,12 +70,12 @@
       "old_lines": {
         "actual_lines": 101,
         "expected_lines": 101,
-        "matching_lines": 91
+        "matching_lines": 95
       },
       "new_lines": {
         "actual_lines": 101,
         "expected_lines": 101,
-        "matching_lines": 95
+        "matching_lines": 94
       }
     }
   ]
