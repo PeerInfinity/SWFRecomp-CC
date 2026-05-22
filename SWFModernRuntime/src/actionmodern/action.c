@@ -50620,6 +50620,18 @@ void actionNewObject(SWFAppContext* app_context)
 	// ---- Stub constructors with native_type (for __initializeNative detection) ----
 	else if (strcmp(ctor_name, "TextSnapshot") == 0)
 	{
+		// If the user has clobbered `TextSnapshot` to undefined/null, this is
+		// `new undefined()` and yields undefined (TextSnapshotTest.c:291).
+		PUSH_STR("TextSnapshot", 12);
+		actionGetVariable(app_context);
+		ActionStackValueType ts_var_type = STACK_TOP_TYPE;
+		POP();
+		if (ts_var_type == ACTION_STACK_VALUE_UNDEFINED ||
+		    ts_var_type == ACTION_STACK_VALUE_NULL)
+		{
+			pushUndefined(app_context);
+			return;
+		}
 		// TextSnapshot: native only when first arg is a MovieClip, and exactly 1 arg
 		ASObject* obj = allocObject(app_context, 8);
 		if (num_args == 1 && args[0].type == ACTION_STACK_VALUE_MOVIECLIP) {
@@ -64243,9 +64255,21 @@ void actionCallMethod(SWFAppContext* app_context, char* str_buffer)
 			actionGetVariable(app_context);
 
 			ASFunction* ts_ctor = NULL;
+			ActionStackValueType ts_ctor_type = STACK_TOP_TYPE;
 			if (STACK_TOP_TYPE == ACTION_STACK_VALUE_FUNCTION)
 				ts_ctor = (ASFunction*)STACK_TOP_VALUE;
 			POP();
+
+			// Flash's getTextSnapshot() builds the result via the global
+			// TextSnapshot constructor; if the user has clobbered
+			// `_global.TextSnapshot` to undefined/null the call yields
+			// undefined (TextSnapshotTest.c:295).
+			if (ts_ctor_type == ACTION_STACK_VALUE_UNDEFINED ||
+			    ts_ctor_type == ACTION_STACK_VALUE_NULL)
+			{
+				pushUndefined(app_context);
+				return;
+			}
 
 			int has_body = ts_ctor != NULL &&
 				((ts_ctor->function_type == 1 && ts_ctor->simple_func != NULL) ||
