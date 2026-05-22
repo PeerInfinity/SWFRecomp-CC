@@ -61426,6 +61426,24 @@ void actionCallMethod(SWFAppContext* app_context, char* str_buffer)
 							VAL(double, &_sp_len.data.numeric_value) = _sp_len_d;
 							setPropertyWithFlags(app_context, _sp_wrap, "length", 6, &_sp_len, PROPERTY_FLAG_WRITABLE);
 						}
+						// Flash quirk: a primitive String's transient wrapper box
+						// claims `__constructor__` as an own property in all
+						// versions, and `constructor` as an own property only in
+						// SWF6 (Function.as:634/638 — v6 expects both true, v7+
+						// expects `!hasOwnProperty('constructor')`). Mirror them
+						// from the String wrapper prototype so a builtin
+						// hasOwnProperty dispatched on this box reports correctly.
+						{
+							ActionVar* _sp_cctor = getPropertyWithPrototype(_sp_proto, "__constructor__", 15);
+							if (_sp_cctor != NULL)
+								setPropertyWithFlags(app_context, _sp_wrap, "__constructor__", 15, _sp_cctor, PROPERTY_FLAGS_DONTENUM);
+							if (g_swf_version <= 6)
+							{
+								ActionVar* _sp_ctor = getPropertyWithPrototype(_sp_proto, "constructor", 11);
+								if (_sp_ctor != NULL)
+									setPropertyWithFlags(app_context, _sp_wrap, "constructor", 11, _sp_ctor, PROPERTY_FLAGS_DONTENUM);
+							}
+						}
 
 						if (g_call_depth >= g_max_call_depth - 1) {
 							if (args != NULL) FREE(args);
@@ -66842,6 +66860,31 @@ _mc_user_dispatch: ;
 		{
 			if (args != NULL) FREE(args);
 			pushVar(app_context, &obj_var);
+		}
+		else if (method_name_len == 14 && strncasecmp(method_name, "hasOwnProperty", 14) == 0)
+		{
+			// Flash quirk: a primitive Number/Boolean's transient wrapper box
+			// claims `__constructor__` as an own property in all versions, and
+			// `constructor` as an own property only in SWF6 (Function.as:618/622
+			// expect both true on v6; v7+ expect `!hasOwnProperty('constructor')`
+			// but still `hasOwnProperty('__constructor__')`). The box has no
+			// other own props, so every other name reports false.
+			int _hop = 0;
+			if (num_args >= 1 && args != NULL && args[0].type == ACTION_STACK_VALUE_STRING)
+			{
+				char _hopbuf[32];
+				int _hoplen = (int) u16_to_utf8(varGetU16Ptr(&args[0]), args[0].str_size,
+				                                _hopbuf, sizeof(_hopbuf));
+				if (_hoplen == 15 && strncmp(_hopbuf, "__constructor__", 15) == 0)
+					_hop = 1;
+				else if (_hoplen == 11 && strncmp(_hopbuf, "constructor", 11) == 0)
+					_hop = (g_swf_version <= 6);
+			}
+			if (args != NULL) FREE(args);
+			ActionVar _hopv = {0};
+			_hopv.type = ACTION_STACK_VALUE_BOOLEAN;
+			_hopv.data.numeric_value = (u64) _hop;
+			pushVar(app_context, &_hopv);
 		}
 		else
 		{

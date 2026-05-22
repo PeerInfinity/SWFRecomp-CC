@@ -29,7 +29,7 @@ phases:
     status: complete
   - id: 7
     name: "Primitive auto-boxing __constructor__ chain (Number/String/Boolean)"
-    status: in_progress
+    status: complete
   - id: 8
     name: "super-binding property assignments not landing on this (myMail.subject == 'greetings')"
     status: complete
@@ -58,6 +58,64 @@ status_note: |
 -->
 
 ## Status
+
+### 2026-05-22 — Phase 7 complete (primitive-box `hasOwnProperty` own-prop synthesis)
+
+Cluster G's last residual — `a.hasOwnProperty('constructor')` /
+`a.hasOwnProperty('__constructor__')` on a primitive Number/String/Boolean
+`a` — is fixed. The 2026-05-22 Phase-7-partial work had already made
+`a.constructor` / `a.__constructor__` resolve and compare correctly; only
+the `hasOwnProperty` ownership claim was outstanding.
+
+The version rule the test's `output.fpN.txt` exhibits:
+- `__constructor__` is an own property of the transient wrapper box in
+  **all** versions (`a.hasOwnProperty('__constructor__')` → true on
+  v6/v7/v8);
+- `constructor` is an own property of the box **only in SWF6**
+  (v6 expects `a.hasOwnProperty('constructor')` true; v7/v8 expect
+  `!a.hasOwnProperty('constructor')`). This mirrors the AVM1 `new`
+  operator versioning — SWF6 instances carry `constructor` directly,
+  SWF7+ carry only `__constructor__` and inherit `constructor`.
+
+Two changes in `SWFModernRuntime/src/actionmodern/action.c`:
+
+1. **Number/Boolean primitive branch** (`actionCallMethod`, the
+   F64/F32/BOOLEAN receiver tail). A new `hasOwnProperty` handler sits
+   beside the existing `toString`/`valueOf` cases — these primitives are
+   dispatched directly (no auto-box), so the handler reports `true` for
+   `__constructor__`, `true` for `constructor` only when
+   `g_swf_version <= 6`, and `false` for every other name (the box has
+   no other own props).
+
+2. **String primitive transient box.** A string primitive *does*
+   auto-box for method dispatch (the `_sp_wrap` NATIVE_STRING object
+   built for user/Object-prototype method calls — `hasOwnProperty`
+   resolves through the wrapper proto to `Object.prototype.hasOwnProperty`
+   and runs `builtin_object_hasOwnProperty` on `_sp_wrap`). `_sp_wrap`
+   now gets `__constructor__` as a DONTENUM own prop unconditionally and
+   `constructor` only when `g_swf_version <= 6`, both mirrored from the
+   String wrapper prototype, so the builtin sees them via `hasPropertyRaw`.
+
+Effect: Function-v6 `#passed` 242 → 248 (+6: lines 162/163/170/171/178/179
+all flip); v7/v8 220 → 223 (+3 each — the `!hasOwnProperty('constructor')`
+lines already passed accidentally via `!undefined`, so only the three
+`__constructor__` lines flip). v5 unaffected (its primitive cluster is
+version-gated out).
+
+No regressions: avm1 boxed_primitives/primitive_type_globals/as2_oop/
+extends_chain/object_constructor/instanceof_coercions/typeof/enumerate/
+coerce_to_object_monkeypatch/string_coercion/string_methods/
+string_ops_swf6/string_paths_eval2/array_prototyping/xmlnode_proto/
+native_subclasses/constructor_function/new_object_enumerate (18/18 PASS);
+gnash actionscript.all Number-v5..v8/Boolean-v5/v7/v8/Object-v5/v6/
+String-v6/v7/toString_valueOf-v6/Inheritance-v6 (13/13 effective pass).
+
+**Function-v6 still `output_mismatch`** — remaining ours-only diff lines
+are 73 (Object.prototype.addProperty override), 81 (`stringInstance.__proto__`),
+122/123/124 (Phase 5 arguments enum), 146/147 (`new this`), 221/223
+(Phase 3 plain-call `this` → movieclip), 256/257 (Phase 9 residual,
+inside Ruffle's diff set). Phases 5 + the 73/81/146/147/221/223 cluster
+must clear before v6 promotes.
 
 ### 2026-05-22 — Phase 9 mostly landed (ASnative(1,0) + conditional __proto__/constructor)
 
