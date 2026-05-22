@@ -50904,6 +50904,18 @@ void actionNewObject(SWFAppContext* app_context)
 			if (rvar != NULL && rvar->type == ACTION_STACK_VALUE_FUNCTION)
 				ctor_func = (ASFunction*) rvar->data.numeric_value;
 		}
+		// `new this`: the `this` keyword is bound through g_this_stack, not
+		// var_map / scope_chain, so none of the lookups above can see it.
+		// Resolve it the same way a GetVariable("this") would. Function.as:560
+		// (`Function.prototype['new'] = function(){ return new this; }`).
+		if (ctor_func == NULL && ctor_name_len == 4 && strcmp(ctor_name, "this") == 0)
+		{
+			PUSH_STR("this", 4);
+			actionGetVariable(app_context);
+			if (STACK_TOP_TYPE == ACTION_STACK_VALUE_FUNCTION)
+				ctor_func = (ASFunction*) STACK_TOP_VALUE;
+			POP();
+		}
 		// If ctor_func resolves to a built-in stub constructor with native construction
 		// semantics (e.g. flash.display.BitmapData), dispatch to its native builder
 		// instead of generic user-defined-ctor handling. This covers both `new BitmapData()`
@@ -56673,11 +56685,15 @@ void actionCallFunction(SWFAppContext* app_context, char* str_buffer)
 				// Push 'this' binding for type 1 functions (DefineFunction)
 				// In Flash, 'this' defaults to current context MC for plain calls,
 				// unless the function was found on a WITH scope object (then this = that object).
-				// Non-WITH scopes (local scopes) should NOT override 'this' for type 1 functions —
-				// only type 2 functions (DefineFunction2) get scope-object-as-this via g_override_this.
+				// A function resolved from a plain (non-MC) local scope object also
+				// binds `this` to that scope object — Ruffle's scope.resolve() returns
+				// Callable(locals_obj, fn) for every scope level, so a bare call to a
+				// local-variable function sees the activation's locals object as `this`
+				// (Function.as:797 `localGetThis()` → typeof(this)=='object').
 				u32 saved_this_depth_t1 = g_this_depth;
 				if (g_this_depth < MAX_THIS_DEPTH) {
-					if (has_callable_this && (callable_this_is_with || callable_this_from_path)) {
+					if (has_callable_this && (callable_this_is_with || callable_this_from_path ||
+					    callable_this.type == ACTION_STACK_VALUE_OBJECT)) {
 						g_this_stack[g_this_depth] = callable_this;
 					} else {
 						// Default this = current context MC (not root_movieclip)
@@ -60475,15 +60491,19 @@ void actionCallMethod(SWFAppContext* app_context, char* str_buffer)
 			return;
 		}
 
-		// Handle addProperty as built-in method — unless the object has
-		// its own user-defined `addProperty` property shadowing the
-		// builtin (it then dispatches via the generic method lookup
-		// below). Object.as:443.
+		// Handle addProperty as built-in method — unless a user-defined
+		// `addProperty` function shadows the builtin anywhere on the
+		// object's prototype chain (e.g. `Object.prototype.addProperty =
+		// function(){...}`). In that case dispatch via the generic method
+		// lookup below. Object.as:443, Function.as:286.
 		ASProperty* _own_addprop_ms = (method_name_len == 11 &&
 			strncasecmp(method_name, "addProperty", 11) == 0)
-			? findPropertyRaw(obj, "addProperty", 11) : NULL;
+			? findPropertyStructWithPrototype(obj, "addProperty", 11) : NULL;
+		bool _user_addprop_override = (_own_addprop_ms != NULL &&
+			_own_addprop_ms->value.type == ACTION_STACK_VALUE_FUNCTION &&
+			(ASFunction*) _own_addprop_ms->value.data.numeric_value != &g_object_addProperty_func);
 		if (method_name_len == 11 && strncasecmp(method_name, "addProperty", 11) == 0 &&
-		    !(_own_addprop_ms != NULL && _own_addprop_ms->value.type == ACTION_STACK_VALUE_FUNCTION))
+		    !_user_addprop_override)
 		{
 			u64 result = 0; // boolean false
 			if (num_args >= 3 && (args[0].type == ACTION_STACK_VALUE_STRING ||
@@ -62593,9 +62613,21 @@ void actionCallMethod(SWFAppContext* app_context, char* str_buffer)
 						pushVar(app_context, &args[i]);
 					if (args != NULL) FREE(args);
 
+					// Bind `this` to the function receiver — a method invoked
+					// on a function (e.g. `Foo['new']()`) sees `this == Foo`.
+					// Without this the type-1 body inherits the caller's stale
+					// g_this_stack top. Function.as:560 (`return new this`).
+					ActionVar t1_fm_this = {0};
+					t1_fm_this.type = ACTION_STACK_VALUE_FUNCTION;
+					t1_fm_this.data.numeric_value = (u64) func;
+					u32 saved_this_depth_fm1 = g_this_depth;
+					if (g_this_depth < MAX_THIS_DEPTH)
+						g_this_stack[g_this_depth++] = t1_fm_this;
+
 					g_call_depth++;
 					ActionVar result = ((ActionVar(*)(SWFAppContext*))mfunc->simple_func)(app_context);
 					g_call_depth--;
+					g_this_depth = saved_this_depth_fm1;
 					pushVar(app_context, &result);
 				}
 				else

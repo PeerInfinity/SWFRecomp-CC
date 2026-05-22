@@ -59,6 +59,51 @@ status_note: |
 
 ## Status
 
+### 2026-05-22 — Function-v6 → `ruffle_matched` (Phases 3/9 residual cluster cleared)
+
+`Function-v6` is now an effective pass. The five remaining ours-only diff
+lines (73, 146, 147, 221, 223) outside Ruffle's diff set were cleared by
+four changes in `SWFModernRuntime/src/actionmodern/action.c`:
+
+1. **`addProperty` prototype-chain override (line 73 / Function.as:287).**
+   The `actionCallMethod` OBJECT-receiver builtin-`addProperty` guard used
+   `findPropertyRaw` (own props only), so `Object.prototype.addProperty =
+   function(){ return 7; }` followed by `instance.addProperty()` still hit
+   the native builtin (→ `false`). Switched to
+   `findPropertyStructWithPrototype` and exclude the builtin
+   `&g_object_addProperty_func`; a user override anywhere on the chain now
+   dispatches via the generic method path.
+
+2. **`new this` constructor resolution (lines 146/147 / Function.as:560,
+   568-569).** `actionNewObject` resolves the constructor by *name*; for
+   `new this` the name is the literal `"this"`, which is bound through
+   `g_this_stack`, not var_map / scope_chain. Added a `ctor_name == "this"`
+   fallback that resolves it via `actionGetVariable("this")`.
+
+3. **Type-1 method-on-function `this` binding (also 146/147).** The
+   generic FUNCTION-receiver method dispatch in `actionCallMethod` (the
+   `mfunc->function_type == 1` arm at ~line 62610) never pushed `this`, so
+   a method invoked on a function (`Foo['new']()`) ran its type-1 body
+   with the caller's stale `g_this_stack` top. Now binds `this` to the
+   FUNCTION receiver `func` for the duration of the call — so `new this`
+   inside `Function.prototype['new']` sees `Foo`.
+
+4. **Type-1 plain-call `this` from a local scope (lines 221/223 /
+   Function.as:797-808).** A type-1 function resolved from a non-MC local
+   scope object now binds `this` to that scope object (matching Ruffle's
+   `scope.resolve()` → `Callable(locals_obj, fn)`), instead of defaulting
+   to the current-context MovieClip. `actionCallFunction`'s type-1 `this`
+   branch now also accepts `callable_this.type == OBJECT`.
+
+`Function-v6` 251 → 256 `#passed`, diff now ⊆ Ruffle's → auto-promoted.
+v5/v7/v8 unaffected (still output_mismatch — v7/v8 blocked on the Phase-2
+type-2 apply/call cluster, v5 on Phase-9 Function class identity).
+
+No regressions: 23-test AVM1 function/call/scope/closure/super/constructor
+battery, 14-test AVM1 addProperty/new/proto/primitive battery, 15-test
+gnash actionscript.all Inheritance/Object/case/Global/with/Number/Boolean
+battery — all effective-pass.
+
 ### 2026-05-22 — Phase 7 complete (primitive-box `hasOwnProperty` own-prop synthesis)
 
 Cluster G's last residual — `a.hasOwnProperty('constructor')` /

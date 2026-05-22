@@ -79,6 +79,24 @@ Suggested write order:
 
 ### Latest fix (2026-05-22, pending CI)
 
+- **`Function-v6` (actionscript.all): output_mismatch → `ruffle_matched`.**
+  Implements the FUNCTION_VN_PLAN Phase 3/9 residual cluster — four
+  changes in `SWFModernRuntime/src/actionmodern/action.c` clear the five
+  ours-only diff lines (73, 146, 147, 221, 223): (1) builtin-`addProperty`
+  guard now consults the full prototype chain
+  (`findPropertyStructWithPrototype`, excluding `&g_object_addProperty_func`)
+  so an `Object.prototype.addProperty` user override dispatches; (2)
+  `actionNewObject` resolves a `"this"` constructor name via
+  `actionGetVariable("this")` (g_this_stack) so `new this` works; (3) the
+  type-1 FUNCTION-receiver method dispatch in `actionCallMethod` binds
+  `this` to the function receiver (was leaving the caller's stale
+  g_this_stack top); (4) `actionCallFunction`'s type-1 path binds `this`
+  to a non-MC local scope object when the function was resolved from one
+  (Ruffle `scope.resolve()` → `Callable(locals, fn)`). v5/v7/v8 unchanged.
+  No regressions across 23-test AVM1 function/scope/super, 14-test
+  addProperty/new/primitive, 15-test gnash Inheritance/Object/Global
+  batteries. See `incomplete/FUNCTION_VN_PLAN.md`.
+
 - **`Sound-v5/v6/v7/v8` (actionscript.all): output_mismatch → `ruffle_matched`
   (all four).** Two changes in `SWFModernRuntime/src/actionmodern/action.c`,
   both Sound-only (blast radius is the Sound builtins).
