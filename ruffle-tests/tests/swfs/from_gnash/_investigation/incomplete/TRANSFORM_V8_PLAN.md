@@ -1,6 +1,13 @@
 # Transform-v8 Investigation Plan
 <!-- TESTS: Transform-v8 -->
 
+Last updated: 2026-05-21 (Phase 1 landed → colorTransform Fixed8
+overflow now collapses to the minimum (-32768 raw) instead of
+bit-wrapping. Our diff against `output.fp10.txt` shrank from 9 to
+6 mismatched lines (90 → 95 line-match). Test stays `ruffle_matched`.
+Phases 3/5 remain pending — shared diffs with Ruffle, don't block
+effective pass.)
+
 Last updated: 2026-05-21 (Phase 2 landed → standalone-Transform
 getters now honour `flash.geom.* = undefined` clobbering. Our diff
 against `output.fp10.txt` shrank from 13 to 9 mismatched lines
@@ -20,7 +27,7 @@ status: in_progress
 phases:
   - id: 1
     name: "colorTransform multiplier coercion (alphaMultiplier=-128, etc.)"
-    status: pending
+    status: completed
   - id: 2
     name: "Standalone Transform object: matrix/colorTransform/pixelBounds return undefined"
     status: completed
@@ -70,6 +77,33 @@ back-propagation) — Ruffle fails the same lines, so they're effective
 pass and no longer block promotion.
 
 ### Fixes landed (2026-05-21)
+
+- **Phase 1 — colorTransform Fixed8 overflow collapses to the
+  minimum (Transform.as:93/103).** Flash stores color-transform
+  multipliers/offsets as signed 16-bit Fixed8 values; a value that
+  falls outside the int16 range collapses to the minimum (raw
+  `-32768`), in *either* overflow direction, rather than wrapping
+  the bit pattern. `mc._alpha = 13000` reads back as
+  `alphaMultiplier=-128` (raw `-32768`); `new ColorTransform(…,
+  2342341, 11234112, …)` reads back `greenMultiplier=blueMultiplier
+  =-128` and out-of-range offsets as `-32768`. Three changes in
+  `SWFModernRuntime/src/actionmodern/action.c`: (a) new helper
+  `ctClampFixed(double)` rounds to int16, returning `-32768` for
+  non-finite or out-of-range inputs; (b) `ctObjToRaw` (used by the
+  `transform.colorTransform =` setter) now routes every
+  multiplier/offset through `ctClampFixed`; (c) new
+  `quantifyColorMultClamp` (clamping variant of `quantifyColorMult`)
+  is used by the two `_alpha`-setter `cx_aa` sync sites.
+  **`Color.setTransform` deliberately keeps the plain wrapping
+  `quantifyColorMult`** — the avm1 `color` test's "setTransform 5
+  (overflow)" expects a wrapped multiplier (`greenMultiplier`
+  reads back `2401.171875`, not the clamped minimum), so the two
+  paths must differ. Lines 27/30 of the result file flip to match;
+  diff shrinks `{27,30,…}` → 6 lines ⊆ Ruffle's 11. No regressions:
+  avm1 `color`/`color_transform`/`bitmap_data_colortransform`/
+  `as_transformed_flag`/`display_object_properties`/
+  `movieclip_state_values`/`movieclip_default_state` all PASS;
+  gnash `Transform-v5/v6/v7` PASS.
 
 - **Phase 2 — standalone Transform getters honour flash-package
   clobbering (Transform.as:110/113/116/121).** The "Tricks with the
@@ -147,9 +181,16 @@ and its `mc.transform`.
 
 ## Failure clusters
 
-### A. colorTransform multiplier coercion (Phase 1)
+### A. colorTransform multiplier coercion (Phase 1) — RESOLVED 2026-05-21
 
 Lines: 27, 30.
+
+**RESOLVED.** The truncation was a bit-wrap (`(s16)lround(...)`);
+Flash collapses out-of-range Fixed8 values to the minimum. See
+"Fixes landed (2026-05-21)" above. The diagnosis below was partly
+wrong — the `-128, -128, -128` case is not a channel-ordering bug,
+it is simply three independent overflows, each collapsing to the
+minimum.
 
 ```
 - FAILED: expected: "(redMultiplier=1, greenMultiplier=1, blueMultiplier=1, alphaMultiplier=-128, ...)" obtained: (... alphaMultiplier=-126, ...) [./Transform.as:93]

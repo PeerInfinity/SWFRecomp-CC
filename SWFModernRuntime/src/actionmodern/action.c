@@ -8525,6 +8525,21 @@ static void mc_get_local_mouse(SWFAppContext* app_context, MovieClip* mc,
 	}
 }
 
+// Round a double to an int16 Fixed8 field. Flash stores color-transform
+// multipliers/offsets as signed 16-bit values; any value that falls outside
+// the int16 range collapses to the minimum (-32768) rather than wrapping —
+// e.g. ColorTransform multiplier 2342341 reads back as -128 (raw -32768),
+// and offset 1222222 reads back as -32768. Verified against Flash Player's
+// Transform.as expected output (out-of-range overflow in either direction
+// → minimum, never the truncated bit pattern).
+static s16 ctClampFixed(double v)
+{
+	if (!isfinite(v)) return (s16)-32768;
+	double r = round(v);
+	if (r < -32768.0 || r > 32767.0) return (s16)-32768;
+	return (s16)(long)r;
+}
+
 // Extract CT raw Fixed8 values from a ColorTransform ASObject.
 static void ctObjToRaw(ASObject* ct_obj,
 	s16* ra, s16* ga, s16* ba, s16* aa,
@@ -8538,14 +8553,14 @@ static void ctObjToRaw(ASObject* ct_obj,
 	double go = propToDouble(ct_obj, "greenOffset",     11);
 	double bo = propToDouble(ct_obj, "blueOffset",      10);
 	double ao = propToDouble(ct_obj, "alphaOffset",     11);
-	*ra = isnan(rm) ? 256 : (s16)lround(rm * 256.0);
-	*ga = isnan(gm) ? 256 : (s16)lround(gm * 256.0);
-	*ba = isnan(bm) ? 256 : (s16)lround(bm * 256.0);
-	*aa = isnan(am) ? 256 : (s16)lround(am * 256.0);
-	*rb = isnan(ro) ? 0 : (s16)lround(ro);
-	*gb = isnan(go) ? 0 : (s16)lround(go);
-	*bb = isnan(bo) ? 0 : (s16)lround(bo);
-	*ab = isnan(ao) ? 0 : (s16)lround(ao);
+	*ra = isnan(rm) ? 256 : ctClampFixed(rm * 256.0);
+	*ga = isnan(gm) ? 256 : ctClampFixed(gm * 256.0);
+	*ba = isnan(bm) ? 256 : ctClampFixed(bm * 256.0);
+	*aa = isnan(am) ? 256 : ctClampFixed(am * 256.0);
+	*rb = isnan(ro) ? 0 : ctClampFixed(ro);
+	*gb = isnan(go) ? 0 : ctClampFixed(go);
+	*bb = isnan(bo) ? 0 : ctClampFixed(bo);
+	*ab = isnan(ao) ? 0 : ctClampFixed(ao);
 }
 
 // 2D affine composition: result = outer * inner (outer applied after inner).
@@ -10438,6 +10453,18 @@ static double quantifyColorMult(double d)
 	int32_t i32 = ecmaToInt32Color(d);
 	int32_t scaled = (int32_t)((int64_t)i32 * 256 / 100);
 	return (double)(int16_t)scaled * 100.0 / 256.0;
+}
+
+// Like quantifyColorMult but, on Fixed8 overflow, collapses to the minimum
+// (-32768 raw) instead of wrapping. The `_alpha` setter and `transform.
+// colorTransform =` use this clamping behaviour — e.g. `mc._alpha = 13000`
+// reads back as alphaMultiplier -128. `Color.setTransform` instead wraps
+// (plain quantifyColorMult), matching the avm1 `color` test.
+static double quantifyColorMultClamp(double d)
+{
+	int32_t i32 = ecmaToInt32Color(d);
+	int32_t scaled = (int32_t)((int64_t)i32 * 256 / 100);
+	return (double)ctClampFixed((double)scaled) * 100.0 / 256.0;
 }
 
 // Quantize a Color setTransform addend value through int16.
@@ -39506,7 +39533,7 @@ void actionSetVariable(SWFAppContext* app_context)
 			if (num_ok) {
 				// Quantize through 8.8 fixed-point like Flash's color transform
 				mc->alpha = (float)((double)(int16_t)roundf(fval * 256.0f / 100.0f) * 100.0 / 256.0);
-				mc->cx_aa = (float)quantifyColorMult(dval);  // Sync MC color transform (uses integer truncation like setTransform)
+				mc->cx_aa = (float)quantifyColorMultClamp(dval);  // Sync MC color transform; `_alpha` overflow clamps to Fixed8 minimum
 #if defined(NO_GRAPHICS) || defined(OFFSCREEN_RENDER)
 				// Sync with display list cx_aa so Color.getTransform() reads the updated value
 				{
@@ -45076,7 +45103,7 @@ void actionSetMember(SWFAppContext* app_context)
 					if (dval_invalid) return;
 					// Quantize through 8.8 fixed-point like Flash's color transform
 					mc->alpha = (float)((double)(int16_t)roundf(fval * 256.0f / 100.0f) * 100.0 / 256.0);
-					mc->cx_aa = (float)quantifyColorMult(dval);  // Sync MC color transform (uses integer truncation like setTransform)
+					mc->cx_aa = (float)quantifyColorMultClamp(dval);  // Sync MC color transform; `_alpha` overflow clamps to Fixed8 minimum
 #if defined(NO_GRAPHICS) || defined(OFFSCREEN_RENDER)
 					// Sync with display list cx_aa so Color.getTransform() reads the updated value
 					{
