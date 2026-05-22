@@ -1,9 +1,9 @@
 {
   "metadata": {
-    "old_timestamp": "2026-05-22T02:55:35.492277+00:00",
-    "old_git_sha": "eb3b66ccfb3b5474317dfd86ab2ddf6501c3335f",
-    "new_timestamp": "2026-05-22T03:29:59.875019+00:00",
-    "new_git_sha": "1ba01729a9382eacc504b727e3c0f0dd586b3081",
+    "old_timestamp": "2026-05-22T03:29:59.875019+00:00",
+    "old_git_sha": "1ba01729a9382eacc504b727e3c0f0dd586b3081",
+    "new_timestamp": "2026-05-22T18:11:24.582679+00:00",
+    "new_git_sha": "1186fc64558760375bb3fcfc672f8d9d05e29334",
     "partial": false,
     "same_commit": false
   },
@@ -19,15 +19,48 @@
     "new_total": 661,
     "new_pass_rate": 91.4,
     "old_mismatched_lines": 9130,
-    "new_mismatched_lines": 9130,
+    "new_mismatched_lines": 9120,
     "increased_mismatches": 0,
-    "decreased_mismatches": 0,
+    "decreased_mismatches": 10,
     "newly_passing": 0,
     "newly_failing": 0,
     "status_changed": 0,
-    "unchanged": 661,
+    "unchanged": 659,
     "added": 0,
     "removed": 0
   },
-  "changes": []
+  "changes": [
+    {
+      "test": "sound_getters",
+      "change_type": "changed",
+      "old_status": "output_mismatch",
+      "new_status": "output_mismatch",
+      "old_lines": {
+        "actual_lines": 99,
+        "expected_lines": 99,
+        "matching_lines": 83
+      },
+      "new_lines": {
+        "actual_lines": 99,
+        "expected_lines": 99,
+        "matching_lines": 92
+      }
+    },
+    {
+      "test": "sound_nested_clips",
+      "change_type": "changed",
+      "old_status": "output_mismatch",
+      "new_status": "output_mismatch",
+      "old_lines": {
+        "actual_lines": 10,
+        "expected_lines": 10,
+        "matching_lines": 5
+      },
+      "new_lines": {
+        "actual_lines": 10,
+        "expected_lines": 10,
+        "matching_lines": 6
+      }
+    }
+  ]
 }

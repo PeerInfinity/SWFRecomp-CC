@@ -1,7 +1,7 @@
 # Ruffle Test Results Diff
 
-**Previous:** `eb3b66ccfb3b` (2026-05-22T02:55:35.518690+00:00)
-**Current:** `1ba01729a938` (2026-05-22T03:29:59.896903+00:00)
+**Previous:** `1ba01729a938` (2026-05-22T03:29:59.896903+00:00)
+**Current:** `1186fc645587` (2026-05-22T18:11:24.609170+00:00)
 
 ## Summary
 
@@ -10,17 +10,22 @@
 | Passing | 128 | 128 | 0 |
 | Total | 243 | 243 | 0 |
 | Pass rate | 52.7% | 52.7% | 0% |
-| Mismatched lines | 9620 | 9606 | -14 |
-|   Decreased | | | -25 |
-|   Increased | | | +11 |
+| Mismatched lines | 9606 | 9553 | -53 |
+|   Decreased | | | -54 |
+|   Increased | | | +1 |
 
-## Line Count Changed (6)
+## Status Changed (4)
+
+| Test | Previous | Current | Lines (prev) | Lines (now) |
+|------|----------|---------|--------------|-------------|
+| `Sound-v5` | output_mismatch | ruffle_matched | 73/100 | 84/100 |
+| `Sound-v6` | output_mismatch | ruffle_matched | 93/121 | 107/121 |
+| `Sound-v7` | output_mismatch | ruffle_matched | 93/121 | 107/121 |
+| `Sound-v8` | output_mismatch | ruffle_matched | 93/121 | 107/121 |
+
+## Line Count Changed (2)
 
 | Test | Status | Lines (prev) | Lines (now) | Diff |
 |------|--------|--------------|-------------|------|
-| `argstest-v7` | output_mismatch | 56/2061 | 67/2061 | -11 |
-| `Function-v6` | output_mismatch | 232/271 | 238/271 | -6 |
-| `argstest-v8` | output_mismatch | 53/2434 | 58/2434 | -5 |
-| `Function-v5` | output_mismatch | 138/158 | 141/158 | -3 |
-| `TextField-v8` | output_mismatch | 449/571 | 448/571 | +1 |
-| `argstest-v6` | output_mismatch | 52/2192 | 42/2192 | +10 |
+| `TextField-v8` | output_mismatch | 448/571 | 449/571 | -1 |
+| `TextField-v7` | output_mismatch | 447/570 | 446/570 | +1 |
