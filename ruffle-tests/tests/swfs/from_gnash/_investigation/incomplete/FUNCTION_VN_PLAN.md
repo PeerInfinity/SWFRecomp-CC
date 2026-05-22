@@ -32,7 +32,7 @@ phases:
     status: in_progress
   - id: 8
     name: "super-binding property assignments not landing on this (myMail.subject == 'greetings')"
-    status: pending
+    status: complete
   - id: 9
     name: "Function.__proto__ identity / Function.prototype mutation"
     status: pending
@@ -58,6 +58,68 @@ status_note: |
 -->
 
 ## Status
+
+### 2026-05-21 — Phase 8 landed (type-1 constructor arg-count discipline)
+
+Cluster H (`super()` property assignments) is fixed, and the root cause
+turned out to be broader than "super-depth machinery" — it was a
+type-1 (old-ming `DefineFunction`) constructor calling convention bug.
+
+A generated `DefineFunction` body pops **exactly `param_count`** values
+off the eval stack to bind its named parameters (highest index first).
+Three `actionNewObject`/`actionNewMethod` type-1 ctor-invocation paths
+and the `actionCallFunction("super")` type-1 path each pushed the wrong
+number of values:
+
+1. **`actionNewObject` main type-1 path pushed args in *reverse***
+   (`for i = num_args-1 .. 0`). With `num_args == param_count` this
+   still bound every parameter to the wrong slot — `new Email('greetings',
+   'you','hello')` bound `subject='hello'`, `message='greetings'`. The
+   reverse loop was simply wrong; the generated reverse-pop binding wants
+   args pushed **forward** (args[0] first, so the last param is on top).
+
+2. **No padding for short calls.** `Email.prototype = new Mail` calls
+   `Mail` (2 params) with 0 args. `Mail`'s body still popped 2 values —
+   stealing the `Email` function ref and the `"prototype"` string that
+   were sitting on the caller's stack as the pending `SetMember`
+   operands. So `Email.prototype = new Mail` never ran as a SetMember at
+   all (it consumed garbage operands), Email's `prototype_obj` was never
+   updated, and `super()` later found no `__constructor__`.
+
+3. **No cap for over-long calls.** `super('you','hello')` to `Spam`
+   (0 params) pushed 2 args that `Spam` never popped. The 2 stale values
+   survived on the eval stack and shifted the next statement's operands:
+   `myMail = new Email(...)` popped the constructor result as the value
+   but a stale `'hello'` as the variable name, so `myMail` was never
+   reassigned (Phase-8 line 745/746 read the *previous* instance).
+
+Fix in `SWFModernRuntime/src/actionmodern/action.c`: all four type-1
+invocation sites now push **exactly `param_count`** values — forward
+order, `args[0..min(num_args,param_count))`, padded with `undefined`
+up to `param_count`, extra args dropped. (Mirrors the existing
+`param_count` discipline in the clip-event listener dispatch at
+`action.c:~31338` and the Phase-2 `call`/`apply` padding.)
+
+Effect: Function-v5 `#passed` 127 → 129 (+2; `Email.prototype = new
+Mail` / `new Email` no longer corrupt the stack — v5 has no `super`);
+Function-v6 215 → 224 (+9; full cluster H: 713/716/717/723/726/727/
+743/745/746). Function-v7/v8 unchanged (their `Email`/`Mail` compile to
+`DefineFunction2`/type-2, which binds params from the `args[]` array
+directly and never had the stack-discipline bug).
+
+No regressions: gnash actionscript.all Inheritance/Object/
+toString_valueOf/Number/Boolean -v5..v8, case-v6, Global-v6, with-v6,
+NetStream-v6, String-v6 all effective-pass; avm1 25-test super/oop/
+proto/constructor/primitive battery (as1_constructor, as2_oop,
+as2_super_*, extends_chain, extends_native_type, constructor_function,
+clip_constructors, native_subclasses, object_constructor,
+new_method_wrap, new_object_wrap, super_edge_cases, register_class*,
+boxed_primitives, primitive_*, *_prototypes, instanceof_coercions,
+array_prototyping, xmlnode_proto, coerce_to_primitive_resolve,
+new_object_enumerate) all PASS.
+
+Residual Function-v6 failures are Phases 5, 6, 7-remainder, 9 plus
+lines 287/305/568/569/802/808.
 
 ### 2026-05-22 — Phase 7 partial: Number/Boolean constructor unification
 

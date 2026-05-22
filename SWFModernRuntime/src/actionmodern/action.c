@@ -50937,12 +50937,24 @@ void actionNewObject(SWFAppContext* app_context)
 					}
 				  }
 
-					// Push arguments onto stack for parameter binding
-					// Arguments are already in args[] in pop order (first arg = args[0])
-					// But DefineFunction binds params by popping, so push in reverse
-					for (int i = (int)num_args - 1; i >= 0; i--)
+					// Push EXACTLY param_count values for the generated
+					// DefineFunction body, which pops param_count values via its
+					// reverse-pop param binding. Forward order (args[0] first);
+					// pad short calls with undefined; drop extra args. Pushing a
+					// different count would leave stale operands on / steal
+					// operands from the caller's eval stack (gnash
+					// actionscript.all/Function.as: `Email.prototype = new Mail`
+					// where Mail declares 2 params but is called with 0).
 					{
-						pushVar(app_context, &args[i]);
+						u32 _pc = ctor_func->param_count;
+						for (u32 i = 0; i < num_args && i < _pc; i++)
+						{
+							pushVar(app_context, &args[i]);
+						}
+						for (u32 i = num_args; i < _pc; i++)
+						{
+							PUSH(ACTION_STACK_VALUE_UNDEFINED, 0);
+						}
 					}
 
 					g_call_depth++;
@@ -51899,8 +51911,13 @@ void actionNewMethod(SWFAppContext* app_context)
 				_nnc_ret = user_ctor_func->advanced_func(app_context, args, num_args, _nnc_regs, new_obj_inst);
 				if (_nnc_regs != NULL) FREE(_nnc_regs);
 			} else if (user_ctor_func->simple_func != NULL) {
-				for (u32 i = 0; i < num_args; i++)
+				u32 _pc = user_ctor_func->param_count;
+				for (u32 i = 0; i < num_args && i < _pc; i++)
 					pushVar(app_context, &args[i]);
+				for (u32 i = num_args; i < _pc; i++)
+				{
+					PUSH(ACTION_STACK_VALUE_UNDEFINED, 0);
+				}
 				_nnc_ret = ((ActionVar(*)(SWFAppContext*))user_ctor_func->simple_func)(app_context);
 			}
 			(void)_nnc_ret;
@@ -52014,10 +52031,20 @@ void actionNewMethod(SWFAppContext* app_context)
 		else if (user_ctor_func->simple_func != NULL)
 		{
 			// Simple DefineFunction (type 1)
-			// Push arguments onto stack for the function
-			for (u32 i = 0; i < num_args; i++)
+			// Push EXACTLY param_count values for the function (which pops
+			// param_count via its reverse-pop param binding): forward order,
+			// pad short calls with undefined, drop extra args, so neither stale
+			// nor stolen operands corrupt the caller's eval stack.
 			{
-				pushVar(app_context, &args[i]);
+				u32 _pc = user_ctor_func->param_count;
+				for (u32 i = 0; i < num_args && i < _pc; i++)
+				{
+					pushVar(app_context, &args[i]);
+				}
+				for (u32 i = num_args; i < _pc; i++)
+				{
+					PUSH(ACTION_STACK_VALUE_UNDEFINED, 0);
+				}
 			}
 
 			// Call simple function (cast to correct return type — generated functions return ActionVar)
@@ -54456,8 +54483,23 @@ void actionCallFunction(SWFAppContext* app_context, char* str_buffer)
 						this_var.data.numeric_value = (u64)this_obj;
 					}
 					setVariableByName("this", &this_var);
-					for (int i = (int)num_args - 1; i >= 0; i--)
-						pushVar(app_context, &args[i]);
+					// Push EXACTLY param_count values: the parent constructor's
+					// generated body pops exactly param_count values via its
+					// reverse-pop param binding. Forward order (args[0] first);
+					// pad short with undefined; drop any extra args. Pushing more
+					// than param_count would leave stale operands on the caller's
+					// eval stack — gnash actionscript.all/Function.as `super()` to
+					// a 0-param constructor (Spam) corrupted the subsequent
+					// `myMail = new Email(...)` SetVariable.
+					{
+						u32 _pc = parent_ctor->param_count;
+						for (u32 i = 0; i < num_args && i < _pc; i++)
+							pushVar(app_context, &args[i]);
+						for (u32 i = num_args; i < _pc; i++)
+						{
+							PUSH(ACTION_STACK_VALUE_UNDEFINED, 0);
+						}
+					}
 					g_call_depth++;
 					((ActionVar(*)(SWFAppContext*))parent_ctor->simple_func)(app_context);
 					g_call_depth--;
