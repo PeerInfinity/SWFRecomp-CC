@@ -26,7 +26,7 @@ phases:
     status: pending
   - id: 6
     name: "Closure scope: eval-stack survival across function call (case1bis @ Function.as:905)"
-    status: pending
+    status: complete
   - id: 7
     name: "Primitive auto-boxing __constructor__ chain (Number/String/Boolean)"
     status: in_progress
@@ -58,6 +58,58 @@ status_note: |
 -->
 
 ## Status
+
+### 2026-05-21 — Phase 6 landed (type-1 call arg-count discipline = eval-stack survival)
+
+Cluster F (eval-stack survival across a function call, Function.as
+case1bis/case2bis) turned out to be the *same* type-1 arg-count bug
+that Phase 8 fixed for the constructor-invocation sites — just at the
+two ordinary type-1 *call* sites that Phase 8 didn't touch.
+
+A generated `DefineFunction` (type-1) body pops **exactly
+`param_count`** values off the eval stack to bind its named
+parameters. The normal-call type-1 paths instead pushed all
+`num_args` supplied args (then padded up to `param_count`). For a
+0-param function called with extra args (`stack_test1(4,5,6)`), the
+3 stray args sat on top of the caller's 6 pre-pushed `asm{ push … }`
+values; the body's `setvariable×3` then consumed `6,5,4` /
+`'testvar3',3` etc. instead of the intended `'testvarN',N` pairs, so
+`testvar1/2/3` ended up `0`.
+
+Fix in `SWFModernRuntime/src/actionmodern/action.c`: three type-1
+dispatch sites now push **exactly `param_count`** values —
+`args[0..min(num_args,param_count))` forward, padded with `undefined`,
+extra args dropped:
+- `actionCallFunction` bare-name type-1 path (`stack_test1(4,5,6)` →
+  case1bis, Function.as:905-907). The `simple_func == NULL` cleanup's
+  `total_pushed` simplified to `param_count` accordingly.
+- `actionCallMethod` MOVIECLIP user-method type-1 path
+  (`clip1.stack_test2(7,8,9)` → case2bis, Function.as:960-962).
+- `actionCallMethod` `__resolve`/registered-function type-1 path
+  (same capping, low-traffic).
+
+Effect: Function-v6 `#passed` 224 → 230 (+6: case1bis 905/906/907 +
+case2bis 960/961/962); Function-v5 129 → 132 (+3, case1bis only —
+v5 gates the case2bis check on `OUTPUT_VERSION > 5`). Function-v7/v8
+unchanged (their `stack_test1`/`stack_test2` compile to
+`DefineFunction2`/type-2, which binds params from the `args[]` array
+and never had the stack-discipline bug).
+
+No regressions: 23-test AVM1 function/call/scope/closure/super/
+constructor battery, 13-test AVM1 timer/watch/enumerate/event battery,
+14-test gnash actionscript.all Inheritance/Object/case/Global/with/
+Number/Boolean/toString_valueOf/delete/enumerate battery, 5-test
+misc-ming.all frame_label/key_event/registerClassTest2/DepthLimits/
+loop_test6 battery — all effective-pass.
+
+Note: ~6 *other* type-1 dispatch sites in `action.c` (super/method
+paths around lines 59757/59872/59957/60045/60948/61220) still push
+`num_args` in **reverse** order without a `param_count` cap. They are
+left untouched — the Function.as clusters don't exercise them and a
+broad reverse-vs-forward + capping sweep is its own risk-managed pass.
+
+Residual Function-v6 failures are Phases 5, 7-remainder, 9 plus
+lines 264/287/305/568/569/802/808.
 
 ### 2026-05-21 — Phase 8 landed (type-1 constructor arg-count discipline)
 

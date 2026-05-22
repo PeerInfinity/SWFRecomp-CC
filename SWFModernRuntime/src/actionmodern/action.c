@@ -56596,14 +56596,19 @@ void actionCallFunction(SWFAppContext* app_context, char* str_buffer)
 					scope_chain[scope_depth++] = local_scope;
 				}
 
-				// Push arguments onto stack in order (first to last)
-				// The function will pop them and bind to parameter names
-				for (u32 i = 0; i < num_args; i++)
+				// Push EXACTLY param_count values onto the stack: a generated
+				// DefineFunction (type-1) body unconditionally pops param_count
+				// values to bind its named parameters. Push args[0..min(num_args,
+				// param_count)) forward, pad short calls with undefined, and DROP
+				// any extra args (num_args > param_count). Pushing the extras
+				// would leave them on the caller's eval stack after the body
+				// returns — gnash actionscript.all/Function.as case1bis
+				// (`stack_test1(4,5,6)` on a 0-param function) had its 6
+				// pre-pushed asm values consumed by the stray 4/5/6.
+				for (u32 i = 0; i < num_args && i < func->param_count; i++)
 				{
 					pushVar(app_context, &args[i]);
 				}
-				// Pad with undefined if fewer args than parameters
-				// (generated code always pops param_count values)
 				for (u32 i = num_args; i < func->param_count; i++)
 				{
 					PUSH(ACTION_STACK_VALUE_UNDEFINED, 0);
@@ -56612,8 +56617,8 @@ void actionCallFunction(SWFAppContext* app_context, char* str_buffer)
 				if (func->simple_func == NULL)
 				{
 					// Built-in constructor called as plain function (no implementation)
-					// Pop all items we pushed: num_args actual args + padding up to param_count
-					u32 total_pushed = num_args > func->param_count ? num_args : func->param_count;
+					// Pop the param_count values we pushed above.
+					u32 total_pushed = func->param_count;
 					for (u32 i = 0; i < total_pushed; i++) { POP(); }
 					// Pop local scope + captured scopes + this binding
 					for (u8 ci = 0; ci < captured_count_t1 + 1; ci++) {
@@ -66367,8 +66372,13 @@ _mc_user_dispatch: ;
 
 						ActionVar result;
 						if (func->function_type == 1 && func->simple_func != NULL) {
-							// Type 1: push args onto stack
-							for (u32 i = 0; i < num_args; i++)
+							// Type 1: push EXACTLY param_count values — a generated
+							// DefineFunction body pops param_count values to bind
+							// params. Drop extra args; pushing them would leave
+							// stale operands on the caller's eval stack (gnash
+							// Function.as case2bis: clip1.stack_test2(7,8,9) on a
+							// 0-param method).
+							for (u32 i = 0; i < num_args && i < func->param_count; i++)
 								pushVar(app_context, &args[i]);
 							for (u32 i = num_args; i < func->param_count; i++) {
 								PUSH(ACTION_STACK_VALUE_UNDEFINED, 0);
@@ -66548,7 +66558,8 @@ _mc_user_dispatch: ;
 							call_result.type = ACTION_STACK_VALUE_UNDEFINED;
 							g_call_depth++;
 							if (rf->function_type == 1 && rf->simple_func != NULL) {
-								for (u32 i = 0; i < num_args; i++)
+								// Push exactly param_count values (drop extra args).
+								for (u32 i = 0; i < num_args && i < rf->param_count; i++)
 									pushVar(app_context, &args[i]);
 								for (u32 i = num_args; i < rf->param_count; i++)
 									PUSH(ACTION_STACK_VALUE_UNDEFINED, 0);
