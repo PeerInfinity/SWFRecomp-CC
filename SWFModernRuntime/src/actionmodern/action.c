@@ -14879,6 +14879,7 @@ static int isNativeTextFieldProperty(const char* name, u32 len) {
 
 static void initStyleSheetPrototype(SWFAppContext* app_context); // forward decl
 static ASFunction g_stylesheet_constructor_global; // forward decl
+static void installAsBroadcaster(SWFAppContext* app_context, ASObject* obj); // forward decl
 
 static void initTextFieldPrototype(SWFAppContext* app_context)
 {
@@ -14973,8 +14974,15 @@ static void initTextFieldPrototype(SWFAppContext* app_context)
 		{"replaceText", 11, &g_tf_replaceText_func},
 	};
 
-	// replaceText (last entry) only exists in SWF7+
+	// replaceText (last entry) only exists as a *function* in SWF7+.
+	// In SWF6 it still exists as an own (DontEnum, undefined-valued) property
+	// on TextField.prototype — `hasOwnProperty('replaceText')` is true but
+	// `typeof` is 'undefined' (TextField.as:127/131).
 	int tf_method_count = (g_swf_version < 7) ? 7 : 8;
+	if (g_swf_version < 7)
+	{
+		setProperty(app_context, proto, "replaceText", 11, &undef_val);
+	}
 	for (int i = 0; i < tf_method_count; i++)
 	{
 		memset(tf_methods[i].func, 0, sizeof(ASFunction));
@@ -15008,6 +15016,11 @@ static void initTextFieldPrototype(SWFAppContext* app_context)
 			proto->properties[i].flags &= ~PROPERTY_FLAG_ENUMERABLE;
 		}
 	}
+
+	// TextField.prototype is implicitly run through AsBroadcaster.initialize:
+	// it gets own addListener/removeListener/broadcastMessage methods plus a
+	// zero-length _listeners Array (TextField.as:78-84). All DontEnum.
+	installAsBroadcaster(app_context, proto);
 
 	// Register TextField.StyleSheet as a property on the constructor (SWF7+)
 	if (g_swf_version >= 7)
@@ -45533,6 +45546,37 @@ void actionSetMember(SWFAppContext* app_context)
 				value_var.type = ACTION_STACK_VALUE_F64;
 				VAL(double, &value_var.data.numeric_value) = (double)masked;
 			}
+			// Frame properties are read-only MovieClip-only props; writes to them
+			// on a TextField are silently ignored (TextField.as:616/620/624) — and
+			// must NOT fall through to generic dynamic_props storage, else the
+			// matching getter (gated off above) would read the stored value back.
+			if (MC_IS_TEXTFIELD(mc) &&
+				((prop_name_len == 13 && strncmp(prop_name, "_currentframe", 13) == 0) ||
+				 (prop_name_len == 12 && strncmp(prop_name, "_totalframes", 12) == 0) ||
+				 (prop_name_len == 13 && strncmp(prop_name, "_framesloaded", 13) == 0)))
+			{
+				return;
+			}
+			// TextField boolean-typed properties: coerce setter input via ToBoolean.
+			// Flash stores background/border/multiline/password/selectable/embedFonts/
+			// html/wordWrap as booleans regardless of the assigned value's type
+			// (e.g. tf.background = 54.3 stores true; tf.background = anObject stores
+			// true because objects are always truthy). TextField.as:247-260.
+			if (MC_IS_TEXTFIELD(mc) && value_var.type != ACTION_STACK_VALUE_BOOLEAN &&
+				((prop_name_len == 10 && strncmp(prop_name, "background", 10) == 0) ||
+				 (prop_name_len == 6  && strncmp(prop_name, "border", 6) == 0) ||
+				 (prop_name_len == 9  && strncmp(prop_name, "multiline", 9) == 0) ||
+				 (prop_name_len == 8  && strncmp(prop_name, "password", 8) == 0) ||
+				 (prop_name_len == 10 && strncmp(prop_name, "selectable", 10) == 0) ||
+				 (prop_name_len == 10 && strncmp(prop_name, "embedFonts", 10) == 0) ||
+				 (prop_name_len == 4  && strncmp(prop_name, "html", 4) == 0) ||
+				 (prop_name_len == 8  && strncmp(prop_name, "wordWrap", 8) == 0)))
+			{
+				int _tfb = isVarTruthy(&value_var);
+				value_var = (ActionVar){0};
+				value_var.type = ACTION_STACK_VALUE_BOOLEAN;
+				value_var.data.numeric_value = _tfb ? 1 : 0;
+			}
 			// TextField text/htmlText setter: coerce any non-string value (undefined, null,
 			// number, boolean, object) to a string. Flash textfields always store text as string.
 			if (MC_IS_TEXTFIELD(mc) &&
@@ -48564,9 +48608,11 @@ void actionGetMember(SWFAppContext* app_context)
 			if (strcasecmp(prop_name, "_visible") == 0) { u64 v = mc->visible ? 1 : 0; PUSH(ACTION_STACK_VALUE_BOOLEAN, v); return; }
 			if (strcasecmp(prop_name, "_width") == 0) { double _ew, _eh; mcGetEffectiveSize(mc, &_ew, &_eh); PUSH(ACTION_STACK_VALUE_F64, VAL(u64, &_ew)); return; }
 			if (strcasecmp(prop_name, "_height") == 0) { double _ew, _eh; mcGetEffectiveSize(mc, &_ew, &_eh); PUSH(ACTION_STACK_VALUE_F64, VAL(u64, &_eh)); return; }
-			if (strcasecmp(prop_name, "_currentframe") == 0) { float v = mc->unloaded ? 0.0f : (float)mc->currentframe; PUSH(ACTION_STACK_VALUE_F32, VAL(u32, &v)); return; }
-			if (strcasecmp(prop_name, "_totalframes") == 0) { float v = mc->unloaded ? 0.0f : (mc->load_failed ? 0.0f : (float)mc->totalframes); PUSH(ACTION_STACK_VALUE_F32, VAL(u32, &v)); return; }
-			if (strcasecmp(prop_name, "_framesloaded") == 0) { float v = mc->unloaded ? 0.0f : (mc->load_failed ? -1.0f : (float)mc->framesloaded); PUSH(ACTION_STACK_VALUE_F32, VAL(u32, &v)); return; }
+			// _currentframe/_totalframes/_framesloaded are MovieClip-only; on a
+			// TextField they are undefined (TextField.as:615-625) — fall through.
+			if (strcasecmp(prop_name, "_currentframe") == 0 && !MC_IS_TEXTFIELD(mc)) { float v = mc->unloaded ? 0.0f : (float)mc->currentframe; PUSH(ACTION_STACK_VALUE_F32, VAL(u32, &v)); return; }
+			if (strcasecmp(prop_name, "_totalframes") == 0 && !MC_IS_TEXTFIELD(mc)) { float v = mc->unloaded ? 0.0f : (mc->load_failed ? 0.0f : (float)mc->totalframes); PUSH(ACTION_STACK_VALUE_F32, VAL(u32, &v)); return; }
+			if (strcasecmp(prop_name, "_framesloaded") == 0 && !MC_IS_TEXTFIELD(mc)) { float v = mc->unloaded ? 0.0f : (mc->load_failed ? -1.0f : (float)mc->framesloaded); PUSH(ACTION_STACK_VALUE_F32, VAL(u32, &v)); return; }
 			if (strcasecmp(prop_name, "_name") == 0) {
 				if (isLevelRootMC(mc)) { PUSH_STR("", 0); return; }
 				PUSH_STR(mc->name, strlen(mc->name));
@@ -52815,9 +52861,10 @@ static int getMCBuiltinProperty(MovieClip* mc, const char* name, u32 name_len, A
 	if (strcasecmp(name, "_visible") == 0) { result->type = ACTION_STACK_VALUE_BOOLEAN; result->data.numeric_value = mc->visible ? 1 : 0; return 1; }
 	if (strcasecmp(name, "_width") == 0) { double _ew, _eh; mcGetEffectiveSize(mc, &_ew, &_eh); result->type = ACTION_STACK_VALUE_F64; memcpy(&result->data.numeric_value, &_ew, 8); return 1; }
 	if (strcasecmp(name, "_height") == 0) { double _ew, _eh; mcGetEffectiveSize(mc, &_ew, &_eh); result->type = ACTION_STACK_VALUE_F64; memcpy(&result->data.numeric_value, &_eh, 8); return 1; }
-	if (strcasecmp(name, "_currentframe") == 0) { float v = (float)mc->currentframe; result->type = ACTION_STACK_VALUE_F32; memcpy(&result->data.numeric_value, &v, 4); return 1; }
-	if (strcasecmp(name, "_totalframes") == 0) { float v = mc->load_failed ? 0.0f : (float)mc->totalframes; result->type = ACTION_STACK_VALUE_F32; memcpy(&result->data.numeric_value, &v, 4); return 1; }
-	if (strcasecmp(name, "_framesloaded") == 0) { float v = mc->load_failed ? -1.0f : (float)mc->framesloaded; result->type = ACTION_STACK_VALUE_F32; memcpy(&result->data.numeric_value, &v, 4); return 1; }
+	// Frame properties are MovieClip-only — undefined on a TextField.
+	if (strcasecmp(name, "_currentframe") == 0 && !MC_IS_TEXTFIELD(mc)) { float v = (float)mc->currentframe; result->type = ACTION_STACK_VALUE_F32; memcpy(&result->data.numeric_value, &v, 4); return 1; }
+	if (strcasecmp(name, "_totalframes") == 0 && !MC_IS_TEXTFIELD(mc)) { float v = mc->load_failed ? 0.0f : (float)mc->totalframes; result->type = ACTION_STACK_VALUE_F32; memcpy(&result->data.numeric_value, &v, 4); return 1; }
+	if (strcasecmp(name, "_framesloaded") == 0 && !MC_IS_TEXTFIELD(mc)) { float v = mc->load_failed ? -1.0f : (float)mc->framesloaded; result->type = ACTION_STACK_VALUE_F32; memcpy(&result->data.numeric_value, &v, 4); return 1; }
 	if (strcasecmp(name, "_name") == 0) { result->type = ACTION_STACK_VALUE_STRING; /* caller must handle string push */ return 2; }
 	if (strcasecmp(name, "_target") == 0) { result->type = ACTION_STACK_VALUE_STRING; return 3; }
 	return 0;

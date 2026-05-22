@@ -1,17 +1,19 @@
 # TextField-vN Investigation Plan
 <!-- TESTS: TextField-v6, TextField-v7, TextField-v8 -->
 
-Last updated: 2026-05-19 (initial planning doc, drafted from local
-single-test reproductions at the current `master` SHA; no fixes
-landed yet)
+Last updated: 2026-05-21 (Phases 4, 6, 12 landed; Phase 1 partial —
+prototype-level AsBroadcaster install done, per-instance self-register
+still pending. Line match: v6 404→438/545, v7 413→447/570,
+v8 416→449/571. No regressions; TextField-v5 still ruffle_matched.
+All three still output_mismatch.)
 
 <!-- PLAN_META
 id: TEXTFIELD_VN_PLAN
-status: pending
+status: in_progress
 phases:
   - id: 1
     name: "TextField AsBroadcaster integration (addListener/removeListener/broadcastMessage/_listeners)"
-    status: pending
+    status: in_progress
   - id: 2
     name: "TextField.prototype.hasOwnProperty visibility for virtual properties"
     status: pending
@@ -20,13 +22,13 @@ phases:
     status: pending
   - id: 4
     name: "Boolean-setter coercion (background/embedFonts/multiline/selectable/password/border)"
-    status: pending
+    status: done
   - id: 5
     name: "null-typed properties (maxChars/variable/restrict) return string instead of null"
     status: pending
   - id: 6
     name: "MovieClip-only properties (_currentframe/_totalframes/_framesloaded) on TextField"
-    status: pending
+    status: done
   - id: 7
     name: "tf.type setter case-normalization (Input/INPUT → 'input')"
     status: pending
@@ -44,7 +46,7 @@ phases:
     status: pending
   - id: 12
     name: "tf.replaceText method existence + behaviour"
-    status: pending
+    status: done
   - id: 13
     name: "Container-MovieClip identity round-trip (storedthis === _root.tfmo)"
     status: pending
@@ -75,6 +77,47 @@ Local CI baseline (commit `eb8206f8`, 2026-05-15):
 | TextField-v6 | 404/545 | 74.1% | output_mismatch |
 | TextField-v7 | 413/570 | 72.5% | output_mismatch |
 | TextField-v8 | 416/571 | 72.9% | output_mismatch |
+
+After Phases 4/6/12 + Phase 1 (partial) — local, 2026-05-21:
+
+| Test | Match | % | Status |
+|------|-------|---|--------|
+| TextField-v6 | 438/545 | 80.4% | output_mismatch |
+| TextField-v7 | 447/570 | 78.4% | output_mismatch |
+| TextField-v8 | 449/571 | 78.6% | output_mismatch |
+
+### Progress log
+
+**2026-05-21 — Phases 4, 6, 12 done; Phase 1 partial.** All in
+`SWFModernRuntime/src/actionmodern/action.c`:
+
+- **Phase 4 (boolean-setter coercion).** `actionSetMember` MOVIECLIP
+  path now coerces the assigned value through `isVarTruthy` (ToBoolean)
+  and stores a `BOOLEAN` ActionVar when the target is a TextField and
+  the property is `background`/`border`/`multiline`/`password`/
+  `selectable`/`embedFonts`/`html`/`wordWrap`. Objects are always
+  truthy (so `tf.background = anObject` → true); numbers/strings use
+  standard ToBoolean.
+- **Phase 6 (MC-only frame props).** `_currentframe`/`_totalframes`/
+  `_framesloaded` getters (both the `actionGetMember` MOVIECLIP arm and
+  `getMCBuiltinProperty`) gated on `!MC_IS_TEXTFIELD(mc)` so they
+  return undefined on a TextField. Also added a setter rejection in
+  `actionSetMember` — writes to those three props on a TextField are a
+  silent no-op (otherwise they'd land in `dynamic_props` and the
+  now-undefined getter would read the stored value back).
+- **Phase 12 (replaceText).** `initTextFieldPrototype` now installs
+  `replaceText` as an own, DontEnum, undefined-valued property on
+  `TextField.prototype` under SWF6 (it was only present as a function
+  under SWF7+). `hasOwnProperty('replaceText')` is now true on v6.
+- **Phase 1 (partial).** `initTextFieldPrototype` calls
+  `installAsBroadcaster(proto)`, giving `TextField.prototype` own
+  `addListener`/`removeListener`/`broadcastMessage` + an empty
+  `_listeners` Array (TextField.as:78-84, 143-144 fixed). **Still
+  pending:** per-instance self-registration — each TextField instance
+  should get its own `_listeners` Array containing itself
+  (`tf.hasOwnProperty('_listeners')`, `tf._listeners[0] == tf`,
+  lines 166-168). Needs hooking the createTextField / DefineEditText
+  init path.
 
 ## Test source
 
