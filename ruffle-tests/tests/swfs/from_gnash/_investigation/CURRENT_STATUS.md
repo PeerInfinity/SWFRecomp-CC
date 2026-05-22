@@ -77,6 +77,35 @@ Suggested write order:
 3. **Decision docs** (not fix plans): argstest-vN, matrix_accuracy_test1 — likely belong in ACCEPTED_DIFFS once confirmed.
 4. **Single-test deferrals**: everything else, lowest priority unless picked up opportunistically.
 
+### Latest fix (2026-05-22, pending CI)
+
+- **`Sound-v5/v6/v7/v8` (actionscript.all): output_mismatch → `ruffle_matched`
+  (all four).** Two changes in `SWFModernRuntime/src/actionmodern/action.c`,
+  both Sound-only (blast radius is the Sound builtins).
+  1. **Invalid controllable-character argument.** `new Sound(arg)` where
+     `arg` is anything other than a MovieClip / null / undefined (a Number,
+     String, Object — e.g. `new Sound(54)`, `new Sound(o)`) produces a Sound
+     bound to nothing: `getVolume`/`getPan`/`getTransform` return undefined,
+     `setVolume`/`setPan` are no-ops. The three Sound-constructor sites now
+     set a hidden `__sound_bad_target__` boolean for such args, and
+     `resolveSoundTransformTarget` returns NULL when it is set. Previously a
+     non-MC owner fell through to the shared global transform, so an invalid
+     Sound's `setVolume` leaked into the global volume read by other
+     ownerless Sounds (`s1e/s1f.getVolume()` came back 54 instead of 76).
+  2. **`getPosition()` undefined until loaded.** `builtin_sound_getPosition`
+     now returns undefined unless the Sound's `__loaded__` flag is set
+     (attachSound / loadSound set it) — Flash returns undefined for
+     `getPosition()` on a Sound that has never had audio bound. Mirrors the
+     existing `_snd_is_loaded` gate on the `position` *property* getter.
+
+  After both changes our diff against `output.fpN.txt` is a strict subset of
+  Ruffle's, so all four versions auto-promote. Residual shared diffs
+  (`checkPolicyFile` boolean property, unloaded-MC-owner getVolume, loaded
+  mp3 duration 209 vs our 1000, getBytesTotal/Loaded) are Ruffle-failed too.
+  No regressions: 15-test AVM1 sound battery — the 8 baseline passes stay
+  PASS, the 7 baseline output_mismatch tests (all on `ignored_tests.txt`)
+  stay output_mismatch.
+
 ### Latest update (2026-05-20, docs only — no code change)
 
 - **`argstest-v6/v7/v8` (actionscript.all) and `matrix_accuracy_test1`

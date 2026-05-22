@@ -1391,6 +1391,15 @@ static ASObject* resolveSoundTransformTarget(SWFAppContext* app_context, void* t
 	// Only Sound objects (native_type == NATIVE_SOUND) participate in shared transform
 	if (sound_obj->native_type != NATIVE_SOUND) return NULL;
 
+	// Sound constructed with an invalid controllable-character argument
+	// (a Number, String, Object, etc. — anything that isn't a MovieClip and
+	// isn't null/undefined). Flash treats such a Sound as bound to nothing:
+	// getVolume/getPan/getTransform return undefined, setVolume/setPan no-op.
+	ActionVar* bad_target = getProperty(sound_obj, "__sound_bad_target__", 20);
+	if (bad_target != NULL && bad_target->type == ACTION_STACK_VALUE_BOOLEAN &&
+	    bad_target->data.numeric_value)
+		return NULL;
+
 	// Check for owner MC
 	ActionVar* owner = getProperty(sound_obj, "__sound_owner__", 15);
 	if (owner != NULL && owner->type == ACTION_STACK_VALUE_MOVIECLIP) {
@@ -2082,7 +2091,18 @@ static ActionVar builtin_sound_getPosition(SWFAppContext* app_context, ActionVar
 	(void)app_context; (void)args; (void)arg_count; (void)registers;
 	ActionVar ret = {0}; ret.type = ACTION_STACK_VALUE_F64;
 	ASObject* sound_obj = resolveSoundThis(this_obj);
-	if (sound_obj == NULL) return ret;
+	if (sound_obj == NULL) { ret.type = ACTION_STACK_VALUE_UNDEFINED; return ret; }
+
+	// Position is undefined until the sound is attached/loaded — Flash returns
+	// undefined for getPosition() on a Sound that has never had a sound bound.
+	{
+		ActionVar* loaded = getProperty(sound_obj, "__loaded__", 10);
+		if (loaded == NULL || loaded->type != ACTION_STACK_VALUE_BOOLEAN ||
+		    !loaded->data.numeric_value) {
+			ret.type = ACTION_STACK_VALUE_UNDEFINED;
+			return ret;
+		}
+	}
 
 	// Check if sound has completed (position = duration)
 	ActionVar* completed = getProperty(sound_obj, "__completed__", 13);
@@ -50821,6 +50841,12 @@ void actionNewObject(SWFAppContext* app_context)
 					// If first arg is a MovieClip, store as owner (shared per-MC transform)
 					if (num_args >= 1 && args[0].type == ACTION_STACK_VALUE_MOVIECLIP) {
 						setPropertyWithFlags(app_context, obj, "__sound_owner__", 15, &args[0], PROPERTY_FLAGS_DONTENUM);
+					} else if (num_args >= 1 && args[0].type != ACTION_STACK_VALUE_NULL &&
+					           args[0].type != ACTION_STACK_VALUE_UNDEFINED) {
+						// Non-MC, non-null/undefined argument → invalid controllable character
+						ActionVar bad_t = {0}; bad_t.type = ACTION_STACK_VALUE_BOOLEAN;
+						bad_t.data.numeric_value = 1;
+						setPropertyWithFlags(app_context, obj, "__sound_bad_target__", 20, &bad_t, PROPERTY_FLAGS_DONTENUM);
 					}
 					// Transform is stored on the target (MC or global), not on the Sound object
 				}
@@ -51951,6 +51977,11 @@ void actionNewMethod(SWFAppContext* app_context)
 				// If first arg is a MovieClip, store as owner
 				if (num_args >= 1 && args[0].type == ACTION_STACK_VALUE_MOVIECLIP) {
 					setPropertyWithFlags(app_context, new_obj_inst, "__sound_owner__", 15, &args[0], PROPERTY_FLAGS_DONTENUM);
+				} else if (num_args >= 1 && args[0].type != ACTION_STACK_VALUE_NULL &&
+				           args[0].type != ACTION_STACK_VALUE_UNDEFINED) {
+					ActionVar bad_t = {0}; bad_t.type = ACTION_STACK_VALUE_BOOLEAN;
+					bad_t.data.numeric_value = 1;
+					setPropertyWithFlags(app_context, new_obj_inst, "__sound_bad_target__", 20, &bad_t, PROPERTY_FLAGS_DONTENUM);
 				}
 			}
 			else if (strcmp(ctor_name, "LoadVars") == 0) new_obj_inst->native_type = NATIVE_LOADVARS;
@@ -53927,6 +53958,11 @@ static int invokeNativeSuperConstructor(SWFAppContext* app_context, ASFunction* 
 		// If first arg is a MovieClip, store as owner
 		if (num_args >= 1 && args[0].type == ACTION_STACK_VALUE_MOVIECLIP) {
 			setPropertyWithFlags(app_context, obj, "__sound_owner__", 15, &args[0], PROPERTY_FLAGS_DONTENUM);
+		} else if (num_args >= 1 && args[0].type != ACTION_STACK_VALUE_NULL &&
+		           args[0].type != ACTION_STACK_VALUE_UNDEFINED) {
+			ActionVar bad_t = {0}; bad_t.type = ACTION_STACK_VALUE_BOOLEAN;
+			bad_t.data.numeric_value = 1;
+			setPropertyWithFlags(app_context, obj, "__sound_bad_target__", 20, &bad_t, PROPERTY_FLAGS_DONTENUM);
 		}
 		out_result->type = ACTION_STACK_VALUE_OBJECT;
 		out_result->data.numeric_value = (u64)obj;
