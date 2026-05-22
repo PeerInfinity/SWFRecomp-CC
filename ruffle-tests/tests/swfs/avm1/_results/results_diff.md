@@ -1,20 +1,20 @@
 # Ruffle Test Results Diff
 
-**Previous:** `49b5c83fbf03` (2026-05-22T20:32:19.425840+00:00)
-**Current:** `46d94b79c9d1` (2026-05-22T21:24:24.328452+00:00)
+**Previous:** `46d94b79c9d1` (2026-05-22T21:24:24.328452+00:00)
+**Current:** `f67f7f775185` (2026-05-22T21:51:14.661933+00:00)
 
 ## Summary
 
 | Metric | Previous | Current | Delta |
 |--------|----------|---------|-------|
-| Passing | 604 | 603 | -1 |
+| Passing | 603 | 604 | +1 |
 | Total | 661 | 661 | 0 |
-| Pass rate | 91.4% | 91.2% | -0.2% |
-| Mismatched lines | 9120 | 9121 | +1 |
-|   Increased | | | +1 |
+| Pass rate | 91.2% | 91.4% | +0.2% |
+| Mismatched lines | 9121 | 9120 | -1 |
+|   Decreased | | | -1 |
 
-## Newly Failing (1)
+## Newly Passing (1)
 
-| Test | New Status | Lines (prev) | Lines (now) |
-|------|-----------|--------------|-------------|
-| `define_local_with_paths` | output_mismatch | 54/54 | 53/54 |
+| Test | Previous Status | Lines (prev) | Lines (now) |
+|------|----------------|--------------|-------------|
+| `define_local_with_paths` | output_mismatch | 53/54 | 54/54 |
