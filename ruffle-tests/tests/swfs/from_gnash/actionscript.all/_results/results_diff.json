@@ -1,9 +1,9 @@
 {
   "metadata": {
-    "old_timestamp": "2026-05-22T18:11:24.609170+00:00",
-    "old_git_sha": "1186fc64558760375bb3fcfc672f8d9d05e29334",
-    "new_timestamp": "2026-05-22T18:45:15.651767+00:00",
-    "new_git_sha": "66e6f10e248107113228d9ede9f9e7e5f4a21d88",
+    "old_timestamp": "2026-05-22T18:45:15.651767+00:00",
+    "old_git_sha": "66e6f10e248107113228d9ede9f9e7e5f4a21d88",
+    "new_timestamp": "2026-05-22T19:21:36.606207+00:00",
+    "new_git_sha": "39c009ae3e798c6e1072c993cb7845c05f58f52b",
     "partial": false,
     "same_commit": false
   },
@@ -18,14 +18,14 @@
     "new_effective_pass": 223,
     "new_total": 243,
     "new_pass_rate": 52.7,
-    "old_mismatched_lines": 9553,
-    "new_mismatched_lines": 9555,
-    "increased_mismatches": 2,
-    "decreased_mismatches": 0,
+    "old_mismatched_lines": 9555,
+    "new_mismatched_lines": 9549,
+    "increased_mismatches": 0,
+    "decreased_mismatches": 6,
     "newly_passing": 0,
     "newly_failing": 0,
     "status_changed": 0,
-    "unchanged": 241,
+    "unchanged": 240,
     "added": 0,
     "removed": 0
   },
@@ -38,12 +38,28 @@
       "old_lines": {
         "actual_lines": 545,
         "expected_lines": 545,
-        "matching_lines": 438
+        "matching_lines": 437
       },
       "new_lines": {
         "actual_lines": 545,
         "expected_lines": 545,
-        "matching_lines": 437
+        "matching_lines": 439
+      }
+    },
+    {
+      "test": "TextField-v7",
+      "change_type": "changed",
+      "old_status": "output_mismatch",
+      "new_status": "output_mismatch",
+      "old_lines": {
+        "actual_lines": 570,
+        "expected_lines": 570,
+        "matching_lines": 446
+      },
+      "new_lines": {
+        "actual_lines": 570,
+        "expected_lines": 570,
+        "matching_lines": 448
       }
     },
     {
@@ -54,12 +70,12 @@
       "old_lines": {
         "actual_lines": 571,
         "expected_lines": 571,
-        "matching_lines": 449
+        "matching_lines": 448
       },
       "new_lines": {
         "actual_lines": 571,
         "expected_lines": 571,
-        "matching_lines": 448
+        "matching_lines": 450
       }
     }
   ]
