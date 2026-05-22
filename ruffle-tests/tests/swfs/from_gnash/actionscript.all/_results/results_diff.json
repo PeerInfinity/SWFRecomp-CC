@@ -1,9 +1,9 @@
 {
   "metadata": {
-    "old_timestamp": "2026-05-22T19:59:46.234342+00:00",
-    "old_git_sha": "493a8d85d952c9a11109618156cfde15a2e9478c",
-    "new_timestamp": "2026-05-22T20:32:19.452128+00:00",
-    "new_git_sha": "49b5c83fbf0377838ecf630f100ed7eb0278dcf1",
+    "old_timestamp": "2026-05-22T20:32:19.452128+00:00",
+    "old_git_sha": "49b5c83fbf0377838ecf630f100ed7eb0278dcf1",
+    "new_timestamp": "2026-05-22T21:24:24.350636+00:00",
+    "new_git_sha": "46d94b79c9d1f562a355c5161e99b4cf83d03541",
     "partial": false,
     "same_commit": false
   },
@@ -14,36 +14,52 @@
     "old_total": 243,
     "old_pass_rate": 52.7,
     "new_pass": 128,
-    "new_ruffle_matched": 95,
-    "new_effective_pass": 223,
+    "new_ruffle_matched": 96,
+    "new_effective_pass": 224,
     "new_total": 243,
     "new_pass_rate": 52.7,
-    "old_mismatched_lines": 9507,
-    "new_mismatched_lines": 9495,
+    "old_mismatched_lines": 9495,
+    "new_mismatched_lines": 9486,
     "increased_mismatches": 0,
-    "decreased_mismatches": 12,
-    "newly_passing": 0,
+    "decreased_mismatches": 9,
+    "newly_passing": 1,
     "newly_failing": 0,
-    "status_changed": 0,
-    "unchanged": 240,
+    "status_changed": 1,
+    "unchanged": 239,
     "added": 0,
     "removed": 0
   },
   "changes": [
     {
-      "test": "Function-v6",
+      "test": "Function-v5",
       "change_type": "changed",
       "old_status": "output_mismatch",
       "new_status": "output_mismatch",
       "old_lines": {
+        "actual_lines": 158,
+        "expected_lines": 158,
+        "matching_lines": 141
+      },
+      "new_lines": {
+        "actual_lines": 158,
+        "expected_lines": 158,
+        "matching_lines": 143
+      }
+    },
+    {
+      "test": "Function-v6",
+      "change_type": "changed",
+      "old_status": "output_mismatch",
+      "new_status": "ruffle_matched",
+      "old_lines": {
         "actual_lines": 271,
         "expected_lines": 271,
-        "matching_lines": 252
+        "matching_lines": 258
       },
       "new_lines": {
         "actual_lines": 271,
         "expected_lines": 271,
-        "matching_lines": 258
+        "matching_lines": 263
       }
     },
     {
@@ -54,12 +70,12 @@
       "old_lines": {
         "actual_lines": 272,
         "expected_lines": 272,
-        "matching_lines": 230
+        "matching_lines": 233
       },
       "new_lines": {
         "actual_lines": 272,
         "expected_lines": 272,
-        "matching_lines": 233
+        "matching_lines": 234
       }
     },
     {
@@ -70,12 +86,12 @@
       "old_lines": {
         "actual_lines": 272,
         "expected_lines": 272,
-        "matching_lines": 230
+        "matching_lines": 233
       },
       "new_lines": {
         "actual_lines": 272,
         "expected_lines": 272,
-        "matching_lines": 233
+        "matching_lines": 234
       }
     }
   ]
