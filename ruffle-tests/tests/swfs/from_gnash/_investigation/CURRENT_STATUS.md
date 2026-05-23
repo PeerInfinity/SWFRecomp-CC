@@ -1,5 +1,25 @@
 # Gnash Test Suite Status
 
+Last updated: 2026-05-23 (pending CI — `loop/loop_test2` and `loop/loop_test3`
+(misc-ming.all) output_mismatch → PASS (+2 PASSes). Single fix in
+`SWFModernRuntime/src/libswf/tag.c::tagPlaceObject2`: added
+`!catch_up_backward` to the early refuse gate at the "Failed to place
+object at depth" warning site. The gate already excluded
+`g_loopback_replay` (natural timeline wrap) so the survives_rewind
+branch below could handle the modify; the analogous catch_up_backward
+case (AS-driven `gotoAndStop`/`gotoAndPlay` backward catch-up) was
+missing. Both tests do `swapDepths` in frame 3 then `gotoAndStop(2)`;
+frame 2's Place tags target the original (now swapped) depths and
+were spuriously refused with a warning that shifted all downstream
+assertion lines. With the fix the placements fall through to the
+survives_rewind branch, which treats them as modify-of-surviving-MC.
+No regressions across 23-test AVM1 goto/lifecycle/clone/swap battery
+and 10-test misc-ming goto/loop/replace/register-class battery, and
+`avm1/placeobject_occupied_depth` (which exercises a different "Failed
+to place" code path at `tag.c:5462`, the within-same-frame
+`place_gen` check) still PASSES; `path_format_test`, `place_object_test`,
+`place_object_test2` still RM.)
+
 Last updated: 2026-05-15 (CI `eb8206f8`, no-graphics, run `25896064893` — first run after SUBTESTS_HARNESS shipped in commit `39b797ac`. 66 previously-undiscoverable tests (53 actionscript.all, 8 misc-ming.all, 3 misc-swfc.all, 2 misc-swfmill.all) now run. Per-suite totals jumped accordingly; effective rates dropped *numerically* purely from denominator growth, while raw passing counts grew (+2 Gnash, +9 effective). Newly-discovered passes/RMs: `Global-v5` PASS, `ops-v5/v6/v7` RM, `setProperty-v5/v6/v7/v8` RM, `BitmapDataDraw` RM, `trace-as2/arguments` PASS (misc-swfmill.all). Two new regressions: `misc-ming.all/loop/loop_test10` RM (5/28) → output_mismatch (1/28); `misc-ming.all/register_class/RegisterClassTest4` 17/42 → 7/42 lines. Triage of 45 newly-visible output_mismatch tests in `incomplete/SUBTESTS_NEWLY_VISIBLE_TRIAGE.md`.)
 
 Last updated: 2026-05-13 (textfield-variable-binding plan complete: Phase A `fda90c99`, Phase B `a05dfc7c`, Phase C `b20ee462`. Dejagnu `_xtrace_win` trace TextField (bound to `_root._trace_text`) and similar variable-only-observed EditTexts now render correctly in graphics mode — driven by `place_object_test`, which stays RUFFLE_MATCHED but visually now matches what we'd expect under our AS2-spec depth handling. No pass-count delta (the affected tests were already effective-pass via RUFFLE_MATCHED); win is qualitative and architectural. See `SWFRecompDocs/plans/textfield-variable-binding-plan.md`.)

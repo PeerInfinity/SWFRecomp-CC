@@ -1,6 +1,27 @@
 # Remaining Tail Triage
 
 <!-- TESTS: EmbeddedFontTest, DrawingApiTest, NetStream-SquareTest, masks_test, movieclip_destruction_test4, action_order/action_execution_order_test6 -->
+<!-- PROMOTED (removed from TESTS, 2026-05-23):
+  - loop/loop_test2 → PASS 15/15 (was 6/15 output_mismatch).
+  - loop/loop_test3 → PASS 16/16 (was 9/16 output_mismatch).
+    Single fix in SWFModernRuntime/src/libswf/tag.c::tagPlaceObject2:
+    added `!catch_up_backward` to the early refuse gate at the
+    "Failed to place object at depth" warning site. The gate already
+    excluded `g_loopback_replay` (natural timeline wrap) so the
+    survives_rewind branch below could handle the modify; the analogous
+    catch_up_backward case (AS-driven gotoAndStop/gotoAndPlay backward
+    catch-up) was missing. Both tests do swapDepths in frame 3 then
+    gotoAndStop(2) — frame 2's Place tags target the original (now
+    swapped) depths and were spuriously refused with a warning. With
+    the fix they fall through to the survives_rewind branch which
+    treats the placement as a modify of the existing MC (preserving
+    the swap). Verified no regressions across 23-test AVM1
+    goto/lifecycle battery + 10-test misc-ming goto/loop/replace
+    battery, and the avm1/placeobject_occupied_depth test
+    (which exercises the same warning at the within-same-frame
+    place_gen check, a different code path at tag.c:5462) still
+    PASSES. Also no regressions on path_format_test /
+    place_object_test / place_object_test2 (all still RM). -->
 <!-- PROMOTED (removed from TESTS, 2026-05-09):
   - DefineEditTextVariableNameTest → PASS 72/72 (was 49/72, output_mismatch).
     Three paired AVM1 textfield-binding fixes:

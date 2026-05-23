@@ -5063,14 +5063,22 @@ void tagPlaceObject2(SWFAppContext* app_context, size_t depth, size_t char_id, u
 	//   here would short-circuit it. Without this, gnash misc-ming loop_test
 	//   prints a spurious "Failed to place" each loop where swapDepths put a
 	//   different character into the depth a frame-0 Place tag targets.
+	// - `!catch_up_backward`: same reasoning as g_loopback_replay above, but
+	//   for AS-driven gotoAndStop/gotoAndPlay backward catch-ups. After
+	//   `swapDepths` repositions two MCs, a gotoAndStop to a frame whose Place
+	//   tags target the original (now swapped) depths must fall through to the
+	//   survives_rewind branch below — refusing here spurious-warns and skips
+	//   the modify path. Fixes gnash misc-ming loop_test2 / loop_test3.
 	extern int ng_depth_has_pending_finalize(size_t);
 	extern int g_loopback_replay;
+	extern int catch_up_backward;
 	if (char_id != 0 && !is_replace
 	    && display_list[depth].char_id != 0
 	    && display_list[depth].char_id != char_id
 	    && display_list[depth].placed_at_frame <= current_frame
 	    && !ng_depth_has_pending_finalize(depth)
-	    && !g_loopback_replay)
+	    && !g_loopback_replay
+	    && !catch_up_backward)
 	{
 		// Match Ruffle's avm_warning on a refused Place (and the existing
 		// same-frame check at ~line 5362, which this earlier-firing gate would
