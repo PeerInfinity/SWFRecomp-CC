@@ -1,6 +1,12 @@
 # Function-vN Investigation Plan
 <!-- TESTS: Function-v5, Function-v6, Function-v7, Function-v8 -->
 
+Last updated: 2026-05-23 (pending CI — Function-v5 promoted to
+`ruffle_matched`. One change in `SWFModernRuntime/src/actionmodern/action.c`
+makes SWF5 type-1 function calls allocate a fresh scope chain on entry
+(same path SWF6+ already took), so callee no longer sees caller's local
+locals. See "Fixes landed (2026-05-23)" below.)
+
 Last updated: 2026-05-22 (pending CI — Function-v7/v8 promoted to
 `ruffle_matched` via the type-2 apply/call this-binding cluster. Four
 changes in `SWFModernRuntime/src/actionmodern/action.c` plus one
@@ -64,6 +70,59 @@ status_note: |
 -->
 
 ## Status
+
+### 2026-05-23 — Function-v5 → `ruffle_matched` (fresh scope chain on SWF5 function entry)
+
+`Function-v5` is now an effective pass. Pre-fix diff against expected
+`output.fp13-18.txt` was at indices `{4, 5, 8, 25, 30, 53, 71, 72, 73,
+95, 105, 114, 137, 155, 156}` (15 lines); Ruffle's diff against the same
+file is `{4, 5, 8, 12, 13, 25, 30, 71, 72, 73, 74, 75, 95, 105, 114,
+115, 117, 118, 119, 121, 122, 137, 155, 156}` (24 lines). Index 53 (line
+54, `Function.as:413 check_equals(result1, undefined)`) was our only
+ours-only diff — every other index was already in Ruffle's set.
+
+One change in `SWFModernRuntime/src/actionmodern/action.c::actionCallFunction`:
+
+- **SWF5 type-1 function calls now allocate a fresh scope chain on entry**
+  (same path SWF6+ already took since the initial closure work). Mirrors
+  Ruffle `avm1/function.rs::Avm1Function::exec` lines 298-330: in the
+  non-closure (SWF5) branch, Ruffle allocates a brand-new `[Global,
+  Target(base_clip)]` scope instead of inheriting the caller's scope.
+  Without this, a function defined and called inside an outer function
+  saw the outer function's local scope and could resolve `eval("a")`
+  through it. Function.as:384-413 defines `outer_func = function() { var
+  a = "hello"; inner_func = function(var_ref) { return eval(var_ref); };
+  result1 = inner_func("a"); }`; SWF5 expects `result1 == undefined`
+  because there is no closure-time capture and no caller-scope
+  inheritance, so `eval("a")` finds nothing for "a" → undefined. The
+  change removes the `if (_cf_caller_ver >= 6)` gate around the
+  scope_chain save+reset and around the matching restore on return; SWF5
+  now also saves the caller's scope, resets `scope_depth = 0`, pushes
+  only the local_scope (no captured scopes for SWF5 — `captured_scope_count`
+  is always 0 in SWF5 by definition), and restores on return.
+
+  Pre-fix: `result1 = "hello"` (we incorrectly inherited outer_func's
+  local `a` through the scope chain), so `check_equals(result1, undefined)`
+  emitted `FAILED: expected: undefined obtained: hello`. Post-fix:
+  `result1 = undefined`, so the same check emits `PASSED: result1 ==
+  undefined`, matching expected. Our diff drops index 53 and is now a
+  strict subset of Ruffle's → auto-promotes via
+  `verify_output.py::ruffle_subset_match`.
+
+Regression battery (all green): 19-test AVM1 scope/function suite
+(closure_scope, swf5_no_closure, swf5_to_6_cross_call, set_variable_scope,
+with_variable_scopes, get_variable_in_scope, string_paths_variable_scopes,
+removed_target_clip_scope, function_as_function, function_base_clip,
+funky_function_calls, swf4_function_calls, call, watch, as2_super_and_this_v6/v8,
+execution_order2/3, goto_methods — 19/19 PASS). 31-test AVM1 super/oop/proto/
+constructor battery (31/31 PASS). 37 SWF4/SWF5 tests (33 PASS + 2 RM,
+2 pre-existing failures unchanged: globals_swf5 in ignore list,
+swf5_xml_event_handler_context already output_mismatch in CI). 31-test
+Gnash actionscript.all Function-v5..v8/Object-v5..v8/Inheritance-v5..v8/
+case-v6/Global-v5..v7/Number-v5/v6/Boolean-v5/toString_valueOf-v5/v6/v8/
+delete-v5/v6/enumerate-v6/v7/with-v5/v6/v8/getvariable-v5/v6 — 30/31
+effective (1 pre-existing fail: getvariable-v5 already at 55/58 in CI).
+29 Shumway AVM1 tests (29/29 PASS).
 
 ### 2026-05-22 #2 — Function-v7/v8 → `ruffle_matched` (Phase 2 type-2 apply/call)
 

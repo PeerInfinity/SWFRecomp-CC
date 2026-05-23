@@ -56560,23 +56560,24 @@ void actionCallFunction(SWFAppContext* app_context, char* str_buffer)
 			int _cf_saved_ver = 0; ASObject* _cf_saved_global = NULL; int _cf_saved_midx = 0;
 			if (_cf_caller_ver >= 6)
 				switchToFunctionVersion(func, &_cf_saved_ver, &_cf_saved_global, &_cf_saved_midx);
-			// Save scope chain: SWF6+ callers start with a fresh scope chain
-			// (only captured scopes + local scope), not inheriting the caller's scopes.
-			// We save the entire scope chain state because the function will overwrite
-			// the global scope_chain array positions during its execution.
+			// Save scope chain: every function call starts with a fresh scope
+			// chain. SWF6+ closures then restore captured scopes from definition
+			// time; SWF5 non-closures start with just the local scope (no
+			// inheritance from the caller). Mirrors Ruffle (avm1/function.rs:298-330)
+			// which creates a fresh [Global, Target(base_clip)] parent for SWF5
+			// instead of inheriting the caller's scope. Required by Function-v5
+			// line 413 (`result1 == undefined` — inner_func defined and called
+			// inside outer_func must NOT see outer_func's local `a`).
 			u32 saved_scope_depth_cf = scope_depth;
 			ASObject* saved_scope_chain_cf[MAX_SCOPE_DEPTH];
 			u8 saved_scope_is_with_cf[MAX_SCOPE_DEPTH];
 			MovieClip* saved_scope_mc_cf[MAX_SCOPE_DEPTH];
-			if (_cf_caller_ver >= 6)
-			{
-				for (u32 si = 0; si < scope_depth; si++) {
-					saved_scope_chain_cf[si] = scope_chain[si];
-					saved_scope_is_with_cf[si] = scope_is_with[si];
-					saved_scope_mc_cf[si] = scope_mc[si];
-				}
-				scope_depth = 0;
+			for (u32 si = 0; si < scope_depth; si++) {
+				saved_scope_chain_cf[si] = scope_chain[si];
+				saved_scope_is_with_cf[si] = scope_is_with[si];
+				saved_scope_mc_cf[si] = scope_mc[si];
 			}
+			scope_depth = 0;
 			if (_cf_caller_ver >= 6 && func->base_clip != NULL)
 			{
 				MovieClip* _bc = reResolveDeadBaseClip(app_context, (MovieClip*)func->base_clip);
@@ -56906,14 +56907,12 @@ void actionCallFunction(SWFAppContext* app_context, char* str_buffer)
 
 			g_call_depth--;
 
-			// Restore caller's scope chain and context
-			if (_cf_caller_ver >= 6)
-			{
-				for (u32 si = 0; si < saved_scope_depth_cf; si++) {
-					scope_chain[si] = saved_scope_chain_cf[si];
-					scope_is_with[si] = saved_scope_is_with_cf[si];
-					scope_mc[si] = saved_scope_mc_cf[si];
-				}
+			// Restore caller's scope chain and context (we reset to 0 on entry
+			// for both SWF5 and SWF6+, so restore unconditionally).
+			for (u32 si = 0; si < saved_scope_depth_cf; si++) {
+				scope_chain[si] = saved_scope_chain_cf[si];
+				scope_is_with[si] = saved_scope_is_with_cf[si];
+				scope_mc[si] = saved_scope_mc_cf[si];
 			}
 			scope_depth = saved_scope_depth_cf;
 			actionSetCurrentContext(saved_cf_context);
