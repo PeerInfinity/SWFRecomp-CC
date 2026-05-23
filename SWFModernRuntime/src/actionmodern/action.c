@@ -45772,23 +45772,43 @@ void actionSetMember(SWFAppContext* app_context)
 				return;
 			}
 			// _lockroot setter via non-underscore name (some tests use "lockroot" without underscore on dynamic_props)
-			// TextField type setter: normalize to lowercase, reject invalid values
+			// TextField type setter: normalize to lowercase, reject invalid values.
+			// OBJECT/ARRAY args go through toString() — `tf.type = {toString: fn}`
+			// uses the returned string; `tf.type = new Array()` returns ""
+			// which fails the "input"/"dynamic" check and rejects.
 			if (prop_name_len == 4 && strncmp(prop_name, "type", 4) == 0
-				&& mc->ng_textfield_idx >= 0)
+				&& MC_IS_TEXTFIELD(mc))
 			{
-				if (value_var.type == ACTION_STACK_VALUE_STRING) {
-					const uint16_t* _ty_u16 = varGetU16Ptr(&value_var);
+				ActionVar _ty_src = value_var;
+				if (_ty_src.type == ACTION_STACK_VALUE_OBJECT
+				    || _ty_src.type == ACTION_STACK_VALUE_ARRAY)
+				{
+					int _ty_found = 0;
+					ActionVar _ty_str = objectCallToString(app_context, &_ty_src, &_ty_found);
+					if (_ty_found && _ty_str.type == ACTION_STACK_VALUE_STRING) {
+						_ty_src = _ty_str;
+					} else if (_ty_src.type == ACTION_STACK_VALUE_ARRAY) {
+						// Empty array → "" — invalid, reject
+						return;
+					} else {
+						return;
+					}
+				}
+				if (_ty_src.type == ACTION_STACK_VALUE_STRING) {
+					const uint16_t* _ty_u16 = varGetU16Ptr(&_ty_src);
 					char _ty_buf[64];
-					if (_ty_u16 && value_var.str_size > 0)
-						u16_to_utf8(_ty_u16, value_var.str_size, _ty_buf, sizeof(_ty_buf));
+					if (_ty_u16 && _ty_src.str_size > 0)
+						u16_to_utf8(_ty_u16, _ty_src.str_size, _ty_buf, sizeof(_ty_buf));
 					else
 						_ty_buf[0] = '\0';
 					if (_ty_buf[0] != '\0') {
 						if (strcasecmp(_ty_buf, "dynamic") == 0) {
+							value_var.type = ACTION_STACK_VALUE_STRING;
 							value_var.data.numeric_value = (u64)u16_dynamic;
 							value_var.data.string_data.owns_memory = false;
 							value_var.str_size = 7;
 						} else if (strcasecmp(_ty_buf, "input") == 0) {
+							value_var.type = ACTION_STACK_VALUE_STRING;
 							value_var.data.numeric_value = (u64)u16_input;
 							value_var.data.string_data.owns_memory = false;
 							value_var.str_size = 5;
@@ -45796,6 +45816,9 @@ void actionSetMember(SWFAppContext* app_context)
 							// Invalid value: silently reject (keep previous)
 							return;
 						}
+					} else {
+						// Empty string: silently reject (keep previous)
+						return;
 					}
 				} else {
 					// Non-string: reject

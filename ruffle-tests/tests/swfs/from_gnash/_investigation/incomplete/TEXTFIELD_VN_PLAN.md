@@ -1,6 +1,14 @@
 # TextField-vN Investigation Plan
 <!-- TESTS: TextField-v6, TextField-v7, TextField-v8 -->
 
+Last updated: 2026-05-23 (Phase 7 landed — tf.type setter now accepts
+OBJECT/ARRAY args, routing them through `objectCallToString` and
+case-insensitive matching against "input"/"dynamic". The conditional
+also widened from `mc->ng_textfield_idx >= 0` to `MC_IS_TEXTFIELD(mc)`
+so dynamically-created TextFields (ng_textfield_idx == -2) are covered.
+Cluster G's 4 lines (709/710/714/717) flip to PASSED on v6/v7/v8.
+All three still output_mismatch.)
+
 Last updated: 2026-05-21 (Phases 4, 6, 12 landed; Phase 1 partial —
 prototype-level AsBroadcaster install done, per-instance self-register
 still pending. Line match: v6 404→438/545, v7 413→447/570,
@@ -31,7 +39,7 @@ phases:
     status: done
   - id: 7
     name: "tf.type setter case-normalization (Input/INPUT → 'input')"
-    status: pending
+    status: done
   - id: 8
     name: "tf.length reading text length vs stored value"
     status: pending
@@ -87,6 +95,35 @@ After Phases 4/6/12 + Phase 1 (partial) — local, 2026-05-21:
 | TextField-v8 | 449/571 | 78.6% | output_mismatch |
 
 ### Progress log
+
+**2026-05-23 — Phase 7 done.** One change in
+`SWFModernRuntime/src/actionmodern/action.c`, in the `actionSetMember`
+MOVIECLIP arm's `tf.type` setter:
+
+- Widened the `mc->ng_textfield_idx >= 0` guard to `MC_IS_TEXTFIELD(mc)`
+  so dynamically-created TextFields (ng_textfield_idx == -2, the
+  `createTextField()` path the test uses) also enter the setter. Without
+  this, the setter was a no-op for the test's `_root.createTextField`
+  TF, and assignments fell through to the generic `setProperty` storage
+  → an Array literal was stored as `ACTION_STACK_VALUE_ARRAY`, breaking
+  `typeof == 'string'`.
+- OBJECT/ARRAY-typed args now route through `objectCallToString` first.
+  For `tf.type = {toString: function() { return 'Input'; }}` the call
+  returns the STRING "Input" which then matches `strcasecmp(_, "input")`
+  and stores `u16_input` (lowercase). For `tf.type = new Array()`,
+  `objectCallToString` returns undefined (no toString on `arr->props`,
+  no addProperty walk for ARRAY) → fall into "reject" branch, keeping
+  the previous value.
+- Added an explicit `else { return; }` for the empty-string case (when
+  `_ty_buf[0] == '\0'`) — previously the empty-string branch fell
+  through to the generic `setProperty` store, overwriting `tf.type`
+  with empty. Now empties silently reject, matching Flash.
+
+Lines 709/710/714/717 (the four `tf.type = new Array()` / `tf.type = o`
+clusters at TextField.as:709-717) flip to PASSED on v6/v7/v8 — +4 each.
+No regressions across 8 AVM1 TextField tests (textfield_properties,
+textfield_props_swf6/7/8, clone_sprite_edittext{,_dynamic},
+edittext_default_format, edittext_input — all PASS).
 
 **2026-05-21 — Phases 4, 6, 12 done; Phase 1 partial.** All in
 `SWFModernRuntime/src/actionmodern/action.c`:
