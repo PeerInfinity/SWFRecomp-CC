@@ -61894,6 +61894,18 @@ void actionCallMethod(SWFAppContext* app_context, char* str_buffer)
 						}
 					}
 
+					// Push a fresh local scope so the body's setVariableByName
+					// param-bind writes don't leak into global var_map across
+					// repeated call()/apply() invocations.
+					ASObject* local_scope_ca2 = allocObject(app_context, 8);
+					int local_scope_pushed_ca2 = 0;
+					if (scope_depth < MAX_SCOPE_DEPTH) {
+						scope_is_with[scope_depth] = 0;
+						scope_mc[scope_depth] = NULL;
+						scope_chain[scope_depth++] = local_scope_ca2;
+						local_scope_pushed_ca2 = 1;
+					}
+
 					// Switch context to base_clip for SWF6+
 					MovieClip* prev_ctx_call = g_current_context;
 					if (g_swf_version >= 6 && func->base_clip != NULL)
@@ -61903,19 +61915,50 @@ void actionCallMethod(SWFAppContext* app_context, char* str_buffer)
 					if (this_obj != NULL)
 						pushSuperContext(this_obj, 1);
 
+					// Bind `this` for the type-2 callee via g_this_stack so the
+					// body's actionGetVariable("this") resolves to the call
+					// thisArg. Mirrors actionCallFunction's type-2
+					// "neither preload nor suppress" branch.
+					u32 saved_this_depth_ca2 = g_this_depth;
+					int t2_this_pushed_ca2 = 0;
+					{
+						u16 f2flags_ca2 = func->flags;
+						int f2_preload_this_ca2  = (f2flags_ca2 & 0x0001);
+						int f2_suppress_this_ca2 = (f2flags_ca2 & 0x0002);
+						if (!f2_preload_this_ca2 && !f2_suppress_this_ca2
+						    && g_this_depth < MAX_THIS_DEPTH) {
+							ActionVar t2_this_var_ca = {0};
+							if (num_args >= 1
+							    && args[0].type != ACTION_STACK_VALUE_UNDEFINED
+							    && args[0].type != ACTION_STACK_VALUE_NULL) {
+								t2_this_var_ca = args[0];
+							} else {
+								t2_this_var_ca.type = ACTION_STACK_VALUE_OBJECT;
+								t2_this_var_ca.data.numeric_value = (u64)(uintptr_t) global_object;
+							}
+							g_this_stack[g_this_depth++] = t2_this_var_ca;
+							t2_this_pushed_ca2 = 1;
+						}
+					}
+
 					// Pass this-type so builtin wrappers can distinguish ASArray from ASObject
 					g_call_this_type = (num_args >= 1) ? args[0].type : 0;
 					ActionVar result = func->advanced_func(app_context, call_args, call_arg_count, registers, this_obj);
 					g_call_this_type = 0;
 					g_override_this_set = 0; // clear in case function didn't consume it
 
+					if (t2_this_pushed_ca2)
+						g_this_depth = saved_this_depth_ca2;
+
 					if (this_obj != NULL)
 						popSuperContext();
 
 					g_current_context = prev_ctx_call;
+					if (local_scope_pushed_ca2 && scope_depth > 0) scope_depth--;
 					for (u32 ci = 0; ci < captured_count; ci++) {
 						if (scope_depth > 0) scope_depth--;
 					}
+					releaseObject(app_context, local_scope_ca2);
 
 					g_current_executing_func = prev_executing_func_call;
 					g_call_depth--;
@@ -62255,6 +62298,18 @@ void actionCallMethod(SWFAppContext* app_context, char* str_buffer)
 						}
 					}
 
+					// Push a fresh local scope so the body's setVariableByName
+					// param-bind writes don't leak into global var_map across
+					// repeated apply()/call() invocations.
+					ASObject* local_scope_ap2 = allocObject(app_context, 8);
+					int local_scope_pushed_ap2 = 0;
+					if (scope_depth < MAX_SCOPE_DEPTH) {
+						scope_is_with[scope_depth] = 0;
+						scope_mc[scope_depth] = NULL;
+						scope_chain[scope_depth++] = local_scope_ap2;
+						local_scope_pushed_ap2 = 1;
+					}
+
 					// Switch context to base_clip for SWF6+
 					MovieClip* prev_ctx_ap2 = g_current_context;
 					if (g_swf_version >= 6 && func->base_clip != NULL)
@@ -62264,16 +62319,47 @@ void actionCallMethod(SWFAppContext* app_context, char* str_buffer)
 					if (this_obj != NULL)
 						pushSuperContext(this_obj, 1);
 
+					// Bind `this` for the type-2 callee via g_this_stack so the
+					// body's actionGetVariable("this") resolves to the apply
+					// thisArg. Mirrors actionCallFunction's type-2
+					// "neither preload nor suppress" branch.
+					u32 saved_this_depth_ap2 = g_this_depth;
+					int t2_this_pushed_ap2 = 0;
+					{
+						u16 f2flags_ap2 = func->flags;
+						int f2_preload_this_ap2  = (f2flags_ap2 & 0x0001);
+						int f2_suppress_this_ap2 = (f2flags_ap2 & 0x0002);
+						if (!f2_preload_this_ap2 && !f2_suppress_this_ap2
+						    && g_this_depth < MAX_THIS_DEPTH) {
+							ActionVar t2_this_var = {0};
+							if (num_args >= 1
+							    && args[0].type != ACTION_STACK_VALUE_UNDEFINED
+							    && args[0].type != ACTION_STACK_VALUE_NULL) {
+								t2_this_var = args[0];
+							} else {
+								t2_this_var.type = ACTION_STACK_VALUE_OBJECT;
+								t2_this_var.data.numeric_value = (u64)(uintptr_t) global_object;
+							}
+							g_this_stack[g_this_depth++] = t2_this_var;
+							t2_this_pushed_ap2 = 1;
+						}
+					}
+
 					ActionVar result = func->advanced_func(app_context, apply_args, apply_arg_count, registers, this_obj);
 					g_override_this_set = 0; // clear in case function didn't consume it
+
+					if (t2_this_pushed_ap2)
+						g_this_depth = saved_this_depth_ap2;
 
 					if (this_obj != NULL)
 						popSuperContext();
 
 					g_current_context = prev_ctx_ap2;
+					if (local_scope_pushed_ap2 && scope_depth > 0) scope_depth--;
 					for (u32 ci = 0; ci < captured_count_ap2; ci++) {
 						if (scope_depth > 0) scope_depth--;
 					}
+					releaseObject(app_context, local_scope_ap2);
 
 					g_current_executing_func = prev_executing_func_ap2;
 					g_call_depth--;
@@ -62602,9 +62688,15 @@ void actionCallMethod(SWFAppContext* app_context, char* str_buffer)
 						int f2_preload_super = (f2flags & 0x0010);
 						int f2_suppress_super= (f2flags & 0x0020);
 						if (!f2_preload_this && !f2_suppress_this) {
+							// Bind `this` to the FUNCTION receiver itself so a
+							// method invoked on a function (e.g. `Foo['new']()`)
+							// sees `this == Foo`. Mirrors the type-1 branch
+							// below — without this `new this` inside
+							// Function.prototype['new'] never resolves to Foo.
+							// Function.as:560-569.
 							ActionVar this_var_fm = {0};
-							this_var_fm.type = ACTION_STACK_VALUE_OBJECT;
-							this_var_fm.data.numeric_value = (u64)func->own_props;
+							this_var_fm.type = ACTION_STACK_VALUE_FUNCTION;
+							this_var_fm.data.numeric_value = (u64) func;
 							setProperty(app_context, local_scope_fm, "this", 4, &this_var_fm);
 							if (g_this_depth < MAX_THIS_DEPTH) {
 								g_this_stack[g_this_depth] = this_var_fm;

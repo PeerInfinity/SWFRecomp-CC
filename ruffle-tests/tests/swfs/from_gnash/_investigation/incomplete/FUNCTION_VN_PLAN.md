@@ -1,6 +1,12 @@
 # Function-vN Investigation Plan
 <!-- TESTS: Function-v5, Function-v6, Function-v7, Function-v8 -->
 
+Last updated: 2026-05-22 (pending CI — Function-v7/v8 promoted to
+`ruffle_matched` via the type-2 apply/call this-binding cluster. Four
+changes in `SWFModernRuntime/src/actionmodern/action.c` plus one
+recompiler change in `SWFRecomp/src/action/action.cpp`. See
+"Fixes landed (2026-05-22 #2)" below.)
+
 Last updated: 2026-05-19 (initial planning doc, drafted from local
 single-test reproductions at the current `master` SHA; no fixes
 landed yet)
@@ -13,7 +19,7 @@ phases:
     name: "Function class identity / Function global constructor"
     status: complete
   - id: 2
-    name: "Function.prototype.call / .apply with non-MC this"
+    name: "Function.prototype.call / .apply with non-MC this (type-1 + type-2)"
     status: complete
   - id: 3
     name: "typeof on auto-bound this in path-call / SetTarget contexts"
@@ -58,6 +64,90 @@ status_note: |
 -->
 
 ## Status
+
+### 2026-05-22 #2 — Function-v7/v8 → `ruffle_matched` (Phase 2 type-2 apply/call)
+
+The dominant `getThisName.apply(this_ref)` / `setThisMember.apply()` /
+`isThisGlobal.apply()` / `getThis.call(o|null|undefined)` cluster
+(Function.as:77, 96, 99, 106, 136-144, 163, 180, 184-199, 209-214 —
+result lines 11-54) and the `Foo['new']()` "`new this`" cluster
+(Function.as:568-569 — result lines 147-148) cleared together with one
+recompiler-side parameter-binding fix.
+
+Four changes in `SWFModernRuntime/src/actionmodern/action.c`:
+
+1. **`apply()` type-2 callee `this` push to `g_this_stack`.** The
+   Function.prototype.apply dispatch (~`actionCallMethod` apply handler)
+   set `g_override_this` only for MOVIECLIP/primitive args; for
+   ordinary OBJECT thisArg or no-arg/undefined/null it never pushed to
+   `g_this_stack`. The recompiler-emitted type-2 body resolves `this`
+   through `actionGetVariable("this")` which reads
+   `g_this_stack[g_this_depth-1]` — without a push, the body saw the
+   caller's `this`. Now: when `!preload_this && !suppress_this`, push
+   `args[0]` (or `global_object` for undefined/null/no-arg) onto
+   `g_this_stack`, pop after the call. Mirrors `actionCallFunction`'s
+   own type-2 "neither preload nor suppress" branch.
+
+2. **`call()` type-2 callee `this` push.** Same fix on the
+   Function.prototype.call dispatch.
+
+3. **Apply/call type-2 paths push a fresh local scope.** Without one,
+   the body's `setVariableByName("a", &args[0])` writes leak into
+   global `var_map` and pollute later same-name reads across repeated
+   `apply()`/`call()` invocations. Fix surfaced as Function.as:99/106 —
+   `getThisName.apply(this_ref, "8")` (non-array second arg ⇒ 0 bound
+   args) was reading the previous call's `a=4, b=5, c=6` instead of
+   undefined. Now: `allocObject` a local_scope, push as scope_chain
+   top, release on return.
+
+4. **FUNCTION-receiver type-2 method dispatch binds `this` to the
+   FUNCTION receiver.** The "Look up arbitrary method on function's
+   own_props" branch (~`actionCallMethod` FUNCTION-receiver handler)
+   set `this_var_fm.type = OBJECT` with `data = func->own_props` for
+   type-2 methods, so `new this` inside `Function.prototype['new']`
+   (`Foo['new']() → return new this`) saw the own_props bag, not Foo
+   itself. Now: `this_var_fm.type = FUNCTION`, `data = func`. Mirrors
+   the existing type-1 branch right below it.
+
+One recompiler change in `SWFRecomp/src/action/action.cpp`:
+
+5. **Unset DefineFunction2 named parameters bind to undefined in local
+   scope.** Per ECMAScript / Flash, a declared parameter that isn't
+   supplied must shadow any outer binding of the same name —
+   `function inc(a,b) { … b.count++; }` called as `inc(a)` must treat
+   `b` as the function's `undefined`, not the outer `b`.
+   `setVariableByName` falls back to global when the local scope
+   doesn't claim the name, so unset variable-named params were
+   resolving to outer scope. The recompiler now emits an explicit
+   `setVariableByName("b", UNDEFINED)` for each variable-typed param
+   that didn't make the `i < arg_count` cutoff. Register-typed params
+   are already zero-init UNDEFINED in `regs[]`, so no change there.
+   Fixes Function.as:1033 (`b.count == 1` after `inc(a)`).
+
+Effects (local, pending CI):
+- Function-v7 `output_mismatch` → **`ruffle_matched`**. `#passed` 234 →
+  ~263; our diff `{8,17,27,30,73,123,124,159,162,170,178}` (11 lines)
+  ⊆ Ruffle's 33-line diff. (Numbers are approximate; the next CI run
+  will confirm.)
+- Function-v8 `output_mismatch` → **`ruffle_matched`**. Same
+  trajectory as v7.
+- Function-v6 still `ruffle_matched` (unchanged), Function-v5 still
+  `output_mismatch` (v5's residuals are Phase 9 Function-class-identity
+  gaps, not Phase 2).
+
+Residual diffs are all inside Ruffle's diff set for v7/v8: line 73
+(addProperty override — pre-existing in v7/v8 only), 123/124 (Phase 5
+`arguments` enumeration), 162/170/178 (Phase 9 ASnative-derived
+function `constructor` / `__proto__` resolution), 265 (`!f.hasOwnProperty
+("constructor")` when `_global.Function = {}`).
+
+No regressions across 9-test gnash actionscript.all
+Object-v6/v7/v8/Inheritance-v6/v7/v8/case-v6/Global-v6/v7 battery (9/9
+effective pass), 13-test Function/toString_valueOf/Boolean/Number
+battery (10/10 effective among non-Function-v5/v7/v8), 4-test
+getvariable-v5/v6/v7/v8 battery (unchanged: v6 still RM, others still
+mismatch on the `this._root._level0.varname` cluster which is
+unrelated).
 
 ### 2026-05-22 — Function-v6 → `ruffle_matched` (Phases 3/9 residual cluster cleared)
 

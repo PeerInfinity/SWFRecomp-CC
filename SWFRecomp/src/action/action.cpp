@@ -1696,7 +1696,12 @@ namespace SWFRecomp
 					func_def << "\t}" << endl;
 				}
 
-				// Bind parameters to registers or variables
+				// Bind parameters to registers or variables. Parameters not
+				// supplied by the caller bind to undefined in the local scope,
+				// matching ECMAScript / Flash: an unset named parameter must
+				// shadow any outer binding of the same name (Function.as:1024
+				// `function inc(a,b) { ... }` called as `inc(a)` — `b` must
+				// be the function's `undefined`, not the outer `b`).
 				for (size_t i = 0; i < params.size(); i++)
 				{
 					if (params[i].first == 0)
@@ -1704,11 +1709,15 @@ namespace SWFRecomp
 						// Variable parameter
 						func_def << "\tif (" << i << " < arg_count) {" << endl;
 						func_def << "\t\tsetVariableByName(\"" << params[i].second << "\", &args[" << i << "]);" << endl;
+						func_def << "\t} else {" << endl;
+						func_def << "\t\tActionVar _undef_" << i << " = {0};" << endl;
+						func_def << "\t\t_undef_" << i << ".type = ACTION_STACK_VALUE_UNDEFINED;" << endl;
+						func_def << "\t\tsetVariableByName(\"" << params[i].second << "\", &_undef_" << i << ");" << endl;
 						func_def << "\t}" << endl;
 					}
 					else
 					{
-						// Register parameter
+						// Register parameter (regs[] is already zeroed to UNDEFINED)
 						func_def << "\tif (" << i << " < arg_count) {" << endl;
 						func_def << "\t\tregs[" << (int)params[i].first << "] = args[" << i << "];" << endl;
 						func_def << "\t}" << endl;
