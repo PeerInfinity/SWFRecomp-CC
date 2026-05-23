@@ -1,8 +1,8 @@
 # Ruffle Test Results (Unfiltered)
 
-**Date**: 2026-05-23 20:35 UTC
+**Date**: 2026-05-23 20:59 UTC
 
-**Git SHA**: `8895f0e675`
+**Git SHA**: `4267c962ea`
 
 **Run Duration**: 0m 23s
 
@@ -37,8 +37,8 @@
 | 4 | `hello` | 4 | 0.2s |  |
 | 5 | `mouse_drag_test` | 12 | 0.2s |  |
 | 6 | `movieclip_destruction_test2` | 56 | 0.2s |  |
-| 7 | `stackscope` | 11 | 0.1s |  |
-| 8 | `submoviegetvar` | 4 | 0.2s |  |
+| 7 | `stackscope` | 11 | 0.2s |  |
+| 8 | `submoviegetvar` | 4 | 0.1s |  |
 
 ## Ruffle-Matched Tests
 
@@ -48,7 +48,7 @@
 |---|------|-----------|--------------|----------|-------|
 | 1 | `action_execution_order_test10` | 11 | 14 | 0.2s |  |
 | 2 | `action_execution_order_test12` | 2 | 2 | 0.2s |  |
-| 3 | `movieclip_destruction_test1` | 43 | 52 | 0.3s |  |
+| 3 | `movieclip_destruction_test1` | 43 | 52 | 0.2s |  |
 | 4 | `opcode_guard_test2` | 5 | 5 | 0.2s |  |
 | 5 | `registerclass_test3` | 12 | 20 | 0.2s |  |
 | 6 | `soft_reference_test1` | 3 | 4 | 0.2s |  |
