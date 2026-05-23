@@ -45744,6 +45744,20 @@ void actionSetMember(SWFAppContext* app_context)
 					}
 					return;
 				}
+				// TextField only: tf._parent silently stores the assigned value as an
+				// own property override. mc->parent and mc->target are not touched.
+				// The getter checks dynamic_props before the native _parent getter.
+				// Gnash TextField.as:475-476, Flash quirk; MovieClip._parent stays a
+				// pure virtual read so AVM1 movieclip tests are unaffected.
+				if (strcasecmp(prop_name, "_parent") == 0 && MC_IS_TEXTFIELD(mc))
+				{
+					if (mc->dynamic_props == NULL) {
+						mc->dynamic_props = (void*) allocObject(app_context, 4);
+						retainObject((ASObject*) mc->dynamic_props);
+					}
+					setProperty(app_context, (ASObject*) mc->dynamic_props, "_parent", 7, &value_var);
+					return;
+				}
 			}
 			// blendMode setter: accepts string name or numeric index
 			if (prop_name_len == 9 && strncmp(prop_name, "blendMode", 9) == 0)
@@ -49079,6 +49093,16 @@ void actionGetMember(SWFAppContext* app_context)
 			if (strcasecmp(prop_name, "_soundbuftime") == 0) { float v = g_soundbuftime; PUSH(ACTION_STACK_VALUE_F32, VAL(u32, &v)); return; }
 			if (strcasecmp(prop_name, "_lockroot") == 0) { PUSH(ACTION_STACK_VALUE_BOOLEAN, (u64)mc->lockroot); return; }
 			if (strcasecmp(prop_name, "_parent") == 0) {
+				// TextField only: own _parent override in dynamic_props wins over the
+				// native getter. Prototype._parent loses to the native getter (handled
+				// by this getter returning before falling through to the prototype walk).
+				if (MC_IS_TEXTFIELD(mc) && mc->dynamic_props != NULL) {
+					ActionVar* _po = getProperty((ASObject*) mc->dynamic_props, "_parent", 7);
+					if (_po != NULL) {
+						pushVar(app_context, _po);
+						return;
+					}
+				}
 				MovieClip* par = mc->parent;
 				// SWF5: buttons are transparent — skip button parents
 				if (par != NULL && par->is_button_mc && g_swf_version < 6)
