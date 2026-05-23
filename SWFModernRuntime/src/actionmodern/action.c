@@ -22572,6 +22572,30 @@ void actionFirePendingUnloads(SWFAppContext* app_context)
 	run_pending_finalize(app_context);
 }
 
+// Recursively rebuild target paths of all descendants of `mc` after `mc->target`
+// changed (e.g. via `mc._name = "newname"` or tagSetInstanceName). Each direct
+// child gets `mc->target + "/" + child->name`; recurse into grandchildren.
+// Walks child_mc_cache linearly per recursion level — O(N * depth) but N is
+// bounded by MAX_CHILD_MOVIECLIPS (128) and depths are typically small.
+static void propagateTargetToDescendants(MovieClip* mc)
+{
+	if (mc == NULL) return;
+	for (int i = 0; i < child_mc_count; i++) {
+		MovieClip* child = child_mc_cache[i];
+		if (child == NULL) continue;
+		if (child->parent != mc) continue;
+		if (mc->target[0] == '/' && mc->target[1] == '\0') {
+			snprintf(child->target, sizeof(child->target), "/%s", child->name);
+		} else if (mc->target[0] != '\0') {
+			snprintf(child->target, sizeof(child->target), "%s/%s", mc->target, child->name);
+		} else {
+			snprintf(child->target, sizeof(child->target), "/%s", child->name);
+		}
+		child->target[sizeof(child->target) - 1] = '\0';
+		propagateTargetToDescendants(child);
+	}
+}
+
 #if defined(NO_GRAPHICS) || defined(OFFSCREEN_RENDER)
 // Clean up child MCs during backward goto.
 // Removes dynamically created MCs (createEmptyMovieClip) from cache and dynamic_props,
@@ -22739,6 +22763,10 @@ void actionRenameMovieClip(const char* old_name, const char* new_name)
 				}
 			}
 		}
+		// Cascade the new target path to any descendants (e.g. mc4._name = 'changed'
+		// must update mc5._target from "/mc4_mc/mc5_mc" to "/changed/mc5_mc").
+		// Gnash MovieClip-v6/v7/v8 Phase 5.
+		propagateTargetToDescendants(mc);
 		return;
 	}
 }
@@ -45517,6 +45545,10 @@ void actionSetMember(SWFAppContext* app_context)
 							else
 								snprintf(mc->target, sizeof(mc->target), "/%s", new_name);
 						}
+						// Cascade the new target down to descendants (mc4._name='changed' must
+						// update mc4.mc5_mc._target from "/mc4_mc/mc5_mc" to "/changed/mc5_mc").
+						// Gnash MovieClip-v6/v7/v8 Phase 5.
+						propagateTargetToDescendants(mc);
 						// Sync parent.dynamic_props and (root only) var_map for the
 						// rename. Without this, after `mc._name = "newname"` the
 						// stale "oldname" entry still resolves to the MC, breaking

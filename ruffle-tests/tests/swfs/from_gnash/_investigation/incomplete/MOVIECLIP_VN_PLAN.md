@@ -1,6 +1,11 @@
 # MovieClip-vN Investigation Plan
 <!-- TESTS: MovieClip-v6, MovieClip-v7, MovieClip-v8 -->
 
+Last updated: 2026-05-22 (Phase 5 landed → MovieClip-v6/v7/v8 each
+−3 mismatched lines: renamed-parent `_target` now cascades to
+descendants. Test still `output_mismatch`; zero regressions across
+AVM1 + gnash batteries.)
+
 Last updated: 2026-05-21 (Phase 17 landed → MovieClip-v6/v7/v8 each
 −20 mismatched lines, still `output_mismatch`. Phases 2 + 4 earlier
 the same day landed −5 each. Zero regressions across AVM1 + gnash
@@ -24,7 +29,7 @@ phases:
     status: completed
   - id: 5
     name: "Renamed-parent _target path propagation to children"
-    status: pending
+    status: completed
   - id: 6
     name: "Soft-reference / hard-reference depth and replacement semantics"
     status: pending
@@ -91,6 +96,38 @@ Local CI baseline (commit `eb8206f8`, 2026-05-15):
 
 MovieClip-v5 already at ruffle_matched (per
 complete/GNASH_FEATURE_PLAN.md).
+
+### Fixes landed (2026-05-22, pending CI)
+
+- **Phase 5 — Renamed-parent `_target` cascades to descendants
+  (MovieClip.as:623/625/629).** After `mc4._name = 'changed'` the
+  child `mc5._target` should read `"/changed/mc5_mc"`, but we
+  reported `"/mc4_mc/mc5_mc"`: the `_name` setter (and
+  `actionRenameMovieClip`) rebuilt the renamed MC's own `target`
+  but never updated descendants whose `target` was a literal copy
+  of the old parent path plus their own name. New helper
+  `propagateTargetToDescendants(mc)` in
+  `SWFModernRuntime/src/actionmodern/action.c` walks `child_mc_cache`
+  for direct children (`child->parent == mc`), rewrites their
+  `target` from the new `mc->target + "/" + child->name`, then
+  recurses. Called from both rename sites: `actionRenameMovieClip`
+  (NO_GRAPHICS path) and the `_name` setter in
+  `actionSetMember`'s MOVIECLIP arm (all builds). Cluster
+  collapses to 0 ours-only lines on v6/v7/v8 (−3 each).
+
+  Verified no regressions on a representative AVM1 / Gnash MC
+  battery: tell_target, tell_target_invalid{,_swf6},
+  property_invalid_base_clip, mcl_replace_root_swf7_to_swf6,
+  string_paths_eval2, string_paths_other, target_clip_removed,
+  target_path, path_string, swf5_to_6_cross_call,
+  movieclip_default_state, movieclip_state_values,
+  movieclip_setmask, unload_nested_child, removed_clip_halts_script,
+  clone_sprite_edittext, clip_constructors, on_construct,
+  function_base_clip, goto_rewind3 — all PASS;
+  gnash misc-swfc soft_reference_test1 + movieclip_destruction_test2 RM/PASS;
+  gnash actionscript.all case-v6, MovieClip-v5, MovieClipLoader-v6,
+  Function-v6, getvariable-v6, Inheritance-v6, Object-v6,
+  delete-v6, Global-v6 all effective-pass.
 
 ### Fixes landed (2026-05-21, pending CI)
 
