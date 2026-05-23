@@ -1,6 +1,12 @@
 # MovieClip-vN Investigation Plan
 <!-- TESTS: MovieClip-v6, MovieClip-v7, MovieClip-v8 -->
 
+Last updated: 2026-05-23 (Phase 11 _yscale-sign marked
+`not_actionable`: Ruffle's `output.fp23.ruffle.txt` also reads
+`obtained: -50` at line 616, so this line is common to both diffs
+and doesn't block ruffle_matched promotion. Reasoning in section K.
+No code change this update — docs only.)
+
 Last updated: 2026-05-22 (Phase 5 landed → MovieClip-v6/v7/v8 each
 −3 mismatched lines: renamed-parent `_target` now cascades to
 descendants. Test still `output_mismatch`; zero regressions across
@@ -47,7 +53,7 @@ phases:
     status: pending
   - id: 11
     name: "_yscale assignment after negative value preserves new sign"
-    status: pending
+    status: not_actionable
   - id: 12
     name: "getBounds with plain-Object reference (Object treated as identity)"
     status: pending
@@ -352,7 +358,7 @@ Lines: 1436, 1437, 1450, 1451, 1487, 1488, 1500, 1501, 1512-1515,
 After `_xscale = -200` or `_yscale = 50`, getBounds should report
 the post-transform bounds. We are returning pre-transform bounds.
 
-### K. _yscale sign preservation (Phase 11)
+### K. _yscale sign preservation (Phase 11) — NOT ACTIONABLE (2026-05-23)
 
 Lines: 1520.
 
@@ -361,9 +367,19 @@ Lines: 1520.
 + FAILED: expected: 50 obtained: -50
 ```
 
-After `draw._yscale = -50; draw._yscale = 50`, we still report
--50. Suggests one of the assignments is failing or the absolute
-value is being stored with cached sign.
+**The original framing was wrong on two counts.** First, the test
+sequence is NOT `draw._yscale = -50; draw._yscale = 50` — it is
+`draw._yscale = -50; draw._xscale = -50; draw._width = 10`, and
+Flash's _width setter resets both axes to positive sign as a side
+effect. Second, **Ruffle's `output.fp23.ruffle.txt` line 616 reads
+`FAILED: expected: 50 obtained: -50`** — Ruffle's set_width does
+not implement the sign-reset side effect either, and our output
+already matches Ruffle here. This line is in BOTH our diff and
+Ruffle's diff against expected, so it does not block ruffle_matched
+promotion. Fixing it would require Flash-specific math in
+`mcSetEffectiveWidth` that Ruffle doesn't have; not worth pursuing
+unless we deliberately want to be more correct than Ruffle on
+MovieClip-vN. Mark phase status `not_actionable` in the meta block.
 
 ### L. getBounds with plain-Object reference (Phase 12)
 
@@ -475,8 +491,10 @@ BEST suggests BEST maps to `_highquality == 2`.
    storage to a global. Estimate: 30 min.
 5. **Phase 17 (_quality BEST)** — small enum addition. Estimate:
    30 min.
-6. **Phase 11 (_yscale sign preservation)** — single setter fix.
-   Estimate: 30 min.
+6. ~~**Phase 11 (_yscale sign preservation)**~~ — NOT ACTIONABLE
+   (2026-05-23). Ruffle's output also reads `obtained: -50`, so the
+   line is already common to both diffs and doesn't block
+   ruffle_matched promotion. See section K for the full reasoning.
 7. **Phase 7 (unloadMovie keeps typeof movieclip)** — small.
    Estimate: 1 hour.
 8. **Phase 9 + 10 + 12 (getBounds reference-clip transform, scale,
