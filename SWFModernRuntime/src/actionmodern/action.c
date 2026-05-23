@@ -1654,10 +1654,10 @@ static ActionVar builtin_sound_getTransform(SWFAppContext* app_context, ActionVa
 	setProperty(app_context, result, "ll", 2, &v);
 	VAL(double, &v.data.numeric_value) = (double)readSoundProp(obj, "__lr__", 6);
 	setProperty(app_context, result, "lr", 2, &v);
-	VAL(double, &v.data.numeric_value) = (double)readSoundProp(obj, "__rl__", 6);
-	setProperty(app_context, result, "rl", 2, &v);
 	VAL(double, &v.data.numeric_value) = (double)readSoundProp(obj, "__rr__", 6);
 	setProperty(app_context, result, "rr", 2, &v);
+	VAL(double, &v.data.numeric_value) = (double)readSoundProp(obj, "__rl__", 6);
+	setProperty(app_context, result, "rl", 2, &v);
 	ret.type = ACTION_STACK_VALUE_OBJECT;
 	ret.data.numeric_value = (u64)result;
 	return ret;
@@ -22439,7 +22439,25 @@ void actionFirePendingDirectLoads(SWFAppContext* app_context)
 		float (*_saved_td)[16] = NULL;
 		if (loads[i].is_level) {
 			DisplayObject* dobj = mc->display_obj ? (DisplayObject*)mc->display_obj : NULL;
-			if (dobj != NULL && dobj->sprite_display_list != NULL) {
+			// Lazily attach a display_obj + private sprite_display_list to a
+			// freshly-created level MC (getOrCreateLevel zeros display_obj). Without
+			// this, the child SWF's frame_funcs run on the parent's display_list
+			// and collide with the parent's placements at the same depths — e.g.
+			// avm1/swf5_xml_event_handler_context's child.swf places at depth 1
+			// where the parent already has its own char, triggering the Phase 3
+			// "Failed to place object" warning.
+			if (dobj == NULL) {
+				dobj = (DisplayObject*)HCALLOC(1, sizeof(DisplayObject));
+				dobj->sprite_dl_capacity = INITIAL_DISPLAYLIST_CAPACITY;
+				dobj->sprite_display_list = (DisplayObject*)HCALLOC(dobj->sprite_dl_capacity, sizeof(DisplayObject));
+				dobj->sprite_max_depth = 0;
+				mc->display_obj = dobj;
+			} else if (dobj->sprite_display_list == NULL) {
+				dobj->sprite_dl_capacity = INITIAL_DISPLAYLIST_CAPACITY;
+				dobj->sprite_display_list = (DisplayObject*)HCALLOC(dobj->sprite_dl_capacity, sizeof(DisplayObject));
+				dobj->sprite_max_depth = 0;
+			}
+			if (dobj->sprite_display_list != NULL) {
 				_saved_dl = display_list;
 				_saved_max = max_depth;
 				_saved_cap = display_list_capacity;
@@ -39514,6 +39532,8 @@ check_special_vars:
 
 void actionSetVariable(SWFAppContext* app_context)
 {
+	if (g_execution_halted) { POP_2(); return; }
+
 	// Stack layout: [name, value] <- sp
 	// According to spec: Pop value first, then name
 	// So VALUE is at top (*sp), NAME is at second (SP_SECOND_TOP)
@@ -40159,6 +40179,8 @@ void actionSetVariable(SWFAppContext* app_context)
 
 void actionDefineLocal(SWFAppContext* app_context)
 {
+	if (g_execution_halted) { POP_2(); return; }
+
 	// Stack layout: [name, value] <- sp
 	// According to AS2 spec for DefineLocal:
 	// Pop value first, then name
@@ -43104,6 +43126,10 @@ void actionResetRegisters(void)
 		g_registers[i].data.numeric_value = 0;
 		g_registers[i].str_size = 0;
 	}
+	// Clear per-script halt so uncaught exceptions in a prior script don't
+	// suppress later scripts on the same frame. Recursion-limit and watch-loop
+	// guards re-arm the flag immediately if they reoccur in the new script.
+	g_execution_halted = 0;
 }
 
 // Flash has exactly 4 global registers (r0..r3). Stores to r4+ at global scope
@@ -50320,13 +50346,52 @@ void actionNewObject(SWFAppContext* app_context)
 				setProperty(app_context, err, "message", 7, &args[0]);
 			}
 		}
-		// Set __proto__ to Error.prototype
-		// Look up Error constructor's prototype
+		// Set __proto__ to Error.prototype. The Error constructor registered as
+		// the global "Error" (g_error_ctor, set up by actionInitGlobals) is a bare
+		// shell with no prototype_obj — but the builtin-name path in
+		// actionGetVariable returns a separately-initialised g_error_constructor
+		// whose prototype carries name/message/toString. If the global lookup
+		// resolves to a function with no prototype_obj, lazily attach one with the
+		// standard Error.prototype layout so `new Error(msg).toString()` works
+		// (also so uncaught-exception formatting can call toString on a thrown
+		// Error).
 		PUSH_STR("Error", 5);
 		actionGetVariable(app_context);
 		if (STACK_TOP_TYPE == ACTION_STACK_VALUE_FUNCTION)
 		{
 			ASFunction* ctor = (ASFunction*) STACK_TOP_VALUE;
+			if (ctor->prototype_obj == NULL)
+			{
+				ASObject* proto = allocObject(app_context, 4);
+				retainObject(proto);
+				setObjectProto(app_context, proto);
+				ActionVar name_val = {0};
+				name_val.type = ACTION_STACK_VALUE_STRING;
+				name_val.str_size = 5;
+				VAL(u64, &name_val.data.numeric_value) = (u64)u16_Error;
+				setProperty(app_context, proto, "name", 4, &name_val);
+				ActionVar msg_val = {0};
+				msg_val.type = ACTION_STACK_VALUE_STRING;
+				msg_val.str_size = 5;
+				VAL(u64, &msg_val.data.numeric_value) = (u64)u16_Error;
+				setProperty(app_context, proto, "message", 7, &msg_val);
+				if (g_error_toString_func.advanced_func == NULL)
+				{
+					memset(&g_error_toString_func, 0, sizeof(ASFunction));
+					strncpy(g_error_toString_func.name, "toString", 255);
+					g_error_toString_func.function_type = 2;
+					g_error_toString_func.param_count = 0;
+					g_error_toString_func.advanced_func = (Function2Ptr) builtin_error_toString;
+					setupNativeFuncOwnProps(app_context, &g_error_toString_func);
+					if (function_count < MAX_FUNCTIONS)
+						function_registry[function_count++] = &g_error_toString_func;
+				}
+				ActionVar ts_val = {0};
+				ts_val.type = ACTION_STACK_VALUE_FUNCTION;
+				VAL(u64, &ts_val.data.numeric_value) = (u64) &g_error_toString_func;
+				setProperty(app_context, proto, "toString", 8, &ts_val);
+				ctor->prototype_obj = proto;
+			}
 			if (ctor->prototype_obj != NULL)
 			{
 				ActionVar proto_var = {0};
@@ -53597,7 +53662,7 @@ void actionWithEnd(SWFAppContext* app_context)
 
 // Exception types moved to top of file (needed by filter property setters)
 
-static void uncaughtException(ActionVar* throw_value)
+static void uncaughtException(SWFAppContext* app_context, ActionVar* throw_value)
 {
 	printf("Warning: Uncaught exception, ");
 
@@ -53615,6 +53680,22 @@ static void uncaughtException(ActionVar* throw_value)
 	} else if (throw_value->type == ACTION_STACK_VALUE_F64) {
 		double val = VAL(double, &throw_value->data.numeric_value);
 		printf("%g", val);
+	} else if (throw_value->type == ACTION_STACK_VALUE_OBJECT ||
+	           throw_value->type == ACTION_STACK_VALUE_ARRAY ||
+	           throw_value->type == ACTION_STACK_VALUE_FUNCTION) {
+		int found = 0;
+		ActionVar coerced = objectCallToString(app_context, throw_value, &found);
+		if (coerced.type == ACTION_STACK_VALUE_STRING) {
+			const uint16_t* u16 = varGetU16Ptr(&coerced);
+			char _thr_buf[512];
+			if (u16 && coerced.str_size > 0)
+				u16_to_utf8(u16, coerced.str_size, _thr_buf, sizeof(_thr_buf));
+			else
+				_thr_buf[0] = '\0';
+			printf("%s", _thr_buf);
+		} else {
+			printf("(type %d)", throw_value->type);
+		}
 	} else {
 		printf("(type %d)", throw_value->type);
 	}
@@ -53644,7 +53725,7 @@ void actionThrow(SWFAppContext* app_context)
 	}
 
 	// No active handler found — uncaught exception
-	uncaughtException(&throw_value);
+	uncaughtException(app_context, &throw_value);
 }
 
 void actionThrowPending(SWFAppContext* app_context)
@@ -53756,7 +53837,7 @@ void actionTryEnd(SWFAppContext* app_context)
 			}
 		}
 		// No parent handler — uncaught
-		uncaughtException(&g_exception_state.exception_value);
+		uncaughtException(app_context, &g_exception_state.exception_value);
 	}
 }
 
