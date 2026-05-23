@@ -1412,7 +1412,14 @@ static MovieClip* resolveSoundOwner(SWFAppContext* app_context, ASObject* sound_
 	MovieClip* mc = resolveFlashPathToMC(app_context, path_buf, path_len, start, 1);
 	if (mc == NULL) return NULL;
 	// _root is a valid owner (e.g. `new Sound(_root)` from sound_id3 test).
-	if (mc != &root_movieclip && (mc->depth == INT_MIN || mc->avm1_removed || mc->pending_removal))
+	// Reject only fully-finalized removals (depth == INT_MIN). MCs in the
+	// deferred-removal state (depth shifted to negative, pending_removal=1,
+	// avm1_removed=1, but dynamic_props still intact) stay valid Sound
+	// owners — SWF6+ Sound retains its binding across `removeMovieClip`
+	// when the MC has an onUnload handler (gnash actionscript.all/Sound-v6
+	// /v7/v8 line 273-274). The Sound's transform lives on the MC's
+	// dynamic_props which survives the deferred-removal window.
+	if (mc != &root_movieclip && mc->depth == INT_MIN)
 		return NULL;
 	return mc;
 }
