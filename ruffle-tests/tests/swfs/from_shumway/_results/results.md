@@ -1,10 +1,10 @@
 # Ruffle Test Results (Unfiltered)
 
-**Date**: 2026-05-23 20:35 UTC
+**Date**: 2026-05-23 20:59 UTC
 
-**Git SHA**: `8895f0e675`
+**Git SHA**: `4267c962ea`
 
-**Run Duration**: 0m 25s
+**Run Duration**: 0m 24s
 
 ## Summary
 
@@ -46,7 +46,7 @@
 | 13 | `avm1/externalinterface` | 4 | 0.2s |  |
 | 14 | `avm1/filters` | 149 | 0.2s | [2](ruffle-tests/tests/swfs/from_shumway/_investigation/complete/SHUMWAY_AVM1_PLAN.md) |
 | 15 | `avm1/haxe/flocons1` | 2 | 0.2s |  |
-| 16 | `avm1/haxe/flocons2` | 3 | 0.1s |  |
+| 16 | `avm1/haxe/flocons2` | 3 | 0.2s |  |
 | 17 | `avm1/label` | 4 | 0.2s |  |
 | 18 | `avm1/levels` | 9 | 0.2s |  |
 | 19 | `avm1/loadevent` | 9 | 0.2s |  |
@@ -54,9 +54,9 @@
 | 21 | `avm1/loadvariables/loadvars` | 2 | 0.2s |  |
 | 22 | `avm1/lookup` | 3 | 0.2s |  |
 | 23 | `avm1/mouse-transparency` | 1 | 0.2s |  |
-| 24 | `avm1/moviecliploader` | 7 | 0.2s | [2](ruffle-tests/tests/swfs/from_shumway/_investigation/complete/SHUMWAY_AVM1_PLAN.md) [3](ruffle-tests/tests/swfs/from_shumway/_investigation/complete/SHUMWAY_AVM1_SUBTREES_PLAN.md) |
+| 24 | `avm1/moviecliploader` | 7 | 0.3s | [2](ruffle-tests/tests/swfs/from_shumway/_investigation/complete/SHUMWAY_AVM1_PLAN.md) [3](ruffle-tests/tests/swfs/from_shumway/_investigation/complete/SHUMWAY_AVM1_SUBTREES_PLAN.md) |
 | 25 | `avm1/nativeinheritance` | 6 | 0.2s | [2](ruffle-tests/tests/swfs/from_shumway/_investigation/complete/SHUMWAY_AVM1_PLAN.md) |
-| 26 | `avm1/nested-button` | 1 | 0.3s | [2](ruffle-tests/tests/swfs/from_shumway/_investigation/complete/SHUMWAY_AVM1_PLAN.md) |
+| 26 | `avm1/nested-button` | 1 | 0.2s | [2](ruffle-tests/tests/swfs/from_shumway/_investigation/complete/SHUMWAY_AVM1_PLAN.md) |
 | 27 | `avm1/operations` | 13 | 0.2s |  |
 | 28 | `avm1/property-paths/property-paths-6` | 6 | 0.2s |  |
 | 29 | `avm1/property-paths/property-paths-7` | 7 | 0.2s |  |
@@ -71,20 +71,20 @@
 | 38 | `avm1/target` | 18 | 0.2s | [2](ruffle-tests/tests/swfs/from_shumway/_investigation/complete/SHUMWAY_AVM1_PLAN.md) |
 | 39 | `avm1/text-bind` | 0 | 0.2s |  |
 | 40 | `avm1/textfield/textfield-html` | 4 | 0.2s |  |
-| 41 | `avm1/textfield/textfield-text-setters` | 8 | 0.2s |  |
-| 42 | `avm1/undefined/undefined-swf6` | 39 | 0.2s |  |
-| 43 | `avm1/undefined/undefined-swf7` | 39 | 0.2s |  |
+| 41 | `avm1/textfield/textfield-text-setters` | 8 | 0.1s |  |
+| 42 | `avm1/undefined/undefined-swf6` | 39 | 0.1s |  |
+| 43 | `avm1/undefined/undefined-swf7` | 39 | 0.1s |  |
 | 44 | `avm1/watch` | 2 | 0.2s | [2](ruffle-tests/tests/swfs/from_shumway/_investigation/complete/SHUMWAY_AVM1_PLAN.md) |
 | 45 | `avm1/xml/xmlbuild` | 1 | 0.2s |  |
 | 46 | `avm1/xml/xmlload` | 4 | 0.2s |  |
 | 47 | `avm1/xml/xmlstring` | 9 | 0.2s |  |
 | 48 | `avm1timeline1` | 3 | 0.2s |  |
 | 49 | `avm1timeline2` | 6 | 0.2s |  |
-| 50 | `button3` | 1 | 0.1s |  |
-| 51 | `doubleAndRegister` | 2 | 0.1s |  |
-| 52 | `fscommand1` | 1 | 0.1s |  |
-| 53 | `fuzz/07580c34e05cda7bd4c976c459f0a667ca3c2602110e34186bca676f311e84da` | 6 | 0.3s |  |
-| 54 | `fuzz/0db0a01a92ae6ad0d2805dcfbac2ddf9a9689e77cd007924adfac57b543b1ed2` | 0 | 0.3s |  |
+| 50 | `button3` | 1 | 0.2s |  |
+| 51 | `doubleAndRegister` | 2 | 0.2s |  |
+| 52 | `fscommand1` | 1 | 0.2s |  |
+| 53 | `fuzz/07580c34e05cda7bd4c976c459f0a667ca3c2602110e34186bca676f311e84da` | 6 | 0.2s |  |
+| 54 | `fuzz/0db0a01a92ae6ad0d2805dcfbac2ddf9a9689e77cd007924adfac57b543b1ed2` | 0 | 0.1s |  |
 | 55 | `fuzz/1276557624e197ee764676c0aa9cb8ee52156dc7269956ee9b3e131a6f7b6dd0` | 3 | 0.2s |  |
 | 56 | `fuzz/2f4f46bf21d6cd33a751b090ad97552e8cdd8f7a606e7f0796deba04abb2e229` | 1 | 0.2s |  |
 | 57 | `fuzz/4935e4aed5e63f07d9e6cc76e97d080f042b029a838630fb2b276b5da0affd26` | 7 | 0.2s | [4](ruffle-tests/tests/swfs/from_shumway/_investigation/complete/SHUMWAY_FUZZ_TIMELINE_PLAN.md) |
@@ -98,12 +98,12 @@
 | 65 | `gradientTransform` | 0 | 0.2s |  |
 | 66 | `invalidClipDepth` | 0 | 0.2s |  |
 | 67 | `movieinfo1` | 3 | 0.2s |  |
-| 68 | `targetPath1` | 8 | 0.1s |  |
-| 69 | `timeline/timeline_as2_1` | 3 | 0.1s | [1](ruffle-tests/tests/swfs/from_shumway/_investigation/complete/ACTION_QUEUE_PLAN.md) |
-| 70 | `timeline/timeline_as2_2` | 3 | 0.1s |  |
-| 71 | `timeline/timeline_as2_3` | 3 | 0.1s |  |
-| 72 | `timeline/timeline_as2_4` | 2 | 0.1s |  |
-| 73 | `timeline/timeline_as2_5` | 4 | 0.1s | [1](ruffle-tests/tests/swfs/from_shumway/_investigation/complete/ACTION_QUEUE_PLAN.md) |
+| 68 | `targetPath1` | 8 | 0.2s |  |
+| 69 | `timeline/timeline_as2_1` | 3 | 0.2s | [1](ruffle-tests/tests/swfs/from_shumway/_investigation/complete/ACTION_QUEUE_PLAN.md) |
+| 70 | `timeline/timeline_as2_2` | 3 | 0.2s |  |
+| 71 | `timeline/timeline_as2_3` | 3 | 0.2s |  |
+| 72 | `timeline/timeline_as2_4` | 2 | 0.2s |  |
+| 73 | `timeline/timeline_as2_5` | 4 | 0.2s | [1](ruffle-tests/tests/swfs/from_shumway/_investigation/complete/ACTION_QUEUE_PLAN.md) |
 
 ## Ruffle-Matched Tests
 
@@ -112,7 +112,7 @@
 | # | Test | Our diffs | Ruffle diffs | Duration | Notes |
 |---|------|-----------|--------------|----------|-------|
 | 1 | `avm1/hitarea` | 2 | 2 | 0.2s | [2](ruffle-tests/tests/swfs/from_shumway/_investigation/complete/SHUMWAY_AVM1_PLAN.md) |
-| 2 | `fuzz/4949de464f5408bc3eaaa543d2e2346e01961965a6aa057dba9a6903fcf1c822` | 4 | 27 | 0.2s | [4](ruffle-tests/tests/swfs/from_shumway/_investigation/complete/SHUMWAY_FUZZ_TIMELINE_PLAN.md) |
+| 2 | `fuzz/4949de464f5408bc3eaaa543d2e2346e01961965a6aa057dba9a6903fcf1c822` | 4 | 27 | 0.3s | [4](ruffle-tests/tests/swfs/from_shumway/_investigation/complete/SHUMWAY_FUZZ_TIMELINE_PLAN.md) |
 | 3 | `fuzz/887c02ab98dbdd3ae22b2363b212dba005565738a572a2156e703dd3bf9b40af` | 20 | 38 | 0.3s | [4](ruffle-tests/tests/swfs/from_shumway/_investigation/complete/SHUMWAY_FUZZ_TIMELINE_PLAN.md) |
 
 ## Near-Passing Tests

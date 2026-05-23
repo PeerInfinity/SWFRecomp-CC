@@ -6,27 +6,27 @@
 
 **Run Duration**: 4m 11s
 
-**Filtered**: 3 tests ignored out of 243 available
+**Filtered**: 6 tests ignored out of 243 available
 
 ## Summary
 
 | Metric | Value |
 |--------|-------|
-| Total tests | 240 |
-| Passing | **127** (52.9%) |
+| Total tests | 237 |
+| Passing | **127** (53.6%) |
 | Ruffle-matched | 73 (diffs ⊆ Ruffle's against Flash) |
-| Effective pass | **200** (83.3%) |
-| Failing | 40 |
-| Total expected lines | 32100 |
-| Matching lines | 27560 (85.9%) |
-| Mismatched lines | 4540 |
+| Effective pass | **200** (84.4%) |
+| Failing | 37 |
+| Total expected lines | 31914 |
+| Matching lines | 27418 (85.9%) |
+| Mismatched lines | 4496 |
 
 ### Failure Breakdown
 
 | Category | Count | % of Failures |
 |----------|-------|---------------|
-| Output Mismatch | 37 | 92.5% |
-| Runtime Error | 3 | 7.5% |
+| Output Mismatch | 34 | 91.9% |
+| Runtime Error | 3 | 8.1% |
 
 ## Passing Tests
 
@@ -246,7 +246,7 @@
 
 Tests with output mismatch but >= 50% line match rate (low-hanging fruit).
 
-**37 tests** within reach
+**34 tests** within reach
 
 | # | Test | Match Rate | Matching | Total | Diff Lines | Notes |
 |---|------|------------|----------|-------|------------|-------|
@@ -267,26 +267,23 @@ Tests with output mismatch but >= 50% line match rate (low-hanging fruit).
 | 15 | `MovieClip-v8` | 81.4% | 885 | 1087 | 202 |  |
 | 16 | `Sound-v7` | 76.9% | 93 | 121 | 28 |  |
 | 17 | `Sound-v8` | 76.9% | 93 | 121 | 28 |  |
-| 18 | `getvariable-v7` | 76.6% | 49 | 64 | 15 |  |
-| 19 | `getvariable-v8` | 76.6% | 49 | 64 | 15 |  |
-| 20 | `getvariable-v5` | 75.9% | 44 | 58 | 14 |  |
-| 21 | `Function-v7` | 75.4% | 205 | 272 | 67 |  |
-| 22 | `Function-v8` | 75.4% | 205 | 272 | 67 |  |
-| 23 | `Sound-v6` | 75.2% | 91 | 121 | 30 |  |
-| 24 | `getvariable-v6` | 75.0% | 48 | 64 | 16 |  |
-| 25 | `TextFormat-v8` | 74.4% | 128 | 172 | 44 |  |
-| 26 | `TextField-v6` | 74.1% | 404 | 545 | 141 |  |
-| 27 | `TextField-v8` | 72.7% | 415 | 571 | 156 |  |
-| 28 | `TextField-v7` | 72.6% | 414 | 570 | 156 |  |
-| 29 | `Transform-v8` | 70.3% | 71 | 101 | 30 |  |
-| 30 | `Function-v6` | 66.8% | 181 | 271 | 90 |  |
-| 31 | `XML-v5` | 62.6% | 281 | 449 | 168 |  |
-| 32 | `NetConnection-v7` | 59.5% | 75 | 126 | 51 |  |
-| 33 | `NetConnection-v8` | 59.5% | 75 | 126 | 51 |  |
-| 34 | `XML-v6` | 59.3% | 288 | 486 | 198 |  |
-| 35 | `XML-v7` | 59.1% | 288 | 487 | 199 |  |
-| 36 | `XML-v8` | 59.1% | 288 | 487 | 199 |  |
-| 37 | `NetConnection-v6` | 56.3% | 71 | 126 | 55 |  |
+| 18 | `Function-v7` | 75.4% | 205 | 272 | 67 |  |
+| 19 | `Function-v8` | 75.4% | 205 | 272 | 67 |  |
+| 20 | `Sound-v6` | 75.2% | 91 | 121 | 30 |  |
+| 21 | `getvariable-v6` | 75.0% | 48 | 64 | 16 |  |
+| 22 | `TextFormat-v8` | 74.4% | 128 | 172 | 44 |  |
+| 23 | `TextField-v6` | 74.1% | 404 | 545 | 141 |  |
+| 24 | `TextField-v8` | 72.7% | 415 | 571 | 156 |  |
+| 25 | `TextField-v7` | 72.6% | 414 | 570 | 156 |  |
+| 26 | `Transform-v8` | 70.3% | 71 | 101 | 30 |  |
+| 27 | `Function-v6` | 66.8% | 181 | 271 | 90 |  |
+| 28 | `XML-v5` | 62.6% | 281 | 449 | 168 |  |
+| 29 | `NetConnection-v7` | 59.5% | 75 | 126 | 51 |  |
+| 30 | `NetConnection-v8` | 59.5% | 75 | 126 | 51 |  |
+| 31 | `XML-v6` | 59.3% | 288 | 486 | 198 |  |
+| 32 | `XML-v7` | 59.1% | 288 | 487 | 199 |  |
+| 33 | `XML-v8` | 59.1% | 288 | 487 | 199 |  |
+| 34 | `NetConnection-v6` | 56.3% | 71 | 126 | 55 |  |
 
 ## Segfaults
 
@@ -308,7 +305,7 @@ No timeouts.
 
 ## All Output Mismatches
 
-**37 tests** with output mismatch, sorted by match rate (best first)
+**34 tests** with output mismatch, sorted by match rate (best first)
 
 | # | Test | Match Rate | Matching/Total | Actual | Expected | Notes |
 |---|------|------------|----------------|--------|----------|-------|
@@ -329,23 +326,20 @@ No timeouts.
 | 15 | `MovieClip-v8` | 81.4% | 885/1087 | 1074 | 1087 |  |
 | 16 | `Sound-v7` | 76.9% | 93/121 | 121 | 121 |  |
 | 17 | `Sound-v8` | 76.9% | 93/121 | 121 | 121 |  |
-| 18 | `getvariable-v7` | 76.6% | 49/64 | 64 | 64 |  |
-| 19 | `getvariable-v8` | 76.6% | 49/64 | 64 | 64 |  |
-| 20 | `getvariable-v5` | 75.9% | 44/58 | 58 | 58 |  |
-| 21 | `Function-v7` | 75.4% | 205/272 | 272 | 272 |  |
-| 22 | `Function-v8` | 75.4% | 205/272 | 272 | 272 |  |
-| 23 | `Sound-v6` | 75.2% | 91/121 | 121 | 121 |  |
-| 24 | `getvariable-v6` | 75.0% | 48/64 | 64 | 64 |  |
-| 25 | `TextFormat-v8` | 74.4% | 128/172 | 172 | 172 |  |
-| 26 | `TextField-v6` | 74.1% | 404/545 | 545 | 545 |  |
-| 27 | `TextField-v8` | 72.7% | 415/571 | 571 | 571 |  |
-| 28 | `TextField-v7` | 72.6% | 414/570 | 570 | 570 |  |
-| 29 | `Transform-v8` | 70.3% | 71/101 | 101 | 101 |  |
-| 30 | `Function-v6` | 66.8% | 181/271 | 271 | 271 |  |
-| 31 | `XML-v5` | 62.6% | 281/449 | 419 | 449 |  |
-| 32 | `NetConnection-v7` | 59.5% | 75/126 | 126 | 126 |  |
-| 33 | `NetConnection-v8` | 59.5% | 75/126 | 126 | 126 |  |
-| 34 | `XML-v6` | 59.3% | 288/486 | 456 | 486 |  |
-| 35 | `XML-v7` | 59.1% | 288/487 | 487 | 486 |  |
-| 36 | `XML-v8` | 59.1% | 288/487 | 487 | 465 |  |
-| 37 | `NetConnection-v6` | 56.3% | 71/126 | 126 | 126 |  |
+| 18 | `Function-v7` | 75.4% | 205/272 | 272 | 272 |  |
+| 19 | `Function-v8` | 75.4% | 205/272 | 272 | 272 |  |
+| 20 | `Sound-v6` | 75.2% | 91/121 | 121 | 121 |  |
+| 21 | `getvariable-v6` | 75.0% | 48/64 | 64 | 64 |  |
+| 22 | `TextFormat-v8` | 74.4% | 128/172 | 172 | 172 |  |
+| 23 | `TextField-v6` | 74.1% | 404/545 | 545 | 545 |  |
+| 24 | `TextField-v8` | 72.7% | 415/571 | 571 | 571 |  |
+| 25 | `TextField-v7` | 72.6% | 414/570 | 570 | 570 |  |
+| 26 | `Transform-v8` | 70.3% | 71/101 | 101 | 101 |  |
+| 27 | `Function-v6` | 66.8% | 181/271 | 271 | 271 |  |
+| 28 | `XML-v5` | 62.6% | 281/449 | 419 | 449 |  |
+| 29 | `NetConnection-v7` | 59.5% | 75/126 | 126 | 126 |  |
+| 30 | `NetConnection-v8` | 59.5% | 75/126 | 126 | 126 |  |
+| 31 | `XML-v6` | 59.3% | 288/486 | 456 | 486 |  |
+| 32 | `XML-v7` | 59.1% | 288/487 | 487 | 486 |  |
+| 33 | `XML-v8` | 59.1% | 288/487 | 487 | 465 |  |
+| 34 | `NetConnection-v6` | 56.3% | 71/126 | 126 | 126 |  |
