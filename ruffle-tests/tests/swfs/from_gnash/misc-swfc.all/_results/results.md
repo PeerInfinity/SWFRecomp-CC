@@ -1,10 +1,10 @@
 # Ruffle Test Results (Unfiltered)
 
-**Date**: 2026-05-23 16:59 UTC
+**Date**: 2026-05-23 18:44 UTC
 
-**Git SHA**: `d2da911ca1`
+**Git SHA**: `42774a946a`
 
-**Run Duration**: 1m 16s
+**Run Duration**: 0m 5s
 
 ## Summary
 
@@ -31,14 +31,14 @@
 
 | # | Test | Lines | Duration | Notes |
 |---|------|-------|----------|-------|
-| 1 | `button_test1` | 31 | 0.2s |  |
+| 1 | `button_test1` | 31 | 0.3s |  |
 | 2 | `edittext_test1` | 47 | 0.2s |  |
 | 3 | `gotoFrameLabelAsFunction` | 6 | 0.2s |  |
 | 4 | `hello` | 4 | 0.2s |  |
-| 5 | `mouse_drag_test` | 12 | 18.0s |  |
+| 5 | `mouse_drag_test` | 12 | 0.2s |  |
 | 6 | `movieclip_destruction_test2` | 56 | 0.2s |  |
-| 7 | `stackscope` | 11 | 0.2s |  |
-| 8 | `submoviegetvar` | 4 | 19.3s |  |
+| 7 | `stackscope` | 11 | 0.1s |  |
+| 8 | `submoviegetvar` | 4 | 0.3s |  |
 
 ## Ruffle-Matched Tests
 
@@ -50,9 +50,9 @@
 | 2 | `action_execution_order_test12` | 2 | 2 | 0.2s |  |
 | 3 | `movieclip_destruction_test1` | 43 | 52 | 0.2s |  |
 | 4 | `opcode_guard_test2` | 5 | 5 | 0.2s |  |
-| 5 | `registerclass_test3` | 12 | 20 | 0.2s |  |
-| 6 | `soft_reference_test1` | 3 | 4 | 19.4s |  |
-| 7 | `swf4opcode` | 4 | 13 | 0.2s |  |
+| 5 | `registerclass_test3` | 12 | 20 | 0.1s |  |
+| 6 | `soft_reference_test1` | 3 | 4 | 0.2s |  |
+| 7 | `swf4opcode` | 4 | 13 | 0.1s |  |
 
 ## Near-Passing Tests
 
