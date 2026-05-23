@@ -1,97 +1,45 @@
 {
   "metadata": {
-    "old_timestamp": "2026-05-23T20:59:05.628286+00:00",
-    "old_git_sha": "4267c962eab72ccf93428e82f621da7832ab00a2",
-    "new_timestamp": "2026-05-23T22:15:01.098795+00:00",
-    "new_git_sha": "ee136f2bb737be2bb7491e866ce488955f5af038",
+    "old_timestamp": "2026-05-23T22:15:01.098795+00:00",
+    "old_git_sha": "ee136f2bb737be2bb7491e866ce488955f5af038",
+    "new_timestamp": "2026-05-23T23:31:49.871825+00:00",
+    "new_git_sha": "21d79eaacafb88d3c7fa20444a670101e3cde21f",
     "partial": false,
     "same_commit": false
   },
   "summary": {
-    "old_pass": 608,
+    "old_pass": 611,
     "old_ruffle_matched": 11,
-    "old_effective_pass": 619,
+    "old_effective_pass": 622,
     "old_total": 661,
-    "old_pass_rate": 92.0,
+    "old_pass_rate": 92.4,
     "new_pass": 611,
     "new_ruffle_matched": 11,
     "new_effective_pass": 622,
-    "new_total": 661,
-    "new_pass_rate": 92.4,
-    "old_mismatched_lines": 9102,
-    "new_mismatched_lines": 9091,
+    "new_total": 662,
+    "new_pass_rate": 92.3,
+    "old_mismatched_lines": 9091,
+    "new_mismatched_lines": 9096,
     "increased_mismatches": 0,
-    "decreased_mismatches": 11,
-    "newly_passing": 3,
+    "decreased_mismatches": 0,
+    "newly_passing": 0,
     "newly_failing": 0,
-    "status_changed": 3,
-    "unchanged": 657,
-    "added": 0,
+    "status_changed": 0,
+    "unchanged": 661,
+    "added": 1,
     "removed": 0
   },
   "changes": [
     {
-      "test": "sound_gettransform_props",
-      "change_type": "changed",
-      "old_status": "output_mismatch",
-      "new_status": "pass",
-      "old_lines": {
-        "actual_lines": 4,
-        "expected_lines": 4,
-        "matching_lines": 2
-      },
-      "new_lines": {
-        "actual_lines": 4,
-        "expected_lines": 4,
-        "matching_lines": 4
-      }
-    },
-    {
-      "test": "sound_owner_tostring_fail",
-      "change_type": "changed",
-      "old_status": "output_mismatch",
-      "new_status": "pass",
-      "old_lines": {
-        "actual_lines": 5,
-        "expected_lines": 9,
-        "matching_lines": 4
-      },
-      "new_lines": {
-        "actual_lines": 9,
-        "expected_lines": 9,
-        "matching_lines": 9
-      }
-    },
-    {
-      "test": "sound_setters",
-      "change_type": "changed",
-      "old_status": "output_mismatch",
+      "test": "shared_stack",
+      "change_type": "added",
+      "old_status": null,
       "new_status": "output_mismatch",
-      "old_lines": {
-        "actual_lines": 39,
-        "expected_lines": 43,
-        "matching_lines": 12
-      },
+      "old_lines": null,
       "new_lines": {
-        "actual_lines": 39,
-        "expected_lines": 43,
-        "matching_lines": 14
-      }
-    },
-    {
-      "test": "swf5_xml_event_handler_context",
-      "change_type": "changed",
-      "old_status": "output_mismatch",
-      "new_status": "pass",
-      "old_lines": {
-        "actual_lines": 3,
-        "expected_lines": 2,
-        "matching_lines": 0
-      },
-      "new_lines": {
-        "actual_lines": 2,
-        "expected_lines": 2,
-        "matching_lines": 2
+        "actual_lines": 12,
+        "expected_lines": 16,
+        "matching_lines": 11
       }
     }
   ]
