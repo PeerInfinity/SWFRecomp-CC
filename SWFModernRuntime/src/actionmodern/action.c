@@ -1380,52 +1380,129 @@ static void initSoundTransformDefaults(SWFAppContext* app_context, ASObject* obj
 	setPropertyWithFlags(app_context, obj, "__rr__", 6, &v, PROPERTY_FLAGS_DONTENUM);
 }
 
+// Forward decl — defined later in the file (around line 19614).
+static MovieClip* resolveFlashPathToMC(SWFAppContext* app_context, const char* path, u32 path_len, MovieClip* start_mc, int first_element);
+
+// Helper: resolve the owner MovieClip for a Sound instance by looking up
+// the stored target path string. Returns NULL if (a) the Sound is set to
+// use global sound (no target), or (b) the target path doesn't currently
+// resolve to a live MC. Mirrors Ruffle's `Sound::owner` (ChrisCPI's
+// caebd7f57 "Fix behavior of `Sound` ownership"): the target is re-resolved
+// on every call so a removed MC stops being the owner, and a fresh MC
+// created at the same path becomes the new owner.
+static MovieClip* resolveSoundOwner(SWFAppContext* app_context, ASObject* sound_obj)
+{
+	if (sound_obj == NULL || sound_obj->native_type != NATIVE_SOUND) return NULL;
+
+	ActionVar* target = getProperty(sound_obj, "__sound_target__", 16);
+	if (target == NULL || target->type != ACTION_STACK_VALUE_STRING) return NULL;
+	if (target->str_size == 0) return NULL;
+
+	char path_buf[256];
+	const uint16_t* u16ptr = varGetU16Ptr(target);
+	if (u16ptr == NULL) return NULL;
+	int n = u16_to_utf8(u16ptr, target->str_size, path_buf, sizeof(path_buf));
+	if (n <= 0) return NULL;
+	u32 path_len = (u32)n;
+
+	extern MovieClip root_movieclip;
+	extern MovieClip* g_current_context;
+	MovieClip* start = (g_current_context != NULL) ? g_current_context : &root_movieclip;
+
+	MovieClip* mc = resolveFlashPathToMC(app_context, path_buf, path_len, start, 1);
+	if (mc == NULL) return NULL;
+	// _root is a valid owner (e.g. `new Sound(_root)` from sound_id3 test).
+	if (mc != &root_movieclip && (mc->depth == INT_MIN || mc->avm1_removed || mc->pending_removal))
+		return NULL;
+	return mc;
+}
+
+// Helper: returns 1 if the Sound is set to use the global sound transform
+// (constructor arg was null/undefined/missing), 0 otherwise.
+static int soundUsesGlobal(ASObject* sound_obj)
+{
+	if (sound_obj == NULL) return 0;
+	ActionVar* use_global = getProperty(sound_obj, "__sound_use_global__", 20);
+	return (use_global != NULL && use_global->type == ACTION_STACK_VALUE_BOOLEAN &&
+	        use_global->data.numeric_value) ? 1 : 0;
+}
+
+// Helper: returns 1 if the Sound has a "valid owner" — either it uses the
+// global sound transform, or its target path currently resolves to a live
+// MC. Mirrors Ruffle's `has_valid_owner`; gates attachSound/loadSound/start/
+// stop/duration/position.
+static int soundHasValidOwner(SWFAppContext* app_context, ASObject* sound_obj)
+{
+	if (soundUsesGlobal(sound_obj)) return 1;
+	return resolveSoundOwner(app_context, sound_obj) != NULL ? 1 : 0;
+}
+
 // Helper: resolve the transform-holding object for a Sound instance.
-// If Sound has an owner MC → returns MC's dynamic_props (shared per-MC transform).
-// If no owner → returns global transform object (shared among all ownerless Sounds).
+// - Sound uses global sound → returns g_sound_global_transform.
+// - Sound has a target path that resolves → returns owner MC's dynamic_props.
+// - Otherwise → returns NULL (caller returns undefined / no-ops the setter).
 static ASObject* resolveSoundTransformTarget(SWFAppContext* app_context, void* this_obj)
 {
 	ASObject* sound_obj = resolveSoundThis(this_obj);
 	if (sound_obj == NULL) return NULL;
-
-	// Only Sound objects (native_type == NATIVE_SOUND) participate in shared transform
 	if (sound_obj->native_type != NATIVE_SOUND) return NULL;
 
-	// Sound constructed with an invalid controllable-character argument
-	// (a Number, String, Object, etc. — anything that isn't a MovieClip and
-	// isn't null/undefined). Flash treats such a Sound as bound to nothing:
-	// getVolume/getPan/getTransform return undefined, setVolume/setPan no-op.
-	ActionVar* bad_target = getProperty(sound_obj, "__sound_bad_target__", 20);
-	if (bad_target != NULL && bad_target->type == ACTION_STACK_VALUE_BOOLEAN &&
-	    bad_target->data.numeric_value)
-		return NULL;
-
-	// Check for owner MC
-	ActionVar* owner = getProperty(sound_obj, "__sound_owner__", 15);
-	if (owner != NULL && owner->type == ACTION_STACK_VALUE_MOVIECLIP) {
-		MovieClip* mc = (MovieClip*)(uintptr_t) owner->data.numeric_value;
-		if (mc != NULL) {
-			// Ensure dynamic_props exists on the MC
-			if (mc->dynamic_props == NULL) {
-				mc->dynamic_props = (void*) allocObject(app_context, 8);
-				retainObject((ASObject*) mc->dynamic_props);
-			}
-			// Initialize MC's sound transform if not yet done
-			ActionVar* existing = getProperty((ASObject*)mc->dynamic_props, "__volume__", 10);
-			if (existing == NULL) {
-				initSoundTransformDefaults(app_context, (ASObject*)mc->dynamic_props);
-			}
-			return (ASObject*)mc->dynamic_props;
+	if (soundUsesGlobal(sound_obj)) {
+		if (g_sound_global_transform == NULL) {
+			g_sound_global_transform = allocObject(app_context, 8);
+			retainObject(g_sound_global_transform);
+			initSoundTransformDefaults(app_context, g_sound_global_transform);
 		}
+		return g_sound_global_transform;
 	}
 
-	// No owner → use global transform (lazy init)
-	if (g_sound_global_transform == NULL) {
-		g_sound_global_transform = allocObject(app_context, 8);
-		retainObject(g_sound_global_transform);
-		initSoundTransformDefaults(app_context, g_sound_global_transform);
+	MovieClip* mc = resolveSoundOwner(app_context, sound_obj);
+	if (mc == NULL) return NULL;
+
+	// Ensure dynamic_props exists on the MC, and that sound-transform
+	// defaults are initialized once on first use.
+	if (mc->dynamic_props == NULL) {
+		mc->dynamic_props = (void*) allocObject(app_context, 8);
+		retainObject((ASObject*) mc->dynamic_props);
 	}
-	return g_sound_global_transform;
+	ActionVar* existing = getProperty((ASObject*)mc->dynamic_props, "__volume__", 10);
+	if (existing == NULL) {
+		initSoundTransformDefaults(app_context, (ASObject*)mc->dynamic_props);
+	}
+	return (ASObject*)mc->dynamic_props;
+}
+
+// Helper: initialize the Sound's target from the constructor's first arg.
+// Mirrors Ruffle's `Sound::empty` (caebd7f57):
+//   - args[0] absent or Null/Undefined → use_global=true, no target stored.
+//   - args[0] anything else (string / MC / number / object / etc.) → coerce
+//     to a string via convertString (uses the stack, so the receiver's stack
+//     position is preserved by PUSH/popVar) and store as the target path.
+static void initSoundTarget(SWFAppContext* app_context, ASObject* sound_obj, ActionVar* args, u32 num_args)
+{
+	if (num_args < 1 || args[0].type == ACTION_STACK_VALUE_NULL ||
+	    args[0].type == ACTION_STACK_VALUE_UNDEFINED) {
+		ActionVar use_global = {0};
+		use_global.type = ACTION_STACK_VALUE_BOOLEAN;
+		use_global.data.numeric_value = 1;
+		setPropertyWithFlags(app_context, sound_obj, "__sound_use_global__", 20, &use_global, PROPERTY_FLAGS_DONTENUM);
+		return;
+	}
+
+	// Coerce args[0] to a string path via the stack-based convertString
+	// (handles MOVIECLIP → full dot-path, numbers/booleans/objects via
+	// their respective coercion rules).
+	ActionVar target_var = {0};
+	if (args[0].type == ACTION_STACK_VALUE_STRING) {
+		target_var = args[0];
+	} else {
+		char sbuf[17];
+		PUSH_VAR(&args[0]);
+		convertString(app_context, sbuf);
+		popVar(app_context, &target_var);
+	}
+	if (target_var.type != ACTION_STACK_VALUE_STRING) return;
+	setPropertyWithFlags(app_context, sound_obj, "__sound_target__", 16, &target_var, PROPERTY_FLAGS_DONTENUM);
 }
 
 // Helper: convert ActionVar to int32 for Sound methods using clamp_to_i32 semantics
@@ -1634,6 +1711,9 @@ static ActionVar builtin_sound_attachSound(SWFAppContext* app_context, ActionVar
 	ret.type = ACTION_STACK_VALUE_UNDEFINED;
 	ASObject* sound_obj = resolveSoundThis(this_obj);
 	if (sound_obj == NULL || arg_count < 1) return ret;
+	// Ruffle (caebd7f57): attachSound no-ops when the Sound's target doesn't
+	// resolve to a live MC (and the Sound isn't bound to global sound).
+	if (!soundHasValidOwner(app_context, sound_obj)) return ret;
 	// Coerce first arg to string (export name)
 	char name_buf[256];
 	if (args[0].type == ACTION_STACK_VALUE_STRING) {
@@ -1663,11 +1743,12 @@ static ActionVar builtin_sound_attachSound(SWFAppContext* app_context, ActionVar
 // Sound.getDuration() - returns duration of attached sound
 static ActionVar builtin_sound_getDuration(SWFAppContext* app_context, ActionVar* args, u32 arg_count, ActionVar* registers, void* this_obj)
 {
-	(void)app_context; (void)args; (void)arg_count; (void)registers;
+	(void)args; (void)arg_count; (void)registers;
 	ActionVar ret = {0};
 	ret.type = ACTION_STACK_VALUE_UNDEFINED;
 	ASObject* sound_obj = resolveSoundThis(this_obj);
 	if (sound_obj == NULL) return ret;
+	if (!soundHasValidOwner(app_context, sound_obj)) return ret;
 	ActionVar* dur = getProperty(sound_obj, "__duration__", 12);
 	if (dur != NULL) ret = *dur;
 	return ret;
@@ -1899,6 +1980,7 @@ static ActionVar builtin_sound_loadSound(SWFAppContext* app_context, ActionVar* 
 	ActionVar ret = {0}; ret.type = ACTION_STACK_VALUE_UNDEFINED;
 	ASObject* sound_obj = resolveSoundThis(this_obj);
 	if (sound_obj == NULL || arg_count < 1) return ret;
+	if (!soundHasValidOwner(app_context, sound_obj)) return ret;
 
 	// Get URL string
 	if (args[0].type != ACTION_STACK_VALUE_STRING) return ret;
@@ -2088,10 +2170,14 @@ static ActionVar builtin_sound_loadSound(SWFAppContext* app_context, ActionVar* 
 
 static ActionVar builtin_sound_getPosition(SWFAppContext* app_context, ActionVar* args, u32 arg_count, ActionVar* registers, void* this_obj)
 {
-	(void)app_context; (void)args; (void)arg_count; (void)registers;
+	(void)args; (void)arg_count; (void)registers;
 	ActionVar ret = {0}; ret.type = ACTION_STACK_VALUE_F64;
 	ASObject* sound_obj = resolveSoundThis(this_obj);
 	if (sound_obj == NULL) { ret.type = ACTION_STACK_VALUE_UNDEFINED; return ret; }
+	if (!soundHasValidOwner(app_context, sound_obj)) {
+		ret.type = ACTION_STACK_VALUE_UNDEFINED;
+		return ret;
+	}
 
 	// Position is undefined until the sound is attached/loaded — Flash returns
 	// undefined for getPosition() on a Sound that has never had a sound bound.
@@ -2122,10 +2208,11 @@ static ActionVar builtin_sound_getPosition(SWFAppContext* app_context, ActionVar
 
 static ActionVar builtin_sound_stop(SWFAppContext* app_context, ActionVar* args, u32 arg_count, ActionVar* registers, void* this_obj)
 {
-	(void)app_context; (void)args; (void)arg_count; (void)registers;
+	(void)args; (void)arg_count; (void)registers;
 	ActionVar ret = {0}; ret.type = ACTION_STACK_VALUE_UNDEFINED;
 	ASObject* sound_obj = resolveSoundThis(this_obj);
 	if (sound_obj == NULL) return ret;
+	if (!soundHasValidOwner(app_context, sound_obj)) return ret;
 	soundStopForObject(sound_obj);
 	return ret;
 }
@@ -2136,6 +2223,7 @@ static ActionVar builtin_sound_start(SWFAppContext* app_context, ActionVar* args
 	ActionVar ret = {0}; ret.type = ACTION_STACK_VALUE_UNDEFINED;
 	ASObject* sound_obj = resolveSoundThis(this_obj);
 	if (sound_obj == NULL) return ret;
+	if (!soundHasValidOwner(app_context, sound_obj)) return ret;
 
 	// Get duration
 	ActionVar* dur = getProperty(sound_obj, "__duration__", 12);
@@ -48013,10 +48101,19 @@ void actionGetMember(SWFAppContext* app_context)
 			// Sound native properties: duration and position
 			// Before loadSound (__loaded__ not set): own property is returned if exists.
 			// After loadSound (__loaded__ set): always return computed value.
+			// Ruffle (caebd7f57): duration/position read as undefined when the Sound's
+			// target doesn't currently resolve to a live MC (and it isn't bound to
+			// global sound).
+			int _snd_has_owner = soundHasValidOwner(app_context, obj);
+
 			ActionVar* _snd_loaded = getProperty(obj, "__loaded__", 10);
 			int _snd_is_loaded = (_snd_loaded && _snd_loaded->type == ACTION_STACK_VALUE_BOOLEAN && _snd_loaded->data.numeric_value);
 
 			if (prop_name_len == 8 && memcmp(prop_name, "duration", 8) == 0) {
+				if (!_snd_has_owner) {
+					pushUndefined(app_context);
+					return;
+				}
 				if (!_snd_is_loaded) {
 					// Not loaded: return own property if exists
 					ASProperty* own = findPropertyRaw(obj, "duration", 8);
@@ -48042,6 +48139,10 @@ void actionGetMember(SWFAppContext* app_context)
 				return;
 			}
 			if (prop_name_len == 8 && memcmp(prop_name, "position", 8) == 0) {
+				if (!_snd_has_owner) {
+					pushUndefined(app_context);
+					return;
+				}
 				if (!_snd_is_loaded) {
 					ASProperty* own = findPropertyRaw(obj, "position", 8);
 					if (own != NULL && own->value.type != ACTION_STACK_VALUE_UNDEFINED) {
@@ -50986,16 +51087,7 @@ void actionNewObject(SWFAppContext* app_context)
 			if (ctor_name != NULL) {
 				if (strcmp(ctor_name, "Sound") == 0) {
 					obj->native_type = NATIVE_SOUND;
-					// If first arg is a MovieClip, store as owner (shared per-MC transform)
-					if (num_args >= 1 && args[0].type == ACTION_STACK_VALUE_MOVIECLIP) {
-						setPropertyWithFlags(app_context, obj, "__sound_owner__", 15, &args[0], PROPERTY_FLAGS_DONTENUM);
-					} else if (num_args >= 1 && args[0].type != ACTION_STACK_VALUE_NULL &&
-					           args[0].type != ACTION_STACK_VALUE_UNDEFINED) {
-						// Non-MC, non-null/undefined argument → invalid controllable character
-						ActionVar bad_t = {0}; bad_t.type = ACTION_STACK_VALUE_BOOLEAN;
-						bad_t.data.numeric_value = 1;
-						setPropertyWithFlags(app_context, obj, "__sound_bad_target__", 20, &bad_t, PROPERTY_FLAGS_DONTENUM);
-					}
+					initSoundTarget(app_context, obj, args, num_args);
 					// Transform is stored on the target (MC or global), not on the Sound object
 				}
 				else if (strcmp(ctor_name, "LoadVars") == 0) obj->native_type = NATIVE_LOADVARS;
@@ -52122,15 +52214,7 @@ void actionNewMethod(SWFAppContext* app_context)
 			// Global stub constructors with native backing
 			else if (strcmp(ctor_name, "Sound") == 0) {
 				new_obj_inst->native_type = NATIVE_SOUND;
-				// If first arg is a MovieClip, store as owner
-				if (num_args >= 1 && args[0].type == ACTION_STACK_VALUE_MOVIECLIP) {
-					setPropertyWithFlags(app_context, new_obj_inst, "__sound_owner__", 15, &args[0], PROPERTY_FLAGS_DONTENUM);
-				} else if (num_args >= 1 && args[0].type != ACTION_STACK_VALUE_NULL &&
-				           args[0].type != ACTION_STACK_VALUE_UNDEFINED) {
-					ActionVar bad_t = {0}; bad_t.type = ACTION_STACK_VALUE_BOOLEAN;
-					bad_t.data.numeric_value = 1;
-					setPropertyWithFlags(app_context, new_obj_inst, "__sound_bad_target__", 20, &bad_t, PROPERTY_FLAGS_DONTENUM);
-				}
+				initSoundTarget(app_context, new_obj_inst, args, num_args);
 			}
 			else if (strcmp(ctor_name, "LoadVars") == 0) new_obj_inst->native_type = NATIVE_LOADVARS;
 			else if (strcmp(ctor_name, "LocalConnection") == 0) new_obj_inst->native_type = NATIVE_LOCALCONNECTION;
@@ -54103,15 +54187,7 @@ static int invokeNativeSuperConstructor(SWFAppContext* app_context, ASFunction* 
 	if (strcmp(name, "Sound") == 0) {
 		if (obj->native_type == NATIVE_NONE)
 			obj->native_type = NATIVE_SOUND;
-		// If first arg is a MovieClip, store as owner
-		if (num_args >= 1 && args[0].type == ACTION_STACK_VALUE_MOVIECLIP) {
-			setPropertyWithFlags(app_context, obj, "__sound_owner__", 15, &args[0], PROPERTY_FLAGS_DONTENUM);
-		} else if (num_args >= 1 && args[0].type != ACTION_STACK_VALUE_NULL &&
-		           args[0].type != ACTION_STACK_VALUE_UNDEFINED) {
-			ActionVar bad_t = {0}; bad_t.type = ACTION_STACK_VALUE_BOOLEAN;
-			bad_t.data.numeric_value = 1;
-			setPropertyWithFlags(app_context, obj, "__sound_bad_target__", 20, &bad_t, PROPERTY_FLAGS_DONTENUM);
-		}
+		initSoundTarget(app_context, obj, args, num_args);
 		out_result->type = ACTION_STACK_VALUE_OBJECT;
 		out_result->data.numeric_value = (u64)obj;
 		return 1;
