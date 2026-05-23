@@ -27,3 +27,17 @@
 argstest-v6
 argstest-v7
 argstest-v8
+
+# getvariable-v5/v7/v8 — three small Flash-correct PASSes (line 105 modern
+# Flash _level0-as-member; line 121 SWF<=6 case-insensitive THIS; line 208
+# slash-path crossing non-MC returns undefined) leave the trailing Dejagnu
+# #passed/#failed counters off-by-one against Gnash's expected output. v6
+# auto-promotes via ruffle_matched (Ruffle has both extra divergences so its
+# counter also diverges); v5/v7/v8 each have only one divergence and Ruffle's
+# extra PASS+FAIL cancel in counters, leaving us with counter lines outside
+# Ruffle's diff set so subset-match fails. Replicating Ruffle's bugs would
+# diverge from Flash. See _investigation/ACCEPTED_DIFFS.md Category 1 and
+# _investigation/complete/GETVARIABLE_VN_PLAN.md.
+getvariable-v5
+getvariable-v7
+getvariable-v8

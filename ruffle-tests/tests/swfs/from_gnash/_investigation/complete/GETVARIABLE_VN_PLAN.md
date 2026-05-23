@@ -249,3 +249,15 @@ Four changes in `SWFModernRuntime/src/actionmodern/action.c`:
    promote them). A future, narrower Phase 3 — one that distinguishes
    genuine top-level `_levelN` path tokens from internal target-path use —
    could still land the v5/v7/v8 full PASS.
+
+5. **2026-05-23 — v5/v7/v8 accepted as ignored.** After re-investigation,
+   the three residual divergences (line 105 modern-Flash `_level0`-as-member,
+   line 121 SWF≤6 case-insensitive `THIS`, line 208 slash-path crossing non-MC)
+   are all Flash-correct behaviours where Ruffle diverges in the opposite
+   direction. Ruffle's two-or-more divergences cancel in v6's `#passed`/`#failed`
+   counters (auto-promotes via subset-match) but each of v5/v7/v8 has only one
+   Ruffle-divergence so its counter matches expected exactly — leaving our
+   counter-off-by-one OUTSIDE Ruffle's diff set. Per `RUFFLE_COMPAT_TWEAKS`
+   policy (these behaviours are well-specified, not "arbitrary"), v5/v7/v8
+   added to `from_gnash/actionscript.all/ignored_tests.txt` with new entry in
+   `_investigation/ACCEPTED_DIFFS.md` Category 1.

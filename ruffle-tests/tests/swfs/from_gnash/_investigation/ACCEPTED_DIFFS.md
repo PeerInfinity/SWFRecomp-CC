@@ -381,6 +381,61 @@ expected `output.txt`. Removing the `fputs("Target not found: ...")` at
 counting it as a failure. Test stays `known_failure = true` upstream. No
 implementation change.
 
+### getvariable-v5 / getvariable-v7 / getvariable-v8 (actionscript.all) — three Flash-correct PASSes vs Gnash's expected FAIL leave the Dejagnu counter off-by-one (3 diff lines each)
+
+**Example diff (getvariable-v7, fp10 subtest):**
+```
+-    8  FAILED: expected: 5.4 obtained: undefined [./getvariable.as:105]
++    8  PASSED: checkpoint == 5.4 [./getvariable.as:105]
+...
+-   62  #passed: 57
++   62  #passed: 58
+-   63  #failed: 1
++   63  #failed: 0
+```
+
+**Root cause:** Three independent Flash-vs-Gnash/Ruffle behaviours align in a way
+that prevents the existing ruffle-subset auto-promotion:
+
+1. **Line 105 (`this._root._level0.variable_in_root`).** Gnash's `output.fpN.txt`
+   expects `FAILED` (old Flash returned `undefined`); modern Flash and our
+   implementation return `5.4` (`PASS`). Ruffle also returns `5.4` (`PASS`). A
+   previous attempt (`13fe9441a`, reverted at `5f2e81587`) to make us FAIL this
+   line by restricting `_levelN`/`_level0` resolution to first-element-only
+   regressed 5 unrelated tests (`levels`, `MovieClip-v5`, `DragDropTest`,
+   `button_test1`, `stage_object_children`), which use `_level0`-as-member
+   internally for target paths.
+
+2. **Line 121 (v5/v6 only — `THIS.variable_in_root` case-insensitive).** Flash
+   path resolution is case-insensitive in SWF≤6 (well-documented). We match
+   Flash (PASS). Ruffle is case-sensitive even in SWF5/6 (FAIL). Only matters
+   for v5; v6 inherits both bugs from Ruffle (see below).
+
+3. **Line 208 (v7/v8 only — `/mc/mc/o` slash-path crossing a non-MC).** Flash's
+   slash-path resolver returns `undefined` when an intermediate segment is not
+   a MovieClip (our behaviour, `PASS typeof == 'undefined'`). Ruffle falls back
+   to property lookup on the parent MC and returns the Object `o` (`FAIL
+   typeof == 'object'`). The dotted-path equivalent (`_root.o.func`) already
+   uses property lookup in both engines — this is slash-path-specific.
+
+**Why v6 promotes but v5/v7/v8 don't.** v6 hits BOTH (2) and (3), so Ruffle's
+diff set against expected gains TWO extra lines (5.5 and 208), making Ruffle's
+Dejagnu pass/fail counters diverge from expected. Our diff set is a proper
+subset of Ruffle's and auto-promotes to `ruffle_matched`. For v5 only (2)
+fires; for v7/v8 only (3) fires — a single extra divergence in each, where our
+PASS-extra-by-one cancels in Ruffle's counters (one extra PASS at 105 + one
+extra FAIL at 121-or-208 = net 0). The cancellation means Ruffle's counters
+match expected exactly, but ours don't (one extra PASS, zero extra FAIL),
+which puts the counter lines in our diff but not in Ruffle's diff. Subset
+check fails.
+
+**Decision:** Accept. Per `RUFFLE_COMPAT_TWEAKS.md` policy these are not
+"arbitrary implementation choices" — both behaviours (THIS case-insensitivity
+in SWF≤6 and `/mc/mc/o` returning `undefined`) are well-specified Flash
+semantics. Replicating Ruffle's bugs to pass these tests would diverge from
+Flash. Added to `from_gnash/actionscript.all/ignored_tests.txt`. v6 stays
+auto-promoted (not in ignored).
+
 ---
 
 ## Category 2: Interactive / Wall-Clock Timing Tests
