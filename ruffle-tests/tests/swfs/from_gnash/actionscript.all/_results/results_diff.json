@@ -1,9 +1,9 @@
 {
   "metadata": {
-    "old_timestamp": "2026-05-23T19:06:23.583271+00:00",
-    "old_git_sha": "8bcd7dbbea8309e543a121cf7e28c89d25aa5783",
-    "new_timestamp": "2026-05-23T20:04:40.171334+00:00",
-    "new_git_sha": "59ad901e329947e7de2c1fca1688f3127bfaf7e4",
+    "old_timestamp": "2026-05-23T20:04:40.171334+00:00",
+    "old_git_sha": "59ad901e329947e7de2c1fca1688f3127bfaf7e4",
+    "new_timestamp": "2026-05-23T20:35:48.730423+00:00",
+    "new_git_sha": "8895f0e675a2d0825aac46a1d79046c543d49acc",
     "partial": false,
     "same_commit": false
   },
@@ -18,65 +18,16 @@
     "new_effective_pass": 227,
     "new_total": 243,
     "new_pass_rate": 52.7,
-    "old_mismatched_lines": 9398,
+    "old_mismatched_lines": 9386,
     "new_mismatched_lines": 9386,
     "increased_mismatches": 0,
-    "decreased_mismatches": 12,
+    "decreased_mismatches": 0,
     "newly_passing": 0,
     "newly_failing": 0,
     "status_changed": 0,
-    "unchanged": 240,
+    "unchanged": 243,
     "added": 0,
     "removed": 0
   },
-  "changes": [
-    {
-      "test": "TextField-v6",
-      "change_type": "changed",
-      "old_status": "output_mismatch",
-      "new_status": "output_mismatch",
-      "old_lines": {
-        "actual_lines": 545,
-        "expected_lines": 545,
-        "matching_lines": 439
-      },
-      "new_lines": {
-        "actual_lines": 545,
-        "expected_lines": 545,
-        "matching_lines": 443
-      }
-    },
-    {
-      "test": "TextField-v7",
-      "change_type": "changed",
-      "old_status": "output_mismatch",
-      "new_status": "output_mismatch",
-      "old_lines": {
-        "actual_lines": 570,
-        "expected_lines": 570,
-        "matching_lines": 448
-      },
-      "new_lines": {
-        "actual_lines": 570,
-        "expected_lines": 570,
-        "matching_lines": 452
-      }
-    },
-    {
-      "test": "TextField-v8",
-      "change_type": "changed",
-      "old_status": "output_mismatch",
-      "new_status": "output_mismatch",
-      "old_lines": {
-        "actual_lines": 571,
-        "expected_lines": 571,
-        "matching_lines": 450
-      },
-      "new_lines": {
-        "actual_lines": 571,
-        "expected_lines": 571,
-        "matching_lines": 454
-      }
-    }
-  ]
+  "changes": []
 }
