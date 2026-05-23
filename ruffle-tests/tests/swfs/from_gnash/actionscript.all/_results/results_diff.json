@@ -1,9 +1,9 @@
 {
   "metadata": {
-    "old_timestamp": "2026-05-22T21:24:24.350636+00:00",
-    "old_git_sha": "46d94b79c9d1f562a355c5161e99b4cf83d03541",
-    "new_timestamp": "2026-05-22T21:51:14.688090+00:00",
-    "new_git_sha": "f67f7f775185955b99f30ca45ffdde4dfe66217b",
+    "old_timestamp": "2026-05-22T21:51:14.688090+00:00",
+    "old_git_sha": "f67f7f775185955b99f30ca45ffdde4dfe66217b",
+    "new_timestamp": "2026-05-23T00:34:45.495881+00:00",
+    "new_git_sha": "c517e0ec96d9b4903240df77c00bea744e698628",
     "partial": false,
     "same_commit": false
   },
@@ -19,15 +19,64 @@
     "new_total": 243,
     "new_pass_rate": 52.7,
     "old_mismatched_lines": 9486,
-    "new_mismatched_lines": 9486,
+    "new_mismatched_lines": 9477,
     "increased_mismatches": 0,
-    "decreased_mismatches": 0,
+    "decreased_mismatches": 9,
     "newly_passing": 0,
     "newly_failing": 0,
     "status_changed": 0,
-    "unchanged": 243,
+    "unchanged": 240,
     "added": 0,
     "removed": 0
   },
-  "changes": []
+  "changes": [
+    {
+      "test": "MovieClip-v6",
+      "change_type": "changed",
+      "old_status": "output_mismatch",
+      "new_status": "output_mismatch",
+      "old_lines": {
+        "actual_lines": 921,
+        "expected_lines": 936,
+        "matching_lines": 811
+      },
+      "new_lines": {
+        "actual_lines": 921,
+        "expected_lines": 936,
+        "matching_lines": 814
+      }
+    },
+    {
+      "test": "MovieClip-v7",
+      "change_type": "changed",
+      "old_status": "output_mismatch",
+      "new_status": "output_mismatch",
+      "old_lines": {
+        "actual_lines": 956,
+        "expected_lines": 969,
+        "matching_lines": 833
+      },
+      "new_lines": {
+        "actual_lines": 956,
+        "expected_lines": 969,
+        "matching_lines": 836
+      }
+    },
+    {
+      "test": "MovieClip-v8",
+      "change_type": "changed",
+      "old_status": "output_mismatch",
+      "new_status": "output_mismatch",
+      "old_lines": {
+        "actual_lines": 1074,
+        "expected_lines": 1087,
+        "matching_lines": 921
+      },
+      "new_lines": {
+        "actual_lines": 1074,
+        "expected_lines": 1087,
+        "matching_lines": 924
+      }
+    }
+  ]
 }
