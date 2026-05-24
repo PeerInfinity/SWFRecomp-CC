@@ -1,28 +1,63 @@
 # Ruffle Test Results Diff
 
-**Previous:** `ef6584787e7e` (2026-05-16T20:55:02.523668+00:00)
-**Current:** `be9aafd78ec0` (2026-05-16T21:06:43.832733+00:00)
+**Previous:** `be9aafd78ec0` (2026-05-16T21:06:43.832733+00:00)
+**Current:** `6fe6fb1a2f62` (2026-05-24T23:52:34.184519+00:00)
 
 ## Summary
 
 | Metric | Previous | Current | Delta |
 |--------|----------|---------|-------|
-| Passing | 601 | 604 | +3 |
-| Total | 655 | 655 | 0 |
-| Pass rate | 91.8% | 92.2% | +0.4% |
-| Mismatched lines | 9292 | 9284 | -8 |
-|   Decreased | | | -8 |
+| Passing | 604 | 614 | +10 |
+| Total | 655 | 671 | +16 |
+| Pass rate | 92.2% | 91.5% | -0.7% |
+| Mismatched lines | 9284 | 9598 | +314 |
+|   Decreased | | | -188 |
+|   Increased | | | +2 |
 
-## Newly Passing (3)
+## Newly Passing (2)
 
 | Test | Previous Status | Lines (prev) | Lines (now) |
 |------|----------------|--------------|-------------|
-| `action_to_integer` | runtime_error | - | 28/28 |
-| `as2_super_and_this_v8` | runtime_error | - | 85/85 |
-| `as2_super_via_manual_prototype` | runtime_error | - | 40/40 |
+| `sound_gettransform_props` | output_mismatch | 2/4 | 4/4 |
+| `swf5_xml_event_handler_context` | output_mismatch | 0/2 | 2/2 |
 
-## Line Count Changed (1)
+## Newly Failing (1)
+
+| Test | New Status | Lines (prev) | Lines (now) |
+|------|-----------|--------------|-------------|
+| `with` | output_mismatch | 49/49 | 44/46 |
+
+## Status Changed (1)
+
+| Test | Previous | Current | Lines (prev) | Lines (now) |
+|------|----------|---------|--------------|-------------|
+| `native_objects_swf6` | segfault | output_mismatch | 9/115 | 114/115 |
+
+## Added Tests (16)
+
+| Test | Status | Lines |
+|------|--------|-------|
+| `geturl_opcode_target_normalize` | output_mismatch | 0/45 |
+| `geturl_target_normalize` | output_mismatch | 4/89 |
+| `looping_child_swf32` | output_mismatch | 29/141 |
+| `looping_child_swf5` | output_mismatch | 29/141 |
+| `looping_child_swf9` | output_mismatch | 29/141 |
+| `looping_real_1_declared_1` | pass | 1/1 |
+| `looping_real_1_declared_2` | pass | 1/1 |
+| `looping_real_2_declared_1` | pass | 5/5 |
+| `looping_real_2_declared_2` | pass | 5/5 |
+| `shared_stack` | output_mismatch | 11/16 |
+| `sound_getters` | pass | 99/99 |
+| `sound_nested_clips` | pass | 10/10 |
+| `sound_owner_reference` | pass | 12/12 |
+| `sound_owner_tostring_fail` | pass | 9/9 |
+| `sound_setters` | output_mismatch | 14/43 |
+| `sound_start_stop` | pass | 44/44 |
+
+## Line Count Changed (3)
 
 | Test | Status | Lines (prev) | Lines (now) | Diff |
 |------|--------|--------------|-------------|------|
-| `native_objects_swf6` | segfault | 1/115 | 9/115 | -8 |
+| `global_proto_decls_delete` | output_mismatch | 386/4158 | 461/4158 | -75 |
+| `global_instance_decls` | output_mismatch | 23/758 | 26/758 | -3 |
+| `xml_getbytes` | output_mismatch | 8/17 | 9/17 | -1 |
