@@ -1,6 +1,18 @@
 # MovieClip-vN Investigation Plan
 <!-- TESTS: MovieClip-v6, MovieClip-v7, MovieClip-v8 -->
 
+Last updated: 2026-05-23 (Phase 1 partial — `MovieClip.prototype.meth`
+implemented as a real function_type=2 builtin. MovieClip-v5/v6/v7/v8
+each gain +23/+24 matching lines (315→338, 814→838, 836→860,
+924→948). v5 stays ruffle_matched; v6/v7/v8 stay output_mismatch.
+Two residual `meth`-related lines remain in v6/v7/v8: line 2097
+(`retCaller == _root.meth`) needs `arguments.caller` tracking
+across the native-builtin frame, and line 2100
+(`_root.meth(1)` after Number.prototype.toLowerCase override) needs
+user-method dispatch on primitive Number receivers in actionCallMethod
+(currently only String primitives walk the wrapper-prototype chain
+for user overrides). Phase 1 status updated below.)
+
 Last updated: 2026-05-23 (Phase 11 _yscale-sign marked
 `not_actionable`: Ruffle's `output.fp23.ruffle.txt` also reads
 `obtained: -50` at line 616, so this line is common to both diffs
@@ -23,7 +35,7 @@ status: pending
 phases:
   - id: 1
     name: "MovieClip.prototype.X = fn — user-added method visibility on instances"
-    status: pending
+    status: in_progress
   - id: 2
     name: "mc.getSWFVersion() returning 5 instead of OUTPUT_VERSION"
     status: completed
@@ -102,6 +114,73 @@ Local CI baseline (commit `eb8206f8`, 2026-05-15):
 
 MovieClip-v5 already at ruffle_matched (per
 complete/GNASH_FEATURE_PLAN.md).
+
+### Fixes landed (2026-05-23, pending CI)
+
+- **Phase 1 partial — `MovieClip.prototype.meth` builtin
+  (MovieClip.as:182/193/2084-2134/2552/2553).** `meth` is an
+  undocumented Flash MovieClip method that parses case-insensitive
+  "get" → 1, "post" → 2, anything else → 0 from `arg.toLowerCase()`.
+  Mirrors Gnash's `movieclip_meth` in
+  `libcore/asobj/MovieClip_as.cpp:1175`. Implemented as a real
+  function_type=2 builtin (`builtin_mc_meth`) on
+  `MovieClip.prototype`, not as an explicit case in actionCallMethod's
+  MOVIECLIP arm — this keeps `o.meth = MovieClip.prototype.meth;
+  o.meth("post")` working on plain OBJECTs (line 2552/2553) via the
+  generic prototype-method dispatch in the OBJECT arm. The builtin
+  delegates `arg.toLowerCase()` to a recursive `actionCallMethod`
+  call. Matching lines per test gain +23/+24:
+
+  | Test | Before | After | Δ |
+  |------|--------|-------|---|
+  | MovieClip-v5 | 315/363 | 338/363 | +23 |
+  | MovieClip-v6 | 814/936 | 838/936 | +24 |
+  | MovieClip-v7 | 836/969 | 860/969 | +24 |
+  | MovieClip-v8 | 924/1087 | 948/1087 | +24 |
+
+  v5 stays ruffle_matched; v6/v7/v8 stay output_mismatch (other
+  phase blockers — getBounds reference-clip transforms, soft/hard
+  reference semantics — dominate the residual diff).
+
+  Two residual `meth`-related lines remain across v6/v7/v8:
+  - Line 2097 `retCaller == _root.meth`: requires
+    `arguments.caller` to point at the `_root.meth` function value
+    from inside the recursive `Number.prototype.toLowerCase` call.
+    Native-builtin frames don't currently push a caller, so
+    `arguments.caller` reads as undefined.
+  - Line 2100 `_root.meth(1)` after `Number.prototype.toLowerCase =
+    function(){ return "post"; }`: requires user-method dispatch on
+    primitive Number receivers. The String primitive arm of
+    `actionCallMethod` (action.c ~61672) checks
+    `getPrimitiveWrapperProto` for user overrides, but the
+    Number/Boolean arm (action.c ~67104) only handles
+    `toString`/`valueOf`/`hasOwnProperty` and falls to
+    `pushUndefined` otherwise. Extending the Number/Boolean arm
+    with a String-arm-style override walk would also fix this
+    line. Out of scope for this commit — would carry wider
+    regression risk; deferred.
+
+  Verified no regressions across:
+  - 14-test AVM1 MC/scope/super battery (swf5_to_6_cross_call,
+    movieclip_state_values, movieclip_default_state, on_construct,
+    as2_super_and_this_v6/v8, clone_sprite_edittext, clip_constructors,
+    function_base_clip, movieclip_setmask, goto_rewind3,
+    swf5_no_closure, closure_scope, set_interval) — all PASS.
+  - 15-test gnash actionscript.all prototype-heavy battery (case-v6,
+    Inheritance-v6/v7/v8, Function-v6/v7/v8, Object-v6/v7/v8,
+    delete-v6, Global-v6, ASnative-v8, getvariable-v6,
+    MovieClipLoader-v6) — all effective pass (3 PASS + 12 RM).
+  - 18-test AVM1 broader regression (closure_scope,
+    register_and_init_order, swf5_xml_event_handler_context,
+    movieclip_default_state, movieclip_library_state_values,
+    array_constructor, watch, add_property, enumerate, swf5_no_closure,
+    extends_chain, on_construct, funky_function_calls, goto_methods,
+    goto_frame, function_as_function, tell_target, swf5_to_6_cross_call)
+    — all effective pass.
+  - 6-test misc-ming.all (DragDropTest, key_event_test,
+    loop/loop_test, loop/loop_test10, register_class/registerClassTest,
+    register_class/registerClassTest2) — all effective pass.
+  - 2-test from_shumway (targetPath1, doubleAndRegister) — PASS.
 
 ### Fixes landed (2026-05-22, pending CI)
 

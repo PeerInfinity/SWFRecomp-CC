@@ -14821,8 +14821,60 @@ ASFunction g_movieclip_constructor;
 int g_movieclip_constructor_init = 0;
 
 // MovieClip prototype method stubs (static storage)
-#define MC_METHOD_COUNT 29
+#define MC_METHOD_COUNT 30
 static ASFunction g_mc_method_funcs[MC_METHOD_COUNT];
+
+// MovieClip.prototype.meth(x): undocumented Flash builtin that parses
+// case-insensitive "get"/"post" from x.toLowerCase() and returns 1/2/0
+// respectively. Mirrors Gnash's movieclip_meth
+// (libcore/asobj/MovieClip_as.cpp:1175). Used by the Gnash MovieClip-v5..v8
+// test suite. Defined as a real function_type=2 method on MovieClip.prototype
+// so it works both via mc.meth(...) (any MOVIECLIP receiver) and
+// o.meth = MovieClip.prototype.meth; o.meth(...) (any OBJECT receiver).
+static ActionVar builtin_mc_meth(SWFAppContext* app_context, ActionVar* args,
+                                 u32 num_args, ActionVar* registers, void* this_obj)
+{
+	(void)registers; (void)this_obj;
+	ActionVar result = {0};
+	result.type = ACTION_STACK_VALUE_F64;
+	double r = 0.0;
+
+	if (num_args == 0 || args[0].type == ACTION_STACK_VALUE_UNDEFINED ||
+	    args[0].type == ACTION_STACK_VALUE_NULL)
+	{
+		VAL(double, &result.data.numeric_value) = r;
+		return result;
+	}
+
+	// Dispatch arg.toLowerCase() via actionCallMethod with arg as receiver.
+	// Stack push order: num_args, receiver, method name (popped in reverse).
+	ActionVar n_var = {0};
+	n_var.type = ACTION_STACK_VALUE_F32;
+	VAL(float, &n_var.data.numeric_value) = 0.0f;
+	pushVar(app_context, &n_var);
+	pushVar(app_context, &args[0]);
+	PUSH_STR("toLowerCase", 11);
+	char str_buffer_local[17];
+	actionCallMethod(app_context, str_buffer_local);
+	ActionVar tlc_result;
+	popVar(app_context, &tlc_result);
+
+	if (tlc_result.type == ACTION_STACK_VALUE_STRING)
+	{
+		const uint16_t* u16p = varGetU16Ptr(&tlc_result);
+		if (u16p != NULL && tlc_result.str_size > 0 && tlc_result.str_size <= 4)
+		{
+			char buf[8] = {0};
+			int n_utf8 = u16_to_utf8(u16p, tlc_result.str_size, buf, sizeof(buf) - 1);
+			buf[n_utf8] = '\0';
+			if (n_utf8 == 3 && strcmp(buf, "get") == 0) r = 1.0;
+			else if (n_utf8 == 4 && strcmp(buf, "post") == 0) r = 2.0;
+		}
+	}
+
+	VAL(double, &result.data.numeric_value) = r;
+	return result;
+}
 
 static void initMovieClipPrototype(SWFAppContext* app_context)
 {
@@ -14884,6 +14936,7 @@ static void initMovieClipPrototype(SWFAppContext* app_context)
 		{"loadMovie", 9},
 		{"loadVariables", 13},
 		{"unloadMovie", 11},
+		{"meth", 4},
 	};
 
 	memset(g_mc_method_funcs, 0, sizeof(g_mc_method_funcs));
@@ -14902,6 +14955,16 @@ static void initMovieClipPrototype(SWFAppContext* app_context)
 		strncpy(g_mc_method_funcs[i].name, mc_methods[i].name, 255);
 		g_mc_method_funcs[i].function_type = 1;
 		g_mc_method_funcs[i].param_count = 0;
+
+		// MovieClip.prototype.meth is a real function (function_type=2) so it
+		// works on both MOVIECLIP receivers and plain OBJECTs that aliased
+		// `o.meth = MovieClip.prototype.meth`. Other methods stay as stubs
+		// dispatched by name in actionCallMethod's MOVIECLIP arm.
+		if (mc_methods[i].len == 4 && strcmp(mc_methods[i].name, "meth") == 0)
+		{
+			g_mc_method_funcs[i].function_type = 2;
+			g_mc_method_funcs[i].advanced_func = (Function2Ptr) builtin_mc_meth;
+		}
 
 		if (function_count < MAX_FUNCTIONS)
 			function_registry[function_count++] = &g_mc_method_funcs[i];
