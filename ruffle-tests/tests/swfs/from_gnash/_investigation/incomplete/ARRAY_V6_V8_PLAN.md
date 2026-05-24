@@ -1,20 +1,26 @@
 # array-v6/v7/v8 Extension Plan
 <!-- TESTS: array-v6, array-v7, array-v8 -->
 
-Last updated: 2026-05-19 (initial planning doc, drafted from local
-single-test reproductions at the current `master` SHA; no fixes
-landed yet)
+Last updated: 2026-05-24 (Phase 2 landed → array-v6/v7/v8 each gained
++2 line matches via the `Array.prototype.join.apply(a)` /
+`a.join.apply(a)` receiver fix. Tests stay output_mismatch; residual
+diffs are Phase 3/4/5 work. SWF5 gate keeps `array-v5` unchanged so
+its `apply(a) == undefined` expectation still passes. Also closes
+Phase 1: `a.hasOwnProperty('length')` was actually already passing in
+the baseline — the originally-documented failure wasn't reproducing.)
 
 <!-- PLAN_META
 id: ARRAY_V6_V8_PLAN
-status: pending
+status: in_progress
 phases:
   - id: 1
     name: "a.hasOwnProperty('length') — Array.length not registered as own prop"
-    status: pending
+    status: completed
+    note: "Already passing in baseline as of 2026-05-24 reproduction — callArrayMethod's hasOwnProperty branch already short-circuits length to true. No code change needed."
   - id: 2
     name: "Array.prototype.join.apply(a) — apply with Array this loses receiver"
-    status: pending
+    status: completed
+    note: "Landed 2026-05-24: Function.prototype.apply's type-2 branch in actionCallMethod now sets g_call_this_type before invoking advanced_func (mirroring the .call path). SWF5 gate (g_swf_version >= 6) preserves SWF5's documented undefined-return behaviour. +2 lines on each of array-v6/v7/v8 (passes 592→594 / 573→575 / 573→575)."
   - id: 3
     name: "Sparse-array hasOwnProperty for densified indices"
     status: pending

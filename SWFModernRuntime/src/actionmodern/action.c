@@ -62766,7 +62766,15 @@ void actionCallMethod(SWFAppContext* app_context, char* str_buffer)
 						}
 					}
 
+					// Pass this-type so builtin wrappers can distinguish ASArray
+					// from ASObject — mirrors the .call path above. SWF5 gate:
+					// Flash's SWF5 apply on Array.prototype methods returns
+					// undefined ("up to SWF5 we couldn't do this" per array.as
+					// line 159); only set the type-tag for SWF6+.
+					if (g_swf_version >= 6)
+						g_call_this_type = (num_args >= 1) ? args[0].type : 0;
 					ActionVar result = func->advanced_func(app_context, apply_args, apply_arg_count, registers, this_obj);
+					g_call_this_type = 0;
 					g_override_this_set = 0; // clear in case function didn't consume it
 
 					if (t2_this_pushed_ap2)
