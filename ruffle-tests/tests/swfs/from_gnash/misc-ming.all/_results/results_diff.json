@@ -1,66 +1,33 @@
 {
   "metadata": {
-    "old_timestamp": "2026-05-23T23:31:49.908172+00:00",
-    "old_git_sha": "21d79eaacafb88d3c7fa20444a670101e3cde21f",
-    "new_timestamp": "2026-05-24T00:04:13.597023+00:00",
-    "new_git_sha": "2d64da6746cb34d0280a5ccfb99d734da5cfbc22",
+    "old_timestamp": "2026-05-24T00:04:13.597023+00:00",
+    "old_git_sha": "2d64da6746cb34d0280a5ccfb99d734da5cfbc22",
+    "new_timestamp": "2026-05-24T01:03:46.532564+00:00",
+    "new_git_sha": "897b026fac5559b59323ed91de55cc47e0a8851e",
     "partial": false,
     "same_commit": false
   },
   "summary": {
-    "old_pass": 65,
+    "old_pass": 67,
     "old_ruffle_matched": 27,
-    "old_effective_pass": 92,
+    "old_effective_pass": 94,
     "old_total": 110,
-    "old_pass_rate": 59.1,
+    "old_pass_rate": 60.9,
     "new_pass": 67,
     "new_ruffle_matched": 27,
     "new_effective_pass": 94,
     "new_total": 110,
     "new_pass_rate": 60.9,
-    "old_mismatched_lines": 1229,
+    "old_mismatched_lines": 1213,
     "new_mismatched_lines": 1213,
     "increased_mismatches": 0,
-    "decreased_mismatches": 16,
-    "newly_passing": 2,
+    "decreased_mismatches": 0,
+    "newly_passing": 0,
     "newly_failing": 0,
-    "status_changed": 2,
-    "unchanged": 108,
+    "status_changed": 0,
+    "unchanged": 110,
     "added": 0,
     "removed": 0
   },
-  "changes": [
-    {
-      "test": "loop/loop_test2",
-      "change_type": "changed",
-      "old_status": "output_mismatch",
-      "new_status": "pass",
-      "old_lines": {
-        "actual_lines": 17,
-        "expected_lines": 15,
-        "matching_lines": 6
-      },
-      "new_lines": {
-        "actual_lines": 15,
-        "expected_lines": 15,
-        "matching_lines": 15
-      }
-    },
-    {
-      "test": "loop/loop_test3",
-      "change_type": "changed",
-      "old_status": "output_mismatch",
-      "new_status": "pass",
-      "old_lines": {
-        "actual_lines": 17,
-        "expected_lines": 16,
-        "matching_lines": 9
-      },
-      "new_lines": {
-        "actual_lines": 16,
-        "expected_lines": 16,
-        "matching_lines": 16
-      }
-    }
-  ]
+  "changes": []
 }
