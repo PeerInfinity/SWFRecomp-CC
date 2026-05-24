@@ -45608,6 +45608,9 @@ void actionSetMember(SWFAppContext* app_context)
 						ActionVar cv; popVar(app_context, &cv);
 						vis_d = VAL(double, &cv.data.numeric_value);
 					}
+					// NaN (unparseable string like "true"/"gibberish") is a no-op,
+					// matching Ruffle's property_coerce_to_number → None semantics.
+					if (!isnan(vis_d))
 					{
 						int new_vis = (vis_d != 0.0) ? 1 : 0;
 						if (mc->visible && !new_vis && g_focused_mc == mc)

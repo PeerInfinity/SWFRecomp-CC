@@ -1,6 +1,19 @@
 # MovieClip-vN Investigation Plan
 <!-- TESTS: MovieClip-v6, MovieClip-v7, MovieClip-v8 -->
 
+Last updated: 2026-05-23 (Phase 16 landed, pending CI. **Phase 16:**
+re-diagnosed cluster 2343/2345/2347/2349 — not parent→child cascading;
+the test exercises `_visible` coercion on unparseable strings ("true",
+"false", "gibberish") and undefined. Ruffle's `set_visible` is
+`property_coerce_to_number(val) → None ⇒ no-op`; our SetMember `_visible`
+arm was running `convertFloat` then `(vis_d != 0.0)` which is `true`
+for NaN in C (NaN unordered against 0.0). Added `if (!isnan(vis_d))`
+guard so NaN no-ops and preserves the previous value. v6/v7/v8 each
+gain +4 lines (cluster collapses to 0). 20-test AVM1 regression
+battery clean. Plan title for Phase 16 corrected from "cascading from
+parent to child" — the line range matched cluster P in the original
+diff but the underlying behaviour is coercion, not cascading.)
+
 Last updated: 2026-05-23 (Phase 3 + Phase 8-partial landed, pending
 CI. **Phase 3:** added `"hitTest"` to the `mc_methods[]` registry in
 `initMovieClipPrototype` (incremented MC_METHOD_COUNT 30→31), so
@@ -99,8 +112,8 @@ phases:
     name: "MovieClip method dispatch with call/apply (mcm counter)"
     status: pending
   - id: 16
-    name: "_visible cascading from parent to child"
-    status: pending
+    name: "_visible NaN coercion no-op (string/undefined → no-op, not truthy)"
+    status: completed
   - id: 17
     name: "_quality setter 'BEST' value"
     status: completed
@@ -544,7 +557,7 @@ MC fails because the assignment didn't land where the lookup looks.
 
 Closely related to Phase A.
 
-### P. _visible cascading (Phase 16)
+### P. _visible NaN coercion (Phase 16) — COMPLETED 2026-05-23
 
 Lines: 2343, 2345, 2347, 2349.
 
@@ -553,11 +566,19 @@ Lines: 2343, 2345, 2347, 2349.
 + FAILED: expected: false obtained: true
 ```
 
-After setting `parent._visible = false`, `child._visible` should
-also read false. We are not cascading. Note: Flash's behaviour here
-is actually that `_visible` on a child reports its OWN flag (not the
-cascaded), but the test expects cascaded — verify whether Ruffle
-cascades or not before fixing.
+Despite the original "cascading from parent to child" framing, the
+test source at MovieClip.as:2342-2349 does no cascading — it
+exercises `vis._visible = "true"`/"false"/"gibberish"/undefined and
+expects each to be a no-op preserving the previous value (which was
+`false` from `vis._visible = 0` on line 2340). Our SetMember `_visible`
+handler called `convertFloat` (NaN for unparseable strings) then
+`(vis_d != 0.0) ? 1 : 0` — and in C `(NaN != 0.0)` is true (NaN
+unordered against 0.0), so the first bad set flipped `visible` to
+`true` and the subsequent sets all preserved the bug. Ruffle's
+`property_coerce_to_number` returns `None` for NaN/undefined/null and
+`set_visible` no-ops in that case. Fixed by gating the assignment on
+`!isnan(vis_d)` in `actionSetMember`. v6/v7/v8 each gain +4 matching
+lines (cluster collapses to zero).
 
 ### Q. _quality setter 'BEST' (Phase 17)
 
@@ -604,8 +625,9 @@ BEST suggests BEST maps to `_highquality == 2`.
 10. **Phase 14 (mc.addProperty for MC props)** — touches MC virtual
     property dispatch; coordinate with AVM1 `addProperty` /
     `watch_textfield` regression battery. Estimate: 2-3 hours.
-11. **Phase 16 (_visible cascading)** — verify against Ruffle first
-    (could be ACCEPTED_DIFFS). Estimate: 1-2 hours.
+11. ~~**Phase 16 (_visible NaN coercion)**~~ — COMPLETED 2026-05-23.
+    Was misdiagnosed as cascading; actually a missing `isnan` guard
+    in the SetMember `_visible` arm.
 12. **Phase 6 (soft/hard reference semantics)** — biggest cluster,
     save for last; needs careful diagnosis since it touches
     soft_reference_test1 (already RM in misc-swfc) and similar
