@@ -1,6 +1,15 @@
 # TextField-vN Investigation Plan
 <!-- TESTS: TextField-v6, TextField-v7, TextField-v8 -->
 
+Last updated: 2026-05-24 (Phase 3 landed — `TextField.getFontList`
+static method registered on `g_textfield_constructor.own_props` as a
+`function_type=2` builtin returning an empty `ASArray`. Marked
+DontEnum on the constructor's own_props. +6 lines per TextField-vN
+version (lines 115, 121, 122, 123, 124, 125). Matching: v6 450→456,
+v7 459→465, v8 461→467. All three still output_mismatch. No
+regressions across the AVM1 TextField battery, gnash actionscript.all
+TextField-v5 / TextFieldHTML-v5/v6/v7/v8 (all effective pass).)
+
 Last updated: 2026-05-24 (Phase 5 partial — `tf.variable` setter +
 variable init landed; `tf.restrict` empty-string change reverted after
 CI flagged AVM1 `edittext_restrict` regression. Net +4 lines per
@@ -69,7 +78,7 @@ phases:
     status: pending
   - id: 3
     name: "TextField.getFontList static method + Array-instance return"
-    status: pending
+    status: done
   - id: 4
     name: "Boolean-setter coercion (background/embedFonts/multiline/selectable/password/border)"
     status: done

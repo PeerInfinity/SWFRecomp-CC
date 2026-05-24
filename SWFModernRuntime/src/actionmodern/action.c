@@ -15098,6 +15098,17 @@ static ASFunction g_tf_getDepth_func;
 static ASFunction g_tf_removeTextField_func;
 static ASFunction g_tf_replaceSel_func;
 static ASFunction g_tf_replaceText_func;
+static ASFunction g_tf_getFontList_func;
+
+static ActionVar builtin_tf_getFontList(SWFAppContext* app_context, ActionVar* args, u32 arg_count, ActionVar* registers, void* this_obj)
+{
+	(void)args; (void)arg_count; (void)registers; (void)this_obj;
+	ASArray* arr = allocArray(app_context, 4);
+	ActionVar result = {0};
+	result.type = ACTION_STACK_VALUE_ARRAY;
+	VAL(u64, &result.data.numeric_value) = (u64)arr;
+	return result;
+}
 
 // Helper: check if an ASObject is a bare TextField instance (created via new TextField())
 static int isTextFieldInstance(ASObject* obj) {
@@ -15278,15 +15289,35 @@ static void initTextFieldPrototype(SWFAppContext* app_context)
 	// zero-length _listeners Array (TextField.as:78-84). All DontEnum.
 	installAsBroadcaster(app_context, proto);
 
+	// Register TextField.getFontList as a static (constructor-level) method.
+	// Returns an Array of installed device font names. We stub it with an empty
+	// Array — sufficient for `getFontList() instanceof Array == true` (TextField.as:115/121-125).
+	if (g_textfield_constructor.own_props == NULL)
+	{
+		g_textfield_constructor.own_props = allocObject(app_context, 4);
+		retainObject(g_textfield_constructor.own_props);
+	}
+	memset(&g_tf_getFontList_func, 0, sizeof(ASFunction));
+	strncpy(g_tf_getFontList_func.name, "getFontList", 255);
+	g_tf_getFontList_func.function_type = 2;
+	g_tf_getFontList_func.advanced_func = (Function2Ptr)builtin_tf_getFontList;
+	if (function_count < MAX_FUNCTIONS)
+		function_registry[function_count++] = &g_tf_getFontList_func;
+	ActionVar gfl_val = {0};
+	gfl_val.type = ACTION_STACK_VALUE_FUNCTION;
+	VAL(u64, &gfl_val.data.numeric_value) = (u64)&g_tf_getFontList_func;
+	setProperty(app_context, g_textfield_constructor.own_props, "getFontList", 11, &gfl_val);
+	for (u32 i = 0; i < g_textfield_constructor.own_props->num_used; i++) {
+		if (strcmp(g_textfield_constructor.own_props->properties[i].name, "getFontList") == 0) {
+			g_textfield_constructor.own_props->properties[i].flags &= ~PROPERTY_FLAG_ENUMERABLE;
+			break;
+		}
+	}
+
 	// Register TextField.StyleSheet as a property on the constructor (SWF7+)
 	if (g_swf_version >= 7)
 	{
 		initStyleSheetPrototype(app_context);
-		if (g_textfield_constructor.own_props == NULL)
-		{
-			g_textfield_constructor.own_props = allocObject(app_context, 4);
-			retainObject(g_textfield_constructor.own_props);
-		}
 		ActionVar ss_val = {0};
 		ss_val.type = ACTION_STACK_VALUE_FUNCTION;
 		VAL(u64, &ss_val.data.numeric_value) = (u64)&g_stylesheet_constructor_global;
