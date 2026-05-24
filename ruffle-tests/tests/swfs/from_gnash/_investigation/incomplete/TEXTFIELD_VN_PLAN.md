@@ -1,6 +1,18 @@
 # TextField-vN Investigation Plan
 <!-- TESTS: TextField-v6, TextField-v7, TextField-v8 -->
 
+Last updated: 2026-05-23 (Phase 5 partial — `tf.maxChars` setter landed.
+New tri-state coercion in `actionSetMember` MOVIECLIP arm: when the
+target is a TextField and prop_name == "maxChars", route the value
+through ECMA ToNumber (`varToDoubleSWF` for OBJECT/ARRAY/FUNCTION/MC,
+direct conversion for primitives, `strtod` strict-parse for strings).
+0 / NaN / undefined / null / unparseable string → NULL-typed; finite
+non-zero number stays as F64. TextField.as:388 (`tf.maxChars = "string"`)
+and 393 (`tf.maxChars = 0`) flip to PASSED on v6/v7/v8 — +2 lines each.
+Negative numbers preserved (test line 391 expects -6 still). Cluster E
+of Phase 5 collapses for maxChars; `tf.restrict` / `tf.variable` still
+pending. All three still output_mismatch.)
+
 Last updated: 2026-05-23 (Phase 7 landed — tf.type setter now accepts
 OBJECT/ARRAY args, routing them through `objectCallToString` and
 case-insensitive matching against "input"/"dynamic". The conditional
@@ -33,7 +45,7 @@ phases:
     status: done
   - id: 5
     name: "null-typed properties (maxChars/variable/restrict) return string instead of null"
-    status: pending
+    status: in_progress
   - id: 6
     name: "MovieClip-only properties (_currentframe/_totalframes/_framesloaded) on TextField"
     status: done

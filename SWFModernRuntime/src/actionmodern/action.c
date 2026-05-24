@@ -46039,6 +46039,59 @@ void actionSetMember(SWFAppContext* app_context)
 			{
 				return;
 			}
+			// TextField maxChars setter: tri-state (number ≠ 0, or NULL).
+			// Flash coerces the assigned value via ECMA ToNumber and stores:
+			//   - finite non-zero number → that number (F64)
+			//   - 0 / NaN / undefined / null / unparseable string → NULL-typed
+			// Test: TextField.as:388 (`tf.maxChars = "string"` → null),
+			//       TextField.as:393 (`tf.maxChars = 0` → null).
+			// Negative numbers are kept (TextField.as:391 expects -6 number).
+			if (MC_IS_TEXTFIELD(mc) && prop_name_len == 8 &&
+				memcmp(prop_name, "maxChars", 8) == 0)
+			{
+				double _mc_d;
+				switch (value_var.type) {
+					case ACTION_STACK_VALUE_F64:
+						_mc_d = VAL(double, &value_var.data.numeric_value); break;
+					case ACTION_STACK_VALUE_F32:
+						_mc_d = (double)VAL(float, &value_var.data.numeric_value); break;
+					case ACTION_STACK_VALUE_BOOLEAN:
+						_mc_d = value_var.data.numeric_value ? 1.0 : 0.0; break;
+					case ACTION_STACK_VALUE_STRING: {
+						const uint16_t* _mc_u16 = varGetU16Ptr(&value_var);
+						char _mc_buf[64];
+						if (_mc_u16 && value_var.str_size > 0)
+							u16_to_utf8(_mc_u16, value_var.str_size, _mc_buf, sizeof(_mc_buf));
+						else
+							_mc_buf[0] = '\0';
+						if (_mc_buf[0] == '\0') {
+							_mc_d = NAN;
+						} else {
+							char* _mc_end;
+							_mc_d = strtod(_mc_buf, &_mc_end);
+							while (*_mc_end == ' ' || *_mc_end == '\t') _mc_end++;
+							if (*_mc_end != '\0') _mc_d = NAN;
+						}
+						break;
+					}
+					case ACTION_STACK_VALUE_OBJECT:
+					case ACTION_STACK_VALUE_ARRAY:
+					case ACTION_STACK_VALUE_FUNCTION:
+					case ACTION_STACK_VALUE_MOVIECLIP:
+						_mc_d = varToDoubleSWF(app_context, &value_var, g_swf_version); break;
+					case ACTION_STACK_VALUE_UNDEFINED:
+					case ACTION_STACK_VALUE_NULL:
+					default:
+						_mc_d = NAN; break;
+				}
+				value_var = (ActionVar){0};
+				if (isnan(_mc_d) || _mc_d == 0.0) {
+					value_var.type = ACTION_STACK_VALUE_NULL;
+				} else {
+					value_var.type = ACTION_STACK_VALUE_F64;
+					VAL(double, &value_var.data.numeric_value) = _mc_d;
+				}
+			}
 			// TextField boolean-typed properties: coerce setter input via ToBoolean.
 			// Flash stores background/border/multiline/password/selectable/embedFonts/
 			// html/wordWrap as booleans regardless of the assigned value's type
