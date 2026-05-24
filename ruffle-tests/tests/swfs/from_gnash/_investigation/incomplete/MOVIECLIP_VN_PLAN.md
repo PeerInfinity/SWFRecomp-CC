@@ -1,6 +1,26 @@
 # MovieClip-vN Investigation Plan
 <!-- TESTS: MovieClip-v6, MovieClip-v7, MovieClip-v8 -->
 
+Last updated: 2026-05-23 (Phase 3 + Phase 8-partial landed, pending
+CI. **Phase 3:** added `"hitTest"` to the `mc_methods[]` registry in
+`initMovieClipPrototype` (incremented MC_METHOD_COUNT 30→31), so
+`typeof(mc.hitTest)` resolves to `'function'` via the prototype stub.
+Actual `hitTest(x,y[,shapeFlag])` invocation already had a dedicated
+case in `actionCallMethod`'s MOVIECLIP arm — the prototype stub is
+only there for the `typeof` / `hasOwnProperty` discoverability path.
+**Phase 8 partial:** in `actionCallMethod`'s MOVIECLIP `getBounds`/
+`getRect` case, gated `getRect` to return undefined when
+`g_swf_version < 8` (mirrors Ruffle's `VERSION_8` flag on
+`getRect`). `getBounds()` unchanged. `MovieClip.prototype.hasOwnProperty
+("getRect")` still passes because the prototype stub stays
+registered for all versions; only the *callable* behaviour version-
+gates. v6/v7 each gain +3 lines (-1 hitTest, -2 getRect xMin/yMin
+undefined); v8 gains +1 (only hitTest, since v8 already exercises
+real-data getRect). v5 already ruffle_matched, stays RM (+1 line).
+v6/v7/v8 stay output_mismatch. Phase 3 + Phase 8 status updated
+below; Phase 8 left in_progress because Phase 9 (reference-clip
+transform) is the remaining cluster.)
+
 Last updated: 2026-05-23 (Phase 1 partial — `MovieClip.prototype.meth`
 implemented as a real function_type=2 builtin. MovieClip-v5/v6/v7/v8
 each gain +23/+24 matching lines (315→338, 814→838, 836→860,
@@ -41,7 +61,7 @@ phases:
     status: completed
   - id: 3
     name: "mc.hitTest method not on prototype"
-    status: pending
+    status: completed
   - id: 4
     name: "_soundbuftime is per-root, not per-MC"
     status: completed
@@ -56,7 +76,7 @@ phases:
     status: pending
   - id: 8
     name: "getBounds undefined fallback for empty MovieClip vs always returning 10"
-    status: pending
+    status: in_progress
   - id: 9
     name: "getBounds with reference-clip argument (transform into ref's coord space)"
     status: pending

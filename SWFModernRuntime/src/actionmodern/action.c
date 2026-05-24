@@ -14821,7 +14821,7 @@ ASFunction g_movieclip_constructor;
 int g_movieclip_constructor_init = 0;
 
 // MovieClip prototype method stubs (static storage)
-#define MC_METHOD_COUNT 30
+#define MC_METHOD_COUNT 31
 static ASFunction g_mc_method_funcs[MC_METHOD_COUNT];
 
 // MovieClip.prototype.meth(x): undocumented Flash builtin that parses
@@ -14937,6 +14937,7 @@ static void initMovieClipPrototype(SWFAppContext* app_context)
 		{"loadVariables", 13},
 		{"unloadMovie", 11},
 		{"meth", 4},
+		{"hitTest", 7},
 	};
 
 	memset(g_mc_method_funcs, 0, sizeof(g_mc_method_funcs));
@@ -65208,6 +65209,14 @@ void actionCallMethod(SWFAppContext* app_context, char* str_buffer)
 			// getBounds(targetCoordSpace) / getRect(targetCoordSpace)
 			// Returns {xMin, yMin, xMax, yMax} in the target's coordinate space.
 			// Empty clips return sentinel values.
+			// Ruffle gates getRect with VERSION_8 — in SWF<8, calling getRect
+			// returns undefined (the prototype property stays visible to
+			// hasOwnProperty but the function isn't callable as a method).
+			if (method_name_len == 7 && g_swf_version < 8) {
+				if (args != NULL) FREE(args);
+				pushUndefined(app_context);
+				return;
+			}
 			// Resolve target MovieClip
 			MovieClip* target_mc = mc;  // default: own coordinate space
 			int target_resolved = (num_args == 0); // no arg = self (valid)
