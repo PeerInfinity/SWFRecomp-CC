@@ -1,9 +1,9 @@
 {
   "metadata": {
-    "old_timestamp": "2026-05-24T02:45:44.736294+00:00",
-    "old_git_sha": "ee3b89e5260e164d1a689d172f55f2bd9aead9ca",
-    "new_timestamp": "2026-05-24T03:24:47.415419+00:00",
-    "new_git_sha": "ae6fdcb6f9466ef1d9bf2c5e57f902fee5002753",
+    "old_timestamp": "2026-05-24T03:24:47.415419+00:00",
+    "old_git_sha": "ae6fdcb6f9466ef1d9bf2c5e57f902fee5002753",
+    "new_timestamp": "2026-05-24T04:10:51.518853+00:00",
+    "new_git_sha": "aa5b2b51e8bb63f26bf637e58dd939fb2002180a",
     "partial": false,
     "same_commit": false
   },
@@ -19,15 +19,64 @@
     "new_total": 243,
     "new_pass_rate": 52.7,
     "old_mismatched_lines": 9269,
-    "new_mismatched_lines": 9269,
+    "new_mismatched_lines": 9263,
     "increased_mismatches": 0,
-    "decreased_mismatches": 0,
+    "decreased_mismatches": 6,
     "newly_passing": 0,
     "newly_failing": 0,
     "status_changed": 0,
-    "unchanged": 243,
+    "unchanged": 240,
     "added": 0,
     "removed": 0
   },
-  "changes": []
+  "changes": [
+    {
+      "test": "TextField-v6",
+      "change_type": "changed",
+      "old_status": "output_mismatch",
+      "new_status": "output_mismatch",
+      "old_lines": {
+        "actual_lines": 545,
+        "expected_lines": 545,
+        "matching_lines": 444
+      },
+      "new_lines": {
+        "actual_lines": 545,
+        "expected_lines": 545,
+        "matching_lines": 446
+      }
+    },
+    {
+      "test": "TextField-v7",
+      "change_type": "changed",
+      "old_status": "output_mismatch",
+      "new_status": "output_mismatch",
+      "old_lines": {
+        "actual_lines": 570,
+        "expected_lines": 570,
+        "matching_lines": 453
+      },
+      "new_lines": {
+        "actual_lines": 570,
+        "expected_lines": 570,
+        "matching_lines": 455
+      }
+    },
+    {
+      "test": "TextField-v8",
+      "change_type": "changed",
+      "old_status": "output_mismatch",
+      "new_status": "output_mismatch",
+      "old_lines": {
+        "actual_lines": 571,
+        "expected_lines": 571,
+        "matching_lines": 455
+      },
+      "new_lines": {
+        "actual_lines": 571,
+        "expected_lines": 571,
+        "matching_lines": 457
+      }
+    }
+  ]
 }
