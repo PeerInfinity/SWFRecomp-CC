@@ -49013,11 +49013,23 @@ void actionGetMember(SWFAppContext* app_context)
 					if (_dep != SIZE_MAX) {
 						double _dx;
 						if (ng_getTransformXY_d(_dep, &_dx, NULL)) {
-							// Textfields: add DefineEditText bounds_xmin offset
+							// Textfields: the DefineEditText bounds_xmin offset
+							// is in the field's local twips. Flash's `_x` is the
+							// bounds origin transformed to parent space, so it
+							// must be multiplied by the placement's linear part
+							// (m00*bxmin + m01*bymin) before adding to tx.
 							if (mc->ng_textfield_idx >= 0) {
 								s32 bxmin, bxmax, bymin, bymax;
 								ng_getTextFieldBounds(mc->ng_textfield_idx, &bxmin, &bxmax, &bymin, &bymax);
-								_dx += (double)bxmin / 20.0;
+								extern float transform_data[][16];
+								u32 _tid;
+								if (ng_getTransformId(_dep, &_tid)) {
+									double _m00 = (double)transform_data[_tid][0];
+									double _m01 = (double)transform_data[_tid][4];
+									_dx += (_m00 * (double)bxmin + _m01 * (double)bymin) / 20.0;
+								} else {
+									_dx += (double)bxmin / 20.0;
+								}
 							}
 							PUSH(ACTION_STACK_VALUE_F64, VAL(u64, &_dx));
 							return;
@@ -49053,11 +49065,23 @@ void actionGetMember(SWFAppContext* app_context)
 					if (_dep != SIZE_MAX) {
 						double _dy;
 						if (ng_getTransformXY_d(_dep, NULL, &_dy)) {
-							// Textfields: add DefineEditText bounds_ymin offset
+							// Textfields: the DefineEditText bounds_ymin offset
+							// is in the field's local twips. Flash's `_y` is the
+							// bounds origin transformed to parent space, so it
+							// must be multiplied by the placement's linear part
+							// (m10*bxmin + m11*bymin) before adding to ty.
 							if (mc->ng_textfield_idx >= 0) {
 								s32 bxmin, bxmax, bymin, bymax;
 								ng_getTextFieldBounds(mc->ng_textfield_idx, &bxmin, &bxmax, &bymin, &bymax);
-								_dy += (double)bymin / 20.0;
+								extern float transform_data[][16];
+								u32 _tid;
+								if (ng_getTransformId(_dep, &_tid)) {
+									double _m10 = (double)transform_data[_tid][1];
+									double _m11 = (double)transform_data[_tid][5];
+									_dy += (_m10 * (double)bxmin + _m11 * (double)bymin) / 20.0;
+								} else {
+									_dy += (double)bymin / 20.0;
+								}
 							}
 							PUSH(ACTION_STACK_VALUE_F64, VAL(u64, &_dy));
 							return;
