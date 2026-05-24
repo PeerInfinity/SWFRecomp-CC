@@ -63462,6 +63462,20 @@ void actionCallMethod(SWFAppContext* app_context, char* str_buffer)
 		else if (method_name_len == 4 && strncasecmp(method_name, "play", 4) == 0)
 		{
 #if defined(NO_GRAPHICS) || defined(OFFSCREEN_RENDER)
+			// Root receiver: act on the root timeline directly. Without this,
+			// `_root.play()` from inside a sprite (preloader pattern) would
+			// fall through to actionPlay, which plays the *current* sprite
+			// rather than the root.
+			{
+				extern MovieClip root_movieclip;
+				extern int is_playing;
+				if (mc == &root_movieclip) {
+					is_playing = 1;
+					if (args != NULL) FREE(args);
+					pushUndefined(app_context);
+					return;
+				}
+			}
 			// Try clip-specific play first
 			if (mc) {
 				size_t depth = ng_findDisplayEntryByName(mc->name);
@@ -63482,6 +63496,18 @@ void actionCallMethod(SWFAppContext* app_context, char* str_buffer)
 		else if (method_name_len == 4 && strncasecmp(method_name, "stop", 4) == 0)
 		{
 #if defined(NO_GRAPHICS) || defined(OFFSCREEN_RENDER)
+			// Symmetric with the play arm: root receiver acts on the global
+			// is_playing flag rather than the current sprite.
+			{
+				extern MovieClip root_movieclip;
+				extern int is_playing;
+				if (mc == &root_movieclip) {
+					is_playing = 0;
+					if (args != NULL) FREE(args);
+					pushUndefined(app_context);
+					return;
+				}
+			}
 			// Try clip-specific stop first
 			if (mc) {
 				size_t depth = ng_findDisplayEntryByName(mc->name);
