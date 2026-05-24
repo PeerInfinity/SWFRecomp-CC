@@ -2,9 +2,9 @@
 
 *See [RUFFLE_RESULTS_FILTERED.md](RUFFLE_RESULTS_FILTERED.md) for results with ignored tests excluded.*
 
-**Commit:** `b19f307488e3`  
-**Date:** 2026-05-24 20:23 UTC  
-**Total duration:** 2h12m49s
+**Commit:** `3a04009d40fa`  
+**Date:** 2026-05-24 21:21 UTC  
+**Total duration:** 2h13m36s
 
 ## Results by Suite
 
@@ -25,14 +25,14 @@
 | Suite | Matching | Expected | Accuracy |
 |-------|--------:|---------:|---------:|
 | avm1 | 106,824 | 116,386 | 91.8% |
-| from_gnash/actionscript.all | 29,554 | 38,787 | 76.2% |
+| from_gnash/actionscript.all | 29,560 | 38,787 | 76.2% |
 | from_gnash/misc-ming.all | 4,035 | 5,239 | 77.0% |
 | from_gnash/misc-mtasc.all | 211 | 231 | 91.3% |
 | from_gnash/misc-swfc.all | 424 | 557 | 76.1% |
 | from_gnash/misc-swfmill.all | 93 | 95 | 97.9% |
 | from_shumway | 882 | 1,276 | 69.1% |
 | from_shumway/avm1 | 489 | 491 | 99.6% |
-| **Total** | **142,512** | **163,062** | **87.4%** |
+| **Total** | **142,518** | **163,062** | **87.4%** |
 
 ## Failure Breakdown
 
@@ -82,10 +82,9 @@ Tests with `output_mismatch` status but ≥80% of expected lines matching.
 
 | Suite | Newly Passing | Newly Failing | Lines Improved | Lines Regressed |
 |-------|-------------:|-------------:|--------------:|----------------:|
-| avm1 | - | - | 2 | - |
-| from_gnash/actionscript.all | - | - | 18 | - |
+| from_gnash/actionscript.all | - | - | 6 | - |
 
-*Comparing `c57dc0bfa590` → `b19f307488e3`*
+*Comparing `b19f307488e3` → `3a04009d40fa`*
 
 ## Flash-Spec Results
 
@@ -100,55 +99,55 @@ Tests verified against Flash's actual output (`output.flash.txt`).
 ### avm1
 
 - **Pass:** 614/671 (91.5%)
-- **Duration:** 1h00m17s across 30 shards
+- **Duration:** 1h01m15s across 30 shards
 - **Lines:** 106,824/116,386 matching (91.8%)
-- **Avg test duration:** 5.3s — slowest: `this_swf5` (21.5s)
+- **Avg test duration:** 5.4s — slowest: `bitxor` (22.1s)
 
 ### from_gnash/actionscript.all
 
 - **Pass:** 128/243 (52.7%)
 - **Duration:** 16m57s across 30 shards
-- **Lines:** 29,554/38,787 matching (76.2%)
-- **Avg test duration:** 4.1s — slowest: `Global-v6` (25.5s)
+- **Lines:** 29,560/38,787 matching (76.2%)
+- **Avg test duration:** 4.1s — slowest: `Global-v6` (26.2s)
 
 ### from_gnash/misc-ming.all
 
 - **Pass:** 67/110 (60.9%)
-- **Duration:** 27m53s across 30 shards
+- **Duration:** 27m41s across 30 shards
 - **Lines:** 4,035/5,239 matching (77.0%)
-- **Avg test duration:** 15.2s — slowest: `matrix_test` (26.8s)
+- **Avg test duration:** 15.0s — slowest: `matrix_test` (28.2s)
 
 ### from_gnash/misc-mtasc.all
 
 - **Pass:** 7/9 (77.8%)
-- **Duration:** 1m53s across 30 shards
+- **Duration:** 1m43s across 30 shards
 - **Lines:** 211/231 matching (91.3%)
-- **Avg test duration:** 12.5s — slowest: `exception` (19.5s)
+- **Avg test duration:** 11.4s — slowest: `hello` (19.4s)
 
 ### from_gnash/misc-swfc.all
 
 - **Pass:** 8/19 (42.1%)
-- **Duration:** 4m37s across 30 shards
+- **Duration:** 4m34s across 30 shards
 - **Lines:** 424/557 matching (76.1%)
-- **Avg test duration:** 14.6s — slowest: `registerclass_test3` (19.8s)
+- **Avg test duration:** 14.4s — slowest: `gotoFrameLabelAsFunction` (19.6s)
 
 ### from_gnash/misc-swfmill.all
 
 - **Pass:** 19/20 (95.0%)
-- **Duration:** 6m05s across 30 shards
+- **Duration:** 6m06s across 30 shards
 - **Lines:** 93/95 matching (97.9%)
-- **Avg test duration:** 18.2s — slowest: `trace-as2/arguments` (19.1s)
+- **Avg test duration:** 18.3s — slowest: `func_dict` (19.5s)
 
 ### from_shumway
 
 - **Pass:** 73/92 (79.3%)
-- **Duration:** 13m17s across 30 shards
+- **Duration:** 13m31s across 30 shards
 - **Lines:** 882/1,276 matching (69.1%)
-- **Avg test duration:** 8.6s — slowest: `invalidClipDepth` (19.9s)
+- **Avg test duration:** 8.8s — slowest: `fuzz/65f0c0a49528b4350e0521d10c632e475a5670010f817d406246b9771a1c2121` (19.9s)
 
 ### from_shumway/avm1
 
 - **Pass:** 46/47 (97.9%)
-- **Duration:** 1m47s across 30 shards
+- **Duration:** 1m46s across 30 shards
 - **Lines:** 489/491 matching (99.6%)
-- **Avg test duration:** 2.2s — slowest: `label` (18.8s)
+- **Avg test duration:** 2.2s — slowest: `text-bind` (19.6s)
