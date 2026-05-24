@@ -1,9 +1,9 @@
 {
   "metadata": {
-    "old_timestamp": "2026-05-24T18:26:23.974668+00:00",
-    "old_git_sha": "5cf301c4e41c6fe0846e04745dd713b2982e391f",
-    "new_timestamp": "2026-05-24T19:10:04.924498+00:00",
-    "new_git_sha": "c57dc0bfa5909e6cd89897d26d236ef872dfe840",
+    "old_timestamp": "2026-05-24T19:10:04.924498+00:00",
+    "old_git_sha": "c57dc0bfa5909e6cd89897d26d236ef872dfe840",
+    "new_timestamp": "2026-05-24T20:23:36.168351+00:00",
+    "new_git_sha": "b19f307488e3d493092b41a58af11e5a1a1eeefb",
     "partial": false,
     "same_commit": false
   },
@@ -18,10 +18,10 @@
     "new_effective_pass": 223,
     "new_total": 243,
     "new_pass_rate": 52.7,
-    "old_mismatched_lines": 9245,
-    "new_mismatched_lines": 9251,
-    "increased_mismatches": 6,
-    "decreased_mismatches": 0,
+    "old_mismatched_lines": 9251,
+    "new_mismatched_lines": 9233,
+    "increased_mismatches": 0,
+    "decreased_mismatches": 18,
     "newly_passing": 0,
     "newly_failing": 0,
     "status_changed": 0,
@@ -38,12 +38,12 @@
       "old_lines": {
         "actual_lines": 545,
         "expected_lines": 545,
-        "matching_lines": 452
+        "matching_lines": 450
       },
       "new_lines": {
         "actual_lines": 545,
         "expected_lines": 545,
-        "matching_lines": 450
+        "matching_lines": 456
       }
     },
     {
@@ -54,12 +54,12 @@
       "old_lines": {
         "actual_lines": 570,
         "expected_lines": 570,
-        "matching_lines": 461
+        "matching_lines": 459
       },
       "new_lines": {
         "actual_lines": 570,
         "expected_lines": 570,
-        "matching_lines": 459
+        "matching_lines": 465
       }
     },
     {
@@ -70,12 +70,12 @@
       "old_lines": {
         "actual_lines": 571,
         "expected_lines": 571,
-        "matching_lines": 463
+        "matching_lines": 461
       },
       "new_lines": {
         "actual_lines": 571,
         "expected_lines": 571,
-        "matching_lines": 461
+        "matching_lines": 467
       }
     }
   ]
