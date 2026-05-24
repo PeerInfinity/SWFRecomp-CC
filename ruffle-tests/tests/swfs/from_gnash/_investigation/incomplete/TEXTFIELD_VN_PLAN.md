@@ -1,6 +1,28 @@
 # TextField-vN Investigation Plan
 <!-- TESTS: TextField-v6, TextField-v7, TextField-v8 -->
 
+Last updated: 2026-05-24 (Phase 5 complete — `tf.restrict` and `tf.variable`
+setters + variable init landed. Three paired changes in
+`SWFModernRuntime/src/actionmodern/action.c`:
+(a) `tf.restrict` setter no longer collapses empty STRING to NULL —
+keeps `""` as STRING so `typeof(tf.restrict) == 'string'` after
+`tf.restrict = ""`. null/undefined still → NULL.
+(b) `tf.variable` setter: new coercion block in `actionSetMember`
+MOVIECLIP arm. undefined / null / empty STRING → NULL; non-STRING types
+(number, boolean, object) go through `convertString` (e.g. `tf.variable
+= 2` → STRING "2"). Mirrors the maxChars tri-state pattern.
+(c) `variable` init at four sites (DefineEditText path × 2,
+createTextField function-form, method-form) now stores NULL when the
+DefineEditText has no `VariableName` (or for createTextField, which has
+none by definition) — previously stored an empty STRING. The clone path
+(line 21663) already stored NULL.
+TextField.as lines 550, 551 (restrict empty-string round-trip) and 736,
+739, 741, 744 (variable tri-state) flip to PASSED on v6/v7/v8.
+All three still output_mismatch; remaining work is Phases 1 (per-
+instance AsBroadcaster self-register), 2 (prototype-vs-instance own-prop
+layout), 3 (getFontList), 8 (length), 9 (maxhscroll), 10 (_width/
+_height), 11 (_parent), 13 (container-MC identity).)
+
 Last updated: 2026-05-23 (Phase 5 partial — `tf.maxChars` setter landed.
 New tri-state coercion in `actionSetMember` MOVIECLIP arm: when the
 target is a TextField and prop_name == "maxChars", route the value
@@ -45,7 +67,7 @@ phases:
     status: done
   - id: 5
     name: "null-typed properties (maxChars/variable/restrict) return string instead of null"
-    status: in_progress
+    status: done
   - id: 6
     name: "MovieClip-only properties (_currentframe/_totalframes/_framesloaded) on TextField"
     status: done

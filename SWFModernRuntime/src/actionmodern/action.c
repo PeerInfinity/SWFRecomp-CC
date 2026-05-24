@@ -21109,16 +21109,19 @@ static MovieClip* findOrCreateMovieClip(SWFAppContext* app_context, const char* 
 					VAL(double, &maxc_val.data.numeric_value) = (double)max_len;
 					setProperty(app_context, props, "maxChars", 8, &maxc_val);
 				}
-				// variable
+				// variable (null when DefineEditText has no VariableName)
 				const char* var_name = ng_getTextFieldVariableName(tf_idx);
-				ActionVar var_val = {0}; var_val.type = ACTION_STACK_VALUE_STRING;
-				{
+				ActionVar var_val = {0};
+				if (var_name == NULL || var_name[0] == '\0') {
+					var_val.type = ACTION_STACK_VALUE_NULL;
+				} else {
+					var_val.type = ACTION_STACK_VALUE_STRING;
 					u32 _vn_u16_len;
 					uint16_t* _vn_u16 = ascii_to_u16(app_context, var_name, (int)strlen(var_name), &_vn_u16_len);
 					var_val.str_size = _vn_u16_len;
 					VAL(u64, &var_val.data.numeric_value) = (u64)_vn_u16;
-					setProperty(app_context, props, "variable", 8, &var_val);
 				}
+				setProperty(app_context, props, "variable", 8, &var_val);
 				// Initialize the bound variable on the textfield's scope.
 				// Phase B: consolidated into actionTryBindTextFieldVariable
 				// (mirrors Ruffle's try_bind_text_field_variable). Handles
@@ -21358,17 +21361,19 @@ static MovieClip* findOrCreateMovieClip(SWFAppContext* app_context, const char* 
 					VAL(double, &maxc_val.data.numeric_value) = (double)max_len;
 					setProperty(app_context, props, "maxChars", 8, &maxc_val);
 				}
-				// variable (from DefineEditText VariableName)
+				// variable (from DefineEditText VariableName; null when empty)
 				const char* var_name = ng_getTextFieldVariableName(tf_idx);
 				ActionVar var_val = {0};
-				var_val.type = ACTION_STACK_VALUE_STRING;
-				{
+				if (var_name == NULL || var_name[0] == '\0') {
+					var_val.type = ACTION_STACK_VALUE_NULL;
+				} else {
+					var_val.type = ACTION_STACK_VALUE_STRING;
 					u32 _vn_u16_len;
 					uint16_t* _vn_u16 = ascii_to_u16(app_context, var_name, (int)strlen(var_name), &_vn_u16_len);
 					var_val.str_size = _vn_u16_len;
 					VAL(u64, &var_val.data.numeric_value) = (u64)_vn_u16;
-					setProperty(app_context, props, "variable", 8, &var_val);
 				}
+				setProperty(app_context, props, "variable", 8, &var_val);
 				// Phase B: bind variable via consolidated helper. Covers both
 				// path-variable and simple-name forms, with the same
 				// "variable wins; else TF seeds variable" semantics as
@@ -46092,6 +46097,32 @@ void actionSetMember(SWFAppContext* app_context)
 					VAL(double, &value_var.data.numeric_value) = _mc_d;
 				}
 			}
+			// TextField variable setter: tri-state (non-empty string, or NULL).
+			// undefined / null / empty string → NULL (no binding); any other
+			// type is ToString-coerced and stored (empty result → NULL).
+			// Test: TextField.as:736 (initial → null), 739 (= undefined → null),
+			//       741/742 (= 2 → string "2"), 744 (= undefined → null).
+			if (MC_IS_TEXTFIELD(mc) && prop_name_len == 8 &&
+				memcmp(prop_name, "variable", 8) == 0)
+			{
+				if (value_var.type == ACTION_STACK_VALUE_UNDEFINED ||
+					value_var.type == ACTION_STACK_VALUE_NULL) {
+					value_var = (ActionVar){0};
+					value_var.type = ACTION_STACK_VALUE_NULL;
+				} else if (value_var.type != ACTION_STACK_VALUE_STRING) {
+					char _vc_buf[17];
+					pushVar(app_context, &value_var);
+					convertString(app_context, _vc_buf);
+					popVar(app_context, &value_var);
+					if (value_var.type == ACTION_STACK_VALUE_STRING && value_var.str_size == 0) {
+						value_var = (ActionVar){0};
+						value_var.type = ACTION_STACK_VALUE_NULL;
+					}
+				} else if (value_var.str_size == 0) {
+					value_var = (ActionVar){0};
+					value_var.type = ACTION_STACK_VALUE_NULL;
+				}
+			}
 			// TextField boolean-typed properties: coerce setter input via ToBoolean.
 			// Flash stores background/border/multiline/password/selectable/embedFonts/
 			// html/wordWrap as booleans regardless of the assigned value's type
@@ -46795,28 +46826,25 @@ void actionSetMember(SWFAppContext* app_context)
 				value_var.type = ACTION_STACK_VALUE_F64;
 				VAL(double, &value_var.data.numeric_value) = (double)ival;
 			}
-			// TextField restrict setter: coerce to string or null
+			// TextField restrict setter: coerce to string or null.
+			// Flash: null/undefined → null (no restriction); empty string stays
+			// empty string (typeof 'string'); any non-string is ToString-coerced
+			// (objects via valueOf/toString, since the SetMember resolution
+			// path has already invoked them — handle them here via convertString).
 			if (prop_name_len == 8 && strncmp(prop_name, "restrict", 8) == 0
 				&& MC_IS_TEXTFIELD(mc))
 			{
 				if (value_var.type == ACTION_STACK_VALUE_NULL ||
 				    value_var.type == ACTION_STACK_VALUE_UNDEFINED) {
-					// null/undefined → store as NULL (no restriction)
 					value_var.type = ACTION_STACK_VALUE_NULL;
 					value_var.str_size = 0;
 					value_var.data.numeric_value = 0;
-				} else if (value_var.type == ACTION_STACK_VALUE_STRING && value_var.str_size == 0) {
-					// Empty string → store as NULL (no restriction)
-					value_var.type = ACTION_STACK_VALUE_NULL;
-					value_var.data.numeric_value = 0;
 				} else if (value_var.type != ACTION_STACK_VALUE_STRING) {
-					// Non-string types (boolean, number, object) → coerce to string
 					char _rc_buf[17];
 					pushVar(app_context, &value_var);
 					convertString(app_context, _rc_buf);
 					popVar(app_context, &value_var);
 				}
-				// Non-empty STRING values pass through unchanged
 			}
 			// transform property: copy transform state from src MC to this MC
 			if (prop_name_len == 9 && strncmp(prop_name, "transform", 9) == 0)
@@ -56038,7 +56066,10 @@ void actionCallFunction(SWFAppContext* app_context, char* str_buffer)
 			VAL(u64, &sval.data.numeric_value) = (u64)u16_empty;
 			setProperty(app_context, props, "text", 4, &sval);
 			setProperty(app_context, props, "htmlText", 8, &sval);
-			setProperty(app_context, props, "variable", 8, &sval);
+			{
+				ActionVar var_null = {0}; var_null.type = ACTION_STACK_VALUE_NULL;
+				setProperty(app_context, props, "variable", 8, &var_null);
+			}
 
 			ActionVar fval = {0};
 			fval.type = ACTION_STACK_VALUE_BOOLEAN;
@@ -63529,7 +63560,10 @@ void actionCallMethod(SWFAppContext* app_context, char* str_buffer)
 				VAL(u64, &sval.data.numeric_value) = (u64)u16_empty;
 				setProperty(app_context, props, "text", 4, &sval);
 				setProperty(app_context, props, "htmlText", 8, &sval);
-				setProperty(app_context, props, "variable", 8, &sval);
+				{
+					ActionVar var_null = {0}; var_null.type = ACTION_STACK_VALUE_NULL;
+					setProperty(app_context, props, "variable", 8, &var_null);
+				}
 
 				ActionVar fval = {0};
 				fval.type = ACTION_STACK_VALUE_BOOLEAN;
