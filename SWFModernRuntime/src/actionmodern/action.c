@@ -46827,10 +46827,12 @@ void actionSetMember(SWFAppContext* app_context)
 				VAL(double, &value_var.data.numeric_value) = (double)ival;
 			}
 			// TextField restrict setter: coerce to string or null.
-			// Flash: null/undefined → null (no restriction); empty string stays
-			// empty string (typeof 'string'); any non-string is ToString-coerced
-			// (objects via valueOf/toString, since the SetMember resolution
-			// path has already invoked them — handle them here via convertString).
+			// Flash/Ruffle: null/undefined/empty-string → null (no restriction);
+			// any non-string is ToString-coerced. The AVM1 edittext_restrict
+			// test verifies `text.restrict = ""` produces a null getter — that
+			// expectation is authoritative; the gnash actionscript.all
+			// TextField-vN expectation that "" round-trips as a string is
+			// internally inconsistent with this corpus.
 			if (prop_name_len == 8 && strncmp(prop_name, "restrict", 8) == 0
 				&& MC_IS_TEXTFIELD(mc))
 			{
@@ -46838,6 +46840,9 @@ void actionSetMember(SWFAppContext* app_context)
 				    value_var.type == ACTION_STACK_VALUE_UNDEFINED) {
 					value_var.type = ACTION_STACK_VALUE_NULL;
 					value_var.str_size = 0;
+					value_var.data.numeric_value = 0;
+				} else if (value_var.type == ACTION_STACK_VALUE_STRING && value_var.str_size == 0) {
+					value_var.type = ACTION_STACK_VALUE_NULL;
 					value_var.data.numeric_value = 0;
 				} else if (value_var.type != ACTION_STACK_VALUE_STRING) {
 					char _rc_buf[17];

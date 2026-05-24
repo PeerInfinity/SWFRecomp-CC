@@ -1,23 +1,31 @@
 # TextField-vN Investigation Plan
 <!-- TESTS: TextField-v6, TextField-v7, TextField-v8 -->
 
-Last updated: 2026-05-24 (Phase 5 complete — `tf.restrict` and `tf.variable`
-setters + variable init landed. Three paired changes in
+Last updated: 2026-05-24 (Phase 5 partial — `tf.variable` setter +
+variable init landed; `tf.restrict` empty-string change reverted after
+CI flagged AVM1 `edittext_restrict` regression. Net +4 lines per
+TextField-vN version. Two changes in
 `SWFModernRuntime/src/actionmodern/action.c`:
-(a) `tf.restrict` setter no longer collapses empty STRING to NULL —
-keeps `""` as STRING so `typeof(tf.restrict) == 'string'` after
-`tf.restrict = ""`. null/undefined still → NULL.
-(b) `tf.variable` setter: new coercion block in `actionSetMember`
+(a) `tf.variable` setter: new coercion block in `actionSetMember`
 MOVIECLIP arm. undefined / null / empty STRING → NULL; non-STRING types
 (number, boolean, object) go through `convertString` (e.g. `tf.variable
 = 2` → STRING "2"). Mirrors the maxChars tri-state pattern.
-(c) `variable` init at four sites (DefineEditText path × 2,
+(b) `variable` init at four sites (DefineEditText path × 2,
 createTextField function-form, method-form) now stores NULL when the
 DefineEditText has no `VariableName` (or for createTextField, which has
 none by definition) — previously stored an empty STRING. The clone path
 (line 21663) already stored NULL.
-TextField.as lines 550, 551 (restrict empty-string round-trip) and 736,
-739, 741, 744 (variable tri-state) flip to PASSED on v6/v7/v8.
+
+TextField.as lines 736, 739, 741, 744 (variable tri-state) flip to
+PASSED on v6/v7/v8 (+4 lines each). Lines 550, 551 (restrict
+empty-string round-trip) NOT addressed: the AVM1 `edittext_restrict`
+test (which is more authoritative — has Ruffle's own `output.txt`
+verified against Flash Player) explicitly asserts that
+`text.restrict = ""` produces a null getter; the gnash
+actionscript.all TextField-vN `check_equals(tf.restrict, "")` is
+inconsistent with this. The 2 lines per version are an accepted diff —
+left in place.
+
 All three still output_mismatch; remaining work is Phases 1 (per-
 instance AsBroadcaster self-register), 2 (prototype-vs-instance own-prop
 layout), 3 (getFontList), 8 (length), 9 (maxhscroll), 10 (_width/
@@ -67,7 +75,7 @@ phases:
     status: done
   - id: 5
     name: "null-typed properties (maxChars/variable/restrict) return string instead of null"
-    status: done
+    status: in_progress
   - id: 6
     name: "MovieClip-only properties (_currentframe/_totalframes/_framesloaded) on TextField"
     status: done

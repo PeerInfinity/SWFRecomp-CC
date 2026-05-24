@@ -438,7 +438,32 @@ auto-promoted (not in ignored).
 
 ---
 
-## Category 2: Interactive / Wall-Clock Timing Tests
+### TextField-v6 / TextField-v7 / TextField-v8 (actionscript.all) — `tf.restrict = ""` (2 diff lines each)
+
+**Example diff:**
+```
+- 264  PASSED: tf.restrict == "" [./TextField.as:550]
++ 264  FAILED: expected: "" obtained: null [./TextField.as:550]
+- 265  PASSED: typeof(tf.restrict) == 'string' [./TextField.as:551]
++ 265  FAILED: expected: 'string' obtained: null [./TextField.as:551]
+```
+
+**Root cause.** Gnash's `TextField.as` asserts (`check_equals`, not
+`xcheck`) that `tf.restrict = ""` round-trips as `""` of typeof
+`'string'`. The AVM1 corpus's `edittext_restrict` test (with its own
+verified-against-Flash `output.txt`) asserts the opposite — after
+`text.restrict = ''` the getter returns `null` (line: `Restrict get:
+'null'`). Ruffle's source (`core/src/avm1/globals/text_field.rs`)
+collapses empty STRING to `None`, matching the AVM1 expected output.
+Implementing the Gnash behaviour ("" → string "") regresses
+`edittext_restrict` from PASS to output_mismatch, costing 1 line on
+that test against gaining 2 lines per TextField-vN version. Net AVM1
+loss outweighs net Gnash gain even ignoring the authoritative-test
+question.
+
+**Decision.** Accept. We follow Flash/Ruffle: `""` → NULL. The 2 lines
+per version are part of TextField-vN's permanent diff set and won't
+get closed unless the Gnash test is itself updated upstream.
 
 ### sound (misc-swfc.all) — interactive Flash session trace, no sound-position simulation
 
