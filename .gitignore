@@ -28,6 +28,8 @@ sup*.swf
 !demos/**/*.swf
 # Allow deployed wrapper SWFs for injector demos
 !docs/injector/**/*.swf
+# Allow the divergence harness's prebuilt tracer SWF (compiled from Tracer.as)
+!tools/divergence/tracer.swf
 
 # Libraries
 zlib.dll
@@ -162,3 +164,8 @@ local_swf_batch/*.SWF
 
 # Per-session prompt scratch (carries instructions across Claude Code sessions)
 .claude/next-session-prompt.md
+
+# Divergence harness per-run outputs (injected SWFs, captured PNGs/traces,
+# build artifacts). The tools themselves are committed; the runs/ subdir is
+# generated per-game.
+tools/divergence/runs/
