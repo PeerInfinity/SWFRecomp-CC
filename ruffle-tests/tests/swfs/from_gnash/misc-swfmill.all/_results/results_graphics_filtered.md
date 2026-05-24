@@ -1,8 +1,8 @@
 # Ruffle Test Results (Filtered)
 
-**Date**: 2026-05-16 21:06 UTC
+**Date**: 2026-05-24 23:52 UTC
 
-**Git SHA**: `be9aafd78e`
+**Git SHA**: `6fe6fb1a2f`
 
 **Run Duration**: 0m 17s
 
@@ -27,25 +27,25 @@
 
 | # | Test | Lines | Duration | Notes |
 |---|------|-------|----------|-------|
-| 1 | `afunc_dict` | 2 | 0.7s |  |
-| 2 | `background` | 0 | 1.2s |  |
+| 1 | `afunc_dict` | 2 | 0.8s |  |
+| 2 | `background` | 0 | 1.1s |  |
 | 3 | `dict_callframe` | 3 | 0.8s |  |
-| 4 | `dict_cross` | 3 | 0.7s |  |
-| 5 | `dict_event` | 5 | 0.7s |  |
-| 6 | `dict_override` | 2 | 0.7s |  |
-| 7 | `func_dict` | 3 | 0.7s |  |
-| 8 | `initaction_in_definesprite` | 2 | 0.8s |  |
-| 9 | `jump_after_end` | 3 | 0.6s |  |
-| 10 | `jump_to_prev_block` | 1 | 0.8s |  |
+| 4 | `dict_cross` | 3 | 0.8s |  |
+| 5 | `dict_event` | 5 | 0.8s |  |
+| 6 | `dict_override` | 2 | 0.9s |  |
+| 7 | `func_dict` | 3 | 0.8s |  |
+| 8 | `initaction_in_definesprite` | 2 | 0.7s |  |
+| 9 | `jump_after_end` | 3 | 0.8s |  |
+| 10 | `jump_to_prev_block` | 1 | 0.7s |  |
 | 11 | `missing_bitmap` | 0 | 1.4s |  |
-| 12 | `mixed-bytecode-as2` | 1 | 0.7s |  |
-| 13 | `registers` | 36 | 0.7s |  |
-| 14 | `tags_after_last_showframe` | 1 | 0.9s |  |
-| 15 | `trace-as2/arguments` | 8 | 0.8s |  |
-| 16 | `trace-as2/root_onload` | 4 | 0.7s |  |
-| 17 | `trace-as2/shortstack` | 2 | 0.8s |  |
-| 18 | `trace-as2/super` | 8 | 0.8s |  |
-| 19 | `trace-as2/this` | 8 | 0.7s |  |
+| 12 | `mixed-bytecode-as2` | 1 | 0.8s |  |
+| 13 | `registers` | 36 | 0.8s |  |
+| 14 | `tags_after_last_showframe` | 1 | 0.7s |  |
+| 15 | `trace-as2/arguments` | 8 | 0.7s |  |
+| 16 | `trace-as2/root_onload` | 4 | 0.6s |  |
+| 17 | `trace-as2/shortstack` | 2 | 0.7s |  |
+| 18 | `trace-as2/super` | 8 | 0.7s |  |
+| 19 | `trace-as2/this` | 8 | 0.6s |  |
 
 ## Ruffle-Matched Tests
 
@@ -53,7 +53,7 @@
 
 | # | Test | Our diffs | Ruffle diffs | Duration | Notes |
 |---|------|-----------|--------------|----------|-------|
-| 1 | `zeroframe_definesprite` | 2 | 2 | 0.7s |  |
+| 1 | `zeroframe_definesprite` | 2 | 2 | 0.8s |  |
 
 ## Near-Passing Tests
 
