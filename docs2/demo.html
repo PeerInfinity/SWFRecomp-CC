@@ -1,0 +1,742 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>SWFRecomp Demo</title>
+    <link rel="icon" type="image/svg+xml" href="favicon.svg">
+    <style>
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            line-height: 1.6;
+            color: #e0e0e0;
+            background: #1a1a1a;
+            min-height: 100vh;
+            padding: 20px;
+        }
+        .container {
+            max-width: 1100px;
+            margin: 0 auto;
+            background: #2a2a2a;
+            border-radius: 12px;
+            box-shadow: 0 20px 60px rgba(0,0,0,0.5);
+            overflow: hidden;
+            border: 1px solid #333;
+        }
+        header {
+            background: #222;
+            padding: 20px 30px;
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            border-bottom: 3px solid #4CAF50;
+        }
+        header.graphics { border-bottom-color: #7B1FA2; }
+        header h1 {
+            font-size: 1.4em;
+            color: #4CAF50;
+            font-weight: 700;
+        }
+        header.graphics h1 { color: #7B1FA2; }
+        .back-link {
+            color: #888;
+            text-decoration: none;
+            font-size: 0.95em;
+            padding: 6px 14px;
+            border: 1px solid #555;
+            border-radius: 6px;
+            transition: all 0.2s;
+        }
+        .back-link:hover { color: #e0e0e0; border-color: #888; }
+        .badge {
+            display: inline-block;
+            background: #7B1FA2;
+            color: white;
+            padding: 2px 10px;
+            border-radius: 12px;
+            font-size: 0.65em;
+            font-weight: bold;
+            margin-left: 10px;
+            vertical-align: middle;
+        }
+        main { padding: 25px 30px; }
+
+        /* Metadata section */
+        .meta {
+            background: #1f1f1f;
+            padding: 18px 22px;
+            border-radius: 8px;
+            margin-bottom: 20px;
+            border-left: 4px solid #4CAF50;
+        }
+        .meta.graphics { border-left-color: #7B1FA2; }
+        .meta-description { color: #d0d0d0; margin-bottom: 10px; }
+        .meta-row {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 20px;
+            font-size: 0.9em;
+            color: #999;
+        }
+        .meta-row span { white-space: nowrap; }
+        .meta-row .label { color: #777; }
+        .meta-row .value { color: #e0e0e0; }
+        .opcode-tag {
+            display: inline-block;
+            background: #333;
+            color: #4CAF50;
+            padding: 1px 7px;
+            border-radius: 4px;
+            font-family: 'Courier New', monospace;
+            font-size: 0.85em;
+            margin: 1px 2px;
+        }
+        .status-ok { color: #4CAF50; }
+        .status-partial { color: #ff9800; }
+
+        /* Controls */
+        .controls {
+            display: flex;
+            gap: 10px;
+            margin-bottom: 20px;
+            flex-wrap: wrap;
+        }
+        button {
+            border: none;
+            padding: 10px 20px;
+            border-radius: 6px;
+            cursor: pointer;
+            font-size: 14px;
+            font-weight: 600;
+            transition: all 0.2s;
+        }
+        button:disabled { opacity: 0.5; cursor: not-allowed; }
+        .btn-run { background: #4CAF50; color: white; }
+        .btn-run:hover:not(:disabled) { background: #45a049; }
+        .btn-run.graphics { background: #7B1FA2; }
+        .btn-run.graphics:hover:not(:disabled) { background: #6A1B9A; }
+        .btn-secondary { background: #444; color: #ddd; }
+        .btn-secondary:hover { background: #555; }
+        .btn-compare { background: #1565C0; color: white; }
+        .btn-compare:hover { background: #1256A0; }
+        .btn-compare.active { background: #0D47A1; box-shadow: inset 0 2px 4px rgba(0,0,0,0.3); }
+
+        /* Status bar */
+        .status {
+            padding: 8px 14px;
+            margin-bottom: 15px;
+            border-radius: 6px;
+            font-weight: 600;
+            font-size: 0.9em;
+        }
+        .status.loading { background: #ff9800; color: #000; }
+        .status.ready { background: #4CAF50; color: #fff; }
+        .status.running { background: #7B1FA2; color: #fff; }
+        .status.error { background: #f44336; color: #fff; }
+
+        /* Main display area */
+        .display-area {
+            display: grid;
+            grid-template-columns: 1fr;
+            gap: 20px;
+            transition: grid-template-columns 0.3s;
+        }
+        .display-area.compare { grid-template-columns: 1fr 1fr; }
+        @media (max-width: 800px) {
+            .display-area.compare { grid-template-columns: 1fr; }
+        }
+
+        .panel {
+            background: #1f1f1f;
+            border-radius: 8px;
+            border: 1px solid #333;
+            overflow: hidden;
+        }
+        .panel-header {
+            background: #2a2a2a;
+            padding: 8px 14px;
+            font-weight: 600;
+            font-size: 0.9em;
+            color: #b0b0b0;
+            border-bottom: 1px solid #333;
+        }
+        .panel-header.swfrecomp { color: #4CAF50; }
+        .panel-header.ruffle { color: #1565C0; }
+
+        /* Canvas */
+        .canvas-wrap {
+            text-align: center;
+            background: #fff;
+        }
+        .canvas-wrap canvas {
+            display: block;
+            margin: 0 auto;
+            background: #fff;
+            max-width: 100%;
+            height: auto;
+        }
+
+        /* Output console */
+        .output {
+            background: #000;
+            padding: 12px;
+            font-family: 'Courier New', monospace;
+            font-size: 13px;
+            min-height: 200px;
+            max-height: 400px;
+            overflow-y: auto;
+            white-space: pre-wrap;
+        }
+        .output .line-error { color: #ff5555; }
+        .output .line-info { color: #88ccff; }
+        .output .line-separator { color: #555; }
+
+        /* Ruffle panel */
+        .ruffle-panel { display: none; }
+        .display-area.compare .ruffle-panel { display: block; }
+
+        #ruffle-container {
+            width: 100%;
+            min-height: 250px;
+            background: #fff;
+        }
+        #ruffle-container ruffle-player {
+            width: 100%;
+            height: 400px;
+        }
+
+        /* Drop zone */
+        .drop-zone {
+            width: 100%;
+            max-width: 500px;
+            border: 2px dashed #555;
+            border-radius: 12px;
+            padding: 3rem;
+            text-align: center;
+            cursor: pointer;
+            transition: all 0.2s;
+            margin: 0 auto 1.5rem auto;
+        }
+        .drop-zone:hover, .drop-zone.dragover {
+            border-color: #1565C0;
+            background: rgba(21, 101, 192, 0.05);
+        }
+        .drop-zone input { display: none; }
+        .drop-zone p { color: #ccc; }
+        .drop-zone .hint { color: #666; margin-top: 0.5rem; font-size: 0.9em; }
+        .standalone-view {
+            text-align: center;
+            padding: 40px 20px;
+        }
+        .standalone-view h2 {
+            color: #1565C0;
+            margin-bottom: 10px;
+            font-size: 1.4em;
+        }
+        .standalone-view .description {
+            color: #999;
+            margin-bottom: 25px;
+        }
+        .standalone-filename {
+            color: #1565C0;
+            font-weight: 600;
+            margin-bottom: 15px;
+        }
+
+        /* Footer info */
+        .footer-info {
+            margin-top: 20px;
+            padding-top: 15px;
+            border-top: 1px solid #333;
+            font-size: 0.85em;
+            color: #666;
+        }
+        .footer-info a { color: #4CAF50; text-decoration: none; }
+        .footer-info a:hover { text-decoration: underline; }
+
+        code {
+            background: #000;
+            color: #4CAF50;
+            padding: 1px 5px;
+            border-radius: 3px;
+            font-family: 'Courier New', monospace;
+            font-size: 0.9em;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <header id="page-header">
+            <h1 id="header-title">SWFRecomp Demo</h1>
+            <a href="./" class="back-link">Back to Index</a>
+        </header>
+
+        <main>
+            <!-- Standalone drop zone (shown when no test is specified) -->
+            <div id="standalone-section" class="standalone-view" style="display:none;">
+                <h2>View SWF in Ruffle</h2>
+                <p class="description">Drop a .swf file to play it in Ruffle</p>
+                <div class="drop-zone" id="dropZone">
+                    <p>Drop a .swf file here</p>
+                    <p class="hint">or click to select</p>
+                    <input type="file" id="fileInput" accept=".swf">
+                </div>
+                <div id="standalone-filename" class="standalone-filename" style="display:none;"></div>
+                <div id="standalone-ruffle" style="display:none;">
+                    <div class="panel">
+                        <div class="panel-header ruffle">Ruffle</div>
+                        <div id="standalone-ruffle-container" style="min-height:400px; background:#fff;"></div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Test demo section (shown when ?test= is specified) -->
+            <div id="test-section" style="display:none;">
+                <div id="meta-section" class="meta" style="display:none;">
+                    <div class="meta-description" id="meta-desc"></div>
+                    <div class="meta-row" id="meta-details"></div>
+                </div>
+
+                <div id="status" class="status loading">Loading...</div>
+
+                <div class="controls">
+                    <button class="btn-run" id="btn-run" disabled onclick="runSwf()">Run SWF</button>
+                    <button class="btn-secondary" onclick="clearOutput()">Clear Output</button>
+                    <button class="btn-compare" id="btn-compare" onclick="toggleComparison()">Toggle Comparison</button>
+                    <button class="btn-secondary" onclick="location.href='demo.html'">New SWF</button>
+                </div>
+
+                <div class="display-area" id="display-area">
+                    <!-- SWFRecomp panel -->
+                    <div class="panel">
+                        <div class="panel-header swfrecomp">SWFRecomp Output</div>
+                        <div id="canvas-wrap" class="canvas-wrap" style="display:none;">
+                            <canvas id="canvas" width="550" height="400"></canvas>
+                        </div>
+                        <div class="output" id="output"></div>
+                    </div>
+
+                    <!-- Ruffle comparison panel -->
+                    <div class="panel ruffle-panel" id="ruffle-panel">
+                        <div class="panel-header ruffle">Ruffle (Original SWF)</div>
+                        <div id="ruffle-container"></div>
+                        <div class="output" id="ruffle-output"></div>
+                    </div>
+                </div>
+
+                <div class="footer-info" id="footer-info"></div>
+            </div>
+        </main>
+    </div>
+
+    <script>
+    (function() {
+        // --- Parse URL parameters ---
+        const params = new URLSearchParams(window.location.search);
+        const testId = params.get('test');
+        const compareParam = params.get('compare') === 'true';
+
+        if (!testId) {
+            // --- Standalone mode: show drop zone for Ruffle playback ---
+            document.getElementById('standalone-section').style.display = 'block';
+            document.title = 'SWFRecomp - View SWF in Ruffle';
+            document.getElementById('header-title').textContent = 'View SWF in Ruffle';
+
+            var dropZone = document.getElementById('dropZone');
+            var fileInput = document.getElementById('fileInput');
+
+            dropZone.addEventListener('click', function() { fileInput.click(); });
+            dropZone.addEventListener('dragover', function(e) {
+                e.preventDefault();
+                dropZone.classList.add('dragover');
+            });
+            dropZone.addEventListener('dragleave', function() {
+                dropZone.classList.remove('dragover');
+            });
+            dropZone.addEventListener('drop', function(e) {
+                e.preventDefault();
+                dropZone.classList.remove('dragover');
+                var file = e.dataTransfer.files[0];
+                if (file) loadDroppedSwf(file);
+            });
+            fileInput.addEventListener('change', function() {
+                if (fileInput.files[0]) loadDroppedSwf(fileInput.files[0]);
+            });
+
+            function loadDroppedSwf(file) {
+                if (!file.name.toLowerCase().endsWith('.swf')) {
+                    alert('Please select a .swf file');
+                    return;
+                }
+                var reader = new FileReader();
+                reader.onload = function(e) {
+                    var swfBytes = new Uint8Array(e.target.result);
+                    document.getElementById('standalone-filename').textContent = file.name;
+                    document.getElementById('standalone-filename').style.display = 'block';
+                    document.getElementById('standalone-ruffle').style.display = 'block';
+                    dropZone.style.display = 'none';
+                    var container = document.getElementById('standalone-ruffle-container');
+
+                    // For CWS (zlib-compressed), decompress to get dimensions
+                    var sig = String.fromCharCode(swfBytes[0], swfBytes[1], swfBytes[2]);
+                    if (sig === 'CWS' && typeof DecompressionStream !== 'undefined') {
+                        var compressed = swfBytes.slice(8);
+                        var ds = new DecompressionStream('deflate');
+                        var writer = ds.writable.getWriter();
+                        writer.write(compressed);
+                        writer.close();
+                        new Response(ds.readable).arrayBuffer().then(function(buf) {
+                            // Build fake uncompressed header for dimension parsing
+                            var decompressed = new Uint8Array(buf);
+                            var fws = new Uint8Array(8 + decompressed.length);
+                            fws[0] = 0x46; fws[1] = 0x57; fws[2] = 0x53; // FWS
+                            fws.set(swfBytes.slice(3, 8), 3);
+                            fws.set(decompressed, 8);
+                            loadRuffleWithData(container, swfBytes, fws);
+                        }).catch(function() {
+                            loadRuffleWithData(container, swfBytes, null);
+                        });
+                    } else {
+                        loadRuffleWithData(container, swfBytes, swfBytes);
+                    }
+                };
+                reader.readAsArrayBuffer(file);
+            }
+
+            function parseSwfDimensions(swfBytes) {
+                // Parse SWF header RECT to get stage dimensions in pixels
+                // Header: 3-byte sig, 1-byte version, 4-byte length, then RECT
+                try {
+                    var data = swfBytes;
+                    // Handle compressed SWFs
+                    var sig = String.fromCharCode(data[0], data[1], data[2]);
+                    if (sig !== 'FWS') return null;
+                    // RECT starts at byte 8
+                    var bitPos = 0;
+                    var bytePos = 8;
+                    function readBits(n) {
+                        var val = 0;
+                        for (var i = 0; i < n; i++) {
+                            var byte = data[bytePos + (bitPos >> 3)];
+                            var bit = (byte >> (7 - (bitPos & 7))) & 1;
+                            val = (val << 1) | bit;
+                            bitPos++;
+                        }
+                        return val;
+                    }
+                    var nBits = readBits(5);
+                    var xMin = readBits(nBits); // twips
+                    var xMax = readBits(nBits);
+                    var yMin = readBits(nBits);
+                    var yMax = readBits(nBits);
+                    var width = (xMax - xMin) / 20;
+                    var height = (yMax - yMin) / 20;
+                    if (width > 0 && height > 0) return { width: width, height: height };
+                } catch (e) {}
+                return null;
+            }
+
+            function loadRuffleWithData(container, swfBytes, headerBytes) {
+                container.innerHTML = '<div style="padding:20px;color:#888;text-align:center;">Loading Ruffle...</div>';
+                var ruffleScript = document.createElement('script');
+                ruffleScript.src = 'https://unpkg.com/@ruffle-rs/ruffle';
+                ruffleScript.onload = function() {
+                    container.innerHTML = '';
+                    var ruffle = window.RufflePlayer.newest();
+                    var player = ruffle.createPlayer();
+                    player.style.width = '100%';
+                    // Match comparison page sizing: compute height from SWF aspect ratio
+                    var dims = headerBytes ? parseSwfDimensions(headerBytes) : null;
+                    if (dims) {
+                        var ruffleWidth = container.clientWidth;
+                        var ruffleHeight = Math.round(ruffleWidth * dims.height / dims.width);
+                        player.style.height = ruffleHeight + 'px';
+                    } else {
+                        player.style.height = '400px';
+                    }
+                    container.appendChild(player);
+                    player.load({ data: swfBytes });
+                };
+                ruffleScript.onerror = function() {
+                    container.innerHTML = '<div style="padding:20px;color:#ff5555;text-align:center;">Failed to load Ruffle from CDN</div>';
+                };
+                document.head.appendChild(ruffleScript);
+            }
+
+            return;
+        }
+
+        // --- Test demo mode ---
+        document.getElementById('test-section').style.display = 'block';
+
+        // Determine if graphics test (local_batch demos are also WebGPU-rendered)
+        const isGraphics = testId.startsWith('graphics/') || testId.startsWith('local_batch/');
+        const baseName = testId.includes('/') ? testId.split('/').pop() : testId;
+        const testDir = 'examples/' + testId + '/';
+
+        // --- Update page header ---
+        const header = document.getElementById('page-header');
+        const headerTitle = document.getElementById('header-title');
+        document.title = 'SWFRecomp Demo: ' + baseName;
+        headerTitle.textContent = 'SWFRecomp Demo: ' + baseName;
+
+        if (isGraphics) {
+            header.classList.add('graphics');
+            headerTitle.innerHTML += ' <span class="badge">WebGPU</span>';
+        }
+
+        // Show canvas for graphics tests
+        if (isGraphics) {
+            document.getElementById('canvas-wrap').style.display = 'block';
+            document.getElementById('btn-run').classList.add('graphics');
+        }
+
+        // --- Footer ---
+        document.getElementById('footer-info').innerHTML =
+            'Loaded from: <code>' + testDir + '</code> · ' +
+            '<a href="' + testDir + '">Direct link</a>';
+
+        // --- Load test_info.json metadata ---
+        fetch(testDir + 'test_info.json')
+            .then(r => r.ok ? r.json() : null)
+            .then(info => {
+                if (!info) return;
+                const meta = info.metadata || {};
+                const opcodes = info.opcodes || {};
+                const metaSection = document.getElementById('meta-section');
+                metaSection.style.display = 'block';
+                if (isGraphics) metaSection.classList.add('graphics');
+
+                document.getElementById('meta-desc').textContent = meta.description || '';
+
+                // Store SWF dimensions and pre-size canvas immediately
+                if (isGraphics && meta.width && meta.height) {
+                    window._swfWidth = meta.width;
+                    window._swfHeight = meta.height;
+                    var canvas = document.getElementById('canvas');
+                    canvas.width = meta.width;
+                    canvas.height = meta.height;
+                    canvas.style.width = '100%';
+                    canvas.style.height = 'auto';
+                    canvas.style.aspectRatio = meta.width + ' / ' + meta.height;
+                }
+
+                let details = '';
+                if (meta.swf_version) {
+                    details += '<span><span class="label">SWF Version:</span> <span class="value">' + meta.swf_version + '</span></span>';
+                }
+                if (meta.fully_implemented !== undefined) {
+                    const cls = meta.fully_implemented ? 'status-ok' : 'status-partial';
+                    const txt = meta.fully_implemented ? 'Fully Implemented' : 'Partial';
+                    details += '<span><span class="label">Status:</span> <span class="' + cls + '">' + txt + '</span></span>';
+                }
+                const tested = opcodes.tested || [];
+                const supporting = opcodes.supporting || [];
+                if (tested.length > 0) {
+                    details += '<span><span class="label">Opcodes:</span> ';
+                    details += tested.map(function(o) { return '<span class="opcode-tag">' + o + '</span>'; }).join(' ');
+                    details += '</span>';
+                }
+                if (supporting.length > 0) {
+                    details += '<span><span class="label">Supporting:</span> ';
+                    details += supporting.map(function(o) { return '<span class="opcode-tag">' + o + '</span>'; }).join(' ');
+                    details += '</span>';
+                }
+                document.getElementById('meta-details').innerHTML = details;
+            })
+            .catch(function() {});
+
+        // --- Check if test.swf exists (for comparison button) ---
+        fetch(testDir + 'test.swf', { method: 'HEAD' })
+            .then(function(r) {
+                if (!r.ok) {
+                    document.getElementById('btn-compare').style.display = 'none';
+                }
+            })
+            .catch(function() {
+                document.getElementById('btn-compare').style.display = 'none';
+            });
+
+        // --- Output helpers ---
+        function addOutput(text, type) {
+            var output = document.getElementById('output');
+            var line = document.createElement('div');
+            if (type === 'error') line.className = 'line-error';
+            else if (type === 'info') line.className = 'line-info';
+            else if (type === 'separator') line.className = 'line-separator';
+            line.textContent = text;
+            output.appendChild(line);
+            output.scrollTop = output.scrollHeight;
+        }
+
+        function updateStatus(type, message) {
+            var status = document.getElementById('status');
+            status.className = 'status ' + type;
+            status.textContent = message;
+        }
+
+        // --- Set up Emscripten Module ---
+        window.Module = {
+            locateFile: function(path) {
+                return testDir + path;
+            },
+            canvas: isGraphics ? document.getElementById('canvas') : undefined,
+            preRun: [],
+            postRun: [],
+            print: function(text) {
+                console.log(text);
+                addOutput(text, 'log');
+            },
+            printErr: function(text) {
+                console.error(text);
+                addOutput(text, 'error');
+            },
+            onRuntimeInitialized: function() {
+                updateStatus('ready', 'WASM module loaded and ready!');
+                document.getElementById('btn-run').disabled = false;
+                addOutput('='.repeat(60), 'separator');
+                addOutput('WASM runtime ready. Click "Run SWF" to execute.', 'info');
+                addOutput('='.repeat(60), 'separator');
+            }
+        };
+
+        // --- Load the Emscripten JS ---
+        updateStatus('loading', 'Loading WASM module...');
+        var script = document.createElement('script');
+        script.src = testDir + baseName + '.js';
+        script.onerror = function() {
+            updateStatus('error', 'Failed to load ' + baseName + '.js');
+            addOutput('Error: Could not load ' + script.src, 'error');
+        };
+        document.body.appendChild(script);
+
+        // --- Run SWF ---
+        var swfRunning = false;
+        window.runSwf = function() {
+            if (swfRunning) return;
+
+            addOutput('', 'separator');
+            addOutput('='.repeat(60), 'separator');
+            addOutput('Running SWF execution...', 'info');
+            addOutput('='.repeat(60), 'separator');
+
+            if (isGraphics) {
+                swfRunning = true;
+                document.getElementById('btn-run').disabled = true;
+                updateStatus('running', 'SWF rendering in progress...');
+
+                // Ensure canvas pixel buffer matches SWF dimensions
+                if (window._swfWidth && window._swfHeight) {
+                    var canvas = document.getElementById('canvas');
+                    canvas.width = window._swfWidth;
+                    canvas.height = window._swfHeight;
+                }
+
+                try {
+                    Module.ccall('runSWF', null, [], [], {async: true}).then(function() {
+                        addOutput('', 'separator');
+                        addOutput('='.repeat(60), 'separator');
+                        addOutput('SWF rendering completed.', 'info');
+                        addOutput('='.repeat(60), 'separator');
+                        updateStatus('ready', 'Rendering complete.');
+                        swfRunning = false;
+                        document.getElementById('btn-run').disabled = false;
+                    }).catch(function(e) {
+                        addOutput('Error: ' + e.message, 'error');
+                        updateStatus('error', 'Error during rendering');
+                        swfRunning = false;
+                        document.getElementById('btn-run').disabled = false;
+                    });
+                } catch (e) {
+                    addOutput('Error: ' + e.message, 'error');
+                    updateStatus('error', 'Error during SWF execution');
+                    swfRunning = false;
+                    document.getElementById('btn-run').disabled = false;
+                }
+            } else {
+                try {
+                    Module.ccall('runSWF', null, [], []);
+                    addOutput('', 'separator');
+                    addOutput('='.repeat(60), 'separator');
+                    addOutput('SWF execution completed.', 'info');
+                    addOutput('='.repeat(60), 'separator');
+                } catch (e) {
+                    addOutput('Error: ' + e.message, 'error');
+                    updateStatus('error', 'Error during SWF execution');
+                }
+            }
+        };
+
+        // --- Clear output ---
+        window.clearOutput = function() {
+            document.getElementById('output').innerHTML = '';
+        };
+
+        // --- Comparison ---
+        var comparisonLoaded = false;
+
+        window.toggleComparison = function() {
+            var area = document.getElementById('display-area');
+            var btn = document.getElementById('btn-compare');
+            var isActive = area.classList.toggle('compare');
+            btn.classList.toggle('active', isActive);
+
+            // Update URL
+            var newParams = new URLSearchParams(window.location.search);
+            if (isActive) {
+                newParams.set('compare', 'true');
+            } else {
+                newParams.delete('compare');
+            }
+            history.replaceState(null, '', '?' + newParams.toString());
+
+            if (isActive && !comparisonLoaded) {
+                loadRuffle();
+            }
+        };
+
+        function loadRuffle() {
+            comparisonLoaded = true;
+            var container = document.getElementById('ruffle-container');
+            container.innerHTML = '<div style="padding:20px;color:#888;text-align:center;">Loading Ruffle...</div>';
+
+            var ruffleScript = document.createElement('script');
+            ruffleScript.src = 'https://unpkg.com/@ruffle-rs/ruffle';
+            ruffleScript.onload = function() {
+                container.innerHTML = '';
+                var ruffle = window.RufflePlayer.newest();
+                var player = ruffle.createPlayer();
+                player.style.width = '100%';
+                if (window._swfWidth && window._swfHeight) {
+                    // Match canvas sizing: compute height from container width + SWF aspect ratio
+                    var ruffleWidth = container.clientWidth;
+                    var ruffleHeight = Math.round(ruffleWidth * window._swfHeight / window._swfWidth);
+                    player.style.height = ruffleHeight + 'px';
+                } else {
+                    player.style.height = '400px';
+                }
+                container.appendChild(player);
+                player.load(testDir + 'test.swf');
+            };
+            ruffleScript.onerror = function() {
+                container.innerHTML = '<div style="padding:20px;color:#ff5555;text-align:center;">Failed to load Ruffle from CDN</div>';
+            };
+            document.head.appendChild(ruffleScript);
+        }
+
+        // Auto-enable comparison if URL param set
+        if (compareParam) {
+            // Delay to let DOM settle
+            setTimeout(function() { window.toggleComparison(); }, 100);
+        }
+
+        // Global error handler
+        window.onerror = function(msg) {
+            updateStatus('error', 'Error loading WASM module');
+            addOutput('Error: ' + msg, 'error');
+        };
+    })();
+    </script>
+</body>
+</html>

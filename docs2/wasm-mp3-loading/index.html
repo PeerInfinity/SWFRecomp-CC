@@ -1,0 +1,373 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>WASM MP3 Loading Demo &mdash; SWFRecomp</title>
+    <link rel="icon" type="image/svg+xml" href="../favicon.svg">
+    <style>
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            line-height: 1.6;
+            color: #e0e0e0;
+            background: #1a1a1a;
+            min-height: 100vh;
+            padding: 20px;
+        }
+        .container {
+            max-width: 1100px;
+            margin: 0 auto;
+            background: #2a2a2a;
+            border-radius: 12px;
+            box-shadow: 0 20px 60px rgba(0,0,0,0.5);
+            overflow: hidden;
+            border: 1px solid #333;
+        }
+        header {
+            background: #222;
+            padding: 20px 30px;
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            border-bottom: 3px solid #e94560;
+        }
+        header h1 {
+            font-size: 1.4em;
+            color: #e94560;
+            font-weight: 700;
+        }
+        .back-link {
+            color: #888;
+            text-decoration: none;
+            font-size: 0.95em;
+            padding: 6px 14px;
+            border: 1px solid #555;
+            border-radius: 6px;
+            transition: all 0.2s;
+        }
+        .back-link:hover { color: #e0e0e0; border-color: #888; }
+
+        main { padding: 25px 30px; }
+
+        .intro {
+            background: #1f1f1f;
+            padding: 18px 22px;
+            border-radius: 8px;
+            margin-bottom: 20px;
+            border-left: 4px solid #e94560;
+            color: #d0d0d0;
+        }
+        .intro p { margin: 0 0 0.6em; }
+        .intro p:last-child { margin-bottom: 0; }
+
+        .method {
+            background: #1f1f1f;
+            border-radius: 8px;
+            border: 1px solid #333;
+            margin-bottom: 18px;
+            overflow: hidden;
+        }
+        .method-header {
+            background: #2a2a2a;
+            padding: 10px 18px;
+            font-weight: 600;
+            color: #e94560;
+            font-size: 1em;
+            border-bottom: 1px solid #333;
+        }
+        .method-body { padding: 16px 18px; }
+        .method-body p {
+            margin-bottom: 12px;
+            color: #b0b0b0;
+            font-size: 0.92em;
+        }
+        .method-body p:last-of-type { margin-bottom: 14px; }
+
+        /* Controls */
+        .controls { display: flex; gap: 10px; flex-wrap: wrap; align-items: center; }
+
+        button {
+            border: none;
+            padding: 9px 18px;
+            border-radius: 6px;
+            cursor: pointer;
+            font-size: 14px;
+            font-weight: 600;
+            font-family: inherit;
+            background: #e94560;
+            color: #fff;
+            transition: background 0.2s;
+        }
+        button:hover:not(:disabled) { background: #d63a55; }
+        button:disabled { opacity: 0.5; cursor: not-allowed; }
+
+        input[type=text], input[type=file], select {
+            background: #111;
+            border: 1px solid #444;
+            color: #e0e0e0;
+            padding: 8px 12px;
+            border-radius: 6px;
+            font-size: 14px;
+            font-family: inherit;
+        }
+        input[type=text] { flex: 1; min-width: 260px; }
+        select { min-width: 280px; cursor: pointer; }
+        input[type=text]:focus, input[type=file]:focus, select:focus {
+            outline: none;
+            border-color: #e94560;
+        }
+        input[type=file]::file-selector-button {
+            background: #444; color: #ddd; border: none;
+            padding: 5px 12px; border-radius: 4px;
+            font-weight: 600; cursor: pointer; margin-right: 10px;
+            font-family: inherit; font-size: 13px;
+        }
+        input[type=file]::file-selector-button:hover { background: #555; }
+
+        /* Playback controls bar */
+        .playback-bar {
+            display: flex;
+            align-items: center;
+            gap: 18px;
+            background: #1f1f1f;
+            padding: 12px 18px;
+            border-radius: 8px;
+            border: 1px solid #333;
+            margin-bottom: 18px;
+        }
+        .playback-bar .label {
+            color: #b0b0b0;
+            font-size: 0.9em;
+            font-weight: 600;
+        }
+        .toggle {
+            display: inline-flex;
+            align-items: center;
+            gap: 8px;
+            cursor: pointer;
+            user-select: none;
+            color: #e0e0e0;
+            font-size: 0.92em;
+        }
+        .toggle input[type=checkbox] {
+            appearance: none;
+            -webkit-appearance: none;
+            width: 36px;
+            height: 20px;
+            background: #444;
+            border-radius: 10px;
+            position: relative;
+            cursor: pointer;
+            transition: background 0.2s;
+            margin: 0;
+            border: none;
+            padding: 0;
+        }
+        .toggle input[type=checkbox]:checked { background: #e94560; }
+        .toggle input[type=checkbox]::before {
+            content: '';
+            position: absolute;
+            width: 16px;
+            height: 16px;
+            border-radius: 50%;
+            background: #fff;
+            top: 2px;
+            left: 2px;
+            transition: transform 0.2s;
+        }
+        .toggle input[type=checkbox]:checked::before { transform: translateX(16px); }
+        .btn-stop {
+            background: #444;
+            color: #ddd;
+            margin-left: auto;
+        }
+        .btn-stop:hover:not(:disabled) { background: #555; }
+        .btn-stop:disabled { background: #2a2a2a; color: #555; }
+
+        /* Log console */
+        .log-panel {
+            background: #1f1f1f;
+            border-radius: 8px;
+            border: 1px solid #333;
+            overflow: hidden;
+        }
+        .log-header {
+            background: #2a2a2a;
+            padding: 8px 14px;
+            font-weight: 600;
+            font-size: 0.9em;
+            color: #b0b0b0;
+            border-bottom: 1px solid #333;
+        }
+        #log {
+            background: #000;
+            color: #88ccff;
+            padding: 12px;
+            font-family: 'Courier New', monospace;
+            font-size: 13px;
+            min-height: 180px;
+            max-height: 320px;
+            overflow-y: auto;
+            white-space: pre-wrap;
+        }
+
+        /* Footer info */
+        .footer-info {
+            margin-top: 20px;
+            padding-top: 15px;
+            border-top: 1px solid #333;
+            font-size: 0.85em;
+            color: #666;
+        }
+        .footer-info a { color: #e94560; text-decoration: none; }
+        .footer-info a:hover { text-decoration: underline; }
+
+        code {
+            background: #000;
+            color: #e94560;
+            padding: 1px 5px;
+            border-radius: 3px;
+            font-family: 'Courier New', monospace;
+            font-size: 0.9em;
+        }
+        .intro code, .method-body code { color: #ff7a8a; }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <header>
+            <h1>WASM MP3 Loading Demo</h1>
+            <a href="../" class="back-link">Back to Index</a>
+        </header>
+
+        <main>
+            <div class="intro">
+                <p>
+                    Three ways to get an MP3 from "somewhere" into a WASM runtime, all decoded
+                    by the same C-side <code>minimp3</code> call and played via WebAudio.
+                    The C source is identical in all three cases (<code>fopen</code> + decode +
+                    hand-off); the difference is purely in <em>how the bytes get into memory</em>.
+                </p>
+            </div>
+
+            <div class="playback-bar">
+                <span class="label">Playback:</span>
+                <label class="toggle">
+                    <input type="checkbox" id="loop-toggle">
+                    <span>Loop</span>
+                </label>
+                <button id="btn-stop" class="btn-stop" disabled>Stop</button>
+            </div>
+
+            <div class="method">
+                <div class="method-header">1. Bundled via <code>--preload-file</code></div>
+                <div class="method-body">
+                    <p>
+                        The entire <code>assets/</code> directory was packed into the build's
+                        <code>.data</code> sidecar at compile time
+                        (<code>emcc --preload-file assets@/assets</code>). From C, each file is
+                        just a regular path on Emscripten's MEMFS — the dropdown picks which
+                        one to <code>fopen</code>. This is the pattern for "ship a set of
+                        levels / music tracks with the game."
+                    </p>
+                    <div class="controls">
+                        <select id="bundled-select">
+                            <option value="/assets/beat-mono.mp3">beat-mono.mp3 &mdash; 44.1 kHz mono, 8 s (126 KB)</option>
+                            <option value="/assets/beat-stereo.mp3">beat-stereo.mp3 &mdash; 44.1 kHz stereo, 8 s (246 KB)</option>
+                            <option value="/assets/stereo8.mp3">stereo8.mp3 &mdash; 8 kHz stereo, 7 s (22 KB, low-fi)</option>
+                        </select>
+                        <button id="btn-bundled">Play selected</button>
+                    </div>
+                </div>
+            </div>
+
+            <div class="method">
+                <div class="method-header">2. User-supplied file (file picker / drag-drop)</div>
+                <div class="method-body">
+                    <p>
+                        Pick a local MP3. JS reads the bytes and writes them to
+                        <code>/uploads/&lt;name&gt;.mp3</code> via <code>FS.writeFile</code>;
+                        C then opens that path with <code>fopen</code>, indistinguishable from the
+                        bundled case. This is the "user installs a mod from disk" pattern.
+                        For persistence across reloads, mount IDBFS at <code>/uploads</code>
+                        and call <code>FS.syncfs(false)</code> after writing.
+                    </p>
+                    <div class="controls">
+                        <input type="file" id="file-input" accept="audio/mpeg,audio/mp3,.mp3">
+                    </div>
+                </div>
+            </div>
+
+            <div class="method">
+                <div class="method-header">3. Remote URL (<code>emscripten_fetch</code>)</div>
+                <div class="method-body">
+                    <p>
+                        C-side async HTTP GET, no MEMFS round-trip. The default URL below points
+                        at the same bundled MP3 served by your local HTTP server. Replace it
+                        with a CORS-friendly absolute URL to simulate "mod hosted on GitHub
+                        Pages / a CDN".
+                    </p>
+                    <div class="controls">
+                        <input type="text" id="url-input" value="assets/beat-mono.mp3">
+                        <button id="btn-url">Fetch + play URL</button>
+                    </div>
+                </div>
+            </div>
+
+            <div class="log-panel">
+                <div class="log-header">Log</div>
+                <div id="log"></div>
+            </div>
+
+            <div class="footer-info">
+                <p>
+                    Source: <code>demo.c</code>, <code>library_audio.js</code>, <code>build.sh</code>
+                    in this directory.
+                    See <a href="README.md">README.md</a> for build instructions and
+                    notes on what the demo deliberately skips (IDBFS persistence, streaming,
+                    SDL3 audio).
+                </p>
+            </div>
+        </main>
+    </div>
+
+    <script>
+    var Module = {
+        print: function(t) { console.log('[stdout]', t); },
+        printErr: function(t) { console.error('[stderr]', t); },
+        onRuntimeInitialized: function() {
+            document.getElementById('btn-stop').addEventListener('click', function() {
+                if (window._demoStopAll) window._demoStopAll();
+            });
+
+            document.getElementById('btn-bundled').addEventListener('click', function() {
+                var path = document.getElementById('bundled-select').value;
+                Module.ccall('play_bundled', null, ['string'], [path]);
+            });
+
+            document.getElementById('btn-url').addEventListener('click', function() {
+                var url = document.getElementById('url-input').value;
+                Module.ccall('play_url', null, ['string'], [url]);
+            });
+
+            document.getElementById('file-input').addEventListener('change', function(e) {
+                var file = e.target.files[0];
+                if (!file) return;
+                var reader = new FileReader();
+                reader.onload = function() {
+                    var bytes = new Uint8Array(reader.result);
+                    try { Module.FS.mkdir('/uploads'); } catch (_) {}
+                    var path = '/uploads/' + file.name;
+                    Module.FS.writeFile(path, bytes);
+                    console.log('[demo] wrote', bytes.length, 'bytes to', path);
+                    Module.ccall('play_uploaded', null, ['string'], [path]);
+                };
+                reader.readAsArrayBuffer(file);
+            });
+        },
+    };
+    </script>
+    <script src="demo.js"></script>
+</body>
+</html>
